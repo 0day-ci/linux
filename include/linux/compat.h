@@ -404,6 +404,19 @@ int __copy_siginfo_to_user32(struct compat_siginfo __user *to,
 #ifndef copy_siginfo_to_user32
 #define copy_siginfo_to_user32 __copy_siginfo_to_user32
 #endif
+
+#ifdef CONFIG_COMPAT
+#define unsafe_copy_siginfo_to_user32(to, from, label)	do {		\
+	struct compat_siginfo __user *__ucs_to = to;			\
+	const struct kernel_siginfo *__ucs_from = from;			\
+	struct compat_siginfo __ucs_new = {0};				\
+									\
+	__copy_siginfo_to_external32(&__ucs_new, __ucs_from);		\
+	unsafe_copy_to_user(__ucs_to, &__ucs_new,			\
+			    sizeof(struct compat_siginfo), label);	\
+} while (0)
+#endif
+
 int get_compat_sigevent(struct sigevent *event,
 		const struct compat_sigevent __user *u_event);
 
@@ -971,15 +984,81 @@ long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
  * appropriately converted them already.
  */
 #ifndef compat_ptr
-static inline void __user *compat_ptr(compat_uptr_t uptr)
+static __always_inline void __user *compat_ptr(compat_uptr_t uptr)
 {
 	return (void __user *)(unsigned long)uptr;
 }
 #endif
 
-static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+static __always_inline compat_uptr_t ptr_to_compat(void __user *uptr)
 {
 	return (u32)(unsigned long)uptr;
+}
+
+static __always_inline void
+__copy_siginfo_to_external32(struct compat_siginfo *to,
+			     const struct kernel_siginfo *from)
+{
+	to->si_signo = from->si_signo;
+	to->si_errno = from->si_errno;
+	to->si_code  = from->si_code;
+	switch(__siginfo_layout(from->si_signo, from->si_code)) {
+	case SIL_KILL:
+		to->si_pid = from->si_pid;
+		to->si_uid = from->si_uid;
+		break;
+	case SIL_TIMER:
+		to->si_tid     = from->si_tid;
+		to->si_overrun = from->si_overrun;
+		to->si_int     = from->si_int;
+		break;
+	case SIL_POLL:
+		to->si_band = from->si_band;
+		to->si_fd   = from->si_fd;
+		break;
+	case SIL_FAULT:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		break;
+	case SIL_FAULT_TRAPNO:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		to->si_trapno = from->si_trapno;
+		break;
+	case SIL_FAULT_MCEERR:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		to->si_addr_lsb = from->si_addr_lsb;
+		break;
+	case SIL_FAULT_BNDERR:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		to->si_lower = ptr_to_compat(from->si_lower);
+		to->si_upper = ptr_to_compat(from->si_upper);
+		break;
+	case SIL_FAULT_PKUERR:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		to->si_pkey = from->si_pkey;
+		break;
+	case SIL_FAULT_PERF_EVENT:
+		to->si_addr = ptr_to_compat(from->si_addr);
+		to->si_perf_data = from->si_perf_data;
+		to->si_perf_type = from->si_perf_type;
+		break;
+	case SIL_CHLD:
+		to->si_pid = from->si_pid;
+		to->si_uid = from->si_uid;
+		to->si_status = from->si_status;
+		to->si_utime = from->si_utime;
+		to->si_stime = from->si_stime;
+		break;
+	case SIL_RT:
+		to->si_pid = from->si_pid;
+		to->si_uid = from->si_uid;
+		to->si_int = from->si_int;
+		break;
+	case SIL_SYS:
+		to->si_call_addr = ptr_to_compat(from->si_call_addr);
+		to->si_syscall   = from->si_syscall;
+		to->si_arch      = from->si_arch;
+		break;
+	}
 }
 
 #endif /* _LINUX_COMPAT_H */

@@ -3249,22 +3249,6 @@ COMPAT_SYSCALL_DEFINE2(rt_sigpending, compat_sigset_t __user *, uset,
 }
 #endif
 
-static const struct {
-	unsigned char limit, layout;
-} sig_sicodes[] = {
-	[SIGILL]  = { NSIGILL,  SIL_FAULT },
-	[SIGFPE]  = { NSIGFPE,  SIL_FAULT },
-	[SIGSEGV] = { NSIGSEGV, SIL_FAULT },
-	[SIGBUS]  = { NSIGBUS,  SIL_FAULT },
-	[SIGTRAP] = { NSIGTRAP, SIL_FAULT },
-#if defined(SIGEMT)
-	[SIGEMT]  = { NSIGEMT,  SIL_FAULT },
-#endif
-	[SIGCHLD] = { NSIGCHLD, SIL_CHLD },
-	[SIGPOLL] = { NSIGPOLL, SIL_POLL },
-	[SIGSYS]  = { NSIGSYS,  SIL_SYS },
-};
-
 static bool known_siginfo_layout(unsigned sig, int si_code)
 {
 	if (si_code == SI_KERNEL)
@@ -3286,42 +3270,7 @@ static bool known_siginfo_layout(unsigned sig, int si_code)
 
 enum siginfo_layout siginfo_layout(unsigned sig, int si_code)
 {
-	enum siginfo_layout layout = SIL_KILL;
-	if ((si_code > SI_USER) && (si_code < SI_KERNEL)) {
-		if ((sig < ARRAY_SIZE(sig_sicodes)) &&
-		    (si_code <= sig_sicodes[sig].limit)) {
-			layout = sig_sicodes[sig].layout;
-			/* Handle the exceptions */
-			if ((sig == SIGBUS) &&
-			    (si_code >= BUS_MCEERR_AR) && (si_code <= BUS_MCEERR_AO))
-				layout = SIL_FAULT_MCEERR;
-			else if ((sig == SIGSEGV) && (si_code == SEGV_BNDERR))
-				layout = SIL_FAULT_BNDERR;
-#ifdef SEGV_PKUERR
-			else if ((sig == SIGSEGV) && (si_code == SEGV_PKUERR))
-				layout = SIL_FAULT_PKUERR;
-#endif
-			else if ((sig == SIGTRAP) && (si_code == TRAP_PERF))
-				layout = SIL_FAULT_PERF_EVENT;
-			else if (IS_ENABLED(CONFIG_SPARC) &&
-				 (sig == SIGILL) && (si_code == ILL_ILLTRP))
-				layout = SIL_FAULT_TRAPNO;
-			else if (IS_ENABLED(CONFIG_ALPHA) &&
-				 ((sig == SIGFPE) ||
-				  ((sig == SIGTRAP) && (si_code == TRAP_UNK))))
-				layout = SIL_FAULT_TRAPNO;
-		}
-		else if (si_code <= NSIGPOLL)
-			layout = SIL_POLL;
-	} else {
-		if (si_code == SI_TIMER)
-			layout = SIL_TIMER;
-		else if (si_code == SI_SIGIO)
-			layout = SIL_POLL;
-		else if (si_code < 0)
-			layout = SIL_RT;
-	}
-	return layout;
+	return __siginfo_layout(sig, si_code);
 }
 
 int copy_siginfo_to_user(siginfo_t __user *to, const kernel_siginfo_t *from)
@@ -3389,66 +3338,7 @@ void copy_siginfo_to_external32(struct compat_siginfo *to,
 {
 	memset(to, 0, sizeof(*to));
 
-	to->si_signo = from->si_signo;
-	to->si_errno = from->si_errno;
-	to->si_code  = from->si_code;
-	switch(siginfo_layout(from->si_signo, from->si_code)) {
-	case SIL_KILL:
-		to->si_pid = from->si_pid;
-		to->si_uid = from->si_uid;
-		break;
-	case SIL_TIMER:
-		to->si_tid     = from->si_tid;
-		to->si_overrun = from->si_overrun;
-		to->si_int     = from->si_int;
-		break;
-	case SIL_POLL:
-		to->si_band = from->si_band;
-		to->si_fd   = from->si_fd;
-		break;
-	case SIL_FAULT:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		break;
-	case SIL_FAULT_TRAPNO:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		to->si_trapno = from->si_trapno;
-		break;
-	case SIL_FAULT_MCEERR:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		to->si_addr_lsb = from->si_addr_lsb;
-		break;
-	case SIL_FAULT_BNDERR:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		to->si_lower = ptr_to_compat(from->si_lower);
-		to->si_upper = ptr_to_compat(from->si_upper);
-		break;
-	case SIL_FAULT_PKUERR:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		to->si_pkey = from->si_pkey;
-		break;
-	case SIL_FAULT_PERF_EVENT:
-		to->si_addr = ptr_to_compat(from->si_addr);
-		to->si_perf_data = from->si_perf_data;
-		to->si_perf_type = from->si_perf_type;
-		break;
-	case SIL_CHLD:
-		to->si_pid = from->si_pid;
-		to->si_uid = from->si_uid;
-		to->si_status = from->si_status;
-		to->si_utime = from->si_utime;
-		to->si_stime = from->si_stime;
-		break;
-	case SIL_RT:
-		to->si_pid = from->si_pid;
-		to->si_uid = from->si_uid;
-		to->si_int = from->si_int;
-		break;
-	case SIL_SYS:
-		to->si_call_addr = ptr_to_compat(from->si_call_addr);
-		to->si_syscall   = from->si_syscall;
-		to->si_arch      = from->si_arch;
-		break;
-	}
+	__copy_siginfo_to_external32(to, from);
 }
 
 int __copy_siginfo_to_user32(struct compat_siginfo __user *to,
