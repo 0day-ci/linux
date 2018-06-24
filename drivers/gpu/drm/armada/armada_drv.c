@@ -7,6 +7,7 @@
 #include <linux/component.h>
 #include <linux/module.h>
 #include <linux/of_graph.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 
 #include <drm/drm_aperture.h>
@@ -60,11 +61,40 @@ static const struct drm_mode_config_funcs armada_drm_mode_config_funcs = {
 	.atomic_commit		= drm_atomic_helper_commit,
 };
 
-static int armada_drm_bind(struct device *dev)
+static struct reserved_mem *armada_drm_get_rmem(struct device *dev,
+	const char *compatible)
 {
-	struct armada_private *priv;
+	struct device_node *np;
+	struct reserved_mem *rmem;
+
+	np = of_find_compatible_node(NULL, NULL, compatible);
+	if (!np)
+		return NULL;
+
+	rmem = of_reserved_mem_lookup(np);
+	of_node_put(np);
+
+	return rmem;
+}
+
+static struct resource *armada_drm_get_mem(struct device *dev)
+{
 	struct resource *mem = NULL;
-	int ret, n;
+	struct reserved_mem *rmem;
+	int n;
+
+	rmem = armada_drm_get_rmem(dev, "marvell,armada-framebuffer");
+	if (rmem) {
+		mem = devm_kzalloc(dev, sizeof(*mem), GFP_KERNEL);
+		if (!mem)
+			return ERR_PTR(-ENOMEM);
+
+		mem->start = rmem->base;
+		mem->end = rmem->base + rmem->size - 1;
+		mem->flags = IORESOURCE_MEM;
+
+		return mem;
+	}
 
 	for (n = 0; ; n++) {
 		struct resource *r = platform_get_resource(to_platform_device(dev),
@@ -76,11 +106,21 @@ static int armada_drm_bind(struct device *dev)
 		if (resource_size(r) > SZ_64K)
 			mem = r;
 		else
-			return -EINVAL;
+			return ERR_PTR(-EINVAL);
 	}
 
-	if (!mem)
-		return -ENXIO;
+	return mem ? : ERR_PTR(-ENXIO);
+}
+
+static int armada_drm_bind(struct device *dev)
+{
+	struct armada_private *priv;
+	struct resource *mem;
+	int ret;
+
+	mem = armada_drm_get_mem(dev);
+	if (IS_ERR(mem))
+		return PTR_ERR(mem);
 
 	if (!devm_request_mem_region(dev, mem->start, resource_size(mem),
 				     "armada-drm"))
