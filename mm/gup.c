@@ -1186,10 +1186,9 @@ long populate_vma_page_range(struct vm_area_struct *vma,
 		gup_flags &= ~FOLL_POPULATE;
 	/*
 	 * We want to touch writable mappings with a write fault in order
-	 * to break COW, except for shared mappings because these don't COW
-	 * and we would not want to dirty them for nothing.
+	 * to break COW.
 	 */
-	if ((vma->vm_flags & (VM_WRITE | VM_SHARED)) == VM_WRITE)
+	if (vma->vm_flags & VM_WRITE)
 		gup_flags |= FOLL_WRITE;
 
 	/*
