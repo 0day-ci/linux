@@ -300,7 +300,7 @@ static void die_kernel_fault(const char *msg, unsigned long addr,
 	mem_abort_decode(esr);
 
 	show_pte(addr);
-	die("Oops", regs, esr);
+	die("Oops - Page fault", regs, esr);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
 }
