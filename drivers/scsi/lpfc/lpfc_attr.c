@@ -7158,6 +7158,8 @@ struct fc_function_template lpfc_transport_functions = {
 	.set_rport_dev_loss_tmo = lpfc_set_rport_loss_tmo,
 	.show_rport_dev_loss_tmo = 1,
 
+	.show_rport_statistics = 1,
+
 	.get_starget_port_id  = lpfc_get_starget_port_id,
 	.show_starget_port_id = 1,
 

@@ -3143,6 +3143,8 @@ struct fc_function_template qla2xxx_transport_functions = {
 	.set_rport_dev_loss_tmo = qla2x00_set_rport_loss_tmo,
 	.show_rport_dev_loss_tmo = 1,
 
+	.show_rport_statistics = 1,
+
 	.issue_fc_host_lip = qla2x00_issue_lip,
 	.dev_loss_tmo_callbk = qla2x00_dev_loss_tmo_callbk,
 	.terminate_rport_io = qla2x00_terminate_rport_io,
