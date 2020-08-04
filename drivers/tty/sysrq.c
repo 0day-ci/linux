@@ -19,6 +19,7 @@
 #include <linux/sched/rt.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/task.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
@@ -439,6 +440,15 @@ static const struct sysrq_key_op sysrq_unrt_op = {
 	.enable_mask	= SYSRQ_ENABLE_RTNICE,
 };
 
+static void sysrq_action_compound(int key);
+
+static struct sysrq_key_op sysrq_action_compound_op = {
+	.handler	= sysrq_action_compound,
+	.help_msg	= "execute-compound-action(C)",
+	.action_msg	= "Execute compound action",
+	.enable_mask	= SYSRQ_ENABLE_COMPOUND,
+};
+
 /* Key Operations table and lock */
 static DEFINE_SPINLOCK(sysrq_key_table_lock);
 
@@ -501,7 +511,7 @@ static const struct sysrq_key_op *sysrq_key_table[62] = {
 	&sysrq_ftrace_dump_op,		/* z */
 	NULL,				/* A */
 	NULL,				/* B */
-	NULL,				/* C */
+	&sysrq_action_compound_op,	/* C */
 	NULL,				/* D */
 	NULL,				/* E */
 	NULL,				/* F */
@@ -634,6 +644,7 @@ EXPORT_SYMBOL(handle_sysrq);
 
 #ifdef CONFIG_INPUT
 static int sysrq_reset_downtime_ms;
+static char *sysrq_compound_action;
 
 /* Simple translation table for the SysRq keys */
 static const unsigned char sysrq_xlate[KEY_CNT] =
@@ -787,6 +798,61 @@ static void sysrq_of_get_keyreset_config(void)
 {
 }
 #endif
+#define SYSRQ_COMPOUND_ACTION_VALIDATE	0
+#define SYSRQ_COMPOUND_ACTION_RUN	1
+
+static int sysrq_process_compound_action(int pass)
+{
+	const char *action = sysrq_compound_action;
+	const struct sysrq_key_op *op_p;
+	int ret, delay;
+
+	while (*action) {
+		op_p = __sysrq_get_key_op(*action);
+		if (!op_p)
+			return -EINVAL;
+
+		/* Don't allow calling ourselves recursively */
+		if (op_p == &sysrq_action_compound_op)
+			return -EINVAL;
+
+		if (pass == SYSRQ_COMPOUND_ACTION_RUN)
+			__handle_sysrq(*action, false);
+
+		if (*++action == ':') {
+			ret = sscanf(action++, ":%d", &delay);
+			if (ret < 1) /* we want at least ":[0-9]" => 1 item */
+				return -EINVAL;
+
+			while (*action >= '0' && *action <= '9')
+				++action;
+			if (pass == SYSRQ_COMPOUND_ACTION_RUN)
+				mdelay(delay);
+		}
+	}
+
+	return 0;
+}
+
+static void sysrq_action_compound(int key)
+{
+	if (!sysrq_compound_action) {
+		pr_err("Unconfigured compound action for %s",
+		       sysrq_action_compound_op.help_msg);
+
+		return;
+	}
+
+	if (sysrq_process_compound_action(SYSRQ_COMPOUND_ACTION_VALIDATE)) {
+		pr_err("Incorrect compound action %s for %s",
+		       sysrq_compound_action,
+		       sysrq_action_compound_op.help_msg);
+
+		return;
+	}
+
+	sysrq_process_compound_action(SYSRQ_COMPOUND_ACTION_RUN);
+}
 
 static void sysrq_reinject_alt_sysrq(struct work_struct *work)
 {
@@ -1079,8 +1145,21 @@ module_param_array_named(reset_seq, sysrq_reset_seq, sysrq_reset_seq,
 
 module_param_named(sysrq_downtime_ms, sysrq_reset_downtime_ms, int, 0644);
 
+module_param(sysrq_compound_action, charp, 0644);
+MODULE_PARM_DESC(sysrq_compound_action,
+	"Compound sysrq action to be executed on Alt-Shift-SysRq-C\n"
+	"The compound action definition consists of known SysRq action letters except 'C',\n"
+	"each letter can be optionally followed by a colon and a number of milliseconds to wait\n"
+	"after executing the last action.\n"
+	"Example:\n"
+	"To unRaw, wait 100ms, tErminate, kIll, Sync, wait 1000ms, Unmount, Boot\n"
+	"sysrq.sysrq_compound_action=r:100eis:1000ub");
 #else
 
+{
+}
+
+static void sysrq_action_compound(int key)
 static inline void sysrq_register_handler(void)
 {
 }

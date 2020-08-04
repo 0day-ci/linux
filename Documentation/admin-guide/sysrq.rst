@@ -32,6 +32,7 @@ to 1. Here is the list of possible values in /proc/sys/kernel/sysrq:
          64 =  0x40 - enable signalling of processes (term, kill, oom-kill)
         128 =  0x80 - allow reboot/poweroff
         256 = 0x100 - allow nicing of all RT tasks
+        512 = 0x200 - allow compound action
 
 You can set the value in the file by the following command::
 
@@ -147,6 +148,14 @@ Command	    Function
 ``y``	    Show global CPU Registers [SPARC-64 specific]
 
 ``z``	    Dump the ftrace buffer
+
+``C``	    Execute a predefined, compound action. The action is defined with
+	    sysrq.sysrq_compound_action module parameter, whose value contains known
+	    command keys (except ``C`` to prevent recursion). The command keys can
+	    be optionally followed by a colon and a number of milliseconds to wait
+	    after executing the last action. For example:
+
+	    sysrq.sysrq_compound_action=r:100eis:1000ub
 
 ``0``-``9`` Sets the console log level, controlling which kernel messages
             will be printed to your console. (``0``, for example would make
