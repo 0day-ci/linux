@@ -25,6 +25,7 @@ Exception for clocks:
     "ti,am437x-dwc3"
     "ti,dwc3"
     "ti,keystone-dwc3"
+    "rockchip,rk3328-dwc3"
     "rockchip,rk3399-dwc3"
     "xlnx,zynqmp-dwc3"
 
