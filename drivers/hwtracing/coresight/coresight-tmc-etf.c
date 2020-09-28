@@ -242,6 +242,9 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
 			break;
 		}
 
+		if (!handle->event->owner)
+			break;
+
 		/* Get a handle on the pid of the process to monitor */
 		pid = task_pid_nr(handle->event->owner);
 
