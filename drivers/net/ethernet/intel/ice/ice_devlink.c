@@ -435,6 +435,193 @@ out_free_ctx:
 	return err;
 }
 
+enum ice_devlink_param_id {
+	ICE_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
+	ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV,
+	ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV,
+};
+
+/**
+ * ice_devlink_minsrev_get - Get the current minimum security revision
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to get
+ * @ctx: context to return the parameter value
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_minsrev_get(struct devlink *devlink, u32 id, struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct device *dev = ice_pf_to_dev(pf);
+	struct ice_minsrev_info minsrevs = {};
+	enum ice_status status;
+
+	if (id != ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV &&
+	    id != ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV)
+		return -EINVAL;
+
+	status = ice_get_nvm_minsrevs(&pf->hw, &minsrevs);
+	if (status) {
+		dev_warn(dev, "Failed to read minimum security revision data from flash\n");
+		return -EIO;
+	}
+
+	/* We report zero if the device has not yet had a valid minimum
+	 * security revision programmed for the associated module. This makes
+	 * sense because it is not possible to have a security revision of
+	 * less than zero. Thus, all images will be able to load if the
+	 * minimum security revision is zero, the same as the case where the
+	 * minimum value is indicated as invalid.
+	 */
+	switch (id) {
+	case ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV:
+		if (minsrevs.nvm_valid)
+			ctx->val.vu32 = minsrevs.nvm;
+		else
+			ctx->val.vu32 = 0;
+		break;
+	case ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV:
+		if (minsrevs.orom_valid)
+			ctx->val.vu32 = minsrevs.orom;
+		else
+			ctx->val.vu32 = 0;
+		break;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_minsrev_set - Set the minimum security revision
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to set
+ * @ctx: context to return the parameter value
+ *
+ * Set the minimum security revision value for fw.mgmt or fw.undi. The kernel
+ * calls the validate handler before calling this, so we do not need to
+ * duplicate those checks here.
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_minsrev_set(struct devlink *devlink, u32 id, struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct device *dev = ice_pf_to_dev(pf);
+	struct ice_minsrev_info minsrevs = {};
+	enum ice_status status;
+
+	switch (id) {
+	case ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV:
+		minsrevs.nvm_valid = true;
+		minsrevs.nvm = ctx->val.vu32;
+		break;
+	case ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV:
+		minsrevs.orom_valid = true;
+		minsrevs.orom = ctx->val.vu32;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	status = ice_update_nvm_minsrevs(&pf->hw, &minsrevs);
+	if (status) {
+		dev_warn(dev, "Failed to update minimum security revision data\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_minsrev_validate - Validate a minimum security revision update
+ * @devlink: unused pointer to devlink instance
+ * @id: the parameter ID to validate
+ * @val: value to validate
+ * @extack: netlink extended ACK structure
+ *
+ * Check that a proposed update to a minimum security revision field is valid.
+ * Each minimum security revision can only be increased, not decreased.
+ * Additionally, we verify that the value is never set higher than the
+ * security revision of the active flash component.
+ *
+ * Returns: zero if the value is valid, -ERANGE if it is out of range, and
+ * -EINVAL if this function is called with the wrong ID.
+ */
+static int
+ice_devlink_minsrev_validate(struct devlink *devlink, u32 id, union devlink_param_value val,
+			     struct netlink_ext_ack *extack)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct device *dev = ice_pf_to_dev(pf);
+	struct ice_minsrev_info minsrevs = {};
+	enum ice_status status;
+
+	if (id != ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV &&
+	    id != ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV)
+		return -EINVAL;
+
+	status = ice_get_nvm_minsrevs(&pf->hw, &minsrevs);
+	if (status) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to read minimum security revision data from flash");
+		return -EIO;
+	}
+
+	switch (id) {
+	case ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV:
+		if (val.vu32 > pf->hw.flash.nvm.srev) {
+			NL_SET_ERR_MSG_MOD(extack, "Cannot update fw.mgmt minimum security revision higher than the currently running firmware");
+			dev_dbg(dev, "Attempted to set fw.mgmt.minsrev to %u, but running firmware has srev %u\n",
+				val.vu32, pf->hw.flash.nvm.srev);
+			return -EPERM;
+		}
+
+		if (minsrevs.nvm_valid && val.vu32 < minsrevs.nvm) {
+			NL_SET_ERR_MSG_MOD(extack, "Cannot lower the minimum security revision for fw.mgmt flash section");
+			dev_dbg(dev, "Attempted  to set fw.mgmt.minsrev to %u, but current minsrev is %u\n",
+				val.vu32, minsrevs.nvm);
+			return -EPERM;
+		}
+		break;
+	case ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV:
+		if (val.vu32 > pf->hw.flash.orom.srev) {
+			NL_SET_ERR_MSG_MOD(extack, "Cannot update fw.undi minimum security revision higher than the currently running firmware");
+			dev_dbg(dev, "Attempted to set fw.undi.minsrev to %u, but running firmware has srev %u\n",
+				val.vu32, pf->hw.flash.orom.srev);
+			return -EPERM;
+		}
+
+		if (minsrevs.orom_valid && val.vu32 < minsrevs.orom) {
+			NL_SET_ERR_MSG_MOD(extack, "Cannot lower the minimum security revision for fw.undi flash section");
+			dev_dbg(dev, "Attempted  to set fw.undi.minsrev to %u, but current minsrev is %u\n",
+				val.vu32, minsrevs.orom);
+			return -EPERM;
+		}
+		break;
+	}
+
+	return 0;
+}
+
+/* devlink parameters for the ice driver */
+static const struct devlink_param ice_devlink_params[] = {
+	DEVLINK_PARAM_DRIVER(ICE_DEVLINK_PARAM_ID_FW_MGMT_MINSREV,
+			     "fw.mgmt.minsrev",
+			     DEVLINK_PARAM_TYPE_U32,
+			     BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+			     ice_devlink_minsrev_get,
+			     ice_devlink_minsrev_set,
+			     ice_devlink_minsrev_validate),
+	DEVLINK_PARAM_DRIVER(ICE_DEVLINK_PARAM_ID_FW_UNDI_MINSREV,
+			     "fw.undi.minsrev",
+			     DEVLINK_PARAM_TYPE_U32,
+			     BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+			     ice_devlink_minsrev_get,
+			     ice_devlink_minsrev_set,
+			     ice_devlink_minsrev_validate),
+};
+
 /**
  * ice_devlink_flash_update - Update firmware stored in flash on the device
  * @devlink: pointer to devlink associated with device to update
@@ -541,6 +728,13 @@ int ice_devlink_register(struct ice_pf *pf)
 		return err;
 	}
 
+	err = devlink_params_register(devlink, ice_devlink_params,
+				      ARRAY_SIZE(ice_devlink_params));
+	if (err) {
+		dev_err(dev, "devlink params registration failed: %d\n", err);
+		return err;
+	}
+
 	return 0;
 }
 
@@ -552,7 +746,29 @@ int ice_devlink_register(struct ice_pf *pf)
  */
 void ice_devlink_unregister(struct ice_pf *pf)
 {
-	devlink_unregister(priv_to_devlink(pf));
+	struct devlink *devlink = priv_to_devlink(pf);
+
+	devlink_params_unregister(devlink, ice_devlink_params,
+				  ARRAY_SIZE(ice_devlink_params));
+	devlink_unregister(devlink);
+}
+
+/**
+ * ice_devlink_params_publish - Publish parameters to allow user access.
+ * @pf: the PF structure pointer
+ */
+void ice_devlink_params_publish(struct ice_pf *pf)
+{
+	devlink_params_publish(priv_to_devlink(pf));
+}
+
+/**
+ * ice_devlink_params_unpublish - Unpublish parameters to prevent user access.
+ * @pf: the PF structure pointer
+ */
+void ice_devlink_params_unpublish(struct ice_pf *pf)
+{
+	devlink_params_unpublish(priv_to_devlink(pf));
 }
 
 /**
