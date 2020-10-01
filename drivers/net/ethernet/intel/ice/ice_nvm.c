@@ -1208,6 +1208,118 @@ enum ice_status ice_nvm_write_activate(struct ice_hw *hw, u8 cmd_flags)
 }
 
 /**
+ * ice_get_nvm_minsrevs - Get the Minimum Security Revision values from flash
+ * @hw: pointer to the HW struct
+ * @minsrevs: structure to store NVM and OROM minsrev values
+ *
+ * Read the Minimum Security Revision TLV and extract the revision values from
+ * the flash image into a readable structure for processing.
+ */
+enum ice_status
+ice_get_nvm_minsrevs(struct ice_hw *hw, struct ice_minsrev_info *minsrevs)
+{
+	struct ice_aqc_nvm_minsrev data;
+	enum ice_status status;
+	u16 valid;
+
+	status = ice_acquire_nvm(hw, ICE_RES_READ);
+	if (status)
+		return status;
+
+	status = ice_aq_read_nvm(hw, ICE_AQC_NVM_MINSREV_MOD_ID, 0, sizeof(data),
+				 &data, true, false, NULL);
+
+	ice_release_nvm(hw);
+
+	if (status)
+		return status;
+
+	valid = le16_to_cpu(data.validity);
+
+	/* Extract NVM minimum security revision */
+	if (valid & ICE_AQC_NVM_MINSREV_NVM_VALID) {
+		u16 minsrev_l, minsrev_h;
+
+		minsrev_l = le16_to_cpu(data.nvm_minsrev_l);
+		minsrev_h = le16_to_cpu(data.nvm_minsrev_h);
+
+		minsrevs->nvm = minsrev_h << 16 | minsrev_l;
+		minsrevs->nvm_valid = true;
+	}
+
+	/* Extract the OROM minimum security revision */
+	if (valid & ICE_AQC_NVM_MINSREV_OROM_VALID) {
+		u16 minsrev_l, minsrev_h;
+
+		minsrev_l = le16_to_cpu(data.orom_minsrev_l);
+		minsrev_h = le16_to_cpu(data.orom_minsrev_h);
+
+		minsrevs->orom = minsrev_h << 16 | minsrev_l;
+		minsrevs->orom_valid = true;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_update_nvm_minsrevs - Update minimum security revision TLV data in flash
+ * @hw: pointer to the HW struct
+ * @minsrevs: minimum security revision information
+ *
+ * Update the NVM or Option ROM minimum security revision fields in the PFA
+ * area of the flash. Reads the minsrevs->nvm_valid and minsrevs->orom_valid
+ * fields to determine what update is being requested. If the valid bit is not
+ * set for that module, then the associated minsrev will be left as is.
+ */
+enum ice_status
+ice_update_nvm_minsrevs(struct ice_hw *hw, struct ice_minsrev_info *minsrevs)
+{
+	struct ice_aqc_nvm_minsrev data;
+	enum ice_status status;
+
+	if (!minsrevs->nvm_valid && !minsrevs->orom_valid) {
+		ice_debug(hw, ICE_DBG_NVM, "At least one of NVM and OROM MinSrev must be valid");
+		return ICE_ERR_PARAM;
+	}
+
+	status = ice_acquire_nvm(hw, ICE_RES_WRITE);
+	if (status)
+		return status;
+
+	/* Get current data */
+	status = ice_aq_read_nvm(hw, ICE_AQC_NVM_MINSREV_MOD_ID, 0, sizeof(data),
+				 &data, true, false, NULL);
+	if (status)
+		goto exit_release_res;
+
+	if (minsrevs->nvm_valid) {
+		data.nvm_minsrev_l = cpu_to_le16(minsrevs->nvm & 0xFFFF);
+		data.nvm_minsrev_h = cpu_to_le16(minsrevs->nvm >> 16);
+		data.validity |= cpu_to_le16(ICE_AQC_NVM_MINSREV_NVM_VALID);
+	}
+
+	if (minsrevs->orom_valid) {
+		data.orom_minsrev_l = cpu_to_le16(minsrevs->orom & 0xFFFF);
+		data.orom_minsrev_h = cpu_to_le16(minsrevs->orom >> 16);
+		data.validity |= cpu_to_le16(ICE_AQC_NVM_MINSREV_OROM_VALID);
+	}
+
+	/* Update flash data */
+	status = ice_aq_update_nvm(hw, ICE_AQC_NVM_MINSREV_MOD_ID, 0, sizeof(data), &data,
+				   true, ICE_AQC_NVM_SPECIAL_UPDATE, NULL);
+	if (status)
+		goto exit_release_res;
+
+	/* Dump the Shadow RAM to the flash */
+	status = ice_nvm_write_activate(hw, 0);
+
+exit_release_res:
+	ice_release_nvm(hw);
+
+	return status;
+}
+
+/**
  * ice_aq_nvm_update_empr
  * @hw: pointer to the HW struct
  *
