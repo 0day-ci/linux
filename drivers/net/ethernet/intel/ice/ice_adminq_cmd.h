@@ -1346,6 +1346,23 @@ struct ice_aqc_nvm_checksum {
 	u8 rsvd2[12];
 };
 
+#define ICE_AQC_NVM_MINSREV_MOD_ID		0x130
+
+/* Used for reading and writing MinSRev using 0x0701 and 0x0703. Note that the
+ * type field is excluded from the section when reading and writing from
+ * a module using the module_typeid field with these AQ commands.
+ */
+struct ice_aqc_nvm_minsrev {
+	__le16 length;
+	__le16 validity;
+#define ICE_AQC_NVM_MINSREV_NVM_VALID		BIT(0)
+#define ICE_AQC_NVM_MINSREV_OROM_VALID		BIT(1)
+	__le16 nvm_minsrev_l;
+	__le16 nvm_minsrev_h;
+	__le16 orom_minsrev_l;
+	__le16 orom_minsrev_h;
+};
+
 /* Used for NVM Set Package Data command - 0x070A */
 struct ice_aqc_nvm_pkg_data {
 	u8 reserved[3];
