@@ -322,6 +322,14 @@ struct ice_nvm_info {
 	u8 minor;
 };
 
+/* Minimum Security Revision information */
+struct ice_minsrev_info {
+	u32 nvm;
+	u32 orom;
+	u8 nvm_valid : 1;
+	u8 orom_valid : 1;
+};
+
 /* netlist version information */
 struct ice_netlist_info {
 	u32 major;			/* major high/low */

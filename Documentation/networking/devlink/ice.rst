@@ -96,6 +96,40 @@ The ``ice`` driver reports the following versions
       - 0xee16ced7
       - The first 4 bytes of the hash of the netlist module contents.
 
+Parameters
+==========
+
+The minimum security revision fields of the ice device control whether the
+associated flash section can be loaded. If the security revision field of
+the section -- ``fw.mgmt.srev`` for the main firmware section and
+``fw.undi.srev`` for the Option ROM -- is lower than the associated minimum
+security revision, then the device will not load that section of firmware.
+
+The ``ice`` driver implements driver-specific parameters for updating the
+minimum security revision fields associated those two sections of the device
+flash. Note that the device will not allow lowering a minimum security
+revision, nor will it allow increasing the security revision higher than the
+associated security revision of the active flash image.
+
+.. list-table:: Minimum security revision parameters
+      :widths: 5 5 5 85
+
+   * - Name
+     - Type
+     - Mode
+     - Description
+   * - ``fw.undi.minsrev``
+     - u32
+     - permanent
+     - The device's minimum security revision for the ``fw.undi`` section of
+       the flash.
+   * - ``fw.mgmt.minsrev``
+     - u32
+     - permanent
+     - The device's minimum security revision for the ``fw.mgmt`` section of
+       the flash.
+
+
 Flash Update
 ============
 
