@@ -75,6 +75,26 @@ static int ice_info_fw_build(struct ice_pf *pf, struct ice_info_ctx *ctx)
 	return 0;
 }
 
+static int ice_info_fw_srev(struct ice_pf *pf, struct ice_info_ctx *ctx)
+{
+	struct ice_nvm_info *nvm = &pf->hw.flash.nvm;
+
+	snprintf(ctx->buf, sizeof(ctx->buf), "%u", nvm->srev);
+
+	return 0;
+}
+
+static int
+ice_info_pending_fw_srev(struct ice_pf __always_unused *pf, struct ice_info_ctx *ctx)
+{
+	struct ice_nvm_info *nvm = &ctx->pending_nvm;
+
+	if (ctx->dev_caps.common_cap.nvm_update_pending_nvm)
+		snprintf(ctx->buf, sizeof(ctx->buf), "%u", nvm->srev);
+
+	return 0;
+}
+
 static int ice_info_orom_ver(struct ice_pf *pf, struct ice_info_ctx *ctx)
 {
 	struct ice_orom_info *orom = &pf->hw.flash.orom;
@@ -92,6 +112,26 @@ ice_info_pending_orom_ver(struct ice_pf __always_unused *pf, struct ice_info_ctx
 	if (ctx->dev_caps.common_cap.nvm_update_pending_orom)
 		snprintf(ctx->buf, sizeof(ctx->buf), "%u.%u.%u",
 			 orom->major, orom->build, orom->patch);
+
+	return 0;
+}
+
+static int ice_info_orom_srev(struct ice_pf *pf, struct ice_info_ctx *ctx)
+{
+	struct ice_orom_info *orom = &pf->hw.flash.orom;
+
+	snprintf(ctx->buf, sizeof(ctx->buf), "%u", orom->srev);
+
+	return 0;
+}
+
+static int
+ice_info_pending_orom_srev(struct ice_pf __always_unused *pf, struct ice_info_ctx *ctx)
+{
+	struct ice_orom_info *orom = &ctx->pending_orom;
+
+	if (ctx->dev_caps.common_cap.nvm_update_pending_orom)
+		snprintf(ctx->buf, sizeof(ctx->buf), "%u", orom->srev);
 
 	return 0;
 }
@@ -243,7 +283,9 @@ static const struct ice_devlink_version {
 	running(DEVLINK_INFO_VERSION_GENERIC_FW_MGMT, ice_info_fw_mgmt),
 	running("fw.mgmt.api", ice_info_fw_api),
 	running("fw.mgmt.build", ice_info_fw_build),
+	combined("fw.mgmt.srev", ice_info_fw_srev, ice_info_pending_fw_srev),
 	combined(DEVLINK_INFO_VERSION_GENERIC_FW_UNDI, ice_info_orom_ver, ice_info_pending_orom_ver),
+	combined("fw.undi.srev", ice_info_orom_srev, ice_info_pending_orom_srev),
 	combined("fw.psid.api", ice_info_nvm_ver, ice_info_pending_nvm_ver),
 	combined(DEVLINK_INFO_VERSION_GENERIC_FW_BUNDLE_ID, ice_info_eetrack, ice_info_pending_eetrack),
 	running("fw.app.name", ice_info_ddp_pkg_name),
