@@ -38,6 +38,11 @@ The ``ice`` driver reports the following versions
       - running
       - 0x305d955f
       - Unique identifier of the source for the management firmware.
+    * - ``fw.mgmt.srev``
+      - running
+      - 2
+      - Security revision of the management firmware and associated NVM
+        contents.
     * - ``fw.undi``
       - running
       - 1.2581.0
@@ -48,6 +53,10 @@ The ``ice`` driver reports the following versions
         non-breaking changes and reset to 1 when the major version is
         incremented. The patch version is normally 0 but is incremented when
         a fix is delivered as a patch against an older base Option ROM.
+    * - ``fw.undi.srev``
+      - running
+      - 2
+      - Security revision of the Option ROM containing the UEFI driver.
     * - ``fw.psid.api``
       - running
       - 0.80
