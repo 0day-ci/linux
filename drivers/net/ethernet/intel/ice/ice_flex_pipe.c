@@ -2605,7 +2605,7 @@ ice_free_prof_id(struct ice_hw *hw, enum ice_block blk, u8 prof_id)
 static enum ice_status
 ice_prof_inc_ref(struct ice_hw *hw, enum ice_block blk, u8 prof_id)
 {
-	if (prof_id > hw->blk[blk].es.count)
+	if (prof_id >= hw->blk[blk].es.count)
 		return ICE_ERR_PARAM;
 
 	hw->blk[blk].es.ref_count[prof_id]++;
@@ -2970,7 +2970,7 @@ ice_write_es(struct ice_hw *hw, enum ice_block blk, u8 prof_id,
 static enum ice_status
 ice_prof_dec_ref(struct ice_hw *hw, enum ice_block blk, u8 prof_id)
 {
-	if (prof_id > hw->blk[blk].es.count)
+	if (prof_id >= hw->blk[blk].es.count)
 		return ICE_ERR_PARAM;
 
 	if (hw->blk[blk].es.ref_count[prof_id] > 0) {
