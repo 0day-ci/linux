@@ -2724,7 +2724,7 @@ sub process {
 			}
 		}
 
-		if ($found_file) {
+		if ($found_file && $tree) {
 			if (is_maintained_obsolete($realfile)) {
 				WARN("OBSOLETE",
 				     "$realfile is marked as 'obsolete' in the MAINTAINERS hierarchy.  No unnecessary modifications please.\n");
