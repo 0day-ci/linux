@@ -209,12 +209,15 @@ static int __init mmp_dt_init_timer(struct device_node *np)
 	}
 
 	irq = irq_of_parse_and_map(np, 0);
-	if (!irq)
+	if (!irq) {
+		clk_disable_unprepare(clk);
 		return -EINVAL;
-
+	}
 	mmp_timer_base = of_iomap(np, 0);
-	if (!mmp_timer_base)
+	if (!mmp_timer_base) {
+		clk_disable_unprepare(clk);
 		return -ENOMEM;
+	}
 
 	mmp_timer_init(irq, rate);
 	return 0;
