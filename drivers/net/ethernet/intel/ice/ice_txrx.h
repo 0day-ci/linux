@@ -281,7 +281,10 @@ struct ice_ring {
 	/* used in interrupt processing */
 	u16 next_to_use;
 	u16 next_to_clean;
-	u16 next_to_alloc;
+	union {
+		u16 next_to_alloc;
+		u16 next_rs_idx;
+	};
 
 	/* stats structs */
 	struct ice_q_stats	stats;
