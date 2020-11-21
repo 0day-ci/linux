@@ -619,6 +619,7 @@ int ice_clean_rx_irq_zc(struct ice_ring *rx_ring, int budget)
  */
 static bool ice_xmit_zc(struct ice_ring *xdp_ring, int budget)
 {
+	unsigned int sent_frames = 0, total_bytes = 0;
 	struct ice_tx_desc *tx_desc = NULL;
 	u16 ntu = xdp_ring->next_to_use;
 	struct xdp_desc desc;
@@ -647,6 +648,8 @@ static bool ice_xmit_zc(struct ice_ring *xdp_ring, int budget)
 		ntu++;
 		if (ntu == xdp_ring->count)
 			ntu = 0;
+		sent_frames++;
+		total_bytes += tx_buf->bytecount;
 	}
 
 	if (tx_desc) {
@@ -656,6 +659,7 @@ static bool ice_xmit_zc(struct ice_ring *xdp_ring, int budget)
 			cpu_to_le64(ICE_TX_DESC_CMD_RS << ICE_TXD_QW1_CMD_S);
 		ice_xdp_ring_update_tail(xdp_ring);
 		xsk_tx_release(xdp_ring->xsk_pool);
+		ice_update_tx_ring_stats(xdp_ring, sent_frames, total_bytes);
 	}
 
 	return budget > 0;
@@ -670,6 +674,7 @@ static void
 ice_clean_xdp_tx_buf(struct ice_ring *xdp_ring, struct ice_tx_buf *tx_buf)
 {
 	xdp_return_frame((struct xdp_frame *)tx_buf->raw_buf);
+	xdp_ring->xdp_tx_active--;
 	dma_unmap_single(xdp_ring->dev, dma_unmap_addr(tx_buf, dma),
 			 dma_unmap_len(tx_buf, len), DMA_TO_DEVICE);
 	dma_unmap_len_set(tx_buf, len, 0);
@@ -704,6 +709,11 @@ bool ice_clean_tx_irq_zc(struct ice_ring *xdp_ring)
 	if (!frames_ready)
 		goto out_xmit;
 
+	if (likely(!xdp_ring->xdp_tx_active)) {
+		xsk_frames = frames_ready;
+		goto skip;
+	}
+
 	for (i = 0; i < frames_ready; i++) {
 		tx_buf = &xdp_ring->tx_buf[ntc];
 
@@ -721,12 +731,13 @@ bool ice_clean_tx_irq_zc(struct ice_ring *xdp_ring)
 			ntc = 0;
 	}
 
-	xdp_ring->next_to_clean = ntc;
+skip:
+	xdp_ring->next_to_clean += frames_ready;
+	if (unlikely(xdp_ring->next_to_clean >= xdp_ring->count))
+		xdp_ring->next_to_clean -= xdp_ring->count;
 
 	if (xsk_frames)
 		xsk_tx_completed(xdp_ring->xsk_pool, xsk_frames);
-
-	ice_update_tx_ring_stats(xdp_ring, frames_ready, total_bytes);
 
 out_xmit:
 	if (xsk_uses_need_wakeup(xdp_ring->xsk_pool))
