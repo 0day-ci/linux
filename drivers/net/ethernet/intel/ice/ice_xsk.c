@@ -690,9 +690,9 @@ bool ice_clean_tx_irq_zc(struct ice_ring *xdp_ring)
 {
 	u16 next_rs_idx = xdp_ring->next_rs_idx;
 	u16 ntc = xdp_ring->next_to_clean;
+	u16 frames_ready = 0, send_budget;
 	struct ice_tx_desc *next_rs_desc;
 	struct ice_tx_buf *tx_buf;
-	u16 frames_ready = 0;
 	u32 total_bytes = 0;
 	u32 xsk_frames = 0;
 	u16 i;
@@ -743,7 +743,9 @@ out_xmit:
 	if (xsk_uses_need_wakeup(xdp_ring->xsk_pool))
 		xsk_set_tx_need_wakeup(xdp_ring->xsk_pool);
 
-	return ice_xmit_zc(xdp_ring, ICE_DESC_UNUSED(xdp_ring));
+	send_budget = ICE_DESC_UNUSED(xdp_ring);
+	send_budget = min_t(u16, send_budget, xdp_ring->count >> 2);
+	return ice_xmit_zc(xdp_ring, send_budget);
 }
 
 /**
