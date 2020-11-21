@@ -1594,7 +1594,7 @@ int ice_napi_poll(struct napi_struct *napi, int budget)
 	 */
 	ice_for_each_ring(ring, q_vector->tx) {
 		bool wd = ring->xsk_pool ?
-			  ice_clean_tx_irq_zc(ring, budget) :
+			  ice_clean_tx_irq_zc(ring) :
 			  ice_clean_tx_irq(ring, budget);
 
 		if (!wd)
