@@ -49,18 +49,23 @@ static bool use_avx512;
 module_param(use_avx512, bool, 0644);
 MODULE_PARM_DESC(use_avx512, "Use AVX512 optimized algorithm, if available");
 
+/* AVX512 optimized algorithms use 48 hash keys to conduct
+ * multiple PCLMULQDQ operations in parallel
+ */
+#define GCM_AVX512_NUM_HASH_KEYS 48
+
 /* This data is stored at the end of the crypto_tfm struct.
  * It's a type of per "session" data storage location.
  * This needs to be 16 byte aligned.
  */
 struct aesni_rfc4106_gcm_ctx {
-	u8 hash_subkey[16] AESNI_ALIGN_ATTR;
+	u8 hash_subkey[16 * GCM_AVX512_NUM_HASH_KEYS] AESNI_ALIGN_ATTR;
 	struct crypto_aes_ctx aes_key_expanded AESNI_ALIGN_ATTR;
 	u8 nonce[4];
 };
 
 struct generic_gcmaes_ctx {
-	u8 hash_subkey[16] AESNI_ALIGN_ATTR;
+	u8 hash_subkey[16 * GCM_AVX512_NUM_HASH_KEYS] AESNI_ALIGN_ATTR;
 	struct crypto_aes_ctx aes_key_expanded AESNI_ALIGN_ATTR;
 };
 
@@ -81,7 +86,8 @@ struct gcm_context_data {
 	u8 current_counter[GCM_BLOCK_LEN];
 	u64 partial_block_len;
 	u64 unused;
-	u8 hash_keys[GCM_BLOCK_LEN * 16];
+	/* Allocate space for hash_keys later */
+	u8 hash_keys[0];
 };
 
 asmlinkage int aesni_set_key(struct crypto_aes_ctx *ctx, const u8 *in_key,
@@ -199,8 +205,37 @@ asmlinkage void aesni_gcm_finalize_avx_gen4(void *ctx,
 				   struct gcm_context_data *gdata,
 				   u8 *auth_tag, unsigned long auth_tag_len);
 
+/* asmlinkage void aesni_gcm_init_avx_512()
+ * gcm_data *my_ctx_data, context data
+ * u8 *hash_subkey,  the Hash sub key input. Data starts on a 16-byte boundary.
+ */
+asmlinkage void aesni_gcm_init_avx_512(void *my_ctx_data,
+				       struct gcm_context_data *gdata,
+				       u8 *iv,
+				       u8 *hash_subkey,
+				       const u8 *aad,
+				       unsigned long aad_len);
+asmlinkage void aesni_gcm_enc_update_avx_512(void *ctx,
+					     struct gcm_context_data *gdata,
+					     u8 *out,
+					     const u8 *in,
+					     unsigned long plaintext_len);
+asmlinkage void aesni_gcm_dec_update_avx_512(void *ctx,
+					     struct gcm_context_data *gdata,
+					     u8 *out,
+					     const u8 *in,
+					     unsigned long ciphertext_len);
+asmlinkage void aesni_gcm_finalize_avx_512(void *ctx,
+					   struct gcm_context_data *gdata,
+					   u8 *auth_tag,
+					   unsigned long auth_tag_len);
+
+asmlinkage void aes_gcm_precomp_avx_512(struct crypto_aes_ctx *ctx,
+					u8 *hash_subkey);
+
 static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx);
 static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx2);
+static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx512);
 
 static inline struct
 aesni_rfc4106_gcm_ctx *aesni_rfc4106_gcm_ctx_get(struct crypto_aead *tfm)
@@ -576,7 +611,10 @@ rfc4106_set_hash_subkey(u8 *hash_subkey, const u8 *key, unsigned int key_len)
 	/* We want to cipher all zeros to create the hash sub key. */
 	memset(hash_subkey, 0, RFC4106_HASH_SUBKEY_SIZE);
 
-	aes_encrypt(&ctx, hash_subkey, hash_subkey);
+	if (static_branch_likely(&gcm_use_avx512) && IS_ENABLED(CONFIG_CRYPTO_AES_GCM_AVX512))
+		aes_gcm_precomp_avx_512(&ctx, hash_subkey);
+	else
+		aes_encrypt(&ctx, hash_subkey, hash_subkey);
 
 	memzero_explicit(&ctx, sizeof(ctx));
 	return 0;
@@ -650,6 +688,22 @@ static int gcmaes_crypt_by_sg(bool enc, struct aead_request *req,
 	u8 *assocmem = NULL;
 	u8 *assoc;
 	int err;
+	int hash_key_size;
+
+	if (static_branch_likely(&gcm_use_avx512))
+		hash_key_size = 16 * GCM_AVX512_NUM_HASH_KEYS;
+	else
+		hash_key_size = 16 * GCM_BLOCK_LEN;
+
+	/* Allocate gcm_context_data structure on the heap. With the
+	 * VPCLMULQDQ version of GCM needing 48 hashkeys, allocating
+	 * this structure on the stack will inflate its size significantly.
+	 */
+	data = kzalloc(sizeof(*data) + hash_key_size, GFP_KERNEL);
+	if (!data) {
+		kfree(data);
+		return -ENOMEM;
+	}
 
 	if (!enc)
 		left -= auth_tag_len;
@@ -675,7 +729,12 @@ static int gcmaes_crypt_by_sg(bool enc, struct aead_request *req,
 	}
 
 	kernel_fpu_begin();
-	if (static_branch_likely(&gcm_use_avx2) && do_avx2)
+
+	if (static_branch_likely(&gcm_use_avx512) &&
+				IS_ENABLED(CONFIG_CRYPTO_AES_GCM_AVX512))
+		aesni_gcm_init_avx_512(aes_ctx, data, iv, hash_subkey, assoc,
+				       assoclen);
+	else if (static_branch_likely(&gcm_use_avx2) && do_avx2)
 		aesni_gcm_init_avx_gen4(aes_ctx, data, iv, hash_subkey, assoc,
 					assoclen);
 	else if (static_branch_likely(&gcm_use_avx) && do_avx)
@@ -695,7 +754,19 @@ static int gcmaes_crypt_by_sg(bool enc, struct aead_request *req,
 
 	while (walk.nbytes > 0) {
 		kernel_fpu_begin();
-		if (static_branch_likely(&gcm_use_avx2) && do_avx2) {
+		if (static_branch_likely(&gcm_use_avx512)
+				&& IS_ENABLED(CONFIG_CRYPTO_AES_GCM_AVX512)) {
+			if (enc)
+				aesni_gcm_enc_update_avx_512(aes_ctx, data,
+							     walk.dst.virt.addr,
+							     walk.src.virt.addr,
+							     walk.nbytes);
+			else
+				aesni_gcm_dec_update_avx_512(aes_ctx, data,
+							     walk.dst.virt.addr,
+							     walk.src.virt.addr,
+							     walk.nbytes);
+		} else if (static_branch_likely(&gcm_use_avx2) && do_avx2) {
 			if (enc)
 				aesni_gcm_enc_update_avx_gen4(aes_ctx, data,
 							      walk.dst.virt.addr,
@@ -733,7 +804,11 @@ static int gcmaes_crypt_by_sg(bool enc, struct aead_request *req,
 		return err;
 
 	kernel_fpu_begin();
-	if (static_branch_likely(&gcm_use_avx2) && do_avx2)
+	if (static_branch_likely(&gcm_use_avx512) &&
+				IS_ENABLED(CONFIG_CRYPTO_AES_GCM_AVX512))
+		aesni_gcm_finalize_avx_512(aes_ctx, data, auth_tag,
+					   auth_tag_len);
+	else if (static_branch_likely(&gcm_use_avx2) && do_avx2)
 		aesni_gcm_finalize_avx_gen4(aes_ctx, data, auth_tag,
 					    auth_tag_len);
 	else if (static_branch_likely(&gcm_use_avx) && do_avx)
@@ -743,6 +818,7 @@ static int gcmaes_crypt_by_sg(bool enc, struct aead_request *req,
 		aesni_gcm_finalize(aes_ctx, data, auth_tag, auth_tag_len);
 	kernel_fpu_end();
 
+	kfree(data);
 	return 0;
 }
 
@@ -1177,7 +1253,11 @@ static int __init aesni_init(void)
 	if (!x86_match_cpu(aesni_cpu_id))
 		return -ENODEV;
 #ifdef CONFIG_X86_64
-	if (boot_cpu_has(X86_FEATURE_AVX2)) {
+	if (use_avx512 && IS_ENABLED(CONFIG_CRYPTO_AES_GCM_AVX512) &&
+	    cpu_feature_enabled(X86_FEATURE_VPCLMULQDQ)) {
+		pr_info("AVX512 version of gcm_enc/dec engaged.\n");
+		static_branch_enable(&gcm_use_avx512);
+	} else if (boot_cpu_has(X86_FEATURE_AVX2)) {
 		pr_info("AVX2 version of gcm_enc/dec engaged.\n");
 		static_branch_enable(&gcm_use_avx);
 		static_branch_enable(&gcm_use_avx2);
