@@ -1146,8 +1146,7 @@ static int __init aesni_init(void)
 		pr_info("AVX2 version of gcm_enc/dec engaged.\n");
 		static_branch_enable(&gcm_use_avx);
 		static_branch_enable(&gcm_use_avx2);
-	} else
-	if (boot_cpu_has(X86_FEATURE_AVX)) {
+	} else if (boot_cpu_has(X86_FEATURE_AVX)) {
 		pr_info("AVX version of gcm_enc/dec engaged.\n");
 		static_branch_enable(&gcm_use_avx);
 	} else {
