@@ -1887,6 +1887,12 @@ static void iavf_watchdog_task(struct work_struct *work)
 	struct iavf_hw *hw = &adapter->hw;
 	u32 reg_val;
 
+	/* If the driver is in the process of being removed then don't run or
+	 * reschedule the watchdog task.
+	 */
+	if (test_bit(__IAVF_IN_REMOVE_TASK, &adapter->crit_section))
+		return;
+
 	if (test_and_set_bit(__IAVF_IN_CRITICAL_TASK, &adapter->crit_section))
 		goto restart_watchdog;
 
@@ -2266,6 +2272,12 @@ static void iavf_adminq_task(struct work_struct *work)
 	enum iavf_status ret, v_ret;
 	u32 val, oldval;
 	u16 pending;
+
+	/* If the driver is in the process of being removed then return
+	 * immediately and don't re-enable the Admin Queue interrupt.
+	 */
+	if (test_bit(__IAVF_IN_REMOVE_TASK, &adapter->crit_section))
+		return;
 
 	if (adapter->flags & IAVF_FLAG_PF_COMMS_FAILED)
 		goto out;
@@ -3245,6 +3257,13 @@ static int iavf_close(struct net_device *netdev)
 
 	clear_bit(__IAVF_IN_CRITICAL_TASK, &adapter->crit_section);
 
+	/* If the interface is closing as part of driver removal it doesn't
+	 * wait. The VF resources will be reinitialized when the hardware is
+	 * reset.
+	 */
+	if (test_bit(__IAVF_IN_REMOVE_TASK, &adapter->crit_section))
+		return 0;
+
 	/* We explicitly don't free resources here because the hardware is
 	 * still active and can DMA into memory. Resources are cleared in
 	 * iavf_virtchnl_completion() after we get confirmation from the PF
@@ -3850,11 +3869,14 @@ static void iavf_remove(struct pci_dev *pdev)
 	struct iavf_cloud_filter *cf, *cftmp;
 	struct iavf_hw *hw = &adapter->hw;
 	int err;
-	/* Indicate we are in remove and not to run reset_task */
+	/* Indicate that program driver is remove task and not
+	 * to run/schedule any driver tasks
+	 */
 	set_bit(__IAVF_IN_REMOVE_TASK, &adapter->crit_section);
 	cancel_delayed_work_sync(&adapter->init_task);
 	cancel_work_sync(&adapter->reset_task);
 	cancel_delayed_work_sync(&adapter->client_task);
+	iavf_misc_irq_disable(adapter);
 	if (adapter->netdev_registered) {
 		unregister_netdev(netdev);
 		adapter->netdev_registered = false;
@@ -3879,14 +3901,9 @@ static void iavf_remove(struct pci_dev *pdev)
 	}
 	iavf_free_all_tx_resources(adapter);
 	iavf_free_all_rx_resources(adapter);
-	iavf_misc_irq_disable(adapter);
 	iavf_free_misc_irq(adapter);
 	iavf_reset_interrupt_capability(adapter);
 	iavf_free_q_vectors(adapter);
-
-	cancel_delayed_work_sync(&adapter->watchdog_task);
-
-	cancel_work_sync(&adapter->adminq_task);
 
 	iavf_free_rss(adapter);
 
