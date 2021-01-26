@@ -474,6 +474,7 @@ int dwc3_event_buffers_setup(struct dwc3 *dwc)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dwc3_event_buffers_setup);
 
 void dwc3_event_buffers_cleanup(struct dwc3 *dwc)
 {
@@ -489,6 +490,7 @@ void dwc3_event_buffers_cleanup(struct dwc3 *dwc)
 			| DWC3_GEVNTSIZ_SIZE(0));
 	dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), 0);
 }
+EXPORT_SYMBOL_GPL(dwc3_event_buffers_cleanup);
 
 static int dwc3_alloc_scratch_buffers(struct dwc3 *dwc)
 {
