@@ -440,6 +440,8 @@ int ice_vsi_cfg_rxq(struct ice_ring *ring)
 	}
 
 	if (ring->xsk_pool) {
+		bool ok;
+
 		if (!xsk_buff_can_alloc(ring->xsk_pool, num_bufs)) {
 			dev_warn(dev, "XSK buffer pool does not provide enough addresses to fill %d buffers on Rx ring %d\n",
 				 num_bufs, ring->q_index);
@@ -448,8 +450,8 @@ int ice_vsi_cfg_rxq(struct ice_ring *ring)
 			return 0;
 		}
 
-		err = ice_alloc_rx_bufs_zc(ring, num_bufs);
-		if (err) {
+		ok = ice_alloc_rx_bufs_zc(ring, num_bufs);
+		if (!ok) {
 			u16 pf_q = ring->vsi->rxq_map[ring->q_index];
 
 			dev_info(dev, "Failed to allocate some buffers on XSK buffer pool enabled Rx ring %d (pf_q %d)\n",
