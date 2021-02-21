@@ -228,6 +228,12 @@ static struct net_device_stats *cvm_oct_common_get_stats(struct net_device *dev)
 	return &dev->stats;
 }
 
+static int cvm_oct_validate_interface(int interface)
+{
+	return interface < 2 && (cvmx_helper_interface_get_mode(interface) !=
+				 CVMX_HELPER_INTERFACE_MODE_SPI);
+}
+
 /**
  * cvm_oct_common_change_mtu - change the link MTU
  * @dev:     Device to change
@@ -245,42 +251,42 @@ static int cvm_oct_common_change_mtu(struct net_device *dev, int new_mtu)
 	int vlan_bytes = 0;
 #endif
 	int mtu_overhead = ETH_HLEN + ETH_FCS_LEN + vlan_bytes;
+	int index;
+	/* Add ethernet header and FCS, and VLAN if configured. */
+	int max_packet = new_mtu + mtu_overhead;
 
 	dev->mtu = new_mtu;
 
-	if ((interface < 2) &&
-	    (cvmx_helper_interface_get_mode(interface) !=
-		CVMX_HELPER_INTERFACE_MODE_SPI)) {
-		int index = INDEX(priv->port);
-		/* Add ethernet header and FCS, and VLAN if configured. */
-		int max_packet = new_mtu + mtu_overhead;
+	if (!cvm_oct_validate_interface(interface))
+		return 0;
 
-		if (OCTEON_IS_MODEL(OCTEON_CN3XXX) ||
-		    OCTEON_IS_MODEL(OCTEON_CN58XX)) {
-			/* Signal errors on packets larger than the MTU */
-			cvmx_write_csr(CVMX_GMXX_RXX_FRM_MAX(index, interface),
-				       max_packet);
-		} else {
-			/*
-			 * Set the hardware to truncate packets larger
-			 * than the MTU and smaller the 64 bytes.
-			 */
-			union cvmx_pip_frm_len_chkx frm_len_chk;
+	index = INDEX(priv->port);
 
-			frm_len_chk.u64 = 0;
-			frm_len_chk.s.minlen = VLAN_ETH_ZLEN;
-			frm_len_chk.s.maxlen = max_packet;
-			cvmx_write_csr(CVMX_PIP_FRM_LEN_CHKX(interface),
-				       frm_len_chk.u64);
-		}
+	if (OCTEON_IS_MODEL(OCTEON_CN3XXX) || OCTEON_IS_MODEL(OCTEON_CN58XX)) {
+		/* Signal errors on packets larger than the MTU */
+		cvmx_write_csr(CVMX_GMXX_RXX_FRM_MAX(index, interface),
+			       max_packet);
+	} else {
 		/*
-		 * Set the hardware to truncate packets larger than
-		 * the MTU. The jabber register must be set to a
-		 * multiple of 8 bytes, so round up.
+		 * Set the hardware to truncate packets larger
+		 * than the MTU and smaller the 64 bytes.
 		 */
-		cvmx_write_csr(CVMX_GMXX_RXX_JABBER(index, interface),
-			       (max_packet + 7) & ~7u);
+		union cvmx_pip_frm_len_chkx frm_len_chk;
+
+		frm_len_chk.u64 = 0;
+		frm_len_chk.s.minlen = VLAN_ETH_ZLEN;
+		frm_len_chk.s.maxlen = max_packet;
+		cvmx_write_csr(CVMX_PIP_FRM_LEN_CHKX(interface),
+			       frm_len_chk.u64);
 	}
+	/*
+	 * Set the hardware to truncate packets larger than
+	 * the MTU. The jabber register must be set to a
+	 * multiple of 8 bytes, so round up.
+	 */
+	cvmx_write_csr(CVMX_GMXX_RXX_JABBER(index, interface),
+		       (max_packet + 7) & ~7u);
+
 	return 0;
 }
 
@@ -293,51 +299,46 @@ static void cvm_oct_common_set_multicast_list(struct net_device *dev)
 	union cvmx_gmxx_prtx_cfg gmx_cfg;
 	struct octeon_ethernet *priv = netdev_priv(dev);
 	int interface = INTERFACE(priv->port);
+	union cvmx_gmxx_rxx_adr_ctl control;
+	int index;
 
-	if ((interface < 2) &&
-	    (cvmx_helper_interface_get_mode(interface) !=
-		CVMX_HELPER_INTERFACE_MODE_SPI)) {
-		union cvmx_gmxx_rxx_adr_ctl control;
-		int index = INDEX(priv->port);
+	if (!cvm_oct_validate_interface(interface))
+		return;
 
-		control.u64 = 0;
-		control.s.bcst = 1;	/* Allow broadcast MAC addresses */
+	index = INDEX(priv->port);
 
-		if (!netdev_mc_empty(dev) || (dev->flags & IFF_ALLMULTI) ||
-		    (dev->flags & IFF_PROMISC))
-			/* Force accept multicast packets */
-			control.s.mcst = 2;
-		else
-			/* Force reject multicast packets */
-			control.s.mcst = 1;
+	control.u64 = 0;
+	control.s.bcst = 1;	/* Allow broadcast MAC addresses */
 
-		if (dev->flags & IFF_PROMISC)
-			/*
-			 * Reject matches if promisc. Since CAM is
-			 * shut off, should accept everything.
-			 */
-			control.s.cam_mode = 0;
-		else
-			/* Filter packets based on the CAM */
-			control.s.cam_mode = 1;
+	if (!netdev_mc_empty(dev) || (dev->flags & IFF_ALLMULTI) ||
+	    (dev->flags & IFF_PROMISC))
+		/* Force accept multicast packets */
+		control.s.mcst = 2;
+	else
+		/* Force reject multicast packets */
+		control.s.mcst = 1;
 
-		gmx_cfg.u64 =
-		    cvmx_read_csr(CVMX_GMXX_PRTX_CFG(index, interface));
-		cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
-			       gmx_cfg.u64 & ~1ull);
+	if (dev->flags & IFF_PROMISC)
+		/*
+		 * Reject matches if promisc. Since CAM is
+		 * shut off, should accept everything.
+		 */
+		control.s.cam_mode = 0;
+	else
+		/* Filter packets based on the CAM */
+		control.s.cam_mode = 1;
 
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CTL(index, interface),
-			       control.u64);
-		if (dev->flags & IFF_PROMISC)
-			cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM_EN
-				       (index, interface), 0);
-		else
-			cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM_EN
-				       (index, interface), 1);
+	gmx_cfg.u64 = cvmx_read_csr(CVMX_GMXX_PRTX_CFG(index, interface));
+	cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
+		       gmx_cfg.u64 & ~1ull);
 
-		cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
-			       gmx_cfg.u64);
-	}
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CTL(index, interface), control.u64);
+	if (dev->flags & IFF_PROMISC)
+		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM_EN(index, interface), 0);
+	else
+		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM_EN(index, interface), 1);
+
+	cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface), gmx_cfg.u64);
 }
 
 static int cvm_oct_set_mac_filter(struct net_device *dev)
@@ -345,40 +346,34 @@ static int cvm_oct_set_mac_filter(struct net_device *dev)
 	struct octeon_ethernet *priv = netdev_priv(dev);
 	union cvmx_gmxx_prtx_cfg gmx_cfg;
 	int interface = INTERFACE(priv->port);
+	int i;
+	u64 mac = 0;
+	u8 *ptr;
+	int index;
 
-	if ((interface < 2) &&
-	    (cvmx_helper_interface_get_mode(interface) !=
-		CVMX_HELPER_INTERFACE_MODE_SPI)) {
-		int i;
-		u8 *ptr = dev->dev_addr;
-		u64 mac = 0;
-		int index = INDEX(priv->port);
+	if (!cvm_oct_validate_interface(interface))
+		return 0;
 
-		for (i = 0; i < 6; i++)
-			mac = (mac << 8) | (u64)ptr[i];
+	ptr = dev->dev_addr;
+	index = INDEX(priv->port);
 
-		gmx_cfg.u64 =
-		    cvmx_read_csr(CVMX_GMXX_PRTX_CFG(index, interface));
-		cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
-			       gmx_cfg.u64 & ~1ull);
+	for (i = 0; i < 6; i++)
+		mac = (mac << 8) | (u64)ptr[i];
 
-		cvmx_write_csr(CVMX_GMXX_SMACX(index, interface), mac);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM0(index, interface),
-			       ptr[0]);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM1(index, interface),
-			       ptr[1]);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM2(index, interface),
-			       ptr[2]);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM3(index, interface),
-			       ptr[3]);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM4(index, interface),
-			       ptr[4]);
-		cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM5(index, interface),
-			       ptr[5]);
-		cvm_oct_common_set_multicast_list(dev);
-		cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
-			       gmx_cfg.u64);
-	}
+	gmx_cfg.u64 = cvmx_read_csr(CVMX_GMXX_PRTX_CFG(index, interface));
+	cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface),
+		       gmx_cfg.u64 & ~1ull);
+
+	cvmx_write_csr(CVMX_GMXX_SMACX(index, interface), mac);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM0(index, interface), ptr[0]);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM1(index, interface), ptr[1]);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM2(index, interface), ptr[2]);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM3(index, interface), ptr[3]);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM4(index, interface), ptr[4]);
+	cvmx_write_csr(CVMX_GMXX_RXX_ADR_CAM5(index, interface), ptr[5]);
+	cvm_oct_common_set_multicast_list(dev);
+	cvmx_write_csr(CVMX_GMXX_PRTX_CFG(index, interface), gmx_cfg.u64);
+
 	return 0;
 }
 
