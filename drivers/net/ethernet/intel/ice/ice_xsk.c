@@ -524,7 +524,7 @@ int ice_clean_rx_irq_zc(struct ice_ring *rx_ring, int budget)
 		struct sk_buff *skb;
 		u16 stat_err_bits;
 		u16 vlan_tag = 0;
-		u8 rx_ptype;
+		u16 rx_ptype;
 
 		rx_desc = ICE_RX_DESC(rx_ring, rx_ring->next_to_clean);
 
