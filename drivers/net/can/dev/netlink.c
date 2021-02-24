@@ -19,6 +19,12 @@ static const struct nla_policy can_policy[IFLA_CAN_MAX + 1] = {
 	[IFLA_CAN_DATA_BITTIMING] = { .len = sizeof(struct can_bittiming) },
 	[IFLA_CAN_DATA_BITTIMING_CONST]	= { .len = sizeof(struct can_bittiming_const) },
 	[IFLA_CAN_TERMINATION] = { .type = NLA_U16 },
+	[IFLA_CAN_TDCV] = { .type = NLA_U32 },
+	[IFLA_CAN_TDCO] = { .type = NLA_U32 },
+	[IFLA_CAN_TDCF] = { .type = NLA_U32 },
+	[IFLA_CAN_TDCV_MAX_CONST] = { .type = NLA_U32 },
+	[IFLA_CAN_TDCO_MAX_CONST] = { .type = NLA_U32 },
+	[IFLA_CAN_TDCF_MAX_CONST] = { .type = NLA_U32 },
 };
 
 static int can_validate(struct nlattr *tb[], struct nlattr *data[],
@@ -218,6 +224,51 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		priv->termination = termval;
 	}
 
+	if (data[IFLA_CAN_TDCV]) {
+		u32 tdcv = nla_get_u32(data[IFLA_CAN_TDCV]);
+
+		if (!priv->tdc_const || !priv->tdc_const->tdcv_max)
+			return -EOPNOTSUPP;
+
+		if (tdcv > priv->tdc_const->tdcv_max)
+			return -EINVAL;
+
+		if (dev->flags & IFF_UP)
+			return -EBUSY;
+
+		priv->tdc.tdcv = tdcv;
+	}
+
+	if (data[IFLA_CAN_TDCO]) {
+		u32 tdco = nla_get_u32(data[IFLA_CAN_TDCO]);
+
+		if (!priv->tdc_const || !priv->tdc_const->tdco_max)
+			return -EOPNOTSUPP;
+
+		if (tdco > priv->tdc_const->tdco_max)
+			return -EINVAL;
+
+		if (dev->flags & IFF_UP)
+			return -EBUSY;
+
+		priv->tdc.tdco = tdco;
+	}
+
+	if (data[IFLA_CAN_TDCF]) {
+		u32 tdcf = nla_get_u32(data[IFLA_CAN_TDCF]);
+
+		if (!priv->tdc_const || !priv->tdc_const->tdcf_max)
+			return -EOPNOTSUPP;
+
+		if (tdcf > priv->tdc_const->tdcf_max)
+			return -EINVAL;
+
+		if (dev->flags & IFF_UP)
+			return -EBUSY;
+
+		priv->tdc.tdcf = tdcf;
+	}
+
 	return 0;
 }
 
@@ -252,6 +303,16 @@ static size_t can_get_size(const struct net_device *dev)
 		size += nla_total_size(sizeof(*priv->data_bitrate_const) *
 				       priv->data_bitrate_const_cnt);
 	size += sizeof(priv->bitrate_max);			/* IFLA_CAN_BITRATE_MAX */
+	if (priv->tdc.tdco) {
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCV */
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCO */
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCF */
+	}
+	if (priv->tdc_const) {
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCV_MAX_CONST */
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCO_MAX_CONST */
+		size += nla_total_size(sizeof(u32));	/* IFLA_CAN_TDCF_MAX_CONST */
+	}
 
 	return size;
 }
@@ -313,7 +374,18 @@ static int can_fill_info(struct sk_buff *skb, const struct net_device *dev)
 
 	    (nla_put(skb, IFLA_CAN_BITRATE_MAX,
 		     sizeof(priv->bitrate_max),
-		     &priv->bitrate_max))
+		     &priv->bitrate_max)) ||
+
+	    (priv->tdc_const &&
+	     (nla_put_u32(skb, IFLA_CAN_TDCV, priv->tdc.tdcv) ||
+	      nla_put_u32(skb, IFLA_CAN_TDCO, priv->tdc.tdco) ||
+	      nla_put_u32(skb, IFLA_CAN_TDCF, priv->tdc.tdcf) ||
+	      nla_put_u32(skb, IFLA_CAN_TDCV_MAX_CONST,
+			  priv->tdc_const->tdcv_max) ||
+	      nla_put_u32(skb, IFLA_CAN_TDCO_MAX_CONST,
+			  priv->tdc_const->tdco_max) ||
+	      nla_put_u32(skb, IFLA_CAN_TDCF_MAX_CONST,
+			  priv->tdc_const->tdcf_max)))
 	    )
 
 		return -EMSGSIZE;
