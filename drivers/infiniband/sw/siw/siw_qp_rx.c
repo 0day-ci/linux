@@ -1072,6 +1072,16 @@ static int siw_get_hdr(struct siw_rx_stream *srx)
 		siw_dbg_qp(rx_qp(srx), "new header, opcode %u\n", opcode);
 	} else {
 		opcode = __rdmap_get_opcode(c_hdr);
+
+		if (opcode > RDMAP_TERMINATE) {
+			pr_warn("siw: received unknown packet type %u\n",
+				opcode);
+
+			siw_init_terminate(rx_qp(srx), TERM_ERROR_LAYER_RDMAP,
+					   RDMAP_ETYPE_REMOTE_OPERATION,
+					   RDMAP_ECODE_OPCODE, 0);
+			return -EINVAL;
+		}
 	}
 	set_rx_fpdu_context(qp, opcode);
 	frx = qp->rx_fpdu;
