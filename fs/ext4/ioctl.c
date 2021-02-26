@@ -1325,6 +1325,8 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		return ext4_ioctl_group_add(file, &input);
 	}
+	case EXT4_IOC_FSGETXATTR:
+	case EXT4_IOC_FSSETXATTR:
 	case EXT4_IOC_MOVE_EXT:
 	case EXT4_IOC_RESIZE_FS:
 	case FITRIM:
