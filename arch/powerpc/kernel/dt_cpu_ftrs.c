@@ -101,7 +101,6 @@ static struct cpu_spec __initdata base_cpu_spec = {
 	.dcache_bsize		= 32, /* cache info init.             */
 	.num_pmcs		= 0,
 	.pmc_type		= PPC_PMC_DEFAULT,
-	.oprofile_cpu_type	= NULL,
 	.cpu_setup		= NULL,
 	.cpu_restore		= __restore_cpu_cpufeatures,
 	.machine_check_early	= NULL,
@@ -379,7 +378,6 @@ static int __init feat_enable_pmu_power8(struct dt_cpu_feature *f)
 
 	cur_cpu_spec->num_pmcs		= 6;
 	cur_cpu_spec->pmc_type		= PPC_PMC_IBM;
-	cur_cpu_spec->oprofile_cpu_type	= "ppc64/power8";
 
 	return 1;
 }
@@ -415,7 +413,6 @@ static int __init feat_enable_pmu_power9(struct dt_cpu_feature *f)
 
 	cur_cpu_spec->num_pmcs		= 6;
 	cur_cpu_spec->pmc_type		= PPC_PMC_IBM;
-	cur_cpu_spec->oprofile_cpu_type	= "ppc64/power9";
 
 	return 1;
 }
@@ -441,7 +438,6 @@ static int __init feat_enable_pmu_power10(struct dt_cpu_feature *f)
 
 	cur_cpu_spec->num_pmcs          = 6;
 	cur_cpu_spec->pmc_type          = PPC_PMC_IBM;
-	cur_cpu_spec->oprofile_cpu_type = "ppc64/power10";
 
 	return 1;
 }
