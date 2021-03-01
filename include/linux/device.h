@@ -607,7 +607,7 @@ struct device_link {
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)
 {
-	return container_of(kobj, struct device, kobj);
+	return kobj_to_dev(kobj);
 }
 
 /**
