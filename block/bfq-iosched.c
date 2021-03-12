@@ -4263,6 +4263,11 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 	if (unlikely(bfqd->strict_guarantees))
 		return true;
 
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	if (!bfq_class_rt(bfqq) && bfqd->busy_groups[0])
+		return false;
+#endif
+
 	/*
 	 * Idling is performed only if slice_idle > 0. In addition, we
 	 * do not idle if
