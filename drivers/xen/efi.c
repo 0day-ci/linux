@@ -116,13 +116,14 @@ static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
 	return efi_data(op).status;
 }
 
-static efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
+static efi_status_t xen_efi_get_variable(const efi_char16_t *name,
+					 const efi_guid_t *vendor,
 					 u32 *attr, unsigned long *data_size,
 					 void *data)
 {
 	struct xen_platform_op op = INIT_EFI_OP(get_variable);
 
-	set_xen_guest_handle(efi_data(op).u.get_variable.name, name);
+	set_xen_guest_handle(efi_data(op).u.get_variable.name, (void *)name);
 	BUILD_BUG_ON(sizeof(*vendor) !=
 		     sizeof(efi_data(op).u.get_variable.vendor_guid));
 	memcpy(&efi_data(op).u.get_variable.vendor_guid, vendor, sizeof(*vendor));
@@ -162,13 +163,14 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
 	return efi_data(op).status;
 }
 
-static efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
+static efi_status_t xen_efi_set_variable(const efi_char16_t *name,
+					 const efi_guid_t *vendor,
 					 u32 attr, unsigned long data_size,
 					 void *data)
 {
 	struct xen_platform_op op = INIT_EFI_OP(set_variable);
 
-	set_xen_guest_handle(efi_data(op).u.set_variable.name, name);
+	set_xen_guest_handle(efi_data(op).u.set_variable.name, (void *)name);
 	efi_data(op).misc = attr;
 	BUILD_BUG_ON(sizeof(*vendor) !=
 		     sizeof(efi_data(op).u.set_variable.vendor_guid));

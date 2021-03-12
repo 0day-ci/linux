@@ -177,7 +177,7 @@ extern struct semaphore __efi_uv_runtime_lock __alias(efi_runtime_lock);
  */
 static void efi_call_rts(struct work_struct *work)
 {
-	void *arg1, *arg2, *arg3, *arg4, *arg5;
+	const void *arg1, *arg2, *arg3, *arg4, *arg5;
 	efi_status_t status = EFI_NOT_FOUND;
 
 	arg1 = efi_rts_work.arg1;
@@ -203,8 +203,8 @@ static void efi_call_rts(struct work_struct *work)
 				       (efi_time_t *)arg2);
 		break;
 	case EFI_GET_VARIABLE:
-		status = efi_call_virt(get_variable, (efi_char16_t *)arg1,
-				       (efi_guid_t *)arg2, (u32 *)arg3,
+		status = efi_call_virt(get_variable, (const efi_char16_t *)arg1,
+				       (const efi_guid_t *)arg2, (u32 *)arg3,
 				       (unsigned long *)arg4, (void *)arg5);
 		break;
 	case EFI_GET_NEXT_VARIABLE:
@@ -213,8 +213,8 @@ static void efi_call_rts(struct work_struct *work)
 				       (efi_guid_t *)arg3);
 		break;
 	case EFI_SET_VARIABLE:
-		status = efi_call_virt(set_variable, (efi_char16_t *)arg1,
-				       (efi_guid_t *)arg2, *(u32 *)arg3,
+		status = efi_call_virt(set_variable, (const efi_char16_t *)arg1,
+				       (const efi_guid_t *)arg2, *(u32 *)arg3,
 				       *(unsigned long *)arg4, (void *)arg5);
 		break;
 	case EFI_QUERY_VARIABLE_INFO:
@@ -296,8 +296,8 @@ static efi_status_t virt_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
 	return status;
 }
 
-static efi_status_t virt_efi_get_variable(efi_char16_t *name,
-					  efi_guid_t *vendor,
+static efi_status_t virt_efi_get_variable(const efi_char16_t *name,
+					  const efi_guid_t *vendor,
 					  u32 *attr,
 					  unsigned long *data_size,
 					  void *data)
@@ -326,8 +326,8 @@ static efi_status_t virt_efi_get_next_variable(unsigned long *name_size,
 	return status;
 }
 
-static efi_status_t virt_efi_set_variable(efi_char16_t *name,
-					  efi_guid_t *vendor,
+static efi_status_t virt_efi_set_variable(const efi_char16_t *name,
+					  const efi_guid_t *vendor,
 					  u32 attr,
 					  unsigned long data_size,
 					  void *data)
@@ -343,7 +343,8 @@ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
 }
 
 static efi_status_t
-virt_efi_set_variable_nonblocking(efi_char16_t *name, efi_guid_t *vendor,
+virt_efi_set_variable_nonblocking(const efi_char16_t *name,
+				  const efi_guid_t *vendor,
 				  u32 attr, unsigned long data_size,
 				  void *data)
 {

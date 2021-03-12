@@ -140,8 +140,8 @@ prefix##_set_wakeup_time (efi_bool_t enabled, efi_time_t *tm)		       \
 
 #define STUB_GET_VARIABLE(prefix, adjust_arg)				       \
 static efi_status_t							       \
-prefix##_get_variable (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,      \
-		       unsigned long *data_size, void *data)		       \
+prefix##_get_variable (const efi_char16_t *name, const efi_guid_t *vendor,     \
+		       u32 *attr, unsigned long *data_size, void *data)	       \
 {									       \
 	struct ia64_fpreg fr[6];					       \
 	u32 *aattr = NULL;						       \
@@ -176,7 +176,7 @@ prefix##_get_next_variable (unsigned long *name_size, efi_char16_t *name,      \
 
 #define STUB_SET_VARIABLE(prefix, adjust_arg)				       \
 static efi_status_t							       \
-prefix##_set_variable (efi_char16_t *name, efi_guid_t *vendor,		       \
+prefix##_set_variable (const efi_char16_t *name, const efi_guid_t *vendor,     \
 		       u32 attr, unsigned long data_size,		       \
 		       void *data)					       \
 {									       \

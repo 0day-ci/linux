@@ -92,12 +92,10 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
 #endif
 
 #define get_efi_var(name, vendor, ...)				\
-	efi_rt_call(get_variable, (efi_char16_t *)(name),	\
-		    (efi_guid_t *)(vendor), __VA_ARGS__)
+	efi_rt_call(get_variable, (name), (vendor), __VA_ARGS__)
 
 #define set_efi_var(name, vendor, ...)				\
-	efi_rt_call(set_variable, (efi_char16_t *)(name),	\
-		    (efi_guid_t *)(vendor), __VA_ARGS__)
+	efi_rt_call(set_variable, (name), (vendor), __VA_ARGS__)
 
 #define efi_get_handle_at(array, idx)					\
 	(efi_is_native() ? (array)[idx] 				\

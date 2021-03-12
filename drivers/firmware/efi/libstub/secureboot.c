@@ -16,8 +16,8 @@
 static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
 static const efi_char16_t shim_MokSBState_name[] = L"MokSBState";
 
-static efi_status_t get_var(efi_char16_t *name, efi_guid_t *vendor, u32 *attr,
-			    unsigned long *data_size, void *data)
+static efi_status_t get_var(const efi_char16_t *name, const efi_guid_t *vendor,
+			    u32 *attr, unsigned long *data_size, void *data)
 {
 	return get_efi_var(name, vendor, attr, data_size, data);
 }
