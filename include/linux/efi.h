@@ -234,11 +234,13 @@ typedef efi_status_t efi_set_time_t (efi_time_t *tm);
 typedef efi_status_t efi_get_wakeup_time_t (efi_bool_t *enabled, efi_bool_t *pending,
 					    efi_time_t *tm);
 typedef efi_status_t efi_set_wakeup_time_t (efi_bool_t enabled, efi_time_t *tm);
-typedef efi_status_t efi_get_variable_t (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,
+typedef efi_status_t efi_get_variable_t (const efi_char16_t *name,
+					 const efi_guid_t *vendor, u32 *attr,
 					 unsigned long *data_size, void *data);
 typedef efi_status_t efi_get_next_variable_t (unsigned long *name_size, efi_char16_t *name,
 					      efi_guid_t *vendor);
-typedef efi_status_t efi_set_variable_t (efi_char16_t *name, efi_guid_t *vendor, 
+typedef efi_status_t efi_set_variable_t (const efi_char16_t *name,
+					 const efi_guid_t *vendor,
 					 u32 attr, unsigned long data_size,
 					 void *data);
 typedef efi_status_t efi_get_next_high_mono_count_t (u32 *count);
@@ -598,7 +600,7 @@ efi_guidcmp (efi_guid_t left, efi_guid_t right)
 }
 
 static inline char *
-efi_guid_to_str(efi_guid_t *guid, char *out)
+efi_guid_to_str(const efi_guid_t *guid, char *out)
 {
 	sprintf(out, "%pUl", guid->b);
         return out;
@@ -1217,11 +1219,11 @@ enum efi_rts_ids {
  * @efi_rts_comp:	Struct used for handling completions
  */
 struct efi_runtime_work {
-	void *arg1;
-	void *arg2;
-	void *arg3;
-	void *arg4;
-	void *arg5;
+	const void *arg1;
+	const void *arg2;
+	const void *arg3;
+	const void *arg4;
+	const void *arg5;
 	efi_status_t status;
 	struct work_struct work;
 	enum efi_rts_ids efi_rts_id;

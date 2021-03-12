@@ -152,7 +152,7 @@ void efi_sync_low_kernel_mappings(void)
  * Wrapper for slow_virt_to_phys() that handles NULL addresses.
  */
 static inline phys_addr_t
-virt_to_phys_or_null_size(void *va, unsigned long size)
+virt_to_phys_or_null_size(const void *va, unsigned long size)
 {
 	phys_addr_t pa;
 
@@ -160,9 +160,9 @@ virt_to_phys_or_null_size(void *va, unsigned long size)
 		return 0;
 
 	if (virt_addr_valid(va))
-		return virt_to_phys(va);
+		return virt_to_phys((void *)va);
 
-	pa = slow_virt_to_phys(va);
+	pa = slow_virt_to_phys((void *)va);
 
 	/* check if the object crosses a page boundary */
 	if (WARN_ON((pa ^ (pa + size - 1)) & PAGE_MASK))
@@ -567,13 +567,13 @@ efi_thunk_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
 	return EFI_UNSUPPORTED;
 }
 
-static unsigned long efi_name_size(efi_char16_t *name)
+static unsigned long efi_name_size(const efi_char16_t *name)
 {
 	return ucs2_strsize(name, EFI_VAR_NAME_LEN) + 1;
 }
 
 static efi_status_t
-efi_thunk_get_variable(efi_char16_t *name, efi_guid_t *vendor,
+efi_thunk_get_variable(const efi_char16_t *name, const efi_guid_t *vendor,
 		       u32 *attr, unsigned long *data_size, void *data)
 {
 	u8 buf[24] __aligned(8);
@@ -605,7 +605,7 @@ efi_thunk_get_variable(efi_char16_t *name, efi_guid_t *vendor,
 }
 
 static efi_status_t
-efi_thunk_set_variable(efi_char16_t *name, efi_guid_t *vendor,
+efi_thunk_set_variable(const efi_char16_t *name, const efi_guid_t *vendor,
 		       u32 attr, unsigned long data_size, void *data)
 {
 	u8 buf[24] __aligned(8);
@@ -634,7 +634,8 @@ efi_thunk_set_variable(efi_char16_t *name, efi_guid_t *vendor,
 }
 
 static efi_status_t
-efi_thunk_set_variable_nonblocking(efi_char16_t *name, efi_guid_t *vendor,
+efi_thunk_set_variable_nonblocking(const efi_char16_t *name,
+				   const efi_guid_t *vendor,
 				   u32 attr, unsigned long data_size,
 				   void *data)
 {
