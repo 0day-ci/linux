@@ -1032,11 +1032,14 @@ static void __bfq_activate_entity(struct bfq_entity *entity,
 	if (!bfq_entity_to_bfqq(entity)) { /* bfq_group */
 		struct bfq_group *bfqg = bfq_entity_to_bfqg(entity);
 		struct bfq_data *bfqd = bfqg->bfqd;
+		int idx = bfq_class_idx(entity);
 
 		if (!entity->in_groups_with_pending_reqs) {
 			entity->in_groups_with_pending_reqs = true;
 			bfqd->num_groups_with_pending_reqs++;
 		}
+
+		bfqd->busy_groups[idx]++;
 	}
 #endif
 
@@ -1188,6 +1191,9 @@ bool __bfq_deactivate_entity(struct bfq_entity *entity, bool ins_into_idle_tree)
 {
 	struct bfq_sched_data *sd = entity->sched_data;
 	struct bfq_service_tree *st;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	struct bfq_group *bfqg;
+#endif
 	int idx = bfq_class_idx(entity);
 	bool is_in_service;
 
@@ -1229,6 +1235,12 @@ bool __bfq_deactivate_entity(struct bfq_entity *entity, bool ins_into_idle_tree)
 		bfq_idle_insert(st, entity);
 
 	sd->bfq_class_last_service[idx] = jiffies;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	bfqg = bfq_entity_to_bfqg(entity);
+	if (bfqg)
+		bfqg->bfqd->busy_groups[idx]--;
+#endif
+
 	return true;
 }
 

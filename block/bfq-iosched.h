@@ -531,6 +531,14 @@ struct bfq_data {
 	 */
 	unsigned int num_groups_with_pending_reqs;
 
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	/*
+	 * Per-class (RT, BE, IDLE) number of bfq_groups waiting for
+	 * service.
+	 */
+	unsigned int busy_groups[3];
+#endif
+
 	/*
 	 * Per-class (RT, BE, IDLE) number of bfq_queues containing
 	 * requests (including the queue in service, even if it is

@@ -428,6 +428,7 @@ void bfq_schedule_dispatch(struct bfq_data *bfqd)
 	}
 }
 
+#define bfq_class_rt(bfqq)	((bfqq)->ioprio_class == IOPRIO_CLASS_RT)
 #define bfq_class_idle(bfqq)	((bfqq)->ioprio_class == IOPRIO_CLASS_IDLE)
 
 #define bfq_sample_valid(samples)	((samples) > 80)
@@ -4709,12 +4710,16 @@ static struct request *bfq_dispatch_rq_from_bfqq(struct bfq_data *bfqd,
 	/*
 	 * Expire bfqq, pretending that its budget expired, if bfqq
 	 * belongs to CLASS_IDLE and other queues are waiting for
-	 * service.
+	 * service, or if bfqq not belongs to CLASS_RT and CLASS_RT
+	 * is waiting for service.
 	 */
-	if (!(bfq_tot_busy_queues(bfqd) > 1 && bfq_class_idle(bfqq)))
-		goto return_rq;
-
-	bfq_bfqq_expire(bfqd, bfqq, false, BFQQE_BUDGET_EXHAUSTED);
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	if ((bfq_tot_busy_queues(bfqd) > 1 && bfq_class_idle(bfqq)) ||
+	    (!bfq_class_rt(bfqq) && bfqd->busy_groups[0]))
+#else
+	if (bfq_tot_busy_queues(bfqd) > 1 && bfq_class_idle(bfqq))
+#endif
+		bfq_bfqq_expire(bfqd, bfqq, false, BFQQE_BUDGET_EXHAUSTED);
 
 return_rq:
 	return rq;
