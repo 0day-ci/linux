@@ -1965,6 +1965,9 @@ static void bfq_check_waker(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 	    bfqd->last_completed_rq_bfqq == bfqq->waker_bfqq)
 		return;
 
+	if (bfq_class_rt(bfqq) && !bfq_class_rt(bfqd->last_completed_rq_bfqq))
+		return;
+
 	if (bfqd->last_completed_rq_bfqq !=
 	    bfqq->tentative_waker_bfqq) {
 		/*
@@ -4391,6 +4394,9 @@ bfq_choose_bfqq_for_injection(struct bfq_data *bfqd)
 			else
 				limit = in_serv_bfqq->inject_limit;
 
+			if (bfq_class_rt(in_serv_bfqq) && !bfq_class_rt(bfqq))
+				continue;
+
 			if (bfqd->rq_in_driver < limit) {
 				bfqd->rqs_injected = true;
 				return bfqq;
@@ -4565,7 +4571,7 @@ check_queue:
 		 * may not be minimized, because the waker queue may
 		 * happen to be served only after other queues.
 		 */
-		if (async_bfqq &&
+		if (async_bfqq && !bfq_class_rt(bfqq) &&
 		    icq_to_bic(async_bfqq->next_rq->elv.icq) == bfqq->bic &&
 		    bfq_serv_to_charge(async_bfqq->next_rq, async_bfqq) <=
 		    bfq_bfqq_budget_left(async_bfqq))
