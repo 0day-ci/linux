@@ -5105,7 +5105,12 @@ static void bfq_check_ioprio_change(struct bfq_io_cq *bic, struct bio *bio)
 {
 	struct bfq_data *bfqd = bic_to_bfqd(bic);
 	struct bfq_queue *bfqq;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	struct bfq_group_data *bfqgd = blkcg_to_bfqgd(__bio_blkcg(bio));
+	int ioprio = bfqgd->ioprio ?: bic->icq.ioc->ioprio;
+#else
 	int ioprio = bic->icq.ioc->ioprio;
+#endif
 
 	/*
 	 * This condition may trigger on a newly created bic, be sure to

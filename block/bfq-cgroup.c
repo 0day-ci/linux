@@ -489,7 +489,7 @@ static struct bfq_group_data *cpd_to_bfqgd(struct blkcg_policy_data *cpd)
 	return cpd ? container_of(cpd, struct bfq_group_data, pd) : NULL;
 }
 
-static struct bfq_group_data *blkcg_to_bfqgd(struct blkcg *blkcg)
+struct bfq_group_data *blkcg_to_bfqgd(struct blkcg *blkcg)
 {
 	return cpd_to_bfqgd(blkcg_to_cpd(blkcg, &blkcg_policy_bfq));
 }
@@ -553,6 +553,16 @@ static void bfq_pd_init(struct blkg_policy_data *pd)
 	bfqg->bfqd = bfqd;
 	bfqg->active_entities = 0;
 	bfqg->rq_pos_tree = RB_ROOT;
+
+	bfqg->new_ioprio_class = IOPRIO_PRIO_CLASS(d->ioprio);
+	bfqg->new_ioprio = IOPRIO_PRIO_DATA(d->ioprio);
+	bfqg->ioprio_class = bfqg->new_ioprio_class;
+	bfqg->ioprio = bfqg->new_ioprio;
+
+	if (d->ioprio) {
+		entity->new_weight = bfq_ioprio_to_weight(bfqg->ioprio);
+		entity->weight = entity->new_weight;
+	}
 }
 
 static void bfq_pd_free(struct blkg_policy_data *pd)
@@ -981,6 +991,20 @@ static int bfq_io_show_weight(struct seq_file *sf, void *v)
 	return 0;
 }
 
+static int bfq_io_show_ioprio(struct seq_file *sf, void *v)
+{
+	struct blkcg *blkcg = css_to_blkcg(seq_css(sf));
+	struct bfq_group_data *bfqgd = blkcg_to_bfqgd(blkcg);
+	unsigned int val = 0;
+
+	if (bfqgd)
+		val = bfqgd->ioprio;
+
+	seq_printf(sf, "%u %lu\n", IOPRIO_PRIO_CLASS(val), IOPRIO_PRIO_DATA(val));
+
+	return 0;
+}
+
 static void bfq_group_set_weight(struct bfq_group *bfqg, u64 weight, u64 dev_weight)
 {
 	weight = dev_weight ?: weight;
@@ -1096,6 +1120,55 @@ static ssize_t bfq_io_set_weight(struct kernfs_open_file *of,
 	}
 
 	return bfq_io_set_device_weight(of, buf, nbytes, off);
+}
+
+static ssize_t bfq_io_set_ioprio(struct kernfs_open_file *of, char *buf,
+				 size_t nbytes, loff_t off)
+{
+	struct cgroup_subsys_state *css = of_css(of);
+	struct blkcg *blkcg = css_to_blkcg(css);
+	struct bfq_group_data *bfqgd = blkcg_to_bfqgd(blkcg);
+	struct blkcg_gq *blkg;
+	unsigned int class, data;
+	char *endp;
+
+	buf = strstrip(buf);
+
+	class = simple_strtoul(buf, &endp, 10);
+	if (*endp != ' ')
+		return -EINVAL;
+	buf = endp + 1;
+
+	data = simple_strtoul(buf, &endp, 10);
+	if ((*endp != ' ') && (*endp != '\0'))
+		return -EINVAL;
+
+	if (class > IOPRIO_CLASS_IDLE || data >= IOPRIO_BE_NR)
+		return -EINVAL;
+
+	spin_lock_irq(&blkcg->lock);
+	bfqgd->ioprio = IOPRIO_PRIO_VALUE(class, data);
+	hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
+		struct bfq_group *bfqg = blkg_to_bfqg(blkg);
+
+		if (bfqg) {
+			if ((bfqg->ioprio_class != class) ||
+			    (bfqg->ioprio != data)) {
+				unsigned short weight;
+
+				weight = class ? bfq_ioprio_to_weight(data) :
+					BFQ_WEIGHT_LEGACY_DFL;
+
+				bfqg->new_ioprio_class = class;
+				bfqg->new_ioprio = data;
+				bfqg->entity.new_weight = weight;
+				bfqg->entity.prio_changed = 1;
+			}
+		}
+	}
+	spin_unlock_irq(&blkcg->lock);
+
+	return nbytes;
 }
 
 static int bfqg_print_rwstat(struct seq_file *sf, void *v)
@@ -1264,6 +1337,12 @@ struct cftype bfq_blkcg_legacy_files[] = {
 		.seq_show = bfq_io_show_weight,
 		.write = bfq_io_set_weight,
 	},
+	{
+		.name = "bfq.ioprio",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = bfq_io_show_ioprio,
+		.write = bfq_io_set_ioprio,
+	},
 
 	/* statistics, covers only the tasks in the bfqg */
 	{
@@ -1383,6 +1462,12 @@ struct cftype bfq_blkg_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = bfq_io_show_weight,
 		.write = bfq_io_set_weight,
+	},
+	{
+		.name = "bfq.ioprio",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = bfq_io_show_ioprio,
+		.write = bfq_io_set_ioprio,
 	},
 	{} /* terminate */
 };
