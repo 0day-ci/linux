@@ -2623,6 +2623,9 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 	if (!bfq_bfqq_sync(bfqq) || !bfq_bfqq_sync(new_bfqq))
 		return false;
 
+	if (bfq_class_rt(bfqq) && !bfq_class_rt(new_bfqq))
+		return false;
+
 	return true;
 }
 
