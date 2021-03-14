@@ -756,7 +756,6 @@ static int venc_power_v4(struct device *dev, int on)
 static int vcodec_domains_get(struct device *dev)
 {
 	int ret;
-	struct opp_table *opp_table;
 	struct device **opp_virt_dev;
 	struct venus_core *core = dev_get_drvdata(dev);
 	const struct venus_resources *res = core->res;
@@ -779,11 +778,9 @@ skip_pmdomains:
 		return 0;
 
 	/* Attach the power domain for setting performance state */
-	opp_table = dev_pm_opp_attach_genpd(dev, res->opp_pmdomain, &opp_virt_dev);
-	if (IS_ERR(opp_table)) {
-		ret = PTR_ERR(opp_table);
+	ret = devm_pm_opp_attach_genpd(dev, res->opp_pmdomain, &opp_virt_dev);
+	if (ret)
 		goto opp_attach_err;
-	}
 
 	core->opp_pmdomain = *opp_virt_dev;
 	core->opp_dl_venus = device_link_add(dev, core->opp_pmdomain,
@@ -792,13 +789,11 @@ skip_pmdomains:
 					     DL_FLAG_STATELESS);
 	if (!core->opp_dl_venus) {
 		ret = -ENODEV;
-		goto opp_dl_add_err;
+		goto opp_attach_err;
 	}
 
 	return 0;
 
-opp_dl_add_err:
-	dev_pm_opp_detach_genpd(core->opp_table);
 opp_attach_err:
 	for (i = 0; i < res->vcodec_pmdomains_num; i++) {
 		if (IS_ERR_OR_NULL(core->pmdomains[i]))
@@ -830,8 +825,6 @@ skip_pmdomains:
 
 	if (core->opp_dl_venus)
 		device_link_del(core->opp_dl_venus);
-
-	dev_pm_opp_detach_genpd(core->opp_table);
 }
 
 static int core_get_v4(struct device *dev)
@@ -860,45 +853,33 @@ static int core_get_v4(struct device *dev)
 	if (legacy_binding)
 		return 0;
 
-	core->opp_table = dev_pm_opp_set_clkname(dev, "core");
-	if (IS_ERR(core->opp_table))
-		return PTR_ERR(core->opp_table);
+	ret = devm_pm_opp_set_clkname(dev, "core");
+	if (ret)
+		return ret;
 
 	if (core->res->opp_pmdomain) {
-		ret = dev_pm_opp_of_add_table(dev);
+		ret = devm_pm_opp_of_add_table(dev);
 		if (!ret) {
 			core->has_opp_table = true;
 		} else if (ret != -ENODEV) {
 			dev_err(dev, "invalid OPP table in device tree\n");
-			dev_pm_opp_put_clkname(core->opp_table);
 			return ret;
 		}
 	}
 
 	ret = vcodec_domains_get(dev);
-	if (ret) {
-		if (core->has_opp_table)
-			dev_pm_opp_of_remove_table(dev);
-		dev_pm_opp_put_clkname(core->opp_table);
+	if (ret)
 		return ret;
-	}
 
 	return 0;
 }
 
 static void core_put_v4(struct device *dev)
 {
-	struct venus_core *core = dev_get_drvdata(dev);
-
 	if (legacy_binding)
 		return;
 
 	vcodec_domains_put(dev);
-
-	if (core->has_opp_table)
-		dev_pm_opp_of_remove_table(dev);
-	dev_pm_opp_put_clkname(core->opp_table);
-
 }
 
 static int core_power_v4(struct device *dev, int on)
