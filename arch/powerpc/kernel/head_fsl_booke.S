@@ -113,7 +113,7 @@ _ENTRY(_start);
 
 1:
 	/*
-	 * We have the runtime (virutal) address of our base.
+	 * We have the runtime (virtual) address of our base.
 	 * We calculate our shift of offset from a 64M page.
 	 * We could map the 64M page we belong to at PAGE_OFFSET and
 	 * get going from there.
@@ -403,7 +403,7 @@ interrupt_base:
 	EXCEPTION(0x2900, AP_UNAVAIL, AuxillaryProcessorUnavailable, \
 		  unknown_exception, EXC_XFER_STD)
 
-	/* Decrementer Interrupt */
+	/* Decremented Interrupt */
 	DECREMENTER_EXCEPTION
 
 	/* Fixed Internal Timer Interrupt */
@@ -497,7 +497,7 @@ END_BTB_FLUSH_SECTION
 #endif
 #endif
 
-	bne	2f			/* Bail if permission/valid mismach */
+	bne	2f			/* Bail if permission/valid mismatch */
 
 	/* Jump to common tlb load */
 	b	finish_tlb_load
@@ -592,7 +592,7 @@ END_BTB_FLUSH_SECTION
 #endif
 #endif
 
-	bne	2f			/* Bail if permission mismach */
+	bne	2f			/* Bail if permission mismatch */
 
 	/* Jump to common TLB load point */
 	b	finish_tlb_load
