@@ -422,7 +422,7 @@ static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
 
 	/*
 	 * TODO This isn't enough to tell if it's UP system (from kernel
-	 * point of view) or not, is_smp() returns the the information
+	 * point of view) or not, is_smp() returns the information
 	 * needed, but can't be called directly from here.
 	 */
 	if (!IS_ENABLED(CONFIG_SMP) || nr_cpu_ids == 1)
