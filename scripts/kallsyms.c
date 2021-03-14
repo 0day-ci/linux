@@ -12,7 +12,7 @@
  *  map char code 0xF7 to represent "write_" and then in every symbol where
  *  "write_" appears it can be replaced by 0xF7, saving 5 bytes.
  *      The used codes themselves are also placed in the table so that the
- *  decompresion can work without "special cases".
+ *  decompression can work without "special cases".
  *      Applied to kernel symbols, this usually produces a compression ratio
  *  of about 50%.
  *
@@ -343,7 +343,7 @@ static void output_label(const char *label)
 	printf("%s:\n", label);
 }
 
-/* Provide proper symbols relocatability by their '_text' relativeness. */
+/* Provide proper symbols relocate ability by their '_text' relativeness. */
 static void output_address(unsigned long long addr)
 {
 	if (_text <= addr)
