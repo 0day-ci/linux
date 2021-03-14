@@ -408,9 +408,8 @@ static void iwl_set_ucode_api_flags(struct iwl_drv *drv, const u8 *data,
 	int i;
 
 	if (api_index >= DIV_ROUND_UP(NUM_IWL_UCODE_TLV_API, 32)) {
-		IWL_WARN(drv,
-			 "api flags index %d larger than supported by driver\n",
-			 api_index);
+		IWL_DEBUG_FW_INFO(drv, "api flags index %d larger than supported by driver\n",
+				  api_index);
 		return;
 	}
 
@@ -429,9 +428,8 @@ static void iwl_set_ucode_capabilities(struct iwl_drv *drv, const u8 *data,
 	int i;
 
 	if (api_index >= DIV_ROUND_UP(NUM_IWL_UCODE_TLV_CAPA, 32)) {
-		IWL_WARN(drv,
-			 "capa flags index %d larger than supported by driver\n",
-			 api_index);
+		IWL_DEBUG_FW_INFO(drv, "capa flags index %d larger than supported by driver\n",
+				  api_index);
 		return;
 	}
 
