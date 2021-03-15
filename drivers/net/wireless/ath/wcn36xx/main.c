@@ -1088,15 +1088,39 @@ static int wcn36xx_sta_remove(struct ieee80211_hw *hw,
 
 #ifdef CONFIG_PM
 
+struct ieee80211_vif *wcn36xx_get_first_vif(struct wcn36xx *wcn)
+{
+	struct wcn36xx_vif *tmp;
+	struct ieee80211_vif *vif = NULL;
+
+	list_for_each_entry(tmp, &wcn->vif_list, list) {
+		vif = wcn36xx_priv_to_vif(tmp);
+		if (vif)
+			break;
+	}
+	return vif;
+}
+
 static int wcn36xx_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wow)
 {
 	struct wcn36xx *wcn = hw->priv;
-	int ret;
+	struct ieee80211_vif *vif = NULL;
+	struct wcn36xx_vif *vif_priv = NULL;
+	int ret = 0;
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac suspend\n");
 
 	flush_workqueue(wcn->hal_ind_wq);
-	ret = wcn36xx_smd_set_power_params(wcn, true);
+	mutex_lock(&wcn->conf_mutex);
+	vif = wcn36xx_get_first_vif(wcn);
+	if (vif) {
+		vif_priv = wcn36xx_vif_to_priv(vif);
+		if (!vif_priv->sta_assoc)
+			goto out;
+		ret = wcn36xx_smd_set_power_params(wcn, true);
+	}
+out:
+	mutex_unlock(&wcn->conf_mutex);
 
 	return ret;
 }
@@ -1104,11 +1128,24 @@ static int wcn36xx_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wow)
 static int wcn36xx_resume(struct ieee80211_hw *hw)
 {
 	struct wcn36xx *wcn = hw->priv;
+	struct ieee80211_vif *vif = NULL;
+	struct wcn36xx_vif *vif_priv = NULL;
 
 	wcn36xx_dbg(WCN36XX_DBG_MAC, "mac resume\n");
 
 	flush_workqueue(wcn->hal_ind_wq);
-	wcn36xx_smd_set_power_params(wcn, false);
+	mutex_lock(&wcn->conf_mutex);
+	vif = wcn36xx_get_first_vif(wcn);
+	if (vif) {
+		vif_priv = wcn36xx_vif_to_priv(vif);
+		if (!vif_priv->sta_assoc)
+			goto out;
+
+		wcn36xx_smd_set_power_params(wcn, false);
+	}
+out:
+	mutex_unlock(&wcn->conf_mutex);
+
 	return 0;
 }
 
