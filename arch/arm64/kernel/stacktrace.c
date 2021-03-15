@@ -18,6 +18,26 @@
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
+#ifdef CONFIG_KRETPROBES
+static bool kretprobe_detected(struct stackframe *frame)
+{
+	static char kretprobe_name[KSYM_NAME_LEN];
+	static unsigned long kretprobe_pc, kretprobe_end_pc;
+	unsigned long pc, offset, size;
+
+	if (!kretprobe_pc) {
+		pc = (unsigned long) kretprobe_trampoline;
+		if (!kallsyms_lookup(pc, &size, &offset, NULL, kretprobe_name))
+			return false;
+
+		kretprobe_pc = pc - offset;
+		kretprobe_end_pc = kretprobe_pc + size;
+	}
+
+	return frame->pc >= kretprobe_pc && frame->pc < kretprobe_end_pc;
+}
+#endif
+
 static void check_if_reliable(unsigned long fp, struct stackframe *frame,
 			      struct stack_info *info)
 {
@@ -111,6 +131,29 @@ static void check_if_reliable(unsigned long fp, struct stackframe *frame,
 		frame->reliable = false;
 		return;
 	}
+
+#ifdef CONFIG_KRETPROBES
+	/*
+	 * The return address of a function that has an active kretprobe
+	 * is modified in the stack frame to point to a trampoline. So,
+	 * the original return address is not available on the stack.
+	 *
+	 * A stack trace taken while executing the function (and its
+	 * descendants) will not show the original caller. So, mark the
+	 * stack trace as unreliable if the trampoline shows up in the
+	 * stack trace. (Obtaining the original return address from
+	 * task->kretprobe_instances seems problematic and not worth the
+	 * effort).
+	 *
+	 * The stack trace taken while inside the trampoline and functions
+	 * called by the trampoline have the same problem as above. This
+	 * is also covered by kretprobe_detected() using a range check.
+	 */
+	if (kretprobe_detected(frame)) {
+		frame->reliable = false;
+		return;
+	}
+#endif
 }
 
 /*
