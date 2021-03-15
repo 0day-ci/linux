@@ -50,6 +50,11 @@ properties:
     minItems: 1
     maxItems: 2
 
+  bluetooth:
+    type: object
+    description: |
+      phandles to the usart controller and bluetooth
+
 # cts-gpios and rts-gpios properties can be used instead of 'uart-has-rtscts'
 # or 'st,hw-flow-ctrl' (deprecated) for making use of any gpio pins for flow
 # control instead of dedicated pins.
