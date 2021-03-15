@@ -20,6 +20,7 @@ int bit1cnt_long(u32 data)
 			cnt++;
 		data >>= 1;
 	}
+
 	return cnt;
 }
 
