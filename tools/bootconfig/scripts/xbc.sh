@@ -9,7 +9,7 @@ BOOTCONFIG=${BOOTCONFIG:=$XBC_BASEDIR/../bootconfig}
 if [ ! -x "$BOOTCONFIG" ]; then
 	BOOTCONFIG=`which bootconfig`
 	if [ -z "$BOOTCONFIG" ]; then
-		echo "Erorr: bootconfig command is not found" 1>&2
+		echo "Error: bootconfig command is not found" 1>&2
 		exit 1
 	fi
 fi
