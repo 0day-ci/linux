@@ -3317,7 +3317,7 @@ static ssize_t amdgpu_hwmon_show_mclk_label(struct device *dev,
  *
  * - fan1_min: an minimum value Unit: revolution/min (RPM)
  *
- * - fan1_max: an maxmum value Unit: revolution/max (RPM)
+ * - fan1_max: an maximum value Unit: revolution/max (RPM)
  *
  * - fan1_input: fan speed in RPM
  *
