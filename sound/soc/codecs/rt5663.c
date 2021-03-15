@@ -1967,7 +1967,7 @@ static void rt5663_jack_detect_work(struct work_struct *work)
 					btn_type);
 				break;
 			}
-			/* button release or spurious interrput*/
+			/* button release or spurious interrupt*/
 			if (btn_type == 0) {
 				report =  rt5663->jack_type;
 				cancel_delayed_work_sync(
