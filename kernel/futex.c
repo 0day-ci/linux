@@ -2460,7 +2460,6 @@ handle_err:
 
 	case -EAGAIN:
 		cond_resched();
-		err = 0;
 		break;
 
 	default:
@@ -2474,11 +2473,22 @@ handle_err:
 	/*
 	 * Check if someone else fixed it for us:
 	 */
-	if (pi_state->owner != oldowner)
+	if (pi_state->owner != oldowner) {
+		/*
+		 * The change might have come from the rare immutable
+		 * state below, which leaves the userspace value out of
+		 * sync. But if we are the lock stealer and can update
+		 * the uval, do so, instead of reporting a successful
+		 * lock operation with an invalid user state.
+		 */
+		if (!err && argowner == current)
+			goto retry;
+
 		return argowner == current;
+	}
 
 	/* Retry if err was -EAGAIN or the fault in succeeded */
-	if (!err)
+	if (err == -EAGAIN || !err)
 		goto retry;
 
 	/*
