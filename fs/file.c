@@ -1107,6 +1107,7 @@ int __receive_fd(int fd, struct file *file, int __user *ufd, unsigned int o_flag
 	__receive_sock(file);
 	return new_fd;
 }
+EXPORT_SYMBOL(__receive_fd);
 
 static int ksys_dup3(unsigned int oldfd, unsigned int newfd, int flags)
 {
