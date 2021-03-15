@@ -168,13 +168,6 @@ struct dcss_dev *dcss_dev_create(struct device *dev, bool hdmi_output)
 	int ret;
 	struct resource *res;
 	struct dcss_dev *dcss;
-	const struct dcss_type_data *devtype;
-
-	devtype = of_device_get_match_data(dev);
-	if (!devtype) {
-		dev_err(dev, "no device match found\n");
-		return ERR_PTR(-ENODEV);
-	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -187,7 +180,7 @@ struct dcss_dev *dcss_dev_create(struct device *dev, bool hdmi_output)
 		return ERR_PTR(-ENOMEM);
 
 	dcss->dev = dev;
-	dcss->devtype = devtype;
+	dcss->devtype = device_get_match_data(dev);
 	dcss->hdmi_output = hdmi_output;
 
 	ret = dcss_clks_init(dcss);
