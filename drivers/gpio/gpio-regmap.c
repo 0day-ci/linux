@@ -249,6 +249,8 @@ struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config
 
 	chip = &gpio->gpio_chip;
 	chip->parent = config->parent;
+       /* gpiolib will use of_node of the parent if chip->of_node is NULL */
+	chip->of_node = to_of_node(config->fwnode);
 	chip->base = -1;
 	chip->ngpio = config->ngpio;
 	chip->names = config->names;
