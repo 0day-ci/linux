@@ -341,6 +341,28 @@ struct ethtool_eeprom {
 };
 
 /**
+ * struct ethtool_eeprom_data - EEPROM dump from specified page
+ * @offset: Offset within the specified EEPROM page to begin read, in bytes.
+ * @length: Number of bytes to read.
+ * @page: Page number to read from.
+ * @bank: Page bank number to read from, if applicable by EEPROM spec.
+ * @i2c_address: I2C address of a page. Value less than 0x7f expected. Most
+ *	EEPROMs use 0x50 or 0x51.
+ * @data: Pointer to buffer with EEPROM data of @length size.
+ *
+ * This can be used to manage pages during EEPROM dump in ethtool and pass
+ * required information to the driver.
+ */
+struct ethtool_eeprom_data {
+	__u32	offset;
+	__u32	length;
+	__u8	page;
+	__u8	bank;
+	__u8	i2c_address;
+	__u8	*data;
+};
+
+/**
  * struct ethtool_eee - Energy Efficient Ethernet information
  * @cmd: ETHTOOL_{G,S}EEE
  * @supported: Mask of %SUPPORTED_* flags for the speed/duplex combinations
@@ -1864,6 +1886,9 @@ static inline int ethtool_validate_duplex(__u8 duplex)
 
 #define ETH_MODULE_SFF_8636_MAX_LEN     640
 #define ETH_MODULE_SFF_8436_MAX_LEN     640
+
+#define ETH_MODULE_EEPROM_PAGE_LEN	256
+#define ETH_MODULE_MAX_I2C_ADDRESS	0x7f
 
 /* Reset flags */
 /* The reset() operation must clear the flags for the components which

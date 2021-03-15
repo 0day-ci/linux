@@ -245,6 +245,7 @@ ethnl_default_requests[__ETHTOOL_MSG_USER_CNT] = {
 	[ETHTOOL_MSG_PAUSE_GET]		= &ethnl_pause_request_ops,
 	[ETHTOOL_MSG_EEE_GET]		= &ethnl_eee_request_ops,
 	[ETHTOOL_MSG_TSINFO_GET]	= &ethnl_tsinfo_request_ops,
+	[ETHTOOL_MSG_EEPROM_DATA_GET]	= &ethnl_eeprom_data_request_ops,
 };
 
 static struct ethnl_dump_ctx *ethnl_dump_context(struct netlink_callback *cb)
@@ -911,6 +912,15 @@ static const struct genl_ops ethtool_genl_ops[] = {
 		.dumpit	= ethnl_tunnel_info_dumpit,
 		.policy = ethnl_tunnel_info_get_policy,
 		.maxattr = ARRAY_SIZE(ethnl_tunnel_info_get_policy) - 1,
+	},
+	{
+		.cmd	= ETHTOOL_MSG_EEPROM_DATA_GET,
+		.doit	= ethnl_default_doit,
+		.start	= ethnl_default_start,
+		.dumpit	= ethnl_default_dumpit,
+		.done	= ethnl_default_done,
+		.policy = ethnl_eeprom_data_get_policy,
+		.maxattr = ARRAY_SIZE(ethnl_eeprom_data_get_policy) - 1,
 	},
 };
 
