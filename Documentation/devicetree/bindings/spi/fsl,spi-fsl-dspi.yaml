@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/spi/fsl,spi-fsl-dspi.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Freescale DSPI Controller
+
+maintainers:
+  - Vladimir Oltean <olteanv@gmail.com>
+
+allOf:
+  - $ref: "spi-controller.yaml#"
+
+properties:
+  compatible:
+    oneOf:
+      - enum:
+          - fsl,vf610-dspi
+          - fsl,ls1021a-v1.0-dspi
+          - fsl,ls1028a-dspi
+          - fsl,ls2085a-dspi
+          - fsl,lx2160a-dspi
+      - items:
+          - enum:
+              - fsl,ls1012a-dspi
+              - fsl,ls1028a-dspi
+              - fsl,ls1043a-dspi
+              - fsl,ls1046a-dspi
+              - fsl,ls1088a-dspi
+          - const: fsl,ls1021a-v1.0-dspi
+      - items:
+          - enum:
+              - fsl,ls2080a-dspi
+              - fsl,lx2160a-dspi
+          - const: fsl,ls2085a-dspi
+
+  reg:
+    maxItems: 1
+    description: Offset and length of registers
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    items:
+      - description: SoC dspi clock
+
+  clock-names:
+    items:
+      - const: dspi
+
+  pinctrl-names:
+    minItems: 1
+    items:
+      - const: default
+    description:
+      Names for the pin configuration must be "default"
+
+  dmas:
+    maxItems: 2
+
+  dma-names:
+    items:
+      - const: tx
+      - const: rx
+
+  spi-num-chipselects:
+    maxItems: 1
+    description: Number of the chipselect signals
+
+  bus-num:
+    items:
+      - description: Slave chip chipselect signal number
+
+patternProperties:
+  "@[0-9a-f]+":
+    type: object
+
+    properties:
+      fsl,spi-cs-sck-delay:
+        description:
+          Delay in nanoseconds between activating chip select and the start of
+          clock signal, at the start of a transfer.
+        $ref: /schemas/types.yaml#/definitions/uint32
+
+      fsl,spi-sck-cs-delay:
+        description:
+          Delay in nanoseconds between stopping the clock signal and
+          deactivating chip select, at the end of a transfer.
+        $ref: /schemas/types.yaml#/definitions/uint32
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - clock-names
+  - spi-num-chipselects
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/fsl,qoriq-clockgen.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        spi@2100000 {
+            compatible = "fsl,ls1028a-dspi", "fsl,ls1021a-v1.0-dspi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            reg = <0x0 0x2100000 0x0 0x10000>;
+            interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+            clock-names = "dspi";
+            clocks = <&clockgen QORIQ_CLK_PLATFORM_PLL QORIQ_CLK_PLL_DIV(2)>;
+            dmas = <&edma0 0 62>, <&edma0 0 60>;
+            dma-names = "tx", "rx";
+            spi-num-chipselects = <4>;
+            little-endian;
+
+            flash@0 {
+                compatible = "jedec,spi-nor";
+                spi-max-frequency = <10000000>;
+                reg = <0>;
+            };
+        };
+    };
