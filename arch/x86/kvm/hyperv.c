@@ -1104,6 +1104,24 @@ void kvm_hv_setup_tsc_page(struct kvm *kvm,
 		goto out_err;
 
 	/*
+	 * Don't touch TSC page values if the guest has opted for TSC emulation
+	 * after migration. KVM doesn't fully support reenlightenment
+	 * notifications and TSC access emulation and Hyper-V is known to expect
+	 * the values in TSC page to stay constant before TSC access emulation
+	 * is disabled from guest side (HV_X64_MSR_TSC_EMULATION_STATUS).
+	 * Userspace is expected to preserve TSC frequency and guest visible TSC
+	 * value across migration (and prevent it when TSC scaling is
+	 * unsupported).
+	 */
+	if ((hv->hv_tsc_page_status != HV_TSC_PAGE_GUEST_CHANGED) &&
+	    hv->hv_tsc_emulation_control && tsc_seq) {
+		if (kvm_read_guest(kvm, gfn_to_gpa(gfn), &hv->tsc_ref, sizeof(hv->tsc_ref)))
+			goto out_err;
+
+		goto out_unlock;
+	}
+
+	/*
 	 * While we're computing and writing the parameters, force the
 	 * guest to use the time reference count MSR.
 	 */
