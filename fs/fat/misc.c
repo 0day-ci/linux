@@ -83,6 +83,7 @@ int fat_clusters_flush(struct super_block *sb)
 		       le32_to_cpu(fsinfo->signature2),
 		       sbi->fsinfo_sector);
 	} else {
+		fat_set_state(sb, true);
 		if (sbi->free_clusters != -1)
 			fsinfo->free_clusters = cpu_to_le32(sbi->free_clusters);
 		if (sbi->prev_free != -1)

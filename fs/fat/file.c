@@ -314,6 +314,7 @@ static int fat_free(struct inode *inode, int skip)
 	if (MSDOS_I(inode)->i_start == 0)
 		return 0;
 
+	fat_set_state(sb, true);
 	fat_cache_inval_inode(inode);
 
 	wait = IS_DIRSYNC(inode);

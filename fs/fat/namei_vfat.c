@@ -944,6 +944,7 @@ static int vfat_rename(struct user_namespace *mnt_userns, struct inode *old_dir,
 	}
 	inode_inc_iversion(new_dir);
 
+	fat_set_state(sb, true);
 	fat_detach(old_inode);
 	fat_attach(old_inode, new_i_pos);
 	if (IS_DIRSYNC(new_dir)) {

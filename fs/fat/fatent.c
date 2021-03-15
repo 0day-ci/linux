@@ -472,6 +472,7 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 
 	BUG_ON(nr_cluster > (MAX_BUF_PER_PAGE / 2));	/* fixed limit */
 
+	fat_set_state(sb, true);
 	lock_fat(sbi);
 	if (sbi->free_clusters != -1 && sbi->free_clus_valid &&
 	    sbi->free_clusters < nr_cluster) {
@@ -559,6 +560,7 @@ int fat_free_clusters(struct inode *inode, int cluster)
 	int i, err, nr_bhs;
 	int first_cl = cluster, dirty_fsinfo = 0;
 
+	fat_set_state(sb, true);
 	nr_bhs = 0;
 	fatent_init(&fatent);
 	lock_fat(sbi);
@@ -741,9 +743,11 @@ int fat_count_free_clusters(struct super_block *sb)
 		} while (fat_ent_next(sbi, &fatent));
 		cond_resched();
 	}
-	sbi->free_clusters = free;
 	sbi->free_clus_valid = 1;
-	mark_fsinfo_dirty(sb);
+	if (sbi->free_clusters != free) {
+		sbi->free_clusters = free;
+		mark_fsinfo_dirty(sb);
+	}
 	fatent_brelse(&fatent);
 out:
 	unlock_fat(sbi);
