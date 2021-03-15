@@ -33,6 +33,8 @@
  */
 
 #include <linux/dma-resv.h>
+#include <linux/dma-fence-chain.h>
+#include <linux/dma-fence-array.h>
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/sched/mm.h>
@@ -48,6 +50,19 @@
  * mechanism is used to protect read access to fences from locked
  * write-side updates.
  */
+
+/**
+ * dma_fence_deep_dive_for_each - deep dive into the fence containers
+ * @fence: resulting fence
+ * @chain: variable for a dma_fence_chain
+ * @index: index into a dma_fence_array
+ * @head: starting point
+ *
+ * Helper to deep dive into the fence containers for flattening them.
+ */
+#define dma_fence_deep_dive_for_each(fence, chain, index, head)	\
+	dma_fence_chain_for_each(chain, head)			\
+		dma_fence_array_for_each(fence, index, chain)
 
 DEFINE_WD_CLASS(reservation_ww_class);
 EXPORT_SYMBOL(reservation_ww_class);
@@ -516,6 +531,109 @@ unlock:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dma_resv_get_fences_rcu);
+
+/**
+ * dma_resv_get_singleton - get a single fence for the dma_resv object
+ * @obj: the reservation object
+ * @extra: extra fence to add to the resulting array
+ * @result: resulting dma_fence
+ *
+ * Get a single fence representing all unsignaled fences in the dma_resv object
+ * plus the given extra fence. If we got only one fence return a new
+ * reference to that, otherwise return a dma_fence_array object.
+ *
+ * RETURNS
+ * Returns -NOMEM if allocations fail, zero otherwise.
+ */
+int dma_resv_get_singleton(struct dma_resv *obj, struct dma_fence *extra,
+			   struct dma_fence **result)
+{
+	struct dma_resv_list *fobj = dma_resv_get_list(obj);
+	struct dma_fence *excl = dma_resv_get_excl(obj);
+	struct dma_fence *fence, *chain, **fences;
+	struct dma_fence_array *array;
+	unsigned int num_fences, shared_count;
+	unsigned int i, j;
+
+	num_fences = 0;
+	*result = NULL;
+
+	dma_fence_deep_dive_for_each(fence, chain, i, extra) {
+		if (dma_fence_is_signaled(fence))
+			continue;
+
+		*result = fence;
+		++num_fences;
+	}
+
+	dma_fence_deep_dive_for_each(fence, chain, i, excl) {
+		if (dma_fence_is_signaled(fence))
+			continue;
+
+		*result = fence;
+		++num_fences;
+	}
+
+	shared_count = fobj ? fobj->shared_count : 0;
+	for (i = 0; i < shared_count; ++i) {
+		struct dma_fence *f;
+
+		f = rcu_dereference_protected(fobj->shared[i],
+					      dma_resv_held(obj));
+		dma_fence_deep_dive_for_each(fence, chain, j, f) {
+			if (dma_fence_is_signaled(fence))
+				continue;
+
+			*result = fence;
+			++num_fences;
+		}
+	}
+
+	if (num_fences <= 1) {
+		*result = dma_fence_get(*result);
+		return 0;
+	}
+
+	fences = kmalloc_array(num_fences, sizeof(struct dma_fence*),
+			       GFP_KERNEL);
+	if (!fences)
+		return -ENOMEM;
+
+	num_fences = 0;
+
+	dma_fence_deep_dive_for_each(fence, chain, i, extra)
+		if (!dma_fence_is_signaled(fence))
+			fences[num_fences++] = dma_fence_get(fence);
+
+	dma_fence_deep_dive_for_each(fence, chain, i, excl)
+		if (!dma_fence_is_signaled(fence))
+			fences[num_fences++] = dma_fence_get(fence);
+
+	for (i = 0; i < shared_count; ++i) {
+		struct dma_fence *f;
+
+		f = rcu_dereference_protected(fobj->shared[i],
+					      dma_resv_held(obj));
+		dma_fence_deep_dive_for_each(fence, chain, j, f)
+			if (!dma_fence_is_signaled(fence))
+				fences[num_fences++] = dma_fence_get(fence);
+	}
+
+	array = dma_fence_array_create(num_fences, fences,
+				       dma_fence_context_alloc(1),
+				       1, false);
+	if (!array)
+		goto error_free;
+
+	*result = &array->base;
+	return 0;
+
+error_free:
+	while (num_fences--)
+		dma_fence_put(fences[num_fences]);
+	kfree(fences);
+	return -ENOMEM;
+}
 
 /**
  * dma_resv_wait_timeout_rcu - Wait on reservation's objects
