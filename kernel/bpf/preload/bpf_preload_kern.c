@@ -4,6 +4,7 @@
 #include <linux/module.h>
 #include <linux/pid.h>
 #include <linux/fs.h>
+#include <linux/file.h>
 #include <linux/sched/signal.h>
 #include "bpf_preload.h"
 
@@ -19,6 +20,14 @@ static struct bpf_preload_ops umd_ops = {
 	.finish = finish,
 	.owner = THIS_MODULE,
 };
+
+static void bpf_preload_umh_cleanup(struct umd_info *info)
+{
+	fput(info->pipe_to_umh);
+	fput(info->pipe_from_umh);
+	put_pid(info->tgid);
+	info->tgid = NULL;
+}
 
 static int preload(struct bpf_preload_info *obj)
 {
@@ -62,7 +71,7 @@ static int finish(void)
 		return -EPIPE;
 	tgid = umd_ops.info.tgid;
 	wait_event(tgid->wait_pidfd, thread_group_exited(tgid));
-	umd_ops.info.tgid = NULL;
+	bpf_preload_umh_cleanup(&umd_ops.info);
 	return 0;
 }
 
@@ -80,10 +89,13 @@ static int __init load_umd(void)
 
 static void __exit fini_umd(void)
 {
+	struct pid *tgid;
 	bpf_preload_ops = NULL;
 	/* kill UMD in case it's still there due to earlier error */
-	kill_pid(umd_ops.info.tgid, SIGKILL, 1);
-	umd_ops.info.tgid = NULL;
+	tgid = umd_ops.info.tgid;
+	kill_pid(tgid, SIGKILL, 1);
+	wait_event(tgid->wait_pidfd, thread_group_exited(tgid));
+	bpf_preload_umh_cleanup(&umd_ops.info);
 	umd_unload_blob(&umd_ops.info);
 }
 late_initcall(load_umd);
