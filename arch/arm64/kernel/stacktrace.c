@@ -18,6 +18,58 @@
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
+static void check_if_reliable(unsigned long fp, struct stackframe *frame,
+			      struct stack_info *info)
+{
+	struct pt_regs *regs;
+	unsigned long regs_start, regs_end;
+
+	/*
+	 * If the stack trace has already been marked unreliable, just
+	 * return.
+	 */
+	if (!frame->reliable)
+		return;
+
+	/*
+	 * Assume that this is an intermediate marker frame inside a pt_regs
+	 * structure created on the stack and get the pt_regs pointer. Other
+	 * checks will be done below to make sure that this is a marker
+	 * frame.
+	 */
+	regs_start = fp - offsetof(struct pt_regs, stackframe);
+	if (regs_start < info->low)
+		return;
+	regs_end = regs_start + sizeof(*regs);
+	if (regs_end > info->high)
+		return;
+	regs = (struct pt_regs *) regs_start;
+
+	/*
+	 * When an EL1 exception happens, a pt_regs structure is created
+	 * on the stack and the register state is recorded. Part of the
+	 * state is the FP and PC at the time of the exception.
+	 *
+	 * In addition, the FP and PC are also stored in pt_regs->stackframe
+	 * and pt_regs->stackframe is chained with other frames on the stack.
+	 * This is so that the interrupted function shows up in the stack
+	 * trace.
+	 *
+	 * The exception could have happened during the frame pointer
+	 * prolog or epilog. This could result in a missing frame in
+	 * the stack trace so that the caller of the interrupted
+	 * function does not show up in the stack trace.
+	 *
+	 * So, mark the stack trace as unreliable if an EL1 frame is
+	 * detected.
+	 */
+	if (regs->frame_type == EL1_FRAME && regs->pc == frame->pc &&
+	    regs->regs[29] == frame->fp) {
+		frame->reliable = false;
+		return;
+	}
+}
+
 /*
  * AArch64 PCS assigns the frame pointer to x29.
  *
@@ -113,6 +165,11 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
+
+	/*
+	 * Check for features that render the stack trace unreliable.
+	 */
+	check_if_reliable(fp, frame, &info);
 
 	return 0;
 }
