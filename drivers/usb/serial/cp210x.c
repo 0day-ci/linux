@@ -247,9 +247,9 @@ struct cp210x_serial_private {
 #ifdef CONFIG_GPIOLIB
 	struct gpio_chip	gc;
 	bool			gpio_registered;
-	u8			gpio_pushpull;
-	u8			gpio_altfunc;
-	u8			gpio_input;
+	u16			gpio_pushpull;
+	u16			gpio_altfunc;
+	u16			gpio_input;
 #endif
 	u8			partnum;
 	speed_t			min_speed;
@@ -511,6 +511,25 @@ struct cp210x_single_port_config {
 	u8	device_cfg;
 } __packed;
 
+/*
+ * CP210X_VENDOR_SPECIFIC, CP210X_GET_PORTCONFIG call reads these 0x49 bytes
+ * on a CP2108 chip. Structure needs padding due to unused/unspecified bytes.
+ */
+struct cp210x_quad_port_state {
+	__le16 Mode_PB[5];
+	__le16 LowPower_PB[5];
+	__le16 Latch_PB[5];
+} __packed;
+
+struct cp210x_quad_port_config {
+	struct cp210x_quad_port_state reset_state;
+	struct cp210x_quad_port_state suspend_state;
+	u8 IPDelay_IFC[4];
+	u8 EnhancedFxn_IFC[4];
+	u8 EnhancedFxn_Device;
+	u8 ExtClkFreq[4];
+} __packed;
+
 /* GPIO modes */
 #define CP210X_SCI_GPIO_MODE_OFFSET	9
 #define CP210X_SCI_GPIO_MODE_MASK	GENMASK(11, 9)
@@ -520,6 +539,27 @@ struct cp210x_single_port_config {
 
 #define CP210X_GPIO_MODE_OFFSET		8
 #define CP210X_GPIO_MODE_MASK		GENMASK(11, 8)
+
+#define CP2108_GPIO_MODE_OFFSET		0
+#define CP2108_GPIO_MODE_MASK		GENMASK(15, 0)
+
+/* CP2108 port configuration values */
+#define CP2108_GPIO0_ALTERNATE_FUNC		BIT(0)
+#define CP2108_GPIO1_ALTERNATE_FUNC		BIT(1)
+#define CP2108_GPIO2_ALTERNATE_FUNC		BIT(2)
+#define CP2108_GPIO3_ALTERNATE_FUNC		BIT(3)
+#define CP2108_GPIO4_ALTERNATE_FUNC		BIT(4)
+#define CP2108_GPIO5_ALTERNATE_FUNC		BIT(5)
+#define CP2108_GPIO6_ALTERNATE_FUNC		BIT(6)
+#define CP2108_GPIO7_ALTERNATE_FUNC		BIT(7)
+#define CP2108_GPIO8_ALTERNATE_FUNC		BIT(8)
+#define CP2108_GPIO9_ALTERNATE_FUNC		BIT(9)
+#define CP2108_GPIO10_ALTERNATE_FUNC	BIT(10)
+#define CP2108_GPIO11_ALTERNATE_FUNC	BIT(11)
+#define CP2108_GPIO12_ALTERNATE_FUNC	BIT(12)
+#define CP2108_GPIO13_ALTERNATE_FUNC	BIT(13)
+#define CP2108_GPIO14_ALTERNATE_FUNC	BIT(14)
+#define CP2108_GPIO15_ALTERNATE_FUNC	BIT(15)
 
 /* CP2105 port configuration values */
 #define CP2105_GPIO0_TXLED_MODE		BIT(0)
@@ -542,6 +582,12 @@ struct cp210x_gpio_write {
 	u8	mask;
 	u8	state;
 };
+
+/* CP210X_VENDOR_SPECIFIC, CP210X_WRITE_LATCH call writes these 0x4 bytes on CP2108. */
+struct cp2108_gpio_write {
+	u16	mask;
+	u16	state;
+} __packed;
 
 /*
  * Helper to get interface number when we only have struct usb_serial.
@@ -1427,50 +1473,73 @@ static int cp210x_gpio_get(struct gpio_chip *gc, unsigned int gpio)
 	struct cp210x_serial_private *priv = usb_get_serial_data(serial);
 	u8 req_type = REQTYPE_DEVICE_TO_HOST;
 	int result;
-	u8 buf;
 
-	if (priv->partnum == CP210X_PARTNUM_CP2105)
+	if (priv->partnum == CP210X_PARTNUM_CP2108) {
+		u16 buf;
+
 		req_type = REQTYPE_INTERFACE_TO_HOST;
+		result = usb_autopm_get_interface(serial->interface);
+		if (result)
+			return result;
+		result = cp210x_read_vendor_block(serial, req_type,
+						CP210X_READ_LATCH, &buf, sizeof(buf));
+		usb_autopm_put_interface(serial->interface);
+		if (result < 0)
+			return result;
+		return !!(buf & BIT(gpio));
+	} else {
+		u8 buf;
 
-	result = usb_autopm_get_interface(serial->interface);
-	if (result)
-		return result;
-
-	result = cp210x_read_vendor_block(serial, req_type,
-					  CP210X_READ_LATCH, &buf, sizeof(buf));
-	usb_autopm_put_interface(serial->interface);
-	if (result < 0)
-		return result;
-
-	return !!(buf & BIT(gpio));
+		if (priv->partnum == CP210X_PARTNUM_CP2105)
+			req_type = REQTYPE_INTERFACE_TO_HOST;
+		result = usb_autopm_get_interface(serial->interface);
+		if (result)
+			return result;
+		result = cp210x_read_vendor_block(serial, req_type,
+						CP210X_READ_LATCH, &buf, sizeof(buf));
+		usb_autopm_put_interface(serial->interface);
+		if (result < 0)
+			return result;
+		return !!(buf & BIT(gpio));
+	}
 }
 
 static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 {
 	struct usb_serial *serial = gpiochip_get_data(gc);
 	struct cp210x_serial_private *priv = usb_get_serial_data(serial);
-	struct cp210x_gpio_write buf;
+	struct cp210x_gpio_write u8_buf;
+	struct cp2108_gpio_write u16_buf;
 	int result;
 
 	if (value == 1)
-		buf.state = BIT(gpio);
+		u8_buf.state = BIT(gpio);
 	else
-		buf.state = 0;
+		u8_buf.state = 0;
 
-	buf.mask = BIT(gpio);
+	u8_buf.mask = BIT(gpio);
 
 	result = usb_autopm_get_interface(serial->interface);
 	if (result)
 		goto out;
 
-	if (priv->partnum == CP210X_PARTNUM_CP2105) {
+	if (priv->partnum == CP210X_PARTNUM_CP2105)
 		result = cp210x_write_vendor_block(serial,
 						   REQTYPE_HOST_TO_INTERFACE,
-						   CP210X_WRITE_LATCH, &buf,
-						   sizeof(buf));
+						   CP210X_WRITE_LATCH, &u8_buf,
+						   sizeof(u8_buf));
+	else if (priv->partnum == CP210X_PARTNUM_CP2108) {
+		if (value == 1)
+			u16_buf.state = cpu_to_le16(BIT(gpio));
+		else
+			u16_buf.state = 0;
+		u16_buf.mask = cpu_to_le16(BIT(gpio));
+		result = cp210x_write_vendor_block(serial,
+						   REQTYPE_HOST_TO_INTERFACE,
+						   CP210X_WRITE_LATCH, &u16_buf,
+						   sizeof(u16_buf));
 	} else {
-		u16 wIndex = buf.state << 8 | buf.mask;
-
+		u16 wIndex = u8_buf.state << 8 | u8_buf.mask;
 		result = usb_control_msg(serial->dev,
 					 usb_sndctrlpipe(serial->dev, 0),
 					 CP210X_VENDOR_SPECIFIC,
@@ -1479,7 +1548,6 @@ static void cp210x_gpio_set(struct gpio_chip *gc, unsigned int gpio, int value)
 					 wIndex,
 					 NULL, 0, USB_CTRL_SET_TIMEOUT);
 	}
-
 	usb_autopm_put_interface(serial->interface);
 out:
 	if (result < 0) {
@@ -1547,6 +1615,75 @@ static int cp210x_gpio_set_config(struct gpio_chip *gc, unsigned int gpio,
 		return 0;
 
 	return -ENOTSUPP;
+}
+
+static int cp2108_gpio_init(struct usb_serial *serial)
+{
+	struct cp210x_serial_private *priv = usb_get_serial_data(serial);
+	struct cp210x_quad_port_config config;
+	u16 iface_config;
+	u16 gpio_latch;
+	int result;
+	u16 i;
+
+	result = cp210x_read_vendor_block(serial, REQTYPE_DEVICE_TO_HOST,
+					  CP210X_GET_PORTCONFIG, &config,
+					  sizeof(config));
+	if (result < 0) {
+		dev_warn(&serial->interface->dev,
+			 "querying port config on cp2108 failed\n");
+		return result;
+	}
+	priv->gc.ngpio = 16;
+	iface_config = config.EnhancedFxn_IFC[0];
+	priv->gpio_pushpull = (u16)((le16_to_cpu(config.reset_state.Mode_PB[1]) &
+								CP2108_GPIO_MODE_MASK) >>
+								CP2108_GPIO_MODE_OFFSET);
+	gpio_latch = (u16)((le16_to_cpu(config.reset_state.Latch_PB[1]) &
+						CP2108_GPIO_MODE_MASK) >>
+						CP2108_GPIO_MODE_OFFSET);
+
+	/* mark all pins which are not in GPIO mode */
+	if (iface_config & CP2108_GPIO0_ALTERNATE_FUNC)		/* GPIO 0 */
+		priv->gpio_altfunc |= BIT(0);
+	if (iface_config & CP2108_GPIO1_ALTERNATE_FUNC)		/* GPIO 1 */
+		priv->gpio_altfunc |= BIT(1);
+	if (iface_config & CP2108_GPIO2_ALTERNATE_FUNC)		/* GPIO 2 */
+		priv->gpio_altfunc |= BIT(2);
+	if (iface_config & CP2108_GPIO3_ALTERNATE_FUNC)		/* GPIO 3 */
+		priv->gpio_altfunc |= BIT(3);
+	if (iface_config & CP2108_GPIO4_ALTERNATE_FUNC)		/* GPIO 4 */
+		priv->gpio_altfunc |= BIT(4);
+	if (iface_config & CP2108_GPIO5_ALTERNATE_FUNC)		/* GPIO 5 */
+		priv->gpio_altfunc |= BIT(5);
+	if (iface_config & CP2108_GPIO6_ALTERNATE_FUNC)		/* GPIO 6 */
+		priv->gpio_altfunc |= BIT(6);
+	if (iface_config & CP2108_GPIO7_ALTERNATE_FUNC)		/* GPIO 7 */
+		priv->gpio_altfunc |= BIT(7);
+	if (iface_config & CP2108_GPIO8_ALTERNATE_FUNC)		/* GPIO 8 */
+		priv->gpio_altfunc |= BIT(8);
+	if (iface_config & CP2108_GPIO9_ALTERNATE_FUNC)		/* GPIO 9 */
+		priv->gpio_altfunc |= BIT(9);
+	if (iface_config & CP2108_GPIO10_ALTERNATE_FUNC)	/* GPIO 10 */
+		priv->gpio_altfunc |= BIT(10);
+	if (iface_config & CP2108_GPIO11_ALTERNATE_FUNC)	/* GPIO 11 */
+		priv->gpio_altfunc |= BIT(11);
+	if (iface_config & CP2108_GPIO12_ALTERNATE_FUNC)	/* GPIO 12 */
+		priv->gpio_altfunc |= BIT(12);
+	if (iface_config & CP2108_GPIO13_ALTERNATE_FUNC)	/* GPIO 13 */
+		priv->gpio_altfunc |= BIT(13);
+	if (iface_config & CP2108_GPIO14_ALTERNATE_FUNC)	/* GPIO 14 */
+		priv->gpio_altfunc |= BIT(14);
+	if (iface_config & CP2108_GPIO15_ALTERNATE_FUNC)	/* GPIO 15 */
+		priv->gpio_altfunc |= BIT(15);
+
+	for (i = 0; i < priv->gc.ngpio; ++i) {
+		/* Set direction to "input" if pin is open-drain and reset value is 1 */
+		if (!(priv->gpio_pushpull & BIT(i)) && (gpio_latch & BIT(i)))
+			priv->gpio_input |= BIT(i);
+	}
+
+	return 0;
 }
 
 /*
@@ -1777,6 +1914,14 @@ static int cp210x_gpio_init(struct usb_serial *serial)
 	case CP210X_PARTNUM_CP2102N_QFN24:
 	case CP210X_PARTNUM_CP2102N_QFN20:
 		result = cp2102n_gpioconf_init(serial);
+		break;
+	case CP210X_PARTNUM_CP2108:
+		/*
+		 * CP2108 has 4 interfaces, but GPIOs at 4 interfaces are the same and shared.
+		 * So just need init GPIO chip for 1 interface.
+		 */
+		if (cp210x_interface_num(serial) == 0)
+			result = cp2108_gpio_init(serial);
 		break;
 	default:
 		return 0;
