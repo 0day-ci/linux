@@ -735,6 +735,7 @@ static int loop_change_fd(struct loop_device *lo, struct block_device *bdev,
 		goto out_err;
 
 	/* and ... switch */
+	inc_diskseq(lo->lo_disk);
 	blk_mq_freeze_queue(lo->lo_queue);
 	mapping_set_gfp_mask(old_file->f_mapping, lo->old_gfp_mask);
 	lo->lo_backing_file = file;
@@ -1122,6 +1123,8 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	error = loop_set_status_from_info(lo, &config->info);
 	if (error)
 		goto out_unlock;
+
+	inc_diskseq(lo->lo_disk);
 
 	if (!(file->f_mode & FMODE_WRITE) || !(mode & FMODE_WRITE) ||
 	    !file->f_op->write_iter)
