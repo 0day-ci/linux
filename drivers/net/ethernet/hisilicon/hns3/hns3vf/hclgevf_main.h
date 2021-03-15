@@ -262,6 +262,11 @@ struct hclgevf_mac_table_cfg {
 	struct list_head mc_mac_list;
 };
 
+struct hclgevf_qb_cfg {
+	bool pf_support_qb;
+	bool hw_qb_en;
+};
+
 struct hclgevf_dev {
 	struct pci_dev *pdev;
 	struct hnae3_ae_dev *ae_dev;
@@ -328,6 +333,8 @@ struct hclgevf_dev {
 	u32 flag;
 	unsigned long serv_processed_cnt;
 	unsigned long last_serv_processed;
+
+	struct hclgevf_qb_cfg qb_cfg;
 };
 
 static inline bool hclgevf_is_reset_pending(struct hclgevf_dev *hdev)

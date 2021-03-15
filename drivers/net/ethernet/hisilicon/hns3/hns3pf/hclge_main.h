@@ -975,6 +975,8 @@ struct hclge_vf_info {
 	u32 max_tx_rate;
 	u32 trusted;
 	u16 promisc_enable;
+	u8 request_qb_en;
+	u8 qb_en;
 };
 
 struct hclge_vport {

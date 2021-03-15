@@ -683,6 +683,36 @@ static void hclge_handle_vf_tbl(struct hclge_vport *vport,
 	}
 }
 
+static void hclge_handle_vf_qb(struct hclge_vport *vport,
+			       struct hclge_mbx_vf_to_pf_cmd *mbx_req,
+			       struct hclge_respond_to_vf_msg *resp_msg)
+{
+	struct hclge_dev *hdev = vport->back;
+
+	if (mbx_req->msg.subcode == HCLGE_MBX_QB_CHECK_CAPS) {
+		struct hnae3_handle *handle = &hdev->vport[0].nic;
+
+		resp_msg->data[0] = test_bit(HNAE3_PFLAG_FD_QB_ENABLE,
+					     &handle->supported_pflags);
+		resp_msg->len = sizeof(u8);
+	} else if (mbx_req->msg.subcode == HCLGE_MBX_QB_ENABLE) {
+		vport->vf_info.request_qb_en = mbx_req->msg.data[0];
+		set_bit(HCLGE_VPORT_STATE_QB_CHANGE, &vport->state);
+	} else if (mbx_req->msg.subcode == HCLGE_MBX_QB_GET_STATE) {
+		u16 msg_data = vport->vf_info.qb_en;
+		int ret;
+
+		ret = hclge_send_mbx_msg(vport, (u8 *)&msg_data,
+					 sizeof(msg_data),
+					 HCLGE_MBX_PUSH_QB_STATE,
+					 vport->vport_id);
+		if (ret)
+			dev_err(&hdev->pdev->dev,
+				"failed to inform qb state to vport %u, ret = %d\n",
+				vport->vport_id, ret);
+	}
+}
+
 void hclge_mbx_handler(struct hclge_dev *hdev)
 {
 	struct hclge_cmq_ring *crq = &hdev->hw.cmq.crq;
@@ -829,6 +859,9 @@ void hclge_mbx_handler(struct hclge_dev *hdev)
 			break;
 		case HCLGE_MBX_HANDLE_VF_TBL:
 			hclge_handle_vf_tbl(vport, req);
+			break;
+		case HCLGE_MBX_SET_QB:
+			hclge_handle_vf_qb(vport, req, &resp_msg);
 			break;
 		default:
 			dev_err(&hdev->pdev->dev,
