@@ -117,6 +117,17 @@
  */
 #define NO_SYSCALL (-1)
 
+/*
+ * pt_regs->stackframe is a marker frame that is used in different
+ * situations. These are the different types of frames. Use patterns
+ * for the frame types instead of (0, 1, 2, 3, ..) so that it is less
+ * likely to find them on the stack.
+ */
+#define TASK_FRAME	0xDEADBEE0	/* Task stack termination frame */
+#define EL0_FRAME	0xDEADBEE1	/* EL0 exception frame */
+#define EL1_FRAME	0xDEADBEE2	/* EL1 exception frame */
+#define FTRACE_FRAME	0xDEADBEE3	/* FTrace frame */
+
 #ifndef __ASSEMBLY__
 #include <linux/bug.h>
 #include <linux/types.h>
@@ -187,11 +198,11 @@ struct pt_regs {
 	};
 	u64 orig_x0;
 #ifdef __AARCH64EB__
-	u32 unused2;
+	u32 frame_type;
 	s32 syscallno;
 #else
 	s32 syscallno;
-	u32 unused2;
+	u32 frame_type;
 #endif
 	u64 sdei_ttbr1;
 	/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */

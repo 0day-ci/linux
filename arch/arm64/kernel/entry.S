@@ -269,8 +269,12 @@ alternative_else_nop_endif
 	 */
 	.if \el == 0
 	stp	xzr, xzr, [sp, #S_STACKFRAME]
+	ldr	w17, =EL0_FRAME
+	str	w17, [sp, #S_FRAME_TYPE]
 	.else
 	stp	x29, x22, [sp, #S_STACKFRAME]
+	ldr	w17, =EL1_FRAME
+	str	w17, [sp, #S_FRAME_TYPE]
 	.endif
 	add	x29, sp, #S_STACKFRAME
 

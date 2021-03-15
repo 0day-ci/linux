@@ -442,6 +442,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	 * as the last frame for the new task.
 	 */
 	p->thread.cpu_context.fp = (unsigned long)childregs->stackframe;
+	childregs->frame_type = TASK_FRAME;
 
 	ptrace_hw_copy_thread(p);
 

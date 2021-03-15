@@ -410,6 +410,8 @@ SYM_FUNC_END(__create_page_tables)
 	 */
 	.macro setup_last_frame
 	sub	sp, sp, #PT_REGS_SIZE
+	ldr	w17, =TASK_FRAME
+	str	w17, [sp, #S_FRAME_TYPE]
 	stp	xzr, xzr, [sp, #S_STACKFRAME]
 	add	x29, sp, #S_STACKFRAME
 	ldr	x30, =ret_from_fork
