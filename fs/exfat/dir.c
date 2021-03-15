@@ -146,7 +146,7 @@ static int exfat_readdir(struct inode *inode, loff_t *cpos, struct exfat_dir_ent
 					0);
 
 			*uni_name.name = 0x0;
-			exfat_get_uniname_from_ext_entry(sb, &dir, dentry,
+			exfat_get_uniname_from_ext_entry(sb, &clu, i,
 				uni_name.name);
 			exfat_utf16_to_nls(sb, &uni_name,
 				dir_entry->namebuf.lfn,
@@ -906,10 +906,15 @@ enum {
 };
 
 /*
- * return values:
- *   >= 0	: return dir entiry position with the name in dir
- *   -ENOENT	: entry with the name does not exist
- *   -EIO	: I/O error
+ * @ei:         inode info of directory
+ * @p_dir:      input as directory structure in which we search name
+ *              if found, output as a cluster dir where the name exists
+ *              if not found, not changed from input
+ * @num_entries entry size of p_uniname
+ * @return:
+ *   >= 0:      dir entry position from output p_dir.dir
+ *   -ENOENT:   entry with the name does not exist
+ *   -EIO:      I/O error
  */
 int exfat_find_dir_entry(struct super_block *sb, struct exfat_inode_info *ei,
 		struct exfat_chain *p_dir, struct exfat_uni_name *p_uniname,
@@ -920,14 +925,16 @@ int exfat_find_dir_entry(struct super_block *sb, struct exfat_inode_info *ei,
 	int dentries_per_clu, num_empty = 0;
 	unsigned int entry_type;
 	unsigned short *uniname = NULL;
-	struct exfat_chain clu;
+	struct exfat_chain clu, tmp_clu;
 	struct exfat_hint *hint_stat = &ei->hint_stat;
 	struct exfat_hint_femp candi_empty;
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
+	int dentry_in_cluster = 0;
 
 	dentries_per_clu = sbi->dentries_per_clu;
 
 	exfat_chain_dup(&clu, p_dir);
+	exfat_chain_dup(&tmp_clu, p_dir);
 
 	if (hint_stat->eidx) {
 		clu.dir = hint_stat->clu;
@@ -1065,11 +1072,14 @@ rewind:
 		}
 
 		if (clu.flags == ALLOC_NO_FAT_CHAIN) {
-			if (--clu.size > 0)
+			if (--clu.size > 0) {
+				exfat_chain_dup(&tmp_clu, &clu);
 				clu.dir++;
+			}
 			else
 				clu.dir = EXFAT_EOF_CLUSTER;
 		} else {
+			exfat_chain_dup(&tmp_clu, &clu);
 			if (exfat_get_next_cluster(sb, &clu.dir))
 				return -EIO;
 		}
@@ -1096,6 +1106,16 @@ not_found:
 	return -ENOENT;
 
 found:
+	/*
+	 * if dentry_set would span to the next_cluster,
+	 * e.g. (dentries_per_clu - dentry_in_cluster < num_ext + 1)
+	 * "tmp_clu" is correct which is currently saved as previous cluster,
+	 * if doesn't span as below, "clu" is correct, so update for return.
+	 */
+	dentry_in_cluster = (dentry - num_ext) & (dentries_per_clu - 1);
+	if (dentries_per_clu - dentry_in_cluster >= num_ext + 1)
+		exfat_chain_dup(&tmp_clu, &clu);
+
 	/* next dentry we'll find is out of this cluster */
 	if (!((dentry + 1) & (dentries_per_clu - 1))) {
 		int ret = 0;
@@ -1113,13 +1133,17 @@ found:
 			/* just initialized hint_stat */
 			hint_stat->clu = p_dir->dir;
 			hint_stat->eidx = 0;
-			return (dentry - num_ext);
+
+			exfat_chain_dup(p_dir, &tmp_clu);
+			return dentry_in_cluster;
 		}
 	}
 
 	hint_stat->clu = clu.dir;
 	hint_stat->eidx = dentry + 1;
-	return dentry - num_ext;
+
+	exfat_chain_dup(p_dir, &tmp_clu);
+	return dentry_in_cluster;
 }
 
 int exfat_count_ext_entries(struct super_block *sb, struct exfat_chain *p_dir,
