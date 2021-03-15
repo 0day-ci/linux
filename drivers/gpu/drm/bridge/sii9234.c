@@ -911,10 +911,10 @@ static int sii9234_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	irq_set_status_flags(client->irq, IRQ_NOAUTOEN);
 	ret = devm_request_threaded_irq(dev, client->irq, NULL,
 					sii9234_irq_thread,
-					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+					IRQF_TRIGGER_HIGH | IRQF_ONESHOT |
+					IRQF_NO_AUTOEN,
 					"sii9234", ctx);
 	if (ret < 0) {
 		dev_err(dev, "failed to install IRQ handler\n");

@@ -2308,10 +2308,10 @@ static int sii8620_probe(struct i2c_client *client,
 		dev_err(dev, "no irq provided\n");
 		return -EINVAL;
 	}
-	irq_set_status_flags(client->irq, IRQ_NOAUTOEN);
 	ret = devm_request_threaded_irq(dev, client->irq, NULL,
 					sii8620_irq_thread,
-					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+					IRQF_TRIGGER_HIGH | IRQF_ONESHOT |
+					IRQF_NO_AUTOEN,
 					"sii8620", ctx);
 	if (ret < 0)
 		return dev_err_probe(dev, ret,
