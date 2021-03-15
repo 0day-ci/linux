@@ -1580,6 +1580,18 @@ int uvc_ctrl_begin(struct uvc_video_chain *chain)
 	return mutex_lock_interruptible(&chain->ctrl_mutex) ? -ERESTARTSYS : 0;
 }
 
+static bool uvc_ctrl_is_inactive(struct uvc_control *ctrl)
+{
+	struct uvc_control_mapping *map;
+
+	list_for_each_entry(map, &ctrl->info.mappings, list) {
+		if (map->master_id)
+			return true;
+	}
+
+	return false;
+}
+
 static int uvc_ctrl_commit_entity(struct uvc_device *dev,
 	struct uvc_entity *entity, int rollback)
 {
@@ -1623,8 +1635,11 @@ static int uvc_ctrl_commit_entity(struct uvc_device *dev,
 
 		ctrl->dirty = 0;
 
-		if (ret < 0)
+		if (ret < 0) {
+			if (uvc_ctrl_is_inactive(ctrl))
+				return -EACCES;
 			return ret;
+		}
 	}
 
 	return 0;
