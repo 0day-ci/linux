@@ -4072,6 +4072,16 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 }
 
 static inline bool
+should_try_oom(int no_progress_loops,
+		enum compact_result last_compact_result)
+{
+	if (no_progress_loops > MAX_RECLAIM_RETRIES && last_compact_result
+			== COMPACT_SKIPPED)
+		return true;
+	return false;
+}
+
+static inline bool
 should_compact_retry(struct alloc_context *ac, int order, int alloc_flags,
 		     enum compact_result compact_result,
 		     enum compact_priority *compact_priority,
@@ -4430,10 +4440,11 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 	 * Make sure we converge to OOM if we cannot make any progress
 	 * several times in the row.
 	 */
-	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
-		/* Before OOM, exhaust highatomic_reserve */
-		return unreserve_highatomic_pageblock(ac, true);
-	}
+	if (*no_progress_loops > MAX_RECLAIM_RETRIES)
+		result false;
+	/* Last chance before OOM, try draining highatomic_reserve once */
+	else if (*no_progress_loops == MAX_RECLAIM_RETRIES)
+		return unreserve_highatomic_pageblock(ac, true)
 
 	/*
 	 * Keep reclaiming pages while there is a chance this will lead
@@ -4705,6 +4716,8 @@ retry:
 				 did_some_progress > 0, &no_progress_loops))
 		goto retry;
 
+	if (should_try_oom(no_progress_loops, compact_result))
+		goto oom:
 	/*
 	 * It doesn't make any sense to retry for the compaction if the order-0
 	 * reclaim is not able to make any progress because the current
@@ -4722,6 +4735,7 @@ retry:
 	if (check_retry_cpuset(cpuset_mems_cookie, ac))
 		goto retry_cpuset;
 
+oom:
 	/* Reclaim has failed us, start killing things */
 	page = __alloc_pages_may_oom(gfp_mask, order, ac, &did_some_progress);
 	if (page)
