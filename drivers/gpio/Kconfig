@@ -501,6 +501,18 @@ config GPIO_RDA
 	help
 	  Say Y here to support RDA Micro GPIO controller.
 
+config GPIO_REALTEK_OTTO
+	bool "Realtek Otto GPIO support"
+	depends on MACH_REALTEK_RTL
+	depends on OF_GPIO
+	default MACH_REALTEK_RTL
+	select GPIO_GENERIC
+	select GPIOLIB_IRQCHIP
+	help
+	  The GPIO controller on the Otto MIPS platform supports up to two
+	  banks of 32 GPIOs, with edge triggered interrupts. The 32 GPIOs
+	  are grouped in four 8-bit wide ports.
+
 config GPIO_REG
 	bool
 	help
