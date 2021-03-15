@@ -23,6 +23,7 @@ static void check_if_reliable(unsigned long fp, struct stackframe *frame,
 {
 	struct pt_regs *regs;
 	unsigned long regs_start, regs_end;
+	unsigned long caller_fp;
 
 	/*
 	 * If the stack trace has already been marked unreliable, just
@@ -68,6 +69,38 @@ static void check_if_reliable(unsigned long fp, struct stackframe *frame,
 		frame->reliable = false;
 		return;
 	}
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	/*
+	 * When tracing is active for a function, the ftrace code is called
+	 * from the function even before the frame pointer prolog and
+	 * epilog. ftrace creates a pt_regs structure on the stack to save
+	 * register state.
+	 *
+	 * In addition, ftrace sets up two stack frames and chains them
+	 * with other frames on the stack. One frame is pt_regs->stackframe
+	 * that is for the traced function. The other frame is set up right
+	 * after the pt_regs structure and it is for the caller of the
+	 * traced function. This is done to ensure a proper stack trace.
+	 *
+	 * If the ftrace code returns to the traced function, then all is
+	 * fine. But if it transfers control to a different function (like
+	 * in livepatch), then a stack walk performed while still in the
+	 * ftrace code will not find the target function.
+	 *
+	 * So, mark the stack trace as unreliable if an ftrace frame is
+	 * detected.
+	 */
+	if (regs->frame_type == FTRACE_FRAME && frame->fp == regs_end &&
+	    frame->fp < info->high) {
+		/* Check the traced function's caller's frame. */
+		caller_fp = READ_ONCE_NOCHECK(*(unsigned long *)(frame->fp));
+		if (caller_fp == regs->regs[29]) {
+			frame->reliable = false;
+			return;
+		}
+	}
+#endif
 }
 
 /*

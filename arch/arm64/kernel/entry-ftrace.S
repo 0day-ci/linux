@@ -74,6 +74,8 @@
 	/* Create our frame record within pt_regs. */
 	stp	x29, x30, [sp, #S_STACKFRAME]
 	add	x29, sp, #S_STACKFRAME
+	ldr	w17, =FTRACE_FRAME
+	str	w17, [sp, #S_FRAME_TYPE]
 	.endm
 
 SYM_CODE_START(ftrace_regs_caller)
