@@ -64,6 +64,8 @@ struct vduse_dev {
 	struct list_head send_list;
 	struct list_head recv_list;
 	struct list_head list;
+	struct vdpa_callback config_cb;
+	spinlock_t irq_lock;
 	bool connected;
 	int minor;
 	u16 vq_size_max;
@@ -439,6 +441,11 @@ static void vduse_dev_reset(struct vduse_dev *dev)
 	vduse_domain_reset_bounce_map(dev->domain);
 	vduse_dev_update_iotlb(dev, 0ULL, ULLONG_MAX);
 
+	spin_lock(&dev->irq_lock);
+	dev->config_cb.callback = NULL;
+	dev->config_cb.private = NULL;
+	spin_unlock(&dev->irq_lock);
+
 	for (i = 0; i < dev->vq_num; i++) {
 		struct vduse_virtqueue *vq = &dev->vqs[i];
 
@@ -557,7 +564,12 @@ static int vduse_vdpa_set_features(struct vdpa_device *vdpa, u64 features)
 static void vduse_vdpa_set_config_cb(struct vdpa_device *vdpa,
 				  struct vdpa_callback *cb)
 {
-	/* We don't support config interrupt */
+	struct vduse_dev *dev = vdpa_to_vduse(vdpa);
+
+	spin_lock(&dev->irq_lock);
+	dev->config_cb.callback = cb->callback;
+	dev->config_cb.private = cb->private;
+	spin_unlock(&dev->irq_lock);
 }
 
 static u16 vduse_vdpa_get_vq_num_max(struct vdpa_device *vdpa)
@@ -842,6 +854,15 @@ static long vduse_dev_ioctl(struct file *file, unsigned int cmd,
 		ret = 0;
 		queue_work(vduse_irq_wq, &dev->vqs[arg].inject);
 		break;
+	case VDUSE_INJECT_CONFIG_IRQ:
+		ret = -EINVAL;
+		spin_lock_irq(&dev->irq_lock);
+		if (dev->config_cb.callback) {
+			dev->config_cb.callback(dev->config_cb.private);
+			ret = 0;
+		}
+		spin_unlock_irq(&dev->irq_lock);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -918,6 +939,7 @@ static struct vduse_dev *vduse_dev_create(void)
 	INIT_LIST_HEAD(&dev->send_list);
 	INIT_LIST_HEAD(&dev->recv_list);
 	atomic64_set(&dev->msg_unique, 0);
+	spin_lock_init(&dev->irq_lock);
 
 	init_waitqueue_head(&dev->waitq);
 

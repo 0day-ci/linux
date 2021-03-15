@@ -150,4 +150,7 @@ struct vduse_vq_eventfd {
 /* Inject an interrupt for specific virtqueue */
 #define VDUSE_INJECT_VQ_IRQ	_IO(VDUSE_BASE, 0x05)
 
+/* Inject a config interrupt */
+#define VDUSE_INJECT_CONFIG_IRQ	_IO(VDUSE_BASE, 0x06)
+
 #endif /* _UAPI_VDUSE_H_ */
