@@ -243,8 +243,8 @@ static int hns3_dbg_bd_info(struct hnae3_handle *h, const char *cmd_buf)
 	dev_info(dev, "(TX)vlan_tag: %u\n",
 		 le16_to_cpu(tx_desc->tx.outer_vlan_tag));
 	dev_info(dev, "(TX)tv: %u\n", le16_to_cpu(tx_desc->tx.tv));
-	dev_info(dev, "(TX)paylen_ol4cs: %u\n",
-		 le32_to_cpu(tx_desc->tx.paylen_ol4cs));
+	dev_info(dev, "(TX)paylen_fdop_ol4cs: %u\n",
+		 le32_to_cpu(tx_desc->tx.paylen_fdop_ol4cs));
 	dev_info(dev, "(TX)vld_ra_ri: %u\n",
 		 le16_to_cpu(tx_desc->tx.bdtp_fe_sc_vld_ra_ri));
 	dev_info(dev, "(TX)mss_hw_csum: %u\n", mss_hw_csum);
@@ -367,6 +367,9 @@ static void hns3_dbg_dev_caps(struct hnae3_handle *h)
 		 "yes" : "no");
 	dev_info(&h->pdev->dev, "support imp-controlled PHY: %s\n",
 		 test_bit(HNAE3_DEV_SUPPORT_PHY_IMP_B, caps) ? "yes" : "no");
+	dev_info(&h->pdev->dev, "support QB: %s\n",
+		 test_bit(HNAE3_DEV_SUPPORT_QB_B, ae_dev->caps) ?
+		 "yes" : "no");
 }
 
 static void hns3_dbg_dev_specs(struct hnae3_handle *h)

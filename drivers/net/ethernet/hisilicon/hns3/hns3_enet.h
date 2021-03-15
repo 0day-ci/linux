@@ -171,6 +171,11 @@ enum hns3_nic_state {
 #define HNS3_TXD_DECTTL_S			12
 #define HNS3_TXD_DECTTL_M			(0xf << HNS3_TXD_DECTTL_S)
 
+#define HNS3_TXD_FD_ADD_B			1
+#define HNS3_TXD_FD_DEL_B			0
+#define HNS3_TXD_FD_OP_M			GENMASK(21, 20)
+#define HNS3_TXD_FD_OP_S			20
+
 #define HNS3_TXD_OL4CS_B			22
 
 #define HNS3_TXD_MSS_S				0
@@ -200,6 +205,8 @@ enum hns3_nic_state {
 #define HNS3_VECTOR_RX_QL_OFFSET		0xf00
 
 #define HNS3_RING_EN_B				0
+
+#define HNS3_FD_QB_FORCE_CNT_MAX		20
 
 enum hns3_pkt_l2t_type {
 	HNS3_L2_TYPE_UNICAST,
@@ -265,7 +272,7 @@ struct __packed hns3_desc {
 			};
 		};
 
-			__le32 paylen_ol4cs;
+			__le32 paylen_fdop_ol4cs;
 			__le16 bdtp_fe_sc_vld_ra_ri;
 			__le16 mss_hw_csum;
 		} tx;
@@ -361,6 +368,9 @@ enum hns3_pkt_ol4type {
 	HNS3_OL4_TYPE_UNKNOWN
 };
 
+#define IP_VERSION_IPV4		0x4
+#define IP_VERSION_IPV6		0x6
+
 struct ring_stats {
 	u64 sw_err_cnt;
 	u64 seg_pkt_cnt;
@@ -423,7 +433,7 @@ struct hns3_enet_ring {
 	void *va; /* first buffer address for current packet */
 
 	u32 flag;          /* ring attribute */
-
+	u32 fd_qb_tx_sample;
 	int pending_buf;
 	struct sk_buff *skb;
 	struct sk_buff *tail_skb;
