@@ -47,6 +47,24 @@ out_default:
 	return "rootfs";
 }
 
+static uint32_t parser_trx_get_magic(struct mtd_info *mtd)
+{
+	uint32_t trx_magic = TRX_MAGIC;
+	struct device_node *np;
+	int err;
+
+	np = mtd_get_of_node(mtd);
+	if (!np)
+		return trx_magic;
+
+	/* Get different magic from device tree if specified */
+	err = of_property_read_u32(np, "trx-magic", &trx_magic);
+	if (err != 0 && err != -EINVAL)
+		pr_err("failed to parse \"trx-magic\" DT attribute, use default: %d\n", err);
+
+	return trx_magic;
+}
+
 static int parser_trx_parse(struct mtd_info *mtd,
 			    const struct mtd_partition **pparts,
 			    struct mtd_part_parser_data *data)
@@ -56,6 +74,7 @@ static int parser_trx_parse(struct mtd_info *mtd,
 	struct trx_header trx;
 	size_t bytes_read;
 	uint8_t curr_part = 0, i = 0;
+	uint32_t trx_magic = parser_trx_get_magic(mtd);
 	int err;
 
 	parts = kcalloc(TRX_PARSER_MAX_PARTS, sizeof(struct mtd_partition),
@@ -70,7 +89,7 @@ static int parser_trx_parse(struct mtd_info *mtd,
 		return err;
 	}
 
-	if (trx.magic != TRX_MAGIC) {
+	if (trx.magic != trx_magic) {
 		kfree(parts);
 		return -ENOENT;
 	}
