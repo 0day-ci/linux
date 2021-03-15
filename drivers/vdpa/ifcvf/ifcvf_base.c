@@ -408,3 +408,45 @@ void ifcvf_notify_queue(struct ifcvf_hw *hw, u16 qid)
 {
 	ifc_iowrite16(qid, hw->vring[qid].notify_addr);
 }
+
+static int ifcvf_probed_N3000(struct pci_dev *pdev)
+{
+	int ret = false;
+
+	if (pdev->device == N3000_DEVICE_ID &&
+	    pdev->vendor == N3000_VENDOR_ID &&
+	    pdev->subsystem_device == N3000_SUBSYS_DEVICE_ID &&
+	    pdev->subsystem_vendor == N3000_SUBSYS_VENDOR_ID)
+		ret = true;
+
+	return ret;
+}
+
+static int ifcvf_probed_C5000X_PL(struct pci_dev *pdev)
+{
+	int ret = false;
+
+	if (pdev->device == C5000X_PL_DEVICE_ID &&
+	    pdev->vendor == C5000X_PL_VENDOR_ID &&
+	    pdev->subsystem_device == C5000X_PL_SUBSYS_DEVICE_ID &&
+	    pdev->subsystem_vendor == C5000X_PL_SUBSYS_VENDOR_ID)
+		ret = true;
+
+	return ret;
+}
+
+int ifcvf_probed_virtio_net(struct ifcvf_hw *hw)
+{
+	struct ifcvf_adapter *adapter;
+	struct pci_dev *pdev;
+	int ret = false;
+
+	adapter = vf_to_adapter(hw);
+	pdev = adapter->pdev;
+
+	if (ifcvf_probed_N3000(pdev) ||
+	    ifcvf_probed_C5000X_PL(pdev))
+		ret = true;
+
+	return ret;
+}
