@@ -771,7 +771,7 @@ static bool jit_has_pid(struct machine *machine, pid_t pid)
 	struct thread *thread = machine__find_thread(machine, pid, pid);
 
 	if (!thread)
-		return 0;
+		return false;
 
 	return (bool)thread->priv;
 }
