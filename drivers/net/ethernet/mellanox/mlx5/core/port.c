@@ -446,7 +446,8 @@ int mlx5_query_module_eeprom_data(struct mlx5_core_dev *dev,
 	if (module_id != MLX5_MODULE_ID_SFP &&
 	    module_id != MLX5_MODULE_ID_QSFP &&
 	    module_id != MLX5_MODULE_ID_QSFP28 &&
-	    module_id != MLX5_MODULE_ID_QSFP_PLUS) {
+	    module_id != MLX5_MODULE_ID_QSFP_PLUS &&
+	    module_id != MLX5_MODULE_ID_DSFP) {
 		mlx5_core_err(dev, "Module ID not recognized: 0x%x\n", module_id);
 		return -EINVAL;
 	}
