@@ -550,9 +550,13 @@ static void tasklet_action_common(struct softirq_action *a,
 
 		if (tasklet_trylock(t)) {
 			if (!atomic_read(&t->count)) {
-				if (!test_and_clear_bit(TASKLET_STATE_SCHED,
-							&t->state))
+				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state)) {
+					if (t->use_callback)
+						pr_emerg("tasklet failed, cb: %pS\n", t->callback);
+					else
+						pr_emerg("tasklet failed, func: %pS\n", t->func);
 					BUG();
+				}
 				if (t->use_callback)
 					t->callback(t);
 				else
