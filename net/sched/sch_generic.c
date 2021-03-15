@@ -38,7 +38,7 @@ EXPORT_SYMBOL(default_qdisc_ops);
 /* Main transmission queue. */
 
 /* Modifications to data participating in scheduling must be protected with
- * qdisc_lock(qdisc) spinlock.
+ * qdisc_lock(qdisc) or qdisc->seqlock spinlock.
  *
  * The idea is the following:
  * - enqueue, dequeue are serialized via qdisc root lock
@@ -51,13 +51,7 @@ EXPORT_SYMBOL(default_qdisc_ops);
 static inline struct sk_buff *__skb_dequeue_bad_txq(struct Qdisc *q)
 {
 	const struct netdev_queue *txq = q->dev_queue;
-	spinlock_t *lock = NULL;
 	struct sk_buff *skb;
-
-	if (q->flags & TCQ_F_NOLOCK) {
-		lock = qdisc_lock(q);
-		spin_lock(lock);
-	}
 
 	skb = skb_peek(&q->skb_bad_txq);
 	if (skb) {
@@ -77,9 +71,6 @@ static inline struct sk_buff *__skb_dequeue_bad_txq(struct Qdisc *q)
 		}
 	}
 
-	if (lock)
-		spin_unlock(lock);
-
 	return skb;
 }
 
@@ -96,13 +87,6 @@ static inline struct sk_buff *qdisc_dequeue_skb_bad_txq(struct Qdisc *q)
 static inline void qdisc_enqueue_skb_bad_txq(struct Qdisc *q,
 					     struct sk_buff *skb)
 {
-	spinlock_t *lock = NULL;
-
-	if (q->flags & TCQ_F_NOLOCK) {
-		lock = qdisc_lock(q);
-		spin_lock(lock);
-	}
-
 	__skb_queue_tail(&q->skb_bad_txq, skb);
 
 	if (qdisc_is_percpu_stats(q)) {
@@ -112,20 +96,10 @@ static inline void qdisc_enqueue_skb_bad_txq(struct Qdisc *q,
 		qdisc_qstats_backlog_inc(q, skb);
 		q->q.qlen++;
 	}
-
-	if (lock)
-		spin_unlock(lock);
 }
 
 static inline void dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 {
-	spinlock_t *lock = NULL;
-
-	if (q->flags & TCQ_F_NOLOCK) {
-		lock = qdisc_lock(q);
-		spin_lock(lock);
-	}
-
 	while (skb) {
 		struct sk_buff *next = skb->next;
 
@@ -144,8 +118,7 @@ static inline void dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 
 		skb = next;
 	}
-	if (lock)
-		spin_unlock(lock);
+
 	__netif_schedule(q);
 }
 
@@ -207,23 +180,8 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 
 	*packets = 1;
 	if (unlikely(!skb_queue_empty(&q->gso_skb))) {
-		spinlock_t *lock = NULL;
-
-		if (q->flags & TCQ_F_NOLOCK) {
-			lock = qdisc_lock(q);
-			spin_lock(lock);
-		}
 
 		skb = skb_peek(&q->gso_skb);
-
-		/* skb may be null if another cpu pulls gso_skb off in between
-		 * empty check and lock.
-		 */
-		if (!skb) {
-			if (lock)
-				spin_unlock(lock);
-			goto validate;
-		}
 
 		/* skb in gso_skb were already validated */
 		*validate = false;
@@ -243,11 +201,10 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 		} else {
 			skb = NULL;
 		}
-		if (lock)
-			spin_unlock(lock);
+
 		goto trace;
 	}
-validate:
+
 	*validate = true;
 
 	if ((q->flags & TCQ_F_ONETXQUEUE) &&
@@ -1153,13 +1110,15 @@ static void dev_reset_queue(struct net_device *dev,
 
 	if (nolock)
 		spin_lock_bh(&qdisc->seqlock);
-	spin_lock_bh(qdisc_lock(qdisc));
+	else
+		spin_lock_bh(qdisc_lock(qdisc));
 
 	qdisc_reset(qdisc);
 
-	spin_unlock_bh(qdisc_lock(qdisc));
 	if (nolock)
 		spin_unlock_bh(&qdisc->seqlock);
+	else
+		spin_unlock_bh(qdisc_lock(qdisc));
 }
 
 static bool some_qdisc_is_busy(struct net_device *dev)
@@ -1168,20 +1127,27 @@ static bool some_qdisc_is_busy(struct net_device *dev)
 
 	for (i = 0; i < dev->num_tx_queues; i++) {
 		struct netdev_queue *dev_queue;
-		spinlock_t *root_lock;
 		struct Qdisc *q;
+		bool nolock;
 		int val;
 
 		dev_queue = netdev_get_tx_queue(dev, i);
 		q = dev_queue->qdisc_sleeping;
 
-		root_lock = qdisc_lock(q);
-		spin_lock_bh(root_lock);
+		nolock = q->flags & TCQ_F_NOLOCK;
+
+		if (nolock)
+			spin_lock_bh(&q->seqlock);
+		else
+			spin_lock_bh(qdisc_lock(q));
 
 		val = (qdisc_is_running(q) ||
 		       test_bit(__QDISC_STATE_SCHED, &q->state));
 
-		spin_unlock_bh(root_lock);
+		if (nolock)
+			spin_unlock_bh(&q->seqlock);
+		else
+			spin_unlock_bh(qdisc_lock(q));
 
 		if (val)
 			return true;
