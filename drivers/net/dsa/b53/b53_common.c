@@ -2037,6 +2037,7 @@ static bool b53_can_enable_brcm_tags(struct dsa_switch *ds, int port,
 
 	switch (tag_protocol) {
 	case DSA_TAG_PROTO_BRCM:
+	case DSA_TAG_PROTO_BRCM_LEGACY:
 	case DSA_TAG_PROTO_BRCM_PREPEND:
 		dev_warn(ds->dev,
 			 "Port %d is stacked to Broadcom tag switch\n", port);
@@ -2058,9 +2059,13 @@ enum dsa_tag_protocol b53_get_tag_protocol(struct dsa_switch *ds, int port,
 	/* Older models (5325, 5365) support a different tag format that we do
 	 * not support in net/dsa/tag_brcm.c yet.
 	 */
-	if (is5325(dev) || is5365(dev) ||
-	    !b53_can_enable_brcm_tags(ds, port, mprot)) {
+	if (!b53_can_enable_brcm_tags(ds, port, mprot)) {
 		dev->tag_protocol = DSA_TAG_PROTO_NONE;
+		goto out;
+	}
+
+	if (is5325(dev) || is5365(dev) || is63xx(dev)) {
+		dev->tag_protocol = DSA_TAG_PROTO_BRCM_LEGACY;
 		goto out;
 	}
 
