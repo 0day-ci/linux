@@ -1982,7 +1982,7 @@ static int mlx5v_probe(struct auxiliary_device *adev,
 	max_vqs = min_t(u32, max_vqs, MLX5_MAX_SUPPORTED_VQS);
 
 	ndev = vdpa_alloc_device(struct mlx5_vdpa_net, mvdev.vdev, mdev->device, &mlx5_vdpa_ops,
-				 NULL);
+				 NULL, false);
 	if (IS_ERR(ndev))
 		return PTR_ERR(ndev);
 
