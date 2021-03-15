@@ -300,6 +300,12 @@
 #define RTL8366RB_INTERRUPT_STATUS_REG	0x0442
 #define RTL8366RB_NUM_INTERRUPT		14 /* 0..13 */
 
+/* Port isolation registers */
+#define RTL8366RB_PORT_ISO_BASE		0x0F08
+#define RTL8366RB_PORT_ISO(pnum)	(RTL8366RB_PORT_ISO_BASE + (pnum))
+#define RTL8366RB_PORT_ISO_EN		BIT(0)
+#define RTL8366RB_PORT_ISO_PORTS_MASK	GENMASK(7, 1)
+
 /* bits 0..5 enable force when cleared */
 #define RTL8366RB_MAC_FORCE_CTRL_REG	0x0F11
 
@@ -835,6 +841,15 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 	if (ret)
 		return ret;
 
+	/* Isolate user ports */
+	for (i = 0; i < RTL8366RB_PORT_NUM_CPU; i++) {
+		ret = regmap_write(smi->map, RTL8366RB_PORT_ISO(i),
+				   RTL8366RB_PORT_ISO_EN |
+				   BIT(RTL8366RB_PORT_NUM_CPU + 1));
+		if (ret)
+			return ret;
+	}
+
 	/* Set up the "green ethernet" feature */
 	ret = rtl8366rb_jam_table(rtl8366rb_green_jam,
 				  ARRAY_SIZE(rtl8366rb_green_jam), smi, false);
@@ -963,10 +978,6 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 			return ret;
 	}
 
-	ret = rtl8366_init_vlan(smi);
-	if (ret)
-		return ret;
-
 	ret = rtl8366rb_setup_cascaded_irq(smi);
 	if (ret)
 		dev_info(smi->dev, "no interrupt support\n");
@@ -976,8 +987,6 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 		dev_info(smi->dev, "could not set up MDIO bus\n");
 		return -ENODEV;
 	}
-
-	ds->configure_vlan_while_not_filtering = false;
 
 	return 0;
 }
@@ -1125,6 +1134,54 @@ rtl8366rb_port_disable(struct dsa_switch *ds, int port)
 		return;
 
 	rb8366rb_set_port_led(smi, port, false);
+}
+
+static int
+rtl8366rb_port_bridge_join(struct dsa_switch *ds, int port,
+			   struct net_device *bridge)
+{
+	struct realtek_smi *smi = ds->priv;
+	unsigned int port_bitmap = 0;
+	int ret, i;
+
+	for (i = 0; i < RTL8366RB_PORT_NUM_CPU; i++) {
+		if (i == port)
+			continue;
+		if (dsa_to_port(ds, i)->bridge_dev != bridge)
+			continue;
+		ret = regmap_update_bits(smi->map, RTL8366RB_PORT_ISO(i),
+					 0, BIT(port + 1));
+		if (ret)
+			return ret;
+
+		port_bitmap |= BIT(i);
+	}
+
+	return regmap_update_bits(smi->map, RTL8366RB_PORT_ISO(port),
+				  0, port_bitmap << 1);
+}
+
+static void
+rtl8366rb_port_bridge_leave(struct dsa_switch *ds, int port,
+			    struct net_device *bridge)
+{
+	struct realtek_smi *smi = ds->priv;
+	unsigned int port_bitmap = 0;
+	int i;
+
+	for (i = 0; i < RTL8366RB_PORT_NUM_CPU; i++) {
+		if (i == port)
+			continue;
+		if (dsa_to_port(ds, i)->bridge_dev != bridge)
+			continue;
+		regmap_update_bits(smi->map, RTL8366RB_PORT_ISO(i),
+				   BIT(port + 1), 0);
+
+		port_bitmap |= BIT(i);
+	}
+
+	regmap_update_bits(smi->map, RTL8366RB_PORT_ISO(port),
+			   port_bitmap << 1, 0);
 }
 
 static int rtl8366rb_change_mtu(struct dsa_switch *ds, int port, int new_mtu)
@@ -1510,6 +1567,8 @@ static const struct dsa_switch_ops rtl8366rb_switch_ops = {
 	.get_strings = rtl8366_get_strings,
 	.get_ethtool_stats = rtl8366_get_ethtool_stats,
 	.get_sset_count = rtl8366_get_sset_count,
+	.port_bridge_join = rtl8366rb_port_bridge_join,
+	.port_bridge_leave = rtl8366rb_port_bridge_leave,
 	.port_vlan_filtering = rtl8366_vlan_filtering,
 	.port_vlan_add = rtl8366_vlan_add,
 	.port_vlan_del = rtl8366_vlan_del,
