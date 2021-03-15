@@ -32,7 +32,12 @@ static void seq_set_overflow(struct seq_file *m)
 
 static void *seq_buf_alloc(unsigned long size)
 {
-	return kvmalloc(size, GFP_KERNEL_ACCOUNT);
+	/*
+	 * To be proactively defensive against buggy seq_get_buf() callers
+	 * (i.e. sysfs handlers), use the vmap area to gain the trailing
+	 * guard page which will protect against linear buffer overflows.
+	 */
+	return __vmalloc(size, GFP_KERNEL_ACCOUNT);
 }
 
 /**
@@ -130,7 +135,7 @@ static int traverse(struct seq_file *m, loff_t offset)
 
 Eoverflow:
 	m->op->stop(m, p);
-	kvfree(m->buf);
+	vfree(m->buf);
 	m->count = 0;
 	m->buf = seq_buf_alloc(m->size <<= 1);
 	return !m->buf ? -ENOMEM : -EAGAIN;
@@ -237,7 +242,7 @@ ssize_t seq_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 			goto Fill;
 		// need a bigger buffer
 		m->op->stop(m, p);
-		kvfree(m->buf);
+		vfree(m->buf);
 		m->count = 0;
 		m->buf = seq_buf_alloc(m->size <<= 1);
 		if (!m->buf)
@@ -349,7 +354,7 @@ EXPORT_SYMBOL(seq_lseek);
 int seq_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *m = file->private_data;
-	kvfree(m->buf);
+	vfree(m->buf);
 	kmem_cache_free(seq_file_cache, m);
 	return 0;
 }
@@ -585,7 +590,7 @@ int single_open_size(struct file *file, int (*show)(struct seq_file *, void *),
 		return -ENOMEM;
 	ret = single_open(file, show, data);
 	if (ret) {
-		kvfree(buf);
+		vfree(buf);
 		return ret;
 	}
 	((struct seq_file *)file->private_data)->buf = buf;
