@@ -101,6 +101,16 @@ static void check_if_reliable(unsigned long fp, struct stackframe *frame,
 		}
 	}
 #endif
+
+	/*
+	 * A NULL or invalid return address probably means there's some
+	 * generated code which __kernel_text_address() doesn't know about.
+	 * Mark the stack trace as not reliable.
+	 */
+	if (!__kernel_text_address(frame->pc)) {
+		frame->reliable = false;
+		return;
+	}
 }
 
 /*
