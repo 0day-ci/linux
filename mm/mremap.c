@@ -216,6 +216,7 @@ static bool move_normal_pmd(struct vm_area_struct *vma, unsigned long old_addr,
 {
 	spinlock_t *old_ptl, *new_ptl;
 	struct mm_struct *mm = vma->vm_mm;
+	struct mmu_gather tlb;
 	pmd_t pmd;
 
 	/*
@@ -244,11 +245,12 @@ static bool move_normal_pmd(struct vm_area_struct *vma, unsigned long old_addr,
 	if (WARN_ON_ONCE(!pmd_none(*new_pmd)))
 		return false;
 
+	tlb_gather_mmu(&tlb, mm);
 	/*
 	 * We don't have to worry about the ordering of src and dst
 	 * ptlocks because exclusive mmap_lock prevents deadlock.
 	 */
-	old_ptl = pmd_lock(vma->vm_mm, old_pmd);
+	old_ptl = pmd_lock(mm, old_pmd);
 	new_ptl = pmd_lockptr(mm, new_pmd);
 	if (new_ptl != old_ptl)
 		spin_lock_nested(new_ptl, SINGLE_DEPTH_NESTING);
@@ -257,13 +259,23 @@ static bool move_normal_pmd(struct vm_area_struct *vma, unsigned long old_addr,
 	pmd = *old_pmd;
 	pmd_clear(old_pmd);
 
+	/*
+	 * Mark the range. We are not freeing page table pages nor
+	 * regular pages. Hence we don't need to call tlb_remove_table()
+	 * or tlb_remove_page().
+	 */
+	tlb_flush_pte_range(&tlb, old_addr, PMD_SIZE);
+	tlb.freed_tables = 1;
 	VM_BUG_ON(!pmd_none(*new_pmd));
 	pmd_populate(mm, new_pmd, (pgtable_t)pmd_page_vaddr(pmd));
 
-	flush_tlb_range(vma, old_addr, old_addr + PMD_SIZE);
 	if (new_ptl != old_ptl)
 		spin_unlock(new_ptl);
 	spin_unlock(old_ptl);
+	/*
+	 * This will invalidate both the old TLB and page table walk caches.
+	 */
+	tlb_finish_mmu(&tlb);
 
 	return true;
 }
@@ -282,6 +294,7 @@ static bool move_normal_pud(struct vm_area_struct *vma, unsigned long old_addr,
 {
 	spinlock_t *old_ptl, *new_ptl;
 	struct mm_struct *mm = vma->vm_mm;
+	struct mmu_gather tlb;
 	pud_t pud;
 
 	/*
@@ -291,11 +304,12 @@ static bool move_normal_pud(struct vm_area_struct *vma, unsigned long old_addr,
 	if (WARN_ON_ONCE(!pud_none(*new_pud)))
 		return false;
 
+	tlb_gather_mmu(&tlb, mm);
 	/*
 	 * We don't have to worry about the ordering of src and dst
 	 * ptlocks because exclusive mmap_lock prevents deadlock.
 	 */
-	old_ptl = pud_lock(vma->vm_mm, old_pud);
+	old_ptl = pud_lock(mm, old_pud);
 	new_ptl = pud_lockptr(mm, new_pud);
 	if (new_ptl != old_ptl)
 		spin_lock_nested(new_ptl, SINGLE_DEPTH_NESTING);
@@ -304,14 +318,25 @@ static bool move_normal_pud(struct vm_area_struct *vma, unsigned long old_addr,
 	pud = *old_pud;
 	pud_clear(old_pud);
 
+	/*
+	 * Mark the range. We are not freeing page table pages nor
+	 * regular pages. Hence we don't need to call tlb_remove_table()
+	 * or tlb_remove_page().
+	 */
+	tlb_flush_pte_range(&tlb, old_addr, PUD_SIZE);
+	tlb.freed_tables = 1;
 	VM_BUG_ON(!pud_none(*new_pud));
 
 	pud_populate(mm, new_pud, (pmd_t *)pud_page_vaddr(pud));
-	flush_tlb_range(vma, old_addr, old_addr + PUD_SIZE);
+
 	if (new_ptl != old_ptl)
 		spin_unlock(new_ptl);
 	spin_unlock(old_ptl);
 
+	/*
+	 * This will invalidate both the old TLB and page table walk caches.
+	 */
+	tlb_finish_mmu(&tlb);
 	return true;
 }
 #else
