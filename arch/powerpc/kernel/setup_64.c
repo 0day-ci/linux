@@ -71,6 +71,8 @@
 
 #include "setup.h"
 
+extern void panic_smp_self_stop(void);
+
 int spinning_secondaries;
 u64 ppc64_pft_size;
 
@@ -949,8 +951,8 @@ static bool no_rfi_flush;
 static bool no_entry_flush;
 static bool no_uaccess_flush;
 bool rfi_flush;
-bool entry_flush;
-bool uaccess_flush;
+static bool entry_flush;
+static bool uaccess_flush;
 DEFINE_STATIC_KEY_FALSE(uaccess_flush_key);
 EXPORT_SYMBOL(uaccess_flush_key);
 
