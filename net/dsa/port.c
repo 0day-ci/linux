@@ -292,72 +292,48 @@ void dsa_port_lag_leave(struct dsa_port *dp, struct net_device *lag)
 	dsa_lag_unmap(dp->ds->dst, lag);
 }
 
-/* Must be called under rcu_read_lock() */
-static bool dsa_port_can_apply_vlan_filtering(struct dsa_port *dp,
-					      bool vlan_filtering,
+bool dsa_port_can_stack_vlan_upper(struct dsa_port *dp, u16 vid,
+				   struct netlink_ext_ack *extack)
+{
+	struct dsa_bridge_mod mod = {
+		.upper_vid = vid,
+	};
+
+	return dsa_bridge_is_coherent(dp->ds->dst, dp->bridge_dev, &mod,
+				      extack);
+}
+
+bool dsa_port_can_bridge_vlan_upper(struct dsa_port *dp,
+				    struct net_device *upper_br,
+				    struct netlink_ext_ack *extack)
+{
+	struct dsa_bridge_mod mod = {
+		.bridge_upper = true,
+	};
+
+	return dsa_bridge_is_coherent(dp->ds->dst, upper_br, &mod, extack);
+}
+
+bool dsa_port_can_add_bridge_vlan(struct dsa_port *dp, u16 vid,
+				  struct netlink_ext_ack *extack)
+{
+	struct dsa_bridge_mod mod = {
+		.br_vid = vid,
+	};
+
+	return dsa_bridge_is_coherent(dp->ds->dst, dp->bridge_dev, &mod,
+				      extack);
+}
+
+static bool dsa_port_can_apply_vlan_filtering(struct dsa_port *dp, bool filter,
 					      struct netlink_ext_ack *extack)
 {
-	struct dsa_switch *ds = dp->ds;
-	int err, i;
+	struct dsa_bridge_mod mod = {
+		.filter = &filter,
+	};
 
-	/* VLAN awareness was off, so the question is "can we turn it on".
-	 * We may have had 8021q uppers, those need to go. Make sure we don't
-	 * enter an inconsistent state: deny changing the VLAN awareness state
-	 * as long as we have 8021q uppers.
-	 */
-	if (vlan_filtering && dsa_is_user_port(ds, dp->index)) {
-		struct net_device *upper_dev, *slave = dp->slave;
-		struct net_device *br = dp->bridge_dev;
-		struct list_head *iter;
-
-		netdev_for_each_upper_dev_rcu(slave, upper_dev, iter) {
-			struct bridge_vlan_info br_info;
-			u16 vid;
-
-			if (!is_vlan_dev(upper_dev))
-				continue;
-
-			vid = vlan_dev_vlan_id(upper_dev);
-
-			/* br_vlan_get_info() returns -EINVAL or -ENOENT if the
-			 * device, respectively the VID is not found, returning
-			 * 0 means success, which is a failure for us here.
-			 */
-			err = br_vlan_get_info(br, vid, &br_info);
-			if (err == 0) {
-				NL_SET_ERR_MSG_MOD(extack,
-						   "Must first remove VLAN uppers having VIDs also present in bridge");
-				return false;
-			}
-		}
-	}
-
-	if (!ds->vlan_filtering_is_global)
-		return true;
-
-	/* For cases where enabling/disabling VLAN awareness is global to the
-	 * switch, we need to handle the case where multiple bridges span
-	 * different ports of the same switch device and one of them has a
-	 * different setting than what is being requested.
-	 */
-	for (i = 0; i < ds->num_ports; i++) {
-		struct net_device *other_bridge;
-
-		other_bridge = dsa_to_port(ds, i)->bridge_dev;
-		if (!other_bridge)
-			continue;
-		/* If it's the same bridge, it also has same
-		 * vlan_filtering setting => no need to check
-		 */
-		if (other_bridge == dp->bridge_dev)
-			continue;
-		if (br_vlan_enabled(other_bridge) != vlan_filtering) {
-			NL_SET_ERR_MSG_MOD(extack,
-					   "VLAN filtering is a global setting");
-			return false;
-		}
-	}
-	return true;
+	return dsa_bridge_is_coherent(dp->ds->dst, dp->bridge_dev, &mod,
+				      extack);
 }
 
 int dsa_port_vlan_filtering(struct dsa_port *dp, bool vlan_filtering,

@@ -188,6 +188,13 @@ int dsa_port_lag_change(struct dsa_port *dp,
 int dsa_port_lag_join(struct dsa_port *dp, struct net_device *lag_dev,
 		      struct netdev_lag_upper_info *uinfo);
 void dsa_port_lag_leave(struct dsa_port *dp, struct net_device *lag_dev);
+bool dsa_port_can_stack_vlan_upper(struct dsa_port *dp, u16 vid,
+				   struct netlink_ext_ack *extack);
+bool dsa_port_can_bridge_vlan_upper(struct dsa_port *dp,
+				    struct net_device *upper_br,
+				    struct netlink_ext_ack *extack);
+bool dsa_port_can_add_bridge_vlan(struct dsa_port *dp, u16 vid,
+				  struct netlink_ext_ack *extack);
 int dsa_port_vlan_filtering(struct dsa_port *dp, bool vlan_filtering,
 			    struct netlink_ext_ack *extack);
 bool dsa_port_skip_vlan_configuration(struct dsa_port *dp);
@@ -271,6 +278,7 @@ static inline bool dsa_tree_offloads_bridge_port(struct dsa_switch_tree *dst,
 }
 
 /* slave.c */
+struct dsa_slave_priv *dsa_slave_dev_lower_find(struct net_device *dev);
 extern const struct dsa_device_ops notag_netdev_ops;
 void dsa_slave_mii_bus_init(struct dsa_switch *ds);
 int dsa_slave_create(struct dsa_port *dp);
@@ -361,6 +369,27 @@ int dsa_switch_register_notifier(struct dsa_switch *ds);
 void dsa_switch_unregister_notifier(struct dsa_switch *ds);
 
 /* dsa2.c */
+
+/**
+ * struct dsa_bridge_mod - Modification of bridge related config
+ * @filter: If non-NULL, the new state of VLAN filtering.
+ * @br_vid: If non-zero, this VID will be added to the bridge.
+ * @upper_vid: If non-zero, a VLAN upper using this VID will be added to
+ *             a bridge port.
+ * @bridge_upper: If non-NULL, a VLAN upper will be added to the bridge.
+ *
+ * Describes a bridge related modification that is about to be applied.
+ */
+struct dsa_bridge_mod {
+	bool *filter;
+	u16   br_vid;
+	u16   upper_vid;
+	bool  bridge_upper;
+};
+
+bool dsa_bridge_is_coherent(struct dsa_switch_tree *dst, struct net_device *br,
+			    struct dsa_bridge_mod *mod,
+			    struct netlink_ext_ack *extack);
 void dsa_lag_map(struct dsa_switch_tree *dst, struct net_device *lag);
 void dsa_lag_unmap(struct dsa_switch_tree *dst, struct net_device *lag);
 int dsa_tree_notify(struct dsa_switch_tree *dst, unsigned long e, void *v);

@@ -325,28 +325,6 @@ static int dsa_slave_port_attr_set(struct net_device *dev,
 	return ret;
 }
 
-/* Must be called under rcu_read_lock() */
-static int
-dsa_slave_vlan_check_for_8021q_uppers(struct net_device *slave,
-				      const struct switchdev_obj_port_vlan *vlan)
-{
-	struct net_device *upper_dev;
-	struct list_head *iter;
-
-	netdev_for_each_upper_dev_rcu(slave, upper_dev, iter) {
-		u16 vid;
-
-		if (!is_vlan_dev(upper_dev))
-			continue;
-
-		vid = vlan_dev_vlan_id(upper_dev);
-		if (vid == vlan->vid)
-			return -EBUSY;
-	}
-
-	return 0;
-}
-
 static int dsa_slave_vlan_add(struct net_device *dev,
 			      const struct switchdev_obj *obj,
 			      struct netlink_ext_ack *extack)
@@ -363,19 +341,8 @@ static int dsa_slave_vlan_add(struct net_device *dev,
 
 	vlan = *SWITCHDEV_OBJ_PORT_VLAN(obj);
 
-	/* Deny adding a bridge VLAN when there is already an 802.1Q upper with
-	 * the same VID.
-	 */
-	if (br_vlan_enabled(dp->bridge_dev)) {
-		rcu_read_lock();
-		err = dsa_slave_vlan_check_for_8021q_uppers(dev, &vlan);
-		rcu_read_unlock();
-		if (err) {
-			NL_SET_ERR_MSG_MOD(extack,
-					   "Port already has a VLAN upper with this VID");
-			return err;
-		}
-	}
+	if (!dsa_port_can_add_bridge_vlan(dp, vlan.vid, extack))
+		return -EBUSY;
 
 	err = dsa_port_vlan_add(dp, &vlan, extack);
 	if (err)
@@ -2050,30 +2017,20 @@ static int
 dsa_prevent_bridging_8021q_upper(struct net_device *dev,
 				 struct netdev_notifier_changeupper_info *info)
 {
-	struct netlink_ext_ack *ext_ack;
-	struct net_device *slave;
-	struct dsa_port *dp;
+	struct netlink_ext_ack *extack;
+	struct dsa_slave_priv *p;
 
-	ext_ack = netdev_notifier_info_to_extack(&info->info);
+	extack = netdev_notifier_info_to_extack(&info->info);
 
-	if (!is_vlan_dev(dev))
+	p = dsa_slave_dev_lower_find(vlan_dev_real_dev(dev));
+	if (!p)
 		return NOTIFY_DONE;
 
-	slave = vlan_dev_real_dev(dev);
-	if (!dsa_slave_dev_check(slave))
+	if (!netif_is_bridge_master(info->upper_dev) || !info->linking)
 		return NOTIFY_DONE;
 
-	dp = dsa_slave_to_port(slave);
-	if (!dp->bridge_dev)
-		return NOTIFY_DONE;
-
-	/* Deny enslaving a VLAN device into a VLAN-aware bridge */
-	if (br_vlan_enabled(dp->bridge_dev) &&
-	    netif_is_bridge_master(info->upper_dev) && info->linking) {
-		NL_SET_ERR_MSG_MOD(ext_ack,
-				   "Cannot enslave VLAN device into VLAN aware bridge");
+	if (!dsa_port_can_bridge_vlan_upper(p->dp, info->upper_dev, extack))
 		return notifier_from_errno(-EINVAL);
-	}
 
 	return NOTIFY_DONE;
 }
@@ -2082,29 +2039,20 @@ static int
 dsa_slave_check_8021q_upper(struct net_device *dev,
 			    struct netdev_notifier_changeupper_info *info)
 {
-	struct dsa_port *dp = dsa_slave_to_port(dev);
-	struct net_device *br = dp->bridge_dev;
-	struct bridge_vlan_info br_info;
 	struct netlink_ext_ack *extack;
-	int err = NOTIFY_DONE;
+	struct dsa_slave_priv *p;
 	u16 vid;
 
-	if (!br || !br_vlan_enabled(br))
+	extack = netdev_notifier_info_to_extack(&info->info);
+
+	p = dsa_slave_dev_lower_find(dev);
+	if (!p)
 		return NOTIFY_DONE;
 
-	extack = netdev_notifier_info_to_extack(&info->info);
 	vid = vlan_dev_vlan_id(info->upper_dev);
 
-	/* br_vlan_get_info() returns -EINVAL or -ENOENT if the
-	 * device, respectively the VID is not found, returning
-	 * 0 means success, which is a failure for us here.
-	 */
-	err = br_vlan_get_info(br, vid, &br_info);
-	if (err == 0) {
-		NL_SET_ERR_MSG_MOD(extack,
-				   "This VLAN is already configured by the bridge");
+	if (!dsa_port_can_stack_vlan_upper(p->dp, vid, extack))
 		return notifier_from_errno(-EBUSY);
-	}
 
 	return NOTIFY_DONE;
 }
@@ -2121,8 +2069,16 @@ static int dsa_slave_netdevice_event(struct notifier_block *nb,
 		struct dsa_port *dp;
 		int err;
 
+		if (is_vlan_dev(dev))
+			err = dsa_prevent_bridging_8021q_upper(dev, ptr);
+		else if (is_vlan_dev(info->upper_dev))
+			err = dsa_slave_check_8021q_upper(dev, ptr);
+
+		if (err)
+			return err;
+
 		if (!dsa_slave_dev_check(dev))
-			return dsa_prevent_bridging_8021q_upper(dev, ptr);
+			return NOTIFY_DONE;
 
 		dp = dsa_slave_to_port(dev);
 		ds = dp->ds;
@@ -2132,9 +2088,6 @@ static int dsa_slave_netdevice_event(struct notifier_block *nb,
 			if (err)
 				return notifier_from_errno(err);
 		}
-
-		if (is_vlan_dev(info->upper_dev))
-			return dsa_slave_check_8021q_upper(dev, ptr);
 		break;
 	}
 	case NETDEV_CHANGEUPPER:
@@ -2260,11 +2213,14 @@ static int dsa_lower_dev_walk(struct net_device *lower_dev,
 	return 0;
 }
 
-static struct dsa_slave_priv *dsa_slave_dev_lower_find(struct net_device *dev)
+struct dsa_slave_priv *dsa_slave_dev_lower_find(struct net_device *dev)
 {
 	struct netdev_nested_priv priv = {
 		.data = NULL,
 	};
+
+	if (dsa_slave_dev_check(dev))
+		return netdev_priv(dev);
 
 	netdev_walk_all_lower_dev_rcu(dev, dsa_lower_dev_walk, &priv);
 

@@ -21,6 +21,186 @@
 static DEFINE_MUTEX(dsa2_mutex);
 LIST_HEAD(dsa_tree_list);
 
+static bool dsa_bridge_filtering_is_coherent(struct dsa_switch_tree *dst, bool filter,
+					     struct netlink_ext_ack *extack)
+{
+	bool is_global = false;
+	struct dsa_port *dp;
+
+	list_for_each_entry(dp, &dst->ports, list) {
+		if (dp->ds->vlan_filtering_is_global) {
+			is_global = true;
+			break;
+		}
+	}
+
+	if (!is_global)
+		return true;
+
+	/* For cases where enabling/disabling VLAN awareness is global
+	 * to the switch, we need to handle the case where multiple
+	 * bridges span different ports of the same switch device and
+	 * one of them has a different setting than what is being
+	 * requested.
+	 */
+	list_for_each_entry(dp, &dst->ports, list) {
+		if (!dp->bridge_dev)
+			continue;
+
+		if (br_vlan_enabled(dp->bridge_dev) != filter) {
+			NL_SET_ERR_MSG_MOD(extack,
+					   "VLAN filtering is not consistent across all bridges");
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool dsa_8021q_uppers_are_coherent(struct dsa_switch_tree *dst,
+					  struct net_device *br,
+					  bool seen_vlan_upper,
+					  unsigned long *upper_vids,
+					  struct netlink_ext_ack *extack)
+{
+	struct net_device *lower, *upper;
+	struct list_head *liter, *uiter;
+	struct dsa_slave_priv *priv;
+	bool seen_offloaded = false;
+	u16 vid;
+
+	netdev_for_each_lower_dev(br, lower, liter) {
+		priv = dsa_slave_dev_lower_find(lower);
+		if (!priv || priv->dp->ds->dst != dst)
+			/* Ignore ports that are not related to us in
+			 * any way.
+			 */
+			continue;
+
+		if (is_vlan_dev(lower)) {
+			seen_vlan_upper = true;
+			continue;
+		}
+
+		if (dsa_port_offloads_bridge(priv->dp, br) &&
+		    dsa_port_offloads_bridge_port(priv->dp, lower))
+			seen_offloaded = true;
+		else
+			/* Non-offloaded uppers can to whatever they
+			 * want.
+			 */
+			continue;
+
+		netdev_for_each_upper_dev_rcu(lower, upper, uiter) {
+			if (!is_vlan_dev(upper))
+				continue;
+
+			vid = vlan_dev_vlan_id(upper);
+			if (!test_bit(vid, upper_vids)) {
+				set_bit(vid, upper_vids);
+				continue;
+			}
+
+			NL_SET_ERR_MSG_MOD(extack,
+					   "Multiple VLAN interfaces cannot use the same VID");
+			return false;
+		}
+	}
+
+	if (seen_offloaded && seen_vlan_upper) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "VLAN interfaces cannot share bridge with offloaded port");
+		return false;
+	}
+
+	return true;
+}
+
+static bool dsa_bridge_vlans_are_coherent(struct net_device *br,
+					  u16 new_vid, unsigned long *upper_vids,
+					  struct netlink_ext_ack *extack)
+{
+	u16 vid;
+
+	if (new_vid && test_bit(new_vid, upper_vids))
+		goto err;
+
+	for_each_set_bit(vid, upper_vids, VLAN_N_VID) {
+		struct bridge_vlan_info br_info;
+
+		if (br_vlan_get_info(br, vid, &br_info))
+			/* Error means that the VID does not exist,
+			 * which is what we want to ensure.
+			 */
+			continue;
+
+		goto err;
+	}
+
+	return true;
+
+err:
+	NL_SET_ERR_MSG_MOD(extack, "No bridge VID may be used on a related VLAN interface");
+	return false;
+}
+
+/**
+ * dsa_bridge_is_coherent - Verify that DSA tree accepts a bridge config.
+ * @dst: Tree to verify against.
+ * @br: Bridge netdev to verify.
+ * @mod: Description of the modification to introduce.
+ * @extack: Netlink extended ack for error reporting.
+ *
+ * Verify that the VLAN config of @br, its offloaded ports belonging
+ * to @dst and their VLAN uppers, can be correctly offloaded after
+ * introducing the change described by @mod. If this is not the case,
+ * an error is reported via @extack.
+ *
+ * Return: true if the config can be offloaded, false otherwise.
+ */
+bool dsa_bridge_is_coherent(struct dsa_switch_tree *dst, struct net_device *br,
+			    struct dsa_bridge_mod *mod,
+			    struct netlink_ext_ack *extack)
+{
+	unsigned long *upper_vids = NULL;
+	bool filter;
+
+	if (mod->filter)
+		filter = *mod->filter;
+	else
+		filter = br && br_vlan_enabled(br);
+
+	if (!dsa_bridge_filtering_is_coherent(dst, filter, extack))
+		goto err;
+
+	if (!filter)
+		return true;
+
+	upper_vids = bitmap_zalloc(VLAN_N_VID, GFP_KERNEL);
+	if (!upper_vids) {
+		WARN_ON_ONCE(1);
+		goto err;
+	}
+
+	if (mod->upper_vid)
+		set_bit(mod->upper_vid, upper_vids);
+
+	if (!dsa_8021q_uppers_are_coherent(dst, br, mod->bridge_upper,
+					   upper_vids, extack))
+		goto err_free;
+
+	if (!dsa_bridge_vlans_are_coherent(br, mod->br_vid, upper_vids, extack))
+		goto err_free;
+
+	kfree(upper_vids);
+	return true;
+
+err_free:
+	kfree(upper_vids);
+err:
+	return false;
+}
+
 /**
  * dsa_tree_notify - Execute code for all switches in a DSA switch tree.
  * @dst: collection of struct dsa_switch devices to notify.
