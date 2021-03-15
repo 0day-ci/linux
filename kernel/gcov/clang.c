@@ -49,7 +49,7 @@
 #include <linux/printk.h>
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
+#include <linux/mm.h>
 #include "gcov.h"
 
 typedef void (*llvm_gcov_callback)(void);
@@ -308,7 +308,7 @@ static struct gcov_fn_info *gcov_fn_info_dup(struct gcov_fn_info *fn)
 		goto err_name;
 
 	cv_size = fn->num_counters * sizeof(fn->counters[0]);
-	fn_dup->counters = vmalloc(cv_size);
+	fn_dup->counters = kvmalloc(cv_size, GFP_KERNEL);
 	if (!fn_dup->counters)
 		goto err_counters;
 	memcpy(fn_dup->counters, fn->counters, cv_size);
@@ -367,7 +367,7 @@ void gcov_info_free(struct gcov_info *info)
 
 	list_for_each_entry_safe(fn, tmp, &info->functions, head) {
 		kfree(fn->function_name);
-		vfree(fn->counters);
+		kvfree(fn->counters);
 		list_del(&fn->head);
 		kfree(fn);
 	}
