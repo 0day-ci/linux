@@ -314,21 +314,6 @@ static int rdacm21_get_fmt(struct v4l2_subdev *sd,
 	return 0;
 }
 
-static const struct v4l2_subdev_video_ops rdacm21_video_ops = {
-	.s_stream	= rdacm21_s_stream,
-};
-
-static const struct v4l2_subdev_pad_ops rdacm21_subdev_pad_ops = {
-	.enum_mbus_code = rdacm21_enum_mbus_code,
-	.get_fmt	= rdacm21_get_fmt,
-	.set_fmt	= rdacm21_get_fmt,
-};
-
-static const struct v4l2_subdev_ops rdacm21_subdev_ops = {
-	.video		= &rdacm21_video_ops,
-	.pad		= &rdacm21_subdev_pad_ops,
-};
-
 static int ov10640_initialize(struct rdacm21_device *dev)
 {
 	u8 val;
@@ -448,18 +433,10 @@ static int ov490_initialize(struct rdacm21_device *dev)
 	return 0;
 }
 
-static int rdacm21_initialize(struct rdacm21_device *dev)
+static int rdacm21_init(struct v4l2_subdev *sd, unsigned int val)
 {
+	struct rdacm21_device *dev = sd_to_rdacm21(sd);
 	int ret;
-
-	/* Verify communication with the MAX9271: ping to wakeup. */
-	dev->serializer.client->addr = MAX9271_DEFAULT_ADDR;
-	max9271_wake_up(&dev->serializer);
-
-	/* Enable reverse channel and disable the serial link. */
-	ret = max9271_set_serial_link(&dev->serializer, false);
-	if (ret)
-		return ret;
 
 	/* Configure I2C bus at 105Kbps speed and configure GMSL. */
 	ret = max9271_configure_i2c(&dev->serializer,
@@ -504,6 +481,42 @@ static int rdacm21_initialize(struct rdacm21_device *dev)
 	usleep_range(3000, 5000);
 
 	ret = ov490_initialize(dev);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static const struct v4l2_subdev_core_ops rdacm21_core_ops = {
+	.init		= rdacm21_init,
+};
+
+static const struct v4l2_subdev_video_ops rdacm21_video_ops = {
+	.s_stream	= rdacm21_s_stream,
+};
+
+static const struct v4l2_subdev_pad_ops rdacm21_subdev_pad_ops = {
+	.enum_mbus_code = rdacm21_enum_mbus_code,
+	.get_fmt	= rdacm21_get_fmt,
+	.set_fmt	= rdacm21_get_fmt,
+};
+
+static const struct v4l2_subdev_ops rdacm21_subdev_ops = {
+	.core		= &rdacm21_core_ops,
+	.video		= &rdacm21_video_ops,
+	.pad		= &rdacm21_subdev_pad_ops,
+};
+
+static int rdacm21_initialize(struct rdacm21_device *dev)
+{
+	int ret;
+
+	/* Verify communication with the MAX9271: ping to wakeup. */
+	dev->serializer.client->addr = MAX9271_DEFAULT_ADDR;
+	max9271_wake_up(&dev->serializer);
+
+	/* Enable reverse channel and disable the serial link. */
+	ret = max9271_set_serial_link(&dev->serializer, false);
 	if (ret)
 		return ret;
 

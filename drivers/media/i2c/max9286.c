@@ -564,16 +564,27 @@ static int max9286_notify_bound(struct v4l2_async_notifier *notifier,
 		return 0;
 
 	/*
+	 * Initialize all the remote camera. Increase the channel amplitude
+	 * to compensate for the remote noise immunity threshold.
+	 */
+	max9286_reverse_channel_setup(priv, MAX9286_REV_AMP_HIGH);
+	for_each_source(priv, source) {
+		ret = v4l2_subdev_call(source->sd, core, init, 0);
+		if (ret) {
+			dev_err(&priv->client->dev,
+				"Failed to initialize camera device %u\n",
+				index);
+			return ret;
+		}
+	}
+
+	/*
 	 * All enabled sources have probed and enabled their reverse control
 	 * channels:
-	 *
-	 * - Increase the reverse channel amplitude to compensate for the
-	 *   remote ends high threshold
 	 * - Verify all configuration links are properly detected
 	 * - Disable auto-ack as communication on the control channel are now
 	 *   stable.
 	 */
-	max9286_reverse_channel_setup(priv, MAX9286_REV_AMP_HIGH);
 	max9286_check_config_link(priv, priv->source_mask);
 
 	/*
