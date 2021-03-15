@@ -208,3 +208,24 @@ int execl_cmd(const char *cmd,...)
 	argv[argc] = NULL;
 	return execv_cmd(argv);
 }
+
+/* The caller is responsible to free the returned buffer */
+char *get_exec_abs_path(void)
+{
+	int ret;
+	int i;
+	char *buf;
+
+	buf = malloc(PATH_MAX);
+	ret = readlink("/proc/self/exe", buf, PATH_MAX - 1);
+	if (ret <= 0) {
+		free(buf);
+		return NULL;
+	}
+
+	for (i = ret - 1; buf[i] != '/'; i--);
+
+	buf[i + 1] = 0;
+
+	return buf;
+}

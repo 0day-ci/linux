@@ -13,5 +13,6 @@ extern int execl_cmd(const char *cmd, ...);
 /* get_argv_exec_path and system_path return malloc'd string, caller must free it */
 extern char *get_argv_exec_path(void);
 extern char *system_path(const char *path);
+extern char *get_exec_abs_path(void);
 
 #endif /* __SUBCMD_EXEC_CMD_H */

@@ -610,12 +610,27 @@ static int report__browse_hists(struct report *rep)
 	struct perf_session *session = rep->session;
 	struct evlist *evlist = session->evlist;
 	const char *help = perf_tip(system_path(TIPDIR));
+	char *exec_path;
+	char *docdir;
 
 	if (help == NULL) {
 		/* fallback for people who don't install perf ;-) */
-		help = perf_tip(DOCDIR);
-		if (help == NULL)
-			help = "Cannot load tips.txt file, please install perf!";
+		exec_path = get_exec_abs_path();
+		if (exec_path == NULL || asprintf(&docdir, "%sDocumentation", exec_path) < 0) {
+			docdir = NULL;
+			help = "Not enough memory or some other internal error occurred!";
+		}
+
+		if (docdir != NULL) {
+			help = perf_tip(docdir);
+			if (help == NULL)
+				help = "Cannot load tips.txt file, please install perf!";
+		}
+
+		if (exec_path)
+			free(exec_path);
+		if (docdir)
+			free(docdir);
 	}
 
 	switch (use_browser) {
