@@ -482,6 +482,10 @@ static int io_wqe_worker(void *data)
 	char buf[TASK_COMM_LEN];
 
 	worker->flags |= (IO_WORKER_F_UP | IO_WORKER_F_RUNNING);
+
+	if (wq == NULL)
+		return -EFAULT;
+
 	io_wqe_inc_running(worker);
 
 	sprintf(buf, "iou-wrk-%d", wq->task_pid);
