@@ -1815,6 +1815,8 @@ static int lbmLogInit(struct jfs_log * log)
 	 */
 	init_waitqueue_head(&log->free_wait);
 
+	init_waitqueue_head(&log->io_waitq);
+
 	log->lbuf_free = NULL;
 
 	for (i = 0; i < LOGPAGES;) {
@@ -1864,6 +1866,7 @@ static void lbmLogShutdown(struct jfs_log * log)
 	struct lbuf *lbuf;
 
 	jfs_info("lbmLogShutdown: log:0x%p", log);
+	wait_event(log->io_waitq, !atomic_read(&log->io_inflight));
 
 	lbuf = log->lbuf_free;
 	while (lbuf) {
@@ -1990,6 +1993,8 @@ static int lbmRead(struct jfs_log * log, int pn, struct lbuf ** bpp)
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
 	bio->bi_opf = REQ_OP_READ;
+
+	atomic_inc(&log->io_inflight);
 	/*check if journaling to disk has been disabled*/
 	if (log->no_integrity) {
 		bio->bi_iter.bi_size = 0;
@@ -2135,6 +2140,7 @@ static void lbmStartIO(struct lbuf * bp)
 	bio->bi_private = bp;
 	bio->bi_opf = REQ_OP_WRITE | REQ_SYNC;
 
+	atomic_inc(&log->io_inflight);
 	/* check if journaling to disk has been disabled */
 	if (log->no_integrity) {
 		bio->bi_iter.bi_size = 0;
@@ -2200,6 +2206,8 @@ static void lbmIODone(struct bio *bio)
 
 	bio_put(bio);
 
+	log = bp->l_log;
+
 	/*
 	 *	pagein completion
 	 */
@@ -2211,7 +2219,7 @@ static void lbmIODone(struct bio *bio)
 		/* wakeup I/O initiator */
 		LCACHE_WAKEUP(&bp->l_ioevent);
 
-		return;
+		goto out;
 	}
 
 	/*
@@ -2230,13 +2238,12 @@ static void lbmIODone(struct bio *bio)
 	INCREMENT(lmStat.pagedone);
 
 	/* update committed lsn */
-	log = bp->l_log;
 	log->clsn = (bp->l_pn << L2LOGPSIZE) + bp->l_ceor;
 
 	if (bp->l_flag & lbmDIRECT) {
 		LCACHE_WAKEUP(&bp->l_ioevent);
 		LCACHE_UNLOCK(flags);
-		return;
+		goto out;
 	}
 
 	tail = log->wqueue;
@@ -2315,6 +2322,10 @@ static void lbmIODone(struct bio *bio)
 
 		LCACHE_UNLOCK(flags);	/* unlock+enable */
 	}
+
+out:
+	if (atomic_dec_and_test(&log->io_inflight))
+		wake_up(&log->io_waitq);
 }
 
 int jfsIOWait(void *arg)

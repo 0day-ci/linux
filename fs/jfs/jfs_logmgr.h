@@ -400,6 +400,8 @@ struct jfs_log {
 	uuid_t uuid;		/* 16: 128-bit uuid of log device */
 
 	int no_integrity;	/* 3: flag to disable journaling to disk */
+	atomic_t io_inflight;
+	wait_queue_head_t io_waitq;
 };
 
 /*
