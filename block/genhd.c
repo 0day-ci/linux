@@ -1764,6 +1764,7 @@ static void disk_check_events(struct disk_events *ev,
  * events_async		: list of events which can be detected w/o polling
  *			  (always empty, only for backwards compatibility)
  * events_poll_msecs	: polling interval, 0: disable, -1: system default
+ * diskseq		: disk sequence number, since boot
  */
 static ssize_t __disk_events_show(unsigned int events, char *buf)
 {
@@ -1834,16 +1835,26 @@ static ssize_t disk_events_poll_msecs_store(struct device *dev,
 	return count;
 }
 
+static ssize_t diskseq_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct gendisk *disk = dev_to_disk(dev);
+
+	return sprintf(buf, "%llu\n", disk->diskseq);
+}
+
 static const DEVICE_ATTR(events, 0444, disk_events_show, NULL);
 static const DEVICE_ATTR(events_async, 0444, disk_events_async_show, NULL);
 static const DEVICE_ATTR(events_poll_msecs, 0644,
 			 disk_events_poll_msecs_show,
 			 disk_events_poll_msecs_store);
+static const DEVICE_ATTR(diskseq, 0444, diskseq_show, NULL);
 
 static const struct attribute *disk_sysfs_attrs[] = {
 	&dev_attr_events.attr,
 	&dev_attr_events_async.attr,
 	&dev_attr_events_poll_msecs.attr,
+	&dev_attr_diskseq.attr,
 	NULL,
 };
 
