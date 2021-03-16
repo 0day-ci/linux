@@ -84,6 +84,7 @@ extern const struct ethtool_ops dpaa2_switch_port_ethtool_ops;
 struct ethsw_core;
 
 struct dpaa2_switch_fq {
+	void (*consume)(struct dpaa2_switch_fq *fq, const struct dpaa2_fd *fd);
 	struct ethsw_core *ethsw;
 	enum dpsw_queue_type type;
 	struct dpaa2_io_store *store;

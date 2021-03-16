@@ -1917,11 +1917,13 @@ static int dpaa2_switch_setup_fqs(struct ethsw_core *ethsw)
 
 	ethsw->fq[i].fqid = ctrl_if_attr.rx_fqid;
 	ethsw->fq[i].ethsw = ethsw;
-	ethsw->fq[i++].type = DPSW_QUEUE_RX;
+	ethsw->fq[i].type = DPSW_QUEUE_RX;
+	ethsw->fq[i++].consume = dpaa2_switch_rx;
 
 	ethsw->fq[i].fqid = ctrl_if_attr.tx_err_conf_fqid;
 	ethsw->fq[i].ethsw = ethsw;
-	ethsw->fq[i++].type = DPSW_QUEUE_TX_ERR_CONF;
+	ethsw->fq[i].type = DPSW_QUEUE_TX_ERR_CONF;
+	ethsw->fq[i++].consume = dpaa2_switch_tx_conf;
 
 	return 0;
 }
@@ -2208,10 +2210,8 @@ static int dpaa2_switch_store_consume(struct dpaa2_switch_fq *fq)
 			continue;
 		}
 
-		if (fq->type == DPSW_QUEUE_RX)
-			dpaa2_switch_rx(fq, dpaa2_dq_fd(dq));
-		else
-			dpaa2_switch_tx_conf(fq, dpaa2_dq_fd(dq));
+		INDIRECT_CALL_2(fq->consume, dpaa2_switch_rx, dpaa2_switch_tx_conf,
+				fq, dpaa2_dq_fd(dq));
 		cleaned++;
 
 	} while (!is_last);
