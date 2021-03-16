@@ -339,11 +339,13 @@ extern struct mem_cgroup *root_mem_cgroup;
 
 enum page_memcg_data_flags {
 	/* page->memcg_data is a pointer to an objcgs vector */
-	MEMCG_DATA_OBJCGS = (1UL << 0),
+	MEMCG_DATA_OBJCGS	= (1UL << 0),
 	/* page has been accounted as a non-slab kernel page */
-	MEMCG_DATA_KMEM = (1UL << 1),
+	MEMCG_DATA_KMEM		= (1UL << 1),
+	/* page has been accounted as network memory */
+	MEMCG_DATA_SOCK		= (1UL << 2),
 	/* the next bit after the last actual flag */
-	__NR_MEMCG_DATA_FLAGS  = (1UL << 2),
+	__NR_MEMCG_DATA_FLAGS	= (1UL << 3),
 };
 
 #define MEMCG_DATA_FLAGS_MASK (__NR_MEMCG_DATA_FLAGS - 1)
@@ -432,6 +434,11 @@ static inline bool PageMemcgKmem(struct page *page)
 {
 	VM_BUG_ON_PAGE(page->memcg_data & MEMCG_DATA_OBJCGS, page);
 	return page->memcg_data & MEMCG_DATA_KMEM;
+}
+
+static inline bool PageMemcgSock(struct page *page)
+{
+	return page->memcg_data & MEMCG_DATA_SOCK;
 }
 
 #ifdef CONFIG_MEMCG_KMEM
@@ -1104,6 +1111,11 @@ static inline bool PageMemcgKmem(struct page *page)
 	return false;
 }
 
+static inline bool PageMemcgSock(struct page *page)
+{
+	return false;
+}
+
 static inline bool mem_cgroup_is_root(struct mem_cgroup *memcg)
 {
 	return true;
@@ -1570,6 +1582,15 @@ extern struct static_key_false memcg_sockets_enabled_key;
 #define mem_cgroup_sockets_enabled static_branch_unlikely(&memcg_sockets_enabled_key)
 void mem_cgroup_sk_alloc(struct sock *sk);
 void mem_cgroup_sk_free(struct sock *sk);
+
+void mem_cgroup_post_charge_sock_pages(struct mem_cgroup *memcg,
+				 unsigned int nr_pages);
+void mem_cgroup_uncharge_sock_page(struct page *page);
+int mem_cgroup_prepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+			       u8 *page_prepared, unsigned int nr_pages);
+int mem_cgroup_unprepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+				 u8 *page_prepared, unsigned int nr_pages);
+
 static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 {
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) && memcg->tcpmem_pressure)
@@ -1597,6 +1618,27 @@ static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 static inline void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
 					  int nid, int shrinker_id)
 {
+}
+
+static inline void mem_cgroup_post_charge_sock_pages(struct mem_cgroup *memcg,
+					       unsigned int nr_pages)
+{
+}
+
+static inline void mem_cgroup_uncharge_sock_page(struct page *page)
+{
+}
+
+static inline int mem_cgroup_prepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+			       u8 *page_prepared, unsigned int nr_pages)
+{
+	return 0;
+}
+
+static inline int mem_cgroup_unprepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+				 u8 *page_prepared, unsigned int nr_pages)
+{
+	return 0;
 }
 #endif
 

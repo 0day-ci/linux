@@ -7053,6 +7053,144 @@ void mem_cgroup_uncharge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
 	refill_stock(memcg, nr_pages);
 }
 
+/**
+ * mem_cgroup_post_charge_sock_pages - charge socket memory
+ * for zerocopy pages mapped to userspace.
+ * @memcg: memcg to charge
+ * @nr_pages: number of pages
+ *
+ * When we perform a zero-copy receive on a socket, the receive payload memory
+ * pages are remapped to the user address space with vm_insert_pages().
+ * mem_cgroup_post_charge_sock_pages() accounts for this memory utilization; it is
+ * *not* mem_cgroup_charge_skmem() which accounts for memory use within socket
+ * buffers.
+ *
+ * Charges all @nr_pages to given memcg. The caller should have a reference
+ * on the given memcg. Unlike mem_cgroup_charge_skmem, the caller must also have
+ * set page->memcg_data for these pages beforehand. Decoupling this page
+ * manipulation from the charging allows us to avoid double-charging the pages,
+ * causing undue memory pressure.
+ */
+void mem_cgroup_post_charge_sock_pages(struct mem_cgroup *memcg,
+				 unsigned int nr_pages)
+{
+	if (mem_cgroup_disabled() || !memcg)
+		return;
+	try_charge(memcg, GFP_KERNEL | __GFP_NOFAIL, nr_pages);
+	mod_memcg_state(memcg, MEMCG_SOCK, nr_pages);
+}
+
+/**
+ * mem_cgroup_uncharge_sock_page - uncharge socket page
+ * when unmapping zerocopy pages mapped to userspace.
+ * @page: page to uncharge
+ *
+ * mem_cgroup_uncharge_sock_page() drops the CSS reference taken by
+ * mem_cgroup_prepare_sock_pages(), and uncharges memory usage.
+ * Page cannot be compound. Must be called with page memcg lock held.
+ */
+void mem_cgroup_uncharge_sock_page(struct page *page)
+{
+	struct mem_cgroup *memcg;
+
+	VM_BUG_ON(PageCompound(page));
+	memcg = page_memcg(page);
+	if (!memcg)
+		return;
+
+	mod_memcg_state(memcg, MEMCG_SOCK, -1);
+	refill_stock(memcg, 1);
+	css_put(&memcg->css);
+	page->memcg_data = 0;
+}
+
+/**
+ * mem_cgroup_unprepare_sock_pages - unset memcg for unremapped zerocopy pages.
+ * @memcg: The memcg we were trying to account pages to.
+ * @pages: array of pages, some subset of which we must 'unprepare'
+ * @page_prepared: array of flags indicating if page must be unprepared
+ * @nr_pages: Length of pages and page_prepared arrays.
+ *
+ * If a zerocopy receive attempt failed to remap some pages to userspace, we
+ * must unset memcg on these pages, if we had previously set them with a
+ * matching call to mem_cgroup_prepare_sock_pages().
+ *
+ * The caller must ensure that all input parameters are the same parameters
+ * (or a subset of the parameters) passed to the preceding call to
+ * mem_cgroup_prepare_sock_pages() otherwise undefined behaviour results.
+ * Returns how many pages were unprepared so caller post-charges the right
+ * amount of pages to the memcg.
+ */
+int mem_cgroup_unprepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+				 u8 *page_prepared, unsigned int nr_pages)
+{
+	unsigned int idx, cleared = 0;
+
+	if (!memcg || mem_cgroup_disabled())
+		return 0;
+
+	for (idx = 0; idx < nr_pages; ++idx) {
+		if (!page_prepared[idx])
+			continue;
+		/* We prepared this page so it is not LRU. */
+		WRITE_ONCE(pages[idx]->memcg_data, 0);
+		++cleared;
+	}
+	css_put_many(&memcg->css, cleared);
+	return cleared;
+}
+
+/**
+ * mem_cgroup_prepare_sock_pages - set memcg for receive zerocopy pages.
+ * @memcg: The memcg we were trying to account pages to.
+ * @pages: array of pages, some subset of which we must 'prepare'
+ * @page_prepared: array of flags indicating if page was prepared
+ * @nr_pages: Length of pages and page_prepared arrays.
+ *
+ * If we are to remap pages to userspace in zerocopy receive, we must set the
+ * memcg for these pages before vm_insert_pages(), if the page does not already
+ * have a memcg set. However, if a memcg was already set, we do not adjust it.
+ * Explicitly track which pages we have prepared ourselves so we can 'unprepare'
+ * them if need be should page remapping fail.
+ *
+ * The caller must ensure that all input parameter passed to a subsequent call
+ * to mem_cgroup_unprepare_sock_pages() are identical or a subset of these
+ * parameters otherwise undefined behaviour results. page_prepared must also be
+ * zero'd by the caller before invoking this method. Returns how many pages were
+ * prepared so caller post-charges the right amount of pages to the memcg.
+ */
+int mem_cgroup_prepare_sock_pages(struct mem_cgroup *memcg, struct page **pages,
+			       u8 *page_prepared, unsigned int nr_pages)
+{
+	unsigned int idx, to_uncharge = 0;
+	const unsigned long memcg_data = (unsigned long) memcg |
+			MEMCG_DATA_SOCK;
+
+	if (!memcg || mem_cgroup_disabled())
+		return 0;
+
+	css_get_many(&memcg->css, nr_pages);
+	for (idx = 0; idx < nr_pages; ++idx) {
+		struct page *page = pages[idx];
+
+		VM_BUG_ON(PageCompound(page));
+		/*
+		 * page->memcg_data == 0 implies non-LRU page. non-LRU pages are
+		 * not changed by the rest of the kernel, so we only have to
+		 * guard against concurrent access in the networking layer.
+		 * cmpxchg(0) lets us both validate non-LRU and protects against
+		 * concurrent access in networking layer.
+		 */
+		if (cmpxchg(&page->memcg_data, 0, memcg_data) == 0)
+			page_prepared[idx] = 1;
+		else
+			++to_uncharge;
+	}
+	if (to_uncharge)
+		css_put_many(&memcg->css, to_uncharge);
+	return nr_pages - to_uncharge;
+}
+
 static int __init cgroup_memory(char *s)
 {
 	char *token;

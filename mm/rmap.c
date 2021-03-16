@@ -1276,6 +1276,9 @@ static void page_remove_file_rmap(struct page *page, bool compound)
 
 	if (unlikely(PageMlocked(page)))
 		clear_page_mlock(page);
+
+	if (unlikely(PageMemcgSock(page)))
+		mem_cgroup_uncharge_sock_page(page);
 }
 
 static void page_remove_anon_compound_rmap(struct page *page)
@@ -1331,7 +1334,7 @@ static void page_remove_anon_compound_rmap(struct page *page)
  */
 void page_remove_rmap(struct page *page, bool compound)
 {
-	lock_page_memcg(page);
+	struct mem_cgroup *memcg = lock_page_memcg(page);
 
 	if (!PageAnon(page)) {
 		page_remove_file_rmap(page, compound);
@@ -1370,7 +1373,7 @@ void page_remove_rmap(struct page *page, bool compound)
 	 * faster for those pages still in swapcache.
 	 */
 out:
-	unlock_page_memcg(page);
+	__unlock_page_memcg(memcg);
 }
 
 /*
