@@ -1789,12 +1789,14 @@ static skb_frag_t *skb_advance_to_frag(struct sk_buff *skb, u32 offset_skb,
 		++frag;
 	}
 	*offset_frag = 0;
+	prefetchw(skb_frag_page(frag));
 	return frag;
 }
 
 static bool can_map_frag(const skb_frag_t *frag)
 {
-	return skb_frag_size(frag) == PAGE_SIZE && !skb_frag_off(frag);
+	return skb_frag_size(frag) == PAGE_SIZE && !skb_frag_off(frag) &&
+		!PageCompound(skb_frag_page(frag));
 }
 
 static int find_next_mappable_frag(const skb_frag_t *frag,
@@ -1944,14 +1946,19 @@ static int tcp_zc_handle_leftover(struct tcp_zerocopy_receive *zc,
 
 static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 					      struct page **pending_pages,
-					      unsigned long pages_remaining,
+					      u8 *page_prepared,
+					      unsigned long leftover_pages,
 					      unsigned long *address,
 					      u32 *length,
 					      u32 *seq,
 					      struct tcp_zerocopy_receive *zc,
 					      u32 total_bytes_to_map,
-					      int err)
+					      int err,
+					      unsigned long *pages_acctd_total,
+					      struct mem_cgroup *memcg)
 {
+	unsigned long pages_remaining = leftover_pages, pages_mapped = 0;
+
 	/* At least one page did not map. Try zapping if we skipped earlier. */
 	if (err == -EBUSY &&
 	    zc->flags & TCP_RECEIVE_ZEROCOPY_FLAG_TLB_CLEAN_HINT) {
@@ -1965,14 +1972,14 @@ static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 	}
 
 	if (!err) {
-		unsigned long leftover_pages = pages_remaining;
 		int bytes_mapped;
 
 		/* We called zap_page_range, try to reinsert. */
 		err = vm_insert_pages(vma, *address,
 				      pending_pages,
 				      &pages_remaining);
-		bytes_mapped = PAGE_SIZE * (leftover_pages - pages_remaining);
+		pages_mapped = leftover_pages - pages_remaining;
+		bytes_mapped = PAGE_SIZE * pages_mapped;
 		*seq += bytes_mapped;
 		*address += bytes_mapped;
 	}
@@ -1986,23 +1993,40 @@ static int tcp_zerocopy_vm_insert_batch_error(struct vm_area_struct *vma,
 
 		*length -= bytes_not_mapped;
 		zc->recv_skip_hint += bytes_not_mapped;
+
+		pending_pages += pages_mapped;
+		page_prepared += pages_mapped;
+
+		/* For the pages that did not map, unset memcg and drop refs. */
+		*pages_acctd_total -= mem_cgroup_unprepare_sock_pages(memcg,
+						pending_pages,
+						page_prepared,
+						pages_remaining);
 	}
 	return err;
 }
 
 static int tcp_zerocopy_vm_insert_batch(struct vm_area_struct *vma,
 					struct page **pages,
+					u8 *page_prepared,
 					unsigned int pages_to_map,
 					unsigned long *address,
 					u32 *length,
 					u32 *seq,
 					struct tcp_zerocopy_receive *zc,
-					u32 total_bytes_to_map)
+					u32 total_bytes_to_map,
+					unsigned long *pages_acctd_total,
+					struct mem_cgroup *memcg)
 {
 	unsigned long pages_remaining = pages_to_map;
 	unsigned int pages_mapped;
 	unsigned int bytes_mapped;
 	int err;
+
+	/* Before mapping, we must take css ref since unmap drops it. */
+	*pages_acctd_total = mem_cgroup_prepare_sock_pages(memcg, pages,
+							   page_prepared,
+							   pages_to_map);
 
 	err = vm_insert_pages(vma, *address, pages, &pages_remaining);
 	pages_mapped = pages_to_map - (unsigned int)pages_remaining;
@@ -2018,8 +2042,9 @@ static int tcp_zerocopy_vm_insert_batch(struct vm_area_struct *vma,
 
 	/* Error: maybe zap and retry + rollback state for failed inserts. */
 	return tcp_zerocopy_vm_insert_batch_error(vma, pages + pages_mapped,
+		page_prepared + pages_mapped,
 		pages_remaining, address, length, seq, zc, total_bytes_to_map,
-		err);
+		err, pages_acctd_total, memcg);
 }
 
 #define TCP_VALID_ZC_MSG_FLAGS   (TCP_CMSG_TS)
@@ -2058,6 +2083,8 @@ static int tcp_zerocopy_receive(struct sock *sk,
 	u32 length = 0, offset, vma_len, avail_len, copylen = 0;
 	unsigned long address = (unsigned long)zc->address;
 	struct page *pages[TCP_ZEROCOPY_PAGE_BATCH_SIZE];
+	u8 page_prepared[TCP_ZEROCOPY_PAGE_BATCH_SIZE];
+	unsigned long total_pages_acctd = 0;
 	s32 copybuf_len = zc->copybuf_len;
 	struct tcp_sock *tp = tcp_sk(sk);
 	const skb_frag_t *frags = NULL;
@@ -2065,6 +2092,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 	struct vm_area_struct *vma;
 	struct sk_buff *skb = NULL;
 	u32 seq = tp->copied_seq;
+	struct mem_cgroup *memcg;
 	u32 total_bytes_to_map;
 	int inq = tcp_inq(sk);
 	int ret;
@@ -2110,12 +2138,15 @@ static int tcp_zerocopy_receive(struct sock *sk,
 		zc->length = avail_len;
 		zc->recv_skip_hint = avail_len;
 	}
+
+	memcg = get_mem_cgroup_from_mm(current->mm);
 	ret = 0;
 	while (length + PAGE_SIZE <= zc->length) {
+		bool skb_remainder_unmappable = zc->recv_skip_hint < PAGE_SIZE;
 		int mappable_offset;
 		struct page *page;
 
-		if (zc->recv_skip_hint < PAGE_SIZE) {
+		if (skb_remainder_unmappable) {
 			u32 offset_frag;
 
 			if (skb) {
@@ -2144,30 +2175,46 @@ static int tcp_zerocopy_receive(struct sock *sk,
 			break;
 		}
 		page = skb_frag_page(frags);
-		prefetchw(page);
 		pages[pages_to_map++] = page;
 		length += PAGE_SIZE;
 		zc->recv_skip_hint -= PAGE_SIZE;
 		frags++;
+		skb_remainder_unmappable = zc->recv_skip_hint < PAGE_SIZE;
 		if (pages_to_map == TCP_ZEROCOPY_PAGE_BATCH_SIZE ||
-		    zc->recv_skip_hint < PAGE_SIZE) {
+		    skb_remainder_unmappable) {
+			unsigned long pages_acctd = 0;
+
 			/* Either full batch, or we're about to go to next skb
 			 * (and we cannot unroll failed ops across skbs).
 			 */
+			memset(page_prepared, 0, sizeof(page_prepared));
 			ret = tcp_zerocopy_vm_insert_batch(vma, pages,
+							   page_prepared,
 							   pages_to_map,
 							   &address, &length,
 							   &seq, zc,
-							   total_bytes_to_map);
+							   total_bytes_to_map,
+							   &pages_acctd,
+							   memcg);
+			total_pages_acctd += pages_acctd;
 			if (ret)
 				goto out;
 			pages_to_map = 0;
 		}
+		if (!skb_remainder_unmappable)
+			prefetchw(skb_frag_page(frags));
 	}
 	if (pages_to_map) {
-		ret = tcp_zerocopy_vm_insert_batch(vma, pages, pages_to_map,
-						   &address, &length, &seq,
-						   zc, total_bytes_to_map);
+		unsigned long pages_acctd = 0;
+
+		memset(page_prepared, 0, sizeof(page_prepared));
+		ret = tcp_zerocopy_vm_insert_batch(vma, pages,
+						   page_prepared,
+						   pages_to_map, &address,
+						   &length, &seq, zc,
+						   total_bytes_to_map,
+						   &pages_acctd, memcg);
+		total_pages_acctd += pages_acctd;
 	}
 out:
 	mmap_read_unlock(current->mm);
@@ -2190,6 +2237,10 @@ out:
 			ret = -EIO;
 	}
 	zc->length = length;
+
+	/* Account pages to user. */
+	mem_cgroup_post_charge_sock_pages(memcg, total_pages_acctd);
+	mem_cgroup_put(memcg);
 	return ret;
 }
 #endif
