@@ -304,10 +304,10 @@ bool try_wait_for_completion(struct completion *x)
 EXPORT_SYMBOL(try_wait_for_completion);
 
 /**
- *	completion_done - Test to see if a completion has any waiters
+ *	completion_done - Test to see if a completion has been done
  *	@x:	completion structure
  *
- *	Return: 0 if there are waiters (wait_for_completion() in progress)
+ *	Return: 0 if there may be waiters (wait_for_completion() in progress)
  *		 1 if there are no waiters.
  *
  *	Note, this will always return true if complete_all() was called on @X.
