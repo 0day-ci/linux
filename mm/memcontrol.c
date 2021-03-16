@@ -6693,7 +6693,8 @@ void mem_cgroup_calculate_protection(struct mem_cgroup *root,
  * @gfp_mask: reclaim mode
  *
  * Try to charge @page to the memcg that @mm belongs to, reclaiming
- * pages according to @gfp_mask if necessary.
+ * pages according to @gfp_mask if necessary. if @mm is NULL, try to
+ * charge to the active memcg.
  *
  * Returns 0 on success. Otherwise, an error code is returned.
  */
@@ -6729,8 +6730,15 @@ int mem_cgroup_charge(struct page *page, struct mm_struct *mm, gfp_t gfp_mask)
 		rcu_read_unlock();
 	}
 
-	if (!memcg)
-		memcg = get_mem_cgroup_from_mm(mm);
+	if (!memcg) {
+		if (!mm) {
+			memcg = get_mem_cgroup_from_current();
+			if (!memcg)
+				memcg = get_mem_cgroup_from_mm(current->mm);
+		} else {
+			memcg = get_mem_cgroup_from_mm(mm);
+		}
+	}
 
 	ret = try_charge(memcg, gfp_mask, nr_pages);
 	if (ret)
