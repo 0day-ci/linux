@@ -77,7 +77,7 @@ struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
 	struct drm_encoder *encoder;
 	struct device_node *port, *endpoint;
 	u32 endpoint_id;
-	int ret = 0, child_count = 0;
+	int subret, ret = 0, child_count = 0;
 	struct drm_panel *panel;
 	struct drm_bridge *bridge;
 
@@ -96,8 +96,9 @@ struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
 		if (of_property_read_u32(endpoint, "reg", &endpoint_id))
 			endpoint_id = 0;
 
-		/* if subdriver (> 0) or error case (< 0), ignore entry */
-		if (rockchip_drm_endpoint_is_subdriver(endpoint) != 0)
+		/* if subdriver (> 0) or non-defer error case (< 0), ignore entry */
+		subret = rockchip_drm_endpoint_is_subdriver(endpoint);
+		if (subret != 0 && subret != -EPROBE_DEFER)
 			continue;
 
 		child_count++;

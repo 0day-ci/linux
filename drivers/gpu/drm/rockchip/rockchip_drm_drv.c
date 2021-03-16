@@ -270,11 +270,15 @@ int rockchip_drm_endpoint_is_subdriver(struct device_node *ep)
 	if (!node)
 		return -ENODEV;
 
-	/* status disabled will prevent creation of platform-devices */
+	/*
+	 * status disabled will prevent creation of platform-devices,
+	 * but equally we can't rely on the driver having been registered
+	 * yet (e.g. I2C bridges).
+	 */
 	pdev = of_find_device_by_node(node);
 	of_node_put(node);
 	if (!pdev)
-		return -ENODEV;
+		return -EPROBE_DEFER;
 
 	/*
 	 * All rockchip subdrivers have probed at this point, so
