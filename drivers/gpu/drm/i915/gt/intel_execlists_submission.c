@@ -752,8 +752,11 @@ assert_pending_valid(const struct intel_engine_execlists *execlists,
 		 * Sentinels are supposed to be the last request so they flush
 		 * the current execution off the HW. Check that they are the only
 		 * request in the pending submission.
+		 *
+		 * Due async nature of preempt-to-busy and request cancellation
+		 * we need to skip this assert for cancelled requests.
 		 */
-		if (sentinel) {
+		if (sentinel && !rq->fence.error) {
 			GEM_TRACE_ERR("%s: context:%llx after sentinel in pending[%zd]\n",
 				      engine->name,
 				      ce->timeline->fence_context,
