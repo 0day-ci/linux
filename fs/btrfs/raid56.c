@@ -18,6 +18,7 @@
 #include "volumes.h"
 #include "raid56.h"
 #include "async-thread.h"
+#include "misc.h"
 
 /* set when additional merges to this rbio are not allowed */
 #define RBIO_RMW_LOCKED_BIT	1

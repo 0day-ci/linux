@@ -27,6 +27,7 @@
 #include "subpage.h"
 #include "zoned.h"
 #include "block-group.h"
+#include "misc.h"
 
 static struct kmem_cache *extent_state_cache;
 static struct kmem_cache *extent_buffer_cache;
