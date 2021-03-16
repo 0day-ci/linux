@@ -980,9 +980,7 @@ static struct mlx5_ib_mr *alloc_cacheable_mr(struct ib_pd *pd,
 	return mr;
 }
 
-#define MLX5_MAX_UMR_CHUNK ((1 << (MLX5_MAX_UMR_SHIFT + 4)) - \
-			    MLX5_UMR_MTT_ALIGNMENT)
-#define MLX5_SPARE_UMR_CHUNK 0x10000
+#define MLX5_SPARE_UMR_CHUNK 0x8000
 
 /*
  * Allocate a temporary buffer to hold the per-page information to transfer to
@@ -1004,29 +1002,15 @@ static void *mlx5_ib_alloc_xlt(size_t *nents, size_t ent_size, gfp_t gfp_mask)
 	 */
 	might_sleep();
 
-	gfp_mask |= __GFP_ZERO;
+	gfp_mask |= __GFP_ZERO | __GFP_NORETRY;
 
-	/*
-	 * If the system already has a suitable high order page then just use
-	 * that, but don't try hard to create one. This max is about 1M, so a
-	 * free x86 huge page will satisfy it.
-	 */
 	size = min_t(size_t, ent_size * ALIGN(*nents, xlt_chunk_align),
-		     MLX5_MAX_UMR_CHUNK);
+		     MLX5_SPARE_UMR_CHUNK);
 	*nents = size / ent_size;
 	res = (void *)__get_free_pages(gfp_mask | __GFP_NOWARN,
 				       get_order(size));
 	if (res)
 		return res;
-
-	if (size > MLX5_SPARE_UMR_CHUNK) {
-		size = MLX5_SPARE_UMR_CHUNK;
-		*nents = get_order(size) / ent_size;
-		res = (void *)__get_free_pages(gfp_mask | __GFP_NOWARN,
-					       get_order(size));
-		if (res)
-			return res;
-	}
 
 	*nents = PAGE_SIZE / ent_size;
 	res = (void *)__get_free_page(gfp_mask);
