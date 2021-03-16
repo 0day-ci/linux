@@ -13,6 +13,7 @@
 #include <linux/of_gpio.h>
 #include <linux/regmap.h>
 #include <linux/rtc.h>
+#include <linux/acpi.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/spi/spi.h>
@@ -447,6 +448,14 @@ static int rx6110_i2c_probe(struct i2c_client *client,
 	return rx6110_probe(rx6110, &client->dev);
 }
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id rx6110_i2c_acpi_match[] = {
+	{ "SECC6110", },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, rx6110_i2c_acpi_match);
+#endif
+
 static const struct i2c_device_id rx6110_i2c_id[] = {
 	{ "rx6110", 0 },
 	{ }
@@ -456,6 +465,9 @@ MODULE_DEVICE_TABLE(i2c, rx6110_i2c_id);
 static struct i2c_driver rx6110_i2c_driver = {
 	.driver = {
 		.name = RX6110_DRIVER_NAME,
+#ifdef CONFIG_ACPI
+		.acpi_match_table = ACPI_PTR(rx6110_i2c_acpi_match),
+#endif
 	},
 	.probe		= rx6110_i2c_probe,
 	.id_table	= rx6110_i2c_id,
