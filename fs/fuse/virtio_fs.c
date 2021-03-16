@@ -899,7 +899,7 @@ out_vqs:
 
 out:
 	vdev->priv = NULL;
-	kfree(fs);
+	virtio_fs_put(fs);
 	return ret;
 }
 
