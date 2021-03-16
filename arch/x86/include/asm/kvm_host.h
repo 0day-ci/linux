@@ -884,12 +884,22 @@ struct kvm_hv_syndbg {
 	u64 options;
 };
 
+enum hv_tsc_page_status {
+	HV_TSC_PAGE_UNSET = 0,
+	HV_TSC_PAGE_GUEST_CHANGED,
+	HV_TSC_PAGE_HOST_CHANGED,
+	HV_TSC_PAGE_SET,
+	HV_TSC_PAGE_UPDATING,
+	HV_TSC_PAGE_BROKEN,
+};
+
 /* Hyper-V emulation context */
 struct kvm_hv {
 	struct mutex hv_lock;
 	u64 hv_guest_os_id;
 	u64 hv_hypercall;
 	u64 hv_tsc_page;
+	enum hv_tsc_page_status hv_tsc_page_status;
 
 	/* Hyper-v based guest crash (NT kernel bugcheck) parameters */
 	u64 hv_crash_param[HV_X64_MSR_CRASH_PARAMS];
