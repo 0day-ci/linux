@@ -997,6 +997,8 @@ All time durations are in microseconds.
 	- nr_periods
 	- nr_throttled
 	- throttled_usec
+	- nr_burst
+	- burst_usec
 
   cpu.weight
 	A read-write single value file which exists on non-root
@@ -1017,16 +1019,18 @@ All time durations are in microseconds.
 	the closest approximation of the current weight.
 
   cpu.max
-	A read-write two value file which exists on non-root cgroups.
-	The default is "max 100000".
+	A read-write three value file which exists on non-root cgroups.
+	The default is "max 100000 0".
 
 	The maximum bandwidth limit.  It's in the following format::
 
-	  $MAX $PERIOD
+	  $MAX $PERIOD $BURST
 
-	which indicates that the group may consume upto $MAX in each
-	$PERIOD duration.  "max" for $MAX indicates no limit.  If only
-	one number is written, $MAX is updated.
+	which indicates that the group may consume upto $MAX from this
+	period plus $BURST carried over from previous periods in each
+	$PERIOD duration.  "max" for $MAX indicates no limit. "0" for
+	$BURST indicates no bandwidth can be carried over. On partial
+	writing, values are updated accordingly.
 
   cpu.pressure
 	A read-write nested-keyed file.
