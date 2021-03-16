@@ -1401,31 +1401,37 @@ static int fl_set_enc_opt(struct nlattr **tb, struct fl_flow_key *key,
 	return 0;
 }
 
-static int fl_validate_ct_state(u16 state, struct nlattr *tb,
+static int fl_validate_ct_state(u16 state_mask, u16 state,
+				struct nlattr *tb,
 				struct netlink_ext_ack *extack)
 {
-	if (state && !(state & TCA_FLOWER_KEY_CT_FLAGS_TRACKED)) {
+	if (state_mask && !(state_mask & TCA_FLOWER_KEY_CT_FLAGS_TRACKED)) {
 		NL_SET_ERR_MSG_ATTR(extack, tb,
 				    "no trk, so no other flag can be set");
 		return -EINVAL;
 	}
 
-	if (state & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	if (state_mask & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	    state & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	    state_mask & TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED &&
 	    state & TCA_FLOWER_KEY_CT_FLAGS_ESTABLISHED) {
 		NL_SET_ERR_MSG_ATTR(extack, tb,
 				    "new and est are mutually exclusive");
 		return -EINVAL;
 	}
 
-	if (state & TCA_FLOWER_KEY_CT_FLAGS_INVALID &&
-	    state & ~(TCA_FLOWER_KEY_CT_FLAGS_TRACKED |
+	if (state_mask & TCA_FLOWER_KEY_CT_FLAGS_INVALID &&
+	    state & TCA_FLOWER_KEY_CT_FLAGS_INVALID &&
+	    state_mask & ~(TCA_FLOWER_KEY_CT_FLAGS_TRACKED |
 		      TCA_FLOWER_KEY_CT_FLAGS_INVALID)) {
 		NL_SET_ERR_MSG_ATTR(extack, tb,
 				    "when inv is set, only trk may be set");
 		return -EINVAL;
 	}
 
-	if (state & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	if (state_mask & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	    state & TCA_FLOWER_KEY_CT_FLAGS_NEW &&
+	    state_mask & TCA_FLOWER_KEY_CT_FLAGS_REPLY &&
 	    state & TCA_FLOWER_KEY_CT_FLAGS_REPLY) {
 		NL_SET_ERR_MSG_ATTR(extack, tb,
 				    "new and rpl are mutually exclusive");
@@ -1451,7 +1457,7 @@ static int fl_set_key_ct(struct nlattr **tb,
 			       &mask->ct_state, TCA_FLOWER_KEY_CT_STATE_MASK,
 			       sizeof(key->ct_state));
 
-		err = fl_validate_ct_state(mask->ct_state,
+		err = fl_validate_ct_state(mask->ct_state, key->ct_state,
 					   tb[TCA_FLOWER_KEY_CT_STATE_MASK],
 					   extack);
 		if (err)
