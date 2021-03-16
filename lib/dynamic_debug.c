@@ -615,7 +615,7 @@ static int remaining(int wrote)
 	return 0;
 }
 
-static char *dynamic_emit_prefix(const struct _ddebug *dp, char *buf)
+static char *__dynamic_emit_prefix(const struct _ddebug *dp, char *buf)
 {
 	int pos_after_tid;
 	int pos = 0;
@@ -652,6 +652,13 @@ static char *dynamic_emit_prefix(const struct _ddebug *dp, char *buf)
 	if (pos >= PREFIX_SIZE)
 		buf[PREFIX_SIZE - 1] = '\0';
 
+	return buf;
+}
+
+static inline char *dynamic_emit_prefix(struct _ddebug *dp, char *buf)
+{
+	if (unlikely(dp->flags & _DPRINTK_FLAGS_INCL_ANY))
+		return __dynamic_emit_prefix(dp, buf);
 	return buf;
 }
 
