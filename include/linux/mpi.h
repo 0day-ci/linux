@@ -267,7 +267,7 @@ int mpi_ec_curve_point(MPI_POINT point, struct mpi_ec_ctx *ctx);
 /**
  * mpi_get_size() - returns max size required to store the number
  *
- * @a:	A multi precision integer for which we want to allocate a bufer
+ * @a:	A multi precision integer for which we want to allocate a buffer
  *
  * Return: size required to store the number
  */
