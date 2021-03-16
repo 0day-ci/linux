@@ -2373,8 +2373,10 @@ static void coda_finish_decode(struct coda_ctx *ctx)
 	if (err_mb > 0) {
 		if (__ratelimit(&dev->mb_err_rs))
 			coda_dbg(1, ctx, "errors in %d macroblocks\n", err_mb);
-		v4l2_ctrl_s_ctrl(ctx->mb_err_cnt_ctrl,
-				 v4l2_ctrl_g_ctrl(ctx->mb_err_cnt_ctrl) + err_mb);
+		if (ctx->mb_err_cnt_ctrl)
+			v4l2_ctrl_s_ctrl(ctx->mb_err_cnt_ctrl,
+					 v4l2_ctrl_g_ctrl(ctx->mb_err_cnt_ctrl)
+					 + err_mb);
 	}
 
 	if (dev->devtype->product == CODA_HX4 ||
