@@ -1771,7 +1771,8 @@ err:
 	return err;
 }
 
-static int check_relocations(const struct drm_i915_gem_exec_object2 *entry)
+static int check_relocations(const struct i915_execbuffer *eb,
+			     const struct drm_i915_gem_exec_object2 *entry)
 {
 	const char __user *addr, *end;
 	unsigned long size;
@@ -1780,6 +1781,12 @@ static int check_relocations(const struct drm_i915_gem_exec_object2 *entry)
 	size = entry->relocation_count;
 	if (size == 0)
 		return 0;
+
+	/* Relocations are disallowed for all platforms after TGL-LP.  This
+	 * also covers all platforms with local memory.
+	 */
+	if (INTEL_GEN(eb->i915) >= 12 && !IS_TIGERLAKE(eb->i915))
+		return -EINVAL;
 
 	if (size > N_RELOC(ULONG_MAX))
 		return -EINVAL;
@@ -1814,7 +1821,7 @@ static int eb_copy_relocations(const struct i915_execbuffer *eb)
 		if (nreloc == 0)
 			continue;
 
-		err = check_relocations(&eb->exec[i]);
+		err = check_relocations(eb, &eb->exec[i]);
 		if (err)
 			goto err;
 
@@ -1887,7 +1894,7 @@ static int eb_prefault_relocations(const struct i915_execbuffer *eb)
 	for (i = 0; i < count; i++) {
 		int err;
 
-		err = check_relocations(&eb->exec[i]);
+		err = check_relocations(eb, &eb->exec[i]);
 		if (err)
 			return err;
 	}
