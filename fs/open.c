@@ -532,6 +532,24 @@ out:
 	return error;
 }
 
+static inline int current_chroot_allowed(void)
+{
+	/*
+	 * Changing the root directory for the calling task (and its future
+	 * children) requires that this task has CAP_SYS_CHROOT in its
+	 * namespace, or be running with no_new_privs and not sharing its
+	 * fs_struct and not escaping its current root (cf. create_user_ns()).
+	 * As for seccomp, checking no_new_privs avoids scenarios where
+	 * unprivileged tasks can affect the behavior of privileged children.
+	 */
+	if (task_no_new_privs(current) && current->fs->users == 1 &&
+			!current_chrooted())
+		return 0;
+	if (ns_capable(current_user_ns(), CAP_SYS_CHROOT))
+		return 0;
+	return -EPERM;
+}
+
 SYSCALL_DEFINE1(chroot, const char __user *, filename)
 {
 	struct path path;
@@ -546,9 +564,10 @@ retry:
 	if (error)
 		goto dput_and_out;
 
-	error = -EPERM;
-	if (!ns_capable(current_user_ns(), CAP_SYS_CHROOT))
+	error = current_chroot_allowed();
+	if (error)
 		goto dput_and_out;
+
 	error = security_path_chroot(&path);
 	if (error)
 		goto dput_and_out;
