@@ -9,10 +9,8 @@ if LEDS_BLINK
 
 config LEDS_BLINK_LGM
 	tristate "LED support for Intel LGM SoC series"
-	depends on GPIOLIB
-	depends on LEDS_CLASS
-	depends on MFD_SYSCON
-	depends on OF
+	depends on X86 || COMPILE_TEST
+	depends on GPIOLIB && LEDS_CLASS && MFD_SYSCON && OF
 	help
 	  Parallel to serial conversion, which is also called SSO controller,
 	  can drive external shift register for LED outputs.
