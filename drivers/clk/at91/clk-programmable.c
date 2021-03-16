@@ -87,9 +87,6 @@ static int clk_programmable_determine_rate(struct clk_hw *hw,
 			req->best_parent_rate = parent_rate;
 			req->best_parent_hw = parent;
 		}
-
-		if (!best_rate)
-			break;
 	}
 
 	if (best_rate < 0)
