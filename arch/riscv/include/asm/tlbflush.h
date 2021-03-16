@@ -21,6 +21,18 @@ static inline void local_flush_tlb_page(unsigned long addr)
 {
 	__asm__ __volatile__ ("sfence.vma %0" : : "r" (addr) : "memory");
 }
+
+static inline unsigned long get_current_asid(void)
+{
+	return (csr_read(CSR_SATP) >> SATP_ASID_SHIFT) & SATP_ASID_MASK;
+}
+
+static inline void local_flush_tlb_asid(void)
+{
+	unsigned long asid = get_current_asid();
+	__asm__ __volatile__ ("sfence.vma x0, %0" : : "r" (asid) : "memory");
+}
+
 #else /* CONFIG_MMU */
 #define local_flush_tlb_all()			do { } while (0)
 #define local_flush_tlb_page(addr)		do { } while (0)

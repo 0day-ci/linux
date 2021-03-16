@@ -222,6 +222,16 @@ static inline int pte_write(pte_t pte)
 	return pte_val(pte) & _PAGE_WRITE;
 }
 
+static inline int pte_user(pte_t pte)
+{
+	return pte_val(pte) & _PAGE_USER;
+}
+
+static inline int pte_global(pte_t pte)
+{
+	return pte_val(pte) & _PAGE_GLOBAL;
+}
+
 static inline int pte_exec(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_EXEC;
@@ -246,6 +256,11 @@ static inline int pte_young(pte_t pte)
 static inline int pte_special(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_SPECIAL;
+}
+
+static inline int pte_leaf(pte_t pte)
+{
+	return pte_val(pte) & (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC);
 }
 
 /* static inline pte_t pte_rdprotect(pte_t pte) */
@@ -358,6 +373,18 @@ static inline void set_pte_at(struct mm_struct *mm,
 		flush_icache_pte(pteval);
 
 	set_pte(ptep, pteval);
+
+	if (pte_present(pteval)) {
+		if (pte_leaf(pteval)) {
+			local_flush_tlb_page(addr);
+		} else {
+			if (pte_global(pteval))
+				local_flush_tlb_all();
+			else
+				local_flush_tlb_asid();
+
+		}
+	}
 }
 
 static inline void pte_clear(struct mm_struct *mm,
