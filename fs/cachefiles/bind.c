@@ -115,6 +115,10 @@ static int cachefiles_daemon_add_cache(struct cachefiles_cache *cache)
 	if (ret < 0)
 		goto error_open_root;
 
+	ret = -EINVAL;
+	if (mnt_user_ns(path.mnt) != &init_user_ns)
+		goto error_unsupported;
+
 	cache->mnt = path.mnt;
 	root = path.dentry;
 
