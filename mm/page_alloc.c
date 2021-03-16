@@ -7692,7 +7692,7 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 	return pages;
 }
 
-void __init mem_init_print_info(const char *str)
+void __init mem_init_print_info(void)
 {
 	unsigned long physpages, codesize, datasize, rosize, bss_size;
 	unsigned long init_code_size, init_data_size;
