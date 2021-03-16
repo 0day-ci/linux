@@ -123,6 +123,8 @@ do {								\
 #define vpr_info(fmt, ...)	vnpr_info(1, fmt, ##__VA_ARGS__)
 #define v2pr_info(fmt, ...)	vnpr_info(2, fmt, ##__VA_ARGS__)
 #define v3pr_info(fmt, ...)	vnpr_info(3, fmt, ##__VA_ARGS__)
+#define v4pr_info(fmt, ...)	vnpr_info(4, fmt, ##__VA_ARGS__)
+#define v5pr_info(fmt, ...)	vnpr_info(5, fmt, ##__VA_ARGS__)
 
 static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
 {
@@ -146,7 +148,17 @@ static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
 
 static struct _ddebug_site *ddebug_site_get(struct _ddebug *dp)
 {
-	return dp->site; /* passthru abstraction */
+	v4pr_info("get %d: %s.%s.%d\n", dp->_index, dp->site->modname,
+		  dp->site->function, dp->lineno);
+
+	if (dp >= __start___dyndbg && dp < __stop___dyndbg) {
+		v4pr_info(" is builtin: %d %ld\n", dp->_index, dp - __start___dyndbg);
+		return &__start___dyndbg_sites[ dp - __start___dyndbg ];
+	} else {
+		v3pr_info(" is loaded: %d %ld\n", dp->_index, dp - __start___dyndbg);
+		return dp->site;
+	}
+	return dp->site;
 }
 static inline void ddebug_site_put(struct _ddebug *dp)
 {
@@ -1034,14 +1046,16 @@ static const struct proc_ops proc_fops = {
  * Allocate a new ddebug_table for the given module
  * and add it to the global list.
  */
-int ddebug_add_module(struct _ddebug *tab, struct _ddebug_site *sites,
-		      unsigned int numdbgs, const char *modname)
+static int __ddebug_add_module(struct _ddebug *tab, struct _ddebug_site *sites,
+			       unsigned numdbgs, unsigned base,
+			       const char *modname)
 {
 	struct ddebug_table *dt;
+	int i;
 
 	dt = kzalloc(sizeof(*dt), GFP_KERNEL);
 	if (dt == NULL) {
-		pr_err("error adding module: %s\n", name);
+		pr_err("error adding module: %s\n", modname);
 		return -ENOMEM;
 	}
 	/*
@@ -1055,12 +1069,25 @@ int ddebug_add_module(struct _ddebug *tab, struct _ddebug_site *sites,
 	dt->ddebugs = tab;
 	dt->sites = sites;
 
+	v3pr_info("add-module: %s\n", modname);
+	for (i = 0; i < numdbgs; i++) {
+		tab[i]._index = base++;
+		v3pr_info(" %d %d %s.%s.%d\n", i, tab[i]._index, modname,
+			  tab[i].site->function, tab[i].lineno);
+	}
+
 	mutex_lock(&ddebug_lock);
 	list_add(&dt->link, &ddebug_tables);
 	mutex_unlock(&ddebug_lock);
 
 	v2pr_info("%3u debug prints in module %s\n", numdbgs, modname);
 	return 0;
+}
+
+int ddebug_add_module(struct _ddebug *tab, struct _ddebug_site *sites,
+		      unsigned int numdbgs, const char *modname)
+{
+	return __ddebug_add_module(tab, sites, numdbgs, 0, modname);
 }
 
 /* helper for ddebug_dyndbg_(boot|module)_param_cb */
@@ -1177,6 +1204,7 @@ static int __init dynamic_debug_init(void)
 	char *cmdline;
 	int ret = 0;
 	int site_ct = 0, entries = 0, modct = 0;
+	int mod_index = 0;
 
 	if (&__start___dyndbg == &__stop___dyndbg) {
 		if (IS_ENABLED(CONFIG_DYNAMIC_DEBUG)) {
@@ -1200,8 +1228,8 @@ static int __init dynamic_debug_init(void)
 		if (strcmp(modname, site->modname)) {
 			modct++;
 
-			ret = ddebug_add_module(iter_mod_start, site_mod_start,
-						site_ct, modname);
+			ret = __ddebug_add_module(iter_mod_start, site_mod_start,
+						  site_ct, mod_index, modname);
 			if (ret)
 				goto out_err;
 			site_ct = 0;
@@ -1210,8 +1238,9 @@ static int __init dynamic_debug_init(void)
 			site_mod_start = site;
 		}
 		site_ct++;
+		iter->_index = index++;
 	}
-	ret = ddebug_add_module(iter_mod_start, site_mod_start, site_ct, modname);
+	ret = __ddebug_add_module(iter_mod_start, site_mod_start, site_ct, mod_index, modname);
 	if (ret)
 		goto out_err;
 
