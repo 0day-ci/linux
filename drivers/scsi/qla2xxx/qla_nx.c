@@ -1095,7 +1095,7 @@ qla82xx_pinit_from_rom(scsi_qla_host_t *vha)
 	int i ;
 	struct crb_addr_pair *buf;
 	unsigned long off;
-	unsigned offset, n;
+	unsigned offset, n = 0;
 	struct qla_hw_data *ha = vha->hw;
 
 	struct crb_addr_pair {
