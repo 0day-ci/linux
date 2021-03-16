@@ -605,7 +605,8 @@ static int dpaa2_eth_consume_frames(struct dpaa2_eth_channel *ch,
 		fd = dpaa2_dq_fd(dq);
 		fq = (struct dpaa2_eth_fq *)(uintptr_t)dpaa2_dq_fqd_ctx(dq);
 
-		fq->consume(priv, ch, fd, fq);
+		INDIRECT_CALL_3(fq->consume, dpaa2_eth_rx, dpaa2_eth_tx_conf, dpaa2_eth_rx_err,
+				priv, ch, fd, fq);
 		cleaned++;
 		retries = 0;
 	} while (!is_last);
