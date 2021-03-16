@@ -82,7 +82,7 @@ void swake_up_all(struct swait_queue_head *q)
 }
 EXPORT_SYMBOL(swake_up_all);
 
-void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait)
+void add_swait_queue_locked(struct swait_queue_head *q, struct swait_queue *wait)
 {
 	wait->task = current;
 	if (list_empty(&wait->task_list))
@@ -94,7 +94,7 @@ void prepare_to_swait_exclusive(struct swait_queue_head *q, struct swait_queue *
 	unsigned long flags;
 
 	raw_spin_lock_irqsave(&q->lock, flags);
-	__prepare_to_swait(q, wait);
+	add_swait_queue_locked(q, wait);
 	set_current_state(state);
 	raw_spin_unlock_irqrestore(&q->lock, flags);
 }
@@ -114,7 +114,7 @@ long prepare_to_swait_event(struct swait_queue_head *q, struct swait_queue *wait
 		list_del_init(&wait->task_list);
 		ret = -ERESTARTSYS;
 	} else {
-		__prepare_to_swait(q, wait);
+		add_swait_queue_locked(q, wait);
 		set_current_state(state);
 	}
 	raw_spin_unlock_irqrestore(&q->lock, flags);

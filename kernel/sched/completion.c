@@ -79,7 +79,7 @@ do_wait_for_common(struct completion *x,
 				timeout = -ERESTARTSYS;
 				break;
 			}
-			__prepare_to_swait(&x->wait, &wait);
+			add_swait_queue_locked(&x->wait, &wait);
 			__set_current_state(state);
 			raw_spin_unlock_irq(&x->wait.lock);
 			timeout = action(timeout);
