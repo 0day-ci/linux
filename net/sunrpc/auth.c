@@ -45,8 +45,7 @@ static struct cred machine_cred = {
 #endif
 };
 
-/*
- * Return the machine_cred pointer to be used whenever
+/* Return the machine_cred pointer to be used whenever
  * the a generic machine credential is needed.
  */
 const struct cred *rpc_machine_cred(void)
@@ -84,7 +83,7 @@ static int param_get_hashtbl_sz(char *buffer, const struct kernel_param *kp)
 	return sprintf(buffer, "%u\n", 1U << nbits);
 }
 
-#define param_check_hashtbl_sz(name, p) __param_check(name, p, unsigned int);
+#define param_check_hashtbl_sz(name, p) __param_check(name, p, unsigned int)
 
 static const struct kernel_param_ops param_ops_hashtbl_sz = {
 	.set = param_set_hashtbl_sz,
@@ -99,7 +98,8 @@ module_param(auth_max_cred_cachesize, ulong, 0644);
 MODULE_PARM_DESC(auth_max_cred_cachesize, "RPC credential maximum total cache size");
 
 static u32
-pseudoflavor_to_flavor(u32 flavor) {
+pseudoflavor_to_flavor(u32 flavor) 
+{
 	if (flavor > RPC_AUTH_MAXFLAVOR)
 		return RPC_AUTH_GSS;
 	return flavor;
@@ -256,8 +256,7 @@ rpcauth_release(struct rpc_auth *auth)
 
 static DEFINE_SPINLOCK(rpc_credcache_lock);
 
-/*
- * On success, the caller is responsible for freeing the reference
+/* On success, the caller is responsible for freeing the reference
  * held by the hashtable
  */
 static bool
@@ -284,8 +283,7 @@ rpcauth_unhash_cred(struct rpc_cred *cred)
 	return ret;
 }
 
-/*
- * Initialize RPC credential cache
+/* Initialize RPC credential cache
  */
 int
 rpcauth_init_credcache(struct rpc_auth *auth)
@@ -320,8 +318,7 @@ rpcauth_stringify_acceptor(struct rpc_cred *cred)
 }
 EXPORT_SYMBOL_GPL(rpcauth_stringify_acceptor);
 
-/*
- * Destroy a list of credentials
+/* Destroy a list of credentials
  */
 static inline
 void rpcauth_destroy_credlist(struct list_head *head)
@@ -373,8 +370,7 @@ rpcauth_lru_remove(struct rpc_cred *cred)
 	spin_unlock(&rpc_credcache_lock);
 }
 
-/*
- * Clear the RPC credential cache, and delete those credentials
+/* Clear the RPC credential cache, and delete those credentials
  * that are not referenced.
  */
 void
@@ -403,8 +399,7 @@ rpcauth_clear_credcache(struct rpc_cred_cache *cache)
 	rpcauth_destroy_credlist(&free);
 }
 
-/*
- * Destroy the RPC credential cache
+/* Destroy the RPC credential cache
  */
 void
 rpcauth_destroy_credcache(struct rpc_auth *auth)
@@ -423,8 +418,7 @@ EXPORT_SYMBOL_GPL(rpcauth_destroy_credcache);
 
 #define RPC_AUTH_EXPIRY_MORATORIUM (60 * HZ)
 
-/*
- * Remove stale credentials. Avoid sleeping inside the loop.
+/* Remove stale credentials. Avoid sleeping inside the loop.
  */
 static long
 rpcauth_prune_expired(struct list_head *free, int nr_to_scan)
@@ -441,8 +435,7 @@ rpcauth_prune_expired(struct list_head *free, int nr_to_scan)
 			rpcauth_lru_remove_locked(cred);
 			continue;
 		}
-		/*
-		 * Enforce a 60 second garbage collection moratorium
+		/* Enforce a 60 second garbage collection moratorium
 		 * Note that the cred_unused list must be time-ordered.
 		 */
 		if (!time_in_range(cred->cr_expire, expired, jiffies))
@@ -471,8 +464,7 @@ rpcauth_cache_do_shrink(int nr_to_scan)
 	return freed;
 }
 
-/*
- * Run memory cache shrinker.
+/* Run memory cache shrinker.
  */
 static unsigned long
 rpcauth_cache_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
@@ -510,8 +502,7 @@ rpcauth_cache_enforce_limit(void)
 	rpcauth_cache_do_shrink(nr_to_scan);
 }
 
-/*
- * Look up a process' credentials in the authentication cache
+/* Look up a process' credentials in the authentication cache
  */
 struct rpc_cred *
 rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
@@ -566,6 +557,7 @@ found:
 	    cred->cr_ops->cr_init != NULL &&
 	    !(flags & RPCAUTH_LOOKUP_NEW)) {
 		int res = cred->cr_ops->cr_init(auth, cred);
+
 		if (res < 0) {
 			put_rpccred(cred);
 			cred = ERR_PTR(res);
