@@ -731,6 +731,9 @@ struct fuse_conn {
 	/** Does the filesystem support posix acls? */
 	unsigned posix_acl:1;
 
+	/** If posix acl results in file mode change, send update to fs */
+	unsigned posix_acl_update_mode:1;
+
 	/** Check permissions based on the file mode or not? */
 	unsigned default_permissions:1;
 
@@ -1098,6 +1101,7 @@ u64 fuse_lock_owner_id(struct fuse_conn *fc, fl_owner_t id);
 
 void fuse_update_ctime(struct inode *inode);
 
+int fuse_do_getattr(struct inode *inode, struct kstat *stat, struct file *file);
 int fuse_update_attributes(struct inode *inode, struct file *file);
 
 void fuse_flush_writepages(struct inode *inode);
@@ -1163,7 +1167,10 @@ int fuse_write_inode(struct inode *inode, struct writeback_control *wbc);
 
 int fuse_do_setattr(struct dentry *dentry, struct iattr *attr,
 		    struct file *file);
-
+void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
+                       struct inode *inode,
+                       struct fuse_setattr_in *inarg_p,
+                       struct fuse_attr_out *outarg_p);
 void fuse_set_initialized(struct fuse_conn *fc);
 
 void fuse_unlock_inode(struct inode *inode, bool locked);

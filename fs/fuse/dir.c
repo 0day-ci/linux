@@ -1022,8 +1022,7 @@ static void fuse_fillattr(struct inode *inode, struct fuse_attr *attr,
 	stat->blksize = 1 << blkbits;
 }
 
-static int fuse_do_getattr(struct inode *inode, struct kstat *stat,
-			   struct file *file)
+int fuse_do_getattr(struct inode *inode, struct kstat *stat, struct file *file)
 {
 	int err;
 	struct fuse_getattr_in inarg;
@@ -1541,10 +1540,10 @@ void fuse_release_nowrite(struct inode *inode)
 	spin_unlock(&fi->lock);
 }
 
-static void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
-			      struct inode *inode,
-			      struct fuse_setattr_in *inarg_p,
-			      struct fuse_attr_out *outarg_p)
+void fuse_setattr_fill(struct fuse_conn *fc, struct fuse_args *args,
+		       struct inode *inode,
+		       struct fuse_setattr_in *inarg_p,
+		       struct fuse_attr_out *outarg_p)
 {
 	args->opcode = FUSE_SETATTR;
 	args->nodeid = get_node_id(inode);
