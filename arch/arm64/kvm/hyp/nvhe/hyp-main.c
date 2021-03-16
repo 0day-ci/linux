@@ -106,6 +106,13 @@ static void handle___vgic_v3_restore_aprs(struct kvm_cpu_context *host_ctxt)
 	__vgic_v3_restore_aprs(kern_hyp_va(cpu_if));
 }
 
+static void handle___kvm_reset_sve_vq(struct kvm_cpu_context *host_ctxt)
+{
+	if (system_supports_sve() &&
+	    read_sysreg_s(SYS_ZCR_EL2) != ZCR_ELx_LEN_MASK)
+		write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL2);
+}
+
 typedef void (*hcall_t)(struct kvm_cpu_context *);
 
 #define HANDLE_FUNC(x)	[__KVM_HOST_SMCCC_FUNC_##x] = (hcall_t)handle_##x
@@ -125,6 +132,7 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__kvm_get_mdcr_el2),
 	HANDLE_FUNC(__vgic_v3_save_aprs),
 	HANDLE_FUNC(__vgic_v3_restore_aprs),
+	HANDLE_FUNC(__kvm_reset_sve_vq),
 };
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
