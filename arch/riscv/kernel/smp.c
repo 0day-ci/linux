@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * SMP initialisation and IPI support
+ * SMP initialization and IPI support
  * Based on arch/arm64/kernel/smp.c
  *
  * Copyright (C) 2012 ARM Ltd.
