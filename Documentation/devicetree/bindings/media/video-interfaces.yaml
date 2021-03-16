@@ -227,17 +227,12 @@ examples:
   # only one of the following data pipelines can be active:
   # ov772x -> ceu0 or imx074 -> csi2 -> ceu0.
   - |
-    ceu@fe910000 {
-        compatible = "renesas,sh-mobile-ceu";
-        reg = <0xfe910000 0xa0>;
-        interrupts = <0x880>;
+    #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/power/r8a7796-sysc.h>
 
-        mclk: master_clock {
-            compatible = "renesas,ceu-clock";
-            #clock-cells = <1>;
-            clock-frequency = <50000000>;  /* Max clock frequency */
-            clock-output-names = "mclk";
-        };
+    ceu@fe910000 {
+        reg = <0xfe910000 0xa0>;
 
         port {
             #address-cells = <1>;
@@ -271,18 +266,14 @@ examples:
         #size-cells = <0>;
 
         camera@21 {
-            compatible = "ovti,ov772x";
+            compatible = "ovti,ov7720";
             reg = <0x21>;
-            vddio-supply = <&regulator1>;
-            vddcore-supply = <&regulator2>;
-
-            clock-frequency = <20000000>;
             clocks = <&mclk 0>;
-            clock-names = "xclk";
 
             port {
                 /* With 1 endpoint per port no need for addresses. */
                 ov772x_1_1: endpoint {
+                    bus-type = <5>;
                     bus-width = <8>;
                     remote-endpoint = <&ceu0_1>;
                     hsync-active = <1>;
@@ -295,48 +286,48 @@ examples:
         };
 
         camera@1a {
-            compatible = "sony,imx074";
+            compatible = "sony,imx334";
             reg = <0x1a>;
-            vddio-supply = <&regulator1>;
-            vddcore-supply = <&regulator2>;
 
-            clock-frequency = <30000000>;  /* Shared clock with ov772x_1 */
             clocks = <&mclk 0>;
-            clock-names = "sysclk";    /* Assuming this is the
-                       name in the datasheet */
+
             port {
-                imx074_1: endpoint {
+                imx334_1: endpoint {
                     clock-lanes = <0>;
                     data-lanes = <1 2>;
+                    link-frequencies = /bits/ 64 <891000000>;
                     remote-endpoint = <&csi2_1>;
                 };
             };
         };
     };
 
-    csi2: csi2@ffc90000 {
-        compatible = "renesas,sh-mobile-csi2";
-        reg = <0xffc90000 0x1000>;
-        interrupts = <0x17a0>;
-        #address-cells = <1>;
-        #size-cells = <0>;
+    csi2@fea80000 {
+        compatible = "renesas,r8a7796-csi2";
+        reg = <0xfea80000 0x10000>;
+        interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&cpg CPG_MOD 714>;
+        power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+        resets = <&cpg 714>;
 
-        port@1 {
-            compatible = "renesas,csi2c";  /* One of CSI2I and CSI2C. */
-            reg = <1>;      /* CSI-2 PHY #1 of 2: PHY_S,
-                       PHY_M has port address 0,
-                       is unused. */
-            csi2_1: endpoint {
-                clock-lanes = <0>;
-                data-lanes = <2 1>;
-                remote-endpoint = <&imx074_1>;
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            port@0 {
+                reg = <0>;
+                csi2_1: endpoint {
+                    clock-lanes = <0>;
+                    data-lanes = <2 1>;
+                    remote-endpoint = <&imx334_1>;
+                };
             };
-        };
-        port@2 {
-            reg = <2>;      /* port 2: link to the CEU */
+            port@1 {
+                reg = <1>;
 
-            csi2_2: endpoint {
-                remote-endpoint = <&ceu0_0>;
+                csi2_2: endpoint {
+                    remote-endpoint = <&ceu0_0>;
+                };
             };
         };
     };
