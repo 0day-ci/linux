@@ -820,8 +820,8 @@ static int get_phy_c22_id(struct mii_bus *bus, int addr, u32 *phy_id)
 
 	*phy_id |= phy_reg;
 
-	/* If the phy_id is mostly Fs, there is no device there */
-	if ((*phy_id & 0x1fffffff) == 0x1fffffff)
+	/* If the phy_id is mostly Fs or all zeroes, there is no device there */
+	if (((*phy_id & 0x1fffffff) == 0x1fffffff) || (*phy_id == 0))
 		return -ENODEV;
 
 	return 0;
