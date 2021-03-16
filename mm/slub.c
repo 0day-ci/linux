@@ -4612,7 +4612,8 @@ static int count_total(struct page *page)
 #endif
 
 #ifdef CONFIG_SLUB_DEBUG
-static void validate_slab(struct kmem_cache *s, struct page *page)
+static void validate_slab(struct kmem_cache *s, struct page *page,
+						int *errors)
 {
 	void *p;
 	void *addr = page_address(page);
@@ -4620,8 +4621,10 @@ static void validate_slab(struct kmem_cache *s, struct page *page)
 
 	slab_lock(page);
 
-	if (!check_slab(s, page) || !on_freelist(s, page, NULL))
+	if (!check_slab(s, page) || !on_freelist(s, page, NULL)) {
+		*errors += 1;
 		goto unlock;
+	}
 
 	/* Now we know that a valid freelist exists */
 	map = get_map(s, page);
@@ -4629,8 +4632,10 @@ static void validate_slab(struct kmem_cache *s, struct page *page)
 		u8 val = test_bit(__obj_to_index(s, addr, p), map) ?
 			 SLUB_RED_INACTIVE : SLUB_RED_ACTIVE;
 
-		if (!check_object(s, page, p, val))
+		if (!check_object(s, page, p, val)) {
+			*errors += 1;
 			break;
+		}
 	}
 	put_map(map);
 unlock:
@@ -4638,7 +4643,7 @@ unlock:
 }
 
 static int validate_slab_node(struct kmem_cache *s,
-		struct kmem_cache_node *n)
+		struct kmem_cache_node *n, int *errors)
 {
 	unsigned long count = 0;
 	struct page *page;
@@ -4647,30 +4652,34 @@ static int validate_slab_node(struct kmem_cache *s,
 	spin_lock_irqsave(&n->list_lock, flags);
 
 	list_for_each_entry(page, &n->partial, slab_list) {
-		validate_slab(s, page);
+		validate_slab(s, page, errors);
 		count++;
 	}
-	if (count != n->nr_partial)
+	if (count != n->nr_partial) {
 		pr_err("SLUB %s: %ld partial slabs counted but counter=%ld\n",
 		       s->name, count, n->nr_partial);
+		*errors += 1;
+	}
 
 	if (!(s->flags & SLAB_STORE_USER))
 		goto out;
 
 	list_for_each_entry(page, &n->full, slab_list) {
-		validate_slab(s, page);
+		validate_slab(s, page, errors);
 		count++;
 	}
-	if (count != atomic_long_read(&n->nr_slabs))
+	if (count != atomic_long_read(&n->nr_slabs)) {
 		pr_err("SLUB: %s %ld slabs counted but counter=%ld\n",
 		       s->name, count, atomic_long_read(&n->nr_slabs));
+		*errors += 1;
+	}
 
 out:
 	spin_unlock_irqrestore(&n->list_lock, flags);
 	return count;
 }
 
-static long validate_slab_cache(struct kmem_cache *s)
+long validate_slab_cache(struct kmem_cache *s, int *errors)
 {
 	int node;
 	unsigned long count = 0;
@@ -4678,10 +4687,12 @@ static long validate_slab_cache(struct kmem_cache *s)
 
 	flush_all(s);
 	for_each_kmem_cache_node(s, node, n)
-		count += validate_slab_node(s, n);
+		count += validate_slab_node(s, n, errors);
 
 	return count;
 }
+EXPORT_SYMBOL(validate_slab_cache);
+
 /*
  * Generate lists of code addresses where slabcache objects are allocated
  * and freed.
@@ -5336,9 +5347,10 @@ static ssize_t validate_store(struct kmem_cache *s,
 			const char *buf, size_t length)
 {
 	int ret = -EINVAL;
+	int errors = 0;
 
 	if (buf[0] == '1') {
-		ret = validate_slab_cache(s);
+		ret = validate_slab_cache(s, &errors);
 		if (ret >= 0)
 			ret = length;
 	}
