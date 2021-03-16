@@ -127,6 +127,8 @@ struct alc_spec {
 	unsigned int coef0;
 	struct input_dev *kb_dev;
 	u8 alc_mute_keycode_map[1];
+	struct hda_codec *codec;
+	struct delayed_work headset_set_work;
 };
 
 /*
@@ -1160,6 +1162,7 @@ static int alc_alloc_spec(struct hda_codec *codec, hda_nid_t mixer_nid)
 		kfree(spec);
 		return err;
 	}
+	spec->codec = codec;
 	return 0;
 }
 
@@ -5370,6 +5373,21 @@ static void alc_determine_headset_type(struct hda_codec *codec)
 	spec->current_headset_type = is_ctia ? ALC_HEADSET_TYPE_CTIA : ALC_HEADSET_TYPE_OMTP;
 }
 
+static void alc_headset_check_and_set(struct work_struct *work)
+{
+	struct alc_spec *spec = container_of(work, struct alc_spec,
+					     headset_set_work.work);
+	struct hda_codec *codec = spec->codec;
+
+	if (spec->current_headset_type == ALC_HEADSET_TYPE_UNKNOWN)
+		alc_determine_headset_type(codec);
+	if (spec->current_headset_type == ALC_HEADSET_TYPE_CTIA)
+		alc_headset_mode_ctia(codec);
+	else if (spec->current_headset_type == ALC_HEADSET_TYPE_OMTP)
+		alc_headset_mode_omtp(codec);
+	spec->gen.hp_jack_present = true;
+}
+
 static void alc_update_headset_mode(struct hda_codec *codec)
 {
 	struct alc_spec *spec = codec->spec;
@@ -5393,6 +5411,7 @@ static void alc_update_headset_mode(struct hda_codec *codec)
 		return;
 	}
 
+	cancel_delayed_work_sync(&spec->headset_set_work);
 	switch (new_headset_mode) {
 	case ALC_HEADSET_MODE_UNPLUGGED:
 		alc_headset_mode_unplugged(codec);
@@ -5401,13 +5420,7 @@ static void alc_update_headset_mode(struct hda_codec *codec)
 		spec->gen.hp_jack_present = false;
 		break;
 	case ALC_HEADSET_MODE_HEADSET:
-		if (spec->current_headset_type == ALC_HEADSET_TYPE_UNKNOWN)
-			alc_determine_headset_type(codec);
-		if (spec->current_headset_type == ALC_HEADSET_TYPE_CTIA)
-			alc_headset_mode_ctia(codec);
-		else if (spec->current_headset_type == ALC_HEADSET_TYPE_OMTP)
-			alc_headset_mode_omtp(codec);
-		spec->gen.hp_jack_present = true;
+		schedule_delayed_work(&spec->headset_set_work, msecs_to_jiffies(2000));
 		break;
 	case ALC_HEADSET_MODE_MIC:
 		alc_headset_mode_mic_in(codec, hp_pin, spec->headphone_mic_pin);
@@ -5473,6 +5486,7 @@ static void alc_fixup_headset_mode(struct hda_codec *codec,
 		spec->parse_flags |= HDA_PINCFG_HEADSET_MIC | HDA_PINCFG_HEADPHONE_MIC;
 		break;
 	case HDA_FIXUP_ACT_PROBE:
+		INIT_DELAYED_WORK(&spec->headset_set_work, alc_headset_check_and_set);
 		alc_probe_headset_mode(codec);
 		break;
 	case HDA_FIXUP_ACT_INIT:
@@ -5481,6 +5495,9 @@ static void alc_fixup_headset_mode(struct hda_codec *codec,
 			spec->current_headset_type = ALC_HEADSET_TYPE_UNKNOWN;
 		}
 		alc_update_headset_mode(codec);
+		break;
+	case HDA_FIXUP_ACT_FREE:
+		cancel_delayed_work_sync(&spec->headset_set_work);
 		break;
 	}
 }
