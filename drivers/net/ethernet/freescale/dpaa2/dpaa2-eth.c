@@ -266,8 +266,11 @@ static int dpaa2_eth_xdp_flush(struct dpaa2_eth_priv *priv,
 	num_fds = xdp_fds->num;
 	max_retries = num_fds * DPAA2_ETH_ENQUEUE_RETRIES;
 	while (total_enqueued < num_fds && retries < max_retries) {
-		err = priv->enqueue(priv, fq, &fds[total_enqueued],
-				    0, num_fds - total_enqueued, &enqueued);
+		err = INDIRECT_CALL_2(priv->enqueue,
+				      dpaa2_eth_enqueue_fq_multiple,
+				      dpaa2_eth_enqueue_qd,
+				      priv, fq, &fds[total_enqueued],
+				      0, num_fds - total_enqueued, &enqueued);
 		if (err == -EBUSY) {
 			percpu_extras->tx_portal_busy += ++retries;
 			continue;
@@ -1153,7 +1156,10 @@ static netdev_tx_t __dpaa2_eth_tx(struct sk_buff *skb,
 	 * the Tx confirmation callback for this frame
 	 */
 	for (i = 0; i < DPAA2_ETH_ENQUEUE_RETRIES; i++) {
-		err = priv->enqueue(priv, fq, &fd, prio, 1, NULL);
+		err = INDIRECT_CALL_2(priv->enqueue,
+				      dpaa2_eth_enqueue_fq_multiple,
+				      dpaa2_eth_enqueue_qd,
+				      priv, fq, &fd, prio, 1, NULL);
 		if (err != -EBUSY)
 			break;
 	}
