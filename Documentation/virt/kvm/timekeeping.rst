@@ -299,7 +299,7 @@ device.
 
 The HPET spec is rather loose and vague, requiring at least 3 hardware timers,
 but allowing implementation freedom to support many more.  It also imposes no
-fixed rate on the timer frequency, but does impose some extremal values on
+fixed rate on the timer frequency, but does impose some external values on
 frequency, error and slew.
 
 In general, the HPET is recommended as a high precision (compared to PIT /RTC)
