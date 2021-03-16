@@ -246,6 +246,15 @@ enum {
 	 * HCI after resume.
 	 */
 	HCI_QUIRK_NO_SUSPEND_NOTIFIER,
+
+	/* When this quirk is set, the controller does not power off
+	 * during suspend and resume. This mechanism lets BT devices wake
+	 * the Host up if the Host and chips support.
+	 *
+	 * This quirk can be set before hci_register_dev is called or
+	 * during the hdev->setup vendor callback.
+	 */
+	HCI_QUIRK_DEVICES_WAKEUP_SUPPORTED,
 };
 
 /* HCI device flags */
