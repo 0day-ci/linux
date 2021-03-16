@@ -25,6 +25,7 @@
 #include <linux/serial_core.h>
 #include <linux/sysfs.h>
 #include <linux/random.h>
+#include <linux/ctype.h>
 
 #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
 #include <asm/page.h>
@@ -1050,8 +1051,26 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 
 	/* Retrieve command line */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);
-	if (p != NULL && l > 0)
+	if (p != NULL && l > 0) {
 		strlcpy(data, p, min(l, COMMAND_LINE_SIZE));
+
+		/*
+		 * If the given command line size is larger than
+		 * COMMAND_LINE_SIZE, truncate it to the last complete
+		 * parameter.
+		 */
+		if (l > COMMAND_LINE_SIZE) {
+			char *cmd_p = (char *)data + COMMAND_LINE_SIZE - 1;
+
+			while (!isspace(*cmd_p))
+				cmd_p--;
+
+			*cmd_p = '\0';
+
+			pr_err("Command line is too long: truncated to %d bytes\n",
+			       (int)(cmd_p - (char *)data + 1));
+		}
+	}
 
 	/*
 	 * CONFIG_CMDLINE is meant to be a default in case nothing else
