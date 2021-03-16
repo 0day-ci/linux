@@ -506,7 +506,7 @@ static void do_optimize_kprobes(void)
 	/*
 	 * The optimization/unoptimization refers online_cpus via
 	 * stop_machine() and cpu-hotplug modifies online_cpus.
-	 * And same time, text_mutex will be held in cpu-hotplug and here.
+	 * At the same time, text_mutex will be held in cpu-hotplug and here.
 	 * This combination can cause a deadlock (cpu-hotplug try to lock
 	 * text_mutex but stop_machine can not be done because online_cpus
 	 * has been changed)
@@ -592,12 +592,12 @@ static void kprobe_optimizer(struct work_struct *work)
 
 	/*
 	 * Step 1: Unoptimize kprobes and collect cleaned (unused and disarmed)
-	 * kprobes before waiting for quiesence period.
+	 * kprobes before waiting for quiescence period.
 	 */
 	do_unoptimize_kprobes();
 
 	/*
-	 * Step 2: Wait for quiesence period to ensure all potentially
+	 * Step 2: Wait for quiescence period to ensure all potentially
 	 * preempted tasks to have normally scheduled. Because optprobe
 	 * may modify multiple instructions, there is a chance that Nth
 	 * instruction is preempted. In that case, such tasks can return
@@ -607,10 +607,10 @@ static void kprobe_optimizer(struct work_struct *work)
 	 */
 	synchronize_rcu_tasks();
 
-	/* Step 3: Optimize kprobes after quiesence period */
+	/* Step 3: Optimize kprobes after quiescence period */
 	do_optimize_kprobes();
 
-	/* Step 4: Free cleaned kprobes after quiesence period */
+	/* Step 4: Free cleaned kprobes after quiescence period */
 	do_free_cleaned_kprobes();
 
 	mutex_unlock(&text_mutex);
@@ -631,7 +631,7 @@ void wait_for_kprobe_optimizer(void)
 	while (!list_empty(&optimizing_list) || !list_empty(&unoptimizing_list)) {
 		mutex_unlock(&kprobe_mutex);
 
-		/* this will also make optimizing_work execute immmediately */
+		/* this will also make optimizing_work execute immediately */
 		flush_delayed_work(&optimizing_work);
 		/* @optimizing_work might not have been queued yet, relax */
 		cpu_relax();
@@ -1057,7 +1057,7 @@ static int __arm_kprobe_ftrace(struct kprobe *p, struct ftrace_ops *ops,
 
 err_ftrace:
 	/*
-	 * At this point, sinec ops is not registered, we should be sefe from
+	 * At this point, since ops is not registered, we should be safe from
 	 * registering empty filter.
 	 */
 	ftrace_set_filter_ip(ops, (unsigned long)p->addr, 1, 0);
@@ -1712,7 +1712,7 @@ static struct kprobe *__disable_kprobe(struct kprobe *p)
 			/*
 			 * If kprobes_all_disarmed is set, orig_p
 			 * should have already been disarmed, so
-			 * skip unneed disarming process.
+			 * skip unneeded disarming process.
 			 */
 			if (!kprobes_all_disarmed) {
 				ret = disarm_kprobe(orig_p, true);
@@ -2424,7 +2424,7 @@ static int kprobes_module_callback(struct notifier_block *nb,
 			     within_module_core((unsigned long)p->addr, mod))) {
 				/*
 				 * The vaddr this probe is installed will soon
-				 * be vfreed buy not synced to disk. Hence,
+				 * be vfreed but not synced to disk. Hence,
 				 * disarming the breakpoint isn't needed.
 				 *
 				 * Note, this will also move any optimized probes
