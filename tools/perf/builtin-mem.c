@@ -172,6 +172,7 @@ static int
 dump_raw_samples(struct perf_tool *tool,
 		 union perf_event *event,
 		 struct perf_sample *sample,
+		 struct evsel *evsel,
 		 struct machine *machine)
 {
 	struct perf_mem *mem = container_of(tool, struct perf_mem, tool);
@@ -220,6 +221,11 @@ dump_raw_samples(struct perf_tool *tool,
 			symbol_conf.field_sep);
 	}
 
+	if (evsel->name)
+		printf("%s%s", evsel->name, symbol_conf.field_sep);
+	else
+		printf("%s", symbol_conf.field_sep);
+
 	if (field_sep)
 		fmt = "%"PRIu64"%s0x%"PRIx64"%s%s:%s\n";
 	else
@@ -240,10 +246,10 @@ out_put:
 static int process_sample_event(struct perf_tool *tool,
 				union perf_event *event,
 				struct perf_sample *sample,
-				struct evsel *evsel __maybe_unused,
+				struct evsel *evsel,
 				struct machine *machine)
 {
-	return dump_raw_samples(tool, event, sample, machine);
+	return dump_raw_samples(tool, event, sample, evsel, machine);
 }
 
 static int report_raw_events(struct perf_mem *mem)
@@ -287,7 +293,7 @@ static int report_raw_events(struct perf_mem *mem)
 	if (mem->data_page_size)
 		printf("DATA PAGE SIZE, ");
 
-	printf("LOCAL WEIGHT, DSRC, SYMBOL\n");
+	printf("EVENT, LOCAL WEIGHT, DSRC, SYMBOL\n");
 
 	ret = perf_session__process_events(session);
 
