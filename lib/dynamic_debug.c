@@ -45,11 +45,11 @@ extern struct _ddebug_site __start___dyndbg_sites[];
 extern struct _ddebug_site __stop___dyndbg_sites[];
 
 struct ddebug_table {
+	struct _ddebug_site *sites;
 	struct list_head link;
 	const char *mod_name;
 	unsigned int num_ddebugs;
 	struct _ddebug *ddebugs;
-	struct _ddebug_site *sites;
 };
 
 struct ddebug_query {
