@@ -624,6 +624,36 @@ static void kvm_send_hwpoison_signal(unsigned long address, short lsb)
 	send_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb, current);
 }
 
+/*
+ * Find a mapping size that properly insides the intersection of vma and
+ * memslot. And hva and pa have the same alignment to this mapping size.
+ * It's rough because there are still other restrictions, which will be
+ * checked by the following fault_supports_stage2_huge_mapping().
+ */
+static short device_rough_page_shift(struct kvm_memory_slot *memslot,
+				     struct vm_area_struct *vma,
+				     unsigned long hva)
+{
+	size_t size = memslot->npages * PAGE_SIZE;
+	hva_t sec_start = max(memslot->userspace_addr, vma->vm_start);
+	hva_t sec_end = min(memslot->userspace_addr + size, vma->vm_end);
+	phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + (hva - vma->vm_start);
+
+#ifndef __PAGETABLE_PMD_FOLDED
+	if ((hva & (PUD_SIZE - 1)) == (pa & (PUD_SIZE - 1)) &&
+	    ALIGN_DOWN(hva, PUD_SIZE) >= sec_start &&
+	    ALIGN(hva, PUD_SIZE) <= sec_end)
+		return PUD_SHIFT;
+#endif
+
+	if ((hva & (PMD_SIZE - 1)) == (pa & (PMD_SIZE - 1)) &&
+	    ALIGN_DOWN(hva, PMD_SIZE) >= sec_start &&
+	    ALIGN(hva, PMD_SIZE) <= sec_end)
+		return PMD_SHIFT;
+
+	return PAGE_SHIFT;
+}
+
 static bool fault_supports_stage2_huge_mapping(struct kvm_memory_slot *memslot,
 					       unsigned long hva,
 					       unsigned long map_size)
@@ -769,7 +799,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		return -EFAULT;
 	}
 
-	/* Let's check if we will get back a huge page backed by hugetlbfs */
+	/*
+	 * Let's check if we will get back a huge page backed by hugetlbfs, or
+	 * get block mapping for device MMIO region.
+	 */
 	mmap_read_lock(current->mm);
 	vma = find_vma_intersection(current->mm, hva, hva + 1);
 	if (unlikely(!vma)) {
@@ -780,11 +813,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	if (is_vm_hugetlb_page(vma))
 		vma_shift = huge_page_shift(hstate_vma(vma));
+	else if (vma->vm_flags & VM_PFNMAP)
+		vma_shift = device_rough_page_shift(memslot, vma, hva);
 	else
 		vma_shift = PAGE_SHIFT;
 
-	if (logging_active ||
-	    (vma->vm_flags & VM_PFNMAP)) {
+	if (logging_active) {
 		force_pte = true;
 		vma_shift = PAGE_SHIFT;
 	}
@@ -855,7 +889,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	if (kvm_is_device_pfn(pfn)) {
 		device = true;
-		force_pte = true;
+		force_pte = (vma_pagesize == PAGE_SIZE);
 	} else if (logging_active && !write_fault) {
 		/*
 		 * Only actually map the page as writable if this was a write
