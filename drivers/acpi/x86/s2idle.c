@@ -317,11 +317,16 @@ static void lpi_check_constraints(void)
 	}
 }
 
+static bool acpi_s2idle_vendor_amd(void)
+{
+	return boot_cpu_data.x86_vendor == X86_VENDOR_AMD;
+}
+
 static void acpi_sleep_run_lps0_dsm(unsigned int func)
 {
 	union acpi_object *out_obj;
 
-	if (!(lps0_dsm_func_mask & (1 << func)))
+	if (!acpi_s2idle_vendor_amd() && !(lps0_dsm_func_mask & (1 << func)))
 		return;
 
 	out_obj = acpi_evaluate_dsm(lps0_device_handle, &lps0_dsm_guid, rev_id, func, NULL);
@@ -329,11 +334,6 @@ static void acpi_sleep_run_lps0_dsm(unsigned int func)
 
 	acpi_handle_debug(lps0_device_handle, "_DSM function %u evaluation %s\n",
 			  func, out_obj ? "successful" : "failed");
-}
-
-static bool acpi_s2idle_vendor_amd(void)
-{
-	return boot_cpu_data.x86_vendor == X86_VENDOR_AMD;
 }
 
 static int lps0_device_attach(struct acpi_device *adev,
