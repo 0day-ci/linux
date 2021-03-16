@@ -724,15 +724,8 @@ void __cfg80211_connect_result(struct net_device *dev,
 	}
 #endif
 
-	if (!cr->bss && (cr->status == WLAN_STATUS_SUCCESS)) {
+	if (cr->status == WLAN_STATUS_SUCCESS)
 		WARN_ON_ONCE(!wiphy_to_rdev(wdev->wiphy)->ops->connect);
-		cr->bss = cfg80211_get_bss(wdev->wiphy, NULL, cr->bssid,
-					   wdev->ssid, wdev->ssid_len,
-					   wdev->conn_bss_type,
-					   IEEE80211_PRIVACY_ANY);
-		if (cr->bss)
-			cfg80211_hold_bss(bss_from_pub(cr->bss));
-	}
 
 	if (wdev->current_bss) {
 		cfg80211_unhold_bss(wdev->current_bss);
@@ -882,6 +875,18 @@ void cfg80211_connect_done(struct net_device *dev,
 	ev->cr.fils.update_erp_next_seq_num = params->fils.update_erp_next_seq_num;
 	if (params->fils.update_erp_next_seq_num)
 		ev->cr.fils.erp_next_seq_num = params->fils.erp_next_seq_num;
+
+	/* Acquire and hold the bss if bss is not provided in argument.
+	 * This ensures that the BSS does not get expired if the schedule
+	 * of the rdev->event_work gets delayed.
+	 */
+	if (!params->bss && params->bssid)
+		params->bss = cfg80211_get_bss(wdev->wiphy, NULL,
+					       params->bssid,
+					       wdev->ssid, wdev->ssid_len,
+					       wdev->conn_bss_type,
+					       IEEE80211_PRIVACY_ANY);
+
 	if (params->bss)
 		cfg80211_hold_bss(bss_from_pub(params->bss));
 	ev->cr.bss = params->bss;
