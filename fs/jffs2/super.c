@@ -74,6 +74,10 @@ static const char *jffs2_compr_name(unsigned int compr)
 	case JFFS2_COMPR_MODE_FORCEZLIB:
 		return "zlib";
 #endif
+#ifdef CONFIG_JFFS2_ZSTD
+	case JFFS2_COMPR_MODE_FORCEZSTD:
+		return "zstd";
+#endif
 	default:
 		/* should never happen; programmer error */
 		WARN_ON(1);
@@ -174,6 +178,9 @@ static const struct constant_table jffs2_param_compr[] = {
 #endif
 #ifdef CONFIG_JFFS2_ZLIB
 	{"zlib",	JFFS2_COMPR_MODE_FORCEZLIB },
+#endif
+#ifdef CONFIG_JFFS2_ZSTD
+	{"zstd",	JFFS2_COMPR_MODE_FORCEZSTD },
 #endif
 	{}
 };

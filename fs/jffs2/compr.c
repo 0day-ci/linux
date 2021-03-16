@@ -237,6 +237,10 @@ uint16_t jffs2_compress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		ret = jffs2_selected_compress(JFFS2_COMPR_ZLIB, data_in,
 				cpage_out, datalen, cdatalen);
 		break;
+	case JFFS2_COMPR_MODE_FORCEZSTD:
+		ret = jffs2_selected_compress(JFFS2_COMPR_ZSTD, data_in,
+				cpage_out, datalen, cdatalen);
+		break;
 	default:
 		pr_err("unknown compression mode\n");
 	}
@@ -378,6 +382,9 @@ int __init jffs2_compressors_init(void)
 #ifdef CONFIG_JFFS2_LZO
 	jffs2_lzo_init();
 #endif
+#ifdef CONFIG_JFFS2_ZSTD
+	jffs2_zstd_init();
+#endif
 /* Setting default compression mode */
 #ifdef CONFIG_JFFS2_CMODE_NONE
 	jffs2_compression_mode = JFFS2_COMPR_MODE_NONE;
@@ -413,6 +420,9 @@ int jffs2_compressors_exit(void)
 #endif
 #ifdef CONFIG_JFFS2_ZLIB
 	jffs2_zlib_exit();
+#endif
+#ifdef CONFIG_JFFS2_ZSTD
+	jffs2_zstd_exit();
 #endif
 	return 0;
 }

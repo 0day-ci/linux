@@ -136,6 +136,15 @@ config JFFS2_LZO
 	  This feature was added in July, 2007. Say 'N' if you need
 	  compatibility with older bootloaders or kernels.
 
+config JFFS2_ZSTD
+	bool "JFFS2 zstd compression support" if JFFS2_COMPRESSION_OPTIONS
+	select ZSTD_COMPRESS
+	select ZSTD_DECOMPRESS
+	depends on JFFS2_FS
+	default n
+	help
+	  Zstd compression.
+
 config JFFS2_RTIME
 	bool "JFFS2 RTIME compression support" if JFFS2_COMPRESSION_OPTIONS
 	depends on JFFS2_FS
