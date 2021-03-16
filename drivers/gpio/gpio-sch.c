@@ -26,6 +26,7 @@
 struct sch_gpio {
 	struct gpio_chip chip;
 	struct irq_chip irqchip;
+	acpi_sci_handler sci_handler;
 	spinlock_t lock;
 	unsigned short iobase;
 	unsigned short resume_base;
@@ -152,6 +153,28 @@ static const struct gpio_chip sch_gpio_chip = {
 	.get_direction		= sch_gpio_get_direction,
 };
 
+static u32 sch_gpio_sci_handler(void *context)
+{
+	struct sch_gpio *sch = context;
+	struct gpio_chip *gc = &sch->chip;
+	unsigned long core_status, resume_status;
+	unsigned long pending;
+	int offset;
+
+	core_status = inl(sch->iobase + GTS + 0x00);
+	resume_status = inl(sch->iobase + GTS + 0x20);
+
+	pending = (resume_status << sch->resume_base) | core_status;
+
+	for_each_set_bit(offset, &pending, sch->chip.ngpio)
+		generic_handle_irq(irq_find_mapping(gc->irq.domain, offset));
+
+	outl(core_status, sch->iobase + GTS + 0x00);
+	outl(resume_status, sch->iobase + GTS + 0x20);
+
+	return pending ? ACPI_INTERRUPT_HANDLED : ACPI_INTERRUPT_NOT_HANDLED;
+}
+
 static int sch_irq_type(struct irq_data *d, unsigned int type)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
@@ -211,10 +234,36 @@ static void sch_irq_unmask(struct irq_data *d)
 	sch_irq_set_enable(d, 1);
 }
 
+static void sch_gpio_remove_sci_handler(void *data)
+{
+	struct sch_gpio *sch = data;
+	struct device *dev = sch->chip.parent;
+	acpi_status status;
+
+	status = acpi_remove_sci_handler(sch->sci_handler);
+	if (ACPI_FAILURE(status))
+		dev_err(dev, "Can't remove SCI handler\n");
+}
+
+static int sch_gpio_install_sci_handler(struct sch_gpio *sch)
+{
+	struct device *dev = sch->chip.parent;
+	acpi_status status;
+
+	status = acpi_install_sci_handler(sch->sci_handler, sch);
+	if (ACPI_SUCCESS(status))
+		return devm_add_action_or_reset(dev, sch_gpio_remove_sci_handler, sch);
+
+	/* SCI handler is optional */
+	dev_warn(dev, "Can't install SCI handler, no IRQ support\n");
+	return 0;
+}
+
 static int sch_gpio_probe(struct platform_device *pdev)
 {
 	struct sch_gpio *sch;
 	struct resource *res;
+	int ret;
 
 	sch = devm_kzalloc(&pdev->dev, sizeof(*sch), GFP_KERNEL);
 	if (!sch)
@@ -285,6 +334,12 @@ static int sch_gpio_probe(struct platform_device *pdev)
 	sch->chip.irq.parent_handler = NULL;
 	sch->chip.irq.default_type = IRQ_TYPE_NONE;
 	sch->chip.irq.handler = handle_bad_irq;
+
+	sch->sci_handler = sch_gpio_sci_handler;
+
+	ret = sch_gpio_install_sci_handler(sch);
+	if (ret)
+		return ret;
 
 	return devm_gpiochip_add_data(&pdev->dev, &sch->chip, sch);
 }
