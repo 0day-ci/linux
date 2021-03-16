@@ -140,6 +140,10 @@ properties:
       - giantplus,gpg48273qs5
         # GiantPlus GPM940B0 3.0" QVGA TFT LCD panel
       - giantplus,gpm940b0
+        # A panel connected to a google,pompom board. Panel is guaranteed to
+        # confirm to google,pompom-panel power sequencing requirements and then
+        # the specific panel will be probed via EDID.
+      - google,pompom-panel
         # HannStar Display Corp. HSD070PWW1 7.0" WXGA TFT LCD panel
       - hannstar,hsd070pww1
         # HannStar Display Corp. HSD100PXN1 10.1" XGA LVDS panel
