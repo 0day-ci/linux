@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/acpi.h>
 #include <linux/acpi_iort.h>
+#include <linux/acpi_viot.h>
 #include <linux/signal.h>
 #include <linux/kthread.h>
 #include <linux/dmi.h>
@@ -1506,11 +1507,16 @@ int acpi_dma_configure_id(struct device *dev, enum dev_dma_attr attr,
 {
 	const struct iommu_ops *iommu;
 	u64 dma_addr = 0, size = 0;
+	int ret;
 
 	if (attr == DEV_DMA_NOT_SUPPORTED) {
 		set_dma_ops(dev, &dma_dummy_ops);
 		return 0;
 	}
+
+	ret = acpi_viot_dma_setup(dev, attr);
+	if (ret)
+		return ret > 0 ? 0 : ret;
 
 	iort_dma_setup(dev, &dma_addr, &size);
 
