@@ -2205,6 +2205,15 @@ static const struct panel_desc hitachi_tx23d38vm0caa = {
 	},
 };
 
+static const struct panel_desc google_pompom_panel = {
+	.delay = {
+		.hpd_absent_delay = 200,
+		.enable = 200,
+		.unprepare = 500,
+	},
+	.connector_type = DRM_MODE_CONNECTOR_eDP,
+};
+
 static const struct drm_display_mode innolux_at043tn24_mode = {
 	.clock = 9000,
 	.hdisplay = 480,
@@ -4265,6 +4274,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "hit,tx23d38vm0caa",
 		.data = &hitachi_tx23d38vm0caa
+	}, {
+		.compatible = "google,pompom-panel",
+		.data = &google_pompom_panel,
 	}, {
 		.compatible = "innolux,at043tn24",
 		.data = &innolux_at043tn24,
