@@ -494,7 +494,8 @@ void ieee80211_process_addba_request(struct ieee80211_local *local,
 
 	ies_len = len - offsetof(struct ieee80211_mgmt,
 				 u.action.u.addba_req.variable);
-	if (ies_len) {
+	if (ies_len &&
+	    mgmt->u.action.u.addba_req.variable[0] == WLAN_EID_ADDBA_EXT) {
 		ieee802_11_parse_elems(mgmt->u.action.u.addba_req.variable,
                                 ies_len, true, &elems, mgmt->bssid, NULL);
 		if (elems.parse_error)
