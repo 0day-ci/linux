@@ -751,6 +751,8 @@ qede_build_skb(struct qede_rx_queue *rxq,
 
 	buf = page_address(bd->data) + bd->page_offset;
 	skb = build_skb(buf, rxq->rx_buf_seg_size);
+	if (unlikely(!skb))
+		return NULL;
 
 	skb_reserve(skb, pad);
 	skb_put(skb, len);
@@ -767,6 +769,9 @@ qede_tpa_rx_build_skb(struct qede_dev *edev,
 	struct sk_buff *skb;
 
 	skb = qede_build_skb(rxq, bd, len, pad);
+	if (unlikely(!skb))
+		return NULL;
+
 	bd->page_offset += rxq->rx_buf_seg_size;
 
 	if (bd->page_offset == PAGE_SIZE) {
@@ -814,6 +819,8 @@ qede_rx_build_skb(struct qede_dev *edev,
 	}
 
 	skb = qede_build_skb(rxq, bd, len, pad);
+	if (unlikely(!skb))
+		return NULL;
 
 	if (unlikely(qede_realloc_rx_buffer(rxq, bd))) {
 		/* Incr page ref count to reuse on allocation failure so
@@ -851,11 +858,16 @@ static void qede_tpa_start(struct qede_dev *edev,
 	if (unlikely(!tpa_info->skb)) {
 		DP_NOTICE(edev, "Failed to allocate SKB for gro\n");
 
+		/* Re-use the buffer instantly instead doing it at tpa_end
+		 * as we are already going to throw away this aggregated packet
+		 * (i.e CQEs till tpa_end) and then going to update the
+		 * producer, so it's safe to pin the buffer here only.
+		 */
+		qede_reuse_page(rxq, sw_rx_data_cons);
 		/* Consume from ring but do not produce since
 		 * this might be used by FW still, it will be re-used
 		 * at TPA end.
 		 */
-		tpa_info->tpa_start_fail = true;
 		qede_rx_bd_ring_consume(rxq);
 		tpa_info->state = QEDE_AGG_STATE_ERROR;
 		goto cons_buf;
@@ -1024,11 +1036,6 @@ static int qede_tpa_end(struct qede_dev *edev,
 	return 1;
 err:
 	tpa_info->state = QEDE_AGG_STATE_NONE;
-
-	if (tpa_info->tpa_start_fail) {
-		qede_reuse_page(rxq, &tpa_info->buffer);
-		tpa_info->tpa_start_fail = false;
-	}
 
 	dev_kfree_skb_any(tpa_info->skb);
 	tpa_info->skb = NULL;
