@@ -12,3 +12,4 @@ trusted-y += trusted_tpm2.o
 trusted-y += tpm2key.asn1.o
 
 trusted-$(CONFIG_TEE) += trusted_tee.o
+trusted-$(CONFIG_CRYPTO_DEV_FSL_CAAM_BLOB_GEN) += trusted_caam.o
