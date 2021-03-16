@@ -923,7 +923,7 @@ EXPORT_SYMBOL(dump_align);
 
 /*
  * Ensures that file size is big enough to contain the current file
- * postion. This prevents gdb from complaining about a truncated file
+ * position. This prevents gdb from complaining about a truncated file
  * if the last "write" to the file was dump_skip.
  */
 void dump_truncate(struct coredump_params *cprm)
