@@ -54,7 +54,7 @@ static ssize_t events_store(struct device *dev,  struct device_attribute *attr,
 
 	events = tmp;
 
-	pvpanic_set_events(events);
+	pvpanic_set_events(base, events);
 
 	return count;
 
@@ -72,7 +72,6 @@ static int pvpanic_mmio_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *res;
-	void __iomem *base;
 
 	res = platform_get_mem_or_io(pdev, 0);
 	if (!res)
@@ -97,17 +96,13 @@ static int pvpanic_mmio_probe(struct platform_device *pdev)
 	capability &= ioread8(base);
 	events = capability;
 
-	pvpanic_probe(base, capability);
-
-	return 0;
+	return pvpanic_probe(base, capability);
 }
 
 static int pvpanic_mmio_remove(struct platform_device *pdev)
 {
 
-	pvpanic_remove();
-
-	return 0;
+	return pvpanic_remove(base);
 }
 
 static const struct of_device_id pvpanic_mmio_match[] = {

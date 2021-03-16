@@ -14,20 +14,35 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/cdev.h>
+#include <linux/list.h>
+#include <linux/slab.h>
 
 #include <uapi/misc/pvpanic.h>
 
 #include "pvpanic.h"
 
-static void __iomem *base;
-static unsigned int capability;
-static unsigned int events;
+struct pvpanic_instance {
+	void __iomem *base;
+	unsigned int capability;
+	unsigned int events;
+	struct list_head list;
+};
+
+struct list_head pvpanic_list;
+spinlock_t pvpanic_lock;
 
 static void
 pvpanic_send_event(unsigned int event)
 {
-	if (event & capability & events)
-		iowrite8(event, base);
+	struct pvpanic_instance *pi_cur;
+
+	spin_lock(&pvpanic_lock);
+	list_for_each_entry(pi_cur, &pvpanic_list, list) {
+		if (event & pi_cur->capability & pi_cur->events)
+			iowrite8(event, pi_cur->base);
+	}
+	spin_unlock(&pvpanic_lock);
 }
 
 static int
@@ -49,29 +64,81 @@ static struct notifier_block pvpanic_panic_nb = {
 	.priority = 1, /* let this called before broken drm_fb_helper */
 };
 
-void pvpanic_probe(void __iomem *pbase, unsigned int dev_cap)
+int pvpanic_probe(void __iomem *pbase, unsigned int dev_cap)
 {
-	base = pbase;
-	capability = dev_cap;
-	events = capability;
+	struct pvpanic_instance *pi;
 
-	if (capability)
-		atomic_notifier_chain_register(&panic_notifier_list,
-					       &pvpanic_panic_nb);
+	if (!pbase)
+		return -EINVAL;
+
+	pi = kmalloc(sizeof(*pi), GFP_ATOMIC);
+	if (!pi)
+		return -ENOMEM;
+
+	pi->base = pbase;
+	pi->capability = dev_cap;
+	pi->events = dev_cap;
+	spin_lock(&pvpanic_lock);
+	list_add(&pi->list, &pvpanic_list);
+	spin_unlock(&pvpanic_lock);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(pvpanic_probe);
 
-void pvpanic_remove(void)
+int pvpanic_remove(void __iomem *pbase)
 {
-	if (capability)
-		atomic_notifier_chain_unregister(&panic_notifier_list,
-						 &pvpanic_panic_nb);
-	base = NULL;
+	struct pvpanic_instance *pi_cur, *pi_next;
+
+	if (!pbase)
+		return -EINVAL;
+
+	spin_lock(&pvpanic_lock);
+	list_for_each_entry_safe(pi_cur, pi_next, &pvpanic_list, list) {
+		if (pi_cur->base == pbase) {
+			list_del(&pi_cur->list);
+			kfree(pi_cur);
+			break;
+		}
+	}
+	spin_unlock(&pvpanic_lock);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(pvpanic_remove);
 
-void pvpanic_set_events(unsigned int dev_events)
+
+void pvpanic_set_events(void __iomem *pbase, unsigned int dev_events)
 {
-	events = dev_events;
+	struct pvpanic_instance *pi_cur;
+
+	spin_lock(&pvpanic_lock);
+	list_for_each_entry(pi_cur, &pvpanic_list, list) {
+		if (pi_cur->base == pbase)
+			pi_cur->events = dev_events;
+	}
+	spin_unlock(&pvpanic_lock);
+
 }
 EXPORT_SYMBOL_GPL(pvpanic_set_events);
+
+static int pvpanic_init(void)
+{
+	INIT_LIST_HEAD(&pvpanic_list);
+	spin_lock_init(&pvpanic_lock);
+
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &pvpanic_panic_nb);
+
+	return 0;
+}
+
+static void pvpanic_exit(void)
+{
+	atomic_notifier_chain_unregister(&panic_notifier_list,
+					 &pvpanic_panic_nb);
+
+}
+
+module_init(pvpanic_init);
+module_exit(pvpanic_exit);
