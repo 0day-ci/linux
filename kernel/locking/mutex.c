@@ -946,7 +946,10 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	}
 
 	preempt_disable();
-	mutex_acquire_nest(&lock->dep_map, subclass, 0, nest_lock, ip);
+	/*
+	 * Treat as trylock for ww_mutex.
+	 */
+	mutex_acquire_nest(&lock->dep_map, subclass, !!ww_ctx, nest_lock, ip);
 
 	if (__mutex_trylock(lock) ||
 	    mutex_optimistic_spin(lock, ww_ctx, NULL)) {
