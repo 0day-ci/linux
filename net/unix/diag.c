@@ -78,11 +78,11 @@ static int sk_diag_dump_icons(struct sock *sk, struct sk_buff *nlskb)
 			struct sock *req, *peer;
 
 			req = skb->sk;
-			/*
-			 * The state lock is outer for the same sk's
-			 * queue lock. With the other's queue locked it's
-			 * OK to lock the state.
-			 */
+			 /*
+			  * The state lock is outer for the same sk's
+			  * queue lock. With the other's queue locked it's
+			  * OK to lock the state.
+			  */
 			unix_state_lock_nested(req);
 			peer = unix_sk(req)->peer;
 			buf[i++] = (peer ? sock_i_ino(peer) : 0);
@@ -116,6 +116,7 @@ static int sk_diag_show_rqlen(struct sock *sk, struct sk_buff *nlskb)
 static int sk_diag_dump_uid(struct sock *sk, struct sk_buff *nlskb)
 {
 	uid_t uid = from_kuid_munged(sk_user_ns(nlskb->sk), sock_i_uid(sk));
+
 	return nla_put(nlskb, UNIX_DIAG_UID, sizeof(uid_t), &uid);
 }
 
