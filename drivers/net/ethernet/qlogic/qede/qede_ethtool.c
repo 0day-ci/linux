@@ -1611,7 +1611,7 @@ static int qede_selftest_run_loopback(struct qede_dev *edev, u32 loopback_mode)
 		return -EINVAL;
 	}
 
-	qede_netif_stop(edev);
+	netif_tx_disable(edev->ndev);
 
 	/* Bring up the link in Loopback mode */
 	memset(&link_params, 0, sizeof(link_params));
@@ -1622,6 +1622,8 @@ static int qede_selftest_run_loopback(struct qede_dev *edev, u32 loopback_mode)
 
 	/* Wait for loopback configuration to apply */
 	msleep_interruptible(500);
+
+	qede_netif_stop(edev);
 
 	/* Setting max packet size to 1.5K to avoid data being split over
 	 * multiple BDs in cases where MTU > PAGE_SIZE.
