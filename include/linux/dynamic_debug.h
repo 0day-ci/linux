@@ -101,10 +101,92 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 			 const struct ib_device *ibdev,
 			 const char *fmt, ...);
 
-#define DEFINE_DYNAMIC_DEBUG_METADATA(name, fmt)		\
+/**
+ * DEFINE_DYNAMIC_DEBUG_TABLE(), DECLARE_DYNAMIC_DEBUG_TABLE()
+ *
+ * These are special versions of DEFINE_DYNAMIC_DEBUG_METADATA().  The
+ * job is to create/reserve a module-header struct-pair as the last
+ * element of the module's sub-vectors of __dyndbg & __dyndbg_sites,
+ * ie at a fixed offset from them.  I expect to settle on 1 of these
+ * 2; DEFINE_ has seen most testing recently, and is favored.
+ *
+ * With this record reliably in-situ at a fixed offset for each
+ * callsite, we can use ._index to remember this offset, find the
+ * header, find the parallel vector, then index the corresponding site
+ * data.
+ *
+ * This macro is invoked at the bottom of this header.  It is
+ * typically invoked multiple times for a module, generally at least
+ * once per object file.  The combination of .gnu.linkonce._ and
+ * __weak appear to resolve earlier troubles with compile errors or
+ * multiple copies of headers.
+ */
+
+#define DECLARE_DYNAMIC_DEBUG_TABLE_(_sym_, _mod_)	       	\
+	static struct _ddebug_site				\
+	__section(".gnu.linkonce.dyndbg_site")			\
+		__aligned(8)					\
+		__maybe_unused					\
+		_sym_##_dyndbg_site;				\
+	static struct _ddebug					\
+	__section(".gnu.linkonce.dyndbg")			\
+		__aligned(8)					\
+		__maybe_unused					\
+		_sym_##_dyndbg_base
+
+#define DYNAMIC_DEBUG_TABLE_refer(_sym_)			\
+	static void __used _sym_##_take_internal_refs(void)	\
+{								\
+	struct _ddebug_site * dc = &_sym_##_dyndbg_site;	\
+	struct _ddebug * dp = &_sym_##_dyndbg_base;		\
+	printk(KERN_INFO "%s %d\n", dc->function, dp->lineno);	\
+}
+
+#define DECLARE_DYNAMIC_DEBUG_TABLE()		       			\
+	DECLARE_DYNAMIC_DEBUG_TABLE_(KBUILD_MODSYM, KBUILD_MODNAME);	\
+	DYNAMIC_DEBUG_TABLE_refer(KBUILD_MODSYM)
+
+//#define DEFN_SC static // clashes with extern forward decl
+//#define DEFN_SC extern // warning: ‘KBUILD_MODNAME_dyndbg_site’ initialized and declared ‘extern’
+//#define DEFN_SC // no section allowd on locals
+#define DEFN_SC __weak
+
+#define DEFINE_DYNAMIC_DEBUG_TABLE_(_sym_,_mod_)	       	\
+	DEFN_SC struct _ddebug_site				\
+	__section(".gnu.linkonce.dyndbg_site")			\
+		__used __aligned(8)				\
+	_sym_ ##_dyndbg_site = {				\
+		.modname = _mod_,				\
+		.filename = __FILE__,				\
+		.function = (void*) _mod_			\
+	};							\
+	DEFN_SC struct _ddebug					\
+	__section(".gnu.linkonce.dyndbg")			\
+		__used __aligned(8)				\
+	_sym_ ##_dyndbg_base = {				\
+		.site = & _sym_ ##_dyndbg_site,			\
+		.format = _mod_,				\
+		.lineno = 0					\
+	}
+
+/* above init conditions as distinguishing predicate.
+ * (site == iter->site) should work but doesnt, possibly cuz MODSYM
+ * expansion problem
+ */
+#define is_dyndbg_header_pair(iter, site)			\
+	((iter->format == site->modname)			\
+	 && (site->modname == site->function))
+
+// build-time expensive, shows repetitive includes
+// #pragma message "<" __stringify(KBUILD_MODSYM) "> adding DYNDBG_TABLE"
+
+#define DEFINE_DYNAMIC_DEBUG_TABLE()				\
+	DEFINE_DYNAMIC_DEBUG_TABLE_(KBUILD_MODSYM, KBUILD_MODNAME);
+
+#define DEFINE_DYNAMIC_DEBUG_METADATA_(_mod_, name, fmt)	\
 	static struct _ddebug_site  __aligned(8)		\
 	__section("__dyndbg_sites") name##_site = {		\
-		.modname = KBUILD_MODNAME,			\
+		.modname = _mod_,				\
 		.filename = __FILE__,				\
 		.function = __func__,				\
 	};							\
@@ -114,8 +196,12 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 		.format = (fmt),				\
 		.lineno = __LINE__,				\
 		.flags = _DPRINTK_FLAGS_DEFAULT,		\
+		._index = 0,					\
 		_DPRINTK_KEY_INIT				\
 	}
+
+#define DEFINE_DYNAMIC_DEBUG_METADATA(name, fmt)		\
+	DEFINE_DYNAMIC_DEBUG_METADATA_(KBUILD_MODNAME, name, fmt)
 
 #ifdef CONFIG_JUMP_LABEL
 
@@ -246,5 +332,15 @@ static inline int dynamic_debug_exec_queries(const char *query, const char *modn
 }
 
 #endif /* !CONFIG_DYNAMIC_DEBUG_CORE */
+
+#if ((defined(CONFIG_DYNAMIC_DEBUG) ||						\
+      (defined(CONFIG_DYNAMIC_DEBUG_CORE) && defined(DYNAMIC_DEBUG_MODULE)))	\
+     && defined(KBUILD_MODNAME)							\
+     && !defined(NO_DYNAMIC_DEBUG_TABLE))
+
+/* transparently invoked, except for -DNO_DYNAMIC_DEBUG_TABLE */
+DEFINE_DYNAMIC_DEBUG_TABLE()
+
+#endif
 
 #endif

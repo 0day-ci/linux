@@ -1203,8 +1203,7 @@ static int __init dynamic_debug_init(void)
 	const char *modname = NULL;
 	char *cmdline;
 	int ret = 0;
-	int site_ct = 0, entries = 0, modct = 0;
-	int mod_index = 0;
+	int i, site_ct = 0, modct = 0, mod_index = 0;
 
 	if (&__start___dyndbg == &__stop___dyndbg) {
 		if (IS_ENABLED(CONFIG_DYNAMIC_DEBUG)) {
@@ -1220,10 +1219,20 @@ static int __init dynamic_debug_init(void)
 	site = site_mod_start = __start___dyndbg_sites;
 	modname = site->modname;
 
-	for (; iter < __stop___dyndbg; iter++, site++) {
+	for (i = 0; iter < __stop___dyndbg; iter++, site++, i++) {
 
+		/* we should have 1 header for kernel, at beginning of blocks
+		 * but lets be safe for a while 
+		 */
+		if (is_dyndbg_header_pair(iter, site)) {
+			v3pr_info("header.%d: %s\n", i, site->modname);
+			iter->site = site; /* fixup bad init */
+			continue;
+		}
 		BUG_ON(site != iter->site);
-		entries++;
+
+		v3pr_info("site: %s.%s.%d\n", site->modname,
+			  site->function, iter->lineno);
 
 		if (strcmp(modname, site->modname)) {
 			modct++;
@@ -1232,13 +1241,14 @@ static int __init dynamic_debug_init(void)
 						  site_ct, mod_index, modname);
 			if (ret)
 				goto out_err;
-			site_ct = 0;
+
 			modname = site->modname;
 			iter_mod_start = iter;
 			site_mod_start = site;
+			mod_index += site_ct;
+			site_ct = 0;
 		}
 		site_ct++;
-		iter->_index = index++;
 	}
 	ret = __ddebug_add_module(iter_mod_start, site_mod_start, site_ct, mod_index, modname);
 	if (ret)
@@ -1246,9 +1256,9 @@ static int __init dynamic_debug_init(void)
 
 	ddebug_init_success = 1;
 	vpr_info("%d modules, %d entries and %d bytes in ddebug tables, %d bytes in __dyndbg section, %d bytes in __dyndbg_sites section\n",
-		 modct, entries, (int)(modct * sizeof(struct ddebug_table)),
-		 (int)(entries * sizeof(struct _ddebug)),
-		 (int)(entries * sizeof(struct _ddebug_site)));
+		 modct, i, (int)(modct * sizeof(struct ddebug_table)),
+		 (int)(i * sizeof(struct _ddebug)),
+		 (int)(i * sizeof(struct _ddebug_site)));
 
 	/* apply ddebug_query boot param, dont unload tables on err */
 	if (ddebug_setup_string[0] != '\0') {
