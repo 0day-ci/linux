@@ -366,6 +366,18 @@ out_rpm:
 	return ret;
 }
 
+static bool gem_has_pread_pwrite(struct drm_device *dev)
+{
+	/*
+	 * FIXME: Finally we only want to enable this for _new_ Gen12+
+	 * platforms but for now for CI purposes declare pread/pwrite are
+	 * unavailable for all Gen11 and Gen12 platforms so that the IGT
+	 * changes which handle absence of pread/pwrite ioctl's can be
+	 * validated.
+	*/
+	return INTEL_GEN(to_i915(dev)) < 11;
+}
+
 /**
  * Reads data from the object referenced by handle.
  * @dev: drm device pointer
@@ -381,6 +393,9 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_pread *args = data;
 	struct drm_i915_gem_object *obj;
 	int ret;
+
+	if (!gem_has_pread_pwrite(dev))
+		return -EOPNOTSUPP;
 
 	if (args->size == 0)
 		return 0;
@@ -686,6 +701,9 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_pwrite *args = data;
 	struct drm_i915_gem_object *obj;
 	int ret;
+
+	if (!gem_has_pread_pwrite(dev))
+		return -EOPNOTSUPP;
 
 	if (args->size == 0)
 		return 0;
