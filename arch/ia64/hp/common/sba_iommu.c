@@ -828,7 +828,7 @@ mark_clean (void *addr, size_t size)
  * corresponding IO TLB entry. The PCOM (Purge Command Register)
  * is to purge stale entries in the IO TLB when unmapping entries.
  *
- * The PCOM register supports purging of multiple pages, with a minium
+ * The PCOM register supports purging of multiple pages, with a minimum
  * of 1 page and a maximum of 2GB. Hardware requires the address be
  * aligned to the size of the range being purged. The size of the range
  * must be a power of 2. The "Cool perf optimization" in the
