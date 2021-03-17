@@ -1135,9 +1135,8 @@ static void rxkad_decrypt_response(struct rxrpc_connection *conn,
 	       ntohl(session_key->n[0]), ntohl(session_key->n[1]));
 
 	mutex_lock(&rxkad_ci_mutex);
-	if (crypto_sync_skcipher_setkey(rxkad_ci, session_key->x,
-					sizeof(*session_key)) < 0)
-		BUG();
+	BUG_ON(crypto_sync_skcipher_setkey(rxkad_ci, session_key->x,
+					sizeof(*session_key)) < 0);
 
 	memcpy(&iv, session_key, sizeof(iv));
 
