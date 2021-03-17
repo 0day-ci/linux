@@ -945,6 +945,9 @@ struct btrfs_fs_info {
 	struct mutex unused_bg_unpin_mutex;
 	struct mutex delete_unused_bgs_mutex;
 
+	struct mutex reclaim_bgs_lock;
+	struct list_head reclaim_bgs;
+
 	/* Cached block sizes */
 	u32 nodesize;
 	u32 sectorsize;
@@ -983,6 +986,8 @@ struct btrfs_fs_info {
 	struct mutex zoned_meta_io_lock;
 	spinlock_t treelog_bg_lock;
 	u64 treelog_bg;
+
+	int bg_reclaim_threshold;
 
 #ifdef CONFIG_BTRFS_FS_REF_VERIFY
 	spinlock_t ref_verify_lock;
