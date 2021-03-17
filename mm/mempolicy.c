@@ -2273,8 +2273,6 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 {
 	struct mempolicy *pol;
 	struct page *page;
-	int preferred_nid;
-	nodemask_t *nmask;
 
 	pol = get_vma_policy(vma, addr);
 
@@ -2288,6 +2286,7 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 	}
 
 	if (unlikely(IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE) && hugepage)) {
+		nodemask_t *nmask;
 		int hpage_node = node;
 
 		/*
@@ -2301,10 +2300,26 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 		 * does not allow the current node in its nodemask, we allocate
 		 * the standard way.
 		 */
-		if ((pol->mode == MPOL_PREFERRED ||
-		     pol->mode == MPOL_PREFERRED_MANY) &&
-		    !(pol->flags & MPOL_F_LOCAL))
+		if (pol->mode == MPOL_PREFERRED || !(pol->flags & MPOL_F_LOCAL)) {
 			hpage_node = first_node(pol->nodes);
+		} else if (pol->mode == MPOL_PREFERRED_MANY) {
+			struct zoneref *z;
+
+			/*
+			 * In this policy, with direct reclaim, the normal
+			 * policy based allocation will do the right thing - try
+			 * twice using the preferred nodes first, and all nodes
+			 * second.
+			 */
+			if (gfp & __GFP_DIRECT_RECLAIM) {
+				page = alloc_pages_policy(pol, gfp, order, NUMA_NO_NODE);
+				goto out;
+			}
+
+			z = first_zones_zonelist(node_zonelist(numa_node_id(), GFP_HIGHUSER),
+						 gfp_zone(GFP_HIGHUSER), &pol->nodes);
+			hpage_node = zone_to_nid(z->zone);
+		}
 
 		nmask = policy_nodemask(gfp, pol);
 		if (!nmask || node_isset(hpage_node, *nmask)) {
@@ -2330,9 +2345,7 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 		}
 	}
 
-	nmask = policy_nodemask(gfp, pol);
-	preferred_nid = policy_node(gfp, pol, node);
-	page = __alloc_pages_nodemask(gfp, order, preferred_nid, nmask);
+	page = alloc_pages_policy(pol, gfp, order, NUMA_NO_NODE);
 	mpol_cond_put(pol);
 out:
 	return page;
