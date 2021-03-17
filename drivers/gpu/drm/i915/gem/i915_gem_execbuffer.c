@@ -3401,6 +3401,22 @@ static bool check_buffer_count(size_t count)
 	return !(count < 1 || count > INT_MAX || count > SIZE_MAX / sz - 1);
 }
 
+static bool check_objects_correctness(const struct drm_i915_private *i915,
+				      const struct drm_i915_gem_exec_object2 *objs,
+				      uint32_t buffer_count)
+{
+	uint32_t i;
+
+	if (INTEL_GEN(i915) < 12 || IS_TIGERLAKE(i915))
+		return true;
+
+	for (i = 0; i < buffer_count; i++)
+		if (objs[i].relocation_count)
+			return false;
+
+	return true;
+}
+
 /*
  * Legacy execbuffer just creates an exec2 list from the original exec object
  * list array and passes it to the real function.
@@ -3534,6 +3550,12 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		drm_dbg(&i915->drm, "copy %zd exec entries failed\n", count);
 		kvfree(exec2_list);
 		return -EFAULT;
+	}
+
+	if (!check_objects_correctness(i915, exec2_list, count)) {
+		drm_dbg(&i915->drm, "Relocations are not supported\n");
+		kvfree(exec2_list);
+		return -EINVAL;
 	}
 
 	err = i915_gem_do_execbuffer(dev, file, args, exec2_list);
