@@ -5,6 +5,7 @@
 /s390x/resets
 /s390x/sync_regs_test
 /x86_64/cr4_cpuid_sync_test
+/x86_64/set_boot_cpu_id
 /x86_64/debug_regs
 /x86_64/evmcs_test
 /x86_64/get_cpuid_test
