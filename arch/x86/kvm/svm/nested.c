@@ -449,9 +449,12 @@ static void nested_vmcb02_prepare_save(struct vcpu_svm *svm, struct vmcb *vmcb12
 	}
 
 	kvm_set_rflags(&svm->vcpu, vmcb12->save.rflags | X86_EFLAGS_FIXED);
-	svm_set_efer(&svm->vcpu, vmcb12->save.efer);
-	svm_set_cr0(&svm->vcpu, vmcb12->save.cr0);
-	svm_set_cr4(&svm->vcpu, vmcb12->save.cr4);
+
+	if (unlikely(new_vmcb12 || vmcb_is_dirty(vmcb12, VMCB_CR))) {
+		svm_set_efer(&svm->vcpu, vmcb12->save.efer);
+		svm_set_cr0(&svm->vcpu, vmcb12->save.cr0);
+		svm_set_cr4(&svm->vcpu, vmcb12->save.cr4);
+	}
 
 	svm->vcpu.arch.cr2 = vmcb12->save.cr2;
 
