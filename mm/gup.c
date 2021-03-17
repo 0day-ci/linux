@@ -1535,6 +1535,14 @@ struct page *get_dump_page(unsigned long addr)
 				      FOLL_FORCE | FOLL_DUMP | FOLL_GET);
 	if (locked)
 		mmap_read_unlock(mm);
+
+	if (IS_ENABLED(CONFIG_MEMORY_FAILURE) && ret == 1) {
+		if (unlikely(PageHuge(page) && PageHWPoison(compound_head(page))))
+			ret = 0;
+		else if (unlikely(PageHWPoison(page)))
+			ret = 0;
+	}
+
 	return (ret == 1) ? page : NULL;
 }
 #endif /* CONFIG_ELF_CORE */
