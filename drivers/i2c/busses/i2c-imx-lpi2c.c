@@ -94,7 +94,8 @@ enum lpi2c_imx_pincfg {
 
 struct lpi2c_imx_struct {
 	struct i2c_adapter	adapter;
-	struct clk		*clk;
+	struct clk		*clk_per;
+	struct clk		*clk_ipg;
 	void __iomem		*base;
 	__u8			*rx_buf;
 	__u8			*tx_buf;
@@ -563,10 +564,16 @@ static int lpi2c_imx_probe(struct platform_device *pdev)
 	strlcpy(lpi2c_imx->adapter.name, pdev->name,
 		sizeof(lpi2c_imx->adapter.name));
 
-	lpi2c_imx->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(lpi2c_imx->clk)) {
+	lpi2c_imx->clk_per = devm_clk_get(&pdev->dev, "per");
+	if (IS_ERR(lpi2c_imx->clk_per)) {
 		dev_err(&pdev->dev, "can't get I2C peripheral clock\n");
-		return PTR_ERR(lpi2c_imx->clk);
+		return PTR_ERR(lpi2c_imx->clk_per);
+	}
+
+	lpi2c_imx->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
+	if (IS_ERR(lpi2c_imx->clk_ipg)) {
+		dev_err(&pdev->dev, "can't get I2C ipg clock\n");
+		return PTR_ERR(lpi2c_imx->clk_ipg);
 	}
 
 	ret = of_property_read_u32(pdev->dev.of_node,
@@ -633,7 +640,8 @@ static int __maybe_unused lpi2c_runtime_suspend(struct device *dev)
 {
 	struct lpi2c_imx_struct *lpi2c_imx = dev_get_drvdata(dev);
 
-	clk_disable_unprepare(lpi2c_imx->clk);
+	clk_disable_unprepare(lpi2c_imx->clk_ipg);
+	clk_disable_unprepare(lpi2c_imx->clk_per);
 	pinctrl_pm_select_idle_state(dev);
 
 	return 0;
@@ -645,10 +653,16 @@ static int __maybe_unused lpi2c_runtime_resume(struct device *dev)
 	int ret;
 
 	pinctrl_pm_select_default_state(dev);
-	ret = clk_prepare_enable(lpi2c_imx->clk);
+	ret = clk_prepare_enable(lpi2c_imx->clk_per);
 	if (ret) {
-		dev_err(dev, "can't enable I2C clock, ret=%d\n", ret);
+		dev_err(dev, "can't enable I2C per clock, ret=%d\n", ret);
 		return ret;
+	}
+
+	ret = clk_prepare_enable(lpi2c_imx->clk_ipg);
+	if (ret) {
+		clk_disable_unprepare(lpi2c_imx->clk_per);
+		dev_err(dev, "can't enable I2C ipg clock, ret=%d\n", ret);
 	}
 
 	return ret;
