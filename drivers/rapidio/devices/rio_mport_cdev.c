@@ -1985,6 +1985,7 @@ static void mport_cdev_release_dma(struct file *filp)
 			current->comm, task_pid_nr(current), wret);
 	}
 
+	mutex_lock(&priv->dma_lock);
 	if (priv->dmach != priv->md->dma_chan) {
 		rmcd_debug(EXIT, "Release DMA channel for filp=%p %s(%d)",
 			   filp, current->comm, task_pid_nr(current));
@@ -1995,6 +1996,7 @@ static void mport_cdev_release_dma(struct file *filp)
 	}
 
 	priv->dmach = NULL;
+	mutex_unlock(&priv->dma_lock);
 }
 #else
 #define mport_cdev_release_dma(priv) do {} while (0)
