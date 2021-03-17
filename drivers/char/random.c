@@ -763,7 +763,7 @@ static DECLARE_WAIT_QUEUE_HEAD(crng_init_wait);
 
 #ifdef CONFIG_NUMA
 /*
- * Hack to deal with crazy userspace progams when they are all trying
+ * Hack to deal with crazy userspace programs when they are all trying
  * to access /dev/urandom in parallel.  The programs are almost
  * certainly doing something terribly wrong, but we'll work around
  * their brain damage.
