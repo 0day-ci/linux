@@ -7,6 +7,7 @@
 #define __DSI_PHY_H__
 
 #include <linux/clk-provider.h>
+#include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 
 #include "dsi.h"
@@ -16,15 +17,6 @@
 
 /* v3.0.0 10nm implementation that requires the old timings settings */
 #define V3_0_0_10NM_OLD_TIMINGS_QUIRK	BIT(0)
-
-struct msm_dsi_pll {
-	struct clk_hw	clk_hw;
-	bool		pll_on;
-
-	const struct msm_dsi_phy_cfg *cfg;
-};
-
-#define hw_clk_to_pll(x) container_of(x, struct msm_dsi_pll, clk_hw)
 
 struct msm_dsi_phy_ops {
 	int (*pll_init)(struct msm_dsi_phy *phy);
@@ -111,7 +103,8 @@ struct msm_dsi_phy {
 	enum msm_dsi_phy_usecase usecase;
 	bool regulator_ldo_mode;
 
-	struct msm_dsi_pll *pll;
+	struct clk_hw *vco_hw;
+	bool pll_on;
 
 	struct clk_hw_onecell_data *provided_clocks;
 
@@ -131,6 +124,27 @@ int msm_dsi_dphy_timing_calc_v4(struct msm_dsi_dphy_timing *timing,
 				struct msm_dsi_phy_clk_request *clk_req);
 void msm_dsi_phy_set_src_pll(struct msm_dsi_phy *phy, int pll_id, u32 reg,
 				u32 bit_mask);
+/* PLL accessors */
+static inline void pll_write(void __iomem *reg, u32 data)
+{
+	msm_writel(data, reg);
+}
+
+static inline u32 pll_read(const void __iomem *reg)
+{
+	return msm_readl(reg);
+}
+
+static inline void pll_write_udelay(void __iomem *reg, u32 data, u32 delay_us)
+{
+	pll_write(reg, data);
+	udelay(delay_us);
+}
+
+static inline void pll_write_ndelay(void __iomem *reg, u32 data, u32 delay_ns)
+{
+	pll_write((reg), data);
+	ndelay(delay_ns);
+}
 
 #endif /* __DSI_PHY_H__ */
-
