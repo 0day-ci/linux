@@ -122,7 +122,7 @@ out:
  * Private to usb-acpi, all the core needs to know is that
  * port_dev->location is non-zero when it has been set by the firmware.
  */
-#define USB_ACPI_LOCATION_VALID (1 << 31)
+#define USB_ACPI_LOCATION_VALID BIT(31)
 
 static struct acpi_device *usb_acpi_find_port(struct acpi_device *parent,
 					      int raw)
