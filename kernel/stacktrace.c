@@ -71,13 +71,6 @@ EXPORT_SYMBOL_GPL(stack_trace_snprint);
 
 #ifdef CONFIG_ARCH_STACKWALK
 
-struct stacktrace_cookie {
-	unsigned long	*store;
-	unsigned int	size;
-	unsigned int	skip;
-	unsigned int	len;
-};
-
 static bool stack_trace_consume_entry(void *cookie, unsigned long addr)
 {
 	struct stacktrace_cookie *c = cookie;
