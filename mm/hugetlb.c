@@ -2284,7 +2284,9 @@ retry:
 		goto unlock;
 	} else if (page_count(old_page)) {
 		/*
-		 * Someone has grabbed the page, fail for now.
+		 * Someone has grabbed the page, return -EBUSY so we give
+		 * isolate_or_dissolve_huge_page a chance to handle an in-use
+		 * page.
 		 */
 		ret = -EBUSY;
 		update_and_free_page(h, new_page);
@@ -2316,10 +2318,12 @@ unlock:
 	return ret;
 }
 
-int isolate_or_dissolve_huge_page(struct page *page)
+int isolate_or_dissolve_huge_page(struct page *page, struct list_head *list)
 {
 	struct hstate *h;
 	struct page *head;
+	bool try_again = true;
+	int ret = -EBUSY;
 
 	/*
 	 * The page might have been dissolved from under our feet, so make sure
@@ -2344,7 +2348,19 @@ int isolate_or_dissolve_huge_page(struct page *page)
 	if (hstate_is_gigantic(h))
 		return -ENOMEM;
 
-	return alloc_and_dissolve_huge_page(h, head);
+retry:
+	if (page_count(head) && isolate_huge_page(head, list)) {
+		ret = 0;
+	} else if (!page_count(head)) {
+		ret = alloc_and_dissolve_huge_page(h, head);
+
+		if (ret == -EBUSY && try_again) {
+			try_again = false;
+			goto retry;
+		}
+	}
+
+	return ret;
 }
 
 struct page *alloc_huge_page(struct vm_area_struct *vma,
