@@ -847,9 +847,9 @@ void msm_dsi_phy_set_usecase(struct msm_dsi_phy *phy,
 
 void msm_dsi_phy_save_state(struct msm_dsi_phy *phy)
 {
-	if (phy->cfg->pll_ops.save_state) {
-		phy->cfg->pll_ops.save_state(phy->pll);
-		phy->pll->state_saved = true;
+	if (phy->cfg->ops.save_state) {
+		phy->cfg->ops.save_state(phy);
+		phy->state_saved = true;
 	}
 }
 
@@ -857,12 +857,12 @@ int msm_dsi_phy_restore_state(struct msm_dsi_phy *phy)
 {
 	int ret;
 
-	if (phy->cfg->pll_ops.restore_state && phy->pll->state_saved) {
-		ret = phy->cfg->pll_ops.restore_state(phy->pll);
+	if (phy->cfg->ops.restore_state && phy->state_saved) {
+		ret = phy->cfg->ops.restore_state(phy);
 		if (ret)
 			return ret;
 
-		phy->pll->state_saved = false;
+		phy->state_saved = false;
 	}
 
 	return 0;
