@@ -931,6 +931,8 @@ static bool check_ext_ctrls(struct v4l2_ext_controls *c, unsigned long ioctl)
 	case V4L2_CTRL_WHICH_DEF_VAL:
 	case V4L2_CTRL_WHICH_CUR_VAL:
 		return true;
+	case V4L2_CTRL_WHICH_REQUEST_VAL:
+		return false;
 	}
 
 	/* Check that all controls are from the same control class. */
