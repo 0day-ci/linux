@@ -650,3 +650,45 @@ void core_tpg_remove_lun(
 
 	percpu_ref_exit(&lun->lun_ref);
 }
+
+
+static ssize_t core_tpg_base_enable_show(struct config_item *item, char *page)
+{
+	return sprintf(page, "%d\n", to_tpg(item)->enabled);
+}
+
+static ssize_t core_tpg_base_enable_store(struct config_item *item,
+					  const char *page, size_t count)
+{
+	struct se_portal_group *se_tpg = to_tpg(item);
+	int ret;
+	u32 op;
+
+	ret = kstrtou32(page, 0, &op);
+	if (ret)
+		return ret;
+	if ((op != 1) && (op != 0)) {
+		pr_err("Illegal value for tpg_enable: %u\n", op);
+		return -EINVAL;
+	}
+
+	if (se_tpg->enabled == op)
+		return count;
+
+	if (se_tpg->se_tpg_tfo->fabric_enable_tpg)
+		ret = se_tpg->se_tpg_tfo->fabric_enable_tpg(se_tpg, op);
+
+	if (ret)
+		return ret;
+
+	se_tpg->enabled = op;
+
+	return count;
+}
+
+CONFIGFS_ATTR(core_tpg_base_, enable);
+
+struct configfs_attribute *core_tpg_base_attrs[] = {
+	&core_tpg_base_attr_enable,
+	NULL,
+};
