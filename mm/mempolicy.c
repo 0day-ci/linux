@@ -2357,7 +2357,7 @@ EXPORT_SYMBOL(alloc_pages_vma);
 struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 {
 	struct mempolicy *pol = &default_policy;
-	struct page *page;
+	int nid = NUMA_NO_NODE;
 
 	if (!in_interrupt() && !(gfp & __GFP_THISNODE))
 		pol = get_task_policy(current);
@@ -2367,14 +2367,9 @@ struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 	 * nor system default_policy
 	 */
 	if (pol->mode == MPOL_INTERLEAVE)
-		page = alloc_pages_policy(pol, gfp, order,
-					  interleave_nodes(pol));
-	else
-		page = __alloc_pages_nodemask(gfp, order,
-				policy_node(gfp, pol, numa_node_id()),
-				policy_nodemask(gfp, pol));
+		nid = interleave_nodes(pol);
 
-	return page;
+	return alloc_pages_policy(pol, gfp, order, nid);
 }
 EXPORT_SYMBOL(alloc_pages_current);
 
