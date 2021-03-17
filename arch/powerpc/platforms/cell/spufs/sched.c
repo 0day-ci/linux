@@ -904,8 +904,7 @@ static noinline void spusched_tick(struct spu_context *ctx)
 	struct spu_context *new = NULL;
 	struct spu *spu = NULL;
 
-	if (spu_acquire(ctx))
-		BUG();	/* a kernel thread never has signals pending */
+	WARN_ON(spu_acquire(ctx));	/* a kernel thread never has signals pending */
 
 	if (ctx->state != SPU_STATE_RUNNABLE)
 		goto out;
