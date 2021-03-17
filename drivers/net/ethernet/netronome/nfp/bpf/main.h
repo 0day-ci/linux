@@ -346,8 +346,6 @@ struct nfp_insn_meta {
 	struct list_head l;
 };
 
-#define BPF_SIZE_MASK	0x18
-
 static inline u8 mbpf_class(const struct nfp_insn_meta *meta)
 {
 	return BPF_CLASS(meta->insn.code);
