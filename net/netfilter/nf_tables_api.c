@@ -7090,6 +7090,7 @@ static int nf_tables_delflowtable(struct net *net, struct sock *nlsk,
 	const struct nlattr *attr;
 	struct nft_table *table;
 	struct nft_ctx ctx;
+	int err;
 
 	if (!nla[NFTA_FLOWTABLE_TABLE] ||
 	    (!nla[NFTA_FLOWTABLE_NAME] &&
@@ -7118,8 +7119,11 @@ static int nf_tables_delflowtable(struct net *net, struct sock *nlsk,
 
 	nft_ctx_init(&ctx, net, skb, nlh, family, table, NULL, nla);
 
-	if (nla[NFTA_FLOWTABLE_HOOK])
-		return nft_delflowtable_hook(&ctx, flowtable);
+	if (nla[NFTA_FLOWTABLE_HOOK]) {
+		err = nft_delflowtable_hook(&ctx, flowtable);
+		if (err < 0)
+			return err;
+	}
 
 	if (flowtable->use > 0) {
 		NL_SET_BAD_ATTR(extack, attr);
