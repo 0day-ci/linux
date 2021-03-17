@@ -427,6 +427,7 @@ static const struct mempolicy_operations mpol_ops[MPOL_MAX] = {
 		.create = mpol_new_bind,
 		.rebind = mpol_rebind_nodemask,
 	},
+	/* [MPOL_LOCAL] - see mpol_new() */
 };
 
 static int migrate_page_add(struct page *page, struct list_head *pagelist,
