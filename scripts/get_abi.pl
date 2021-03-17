@@ -305,7 +305,7 @@ sub output_rest {
 		}
 
 		my $w = $what;
-		$w =~ s/([\(\)\_\-\*\=\^\~\\])/\\$1/g;
+		$w =~ s/([\(\)\_\-\*\=\^\~\\\<\>])/\\$1/g;
 
 		if ($type ne "File") {
 			my $cur_part = $what;
