@@ -1220,9 +1220,6 @@ static void scsi_sequential_lun_scan(struct scsi_target *starget,
 	u64 sparse_lun, lun;
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 
-	SCSI_LOG_SCAN_BUS(3, starget_printk(KERN_INFO, starget,
-		"scsi scan: Sequential scan\n"));
-
 	max_dev_lun = min(max_scsi_luns, shost->max_lun);
 	/*
 	 * If this device is known to support sparse multiple units,
@@ -1272,6 +1269,8 @@ static void scsi_sequential_lun_scan(struct scsi_target *starget,
 	else
 		max_dev_lun = min(256U, max_dev_lun);
 
+	SCSI_LOG_SCAN_BUS(3, starget_printk(KERN_INFO, starget,
+		"scsi scan: Sequential scan, max LUNs:%u\n", max_dev_lun));
 	/*
 	 * We have already scanned LUN 0, so start at LUN 1. Keep scanning
 	 * until we reach the max, or no LUN is found and we are not
@@ -1432,7 +1431,7 @@ retry:
 	num_luns = (length / sizeof(struct scsi_lun));
 
 	SCSI_LOG_SCAN_BUS(3, sdev_printk (KERN_INFO, sdev,
-		"scsi scan: REPORT LUN scan\n"));
+		"scsi scan: REPORT LUN scan, total LUNs%u\n", num_luns));
 
 	/*
 	 * Scan the luns in lun_data. The entry at offset 0 is really
