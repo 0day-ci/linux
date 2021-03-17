@@ -688,12 +688,19 @@ uint64_t kvm_get_feature_msr(uint64_t msr_index)
 		struct kvm_msr_entry entry;
 	} buffer = {};
 	int r, kvm_fd;
+	struct kvm_msr_list features_list;
 
 	buffer.header.nmsrs = 1;
 	buffer.entry.index = msr_index;
+	features_list.nmsrs = 1;
+
 	kvm_fd = open(KVM_DEV_PATH, O_RDONLY);
 	if (kvm_fd < 0)
 		exit(KSFT_SKIP);
+
+	r = ioctl(kvm_fd, KVM_GET_MSR_FEATURE_INDEX_LIST, &features_list);
+	TEST_ASSERT(r < 0 && r != -E2BIG, "KVM_GET_MSR_FEATURE_INDEX_LIST IOCTL failed,\n"
+		"  rc: %i errno: %i", r, errno);
 
 	r = ioctl(kvm_fd, KVM_GET_MSRS, &buffer.header);
 	TEST_ASSERT(r == 1, "KVM_GET_MSRS IOCTL failed,\n"
