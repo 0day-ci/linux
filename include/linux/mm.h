@@ -1349,6 +1349,9 @@ static inline void __page_cpupid_reset_last(struct page *page)
 
 static inline void page_cpupid_reset_last(struct page *page)
 {
+	if (page_cpupid_last(page) == (-1 & LAST_CPUPID_MASK))
+		return;
+
 	page_cpupid_xchg_last(page, (1 << LAST_CPUPID_SHIFT) - 1);
 }
 
