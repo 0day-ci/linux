@@ -36,10 +36,6 @@
  *                                                  dsi0_pll_post_out_div_clk
  */
 
-#define DSI_BYTE_PLL_CLK		0
-#define DSI_PIXEL_PLL_CLK		1
-#define NUM_PROVIDED_CLKS		2
-
 #define VCO_REF_CLK_RATE		19200000
 
 struct dsi_pll_regs {
@@ -112,9 +108,6 @@ struct dsi_pll_10nm {
 	struct clk_hw *post_out_div_clk_hw;
 	struct clk_hw *pclk_mux_hw;
 	struct clk_hw *out_dsiclk_hw;
-
-	/* clock-provider: */
-	struct clk_hw_onecell_data *hw_data;
 
 	struct pll_10nm_cached_state cached_state;
 
@@ -621,10 +614,8 @@ static int dsi_pll_10nm_set_usecase(struct msm_dsi_pll *pll,
 static void dsi_pll_10nm_destroy(struct msm_dsi_pll *pll)
 {
 	struct dsi_pll_10nm *pll_10nm = to_pll_10nm(pll);
-	struct device *dev = &pll_10nm->pdev->dev;
 
 	DBG("DSI PLL%d", pll_10nm->id);
-	of_clk_del_provider(dev->of_node);
 
 	clk_hw_unregister_divider(pll_10nm->out_dsiclk_hw);
 	clk_hw_unregister_mux(pll_10nm->pclk_mux_hw);
@@ -642,7 +633,7 @@ static void dsi_pll_10nm_destroy(struct msm_dsi_pll *pll)
  * state to follow the master PLL's divider/mux state. Therefore, we don't
  * require special clock ops that also configure the slave PLL registers
  */
-static int pll_10nm_register(struct dsi_pll_10nm *pll_10nm)
+static int pll_10nm_register(struct dsi_pll_10nm *pll_10nm, struct clk_hw_onecell_data *provided_clocks)
 {
 	char clk_name[32], parent[32], vco_name[32];
 	char parent2[32], parent3[32], parent4[32];
@@ -654,17 +645,10 @@ static int pll_10nm_register(struct dsi_pll_10nm *pll_10nm)
 		.ops = &clk_ops_dsi_pll_10nm_vco,
 	};
 	struct device *dev = &pll_10nm->pdev->dev;
-	struct clk_hw_onecell_data *hw_data;
 	struct clk_hw *hw;
 	int ret;
 
 	DBG("DSI%d", pll_10nm->id);
-
-	hw_data = devm_kzalloc(dev, sizeof(*hw_data) +
-			       NUM_PROVIDED_CLKS * sizeof(struct clk_hw *),
-			       GFP_KERNEL);
-	if (!hw_data)
-		return -ENOMEM;
 
 	snprintf(vco_name, 32, "dsi%dvco_clk", pll_10nm->id);
 	pll_10nm->base.clk_hw.init = &vco_init;
@@ -717,7 +701,7 @@ static int pll_10nm_register(struct dsi_pll_10nm *pll_10nm)
 	}
 
 	pll_10nm->byte_clk_hw = hw;
-	hw_data->hws[DSI_BYTE_PLL_CLK] = hw;
+	provided_clocks->hws[DSI_BYTE_PLL_CLK] = hw;
 
 	snprintf(clk_name, 32, "dsi%d_pll_by_2_bit_clk", pll_10nm->id);
 	snprintf(parent, 32, "dsi%d_pll_bit_clk", pll_10nm->id);
@@ -777,22 +761,10 @@ static int pll_10nm_register(struct dsi_pll_10nm *pll_10nm)
 	}
 
 	pll_10nm->out_dsiclk_hw = hw;
-	hw_data->hws[DSI_PIXEL_PLL_CLK] = hw;
-
-	hw_data->num = NUM_PROVIDED_CLKS;
-	pll_10nm->hw_data = hw_data;
-
-	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-				     pll_10nm->hw_data);
-	if (ret) {
-		DRM_DEV_ERROR(dev, "failed to register clk provider: %d\n", ret);
-		goto err_dsiclk_hw;
-	}
+	provided_clocks->hws[DSI_PIXEL_PLL_CLK] = hw;
 
 	return 0;
 
-err_dsiclk_hw:
-	clk_hw_unregister_divider(pll_10nm->out_dsiclk_hw);
 err_pclk_mux_hw:
 	clk_hw_unregister_mux(pll_10nm->pclk_mux_hw);
 err_post_out_div_clk_hw:
@@ -848,7 +820,7 @@ static int dsi_pll_10nm_init(struct msm_dsi_phy *phy)
 
 	pll_10nm->vco_delay = 1;
 
-	ret = pll_10nm_register(pll_10nm);
+	ret = pll_10nm_register(pll_10nm, phy->provided_clocks);
 	if (ret) {
 		DRM_DEV_ERROR(&pdev->dev, "failed to register PLL: %d\n", ret);
 		return ret;

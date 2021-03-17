@@ -34,14 +34,9 @@
 #define POLL_MAX_READS			15
 #define POLL_TIMEOUT_US			1000
 
-#define NUM_PROVIDED_CLKS		2
-
 #define VCO_REF_CLK_RATE		19200000
 #define VCO_MIN_RATE			1300000000UL
 #define VCO_MAX_RATE			2600000000UL
-
-#define DSI_BYTE_PLL_CLK		0
-#define DSI_PIXEL_PLL_CLK		1
 
 #define DSI_PLL_DEFAULT_VCO_POSTDIV	1
 
@@ -141,9 +136,6 @@ struct dsi_pll_14nm {
 	/* private clocks: */
 	struct clk_hw *hws[NUM_DSI_CLOCKS_MAX];
 	u32 num_hws;
-
-	/* clock-provider: */
-	struct clk_hw_onecell_data *hw_data;
 
 	struct pll_14nm_cached_state cached_state;
 
@@ -883,10 +875,7 @@ static int dsi_pll_14nm_set_usecase(struct msm_dsi_pll *pll,
 static void dsi_pll_14nm_destroy(struct msm_dsi_pll *pll)
 {
 	struct dsi_pll_14nm *pll_14nm = to_pll_14nm(pll);
-	struct platform_device *pdev = pll_14nm->pdev;
 	int num_hws = pll_14nm->num_hws;
-
-	of_clk_del_provider(pdev->dev.of_node);
 
 	while (num_hws--)
 		clk_hw_unregister(pll_14nm->hws[num_hws]);
@@ -928,7 +917,7 @@ static struct clk_hw *pll_14nm_postdiv_register(struct dsi_pll_14nm *pll_14nm,
 	return &pll_postdiv->hw;
 }
 
-static int pll_14nm_register(struct dsi_pll_14nm *pll_14nm)
+static int pll_14nm_register(struct dsi_pll_14nm *pll_14nm, struct clk_hw_onecell_data *provided_clocks)
 {
 	char clk_name[32], parent[32], vco_name[32];
 	struct clk_init_data vco_init = {
@@ -940,18 +929,11 @@ static int pll_14nm_register(struct dsi_pll_14nm *pll_14nm)
 	};
 	struct device *dev = &pll_14nm->pdev->dev;
 	struct clk_hw **hws = pll_14nm->hws;
-	struct clk_hw_onecell_data *hw_data;
 	struct clk_hw *hw;
 	int num = 0;
 	int ret;
 
 	DBG("DSI%d", pll_14nm->id);
-
-	hw_data = devm_kzalloc(dev, sizeof(*hw_data) +
-			       NUM_PROVIDED_CLKS * sizeof(struct clk_hw *),
-			       GFP_KERNEL);
-	if (!hw_data)
-		return -ENOMEM;
 
 	snprintf(vco_name, 32, "dsi%dvco_clk", pll_14nm->id);
 	pll_14nm->base.clk_hw.init = &vco_init;
@@ -983,7 +965,7 @@ static int pll_14nm_register(struct dsi_pll_14nm *pll_14nm)
 		return PTR_ERR(hw);
 
 	hws[num++] = hw;
-	hw_data->hws[DSI_BYTE_PLL_CLK] = hw;
+	provided_clocks->hws[DSI_BYTE_PLL_CLK] = hw;
 
 	snprintf(clk_name, 32, "dsi%dn1_postdivby2_clk", pll_14nm->id);
 	snprintf(parent, 32, "dsi%dn1_postdiv_clk", pll_14nm->id);
@@ -1010,19 +992,9 @@ static int pll_14nm_register(struct dsi_pll_14nm *pll_14nm)
 		return PTR_ERR(hw);
 
 	hws[num++] = hw;
-	hw_data->hws[DSI_PIXEL_PLL_CLK]	= hw;
+	provided_clocks->hws[DSI_PIXEL_PLL_CLK]	= hw;
 
 	pll_14nm->num_hws = num;
-
-	hw_data->num = NUM_PROVIDED_CLKS;
-	pll_14nm->hw_data = hw_data;
-
-	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-				     pll_14nm->hw_data);
-	if (ret) {
-		DRM_DEV_ERROR(dev, "failed to register clk provider: %d\n", ret);
-		return ret;
-	}
 
 	return 0;
 }
@@ -1067,7 +1039,7 @@ static int dsi_pll_14nm_init(struct msm_dsi_phy *phy)
 
 	pll_14nm->vco_delay = 1;
 
-	ret = pll_14nm_register(pll_14nm);
+	ret = pll_14nm_register(pll_14nm, phy->provided_clocks);
 	if (ret) {
 		DRM_DEV_ERROR(&pdev->dev, "failed to register PLL: %d\n", ret);
 		return ret;
