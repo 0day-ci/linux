@@ -344,9 +344,7 @@ int notify_change(struct user_namespace *mnt_userns, struct dentry *dentry,
 	 * no function will ever call notify_change with both ATTR_MODE and
 	 * ATTR_KILL_S*ID set.
 	 */
-	if ((ia_valid & (ATTR_KILL_SUID|ATTR_KILL_SGID)) &&
-	    (ia_valid & ATTR_MODE))
-		BUG();
+	BUG_ON((ia_valid & (ATTR_KILL_SUID|ATTR_KILL_SGID)) && (ia_valid & ATTR_MODE));
 
 	if (ia_valid & ATTR_KILL_SUID) {
 		if (mode & S_ISUID) {
