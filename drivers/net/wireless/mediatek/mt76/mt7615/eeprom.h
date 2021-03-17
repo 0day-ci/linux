@@ -64,7 +64,11 @@ enum mt7615_eeprom_field {
 #define MT_EE_NIC_CONF_TSSI_2G			BIT(5)
 #define MT_EE_NIC_CONF_TSSI_5G			BIT(6)
 
+#define MT_EE_NIC_WIFI_CONF_BAND_PALNA		GENMASK(3, 2)
+#define MT_EE_NIC_WIFI_CONF_IPA_ELNA		0x1
+#define MT_EE_NIC_WIFI_CONF_EPA_ELNA		0x2
 #define MT_EE_NIC_WIFI_CONF_BAND_SEL		GENMASK(5, 4)
+
 enum mt7615_eeprom_band {
 	MT_EE_DUAL_BAND,
 	MT_EE_5GHZ,

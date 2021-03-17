@@ -6,6 +6,7 @@
  */
 
 #include <linux/of.h>
+#include <linux/pinctrl/consumer.h>
 #include "mt7615.h"
 #include "eeprom.h"
 
@@ -135,12 +136,40 @@ mt7615_eeprom_parse_hw_band_cap(struct mt7615_dev *dev)
 	}
 }
 
+static void mt7615_eeprom_parse_hw_epa_cap(struct mt7615_dev *dev)
+{
+	struct pinctrl_state *state;
+	struct pinctrl *pinctrl;
+	u8 i, *eeprom = dev->mt76.eeprom.data;
+
+	if (!is_mt7622(&dev->mt76))
+		return;
+
+	i = FIELD_GET(MT_EE_NIC_WIFI_CONF_BAND_PALNA, eeprom[MT_EE_WIFI_CONF]);
+	if (i != MT_EE_NIC_WIFI_CONF_EPA_ELNA &&
+	    i != MT_EE_NIC_WIFI_CONF_IPA_ELNA)
+		return;
+
+	pinctrl = devm_pinctrl_get(dev->mt76.dev);
+	if (IS_ERR(pinctrl))
+		return;
+
+	state = pinctrl_lookup_state(pinctrl, "epa-state");
+	if (IS_ERR(state))
+		goto out;
+
+	pinctrl_select_state(pinctrl, state);
+out:
+	devm_pinctrl_put(pinctrl);
+}
+
 static void mt7615_eeprom_parse_hw_cap(struct mt7615_dev *dev)
 {
 	u8 *eeprom = dev->mt76.eeprom.data;
 	u8 tx_mask, max_nss;
 
 	mt7615_eeprom_parse_hw_band_cap(dev);
+	mt7615_eeprom_parse_hw_epa_cap(dev);
 
 	if (is_mt7663(&dev->mt76)) {
 		max_nss = 2;
