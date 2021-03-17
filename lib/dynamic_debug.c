@@ -632,6 +632,9 @@ static char *dynamic_emit_prefix(const struct _ddebug *dp, char *buf)
 	}
 	pos_after_tid = pos;
 
+	if (!(dp->flags & _DPRINTK_FLAGS_INCL_ANYSITE))
+		return buf;
+
 	if (desc) {
 		if (dp->flags & _DPRINTK_FLAGS_INCL_MODNAME)
 			pos += snprintf(buf + pos, remaining(pos), "%s:",
