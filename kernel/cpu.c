@@ -15,6 +15,7 @@
 #include <linux/sched/smt.h>
 #include <linux/unistd.h>
 #include <linux/cpu.h>
+#include <linux/cpuset.h>
 #include <linux/oom.h>
 #include <linux/rcupdate.h>
 #include <linux/export.h>
@@ -1301,7 +1302,17 @@ out:
  */
 int cpu_device_up(struct device *dev)
 {
-	return cpu_up(dev->id, CPUHP_ONLINE);
+	int err;
+
+	err = cpu_up(dev->id, CPUHP_ONLINE);
+	/*
+	 * Wait for cpuset updates to cpumasks to finish.  Later on this path
+	 * may generate uevents whose consumers rely on the updates.
+	 */
+	if (!err)
+		cpuset_wait_for_hotplug();
+
+	return err;
 }
 
 int add_cpu(unsigned int cpu)
@@ -2084,8 +2095,13 @@ static void cpuhp_online_cpu_device(unsigned int cpu)
 
 int cpuhp_smt_disable(enum cpuhp_smt_control ctrlval)
 {
-	int cpu, ret = 0;
+	cpumask_var_t mask;
+	int cpu, ret;
 
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	ret = 0;
 	cpu_maps_update_begin();
 	for_each_online_cpu(cpu) {
 		if (topology_is_primary_thread(cpu))
@@ -2093,31 +2109,42 @@ int cpuhp_smt_disable(enum cpuhp_smt_control ctrlval)
 		ret = cpu_down_maps_locked(cpu, CPUHP_OFFLINE);
 		if (ret)
 			break;
-		/*
-		 * As this needs to hold the cpu maps lock it's impossible
-		 * to call device_offline() because that ends up calling
-		 * cpu_down() which takes cpu maps lock. cpu maps lock
-		 * needs to be held as this might race against in kernel
-		 * abusers of the hotplug machinery (thermal management).
-		 *
-		 * So nothing would update device:offline state. That would
-		 * leave the sysfs entry stale and prevent onlining after
-		 * smt control has been changed to 'off' again. This is
-		 * called under the sysfs hotplug lock, so it is properly
-		 * serialized against the regular offline usage.
-		 */
-		cpuhp_offline_cpu_device(cpu);
+
+		cpumask_set_cpu(cpu, mask);
 	}
 	if (!ret)
 		cpu_smt_control = ctrlval;
 	cpu_maps_update_done();
+
+	/*
+	 * When the cpu maps lock was taken above it was impossible
+	 * to call device_offline() because that ends up calling
+	 * cpu_down() which takes cpu maps lock. cpu maps lock
+	 * needed to be held as this might race against in-kernel
+	 * abusers of the hotplug machinery (thermal management).
+	 *
+	 * So nothing would update device:offline state. That would
+	 * leave the sysfs entry stale and prevent onlining after
+	 * smt control has been changed to 'off' again. This is
+	 * called under the sysfs hotplug lock, so it is properly
+	 * serialized against the regular offline usage.
+	 */
+	for_each_cpu(cpu, mask)
+		cpuhp_offline_cpu_device(cpu);
+
+	free_cpumask_var(mask);
 	return ret;
 }
 
 int cpuhp_smt_enable(void)
 {
-	int cpu, ret = 0;
+	cpumask_var_t mask;
+	int cpu, ret;
 
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	ret = 0;
 	cpu_maps_update_begin();
 	cpu_smt_control = CPU_SMT_ENABLED;
 	for_each_present_cpu(cpu) {
@@ -2128,9 +2155,20 @@ int cpuhp_smt_enable(void)
 		if (ret)
 			break;
 		/* See comment in cpuhp_smt_disable() */
-		cpuhp_online_cpu_device(cpu);
+		cpumask_set_cpu(cpu, mask);
 	}
 	cpu_maps_update_done();
+
+	/*
+	 * Wait for cpuset updates to cpumasks to finish.  Later on this path
+	 * may generate uevents whose consumers rely on the updates.
+	 */
+	cpuset_wait_for_hotplug();
+
+	for_each_cpu(cpu, mask)
+		cpuhp_online_cpu_device(cpu);
+
+	free_cpumask_var(mask);
 	return ret;
 }
 #endif
