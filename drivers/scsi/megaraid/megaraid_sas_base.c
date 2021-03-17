@@ -426,6 +426,12 @@ megasas_decode_evt(struct megasas_instance *instance)
 			(class_locale.members.locale),
 			format_class(class_locale.members.class),
 			evt_detail->description);
+
+	if (megasas_dbg_lvl & LD_PD_DEBUG)
+		dev_info(&instance->pdev->dev,
+			 "evt_detail.args.ld.target_id/index %d/%d\n",
+			 evt_detail->args.ld.target_id, evt_detail->args.ld.ld_index);
+
 }
 
 /*
@@ -1802,7 +1808,8 @@ megasas_queue_command(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 	}
 
 	mr_device_priv_data = scmd->device->hostdata;
-	if (!mr_device_priv_data) {
+	if (!mr_device_priv_data ||
+	    mr_device_priv_data->device_removed_by_fw) {
 		scmd->result = DID_NO_CONNECT << 16;
 		scmd->scsi_done(scmd);
 		return 0;
@@ -3491,6 +3498,39 @@ megasas_complete_abort(struct megasas_instance *instance,
 	}
 }
 
+void
+megasas_set_sdev_removed_by_fw(struct megasas_instance *instance)
+{
+	struct scsi_device *sdev;
+	struct MR_PRIV_DEVICE *mr_device_priv_data;
+	uint channel, id, i;
+
+	for (i = 0; (i < MEGASAS_MAX_LD_IDS); i++) {
+		if (instance->ld_ids_prev[i] != 0xff &&
+		    instance->ld_ids_from_raidmap[i] == 0xff) {
+			channel = MEGASAS_MAX_PD_CHANNELS +
+					(instance->ld_ids_prev[i] /
+					MEGASAS_MAX_DEV_PER_CHANNEL);
+			id = (instance->ld_ids_prev[i] %
+				MEGASAS_MAX_DEV_PER_CHANNEL);
+
+			if (megasas_dbg_lvl & LD_PD_DEBUG)
+				dev_info(&instance->pdev->dev,
+					 "index %d old 0x%x new 0x%x from %s\n",
+					 i, instance->ld_ids_prev[i],
+					 instance->ld_ids_from_raidmap[i],
+					 __func__);
+
+			sdev = scsi_device_lookup(instance->host, channel, id, 0);
+			if (sdev) {
+				mr_device_priv_data = sdev->hostdata;
+				mr_device_priv_data->device_removed_by_fw = true;
+				scsi_device_put(sdev);
+			}
+		}
+	}
+}
+
 /**
  * megasas_complete_cmd -	Completes a command
  * @instance:			Adapter soft state
@@ -3656,6 +3696,10 @@ megasas_complete_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd,
 			megasas_sync_map_info(instance);
 			spin_unlock_irqrestore(instance->host->host_lock,
 					       flags);
+
+			if (instance->adapter_type >= INVADER_SERIES)
+				megasas_set_sdev_removed_by_fw(instance);
+
 			break;
 		}
 		if (opcode == MR_DCMD_CTRL_EVENT_GET_INFO ||
@@ -8764,8 +8808,10 @@ megasas_aen_polling(struct work_struct *work)
 	union megasas_evt_class_locale class_locale;
 	int event_type = 0;
 	u32 seq_num;
+	u16 ld_target_id;
 	int error;
 	u8  dcmd_ret = DCMD_SUCCESS;
+	struct scsi_device *sdev1;
 
 	if (!instance) {
 		printk(KERN_ERR "invalid instance!\n");
@@ -8788,12 +8834,23 @@ megasas_aen_polling(struct work_struct *work)
 			break;
 
 		case MR_EVT_LD_OFFLINE:
-		case MR_EVT_CFG_CLEARED:
 		case MR_EVT_LD_DELETED:
+			ld_target_id = instance->evt_detail->args.ld.target_id;
+			sdev1 = scsi_device_lookup(instance->host,
+						   MEGASAS_MAX_PD_CHANNELS +
+						   (ld_target_id / MEGASAS_MAX_DEV_PER_CHANNEL),
+						   (ld_target_id - MEGASAS_MAX_DEV_PER_CHANNEL),
+						   0);
+			if (sdev1)
+				megasas_remove_scsi_device(sdev1);
+
+			event_type = SCAN_VD_CHANNEL;
+			break;
 		case MR_EVT_LD_CREATED:
 			event_type = SCAN_VD_CHANNEL;
 			break;
 
+		case MR_EVT_CFG_CLEARED:
 		case MR_EVT_CTRL_HOST_BUS_SCAN_REQUESTED:
 		case MR_EVT_FOREIGN_CFG_IMPORTED:
 		case MR_EVT_LD_STATE_CHANGE:
