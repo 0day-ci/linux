@@ -2335,6 +2335,11 @@ void security_sctp_sk_clone(struct sctp_endpoint *ep, struct sock *sk,
 }
 EXPORT_SYMBOL(security_sctp_sk_clone);
 
+void security_vsock_sk_clone(struct sock *sock, struct sock *newsk)
+{
+	call_void_hook(vsock_sk_clone, sock, newsk);
+}
+EXPORT_SYMBOL(security_vsock_sk_clone);
 #endif	/* CONFIG_SECURITY_NETWORK */
 
 #ifdef CONFIG_SECURITY_INFINIBAND

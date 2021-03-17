@@ -1033,6 +1033,13 @@
  *	@sk pointer to current sock structure.
  *	@sk pointer to new sock structure.
  *
+ * Security hooks for vSockets
+ *
+ * @vsock_sk_clone:
+ *	Clone SID from the server socket to a newly connected child socket.
+ *	@sock contains the sock structure.
+ *	@newsk contains the new sock structure.
+ *
  * Security hooks for Infiniband
  *
  * @ib_pkey_access:
