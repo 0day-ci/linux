@@ -1025,6 +1025,11 @@ void perf_stat__set_big_num(int set)
 	stat_config.big_num = (set != 0);
 }
 
+void perf_stat__set_no_cvs_summary(int set)
+{
+	stat_config.no_cvs_summary = (set != 0);
+}
+
 static int stat__set_big_num(const struct option *opt __maybe_unused,
 			     const char *s __maybe_unused, int unset)
 {
@@ -1171,6 +1176,8 @@ static struct option stat_options[] = {
 		    "threads of same physical core"),
 	OPT_BOOLEAN(0, "summary", &stat_config.summary,
 		       "print summary for interval mode"),
+	OPT_BOOLEAN(0, "no-cvs-summary", &stat_config.no_cvs_summary,
+		       "don't print 'summary' for CVS summary output"),
 	OPT_BOOLEAN(0, "quiet", &stat_config.quiet,
 			"don't print output (useful with record)"),
 #ifdef HAVE_LIBPFM

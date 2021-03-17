@@ -120,6 +120,7 @@ struct perf_stat_config {
 	bool			 all_user;
 	bool			 percore_show_thread;
 	bool			 summary;
+	bool			 no_cvs_summary;
 	bool			 metric_no_group;
 	bool			 metric_no_merge;
 	bool			 stop_read_counter;
@@ -151,6 +152,7 @@ struct perf_stat_config {
 };
 
 void perf_stat__set_big_num(int set);
+void perf_stat__set_no_cvs_summary(int set);
 
 void update_stats(struct stats *stats, u64 val);
 double avg_stats(struct stats *stats);
