@@ -66,6 +66,35 @@ struct _ddebug {
 #endif
 } __aligned(8);
 
+/* this pair of header structs correspond quite deeply to struct
+ * _ddebug(|_site)s above; they are also created into __dyndbg*
+ * sections (by DEFINE_DYNAMIC_DEBUG_TABLE), and should be unionized
+ * with them to reinforce this.
+ *
+ * struct _ddebug_header is the important one, it has enough space to
+ * take struct ddebug_table's job, ie: link together into a list, and
+ * keep track of the modname & _ddebug(|_sites) vectors.
+ *
+ * Its other job is handled by its placement in the front of a
+ * module's _ddebug[N] entries.  Each _ddebug knows its N, so the
+ * header's address is computable, and its site pointer is available
+ * to get _ddebug_sites[N].  Then we can drop _ddebug.sites, regaining
+ * parity with original _ddebug footprint.
+ *
+ * Eventually, N will index a fetch from a compressed block, or for
+ * enabled callsites, a hash.  A global hash is probably adequate, if
+ * ~5k elements doesnt degrade access time.
+ */
+struct _ddebug_site_header {
+	/* we have 24 bytes total here, all currently unused */
+} __aligned(8);
+
+struct _ddebug_header {
+	struct _ddebug_site* sites;
+	struct list_head link;
+	const char* mod_name;
+	unsigned num_ddebugs;
+} __aligned(8);
 
 #if defined(CONFIG_DYNAMIC_DEBUG_CORE)
 
