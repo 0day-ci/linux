@@ -2616,7 +2616,7 @@ static inline void wp_page_reuse(struct vm_fault *vmf)
 	 * unrelated process.
 	 */
 	if (page)
-		page_cpupid_xchg_last(page, (1 << LAST_CPUPID_SHIFT) - 1);
+		page_cpupid_reset_last(page);
 
 	flush_cache_page(vma, vmf->address, pte_pfn(vmf->orig_pte));
 	entry = pte_mkyoung(vmf->orig_pte);
