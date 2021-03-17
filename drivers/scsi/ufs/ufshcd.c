@@ -2940,13 +2940,15 @@ static inline void ufshcd_init_query(struct ufs_hba *hba,
 }
 
 static int ufshcd_query_flag_retry(struct ufs_hba *hba,
-	enum query_opcode opcode, enum flag_idn idn, u8 index, bool *flag_res)
+	enum query_opcode opcode, enum flag_idn idn, u8 index, bool *flag_res,
+	u8 selector)
 {
 	int ret;
 	int retries;
 
 	for (retries = 0; retries < QUERY_REQ_RETRIES; retries++) {
-		ret = ufshcd_query_flag(hba, opcode, idn, index, flag_res);
+		ret = ufshcd_query_flag(hba, opcode, idn, index, flag_res,
+					selector);
 		if (ret)
 			dev_dbg(hba->dev,
 				"%s: failed with error %d, retries %d\n",
@@ -2969,15 +2971,17 @@ static int ufshcd_query_flag_retry(struct ufs_hba *hba,
  * @idn: flag idn to access
  * @index: flag index to access
  * @flag_res: the flag value after the query request completes
+ * @selector: selector field
  *
  * Returns 0 for success, non-zero in case of failure
  */
 int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
-			enum flag_idn idn, u8 index, bool *flag_res)
+			enum flag_idn idn, u8 index, bool *flag_res,
+			u8 selector)
 {
 	struct ufs_query_req *request = NULL;
 	struct ufs_query_res *response = NULL;
-	int err, selector = 0;
+	int err;
 	int timeout = QUERY_REQ_TIMEOUT;
 
 	BUG_ON(!hba);
@@ -4331,7 +4335,7 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 	ktime_t timeout;
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_SET_FLAG,
-		QUERY_FLAG_IDN_FDEVICEINIT, 0, NULL);
+		QUERY_FLAG_IDN_FDEVICEINIT, 0, NULL, 0);
 	if (err) {
 		dev_err(hba->dev,
 			"%s setting fDeviceInit flag failed with error %d\n",
@@ -4343,7 +4347,8 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 	timeout = ktime_add_ms(ktime_get(), FDEVICEINIT_COMPL_TIMEOUT);
 	do {
 		err = ufshcd_query_flag(hba, UPIU_QUERY_OPCODE_READ_FLAG,
-					QUERY_FLAG_IDN_FDEVICEINIT, 0, &flag_res);
+					QUERY_FLAG_IDN_FDEVICEINIT, 0, &flag_res,
+					0);
 		if (!flag_res)
 			break;
 		usleep_range(5000, 10000);
@@ -5250,7 +5255,7 @@ static int ufshcd_enable_auto_bkops(struct ufs_hba *hba)
 		goto out;
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_SET_FLAG,
-			QUERY_FLAG_IDN_BKOPS_EN, 0, NULL);
+			QUERY_FLAG_IDN_BKOPS_EN, 0, NULL, 0);
 	if (err) {
 		dev_err(hba->dev, "%s: failed to enable bkops %d\n",
 				__func__, err);
@@ -5300,7 +5305,7 @@ static int ufshcd_disable_auto_bkops(struct ufs_hba *hba)
 	}
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_CLEAR_FLAG,
-			QUERY_FLAG_IDN_BKOPS_EN, 0, NULL);
+			QUERY_FLAG_IDN_BKOPS_EN, 0, NULL, 0);
 	if (err) {
 		dev_err(hba->dev, "%s: failed to disable bkops %d\n",
 				__func__, err);
@@ -5463,7 +5468,7 @@ int ufshcd_wb_ctrl(struct ufs_hba *hba, bool enable)
 
 	index = ufshcd_wb_get_query_index(hba);
 	ret = ufshcd_query_flag_retry(hba, opcode,
-				      QUERY_FLAG_IDN_WB_EN, index, NULL);
+				      QUERY_FLAG_IDN_WB_EN, index, NULL, 0);
 	if (ret) {
 		dev_err(hba->dev, "%s write booster %s failed %d\n",
 			__func__, enable ? "enable" : "disable", ret);
@@ -5490,7 +5495,7 @@ static int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
 	index = ufshcd_wb_get_query_index(hba);
 	return ufshcd_query_flag_retry(hba, val,
 				QUERY_FLAG_IDN_WB_BUFF_FLUSH_DURING_HIBERN8,
-				index, NULL);
+				index, NULL, 0);
 }
 
 static inline int ufshcd_wb_toggle_flush(struct ufs_hba *hba, bool enable)
@@ -5511,7 +5516,7 @@ static inline int ufshcd_wb_toggle_flush(struct ufs_hba *hba, bool enable)
 	index = ufshcd_wb_get_query_index(hba);
 	ret = ufshcd_query_flag_retry(hba, opcode,
 				      QUERY_FLAG_IDN_WB_BUFF_FLUSH_EN, index,
-				      NULL);
+				      NULL, 0);
 	if (ret) {
 		dev_err(hba->dev, "%s WB-Buf Flush %s failed %d\n", __func__,
 			enable ? "enable" : "disable", ret);
@@ -7751,7 +7756,7 @@ static int ufshcd_device_params_init(struct ufs_hba *hba)
 	ufshcd_get_ref_clk_gating_wait(hba);
 
 	if (!ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
-			QUERY_FLAG_IDN_PWR_ON_WPE, 0, &flag))
+			QUERY_FLAG_IDN_PWR_ON_WPE, 0, &flag, 0))
 		hba->dev_info.f_power_on_wp_en = flag;
 
 	/* Probe maximum power mode co-supported by both UFS host and device */
