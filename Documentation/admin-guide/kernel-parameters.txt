@@ -2473,6 +2473,8 @@
 
 			* [no]ncqtrim: Turn off queued DSM TRIM.
 
+			* [no]dmalog: Turn off use of ATA_CMD_READ_LOG_DMA_EXT (0x47) command
+
 			* nohrst, nosrst, norst: suppress hard, soft
 			  and both resets.
 
