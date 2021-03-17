@@ -1415,11 +1415,11 @@ static int read_powermode(struct w1_slave *sl)
 		if (!reset_select_slave(sl)) {
 			w1_write_8(dev_master, W1_READ_PSUPPLY);
 			/*
-			 * Emit a read time slot and read only one bit,
+			 * Emit a read time slot and read a byte,
 			 * 1 is externally powered,
 			 * 0 is parasite powered
 			 */
-			ret = w1_touch_bit(dev_master, 1);
+			ret = w1_read_8(dev_master) ? 1 : 0;
 			/* ret should be either 1 either 0 */
 		}
 	}
