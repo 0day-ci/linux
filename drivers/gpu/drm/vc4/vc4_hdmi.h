@@ -1,6 +1,7 @@
 #ifndef _VC4_HDMI_H_
 #define _VC4_HDMI_H_
 
+#include <drm/drm_bridge.h>
 #include <drm/drm_connector.h>
 #include <media/cec.h>
 #include <sound/dmaengine_pcm.h>
@@ -125,6 +126,7 @@ struct vc4_hdmi {
 
 	struct vc4_hdmi_encoder encoder;
 	struct drm_connector connector;
+	struct vc4_bridge bridge;
 
 	struct i2c_adapter *ddc;
 	void __iomem *hdmicore_regs;
@@ -170,6 +172,12 @@ struct vc4_hdmi {
 	struct debugfs_regset32 hdmi_regset;
 	struct debugfs_regset32 hd_regset;
 };
+
+static inline struct vc4_hdmi *
+bridge_to_vc4_hdmi(struct drm_bridge *bridge)
+{
+	return container_of(bridge, struct vc4_hdmi, bridge.base);
+}
 
 static inline struct vc4_hdmi *
 connector_to_vc4_hdmi(struct drm_connector *connector)
