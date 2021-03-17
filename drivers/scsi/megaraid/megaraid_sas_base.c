@@ -5630,6 +5630,7 @@ megasas_setup_irqs_ioapic(struct megasas_instance *instance)
 	pdev = instance->pdev;
 	instance->irq_context[0].instance = instance;
 	instance->irq_context[0].MSIxIndex = 0;
+	atomic_set(&instance->irq_context[0].in_use, 0);
 	snprintf(instance->irq_context->name, MEGASAS_MSIX_NAME_LEN, "%s%u",
 		"megasas", instance->host->host_no);
 	if (request_irq(pci_irq_vector(pdev, 0),
@@ -5666,6 +5667,7 @@ megasas_setup_irqs_msix(struct megasas_instance *instance, u8 is_probe)
 	for (i = 0; i < instance->msix_vectors; i++) {
 		instance->irq_context[i].instance = instance;
 		instance->irq_context[i].MSIxIndex = i;
+		atomic_set(&instance->irq_context[i].in_use, 0);
 		snprintf(instance->irq_context[i].name, MEGASAS_MSIX_NAME_LEN, "%s%u-msix%u",
 			"megasas", instance->host->host_no, i);
 		if (request_irq(pci_irq_vector(pdev, i),

@@ -2213,6 +2213,7 @@ struct megasas_irq_context {
 	struct irq_poll irqpoll;
 	bool irq_poll_scheduled;
 	bool irq_line_enable;
+	atomic_t in_use;
 };
 
 struct MR_DRV_SYSTEM_INFO {
