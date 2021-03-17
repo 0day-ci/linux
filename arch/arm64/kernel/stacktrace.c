@@ -201,11 +201,12 @@ void arch_stack_walk(stack_trace_consume_fn consume_entry, void *cookie,
 
 	if (regs)
 		start_backtrace(&frame, regs->regs[29], regs->pc);
-	else if (task == current)
+	else if (task == current) {
+		((struct stacktrace_cookie *)cookie)->skip += 2;
 		start_backtrace(&frame,
 				(unsigned long)__builtin_frame_address(0),
 				(unsigned long)arch_stack_walk);
-	else
+	} else
 		start_backtrace(&frame, thread_saved_fp(task),
 				thread_saved_pc(task));
 
