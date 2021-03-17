@@ -205,9 +205,9 @@ MPOL_PREFERRED
 	of increasing distance from the preferred node based on
 	information provided by the platform firmware.
 
-	Internally, the Preferred policy uses a single node--the
-	preferred_node member of struct mempolicy.  When the internal
-	mode flag MPOL_F_LOCAL is set, the preferred_node is ignored
+	Internally, the Preferred policy uses a nodemask--the
+	preferred_nodes member of struct mempolicy.  When the internal
+	mode flag MPOL_F_LOCAL is set, the preferred_nodes are ignored
 	and the policy is interpreted as local allocation.  "Local"
 	allocation policy can be viewed as a Preferred policy that
 	starts at the node containing the cpu where the allocation
