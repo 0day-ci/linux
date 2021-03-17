@@ -3680,7 +3680,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, void *buffer,
 	u32 hdr_size = sizeof(struct ixgbe_hic_hdr);
 	union {
 		struct ixgbe_hic_hdr hdr;
-		u32 u32arr[1];
+		u32 *u32arr;
 	} *bp = buffer;
 	u16 buf_len, dword_len;
 	s32 status;
