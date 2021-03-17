@@ -92,7 +92,7 @@ static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
 		goto out;
 	}
 
-	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+	iter = kmalloc(sizeof(*iter), GFP_KERNEL_ACCOUNT);
 	if (!iter) {
 		iter = ERR_PTR(-ENOMEM);
 		goto out;

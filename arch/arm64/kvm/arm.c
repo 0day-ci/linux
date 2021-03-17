@@ -278,9 +278,10 @@ long kvm_arch_dev_ioctl(struct file *filp,
 struct kvm *kvm_arch_alloc_vm(void)
 {
 	if (!has_vhe())
-		return kzalloc(sizeof(struct kvm), GFP_KERNEL);
+		return kzalloc(sizeof(struct kvm), GFP_KERNEL_ACCOUNT);
 
-	return vzalloc(sizeof(struct kvm));
+	return __vmalloc(sizeof(struct kvm),
+			GFP_KERNEL_ACCOUNT | __GFP_ZERO);
 }
 
 void kvm_arch_free_vm(struct kvm *kvm)
