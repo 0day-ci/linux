@@ -1206,7 +1206,7 @@ static __always_inline bool free_pages_prepare(struct page *page,
 	if (bad)
 		return false;
 
-	page_cpupid_reset_last(page);
+	__page_cpupid_reset_last(page);
 	page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
 	reset_page_owner(page, order);
 
@@ -1392,7 +1392,7 @@ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 	set_page_links(page, zone, nid, pfn);
 	init_page_count(page);
 	page_mapcount_reset(page);
-	page_cpupid_reset_last(page);
+	__page_cpupid_reset_last(page);
 	page_kasan_tag_reset(page);
 
 	INIT_LIST_HEAD(&page->lru);

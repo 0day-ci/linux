@@ -1325,7 +1325,7 @@ static inline int page_cpupid_last(struct page *page)
 {
 	return page->_last_cpupid;
 }
-static inline void page_cpupid_reset_last(struct page *page)
+static inline void __page_cpupid_reset_last(struct page *page)
 {
 	page->_last_cpupid = -1 & LAST_CPUPID_MASK;
 }
@@ -1337,7 +1337,7 @@ static inline int page_cpupid_last(struct page *page)
 
 extern int page_cpupid_xchg_last(struct page *page, int cpupid);
 
-static inline void page_cpupid_reset_last(struct page *page)
+static inline void __page_cpupid_reset_last(struct page *page)
 {
 	page->flags |= LAST_CPUPID_MASK << LAST_CPUPID_PGSHIFT;
 }
@@ -1378,7 +1378,7 @@ static inline bool cpupid_pid_unset(int cpupid)
 	return true;
 }
 
-static inline void page_cpupid_reset_last(struct page *page)
+static inline void __page_cpupid_reset_last(struct page *page)
 {
 }
 
