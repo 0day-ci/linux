@@ -456,6 +456,71 @@ static int ipmi_set_timeout(int do_heartbeat)
 	return rv;
 }
 
+static unsigned int __ipmi_get_timeout(struct ipmi_smi_msg  *smi_msg,
+				       struct ipmi_recv_msg *recv_msg,
+				       int                  *countdown)
+{
+	struct kernel_ipmi_msg            msg;
+	int                               rv = 0;
+	struct ipmi_system_interface_addr addr;
+
+
+	addr.addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
+	addr.channel = IPMI_BMC_CHANNEL;
+	addr.lun = 0;
+
+	msg.netfn = 0x06;
+	msg.cmd = IPMI_WDOG_GET_TIMER;
+	msg.data = NULL;
+	msg.data_len = 0;
+	rv = ipmi_request_supply_msgs(watchdog_user,
+				      (struct ipmi_addr *) &addr,
+				      0,
+				      &msg,
+				      NULL,
+				      smi_msg,
+				      recv_msg,
+				      1);
+	if (rv) {
+		pr_warn("get timeout error: %d\n", rv);
+		return rv;
+	}
+
+	wait_for_completion(&msg_wait);
+
+	if (recv_msg->msg.data_len < 9) {
+		pr_warn("get timeout response size: %d (expected 9)\n",
+			recv_msg->msg.data_len);
+		return -EIO;
+	}
+
+	if (recv_msg->msg.data[0] != 0)  {
+		pr_warn("get timeout completion code error: %d\n",
+			recv_msg->msg.data[0]);
+		return -EIO;
+	}
+
+	*countdown = WDOG_GET_TIMEOUT(recv_msg->msg.data[7], recv_msg->msg.data[8]);
+
+	return rv;
+}
+
+static int _ipmi_get_timeout(int *countdown)
+{
+	int rv;
+
+	if (!watchdog_user)
+		return -ENODEV;
+
+	atomic_set(&msg_tofree, 2);
+
+	rv = __ipmi_get_timeout(&smi_msg,
+				&recv_msg,
+				countdown);
+
+	return rv;
+}
+
 static atomic_t panic_done_count = ATOMIC_INIT(0);
 
 static void panic_smi_free(struct ipmi_smi_msg *msg)
@@ -724,6 +789,16 @@ static int ipmi_ioctl(struct file *file,
 
 	case WDIOC_GETSTATUS:
 		val = 0;
+		i = copy_to_user(argp, &val, sizeof(val));
+		if (i)
+			return -EFAULT;
+		return 0;
+
+	case WDIOC_GETTIMELEFT:
+		val = 0;
+		i = _ipmi_get_timeout(&val);
+		if (i)
+			return i;
 		i = copy_to_user(argp, &val, sizeof(val));
 		if (i)
 			return -EFAULT;
