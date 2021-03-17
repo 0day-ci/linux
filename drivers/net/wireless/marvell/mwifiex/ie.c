@@ -333,7 +333,6 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 	u16 gen_idx = MWIFIEX_AUTO_IDX_MASK, ie_len = 0;
 	int left_len, parsed_len = 0;
 	unsigned int token_len;
-	int err = 0;
 
 	if (!info->tail || !info->tail_len)
 		return 0;
@@ -351,7 +350,6 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 		hdr = (void *)(info->tail + parsed_len);
 		token_len = hdr->len + sizeof(struct ieee_types_header);
 		if (token_len > left_len) {
-			err = -EINVAL;
 			goto out;
 		}
 
@@ -377,7 +375,6 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 			fallthrough;
 		default:
 			if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
-				err = -EINVAL;
 				goto out;
 			}
 			memcpy(gen_ie->ie_buffer + ie_len, hdr, token_len);
@@ -397,7 +394,6 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 	if (vendorhdr) {
 		token_len = vendorhdr->len + sizeof(struct ieee_types_header);
 		if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
-			err = -EINVAL;
 			goto out;
 		}
 		memcpy(gen_ie->ie_buffer + ie_len, vendorhdr, token_len);
@@ -415,7 +411,6 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 
 	if (mwifiex_update_uap_custom_ie(priv, gen_ie, &gen_idx, NULL, NULL,
 					 NULL, NULL)) {
-		err = -EINVAL;
 		goto out;
 	}
 
@@ -423,7 +418,7 @@ static int mwifiex_uap_parse_tail_ies(struct mwifiex_private *priv,
 
  out:
 	kfree(gen_ie);
-	return err;
+	return -EINVAL;
 }
 
 /* This function parses different IEs-head & tail IEs, beacon IEs,
