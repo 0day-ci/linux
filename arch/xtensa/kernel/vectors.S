@@ -202,7 +202,7 @@ ENDPROC(_KernelExceptionVector)
  * See the handle_alloca_user and spill_registers routines for example clients.
  *
  * FIXME: Note: we currently don't allow signal handling coming from a double
- *        exception, so the item markt with (*) is not required.
+ *        exception, so the item mark with (*) is not required.
  */
 
 	.section .DoubleExceptionVector.text, "ax"
