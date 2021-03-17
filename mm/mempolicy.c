@@ -108,8 +108,6 @@
 
 #include "internal.h"
 
-#define MPOL_PREFERRED_MANY MPOL_MAX
-
 /* Internal flags */
 #define MPOL_MF_DISCONTIG_OK (MPOL_MF_INTERNAL << 0)	/* Skip checks for continuous vmas */
 #define MPOL_MF_INVERT (MPOL_MF_INTERNAL << 1)		/* Invert check for nodemask */
@@ -180,7 +178,7 @@ struct mempolicy *get_task_policy(struct task_struct *p)
 static const struct mempolicy_operations {
 	int (*create)(struct mempolicy *pol, const nodemask_t *nodes);
 	void (*rebind)(struct mempolicy *pol, const nodemask_t *nodes);
-} mpol_ops[MPOL_MAX + 1];
+} mpol_ops[MPOL_MAX];
 
 static inline int mpol_store_user_nodemask(const struct mempolicy *pol)
 {
@@ -389,8 +387,8 @@ static void mpol_rebind_preferred_common(struct mempolicy *pol,
 }
 
 /* MPOL_PREFERRED_MANY allows multiple nodes to be set in 'nodes' */
-static void __maybe_unused mpol_rebind_preferred_many(struct mempolicy *pol,
-						      const nodemask_t *nodes)
+static void mpol_rebind_preferred_many(struct mempolicy *pol,
+				       const nodemask_t *nodes)
 {
 	mpol_rebind_preferred_common(pol, nodes, nodes);
 }
@@ -452,7 +450,7 @@ void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new)
 	mmap_write_unlock(mm);
 }
 
-static const struct mempolicy_operations mpol_ops[MPOL_MAX + 1] = {
+static const struct mempolicy_operations mpol_ops[MPOL_MAX] = {
 	[MPOL_DEFAULT] = {
 		.rebind = mpol_rebind_default,
 	},
@@ -470,8 +468,8 @@ static const struct mempolicy_operations mpol_ops[MPOL_MAX + 1] = {
 	},
 	/* [MPOL_LOCAL] - see mpol_new() */
 	[MPOL_PREFERRED_MANY] = {
-		.create = NULL,
-		.rebind = NULL,
+		.create = mpol_new_preferred_many,
+		.rebind = mpol_rebind_preferred_many,
 	},
 };
 

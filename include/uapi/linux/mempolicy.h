@@ -16,13 +16,13 @@
  */
 
 /* Policies */
-enum {
-	MPOL_DEFAULT,
+enum { MPOL_DEFAULT,
 	MPOL_PREFERRED,
 	MPOL_BIND,
 	MPOL_INTERLEAVE,
 	MPOL_LOCAL,
-	MPOL_MAX,	/* always last member of enum */
+	MPOL_PREFERRED_MANY,
+	MPOL_MAX, /* always last member of enum */
 };
 
 /* Flags for set_mempolicy */

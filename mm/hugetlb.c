@@ -1126,7 +1126,7 @@ static struct page *dequeue_huge_page_vma(struct hstate *h,
 
 	gfp_mask = htlb_alloc_mask(h);
 	nid = huge_node(vma, address, gfp_mask, &mpol, &nodemask);
-	if (mpol->mode != MPOL_BIND && nodemask) { /* AKA MPOL_PREFERRED_MANY */
+	if (mpol->mode == MPOL_PREFERRED_MANY) {
 		gfp_t gfp_mask1 = gfp_mask | __GFP_NOWARN;
 
 		gfp_mask1 &= ~__GFP_DIRECT_RECLAIM;
@@ -1893,7 +1893,7 @@ struct page *alloc_buddy_huge_page_with_mpol(struct hstate *h,
 	nodemask_t *nodemask;
 
 	nid = huge_node(vma, addr, gfp_mask, &mpol, &nodemask);
-	if (mpol->mode != MPOL_BIND && nodemask) { /* AKA MPOL_PREFERRED_MANY */
+	if (mpol->mode == MPOL_PREFERRED_MANY) {
 		gfp_t gfp_mask1 = gfp_mask | __GFP_NOWARN;
 
 		gfp_mask1 &= ~__GFP_DIRECT_RECLAIM;
