@@ -335,6 +335,22 @@
 	KEEP(*(.dtb.init.rodata))					\
 	__dtb_end = .;
 
+/* implement dynamic printk debug */
+#if defined(CONFIG_DYNAMIC_DEBUG) ||					\
+	(defined(CONFIG_DYNAMIC_DEBUG_CORE)				\
+	 && defined(DYNAMIC_DEBUG_MODULE))
+#define DYNAMIC_DEBUG_DATA()						\
+	. = ALIGN(8);							\
+	__start___dyndbg_sites = .;					\
+	KEEP(*(__dyndbg_sites .gnu.linkonce.dyndbg_site))		\
+	__stop___dyndbg_sites = .;					\
+	__start___dyndbg = .;						\
+	KEEP(*(__dyndbg .gnu.linkonce.dyndbg))				\
+	__stop___dyndbg = .;
+#else
+#define DYNAMIC_DEBUG_DATA()
+#endif
+
 /*
  * .data section
  */
@@ -351,15 +367,8 @@
 	__end_once = .;							\
 	STRUCT_ALIGN();							\
 	*(__tracepoints)						\
-	/* implement dynamic printk debug */				\
-	. = ALIGN(8);							\
-	__start___dyndbg_sites = .;					\
-	KEEP(*(__dyndbg_sites))					\
-	__stop___dyndbg_sites = .;					\
-	__start___dyndbg = .;						\
-	KEEP(*(__dyndbg))						\
-	__stop___dyndbg = .;						\
-	LIKELY_PROFILE()		       				\
+	DYNAMIC_DEBUG_DATA()						\
+	LIKELY_PROFILE()						\
 	BRANCH_PROFILE()						\
 	TRACE_PRINTKS()							\
 	BPF_RAW_TP()							\

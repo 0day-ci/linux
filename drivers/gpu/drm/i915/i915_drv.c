@@ -91,6 +91,8 @@
 
 static const struct drm_driver driver;
 
+//DEFINE_DYNAMIC_DEBUG_TABLE();
+
 static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
 {
 	int domain = pci_domain_nr(dev_priv->drm.pdev->bus);
