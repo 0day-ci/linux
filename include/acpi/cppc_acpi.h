@@ -31,7 +31,7 @@
 #define	CMD_READ 0
 #define	CMD_WRITE 1
 
-/* Each register has the folowing format. */
+/* Each register has the following format. */
 struct cpc_reg {
 	u8 descriptor;
 	u16 length;
