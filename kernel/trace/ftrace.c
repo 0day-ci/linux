@@ -282,7 +282,7 @@ static int remove_ftrace_ops(struct ftrace_ops __rcu **list,
 			lockdep_is_held(&ftrace_lock)) == ops &&
 	    rcu_dereference_protected(ops->next,
 			lockdep_is_held(&ftrace_lock)) == &ftrace_list_end) {
-		*list = &ftrace_list_end;
+		rcu_assign_pointer(*list, &ftrace_list_end);
 		return 0;
 	}
 
@@ -293,7 +293,7 @@ static int remove_ftrace_ops(struct ftrace_ops __rcu **list,
 	if (*p != ops)
 		return -1;
 
-	*p = (*p)->next;
+	rcu_assign_pointer(*p, (*p)->next);
 	return 0;
 }
 
