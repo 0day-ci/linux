@@ -3251,6 +3251,11 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SOLARFLARE,
 			 PCI_DEVICE_ID_SOLARFLARE_SFC4000A_1, fixup_mpss_256);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SOLARFLARE,
 			 PCI_DEVICE_ID_SOLARFLARE_SFC4000B, fixup_mpss_256);
+/*
+ * For some reason DECLARE_PCI_FIXUP_HEADER does not work with pci-aardvark
+ * controller. We have to use DECLARE_PCI_FIXUP_EARLY.
+ */
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_ASMEDIA, 0x0612, fixup_mpss_256);
 
 /*
  * Intel 5000 and 5100 Memory controllers have an erratum with read completion
