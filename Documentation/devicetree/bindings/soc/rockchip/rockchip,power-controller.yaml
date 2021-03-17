@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+# %YAML 1.2
+---
+$id: http://devicetree.org/soc/rockchip/rockchip,power-controller.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Rcokchip Generic PM domains
+
+maintainers:
+  - Rob Herring <robh+dt@kernel.org>
+  - Heiko Stuebner <heiko@sntech.de>
+
+description: |
+  Rockchip processors include support for multiple power domains which can be
+  powered up/down by software based on different application scenes to save power.
+
+  IP cores belonging to a power domain should contain a 'power-domains'
+  property that is a phandle for SCPSYS node representing the domain.
+
+properties:
+  $nodename:
+    const: power-controller
+
+  compatible:
+    enum:
+      - rockchip,px30-power-controller
+      - rockchip,rk3036-power-controller
+      - rockchip,rk3066-power-controller
+      - rockchip,rk3128-power-controller
+      - rockchip,rk3188-power-controller
+      - rockchip,rk3228-power-controller
+      - rockchip,rk3288-power-controller
+      - rockchip,rk3328-power-controller
+      - rockchip,rk3366-power-controller
+      - rockchip,rk3368-power-controller
+      - rockchip,rk3399-power-controller
+      - rockchip,rk3568-power-controller
+
+  '#power-domain-cells':
+    const: 1
+
+  '#address-cells':
+    const: 1
+
+  '#size-cells':
+    const: 0
+
+patternProperties:
+  "^power-domain@[0-9a-f]+$":
+    type: object
+    description: |
+      Represents the power domains within the power controller node as documented
+      in Documentation/devicetree/bindings/power/power-domain.yaml.
+
+    properties:
+
+      '#power-domain-cells':
+        description:
+          Must be 0 for nodes representing a single PM domain and 1 for nodes
+          providing multiple PM domains.
+
+      '#address-cells':
+        const: 1
+
+      '#size-cells':
+        const: 0
+
+      reg:
+        description: |
+          Power domain index. Valid values are defined in:
+              "include/dt-bindings/power/px30-power.h" - for PX30 type power domain.
+              "include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
+              "include/dt-bindings/power/rk3066-power.h" - for RK3066 type power domain.
+              "include/dt-bindings/power/rk3128-power.h" - for RK3128 type power domain.
+              "include/dt-bindings/power/rk3188-power.h" - for RK3188 type power domain.
+              "include/dt-bindings/power/rk3228-power.h" - for RK3228 type power domain.
+              "include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+              "include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
+              "include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
+              "include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
+              "include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+              "include/dt-bindings/power/rk3568-power.h" - for RK3568 type power domain.
+        maxItems: 1
+
+      clocks:
+        description: |
+          A number of phandles to clocks that need to be enabled during domain
+          power-up sequencing.
+
+      clock-names:
+        description: |
+          List of names of clocks, in order to match the power-up sequencing
+          for each power domain we need to group the clocks by name. BASIC
+          clocks need to be enabled before enabling the corresponding power
+          domain.
+
+      pm_qos:
+        description: |
+          A number of phandles for qos registers that need to be save and restor during domain
+          power-up sequencing.
+
+    additionalProperties: false
+
+required:
+  - compatible
+
+additionalProperties: false
+
+examples:
+  - |
+    pmu: power-management@fdd90000 {
+        compatible = "rockchip,rk3568-pmu", "syscon", "simple-mfd";
+        reg = <0xfdd90000 0x1000>;
+
+        power: power-controller {
+            compatible = "rockchip,rk3568-power-controller";
+            #power-domain-cells = <1>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+
+            /* These power domains are grouped by VD_NPU */
+            pd_npu@RK3568_PD_NPU {
+                reg = <RK3568_PD_NPU>;
+                clocks = <&cru ACLK_NPU_PRE>,
+                         <&cru HCLK_NPU_PRE>,
+                         <&cru PCLK_NPU_PRE>;
+                pm_qos = <&qos_npu>;
+            };
+            /* These power domains are grouped by VD_GPU */
+            pd_gpu@RK3568_PD_GPU {
+                reg = <RK3568_PD_GPU>;
+                clocks = <&cru ACLK_GPU_PRE>,
+                         <&cru PCLK_GPU_PRE>;
+                pm_qos = <&qos_gpu>;
+            };
+            /* These power domains are grouped by VD_LOGIC */
+            pd_vi@RK3568_PD_VI {
+                reg = <RK3568_PD_VI>;
+                clocks = <&cru HCLK_VI>,
+                         <&cru PCLK_VI>;
+                pm_qos = <&qos_isp>,
+                         <&qos_vicap0>,
+                         <&qos_vicap1>;
+            };
+            pd_vo@RK3568_PD_VO {
+                reg = <RK3568_PD_VO>;
+                clocks = <&cru HCLK_VO>,
+                         <&cru PCLK_VO>,
+                         <&cru ACLK_VOP_PRE>;
+                pm_qos = <&qos_hdcp>,
+                         <&qos_vop_m0>,
+                         <&qos_vop_m1>;
+            };
+            pd_rga@RK3568_PD_RGA {
+                reg = <RK3568_PD_RGA>;
+                clocks = <&cru HCLK_RGA_PRE>,
+                         <&cru PCLK_RGA_PRE>;
+                pm_qos = <&qos_ebc>,
+                         <&qos_iep>,
+                         <&qos_jpeg_dec>,
+                         <&qos_jpeg_enc>,
+                         <&qos_rga_rd>,
+                         <&qos_rga_wr>;
+            };
+            pd_vpu@RK3568_PD_VPU {
+                reg = <RK3568_PD_VPU>;
+                clocks = <&cru HCLK_VPU_PRE>;
+                pm_qos = <&qos_vpu>;
+            };
+            pd_rkvdec@RK3568_PD_RKVDEC {
+                clocks = <&cru HCLK_RKVDEC_PRE>;
+                reg = <RK3568_PD_RKVDEC>;
+                pm_qos = <&qos_rkvdec>;
+            };
+            pd_rkvenc@RK3568_PD_RKVENC {
+                reg = <RK3568_PD_RKVENC>;
+                clocks = <&cru HCLK_RKVENC_PRE>;
+                pm_qos = <&qos_rkvenc_rd_m0>,
+                <&qos_rkvenc_rd_m1>,
+                <&qos_rkvenc_wr_m0>;
+            };
+            pd_pipe@RK3568_PD_PIPE {
+                reg = <RK3568_PD_PIPE>;
+                clocks = <&cru PCLK_PIPE>;
+                pm_qos = <&qos_pcie2x1>,
+                         <&qos_pcie3x1>,
+                         <&qos_pcie3x2>,
+                         <&qos_sata0>,
+                         <&qos_sata1>,
+                         <&qos_sata2>,
+                         <&qos_usb3_0>,
+                         <&qos_usb3_1>;
+            };
+        };
+    };
