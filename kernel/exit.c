@@ -766,6 +766,17 @@ void __noreturn do_exit(long code)
 
 	validate_creds_for_do_exit(tsk);
 
+	group_dead = atomic_dec_and_test(&tsk->signal->live);
+	/*
+	 * If global init has exited,
+	 * panic immediately to get a useable coredump.
+	 */
+	if (unlikely(is_global_init(tsk) &&
+	    (group_dead || (tsk->signal->flags & SIGNAL_GROUP_EXIT)))) {
+			panic("Attempted to kill init! exitcode=0x%08x\n",
+				tsk->signal->group_exit_code ?: (int)code);
+	}
+
 	/*
 	 * We're taking recursive faults here in do_exit. Safest is to just
 	 * leave this task alone and wait for reboot.
@@ -784,16 +795,7 @@ void __noreturn do_exit(long code)
 	if (tsk->mm)
 		sync_mm_rss(tsk->mm);
 	acct_update_integrals(tsk);
-	group_dead = atomic_dec_and_test(&tsk->signal->live);
 	if (group_dead) {
-		/*
-		 * If the last thread of global init has exited, panic
-		 * immediately to get a useable coredump.
-		 */
-		if (unlikely(is_global_init(tsk)))
-			panic("Attempted to kill init! exitcode=0x%08x\n",
-				tsk->signal->group_exit_code ?: (int)code);
-
 #ifdef CONFIG_POSIX_TIMERS
 		hrtimer_cancel(&tsk->signal->real_timer);
 		exit_itimers(tsk->signal);
