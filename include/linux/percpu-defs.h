@@ -220,6 +220,16 @@ do {									\
 	(void)__vpp_verify;						\
 } while (0)
 
+#define per_cpu_sum(var)						\
+({									\
+	typeof(var) __sum = 0;						\
+	int cpu;							\
+	compiletime_assert_atomic_type(__sum);				\
+	for_each_possible_cpu(cpu)					\
+		__sum += per_cpu(var, cpu);				\
+	__sum;								\
+})
+
 #ifdef CONFIG_SMP
 
 /*
