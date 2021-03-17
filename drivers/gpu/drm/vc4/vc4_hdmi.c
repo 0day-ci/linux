@@ -330,10 +330,10 @@ static int vc4_hdmi_stop_packet(struct drm_encoder *encoder,
 			  BIT(packet_id)), 100);
 }
 
-static void vc4_hdmi_write_infoframe(struct drm_encoder *encoder,
+static void vc4_hdmi_write_infoframe(struct vc4_hdmi *vc4_hdmi,
 				     union hdmi_infoframe *frame)
 {
-	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
+	struct drm_encoder *encoder = &vc4_hdmi->encoder.base.base;
 	u32 packet_id = frame->any.type - 0x80;
 	const struct vc4_hdmi_register *ram_packet_start =
 		&vc4_hdmi->variant->registers[HDMI_RAM_PACKET_START];
@@ -381,11 +381,13 @@ static void vc4_hdmi_write_infoframe(struct drm_encoder *encoder,
 		DRM_ERROR("Failed to wait for infoframe to start: %d\n", ret);
 }
 
-static void vc4_hdmi_set_avi_infoframe(struct drm_encoder *encoder)
+static void vc4_hdmi_set_avi_infoframe(struct vc4_hdmi *vc4_hdmi,
+				       struct drm_atomic_state *state)
 {
-	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
+	struct drm_encoder *encoder = &vc4_hdmi->encoder.base.base;
 	struct drm_connector *connector = &vc4_hdmi->connector;
-	struct drm_connector_state *cstate = connector->state;
+	struct drm_connector_state *cstate =
+		drm_atomic_get_new_connector_state(state, connector);
 	struct drm_crtc *crtc = encoder->crtc;
 	const struct drm_display_mode *mode = &crtc->state->adjusted_mode;
 	union hdmi_infoframe frame;
@@ -406,10 +408,10 @@ static void vc4_hdmi_set_avi_infoframe(struct drm_encoder *encoder)
 
 	drm_hdmi_avi_infoframe_bars(&frame.avi, cstate);
 
-	vc4_hdmi_write_infoframe(encoder, &frame);
+	vc4_hdmi_write_infoframe(vc4_hdmi, &frame);
 }
 
-static void vc4_hdmi_set_spd_infoframe(struct drm_encoder *encoder)
+static void vc4_hdmi_set_spd_infoframe(struct vc4_hdmi *vc4_hdmi)
 {
 	union hdmi_infoframe frame;
 	int ret;
@@ -422,12 +424,11 @@ static void vc4_hdmi_set_spd_infoframe(struct drm_encoder *encoder)
 
 	frame.spd.sdi = HDMI_SPD_SDI_PC;
 
-	vc4_hdmi_write_infoframe(encoder, &frame);
+	vc4_hdmi_write_infoframe(vc4_hdmi, &frame);
 }
 
-static void vc4_hdmi_set_audio_infoframe(struct drm_encoder *encoder)
+static void vc4_hdmi_set_audio_infoframe(struct vc4_hdmi *vc4_hdmi)
 {
-	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
 	union hdmi_infoframe frame;
 
 	hdmi_audio_infoframe_init(&frame.audio);
@@ -437,21 +438,19 @@ static void vc4_hdmi_set_audio_infoframe(struct drm_encoder *encoder)
 	frame.audio.sample_size = HDMI_AUDIO_SAMPLE_SIZE_STREAM;
 	frame.audio.channels = vc4_hdmi->audio.channels;
 
-	vc4_hdmi_write_infoframe(encoder, &frame);
+	vc4_hdmi_write_infoframe(vc4_hdmi, &frame);
 }
 
-static void vc4_hdmi_set_infoframes(struct drm_encoder *encoder)
+static void vc4_hdmi_set_infoframes(struct vc4_hdmi *vc4_hdmi, struct drm_atomic_state *state)
 {
-	struct vc4_hdmi *vc4_hdmi = encoder_to_vc4_hdmi(encoder);
-
-	vc4_hdmi_set_avi_infoframe(encoder);
-	vc4_hdmi_set_spd_infoframe(encoder);
+	vc4_hdmi_set_avi_infoframe(vc4_hdmi, state);
+	vc4_hdmi_set_spd_infoframe(vc4_hdmi);
 	/*
 	 * If audio was streaming, then we need to reenabled the audio
 	 * infoframe here during encoder_enable.
 	 */
 	if (vc4_hdmi->audio.streaming)
-		vc4_hdmi_set_audio_infoframe(encoder);
+		vc4_hdmi_set_audio_infoframe(vc4_hdmi);
 }
 
 static void vc4_hdmi_bridge_post_crtc_disable(struct drm_bridge *bridge,
@@ -921,7 +920,7 @@ static void vc4_hdmi_bridge_post_crtc_enable(struct drm_bridge *bridge,
 		HDMI_WRITE(HDMI_RAM_PACKET_CONFIG,
 			   VC4_HDMI_RAM_PACKET_ENABLE);
 
-		vc4_hdmi_set_infoframes(encoder);
+		vc4_hdmi_set_infoframes(vc4_hdmi, state);
 	}
 
 	vc4_hdmi_recenter_fifo(vc4_hdmi);
@@ -1184,7 +1183,6 @@ static int vc4_hdmi_audio_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 	struct vc4_hdmi *vc4_hdmi = dai_to_hdmi(dai);
-	struct drm_encoder *encoder = &vc4_hdmi->encoder.base.base;
 	struct device *dev = &vc4_hdmi->pdev->dev;
 	u32 audio_packet_config, channel_mask;
 	u32 channel_map;
@@ -1244,7 +1242,7 @@ static int vc4_hdmi_audio_hw_params(struct snd_pcm_substream *substream,
 	HDMI_WRITE(HDMI_AUDIO_PACKET_CONFIG, audio_packet_config);
 	vc4_hdmi_set_n_cts(vc4_hdmi);
 
-	vc4_hdmi_set_audio_infoframe(encoder);
+	vc4_hdmi_set_audio_infoframe(vc4_hdmi);
 
 	return 0;
 }
