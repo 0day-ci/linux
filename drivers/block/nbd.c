@@ -1846,7 +1846,7 @@ again:
 		nbd->destroy_complete = &destroy_complete;
 		mutex_unlock(&nbd_index_mutex);
 
-		/* Wait untill the the nbd stuff is totally destroyed */
+		/* Wait until the nbd stuff is totally destroyed */
 		wait_for_completion(&destroy_complete);
 		goto again;
 	}
