@@ -363,14 +363,11 @@ static void mpol_rebind_nodemask(struct mempolicy *pol, const nodemask_t *nodes)
 	pol->v.nodes = tmp;
 }
 
-static void mpol_rebind_preferred(struct mempolicy *pol,
-						const nodemask_t *nodes)
+static void mpol_rebind_preferred_common(struct mempolicy *pol,
+					 const nodemask_t *preferred_nodes,
+					 const nodemask_t *nodes)
 {
 	nodemask_t tmp;
-	nodemask_t preferred_node;
-
-	/* MPOL_PREFERRED uses only the first node in the mask */
-	preferred_node = nodemask_of_node(first_node(*nodes));
 
 	if (pol->flags & MPOL_F_STATIC_NODES) {
 		int node = first_node(pol->w.user_nodemask);
@@ -385,10 +382,28 @@ static void mpol_rebind_preferred(struct mempolicy *pol,
 		pol->v.preferred_nodes = tmp;
 	} else if (!(pol->flags & MPOL_F_LOCAL)) {
 		nodes_remap(tmp, pol->v.preferred_nodes,
-			    pol->w.cpuset_mems_allowed, preferred_node);
+			    pol->w.cpuset_mems_allowed, *preferred_nodes);
 		pol->v.preferred_nodes = tmp;
 		pol->w.cpuset_mems_allowed = *nodes;
 	}
+}
+
+/* MPOL_PREFERRED_MANY allows multiple nodes to be set in 'nodes' */
+static void __maybe_unused mpol_rebind_preferred_many(struct mempolicy *pol,
+						      const nodemask_t *nodes)
+{
+	mpol_rebind_preferred_common(pol, nodes, nodes);
+}
+
+static void mpol_rebind_preferred(struct mempolicy *pol,
+				  const nodemask_t *nodes)
+{
+	nodemask_t preferred_node;
+
+	/* MPOL_PREFERRED uses only the first node in 'nodes' */
+	preferred_node = nodemask_of_node(first_node(*nodes));
+
+	mpol_rebind_preferred_common(pol, &preferred_node, nodes);
 }
 
 /*
