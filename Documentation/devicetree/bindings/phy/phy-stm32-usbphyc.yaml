@@ -67,6 +67,9 @@ patternProperties:
       phy-supply:
         description: regulator providing 3V3 power supply to the PHY.
 
+      vbus-supply:
+        description: regulator providing 5V Vbus to the USB connector.
+
       "#phy-cells":
         enum: [ 0x0, 0x1 ]
 
