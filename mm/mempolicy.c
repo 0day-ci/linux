@@ -31,6 +31,9 @@
  *                but useful to set in a VMA when you have a non default
  *                process policy.
  *
+ * preferred many Try a set of nodes first before normal fallback. This is
+ *                similar to preferred without the special case.
+ *
  * default        Allocate on the local node first, or when on a VMA
  *                use the process policy. This is what Linux always did
  *		  in a NUMA aware kernel and still does by, ahem, default.
@@ -105,6 +108,8 @@
 
 #include "internal.h"
 
+#define MPOL_PREFERRED_MANY MPOL_MAX
+
 /* Internal flags */
 #define MPOL_MF_DISCONTIG_OK (MPOL_MF_INTERNAL << 0)	/* Skip checks for continuous vmas */
 #define MPOL_MF_INVERT (MPOL_MF_INTERNAL << 1)		/* Invert check for nodemask */
@@ -175,7 +180,7 @@ struct mempolicy *get_task_policy(struct task_struct *p)
 static const struct mempolicy_operations {
 	int (*create)(struct mempolicy *pol, const nodemask_t *nodes);
 	void (*rebind)(struct mempolicy *pol, const nodemask_t *nodes);
-} mpol_ops[MPOL_MAX];
+} mpol_ops[MPOL_MAX + 1];
 
 static inline int mpol_store_user_nodemask(const struct mempolicy *pol)
 {
@@ -415,7 +420,7 @@ void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new)
 	mmap_write_unlock(mm);
 }
 
-static const struct mempolicy_operations mpol_ops[MPOL_MAX] = {
+static const struct mempolicy_operations mpol_ops[MPOL_MAX + 1] = {
 	[MPOL_DEFAULT] = {
 		.rebind = mpol_rebind_default,
 	},
@@ -432,6 +437,10 @@ static const struct mempolicy_operations mpol_ops[MPOL_MAX] = {
 		.rebind = mpol_rebind_nodemask,
 	},
 	/* [MPOL_LOCAL] - see mpol_new() */
+	[MPOL_PREFERRED_MANY] = {
+		.create = NULL,
+		.rebind = NULL,
+	},
 };
 
 static int migrate_page_add(struct page *page, struct list_head *pagelist,
@@ -923,6 +932,9 @@ static void get_policy_nodemask(struct mempolicy *p, nodemask_t *nodes)
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
 		*nodes = p->v.nodes;
+		break;
+	case MPOL_PREFERRED_MANY:
+		*nodes = p->v.preferred_nodes;
 		break;
 	case MPOL_PREFERRED:
 		if (!(p->flags & MPOL_F_LOCAL))
@@ -1895,7 +1907,9 @@ nodemask_t *policy_nodemask(gfp_t gfp, struct mempolicy *policy)
 /* Return the node id preferred by the given mempolicy, or the given id */
 static int policy_node(gfp_t gfp, struct mempolicy *policy, int nd)
 {
-	if (policy->mode == MPOL_PREFERRED && !(policy->flags & MPOL_F_LOCAL)) {
+	if ((policy->mode == MPOL_PREFERRED ||
+	     policy->mode == MPOL_PREFERRED_MANY) &&
+	    !(policy->flags & MPOL_F_LOCAL)) {
 		nd = first_node(policy->v.preferred_nodes);
 	} else {
 		/*
@@ -1938,6 +1952,7 @@ unsigned int mempolicy_slab_node(void)
 		return node;
 
 	switch (policy->mode) {
+	case MPOL_PREFERRED_MANY:
 	case MPOL_PREFERRED:
 		/*
 		 * handled MPOL_F_LOCAL above
@@ -2072,6 +2087,9 @@ bool init_nodemask_of_mempolicy(nodemask_t *mask)
 	task_lock(current);
 	mempolicy = current->mempolicy;
 	switch (mempolicy->mode) {
+	case MPOL_PREFERRED_MANY:
+		*mask = mempolicy->v.preferred_nodes;
+		break;
 	case MPOL_PREFERRED:
 		if (mempolicy->flags & MPOL_F_LOCAL)
 			nid = numa_node_id();
@@ -2125,6 +2143,9 @@ bool mempolicy_nodemask_intersects(struct task_struct *tsk,
 		 * Thus, it's possible for tsk to have allocated memory from
 		 * nodes in mask.
 		 */
+		break;
+	case MPOL_PREFERRED_MANY:
+		ret = nodes_intersects(mempolicy->v.preferred_nodes, *mask);
 		break;
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
@@ -2210,10 +2231,13 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 		 * node and don't fall back to other nodes, as the cost of
 		 * remote accesses would likely offset THP benefits.
 		 *
-		 * If the policy is interleave, or does not allow the current
-		 * node in its nodemask, we allocate the standard way.
+		 * If the policy is interleave or multiple preferred nodes, or
+		 * does not allow the current node in its nodemask, we allocate
+		 * the standard way.
 		 */
-		if (pol->mode == MPOL_PREFERRED && !(pol->flags & MPOL_F_LOCAL))
+		if ((pol->mode == MPOL_PREFERRED ||
+		     pol->mode == MPOL_PREFERRED_MANY) &&
+		    !(pol->flags & MPOL_F_LOCAL))
 			hpage_node = first_node(pol->v.preferred_nodes);
 
 		nmask = policy_nodemask(gfp, pol);
@@ -2349,6 +2373,9 @@ bool __mpol_equal(struct mempolicy *a, struct mempolicy *b)
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
 		return !!nodes_equal(a->v.nodes, b->v.nodes);
+	case MPOL_PREFERRED_MANY:
+		return !!nodes_equal(a->v.preferred_nodes,
+				     b->v.preferred_nodes);
 	case MPOL_PREFERRED:
 		/* a's ->flags is the same as b's */
 		if (a->flags & MPOL_F_LOCAL)
@@ -2522,6 +2549,8 @@ int mpol_misplaced(struct page *page, struct vm_area_struct *vma, unsigned long 
 				&pol->v.nodes);
 		polnid = zone_to_nid(z->zone);
 		break;
+
+		/* case MPOL_PREFERRED_MANY: */
 
 	default:
 		BUG();
@@ -2874,6 +2903,7 @@ static const char * const policy_modes[] =
 	[MPOL_BIND]       = "bind",
 	[MPOL_INTERLEAVE] = "interleave",
 	[MPOL_LOCAL]      = "local",
+	[MPOL_PREFERRED_MANY]  = "prefer (many)",
 };
 
 
@@ -2953,6 +2983,7 @@ int mpol_parse_str(char *str, struct mempolicy **mpol)
 		if (!nodelist)
 			err = 0;
 		goto out;
+	case MPOL_PREFERRED_MANY:
 	case MPOL_BIND:
 		/*
 		 * Insist on a nodelist
@@ -3035,6 +3066,9 @@ void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 	switch (mode) {
 	case MPOL_DEFAULT:
 		break;
+	case MPOL_PREFERRED_MANY:
+		WARN_ON(flags & MPOL_F_LOCAL);
+		fallthrough;
 	case MPOL_PREFERRED:
 		if (flags & MPOL_F_LOCAL)
 			mode = MPOL_LOCAL;
