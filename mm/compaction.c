@@ -810,6 +810,8 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 	bool skip_on_failure = false;
 	unsigned long next_skip_pfn = 0;
 	bool skip_updated = false;
+	bool fatal_error = false;
+	int ret = 0;
 
 	cc->migrate_pfn = low_pfn;
 
@@ -905,6 +907,32 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 				goto isolate_abort;
 			}
 			valid_page = page;
+		}
+
+		if (PageHuge(page) && cc->alloc_contig) {
+			ret = isolate_or_dissolve_huge_page(page);
+
+			/*
+			 * Fail isolation in case isolate_or_dissolve_huge_page
+			 * reports an error. In case of -ENOMEM, abort right away.
+			 */
+			if (ret < 0) {
+				/*
+				 * Do not report -EBUSY down the chain.
+				 */
+				if (ret == -ENOMEM)
+					fatal_error = true;
+				else
+					ret = 0;
+				goto isolate_fail;
+			}
+
+			/*
+			 * Ok, the hugepage was dissolved. Now these pages are
+			 * Buddy and cannot be re-allocated because they are
+			 * isolated. Fall-through as the check below handles
+			 * Buddy pages.
+			 */
 		}
 
 		/*
@@ -1092,6 +1120,9 @@ isolate_fail:
 			 */
 			next_skip_pfn += 1UL << cc->order;
 		}
+
+		if (fatal_error)
+			break;
 	}
 
 	/*
@@ -1135,7 +1166,7 @@ fatal_pending:
 
 	cc->migrate_pfn = low_pfn;
 
-	return 0;
+	return ret;
 }
 
 /**
