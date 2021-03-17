@@ -282,6 +282,20 @@ extern enum ftrace_tracing_type_t ftrace_tracing_type;
 int register_ftrace_function(struct ftrace_ops *ops);
 int unregister_ftrace_function(struct ftrace_ops *ops);
 
+/*
+ * If the ftrace_ops is dynamically allocated, the unregistering of it
+ * should call ftrace_function_unregister_sync() to make sure that there
+ * are no more users references it. Then free it should be safe for ftrace.
+ *
+ * We don't call synchronize_rcu() in unregister_ftrace_function() because
+ * some of the registered ftrace_ops are static and doing synchronize_rcu()
+ * for them is unnecessary and is a performance penalty.
+ */
+static inline void ftrace_function_unregister_sync(void)
+{
+	synchronize_rcu();
+}
+
 extern void ftrace_stub(unsigned long a0, unsigned long a1,
 			struct ftrace_ops *op, struct ftrace_regs *fregs);
 
@@ -292,6 +306,7 @@ extern void ftrace_stub(unsigned long a0, unsigned long a1,
  */
 #define register_ftrace_function(ops) ({ 0; })
 #define unregister_ftrace_function(ops) ({ 0; })
+static inline void ftrace_function_unregister_sync(void) { }
 static inline void ftrace_kill(void) { }
 static inline void ftrace_free_init_mem(void) { }
 static inline void ftrace_free_mem(struct module *mod, void *start, void *end) { }
