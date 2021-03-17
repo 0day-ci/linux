@@ -203,15 +203,32 @@ static int mpol_new_interleave(struct mempolicy *pol, const nodemask_t *nodes)
 	return 0;
 }
 
-static int mpol_new_preferred(struct mempolicy *pol, const nodemask_t *nodes)
+static int mpol_new_preferred_many(struct mempolicy *pol,
+				   const nodemask_t *nodes)
 {
 	if (!nodes)
 		pol->flags |= MPOL_F_LOCAL;	/* local allocation */
 	else if (nodes_empty(*nodes))
 		return -EINVAL;			/*  no allowed nodes */
 	else
-		pol->v.preferred_nodes = nodemask_of_node(first_node(*nodes));
+		pol->v.preferred_nodes = *nodes;
 	return 0;
+}
+
+static int mpol_new_preferred(struct mempolicy *pol, const nodemask_t *nodes)
+{
+	if (nodes) {
+		/* MPOL_PREFERRED can only take a single node: */
+		nodemask_t tmp;
+
+		if (nodes_empty(*nodes))
+			return -EINVAL;
+
+		tmp = nodemask_of_node(first_node(*nodes));
+		return mpol_new_preferred_many(pol, &tmp);
+	}
+
+	return mpol_new_preferred_many(pol, NULL);
 }
 
 static int mpol_new_bind(struct mempolicy *pol, const nodemask_t *nodes)
