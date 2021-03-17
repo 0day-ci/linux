@@ -1867,6 +1867,19 @@ config SLUB_DEBUG
 	  SLUB sysfs support. /sys/slab will not exist and there will be
 	  no support for cache validation etc.
 
+config SLUB_DEBUG_PARTIAL
+	default n
+	bool "Enable SLUB debugging for the node partial list" if EXPERT
+	depends on SLUB && SYSFS
+	help
+	  Maintain runtime counters for the node partial list debugging.
+	  When CONFIG_SLUB_DEBUG_PARTIAL is not selected, the sysfs or proc
+	  files related to the partial list assume zero data usage, e.g.,
+	  value of "active_objs" and "num_objs" of "/proc/slabinfo" equals.
+	  "cat /sys/kernel/slab/<slab>/partial" displays "0".
+
+	  It might have slight performance impact for production use.
+
 config COMPAT_BRK
 	bool "Disable heap randomization"
 	default y
