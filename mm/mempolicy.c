@@ -963,8 +963,6 @@ static void get_policy_nodemask(struct mempolicy *p, nodemask_t *nodes)
 	switch (p->mode) {
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
-		*nodes = p->nodes;
-		break;
 	case MPOL_PREFERRED_MANY:
 		*nodes = p->nodes;
 		break;
@@ -1928,7 +1926,8 @@ static int apply_policy_zone(struct mempolicy *policy, enum zone_type zone)
 nodemask_t *policy_nodemask(gfp_t gfp, struct mempolicy *policy)
 {
 	/* Lower zones don't get a nodemask applied for MPOL_BIND */
-	if (unlikely(policy->mode == MPOL_BIND) &&
+	if (unlikely(policy->mode == MPOL_BIND ||
+		     policy->mode == MPOL_PREFERRED_MANY) &&
 	    apply_policy_zone(policy, gfp_zone(gfp)) &&
 	    cpuset_nodemask_valid_mems_allowed(&policy->nodes))
 		return &policy->nodes;
@@ -1984,7 +1983,6 @@ unsigned int mempolicy_slab_node(void)
 		return node;
 
 	switch (policy->mode) {
-	case MPOL_PREFERRED_MANY:
 	case MPOL_PREFERRED:
 		/*
 		 * handled MPOL_F_LOCAL above
@@ -1994,6 +1992,7 @@ unsigned int mempolicy_slab_node(void)
 	case MPOL_INTERLEAVE:
 		return interleave_nodes(policy);
 
+	case MPOL_PREFERRED_MANY:
 	case MPOL_BIND: {
 		struct zoneref *z;
 
@@ -2119,9 +2118,6 @@ bool init_nodemask_of_mempolicy(nodemask_t *mask)
 	task_lock(current);
 	mempolicy = current->mempolicy;
 	switch (mempolicy->mode) {
-	case MPOL_PREFERRED_MANY:
-		*mask = mempolicy->nodes;
-		break;
 	case MPOL_PREFERRED:
 		if (mempolicy->flags & MPOL_F_LOCAL)
 			nid = numa_node_id();
@@ -2132,6 +2128,7 @@ bool init_nodemask_of_mempolicy(nodemask_t *mask)
 
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
+	case MPOL_PREFERRED_MANY:
 		*mask = mempolicy->nodes;
 		break;
 
@@ -2175,12 +2172,11 @@ bool mempolicy_nodemask_intersects(struct task_struct *tsk,
 		 * Thus, it's possible for tsk to have allocated memory from
 		 * nodes in mask.
 		 */
-		break;
-	case MPOL_PREFERRED_MANY:
 		ret = nodes_intersects(mempolicy->nodes, *mask);
 		break;
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
+	case MPOL_PREFERRED_MANY:
 		ret = nodes_intersects(mempolicy->nodes, *mask);
 		break;
 	default:
@@ -2404,7 +2400,6 @@ bool __mpol_equal(struct mempolicy *a, struct mempolicy *b)
 	switch (a->mode) {
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
-		return !!nodes_equal(a->nodes, b->nodes);
 	case MPOL_PREFERRED_MANY:
 		return !!nodes_equal(a->nodes, b->nodes);
 	case MPOL_PREFERRED:
@@ -2558,6 +2553,7 @@ int mpol_misplaced(struct page *page, struct vm_area_struct *vma, unsigned long 
 			polnid = first_node(pol->nodes);
 		break;
 
+	case MPOL_PREFERRED_MANY:
 	case MPOL_BIND:
 		/* Optimize placement among multiple nodes via NUMA balancing */
 		if (pol->flags & MPOL_F_MORON) {
@@ -2579,8 +2575,6 @@ int mpol_misplaced(struct page *page, struct vm_area_struct *vma, unsigned long 
 					 gfp_zone(GFP_HIGHUSER), &pol->nodes);
 		polnid = zone_to_nid(z->zone);
 		break;
-
-		/* case MPOL_PREFERRED_MANY: */
 
 	default:
 		BUG();
@@ -3094,15 +3088,13 @@ void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 	switch (mode) {
 	case MPOL_DEFAULT:
 		break;
-	case MPOL_PREFERRED_MANY:
-		WARN_ON(flags & MPOL_F_LOCAL);
-		fallthrough;
 	case MPOL_PREFERRED:
 		if (flags & MPOL_F_LOCAL)
 			mode = MPOL_LOCAL;
 		else
 			nodes_or(nodes, nodes, pol->nodes);
 		break;
+	case MPOL_PREFERRED_MANY:
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
 		nodes = pol->nodes;
