@@ -49,6 +49,7 @@ struct ddebug_table {
 	const char *mod_name;
 	unsigned int num_ddebugs;
 	struct _ddebug *ddebugs;
+	struct _ddebug_site *sites;
 };
 
 struct ddebug_query {
@@ -1014,14 +1015,14 @@ static const struct proc_ops proc_fops = {
  * Allocate a new ddebug_table for the given module
  * and add it to the global list.
  */
-int ddebug_add_module(struct _ddebug *tab, unsigned int n,
-			     const char *name)
+int ddebug_add_module(struct _ddebug *tab, struct _ddebug_site *sites,
+		      unsigned int numdbgs, const char *modname)
 {
 	struct ddebug_table *dt;
 
 	dt = kzalloc(sizeof(*dt), GFP_KERNEL);
 	if (dt == NULL) {
-		pr_err("error adding module: %s\n", name);
+		pr_err("error adding module: %s\n", modname);
 		return -ENOMEM;
 	}
 	/*
@@ -1030,15 +1031,16 @@ int ddebug_add_module(struct _ddebug *tab, unsigned int n,
 	 * member of struct module, which lives at least as long as
 	 * this struct ddebug_table.
 	 */
-	dt->mod_name = name;
-	dt->num_ddebugs = n;
+	dt->mod_name = modname;
+	dt->num_ddebugs = numdbgs;
 	dt->ddebugs = tab;
+	dt->sites = sites;
 
 	mutex_lock(&ddebug_lock);
 	list_add(&dt->link, &ddebug_tables);
 	mutex_unlock(&ddebug_lock);
 
-	v2pr_info("%3u debug prints in module %s\n", n, dt->mod_name);
+	v2pr_info("%3u debug prints in module %s\n", numdbgs, modname);
 	return 0;
 }
 
@@ -1178,7 +1180,9 @@ static int __init dynamic_debug_init(void)
 
 		if (strcmp(modname, site->modname)) {
 			modct++;
-			ret = ddebug_add_module(iter_mod_start, site_ct, modname);
+
+			ret = ddebug_add_module(iter_mod_start, site_mod_start,
+						site_ct, modname);
 			if (ret)
 				goto out_err;
 			site_ct = 0;
@@ -1188,7 +1192,7 @@ static int __init dynamic_debug_init(void)
 		}
 		site_ct++;
 	}
-	ret = ddebug_add_module(iter_mod_start, site_ct, modname);
+	ret = ddebug_add_module(iter_mod_start, site_mod_start, site_ct, modname);
 	if (ret)
 		goto out_err;
 
