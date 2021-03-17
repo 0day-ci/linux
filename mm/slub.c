@@ -2533,11 +2533,6 @@ static inline int node_match(struct page *page, int node)
 }
 
 #ifdef CONFIG_SLUB_DEBUG
-static int count_free(struct page *page)
-{
-	return page->objects - page->inuse;
-}
-
 static inline unsigned long node_nr_objs(struct kmem_cache_node *n)
 {
 	return atomic_long_read(&n->total_objects);
@@ -2545,18 +2540,33 @@ static inline unsigned long node_nr_objs(struct kmem_cache_node *n)
 #endif /* CONFIG_SLUB_DEBUG */
 
 #if defined(CONFIG_SLUB_DEBUG) || defined(CONFIG_SYSFS)
-static unsigned long count_partial(struct kmem_cache_node *n,
-					int (*get_count)(struct page *))
-{
-	unsigned long flags;
-	unsigned long x = 0;
-	struct page *page;
+enum partial_item { PARTIAL_FREE, PARTIAL_INUSE, PARTIAL_TOTAL, PARTIAL_SLAB };
 
-	spin_lock_irqsave(&n->list_lock, flags);
-	list_for_each_entry(page, &n->partial, slab_list)
-		x += get_count(page);
-	spin_unlock_irqrestore(&n->list_lock, flags);
-	return x;
+static unsigned long partial_counter(struct kmem_cache_node *n,
+		enum partial_item item)
+{
+	unsigned long ret = 0;
+
+#ifdef CONFIG_SLUB_DEBUG_PARTIAL
+	if (item == PARTIAL_FREE) {
+		ret = per_cpu_sum(*n->partial_free_objs);
+		if ((long)ret < 0)
+			ret = 0;
+	} else if (item == PARTIAL_TOTAL) {
+		ret = n->partial_total_objs;
+	} else if (item == PARTIAL_INUSE) {
+		ret = per_cpu_sum(*n->partial_free_objs);
+		if ((long)ret < 0)
+			ret = 0;
+		ret = n->partial_total_objs - ret;
+		if ((long)ret < 0)
+			ret = 0;
+	} else { /* item == PARTIAL_SLAB */
+		ret = n->nr_partial;
+	}
+#endif
+
+	return ret;
 }
 #endif /* CONFIG_SLUB_DEBUG || CONFIG_SYSFS */
 
@@ -2587,7 +2597,7 @@ slab_out_of_memory(struct kmem_cache *s, gfp_t gfpflags, int nid)
 		unsigned long nr_objs;
 		unsigned long nr_free;
 
-		nr_free  = count_partial(n, count_free);
+		nr_free  = partial_counter(n, PARTIAL_FREE);
 		nr_slabs = node_nr_slabs(n);
 		nr_objs  = node_nr_objs(n);
 
@@ -4654,18 +4664,6 @@ void *__kmalloc_node_track_caller(size_t size, gfp_t gfpflags,
 EXPORT_SYMBOL(__kmalloc_node_track_caller);
 #endif
 
-#ifdef CONFIG_SYSFS
-static int count_inuse(struct page *page)
-{
-	return page->inuse;
-}
-
-static int count_total(struct page *page)
-{
-	return page->objects;
-}
-#endif
-
 #ifdef CONFIG_SLUB_DEBUG
 static void validate_slab(struct kmem_cache *s, struct page *page)
 {
@@ -5102,7 +5100,7 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 				x = atomic_long_read(&n->total_objects);
 			else if (flags & SO_OBJECTS)
 				x = atomic_long_read(&n->total_objects) -
-					count_partial(n, count_free);
+					partial_counter(n, PARTIAL_FREE);
 			else
 				x = atomic_long_read(&n->nr_slabs);
 			total += x;
@@ -5116,11 +5114,11 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 
 		for_each_kmem_cache_node(s, node, n) {
 			if (flags & SO_TOTAL)
-				x = count_partial(n, count_total);
+				x = partial_counter(n, PARTIAL_TOTAL);
 			else if (flags & SO_OBJECTS)
-				x = count_partial(n, count_inuse);
+				x = partial_counter(n, PARTIAL_INUSE);
 			else
-				x = n->nr_partial;
+				x = partial_counter(n, PARTIAL_SLAB);
 			total += x;
 			nodes[node] += x;
 		}
@@ -5884,7 +5882,7 @@ void get_slabinfo(struct kmem_cache *s, struct slabinfo *sinfo)
 	for_each_kmem_cache_node(s, node, n) {
 		nr_slabs += node_nr_slabs(n);
 		nr_objs += node_nr_objs(n);
-		nr_free += count_partial(n, count_free);
+		nr_free += partial_counter(n, PARTIAL_FREE);
 	}
 
 	sinfo->active_objs = nr_objs - nr_free;
