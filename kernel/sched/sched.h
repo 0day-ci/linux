@@ -57,6 +57,7 @@
 #include <linux/prefetch.h>
 #include <linux/profile.h>
 #include <linux/psi.h>
+#include <linux/ratelimit.h>
 #include <linux/rcupdate_wait.h>
 #include <linux/security.h>
 #include <linux/stop_machine.h>
@@ -962,6 +963,11 @@ struct rq {
 	unsigned long		lost_idle_time;
 
 	atomic_t		nr_iowait;
+
+#ifdef CONFIG_SCHED_DEBUG
+	u64 last_seen_need_resched_ns;
+	int ticks_without_resched;
+#endif
 
 #ifdef CONFIG_MEMBARRIER
 	int membarrier_state;
