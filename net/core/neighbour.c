@@ -173,25 +173,48 @@ static bool neigh_update_ext_learned(struct neighbour *neigh, u32 flags,
 	return rc;
 }
 
+static int neigh_del_timer(struct neighbour *n)
+{
+	if ((n->nud_state & NUD_IN_TIMER) &&
+	    del_timer(&n->timer)) {
+		neigh_release(n);
+		return 1;
+	}
+	return 0;
+}
+
 static bool neigh_del(struct neighbour *n, struct neighbour __rcu **np,
 		      struct neigh_table *tbl)
 {
-	bool retval = false;
-
+	rcu_assign_pointer(*np,
+		   rcu_dereference_protected(n->next,
+				lockdep_is_held(&tbl->lock)));
 	write_lock(&n->lock);
-	if (refcount_read(&n->refcnt) == 1) {
-		struct neighbour *neigh;
+	neigh_del_timer(n);
+	neigh_mark_dead(n);
+	if (refcount_read(&n->refcnt) != 1) {
+		/* The most unpleasant situation.
+		   We must destroy neighbour entry,
+		   but someone still uses it.
 
-		neigh = rcu_dereference_protected(n->next,
-						  lockdep_is_held(&tbl->lock));
-		rcu_assign_pointer(*np, neigh);
-		neigh_mark_dead(n);
-		retval = true;
+		   The destroy will be delayed until
+		   the last user releases us, but
+		   we must kill timers etc. and move
+		   it to safe state.
+		 */
+		__skb_queue_purge(&n->arp_queue);
+		n->arp_queue_len_bytes = 0;
+		n->output = neigh_blackhole;
+		if (n->nud_state & NUD_VALID)
+			n->nud_state = NUD_NOARP;
+		else
+			n->nud_state = NUD_NONE;
+		neigh_dbg(2, "neigh %p is stray\n", n);
 	}
 	write_unlock(&n->lock);
-	if (retval)
-		neigh_cleanup_and_release(n);
-	return retval;
+	neigh_cleanup_and_release(n);
+
+	return true;
 }
 
 bool neigh_remove_one(struct neighbour *ndel, struct neigh_table *tbl)
@@ -229,22 +252,20 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 	write_lock_bh(&tbl->lock);
 
 	list_for_each_entry_safe(n, tmp, &tbl->gc_list, gc_list) {
-		if (refcount_read(&n->refcnt) == 1) {
-			bool remove = false;
+		bool remove = false;
 
-			write_lock(&n->lock);
-			if ((n->nud_state == NUD_FAILED) ||
-			    (tbl->is_multicast &&
-			     tbl->is_multicast(n->primary_key)) ||
-			    time_after(tref, n->updated))
-				remove = true;
-			write_unlock(&n->lock);
+		write_lock(&n->lock);
+		if ((n->nud_state == NUD_FAILED) ||
+		    (tbl->is_multicast &&
+		     tbl->is_multicast(n->primary_key)) ||
+		    time_after(tref, n->updated))
+			remove = true;
+		write_unlock(&n->lock);
 
-			if (remove && neigh_remove_one(n, tbl))
-				shrunk++;
-			if (shrunk >= max_clean)
-				break;
-		}
+		if (remove && neigh_remove_one(n, tbl))
+			shrunk++;
+		if (shrunk >= max_clean)
+			break;
 	}
 
 	tbl->last_flush = jiffies;
@@ -262,16 +283,6 @@ static void neigh_add_timer(struct neighbour *n, unsigned long when)
 		       n->nud_state);
 		dump_stack();
 	}
-}
-
-static int neigh_del_timer(struct neighbour *n)
-{
-	if ((n->nud_state & NUD_IN_TIMER) &&
-	    del_timer(&n->timer)) {
-		neigh_release(n);
-		return 1;
-	}
-	return 0;
 }
 
 static void pneigh_queue_purge(struct sk_buff_head *list)
@@ -307,33 +318,7 @@ static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev,
 				np = &n->next;
 				continue;
 			}
-			rcu_assign_pointer(*np,
-				   rcu_dereference_protected(n->next,
-						lockdep_is_held(&tbl->lock)));
-			write_lock(&n->lock);
-			neigh_del_timer(n);
-			neigh_mark_dead(n);
-			if (refcount_read(&n->refcnt) != 1) {
-				/* The most unpleasant situation.
-				   We must destroy neighbour entry,
-				   but someone still uses it.
-
-				   The destroy will be delayed until
-				   the last user releases us, but
-				   we must kill timers etc. and move
-				   it to safe state.
-				 */
-				__skb_queue_purge(&n->arp_queue);
-				n->arp_queue_len_bytes = 0;
-				n->output = neigh_blackhole;
-				if (n->nud_state & NUD_VALID)
-					n->nud_state = NUD_NOARP;
-				else
-					n->nud_state = NUD_NONE;
-				neigh_dbg(2, "neigh %p is stray\n", n);
-			}
-			write_unlock(&n->lock);
-			neigh_cleanup_and_release(n);
+			neigh_del(n, np, tbl);
 		}
 	}
 }
