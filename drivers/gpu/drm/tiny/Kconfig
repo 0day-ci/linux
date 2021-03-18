@@ -41,6 +41,7 @@ config DRM_GM12U320
 config DRM_SIMPLEDRM
 	tristate "Simple framebuffer driver"
 	depends on DRM
+	select DRM_APERTURE
 	select DRM_GEM_SHMEM_HELPER
 	select DRM_KMS_HELPER
 	help
