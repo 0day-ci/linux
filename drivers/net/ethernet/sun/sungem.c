@@ -1675,7 +1675,7 @@ static void gem_init_phy(struct gem *gp)
 		int i;
 
 		/* Those delay sucks, the HW seem to love them though, I'll
-		 * serisouly consider breaking some locks here to be able
+		 * seriously consider breaking some locks here to be able
 		 * to schedule instead
 		 */
 		for (i = 0; i < 3; i++) {
