@@ -815,6 +815,13 @@ unlock:
 		spin_unlock_irqrestore(&rq->lock, flags);
 		if (!ok)
 			return false;
+
+		/*
+		 * Due async nature of preempt-to-busy and request cancellation
+		 * we need to skip further asserts for cancelled requests.
+		 */
+		if (READ_ONCE(rq->fence.error))
+			break;
 	}
 
 	return ce;
