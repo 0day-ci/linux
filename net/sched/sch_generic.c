@@ -205,6 +205,7 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 	const struct netdev_queue *txq = q->dev_queue;
 	struct sk_buff *skb = NULL;
 
+	clear_bit(__QDISC_STATE_NEED_RESCHEDULE, &q->state);
 	*packets = 1;
 	if (unlikely(!skb_queue_empty(&q->gso_skb))) {
 		spinlock_t *lock = NULL;

@@ -36,6 +36,7 @@ struct qdisc_rate_table {
 enum qdisc_state_t {
 	__QDISC_STATE_SCHED,
 	__QDISC_STATE_DEACTIVATED,
+	__QDISC_STATE_NEED_RESCHEDULE,
 };
 
 struct qdisc_size_table {
@@ -159,8 +160,17 @@ static inline bool qdisc_is_empty(const struct Qdisc *qdisc)
 static inline bool qdisc_run_begin(struct Qdisc *qdisc)
 {
 	if (qdisc->flags & TCQ_F_NOLOCK) {
-		if (!spin_trylock(&qdisc->seqlock))
-			return false;
+		if (!spin_trylock(&qdisc->seqlock)) {
+			set_bit(__QDISC_STATE_NEED_RESCHEDULE,
+				&qdisc->state);
+
+			/* Retry again in case other CPU may not see the
+			 * new flags after it releases the lock at the
+			 * end of qdisc_run_end().
+			 */
+			if (!spin_trylock(&qdisc->seqlock))
+				return false;
+		}
 		WRITE_ONCE(qdisc->empty, false);
 	} else if (qdisc_is_running(qdisc)) {
 		return false;
@@ -176,8 +186,15 @@ static inline bool qdisc_run_begin(struct Qdisc *qdisc)
 static inline void qdisc_run_end(struct Qdisc *qdisc)
 {
 	write_seqcount_end(&qdisc->running);
-	if (qdisc->flags & TCQ_F_NOLOCK)
+	if (qdisc->flags & TCQ_F_NOLOCK) {
 		spin_unlock(&qdisc->seqlock);
+
+		if (unlikely(test_bit(__QDISC_STATE_NEED_RESCHEDULE,
+				      &qdisc->state) &&
+			     !test_bit(__QDISC_STATE_DEACTIVATED,
+				       &qdisc->state)))
+			__netif_schedule(qdisc);
+	}
 }
 
 static inline bool qdisc_may_bulk(const struct Qdisc *qdisc)
