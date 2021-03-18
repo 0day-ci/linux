@@ -499,23 +499,22 @@ unregister_mux:
 static void xvcu_clk_hw_unregister_leaf(struct clk_hw *hw)
 {
 	struct clk_hw *gate = hw;
-	struct clk_hw *divider;
-	struct clk_hw *mux;
+	struct clk_hw *divider = NULL;
+	struct clk_hw *mux = NULL;
 
-	if (!gate)
-		return;
+	/* Get all clocks of this output clock */
+	if (gate)
+		divider = clk_hw_get_parent(gate);
+	if (divider)
+		mux = clk_hw_get_parent(divider);
 
-	divider = clk_hw_get_parent(gate);
-	clk_hw_unregister_gate(gate);
-	if (!divider)
-		return;
-
-	mux = clk_hw_get_parent(divider);
-	clk_hw_unregister_mux(mux);
-	if (!divider)
-		return;
-
-	clk_hw_unregister_divider(divider);
+	/* Unregister clocks of this output clock if they have been found */
+	if (gate)
+		clk_hw_unregister_gate(gate);
+	if (divider)
+		clk_hw_unregister_divider(divider);
+	if (mux)
+		clk_hw_unregister_mux(mux);
 }
 
 static int xvcu_register_clock_provider(struct xvcu_device *xvcu)
