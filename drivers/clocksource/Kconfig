@@ -437,13 +437,20 @@ config OXNAS_RPS_TIMER
 config SYS_SUPPORTS_SH_CMT
 	bool
 
-config MTK_TIMER
-	bool "Mediatek timer driver" if COMPILE_TEST
+config TIMER_MEDIATEK_MT6577
+	bool "Mediatek mt6577 timer driver" if COMPILE_TEST
 	depends on HAS_IOMEM
 	select TIMER_OF
 	select CLKSRC_MMIO
 	help
-	  Support for Mediatek timer driver.
+	  Enables clocksource and clockevent driver for Mediatek mt6577 timer.
+
+config TIMER_MEDIATEK_MT6765
+	bool "Mediatek mt6765 timer driver" if COMPILE_TEST
+	depends on HAS_IOMEM
+	select TIMER_OF
+	help
+	  Enables clockevent driver for Mediatek mt6765 timer.
 
 config SPRD_TIMER
 	bool "Spreadtrum timer driver" if EXPERT

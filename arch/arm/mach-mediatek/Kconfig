@@ -4,7 +4,8 @@ menuconfig ARCH_MEDIATEK
 	depends on ARCH_MULTI_V7
 	select ARM_GIC
 	select PINCTRL
-	select MTK_TIMER
+	select TIMER_MEDIATEK_MT6577
+	select TIMER_MEDIATEK_MT6765
 	select MFD_SYSCON
 	help
 	  Support for Mediatek MT65xx & MT81xx SoCs

@@ -153,7 +153,8 @@ config ARCH_MEDIATEK
 	bool "MediaTek SoC Family"
 	select ARM_GIC
 	select PINCTRL
-	select MTK_TIMER
+	select TIMER_MEDIATEK_MT6577
+	select TIMER_MEDIATEK_MT6765
 	help
 	  This enables support for MediaTek MT27xx, MT65xx, MT76xx
 	  & MT81xx ARMv8 SoCs
