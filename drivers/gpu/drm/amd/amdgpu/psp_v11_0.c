@@ -661,7 +661,7 @@ static int psp_v11_0_memory_training(struct psp_context *psp, uint32_t ops)
 
 	if (ops & PSP_MEM_TRAIN_SEND_LONG_MSG) {
 		/*
-		 * Long traing will encroach certain mount of bottom VRAM,
+		 * Long training will encroach certain mount of bottom VRAM,
 		 * saving the content of this bottom VRAM to system memory
 		 * before training, and restoring it after training to avoid
 		 * VRAM corruption.
