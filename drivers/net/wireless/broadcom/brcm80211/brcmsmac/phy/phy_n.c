@@ -26329,7 +26329,7 @@ static void wlc_phy_rxcal_radio_setup_nphy(struct brcms_phy *pi, u8 rx_core)
 
 					offtune_val =
 						(pi->tx_rx_cal_radio_saveregs
-						 [2] & 0xF0) >> 8;
+						 [2] & 0xF0) >> 4;
 					offtune_val =
 						(offtune_val <= 0x7) ? 0xF : 0;
 
