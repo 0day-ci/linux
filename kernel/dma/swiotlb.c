@@ -126,6 +126,8 @@ setup_io_tlb_npages(char *str)
 	} else if (!strcmp(str, "noforce")) {
 		swiotlb_force = SWIOTLB_NO_FORCE;
 		io_tlb_nslabs = 1;
+	} else if (!strcmp(str, "off")) {
+		swiotlb_force = SWIOTLB_OFF;
 	}
 
 	return 0;
@@ -229,6 +231,9 @@ int __init swiotlb_init_with_tbl(char *tlb, unsigned long nslabs, int verbose)
 	unsigned long i, bytes;
 	size_t alloc_size;
 
+	if (swiotlb_force == SWIOTLB_OFF)
+		return 0;
+
 	bytes = nslabs << IO_TLB_SHIFT;
 
 	io_tlb_nslabs = nslabs;
@@ -284,6 +289,9 @@ swiotlb_init(int verbose)
 	unsigned char *vstart;
 	unsigned long bytes;
 
+	if (swiotlb_force == SWIOTLB_OFF)
+		goto out;
+
 	if (!io_tlb_nslabs) {
 		io_tlb_nslabs = (default_size >> IO_TLB_SHIFT);
 		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
@@ -302,6 +310,7 @@ swiotlb_init(int verbose)
 		io_tlb_start = 0;
 	}
 	pr_warn("Cannot allocate buffer");
+out:
 	no_iotlb_memory = true;
 }
 

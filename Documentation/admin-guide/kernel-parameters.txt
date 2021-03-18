@@ -5278,6 +5278,7 @@
 			force -- force using of bounce buffers even if they
 			         wouldn't be automatically used by the kernel
 			noforce -- Never use bounce buffers (for debugging)
+			off -- Completely disable SWIOTLB
 
 	switches=	[HW,M68k]
 
