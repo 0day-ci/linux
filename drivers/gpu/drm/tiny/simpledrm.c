@@ -8,6 +8,7 @@
 #include <drm/drm_damage_helper.h>
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
+#include <drm/drm_fb_helper.h>
 #include <drm/drm_format_helper.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
@@ -499,6 +500,8 @@ static int simpledrm_probe(struct platform_device *pdev)
 	ret = drm_dev_register(dev, 0);
 	if (ret)
 		return ret;
+
+	drm_fbdev_generic_setup(dev, 0);
 
 	return 0;
 }
