@@ -189,6 +189,10 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
+	err = dsa_port_mrouter(dp->cpu_dp, br_multicast_router(br), extack);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
 	return 0;
 }
 
@@ -212,6 +216,12 @@ static void dsa_port_switchdev_unsync(struct dsa_port *dp)
 	dsa_port_set_state_now(dp, BR_STATE_FORWARDING);
 
 	/* VLAN filtering is handled by dsa_switch_bridge_leave */
+
+	/* Some drivers treat the notification for having a local multicast
+	 * router by allowing multicast to be flooded to the CPU, so we should
+	 * allow this in standalone mode too.
+	 */
+	dsa_port_mrouter(dp->cpu_dp, true, NULL);
 }
 
 int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
