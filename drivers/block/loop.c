@@ -1191,7 +1191,7 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	lo->workqueue = alloc_workqueue("loop%d",
 					WQ_UNBOUND | WQ_FREEZABLE |
 					WQ_MEM_RECLAIM,
-					lo->lo_number);
+					1, lo->lo_number);
 	if (!lo->workqueue) {
 		error = -ENOMEM;
 		goto out_unlock;
