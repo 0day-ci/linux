@@ -109,7 +109,7 @@ curs507a_acquire(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw,
 	if (ret || !asyh->curs.visible)
 		return ret;
 
-	if (asyw->image.w != asyw->image.h)
+	if (asyw->state.crtc_w != asyw->state.crtc_h)
 		return -EINVAL;
 
 	ret = head->func->curs_layout(head, asyw, asyh);
