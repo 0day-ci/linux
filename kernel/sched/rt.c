@@ -1998,7 +1998,7 @@ static void push_rt_tasks(struct rq *rq)
  *
  * Each root domain has its own irq work function that can iterate over
  * all CPUs with RT overloaded tasks. Since all CPUs with overloaded RT
- * tassk must be checked if there's one or many CPUs that are lowering
+ * task must be checked if there's one or many CPUs that are lowering
  * their priority, there's a single irq work iterator that will try to
  * push off RT tasks that are waiting to run.
  *
