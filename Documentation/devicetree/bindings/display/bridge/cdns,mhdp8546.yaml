@@ -17,8 +17,8 @@ properties:
       - ti,j721e-mhdp8546
 
   reg:
-    minItems: 1
-    maxItems: 2
+    minItems: 2
+    maxItems: 3
     items:
       - description:
           Register block of mhdptx apb registers up to PHY mapped area (AUX_CONFIG_P).
@@ -26,13 +26,16 @@ properties:
           included in the associated PHY.
       - description:
           Register block for DSS_EDP0_INTG_CFG_VP registers in case of TI J7 SoCs.
+      - description:
+          Register block of mhdptx sapb registers.
 
   reg-names:
-    minItems: 1
-    maxItems: 2
+    minItems: 2
+    maxItems: 3
     items:
       - const: mhdptx
       - const: j721e-intg
+      - const: mhdptx-sapb
 
   clocks:
     maxItems: 1
@@ -98,15 +101,15 @@ allOf:
     then:
       properties:
         reg:
-          minItems: 2
+          minItems: 3
         reg-names:
-          minItems: 2
+          minItems: 3
     else:
       properties:
         reg:
-          maxItems: 1
+          maxItems: 2
         reg-names:
-          maxItems: 1
+          maxItems: 2
 
 required:
   - compatible
@@ -129,8 +132,9 @@ examples:
 
         mhdp: dp-bridge@f0fb000000 {
             compatible = "cdns,mhdp8546";
-            reg = <0xf0 0xfb000000 0x0 0x1000000>;
-            reg-names = "mhdptx";
+            reg = <0xf0 0xfb000000 0x0 0x1000000>,
+                  <0x0 0x4f48000 0x0 0x74>;
+            reg-names = "mhdptx", "mhdptx-sapb";
             clocks = <&mhdp_clock>;
             phys = <&dp_phy>;
             phy-names = "dpphy";
