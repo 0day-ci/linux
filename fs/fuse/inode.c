@@ -1058,6 +1058,13 @@ static void process_init_reply(struct fuse_mount *fm, struct fuse_args *args,
 			fc->no_flock = 1;
 		}
 
+#if IS_ENABLED(CONFIG_VIRTIO_FS)
+		/* fuse_conn_init() sets this to zero for all others, this is
+		 * explicitly set by virtio_fs.
+		 */
+		if (fc->transport_capacity)
+			fc->max_pages = min_t(unsigned int, fc->max_pages, fc->transport_capacity);
+#endif
 		fm->sb->s_bdi->ra_pages =
 				min(fm->sb->s_bdi->ra_pages, ra_pages);
 		fc->minor = arg->minor;

@@ -18,6 +18,12 @@
 #include <linux/uio.h>
 #include "fuse_i.h"
 
+/* Used to help calculate the FUSE connection's max_pages limit for a request's
+ * size. Parts of the struct fuse_req are sliced into scattergather lists in
+ * addition to the pages used, so this can help account for that overhead.
+ */
+#define FUSE_HEADER_OVERHEAD    4
+
 /* List of virtio-fs device instances and a lock for the list. Also provides
  * mutual exclusion in device removal and mounting path
  */
@@ -1415,6 +1421,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	struct super_block *sb;
 	struct fuse_conn *fc;
 	struct fuse_mount *fm;
+	unsigned int virtqueue_size;
 	int err;
 
 	/* This gets a reference on virtio_fs object. This ptr gets installed
@@ -1441,6 +1448,13 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	fc->release = fuse_free_conn;
 	fc->delete_stale = true;
 	fc->auto_submounts = true;
+
+	/* Tell FUSE to split requests that exceed the virtqueue's size */
+	virtqueue_size = virtqueue_get_vring_size(fs->vqs[VQ_REQUEST].vq);
+	WARN_ON(virtqueue_size <= FUSE_HEADER_OVERHEAD);
+	fc->transport_capacity = min_t(unsigned int,
+			virtqueue_size - FUSE_HEADER_OVERHEAD,
+			FUSE_MAX_MAX_PAGES);
 
 	fsc->s_fs_info = fm;
 	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);

@@ -555,6 +555,11 @@ struct fuse_conn {
 	/** Maxmum number of pages that can be used in a single request */
 	unsigned int max_pages;
 
+#if IS_ENABLED(CONFIG_VIRTIO_FS)
+	/** Constrain ->max_pages to this value during feature negotiation */
+	unsigned int transport_capacity;
+#endif
+
 	/** Input queue */
 	struct fuse_iqueue iq;
 
