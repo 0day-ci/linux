@@ -1025,6 +1025,10 @@ static int uvc_ioctl_s_ctrl(struct file *file, void *fh,
 	struct uvc_fh *handle = fh;
 	struct uvc_video_chain *chain = handle->chain;
 	struct v4l2_ext_control xctrl;
+	struct v4l2_ext_controls ctrls = {
+		.count = 1,
+		.controls = &xctrl,
+	};
 	int ret;
 
 	ret = uvc_ctrl_is_accessible(chain, ctrl->id, VIDIOC_S_CTRL);
@@ -1045,7 +1049,7 @@ static int uvc_ioctl_s_ctrl(struct file *file, void *fh,
 		return ret;
 	}
 
-	ret = uvc_ctrl_commit(handle, &xctrl, 1);
+	ret = uvc_ctrl_commit(handle, &ctrls);
 	if (ret < 0)
 		return ret;
 
@@ -1149,7 +1153,7 @@ static int uvc_ioctl_s_try_ext_ctrls(struct uvc_fh *handle,
 	ctrls->error_idx = 0;
 
 	if (ioctl == VIDIOC_S_EXT_CTRLS)
-		return uvc_ctrl_commit(handle, ctrls->controls, ctrls->count);
+		return uvc_ctrl_commit(handle, ctrls);
 	else
 		return uvc_ctrl_rollback(handle);
 }
