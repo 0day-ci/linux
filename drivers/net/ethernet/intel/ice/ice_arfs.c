@@ -654,7 +654,6 @@ void ice_rebuild_arfs(struct ice_pf *pf)
 	if (!pf_vsi)
 		return;
 
-	ice_remove_arfs(pf);
 	if (ice_set_cpu_rx_rmap(pf_vsi)) {
 		dev_err(ice_pf_to_dev(pf), "Failed to rebuild aRFS\n");
 		return;

@@ -4568,6 +4568,9 @@ static int __maybe_unused ice_suspend(struct device *dev)
 			continue;
 		ice_vsi_free_q_vectors(pf->vsi[v]);
 	}
+	if (test_bit(ICE_FLAG_FD_ENA, pf->flags)) {
+		ice_remove_arfs(pf);
+	}
 	ice_clear_interrupt_scheme(pf);
 
 	pci_save_state(pdev);
