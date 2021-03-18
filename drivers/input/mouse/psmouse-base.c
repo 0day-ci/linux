@@ -1923,9 +1923,9 @@ static ssize_t psmouse_attr_set_protocol(struct psmouse *psmouse, void *data, co
 			return -EIO;
 		}
 
-		mutex_unlock(&psmouse_mutex);
-		serio_unregister_child_port(serio);
 		mutex_lock(&psmouse_mutex);
+		serio_unregister_child_port(serio);
+		mutex_unlock(&psmouse_mutex);
 
 		if (serio->drv != &psmouse_drv) {
 			input_free_device(new_dev);
