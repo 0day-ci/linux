@@ -536,7 +536,7 @@ static int copy_strings(int argc, struct user_arg_ptr argv,
 		if (!valid_arg_len(bprm, len))
 			goto out;
 
-		/* We're going to work our way backwords. */
+		/* We're going to work our way backwards. */
 		pos = bprm->p;
 		str += len;
 		bprm->p -= len;
@@ -603,7 +603,7 @@ out:
 }
 
 /*
- * Copy and argument/environment string from the kernel to the processes stack.
+ * Copy an argument/environment string from the kernel to the processes stack.
  */
 int copy_string_kernel(const char *arg, struct linux_binprm *bprm)
 {
@@ -718,9 +718,9 @@ static int shift_arg_pages(struct vm_area_struct *vma, unsigned long shift)
 	} else {
 		/*
 		 * otherwise, clean from old_start; this is done to not touch
-		 * the address space in [new_end, old_start) some architectures
+		 * the address space in [new_end, old_start]. Some architectures
 		 * have constraints on va-space that make this illegal (IA64) -
-		 * for the others its just a little faster.
+		 * for the others it's just a little faster.
 		 */
 		free_pgd_range(&tlb, old_start, old_end, new_end,
 			vma->vm_next ? vma->vm_next->vm_start : USER_PGTABLES_CEILING);
@@ -1120,7 +1120,7 @@ static int de_thread(struct task_struct *tsk)
 		 */
 
 		/* Become a process group leader with the old leader's pid.
-		 * The old leader becomes a thread of the this thread group.
+		 * The old leader becomes a thread of this thread group.
 		 */
 		exchange_tids(tsk, leader);
 		transfer_pid(leader, tsk, PIDTYPE_TGID);
@@ -1142,7 +1142,7 @@ static int de_thread(struct task_struct *tsk)
 		/*
 		 * We are going to release_task()->ptrace_unlink() silently,
 		 * the tracer can sleep in do_wait(). EXIT_DEAD guarantees
-		 * the tracer wont't block again waiting for this thread.
+		 * the tracer won't block again waiting for this thread.
 		 */
 		if (unlikely(leader->ptrace))
 			__wake_up_parent(leader, leader->parent);
@@ -1270,7 +1270,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 
 	/*
 	 * Must be called _before_ exec_mmap() as bprm->mm is
-	 * not visibile until then. This also enables the update
+	 * not visible until then. This also enables the update
 	 * to be lockless.
 	 */
 	set_mm_exe_file(bprm->mm, bprm->file);
