@@ -6817,6 +6817,24 @@ EXPORT_SYMBOL(netif_napi_add);
 void napi_disable(struct napi_struct *n)
 {
 	might_sleep();
+
+	/* make sure napi_disable() runs only once,
+	 * When napi is disabled, the state bits are like:
+	 * NAPI_STATE_SCHED (set by previous napi_disable)
+	 * NAPI_STATE_NPSVC (set by previous napi_disable)
+	 * NAPI_STATE_DISABLE (cleared by previous napi_disable)
+	 * NAPI_STATE_PREFER_BUSY_POLL (cleared by previous napi_complete_done)
+	 * NAPI_STATE_MISSED (cleared by previous napi_complete_done)
+	 */
+
+	if (napi_disable_pending(n))
+		return;
+	if (test_bit(NAPI_STATE_SCHED, &n->state) &&
+	    test_bit(NAPI_STATE_NPSVC, &n->state) &&
+	    !test_bit(NAPI_STATE_MISSED, &n->state) &&
+	    !test_bit(NAPI_STATE_PREFER_BUSY_POLL, &n->state))
+		return;
+
 	set_bit(NAPI_STATE_DISABLE, &n->state);
 
 	while (test_and_set_bit(NAPI_STATE_SCHED, &n->state))
