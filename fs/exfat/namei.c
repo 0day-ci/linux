@@ -596,6 +596,8 @@ static int exfat_find(struct inode *dir, struct qstr *qname,
 	struct exfat_inode_info *ei = EXFAT_I(dir);
 	struct exfat_dentry *ep, *ep2;
 	struct exfat_entry_set_cache *es;
+	/* for optimized dir & entry to prevent long traverse of cluster chain */
+	struct exfat_dir_entry de_opt;
 
 	if (qname->len == 0)
 		return -ENOENT;
@@ -619,7 +621,7 @@ static int exfat_find(struct inode *dir, struct qstr *qname,
 
 	/* search the file name for directories */
 	dentry = exfat_find_dir_entry(sb, ei, &cdir, &uni_name,
-			num_entries, TYPE_ALL);
+			num_entries, TYPE_ALL, &de_opt);
 
 	if (dentry < 0)
 		return dentry; /* -error value */
@@ -628,7 +630,7 @@ static int exfat_find(struct inode *dir, struct qstr *qname,
 	info->entry = dentry;
 	info->num_subdirs = 0;
 
-	es = exfat_get_dentry_set(sb, &cdir, dentry, ES_2_ENTRIES);
+	es = exfat_get_dentry_set(sb, &de_opt.dir, de_opt.entry, ES_2_ENTRIES);
 	if (!es)
 		return -EIO;
 	ep = exfat_get_dentry_cached(es, 0);
