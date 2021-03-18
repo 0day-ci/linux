@@ -741,7 +741,7 @@ static inline bool fast_dput(struct dentry *dentry)
 	unsigned int d_flags;
 
 	/*
-	 * If we have a d_op->d_delete() operation, we sould not
+	 * If we have a d_op->d_delete() operation, we should not
 	 * let the dentry count go to zero, so use "put_or_lock".
 	 */
 	if (unlikely(dentry->d_flags & DCACHE_OP_DELETE))
@@ -1053,7 +1053,7 @@ struct dentry *d_find_alias_rcu(struct inode *inode)
 	struct dentry *de = NULL;
 
 	spin_lock(&inode->i_lock);
-	// ->i_dentry and ->i_rcu are colocated, but the latter won't be
+	// ->i_dentry and ->i_rcu are collocated, but the latter won't be
 	// used without having I_FREEING set, which means no aliases left
 	if (likely(!(inode->i_state & I_FREEING) && !hlist_empty(l))) {
 		if (S_ISDIR(inode->i_mode)) {
@@ -1297,7 +1297,7 @@ void shrink_dcache_sb(struct super_block *sb)
 EXPORT_SYMBOL(shrink_dcache_sb);
 
 /**
- * enum d_walk_ret - action to talke during tree walk
+ * enum d_walk_ret - action to take during tree walk
  * @D_WALK_CONTINUE:	contrinue walk
  * @D_WALK_QUIT:	quit walk
  * @D_WALK_NORETRY:	quit when retry is needed
@@ -2156,8 +2156,8 @@ EXPORT_SYMBOL(d_obtain_alias);
  *
  * On successful return, the reference to the inode has been transferred
  * to the dentry.  In case of an error the reference on the inode is
- * released.  A %NULL or IS_ERR inode may be passed in and will be the
- * error will be propagate to the return value, with a %NULL @inode
+ * released.  A %NULL or IS_ERR inode may be passed in and the error will
+ * be propagated to the return value, with a %NULL @inode
  * replaced by ERR_PTR(-ESTALE).
  */
 struct dentry *d_obtain_root(struct inode *inode)
