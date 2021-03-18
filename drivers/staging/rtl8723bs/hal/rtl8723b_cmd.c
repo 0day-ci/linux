@@ -125,9 +125,6 @@ static void ConstructBeacon(struct adapter *padapter, u8 *pframe, u32 *pLength)
 	struct wlan_bssid_ex *cur_network = &(pmlmeinfo->network);
 	u8 bc_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-
-	/* DBG_871X("%s\n", __func__); */
-
 	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
 	fctrl = &(pwlanhdr->frame_control);
@@ -218,8 +215,6 @@ static void ConstructPSPoll(struct adapter *padapter, u8 *pframe, u32 *pLength)
 	__le16 *fctrl;
 	struct mlme_ext_priv *pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
-
-	/* DBG_871X("%s\n", __func__); */
 
 	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
@@ -325,8 +320,6 @@ static void ConstructProbeRsp(struct adapter *padapter, u8 *pframe, u32 *pLength
 	u8 *pwps_ie;
 	uint wps_ielen;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-
-	/* DBG_871X("%s\n", __func__); */
 
 	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
@@ -692,9 +685,6 @@ void rtl8723b_set_FwPsTuneParam_cmd(struct adapter *padapter)
 void rtl8723b_set_FwPwrModeInIPS_cmd(struct adapter *padapter, u8 cmd_param)
 {
 	/* BIT0:enable, BIT1:NoConnect32k */
-
-	DBG_871X("%s()\n", __func__);
-
 	FillH2CCmd8723B(padapter, H2C_8723B_FWLPS_IN_IPS_, 1, &cmd_param);
 }
 
@@ -790,8 +780,6 @@ static void rtl8723b_set_FwRsvdPagePkt(
 	u32 TotalPacketLen, MaxRsvdPageBufSize = 0;
 
 	struct RSVDPAGE_LOC RsvdPageLoc;
-
-	/* DBG_871X("%s---->\n", __func__); */
 
 	pxmitpriv = &padapter->xmitpriv;
 	pmlmeext = &padapter->mlmeextpriv;
@@ -962,7 +950,6 @@ static void rtl8723b_set_AP_FwRsvdPagePkt(
 	u32 TotalPacketLen = 0, MaxRsvdPageBufSize = 0;
 	struct RSVDPAGE_LOC RsvdPageLoc;
 
-	/* DBG_871X("%s---->\n", __func__); */
 	DBG_8192C("+" FUNC_ADPT_FMT ": iface_type =%d\n",
 		FUNC_ADPT_ARG(padapter), get_iface_type(padapter));
 
