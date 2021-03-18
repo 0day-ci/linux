@@ -513,7 +513,7 @@ ice_vc_fdir_set_flow_fld(struct ice_vf *vf, struct virtchnl_fdir_add *fltr,
 }
 
 /**
- * ice_vc_fdir_set_flow_fld - config the flow's packet segment header
+ * ice_vc_fdir_set_flow_hdr - config the flow's packet segment header
  * @vf: pointer to the VF structure
  * @conf: FDIR configuration for each filter
  * @seg: array of one or more packet segments that describe the flow

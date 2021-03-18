@@ -734,7 +734,7 @@ bool iavf_fdir_is_dup_fltr(struct iavf_adapter *adapter, struct iavf_fdir_fltr *
 }
 
 /**
- * iavf_fdir_fltr - find filter with location
+ * iavf_find_fdir_fltr_by_loc - find filter with location
  * @adapter: pointer to the VF adapter structure
  * @loc: location to find.
  *
