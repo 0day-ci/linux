@@ -327,6 +327,10 @@
 	status = "okay";
 };
 
+&optee {
+	status = "okay";
+};
+
 &sai1 {
 	status = "okay";
 };
