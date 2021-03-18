@@ -295,8 +295,6 @@ static struct sk_buff *sja1105_rcv(struct sk_buff *skb,
 	is_link_local = sja1105_is_link_local(skb);
 	is_meta = sja1105_is_meta_frame(skb);
 
-	skb->offload_fwd_mark = 1;
-
 	if (is_tagged) {
 		/* Normal traffic path. */
 		skb_push_rcsum(skb, ETH_HLEN);
@@ -338,6 +336,8 @@ static struct sk_buff *sja1105_rcv(struct sk_buff *skb,
 		netdev_warn(netdev, "Couldn't decode source port\n");
 		return NULL;
 	}
+
+	dsa_default_offload_fwd_mark(skb);
 
 	if (subvlan)
 		sja1105_decode_subvlan(skb, subvlan);
