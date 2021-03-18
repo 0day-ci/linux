@@ -78,8 +78,14 @@ DRM_IOCTL_VERSION ioctl.
 Managing Ownership of the Framebuffer Aperture
 ----------------------------------------------
 
+.. kernel-doc:: drivers/gpu/drm/drm_aperture.c
+   :doc: overview
+
 .. kernel-doc:: include/drm/drm_aperture.h
    :internal:
+
+.. kernel-doc:: drivers/gpu/drm/drm_aperture.c
+   :export:
 
 Device Instance and Driver Handling
 -----------------------------------

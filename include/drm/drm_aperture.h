@@ -4,7 +4,29 @@
 #define _DRM_APERTURE_H_
 
 #include <linux/fb.h>
+#include <linux/pci.h>
 #include <linux/vgaarb.h>
+
+struct drm_aperture;
+struct drm_device;
+
+struct drm_aperture_funcs {
+	void (*detach)(struct drm_device *dev, resource_size_t base, resource_size_t size);
+};
+
+struct drm_aperture *
+devm_aperture_acquire(struct drm_device *dev,
+		      resource_size_t base, resource_size_t size,
+		      const struct drm_aperture_funcs *funcs);
+
+#if defined(CONFIG_DRM_APERTURE)
+void drm_aperture_detach_drivers(resource_size_t base, resource_size_t size);
+#else
+static inline void
+drm_aperture_detach_drivers(resource_size_t base, resource_size_t size)
+{
+}
+#endif
 
 /**
  * drm_fb_helper_remove_conflicting_framebuffers - remove firmware-configured framebuffers
@@ -20,6 +42,11 @@ static inline int
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 					      const char *name, bool primary)
 {
+	int i;
+
+	for (i = 0; i < a->count; ++i)
+		drm_aperture_detach_drivers(a->ranges[i].base, a->ranges[i].size);
+
 #if IS_REACHABLE(CONFIG_FB)
 	return remove_conflicting_framebuffers(a, name, primary);
 #else
@@ -43,7 +70,16 @@ static inline int
 drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 						  const char *name)
 {
-	int ret = 0;
+	resource_size_t base, size;
+	int bar, ret = 0;
+
+	for (bar = 0; bar < PCI_STD_NUM_BARS; bar++) {
+		if (!(pci_resource_flags(pdev, bar) & IORESOURCE_MEM))
+			continue;
+		base = pci_resource_start(pdev, bar);
+		size = pci_resource_len(pdev, bar);
+		drm_aperture_detach_drivers(base, size);
+	}
 
 	/*
 	 * WARNING: Apparently we must kick fbdev drivers before vgacon,

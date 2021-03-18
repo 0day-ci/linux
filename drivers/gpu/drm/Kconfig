@@ -221,6 +221,13 @@ config DRM_SCHED
 	tristate
 	depends on DRM
 
+config DRM_APERTURE
+	bool
+	depends on DRM
+	help
+	  Controls ownership of graphics apertures. Required to
+	  synchronize with firmware-based drivers.
+
 source "drivers/gpu/drm/i2c/Kconfig"
 
 source "drivers/gpu/drm/arm/Kconfig"
