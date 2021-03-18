@@ -155,7 +155,7 @@ EXPORT_SYMBOL_GPL(devfreq_event_set_event);
  * @edata	: the calculated data of devfreq-event device
  *
  * Note that this function get the calculated event data from devfreq-event dev
- * after stoping the progress of whole sequence of devfreq-event dev.
+ * after stopping the progress of whole sequence of devfreq-event dev.
  */
 int devfreq_event_get_event(struct devfreq_event_dev *edev,
 			    struct devfreq_event_data *edata)
@@ -184,7 +184,7 @@ int devfreq_event_get_event(struct devfreq_event_dev *edev,
 EXPORT_SYMBOL_GPL(devfreq_event_get_event);
 
 /**
- * devfreq_event_reset_event() - Reset all opeations of devfreq-event dev.
+ * devfreq_event_reset_event() - Reset all operations of devfreq-event dev.
  * @edev	: the devfreq-event device
  *
  * Note that this function stop all operations of devfreq-event dev and reset
