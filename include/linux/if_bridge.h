@@ -196,4 +196,20 @@ static inline int br_fdb_replay(struct net_device *br_dev,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_BRIDGE) && IS_ENABLED(CONFIG_NET_SWITCHDEV)
+int switchdev_bridge_port_offload(struct net_device *dev,
+				  struct netlink_ext_ack *extack);
+int switchdev_bridge_port_unoffload(struct net_device *dev);
+#else
+int switchdev_bridge_port_offload(struct net_device *dev,
+				  struct netlink_ext_ack *extack)
+{
+	return 0;
+}
+
+int switchdev_bridge_port_unoffload(struct net_device *dev)
+{
+}
+#endif
+
 #endif

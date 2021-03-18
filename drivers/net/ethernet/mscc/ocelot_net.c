@@ -1213,7 +1213,7 @@ static int ocelot_netdevice_bridge_join(struct net_device *dev,
 	if (err)
 		goto err_switchdev_sync;
 
-	return 0;
+	return switchdev_bridge_port_offload(brport_dev, extack);
 
 err_switchdev_sync:
 	ocelot_port_bridge_leave(ocelot, port, bridge);
@@ -1233,6 +1233,8 @@ static int ocelot_netdevice_bridge_leave(struct net_device *dev,
 	err = ocelot_switchdev_unsync(ocelot, port);
 	if (err)
 		return err;
+
+	switchdev_bridge_port_unoffload(brport_dev);
 
 	ocelot_port_bridge_leave(ocelot, port, bridge);
 

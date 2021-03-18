@@ -1518,7 +1518,7 @@ static int dpaa2_switch_port_bridge_join(struct net_device *netdev,
 	if (err)
 		goto err_egress_flood;
 
-	return 0;
+	return switchdev_bridge_port_offload(netdev, NULL);
 
 err_egress_flood:
 	dpaa2_switch_port_set_fdb(port_priv, NULL);
@@ -1551,6 +1551,8 @@ static int dpaa2_switch_port_bridge_leave(struct net_device *netdev)
 	struct dpaa2_switch_fdb *old_fdb = port_priv->fdb;
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
 	int err;
+
+	switchdev_bridge_port_unoffload(netdev);
 
 	/* First of all, fast age any learn FDB addresses on this switch port */
 	dpaa2_switch_port_fast_age(port_priv);

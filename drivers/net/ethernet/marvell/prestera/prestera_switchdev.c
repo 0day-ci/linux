@@ -443,6 +443,10 @@ static int prestera_port_bridge_join(struct prestera_port *port,
 		goto err_brport_create;
 	}
 
+	err = switchdev_bridge_port_offload(port->dev, NULL);
+	if (err)
+		goto err_brport_offload;
+
 	if (bridge->vlan_enabled)
 		return 0;
 
@@ -453,6 +457,7 @@ static int prestera_port_bridge_join(struct prestera_port *port,
 	return 0;
 
 err_port_join:
+err_brport_offload:
 	prestera_bridge_port_put(br_port);
 err_brport_create:
 	prestera_bridge_put(bridge);
@@ -519,6 +524,8 @@ static void prestera_port_bridge_leave(struct prestera_port *port,
 	br_port = __prestera_bridge_port_by_dev(bridge, port->dev);
 	if (!br_port)
 		return;
+
+	switchdev_bridge_port_unoffload(port->dev);
 
 	bridge = br_port->bridge;
 

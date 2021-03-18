@@ -1508,6 +1508,7 @@ static int cpsw_netdevice_port_link(struct net_device *ndev,
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
+	int err;
 
 	if (!cpsw->br_members) {
 		cpsw->hw_bridge_dev = br_ndev;
@@ -1523,13 +1524,16 @@ static int cpsw_netdevice_port_link(struct net_device *ndev,
 
 	cpsw_port_offload_fwd_mark_update(cpsw);
 
-	return NOTIFY_DONE;
+	err = switchdev_bridge_port_offload(ndev, NULL);
+	return notifier_to_errno(err);
 }
 
 static void cpsw_netdevice_port_unlink(struct net_device *ndev)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
+
+	switchdev_bridge_port_unoffload(ndev);
 
 	cpsw->br_members &= ~BIT(priv->emac_port);
 

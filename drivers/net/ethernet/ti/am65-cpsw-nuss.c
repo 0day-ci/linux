@@ -7,6 +7,7 @@
 
 #include <linux/clk.h>
 #include <linux/etherdevice.h>
+#include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -2082,6 +2083,7 @@ static int am65_cpsw_netdevice_port_link(struct net_device *ndev, struct net_dev
 {
 	struct am65_cpsw_common *common = am65_ndev_to_common(ndev);
 	struct am65_cpsw_ndev_priv *priv = am65_ndev_to_priv(ndev);
+	int err;
 
 	if (!common->br_members) {
 		common->hw_bridge_dev = br_ndev;
@@ -2097,13 +2099,16 @@ static int am65_cpsw_netdevice_port_link(struct net_device *ndev, struct net_dev
 
 	am65_cpsw_port_offload_fwd_mark_update(common);
 
-	return NOTIFY_DONE;
+	err = switchdev_bridge_port_offload(ndev, NULL);
+	return notifier_to_errno(err);
 }
 
 static void am65_cpsw_netdevice_port_unlink(struct net_device *ndev)
 {
 	struct am65_cpsw_common *common = am65_ndev_to_common(ndev);
 	struct am65_cpsw_ndev_priv *priv = am65_ndev_to_priv(ndev);
+
+	switchdev_bridge_port_unoffload(ndev);
 
 	common->br_members &= ~BIT(priv->port->port_id);
 
