@@ -173,6 +173,7 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 {
 	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
 	struct net_device *br = dp->bridge_dev;
+	clock_t ageing_time;
 	u8 stp_state;
 	int err;
 
@@ -190,6 +191,11 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 		return err;
 
 	err = dsa_port_mrouter(dp->cpu_dp, br_multicast_router(br), extack);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
+	ageing_time = br_get_ageing_time(br);
+	err = dsa_port_ageing_time(dp, ageing_time);
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
@@ -222,6 +228,10 @@ static void dsa_port_switchdev_unsync(struct dsa_port *dp)
 	 * allow this in standalone mode too.
 	 */
 	dsa_port_mrouter(dp->cpu_dp, true, NULL);
+
+	/* Ageing time may be global to the switch chip, so don't change it
+	 * here because we have no good reason (or value) to change it to.
+	 */
 }
 
 int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
