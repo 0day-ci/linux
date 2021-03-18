@@ -36,6 +36,11 @@ allOf:
             minItems: 3
             maxItems: 3
 
+        st,smbus-alert:
+          description: Enable the SMBus-Alert via SMBA pin, note SMBA pin
+                       must also be configured via pinctrl.
+          type: boolean
+
   - if:
       properties:
         compatible:
