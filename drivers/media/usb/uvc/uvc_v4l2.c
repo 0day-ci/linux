@@ -999,6 +999,10 @@ static int uvc_ioctl_g_ctrl(struct file *file, void *fh,
 	struct v4l2_ext_control xctrl;
 	int ret;
 
+	ret = uvc_ctrl_is_accessible(chain, ctrl->id, VIDIOC_G_CTRL);
+	if (ret)
+		return ret;
+
 	memset(&xctrl, 0, sizeof(xctrl));
 	xctrl.id = ctrl->id;
 
@@ -1022,6 +1026,10 @@ static int uvc_ioctl_s_ctrl(struct file *file, void *fh,
 	struct uvc_video_chain *chain = handle->chain;
 	struct v4l2_ext_control xctrl;
 	int ret;
+
+	ret = uvc_ctrl_is_accessible(chain, ctrl->id, VIDIOC_S_CTRL);
+	if (ret)
+		return ret;
 
 	memset(&xctrl, 0, sizeof(xctrl));
 	xctrl.id = ctrl->id;
@@ -1054,8 +1062,7 @@ static int uvc_ctrl_check_access(struct uvc_video_chain *chain,
 	int ret = 0;
 
 	for (i = 0; i < ctrls->count; ++ctrl, ++i) {
-		ret = uvc_ctrl_is_accessible(chain, ctrl->id,
-					    ioctl == VIDIOC_G_EXT_CTRLS);
+		ret = uvc_ctrl_is_accessible(chain, ctrl->id, ioctl);
 		if (ret)
 			break;
 	}
