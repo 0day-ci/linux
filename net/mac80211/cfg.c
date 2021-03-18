@@ -1449,7 +1449,8 @@ static int sta_apply_parameters(struct ieee80211_local *local,
 	int ret = 0;
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_sub_if_data *sdata = sta->sdata;
-	u32 mask, set;
+	u32 mask, set, tid, ac, old_weight;
+	struct txq_info *txqi;
 
 	sband = ieee80211_get_sband(sdata);
 	if (!sband)
@@ -1628,8 +1629,30 @@ static int sta_apply_parameters(struct ieee80211_local *local,
 	if (ieee80211_vif_is_mesh(&sdata->vif))
 		sta_apply_mesh_params(local, sta, params);
 
-	if (params->airtime_weight)
-		sta->airtime_weight = params->airtime_weight;
+	if (params->airtime_weight) {
+		for (ac = 0; ac < IEEE80211_NUM_ACS; ac++) {
+			struct airtime_sched_info *air_sched = &local->airtime[ac];
+			struct airtime_info *air_info = &sta->airtime[ac];
+
+			spin_lock_bh(&air_sched->lock);
+			for (tid = 0; tid < IEEE80211_NUM_TIDS + 1; tid++) {
+				if (air_info->weight == params->airtime_weight ||
+				    !sta->sta.txq[tid] ||
+				    ac != ieee80211_ac_from_tid(tid))
+					continue;
+
+				old_weight = air_info->weight;
+				airtime_weight_set(air_info, params->airtime_weight);
+
+				txqi = to_txq_info(sta->sta.txq[tid]);
+				if (RB_EMPTY_NODE(&txqi->schedule_order))
+					continue;
+
+				ieee80211_update_airtime_weight(local, air_sched, 0, true);
+			}
+			spin_unlock_bh(&air_sched->lock);
+		}
+	}
 
 	/* set the STA state after all sta info from usermode has been set */
 	if (test_sta_flag(sta, WLAN_STA_TDLS_PEER) ||
