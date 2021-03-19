@@ -1,0 +1,12 @@
+digraph board {
+	rankdir=TB
+	n00000001 [label="{{} | imx334 1-001a\n/dev/v4l-subdev0 | {<port0> 0}}", shape=Mrecord, style=filled, fillcolor=green]
+	n00000001:port0 -> n00000003:port0 [style=bold]
+	n00000003 [label="{{<port0> 0 | <port1> 1} | keembay-camera-isp\n/dev/v4l-subdev1 | {<port2> 2 | <port3> 3}}", shape=Mrecord, style=filled, fillcolor=green]
+	n00000003:port2 -> n0000000e [style=bold]
+	n00000003:port3 -> n00000014 [style=bold]
+	n00000008 [label="keembay-metadata-params\n/dev/video0", shape=box, style=filled, fillcolor=yellow]
+	n00000008 -> n00000003:port1 [style=bold]
+	n0000000e [label="keembay-metadata-stats\n/dev/video1", shape=box, style=filled, fillcolor=yellow]
+	n00000014 [label="kmb_video kmb-video-capture\n/dev/video2", shape=box, style=filled, fillcolor=yellow]
+}

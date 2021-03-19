@@ -19,6 +19,7 @@ Video4Linux (V4L) driver-specific documentation
 	imx7
 	ipu3
 	ivtv
+	keembay-camera
 	meye
 	omap3isp
 	omap4_camera
