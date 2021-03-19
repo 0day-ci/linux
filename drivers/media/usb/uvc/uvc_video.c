@@ -1119,7 +1119,7 @@ static int uvc_submit_urb(struct uvc_urb *uvc_urb, gfp_t mem_flags)
 	dma_sync_sgtable_for_device(uvc_stream_to_dmadev(uvc_urb->stream),
 				    uvc_urb->sgt,
 				    uvc_stream_dir(uvc_urb->stream));
-	return usb_submit_urb(uvc_urb->urb, GFP_KERNEL);
+	return usb_submit_urb(uvc_urb->urb, mem_flags);
 }
 
 /*
