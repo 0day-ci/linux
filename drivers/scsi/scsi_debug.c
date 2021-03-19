@@ -361,6 +361,8 @@ static atomic_t sdebug_a_tsf;	     /* 'almost task set full' counter */
 static atomic_t sdeb_inject_pending;
 static atomic_t sdeb_mq_poll_count;  /* bumped when mq_poll returns > 0 */
 
+static struct execute_work ew_init;
+
 struct opcode_info_t {
 	u8 num_attached;	/* 0 if this is it (i.e. a leaf); use 0xff */
 				/* for terminating element */
@@ -6651,14 +6653,51 @@ static struct attribute *sdebug_drv_attrs[] = {
 };
 ATTRIBUTE_GROUPS(sdebug_drv);
 
+static void sdeb_add_hosts_thr(struct work_struct *work)
+{
+	bool want_store = (sdebug_fake_rw == 0);
+	int k, ret, hosts_to_add;
+	int idx = -1;
+
+	if (want_store) {
+		idx = sdebug_add_store();
+		if (idx < 0) {
+			pr_warn("%s: unable to allocate any store\n", __func__);
+			goto fini;
+		}
+	}
+	hosts_to_add = READ_ONCE(sdebug_add_host);
+	WRITE_ONCE(sdebug_add_host, 0);
+
+	for (k = 0; k < hosts_to_add; k++) {
+		if (want_store && k == 0) {
+			ret = sdebug_add_host_helper(idx);
+			if (ret < 0) {
+				pr_err("add_host_helper k=%d, error=%d\n",
+				       k, -ret);
+				break;
+			}
+		} else {
+			ret = sdebug_do_add_host(want_store &&
+						 sdebug_per_host_store);
+			if (ret < 0) {
+				pr_err("add_host k=%d error=%d\n", k, -ret);
+				break;
+			}
+		}
+	}
+	if (sdebug_verbose)
+		pr_info("built %d host(s)\n", sdebug_num_hosts);
+fini:
+	module_put(THIS_MODULE);
+}
+
 static struct device *pseudo_primary;
 
 static int __init scsi_debug_init(void)
 {
-	bool want_store = (sdebug_fake_rw == 0);
 	unsigned long sz;
-	int k, ret, hosts_to_add;
-	int idx = -1;
+	int k, ret;
 
 	ramdisk_lck_a[0] = &atomic_rw;
 	ramdisk_lck_a[1] = &atomic_rw2;
@@ -6841,19 +6880,12 @@ static int __init scsi_debug_init(void)
 		}
 	}
 	xa_init_flags(per_store_ap, XA_FLAGS_ALLOC | XA_FLAGS_LOCK_IRQ);
-	if (want_store) {
-		idx = sdebug_add_store();
-		if (idx < 0) {
-			ret = idx;
-			goto free_q_arr;
-		}
-	}
 
 	pseudo_primary = root_device_register("pseudo_0");
 	if (IS_ERR(pseudo_primary)) {
 		pr_warn("root_device_register() error\n");
 		ret = PTR_ERR(pseudo_primary);
-		goto free_vm;
+		goto free_q_arr;
 	}
 	ret = bus_register(&pseudo_lld_bus);
 	if (ret < 0) {
@@ -6866,28 +6898,9 @@ static int __init scsi_debug_init(void)
 		goto bus_unreg;
 	}
 
-	hosts_to_add = sdebug_add_host;
-	sdebug_add_host = 0;
-
-	for (k = 0; k < hosts_to_add; k++) {
-		if (want_store && k == 0) {
-			ret = sdebug_add_host_helper(idx);
-			if (ret < 0) {
-				pr_err("add_host_helper k=%d, error=%d\n",
-				       k, -ret);
-				break;
-			}
-		} else {
-			ret = sdebug_do_add_host(want_store &&
-						 sdebug_per_host_store);
-			if (ret < 0) {
-				pr_err("add_host k=%d error=%d\n", k, -ret);
-				break;
-			}
-		}
-	}
-	if (sdebug_verbose)
-		pr_info("built %d host(s)\n", sdebug_num_hosts);
+	__module_get(THIS_MODULE);	/* _put() at end of sdeb_add_hosts_thr() */
+	INIT_WORK(&ew_init.work, sdeb_add_hosts_thr);
+	schedule_work(&ew_init.work);
 
 	return 0;
 
@@ -6895,8 +6908,6 @@ bus_unreg:
 	bus_unregister(&pseudo_lld_bus);
 dev_unreg:
 	root_device_unregister(pseudo_primary);
-free_vm:
-	sdebug_erase_store(idx, NULL);
 free_q_arr:
 	kfree(sdebug_q_arr);
 	return ret;
