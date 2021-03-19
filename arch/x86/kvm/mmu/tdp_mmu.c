@@ -709,10 +709,10 @@ static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
  * SPTEs have been cleared and a TLB flush is needed before releasing the
  * MMU lock.
  */
-bool kvm_tdp_mmu_zap_gfn_range(struct kvm *kvm, gfn_t start, gfn_t end)
+bool kvm_tdp_mmu_zap_gfn_range(struct kvm *kvm, gfn_t start, gfn_t end,
+			       bool flush)
 {
 	struct kvm_mmu_page *root;
-	bool flush = false;
 
 	for_each_tdp_mmu_root_yield_safe(kvm, root)
 		flush = zap_gfn_range(kvm, root, start, end, true, flush);
@@ -725,7 +725,7 @@ void kvm_tdp_mmu_zap_all(struct kvm *kvm)
 	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
 	bool flush;
 
-	flush = kvm_tdp_mmu_zap_gfn_range(kvm, 0, max_gfn);
+	flush = kvm_tdp_mmu_zap_gfn_range(kvm, 0, max_gfn, false);
 	if (flush)
 		kvm_flush_remote_tlbs(kvm);
 }
