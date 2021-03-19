@@ -7,13 +7,13 @@
 #include "kcs_bmc.h"
 
 struct kcs_bmc_device_ops {
-	u8 (*io_inputb)(struct kcs_bmc *kcs_bmc, u32 reg);
-	void (*io_outputb)(struct kcs_bmc *kcs_bmc, u32 reg, u8 b);
-	void (*io_updateb)(struct kcs_bmc *kcs_bmc, u32 reg, u8 mask, u8 b);
+	u8 (*io_inputb)(struct kcs_bmc_device *kcs_bmc, u32 reg);
+	void (*io_outputb)(struct kcs_bmc_device *kcs_bmc, u32 reg, u8 b);
+	void (*io_updateb)(struct kcs_bmc_device *kcs_bmc, u32 reg, u8 mask, u8 b);
 };
 
-int kcs_bmc_handle_event(struct kcs_bmc *kcs_bmc);
-int kcs_bmc_add_device(struct kcs_bmc *kcs_bmc);
-int kcs_bmc_remove_device(struct kcs_bmc *kcs_bmc);
+int kcs_bmc_handle_event(struct kcs_bmc_device *kcs_bmc);
+int kcs_bmc_add_device(struct kcs_bmc_device *kcs_bmc);
+int kcs_bmc_remove_device(struct kcs_bmc_device *kcs_bmc);
 
 #endif
