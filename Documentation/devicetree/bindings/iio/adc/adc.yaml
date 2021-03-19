@@ -39,4 +39,13 @@ properties:
       The first value specifies the positive input pin, the second
       specifies the negative input pin.
 
+  settling-time-us:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Time between enabling the channel and firs stable readings.
+
+  oversampling-ratio:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: Number of data samples which are averaged for each read.
+
 additionalProperties: true
