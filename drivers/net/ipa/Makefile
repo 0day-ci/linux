@@ -1,5 +1,5 @@
 # Un-comment the next line if you want to validate configuration data
-#ccflags-y		+=	-DIPA_VALIDATE
+# ccflags-y		+=	-DIPA_VALIDATION
 
 obj-$(CONFIG_QCOM_IPA)	+=	ipa.o
 

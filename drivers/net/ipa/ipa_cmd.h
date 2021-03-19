@@ -50,7 +50,7 @@ struct ipa_cmd_info {
 	enum dma_data_direction direction;
 };
 
-#ifdef IPA_VALIDATE
+#ifdef IPA_VALIDATION
 
 /**
  * ipa_cmd_table_valid() - Validate a memory region holding a table
@@ -73,7 +73,7 @@ bool ipa_cmd_table_valid(struct ipa *ipa, const struct ipa_mem *mem,
  */
 bool ipa_cmd_data_valid(struct ipa *ipa);
 
-#else /* !IPA_VALIDATE */
+#else /* !IPA_VALIDATION */
 
 static inline bool ipa_cmd_table_valid(struct ipa *ipa,
 				       const struct ipa_mem *mem, bool route,
@@ -87,7 +87,7 @@ static inline bool ipa_cmd_data_valid(struct ipa *ipa)
 	return true;
 }
 
-#endif /* !IPA_VALIDATE */
+#endif /* !IPA_VALIDATION */
 
 /**
  * ipa_cmd_pool_init() - initialize command channel pools
