@@ -112,6 +112,37 @@ DEFINE_EVENT(/* event */
 	TP_ARGS(rv_inx, jdev, total_size, max_size, refcount)
 );
 
+DECLARE_EVENT_CLASS(/* user_ring */
+	rv_user_ring_template,
+	TP_PROTO(int rv_inx, u32 count, u32 hd, u32 tail),
+	TP_ARGS(rv_inx, count, hd, tail),
+	TP_STRUCT__entry(/* entry */
+		__field(int, rv_inx)
+		__field(u32, count)
+		__field(u32, head)
+		__field(u32, tail)
+	),
+	TP_fast_assign(/* assign */
+		__entry->rv_inx = rv_inx;
+		__entry->count = count;
+		__entry->head = hd;
+		__entry->tail = tail;
+	),
+	TP_printk(/* print */
+		"rv_inx %d entries %u head %u tail %u",
+		__entry->rv_inx,
+		__entry->count,
+		__entry->head,
+		__entry->tail
+	)
+);
+
+DEFINE_EVENT(/* event */
+	rv_user_ring_template, rv_user_ring_post_event,
+	TP_PROTO(int rv_inx, u32 count, u32 hd, u32 tail),
+	TP_ARGS(rv_inx, count, hd, tail)
+);
+
 #endif /* __RV_TRACE_USER_H */
 
 #undef TRACE_INCLUDE_PATH
