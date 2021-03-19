@@ -786,7 +786,7 @@ static inline void wake_up_sem_queue_prepare(struct sem_queue *q, int error,
 {
 	get_task_struct(q->sleeper);
 
-	/* see SEM_BARRIER_2 for purpuse/pairing */
+	/* see SEM_BARRIER_2 for purpose/pairing */
 	smp_store_release(&q->status, error);
 
 	wake_q_add_safe(wake_q, q->sleeper);
@@ -821,7 +821,7 @@ static inline int check_restart(struct sem_array *sma, struct sem_queue *q)
 
 	/* It is impossible that someone waits for the new value:
 	 * - complex operations always restart.
-	 * - wait-for-zero are handled seperately.
+	 * - wait-for-zero are handled separately.
 	 * - q is a previously sleeping simple operation that
 	 *   altered the array. It must be a decrement, because
 	 *   simple increments never sleep.
