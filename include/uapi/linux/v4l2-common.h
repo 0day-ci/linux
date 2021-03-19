@@ -92,6 +92,16 @@
 #define V4L2_SEL_FLAG_LE		(1 << 1)
 #define V4L2_SEL_FLAG_KEEP_CONFIG	(1 << 2)
 
+/* ROI auto-controls flags */
+#define V4L2_SEL_FLAG_ROI_AUTO_EXPOSURE		(1 << 0)
+#define V4L2_SEL_FLAG_ROI_AUTO_IRIS			(1 << 1)
+#define V4L2_SEL_FLAG_ROI_AUTO_WHITE_BALANCE		(1 << 2)
+#define V4L2_SEL_FLAG_ROI_AUTO_FOCUS			(1 << 3)
+#define V4L2_SEL_FLAG_ROI_AUTO_FACE_DETECT		(1 << 4)
+#define V4L2_SEL_FLAG_ROI_AUTO_DETECT_AND_TRACK	(1 << 5)
+#define V4L2_SEL_FLAG_ROI_AUTO_IMAGE_STABILIXATION	(1 << 6)
+#define V4L2_SEL_FLAG_ROI_AUTO_HIGHER_QUALITY		(1 << 7)
+
 struct v4l2_edid {
 	__u32 pad;
 	__u32 start_block;
