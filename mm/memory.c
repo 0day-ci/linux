@@ -3392,6 +3392,11 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (vma->vm_flags & VM_WRITE)
 		entry = pte_mkwrite(pte_mkdirty(entry));
 
+	if (userfaultfd_wp(vma)) {
+		entry = pte_wrprotect(entry);
+		entry = pte_mkuffd_wp(entry);
+	}
+
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
 			&vmf->ptl);
 	if (!pte_none(*vmf->pte)) {
@@ -3418,6 +3423,11 @@ setpte:
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, vmf->address, vmf->pte);
+
+	if (userfaultfd_pte_wp(vma, *vmf->pte)) {
+		pte_unmap_unlock(vmf->pte, vmf->ptl);
+		return handle_userfault(vmf, VM_UFFD_WP);
+	}
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
 	return ret;

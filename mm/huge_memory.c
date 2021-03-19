@@ -618,6 +618,11 @@ static vm_fault_t __do_huge_pmd_anonymous_page(struct vm_fault *vmf,
 
 		entry = mk_huge_pmd(page, vma->vm_page_prot);
 		entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
+		if (userfaultfd_wp(vma)) {
+			entry = pmd_wrprotect(entry);
+			entry = pmd_mkuffd_wp(entry);
+		}
+
 		page_add_new_anon_rmap(page, vma, haddr, true);
 		lru_cache_add_inactive_or_unevictable(page, vma);
 		pgtable_trans_huge_deposit(vma->vm_mm, vmf->pmd, pgtable);
@@ -625,6 +630,13 @@ static vm_fault_t __do_huge_pmd_anonymous_page(struct vm_fault *vmf,
 		update_mmu_cache_pmd(vma, vmf->address, vmf->pmd);
 		add_mm_counter(vma->vm_mm, MM_ANONPAGES, HPAGE_PMD_NR);
 		mm_inc_nr_ptes(vma->vm_mm);
+
+		if (userfaultfd_huge_pmd_wp(vma, *vmf->pmd)) {
+			spin_unlock(vmf->ptl);
+			count_vm_event(THP_FAULT_ALLOC);
+			count_memcg_event_mm(vma->vm_mm, THP_FAULT_ALLOC);
+			return handle_userfault(vmf, VM_UFFD_WP);
+		}
 		spin_unlock(vmf->ptl);
 		count_vm_event(THP_FAULT_ALLOC);
 		count_memcg_event_mm(vma->vm_mm, THP_FAULT_ALLOC);
