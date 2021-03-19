@@ -97,6 +97,15 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
 	struct rb_node **p;
 	struct rb_node *node, *parent = NULL;
 	struct integrity_iint_cache *iint, *test_iint;
+	static int once = 0;
+
+	if (!iint_cache) { /* shouldn't get here */
+		if (!once) {
+			dump_stack();
+			once = 1;
+		}
+		return NULL;
+	}
 
 	iint = integrity_iint_find(inode);
 	if (iint)
