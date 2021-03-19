@@ -297,7 +297,7 @@ static Node *create_entry(const char __user *buffer, size_t count)
 	if (copy_from_user(buf, buffer, count))
 		goto efault;
 
-	del = *p++;	/* delimeter */
+	del = *p++;	/* delimiter */
 
 	pr_debug("register: delim: %#x {%c}\n", del, del);
 
