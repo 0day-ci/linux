@@ -1796,9 +1796,7 @@ static void atl1c_clean_rx_irq(struct atl1c_adapter *adapter,
 	struct atl1c_recv_ret_status *rrs;
 	struct atl1c_buffer *buffer_info;
 
-	while (1) {
-		if (*work_done >= work_to_do)
-			break;
+	while (*work_done < work_to_do) {
 		rrs = ATL1C_RRD_DESC(rrd_ring, rrd_ring->next_to_clean);
 		if (likely(RRS_RXD_IS_VALID(rrs->word3))) {
 			rfd_num = (rrs->word0 >> RRS_RX_RFD_CNT_SHIFT) &
