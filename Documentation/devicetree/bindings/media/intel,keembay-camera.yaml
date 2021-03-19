@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) 2021 Intel Corporation
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/media/intel,keembay-camera.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Intel Keem Bay camera subsystem
+
+maintainers:
+  - Paul J. Murphy <paul.j.murphy@intel.com>
+  - Daniele Alessandrelli <daniele.alessandrelli@intel.com>
+
+properties:
+  compatible:
+    const: intel,keembay-camera
+  memory-region:
+    $ref: /schemas/types.yaml#/definitions/phandle
+
+  ports:
+    type: object
+    $ref: /schemas/graph.yaml#/properties/ports
+
+    "#address-cells":
+      const: 1
+    "#size-cells":
+      const: 0
+
+    properties:
+      port@[0-5]:
+        type: object
+        additionalProperties: false
+        $ref: /schemas/graph.yaml#/properties/port
+        description:
+          The port number matches the D-PHY number (D-PHY#0 - D-PHY#5).
+
+        properties:
+          endpoint:
+            type: object
+
+            properties:
+              data-lanes:
+                $ref: video-interfaces.yaml#/properties/data-lanes
+                description:
+                  Six two-lane d-phys (D-PHY#0 - D-PHY#5) are available, which
+                  can be used by six RX controllers (RX-CTRL#0 - RX-CTRL#5).
+                  RX-CTRL#0, RX-CTRL#2, RX-CTRL#4 can be connected to two
+                  D-PHY's and will be able to work with 3 and 4 lanes. In this
+                  case the RX-CTRLs mapped to those D-PHYs cannot be used.
+
+                  Clock and data lanes are defined as follows
+                    D-PHY#0 - clock - 0, data - 1, 2
+                    D-PHY#1 - clock - 3, data - 4, 5
+                    D-PHY#2 - clock - 6, data - 7, 8
+                    D-PHY#3 - clock - 9, data - 10, 11
+                    D-PHY#4 - clock - 12, data - 13, 14
+                    D-PHY#5 - clock - 15, data - 16, 17
+
+            required:
+              - data-lanes
+
+      required:
+        - reg
+        - endpoint
+
+    required:
+      - "#address-cells"
+      - "#size-cells"
+      - port@[0-5]
+
+required:
+  - compatible
+  - ports
+
+
+additionalProperties: false
+
+examples:
+  - |
+    keembay_camera {
+        compatible = "intel,keembay-camera";
+        memory-region = <&mem>;
+
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            port@4 {
+                reg = <4>;
+
+                cam: endpoint {
+                    remote-endpoint = <&imx334>;
+                    data-lanes = <13 14 16 17>;
+                };
+            };
+        };
+    };
+...
