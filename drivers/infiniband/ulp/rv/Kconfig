@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
+#
+# Copyright(c) 2020 - 2021 Intel Corporation.
+#
+config INFINIBAND_RV
+	tristate "InfiniBand Rendezvous Module"
+	depends on X86_64 && INFINIBAND
+	help
+	  The rendezvous module provides mechanisms for HPC middlewares
+	  to cache memory region registration, to manage connections
+	  between nodes, and improve the scability of RDMA transactions.
