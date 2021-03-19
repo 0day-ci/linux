@@ -1285,8 +1285,7 @@ static int mv88e6393x_serdes_port_errata(struct mv88e6xxx_chip *chip, int lane)
 	 * powered up (the bit is cleared), so power it down.
 	 */
 	if (lane == MV88E6393X_PORT0_LANE) {
-		err = mv88e6390_serdes_read(chip, MV88E6393X_PORT0_LANE,
-					    MDIO_MMD_PHYXS,
+		err = mv88e6390_serdes_read(chip, lane, MDIO_MMD_PHYXS,
 					    MV88E6393X_SERDES_POC, &reg);
 		if (err)
 			return err;
