@@ -192,3 +192,136 @@ int kmb_cam_xlink_read_msg(struct kmb_xlink_cam *xlink_cam, int chan_id,
 
 	return written_size;
 }
+
+/**
+ * kmb_cam_xlink_open_ctrl_channel - Open xlink control channel for communication
+ * @xlink_cam: Pointer to xlink camera handle
+ *
+ * There is only one control channel for xlink camera communication.
+ * NOTE: The channel is serialized and reference counted.
+ *
+ * Return: 0 if successful, error code otherwise
+ */
+int kmb_cam_xlink_open_ctrl_channel(struct kmb_xlink_cam *xlink_cam)
+{
+	int ret;
+
+	mutex_lock(&xlink_cam->lock);
+
+	if (xlink_cam->ctrl_chan_refcnt) {
+		xlink_cam->ctrl_chan_refcnt++;
+		mutex_unlock(&xlink_cam->lock);
+		return 0;
+	}
+
+	ret = xlink_open_channel(&xlink_cam->handle,
+				 KMB_CAM_XLINK_CTRL_CHAN_ID, RXB_TXB,
+				 KMB_CAM_XLINK_CH_MAX_DATA_SIZE,
+				 KMB_CAM_XLINK_CH_TIMEOUT_MS);
+	if (ret) {
+		dev_err(xlink_cam->dev, "Failed to open xlink control channel %d", ret);
+		mutex_unlock(&xlink_cam->lock);
+		return -ENODEV;
+	}
+
+	xlink_cam->ctrl_chan_refcnt++;
+
+	mutex_unlock(&xlink_cam->lock);
+
+	return 0;
+}
+
+/**
+ * kmb_cam_xlink_close_ctrl_channel - Close xlink control channel
+ * @xlink_cam: Pointer to xlink camera handle
+ *
+ * There is only one control channel for xlink camera communication.
+ * NOTE: The channel is serialized and reference counted.
+ *
+ * Return: 0 if successful, error code otherwise
+ */
+void kmb_cam_xlink_close_ctrl_channel(struct kmb_xlink_cam *xlink_cam)
+{
+	int ret;
+
+	mutex_lock(&xlink_cam->lock);
+
+	if (WARN_ON(!xlink_cam->ctrl_chan_refcnt)) {
+		mutex_unlock(&xlink_cam->lock);
+		return;
+	}
+
+	if (--xlink_cam->ctrl_chan_refcnt) {
+		mutex_unlock(&xlink_cam->lock);
+		return;
+	}
+
+	ret = xlink_close_channel(&xlink_cam->handle, KMB_CAM_XLINK_CTRL_CHAN_ID);
+	if (ret)
+		dev_err(xlink_cam->dev, "Failed to close xlink channel %d", ret);
+
+	mutex_unlock(&xlink_cam->lock);
+}
+
+/**
+ * kmb_cam_xlink_write_ctrl_msg - Write xlink control message
+ * @xlink_cam: Pointer to xlink camera handle
+ * @ctrl_paddr: Physical address of the control message
+ * @ctrl_type: Control message type
+ * @expected_result: Control message expected result
+ *
+ * For each control message there is ack from the VPU camera.
+ * This function check the error against expected result.
+ * NOTE: Because there is only one control channel, the msg/ack
+ *       is sequence serliazed.
+ *
+ * Return: 0 if successful, error code otherwise
+ */
+int kmb_cam_xlink_write_ctrl_msg(struct kmb_xlink_cam *xlink_cam,
+				 dma_addr_t ctrl_paddr, u32 ctrl_type,
+				 u32 expected_result)
+{
+	size_t init_evt_size = sizeof(struct kmb_ic_ev);
+	struct kmb_ic_ev init_evt;
+	int ret;
+
+	mutex_lock(&xlink_cam->lock);
+
+	memset(&init_evt, 0, sizeof(init_evt));
+	init_evt.ctrl = ctrl_type;
+	init_evt.ev_info.user_data_base_addr01 = ctrl_paddr;
+	ret = xlink_write_volatile(&xlink_cam->handle,
+				   KMB_CAM_XLINK_CTRL_CHAN_ID,
+				   (u8 *)&init_evt,
+				   init_evt_size);
+	if (ret) {
+		dev_err(xlink_cam->dev, "Error ret %d ctrl type %d",
+			ret, ctrl_type);
+		ret = -ENODEV;
+		goto error_unlock;
+	}
+
+	ret = xlink_read_data_to_buffer(&xlink_cam->handle,
+					KMB_CAM_XLINK_CTRL_CHAN_ID,
+					(u8 *)&init_evt,
+					(u32 *)&init_evt_size);
+	if (ret) {
+		dev_err(xlink_cam->dev, "Error read ack ret %d", ret);
+		ret = -ENODEV;
+		goto error_unlock;
+	}
+	if (init_evt.ctrl != expected_result) {
+		dev_err(xlink_cam->dev, "Error ctrl type %d evt ctrl %d",
+			ctrl_type, init_evt.ctrl);
+		ret = -EINVAL;
+		goto error_unlock;
+	}
+
+	mutex_unlock(&xlink_cam->lock);
+
+	return 0;
+
+error_unlock:
+	mutex_unlock(&xlink_cam->lock);
+	return ret;
+}

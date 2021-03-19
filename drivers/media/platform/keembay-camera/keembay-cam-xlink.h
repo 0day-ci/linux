@@ -39,4 +39,11 @@ int kmb_cam_xlink_write_msg(struct kmb_xlink_cam *xlink_cam, int chan_id,
 int kmb_cam_xlink_read_msg(struct kmb_xlink_cam *xlink_cam, int chan_id,
 			   u8 *message, u32 msg_size);
 
+int kmb_cam_xlink_open_ctrl_channel(struct kmb_xlink_cam *xlink_cam);
+void kmb_cam_xlink_close_ctrl_channel(struct kmb_xlink_cam *xlink_cam);
+
+int kmb_cam_xlink_write_ctrl_msg(struct kmb_xlink_cam *xlink_cam,
+				 dma_addr_t ctrl_paddr, u32 ctrl_type,
+				 u32 expected_result);
+
 #endif /* KEEMBAY_CAM_XLINK_H */
