@@ -80,13 +80,13 @@ struct journal_head {
 	 * Pointer to the running compound transaction which is currently
 	 * modifying the buffer's metadata, if there was already a transaction
 	 * committing it when the new transaction touched it.
-	 * [t_list_lock] [b_state_lock]
+	 * [j_list_lock] [b_state_lock]
 	 */
 	transaction_t *b_next_transaction;
 
 	/*
 	 * Doubly-linked list of buffers on a transaction's data, metadata or
-	 * forget queue. [t_list_lock] [b_state_lock]
+	 * forget queue. [j_list_lock] [b_state_lock]
 	 */
 	struct journal_head *b_tnext, *b_tprev;
 
