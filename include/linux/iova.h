@@ -25,7 +25,8 @@ struct iova {
 struct iova_magazine;
 struct iova_cpu_rcache;
 
-#define IOVA_RANGE_CACHE_MAX_SIZE 6	/* log of max cached IOVA range size (in pages) */
+#define IOVA_RANGE_CACHE_DEFAULT_SIZE 6
+#define IOVA_RANGE_CACHE_MAX_SIZE 10 /* log of max cached IOVA range size (in pages) */
 #define MAX_GLOBAL_MAGS 32	/* magazines per bin */
 
 struct iova_rcache {
@@ -74,6 +75,7 @@ struct iova_domain {
 	unsigned long	start_pfn;	/* Lower limit for this domain */
 	unsigned long	dma_32bit_pfn;
 	unsigned long	max32_alloc_size; /* Size of last failed allocation */
+	unsigned long	rcache_max_size; /* Upper limit of cached IOVA RANGE */
 	struct iova_fq __percpu *fq;	/* Flush Queue */
 
 	atomic64_t	fq_flush_start_cnt;	/* Number of TLB flushes that
@@ -158,6 +160,8 @@ int init_iova_flush_queue(struct iova_domain *iovad,
 struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
 void put_iova_domain(struct iova_domain *iovad);
 void free_cpu_cached_iovas(unsigned int cpu, struct iova_domain *iovad);
+void iova_rcache_set_upper_limit(struct iova_domain *iovad,
+				 unsigned long iova_len);
 #else
 static inline int iova_cache_get(void)
 {
@@ -236,6 +240,11 @@ static inline void put_iova_domain(struct iova_domain *iovad)
 
 static inline void free_cpu_cached_iovas(unsigned int cpu,
 					 struct iova_domain *iovad)
+{
+}
+
+static inline void iova_rcache_set_upper_limit(struct iova_domain *iovad,
+					       unsigned long iova_len)
 {
 }
 #endif

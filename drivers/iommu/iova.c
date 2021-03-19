@@ -54,6 +54,7 @@ init_iova_domain(struct iova_domain *iovad, unsigned long granule,
 	iovad->flush_cb = NULL;
 	iovad->fq = NULL;
 	iovad->anchor.pfn_lo = iovad->anchor.pfn_hi = IOVA_ANCHOR;
+	iovad->rcache_max_size = IOVA_RANGE_CACHE_DEFAULT_SIZE;
 	rb_link_node(&iovad->anchor.node, NULL, &iovad->rbroot.rb_node);
 	rb_insert_color(&iovad->anchor.node, &iovad->rbroot);
 	init_iova_rcaches(iovad);
@@ -236,7 +237,7 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 	 * rounding up anything cacheable to make sure that can't happen. The
 	 * order of the unadjusted size will still match upon freeing.
 	 */
-	if (fast && size < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
+	if (fast && size < (1 << (iovad->rcache_max_size - 1)))
 		size = roundup_pow_of_two(size);
 
 	if (size_aligned)
@@ -943,7 +944,7 @@ static bool iova_rcache_insert(struct iova_domain *iovad, unsigned long pfn,
 {
 	unsigned int log_size = order_base_2(size);
 
-	if (log_size >= IOVA_RANGE_CACHE_MAX_SIZE)
+	if (log_size >= iovad->rcache_max_size)
 		return false;
 
 	return __iova_rcache_insert(iovad, &iovad->rcaches[log_size], pfn);
@@ -986,6 +987,38 @@ static unsigned long __iova_rcache_get(struct iova_rcache *rcache,
 	spin_unlock_irqrestore(&cpu_rcache->lock, flags);
 
 	return iova_pfn;
+}
+
+void iova_rcache_set_upper_limit(struct iova_domain *iovad,
+				 unsigned long iova_len)
+{
+	unsigned int rcache_index = order_base_2(iova_len) + 1;
+	struct rb_node *rb_node = &iovad->anchor.node;
+	unsigned long flags;
+	int count = 0;
+
+	spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
+	if (rcache_index <= iovad->rcache_max_size)
+		goto out;
+
+	while (1) {
+		rb_node = rb_prev(rb_node);
+		if (!rb_node)
+			break;
+		count++;
+	}
+
+	/*
+	 * If there are already IOVA nodes present in the tree, then don't
+	 * allow range upper limit to be set.
+	 */
+	if (count != iovad->reserved_node_count)
+		goto out;
+
+	iovad->rcache_max_size = min_t(unsigned long, rcache_index,
+				       IOVA_RANGE_CACHE_MAX_SIZE);
+out:
+	spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
 }
 
 /*
