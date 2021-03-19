@@ -48,6 +48,46 @@ Selection flags
 	inside the subdevice to all further processing steps.
       - No
       - Yes
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_EXPOSURE``
+      - (1 << 0)
+      - Auto Exposure.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_IRIS``
+      - (1 << 1)
+      - Auto Iris.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_WHITE_BALANCE``
+      - (1 << 2)
+      - Auto White Balance.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_FOCUS``
+      - (1 << 3)
+      - Auto Focus.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_FACE_DETECT``
+      - (1 << 4)
+      - Auto Face Detect.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_DETECT_AND_TRACK``
+      - (1 << 5)
+      - Auto Detect and Track.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_IMAGE_STABILIXATION``
+      - (1 << 6)
+      - Image Stabilization.
+      - Yes
+      - No
+    * - ``V4L2_SEL_FLAG_ROI_AUTO_HIGHER_QUALITY``
+      - (1 << 7)
+      - Higher Quality.
+      - Yes
+      - No
 
 .. raw:: latex
 
