@@ -458,7 +458,6 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
 	return (dma_addr_t)iova << shift;
 }
 
-__maybe_unused
 static void iommu_dma_set_opt_size(struct device *dev, size_t size)
 {
 	struct iommu_domain *domain = iommu_get_dma_domain(dev);
@@ -1289,6 +1288,7 @@ static const struct dma_map_ops iommu_dma_ops = {
 	.map_resource		= iommu_dma_map_resource,
 	.unmap_resource		= iommu_dma_unmap_resource,
 	.get_merge_boundary	= iommu_dma_get_merge_boundary,
+	.set_max_opt_size	= iommu_dma_set_opt_size,
 };
 
 /*
