@@ -59,6 +59,10 @@ Additional required properties for imx7d-pcie and imx8mq-pcie:
 Additional required properties for imx8mq-pcie:
 - clock-names: Must include the following additional entries:
 	- "pcie_aux"
+- pcie-vph-3v3: If present then PCIE_VPH is feeded by 3.3v in the HW
+  schematic design. The PCIE_VPH is suggested to be 1.8v refer to the
+  data sheet. If the PCIE_VPH is supplied by 3.3V, the VREG_BYPASS
+  should be cleared to zero accordingly.
 
 Example:
 
