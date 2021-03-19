@@ -46,6 +46,7 @@
 #include <linux/uaccess.h>
 #include <linux/highmem.h>
 #include <asm/ioctls.h>
+#include <linux/ctype.h>
 
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/clnt.h>
@@ -863,6 +864,34 @@ out:
 	svsk->sk_datalen = 0;
 }
 
+/* The reclen is taken directly from the first four bytes of the message with
+ * the highest bit stripped, which makes it ripe for protocol mixups. For
+ * example, if someone tries to send a HTTP GET request to us, we'll interpret
+ * it as a 1195725856-sized fragment (ie. (u32)'GET '), and print a ratelimited
+ * KERN_NOTICE with that number verbatim.
+ *
+ * To allow users to more easily understand and debug these cases, this
+ * function decodes the purported length as ASCII, and returns it if all
+ * characters were printable. Otherwise, we return NULL.
+ *
+ * WARNING: Since we reuse the u32 directly, the return value is not null
+ * terminated, and must be printed using %.*s with
+ * sizeof(svc_sock_reclen(svsk)).
+ */
+static char *svc_sock_reclen_ascii(struct svc_sock *svsk)
+{
+	u32 len_be = cpu_to_be32(svc_sock_reclen(svsk));
+	char *len_be_ascii = (char *)&len_be;
+	size_t i;
+
+	for (i = 0; i < sizeof(len_be); i++) {
+		if (!isprint(len_be_ascii[i]))
+			return NULL;
+	}
+
+	return len_be_ascii;
+}
+
 /*
  * Receive fragment record header into sk_marker.
  */
@@ -870,6 +899,7 @@ static ssize_t svc_tcp_read_marker(struct svc_sock *svsk,
 				   struct svc_rqst *rqstp)
 {
 	ssize_t want, len;
+	char *reclen_ascii;
 
 	/* If we haven't gotten the record length yet,
 	 * get the next four bytes.
@@ -898,9 +928,14 @@ static ssize_t svc_tcp_read_marker(struct svc_sock *svsk,
 	return svc_sock_reclen(svsk);
 
 err_too_large:
-	net_notice_ratelimited("svc: %s %s RPC fragment too large: %d\n",
+	reclen_ascii = svc_sock_reclen_ascii(svsk);
+	net_notice_ratelimited("svc: %s %s RPC fragment too large: %d%s%.*s%s\n",
 			       __func__, svsk->sk_xprt.xpt_server->sv_name,
-			       svc_sock_reclen(svsk));
+			       svc_sock_reclen(svsk),
+			       reclen_ascii ? " (ASCII \"" : "",
+			       (int)sizeof(u32),
+			       reclen_ascii ?: "",
+			       reclen_ascii ? "\")" : "");
 	set_bit(XPT_CLOSE, &svsk->sk_xprt.xpt_flags);
 err_short:
 	return -EAGAIN;
