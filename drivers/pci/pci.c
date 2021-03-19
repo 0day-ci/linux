@@ -5055,9 +5055,11 @@ static void pci_dev_restore(struct pci_dev *dev)
 }
 
 /**
- * __pci_reset_function_locked - reset a PCI device function while holding
- * the @dev mutex lock.
+ * pci_probe_reset_function - check whether the device can be safely reset
+ *                            or reset a PCI device function while holding
+ *                            the @dev mutex lock.
  * @dev: PCI device to reset
+ * @probe: Probe or not whether the device can be reset.
  *
  * Some devices allow an individual function to be reset without affecting
  * other functions in the same device.  The PCI device must be responsive
@@ -5071,10 +5073,11 @@ static void pci_dev_restore(struct pci_dev *dev)
  * device including MSI, bus mastering, BARs, decoding IO and memory spaces,
  * etc.
  *
- * Returns 0 if the device function was successfully reset or negative if the
- * device doesn't support resetting a single function.
+ * Returns 0 if the device function can be reset or was successfully
+ * reset, otherwise negative if the device doesn't support resetting
+ * a single function.
  */
-int __pci_reset_function_locked(struct pci_dev *dev)
+int pci_probe_reset_function(struct pci_dev *dev, int probe)
 {
 	int rc;
 
@@ -5088,61 +5091,34 @@ int __pci_reset_function_locked(struct pci_dev *dev)
 	 * other error, we're also finished: this indicates that further
 	 * reset mechanisms might be broken on the device.
 	 */
-	rc = pci_dev_specific_reset(dev, 0);
+	rc = pci_dev_specific_reset(dev, probe);
 	if (rc != -ENOTTY)
 		return rc;
 	if (pcie_has_flr(dev)) {
+		if (probe)
+			return 0;
 		rc = pcie_flr(dev);
 		if (rc != -ENOTTY)
 			return rc;
 	}
-	rc = pci_af_flr(dev, 0);
+	rc = pci_af_flr(dev, probe);
 	if (rc != -ENOTTY)
 		return rc;
-	rc = pci_pm_reset(dev, 0);
+	rc = pci_pm_reset(dev, probe);
 	if (rc != -ENOTTY)
 		return rc;
-	rc = pci_dev_reset_slot_function(dev, 0);
+	rc = pci_dev_reset_slot_function(dev, probe);
 	if (rc != -ENOTTY)
 		return rc;
-	return pci_parent_bus_reset(dev, 0);
+
+	return pci_parent_bus_reset(dev, probe);
+}
+
+int __pci_reset_function_locked(struct pci_dev *dev)
+{
+	return pci_probe_reset_function(dev, 0);
 }
 EXPORT_SYMBOL_GPL(__pci_reset_function_locked);
-
-/**
- * pci_probe_reset_function - check whether the device can be safely reset
- * @dev: PCI device to reset
- *
- * Some devices allow an individual function to be reset without affecting
- * other functions in the same device.  The PCI device must be responsive
- * to PCI config space in order to use this function.
- *
- * Returns 0 if the device function can be reset or negative if the
- * device doesn't support resetting a single function.
- */
-int pci_probe_reset_function(struct pci_dev *dev)
-{
-	int rc;
-
-	might_sleep();
-
-	rc = pci_dev_specific_reset(dev, 1);
-	if (rc != -ENOTTY)
-		return rc;
-	if (pcie_has_flr(dev))
-		return 0;
-	rc = pci_af_flr(dev, 1);
-	if (rc != -ENOTTY)
-		return rc;
-	rc = pci_pm_reset(dev, 1);
-	if (rc != -ENOTTY)
-		return rc;
-	rc = pci_dev_reset_slot_function(dev, 1);
-	if (rc != -ENOTTY)
-		return rc;
-
-	return pci_parent_bus_reset(dev, 1);
-}
 
 /**
  * pci_reset_function - quiesce and reset a PCI device function
