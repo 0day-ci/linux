@@ -684,8 +684,7 @@ int posix_acl_update_mode(struct user_namespace *mnt_userns,
 		return error;
 	if (error == 0)
 		*acl = NULL;
-	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
-	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+	if (posix_acl_mode_clear_sgid(mnt_userns, inode))
 		mode &= ~S_ISGID;
 	*mode_p = mode;
 	return 0;

@@ -59,6 +59,17 @@ posix_acl_release(struct posix_acl *acl)
 }
 
 
+static inline bool
+posix_acl_mode_clear_sgid(struct user_namespace *mnt_userns,
+			  struct inode *inode)
+{
+	if (!in_group_p(i_gid_into_mnt(mnt_userns, inode)) &&
+	    !capable_wrt_inode_uidgid(mnt_userns, inode, CAP_FSETID))
+		return true;
+
+	return false;
+}
+
 /* posix_acl.c */
 
 extern void posix_acl_init(struct posix_acl *, int);
