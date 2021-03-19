@@ -123,7 +123,7 @@ size_t __weak strlcpy(char *dest, const char *src, size_t size)
  */
 char *skip_spaces(const char *str)
 {
-	while (isspace(*str))
+	while (isspace((unsigned char)*str))
 		++str;
 	return (char *)str;
 }
@@ -146,7 +146,7 @@ char *strim(char *s)
 		return s;
 
 	end = s + size - 1;
-	while (end >= s && isspace(*end))
+	while (end >= s && isspace((unsigned char)*end))
 		end--;
 	*(end + 1) = '\0';
 
