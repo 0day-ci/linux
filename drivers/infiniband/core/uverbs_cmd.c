@@ -696,11 +696,8 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 {
 	struct ib_uverbs_reg_mr_resp resp = {};
 	struct ib_uverbs_reg_mr      cmd;
-	struct ib_uobject           *uobj;
-	struct ib_pd                *pd;
 	struct ib_mr                *mr;
 	int                          ret;
-	struct ib_device *ib_dev;
 
 	ret = uverbs_request(attrs, &cmd, sizeof(cmd));
 	if (ret)
@@ -709,55 +706,16 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 	if ((cmd.start & ~PAGE_MASK) != (cmd.hca_va & ~PAGE_MASK))
 		return -EINVAL;
 
-	uobj = uobj_alloc(UVERBS_OBJECT_MR, attrs, &ib_dev);
-	if (IS_ERR(uobj))
-		return PTR_ERR(uobj);
-
-	ret = ib_check_mr_access(ib_dev, cmd.access_flags);
-	if (ret)
-		goto err_free;
-
-	pd = uobj_get_obj_read(pd, UVERBS_OBJECT_PD, cmd.pd_handle, attrs);
-	if (!pd) {
-		ret = -EINVAL;
-		goto err_free;
-	}
-
-	mr = pd->device->ops.reg_user_mr(pd, cmd.start, cmd.length, cmd.hca_va,
-					 cmd.access_flags,
-					 &attrs->driver_udata);
-	if (IS_ERR(mr)) {
-		ret = PTR_ERR(mr);
-		goto err_put;
-	}
-
-	mr->device  = pd->device;
-	mr->pd      = pd;
-	mr->type    = IB_MR_TYPE_USER;
-	mr->dm	    = NULL;
-	mr->sig_attrs = NULL;
-	mr->uobject = uobj;
-	atomic_inc(&pd->usecnt);
-	mr->iova = cmd.hca_va;
-
-	rdma_restrack_new(&mr->res, RDMA_RESTRACK_MR);
-	rdma_restrack_set_name(&mr->res, NULL);
-	rdma_restrack_add(&mr->res);
-
-	uobj->object = mr;
-	uobj_put_obj_read(pd);
-	uobj_finalize_uobj_create(uobj, attrs);
+	mr = uverbs_reg_mr(attrs, cmd.pd_handle, cmd.start, cmd.length,
+			   cmd.hca_va, cmd.access_flags,
+			   &attrs->driver_udata);
+	if (IS_ERR(mr))
+		return PTR_ERR(mr);
 
 	resp.lkey = mr->lkey;
 	resp.rkey = mr->rkey;
-	resp.mr_handle = uobj->id;
+	resp.mr_handle = mr->uobject->id;
 	return uverbs_response(attrs, &resp, sizeof(resp));
-
-err_put:
-	uobj_put_obj_read(pd);
-err_free:
-	uobj_alloc_abort(uobj, attrs);
-	return ret;
 }
 
 static int ib_uverbs_rereg_mr(struct uverbs_attr_bundle *attrs)

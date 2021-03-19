@@ -4,3 +4,5 @@
  */
 #include "trace_mr_cache.h"
 #include "trace_dev.h"
+#include "trace_mr.h"
+#include "trace_user.h"

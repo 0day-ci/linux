@@ -1013,3 +1013,240 @@ void uverbs_finalize_object(struct ib_uobject *uobj,
 		WARN_ON(true);
 	}
 }
+
+static struct ib_uverbs_file *get_ufile_from_fd(struct fd *fd)
+{
+	return fd->file ? (struct ib_uverbs_file *)fd->file->private_data :
+			  NULL;
+}
+
+static struct ib_uverbs_file *get_ufile(u32 cmd_fd, struct fd *fd)
+{
+	struct fd f;
+	struct ib_uverbs_file *file;
+
+	/* fd to "struct fd" */
+	f = fdget(cmd_fd);
+
+	file = get_ufile_from_fd(&f);
+	if (!file)
+		goto bail;
+
+	memcpy(fd, &f, sizeof(f));
+	return file;
+bail:
+	fdput(f);
+	return NULL;
+}
+
+struct ib_mr *uverbs_reg_mr(struct uverbs_attr_bundle *attrs, u32 pd_handle,
+			    u64 start, u64 length, u64 hca_va,
+			    u32 access_flags, struct ib_udata *driver_udata)
+{
+	struct ib_uobject           *uobj;
+	struct ib_pd                *pd;
+	struct ib_mr                *mr;
+	int                          ret;
+	struct ib_device            *ib_dev;
+
+	uobj = uobj_alloc(UVERBS_OBJECT_MR, attrs, &ib_dev);
+	if (IS_ERR(uobj))
+		return (struct ib_mr *)uobj;
+
+	ret = ib_check_mr_access(ib_dev, access_flags);
+	if (ret)
+		goto err_free;
+
+	pd = uobj_get_obj_read(pd, UVERBS_OBJECT_PD, pd_handle, attrs);
+	if (!pd) {
+		ret = -EINVAL;
+		goto err_free;
+	}
+
+	mr = pd->device->ops.reg_user_mr(pd, start, length, hca_va,
+					 access_flags, driver_udata);
+	if (IS_ERR(mr)) {
+		ret = PTR_ERR(mr);
+		goto err_put;
+	}
+
+	mr->device  = pd->device;
+	mr->pd      = pd;
+	mr->type    = IB_MR_TYPE_USER;
+	mr->dm      = NULL;
+	mr->sig_attrs = NULL;
+	mr->uobject = uobj;
+	atomic_inc(&pd->usecnt);
+	mr->iova = hca_va;
+
+	rdma_restrack_new(&mr->res, RDMA_RESTRACK_MR);
+	rdma_restrack_set_name(&mr->res, NULL);
+	rdma_restrack_add(&mr->res);
+
+	uobj->object = mr;
+	uobj_put_obj_read(pd);
+	uobj_finalize_uobj_create(uobj, attrs);
+
+	return mr;
+
+err_put:
+	uobj_put_obj_read(pd);
+err_free:
+	uobj_alloc_abort(uobj, attrs);
+	return ERR_PTR(ret);
+}
+
+struct ib_mr *rdma_reg_user_mr(struct ib_device *ib_dev, u32 cmd_fd,
+			       u32 pd_handle, u64 start, u64 length,
+			       u32 access_flags, size_t ulen, void *udata,
+			       struct fd *fd)
+{
+	struct ib_mr *mr;
+	struct ib_uverbs_file *ufile;
+	struct uverbs_attr_bundle attrs;
+	int srcu_key;
+	struct ib_device *device;
+
+	if (!fd) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
+	memset(&attrs, 0, sizeof(attrs));
+	ufile = get_ufile(cmd_fd, fd);
+	if (!ufile) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
+	srcu_key = srcu_read_lock(&ufile->device->disassociate_srcu);
+	/* Validate the target ib_device */
+	device = srcu_dereference(ufile->device->ib_dev,
+				  &ufile->device->disassociate_srcu);
+	if (device != ib_dev) {
+		mr = ERR_PTR(-EINVAL);
+		goto out_fd;
+	}
+	attrs.ufile = ufile;
+	attrs.driver_udata.inlen = ulen;
+	if (ulen)
+		attrs.driver_udata.inbuf = udata;
+
+	mr = uverbs_reg_mr(&attrs, pd_handle, start, length, start,
+			   access_flags, &attrs.driver_udata);
+	if (IS_ERR(mr))
+		goto out_fd;
+	else
+		uverbs_finalize_object(attrs.uobject, UVERBS_ACCESS_NEW, true,
+				       true, &attrs);
+
+	goto out_unlock;
+
+out_fd:
+	fdput(*fd);
+out_unlock:
+	srcu_read_unlock(&ufile->device->disassociate_srcu, srcu_key);
+out:
+	return mr;
+}
+EXPORT_SYMBOL(rdma_reg_user_mr);
+
+int rdma_dereg_user_mr(struct ib_mr *mr, struct fd *fd)
+{
+	struct ib_uverbs_file *ufile;
+	struct uverbs_attr_bundle attrs;
+	int srcu_key;
+	int ret;
+
+	if (!fd || !mr || !mr->uobject)
+		return -EINVAL;
+
+	memset(&attrs, 0, sizeof(attrs));
+	ufile = get_ufile_from_fd(fd);
+	if (!ufile || !ufile->device)
+		return -EINVAL;
+
+	srcu_key = srcu_read_lock(&ufile->device->disassociate_srcu);
+	attrs.ufile = ufile;
+
+	ret = uobj_perform_destroy(UVERBS_OBJECT_MR, (u32)mr->uobject->id,
+				   &attrs);
+	fdput(*fd);
+
+	srcu_read_unlock(&ufile->device->disassociate_srcu, srcu_key);
+	return ret;
+}
+EXPORT_SYMBOL(rdma_dereg_user_mr);
+
+struct ib_mr *rdma_reg_kernel_mr(u32 cmd_fd, struct ib_pd *kern_pd, u64 start,
+				 u64 length, u32 access_flags, size_t ulen,
+				 void *udata, struct fd *fd)
+{
+	struct ib_mr *mr;
+	struct ib_uverbs_file *ufile;
+	struct uverbs_attr_bundle attrs;
+	int srcu_key;
+
+	if (!fd) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
+	memset(&attrs, 0, sizeof(attrs));
+	ufile = get_ufile(cmd_fd, fd);
+	if (!ufile) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+	srcu_key = srcu_read_lock(&ufile->device->disassociate_srcu);
+	attrs.ufile = ufile;
+	attrs.driver_udata.inlen = ulen;
+	if (ulen)
+		attrs.driver_udata.inbuf = udata;
+
+	mr = kern_pd->device->ops.reg_user_mr(kern_pd, start, length, start,
+					      access_flags,
+					      &attrs.driver_udata);
+	if (IS_ERR(mr)) {
+		fdput(*fd);
+		goto out_unlock;
+	}
+
+	mr->device  = kern_pd->device;
+	mr->pd      = kern_pd;
+	mr->dm      = NULL;
+	atomic_inc(&kern_pd->usecnt);
+
+out_unlock:
+	srcu_read_unlock(&ufile->device->disassociate_srcu, srcu_key);
+out:
+	return mr;
+}
+EXPORT_SYMBOL(rdma_reg_kernel_mr);
+
+int rdma_dereg_kernel_mr(struct ib_mr *mr, struct fd *fd)
+{
+	struct ib_pd *pd;
+	struct ib_uverbs_file *ufile;
+	int srcu_key;
+	int ret = 0;
+	struct ib_udata udata;
+
+	if (!fd || !mr)
+		return -EINVAL;
+
+	ufile = get_ufile_from_fd(fd);
+	if (!ufile)
+		return -EINVAL;
+
+	srcu_key = srcu_read_lock(&ufile->device->disassociate_srcu);
+	memset(&udata, 0, sizeof(udata));
+	pd = mr->pd;
+	ret = pd->device->ops.dereg_mr(mr, &udata);
+	atomic_dec(&pd->usecnt);
+	fdput(*fd);
+
+	srcu_read_unlock(&ufile->device->disassociate_srcu, srcu_key);
+	return ret;
+}
+EXPORT_SYMBOL(rdma_dereg_kernel_mr);

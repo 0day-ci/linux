@@ -374,7 +374,7 @@ static void do_remove(struct rv_mr_cache *cache, struct list_head *del_list)
 	while (!list_empty(del_list)) {
 		mrc = list_first_entry(del_list, struct rv_mr_cached, list);
 		list_del(&mrc->list);
-		/* Deregister the mr here */
+		rv_drv_api_dereg_mem(&mrc->mr);
 		kfree(mrc);
 	}
 }

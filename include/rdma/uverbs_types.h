@@ -134,6 +134,16 @@ static inline void uverbs_uobject_get(struct ib_uobject *uobject)
 }
 void uverbs_uobject_put(struct ib_uobject *uobject);
 
+struct ib_mr *rdma_reg_user_mr(struct ib_device *ib_dev, u32 cmd_fd,
+			       u32 pd_handle, u64 start, u64 length,
+			       u32 access_flags, size_t ulen, void *udata,
+			       struct fd *fd);
+int rdma_dereg_user_mr(struct ib_mr *mr, struct fd *fd);
+struct ib_mr *rdma_reg_kernel_mr(u32 cmd_fd, struct ib_pd *kern_pd, u64 start,
+				 u64 length, u32 access_flags, size_t ulen,
+				 void *udata, struct fd *fd);
+int rdma_dereg_kernel_mr(struct ib_mr *mr, struct fd *fd);
+
 struct uverbs_obj_fd_type {
 	/*
 	 * In fd based objects, uverbs_obj_type_ops points to generic

@@ -404,4 +404,8 @@ void rdma_umap_priv_init(struct rdma_umap_priv *priv,
 
 void ib_cq_pool_cleanup(struct ib_device *dev);
 
+struct ib_mr *uverbs_reg_mr(struct uverbs_attr_bundle *attrs, u32 pd_handle,
+			    u64 start, u64 length, u64 hca_va,
+			    u32 access_flags, struct ib_udata *driver_udata);
+
 #endif /* _CORE_PRIV_H */
