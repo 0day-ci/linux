@@ -16,6 +16,8 @@
 #include <linux/printk.h>
 #include <linux/smp.h>
 
+#include <asm/sbi.h>
+
 static unsigned long csr_read_num(int csr_num)
 {
 #define switchcase_csr_read(__csr_num, __val)		{\
@@ -350,7 +352,15 @@ static int riscv_pmu_device_probe(struct platform_device *pdev)
 	if (!pmu)
 		return -ENOMEM;
 
-	riscv_pmu_legacy_init(pmu);
+	if (sbi_major_version() == 0 &&
+	    sbi_minor_version() == 3 &&
+	    sbi_probe_extension(SBI_EXT_PMU) > 0) {
+		pr_info("SBI PMU extension detected\n");
+		riscv_pmu_sbi_init(pmu);
+	} else {
+		pr_info("Legacy PMU is in use as SBI PMU extension is not available\n");
+		riscv_pmu_legacy_init(pmu);
+	}
 
 	cpuhp_setup_state(CPUHP_AP_PERF_RISCV_STARTING,
 			  "perf/riscv/pmu:starting",
