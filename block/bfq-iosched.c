@@ -5027,7 +5027,14 @@ static void bfq_exit_icq_bfqq(struct bfq_io_cq *bic, bool is_sync)
 	if (bfqq && bfqd) {
 		unsigned long flags;
 
-		spin_lock_irqsave(&bfqd->lock, flags);
+		/* bfq_exit_icq is usually called with ioc->lock held, which is
+		 * inverse order from elsewhere, which may grab ioc->lock
+		 * under bfqd->lock if we merge requests and drop the last ioc
+		 * refcount. Since exit_icq is either called with a refcount,
+		 * or with queue quiesced, use a differnet lock class to
+		 * silence lockdep
+		 */
+		spin_lock_irqsave_nested(&bfqd->lock, flags, 1);
 		bfqq->bic = NULL;
 		bfq_exit_bfqq(bfqd, bfqq);
 		bic_set_bfqq(bic, NULL, is_sync);
