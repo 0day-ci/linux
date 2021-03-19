@@ -12,6 +12,7 @@
 #include <media/videobuf2-v4l2.h>
 
 #include "keembay-vpu-isp.h"
+#include "keembay-params-defaults.h"
 
 /**
  * enum kmb_metadata_table_type - Keembay metadata table type
@@ -68,12 +69,12 @@ struct kmb_metadata_table {
  * @vb: Video buffer for v4l2
  * @type: Metadata type
  * @stats: Statistics physical addresses
- *   @raw: VPU raw statistics physical addresses
- *   @dehaze_stats_addr: VPU dehaze statistics physical address
+ * @stats.raw: VPU raw statistics physical addresses
+ * @stats.dehaze_stats_addr: VPU dehaze statistics physical address
  * @params: VPU ISP parameters
- *   @isp: VPU ISP parameters virtual address
- *   @dma_addr_isp: VPU ISP parameters physical address
- *   @tab: Metadata tables
+ * @params.isp: VPU ISP parameters virtual address
+ * @params.dma_addr_isp: VPU ISP parameters physical address
+ * @params.tab: Metadata tables
  * @list: List for buffer queue
  */
 struct kmb_metadata_buf {
@@ -118,6 +119,7 @@ struct kmb_metabuf_queue_ops {
  * @table_pool: ISP tables dma pool
  * @last_buf: Pointer to last enqueued buffer
  * @format: Active format
+ * @def: Default ISP params
  */
 struct kmb_metadata {
 	struct mutex lock;
@@ -138,6 +140,8 @@ struct kmb_metadata {
 	struct kmb_metadata_buf *last_buf;
 
 	struct v4l2_meta_format format;
+
+	struct kmb_vpu_isp_params_defaults def;
 };
 
 int kmb_metadata_init(struct kmb_metadata *kmb_meta);
