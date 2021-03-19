@@ -458,6 +458,21 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
 	return (dma_addr_t)iova << shift;
 }
 
+__maybe_unused
+static void iommu_dma_set_opt_size(struct device *dev, size_t size)
+{
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
+	unsigned long shift, iova_len;
+
+	shift = iova_shift(iovad);
+	iova_len = size >> shift;
+	iova_len = roundup_pow_of_two(iova_len);
+
+	iova_rcache_set_upper_limit(iovad, iova_len);
+}
+
 static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
 		dma_addr_t iova, size_t size, struct page *freelist)
 {
