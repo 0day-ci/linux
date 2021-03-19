@@ -221,7 +221,7 @@ iova_insert_rbtree(struct rb_root *root, struct iova *iova,
 
 static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 		unsigned long size, unsigned long limit_pfn,
-			struct iova *new, bool size_aligned)
+			struct iova *new, bool size_aligned, bool fast)
 {
 	struct rb_node *curr, *prev;
 	struct iova *curr_iova;
@@ -229,6 +229,15 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
 	unsigned long new_pfn, retry_pfn;
 	unsigned long align_mask = ~0UL;
 	unsigned long high_pfn = limit_pfn, low_pfn = iovad->start_pfn;
+
+	/*
+	 * Freeing non-power-of-two-sized allocations back into the IOVA caches
+	 * will come back to bite us badly, so we have to waste a bit of space
+	 * rounding up anything cacheable to make sure that can't happen. The
+	 * order of the unadjusted size will still match upon freeing.
+	 */
+	if (fast && size < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
+		size = roundup_pow_of_two(size);
 
 	if (size_aligned)
 		align_mask <<= fls_long(size - 1);
@@ -330,6 +339,29 @@ void iova_cache_put(void)
 }
 EXPORT_SYMBOL_GPL(iova_cache_put);
 
+static struct iova *
+__alloc_iova(struct iova_domain *iovad, unsigned long size,
+	unsigned long limit_pfn,
+	bool size_aligned, bool fast)
+{
+	struct iova *new_iova;
+	int ret;
+
+	new_iova = alloc_iova_mem();
+	if (!new_iova)
+		return NULL;
+
+	ret = __alloc_and_insert_iova_range(iovad, size, limit_pfn + 1,
+			new_iova, size_aligned, fast);
+
+	if (ret) {
+		free_iova_mem(new_iova);
+		return NULL;
+	}
+
+	return new_iova;
+}
+
 /**
  * alloc_iova - allocates an iova
  * @iovad: - iova domain in question
@@ -346,22 +378,7 @@ alloc_iova(struct iova_domain *iovad, unsigned long size,
 	unsigned long limit_pfn,
 	bool size_aligned)
 {
-	struct iova *new_iova;
-	int ret;
-
-	new_iova = alloc_iova_mem();
-	if (!new_iova)
-		return NULL;
-
-	ret = __alloc_and_insert_iova_range(iovad, size, limit_pfn + 1,
-			new_iova, size_aligned);
-
-	if (ret) {
-		free_iova_mem(new_iova);
-		return NULL;
-	}
-
-	return new_iova;
+	return __alloc_iova(iovad, size, limit_pfn, size_aligned, false);
 }
 EXPORT_SYMBOL_GPL(alloc_iova);
 
@@ -475,7 +492,7 @@ alloc_iova_fast(struct iova_domain *iovad, unsigned long size,
 		return iova_pfn;
 
 retry:
-	new_iova = alloc_iova(iovad, size, limit_pfn, true);
+	new_iova = __alloc_iova(iovad, size, limit_pfn, true, true);
 	if (!new_iova) {
 		unsigned int cpu;
 
