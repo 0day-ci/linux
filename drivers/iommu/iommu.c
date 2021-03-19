@@ -152,8 +152,13 @@ static int __init iommu_subsys_init(void)
 }
 subsys_initcall(iommu_subsys_init);
 
-int iommu_device_register(struct iommu_device *iommu)
+int iommu_device_register(struct iommu_device *iommu, const struct iommu_ops *ops,
+			    struct device *hwdev)
 {
+	iommu->ops = ops;
+	if (hwdev)
+		iommu->fwnode = hwdev->fwnode;
+
 	spin_lock(&iommu_device_lock);
 	list_add_tail(&iommu->list, &iommu_device_list);
 	spin_unlock(&iommu_device_lock);
