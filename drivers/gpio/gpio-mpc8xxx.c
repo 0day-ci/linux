@@ -9,6 +9,7 @@
  * kind, whether express or implied.
  */
 
+#include <linux/acpi.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -303,8 +304,8 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct mpc8xxx_gpio_chip *mpc8xxx_gc;
 	struct gpio_chip	*gc;
-	const struct mpc8xxx_gpio_devtype *devtype =
-		of_device_get_match_data(&pdev->dev);
+	const struct mpc8xxx_gpio_devtype *devtype = NULL;
+	struct fwnode_handle *fwnode;
 	int ret;
 
 	mpc8xxx_gc = devm_kzalloc(&pdev->dev, sizeof(*mpc8xxx_gc), GFP_KERNEL);
@@ -315,14 +316,14 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 
 	raw_spin_lock_init(&mpc8xxx_gc->lock);
 
-	mpc8xxx_gc->regs = of_iomap(np, 0);
+	mpc8xxx_gc->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (!mpc8xxx_gc->regs)
 		return -ENOMEM;
 
 	gc = &mpc8xxx_gc->gc;
 	gc->parent = &pdev->dev;
 
-	if (of_property_read_bool(np, "little-endian")) {
+	if (device_property_read_bool(&pdev->dev, "little-endian")) {
 		ret = bgpio_init(gc, &pdev->dev, 4,
 				 mpc8xxx_gc->regs + GPIO_DAT,
 				 NULL, NULL,
@@ -345,6 +346,7 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 
 	mpc8xxx_gc->direction_output = gc->direction_output;
 
+	devtype = device_get_match_data(&pdev->dev);
 	if (!devtype)
 		devtype = &mpc8xxx_gpio_devtype_default;
 
@@ -369,9 +371,11 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 	 * associated input enable must be set (GPIOxGPIE[IEn]=1) to propagate
 	 * the port value to the GPIO Data Register.
 	 */
+	fwnode = dev_fwnode(&pdev->dev);
 	if (of_device_is_compatible(np, "fsl,qoriq-gpio") ||
 	    of_device_is_compatible(np, "fsl,ls1028a-gpio") ||
-	    of_device_is_compatible(np, "fsl,ls1088a-gpio"))
+	    of_device_is_compatible(np, "fsl,ls1088a-gpio") ||
+	    !(IS_ERR_OR_NULL(fwnode) || is_of_node(fwnode)))
 		gc->write_reg(mpc8xxx_gc->regs + GPIO_IBE, 0xffffffff);
 
 	ret = gpiochip_add_data(gc, mpc8xxx_gc);
@@ -381,12 +385,15 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	mpc8xxx_gc->irqn = irq_of_parse_and_map(np, 0);
+	mpc8xxx_gc->irqn = platform_get_irq(pdev, 0);
 	if (!mpc8xxx_gc->irqn)
 		return 0;
 
-	mpc8xxx_gc->irq = irq_domain_add_linear(np, MPC8XXX_GPIO_PINS,
-					&mpc8xxx_gpio_irq_ops, mpc8xxx_gc);
+	mpc8xxx_gc->irq = irq_domain_create_linear(fwnode,
+						   MPC8XXX_GPIO_PINS,
+						   &mpc8xxx_gpio_irq_ops,
+						   mpc8xxx_gc);
+
 	if (!mpc8xxx_gc->irq)
 		return 0;
 
@@ -425,12 +432,21 @@ static int mpc8xxx_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id gpio_acpi_ids[] = {
+	{"NXP0031",},
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, gpio_acpi_ids);
+#endif
+
 static struct platform_driver mpc8xxx_plat_driver = {
 	.probe		= mpc8xxx_probe,
 	.remove		= mpc8xxx_remove,
 	.driver		= {
 		.name = "gpio-mpc8xxx",
 		.of_match_table	= mpc8xxx_gpio_ids,
+		.acpi_match_table = ACPI_PTR(gpio_acpi_ids),
 	},
 };
 
