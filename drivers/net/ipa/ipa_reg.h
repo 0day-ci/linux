@@ -9,6 +9,7 @@
 #include <linux/bitfield.h>
 
 #include "ipa_version.h"
+#include "ipa_assert.h"
 
 struct ipa;
 
@@ -212,7 +213,7 @@ static inline u32 ipa_reg_bcr_val(enum ipa_version version)
 			BCR_HOLB_DROP_L2_IRQ_FMASK |
 			BCR_DUAL_TX_FMASK;
 
-	/* assert(version != IPA_VERSION_4_5); */
+	ipa_assert(NULL, version != IPA_VERSION_4_5);
 
 	return 0x00000000;
 }
@@ -413,7 +414,7 @@ static inline u32 ipa_header_size_encoded(enum ipa_version version,
 
 	val = u32_encode_bits(size, HDR_LEN_FMASK);
 	if (version < IPA_VERSION_4_5) {
-		/* ipa_assert(header_size == size); */
+		ipa_assert(NULL, header_size == size);
 		return val;
 	}
 
@@ -433,7 +434,7 @@ static inline u32 ipa_metadata_offset_encoded(enum ipa_version version,
 
 	val = u32_encode_bits(off, HDR_OFST_METADATA_FMASK);
 	if (version < IPA_VERSION_4_5) {
-		/* ipa_assert(offset == off); */
+		ipa_assert(NULL, offset == off);
 		return val;
 	}
 

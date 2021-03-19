@@ -23,6 +23,7 @@
 #include "ipa_cmd.h"
 #include "gsi.h"
 #include "gsi_trans.h"
+#include "ipa_assert.h"
 
 /**
  * DOC: IPA Filter and Route Tables
@@ -237,11 +238,13 @@ static void ipa_table_validate_build(void)
 static dma_addr_t ipa_table_addr(struct ipa *ipa, bool filter_mask, u16 count)
 {
 	u32 skip;
+	u32 max;
 
 	if (!count)
 		return 0;
 
-/* assert(count <= max_t(u32, IPA_FILTER_COUNT_MAX, IPA_ROUTE_COUNT_MAX)); */
+	max = max_t(u32, IPA_FILTER_COUNT_MAX, IPA_ROUTE_COUNT_MAX);
+	ipa_assert(&ipa->pdev->dev, max);
 
 	/* Skip over the zero rule and possibly the filter mask */
 	skip = filter_mask ? 1 : 2;
