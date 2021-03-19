@@ -1972,6 +1972,8 @@ L:	linux-media@vger.kernel.org
 S:	Maintained
 T:	git git://linuxtv.org/media_tree.git
 F:	Documentation/devicetree/bindings/media/intel,keembay-camera.yaml
+F:	Documentation/media/uapi/v4l/meta-formats.rst
+F:	Documentation/media/uapi/v4l/pixfmt-meta-intel-kmb.rst
 F:	drivers/media/platform/keembay-camera/
 F:	include/uapi/linux/keembay-isp-ctl.h
 
