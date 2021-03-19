@@ -469,8 +469,7 @@ static const struct file_operations kcs_bmc_ipmi_fops = {
 static DEFINE_SPINLOCK(kcs_bmc_ipmi_instances_lock);
 static LIST_HEAD(kcs_bmc_ipmi_instances);
 
-int kcs_bmc_ipmi_attach_cdev(struct kcs_bmc_device *kcs_bmc);
-int kcs_bmc_ipmi_attach_cdev(struct kcs_bmc_device *kcs_bmc)
+static int kcs_bmc_ipmi_attach_cdev(struct kcs_bmc_device *kcs_bmc)
 {
 	struct kcs_bmc_ipmi *priv;
 	int rc;
@@ -512,10 +511,8 @@ int kcs_bmc_ipmi_attach_cdev(struct kcs_bmc_device *kcs_bmc)
 
 	return 0;
 }
-EXPORT_SYMBOL(kcs_bmc_ipmi_attach_cdev);
 
-int kcs_bmc_ipmi_detach_cdev(struct kcs_bmc_device *kcs_bmc);
-int kcs_bmc_ipmi_detach_cdev(struct kcs_bmc_device *kcs_bmc)
+static int kcs_bmc_ipmi_detach_cdev(struct kcs_bmc_device *kcs_bmc)
 {
 	struct kcs_bmc_ipmi *priv = NULL, *pos;
 
@@ -541,7 +538,31 @@ int kcs_bmc_ipmi_detach_cdev(struct kcs_bmc_device *kcs_bmc)
 
 	return 0;
 }
-EXPORT_SYMBOL(kcs_bmc_ipmi_detach_cdev);
+
+static const struct kcs_bmc_cdev_ops kcs_bmc_ipmi_cdev_ops = {
+	.add_device = kcs_bmc_ipmi_attach_cdev,
+	.remove_device = kcs_bmc_ipmi_detach_cdev,
+};
+
+static struct kcs_bmc_cdev kcs_bmc_ipmi_cdev = {
+	.ops = &kcs_bmc_ipmi_cdev_ops,
+};
+
+static int kcs_bmc_ipmi_init(void)
+{
+	return kcs_bmc_register_cdev(&kcs_bmc_ipmi_cdev);
+}
+module_init(kcs_bmc_ipmi_init);
+
+static void kcs_bmc_ipmi_exit(void)
+{
+	int rc;
+
+	rc = kcs_bmc_unregister_cdev(&kcs_bmc_ipmi_cdev);
+	if (rc)
+		pr_warn("Failed to remove KCS BMC client: %d", rc);
+}
+module_exit(kcs_bmc_ipmi_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Haiyue Wang <haiyue.wang@linux.intel.com>");

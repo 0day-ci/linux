@@ -10,6 +10,17 @@
 
 #include "kcs_bmc.h"
 
+struct kcs_bmc_cdev_ops {
+	int (*add_device)(struct kcs_bmc_device *kcs_bmc);
+	int (*remove_device)(struct kcs_bmc_device *kcs_bmc);
+};
+
+struct kcs_bmc_cdev {
+	struct list_head entry;
+
+	const struct kcs_bmc_cdev_ops *ops;
+};
+
 struct kcs_bmc_client_ops {
 	int (*event)(struct kcs_bmc_client *client);
 };
@@ -19,6 +30,9 @@ struct kcs_bmc_client {
 
 	struct kcs_bmc_device *dev;
 };
+
+int kcs_bmc_register_cdev(struct kcs_bmc_cdev *cdev);
+int kcs_bmc_unregister_cdev(struct kcs_bmc_cdev *cdev);
 
 int kcs_bmc_enable_device(struct kcs_bmc_device *kcs_bmc, struct kcs_bmc_client *client);
 void kcs_bmc_disable_device(struct kcs_bmc_device *kcs_bmc, struct kcs_bmc_client *client);

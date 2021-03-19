@@ -42,8 +42,4 @@ struct kcs_bmc_device {
 	spinlock_t lock;
 	struct kcs_bmc_client *client;
 };
-
-/* Temporary exports while refactoring */
-int kcs_bmc_ipmi_attach_cdev(struct kcs_bmc_device *kcs_bmc);
-int kcs_bmc_ipmi_detach_cdev(struct kcs_bmc_device *kcs_bmc);
 #endif /* __KCS_BMC_H__ */
