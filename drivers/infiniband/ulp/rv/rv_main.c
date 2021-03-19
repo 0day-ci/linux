@@ -253,11 +253,16 @@ static int __init rv_init_module(void)
 		return -EINVAL;
 	}
 
+	if (rv_file_init()) {
+		ib_unregister_client(&rv_client);
+		return -EINVAL;
+	}
 	return 0;
 }
 
 static void __exit rv_cleanup_module(void)
 {
+	rv_file_uninit();
 	ib_unregister_client(&rv_client);
 	rv_deinit_devices();
 }
