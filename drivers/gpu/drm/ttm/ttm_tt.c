@@ -369,7 +369,7 @@ static unsigned long ttm_tt_shrinker_scan(struct shrinker *shrink,
 	};
 	int ret;
 
-	ret = ttm_bo_swapout(&ctx, GFP_NOFS);
+	ret = ttm_bo_swapout(&ctx, GFP_KERNEL | __GFP_NOWARN);
 	return ret < 0 ? SHRINK_EMPTY : ret;
 }
 
@@ -389,10 +389,13 @@ static unsigned long ttm_tt_shrinker_count(struct shrinker *shrink,
 static int ttm_tt_debugfs_shrink_show(struct seq_file *m, void *data)
 {
 	struct shrink_control sc = { .gfp_mask = GFP_KERNEL };
+	unsigned int flags;
 
 	fs_reclaim_acquire(GFP_KERNEL);
+	flags = memalloc_nofs_save();
 	seq_printf(m, "%lu/%lu\n", ttm_tt_shrinker_count(&mm_shrinker, &sc),
 		   ttm_tt_shrinker_scan(&mm_shrinker, &sc));
+	memalloc_nofs_restore(flags);
 	fs_reclaim_release(GFP_KERNEL);
 
 	return 0;
