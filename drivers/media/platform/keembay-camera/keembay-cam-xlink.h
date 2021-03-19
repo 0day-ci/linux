@@ -28,4 +28,15 @@ struct kmb_xlink_cam {
 int kmb_cam_xlink_init(struct kmb_xlink_cam *xlink_cam, struct device *dev);
 void kmb_cam_xlink_cleanup(struct kmb_xlink_cam *xlink_cam);
 
+int kmb_cam_xlink_alloc_channel(struct kmb_xlink_cam *xlink_cam);
+void kmb_cam_xlink_free_channel(struct kmb_xlink_cam *xlink_cam, int chan_id);
+
+int kmb_cam_xlink_open_channel(struct kmb_xlink_cam *xlink_cam, int chan_id);
+int kmb_cam_xlink_close_channel(struct kmb_xlink_cam *xlink_cam, int chan_id);
+
+int kmb_cam_xlink_write_msg(struct kmb_xlink_cam *xlink_cam, int chan_id,
+			    u8 *message, u32 msg_size);
+int kmb_cam_xlink_read_msg(struct kmb_xlink_cam *xlink_cam, int chan_id,
+			   u8 *message, u32 msg_size);
+
 #endif /* KEEMBAY_CAM_XLINK_H */
