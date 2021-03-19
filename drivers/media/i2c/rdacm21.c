@@ -448,7 +448,10 @@ static int rdacm21_init(struct v4l2_subdev *sd, unsigned int val)
 	if (ret)
 		return ret;
 
-	/* Enable GPIO1 and hold OV490 in reset during max9271 configuration. */
+	/*
+	 * Enable GPIO1 and hold OV490 in reset during max9271 configuration.
+	 * The reset signal has to be asserted for at least 250 useconds.
+	 */
 	ret = max9271_enable_gpios(&dev->serializer, MAX9271_GPIO1OUT);
 	if (ret)
 		return ret;
@@ -456,6 +459,7 @@ static int rdacm21_init(struct v4l2_subdev *sd, unsigned int val)
 	ret = max9271_clear_gpios(&dev->serializer, MAX9271_GPIO1OUT);
 	if (ret)
 		return ret;
+	usleep_range(250, 500);
 
 	ret = max9271_configure_gmsl_link(&dev->serializer);
 	if (ret)
