@@ -178,7 +178,7 @@ static void rv_device_detach_users(struct rv_device *dev)
 		list_del_init(&rv->user_entry);
 
 		spin_unlock_irqrestore(&rv_dev_list_lock, flags);
-		/* Detach user here */
+		rv_detach_user(rv);
 		spin_lock_irqsave(&rv_dev_list_lock, flags);
 	}
 	spin_unlock_irqrestore(&rv_dev_list_lock, flags);

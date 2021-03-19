@@ -233,6 +233,24 @@ DEFINE_EVENT(/* event */
 		jkey_len, jkey, sid, q_depth, ua_next, refcount)
 );
 
+DEFINE_EVENT(/* event */
+	rv_jdev_template, rv_jdev_alloc,
+	TP_PROTO(void *ptr, const char *dev_name, u8 num_conn, u8 index_bits,
+		 u16 loc_gid_index, u32 loc_addr, u8 jkey_len, u8 *jkey,
+		 u64 sid, u32 q_depth, u32 ua_next, u32 refcount),
+	TP_ARGS(ptr, dev_name, num_conn, index_bits, loc_gid_index, loc_addr,
+		jkey_len, jkey, sid, q_depth, ua_next, refcount)
+);
+
+DEFINE_EVENT(/* event */
+	rv_jdev_template, rv_jdev_release,
+	TP_PROTO(void *ptr, const char *dev_name, u8 num_conn, u8 index_bits,
+		 u16 loc_gid_index, u32 loc_addr, u8 jkey_len, u8 *jkey,
+		 u64 sid, u32 q_depth, u32 ua_next, u32 refcount),
+	TP_ARGS(ptr, dev_name, num_conn, index_bits, loc_gid_index, loc_addr,
+		jkey_len, jkey, sid, q_depth, ua_next, refcount)
+);
+
 DECLARE_EVENT_CLASS(/* sconn */
 	rv_sconn_template,
 	TP_PROTO(void *ptr, u8 index, u32 qp_num, void *conn, u32 flags,
