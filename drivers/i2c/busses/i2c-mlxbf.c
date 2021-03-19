@@ -2426,8 +2426,6 @@ static int mlxbf_i2c_remove(struct platform_device *pdev)
 	}
 	mutex_unlock(&mlxbf_i2c_bus_lock);
 
-	devm_free_irq(dev, priv->irq, priv);
-
 	i2c_del_adapter(&priv->adap);
 
 	return 0;
