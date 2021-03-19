@@ -106,6 +106,30 @@ properties:
       Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h for applicable
       values.
 
+  ti,dp83867-led-mode-names:
+    $ref: /schemas/types.yaml#/definitions/string-array
+    description: |
+      A list of led name strings sorted in the same order as the
+      ti,dp83867-led-modes property.
+    items:
+      anyOf:
+        items:
+          - const: led-0
+          - const: led-1
+          - const: led-2
+          - const: led-gpio
+    maxItems: 4
+
+  ti,dp83867-led-modes:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: |
+      The DP83867 supports four configurable LED pins. Several functions can
+      be multiplexed onto the LEDs for different modes of operation.
+
+      Must contain an entry for each entry in ti,dp83867-led-mode-names.
+      See dt-bindings/net/ti-dp83867.h for applicable values.
+    maxItems: 4
+
 required:
   - reg
 

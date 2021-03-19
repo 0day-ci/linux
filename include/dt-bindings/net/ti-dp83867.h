@@ -50,4 +50,20 @@
 #define DP83867_CLK_O_SEL_REF_CLK		0xC
 /* Special flag to indicate clock should be off */
 #define DP83867_CLK_O_SEL_OFF			0xFFFFFFFF
+
+/* LED configuration */
+#define DP83867_LED_LINK_EST			0x0
+#define DP83867_LED_RX_TX_ACT			0x1
+#define DP83867_LED_TX_ACT			0x2
+#define DP83867_LED_RX_ACT			0x3
+#define DP83867_LED_COLLISION_DET		0x4
+#define DP83867_LED_1000_BT_LINK		0x5
+#define DP83867_LED_100_BT_LINK			0x6
+#define DP83867_LED_10_BT_LINK			0x7
+#define DP83867_LED_10_100_BT_LINK		0x8
+#define DP83867_LED_100_1000_BT_LINK		0x9
+#define DP83867_LED_FULL_DUPLEX			0xa
+#define DP83867_LED_LINK_EST_RX_TX_ACT		0xb
+#define DP83867_LED_RX_TX_ERR			0xd
+#define DP83867_LED_RX_ERR			0xe
 #endif
