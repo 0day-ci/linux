@@ -1224,12 +1224,6 @@ static int pci_scan_bridge_extend(struct pci_bus *bus, struct pci_dev *dev,
 	u8 fixed_sec, fixed_sub;
 	int next_busnr;
 
-	/*
-	 * Make sure the bridge is powered on to be able to access config
-	 * space of devices below it.
-	 */
-	pm_runtime_get_sync(&dev->dev);
-
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 	primary = buses & 0xFF;
 	secondary = (buses >> 8) & 0xFF;
@@ -1430,8 +1424,6 @@ static int pci_scan_bridge_extend(struct pci_bus *bus, struct pci_dev *dev,
 
 out:
 	pci_write_config_word(dev, PCI_BRIDGE_CONTROL, bctl);
-
-	pm_runtime_put(&dev->dev);
 
 	return max;
 }
@@ -2797,10 +2789,18 @@ static unsigned int pci_scan_child_bus_extend(struct pci_bus *bus,
 	unsigned int used_buses, normal_bridges = 0, hotplug_bridges = 0;
 	unsigned int start = bus->busn_res.start;
 	unsigned int devfn, fn, cmax, max = start;
-	struct pci_dev *dev;
+	struct pci_dev *dev, *bridge = bus->self;
 	int nr_devs;
 
 	dev_dbg(&bus->dev, "scanning bus\n");
+
+	/*
+	 * Make sure the bus bridge is powered on, otherwise we may not be
+	 * able to scan the devices as we may fail to access the configuration
+	 * space of subordinates.
+	 */
+	if (bridge)
+		pm_runtime_get_sync(&bridge->dev);
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 256; devfn += 8) {
@@ -2913,6 +2913,9 @@ static unsigned int pci_scan_child_bus_extend(struct pci_bus *bus,
 				&bus->busn_res, max - start);
 		}
 	}
+
+	if (bridge)
+		pm_runtime_put(&bridge->dev);
 
 	/*
 	 * We've scanned the bus and so we know all about what's on
