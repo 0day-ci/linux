@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pm.h>
+#include <linux/of_irq.h>
 
 #define GPIODIR 0x400
 #define GPIOIS  0x404
@@ -283,6 +284,69 @@ static int pl061_irq_set_wake(struct irq_data *d, unsigned int state)
 	return irq_set_irq_wake(pl061->parent_irq, state);
 }
 
+static int pl061_child_to_parent_hwirq(struct gpio_chip *gc, unsigned int child,
+				       unsigned int child_type,
+				       unsigned int *parent,
+				       unsigned int *parent_type)
+{
+	struct amba_device *adev = to_amba_device(gc->parent);
+	unsigned int irq = adev->irq[child];
+	struct irq_data *d = irq_get_irq_data(irq);
+
+	if (!d)
+		return -EINVAL;
+
+	*parent_type = irqd_get_trigger_type(d);
+	*parent = irqd_to_hwirq(d);
+	return 0;
+}
+
+#ifdef CONFIG_OF
+static void *pl061_populate_parent_alloc_arg(struct gpio_chip *gc,
+					     unsigned int parent_hwirq,
+					     unsigned int parent_type)
+{
+	struct device_node *dn = to_of_node(gc->irq.fwnode);
+	struct of_phandle_args pha;
+	struct irq_fwspec *fwspec;
+	int i;
+
+	if (WARN_ON(!dn))
+		return NULL;
+
+	fwspec = kmalloc(sizeof(*fwspec), GFP_KERNEL);
+	if (!fwspec)
+		return NULL;
+
+	/*
+	 * This brute-force here is because of the fact PL061 is often paired
+	 * with GIC-v3, which has 3-cell IRQ specifier (SPI/PPI selection), and
+	 * unexpected range shifts in hwirq mapping (SPI IRQs are shifted by
+	 * 32). So this is about reversing of gic_irq_domain_translate().
+	 */
+	for (i = 0; i < PL061_GPIO_NR; i++) {
+		unsigned int p, pt;
+
+		if (pl061_child_to_parent_hwirq(gc, i, parent_type, &p, &pt))
+			continue;
+		if (p == parent_hwirq)
+			break;
+	}
+	if (WARN_ON(i == PL061_GPIO_NR))
+		return NULL;
+
+	if (WARN_ON(of_irq_parse_one(dn, i, &pha)))
+		return NULL;
+
+	fwspec->fwnode = gc->irq.parent_domain->fwnode;
+	fwspec->param_count = pha.args_count;
+	for (i = 0; i < pha.args_count; i++)
+		fwspec->param[i] = pha.args[i];
+
+	return fwspec;
+}
+#endif
+
 static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
 {
 	struct device *dev = &adev->dev;
@@ -330,15 +394,34 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
 
 	girq = &pl061->gc.irq;
 	girq->chip = &pl061->irq_chip;
-	girq->parent_handler = pl061_irq_handler;
-	girq->num_parents = 1;
-	girq->parents = devm_kcalloc(dev, 1, sizeof(*girq->parents),
-				     GFP_KERNEL);
-	if (!girq->parents)
-		return -ENOMEM;
-	girq->parents[0] = irq;
 	girq->default_type = IRQ_TYPE_NONE;
 	girq->handler = handle_bad_irq;
+
+	/*
+	 * There are some PL061 implementations which lack GPIOINTR in hardware
+	 * and only have individual GPIOMIS[7:0] signals. We distinguish them by
+	 * the number of IRQs assigned to the AMBA device.
+	 */
+	if (adev->irq[PL061_GPIO_NR - 1]) {
+		girq->fwnode = dev->fwnode;
+		girq->parent_domain =
+			irq_get_irq_data(adev->irq[PL061_GPIO_NR - 1])->domain;
+		girq->child_to_parent_hwirq = pl061_child_to_parent_hwirq;
+#ifdef CONFIG_OF
+		girq->populate_parent_alloc_arg =
+			pl061_populate_parent_alloc_arg;
+#endif
+	} else {
+		WARN_ON(adev->irq[1]);
+
+		girq->parent_handler = pl061_irq_handler;
+		girq->num_parents = 1;
+		girq->parents = devm_kcalloc(dev, 1, sizeof(*girq->parents),
+					     GFP_KERNEL);
+		if (!girq->parents)
+			return -ENOMEM;
+		girq->parents[0] = irq;
+	}
 
 	ret = devm_gpiochip_add_data(dev, &pl061->gc, pl061);
 	if (ret)
