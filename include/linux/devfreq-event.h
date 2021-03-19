@@ -56,7 +56,7 @@ struct devfreq_event_data {
  * @disable	: Disable the devfreq-event device.
  * @reset	: Reset all setting of the devfreq-event device.
  * @set_event	: Set the specific event type for the devfreq-event device.
- * @get_event	: Get the result of the devfreq-event devie with specific
+ * @get_event	: Get the result of the devfreq-event device with specific
  *		  event type.
  *
  * This structure contains devfreq-event device operations which can be
