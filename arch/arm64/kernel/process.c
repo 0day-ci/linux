@@ -304,6 +304,17 @@ void __show_regs(struct pt_regs *regs)
 	}
 }
 
+void __show_regs_alloc_free(struct pt_regs *regs)
+{
+	int i;
+
+	/* check for x0 - x29 only */
+	for (i = 0; i <= 29; i++) {
+		pr_alert("Register x%d information:", i);
+		mem_dump_obj((void *)regs->regs[i]);
+	}
+}
+
 void show_regs(struct pt_regs *regs)
 {
 	__show_regs(regs);

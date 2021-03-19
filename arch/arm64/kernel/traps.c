@@ -104,6 +104,7 @@ static int __die(const char *str, int err, struct pt_regs *regs)
 
 	print_modules();
 	show_regs(regs);
+	__show_regs_alloc_free(regs);
 
 	dump_kernel_instr(KERN_EMERG, regs);
 
