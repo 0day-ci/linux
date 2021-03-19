@@ -1824,7 +1824,7 @@ void requeue_pi_wake_futex(struct futex_q *q, union futex_key *key,
 
 	q->lock_ptr = &hb->lock;
 
-	wake_up_state(q->task, TASK_NORMAL);
+	wake_up_process(q->task);
 }
 
 /**
