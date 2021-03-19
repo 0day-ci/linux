@@ -60,6 +60,39 @@ static void kmb_pipe_print_config(struct kmb_pipeline *pipe)
 	dev_dbg(dev, "\tinternal_memory_size %u\n", cfg->internal_memory_size);
 }
 
+static unsigned int kmb_pipe_get_pending(struct media_entity *entity)
+{
+	struct media_device *mdev = entity->graph_obj.mdev;
+	unsigned int num_vdevs = 0;
+	struct media_entity *next;
+	struct media_graph graph;
+	int ret;
+
+	/* Walk through graph to count the connected video node entities */
+	mutex_lock(&mdev->graph_mutex);
+
+	ret = media_graph_walk_init(&graph, mdev);
+	if (ret) {
+		mutex_unlock(&mdev->graph_mutex);
+		return -EINVAL;
+	}
+
+	media_graph_walk_start(&graph, entity);
+
+	while ((next = media_graph_walk_next(&graph))) {
+		if (!is_media_entity_v4l2_video_device(next))
+			continue;
+
+		num_vdevs++;
+	}
+
+	mutex_unlock(&mdev->graph_mutex);
+
+	media_graph_walk_cleanup(&graph);
+
+	return num_vdevs;
+}
+
 /**
  * kmb_pipe_init - Initialize KMB Pipeline
  * @pipe: pointer to pipeline object
@@ -205,5 +238,164 @@ int kmb_pipe_config_src(struct kmb_pipeline *pipe,
 	}
 
 	mutex_unlock(&pipe->lock);
+	return ret;
+}
+
+/**
+ * kmb_pipe_prepare - Prepare VPU pipeline for streaming
+ * @pipe: pointer to pipeline object
+ *
+ * Prepare pipeline for streaming by sending negotiated configuration to VPU
+ * and changing state to BUILT.
+ *
+ * Return: 0 if successful, error code otherwise.
+ */
+int kmb_pipe_prepare(struct kmb_pipeline *pipe)
+{
+	int ret = 0;
+
+	mutex_lock(&pipe->lock);
+
+	/* build only if all outputs are configured */
+	switch (pipe->state) {
+	case KMB_PIPE_STATE_UNCONFIGURED:
+		/* Call config and continue */
+		ret = kmb_cam_xlink_write_ctrl_msg(pipe->xlink_cam,
+						   pipe->pipe_cfg_paddr,
+						   KMB_IC_EVENT_TYPE_CONFIG_ISP_PIPE,
+						   KMB_IC_EVENT_TYPE_SUCCESSFUL);
+		if (ret < 0) {
+			dev_err(pipe->dev, "Failed to reconfigure pipeline!");
+			break;
+		}
+		fallthrough;
+	case KMB_PIPE_STATE_CONFIGURED:
+		ret = kmb_cam_xlink_write_ctrl_msg(pipe->xlink_cam,
+						   pipe->pipe_cfg_paddr,
+						   KMB_IC_EVENT_TYPE_BUILD_ISP_PIPE,
+						   KMB_IC_EVENT_TYPE_SUCCESSFUL);
+		if (ret < 0) {
+			dev_err(pipe->dev, "Failed to build pipeline!");
+			break;
+		}
+		pipe->state = KMB_PIPE_STATE_BUILT;
+		break;
+	case KMB_PIPE_STATE_BUILT:
+		/* Pipeline is already built ignore */
+		break;
+	default:
+		dev_err(pipe->dev,
+			"Build pipe in invalid state %d", pipe->state);
+		ret = -EINVAL;
+		break;
+	}
+
+	mutex_unlock(&pipe->lock);
+
+	return ret;
+}
+
+static int kmb_pipe_s_stream(struct kmb_pipeline *pipe,
+			     struct media_entity *entity, int enable)
+{
+	struct v4l2_subdev *subdev;
+	struct media_pad *remote;
+	int ret;
+
+	remote = media_entity_remote_pad(entity->pads);
+	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
+		return -EINVAL;
+
+	subdev = media_entity_to_v4l2_subdev(remote->entity);
+	if (!subdev)
+		return -EINVAL;
+
+	ret = v4l2_subdev_call(subdev, video, s_stream, enable);
+	if (ret < 0 && ret != -ENOIOCTLCMD)
+		dev_err(pipe->dev, "Cannot set stream %d", enable);
+
+	return ret != -ENOIOCTLCMD ? ret : 0;
+}
+
+/**
+ * kmb_pipe_stop - Set stream off and stop media pipeline
+ * @pipe: KMB pipeline object
+ * @entity: media entity
+ */
+void kmb_pipe_stop(struct kmb_pipeline *pipe, struct media_entity *entity)
+{
+	mutex_lock(&pipe->lock);
+
+	if (WARN_ON(!pipe->streaming)) {
+		dev_err(pipe->dev, "Calling stop on already stopped pipeline");
+		mutex_unlock(&pipe->lock);
+		return;
+	}
+
+	if (pipe->state == KMB_PIPE_STATE_STREAMING) {
+		kmb_pipe_s_stream(pipe, entity, 0);
+		media_pipeline_stop(entity);
+		pipe->state = KMB_PIPE_STATE_BUILT;
+	}
+
+	if (pipe->state == KMB_PIPE_STATE_BUILT ||
+	    pipe->state == KMB_PIPE_STATE_CONFIGURED) {
+		kmb_cam_xlink_write_ctrl_msg(pipe->xlink_cam,
+					     pipe->pipe_cfg_paddr,
+					     KMB_IC_EVENT_TYPE_DELETE_ISP_PIPE,
+					     KMB_IC_EVENT_TYPE_SUCCESSFUL);
+
+		pipe->state = KMB_PIPE_STATE_UNCONFIGURED;
+	}
+
+	pipe->streaming--;
+
+	mutex_unlock(&pipe->lock);
+}
+
+/**
+ * kmb_pipe_run - Run media pipeline and start streaming
+ * @pipe: KMB pipeline object
+ * @entity: media entity
+ *
+ * Return: 0 if successful, error code otherwise.
+ */
+int kmb_pipe_run(struct kmb_pipeline *pipe, struct media_entity *entity)
+{
+	int ret = 0;
+
+	mutex_lock(&pipe->lock);
+
+	if (!pipe->streaming)
+		pipe->pending = kmb_pipe_get_pending(entity);
+
+	pipe->streaming++;
+
+	if (pipe->streaming != pipe->pending)
+		goto done_unlock;
+
+	if (pipe->state != KMB_PIPE_STATE_BUILT) {
+		ret = -EINVAL;
+		goto done_unlock;
+	}
+
+	ret = media_pipeline_start(entity, &pipe->media_pipe);
+	if (ret < 0) {
+		dev_err(pipe->dev, "Failed to start media pipeline");
+		goto done_unlock;
+	}
+
+	ret = kmb_pipe_s_stream(pipe, entity, 1);
+	if (ret < 0 && ret != -ENOIOCTLCMD) {
+		mutex_unlock(&pipe->lock);
+		kmb_pipe_stop(pipe, entity);
+		return ret;
+	}
+
+	pipe->state = KMB_PIPE_STATE_STREAMING;
+
+done_unlock:
+	mutex_unlock(&pipe->lock);
+
 	return ret;
 }

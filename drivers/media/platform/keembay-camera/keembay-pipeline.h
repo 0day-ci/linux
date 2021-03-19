@@ -68,4 +68,8 @@ void kmb_pipe_config_dest(struct kmb_pipeline *pipe, unsigned int output_id,
 int kmb_pipe_config_src(struct kmb_pipeline *pipe,
 			struct kmb_pipe_config_evs *pipe_cfg);
 
+int kmb_pipe_prepare(struct kmb_pipeline *pipe);
+int kmb_pipe_run(struct kmb_pipeline *pipe, struct media_entity *entity);
+void kmb_pipe_stop(struct kmb_pipeline *pipe, struct media_entity *entity);
+
 #endif /* KEEMBAY_PIPELINE_H */

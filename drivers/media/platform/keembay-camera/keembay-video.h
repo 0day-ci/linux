@@ -16,7 +16,7 @@
 /**
  * struct kmb_frame_buffer - KMB frame buffer structure
  * @vb: Video buffer for v4l2
- * @addr: Array of dma buffer plane address
+ * @addr: Array of dma buffer plane addresses
  * @list: Frame buffer list
  */
 struct kmb_frame_buffer {
@@ -28,50 +28,39 @@ struct kmb_frame_buffer {
 /**
  * struct kmb_video - KMB Video device structure
  * @lock: Mutex serializing kmb video device ops
- * @video_lock: Mutex serializing video operations
  * @video: Pointer to V4L2 sub-device
+ * @vb2_q: Video buffer queue
  * @pad: Media pad graph objects
  * @dma_dev: Pointer to dma device
- * @pipe: Pointer to kmb media pipeline
- * @chan: Pointer to xlink channel
- */
-struct kmb_video {
-	struct mutex lock; /* Lock protecting kmb video device */
-	struct mutex video_lock; /* Lock serializing video device operations */
-	struct video_device *video;
-	struct media_pad pad;
-	struct device *dma_dev;
-	struct kmb_pipeline *pipe;
-	struct kmb_xlink_cam *xlink_cam;
-	unsigned int chan_id;
-};
-
-/**
- * struct kmb_video_fh - KMB video file handler
- * @fh: V4L2 file handler
- * @kmb_vid: Pointer to KMB video device
- * @lock: Mutex serializing access to fh
- * @vb2_lock: Mutex serializing access to vb2 queue
- * @vb2_q: Video buffer queue
- * @active_fmt: Active format
-     @pix: Mplane active pixel format
-     @info: Active kmb format info
- * @contiguous_memory: Flag to enable contiguous memory allocation
  * @dma_queue: DMA buffers queue
+ * @dma_lock: Mutex serializing dma queue ops
+ * @active_fmt: Active format
+ * @active_fmt.pix: Mplane active pixel format
+ * @active_fmt.info: Active kmb format info
+ * @pipe: Pointer to kmb media pipeline
+ * @xlink_cam: Pointer to xlink camera communication handler
+ * @chan_id: Channel ID
  * @thread: Pointer to worker thread data
  */
-struct kmb_video_fh {
-	struct v4l2_fh fh;
-	struct kmb_video *kmb_vid;
-	struct mutex lock; /* Lock protecting fh operations */
-	struct mutex vb2_lock; /* Lock protecting video buffer queue */
+struct kmb_video {
+	struct mutex lock;
+	struct video_device *video;
 	struct vb2_queue vb2_q;
+	struct media_pad pad;
+
+	struct device *dma_dev;
+	struct list_head dma_queue;
+	struct mutex dma_lock;
+
 	struct {
 		struct v4l2_pix_format_mplane pix;
 		const struct kmb_video_fmt_info *info;
 	} active_fmt;
-	bool contiguous_memory;
-	struct list_head dma_queue;
+
+	struct kmb_pipeline *pipe;
+	struct kmb_xlink_cam *xlink_cam;
+	unsigned int chan_id;
+
 	struct task_struct *thread;
 };
 
