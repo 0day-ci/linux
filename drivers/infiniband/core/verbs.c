@@ -1613,6 +1613,10 @@ bool ib_modify_qp_is_ok(enum ib_qp_state cur_state, enum ib_qp_state next_state,
 	    cur_state != IB_QPS_SQD && cur_state != IB_QPS_SQE)
 		return false;
 
+	if (cur_state >= ARRAY_SIZE(qp_state_table) ||
+	    next_state >= ARRAY_SIZE(qp_state_table[0]))
+		return false;
+
 	if (!qp_state_table[cur_state][next_state].valid)
 		return false;
 
