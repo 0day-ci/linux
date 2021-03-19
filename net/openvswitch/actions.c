@@ -890,7 +890,7 @@ static void do_output(struct datapath *dp, struct sk_buff *skb, int out_port,
 		if (likely(!mru ||
 		           (skb->len <= mru + vport->dev->hard_header_len))) {
 			ovs_vport_send(vport, skb, ovs_key_mac_proto(key));
-		} else if (mru <= vport->dev->mtu) {
+		} else if (mru) {
 			struct net *net = read_pnet(&dp->net);
 
 			ovs_fragment(net, vport, skb, mru, key);
