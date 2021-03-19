@@ -53,6 +53,7 @@ struct riscv_pmu {
 
 #define to_riscv_pmu(p) (container_of(p, struct riscv_pmu, pmu))
 unsigned long riscv_pmu_read_ctr_csr(unsigned long csr);
+void riscv_pmu_legacy_init(struct riscv_pmu *pmu);
 
 #endif /* CONFIG_RISCV_PMU */
 

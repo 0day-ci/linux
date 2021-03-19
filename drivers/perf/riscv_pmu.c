@@ -350,6 +350,8 @@ static int riscv_pmu_device_probe(struct platform_device *pdev)
 	if (!pmu)
 		return -ENOMEM;
 
+	riscv_pmu_legacy_init(pmu);
+
 	cpuhp_setup_state(CPUHP_AP_PERF_RISCV_STARTING,
 			  "perf/riscv/pmu:starting",
 			  riscv_perf_starting_cpu, riscv_perf_dying_cpu);
