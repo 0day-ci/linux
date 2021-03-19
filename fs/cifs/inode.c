@@ -2395,7 +2395,7 @@ int cifs_getattr(struct user_namespace *mnt_userns, const struct path *path,
 	 * We need to be sure that all dirty pages are written and the server
 	 * has actual ctime, mtime and file length.
 	 */
-	if ((request_mask & (STATX_CTIME | STATX_MTIME | STATX_SIZE)) &&
+	if ((request_mask & (STATX_CTIME | STATX_MTIME | STATX_SIZE | STATX_BLOCKS)) &&
 	    !CIFS_CACHE_READ(CIFS_I(inode)) &&
 	    inode->i_mapping && inode->i_mapping->nrpages != 0) {
 		rc = filemap_fdatawait(inode->i_mapping);
@@ -2585,6 +2585,14 @@ set_size_out:
 	if (rc == 0) {
 		cifsInode->server_eof = attrs->ia_size;
 		cifs_setsize(inode, attrs->ia_size);
+		/*
+		 * i_blocks is not related to (i_size / i_blksize),
+		 * but instead 512 byte (2**9) size is required for
+		 * calculating num blocks. Until we can query the
+		 * server for actual allocation size, this is best estimate
+		 * we have for the blocks allocated for this file
+		 */
+		inode->i_blocks = (512 - 1 + attrs->ia_size) >> 9;
 
 		/*
 		 * The man page of truncate says if the size changed,
@@ -2912,7 +2920,7 @@ cifs_setattr_nounix(struct dentry *direntry, struct iattr *attrs)
 		sys_utimes in which case we ought to fail the call back to
 		the user when the server rejects the call */
 		if ((rc) && (attrs->ia_valid &
-				(ATTR_MODE | ATTR_GID | ATTR_UID | ATTR_SIZE)))
+			    (ATTR_MODE | ATTR_GID | ATTR_UID | ATTR_SIZE)))
 			rc = 0;
 	}
 
