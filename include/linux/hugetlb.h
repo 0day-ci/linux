@@ -498,12 +498,18 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
  *	modifications require hugetlb_lock.
  * HPG_freed - Set when page is on the free lists.
  *	Synchronization: hugetlb_lock held for examination and modification.
+ * HPG_cma - Set if huge page was directly allocated from CMA area via
+ *      cma_alloc.  Initially set for gigantic page cma allocations, but can
+ *      be set in non-gigantic pages if gigantic pages are demoted.
+ *	Synchronization: Only accessed or modified when there is only one
+ *	reference to the page at allocation or free time.
  */
 enum hugetlb_page_flags {
 	HPG_restore_reserve = 0,
 	HPG_migratable,
 	HPG_temporary,
 	HPG_freed,
+	HPG_cma,
 	__NR_HPAGEFLAGS,
 };
 
@@ -549,6 +555,7 @@ HPAGEFLAG(RestoreReserve, restore_reserve)
 HPAGEFLAG(Migratable, migratable)
 HPAGEFLAG(Temporary, temporary)
 HPAGEFLAG(Freed, freed)
+HPAGEFLAG(Cma, cma)
 
 #ifdef CONFIG_HUGETLB_PAGE
 

@@ -1238,13 +1238,11 @@ static void destroy_compound_gigantic_page(struct page *page,
 
 static void free_gigantic_page(struct page *page, unsigned int order)
 {
-	/*
-	 * If the page isn't allocated using the cma allocator,
-	 * cma_release() returns false.
-	 */
 #ifdef CONFIG_CMA
-	if (cma_release(hugetlb_cma[page_to_nid(page)], page, 1 << order))
+	if (HPageCma(page)) {
+		cma_release(hugetlb_cma[page_to_nid(page)], page, 1 << order);
 		return;
+	}
 #endif
 
 	free_contig_range(page_to_pfn(page), 1 << order);
@@ -1266,8 +1264,10 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
 		if (hugetlb_cma[nid]) {
 			page = cma_alloc(hugetlb_cma[nid], nr_pages,
 					huge_page_order(h), true);
-			if (page)
+			if (page) {
+				SetHPageCma(page);
 				return page;
+			}
 		}
 
 		if (!(gfp_mask & __GFP_THISNODE)) {
@@ -1277,8 +1277,10 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
 
 				page = cma_alloc(hugetlb_cma[node], nr_pages,
 						huge_page_order(h), true);
-				if (page)
+				if (page) {
+					SetHPageCma(page);
 					return page;
+				}
 			}
 		}
 	}
@@ -1394,7 +1396,7 @@ static DECLARE_WORK(free_hpage_work, free_hpage_workfn);
 static bool free_page_may_sleep(struct hstate *h, struct page *page)
 {
 	/* freeing gigantic pages in CMA may sleep */
-	if (hstate_is_gigantic(h))
+	if (HPageCma(page))
 		return true;
 
 	return false;
