@@ -1,0 +1,11 @@
+config VIDEO_INTEL_KEEMBAY_CAMERA
+	tristate "Intel Keem Bay camera subsystem"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on XLINK_CORE  && HAS_DMA && OF
+	select VIDEOBUF2_DMA_CONTIG
+	select V4L2_FWNODE
+	help
+          This is a V4L2 driver for the Intel Keem Bay VPU camera interface.
+
+          To compile this driver as a module, choose M here: the module
+          will be called keembay_cam
