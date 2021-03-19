@@ -22,6 +22,8 @@ ALL_PROGRAMS := $(patsubst %,$(OUTPUT)%,$(ALL_TARGETS))
 
 ALL_SCRIPTS := hv_get_dhcp_info.sh hv_get_dns_info.sh hv_set_ifconfig.sh
 
+$(OUTPUT)hv_kvp_daemon: LDFLAGS += -lpthread
+
 all: $(ALL_PROGRAMS)
 
 export srctree OUTPUT CC LD CFLAGS
