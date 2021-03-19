@@ -25,6 +25,7 @@
 #define MII_DP83867_MICR	0x12
 #define MII_DP83867_ISR		0x13
 #define DP83867_CFG2		0x14
+#define DP83867_LEDCR1		0x18
 #define DP83867_CFG3		0x1e
 #define DP83867_CTRL		0x1f
 
@@ -138,6 +139,12 @@
 #define DP83867_DOWNSHIFT_4_COUNT	4
 #define DP83867_DOWNSHIFT_8_COUNT	8
 
+/* LEDCR1 bits */
+#define DP83867_LEDCR1_LED_0_SEL	GENMASK(3, 0)
+#define DP83867_LEDCR1_LED_1_SEL	GENMASK(7, 4)
+#define DP83867_LEDCR1_LED_2_SEL	GENMASK(11, 8)
+#define DP83867_LEDCR1_LED_GPIO_SEL	GENMASK(15, 12)
+
 /* CFG3 bits */
 #define DP83867_CFG3_INT_OE			BIT(7)
 #define DP83867_CFG3_ROBUST_AUTO_MDIX		BIT(9)
@@ -154,6 +161,14 @@ enum {
 	DP83867_PORT_MIRROING_DIS,
 };
 
+enum {
+	DP83867_LED_0,
+	DP83867_LED_1,
+	DP83867_LED_2,
+	DP83867_LED_GPIO,
+	DP83867_LED_MAX,
+};
+
 struct dp83867_private {
 	u32 rx_id_delay;
 	u32 tx_id_delay;
@@ -165,6 +180,7 @@ struct dp83867_private {
 	bool set_clk_output;
 	u32 clk_output_sel;
 	bool sgmii_ref_clk_en;
+	u32 led_mode[DP83867_LED_MAX];
 };
 
 static int dp83867_ack_interrupt(struct phy_device *phydev)
@@ -521,6 +537,27 @@ static int dp83867_verify_rgmii_cfg(struct phy_device *phydev)
 }
 
 #if IS_ENABLED(CONFIG_OF_MDIO)
+static int dp83867_of_led_mode_read(struct device_node *of_node,
+				    const char *led_name, u32 *mode)
+{
+	u32 tmp;
+	int index;
+	int err;
+
+	index = of_property_match_string(of_node, "ti,dp83867-led-mode-names",
+					 led_name);
+	err = of_property_read_u32_index(of_node, "ti,dp83867-led-modes",
+					 index, tmp);
+	if (err)
+		return err;
+	if (tmp == 0xc || tmp >= 0xf)
+		return -EINVAL;
+
+	*mode = tmp;
+
+	return 0;
+}
+
 static int dp83867_of_init(struct phy_device *phydev)
 {
 	struct dp83867_private *dp83867 = phydev->priv;
@@ -614,6 +651,15 @@ static int dp83867_of_init(struct phy_device *phydev)
 		return -EINVAL;
 	}
 
+	dp83867_of_led_mode_read(of_node, "led-0",
+				 &dp83867->led_mode[DP83867_LED_0]);
+	dp83867_of_led_mode_read(of_node, "led-1",
+				 &dp83867->led_mode[DP83867_LED_1]);
+	dp83867_of_led_mode_read(of_node, "led-2",
+				 &dp83867->led_mode[DP83867_LED_2]);
+	dp83867_of_led_mode_read(of_node, "led-gpio",
+				 &dp83867->led_mode[DP83867_LED_GPIO]);
+
 	return 0;
 }
 #else
@@ -631,6 +677,11 @@ static int dp83867_probe(struct phy_device *phydev)
 			       GFP_KERNEL);
 	if (!dp83867)
 		return -ENOMEM;
+
+	dp83867->led_mode[DP83867_LED_0] = DP83867_LED_LINK_EST;
+	dp83867->led_mode[DP83867_LED_1] = DP83867_LED_1000_BT_LINK;
+	dp83867->led_mode[DP83867_LED_2] = DP83867_LED_RX_TX_ACT;
+	dp83867->led_mode[DP83867_LED_GPIO] = DP83867_LED_100_BT_LINK;
 
 	phydev->priv = dp83867;
 
@@ -791,6 +842,12 @@ static int dp83867_config_init(struct phy_device *phydev)
 			val &= ~DP83867_SGMII_TYPE;
 		phy_write_mmd(phydev, DP83867_DEVADDR, DP83867_SGMIICTL, val);
 	}
+
+	val = FIELD_PREP(DP83867_LEDCR1_LED_0_SEL, dp83867->led_mode[DP83867_LED_0]) |
+	      FIELD_PREP(DP83867_LEDCR1_LED_1_SEL, dp83867->led_mode[DP83867_LED_1]) |
+	      FIELD_PREP(DP83867_LEDCR1_LED_2_SEL, dp83867->led_mode[DP83867_LED_2]) |
+	      FIELD_PREP(DP83867_LEDCR1_LED_GPIO_SEL, dp83867->led_mode[DP83867_LED_GPIO]);
+	phy_write(phydev, DP83867_LEDCR1, val);
 
 	val = phy_read(phydev, DP83867_CFG3);
 	/* Enable Interrupt output INT_OE in CFG3 register */
