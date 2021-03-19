@@ -2,4 +2,5 @@
 /*
  * Copyright(c) 2020 - 2021 Intel Corporation.
  */
+#include "trace_mr_cache.h"
 #include "trace_dev.h"
