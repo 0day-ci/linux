@@ -2518,11 +2518,20 @@ static void __init report_hugepages(void)
 	}
 }
 
+static inline unsigned long min_hp_count(struct hstate *h, unsigned long count)
+{
+	unsigned long min_count;
+
+	min_count = h->resv_huge_pages + h->nr_huge_pages - h->free_huge_pages;
+	return max(count, min_count);
+}
+
 #ifdef CONFIG_HIGHMEM
 static void try_to_free_low(struct hstate *h, unsigned long count,
 						nodemask_t *nodes_allowed)
 {
 	int i;
+	unsigned long min_count = min_hp_count(h, count);
 
 	if (hstate_is_gigantic(h))
 		return;
@@ -2531,7 +2540,7 @@ static void try_to_free_low(struct hstate *h, unsigned long count,
 		struct page *page, *next;
 		struct list_head *freel = &h->hugepage_freelists[i];
 		list_for_each_entry_safe(page, next, freel, lru) {
-			if (count >= h->nr_huge_pages)
+			if (min_count >= h->nr_huge_pages)
 				return;
 			if (PageHighMem(page))
 				continue;
@@ -2539,6 +2548,12 @@ static void try_to_free_low(struct hstate *h, unsigned long count,
 			update_and_free_page(h, page);
 			h->free_huge_pages--;
 			h->free_huge_pages_node[page_to_nid(page)]--;
+
+			/*
+			 * update_and_free_page could have dropped lock so
+			 * recompute min_count.
+			 */
+			min_count = min_hp_count(h, count);
 		}
 	}
 }
@@ -2692,13 +2707,15 @@ static int set_max_huge_pages(struct hstate *h, unsigned long count, int nid,
 	 * and won't grow the pool anywhere else. Not until one of the
 	 * sysctls are changed, or the surplus pages go out of use.
 	 */
-	min_count = h->resv_huge_pages + h->nr_huge_pages - h->free_huge_pages;
-	min_count = max(count, min_count);
-	try_to_free_low(h, min_count, nodes_allowed);
+	min_count = min_hp_count(h, count);
+	try_to_free_low(h, count, nodes_allowed);
 	while (min_count < persistent_huge_pages(h)) {
 		if (!free_pool_huge_page(h, nodes_allowed, 0))
 			break;
 		cond_resched_lock(&hugetlb_lock);
+
+		/* Recompute min_count in case hugetlb_lock was dropped */
+		min_count = min_hp_count(h, count);
 	}
 	while (count < persistent_huge_pages(h)) {
 		if (!adjust_pool_surplus(h, nodes_allowed, 1))
