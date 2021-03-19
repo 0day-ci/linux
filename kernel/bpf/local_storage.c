@@ -9,7 +9,8 @@
 #include <linux/slab.h>
 #include <uapi/linux/btf.h>
 
-DEFINE_PER_CPU(struct bpf_cgroup_storage*, bpf_cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE]);
+DEFINE_PER_CPU(struct bpf_cgroup_storage_info,
+	       bpf_cgroup_storage_info[BPF_CGROUP_STORAGE_NEST_MAX]);
 
 #ifdef CONFIG_CGROUP_BPF
 
