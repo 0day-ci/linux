@@ -5441,6 +5441,7 @@ static void alc_update_headset_jack_cb(struct hda_codec *codec,
 				       struct hda_jack_callback *jack)
 {
 	snd_hda_gen_hp_automute(codec, jack);
+	alc_update_headset_mode(codec);
 }
 
 static void alc_probe_headset_mode(struct hda_codec *codec)
@@ -5553,7 +5554,7 @@ static void alc288_update_headset_jack_cb(struct hda_codec *codec,
 {
 	struct alc_spec *spec = codec->spec;
 
-	alc_update_headset_jack_cb(codec, jack);
+	snd_hda_gen_hp_automute(codec, jack);
 	/* Headset Mic enable or disable, only for Dell Dino */
 	alc_update_gpio_data(codec, 0x40, spec->gen.hp_jack_present);
 }
