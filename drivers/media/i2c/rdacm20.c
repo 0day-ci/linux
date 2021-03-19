@@ -518,7 +518,19 @@ again:
 
 	dev_info(dev->dev, "Identified MAX9271 + OV10635 device\n");
 
-	return 0;
+	/*
+	 * Set reverse channel high threshold to increase noise immunity.
+	 *
+	 * This should be compensated by increasing the reverse channel
+	 * amplitude on the remote deserializer side.
+	 *
+	 * TODO Inspect the embedded MCU programming sequence to make sure
+	 * there are no conflicts with the configuration applied here.
+	 *
+	 * TODO Clarify the embedded MCU startup delay to avoid write
+	 * collisions on the I2C bus.
+	 */
+	return max9271_set_high_threshold(&dev->serializer, true);
 }
 
 static const struct v4l2_subdev_core_ops rdacm20_core_ops = {
