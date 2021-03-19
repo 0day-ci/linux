@@ -859,6 +859,9 @@ static int hv_pcifront_write_config(struct pci_bus *bus, unsigned int devfn,
 static struct pci_ops hv_pcifront_ops = {
 	.read  = hv_pcifront_read_config,
 	.write = hv_pcifront_write_config,
+#ifdef CONFIG_PCI_DOMAINS_GENERIC
+	.use_arch_sysdata = 1,
+#endif
 };
 
 /*
