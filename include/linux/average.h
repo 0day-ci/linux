@@ -11,7 +11,7 @@
  *
  * This implements a fixed-precision EWMA algorithm, with both the
  * precision and fall-off coefficient determined at compile-time
- * and built into the generated helper funtions.
+ * and built into the generated helper functions.
  *
  * The first argument to the macro is the name that will be used
  * for the struct and helper functions.
