@@ -59,6 +59,8 @@
  */
 #define OV10635_PIXEL_RATE		(44000000)
 
+#define OV10635_PID_TIMEOUT		3
+
 static const struct ov10635_reg {
 	u16	reg;
 	u8	val;
@@ -438,7 +440,7 @@ static int rdacm20_get_fmt(struct v4l2_subdev *sd,
 static int rdacm20_init(struct v4l2_subdev *sd, unsigned int val)
 {
 	struct rdacm20_device *dev = sd_to_rdacm20(sd);
-	unsigned int retry = 3;
+	unsigned int i;
 	int ret;
 
 	/*
@@ -478,23 +480,18 @@ static int rdacm20_init(struct v4l2_subdev *sd, unsigned int val)
 		return ret;
 	usleep_range(10000, 15000);
 
-again:
-	ret = ov10635_read16(dev, OV10635_PID);
-	if (ret < 0) {
-		if (retry--)
-			goto again;
+	for (i = 0; i < OV10635_PID_TIMEOUT; ++i) {
+		ret = ov10635_read16(dev, OV10635_PID);
+		if (ret == OV10635_VERSION)
+			break;
+		else if (ret >= 0)
+			/* Sometimes we get a successful read but a wrong ID. */
+			dev_dbg(dev->dev, "OV10635 ID mismatch (%d)\n", ret);
 
-		dev_err(dev->dev, "OV10635 ID read failed (%d)\n",
-			ret);
-		return -ENXIO;
+		usleep_range(1000, 2000);
 	}
-
-	if (ret != OV10635_VERSION) {
-		if (retry--)
-			goto again;
-
-		dev_err(dev->dev, "OV10635 ID mismatch (0x%04x)\n",
-			ret);
+	if (i == OV10635_PID_TIMEOUT) {
+		dev_err(dev->dev, "OV10635 ID read failed (%d)\n", ret);
 		return -ENXIO;
 	}
 
