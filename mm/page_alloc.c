@@ -5072,10 +5072,9 @@ static inline void free_the_page(struct page *page, unsigned int order)
  * the allocation, so it is easy to leak memory.  Freeing more memory
  * than was allocated will probably emit a warning.
  *
- * If the last reference to this page is speculative, it will be released
- * by put_page() which only frees the first page of a non-compound
- * allocation.  To prevent the remaining pages from being leaked, we free
- * the subsequent pages here.  If you want to use the page's reference
+ * This function isn't a put_page(). Don't let the put_page_testzero()
+ * fool you, it's only to deal with speculative cache references. It
+ * WILL free pages directly. If you want to use the page's reference
  * count to decide when to free the allocation, you should allocate a
  * compound page, and use put_page() instead of __free_pages().
  *
@@ -5084,11 +5083,33 @@ static inline void free_the_page(struct page *page, unsigned int order)
  */
 void __free_pages(struct page *page, unsigned int order)
 {
-	if (put_page_testzero(page))
+	/*
+	 * Drop the base reference from __alloc_pages and free. In
+	 * case there is an outstanding speculative reference, from
+	 * e.g. the page cache, it will put and free the page later.
+	 */
+	if (likely(put_page_testzero(page))) {
 		free_the_page(page, order);
-	else if (!PageHead(page))
+		return;
+	}
+
+	/*
+	 * The speculative reference will put and free the page.
+	 *
+	 * However, if the speculation was into a higher-order page
+	 * chunk that isn't marked compound, the other side will know
+	 * nothing about our buddy pages and only free the order-0
+	 * page at the start of our chunk! We must split off and free
+	 * the buddy pages here.
+	 *
+	 * The buddy pages aren't individually refcounted, so they
+	 * can't have any pending speculative references themselves.
+	 */
+	if (!PageHead(page) && order > 0) {
+		split_page_memcg(page, 1 << order);
 		while (order-- > 0)
 			free_the_page(page + (1 << order), order);
+	}
 }
 EXPORT_SYMBOL(__free_pages);
 
