@@ -1348,7 +1348,60 @@ static void remove_hugetlb_page(struct hstate *h, struct page *page,
 	h->nr_huge_pages_node[nid]--;
 }
 
-static void update_and_free_page(struct hstate *h, struct page *page)
+/*
+ * free_huge_page() can be called from any context.  However, the freeing
+ * of a hugetlb page can potentially sleep.  If freeing will sleep, defer
+ * the actual freeing to a workqueue to prevent sleeping in contexts where
+ * sleeping is not allowed.
+ *
+ * Use the page->mapping pointer as a llist_node structure for the lockless
+ * linked list of pages to be freeed.  free_hpage_workfn() locklessly
+ * retrieves the linked list of pages to be freed and frees them one-by-one.
+ *
+ * The page passed to __free_huge_page is technically not a hugetlb page, so
+ * we can not use interfaces such as page_hstate().
+ */
+static void __free_huge_page(struct page *page)
+{
+	unsigned int order = compound_order(page);
+
+	if (order_is_gigantic(order)) {
+		destroy_compound_gigantic_page(page, order);
+		free_gigantic_page(page, order);
+	} else {
+		__free_pages(page, order);
+	}
+}
+
+static LLIST_HEAD(hpage_freelist);
+
+static void free_hpage_workfn(struct work_struct *work)
+{
+	struct llist_node *node;
+	struct page *page;
+
+	node = llist_del_all(&hpage_freelist);
+
+	while (node) {
+		page = container_of((struct address_space **)node,
+				     struct page, mapping);
+		node = node->next;
+		__free_huge_page(page);
+	}
+}
+static DECLARE_WORK(free_hpage_work, free_hpage_workfn);
+
+static bool free_page_may_sleep(struct hstate *h, struct page *page)
+{
+	/* freeing gigantic pages in CMA may sleep */
+	if (hstate_is_gigantic(h))
+		return true;
+
+	return false;
+}
+
+static void __update_and_free_page(struct hstate *h, struct page *page,
+								bool can_sleep)
 {
 	int i;
 	struct page *subpage = page;
@@ -1363,12 +1416,39 @@ static void update_and_free_page(struct hstate *h, struct page *page)
 				1 << PG_active | 1 << PG_private |
 				1 << PG_writeback);
 	}
+
+	if (!can_sleep && free_page_may_sleep(h, page)) {
+		/*
+		 * Send page freeing to workqueue
+		 *
+		 * Only call schedule_work() if hpage_freelist is previously
+		 * empty. Otherwise, schedule_work() had been called but the
+		 * workfn hasn't retrieved the list yet.
+		 */
+		if (llist_add((struct llist_node *)&page->mapping,
+					&hpage_freelist))
+			schedule_work(&free_hpage_work);
+		return;
+	}
+
 	if (hstate_is_gigantic(h)) {
 		destroy_compound_gigantic_page(page, huge_page_order(h));
 		free_gigantic_page(page, huge_page_order(h));
 	} else {
 		__free_pages(page, huge_page_order(h));
 	}
+}
+
+static void update_and_free_page_no_sleep(struct hstate *h, struct page *page)
+{
+	/* can not sleep */
+	return __update_and_free_page(h, page, false);
+}
+
+static void update_and_free_page(struct hstate *h, struct page *page)
+{
+	/* can sleep */
+	return __update_and_free_page(h, page, true);
 }
 
 struct hstate *size_to_hstate(unsigned long size)
@@ -1433,12 +1513,12 @@ void free_huge_page(struct page *page)
 	if (HPageTemporary(page)) {
 		remove_hugetlb_page(h, page, false);
 		spin_unlock_irqrestore(&hugetlb_lock, flags);
-		update_and_free_page(h, page);
+		update_and_free_page_no_sleep(h, page);
 	} else if (h->surplus_huge_pages_node[nid]) {
 		/* remove the page from active list */
 		remove_hugetlb_page(h, page, true);
 		spin_unlock_irqrestore(&hugetlb_lock, flags);
-		update_and_free_page(h, page);
+		update_and_free_page_no_sleep(h, page);
 	} else {
 		arch_clear_hugepage_flags(page);
 		enqueue_huge_page(h, page);
