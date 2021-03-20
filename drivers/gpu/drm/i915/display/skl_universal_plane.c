@@ -294,7 +294,7 @@ skl_plane_ratio(const struct intel_crtc_state *crtc_state,
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
 
 	if (fb->format->cpp[0] == 8) {
-		if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) {
+		if (DISPLAY_VER(dev_priv) >= 10) {
 			*num = 10;
 			*den = 8;
 		} else {
@@ -317,7 +317,7 @@ static int skl_plane_min_cdclk(const struct intel_crtc_state *crtc_state,
 	skl_plane_ratio(crtc_state, plane_state, &num, &den);
 
 	/* two pixels per clock on glk+ */
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		den *= 2;
 
 	return DIV_ROUND_UP(pixel_rate * num, den);
@@ -810,7 +810,7 @@ static u32 skl_plane_ctl_crtc(const struct intel_crtc_state *crtc_state)
 	struct drm_i915_private *dev_priv = to_i915(crtc_state->uapi.crtc->dev);
 	u32 plane_ctl = 0;
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		return plane_ctl;
 
 	if (crtc_state->gamma_enable)
@@ -834,7 +834,7 @@ static u32 skl_plane_ctl(const struct intel_crtc_state *crtc_state,
 
 	plane_ctl = PLANE_CTL_ENABLE;
 
-	if (DISPLAY_VER(dev_priv) < 10 && !IS_GEMINILAKE(dev_priv)) {
+	if (DISPLAY_VER(dev_priv) < 10) {
 		plane_ctl |= skl_plane_ctl_alpha(plane_state);
 		plane_ctl |= PLANE_CTL_PLANE_GAMMA_DISABLE;
 
@@ -976,7 +976,7 @@ skl_program_plane(struct intel_plane *plane,
 
 	plane_ctl |= skl_plane_ctl_crtc(crtc_state);
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		plane_color_ctl = plane_state->color_ctl |
 			glk_plane_color_ctl_crtc(crtc_state);
 
@@ -1017,7 +1017,7 @@ skl_program_plane(struct intel_plane *plane,
 		intel_de_write_fw(dev_priv, PLANE_CUS_CTL(pipe, plane_id),
 				  plane_state->cus_ctl);
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		intel_de_write_fw(dev_priv, PLANE_COLOR_CTL(pipe, plane_id),
 				  plane_color_ctl);
 
@@ -1222,7 +1222,7 @@ static int skl_plane_check_dst_coordinates(const struct intel_crtc_state *crtc_s
 	 * than the cursor ending less than 4 pixels from the left edge of the
 	 * screen may cause FIFO underflow and display corruption.
 	 */
-	if ((IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) &&
+	if (IS_DISPLAY_VER(dev_priv, 10) &&
 	    (crtc_x + crtc_w < 4 || crtc_x > pipe_src_w - 4)) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "requested plane X %s position %d invalid (valid range %d-%d)\n",
@@ -1262,7 +1262,7 @@ static int skl_plane_max_scale(struct drm_i915_private *dev_priv,
 	 * the best case.
 	 * FIXME need to properly check this later.
 	 */
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv) ||
+	if (DISPLAY_VER(dev_priv) >= 10 ||
 	    !intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier))
 		return 0x30000 - 1;
 	else
@@ -1687,7 +1687,7 @@ static int skl_plane_check(struct intel_crtc_state *crtc_state,
 
 	plane_state->ctl = skl_plane_ctl(crtc_state, plane_state);
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		plane_state->color_ctl = glk_plane_color_ctl(crtc_state,
 							     plane_state);
 
@@ -1719,7 +1719,7 @@ static bool skl_plane_has_planar(struct drm_i915_private *dev_priv,
 	if (IS_SKYLAKE(dev_priv) || IS_BROXTON(dev_priv))
 		return false;
 
-	if (IS_DISPLAY_VER(dev_priv, 9) && !IS_GEMINILAKE(dev_priv) && pipe == PIPE_C)
+	if (IS_DISPLAY_VER(dev_priv, 9) && pipe == PIPE_C)
 		return false;
 
 	if (plane_id != PLANE_PRIMARY && plane_id != PLANE_SPRITE0)
@@ -2013,7 +2013,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 		plane->min_width = icl_plane_min_width;
 		plane->max_width = icl_plane_max_width;
 		plane->max_height = icl_plane_max_height;
-	} else if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) {
+	} else if (DISPLAY_VER(dev_priv) >= 10) {
 		plane->max_width = glk_plane_max_width;
 		plane->max_height = skl_plane_max_height;
 	} else {
@@ -2039,7 +2039,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 	if (DISPLAY_VER(dev_priv) >= 11)
 		formats = icl_get_plane_formats(dev_priv, pipe,
 						plane_id, &num_formats);
-	else if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	else if (DISPLAY_VER(dev_priv) >= 10)
 		formats = glk_get_plane_formats(dev_priv, pipe,
 						plane_id, &num_formats);
 	else
@@ -2085,7 +2085,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 
 	supported_csc = BIT(DRM_COLOR_YCBCR_BT601) | BIT(DRM_COLOR_YCBCR_BT709);
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		supported_csc |= BIT(DRM_COLOR_YCBCR_BT2020);
 
 	drm_plane_create_color_properties(&plane->base,
@@ -2165,7 +2165,7 @@ skl_get_initial_plane_config(struct intel_crtc *crtc,
 	else
 		pixel_format = val & PLANE_CTL_FORMAT_MASK;
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) {
+	if (DISPLAY_VER(dev_priv) >= 10) {
 		alpha = intel_de_read(dev_priv,
 				      PLANE_COLOR_CTL(pipe, plane_id));
 		alpha &= PLANE_COLOR_ALPHA_MASK;

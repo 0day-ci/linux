@@ -295,7 +295,7 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 	if (DISPLAY_VER(dev_priv) >= 10) {
 		source_rates = cnl_rates;
 		size = ARRAY_SIZE(cnl_rates);
-		if (IS_DISPLAY_VER(dev_priv, 10))
+		if (IS_CANNONLAKE(dev_priv))
 			max_rate = cnl_max_source_rate(intel_dp);
 		else if (IS_JSL_EHL(dev_priv))
 			max_rate = ehl_max_source_rate(intel_dp);
@@ -776,7 +776,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	 * Output bpp is stored in 6.4 format so right shift by 4 to get the
 	 * integer value since we support only integer values of bpp.
 	 */
-	if ((DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv)) &&
+	if ((DISPLAY_VER(dev_priv) >= 10) &&
 	    drm_dp_sink_supports_dsc(intel_dp->dsc_dpcd)) {
 		if (intel_dp_is_edp(intel_dp)) {
 			dsc_max_output_bpp =
@@ -2523,7 +2523,7 @@ intel_edp_init_dpcd(struct intel_dp *intel_dp)
 	intel_dp_set_common_rates(intel_dp);
 
 	/* Read the eDP DSC DPCD registers */
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		intel_dp_get_dsc_sink_cap(intel_dp);
 
 	/*

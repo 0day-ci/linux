@@ -1433,7 +1433,7 @@ static void bxt_get_cdclk(struct drm_i915_private *dev_priv,
 		break;
 	case BXT_CDCLK_CD2X_DIV_SEL_1_5:
 		drm_WARN(&dev_priv->drm,
-			 IS_GEMINILAKE(dev_priv) || DISPLAY_VER(dev_priv) >= 10,
+			 DISPLAY_VER(dev_priv) >= 10,
 			 "Unsupported divider\n");
 		div = 3;
 		break;
@@ -1591,7 +1591,7 @@ static void bxt_set_cdclk(struct drm_i915_private *dev_priv,
 		break;
 	case 3:
 		drm_WARN(&dev_priv->drm,
-			 IS_GEMINILAKE(dev_priv) || DISPLAY_VER(dev_priv) >= 10,
+			 DISPLAY_VER(dev_priv) >= 10,
 			 "Unsupported divider\n");
 		divider = BXT_CDCLK_CD2X_DIV_SEL_1_5;
 		break;
@@ -1998,7 +1998,7 @@ static int intel_pixel_rate_to_cdclk(const struct intel_crtc_state *crtc_state)
 	struct drm_i915_private *dev_priv = to_i915(crtc_state->uapi.crtc->dev);
 	int pixel_rate = crtc_state->pixel_rate;
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		return DIV_ROUND_UP(pixel_rate, 2);
 	else if (IS_DISPLAY_VER(dev_priv, 9) ||
 		 IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
@@ -2048,7 +2048,7 @@ int intel_crtc_compute_min_cdclk(const struct intel_crtc_state *crtc_state)
 	    crtc_state->has_audio &&
 	    crtc_state->port_clock >= 540000 &&
 	    crtc_state->lane_count == 4) {
-		if (IS_CANNONLAKE(dev_priv) || IS_GEMINILAKE(dev_priv)) {
+		if (IS_DISPLAY_VER(dev_priv, 10)) {
 			/* Display WA #1145: glk,cnl */
 			min_cdclk = max(316800, min_cdclk);
 		} else if (IS_DISPLAY_VER(dev_priv, 9) || IS_BROADWELL(dev_priv)) {
@@ -2588,7 +2588,7 @@ static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
 {
 	int max_cdclk_freq = dev_priv->max_cdclk_freq;
 
-	if (DISPLAY_VER(dev_priv) >= 10 || IS_GEMINILAKE(dev_priv))
+	if (DISPLAY_VER(dev_priv) >= 10)
 		return 2 * max_cdclk_freq;
 	else if (IS_DISPLAY_VER(dev_priv, 9) ||
 		 IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))

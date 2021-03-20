@@ -174,7 +174,7 @@ static void intel_wait_ddi_buf_active(struct drm_i915_private *dev_priv,
 				      enum port port)
 {
 	/* Wait > 518 usecs for DDI_BUF_CTL to be non idle */
-	if (DISPLAY_VER(dev_priv) < 10 && !IS_GEMINILAKE(dev_priv)) {
+	if (DISPLAY_VER(dev_priv) < 10) {
 		usleep_range(518, 1000);
 		return;
 	}
@@ -4610,7 +4610,7 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 		encoder->hpd_pin = ehl_hpd_pin(dev_priv, port);
 	else if (IS_DISPLAY_VER(dev_priv, 11))
 		encoder->hpd_pin = icl_hpd_pin(dev_priv, port);
-	else if (IS_DISPLAY_VER(dev_priv, 10))
+	else if (IS_CANNONLAKE(dev_priv))
 		encoder->hpd_pin = cnl_hpd_pin(dev_priv, port);
 	else if (IS_DISPLAY_VER(dev_priv, 9))
 		encoder->hpd_pin = skl_hpd_pin(dev_priv, port);
