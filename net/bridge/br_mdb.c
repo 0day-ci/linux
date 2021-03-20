@@ -506,6 +506,90 @@ err:
 	kfree(priv);
 }
 
+static int br_mdb_replay_one(struct notifier_block *nb, struct net_device *dev,
+			     struct net_bridge_mdb_entry *mp, int obj_id,
+			     struct net_device *orig_dev,
+			     struct netlink_ext_ack *extack)
+{
+	struct switchdev_notifier_port_obj_info obj_info = {
+		.info = {
+			.dev = dev,
+			.extack = extack,
+		},
+	};
+	struct switchdev_obj_port_mdb mdb = {
+		.obj = {
+			.orig_dev = orig_dev,
+			.id = obj_id,
+		},
+		.vid = mp->addr.vid,
+	};
+	int err;
+
+	if (mp->addr.proto == htons(ETH_P_IP))
+		ip_eth_mc_map(mp->addr.dst.ip4, mdb.addr);
+#if IS_ENABLED(CONFIG_IPV6)
+	else if (mp->addr.proto == htons(ETH_P_IPV6))
+		ipv6_eth_mc_map(&mp->addr.dst.ip6, mdb.addr);
+#endif
+	else
+		ether_addr_copy(mdb.addr, mp->addr.dst.mac_addr);
+
+	obj_info.obj = &mdb.obj;
+
+	err = nb->notifier_call(nb, SWITCHDEV_PORT_OBJ_ADD, &obj_info);
+	return notifier_to_errno(err);
+}
+
+int br_mdb_replay(struct net_device *br_dev, struct net_device *dev,
+		  struct notifier_block *nb, struct netlink_ext_ack *extack)
+{
+	struct net_bridge_mdb_entry *mp;
+	struct list_head mdb_list;
+	struct net_bridge *br;
+	int err = 0;
+
+	ASSERT_RTNL();
+
+	INIT_LIST_HEAD(&mdb_list);
+
+	if (!netif_is_bridge_master(br_dev) || !netif_is_bridge_port(dev))
+		return -EINVAL;
+
+	br = netdev_priv(br_dev);
+
+	if (!br_opt_get(br, BROPT_MULTICAST_ENABLED))
+		return 0;
+
+	hlist_for_each_entry(mp, &br->mdb_list, mdb_node) {
+		struct net_bridge_port_group __rcu **pp;
+		struct net_bridge_port_group *p;
+
+		if (mp->host_joined) {
+			err = br_mdb_replay_one(nb, dev, mp,
+						SWITCHDEV_OBJ_ID_HOST_MDB,
+						br_dev, extack);
+			if (err)
+				return err;
+		}
+
+		for (pp = &mp->ports; (p = rtnl_dereference(*pp)) != NULL;
+		     pp = &p->next) {
+			if (p->key.port->dev != dev)
+				continue;
+
+			err = br_mdb_replay_one(nb, dev, mp,
+						SWITCHDEV_OBJ_ID_PORT_MDB,
+						dev, extack);
+			if (err)
+				return err;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(br_mdb_replay);
+
 static void br_mdb_switchdev_host_port(struct net_device *dev,
 				       struct net_device *lower_dev,
 				       struct net_bridge_mdb_entry *mp,
