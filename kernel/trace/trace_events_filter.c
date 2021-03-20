@@ -1693,6 +1693,7 @@ static void create_filter_finish(struct filter_parse_error *pe)
 
 /**
  * create_filter - create a filter for a trace_event_call
+ * @tr: the trace array associated with these events
  * @call: trace_event_call to create a filter for
  * @filter_str: filter string
  * @set_str: remember @filter_str and enable detailed error in filter
@@ -1741,8 +1742,9 @@ int create_event_filter(struct trace_array *tr,
 }
 
 /**
- * create_system_filter - create a filter for an event_subsystem
- * @system: event_subsystem to create a filter for
+ * create_system_filter - create a filter for an event_subsystem_dir
+ * @dir: event_subsystem_dir to create a filter for
+ * @tr: the trace array associated with these events
  * @filter_str: filter string
  * @filterp: out param for created filter (always updated on return)
  *
