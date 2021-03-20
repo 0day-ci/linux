@@ -410,6 +410,7 @@
 &etm1 { status = "okay"; };
 &etm2 { status = "okay"; };
 &etm3 { status = "okay"; };
+&stm { status = "okay"; };
 &etr { status = "okay"; };
 &funnel0 { status = "okay"; };
 &funnel1 { status = "okay"; };
