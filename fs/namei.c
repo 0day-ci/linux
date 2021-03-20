@@ -2045,7 +2045,7 @@ static inline unsigned int fold_hash(unsigned long x, unsigned long y)
 #endif
 
 /*
- * Return the hash of a string of known length.  This is carfully
+ * Return the hash of a string of known length.  This is carefully
  * designed to match hash_name(), which is the more critical function.
  * In particular, we must end by hashing a final word containing 0..7
  * payload bytes, to match the way that hash_name() iterates until it
