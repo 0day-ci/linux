@@ -461,6 +461,18 @@ config ETHTOOL_NETLINK
 	  netlink. It provides better extensibility and some new features,
 	  e.g. notification messages.
 
+config UNREGISTER_NETDEV_TIMEOUT
+	int "Unregister network device timeout in seconds"
+	default 10
+	range 0 3600
+	help
+	  This option controls the timeout (in seconds) used to issue
+	  a warning while waiting for a network device refcount to drop to 0
+	  during device unregistration.
+	  A lower value may be useful during bisection to detect a leaked
+	  reference faster. A larger value may be useful to prevent false
+	  warnings on slow/loaded systems.
+
 endif   # if NET
 
 # Used by archs to tell that they support BPF JIT compiler plus which flavour.
