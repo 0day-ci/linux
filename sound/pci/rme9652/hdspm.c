@@ -6583,8 +6583,10 @@ static int snd_hdspm_create(struct snd_card *card,
 	pci_set_master(hdspm->pci);
 
 	err = pci_request_regions(pci, "hdspm");
-	if (err < 0)
+	if (err < 0) {
+		pci_disable_device(pci);
 		return err;
+	}
 
 	hdspm->port = pci_resource_start(pci, 0);
 	io_extent = pci_resource_len(pci, 0);
@@ -6881,10 +6883,10 @@ static int snd_hdspm_free(struct hdspm * hdspm)
 	kfree(hdspm->mixer);
 	iounmap(hdspm->iobase);
 
-	if (hdspm->port)
+	if (hdspm->port) {
 		pci_release_regions(hdspm->pci);
-
-	pci_disable_device(hdspm->pci);
+		pci_disable_device(hdspm->pci);
+	}
 	return 0;
 }
 
