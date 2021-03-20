@@ -2349,6 +2349,10 @@ static bool do_signal_stop(int signr)
 
 		t = current;
 		while_each_thread(current, t) {
+			/* don't STOP PF_IO_WORKER threads */
+			if (t->flags & PF_IO_WORKER)
+				continue;
+
 			/*
 			 * Setting state to TASK_STOPPED for a group
 			 * stop is always done with the siglock held,
