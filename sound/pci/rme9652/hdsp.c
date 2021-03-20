@@ -5288,8 +5288,10 @@ static int snd_hdsp_create(struct snd_card *card,
 
 	pci_set_master(hdsp->pci);
 
-	if ((err = pci_request_regions(pci, "hdsp")) < 0)
+	if ((err = pci_request_regions(pci, "hdsp")) < 0) {
+		pci_disable_device(pci);
 		return err;
+	}
 	hdsp->port = pci_resource_start(pci, 0);
 	if ((hdsp->iobase = ioremap(hdsp->port, HDSP_IO_EXTENT)) == NULL) {
 		dev_err(hdsp->card->dev, "unable to remap region 0x%lx-0x%lx\n",
@@ -5390,10 +5392,10 @@ static int snd_hdsp_free(struct hdsp *hdsp)
 	vfree(hdsp->fw_uploaded);
 	iounmap(hdsp->iobase);
 
-	if (hdsp->port)
+	if (hdsp->port) {
 		pci_release_regions(hdsp->pci);
-
-	pci_disable_device(hdsp->pci);
+		pci_disable_device(hdsp->pci);
+	}
 	return 0;
 }
 
