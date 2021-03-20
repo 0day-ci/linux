@@ -172,6 +172,7 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 				   struct netlink_ext_ack *extack)
 {
 	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
+	struct net_device *br = dp->bridge_dev;
 	u8 stp_state;
 	int err;
 
@@ -181,6 +182,10 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 
 	stp_state = br_port_get_stp_state(brport_dev);
 	err = dsa_port_set_state(dp, stp_state);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
+	err = dsa_port_vlan_filtering(dp, br, extack);
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
@@ -205,6 +210,8 @@ static void dsa_port_switchdev_unsync(struct dsa_port *dp)
 	 * so allow it to be in BR_STATE_FORWARDING to be kept functional
 	 */
 	dsa_port_set_state_now(dp, BR_STATE_FORWARDING);
+
+	/* VLAN filtering is handled by dsa_switch_bridge_leave */
 }
 
 int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
