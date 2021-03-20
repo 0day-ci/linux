@@ -1406,9 +1406,11 @@ static int dsa_slave_clear_vlan(struct net_device *vdev, int vid, void *arg)
  *
  * - Standalone ports offload:
  *   - no VLAN (any 8021q upper is a software VLAN) if
- *     ds->vlan_filtering_is_global = false
+ *     ds->vlan_filtering_is_global = false and
+ *     ds->needs_standalone_vlan_filtering = false
  *   - the 8021q upper VLANs if ds->vlan_filtering_is_global = true and there
- *     are bridges spanning this switch chip which have vlan_filtering=1
+ *     are bridges spanning this switch chip which have vlan_filtering=1, or
+ *     ds->needs_standalone_vlan_filtering = true.
  *
  * - Ports under a vlan_filtering=0 bridge offload:
  *   - no VLAN if ds->configure_vlan_while_not_filtering = false (deprecated)
@@ -1914,6 +1916,8 @@ int dsa_slave_create(struct dsa_port *port)
 
 	slave_dev->features = master->vlan_features | NETIF_F_HW_TC;
 	slave_dev->hw_features |= NETIF_F_HW_TC;
+	if (ds->needs_standalone_vlan_filtering)
+		slave_dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 	slave_dev->features |= NETIF_F_LLTX;
 	slave_dev->ethtool_ops = &dsa_slave_ethtool_ops;
 	if (!IS_ERR_OR_NULL(port->mac))
