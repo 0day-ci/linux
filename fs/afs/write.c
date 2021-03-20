@@ -850,7 +850,7 @@ vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 		return VM_FAULT_RETRY;
 #endif
 
-	if (wait_on_page_writeback_killable(page))
+	if (wait_on_folio_writeback_killable(page_folio(page)))
 		return VM_FAULT_RETRY;
 
 	if (lock_page_killable(page) < 0)
