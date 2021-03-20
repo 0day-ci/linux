@@ -1730,10 +1730,10 @@ static int snd_rme9652_free(struct snd_rme9652 *rme9652)
 	if (rme9652->irq >= 0)
 		free_irq(rme9652->irq, (void *)rme9652);
 	iounmap(rme9652->iobase);
-	if (rme9652->port)
+	if (rme9652->port) {
 		pci_release_regions(rme9652->pci);
-
-	pci_disable_device(rme9652->pci);
+		pci_disable_device(rme9652->pci);
+  }
 	return 0;
 }
 
@@ -2456,8 +2456,10 @@ static int snd_rme9652_create(struct snd_card *card,
 
 	spin_lock_init(&rme9652->lock);
 
-	if ((err = pci_request_regions(pci, "rme9652")) < 0)
+	if ((err = pci_request_regions(pci, "rme9652")) < 0) {
+		pci_disable_device(pci);
 		return err;
+	}
 	rme9652->port = pci_resource_start(pci, 0);
 	rme9652->iobase = ioremap(rme9652->port, RME9652_IO_EXTENT);
 	if (rme9652->iobase == NULL) {
