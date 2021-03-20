@@ -402,10 +402,6 @@ static int zynqmp_dp_phy_init(struct zynqmp_dp *dp)
 		}
 	}
 
-	ret = zynqmp_dp_reset(dp, false);
-	if (ret < 0)
-		return ret;
-
 	zynqmp_dp_clr(dp, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_ALL_RESET);
 
 	/*
@@ -1681,6 +1677,10 @@ int zynqmp_dp_probe(struct zynqmp_dpsub *dpsub, struct drm_device *drm)
 				PTR_ERR(dp->reset));
 		return PTR_ERR(dp->reset);
 	}
+
+	ret = zynqmp_dp_reset(dp, false);
+	if (ret < 0)
+		return ret;
 
 	ret = zynqmp_dp_phy_probe(dp);
 	if (ret)
