@@ -100,7 +100,7 @@ void ipa_mem_teardown(struct ipa *ipa)
 	/* Nothing to do */
 }
 
-#ifdef IPA_VALIDATE
+#ifdef IPA_VALIDATION
 
 static bool ipa_mem_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 {
@@ -127,14 +127,14 @@ static bool ipa_mem_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 	return false;
 }
 
-#else /* !IPA_VALIDATE */
+#else /* !IPA_VALIDATION */
 
 static bool ipa_mem_valid(struct ipa *ipa, enum ipa_mem_id mem_id)
 {
 	return true;
 }
 
-#endif /*! IPA_VALIDATE */
+#endif /*! IPA_VALIDATION */
 
 /**
  * ipa_mem_config() - Configure IPA shared memory

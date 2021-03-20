@@ -113,7 +113,7 @@
  */
 #define IPA_ZERO_RULE_SIZE		(2 * sizeof(__le32))
 
-#ifdef IPA_VALIDATE
+#ifdef IPA_VALIDATION
 
 /* Check things that can be validated at build time. */
 static void ipa_table_validate_build(void)
@@ -225,13 +225,13 @@ bool ipa_filter_map_valid(struct ipa *ipa, u32 filter_map)
 	return true;
 }
 
-#else /* !IPA_VALIDATE */
+#else /* !IPA_VALIDATION */
 static void ipa_table_validate_build(void)
 
 {
 }
 
-#endif /* !IPA_VALIDATE */
+#endif /* !IPA_VALIDATION */
 
 /* Zero entry count means no table, so just return a 0 address */
 static dma_addr_t ipa_table_addr(struct ipa *ipa, bool filter_mask, u16 count)

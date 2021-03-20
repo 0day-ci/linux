@@ -162,7 +162,7 @@ static void ipa_cmd_validate_build(void)
 #undef TABLE_SIZE
 }
 
-#ifdef IPA_VALIDATE
+#ifdef IPA_VALIDATION
 
 /* Validate a memory region holding a table */
 bool ipa_cmd_table_valid(struct ipa *ipa, const struct ipa_mem *mem,
@@ -317,7 +317,7 @@ bool ipa_cmd_data_valid(struct ipa *ipa)
 	return true;
 }
 
-#endif /* IPA_VALIDATE */
+#endif /* IPA_VALIDATION */
 
 int ipa_cmd_pool_init(struct gsi_channel *channel, u32 tre_max)
 {
