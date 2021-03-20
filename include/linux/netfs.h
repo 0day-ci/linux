@@ -54,7 +54,7 @@ static inline void unlock_page_fscache(struct page *page)
 static inline void wait_on_page_fscache(struct page *page)
 {
 	if (PageFsCache(page))
-		wait_on_page_bit(compound_head(page), PG_fscache);
+		wait_on_folio_bit(page_folio(page), PG_fscache);
 }
 
 enum netfs_read_source {
