@@ -441,7 +441,7 @@ struct nvme_fc_remote_port {
  * @dma_boundary:  indicates the dma address boundary where dma mappings
  *       will be split across.
  *       Value is Mandatory. Typical value is 0xFFFFFFFF to split across
- *       4Gig address boundarys
+ *       4Gig address boundaries
  *
  * @local_priv_sz: The LLDD sets this field to the amount of additional
  *       memory that it would like fc nvme layer to allocate on the LLDD's
@@ -608,7 +608,7 @@ enum {
  *
  * Structure used between LLDD and nvmet-fc layer to represent the exchange
  * context for a FC-NVME FCP I/O operation (e.g. a nvme sqe, the sqe-related
- * memory transfers, and its assocated cqe transfer).
+ * memory transfers, and its associated cqe transfer).
  *
  * The structure is allocated by the LLDD whenever a FCP CMD IU is received
  * from the FC link. The address of the structure is passed to the nvmet-fc
@@ -631,7 +631,7 @@ enum {
  *   When the structure is used for an FCP target operation, the nvmet-fc
  *     layer will fully set the fields in order to specify the scattergather
  *     list, the transfer length, as well as the done routine to be called
- *     upon compeletion of the operation.  The nvmet-fc layer will also set a
+ *     upon completion of the operation.  The nvmet-fc layer will also set a
  *     private pointer for its own use in the done routine.
  *
  * Values set by the NVMET-FC layer prior to calling the LLDD fcp_op
@@ -640,7 +640,7 @@ enum {
  * @hwqid:    Specifies the hw queue index (0..N-1, where N is the
  *            max_hw_queues value from the LLD's nvmet_fc_target_template)
  *            that the operation is to use.
- * @offset:   Indicates the DATA_OUT/DATA_IN payload offset to be tranferred.
+ * @offset:   Indicates the DATA_OUT/DATA_IN payload offset to be transferred.
  *            Field is only valid on WRITEDATA, READDATA, or READDATA_RSP ops.
  * @timeout:  amount of time, in seconds, to wait for a response from the NVME
  *            host. A value of 0 is an infinite wait.
@@ -718,7 +718,7 @@ enum {
  *
  * Fields with static values for the port. Initialized by the
  * port_info struct supplied to the registration call.
- * @port_num:  NVME-FC transport subsytem port number
+ * @port_num:  NVME-FC transport subsystem port number
  * @node_name: FC WWNN for the port
  * @port_name: FC WWPN for the port
  * @private:   pointer to memory allocated alongside the local port
@@ -919,7 +919,7 @@ struct nvmet_fc_target_port {
  * @dma_boundary:  indicates the dma address boundary where dma mappings
  *       will be split across.
  *       Value is Mandatory. Typical value is 0xFFFFFFFF to split across
- *       4Gig address boundarys
+ *       4Gig address boundaries
  *
  * @target_features: The LLDD sets bits in this field to correspond to
  *       optional features that are supported by the LLDD.
