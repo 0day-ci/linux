@@ -1319,7 +1319,6 @@ static int __init ohci_hcd_mod_init(void)
 
 	/* Error path */
 #ifdef TMIO_OHCI_DRIVER
-	platform_driver_unregister(&TMIO_OHCI_DRIVER);
  error_tmio:
 #endif
 #ifdef SM501_OHCI_DRIVER
