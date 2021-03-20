@@ -250,7 +250,7 @@ void setattr_copy(struct user_namespace *mnt_userns, struct inode *inode,
 EXPORT_SYMBOL(setattr_copy);
 
 /**
- * notify_change - modify attributes of a filesytem object
+ * notify_change - modify attributes of a filesystem object
  * @mnt_userns:	user namespace of the mount the inode was found from
  * @dentry:	object affected
  * @attr:	new attributes
@@ -265,7 +265,7 @@ EXPORT_SYMBOL(setattr_copy);
  * caller should drop the i_mutex before doing so.
  *
  * If file ownership is changed notify_change() doesn't map ia_uid and
- * ia_gid. It will asssume the caller has already provided the intended values.
+ * ia_gid. It will assume the caller has already provided the intended values.
  *
  * Alternatively, a caller may pass NULL for delegated_inode.  This may
  * be appropriate for callers that expect the underlying filesystem not
