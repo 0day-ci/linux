@@ -171,10 +171,17 @@ static void dsa_port_clear_brport_flags(struct dsa_port *dp,
 static int dsa_port_switchdev_sync(struct dsa_port *dp,
 				   struct netlink_ext_ack *extack)
 {
+	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
+	u8 stp_state;
 	int err;
 
 	err = dsa_port_inherit_brport_flags(dp, extack);
 	if (err)
+		return err;
+
+	stp_state = br_port_get_stp_state(brport_dev);
+	err = dsa_port_set_state(dp, stp_state);
+	if (err && err != -EOPNOTSUPP)
 		return err;
 
 	return 0;
