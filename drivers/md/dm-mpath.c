@@ -24,6 +24,7 @@
 #include <linux/workqueue.h>
 #include <linux/delay.h>
 #include <scsi/scsi_dh.h>
+#include <linux/dm-ioctl.h>
 #include <linux/atomic.h>
 #include <linux/blk-mq.h>
 
@@ -1169,6 +1170,45 @@ static int parse_features(struct dm_arg_set *as, struct multipath *m)
 	return r;
 }
 
+#define SCSI_VPD_LUN_ID_PREFIX_LEN 4
+#define MPATH_UUID_PREFIX_LEN 7
+static int check_pg_uuid(struct priority_group *pg, char *md_uuid)
+{
+	char pgpath_uuid[DM_UUID_LEN] = {0};
+	struct request_queue *q;
+	struct pgpath *pgpath;
+	struct scsi_device *sdev;
+	ssize_t count;
+	int r = 0;
+
+	list_for_each_entry(pgpath, &pg->pgpaths, list) {
+		q = bdev_get_queue(pgpath->path.dev->bdev);
+		sdev = scsi_device_from_queue(q);
+		if (!sdev) {
+			r = -EINVAL;
+			goto out;
+		}
+
+		count = scsi_vpd_lun_id(sdev, pgpath_uuid, DM_UUID_LEN);
+		if (count <= SCSI_VPD_LUN_ID_PREFIX_LEN) {
+			r = -EINVAL;
+			put_device(&sdev->sdev_gendev);
+			goto out;
+		}
+
+		if (strcmp(md_uuid + MPATH_UUID_PREFIX_LEN,
+			   pgpath_uuid + SCSI_VPD_LUN_ID_PREFIX_LEN)) {
+			r = -EINVAL;
+			put_device(&sdev->sdev_gendev);
+			goto out;
+		}
+		put_device(&sdev->sdev_gendev);
+	}
+
+out:
+	return r;
+}
+
 static int multipath_ctr(struct dm_target *ti, unsigned argc, char **argv)
 {
 	/* target arguments */
@@ -1183,6 +1223,7 @@ static int multipath_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	unsigned pg_count = 0;
 	unsigned next_pg_num;
 	unsigned long flags;
+	char md_uuid[DM_UUID_LEN] = {0};
 
 	as.argc = argc;
 	as.argv = argv;
@@ -1220,6 +1261,11 @@ static int multipath_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		goto bad;
 	}
 
+	if (dm_copy_name_and_uuid(dm_table_get_md(ti->table), NULL, md_uuid)) {
+		r = -ENXIO;
+		goto bad;
+	}
+
 	/* parse the priority groups */
 	while (as.argc) {
 		struct priority_group *pg;
@@ -1228,6 +1274,12 @@ static int multipath_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		pg = parse_priority_group(&as, m);
 		if (IS_ERR(pg)) {
 			r = PTR_ERR(pg);
+			goto bad;
+		}
+
+		if (check_pg_uuid(pg, md_uuid)) {
+			ti->error = "uuid of pgpaths mismatch";
+			r = -EINVAL;
 			goto bad;
 		}
 
