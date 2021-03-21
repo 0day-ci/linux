@@ -92,7 +92,7 @@ static int vfs_parse_sb_flag(struct fs_context *fc, const char *key)
  *
  * This may be called multiple times for a context.
  *
- * Returns 0 on success and a negative error code on failure.  In the event of
+ * Return: %0 on success and a negative error code on failure.  In the event of
  * failure, supplementary error information may have been set.
  */
 int vfs_parse_fs_param(struct fs_context *fc, struct fs_parameter *param)
@@ -139,6 +139,10 @@ EXPORT_SYMBOL(vfs_parse_fs_param);
 
 /**
  * vfs_parse_fs_string - Convenience function to just parse a string.
+ * @fc: The filesystem context for this config option
+ * @key: The string option's name
+ * @value: The string option's value (optional)
+ * @v_size: Length of the @value string
  */
 int vfs_parse_fs_string(struct fs_context *fc, const char *key,
 			const char *value, size_t v_size)
@@ -166,13 +170,13 @@ EXPORT_SYMBOL(vfs_parse_fs_string);
 
 /**
  * generic_parse_monolithic - Parse key[=val][,key[=val]]* mount data
- * @ctx: The superblock configuration to fill in.
+ * @fc: The superblock configuration to fill in.
  * @data: The data to parse
  *
  * Parse a blob of data that's in key[=val][,key[=val]]* form.  This can be
  * called from the ->monolithic_mount_data() fs_context operation.
  *
- * Returns 0 on success or the error returned by the ->parse_option() fs_context
+ * Return: %0 on success or the error returned by the ->parse_option() fs_context
  * operation on failure.
  */
 int generic_parse_monolithic(struct fs_context *fc, void *data)
@@ -310,7 +314,7 @@ void fc_drop_locked(struct fs_context *fc)
 static void legacy_fs_context_free(struct fs_context *fc);
 
 /**
- * vfs_dup_fc_config: Duplicate a filesystem context.
+ * vfs_dup_fs_context - Duplicate a filesystem context.
  * @src_fc: The context to copy.
  */
 struct fs_context *vfs_dup_fs_context(struct fs_context *src_fc)
@@ -356,7 +360,9 @@ EXPORT_SYMBOL(vfs_dup_fs_context);
 
 /**
  * logfc - Log a message to a filesystem context
- * @fc: The filesystem context to log to.
+ * @log: The filesystem context to log to.
+ * @prefix: message prefix
+ * @level: kernel log message level
  * @fmt: The format of the buffer.
  */
 void logfc(struct fc_log *log, const char *prefix, char level, const char *fmt, ...)
