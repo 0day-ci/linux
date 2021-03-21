@@ -1705,7 +1705,7 @@ static int add_default_attributes(void)
 	bzero(&errinfo, sizeof(errinfo));
 	if (transaction_run) {
 		/* Handle -T as -M transaction. Once platform specific metrics
-		 * support has been added to the json files, all archictures
+		 * support has been added to the json files, all architectures
 		 * will use this approach. To determine transaction support
 		 * on an architecture test for such a metric name.
 		 */
