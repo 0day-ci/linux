@@ -316,17 +316,21 @@ struct ucred {
 					 * plain text and require encryption
 					 */
 
+#if defined(CONFIG_COMPAT)
+#define MSG_CMSG_COMPAT		BIT(21)	/* This message needs 32 bit fixups */
+#else
+#define MSG_CMSG_COMPAT		0	/* We never have 32 bit fixups */
+#endif
+
 #define MSG_ZEROCOPY		BIT(26)	/* Use user data in kernel path */
 #define MSG_FASTOPEN		BIT(29)	/* Send data in TCP SYN */
 #define MSG_CMSG_CLOEXEC	BIT(30)	/* Set close_on_exec for file
 					 * descriptor received through
 					 * SCM_RIGHTS
 					 */
-#if defined(CONFIG_COMPAT)
-#define MSG_CMSG_COMPAT		BIT(31)	/* This message needs 32 bit fixups */
-#else
-#define MSG_CMSG_COMPAT		0	/* We never have 32 bit fixups */
-#endif
+/* Attention: Don't use BIT(31) for MSG_*, as 'msg_flags' is defined
+ * as 'int' somewhere and BIT(31) will make it become negative.
+ */
 
 
 /* Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx */
