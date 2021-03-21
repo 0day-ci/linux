@@ -47,7 +47,7 @@ static atomic_t extracting;
 int cpci_debug;
 static struct cpci_hp_controller *controller;
 static struct task_struct *cpci_thread;
-static int thread_finished;
+static int thread_started;
 
 static int enable_slot(struct hotplug_slot *slot);
 static int disable_slot(struct hotplug_slot *slot);
@@ -447,7 +447,7 @@ event_thread(void *data)
 				msleep(500);
 			} else if (rc < 0) {
 				dbg("%s - error checking slots", __func__);
-				thread_finished = 1;
+				thread_started = 0;
 				goto out;
 			}
 		} while (atomic_read(&extracting) && !kthread_should_stop());
@@ -479,7 +479,7 @@ poll_thread(void *data)
 					msleep(500);
 				} else if (rc < 0) {
 					dbg("%s - error checking slots", __func__);
-					thread_finished = 1;
+					thread_started = 0;
 					goto out;
 				}
 			} while (atomic_read(&extracting) && !kthread_should_stop());
@@ -501,7 +501,7 @@ cpci_start_thread(void)
 		err("Can't start up our thread");
 		return PTR_ERR(cpci_thread);
 	}
-	thread_finished = 0;
+	thread_started = 1;
 	return 0;
 }
 
@@ -509,7 +509,7 @@ static void
 cpci_stop_thread(void)
 {
 	kthread_stop(cpci_thread);
-	thread_finished = 1;
+	thread_started = 0;
 }
 
 int
@@ -571,7 +571,7 @@ cpci_hp_unregister_controller(struct cpci_hp_controller *old_controller)
 	int status = 0;
 
 	if (controller) {
-		if (!thread_finished)
+		if (thread_started)
 			cpci_stop_thread();
 		if (controller->irq)
 			free_irq(controller->irq, controller->dev_id);
