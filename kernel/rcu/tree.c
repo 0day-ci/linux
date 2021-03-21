@@ -202,7 +202,7 @@ EXPORT_SYMBOL_GPL(rcu_get_gp_kthreads_prio);
  * the need for long delays to increase some race probabilities with the
  * need for fast grace periods to increase other race probabilities.
  */
-#define PER_RCU_NODE_PERIOD 3	/* Number of grace periods between delays. */
+#define PER_RCU_NODE_PERIOD 3	/* Number of grace periods between delays, for debug purpose. */
 
 /*
  * Compute the mask of online CPUs for the specified rcu_node structure.
@@ -835,9 +835,9 @@ void noinstr rcu_irq_exit(void)
 
 /**
  * rcu_irq_exit_preempt - Inform RCU that current CPU is exiting irq
- *			  towards in kernel preemption
+ *			  towards kernel preemption
  *
- * Same as rcu_irq_exit() but has a sanity check that scheduling is safe
+ * Same as rcu_irq_exit() but has some sanity checks that scheduling is safe
  * from RCU point of view. Invoked from return from interrupt before kernel
  * preemption.
  */
@@ -959,7 +959,7 @@ EXPORT_SYMBOL_GPL(rcu_idle_exit);
  */
 void noinstr rcu_user_exit(void)
 {
-	rcu_eqs_exit(1);
+	rcu_eqs_exit(true);
 }
 
 /**
@@ -1225,7 +1225,7 @@ EXPORT_SYMBOL_GPL(rcu_lockdep_current_cpu_online);
 #endif /* #if defined(CONFIG_PROVE_RCU) && defined(CONFIG_HOTPLUG_CPU) */
 
 /*
- * We are reporting a quiescent state on behalf of some other CPU, so
+ * We may reporting a quiescent state on behalf of some other CPU, so
  * it is our responsibility to check for and handle potential overflow
  * of the rcu_node ->gp_seq counter with respect to the rcu_data counters.
  * After all, the CPU might be in deep idle state, and thus executing no
@@ -1807,9 +1807,9 @@ static bool rcu_gp_init(void)
 		return false;
 	}
 
-	/* Advance to a new grace period and initialize state. */
-	record_gp_stall_check_time();
 	/* Record GP times before starting GP, hence rcu_seq_start(). */
+	record_gp_stall_check_time();
+	/* Advance to a new grace period and initialize state. */
 	rcu_seq_start(&rcu_state.gp_seq);
 	ASSERT_EXCLUSIVE_WRITER(rcu_state.gp_seq);
 	trace_rcu_grace_period(rcu_state.name, rcu_state.gp_seq, TPS("start"));
@@ -2629,7 +2629,7 @@ static void rcu_do_batch(struct rcu_data *rdp)
  * state, for example, user mode or idle loop.  It also schedules RCU
  * core processing.  If the current grace period has gone on too long,
  * it will ask the scheduler to manufacture a context switch for the sole
- * purpose of providing a providing the needed quiescent state.
+ * purpose of providing the needed quiescent state.
  */
 void rcu_sched_clock_irq(int user)
 {
@@ -3258,7 +3258,7 @@ put_cached_bnode(struct kfree_rcu_cpu *krcp,
 
 /*
  * This function is invoked in workqueue context after a grace period.
- * It frees all the objects queued on ->bhead_free or ->head_free.
+ * It frees all the objects queued on ->bkvhead_free or ->head_free.
  */
 static void kfree_rcu_work(struct work_struct *work)
 {
@@ -3285,7 +3285,7 @@ static void kfree_rcu_work(struct work_struct *work)
 	krwp->head_free = NULL;
 	raw_spin_unlock_irqrestore(&krcp->lock, flags);
 
-	// Handle two first channels.
+	// Handle first two channels.
 	for (i = 0; i < FREE_N_CHANNELS; i++) {
 		for (; bkvhead[i]; bkvhead[i] = bnext) {
 			bnext = bkvhead[i]->next;
@@ -3553,7 +3553,7 @@ add_ptr_to_bulk_krc_lock(struct kfree_rcu_cpu **krcp,
 
 /*
  * Queue a request for lazy invocation of appropriate free routine after a
- * grace period. Please note there are three paths are maintained, two are the
+ * grace period. Please note there are three paths maintained, two are the
  * main ones that use array of pointers interface and third one is emergency
  * one, that is used only when the main path can not be maintained temporary,
  * due to memory pressure.
@@ -3891,7 +3891,7 @@ EXPORT_SYMBOL_GPL(cond_synchronize_rcu);
 
 /*
  * Check to see if there is any immediate RCU-related work to be done by
- * the current CPU, returning 1 if so and zero otherwise.  The checks are
+ * the current CPU, returning 1 if so and 0 otherwise.  The checks are
  * in order of increasing expense: checks that can be carried out against
  * CPU-local state are performed first.  However, we must check for CPU
  * stalls first, else we might not get a chance.
@@ -4229,7 +4229,7 @@ int rcutree_online_cpu(unsigned int cpu)
 }
 
 /*
- * Near the beginning of the process.  The CPU is still very much alive
+ * Near the beginning of the offline process. The CPU is still very much alive
  * with pretty much all services enabled.
  */
 int rcutree_offline_cpu(unsigned int cpu)
@@ -4727,7 +4727,7 @@ void __init rcu_init(void)
 		rcutree_online_cpu(cpu);
 	}
 
-	/* Create workqueue for expedited GPs and for Tree SRCU. */
+	/* Create workqueue for Tree SRCU and for expedited GPs. */
 	rcu_gp_wq = alloc_workqueue("rcu_gp", WQ_MEM_RECLAIM, 0);
 	WARN_ON(!rcu_gp_wq);
 	rcu_par_gp_wq = alloc_workqueue("rcu_par_gp", WQ_MEM_RECLAIM, 0);
