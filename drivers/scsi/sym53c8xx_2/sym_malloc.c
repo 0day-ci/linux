@@ -321,20 +321,16 @@ void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name)
 
 void __sym_mfree_dma(m_pool_ident_t dev_dmat, void *m, int size, char *name)
 {
-	unsigned long flags;
 	m_pool_p mp;
 
-	spin_lock_irqsave(&sym53c8xx_lock, flags);
 	mp = ___get_dma_pool(dev_dmat);
 	if (!mp)
-		goto out;
+		return;
 	__sym_mfree(mp, m, size, name);
 #ifdef	SYM_MEM_FREE_UNUSED
 	if (!mp->nump)
 		___del_dma_pool(mp);
 #endif
- out:
-	spin_unlock_irqrestore(&sym53c8xx_lock, flags);
 }
 
 /*
