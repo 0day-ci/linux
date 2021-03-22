@@ -259,6 +259,27 @@ static int del_qgroup_rb(struct btrfs_fs_info *fs_info, u64 qgroupid)
 }
 
 /* must be called with qgroup_lock held */
+static int add_relation_rb_qgroup(struct btrfs_fs_info *fs_info,
+			   struct btrfs_qgroup* member, struct btrfs_qgroup* parent)
+{
+	struct btrfs_qgroup_list *list;
+
+	if (!member || !parent)
+		return -EINVAL;
+
+	list = kzalloc(sizeof(*list), GFP_ATOMIC);
+	if (!list)
+		return -ENOMEM;
+
+	list->group = parent;
+	list->member = member;
+	list_add_tail(&list->next_group, &member->groups);
+	list_add_tail(&list->next_member, &parent->members);
+
+	return 0;
+}
+
+/* must be called with qgroup_lock held */
 static int add_relation_rb(struct btrfs_fs_info *fs_info,
 			   u64 memberid, u64 parentid)
 {
@@ -1410,7 +1431,7 @@ int btrfs_add_qgroup_relation(struct btrfs_trans_handle *trans, u64 src,
 	}
 
 	spin_lock(&fs_info->qgroup_lock);
-	ret = add_relation_rb(fs_info, src, dst);
+	ret = add_relation_rb_qgroup(fs_info, member, parent);
 	if (ret < 0) {
 		spin_unlock(&fs_info->qgroup_lock);
 		goto out;
