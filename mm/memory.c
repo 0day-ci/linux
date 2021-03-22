@@ -3684,7 +3684,7 @@ vm_fault_t do_set_pmd(struct vm_fault *vmf, struct page *page)
 		return ret;
 
 	/*
-	 * Archs like ppc64 need additonal space to store information
+	 * Archs like ppc64 need additional space to store information
 	 * related to pte entry. Use the preallocated table for that.
 	 */
 	if (arch_needs_pgtable_deposit() && !vmf->prealloc_pte) {
@@ -4116,8 +4116,8 @@ static vm_fault_t do_numa_page(struct vm_fault *vmf)
 	}
 
 	/*
-	 * Make it present again, Depending on how arch implementes non
-	 * accessible ptes, some can allow access by kernel mode.
+	 * Make it present again, depending on how arch implements
+	 * non-accessible ptes, some can allow access by kernel mode.
 	 */
 	old_pte = ptep_modify_prot_start(vma, vmf->address, vmf->pte);
 	pte = pte_modify(old_pte, vma->vm_page_prot);
@@ -4452,7 +4452,7 @@ retry_pud:
 }
 
 /**
- * mm_account_fault - Do page fault accountings
+ * mm_account_fault - Do page fault accounting
  *
  * @regs: the pt_regs struct pointer.  When set to NULL, will skip accounting
  *        of perf event counters, but we'll still do the per-task accounting to
@@ -4461,7 +4461,7 @@ retry_pud:
  * @flags: the fault flags.
  * @ret: the fault retcode.
  *
- * This will take care of most of the page fault accountings.  Meanwhile, it
+ * This will take care of most of the page fault accounting.  Meanwhile, it
  * will also include the PERF_COUNT_SW_PAGE_FAULTS_[MAJ|MIN] perf counter
  * updates.  However note that the handling of PERF_COUNT_SW_PAGE_FAULTS should
  * still be in per-arch page fault handlers at the entry of page fault.
@@ -4797,7 +4797,7 @@ out:
 /**
  * generic_access_phys - generic implementation for iomem mmap access
  * @vma: the vma to access
- * @addr: userspace addres, not relative offset within @vma
+ * @addr: userspace address, not relative offset within @vma
  * @buf: buffer to read/write
  * @len: length of transfer
  * @write: set to FOLL_WRITE when writing, otherwise reading

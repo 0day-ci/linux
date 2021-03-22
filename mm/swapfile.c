@@ -164,7 +164,7 @@ static inline struct swap_extent *next_se(struct swap_extent *se)
 
 /*
  * swapon tell device that all the old swap contents can be discarded,
- * to allow the swap device to optimize its wear-levelling.
+ * to allow the swap device to optimize its wear-leveling.
  */
 static int discard_swap(struct swap_info_struct *si)
 {
@@ -234,7 +234,7 @@ sector_t swap_page_sector(struct page *page)
 
 /*
  * swap allocation tell device that a cluster of swap can now be discarded,
- * to allow the swap device to optimize its wear-levelling.
+ * to allow the swap device to optimize its wear-leveling.
  */
 static void discard_swap_cluster(struct swap_info_struct *si,
 				 pgoff_t start_page, pgoff_t nr_pages)
