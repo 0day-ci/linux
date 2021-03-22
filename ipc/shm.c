@@ -357,7 +357,7 @@ static int shm_try_destroy_orphaned(int id, void *p, void *data)
 
 	/*
 	 * We want to destroy segments without users and with already
-	 * exit'ed originating process.
+	 * exited originating process.
 	 *
 	 * As shp->* are changed under rwsem, it's safe to skip shp locking.
 	 */
