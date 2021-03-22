@@ -1305,6 +1305,12 @@ static bool ahci_broken_lpm(struct pci_dev *pdev)
 			 */
 			.driver_data = "20180310", /* 2.35 */
 		},
+		{
+			.matches = {
+				DMI_MATCH(DMI_BOARD_VENDOR, "Google"),
+				DMI_MATCH(DMI_BOARD_NAME, "Fizz"),
+			},
+		},
 		{ }	/* terminate list */
 	};
 	const struct dmi_system_id *dmi = dmi_first_match(sysids);
