@@ -845,22 +845,9 @@ long keyctl_read_key(key_serial_t keyid, char __user *buffer, size_t buflen)
 
 	/* see if we can read it directly */
 	ret = key_permission(key_ref, KEY_NEED_READ);
-	if (ret == 0)
-		goto can_read_key;
-	if (ret != -EACCES)
+	if (ret != 0)
 		goto key_put_out;
 
-	/* we can't; see if it's searchable from this process's keyrings
-	 * - we automatically take account of the fact that it may be
-	 *   dangling off an instantiation key
-	 */
-	if (!is_key_possessed(key_ref)) {
-		ret = -EACCES;
-		goto key_put_out;
-	}
-
-	/* the key is probably readable - now try to read it */
-can_read_key:
 	if (!key->type->read) {
 		ret = -EOPNOTSUPP;
 		goto key_put_out;
