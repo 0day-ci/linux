@@ -261,7 +261,10 @@ static void ti_sn_debugfs_remove(struct ti_sn_bridge *pdata)
 	pdata->debugfs = NULL;
 }
 
-/* Connector funcs */
+/* -----------------------------------------------------------------------------
+ * DRM Connector Operations
+ */
+
 static struct ti_sn_bridge *
 connector_to_ti_sn_bridge(struct drm_connector *connector)
 {
@@ -328,23 +331,13 @@ static const struct drm_connector_funcs ti_sn_bridge_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
+/*------------------------------------------------------------------------------
+ * DRM Bridge Operations
+ */
+
 static struct ti_sn_bridge *bridge_to_ti_sn_bridge(struct drm_bridge *bridge)
 {
 	return container_of(bridge, struct ti_sn_bridge, bridge);
-}
-
-static int ti_sn_bridge_parse_regulators(struct ti_sn_bridge *pdata)
-{
-	unsigned int i;
-	const char * const ti_sn_bridge_supply_names[] = {
-		"vcca", "vcc", "vccio", "vpll",
-	};
-
-	for (i = 0; i < SN_REGULATOR_SUPPLY_NUM; i++)
-		pdata->supplies[i].supply = ti_sn_bridge_supply_names[i];
-
-	return devm_regulator_bulk_get(pdata->dev, SN_REGULATOR_SUPPLY_NUM,
-				       pdata->supplies);
 }
 
 static int ti_sn_bridge_attach(struct drm_bridge *bridge,
@@ -875,6 +868,10 @@ static const struct drm_bridge_funcs ti_sn_bridge_funcs = {
 	.post_disable = ti_sn_bridge_post_disable,
 };
 
+/* -----------------------------------------------------------------------------
+ * AUX Adapter
+ */
+
 static struct ti_sn_bridge *aux_to_ti_sn_bridge(struct drm_dp_aux *aux)
 {
 	return container_of(aux, struct ti_sn_bridge, aux);
@@ -973,19 +970,9 @@ static ssize_t ti_sn_aux_transfer(struct drm_dp_aux *aux,
 	return len;
 }
 
-static int ti_sn_bridge_parse_dsi_host(struct ti_sn_bridge *pdata)
-{
-	struct device_node *np = pdata->dev->of_node;
-
-	pdata->host_node = of_graph_get_remote_node(np, 0, 0);
-
-	if (!pdata->host_node) {
-		DRM_ERROR("remote dsi host node not found\n");
-		return -ENODEV;
-	}
-
-	return 0;
-}
+/* -----------------------------------------------------------------------------
+ * GPIO Controller
+ */
 
 #if defined(CONFIG_OF_GPIO)
 
@@ -1168,6 +1155,10 @@ static inline int ti_sn_setup_gpio_controller(struct ti_sn_bridge *pdata)
 
 #endif
 
+/* -----------------------------------------------------------------------------
+ * Probe & Remove
+ */
+
 static void ti_sn_bridge_parse_lanes(struct ti_sn_bridge *pdata,
 				     struct device_node *np)
 {
@@ -1215,6 +1206,34 @@ static void ti_sn_bridge_parse_lanes(struct ti_sn_bridge *pdata,
 	pdata->dp_lanes = dp_lanes;
 	pdata->ln_assign = ln_assign;
 	pdata->ln_polrs = ln_polrs;
+}
+
+static int ti_sn_bridge_parse_regulators(struct ti_sn_bridge *pdata)
+{
+	unsigned int i;
+	const char * const ti_sn_bridge_supply_names[] = {
+		"vcca", "vcc", "vccio", "vpll",
+	};
+
+	for (i = 0; i < SN_REGULATOR_SUPPLY_NUM; i++)
+		pdata->supplies[i].supply = ti_sn_bridge_supply_names[i];
+
+	return devm_regulator_bulk_get(pdata->dev, SN_REGULATOR_SUPPLY_NUM,
+				       pdata->supplies);
+}
+
+static int ti_sn_bridge_parse_dsi_host(struct ti_sn_bridge *pdata)
+{
+	struct device_node *np = pdata->dev->of_node;
+
+	pdata->host_node = of_graph_get_remote_node(np, 0, 0);
+
+	if (!pdata->host_node) {
+		DRM_ERROR("remote dsi host node not found\n");
+		return -ENODEV;
+	}
+
+	return 0;
 }
 
 static int ti_sn_bridge_probe(struct i2c_client *client,
