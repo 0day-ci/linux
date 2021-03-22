@@ -1307,6 +1307,9 @@ static int ti_sn_bridge_remove(struct i2c_client *client)
 		return -EINVAL;
 
 	kfree(pdata->edid);
+
+	drm_dp_aux_unregister(&pdata->aux);
+
 	ti_sn_debugfs_remove(pdata);
 
 	of_node_put(pdata->host_node);
