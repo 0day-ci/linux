@@ -380,14 +380,14 @@ static int add_bio(struct cardinfo *card)
 
 	desc->data_dma_handle = dma_handle;
 
-	desc->pci_addr = cpu_to_le64((u64)desc->data_dma_handle);
+	desc->pci_addr = cpu_to_le64(desc->data_dma_handle);
 	desc->local_addr = cpu_to_le64(card->current_iter.bi_sector << 9);
 	desc->transfer_size = cpu_to_le32(vec.bv_len);
 	offset = (((char *)&desc->sem_control_bits) - ((char *)p->desc));
-	desc->sem_addr = cpu_to_le64((u64)(p->page_dma+offset));
+	desc->sem_addr = cpu_to_le64(p->page_dma + offset);
 	desc->zero1 = desc->zero2 = 0;
 	offset = (((char *)(desc+1)) - ((char *)p->desc));
-	desc->next_desc_addr = cpu_to_le64(p->page_dma+offset);
+	desc->next_desc_addr = cpu_to_le64(p->page_dma + offset);
 	desc->control_bits = cpu_to_le32(DMASCR_GO|DMASCR_ERR_INT_EN|
 					 DMASCR_PARITY_INT_EN|
 					 DMASCR_CHAIN_EN |
