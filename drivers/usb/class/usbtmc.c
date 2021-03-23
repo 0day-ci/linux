@@ -2487,7 +2487,9 @@ static void usbtmc_disconnect(struct usb_interface *intf)
 	}
 	mutex_unlock(&data->io_mutex);
 	usbtmc_free_int(data);
-	kref_put(&data->kref, usbtmc_delete);
+
+	if (data->iin_ep_present && data->iin_urb)
+		kref_put(&data->kref, usbtmc_delete);
 }
 
 static void usbtmc_draw_down(struct usbtmc_file_data *file_data)
