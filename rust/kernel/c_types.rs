@@ -60,7 +60,7 @@ mod c {
     pub type c_size_t = usize;
 }
 
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "powerpc64"))]
 mod c {
     /// C `void` type.
     pub type c_void = core::ffi::c_void;
