@@ -392,6 +392,11 @@ static int dma_mmu_remap_num __initdata;
 
 void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 {
+	if (!MAX_CMA_AREAS || dma_mmu_remap_num >= MAX_CMA_AREAS) {
+		WARN_ONCE(1, "number of CMA areas\n");
+		return;
+	}
+
 	dma_mmu_remap[dma_mmu_remap_num].base = base;
 	dma_mmu_remap[dma_mmu_remap_num].size = size;
 	dma_mmu_remap_num++;
@@ -400,6 +405,10 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 void __init dma_contiguous_remap(void)
 {
 	int i;
+
+	if (!MAX_CMA_AREAS)
+		return;
+
 	for (i = 0; i < dma_mmu_remap_num; i++) {
 		phys_addr_t start = dma_mmu_remap[i].base;
 		phys_addr_t end = start + dma_mmu_remap[i].size;
