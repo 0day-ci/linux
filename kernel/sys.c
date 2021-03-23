@@ -1942,6 +1942,30 @@ out:
 	return error;
 }
 
+static int copy_auxv_from_user(unsigned long *auxv, size_t auxv_size,
+			       const void __user *addr, size_t len)
+{
+	BUG_ON(auxv_size != sizeof(current->mm->saved_auxv));
+
+	if (!addr || len > auxv_size)
+		return -EINVAL;
+
+	memset(auxv, 0, auxv_size);
+	if (len && copy_from_user(auxv, addr, len))
+		return -EFAULT;
+
+	/*
+	 * Specification requires the vector to be
+	 * ended up with AT_NULL entry so user space
+	 * will notice where to stop enumerating.
+	 */
+	if (len == auxv_size) {
+		auxv[AT_VECTOR_SIZE - 2] = AT_NULL;
+		auxv[AT_VECTOR_SIZE - 1] = AT_NULL;
+	}
+	return 0;
+}
+
 #ifdef CONFIG_CHECKPOINT_RESTORE
 static int prctl_set_mm_map(int opt, const void __user *addr, unsigned long data_size)
 {
@@ -1968,22 +1992,12 @@ static int prctl_set_mm_map(int opt, const void __user *addr, unsigned long data
 		return error;
 
 	if (prctl_map.auxv_size) {
-		/*
-		 * Someone is trying to cheat the auxv vector.
-		 */
-		if (!prctl_map.auxv ||
-				prctl_map.auxv_size > sizeof(mm->saved_auxv))
-			return -EINVAL;
-
-		memset(user_auxv, 0, sizeof(user_auxv));
-		if (copy_from_user(user_auxv,
-				   (const void __user *)prctl_map.auxv,
-				   prctl_map.auxv_size))
-			return -EFAULT;
-
-		/* Last entry must be AT_NULL as specification requires */
-		user_auxv[AT_VECTOR_SIZE - 2] = AT_NULL;
-		user_auxv[AT_VECTOR_SIZE - 1] = AT_NULL;
+		int error = copy_auxv_from_user(user_auxv,
+						sizeof(user_auxv),
+						prctl_map.auxv,
+						prctl_map.auxv_size);
+		if (error)
+			return error;
 	}
 
 	if (prctl_map.exe_fd != (u32)-1) {
@@ -2060,25 +2074,17 @@ static int prctl_set_auxv(struct mm_struct *mm, unsigned long addr,
 	 * up to the caller to provide sane values here, otherwise userspace
 	 * tools which use this vector might be unhappy.
 	 */
-	unsigned long user_auxv[AT_VECTOR_SIZE] = {};
-
-	if (len > sizeof(user_auxv))
-		return -EINVAL;
-
-	if (copy_from_user(user_auxv, (const void __user *)addr, len))
-		return -EFAULT;
-
-	/* Make sure the last entry is always AT_NULL */
-	user_auxv[AT_VECTOR_SIZE - 2] = 0;
-	user_auxv[AT_VECTOR_SIZE - 1] = 0;
+	unsigned long user_auxv[AT_VECTOR_SIZE];
+	int error;
 
 	BUILD_BUG_ON(sizeof(user_auxv) != sizeof(mm->saved_auxv));
 
-	task_lock(current);
-	memcpy(mm->saved_auxv, user_auxv, len);
-	task_unlock(current);
-
-	return 0;
+	error = copy_auxv_from_user(user_auxv, sizeof(user_auxv),
+				    (const void __user *)addr,
+				    len);
+	if (!error)
+		memcpy(mm->saved_auxv, user_auxv, len);
+	return error;
 }
 
 static int prctl_set_mm(int opt, unsigned long addr,
