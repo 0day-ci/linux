@@ -58,7 +58,7 @@ config LLD_VERSION
 	default 0
 
 config HAS_RUST
-	depends on ARM64 || X86_64
+	depends on ARM64 || X86_64 || (PPC64 && CPU_LITTLE_ENDIAN && CC_IS_CLANG)
 	def_bool $(success,$(RUSTC) --version)
 
 config RUSTC_VERSION
