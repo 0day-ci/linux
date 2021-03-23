@@ -12,6 +12,7 @@
 #ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/percpu.h>
+#include <linux/spinlock.h>
 
 #include <asm/processor.h>
 #include <asm/cpu_has_feature.h>
@@ -22,6 +23,8 @@ extern unsigned long tb_ticks_per_jiffy;
 extern unsigned long tb_ticks_per_usec;
 extern unsigned long tb_ticks_per_sec;
 extern struct clock_event_device decrementer_clockevent;
+extern u64 decrementer_max;
+extern spinlock_t rtc_lock;
 
 
 extern void generic_calibrate_decr(void);

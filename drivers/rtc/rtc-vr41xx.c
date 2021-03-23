@@ -72,7 +72,7 @@ static void __iomem *rtc2_base;
 
 static unsigned long epoch = 1970;	/* Jan 1 1970 00:00:00 */
 
-static DEFINE_SPINLOCK(rtc_lock);
+static DEFINE_SPINLOCK(vr41xx_rtc_lock);
 static char rtc_name[] = "RTC";
 static unsigned long periodic_count;
 static unsigned int alarm_enabled;
@@ -101,13 +101,13 @@ static inline time64_t read_elapsed_second(void)
 
 static inline void write_elapsed_second(time64_t sec)
 {
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irq(&vr41xx_rtc_lock);
 
 	rtc1_write(ETIMELREG, (uint16_t)(sec << 15));
 	rtc1_write(ETIMEMREG, (uint16_t)(sec >> 1));
 	rtc1_write(ETIMEHREG, (uint16_t)(sec >> 17));
 
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irq(&vr41xx_rtc_lock);
 }
 
 static int vr41xx_rtc_read_time(struct device *dev, struct rtc_time *time)
@@ -139,14 +139,14 @@ static int vr41xx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 	unsigned long low, mid, high;
 	struct rtc_time *time = &wkalrm->time;
 
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irq(&vr41xx_rtc_lock);
 
 	low = rtc1_read(ECMPLREG);
 	mid = rtc1_read(ECMPMREG);
 	high = rtc1_read(ECMPHREG);
 	wkalrm->enabled = alarm_enabled;
 
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irq(&vr41xx_rtc_lock);
 
 	rtc_time64_to_tm((high << 17) | (mid << 1) | (low >> 15), time);
 
@@ -159,7 +159,7 @@ static int vr41xx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	alarm_sec = rtc_tm_to_time64(&wkalrm->time);
 
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irq(&vr41xx_rtc_lock);
 
 	if (alarm_enabled)
 		disable_irq(aie_irq);
@@ -173,7 +173,7 @@ static int vr41xx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	alarm_enabled = wkalrm->enabled;
 
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irq(&vr41xx_rtc_lock);
 
 	return 0;
 }
@@ -202,7 +202,7 @@ static int vr41xx_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long 
 
 static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 {
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irq(&vr41xx_rtc_lock);
 	if (enabled) {
 		if (!alarm_enabled) {
 			enable_irq(aie_irq);
@@ -214,7 +214,7 @@ static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 			alarm_enabled = 0;
 		}
 	}
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irq(&vr41xx_rtc_lock);
 	return 0;
 }
 
@@ -296,7 +296,7 @@ static int rtc_probe(struct platform_device *pdev)
 	rtc->range_max = (1ULL << 33) - 1;
 	rtc->max_user_freq = MAX_PERIODIC_RATE;
 
-	spin_lock_irq(&rtc_lock);
+	spin_lock_irq(&vr41xx_rtc_lock);
 
 	rtc1_write(ECMPLREG, 0);
 	rtc1_write(ECMPMREG, 0);
@@ -304,7 +304,7 @@ static int rtc_probe(struct platform_device *pdev)
 	rtc1_write(RTCL1LREG, 0);
 	rtc1_write(RTCL1HREG, 0);
 
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irq(&vr41xx_rtc_lock);
 
 	aie_irq = platform_get_irq(pdev, 0);
 	if (aie_irq <= 0) {
