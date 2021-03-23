@@ -34,6 +34,8 @@
 #define DBG(x...)
 #endif
 
+DEFINE_SPINLOCK(rtc_lock);
+
 static int maple_rtc_addr;
 
 static int maple_clock_read(int addr)

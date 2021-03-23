@@ -30,7 +30,7 @@
 
 #include <platforms/chrp/chrp.h>
 
-extern spinlock_t rtc_lock;
+DEFINE_SPINLOCK(rtc_lock);
 
 #define NVRAM_AS0  0x74
 #define NVRAM_AS1  0x75

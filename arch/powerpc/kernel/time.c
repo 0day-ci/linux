@@ -124,9 +124,6 @@ EXPORT_SYMBOL(tb_ticks_per_usec);
 unsigned long tb_ticks_per_sec;
 EXPORT_SYMBOL(tb_ticks_per_sec);	/* for cputime_t conversions */
 
-DEFINE_SPINLOCK(rtc_lock);
-EXPORT_SYMBOL_GPL(rtc_lock);
-
 static u64 tb_to_ns_scale __read_mostly;
 static unsigned tb_to_ns_shift __read_mostly;
 static u64 boot_tb __read_mostly;
