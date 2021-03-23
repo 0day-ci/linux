@@ -348,7 +348,6 @@ static void smcd_handle_sw_event(struct smc_ism_event_work *wrk)
 
 int smc_ism_signal_shutdown(struct smc_link_group *lgr)
 {
-	int rc;
 	union smcd_sw_event_info ev_info;
 
 	if (lgr->peer_shutdown)
@@ -357,11 +356,10 @@ int smc_ism_signal_shutdown(struct smc_link_group *lgr)
 	memcpy(ev_info.uid, lgr->id, SMC_LGR_ID_SIZE);
 	ev_info.vlan_id = lgr->vlan_id;
 	ev_info.code = ISM_EVENT_REQUEST;
-	rc = lgr->smcd->ops->signal_event(lgr->smcd, lgr->peer_gid,
+	return lgr->smcd->ops->signal_event(lgr->smcd, lgr->peer_gid,
 					  ISM_EVENT_REQUEST_IR,
 					  ISM_EVENT_CODE_SHUTDOWN,
 					  ev_info.info);
-	return rc;
 }
 
 /* worker for SMC-D events */
