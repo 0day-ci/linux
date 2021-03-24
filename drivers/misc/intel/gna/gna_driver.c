@@ -23,6 +23,8 @@ static struct pci_driver gna_driver = {
 
 static int __init gna_drv_init(void)
 {
+	atomic_set(&gna_drv_priv.dev_last_idx, -1);
+
 	gna_drv_priv.recovery_timeout_jiffies = msecs_to_jiffies(recovery_timeout * 1000);
 
 	return pci_register_driver(&gna_driver);

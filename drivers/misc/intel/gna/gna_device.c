@@ -91,9 +91,57 @@ const struct pci_device_id gna_pci_ids[] = {
 
 MODULE_DEVICE_TABLE(pci, gna_pci_ids);
 
+static int gna_open(struct inode *inode, struct file *f)
+{
+	return -EPERM;
+}
+
+static const struct file_operations gna_file_ops = {
+	.owner		=	THIS_MODULE,
+	.open		=	gna_open,
+};
+
+static void gna_dev_release(struct gna_private *gna_priv)
+{
+	misc_deregister(&gna_priv->misc);
+	kfree(gna_priv->misc.name);
+	gna_priv->misc.name = NULL;
+}
+
+static int gna_dev_create(struct gna_private *gna_priv, char *gna_name)
+{
+	struct pci_dev *pcidev;
+	int ret;
+
+	pcidev = gna_priv->pdev;
+
+	gna_priv->misc.minor = MISC_DYNAMIC_MINOR;
+	gna_priv->misc.name = kasprintf(GFP_KERNEL, "%s", gna_name);
+	gna_priv->misc.fops = &gna_file_ops;
+	gna_priv->misc.parent = &pcidev->dev;
+	gna_priv->misc.mode = 0666;
+
+	dev_dbg(&pcidev->dev, "registering device: %s\n",
+		gna_priv->misc.name);
+
+	ret = misc_register(&gna_priv->misc);
+	if (ret) {
+		dev_err(&pcidev->dev, "misc_register %s failed: %d\n",
+			gna_name, ret);
+		misc_deregister(&gna_priv->misc);
+		kfree(gna_priv->misc.name);
+		gna_priv->misc.name = NULL;
+	}
+
+	return ret;
+}
+
+
 static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 			const struct pci_device_id *pci_id)
 {
+	// strlen(GNA_DV_NAME) + max minor number.
+	char gna_name[sizeof(GNA_DV_NAME) + sizeof("255") + 1];
 	u32 bld_reg;
 	int ret;
 
@@ -103,6 +151,8 @@ static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 	gna_priv->pdev = pcidev;
 	gna_priv->info = *(struct gna_drv_info *)pci_id->driver_data;
 	gna_priv->drv_priv = &gna_drv_priv;
+
+	gna_priv->index = atomic_inc_return(&gna_priv->drv_priv->dev_last_idx);
 
 	bld_reg = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_IBUFFS);
 	gna_priv->hw_info.in_buf_s = bld_reg & GENMASK(7, 0);
@@ -134,14 +184,25 @@ static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 
 	init_waitqueue_head(&gna_priv->dev_busy_waitq);
 
-	gna_priv->request_wq = create_singlethread_workqueue(GNA_DV_NAME);
+	snprintf(gna_name, sizeof(gna_name), "%s%d", GNA_DV_NAME, gna_priv->index);
+
+	gna_priv->request_wq = create_singlethread_workqueue(gna_name);
 	if (!gna_priv->request_wq) {
-		dev_err(&pcidev->dev, "could not create %s workqueue\n", GNA_DV_NAME);
+		dev_err(&pcidev->dev, "could not create %s workqueue\n", gna_name);
 		ret = -EFAULT;
 		goto err_pci_drvdata_unset;
 	}
 
+	ret = gna_dev_create(gna_priv, gna_name);
+	if (ret) {
+		dev_err(&pcidev->dev, "could not create %s device\n", GNA_DV_NAME);
+		goto err_del_wq;
+	}
+
 	return 0;
+
+err_del_wq:
+	destroy_workqueue(gna_priv->request_wq);
 
 err_pci_drvdata_unset:
 	pci_set_drvdata(pcidev, NULL);
@@ -151,6 +212,8 @@ err_pci_drvdata_unset:
 
 static void gna_dev_deinit(struct gna_private *gna_priv)
 {
+	gna_dev_release(gna_priv);
+
 	flush_workqueue(gna_priv->request_wq);
 	destroy_workqueue(gna_priv->request_wq);
 
@@ -300,7 +363,7 @@ int gna_getparam(struct gna_private *gna_priv, union gna_parameter *param)
 		param->out.value = gna_device_type_by_hwid(gna_priv->info.hwid);
 		break;
 	default:
-		dev_err(&gna_priv->pdev->dev, "unknown parameter id %llu\n", param->in.id);
+		dev_err(gna_priv->misc.this_device, "unknown parameter id %llu\n", param->in.id);
 		return -EINVAL;
 	}
 

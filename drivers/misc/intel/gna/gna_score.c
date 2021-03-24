@@ -30,23 +30,23 @@ int gna_validate_score_config(struct gna_compute_cfg *compute_cfg,
 	gna_priv = file_priv->gna_priv;
 
 	if (compute_cfg->gna_mode > GNA_MODE_XNN) {
-		dev_err(&gna_priv->pdev->dev, "invalid mode\n");
+		dev_err(gna_priv->misc.this_device, "invalid mode\n");
 		return -EINVAL;
 	}
 
 	if (compute_cfg->layer_count > gna_priv->info.max_layer_count) {
-		dev_err(&gna_priv->pdev->dev, "max layer count exceeded\n");
+		dev_err(gna_priv->misc.this_device, "max layer count exceeded\n");
 		return -EINVAL;
 	}
 
 	if (compute_cfg->buffer_count == 0) {
-		dev_err(&gna_priv->pdev->dev, "no buffers\n");
+		dev_err(gna_priv->misc.this_device, "no buffers\n");
 		return -EINVAL;
 	}
 
 	buffers_size = sizeof(struct gna_buffer) * compute_cfg->buffer_count;
 	if (!access_ok(u64_to_user_ptr(compute_cfg->buffers_ptr), buffers_size)) {
-		dev_err(&gna_priv->pdev->dev, "invalid buffers pointer\n");
+		dev_err(gna_priv->misc.this_device, "invalid buffers pointer\n");
 		return -EINVAL;
 	}
 
@@ -63,7 +63,7 @@ static int gna_do_patch_memory(struct gna_private *gna_priv, struct gna_memory_o
 	value = patch->value;
 	size = patch->size;
 	dest = (u8 *)vaddr + patch->offset;
-	dev_dbg(&gna_priv->pdev->dev, "patch offset: %llu, size: %zu, value: %llu\n",
+	dev_dbg(gna_priv->misc.this_device, "patch offset: %llu, size: %zu, value: %llu\n",
 		patch->offset, size, value);
 
 	switch (size) {
@@ -97,7 +97,7 @@ static int gna_mem_patch_memory(struct gna_private *gna_priv, struct gna_buffer 
 	int ret = 0;
 	u32 i;
 
-	dev_dbg(&gna_priv->pdev->dev, "memory_id: %llu, patch_count, %llu\n",
+	dev_dbg(gna_priv->misc.this_device, "memory_id: %llu, patch_count, %llu\n",
 		buffer->memory_id, buffer->patch_count);
 
 	mutex_lock(&gna_priv->memidr_lock);
@@ -179,7 +179,7 @@ static int gna_copy_gmm_config(struct gna_private *gna_priv,
 
 	buffer = gna_find_buffer(buffer_list, buffer_count, mmu_offset, &memory_offset);
 	if (!buffer) {
-		dev_dbg(&gna_priv->pdev->dev, "buffer not found\n");
+		dev_dbg(gna_priv->misc.this_device, "buffer not found\n");
 		return -EINVAL;
 	}
 
@@ -187,13 +187,13 @@ static int gna_copy_gmm_config(struct gna_private *gna_priv,
 	mo = idr_find(&gna_priv->memory_idr, buffer->memory_id);
 	mutex_unlock(&gna_priv->memidr_lock);
 	if (!mo) {
-		dev_dbg(&gna_priv->pdev->dev, "memory object not found\n");
+		dev_dbg(gna_priv->misc.this_device, "memory object not found\n");
 		return -EFAULT;
 	}
 
 	vaddr = vm_map_ram(mo->pages, mo->num_pinned, 0);
 	if (!vaddr) {
-		dev_dbg(&gna_priv->pdev->dev, "mapping failed\n");
+		dev_dbg(gna_priv->misc.this_device, "mapping failed\n");
 		return -EFAULT;
 	}
 
@@ -230,9 +230,9 @@ int gna_score(struct gna_request *score_request)
 
 	buffer = score_request->buffer_list;
 	buffer_count = score_request->buffer_count;
-	dev_dbg(&gna_priv->pdev->dev, "buffer count: %llu\n", buffer_count);
+	dev_dbg(gna_priv->misc.this_device, "buffer count: %llu\n", buffer_count);
 	for (i = 0; i < buffer_count; i++, buffer++) {
-		dev_dbg(&gna_priv->pdev->dev, "patch count: %llu\n", buffer->patch_count);
+		dev_dbg(gna_priv->misc.this_device, "patch count: %llu\n", buffer->patch_count);
 		ret = gna_mem_patch_memory(gna_priv, buffer);
 		if (ret)
 			goto err_put_pages;
@@ -240,13 +240,13 @@ int gna_score(struct gna_request *score_request)
 
 	switch (compute_cfg->gna_mode) {
 	case GNA_MODE_XNN:
-		dev_dbg(&gna_priv->pdev->dev, "xNN mode, labase: %d, lacount: %d\n",
+		dev_dbg(gna_priv->misc.this_device, "xNN mode, labase: %d, lacount: %d\n",
 			compute_cfg->layer_base, compute_cfg->layer_count);
 		xnn_config->labase = compute_cfg->layer_base;
 		xnn_config->lacount = compute_cfg->layer_count;
 		break;
 	case GNA_MODE_GMM:
-		dev_dbg(&gna_priv->pdev->dev, "GMM mode, offset: %d\n", compute_cfg->layer_base);
+		dev_dbg(gna_priv->misc.this_device, "GMM mode, offset: %d\n", compute_cfg->layer_base);
 		ret = gna_copy_gmm_config(gna_priv, score_request->buffer_list,
 					  buffer_count, compute_cfg->layer_base);
 		if (ret)
@@ -279,7 +279,7 @@ err_put_pages:
 			mutex_unlock(&mo->page_lock);
 		} else {
 			mo_valid = false;
-			dev_warn(&gna_priv->pdev->dev, "memory object not found %llu\n",
+			dev_warn(gna_priv->misc.this_device, "memory object not found %llu\n",
 				 buffer->memory_id);
 		}
 		buffer--;

@@ -4,6 +4,7 @@
 #ifndef __GNA_DEVICE_H__
 #define __GNA_DEVICE_H__
 
+#include <linux/miscdevice.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
@@ -43,6 +44,11 @@ struct gna_private {
 	struct pci_dev *pdev;
 	/* pdev->dev */
 	struct device *parent;
+
+	int index;
+
+	/* gna misc-device */
+	struct miscdevice misc;
 
 	int irq;
 	/* hardware status set by interrupt handler */

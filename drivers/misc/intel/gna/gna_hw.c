@@ -14,13 +14,13 @@ int gna_parse_hw_status(struct gna_private *gna_priv, u32 hw_status)
 	int status;
 
 	if (hw_status & GNA_ERROR) {
-		dev_dbg(&gna_priv->pdev->dev, "GNA completed with errors: %#x\n", hw_status);
+		dev_dbg(gna_priv->misc.this_device, "GNA completed with errors: %#x\n", hw_status);
 		status = -EIO;
 	} else if (hw_status & GNA_STS_SCORE_COMPLETED) {
 		status = 0;
-		dev_dbg(&gna_priv->pdev->dev, "GNA completed successfully: %#x\n", hw_status);
+		dev_dbg(gna_priv->misc.this_device, "GNA completed successfully: %#x\n", hw_status);
 	} else {
-		dev_err(&gna_priv->pdev->dev, "GNA not completed, status: %#x\n", hw_status);
+		dev_err(gna_priv->misc.this_device, "GNA not completed, status: %#x\n", hw_status);
 		status = -ENODATA;
 	}
 
@@ -30,22 +30,22 @@ int gna_parse_hw_status(struct gna_private *gna_priv, u32 hw_status)
 void gna_print_error_status(struct gna_private *gna_priv, u32 hw_status)
 {
 	if (hw_status & GNA_STS_PARAM_OOR)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: Param Out Range Error\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: Param Out Range Error\n");
 
 	if (hw_status & GNA_STS_VA_OOR)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: VA Out of Range Error\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: VA Out of Range Error\n");
 
 	if (hw_status & GNA_STS_PCI_MMU_ERR)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: PCI MMU Error\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: PCI MMU Error\n");
 
 	if (hw_status & GNA_STS_PCI_DMA_ERR)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: PCI MMU Error\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: PCI MMU Error\n");
 
 	if (hw_status & GNA_STS_PCI_UNEXCOMPL_ERR)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: PCI Unexpected Completion Error\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: PCI Unexpected Completion Error\n");
 
 	if (hw_status & GNA_STS_SATURATE)
-		dev_dbg(&gna_priv->pdev->dev, "GNA error: Saturation Reached !\n");
+		dev_dbg(gna_priv->misc.this_device, "GNA error: Saturation Reached !\n");
 }
 
 bool gna_hw_perf_enabled(struct gna_private *gna_priv)
@@ -77,7 +77,7 @@ void gna_start_scoring(struct gna_private *gna_priv, void __iomem *addr,
 
 	gna_reg_write(addr, GNA_MMIO_CTRL, ctrl);
 
-	dev_dbg(&gna_priv->pdev->dev, "scoring started...\n");
+	dev_dbg(gna_priv->misc.this_device, "scoring started...\n");
 }
 
 static void gna_clear_saturation(struct gna_private *gna_priv)
@@ -87,8 +87,8 @@ static void gna_clear_saturation(struct gna_private *gna_priv)
 
 	val = gna_reg_read(addr, GNA_MMIO_STS);
 	if (val & GNA_STS_SATURATE) {
-		dev_dbg(&gna_priv->pdev->dev, "saturation reached\n");
-		dev_dbg(&gna_priv->pdev->dev, "status: %#x\n", val);
+		dev_dbg(gna_priv->misc.this_device, "saturation reached\n");
+		dev_dbg(gna_priv->misc.this_device, "status: %#x\n", val);
 
 		val = val & GNA_STS_SATURATE;
 		gna_reg_write(addr, GNA_MMIO_STS, val);
@@ -107,7 +107,7 @@ void gna_abort_hw(struct gna_private *gna_priv)
 	gna_clear_saturation(gna_priv);
 
 	val = gna_reg_read(addr, GNA_MMIO_STS);
-	dev_dbg(&gna_priv->pdev->dev, "status before abort: %#x\n", val);
+	dev_dbg(gna_priv->misc.this_device, "status before abort: %#x\n", val);
 
 	val = gna_reg_read(addr, GNA_MMIO_CTRL);
 	val |= GNA_CTRL_ABORT_CLR_ACCEL;
@@ -121,5 +121,5 @@ void gna_abort_hw(struct gna_private *gna_priv)
 	} while (--i);
 
 	if (i == 0)
-		dev_err(&gna_priv->pdev->dev, "abort did not complete\n");
+		dev_err(gna_priv->misc.this_device, "abort did not complete\n");
 }

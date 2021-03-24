@@ -159,7 +159,7 @@ void gna_mmu_add(struct gna_private *gna_priv, struct gna_memory_object *mo)
 	j = mmu->filled_pages;
 	sgl = mo->sgt->sgl;
 	if (!sgl) {
-		dev_warn(&gna_priv->pdev->dev, "empty scatter list in memory object\n");
+		dev_warn(gna_priv->misc.this_device, "empty scatter list in memory object\n");
 		goto warn_empty_sgl;
 	}
 	sg_page = sg_dma_address(sgl);
@@ -201,7 +201,7 @@ void gna_mmu_add(struct gna_private *gna_priv, struct gna_memory_object *mo)
 	mmu->hwdesc->mmu.vamaxaddr =
 		(mmu->filled_pts * PAGE_SIZE * GNA_PGDIR_ENTRIES) +
 		(mmu->filled_pages * PAGE_SIZE) - 1;
-	dev_dbg(&gna_priv->pdev->dev, "vamaxaddr set to %u\n", mmu->hwdesc->mmu.vamaxaddr);
+	dev_dbg(gna_priv->misc.this_device, "vamaxaddr set to %u\n", mmu->hwdesc->mmu.vamaxaddr);
 
 warn_empty_sgl:
 	mutex_unlock(&gna_priv->mmu_lock);
@@ -255,20 +255,20 @@ static int gna_get_pages(struct gna_memory_object *mo, u64 offset, u64 size)
 	gna_priv = mo->gna_priv;
 
 	if (mo->pages) {
-		dev_warn(&gna_priv->pdev->dev, "pages are already pinned\n");
+		dev_warn(gna_priv->misc.this_device, "pages are already pinned\n");
 		return -EFAULT;
 	}
 
 	/* using vmalloc because num_pages can be large */
 	skip_size = round_down(offset, PAGE_SIZE);
 	effective_address = mo->user_address + skip_size;
-	dev_dbg(&gna_priv->pdev->dev, "user address %llx\n", mo->user_address);
-	dev_dbg(&gna_priv->pdev->dev, "effective user address %llx\n", effective_address);
+	dev_dbg(gna_priv->misc.this_device, "user address %llx\n", mo->user_address);
+	dev_dbg(gna_priv->misc.this_device, "effective user address %llx\n", effective_address);
 
 	effective_size = gna_buffer_get_size(offset, size);
 
 	num_pages = effective_size >> PAGE_SHIFT;
-	dev_dbg(&gna_priv->pdev->dev, "allocating %d pages\n", num_pages);
+	dev_dbg(gna_priv->misc.this_device, "allocating %d pages\n", num_pages);
 	pages = kvmalloc_array(num_pages, sizeof(struct page *), GFP_KERNEL);
 	if (!pages) {
 		ret = -ENOMEM;
@@ -289,12 +289,12 @@ static int gna_get_pages(struct gna_memory_object *mo, u64 offset, u64 size)
 
 	if (num_pinned <= 0) {
 		ret = num_pinned;
-		dev_err(&gna_priv->pdev->dev, "function get_user_pages_remote() failed\n");
+		dev_err(gna_priv->misc.this_device, "function get_user_pages_remote() failed\n");
 		goto err_free_pages;
 	}
 	if (num_pinned < num_pages) {
 		ret = -EFAULT;
-		dev_err(&gna_priv->pdev->dev,
+		dev_err(gna_priv->misc.this_device,
 			"get_user_pages_remote() pinned fewer pages number than requested\n");
 		goto err_free_pages;
 	}
@@ -307,19 +307,19 @@ static int gna_get_pages(struct gna_memory_object *mo, u64 offset, u64 size)
 
 	ret = sg_alloc_table_from_pages(sgt, pages, num_pinned, 0, mo->memory_size, GFP_KERNEL);
 	if (ret) {
-		dev_err(&gna_priv->pdev->dev, "could not alloc scatter list\n");
+		dev_err(gna_priv->misc.this_device, "could not alloc scatter list\n");
 		goto err_free_sgt;
 	}
 
 	if (IS_ERR(sgt->sgl)) {
-		dev_err(&gna_priv->pdev->dev, "sgl allocation failed\n");
+		dev_err(gna_priv->misc.this_device, "sgl allocation failed\n");
 		ret = PTR_ERR(sgt->sgl);
 		goto err_free_sgt;
 	}
 
 	ents = pci_map_sg(gna_priv->pdev, sgt->sgl, sgt->nents, PCI_DMA_BIDIRECTIONAL);
 	if (ents <= 0) {
-		dev_err(&gna_priv->pdev->dev, "could not map scatter gather list\n");
+		dev_err(gna_priv->misc.this_device, "could not map scatter gather list\n");
 		ret = -EIO;
 		goto err_free_sgl;
 	}
@@ -358,7 +358,7 @@ static void gna_put_pages(struct gna_memory_object *mo)
 	gna_priv = mo->gna_priv;
 
 	if (!mo->pages) {
-		dev_warn(&gna_priv->pdev->dev, "memory object has no pages %llu\n", mo->memory_id);
+		dev_warn(gna_priv->misc.this_device, "memory object has no pages %llu\n", mo->memory_id);
 		return;
 	}
 
@@ -417,17 +417,17 @@ int gna_map_memory(struct gna_file_private *file_priv, union gna_memory_map *gna
 	gna_priv = file_priv->gna_priv;
 
 	if (gna_mem->in.address & ~PAGE_MASK) {
-		dev_err(&gna_priv->pdev->dev, "user pointer not page aligned\n");
+		dev_err(gna_priv->misc.this_device, "user pointer not page aligned\n");
 		return -EINVAL;
 	}
 
 	if (!gna_mem->in.size) {
-		dev_err(&gna_priv->pdev->dev, "invalid user memory size\n");
+		dev_err(gna_priv->misc.this_device, "invalid user memory size\n");
 		return -EINVAL;
 	}
 
 	if (!access_ok(u64_to_user_ptr(gna_mem->in.address), gna_mem->in.size)) {
-		dev_err(&gna_priv->pdev->dev, "invalid user pointer\n");
+		dev_err(gna_priv->misc.this_device, "invalid user pointer\n");
 		return -EINVAL;
 	}
 
@@ -452,7 +452,7 @@ int gna_map_memory(struct gna_file_private *file_priv, union gna_memory_map *gna
 	mutex_unlock(&gna_priv->memidr_lock);
 
 	if (memory_id < 0) {
-		dev_err(&gna_priv->pdev->dev, "idr allocation for memory failed\n");
+		dev_err(gna_priv->misc.this_device, "idr allocation for memory failed\n");
 		ret = -EFAULT;
 		goto err_free_mo;
 	}

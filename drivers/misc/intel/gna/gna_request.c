@@ -39,7 +39,7 @@ static void gna_request_update_status(struct gna_request *score_request)
 			score_request->hw_perf.total = total_cycles;
 			score_request->hw_perf.stall = stall_cycles;
 		} else
-			dev_warn(&gna_priv->pdev->dev, "GNA statistics missing\n");
+			dev_warn(gna_priv->misc.this_device, "GNA statistics missing\n");
 	}
 	if (unlikely(hw_status & GNA_ERROR))
 		gna_print_error_status(gna_priv, hw_status);
@@ -57,7 +57,7 @@ static void gna_request_process(struct work_struct *work)
 
 	score_request = container_of(work, struct gna_request, work);
 	gna_priv = score_request->gna_priv;
-	dev_dbg(&gna_priv->pdev->dev, "processing request %llu\n", score_request->request_id);
+	dev_dbg(gna_priv->misc.this_device, "processing request %llu\n", score_request->request_id);
 
 	score_request->state = ACTIVE;
 
@@ -85,7 +85,7 @@ static void gna_request_process(struct work_struct *work)
 			!gna_priv->dev_busy, hw_timeout);
 
 	if (!hw_timeout)
-		dev_warn(&gna_priv->pdev->dev, "hardware timeout occurred\n");
+		dev_warn(gna_priv->misc.this_device, "hardware timeout occurred\n");
 
 	gna_priv->hw_status = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_STS);
 
@@ -102,7 +102,7 @@ static void gna_request_process(struct work_struct *work)
 			mo->ops->put_pages(mo);
 			mutex_unlock(&mo->page_lock);
 		} else {
-			dev_warn(&gna_priv->pdev->dev, "mo not found %llu\n", buffer->memory_id);
+			dev_warn(gna_priv->misc.this_device, "mo not found %llu\n", buffer->memory_id);
 		}
 	}
 
@@ -115,7 +115,7 @@ static void gna_request_process(struct work_struct *work)
 
 end:
 	score_request->drv_perf.completion = ktime_get_ns();
-	dev_dbg(&gna_priv->pdev->dev, "request %llu done, waking processes\n",
+	dev_dbg(gna_priv->misc.this_device, "request %llu done, waking processes\n",
 		score_request->request_id);
 	score_request->state = DONE;
 	wake_up_interruptible_all(&score_request->waitq);
@@ -136,7 +136,7 @@ static struct gna_request *gna_request_create(struct gna_file_private *file_priv
 		return NULL;
 	kref_init(&score_request->refcount);
 
-	dev_dbg(&gna_priv->pdev->dev, "layer_base %d layer_count %d\n",
+	dev_dbg(gna_priv->misc.this_device, "layer_base %d layer_count %d\n",
 		compute_cfg->layer_base, compute_cfg->layer_count);
 
 	score_request->request_id = atomic_inc_return(&gna_priv->request_count);
@@ -166,12 +166,12 @@ static int gna_validate_patches(struct gna_private *gna_priv, __u64 buffer_size,
 
 	for (idx = 0; idx < count; ++idx) {
 		if (patches[idx].size > 8) {
-			dev_err(&gna_priv->pdev->dev, "invalid patch size: %llu\n", patches[idx].size);
+			dev_err(gna_priv->misc.this_device, "invalid patch size: %llu\n", patches[idx].size);
 			return -EINVAL;
 		}
 
 		if (!gna_validate_ranges(buffer_size, patches[idx].offset, patches[idx].size)) {
-			dev_err(&gna_priv->pdev->dev,
+			dev_err(gna_priv->misc.this_device,
 				"patch out of bounds. buffer size: %llu, patch offset/size:%llu/%llu\n",
 				buffer_size, patches[idx].offset, patches[idx].size);
 			return -EINVAL;
@@ -204,14 +204,14 @@ static int gna_buffer_fill_patches(struct gna_buffer *buffer, struct gna_private
 
 	if (copy_from_user(patches, u64_to_user_ptr(patches_user),
 				sizeof(struct gna_memory_patch) * patch_count)) {
-		dev_err(&gna_priv->pdev->dev, "copy %llu patches from user failed\n", patch_count);
+		dev_err(gna_priv->misc.this_device, "copy %llu patches from user failed\n", patch_count);
 		ret = -EFAULT;
 		goto err_fill_patches;
 	}
 
 	ret = gna_validate_patches(gna_priv, buffer->size, patches, patch_count);
 	if (ret) {
-		dev_err(&gna_priv->pdev->dev, "patches failed validation\n");
+		dev_err(gna_priv->misc.this_device, "patches failed validation\n");
 		goto err_fill_patches;
 	}
 
@@ -246,7 +246,7 @@ static int gna_request_fill_buffers(struct gna_request *score_request,
 
 	if (copy_from_user(buffer_list, u64_to_user_ptr(compute_cfg->buffers_ptr),
 			sizeof(*buffer_list) * buffer_count)) {
-		dev_err(&gna_priv->pdev->dev, "copying %llu buffers failed\n", buffer_count);
+		dev_err(gna_priv->misc.this_device, "copying %llu buffers failed\n", buffer_count);
 		ret = -EFAULT;
 		goto err_free_buffers;
 	}
@@ -257,7 +257,7 @@ static int gna_request_fill_buffers(struct gna_request *score_request,
 
 		for (j = 0; j < i; j++) {
 			if (buffer_list[j].memory_id == memory_id) {
-				dev_err(&gna_priv->pdev->dev,
+				dev_err(gna_priv->misc.this_device,
 					"doubled memory id in score config. id:%llu\n", memory_id);
 				ret = -EINVAL;
 				goto err_zero_patch_ptr;
@@ -267,7 +267,7 @@ static int gna_request_fill_buffers(struct gna_request *score_request,
 		buffers_total_size +=
 			gna_buffer_get_size(buffer->offset, buffer->size);
 		if (buffers_total_size > gna_priv->info.max_hw_mem) {
-			dev_err(&gna_priv->pdev->dev, "buffers' total size too big\n");
+			dev_err(gna_priv->misc.this_device, "buffers' total size too big\n");
 			ret = -EINVAL;
 			goto err_zero_patch_ptr;
 		}
@@ -276,14 +276,14 @@ static int gna_request_fill_buffers(struct gna_request *score_request,
 		mo = idr_find(&gna_priv->memory_idr, memory_id);
 		if (!mo) {
 			mutex_unlock(&gna_priv->memidr_lock);
-			dev_err(&gna_priv->pdev->dev, "memory object %llu not found\n", memory_id);
+			dev_err(gna_priv->misc.this_device, "memory object %llu not found\n", memory_id);
 			ret = -EINVAL;
 			goto err_zero_patch_ptr;
 		}
 		mutex_unlock(&gna_priv->memidr_lock);
 
 		if (mo->fd != score_request->fd) {
-			dev_err(&gna_priv->pdev->dev,
+			dev_err(gna_priv->misc.this_device,
 				"memory object from another file. %p != %p\n",
 				mo->fd, score_request->fd);
 			ret = -EINVAL;
@@ -291,7 +291,7 @@ static int gna_request_fill_buffers(struct gna_request *score_request,
 		}
 
 		if (!gna_validate_ranges(mo->memory_size, buffer->offset, buffer->size)) {
-			dev_err(&gna_priv->pdev->dev,
+			dev_err(gna_priv->misc.this_device,
 				"buffer out of bounds. mo size: %llu, buffer offset/size:%llu/%llu\n",
 				mo->memory_size, buffer->offset, buffer->size);
 			ret = -EINVAL;

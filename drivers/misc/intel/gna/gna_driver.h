@@ -5,6 +5,7 @@
 #define __GNA_DRIVER_H__
 
 #include <linux/mutex.h>
+#include <linux/types.h>
 #include <linux/list.h>
 
 #define GNA_DV_NAME	"intel_gna"
@@ -13,6 +14,7 @@ struct gna_private;
 struct file;
 
 struct gna_driver_private {
+	atomic_t dev_last_idx;
 	int recovery_timeout_jiffies;
 };
 

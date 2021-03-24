@@ -22,25 +22,25 @@ static int gna_ioctl_score(struct gna_file_private *file_priv, void __user *argp
 	gna_priv = file_priv->gna_priv;
 
 	if (copy_from_user(&score_args, argptr, sizeof(score_args))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy score ioctl config from user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy score ioctl config from user\n");
 		return -EFAULT;
 	}
 
 	ret = gna_validate_score_config(&score_args.in.config, file_priv);
 	if (ret) {
-		dev_err(&gna_priv->pdev->dev, "request not valid\n");
+		dev_err(gna_priv->misc.this_device, "request not valid\n");
 		return ret;
 	}
 
 	ret = gna_enqueue_request(&score_args.in.config, file_priv, &request_id);
 	if (ret) {
-		dev_err(&gna_priv->pdev->dev, "could not enqueue score request %d\n", ret);
+		dev_err(gna_priv->misc.this_device, "could not enqueue score request %d\n", ret);
 		return ret;
 	}
 
 	score_args.out.request_id = request_id;
 	if (copy_to_user(argptr, &score_args, sizeof(score_args))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy score ioctl status to user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy score ioctl status to user\n");
 		return -EFAULT;
 	}
 
@@ -63,7 +63,7 @@ static int gna_ioctl_wait(struct file *f, void __user *argptr)
 	ret = 0;
 
 	if (copy_from_user(&wait_data, argptr, sizeof(wait_data))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy wait ioctl data from user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy wait ioctl data from user\n");
 		return -EFAULT;
 	}
 
@@ -73,7 +73,7 @@ static int gna_ioctl_wait(struct file *f, void __user *argptr)
 	score_request = gna_find_request_by_id(request_id, gna_priv);
 
 	if (!score_request) {
-		dev_err(&gna_priv->pdev->dev, "could not find request with id: %llu\n", request_id);
+		dev_err(gna_priv->misc.this_device, "could not find request with id: %llu\n", request_id);
 		return -EINVAL;
 	}
 
@@ -82,17 +82,17 @@ static int gna_ioctl_wait(struct file *f, void __user *argptr)
 		return -EINVAL;
 	}
 
-	dev_dbg(&gna_priv->pdev->dev, "waiting for request %llu for timeout %u\n", request_id, timeout);
+	dev_dbg(gna_priv->misc.this_device, "waiting for request %llu for timeout %u\n", request_id, timeout);
 
 	ret = wait_event_interruptible_timeout(score_request->waitq, score_request->state == DONE,
 					       msecs_to_jiffies(timeout));
 	if (ret == 0 || ret == -ERESTARTSYS) {
-		dev_err(&gna_priv->pdev->dev, "request timed out, id: %llu\n", request_id);
+		dev_err(gna_priv->misc.this_device, "request timed out, id: %llu\n", request_id);
 		kref_put(&score_request->refcount, gna_request_release);
 		return -EBUSY;
 	}
 
-	dev_dbg(&gna_priv->pdev->dev, "request wait completed with %d req id %llu\n", ret, request_id);
+	dev_dbg(gna_priv->misc.this_device, "request wait completed with %d req id %llu\n", ret, request_id);
 
 	wait_data.out.hw_perf = score_request->hw_perf;
 	wait_data.out.drv_perf = score_request->drv_perf;
@@ -100,14 +100,14 @@ static int gna_ioctl_wait(struct file *f, void __user *argptr)
 
 	ret = score_request->status;
 
-	dev_dbg(&gna_priv->pdev->dev, "request status %d, hw status: %#x\n",
+	dev_dbg(gna_priv->misc.this_device, "request status %d, hw status: %#x\n",
 		score_request->status, score_request->hw_status);
 	kref_put(&score_request->refcount, gna_request_release);
 
 	gna_delete_request_by_id(request_id, gna_priv);
 
 	if (copy_to_user(argptr, &wait_data, sizeof(wait_data))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy wait ioctl status to user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy wait ioctl status to user\n");
 		ret = -EFAULT;
 	}
 
@@ -123,7 +123,7 @@ static int gna_ioctl_map(struct gna_file_private *file_priv, void __user *argptr
 	gna_priv = file_priv->gna_priv;
 
 	if (copy_from_user(&gna_mem, argptr, sizeof(gna_mem))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy userptr ioctl data from user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy userptr ioctl data from user\n");
 		return -EFAULT;
 	}
 
@@ -132,7 +132,7 @@ static int gna_ioctl_map(struct gna_file_private *file_priv, void __user *argptr
 		return ret;
 
 	if (copy_to_user(argptr, &gna_mem, sizeof(gna_mem))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy userptr ioctl status to user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy userptr ioctl status to user\n");
 		return -EFAULT;
 	}
 
@@ -154,13 +154,13 @@ static int gna_ioctl_free(struct gna_file_private *file_priv, unsigned long arg)
 	mutex_unlock(&gna_priv->memidr_lock);
 
 	if (!mo) {
-		dev_warn(&gna_priv->pdev->dev, "memory object not found\n");
+		dev_warn(gna_priv->misc.this_device, "memory object not found\n");
 		return -EINVAL;
 	}
 
 	queue_work(gna_priv->request_wq, &mo->work);
 	if (wait_event_interruptible(mo->waitq, true)) {
-		dev_dbg(&gna_priv->pdev->dev, "wait interrupted\n");
+		dev_dbg(gna_priv->misc.this_device, "wait interrupted\n");
 		return -ETIME;
 	}
 
@@ -184,7 +184,7 @@ static int gna_ioctl_getparam(struct gna_private *gna_priv, void __user *argptr)
 	int ret;
 
 	if (copy_from_user(&param, argptr, sizeof(param))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy getparam ioctl data from user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy getparam ioctl data from user\n");
 		return -EFAULT;
 	}
 
@@ -193,7 +193,7 @@ static int gna_ioctl_getparam(struct gna_private *gna_priv, void __user *argptr)
 		return ret;
 
 	if (copy_to_user(argptr, &param, sizeof(param))) {
-		dev_err(&gna_priv->pdev->dev, "could not copy getparam ioctl status to user\n");
+		dev_err(gna_priv->misc.this_device, "could not copy getparam ioctl status to user\n");
 		return -EFAULT;
 	}
 
@@ -240,7 +240,7 @@ long gna_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		dev_warn(&gna_priv->pdev->dev, "wrong ioctl %#x\n", cmd);
+		dev_warn(gna_priv->misc.this_device, "wrong ioctl %#x\n", cmd);
 		ret = -EINVAL;
 		break;
 	}
