@@ -23,9 +23,6 @@
 #define LM_FG_COLOR_FILL_SIZE            0x10
 #define LM_FG_COLOR_FILL_XY              0x14
 
-#define LM_BLEND0_FG_ALPHA               0x04
-#define LM_BLEND0_BG_ALPHA               0x08
-
 static const struct dpu_lm_cfg *_lm_offset(enum dpu_lm mixer,
 		const struct dpu_mdss_cfg *m,
 		void __iomem *addr,
@@ -117,24 +114,6 @@ static void dpu_hw_lm_setup_blend_config_sdm845(struct dpu_hw_mixer *ctx,
 	DPU_REG_WRITE(c, LM_BLEND0_OP + stage_off, blend_op);
 }
 
-static void dpu_hw_lm_setup_blend_config(struct dpu_hw_mixer *ctx,
-	u32 stage, u32 fg_alpha, u32 bg_alpha, u32 blend_op)
-{
-	struct dpu_hw_blk_reg_map *c = &ctx->hw;
-	int stage_off;
-
-	if (stage == DPU_STAGE_BASE)
-		return;
-
-	stage_off = _stage_offset(ctx, stage);
-	if (WARN_ON(stage_off < 0))
-		return;
-
-	DPU_REG_WRITE(c, LM_BLEND0_FG_ALPHA + stage_off, fg_alpha);
-	DPU_REG_WRITE(c, LM_BLEND0_BG_ALPHA + stage_off, bg_alpha);
-	DPU_REG_WRITE(c, LM_BLEND0_OP + stage_off, blend_op);
-}
-
 static void dpu_hw_lm_setup_color3(struct dpu_hw_mixer *ctx,
 	uint32_t mixer_op_mode)
 {
@@ -154,10 +133,7 @@ static void _setup_mixer_ops(const struct dpu_mdss_cfg *m,
 		unsigned long features)
 {
 	ops->setup_mixer_out = dpu_hw_lm_setup_out;
-	if (m->hwversion >= DPU_HW_VER_400)
-		ops->setup_blend_config = dpu_hw_lm_setup_blend_config_sdm845;
-	else
-		ops->setup_blend_config = dpu_hw_lm_setup_blend_config;
+	ops->setup_blend_config = dpu_hw_lm_setup_blend_config_sdm845;
 	ops->setup_alpha_out = dpu_hw_lm_setup_color3;
 	ops->setup_border_color = dpu_hw_lm_setup_border_color;
 }
