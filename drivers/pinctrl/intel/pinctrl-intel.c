@@ -1493,6 +1493,8 @@ static int intel_pinctrl_probe(struct platform_device *pdev,
 
 		/* Determine community features based on the revision */
 		value = readl(regs + REVID);
+		if (value == ~0u)
+			return -ENODATA;
 		if (((value & REVID_MASK) >> REVID_SHIFT) >= 0x94) {
 			community->features |= PINCTRL_FEATURE_DEBOUNCE;
 			community->features |= PINCTRL_FEATURE_1K_PD;
