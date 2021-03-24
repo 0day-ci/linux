@@ -12,12 +12,17 @@
 static void gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 			const struct pci_device_id *pci_id)
 {
+	u32 bld_reg;
+
 	pci_set_drvdata(pcidev, gna_priv);
 
 	gna_priv->parent = &pcidev->dev;
 	gna_priv->pdev = pcidev;
 	gna_priv->info = *(struct gna_drv_info *)pci_id->driver_data;
 	gna_priv->drv_priv = &gna_drv_priv;
+
+	bld_reg = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_IBUFFS);
+	gna_priv->hw_info.in_buf_s = bld_reg & GENMASK(7, 0);
 }
 
 int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)

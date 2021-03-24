@@ -23,6 +23,10 @@ struct gna_drv_info {
 	struct gna_desc_info desc_info;
 };
 
+struct gna_hw_info {
+	u8 in_buf_s;
+};
+
 struct gna_private {
 	struct gna_driver_private *drv_priv;
 
@@ -33,6 +37,7 @@ struct gna_private {
 	/* device related resources */
 	void __iomem *bar0_base;
 	struct gna_drv_info info;
+	struct gna_hw_info hw_info;
 };
 
 int gna_probe(struct pci_dev *dev, const struct pci_device_id *id);
