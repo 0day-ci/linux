@@ -47,7 +47,7 @@ static void dpu_core_irq_callback_handler(void *arg, int irq_idx)
 	 * NOTE: dpu_core_irq_callback_handler is protected by top-level
 	 *       spinlock, so it is safe to clear any interrupt status here.
 	 */
-	dpu_kms->hw_intr->ops.clear_intr_status_nolock(
+	dpu_hw_intr_clear_intr_status_nolock(
 			dpu_kms->hw_intr,
 			irq_idx);
 }
@@ -55,10 +55,10 @@ static void dpu_core_irq_callback_handler(void *arg, int irq_idx)
 int dpu_core_irq_idx_lookup(struct dpu_kms *dpu_kms,
 		enum dpu_intr_type intr_type, u32 instance_idx)
 {
-	if (!dpu_kms->hw_intr || !dpu_kms->hw_intr->ops.irq_idx_lookup)
+	if (!dpu_kms->hw_intr)
 		return -EINVAL;
 
-	return dpu_kms->hw_intr->ops.irq_idx_lookup(intr_type,
+	return dpu_hw_intr_irq_idx_lookup(intr_type,
 			instance_idx);
 }
 
@@ -89,7 +89,7 @@ static int _dpu_core_irq_enable(struct dpu_kms *dpu_kms, int irq_idx)
 	trace_dpu_core_irq_enable_idx(irq_idx, enable_count);
 
 	if (atomic_inc_return(&dpu_kms->irq_obj.enable_counts[irq_idx]) == 1) {
-		ret = dpu_kms->hw_intr->ops.enable_irq(
+		ret = dpu_hw_intr_enable_irq(
 				dpu_kms->hw_intr,
 				irq_idx);
 		if (ret)
@@ -152,7 +152,7 @@ static int _dpu_core_irq_disable(struct dpu_kms *dpu_kms, int irq_idx)
 	trace_dpu_core_irq_disable_idx(irq_idx, enable_count);
 
 	if (atomic_dec_return(&dpu_kms->irq_obj.enable_counts[irq_idx]) == 0) {
-		ret = dpu_kms->hw_intr->ops.disable_irq(
+		ret = dpu_hw_intr_disable_irq(
 				dpu_kms->hw_intr,
 				irq_idx);
 		if (ret)
@@ -185,8 +185,7 @@ int dpu_core_irq_disable(struct dpu_kms *dpu_kms, int *irq_idxs, u32 irq_count)
 
 u32 dpu_core_irq_read(struct dpu_kms *dpu_kms, int irq_idx, bool clear)
 {
-	if (!dpu_kms->hw_intr ||
-			!dpu_kms->hw_intr->ops.get_interrupt_status)
+	if (!dpu_kms->hw_intr)
 		return 0;
 
 	if (irq_idx < 0) {
@@ -195,7 +194,7 @@ u32 dpu_core_irq_read(struct dpu_kms *dpu_kms, int irq_idx, bool clear)
 		return 0;
 	}
 
-	return dpu_kms->hw_intr->ops.get_interrupt_status(dpu_kms->hw_intr,
+	return dpu_hw_intr_get_interrupt_status(dpu_kms->hw_intr,
 			irq_idx, clear);
 }
 
@@ -273,18 +272,18 @@ int dpu_core_irq_unregister_callback(struct dpu_kms *dpu_kms, int irq_idx,
 
 static void dpu_clear_all_irqs(struct dpu_kms *dpu_kms)
 {
-	if (!dpu_kms->hw_intr || !dpu_kms->hw_intr->ops.clear_all_irqs)
+	if (!dpu_kms->hw_intr)
 		return;
 
-	dpu_kms->hw_intr->ops.clear_all_irqs(dpu_kms->hw_intr);
+	dpu_hw_intr_clear_all_irqs(dpu_kms->hw_intr);
 }
 
 static void dpu_disable_all_irqs(struct dpu_kms *dpu_kms)
 {
-	if (!dpu_kms->hw_intr || !dpu_kms->hw_intr->ops.disable_all_irqs)
+	if (!dpu_kms->hw_intr)
 		return;
 
-	dpu_kms->hw_intr->ops.disable_all_irqs(dpu_kms->hw_intr);
+	dpu_hw_intr_disable_all_irqs(dpu_kms->hw_intr);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -383,7 +382,7 @@ irqreturn_t dpu_core_irq(struct dpu_kms *dpu_kms)
 	 * Individual interrupt status bit will only get stored if it
 	 * is enabled.
 	 */
-	dpu_kms->hw_intr->ops.get_interrupt_statuses(dpu_kms->hw_intr);
+	dpu_hw_intr_get_interrupt_statuses(dpu_kms->hw_intr);
 
 	/*
 	 * Dispatch to HW driver to handle interrupt lookup that is being
@@ -393,7 +392,7 @@ irqreturn_t dpu_core_irq(struct dpu_kms *dpu_kms)
 	 * callback, and do the interrupt status clearing once the registered
 	 * callback is finished.
 	 */
-	dpu_kms->hw_intr->ops.dispatch_irqs(
+	dpu_hw_intr_dispatch_irqs(
 			dpu_kms->hw_intr,
 			dpu_core_irq_callback_handler,
 			dpu_kms);

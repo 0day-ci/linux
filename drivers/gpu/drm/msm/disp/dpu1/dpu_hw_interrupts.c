@@ -755,7 +755,7 @@ static const struct dpu_irq_type dpu_irq_map[] = {
 	{ DPU_IRQ_TYPE_RESERVED, 0, 0, 9},
 };
 
-static int dpu_hw_intr_irqidx_lookup(enum dpu_intr_type intr_type,
+int dpu_hw_intr_irq_idx_lookup(enum dpu_intr_type intr_type,
 		u32 instance_idx)
 {
 	int i;
@@ -771,7 +771,7 @@ static int dpu_hw_intr_irqidx_lookup(enum dpu_intr_type intr_type,
 	return -EINVAL;
 }
 
-static void dpu_hw_intr_dispatch_irq(struct dpu_hw_intr *intr,
+void dpu_hw_intr_dispatch_irqs(struct dpu_hw_intr *intr,
 		void (*cbfunc)(void *, int),
 		void *arg)
 {
@@ -825,7 +825,7 @@ static void dpu_hw_intr_dispatch_irq(struct dpu_hw_intr *intr,
 				if (cbfunc)
 					cbfunc(arg, irq_idx);
 				else
-					intr->ops.clear_intr_status_nolock(
+					dpu_hw_intr_clear_intr_status_nolock(
 							intr, irq_idx);
 
 				/*
@@ -839,7 +839,7 @@ static void dpu_hw_intr_dispatch_irq(struct dpu_hw_intr *intr,
 	spin_unlock_irqrestore(&intr->irq_lock, irq_flags);
 }
 
-static int dpu_hw_intr_enable_irq(struct dpu_hw_intr *intr, int irq_idx)
+int dpu_hw_intr_enable_irq(struct dpu_hw_intr *intr, int irq_idx)
 {
 	int reg_idx;
 	unsigned long irq_flags;
@@ -886,7 +886,7 @@ static int dpu_hw_intr_enable_irq(struct dpu_hw_intr *intr, int irq_idx)
 	return 0;
 }
 
-static int dpu_hw_intr_disable_irq_nolock(struct dpu_hw_intr *intr, int irq_idx)
+int dpu_hw_intr_disable_irq_nolock(struct dpu_hw_intr *intr, int irq_idx)
 {
 	int reg_idx;
 	const struct dpu_intr_reg *reg;
@@ -930,7 +930,7 @@ static int dpu_hw_intr_disable_irq_nolock(struct dpu_hw_intr *intr, int irq_idx)
 	return 0;
 }
 
-static int dpu_hw_intr_disable_irq(struct dpu_hw_intr *intr, int irq_idx)
+int dpu_hw_intr_disable_irq(struct dpu_hw_intr *intr, int irq_idx)
 {
 	unsigned long irq_flags;
 
@@ -949,7 +949,7 @@ static int dpu_hw_intr_disable_irq(struct dpu_hw_intr *intr, int irq_idx)
 	return 0;
 }
 
-static int dpu_hw_intr_clear_irqs(struct dpu_hw_intr *intr)
+int dpu_hw_intr_clear_all_irqs(struct dpu_hw_intr *intr)
 {
 	int i;
 
@@ -968,7 +968,7 @@ static int dpu_hw_intr_clear_irqs(struct dpu_hw_intr *intr)
 	return 0;
 }
 
-static int dpu_hw_intr_disable_irqs(struct dpu_hw_intr *intr)
+int dpu_hw_intr_disable_all_irqs(struct dpu_hw_intr *intr)
 {
 	int i;
 
@@ -987,7 +987,7 @@ static int dpu_hw_intr_disable_irqs(struct dpu_hw_intr *intr)
 	return 0;
 }
 
-static void dpu_hw_intr_get_interrupt_statuses(struct dpu_hw_intr *intr)
+void dpu_hw_intr_get_interrupt_statuses(struct dpu_hw_intr *intr)
 {
 	int i;
 	u32 enable_mask;
@@ -1023,7 +1023,7 @@ static void dpu_hw_intr_get_interrupt_statuses(struct dpu_hw_intr *intr)
 	spin_unlock_irqrestore(&intr->irq_lock, irq_flags);
 }
 
-static void dpu_hw_intr_clear_intr_status_nolock(struct dpu_hw_intr *intr,
+void dpu_hw_intr_clear_intr_status_nolock(struct dpu_hw_intr *intr,
 		int irq_idx)
 {
 	int reg_idx;
@@ -1039,7 +1039,7 @@ static void dpu_hw_intr_clear_intr_status_nolock(struct dpu_hw_intr *intr,
 	wmb();
 }
 
-static u32 dpu_hw_intr_get_interrupt_status(struct dpu_hw_intr *intr,
+u32 dpu_hw_intr_get_interrupt_status(struct dpu_hw_intr *intr,
 		int irq_idx, bool clear)
 {
 	int reg_idx;
@@ -1072,19 +1072,6 @@ static u32 dpu_hw_intr_get_interrupt_status(struct dpu_hw_intr *intr,
 	return intr_status;
 }
 
-static void __setup_intr_ops(struct dpu_hw_intr_ops *ops)
-{
-	ops->irq_idx_lookup = dpu_hw_intr_irqidx_lookup;
-	ops->enable_irq = dpu_hw_intr_enable_irq;
-	ops->disable_irq = dpu_hw_intr_disable_irq;
-	ops->dispatch_irqs = dpu_hw_intr_dispatch_irq;
-	ops->clear_all_irqs = dpu_hw_intr_clear_irqs;
-	ops->disable_all_irqs = dpu_hw_intr_disable_irqs;
-	ops->get_interrupt_statuses = dpu_hw_intr_get_interrupt_statuses;
-	ops->clear_intr_status_nolock = dpu_hw_intr_clear_intr_status_nolock;
-	ops->get_interrupt_status = dpu_hw_intr_get_interrupt_status;
-}
-
 static void __intr_offset(struct dpu_mdss_cfg *m,
 		void __iomem *addr, struct dpu_hw_blk_reg_map *hw)
 {
@@ -1106,7 +1093,6 @@ struct dpu_hw_intr *dpu_hw_intr_init(void __iomem *addr,
 		return ERR_PTR(-ENOMEM);
 
 	__intr_offset(m, addr, &intr->hw);
-	__setup_intr_ops(&intr->ops);
 
 	intr->irq_idx_tbl_size = ARRAY_SIZE(dpu_irq_map);
 

@@ -77,99 +77,94 @@ enum dpu_intr_type {
 struct dpu_hw_intr;
 
 /**
- * Interrupt operations.
+ * dpu_hw_intr_irq_idx_lookup - Lookup IRQ index on the HW interrupt type
+ *                 Used for all irq related ops
+ * @intr_type:		Interrupt type defined in dpu_intr_type
+ * @instance_idx:	HW interrupt block instance
+ * @return:		irq_idx or -EINVAL for lookup fail
  */
-struct dpu_hw_intr_ops {
-	/**
-	 * irq_idx_lookup - Lookup IRQ index on the HW interrupt type
-	 *                 Used for all irq related ops
-	 * @intr_type:		Interrupt type defined in dpu_intr_type
-	 * @instance_idx:	HW interrupt block instance
-	 * @return:		irq_idx or -EINVAL for lookup fail
-	 */
-	int (*irq_idx_lookup)(
-			enum dpu_intr_type intr_type,
-			u32 instance_idx);
+int dpu_hw_intr_irq_idx_lookup(
+		enum dpu_intr_type intr_type,
+		u32 instance_idx);
 
-	/**
-	 * enable_irq - Enable IRQ based on lookup IRQ index
-	 * @intr:	HW interrupt handle
-	 * @irq_idx:	Lookup irq index return from irq_idx_lookup
-	 * @return:	0 for success, otherwise failure
-	 */
-	int (*enable_irq)(
-			struct dpu_hw_intr *intr,
-			int irq_idx);
+/**
+ * dpu_hw_intr_enable_irq - Enable IRQ based on lookup IRQ index
+ * @intr:	HW interrupt handle
+ * @irq_idx:	Lookup irq index return from irq_idx_lookup
+ * @return:	0 for success, otherwise failure
+ */
+int dpu_hw_intr_enable_irq(
+		struct dpu_hw_intr *intr,
+		int irq_idx);
 
-	/**
-	 * disable_irq - Disable IRQ based on lookup IRQ index
-	 * @intr:	HW interrupt handle
-	 * @irq_idx:	Lookup irq index return from irq_idx_lookup
-	 * @return:	0 for success, otherwise failure
-	 */
-	int (*disable_irq)(
-			struct dpu_hw_intr *intr,
-			int irq_idx);
+/**
+ * dpu_hw_intr_disable_irq - Disable IRQ based on lookup IRQ index
+ * @intr:	HW interrupt handle
+ * @irq_idx:	Lookup irq index return from irq_idx_lookup
+ * @return:	0 for success, otherwise failure
+ */
+int dpu_hw_intr_disable_irq(
+		struct dpu_hw_intr *intr,
+		int irq_idx);
 
-	/**
-	 * clear_all_irqs - Clears all the interrupts (i.e. acknowledges
-	 *                  any asserted IRQs). Useful during reset.
-	 * @intr:	HW interrupt handle
-	 * @return:	0 for success, otherwise failure
-	 */
-	int (*clear_all_irqs)(
-			struct dpu_hw_intr *intr);
+/**
+ * dpu_hw_intr_clear_all_irqs - Clears all the interrupts (i.e. acknowledges
+ *                  any asserted IRQs). Useful during reset.
+ * @intr:	HW interrupt handle
+ * @return:	0 for success, otherwise failure
+ */
+int dpu_hw_intr_clear_all_irqs(
+		struct dpu_hw_intr *intr);
 
-	/**
-	 * disable_all_irqs - Disables all the interrupts. Useful during reset.
-	 * @intr:	HW interrupt handle
-	 * @return:	0 for success, otherwise failure
-	 */
-	int (*disable_all_irqs)(
-			struct dpu_hw_intr *intr);
+/**
+ * dpu_hw_intr_disable_all_irqs - Disables all the interrupts. Useful during reset.
+ * @intr:	HW interrupt handle
+ * @return:	0 for success, otherwise failure
+ */
+int dpu_hw_intr_disable_all_irqs(
+		struct dpu_hw_intr *intr);
 
-	/**
-	 * dispatch_irqs - IRQ dispatcher will call the given callback
-	 *                 function when a matching interrupt status bit is
-	 *                 found in the irq mapping table.
-	 * @intr:	HW interrupt handle
-	 * @cbfunc:	Callback function pointer
-	 * @arg:	Argument to pass back during callback
-	 */
-	void (*dispatch_irqs)(
-			struct dpu_hw_intr *intr,
-			void (*cbfunc)(void *arg, int irq_idx),
-			void *arg);
+/**
+ * dpu_hw_intr_dispatch_irqs - IRQ dispatcher will call the given callback
+ *                 function when a matching interrupt status bit is
+ *                 found in the irq mapping table.
+ * @intr:	HW interrupt handle
+ * @cbfunc:	Callback function pointer
+ * @arg:	Argument to pass back during callback
+ */
+void dpu_hw_intr_dispatch_irqs(
+		struct dpu_hw_intr *intr,
+		void dpu_hw_intr_cbfunc(void *arg, int irq_idx),
+		void *arg);
 
-	/**
-	 * get_interrupt_statuses - Gets and store value from all interrupt
-	 *                          status registers that are currently fired.
-	 * @intr:	HW interrupt handle
-	 */
-	void (*get_interrupt_statuses)(
-			struct dpu_hw_intr *intr);
+/**
+ * dpu_hw_intr_get_interrupt_statuses - Gets and store value from all interrupt
+ *                          status registers that are currently fired.
+ * @intr:	HW interrupt handle
+ */
+void dpu_hw_intr_get_interrupt_statuses(
+		struct dpu_hw_intr *intr);
 
-	/**
-	 * clear_intr_status_nolock() - clears the HW interrupts without lock
-	 * @intr:	HW interrupt handle
-	 * @irq_idx:	Lookup irq index return from irq_idx_lookup
-	 */
-	void (*clear_intr_status_nolock)(
-			struct dpu_hw_intr *intr,
-			int irq_idx);
+/**
+ * dpu_hw_intr_clear_intr_status_nolock() - clears the HW interrupts without lock
+ * @intr:	HW interrupt handle
+ * @irq_idx:	Lookup irq index return from irq_idx_lookup
+ */
+void dpu_hw_intr_clear_intr_status_nolock(
+		struct dpu_hw_intr *intr,
+		int irq_idx);
 
-	/**
-	 * get_interrupt_status - Gets HW interrupt status, and clear if set,
-	 *                        based on given lookup IRQ index.
-	 * @intr:	HW interrupt handle
-	 * @irq_idx:	Lookup irq index return from irq_idx_lookup
-	 * @clear:	True to clear irq after read
-	 */
-	u32 (*get_interrupt_status)(
-			struct dpu_hw_intr *intr,
-			int irq_idx,
-			bool clear);
-};
+/**
+ * dpu_hw_intr_get_interrupt_status - Gets HW interrupt status, and clear if set,
+ *                        based on given lookup IRQ index.
+ * @intr:	HW interrupt handle
+ * @irq_idx:	Lookup irq index return from irq_idx_lookup
+ * @clear:	True to clear irq after read
+ */
+u32 dpu_hw_intr_get_interrupt_status(
+		struct dpu_hw_intr *intr,
+		int irq_idx,
+		bool clear);
 
 /**
  * struct dpu_hw_intr: hw interrupts handling data structure
@@ -182,7 +177,6 @@ struct dpu_hw_intr_ops {
  */
 struct dpu_hw_intr {
 	struct dpu_hw_blk_reg_map hw;
-	struct dpu_hw_intr_ops ops;
 	u32 *cache_irq_mask;
 	u32 *save_irq_status;
 	u32 irq_idx_tbl_size;
