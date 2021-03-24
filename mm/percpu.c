@@ -2056,6 +2056,96 @@ retry_pop:
 }
 
 /**
+ * pcpu_shrink_populated - scan chunks and release unused pages to the system
+ * @type: chunk type
+ *
+ * Scan over all chunks, find those marked with the depopulate flag and
+ * try to release unused pages to the system. On every attempt clear the
+ * chunk's depopulate flag to avoid wasting CPU by scanning the same
+ * chunk again and again.
+ */
+static void pcpu_shrink_populated(enum pcpu_chunk_type type)
+{
+	struct list_head *pcpu_slot = pcpu_chunk_list(type);
+	struct pcpu_chunk *chunk;
+	int slot, i, off, start;
+
+	spin_lock_irq(&pcpu_lock);
+	for (slot = pcpu_nr_slots - 1; slot >= 0; slot--) {
+restart:
+		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
+			bool isolated = false;
+
+			if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH)
+				break;
+
+			for (i = 0, start = -1; i < chunk->nr_pages; i++) {
+				if (!chunk->nr_empty_pop_pages)
+					break;
+
+				/*
+				 * If the page is empty and populated, start or
+				 * extend the [start, i) range.
+				 */
+				if (test_bit(i, chunk->populated)) {
+					off = find_first_bit(
+						pcpu_index_alloc_map(chunk, i),
+						PCPU_BITMAP_BLOCK_BITS);
+					if (off >= PCPU_BITMAP_BLOCK_BITS) {
+						if (start == -1)
+							start = i;
+						continue;
+					}
+				}
+
+				/*
+				 * Otherwise check if there is an active range,
+				 * and if yes, depopulate it.
+				 */
+				if (start == -1)
+					continue;
+
+				/*
+				 * Isolate the chunk, so new allocations
+				 * wouldn't be served using this chunk.
+				 * Async releases can still happen.
+				 */
+				if (!list_empty(&chunk->list)) {
+					list_del_init(&chunk->list);
+					isolated = true;
+				}
+
+				spin_unlock_irq(&pcpu_lock);
+				pcpu_depopulate_chunk(chunk, start, i);
+				cond_resched();
+				spin_lock_irq(&pcpu_lock);
+
+				pcpu_chunk_depopulated(chunk, start, i);
+
+				/*
+				 * Reset the range and continue.
+				 */
+				start = -1;
+			}
+
+			if (isolated) {
+				/*
+				 * The chunk could have been moved while
+				 * pcpu_lock wasn't held. Make sure we put
+				 * the chunk back into the slot and restart
+				 * the scanning.
+				 */
+				if (list_empty(&chunk->list))
+					list_add_tail(&chunk->list,
+						      &pcpu_slot[slot]);
+				goto restart;
+			}
+		}
+	}
+	spin_unlock_irq(&pcpu_lock);
+}
+
+/**
  * pcpu_balance_workfn - manage the amount of free chunks and populated pages
  * @work: unused
  *
