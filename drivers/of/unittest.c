@@ -1410,12 +1410,12 @@ static int __init unittest_data_add(void)
 	void *unittest_data;
 	struct device_node *unittest_data_node, *np;
 	/*
-	 * __dtb_testcases_begin[] and __dtb_testcases_end[] are magically
-	 * created by cmd_dt_S_dtb in scripts/Makefile.lib
+	 * __dtbo_testcases_begin[] and __dtbo_testcases_end[] are
+	 * created by cmd_dt_S_dtbo in Makefile
 	 */
-	extern uint8_t __dtb_testcases_begin[];
-	extern uint8_t __dtb_testcases_end[];
-	const int size = __dtb_testcases_end - __dtb_testcases_begin;
+	extern uint8_t __dtbo_testcases_begin[];
+	extern uint8_t __dtbo_testcases_end[];
+	const int size = __dtbo_testcases_end - __dtbo_testcases_begin;
 	int rc;
 
 	if (!size) {
@@ -1425,7 +1425,7 @@ static int __init unittest_data_add(void)
 	}
 
 	/* creating copy */
-	unittest_data = kmemdup(__dtb_testcases_begin, size, GFP_KERNEL);
+	unittest_data = kmemdup(__dtbo_testcases_begin, size, GFP_KERNEL);
 	if (!unittest_data)
 		return -ENOMEM;
 
@@ -2806,24 +2806,24 @@ static inline void __init of_unittest_overlay(void) { }
 #ifdef CONFIG_OF_OVERLAY
 
 /*
- * __dtb_ot_begin[] and __dtb_ot_end[] are created by cmd_dt_S_dtb
- * in scripts/Makefile.lib
+ * __dtbo_##overlay_name##_begin[] and __dtbo_##overlay_name##_end[] are
+ * created by cmd_dt_S_dtbo in Makefile
  */
 
-#define OVERLAY_INFO_EXTERN(name) \
-	extern uint8_t __dtb_##name##_begin[]; \
-	extern uint8_t __dtb_##name##_end[]
+#define OVERLAY_INFO_EXTERN(overlay_name) \
+	extern uint8_t __dtbo_##overlay_name##_begin[]; \
+	extern uint8_t __dtbo_##overlay_name##_end[]
 
-#define OVERLAY_INFO(overlay_name, expected)             \
-{	.dtb_begin       = __dtb_##overlay_name##_begin, \
-	.dtb_end         = __dtb_##overlay_name##_end,   \
-	.expected_result = expected,                     \
-	.name            = #overlay_name,                \
+#define OVERLAY_INFO(overlay_name, expected)               \
+{	.dtbo_begin       = __dtbo_##overlay_name##_begin, \
+	.dtbo_end         = __dtbo_##overlay_name##_end,   \
+	.expected_result = expected,                       \
+	.name            = #overlay_name,                  \
 }
 
 struct overlay_info {
-	uint8_t		*dtb_begin;
-	uint8_t		*dtb_end;
+	uint8_t		*dtbo_begin;
+	uint8_t		*dtbo_end;
 	int		expected_result;
 	int		overlay_id;
 	char		*name;
@@ -2887,7 +2887,7 @@ static struct overlay_info overlays[] = {
 	OVERLAY_INFO(overlay_bad_phandle, -EINVAL),
 	OVERLAY_INFO(overlay_bad_symbol, -EINVAL),
 	/* end marker */
-	{.dtb_begin = NULL, .dtb_end = NULL, .expected_result = 0, .name = NULL}
+	{.dtbo_begin = NULL, .dtbo_end = NULL, .expected_result = 0, .name = NULL}
 };
 
 static struct device_node *overlay_base_root;
@@ -2944,13 +2944,13 @@ void __init unittest_unflatten_overlay_base(void)
 		return;
 	}
 
-	data_size = info->dtb_end - info->dtb_begin;
+	data_size = info->dtbo_end - info->dtbo_begin;
 	if (!data_size) {
 		pr_err("No dtb 'overlay_base' to attach\n");
 		return;
 	}
 
-	size = fdt_totalsize(info->dtb_begin);
+	size = fdt_totalsize(info->dtbo_begin);
 	if (size != data_size) {
 		pr_err("dtb 'overlay_base' header totalsize != actual size");
 		return;
@@ -2962,7 +2962,7 @@ void __init unittest_unflatten_overlay_base(void)
 		return;
 	}
 
-	memcpy(new_fdt, info->dtb_begin, size);
+	memcpy(new_fdt, info->dtbo_begin, size);
 
 	__unflatten_device_tree(new_fdt, NULL, &overlay_base_root,
 				dt_alloc_memory, true);
@@ -2997,11 +2997,11 @@ static int __init overlay_data_apply(const char *overlay_name, int *overlay_id)
 		return 0;
 	}
 
-	size = info->dtb_end - info->dtb_begin;
+	size = info->dtbo_end - info->dtbo_begin;
 	if (!size)
 		pr_err("no overlay data for %s\n", overlay_name);
 
-	ret = of_overlay_fdt_apply(info->dtb_begin, size, &info->overlay_id);
+	ret = of_overlay_fdt_apply(info->dtbo_begin, size, &info->overlay_id);
 	if (overlay_id)
 		*overlay_id = info->overlay_id;
 	if (ret < 0)
