@@ -33,6 +33,11 @@ struct gna_hw_info {
 struct gna_private {
 	struct gna_driver_private *drv_priv;
 
+	/* list of opened files */
+	struct list_head file_list;
+	/* protects file_list */
+	struct mutex flist_lock;
+
 	struct pci_dev *pdev;
 	/* pdev->dev */
 	struct device *parent;

@@ -119,6 +119,9 @@ static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 	idr_init(&gna_priv->memory_idr);
 	mutex_init(&gna_priv->memidr_lock);
 
+	mutex_init(&gna_priv->flist_lock);
+	INIT_LIST_HEAD(&gna_priv->file_list);
+
 	atomic_set(&gna_priv->request_count, 0);
 
 	mutex_init(&gna_priv->reqlist_lock);
