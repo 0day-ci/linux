@@ -1015,9 +1015,6 @@ static int snd_ctl_elem_info_user(struct snd_ctl_file *ctl,
 
 	if (copy_from_user(&info, _info, sizeof(info)))
 		return -EFAULT;
-	result = snd_power_wait(ctl->card, SNDRV_CTL_POWER_D0);
-	if (result < 0)
-		return result;
 	result = snd_ctl_elem_info(ctl, &info);
 	if (result < 0)
 		return result;
@@ -1060,9 +1057,12 @@ static int snd_ctl_elem_read(struct snd_card *card,
 
 	if (!snd_ctl_skip_validation(&info))
 		fill_remaining_elem_value(control, &info, pattern);
+	ret = snd_power_wait_and_ref(card, true);
+	if (ret < 0)
+		goto out;
 	ret = kctl->get(kctl, control);
 	if (ret < 0)
-		return ret;
+		goto out;
 	if (!snd_ctl_skip_validation(&info) &&
 	    sanity_check_elem_value(card, control, &info, pattern) < 0) {
 		dev_err(card->dev,
@@ -1070,8 +1070,12 @@ static int snd_ctl_elem_read(struct snd_card *card,
 			control->id.iface, control->id.device,
 			control->id.subdevice, control->id.name,
 			control->id.index);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
+
+ out:
+	snd_power_unref(card);
 	return ret;
 }
 
@@ -1084,10 +1088,6 @@ static int snd_ctl_elem_read_user(struct snd_card *card,
 	control = memdup_user(_control, sizeof(*control));
 	if (IS_ERR(control))
 		return PTR_ERR(control);
-
-	result = snd_power_wait(card, SNDRV_CTL_POWER_D0);
-	if (result < 0)
-		goto error;
 
 	down_read(&card->controls_rwsem);
 	result = snd_ctl_elem_read(card, control);
@@ -1122,16 +1122,22 @@ static int snd_ctl_elem_write(struct snd_card *card, struct snd_ctl_file *file,
 	}
 
 	snd_ctl_build_ioff(&control->id, kctl, index_offset);
+
+	result = snd_power_wait_and_ref(card, true);
+	if (result < 0)
+		goto out;
 	result = kctl->put(kctl, control);
 	if (result < 0)
-		return result;
+		goto out;
 
 	if (result > 0) {
 		struct snd_ctl_elem_id id = control->id;
 		snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_VALUE, &id);
 	}
 
-	return 0;
+ out:
+	snd_power_unref(card);
+	return result < 0 ? result : 0;
 }
 
 static int snd_ctl_elem_write_user(struct snd_ctl_file *file,
@@ -1146,10 +1152,6 @@ static int snd_ctl_elem_write_user(struct snd_ctl_file *file,
 		return PTR_ERR(control);
 
 	card = file->card;
-	result = snd_power_wait(card, SNDRV_CTL_POWER_D0);
-	if (result < 0)
-		goto error;
-
 	down_write(&card->controls_rwsem);
 	result = snd_ctl_elem_write(card, file, control);
 	up_write(&card->controls_rwsem);
@@ -1606,7 +1608,7 @@ static int call_tlv_handler(struct snd_ctl_file *file, int op_flag,
 		{SNDRV_CTL_TLV_OP_CMD,   SNDRV_CTL_ELEM_ACCESS_TLV_COMMAND},
 	};
 	struct snd_kcontrol_volatile *vd = &kctl->vd[snd_ctl_get_ioff(kctl, id)];
-	int i;
+	int i, ret;
 
 	/* Check support of the request for this element. */
 	for (i = 0; i < ARRAY_SIZE(pairs); ++i) {
@@ -1624,7 +1626,11 @@ static int call_tlv_handler(struct snd_ctl_file *file, int op_flag,
 	    vd->owner != NULL && vd->owner != file)
 		return -EPERM;
 
-	return kctl->tlv.c(kctl, op_flag, size, buf);
+	ret = snd_power_wait_and_ref(file->card, true);
+	if (!ret)
+		ret = kctl->tlv.c(kctl, op_flag, size, buf);
+	snd_power_unref(file->card);
+	return ret;
 }
 
 static int read_tlv_buf(struct snd_kcontrol *kctl, struct snd_ctl_elem_id *id,
@@ -1709,6 +1715,9 @@ static long snd_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 	card = ctl->card;
 	if (snd_BUG_ON(!card))
 		return -ENXIO;
+	err = snd_power_wait(card, SNDRV_CTL_POWER_D0);
+	if (err < 0)
+		return err;
 	switch (cmd) {
 	case SNDRV_CTL_IOCTL_PVERSION:
 		return put_user(SNDRV_CTL_VERSION, ip) ? -EFAULT : 0;
@@ -1752,11 +1761,7 @@ static long snd_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 	case SNDRV_CTL_IOCTL_POWER:
 		return -ENOPROTOOPT;
 	case SNDRV_CTL_IOCTL_POWER_STATE:
-#ifdef CONFIG_PM
-		return put_user(card->power_state, ip) ? -EFAULT : 0;
-#else
 		return put_user(SNDRV_CTL_POWER_D0, ip) ? -EFAULT : 0;
-#endif
 	}
 	down_read(&snd_ioctl_rwsem);
 	list_for_each_entry(p, &snd_control_ioctls, list) {

@@ -220,6 +220,8 @@ int snd_card_new(struct device *parent, int idx, const char *xid,
 	mutex_init(&card->memory_mutex);
 #ifdef CONFIG_PM
 	init_waitqueue_head(&card->power_sleep);
+	refcount_set(&card->power_ref, 0);
+	init_waitqueue_head(&card->power_ref_sleep);
 #endif
 	init_waitqueue_head(&card->remove_sleep);
 	card->sync_irq = -1;
@@ -1004,21 +1006,27 @@ EXPORT_SYMBOL(snd_card_file_remove);
 
 #ifdef CONFIG_PM
 /**
- *  snd_power_wait - wait until the power-state is changed.
- *  @card: soundcard structure
- *  @power_state: expected power state
+ * snd_power_wait_and_ref - wait until the card gets powered up
+ * @card: soundcard structure
+ * @ref: take power_ref refcount if set
  *
- *  Waits until the power-state is changed.
+ * Waits until the card gets powered up to SNDRV_CTL_POWER_D0 state.
+ * When @ref is set, power_ref refcount is incremented.  The refcount is
+ * down while sleeping, hence it can be used for syncing the floating control
+ * ops accesses.
+ * The caller needs to pull down the refcount via snd_power_unref() later.
  *
- *  Return: Zero if successful, or a negative error code.
+ * Return: Zero if successful, or a negative error code.
  */
-int snd_power_wait(struct snd_card *card, unsigned int power_state)
+int snd_power_wait_and_ref(struct snd_card *card, bool ref)
 {
 	wait_queue_entry_t wait;
 	int result = 0;
 
 	/* fastpath */
-	if (snd_power_get_state(card) == power_state)
+	if (ref)
+		snd_power_ref(card);
+	if (snd_power_get_state(card) == SNDRV_CTL_POWER_D0)
 		return 0;
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&card->power_sleep, &wait);
@@ -1027,13 +1035,34 @@ int snd_power_wait(struct snd_card *card, unsigned int power_state)
 			result = -ENODEV;
 			break;
 		}
-		if (snd_power_get_state(card) == power_state)
+		if (snd_power_get_state(card) == SNDRV_CTL_POWER_D0)
 			break;
+		if (ref)
+			snd_power_unref(card);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(30 * HZ);
+		if (ref)
+			snd_power_ref(card);
 	}
 	remove_wait_queue(&card->power_sleep, &wait);
 	return result;
+}
+EXPORT_SYMBOL_GPL(snd_power_wait_and_ref);
+
+/**
+ * snd_power_wait - wait until the card gets powered up (old form)
+ * @card: soundcard structure
+ * @power_state: expected power state
+ *
+ * Same as snd_power_wait_and_ref() with ref=false.
+ * @power_state must be SNDRV_CTL_POWER_D0.
+ *
+ * Return: Zero if successful, or a negative error code.
+ */
+int snd_power_wait(struct snd_card *card, unsigned int power_state)
+{
+	WARN_ON(power_state != SNDRV_CTL_POWER_D0);
+	return snd_power_wait_and_ref(card, false);
 }
 EXPORT_SYMBOL(snd_power_wait);
 #endif /* CONFIG_PM */

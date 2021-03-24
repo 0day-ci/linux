@@ -991,6 +991,7 @@ static int azx_prepare(struct device *dev)
 
 	chip = card->private_data;
 	chip->pm_prepared = 1;
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 
 	flush_work(&azx_bus(chip)->unsol_work);
 
@@ -1006,6 +1007,7 @@ static void azx_complete(struct device *dev)
 	struct azx *chip;
 
 	chip = card->private_data;
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	chip->pm_prepared = 0;
 }
 
@@ -1832,6 +1834,26 @@ static int azx_create(struct snd_card *card, struct pci_dev *pci,
 	return 0;
 }
 
+static int azx_request_pci_regions(struct azx *chip)
+{
+	struct hdac_bus *bus = azx_bus(chip);
+	struct pci_dev *pci = chip->pci;
+	int err;
+
+	err = pci_request_regions(pci, "ICH HD audio");
+	if (err < 0)
+		return err;
+	chip->region_requested = 1;
+
+	bus->addr = pci_resource_start(pci, 0);
+	bus->remap_addr = pci_ioremap_bar(pci, 0);
+	if (bus->remap_addr == NULL) {
+		dev_err(&pci->dev, "ioremap error\n");
+		return -ENXIO;
+	}
+	return 0;
+}
+
 static int azx_first_init(struct azx *chip)
 {
 	int dev = chip->dev_index;
@@ -1852,17 +1874,9 @@ static int azx_first_init(struct azx *chip)
 	}
 #endif
 
-	err = pci_request_regions(pci, "ICH HD audio");
+	err = azx_request_pci_regions(chip);
 	if (err < 0)
 		return err;
-	chip->region_requested = 1;
-
-	bus->addr = pci_resource_start(pci, 0);
-	bus->remap_addr = pci_ioremap_bar(pci, 0);
-	if (bus->remap_addr == NULL) {
-		dev_err(card->dev, "ioremap error\n");
-		return -ENXIO;
-	}
 
 	if (chip->driver_type == AZX_DRIVER_SKL)
 		snd_hdac_bus_parse_capabilities(bus);
@@ -2380,6 +2394,86 @@ static void azx_shutdown(struct pci_dev *pci)
 		azx_stop_chip(chip);
 }
 
+#ifdef CONFIG_PM
+static bool azx_bar_fixed(struct pci_dev *pdev, int resno)
+{
+	return false;
+}
+
+static void azx_rescan_prepare(struct pci_dev *pdev)
+{
+	struct snd_card *card = pci_get_drvdata(pdev);
+	struct azx *chip = card->private_data;
+	struct hda_intel *hda = container_of(chip, struct hda_intel, chip);
+	struct hdac_bus *bus = azx_bus(chip);
+	struct hda_codec *codec;
+
+	// FIXME: need unlock/lock dance as in azx_remove()?
+	flush_work(&hda->probe_work);
+
+	if (hda->freed || hda->init_failed)
+		return;
+
+	if (chip->running) {
+		pm_runtime_get_sync(&pdev->dev);
+		azx_prepare(&pdev->dev);
+		azx_suspend_streams(chip);
+		wait_event(card->power_ref_sleep,
+			   !refcount_read(&card->power_ref));
+		list_for_each_codec(codec, &chip->bus) {
+			pm_runtime_suspend(hda_codec_dev(codec));
+			pm_runtime_disable(hda_codec_dev(codec));
+		}
+		azx_suspend(&pdev->dev);
+	}
+
+	/* Unmap MMIO and release BAR resource */
+	iounmap(bus->remap_addr);
+	if (chip->region_requested) {
+		pci_release_regions(chip->pci);
+		chip->region_requested = 0;
+	}
+}
+
+static void azx_rescan_done(struct pci_dev *pdev)
+{
+	struct snd_card *card = pci_get_drvdata(pdev);
+	struct azx *chip = card->private_data;
+	struct hda_intel *hda = container_of(chip, struct hda_intel, chip);
+	struct hdac_bus *bus = azx_bus(chip);
+	struct hdac_stream *azx_dev;
+	struct hda_codec *codec;
+	int err;
+
+	if (hda->freed || hda->init_failed)
+		return;
+
+	/* Reassign BAR and remap */
+	err = azx_request_pci_regions(chip);
+	if (err < 0) {
+		dev_err(card->dev, "Rescan failed: disabling the device\n");
+		card->shutdown = 1;
+		hda->init_failed = true;
+		// FIXME: any better handling?
+		return;
+	}
+
+	// FIXME: should be in hdac_stream.c
+	list_for_each_entry(azx_dev, &bus->stream_list, list)
+		azx_dev->sd_addr = bus->remap_addr + (0x20 * azx_dev->index + 0x80);
+
+	if (chip->running) {
+		azx_resume(&pdev->dev);
+		list_for_each_codec(codec, &chip->bus) {
+			pm_runtime_enable(hda_codec_dev(codec));
+			pm_runtime_resume(hda_codec_dev(codec));
+		}
+		azx_complete(&pdev->dev);
+		pm_runtime_put_sync(&pdev->dev);
+	}
+}
+#endif /* CONFIG_PM */
+
 /* PCI IDs */
 static const struct pci_device_id azx_ids[] = {
 	/* CPT */
@@ -2747,6 +2841,11 @@ static struct pci_driver azx_driver = {
 	.driver = {
 		.pm = AZX_PM_OPS,
 	},
+#ifdef CONFIG_PM
+	.rescan_prepare	= azx_rescan_prepare,
+	.rescan_done	= azx_rescan_done,
+	.bar_fixed	= azx_bar_fixed,
+#endif
 };
 
 module_pci_driver(azx_driver);

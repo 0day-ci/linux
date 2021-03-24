@@ -1057,6 +1057,15 @@ void azx_stop_chip(struct azx *chip)
 }
 EXPORT_SYMBOL_GPL(azx_stop_chip);
 
+void azx_suspend_streams(struct azx *chip)
+{
+	struct azx_pcm *apcm;
+
+	list_for_each_entry(apcm, &chip->pcm_list, list)
+		snd_pcm_suspend_all(apcm->pcm);
+}
+EXPORT_SYMBOL_GPL(azx_suspend_streams);
+
 /*
  * interrupt handler
  */

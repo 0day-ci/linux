@@ -129,6 +129,8 @@ struct snd_card {
 #ifdef CONFIG_PM
 	unsigned int power_state;	/* power state */
 	wait_queue_head_t power_sleep;
+	refcount_t power_ref;
+	wait_queue_head_t power_ref_sleep;
 #endif
 
 #if IS_ENABLED(CONFIG_SND_MIXER_OSS)
@@ -142,23 +144,38 @@ struct snd_card {
 #ifdef CONFIG_PM
 static inline unsigned int snd_power_get_state(struct snd_card *card)
 {
-	return card->power_state;
+	return READ_ONCE(card->power_state);
 }
 
 static inline void snd_power_change_state(struct snd_card *card, unsigned int state)
 {
-	card->power_state = state;
+	WRITE_ONCE(card->power_state, state);
 	wake_up(&card->power_sleep);
+}
+
+static inline void snd_power_ref(struct snd_card *card)
+{
+	refcount_inc(&card->power_ref);
+}
+
+static inline void snd_power_unref(struct snd_card *card)
+{
+	if (refcount_dec_and_test(&card->power_ref))
+		wake_up(&card->power_ref_sleep);
 }
 
 /* init.c */
 int snd_power_wait(struct snd_card *card, unsigned int power_state);
+int snd_power_wait_and_ref(struct snd_card *card, bool ref);
 
 #else /* ! CONFIG_PM */
 
 static inline int snd_power_wait(struct snd_card *card, unsigned int state) { return 0; }
 #define snd_power_get_state(card)	({ (void)(card); SNDRV_CTL_POWER_D0; })
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
+#define snd_power_wait_and_ref(card, ref)	do { (void)(card); } while (0)
+#define snd_power_ref(card)		do { (void)(card); } while (0)
+#define snd_power_unref(card)		do { (void)(card); } while (0)
 
 #endif /* CONFIG_PM */
 

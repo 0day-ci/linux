@@ -212,5 +212,6 @@ int azx_probe_codecs(struct azx *chip, unsigned int max_slots);
 int azx_codec_configure(struct azx *chip);
 int azx_init_streams(struct azx *chip);
 void azx_free_streams(struct azx *chip);
+void azx_suspend_streams(struct azx *chip);
 
 #endif /* __SOUND_HDA_CONTROLLER_H */
