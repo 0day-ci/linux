@@ -44,37 +44,35 @@ struct intf_status {
 	u32 line_count;		/* current line count including blanking */
 };
 
-/**
- * struct dpu_hw_intf_ops : Interface to the interface Hw driver functions
+/*
  *  Assumption is these functions will be called after clocks are enabled
- * @ setup_timing_gen : programs the timing engine
- * @ setup_prog_fetch : enables/disables the programmable fetch logic
- * @ enable_timing: enable/disable timing engine
- * @ get_status: returns if timing engine is enabled or not
- * @ get_line_count: reads current vertical line counter
- * @bind_pingpong_blk: enable/disable the connection with pingpong which will
- *                     feed pixels to this interface
  */
-struct dpu_hw_intf_ops {
-	void (*setup_timing_gen)(struct dpu_hw_intf *intf,
-			const struct intf_timing_params *p,
-			const struct dpu_format *fmt);
 
-	void (*setup_prg_fetch)(struct dpu_hw_intf *intf,
-			const struct intf_prog_fetch *fetch);
+/* dpu_hw_intf_setup_timing_engine: programs the timing engine */
+void dpu_hw_intf_setup_timing_engine(struct dpu_hw_intf *intf,
+		const struct intf_timing_params *p,
+		const struct dpu_format *fmt);
 
-	void (*enable_timing)(struct dpu_hw_intf *intf,
-			u8 enable);
+/* dpu_hw_intf_setup_prg_fetch : enables/disables the programmable fetch logic */
+void dpu_hw_intf_setup_prg_fetch(struct dpu_hw_intf *intf,
+		const struct intf_prog_fetch *fetch);
 
-	void (*get_status)(struct dpu_hw_intf *intf,
-			struct intf_status *status);
+/* dpu_hw_intf_enable_timing_engine: enable/disable timing engine */
+void dpu_hw_intf_enable_timing_engine(struct dpu_hw_intf *intf,
+		u8 enable);
 
-	u32 (*get_line_count)(struct dpu_hw_intf *intf);
+/* dpu_hw_intf_get_status: returns if timing engine is enabled or not */
+void dpu_hw_intf_get_status(struct dpu_hw_intf *intf,
+		struct intf_status *status);
 
-	void (*bind_pingpong_blk)(struct dpu_hw_intf *intf,
-			bool enable,
-			const enum dpu_pingpong pp);
-};
+/* dpu_hw_intf_get_line_count: reads current vertical line counter */
+u32 dpu_hw_intf_get_line_count(struct dpu_hw_intf *intf);
+
+/* dpu_hw_intf_bind_pingpong_blk: enable/disable the connection with pingpong
+ * which will feed pixels to this interface */
+void dpu_hw_intf_bind_pingpong_blk(struct dpu_hw_intf *intf,
+		bool enable,
+		const enum dpu_pingpong pp);
 
 struct dpu_hw_intf {
 	struct dpu_hw_blk base;
@@ -84,9 +82,6 @@ struct dpu_hw_intf {
 	enum dpu_intf idx;
 	const struct dpu_intf_cfg *cap;
 	const struct dpu_mdss_cfg *mdss;
-
-	/* ops */
-	struct dpu_hw_intf_ops ops;
 };
 
 /**

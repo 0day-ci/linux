@@ -202,9 +202,6 @@ static void programmable_fetch_config(struct dpu_encoder_phys *phys_enc,
 	u32 vfp_fetch_start_vsync_counter = 0;
 	unsigned long lock_flags;
 
-	if (WARN_ON_ONCE(!phys_enc->hw_intf->ops.setup_prg_fetch))
-		return;
-
 	vfp_fetch_lines = programmable_fetch_get_num_lines(phys_enc, timing);
 	if (vfp_fetch_lines) {
 		vert_total = get_vertical_total(timing);
@@ -220,7 +217,7 @@ static void programmable_fetch_config(struct dpu_encoder_phys *phys_enc,
 		vfp_fetch_lines, vfp_fetch_start_vsync_counter);
 
 	spin_lock_irqsave(phys_enc->enc_spinlock, lock_flags);
-	phys_enc->hw_intf->ops.setup_prg_fetch(phys_enc->hw_intf, &f);
+	dpu_hw_intf_setup_prg_fetch(phys_enc->hw_intf, &f);
 	spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
 }
 
@@ -253,10 +250,6 @@ static void dpu_encoder_phys_vid_setup_timing_engine(
 	}
 
 	mode = phys_enc->cached_mode;
-	if (!phys_enc->hw_intf->ops.setup_timing_gen) {
-		DPU_ERROR("timing engine setup is not supported\n");
-		return;
-	}
 
 	DPU_DEBUG_VIDENC(phys_enc, "enabling mode:\n");
 	drm_mode_debug_printmodeline(&mode);
@@ -287,13 +280,12 @@ static void dpu_encoder_phys_vid_setup_timing_engine(
 		intf_cfg.merge_3d = phys_enc->hw_pp->merge_3d->idx;
 
 	spin_lock_irqsave(phys_enc->enc_spinlock, lock_flags);
-	phys_enc->hw_intf->ops.setup_timing_gen(phys_enc->hw_intf,
+	dpu_hw_intf_setup_timing_engine(phys_enc->hw_intf,
 			&timing_params, fmt);
 	phys_enc->hw_ctl->ops.setup_intf_cfg(phys_enc->hw_ctl, &intf_cfg);
 
 	/* setup which pp blk will connect to this intf */
-	if (phys_enc->hw_intf->ops.bind_pingpong_blk)
-		phys_enc->hw_intf->ops.bind_pingpong_blk(
+	dpu_hw_intf_bind_pingpong_blk(
 				phys_enc->hw_intf,
 				true,
 				phys_enc->hw_pp->idx);
@@ -440,9 +432,6 @@ static void dpu_encoder_phys_vid_enable(struct dpu_encoder_phys *phys_enc)
 
 	DPU_DEBUG_VIDENC(phys_enc, "\n");
 
-	if (WARN_ON(!phys_enc->hw_intf->ops.enable_timing))
-		return;
-
 	dpu_encoder_helper_split_config(phys_enc, phys_enc->hw_intf->idx);
 
 	dpu_encoder_phys_vid_setup_timing_engine(phys_enc);
@@ -560,16 +549,13 @@ static void dpu_encoder_phys_vid_disable(struct dpu_encoder_phys *phys_enc)
 		return;
 	}
 
-	if (WARN_ON(!phys_enc->hw_intf->ops.enable_timing))
-		return;
-
 	if (phys_enc->enable_state == DPU_ENC_DISABLED) {
 		DPU_ERROR("already disabled\n");
 		return;
 	}
 
 	spin_lock_irqsave(phys_enc->enc_spinlock, lock_flags);
-	phys_enc->hw_intf->ops.enable_timing(phys_enc->hw_intf, 0);
+	dpu_hw_intf_enable_timing_engine(phys_enc->hw_intf, 0);
 	if (dpu_encoder_phys_vid_is_master(phys_enc))
 		dpu_encoder_phys_inc_pending(phys_enc);
 	spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
@@ -608,7 +594,7 @@ static void dpu_encoder_phys_vid_handle_post_kickoff(
 		trace_dpu_enc_phys_vid_post_kickoff(DRMID(phys_enc->parent),
 				    phys_enc->hw_intf->idx - INTF_0);
 		spin_lock_irqsave(phys_enc->enc_spinlock, lock_flags);
-		phys_enc->hw_intf->ops.enable_timing(phys_enc->hw_intf, 1);
+		dpu_hw_intf_enable_timing_engine(phys_enc->hw_intf, 1);
 		spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
 		phys_enc->enable_state = DPU_ENC_ENABLED;
 	}
@@ -642,10 +628,10 @@ static int dpu_encoder_phys_vid_get_line_count(
 	if (!dpu_encoder_phys_vid_is_master(phys_enc))
 		return -EINVAL;
 
-	if (!phys_enc->hw_intf || !phys_enc->hw_intf->ops.get_line_count)
+	if (!phys_enc->hw_intf)
 		return -EINVAL;
 
-	return phys_enc->hw_intf->ops.get_line_count(phys_enc->hw_intf);
+	return dpu_hw_intf_get_line_count(phys_enc->hw_intf);
 }
 
 static void dpu_encoder_phys_vid_init_ops(struct dpu_encoder_phys_ops *ops)

@@ -80,7 +80,7 @@ static const struct dpu_intf_cfg *_intf_offset(enum dpu_intf intf,
 	return ERR_PTR(-EINVAL);
 }
 
-static void dpu_hw_intf_setup_timing_engine(struct dpu_hw_intf *ctx,
+void dpu_hw_intf_setup_timing_engine(struct dpu_hw_intf *ctx,
 		const struct intf_timing_params *p,
 		const struct dpu_format *fmt)
 {
@@ -197,7 +197,7 @@ static void dpu_hw_intf_setup_timing_engine(struct dpu_hw_intf *ctx,
 	DPU_REG_WRITE(c, INTF_PANEL_FORMAT, panel_format);
 }
 
-static void dpu_hw_intf_enable_timing_engine(
+void dpu_hw_intf_enable_timing_engine(
 		struct dpu_hw_intf *intf,
 		u8 enable)
 {
@@ -206,7 +206,7 @@ static void dpu_hw_intf_enable_timing_engine(
 	DPU_REG_WRITE(c, INTF_TIMING_ENGINE_EN, enable != 0);
 }
 
-static void dpu_hw_intf_setup_prg_fetch(
+void dpu_hw_intf_setup_prg_fetch(
 		struct dpu_hw_intf *intf,
 		const struct intf_prog_fetch *fetch)
 {
@@ -230,13 +230,16 @@ static void dpu_hw_intf_setup_prg_fetch(
 	DPU_REG_WRITE(c, INTF_CONFIG, fetch_enable);
 }
 
-static void dpu_hw_intf_bind_pingpong_blk(
+void dpu_hw_intf_bind_pingpong_blk(
 		struct dpu_hw_intf *intf,
 		bool enable,
 		const enum dpu_pingpong pp)
 {
 	struct dpu_hw_blk_reg_map *c = &intf->hw;
 	u32 mux_cfg;
+
+	if (!test_bit(DPU_INTF_INPUT_CTRL, &intf->cap->features))
+		return;
 
 	mux_cfg = DPU_REG_READ(c, INTF_MUX);
 	mux_cfg &= ~0xf;
@@ -249,7 +252,7 @@ static void dpu_hw_intf_bind_pingpong_blk(
 	DPU_REG_WRITE(c, INTF_MUX, mux_cfg);
 }
 
-static void dpu_hw_intf_get_status(
+void dpu_hw_intf_get_status(
 		struct dpu_hw_intf *intf,
 		struct intf_status *s)
 {
@@ -265,7 +268,7 @@ static void dpu_hw_intf_get_status(
 	}
 }
 
-static u32 dpu_hw_intf_get_line_count(struct dpu_hw_intf *intf)
+u32 dpu_hw_intf_get_line_count(struct dpu_hw_intf *intf)
 {
 	struct dpu_hw_blk_reg_map *c;
 
@@ -275,18 +278,6 @@ static u32 dpu_hw_intf_get_line_count(struct dpu_hw_intf *intf)
 	c = &intf->hw;
 
 	return DPU_REG_READ(c, INTF_LINE_COUNT);
-}
-
-static void _setup_intf_ops(struct dpu_hw_intf_ops *ops,
-		unsigned long cap)
-{
-	ops->setup_timing_gen = dpu_hw_intf_setup_timing_engine;
-	ops->setup_prg_fetch  = dpu_hw_intf_setup_prg_fetch;
-	ops->get_status = dpu_hw_intf_get_status;
-	ops->enable_timing = dpu_hw_intf_enable_timing_engine;
-	ops->get_line_count = dpu_hw_intf_get_line_count;
-	if (cap & BIT(DPU_INTF_INPUT_CTRL))
-		ops->bind_pingpong_blk = dpu_hw_intf_bind_pingpong_blk;
 }
 
 struct dpu_hw_intf *dpu_hw_intf_init(enum dpu_intf idx,
@@ -313,7 +304,6 @@ struct dpu_hw_intf *dpu_hw_intf_init(enum dpu_intf idx,
 	c->idx = idx;
 	c->cap = cfg;
 	c->mdss = m;
-	_setup_intf_ops(&c->ops, c->cap->features);
 
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_INTF, idx);
 
