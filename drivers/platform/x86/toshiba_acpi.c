@@ -2876,7 +2876,8 @@ err_null_dev:
 	return error;
 }
 
-static int toshiba_acpi_setup_backlight(struct toshiba_acpi_dev *dev)
+static int toshiba_acpi_setup_backlight(struct device *parent,
+					struct toshiba_acpi_dev *dev)
 {
 	struct backlight_properties props;
 	int brightness;
@@ -2924,11 +2925,12 @@ static int toshiba_acpi_setup_backlight(struct toshiba_acpi_dev *dev)
 	if (dev->tr_backlight_supported)
 		props.max_brightness++;
 
-	dev->backlight_dev = backlight_device_register("toshiba",
-						       &dev->acpi_dev->dev,
-						       dev,
-						       &toshiba_backlight_data,
-						       &props);
+	dev->backlight_dev = devm_backlight_device_register(parent,
+							    "toshiba",
+							    &dev->acpi_dev->dev,
+							    dev,
+							    &toshiba_backlight_data,
+							    &props);
 	if (IS_ERR(dev->backlight_dev)) {
 		ret = PTR_ERR(dev->backlight_dev);
 		pr_err("Could not register toshiba backlight device\n");
@@ -2998,8 +3000,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 	if (dev->sysfs_created)
 		sysfs_remove_group(&dev->acpi_dev->dev.kobj,
 				   &toshiba_attr_group);
-
-	backlight_device_unregister(dev->backlight_dev);
 
 	led_classdev_unregister(&dev->led_dev);
 	led_classdev_unregister(&dev->kbd_led);
@@ -3104,9 +3104,9 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 	ret = get_tr_backlight_status(dev, &dummy);
 	dev->tr_backlight_supported = !ret;
 
-	ret = toshiba_acpi_setup_backlight(dev);
+	ret = toshiba_acpi_setup_backlight(parent, dev);
 	if (ret)
-		goto error;
+		return ret;
 
 	toshiba_illumination_available(dev);
 	if (dev->illumination_supported) {
