@@ -23,18 +23,18 @@ static int _dpu_vbif_wait_for_xin_halt(struct dpu_hw_vbif *vbif, u32 xin_id)
 	bool status;
 	int rc;
 
-	if (!vbif || !vbif->cap || !vbif->ops.get_halt_ctrl) {
+	if (!vbif || !vbif->cap) {
 		DPU_ERROR("invalid arguments vbif %d\n", vbif != NULL);
 		return -EINVAL;
 	}
 
 	timeout = ktime_add_us(ktime_get(), vbif->cap->xin_halt_timeout);
 	for (;;) {
-		status = vbif->ops.get_halt_ctrl(vbif, xin_id);
+		status = dpu_hw_vbif_get_halt_ctrl(vbif, xin_id);
 		if (status)
 			break;
 		if (ktime_compare_safe(ktime_get(), timeout) > 0) {
-			status = vbif->ops.get_halt_ctrl(vbif, xin_id);
+			status = dpu_hw_vbif_get_halt_ctrl(vbif, xin_id);
 			break;
 		}
 		usleep_range(501, 1000);
@@ -125,8 +125,8 @@ static u32 _dpu_vbif_get_ot_limit(struct dpu_hw_vbif *vbif,
 	/* Modify the limits if the target and the use case requires it */
 	_dpu_vbif_apply_dynamic_ot_limit(vbif, &ot_lim, params);
 
-	if (vbif && vbif->ops.get_limit_conf) {
-		val = vbif->ops.get_limit_conf(vbif,
+	if (vbif) {
+		val = dpu_hw_vbif_get_limit_conf(vbif,
 				params->xin_id, params->rd);
 		if (val == ot_lim)
 			ot_lim = 0;
@@ -168,13 +168,9 @@ void dpu_vbif_set_ot_limit(struct dpu_kms *dpu_kms,
 		return;
 	}
 
-	if (!vbif->ops.set_limit_conf ||
-	    !vbif->ops.set_halt_ctrl)
-		return;
-
 	/* set write_gather_en for all write clients */
-	if (vbif->ops.set_write_gather_en && !params->rd)
-		vbif->ops.set_write_gather_en(vbif, params->xin_id);
+	if (!params->rd)
+		dpu_hw_vbif_set_write_gather_en(vbif, params->xin_id);
 
 	ot_lim = _dpu_vbif_get_ot_limit(vbif, params) & 0xFF;
 
@@ -186,15 +182,15 @@ void dpu_vbif_set_ot_limit(struct dpu_kms *dpu_kms,
 
 	forced_on = dpu_hw_setup_clk_force_ctrl(mdp, params->clk_ctrl, true);
 
-	vbif->ops.set_limit_conf(vbif, params->xin_id, params->rd, ot_lim);
+	dpu_hw_vbif_set_limit_conf(vbif, params->xin_id, params->rd, ot_lim);
 
-	vbif->ops.set_halt_ctrl(vbif, params->xin_id, true);
+	dpu_hw_vbif_set_halt_ctrl(vbif, params->xin_id, true);
 
 	ret = _dpu_vbif_wait_for_xin_halt(vbif, params->xin_id);
 	if (ret)
 		trace_dpu_vbif_wait_xin_halt_fail(vbif->idx, params->xin_id);
 
-	vbif->ops.set_halt_ctrl(vbif, params->xin_id, false);
+	dpu_hw_vbif_set_halt_ctrl(vbif, params->xin_id, false);
 
 	if (forced_on)
 		dpu_hw_setup_clk_force_ctrl(mdp, params->clk_ctrl, false);
@@ -228,11 +224,6 @@ void dpu_vbif_set_qos_remap(struct dpu_kms *dpu_kms,
 		return;
 	}
 
-	if (!vbif->ops.set_qos_remap) {
-		DPU_DEBUG("qos remap not supported\n");
-		return;
-	}
-
 	qos_tbl = params->is_rt ? &vbif->cap->qos_rt_tbl :
 			&vbif->cap->qos_nrt_tbl;
 
@@ -247,7 +238,7 @@ void dpu_vbif_set_qos_remap(struct dpu_kms *dpu_kms,
 		DPU_DEBUG("vbif:%d xin:%d lvl:%d/%d\n",
 				params->vbif_idx, params->xin_id, i,
 				qos_tbl->priority_lvl[i]);
-		vbif->ops.set_qos_remap(vbif, params->xin_id, i,
+		dpu_hw_vbif_set_qos_remap(vbif, params->xin_id, i,
 				qos_tbl->priority_lvl[i]);
 	}
 
@@ -262,8 +253,8 @@ void dpu_vbif_clear_errors(struct dpu_kms *dpu_kms)
 
 	for (i = 0; i < ARRAY_SIZE(dpu_kms->hw_vbif); i++) {
 		vbif = dpu_kms->hw_vbif[i];
-		if (vbif && vbif->ops.clear_errors) {
-			vbif->ops.clear_errors(vbif, &pnd, &src);
+		if (vbif) {
+			dpu_hw_vbif_clear_errors(vbif, &pnd, &src);
 			if (pnd || src) {
 				DRM_DEBUG_KMS("VBIF %d: pnd 0x%X, src 0x%X\n",
 					      vbif->idx - VBIF_0, pnd, src);
@@ -279,9 +270,9 @@ void dpu_vbif_init_memtypes(struct dpu_kms *dpu_kms)
 
 	for (i = 0; i < ARRAY_SIZE(dpu_kms->hw_vbif); i++) {
 		vbif = dpu_kms->hw_vbif[i];
-		if (vbif && vbif->cap && vbif->ops.set_mem_type) {
+		if (vbif && vbif->cap) {
 			for (j = 0; j < vbif->cap->memtype_count; j++)
-				vbif->ops.set_mem_type(
+				dpu_hw_vbif_set_mem_type(
 						vbif, j, vbif->cap->memtype[j]);
 		}
 	}

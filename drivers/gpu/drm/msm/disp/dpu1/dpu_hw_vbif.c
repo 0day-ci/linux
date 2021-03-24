@@ -32,7 +32,7 @@
 #define VBIF_XINL_QOS_RP_REMAP_000	0x0550
 #define VBIF_XINL_QOS_LVL_REMAP_000(v)	(v < DPU_HW_VER_400 ? 0x570 : 0x0590)
 
-static void dpu_hw_clear_errors(struct dpu_hw_vbif *vbif,
+void dpu_hw_vbif_clear_errors(struct dpu_hw_vbif *vbif,
 		u32 *pnd_errors, u32 *src_errors)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -52,7 +52,7 @@ static void dpu_hw_clear_errors(struct dpu_hw_vbif *vbif,
 	DPU_REG_WRITE(c, VBIF_XIN_CLR_ERR, pnd | src);
 }
 
-static void dpu_hw_set_mem_type(struct dpu_hw_vbif *vbif,
+void dpu_hw_vbif_set_mem_type(struct dpu_hw_vbif *vbif,
 		u32 xin_id, u32 value)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -82,7 +82,7 @@ static void dpu_hw_set_mem_type(struct dpu_hw_vbif *vbif,
 	DPU_REG_WRITE(c, reg_off, reg_val);
 }
 
-static void dpu_hw_set_limit_conf(struct dpu_hw_vbif *vbif,
+void dpu_hw_vbif_set_limit_conf(struct dpu_hw_vbif *vbif,
 		u32 xin_id, bool rd, u32 limit)
 {
 	struct dpu_hw_blk_reg_map *c = &vbif->hw;
@@ -103,7 +103,7 @@ static void dpu_hw_set_limit_conf(struct dpu_hw_vbif *vbif,
 	DPU_REG_WRITE(c, reg_off, reg_val);
 }
 
-static u32 dpu_hw_get_limit_conf(struct dpu_hw_vbif *vbif,
+u32 dpu_hw_vbif_get_limit_conf(struct dpu_hw_vbif *vbif,
 		u32 xin_id, bool rd)
 {
 	struct dpu_hw_blk_reg_map *c = &vbif->hw;
@@ -125,7 +125,7 @@ static u32 dpu_hw_get_limit_conf(struct dpu_hw_vbif *vbif,
 	return limit;
 }
 
-static void dpu_hw_set_halt_ctrl(struct dpu_hw_vbif *vbif,
+void dpu_hw_vbif_set_halt_ctrl(struct dpu_hw_vbif *vbif,
 		u32 xin_id, bool enable)
 {
 	struct dpu_hw_blk_reg_map *c = &vbif->hw;
@@ -141,7 +141,7 @@ static void dpu_hw_set_halt_ctrl(struct dpu_hw_vbif *vbif,
 	DPU_REG_WRITE(c, VBIF_XIN_HALT_CTRL0, reg_val);
 }
 
-static bool dpu_hw_get_halt_ctrl(struct dpu_hw_vbif *vbif,
+bool dpu_hw_vbif_get_halt_ctrl(struct dpu_hw_vbif *vbif,
 		u32 xin_id)
 {
 	struct dpu_hw_blk_reg_map *c = &vbif->hw;
@@ -152,7 +152,7 @@ static bool dpu_hw_get_halt_ctrl(struct dpu_hw_vbif *vbif,
 	return (reg_val & BIT(xin_id)) ? true : false;
 }
 
-static void dpu_hw_set_qos_remap(struct dpu_hw_vbif *vbif,
+void dpu_hw_vbif_set_qos_remap(struct dpu_hw_vbif *vbif,
 		u32 xin_id, u32 level, u32 remap_level)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -182,7 +182,7 @@ static void dpu_hw_set_qos_remap(struct dpu_hw_vbif *vbif,
 	DPU_REG_WRITE(c, reg_lvl + reg_high, reg_val_lvl);
 }
 
-static void dpu_hw_set_write_gather_en(struct dpu_hw_vbif *vbif, u32 xin_id)
+void dpu_hw_vbif_set_write_gather_en(struct dpu_hw_vbif *vbif, u32 xin_id)
 {
 	struct dpu_hw_blk_reg_map *c;
 	u32 reg_val;
@@ -195,19 +195,6 @@ static void dpu_hw_set_write_gather_en(struct dpu_hw_vbif *vbif, u32 xin_id)
 	reg_val = DPU_REG_READ(c, VBIF_WRITE_GATHER_EN);
 	reg_val |= BIT(xin_id);
 	DPU_REG_WRITE(c, VBIF_WRITE_GATHER_EN, reg_val);
-}
-
-static void _setup_vbif_ops(struct dpu_hw_vbif_ops *ops,
-		unsigned long cap)
-{
-	ops->set_limit_conf = dpu_hw_set_limit_conf;
-	ops->get_limit_conf = dpu_hw_get_limit_conf;
-	ops->set_halt_ctrl = dpu_hw_set_halt_ctrl;
-	ops->get_halt_ctrl = dpu_hw_get_halt_ctrl;
-	ops->set_qos_remap = dpu_hw_set_qos_remap;
-	ops->set_mem_type = dpu_hw_set_mem_type;
-	ops->clear_errors = dpu_hw_clear_errors;
-	ops->set_write_gather_en = dpu_hw_set_write_gather_en;
 }
 
 static const struct dpu_vbif_cfg *_top_offset(enum dpu_vbif vbif,
@@ -253,7 +240,6 @@ struct dpu_hw_vbif *dpu_hw_vbif_init(enum dpu_vbif idx,
 	 */
 	c->idx = idx;
 	c->cap = cfg;
-	_setup_vbif_ops(&c->ops, c->cap->features);
 
 	/* no need to register sub-range in dpu dbg, dump entire vbif io base */
 
