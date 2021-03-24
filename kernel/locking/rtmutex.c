@@ -1504,7 +1504,7 @@ int __sched rt_mutex_trylock(struct rt_mutex *lock)
 {
 	int ret;
 
-	if (IS_ENABLED(CONFIG_RT_MUTEX_DEBUG) && WARN_ON_ONCE(!in_task()))
+	if (IS_ENABLED(CONFIG_DEBUG_RT_MUTEXES) && WARN_ON_ONCE(!in_task()))
 		return 0;
 
 	ret = rt_mutex_fasttrylock(lock, rt_mutex_slowtrylock);
