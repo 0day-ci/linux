@@ -16,6 +16,7 @@ struct gna_driver_private gna_drv_priv;
 
 static struct pci_driver gna_driver = {
 	.name = GNA_DV_NAME,
+	.id_table = gna_pci_ids,
 	.probe = gna_probe,
 	.remove = gna_remove,
 };

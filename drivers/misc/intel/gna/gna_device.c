@@ -7,7 +7,83 @@
 #include "gna_device.h"
 #include "gna_driver.h"
 
+#define GNA_DEV_HWID_CNL	0x5A11
+#define GNA_DEV_HWID_EHL	0x4511
+#define GNA_DEV_HWID_GLK	0x3190
+#define GNA_DEV_HWID_ICL	0x8A11
+#define GNA_DEV_HWID_JSL	0x4E11
+#define GNA_DEV_HWID_TGL	0x9A11
+
 #define GNA_BAR0		0
+
+#define GNA_FEATURES \
+	.max_hw_mem = 256 * 1024 * 1024, \
+	.num_pagetables = 64, \
+	.num_page_entries = PAGE_SIZE / sizeof(u32), \
+	/* desc_info all in bytes */ \
+	.desc_info = { \
+		.rsvd_size = 256, \
+		.cfg_size = 256, \
+		.desc_size = 784, \
+		.mmu_info = { \
+			.vamax_size = 4, \
+			.rsvd_size = 12, \
+			.pd_size = 4 * 64, \
+		}, \
+	}
+
+#define GNA_GEN1_FEATURES \
+	GNA_FEATURES, \
+	.max_layer_count = 1024
+
+#define GNA_GEN2_FEATURES \
+	GNA_FEATURES, \
+	.max_layer_count = 4096
+
+static const struct gna_drv_info cnl_drv_info = {
+	.hwid = GNA_DEV_HWID_CNL,
+	GNA_GEN1_FEATURES
+};
+
+static const struct gna_drv_info glk_drv_info = {
+	.hwid = GNA_DEV_HWID_GLK,
+	GNA_GEN1_FEATURES
+};
+
+static const struct gna_drv_info ehl_drv_info = {
+	.hwid = GNA_DEV_HWID_EHL,
+	GNA_GEN1_FEATURES
+};
+
+static const struct gna_drv_info icl_drv_info = {
+	.hwid = GNA_DEV_HWID_ICL,
+	GNA_GEN1_FEATURES
+};
+
+static const struct gna_drv_info jsl_drv_info = {
+	.hwid = GNA_DEV_HWID_JSL,
+	GNA_GEN2_FEATURES
+};
+
+static const struct gna_drv_info tgl_drv_info = {
+	.hwid = GNA_DEV_HWID_TGL,
+	GNA_GEN2_FEATURES
+};
+
+#define INTEL_GNA_DEVICE(hwid, info) \
+	{ PCI_VDEVICE(INTEL, hwid), (kernel_ulong_t)(info) }
+
+const struct pci_device_id gna_pci_ids[] = {
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_CNL, &cnl_drv_info),
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_EHL, &ehl_drv_info),
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_GLK, &glk_drv_info),
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_ICL, &icl_drv_info),
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_JSL, &jsl_drv_info),
+	INTEL_GNA_DEVICE(GNA_DEV_HWID_TGL, &tgl_drv_info),
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, gna_pci_ids);
 
 static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 			const struct pci_device_id *pci_id)

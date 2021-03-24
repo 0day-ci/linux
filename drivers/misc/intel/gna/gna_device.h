@@ -7,13 +7,12 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/idr.h>
+#include <linux/pci.h>
 
 #include "gna_hw.h"
 #include "gna_mem.h"
 
 struct gna_driver_private;
-struct pci_device_id;
-struct pci_dev;
 struct device;
 
 struct gna_drv_info {
@@ -50,6 +49,8 @@ struct gna_private {
 	/* lock protecting memory_idr */
 	struct mutex memidr_lock;
 };
+
+extern const struct pci_device_id gna_pci_ids[];
 
 int gna_probe(struct pci_dev *dev, const struct pci_device_id *id);
 
