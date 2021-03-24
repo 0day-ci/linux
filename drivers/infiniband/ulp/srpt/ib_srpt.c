@@ -2342,7 +2342,7 @@ static int srpt_cm_req_recv(struct srpt_device *const sdev,
 
 	if (IS_ERR_OR_NULL(ch->sess)) {
 		WARN_ON_ONCE(ch->sess == NULL);
-		ret = PTR_ERR(ch->sess);
+		ret = PTR_ERR_OR_ZERO(ch->sess);
 		ch->sess = NULL;
 		pr_info("Rejected login for initiator %s: ret = %d.\n",
 			ch->sess_name, ret);
