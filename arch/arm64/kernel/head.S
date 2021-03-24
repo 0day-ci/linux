@@ -393,6 +393,28 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 	ret	x28
 SYM_FUNC_END(__create_page_tables)
 
+	/*
+	 * The boot task becomes the idle task for the primary CPU. The
+	 * CPU startup task on each secondary CPU becomes the idle task
+	 * for the secondary CPU.
+	 *
+	 * The idle task does not require pt_regs. But create a dummy
+	 * pt_regs so that task_pt_regs(idle_task)->stackframe can be
+	 * set up to be the last frame on the idle task stack just like
+	 * all the other kernel tasks. This helps the unwinder to
+	 * terminate the stack trace at a well-known stack offset.
+	 *
+	 * Also, set up the last return PC to be ret_from_fork() just
+	 * like all the other kernel tasks so that the stack trace of
+	 * all kernel tasks ends with the same function.
+	 */
+	.macro setup_last_frame
+	sub	sp, sp, #PT_REGS_SIZE
+	stp	xzr, xzr, [sp, #S_STACKFRAME]
+	add	x29, sp, #S_STACKFRAME
+	ldr	x30, =ret_from_fork
+	.endm
+
 /*
  * The following fragment of code is executed with the MMU enabled.
  *
@@ -447,8 +469,7 @@ SYM_FUNC_START_LOCAL(__primary_switched)
 #endif
 	bl	switch_to_vhe			// Prefer VHE if possible
 	add	sp, sp, #16
-	mov	x29, #0
-	mov	x30, #0
+	setup_last_frame
 	b	start_kernel
 SYM_FUNC_END(__primary_switched)
 
@@ -606,8 +627,7 @@ SYM_FUNC_START_LOCAL(__secondary_switched)
 	cbz	x2, __secondary_too_slow
 	msr	sp_el0, x2
 	scs_load x2, x3
-	mov	x29, #0
-	mov	x30, #0
+	setup_last_frame
 
 #ifdef CONFIG_ARM64_PTR_AUTH
 	ptrauth_keys_init_cpu x2, x3, x4, x5
