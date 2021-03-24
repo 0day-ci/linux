@@ -100,7 +100,7 @@ enum {
 
 struct mv3310_priv {
 	u32 firmware_ver;
-	bool rate_match;
+	u8 mactype;
 
 	struct device *hwmon_dev;
 	char *hwmon_name;
@@ -486,8 +486,7 @@ static int mv3310_config_init(struct phy_device *phydev)
 	val = phy_read_mmd(phydev, MDIO_MMD_VEND2, MV_V2_PORT_CTRL);
 	if (val < 0)
 		return val;
-	priv->rate_match = ((val & MV_V2_PORT_CTRL_MACTYPE_MASK) ==
-			MV_V2_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH);
+	priv->mactype = val & MV_V2_PORT_CTRL_MACTYPE_MASK;
 
 	/* Enable EDPD mode - saving 600mW */
 	return mv3310_set_edpd(phydev, ETHTOOL_PHY_EDPD_DFLT_TX_MSECS);
@@ -601,7 +600,7 @@ static void mv3310_update_interface(struct phy_device *phydev)
 	 * 10Gb. The PHY adapts the rate to actual wire speed with help of
 	 * internal 16KB buffer.
 	 */
-	if (priv->rate_match) {
+	if (priv->mactype == MV_V2_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH) {
 		phydev->interface = PHY_INTERFACE_MODE_10GBASER;
 		return;
 	}
