@@ -9,10 +9,11 @@
 
 #define GNA_BAR0		0
 
-static void gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
+static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 			const struct pci_device_id *pci_id)
 {
 	u32 bld_reg;
+	int ret;
 
 	pci_set_drvdata(pcidev, gna_priv);
 
@@ -24,10 +25,29 @@ static void gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 	bld_reg = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_IBUFFS);
 	gna_priv->hw_info.in_buf_s = bld_reg & GENMASK(7, 0);
 
+	if (gna_mmu_alloc(gna_priv)) {
+		dev_err(&pcidev->dev, "mmu allocation failed\n");
+		ret = -EFAULT;
+		goto err_pci_drvdata_unset;
+
+	}
+	dev_dbg(&pcidev->dev, "maximum memory size %llu num pd %d\n",
+		gna_priv->info.max_hw_mem, gna_priv->info.num_pagetables);
+	dev_dbg(&pcidev->dev, "desc rsvd size %d mmu vamax size %d\n",
+		gna_priv->info.desc_info.rsvd_size,
+		gna_priv->info.desc_info.mmu_info.vamax_size);
+
 	mutex_init(&gna_priv->mmu_lock);
 
 	idr_init(&gna_priv->memory_idr);
 	mutex_init(&gna_priv->memidr_lock);
+
+	return 0;
+
+err_pci_drvdata_unset:
+	pci_set_drvdata(pcidev, NULL);
+
+	return ret;
 }
 
 static void gna_dev_deinit(struct gna_private *gna_priv)
@@ -84,7 +104,12 @@ int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)
 
 	pci_set_master(pcidev);
 
-	gna_dev_init(gna_priv, pcidev, pci_id);
+	ret = gna_dev_init(gna_priv, pcidev, pci_id);
+	if (ret) {
+		dev_err(&pcidev->dev, "could not initialize %s device\n", GNA_DV_NAME);
+		return ret;
+	}
+
 
 	return 0;
 }
