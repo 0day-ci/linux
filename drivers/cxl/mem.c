@@ -1204,12 +1204,14 @@ static int cxl_mem_add_memdev(struct cxl_mem *cxlm)
 	dev->bus = &cxl_bus_type;
 	dev->devt = MKDEV(cxl_mem_major, cxlmd->id);
 	dev->type = &cxl_memdev_type;
-	dev_set_name(dev, "mem%d", cxlmd->id);
 
 	cdev = &cxlmd->cdev;
 	cdev_init(cdev, &cxl_memdev_fops);
 
-	rc = cdev_device_add(cdev, dev);
+	rc = dev_set_name(dev, "mem%d", cxlmd->id);
+	if (rc == 0)
+		rc = cdev_device_add(cdev, dev);
+
 	if (rc) {
 		percpu_ref_kill(&cxlmd->ops_active);
 		put_device(dev);
