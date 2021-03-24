@@ -35,7 +35,7 @@ static const struct dpu_merge_3d_cfg *_merge_3d_offset(enum dpu_merge_3d idx,
 	return ERR_PTR(-EINVAL);
 }
 
-static void dpu_hw_merge_3d_setup_3d_mode(struct dpu_hw_merge_3d *merge_3d,
+void dpu_hw_merge_3d_setup_3d_mode(struct dpu_hw_merge_3d *merge_3d,
 			enum dpu_3d_blend_mode mode_3d)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -51,12 +51,6 @@ static void dpu_hw_merge_3d_setup_3d_mode(struct dpu_hw_merge_3d *merge_3d,
 		DPU_REG_WRITE(c, MERGE_3D_MODE, data);
 	}
 }
-
-static void _setup_merge_3d_ops(struct dpu_hw_merge_3d *c,
-				unsigned long features)
-{
-	c->ops.setup_3d_mode = dpu_hw_merge_3d_setup_3d_mode;
-};
 
 struct dpu_hw_merge_3d *dpu_hw_merge_3d_init(enum dpu_merge_3d idx,
 		void __iomem *addr,
@@ -77,7 +71,6 @@ struct dpu_hw_merge_3d *dpu_hw_merge_3d_init(enum dpu_merge_3d idx,
 
 	c->idx = idx;
 	c->caps = cfg;
-	_setup_merge_3d_ops(c, c->caps->features);
 
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_MERGE_3D, idx);
 

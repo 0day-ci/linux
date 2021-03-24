@@ -299,7 +299,7 @@ static void dpu_encoder_phys_vid_setup_timing_engine(
 				phys_enc->hw_pp->idx);
 
 	if (phys_enc->hw_pp->merge_3d)
-		phys_enc->hw_pp->merge_3d->ops.setup_3d_mode(phys_enc->hw_pp->merge_3d, intf_cfg.mode_3d);
+		dpu_hw_merge_3d_setup_3d_mode(phys_enc->hw_pp->merge_3d, intf_cfg.mode_3d);
 
 	spin_unlock_irqrestore(phys_enc->enc_spinlock, lock_flags);
 
