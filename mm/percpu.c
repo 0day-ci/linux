@@ -179,6 +179,12 @@ static LIST_HEAD(pcpu_map_extend_chunks);
 int pcpu_nr_empty_pop_pages;
 
 /*
+ * Track the number of chunks with a lot of free memory.
+ * It's used to release unused pages to the system.
+ */
+static int pcpu_nr_chunks_to_depopulate;
+
+/*
  * The number of populated pages in use by the allocator, protected by
  * pcpu_lock.  This number is kept per a unit per chunk (i.e. when a page gets
  * allocated/deallocated, it is allocated/deallocated in all units of a chunk
@@ -1955,6 +1961,11 @@ static void pcpu_balance_free(enum pcpu_chunk_type type)
 		if (chunk == list_first_entry(free_head, struct pcpu_chunk, list))
 			continue;
 
+		if (chunk->depopulate) {
+			chunk->depopulate = false;
+			pcpu_nr_chunks_to_depopulate--;
+		}
+
 		list_move(&chunk->list, &to_free);
 	}
 
@@ -1976,7 +1987,7 @@ static void pcpu_balance_free(enum pcpu_chunk_type type)
 }
 
 /**
- * pcpu_balance_populated - manage the amount of populated pages
+ * pcpu_grow_populated - populate chunk(s) to satisfy atomic allocations
  * @type: chunk type
  *
  * Maintain a certain amount of populated pages to satisfy atomic allocations.
@@ -1985,35 +1996,15 @@ static void pcpu_balance_free(enum pcpu_chunk_type type)
  * allocation causes the failure as it is possible that requests can be
  * serviced from already backed regions.
  */
-static void pcpu_balance_populated(enum pcpu_chunk_type type)
+static void pcpu_grow_populated(enum pcpu_chunk_type type, int nr_to_pop)
 {
 	/* gfp flags passed to underlying allocators */
 	const gfp_t gfp = GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN;
 	struct list_head *pcpu_slot = pcpu_chunk_list(type);
 	struct pcpu_chunk *chunk;
-	int slot, nr_to_pop, ret;
+	int slot, ret;
 
-	/*
-	 * Ensure there are certain number of free populated pages for
-	 * atomic allocs.  Fill up from the most packed so that atomic
-	 * allocs don't increase fragmentation.  If atomic allocation
-	 * failed previously, always populate the maximum amount.  This
-	 * should prevent atomic allocs larger than PAGE_SIZE from keeping
-	 * failing indefinitely; however, large atomic allocs are not
-	 * something we support properly and can be highly unreliable and
-	 * inefficient.
-	 */
 retry_pop:
-	if (pcpu_atomic_alloc_failed) {
-		nr_to_pop = PCPU_EMPTY_POP_PAGES_HIGH;
-		/* best effort anyway, don't worry about synchronization */
-		pcpu_atomic_alloc_failed = false;
-	} else {
-		nr_to_pop = clamp(PCPU_EMPTY_POP_PAGES_HIGH -
-				  pcpu_nr_empty_pop_pages,
-				  0, PCPU_EMPTY_POP_PAGES_HIGH);
-	}
-
 	for (slot = pcpu_size_to_slot(PAGE_SIZE); slot < pcpu_nr_slots; slot++) {
 		unsigned int nr_unpop = 0, rs, re;
 
@@ -2084,8 +2075,17 @@ restart:
 		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
 			bool isolated = false;
 
-			if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH)
+			if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH ||
+			    pcpu_nr_chunks_to_depopulate < 1)
 				break;
+
+			/*
+			 * Don't try to depopulate a chunk again and again.
+			 */
+			if (!chunk->depopulate)
+				continue;
+			chunk->depopulate = false;
+			pcpu_nr_chunks_to_depopulate--;
 
 			for (i = 0, start = -1; i < chunk->nr_pages; i++) {
 				if (!chunk->nr_empty_pop_pages)
@@ -2154,6 +2154,41 @@ restart:
 }
 
 /**
+ * pcpu_balance_populated - manage the amount of populated pages
+ * @type: chunk type
+ *
+ * Populate or depopulate chunks to maintain a certain amount
+ * of free pages to satisfy atomic allocations, but not waste
+ * large amounts of memory.
+ */
+static void pcpu_balance_populated(enum pcpu_chunk_type type)
+{
+	int nr_to_pop;
+
+	/*
+	 * Ensure there are certain number of free populated pages for
+	 * atomic allocs.  Fill up from the most packed so that atomic
+	 * allocs don't increase fragmentation.  If atomic allocation
+	 * failed previously, always populate the maximum amount.  This
+	 * should prevent atomic allocs larger than PAGE_SIZE from keeping
+	 * failing indefinitely; however, large atomic allocs are not
+	 * something we support properly and can be highly unreliable and
+	 * inefficient.
+	 */
+	if (pcpu_atomic_alloc_failed) {
+		nr_to_pop = PCPU_EMPTY_POP_PAGES_HIGH;
+		/* best effort anyway, don't worry about synchronization */
+		pcpu_atomic_alloc_failed = false;
+		pcpu_grow_populated(type, nr_to_pop);
+	} else if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH) {
+		nr_to_pop = PCPU_EMPTY_POP_PAGES_HIGH - pcpu_nr_empty_pop_pages;
+		pcpu_grow_populated(type, nr_to_pop);
+	} else if (pcpu_nr_chunks_to_depopulate > 0) {
+		pcpu_shrink_populated(type);
+	}
+}
+
+/**
  * pcpu_balance_workfn - manage the amount of free chunks and populated pages
  * @work: unused
  *
@@ -2188,6 +2223,7 @@ void free_percpu(void __percpu *ptr)
 	int size, off;
 	bool need_balance = false;
 	struct list_head *pcpu_slot;
+	struct pcpu_chunk *pos;
 
 	if (!ptr)
 		return;
@@ -2207,15 +2243,36 @@ void free_percpu(void __percpu *ptr)
 
 	pcpu_memcg_free_hook(chunk, off, size);
 
-	/* if there are more than one fully free chunks, wake up grim reaper */
 	if (chunk->free_bytes == pcpu_unit_size) {
-		struct pcpu_chunk *pos;
-
+		/*
+		 * If there are more than one fully free chunks,
+		 * wake up grim reaper.
+		 */
 		list_for_each_entry(pos, &pcpu_slot[pcpu_nr_slots - 1], list)
 			if (pos != chunk) {
 				need_balance = true;
 				break;
 			}
+
+	} else if (chunk->nr_empty_pop_pages > chunk->nr_pages / 4) {
+		/*
+		 * If there is more than one chunk in the slot and
+		 * at least 1/4 of its pages are empty, mark the chunk
+		 * as a target for the depopulation. If there is more
+		 * than one chunk like this, schedule an async balancing.
+		 */
+		int nslot = pcpu_chunk_slot(chunk);
+
+		list_for_each_entry(pos, &pcpu_slot[nslot], list)
+			if (pos != chunk && !chunk->depopulate &&
+			    !chunk->immutable) {
+				chunk->depopulate = true;
+				pcpu_nr_chunks_to_depopulate++;
+				break;
+			}
+
+		if (pcpu_nr_chunks_to_depopulate > 1)
+			need_balance = true;
 	}
 
 	trace_percpu_free_percpu(chunk->base_addr, off, ptr);

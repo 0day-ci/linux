@@ -67,6 +67,7 @@ struct pcpu_chunk {
 
 	void			*data;		/* chunk data */
 	bool			immutable;	/* no [de]population allowed */
+	bool			depopulate;	/* depopulation hint */
 	int			start_offset;	/* the overlap with the previous
 						   region to have a page aligned
 						   base_addr */
