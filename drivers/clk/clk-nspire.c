@@ -27,7 +27,7 @@
 #define CX_BASE_SHIFT		15
 #define CX_BASE_MASK		0x3F
 
-#define CX_UNKNOWN_SHIFT	21
+#define CX_UNKNOWN_SHIFT	30
 #define CX_UNKNOWN_MASK		0x03
 
 struct nspire_clk_info {
@@ -40,13 +40,17 @@ struct nspire_clk_info {
 #define EXTRACT(var, prop) (((var)>>prop##_SHIFT) & prop##_MASK)
 static void nspire_clkinfo_cx(u32 val, struct nspire_clk_info *clk)
 {
-	if (EXTRACT(val, FIXED_BASE))
+	if (EXTRACT(val, FIXED_BASE)) {
 		clk->base_clock = 48 * MHZ;
-	else
+		clk->base_cpu_ratio = 1 << EXTRACT(val, CX_UNKNOWN);
+		clk->base_ahb_ratio = clk->base_cpu_ratio * 2;
+	} else {
 		clk->base_clock = 6 * EXTRACT(val, CX_BASE) * MHZ;
-
-	clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * EXTRACT(val, CX_UNKNOWN);
-	clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
+		clk->base_cpu_ratio = 2;
+		if (EXTRACT(val, BASE_CPU))
+			clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * 2;
+		clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
+	}
 }
 
 static void nspire_clkinfo_classic(u32 val, struct nspire_clk_info *clk)
