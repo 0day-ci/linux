@@ -5,8 +5,11 @@
 #define __GNA_DEVICE_H__
 
 #include <linux/types.h>
+#include <linux/mutex.h>
+#include <linux/idr.h>
 
 #include "gna_hw.h"
+#include "gna_mem.h"
 
 struct gna_driver_private;
 struct pci_device_id;
@@ -38,8 +41,18 @@ struct gna_private {
 	void __iomem *bar0_base;
 	struct gna_drv_info info;
 	struct gna_hw_info hw_info;
+
+	struct gna_mmu_object mmu;
+	struct mutex mmu_lock;
+
+	/* memory objects' store */
+	struct idr memory_idr;
+	/* lock protecting memory_idr */
+	struct mutex memidr_lock;
 };
 
 int gna_probe(struct pci_dev *dev, const struct pci_device_id *id);
+
+void gna_remove(struct pci_dev *dev);
 
 #endif /* __GNA_DEVICE_H__ */

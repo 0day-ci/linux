@@ -23,6 +23,17 @@ static void gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 
 	bld_reg = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_IBUFFS);
 	gna_priv->hw_info.in_buf_s = bld_reg & GENMASK(7, 0);
+
+	mutex_init(&gna_priv->mmu_lock);
+
+	idr_init(&gna_priv->memory_idr);
+	mutex_init(&gna_priv->memidr_lock);
+}
+
+static void gna_dev_deinit(struct gna_private *gna_priv)
+{
+	idr_destroy(&gna_priv->memory_idr);
+	gna_mmu_free(gna_priv);
 }
 
 int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)
@@ -76,4 +87,13 @@ int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)
 	gna_dev_init(gna_priv, pcidev, pci_id);
 
 	return 0;
+}
+
+void gna_remove(struct pci_dev *pcidev)
+{
+	struct gna_private *gna_priv;
+
+	gna_priv = pci_get_drvdata(pcidev);
+
+	gna_dev_deinit(gna_priv);
 }

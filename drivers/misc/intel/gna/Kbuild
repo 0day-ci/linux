@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-intel_gna-y := gna_device.o gna_driver.o gna_hw.o
+intel_gna-y := gna_device.o gna_driver.o gna_mem.o gna_hw.o
 
 obj-$(CONFIG_INTEL_GNA) += intel_gna.o
