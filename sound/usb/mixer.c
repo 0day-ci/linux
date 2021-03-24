@@ -3631,10 +3631,27 @@ static int restore_mixer_value(struct usb_mixer_elem_list *list)
 	return 0;
 }
 
+static int resume_connector(struct usb_mixer_elem_list *list)
+{
+	struct usb_mixer_elem_info *cval = mixer_elem_list_to_info(list);
+
+	if (cval->val_type != USB_MIXER_BOOLEAN || cval->channels != 1)
+		return 0;
+
+	return get_connector_value(cval, NULL, NULL);
+}
+
 int snd_usb_mixer_resume(struct usb_mixer_interface *mixer, bool reset_resume)
 {
 	struct usb_mixer_elem_list *list;
 	int id, err;
+
+	for (id = 0; id < MAX_ID_ELEMS; id++) {
+		for_each_mixer_elem(list, mixer, id) {
+			if (list->resume_connector)
+				list->resume_connector(list);
+		}
+	}
 
 	if (reset_resume) {
 		/* restore cached mixer values */
@@ -3664,5 +3681,6 @@ void snd_usb_mixer_elem_init_std(struct usb_mixer_elem_list *list,
 	list->dump = snd_usb_mixer_dump_cval;
 #ifdef CONFIG_PM
 	list->resume = restore_mixer_value;
+	list->resume_connector = resume_connector;
 #endif
 }
