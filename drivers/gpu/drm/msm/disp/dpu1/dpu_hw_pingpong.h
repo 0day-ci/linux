@@ -133,7 +133,7 @@ struct dpu_hw_pingpong {
 	/* pingpong */
 	enum dpu_pingpong idx;
 	const struct dpu_pingpong_cfg *caps;
-	struct dpu_hw_blk *merge_3d;
+	struct dpu_hw_merge_3d *merge_3d;
 
 	/* ops */
 	struct dpu_hw_pingpong_ops ops;
@@ -155,11 +155,13 @@ static inline struct dpu_hw_pingpong *to_dpu_hw_pingpong(struct dpu_hw_blk *hw)
  * @idx:  Pingpong index for which driver object is required
  * @addr: Mapped register io address of MDP
  * @m:    Pointer to mdss catalog data
+ * @merge_3d_blks: Pointer to merge 3d blocks
  * Returns: Error code or allocated dpu_hw_pingpong context
  */
 struct dpu_hw_pingpong *dpu_hw_pingpong_init(enum dpu_pingpong idx,
 		void __iomem *addr,
-		const struct dpu_mdss_cfg *m);
+		const struct dpu_mdss_cfg *m,
+		struct dpu_hw_merge_3d **merge_3d_blks);
 
 /**
  * dpu_hw_pingpong_destroy - destroys pingpong driver context

@@ -22,6 +22,7 @@
 #include "dpu_kms.h"
 #include "dpu_core_irq.h"
 #include "dpu_formats.h"
+#include "dpu_hw_merge3d.h"
 #include "dpu_hw_vbif.h"
 #include "dpu_vbif.h"
 #include "dpu_encoder.h"
@@ -685,6 +686,16 @@ static void _dpu_kms_hw_destroy(struct dpu_kms *dpu_kms)
 		dpu_rm_destroy(&dpu_kms->rm);
 	dpu_kms->rm_init = false;
 
+	/* After RM destroy, as PP blocks reference MERGE_3D blocks */
+	if (dpu_kms->catalog) {
+		for (i = 0; i < dpu_kms->catalog->merge_3d_count; i++) {
+			u32 merge_3d_idx = dpu_kms->catalog->merge_3d[i].id;
+
+			if ((merge_3d_idx < MERGE_3D_MAX) && dpu_kms->hw_merge_3d[merge_3d_idx])
+				dpu_hw_merge_3d_destroy(dpu_kms->hw_merge_3d[merge_3d_idx]);
+		}
+	}
+
 	if (dpu_kms->catalog)
 		dpu_hw_catalog_deinit(dpu_kms->catalog);
 	dpu_kms->catalog = NULL;
@@ -957,7 +968,21 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 		goto power_error;
 	}
 
-	rc = dpu_rm_init(&dpu_kms->rm, dpu_kms->catalog, dpu_kms->mmio);
+	/* Before RM init so PP blocks can find MERGE_3D blocks */
+	for (i = 0; i < dpu_kms->catalog->merge_3d_count; i++) {
+		u32 merge_3d_idx = dpu_kms->catalog->merge_3d[i].id;
+
+		dpu_kms->hw_merge_3d[i] = dpu_hw_merge_3d_init(merge_3d_idx,
+				dpu_kms->mmio, dpu_kms->catalog);
+		if (IS_ERR(dpu_kms->hw_merge_3d[merge_3d_idx])) {
+			rc = PTR_ERR(dpu_kms->hw_merge_3d[merge_3d_idx]);
+			DPU_ERROR("failed to init merge_3d %d: %d\n", merge_3d_idx, rc);
+			dpu_kms->hw_merge_3d[merge_3d_idx] = NULL;
+			goto power_error;
+		}
+	}
+
+	rc = dpu_rm_init(&dpu_kms->rm, dpu_kms);
 	if (rc) {
 		DPU_ERROR("rm init failed: %d\n", rc);
 		goto power_error;

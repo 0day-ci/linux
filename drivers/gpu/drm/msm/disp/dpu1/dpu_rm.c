@@ -9,7 +9,6 @@
 #include "dpu_hw_ctl.h"
 #include "dpu_hw_pingpong.h"
 #include "dpu_hw_intf.h"
-#include "dpu_hw_merge3d.h"
 #include "dpu_encoder.h"
 #include "dpu_trace.h"
 
@@ -50,14 +49,6 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 			dpu_hw_pingpong_destroy(hw);
 		}
 	}
-	for (i = 0; i < ARRAY_SIZE(rm->merge_3d_blks); i++) {
-		struct dpu_hw_merge_3d *hw;
-
-		if (rm->merge_3d_blks[i]) {
-			hw = to_dpu_hw_merge_3d(rm->merge_3d_blks[i]);
-			dpu_hw_merge_3d_destroy(hw);
-		}
-	}
 	for (i = 0; i < ARRAY_SIZE(rm->ctl_blks); i++) {
 		struct dpu_hw_ctl *hw;
 
@@ -79,9 +70,10 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 }
 
 int dpu_rm_init(struct dpu_rm *rm,
-		struct dpu_mdss_cfg *cat,
-		void __iomem *mmio)
+		struct dpu_kms *dpu_kms)
 {
+	struct dpu_mdss_cfg *cat = dpu_kms->catalog;
+	void __iomem *mmio = dpu_kms->mmio;
 	int rc, i;
 
 	if (!rm || !cat || !mmio) {
@@ -93,24 +85,6 @@ int dpu_rm_init(struct dpu_rm *rm,
 	memset(rm, 0, sizeof(*rm));
 
 	/* Interrogate HW catalog and create tracking items for hw blocks */
-	for (i = 0; i < cat->merge_3d_count; i++) {
-		struct dpu_hw_merge_3d *hw;
-		const struct dpu_merge_3d_cfg *merge_3d = &cat->merge_3d[i];
-
-		if (merge_3d->id < MERGE_3D_0 || merge_3d->id >= MERGE_3D_MAX) {
-			DPU_ERROR("skip merge_3d %d with invalid id\n", merge_3d->id);
-			continue;
-		}
-		hw = dpu_hw_merge_3d_init(merge_3d->id, mmio, cat);
-		if (IS_ERR_OR_NULL(hw)) {
-			rc = PTR_ERR(hw);
-			DPU_ERROR("failed merge_3d object creation: err %d\n",
-				rc);
-			goto fail;
-		}
-		rm->merge_3d_blks[merge_3d->id - MERGE_3D_0] = &hw->base;
-	}
-
 	for (i = 0; i < cat->pingpong_count; i++) {
 		struct dpu_hw_pingpong *hw;
 		const struct dpu_pingpong_cfg *pp = &cat->pingpong[i];
@@ -119,15 +93,13 @@ int dpu_rm_init(struct dpu_rm *rm,
 			DPU_ERROR("skip pingpong %d with invalid id\n", pp->id);
 			continue;
 		}
-		hw = dpu_hw_pingpong_init(pp->id, mmio, cat);
+		hw = dpu_hw_pingpong_init(pp->id, mmio, cat, dpu_kms->hw_merge_3d);
 		if (IS_ERR_OR_NULL(hw)) {
 			rc = PTR_ERR(hw);
 			DPU_ERROR("failed pingpong object creation: err %d\n",
 				rc);
 			goto fail;
 		}
-		if (pp->merge_3d && pp->merge_3d < MERGE_3D_MAX)
-			hw->merge_3d = rm->merge_3d_blks[pp->merge_3d - MERGE_3D_0];
 		rm->pingpong_blks[pp->id - PINGPONG_0] = &hw->base;
 	}
 

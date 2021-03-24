@@ -123,6 +123,7 @@ struct dpu_kms {
 	bool rm_init;
 
 	struct dpu_hw_vbif *hw_vbif[VBIF_MAX];
+	struct dpu_hw_merge_3d *hw_merge_3d[MERGE_3D_MAX];
 	struct dpu_hw_mdp *hw_mdp;
 
 	bool has_danger_ctrl;

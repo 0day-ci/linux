@@ -8,6 +8,7 @@
 #include "dpu_hwio.h"
 #include "dpu_hw_catalog.h"
 #include "dpu_hw_pingpong.h"
+#include "dpu_hw_merge3d.h"
 #include "dpu_kms.h"
 #include "dpu_trace.h"
 
@@ -263,7 +264,8 @@ static void _setup_pingpong_ops(struct dpu_hw_pingpong *c,
 
 struct dpu_hw_pingpong *dpu_hw_pingpong_init(enum dpu_pingpong idx,
 		void __iomem *addr,
-		const struct dpu_mdss_cfg *m)
+		const struct dpu_mdss_cfg *m,
+		struct dpu_hw_merge_3d **merge_3d_blks)
 {
 	struct dpu_hw_pingpong *c;
 	const struct dpu_pingpong_cfg *cfg;
@@ -281,6 +283,9 @@ struct dpu_hw_pingpong *dpu_hw_pingpong_init(enum dpu_pingpong idx,
 	c->idx = idx;
 	c->caps = cfg;
 	_setup_pingpong_ops(c, c->caps->features);
+
+	if (cfg->merge_3d && cfg->merge_3d < MERGE_3D_MAX)
+		c->merge_3d = merge_3d_blks[cfg->merge_3d - MERGE_3D_0];
 
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_PINGPONG, idx);
 
