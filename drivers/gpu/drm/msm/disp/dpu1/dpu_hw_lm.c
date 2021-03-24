@@ -5,6 +5,7 @@
 #include "dpu_kms.h"
 #include "dpu_hw_catalog.h"
 #include "dpu_hwio.h"
+#include "dpu_hw_dspp.h"
 #include "dpu_hw_lm.h"
 #include "dpu_hw_mdss.h"
 
@@ -182,6 +183,9 @@ struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 	c->cap = cfg;
 	_setup_mixer_ops(m, &c->ops, c->cap->features);
 
+	if (cfg->dspp && cfg->dspp < DSPP_MAX)
+		c->dspp = dpu_hw_dspp_init(cfg->dspp, addr, m);
+
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_LM, idx);
 
 	return c;
@@ -189,5 +193,7 @@ struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 
 void dpu_hw_lm_destroy(struct dpu_hw_mixer *lm)
 {
+	if (lm)
+		dpu_hw_dspp_destroy(lm->dspp);
 	kfree(lm);
 }

@@ -9,7 +9,6 @@
 #include "dpu_hw_ctl.h"
 #include "dpu_hw_pingpong.h"
 #include "dpu_hw_intf.h"
-#include "dpu_hw_dspp.h"
 #include "dpu_hw_merge3d.h"
 #include "dpu_encoder.h"
 #include "dpu_trace.h"
@@ -35,6 +34,14 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 {
 	int i;
 
+	for (i = 0; i < ARRAY_SIZE(rm->mixer_blks); i++) {
+		struct dpu_hw_mixer *hw;
+
+		if (rm->mixer_blks[i]) {
+			hw = to_dpu_hw_mixer(rm->mixer_blks[i]);
+			dpu_hw_lm_destroy(hw);
+		}
+	}
 	for (i = 0; i < ARRAY_SIZE(rm->pingpong_blks); i++) {
 		struct dpu_hw_pingpong *hw;
 
@@ -49,14 +56,6 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 		if (rm->merge_3d_blks[i]) {
 			hw = to_dpu_hw_merge_3d(rm->merge_3d_blks[i]);
 			dpu_hw_merge_3d_destroy(hw);
-		}
-	}
-	for (i = 0; i < ARRAY_SIZE(rm->mixer_blks); i++) {
-		struct dpu_hw_mixer *hw;
-
-		if (rm->mixer_blks[i]) {
-			hw = to_dpu_hw_mixer(rm->mixer_blks[i]);
-			dpu_hw_lm_destroy(hw);
 		}
 	}
 	for (i = 0; i < ARRAY_SIZE(rm->ctl_blks); i++) {
@@ -94,40 +93,6 @@ int dpu_rm_init(struct dpu_rm *rm,
 	memset(rm, 0, sizeof(*rm));
 
 	/* Interrogate HW catalog and create tracking items for hw blocks */
-	for (i = 0; i < cat->mixer_count; i++) {
-		struct dpu_hw_mixer *hw;
-		const struct dpu_lm_cfg *lm = &cat->mixer[i];
-
-		if (lm->pingpong == PINGPONG_MAX) {
-			DPU_DEBUG("skip mixer %d without pingpong\n", lm->id);
-			continue;
-		}
-
-		if (lm->id < LM_0 || lm->id >= LM_MAX) {
-			DPU_ERROR("skip mixer %d with invalid id\n", lm->id);
-			continue;
-		}
-		hw = dpu_hw_lm_init(lm->id, mmio, cat);
-		if (IS_ERR_OR_NULL(hw)) {
-			rc = PTR_ERR(hw);
-			DPU_ERROR("failed lm object creation: err %d\n", rc);
-			goto fail;
-		}
-		rm->mixer_blks[lm->id - LM_0] = &hw->base;
-
-		if (!rm->lm_max_width) {
-			rm->lm_max_width = lm->sblk->maxwidth;
-		} else if (rm->lm_max_width != lm->sblk->maxwidth) {
-			/*
-			 * Don't expect to have hw where lm max widths differ.
-			 * If found, take the min.
-			 */
-			DPU_ERROR("unsupported: lm maxwidth differs\n");
-			if (rm->lm_max_width > lm->sblk->maxwidth)
-				rm->lm_max_width = lm->sblk->maxwidth;
-		}
-	}
-
 	for (i = 0; i < cat->merge_3d_count; i++) {
 		struct dpu_hw_merge_3d *hw;
 		const struct dpu_merge_3d_cfg *merge_3d = &cat->merge_3d[i];
@@ -204,21 +169,38 @@ int dpu_rm_init(struct dpu_rm *rm,
 		rm->ctl_blks[ctl->id - CTL_0] = &hw->base;
 	}
 
-	for (i = 0; i < cat->dspp_count; i++) {
-		struct dpu_hw_dspp *hw;
-		const struct dpu_dspp_cfg *dspp = &cat->dspp[i];
+	for (i = 0; i < cat->mixer_count; i++) {
+		struct dpu_hw_mixer *hw;
+		const struct dpu_lm_cfg *lm = &cat->mixer[i];
 
-		if (dspp->id < DSPP_0 || dspp->id >= DSPP_MAX) {
-			DPU_ERROR("skip dspp %d with invalid id\n", dspp->id);
+		if (lm->pingpong == PINGPONG_MAX) {
+			DPU_DEBUG("skip mixer %d without pingpong\n", lm->id);
 			continue;
 		}
-		hw = dpu_hw_dspp_init(dspp->id, mmio, cat);
+
+		if (lm->id < LM_0 || lm->id >= LM_MAX) {
+			DPU_ERROR("skip mixer %d with invalid id\n", lm->id);
+			continue;
+		}
+		hw = dpu_hw_lm_init(lm->id, mmio, cat);
 		if (IS_ERR_OR_NULL(hw)) {
 			rc = PTR_ERR(hw);
-			DPU_ERROR("failed dspp object creation: err %d\n", rc);
+			DPU_ERROR("failed lm object creation: err %d\n", rc);
 			goto fail;
 		}
-		rm->dspp_blks[dspp->id - DSPP_0] = &hw->base;
+		rm->mixer_blks[lm->id - LM_0] = &hw->base;
+
+		if (!rm->lm_max_width) {
+			rm->lm_max_width = lm->sblk->maxwidth;
+		} else if (rm->lm_max_width != lm->sblk->maxwidth) {
+			/*
+			 * Don't expect to have hw where lm max widths differ.
+			 * If found, take the min.
+			 */
+			DPU_ERROR("unsupported: lm maxwidth differs\n");
+			if (rm->lm_max_width > lm->sblk->maxwidth)
+				rm->lm_max_width = lm->sblk->maxwidth;
+		}
 	}
 
 	return 0;
@@ -271,15 +253,13 @@ static bool _dpu_rm_check_lm_peer(struct dpu_rm *rm, int primary_idx,
  *      available and appropriate
  * @pp_idx: output parameter, index of pingpong block attached to the layer
  *      mixer in rm->pingpong_blks[].
- * @dspp_idx: output parameter, index of dspp block attached to the layer
- *      mixer in rm->dspp_blks[].
  * @reqs: input parameter, rm requirements for HW blocks needed in the
  *      datapath.
  * Return: true if lm matches all requirements, false otherwise
  */
 static bool _dpu_rm_check_lm_and_get_connected_blks(struct dpu_rm *rm,
 		struct dpu_global_state *global_state,
-		uint32_t enc_id, int lm_idx, int *pp_idx, int *dspp_idx,
+		uint32_t enc_id, int lm_idx, int *pp_idx,
 		struct dpu_rm_requirements *reqs)
 {
 	const struct dpu_lm_cfg *lm_cfg;
@@ -305,22 +285,6 @@ static bool _dpu_rm_check_lm_and_get_connected_blks(struct dpu_rm *rm,
 	}
 	*pp_idx = idx;
 
-	if (!reqs->topology.num_dspp)
-		return true;
-
-	idx = lm_cfg->dspp - DSPP_0;
-	if (idx < 0 || idx >= ARRAY_SIZE(rm->dspp_blks)) {
-		DPU_ERROR("failed to get dspp on lm %d\n", lm_cfg->dspp);
-		return false;
-	}
-
-	if (reserved_by_other(global_state->dspp_to_enc_id, idx, enc_id)) {
-		DPU_DEBUG("lm %d dspp %d already reserved\n", lm_cfg->id,
-				lm_cfg->dspp);
-		return false;
-	}
-	*dspp_idx = idx;
-
 	return true;
 }
 
@@ -332,7 +296,6 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 {
 	int lm_idx[MAX_BLOCKS];
 	int pp_idx[MAX_BLOCKS];
-	int dspp_idx[MAX_BLOCKS] = {0};
 	int i, j, lm_count = 0;
 
 	if (!reqs->topology.num_lm) {
@@ -351,7 +314,7 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 
 		if (!_dpu_rm_check_lm_and_get_connected_blks(rm, global_state,
 				enc_id, i, &pp_idx[lm_count],
-				&dspp_idx[lm_count], reqs)) {
+				reqs)) {
 			continue;
 		}
 
@@ -371,7 +334,7 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 
 			if (!_dpu_rm_check_lm_and_get_connected_blks(rm,
 					global_state, enc_id, j,
-					&pp_idx[lm_count], &dspp_idx[lm_count],
+					&pp_idx[lm_count],
 					reqs)) {
 				continue;
 			}
@@ -389,8 +352,6 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 	for (i = 0; i < lm_count; i++) {
 		global_state->mixer_to_enc_id[lm_idx[i]] = enc_id;
 		global_state->pingpong_to_enc_id[pp_idx[i]] = enc_id;
-		global_state->dspp_to_enc_id[dspp_idx[i]] =
-			reqs->topology.num_dspp ? enc_id : 0;
 
 		trace_dpu_rm_reserve_lms(lm_idx[i] + LM_0, enc_id,
 					 pp_idx[i] + PINGPONG_0);
@@ -634,11 +595,6 @@ int dpu_rm_get_assigned_resources(struct dpu_rm *rm,
 		hw_blks = rm->intf_blks;
 		hw_to_enc_id = global_state->intf_to_enc_id;
 		max_blks = ARRAY_SIZE(rm->intf_blks);
-		break;
-	case DPU_HW_BLK_DSPP:
-		hw_blks = rm->dspp_blks;
-		hw_to_enc_id = global_state->dspp_to_enc_id;
-		max_blks = ARRAY_SIZE(rm->dspp_blks);
 		break;
 	default:
 		DPU_ERROR("blk type %d not managed by rm\n", type);
