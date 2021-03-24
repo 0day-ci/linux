@@ -204,8 +204,7 @@ static void _setup_vbif_ops(struct dpu_hw_vbif_ops *ops,
 	ops->get_limit_conf = dpu_hw_get_limit_conf;
 	ops->set_halt_ctrl = dpu_hw_set_halt_ctrl;
 	ops->get_halt_ctrl = dpu_hw_get_halt_ctrl;
-	if (test_bit(DPU_VBIF_QOS_REMAP, &cap))
-		ops->set_qos_remap = dpu_hw_set_qos_remap;
+	ops->set_qos_remap = dpu_hw_set_qos_remap;
 	ops->set_mem_type = dpu_hw_set_mem_type;
 	ops->clear_errors = dpu_hw_clear_errors;
 	ops->set_write_gather_en = dpu_hw_set_write_gather_en;
