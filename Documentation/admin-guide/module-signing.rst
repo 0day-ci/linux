@@ -30,8 +30,8 @@ This facility uses X.509 ITU-T standard certificates to encode the public keys
 involved.  The signatures are not themselves encoded in any industrial standard
 type.  The facility currently only supports the RSA public key encryption
 standard (though it is pluggable and permits others to be used).  The possible
-hash algorithms that can be used are SHA-1, SHA-224, SHA-256, SHA-384, and
-SHA-512 (the algorithm is selected by data in the signature).
+hash algorithms that can be used are SHA-1, SHA-224, SHA-256, SHA-384, SHA-512,
+and SM3 (the algorithm is selected by data in the signature).
 
 
 ==========================
@@ -86,6 +86,7 @@ This has a number of options available:
 	``CONFIG_MODULE_SIG_SHA256``	:menuselection:`Sign modules with SHA-256`
 	``CONFIG_MODULE_SIG_SHA384``	:menuselection:`Sign modules with SHA-384`
 	``CONFIG_MODULE_SIG_SHA512``	:menuselection:`Sign modules with SHA-512`
+	``CONFIG_MODULE_SIG_SM3``	:menuselection:`Sign modules with SM3`
         =============================== ==========================================
 
      The algorithm selected here will also be built into the kernel (rather
