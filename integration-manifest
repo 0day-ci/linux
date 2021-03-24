@@ -1,0 +1,36 @@
+drm drm-fixes d27ce83fa4baa5cb908a42e9878564cad6ea0eb3
+	Merge tag 'du-fixes-20210316' of git://linuxtv.org/pinchartl/media into drm-fixes
+drm-misc drm-misc-fixes 50891bead80bc79871528c2962d65c781c02330b
+	drm/etnaviv: User FOLL_LONGTERM in userptr
+drm-intel drm-intel-fixes b61fde1beb6b1847f1743e75f4d9839acebad76a
+	drm/i915/dsc: fix DSS CTL register usage for ICL DSI transcoders
+drm-amd drm-amd-fixes 2b702e72e33bbdec0764cfb6e1dd00fe1142ae55
+	Merge tag 'drm-misc-fixes-2017-09-28-1' of git://anongit.freedesktop.org/git/drm-misc into drm-fixes
+drm drm-next 06debd6e1b28029e6e77c41e59a162868f377897
+	Merge tag 'drm-intel-next-2021-03-16' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes fe07bfda2fb9cdef8a4d4008a409bb02f35f1bd8
+	Linux 5.12-rc1
+drm-intel drm-intel-next-fixes d153e8c156dafeb847fd655f416cf81c007e8706
+	Merge tag 'drm-intel-next-fixes-2021-02-25' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-amd drm-amd-next-fixes 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e
+	Linux 4.14-rc1
+drm-misc drm-misc-next 2818c20871e6b9cec806ba546faf90ae3a079e22
+	drm/rockchip: Remove unused variable
+drm-intel drm-intel-next 9d58aa46291d4d696bb1eac3436d3118f7bf2573
+	drm/i915: Fix the GT fence revocation runtime PM logic
+drm-intel drm-intel-gt-next 5a1a659762d35a6dc51047c9127c011303c77b7f
+	drm/i915: Wedge the GPU if command parser setup fails
+drm-amd drm-amd-next 754270c7c56292e97d0eff924a5d5d83f92add07
+	Merge branch 'drm-next-4.15' of git://people.freedesktop.org/~agd5f/linux into drm-next
+sound-upstream for-linus e54f30befa7990b897189b44a56c1138c6bfdbb5
+	ALSA: hda/realtek: call alc_update_headset_mode() in hp_automute_hook
+sound-upstream for-next 940ba1f5e18d4411c4e87ef902dc811a10d341d0
+	ALSA: core: avoid -Wempty-body warnings
+drm-intel topic/core-for-CI 785b066b32b630e4735ca6e51acbb067703e2d3a
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/iomem-mmap-vs-gup fe07bfda2fb9cdef8a4d4008a409bb02f35f1bd8
+	Linux 5.12-rc1
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm topic/i915-gem-next 547be6a479fd19fe1071d2cf76ed574fbff13481
+	i915_vma: Rename vma_lookup to i915_vma_lookup
