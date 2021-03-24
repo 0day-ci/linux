@@ -115,6 +115,7 @@ Code  Seq#    Include File                                           Comments
 'B'   C0-FF  advanced bbus                                           <mailto:maassen@uni-freiburg.de>
 'C'   all    linux/soundcard.h                                       conflict!
 'C'   01-2F  linux/capi.h                                            conflict!
+'C'   01-5F  uapi/misc/intel/gna.h                                   conflict!
 'C'   F0-FF  drivers/net/wan/cosa.h                                  conflict!
 'D'   all    arch/s390/include/asm/dasd.h
 'D'   40-5F  drivers/scsi/dpt/dtpi_ioctl.h

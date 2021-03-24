@@ -19,6 +19,7 @@ fit into other categories.
    bh1770glc
    eeprom
    c2port
+   intel/gna
    ibmvmc
    ics932s401
    isl29003
