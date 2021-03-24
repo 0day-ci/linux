@@ -200,7 +200,6 @@ struct toshiba_acpi_dev {
 	unsigned int usb_three_supported:1;
 	unsigned int wwan_supported:1;
 	unsigned int cooling_method_supported:1;
-	unsigned int sysfs_created:1;
 	unsigned int special_functions;
 
 	bool kbd_event_generated;
@@ -3019,10 +3018,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 
 	remove_toshiba_proc_entries(dev);
 
-	if (dev->sysfs_created)
-		sysfs_remove_group(&dev->acpi_dev->dev.kobj,
-				   &toshiba_attr_group);
-
 	return 0;
 }
 
@@ -3047,6 +3042,13 @@ static void toshiba_acpi_misc_deregister(void *data)
 	struct miscdevice *miscdev = data;
 
 	misc_deregister(miscdev);
+}
+
+static void toshiba_acpi_sysfs_remove(void *data)
+{
+	struct kobject *kobj = data;
+
+	sysfs_remove_group(kobj, &toshiba_attr_group);
 }
 
 static int toshiba_acpi_add(struct acpi_device *acpi_dev)
@@ -3219,21 +3221,20 @@ iio_error:
 
 	ret = sysfs_create_group(&dev->acpi_dev->dev.kobj,
 				 &toshiba_attr_group);
-	if (ret) {
-		dev->sysfs_created = 0;
-		goto error;
-	}
-	dev->sysfs_created = !ret;
+	if (ret)
+		return ret;
+
+	ret = devm_add_action_or_reset(parent,
+				       toshiba_acpi_sysfs_remove,
+				       &dev->acpi_dev->dev.kobj);
+	if (ret)
+		return ret;
 
 	create_toshiba_proc_entries(dev);
 
 	toshiba_acpi = dev;
 
 	return 0;
-
-error:
-	toshiba_acpi_remove(acpi_dev);
-	return ret;
 }
 
 static void toshiba_acpi_notify(struct acpi_device *acpi_dev, u32 event)
