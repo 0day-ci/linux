@@ -137,6 +137,13 @@ int amd_pci_get_num_boost_states(int *active, int *states)
 		return -ENODEV;
 
 	val = pci_read_byte(device, 0x15c);
+
+	/* If val is 0xff, meaning has no permisson to
+	 * get the boost states, return -1
+	 */
+	if (val == 0xff)
+		return -1;
+
 	if (val & 3)
 		*active = 1;
 	else
