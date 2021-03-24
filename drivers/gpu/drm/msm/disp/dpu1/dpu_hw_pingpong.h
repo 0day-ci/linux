@@ -56,75 +56,65 @@ struct dpu_hw_dither_cfg {
 	u32 matrix[DITHER_MATRIX_SZ];
 };
 
-/**
- *
- * struct dpu_hw_pingpong_ops : Interface to the pingpong Hw driver functions
+/*
  *  Assumption is these functions will be called after clocks are enabled
- *  @setup_tearcheck : program tear check values
- *  @enable_tearcheck : enables tear check
- *  @get_vsync_info : retries timing info of the panel
- *  @setup_autorefresh : configure and enable the autorefresh config
- *  @get_autorefresh : retrieve autorefresh config from hardware
- *  @setup_dither : function to program the dither hw block
- *  @get_line_count: obtain current vertical line counter
  */
-struct dpu_hw_pingpong_ops {
-	/**
-	 * enables vysnc generation and sets up init value of
-	 * read pointer and programs the tear check cofiguration
-	 */
-	int (*setup_tearcheck)(struct dpu_hw_pingpong *pp,
-			struct dpu_hw_tear_check *cfg);
 
-	/**
-	 * enables tear check block
-	 */
-	int (*enable_tearcheck)(struct dpu_hw_pingpong *pp,
-			bool enable);
+/**
+ * enables vysnc generation and sets up init value of
+ * read pointer and programs the tear check cofiguration
+ */
+int dpu_hw_pingpong_setup_tearcheck(struct dpu_hw_pingpong *pp,
+		struct dpu_hw_tear_check *cfg);
 
-	/**
-	 * read, modify, write to either set or clear listening to external TE
-	 * @Return: 1 if TE was originally connected, 0 if not, or -ERROR
-	 */
-	int (*connect_external_te)(struct dpu_hw_pingpong *pp,
-			bool enable_external_te);
+/**
+ * enables tear check block
+ */
+int dpu_hw_pingpong_enable_tearcheck(struct dpu_hw_pingpong *pp,
+		bool enable);
 
-	/**
-	 * provides the programmed and current
-	 * line_count
-	 */
-	int (*get_vsync_info)(struct dpu_hw_pingpong *pp,
-			struct dpu_hw_pp_vsync_info  *info);
+/**
+ * read, modify, write to either set or clear listening to external TE
+ * @Return: 1 if TE was originally connected, 0 if not, or -ERROR
+ */
+int dpu_hw_pingpong_connect_external_te(struct dpu_hw_pingpong *pp,
+		bool enable_external_te);
 
-	/**
-	 * configure and enable the autorefresh config
-	 */
-	void (*setup_autorefresh)(struct dpu_hw_pingpong *pp,
-				  u32 frame_count, bool enable);
+/**
+ * provides the programmed and current
+ * line_count
+ */
+int dpu_hw_pingpong_get_vsync_info(struct dpu_hw_pingpong *pp,
+		struct dpu_hw_pp_vsync_info  *info);
 
-	/**
-	 * retrieve autorefresh config from hardware
-	 */
-	bool (*get_autorefresh)(struct dpu_hw_pingpong *pp,
-				u32 *frame_count);
+/**
+ * configure and enable the autorefresh config
+ */
+void dpu_hw_pingpong_setup_autorefresh(struct dpu_hw_pingpong *pp,
+			  u32 frame_count, bool enable);
 
-	/**
-	 * poll until write pointer transmission starts
-	 * @Return: 0 on success, -ETIMEDOUT on timeout
-	 */
-	int (*poll_timeout_wr_ptr)(struct dpu_hw_pingpong *pp, u32 timeout_us);
+/**
+ * retrieve autorefresh config from hardware
+ */
+bool dpu_hw_pingpong_get_autorefresh(struct dpu_hw_pingpong *pp,
+			u32 *frame_count);
 
-	/**
-	 * Obtain current vertical line counter
-	 */
-	u32 (*get_line_count)(struct dpu_hw_pingpong *pp);
+/**
+ * poll until write pointer transmission starts
+ * @Return: 0 on success, -ETIMEDOUT on timeout
+ */
+int dpu_hw_pingpong_poll_timeout_wr_ptr(struct dpu_hw_pingpong *pp, u32 timeout_us);
 
-	/**
-	 * Setup dither matix for pingpong block
-	 */
-	void (*setup_dither)(struct dpu_hw_pingpong *pp,
-			struct dpu_hw_dither_cfg *cfg);
-};
+/**
+ * Obtain current vertical line counter
+ */
+u32 dpu_hw_pingpong_get_line_count(struct dpu_hw_pingpong *pp);
+
+/**
+ * Setup dither matix for pingpong block
+ */
+void dpu_hw_pingpong_setup_dither(struct dpu_hw_pingpong *pp,
+		struct dpu_hw_dither_cfg *cfg);
 
 struct dpu_hw_pingpong {
 	struct dpu_hw_blk base;
@@ -134,9 +124,6 @@ struct dpu_hw_pingpong {
 	enum dpu_pingpong idx;
 	const struct dpu_pingpong_cfg *caps;
 	struct dpu_hw_merge_3d *merge_3d;
-
-	/* ops */
-	struct dpu_hw_pingpong_ops ops;
 };
 
 /**

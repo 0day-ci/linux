@@ -226,14 +226,14 @@ static void _dpu_encoder_setup_dither(struct dpu_hw_pingpong *hw_pp, unsigned bp
 		dither_cfg.temporal_en = 0;
 		break;
 	default:
-		hw_pp->ops.setup_dither(hw_pp, NULL);
+		dpu_hw_pingpong_setup_dither(hw_pp, NULL);
 		return;
 	}
 
 	memcpy(&dither_cfg.matrix, dither_matrix,
 			sizeof(u32) * DITHER_MATRIX_SZ);
 
-	hw_pp->ops.setup_dither(hw_pp, &dither_cfg);
+	dpu_hw_pingpong_setup_dither(hw_pp, &dither_cfg);
 }
 
 void dpu_encoder_helper_report_irq_timeout(struct dpu_encoder_phys *phys_enc,

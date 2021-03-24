@@ -345,12 +345,6 @@ static void dpu_encoder_phys_cmd_tearcheck_config(
 
 	DPU_DEBUG_CMDENC(cmd_enc, "pp %d\n", phys_enc->hw_pp->idx - PINGPONG_0);
 
-	if (!phys_enc->hw_pp->ops.setup_tearcheck ||
-		!phys_enc->hw_pp->ops.enable_tearcheck) {
-		DPU_DEBUG_CMDENC(cmd_enc, "tearcheck not supported\n");
-		return;
-	}
-
 	dpu_kms = phys_enc->dpu_kms;
 
 	/*
@@ -401,8 +395,8 @@ static void dpu_encoder_phys_cmd_tearcheck_config(
 		phys_enc->hw_pp->idx - PINGPONG_0, tc_cfg.sync_cfg_height,
 		tc_cfg.sync_threshold_start, tc_cfg.sync_threshold_continue);
 
-	phys_enc->hw_pp->ops.setup_tearcheck(phys_enc->hw_pp, &tc_cfg);
-	phys_enc->hw_pp->ops.enable_tearcheck(phys_enc->hw_pp, tc_enable);
+	dpu_hw_pingpong_setup_tearcheck(phys_enc->hw_pp, &tc_cfg);
+	dpu_hw_pingpong_enable_tearcheck(phys_enc->hw_pp, tc_enable);
 }
 
 static void _dpu_encoder_phys_cmd_pingpong_config(
@@ -479,11 +473,11 @@ static void dpu_encoder_phys_cmd_enable(struct dpu_encoder_phys *phys_enc)
 static void _dpu_encoder_phys_cmd_connect_te(
 		struct dpu_encoder_phys *phys_enc, bool enable)
 {
-	if (!phys_enc->hw_pp || !phys_enc->hw_pp->ops.connect_external_te)
+	if (!phys_enc->hw_pp)
 		return;
 
 	trace_dpu_enc_phys_cmd_connect_te(DRMID(phys_enc->parent), enable);
-	phys_enc->hw_pp->ops.connect_external_te(phys_enc->hw_pp, enable);
+	dpu_hw_pingpong_connect_external_te(phys_enc->hw_pp, enable);
 }
 
 static void dpu_encoder_phys_cmd_prepare_idle_pc(
@@ -495,19 +489,13 @@ static void dpu_encoder_phys_cmd_prepare_idle_pc(
 static int dpu_encoder_phys_cmd_get_line_count(
 		struct dpu_encoder_phys *phys_enc)
 {
-	struct dpu_hw_pingpong *hw_pp;
-
 	if (!phys_enc->hw_pp)
 		return -EINVAL;
 
 	if (!dpu_encoder_phys_cmd_is_master(phys_enc))
 		return -EINVAL;
 
-	hw_pp = phys_enc->hw_pp;
-	if (!hw_pp->ops.get_line_count)
-		return -EINVAL;
-
-	return hw_pp->ops.get_line_count(hw_pp);
+	return dpu_hw_pingpong_get_line_count(phys_enc->hw_pp);
 }
 
 static void dpu_encoder_phys_cmd_disable(struct dpu_encoder_phys *phys_enc)
@@ -528,8 +516,7 @@ static void dpu_encoder_phys_cmd_disable(struct dpu_encoder_phys *phys_enc)
 		return;
 	}
 
-	if (phys_enc->hw_pp->ops.enable_tearcheck)
-		phys_enc->hw_pp->ops.enable_tearcheck(phys_enc->hw_pp, false);
+	dpu_hw_pingpong_enable_tearcheck(phys_enc->hw_pp, false);
 	phys_enc->enable_state = DPU_ENC_DISABLED;
 }
 
@@ -582,7 +569,7 @@ static bool dpu_encoder_phys_cmd_is_ongoing_pptx(
 	if (!phys_enc)
 		return false;
 
-	phys_enc->hw_pp->ops.get_vsync_info(phys_enc->hw_pp, &info);
+	dpu_hw_pingpong_get_vsync_info(phys_enc->hw_pp, &info);
 	if (info.wr_ptr_line_count > 0 &&
 	    info.wr_ptr_line_count < phys_enc->cached_mode.vdisplay)
 		return true;
@@ -605,7 +592,7 @@ static void dpu_encoder_phys_cmd_prepare_commit(
 		return;
 
 	/* If autorefresh is already disabled, we have nothing to do */
-	if (!phys_enc->hw_pp->ops.get_autorefresh(phys_enc->hw_pp, NULL))
+	if (!dpu_hw_pingpong_get_autorefresh(phys_enc->hw_pp, NULL))
 		return;
 
 	/*
@@ -617,7 +604,7 @@ static void dpu_encoder_phys_cmd_prepare_commit(
 	 * 5. Enable TE back
 	 */
 	_dpu_encoder_phys_cmd_connect_te(phys_enc, false);
-	phys_enc->hw_pp->ops.setup_autorefresh(phys_enc->hw_pp, 0, false);
+	dpu_hw_pingpong_setup_autorefresh(phys_enc->hw_pp, 0, false);
 
 	do {
 		udelay(DPU_ENC_MAX_POLL_TIMEOUT_US);

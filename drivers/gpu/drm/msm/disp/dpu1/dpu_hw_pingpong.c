@@ -61,7 +61,7 @@ static const struct dpu_pingpong_cfg *_pingpong_offset(enum dpu_pingpong pp,
 	return ERR_PTR(-EINVAL);
 }
 
-static void dpu_hw_pp_setup_dither(struct dpu_hw_pingpong *pp,
+void dpu_hw_pingpong_setup_dither(struct dpu_hw_pingpong *pp,
 				    struct dpu_hw_dither_cfg *cfg)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -92,7 +92,7 @@ static void dpu_hw_pp_setup_dither(struct dpu_hw_pingpong *pp,
 	DPU_REG_WRITE(c, base + PP_DITHER_EN, 1);
 }
 
-static int dpu_hw_pp_setup_te_config(struct dpu_hw_pingpong *pp,
+int dpu_hw_pingpong_setup_tearcheck(struct dpu_hw_pingpong *pp,
 		struct dpu_hw_tear_check *te)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -122,7 +122,7 @@ static int dpu_hw_pp_setup_te_config(struct dpu_hw_pingpong *pp,
 	return 0;
 }
 
-static void dpu_hw_pp_setup_autorefresh_config(struct dpu_hw_pingpong *pp,
+void dpu_hw_pingpong_setup_autorefresh(struct dpu_hw_pingpong *pp,
 					       u32 frame_count, bool enable)
 {
 	DPU_REG_WRITE(&pp->hw, PP_AUTOREFRESH_CONFIG,
@@ -130,13 +130,13 @@ static void dpu_hw_pp_setup_autorefresh_config(struct dpu_hw_pingpong *pp,
 }
 
 /*
- * dpu_hw_pp_get_autorefresh_config - Get autorefresh config from HW
+ * dpu_hw_pingpong_get_autorefresh - Get autorefresh config from HW
  * @pp:          DPU pingpong structure
  * @frame_count: Used to return the current frame count from hw
  *
  * Returns: True if autorefresh enabled, false if disabled.
  */
-static bool dpu_hw_pp_get_autorefresh_config(struct dpu_hw_pingpong *pp,
+bool dpu_hw_pingpong_get_autorefresh(struct dpu_hw_pingpong *pp,
 					     u32 *frame_count)
 {
 	u32 val = DPU_REG_READ(&pp->hw, PP_AUTOREFRESH_CONFIG);
@@ -145,7 +145,7 @@ static bool dpu_hw_pp_get_autorefresh_config(struct dpu_hw_pingpong *pp,
 	return !!((val & BIT(31)) >> 31);
 }
 
-static int dpu_hw_pp_poll_timeout_wr_ptr(struct dpu_hw_pingpong *pp,
+int dpu_hw_pingpong_poll_timeout_wr_ptr(struct dpu_hw_pingpong *pp,
 		u32 timeout_us)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -162,7 +162,7 @@ static int dpu_hw_pp_poll_timeout_wr_ptr(struct dpu_hw_pingpong *pp,
 	return rc;
 }
 
-static int dpu_hw_pp_enable_te(struct dpu_hw_pingpong *pp, bool enable)
+int dpu_hw_pingpong_enable_tearcheck(struct dpu_hw_pingpong *pp, bool enable)
 {
 	struct dpu_hw_blk_reg_map *c;
 
@@ -174,7 +174,7 @@ static int dpu_hw_pp_enable_te(struct dpu_hw_pingpong *pp, bool enable)
 	return 0;
 }
 
-static int dpu_hw_pp_connect_external_te(struct dpu_hw_pingpong *pp,
+int dpu_hw_pingpong_connect_external_te(struct dpu_hw_pingpong *pp,
 		bool enable_external_te)
 {
 	struct dpu_hw_blk_reg_map *c = &pp->hw;
@@ -197,7 +197,7 @@ static int dpu_hw_pp_connect_external_te(struct dpu_hw_pingpong *pp,
 	return orig;
 }
 
-static int dpu_hw_pp_get_vsync_info(struct dpu_hw_pingpong *pp,
+int dpu_hw_pingpong_get_vsync_info(struct dpu_hw_pingpong *pp,
 		struct dpu_hw_pp_vsync_info *info)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -220,7 +220,7 @@ static int dpu_hw_pp_get_vsync_info(struct dpu_hw_pingpong *pp,
 	return 0;
 }
 
-static u32 dpu_hw_pp_get_line_count(struct dpu_hw_pingpong *pp)
+u32 dpu_hw_pingpong_get_line_count(struct dpu_hw_pingpong *pp)
 {
 	struct dpu_hw_blk_reg_map *c = &pp->hw;
 	u32 height, init;
@@ -246,21 +246,6 @@ static u32 dpu_hw_pp_get_line_count(struct dpu_hw_pingpong *pp)
 	return line;
 }
 
-static void _setup_pingpong_ops(struct dpu_hw_pingpong *c,
-				unsigned long features)
-{
-	c->ops.setup_tearcheck = dpu_hw_pp_setup_te_config;
-	c->ops.enable_tearcheck = dpu_hw_pp_enable_te;
-	c->ops.connect_external_te = dpu_hw_pp_connect_external_te;
-	c->ops.get_vsync_info = dpu_hw_pp_get_vsync_info;
-	c->ops.setup_autorefresh = dpu_hw_pp_setup_autorefresh_config;
-	c->ops.get_autorefresh = dpu_hw_pp_get_autorefresh_config;
-	c->ops.poll_timeout_wr_ptr = dpu_hw_pp_poll_timeout_wr_ptr;
-	c->ops.get_line_count = dpu_hw_pp_get_line_count;
-
-	c->ops.setup_dither = dpu_hw_pp_setup_dither;
-};
-
 struct dpu_hw_pingpong *dpu_hw_pingpong_init(enum dpu_pingpong idx,
 		void __iomem *addr,
 		const struct dpu_mdss_cfg *m,
@@ -281,7 +266,6 @@ struct dpu_hw_pingpong *dpu_hw_pingpong_init(enum dpu_pingpong idx,
 
 	c->idx = idx;
 	c->caps = cfg;
-	_setup_pingpong_ops(c, c->caps->features);
 
 	if (cfg->merge_3d && cfg->merge_3d < MERGE_3D_MAX)
 		c->merge_3d = merge_3d_blks[cfg->merge_3d - MERGE_3D_0];
