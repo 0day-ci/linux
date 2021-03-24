@@ -2963,8 +2963,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 {
 	struct toshiba_acpi_dev *dev = acpi_driver_data(acpi_dev);
 
-	misc_deregister(&dev->miscdev);
-
 	remove_toshiba_proc_entries(dev);
 
 	if (dev->accelerometer_supported && dev->indio_dev) {
@@ -3014,6 +3012,13 @@ static void toshiba_acpi_singleton_clear(void *data)
 	toshiba_acpi = NULL;
 }
 
+static void toshiba_acpi_misc_deregister(void *data)
+{
+	struct miscdevice *miscdev = data;
+
+	misc_deregister(miscdev);
+}
+
 static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 {
 	struct device *parent = &acpi_dev->dev;
@@ -3055,6 +3060,11 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 		pr_err("Failed to register miscdevice\n");
 		return ret;
 	}
+
+	ret = devm_add_action_or_reset(parent, toshiba_acpi_misc_deregister,
+				       &dev->miscdev);
+	if (ret)
+		return ret;
 
 	acpi_dev->driver_data = dev;
 	dev_set_drvdata(&acpi_dev->dev, dev);
