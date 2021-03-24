@@ -650,4 +650,8 @@ static inline bool i915_request_use_semaphores(const struct i915_request *rq)
 	return intel_engine_has_semaphores(rq->engine);
 }
 
+bool
+i915_request_active_engine(struct i915_request *rq,
+			   struct intel_engine_cs **active);
+
 #endif /* I915_REQUEST_H */
