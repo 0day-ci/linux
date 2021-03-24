@@ -509,11 +509,11 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 out:
 	if (page) {
 		count_vm_event(CMA_ALLOC_SUCCESS);
-		cma_sysfs_alloc_pages_count(cma, count);
+		cma_sysfs_account_success_pages(cma, count);
 	} else {
 		count_vm_event(CMA_ALLOC_FAIL);
 		if (cma)
-			cma_sysfs_fail_pages_count(cma, count);
+			cma_sysfs_account_fail_pages(cma, count);
 	}
 
 	return page;

@@ -5,12 +5,8 @@
 #include <linux/debugfs.h>
 #include <linux/kobject.h>
 
-struct cma_stat {
-	spinlock_t lock;
-	/* the number of CMA page successful allocations */
-	unsigned long nr_pages_succeeded;
-	/* the number of CMA page allocation failures */
-	unsigned long nr_pages_failed;
+struct cma_kobject {
+	struct cma *cma;
 	struct kobject kobj;
 };
 
@@ -27,7 +23,12 @@ struct cma {
 #endif
 	char name[CMA_MAX_NAME];
 #ifdef CONFIG_CMA_SYSFS
-	struct cma_stat	*stat;
+	/* the number of CMA page successful allocations */
+	atomic64_t nr_pages_succeeded;
+	/* the number of CMA page allocation failures */
+	atomic64_t nr_pages_failed;
+	/* kobject requires dynamic object */
+	struct cma_kobject *cma_kobj;
 #endif
 };
 
@@ -40,10 +41,12 @@ static inline unsigned long cma_bitmap_maxno(struct cma *cma)
 }
 
 #ifdef CONFIG_CMA_SYSFS
-void cma_sysfs_alloc_pages_count(struct cma *cma, size_t count);
-void cma_sysfs_fail_pages_count(struct cma *cma, size_t count);
+void cma_sysfs_account_success_pages(struct cma *cma, unsigned long nr_pages);
+void cma_sysfs_account_fail_pages(struct cma *cma, unsigned long nr_pages);
 #else
-static inline void cma_sysfs_alloc_pages_count(struct cma *cma, size_t count) {};
-static inline void cma_sysfs_fail_pages_count(struct cma *cma, size_t count) {};
+static inline void cma_sysfs_account_success_pages(struct cma *cma,
+						   unsigned long nr_pages) {};
+static inline void cma_sysfs_account_fail_pages(struct cma *cma,
+						unsigned long nr_pages) {};
 #endif
 #endif
