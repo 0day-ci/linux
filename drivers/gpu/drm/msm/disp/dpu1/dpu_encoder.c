@@ -217,9 +217,6 @@ static void _dpu_encoder_setup_dither(struct dpu_hw_pingpong *hw_pp, unsigned bp
 {
 	struct dpu_hw_dither_cfg dither_cfg = { 0 };
 
-	if (!hw_pp->ops.setup_dither)
-		return;
-
 	switch (bpc) {
 	case 6:
 		dither_cfg.c0_bitdepth = 6;
