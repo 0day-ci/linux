@@ -596,13 +596,22 @@ static void mv3310_update_interface(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
 
-	/* In "XFI with Rate Matching" mode the PHY interface is fixed at
-	 * 10Gb. The PHY adapts the rate to actual wire speed with help of
+	/* In all of the "* with Rate Matching" modes the PHY interface is fixed
+	 * at 10Gb. The PHY adapts the rate to actual wire speed with help of
 	 * internal 16KB buffer.
 	 */
-	if (priv->mactype == MV_V2_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH) {
+	switch (priv->mactype) {
+	case MV_V2_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH:
 		phydev->interface = PHY_INTERFACE_MODE_10GBASER;
 		return;
+	case MV_V2_PORT_CTRL_MACTYPE_XAUI_RATE_MATCH:
+		phydev->interface = PHY_INTERFACE_MODE_XAUI;
+		return;
+	case MV_V2_PORT_CTRL_MACTYPE_RXAUI_RATE_MATCH:
+		phydev->interface = PHY_INTERFACE_MODE_RXAUI;
+		return;
+	default:
+		break;
 	}
 
 	if ((phydev->interface == PHY_INTERFACE_MODE_SGMII ||
