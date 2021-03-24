@@ -2591,7 +2591,22 @@ static const struct rfkill_ops wwan_rfk_ops = {
 	.poll = toshiba_acpi_wwan_poll,
 };
 
-static int toshiba_acpi_setup_wwan_rfkill(struct toshiba_acpi_dev *dev)
+static void toshiba_acpi_rfkill_destroy(void *data)
+{
+	struct rfkill *wwan_rfk = data;
+
+	rfkill_destroy(wwan_rfk);
+}
+
+static void toshiba_acpi_rfkill_unreg(void *data)
+{
+	struct rfkill *wwan_rfk = data;
+
+	rfkill_unregister(wwan_rfk);
+}
+
+static int toshiba_acpi_setup_wwan_rfkill(struct device *parent,
+					  struct toshiba_acpi_dev *dev)
 {
 	int ret = toshiba_wireless_status(dev);
 
@@ -2608,15 +2623,27 @@ static int toshiba_acpi_setup_wwan_rfkill(struct toshiba_acpi_dev *dev)
 		return -ENOMEM;
 	}
 
+	ret = devm_add_action_or_reset(parent, toshiba_acpi_rfkill_destroy,
+				       dev->wwan_rfk);
+	if (ret)
+		return ret;
+
 	rfkill_set_hw_state(dev->wwan_rfk, !dev->killswitch);
 
 	ret = rfkill_register(dev->wwan_rfk);
 	if (ret) {
 		pr_err("Unable to register WWAN rfkill device\n");
-		rfkill_destroy(dev->wwan_rfk);
+		return ret;
 	}
 
-	return ret;
+	ret = devm_add_action_or_reset(parent, toshiba_acpi_rfkill_unreg,
+				       dev->wwan_rfk);
+	if (ret) {
+		dev->wwan_rfk = NULL;
+		return ret;
+	}
+
+	return 0;
 }
 
 /*
@@ -2996,11 +3023,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 		sysfs_remove_group(&dev->acpi_dev->dev.kobj,
 				   &toshiba_attr_group);
 
-	if (dev->wwan_rfk) {
-		rfkill_unregister(dev->wwan_rfk);
-		rfkill_destroy(dev->wwan_rfk);
-	}
-
 	return 0;
 }
 
@@ -3189,7 +3211,7 @@ iio_error:
 
 	toshiba_wwan_available(dev);
 	if (dev->wwan_supported)
-		toshiba_acpi_setup_wwan_rfkill(dev);
+		toshiba_acpi_setup_wwan_rfkill(parent, dev);
 
 	toshiba_cooling_method_available(dev);
 
