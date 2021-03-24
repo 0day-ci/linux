@@ -1671,7 +1671,23 @@ static int __maybe_unused version_proc_show(struct seq_file *m, void *v)
 
 #define PROC_TOSHIBA		"toshiba"
 
-static void create_toshiba_proc_entries(struct toshiba_acpi_dev *dev)
+static void remove_toshiba_proc_entries(void *data)
+{
+	struct toshiba_acpi_dev *dev = data;
+
+	if (dev->backlight_dev)
+		remove_proc_entry("lcd", toshiba_proc_dir);
+	if (dev->video_supported)
+		remove_proc_entry("video", toshiba_proc_dir);
+	if (dev->fan_supported)
+		remove_proc_entry("fan", toshiba_proc_dir);
+	if (dev->hotkey_dev)
+		remove_proc_entry("keys", toshiba_proc_dir);
+	remove_proc_entry("version", toshiba_proc_dir);
+}
+
+static int create_toshiba_proc_entries(struct device *parent,
+				       struct toshiba_acpi_dev *dev)
 {
 	if (dev->backlight_dev)
 		proc_create_data("lcd", S_IRUGO | S_IWUSR, toshiba_proc_dir,
@@ -1687,19 +1703,8 @@ static void create_toshiba_proc_entries(struct toshiba_acpi_dev *dev)
 				 &keys_proc_ops, dev);
 	proc_create_single_data("version", S_IRUGO, toshiba_proc_dir,
 			version_proc_show, dev);
-}
 
-static void remove_toshiba_proc_entries(struct toshiba_acpi_dev *dev)
-{
-	if (dev->backlight_dev)
-		remove_proc_entry("lcd", toshiba_proc_dir);
-	if (dev->video_supported)
-		remove_proc_entry("video", toshiba_proc_dir);
-	if (dev->fan_supported)
-		remove_proc_entry("fan", toshiba_proc_dir);
-	if (dev->hotkey_dev)
-		remove_proc_entry("keys", toshiba_proc_dir);
-	remove_proc_entry("version", toshiba_proc_dir);
+	return devm_add_action_or_reset(parent, remove_toshiba_proc_entries, dev);
 }
 
 static const struct backlight_ops toshiba_backlight_data = {
@@ -3012,15 +3017,6 @@ static void print_supported_features(struct toshiba_acpi_dev *dev)
 	pr_cont("\n");
 }
 
-static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
-{
-	struct toshiba_acpi_dev *dev = acpi_driver_data(acpi_dev);
-
-	remove_toshiba_proc_entries(dev);
-
-	return 0;
-}
-
 static const char *find_hci_method(acpi_handle handle)
 {
 	if (acpi_has_method(handle, "GHCI"))
@@ -3230,7 +3226,9 @@ iio_error:
 	if (ret)
 		return ret;
 
-	create_toshiba_proc_entries(dev);
+	ret = create_toshiba_proc_entries(parent, dev);
+	if (ret)
+		return ret;
 
 	toshiba_acpi = dev;
 
@@ -3340,7 +3338,6 @@ static struct acpi_driver toshiba_acpi_driver = {
 	.flags	= ACPI_DRIVER_ALL_NOTIFY_EVENTS,
 	.ops	= {
 		.add		= toshiba_acpi_add,
-		.remove		= toshiba_acpi_remove,
 		.notify		= toshiba_acpi_notify,
 	},
 	.drv.pm	= &toshiba_acpi_pm,
