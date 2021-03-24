@@ -2992,11 +2992,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 
 	remove_toshiba_proc_entries(dev);
 
-	if (dev->accelerometer_supported && dev->indio_dev) {
-		iio_device_unregister(dev->indio_dev);
-		iio_device_free(dev->indio_dev);
-	}
-
 	if (dev->sysfs_created)
 		sysfs_remove_group(&dev->acpi_dev->dev.kobj,
 				   &toshiba_attr_group);
@@ -3149,7 +3144,7 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 
 	toshiba_accelerometer_available(dev);
 	if (dev->accelerometer_supported) {
-		dev->indio_dev = iio_device_alloc(&acpi_dev->dev, sizeof(*dev));
+		dev->indio_dev = devm_iio_device_alloc(parent, sizeof(*dev));
 		if (!dev->indio_dev) {
 			pr_err("Unable to allocate iio device\n");
 			goto iio_error;
@@ -3164,10 +3159,10 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 		dev->indio_dev->num_channels =
 					ARRAY_SIZE(toshiba_iio_accel_channels);
 
-		ret = iio_device_register(dev->indio_dev);
+		ret = devm_iio_device_register(parent, dev->indio_dev);
 		if (ret < 0) {
 			pr_err("Unable to register iio device\n");
-			iio_device_free(dev->indio_dev);
+			dev->indio_dev = NULL;
 		}
 	}
 iio_error:
