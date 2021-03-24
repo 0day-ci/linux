@@ -505,8 +505,7 @@ void dpu_encoder_helper_split_config(
 	 * update.
 	 */
 	if (phys_enc->split_role == ENC_ROLE_SOLO) {
-		if (hw_mdptop->ops.setup_split_pipe)
-			hw_mdptop->ops.setup_split_pipe(hw_mdptop, &cfg);
+		dpu_hw_setup_split_pipe(hw_mdptop, &cfg);
 		return;
 	}
 
@@ -521,8 +520,7 @@ void dpu_encoder_helper_split_config(
 	if (phys_enc->split_role == ENC_ROLE_MASTER) {
 		DPU_DEBUG_ENC(dpu_enc, "enable %d\n", cfg.en);
 
-		if (hw_mdptop->ops.setup_split_pipe)
-			hw_mdptop->ops.setup_split_pipe(hw_mdptop, &cfg);
+		dpu_hw_setup_split_pipe(hw_mdptop, &cfg);
 	}
 }
 
@@ -674,8 +672,7 @@ static void _dpu_encoder_update_vsync_source(struct dpu_encoder_virt *dpu_enc,
 		return;
 	}
 
-	if (hw_mdptop->ops.setup_vsync_source &&
-			disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) {
+	if (disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) {
 		for (i = 0; i < dpu_enc->num_phys_encs; i++)
 			vsync_cfg.ppnumber[i] = dpu_enc->hw_pp[i]->idx;
 
@@ -685,7 +682,7 @@ static void _dpu_encoder_update_vsync_source(struct dpu_encoder_virt *dpu_enc,
 		else
 			vsync_cfg.vsync_source = DPU_VSYNC0_SOURCE_GPIO;
 
-		hw_mdptop->ops.setup_vsync_source(hw_mdptop, &vsync_cfg);
+		dpu_hw_setup_vsync_source(hw_mdptop, &vsync_cfg);
 	}
 }
 
@@ -1095,10 +1092,8 @@ static void _dpu_encoder_virt_enable_helper(struct drm_encoder *drm_enc)
 
 
 	if (dpu_enc->disp_info.intf_type == DRM_MODE_CONNECTOR_DisplayPort &&
-		dpu_enc->cur_master->hw_mdptop &&
-		dpu_enc->cur_master->hw_mdptop->ops.intf_audio_select)
-		dpu_enc->cur_master->hw_mdptop->ops.intf_audio_select(
-			dpu_enc->cur_master->hw_mdptop);
+		dpu_enc->cur_master->hw_mdptop)
+		dpu_hw_intf_audio_select(dpu_enc->cur_master->hw_mdptop);
 
 	_dpu_encoder_update_vsync_source(dpu_enc, &dpu_enc->disp_info);
 

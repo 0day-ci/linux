@@ -50,7 +50,7 @@
 
 #define DCE_SEL                           0x450
 
-static void dpu_hw_setup_split_pipe(struct dpu_hw_mdp *mdp,
+void dpu_hw_setup_split_pipe(struct dpu_hw_mdp *mdp,
 		struct split_pipe_cfg *cfg)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -88,7 +88,7 @@ static void dpu_hw_setup_split_pipe(struct dpu_hw_mdp *mdp,
 	DPU_REG_WRITE(c, SPLIT_DISPLAY_EN, cfg->en & 0x1);
 }
 
-static bool dpu_hw_setup_clk_force_ctrl(struct dpu_hw_mdp *mdp,
+bool dpu_hw_setup_clk_force_ctrl(struct dpu_hw_mdp *mdp,
 		enum dpu_clk_ctrl_type clk_ctrl, bool enable)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -122,7 +122,7 @@ static bool dpu_hw_setup_clk_force_ctrl(struct dpu_hw_mdp *mdp,
 }
 
 
-static void dpu_hw_get_danger_status(struct dpu_hw_mdp *mdp,
+void dpu_hw_get_danger_status(struct dpu_hw_mdp *mdp,
 		struct dpu_danger_safe_status *status)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -151,7 +151,7 @@ static void dpu_hw_get_danger_status(struct dpu_hw_mdp *mdp,
 	status->sspp[SSPP_CURSOR1] = (value >> 26) & 0x3;
 }
 
-static void dpu_hw_setup_vsync_source(struct dpu_hw_mdp *mdp,
+void dpu_hw_setup_vsync_source(struct dpu_hw_mdp *mdp,
 		struct dpu_vsync_source_cfg *cfg)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -219,7 +219,7 @@ static void dpu_hw_setup_vsync_source(struct dpu_hw_mdp *mdp,
 	}
 }
 
-static void dpu_hw_get_safe_status(struct dpu_hw_mdp *mdp,
+void dpu_hw_get_safe_status(struct dpu_hw_mdp *mdp,
 		struct dpu_danger_safe_status *status)
 {
 	struct dpu_hw_blk_reg_map *c;
@@ -248,7 +248,7 @@ static void dpu_hw_get_safe_status(struct dpu_hw_mdp *mdp,
 	status->sspp[SSPP_CURSOR1] = (value >> 26) & 0x1;
 }
 
-static void dpu_hw_intf_audio_select(struct dpu_hw_mdp *mdp)
+void dpu_hw_intf_audio_select(struct dpu_hw_mdp *mdp)
 {
 	struct dpu_hw_blk_reg_map *c;
 
@@ -258,17 +258,6 @@ static void dpu_hw_intf_audio_select(struct dpu_hw_mdp *mdp)
 	c = &mdp->hw;
 
 	DPU_REG_WRITE(c, HDMI_DP_CORE_SELECT, 0x1);
-}
-
-static void _setup_mdp_ops(struct dpu_hw_mdp_ops *ops,
-		unsigned long cap)
-{
-	ops->setup_split_pipe = dpu_hw_setup_split_pipe;
-	ops->setup_clk_force_ctrl = dpu_hw_setup_clk_force_ctrl;
-	ops->get_danger_status = dpu_hw_get_danger_status;
-	ops->setup_vsync_source = dpu_hw_setup_vsync_source;
-	ops->get_safe_status = dpu_hw_get_safe_status;
-	ops->intf_audio_select = dpu_hw_intf_audio_select;
 }
 
 static const struct dpu_mdp_cfg *_top_offset(enum dpu_mdp mdp,
@@ -315,12 +304,8 @@ struct dpu_hw_mdp *dpu_hw_mdptop_init(enum dpu_mdp idx,
 		return ERR_PTR(-EINVAL);
 	}
 
-	/*
-	 * Assign ops
-	 */
 	mdp->idx = idx;
 	mdp->caps = cfg;
-	_setup_mdp_ops(&mdp->ops, mdp->caps->features);
 
 	dpu_hw_blk_init(&mdp->base, DPU_HW_BLK_TOP, idx);
 
