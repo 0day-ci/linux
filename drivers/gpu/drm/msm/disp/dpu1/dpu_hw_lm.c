@@ -59,7 +59,7 @@ static inline int _stage_offset(struct dpu_hw_mixer *ctx, enum dpu_stage stage)
 	return -EINVAL;
 }
 
-static void dpu_hw_lm_setup_out(struct dpu_hw_mixer *ctx,
+void dpu_hw_lm_setup_mixer_out(struct dpu_hw_mixer *ctx,
 		struct dpu_hw_mixer_cfg *mixer)
 {
 	struct dpu_hw_blk_reg_map *c = &ctx->hw;
@@ -79,7 +79,7 @@ static void dpu_hw_lm_setup_out(struct dpu_hw_mixer *ctx,
 	DPU_REG_WRITE(c, LM_OP_MODE, op_mode);
 }
 
-static void dpu_hw_lm_setup_border_color(struct dpu_hw_mixer *ctx,
+void dpu_hw_lm_setup_border_color(struct dpu_hw_mixer *ctx,
 		struct dpu_mdss_color *color,
 		u8 border_en)
 {
@@ -95,7 +95,7 @@ static void dpu_hw_lm_setup_border_color(struct dpu_hw_mixer *ctx,
 	}
 }
 
-static void dpu_hw_lm_setup_blend_config_sdm845(struct dpu_hw_mixer *ctx,
+void dpu_hw_lm_setup_blend_config(struct dpu_hw_mixer *ctx,
 	u32 stage, u32 fg_alpha, u32 bg_alpha, u32 blend_op)
 {
 	struct dpu_hw_blk_reg_map *c = &ctx->hw;
@@ -114,7 +114,7 @@ static void dpu_hw_lm_setup_blend_config_sdm845(struct dpu_hw_mixer *ctx,
 	DPU_REG_WRITE(c, LM_BLEND0_OP + stage_off, blend_op);
 }
 
-static void dpu_hw_lm_setup_color3(struct dpu_hw_mixer *ctx,
+void dpu_hw_lm_setup_alpha_out(struct dpu_hw_mixer *ctx,
 	uint32_t mixer_op_mode)
 {
 	struct dpu_hw_blk_reg_map *c = &ctx->hw;
@@ -126,16 +126,6 @@ static void dpu_hw_lm_setup_color3(struct dpu_hw_mixer *ctx,
 	op_mode = (op_mode & (BIT(31) | BIT(30))) | mixer_op_mode;
 
 	DPU_REG_WRITE(c, LM_OP_MODE, op_mode);
-}
-
-static void _setup_mixer_ops(const struct dpu_mdss_cfg *m,
-		struct dpu_hw_lm_ops *ops,
-		unsigned long features)
-{
-	ops->setup_mixer_out = dpu_hw_lm_setup_out;
-	ops->setup_blend_config = dpu_hw_lm_setup_blend_config_sdm845;
-	ops->setup_alpha_out = dpu_hw_lm_setup_color3;
-	ops->setup_border_color = dpu_hw_lm_setup_border_color;
 }
 
 struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
@@ -159,7 +149,6 @@ struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 	/* Assign ops */
 	c->idx = idx;
 	c->cap = cfg;
-	_setup_mixer_ops(m, &c->ops, c->cap->features);
 
 	if (cfg->dspp && cfg->dspp < DSPP_MAX)
 		c->dspp = dpu_hw_dspp_init(cfg->dspp, addr, m);

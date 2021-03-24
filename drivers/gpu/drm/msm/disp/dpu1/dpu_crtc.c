@@ -84,7 +84,7 @@ static void _dpu_crtc_setup_blend_cfg(struct dpu_crtc_mixer *mixer,
 			DPU_BLEND_BG_INV_ALPHA;
 	}
 
-	lm->ops.setup_blend_config(lm, pstate->stage,
+	dpu_hw_lm_setup_blend_config(lm, pstate->stage,
 				0xFF, 0, blend_op);
 
 	DPU_DEBUG("format:%s, alpha_en:%u blend_op:0x%x\n",
@@ -112,7 +112,7 @@ static void _dpu_crtc_program_lm_output_roi(struct drm_crtc *crtc)
 		cfg.out_height = drm_rect_height(lm_roi);
 		cfg.right_mixer = lm_horiz_position++;
 		cfg.flags = 0;
-		hw_lm->ops.setup_mixer_out(hw_lm, &cfg);
+		dpu_hw_lm_setup_mixer_out(hw_lm, &cfg);
 	}
 }
 
@@ -217,7 +217,7 @@ static void _dpu_crtc_blend_setup(struct drm_crtc *crtc)
 		ctl = mixer[i].lm_ctl;
 		lm = mixer[i].hw_lm;
 
-		lm->ops.setup_alpha_out(lm, mixer[i].mixer_op_mode);
+		dpu_hw_lm_setup_alpha_out(lm, mixer[i].mixer_op_mode);
 
 		mixer[i].flush_mask |= ctl->ops.get_bitmask_mixer(ctl,
 			mixer[i].hw_lm->idx);
