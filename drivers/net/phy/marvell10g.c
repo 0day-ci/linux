@@ -595,6 +595,10 @@ static int mv3310_aneg_done(struct phy_device *phydev)
 static void mv3310_update_interface(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	phy_interface_t interface10g;
+
+	if (!phydev->link)
+		return;
 
 	/* In all of the "* with Rate Matching" modes the PHY interface is fixed
 	 * at 10Gb. The PHY adapts the rate to actual wire speed with help of
@@ -610,38 +614,46 @@ static void mv3310_update_interface(struct phy_device *phydev)
 	case MV_V2_PORT_CTRL_MACTYPE_RXAUI_RATE_MATCH:
 		phydev->interface = PHY_INTERFACE_MODE_RXAUI;
 		return;
-	default:
+	case MV_V2_PORT_CTRL_MACTYPE_USXGMII:
+		phydev->interface = PHY_INTERFACE_MODE_USXGMII;
+		return;
+	case MV_V2_PORT_CTRL_MACTYPE_10GBASER:
+	case MV_V2_PORT_CTRL_MACTYPE_10GBASER_NO_SGMII_AN:
+		interface10g = PHY_INTERFACE_MODE_10GBASER;
 		break;
+	case MV_V2_PORT_CTRL_MACTYPE_XAUI:
+		interface10g = PHY_INTERFACE_MODE_XAUI;
+		break;
+	case MV_V2_PORT_CTRL_MACTYPE_RXAUI:
+		interface10g = PHY_INTERFACE_MODE_RXAUI;
+		break;
+	default:
+		unreachable();
 	}
 
-	if ((phydev->interface == PHY_INTERFACE_MODE_SGMII ||
-	     phydev->interface == PHY_INTERFACE_MODE_2500BASEX ||
-	     phydev->interface == PHY_INTERFACE_MODE_10GBASER) &&
-	    phydev->link) {
-		/* The PHY automatically switches its serdes interface (and
-		 * active PHYXS instance) between Cisco SGMII, 10GBase-R and
-		 * 2500BaseX modes according to the speed.  Florian suggests
-		 * setting phydev->interface to communicate this to the MAC.
-		 * Only do this if we are already in one of the above modes.
-		 */
-		switch (phydev->speed) {
-		case SPEED_10000:
-			phydev->interface = PHY_INTERFACE_MODE_10GBASER;
-			break;
-		case SPEED_5000:
-			phydev->interface = PHY_INTERFACE_MODE_5GBASER;
-			break;
-		case SPEED_2500:
-			phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
-			break;
-		case SPEED_1000:
-		case SPEED_100:
-		case SPEED_10:
-			phydev->interface = PHY_INTERFACE_MODE_SGMII;
-			break;
-		default:
-			break;
-		}
+	/* The PHY automatically switches its serdes interface (and active PHYXS
+	 * instance) between Cisco SGMII, 2500BaseX, 5GBase-R and 10GBase-R /
+	 * xaui / rxaui modes according to the speed.
+	 * Florian suggests setting phydev->interface to communicate this to the
+	 * MAC. Only do this if we are already in one of the above modes.
+	 */
+	switch (phydev->speed) {
+	case SPEED_10000:
+		phydev->interface = interface10g;
+		break;
+	case SPEED_5000:
+		phydev->interface = PHY_INTERFACE_MODE_5GBASER;
+		break;
+	case SPEED_2500:
+		phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
+		break;
+	case SPEED_1000:
+	case SPEED_100:
+	case SPEED_10:
+		phydev->interface = PHY_INTERFACE_MODE_SGMII;
+		break;
+	default:
+		break;
 	}
 }
 
