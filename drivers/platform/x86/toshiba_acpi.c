@@ -2995,9 +2995,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 		rfkill_destroy(dev->wwan_rfk);
 	}
 
-	if (toshiba_acpi)
-		toshiba_acpi = NULL;
-
 	return 0;
 }
 
@@ -3010,6 +3007,11 @@ static const char *find_hci_method(acpi_handle handle)
 		return "SPFC";
 
 	return NULL;
+}
+
+static void toshiba_acpi_singleton_clear(void *data)
+{
+	toshiba_acpi = NULL;
 }
 
 static int toshiba_acpi_add(struct acpi_device *acpi_dev)
@@ -3035,6 +3037,13 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 	dev = devm_kzalloc(parent, sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
+
+	ret = devm_add_action_or_reset(parent,
+				       toshiba_acpi_singleton_clear,
+				       NULL);
+	if (ret)
+		return ret;
+
 	dev->acpi_dev = acpi_dev;
 	dev->method_hci = hci_method;
 	dev->miscdev.minor = MISC_DYNAMIC_MINOR;
