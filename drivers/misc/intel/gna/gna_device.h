@@ -15,6 +15,7 @@
 
 struct gna_driver_private;
 struct workqueue_struct;
+union gna_parameter;
 struct device;
 
 struct gna_drv_info {
@@ -76,5 +77,7 @@ extern const struct pci_device_id gna_pci_ids[];
 int gna_probe(struct pci_dev *dev, const struct pci_device_id *id);
 
 void gna_remove(struct pci_dev *dev);
+
+int gna_getparam(struct gna_private *gna_priv, union gna_parameter *param);
 
 #endif /* __GNA_DEVICE_H__ */

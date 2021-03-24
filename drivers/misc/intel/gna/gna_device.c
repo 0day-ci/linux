@@ -5,8 +5,12 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 
+#include <uapi/misc/intel/gna.h>
+
 #include "gna_device.h"
 #include "gna_driver.h"
+#include "gna_hw.h"
+#include "gna_ioctl.h"
 #include "gna_request.h"
 
 #define GNA_DEV_HWID_CNL	0x5A11
@@ -261,4 +265,44 @@ void gna_remove(struct pci_dev *pcidev)
 	gna_dev_deinit(gna_priv);
 
 	pci_free_irq_vectors(pcidev);
+}
+
+static u32 gna_device_type_by_hwid(u32 hwid)
+{
+	switch (hwid) {
+	case GNA_DEV_HWID_CNL:
+		return GNA_DEV_TYPE_0_9;
+	case GNA_DEV_HWID_GLK:
+	case GNA_DEV_HWID_EHL:
+	case GNA_DEV_HWID_ICL:
+		return GNA_DEV_TYPE_1_0;
+	case GNA_DEV_HWID_JSL:
+	case GNA_DEV_HWID_TGL:
+		return GNA_DEV_TYPE_2_0;
+	default:
+		return 0;
+	}
+}
+
+int gna_getparam(struct gna_private *gna_priv, union gna_parameter *param)
+{
+	switch (param->in.id) {
+	case GNA_PARAM_DEVICE_ID:
+		param->out.value = gna_priv->info.hwid;
+		break;
+	case GNA_PARAM_RECOVERY_TIMEOUT:
+		param->out.value = jiffies_to_msecs(gna_priv->drv_priv->recovery_timeout_jiffies) / 1000;
+		break;
+	case GNA_PARAM_INPUT_BUFFER_S:
+		param->out.value = gna_priv->hw_info.in_buf_s;
+		break;
+	case GNA_PARAM_DEVICE_TYPE:
+		param->out.value = gna_device_type_by_hwid(gna_priv->info.hwid);
+		break;
+	default:
+		dev_err(&gna_priv->pdev->dev, "unknown parameter id %llu\n", param->in.id);
+		return -EINVAL;
+	}
+
+	return 0;
 }
