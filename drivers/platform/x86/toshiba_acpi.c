@@ -2998,8 +2998,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 	if (toshiba_acpi)
 		toshiba_acpi = NULL;
 
-	kfree(dev);
-
 	return 0;
 }
 
@@ -3016,6 +3014,7 @@ static const char *find_hci_method(acpi_handle handle)
 
 static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 {
+	struct device *parent = &acpi_dev->dev;
 	struct toshiba_acpi_dev *dev;
 	const char *hci_method;
 	u32 dummy;
@@ -3033,7 +3032,7 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 		return -ENODEV;
 	}
 
-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	dev = devm_kzalloc(parent, sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
 	dev->acpi_dev = acpi_dev;
@@ -3045,7 +3044,6 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 	ret = misc_register(&dev->miscdev);
 	if (ret) {
 		pr_err("Failed to register miscdevice\n");
-		kfree(dev);
 		return ret;
 	}
 
