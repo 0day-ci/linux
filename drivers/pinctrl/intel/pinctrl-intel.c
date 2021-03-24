@@ -1481,15 +1481,21 @@ static int intel_pinctrl_probe(struct platform_device *pdev,
 
 	for (i = 0; i < pctrl->ncommunities; i++) {
 		struct intel_community *community = &pctrl->communities[i];
+		struct resource *res;
 		void __iomem *regs;
+		size_t size;
 		u32 offset;
 		u32 value;
 
 		*community = pctrl->soc->communities[i];
 
-		regs = devm_platform_ioremap_resource(pdev, community->barno);
+		regs = devm_platform_get_and_ioremap_resource(pdev,
+							      community->barno,
+							      &res);
 		if (IS_ERR(regs))
 			return PTR_ERR(regs);
+
+		size = res->end - res->start;
 
 		/* Determine community features based on the revision */
 		value = readl(regs + REVID);
@@ -1521,6 +1527,12 @@ static int intel_pinctrl_probe(struct platform_device *pdev,
 				break;
 			}
 			offset = (value & CAPLIST_NEXT_MASK) >> CAPLIST_NEXT_SHIFT;
+			if (offset >= size) {
+				dev_err(&pdev->dev,
+					"wrong capability offset: %#x\n",
+					offset);
+				return -ENOENT;
+			}
 		} while (offset);
 
 		dev_dbg(&pdev->dev, "Community%d features: %#08x\n", i, community->features);
