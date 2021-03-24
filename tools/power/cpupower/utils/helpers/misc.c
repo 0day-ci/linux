@@ -30,10 +30,15 @@ int cpufreq_has_boost_support(unsigned int cpu, int *support, int *active,
 		 */
 
 		if (cpupower_cpu_info.caps & CPUPOWER_CAP_AMD_CPB_MSR) {
-			if (!read_msr(cpu, MSR_AMD_HWCR, &val)) {
+			ret = read_msr(cpu, MSR_AMD_HWCR, &val);
+			if (!ret) {
 				if (!(val & CPUPOWER_AMD_CPBDIS))
 					*active = 1;
-			}
+			} else
+				/* no permission to access /dev/cpu/%d/msr, return -1 immediately,
+				 * and should not follow the original logic to return 0
+				 */
+				return ret;
 		} else {
 			ret = amd_pci_get_num_boost_states(active, states);
 			if (ret)
