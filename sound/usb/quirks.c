@@ -427,10 +427,10 @@ static int create_autodetect_quirks(struct snd_usb_audio *chip,
 
 		err = create_autodetect_quirk(chip, iface, driver);
 		if (err >= 0)
-			usb_driver_claim_interface(driver, iface, (void *)-1L);
+			err = usb_driver_claim_interface(driver, iface, (void *)-1L);
 	}
 
-	return 0;
+	return err;
 }
 
 /*
