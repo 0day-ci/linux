@@ -6,7 +6,6 @@
 
 #include <linux/bits.h>
 #include <linux/bitfield.h>
-#include <linux/interrupt.h>
 #include <linux/io.h>
 
 /* GNA MMIO registers */

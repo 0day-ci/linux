@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright(c) 2017-2021 Intel Corporation
 
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 
@@ -153,6 +154,16 @@ static void gna_dev_deinit(struct gna_private *gna_priv)
 	gna_mmu_free(gna_priv);
 }
 
+static irqreturn_t gna_interrupt(int irq, void *priv)
+{
+	struct gna_private *gna_priv;
+
+	gna_priv = (struct gna_private *)priv;
+	gna_priv->dev_busy = false;
+	wake_up(&gna_priv->dev_busy_waitq);
+	return IRQ_HANDLED;
+}
+
 int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)
 {
 	struct gna_private *gna_priv;
@@ -201,14 +212,42 @@ int gna_probe(struct pci_dev *pcidev, const struct pci_device_id *pci_id)
 
 	pci_set_master(pcidev);
 
+	ret = pci_alloc_irq_vectors(pcidev, 1, 1, PCI_IRQ_ALL_TYPES);
+	if (ret < 0)
+		return ret;
+
+	gna_priv->irq = pci_irq_vector(pcidev, 0);
+	if (unlikely(gna_priv->irq < 0)) {
+		dev_err(&pcidev->dev, "could not obtain irq number\n");
+		ret = -EIO;
+		goto err_free_irq_vector;
+	}
+
+	ret = request_irq(gna_priv->irq, gna_interrupt,
+			IRQF_SHARED, GNA_DV_NAME, gna_priv);
+
+	if (ret) {
+		dev_err(&pcidev->dev, "could not register for interrupt\n");
+		goto err_free_irq_vector;
+	}
+
+	dev_dbg(&pcidev->dev, "irq num %d\n", gna_priv->irq);
+
 	ret = gna_dev_init(gna_priv, pcidev, pci_id);
 	if (ret) {
 		dev_err(&pcidev->dev, "could not initialize %s device\n", GNA_DV_NAME);
-		return ret;
+		goto err_free_irq;
 	}
 
 
 	return 0;
+
+err_free_irq:
+	free_irq(gna_priv->irq, gna_priv);
+err_free_irq_vector:
+	pci_free_irq_vectors(pcidev);
+
+	return ret;
 }
 
 void gna_remove(struct pci_dev *pcidev)
@@ -217,5 +256,9 @@ void gna_remove(struct pci_dev *pcidev)
 
 	gna_priv = pci_get_drvdata(pcidev);
 
+	free_irq(gna_priv->irq, gna_priv);
+
 	gna_dev_deinit(gna_priv);
+
+	pci_free_irq_vectors(pcidev);
 }

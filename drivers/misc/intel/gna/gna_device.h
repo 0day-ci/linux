@@ -43,6 +43,8 @@ struct gna_private {
 	/* pdev->dev */
 	struct device *parent;
 
+	int irq;
+	/* hardware status set by interrupt handler */
 	u32 hw_status;
 
 	/* device related resources */
