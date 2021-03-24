@@ -462,14 +462,14 @@ static void _dpu_crtc_setup_cp_blocks(struct drm_crtc *crtc)
 		ctl = mixer[i].lm_ctl;
 		dspp = mixer[i].hw_dspp;
 
-		if (!dspp || !dspp->ops.setup_pcc)
+		if (!dspp)
 			continue;
 
 		if (!state->ctm) {
-			dspp->ops.setup_pcc(dspp, NULL);
+			dpu_hw_dspp_setup_pcc(dspp, NULL);
 		} else {
 			_dpu_crtc_get_pcc_coeff(state, &cfg);
-			dspp->ops.setup_pcc(dspp, &cfg);
+			dpu_hw_dspp_setup_pcc(dspp, &cfg);
 		}
 
 		mixer[i].flush_mask |= ctl->ops.get_bitmask_dspp(ctl,

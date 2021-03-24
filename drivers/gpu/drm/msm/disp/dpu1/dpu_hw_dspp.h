@@ -36,19 +36,15 @@ struct dpu_hw_pcc_cfg {
 };
 
 /**
- * struct dpu_hw_dspp_ops - interface to the dspp hardware driver functions
  * Caller must call the init function to get the dspp context for each dspp
  * Assumption is these functions will be called after clocks are enabled
  */
-struct dpu_hw_dspp_ops {
-	/**
-	 * setup_pcc - setup dspp pcc
-	 * @ctx: Pointer to dspp context
-	 * @cfg: Pointer to configuration
-	 */
-	void (*setup_pcc)(struct dpu_hw_dspp *ctx, struct dpu_hw_pcc_cfg *cfg);
-
-};
+/**
+ * setup_pcc - setup dspp pcc
+ * @ctx: Pointer to dspp context
+ * @cfg: Pointer to configuration
+ */
+void dpu_hw_dspp_setup_pcc(struct dpu_hw_dspp *ctx, struct dpu_hw_pcc_cfg *cfg);
 
 /**
  * struct dpu_hw_dspp - dspp description
@@ -65,9 +61,6 @@ struct dpu_hw_dspp {
 	/* dspp */
 	int idx;
 	const struct dpu_dspp_cfg *cap;
-
-	/* Ops */
-	struct dpu_hw_dspp_ops ops;
 };
 
 /**

@@ -22,7 +22,7 @@
 #define PCC_BLUE_G_OFF 0x24
 #define PCC_BLUE_B_OFF 0x30
 
-static void dpu_setup_dspp_pcc(struct dpu_hw_dspp *ctx,
+void dpu_hw_dspp_setup_pcc(struct dpu_hw_dspp *ctx,
 		struct dpu_hw_pcc_cfg *cfg)
 {
 
@@ -30,6 +30,11 @@ static void dpu_setup_dspp_pcc(struct dpu_hw_dspp *ctx,
 
 	if (!ctx || !base) {
 		DRM_ERROR("invalid ctx %pK pcc base 0x%x\n", ctx, base);
+		return;
+	}
+
+	if (!test_bit(DPU_DSPP_PCC, &ctx->cap->features)) {
+		DRM_ERROR("called for wrong DSPP block\n");
 		return;
 	}
 
@@ -52,13 +57,6 @@ static void dpu_setup_dspp_pcc(struct dpu_hw_dspp *ctx,
 	DPU_REG_WRITE(&ctx->hw, base + PCC_BLUE_B_OFF, cfg->b.b);
 
 	DPU_REG_WRITE(&ctx->hw, base, PCC_EN);
-}
-
-static void _setup_dspp_ops(struct dpu_hw_dspp *c,
-		unsigned long features)
-{
-	if (test_bit(DPU_DSPP_PCC, &features))
-		c->ops.setup_pcc = dpu_setup_dspp_pcc;
 }
 
 static const struct dpu_dspp_cfg *_dspp_offset(enum dpu_dspp dspp,
@@ -108,7 +106,6 @@ struct dpu_hw_dspp *dpu_hw_dspp_init(enum dpu_dspp idx,
 	/* Assign ops */
 	c->idx = idx;
 	c->cap = cfg;
-	_setup_dspp_ops(c, c->cap->features);
 
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_DSPP, idx);
 
