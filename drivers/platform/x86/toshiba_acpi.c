@@ -186,7 +186,6 @@ struct toshiba_acpi_dev {
 	unsigned int video_supported:1;
 	unsigned int fan_supported:1;
 	unsigned int system_event_supported:1;
-	unsigned int ntfy_supported:1;
 	unsigned int info_supported:1;
 	unsigned int tr_backlight_supported:1;
 	unsigned int kbd_illum_supported:1;
@@ -2756,9 +2755,23 @@ static void toshiba_acpi_process_hotkeys(struct toshiba_acpi_dev *dev)
 	}
 }
 
-static int toshiba_acpi_setup_keyboard(struct toshiba_acpi_dev *dev)
+static void toshiba_acpi_cancel_hotkey_work(void *data)
+{
+	struct work_struct *hotkey_work = data;
+
+	cancel_work_sync(hotkey_work);
+}
+
+static void toshiba_acpi_i8042_remove_filter(void *data)
+{
+	i8042_remove_filter(toshiba_acpi_i8042_filter);
+}
+
+static int toshiba_acpi_setup_keyboard(struct device *parent,
+				       struct toshiba_acpi_dev *dev)
 {
 	const struct key_entry *keymap = toshiba_acpi_keymap;
+	bool ntfy_supported = false;
 	acpi_handle ec_handle;
 	int error;
 
@@ -2779,7 +2792,7 @@ static int toshiba_acpi_setup_keyboard(struct toshiba_acpi_dev *dev)
 	if (toshiba_hotkey_event_type_get(dev, &dev->hotkey_event_type))
 		pr_notice("Unable to query Hotkey Event Type\n");
 
-	dev->hotkey_dev = input_allocate_device();
+	dev->hotkey_dev = devm_input_allocate_device(parent);
 	if (!dev->hotkey_dev)
 		return -ENOMEM;
 
@@ -2798,7 +2811,7 @@ static int toshiba_acpi_setup_keyboard(struct toshiba_acpi_dev *dev)
 			dev->hotkey_event_type);
 	error = sparse_keymap_setup(dev->hotkey_dev, keymap, NULL);
 	if (error)
-		goto err_free_dev;
+		goto err_null_dev;
 
 	/*
 	 * For some machines the SCI responsible for providing hotkey
@@ -2811,13 +2824,19 @@ static int toshiba_acpi_setup_keyboard(struct toshiba_acpi_dev *dev)
 	if (ec_handle && acpi_has_method(ec_handle, "NTFY")) {
 		INIT_WORK(&dev->hotkey_work, toshiba_acpi_hotkey_work);
 
+		error = devm_add_action(parent,
+					toshiba_acpi_cancel_hotkey_work,
+					&dev->hotkey_work);
+		if (error)
+			return error;
+
 		error = i8042_install_filter(toshiba_acpi_i8042_filter);
 		if (error) {
 			pr_err("Error installing key filter\n");
-			goto err_free_dev;
+			return error;
 		}
 
-		dev->ntfy_supported = 1;
+		ntfy_supported = true;
 	}
 
 	/*
@@ -2840,13 +2859,19 @@ static int toshiba_acpi_setup_keyboard(struct toshiba_acpi_dev *dev)
 		goto err_remove_filter;
 	}
 
+	if (ntfy_supported) {
+		error = devm_add_action(parent,
+					toshiba_acpi_i8042_remove_filter,
+					NULL);
+		goto err_remove_filter;
+	}
+
 	return 0;
 
- err_remove_filter:
-	if (dev->ntfy_supported)
+err_remove_filter:
+	if (ntfy_supported)
 		i8042_remove_filter(toshiba_acpi_i8042_filter);
- err_free_dev:
-	input_free_device(dev->hotkey_dev);
+err_null_dev:
 	dev->hotkey_dev = NULL;
 	return error;
 }
@@ -2974,14 +2999,6 @@ static int toshiba_acpi_remove(struct acpi_device *acpi_dev)
 		sysfs_remove_group(&dev->acpi_dev->dev.kobj,
 				   &toshiba_attr_group);
 
-	if (dev->ntfy_supported) {
-		i8042_remove_filter(toshiba_acpi_i8042_filter);
-		cancel_work_sync(&dev->hotkey_work);
-	}
-
-	if (dev->hotkey_dev)
-		input_unregister_device(dev->hotkey_dev);
-
 	backlight_device_unregister(dev->backlight_dev);
 
 	led_classdev_unregister(&dev->led_dev);
@@ -3080,7 +3097,7 @@ static int toshiba_acpi_add(struct acpi_device *acpi_dev)
 	dev->kbd_function_keys_supported = !ret;
 
 	dev->hotkey_event_type = 0;
-	if (toshiba_acpi_setup_keyboard(dev))
+	if (toshiba_acpi_setup_keyboard(parent, dev))
 		pr_info("Unable to activate hotkeys\n");
 
 	/* Determine whether or not BIOS supports transflective backlight */
