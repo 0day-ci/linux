@@ -6,6 +6,7 @@
 
 #include "gna_device.h"
 #include "gna_driver.h"
+#include "gna_request.h"
 
 #define GNA_DEV_HWID_CNL	0x5A11
 #define GNA_DEV_HWID_EHL	0x4511
@@ -117,6 +118,11 @@ static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 
 	idr_init(&gna_priv->memory_idr);
 	mutex_init(&gna_priv->memidr_lock);
+
+	atomic_set(&gna_priv->request_count, 0);
+
+	mutex_init(&gna_priv->reqlist_lock);
+	INIT_LIST_HEAD(&gna_priv->request_list);
 
 	return 0;
 

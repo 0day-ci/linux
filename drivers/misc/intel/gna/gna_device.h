@@ -6,6 +6,7 @@
 
 #include <linux/types.h>
 #include <linux/mutex.h>
+#include <linux/list.h>
 #include <linux/idr.h>
 #include <linux/pci.h>
 
@@ -43,6 +44,11 @@ struct gna_private {
 
 	struct gna_mmu_object mmu;
 	struct mutex mmu_lock;
+
+	struct list_head request_list;
+	/* protects request_list */
+	struct mutex reqlist_lock;
+	atomic_t request_count;
 
 	/* memory objects' store */
 	struct idr memory_idr;

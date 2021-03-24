@@ -17,6 +17,7 @@
 #include "gna_device.h"
 #include "gna_driver.h"
 #include "gna_mem.h"
+#include "gna_request.h"
 
 static void gna_mmu_init(struct gna_private *gna_priv)
 {
@@ -391,6 +392,8 @@ static void gna_memory_release(struct work_struct *work)
 	struct gna_memory_object *mo;
 
 	mo = container_of(work, struct gna_memory_object, work);
+
+	gna_delete_memory_requests(mo->memory_id, mo->gna_priv);
 
 	mo->user_ptr = NULL;
 
