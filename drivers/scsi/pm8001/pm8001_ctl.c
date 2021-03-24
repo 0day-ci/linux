@@ -964,6 +964,29 @@ static ssize_t ctl_iop0_count_show(struct device *cdev,
 }
 static DEVICE_ATTR_RO(ctl_iop0_count);
 
+/**
+ * ctl_iop1_count_show - controller iop1 count check
+ * @cdev: pointer to embedded class device
+ * @buf: the buffer returned
+ *
+ * A sysfs 'read-only' shost attribute.
+ */
+
+static ssize_t ctl_iop1_count_show(struct device *cdev,
+		struct device_attribute *attr, char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(cdev);
+	struct sas_ha_struct *sha = SHOST_TO_SAS_HA(shost);
+	struct pm8001_hba_info *pm8001_ha = sha->lldd_ha;
+	unsigned int iop1cnt;
+	int c;
+
+	iop1cnt = pm8001_mr32(pm8001_ha->general_stat_tbl_addr, 20);
+	c = sysfs_emit(buf, "0x%08x\n", iop1cnt);
+	return c;
+}
+static DEVICE_ATTR_RO(ctl_iop1_count);
+
 struct device_attribute *pm8001_host_attrs[] = {
 	&dev_attr_interface_rev,
 	&dev_attr_controller_fatal_error,
@@ -990,6 +1013,7 @@ struct device_attribute *pm8001_host_attrs[] = {
 	&dev_attr_ctl_mpi_state,
 	&dev_attr_ctl_raae_count,
 	&dev_attr_ctl_iop0_count,
+	&dev_attr_ctl_iop1_count,
 	NULL,
 };
 
