@@ -15,7 +15,6 @@ struct dpu_global_state;
 
 /**
  * struct dpu_rm - DPU dynamic hardware resource manager
- * @pingpong_blks: array of pingpong hardware resources
  * @mixer_blks: array of layer mixer hardware resources
  * @ctl_blks: array of ctl hardware resources
  * @intf_blks: array of intf hardware resources
@@ -23,7 +22,6 @@ struct dpu_global_state;
  * @rm_lock: resource manager mutex
  */
 struct dpu_rm {
-	struct dpu_hw_blk *pingpong_blks[PINGPONG_MAX - PINGPONG_0];
 	struct dpu_hw_blk *mixer_blks[LM_MAX - LM_0];
 	struct dpu_hw_blk *ctl_blks[CTL_MAX - CTL_0];
 	struct dpu_hw_blk *intf_blks[INTF_MAX - INTF_0];

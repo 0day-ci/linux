@@ -835,20 +835,17 @@ DEFINE_EVENT(dpu_rm_iter_template, dpu_rm_reserve_ctls,
 );
 
 TRACE_EVENT(dpu_rm_reserve_lms,
-	TP_PROTO(uint32_t id, uint32_t enc_id, uint32_t pp_id),
-	TP_ARGS(id, enc_id, pp_id),
+	TP_PROTO(uint32_t id, uint32_t enc_id),
+	TP_ARGS(id, enc_id),
 	TP_STRUCT__entry(
 		__field(	uint32_t,		id	)
 		__field(	uint32_t,		enc_id	)
-		__field(	uint32_t,		pp_id	)
 	),
 	TP_fast_assign(
 		__entry->id = id;
 		__entry->enc_id = enc_id;
-		__entry->pp_id = pp_id;
 	),
-	TP_printk("id:%d enc_id:%u pp_id:%u", __entry->id,
-		  __entry->enc_id, __entry->pp_id)
+	TP_printk("id:%d enc_id:%u", __entry->id, __entry->enc_id)
 );
 
 TRACE_EVENT(dpu_vbif_wait_xin_halt_fail,

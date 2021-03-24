@@ -8,6 +8,7 @@
 #include "dpu_hw_dspp.h"
 #include "dpu_hw_lm.h"
 #include "dpu_hw_mdss.h"
+#include "dpu_hw_pingpong.h"
 
 #define LM_OP_MODE                        0x00
 #define LM_OUT_SIZE                       0x04
@@ -163,7 +164,8 @@ static void _setup_mixer_ops(const struct dpu_mdss_cfg *m,
 
 struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 		void __iomem *addr,
-		const struct dpu_mdss_cfg *m)
+		const struct dpu_mdss_cfg *m,
+		struct dpu_hw_merge_3d **merge_3d_blks)
 {
 	struct dpu_hw_mixer *c;
 	const struct dpu_lm_cfg *cfg;
@@ -185,6 +187,8 @@ struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 
 	if (cfg->dspp && cfg->dspp < DSPP_MAX)
 		c->dspp = dpu_hw_dspp_init(cfg->dspp, addr, m);
+	if (cfg->pingpong && cfg->pingpong < PINGPONG_MAX)
+		c->pingpong = dpu_hw_pingpong_init(cfg->pingpong, addr, m, merge_3d_blks);
 
 	dpu_hw_blk_init(&c->base, DPU_HW_BLK_LM, idx);
 
@@ -193,7 +197,9 @@ struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 
 void dpu_hw_lm_destroy(struct dpu_hw_mixer *lm)
 {
-	if (lm)
+	if (lm) {
 		dpu_hw_dspp_destroy(lm->dspp);
+		dpu_hw_pingpong_destroy(lm->pingpong);
+	}
 	kfree(lm);
 }

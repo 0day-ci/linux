@@ -64,6 +64,7 @@ struct dpu_hw_mixer {
 	const struct dpu_lm_cfg   *cap;
 	const struct dpu_mdp_cfg  *mdp;
 	const struct dpu_ctl_cfg  *ctl;
+	struct dpu_hw_pingpong *pingpong;
 	struct dpu_hw_dspp *dspp;
 
 	/* ops */
@@ -83,16 +84,19 @@ static inline struct dpu_hw_mixer *to_dpu_hw_mixer(struct dpu_hw_blk *hw)
 	return container_of(hw, struct dpu_hw_mixer, base);
 }
 
+struct dpu_hw_merge_3d;
 /**
  * dpu_hw_lm_init(): Initializes the mixer hw driver object.
  * should be called once before accessing every mixer.
  * @idx:  mixer index for which driver object is required
  * @addr: mapped register io address of MDP
  * @m :   pointer to mdss catalog data
+ * @merge_3d_blks: Pointer to merge 3d blocks
  */
 struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
 		void __iomem *addr,
-		const struct dpu_mdss_cfg *m);
+		const struct dpu_mdss_cfg *m,
+		struct dpu_hw_merge_3d **merge_3d_blks);
 
 /**
  * dpu_hw_lm_destroy(): Destroys layer mixer driver context

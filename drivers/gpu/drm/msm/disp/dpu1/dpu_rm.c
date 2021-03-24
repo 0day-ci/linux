@@ -7,7 +7,6 @@
 #include "dpu_kms.h"
 #include "dpu_hw_lm.h"
 #include "dpu_hw_ctl.h"
-#include "dpu_hw_pingpong.h"
 #include "dpu_hw_intf.h"
 #include "dpu_encoder.h"
 #include "dpu_trace.h"
@@ -39,14 +38,6 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 		if (rm->mixer_blks[i]) {
 			hw = to_dpu_hw_mixer(rm->mixer_blks[i]);
 			dpu_hw_lm_destroy(hw);
-		}
-	}
-	for (i = 0; i < ARRAY_SIZE(rm->pingpong_blks); i++) {
-		struct dpu_hw_pingpong *hw;
-
-		if (rm->pingpong_blks[i]) {
-			hw = to_dpu_hw_pingpong(rm->pingpong_blks[i]);
-			dpu_hw_pingpong_destroy(hw);
 		}
 	}
 	for (i = 0; i < ARRAY_SIZE(rm->ctl_blks); i++) {
@@ -85,24 +76,6 @@ int dpu_rm_init(struct dpu_rm *rm,
 	memset(rm, 0, sizeof(*rm));
 
 	/* Interrogate HW catalog and create tracking items for hw blocks */
-	for (i = 0; i < cat->pingpong_count; i++) {
-		struct dpu_hw_pingpong *hw;
-		const struct dpu_pingpong_cfg *pp = &cat->pingpong[i];
-
-		if (pp->id < PINGPONG_0 || pp->id >= PINGPONG_MAX) {
-			DPU_ERROR("skip pingpong %d with invalid id\n", pp->id);
-			continue;
-		}
-		hw = dpu_hw_pingpong_init(pp->id, mmio, cat, dpu_kms->hw_merge_3d);
-		if (IS_ERR_OR_NULL(hw)) {
-			rc = PTR_ERR(hw);
-			DPU_ERROR("failed pingpong object creation: err %d\n",
-				rc);
-			goto fail;
-		}
-		rm->pingpong_blks[pp->id - PINGPONG_0] = &hw->base;
-	}
-
 	for (i = 0; i < cat->intf_count; i++) {
 		struct dpu_hw_intf *hw;
 		const struct dpu_intf_cfg *intf = &cat->intf[i];
@@ -154,7 +127,7 @@ int dpu_rm_init(struct dpu_rm *rm,
 			DPU_ERROR("skip mixer %d with invalid id\n", lm->id);
 			continue;
 		}
-		hw = dpu_hw_lm_init(lm->id, mmio, cat);
+		hw = dpu_hw_lm_init(lm->id, mmio, cat, dpu_kms->hw_merge_3d);
 		if (IS_ERR_OR_NULL(hw)) {
 			rc = PTR_ERR(hw);
 			DPU_ERROR("failed lm object creation: err %d\n", rc);
@@ -213,53 +186,6 @@ static bool _dpu_rm_check_lm_peer(struct dpu_rm *rm, int primary_idx,
 	return true;
 }
 
-/**
- * _dpu_rm_check_lm_and_get_connected_blks - check if proposed layer mixer meets
- *	proposed use case requirements, incl. hardwired dependent blocks like
- *	pingpong
- * @rm: dpu resource manager handle
- * @global_state: resources shared across multiple kms objects
- * @enc_id: encoder id requesting for allocation
- * @lm_idx: index of proposed layer mixer in rm->mixer_blks[], function checks
- *      if lm, and all other hardwired blocks connected to the lm (pp) is
- *      available and appropriate
- * @pp_idx: output parameter, index of pingpong block attached to the layer
- *      mixer in rm->pingpong_blks[].
- * @reqs: input parameter, rm requirements for HW blocks needed in the
- *      datapath.
- * Return: true if lm matches all requirements, false otherwise
- */
-static bool _dpu_rm_check_lm_and_get_connected_blks(struct dpu_rm *rm,
-		struct dpu_global_state *global_state,
-		uint32_t enc_id, int lm_idx, int *pp_idx,
-		struct dpu_rm_requirements *reqs)
-{
-	const struct dpu_lm_cfg *lm_cfg;
-	int idx;
-
-	/* Already reserved? */
-	if (reserved_by_other(global_state->mixer_to_enc_id, lm_idx, enc_id)) {
-		DPU_DEBUG("lm %d already reserved\n", lm_idx + LM_0);
-		return false;
-	}
-
-	lm_cfg = to_dpu_hw_mixer(rm->mixer_blks[lm_idx])->cap;
-	idx = lm_cfg->pingpong - PINGPONG_0;
-	if (idx < 0 || idx >= ARRAY_SIZE(rm->pingpong_blks)) {
-		DPU_ERROR("failed to get pp on lm %d\n", lm_cfg->pingpong);
-		return false;
-	}
-
-	if (reserved_by_other(global_state->pingpong_to_enc_id, idx, enc_id)) {
-		DPU_DEBUG("lm %d pp %d already reserved\n", lm_cfg->id,
-				lm_cfg->pingpong);
-		return false;
-	}
-	*pp_idx = idx;
-
-	return true;
-}
-
 static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 			       struct dpu_global_state *global_state,
 			       uint32_t enc_id,
@@ -267,7 +193,6 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 
 {
 	int lm_idx[MAX_BLOCKS];
-	int pp_idx[MAX_BLOCKS];
 	int i, j, lm_count = 0;
 
 	if (!reqs->topology.num_lm) {
@@ -284,9 +209,8 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 		lm_count = 0;
 		lm_idx[lm_count] = i;
 
-		if (!_dpu_rm_check_lm_and_get_connected_blks(rm, global_state,
-				enc_id, i, &pp_idx[lm_count],
-				reqs)) {
+		if (reserved_by_other(global_state->mixer_to_enc_id, i, enc_id)) {
+			DPU_DEBUG("lm %d already reserved\n", i + LM_0);
 			continue;
 		}
 
@@ -304,10 +228,8 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 				continue;
 			}
 
-			if (!_dpu_rm_check_lm_and_get_connected_blks(rm,
-					global_state, enc_id, j,
-					&pp_idx[lm_count],
-					reqs)) {
+			if (reserved_by_other(global_state->mixer_to_enc_id, j, enc_id)) {
+				DPU_DEBUG("lm %d already reserved\n", j + LM_0);
 				continue;
 			}
 
@@ -323,10 +245,8 @@ static int _dpu_rm_reserve_lms(struct dpu_rm *rm,
 
 	for (i = 0; i < lm_count; i++) {
 		global_state->mixer_to_enc_id[lm_idx[i]] = enc_id;
-		global_state->pingpong_to_enc_id[pp_idx[i]] = enc_id;
 
-		trace_dpu_rm_reserve_lms(lm_idx[i] + LM_0, enc_id,
-					 pp_idx[i] + PINGPONG_0);
+		trace_dpu_rm_reserve_lms(lm_idx[i] + LM_0, enc_id);
 	}
 
 	return 0;
@@ -492,8 +412,6 @@ static void _dpu_rm_clear_mapping(uint32_t *res_mapping, int cnt,
 void dpu_rm_release(struct dpu_global_state *global_state,
 		    struct drm_encoder *enc)
 {
-	_dpu_rm_clear_mapping(global_state->pingpong_to_enc_id,
-		ARRAY_SIZE(global_state->pingpong_to_enc_id), enc->base.id);
 	_dpu_rm_clear_mapping(global_state->mixer_to_enc_id,
 		ARRAY_SIZE(global_state->mixer_to_enc_id), enc->base.id);
 	_dpu_rm_clear_mapping(global_state->ctl_to_enc_id,
@@ -548,11 +466,6 @@ int dpu_rm_get_assigned_resources(struct dpu_rm *rm,
 	int i, num_blks, max_blks;
 
 	switch (type) {
-	case DPU_HW_BLK_PINGPONG:
-		hw_blks = rm->pingpong_blks;
-		hw_to_enc_id = global_state->pingpong_to_enc_id;
-		max_blks = ARRAY_SIZE(rm->pingpong_blks);
-		break;
 	case DPU_HW_BLK_LM:
 		hw_blks = rm->mixer_blks;
 		hw_to_enc_id = global_state->mixer_to_enc_id;

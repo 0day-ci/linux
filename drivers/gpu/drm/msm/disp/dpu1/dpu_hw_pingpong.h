@@ -149,6 +149,7 @@ static inline struct dpu_hw_pingpong *to_dpu_hw_pingpong(struct dpu_hw_blk *hw)
 	return container_of(hw, struct dpu_hw_pingpong, base);
 }
 
+struct dpu_rm;
 /**
  * dpu_hw_pingpong_init - initializes the pingpong driver for the passed
  *	pingpong idx.
