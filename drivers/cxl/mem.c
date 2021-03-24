@@ -1049,6 +1049,7 @@ static void cxl_memdev_release(struct device *dev)
 {
 	struct cxl_memdev *cxlmd = to_cxl_memdev(dev);
 
+	wait_for_completion(&cxlmd->ops_dead);
 	percpu_ref_exit(&cxlmd->ops_active);
 	ida_free(&cxl_memdev_ida, cxlmd->id);
 	kfree(cxlmd);
@@ -1157,7 +1158,6 @@ static void cxlmdev_unregister(void *_cxlmd)
 
 	percpu_ref_kill(&cxlmd->ops_active);
 	cdev_device_del(&cxlmd->cdev, dev);
-	wait_for_completion(&cxlmd->ops_dead);
 	cxlmd->cxlm = NULL;
 	put_device(dev);
 }
@@ -1210,20 +1210,16 @@ static int cxl_mem_add_memdev(struct cxl_mem *cxlm)
 	cdev_init(cdev, &cxl_memdev_fops);
 
 	rc = cdev_device_add(cdev, dev);
-	if (rc)
-		goto err_add;
+	if (rc) {
+		percpu_ref_kill(&cxlmd->ops_active);
+		put_device(dev);
+		return rc;
+	}
 
 	return devm_add_action_or_reset(dev->parent, cxlmdev_unregister, cxlmd);
 
-err_add:
-	ida_free(&cxl_memdev_ida, cxlmd->id);
 err_id:
-	/*
-	 * Theoretically userspace could have already entered the fops,
-	 * so flush ops_active.
-	 */
 	percpu_ref_kill(&cxlmd->ops_active);
-	wait_for_completion(&cxlmd->ops_dead);
 	percpu_ref_exit(&cxlmd->ops_active);
 err_ref:
 	kfree(cxlmd);
