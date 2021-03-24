@@ -6,6 +6,8 @@
 
 #include <linux/types.h>
 
+#include "gna_hw.h"
+
 struct gna_driver_private;
 struct pci_device_id;
 struct pci_dev;
@@ -17,6 +19,8 @@ struct gna_drv_info {
 	u32 num_page_entries;
 	u32 max_layer_count;
 	u64 max_hw_mem;
+
+	struct gna_desc_info desc_info;
 };
 
 struct gna_private {
