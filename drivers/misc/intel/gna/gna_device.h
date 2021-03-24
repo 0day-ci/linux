@@ -14,6 +14,7 @@
 #include "gna_mem.h"
 
 struct gna_driver_private;
+struct workqueue_struct;
 struct device;
 
 struct gna_drv_info {
@@ -42,6 +43,8 @@ struct gna_private {
 	/* pdev->dev */
 	struct device *parent;
 
+	u32 hw_status;
+
 	/* device related resources */
 	void __iomem *bar0_base;
 	struct gna_drv_info info;
@@ -50,9 +53,14 @@ struct gna_private {
 	struct gna_mmu_object mmu;
 	struct mutex mmu_lock;
 
+	/* if true, then gna device is processing */
+	bool dev_busy;
+	struct wait_queue_head dev_busy_waitq;
+
 	struct list_head request_list;
 	/* protects request_list */
 	struct mutex reqlist_lock;
+	struct workqueue_struct *request_wq;
 	atomic_t request_count;
 
 	/* memory objects' store */

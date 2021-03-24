@@ -43,6 +43,7 @@ struct gna_request {
 	u64 buffer_count;
 
 	struct wait_queue_head waitq;
+	struct work_struct work;
 };
 
 int gna_enqueue_request(struct gna_compute_cfg *compute_cfg,

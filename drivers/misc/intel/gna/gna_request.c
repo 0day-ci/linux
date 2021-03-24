@@ -8,7 +8,118 @@
 
 #include "gna_device.h"
 #include "gna_driver.h"
+#include "gna_hw.h"
 #include "gna_request.h"
+#include "gna_score.h"
+
+static void gna_request_update_status(struct gna_request *score_request)
+{
+	struct gna_private *gna_priv = score_request->gna_priv;
+	void __iomem *addr = gna_priv->bar0_base;
+	/* The gna_priv's hw_status should be updated first */
+	u32 hw_status = gna_priv->hw_status;
+	u32 stall_cycles;
+	u32 total_cycles;
+
+	/* Technically, the time stamp can be a bit later than
+	 * when the hw actually completed scoring. Here we just
+	 * do our best in a deferred work, unless we want to
+	 * tax isr for a more accurate record.
+	 */
+	score_request->drv_perf.hw_completed = ktime_get_ns();
+
+	score_request->hw_status = hw_status;
+
+	score_request->status = gna_parse_hw_status(gna_priv, hw_status);
+
+	if (gna_hw_perf_enabled(gna_priv)) {
+		if (hw_status & GNA_STS_STATISTICS_VALID) {
+			total_cycles = gna_reg_read(addr, GNA_MMIO_PTC);
+			stall_cycles = gna_reg_read(addr, GNA_MMIO_PSC);
+			score_request->hw_perf.total = total_cycles;
+			score_request->hw_perf.stall = stall_cycles;
+		} else
+			dev_warn(&gna_priv->pdev->dev, "GNA statistics missing\n");
+	}
+	if (unlikely(hw_status & GNA_ERROR))
+		gna_print_error_status(gna_priv, hw_status);
+}
+
+static void gna_request_process(struct work_struct *work)
+{
+	struct gna_request *score_request;
+	struct gna_memory_object *mo;
+	struct gna_private *gna_priv;
+	struct gna_buffer *buffer;
+	unsigned long hw_timeout;
+	int ret;
+	u64 i;
+
+	score_request = container_of(work, struct gna_request, work);
+	gna_priv = score_request->gna_priv;
+	dev_dbg(&gna_priv->pdev->dev, "processing request %llu\n", score_request->request_id);
+
+	score_request->state = ACTIVE;
+
+	score_request->drv_perf.pre_processing = ktime_get_ns();
+
+	/* Set busy flag before kicking off HW. The isr will clear it and wake up us. There is
+	 * no difference if isr is missed in a timeout situation of the last request. We just
+	 * always set it busy and let the wait_event_timeout check the reset.
+	 * wq:  X -> true
+	 * isr: X -> false
+	 */
+	gna_priv->dev_busy = true;
+
+	ret = gna_score(score_request);
+	if (ret) {
+		score_request->status = ret;
+		goto end;
+	}
+
+	score_request->drv_perf.processing = ktime_get_ns();
+
+	hw_timeout = gna_priv->drv_priv->recovery_timeout_jiffies;
+
+	hw_timeout = wait_event_timeout(gna_priv->dev_busy_waitq,
+			!gna_priv->dev_busy, hw_timeout);
+
+	if (!hw_timeout)
+		dev_warn(&gna_priv->pdev->dev, "hardware timeout occurred\n");
+
+	gna_priv->hw_status = gna_reg_read(gna_priv->bar0_base, GNA_MMIO_STS);
+
+	gna_request_update_status(score_request);
+	gna_abort_hw(gna_priv);
+
+	buffer = score_request->buffer_list;
+	for (i = 0; i < score_request->buffer_count; i++, buffer++) {
+		mutex_lock(&gna_priv->memidr_lock);
+		mo = idr_find(&gna_priv->memory_idr, buffer->memory_id);
+		mutex_unlock(&gna_priv->memidr_lock);
+		if (mo) {
+			mutex_lock(&mo->page_lock);
+			mo->ops->put_pages(mo);
+			mutex_unlock(&mo->page_lock);
+		} else {
+			dev_warn(&gna_priv->pdev->dev, "mo not found %llu\n", buffer->memory_id);
+		}
+	}
+
+	/* patches_ptr's are already freed by ops->score() function */
+	kvfree(score_request->buffer_list);
+	score_request->buffer_list = NULL;
+	score_request->buffer_count = 0;
+
+	gna_mmu_clear(gna_priv);
+
+end:
+	score_request->drv_perf.completion = ktime_get_ns();
+	dev_dbg(&gna_priv->pdev->dev, "request %llu done, waking processes\n",
+		score_request->request_id);
+	score_request->state = DONE;
+	wake_up_interruptible_all(&score_request->waitq);
+}
 
 static struct gna_request *gna_request_create(struct gna_file_private *file_priv,
 				       struct gna_compute_cfg *compute_cfg)
@@ -34,6 +145,7 @@ static struct gna_request *gna_request_create(struct gna_file_private *file_priv
 	score_request->gna_priv = gna_priv;
 	score_request->state = NEW;
 	init_waitqueue_head(&score_request->waitq);
+	INIT_WORK(&score_request->work, gna_request_process);
 
 	return score_request;
 }
@@ -242,6 +354,7 @@ int gna_enqueue_request(struct gna_compute_cfg *compute_cfg,
 	list_add_tail(&score_request->node, &gna_priv->request_list);
 	mutex_unlock(&gna_priv->reqlist_lock);
 
+	queue_work(gna_priv->request_wq, &score_request->work);
 	kref_put(&score_request->refcount, gna_request_release);
 
 	*request_id = score_request->request_id;
@@ -292,6 +405,7 @@ void gna_delete_request_by_id(u64 req_id, struct gna_private *gna_priv)
 		list_for_each_entry_safe(req, temp_req, reqs_list, node) {
 			if (req->request_id == req_id) {
 				list_del(&req->node);
+				cancel_work_sync(&req->work);
 				kref_put(&req->refcount, gna_request_release);
 				break;
 			}
@@ -313,6 +427,7 @@ void gna_delete_file_requests(struct file *fd, struct gna_private *gna_priv)
 		list_for_each_entry_safe(req, temp_req, reqs_list, node) {
 			if (req->fd == fd) {
 				list_del(&req->node);
+				cancel_work_sync(&req->work);
 				kref_put(&req->refcount, gna_request_release);
 				break;
 			}
@@ -336,6 +451,7 @@ void gna_delete_memory_requests(u64 memory_id, struct gna_private *gna_priv)
 			for (i = 0; i < req->buffer_count; ++i) {
 				if (req->buffer_list[i].memory_id == memory_id) {
 					list_del(&req->node);
+					cancel_work_sync(&req->work);
 					kref_put(&req->refcount, gna_request_release);
 					break;
 				}

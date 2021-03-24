@@ -127,6 +127,15 @@ static int gna_dev_init(struct gna_private *gna_priv, struct pci_dev *pcidev,
 	mutex_init(&gna_priv->reqlist_lock);
 	INIT_LIST_HEAD(&gna_priv->request_list);
 
+	init_waitqueue_head(&gna_priv->dev_busy_waitq);
+
+	gna_priv->request_wq = create_singlethread_workqueue(GNA_DV_NAME);
+	if (!gna_priv->request_wq) {
+		dev_err(&pcidev->dev, "could not create %s workqueue\n", GNA_DV_NAME);
+		ret = -EFAULT;
+		goto err_pci_drvdata_unset;
+	}
+
 	return 0;
 
 err_pci_drvdata_unset:
@@ -137,6 +146,9 @@ err_pci_drvdata_unset:
 
 static void gna_dev_deinit(struct gna_private *gna_priv)
 {
+	flush_workqueue(gna_priv->request_wq);
+	destroy_workqueue(gna_priv->request_wq);
+
 	idr_destroy(&gna_priv->memory_idr);
 	gna_mmu_free(gna_priv);
 }
