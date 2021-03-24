@@ -1430,11 +1430,11 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	err = -ENOMEM;
 	fc = kzalloc(sizeof(struct fuse_conn), GFP_KERNEL);
 	if (!fc)
-		goto out_err;
+		goto out_err_fc;
 
 	fm = kzalloc(sizeof(struct fuse_mount), GFP_KERNEL);
 	if (!fm)
-		goto out_err;
+		goto out_err_fm;
 
 	fuse_conn_init(fc, fm, get_user_ns(current_user_ns()),
 		       &virtio_fs_fiq_ops, fs);
@@ -1468,8 +1468,9 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	fsc->root = dget(sb->s_root);
 	return 0;
 
-out_err:
+out_err_fm:
 	kfree(fc);
+out_err_fc:
 	mutex_lock(&virtio_fs_mutex);
 	virtio_fs_put(fs);
 	mutex_unlock(&virtio_fs_mutex);
