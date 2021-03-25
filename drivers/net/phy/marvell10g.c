@@ -78,6 +78,10 @@ enum {
 	/* Temperature read register (88E2110 only) */
 	MV_PCS_TEMP		= 0x8042,
 
+	MV_PCS_ID		= 0xd00d,
+	MV_PCS_ID_NPORTS_MASK	= 0x0380,
+	MV_PCS_ID_NPORTS_SHIFT	= 7,
+
 	/* These registers appear at 0x800X and 0xa00X - the 0xa00X control
 	 * registers appear to set themselves to the 0x800X when AN is
 	 * restarted, but status registers appear readable from either.
@@ -108,7 +112,17 @@ enum {
 	MV_V2_TEMP_UNKNOWN	= 0x9600, /* unknown function */
 };
 
+enum mv3310_model {
+	MV_MODEL_NA = 0,
+	MV_MODEL_88E211X,
+	MV_MODEL_88E218X,
+	MV_MODEL_88X3310,
+	MV_MODEL_88X3340,
+};
+
 struct mv3310_priv {
+	enum mv3310_model model;
+
 	u32 firmware_ver;
 	bool rate_match;
 
@@ -382,7 +396,7 @@ static int mv3310_probe(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv;
 	u32 mmd_mask = MDIO_DEVS_PMAPMD | MDIO_DEVS_AN;
-	int ret;
+	int ret, nports;
 
 	if (!phydev->is_c45 ||
 	    (phydev->c45_ids.devices_in_package & mmd_mask) != mmd_mask)
@@ -419,6 +433,34 @@ static int mv3310_probe(struct phy_device *phydev)
 	phydev_info(phydev, "Firmware version %u.%u.%u.%u\n",
 		    priv->firmware_ver >> 24, (priv->firmware_ver >> 16) & 255,
 		    (priv->firmware_ver >> 8) & 255, priv->firmware_ver & 255);
+
+	ret = phy_read_mmd(phydev, MDIO_MMD_PCS, MV_PCS_ID);
+	if (ret < 0)
+		return ret;
+
+	nports = ((ret & MV_PCS_ID_NPORTS_MASK) >> MV_PCS_ID_NPORTS_SHIFT) + 1;
+
+	switch (phydev->drv->phy_id) {
+	case MARVELL_PHY_ID_88X3310:
+		if (nports == 4)
+			priv->model = MV_MODEL_88X3340;
+		else if (nports == 1)
+			priv->model = MV_MODEL_88X3310;
+		break;
+	case MARVELL_PHY_ID_88E2110:
+		if (nports == 8)
+			priv->model = MV_MODEL_88E218X;
+		else if (nports == 1)
+			priv->model = MV_MODEL_88E211X;
+		break;
+	default:
+		unreachable();
+	}
+
+	if (!priv->model) {
+		phydev_err(phydev, "unknown PHY model (nports = %i)\n", nports);
+		return -ENODEV;
+	}
 
 	/* Powering down the port when not in use saves about 600mW */
 	ret = mv3310_power_down(phydev);
