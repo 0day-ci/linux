@@ -515,6 +515,24 @@ static inline struct sk_buff *udp_rcv_segment(struct sock *sk,
 	return segs;
 }
 
+static inline void udp_post_segment_fix_csum(struct sk_buff *skb)
+{
+	/* UDP-lite can't land here - no GRO */
+	WARN_ON_ONCE(UDP_SKB_CB(skb)->partial_cov);
+
+	/* UDP packets generated with UDP_SEGMENT and traversing:
+	 * UDP tunnel(xmit) -> veth (segmentation) -> veth (gro) -> UDP tunnel (rx)
+	 * land here with CHECKSUM_NONE. Instead of adding another check
+	 * in the tunnel fastpath, we can force valid csums here:
+	 * packets are locally generated and the GRO engine already validated
+	 * the csum.
+	 * Additionally fixup the UDP CB
+	 */
+	UDP_SKB_CB(skb)->cscov = skb->len;
+	if (skb->ip_summed == CHECKSUM_NONE && !skb->csum_valid)
+		skb->csum_valid = 1;
+}
+
 #ifdef CONFIG_BPF_SYSCALL
 struct sk_psock;
 struct proto *udp_bpf_get_proto(struct sock *sk, struct sk_psock *psock);
