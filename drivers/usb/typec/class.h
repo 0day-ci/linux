@@ -80,15 +80,15 @@ extern struct class typec_mux_class;
 extern struct class typec_class;
 
 #ifdef CONFIG_ACPI
-void *get_pld(struct device *dev);
-void free_pld(void *pld);
+int typec_link_ports(struct typec_port *connector);
+void typec_unlink_ports(struct typec_port *connector);
 #else
-static inline void *get_pld(struct device *dev)
+static inline int typec_link_ports(struct typec_port *connector)
 {
-	return NULL;
+	return 0;
 }
 
-static inline void free_pld(void *pld) { }
+static inline void typec_unlink_ports(struct typec_port *connector) { }
 #endif
 
 #endif /* __USB_TYPEC_CLASS__ */
