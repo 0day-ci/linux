@@ -668,9 +668,16 @@ static inline bool thread_group_leader(struct task_struct *p)
 }
 
 static inline
-bool same_thread_group(struct task_struct *p1, struct task_struct *p2)
+bool same_thread_group_account(struct task_struct *p1, struct task_struct *p2)
 {
 	return p1->signal == p2->signal;
+}
+
+static inline
+bool same_thread_group(struct task_struct *p1, struct task_struct *p2)
+{
+	return same_thread_group_account(p1, p2) &&
+			!((p1->flags | p2->flags) & PF_IO_WORKER);
 }
 
 static inline struct task_struct *next_thread(const struct task_struct *p)
