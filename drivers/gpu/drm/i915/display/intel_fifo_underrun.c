@@ -359,6 +359,39 @@ bool intel_set_pch_fifo_underrun_reporting(struct drm_i915_private *dev_priv,
 	return old;
 }
 
+static u32
+underrun_pipestat_mask(struct drm_i915_private *dev_priv)
+{
+	u32 mask = PIPE_FIFO_UNDERRUN_STATUS;
+
+	if (DISPLAY_VER(dev_priv) >= 13)
+		mask |= PIPE_STAT_SOFT_UNDERRUN_XELPD |
+			PIPE_STAT_HARD_UNDERRUN_XELPD |
+			PIPE_STAT_PORT_UNDERRUN_XELPD;
+
+	return mask;
+}
+
+static const char *
+pipe_underrun_reason(u32 pipestat_underruns)
+{
+	if (pipestat_underruns & PIPE_STAT_SOFT_UNDERRUN_XELPD)
+		/*
+		 * Hardware used replacement/interpolated pixels at
+		 * underrun locations.
+		 */
+		return "soft";
+	else if (pipestat_underruns & PIPE_STAT_HARD_UNDERRUN_XELPD)
+		/*
+		 * Hardware used previous pixel value at underrun
+		 * locations.
+		 */
+		return "hard";
+	else
+		/* Old platform or no extra soft/hard bit set */
+		return "FIFO";
+}
+
 /**
  * intel_cpu_fifo_underrun_irq_handler - handle CPU fifo underrun interrupt
  * @dev_priv: i915 device instance
@@ -372,6 +405,7 @@ void intel_cpu_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 					 enum pipe pipe)
 {
 	struct intel_crtc *crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
+	u32 underruns = 0;
 
 	/* We may be called too early in init, thanks BIOS! */
 	if (crtc == NULL)
@@ -382,10 +416,37 @@ void intel_cpu_fifo_underrun_irq_handler(struct drm_i915_private *dev_priv,
 	    crtc->cpu_fifo_underrun_disabled)
 		return;
 
+	/*
+	 * Starting with display version 11, the PIPE_STAT register records
+	 * whether an underrun has happened, and on XELPD+, it will also record
+	 * whether the underrun was soft/hard and whether it was triggered by
+	 * the downstream port logic.  We should clear these bits (which use
+	 * write-1-to-clear logic) too.
+	 *
+	 * Note that although the IIR gives us the same underrun and soft/hard
+	 * information, PIPE_STAT is the only place we can find out whether
+	 * the underrun was caused by the downstream port.
+	 */
+	if (DISPLAY_VER(dev_priv) >= 11) {
+		underruns = intel_uncore_read(&dev_priv->uncore,
+					      ICL_PIPESTATUS(pipe)) &
+			underrun_pipestat_mask(dev_priv);
+		intel_uncore_write(&dev_priv->uncore, ICL_PIPESTATUS(pipe),
+				   underruns);
+	}
+
 	if (intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, false)) {
 		trace_intel_cpu_fifo_underrun(dev_priv, pipe);
-		drm_err(&dev_priv->drm, "CPU pipe %c FIFO underrun\n",
-			pipe_name(pipe));
+
+		if (underruns & PIPE_STAT_PORT_UNDERRUN_XELPD)
+			/* Underrun was caused downstream from the pipes */
+			drm_err(&dev_priv->drm, "Port triggered a %s underrun on pipe %c\n",
+				pipe_underrun_reason(underruns),
+				pipe_name(pipe));
+		else
+			drm_err(&dev_priv->drm, "CPU pipe %c %s underrun\n",
+				pipe_name(pipe),
+				pipe_underrun_reason(underruns));
 	}
 
 	intel_fbc_handle_fifo_underrun_irq(dev_priv);
