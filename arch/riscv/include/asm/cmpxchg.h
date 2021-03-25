@@ -22,7 +22,43 @@
 	__typeof__(ptr) __ptr = (ptr);					\
 	__typeof__(new) __new = (new);					\
 	__typeof__(*(ptr)) __ret;					\
+	register unsigned long __rc, tmp, align, addr;			\
 	switch (size) {							\
+	case 2:								\
+		align = ((unsigned long) __ptr & 0x3);			\
+		addr = ((unsigned long) __ptr & ~0x3);			\
+		if (align) {						\
+			__asm__ __volatile__ (				\
+			"0:	lr.w	%0, (%4)	\n"		\
+			"	mv	%1, %0		\n"		\
+			"	slliw	%1, %1, 16	\n"		\
+			"	srliw	%1, %1, 16	\n"		\
+			"	mv	%2, %3		\n"		\
+			"	slliw	%2, %2, 16	\n"		\
+			"	or	%1, %2, %1	\n"		\
+			"	sc.w	%2, %1, (%4)	\n"		\
+			"	bnez	%2, 0b		\n"		\
+			"	srliw	%0, %0, 16	\n"		\
+			: "=&r" (__ret), "=&r" (tmp), "=&r" (__rc)	\
+			: "r" (__new), "r"(addr)			\
+			: "memory");					\
+		} else {						\
+			__asm__ __volatile__ (				\
+			"0:	lr.w	%0, (%4)	\n"		\
+			"	mv	%1, %0		\n"		\
+			"	srliw	%1, %1, 16	\n"		\
+			"	slliw	%1, %1, 16	\n"		\
+			"	mv	%2, %3		\n"		\
+			"	or	%1, %2, %1	\n"		\
+			"	sc.w	%2, %1, 0(%4)	\n"		\
+			"	bnez	%2, 0b		\n"		\
+			"	slliw	%0, %0, 16	\n"		\
+			"	srliw	%0, %0, 16	\n"		\
+			: "=&r" (__ret), "=&r" (tmp), "=&r" (__rc)	\
+			: "r" (__new), "r"(addr)			\
+			: "memory");					\
+		}							\
+		break;							\
 	case 4:								\
 		__asm__ __volatile__ (					\
 			"	amoswap.w %0, %2, %1\n"			\
