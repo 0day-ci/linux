@@ -15,6 +15,7 @@ struct drm_i915_private;
 struct i915_ggtt_view;
 
 struct intel_fb_view;
+struct intel_framebuffer;
 struct intel_plane_state;
 
 enum i915_ggtt_view_type;
@@ -49,11 +50,9 @@ u32 intel_plane_compute_aligned_offset(int *x, int *y,
 				       const struct intel_plane_state *state,
 				       int color_plane);
 
-int intel_fb_pitch(const struct drm_framebuffer *fb, int color_plane, unsigned int rotation);
-
 int intel_fill_fb_info(struct drm_i915_private *i915, struct drm_framebuffer *fb);
-void intel_fill_fb_ggtt_view(struct i915_ggtt_view *view, const struct drm_framebuffer *fb,
-			     unsigned int rotation);
+void intel_fb_fill_view(const struct intel_framebuffer *fb, unsigned int rotation,
+			struct intel_fb_view *view);
 int intel_plane_compute_gtt(struct intel_plane_state *plane_state);
 
 #endif /* __INTEL_FB_H__ */
