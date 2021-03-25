@@ -1,0 +1,36 @@
+drm drm-fixes d27ce83fa4baa5cb908a42e9878564cad6ea0eb3
+	Merge tag 'du-fixes-20210316' of git://linuxtv.org/pinchartl/media into drm-fixes
+drm-misc drm-misc-fixes 50891bead80bc79871528c2962d65c781c02330b
+	drm/etnaviv: User FOLL_LONGTERM in userptr
+drm-intel drm-intel-fixes 8840e3bd981f128846b01c12d3966d115e8617c9
+	drm/i915: Fix the GT fence revocation runtime PM logic
+drm-amd drm-amd-fixes 2b702e72e33bbdec0764cfb6e1dd00fe1142ae55
+	Merge tag 'drm-misc-fixes-2017-09-28-1' of git://anongit.freedesktop.org/git/drm-misc into drm-fixes
+drm drm-next 06debd6e1b28029e6e77c41e59a162868f377897
+	Merge tag 'drm-intel-next-2021-03-16' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes 56a2ebb85f65ac2549b1b992c0b986332c884b14
+	drivers: gpu: drm: xen_drm_front_drm_info is declared twice
+drm-intel drm-intel-next-fixes d153e8c156dafeb847fd655f416cf81c007e8706
+	Merge tag 'drm-intel-next-fixes-2021-02-25' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-amd drm-amd-next-fixes 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e
+	Linux 4.14-rc1
+drm-misc drm-misc-next b4142fc4d52d051d4d8df1fb6c569e5b445d369e
+	drm/vkms: fix misuse of WARN_ON
+drm-intel drm-intel-next 989634fb49ad070671b5a4714d178d238f493868
+	drm/i915/audio: set HDA link parameters in driver
+drm-intel drm-intel-gt-next 2da21daa7d93817fa82f703c29adfcb5eed7f77d
+	drm/i915/gt: Always flush the submission queue on checking for idle
+drm-amd drm-amd-next 754270c7c56292e97d0eff924a5d5d83f92add07
+	Merge branch 'drm-next-4.15' of git://people.freedesktop.org/~agd5f/linux into drm-next
+sound-upstream for-linus e54f30befa7990b897189b44a56c1138c6bfdbb5
+	ALSA: hda/realtek: call alc_update_headset_mode() in hp_automute_hook
+sound-upstream for-next e839fbed26e8b8713803b8ac73da92fd2b0c7594
+	ALSA: hda/hdmi: fix max DP-MST dev_num for Intel TGL+ platforms
+drm-intel topic/core-for-CI 785b066b32b630e4735ca6e51acbb067703e2d3a
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/iomem-mmap-vs-gup fe07bfda2fb9cdef8a4d4008a409bb02f35f1bd8
+	Linux 5.12-rc1
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm topic/i915-gem-next 5b0a78ec0b5738046ab170e67cc28491cbee3f3f
+	drm/i915: Move gt_revoke() slightly
