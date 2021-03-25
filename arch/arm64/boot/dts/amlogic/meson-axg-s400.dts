@@ -374,6 +374,7 @@
 
 		eth_phy0: ethernet-phy@0 {
 			/* Realtek RTL8211F (0x001cc916) */
+			compatible = "ethernet-phy-ieee802.3-c22";
 			reg = <0>;
 			interrupt-parent = <&gpio_intc>;
 			interrupts = <98 IRQ_TYPE_LEVEL_LOW>;

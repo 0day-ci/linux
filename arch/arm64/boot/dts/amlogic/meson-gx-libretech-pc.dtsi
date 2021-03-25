@@ -272,6 +272,7 @@
 
 &external_mdio {
 	external_phy: ethernet-phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c22";
 		reg = <0>;
 		max-speed = <1000>;
 		reset-assert-us = <10000>;
