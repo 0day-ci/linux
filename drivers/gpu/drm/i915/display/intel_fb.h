@@ -14,7 +14,10 @@ struct drm_i915_private;
 
 struct i915_ggtt_view;
 
+struct intel_fb_view;
 struct intel_plane_state;
+
+enum i915_ggtt_view_type;
 
 bool is_ccs_plane(const struct drm_framebuffer *fb, int plane);
 bool is_gen12_ccs_plane(const struct drm_framebuffer *fb, int plane);
