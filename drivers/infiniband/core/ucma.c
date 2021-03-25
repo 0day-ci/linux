@@ -1282,6 +1282,13 @@ static int ucma_set_option_id(struct ucma_context *ctx, int optname,
 		}
 		ret = rdma_set_ack_timeout(ctx->cm_id, *((u8 *)optval));
 		break;
+	case RDMA_OPTION_ID_RNR_RETRY_TIMER:
+		if (optlen != sizeof(u8)) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = rdma_set_min_rnr_timer(ctx->cm_id, *((u8 *)optval));
+		break;
 	default:
 		ret = -ENOSYS;
 	}
