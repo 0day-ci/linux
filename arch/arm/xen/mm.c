@@ -105,8 +105,8 @@ bool xen_arch_need_swiotlb(struct device *dev,
 	 *	- The Linux page refers to foreign memory
 	 *	- The device doesn't support coherent DMA request
 	 *
-	 * The Linux page may be spanned acrros multiple Xen page, although
-	 * it's not possible to have a mix of local and foreign Xen page.
+	 * The Linux page may be spanned across multiple Xen pages, although
+	 * it's not possible to have a mix of local and foreign Xen pages.
 	 * Furthermore, range_straddles_page_boundary is already checking
 	 * if buffer is physically contiguous in the host RAM.
 	 *
