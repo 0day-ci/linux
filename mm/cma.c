@@ -36,8 +36,17 @@
 
 #include "cma.h"
 
+struct cma_clear_bitmap_work {
+	struct work_struct work;
+	struct cma *cma;
+	unsigned long pfn;
+	unsigned int count;
+};
+
 struct cma cma_areas[MAX_CMA_AREAS];
 unsigned cma_area_count;
+
+struct workqueue_struct *cma_release_wq;
 
 phys_addr_t cma_get_base(const struct cma *cma)
 {
@@ -146,6 +155,10 @@ static int __init cma_init_reserved_areas(void)
 	for (i = 0; i < cma_area_count; i++)
 		cma_activate_area(&cma_areas[i]);
 
+	cma_release_wq = create_workqueue("cma_release");
+	if (!cma_release_wq)
+		return -ENOMEM;
+
 	return 0;
 }
 core_initcall(cma_init_reserved_areas);
@@ -203,6 +216,7 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
 
 	cma->base_pfn = PFN_DOWN(base);
 	cma->count = size >> PAGE_SHIFT;
+	cma->flags = 0;
 	cma->order_per_bit = order_per_bit;
 	*res_cma = cma;
 	cma_area_count++;
@@ -452,6 +466,14 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
 		goto out;
 
 	for (;;) {
+		/*
+		 * If the CMA bitmap is cleared asynchronously after
+		 * cma_release_nowait(), cma release workqueue has to be
+		 * flushed here in order to make the allocation succeed.
+		 */
+		if (test_bit(CMA_DELAYED_RELEASE, &cma->flags))
+			flush_workqueue(cma_release_wq);
+
 		mutex_lock(&cma->lock);
 		bitmap_no = bitmap_find_next_zero_area_off(cma->bitmap,
 				bitmap_maxno, start, bitmap_count, mask,
@@ -547,6 +569,77 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
 
 	free_contig_range(pfn, count);
 	cma_clear_bitmap(cma, pfn, count);
+	trace_cma_release(pfn, pages, count);
+
+	return true;
+}
+
+static void cma_clear_bitmap_fn(struct work_struct *work)
+{
+	struct cma_clear_bitmap_work *w;
+
+	w = container_of(work, struct cma_clear_bitmap_work, work);
+
+	cma_clear_bitmap(w->cma, w->pfn, w->count);
+
+	__free_page(pfn_to_page(w->pfn));
+}
+
+/**
+ * cma_release_nowait() - release allocated pages without blocking
+ * @cma:   Contiguous memory region for which the allocation is performed.
+ * @pages: Allocated pages.
+ * @count: Number of allocated pages.
+ *
+ * Similar to cma_release(), this function releases memory allocated
+ * by cma_alloc(), but unlike cma_release() is non-blocking and can be
+ * called from an atomic context.
+ * It returns false when provided pages do not belong to contiguous area
+ * and true otherwise.
+ */
+bool cma_release_nowait(struct cma *cma, const struct page *pages,
+			unsigned int count)
+{
+	struct cma_clear_bitmap_work *work;
+	unsigned long pfn;
+
+	if (!cma || !pages)
+		return false;
+
+	pr_debug("%s(page %p)\n", __func__, (void *)pages);
+
+	pfn = page_to_pfn(pages);
+
+	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
+		return false;
+
+	VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
+
+	/*
+	 * Set CMA_DELAYED_RELEASE flag: subsequent cma_alloc()'s
+	 * will wait for the async part of cma_release_nowait() to
+	 * finish.
+	 */
+	if (unlikely(!test_bit(CMA_DELAYED_RELEASE, &cma->flags)))
+		set_bit(CMA_DELAYED_RELEASE, &cma->flags);
+
+	/*
+	 * To make cma_release_nowait() non-blocking, cma bitmap is cleared
+	 * from a work context (see cma_clear_bitmap_fn()). The first page
+	 * in the cma allocation is used to store the work structure,
+	 * so it's released after the cma bitmap clearance. Other pages
+	 * are released immediately as previously.
+	 */
+	if (count > 1)
+		free_contig_range(pfn + 1, count - 1);
+
+	work = (struct cma_clear_bitmap_work *)page_to_virt(pages);
+	INIT_WORK(&work->work, cma_clear_bitmap_fn);
+	work->cma = cma;
+	work->pfn = pfn;
+	work->count = count;
+	queue_work(cma_release_wq, &work->work);
+
 	trace_cma_release(pfn, pages, count);
 
 	return true;
