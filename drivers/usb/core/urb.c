@@ -123,7 +123,7 @@ EXPORT_SYMBOL_GPL(usb_get_urb);
  * This can be called to have access to URBs which are to be executed
  * without bothering to track them
  */
-void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor)
+static void __usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor)
 {
 	unsigned long flags;
 
@@ -137,7 +137,19 @@ void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor)
 
 	spin_unlock_irqrestore(&anchor->lock, flags);
 }
+
+void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor)
+{
+	__usb_anchor_urb(urb, anchor);
+}
 EXPORT_SYMBOL_GPL(usb_anchor_urb);
+
+void usb_moor_urb(struct urb *urb, struct usb_anchor *anchor)
+{
+	urb->moored = true;
+	__usb_anchor_urb(urb, anchor);
+}
+EXPORT_SYMBOL_GPL(usb_moor_urb);
 
 static int usb_anchor_check_wakeup(struct usb_anchor *anchor)
 {
@@ -170,6 +182,7 @@ void usb_unanchor_urb(struct urb *urb)
 		return;
 
 	anchor = urb->anchor;
+	urb->moored = false;
 	if (!anchor)
 		return;
 
@@ -184,6 +197,86 @@ void usb_unanchor_urb(struct urb *urb)
 	spin_unlock_irqrestore(&anchor->lock, flags);
 }
 EXPORT_SYMBOL_GPL(usb_unanchor_urb);
+
+int usb_submit_anchored_urbs(struct usb_anchor *anchor, int *error, gfp_t gfp)
+{
+	int rv = 0;
+	int count = 0;
+	unsigned long flags;
+	struct urb *cur;
+
+	spin_lock_irqsave(&anchor->lock, flags);
+	list_for_each_entry(cur, &anchor->urb_list, urb_list) {
+		usb_get_urb(cur);
+		spin_unlock_irqrestore(&anchor->lock, flags);
+		rv = usb_submit_urb(cur, gfp);
+		if (!rv) {
+			count++;
+		} else {
+			usb_put_urb(cur);
+			goto bail_out;
+		}
+		spin_lock_irqsave(&anchor->lock, flags);
+		usb_put_urb(cur);
+	}
+	spin_unlock_irqrestore(&anchor->lock, flags);
+
+bail_out:
+	if (error)
+		*error = rv;
+	return count;
+}
+EXPORT_SYMBOL_GPL(usb_submit_anchored_urbs);
+
+int usb_transfer_anchors(
+		struct usb_anchor *from,
+		struct usb_anchor *to,
+		int *error,
+		int (*transform_fn)(struct urb *urb, gfp_t gfp),
+		gfp_t gfp)
+{
+	int rv = 0;
+	int count = 0;
+	unsigned long flags;
+	struct urb *cur;
+	bool moor;
+
+	spin_lock_irqsave(&from->lock, flags);
+	list_for_each_entry(cur, &from->urb_list, urb_list) {
+		usb_get_urb(cur);
+		moor = cur->moored;
+		__usb_unanchor_urb(cur, from);
+		__usb_anchor_urb(cur, to);
+		spin_unlock_irqrestore(&from->lock, flags);
+		rv = (transform_fn)(cur, gfp);
+		spin_lock_irqsave(&from->lock, flags);
+		if (rv < 0) {
+			/* put it back */
+			__usb_unanchor_urb(cur, to);
+			__usb_anchor_urb(cur, from);
+			cur->moored = moor;
+			spin_unlock_irqrestore(&from->lock, flags);
+			goto bail_out;
+		} else {
+			count++;
+		}
+		usb_put_urb(cur);
+	}
+	spin_unlock_irqrestore(&from->lock, flags);
+
+bail_out:
+	if (error)
+		*error = rv;
+	return count;
+
+}
+EXPORT_SYMBOL_GPL(usb_transfer_anchors);
+
+void inline usb_unmoor_urb(struct urb *urb)
+{
+	urb->moored = false;
+}
+EXPORT_SYMBOL_GPL(usb_unmoor_urb);
 
 /*-------------------------------------------------------------------*/
 
@@ -978,6 +1071,7 @@ struct urb *usb_get_from_anchor(struct usb_anchor *anchor)
 				    anchor_list);
 		usb_get_urb(victim);
 		__usb_unanchor_urb(victim, anchor);
+		victim->moored = false;
 	} else {
 		victim = NULL;
 	}
@@ -1005,6 +1099,7 @@ void usb_scuttle_anchored_urbs(struct usb_anchor *anchor)
 		while (!list_empty(&anchor->urb_list)) {
 			victim = list_entry(anchor->urb_list.prev,
 					    struct urb, anchor_list);
+			victim->moored = false;
 			__usb_unanchor_urb(victim, anchor);
 		}
 		surely_empty = usb_anchor_check_wakeup(anchor);

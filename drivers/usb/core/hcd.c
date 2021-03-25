@@ -1631,6 +1631,7 @@ static void __usb_hcd_giveback_urb(struct urb *urb)
 	struct usb_hcd *hcd = bus_to_hcd(urb->dev->bus);
 	struct usb_anchor *anchor = urb->anchor;
 	int status = urb->unlinked;
+	unsigned long flags;
 
 	urb->hcpriv = NULL;
 	if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
@@ -1641,7 +1642,19 @@ static void __usb_hcd_giveback_urb(struct urb *urb)
 	unmap_urb_for_dma(hcd, urb);
 	usbmon_urb_complete(&hcd->self, urb, status);
 	usb_anchor_suspend_wakeups(anchor);
-	usb_unanchor_urb(urb);
+	if (!urb->moored) {
+		usb_unanchor_urb(urb);
+	} else {
+		/*
+		 * we do not kick it off the list
+		 * but it needs to go to the end
+		 * this needs to be done atomically
+		 */
+		spin_lock_irqsave(&anchor->lock, flags);
+		list_del(&urb->anchor_list);
+		list_add_tail(&urb->anchor_list, &anchor->urb_list);
+		spin_unlock_irqrestore(&anchor->lock, flags);
+	}
 	if (likely(status == 0))
 		usb_led_activity(USB_LED_EVENT_HOST);
 

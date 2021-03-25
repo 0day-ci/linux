@@ -1567,6 +1567,7 @@ struct urb {
 	void *hcpriv;			/* private data for host controller */
 	atomic_t use_count;		/* concurrent submissions counter */
 	atomic_t reject;		/* submissions will fail */
+	bool moored;			/* the URB is moored not anchored */
 
 	/* public: documented fields in the urb that can be used by drivers */
 	struct list_head urb_list;	/* list head for use by the urb's
@@ -1726,6 +1727,13 @@ extern void usb_kill_urb(struct urb *urb);
 extern void usb_poison_urb(struct urb *urb);
 extern void usb_unpoison_urb(struct urb *urb);
 extern void usb_block_urb(struct urb *urb);
+extern int usb_submit_anchored_urbs(struct usb_anchor *anchor, int *error, gfp_t gfp);
+extern int usb_transfer_anchors(
+		struct usb_anchor *from,
+		struct usb_anchor *to,
+		int *error,
+		int (*transform_fn)(struct urb *urb, gfp_t gfp),
+		gfp_t gfp);
 extern void usb_kill_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_poison_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_unpoison_anchored_urbs(struct usb_anchor *anchor);
@@ -1734,6 +1742,8 @@ extern void usb_anchor_suspend_wakeups(struct usb_anchor *anchor);
 extern void usb_anchor_resume_wakeups(struct usb_anchor *anchor);
 extern void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor);
 extern void usb_unanchor_urb(struct urb *urb);
+extern void usb_moor_urb(struct urb *urb, struct usb_anchor *anchor);
+extern void inline usb_unmoor_urb(struct urb *urb);
 extern int usb_wait_anchor_empty_timeout(struct usb_anchor *anchor,
 					 unsigned int timeout);
 extern struct urb *usb_get_from_anchor(struct usb_anchor *anchor);

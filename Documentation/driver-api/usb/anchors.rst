@@ -1,8 +1,8 @@
 USB Anchors
 ~~~~~~~~~~~
 
-What is anchor?
-===============
+What is an anchor?
+==================
 
 A USB driver needs to support some callbacks requiring
 a driver to cease all IO to an interface. To do so, a
@@ -11,6 +11,19 @@ to know they've all completed or to call usb_kill_urb
 for them. The anchor is a data structure takes care of
 keeping track of URBs and provides methods to deal with
 multiple URBs.
+
+What is a mooring?
+==================
+
+A mooring is a permanent anchoring that persist across
+the completion of an URB.
+The drawback of anchors is that there is an unavoidable
+window between taking an URB off an anchor for completion
+and the completion itself.
+A mooring acts as a permanent anchor to which you can add
+URBs. The order of URBs will be maintained in such a way
+that completing URBs go to the back of the chain.
+The whole anchor can then be manipulated as a whole.
 
 Allocation and Initialisation
 =============================
@@ -34,6 +47,13 @@ an URB is finished by (successful) completion. Thus disassociation
 is automatic. A function is provided to forcibly finish (kill)
 all URBs associated with an anchor.
 Furthermore, disassociation can be made with :c:func:`usb_unanchor_urb`
+
+Association and disassociation of URBs with moorings
+====================================================
+
+An association of URBs to an anchor is made by an explicit
+call to :c:func:`usb_moor_urb`. A moored URB can be turned
+into an anchored URB by :c:func:`usb_unmoor_urb`
 
 Operations on multitudes of URBs
 ================================
@@ -81,3 +101,18 @@ Returns the oldest anchored URB of an anchor. The URB is unanchored
 and returned with a reference. As you may mix URBs to several
 destinations in one anchor you have no guarantee the chronologically
 first submitted URB is returned.
+
+:c:func:`usb_submit_anchored_urbs`
+---------------------------------
+
+The URBs contained in anchor are chronologically submitted until
+they are all submitted or an error happens during submission.
+
+:c:func:`usb_transfer_anchors`
+------------------------------
+
+Transfers URBs from an anchor to another anchor by means of a
+transform function you pass to the method. It proceeds until
+all URBs are transfered or an error is encountered during transfer.
+
+
