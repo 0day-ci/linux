@@ -27,12 +27,21 @@ static struct bfq_entity *bfq_root_active_entity(struct rb_root *tree)
 	return rb_entry(node, struct bfq_entity, rb_node);
 }
 
-static unsigned int bfq_class_idx(struct bfq_entity *entity)
+unsigned int bfq_class_idx(struct bfq_entity *entity)
 {
 	struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
+	unsigned short class = BFQ_DEFAULT_GRP_CLASS;
 
-	return bfqq ? bfqq->ioprio_class - 1 :
-		BFQ_DEFAULT_GRP_CLASS - 1;
+	if (bfqq)
+		class = bfqq->ioprio_class;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	else {
+		struct bfq_group *bfqg = bfq_entity_to_bfqg(entity);
+
+		class = bfqg->ioprio_class ?: BFQ_DEFAULT_GRP_CLASS;
+	}
+#endif
+	return class - 1;
 }
 
 unsigned int bfq_tot_busy_queues(struct bfq_data *bfqd)
@@ -767,14 +776,25 @@ __bfq_entity_update_weight_prio(struct bfq_service_tree *old_st,
 				  bfq_weight_to_ioprio(entity->orig_weight);
 		}
 
-		if (bfqq && update_class_too)
-			bfqq->ioprio_class = bfqq->new_ioprio_class;
+		if (update_class_too) {
+			if (bfqq)
+				bfqq->ioprio_class = bfqq->new_ioprio_class;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+			else
+				bfqg->ioprio_class = bfqg->new_ioprio_class;
+#endif
+		}
 
 		/*
 		 * Reset prio_changed only if the ioprio_class change
 		 * is not pending any longer.
 		 */
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+		if ((bfqq && bfqq->ioprio_class == bfqq->new_ioprio_class) ||
+		    (!bfqq && bfqg->ioprio_class == bfqg->new_ioprio_class))
+#else
 		if (!bfqq || bfqq->ioprio_class == bfqq->new_ioprio_class)
+#endif
 			entity->prio_changed = 0;
 
 		/*
