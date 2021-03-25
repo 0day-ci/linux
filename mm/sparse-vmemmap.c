@@ -141,16 +141,20 @@ void __meminit vmemmap_verify(pte_t *pte, int node,
 }
 
 pte_t * __meminit vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node,
-				       struct vmem_altmap *altmap)
+				       struct vmem_altmap *altmap, void *block)
 {
 	pte_t *pte = pte_offset_kernel(pmd, addr);
 	if (pte_none(*pte)) {
 		pte_t entry;
-		void *p;
+		void *p = block;
 
-		p = vmemmap_alloc_block_buf(PAGE_SIZE, node, altmap);
-		if (!p)
-			return NULL;
+		if (!block) {
+			p = vmemmap_alloc_block_buf(PAGE_SIZE, node, altmap);
+			if (!p)
+				return NULL;
+		} else if (!altmap) {
+			get_page(virt_to_page(block));
+		}
 		entry = pfn_pte(__pa(p) >> PAGE_SHIFT, PAGE_KERNEL);
 		set_pte_at(&init_mm, addr, pte, entry);
 	}
@@ -217,7 +221,8 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 }
 
 static int __meminit vmemmap_populate_address(unsigned long addr, int node,
-					      struct vmem_altmap *altmap)
+					      struct vmem_altmap *altmap,
+					      void *page, void **ptr)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
@@ -237,10 +242,14 @@ static int __meminit vmemmap_populate_address(unsigned long addr, int node,
 	pmd = vmemmap_pmd_populate(pud, addr, node);
 	if (!pmd)
 		return -ENOMEM;
-	pte = vmemmap_pte_populate(pmd, addr, node, altmap);
+	pte = vmemmap_pte_populate(pmd, addr, node, altmap, page);
 	if (!pte)
 		return -ENOMEM;
 	vmemmap_verify(pte, node, addr, addr + PAGE_SIZE);
+
+	if (ptr)
+		*ptr = __va(__pfn_to_phys(pte_pfn(*pte)));
+	return 0;
 }
 
 int __meminit vmemmap_populate_basepages(unsigned long start, unsigned long end,
@@ -249,7 +258,110 @@ int __meminit vmemmap_populate_basepages(unsigned long start, unsigned long end,
 	unsigned long addr = start;
 
 	for (; addr < end; addr += PAGE_SIZE) {
-		if (vmemmap_populate_address(addr, node, altmap))
+		if (vmemmap_populate_address(addr, node, altmap, NULL, NULL))
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int __meminit vmemmap_populate_range(unsigned long start,
+					    unsigned long end,
+					    int node, void *page)
+{
+	unsigned long addr = start;
+
+	for (; addr < end; addr += PAGE_SIZE) {
+		if (vmemmap_populate_address(addr, node, NULL, page, NULL))
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static inline int __meminit vmemmap_populate_page(unsigned long addr, int node,
+						  void **ptr)
+{
+	return vmemmap_populate_address(addr, node, NULL, NULL, ptr);
+}
+
+static pte_t * __meminit vmemmap_lookup_address(unsigned long addr)
+{
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	pgd = pgd_offset_k(addr);
+	if (pgd_none(*pgd))
+		return NULL;
+
+	p4d = p4d_offset(pgd, addr);
+	if (p4d_none(*p4d))
+		return NULL;
+
+	pud = pud_offset(p4d, addr);
+	if (pud_none(*pud))
+		return NULL;
+
+	pmd = pmd_offset(pud, addr);
+	if (pmd_none(*pmd))
+		return NULL;
+
+	pte = pte_offset_kernel(pmd, addr);
+	if (pte_none(*pte))
+		return NULL;
+
+	return pte;
+}
+
+static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
+						     unsigned long start,
+						     unsigned long end, int node,
+						     struct dev_pagemap *pgmap)
+{
+	unsigned long offset, size, addr;
+
+	/*
+	 * For compound pages bigger than section size (e.g. 1G) fill the rest
+	 * of sections as tail pages.
+	 *
+	 * Note that memremap_pages() resets @nr_range value and will increment
+	 * it after each range successful onlining. Thus the value or @nr_range
+	 * at section memmap populate corresponds to the in-progress range
+	 * being onlined that we care about.
+	 */
+	offset = PFN_PHYS(start_pfn) - pgmap->ranges[pgmap->nr_range].start;
+	if (!IS_ALIGNED(offset, pgmap_align(pgmap)) &&
+	    pgmap_align(pgmap) > SUBSECTION_SIZE) {
+		pte_t *ptep = vmemmap_lookup_address(start - PAGE_SIZE);
+
+		if (!ptep)
+			return -ENOMEM;
+
+		return vmemmap_populate_range(start, end, node,
+					      page_to_virt(pte_page(*ptep)));
+	}
+
+	size = min(end - start, pgmap_pfn_align(pgmap) * sizeof(struct page));
+	for (addr = start; addr < end; addr += size) {
+		unsigned long next = addr, last = addr + size;
+		void *block;
+
+		/* Populate the head page vmemmap page */
+		if (vmemmap_populate_page(addr, node, NULL))
+			return -ENOMEM;
+
+		/* Populate the tail pages vmemmap page */
+		block = NULL;
+		next = addr + PAGE_SIZE;
+		if (vmemmap_populate_page(next, node, &block))
+			return -ENOMEM;
+
+		/* Reuse the previous page for the rest of tail pages */
+		next += PAGE_SIZE;
+		if (vmemmap_populate_range(next, last, node, block))
 			return -ENOMEM;
 	}
 
@@ -262,12 +374,19 @@ struct page * __meminit __populate_section_memmap(unsigned long pfn,
 {
 	unsigned long start = (unsigned long) pfn_to_page(pfn);
 	unsigned long end = start + nr_pages * sizeof(struct page);
+	unsigned int align = pgmap_align(pgmap);
+	int r;
 
 	if (WARN_ON_ONCE(!IS_ALIGNED(pfn, PAGES_PER_SUBSECTION) ||
 		!IS_ALIGNED(nr_pages, PAGES_PER_SUBSECTION)))
 		return NULL;
 
-	if (vmemmap_populate(start, end, nid, altmap))
+	if (align > PAGE_SIZE && !altmap)
+		r = vmemmap_populate_compound_pages(pfn, start, end, nid, pgmap);
+	else
+		r = vmemmap_populate(start, end, nid, altmap);
+
+	if (r < 0)
 		return NULL;
 
 	return pfn_to_page(pfn);
