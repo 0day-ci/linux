@@ -124,6 +124,7 @@ enum mv3310_model {
 
 struct mv3310_priv {
 	enum mv3310_model model;
+	bool has_5g;
 
 	u32 firmware_ver;
 	phy_interface_t const_interface;
@@ -399,7 +400,7 @@ static int mv3310_probe(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv;
 	u32 mmd_mask = MDIO_DEVS_PMAPMD | MDIO_DEVS_AN;
-	bool has_5g, has_macsec;
+	bool has_macsec;
 	int ret, nports;
 
 	if (!phydev->is_c45 ||
@@ -451,6 +452,7 @@ static int mv3310_probe(struct phy_device *phydev)
 			return ret;
 
 		has_macsec = !(ret & MV_PMA_XGSTAT_NO_MACSEC);
+		priv->has_5g = true;
 
 		if (nports == 4)
 			priv->model = MV_MODEL_88X3340;
@@ -462,7 +464,7 @@ static int mv3310_probe(struct phy_device *phydev)
 		if (ret < 0)
 			return ret;
 
-		has_5g = ret & MDIO_PCS_SPEED_5G;
+		priv->has_5g = ret & MDIO_PCS_SPEED_5G;
 
 		if (nports == 8)
 			priv->model = MV_MODEL_88E218X;
@@ -476,7 +478,7 @@ static int mv3310_probe(struct phy_device *phydev)
 	switch (priv->model) {
 	case MV_MODEL_88E211X:
 	case MV_MODEL_88E218X:
-		phydev_info(phydev, "model 88E21%d%d\n", nports, !has_5g);
+		phydev_info(phydev, "model 88E21%d%d\n", nports, !priv->has_5g);
 		break;
 	case MV_MODEL_88X3310:
 	case MV_MODEL_88X3340:
@@ -543,6 +545,15 @@ static int mv2110_init_interface(struct phy_device *phydev)
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
 	int mactype;
 
+	/* Check that the PHY interface type is compatible */
+	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
+	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
+	    (phydev->interface != PHY_INTERFACE_MODE_5GBASER ||
+	     !priv->has_5g) &&
+	    phydev->interface != PHY_INTERFACE_MODE_10GBASER &&
+	    phydev->interface != PHY_INTERFACE_MODE_USXGMII)
+		return -ENODEV;
+
 	mactype = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MV_PMA_21X0_PORT_CTRL);
 	if (mactype < 0)
 		return mactype;
@@ -572,6 +583,17 @@ static int mv3310_init_interface(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
 	int mactype;
+
+	/* Check that the PHY interface type is compatible */
+	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
+	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
+	    phydev->interface != PHY_INTERFACE_MODE_5GBASER &&
+	    (phydev->interface != PHY_INTERFACE_MODE_XAUI ||
+	     priv->model == MV_MODEL_88X3340) &&
+	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
+	    phydev->interface != PHY_INTERFACE_MODE_10GBASER &&
+	    phydev->interface != PHY_INTERFACE_MODE_USXGMII)
+		return -ENODEV;
 
 	mactype = phy_read_mmd(phydev, MDIO_MMD_VEND2, MV_V2_PORT_CTRL);
 	if (mactype < 0)
@@ -609,16 +631,6 @@ static int mv3310_init_interface(struct phy_device *phydev)
 static int mv3310_config_init(struct phy_device *phydev)
 {
 	int err;
-
-	/* Check that the PHY interface type is compatible */
-	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
-	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
-	    phydev->interface != PHY_INTERFACE_MODE_5GBASER &&
-	    phydev->interface != PHY_INTERFACE_MODE_XAUI &&
-	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
-	    phydev->interface != PHY_INTERFACE_MODE_10GBASER &&
-	    phydev->interface != PHY_INTERFACE_MODE_USXGMII)
-		return -ENODEV;
 
 	phydev->mdix_ctrl = ETH_TP_MDI_AUTO;
 
