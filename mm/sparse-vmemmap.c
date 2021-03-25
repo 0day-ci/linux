@@ -172,13 +172,20 @@ static void * __meminit vmemmap_alloc_block_zero(unsigned long size, int node)
 	return p;
 }
 
-pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
+pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node,
+				       void *block)
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
-		if (!p)
-			return NULL;
+		void *p = block;
+
+		if (!block) {
+			p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+			if (!p)
+				return NULL;
+		} else {
+			get_page(virt_to_page(block));
+		}
 		pmd_populate_kernel(&init_mm, pmd, p);
 	}
 	return pmd;
@@ -220,15 +227,14 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 	return pgd;
 }
 
-static int __meminit vmemmap_populate_address(unsigned long addr, int node,
-					      struct vmem_altmap *altmap,
-					      void *page, void **ptr)
+static int __meminit vmemmap_populate_pmd_address(unsigned long addr, int node,
+						  struct vmem_altmap *altmap,
+						  void *page, pmd_t **ptr)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
-	pte_t *pte;
 
 	pgd = vmemmap_pgd_populate(addr, node);
 	if (!pgd)
@@ -239,9 +245,24 @@ static int __meminit vmemmap_populate_address(unsigned long addr, int node,
 	pud = vmemmap_pud_populate(p4d, addr, node);
 	if (!pud)
 		return -ENOMEM;
-	pmd = vmemmap_pmd_populate(pud, addr, node);
+	pmd = vmemmap_pmd_populate(pud, addr, node, page);
 	if (!pmd)
 		return -ENOMEM;
+	if (ptr)
+		*ptr = pmd;
+	return 0;
+}
+
+static int __meminit vmemmap_populate_address(unsigned long addr, int node,
+					      struct vmem_altmap *altmap,
+					      void *page, void **ptr)
+{
+	pmd_t *pmd;
+	pte_t *pte;
+
+	if (vmemmap_populate_pmd_address(addr, node, altmap, NULL, &pmd))
+		return -ENOMEM;
+
 	pte = vmemmap_pte_populate(pmd, addr, node, altmap, page);
 	if (!pte)
 		return -ENOMEM;
@@ -285,13 +306,26 @@ static inline int __meminit vmemmap_populate_page(unsigned long addr, int node,
 	return vmemmap_populate_address(addr, node, NULL, NULL, ptr);
 }
 
-static pte_t * __meminit vmemmap_lookup_address(unsigned long addr)
+static int __meminit vmemmap_populate_pmd_range(unsigned long start,
+						unsigned long end,
+						int node, void *page)
+{
+	unsigned long addr = start;
+
+	for (; addr < end; addr += PMD_SIZE) {
+		if (vmemmap_populate_pmd_address(addr, node, NULL, page, NULL))
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static pmd_t * __meminit vmemmap_lookup_address(unsigned long addr)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
-	pte_t *pte;
 
 	pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd))
@@ -309,11 +343,7 @@ static pte_t * __meminit vmemmap_lookup_address(unsigned long addr)
 	if (pmd_none(*pmd))
 		return NULL;
 
-	pte = pte_offset_kernel(pmd, addr);
-	if (pte_none(*pte))
-		return NULL;
-
-	return pte;
+	return pmd;
 }
 
 static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
@@ -335,9 +365,22 @@ static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 	offset = PFN_PHYS(start_pfn) - pgmap->ranges[pgmap->nr_range].start;
 	if (!IS_ALIGNED(offset, pgmap_align(pgmap)) &&
 	    pgmap_align(pgmap) > SUBSECTION_SIZE) {
-		pte_t *ptep = vmemmap_lookup_address(start - PAGE_SIZE);
+		pmd_t *pmdp;
+		pte_t *ptep;
 
-		if (!ptep)
+		addr = start - PAGE_SIZE;
+		pmdp = vmemmap_lookup_address(addr);
+		if (!pmdp)
+			return -ENOMEM;
+
+		/* Reuse the tail pages vmemmap pmd page */
+		if (offset % pgmap->align > PFN_PHYS(PAGES_PER_SECTION))
+			return vmemmap_populate_pmd_range(start, end, node,
+						page_to_virt(pmd_page(*pmdp)));
+
+		/* Populate the tail pages vmemmap pmd page */
+		ptep = pte_offset_kernel(pmdp, addr);
+		if (pte_none(*ptep))
 			return -ENOMEM;
 
 		return vmemmap_populate_range(start, end, node,
