@@ -6745,6 +6745,7 @@ SHOW_FUNCTION(bfq_slice_idle_show, bfqd->bfq_slice_idle, 2);
 SHOW_FUNCTION(bfq_max_budget_show, bfqd->bfq_user_max_budget, 0);
 SHOW_FUNCTION(bfq_timeout_sync_show, bfqd->bfq_timeout, 1);
 SHOW_FUNCTION(bfq_strict_guarantees_show, bfqd->strict_guarantees, 0);
+SHOW_FUNCTION(bfq_better_fairness_show, bfqd->better_fairness, 0);
 SHOW_FUNCTION(bfq_low_latency_show, bfqd->low_latency, 0);
 #undef SHOW_FUNCTION
 
@@ -6886,6 +6887,26 @@ static ssize_t bfq_strict_guarantees_store(struct elevator_queue *e,
 	return count;
 }
 
+static ssize_t bfq_better_fairness_store(struct elevator_queue *e,
+				     const char *page, size_t count)
+{
+	struct bfq_data *bfqd = e->elevator_data;
+	unsigned long __data;
+	int ret;
+
+	ret = bfq_var_store(&__data, (page));
+	if (ret)
+		return ret;
+
+	if (__data > 1)
+		__data = 1;
+	if (__data == 0 && bfqd->better_fairness != 0)
+		bfq_end_wr(bfqd);
+	bfqd->better_fairness = __data;
+
+	return count;
+}
+
 static ssize_t bfq_low_latency_store(struct elevator_queue *e,
 				     const char *page, size_t count)
 {
@@ -6919,6 +6940,7 @@ static struct elv_fs_entry bfq_attrs[] = {
 	BFQ_ATTR(max_budget),
 	BFQ_ATTR(timeout_sync),
 	BFQ_ATTR(strict_guarantees),
+	BFQ_ATTR(better_fairness),
 	BFQ_ATTR(low_latency),
 	__ATTR_NULL
 };

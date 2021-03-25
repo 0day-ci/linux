@@ -672,6 +672,16 @@ struct bfq_data {
 	bool strict_guarantees;
 
 	/*
+	 * If there is no prio preemption, we force the device to
+	 * idle to ensure Qos. IO inject also has some additional
+	 * restrictions. The inject/merge queue should come from the
+	 * same class in the same group. Doing so will reduce the
+	 * throughput of the system, but it can better guarantee
+	 * the Qos of each group and real-time tasks.
+	 */
+	bool better_fairness;
+
+	/*
 	 * Last time at which a queue entered the current burst of
 	 * queues being activated shortly after each other; for more
 	 * details about this and the following parameters related to
