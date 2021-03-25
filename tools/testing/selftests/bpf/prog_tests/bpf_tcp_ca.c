@@ -6,6 +6,7 @@
 #include <test_progs.h>
 #include "bpf_dctcp.skel.h"
 #include "bpf_cubic.skel.h"
+#include "bpf_nogpltcp.skel.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
@@ -227,10 +228,53 @@ static void test_dctcp(void)
 	bpf_dctcp__destroy(dctcp_skel);
 }
 
+static char *err_str = NULL;
+static bool found = false;
+
+static int libbpf_debug_print(enum libbpf_print_level level,
+			      const char *format, va_list args)
+{
+	char *log_buf;
+
+	if (level != LIBBPF_WARN ||
+	    strcmp(format, "libbpf: \n%s\n")) {
+		vprintf(format, args);
+		return 0;
+	}
+
+	log_buf = va_arg(args, char *);
+	if (!log_buf)
+		goto out;
+	if (err_str && strstr(log_buf, err_str) != NULL)
+		found = true;
+out:
+	printf(format, log_buf);
+	return 0;
+}
+
+static void test_invalid_license(void)
+{
+	libbpf_print_fn_t old_print_fn = NULL;
+	struct bpf_nogpltcp *skel;
+
+	err_str = "struct ops programs must have a GPL compatible license";
+	old_print_fn = libbpf_set_print(libbpf_debug_print);
+
+	skel = bpf_nogpltcp__open_and_load();
+	if (CHECK(skel, "bpf_nogplgtcp__open_and_load()", "didn't fail\n"))
+		bpf_nogpltcp__destroy(skel);
+
+	CHECK(!found, "errmsg check", "expected string '%s'", err_str);
+
+	libbpf_set_print(old_print_fn);
+}
+
 void test_bpf_tcp_ca(void)
 {
 	if (test__start_subtest("dctcp"))
 		test_dctcp();
 	if (test__start_subtest("cubic"))
 		test_cubic();
+	if (test__start_subtest("invalid_license"))
+		test_invalid_license();
 }
