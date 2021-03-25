@@ -777,6 +777,7 @@ enum bfqq_state_flags {
 				     * without idling the device
 				     */
 	BFQQF_fifo_expire,	/* FIFO checked in this slice */
+	BFQQF_prio_expire,	/* should expire for higher prio queue*/
 	BFQQF_has_short_ttime,	/* queue has a short think time */
 	BFQQF_sync,		/* synchronous queue */
 	BFQQF_IO_bound,		/*
@@ -806,6 +807,7 @@ BFQ_BFQQ_FNS(busy);
 BFQ_BFQQ_FNS(wait_request);
 BFQ_BFQQ_FNS(non_blocking_wait_rq);
 BFQ_BFQQ_FNS(fifo_expire);
+BFQ_BFQQ_FNS(prio_expire);
 BFQ_BFQQ_FNS(has_short_ttime);
 BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(IO_bound);

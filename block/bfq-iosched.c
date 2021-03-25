@@ -153,6 +153,7 @@ BFQ_BFQQ_FNS(busy);
 BFQ_BFQQ_FNS(wait_request);
 BFQ_BFQQ_FNS(non_blocking_wait_rq);
 BFQ_BFQQ_FNS(fifo_expire);
+BFQ_BFQQ_FNS(prio_expire);
 BFQ_BFQQ_FNS(has_short_ttime);
 BFQ_BFQQ_FNS(sync);
 BFQ_BFQQ_FNS(IO_bound);
@@ -2986,6 +2987,7 @@ static void __bfq_set_in_service_queue(struct bfq_data *bfqd,
 {
 	if (bfqq) {
 		bfq_clear_bfqq_fifo_expire(bfqq);
+		bfq_clear_bfqq_prio_expire(bfqq);
 
 		bfqd->budgets_assigned = (bfqd->budgets_assigned * 7 + 256) / 8;
 
