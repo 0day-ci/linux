@@ -1410,13 +1410,11 @@ static int hub_configure(struct usb_hub *hub,
 		maxchild = min_t(unsigned, maxchild, USB_SS_MAXPORTS);
 
 	if (hub->descriptor->bNbrPorts > maxchild) {
-		message = "hub has too many ports!";
-		ret = -ENODEV;
-		goto fail;
+		dev_info(hub_dev, "hub has too many ports!\n");
+		return -ENODEV;
 	} else if (hub->descriptor->bNbrPorts == 0) {
-		message = "hub doesn't have any ports!";
-		ret = -ENODEV;
-		goto fail;
+		dev_info(hub_dev, "hub doesn't have any ports!\n");
+		return -ENODEV;
 	}
 
 	/*
