@@ -1071,6 +1071,7 @@ void bfq_requeue_bfqq(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 void bfq_del_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 		       bool expiration);
 void bfq_add_bfqq_busy(struct bfq_data *bfqd, struct bfq_queue *bfqq);
+unsigned short bfq_ioprio_class(struct bfq_entity *entity);
 
 /* --------------- end of interface of B-WF2Q+ ---------------- */
 

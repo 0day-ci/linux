@@ -428,7 +428,30 @@ void bfq_schedule_dispatch(struct bfq_data *bfqd)
 	}
 }
 
-#define bfq_class_idle(bfqq)	((bfqq)->ioprio_class == IOPRIO_CLASS_IDLE)
+unsigned short bfq_ioprio_class(struct bfq_entity *entity)
+{
+	struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
+	unsigned short class = BFQ_DEFAULT_GRP_CLASS;
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	struct bfq_group *bfqg;
+
+	if (bfqq) {
+		bfqg = bfqq_group(bfqq);
+		class = bfqg->ioprio_class?:bfqq->ioprio_class;
+	} else {
+		bfqg = bfq_entity_to_bfqg(entity);
+		class = bfqg->ioprio_class?:BFQ_DEFAULT_GRP_CLASS;
+	}
+#else
+	if (bfqq)
+		class = bfqq->ioprio_class;
+#endif
+	return class;
+}
+
+#define bfq_class(bfq)		(bfq_ioprio_class(&bfq->entity))
+#define bfq_class_rt(bfq)	(bfq_ioprio_class(&bfq->entity) == IOPRIO_CLASS_RT)
+#define bfq_class_idle(bfq)	(bfq_ioprio_class(&bfq->entity) == IOPRIO_CLASS_IDLE)
 
 #define bfq_sample_valid(samples)	((samples) > 80)
 
@@ -1635,7 +1658,7 @@ static bool bfq_bfqq_higher_class_or_weight(struct bfq_queue *bfqq,
 {
 	int bfqq_weight, in_serv_weight;
 
-	if (bfqq->ioprio_class < in_serv_bfqq->ioprio_class)
+	if (bfq_class(bfqq) < bfq_class(in_serv_bfqq))
 		return true;
 
 	if (in_serv_bfqq->entity.parent == bfqq->entity.parent) {
@@ -2600,7 +2623,7 @@ static bool bfq_may_be_close_cooperator(struct bfq_queue *bfqq,
 		return false;
 
 	if (bfq_class_idle(bfqq) || bfq_class_idle(new_bfqq) ||
-	    (bfqq->ioprio_class != new_bfqq->ioprio_class))
+	    (bfq_class(bfqq) != bfq_class(new_bfqq)))
 		return false;
 
 	/*
