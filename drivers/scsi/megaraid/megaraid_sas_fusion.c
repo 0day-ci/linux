@@ -3057,6 +3057,8 @@ static void megasas_build_ld_nonrw_fusion(struct megasas_instance *instance,
 		io_request->Function = MPI2_FUNCTION_SCSI_IO_REQUEST;
 		io_request->DevHandle = devHandle;
 	}
+
+	megasas_get_msix_index(instance, scmd, cmd, 1);
 }
 
 /**
