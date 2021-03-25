@@ -1641,4 +1641,15 @@ config GPIO_MOCKUP
 
 endmenu
 
+comment "Other GPIO expanders"
+
+config GPIO_MUX_INPUT
+	tristate "General GPIO input multiplexer"
+	select MULTIPLEXER
+	select MUX_GPIO
+	depends on OF_GPIO
+	help
+	  Say yes here to enable support for generic GPIO input multiplexer. This
+	  needs a multiplexer controller to drive the select pins.
+
 endif
