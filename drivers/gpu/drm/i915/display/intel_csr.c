@@ -40,6 +40,10 @@
 
 #define GEN12_CSR_MAX_FW_SIZE		ICL_CSR_MAX_FW_SIZE
 
+#define ADLP_CSR_PATH			"i915/adlp_dmc_ver2_08.bin"
+#define ADLP_CSR_VERSION_REQUIRED	CSR_VERSION(2, 8)
+MODULE_FIRMWARE(ADLP_CSR_PATH);
+
 #define ADLS_CSR_PATH			"i915/adls_dmc_ver2_01.bin"
 #define ADLS_CSR_VERSION_REQUIRED	CSR_VERSION(2, 1)
 MODULE_FIRMWARE(ADLS_CSR_PATH);
@@ -693,7 +697,11 @@ void intel_csr_ucode_init(struct drm_i915_private *dev_priv)
 	 */
 	intel_csr_runtime_pm_get(dev_priv);
 
-	if (IS_ALDERLAKE_S(dev_priv)) {
+	if (IS_ALDERLAKE_P(dev_priv)) {
+		csr->fw_path = ADLP_CSR_PATH;
+		csr->required_version = ADLP_CSR_VERSION_REQUIRED;
+		csr->max_fw_size = GEN12_CSR_MAX_FW_SIZE;
+	} else if (IS_ALDERLAKE_S(dev_priv)) {
 		csr->fw_path = ADLS_CSR_PATH;
 		csr->required_version = ADLS_CSR_VERSION_REQUIRED;
 		csr->max_fw_size = GEN12_CSR_MAX_FW_SIZE;

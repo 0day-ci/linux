@@ -4953,7 +4953,21 @@ static u32 get_allowed_dc_mask(const struct drm_i915_private *dev_priv,
 	int requested_dc;
 	int max_dc;
 
-	if (IS_DG1(dev_priv))
+	if (!HAS_DISPLAY(dev_priv))
+		return 0;
+
+	if (DISPLAY_VER(dev_priv) == 13)
+		/*
+		 * FIXME: We need to disable DC-states for two reasons:
+		 *
+		 *  - Although not documented in the bspec, we've been told
+		 *    that we need to upload Pipe DMC firmwares in addition
+		 *    to the main DMC firmware for DC5 to work properly.
+		 *    We need proper bspec documentation before we can handle
+		 *    this.
+		 */
+		max_dc = 0;
+	else if (IS_DG1(dev_priv))
 		max_dc = 3;
 	else if (DISPLAY_VER(dev_priv) >= 12)
 		max_dc = 4;
