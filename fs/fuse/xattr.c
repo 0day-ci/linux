@@ -12,24 +12,33 @@
 #include <linux/posix_acl_xattr.h>
 
 int fuse_setxattr(struct inode *inode, const char *name, const void *value,
-		  size_t size, int flags)
+		  size_t size, int flags, unsigned extra_flags)
 {
 	struct fuse_mount *fm = get_fuse_mount(inode);
 	FUSE_ARGS(args);
 	struct fuse_setxattr_in inarg;
+	struct fuse_setxattr_in_v2 inarg_v2;
+	bool setxattr_v2 = fm->fc->setxattr_v2;
 	int err;
 
 	if (fm->fc->no_setxattr)
 		return -EOPNOTSUPP;
 
 	memset(&inarg, 0, sizeof(inarg));
-	inarg.size = size;
-	inarg.flags = flags;
+	memset(&inarg_v2, 0, sizeof(inarg_v2));
+	if (setxattr_v2) {
+		inarg_v2.size = size;
+		inarg_v2.flags = flags;
+		inarg_v2.setxattr_flags = extra_flags;
+	} else {
+		inarg.size = size;
+		inarg.flags = flags;
+	}
 	args.opcode = FUSE_SETXATTR;
 	args.nodeid = get_node_id(inode);
 	args.in_numargs = 3;
-	args.in_args[0].size = sizeof(inarg);
-	args.in_args[0].value = &inarg;
+	args.in_args[0].size = setxattr_v2 ? sizeof(inarg_v2) : sizeof(inarg);
+	args.in_args[0].value = setxattr_v2 ? &inarg_v2 : (void *)&inarg;
 	args.in_args[1].size = strlen(name) + 1;
 	args.in_args[1].value = name;
 	args.in_args[2].size = size;
@@ -199,7 +208,7 @@ static int fuse_xattr_set(const struct xattr_handler *handler,
 	if (!value)
 		return fuse_removexattr(inode, name);
 
-	return fuse_setxattr(inode, name, value, size, flags);
+	return fuse_setxattr(inode, name, value, size, flags, 0);
 }
 
 static bool no_xattr_list(struct dentry *dentry)
