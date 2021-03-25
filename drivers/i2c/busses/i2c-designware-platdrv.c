@@ -178,6 +178,7 @@ static void dw_i2c_plat_pm_cleanup(struct dw_i2c_dev *dev)
 static int dw_i2c_plat_request_regs(struct dw_i2c_dev *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev->dev);
+	struct resource *res;
 	int ret;
 
 	switch (dev->flags & MODEL_MASK) {
@@ -185,7 +186,8 @@ static int dw_i2c_plat_request_regs(struct dw_i2c_dev *dev)
 		ret = bt1_i2c_request_regs(dev);
 		break;
 	default:
-		dev->base = devm_platform_ioremap_resource(pdev, 0);
+		dev->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
+		dev->base_addr = res->start;
 		ret = PTR_ERR_OR_ZERO(dev->base);
 		break;
 	}
@@ -312,6 +314,8 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 	ret = i2c_dw_probe(dev);
 	if (ret)
 		goto exit_probe;
+
+	dev_info(&pdev->dev, "%s\n", adap->name);
 
 	return ret;
 

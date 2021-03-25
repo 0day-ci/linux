@@ -767,7 +767,7 @@ int i2c_dw_probe_master(struct dw_i2c_dev *dev)
 		return ret;
 
 	snprintf(adap->name, sizeof(adap->name),
-		 "Synopsys DesignWare I2C adapter");
+		 "Synopsys DesignWare I2C adapter at 0x%llx", dev->base_addr);
 	adap->retries = 3;
 	adap->algo = &i2c_dw_algo;
 	adap->quirks = &i2c_dw_quirks;

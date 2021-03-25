@@ -241,6 +241,7 @@ struct dw_i2c_dev {
 	struct regmap		*sysmap;
 	void __iomem		*base;
 	void __iomem		*ext;
+	phys_addr_t		base_addr;
 	struct completion	cmd_complete;
 	struct clk		*clk;
 	struct clk		*pclk;
