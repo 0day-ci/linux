@@ -2240,6 +2240,11 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
 	INIT_LIST_HEAD(&dev->bus_list);
 	dev->dev.type = &pci_dev_type;
 	dev->bus = pci_bus_get(bus);
+	dev->config_resource = (struct resource) {
+		.name = "PCI Config",
+		.start = 0,
+		.end = -1,
+	};
 
 	return dev;
 }

@@ -1706,27 +1706,16 @@ static int strict_iomem_checks;
 #endif
 
 /*
- * check if an address is reserved in the iomem resource tree
+ * check if an address is reserved in the @resource tree
  * returns true if reserved, false if not reserved.
  */
-bool iomem_is_exclusive(u64 addr)
+bool resource_is_exclusive(struct resource *p, u64 addr, resource_size_t size)
 {
-	struct resource *p = &iomem_resource;
 	bool err = false;
 	loff_t l;
-	int size = PAGE_SIZE;
-
-	if (!strict_iomem_checks)
-		return false;
-
-	addr = addr & PAGE_MASK;
 
 	read_lock(&resource_lock);
 	for (p = p->child; p ; p = r_next(NULL, p, &l)) {
-		/*
-		 * We can probably skip the resources without
-		 * IORESOURCE_IO attribute?
-		 */
 		if (p->start >= addr + size)
 			break;
 		if (p->end < addr)
@@ -1747,6 +1736,15 @@ bool iomem_is_exclusive(u64 addr)
 	read_unlock(&resource_lock);
 
 	return err;
+}
+
+bool iomem_is_exclusive(u64 addr)
+{
+	if (!strict_iomem_checks)
+		return false;
+
+	return resource_is_exclusive(&iomem_resource, addr & PAGE_MASK,
+				     PAGE_SIZE);
 }
 
 struct resource_entry *resource_list_create_entry(struct resource *res,

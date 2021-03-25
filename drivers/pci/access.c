@@ -225,8 +225,9 @@ int pci_user_read_config_##size						\
 	raw_spin_lock_irq(&pci_lock);				\
 	if (unlikely(dev->block_cfg_access))				\
 		pci_wait_cfg(dev);					\
-	ret = dev->bus->ops->read(dev->bus, dev->devfn,			\
-					pos, sizeof(type), &data);	\
+	if (!resource_is_exclusive(&dev->config_resource, pos, sizeof(type))) \
+		ret = dev->bus->ops->read(dev->bus, dev->devfn,		\
+					  pos, sizeof(type), &data);	\
 	raw_spin_unlock_irq(&pci_lock);				\
 	*val = (type)data;						\
 	return pcibios_err_to_errno(ret);				\

@@ -401,6 +401,7 @@ struct pci_dev {
 	 */
 	unsigned int	irq;
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
+	struct resource config_resource;	/* driver exclusive config register ranges */
 
 	bool		match_driver;		/* Skip attaching driver */
 
@@ -1329,6 +1330,21 @@ void pci_release_region(struct pci_dev *, int);
 int pci_request_selected_regions(struct pci_dev *, int, const char *);
 int pci_request_selected_regions_exclusive(struct pci_dev *, int, const char *);
 void pci_release_selected_regions(struct pci_dev *, int);
+
+static inline __must_check struct resource *
+pci_request_config_region(struct pci_dev *pdev, unsigned int where,
+			  unsigned int len, const char *name)
+{
+	return __request_region(&pdev->config_resource, where, len, name,
+				IORESOURCE_EXCLUSIVE);
+}
+
+static inline void pci_release_config_region(struct pci_dev *pdev,
+					     unsigned int where,
+					     unsigned int len)
+{
+	__release_region(&pdev->config_resource, where, len);
+}
 
 /* drivers/pci/bus.c */
 void pci_add_resource(struct list_head *resources, struct resource *res);

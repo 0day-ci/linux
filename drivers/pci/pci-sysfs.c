@@ -753,6 +753,9 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 	u8 *data = (u8 *) buf;
 	int ret;
 
+	if (resource_is_exclusive(&dev->config_resource, off, count))
+		return -EBUSY;
+
 	ret = security_locked_down(LOCKDOWN_PCI_ACCESS);
 	if (ret)
 		return ret;
