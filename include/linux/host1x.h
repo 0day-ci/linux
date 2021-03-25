@@ -140,7 +140,6 @@ static inline void host1x_bo_munmap(struct host1x_bo *bo, void *addr)
 
 struct host1x_syncpt_base;
 struct host1x_syncpt;
-struct host1x;
 
 struct host1x_syncpt *host1x_syncpt_get(struct host1x *host, u32 id);
 u32 host1x_syncpt_id(struct host1x_syncpt *sp);
