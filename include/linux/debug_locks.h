@@ -6,8 +6,6 @@
 #include <linux/bug.h>
 #include <linux/printk.h>
 
-struct task_struct;
-
 extern int debug_locks __read_mostly;
 extern int debug_locks_silent __read_mostly;
 
