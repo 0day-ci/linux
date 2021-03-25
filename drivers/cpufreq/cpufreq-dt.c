@@ -257,7 +257,12 @@ static int dt_cpufreq_early_init(struct device *dev, int cpu)
 	 *
 	 * OPPs might be populated at runtime, don't check for error here.
 	 */
-	if (!dev_pm_opp_of_cpumask_add_table(priv->cpus))
+	ret = dev_pm_opp_of_cpumask_add_table(priv->cpus);
+	if (ret) {
+		/* Return the -EPROBE_DEFER error to trigger the deferred probe. */
+		if (ret == -EPROBE_DEFER)
+			goto out;
+	} else
 		priv->have_static_opps = true;
 
 	/*
