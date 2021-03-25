@@ -337,10 +337,12 @@ static int raspberrypi_clk_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-					  clk_data);
-	if (ret)
-		return ret;
+	if (dev->of_node) {
+		ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
+						  clk_data);
+		if (ret)
+			return ret;
+	}
 
 	rpi->cpufreq = platform_device_register_data(dev, "raspberrypi-cpufreq",
 						     -1, NULL, 0);
