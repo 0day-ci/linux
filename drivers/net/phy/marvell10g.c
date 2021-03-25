@@ -33,6 +33,8 @@
 #define MV_PHY_ALASKA_NBT_QUIRK_REV	(MARVELL_PHY_ID_88X3310 | 0xa)
 
 enum {
+	MV_PMA_XGSTAT		= 0xc001,
+	MV_PMA_XGSTAT_NO_MACSEC	= BIT(12),
 	MV_PMA_FW_VER0		= 0xc011,
 	MV_PMA_FW_VER1		= 0xc012,
 	MV_PMA_21X0_PORT_CTRL	= 0xc04a,
@@ -397,6 +399,7 @@ static int mv3310_probe(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv;
 	u32 mmd_mask = MDIO_DEVS_PMAPMD | MDIO_DEVS_AN;
+	bool has_5g, has_macsec;
 	int ret, nports;
 
 	if (!phydev->is_c45 ||
@@ -443,12 +446,24 @@ static int mv3310_probe(struct phy_device *phydev)
 
 	switch (phydev->drv->phy_id) {
 	case MARVELL_PHY_ID_88X3310:
+		ret = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MV_PMA_XGSTAT);
+		if (ret < 0)
+			return ret;
+
+		has_macsec = !(ret & MV_PMA_XGSTAT_NO_MACSEC);
+
 		if (nports == 4)
 			priv->model = MV_MODEL_88X3340;
 		else if (nports == 1)
 			priv->model = MV_MODEL_88X3310;
 		break;
 	case MARVELL_PHY_ID_88E2110:
+		ret = phy_read_mmd(phydev, MDIO_MMD_PCS, MDIO_SPEED);
+		if (ret < 0)
+			return ret;
+
+		has_5g = ret & MDIO_PCS_SPEED_5G;
+
 		if (nports == 8)
 			priv->model = MV_MODEL_88E218X;
 		else if (nports == 1)
@@ -458,7 +473,17 @@ static int mv3310_probe(struct phy_device *phydev)
 		unreachable();
 	}
 
-	if (!priv->model) {
+	switch (priv->model) {
+	case MV_MODEL_88E211X:
+	case MV_MODEL_88E218X:
+		phydev_info(phydev, "model 88E21%d%d\n", nports, !has_5g);
+		break;
+	case MV_MODEL_88X3310:
+	case MV_MODEL_88X3340:
+		phydev_info(phydev, "model 88X33%d0%s\n", nports,
+			    has_macsec ? "P" : "");
+		break;
+	default:
 		phydev_err(phydev, "unknown PHY model (nports = %i)\n", nports);
 		return -ENODEV;
 	}
