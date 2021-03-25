@@ -33,7 +33,7 @@ properties:
         description: PHYs that implement IEEE802.3 clause 22
       - const: ethernet-phy-ieee802.3-c45
         description: PHYs that implement IEEE802.3 clause 45
-      - pattern: "^ethernet-phy-id[a-f0-9]{4}\\.[a-f0-9]{4}$"
+      - pattern: "^ethernet-phy-ieee[0-9]{3}\\.[0-9][-][a-f0-9]{4}$"
         description:
           If the PHY reports an incorrect ID (or none at all) then the
           compatible list may contain an entry with the correct PHY ID
@@ -44,10 +44,10 @@ properties:
           this is the chip vendor OUI bits 19:24, followed by 10
           bits of a vendor specific ID.
       - items:
-          - pattern: "^ethernet-phy-id[a-f0-9]{4}\\.[a-f0-9]{4}$"
+          - pattern: "^ethernet-phy-ieee[0-9]{3}\\.[0-9][-][a-f0-9]{4}$"
           - const: ethernet-phy-ieee802.3-c22
       - items:
-          - pattern: "^ethernet-phy-id[a-f0-9]{4}\\.[a-f0-9]{4}$"
+          - pattern: "^ethernet-phy-ieee[0-9]{3}\\.[0-9][-][a-f0-9]{4}$"
           - const: ethernet-phy-ieee802.3-c45
 
   reg:
