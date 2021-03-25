@@ -233,6 +233,8 @@ void ufshcd_init_crypto(struct ufs_hba *hba)
 void ufshcd_crypto_setup_rq_keyslot_manager(struct ufs_hba *hba,
 					    struct request_queue *q)
 {
-	if (hba->caps & UFSHCD_CAP_CRYPTO)
-		blk_ksm_register(&hba->ksm, q);
+	if (hba->caps & UFSHCD_CAP_CRYPTO) {
+		if (WARN_ON(!blk_ksm_register(&hba->ksm, q)))
+			hba->caps &= ~UFSHCD_CAP_CRYPTO;
+	}
 }

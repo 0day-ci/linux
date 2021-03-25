@@ -21,8 +21,10 @@ void mmc_crypto_set_initial_state(struct mmc_host *host)
 
 void mmc_crypto_setup_queue(struct request_queue *q, struct mmc_host *host)
 {
-	if (host->caps2 & MMC_CAP2_CRYPTO)
-		blk_ksm_register(&host->ksm, q);
+	if (host->caps2 & MMC_CAP2_CRYPTO) {
+		if (WARN_ON(!blk_ksm_register(&host->ksm, q)))
+			host->caps2 &= ~MMC_CAP2_CRYPTO;
+	}
 }
 EXPORT_SYMBOL_GPL(mmc_crypto_setup_queue);
 
