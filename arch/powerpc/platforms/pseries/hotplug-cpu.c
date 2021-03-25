@@ -39,6 +39,8 @@
 /* This version can't take the spinlock, because it never returns */
 static int rtas_stop_self_token = RTAS_UNKNOWN_SERVICE;
 
+static cpumask_var_t node_recorded_ids_map[MAX_NUMNODES];
+
 static void rtas_stop_self(void)
 {
 	static struct rtas_args args;
@@ -151,29 +153,61 @@ static void pseries_cpu_die(unsigned int cpu)
  */
 static int pseries_add_processor(struct device_node *np)
 {
-	unsigned int cpu;
+	unsigned int cpu, node;
 	cpumask_var_t candidate_mask, tmp;
-	int err = -ENOSPC, len, nthreads, i;
+	int err = -ENOSPC, len, nthreads, i, nid;
 	const __be32 *intserv;
+	bool force_reusing = false;
 
 	intserv = of_get_property(np, "ibm,ppc-interrupt-server#s", &len);
 	if (!intserv)
 		return 0;
 
-	zalloc_cpumask_var(&candidate_mask, GFP_KERNEL);
-	zalloc_cpumask_var(&tmp, GFP_KERNEL);
+	alloc_cpumask_var(&candidate_mask, GFP_KERNEL);
+	alloc_cpumask_var(&tmp, GFP_KERNEL);
+
+	/*
+	 * Fetch from the DT nodes read by dlpar_configure_connector() the NUMA
+	 * node id the added CPU belongs to.
+	 */
+	nid = of_node_to_nid(np);
+	if (nid < 0 || !node_possible(nid))
+		nid = first_online_node;
 
 	nthreads = len / sizeof(u32);
-	for (i = 0; i < nthreads; i++)
-		cpumask_set_cpu(i, tmp);
 
 	cpu_maps_update_begin();
 
 	BUG_ON(!cpumask_subset(cpu_present_mask, cpu_possible_mask));
 
+again:
+	cpumask_clear(candidate_mask);
+	cpumask_clear(tmp);
+	for (i = 0; i < nthreads; i++)
+		cpumask_set_cpu(i, tmp);
+
 	/* Get a bitmap of unoccupied slots. */
 	cpumask_xor(candidate_mask, cpu_possible_mask, cpu_present_mask);
+
+	/*
+	 * Remove free ids previously assigned on the other nodes. We can walk
+	 * only online nodes because once a node became online it is not turned
+	 * offlined back.
+	 */
+	if (!force_reusing)
+		for_each_online_node(node) {
+			if (node == nid) /* Keep our node's recorded ids */
+				continue;
+			cpumask_andnot(candidate_mask, candidate_mask,
+				       node_recorded_ids_map[node]);
+		}
+
 	if (cpumask_empty(candidate_mask)) {
+		if (!force_reusing) {
+			force_reusing = true;
+			goto again;
+		}
+
 		/* If we get here, it most likely means that NR_CPUS is
 		 * less than the partition's max processors setting.
 		 */
@@ -191,10 +225,34 @@ static int pseries_add_processor(struct device_node *np)
 			cpumask_shift_left(tmp, tmp, nthreads);
 
 	if (cpumask_empty(tmp)) {
+		if (!force_reusing) {
+			force_reusing = true;
+			goto again;
+		}
 		printk(KERN_ERR "Unable to find space in cpu_present_mask for"
 		       " processor %pOFn with %d thread(s)\n", np,
 		       nthreads);
 		goto out_unlock;
+	}
+
+	/* Record the newly used CPU ids for the associate node. */
+	cpumask_or(node_recorded_ids_map[nid], node_recorded_ids_map[nid], tmp);
+
+	/*
+	 * If we force reusing the id, remove these ids from any node which was
+	 * previously using it.
+	 */
+	if (force_reusing) {
+		cpu = cpumask_first(tmp);
+		pr_warn("Reusing free CPU ids %d-%d from another node\n",
+			cpu, cpu + nthreads - 1);
+
+		for_each_online_node(node) {
+			if (node == nid)
+				continue;
+			cpumask_andnot(node_recorded_ids_map[node],
+				       node_recorded_ids_map[node], tmp);
+		}
 	}
 
 	for_each_cpu(cpu, tmp) {
@@ -889,6 +947,7 @@ static struct notifier_block pseries_smp_nb = {
 static int __init pseries_cpu_hotplug_init(void)
 {
 	int qcss_tok;
+	unsigned int node;
 
 #ifdef CONFIG_ARCH_CPU_PROBE_RELEASE
 	ppc_md.cpu_probe = dlpar_cpu_probe;
@@ -910,8 +969,18 @@ static int __init pseries_cpu_hotplug_init(void)
 	smp_ops->cpu_die = pseries_cpu_die;
 
 	/* Processors can be added/removed only on LPAR */
-	if (firmware_has_feature(FW_FEATURE_LPAR))
+	if (firmware_has_feature(FW_FEATURE_LPAR)) {
+		for_each_node(node) {
+			alloc_bootmem_cpumask_var(&node_recorded_ids_map[node]);
+
+			/* Record ids of CPU added at boot time */
+			cpumask_or(node_recorded_ids_map[node],
+				   node_recorded_ids_map[node],
+				   node_to_cpumask_map[node]);
+		}
+
 		of_reconfig_notifier_register(&pseries_smp_nb);
+	}
 
 	return 0;
 }
