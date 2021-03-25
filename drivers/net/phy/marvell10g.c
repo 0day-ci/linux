@@ -124,6 +124,7 @@ struct mv3310_priv {
 	enum mv3310_model model;
 
 	u32 firmware_ver;
+	phy_interface_t const_interface;
 	bool rate_match;
 
 	struct device *hwmon_dev;
@@ -512,11 +513,56 @@ static bool mv3310_has_pma_ngbaset_quirk(struct phy_device *phydev)
 		MV_PHY_ALASKA_NBT_QUIRK_MASK) == MV_PHY_ALASKA_NBT_QUIRK_REV;
 }
 
-static int mv3310_config_init(struct phy_device *phydev)
+static int mv2110_init_interface(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	int mactype;
+
+	mactype = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MV_PMA_21X0_PORT_CTRL);
+	if (mactype < 0)
+		return mactype;
+
+	mactype &= MV_PMA_21X0_PORT_CTRL_MACTYPE_MASK;
+
+	if (mactype == MV_PMA_21X0_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH) {
+		priv->rate_match = true;
+		priv->const_interface = PHY_INTERFACE_MODE_10GBASER;
+	}
+
+	return 0;
+}
+
+static int mv3310_init_interface(struct phy_device *phydev)
+{
+	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	int mactype;
+
+	mactype = phy_read_mmd(phydev, MDIO_MMD_VEND2, MV_V2_PORT_CTRL);
+	if (mactype < 0)
+		return mactype;
+
+	mactype &= MV_V2_33X0_PORT_CTRL_MACTYPE_MASK;
+
+	if (mactype == MV_V2_33X0_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH ||
+	    mactype == MV_V2_33X0_PORT_CTRL_MACTYPE_RXAUI_RATE_MATCH ||
+	    (mactype == MV_V2_3310_PORT_CTRL_MACTYPE_XAUI_RATE_MATCH &&
+	     priv->model == MV_MODEL_88X3310))
+		priv->rate_match = true;
+
+	if (mactype == MV_V2_33X0_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH)
+		priv->const_interface = PHY_INTERFACE_MODE_10GBASER;
+	else if (mactype == MV_V2_33X0_PORT_CTRL_MACTYPE_RXAUI_RATE_MATCH)
+		priv->const_interface = PHY_INTERFACE_MODE_RXAUI;
+	else if (priv->model == MV_MODEL_88X3310 &&
+		 mactype == MV_V2_3310_PORT_CTRL_MACTYPE_XAUI_RATE_MATCH)
+		priv->const_interface = PHY_INTERFACE_MODE_XAUI;
+
+	return 0;
+}
+
+static int mv3310_config_init(struct phy_device *phydev)
+{
 	int err;
-	int val;
 
 	/* Check that the PHY interface type is compatible */
 	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
@@ -535,11 +581,12 @@ static int mv3310_config_init(struct phy_device *phydev)
 	if (err)
 		return err;
 
-	val = phy_read_mmd(phydev, MDIO_MMD_VEND2, MV_V2_PORT_CTRL);
-	if (val < 0)
-		return val;
-	priv->rate_match = ((val & MV_V2_33X0_PORT_CTRL_MACTYPE_MASK) ==
-			MV_V2_33X0_PORT_CTRL_MACTYPE_10GBASER_RATE_MATCH);
+	if (phydev->drv->phy_id == MARVELL_PHY_ID_88E2110)
+		err = mv2110_init_interface(phydev);
+	else
+		err = mv3310_init_interface(phydev);
+	if (err < 0)
+		return err;
 
 	/* Enable EDPD mode - saving 600mW */
 	return mv3310_set_edpd(phydev, ETHTOOL_PHY_EDPD_DFLT_TX_MSECS);
@@ -649,12 +696,12 @@ static void mv3310_update_interface(struct phy_device *phydev)
 {
 	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
 
-	/* In "XFI with Rate Matching" mode the PHY interface is fixed at
-	 * 10Gb. The PHY adapts the rate to actual wire speed with help of
+	/* In all of the "* with Rate Matching" modes the PHY interface is fixed
+	 * at 10Gb. The PHY adapts the rate to actual wire speed with help of
 	 * internal 16KB buffer.
 	 */
 	if (priv->rate_match) {
-		phydev->interface = PHY_INTERFACE_MODE_10GBASER;
+		phydev->interface = priv->const_interface;
 		return;
 	}
 
