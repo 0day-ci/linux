@@ -1272,10 +1272,6 @@ static int khugepaged_scan_pmd(struct mm_struct *mm,
 				goto out_unmap;
 			}
 		}
-		if (!pte_present(pteval)) {
-			result = SCAN_PTE_NON_PRESENT;
-			goto out_unmap;
-		}
 		if (pte_uffd_wp(pteval)) {
 			/*
 			 * Don't collapse the page if any of the small
