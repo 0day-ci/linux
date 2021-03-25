@@ -640,8 +640,10 @@ static struct sk_buff *pfifo_fast_dequeue(struct Qdisc *qdisc)
 {
 	struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
 	struct sk_buff *skb = NULL;
+	bool need_retry = true;
 	int band;
 
+retry:
 	for (band = 0; band < PFIFO_FAST_BANDS && !skb; band++) {
 		struct skb_array *q = band2list(priv, band);
 
@@ -652,6 +654,16 @@ static struct sk_buff *pfifo_fast_dequeue(struct Qdisc *qdisc)
 	}
 	if (likely(skb)) {
 		qdisc_update_stats_at_dequeue(qdisc, skb);
+	} else if (need_retry &&
+		   test_and_clear_bit(__QDISC_STATE_NEED_RESCHEDULE,
+				      &qdisc->state)) {
+		/* do another enqueuing after clearing the flag to
+		 * avoid calling __netif_schedule().
+		 */
+		smp_mb__after_atomic();
+		need_retry = false;
+
+		goto retry;
 	} else {
 		WRITE_ONCE(qdisc->empty, true);
 	}

@@ -36,6 +36,7 @@ struct qdisc_rate_table {
 enum qdisc_state_t {
 	__QDISC_STATE_SCHED,
 	__QDISC_STATE_DEACTIVATED,
+	__QDISC_STATE_NEED_RESCHEDULE,
 };
 
 struct qdisc_size_table {
@@ -159,8 +160,38 @@ static inline bool qdisc_is_empty(const struct Qdisc *qdisc)
 static inline bool qdisc_run_begin(struct Qdisc *qdisc)
 {
 	if (qdisc->flags & TCQ_F_NOLOCK) {
+		bool dont_retry = test_bit(__QDISC_STATE_NEED_RESCHEDULE,
+					   &qdisc->state);
+
+		if (spin_trylock(&qdisc->seqlock))
+			goto nolock_empty;
+
+		/* If the flag is set before doing the spin_trylock() and
+		 * the above spin_trylock() return false, it means other cpu
+		 * holding the lock will do dequeuing for us, or it wil see
+		 * the flag set after releasing lock and reschedule the
+		 * net_tx_action() to do the dequeuing.
+		 */
+		if (dont_retry)
+			return false;
+
+		/* We could do set_bit() before the first spin_trylock(),
+		 * and avoid doing second spin_trylock() completely, then
+		 * we could have multi cpus doing the set_bit(). Here use
+		 * dont_retry to avoid doing the set_bit() and the second
+		 * spin_trylock(), which has 5% performance improvement than
+		 * doing the set_bit() before the first spin_trylock().
+		 */
+		set_bit(__QDISC_STATE_NEED_RESCHEDULE,
+			&qdisc->state);
+
+		/* Retry again in case other CPU may not see the new flag
+		 * after it releases the lock at the end of qdisc_run_end().
+		 */
 		if (!spin_trylock(&qdisc->seqlock))
 			return false;
+
+nolock_empty:
 		WRITE_ONCE(qdisc->empty, false);
 	} else if (qdisc_is_running(qdisc)) {
 		return false;
@@ -176,8 +207,13 @@ static inline bool qdisc_run_begin(struct Qdisc *qdisc)
 static inline void qdisc_run_end(struct Qdisc *qdisc)
 {
 	write_seqcount_end(&qdisc->running);
-	if (qdisc->flags & TCQ_F_NOLOCK)
+	if (qdisc->flags & TCQ_F_NOLOCK) {
 		spin_unlock(&qdisc->seqlock);
+
+		if (unlikely(test_bit(__QDISC_STATE_NEED_RESCHEDULE,
+				      &qdisc->state)))
+			__netif_schedule(qdisc);
+	}
 }
 
 static inline bool qdisc_may_bulk(const struct Qdisc *qdisc)
