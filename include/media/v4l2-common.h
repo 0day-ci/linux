@@ -544,11 +544,11 @@ static inline u64 v4l2_buffer_get_timestamp(const struct v4l2_buffer *buf)
 {
 	/*
 	 * When the timestamp comes from 32-bit user space, there may be
-	 * uninitialized data in tv_usec, so cast it to u32.
+	 * uninitialized data in tv_usec, so cast it to s32.
 	 * Otherwise allow invalid input for backwards compatibility.
 	 */
 	return buf->timestamp.tv_sec * NSEC_PER_SEC +
-		(u32)buf->timestamp.tv_usec * NSEC_PER_USEC;
+		(s32)buf->timestamp.tv_usec * NSEC_PER_USEC;
 }
 
 static inline void v4l2_buffer_set_timestamp(struct v4l2_buffer *buf,
