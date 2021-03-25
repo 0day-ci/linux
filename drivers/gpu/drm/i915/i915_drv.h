@@ -1599,6 +1599,13 @@ tgl_stepping_get(struct drm_i915_private *dev_priv)
 	 tgl_stepping_get(p)->gt_stepping >= (since) && \
 	 tgl_stepping_get(p)->gt_stepping <= (until))
 
+#define ADLP_REVID_A0		0x0
+#define ADLP_REVID_B0		0x4
+#define ADLP_REVID_C0		0x8
+
+#define IS_ADLP_REVID(p, since, until) \
+	(IS_ALDERLAKE_P(p) && IS_REVID(p, since, until))
+
 #define IS_LP(dev_priv)	(INTEL_INFO(dev_priv)->is_lp)
 #define IS_GEN9_LP(dev_priv)	(IS_GEN(dev_priv, 9) && IS_LP(dev_priv))
 #define IS_GEN9_BC(dev_priv)	(IS_GEN(dev_priv, 9) && !IS_LP(dev_priv))
