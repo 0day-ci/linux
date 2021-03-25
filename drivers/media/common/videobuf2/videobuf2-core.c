@@ -1205,6 +1205,7 @@ static int __prepare_dmabuf(struct vb2_buffer *vb)
 
 	for (plane = 0; plane < vb->num_planes; ++plane) {
 		struct dma_buf *dbuf = dma_buf_get(planes[plane].m.fd);
+		unsigned int bytesused;
 
 		if (IS_ERR_OR_NULL(dbuf)) {
 			dprintk(q, 1, "invalid dmabuf fd for plane %d\n",
@@ -1213,9 +1214,23 @@ static int __prepare_dmabuf(struct vb2_buffer *vb)
 			goto err;
 		}
 
-		/* use DMABUF size if length is not provided */
-		if (planes[plane].length == 0)
-			planes[plane].length = dbuf->size;
+		planes[plane].length = dbuf->size;
+		bytesused = planes[plane].bytesused ?
+			    planes[plane].bytesused : dbuf->size;
+
+		if (planes[plane].bytesused > planes[plane].length) {
+			dprintk(q, 1, "bytesused is bigger then dmabuf length for plane %d\n",
+				plane);
+			ret = -EINVAL;
+			goto err;
+		}
+
+		if (planes[plane].data_offset >= bytesused) {
+			dprintk(q, 1, "data_offset >= bytesused for plane %d\n",
+				plane);
+			ret = -EINVAL;
+			goto err;
+		}
 
 		if (planes[plane].length < vb->planes[plane].min_length) {
 			dprintk(q, 1, "invalid dmabuf length %u for plane %d, minimum length %u\n",

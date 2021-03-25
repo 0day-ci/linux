@@ -968,7 +968,9 @@ struct v4l2_requestbuffers {
 /**
  * struct v4l2_plane - plane info for multi-planar buffers
  * @bytesused:		number of bytes occupied by data in the plane (payload)
- * @length:		size of this plane (NOT the payload) in bytes
+ * @length:		size of this plane (NOT the payload) in bytes. Filled
+ *			by userspace for USERPTR and by the driver for DMABUF
+ *			and MMAP.
  * @mem_offset:		when memory in the associated struct v4l2_buffer is
  *			V4L2_MEMORY_MMAP, equals the offset from the start of
  *			the device memory for this plane (or is a "cookie" that
@@ -1025,7 +1027,8 @@ struct v4l2_plane {
  * @m:		union of @offset, @userptr, @planes and @fd
  * @length:	size in bytes of the buffer (NOT its payload) for single-plane
  *		buffers (when type != *_MPLANE); number of elements in the
- *		planes array for multi-plane buffers
+ *		planes array for multi-plane buffers. Filled by userspace for
+ *		USERPTR and by the driver for DMABUF and MMAP.
  * @reserved2:	drivers and applications must zero this field
  * @request_fd: fd of the request that this buffer should use
  * @reserved:	for backwards compatibility with applications that do not know
