@@ -134,7 +134,6 @@ struct vb2_mem_ops {
 
 	void		*(*attach_dmabuf)(struct device *dev,
 					  struct dma_buf *dbuf,
-					  unsigned long size,
 					  enum dma_data_direction dma_dir);
 	void		(*detach_dmabuf)(void *buf_priv);
 	int		(*map_dmabuf)(void *buf_priv);

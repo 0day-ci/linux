@@ -606,16 +606,13 @@ static void vb2_dma_sg_detach_dmabuf(void *mem_priv)
 }
 
 static void *vb2_dma_sg_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
-	unsigned long size, enum dma_data_direction dma_dir)
+				      enum dma_data_direction dma_dir)
 {
 	struct vb2_dma_sg_buf *buf;
 	struct dma_buf_attachment *dba;
 
 	if (WARN_ON(!dev))
 		return ERR_PTR(-EINVAL);
-
-	if (dbuf->size < size)
-		return ERR_PTR(-EFAULT);
 
 	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
@@ -631,7 +628,7 @@ static void *vb2_dma_sg_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
 	}
 
 	buf->dma_dir = dma_dir;
-	buf->size = size;
+	buf->size = dmabuf->size;
 	buf->db_attach = dba;
 
 	return buf;

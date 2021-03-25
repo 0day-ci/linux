@@ -661,13 +661,10 @@ static void vb2_dc_detach_dmabuf(void *mem_priv)
 }
 
 static void *vb2_dc_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
-	unsigned long size, enum dma_data_direction dma_dir)
+				  enum dma_data_direction dma_dir)
 {
 	struct vb2_dc_buf *buf;
 	struct dma_buf_attachment *dba;
-
-	if (dbuf->size < size)
-		return ERR_PTR(-EFAULT);
 
 	if (WARN_ON(!dev))
 		return ERR_PTR(-EINVAL);
@@ -686,7 +683,7 @@ static void *vb2_dc_attach_dmabuf(struct device *dev, struct dma_buf *dbuf,
 	}
 
 	buf->dma_dir = dma_dir;
-	buf->size = size;
+	buf->size = dbuf->size;
 	buf->db_attach = dba;
 
 	return buf;
