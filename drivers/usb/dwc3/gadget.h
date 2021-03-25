@@ -56,6 +56,12 @@ struct dwc3;
 
 /* Frame/Microframe Number Mask */
 #define DWC3_FRNUMBER_MASK		0x3fff
+
+/* Cancel reason for dwc3 request */
+#define DWC3_REQUEST_DEQUEUED		-ECONNRESET  /* Request get dequeued */
+#define DWC3_REQUEST_DISCONNECTED	-ESHUTDOWN   /* Device is disconnected/disabled */
+#define DWC3_REQUEST_STALL		-EPIPE       /* Bus or protocol error */
+
 /* -------------------------------------------------------------------------- */
 
 #define to_dwc3_request(r)	(container_of(r, struct dwc3_request, request))
@@ -90,15 +96,17 @@ static inline void dwc3_gadget_move_started_request(struct dwc3_request *req)
 /**
  * dwc3_gadget_move_cancelled_request - move @req to the cancelled_list
  * @req: the request to be moved
+ * @reason: cancelled reason for the dwc3 request
  *
  * Caller should take care of locking. This function will move @req from its
  * current list to the endpoint's cancelled_list.
  */
-static inline void dwc3_gadget_move_cancelled_request(struct dwc3_request *req)
+static inline void dwc3_gadget_move_cancelled_request(struct dwc3_request *req, int reason)
 {
 	struct dwc3_ep		*dep = req->dep;
 
 	req->status = DWC3_REQUEST_STATUS_CANCELLED;
+	req->request.status = reason;
 	list_move_tail(&req->list, &dep->cancelled_list);
 }
 
