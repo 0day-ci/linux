@@ -1958,6 +1958,20 @@ static int power_pmu_event_init(struct perf_event *event)
 
 		if (ppmu->blacklist_ev && is_event_blacklisted(ev))
 			return -EINVAL;
+		/*
+		 * PMU config registers have fields that are
+		 * reserved and specific value to bit field as reserved.
+		 * For ex., MMCRA[61:62] is Randome Sampling Mode (SM)
+		 * and value of 0b11 to this field is reserved.
+		 *
+		 * This check is needed only for raw event type,
+		 * since tools like fuzzer use raw event type to
+		 * provide randomized event code values for test.
+		 *
+		 */
+		if (ppmu->check_attr_config &&
+		    ppmu->check_attr_config(event))
+			return -EINVAL;
 		break;
 	default:
 		return -ENOENT;
