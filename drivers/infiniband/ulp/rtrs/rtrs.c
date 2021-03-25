@@ -466,7 +466,7 @@ EXPORT_SYMBOL(sockaddr_to_str);
 /**
  * rtrs_addr_to_str() - convert rtrs_addr to a string "src@dst"
  * @addr:	the rtrs_addr structure to be converted
- * @str:	string containing source and destination addr of a path
+ * @buf:	string containing source and destination addr of a path
  *		separated by '@' I.e. "ip:1.1.1.1@ip:1.1.1.2"
  *		"ip:1.1.1.1@ip:1.1.1.2".
  * @len:	string length
