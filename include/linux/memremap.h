@@ -114,6 +114,7 @@ struct dev_pagemap {
 	struct completion done;
 	enum memory_type type;
 	unsigned int flags;
+	unsigned long align;
 	const struct dev_pagemap_ops *ops;
 	void *owner;
 	int nr_range;
@@ -128,6 +129,18 @@ static inline struct vmem_altmap *pgmap_altmap(struct dev_pagemap *pgmap)
 	if (pgmap->flags & PGMAP_ALTMAP_VALID)
 		return &pgmap->altmap;
 	return NULL;
+}
+
+static inline unsigned long pgmap_align(struct dev_pagemap *pgmap)
+{
+	if (!pgmap || !pgmap->align)
+		return PAGE_SIZE;
+	return pgmap->align;
+}
+
+static inline unsigned long pgmap_pfn_align(struct dev_pagemap *pgmap)
+{
+	return PHYS_PFN(pgmap_align(pgmap));
 }
 
 #ifdef CONFIG_ZONE_DEVICE
