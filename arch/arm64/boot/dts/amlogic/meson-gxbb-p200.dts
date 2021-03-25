@@ -75,6 +75,7 @@
 
 		eth_phy0: ethernet-phy@3 {
 			/* Micrel KSZ9031 (0x00221620) */
+			compatible = "ethernet-phy-ieee802.3-c22";
 			reg = <3>;
 
 			reset-assert-us = <10000>;

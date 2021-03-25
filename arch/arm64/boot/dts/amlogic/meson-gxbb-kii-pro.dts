@@ -69,6 +69,7 @@
 
 		eth_phy0: ethernet-phy@0 {
 			/* IC Plus IP101GR (0x02430c54) */
+			compatible = "ethernet-phy-ieee802.3-c22";
 			reg = <0>;
 			reset-assert-us = <10000>;
 			reset-deassert-us = <10000>;
