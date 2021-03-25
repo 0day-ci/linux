@@ -3723,7 +3723,7 @@ static struct task_struct *first_tid(struct pid *pid, int tid, loff_t f_pos,
 	 */
 	pos = task = task->group_leader;
 	do {
-		if (!nr--)
+		if (same_thread_group(task, pos) && !nr--)
 			goto found;
 	} while_each_thread(task, pos);
 fail:
@@ -3744,16 +3744,22 @@ out:
  */
 static struct task_struct *next_tid(struct task_struct *start)
 {
-	struct task_struct *pos = NULL;
+	struct task_struct *tmp, *pos = NULL;
+
 	rcu_read_lock();
-	if (pid_alive(start)) {
-		pos = next_thread(start);
-		if (thread_group_leader(pos))
-			pos = NULL;
-		else
-			get_task_struct(pos);
+	if (!pid_alive(start))
+		goto no_thread;
+	list_for_each_entry_rcu(tmp, &start->thread_group, thread_group) {
+		if (!thread_group_leader(tmp) && same_thread_group(start, tmp)) {
+			get_task_struct(tmp);
+			pos = tmp;
+			break;
+		}
 	}
+no_thread:
 	rcu_read_unlock();
+	if (!pos)
+		return NULL;
 	put_task_struct(start);
 	return pos;
 }
