@@ -21,24 +21,18 @@
 enum {
 	P_BI_TCXO,
 	P_CORE_BI_PLL_TEST_SE,
-	P_VIDEO_PLL0_OUT_EVEN,
 	P_VIDEO_PLL0_OUT_MAIN,
-	P_VIDEO_PLL0_OUT_ODD,
 };
 
 static const struct parent_map video_cc_parent_map_0[] = {
 	{ P_BI_TCXO, 0 },
 	{ P_VIDEO_PLL0_OUT_MAIN, 1 },
-	{ P_VIDEO_PLL0_OUT_EVEN, 2 },
-	{ P_VIDEO_PLL0_OUT_ODD, 3 },
 	{ P_CORE_BI_PLL_TEST_SE, 4 },
 };
 
 static const char * const video_cc_parent_names_0[] = {
 	"bi_tcxo",
 	"video_pll0",
-	"video_pll0_out_even",
-	"video_pll0_out_odd",
 	"core_bi_pll_test_se",
 };
 
@@ -79,7 +73,7 @@ static struct clk_rcg2 video_cc_venus_clk_src = {
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "video_cc_venus_clk_src",
 		.parent_names = video_cc_parent_names_0,
-		.num_parents = 5,
+		.num_parents = 3,
 		.flags = CLK_SET_RATE_PARENT,
 		.ops = &clk_rcg2_shared_ops,
 	},
