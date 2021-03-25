@@ -425,9 +425,9 @@ static int create_autodetect_quirks(struct snd_usb_audio *chip,
 							USB_CLASS_VENDOR_SPEC)
 			continue;
 
-		err = create_autodetect_quirk(chip, iface, driver);
-		if (err >= 0)
-			usb_driver_claim_interface(driver, iface, (void *)-1L);
+		if (create_autodetect_quirk(chip, iface, driver) < 0)
+			continue;
+		usb_driver_claim_interface(driver, iface, (void *)-1L);
 	}
 
 	return 0;
