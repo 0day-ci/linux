@@ -117,4 +117,6 @@ bool blk_ksm_is_superset(struct blk_keyslot_manager *ksm_superset,
 void blk_ksm_update_capabilities(struct blk_keyslot_manager *target_ksm,
 				 struct blk_keyslot_manager *reference_ksm);
 
+bool blk_ksm_is_empty(struct blk_keyslot_manager *ksm);
+
 #endif /* __LINUX_KEYSLOT_MANAGER_H */
