@@ -67,6 +67,7 @@ EXPORT_SYMBOL(jbd2_journal_set_triggers);
 EXPORT_SYMBOL(jbd2_journal_dirty_metadata);
 EXPORT_SYMBOL(jbd2_journal_forget);
 EXPORT_SYMBOL(jbd2_journal_flush);
+EXPORT_SYMBOL(jbd2_journal_flush_and_discard);
 EXPORT_SYMBOL(jbd2_journal_revoke);
 
 EXPORT_SYMBOL(jbd2_journal_init_dev);
@@ -1686,6 +1687,90 @@ static void jbd2_mark_journal_empty(journal_t *journal, int write_op)
 	write_unlock(&journal->j_state_lock);
 }
 
+/* discard journal blocks excluding journal superblock */
+static int __jbd2_journal_issue_discard(journal_t *journal)
+{
+	int err = 0;
+	unsigned long block, log_offset;
+	unsigned long long phys_block, block_start, block_stop;
+	loff_t byte_start, byte_stop, byte_count;
+	struct request_queue *q = bdev_get_queue(journal->j_dev);
+
+	if (!q)
+		return -ENXIO;
+
+	if (!blk_queue_discard(q))
+		return -EOPNOTSUPP;
+
+	/* lookup block mapping and issue discard for each contiguous region */
+	log_offset = be32_to_cpu(journal->j_superblock->s_first);
+
+	err = jbd2_journal_bmap(journal, log_offset, &block_start);
+	if (err) {
+		printk(KERN_ERR "JBD2: bad block at offset %lu", log_offset);
+		return err;
+	}
+
+	/*
+	 * use block_start - 1 to meet check for contiguous with previous region:
+	 * phys_block == block_stop + 1
+	 */
+	block_stop = block_start - 1;
+
+	for (block = log_offset; block < journal->j_total_len; block++) {
+		err = jbd2_journal_bmap(journal, block, &phys_block);
+		if (err) {
+			printk(KERN_ERR "JBD2: bad block at offset %lu", block);
+			return err;
+		}
+
+		/*
+		 * if block is last block, update stopping point
+		 * if not last block and
+		 * block is contiguous with previous block, continue
+		 */
+		if (block == journal->j_total_len - 1)
+			block_stop = phys_block;
+		else if (phys_block == block_stop + 1) {
+			block_stop++;
+			continue;
+		}
+
+		/*
+		 * if not contiguous with prior physical block or this is last
+		 * block of journal, take care of the region
+		 */
+		byte_start = block_start * journal->j_blocksize;
+		byte_stop = block_stop * journal->j_blocksize;
+		byte_count = (block_stop - block_start + 1) *
+			journal->j_blocksize;
+
+		truncate_inode_pages_range(journal->j_dev->bd_inode->i_mapping,
+			byte_start, byte_stop);
+
+		/*
+		 * use blkdev_issue_discard instead of sb_issue_discard
+		 * because superblock not yet populated when this is
+		 * called during journal_load during mount process
+		 */
+		err = blkdev_issue_discard(journal->j_dev,
+			byte_start >> SECTOR_SHIFT,
+			byte_count >> SECTOR_SHIFT,
+			GFP_NOFS, 0);
+
+		if (unlikely(err != 0)) {
+			printk(KERN_ERR "JBD2: unable to discard "
+				"journal at physical blocks %llu - %llu",
+				block_start, block_stop);
+			return err;
+		}
+
+		block_start = phys_block;
+		block_stop = phys_block;
+	}
+
+	return blkdev_issue_flush(journal->j_dev);
+}
 
 /**
  * jbd2_journal_update_sb_errno() - Update error in the journal.
@@ -1892,6 +1977,7 @@ int jbd2_journal_load(journal_t *journal)
 {
 	int err;
 	journal_superblock_t *sb;
+	struct request_queue *q = bdev_get_queue(journal->j_dev);
 
 	err = load_superblock(journal);
 	if (err)
@@ -1935,6 +2021,12 @@ int jbd2_journal_load(journal_t *journal)
 	 * here to update log tail information with the newest seq.
 	 */
 	journal->j_flags &= ~JBD2_ABORT;
+
+	/* if journal device supports discard, discard journal blocks */
+	if (q && blk_queue_discard(q)) {
+		if (__jbd2_journal_issue_discard(journal))
+			printk(KERN_ERR "JBD2: failed to discard journal when loading");
+	}
 
 	/* OK, we've finished with the dynamic journal bits:
 	 * reinitialise the dynamic contents of the superblock in memory
@@ -2244,15 +2336,18 @@ void jbd2_journal_clear_features(journal_t *journal, unsigned long compat,
 EXPORT_SYMBOL(jbd2_journal_clear_features);
 
 /**
- * jbd2_journal_flush() - Flush journal
+ * __jbd2_journal_flush() - Flush journal
  * @journal: Journal to act on.
+ * @discard: flag (see below)
  *
  * Flush all data for a given journal to disk and empty the journal.
  * Filesystems can use this when remounting readonly to ensure that
  * recovery does not need to happen on remount.
+ *
+ * If 'discard' is false, the journal is simply flushed. If discard is true,
+ * the journal is also discarded.
  */
-
-int jbd2_journal_flush(journal_t *journal)
+static int __jbd2_journal_flush(journal_t *journal, bool discard)
 {
 	int err = 0;
 	transaction_t *transaction = NULL;
@@ -2306,6 +2401,10 @@ int jbd2_journal_flush(journal_t *journal)
 	 * commits of data to the journal will restore the current
 	 * s_start value. */
 	jbd2_mark_journal_empty(journal, REQ_SYNC | REQ_FUA);
+
+	if (discard)
+		err = __jbd2_journal_issue_discard(journal);
+
 	mutex_unlock(&journal->j_checkpoint_mutex);
 	write_lock(&journal->j_state_lock);
 	J_ASSERT(!journal->j_running_transaction);
@@ -2316,6 +2415,17 @@ int jbd2_journal_flush(journal_t *journal)
 	write_unlock(&journal->j_state_lock);
 out:
 	return err;
+}
+
+int jbd2_journal_flush(journal_t *journal)
+{
+	return __jbd2_journal_flush(journal, false /* don't discard */);
+}
+
+/* flush journal and discard journal log */
+int jbd2_journal_flush_and_discard(journal_t *journal)
+{
+	return __jbd2_journal_flush(journal, true /* also discard */);
 }
 
 /**

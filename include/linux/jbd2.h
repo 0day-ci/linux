@@ -1492,6 +1492,7 @@ extern int	 jbd2_journal_invalidatepage(journal_t *,
 extern int	 jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page);
 extern int	 jbd2_journal_stop(handle_t *);
 extern int	 jbd2_journal_flush (journal_t *);
+extern int	 jbd2_journal_flush_and_discard(journal_t *journal);
 extern void	 jbd2_journal_lock_updates (journal_t *);
 extern void	 jbd2_journal_unlock_updates (journal_t *);
 

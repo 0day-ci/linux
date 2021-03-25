@@ -1318,6 +1318,33 @@ out:
 			return -EOPNOTSUPP;
 		return fsverity_ioctl_read_metadata(filp,
 						    (const void __user *)arg);
+	case EXT4_FLUSH_JOURNAL:
+	{
+		int discard = 0, err = 0;
+
+		/* file argument is not the mount point */
+		if (file_dentry(filp) != sb->s_root)
+			return -EINVAL;
+
+		/* filesystem is not backed by block device */
+		if (sb->s_bdev == NULL)
+			return -EINVAL;
+
+		if (copy_from_user(&discard, (int __user *)arg, sizeof(int)))
+			return -EFAULT;
+
+		if (EXT4_SB(sb)->s_journal) {
+			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+
+			if (discard)
+				err = jbd2_journal_flush_and_discard(EXT4_SB(sb)->s_journal);
+			else
+				err = jbd2_journal_flush(EXT4_SB(sb)->s_journal);
+
+			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+		}
+		return err;
+	}
 
 	default:
 		return -ENOTTY;
@@ -1407,6 +1434,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_GET_ES_CACHE:
 	case FS_IOC_FSGETXATTR:
 	case FS_IOC_FSSETXATTR:
+	case EXT4_FLUSH_JOURNAL:
 		break;
 	default:
 		return -ENOIOCTLCMD;
