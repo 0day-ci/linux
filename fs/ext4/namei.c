@@ -2492,6 +2492,10 @@ int ext4_generic_delete_entry(struct inode *dir,
 			else
 				de->inode = 0;
 			inode_inc_iversion(dir);
+
+			if (test_opt2(dir->i_sb, WIPE_FILENAME))
+				memset(de_del->name, 0, de_del->name_len);
+
 			return 0;
 		}
 		i += ext4_rec_len_from_disk(de->rec_len, blocksize);
