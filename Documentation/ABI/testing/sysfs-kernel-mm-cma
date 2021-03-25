@@ -5,12 +5,10 @@ Description:
 		/sys/kernel/mm/cma/ contains a subdirectory for each CMA
 		heap name (also sometimes called CMA areas).
 
-		Each CMA heap subdirectory (that is, each
-		/sys/kernel/mm/cma/<cma-heap-name> directory) contains the
-		following items:
+		Each CMA heap subdirectory contains the following items:
 
-			alloc_pages_success
-			alloc_pages_fail
+			- /sys/kernel/mm/cma/<cma-heap-name>/alloc_pages_success
+			- /sys/kernel/mm/cma/<cma-heap-name>/alloc_pages_fail
 
 What:		/sys/kernel/mm/cma/<cma-heap-name>/alloc_pages_success
 Date:		Feb 2021
