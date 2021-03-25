@@ -446,16 +446,24 @@ static int intel_fb_check_ccs_xy(const struct drm_framebuffer *fb, int ccs_plane
 	return 0;
 }
 
+static bool intel_fb_can_remap(const struct drm_framebuffer *fb);
+
 static bool intel_plane_can_remap(const struct intel_plane_state *plane_state)
 {
 	struct intel_plane *plane = to_intel_plane(plane_state->uapi.plane);
-	struct drm_i915_private *i915 = to_i915(plane->base.dev);
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
-	int i;
 
 	/* We don't want to deal with remapping with cursors */
 	if (plane->id == PLANE_CURSOR)
 		return false;
+
+	return intel_fb_can_remap(fb);
+}
+
+static bool intel_fb_can_remap(const struct drm_framebuffer *fb)
+{
+	struct drm_i915_private *i915 = to_i915(fb->dev);
+	int i;
 
 	/*
 	 * The display engine limits already match/exceed the
@@ -486,9 +494,13 @@ static bool intel_plane_can_remap(const struct intel_plane_state *plane_state)
 	return true;
 }
 
+#define FORCE_POT_STRIDE_REMAP	true
+
 static bool intel_fb_needs_pot_stride_remap(const struct intel_framebuffer *fb)
 {
-	return false;
+	return FORCE_POT_STRIDE_REMAP &&
+	       fb->base.modifier != DRM_FORMAT_MOD_LINEAR &&
+	       intel_fb_can_remap(&fb->base);
 }
 
 static int intel_fb_pitch(const struct intel_framebuffer *fb, int color_plane, unsigned int rotation)
