@@ -12166,6 +12166,11 @@ static int check_struct_ops_btf_id(struct bpf_verifier_env *env)
 		return -ENOTSUPP;
 	}
 
+	if (!prog->gpl_compatible) {
+		verbose(env, "struct ops programs must have a GPL compatible license\n");
+		return -EINVAL;
+	}
+
 	t = st_ops->type;
 	member_idx = prog->expected_attach_type;
 	if (member_idx >= btf_type_vlen(t)) {
