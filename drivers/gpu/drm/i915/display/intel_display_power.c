@@ -550,7 +550,8 @@ static void icl_tc_port_assert_ref_held(struct drm_i915_private *dev_priv,
 	if (drm_WARN_ON(&dev_priv->drm, !dig_port))
 		return;
 
-	if (IS_DISPLAY_VER(dev_priv, 11) && dig_port->tc_legacy_port)
+	if (IS_ALDERLAKE_P(dev_priv) ||
+	   (IS_DISPLAY_VER(dev_priv, 11) && dig_port->tc_legacy_port))
 		return;
 
 	drm_WARN_ON(&dev_priv->drm, !intel_tc_port_ref_held(dig_port));
