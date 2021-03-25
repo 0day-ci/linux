@@ -6277,6 +6277,8 @@ static void __ref __init_zone_device_page(struct page *page, unsigned long pfn,
 	}
 }
 
+#define MEMMAP_NR_PAGES	(2 * (PAGE_SIZE/sizeof(struct page)))
+
 void __ref memmap_init_zone_device(struct zone *zone,
 				   unsigned long start_pfn,
 				   unsigned long nr_pages,
@@ -6287,6 +6289,7 @@ void __ref memmap_init_zone_device(struct zone *zone,
 	struct vmem_altmap *altmap = pgmap_altmap(pgmap);
 	unsigned int pfn_align = pgmap_pfn_align(pgmap);
 	unsigned int order_align = order_base_2(pfn_align);
+	unsigned long ntails = min_t(unsigned long, pfn_align, MEMMAP_NR_PAGES);
 	unsigned long zone_idx = zone_idx(zone);
 	unsigned long start = jiffies;
 	int nid = pgdat->node_id;
@@ -6302,6 +6305,7 @@ void __ref memmap_init_zone_device(struct zone *zone,
 	if (altmap) {
 		start_pfn = altmap->base_pfn + vmem_altmap_offset(altmap);
 		nr_pages = end_pfn - start_pfn;
+		ntails = pfn_align;
 	}
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn += pfn_align) {
@@ -6315,7 +6319,7 @@ void __ref memmap_init_zone_device(struct zone *zone,
 
 		__SetPageHead(page);
 
-		for (i = 1; i < pfn_align; i++) {
+		for (i = 1; i < ntails; i++) {
 			__init_zone_device_page(page + i, pfn + i, zone_idx,
 						nid, pgmap);
 			prep_compound_tail(page, i);
