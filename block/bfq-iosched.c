@@ -4307,6 +4307,14 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 		return true;
 
 	/*
+	 * In better_fairness mode, we also put emphasis on Qos. The main
+	 * purpose of allowing idle here is to ensure better isolation
+	 * of Buffer IO.
+	 */
+	if (unlikely(bfqd->better_fairness))
+		return !(bfqd->bfq_slice_idle == 0 || bfq_class_idle(bfqq));
+
+	/*
 	 * Idling is performed only if slice_idle > 0. In addition, we
 	 * do not idle if
 	 * (a) bfqq is async
@@ -4316,6 +4324,9 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 	 */
 	if (bfqd->bfq_slice_idle == 0 || !bfq_bfqq_sync(bfqq) ||
 	   bfq_class_idle(bfqq))
+		return false;
+
+	if (bfq_may_expire_in_serv_for_prio(&bfqq->entity))
 		return false;
 
 	idling_boosts_thr_with_no_issue =
