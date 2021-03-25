@@ -12,6 +12,7 @@
 
 #include <linux/device.h>
 #include "rtrs-pri.h"
+#include "rtrs-fault.h"
 
 /**
  * enum rtrs_clt_state - Client states.
@@ -122,6 +123,13 @@ struct rtrs_rbuf {
 	u32 rkey;
 };
 
+struct rtrs_clt_fault_inject {
+#ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
+	struct rtrs_fault_inject fj;
+	bool fail_request;
+#endif
+};
+
 struct rtrs_clt_sess {
 	struct rtrs_sess	s;
 	struct rtrs_clt	*clt;
@@ -150,6 +158,7 @@ struct rtrs_clt_sess {
 	char                    hca_name[IB_DEVICE_NAME_MAX];
 	struct list_head __percpu
 				*mp_skip_entry;
+	struct rtrs_clt_fault_inject	fault_inject;
 };
 
 struct rtrs_clt {
@@ -250,4 +259,8 @@ int rtrs_clt_create_sess_files(struct rtrs_clt_sess *sess);
 void rtrs_clt_destroy_sess_files(struct rtrs_clt_sess *sess,
 				  const struct attribute *sysfs_self);
 
+void rtrs_clt_fault_inject_init(struct rtrs_clt_fault_inject *fault_inject,
+				struct rtrs_clt_sess *sess);
+void rtrs_clt_fault_inject_final(struct rtrs_clt_fault_inject *fault_inject);
+int rtrs_clt_should_fail_request(struct rtrs_clt_fault_inject *fault_inject);
 #endif /* RTRS_CLT_H */
