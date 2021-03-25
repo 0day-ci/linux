@@ -393,13 +393,24 @@ static int vhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			else
 				vhci_hcd->port_status[rhport] &= ~USB_PORT_STAT_POWER;
 			break;
-		default:
-			usbip_dbg_vhci_rh(" ClearPortFeature: default %x\n",
-					  wValue);
+		case USB_PORT_FEAT_ENABLE:
+		case USB_PORT_FEAT_C_ENABLE:
+		case USB_PORT_FEAT_C_SUSPEND:
+			/* Not allowed for USB-3 */
+			if (hcd->speed == HCD_USB3)
+				goto error;
+			fallthrough;
+		case USB_PORT_FEAT_C_CONNECTION:
+		case USB_PORT_FEAT_C_RESET:
 			if (wValue >= 32)
 				goto error;
 			vhci_hcd->port_status[rhport] &= ~(1 << wValue);
 			break;
+		default:
+			/* Disallow INDICATOR and C_OVER_CURRENT */
+			usbip_dbg_vhci_rh(" ClearPortFeature: default %x\n",
+					  wValue);
+			goto error;
 		}
 		break;
 	case GetHubDescriptor:
@@ -587,6 +598,14 @@ static int vhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			/* 50msec reset signaling */
 			vhci_hcd->re_timeout = jiffies + msecs_to_jiffies(50);
 			fallthrough;
+		case USB_PORT_FEAT_C_CONNECTION:
+		case USB_PORT_FEAT_C_RESET:
+		case USB_PORT_FEAT_C_ENABLE:
+		case USB_PORT_FEAT_C_SUSPEND:
+			/* Not allowed for USB-3, and ignored for USB-2 */
+			if (hcd->speed == HCD_USB3)
+				goto error;
+			break;
 		default:
 			usbip_dbg_vhci_rh(" SetPortFeature: default %d\n",
 					  wValue);
