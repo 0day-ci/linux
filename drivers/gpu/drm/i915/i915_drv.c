@@ -69,6 +69,7 @@
 
 #include "i915_debugfs.h"
 #include "i915_drv.h"
+#include "i915_hwmon.h"
 #include "i915_ioc32.h"
 #include "i915_irq.h"
 #include "i915_memcpy.h"
@@ -667,6 +668,10 @@ static void i915_driver_register(struct drm_i915_private *dev_priv)
 		return;
 	}
 
+	/* Register with hwmon */
+	if (i915_hwmon_init(&dev_priv->drm))
+		drm_err(&dev_priv->drm, "Failed to register driver hwmon!\n");
+
 	i915_debugfs_register(dev_priv);
 	i915_setup_sysfs(dev_priv);
 
@@ -707,6 +712,9 @@ static void i915_driver_unregister(struct drm_i915_private *dev_priv)
 	i915_pmu_unregister(dev_priv);
 
 	i915_teardown_sysfs(dev_priv);
+
+	i915_hwmon_fini(&dev_priv->drm);
+
 	drm_dev_unplug(&dev_priv->drm);
 
 	i915_gem_driver_unregister(dev_priv);

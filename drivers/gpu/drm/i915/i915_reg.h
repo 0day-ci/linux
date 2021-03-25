@@ -4068,6 +4068,59 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define BXT_RP_STATE_CAP        _MMIO(0x138170)
 #define GEN9_RP_STATE_LIMITS	_MMIO(0x138148)
 
+/* DG1 */
+
+/* based on MCHBAR_MIRROR_BASE_SNB == 0x140000 */
+#define PCU_PACKAGE_POWER_SKU_UNIT	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5938)
+#define PCU_PACKAGE_ENERGY_STATUS	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x593c)
+#define PCU_PACKAGE_RAPL_LIMIT		_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x59a0)
+#define PCU_PACKAGE_RAPL_LIMIT_UDW	_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x59a4)
+#define PCU_PACKAGE_POWER_SKU		INVALID_MMIO_REG
+#define PCU_PLATFORM_ENERGY_STATUS	INVALID_MMIO_REG
+
+/* Fields for *_PACKAGE_RAPL_LIMIT: */
+#define   PKG_PWR_LIM_1			REG_GENMASK(14, 0)
+#define   PKG_PWR_LIM_1_EN		REG_BIT(15)
+#define   PKG_PWR_LIM_1_TIME		REG_GENMASK(23, 17)
+
+/*
+ * Fields for *_PACKAGE_RAPL_LIMIT_UDW:
+ * In docs, these fields may be defined relative to the entire 64-bit
+ * register, but here they are defined relative to the 32-bit boundary.
+ */
+#define   PKG_PWR_LIM_2			REG_GENMASK(14, 0)	// 46:32
+#define   PKG_PWR_LIM_2_EN		REG_BIT(15)		// 47:47
+#define   PKG_PWR_LIM_2_TIME		REG_GENMASK(23, 17)	// 55:49
+
+/*
+ * *_PACKAGE_POWER_SKU_UNIT - fields specifying scaling for PCU quantities.
+ * - PKG_PWR_UNIT - Power Units used for power control registers. The
+ *   actual unit value is calculated by 1 W / Power(2,PKG_PWR_UNIT).
+ * - PKG_ENERGY_UNIT - Energy Units used for power control registers. The
+ *   actual unit value is calculated by 1 J / Power(2,PKG_ENERGY_UNIT).
+ * - PKG_TIME_UNIT - Time Units used for power control registers. The
+ *   actual unit value is calculated by 1 s / Power(2,PKG_TIME_UNIT).
+ */
+#define   PKG_PWR_UNIT			REG_GENMASK(3, 0)
+#define   PKG_ENERGY_UNIT		REG_GENMASK(12, 8)
+#define   PKG_TIME_UNIT			REG_GENMASK(19, 16)
+
+/*
+ * *_PACKAGE_POWER_SKU - SKU power and timing parameters.
+ * Used herein as a 64-bit bit register.
+ * These masks are defined using GENMASK_ULL as REG_GENMASK is limited to u32
+ * and as GENMASK is "long" and therefore 32-bits on a 32-bit system.
+ * PKG_PKG_TDP, PKG_MIN_PWR, and PKG_MAX_PWR are scaled in the same way as
+ * PKG_PWR_LIM_*, above.
+ * PKG_MAX_WIN has sub-fields for x and y, and has the value: is 1.x * 2^y.
+ */
+#define   PKG_PKG_TDP			GENMASK_ULL(14, 0)
+#define   PKG_MIN_PWR			GENMASK_ULL(30, 16)
+#define   PKG_MAX_PWR			GENMASK_ULL(46, 32)
+#define   PKG_MAX_WIN			GENMASK_ULL(54, 48)
+#define     PKG_MAX_WIN_Y		GENMASK_ULL(54, 53)
+#define     PKG_MAX_WIN_X		GENMASK_ULL(52, 48)
+
 /*
  * Logical Context regs
  */
