@@ -17,10 +17,10 @@ Example 1: Inject an error into request processing of rtrs-client
 -----------------------------------------------------------------
 
 Generate an error on one session of rtrs-client::
-   
-  echo 100 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/probability 
-  echo 1 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/times 
-  echo 1 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/fail-request 
+
+  echo 100 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/probability
+  echo 1 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/times
+  echo 1 > /sys/kernel/debug/ip\:192.168.123.144@ip\:192.168.123.190/fault_inject/fail-request
   dd if=/dev/rnbd0 of=./dd bs=1k count=10
 
 Expected Result::
@@ -72,12 +72,12 @@ Example 2: rtrs-server does not send ACK to the heart-beat of rtrs-client
   echo 100 > /sys/kernel/debug/ip\:192.168.123.190@ip\:192.168.123.144/fault_inject/probability 
   echo 5 > /sys/kernel/debug/ip\:192.168.123.190@ip\:192.168.123.144/fault_inject/times 
   echo 1 > /sys/kernel/debug/ip\:192.168.123.190@ip\:192.168.123.144/fault_inject/fail-hb-ack
-   
+
 Expected Result::
 
   If rtrs-server does not send ACK more than 5 times, rtrs-client tries reconnection.
 
 Check how many times rtrs-client did reconnection::
 
-  cat /sys/devices/virtual/rtrs-client/bla/paths/ip\:192.168.122.142@ip\:192.168.122.130/stats/reconnects 
+  cat /sys/devices/virtual/rtrs-client/bla/paths/ip\:192.168.122.142@ip\:192.168.122.130/stats/reconnects
   1 0
