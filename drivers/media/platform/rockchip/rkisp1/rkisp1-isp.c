@@ -758,9 +758,13 @@ static void rkisp1_isp_set_sink_crop(struct rkisp1_isp *isp,
 					  which);
 
 	sink_crop->left = ALIGN(r->left, 2);
-	sink_crop->width = ALIGN(r->width, 2);
+	sink_crop->width = clamp_t(u32, ALIGN(r->width, 2),
+				   RKISP1_ISP_MIN_WIDTH,
+				   RKISP1_ISP_MAX_WIDTH_PROCESSING);
 	sink_crop->top = r->top;
-	sink_crop->height = r->height;
+	sink_crop->height = clamp_t(u32, r->height,
+				    RKISP1_ISP_MIN_HEIGHT,
+				    RKISP1_ISP_MAX_HEIGHT_PROCESSING);
 	rkisp1_sd_adjust_crop(sink_crop, sink_fmt);
 
 	*r = *sink_crop;
