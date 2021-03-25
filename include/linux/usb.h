@@ -867,6 +867,7 @@ extern int usb_match_one_id(struct usb_interface *interface,
 			    const struct usb_device_id *id);
 
 extern int usb_for_each_dev(void *data, int (*fn)(struct usb_device *, void *));
+int usb_for_each_port(void *data, int (*fn)(struct device *, void *));
 extern struct usb_interface *usb_find_interface(struct usb_driver *drv,
 		int minor);
 extern struct usb_interface *usb_ifnum_to_if(const struct usb_device *dev,
