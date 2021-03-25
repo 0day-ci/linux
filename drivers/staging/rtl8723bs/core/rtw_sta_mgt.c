@@ -551,7 +551,7 @@ u32 rtw_init_bcmc_stainfo(struct adapter *padapter)
 	psta->mac_id = 1;
 
 exit:
-	return _SUCCESS;
+	return res;
 }
 
 struct sta_info *rtw_get_bcmc_stainfo(struct adapter *padapter)
