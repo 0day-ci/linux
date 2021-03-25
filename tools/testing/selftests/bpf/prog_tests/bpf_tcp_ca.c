@@ -227,10 +227,41 @@ static void test_dctcp(void)
 	bpf_dctcp__destroy(dctcp_skel);
 }
 
+static void test_invalid_license(void)
+{
+	/* We want to check that the verifier refuses to load a non-GPL TCP CC.
+	 * Rather than create a whole new file+skeleton, just reuse an existing
+	 * object and rewrite the license in memory after loading. Sine libbpf
+	 * doesn't expose this, we define a struct that includes the first couple
+	 * of internal fields for struct bpf_object so we can overwrite the right
+	 * bits. Yes, this is a bit of a hack, but it makes the test a lot simpler.
+	 */
+	struct bpf_object_fragment {
+		char name[BPF_OBJ_NAME_LEN];
+		char license[64];
+	} *obj;
+	struct bpf_dctcp *skel;
+	int err;
+
+	skel = bpf_dctcp__open();
+	if (CHECK(!skel, "bpf_dctcp__open", "failed\n"))
+		return;
+
+	obj = (void *)skel->obj;
+	obj->license[0] = 'X'; // turns 'GPL' into 'XPL' which will fail the check
+
+	err = bpf_dctcp__load(skel);
+	CHECK(err != -LIBBPF_ERRNO__VERIFY, "bpf_dctcp__load", "err:%d\n", err);
+
+	bpf_dctcp__destroy(skel);
+}
+
 void test_bpf_tcp_ca(void)
 {
 	if (test__start_subtest("dctcp"))
 		test_dctcp();
 	if (test__start_subtest("cubic"))
 		test_cubic();
+	if (test__start_subtest("invalid_license"))
+		test_invalid_license();
 }
