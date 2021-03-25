@@ -37,9 +37,6 @@ void iommu_dma_compose_msi_msg(struct msi_desc *desc,
 
 void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
 
-void iommu_dma_free_cpu_cached_iovas(unsigned int cpu,
-		struct iommu_domain *domain);
-
 #else /* CONFIG_IOMMU_DMA */
 
 struct iommu_domain;
@@ -78,11 +75,6 @@ static inline void iommu_dma_compose_msi_msg(struct msi_desc *desc,
 }
 
 static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
-{
-}
-
-static inline void iommu_dma_free_cpu_cached_iovas(unsigned int cpu,
-		struct iommu_domain *domain)
 {
 }
 

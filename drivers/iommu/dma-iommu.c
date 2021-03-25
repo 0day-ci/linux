@@ -53,15 +53,6 @@ struct iommu_dma_cookie {
 
 static DEFINE_STATIC_KEY_FALSE(iommu_deferred_attach_enabled);
 
-void iommu_dma_free_cpu_cached_iovas(unsigned int cpu,
-		struct iommu_domain *domain)
-{
-	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-	struct iova_domain *iovad = &cookie->iovad;
-
-	free_cpu_cached_iovas(cpu, iovad);
-}
-
 static void iommu_dma_entry_dtor(unsigned long data)
 {
 	struct page *freelist = (struct page *)data;
