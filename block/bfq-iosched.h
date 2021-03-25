@@ -989,6 +989,7 @@ void bfq_end_wr_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
 void bfq_release_process_ref(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 void bfq_schedule_dispatch(struct bfq_data *bfqd);
 void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
+bool bfq_may_expire_in_serv_for_prio(struct bfq_entity *entity);
 
 /* ------------ end of main algorithm interface -------------- */
 

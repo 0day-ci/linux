@@ -161,6 +161,51 @@ struct bfq_group *bfq_bfqq_to_bfqg(struct bfq_queue *bfqq)
 	return bfq_entity_to_bfqg(group_entity);
 }
 
+bool bfq_may_expire_in_serv_for_prio(struct bfq_entity *entity)
+{
+	struct bfq_sched_data *sd;
+	struct bfq_queue *bfqq;
+	struct bfq_group *bfqg;
+	bool ret = false;
+
+	sd = entity->sched_data;
+	bfqg = container_of(sd, struct bfq_group, sched_data);
+
+	if (likely(!bfqg->bfqd->better_fairness))
+		return false;
+
+	bfqq = bfqg->bfqd->in_service_queue;
+	if (bfqq) {
+		struct bfq_entity *next_in_serv;
+
+		/*
+		 * Traverse the upper-level scheduling domain for
+		 * prio preemption, and expire in_service_queue
+		 * if necessary.
+		 */
+		entity = &bfqq->entity;
+		for_each_entity(entity) {
+			sd = entity->sched_data;
+			next_in_serv = sd->next_in_service;
+
+			if (!next_in_serv)
+				continue;
+
+			/*
+			 * Expire bfqq, if next_in_serv belongs to
+			 * a higher class.
+			 */
+			if (bfq_class_idx(next_in_serv) <
+			    bfq_class_idx(entity)) {
+				bfq_mark_bfqq_prio_expire(bfqq);
+				ret = true;
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
 /*
  * Returns true if this budget changes may let next_in_service->parent
  * become the next_in_service entity for its parent entity.
@@ -242,6 +287,11 @@ static bool bfq_no_longer_next_in_service(struct bfq_entity *entity)
 struct bfq_group *bfq_bfqq_to_bfqg(struct bfq_queue *bfqq)
 {
 	return bfqq->bfqd->root_group;
+}
+
+bool bfq_may_expire_in_serv_for_prio(struct bfq_entity *entity)
+{
+	return false;
 }
 
 static bool bfq_update_parent_budget(struct bfq_entity *next_in_service)
@@ -1162,6 +1212,7 @@ static void bfq_activate_requeue_entity(struct bfq_entity *entity,
 					bool non_blocking_wait_rq,
 					bool requeue, bool expiration)
 {
+	struct bfq_entity *old_entity = entity;
 	struct bfq_sched_data *sd;
 
 	for_each_entity(entity) {
@@ -1172,6 +1223,15 @@ static void bfq_activate_requeue_entity(struct bfq_entity *entity,
 		    !requeue)
 			break;
 	}
+
+	/*
+	 * Expire in_service_queue, if a task belongs to higher class
+	 * is added to the upper-level scheduling domain, we should
+	 * initiate a new schedule. But here is just to mark bfqq
+	 * prio_expire, the real schedule occurs in
+	 * bfq_dispatch_rq_from_bfqq().
+	 */
+	bfq_may_expire_in_serv_for_prio(old_entity);
 }
 
 /**
