@@ -450,12 +450,71 @@ bool blk_ksm_is_empty(struct blk_keyslot_manager *ksm)
 }
 EXPORT_SYMBOL_GPL(blk_ksm_is_empty);
 
+/*
+ * Restrict the supported data unit sizes of the ksm based on the request queue
+ * limits
+ */
+void blk_ksm_restrict_dus_to_queue_limits(struct blk_keyslot_manager *ksm,
+					  struct queue_limits *limits)
+{
+	/* The largest possible data unit size we support is PAGE_SIZE. */
+	unsigned long largest_dus = PAGE_SIZE;
+	unsigned int dus_allowed_mask;
+	int i;
+	bool dus_was_restricted = false;
+
+	/*
+	 * If the queue doesn't support SG gaps, a bio might get split in the
+	 * middle of a data unit. So require SG gap support for inline
+	 * encryption for any data unit size larger than a single sector.
+	 */
+	if (limits->virt_boundary_mask)
+		largest_dus = SECTOR_SIZE;
+
+	/*
+	 * If the queue has chunk_sectors, the bio might be split within a data
+	 * unit if the data unit size is larger than a single sector. So only
+	 * support a single sector data unit size in this case.
+	 */
+	if (limits->chunk_sectors)
+		largest_dus = SECTOR_SIZE;
+
+	/*
+	 * Any bio sent to the queue must be allowed to contain at least a
+	 * data_unit_size worth of data. Since each segment in a bio contains
+	 * at least a SECTOR_SIZE worth of data, it's sufficient that
+	 * queue_max_segments(q) * SECTOR_SIZE >= data_unit_size. So disable
+	 * all data_unit_sizes not satisfiable.
+	 */
+	largest_dus = min(largest_dus,
+			1UL << (fls(limits->max_segments) - 1 + SECTOR_SHIFT));
+
+	/* Clear all unsupported data unit sizes. */
+	dus_allowed_mask = (largest_dus << 1) - 1;
+	for (i = 0; i < ARRAY_SIZE(ksm->crypto_modes_supported); i++) {
+		if (ksm->crypto_modes_supported[i] & (~dus_allowed_mask))
+			dus_was_restricted = true;
+		ksm->crypto_modes_supported[i] &= dus_allowed_mask;
+	}
+
+	if (dus_was_restricted) {
+		pr_warn("Disallowed use of encryption data unit sizes above %lu bytes with inline encryption hardware because of device request queue limits.\n",
+			largest_dus);
+	}
+}
+
 bool blk_ksm_register(struct blk_keyslot_manager *ksm, struct request_queue *q)
 {
 	if (blk_integrity_queue_supports_integrity(q)) {
 		pr_warn("Integrity and hardware inline encryption are not supported together. Disabling hardware inline encryption.\n");
 		return false;
 	}
+
+	blk_ksm_restrict_dus_to_queue_limits(ksm, &q->limits);
+
+	if (blk_ksm_is_empty(ksm))
+		return false;
+
 	q->ksm = ksm;
 	return true;
 }
