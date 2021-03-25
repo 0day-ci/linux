@@ -710,7 +710,7 @@ enum {
  *  Raw MIDI section - /dev/snd/midi??
  */
 
-#define SNDRV_RAWMIDI_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
+#define SNDRV_RAWMIDI_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
 
 enum {
 	SNDRV_RAWMIDI_STREAM_OUTPUT = 0,
@@ -736,12 +736,29 @@ struct snd_rawmidi_info {
 	unsigned char reserved[64];	/* reserved for future use */
 };
 
+enum {
+	SNDRV_RAWMIDI_FRAMING_NONE = 0,
+	SNDRV_RAWMIDI_FRAMING_TSTAMP,
+	SNDRV_RAWMIDI_FRAMING_LAST = SNDRV_RAWMIDI_FRAMING_TSTAMP,
+};
+
+#define SND_RAWMIDI_FRAMING_DATA_LENGTH 3
+
+struct snd_rawmidi_framing_tstamp {
+	unsigned long long tv_sec;	/* seconds */
+	unsigned int tv_nsec;		/* nanoseconds */
+	unsigned char length;
+	unsigned char data[SND_RAWMIDI_FRAMING_DATA_LENGTH];
+};
+
 struct snd_rawmidi_params {
 	int stream;
 	size_t buffer_size;		/* queue size in bytes */
 	size_t avail_min;		/* minimum avail bytes for wakeup */
 	unsigned int no_active_sensing: 1; /* do not send active sensing byte in close() */
-	unsigned char reserved[16];	/* reserved for future use */
+	unsigned char framing;		/* For input data only, frame incoming data */
+	unsigned char clock_type;		/* Type of clock to use for framing, same as clockid_t */
+	unsigned char reserved[14];	/* reserved for future use */
 };
 
 #ifndef __KERNEL__
