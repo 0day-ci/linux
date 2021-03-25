@@ -118,6 +118,11 @@ autosectionlabel_maxdepth = 2
 
 extensions.append("sphinx.ext.imgmath")
 
+# Enable experimental rst2pdf, if available and selected by the user
+for i in range(1, len(sys.argv)):
+    if sys.argv[i] == "pdf":
+        extensions.append('rst2pdf.pdfbuilder')
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -553,12 +558,15 @@ epub_exclude_files = ['search.html']
 #
 # See the Sphinx chapter of https://ralsina.me/static/manual.pdf
 #
-# FIXME: Do not add the index file here; the result will be too big. Adding
-# multiple PDF files here actually tries to get the cross-referencing right
-# *between* PDF files.
-pdf_documents = [
-    ('kernel-documentation', u'Kernel', u'Kernel', u'J. Random Bozo'),
-]
+
+# Add all LaTeX files to PDF documents as well
+pdf_documents = []
+for l in latex_documents:
+    doc = l[0]
+    fn = l[1].replace(".tex", "")
+    name = l[2]
+    authors = l[3]
+    pdf_documents.append((doc, fn, name, authors))
 
 # kernel-doc extension configuration for running Sphinx directly (e.g. by Read
 # the Docs). In a normal build, these are supplied from the Makefile via command

@@ -43,6 +43,18 @@ def loadConfig(namespace):
 
             namespace['latex_documents'] = new_latex_docs
 
+            new_pdf_docs = []
+            pdf_documents = namespace['pdf_documents']
+
+            for l in pdf_documents:
+                if l[0].find(dir + '/') == 0:
+                    has = True
+                    fn = l[0][len(dir) + 1:]
+                    new_pdf_docs.append((fn, l[1], l[2], l[3]))
+                    break
+
+            namespace['pdf_documents'] = new_pdf_docs
+
         # If there is an extra conf.py file, load it
         if os.path.isfile(config_file):
             sys.stdout.write("load additional sphinx-config: %s\n" % config_file)
