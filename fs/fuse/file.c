@@ -1166,6 +1166,8 @@ static ssize_t fuse_fill_write_pages(struct fuse_args_pages *ap,
 		if (!page)
 			break;
 
+		wait_on_page_writeback(page);
+
 		if (mapping_writably_mapped(mapping))
 			flush_dcache_page(page);
 
