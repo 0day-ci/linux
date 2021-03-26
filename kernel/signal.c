@@ -2756,6 +2756,15 @@ relock:
 		 */
 		current->flags |= PF_SIGNALED;
 
+		/*
+		 * PF_IO_WORKER threads will catch and exit on fatal signals
+		 * themselves. They have cleanup that must be performed, so
+		 * we cannot call do_exit() on their behalf. coredumps also
+		 * do not apply to them.
+		 */
+		if (current->flags & PF_IO_WORKER)
+			return false;
+
 		if (sig_kernel_coredump(signr)) {
 			if (print_fatal_signals)
 				print_fatal_signal(ksig->info.si_signo);
