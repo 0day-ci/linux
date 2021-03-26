@@ -150,9 +150,9 @@
 		} \
 	} while (0)
 #else
-#define ODM_RT_TRACE(pDM_Odm, comp, level, fmt)		no_printk fmt
-#define ODM_RT_TRACE_F(pDM_Odm, comp, level, fmt)	no_printk fmt
-#define ODM_RT_ASSERT(pDM_Odm, expr, fmt)		no_printk fmt
+#define ODM_RT_TRACE(pDM_Odm, comp, level, fmt)		(no_printk fmt)
+#define ODM_RT_TRACE_F(pDM_Odm, comp, level, fmt)	(no_printk fmt)
+#define ODM_RT_ASSERT(pDM_Odm, expr, fmt)		(no_printk fmt)
 #define ODM_dbg_enter()					do {} while (0)
 #define ODM_dbg_exit()					do {} while (0)
 #define ODM_dbg_trace(str)				no_printk("%s", str)
