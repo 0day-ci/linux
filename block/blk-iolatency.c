@@ -18,7 +18,7 @@
  * every configured node, and each configured node has it's own independent
  * queue depth.  This means that we only care about our latency targets at the
  * peer level.  Some group at the bottom of the hierarchy isn't going to affect
- * a group at the end of some other path if we're only configred at leaf level.
+ * a group at the end of some other path if we're only configured at leaf level.
  *
  * Consider the following
  *
@@ -34,7 +34,7 @@
  * throttle "unloved", but nobody else.
  *
  * In this example "fast", "slow", and "normal" will be the only groups actually
- * accounting their io latencies.  We have to walk up the heirarchy to the root
+ * accounting their io latencies.  We have to walk up the hierarchy to the root
  * on every submit and complete so we can do the appropriate stat recording and
  * adjust the queue depth of ourselves if needed.
  *

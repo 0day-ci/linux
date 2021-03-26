@@ -1798,7 +1798,7 @@ static void bfq_bfqq_handle_idle_busy_switch(struct bfq_data *bfqd,
 	 * As for throughput, we ask bfq_better_to_idle() whether we
 	 * still need to plug I/O dispatching. If bfq_better_to_idle()
 	 * says no, then plugging is not needed any longer, either to
-	 * boost throughput or to perserve service guarantees. Then
+	 * boost throughput or to preserve service guarantees. Then
 	 * the best option is to stop plugging I/O, as not doing so
 	 * would certainly lower throughput. We may end up in this
 	 * case if: (1) upon a dispatch attempt, we detected that it
@@ -5050,7 +5050,7 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 		 * by the fact that bfqq has just been merged.
 		 * 2) burst_size is greater than 0, to handle
 		 * unbalanced decrements. Unbalanced decrements may
-		 * happen in te following case: bfqq is inserted into
+		 * happen in the following case: bfqq is inserted into
 		 * the current burst list--without incrementing
 		 * bust_size--because of a split, but the current
 		 * burst list is not the burst list bfqq belonged to

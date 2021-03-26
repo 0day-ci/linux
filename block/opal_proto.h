@@ -212,7 +212,7 @@ enum opal_parameter {
 
 /* Packets derived from:
  * TCG_Storage_Architecture_Core_Spec_v2.01_r1.00
- * Secion: 3.2.3 ComPackets, Packets & Subpackets
+ * Section: 3.2.3 ComPackets, Packets & Subpackets
  */
 
 /* Comm Packet (header) for transmissions. */
@@ -405,7 +405,7 @@ struct d0_single_user_mode {
 };
 
 /*
- * Additonal Datastores feature
+ * Additional Datastores feature
  *
  * code == 0x0202
  */

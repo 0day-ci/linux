@@ -252,7 +252,7 @@ static inline void req_set_nomerge(struct request_queue *q, struct request *req)
 }
 
 /*
- * The max size one bio can handle is UINT_MAX becasue bvec_iter.bi_size
+ * The max size one bio can handle is UINT_MAX because bvec_iter.bi_size
  * is defined as 'unsigned int', meantime it has to aligned to with logical
  * block size which is the minimum accepted unit by hardware.
  */

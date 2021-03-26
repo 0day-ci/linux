@@ -105,7 +105,7 @@ void blk_stat_add_callback(struct request_queue *q,
  * @cb: The callback.
  *
  * When this returns, the callback is not running on any CPUs and will not be
- * called again unless readded.
+ * called again unless read.
  */
 void blk_stat_remove_callback(struct request_queue *q,
 			      struct blk_stat_callback *cb);

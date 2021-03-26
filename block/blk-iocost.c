@@ -111,7 +111,7 @@
  * busy signal.
  *
  * As devices can have deep queues and be unfair in how the queued commands
- * are executed, soley depending on rq wait may not result in satisfactory
+ * are executed, solely depending on rq wait may not result in satisfactory
  * control quality.  For a better control quality, completion latency QoS
  * parameters can be configured so that the device is considered saturated
  * if N'th percentile completion latency rises above the set point.
@@ -851,7 +851,7 @@ static int ioc_autop_idx(struct ioc *ioc)
 }
 
 /*
- * Take the followings as input
+ * Take the following as input
  *
  *  @bps	maximum sequential throughput
  *  @seqiops	maximum sequential 4k iops
@@ -1090,7 +1090,7 @@ static void __propagate_weights(struct ioc_gq *iocg, u32 active, u32 inuse,
 		/* update the level sums */
 		parent->child_active_sum += (s32)(active - child->active);
 		parent->child_inuse_sum += (s32)(inuse - child->inuse);
-		/* apply the udpates */
+		/* apply the updates */
 		child->active = active;
 		child->inuse = inuse;
 
@@ -1144,7 +1144,7 @@ static void current_hweight(struct ioc_gq *iocg, u32 *hw_activep, u32 *hw_inusep
 	u32 hwa, hwi;
 	int ioc_gen;
 
-	/* hot path - if uptodate, use cached */
+	/* hot path - if up-to-date, use cached */
 	ioc_gen = atomic_read(&ioc->hweight_gen);
 	if (ioc_gen == iocg->hweight_gen)
 		goto out;
@@ -1241,7 +1241,7 @@ static bool iocg_activate(struct ioc_gq *iocg, struct ioc_now *now)
 
 	/*
 	 * If seem to be already active, just update the stamp to tell the
-	 * timer that we're still active.  We don't mind occassional races.
+	 * timer that we're still active.  We don't mind occasional races.
 	 */
 	if (!list_empty(&iocg->active_list)) {
 		ioc_now(ioc, now);
@@ -2122,7 +2122,7 @@ static void ioc_forgive_debts(struct ioc *ioc, u64 usage_us_sum, int nr_debtors,
 }
 
 /*
- * Check the active iocgs' state to avoid oversleeping and deactive
+ * Check the active iocgs' state to avoid oversleeping and deactivate
  * idle iocgs.
  *
  * Since waiters determine the sleep durations based on the vrate

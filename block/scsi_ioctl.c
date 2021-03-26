@@ -461,7 +461,7 @@ int sg_scsi_ioctl(struct request_queue *q, struct gendisk *disk, fmode_t mode,
 	if (err)
 		goto error;
 
-	/* default.  possible overriden later */
+	/* default.  possible overridden later */
 	req->retries = 5;
 
 	switch (opcode) {

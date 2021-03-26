@@ -142,7 +142,7 @@ struct kyber_cpu_latency {
  */
 struct kyber_ctx_queue {
 	/*
-	 * Used to ensure operations on rq_list and kcq_map to be an atmoic one.
+	 * Used to ensure operations on rq_list and kcq_map to be an atomic one.
 	 * Also protect the rqs on rq_list when merge.
 	 */
 	spinlock_t lock;

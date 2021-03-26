@@ -101,7 +101,7 @@ int sun_partition(struct parsed_partitions *state)
 
 	/*
 	 * So that old Linux-Sun partitions continue to work,
-	 * alow the VTOC to be used under the additional condition ...
+	 * allow the VTOC to be used under the additional condition ...
 	 */
 	use_vtoc = use_vtoc || !(label->vtoc.sanity ||
 				 label->vtoc.version || label->vtoc.nparts);
