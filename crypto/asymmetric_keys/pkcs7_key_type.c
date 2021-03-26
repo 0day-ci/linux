@@ -18,7 +18,7 @@ MODULE_DESCRIPTION("PKCS#7 testing key type");
 MODULE_AUTHOR("Red Hat, Inc.");
 
 static unsigned pkcs7_usage;
-module_param_named(usage, pkcs7_usage, uint, S_IWUSR | S_IRUGO);
+module_param_named(usage, pkcs7_usage, uint, 0644);
 MODULE_PARM_DESC(pkcs7_usage,
 		 "Usage to specify when verifying the PKCS#7 message");
 
