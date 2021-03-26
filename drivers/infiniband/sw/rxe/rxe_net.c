@@ -72,6 +72,9 @@ static struct dst_entry *rxe_find_route6(struct net_device *ndev,
 	struct dst_entry *ndst;
 	struct flowi6 fl6 = { { 0 } };
 
+	if (!ipv6_mod_enabled())
+		return NULL;
+
 	memset(&fl6, 0, sizeof(fl6));
 	fl6.flowi6_oif = ndev->ifindex;
 	memcpy(&fl6.saddr, saddr, sizeof(*saddr));
@@ -616,6 +619,8 @@ static int rxe_net_ipv4_init(void)
 static int rxe_net_ipv6_init(void)
 {
 #if IS_ENABLED(CONFIG_IPV6)
+	if (!ipv6_mod_enabled())
+		return 0;
 
 	recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
 						htons(ROCE_V2_UDP_DPORT), true);
