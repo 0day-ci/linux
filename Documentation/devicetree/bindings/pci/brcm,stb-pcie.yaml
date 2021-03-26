@@ -156,5 +156,11 @@ examples:
                                  <0x42000000 0x1 0x80000000 0x3 0x00000000 0x0 0x80000000>;
                     brcm,enable-ssc;
                     brcm,scb-sizes =  <0x0000000080000000 0x0000000080000000>;
+
+                    pcie-ep@0,0 {
+                            reg = <0x0 0x0 0x0 0x0 0x0>;
+                            compatible = "pci14e4,1688";
+                            vpcie12v-supply: <&vreg12>;
+                    };
             };
     };
