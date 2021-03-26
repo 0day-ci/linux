@@ -1622,7 +1622,7 @@ static inline void atmel_sha_hmac_key_init(struct atmel_sha_hmac_key *hkey)
 static inline void atmel_sha_hmac_key_release(struct atmel_sha_hmac_key *hkey)
 {
 	kfree(hkey->keydup);
-	memset(hkey, 0, sizeof(*hkey));
+	memzero_explicit(hkey, sizeof(*hkey));
 }
 
 static inline int atmel_sha_hmac_key_set(struct atmel_sha_hmac_key *hkey,
