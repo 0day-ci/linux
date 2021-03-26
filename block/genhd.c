@@ -183,6 +183,7 @@ void disk_part_iter_init(struct disk_part_iter *piter, struct gendisk *disk,
 		piter->idx = 1;
 	piter->flags = flags;
 }
+EXPORT_SYMBOL_GPL(disk_part_iter_init);
 
 /**
  * disk_part_iter_next - proceed iterator to the next partition and return it
@@ -219,6 +220,7 @@ struct block_device *disk_part_iter_next(struct disk_part_iter *piter)
 
 	return piter->part;
 }
+EXPORT_SYMBOL_GPL(disk_part_iter_next);
 
 /**
  * disk_part_iter_exit - finish up partition iteration
@@ -235,6 +237,7 @@ void disk_part_iter_exit(struct disk_part_iter *piter)
 		bdput(piter->part);
 	piter->part = NULL;
 }
+EXPORT_SYMBOL_GPL(disk_part_iter_exit);
 
 /*
  * Can be deleted altogether. Later.
