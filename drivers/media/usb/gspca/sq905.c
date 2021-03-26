@@ -181,7 +181,7 @@ sq905_read_data(struct gspca_dev *gspca_dev, u8 *data, int size, int need_lock)
 
 	/* successful, it returns 0, otherwise  negative */
 	if (ret < 0 || act_len != size) {
-		pr_err("bulk read fail (%d) len %d/%d\n", ret, act_len, size);
+	       pr_err("bulk read fail (%d) len %d/%d\n", ret, ret < 0 ? -1 : act_len, size);
 		return -EIO;
 	}
 	return 0;
