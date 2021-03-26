@@ -117,7 +117,7 @@ EXPORT_SYMBOL(fbtft_write_reg8_bus9);
  *
  *****************************************************************************/
 
-/* 16 bit pixel over 8-bit databus */
+/* 16-bit pixel over 8-bit databus */
 int fbtft_write_vmem16_bus8(struct fbtft_par *par, size_t offset, size_t len)
 {
 	u16 *vmem16;
@@ -172,7 +172,7 @@ int fbtft_write_vmem16_bus8(struct fbtft_par *par, size_t offset, size_t len)
 }
 EXPORT_SYMBOL(fbtft_write_vmem16_bus8);
 
-/* 16 bit pixel over 9-bit SPI bus: dc + high byte, dc + low byte */
+/* 16-bit pixel over 9-bit SPI bus: dc + high byte, dc + low byte */
 int fbtft_write_vmem16_bus9(struct fbtft_par *par, size_t offset, size_t len)
 {
 	u8 *vmem8;
@@ -228,7 +228,7 @@ int fbtft_write_vmem8_bus8(struct fbtft_par *par, size_t offset, size_t len)
 }
 EXPORT_SYMBOL(fbtft_write_vmem8_bus8);
 
-/* 16 bit pixel over 16-bit databus */
+/* 16-bit pixel over 16-bit databus */
 int fbtft_write_vmem16_bus16(struct fbtft_par *par, size_t offset, size_t len)
 {
 	u16 *vmem16;
