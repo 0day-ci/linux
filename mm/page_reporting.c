@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
 #include <linux/page_reporting.h>
@@ -18,6 +19,22 @@ enum {
 	PAGE_REPORTING_REQUESTED,
 	PAGE_REPORTING_ACTIVE
 };
+
+#ifdef CONFIG_SYSFS
+static struct percpu_counter refault_pages;
+
+void page_reporting_update_refault(struct zone *zone, unsigned int pages)
+{
+	zone->reported_pages -= pages;
+	percpu_counter_add_batch(&refault_pages, pages, INT_MAX / 2);
+}
+#else
+void page_reporting_update_refault(struct zone *zone, unsigned int pages)
+{
+	zone->reported_pages -= pages;
+}
+#endif
+
 
 /* request page reporting */
 static void
@@ -66,7 +83,8 @@ void __page_reporting_notify(void)
 
 static void
 page_reporting_drain(struct page_reporting_dev_info *prdev,
-		     struct scatterlist *sgl, unsigned int nents, bool reported)
+		     struct scatterlist *sgl, struct zone *zone,
+		     unsigned int nents, bool reported)
 {
 	struct scatterlist *sg = sgl;
 
@@ -92,8 +110,10 @@ page_reporting_drain(struct page_reporting_dev_info *prdev,
 		 * report on the new larger page when we make our way
 		 * up to that higher order.
 		 */
-		if (PageBuddy(page) && buddy_order(page) == order)
+		if (PageBuddy(page) && buddy_order(page) == order) {
 			__SetPageReported(page);
+			zone->reported_pages += (1 << order);
+		}
 	} while ((sg = sg_next(sg)));
 
 	/* reinitialize scatterlist now that it is empty */
@@ -197,7 +217,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 		spin_lock_irq(&zone->lock);
 
 		/* flush reported pages from the sg list */
-		page_reporting_drain(prdev, sgl, PAGE_REPORTING_CAPACITY, !err);
+		page_reporting_drain(prdev, sgl, zone, PAGE_REPORTING_CAPACITY, !err);
 
 		/*
 		 * Reset next to first entry, the old next isn't valid
@@ -260,7 +280,7 @@ page_reporting_process_zone(struct page_reporting_dev_info *prdev,
 
 		/* flush any remaining pages out from the last report */
 		spin_lock_irq(&zone->lock);
-		page_reporting_drain(prdev, sgl, leftover, !err);
+		page_reporting_drain(prdev, sgl, zone, leftover, !err);
 		spin_unlock_irq(&zone->lock);
 	}
 
@@ -362,3 +382,87 @@ void page_reporting_unregister(struct page_reporting_dev_info *prdev)
 	mutex_unlock(&page_reporting_mutex);
 }
 EXPORT_SYMBOL_GPL(page_reporting_unregister);
+
+#ifdef CONFIG_SYSFS
+#define REPORTING_ATTR(_name) \
+	static struct kobj_attribute _name##_attr = \
+		__ATTR(_name, 0644, _name##_show, _name##_store)
+
+static unsigned long get_reported_kbytes(void)
+{
+	struct zone *z;
+	unsigned long nr_reported = 0;
+
+	for_each_populated_zone(z)
+		nr_reported += z->reported_pages;
+
+	return nr_reported << (PAGE_SHIFT - 10);
+}
+
+static ssize_t reported_kbytes_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", get_reported_kbytes());
+}
+
+static ssize_t reported_kbytes_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	return -EINVAL;
+}
+REPORTING_ATTR(reported_kbytes);
+
+static u64 get_refault_kbytes(void)
+{
+	u64 sum;
+
+	sum = percpu_counter_sum_positive(&refault_pages);
+	return sum << (PAGE_SHIFT - 10);
+}
+
+static ssize_t refault_kbytes_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%llu\n", get_refault_kbytes());
+}
+
+static ssize_t refault_kbytes_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	return -EINVAL;
+}
+REPORTING_ATTR(refault_kbytes);
+
+static struct attribute *reporting_attrs[] = {
+	&reported_kbytes_attr.attr,
+	&refault_kbytes_attr.attr,
+	NULL,
+};
+
+static struct attribute_group reporting_attr_group = {
+	.attrs = reporting_attrs,
+	.name = "page_reporting",
+};
+#endif
+
+static int __init page_reporting_init(void)
+{
+#ifdef CONFIG_SYSFS
+	int err;
+
+	if (percpu_counter_init(&refault_pages, 0, GFP_KERNEL))
+		panic("Failed to allocate refault_pages percpu counter\n");
+
+	err = sysfs_create_group(mm_kobj, &reporting_attr_group);
+	if (err) {
+		pr_err("%s: Unable to populate sysfs files\n", __func__);
+		return err;
+	}
+#endif
+
+	return 0;
+}
+
+module_init(page_reporting_init);

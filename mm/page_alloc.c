@@ -930,8 +930,10 @@ static inline void del_page_from_free_list(struct page *page, struct zone *zone,
 					   unsigned int order)
 {
 	/* clear reported state and update reported page count */
-	if (page_reported(page))
+	if (page_reported(page)) {
 		__ClearPageReported(page);
+		page_reporting_update_refault(zone, 1 << order);
+	}
 
 	list_del(&page->lru);
 	__ClearPageBuddy(page);

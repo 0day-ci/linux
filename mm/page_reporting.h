@@ -44,11 +44,16 @@ static inline void page_reporting_notify_free(unsigned int order)
 	/* This will add a few cycles, but should be called infrequently */
 	__page_reporting_notify();
 }
+
+void page_reporting_update_refault(struct zone *zone, unsigned int pages);
 #else /* CONFIG_PAGE_REPORTING */
 #define page_reported(_page)	false
 
 static inline void page_reporting_notify_free(unsigned int order)
 {
 }
+
+static inline void
+page_reporting_update_refault(struct zone *zone, unsigned int pages) { }
 #endif /* CONFIG_PAGE_REPORTING */
 #endif /*_MM_PAGE_REPORTING_H */
