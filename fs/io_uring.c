@@ -78,7 +78,6 @@
 #include <linux/task_work.h>
 #include <linux/pagemap.h>
 #include <linux/io_uring.h>
-#include <linux/freezer.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/io_uring.h>
@@ -6764,8 +6763,14 @@ static int io_sq_thread(void *data)
 			timeout = jiffies + sqd->sq_thread_idle;
 			continue;
 		}
-		if (fatal_signal_pending(current))
-			break;
+		if (signal_pending(current)) {
+			struct ksignal ksig;
+
+			if (fatal_signal_pending(current))
+				break;
+			if (get_signal(&ksig))
+				continue;
+		}
 		sqt_spin = false;
 		cap_entries = !list_is_singular(&sqd->ctx_list);
 		list_for_each_entry(ctx, &sqd->ctx_list, sqd_list) {
@@ -6808,7 +6813,6 @@ static int io_sq_thread(void *data)
 
 			mutex_unlock(&sqd->lock);
 			schedule();
-			try_to_freeze();
 			mutex_lock(&sqd->lock);
 			list_for_each_entry(ctx, &sqd->ctx_list, sqd_list)
 				io_ring_clear_wakeup_flag(ctx);
