@@ -22,9 +22,8 @@
 #include "sys.h"
 #include "trace_gfs2.h"
 
-/**
+/*
  * gfs2_update_stats - Update time based stats
- * @mv: Pointer to mean/variance structure to update
  * @sample: New data to include
  *
  * @delta is the difference between the current rtt sample and the
