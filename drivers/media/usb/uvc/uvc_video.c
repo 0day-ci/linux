@@ -76,35 +76,31 @@ int uvc_query_ctrl(struct uvc_device *dev, u8 query, u8 unit,
 	if (likely(ret == size))
 		return 0;
 
-	dev_dbg(&dev->udev->dev,
-		"Failed to query (%s) UVC control %u on unit %u: %d (exp. %u).\n",
-		uvc_query_name(query), cs, unit, ret, size);
+	if (ret < 0 && ret != -EPIPE)
+		goto err;
 
-	if (ret != -EPIPE)
-		return ret;
-
+	// reuse data[0] for request the error code.
 	tmp = *(u8 *)data;
-
 	ret = __uvc_query_ctrl(dev, UVC_GET_CUR, 0, intfnum,
 			       UVC_VC_REQUEST_ERROR_CODE_CONTROL, data, 1,
 			       UVC_CTRL_CONTROL_TIMEOUT);
-
 	error = *(u8 *)data;
 	*(u8 *)data = tmp;
 
-	if (ret != 1)
-		return ret < 0 ? ret : -EPIPE;
+	if (ret != 1) {
+		ret = ret < 0 ? ret : -EPIPE;
+		goto err;
+	}
 
-	uvc_dbg(dev, CONTROL, "Control error %u\n", error);
+	dev_dbg(&dev->udev->dev,
+		"Failed to query (%s) UVC control %u on unit %u: got error %u.\n",
+		uvc_query_name(query), cs, unit, error);
 
 	switch (error) {
-	case 0:
-		/* Cannot happen - we received a STALL */
-		return -EPIPE;
 	case 1: /* Not ready */
 		return -EBUSY;
 	case 2: /* Wrong state */
-		return -EILSEQ;
+		return -EACCES;
 	case 3: /* Power */
 		return -EREMOTE;
 	case 4: /* Out of range */
@@ -120,10 +116,18 @@ int uvc_query_ctrl(struct uvc_device *dev, u8 query, u8 unit,
 	case 8: /* Invalid value within range */
 		return -EINVAL;
 	default: /* reserved or unknown */
-		break;
+		dev_err(&dev->udev->dev,
+			"Failed to query (%s) UVC control %u on unit %u: got error %u.\n",
+			uvc_query_name(query), cs, unit, error);
+		return -EPIPE;
 	}
 
-	return -EPIPE;
+err:
+	dev_err(&dev->udev->dev,
+		"Failed to query (%s) UVC control %u on unit %u: %d (exp. %u).\n",
+		uvc_query_name(query), cs, unit, ret, size);
+
+	return ret;
 }
 
 static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
