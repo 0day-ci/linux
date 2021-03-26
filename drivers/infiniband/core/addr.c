@@ -257,6 +257,9 @@ rdma_find_ndev_for_src_ip_rcu(struct net *net, const struct sockaddr *src_in)
 		break;
 #if IS_ENABLED(CONFIG_IPV6)
 	case AF_INET6:
+		if (!ipv6_mod_enabled())
+			return ERR_PTR(-EPFNOSUPPORT);
+
 		for_each_netdev_rcu(net, dev) {
 			if (ipv6_chk_addr(net,
 					  &((const struct sockaddr_in6 *)src_in)->sin6_addr,
@@ -423,6 +426,9 @@ static int addr6_resolve(struct sockaddr *src_sock,
 				(const struct sockaddr_in6 *)dst_sock;
 	struct flowi6 fl6;
 	struct dst_entry *dst;
+
+	if (!ipv6_mod_enabled())
+		return -EADDRNOTAVAIL;
 
 	memset(&fl6, 0, sizeof fl6);
 	fl6.daddr = dst_in->sin6_addr;
