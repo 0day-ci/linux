@@ -668,6 +668,35 @@ static const struct devlink_ops dsa_devlink_ops = {
 	.sb_occ_tc_port_bind_get	= dsa_devlink_sb_occ_tc_port_bind_get,
 };
 
+static int dsa_switch_setup_tag_protocol(struct dsa_switch *ds)
+{
+	const struct dsa_device_ops *tag_ops = ds->dst->tag_ops;
+	struct dsa_switch_tree *dst = ds->dst;
+	int port, err;
+
+	if (tag_ops->proto == dst->default_proto)
+		return 0;
+
+	if (!ds->ops->change_tag_protocol) {
+		dev_err(ds->dev, "Tag protocol cannot be modified\n");
+		return -EINVAL;
+	}
+
+	for (port = 0; port < ds->num_ports; port++) {
+		if (!(dsa_is_dsa_port(ds, port) || dsa_is_cpu_port(ds, port)))
+			continue;
+
+		err = ds->ops->change_tag_protocol(ds, port, tag_ops->proto);
+		if (err) {
+			dev_err(ds->dev, "Tag protocol \"%s\" is not supported\n",
+				tag_ops->name);
+			return err;
+		}
+	}
+
+	return 0;
+}
+
 static int dsa_switch_setup(struct dsa_switch *ds)
 {
 	struct dsa_devlink_priv *dl_priv;
@@ -717,6 +746,10 @@ static int dsa_switch_setup(struct dsa_switch *ds)
 	err = ds->ops->setup(ds);
 	if (err < 0)
 		goto unregister_notifier;
+
+	err = dsa_switch_setup_tag_protocol(ds);
+	if (err)
+		goto teardown;
 
 	devlink_params_publish(ds->devlink);
 
@@ -1062,32 +1095,60 @@ static enum dsa_tag_protocol dsa_get_tag_protocol(struct dsa_port *dp,
 	return ds->ops->get_tag_protocol(ds, dp->index, tag_protocol);
 }
 
-static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
+static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master,
+			      const char *user_protocol)
 {
 	struct dsa_switch *ds = dp->ds;
 	struct dsa_switch_tree *dst = ds->dst;
-	enum dsa_tag_protocol tag_protocol;
+	const struct dsa_device_ops *tag_ops;
+	enum dsa_tag_protocol default_proto;
 
-	tag_protocol = dsa_get_tag_protocol(dp, master);
-	if (dst->tag_ops) {
-		if (dst->tag_ops->proto != tag_protocol) {
+	/* Find out which protocol the switch would prefer. */
+	default_proto = dsa_get_tag_protocol(dp, master);
+	if (dst->default_proto) {
+		if (dst->default_proto != default_proto) {
 			dev_err(ds->dev,
-				"A DSA switch tree can have only one tagging protocol\n");
+				"A DSA switch tree can have only one tagging protovol\n");
 			return -EINVAL;
 		}
-		/* In the case of multiple CPU ports per switch, the tagging
-		 * protocol is still reference-counted only per switch tree, so
-		 * nothing to do here.
-		 */
 	} else {
-		dst->tag_ops = dsa_tag_driver_get(tag_protocol);
-		if (IS_ERR(dst->tag_ops)) {
-			if (PTR_ERR(dst->tag_ops) == -ENOPROTOOPT)
-				return -EPROBE_DEFER;
-			dev_warn(ds->dev, "No tagger for this switch\n");
-			dp->master = NULL;
-			return PTR_ERR(dst->tag_ops);
+		dst->default_proto = default_proto;
+	}
+
+	/* See if the user wants to override that preference. */
+	if (user_protocol && ds->ops->change_tag_protocol) {
+		tag_ops = dsa_find_tagger_by_name(user_protocol);
+	} else {
+		if (user_protocol)
+			dev_warn(ds->dev,
+				 "Tag protocol cannot be modified, using default\n");
+
+		tag_ops = dsa_tag_driver_get(default_proto);
+	}
+
+	if (IS_ERR(tag_ops)) {
+		if (PTR_ERR(tag_ops) == -ENOPROTOOPT)
+			return -EPROBE_DEFER;
+
+		dev_warn(ds->dev, "No tagger for this switch\n");
+		return PTR_ERR(tag_ops);
+	}
+
+	if (dst->tag_ops) {
+		if (dst->tag_ops != tag_ops) {
+			dev_err(ds->dev,
+				"A DSA switch tree can have only one tagging protocol\n");
+
+			dsa_tag_driver_put(tag_ops);
+			return -EINVAL;
 		}
+
+		/* In the case of multiple CPU ports per switch, the tagging
+		 * protocol is still reference-counted only per switch tree.
+		 */
+		dsa_tag_driver_put(tag_ops);
+	} else {
+		dst->tag_ops = tag_ops;
 	}
 
 	dp->master = master;
@@ -1108,12 +1169,14 @@ static int dsa_port_parse_of(struct dsa_port *dp, struct device_node *dn)
 
 	if (ethernet) {
 		struct net_device *master;
+		const char *user_protocol;
 
 		master = of_find_net_device_by_node(ethernet);
 		if (!master)
 			return -EPROBE_DEFER;
 
-		return dsa_port_parse_cpu(dp, master);
+		user_protocol = of_get_property(dn, "dsa,tag-protocol", NULL);
+		return dsa_port_parse_cpu(dp, master, user_protocol);
 	}
 
 	if (link)
@@ -1225,7 +1288,7 @@ static int dsa_port_parse(struct dsa_port *dp, const char *name,
 
 		dev_put(master);
 
-		return dsa_port_parse_cpu(dp, master);
+		return dsa_port_parse_cpu(dp, master, NULL);
 	}
 
 	if (!strcmp(name, "dsa"))
