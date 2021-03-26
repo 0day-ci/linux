@@ -1572,9 +1572,9 @@ sub ctx_statement_block {
 		# Handle nested #if/#else.
 		if ($remainder =~ /^#\s*(?:ifndef|ifdef|if)\s/) {
 			push(@stack, [ $type, $level ]);
-		} elsif ($remainder =~ /^#\s*(?:else|elif)\b/) {
-			($type, $level) = @{$stack[$#stack - 1]};
-		} elsif ($remainder =~ /^#\s*endif\b/) {
+		} elsif ($remainder =~ /^#\s*(?:else|elif)\b/ && $#stack > 0) {
+			($type, $level) = @{$stack[$#stack]};
+		} elsif ($remainder =~ /^#\s*endif\b/ && $#stack > 0) {
 			($type, $level) = @{pop(@stack)};
 		}
 
