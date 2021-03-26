@@ -1396,7 +1396,9 @@ static int brcm_pcie_resume(struct device *dev)
 	int ret;
 
 	base = pcie->base;
-	clk_prepare_enable(pcie->clk);
+	ret = clk_prepare_enable(pcie->clk);
+	if (ret)
+		return ret;
 
 	ret = brcm_set_regulators(pcie, TURN_ON);
 	if (ret)
@@ -1535,7 +1537,9 @@ static int brcm_pcie_probe(struct platform_device *pdev)
 
 	ret = brcm_pcie_get_regulators(pcie);
 	if (ret) {
-		dev_err(pcie->dev, "failed to get regulators (err=%d)\n", ret);
+		pcie->num_supplies = 0;
+		if (ret != -EPROBE_DEFER)
+			dev_err(pcie->dev, "failed to get regulators (err=%d)\n", ret);
 		goto fail;
 	}
 
