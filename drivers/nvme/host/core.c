@@ -3266,34 +3266,30 @@ static int nvme_dev_release(struct inode *inode, struct file *file)
 
 static int nvme_dev_user_cmd(struct nvme_ctrl *ctrl, void __user *argp)
 {
+	struct nvme_passthru_cmd cmd;
 	struct nvme_ns *ns;
 	int ret;
 
 	down_read(&ctrl->namespaces_rwsem);
 	if (list_empty(&ctrl->namespaces)) {
-		ret = -ENOTTY;
-		goto out_unlock;
+		up_read(&ctrl->namespaces_rwsem);
+		return -ENOTTY;
 	}
-
-	ns = list_first_entry(&ctrl->namespaces, struct nvme_ns, list);
-	if (ns != list_last_entry(&ctrl->namespaces, struct nvme_ns, list)) {
-		dev_warn(ctrl->device,
-			"NVME_IOCTL_IO_CMD not supported when multiple namespaces present!\n");
-		ret = -EINVAL;
-		goto out_unlock;
-	}
-
-	dev_warn(ctrl->device,
-		"using deprecated NVME_IOCTL_IO_CMD ioctl on the char device!\n");
-	kref_get(&ns->kref);
 	up_read(&ctrl->namespaces_rwsem);
+
+	if (copy_from_user(&cmd, argp, sizeof(cmd)))
+		return -EFAULT;
+
+	ns = nvme_find_get_ns(ctrl, cmd.nsid);
+	if (!ns) {
+		dev_err(ctrl->device,
+			"%s: could not find namespace with nsid %u\n",
+			current->comm, cmd.nsid);
+		return -EINVAL;
+	}
 
 	ret = nvme_user_cmd(ctrl, ns, argp);
 	nvme_put_ns(ns);
-	return ret;
-
-out_unlock:
-	up_read(&ctrl->namespaces_rwsem);
 	return ret;
 }
 
