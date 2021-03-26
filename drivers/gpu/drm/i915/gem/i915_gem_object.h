@@ -27,9 +27,9 @@
  * - get_user_pages*() mixed ints with longs
  */
 #define GEM_CHECK_SIZE_OVERFLOW(sz) \
-	GEM_WARN_ON((sz) >> PAGE_SHIFT > INT_MAX)
+	((sz) >> PAGE_SHIFT > INT_MAX)
 
-static inline bool i915_gem_object_size_2big(u64 size)
+static inline bool __i915_gem_object_size_2big(u64 size)
 {
 	struct drm_i915_gem_object *obj;
 
@@ -40,6 +40,16 @@ static inline bool i915_gem_object_size_2big(u64 size)
 		return true;
 
 	return false;
+}
+
+static inline bool i915_gem_object_size_2big(u64 size)
+{
+	return GEM_WARN_ON(__i915_gem_object_size_2big(size));
+}
+
+static inline bool i915_gem_object_size_2big_nowarn(u64 size)
+{
+	return __i915_gem_object_size_2big(size);
 }
 
 void i915_gem_init__objects(struct drm_i915_private *i915);

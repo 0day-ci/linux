@@ -508,7 +508,7 @@ i915_gem_userptr_ioctl(struct drm_device *dev,
 			    I915_USERPTR_UNSYNCHRONIZED))
 		return -EINVAL;
 
-	if (i915_gem_object_size_2big(args->user_size))
+	if (i915_gem_object_size_2big_nowarn(args->user_size))
 		return -E2BIG;
 
 	if (!args->user_size)

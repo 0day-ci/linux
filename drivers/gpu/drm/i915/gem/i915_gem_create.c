@@ -27,6 +27,9 @@ i915_gem_create(struct drm_file *file,
 	/* For most of the ABI (e.g. mmap) we think in system pages */
 	GEM_BUG_ON(!IS_ALIGNED(size, PAGE_SIZE));
 
+	if (i915_gem_object_size_2big_nowarn(size))
+		return -E2BIG;
+
 	/* Allocate the new object */
 	obj = i915_gem_object_create_region(mr, size, 0);
 	if (IS_ERR(obj))
