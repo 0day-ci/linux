@@ -2742,7 +2742,15 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
 	}
 
 	vcpu->hv_clock.tsc_timestamp = tsc_timestamp;
-	vcpu->hv_clock.system_time = kernel_ns + v->kvm->arch.kvmclock_offset;
+
+	/*
+	 * 'kvmclock_offset' can be negative and its absolute value can be
+	 * slightly greater than 'kernel_ns' because when KVM_SET_CLOCK is
+	 * handled, we use more precise get_kvmclock_ns() there. Make sure
+	 * unsigned 'system_time' doesn't go negative.
+	 */
+	vcpu->hv_clock.system_time = max(kernel_ns + v->kvm->arch.kvmclock_offset,
+					 (s64)0);
 	vcpu->last_guest_tsc = tsc_timestamp;
 
 	/* If the host uses TSC clocksource, then it is stable */
