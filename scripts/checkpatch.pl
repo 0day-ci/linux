@@ -1396,8 +1396,12 @@ sub copy_spacing {
 sub line_stats {
 	my ($line) = @_;
 
-	# Drop the diff line leader and expand tabs
+	# Drop the diff line leader
 	$line =~ s/^.//;
+
+	# Treat labels like whitespace when counting indentation
+	$line =~ s/^( ?$Ident:)/" " x length($1)/e;
+
 	$line = expand_tabs($line);
 
 	# Pick the indent from the front of the line.
@@ -4196,6 +4200,9 @@ sub process {
 
 			# Remove any comments
 			$s_next =~ s/$;//g;
+
+			# Remove any leading labels
+			$s_next =~ s/\n( ?$Ident:)/"\n" . " " x length($1)/eg;
 
 			# Skip this check for in case next statement starts with 'else'
 			if ($s_next !~ /\s*\belse\b/) {
