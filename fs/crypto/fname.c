@@ -178,10 +178,8 @@ static int fname_decrypt(const struct inode *inode,
 static const char lookup_table[65] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
 
-#define BASE64_CHARS(nbytes)	DIV_ROUND_UP((nbytes) * 4, 3)
-
 /**
- * base64_encode() - base64-encode some bytes
+ * fscrypt_base64_encode() - base64-encode some bytes
  * @src: the bytes to encode
  * @len: number of bytes to encode
  * @dst: (output) the base64-encoded string.  Not NUL-terminated.
@@ -191,7 +189,7 @@ static const char lookup_table[65] =
  *
  * Return: length of the encoded string
  */
-static int base64_encode(const u8 *src, int len, char *dst)
+int fscrypt_base64_encode(const u8 *src, int len, char *dst)
 {
 	int i, bits = 0, ac = 0;
 	char *cp = dst;
@@ -209,8 +207,20 @@ static int base64_encode(const u8 *src, int len, char *dst)
 		*cp++ = lookup_table[ac & 0x3f];
 	return cp - dst;
 }
+EXPORT_SYMBOL(fscrypt_base64_encode);
 
-static int base64_decode(const char *src, int len, u8 *dst)
+/**
+ * fscrypt_base64_decode() - base64-decode some bytes
+ * @src: the bytes to decode
+ * @len: number of bytes to decode
+ * @dst: (output) decoded binary data
+ *
+ * Decode an input string that was previously encoded using
+ * fscrypt_base64_encode.
+ *
+ * Return: length of the decoded binary data
+ */
+int fscrypt_base64_decode(const char *src, int len, u8 *dst)
 {
 	int i, bits = 0, ac = 0;
 	const char *p;
@@ -232,6 +242,7 @@ static int base64_decode(const char *src, int len, u8 *dst)
 		return -1;
 	return cp - dst;
 }
+EXPORT_SYMBOL(fscrypt_base64_decode);
 
 bool fscrypt_fname_encrypted_size(const union fscrypt_policy *policy,
 				  u32 orig_len, u32 max_len,
@@ -263,8 +274,9 @@ bool fscrypt_fname_encrypted_size(const union fscrypt_policy *policy,
 int fscrypt_fname_alloc_buffer(u32 max_encrypted_len,
 			       struct fscrypt_str *crypto_str)
 {
-	const u32 max_encoded_len = BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX);
 	u32 max_presented_len;
+	const u32 max_encoded_len =
+		FSCRYPT_BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX);
 
 	max_presented_len = max(max_encoded_len, max_encrypted_len);
 
@@ -342,7 +354,7 @@ int fscrypt_fname_disk_to_usr(const struct inode *inode,
 		     offsetof(struct fscrypt_nokey_name, bytes));
 	BUILD_BUG_ON(offsetofend(struct fscrypt_nokey_name, bytes) !=
 		     offsetof(struct fscrypt_nokey_name, sha256));
-	BUILD_BUG_ON(BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX) > NAME_MAX);
+	BUILD_BUG_ON(FSCRYPT_BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX) > NAME_MAX);
 
 	if (hash) {
 		nokey_name.dirhash[0] = hash;
@@ -362,7 +374,8 @@ int fscrypt_fname_disk_to_usr(const struct inode *inode,
 		       nokey_name.sha256);
 		size = FSCRYPT_NOKEY_NAME_MAX;
 	}
-	oname->len = base64_encode((const u8 *)&nokey_name, size, oname->name);
+	oname->len = fscrypt_base64_encode((const u8 *)&nokey_name, size,
+					   oname->name);
 	return 0;
 }
 EXPORT_SYMBOL(fscrypt_fname_disk_to_usr);
@@ -436,14 +449,15 @@ int fscrypt_setup_filename(struct inode *dir, const struct qstr *iname,
 	 * user-supplied name
 	 */
 
-	if (iname->len > BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX))
+	if (iname->len > FSCRYPT_BASE64_CHARS(FSCRYPT_NOKEY_NAME_MAX))
 		return -ENOENT;
 
 	fname->crypto_buf.name = kmalloc(FSCRYPT_NOKEY_NAME_MAX, GFP_KERNEL);
 	if (fname->crypto_buf.name == NULL)
 		return -ENOMEM;
 
-	ret = base64_decode(iname->name, iname->len, fname->crypto_buf.name);
+	ret = fscrypt_base64_decode(iname->name, iname->len,
+				    fname->crypto_buf.name);
 	if (ret < (int)offsetof(struct fscrypt_nokey_name, bytes[1]) ||
 	    (ret > offsetof(struct fscrypt_nokey_name, sha256) &&
 	     ret != FSCRYPT_NOKEY_NAME_MAX)) {
