@@ -10,8 +10,8 @@
 #include <linux/err.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/mux/driver.h>
-#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
@@ -97,7 +97,7 @@ static int mux_gpio_probe(struct platform_device *pdev)
 static struct platform_driver mux_gpio_driver = {
 	.driver = {
 		.name = "gpio-mux",
-		.of_match_table	= of_match_ptr(mux_gpio_dt_ids),
+		.of_match_table	= mux_gpio_dt_ids,
 	},
 	.probe = mux_gpio_probe,
 };
