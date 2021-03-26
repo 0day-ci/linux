@@ -46,11 +46,11 @@ enum rt_ampdu_burst {
 	RT_AMPDU_BURST_8723B	= 7,
 };
 
-#define CHANNEL_MAX_NUMBER		14+24+21	/*  14 is the max channel number */
+#define CHANNEL_MAX_NUMBER		(14+24+21)	/*  14 is the max channel number */
 #define CHANNEL_MAX_NUMBER_2G		14
 #define CHANNEL_MAX_NUMBER_5G		54			/*  Please refer to "phy_GetChnlGroup8812A" and "Hal_ReadTxPowerInfo8812A" */
 #define CHANNEL_MAX_NUMBER_5G_80M	7
-#define CHANNEL_GROUP_MAX		3+9	/*  ch1~3, ch4~9, ch10~14 total three groups */
+#define CHANNEL_GROUP_MAX		(3+9)	/*  ch1~3, ch4~9, ch10~14 total three groups */
 #define MAX_PG_GROUP			13
 
 /*  Tx Power Limit Table Size */
@@ -73,7 +73,7 @@ enum rt_ampdu_burst {
 #define IQK_BB_REG_NUM_92D	10
 #define IQK_BB_REG_NUM_test	6
 
-#define IQK_Matrix_Settings_NUM_92D	1+24+21
+#define IQK_Matrix_Settings_NUM_92D	(1+24+21)
 
 /* define HP_THERMAL_NUM		8 */
 /*  duplicate code, will move to ODM ######### */
