@@ -36,17 +36,17 @@ static inline u32 p1(u32 x)
 	return x ^ rol32(x, 15) ^ rol32(x, 23);
 }
 
-static inline u32 ff(unsigned int n, u32 a, u32 b, u32 c)
+static inline u32 ff(u32 n, u32 a, u32 b, u32 c)
 {
 	return (n < 16) ? (a ^ b ^ c) : ((a & b) | (a & c) | (b & c));
 }
 
-static inline u32 gg(unsigned int n, u32 e, u32 f, u32 g)
+static inline u32 gg(u32 n, u32 e, u32 f, u32 g)
 {
 	return (n < 16) ? (e ^ f ^ g) : ((e & f) | ((~e) & g));
 }
 
-static inline u32 t(unsigned int n)
+static inline u32 t(u32 n)
 {
 	return (n < 16) ? SM3_T1 : SM3_T2;
 }
@@ -54,7 +54,7 @@ static inline u32 t(unsigned int n)
 static void sm3_expand(u32 *t, u32 *w, u32 *wt)
 {
 	int i;
-	unsigned int tmp;
+	u32 tmp;
 
 	/* load the input */
 	for (i = 0; i <= 15; i++)
@@ -123,8 +123,8 @@ static void sm3_compress(u32 *w, u32 *wt, u32 *m)
 
 static void sm3_transform(struct sm3_state *sst, u8 const *src)
 {
-	unsigned int w[68];
-	unsigned int wt[64];
+	u32 w[68];
+	u32 wt[64];
 
 	sm3_expand((u32 *)src, w, wt);
 	sm3_compress(w, wt, sst->state);
