@@ -24,6 +24,9 @@ properties:
   compatible:
     const: nvidia,tegra194-tcu
 
+  reg:
+    maxItems: 1
+
   mbox-names:
     items:
       - const: rx
@@ -48,8 +51,9 @@ examples:
   - |
     #include <dt-bindings/mailbox/tegra186-hsp.h>
 
-    tcu: tcu {
+    tcu: tcu@c168000 {
         compatible = "nvidia,tegra194-tcu";
+        reg = <0x0c168000 0x4>;
         mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
                  <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
         mbox-names = "rx", "tx";
