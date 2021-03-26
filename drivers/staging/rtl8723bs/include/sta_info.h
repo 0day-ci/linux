@@ -282,19 +282,19 @@ struct sta_info {
 	} while (0)
 
 #define STA_RX_PKTS_ARG(sta) \
-	sta->sta_stats.rx_mgnt_pkts \
+	(sta->sta_stats.rx_mgnt_pkts \
 	, sta->sta_stats.rx_ctrl_pkts \
-	, sta->sta_stats.rx_data_pkts
+	, sta->sta_stats.rx_data_pkts)
 
 #define STA_LAST_RX_PKTS_ARG(sta) \
-	sta->sta_stats.last_rx_mgnt_pkts \
+	(sta->sta_stats.last_rx_mgnt_pkts \
 	, sta->sta_stats.last_rx_ctrl_pkts \
-	, sta->sta_stats.last_rx_data_pkts
+	, sta->sta_stats.last_rx_data_pkts)
 
 #define STA_RX_PKTS_DIFF_ARG(sta) \
-	sta->sta_stats.rx_mgnt_pkts - sta->sta_stats.last_rx_mgnt_pkts \
+	(sta->sta_stats.rx_mgnt_pkts - sta->sta_stats.last_rx_mgnt_pkts \
 	, sta->sta_stats.rx_ctrl_pkts - sta->sta_stats.last_rx_ctrl_pkts \
-	, sta->sta_stats.rx_data_pkts - sta->sta_stats.last_rx_data_pkts
+	, sta->sta_stats.rx_data_pkts - sta->sta_stats.last_rx_data_pkts)
 
 #define STA_PKTS_FMT "(m:%llu, c:%llu, d:%llu)"
 
