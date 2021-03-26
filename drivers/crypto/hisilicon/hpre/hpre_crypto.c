@@ -1093,6 +1093,9 @@ static int hpre_rsa_setpubkey(struct crypto_akcipher *tfm, const void *key,
 	struct hpre_ctx *ctx = akcipher_tfm_ctx(tfm);
 	int ret;
 
+	if (!key || !keylen)
+		return -EINVAL;
+
 	ret = crypto_akcipher_set_pub_key(ctx->rsa.soft_tfm, key, keylen);
 	if (ret)
 		return ret;
@@ -1105,6 +1108,9 @@ static int hpre_rsa_setprivkey(struct crypto_akcipher *tfm, const void *key,
 {
 	struct hpre_ctx *ctx = akcipher_tfm_ctx(tfm);
 	int ret;
+
+	if (!key || !keylen)
+		return -EINVAL;
 
 	ret = crypto_akcipher_set_priv_key(ctx->rsa.soft_tfm, key, keylen);
 	if (ret)
