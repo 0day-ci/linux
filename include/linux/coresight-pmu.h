@@ -14,7 +14,7 @@
  * Below are the definition of bit offsets for perf option, and works as
  * arbitrary values for all ETM versions.
  *
- * Most of them are orignally from ETMv3.5/PTM's ETMCR config, therefore,
+ * Most of them are originally from ETMv3.5/PTM's ETMCR config, therefore,
  * ETMv3.5/PTM doesn't define ETMCR config bits with prefix "ETM3_" and
  * directly use below macros as config bits.
  */
