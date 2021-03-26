@@ -14,10 +14,12 @@
 #include <linux/random.h>
 #include <linux/sort.h>
 #include <linux/iversion.h>
+#include <linux/fscrypt.h>
 
 #include "super.h"
 #include "mds_client.h"
 #include "cache.h"
+#include "crypto.h"
 #include <linux/ceph/decode.h>
 
 /*
@@ -565,6 +567,7 @@ void ceph_evict_inode(struct inode *inode)
 	clear_inode(inode);
 
 	ceph_fscache_unregister_inode_cookie(ci);
+	fscrypt_put_encryption_info(inode);
 
 	__ceph_remove_caps(ci);
 
@@ -943,6 +946,18 @@ int ceph_fill_inode(struct inode *inode, struct page *locked_page,
 		ceph_forget_all_cached_acls(inode);
 		ceph_security_invalidate_secctx(inode);
 		xattr_blob = NULL;
+
+		/*
+		 * Most inodes inherit the encrypted flag from their parent,
+		 * but empty directories can end up being encrypted later via
+		 * ioctl. Only check for encryption if it's not already encrypted,
+		 * and it's a new inode, or a directory.
+		 */
+		if (!IS_ENCRYPTED(inode) &&
+		    ((inode->i_state & I_NEW) || S_ISDIR(inode->i_mode))) {
+			if (ceph_inode_has_xattr(ci, CEPH_XATTR_NAME_ENCRYPTION_CONTEXT))
+				inode_set_flags(inode, S_ENCRYPTED, S_ENCRYPTED);
+		}
 	}
 
 	/* finally update i_version */
