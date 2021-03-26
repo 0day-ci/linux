@@ -2574,6 +2574,9 @@ static int ethtool_set_fecparam(struct net_device *dev, void __user *useraddr)
 	if (copy_from_user(&fecparam, useraddr, sizeof(fecparam)))
 		return -EFAULT;
 
+	if (!fecparam.fec || fecparam.fec & ETHTOOL_FEC_NONE)
+		return -EINVAL;
+
 	fecparam.active_fec = 0;
 	fecparam.reserved = 0;
 
