@@ -1380,7 +1380,11 @@ struct ethtool_per_queue_op {
  * @cmd: Command number = %ETHTOOL_GFECPARAM or %ETHTOOL_SFECPARAM
  * @active_fec: FEC mode which is active on the port
  * @fec: Bitmask of supported/configured FEC modes
- * @rsvd: Reserved for future extensions. i.e FEC bypass feature.
+ * @reserved: Reserved for future extensions, ignore on GET, write 0 for SET.
+ *
+ * Note that @reserved was never validated on input and ethtool user space
+ * left it uninitialized when calling SET. Hence going forward it can only be
+ * used to return a value to userspace with GET.
  */
 struct ethtool_fecparam {
 	__u32   cmd;
