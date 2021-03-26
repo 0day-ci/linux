@@ -241,6 +241,7 @@ static void __fanout_link(struct sock *sk, struct packet_sock *po);
 
 static int packet_direct_xmit(struct sk_buff *skb)
 {
+	skb_reset_mac_header(skb);
 	return dev_direct_xmit(skb, packet_pick_tx_queue(skb));
 }
 
