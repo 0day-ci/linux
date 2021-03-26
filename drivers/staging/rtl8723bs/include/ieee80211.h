@@ -823,8 +823,8 @@ struct rtw_ieee80211_channel {
 #define CHAN_ARG(channel) \
 	/*(channel)->band*/ \
 	/*, (channel)->center_freq*/ \
-	(channel)->hw_value \
-	, (channel)->flags \
+	((channel)->hw_value \
+	, (channel)->flags) \
 	/*, (channel)->max_antenna_gain*/ \
 	/*, (channel)->max_power*/ \
 	/*, (channel)->max_reg_power*/ \
