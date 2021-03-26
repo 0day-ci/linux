@@ -654,6 +654,13 @@ struct drm_dp_mst_topology_mgr {
 	int pbn_div;
 
 	/**
+	 * @first_link_total_avail_slots: frist link total slots available.
+	 * @first_link_start_slot: start slot index for real data transmission.
+	 */
+	u8 first_link_total_avail_slots;
+	u8 first_link_start_slot;
+
+	/**
 	 * @funcs: Atomic helper callbacks
 	 */
 	const struct drm_private_state_funcs *funcs;
@@ -795,6 +802,7 @@ int drm_dp_mst_get_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp
 
 void drm_dp_mst_reset_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port);
 
+void drm_dp_mst_update_first_link_slot_info(struct drm_dp_mst_topology_mgr *mgr, uint8_t encoding_format);
 
 void drm_dp_mst_deallocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 				struct drm_dp_mst_port *port);
