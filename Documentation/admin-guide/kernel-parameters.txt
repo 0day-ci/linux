@@ -3524,6 +3524,9 @@
 			off: turn off poisoning (default)
 			on: turn on poisoning
 
+	page_reporting_factor= [KNL] Guest Free Page Reporting percentile.
+			[0, 100]: 0 - off, not report; 100 - default, full report.
+
 	panic=		[KNL] Kernel behaviour on panic: delay <timeout>
 			timeout > 0: seconds before rebooting
 			timeout = 0: wait forever

@@ -524,3 +524,16 @@ static int __init page_reporting_init(void)
 }
 
 module_init(page_reporting_init);
+
+static int __init setup_reporting_factor(char *str)
+{
+	int v;
+
+	if (kstrtoint(str, 10, &v))
+		return -EINVAL;
+	if (v >= 0 && v <= 100)
+		reporting_factor = v;
+
+	return 0;
+}
+__setup("page_reporting_factor=", setup_reporting_factor);
