@@ -2301,7 +2301,7 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
 	kernel_unpoison_pages(page, 1 << order);
 	set_page_owner(page, order, gfp_flags);
 
-	if (!want_init_on_free() && want_init_on_alloc(gfp_flags))
+	if (want_init_on_alloc(gfp_flags))
 		kernel_init_free_pages(page, 1 << order);
 }
 
