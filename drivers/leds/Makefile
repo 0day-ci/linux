@@ -111,3 +111,6 @@ obj-$(CONFIG_LEDS_TRIGGERS)		+= trigger/
 
 # LED Blink
 obj-$(CONFIG_LEDS_BLINK)                += blink/
+
+# LED Blink
+obj-$(CONFIG_LEDS_SIMPLE)		+= simple/
