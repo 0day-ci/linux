@@ -20,9 +20,27 @@ properties:
   compatible:
     enum:
       - mediatek,mt6779-devapc
+      - mediatek,mt8192-devapc
+
+  version:
+    description: The version of the hardware architecture
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 2]
+    maxItems: 1
+
+  slave_type_num:
+    description: The number of the devapc set
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [1, 4]
+    maxItems: 1
 
   reg:
     description: The base address of devapc register bank
+    maxItems: 4
+
+  vio_idx_num:
+    description: The number of the devices controlled by devapc
+    $ref: /schemas/types.yaml#/definitions/uint32-array
     maxItems: 1
 
   interrupts:
@@ -39,7 +57,10 @@ properties:
 
 required:
   - compatible
+  - version
+  - slave_type_num
   - reg
+  - vio_idx_num
   - interrupts
   - clocks
   - clock-names
@@ -53,8 +74,28 @@ examples:
 
     devapc: devapc@10207000 {
       compatible = "mediatek,mt6779-devapc";
+      version = <1>;
+      slave_type_num = <1>;
       reg = <0x10207000 0x1000>;
+      vio_idx_num = <511>;
       interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_LOW>;
       clocks = <&infracfg_ao CLK_INFRA_DEVICE_APC>;
       clock-names = "devapc-infra-clock";
+    };
+  - |
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/clock/mt8192-clk.h>
+
+    devapc: devapc@10207000 {
+        compatible = "mediatek,mt8192-devapc";
+        version = <2>;
+        slave_type_num = <4>;
+        reg = <0 0x10207000 0 0x1000>,
+            <0 0x10274000 0 0x1000>,
+            <0 0x10275000 0 0x1000>,
+            <0 0x11020000 0 0x1000>;
+        vio_idx_num = <367 292 242 58>;
+        interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&infracfg_ao CLK_INFRA_DEVICE_APC>;
+        clock-names = "devapc-infra-clock";
     };
