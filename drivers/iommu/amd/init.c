@@ -1734,7 +1734,7 @@ static void __init init_iommu_perf_ctr(struct amd_iommu *iommu)
 		goto pc_false;
 
 	/*
-	 * Disable power gating by programing the performance counter
+	 * Disable power gating by programming the performance counter
 	 * source to 20 (i.e. counts the reads and writes from/to IOMMU
 	 * Reserved Register [MMIO Offset 1FF8h] that are ignored.),
 	 * which never get incremented during this init phase.
@@ -2088,7 +2088,7 @@ static int intcapxt_irqdomain_activate(struct irq_domain *domain,
 	xt.destid_24_31 = cfg->dest_apicid >> 24;
 
 	/**
-	 * Current IOMMU implemtation uses the same IRQ for all
+	 * Current IOMMU implementation uses the same IRQ for all
 	 * 3 IOMMU interrupts.
 	 */
 	writeq(xt.capxt, iommu->mmio_base + MMIO_INTCAPXT_EVT_OFFSET);
