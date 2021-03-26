@@ -545,28 +545,31 @@ static ssize_t align_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct nd_region *nd_region = to_nd_region(dev);
-	unsigned long val, dpa;
-	u32 remainder;
+	unsigned long val;
 	int rc;
 
 	rc = kstrtoul(buf, 0, &val);
 	if (rc)
 		return rc;
 
-	if (!nd_region->ndr_mappings)
-		return -ENXIO;
-
-	/*
-	 * Ensure space-align is evenly divisible by the region
-	 * interleave-width because the kernel typically has no facility
-	 * to determine which DIMM(s), dimm-physical-addresses, would
-	 * contribute to the tail capacity in system-physical-address
-	 * space for the namespace.
-	 */
-	dpa = div_u64_rem(val, nd_region->ndr_mappings, &remainder);
-	if (!is_power_of_2(dpa) || dpa < PAGE_SIZE
-			|| val > region_size(nd_region) || remainder)
+	if (val > region_size(nd_region))
 		return -EINVAL;
+
+	if (nd_region->ndr_mappings) {
+		unsigned long dpa;
+		u32 remainder;
+
+		/*
+		 * Ensure space-align is evenly divisible by the region
+		 * interleave-width because the kernel typically has no facility
+		 * to determine which DIMM(s), dimm-physical-addresses, would
+		 * contribute to the tail capacity in system-physical-address
+		 * space for the namespace.
+		 */
+		dpa = div_u64_rem(val, nd_region->ndr_mappings, &remainder);
+		if (!is_power_of_2(dpa) || dpa < PAGE_SIZE || remainder)
+			return -EINVAL;
+	}
 
 	/*
 	 * Given that space allocation consults this value multiple
