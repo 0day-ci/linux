@@ -380,6 +380,7 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
 
 	ret = crypto_wait_req(crypto_ahash_digest(req), &wait);
 
+	memzero_explicit(buf, keylen + QCE_MAX_ALIGN_SIZE);
 	kfree(buf);
 err_free_req:
 	ahash_request_free(req);
