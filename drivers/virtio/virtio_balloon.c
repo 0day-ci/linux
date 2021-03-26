@@ -303,8 +303,8 @@ static unsigned leak_balloon(struct virtio_balloon *vb, size_t num)
 	 */
 	if (vb->num_pfns != 0)
 		tell_host(vb, vb->deflate_vq);
-	release_pages_balloon(vb, &pages);
 	mutex_unlock(&vb->balloon_lock);
+	release_pages_balloon(vb, &pages);
 	return num_freed_pages;
 }
 
