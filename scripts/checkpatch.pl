@@ -4185,6 +4185,47 @@ sub process {
 				WARN("SUSPECT_CODE_INDENT",
 				     "suspect code indent for conditional statements ($indent, $sindent)\n" . $herecurr . "$stat_real\n");
 			}
+
+# Also check if the next statement after the previous condition has the same indent
+			my ($stat_next, undef, $line_nr_next_next) =
+				ctx_statement_block($line_nr_next, $remain_next, $off_next);
+			my $s_next = $stat_next;
+
+			# Remove line prefixes
+			$s_next =~ s/\n./\n/gs;
+
+			# Remove any comments
+			$s_next =~ s/$;//g;
+
+			# Skip this check for in case next statement starts with 'else'
+			if ($s_next !~ /\s*\belse\b/) {
+
+				# Remove while that belongs to a do {} while
+				if ($stat =~ /\bdo\b/) {
+					$s_next =~ s/^.*\bwhile\b\s*($balanced_parens)\s*?//;
+				}
+
+				# Remove blank lines
+				$s_next =~ s/\s*\\?\n//g;
+
+				# Get the real next lines
+				my $next_nof_lines = $line_nr_next_next - $line_nr_next;
+				my $stat_next_real = raw_line($line_nr_next, $next_nof_lines);
+				if (!defined($stat_next_real)) {
+					$stat_next_real = "";
+				} elsif ($next_nof_lines > 1) {
+					$stat_next_real = "[...]\n$stat_next_real";
+				}
+				my (undef, $nindent) = line_stats('+' . $s_next);
+
+				#print "stat_next<$stat_next> stat<$stat> indent<$indent> nindent<$nindent> s_next<$s_next> stat_next_real<$stat_next_real>\n";
+
+				if ($nindent > $indent) {
+					WARN("SUSPICIOUS_CODE_INDENT",
+					     "suspicious code indentation after conditional statements\n" .
+					     $herecurr . "$stat_real\n$stat_next_real\n");
+				}
+			}
 		}
 
 		# Track the 'values' across context and added lines.
