@@ -187,6 +187,10 @@ static const struct irq_source_info_funcs vupdate_no_lock_irq_info_funcs = {
 	.ack = NULL
 };
 
+static const struct irq_source_info_funcs dmub_trace_irq_info_funcs = {
+	.set = NULL,
+	.ack = NULL
+};
 
 static const struct irq_source_info_funcs vline0_irq_info_funcs = {
 	.set = NULL,
