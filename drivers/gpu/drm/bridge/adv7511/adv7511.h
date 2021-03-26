@@ -342,7 +342,7 @@ struct adv7511 {
 	unsigned int f_audio;
 	unsigned int audio_source;
 
-	unsigned int current_edid_segment;
+	int current_edid_segment;
 	uint8_t edid_buf[256];
 	bool edid_read;
 

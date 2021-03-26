@@ -327,7 +327,12 @@ static void adv7511_set_link_config(struct adv7511 *adv7511,
 
 static void __adv7511_power_on(struct adv7511 *adv7511)
 {
+	/*
+	 * The adv7511 will start reading the first EDID segment as
+	 * soon as it is powered on.
+	 */
 	adv7511->current_edid_segment = -1;
+	adv7511->edid_read = false;
 
 	regmap_update_bits(adv7511->regmap, ADV7511_REG_POWER,
 			   ADV7511_POWER_POWER_DOWN, 0);
@@ -526,6 +531,7 @@ static int adv7511_wait_for_edid(struct adv7511 *adv7511, int timeout)
 static int adv7511_get_edid_block(void *data, u8 *buf, unsigned int block,
 				  size_t len)
 {
+	unsigned int need_segment = block / 2;
 	struct adv7511 *adv7511 = data;
 	struct i2c_msg xfer[2];
 	uint8_t offset;
@@ -535,23 +541,29 @@ static int adv7511_get_edid_block(void *data, u8 *buf, unsigned int block,
 	if (len > 128)
 		return -EINVAL;
 
-	if (adv7511->current_edid_segment != block / 2) {
-		unsigned int status;
+	/* wait for any ongoing EDID segment reads to finish */
+	adv7511_wait_for_edid(adv7511, 200);
 
-		ret = regmap_read(adv7511->regmap, ADV7511_REG_DDC_STATUS,
-				  &status);
+	/*
+	 * If the current read segment does not match what we need, then
+	 * write the new segment and wait for it to be read.
+	 *
+	 * Note that after power on the adv7511 starts reading segment 0
+	 * of the EDID automatically. So if current_edid_segment < 0, then
+	 * we do not need to write the EDID_SEGMENT register again, since
+	 * it is already reading segment 0.
+	 */
+	if (adv7511->current_edid_segment >= 0 &&
+	    adv7511->current_edid_segment != need_segment) {
+		adv7511->edid_read = false;
+		regmap_write(adv7511->regmap, ADV7511_REG_EDID_SEGMENT,
+			     need_segment);
+		ret = adv7511_wait_for_edid(adv7511, 200);
 		if (ret < 0)
 			return ret;
+	}
 
-		if (status != 2) {
-			adv7511->edid_read = false;
-			regmap_write(adv7511->regmap, ADV7511_REG_EDID_SEGMENT,
-				     block);
-			ret = adv7511_wait_for_edid(adv7511, 200);
-			if (ret < 0)
-				return ret;
-		}
-
+	if (adv7511->current_edid_segment != need_segment) {
 		/* Break this apart, hopefully more I2C controllers will
 		 * support 64 byte transfers than 256 byte transfers
 		 */
@@ -579,7 +591,7 @@ static int adv7511_get_edid_block(void *data, u8 *buf, unsigned int block,
 			offset += 64;
 		}
 
-		adv7511->current_edid_segment = block / 2;
+		adv7511->current_edid_segment = need_segment;
 	}
 
 	if (block % 2 == 0)
