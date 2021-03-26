@@ -60,6 +60,8 @@ static int convert_prio(int prio)
 	case MAX_RT_PRIO:
 		cpupri = CPUPRI_HIGHER;		/* 100 */
 		break;
+	default:
+		BUG();
 	}
 
 	return cpupri;
@@ -148,8 +150,6 @@ int cpupri_find_fitness(struct cpupri *cp, struct task_struct *p,
 	int task_pri = convert_prio(p->prio);
 	int idx, cpu;
 
-	BUG_ON(task_pri >= CPUPRI_NR_PRIORITIES);
-
 	for (idx = 0; idx < task_pri; idx++) {
 
 		if (!__cpupri_find(cp, p, lowest_mask, idx))
@@ -214,8 +214,6 @@ void cpupri_set(struct cpupri *cp, int cpu, int newpri)
 	int do_mb = 0;
 
 	newpri = convert_prio(newpri);
-
-	BUG_ON(newpri >= CPUPRI_NR_PRIORITIES);
 
 	if (newpri == oldpri)
 		return;
