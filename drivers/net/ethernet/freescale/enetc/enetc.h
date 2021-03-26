@@ -24,7 +24,7 @@ struct enetc_tx_swbd {
 	u16 len;
 	u8 is_dma_page:1;
 	u8 check_wb:1;
-	u8 do_tstamp:1;
+	u8 do_twostep_tstamp:1;
 };
 
 #define ENETC_RX_MAXFRM_SIZE	ENETC_MAC_MAXFRM_SIZE
@@ -231,11 +231,12 @@ struct psfp_cap {
 /* TODO: more hardware offloads */
 enum enetc_active_offloads {
 	/* 8 bits reserved for TX timestamp types (hwtstamp_tx_types) */
-	ENETC_F_TX_TSTAMP	= BIT(0),
+	ENETC_F_TX_TSTAMP		= BIT(0),
+	ENETC_F_TX_ONESTEP_SYNC_TSTAMP	= BIT(1),
 
-	ENETC_F_RX_TSTAMP	= BIT(8),
-	ENETC_F_QBV		= BIT(9),
-	ENETC_F_QCI		= BIT(10),
+	ENETC_F_RX_TSTAMP		= BIT(8),
+	ENETC_F_QBV			= BIT(9),
+	ENETC_F_QCI			= BIT(10),
 };
 
 /* interrupt coalescing modes */
@@ -278,6 +279,16 @@ struct enetc_ndev_priv {
 	struct phylink *phylink;
 	int ic_mode;
 	u32 tx_ictt;
+
+	/* The single-step register has to be configured dynamically per
+	 * message. So, before transmit current message, use a mutex lock
+	 * to make sure the lock is released by last one-step timestamping
+	 * message completing transmitting on hardware.
+	 */
+	struct mutex		onestep_tstamp_lock;
+	struct workqueue_struct	*enetc_ptp_wq;
+	struct work_struct	tx_onestep_tstamp;
+	struct sk_buff_head	tx_skbs;
 };
 
 /* Messaging */
