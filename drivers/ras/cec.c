@@ -313,7 +313,7 @@ static int cec_add_elem(u64 pfn)
 {
 	struct ce_array *ca = &ce_arr;
 	unsigned int to = 0;
-	int count, ret = 0;
+	int count, ret;
 
 	/*
 	 * We can be called very early on the identify_cpu() path where we are
@@ -371,6 +371,9 @@ static int cec_add_elem(u64 pfn)
 
 		goto unlock;
 	}
+
+	/* action threshold not reached */
+	ret = 0;
 
 	ca->decay_count++;
 
