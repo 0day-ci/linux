@@ -315,6 +315,14 @@ static int ohci_bus_suspend (struct usb_hcd *hcd)
 		del_timer_sync(&ohci->io_watchdog);
 		ohci->prev_frame_no = IO_WATCHDOG_OFF;
 	}
+
+	spin_lock_irqsave(&ohci->lock, flags);
+	ohci_writel(ohci, OHCI_INTR_MIE, &ohci->regs->intrdisable);
+	(void)ohci_readl(ohci, &ohci->regs->intrdisable);
+
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	spin_unlock_irqrestore(&ohci->lock, flags);
+
 	return rc;
 }
 
@@ -326,7 +334,10 @@ static int ohci_bus_resume (struct usb_hcd *hcd)
 	if (time_before (jiffies, ohci->next_statechange))
 		msleep(5);
 
-	spin_lock_irq (&ohci->lock);
+	spin_lock_irq(&ohci->lock);
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	ohci_writel(ohci, OHCI_INTR_MIE, &ohci->regs->intrenable);
+	ohci_readl(ohci, &ohci->regs->intrenable);
 
 	if (unlikely(!HCD_HW_ACCESSIBLE(hcd)))
 		rc = -ESHUTDOWN;
