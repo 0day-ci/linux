@@ -900,24 +900,22 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 	}
 	xsk->ctx = ctx;
 
-	if (rx) {
-		err = setsockopt(xsk->fd, SOL_XDP, XDP_RX_RING,
-				 &xsk->config.rx_size,
-				 sizeof(xsk->config.rx_size));
-		if (err) {
-			err = -errno;
-			goto out_put_ctx;
-		}
-	}
-	if (tx) {
-		err = setsockopt(xsk->fd, SOL_XDP, XDP_TX_RING,
-				 &xsk->config.tx_size,
-				 sizeof(xsk->config.tx_size));
-		if (err) {
-			err = -errno;
-			goto out_put_ctx;
-		}
-	}
+	/* The return values of these setsockopt calls are intentionally not checked.
+	 * If the ring has already been set up setsockopt will return an error. However,
+	 * this scenario is acceptable as the user may be retrying the socket creation
+	 * with rings which were set up in a previous but ultimately unsuccessful call
+	 * to xsk_socket__create(_shared). The call later to mmap() will fail if there
+	 * is a real issue and we handle that return value appropriately there.
+	 */
+	if (rx)
+		setsockopt(xsk->fd, SOL_XDP, XDP_RX_RING,
+			   &xsk->config.rx_size,
+			   sizeof(xsk->config.rx_size));
+
+	if (tx)
+		setsockopt(xsk->fd, SOL_XDP, XDP_TX_RING,
+			   &xsk->config.tx_size,
+			   sizeof(xsk->config.tx_size));
 
 	err = xsk_get_mmap_offsets(xsk->fd, &off);
 	if (err) {
