@@ -29,11 +29,19 @@
 #define RKISP1_ISP_SD_SRC BIT(0)
 #define RKISP1_ISP_SD_SINK BIT(1)
 
-/* min and max values for the widths and heights of the entities */
-#define RKISP1_ISP_MAX_WIDTH		4032
-#define RKISP1_ISP_MAX_HEIGHT		3024
-#define RKISP1_ISP_MIN_WIDTH		32
-#define RKISP1_ISP_MIN_HEIGHT		32
+/*
+ * min and max values for the widths and heights of the entities
+ * The ISP device accepts input resolutions of up to 4416x3312, but
+ * it can only process resolutions of 4032x3024 internally.
+ * Therefore the crop resolution is limited to 4032x3024, the
+ * sink pad crop is applied automatically when the format is set.
+ */
+#define RKISP1_ISP_MAX_WIDTH			4416
+#define RKISP1_ISP_MAX_HEIGHT			3312
+#define RKISP1_ISP_MAX_WIDTH_CROP		4032
+#define RKISP1_ISP_MAX_HEIGHT_CROP		3024
+#define RKISP1_ISP_MIN_WIDTH			32
+#define RKISP1_ISP_MIN_HEIGHT			32
 
 #define RKISP1_RSZ_MP_SRC_MAX_WIDTH		4416
 #define RKISP1_RSZ_MP_SRC_MAX_HEIGHT		3312
