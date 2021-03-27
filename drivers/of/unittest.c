@@ -1408,7 +1408,7 @@ static void attach_node_and_children(struct device_node *np)
 static int __init unittest_data_add(void)
 {
 	void *unittest_data;
-	struct device_node *unittest_data_node, *np;
+	struct device_node *unittest_data_node = NULL, *np;
 	/*
 	 * __dtb_testcases_begin[] and __dtb_testcases_end[] are magically
 	 * created by cmd_dt_S_dtb in scripts/Makefile.lib
