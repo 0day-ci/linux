@@ -53,7 +53,7 @@ struct resume_performance_record {
 	u32 resume_count;
 	u64 resume_prev;
 	u64 resume_avg;
-} __attribute__((packed));
+} __packed;
 
 struct boot_performance_record {
 	struct fpdt_record_header header;
@@ -63,13 +63,13 @@ struct boot_performance_record {
 	u64 bootloader_launch;
 	u64 exitbootservice_start;
 	u64 exitbootservice_end;
-} __attribute__((packed));
+} __packed;
 
 struct suspend_performance_record {
 	struct fpdt_record_header header;
 	u64 suspend_start;
 	u64 suspend_end;
-} __attribute__((packed));
+} __packed;
 
 
 static struct resume_performance_record *record_resume;
