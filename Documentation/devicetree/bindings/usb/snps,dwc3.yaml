@@ -301,6 +301,13 @@ properties:
     items:
       enum: [1, 4, 8, 16, 32, 64, 128, 256]
 
+  usb-psy-name:
+    description:
+      Contains the name for power supply interface. To follow
+      BC1.2 specification, DWC3 could use power supply interface
+      to control current with corresponding USB state and USB speed.
+    minItems: 1
+
 unevaluatedProperties: false
 
 required:
