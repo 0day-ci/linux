@@ -27,7 +27,9 @@
 
 static pgd_t tmp_pgd_table[PTRS_PER_PGD] __initdata __aligned(PGD_SIZE);
 
-pmd_t tmp_pmd_table[PTRS_PER_PMD] __page_aligned_bss;
+#ifdef CONFIG_ARM_LPAE
+static pmd_t tmp_pmd_table[PTRS_PER_PMD] __page_aligned_bss;
+#endif
 
 static __init void *kasan_alloc_block(size_t size)
 {
