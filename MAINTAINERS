@@ -9193,6 +9193,7 @@ F:	tools/power/x86/intel-speed-select/
 
 INTEL STRATIX10 FIRMWARE DRIVERS
 M:	Richard Gong <richard.gong@linux.intel.com>
+R:	Tom Rix <trix@redhat.com>
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	Documentation/ABI/testing/sysfs-devices-platform-stratix10-rsu
