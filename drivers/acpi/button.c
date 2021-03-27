@@ -157,8 +157,9 @@ module_param(lid_report_interval, ulong, 0644);
 MODULE_PARM_DESC(lid_report_interval, "Interval (ms) between lid key events");
 
 /* --------------------------------------------------------------------------
-                              FS Interface (/proc)
-   -------------------------------------------------------------------------- */
+ *			FS Interface (/proc)
+ * --------------------------------------------------------------------------
+ */
 
 static struct proc_dir_entry *acpi_button_dir;
 static struct proc_dir_entry *acpi_lid_dir;
@@ -349,8 +350,9 @@ static int acpi_button_remove_fs(struct acpi_device *device)
 }
 
 /* --------------------------------------------------------------------------
-                                Driver Interface
-   -------------------------------------------------------------------------- */
+ *				Driver Interface
+ * --------------------------------------------------------------------------
+ */
 int acpi_lid_open(void)
 {
 	if (!lid_device)
