@@ -1101,9 +1101,6 @@ static ssize_t fuse_send_write_pages(struct fuse_io_args *ia,
 	unsigned int offset, i;
 	int err;
 
-	for (i = 0; i < ap->num_pages; i++)
-		fuse_wait_on_page_writeback(inode, ap->pages[i]->index);
-
 	fuse_write_args_fill(ia, ff, pos, count);
 	ia->write.in.flags = fuse_write_flags(iocb);
 	if (fm->fc->handle_killpriv_v2 && !capable(CAP_FSETID))
@@ -1140,6 +1137,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_args_pages *ap,
 				     unsigned int max_pages)
 {
 	struct fuse_conn *fc = get_fuse_conn(mapping->host);
+	struct inode *inode = mapping->host;
 	unsigned offset = pos & (PAGE_SIZE - 1);
 	size_t count = 0;
 	int err;
@@ -1165,6 +1163,8 @@ static ssize_t fuse_fill_write_pages(struct fuse_args_pages *ap,
 		page = grab_cache_page_write_begin(mapping, index, 0);
 		if (!page)
 			break;
+
+		fuse_wait_on_page_writeback(inode, page->index);
 
 		if (mapping_writably_mapped(mapping))
 			flush_dcache_page(page);
