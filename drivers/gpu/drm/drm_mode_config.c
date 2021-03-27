@@ -626,9 +626,7 @@ void drm_mode_config_validate(struct drm_device *dev)
 {
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
-	struct drm_plane *plane;
 	u32 primary_with_crtc = 0, cursor_with_crtc = 0;
-	unsigned int num_primary = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return;
@@ -676,13 +674,4 @@ void drm_mode_config_validate(struct drm_device *dev)
 			cursor_with_crtc |= drm_plane_mask(crtc->cursor);
 		}
 	}
-
-	drm_for_each_plane(plane, dev) {
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
-			num_primary++;
-	}
-
-	WARN(num_primary != dev->mode_config.num_crtc,
-	     "Must have as many primary planes as there are CRTCs, but have %u primary planes and %u CRTCs",
-	     num_primary, dev->mode_config.num_crtc);
 }
