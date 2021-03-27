@@ -894,6 +894,8 @@ static struct fwnode_handle *
 swnode_register(const struct software_node *node, struct swnode *parent,
 		unsigned int allocated)
 {
+	struct ida *ids = parent ? &parent->child_ids : &swnode_root_ids;
+	struct kobject *kobj_parent = parent ? &parent->kobj : NULL;
 	struct swnode *swnode;
 	int ret;
 
@@ -901,8 +903,7 @@ swnode_register(const struct software_node *node, struct swnode *parent,
 	if (!swnode)
 		return ERR_PTR(-ENOMEM);
 
-	ret = ida_simple_get(parent ? &parent->child_ids : &swnode_root_ids,
-			     0, 0, GFP_KERNEL);
+	ret = ida_simple_get(ids, 0, 0, GFP_KERNEL);
 	if (ret < 0) {
 		kfree(swnode);
 		return ERR_PTR(ret);
@@ -920,12 +921,10 @@ swnode_register(const struct software_node *node, struct swnode *parent,
 
 	if (node->name)
 		ret = kobject_init_and_add(&swnode->kobj, &software_node_type,
-					   parent ? &parent->kobj : NULL,
-					   "%s", node->name);
+					   kobj_parent, "%s", node->name);
 	else
 		ret = kobject_init_and_add(&swnode->kobj, &software_node_type,
-					   parent ? &parent->kobj : NULL,
-					   "node%d", swnode->id);
+					   kobj_parent, "node%d", swnode->id);
 	if (ret) {
 		kobject_put(&swnode->kobj);
 		return ERR_PTR(ret);
