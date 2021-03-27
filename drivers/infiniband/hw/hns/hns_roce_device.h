@@ -372,7 +372,7 @@ struct hns_roce_wq {
 	int		wqe_shift;	/* WQE size */
 	u32		head;
 	u32		tail;
-	void __iomem	*db_reg_l;
+	void __iomem	*db_reg;
 };
 
 struct hns_roce_sge {
@@ -446,7 +446,7 @@ struct hns_roce_cq {
 	u32				cq_depth;
 	u32				cons_index;
 	u32				*set_ci_db;
-	void __iomem			*cq_db_l;
+	void __iomem			*db_reg;
 	u16				*tptr_addr;
 	int				arm_sn;
 	int				cqe_size;
@@ -477,7 +477,7 @@ struct hns_roce_srq {
 	int			wqe_shift;
 	u32			cqn;
 	u32			xrcdn;
-	void __iomem		*db_reg_l;
+	void __iomem		*db_reg;
 
 	atomic_t		refcount;
 	struct completion	free;
@@ -707,7 +707,7 @@ struct hns_roce_aeqe {
 
 struct hns_roce_eq {
 	struct hns_roce_dev		*hr_dev;
-	void __iomem			*doorbell;
+	void __iomem			*db_reg;
 
 	int				type_flag; /* Aeq:1 ceq:0 */
 	int				eqn;
