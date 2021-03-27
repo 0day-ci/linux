@@ -515,6 +515,15 @@ static int get_mext_match(const char *match_str, match_f flag)
 			--index;
 		else
 			++index;
+		/*
+		 * It's fine for index to become negative - think of an
+		 * initial value for match_start of 0 with a match direction
+		 * of up, eventually making it -1.
+		 *
+		 * Handle this as a special case.
+		 */
+		if ((-1 == index) && (index == match_start))
+			return -1;
 		index = (index + items_num) % items_num;
 		if (index == match_start)
 			return -1;
