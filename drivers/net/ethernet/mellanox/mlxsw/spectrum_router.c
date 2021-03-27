@@ -5059,7 +5059,7 @@ mlxsw_sp_nexthop_obj_bucket_adj_update(struct mlxsw_sp *mlxsw_sp,
 {
 	u16 bucket_index = info->nh_res_bucket->bucket_index;
 	struct netlink_ext_ack *extack = info->extack;
-	bool force = info->nh_res_bucket->force;
+	bool force;
 	char ratr_pl_new[MLXSW_REG_RATR_LEN];
 	char ratr_pl[MLXSW_REG_RATR_LEN];
 	u32 adj_index;
