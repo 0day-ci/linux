@@ -21,7 +21,7 @@
 #include <linux/acpi.h>
 #include "internal.h"
 
-#define ACPI_AML_BUF_ALIGN	(sizeof (acpi_size))
+#define ACPI_AML_BUF_ALIGN	(sizeof(acpi_size))
 #define ACPI_AML_BUF_SIZE	PAGE_SIZE
 
 #define circ_count(circ) \
@@ -613,16 +613,15 @@ again:
 		if (ret == -EAGAIN) {
 			if (file->f_flags & O_NONBLOCK)
 				break;
-			else {
-				ret = wait_event_interruptible(acpi_aml_io.wait,
-					acpi_aml_user_readable());
-				/*
-				 * We need to retry when the condition
-				 * becomes true.
-				 */
-				if (ret == 0)
-					goto again;
-			}
+
+			ret = wait_event_interruptible(acpi_aml_io.wait,
+				acpi_aml_user_readable());
+			/*
+			 * We need to retry when the condition
+			 * becomes true.
+			 */
+			if (ret == 0)
+				goto again;
 		}
 		if (ret < 0) {
 			if (!acpi_aml_running())
@@ -683,16 +682,15 @@ again:
 		if (ret == -EAGAIN) {
 			if (file->f_flags & O_NONBLOCK)
 				break;
-			else {
-				ret = wait_event_interruptible(acpi_aml_io.wait,
-					acpi_aml_user_writable());
-				/*
-				 * We need to retry when the condition
-				 * becomes true.
-				 */
-				if (ret == 0)
-					goto again;
-			}
+
+			ret = wait_event_interruptible(acpi_aml_io.wait,
+				acpi_aml_user_writable());
+			/*
+			 * We need to retry when the condition
+			 * becomes true.
+			 */
+			if (ret == 0)
+				goto again;
 		}
 		if (ret < 0) {
 			if (!acpi_aml_running())
