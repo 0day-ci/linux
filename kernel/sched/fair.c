@@ -1569,8 +1569,7 @@ numa_type numa_classify(unsigned int imbalance_pct,
 static inline bool test_idle_cores(int cpu, bool def);
 static inline int numa_idle_core(int idle_core, int cpu)
 {
-	if (!static_branch_likely(&sched_smt_present) ||
-	    idle_core >= 0 || !test_idle_cores(cpu, false))
+	if (!test_idle_cores(cpu, false))
 		return idle_core;
 
 	/*
@@ -1622,7 +1621,8 @@ static void update_numa_stats(struct task_numa_env *env,
 			if (ns->idle_cpu == -1)
 				ns->idle_cpu = cpu;
 
-			idle_core = numa_idle_core(idle_core, cpu);
+			if (idle_core >= 0)
+				idle_core = numa_idle_core(idle_core, cpu);
 		}
 	}
 	rcu_read_unlock();
