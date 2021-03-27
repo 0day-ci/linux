@@ -6,14 +6,14 @@
 #include <linux/async.h>
 #include <scsi/scsi_device.h>
 
-struct request_queue;
 struct request;
+struct request_queue;
+struct Scsi_Host;
 struct scsi_cmnd;
 struct scsi_device;
-struct scsi_target;
 struct scsi_host_template;
-struct Scsi_Host;
 struct scsi_nl_hdr;
+struct scsi_target;
 
 #define SCSI_CMD_RETRIES_NO_LIMIT -1
 
@@ -96,8 +96,6 @@ extern int scsi_mq_setup_tags(struct Scsi_Host *shost);
 extern void scsi_mq_destroy_tags(struct Scsi_Host *shost);
 extern void scsi_exit_queue(void);
 extern void scsi_evt_thread(struct work_struct *work);
-struct request_queue;
-struct request;
 
 /* scsi_proc.c */
 #ifdef CONFIG_SCSI_PROC_FS
