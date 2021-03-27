@@ -722,17 +722,23 @@ static int qrtr_port_assign(struct qrtr_sock *ipc, int *port)
 	mutex_lock(&qrtr_port_lock);
 	if (!*port) {
 		min_port = QRTR_MIN_EPH_SOCKET;
+		idr_preload(GFP_ATOMIC);
 		rc = idr_alloc_u32(&qrtr_ports, ipc, &min_port, QRTR_MAX_EPH_SOCKET, GFP_ATOMIC);
+		idr_preload_end();
 		if (!rc)
 			*port = min_port;
 	} else if (*port < QRTR_MIN_EPH_SOCKET && !capable(CAP_NET_ADMIN)) {
 		rc = -EACCES;
 	} else if (*port == QRTR_PORT_CTRL) {
 		min_port = 0;
+		idr_preload(GFP_ATOMIC);
 		rc = idr_alloc_u32(&qrtr_ports, ipc, &min_port, 0, GFP_ATOMIC);
+		idr_preload_end();
 	} else {
 		min_port = *port;
+		idr_preload(GFP_ATOMIC);
 		rc = idr_alloc_u32(&qrtr_ports, ipc, &min_port, *port, GFP_ATOMIC);
+		idr_preload_end();
 		if (!rc)
 			*port = min_port;
 	}
