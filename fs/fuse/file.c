@@ -1091,7 +1091,7 @@ bool fuse_write_update_size(struct inode *inode, loff_t pos)
 }
 
 static ssize_t fuse_send_write_pages(struct fuse_io_args *ia,
-				     struct kiocb *iocb, struct inode *inode,
+				     struct kiocb *iocb,
 				     loff_t pos, size_t count)
 {
 	struct fuse_args_pages *ap = &ia->ap;
@@ -1238,8 +1238,7 @@ static ssize_t fuse_perform_write(struct kiocb *iocb,
 		if (count <= 0) {
 			err = count;
 		} else {
-			err = fuse_send_write_pages(&ia, iocb, inode,
-						    pos, count);
+			err = fuse_send_write_pages(&ia, iocb, pos, count);
 			if (!err) {
 				size_t num_written = ia.write.out.size;
 
