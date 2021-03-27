@@ -45,7 +45,7 @@
  */
 
 static long cs3_shadow;
-static spinlock_t cs3_lock;
+static DEFINE_SPINLOCK(cs3_lock);
 static struct gpio_chip cs3_gpio;
 
 long simpad_get_cs3_ro(void)
@@ -378,8 +378,6 @@ static struct gpiod_lookup_table simpad_cf_gpio_table = {
 static int __init simpad_init(void)
 {
 	int ret;
-
-	spin_lock_init(&cs3_lock);
 
 	cs3_gpio.label = "simpad_cs3";
 	cs3_gpio.base = SIMPAD_CS3_GPIO_BASE;
