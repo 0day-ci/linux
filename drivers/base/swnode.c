@@ -13,10 +13,10 @@
 #include <linux/sysfs.h>
 
 struct swnode {
-	int id;
 	struct kobject kobj;
 	struct fwnode_handle fwnode;
 	const struct software_node *node;
+	int id;
 
 	/* properties in sysfs */
 	struct kobj_attribute *property_attrs;
