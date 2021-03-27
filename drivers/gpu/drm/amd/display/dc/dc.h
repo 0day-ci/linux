@@ -234,7 +234,6 @@ struct dc_static_screen_params {
 	unsigned int num_frames;
 };
 
-
 /* Surface update type is used by dc_update_surfaces_and_stream
  * The update type is determined at the very beginning of the function based
  * on parameters passed in and decides how much programming (or updating) is
@@ -272,7 +271,6 @@ struct dc;
 struct dc_plane_state;
 struct dc_state;
 
-
 struct dc_cap_funcs {
 	bool (*get_dcc_compression_cap)(const struct dc *dc,
 			const struct dc_dcc_surface_param *input,
@@ -280,7 +278,6 @@ struct dc_cap_funcs {
 };
 
 struct link_training_settings;
-
 
 /* Structure to hold configuration flags set by dm at dc creation. */
 struct dc_config {
@@ -581,7 +578,6 @@ struct dc_bounding_box_overrides {
 	int min_dcfclk_mhz;
 };
 
-struct dc_state;
 struct resource_pool;
 struct dce_hwseq;
 struct gpu_info_soc_bounding_box_v1_0;
@@ -757,7 +753,6 @@ enum dc_transfer_func_predefined {
 	TRANSFER_FUNCTION_GAMMA26
 };
 
-
 struct dc_transfer_func {
 	struct kref refcount;
 	enum dc_transfer_func_type type;
@@ -769,7 +764,6 @@ struct dc_transfer_func {
 		struct dc_transfer_func_distributed_points tf_pts;
 	};
 };
-
 
 union dc_3dlut_state {
 	struct {
@@ -783,7 +777,6 @@ union dc_3dlut_state {
 	} bits;
 	uint32_t raw;
 };
-
 
 struct dc_3dlut {
 	struct kref refcount;
@@ -1014,7 +1007,6 @@ enum dc_status dc_validate_global_state(
 		struct dc_state *new_ctx,
 		bool fast_validate);
 
-
 void dc_resource_state_construct(
 		const struct dc *dc,
 		struct dc_state *dst_ctx);
@@ -1167,7 +1159,6 @@ struct dc_container_id {
 	unsigned short productCode;
 };
 
-
 struct dc_sink_dsc_caps {
 	// 'true' if these are virtual DPCD's DSC caps (immediately upstream of sink in MST topology),
 	// 'false' if they are sink's DSC caps
@@ -1228,7 +1219,6 @@ struct dc_cursor {
 	struct dc_plane_address address;
 	struct dc_cursor_attributes attributes;
 };
-
 
 /*******************************************************************************
  * Interrupt interfaces
