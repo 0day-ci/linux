@@ -304,8 +304,15 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 	if (num_vfs == pdev->sriov->num_VFs)
 		goto exit;
 
+	/* is PF driver loaded */
+	if (!pdev->driver) {
+		pci_info(pdev, "No driver bound to device. Cannot configure SRIOV\n");
+		ret = -ENOENT;
+		goto exit;
+	}
+
 	/* is PF driver loaded w/callback */
-	if (!pdev->driver || !pdev->driver->sriov_configure) {
+	if (!pdev->driver->sriov_configure) {
 		pci_info(pdev, "Driver does not support SRIOV configuration via sysfs\n");
 		ret = -ENOENT;
 		goto exit;
