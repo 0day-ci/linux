@@ -470,7 +470,7 @@ static struct davinci_i2c_platform_data i2c_pdata = {
 #define TVP5147_CH1		"tvp514x-1"
 
 /* spin lock for updating above registers */
-static spinlock_t vpif_reg_lock;
+static DEFINE_SPINLOCK(vpif_reg_lock);
 
 static int set_vpif_clock(int mux_mode, int hd)
 {
@@ -746,8 +746,6 @@ static struct vpif_capture_config dm646x_vpif_capture_cfg = {
 
 static void __init evm_init_video(void)
 {
-	spin_lock_init(&vpif_reg_lock);
-
 	dm646x_setup_vpif(&dm646x_vpif_display_config,
 			  &dm646x_vpif_capture_cfg);
 }
