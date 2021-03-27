@@ -111,8 +111,6 @@ SYM_FUNC_START(startup_32)
 	leal	rva(boot_stack_end)(%ebp), %esp
 
 	call	verify_cpu
-	testl	%eax, %eax
-	jnz	.Lno_longmode
 
 /*
  * Compute the delta between where we were compiled to run at
