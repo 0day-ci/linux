@@ -10,12 +10,17 @@
 #include <linux/kernel.h>
 #include <linux/property.h>
 #include <linux/slab.h>
+#include <linux/sysfs.h>
 
 struct swnode {
 	int id;
 	struct kobject kobj;
 	struct fwnode_handle fwnode;
 	const struct software_node *node;
+
+	/* properties in sysfs */
+	struct kobj_attribute *property_attrs;
+	struct attribute_group property_group;
 
 	/* hierarchy */
 	struct ida child_ids;
@@ -25,6 +30,7 @@ struct swnode {
 
 	unsigned int allocated:1;
 	unsigned int managed:1;
+	unsigned int properties:1;
 };
 
 static DEFINE_IDA(swnode_root_ids);
@@ -299,6 +305,18 @@ static int property_entry_copy_data(struct property_entry *dst,
 	return 0;
 }
 
+static int property_entries_count(const struct property_entry *properties)
+{
+	int n = 0;
+
+	if (properties) {
+		while (properties[n].name)
+			n++;
+	}
+
+	return n;
+}
+
 /**
  * property_entries_dup - duplicate array of properties
  * @properties: array of properties to copy
@@ -310,14 +328,12 @@ struct property_entry *
 property_entries_dup(const struct property_entry *properties)
 {
 	struct property_entry *p;
-	int i, n = 0;
+	int i, n;
 	int ret;
 
-	if (!properties)
+	n = property_entries_count(properties);
+	if (n == 0)
 		return NULL;
-
-	while (properties[n].name)
-		n++;
 
 	p = kcalloc(n + 1, sizeof(*p), GFP_KERNEL);
 	if (!p)
@@ -746,6 +762,108 @@ static void software_node_free(const struct software_node *node)
 	kfree(node);
 }
 
+static ssize_t
+swnode_property_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	struct swnode *swnode = kobj_to_swnode(kobj);
+	const struct property_entry *prop;
+	const void *pointer;
+	ssize_t len = 0;
+	int i;
+
+	prop = property_entry_get(swnode->node->properties, attr->attr.name);
+	if (!prop)
+		return -EINVAL;
+
+	/* We can't fail here, because it means boolean property */
+	pointer = property_get_pointer(prop);
+	if (!pointer)
+		return sysfs_emit(buf, "\n");
+
+	switch (prop->type) {
+	case DEV_PROP_U8:
+		for (i = 0; i < prop->length / sizeof(u8); i++)
+			len += sysfs_emit_at(buf, len, "%u,", ((u8 *)pointer)[i]);
+		break;
+	case DEV_PROP_U16:
+		for (i = 0; i < prop->length / sizeof(u16); i++)
+			len += sysfs_emit_at(buf, len, "%u,", ((u16 *)pointer)[i]);
+		break;
+	case DEV_PROP_U32:
+		for (i = 0; i < prop->length / sizeof(u32); i++)
+			len += sysfs_emit_at(buf, len, "%u,", ((u32 *)pointer)[i]);
+		break;
+	case DEV_PROP_U64:
+		for (i = 0; i < prop->length / sizeof(u64); i++)
+			len += sysfs_emit_at(buf, len, "%llu,", ((u64 *)pointer)[i]);
+		break;
+	case DEV_PROP_STRING:
+		for (i = 0; i < prop->length / sizeof(const char **); i++)
+			len += sysfs_emit_at(buf, len, "\"%s\",", ((const char **)pointer)[i]);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	sysfs_emit_at(buf, len ? len - 1 : 0, "\n");
+	return len;
+}
+
+static int swnode_register_properties(struct swnode *swnode)
+{
+	const struct property_entry *props = swnode->node->properties;
+	struct attribute **group_attrs;
+	struct kobj_attribute *attrs;
+	int n;
+	int ret;
+
+	n = property_entries_count(props);
+	if (n == 0)
+		return 0;
+
+	group_attrs = kcalloc(n + 1, sizeof(*group_attrs), GFP_KERNEL);
+	if (!group_attrs)
+		return -ENOMEM;
+
+	attrs = kcalloc(n, sizeof(*attrs), GFP_KERNEL);
+	if (!attrs) {
+		kfree(group_attrs);
+		return -ENOMEM;
+	}
+
+	while (n--) {
+		sysfs_attr_init(&attrs[n]);
+		attrs[n].attr.mode = 0444;
+		attrs[n].attr.name = props[n].name;
+		attrs[n].show = swnode_property_show;
+		group_attrs[n] = &attrs[n].attr;
+	}
+
+	swnode->property_group.name = "properties";
+	swnode->property_group.attrs = group_attrs;
+
+	ret = sysfs_create_group(&swnode->kobj, &swnode->property_group);
+	if (ret) {
+		kfree(attrs);
+		kfree(group_attrs);
+		return ret;
+	}
+
+	swnode->property_attrs = attrs;
+	swnode->properties = true;
+	return 0;
+}
+
+static void swnode_unregister_properties(struct swnode *swnode)
+{
+	/*
+	 * Nodes under sysfs are removed by __kobject_del(),
+	 * we don't need to call sysfs_remove_group() explicitly.
+	 */
+	kfree(swnode->property_group.attrs);
+	kfree(swnode->property_attrs);
+}
+
 static void software_node_release(struct kobject *kobj)
 {
 	struct swnode *swnode = kobj_to_swnode(kobj);
@@ -756,6 +874,9 @@ static void software_node_release(struct kobject *kobj)
 	} else {
 		ida_simple_remove(&swnode_root_ids, swnode->id);
 	}
+
+	if (swnode->properties)
+		swnode_unregister_properties(swnode);
 
 	if (swnode->allocated)
 		software_node_free(swnode->node);
@@ -805,6 +926,12 @@ swnode_register(const struct software_node *node, struct swnode *parent,
 		ret = kobject_init_and_add(&swnode->kobj, &software_node_type,
 					   parent ? &parent->kobj : NULL,
 					   "node%d", swnode->id);
+	if (ret) {
+		kobject_put(&swnode->kobj);
+		return ERR_PTR(ret);
+	}
+
+	ret = swnode_register_properties(swnode);
 	if (ret) {
 		kobject_put(&swnode->kobj);
 		return ERR_PTR(ret);
