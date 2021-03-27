@@ -722,6 +722,9 @@ static int hpre_debugfs_init(struct hisi_qm *qm)
 	struct device *dev = &qm->pdev->dev;
 	int ret;
 
+	if (!debugfs_initialized())
+		return -ENOENT;
+
 	qm->debug.debug_root = debugfs_create_dir(dev_name(dev),
 						  hpre_debugfs_root);
 
@@ -890,7 +893,7 @@ static int hpre_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ret = hpre_debugfs_init(qm);
 	if (ret)
-		dev_warn(&pdev->dev, "init debugfs fail!\n");
+		dev_warn(&pdev->dev, "init debugfs fail (%d)!\n", ret);
 
 	ret = hisi_qm_alg_register(qm, &hpre_devices);
 	if (ret < 0) {

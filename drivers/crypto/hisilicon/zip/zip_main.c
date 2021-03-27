@@ -547,6 +547,9 @@ static int hisi_zip_debugfs_init(struct hisi_qm *qm)
 	struct dentry *dev_d;
 	int ret;
 
+	if (!debugfs_initialized())
+		return -ENOENT;
+
 	dev_d = debugfs_create_dir(dev_name(dev), hzip_debugfs_root);
 
 	qm->debug.sqe_mask_offset = HZIP_SQE_MASK_OFFSET;

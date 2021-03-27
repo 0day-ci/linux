@@ -637,6 +637,9 @@ static int sec_debugfs_init(struct hisi_qm *qm)
 	struct device *dev = &qm->pdev->dev;
 	int ret;
 
+	if (!debugfs_initialized())
+		return -ENOENT;
+
 	qm->debug.debug_root = debugfs_create_dir(dev_name(dev),
 						  sec_debugfs_root);
 	qm->debug.sqe_mask_offset = SEC_SQE_MASK_OFFSET;
@@ -865,7 +868,7 @@ static int sec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ret = sec_debugfs_init(qm);
 	if (ret)
-		pci_warn(pdev, "Failed to init debugfs!\n");
+		pci_warn(pdev, "Failed to init debugfs (%d)!\n", ret);
 
 	ret = hisi_qm_alg_register(qm, &sec_devices);
 	if (ret < 0) {

@@ -3019,6 +3019,9 @@ void hisi_qm_debug_init(struct hisi_qm *qm)
 	void *data;
 	int i;
 
+	if (!debugfs_initialized())
+		return;
+
 	qm_d = debugfs_create_dir("qm", qm->debug.debug_root);
 	qm->debug.qm_d = qm_d;
 
