@@ -1678,6 +1678,20 @@ void acpi_device_add_finalize(struct acpi_device *device)
 	kobject_uevent(&device->dev.kobj, KOBJ_ADD);
 }
 
+static void acpi_scan_dep_init(struct acpi_device *adev)
+{
+	struct acpi_dep_data *dep;
+
+	mutex_lock(&acpi_dep_list_lock);
+
+	list_for_each_entry(dep, &acpi_dep_list, node) {
+		if (dep->consumer == adev->handle)
+			adev->dep_unmet++;
+	}
+
+	mutex_unlock(&acpi_dep_list_lock);
+}
+
 static int acpi_add_single_object(struct acpi_device **child,
 				  acpi_handle handle, int type,
 				  unsigned long long sta)
@@ -1927,20 +1941,6 @@ static u32 acpi_scan_check_dep(acpi_handle handle)
 	}
 
 	return count;
-}
-
-static void acpi_scan_dep_init(struct acpi_device *adev)
-{
-	struct acpi_dep_data *dep;
-
-	mutex_lock(&acpi_dep_list_lock);
-
-	list_for_each_entry(dep, &acpi_dep_list, node) {
-		if (dep->consumer == adev->handle)
-			adev->dep_unmet++;
-	}
-
-	mutex_unlock(&acpi_dep_list_lock);
 }
 
 static bool acpi_bus_scan_second_pass;
