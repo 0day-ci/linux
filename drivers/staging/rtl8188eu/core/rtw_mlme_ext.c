@@ -3517,56 +3517,6 @@ static unsigned int OnAtim(struct adapter *padapter,
 	return _SUCCESS;
 }
 
-static unsigned int on_action_spct(struct adapter *padapter,
-				   struct recv_frame *precv_frame)
-{
-	struct sta_info *psta = NULL;
-	struct sta_priv *pstapriv = &padapter->stapriv;
-	u8 *pframe = precv_frame->pkt->data;
-	u8 *frame_body = pframe + sizeof(struct ieee80211_hdr_3addr);
-	u8 category;
-	u8 action;
-
-	DBG_88E(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(padapter->pnetdev));
-
-	psta = rtw_get_stainfo(pstapriv, GetAddr2Ptr(pframe));
-
-	if (!psta)
-		goto exit;
-
-	category = frame_body[0];
-	if (category != RTW_WLAN_CATEGORY_SPECTRUM_MGMT)
-		goto exit;
-
-	action = frame_body[1];
-	switch (action) {
-	case WLAN_ACTION_SPCT_MSR_REQ:
-	case WLAN_ACTION_SPCT_MSR_RPRT:
-	case WLAN_ACTION_SPCT_TPC_REQ:
-	case WLAN_ACTION_SPCT_TPC_RPRT:
-		break;
-	case WLAN_ACTION_SPCT_CHL_SWITCH:
-		break;
-	default:
-		break;
-	}
-
-exit:
-	return _FAIL;
-}
-
-static unsigned int OnAction_qos(struct adapter *padapter,
-				 struct recv_frame *precv_frame)
-{
-	return _SUCCESS;
-}
-
-static unsigned int OnAction_dls(struct adapter *padapter,
-				 struct recv_frame *precv_frame)
-{
-	return _SUCCESS;
-}
-
 static unsigned int OnAction_back(struct adapter *padapter,
 				  struct recv_frame *precv_frame)
 {
@@ -3756,24 +3706,6 @@ exit:
 	return ret;
 }
 
-static unsigned int OnAction_ht(struct adapter *padapter,
-				struct recv_frame *precv_frame)
-{
-	return _SUCCESS;
-}
-
-static unsigned int OnAction_wmm(struct adapter *padapter,
-				 struct recv_frame *precv_frame)
-{
-	return _SUCCESS;
-}
-
-static unsigned int OnAction_p2p(struct adapter *padapter,
-				 struct recv_frame *precv_frame)
-{
-	return _SUCCESS;
-}
-
 static unsigned int DoReserved(struct adapter *padapter,
 			       struct recv_frame *precv_frame)
 {
@@ -3792,38 +3724,11 @@ static unsigned int OnAction(struct adapter *padapter,
 	category = frame_body[0];
 
 	switch (category) {
-	case RTW_WLAN_CATEGORY_SPECTRUM_MGMT:
-		on_action_spct(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_QOS:
-		OnAction_qos(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_DLS:
-		OnAction_dls(padapter, precv_frame);
-		break;
 	case RTW_WLAN_CATEGORY_BACK:
 		OnAction_back(padapter, precv_frame);
 		break;
 	case RTW_WLAN_CATEGORY_PUBLIC:
 		on_action_public(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_RADIO_MEASUREMENT:
-		DoReserved(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_FT:
-		DoReserved(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_HT:
-		OnAction_ht(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_SA_QUERY:
-		DoReserved(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_WMM:
-		OnAction_wmm(padapter, precv_frame);
-		break;
-	case RTW_WLAN_CATEGORY_P2P:
-		OnAction_p2p(padapter, precv_frame);
 		break;
 	default:
 		break;
