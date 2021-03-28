@@ -124,11 +124,10 @@ static int da280_probe(struct i2c_client *client,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = da280_channels;
 
-	if (ACPI_HANDLE(&client->dev)) {
+	if (ACPI_HANDLE(&client->dev))
 		chip = da280_match_acpi_device(&client->dev);
-	} else {
+	else
 		chip = id->driver_data;
-	}
 
 	if (chip == da226) {
 		indio_dev->name = "da226";
