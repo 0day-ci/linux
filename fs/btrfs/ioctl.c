@@ -3027,7 +3027,7 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 				err = PTR_ERR(subvol_name_ptr);
 				goto free_parent;
 			}
-			/* subvol_name_ptr is already NULL termined */
+			/* subvol_name_ptr is already NULL terminated */
 			subvol_name = (char *)kbasename(subvol_name_ptr);
 		}
 	} else {
