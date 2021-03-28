@@ -3074,6 +3074,9 @@ int tcf_exts_validate(struct net *net, struct tcf_proto *tp, struct nlattr **tb,
 			exts->nr_actions = err;
 		}
 	}
+
+	if (ovr)
+		tcf_action_put_many(exts->actions);
 #else
 	if ((exts->action && tb[exts->action]) ||
 	    (exts->police && tb[exts->police])) {

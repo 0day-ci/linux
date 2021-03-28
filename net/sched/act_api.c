@@ -778,7 +778,7 @@ static int tcf_action_put(struct tc_action *p)
 }
 
 /* Put all actions in this array, skip those NULL's. */
-static void tcf_action_put_many(struct tc_action *actions[])
+void tcf_action_put_many(struct tc_action *actions[])
 {
 	int i;
 
@@ -1041,6 +1041,9 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 	 */
 	if (err != ACT_P_CREATED)
 		module_put(a_o->owner);
+
+	if (err == ACT_P_CREATED && ovr)
+		refcount_set(&a->tcfa_refcnt, 2);
 
 	return a;
 
