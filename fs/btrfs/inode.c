@@ -2778,8 +2778,8 @@ static int insert_reserved_file_extent(struct btrfs_trans_handle *trans,
 	/*
 	 * If we dropped an inline extent here, we know the range where it is
 	 * was not marked with the EXTENT_DELALLOC_NEW bit, so we update the
-	 * number of bytes only for that range contaning the inline extent.
-	 * The remaining of the range will be processed when clearning the
+	 * number of bytes only for that range containing the inline extent.
+	 * The remaining of the range will be processed when clearing the
 	 * EXTENT_DELALLOC_BIT bit through the ordered extent completion.
 	 */
 	if (file_pos == 0 && !IS_ALIGNED(drop_args.bytes_found, sectorsize)) {
