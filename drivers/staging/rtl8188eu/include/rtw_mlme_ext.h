@@ -227,12 +227,6 @@ struct mlme_handler {
 	unsigned int (*func)(struct adapter *adapt, struct recv_frame *frame);
 };
 
-struct action_handler {
-	unsigned int num;
-	const char *str;
-	unsigned int (*func)(struct adapter *adapt, struct recv_frame *frame);
-};
-
 struct ss_res {
 	int state;
 	int bss_cnt;

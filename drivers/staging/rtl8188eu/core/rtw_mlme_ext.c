@@ -3780,26 +3780,10 @@ static unsigned int DoReserved(struct adapter *padapter,
 	return _SUCCESS;
 }
 
-static struct action_handler OnAction_tbl[] = {
-	{RTW_WLAN_CATEGORY_SPECTRUM_MGMT,	 "ACTION_SPECTRUM_MGMT", on_action_spct},
-	{RTW_WLAN_CATEGORY_QOS, "ACTION_QOS", &OnAction_qos},
-	{RTW_WLAN_CATEGORY_DLS, "ACTION_DLS", &OnAction_dls},
-	{RTW_WLAN_CATEGORY_BACK, "ACTION_BACK", &OnAction_back},
-	{RTW_WLAN_CATEGORY_PUBLIC, "ACTION_PUBLIC", on_action_public},
-	{RTW_WLAN_CATEGORY_RADIO_MEASUREMENT, "ACTION_RADIO_MEASUREMENT", &DoReserved},
-	{RTW_WLAN_CATEGORY_FT, "ACTION_FT",	&DoReserved},
-	{RTW_WLAN_CATEGORY_HT,	"ACTION_HT",	&OnAction_ht},
-	{RTW_WLAN_CATEGORY_SA_QUERY, "ACTION_SA_QUERY", &DoReserved},
-	{RTW_WLAN_CATEGORY_WMM, "ACTION_WMM", &OnAction_wmm},
-	{RTW_WLAN_CATEGORY_P2P, "ACTION_P2P", &OnAction_p2p},
-};
-
 static unsigned int OnAction(struct adapter *padapter,
 			     struct recv_frame *precv_frame)
 {
-	int i;
 	unsigned char category;
-	struct action_handler *ptable;
 	unsigned char *frame_body;
 	u8 *pframe = precv_frame->pkt->data;
 
@@ -3807,11 +3791,44 @@ static unsigned int OnAction(struct adapter *padapter,
 
 	category = frame_body[0];
 
-	for (i = 0; i < ARRAY_SIZE(OnAction_tbl); i++) {
-		ptable = &OnAction_tbl[i];
-		if (category == ptable->num)
-			ptable->func(padapter, precv_frame);
+	switch (category) {
+	case RTW_WLAN_CATEGORY_SPECTRUM_MGMT:
+		on_action_spct(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_QOS:
+		OnAction_qos(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_DLS:
+		OnAction_dls(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_BACK:
+		OnAction_back(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_PUBLIC:
+		on_action_public(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_RADIO_MEASUREMENT:
+		DoReserved(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_FT:
+		DoReserved(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_HT:
+		OnAction_ht(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_SA_QUERY:
+		DoReserved(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_WMM:
+		OnAction_wmm(padapter, precv_frame);
+		break;
+	case RTW_WLAN_CATEGORY_P2P:
+		OnAction_p2p(padapter, precv_frame);
+		break;
+	default:
+		break;
 	}
+
 	return _SUCCESS;
 }
 
