@@ -21,6 +21,8 @@
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_ring.h"
 
+#include "pxp/intel_pxp.h"
+
 #include "i915_drv.h"
 #include "i915_gem_clflush.h"
 #include "i915_gem_context.h"
@@ -745,6 +747,11 @@ static int eb_select_context(struct i915_execbuffer *eb)
 	ctx = i915_gem_context_lookup(eb->file->driver_priv, eb->args->rsvd1);
 	if (unlikely(!ctx))
 		return -ENOENT;
+
+	if (i915_gem_context_invalidated(ctx)) {
+		i915_gem_context_put(ctx);
+		return -EACCES;
+	}
 
 	eb->gem_context = ctx;
 	if (rcu_access_pointer(ctx->vm))
@@ -2939,6 +2946,17 @@ eb_select_engine(struct i915_execbuffer *eb)
 		return PTR_ERR(ce);
 
 	intel_gt_pm_get(ce->engine->gt);
+
+	if (i915_gem_context_uses_protected_content(eb->gem_context)) {
+		err = intel_pxp_wait_for_arb_start(&ce->engine->gt->pxp);
+		if (err)
+			goto err;
+
+		if (i915_gem_context_invalidated(eb->gem_context)) {
+			err = -EACCES;
+			goto err;
+		}
+	}
 
 	if (!test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
 		err = intel_context_alloc_state(ce);

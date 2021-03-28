@@ -7,6 +7,7 @@
 #include "intel_pxp_irq.h"
 #include "intel_pxp_session.h"
 #include "intel_pxp_tee.h"
+#include "gem/i915_gem_context.h"
 #include "gt/intel_context.h"
 #include "i915_drv.h"
 
@@ -171,3 +172,50 @@ void intel_pxp_fini_hw(struct intel_pxp *pxp)
 
 	intel_pxp_irq_disable(pxp);
 }
+
+void intel_pxp_invalidate(struct intel_pxp *pxp)
+{
+	struct drm_i915_private *i915 = pxp_to_gt(pxp)->i915;
+	struct i915_gem_context *ctx, *cn;
+
+	/* ban all contexts marked as protected */
+	spin_lock_irq(&i915->gem.contexts.lock);
+	list_for_each_entry_safe(ctx, cn, &i915->gem.contexts.list, link) {
+		struct i915_gem_engines_iter it;
+		struct intel_context *ce;
+
+		if (!kref_get_unless_zero(&ctx->ref))
+			continue;
+
+		if (likely(!i915_gem_context_uses_protected_content(ctx)) ||
+		    i915_gem_context_invalidated(ctx)) {
+			i915_gem_context_put(ctx);
+			continue;
+		}
+
+		spin_unlock_irq(&i915->gem.contexts.lock);
+
+		/*
+		 * Note that by the time we get here the HW keys are already
+		 * long gone, so any batch using them that's already on the
+		 * engines is very likely a lost cause (and it has probably
+		 * already hung the engine). Therefore, we skip attempting to
+		 * pull the running context out of the HW and we prioritize
+		 * bringing the session back as soon as possible.
+		 */
+		for_each_gem_engine(ce, i915_gem_context_lock_engines(ctx), it) {
+			/* only invalidate if at least one ce was allocated */
+			if (test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
+				intel_context_set_banned(ce);
+				i915_gem_context_set_invalid(ctx);
+			}
+		}
+		i915_gem_context_unlock_engines(ctx);
+
+		spin_lock_irq(&i915->gem.contexts.lock);
+		list_safe_reset_next(ctx, cn, link);
+		i915_gem_context_put(ctx);
+	}
+	spin_unlock_irq(&i915->gem.contexts.lock);
+}
+

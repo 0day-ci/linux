@@ -76,6 +76,8 @@
 #include "gt/intel_gpu_commands.h"
 #include "gt/intel_ring.h"
 
+#include "pxp/intel_pxp.h"
+
 #include "i915_gem_context.h"
 #include "i915_globals.h"
 #include "i915_trace.h"
@@ -1972,6 +1974,40 @@ static int set_priority(struct i915_gem_context *ctx,
 	return 0;
 }
 
+static int set_protected(struct i915_gem_context *ctx,
+			 const struct drm_i915_gem_context_param *args)
+{
+	int ret = 0;
+
+	if (!intel_pxp_is_enabled(&ctx->i915->gt.pxp))
+		ret = -ENODEV;
+	else if (ctx->file_priv) /* can't change this after creation! */
+		ret = -EEXIST;
+	else if (args->size)
+		ret = -EINVAL;
+	else if (!args->value)
+		clear_bit(UCONTEXT_PROTECTED, &ctx->user_flags);
+	else if (i915_gem_context_is_recoverable(ctx) ||
+		 !i915_gem_context_is_bannable(ctx))
+		ret = -EPERM;
+	else
+		set_bit(UCONTEXT_PROTECTED, &ctx->user_flags);
+
+	return ret;
+}
+
+static int get_protected(struct i915_gem_context *ctx,
+			 struct drm_i915_gem_context_param *args)
+{
+	if (!intel_pxp_is_enabled(&ctx->i915->gt.pxp))
+		return -ENODEV;
+
+	args->size = 0;
+	args->value = i915_gem_context_uses_protected_content(ctx);
+
+	return 0;
+}
+
 static int ctx_setparam(struct drm_i915_file_private *fpriv,
 			struct i915_gem_context *ctx,
 			struct drm_i915_gem_context_param *args)
@@ -2004,6 +2040,8 @@ static int ctx_setparam(struct drm_i915_file_private *fpriv,
 			ret = -EPERM;
 		else if (args->value)
 			i915_gem_context_set_bannable(ctx);
+		else if (i915_gem_context_uses_protected_content(ctx))
+			ret = -EPERM; /* can't clear this for protected contexts */
 		else
 			i915_gem_context_clear_bannable(ctx);
 		break;
@@ -2011,10 +2049,12 @@ static int ctx_setparam(struct drm_i915_file_private *fpriv,
 	case I915_CONTEXT_PARAM_RECOVERABLE:
 		if (args->size)
 			ret = -EINVAL;
-		else if (args->value)
-			i915_gem_context_set_recoverable(ctx);
-		else
+		else if (!args->value)
 			i915_gem_context_clear_recoverable(ctx);
+		else if (i915_gem_context_uses_protected_content(ctx))
+			ret = -EPERM; /* can't set this for protected contexts */
+		else
+			i915_gem_context_set_recoverable(ctx);
 		break;
 
 	case I915_CONTEXT_PARAM_PRIORITY:
@@ -2039,6 +2079,10 @@ static int ctx_setparam(struct drm_i915_file_private *fpriv,
 
 	case I915_CONTEXT_PARAM_RINGSIZE:
 		ret = set_ringsize(ctx, args);
+		break;
+
+	case I915_CONTEXT_PARAM_PROTECTED_CONTENT:
+		ret = set_protected(ctx, args);
 		break;
 
 	case I915_CONTEXT_PARAM_BAN_PERIOD:
@@ -2494,6 +2538,10 @@ int i915_gem_context_getparam_ioctl(struct drm_device *dev, void *data,
 		ret = get_ringsize(ctx, args);
 		break;
 
+	case I915_CONTEXT_PARAM_PROTECTED_CONTENT:
+		ret = get_protected(ctx, args);
+		break;
+
 	case I915_CONTEXT_PARAM_BAN_PERIOD:
 	default:
 		ret = -EINVAL;
@@ -2553,6 +2601,11 @@ int i915_gem_context_reset_stats_ioctl(struct drm_device *dev,
 
 	args->batch_active = atomic_read(&ctx->guilty_count);
 	args->batch_pending = atomic_read(&ctx->active_count);
+
+	/* re-use args->flags for output flags */
+	args->flags = 0;
+	if (i915_gem_context_invalidated(ctx))
+		args->flags |= I915_CONTEXT_INVALIDATED;
 
 	ret = 0;
 out:
