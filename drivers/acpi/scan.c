@@ -1694,7 +1694,8 @@ static void acpi_scan_dep_init(struct acpi_device *adev)
 
 static int acpi_add_single_object(struct acpi_device **child,
 				  acpi_handle handle, int type,
-				  unsigned long long sta)
+				  unsigned long long sta,
+				  bool init_dep)
 {
 	struct acpi_device_info *info = NULL;
 	struct acpi_device *device;
@@ -1716,9 +1717,13 @@ static int acpi_add_single_object(struct acpi_device **child,
 	 * that we can call acpi_bus_get_status() and use its quirk handling.
 	 * Note this must be done before the get power-/wakeup_dev-flags calls.
 	 */
-	if (type == ACPI_BUS_TYPE_DEVICE)
+	if (type == ACPI_BUS_TYPE_DEVICE) {
+		if (init_dep)
+			acpi_scan_dep_init(device);
+
 		if (acpi_bus_get_status(device) < 0)
 			acpi_set_device_status(device, 0);
+	}
 
 	acpi_bus_get_power_flags(device);
 	acpi_bus_get_wakeup_device_flags(device);
@@ -1975,13 +1980,11 @@ static acpi_status acpi_bus_check_add(acpi_handle handle, bool check_dep,
 		}
 	}
 
-	acpi_add_single_object(&device, handle, type, sta);
+	acpi_add_single_object(&device, handle, type, sta, !check_dep);
 	if (!device)
 		return AE_CTRL_DEPTH;
 
 	acpi_scan_init_hotplug(device);
-	if (!check_dep)
-		acpi_scan_dep_init(device);
 
 out:
 	if (!*adev_p)
@@ -2244,7 +2247,7 @@ int acpi_bus_register_early_device(int type)
 	int result;
 
 	result = acpi_add_single_object(&device, NULL,
-					type, ACPI_STA_DEFAULT);
+					type, ACPI_STA_DEFAULT, false);
 	if (result)
 		return result;
 
@@ -2265,7 +2268,7 @@ static int acpi_bus_scan_fixed(void)
 
 		result = acpi_add_single_object(&device, NULL,
 						ACPI_BUS_TYPE_POWER_BUTTON,
-						ACPI_STA_DEFAULT);
+						ACPI_STA_DEFAULT, false);
 		if (result)
 			return result;
 
@@ -2282,7 +2285,7 @@ static int acpi_bus_scan_fixed(void)
 
 		result = acpi_add_single_object(&device, NULL,
 						ACPI_BUS_TYPE_SLEEP_BUTTON,
-						ACPI_STA_DEFAULT);
+						ACPI_STA_DEFAULT, false);
 		if (result)
 			return result;
 
