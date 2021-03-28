@@ -45,4 +45,5 @@ obj-$(CONFIG_KPC2000)		+= kpc2000/
 obj-$(CONFIG_QLGE)		+= qlge/
 obj-$(CONFIG_WIMAX)		+= wimax/
 obj-$(CONFIG_WFX)		+= wfx/
+obj-$(CONFIG_QRTR)		+= qrtr/
 obj-y				+= hikey9xx/

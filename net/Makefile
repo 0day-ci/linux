@@ -74,7 +74,6 @@ obj-$(CONFIG_NET_NSH)		+= nsh/
 obj-$(CONFIG_HSR)		+= hsr/
 obj-$(CONFIG_NET_SWITCHDEV)	+= switchdev/
 obj-$(CONFIG_NET_L3_MASTER_DEV)	+= l3mdev/
-obj-$(CONFIG_QRTR)		+= qrtr/
 obj-$(CONFIG_NET_NCSI)		+= ncsi/
 obj-$(CONFIG_XDP_SOCKETS)	+= xdp/
 obj-$(CONFIG_MPTCP)		+= mptcp/
