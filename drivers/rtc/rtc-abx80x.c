@@ -51,6 +51,9 @@
 #define ABX8XX_IRQ_AIE		BIT(2)
 #define ABX8XX_IRQ_IM_1_4	(0x3 << 5)
 
+#define ABX8XX_REG_SQW		0x13
+#define ABX8XX_SQW_MODE_BITS	5
+
 #define ABX8XX_REG_CD_TIMER_CTL	0x18
 
 #define ABX8XX_REG_OSC		0x1c
@@ -116,6 +119,15 @@ struct abx80x_priv {
 	struct i2c_client *client;
 	struct watchdog_device wdog;
 };
+
+union abx8xx_reg_sqw {
+	struct {
+		unsigned int sqws:5;
+		int:2;
+		unsigned int sqwe:2;
+	};
+	int val;
+} __packed;
 
 static int abx80x_write_config_key(struct i2c_client *client, u8 key)
 {
@@ -486,9 +498,119 @@ static ssize_t oscillator_show(struct device *dev,
 
 static DEVICE_ATTR_RW(oscillator);
 
+#define SQFS_COUNT (1 << ABX8XX_SQW_MODE_BITS)
+/* The index of the array is the value to be written to the 'Square Wave Function
+ * Select' register to make the RTC generate the required square wave.
+ */
+static const char *const sqfs[SQFS_COUNT] = {
+	"1_century", "32768_Hz", "8192_Hz", "4096_Hz",
+	"2048_Hz", "1024_Hz", "512_Hz", "256_Hz",
+	"128_Hz", "64_Hz", "32_Hz", "16_Hz",
+	"8_Hz", "4_Hz", "2_Hz", "1_Hz",
+	"1/2_Hz", "1/4_Hz", "1/8_Hz", "1/16_Hz",
+	"1/32_Hz", "1_min", "16384_Hz", "100_Hz",
+	"1_hour", "1_day", "TIRQ", "nTIRQ",
+	"1_year", "1_Hz_to_Counters", "1/32_Hz_from_Acal", "1/8_Hz_from_Acal",
+};
+
+static const bool valid_for_rc_mode[SQFS_COUNT] = {
+	true, false, false, false,
+	false, false, false, false,
+	true, true, true, true,
+	true, true, true, true,
+	true, true, true, true,
+	true, true, false, false,
+	true, true, true, true,
+	true, true, true, true,
+};
+
+static int sqw_set(struct i2c_client *client, const char *buf)
+{
+	union abx8xx_reg_sqw reg_sqw;
+	int retval;
+
+	reg_sqw.val = i2c_smbus_read_byte_data(client, ABX8XX_REG_SQW);
+	if (reg_sqw.val < 0)
+		goto err;
+
+	if (sysfs_streq(buf, "none")) {
+		reg_sqw.sqwe = 0;
+		dev_info(&client->dev, "sqw output disabled\n");
+	} else {
+		int idx = __sysfs_match_string(sqfs, SQFS_COUNT, buf);
+
+		if (idx < 0)
+			return idx;
+
+		if (abx80x_is_rc_mode(client) && !valid_for_rc_mode[idx])
+			dev_warn(&client->dev, "sqw frequency %s valid only in xt mode\n",
+				sqfs[idx]);
+
+		dev_info(&client->dev, "sqw output enabled @ %s\n", sqfs[idx]);
+		reg_sqw.sqwe = 1;
+		reg_sqw.sqws = idx;
+	}
+
+	retval = i2c_smbus_write_byte_data(client, ABX8XX_REG_SQW, reg_sqw.val);
+	if (retval < 0)
+		goto err;
+
+	return 0;
+err:
+	dev_err(&client->dev, "Failed to set SQW\n");
+	return retval;
+
+}
+
+static ssize_t sqw_store(struct device *dev,
+			 struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	int retval;
+
+	retval = sqw_set(to_i2c_client(dev->parent), buf);
+	if (retval)
+		return retval;
+	else
+		return count;
+}
+
+static ssize_t sqw_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev->parent);
+	union abx8xx_reg_sqw reg_sqw;
+	int len = 0;
+	int i;
+
+	reg_sqw.val = i2c_smbus_read_byte_data(client, ABX8XX_REG_SQW);
+	if (reg_sqw.val < 0) {
+		dev_err(dev, "Failed to read SQW\n");
+		sprintf(buf, "\n");
+		return reg_sqw.val;
+	}
+
+	if (reg_sqw.sqwe)
+		len += scnprintf(buf+len, PAGE_SIZE - len, "none ");
+	else
+		len += scnprintf(buf+len, PAGE_SIZE - len, "[none] ");
+
+	for (i = 0; i < SQFS_COUNT; ++i) {
+		if (reg_sqw.sqwe && i == reg_sqw.sqws)
+			len += scnprintf(buf+len, PAGE_SIZE - len, "[%s] ", sqfs[i]);
+		else
+			len += scnprintf(buf+len, PAGE_SIZE - len, "%s ", sqfs[i]);
+	}
+
+	return len;
+}
+
+static DEVICE_ATTR_RW(sqw);
+
 static struct attribute *rtc_calib_attrs[] = {
 	&dev_attr_autocalibration.attr,
 	&dev_attr_oscillator.attr,
+	&dev_attr_sqw.attr,
 	NULL,
 };
 
@@ -686,6 +808,7 @@ static int abx80x_probe(struct i2c_client *client,
 	unsigned int lot;
 	unsigned int wafer;
 	unsigned int uid;
+	const char *sqw_mode_name;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
@@ -799,6 +922,9 @@ static int abx80x_probe(struct i2c_client *client,
 			 trickle_cfg);
 		abx80x_enable_trickle_charger(client, trickle_cfg);
 	}
+
+	if (!of_property_read_string(np, "sqw", &sqw_mode_name))
+		sqw_set(client, sqw_mode_name);
 
 	err = i2c_smbus_write_byte_data(client, ABX8XX_REG_CD_TIMER_CTL,
 					BIT(2));
