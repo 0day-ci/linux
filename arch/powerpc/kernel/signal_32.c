@@ -809,6 +809,7 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 		unsafe_put_user(PPC_INST_ADDI + __NR_rt_sigreturn, &mctx->mc_pad[0],
 				failed);
 		unsafe_put_user(PPC_INST_SC, &mctx->mc_pad[1], failed);
+		asm("dcbst %y0; sync; icbi %y0; sync" :: "Z" (mctx->mc_pad[0]));
 	}
 	unsafe_put_sigset_t(&frame->uc.uc_sigmask, oldset, failed);
 
@@ -816,9 +817,6 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 
 	if (copy_siginfo_to_user(&frame->info, &ksig->info))
 		goto badframe;
-
-	if (tramp == (unsigned long)mctx->mc_pad)
-		flush_icache_range(tramp, tramp + 2 * sizeof(unsigned long));
 
 	regs->link = tramp;
 
@@ -908,11 +906,9 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset,
 		/* Set up the sigreturn trampoline: li r0,sigret; sc */
 		unsafe_put_user(PPC_INST_ADDI + __NR_sigreturn, &mctx->mc_pad[0], failed);
 		unsafe_put_user(PPC_INST_SC, &mctx->mc_pad[1], failed);
+		asm("dcbst %y0; sync; icbi %y0; sync" :: "Z" (mctx->mc_pad[0]));
 	}
 	user_write_access_end();
-
-	if (tramp == (unsigned long)mctx->mc_pad)
-		flush_icache_range(tramp, tramp + 2 * sizeof(unsigned long));
 
 	regs->link = tramp;
 
