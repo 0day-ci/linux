@@ -41,3 +41,16 @@ property to enable the output:
 	"1_min", "16384_Hz", "100_Hz", "1_hour", "1_day", "TIRQ", "nTIRQ",
 	"1_year", "1_Hz_to_Counters", "1/32_Hz_from_Acal", "1/8_Hz_from_Acal",
 	"none"
+
+The RTCs support XT calibration that allows to improve the RTC accuracy.
+To perform the calibration follow the instruction:
+
+	Write the nominal XT frequency (in milliHerz) 32768000 to
+		/sys/class/rtc/your_rtc/xt-frequency
+		to ensure the calibration is not occurring.
+	Select the XT oscillator by writing by writing xtal to
+		/sys/class/rtc/your_rtc/oscillator
+	Configure the square wave SQW output by writing
+		32768_Hz to /sys/class/rtc/your_rtc/sqw
+	Measure the square wave frequency on the output pin in milliHerz.
+	Assign the measured value to the property xt-frequency.
