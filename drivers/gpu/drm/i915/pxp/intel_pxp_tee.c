@@ -89,21 +89,21 @@ static int i915_pxp_tee_component_bind(struct device *i915_kdev,
 {
 	struct drm_i915_private *i915 = kdev_to_i915(i915_kdev);
 	struct intel_pxp *pxp = i915_dev_to_pxp(i915_kdev);
+	int ret;
 
 	pxp->pxp_component = data;
 	pxp->pxp_component->tee_dev = tee_kdev;
 
 	/* the component is required to fully start the PXP HW */
 	intel_pxp_init_hw(pxp);
-
-	if (!pxp->arb_is_valid) {
+	ret = intel_pxp_wait_for_arb_start(pxp);
+	if (ret) {
 		drm_err(&i915->drm, "Failed to create arb session during bind\n");
 		intel_pxp_fini_hw(pxp);
 		pxp->pxp_component = NULL;
-		return -EIO;
 	}
 
-	return 0;
+	return ret;
 }
 
 static void i915_pxp_tee_component_unbind(struct device *i915_kdev,
