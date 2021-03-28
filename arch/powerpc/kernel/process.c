@@ -1451,6 +1451,10 @@ static void print_msr_bits(unsigned long val)
 #define LAST_VOLATILE	12
 #endif
 
+#define TRAP_MC  0x200 /* Machine Check */
+#define TRAP_DSI 0x300 /* DSI exception */
+#define TRAP_AM  0x600 /* Alignment exception */
+
 static void __show_regs(struct pt_regs *regs)
 {
 	int i, trap;
@@ -1465,7 +1469,7 @@ static void __show_regs(struct pt_regs *regs)
 	trap = TRAP(regs);
 	if (!trap_is_syscall(regs) && cpu_has_feature(CPU_FTR_CFAR))
 		pr_cont("CFAR: "REG" ", regs->orig_gpr3);
-	if (trap == 0x200 || trap == 0x300 || trap == 0x600) {
+	if (trap == TRAP_MC || trap == TRAP_DSI || trap == TRAP_AM) {
 		if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
 			pr_cont("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
 		else
