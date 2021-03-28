@@ -381,6 +381,9 @@ static int ext4_ioctl_setflags(struct inode *inode,
 			err = -ENOTEMPTY;
 			goto flags_out;
 		}
+
+		if (!(oldflags & EXT4_CASEFOLD_FL) && (flags & EXT4_CASEFOLD_FL))
+			d_clear_dir_neg_dentries(inode);
 	}
 
 	/*
