@@ -7,8 +7,10 @@
 #define __INTEL_PXP_TYPES_H__
 
 #include <linux/completion.h>
+#include <linux/list.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
 struct intel_context;
@@ -33,6 +35,9 @@ struct intel_pxp {
 	u32 session_events; /* protected with gt->irq_lock */
 #define PXP_TERMINATION_REQUEST  BIT(0)
 #define PXP_TERMINATION_COMPLETE BIT(1)
+
+	spinlock_t lock; /* protects the objects list */
+	struct list_head protected_objects;
 };
 
 #endif /* __INTEL_PXP_TYPES_H__ */

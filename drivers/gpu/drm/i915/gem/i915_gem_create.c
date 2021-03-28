@@ -5,6 +5,7 @@
 
 #include "gem/i915_gem_ioctls.h"
 #include "gem/i915_gem_region.h"
+#include "pxp/intel_pxp.h"
 
 #include "i915_drv.h"
 #include "i915_user_extensions.h"
@@ -13,7 +14,8 @@ static int
 i915_gem_create(struct drm_file *file,
 		struct intel_memory_region *mr,
 		u64 *size_p,
-		u32 *handle_p)
+		u32 *handle_p,
+		u64 user_flags)
 {
 	struct drm_i915_gem_object *obj;
 	u32 handle;
@@ -35,11 +37,16 @@ i915_gem_create(struct drm_file *file,
 
 	GEM_BUG_ON(size != obj->base.size);
 
+	obj->user_flags = user_flags;
+
 	ret = drm_gem_handle_create(file, &obj->base, &handle);
 	/* drop reference from allocate - handle holds it now */
 	i915_gem_object_put(obj);
 	if (ret)
 		return ret;
+
+	if (user_flags & I915_GEM_OBJECT_PROTECTED)
+		intel_pxp_object_add(obj);
 
 	*handle_p = handle;
 	*size_p = size;
@@ -89,11 +96,12 @@ i915_gem_dumb_create(struct drm_file *file,
 	return i915_gem_create(file,
 			       intel_memory_region_by_type(to_i915(dev),
 							   mem_type),
-			       &args->size, &args->handle);
+			       &args->size, &args->handle, 0);
 }
 
 struct create_ext {
 	struct drm_i915_private *i915;
+	unsigned long user_flags;
 };
 
 static int __create_setparam(struct drm_i915_gem_object_param *args,
@@ -102,6 +110,19 @@ static int __create_setparam(struct drm_i915_gem_object_param *args,
 	if (!(args->param & I915_OBJECT_PARAM)) {
 		DRM_DEBUG("Missing I915_OBJECT_PARAM namespace\n");
 		return -EINVAL;
+	}
+
+	switch (lower_32_bits(args->param)) {
+	case I915_OBJECT_PARAM_PROTECTED_CONTENT:
+		if (!intel_pxp_is_enabled(&ext_data->i915->gt.pxp))
+			return -ENODEV;
+		if (args->size) {
+			return -EINVAL;
+		} else if (args->data) {
+			ext_data->user_flags |= I915_GEM_OBJECT_PROTECTED;
+			return 0;
+		}
+	break;
 	}
 
 	return -EINVAL;
@@ -148,5 +169,5 @@ i915_gem_create_ioctl(struct drm_device *dev, void *data,
 	return i915_gem_create(file,
 			       intel_memory_region_by_type(i915,
 							   INTEL_MEMORY_SYSTEM),
-			       &args->size, &args->handle);
+			       &args->size, &args->handle, ext_data.user_flags);
 }

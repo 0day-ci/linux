@@ -1756,6 +1756,26 @@ struct drm_i915_gem_object_param {
  */
 #define I915_OBJECT_PARAM  (1ull << 32)
 
+/*
+ * I915_OBJECT_PARAM_PROTECTED_CONTENT:
+ *
+ * If set to true, buffer contents is expected to be protected by PXP
+ * encryption and requires decryption for scan out and processing. This is
+ * only possible on platforms that have PXP enabled, on all other scenarios
+ * setting this flag will cause the ioctl to fail and return -ENODEV.
+ *
+ * The buffer contents are considered invalid after a PXP session teardown.
+ * It is recommended to use protected buffers only with contexts created
+ * using the I915_CONTEXT_PARAM_PROTECTED_CONTENT flag, as that will enable
+ * extra checks at submission time on the validity of the objects involved,
+ * which can lead to the following errors:
+ *
+ * -ENODEV: PXP session not currently active
+ * -EIO: buffer has become invalid after a teardown event
+ */
+#define I915_OBJECT_PARAM_PROTECTED_CONTENT  0x0
+/* Must be kept compact -- no holes and well documented */
+
 	__u64 param;
 
 	/* Data value or pointer */
