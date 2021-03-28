@@ -2377,6 +2377,9 @@ struct drm_i915_query_perf_config {
 	__u8 data[];
 };
 
+/* ID of the protected content session managed by i915 when PXP is active */
+#define I915_PROTECTED_CONTENT_DEFAULT_SESSION 0xf
+
 #if defined(__cplusplus)
 }
 #endif
