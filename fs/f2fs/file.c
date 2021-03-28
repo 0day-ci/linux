@@ -1826,6 +1826,10 @@ static int f2fs_setflags_common(struct inode *inode, u32 iflags, u32 mask)
 			return -EOPNOTSUPP;
 		if (!f2fs_empty_dir(inode))
 			return -ENOTEMPTY;
+
+		if (!(masked_flags & F2FS_CASEFOLD_FL) &&
+		    (iflags & F2FS_CASEFOLD_FL))
+			d_clear_dir_neg_dentries(inode);
 	}
 
 	if (iflags & (F2FS_COMPR_FL | F2FS_NOCOMP_FL)) {
