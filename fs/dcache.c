@@ -1724,6 +1724,33 @@ void d_invalidate(struct dentry *dentry)
 EXPORT_SYMBOL(d_invalidate);
 
 /**
+ * d_clear_dir_neg_dentries - Remove negative dentries in an inode
+ * @dir: Directory to clear negative dentries
+ *
+ * For directories with negative dentries that are becoming case-insensitive
+ * dirs, we need to remove all those negative dentries, otherwise they will
+ * become dangling dentries. During the creation of a new file, if a d_hash
+ * collision happens and the names match in a case-insensitive, the name of
+ * the file will be the name defined at the negative dentry, that can be
+ * different from the specified by the user. To prevent this from happening, we
+ * need to remove all dentries in a directory. Given that the directory must be
+ * empty before we call this function we are sure that all dentries there will
+ * be negative.
+ */
+void d_clear_dir_neg_dentries(struct inode *dir)
+{
+	struct dentry *alias, *dentry;
+
+	hlist_for_each_entry(alias, &dir->i_dentry, d_u.d_alias) {
+		list_for_each_entry(dentry, &alias->d_subdirs, d_child) {
+			d_drop(dentry);
+			dput(dentry);
+		}
+	}
+}
+EXPORT_SYMBOL(d_clear_dir_neg_dentries);
+
+/**
  * __d_alloc	-	allocate a dcache entry
  * @sb: filesystem it will belong to
  * @name: qstr of the name

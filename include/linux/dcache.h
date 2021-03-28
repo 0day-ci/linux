@@ -250,6 +250,7 @@ extern void shrink_dcache_sb(struct super_block *);
 extern void shrink_dcache_parent(struct dentry *);
 extern void shrink_dcache_for_umount(struct super_block *);
 extern void d_invalidate(struct dentry *);
+extern void d_clear_dir_neg_dentries(struct inode *);
 
 /* only used at mount-time */
 extern struct dentry * d_make_root(struct inode *);
