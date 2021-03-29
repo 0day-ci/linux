@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/gpio/pensando,elba-spics.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Pensando Elba SPI Chip Select Driver
+
+description: |
+  The Pensando Elba SoC provides four SPI bus chip selects.
+
+maintainers:
+  - Brad Larson <brad@pensando.io>
+
+properties:
+  $nodename:
+    pattern: "^spics@[0-9a-f]+$"
+  
+  compatible:
+    const: pensando,elba-spics
+
+  reg:
+    maxItems: 1
+
+  gpio-controller: true
+
+  "#gpio-cells":
+    const: 2
+
+required:
+  - compatible
+  - reg
+  - gpio-controller
+  - "#gpio-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        spics: spics@307c2468 {
+            compatible = "pensando,elba-spics";
+            reg = <0x0 0x307c2468 0x0 0x4>;
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
+    };
