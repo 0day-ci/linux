@@ -847,7 +847,7 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 	}
 
 	mutex_lock(&q->mmap_lock);
-	q->num_buffers = allocated_buffers;
+	q->num_buffers += allocated_buffers;
 
 	if (ret < 0) {
 		/*
