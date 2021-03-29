@@ -535,8 +535,8 @@ static inline __le32 enetc_txbd_set_tx_start(u64 tx_start, u8 flags)
 {
 	u32 temp;
 
-	temp = (tx_start >> 5 & ENETC_TXBD_TXSTART_MASK) |
-	       (flags << ENETC_TXBD_FLAGS_OFFSET);
+	temp = lower_32_bits(tx_start >> 5 & ENETC_TXBD_TXSTART_MASK) |
+	       (u32)(flags << ENETC_TXBD_FLAGS_OFFSET);
 
 	return cpu_to_le32(temp);
 }
