@@ -128,4 +128,6 @@ int perf_pmu__convert_scale(const char *scale, char **end, double *sval);
 
 int perf_pmu__caps_parse(struct perf_pmu *pmu);
 
+bool perf_pmu__has_hybrid(void);
+
 #endif /* __PMU_H */
