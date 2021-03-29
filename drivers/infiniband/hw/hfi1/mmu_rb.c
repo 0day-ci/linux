@@ -210,9 +210,6 @@ bool hfi1_mmu_rb_remove_unless_exact(struct mmu_rb_handler *handler,
 	unsigned long flags;
 	bool ret = false;
 
-	if (current->mm != handler->mn.mm)
-		return ret;
-
 	spin_lock_irqsave(&handler->lock, flags);
 	node = __mmu_rb_search(handler, addr, len);
 	if (node) {
@@ -234,9 +231,6 @@ void hfi1_mmu_rb_evict(struct mmu_rb_handler *handler, void *evict_arg)
 	struct list_head del_list;
 	unsigned long flags;
 	bool stop = false;
-
-	if (current->mm != handler->mn.mm)
-		return;
 
 	INIT_LIST_HEAD(&del_list);
 
@@ -270,9 +264,6 @@ void hfi1_mmu_rb_remove(struct mmu_rb_handler *handler,
 			struct mmu_rb_node *node)
 {
 	unsigned long flags;
-
-	if (current->mm != handler->mn.mm)
-		return;
 
 	/* Validity of handler and node pointers has been checked by caller. */
 	trace_hfi1_mmu_rb_remove(node->addr, node->len);
