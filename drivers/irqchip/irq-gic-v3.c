@@ -1124,6 +1124,26 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
 	gic_write_sgi1r(val);
 }
 
+static void gic_ipi_send_single(struct irq_data *d, unsigned int cpu)
+{
+	unsigned long mpidr;
+	u64 cluster_id;
+	u16 tlist;
+
+	if (WARN_ON(d->hwirq >= 16))
+		return;
+
+	wmb();
+
+	mpidr = cpu_logical_map(cpu);
+	cluster_id = MPIDR_TO_SGI_CLUSTER_ID(mpidr);
+	tlist = 1 << (mpidr & 0xf);
+
+	gic_send_sgi(cluster_id, tlist, d->hwirq);
+
+	isb();
+}
+
 static void gic_ipi_send_mask(struct irq_data *d, const struct cpumask *mask)
 {
 	int cpu;
@@ -1279,6 +1299,7 @@ static struct irq_chip gic_chip = {
 	.irq_nmi_setup		= gic_irq_nmi_setup,
 	.irq_nmi_teardown	= gic_irq_nmi_teardown,
 	.ipi_send_mask		= gic_ipi_send_mask,
+	.ipi_send_single	= gic_ipi_send_single,
 	.flags			= IRQCHIP_SET_TYPE_MASKED |
 				  IRQCHIP_SKIP_SET_WAKE |
 				  IRQCHIP_MASK_ON_SUSPEND,
@@ -1298,6 +1319,7 @@ static struct irq_chip gic_eoimode1_chip = {
 	.irq_nmi_setup		= gic_irq_nmi_setup,
 	.irq_nmi_teardown	= gic_irq_nmi_teardown,
 	.ipi_send_mask		= gic_ipi_send_mask,
+	.ipi_send_single	= gic_ipi_send_single,
 	.flags			= IRQCHIP_SET_TYPE_MASKED |
 				  IRQCHIP_SKIP_SET_WAKE |
 				  IRQCHIP_MASK_ON_SUSPEND,
