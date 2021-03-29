@@ -856,7 +856,6 @@ int mwifiex_send_tdls_action_frame(struct mwifiex_private *priv, const u8 *peer,
 	if (mwifiex_construct_tdls_action_frame(priv, peer, action_code,
 						dialog_token, status_code,
 						skb)) {
-		dev_kfree_skb_any(skb);
 		return -EINVAL;
 	}
 
