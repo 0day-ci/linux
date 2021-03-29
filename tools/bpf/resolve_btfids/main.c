@@ -115,10 +115,10 @@ struct object {
 
 static int verbose;
 
-int eprintf(int level, int var, const char *fmt, ...)
+static int eprintf(int level, int var, const char *fmt, ...)
 {
 	va_list args;
-	int ret;
+	int ret = 0;
 
 	if (var >= level) {
 		va_start(args, fmt);
@@ -403,7 +403,7 @@ static int symbols_collect(struct object *obj)
 	 * __BTF_ID__* over .BTF_ids section.
 	 */
 	for (i = 0; !err && i < n; i++) {
-		char *tmp, *prefix;
+		char *prefix;
 		struct btf_id *id;
 		GElf_Sym sym;
 		int err = -1;
