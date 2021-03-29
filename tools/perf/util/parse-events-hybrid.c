@@ -74,6 +74,41 @@ static int add_hw_hybrid(struct parse_events_state *parse_state,
 	return 0;
 }
 
+static int create_raw_event_hybrid(int *idx, struct list_head *list,
+				   struct perf_event_attr *attr, char *name,
+				   struct list_head *config_terms,
+				   struct perf_pmu *pmu)
+{
+	struct evsel *evsel;
+
+	attr->type = pmu->type;
+	evsel = parse_events__add_event_hybrid(list, idx, attr, name,
+					       pmu, config_terms);
+	if (evsel)
+		evsel->pmu_name = strdup(pmu->name);
+	else
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int add_raw_hybrid(struct parse_events_state *parse_state,
+			  struct list_head *list, struct perf_event_attr *attr,
+			  char *name, struct list_head *config_terms)
+{
+	struct perf_pmu *pmu;
+	int ret;
+
+	perf_pmu__for_each_hybrid_pmu(pmu) {
+		ret = create_raw_event_hybrid(&parse_state->idx, list, attr,
+					      name, config_terms, pmu);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 int parse_events__add_numeric_hybrid(struct parse_events_state *parse_state,
 				     struct list_head *list,
 				     struct perf_event_attr *attr,
@@ -91,6 +126,9 @@ int parse_events__add_numeric_hybrid(struct parse_events_state *parse_state,
 	if (attr->type != PERF_TYPE_RAW) {
 		return add_hw_hybrid(parse_state, list, attr, name,
 				     config_terms);
+	} else {
+		return add_raw_hybrid(parse_state, list, attr, name,
+				      config_terms);
 	}
 
 	return -1;
