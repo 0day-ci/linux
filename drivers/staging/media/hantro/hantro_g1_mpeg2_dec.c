@@ -84,7 +84,7 @@ hantro_g1_mpeg2_dec_set_quantization(struct hantro_dev *vpu,
 	struct v4l2_ctrl_mpeg2_quantization *quantization;
 
 	quantization = hantro_get_ctrl(ctx,
-				       V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION);
+				       V4L2_CID_STATELESS_MPEG2_QUANTIZATION);
 	hantro_mpeg2_dec_copy_qtable(ctx->mpeg2_dec.qtable.cpu,
 				     quantization);
 	vdpu_write_relaxed(vpu, ctx->mpeg2_dec.qtable.dma,
@@ -163,9 +163,9 @@ void hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx)
 	hantro_start_prepare_run(ctx);
 
 	seq = hantro_get_ctrl(ctx,
-			      V4L2_CID_MPEG_VIDEO_MPEG2_SEQUENCE);
+			      V4L2_CID_STATELESS_MPEG2_SEQUENCE);
 	pic = hantro_get_ctrl(ctx,
-			      V4L2_CID_MPEG_VIDEO_MPEG2_PICTURE);
+			      V4L2_CID_STATELESS_MPEG2_PICTURE);
 
 	reg = G1_REG_DEC_AXI_RD_ID(0) |
 	      G1_REG_DEC_TIMEOUT_E(1) |

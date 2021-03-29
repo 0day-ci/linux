@@ -221,6 +221,18 @@ still cause this situation.
       - ``p_vp8_frame``
       - A pointer to a struct :c:type:`v4l2_ctrl_vp8_frame`. Valid if this control is
         of type ``V4L2_CTRL_TYPE_VP8_FRAME``.
+    * - struct :c:type:`v4l2_ctrl_mpeg2_sequence` *
+      - ``p_mpeg2_sequence``
+      - A pointer to a struct :c:type:`v4l2_ctrl_mpeg2_sequence`. Valid if this control is
+        of type ``V4L2_CTRL_TYPE_MPEG2_SEQUENCE``.
+    * - struct :c:type:`v4l2_ctrl_mpeg2_picture` *
+      - ``p_mpeg2_picture``
+      - A pointer to a struct :c:type:`v4l2_ctrl_mpeg2_picture`. Valid if this control is
+        of type ``V4L2_CTRL_TYPE_MPEG2_PICTURE``.
+    * - struct :c:type:`v4l2_ctrl_mpeg2_quantization` *
+      - ``p_mpeg2_quantization``
+      - A pointer to a struct :c:type:`v4l2_ctrl_mpeg2_quantization`. Valid if this control is
+        of type ``V4L2_CTRL_TYPE_MPEG2_QUANTIZATION``.
     * - void *
       - ``ptr``
       - A pointer to a compound type which can be an N-dimensional array
