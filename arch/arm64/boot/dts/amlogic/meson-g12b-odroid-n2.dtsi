@@ -508,6 +508,10 @@
 	status = "okay";
 };
 
+&saradc {
+	status = "okay";
+};
+
 /* SD card */
 &sd_emmc_b {
 	status = "okay";
