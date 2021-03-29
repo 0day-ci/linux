@@ -693,20 +693,25 @@ u8 pci_find_ht_capability(struct pci_dev *dev, int ht_cap)
 EXPORT_SYMBOL_GPL(pci_find_ht_capability);
 
 /**
- * pci_find_parent_resource - return resource region of parent bus of given
+ * pci_find_parent_resource - find resource region of parent bus of given
  *			      region
  * @dev: PCI device structure contains resources to be searched
  * @res: child resource record for which parent is sought
+ * @first: the first region that contains the child resource
+ * @second: the second region that combines with the first region to fully
+ * contains the child resource
  *
  * For given resource region of given device, return the resource region of
  * parent bus the given region is contained in.
  */
-struct resource *pci_find_parent_resource(const struct pci_dev *dev,
-					  struct resource *res)
+void pci_find_parent_resource(const struct pci_dev *dev,
+					  struct resource *res,
+					  struct resource **first,
+					  struct resource **second)
 {
 	const struct pci_bus *bus = dev->bus;
 	struct resource *r;
-	int i;
+	int i, overlaps = 0;
 
 	pci_bus_for_each_resource(bus, r, i) {
 		if (!r)
@@ -718,8 +723,10 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
 			 * not, the allocator made a mistake.
 			 */
 			if (r->flags & IORESOURCE_PREFETCH &&
-			    !(res->flags & IORESOURCE_PREFETCH))
-				return NULL;
+			    !(res->flags & IORESOURCE_PREFETCH)) {
+				*first = NULL;
+				return;
+			}
 
 			/*
 			 * If we're below a transparent bridge, there may
@@ -729,10 +736,47 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
 			 * on pci_bus_for_each_resource() giving us those
 			 * first.
 			 */
-			return r;
+			*first = r;
+			return;
 		}
 	}
-	return NULL;
+
+	if (!second)
+		return;
+
+	pci_bus_for_each_resource(bus, r, i) {
+		if (!r)
+			continue;
+		if (resource_overlaps(r, res)) {
+			if (r->flags & IORESOURCE_PREFETCH &&
+			    !(res->flags & IORESOURCE_PREFETCH))
+				continue;
+
+			if (!overlaps++)
+				*first = r;
+			else {
+				*second = r;
+				break;
+			}
+		}
+	}
+
+	if (overlaps != 2)
+		goto out;
+
+	if ((*first)->start > (*second)->start)
+		swap(*first, *second);
+
+	if ((*first)->end + 1 != (*second)->start)
+		goto out;
+
+	if ((*first)->start <= res->start && (*second)->end >= res->end)
+		return;
+out:
+
+	*first = NULL;
+	*second = NULL;
+	return;
 }
 EXPORT_SYMBOL(pci_find_parent_resource);
 

@@ -1196,7 +1196,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 {
 	struct pci_bus *b;
 	int i;
-	struct resource *res, *pr;
+	struct resource *res, *pr = NULL;
 
 	pr_debug("PCI: Allocating bus resources for %04x:%02x...\n",
 		 pci_domain_nr(bus), bus->number);
@@ -1213,7 +1213,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 			pr = (res->flags & IORESOURCE_IO) ?
 				&ioport_resource : &iomem_resource;
 		else {
-			pr = pci_find_parent_resource(bus->self, res);
+			pci_find_parent_resource(bus->self, res, &pr, NULL);
 			if (pr == res) {
 				/* this happens when the generic PCI
 				 * code (wrongly) decides that this
@@ -1265,12 +1265,12 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 
 static inline void alloc_resource(struct pci_dev *dev, int idx)
 {
-	struct resource *pr, *r = &dev->resource[idx];
+	struct resource *pr = NULL, *r = &dev->resource[idx];
 
 	pr_debug("PCI: Allocating %s: Resource %d: %pR\n",
 		 pci_name(dev), idx, r);
 
-	pr = pci_find_parent_resource(dev, r);
+	pci_find_parent_resource(dev, r, &pr, NULL);
 	if (!pr || (pr->flags & IORESOURCE_UNSET) ||
 	    request_resource(pr, r) < 0) {
 		printk(KERN_WARNING "PCI: Cannot allocate resource region %d"

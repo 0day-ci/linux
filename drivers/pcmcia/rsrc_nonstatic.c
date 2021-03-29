@@ -73,7 +73,7 @@ static struct resource *
 claim_region(struct pcmcia_socket *s, resource_size_t base,
 		resource_size_t size, int type, char *name)
 {
-	struct resource *res, *parent;
+	struct resource *res, *parent = NULL;
 
 	parent = type & IORESOURCE_MEM ? &iomem_resource : &ioport_resource;
 	res = pcmcia_make_resource(base, size, type | IORESOURCE_BUSY, name);
@@ -81,7 +81,7 @@ claim_region(struct pcmcia_socket *s, resource_size_t base,
 	if (res) {
 #ifdef CONFIG_PCI
 		if (s && s->cb_dev)
-			parent = pci_find_parent_resource(s->cb_dev, res);
+			pci_find_parent_resource(s->cb_dev, res, &parent, NULL);
 #endif
 		if (!parent || request_resource(parent, res)) {
 			kfree(res);

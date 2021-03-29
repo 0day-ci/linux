@@ -1049,8 +1049,10 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus);
 unsigned int pci_scan_child_bus(struct pci_bus *bus);
 void pci_bus_add_device(struct pci_dev *dev);
 void pci_read_bridge_bases(struct pci_bus *child);
-struct resource *pci_find_parent_resource(const struct pci_dev *dev,
-					  struct resource *res);
+void pci_find_parent_resource(const struct pci_dev *dev,
+					  struct resource *res,
+					  struct resource **first,
+					  struct resource **second);
 u8 pci_swizzle_interrupt_pin(const struct pci_dev *dev, u8 pin);
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
 u8 pci_common_swizzle(struct pci_dev *dev, u8 *pinp);

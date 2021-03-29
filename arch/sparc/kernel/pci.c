@@ -621,7 +621,7 @@ static void pci_bus_register_of_sysfs(struct pci_bus *bus)
 static void pci_claim_legacy_resources(struct pci_dev *dev)
 {
 	struct pci_bus_region region;
-	struct resource *p, *root, *conflict;
+	struct resource *p, *root = NULL, *conflict;
 
 	if ((dev->class >> 8) != PCI_CLASS_DISPLAY_VGA)
 		return;
@@ -637,7 +637,7 @@ static void pci_claim_legacy_resources(struct pci_dev *dev)
 	region.end = region.start + 0x1ffffUL;
 	pcibios_bus_to_resource(dev->bus, p, &region);
 
-	root = pci_find_parent_resource(dev, p);
+	pci_find_parent_resource(dev, p, &root, NULL);
 	if (!root) {
 		pci_info(dev, "can't claim VGA legacy %pR: no compatible bridge window\n", p);
 		goto err;

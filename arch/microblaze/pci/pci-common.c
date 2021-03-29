@@ -669,7 +669,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 {
 	struct pci_bus *b;
 	int i;
-	struct resource *res, *pr;
+	struct resource *res, *pr = NULL;
 
 	pr_debug("PCI: Allocating bus resources for %04x:%02x...\n",
 		 pci_domain_nr(bus), bus->number);
@@ -688,7 +688,7 @@ static void pcibios_allocate_bus_resources(struct pci_bus *bus)
 			 * and as such ensure proper re-allocation
 			 * later.
 			 */
-			pr = pci_find_parent_resource(bus->self, res);
+			pci_find_parent_resource(bus->self, res, &pr, NULL);
 			if (pr == res) {
 				/* this happens when the generic PCI
 				 * code (wrongly) decides that this

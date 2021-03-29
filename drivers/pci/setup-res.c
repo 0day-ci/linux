@@ -131,7 +131,7 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 int pci_claim_resource(struct pci_dev *dev, int resource)
 {
 	struct resource *res = &dev->resource[resource];
-	struct resource *root, *conflict;
+	struct resource *first = NULL, *second = NULL, *conflict;
 
 	if (res->flags & IORESOURCE_UNSET) {
 		pci_info(dev, "can't claim BAR %d %pR: no address assigned\n",
@@ -147,21 +147,28 @@ int pci_claim_resource(struct pci_dev *dev, int resource)
 	if (res->flags & IORESOURCE_ROM_SHADOW)
 		return 0;
 
-	root = pci_find_parent_resource(dev, res);
-	if (!root) {
+	pci_find_parent_resource(dev, res, &first, &second);
+	if (!first) {
 		pci_info(dev, "can't claim BAR %d %pR: no compatible bridge window\n",
 			 resource, res);
 		res->flags |= IORESOURCE_UNSET;
 		return -EINVAL;
 	}
 
-	conflict = request_resource_conflict(root, res);
+	if (second)
+		first->end = second->end;
+
+	conflict = request_resource_conflict(first, res);
 	if (conflict) {
+		if (second)
+			first->end = second->start - 1;
+
 		pci_info(dev, "can't claim BAR %d %pR: address conflict with %s %pR\n",
 			 resource, res, conflict->name, conflict);
 		res->flags |= IORESOURCE_UNSET;
 		return -EBUSY;
-	}
+	} else if (second)
+		second->start = second->end = 0;
 
 	return 0;
 }
@@ -195,7 +202,7 @@ resource_size_t __weak pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx)
 static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
 		int resno, resource_size_t size)
 {
-	struct resource *root, *conflict;
+	struct resource *root = NULL, *conflict;
 	resource_size_t fw_addr, start, end;
 
 	fw_addr = pcibios_retrieve_fw_addr(dev, resno);
@@ -208,7 +215,7 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
 	res->end = res->start + size - 1;
 	res->flags &= ~IORESOURCE_UNSET;
 
-	root = pci_find_parent_resource(dev, res);
+	pci_find_parent_resource(dev, res, &root, NULL);
 	if (!root) {
 		if (res->flags & IORESOURCE_IO)
 			root = &ioport_resource;
