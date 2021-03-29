@@ -138,3 +138,6 @@ obj-$(CONFIG_INTEL_TELEMETRY)		+= intel_telemetry_core.o \
 					   intel_telemetry_pltdrv.o \
 					   intel_telemetry_debugfs.o
 obj-$(CONFIG_PMC_ATOM)			+= pmc_atom.o
+
+# Siemens Simatic Industrial PCs
+obj-$(CONFIG_SIEMENS_SIMATIC_IPC)	+= simatic-ipc.o
