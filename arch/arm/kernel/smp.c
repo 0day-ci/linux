@@ -534,6 +534,8 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 };
 
 static void smp_cross_call(const struct cpumask *target, unsigned int ipinr);
+static void smp_cross_call_single(const struct cpumask *target, int cpu,
+				  unsigned int ipinr);
 
 void show_ipi_list(struct seq_file *p, int prec)
 {
@@ -564,14 +566,15 @@ void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
 
 void arch_send_call_function_single_ipi(int cpu)
 {
-	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
+	smp_cross_call_single(cpumask_of(cpu), cpu, IPI_CALL_FUNC);
 }
 
 #ifdef CONFIG_IRQ_WORK
 void arch_irq_work_raise(void)
 {
+	int cpu = smp_processor_id();
 	if (arch_irq_work_has_interrupt())
-		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+		smp_cross_call(cpumask_of(cpu), cpu, IPI_IRQ_WORK);
 }
 #endif
 
@@ -707,6 +710,13 @@ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
 	__ipi_send_mask(ipi_desc[ipinr], target);
 }
 
+static void smp_cross_call_single(const struct cpumask *target, int cpu,
+				  unsigned int ipinr)
+{
+	trace_ipi_raise_rcuidle(target, ipi_types[ipinr]);
+	__ipi_send_single(ipi_desc[ipinr], cpu);
+}
+
 static void ipi_setup(int cpu)
 {
 	int i;
@@ -744,7 +754,7 @@ void __init set_smp_ipi_range(int ipi_base, int n)
 
 void smp_send_reschedule(int cpu)
 {
-	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+	smp_cross_call_single(cpumask_of(cpu), cpu, IPI_RESCHEDULE);
 }
 
 void smp_send_stop(void)
