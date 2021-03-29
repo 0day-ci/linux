@@ -1507,7 +1507,7 @@ static void __exit hfi1_mod_cleanup(void)
 	node_affinity_destroy_all();
 	hfi1_dbg_exit();
 
-	WARN_ON(!xa_empty(&hfi1_dev_table));
+	xa_destroy(&hfi1_dev_table);
 	dispose_firmware();	/* asymmetric with obtain_firmware() */
 	dev_cleanup();
 }
