@@ -6623,7 +6623,8 @@ static noinstr void vmx_vcpu_enter_exit(struct kvm_vcpu *vcpu,
 	 * into world and some more.
 	 */
 	lockdep_hardirqs_off(CALLER_ADDR0);
-	guest_exit_irqoff();
+	if (vtime_accounting_enabled_this_cpu())
+		guest_exit_irqoff();
 
 	instrumentation_begin();
 	trace_hardirqs_off_finish();
