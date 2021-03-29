@@ -47,13 +47,15 @@
 #define DUAL_CHANNEL		2
 #define RT5682_PLL_FREQ (48000 * 512)
 
+extern bool bt_uart_enable;
+void *acp_soc_is_rltk_max(struct device *dev);
+
+#ifdef CONFIG_ACPI
 static struct snd_soc_jack cz_jack;
 static struct clk *da7219_dai_wclk;
 static struct clk *da7219_dai_bclk;
 static struct clk *rt5682_dai_wclk;
 static struct clk *rt5682_dai_bclk;
-extern bool bt_uart_enable;
-void *acp_soc_is_rltk_max(struct device *dev);
 
 static int cz_da7219_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -692,6 +694,7 @@ static struct snd_soc_card cz_rt5682_card = {
 	.controls = cz_mc_controls,
 	.num_controls = ARRAY_SIZE(cz_mc_controls),
 };
+#endif
 
 void *acp_soc_is_rltk_max(struct device *dev)
 {
