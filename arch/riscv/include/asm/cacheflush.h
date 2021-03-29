@@ -8,6 +8,14 @@
 
 #include <linux/mm.h>
 
+/*
+ * flush_cache_vmap and flush_cache_vunmap might modify PTE, needs SFENCE.VMA.
+ * - flush_cache_vmap is invoked after map_kernel_range() has installed the page table entries.
+ * - flush_cache_vunmap is invoked before unmap_kernel_range() deletes the page table entries
+ */
+#define flush_cache_vmap(start, end) flush_tlb_all()
+#define flush_cache_vunmap(start, end) flush_tlb_all()
+
 static inline void local_flush_icache_all(void)
 {
 	asm volatile ("fence.i" ::: "memory");
