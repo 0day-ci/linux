@@ -916,6 +916,35 @@ static int pmu_max_precise(const char *name)
 	return max_precise;
 }
 
+static void perf_pmu__add_hybrid_aliases(struct list_head *head)
+{
+	static struct pmu_event pme_hybrid_fixup[] = {
+		{
+			.name = "cycles",
+			.event = "event=0x3c",
+		},
+		{
+			.name = "branches",
+			.event = "event=0xc4",
+		},
+		{
+			.name = 0,
+			.event = 0,
+		},
+	};
+	int i = 0;
+
+	while (1) {
+		struct pmu_event *pe = &pme_hybrid_fixup[i++];
+
+		if (!pe->name)
+			break;
+
+		__perf_pmu__new_alias(head, NULL, (char *)pe->name, NULL,
+				      (char *)pe->event, NULL);
+	}
+}
+
 static struct perf_pmu *pmu_lookup(const char *name)
 {
 	struct perf_pmu *pmu;
@@ -954,6 +983,9 @@ static struct perf_pmu *pmu_lookup(const char *name)
 	pmu->max_precise = pmu_max_precise(name);
 	pmu_add_cpu_aliases(&aliases, pmu);
 	pmu_add_sys_aliases(&aliases, pmu);
+
+	if (pmu->is_hybrid)
+		perf_pmu__add_hybrid_aliases(&aliases);
 
 	INIT_LIST_HEAD(&pmu->format);
 	INIT_LIST_HEAD(&pmu->aliases);
