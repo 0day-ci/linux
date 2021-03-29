@@ -1029,7 +1029,11 @@ void qlt_free_session_done(struct work_struct *work)
 			}
 			msleep(100);
 			cnt++;
-			if (cnt > 200)
+			/*
+			 * wait for logout to complete before advance. Otherwise,
+			 * straddling logout can interfere with relogin.
+			 */
+			if (cnt > 230)
 				break;
 		}
 
