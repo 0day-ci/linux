@@ -2127,7 +2127,7 @@ static inline bool is_shared_exec_page(struct vm_area_struct *vma,
  * the page that will be dropped by this function before returning.
  */
 int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
-			   int node)
+			   int node, bool compound)
 {
 	pg_data_t *pgdat = NODE_DATA(node);
 	int isolated;
