@@ -64,6 +64,11 @@ static int add_hw_hybrid(struct parse_events_state *parse_state,
 	int ret;
 
 	perf_pmu__for_each_hybrid_pmu(pmu) {
+		if (parse_state->pmu_name &&
+		    strcmp(parse_state->pmu_name, pmu->name)) {
+			continue;
+		}
+
 		ret = create_event_hybrid(PERF_TYPE_HARDWARE_PMU,
 					  &parse_state->idx, list, attr, name,
 					  config_terms, pmu);
@@ -100,6 +105,11 @@ static int add_raw_hybrid(struct parse_events_state *parse_state,
 	int ret;
 
 	perf_pmu__for_each_hybrid_pmu(pmu) {
+		if (parse_state->pmu_name &&
+		    strcmp(parse_state->pmu_name, pmu->name)) {
+			continue;
+		}
+
 		ret = create_raw_event_hybrid(&parse_state->idx, list, attr,
 					      name, config_terms, pmu);
 		if (ret)
@@ -137,7 +147,8 @@ int parse_events__add_numeric_hybrid(struct parse_events_state *parse_state,
 int parse_events__add_cache_hybrid(struct list_head *list, int *idx,
 				   struct perf_event_attr *attr, char *name,
 				   struct list_head *config_terms,
-				   bool *hybrid)
+				   bool *hybrid,
+				   struct parse_events_state *parse_state)
 {
 	struct perf_pmu *pmu;
 	int ret;
@@ -148,6 +159,11 @@ int parse_events__add_cache_hybrid(struct list_head *list, int *idx,
 
 	*hybrid = true;
 	perf_pmu__for_each_hybrid_pmu(pmu) {
+		if (parse_state->pmu_name &&
+		    strcmp(parse_state->pmu_name, pmu->name)) {
+			continue;
+		}
+
 		ret = create_event_hybrid(PERF_TYPE_HW_CACHE_PMU, idx, list,
 					  attr, name, config_terms, pmu);
 		if (ret)

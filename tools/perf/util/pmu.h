@@ -91,7 +91,7 @@ int perf_pmu__config_terms(const char *pmu_name, struct list_head *formats,
 __u64 perf_pmu__format_bits(struct list_head *formats, const char *name);
 int perf_pmu__format_type(struct list_head *formats, const char *name);
 int perf_pmu__check_alias(struct perf_pmu *pmu, struct list_head *head_terms,
-			  struct perf_pmu_info *info);
+			  struct perf_pmu_info *info, bool *found);
 struct list_head *perf_pmu__alias(struct perf_pmu *pmu,
 				  struct list_head *head_terms);
 void perf_pmu_error(struct list_head *list, char *name, char const *msg);

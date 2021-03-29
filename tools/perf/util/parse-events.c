@@ -38,6 +38,7 @@
 #include "util/event.h"
 #include "util/pfm.h"
 #include "util/parse-events-hybrid.h"
+#include "util/pmu-hybrid.h"
 #include "perf.h"
 
 #define MAX_NAME_LEN 100
@@ -48,6 +49,9 @@ extern int parse_events_debug;
 int parse_events_parse(void *parse_state, void *scanner);
 static int get_config_terms(struct list_head *head_config,
 			    struct list_head *head_terms __maybe_unused);
+static int parse_events__with_hybrid_pmu(struct parse_events_state *parse_state,
+					 const char *str, char *pmu_name,
+					 bool *found, struct list_head *list);
 
 static struct perf_pmu_event_symbol *perf_pmu_events_list;
 /*
@@ -450,7 +454,8 @@ static int config_attr(struct perf_event_attr *attr,
 int parse_events_add_cache(struct list_head *list, int *idx,
 			   char *type, char *op_result1, char *op_result2,
 			   struct parse_events_error *err,
-			   struct list_head *head_config)
+			   struct list_head *head_config,
+			   struct parse_events_state *parse_state)
 {
 	struct perf_event_attr attr;
 	LIST_HEAD(config_terms);
@@ -521,7 +526,7 @@ int parse_events_add_cache(struct list_head *list, int *idx,
 
 	i = parse_events__add_cache_hybrid(list, idx, &attr,
 					   config_name ? : name, &config_terms,
-					   &hybrid);
+					   &hybrid, parse_state);
 	if (hybrid)
 		return i;
 
@@ -1481,7 +1486,7 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 	struct perf_pmu *pmu;
 	struct evsel *evsel;
 	struct parse_events_error *err = parse_state->error;
-	bool use_uncore_alias;
+	bool use_uncore_alias, found = false;
 	LIST_HEAD(config_terms);
 
 	if (verbose > 1) {
@@ -1530,8 +1535,28 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 		}
 	}
 
-	if (!parse_state->fake_pmu && perf_pmu__check_alias(pmu, head_config, &info))
+	if (!parse_state->fake_pmu &&
+	    perf_pmu__check_alias(pmu, head_config, &info, &found)) {
 		return -EINVAL;
+	}
+
+	if (!parse_state->fake_pmu && head_config && !found &&
+	    perf_pmu__is_hybrid(name)) {
+		struct parse_events_term *term;
+		int ret;
+
+		list_for_each_entry(term, head_config, list) {
+			if (!term->config)
+				continue;
+
+			ret = parse_events__with_hybrid_pmu(parse_state,
+							    term->config,
+							    name, &found,
+							    list);
+			if (found)
+				return ret;
+		}
+	}
 
 	if (verbose > 1) {
 		fprintf(stderr, "After aliases, add event pmu '%s' with '",
@@ -1604,6 +1629,15 @@ int parse_events_multi_pmu_add(struct parse_events_state *parse_state,
 	struct list_head *list;
 	struct perf_pmu *pmu = NULL;
 	int ok = 0;
+
+	if (parse_state->pmu_name) {
+		list = malloc(sizeof(struct list_head));
+		if (!list)
+			return -1;
+		INIT_LIST_HEAD(list);
+		*listp = list;
+		return 0;
+	}
 
 	*listp = NULL;
 	/* Add it for all PMUs that support the alias */
@@ -2173,6 +2207,44 @@ int parse_events_terms(struct list_head *terms, const char *str)
 	}
 
 	parse_events_terms__delete(parse_state.terms);
+	return ret;
+}
+
+static int list_entries_nr(struct list_head *list)
+{
+	struct list_head *pos;
+	int n = 0;
+
+	list_for_each(pos, list)
+		n++;
+
+	return n;
+}
+
+static int parse_events__with_hybrid_pmu(struct parse_events_state *parse_state,
+					 const char *str, char *pmu_name,
+					 bool *found, struct list_head *list)
+{
+	struct parse_events_state ps = {
+		.list           = LIST_HEAD_INIT(ps.list),
+		.stoken         = PE_START_EVENTS,
+		.pmu_name       = pmu_name,
+		.idx            = parse_state->idx,
+	};
+	int ret;
+
+	*found = false;
+	ret = parse_events__scanner(str, &ps);
+	perf_pmu__parse_cleanup();
+
+	if (!ret) {
+		if (!list_empty(&ps.list)) {
+			*found = true;
+			list_splice(&ps.list, list);
+			parse_state->idx = list_entries_nr(list);
+		}
+	}
+
 	return ret;
 }
 
