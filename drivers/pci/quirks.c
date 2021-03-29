@@ -5612,3 +5612,16 @@ static void apex_pci_fixup_class(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_CLASS_HEADER(0x1ac1, 0x089a,
 			       PCI_CLASS_NOT_DEFINED, 8, apex_pci_fixup_class);
+
+/*
+ * Device [8086:7360]
+ * When it resumes from D3cold, system freeze and shutdown happens.
+ * Currently there's no driver for XMM7360, so add it as a PCI quirk.
+ * https://bugzilla.kernel.org/show_bug.cgi?id=212419
+ */
+static void pci_fixup_no_d3cold(struct pci_dev *pdev)
+{
+	pci_info(pdev, "disable D3cold\n");
+	pci_d3cold_disable(pdev);
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x7360, pci_fixup_no_d3cold);
