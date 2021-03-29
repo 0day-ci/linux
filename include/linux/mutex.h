@@ -127,10 +127,18 @@ do {									\
 # define __DEP_MAP_MUTEX_INITIALIZER(lockname)
 #endif
 
+#ifdef CONFIG_MUTEX_SPIN_ON_OWNER
+# define __OSQ_MUTEX_INITIALIZER(lockname)			\
+		, .osq = OSQ_LOCK_UNLOCKED
+#else
+# define __OSQ_MUTEX_INITIALIZER(lockname)
+#endif
+
 #define __MUTEX_INITIALIZER(lockname) \
 		{ .owner = ATOMIC_LONG_INIT(0) \
 		, .wait_lock = __SPIN_LOCK_UNLOCKED(lockname.wait_lock) \
 		, .wait_list = LIST_HEAD_INIT(lockname.wait_list) \
+		__OSQ_MUTEX_INITIALIZER(lockname) \
 		__DEBUG_MUTEX_INITIALIZER(lockname) \
 		__DEP_MAP_MUTEX_INITIALIZER(lockname) }
 
