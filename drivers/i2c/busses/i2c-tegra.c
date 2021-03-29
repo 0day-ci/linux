@@ -1196,8 +1196,14 @@ static int tegra_i2c_error_recover(struct tegra_i2c_dev *i2c_dev,
 
 	/* start recovery upon arbitration loss in single master mode */
 	if (i2c_dev->msg_err == I2C_ERR_ARBITRATION_LOST) {
-		if (!i2c_dev->multimaster_mode)
-			return i2c_recover_bus(&i2c_dev->adapter);
+		if (!i2c_dev->multimaster_mode) {
+			int err = i2c_recover_bus(&i2c_dev->adapter);
+
+			if (err == -EOPNOTSUPP)
+				return -EIO;
+
+			return err;
+		}
 
 		return -EAGAIN;
 	}
