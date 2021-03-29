@@ -41,6 +41,8 @@
 
 #include "mm.h"
 
+bool initmem_freed;
+
 #ifdef CONFIG_CPU_CP15_MMU
 unsigned long __init __clear_cr(unsigned long mask)
 {
@@ -523,8 +525,10 @@ void free_initmem(void)
 	fix_kernmem_perms();
 
 	poison_init_mem(__init_begin, __init_end - __init_begin);
-	if (!machine_is_integrator() && !machine_is_cintegrator())
+	if (!machine_is_integrator() && !machine_is_cintegrator()) {
+		initmem_freed = true;
 		free_initmem_default(-1);
+	}
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
