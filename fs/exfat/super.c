@@ -317,14 +317,12 @@ static int exfat_parse_param(struct fs_context *fc, struct fs_parameter *param)
 	return 0;
 }
 
-static void exfat_hash_init(struct super_block *sb)
+static void exfat_inode_tree_init(struct super_block *sb)
 {
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
-	int i;
 
-	spin_lock_init(&sbi->inode_hash_lock);
-	for (i = 0; i < EXFAT_HASH_SIZE; i++)
-		INIT_HLIST_HEAD(&sbi->inode_hashtable[i]);
+	spin_lock_init(&sbi->inode_tree_lock);
+	sbi->inode_tree = RB_ROOT;
 }
 
 static int exfat_read_root(struct inode *inode)
@@ -648,8 +646,8 @@ static int exfat_fill_super(struct super_block *sb, struct fs_context *fc)
 		goto check_nls_io;
 	}
 
-	/* set up enough so that it can read an inode */
-	exfat_hash_init(sb);
+	/* set up exfat inode tree */
+	exfat_inode_tree_init(sb);
 
 	if (!strcmp(sbi->options.iocharset, "utf8"))
 		opts->utf8 = 1;
@@ -683,7 +681,7 @@ static int exfat_fill_super(struct super_block *sb, struct fs_context *fc)
 		goto put_inode;
 	}
 
-	exfat_hash_inode(root_inode, EXFAT_I(root_inode)->i_pos);
+	exfat_inode_tree_insert(root_inode, EXFAT_I(root_inode)->i_pos);
 	insert_inode_hash(root_inode);
 
 	sb->s_root = d_make_root(root_inode);
@@ -785,7 +783,7 @@ static void exfat_inode_init_once(void *foo)
 	ei->nr_caches = 0;
 	ei->cache_valid_id = EXFAT_CACHE_VALID + 1;
 	INIT_LIST_HEAD(&ei->cache_lru);
-	INIT_HLIST_NODE(&ei->i_hash_fat);
+	RB_CLEAR_NODE(&ei->rbnode);
 	inode_init_once(&ei->vfs_inode);
 }
 
