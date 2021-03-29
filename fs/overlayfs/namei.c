@@ -921,6 +921,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		if ((uppermetacopy || d.metacopy) && !ofs->config.metacopy) {
 			err = -EPERM;
 			pr_warn_ratelimited("refusing to follow metacopy origin for (%pd2)\n", dentry);
+			dput(this);
 			goto out_put;
 		}
 
