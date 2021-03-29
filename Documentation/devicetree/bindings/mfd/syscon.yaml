@@ -44,6 +44,7 @@ properties:
               - hisilicon,peri-subctrl
               - microchip,sparx5-cpu-syscon
               - mstar,msc313-pmsleep
+              - nxp,imx8mq-vpu-ctrl
               - rockchip,px30-qos
               - rockchip,rk3066-qos
               - rockchip,rk3288-qos
