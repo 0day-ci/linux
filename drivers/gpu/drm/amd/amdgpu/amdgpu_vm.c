@@ -1707,7 +1707,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		}
 		start = tmp;
 
-	} while (unlikely(start != last + 1));
+	} while (unlikely(start < last + 1));
 
 	r = vm->update_funcs->commit(&params, fence);
 
