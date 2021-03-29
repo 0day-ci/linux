@@ -32,7 +32,9 @@ patternProperties:
     $ref: "partition.yaml#"
     properties:
       compatible:
-        const: brcm,bcm4908-firmware
+        enum:
+          - brcm,bcm4908-firmware
+          - nvmem-cells
     unevaluatedProperties: false
 
 required:
