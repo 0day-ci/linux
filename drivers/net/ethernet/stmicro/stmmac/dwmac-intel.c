@@ -810,6 +810,7 @@ static int stmmac_config_multi_msi(struct pci_dev *pdev,
 				   struct plat_stmmacenet_data *plat,
 				   struct stmmac_resources *res)
 {
+	cpumask_t cpu_mask;
 	int ret;
 	int i;
 
@@ -832,12 +833,18 @@ static int stmmac_config_multi_msi(struct pci_dev *pdev,
 	for (i = 0; i < plat->rx_queues_to_use; i++) {
 		res->rx_irq[i] = pci_irq_vector(pdev,
 						plat->msi_rx_base_vec + i * 2);
+		cpumask_clear(&cpu_mask);
+		cpumask_set_cpu(i % num_online_cpus(), &cpu_mask);
+		irq_set_affinity_hint(res->rx_irq[i], &cpu_mask);
 	}
 
 	/* For TX MSI */
 	for (i = 0; i < plat->tx_queues_to_use; i++) {
 		res->tx_irq[i] = pci_irq_vector(pdev,
 						plat->msi_tx_base_vec + i * 2);
+		cpumask_clear(&cpu_mask);
+		cpumask_set_cpu(i % num_online_cpus(), &cpu_mask);
+		irq_set_affinity_hint(res->tx_irq[i], &cpu_mask);
 	}
 
 	if (plat->msi_mac_vec < STMMAC_MSI_VEC_MAX)
