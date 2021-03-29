@@ -4217,13 +4217,13 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 
 	if (unlikely(rtl8169_tx_map(tp, opts, skb_headlen(skb), skb->data,
 				    entry, false)))
-		goto err_dma_0;
+		goto err_dma_1;
 
 	txd_first = tp->TxDescArray + entry;
 
 	if (frags) {
 		if (rtl8169_xmit_frags(tp, skb, opts, entry))
-			goto err_dma_1;
+			goto err_dma_2;
 		entry = (entry + frags) % NUM_TX_DESC;
 	}
 
@@ -4270,10 +4270,11 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 
 	return NETDEV_TX_OK;
 
-err_dma_1:
+err_dma_2:
 	rtl8169_unmap_tx_skb(tp, entry);
-err_dma_0:
+err_dma_1:
 	dev_kfree_skb_any(skb);
+err_dma_0:
 	dev->stats.tx_dropped++;
 	return NETDEV_TX_OK;
 
