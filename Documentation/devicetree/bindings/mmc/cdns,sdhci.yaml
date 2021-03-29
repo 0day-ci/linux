@@ -18,6 +18,7 @@ properties:
     items:
       - enum:
           - socionext,uniphier-sd4hc
+          - pensando,elba-emmc
       - const: cdns,sd4hc
 
   reg:
