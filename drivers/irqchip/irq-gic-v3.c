@@ -1127,6 +1127,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
 static void gic_ipi_send_mask(struct irq_data *d, const struct cpumask *mask)
 {
 	int cpu;
+	cpumask_t tmp;
 
 	if (WARN_ON(d->hwirq >= 16))
 		return;
@@ -1136,6 +1137,17 @@ static void gic_ipi_send_mask(struct irq_data *d, const struct cpumask *mask)
 	 * other CPUs before issuing the IPI.
 	 */
 	wmb();
+
+	if (!cpumask_and(&tmp, mask, cpumask_of(smp_processor_id()))) {
+		/* Set Interrupt Routing Mode bit */
+		u64 val;
+		val = (d->hwirq) << ICC_SGI1R_SGI_ID_SHIFT;
+		val |= BIT_ULL(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+		gic_write_sgi1r(val);
+
+		isb();
+		return;
+	}
 
 	for_each_cpu(cpu, mask) {
 		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(cpu_logical_map(cpu));
