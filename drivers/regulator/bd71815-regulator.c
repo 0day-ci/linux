@@ -264,36 +264,7 @@ static int buck12_set_hw_dvs_levels(struct device_node *np,
  * 10: 2.50mV/usec	10mV 4uS
  * 11: 1.25mV/usec	10mV 8uS
  */
-static int bd7181x_buck12_set_ramp_delay(struct regulator_dev *rdev,
-					 int ramp_delay)
-{
-	struct bd71815_pmic *pmic = rdev_get_drvdata(rdev);
-	int id = rdev->desc->id;
-	unsigned int ramp_value = BD71815_BUCK_RAMPRATE_10P00MV;
-
-	switch (ramp_delay) {
-	case 1 ... 1250:
-		ramp_value = BD71815_BUCK_RAMPRATE_1P25MV;
-		break;
-	case 1251 ... 2500:
-		ramp_value = BD71815_BUCK_RAMPRATE_2P50MV;
-		break;
-	case 2501 ... 5000:
-		ramp_value = BD71815_BUCK_RAMPRATE_5P00MV;
-		break;
-	case 5001 ... 10000:
-		ramp_value = BD71815_BUCK_RAMPRATE_10P00MV;
-		break;
-	default:
-		ramp_value = BD71815_BUCK_RAMPRATE_10P00MV;
-		dev_err(pmic->dev,
-			"%s: ramp_delay: %d not supported, setting 10000mV//us\n",
-			rdev->desc->name, ramp_delay);
-	}
-
-	return regmap_update_bits(pmic->regmap, BD71815_REG_BUCK1_MODE + id*0x1,
-			BD71815_BUCK_RAMPRATE_MASK, ramp_value << 6);
-}
+static const unsigned int bd7181x_ramp_table[] = { 1250, 2500, 5000, 10000 };
 
 static int bd7181x_led_set_current_limit(struct regulator_dev *rdev,
 					int min_uA, int max_uA)
@@ -429,7 +400,7 @@ static const struct regulator_ops bd7181x_buck12_regulator_ops = {
 	.set_voltage_sel = bd7181x_buck12_set_voltage_sel,
 	.get_voltage_sel = bd7181x_buck12_get_voltage_sel,
 	.set_voltage_time_sel = regulator_set_voltage_time_sel,
-	.set_ramp_delay = bd7181x_buck12_set_ramp_delay,
+	.set_ramp_delay = regulator_set_ramp_delay_regmap,
 };
 
 static const struct regulator_ops bd7181x_led_regulator_ops = {
@@ -499,6 +470,10 @@ static const struct regulator_ops bd7181x_led_regulator_ops = {
 			.vsel_mask = 0x3f,				\
 			.enable_reg = (ereg),				\
 			.enable_mask = 0x04,				\
+			.ramp_reg = (ereg),				\
+			.ramp_mask = BD71815_BUCK_RAMPRATE_MASK,	\
+			.ramp_delay_table = bd7181x_ramp_table,		\
+			.n_ramp_values = ARRAY_SIZE(bd7181x_ramp_table),\
 			.of_parse_cb = buck12_set_hw_dvs_levels,	\
 		},							\
 		.dvs = (_dvs),						\
