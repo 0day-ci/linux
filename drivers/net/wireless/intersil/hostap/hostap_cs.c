@@ -537,10 +537,10 @@ static int prism2_config(struct pcmcia_device *link)
 	sandisk_enable_wireless(dev);
 
 	ret = prism2_hw_config(dev, 1);
-	if (!ret)
-		ret = hostap_hw_ready(dev);
+	if (ret)
+		goto failed;
 
-	return ret;
+	return hostap_hw_ready(dev);;
 
  failed:
 	kfree(hw_priv);
