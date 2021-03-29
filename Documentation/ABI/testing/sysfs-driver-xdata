@@ -1,0 +1,46 @@
+What:		/sys/class/misc/drivers/dw-xdata-pcie.<device>/write
+Date:		April 2021
+KernelVersion:	5.13
+Contact:	Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+Description:	Allows the user to enable the PCIe traffic generator which
+		will create write TLPs frames - from the Root Complex to the
+		Endpoint direction.
+		Usage e.g.
+		 echo 1 > /sys/class/misc/dw-xdata-pcie.<device>/write
+
+		The user can read the current PCIe link throughput generated
+		through this generator in MB/s.
+		Usage e.g.
+		 cat /sys/class/misc/dw-xdata-pcie.<device>/write
+		 204
+
+		The file is read and write.
+
+What:		/sys/class/misc/dw-xdata-pcie.<device>/read
+Date:		April 2021
+KernelVersion:	5.13
+Contact:	Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+Description:	Allows the user to enable the PCIe traffic generator which
+		will create read TLPs frames - from the Endpoint to the Root
+		Complex direction.
+		Usage e.g.
+		 echo 1 > /sys/class/misc/dw-xdata-pcie.<device>/read
+
+		The user can read the current PCIe link throughput generated
+		through this generator in MB/s.
+		Usage e.g.
+		 cat /sys/class/misc/dw-xdata-pcie.<device>/read
+		 199
+
+		The file is read and write.
+
+What:		/sys/class/misc/dw-xdata-pcie.<device>/stop
+Date:		April 2021
+KernelVersion:	5.13
+Contact:	Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+Description:	Allows the user to disable the PCIe traffic generator in all
+		directions.
+		Usage e.g.
+		 echo 1 > /sys/class/misc/dw-xdata-pcie.<device>/stop
+
+		The file is write only.
