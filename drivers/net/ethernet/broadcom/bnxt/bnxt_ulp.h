@@ -66,7 +66,7 @@ struct bnxt_en_dev {
 	#define BNXT_EN_FLAG_MSIX_REQUESTED	0x4
 	#define BNXT_EN_FLAG_ULP_STOPPED	0x8
 	const struct bnxt_en_ops	*en_ops;
-	struct bnxt_ulp			ulp_tbl[BNXT_MAX_ULP];
+	struct bnxt_ulp			*ulp_tbl;
 	int				l2_db_size;	/* Doorbell BAR size in
 							 * bytes mapped by L2
 							 * driver.
@@ -86,13 +86,11 @@ struct bnxt_en_ops {
 	int (*bnxt_free_msix)(struct bnxt_en_dev *, int);
 	int (*bnxt_send_fw_msg)(struct bnxt_en_dev *, int,
 				struct bnxt_fw_msg *);
-	int (*bnxt_register_fw_async_events)(struct bnxt_en_dev *, int,
-					     unsigned long *, u16);
 };
 
 static inline bool bnxt_ulp_registered(struct bnxt_en_dev *edev, int ulp_id)
 {
-	if (edev && rcu_access_pointer(edev->ulp_tbl[ulp_id].ulp_ops))
+	if (edev && edev->ulp_tbl)
 		return true;
 	return false;
 }
