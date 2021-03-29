@@ -618,4 +618,7 @@ struct migration_target_control {
 	gfp_t gfp_mask;
 };
 
+int numa_migrate_prep(struct page *page, struct vm_area_struct *vma,
+		      unsigned long addr, int page_nid, int *flags);
+
 #endif	/* __MM_INTERNAL_H */
