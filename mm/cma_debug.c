@@ -35,11 +35,12 @@ static int cma_used_get(void *data, u64 *val)
 {
 	struct cma *cma = data;
 	unsigned long used;
+	unsigned long flags;
 
-	mutex_lock(&cma->lock);
+	spin_lock_irqsave(&cma->lock, flags);
 	/* pages counter is smaller than sizeof(int) */
 	used = bitmap_weight(cma->bitmap, (int)cma_bitmap_maxno(cma));
-	mutex_unlock(&cma->lock);
+	spin_unlock_irqrestore(&cma->lock, flags);
 	*val = (u64)used << cma->order_per_bit;
 
 	return 0;
@@ -52,8 +53,9 @@ static int cma_maxchunk_get(void *data, u64 *val)
 	unsigned long maxchunk = 0;
 	unsigned long start, end = 0;
 	unsigned long bitmap_maxno = cma_bitmap_maxno(cma);
+	unsigned long flags;
 
-	mutex_lock(&cma->lock);
+	spin_lock_irqsave(&cma->lock, flags);
 	for (;;) {
 		start = find_next_zero_bit(cma->bitmap, bitmap_maxno, end);
 		if (start >= bitmap_maxno)
@@ -61,7 +63,7 @@ static int cma_maxchunk_get(void *data, u64 *val)
 		end = find_next_bit(cma->bitmap, bitmap_maxno, start);
 		maxchunk = max(end - start, maxchunk);
 	}
-	mutex_unlock(&cma->lock);
+	spin_unlock_irqrestore(&cma->lock, flags);
 	*val = (u64)maxchunk << cma->order_per_bit;
 
 	return 0;
