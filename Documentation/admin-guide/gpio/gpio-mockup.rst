@@ -27,7 +27,7 @@ module.
         the second 16 and the third 4. The base GPIO for the third chip is set
         to 405 while for two first chips it will be assigned automatically.
 
-    gpio_named_lines
+    gpio_mockup_named_lines
 
         This parameter doesn't take any arguments. It lets the driver know that
         GPIO lines exposed by it should be named.
