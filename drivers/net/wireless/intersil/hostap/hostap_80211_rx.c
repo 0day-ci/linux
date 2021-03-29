@@ -1016,10 +1016,10 @@ void hostap_80211_rx(struct net_device *dev, struct sk_buff *skb,
 			if (local->hostapd && local->apdev) {
 				/* Send IEEE 802.1X frames to the user
 				 * space daemon for processing */
-				prism2_rx_80211(local->apdev, skb, rx_stats,
+				int len = prism2_rx_80211(local->apdev, skb, rx_stats,
 						PRISM2_RX_MGMT);
 				local->apdevstats.rx_packets++;
-				local->apdevstats.rx_bytes += skb->len;
+				local->apdevstats.rx_bytes += len;
 				goto rx_exit;
 			}
 		} else if (!frame_authorized) {
