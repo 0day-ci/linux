@@ -241,6 +241,12 @@ config GPIO_EIC_SPRD
 	help
 	  Say yes here to support Spreadtrum EIC device.
 
+config GPIO_ELBA_SPICS
+	bool "Pensando Elba SPI chip-select"
+	depends on (ARCH_PENSANDO_ELBA_SOC || COMPILE_TEST)
+	help
+	  Say yes here to support the Penasndo Elba SoC SPI chip-select driver
+
 config GPIO_EM
 	tristate "Emma Mobile GPIO"
 	depends on (ARCH_EMEV2 || COMPILE_TEST) && OF_GPIO
