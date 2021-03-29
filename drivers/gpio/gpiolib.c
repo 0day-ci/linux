@@ -2118,7 +2118,7 @@ static int gpio_set_config_with_argument_optional(struct gpio_desc *desc,
 	int ret;
 
 	ret = gpio_set_config_with_argument(desc, mode, argument);
-	if (ret != -ENOTSUPP)
+	if (ret != -ENOTSUPP && ret != -EOPNOTSUPP)
 		return ret;
 
 	switch (mode) {
