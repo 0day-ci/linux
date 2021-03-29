@@ -1603,14 +1603,6 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
     * - __u32
       - ``data_bit_offset``
       - Offset (in bits) to the video data in the current slice data.
-    * - struct :c:type:`v4l2_mpeg2_sequence`
-      - ``sequence``
-      - Structure with MPEG-2 sequence metadata, merging relevant fields from
-	the sequence header and sequence extension parts of the bitstream.
-    * - struct :c:type:`v4l2_mpeg2_picture`
-      - ``picture``
-      - Structure with MPEG-2 picture metadata, merging relevant fields from
-	the picture header and picture coding extension parts of the bitstream.
     * - __u64
       - ``backward_ref_ts``
       - Timestamp of the V4L2 capture buffer to use as backward reference, used
@@ -1628,14 +1620,28 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
     * - __u32
       - ``quantiser_scale_code``
       - Code used to determine the quantization scale to use for the IDCT.
+    * - __u8
+      - ``reserved``
+      - Applications and drivers must set this to zero.
 
-.. c:type:: v4l2_mpeg2_sequence
+``V4L2_CID_MPEG_VIDEO_MPEG2_SEQUENCE (struct)``
+    Specifies the sequence parameters (as extracted from the bitstream) for the
+    associated MPEG-2 slice data. This includes fields matching the syntax
+    elements from the sequence header and sequence extension parts of the
+    bitstream as specified by :ref:`mpeg2part2`.
+
+    .. note::
+
+       This compound control is not yet part of the public kernel API and
+       it is expected to change.
+
+.. c:type:: v4l2_ctrl_mpeg2_sequence
 
 .. cssclass:: longtable
 
 .. tabularcolumns:: |p{1.4cm}|p{6.5cm}|p{9.4cm}|
 
-.. flat-table:: struct v4l2_mpeg2_sequence
+.. flat-table:: struct v4l2_ctrl_mpeg2_sequence
     :header-rows:  0
     :stub-columns: 0
     :widths:       1 1 2
@@ -1657,6 +1663,9 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
     * - __u8
       - ``chroma_format``
       - The chrominance sub-sampling format (1: 4:2:0, 2: 4:2:2, 3: 4:4:4).
+    * - __u8
+      - ``reserved``
+      - Applications and drivers must set this to zero.
     * - __u32
       - ``flags``
       - See :ref:`MPEG-2 Sequence Flags <mpeg2_sequence_flags>`.
@@ -1677,7 +1686,18 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
       - Indication that all the frames for the sequence are progressive instead
 	of interlaced.
 
-.. c:type:: v4l2_mpeg2_picture
+``V4L2_CID_MPEG_VIDEO_MPEG2_PICTURE (struct)``
+    Specifies the picture parameters (as extracted from the bitstream) for the
+    associated MPEG-2 slice data. This includes fields matching the syntax
+    elements from the picture header and picture coding extension parts of the
+    bitstream as specified by :ref:`mpeg2part2`.
+
+    .. note::
+
+       This compound control is not yet part of the public kernel API and
+       it is expected to change.
+
+.. c:type:: v4l2_ctrl_mpeg2_picture
 
 .. raw:: latex
 
@@ -1687,7 +1707,7 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
 
 .. tabularcolumns:: |p{1.0cm}|p{5.6cm}|p{10.7cm}|
 
-.. flat-table:: struct v4l2_mpeg2_picture
+.. flat-table:: struct v4l2_ctrl_mpeg2_picture
     :header-rows:  0
     :stub-columns: 0
     :widths:       1 1 2
@@ -1708,6 +1728,9 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
       - ``picture_structure``
       - Picture structure (1: interlaced top field, 2: interlaced bottom field,
 	3: progressive frame).
+    * - __u8
+      - ``reserved``
+      - Applications and drivers must set this to zero.
     * - __u32
       - ``flags``
       - See :ref:`MPEG-2 Picture Flags <mpeg2_picture_flags>`.
