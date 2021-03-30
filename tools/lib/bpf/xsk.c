@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <asm/barrier.h>
+#include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <linux/ethtool.h>
 #include <linux/filter.h>
@@ -46,6 +47,9 @@
  #define PF_XDP AF_XDP
 #endif
 
+#define XDP_RX_RING_SETUP_DONE BIT(0)
+#define XDP_TX_RING_SETUP_DONE BIT(1)
+
 enum xsk_prog {
 	XSK_PROG_FALLBACK,
 	XSK_PROG_REDIRECT_FLAGS,
@@ -59,6 +63,7 @@ struct xsk_umem {
 	int fd;
 	int refcount;
 	struct list_head ctx_list;
+	__u8 ring_setup_status;
 };
 
 struct xsk_ctx {
@@ -855,6 +860,7 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 	struct xsk_ctx *ctx;
 	int err, ifindex;
 	bool unmap = umem->fill_save != fill;
+	bool rx_setup_done = false, tx_setup_done = false;
 
 	if (!umem || !xsk_ptr || !(rx || tx))
 		return -EFAULT;
@@ -882,6 +888,8 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 		}
 	} else {
 		xsk->fd = umem->fd;
+		rx_setup_done = umem->ring_setup_status & XDP_RX_RING_SETUP_DONE;
+		tx_setup_done = umem->ring_setup_status & XDP_TX_RING_SETUP_DONE;
 	}
 
 	ctx = xsk_get_ctx(umem, ifindex, queue_id);
@@ -900,7 +908,7 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 	}
 	xsk->ctx = ctx;
 
-	if (rx) {
+	if (rx && !rx_setup_done) {
 		err = setsockopt(xsk->fd, SOL_XDP, XDP_RX_RING,
 				 &xsk->config.rx_size,
 				 sizeof(xsk->config.rx_size));
@@ -908,8 +916,10 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 			err = -errno;
 			goto out_put_ctx;
 		}
+		if (xsk->fd == umem->fd)
+			umem->ring_setup_status |= XDP_RX_RING_SETUP_DONE;
 	}
-	if (tx) {
+	if (tx && !tx_setup_done) {
 		err = setsockopt(xsk->fd, SOL_XDP, XDP_TX_RING,
 				 &xsk->config.tx_size,
 				 sizeof(xsk->config.tx_size));
@@ -917,6 +927,8 @@ int xsk_socket__create_shared(struct xsk_socket **xsk_ptr,
 			err = -errno;
 			goto out_put_ctx;
 		}
+		if (xsk->fd == umem->fd)
+			umem->ring_setup_status |= XDP_TX_RING_SETUP_DONE;
 	}
 
 	err = xsk_get_mmap_offsets(xsk->fd, &off);
