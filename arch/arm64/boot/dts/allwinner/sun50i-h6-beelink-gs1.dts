@@ -289,10 +289,6 @@
 	};
 };
 
-&rtc {
-	clocks = <&ext_osc32k>;
-};
-
 &spdif {
 	status = "okay";
 };
