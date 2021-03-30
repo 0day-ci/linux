@@ -301,12 +301,16 @@ static void nfs_validate_transport_protocol(struct nfs_fs_context *ctx)
 
 /*
  * For text based NFSv2/v3 mounts, the mount protocol transport default
- * settings should depend upon the specified NFS transport.
+ * settings should depend upon the specified NFS transport. If UDP is disabled,
+ * only TCP is allowed.
  */
 static void nfs_set_mount_transport_protocol(struct nfs_fs_context *ctx)
 {
 	nfs_validate_transport_protocol(ctx);
 
+#ifdef CONFIG_NFS_DISABLE_UDP_SUPPORT
+	ctx->mount_server.protocol = XPRT_TRANSPORT_TCP;
+#else
 	if (ctx->mount_server.protocol == XPRT_TRANSPORT_UDP ||
 	    ctx->mount_server.protocol == XPRT_TRANSPORT_TCP)
 			return;
@@ -318,6 +322,7 @@ static void nfs_set_mount_transport_protocol(struct nfs_fs_context *ctx)
 	case XPRT_TRANSPORT_RDMA:
 		ctx->mount_server.protocol = XPRT_TRANSPORT_TCP;
 	}
+#endif
 }
 
 /*
