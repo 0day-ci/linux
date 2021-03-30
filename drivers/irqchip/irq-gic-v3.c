@@ -440,10 +440,21 @@ static void gic_irq_set_prio(struct irq_data *d, u8 prio)
 {
 	void __iomem *base = gic_dist_base(d);
 	u32 offset, index;
+	u32 val, prio_offset_mask, prio_offset_shift;
 
 	offset = convert_offset_index(d, GICD_IPRIORITYR, &index);
 
-	writeb_relaxed(prio, base + offset + index);
+	/*
+	 * GIC-600 memory mapping register doesn't support byte opteration,
+	 * thus read 32-bits from register, set bytes and wtire back to it.
+	 */
+	prio_offset_shift = (index & 0x3) * 8;
+	prio_offset_mask = GENMASK(prio_offset_shift + 7, prio_offset_shift);
+	index &= ~0x3;
+	val = readl_relaxed(base + offset + index);
+	val &= ~prio_offset_mask;
+	val |= prio << prio_offset_shift;
+	writel_relaxed(val, base + offset + index);
 }
 
 static u32 gic_get_ppi_index(struct irq_data *d)
