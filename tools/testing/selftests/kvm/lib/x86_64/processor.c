@@ -714,7 +714,7 @@ uint64_t kvm_get_feature_msr(uint64_t msr_index)
  *
  * Return: KVM CPUID (KVM_GET_CPUID2)
  *
- * Set the VCPU's CPUID.
+ * Get the VCPU's CPUID.
  */
 struct kvm_cpuid2 *vcpu_get_cpuid(struct kvm_vm *vm, uint32_t vcpuid)
 {

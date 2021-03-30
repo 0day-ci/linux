@@ -190,7 +190,7 @@ struct kvm_msrs {
 
 /* for KVM_GET_MSR_INDEX_LIST */
 struct kvm_msr_list {
-	__u32 nmsrs; /* number of msrs in entries */
+	__u32 nmsrs; /* number of msrs in indices */
 	__u32 indices[0];
 };
 
