@@ -9,38 +9,6 @@
 #include <linux/module.h>
 #include <linux/random.h>
 
-typedef int (*rsa_akcipher_complete_cb)(struct akcipher_request *, int);
-static void rsapad_akcipher_req_complete(struct crypto_async_request *child_async_req,
-					 int err, rsa_akcipher_complete_cb cb)
-{
-	struct akcipher_request *req = child_async_req->data;
-	struct crypto_async_request async_req;
-
-	if (err == -EINPROGRESS)
-		return;
-
-	async_req.data = req->base.data;
-	async_req.tfm = crypto_akcipher_tfm(crypto_akcipher_reqtfm(req));
-	async_req.flags = child_async_req->flags;
-	req->base.complete(&async_req, cb(req, err));
-}
-
-static void rsapad_akcipher_setup_child(struct akcipher_request *req,
-					struct scatterlist *src_sg,
-					struct scatterlist *dst_sg,
-					unsigned int src_len,
-					unsigned int dst_len,
-					crypto_completion_t cb)
-{
-	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
-
-	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
-	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags, cb, req);
-	akcipher_request_set_crypt(&req_ctx->child_req, src_sg, dst_sg, src_len, dst_len);
-}
-
 static int pkcs1pad_encrypt_sign_complete(struct akcipher_request *req, int err)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
