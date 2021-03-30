@@ -29,3 +29,12 @@
 &uart0 {
 	status = "okay";
 };
+
+&dramc {
+	dram_type = <0>;
+	channel_cnt = <2>;
+	rank_cnt = <2>;
+	rank_size = <0x0 0x0>;
+	mr_cnt = <1>;
+	mr = <0x5 0xff>;
+};
