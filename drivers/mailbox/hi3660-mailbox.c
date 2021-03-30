@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2017-2018 Hisilicon Limited.
+// Copyright (c) 2017-2018 HiSilicon Limited.
 // Copyright (c) 2017-2018 Linaro Limited.
 
 #include <linux/bitops.h>
@@ -297,5 +297,5 @@ static void __exit hi3660_mbox_exit(void)
 module_exit(hi3660_mbox_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Hisilicon Hi3660 Mailbox Controller");
+MODULE_DESCRIPTION("HiSilicon Hi3660 Mailbox Controller");
 MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
