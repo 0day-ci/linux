@@ -6616,7 +6616,7 @@ compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
  */
 static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 {
-	unsigned long prev_delta = ULONG_MAX, best_delta = ULONG_MAX;
+	long prev_delta = LONG_MAX, best_delta = LONG_MAX;
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 	unsigned long cpu_cap, util, base_energy = 0;
 	int cpu, best_energy_cpu = prev_cpu;
@@ -6643,13 +6643,11 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 		goto unlock;
 
 	for (; pd; pd = pd->next) {
-		unsigned long cur_delta, spare_cap, max_spare_cap = 0;
+		long cur_delta;
+		unsigned long spare_cap, max_spare_cap = 0;
 		unsigned long base_energy_pd;
 		int max_spare_cap_cpu = -1;
-
-		/* Compute the 'base' energy of the pd, without @p */
-		base_energy_pd = compute_energy(p, -1, pd);
-		base_energy += base_energy_pd;
+		bool prev_in_pd = false;
 
 		for_each_cpu_and(cpu, perf_domain_span(pd), sched_domain_span(sd)) {
 			if (!cpumask_test_cpu(cpu, p->cpus_ptr))
@@ -6671,13 +6669,8 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 			if (!fits_capacity(util, cpu_cap))
 				continue;
 
-			/* Always use prev_cpu as a candidate. */
-			if (cpu == prev_cpu) {
-				prev_delta = compute_energy(p, prev_cpu, pd);
-				prev_delta -= base_energy_pd;
-				best_delta = min(best_delta, prev_delta);
-			}
-
+			if (cpu == prev_cpu)
+				prev_in_pd = true;
 			/*
 			 * Find the CPU with the maximum spare capacity in
 			 * the performance domain
@@ -6688,6 +6681,16 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 			}
 		}
 
+		/* Compute the 'base' energy of the pd, without @p */
+		base_energy_pd = compute_energy(p, -1, pd);
+		base_energy += base_energy_pd;
+
+		/* Always use prev_cpu as a candidate. */
+		if (prev_in_pd) {
+			prev_delta = compute_energy(p, prev_cpu, pd);
+			prev_delta -= base_energy_pd;
+			best_delta = min(best_delta, prev_delta);
+		}
 		/* Evaluate the energy impact of using this CPU. */
 		if (max_spare_cap_cpu >= 0 && max_spare_cap_cpu != prev_cpu) {
 			cur_delta = compute_energy(p, max_spare_cap_cpu, pd);
@@ -6705,7 +6708,7 @@ unlock:
 	 * Pick the best CPU if prev_cpu cannot be used, or if it saves at
 	 * least 6% of the energy used by prev_cpu.
 	 */
-	if (prev_delta == ULONG_MAX)
+	if (prev_delta == LONG_MAX)
 		return best_energy_cpu;
 
 	if ((prev_delta - best_delta) > ((prev_delta + base_energy) >> 4))
