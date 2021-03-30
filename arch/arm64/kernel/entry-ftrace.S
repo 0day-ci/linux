@@ -95,6 +95,16 @@ SYM_CODE_START(ftrace_common)
 SYM_INNER_LABEL(ftrace_call, SYM_L_GLOBAL)
 	bl	ftrace_stub
 
+	/*
+	 * The only call in the FTRACE trampoline code is above. The above
+	 * instruction is patched to call a tracer function. Its return
+	 * address is below (ftrace_graph_call). In a stack trace taken from
+	 * a tracer function, ftrace_graph_call() will show. The unwinder
+	 * checks this for reliable stack trace. Please see the comments
+	 * in stacktrace.c. If another call is added in the FTRACE
+	 * trampoline code, the special_functions[] array in stacktrace.c
+	 * must be updated.
+	 */
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 SYM_INNER_LABEL(ftrace_graph_call, SYM_L_GLOBAL) // ftrace_graph_caller();
 	nop				// If enabled, this will be replaced
