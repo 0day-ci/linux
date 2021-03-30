@@ -7807,43 +7807,22 @@ static int md_open(struct block_device *bdev, fmode_t mode)
 	 * Succeed if we can lock the mddev, which confirms that
 	 * it isn't being stopped right now.
 	 */
-	struct mddev *mddev = mddev_find(bdev->bd_dev);
+	struct mddev *mddev = bdev->bd_disk->private_data;
 	int err;
 
-	if (!mddev)
-		return -ENODEV;
-
-	if (mddev->gendisk != bdev->bd_disk) {
-		/* we are racing with mddev_put which is discarding this
-		 * bd_disk.
-		 */
-		mddev_put(mddev);
-		/* Wait until bdev->bd_disk is definitely gone */
-		if (work_pending(&mddev->del_work))
-			flush_workqueue(md_misc_wq);
-		/* Then retry the open from the top */
-		return -ERESTARTSYS;
-	}
-	BUG_ON(mddev != bdev->bd_disk->private_data);
-
-	if ((err = mutex_lock_interruptible(&mddev->open_mutex)))
-		goto out;
-
+	err = mutex_lock_interruptible(&mddev->open_mutex);
+	if (err)
+		return err;
 	if (test_bit(MD_CLOSING, &mddev->flags)) {
 		mutex_unlock(&mddev->open_mutex);
-		err = -ENODEV;
-		goto out;
+		return -ENODEV;
 	}
-
-	err = 0;
+	mddev_get(mddev);
 	atomic_inc(&mddev->openers);
 	mutex_unlock(&mddev->open_mutex);
 
 	bdev_check_media_change(bdev);
- out:
-	if (err)
-		mddev_put(mddev);
-	return err;
+	return 0;
 }
 
 static void md_release(struct gendisk *disk, fmode_t mode)
