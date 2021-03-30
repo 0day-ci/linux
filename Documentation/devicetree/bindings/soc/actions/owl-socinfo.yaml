@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/soc/actions/owl-socinfo.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Actions Semi Owl SoC info module
+
+maintainers:
+  - Cristian Ciocaltea <cristian.ciocaltea@gmail.com>
+
+description: |
+  Actions Semi Owl SoC info module provides access to various information
+  about the S500, S700 and S900 SoC variants, such as serial number or id.
+
+select:
+  properties:
+    compatible:
+      contains:
+        enum:
+          - actions,s500-soc
+          - actions,s700-soc
+          - actions,s900-soc
+  required:
+    - compatible
+
+properties:
+  compatible:
+    items:
+      - enum:
+          - actions,s500-soc
+          - actions,s700-soc
+          - actions,s900-soc
+      - const: simple-bus
+
+required:
+  - compatible
+
+additionalProperties: true
+
+examples:
+  - |
+    / {
+        compatible = "roseapplepi,roseapplepi", "actions,s500";
+        model = "Roseapple Pi";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        soc {
+            compatible = "actions,s500-soc", "simple-bus";
+            #address-cells = <1>;
+            #size-cells = <1>;
+            ranges;
+        };
+    };
+
+...
