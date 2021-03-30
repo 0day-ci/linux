@@ -128,6 +128,7 @@
  * @dp_lanes:     Count of dp_lanes we're using.
  * @ln_assign:    Value to program to the LN_ASSIGN register.
  * @ln_polrs:     Value for the 4-bit LN_POLRS field of SN_ENH_FRAME_REG.
+ * @pre_enabled:  If true then pre_enable() has run.
  *
  * @gchip:        If we expose our GPIOs, this is used.
  * @gchip_output: A cache of whether we've set GPIOs to output.  This
@@ -155,6 +156,7 @@ struct ti_sn_bridge {
 	int				dp_lanes;
 	u8				ln_assign;
 	u8				ln_polrs;
+	bool				pre_enabled;
 
 #if defined(CONFIG_OF_GPIO)
 	struct gpio_chip		gchip;
@@ -268,11 +270,33 @@ static int ti_sn_bridge_connector_get_modes(struct drm_connector *connector)
 {
 	struct ti_sn_bridge *pdata = connector_to_ti_sn_bridge(connector);
 	struct edid *edid;
+	bool was_enabled;
 	int num = 0;
 
-	pm_runtime_get_sync(pdata->dev);
+	/*
+	 * Try to get the EDID first without anything special. There are
+	 * three things that could happen with this call.
+	 * a) It might just return from its cache.
+	 * b) It might try to initiate an AUX transfer which might work.
+	 * c) It might try to initiate an AUX transfer which might fail because
+	 *    we're not powered up.
+	 *
+	 * If we get a failure we'll assume case c) and try again. NOTE: we
+	 * don't want to power up every time because that's slow and we don't
+	 * have visibility into whether the data has already been cached.
+	 */
 	edid = drm_get_edid(connector, &pdata->aux.ddc);
-	pm_runtime_put(pdata->dev);
+	if (!edid) {
+		was_enabled = pdata->pre_enabled;
+
+		if (!was_enabled)
+			drm_bridge_chain_pre_enable(&pdata->bridge);
+
+		edid = drm_get_edid(connector, &pdata->aux.ddc);
+
+		if (!was_enabled)
+			drm_bridge_chain_post_disable(&pdata->bridge);
+	}
 
 	if (edid) {
 		if (drm_edid_is_valid(edid))
@@ -852,11 +876,15 @@ static void ti_sn_bridge_pre_enable(struct drm_bridge *bridge)
 			   HPD_DISABLE);
 
 	drm_panel_prepare(pdata->panel);
+
+	pdata->pre_enabled = true;
 }
 
 static void ti_sn_bridge_post_disable(struct drm_bridge *bridge)
 {
 	struct ti_sn_bridge *pdata = bridge_to_ti_sn_bridge(bridge);
+
+	pdata->pre_enabled = false;
 
 	drm_panel_unprepare(pdata->panel);
 
@@ -890,6 +918,13 @@ static ssize_t ti_sn_aux_transfer(struct drm_dp_aux *aux,
 	unsigned int val;
 	int ret;
 	u8 addr_len[SN_AUX_LENGTH_REG + 1 - SN_AUX_ADDR_19_16_REG];
+
+	/*
+	 * Things just won't work if the panel isn't powered. Return failure
+	 * right away.
+	 */
+	if (!pdata->pre_enabled)
+		return -EIO;
 
 	if (len > SN_AUX_MAX_PAYLOAD_BYTES)
 		return -EINVAL;
