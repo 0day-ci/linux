@@ -101,6 +101,8 @@ struct akcipher_alg {
 	unsigned int (*max_size)(struct crypto_akcipher *tfm);
 	int (*init)(struct crypto_akcipher *tfm);
 	void (*exit)(struct crypto_akcipher *tfm);
+	int (*set_sig_params)(struct crypto_akcipher *tfm, const void *sig,
+			      unsigned int sig_len);
 
 	unsigned int reqsize;
 	struct crypto_alg base;
@@ -414,5 +416,29 @@ static inline int crypto_akcipher_set_priv_key(struct crypto_akcipher *tfm,
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
 	return alg->set_priv_key(tfm, key, keylen);
+}
+
+/**
+ * crypto_akcipher_set_sig_params() - Invoke set sig params operation
+ *
+ * Use this if the verification/signing operation behavior depends on
+ * parameters contained in the signature.
+ *
+ * @tfm:	tfm handle
+ * @sig:	ptr to a struct public_key_signature to extract info from
+ * @siglen:	Length of sig - should be unnecessary if you pass the struct.
+ *
+ * Return: zero on success; error code in case of error
+ */
+static inline int crypto_akcipher_set_sig_params(struct crypto_akcipher *tfm,
+						 const void *sig,
+						 unsigned int siglen)
+{
+	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
+
+	if (alg->set_sig_params)
+		return alg->set_sig_params(tfm, sig, siglen);
+	else
+		return -EOPNOTSUPP;
 }
 #endif

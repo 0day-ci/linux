@@ -277,6 +277,7 @@ int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **tb,
 	inst->alg.set_pub_key = alg->set_pub_key;
 	inst->alg.set_priv_key = alg->set_priv_key;
 	inst->alg.max_size = alg->max_size;
+	inst->alg.set_sig_params = alg->set_sig_params;
 	inst->alg.reqsize = sizeof(struct rsapad_akciper_req_ctx) + rsa_alg->reqsize;
 
 	inst->free = rsapad_akcipher_free;
