@@ -112,6 +112,7 @@ properties:
         - pattern: '^clk_(a|b|c|i)$'
 
   port: true
+  ports: true
 
 # use patternProperties to avoid naming "xxx,yyy" issue
 patternProperties:
