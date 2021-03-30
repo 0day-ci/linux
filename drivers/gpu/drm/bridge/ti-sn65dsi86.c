@@ -274,6 +274,18 @@ static int ti_sn_bridge_connector_get_modes(struct drm_connector *connector)
 	int num = 0;
 
 	/*
+	 * Don't try to read the EDID if no refclk. In theory it is possible
+	 * to make this work but it's tricky. I believe that we need to get
+	 * our upstream MIPI source to provide a pixel clock before we can
+	 * do AUX transations but we need to be able to read the EDID before
+	 * we've picked a display mode. The bridge is already super limited
+	 * if you try to use it without a refclk so presumably limiting to
+	 * the fixed modes our downstream panel reports is fine.
+	 */
+	if (!pdata->refclk)
+		goto exit;
+
+	/*
 	 * Try to get the EDID first without anything special. There are
 	 * three things that could happen with this call.
 	 * a) It might just return from its cache.
@@ -306,6 +318,7 @@ static int ti_sn_bridge_connector_get_modes(struct drm_connector *connector)
 			return num;
 	}
 
+exit:
 	return drm_panel_get_modes(pdata->panel, connector);
 }
 
