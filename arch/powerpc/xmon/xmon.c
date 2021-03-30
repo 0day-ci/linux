@@ -54,6 +54,7 @@
 #include <asm/code-patching.h>
 #include <asm/sections.h>
 #include <asm/inst.h>
+#include <asm/traps.h>
 
 #ifdef CONFIG_PPC64
 #include <asm/hvcall.h>
@@ -605,7 +606,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 			 * debugger break (IPI). This is similar to
 			 * crash_kexec_secondary().
 			 */
-			if (TRAP(regs) != 0x100 || !wait_for_other_cpus(ncpus))
+			if (TRAP(regs) != TRAP_RESET || !wait_for_other_cpus(ncpus))
 				smp_send_debugger_break();
 
 			wait_for_other_cpus(ncpus);
@@ -615,7 +616,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 
 		if (!locked_down) {
 			/* for breakpoint or single step, print curr insn */
-			if (bp || TRAP(regs) == 0xd00)
+			if (bp || TRAP(regs) == TRAP_TRACEI)
 				ppc_inst_dump(regs->nip, 1, 0);
 			printf("enter ? for help\n");
 		}
@@ -684,7 +685,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 		disable_surveillance();
 		if (!locked_down) {
 			/* for breakpoint or single step, print current insn */
-			if (bp || TRAP(regs) == 0xd00)
+			if (bp || TRAP(regs) == TRAP_TRACEI)
 				ppc_inst_dump(regs->nip, 1, 0);
 			printf("enter ? for help\n");
 		}
@@ -1769,9 +1770,9 @@ static void excprint(struct pt_regs *fp)
 	printf("    sp: %lx\n", fp->gpr[1]);
 	printf("   msr: %lx\n", fp->msr);
 
-	if (trap == 0x300 || trap == 0x380 || trap == 0x600 || trap == 0x200) {
+	if (trap == TRAP_DSI || trap == TRAP_DSEGI || trap == TRAP_ALIGN || trap == TRAP_MCE) {
 		printf("   dar: %lx\n", fp->dar);
-		if (trap != 0x380)
+		if (trap != TRAP_DSEGI)
 			printf(" dsisr: %lx\n", fp->dsisr);
 	}
 
@@ -1785,7 +1786,7 @@ static void excprint(struct pt_regs *fp)
 		       current->pid, current->comm);
 	}
 
-	if (trap == 0x700)
+	if (trap == TRAP_PROG)
 		print_bug_trap(fp);
 
 	printf(linux_banner);
@@ -1846,7 +1847,7 @@ static void prregs(struct pt_regs *fp)
 	printf("ctr = "REG"   xer = "REG"   trap = %4lx\n",
 	       fp->ctr, fp->xer, fp->trap);
 	trap = TRAP(fp);
-	if (trap == 0x300 || trap == 0x380 || trap == 0x600)
+	if (trap == TRAP_DSI || trap == TRAP_DSEGI || trap == TRAP_ALIGN)
 		printf("dar = "REG"   dsisr = %.8lx\n", fp->dar, fp->dsisr);
 }
 
@@ -2235,11 +2236,11 @@ static int handle_fault(struct pt_regs *regs)
 {
 	fault_except = TRAP(regs);
 	switch (TRAP(regs)) {
-	case 0x200:
+	case TRAP_MCE:
 		fault_type = 0;
 		break;
-	case 0x300:
-	case 0x380:
+	case TRAP_DSI:
+	case TRAP_DSEGI:
 		fault_type = 1;
 		break;
 	default:
