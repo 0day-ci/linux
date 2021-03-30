@@ -23,6 +23,17 @@
 	chosen {
 	};
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		soc_serial: soc-serial@800 {
+			compatible = "actions,s500-soc-serial", "actions,owl-soc-serial";
+			reg = <0x800 0x8>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
