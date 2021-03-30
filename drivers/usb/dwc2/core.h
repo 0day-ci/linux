@@ -210,7 +210,6 @@ do { \
 #define call_gadget(_hs, _entry)	do {} while (0)
 #endif
 
-struct dwc2_hsotg;
 struct dwc2_host_chan;
 
 /* Device States */
