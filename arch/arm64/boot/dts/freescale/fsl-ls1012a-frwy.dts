@@ -38,3 +38,7 @@
 		spi-tx-bus-width = <2>;
 	};
 };
+
+&pcie1 {
+	status = "okay";
+};
