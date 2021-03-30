@@ -10,11 +10,11 @@
 #include <linux/perf_event.h>
 #include <linux/tracepoint.h>
 
-struct trace_array;
 struct array_buffer;
-struct tracer;
-struct dentry;
 struct bpf_prog;
+struct dentry;
+struct tracer;
+struct trace_array;
 
 const char *trace_print_flags_seq(struct trace_seq *p, const char *delim,
 				  unsigned long flags,
@@ -404,7 +404,6 @@ trace_get_fields(struct trace_event_call *event_call)
 	return event_call->class->get_fields(event_call);
 }
 
-struct trace_array;
 struct trace_subsystem_dir;
 
 enum {
