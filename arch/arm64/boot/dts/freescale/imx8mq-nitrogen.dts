@@ -281,14 +281,6 @@
 	};
 };
 
-&gpio3 {
-	max7323_intterupt {
-		gpio-hog;
-		gpios = <15 0>;
-		input;
-	};
-};
-
 &lcdif {
 	status = "okay";
 };
