@@ -1532,6 +1532,8 @@ F:	Documentation/devicetree/bindings/mmc/owl-mmc.yaml
 F:	Documentation/devicetree/bindings/net/actions,owl-emac.yaml
 F:	Documentation/devicetree/bindings/pinctrl/actions,*
 F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+F:	Documentation/devicetree/bindings/reserved-memory/actions,owl-soc-serial.yaml
+F:	Documentation/devicetree/bindings/soc/actions/owl-socinfo.yaml
 F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
 F:	arch/arm/boot/dts/owl-*
 F:	arch/arm/mach-actions/
