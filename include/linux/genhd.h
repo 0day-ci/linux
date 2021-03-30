@@ -155,6 +155,7 @@ struct gendisk {
 #define GD_READ_ONLY			1
 
 	struct mutex open_mutex;	/* open/close mutex */
+	unsigned open_partitions;	/* number of open partitions */
 
 	struct kobject *slave_dir;
 

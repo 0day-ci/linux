@@ -527,7 +527,7 @@ int blk_drop_partitions(struct block_device *bdev)
 	struct disk_part_iter piter;
 	struct block_device *part;
 
-	if (bdev->bd_part_count)
+	if (bdev->bd_disk->open_partitions)
 		return -EBUSY;
 
 	sync_blockdev(bdev);
