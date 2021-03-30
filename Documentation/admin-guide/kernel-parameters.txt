@@ -1356,6 +1356,21 @@
 			See Documentation/admin-guide/sysctl/net.rst for
 			fb_tunnels_only_for_init_ns
 
+	fips=		Format: { 0 | 1}
+			Use to disable (0) or enable (1) FIPS mode.
+			If enabled, any process that is waiting on the
+			'fips_fail_notif_chain' will be notified of fips
+			failures.
+			This setting can also be modified via sysctl at
+			/proc/sysctl/crypto/fips_enabled, i.e.,
+			crypto.fips_enabled.
+			If fips_enabled = 1, some crypto tests are skipped.
+			It can also effect which ECC curve is used.
+			If fips_enabled = 1 and a test fails, it will cause a
+			kernel panic.
+			If fips_enabled = 1, RSA test requires a key size of
+			2K or larger.
+
 	floppy=		[HW]
 			See Documentation/admin-guide/blockdev/floppy.rst.
 
