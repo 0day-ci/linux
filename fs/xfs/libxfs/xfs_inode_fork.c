@@ -292,6 +292,15 @@ xfs_ifork_alloc(
 	ifp = kmem_cache_zalloc(xfs_ifork_zone, GFP_NOFS | __GFP_NOFAIL);
 	ifp->if_format = format;
 	ifp->if_nextents = nextents;
+
+	/*
+	 * If this is a caller initialising a newly created fork, we need to
+	 * set XFS_IFEXTENTS to indicate the fork state is completely up to
+	 * date. Otherwise it is up to the caller to initialise the in-memory
+	 * state of the inode fork from the on-disk state.
+	 */
+	if (format == XFS_DINODE_FMT_EXTENTS && nextents == 0)
+		ifp->if_flags |= XFS_IFEXTENTS;
 	return ifp;
 }
 

@@ -1095,7 +1095,6 @@ xfs_bmap_add_attrfork(
 	ASSERT(ip->i_afp == NULL);
 
 	ip->i_afp = xfs_ifork_alloc(XFS_DINODE_FMT_EXTENTS, 0);
-	ip->i_afp->if_flags = XFS_IFEXTENTS;
 	logflags = 0;
 	switch (ip->i_df.if_format) {
 	case XFS_DINODE_FMT_LOCAL:
