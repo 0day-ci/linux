@@ -357,7 +357,6 @@ int zlib_decompress_bio(struct list_head *ws, struct compressed_bio *cb)
 	else
 		ret = 0;
 done:
-	zlib_inflateEnd(&workspace->strm);
 	if (data_in)
 		kunmap(pages_in[page_in_index]);
 	if (!ret)
