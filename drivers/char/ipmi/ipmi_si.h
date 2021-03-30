@@ -22,6 +22,9 @@ enum si_type {
 	SI_TYPE_INVALID, SI_KCS, SI_SMIC, SI_BT
 };
 
+/* 'invalid' to allow a firmware-specified interface to be disabled */
+static __maybe_unused const char *const si_to_str[] = { "invalid", "kcs", "smic", "bt" };
+
 enum ipmi_addr_space {
 	IPMI_IO_ADDR_SPACE, IPMI_MEM_ADDR_SPACE
 };
