@@ -891,7 +891,6 @@ struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 	mapping_set_gfp_mask(&inode->i_data, GFP_USER);
 
 	bdev = I_BDEV(inode);
-	mutex_init(&bdev->bd_mutex);
 	mutex_init(&bdev->bd_fsfreeze_mutex);
 	spin_lock_init(&bdev->bd_size_lock);
 	bdev->bd_disk = disk;
@@ -1150,7 +1149,7 @@ int bd_link_disk_holder(struct block_device *bdev, struct gendisk *disk)
 	struct bd_holder_disk *holder;
 	int ret = 0;
 
-	mutex_lock(&bdev->bd_mutex);
+	mutex_lock(&bdev->bd_disk->open_mutex);
 
 	WARN_ON_ONCE(!bdev->bd_holder);
 
@@ -1195,7 +1194,7 @@ out_del:
 out_free:
 	kfree(holder);
 out_unlock:
-	mutex_unlock(&bdev->bd_mutex);
+	mutex_unlock(&bdev->bd_disk->open_mutex);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(bd_link_disk_holder);
@@ -1214,7 +1213,7 @@ void bd_unlink_disk_holder(struct block_device *bdev, struct gendisk *disk)
 {
 	struct bd_holder_disk *holder;
 
-	mutex_lock(&bdev->bd_mutex);
+	mutex_lock(&bdev->bd_disk->open_mutex);
 
 	holder = bd_find_holder_disk(bdev, disk);
 
@@ -1226,7 +1225,7 @@ void bd_unlink_disk_holder(struct block_device *bdev, struct gendisk *disk)
 		kfree(holder);
 	}
 
-	mutex_unlock(&bdev->bd_mutex);
+	mutex_unlock(&bdev->bd_disk->open_mutex);
 }
 EXPORT_SYMBOL_GPL(bd_unlink_disk_holder);
 #endif
@@ -1238,7 +1237,7 @@ int bdev_disk_changed(struct block_device *bdev, bool invalidate)
 	struct gendisk *disk = bdev->bd_disk;
 	int ret;
 
-	lockdep_assert_held(&bdev->bd_mutex);
+	lockdep_assert_held(&disk->open_mutex);
 
 	clear_bit(GD_NEED_PART_SCAN, &bdev->bd_disk->state);
 
@@ -1321,14 +1320,10 @@ static int blkdev_get_part(struct block_device *part, fmode_t mode)
 		goto done;
 
 	whole = bdgrab(disk->part0);
-	mutex_lock_nested(&whole->bd_mutex, 1);
 	ret = blkdev_get_whole(whole, mode);
-	if (ret) {
-		mutex_unlock(&whole->bd_mutex);
+	if (ret)
 		goto out_put_whole;
-	}
 	whole->bd_part_count++;
-	mutex_unlock(&whole->bd_mutex);
 
 	ret = -ENXIO;
 	if (!(disk->flags & GENHD_FL_UP) || !bdev_nr_sectors(part))
@@ -1438,7 +1433,7 @@ struct block_device *blkdev_get_by_dev(dev_t dev, fmode_t mode, void *holder)
 
 	disk_block_events(disk);
 
-	mutex_lock(&bdev->bd_mutex);
+	mutex_lock(&disk->open_mutex);
 	if (bdev_is_partition(bdev))
 		ret = blkdev_get_part(bdev, mode);
 	else
@@ -1461,7 +1456,7 @@ struct block_device *blkdev_get_by_dev(dev_t dev, fmode_t mode, void *holder)
 			unblock_events = false;
 		}
 	}
-	mutex_unlock(&bdev->bd_mutex);
+	mutex_unlock(&disk->open_mutex);
 
 	if (unblock_events)
 		disk_unblock_events(disk);
@@ -1470,7 +1465,7 @@ struct block_device *blkdev_get_by_dev(dev_t dev, fmode_t mode, void *holder)
 abort_claiming:
 	if (mode & FMODE_EXCL)
 		bd_abort_claiming(bdev, holder);
-	mutex_unlock(&bdev->bd_mutex);
+	mutex_unlock(&disk->open_mutex);
 	disk_unblock_events(disk);
 put_blkdev:
 	blkdev_put_no_open(bdev);
@@ -1550,7 +1545,6 @@ static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 	struct gendisk *disk = bdev->bd_disk;
 	struct block_device *victim = NULL;
 
-	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (for_part)
 		bdev->bd_part_count--;
 
@@ -1565,7 +1559,6 @@ static void __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 
 	if (!bdev_is_partition(bdev) && disk->fops->release)
 		disk->fops->release(disk, mode);
-	mutex_unlock(&bdev->bd_mutex);
 	if (victim) {
 		__blkdev_put(victim, mode, 1);
 		bdput(victim);
@@ -1586,15 +1579,14 @@ void blkdev_put(struct block_device *bdev, fmode_t mode)
 	if (bdev->bd_openers == 1)
 		sync_blockdev(bdev);
 
-	mutex_lock(&bdev->bd_mutex);
-
+	mutex_lock(&disk->open_mutex);
 	if (mode & FMODE_EXCL) {
 		struct block_device *whole = bdev_whole(bdev);
 		bool bdev_free;
 
 		/*
 		 * Release a claim on the device.  The holder fields
-		 * are protected with bdev_lock.  bd_mutex is to
+		 * are protected with bdev_lock.  open_mutex is to
 		 * synchronize disk_holder unlinking.
 		 */
 		spin_lock(&bdev_lock);
@@ -1625,9 +1617,10 @@ void blkdev_put(struct block_device *bdev, fmode_t mode)
 	 * from userland - e.g. eject(1).
 	 */
 	disk_flush_events(disk, DISK_EVENT_MEDIA_CHANGE);
-	mutex_unlock(&bdev->bd_mutex);
 
 	__blkdev_put(bdev, mode, 0);
+	mutex_unlock(&disk->open_mutex);
+
 	blkdev_put_no_open(bdev);
 }
 EXPORT_SYMBOL(blkdev_put);
@@ -1920,10 +1913,10 @@ void iterate_bdevs(void (*func)(struct block_device *, void *), void *arg)
 		old_inode = inode;
 		bdev = I_BDEV(inode);
 
-		mutex_lock(&bdev->bd_mutex);
+		mutex_lock(&bdev->bd_disk->open_mutex);
 		if (bdev->bd_openers)
 			func(bdev, arg);
-		mutex_unlock(&bdev->bd_mutex);
+		mutex_unlock(&bdev->bd_disk->open_mutex);
 
 		spin_lock(&blockdev_superblock->s_inode_list_lock);
 	}
