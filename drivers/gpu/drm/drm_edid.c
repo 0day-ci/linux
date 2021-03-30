@@ -2049,15 +2049,39 @@ struct edid *drm_get_edid(struct drm_connector *connector,
 			  struct i2c_adapter *adapter)
 {
 	struct edid *edid;
+	size_t old_edid_size;
+	const struct edid *old_edid;
 
 	if (connector->force == DRM_FORCE_OFF)
 		return NULL;
 
-	if (connector->force == DRM_FORCE_UNSPECIFIED && !drm_probe_ddc(adapter))
-		return NULL;
+	if (connector->connector_type == DRM_MODE_CONNECTOR_eDP &&
+	    connector->edid_blob_ptr) {
+		/*
+		 * eDP devices are non-removable, or at least not something
+		 * that's expected to be hot-pluggable. We can freely use
+		 * the cached EDID.
+		 *
+		 * NOTE: technically we could probably even use the cached
+		 * EDID even for non-eDP because the cached EDID should be
+		 * cleared if we ever notice a display is not connected, but
+		 * we'll use an abundance of caution and only do it for eDP.
+		 * It's more important for eDP anyway because the EDID may not
+		 * always be readable, like when the panel is powered down.
+		 */
+		old_edid = (const struct edid *)connector->edid_blob_ptr->data;
+		old_edid_size = ksize(old_edid);
+		edid = kmalloc(old_edid_size, GFP_KERNEL);
+		if (edid)
+			memcpy(edid, old_edid, old_edid_size);
+	} else {
+		if (connector->force == DRM_FORCE_UNSPECIFIED && !drm_probe_ddc(adapter))
+			return NULL;
 
-	edid = drm_do_get_edid(connector, drm_do_probe_ddc_edid, adapter);
-	drm_connector_update_edid_property(connector, edid);
+		edid = drm_do_get_edid(connector, drm_do_probe_ddc_edid, adapter);
+		drm_connector_update_edid_property(connector, edid);
+	}
+
 	return edid;
 }
 EXPORT_SYMBOL(drm_get_edid);
