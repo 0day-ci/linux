@@ -293,9 +293,12 @@ struct dw_i2c_dev {
 #define ACCESS_INTR_MASK	BIT(0)
 #define ACCESS_NO_IRQ_SUSPEND	BIT(1)
 
+#define MODEL_AMD_NAVI_GPU	BIT(2)
 #define MODEL_MSCC_OCELOT	BIT(8)
 #define MODEL_BAIKAL_BT1	BIT(9)
 #define MODEL_MASK		GENMASK(11, 8)
+#define AMD_UCSI_INTR_EN	0xd
+#define AMD_UCSI_INTR_REG	0x474
 
 int i2c_dw_init_regmap(struct dw_i2c_dev *dev);
 u32 i2c_dw_scl_hcnt(u32 ic_clk, u32 tSYMBOL, u32 tf, int cond, int offset);
