@@ -191,7 +191,10 @@ static u64 get_rc6(struct intel_gt *gt)
 		 * on top of the last known real value, as the approximated RC6
 		 * counter value.
 		 */
-		val = ktime_since_raw(pmu->sleep_last);
+		if (gt->rc6.supported)
+			val = ktime_since_raw(pmu->sleep_last);
+		else
+			val = 0;
 		val += pmu->sample[__I915_SAMPLE_RC6].cur;
 	}
 
