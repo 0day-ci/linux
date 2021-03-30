@@ -42,6 +42,7 @@ rsa_generic-y += rsa_helper.o
 rsa_generic-y += rsa-common.o
 rsa_generic-y += rsa-pkcs1pad.o
 obj-$(CONFIG_CRYPTO_RSA) += rsa_generic.o
+obj-$(CONFIG_CRYPTO_RSASSA_PSS) += rsa-psspad.o
 
 $(obj)/sm2signature.asn1.o: $(obj)/sm2signature.asn1.c $(obj)/sm2signature.asn1.h
 $(obj)/sm2.o: $(obj)/sm2signature.asn1.h

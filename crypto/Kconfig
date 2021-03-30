@@ -224,6 +224,12 @@ config CRYPTO_RSA
 	help
 	  Generic implementation of the RSA public key algorithm.
 
+config CRYPTO_RSASSA_PSS
+	bool "RSASSA-PSS algorithm"
+	select CRYPTO_RSA
+	help
+	  RSASSA-PSS signature verification scheme.
+
 config CRYPTO_DH
 	tristate "Diffie-Hellman algorithm"
 	select CRYPTO_KPP
