@@ -767,7 +767,7 @@ static int get_leaf(struct gfs2_inode *dip, u64 leaf_no,
 	return error;
 }
 
-/**
+/*
  * get_leaf_nr - Get a leaf number associated with the index
  * @dip: The GFS2 inode
  * @index:
@@ -775,7 +775,6 @@ static int get_leaf(struct gfs2_inode *dip, u64 leaf_no,
  *
  * Returns: 0 on success, error code otherwise
  */
-
 static int get_leaf_nr(struct gfs2_inode *dip, u32 index,
 		       u64 *leaf_out)
 {
@@ -898,7 +897,7 @@ static struct gfs2_leaf *new_leaf(struct inode *inode, struct buffer_head **pbh,
 
 /**
  * dir_make_exhash - Convert a stuffed directory into an ExHash directory
- * @dip: The GFS2 inode
+ * @inode: The GFS2 inode
  *
  * Returns: 0 on success, error code otherwise
  */
@@ -989,11 +988,9 @@ static int dir_make_exhash(struct inode *inode)
 	return 0;
 }
 
-/**
+/*
  * dir_split_leaf - Split a leaf block into two
- * @dip: The GFS2 inode
- * @index:
- * @leaf_no:
+ * @inode: The GFS2 inode
  *
  * Returns: 0 on success, error code on failure
  */
@@ -1252,6 +1249,7 @@ static int compare_dents(const void *a, const void *b)
  * @ctx: what to feed the entries to
  * @darr: an array of struct gfs2_dirent pointers to read
  * @entries: the number of entries in darr
+ * @sort_start: the index into @darr to start the sort from
  * @copied: pointer to int that's non-zero if a entry has been copied out
  *
  * Jump through some hoops to make sure that if there are hash collsions,
@@ -1466,7 +1464,7 @@ out:
 	return error;
 }
 
-/**
+/*
  * gfs2_dir_readahead - Issue read-ahead requests for leaf blocks.
  *
  * Note: we can't calculate each index like dir_e_read can because we don't
@@ -1515,14 +1513,11 @@ static void gfs2_dir_readahead(struct inode *inode, unsigned hsize, u32 index,
 	}
 }
 
-/**
+/*
  * dir_e_read - Reads the entries from a directory into a filldir buffer
- * @dip: dinode pointer
- * @ctx: actor to feed the entries to
  *
  * Returns: errno
  */
-
 static int dir_e_read(struct inode *inode, struct dir_context *ctx,
 		      struct file_ra_state *f_ra)
 {
@@ -1627,7 +1622,7 @@ out:
 
 /**
  * gfs2_dir_search - Search a directory
- * @dip: The GFS2 dir inode
+ * @dir: The GFS2 dir inode
  * @name: The name we are looking up
  * @fail_on_exist: Fail if the name exists rather than looking it up
  *
@@ -1636,7 +1631,6 @@ out:
  *
  * Returns: errno
  */
-
 struct inode *gfs2_dir_search(struct inode *dir, const struct qstr *name,
 			      bool fail_on_exist)
 {
@@ -1864,11 +1858,10 @@ int gfs2_dir_add(struct inode *inode, const struct qstr *name,
 /**
  * gfs2_dir_del - Delete a directory entry
  * @dip: The GFS2 inode
- * @filename: The filename
+ * @dentry: The directory entry to delete
  *
  * Returns: 0 on success, error code on failure
  */
-
 int gfs2_dir_del(struct gfs2_inode *dip, const struct dentry *dentry)
 {
 	const struct qstr *name = &dentry->d_name;
@@ -1916,11 +1909,9 @@ int gfs2_dir_del(struct gfs2_inode *dip, const struct dentry *dentry)
 	return 0;
 }
 
-/**
+/*
  * gfs2_dir_mvino - Change inode number of directory entry
  * @dip: The GFS2 inode
- * @filename:
- * @new_inode:
  *
  * This routine changes the inode number of a directory entry.  It's used
  * by rename to change ".." when a directory is moved.
@@ -1960,7 +1951,7 @@ int gfs2_dir_mvino(struct gfs2_inode *dip, const struct qstr *filename,
  * @len: the number of pointers to this leaf
  * @leaf_no: the leaf number
  * @leaf_bh: buffer_head for the starting leaf
- * last_dealloc: 1 if this is the final dealloc for the leaf, else 0
+ * @last_dealloc: 1 if this is the final dealloc for the leaf, else 0
  *
  * Returns: errno
  */
@@ -2142,8 +2133,8 @@ out:
 
 /**
  * gfs2_diradd_alloc_required - find if adding entry will require an allocation
- * @ip: the file being written to
- * @filname: the filename that's going to be added
+ * @inode: The directory inode
+ * @name: the filename that's going to be added
  * @da: The structure to return dir alloc info
  *
  * Returns: 0 if ok, -ve on error
