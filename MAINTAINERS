@@ -17871,6 +17871,13 @@ S:	Odd Fixes
 F:	drivers/clk/ti/
 F:	include/linux/clk/ti.h
 
+TI CSI2RX DRIVER
+M:	Pratyush Yadav <p.yadav@ti.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/media/ti,csi2rx.yaml
+F:	drivers/media/platform/ti-vpe/ti-csi2rx.c
+
 TI DAVINCI MACHINE SUPPORT
 M:	Sekhar Nori <nsekhar@ti.com>
 R:	Bartosz Golaszewski <bgolaszewski@baylibre.com>
