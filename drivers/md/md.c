@@ -734,7 +734,7 @@ void mddev_init(struct mddev *mddev)
 }
 EXPORT_SYMBOL_GPL(mddev_init);
 
-static struct mddev *mddev_find(dev_t unit)
+static struct mddev *mddev_find(dev_t unit, bool create)
 {
 	struct mddev *mddev, *new = NULL;
 
@@ -5644,7 +5644,7 @@ static int md_alloc(dev_t dev, char *name)
 	 * writing to /sys/module/md_mod/parameters/new_array.
 	 */
 	static DEFINE_MUTEX(disks_mutex);
-	struct mddev *mddev = mddev_find(dev);
+	struct mddev *mddev = mddev_find(dev, true);
 	struct gendisk *disk;
 	int partitioned;
 	int shift;
@@ -6523,7 +6523,7 @@ static void autorun_devices(int part)
 		}
 
 		md_probe(dev);
-		mddev = mddev_find(dev);
+		mddev = mddev_find(dev, true);
 		if (!mddev || !mddev->gendisk) {
 			if (mddev)
 				mddev_put(mddev);
@@ -7807,7 +7807,7 @@ static int md_open(struct block_device *bdev, fmode_t mode)
 	 * Succeed if we can lock the mddev, which confirms that
 	 * it isn't being stopped right now.
 	 */
-	struct mddev *mddev = mddev_find(bdev->bd_dev);
+	struct mddev *mddev = mddev_find(bdev->bd_dev, false);
 	int err;
 
 	if (!mddev)
