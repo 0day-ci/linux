@@ -653,7 +653,7 @@ static int vidioc_vdec_subscribe_evt(struct v4l2_fh *fh,
 	}
 }
 
-static int vidioc_try_fmt(struct v4l2_format *f,
+static int vidioc_try_fmt(struct v4l2_format *f, void *priv,
 			  const struct mtk_video_fmt *fmt)
 {
 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
@@ -665,6 +665,7 @@ static int vidioc_try_fmt(struct v4l2_format *f,
 		pix_fmt_mp->plane_fmt[0].bytesperline = 0;
 	} else if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		int tmp_w, tmp_h;
+		struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
 
 		pix_fmt_mp->height = clamp(pix_fmt_mp->height,
 					MTK_VDEC_MIN_H,
@@ -673,27 +674,45 @@ static int vidioc_try_fmt(struct v4l2_format *f,
 					MTK_VDEC_MIN_W,
 					MTK_VDEC_MAX_W);
 
+		tmp_w = pix_fmt_mp->width;
+		tmp_h = pix_fmt_mp->height;
+
+		if (ctx->dev->vdec_pdata->uses_stateless_api ||
+			ctx->state >= MTK_STATE_HEADER) {
+			v4l_bound_align_image(&pix_fmt_mp->width,
+						MTK_VDEC_MIN_W,
+						MTK_VDEC_MAX_W, 4,
+						&pix_fmt_mp->height,
+						MTK_VDEC_MIN_H,
+						MTK_VDEC_MAX_H, 5, 6);
+
+			if (pix_fmt_mp->width < tmp_w &&
+				(pix_fmt_mp->width + 16) <= MTK_VDEC_MAX_W)
+				pix_fmt_mp->width += 16;
+			if (pix_fmt_mp->height < tmp_h &&
+				(pix_fmt_mp->height + 32) <= MTK_VDEC_MAX_H)
+				pix_fmt_mp->height += 32;
+		} else {
 		/*
-		 * Find next closer width align 64, heign align 64, size align
+		 * Find next closer width align 64, height align 64, size align
 		 * 64 rectangle
 		 * Note: This only get default value, the real HW needed value
 		 *       only available when ctx in MTK_STATE_HEADER state
 		 */
-		tmp_w = pix_fmt_mp->width;
-		tmp_h = pix_fmt_mp->height;
-		v4l_bound_align_image(&pix_fmt_mp->width,
-					MTK_VDEC_MIN_W,
-					MTK_VDEC_MAX_W, 6,
-					&pix_fmt_mp->height,
-					MTK_VDEC_MIN_H,
-					MTK_VDEC_MAX_H, 6, 9);
+			v4l_bound_align_image(&pix_fmt_mp->width,
+						MTK_VDEC_MIN_W,
+						MTK_VDEC_MAX_W, 6,
+						&pix_fmt_mp->height,
+						MTK_VDEC_MIN_H,
+						MTK_VDEC_MAX_H, 6, 9);
 
-		if (pix_fmt_mp->width < tmp_w &&
-			(pix_fmt_mp->width + 64) <= MTK_VDEC_MAX_W)
-			pix_fmt_mp->width += 64;
-		if (pix_fmt_mp->height < tmp_h &&
-			(pix_fmt_mp->height + 64) <= MTK_VDEC_MAX_H)
-			pix_fmt_mp->height += 64;
+			if (pix_fmt_mp->width < tmp_w &&
+				(pix_fmt_mp->width + 64) <= MTK_VDEC_MAX_W)
+				pix_fmt_mp->width += 64;
+			if (pix_fmt_mp->height < tmp_h &&
+				(pix_fmt_mp->height + 64) <= MTK_VDEC_MAX_H)
+				pix_fmt_mp->height += 64;
+		}
 
 		mtk_v4l2_debug(0,
 			"before resize width=%d, height=%d, after resize width=%d, height=%d, sizeimage=%d",
@@ -729,7 +748,7 @@ static int vidioc_try_fmt_vid_cap_mplane(struct file *file, void *priv,
 		fmt = mtk_vdec_find_format(f);
 	}
 
-	return vidioc_try_fmt(f, fmt);
+	return vidioc_try_fmt(f, priv, fmt);
 }
 
 static int vidioc_try_fmt_vid_out_mplane(struct file *file, void *priv,
@@ -749,7 +768,7 @@ static int vidioc_try_fmt_vid_out_mplane(struct file *file, void *priv,
 		return -EINVAL;
 	}
 
-	return vidioc_try_fmt(f, fmt);
+	return vidioc_try_fmt(f, priv, fmt);
 }
 
 static int vidioc_vdec_g_selection(struct file *file, void *priv,
@@ -875,7 +894,7 @@ static int vidioc_vdec_s_fmt(struct file *file, void *priv,
 		return -EINVAL;
 
 	q_data->fmt = fmt;
-	vidioc_try_fmt(f, q_data->fmt);
+	vidioc_try_fmt(f, priv, q_data->fmt);
 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 		q_data->sizeimage[0] = pix_mp->plane_fmt[0].sizeimage;
 		q_data->coded_width = pix_mp->width;
