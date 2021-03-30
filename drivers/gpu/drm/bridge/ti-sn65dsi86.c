@@ -437,7 +437,15 @@ err_conn_init:
 
 static void ti_sn_bridge_detach(struct drm_bridge *bridge)
 {
-	drm_dp_aux_unregister(&bridge_to_ti_sn_bridge(bridge)->aux);
+	struct ti_sn_bridge *pdata = bridge_to_ti_sn_bridge(bridge);
+
+
+	if (pdata->dsi) {
+		mipi_dsi_detach(pdata->dsi);
+		mipi_dsi_device_unregister(pdata->dsi);
+	}
+
+	drm_dp_aux_unregister(&pdata->aux);
 }
 
 static void ti_sn_bridge_disable(struct drm_bridge *bridge)
@@ -1314,11 +1322,6 @@ static int ti_sn_bridge_remove(struct i2c_client *client)
 
 	if (!pdata)
 		return -EINVAL;
-
-	if (pdata->dsi) {
-		mipi_dsi_detach(pdata->dsi);
-		mipi_dsi_device_unregister(pdata->dsi);
-	}
 
 	kfree(pdata->edid);
 
