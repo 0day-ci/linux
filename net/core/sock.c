@@ -2137,6 +2137,8 @@ void skb_orphan_partial(struct sk_buff *skb)
 
 		if (refcount_inc_not_zero(&sk->sk_refcnt)) {
 			WARN_ON(refcount_sub_and_test(skb->truesize, &sk->sk_wmem_alloc));
+			if (skb->destructor == sock_wfree)
+				sk->sk_write_space(sk);
 			skb->destructor = sock_efree;
 		}
 	} else {
