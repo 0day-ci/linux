@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/reserved-memory/actions,owl-soc-serial.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Actions Semi Owl reserved-memory for SoC serial number
+
+maintainers:
+  - Cristian Ciocaltea <cristian.ciocaltea@gmail.com>
+
+description: |
+  Provide access to the memory region where the two parts of the Actions
+  Semi Owl SoC serial number (low & high) can be read from. This information
+  is provided by the bootloader, hence expose it under /reserved-memory node.
+
+  Please refer to reserved-memory.txt in this directory for common binding
+  part and usage.
+
+  This is currently supported only on the S500 SoC variant.
+
+properties:
+  compatible:
+    oneOf:
+      - const: actions,owl-soc-serial
+      - items:
+          - enum:
+              - actions,s500-soc-serial
+          - const: actions,owl-soc-serial
+
+  reg:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: true
+
+examples:
+  - |
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        soc_serial: soc-serial@800 {
+            compatible = "actions,s500-soc-serial", "actions,owl-soc-serial";
+            reg = <0x800 0x8>;
+        };
+    };
+
+...
