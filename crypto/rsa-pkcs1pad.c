@@ -88,17 +88,17 @@ static const struct rsa_asn1_template *rsa_lookup_asn1(const char *name)
 	return NULL;
 }
 
-struct pkcs1pad_ctx {
+struct rsapad_tfm_ctx {
 	struct crypto_akcipher *child;
 	unsigned int key_size;
 };
 
-struct pkcs1pad_inst_ctx {
+struct rsapad_inst_ctx {
 	struct crypto_akcipher_spawn spawn;
 	const struct rsa_asn1_template *digest_info;
 };
 
-struct pkcs1pad_request {
+struct rsapad_akciper_req_ctx {
 	struct scatterlist in_sg[2], out_sg[1];
 	uint8_t *in_buf, *out_buf;
 	struct akcipher_request child_req;
@@ -107,7 +107,7 @@ struct pkcs1pad_request {
 static int rsapad_set_pub_key(struct crypto_akcipher *tfm, const void *key,
 		unsigned int keylen)
 {
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
 	int err;
 
 	ctx->key_size = 0;
@@ -128,7 +128,7 @@ static int rsapad_set_pub_key(struct crypto_akcipher *tfm, const void *key,
 static int rsapad_set_priv_key(struct crypto_akcipher *tfm, const void *key,
 		unsigned int keylen)
 {
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
 	int err;
 
 	ctx->key_size = 0;
@@ -148,7 +148,7 @@ static int rsapad_set_priv_key(struct crypto_akcipher *tfm, const void *key,
 
 static unsigned int rsapad_get_max_size(struct crypto_akcipher *tfm)
 {
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
 
 	/*
 	 * The maximum destination buffer size for the encrypt/sign operations
@@ -195,8 +195,8 @@ static void rsapad_akcipher_setup_child(struct akcipher_request *req,
 					crypto_completion_t cb)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 
 	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
 	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags, cb, req);
@@ -206,8 +206,8 @@ static void rsapad_akcipher_setup_child(struct akcipher_request *req,
 static int pkcs1pad_encrypt_sign_complete(struct akcipher_request *req, int err)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	unsigned int pad_len;
 	unsigned int len;
 	u8 *out_buf;
@@ -252,8 +252,8 @@ static void pkcs1pad_encrypt_sign_complete_cb(
 static int pkcs1pad_encrypt(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	int err;
 	unsigned int i, ps_end;
 
@@ -297,8 +297,8 @@ static int pkcs1pad_encrypt(struct akcipher_request *req)
 static int pkcs1pad_decrypt_complete(struct akcipher_request *req, int err)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	unsigned int dst_len;
 	unsigned int pos;
 	u8 *out_buf;
@@ -357,8 +357,8 @@ static void pkcs1pad_decrypt_complete_cb(
 static int pkcs1pad_decrypt(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	int err;
 
 	if (!ctx->key_size || req->src_len != ctx->key_size)
@@ -386,10 +386,10 @@ static int pkcs1pad_decrypt(struct akcipher_request *req)
 static int pkcs1pad_sign(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	struct akcipher_instance *inst = akcipher_alg_instance(tfm);
-	struct pkcs1pad_inst_ctx *ictx = akcipher_instance_ctx(inst);
+	struct rsapad_inst_ctx *ictx = akcipher_instance_ctx(inst);
 	const struct rsa_asn1_template *digest_info = ictx->digest_info;
 	int err;
 	unsigned int ps_end, digest_size = 0;
@@ -440,10 +440,10 @@ static int pkcs1pad_sign(struct akcipher_request *req)
 static int pkcs1pad_verify_complete(struct akcipher_request *req, int err)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	struct akcipher_instance *inst = akcipher_alg_instance(tfm);
-	struct pkcs1pad_inst_ctx *ictx = akcipher_instance_ctx(inst);
+	struct rsapad_inst_ctx *ictx = akcipher_instance_ctx(inst);
 	const struct rsa_asn1_template *digest_info = ictx->digest_info;
 	unsigned int dst_len;
 	unsigned int pos;
@@ -528,8 +528,8 @@ static void pkcs1pad_verify_complete_cb(
 static int pkcs1pad_verify(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
-	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
 	int err;
 
 	if (WARN_ON(req->dst) ||
@@ -559,8 +559,8 @@ static int pkcs1pad_verify(struct akcipher_request *req)
 static int rsapad_akcipher_init_tfm(struct crypto_akcipher *tfm)
 {
 	struct akcipher_instance *inst = akcipher_alg_instance(tfm);
-	struct pkcs1pad_inst_ctx *ictx = akcipher_instance_ctx(inst);
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_inst_ctx *ictx = akcipher_instance_ctx(inst);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
 	struct crypto_akcipher *child_tfm;
 
 	child_tfm = crypto_spawn_akcipher(&ictx->spawn);
@@ -573,14 +573,14 @@ static int rsapad_akcipher_init_tfm(struct crypto_akcipher *tfm)
 
 static void rsapad_akcipher_exit_tfm(struct crypto_akcipher *tfm)
 {
-	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
 
 	crypto_free_akcipher(ctx->child);
 }
 
 static void rsapad_akcipher_free(struct akcipher_instance *inst)
 {
-	struct pkcs1pad_inst_ctx *ctx = akcipher_instance_ctx(inst);
+	struct rsapad_inst_ctx *ctx = akcipher_instance_ctx(inst);
 	struct crypto_akcipher_spawn *spawn = &ctx->spawn;
 
 	crypto_drop_akcipher(spawn);
@@ -605,7 +605,7 @@ static int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **
 {
 	u32 mask;
 	struct akcipher_instance *inst;
-	struct pkcs1pad_inst_ctx *ctx;
+	struct rsapad_inst_ctx *ctx;
 	struct akcipher_alg *rsa_alg;
 	const char *hash_name;
 	int err;
@@ -661,7 +661,7 @@ static int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **
 	}
 
 	inst->alg.base.cra_priority = rsa_alg->base.cra_priority;
-	inst->alg.base.cra_ctxsize = sizeof(struct pkcs1pad_ctx);
+	inst->alg.base.cra_ctxsize = sizeof(struct rsapad_tfm_ctx);
 
 	inst->alg.init = alg->init;
 	inst->alg.exit = alg->exit;
@@ -673,7 +673,7 @@ static int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **
 	inst->alg.set_pub_key = alg->set_pub_key;
 	inst->alg.set_priv_key = alg->set_priv_key;
 	inst->alg.max_size = alg->max_size;
-	inst->alg.reqsize = sizeof(struct pkcs1pad_request) + rsa_alg->reqsize;
+	inst->alg.reqsize = sizeof(struct rsapad_akciper_req_ctx) + rsa_alg->reqsize;
 
 	inst->free = rsapad_akcipher_free;
 
