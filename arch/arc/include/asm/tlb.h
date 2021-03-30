@@ -9,4 +9,9 @@
 #include <linux/pagemap.h>
 #include <asm-generic/tlb.h>
 
+#define arch_supports_page_tables_move arch_supports_page_tables_move
+static inline bool arch_supports_page_tables_move(void)
+{
+	return true;
+}
 #endif /* _ASM_ARC_TLB_H */
