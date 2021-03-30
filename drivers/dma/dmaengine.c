@@ -1249,8 +1249,10 @@ int dma_async_device_register(struct dma_device *device)
 	/* represent channels in sysfs. Probably want devs too */
 	list_for_each_entry(chan, &device->channels, device_node) {
 		rc = __dma_async_device_channel_register(device, chan);
-		if (rc < 0)
+		if (rc < 0) {
+			chan->local = NULL;
 			goto err_out;
+		}
 	}
 
 	mutex_lock(&dma_list_mutex);
