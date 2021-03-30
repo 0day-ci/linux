@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Hisilicon Hi6220 SoC ADE(Advanced Display Engine)'s crtc&plane driver
+ * HiSilicon Hi6220 SoC ADE(Advanced Display Engine)'s crtc&plane driver
  *
  * Copyright (c) 2016 Linaro Limited.
- * Copyright (c) 2014-2016 Hisilicon Limited.
+ * Copyright (c) 2014-2016 HiSilicon Limited.
  *
  * Author:
  *	Xinliang Liu <z.liuxinliang@hisilicon.com>
@@ -923,7 +923,7 @@ static const struct drm_driver ade_driver = {
 	.fops = &ade_fops,
 	DRM_GEM_CMA_DRIVER_OPS,
 	.name = "kirin",
-	.desc = "Hisilicon Kirin620 SoC DRM Driver",
+	.desc = "HiSilicon Kirin620 SoC DRM Driver",
 	.date = "20150718",
 	.major = 1,
 	.minor = 0,
