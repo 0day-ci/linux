@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
+ * Copyright (C) 2017 HiSilicon Limited, All Rights Reserved.
  * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
  * Author: Zou Rongrong <zourongrong@huawei.com>
  * Author: John Garry <john.garry@huawei.com>
