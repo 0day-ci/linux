@@ -121,7 +121,6 @@
  * @debugfs:      Used for managing our debugfs.
  * @host_node:    Remote DSI node.
  * @dsi:          Our MIPI DSI source.
- * @edid:         Detected EDID of eDP panel.
  * @refclk:       Our reference clock.
  * @panel:        Our panel.
  * @enable_gpio:  The GPIO we toggle to enable the bridge.
@@ -147,7 +146,6 @@ struct ti_sn_bridge {
 	struct drm_bridge		bridge;
 	struct drm_connector		connector;
 	struct dentry			*debugfs;
-	struct edid			*edid;
 	struct device_node		*host_node;
 	struct mipi_dsi_device		*dsi;
 	struct clk			*refclk;
@@ -269,17 +267,17 @@ connector_to_ti_sn_bridge(struct drm_connector *connector)
 static int ti_sn_bridge_connector_get_modes(struct drm_connector *connector)
 {
 	struct ti_sn_bridge *pdata = connector_to_ti_sn_bridge(connector);
-	struct edid *edid = pdata->edid;
-	int num;
+	struct edid *edid;
+	int num = 0;
 
-	if (!edid) {
-		pm_runtime_get_sync(pdata->dev);
-		edid = pdata->edid = drm_get_edid(connector, &pdata->aux.ddc);
-		pm_runtime_put(pdata->dev);
-	}
+	pm_runtime_get_sync(pdata->dev);
+	edid = drm_get_edid(connector, &pdata->aux.ddc);
+	pm_runtime_put(pdata->dev);
 
-	if (edid && drm_edid_is_valid(edid)) {
-		num = drm_add_edid_modes(connector, edid);
+	if (edid) {
+		if (drm_edid_is_valid(edid))
+			num = drm_add_edid_modes(connector, edid);
+		kfree(edid);
 		if (num)
 			return num;
 	}
@@ -1307,8 +1305,6 @@ static int ti_sn_bridge_remove(struct i2c_client *client)
 
 	if (!pdata)
 		return -EINVAL;
-
-	kfree(pdata->edid);
 
 	ti_sn_debugfs_remove(pdata);
 
