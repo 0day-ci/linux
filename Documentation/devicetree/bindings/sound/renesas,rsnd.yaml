@@ -256,8 +256,10 @@ required:
   - "#sound-dai-cells"
 
 allOf:
-  - $ref: audio-graph.yaml#
   - $ref: audio-graph-port.yaml#
+
+anyOf:
+  - $ref: audio-graph-card.yaml#
   - if:
       properties:
         compatible:
