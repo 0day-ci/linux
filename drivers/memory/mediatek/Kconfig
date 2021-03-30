@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config MTK_DRAMC
+	tristate "MediaTek DRAMC driver"
+	help
+	  This selects the MediaTek(R) DRAMC driver.
+	  Provide the API for DRAMC low power scenario, and the interface
+	  for reporting DRAM information, e.g. DRAM mode register (MR) for
+	  DRAM vendor ID, temperature, and density.
