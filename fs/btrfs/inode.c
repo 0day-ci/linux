@@ -3076,6 +3076,7 @@ void btrfs_writepage_endio_finish_ordered(struct page *page, u64 start,
 	struct btrfs_ordered_extent *ordered_extent = NULL;
 	struct btrfs_workqueue *wq;
 
+	ASSERT(end + 1 - start < U32_MAX);
 	trace_btrfs_writepage_end_io_hook(page, start, end, uptodate);
 
 	ClearPagePrivate2(page);
@@ -7959,6 +7960,7 @@ static void __endio_write_update_ordered(struct btrfs_inode *inode,
 	else
 		wq = fs_info->endio_write_workers;
 
+	ASSERT(bytes < U32_MAX);
 	while (ordered_offset < offset + bytes) {
 		last_offset = ordered_offset;
 		if (btrfs_dec_test_first_ordered_pending(inode, &ordered,
@@ -8415,6 +8417,7 @@ again:
 				ordered->truncated_len = new_len;
 			spin_unlock_irq(&tree->lock);
 
+			ASSERT(end - start + 1 < U32_MAX);
 			if (btrfs_dec_test_ordered_pending(inode, &ordered,
 							   start,
 							   end - start + 1, 1)) {
@@ -8930,7 +8933,7 @@ void btrfs_destroy_inode(struct inode *vfs_inode)
 			break;
 		else {
 			btrfs_err(root->fs_info,
-				  "found ordered extent %llu %llu on inode cleanup",
+				  "found ordered extent %llu %u on inode cleanup",
 				  ordered->file_offset, ordered->num_bytes);
 			btrfs_remove_ordered_extent(inode, ordered);
 			btrfs_put_ordered_extent(ordered);

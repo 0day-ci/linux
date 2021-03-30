@@ -83,13 +83,22 @@ struct btrfs_ordered_extent {
 	/*
 	 * These fields directly correspond to the same fields in
 	 * btrfs_file_extent_item.
+	 *
+	 * But since ordered extents can't be larger than BTRFS_MAX_EXTENT_SIZE,
+	 * for length related members, they can use u32.
 	 */
 	u64 disk_bytenr;
-	u64 num_bytes;
-	u64 disk_num_bytes;
+	u32 num_bytes;
+	u32 disk_num_bytes;
 
 	/* number of bytes that still need writing */
-	u64 bytes_left;
+	u32 bytes_left;
+
+	/*
+	 * If we get truncated we need to adjust the file extent we enter for
+	 * this ordered extent so that we do not expose stale data.
+	 */
+	u32 truncated_len;
 
 	/*
 	 * the end of the ordered extent which is behind it but
@@ -97,12 +106,6 @@ struct btrfs_ordered_extent {
 	 * btrfs_ordered_update_i_size();
 	 */
 	u64 outstanding_isize;
-
-	/*
-	 * If we get truncated we need to adjust the file extent we enter for
-	 * this ordered extent so that we do not expose stale data.
-	 */
-	u64 truncated_len;
 
 	/* flags (described above) */
 	unsigned long flags;
@@ -174,10 +177,10 @@ void btrfs_remove_ordered_extent(struct btrfs_inode *btrfs_inode,
 				struct btrfs_ordered_extent *entry);
 bool btrfs_dec_test_ordered_pending(struct btrfs_inode *inode,
 				    struct btrfs_ordered_extent **cached,
-				    u64 file_offset, u64 io_size, int uptodate);
+				    u64 file_offset, u32 io_size, int uptodate);
 bool btrfs_dec_test_first_ordered_pending(struct btrfs_inode *inode,
 				   struct btrfs_ordered_extent **finished_ret,
-				   u64 *file_offset, u64 io_size,
+				   u64 *file_offset, u32 io_size,
 				   int uptodate);
 int btrfs_add_ordered_extent(struct btrfs_inode *inode, u64 file_offset,
 			     u64 disk_bytenr, u64 num_bytes, u64 disk_num_bytes,

@@ -171,6 +171,12 @@ static int __btrfs_add_ordered_extent(struct btrfs_inode *inode, u64 file_offset
 	struct btrfs_ordered_extent *entry;
 	int ret;
 
+	/*
+	 * Basic size check, all length related members should be smaller
+	 * than U32_MAX.
+	 */
+	ASSERT(num_bytes < U32_MAX && disk_num_bytes < U32_MAX);
+
 	if (type == BTRFS_ORDERED_NOCOW || type == BTRFS_ORDERED_PREALLOC) {
 		/* For nocow write, we can release the qgroup rsv right now */
 		ret = btrfs_qgroup_free_data(inode, NULL, file_offset, num_bytes);
@@ -197,7 +203,7 @@ static int __btrfs_add_ordered_extent(struct btrfs_inode *inode, u64 file_offset
 	entry->bytes_left = num_bytes;
 	entry->inode = igrab(&inode->vfs_inode);
 	entry->compress_type = compress_type;
-	entry->truncated_len = (u64)-1;
+	entry->truncated_len = (u32)-1;
 	entry->qgroup_rsv = ret;
 	entry->physical = (u64)-1;
 	entry->disk = NULL;
@@ -331,7 +337,7 @@ void btrfs_add_ordered_sum(struct btrfs_ordered_extent *entry,
  */
 bool btrfs_dec_test_first_ordered_pending(struct btrfs_inode *inode,
 				   struct btrfs_ordered_extent **finished_ret,
-				   u64 *file_offset, u64 io_size, int uptodate)
+				   u64 *file_offset, u32 io_size, int uptodate)
 {
 	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	struct btrfs_ordered_inode_tree *tree = &inode->ordered_tree;
@@ -341,7 +347,7 @@ bool btrfs_dec_test_first_ordered_pending(struct btrfs_inode *inode,
 	unsigned long flags;
 	u64 dec_end;
 	u64 dec_start;
-	u64 to_dec;
+	u32 to_dec;
 
 	spin_lock_irqsave(&tree->lock, flags);
 	node = tree_search(tree, *file_offset);
@@ -363,7 +369,7 @@ bool btrfs_dec_test_first_ordered_pending(struct btrfs_inode *inode,
 	to_dec = dec_end - dec_start;
 	if (to_dec > entry->bytes_left) {
 		btrfs_crit(fs_info,
-			   "bad ordered accounting left %llu size %llu",
+			   "bad ordered accounting left %u size %u",
 			   entry->bytes_left, to_dec);
 	}
 	entry->bytes_left -= to_dec;
@@ -408,7 +414,7 @@ out:
  */
 bool btrfs_dec_test_ordered_pending(struct btrfs_inode *inode,
 				    struct btrfs_ordered_extent **cached,
-				    u64 file_offset, u64 io_size, int uptodate)
+				    u64 file_offset, u32 io_size, int uptodate)
 {
 	struct btrfs_ordered_inode_tree *tree = &inode->ordered_tree;
 	struct rb_node *node;
@@ -433,7 +439,7 @@ have_entry:
 
 	if (io_size > entry->bytes_left)
 		btrfs_crit(inode->root->fs_info,
-			   "bad ordered accounting left %llu size %llu",
+			   "bad ordered accounting left %u size %u",
 		       entry->bytes_left, io_size);
 
 	entry->bytes_left -= io_size;
