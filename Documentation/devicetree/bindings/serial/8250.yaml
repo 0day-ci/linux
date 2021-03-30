@@ -13,7 +13,7 @@ allOf:
   - $ref: /schemas/serial.yaml#
   - if:
       required:
-        - aspeed,sirq-polarity-sense
+        - aspeed,sirq-active-high
     then:
       properties:
         compatible:
@@ -182,13 +182,11 @@ properties:
   rng-gpios: true
   dcd-gpios: true
 
-  aspeed,sirq-polarity-sense:
-    $ref: /schemas/types.yaml#/definitions/phandle-array
+  aspeed,sirq-active-high:
+    type: boolean
     description: |
-      Phandle to aspeed,ast2500-scu compatible syscon alongside register
-      offset and bit number to identify how the SIRQ polarity should be
-      configured. One possible data source is the LPC/eSPI mode bit. Only
-      applicable to aspeed,ast2500-vuart.
+      Set to indicate that the SIRQ polarity is active-high (default
+      is active-low).  Only applicable to aspeed,ast2500-vuart.
 
 required:
   - reg
@@ -228,7 +226,7 @@ examples:
         interrupts = <8>;
         clocks = <&syscon ASPEED_CLK_APB>;
         no-loopback-test;
-        aspeed,sirq-polarity-sense = <&syscon 0x70 25>;
+        aspeed,sirq-active-high;
     };
 
 ...
