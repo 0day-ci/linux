@@ -14,4 +14,12 @@ config OWL_PM_DOMAINS
 	  power-gating on Actions Semiconductor S500, S700 and S900 SoCs.
 	  If unsure, say 'n'.
 
+config OWL_SOCINFO
+	bool "Actions Semi Owl SoC info driver"
+	default ARCH_ACTIONS
+	select SOC_BUS
+	help
+	  Say 'y' here to support the Action Semiconductor Owl socinfo
+	  driver, providing information about the SoC to user space.
+
 endif
