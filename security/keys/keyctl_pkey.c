@@ -24,11 +24,13 @@ enum {
 	Opt_err,
 	Opt_enc,		/* "enc=<encoding>" eg. "enc=oaep" */
 	Opt_hash,		/* "hash=<digest-name>" eg. "hash=sha1" */
+	Opt_slen,		/* "slen=<salt-length>" eg. "slen=32" */
 };
 
 static const match_table_t param_keys = {
 	{ Opt_enc,	"enc=%s" },
 	{ Opt_hash,	"hash=%s" },
+	{ Opt_slen,	"slen=%u" },
 	{ Opt_err,	NULL }
 };
 
@@ -63,6 +65,10 @@ static int keyctl_pkey_params_parse(struct kernel_pkey_params *params)
 			params->hash_algo = q;
 			break;
 
+		case Opt_slen:
+			if (kstrtouint(q, 0, &params->slen))
+				return -EINVAL;
+			break;
 		default:
 			return -EINVAL;
 		}
