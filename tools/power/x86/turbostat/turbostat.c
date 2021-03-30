@@ -296,7 +296,7 @@ struct msr_sum_array {
 /* The percpu MSR sum array.*/
 struct msr_sum_array *per_cpu_msr_sum;
 
-int idx_to_offset(int idx)
+int idx_to_offset_intel(int idx)
 {
 	int offset;
 
@@ -325,7 +325,7 @@ int idx_to_offset(int idx)
 	return offset;
 }
 
-int offset_to_idx(int offset)
+int offset_to_idx_intel(int offset)
 {
 	int idx;
 
@@ -354,7 +354,7 @@ int offset_to_idx(int offset)
 	return idx;
 }
 
-int idx_valid(int idx)
+int idx_valid_intel(int idx)
 {
 	switch (idx) {
 	case IDX_PKG_ENERGY:
@@ -373,6 +373,51 @@ int idx_valid(int idx)
 		return 0;
 	}
 }
+
+int (*idx_to_offset)(int idx) = idx_to_offset_intel;
+int (*offset_to_idx)(int offset) = offset_to_idx_intel;
+int (*idx_valid)(int idx) = idx_valid_intel;
+
+int idx_to_offset_amd(int idx)
+{
+	int offset;
+
+	switch (idx) {
+	case IDX_PKG_ENERGY:
+		offset = MSR_PKG_ENERGY_STAT;
+		break;
+	default:
+		offset = -1;
+	}
+
+	return offset;
+}
+
+int offset_to_idx_amd(int offset)
+{
+	int idx;
+
+	switch (offset) {
+	case MSR_PKG_ENERGY_STAT:
+		idx = IDX_PKG_ENERGY;
+		break;
+	default:
+		idx = -1;
+	}
+
+	return idx;
+}
+
+int idx_valid_amd(int idx)
+{
+	switch (idx) {
+	case IDX_PKG_ENERGY:
+		return do_rapl & MSR_PKG_ENERGY_STAT;
+	default:
+		return 0;
+	}
+}
+
 struct sys_counters {
 	unsigned int added_thread_counters;
 	unsigned int added_core_counters;
@@ -3311,7 +3356,7 @@ int get_msr_sum(int cpu, off_t offset, unsigned long long *msr)
 		return 1;
 
 	idx = offset_to_idx(offset);
-	if (idx < 0)
+	if (idx == -1)
 		return idx;
 	/* get_msr_sum() = sum + (get_msr() - last) */
 	ret = get_msr(cpu, offset, &msr_cur);
@@ -3339,7 +3384,7 @@ static int update_msr_sum(struct thread_data *t, struct core_data *c, struct pkg
 		if (!idx_valid(i))
 			continue;
 		offset = idx_to_offset(i);
-		if (offset < 0)
+		if (offset == -1)
 			continue;
 		ret = get_msr(cpu, offset, &msr_cur);
 		if (ret) {
@@ -5441,6 +5486,12 @@ void process_cpuid()
 
 	if (!quiet)
 		decode_misc_feature_control();
+
+	if (authentic_amd || hygon_genuine) {
+		idx_to_offset = idx_to_offset_amd;
+		offset_to_idx = offset_to_idx_amd;
+		idx_valid = idx_valid_amd;
+	}
 
 	return;
 }
