@@ -975,6 +975,12 @@ int kvm_dev_ioctl_get_cpuid(struct kvm_cpuid2 *cpuid,
 
 	if (cpuid->nent < 1)
 		return -E2BIG;
+
+	/* if there are X entries, we need to allocate at least X+1
+	 * entries but return the actual number of entries
+	 */
+	cpuid->nent++;
+
 	if (cpuid->nent > KVM_MAX_CPUID_ENTRIES)
 		cpuid->nent = KVM_MAX_CPUID_ENTRIES;
 
