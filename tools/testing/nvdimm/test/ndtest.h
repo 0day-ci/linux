@@ -16,6 +16,8 @@
 #define PAPR_PMEM_HEALTH_FATAL              (1ULL << (63 - 5))
 /* SCM contents cannot persist due to current platform health status */
 #define PAPR_PMEM_HEALTH_UNHEALTHY          (1ULL << (63 - 6))
+/* SCM device is unable to persist memory contents in certain conditions */
+#define PAPR_PMEM_HEALTH_NON_CRITICAL       (1ULL << (63 - 7))
 
 /* Bits status indicators for health bitmap indicating unarmed dimm */
 #define PAPR_PMEM_UNARMED_MASK (PAPR_PMEM_UNARMED |		\
@@ -37,6 +39,44 @@
 #define PAPR_PMEM_SAVE_MASK                (PAPR_PMEM_SAVE_FAILED)
 
 struct ndtest_config;
+
+/* DIMM Health extension flag bits */
+#define PDSM_DIMM_HEALTH_RUN_GAUGE_VALID                (1 << 0)
+#define PDSM_DIMM_HEALTH_MEDIA_TEMPERATURE_VALID        (1 << 1)
+#define PDSM_DIMM_HEALTH_CTRL_TEMPERATURE_VALID         (1 << 2)
+#define PDSM_DIMM_HEALTH_SHUTDOWN_COUNT_VALID		(1 << 3)
+#define PDSM_DIMM_HEALTH_SPARES_VALID                   (1 << 4)
+#define PDSM_DIMM_HEALTH_ALARM_VALID                    (1 << 5)
+
+#define PAPR_PDSM_DIMM_HEALTHY           0
+
+#define ND_PAPR_HEALTH_SPARE_TRIP       (1 << 0)
+#define ND_PAPR_HEALTH_TEMP_TRIP        (1 << 1)
+#define ND_PAPR_HEALTH_CTEMP_TRIP       (1 << 2)
+
+/* DIMM Health inject flag bits */
+#define ND_PAPR_HEALTH_INJECT_MTEMP     (1 << 0)
+#define ND_PAPR_HEALTH_INJECT_SPARE     (1 << 1)
+#define ND_PAPR_HEALTH_INJECT_FATAL     (1 << 2)
+#define ND_PAPR_HEALTH_INJECT_SHUTDOWN  (1 << 3)
+
+/* Various nvdimm health indicators */
+#define PAPR_PDSM_DIMM_HEALTHY           0
+#define PAPR_PDSM_DIMM_UNHEALTHY         1
+#define PAPR_PDSM_DIMM_CRITICAL          2
+#define PAPR_PDSM_DIMM_FATAL             3
+
+enum papr_pdsm {
+	PAPR_PDSM_MIN = 0x0,
+	PAPR_PDSM_HEALTH,
+	PAPR_PDSM_INJECT_SET = 11,
+	PAPR_PDSM_INJECT_CLEAR = 12,
+	PAPR_PDSM_INJECT_GET = 13,
+	PAPR_PDSM_HEALTH_INJECT = 14,
+	PAPR_PDSM_HEALTH_THRESHOLD = 15,
+	PAPR_PDSM_HEALTH_THRESHOLD_SET = 16,
+	PAPR_PDSM_MAX,
+};
 
 struct ndtest_priv {
 	struct platform_device pdev;
@@ -80,6 +120,21 @@ struct ndtest_dimm {
 	int id;
 	int fail_cmd_code;
 	u8 no_alias;
+
+	struct kernfs_node *notify_handle;
+
+	/* SMART Health information */
+	unsigned long long extension_flags;
+	__u16 dimm_fuel_gauge;
+	__u16 media_temperature;
+	__u16 ctrl_temperature;
+	__u8 spares;
+	__u8 alarm_flags;
+
+	/* SMART Health thresholds */
+	__u16 media_temperature_threshold;
+	__u16 ctrl_temperature_threshold;
+	__u8 spares_threshold;
 };
 
 struct ndtest_mapping {
@@ -105,5 +160,74 @@ struct ndtest_config {
 	unsigned int dimm_start;
 	u8 num_regions;
 };
+
+#define ND_PDSM_PAYLOAD_MAX_SIZE 184
+
+struct nd_papr_pdsm_health {
+	union {
+		struct {
+			__u32 extension_flags;
+			__u8 dimm_unarmed;
+			__u8 dimm_bad_shutdown;
+			__u8 dimm_bad_restore;
+			__u8 dimm_scrubbed;
+			__u8 dimm_locked;
+			__u8 dimm_encrypted;
+			__u16 dimm_health;
+
+			/* Extension flag PDSM_DIMM_HEALTH_RUN_GAUGE_VALID */
+			__u16 dimm_fuel_gauge;
+			__u16 media_temperature;
+			__u16 ctrl_temperature;
+			__u8 spares;
+			__u16 alarm_flags;
+		};
+		__u8 buf[ND_PDSM_PAYLOAD_MAX_SIZE];
+	};
+};
+
+struct nd_papr_pdsm_health_threshold {
+	union {
+		struct {
+			__u16 alarm_control;
+			__u8 spares;
+			__u16 media_temperature;
+			__u16 ctrl_temperature;
+			__u32 status;
+		};
+		__u8 buf[ND_PDSM_PAYLOAD_MAX_SIZE];
+	};
+};
+
+struct nd_papr_pdsm_health_inject {
+	union {
+		struct {
+			__u64 flags;
+			__u8 mtemp_enable;
+			__u16 media_temperature;
+			__u8 ctemp_enable;
+			__u16 ctrl_temperature;
+			__u8 spares_enable;
+			__u8 spares;
+			__u8 fatal_enable;
+			__u8 unsafe_shutdown_enable;
+			__u32 status;
+		};
+		__u8 buf[ND_PDSM_PAYLOAD_MAX_SIZE];
+	};
+};
+
+union nd_pdsm_payload {
+	struct nd_papr_pdsm_health health;
+	struct nd_papr_pdsm_health_inject inject;
+	struct nd_papr_pdsm_health_threshold threshold;
+	__u8 buf[ND_PDSM_PAYLOAD_MAX_SIZE];
+} __packed;
+
+struct nd_pkg_pdsm {
+	__s32 cmd_status;       /* Out: Sub-cmd status returned back */
+	__u16 reserved[2];      /* Ignored and to be set as '0' */
+	union nd_pdsm_payload payload;
+} __packed;
 
 #endif /* NDTEST_H */
