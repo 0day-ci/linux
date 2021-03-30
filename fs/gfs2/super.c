@@ -385,8 +385,6 @@ struct lfcc {
  * gfs2_lock_fs_check_clean - Stop all writes to the FS and check that all
  *                            journals are clean
  * @sdp: the file system
- * @state: the state to put the transaction lock into
- * @t_gh: the hold on the transaction lock
  *
  * Returns: errno
  */
@@ -696,7 +694,7 @@ restart:
 	free_sbd(sdp);
 }
 
-/**
+/*
  * gfs2_sync_fs - sync the filesystem
  * @sb: the superblock
  *
@@ -807,7 +805,7 @@ static int gfs2_unfreeze(struct super_block *sb)
 }
 
 /**
- * statfs_fill - fill in the sg for a given RG
+ * statfs_slow_fill - fill in the sg for a given RG
  * @rgd: the RG
  * @sc: the sc structure
  *
@@ -905,7 +903,7 @@ static int gfs2_statfs_slow(struct gfs2_sbd *sdp, struct gfs2_statfs_change_host
 /**
  * gfs2_statfs_i - Do a statfs
  * @sdp: the filesystem
- * @sg: the sg structure
+ * @sc: the sc structure
  *
  * Returns: errno
  */
@@ -936,8 +934,8 @@ static int gfs2_statfs_i(struct gfs2_sbd *sdp, struct gfs2_statfs_change_host *s
 
 /**
  * gfs2_statfs - Gather and return stats about the filesystem
- * @sb: The superblock
- * @statfsbuf: The buffer
+ * @dentry: The name of the link
+ * @buf: The buffer
  *
  * Returns: 0 on success or error code
  */
@@ -1268,6 +1266,7 @@ static bool gfs2_upgrade_iopen_glock(struct inode *inode)
 /**
  * evict_should_delete - determine whether the inode is eligible for deletion
  * @inode: The inode to evict
+ * @gh: the holder structure
  *
  * This function determines whether the evicted inode is eligible to be deleted
  * and locks the inode glock.
