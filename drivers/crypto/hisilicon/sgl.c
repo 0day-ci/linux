@@ -9,6 +9,7 @@
 #define HISI_ACC_SGL_NR_MAX		256
 #define HISI_ACC_SGL_ALIGN_SIZE		64
 #define HISI_ACC_MEM_BLOCK_NR		5
+#define HISI_ACC_BLOCK_SIZE_MAX_SHIFT	31
 
 struct acc_hw_sge {
 	dma_addr_t buf;
@@ -67,7 +68,8 @@ struct hisi_acc_sgl_pool *hisi_acc_create_sgl_pool(struct device *dev,
 	sgl_size = sizeof(struct acc_hw_sge) * sge_nr +
 		   sizeof(struct hisi_acc_hw_sgl);
 	block_size = 1 << (PAGE_SHIFT + MAX_ORDER <= 32 ?
-			   PAGE_SHIFT + MAX_ORDER - 1 : 31);
+			   PAGE_SHIFT + MAX_ORDER - 1 :
+			   HISI_ACC_BLOCK_SIZE_MAX_SHIFT);
 	sgl_num_per_block = block_size / sgl_size;
 	block_num = count / sgl_num_per_block;
 	remain_sgl = count % sgl_num_per_block;
