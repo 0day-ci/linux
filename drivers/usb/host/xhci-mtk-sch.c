@@ -388,13 +388,17 @@ static void setup_sch_info(struct xhci_ep_ctx *ep_ctx,
 		} else { /* INT_IN_EP or ISOC_IN_EP */
 			bwb_table[0] = 0; /* start split */
 			bwb_table[1] = 0; /* idle */
+
+			sch_ep->num_budget_microframes += 2;
+			if (sch_ep->num_budget_microframes > sch_ep->esit)
+				sch_ep->num_budget_microframes = sch_ep->esit;
 			/*
 			 * due to cs_count will be updated according to cs
 			 * position, assign all remainder budget array
 			 * elements as @bw_cost_per_microframe, but only first
 			 * @num_budget_microframes elements will be used later
 			 */
-			for (i = 2; i < TT_MICROFRAMES_MAX; i++)
+			for (i = 2; i < sch_ep->num_budget_microframes; i++)
 				bwb_table[i] =	sch_ep->bw_cost_per_microframe;
 		}
 	}
@@ -449,20 +453,17 @@ static void update_bus_bw(struct mu3h_sch_bw_info *sch_bw,
 static int check_fs_bus_bw(struct mu3h_sch_ep_info *sch_ep, int offset)
 {
 	struct mu3h_sch_tt *tt = sch_ep->sch_tt;
-	u32 num_esit, tmp;
-	int base;
 	int i, j;
+	const int nr_lower_uframes =
+		DIV_ROUND_UP(sch_ep->maxpkt, FS_PAYLOAD_MAX);
 
-	num_esit = XHCI_MTK_MAX_ESIT / sch_ep->esit;
-	for (i = 0; i < num_esit; i++) {
-		base = offset + i * sch_ep->esit;
-
+	for (i = offset; i < XHCI_MTK_MAX_ESIT; i += sch_ep->esit) {
 		/*
 		 * Compared with hs bus, no matter what ep type,
 		 * the hub will always delay one uframe to send data
 		 */
-		for (j = 0; j < sch_ep->cs_count; j++) {
-			tmp = tt->fs_bus_bw[base + j] + sch_ep->bw_cost_per_microframe;
+		for (j = 0; j < nr_lower_uframes; j++) {
+			u32 tmp = tt->fs_bus_bw[i + j + 1] + sch_ep->bw_cost_per_microframe;
 			if (tmp > FS_PAYLOAD_MAX)
 				return -ESCH_BW_OVERFLOW;
 		}
@@ -473,11 +474,9 @@ static int check_fs_bus_bw(struct mu3h_sch_ep_info *sch_ep, int offset)
 
 static int check_sch_tt(struct mu3h_sch_ep_info *sch_ep, u32 offset)
 {
-	struct mu3h_sch_tt *tt = sch_ep->sch_tt;
 	u32 extra_cs_count;
 	u32 start_ss, last_ss;
 	u32 start_cs, last_cs;
-	int i;
 
 	if (!sch_ep->sch_tt)
 		return 0;
@@ -493,10 +492,6 @@ static int check_sch_tt(struct mu3h_sch_ep_info *sch_ep, u32 offset)
 		 */
 		if (!(start_ss == 7 || last_ss < 6))
 			return -ESCH_SS_Y6;
-
-		for (i = 0; i < sch_ep->cs_count; i++)
-			if (test_bit(offset + i, tt->ss_bit_map))
-				return -ESCH_SS_OVERLAP;
 
 	} else {
 		u32 cs_count = DIV_ROUND_UP(sch_ep->maxpkt, FS_PAYLOAD_MAX);
@@ -524,19 +519,7 @@ static int check_sch_tt(struct mu3h_sch_ep_info *sch_ep, u32 offset)
 		if (cs_count > 7)
 			cs_count = 7; /* HW limit */
 
-		if (test_bit(offset, tt->ss_bit_map))
-			return -ESCH_SS_OVERLAP;
-
 		sch_ep->cs_count = cs_count;
-		/* one for ss, the other for idle */
-		sch_ep->num_budget_microframes = cs_count + 2;
-
-		/*
-		 * if interval=1, maxp >752, num_budge_micoframe is larger
-		 * than sch_ep->esit, will overstep boundary
-		 */
-		if (sch_ep->num_budget_microframes > sch_ep->esit)
-			sch_ep->num_budget_microframes = sch_ep->esit;
 	}
 
 	return check_fs_bus_bw(sch_ep, offset);
@@ -545,31 +528,18 @@ static int check_sch_tt(struct mu3h_sch_ep_info *sch_ep, u32 offset)
 static void update_sch_tt(struct mu3h_sch_ep_info *sch_ep, bool used)
 {
 	struct mu3h_sch_tt *tt = sch_ep->sch_tt;
-	u32 base, num_esit;
-	int bw_updated;
-	int bits;
-	int i, j;
-
-	num_esit = XHCI_MTK_MAX_ESIT / sch_ep->esit;
-	bits = (sch_ep->ep_type == ISOC_OUT_EP) ? sch_ep->cs_count : 1;
+	int i, j, bw_updated;
+	const int nr_lower_uframes =
+		DIV_ROUND_UP(sch_ep->maxpkt, FS_PAYLOAD_MAX);
 
 	if (used)
 		bw_updated = sch_ep->bw_cost_per_microframe;
 	else
 		bw_updated = -sch_ep->bw_cost_per_microframe;
 
-	for (i = 0; i < num_esit; i++) {
-		base = sch_ep->offset + i * sch_ep->esit;
-
-		for (j = 0; j < bits; j++) {
-			if (used)
-				set_bit(base + j, tt->ss_bit_map);
-			else
-				clear_bit(base + j, tt->ss_bit_map);
-		}
-
-		for (j = 0; j < sch_ep->cs_count; j++)
-			tt->fs_bus_bw[base + j] += bw_updated;
+	for (i = sch_ep->offset; i < XHCI_MTK_MAX_ESIT; i += sch_ep->esit) {
+		for (j = 0; j < nr_lower_uframes; j++)
+			tt->fs_bus_bw[i+ j + 1] += bw_updated;
 	}
 
 	if (used)
@@ -634,9 +604,11 @@ static int check_sch_bw(struct mu3h_sch_bw_info *sch_bw,
 		if (min_bw > worst_bw) {
 			min_bw = worst_bw;
 			found = i;
+			/* fastpath: bandwidth contributions to host is low
+			 * when it's fs/ls */
+			if (sch_ep->sch_tt || min_bw == 0)
+				break;
 		}
-		if (min_bw == 0)
-			break;
 	}
 
 	/* check bandwidth */
