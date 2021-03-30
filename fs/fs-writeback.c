@@ -508,8 +508,10 @@ static void inode_switch_wbs(struct inode *inode, int new_wb_id)
 	/* find and pin the new wb */
 	rcu_read_lock();
 	memcg_css = css_from_id(new_wb_id, &memory_cgrp_subsys);
-	if (memcg_css)
+	if (memcg_css && css_tryget(memcg_css)) {
 		isw->new_wb = wb_get_create(bdi, memcg_css, GFP_ATOMIC);
+		css_put(memcg_css);
+	}
 	rcu_read_unlock();
 	if (!isw->new_wb)
 		goto out_free;
