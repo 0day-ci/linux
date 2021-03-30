@@ -47,6 +47,26 @@ typedef int (*i2c_slave_cb_t)(struct i2c_client *client,
 #define I2C_MAX_HIGH_SPEED_MODE_FREQ	3400000
 #define I2C_MAX_ULTRA_FAST_MODE_FREQ	5000000
 
+static inline const char *i2c_freq_mode_string(u32 bus_freq_hz)
+{
+	switch (bus_freq_hz) {
+	case I2C_MAX_STANDARD_MODE_FREQ:
+		return "Standard Mode(100KHz)";
+	case I2C_MAX_FAST_MODE_FREQ:
+		return "Fast Mode(400KHz)";
+	case I2C_MAX_FAST_MODE_PLUS_FREQ:
+		return "Fast Mode Plus(1.0MHz)";
+	case I2C_MAX_TURBO_MODE_FREQ:
+		return "Turbo Mode(1.4MHz)";
+	case I2C_MAX_HIGH_SPEED_MODE_FREQ:
+		return "High Speed Mode(3.4MHz)";
+	case I2C_MAX_ULTRA_FAST_MODE_FREQ:
+		return "Ultra Fast Mode(5.0MHz)";
+	default:
+		return "Unknown Mode";
+	}
+}
+
 struct module;
 struct property_entry;
 
