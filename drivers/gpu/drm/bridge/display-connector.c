@@ -98,7 +98,7 @@ static irqreturn_t display_connector_hpd_irq(int irq, void *arg)
 	struct display_connector *conn = arg;
 	struct drm_bridge *bridge = &conn->bridge;
 
-	drm_bridge_hpd_notify(bridge, display_connector_detect(bridge));
+	drm_bridge_hpd_cb(bridge, display_connector_detect(bridge));
 
 	return IRQ_HANDLED;
 }

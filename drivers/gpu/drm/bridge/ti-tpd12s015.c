@@ -103,7 +103,7 @@ static irqreturn_t tpd12s015_hpd_isr(int irq, void *data)
 	struct tpd12s015_device *tpd = data;
 	struct drm_bridge *bridge = &tpd->bridge;
 
-	drm_bridge_hpd_notify(bridge, tpd12s015_detect(bridge));
+	drm_bridge_hpd_cb(bridge, tpd12s015_detect(bridge));
 
 	return IRQ_HANDLED;
 }

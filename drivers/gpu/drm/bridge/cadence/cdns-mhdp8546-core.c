@@ -794,7 +794,7 @@ static void cdns_mhdp_fw_cb(const struct firmware *fw, void *context)
 		if (mhdp->connector.dev)
 			drm_kms_helper_hotplug_event(mhdp->bridge.dev);
 		else
-			drm_bridge_hpd_notify(&mhdp->bridge, cdns_mhdp_detect(mhdp));
+			drm_bridge_hpd_cb(&mhdp->bridge, cdns_mhdp_detect(mhdp));
 	}
 }
 
@@ -2314,7 +2314,7 @@ static irqreturn_t cdns_mhdp_irq_handler(int irq, void *data)
 			else
 				drm_kms_helper_hotplug_event(mhdp->bridge.dev);
 		} else {
-			drm_bridge_hpd_notify(&mhdp->bridge, cdns_mhdp_detect(mhdp));
+			drm_bridge_hpd_cb(&mhdp->bridge, cdns_mhdp_detect(mhdp));
 		}
 	}
 

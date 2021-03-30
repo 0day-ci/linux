@@ -175,10 +175,10 @@ static void lt9611uxc_hpd_work(struct work_struct *work)
 		connected = lt9611uxc->hdmi_connected;
 		mutex_unlock(&lt9611uxc->ocm_lock);
 
-		drm_bridge_hpd_notify(&lt9611uxc->bridge,
-				      connected ?
-				      connector_status_connected :
-				      connector_status_disconnected);
+		drm_bridge_hpd_cb(&lt9611uxc->bridge,
+				  connected ?
+				  connector_status_connected :
+				  connector_status_disconnected);
 	}
 }
 

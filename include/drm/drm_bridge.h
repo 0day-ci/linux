@@ -605,7 +605,7 @@ struct drm_bridge_funcs {
 	 * @hpd_enable:
 	 *
 	 * Enable hot plug detection. From now on the bridge shall call
-	 * drm_bridge_hpd_notify() each time a change is detected in the output
+	 * drm_bridge_hpd_cb() each time a change is detected in the output
 	 * connection status, until hot plug detection gets disabled with
 	 * @hpd_disable.
 	 *
@@ -620,7 +620,7 @@ struct drm_bridge_funcs {
 	 * @hpd_disable:
 	 *
 	 * Disable hot plug detection. Once this function returns the bridge
-	 * shall not call drm_bridge_hpd_notify() when a change in the output
+	 * shall not call drm_bridge_hpd_cb() when a change in the output
 	 * connection status occurs.
 	 *
 	 * This callback is optional and shall only be implemented by bridges
@@ -878,8 +878,8 @@ void drm_bridge_hpd_enable(struct drm_bridge *bridge,
 				      enum drm_connector_status status),
 			   void *data);
 void drm_bridge_hpd_disable(struct drm_bridge *bridge);
-void drm_bridge_hpd_notify(struct drm_bridge *bridge,
-			   enum drm_connector_status status);
+void drm_bridge_hpd_cb(struct drm_bridge *bridge,
+		       enum drm_connector_status status);
 
 #ifdef CONFIG_DRM_PANEL_BRIDGE
 struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel);
