@@ -630,19 +630,19 @@ SYM_CODE_START_LOCAL(el0_fiq_invalid_compat)
 SYM_CODE_END(el0_fiq_invalid_compat)
 #endif
 
-SYM_CODE_START_LOCAL(el1_sync_invalid)
+SYM_CODE_START(el1_sync_invalid)
 	inv_entry 1, BAD_SYNC
 SYM_CODE_END(el1_sync_invalid)
 
-SYM_CODE_START_LOCAL(el1_irq_invalid)
+SYM_CODE_START(el1_irq_invalid)
 	inv_entry 1, BAD_IRQ
 SYM_CODE_END(el1_irq_invalid)
 
-SYM_CODE_START_LOCAL(el1_fiq_invalid)
+SYM_CODE_START(el1_fiq_invalid)
 	inv_entry 1, BAD_FIQ
 SYM_CODE_END(el1_fiq_invalid)
 
-SYM_CODE_START_LOCAL(el1_error_invalid)
+SYM_CODE_START(el1_error_invalid)
 	inv_entry 1, BAD_ERROR
 SYM_CODE_END(el1_error_invalid)
 
@@ -650,7 +650,7 @@ SYM_CODE_END(el1_error_invalid)
  * EL1 mode handlers.
  */
 	.align	6
-SYM_CODE_START_LOCAL_NOALIGN(el1_sync)
+SYM_CODE_START_NOALIGN(el1_sync)
 	kernel_entry 1
 	mov	x0, sp
 	bl	el1_sync_handler
@@ -658,7 +658,7 @@ SYM_CODE_START_LOCAL_NOALIGN(el1_sync)
 SYM_CODE_END(el1_sync)
 
 	.align	6
-SYM_CODE_START_LOCAL_NOALIGN(el1_irq)
+SYM_CODE_START_NOALIGN(el1_irq)
 	kernel_entry 1
 	gic_prio_irq_setup pmr=x20, tmp=x1
 	enable_da_f
@@ -737,7 +737,7 @@ el0_irq_naked:
 	b	ret_to_user
 SYM_CODE_END(el0_irq)
 
-SYM_CODE_START_LOCAL(el1_error)
+SYM_CODE_START(el1_error)
 	kernel_entry 1
 	mrs	x1, esr_el1
 	gic_prio_kentry_setup tmp=x2
