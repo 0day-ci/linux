@@ -355,6 +355,29 @@ do {									\
 	(val) = __gu_tmp.t;						\
 }
 
+#define __get_udata(x, ptr, size)					\
+({									\
+	int __gu_err;							\
+									\
+	__chk_user_ptr(ptr);						\
+	__get_user_common((x), size, ptr);				\
+									\
+	__gu_err;							\
+})
+
+#define __get_kdata(x, ptr, size)					\
+({									\
+	int __gu_err;							\
+									\
+	__get_kernel_common((x), size, ptr);				\
+									\
+	__gu_err;							\
+})
+
+#define __get_data(x, ptr, u)						\
+	(((u) == true) ? __get_udata((x), (ptr), sizeof(*(ptr))) :	\
+			__get_kdata((x), (ptr), sizeof(*(ptr))))
+
 #define HAVE_GET_KERNEL_NOFAULT
 
 #define __get_kernel_nofault(dst, src, type, err_label)			\
