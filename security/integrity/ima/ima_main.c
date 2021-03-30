@@ -409,7 +409,7 @@ int ima_file_mmap(struct file *file, unsigned long prot)
  * this point.  Eliminate this integrity gap by denying the mprotect
  * PROT_EXECUTE change, if an mmap appraise policy rule exists.
  *
- * On mprotect change success, return 0.  On failure, return -EACESS.
+ * On mprotect change success, return 0.  On failure, return -EPERM.
  */
 int ima_file_mprotect(struct vm_area_struct *vma, unsigned long prot)
 {
