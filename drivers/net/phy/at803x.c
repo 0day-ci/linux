@@ -326,6 +326,30 @@ static int at803x_resume(struct phy_device *phydev)
 	return phy_modify(phydev, MII_BMCR, BMCR_PDOWN | BMCR_ISOLATE, 0);
 }
 
+static int at803x_loopback(struct phy_device *phydev, bool enable)
+{
+	int ret;
+
+	if (enable)
+		ret = phy_clear_bits(phydev, MII_BMCR, BMCR_ANENABLE);
+	else
+		ret = phy_set_bits(phydev, MII_BMCR, BMCR_ANENABLE);
+
+	if (ret)
+		return ret;
+
+	ret = genphy_loopback(phydev, enable);
+
+	/*
+	 * Loop back needs some time to start transmitting packets in the loop.
+	 * Documentation says nothing about it, so I take time which seems to
+	 * work on AR8085.
+	 */
+	msleep(1);
+
+	return ret;
+}
+
 static int at803x_rgmii_reg_set_voltage_sel(struct regulator_dev *rdev,
 					    unsigned int selector)
 {
@@ -1128,6 +1152,7 @@ static struct phy_driver at803x_driver[] = {
 	.get_wol		= at803x_get_wol,
 	.suspend		= at803x_suspend,
 	.resume			= at803x_resume,
+	.set_loopback		= at803x_loopback,
 	/* PHY_GBIT_FEATURES */
 	.read_status		= at803x_read_status,
 	.config_intr		= at803x_config_intr,
