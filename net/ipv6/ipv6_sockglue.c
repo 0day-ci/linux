@@ -1137,9 +1137,12 @@ static int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 		val = sk->sk_family;
 		break;
 	case MCAST_MSFILTER:
+		rtnl_lock();
 		if (in_compat_syscall())
-			return compat_ipv6_get_msfilter(sk, optval, optlen);
-		return ipv6_get_msfilter(sk, optval, optlen, len);
+			val = compat_ipv6_get_msfilter(sk, optval, optlen);
+		val = ipv6_get_msfilter(sk, optval, optlen, len);
+		rtnl_unlock();
+		return val;
 	case IPV6_2292PKTOPTIONS:
 	{
 		struct msghdr msg;
