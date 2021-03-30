@@ -467,6 +467,9 @@ struct bufdesc_ex {
  */
 #define FEC_QUIRK_NO_HARD_RESET		(1 << 18)
 
+#define FEC_ENET_DRT	(1 << 1)
+#define FEC_ENET_LOOP	(1 << 0)
+
 struct bufdesc_prop {
 	int qid;
 	/* Address of Rx and Tx buffers */
@@ -604,6 +607,9 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev);
 void fec_ptp_disable_hwts(struct net_device *ndev);
 int fec_ptp_set(struct net_device *ndev, struct ifreq *ifr);
 int fec_ptp_get(struct net_device *ndev, struct ifreq *ifr);
+void fec_selftest(struct net_device *ndev, struct ethtool_test *etest, u64 *data);
+int fec_selftest_get_count(void);
+void fec_selftest_get_strings(u8 *data);
 
 /****************************************************************************/
 #endif /* FEC_H */

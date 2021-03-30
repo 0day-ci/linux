@@ -2474,6 +2474,9 @@ static void fec_enet_get_strings(struct net_device *netdev,
 {
 	int i;
 	switch (stringset) {
+	case ETH_SS_TEST:
+		fec_selftest_get_strings(data);
+		break;
 	case ETH_SS_STATS:
 		for (i = 0; i < ARRAY_SIZE(fec_stats); i++)
 			memcpy(data + i * ETH_GSTRING_LEN,
@@ -2485,6 +2488,8 @@ static void fec_enet_get_strings(struct net_device *netdev,
 static int fec_enet_get_sset_count(struct net_device *dev, int sset)
 {
 	switch (sset) {
+	case ETH_SS_TEST:
+		return fec_selftest_get_count();
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(fec_stats);
 	default:
@@ -2738,6 +2743,7 @@ static const struct ethtool_ops fec_enet_ethtool_ops = {
 	.set_wol		= fec_enet_set_wol,
 	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
+	.self_test		= fec_selftest,
 };
 
 static int fec_enet_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
