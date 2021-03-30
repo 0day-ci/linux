@@ -256,6 +256,10 @@ static int csi2rx_start(struct csi2rx_priv *csi2rx)
 
 	writel(reg, csi2rx->base + CSI2RX_STATIC_CFG_REG);
 
+	ret = v4l2_subdev_call(csi2rx->source_subdev, core, s_power, true);
+	if (ret && ret != -ENOIOCTLCMD)
+		goto err_disable_pclk;
+
 	ret = v4l2_subdev_call(csi2rx->source_subdev, video, s_stream, true);
 	if (ret)
 		goto err_disable_pclk;
@@ -357,6 +361,10 @@ static void csi2rx_stop(struct csi2rx_priv *csi2rx)
 
 	if (v4l2_subdev_call(csi2rx->source_subdev, video, s_stream, false))
 		dev_warn(csi2rx->dev, "Couldn't disable our subdev\n");
+
+	ret = v4l2_subdev_call(csi2rx->source_subdev, core, s_power, false);
+	if (ret && ret != -ENOIOCTLCMD)
+		dev_warn(csi2rx->dev, "Couldn't power off subdev\n");
 
 	if (csi2rx->dphy) {
 		writel(0, csi2rx->base + CSI2RX_DPHY_LANE_CTRL_REG);
