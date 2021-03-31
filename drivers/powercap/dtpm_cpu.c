@@ -177,7 +177,7 @@ static int cpuhp_dtpm_cpu_online(unsigned int cpu)
 
 	snprintf(name, sizeof(name), "cpu%d-cpufreq", dtpm_cpu->cpu);
 
-	ret = dtpm_register(name, dtpm, NULL);
+	ret = dtpm_add(name, dtpm);
 	if (ret)
 		goto out_kfree_dtpm_cpu;
 
@@ -185,12 +185,12 @@ static int cpuhp_dtpm_cpu_online(unsigned int cpu)
 				   &dtpm_cpu->qos_req, FREQ_QOS_MAX,
 				   pd->table[pd->nr_perf_states - 1].frequency);
 	if (ret)
-		goto out_dtpm_unregister;
+		goto out_dtpm_del;
 
 	return 0;
 
-out_dtpm_unregister:
-	dtpm_unregister(dtpm);
+out_dtpm_del:
+	dtpm_del(name);
 	dtpm_cpu = NULL;
 	dtpm = NULL;
 
