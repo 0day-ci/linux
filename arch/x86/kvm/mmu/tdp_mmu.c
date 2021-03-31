@@ -50,6 +50,22 @@ static void tdp_mmu_free_sp(struct kvm_mmu_page *sp)
 	kmem_cache_free(mmu_page_header_cache, sp);
 }
 
+/*
+ * This is called through call_rcu in order to free TDP page table memory
+ * safely with respect to other kernel threads that may be operating on
+ * the memory.
+ * By only accessing TDP MMU page table memory in an RCU read critical
+ * section, and freeing it after a grace period, lockless access to that
+ * memory won't use it after it is freed.
+ */
+static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
+{
+	struct kvm_mmu_page *sp = container_of(head, struct kvm_mmu_page,
+					       rcu_head);
+
+	tdp_mmu_free_sp(sp);
+}
+
 void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root)
 {
 	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
@@ -61,11 +77,13 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root)
 
 	WARN_ON(!root->tdp_mmu_page);
 
-	list_del(&root->link);
+	spin_lock(&kvm->arch.tdp_mmu_pages_lock);
+	list_del_rcu(&root->link);
+	spin_unlock(&kvm->arch.tdp_mmu_pages_lock);
 
 	zap_gfn_range(kvm, root, 0, max_gfn, false);
 
-	tdp_mmu_free_sp(root);
+	call_rcu(&root->rcu_head, tdp_mmu_free_sp_rcu_callback);
 }
 
 /*
@@ -82,18 +100,21 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 
 	lockdep_assert_held_write(&kvm->mmu_lock);
 
+	rcu_read_lock();
+
 	if (prev_root)
-		next_root = list_next_entry(prev_root, link);
+		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+						  &prev_root->link,
+						  typeof(*prev_root), link);
 	else
-		next_root = list_first_entry(&kvm->arch.tdp_mmu_roots,
-					     typeof(*next_root), link);
+		next_root = list_first_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+						   typeof(*next_root), link);
 
-	while (!list_entry_is_head(next_root, &kvm->arch.tdp_mmu_roots, link) &&
-	       !kvm_tdp_mmu_get_root(kvm, next_root))
-		next_root = list_next_entry(next_root, link);
+	while (next_root && !kvm_tdp_mmu_get_root(kvm, next_root))
+		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+				&next_root->link, typeof(*next_root), link);
 
-	if (list_entry_is_head(next_root, &kvm->arch.tdp_mmu_roots, link))
-		next_root = NULL;
+	rcu_read_unlock();
 
 	if (prev_root)
 		kvm_tdp_mmu_put_root(kvm, prev_root);
@@ -114,7 +135,8 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 
 /* Only safe under the MMU lock in write mode, without yielding. */
 #define for_each_tdp_mmu_root(_kvm, _root)				\
-	list_for_each_entry(_root, &_kvm->arch.tdp_mmu_roots, link)
+	list_for_each_entry_rcu(_root, &_kvm->arch.tdp_mmu_roots, link,	\
+				lockdep_is_held_write(&kvm->mmu_lock))
 
 static union kvm_mmu_page_role page_role_for_level(struct kvm_vcpu *vcpu,
 						   int level)
@@ -168,26 +190,12 @@ hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
 	root = alloc_tdp_mmu_page(vcpu, 0, vcpu->arch.mmu->shadow_root_level);
 	refcount_set(&root->tdp_mmu_root_count, 1);
 
-	list_add(&root->link, &kvm->arch.tdp_mmu_roots);
+	spin_lock(&kvm->arch.tdp_mmu_pages_lock);
+	list_add_rcu(&root->link, &kvm->arch.tdp_mmu_roots);
+	spin_unlock(&kvm->arch.tdp_mmu_pages_lock);
 
 out:
 	return __pa(root->spt);
-}
-
-/*
- * This is called through call_rcu in order to free TDP page table memory
- * safely with respect to other kernel threads that may be operating on
- * the memory.
- * By only accessing TDP MMU page table memory in an RCU read critical
- * section, and freeing it after a grace period, lockless access to that
- * memory won't use it after it is freed.
- */
-static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
-{
-	struct kvm_mmu_page *sp = container_of(head, struct kvm_mmu_page,
-					       rcu_head);
-
-	tdp_mmu_free_sp(sp);
 }
 
 static void handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
