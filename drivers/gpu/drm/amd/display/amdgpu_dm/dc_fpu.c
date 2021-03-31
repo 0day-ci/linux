@@ -40,6 +40,25 @@
  */
 
 static DEFINE_PER_CPU(atomic_t, fpu_ref);
+static DEFINE_PER_CPU(atomic_t, fp_dc_enabled);
+
+/**
+ * is_fp_dc_enabled - Check if FPU protection is enabled
+ *
+ * This function tells if the code is already under FPU protection or not. A
+ * function that works as an API for a set of FPU operations can use this
+ * function for checking if the caller invoked it after DC_FP_START(). For
+ * example, take a look at dcn2x.c file.
+ *
+ * Return:
+ * Return true if we already enabled FPU protection, otherwise return false.
+ */
+inline bool is_fp_dc_enabled(void)
+{
+	atomic_t *fp_enabled = this_cpu_ptr(&fp_dc_enabled);
+
+	return atomic_read(fp_enabled);
+}
 
 /**
  * dc_fpu_begin - Enables FPU protection
@@ -55,12 +74,15 @@ void dc_fpu_begin(const char *function_name, const int line)
 {
 	int ret;
 	atomic_t *local_fpu_ref = this_cpu_ptr(&fpu_ref);
+	atomic_t *fp_enabled = this_cpu_ptr(&fp_dc_enabled);
 
 	ret = atomic_inc_return(local_fpu_ref);
 	TRACE_DCN_FPU(true, function_name, line, ret);
 
-	if (ret == 1)
+	if (ret == 1) {
 		kernel_fpu_begin();
+		atomic_set(fp_enabled, 1);
+	}
 }
 
 /**
@@ -75,13 +97,15 @@ void dc_fpu_begin(const char *function_name, const int line)
  */
 void dc_fpu_end(const char *function_name, const int line)
 {
-
-	int ret;
+	bool ret;
 	atomic_t *local_fpu_ref = this_cpu_ptr(&fpu_ref);
+	atomic_t *fp_enabled = this_cpu_ptr(&fp_dc_enabled);
 
-	ret = atomic_dec_return(local_fpu_ref);
+	ret = atomic_dec_and_test(local_fpu_ref);
 	TRACE_DCN_FPU(false, function_name, line, ret);
 
-	if (!ret)
+	if (ret) {
+		atomic_set(fp_enabled, 0);
 		kernel_fpu_end();
+	}
 }
