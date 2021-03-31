@@ -188,6 +188,8 @@ struct msm_drm_private {
 	 */
 	struct list_head inactive_willneed;  /* inactive + !shrinkable */
 	struct list_head inactive_dontneed;  /* inactive +  shrinkable */
+	struct list_head inactive_purged;    /* inactive +  purged */
+	int shrinkable_count;                /* write access under mm_lock */
 	struct mutex mm_lock;
 
 	struct workqueue_struct *wq;

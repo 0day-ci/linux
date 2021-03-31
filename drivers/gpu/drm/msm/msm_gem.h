@@ -51,6 +51,11 @@ struct msm_gem_object {
 	uint8_t madv;
 
 	/**
+	 * Is object on inactive_dontneed list (ie. counted in priv->shrinkable_count)?
+	 */
+	bool dontneed : 1;
+
+	/**
 	 * count of active vmap'ing
 	 */
 	uint8_t vmap_count;
@@ -196,6 +201,33 @@ static inline bool is_vunmapable(struct msm_gem_object *msm_obj)
 {
 	WARN_ON(!msm_gem_is_locked(&msm_obj->base));
 	return (msm_obj->vmap_count == 0) && msm_obj->vaddr;
+}
+
+static inline void mark_purgable(struct msm_gem_object *msm_obj)
+{
+	struct msm_drm_private *priv = msm_obj->base.dev->dev_private;
+
+	WARN_ON(!mutex_is_locked(&priv->mm_lock));
+
+	if (WARN_ON(msm_obj->dontneed))
+		return;
+
+	priv->shrinkable_count += msm_obj->base.size >> PAGE_SHIFT;
+	msm_obj->dontneed = true;
+}
+
+static inline void mark_unpurgable(struct msm_gem_object *msm_obj)
+{
+	struct msm_drm_private *priv = msm_obj->base.dev->dev_private;
+
+	WARN_ON(!mutex_is_locked(&priv->mm_lock));
+
+	if (WARN_ON(!msm_obj->dontneed))
+		return;
+
+	priv->shrinkable_count -= msm_obj->base.size >> PAGE_SHIFT;
+	WARN_ON(priv->shrinkable_count < 0);
+	msm_obj->dontneed = false;
 }
 
 void msm_gem_purge(struct drm_gem_object *obj);
