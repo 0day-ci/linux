@@ -1141,7 +1141,40 @@ DECLARE_EVENT_CLASS(xprt_writelock_event,
 
 DEFINE_WRITELOCK_EVENT(reserve_xprt);
 DEFINE_WRITELOCK_EVENT(release_xprt);
-DEFINE_WRITELOCK_EVENT(transmit_queued);
+
+TRACE_EVENT(xprt_transmit_queued,
+	TP_PROTO(
+		const struct rpc_task *task
+	),
+
+	TP_ARGS(task),
+
+	TP_STRUCT__entry(
+		__field(unsigned int, task_id)
+		__field(unsigned int, client_id)
+		__field(unsigned long, runstate)
+		__field(u32, xid)
+		__field(int, status)
+		__field(unsigned short, flags)
+	),
+
+	TP_fast_assign(
+		__entry->task_id = task->tk_pid;
+		__entry->client_id =
+			task->tk_client ? task->tk_client->cl_clid : -1;
+		__entry->runstate = task->tk_runstate;
+		__entry->xid = be32_to_cpu(task->tk_rqstp->rq_xid);
+		__entry->status = task->tk_status;
+		__entry->flags = task->tk_flags;
+	),
+
+	TP_printk("task:%u@%u xid=0x%08x flags=%s runstate=%s status=%d",
+		__entry->task_id, __entry->client_id, __entry->xid,
+		rpc_show_task_flags(__entry->flags),
+		rpc_show_runstate(__entry->runstate),
+		__entry->status
+	)
+);
 
 DECLARE_EVENT_CLASS(xprt_cong_event,
 	TP_PROTO(
