@@ -34,7 +34,7 @@
 #include "virtgpu_drv.h"
 #include "virtgpu_trace.h"
 
-#define MAX_INLINE_CMD_SIZE   96
+#define MAX_INLINE_CMD_SIZE   112
 #define MAX_INLINE_RESP_SIZE  24
 #define VBUFFER_SIZE          (sizeof(struct virtio_gpu_vbuffer) \
 			       + MAX_INLINE_CMD_SIZE		 \
@@ -1294,6 +1294,7 @@ void virtio_gpu_cmd_set_scanout_blob(struct virtio_gpu_device *vgdev,
 	cmd_p->format = cpu_to_le32(format);
 	cmd_p->width  = cpu_to_le32(fb->width);
 	cmd_p->height = cpu_to_le32(fb->height);
+	cmd_p->modifier = cpu_to_le64(fb->modifier);
 
 	for (i = 0; i < 4; i++) {
 		cmd_p->strides[i] = cpu_to_le32(fb->pitches[i]);

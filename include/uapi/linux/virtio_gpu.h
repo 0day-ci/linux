@@ -409,6 +409,7 @@ struct virtio_gpu_set_scanout_blob {
 	__le32 width;
 	__le32 height;
 	__le32 format;
+	__le64 modifier;
 	__le32 padding;
 	__le32 strides[4];
 	__le32 offsets[4];
