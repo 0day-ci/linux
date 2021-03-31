@@ -389,16 +389,18 @@ struct wl3501_join_req {
 	u16			    probe_delay;
 	u8			    timestamp[8];
 	u8			    local_time[8];
-	u16			    beacon_period;
-	u16			    dtim_period;
-	u16			    cap_info;
-	u8			    bss_type;
-	u8			    bssid[ETH_ALEN];
-	struct iw_mgmt_essid_pset   ssid;
-	struct iw_mgmt_ds_pset	    ds_pset;
-	struct iw_mgmt_cf_pset	    cf_pset;
-	struct iw_mgmt_ibss_pset    ibss_pset;
-	struct iw_mgmt_data_rset    bss_basic_rset;
+	struct {
+		u16			    beacon_period;
+		u16			    dtim_period;
+		u16			    cap_info;
+		u8			    bss_type;
+		u8			    bssid[ETH_ALEN];
+		struct iw_mgmt_essid_pset   ssid;
+		struct iw_mgmt_ds_pset	    ds_pset;
+		struct iw_mgmt_cf_pset	    cf_pset;
+		struct iw_mgmt_ibss_pset    ibss_pset;
+		struct iw_mgmt_data_rset    bss_basic_rset;
+	} req;
 };
 
 struct wl3501_join_confirm {
