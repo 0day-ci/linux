@@ -29,10 +29,12 @@ module_param(napi_weight, int, 0444);
 
 static bool csum = true, gso = true, napi_tx = true;
 static int xsk_budget = 32;
+static int xsk_kick_thr = 8;
 module_param(csum, bool, 0444);
 module_param(gso, bool, 0444);
 module_param(napi_tx, bool, 0644);
 module_param(xsk_budget, int, 0644);
+module_param(xsk_kick_thr, int, 0644);
 
 /* FIXME: MTU in config. */
 #define GOOD_PACKET_LEN (ETH_HLEN + VLAN_HLEN + ETH_DATA_LEN)
@@ -2612,6 +2614,8 @@ static int virtnet_xsk_xmit_batch(struct send_queue *sq,
 	struct xdp_desc desc;
 	int err, packet = 0;
 	int ret = -EAGAIN;
+	int need_kick = 0;
+	int kicks = 0;
 
 	if (sq->xsk.last_desc.addr) {
 		err = virtnet_xsk_xmit(sq, pool, &sq->xsk.last_desc);
@@ -2619,6 +2623,7 @@ static int virtnet_xsk_xmit_batch(struct send_queue *sq,
 			return -EBUSY;
 
 		++packet;
+		++need_kick;
 		--budget;
 		sq->xsk.last_desc.addr = 0;
 	}
@@ -2642,13 +2647,25 @@ static int virtnet_xsk_xmit_batch(struct send_queue *sq,
 		}
 
 		++packet;
+		++need_kick;
+		if (need_kick > xsk_kick_thr) {
+			if (virtqueue_kick_prepare(sq->vq) &&
+			    virtqueue_notify(sq->vq))
+				++kicks;
+
+			need_kick = 0;
+		}
 	}
 
 	if (packet) {
-		if (virtqueue_kick_prepare(sq->vq) &&
-		    virtqueue_notify(sq->vq)) {
+		if (need_kick) {
+			if (virtqueue_kick_prepare(sq->vq) &&
+			    virtqueue_notify(sq->vq))
+				++kicks;
+		}
+		if (kicks) {
 			u64_stats_update_begin(&sq->stats.syncp);
-			sq->stats.kicks += 1;
+			sq->stats.kicks += kicks;
 			u64_stats_update_end(&sq->stats.syncp);
 		}
 
