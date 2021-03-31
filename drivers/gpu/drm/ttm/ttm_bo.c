@@ -49,8 +49,8 @@ static void ttm_bo_global_kobj_release(struct kobject *kobj);
 /*
  * ttm_global_mutex - protecting the global BO state
  */
-DEFINE_MUTEX(ttm_global_mutex);
-unsigned ttm_bo_glob_use_count;
+static DEFINE_MUTEX(ttm_global_mutex);
+static unsigned int ttm_bo_glob_use_count;
 struct ttm_bo_global ttm_bo_glob;
 EXPORT_SYMBOL(ttm_bo_glob);
 
