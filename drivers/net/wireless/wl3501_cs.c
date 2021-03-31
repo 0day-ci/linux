@@ -484,7 +484,7 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 			goto out;
 		}
 		rc = 0;
-		memcpy(&sig.daddr[0], pdata, 12);
+		memcpy(&sig.addr, pdata, sizeof(sig.addr));
 		pktlen = len - 12;
 		pdata += 12;
 		sig.data = bf;
