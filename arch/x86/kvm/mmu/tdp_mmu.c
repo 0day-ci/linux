@@ -56,7 +56,7 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root)
 
 	lockdep_assert_held_write(&kvm->mmu_lock);
 
-	if (--root->root_count)
+	if (!refcount_dec_and_test(&root->tdp_mmu_root_count))
 		return;
 
 	WARN_ON(!root->tdp_mmu_page);
@@ -88,10 +88,12 @@ static struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 		next_root = list_first_entry(&kvm->arch.tdp_mmu_roots,
 					     typeof(*next_root), link);
 
+	while (!list_entry_is_head(next_root, &kvm->arch.tdp_mmu_roots, link) &&
+	       !kvm_tdp_mmu_get_root(kvm, next_root))
+		next_root = list_next_entry(next_root, link);
+
 	if (list_entry_is_head(next_root, &kvm->arch.tdp_mmu_roots, link))
 		next_root = NULL;
-	else
-		kvm_tdp_mmu_get_root(kvm, next_root);
 
 	if (prev_root)
 		kvm_tdp_mmu_put_root(kvm, prev_root);
@@ -158,14 +160,13 @@ hpa_t kvm_tdp_mmu_get_vcpu_root_hpa(struct kvm_vcpu *vcpu)
 
 	/* Check for an existing root before allocating a new one. */
 	for_each_tdp_mmu_root(kvm, root) {
-		if (root->role.word == role.word) {
-			kvm_tdp_mmu_get_root(kvm, root);
+		if (root->role.word == role.word &&
+		    kvm_tdp_mmu_get_root(kvm, root))
 			goto out;
-		}
 	}
 
 	root = alloc_tdp_mmu_page(vcpu, 0, vcpu->arch.mmu->shadow_root_level);
-	root->root_count = 1;
+	refcount_set(&root->tdp_mmu_root_count, 1);
 
 	list_add(&root->link, &kvm->arch.tdp_mmu_roots);
 
