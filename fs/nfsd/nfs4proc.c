@@ -1737,9 +1737,13 @@ nfsd4_seek(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	 *        should ever file->f_pos.
 	 */
 	seek->seek_pos = vfs_llseek(nf->nf_file, seek->seek_offset, whence);
-	if (seek->seek_pos < 0)
-		status = nfserrno(seek->seek_pos);
-	else if (seek->seek_pos >= i_size_read(file_inode(nf->nf_file)))
+	if (seek->seek_pos < 0) {
+		if (whence == SEEK_DATA &&
+		    seek->seek_offset < i_size_read(file_inode(nf->nf_file)))
+			seek->seek_eof = true;
+		else
+			status = nfserrno(seek->seek_pos);
+	} else if (seek->seek_pos >= i_size_read(file_inode(nf->nf_file)))
 		seek->seek_eof = true;
 
 out:
