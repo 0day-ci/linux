@@ -7010,6 +7010,14 @@ static int napi_thread_wait(struct napi_struct *napi)
 		set_current_state(TASK_INTERRUPTIBLE);
 	}
 	__set_current_state(TASK_RUNNING);
+
+	/* if the thread owns this napi, and the napi itself has been disabled
+	 * in-between napi_schedule() and the above napi_disable_pending()
+	 * check, we need to clear the SCHED bit here, or napi_disable
+	 * will hang waiting for such bit being cleared
+	 */
+	if (test_bit(NAPI_STATE_SCHED_THREADED, &napi->state) || woken)
+		clear_bit(NAPI_STATE_SCHED, &napi->state);
 	return -1;
 }
 
