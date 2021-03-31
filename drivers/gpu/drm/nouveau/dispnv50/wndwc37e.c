@@ -41,9 +41,9 @@ static int
 wndwc37e_csc_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 13);
 
-	if ((ret = PUSH_WAIT(push, 13)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CSC_RED2RED, asyw->csc.matrix, 12);
@@ -54,9 +54,9 @@ static int
 wndwc37e_ilut_clr(struct nv50_wndw *wndw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 2);
 
-	if ((ret = PUSH_WAIT(push, 2)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CONTEXT_DMA_INPUT_LUT, 0x00000000);
@@ -67,9 +67,9 @@ static int
 wndwc37e_ilut_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 4);
 
-	if ((ret = PUSH_WAIT(push, 4)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CONTROL_INPUT_LUT,
@@ -100,9 +100,9 @@ int
 wndwc37e_blend_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 8);
 
-	if ((ret = PUSH_WAIT(push, 8)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_COMPOSITION_CONTROL,
@@ -145,9 +145,9 @@ int
 wndwc37e_image_clr(struct nv50_wndw *wndw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 4);
 
-	if ((ret = PUSH_WAIT(push, 4)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_PRESENT_CONTROL,
@@ -162,9 +162,9 @@ static int
 wndwc37e_image_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 17);
 
-	if ((ret = PUSH_WAIT(push, 17)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_PRESENT_CONTROL,
@@ -215,9 +215,9 @@ int
 wndwc37e_ntfy_clr(struct nv50_wndw *wndw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 2);
 
-	if ((ret = PUSH_WAIT(push, 2)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CONTEXT_DMA_NOTIFIER, 0x00000000);
@@ -228,9 +228,9 @@ int
 wndwc37e_ntfy_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 3);
 
-	if ((ret = PUSH_WAIT(push, 3)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CONTEXT_DMA_NOTIFIER, asyw->ntfy.handle,
@@ -245,9 +245,9 @@ int
 wndwc37e_sema_clr(struct nv50_wndw *wndw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 2);
 
-	if ((ret = PUSH_WAIT(push, 2)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_CONTEXT_DMA_SEMAPHORE, 0x00000000);
@@ -258,9 +258,9 @@ int
 wndwc37e_sema_set(struct nv50_wndw *wndw, struct nv50_wndw_atom *asyw)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 5);
 
-	if ((ret = PUSH_WAIT(push, 5)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_SEMAPHORE_CONTROL, asyw->sema.offset,
@@ -274,9 +274,9 @@ int
 wndwc37e_update(struct nv50_wndw *wndw, u32 *interlock)
 {
 	struct nvif_push *push = wndw->wndw.push;
-	int ret;
+	int ret = PUSH_WAIT(push, 5);
 
-	if ((ret = PUSH_WAIT(push, 5)))
+	if (ret)
 		return ret;
 
 	PUSH_MTHD(push, NVC37E, SET_INTERLOCK_FLAGS, interlock[NV50_DISP_INTERLOCK_CURS] << 1 |
