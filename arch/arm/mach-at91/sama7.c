@@ -17,6 +17,7 @@
 static void __init sama7_common_init(void)
 {
 	of_platform_default_populate(NULL, NULL, NULL);
+	sama7_pm_init();
 }
 
 static void __init sama7_dt_device_init(void)
