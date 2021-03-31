@@ -752,8 +752,16 @@ static int hantro_probe(struct platform_device *pdev)
 	if (!vpu->clocks)
 		return -ENOMEM;
 
-	for (i = 0; i < vpu->variant->num_clocks; i++)
+	for (i = 0; i < vpu->variant->num_clocks; i++) {
 		vpu->clocks[i].id = vpu->variant->clk_names[i];
+
+		/*
+		 * Warn and refuse to load if the driver has multiple clocks,
+		 * yet they are lacking the respective names.
+		 */
+		if (WARN_ON(!vpu->variant->clk_names[i] && i))
+			return -ENXIO;
+	}
 	ret = devm_clk_bulk_get(&pdev->dev, vpu->variant->num_clocks,
 				vpu->clocks);
 	if (ret)
@@ -791,7 +799,19 @@ static int hantro_probe(struct platform_device *pdev)
 		if (!vpu->variant->irqs[i].handler)
 			continue;
 
-		irq = platform_get_irq_byname(vpu->pdev, irq_name);
+		/*
+		 * If the driver has a single IRQ, chances are there will be no
+		 * actual name in the DT bindings.
+		 */
+		if (!irq_name) {
+			if (WARN_ON(i))
+				return -ENXIO;
+
+			irq_name = "default";
+			irq = platform_get_irq(vpu->pdev, 0);
+		} else {
+			irq = platform_get_irq_byname(vpu->pdev, irq_name);
+		}
 		if (irq <= 0)
 			return -ENXIO;
 
