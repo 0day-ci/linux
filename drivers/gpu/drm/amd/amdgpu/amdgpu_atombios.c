@@ -1283,65 +1283,51 @@ int amdgpu_atombios_get_leakage_vddc_based_on_leakage_params(struct amdgpu_devic
 	profile = (ATOM_ASIC_PROFILING_INFO_V2_1 *)
 		(adev->mode_info.atom_context->bios + data_offset);
 
-	switch (frev) {
-	case 1:
-		return -EINVAL;
-	case 2:
-		switch (crev) {
-		case 1:
-			if (size < sizeof(ATOM_ASIC_PROFILING_INFO_V2_1))
-				return -EINVAL;
-			leakage_bin = (u16 *)
-				(adev->mode_info.atom_context->bios + data_offset +
-				 le16_to_cpu(profile->usLeakageBinArrayOffset));
-			vddc_id_buf = (u16 *)
-				(adev->mode_info.atom_context->bios + data_offset +
-				 le16_to_cpu(profile->usElbVDDC_IdArrayOffset));
-			vddc_buf = (u16 *)
-				(adev->mode_info.atom_context->bios + data_offset +
-				 le16_to_cpu(profile->usElbVDDC_LevelArrayOffset));
-			vddci_id_buf = (u16 *)
-				(adev->mode_info.atom_context->bios + data_offset +
-				 le16_to_cpu(profile->usElbVDDCI_IdArrayOffset));
-			vddci_buf = (u16 *)
-				(adev->mode_info.atom_context->bios + data_offset +
-				 le16_to_cpu(profile->usElbVDDCI_LevelArrayOffset));
-
-			if (profile->ucElbVDDC_Num > 0) {
-				for (i = 0; i < profile->ucElbVDDC_Num; i++) {
-					if (vddc_id_buf[i] == virtual_voltage_id) {
-						for (j = 0; j < profile->ucLeakageBinNum; j++) {
-							if (vbios_voltage_id <= leakage_bin[j]) {
-								*vddc = vddc_buf[j * profile->ucElbVDDC_Num + i];
-								break;
-							}
-						}
-						break;
-					}
-				}
-			}
-			if (profile->ucElbVDDCI_Num > 0) {
-				for (i = 0; i < profile->ucElbVDDCI_Num; i++) {
-					if (vddci_id_buf[i] == virtual_voltage_id) {
-						for (j = 0; j < profile->ucLeakageBinNum; j++) {
-							if (vbios_voltage_id <= leakage_bin[j]) {
-								*vddci = vddci_buf[j * profile->ucElbVDDCI_Num + i];
-								break;
-							}
-						}
-						break;
-					}
-				}
-			}
-			break;
-		default:
-			DRM_ERROR("Unknown table version %d, %d\n", frev, crev);
-			return -EINVAL;
-		}
-		break;
-	default:
+	if ((frev != 2) || (crev != 1)) {
 		DRM_ERROR("Unknown table version %d, %d\n", frev, crev);
 		return -EINVAL;
+	}
+
+	if (size < sizeof(ATOM_ASIC_PROFILING_INFO_V2_1))
+		return -EINVAL;
+
+	leakage_bin = (u16 *)(adev->mode_info.atom_context->bios + data_offset +
+		 le16_to_cpu(profile->usLeakageBinArrayOffset));
+	vddc_id_buf = (u16 *)(adev->mode_info.atom_context->bios + data_offset +
+		 le16_to_cpu(profile->usElbVDDC_IdArrayOffset));
+	vddc_buf = (u16 *)(adev->mode_info.atom_context->bios + data_offset +
+		 le16_to_cpu(profile->usElbVDDC_LevelArrayOffset));
+	vddci_id_buf = (u16 *)(adev->mode_info.atom_context->bios + data_offset +
+		 le16_to_cpu(profile->usElbVDDCI_IdArrayOffset));
+	vddci_buf = (u16 *)(adev->mode_info.atom_context->bios + data_offset +
+		 le16_to_cpu(profile->usElbVDDCI_LevelArrayOffset));
+
+	if (profile->ucElbVDDC_Num > 0) {
+		for (i = 0; i < profile->ucElbVDDC_Num; i++) {
+			if (vddc_id_buf[i] == virtual_voltage_id) {
+				for (j = 0; j < profile->ucLeakageBinNum; j++) {
+					if (vbios_voltage_id <= leakage_bin[j]) {
+						*vddc = vddc_buf[j * profile->ucElbVDDC_Num + i];
+						break;
+					}
+				}
+				break;
+			}
+		}
+	}
+
+	if (profile->ucElbVDDCI_Num > 0) {
+		for (i = 0; i < profile->ucElbVDDCI_Num; i++) {
+			if (vddci_id_buf[i] == virtual_voltage_id) {
+				for (j = 0; j < profile->ucLeakageBinNum; j++) {
+					if (vbios_voltage_id <= leakage_bin[j]) {
+						*vddci = vddci_buf[j * profile->ucElbVDDCI_Num + i];
+						break;
+					}
+				}
+				break;
+			}
+		}
 	}
 
 	return 0;
