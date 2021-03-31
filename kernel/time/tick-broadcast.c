@@ -47,6 +47,7 @@ static inline void tick_resume_broadcast_oneshot(struct clock_event_device *bc) 
 static inline void tick_broadcast_oneshot_offline(unsigned int cpu) { }
 # endif
 #endif
+static void tick_handle_oneshot_broadcast(struct clock_event_device *dev);
 
 /*
  * Debugging: see timer_list.c
@@ -107,6 +108,19 @@ void tick_install_broadcast_device(struct clock_event_device *dev)
 	tick_broadcast_device.evtdev = dev;
 	if (!cpumask_empty(tick_broadcast_mask))
 		tick_broadcast_start_periodic(dev);
+
+	if (!(dev->features & CLOCK_EVT_FEAT_ONESHOT))
+		return;
+
+	/*
+	 * If system already runs in oneshot mode, switch new registered
+	 * broadcast device to oneshot mode explicitly if possiable.
+	 */
+	if (tick_broadcast_oneshot_active()) {
+		tick_broadcast_switch_to_oneshot();
+		return;
+	}
+
 	/*
 	 * Inform all cpus about this. We might be in a situation
 	 * where we did not switch to oneshot mode because the per cpu
@@ -115,8 +129,7 @@ void tick_install_broadcast_device(struct clock_event_device *dev)
 	 * notification the systems stays stuck in periodic mode
 	 * forever.
 	 */
-	if (dev->features & CLOCK_EVT_FEAT_ONESHOT)
-		tick_clock_notify();
+	tick_clock_notify();
 }
 
 /*
