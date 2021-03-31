@@ -65,6 +65,8 @@ static inline s64 div_frac(s64 x, s64 y)
  *					controlling for.
  * @sustainable_power:	Sustainable power (heat) that this thermal zone can
  *			dissipate
+ * @updated:		Keeps track if the framework was updated when the
+ *			temperature went below the first trip point.
  */
 struct power_allocator_params {
 	bool allocated_tzp;
@@ -73,6 +75,7 @@ struct power_allocator_params {
 	int trip_switch_on;
 	int trip_max_desired_temperature;
 	u32 sustainable_power;
+	bool updated;
 };
 
 /**
@@ -393,6 +396,12 @@ static int allocate_power(struct thermal_zone_device *tz,
 
 	mutex_lock(&tz->lock);
 
+	/*
+	 * The temperature has crossed the first trip point, so next time
+	 * when it drops below, update cooling devices and framework.
+	 */
+	params->updated = false;
+
 	num_actors = 0;
 	total_weight = 0;
 	list_for_each_entry(instance, &tz->thermal_instances, tz_node) {
@@ -594,10 +603,18 @@ static void allow_maximum_power(struct thermal_zone_device *tz)
 		 */
 		cdev->ops->get_requested_power(cdev, &req_power);
 
-		instance->cdev->updated = false;
+		if (!params->updated)
+			instance->cdev->updated = false;
+
 		mutex_unlock(&instance->cdev->lock);
-		thermal_cdev_update(instance->cdev);
+
+		if (!params->updated)
+			thermal_cdev_update(instance->cdev);
 	}
+
+	/* Don't send updates next time when temperature is low. */
+	params->updated = true;
+
 	mutex_unlock(&tz->lock);
 }
 
