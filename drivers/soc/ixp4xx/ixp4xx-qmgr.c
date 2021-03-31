@@ -16,7 +16,7 @@
 static struct qmgr_regs __iomem *qmgr_regs;
 static int qmgr_irq_1;
 static int qmgr_irq_2;
-static spinlock_t qmgr_lock;
+static DEFINE_SPINLOCK(qmgr_lock);
 static u32 used_sram_bitmap[4]; /* 128 16-dword pages */
 static void (*irq_handlers[QUEUES])(void *pdev);
 static void *irq_pdevs[QUEUES];
@@ -434,7 +434,6 @@ static int ixp4xx_qmgr_probe(struct platform_device *pdev)
 	}
 
 	used_sram_bitmap[0] = 0xF; /* 4 first pages reserved for config */
-	spin_lock_init(&qmgr_lock);
 
 	dev_info(dev, "IXP4xx Queue Manager initialized.\n");
 	return 0;
