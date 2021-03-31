@@ -156,10 +156,11 @@ static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 		return;
 
 	bo = gem_to_virtio_gpu_obj(plane->state->fb->obj[0]);
-	if (bo->dumb)
+	if (bo->dumb && !bo->guest_blob)
 		virtio_gpu_update_dumb_bo(vgdev, plane->state, &rect);
 
-	if (plane->state->fb != old_state->fb ||
+	if ((bo->dumb && bo->guest_blob) ||
+	    plane->state->fb != old_state->fb ||
 	    plane->state->src_w != old_state->src_w ||
 	    plane->state->src_h != old_state->src_h ||
 	    plane->state->src_x != old_state->src_x ||
@@ -193,11 +194,14 @@ static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 		}
 	}
 
-	virtio_gpu_cmd_resource_flush(vgdev, bo->hw_res_handle,
-				      rect.x1,
-				      rect.y1,
-				      rect.x2 - rect.x1,
-				      rect.y2 - rect.y1);
+	if (!bo->guest_blob) {
+		virtio_gpu_cmd_resource_flush(vgdev, bo->hw_res_handle,
+					      rect.x1,
+				              rect.y1,
+				              rect.x2 - rect.x1,
+				              rect.y2 - rect.y1);
+	}
+
 	virtio_gpu_notify(vgdev);
 }
 
