@@ -35,6 +35,7 @@ DC_LIBS += dcn301
 DC_LIBS += dcn302
 endif
 
+DC_LIBS += fpu_operations
 DC_LIBS += dce120
 
 DC_LIBS += dce112
