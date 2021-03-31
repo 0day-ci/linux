@@ -41,7 +41,6 @@ int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen)
 	err = zlib_inflateReset(&stream);
 	if (err != Z_OK) {
 		pr_err("zlib_inflateReset error %d\n", err);
-		zlib_inflateEnd(&stream);
 		zlib_inflateInit(&stream);
 	}
 
