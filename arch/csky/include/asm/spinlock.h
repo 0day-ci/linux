@@ -26,10 +26,8 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 		: "r"(p), "r"(ticket_next)
 		: "cc");
 
-	while (lockval.tickets.next != lockval.tickets.owner)
-		lockval.tickets.owner = READ_ONCE(lock->tickets.owner);
-
-	smp_mb();
+	smp_cond_load_acquire(&lock->tickets.owner,
+					VAL == lockval.tickets.next);
 }
 
 static inline int arch_spin_trylock(arch_spinlock_t *lock)
@@ -55,15 +53,14 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
 	} while (!res);
 
 	if (!contended)
-		smp_mb();
+		__smp_acquire_fence();
 
 	return !contended;
 }
 
 static inline void arch_spin_unlock(arch_spinlock_t *lock)
 {
-	smp_mb();
-	WRITE_ONCE(lock->tickets.owner, lock->tickets.owner + 1);
+	smp_store_release(&lock->tickets.owner, lock->tickets.owner + 1);
 }
 
 static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
