@@ -229,6 +229,8 @@ patternProperties:
     description: Chuwi Innovation Ltd.
   "^ciaa,.*":
     description: Computadora Industrial Abierta Argentina
+  "^cisco,.*":
+    description: Cisco Systems, Inc
   "^cirrus,.*":
     description: Cirrus Logic, Inc.
   "^cisco,.*":

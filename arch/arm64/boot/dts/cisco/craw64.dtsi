@@ -1,0 +1,392 @@
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+/* the mbox for spin-table; not sure if this is needed given that it's outside our defined memory zone */
+/memreserve/ 0x285001F8 0x00000008;
+
+/ {
+	compatible = "cisco,craw64";
+	interrupt-parent = <&gic>;
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi; /* spi driver uses this to set bus number 0, which is tacked onto the reported device name
+				so that we get device spi0 instead of spiN where N is some arbitrary large integer. */
+	};
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x0>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0 0x285001F8>;
+			next-level-cache = <&L2_0>;
+			cci-control-port = <&cci_control4>;
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x1>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0 0x285001F8>;
+			next-level-cache = <&L2_0>;
+			cci-control-port = <&cci_control4>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x2>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0 0x285001F8>;
+			next-level-cache = <&L2_0>;
+			cci-control-port = <&cci_control4>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0 0x3>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0 0x285001F8>;
+			next-level-cache = <&L2_0>;
+			cci-control-port = <&cci_control4>;
+		};
+
+		L2_0: l2-cache0 {
+			compatible = "cache";
+		};
+	};
+
+        cci@28d70000 {
+		compatible = "arm,cci-400";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x0 0x28d70000 0 0x1000>;
+		ranges = <0x0 0x0 0x28d70000 0x6000>; /* size should be 0x10000 if including pmu node */
+
+		cci_control0: slave-if@1000 {  /* Nmp */
+			compatible = "arm,cci-400-ctrl-if";
+			interface-type = "ace-lite";
+			reg = <0x1000 0x1000>;
+		};
+
+		cci_control1: slave-if@2000 {  /* Nap */
+			compatible = "arm,cci-400-ctrl-if";
+			interface-type = "ace-lite";
+			reg = <0x2000 0x1000>;
+		};
+
+		cci_control2: slave-if@3000 {  /* Nap */
+			compatible = "arm,cci-400-ctrl-if";
+			interface-type = "ace-lite";
+			reg = <0x3000 0x1000>;
+		};
+
+		cci_control3: slave-if@4000 {  /* Lil1 */
+			compatible = "arm,cci-400-ctrl-if";
+			interface-type = "ace";
+			reg = <0x4000 0x1000>;
+		};
+
+		cci_control4: slave-if@5000 {  /* Lil0 */
+			compatible = "arm,cci-400-ctrl-if";
+			interface-type = "ace";
+			reg = <0x5000 0x1000>;
+		};
+        };
+
+/* Macro definitions for reference
+ *
+ * define GIC_SPI 0
+ * define GIC_PPI 1
+ *
+ * define GIC_CPU_MASK_RAW(x) ((x) << 8)
+ *
+ * define IRQ_TYPE_EDGE_RISING    1
+ * define IRQ_TYPE_LEVEL_HIGH     4
+ */
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
+			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
+			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>,
+			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_EDGE_RISING)>;
+	};
+
+	soc: soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0 0 0xffffffff>;
+
+		reset: reset@20001004 {
+			compatible = "syscon";
+			reg = <0x20001004 0x4>;
+		};
+
+		reboot: reboot@20001004 {
+			compatible = "syscon-reboot";
+			regmap = <&reset>;
+			offset = <0x0>;
+			mask = <0xE0002001>;
+		};
+
+		gic: interrupt-controller@28381000 {
+			compatible = "arm,gic-400";
+			#interrupt-cells = <3>;
+			interrupt-controller;
+			reg = <0x28381000 0x1000>,
+			      <0x28382000 0x1000>,
+			      <0x28384000 0x2000>,
+			      <0x28386000 0x2000>;
+		};
+
+		uart0: serial@23f80000 {
+			compatible = "ns16550a";
+			reg = <0x23f80000 0x100>;
+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		uart1: serial@23fc0000 {
+			compatible = "ns16550a";
+			reg = <0x23fc0000 0x100>;
+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
+		spiclk: spiclk {
+			compatible = "fixed-clock";
+			#clock-cells = <1>;
+			clock-output-names = "spiclk";
+		};
+
+		spi:    spi@24000000 {
+			compatible      = "snps,dw-spi-nor";
+			reg = <0x24000000 0x1000>;
+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			num-cs = <4>;
+			clocks = <&spiclk 0>;
+			status="disabled";
+		};
+
+		ciu: ciu {
+			compatible = "fixed-clock";
+			#clock-cells = <1>;
+			clock-output-names = "ciu";
+		};
+
+		biu: biu {
+			compatible = "fixed-clock";
+			#clock-cells = <1>;
+			clock-output-names = "biu";
+		};
+
+		i2c@23f70400 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70400 0x100>;
+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-0";
+			status="disabled";
+			controller-id = <0>;
+		};
+
+		i2c@23f70500 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70500 0x100>;
+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-1";
+			status="disabled";
+			controller-id = <1>;
+		};
+
+		i2c@23f70600 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70600 0x100>;
+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-2";
+			status="disabled";
+			controller-id = <2>;
+		};
+
+		i2c@23f70700 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70700 0x100>;
+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-3";
+			status="disabled";
+			controller-id = <3>;
+		};
+
+		i2c@23f70800 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70800 0x100>;
+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-4";
+			status="disabled";
+			controller-id = <4>;
+		};
+
+		i2c@23f70900 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70900 0x100>;
+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-5";
+			status="disabled";
+			controller-id = <5>;
+		};
+
+		i2c@23f70A00 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70a00 0x100>;
+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-6";
+			status="disabled";
+			controller-id = <6>;
+		};
+
+		i2c@23f70B00 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "snps,designware-i2c";
+			reg = <0x23f70b00 0x100>;
+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+			interrupt-names = "dwi2c-7";
+			status="disabled";
+			controller-id = <7>;
+		};
+
+		sdmmc: sdmmc@28100000 {
+			compatible = "snps,dw-mshc";
+			reg = <0x28100000 0x1000>;
+			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			fifo-depth = <4096>;
+			card-detect-delay = <200>; /* XXX: millisecond; do we need this? */
+			bus-width = <8>;
+			status = "disabled";
+		};
+
+		stmmaceth: stmmaceth {
+			compatible = "fixed-clock";
+			#clock-cells = <1>;
+			clock-output-names = "stmmaceth";
+		};
+
+		eth0: dwmac@282c0000 {
+			compatible = "snps,craw-dwmac";
+			reg = <0x282c0000 0x8000>;
+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq";
+			clock-names = "stmmaceth";
+			clocks = <&stmmaceth 0>;
+			phy-mode = "sgmii";
+			status = "disabled";
+		};
+
+		ehci: ehci@281c0000 {
+			compatible = "generic-ehci";
+			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+			reg = <0x281c0000 0x90 0x281c0000 0x24>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+		};
+
+		ohci: ohci@0x28200000 {
+			compatible = "generic-ohci";
+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+			reg = <0x28200000 0x90>;
+			clocks = <&biu 0 &ciu 0>;
+			clock-names = "biu", "ciu";
+		};
+
+		mc: memory-controller@20140000 {
+			compatible = "cisco,craw-dmc-400";
+			reg = <0x20140000 0x40000
+				0x20200000 0x1000>;
+			reg-names = "dmc", "config";
+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+		};
+	};
+
+	pcie0: pcie@0 {
+		status = "disabled";
+		compatible = "cisco,craw-pcie", "snps,dw-pcie";
+		interrupts = <GIC_SPI 184 IRQ_TYPE_EDGE_RISING>;
+		reg = <0x0 0x28370004 0x0 0x00000008	/* controller registers */
+			0x0 0x73ffe000 0x0 0x00004000>;  /* configuration space */
+		reg-names = "regs", "config";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		device_type = "pci";
+		num-lanes = <1>;
+		bus-range = <0x0 0xff>;
+		ranges = <0x43000000 0x20 0x00000000 0x20 0x00000000 0x0 0x80000000>; /* prefetchable memory */
+	};
+
+	pcie1: pcie@1 {
+		status = "disabled";
+		compatible = "cisco,craw-pcie", "snps,dw-pcie";
+		interrupts = <GIC_SPI 185 IRQ_TYPE_EDGE_RISING>;
+		reg = <0x0 0x2837000C 0x0 0x00000008	/* controller registers */
+			0x0 0x7bffe000 0x0 0x00004000>;  /* configuration space */
+		reg-names = "regs", "config";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		device_type = "pci";
+		num-lanes = <1>;
+		bus-range = <0x0 0xff>;
+		ranges = <0x43000000 0x30 0x00000000 0x30 0x00000000 0x0 0x80000000>; /* prefetchable memory */
+	};
+
+	doppler {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "simple-bus";
+		ranges;
+	};
+};

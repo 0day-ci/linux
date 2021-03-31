@@ -1,0 +1,239 @@
+/dts-v1/;
+
+#include "craw64.dtsi"
+
+/ {
+	model = "Cisco Craw64 on DopplerG 2.0";
+	compatible = "cisco,craw64-dopplerg2", "cisco,craw64";
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x0 0x80000000>;
+	};
+
+	soc: soc {
+		uart0: serial@23f80000 {
+			clock-frequency = <250000000>;
+			status = "ok";
+		};
+
+		uart1: serial@23fc0000 {
+			clock-frequency = <250000000>;
+			status = "ok";
+		};
+
+		spiclk: spiclk {
+			clock-frequency = <250000000>;
+		};
+
+		spi: spi@24000000 {
+			status="ok";
+			flash: flash@0 {
+				compatible = "micron,n25q128a13", "jedec,spi-nor";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				spi-max-frequency = <8000000>;
+				reg = <0>;
+				partition@0 {
+					label = "unused0";
+					reg = <0x0 0x10000>;
+					read-only;
+				};
+				partition@1 {
+					label = "brom";
+					reg = <0x10000 0x10000>;
+				};
+				partition@2 {
+					label = "bromg";
+					reg = <0x20000 0x10000>;
+					read-only;
+				};
+				partition@3 {
+					label = "vb";
+					reg = <0x30000 0x10000>;
+				};
+				partition@4 {
+					label = "vbg";
+					reg = <0x40000 0x10000>;
+				};
+				partition@5 {
+					label = "rsvd";
+					reg = <0x50000 0x10000>;
+				};
+				partition@6 {
+					label = "keys";
+					reg = <0x60000 0x10000>;
+				};
+				partition@7 {
+					label = "ddrinit";
+					reg = <0x70000 0x20000>;
+				};
+				partition@8 {
+					label = "bs";
+					reg = <0x90000 0x1E0000>;
+				};
+				partition@9 {
+					label = "ddrinitg";
+					reg = <0x270000 0x20000>;
+					read-only;
+				};
+				partition@10 {
+					label = "bsg";
+					reg = <0x290000 0x1E0000>;
+					read-only;
+				};
+				partition@11 {
+					label = "rsvd1";
+					reg = <0x470000 0xB90000>;
+				};
+			};
+		};
+
+		sdmmc: sdmmc@28100000 {
+			clock-frequency = <50000000>;
+			max-frequency = <25000000>;
+			status = "ok";
+			cap-mmc-highspeed;
+			non-removable;
+			no-sdio;
+			no-sd;
+		};
+
+		ciu: ciu {
+			clock-frequency = <50000000>;
+		};
+
+		biu: biu {
+			clock-frequency = <5000000>;
+		};
+
+		i2c@23f70400 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+
+			rtc: ds1339@68 {
+				compatible = "dallas,ds1339";
+				reg = <0x68>;
+				interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
+
+		i2c@23f70500 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "disabled";
+		};
+
+		i2c@23f70600 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		i2c@23f70700 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		i2c@23f70800 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		i2c@23f70900 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		i2c@23f70A00 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		i2c@23f70B00 {
+			clock-frequency = <100000>;
+			i2c-sda-hold-time-ns = <108800>;
+			i2c-ss-hcnt = /bits/ 16 <1250>;
+			i2c-ss-lcnt = /bits/ 16 <1250>;
+			cntrl-reg = <&doppler_i2c>;
+			status = "ok";
+		};
+
+		stmmaceth: stmmaceth {
+			clock-frequency = <250000000>;
+		};
+
+		eth0: dwmac@282c0000 {
+			status = "ok";
+			mdio-channel = <0>;
+		};
+
+		wd@28500200 {
+			compatible = "cisco,craw-smgmt-wdt";
+			reg = <0x28500200 0x140>;
+		};
+
+		doppler_i2c: bsp_i2c {
+			compatible = "cisco,dplr-i2c";
+			reg = <0x23f71000 0x10>;
+		};
+	};
+
+	doppler {
+		intrpt {
+			compatible = "cisco,dplr_intrpt";
+			reg = <0x0 0x20000000 0x0 0x0FFFFFFF>;
+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "dpu", "oob", "packet", "offload",
+				"tla0", "tla1", "misc";
+		};
+
+		mmap {
+			compatible = "cisco,dplr_dma_mmap";
+			reg =	<0x0 0x20000000 0x0 0x10000000>,
+				<0x0 0x1fe00000 0x0 0x00040000>,
+				<0x0 0x28500000 0x0 0x00040000>,
+				<0x0 0x0e000000 0x0 0x0>,
+				<0x0 0x03f71208 0x0 0x0>;
+			reg-names = "base", "local_sram", "bsp_sram",
+				"sup_id_off", "bsp_exp0_off";
+		};
+
+		gpio {
+			compatible = "cisco,dplr_gpio";
+			reg = <0x0 0x23f700e0 0x0 0x120>;
+		};
+	};
+};
