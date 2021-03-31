@@ -794,13 +794,85 @@ void kvm_tdp_mmu_zap_all(struct kvm *kvm)
  * kvm_reload_remote_mmus. Since this is in the same critical section, no new
  * roots will be created between this function and the MMU reload signals
  * being sent.
+ * Take a reference on all roots so that this thread can do the bulk of
+ * the work required to free the roots once they are invalidated. Without
+ * this reference, a vCPU thread might drop the last reference to a root
+ * and get stuck with tearing down the entire paging structure.
  */
 void kvm_tdp_mmu_invalidate_roots(struct kvm *kvm)
 {
 	struct kvm_mmu_page *root;
 
 	for_each_tdp_mmu_root(kvm, root)
-		root->role.invalid = true;
+		if (refcount_inc_not_zero(&root->tdp_mmu_root_count))
+			root->role.invalid = true;
+}
+
+static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
+						  struct kvm_mmu_page *prev_root)
+{
+	struct kvm_mmu_page *next_root;
+
+	if (prev_root)
+		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+						  &prev_root->link,
+						  typeof(*prev_root), link);
+	else
+		next_root = list_first_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+						   typeof(*next_root), link);
+
+	while (next_root && !(next_root->role.invalid &&
+			      refcount_read(&next_root->tdp_mmu_root_count)))
+		next_root = list_next_or_null_rcu(&kvm->arch.tdp_mmu_roots,
+						  &next_root->link,
+						  typeof(*next_root), link);
+
+	return next_root;
+}
+
+/*
+ * Since kvm_tdp_mmu_invalidate_roots has acquired a reference to each
+ * invalidated root, they will not be freed until this function drops the
+ * reference. Before dropping that reference, tear down the paging
+ * structure so that whichever thread does drop the last reference
+ * only has to do a trivial ammount of work. Since the roots are invalid,
+ * no new SPTEs should be created under them.
+ */
+void kvm_tdp_mmu_zap_all_fast(struct kvm *kvm)
+{
+	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
+	struct kvm_mmu_page *next_root;
+	struct kvm_mmu_page *root;
+	bool flush = false;
+
+	lockdep_assert_held_read(&kvm->mmu_lock);
+
+	rcu_read_lock();
+
+	root = next_invalidated_root(kvm, NULL);
+
+	while (root) {
+		next_root = next_invalidated_root(kvm, root);
+
+		rcu_read_unlock();
+
+		flush |= zap_gfn_range(kvm, root, 0, max_gfn, true, true);
+
+		/*
+		 * Put the reference acquired in
+		 * kvm_tdp_mmu_invalidate_roots
+		 */
+		kvm_tdp_mmu_put_root(kvm, root, true);
+
+		root = next_root;
+
+		rcu_read_lock();
+	}
+
+	rcu_read_unlock();
+
+	if (flush)
+		kvm_flush_remote_tlbs(kvm);
 }
 
 /*
