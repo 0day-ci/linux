@@ -22,6 +22,7 @@
 #include <net/route.h>
 #include <net/xdp.h>
 #include <net/net_failover.h>
+#include <net/xdp_sock_drv.h>
 
 static int napi_weight = NAPI_POLL_WEIGHT;
 module_param(napi_weight, int, 0444);
@@ -133,6 +134,11 @@ struct send_queue {
 	struct virtnet_sq_stats stats;
 
 	struct napi_struct napi;
+
+	struct {
+		/* xsk pool */
+		struct xsk_buff_pool __rcu *pool;
+	} xsk;
 };
 
 /* Internal representation of a receive virtqueue */
@@ -2526,11 +2532,71 @@ err:
 	return err;
 }
 
+static int virtnet_xsk_pool_enable(struct net_device *dev,
+				   struct xsk_buff_pool *pool,
+				   u16 qid)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	struct send_queue *sq;
+	int ret = -EBUSY;
+
+	if (qid >= vi->curr_queue_pairs)
+		return -EINVAL;
+
+	sq = &vi->sq[qid];
+
+	/* xsk zerocopy depend on the tx napi */
+	if (!sq->napi.weight)
+		return -EPERM;
+
+	rcu_read_lock();
+	if (rcu_dereference(sq->xsk.pool))
+		goto end;
+
+	/* Here is already protected by rtnl_lock, so rcu_assign_pointer is
+	 * safe.
+	 */
+	rcu_assign_pointer(sq->xsk.pool, pool);
+	ret = 0;
+end:
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static int virtnet_xsk_pool_disable(struct net_device *dev, u16 qid)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	struct send_queue *sq;
+
+	if (qid >= vi->curr_queue_pairs)
+		return -EINVAL;
+
+	sq = &vi->sq[qid];
+
+	/* Here is already protected by rtnl_lock, so rcu_assign_pointer is
+	 * safe.
+	 */
+	rcu_assign_pointer(sq->xsk.pool, NULL);
+
+	synchronize_rcu(); /* Sync with the XSK wakeup and with NAPI. */
+
+	return 0;
+}
+
 static int virtnet_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 {
 	switch (xdp->command) {
 	case XDP_SETUP_PROG:
 		return virtnet_xdp_set(dev, xdp->prog, xdp->extack);
+	case XDP_SETUP_XSK_POOL:
+		/* virtio net not use dma before call vring api */
+		xdp->xsk.check_dma = false;
+		if (xdp->xsk.pool)
+			return virtnet_xsk_pool_enable(dev, xdp->xsk.pool,
+						       xdp->xsk.queue_id);
+		else
+			return virtnet_xsk_pool_disable(dev, xdp->xsk.queue_id);
 	default:
 		return -EINVAL;
 	}
