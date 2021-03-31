@@ -670,7 +670,7 @@ struct phy_device *mdiobus_scan(struct mii_bus *bus, int addr)
 	struct phy_device *phydev = ERR_PTR(-ENODEV);
 	int err;
 
-	switch (bus->probe_capabilities) {
+	switch (bus->capabilities) {
 	case MDIOBUS_NO_CAP:
 	case MDIOBUS_C22:
 		phydev = get_phy_device(bus, addr, false);
