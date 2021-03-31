@@ -1775,7 +1775,7 @@ ifdef CONFIG_MODULES
 modules: $(MODORDER)
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost
 
-quiet_cmd_depmod = DEPMOD  $(KERNELRELEASE)
+quiet_cmd_depmod = DEPMOD  $(MODLIB)
       cmd_depmod = $(CONFIG_SHELL) $(srctree)/scripts/depmod.sh $(DEPMOD) \
                    $(KERNELRELEASE)
 
