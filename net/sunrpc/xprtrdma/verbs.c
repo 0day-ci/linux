@@ -1371,8 +1371,10 @@ void rpcrdma_post_recvs(struct rpcrdma_xprt *r_xprt, bool temp)
 {
 	struct rpcrdma_buffer *buf = &r_xprt->rx_buf;
 	struct rpcrdma_ep *ep = r_xprt->rx_ep;
+	struct ib_qp_init_attr init_attr;
 	struct ib_recv_wr *wr, *bad_wr;
 	struct rpcrdma_rep *rep;
+	struct ib_qp_attr attr;
 	int needed, count, rc;
 
 	rc = 0;
@@ -1384,6 +1386,11 @@ void rpcrdma_post_recvs(struct rpcrdma_xprt *r_xprt, bool temp)
 	needed -= ep->re_receive_count;
 	if (!temp)
 		needed += RPCRDMA_MAX_RECV_BATCH;
+
+	if (ib_query_qp(ep->re_id->qp, &attr, IB_QP_STATE, &init_attr))
+		goto out;
+	if (attr.qp_state == IB_QPS_ERR)
+		goto out;
 
 	/* fast path: all needed reps can be found on the free list */
 	wr = NULL;
