@@ -670,18 +670,20 @@ struct phy_device *mdiobus_scan(struct mii_bus *bus, int addr)
 	struct phy_device *phydev = ERR_PTR(-ENODEV);
 	int err;
 
+	/* In case of NO_CAP and C22 only, we still can try to scan for C45
+	 * devices, since indirect access will be used for busses that are not
+	 * capable of C45 frame format.
+	 */
 	switch (bus->capabilities) {
 	case MDIOBUS_NO_CAP:
 	case MDIOBUS_C22:
-		phydev = get_phy_device(bus, addr, false);
-		break;
-	case MDIOBUS_C45:
-		phydev = get_phy_device(bus, addr, true);
-		break;
 	case MDIOBUS_C22_C45:
 		phydev = get_phy_device(bus, addr, false);
 		if (IS_ERR(phydev))
 			phydev = get_phy_device(bus, addr, true);
+		break;
+	case MDIOBUS_C45:
+		phydev = get_phy_device(bus, addr, true);
 		break;
 	}
 
@@ -902,6 +904,259 @@ int mdiobus_write(struct mii_bus *bus, int addr, u32 regnum, u16 val)
 	return err;
 }
 EXPORT_SYMBOL(mdiobus_write);
+
+/**
+ * mdiobus_indirect_mmd - Prepares MMD indirect access
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * Prepares indirect MMD access, such that only the MII_MMD_DATA register is
+ * left to be read or written. Caller must hold the mdio bus lock.
+ *
+ * NOTE: MUST NOT be called from interrupt context.
+ */
+static int mdiobus_indirect_mmd(struct mii_bus *bus, int addr, u16 devad, u32 regnum)
+{
+	int err;
+
+	/* Write the desired MMD Devad */
+	err = __mdiobus_write(bus, addr, MII_MMD_CTRL, devad);
+	if (err)
+		goto out;
+
+	/* Write the desired MMD register address */
+	err = __mdiobus_write(bus, addr, MII_MMD_DATA, regnum);
+	if (err)
+		goto out;
+
+	/* Select the Function : DATA with no post increment */
+	err = __mdiobus_write(bus, addr, MII_MMD_CTRL,
+			      devad | MII_MMD_CTRL_NOINCR);
+
+out:
+	return err;
+}
+
+/**
+ * __mdiobus_read_mmd - Unlocked version of the mdiobus_read_mmd function
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * Read a MDIO bus register. Caller must hold the mdio bus lock.
+ *
+ * NOTE: MUST NOT be called from interrupt context.
+ */
+int __mdiobus_read_mmd(struct mii_bus *bus, int addr, u16 devad, u32 regnum)
+{
+	int retval;
+
+	retval = mdiobus_indirect_mmd(bus, addr, devad, regnum);
+	if (retval)
+		goto out;
+
+	/* Read the content of the MMD's selected register */
+	retval = __mdiobus_read(bus, addr, MII_MMD_DATA);
+
+out:
+	return retval;
+}
+EXPORT_SYMBOL(__mdiobus_read_mmd);
+
+/**
+ * __mdiobus_write_mmd - Unlocked version of the mdiobus_write_mmd function
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to write
+ * @val: value to write to @regnum
+ *
+ * Write a MDIO bus register. Caller must hold the mdio bus lock.
+ *
+ * NOTE: MUST NOT be called from interrupt context.
+ */
+int __mdiobus_write_mmd(struct mii_bus *bus, int addr, u16 devad, u32 regnum,
+			u16 val)
+{
+	int err;
+
+	err = mdiobus_indirect_mmd(bus, addr, devad, regnum);
+	if (err)
+		goto out;
+
+	/* Write the data into MMD's selected register */
+	err = __mdiobus_write(bus, addr, MII_MMD_DATA, val);
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(__mdiobus_write_mmd);
+
+/**
+ * mdiobus_read_mmd - Convenience function for indirect MMD reads
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ */
+int mdiobus_read_mmd(struct mii_bus *bus, int addr, u16 devad, u32 regnum)
+{
+	int retval;
+
+	mutex_lock(&bus->mdio_lock);
+	retval = __mdiobus_read_mmd(bus, addr, devad, regnum);
+	mutex_unlock(&bus->mdio_lock);
+
+	return retval;
+}
+EXPORT_SYMBOL(mdiobus_read_mmd);
+
+/**
+ * mdiobus_write_mmd - Convenience function for indirect MMD writes
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to write
+ * @val: value to write to @regnum
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ */
+int mdiobus_write_mmd(struct mii_bus *bus, int addr, u16 devad, u32 regnum,
+		      u16 val)
+{
+	int err;
+
+	mutex_lock(&bus->mdio_lock);
+	err = __mdiobus_write_mmd(bus, addr, devad, regnum, val);
+	mutex_unlock(&bus->mdio_lock);
+
+	return err;
+}
+EXPORT_SYMBOL(mdiobus_write_mmd);
+
+/**
+ * __mdiobus_c45_read - Unlocked version of the mdiobus_c45_read function
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * Read a MDIO bus register. Caller must hold the mdio bus lock.
+ *
+ * NOTE: MUST NOT be called from interrupt context.
+ */
+int __mdiobus_c45_read(struct mii_bus *bus, int addr, int devad, u32 regnum)
+{
+	int ret = -EOPNOTSUPP;
+
+	switch (bus->capabilities) {
+	case MDIOBUS_NO_CAP:
+	case MDIOBUS_C22:
+		ret =  __mdiobus_read_mmd(bus, addr, devad, regnum);
+		break;
+	case MDIOBUS_C45:
+	case MDIOBUS_C22_C45:
+		ret =  __mdiobus_read(bus, addr,
+				      mdiobus_c45_addr(devad, regnum));
+		break;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(__mdiobus_c45_read);
+
+/**
+ * __mdiobus_c45_write - Unlocked version of the mdiobus_c45_write function
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to write
+ * @val: value to write to @regnum
+ *
+ * Write a MDIO bus register. Caller must hold the mdio bus lock.
+ *
+ * NOTE: MUST NOT be called from interrupt context.
+ */
+int __mdiobus_c45_write(struct mii_bus *bus, int addr, int devad, u32 regnum,
+			u16 val)
+{
+	int ret = -EOPNOTSUPP;
+
+	switch (bus->capabilities) {
+	case MDIOBUS_NO_CAP:
+	case MDIOBUS_C22:
+		ret = __mdiobus_write_mmd(bus, addr, devad, regnum, val);
+		break;
+	case MDIOBUS_C45:
+	case MDIOBUS_C22_C45:
+		ret = __mdiobus_write(bus, addr,
+				      mdiobus_c45_addr(devad, regnum), val);
+		break;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(__mdiobus_c45_write);
+
+/**
+ * mdiobus_c45_read - Convenience function for clause 45 reads
+ * The read is either performed by clause 45 frame format or by an indirect
+ * access, depending on the capabilities of the bus.
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ */
+int mdiobus_c45_read(struct mii_bus *bus, int addr, int devad, u32 regnum)
+{
+	int retval;
+
+	mutex_lock(&bus->mdio_lock);
+	retval = __mdiobus_c45_read(bus, addr, devad, regnum);
+	mutex_unlock(&bus->mdio_lock);
+
+	return retval;
+}
+EXPORT_SYMBOL(mdiobus_c45_read);
+
+/**
+ * mdiobus_c45_write - Convenience function for clause 45 writes
+ * The write is either performed by clause 45 frame format or by an indirect
+ * access, depending on the capabilities of the bus.
+ * @bus: the mii_bus struct
+ * @addr: the phy address
+ * @devad: the device address
+ * @regnum: register number to read
+ *
+ * NOTE: MUST NOT be called from interrupt context,
+ * because the bus read/write functions may wait for an interrupt
+ * to conclude the operation.
+ */
+int mdiobus_c45_write(struct mii_bus *bus, int addr, int devad, u32 regnum,
+		      u16 val)
+{
+	int err;
+
+	mutex_lock(&bus->mdio_lock);
+	err = __mdiobus_c45_write(bus, addr, devad, regnum, val);
+	mutex_unlock(&bus->mdio_lock);
+
+	return err;
+}
+EXPORT_SYMBOL(mdiobus_c45_write);
 
 /**
  * mdiobus_modify - Convenience function for modifying a given mdio device
