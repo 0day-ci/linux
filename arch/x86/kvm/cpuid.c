@@ -567,34 +567,34 @@ static struct kvm_cpuid_entry2 *do_host_cpuid(struct kvm_cpuid_array *array,
 
 static int __do_cpuid_func_emulated(struct kvm_cpuid_array *array, u32 func)
 {
-	struct kvm_cpuid_entry2 *entry;
+	struct kvm_cpuid_entry2 entry;
+
+	entry.function = func;
+	entry.index = 0;
+	entry.flags = 0;
+
+	switch (func) {
+	case 0:
+		entry.eax = 7;
+		break;
+	case 1:
+		entry.ecx = F(MOVBE);
+		break;
+	case 7:
+		entry.flags |= KVM_CPUID_FLAG_SIGNIFCANT_INDEX;
+		entry.eax = 0;
+		entry.ecx = F(RDPID);
+		break;
+	default:
+		goto out;
+	}
 
 	if (array->nent >= array->maxnent)
 		return -E2BIG;
 
-	entry = &array->entries[array->nent];
-	entry->function = func;
-	entry->index = 0;
-	entry->flags = 0;
+	memcpy(&array->entries[array->nent++], &entry, sizeof(entry));
 
-	switch (func) {
-	case 0:
-		entry->eax = 7;
-		++array->nent;
-		break;
-	case 1:
-		entry->ecx = F(MOVBE);
-		++array->nent;
-		break;
-	case 7:
-		entry->flags |= KVM_CPUID_FLAG_SIGNIFCANT_INDEX;
-		entry->eax = 0;
-		entry->ecx = F(RDPID);
-		++array->nent;
-	default:
-		break;
-	}
-
+out:
 	return 0;
 }
 
@@ -975,6 +975,7 @@ int kvm_dev_ioctl_get_cpuid(struct kvm_cpuid2 *cpuid,
 
 	if (cpuid->nent < 1)
 		return -E2BIG;
+
 	if (cpuid->nent > KVM_MAX_CPUID_ENTRIES)
 		cpuid->nent = KVM_MAX_CPUID_ENTRIES;
 
