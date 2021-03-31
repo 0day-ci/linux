@@ -686,6 +686,25 @@ struct anon_vma *page_anon_vma(struct page *page)
 	return __page_rmapping(page);
 }
 
+static inline void folio_build_bug(void)
+{
+#define FOLIO_MATCH(pg, fl)						\
+BUILD_BUG_ON(offsetof(struct page, pg) != offsetof(struct folio, fl));
+
+	FOLIO_MATCH(flags, flags);
+	FOLIO_MATCH(lru, lru);
+	FOLIO_MATCH(mapping, mapping);
+	FOLIO_MATCH(index, index);
+	FOLIO_MATCH(private, private);
+	FOLIO_MATCH(_mapcount, _mapcount);
+	FOLIO_MATCH(_refcount, _refcount);
+#ifdef CONFIG_MEMCG
+	FOLIO_MATCH(memcg_data, memcg_data);
+#endif
+#undef FOLIO_MATCH
+	BUILD_BUG_ON(sizeof(struct page) != sizeof(struct folio));
+}
+
 struct address_space *page_mapping(struct page *page)
 {
 	struct address_space *mapping;
