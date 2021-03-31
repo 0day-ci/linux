@@ -753,20 +753,28 @@ repeat:
 }
 EXPORT_SYMBOL(tcf_action_exec);
 
-int tcf_action_destroy(struct tc_action *actions[], int bind)
+static int tcf_action_destroy_1(struct tc_action *a, int bind)
 {
 	const struct tc_action_ops *ops;
+	int ret;
+
+	ops = a->ops;
+	ret = __tcf_idr_release(a, bind, true);
+	if (ret == ACT_P_DELETED)
+		module_put(ops->owner);
+	return ret;
+}
+
+int tcf_action_destroy(struct tc_action *actions[], int bind)
+{
 	struct tc_action *a;
 	int ret = 0, i;
 
 	for (i = 0; i < TCA_ACT_MAX_PRIO && actions[i]; i++) {
 		a = actions[i];
 		actions[i] = NULL;
-		ops = a->ops;
-		ret = __tcf_idr_release(a, bind, true);
-		if (ret == ACT_P_DELETED)
-			module_put(ops->owner);
-		else if (ret < 0)
+		ret = tcf_action_destroy_1(a, bind);
+		if (ret < 0)
 			return ret;
 	}
 	return ret;
@@ -1082,7 +1090,7 @@ int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
 		a_o = tc_action_load_ops(name, tb[i], rtnl_held, extack);
 		if (IS_ERR(a_o)) {
 			err = PTR_ERR(a_o);
-			goto err_mod;
+			goto err;
 		}
 		ops[i - 1] = a_o;
 	}
@@ -1109,11 +1117,13 @@ int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
 	return i - 1;
 
 err:
-	tcf_action_destroy(actions, bind);
-err_mod:
 	for (i = 0; i < TCA_ACT_MAX_PRIO; i++) {
-		if (ops[i])
+		if (actions[i]) {
+			tcf_action_destroy_1(actions[i], bind);
+			actions[i] = NULL;
+		} else if (ops[i]) {
 			module_put(ops[i]->owner);
+		}
 	}
 	return err;
 }
