@@ -955,7 +955,7 @@ static int age_gfn_range(struct kvm *kvm, struct kvm_memory_slot *slot,
 {
 	struct tdp_iter iter;
 	int young = 0;
-	u64 new_spte = 0;
+	u64 new_spte;
 
 	rcu_read_lock();
 
@@ -970,8 +970,7 @@ static int age_gfn_range(struct kvm *kvm, struct kvm_memory_slot *slot,
 		new_spte = iter.old_spte;
 
 		if (spte_ad_enabled(new_spte)) {
-			clear_bit((ffs(shadow_accessed_mask) - 1),
-				  (unsigned long *)&new_spte);
+			new_spte &= ~shadow_accessed_mask;
 		} else {
 			/*
 			 * Capture the dirty status of the page, so that it doesn't get
