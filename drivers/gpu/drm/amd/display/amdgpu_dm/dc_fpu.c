@@ -29,6 +29,19 @@
 #include <asm/fpu/api.h>
 
 /**
+ * DOC: Overview
+ *
+ * DC core uses FPU operations in multiple parts of the code, which requires a
+ * more specialized way to manage these areas' entrance. To fulfill this
+ * requirement, we created some wrapper functions that encapsulate
+ * kernel_fpu_begin/end to better fit our need in the display component. In
+ * summary, in this file, you can find functions related to FPU operation
+ * management.
+ */
+
+static DEFINE_PER_CPU(atomic_t, fpu_ref);
+
+/**
  * dc_fpu_begin - Enables FPU protection
  * @function_name: A string containing the function name for debug purposes
  * @line: A-line number where DC_FP_START was invoked for debug purpose
@@ -40,8 +53,14 @@
  */
 void dc_fpu_begin(const char *function_name, const int line)
 {
-	TRACE_DCN_FPU(true, function_name, line);
-	kernel_fpu_begin();
+	int ret;
+	atomic_t *local_fpu_ref = this_cpu_ptr(&fpu_ref);
+
+	ret = atomic_inc_return(local_fpu_ref);
+	TRACE_DCN_FPU(true, function_name, line, ret);
+
+	if (ret == 1)
+		kernel_fpu_begin();
 }
 
 /**
@@ -56,6 +75,13 @@ void dc_fpu_begin(const char *function_name, const int line)
  */
 void dc_fpu_end(const char *function_name, const int line)
 {
-	TRACE_DCN_FPU(false, function_name, line);
-	kernel_fpu_end();
+
+	int ret;
+	atomic_t *local_fpu_ref = this_cpu_ptr(&fpu_ref);
+
+	ret = atomic_dec_return(local_fpu_ref);
+	TRACE_DCN_FPU(false, function_name, line, ret);
+
+	if (!ret)
+		kernel_fpu_end();
 }
