@@ -1699,9 +1699,6 @@ static int bq27xxx_battery_read_time(struct bq27xxx_device_info *di, u8 reg)
 		return tval;
 	}
 
-	if (tval == 65535)
-		return -ENODATA;
-
 	return tval * 60;
 }
 
