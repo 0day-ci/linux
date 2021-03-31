@@ -34,7 +34,7 @@ config RISCV
 	select ARCH_WANT_FRAME_POINTERS
 	select ARCH_WANT_HUGE_PMD_SHARE if 64BIT
 	select ARCH_USE_QUEUED_RWLOCKS
-	select ARCH_USE_QUEUED_SPINLOCKS
+	select ARCH_USE_QUEUED_SPINLOCKS	if !RISCV_TICKET_LOCK
 	select ARCH_USE_QUEUED_SPINLOCKS_XCHG32
 	select CLONE_BACKWARDS
 	select CLINT_TIMER if !MMU
@@ -343,6 +343,11 @@ config USE_PERCPU_NUMA_NODE_ID
 config NEED_PER_CPU_EMBED_FIRST_CHUNK
 	def_bool y
 	depends on NUMA
+
+config RISCV_TICKET_LOCK
+	bool "Ticket-based spin-locking"
+	help
+	  Say Y here to use ticket-based spin-locking.
 
 config RISCV_ISA_C
 	bool "Emit compressed instructions when building Linux"
