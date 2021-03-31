@@ -5430,6 +5430,9 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	write_lock(&kvm->mmu_lock);
 	trace_kvm_mmu_zap_all_fast(kvm);
 
+	if (is_tdp_mmu_enabled(kvm))
+		kvm_tdp_mmu_invalidate_roots(kvm);
+
 	/*
 	 * Toggle mmu_valid_gen between '0' and '1'.  Because slots_lock is
 	 * held for the entire duration of zapping obsolete pages, it's
@@ -5450,9 +5453,6 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	kvm_reload_remote_mmus(kvm);
 
 	kvm_zap_obsolete_pages(kvm);
-
-	if (is_tdp_mmu_enabled(kvm))
-		kvm_tdp_mmu_zap_all(kvm);
 
 	write_unlock(&kvm->mmu_lock);
 }

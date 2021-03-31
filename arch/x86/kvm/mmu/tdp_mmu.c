@@ -790,6 +790,20 @@ void kvm_tdp_mmu_zap_all(struct kvm *kvm)
 }
 
 /*
+ * This function depends on running in the same MMU lock cirical section as
+ * kvm_reload_remote_mmus. Since this is in the same critical section, no new
+ * roots will be created between this function and the MMU reload signals
+ * being sent.
+ */
+void kvm_tdp_mmu_invalidate_roots(struct kvm *kvm)
+{
+	struct kvm_mmu_page *root;
+
+	for_each_tdp_mmu_root(kvm, root)
+		root->role.invalid = true;
+}
+
+/*
  * Installs a last-level SPTE to handle a TDP page fault.
  * (NPT/EPT violation/misconfiguration)
  */
