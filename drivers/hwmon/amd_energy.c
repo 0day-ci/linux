@@ -18,6 +18,7 @@
 #include <linux/mutex.h>
 #include <linux/processor.h>
 #include <linux/platform_device.h>
+#include <linux/random.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/topology.h>
@@ -35,6 +36,8 @@
 struct sensor_accumulator {
 	u64 energy_ctr;
 	u64 prev_value;
+	u64 cached_value;
+	unsigned long cache_timeout;
 };
 
 struct amd_energy_data {
@@ -93,6 +96,8 @@ static void accumulate_delta(struct amd_energy_data *data,
 			accum->prev_value + input;
 
 	accum->prev_value = input;
+	accum->cached_value = input;
+	accum->cache_timeout = jiffies + HZ + get_random_int() % HZ;
 	mutex_unlock(&data->lock);
 }
 
@@ -125,16 +130,21 @@ static void amd_add_delta(struct amd_energy_data *data, int ch,
 	u64 input;
 
 	mutex_lock(&data->lock);
-	rdmsrl_safe_on_cpu(cpu, reg, &input);
-	input &= AMD_ENERGY_MASK;
 
 	accum = &data->accums[ch];
-	if (input >= accum->prev_value)
-		input += accum->energy_ctr -
-				accum->prev_value;
-	else
-		input += UINT_MAX - accum->prev_value +
-				accum->energy_ctr;
+	if (!accum->cached_value || time_after(jiffies, accum->cache_timeout)) {
+		rdmsrl_safe_on_cpu(cpu, reg, &input);
+		input &= AMD_ENERGY_MASK;
+
+		if (input >= accum->prev_value)
+			input += accum->energy_ctr - accum->prev_value;
+		else
+			input += UINT_MAX - accum->prev_value + accum->energy_ctr;
+		accum->cached_value = input;
+		accum->cache_timeout = jiffies + HZ + get_random_int() % HZ;
+	} else {
+		input = accum->cached_value;
+	}
 
 	/* Energy consumed = (1/(2^ESU) * RAW * 1000000UL) μJoules */
 	*val = div64_ul(input * 1000000UL, BIT(data->energy_units));
@@ -171,7 +181,7 @@ static umode_t amd_energy_is_visible(const void *_data,
 				     enum hwmon_sensor_types type,
 				     u32 attr, int channel)
 {
-	return 0440;
+	return 0444;
 }
 
 static int energy_accumulator(void *p)
