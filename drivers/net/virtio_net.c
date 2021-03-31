@@ -2562,24 +2562,42 @@ static void virtnet_xsk_check_space(struct send_queue *sq)
 static int virtnet_xsk_xmit(struct send_queue *sq, struct xsk_buff_pool *pool,
 			    struct xdp_desc *desc)
 {
+	u32 offset, n, i, copy, copied;
 	struct virtnet_info *vi;
 	struct page *page;
 	void *data;
-	u32 offset;
+	int err, m;
 	u64 addr;
-	int err;
 
 	vi = sq->vq->vdev->priv;
 	addr = desc->addr;
+
 	data = xsk_buff_raw_get_data(pool, addr);
+
 	offset = offset_in_page(data);
+	m = desc->len - (PAGE_SIZE - offset);
+	/* xsk unaligned mode, desc will use two page */
+	if (m > 0)
+		n = 3;
+	else
+		n = 2;
 
-	sg_init_table(sq->sg, 2);
+	sg_init_table(sq->sg, n);
 	sg_set_buf(sq->sg, &xsk_hdr, vi->hdr_len);
-	page = xsk_buff_xdp_get_page(pool, addr);
-	sg_set_page(sq->sg + 1, page, desc->len, offset);
 
-	err = virtqueue_add_outbuf(sq->vq, sq->sg, 2, NULL, GFP_ATOMIC);
+	copied = 0;
+	for (i = 1; i < n; ++i) {
+		copy = min_t(int, desc->len - copied, PAGE_SIZE - offset);
+
+		page = xsk_buff_xdp_get_page(pool, addr + copied);
+
+		sg_set_page(sq->sg + i, page, copy, offset);
+		copied += copy;
+		if (offset)
+			offset = 0;
+	}
+
+	err = virtqueue_add_outbuf(sq->vq, sq->sg, n, NULL, GFP_ATOMIC);
 	if (unlikely(err))
 		sq->xsk.last_desc = *desc;
 
