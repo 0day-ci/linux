@@ -1729,12 +1729,11 @@ bool perform_link_training_with_retries(
 			dc_link_dp_perform_link_training_skip_aux(link, link_setting);
 			return true;
 		} else {
-			enum link_training_result status = LINK_TRAINING_CR_FAIL_LANE0;
+			enum link_training_result status;
 
-				status = dc_link_dp_perform_link_training(
-										link,
-										link_setting,
-										skip_video_pattern);
+			status = dc_link_dp_perform_link_training(link,
+								  link_setting,
+								  skip_video_pattern);
 			if (status == LINK_TRAINING_SUCCESS)
 				return true;
 		}
