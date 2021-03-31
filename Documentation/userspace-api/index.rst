@@ -24,6 +24,7 @@ place where this information is gathered.
    ioctl/index
    iommu
    media/index
+   vduse
 
 .. only::  subproject and html
 
