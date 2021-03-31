@@ -847,7 +847,7 @@ vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 	 */
 #ifdef CONFIG_AFS_FSCACHE
 	if (PageFsCache(page) &&
-	    wait_on_page_bit_killable(page, PG_fscache) < 0)
+	    wait_on_folio_bit_killable(folio, PG_fscache) < 0)
 		return VM_FAULT_RETRY;
 #endif
 
