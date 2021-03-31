@@ -103,6 +103,7 @@ static inline struct kvm_mmu_page *tdp_mmu_next_root(struct kvm *kvm,
 	     tdp_mmu_next_root_valid(_kvm, _root);			\
 	     _root = tdp_mmu_next_root(_kvm, _root))
 
+/* Only safe under the MMU lock in write mode, without yielding. */
 #define for_each_tdp_mmu_root(_kvm, _root)				\
 	list_for_each_entry(_root, &_kvm->arch.tdp_mmu_roots, link)
 
