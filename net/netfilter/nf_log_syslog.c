@@ -1042,7 +1042,7 @@ static int __init nf_log_syslog_init(void)
 	if (ret < 0)
 		goto err4;
 
-	nf_log_register(NFPROTO_BRIDGE, &nf_bridge_logger);
+	ret = nf_log_register(NFPROTO_BRIDGE, &nf_bridge_logger);
 	if (ret < 0)
 		goto err5;
 
