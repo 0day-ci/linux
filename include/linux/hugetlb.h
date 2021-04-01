@@ -862,7 +862,7 @@ static inline void huge_ptep_modify_prot_commit(struct vm_area_struct *vma,
 }
 #endif
 
-#else	/* CONFIG_HUGETLB_PAGE */
+#else	/* !CONFIG_HUGETLB_PAGE */
 struct hstate {};
 
 static inline struct page *alloc_huge_page(struct vm_area_struct *vma,
@@ -1015,7 +1015,7 @@ static inline void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr
 					pte_t *ptep, pte_t pte, unsigned long sz)
 {
 }
-#endif	/* CONFIG_HUGETLB_PAGE */
+#endif	/* !CONFIG_HUGETLB_PAGE */
 
 static inline spinlock_t *huge_pte_lock(struct hstate *h,
 					struct mm_struct *mm, pte_t *pte)
