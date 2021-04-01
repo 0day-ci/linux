@@ -289,6 +289,7 @@ int dtpm_update_power(struct dtpm *dtpm)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(dtpm_update_power);
 
 /**
  * dtpm_release_zone - Cleanup when the node is released
@@ -486,6 +487,7 @@ void dtpm_init(struct dtpm *dtpm, struct dtpm_ops *ops)
 		dtpm->ops = ops;
 	}
 }
+EXPORT_SYMBOL_GPL(dtpm_init);
 
 /**
  * dtpm_unregister - Unregister a dtpm node from the hierarchy tree
@@ -500,6 +502,7 @@ void dtpm_unregister(struct dtpm *dtpm)
 
 	pr_debug("Unregistered dtpm node '%s'\n", dtpm->zone.name);
 }
+EXPORT_SYMBOL_GPL(dtpm_unregister);
 
 /**
  * dtpm_register - Register a dtpm node in the hierarchy tree
@@ -574,6 +577,7 @@ int dtpm_register(const char *name, struct dtpm *dtpm, struct dtpm *parent)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(dtpm_register);
 
 static int __init init_dtpm(void)
 {
