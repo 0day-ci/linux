@@ -75,4 +75,10 @@ int dtpm_register(const char *name, struct dtpm *dtpm, struct dtpm *parent);
 
 int dtpm_register_cpu(struct dtpm *parent);
 
+struct dtpm *dtpm_lookup(const char *name);
+
+int dtpm_add(const char *name, struct dtpm *dtpm);
+
+void dtpm_del(const char *name);
+
 #endif
