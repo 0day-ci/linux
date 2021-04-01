@@ -270,6 +270,12 @@ properties:
       For PSCI based platforms, the name corresponding to the index of the PSCI
       PM domain provider, must be "psci".
 
+  edac-enabled:
+    $ref: '/schemas/types.yaml#/definitions/flag'
+    description:
+      Some CPUs support Error Detection And Correction (EDAC) on their L1 and
+      L2 caches. This flag marks this function as usable.
+
   qcom,saw:
     $ref: '/schemas/types.yaml#/definitions/phandle'
     description: |

@@ -190,8 +190,11 @@ static int __init cortex_arm64_edac_driver_init(void)
 	for_each_possible_cpu(cpu) {
 		np = of_get_cpu_node(cpu, NULL);
 
-		if (of_match_node(cortex_arm64_edac_of_match, np))
-			cpumask_set_cpu(cpu, &compat_mask);
+		if (!of_match_node(cortex_arm64_edac_of_match, np))
+			continue;
+		if (!of_property_read_bool(np, "edac-enabled"))
+			continue;
+		cpumask_set_cpu(cpu, &compat_mask);
 	}
 
 	if (cpumask_empty(&compat_mask))
