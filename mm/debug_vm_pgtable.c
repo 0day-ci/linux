@@ -196,7 +196,6 @@ static void __init pmd_advanced_tests(struct mm_struct *mm,
 
 	pgtable_trans_huge_deposit(mm, pmdp, pgtable);
 
-	pmd = pfn_pmd(pfn, prot);
 	set_pmd_at(mm, vaddr, pmdp, pmd);
 	pmdp_set_wrprotect(mm, vaddr, pmdp);
 	pmd = READ_ONCE(*pmdp);
