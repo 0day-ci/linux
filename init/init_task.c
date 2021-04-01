@@ -213,6 +213,9 @@ struct task_struct init_task
 #ifdef CONFIG_SECCOMP
 	.seccomp	= { .filter_count = ATOMIC_INIT(0) },
 #endif
+#ifdef CONFIG_PAGE_OWNER
+	.page_owner_depth	= 0,
+#endif
 };
 EXPORT_SYMBOL(init_task);
 

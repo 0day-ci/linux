@@ -1370,6 +1370,15 @@ struct task_struct {
 	struct llist_head               kretprobe_instances;
 #endif
 
+#ifdef CONFIG_PAGE_OWNER
+	/*
+	 * Used by page_owner=on to detect recursion in page tracking.
+	 * Is it fine to have non-atomic ops here if we ever access
+	 * this variable via current->page_owner_depth?
+	 */
+	unsigned int page_owner_depth;
+#endif
+
 	/*
 	 * New fields for task_struct should be added above here, so that
 	 * they are included in the randomized portion of task_struct.
