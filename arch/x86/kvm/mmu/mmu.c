@@ -5407,6 +5407,8 @@ restart:
  */
 static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 {
+	struct kvm_mmu_page *root;
+
 	lockdep_assert_held(&kvm->slots_lock);
 
 	write_lock(&kvm->mmu_lock);
@@ -5421,6 +5423,27 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	 */
 	kvm->arch.mmu_valid_gen = kvm->arch.mmu_valid_gen ? 0 : 1;
 
+
+	if (is_tdp_mmu_enabled(kvm)) {
+		/*
+		 * Mark each TDP MMU root as invalid so that other threads
+		 * will drop their references and allow the root count to
+		 * go to 0.
+		 *
+		 * This has essentially the same effect for the TDP MMU
+		 * as updating mmu_valid_gen above does for the shadow
+		 * MMU.
+		 *
+		 * In order to ensure all threads see this change when
+		 * handling the MMU reload signal, this must happen in the
+		 * same critical section as kvm_reload_remote_mmus, and
+		 * before kvm_zap_obsolete_pages as kvm_zap_obsolete_pages
+		 * could drop the MMU lock and yield.
+		 */
+		list_for_each_entry(root, &kvm->arch.tdp_mmu_roots, link)
+			root->role.invalid = true;
+	}
+
 	/*
 	 * Notify all vcpus to reload its shadow page table and flush TLB.
 	 * Then all vcpus will switch to new shadow page table with the new
@@ -5432,9 +5455,6 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	kvm_reload_remote_mmus(kvm);
 
 	kvm_zap_obsolete_pages(kvm);
-
-	if (is_tdp_mmu_enabled(kvm))
-		kvm_tdp_mmu_zap_all(kvm);
 
 	write_unlock(&kvm->mmu_lock);
 }
