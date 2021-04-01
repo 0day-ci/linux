@@ -170,8 +170,7 @@ static irqreturn_t iproc_adc_interrupt_handler(int irq, void *data)
 	adc_priv = iio_priv(indio_dev);
 
 	regmap_read(adc_priv->regmap, IPROC_INTERRUPT_STATUS, &intr_status);
-	dev_dbg(&indio_dev->dev, "iproc_adc_interrupt_handler(),INTRPT_STS:%x\n",
-			intr_status);
+	dev_dbg(&indio_dev->dev, "%s,INTRPT_STS:%x\n", __func__, intr_status);
 
 	intr_channels = (intr_status & IPROC_ADC_INTR_MASK) >> IPROC_ADC_INTR;
 	if (intr_channels) {
