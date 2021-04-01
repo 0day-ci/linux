@@ -600,7 +600,7 @@ static void __ioam6_fill_trace_data(struct sk_buff *skb,
 		if (skb->dev)
 			byte--;
 
-		raw32 = dev_net(skb->dev)->ipv6.sysctl.ioam6_id;
+		raw32 = dev_net(skb_dst(skb)->dev)->ipv6.sysctl.ioam6_id;
 		if (!raw32)
 			raw32 = IOAM6_EMPTY_u24;
 		else
@@ -688,7 +688,7 @@ static void __ioam6_fill_trace_data(struct sk_buff *skb,
 		if (skb->dev)
 			byte--;
 
-		raw64 = dev_net(skb->dev)->ipv6.sysctl.ioam6_id;
+		raw64 = dev_net(skb_dst(skb)->dev)->ipv6.sysctl.ioam6_id;
 		if (!raw64)
 			raw64 = IOAM6_EMPTY_u56;
 		else
@@ -843,10 +843,20 @@ int __init ioam6_init(void)
 	if (err)
 		goto out_unregister_pernet_subsys;
 
+#ifdef CONFIG_IPV6_IOAM6_LWTUNNEL
+	err = ioam6_iptunnel_init();
+	if (err)
+		goto out_unregister_genl;
+#endif
+
 	pr_info("In-situ OAM (IOAM) with IPv6\n");
 
 out:
 	return err;
+#ifdef CONFIG_IPV6_IOAM6_LWTUNNEL
+out_unregister_genl:
+	genl_unregister_family(&ioam6_genl_family);
+#endif
 out_unregister_pernet_subsys:
 	unregister_pernet_subsys(&ioam6_net_ops);
 	goto out;
@@ -854,6 +864,9 @@ out_unregister_pernet_subsys:
 
 void ioam6_exit(void)
 {
+#ifdef CONFIG_IPV6_IOAM6_LWTUNNEL
+	ioam6_iptunnel_exit();
+#endif
 	genl_unregister_family(&ioam6_genl_family);
 	unregister_pernet_subsys(&ioam6_net_ops);
 }
