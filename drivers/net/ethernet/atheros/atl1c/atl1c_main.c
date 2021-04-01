@@ -813,6 +813,7 @@ static int atl1c_sw_init(struct atl1c_adapter *adapter)
 	atl1c_set_rxbufsize(adapter, adapter->netdev);
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->mdio_lock);
+	spin_lock_init(&adapter->irq_mask_lock);
 	set_bit(__AT_DOWN, &adapter->flags);
 
 	return 0;
@@ -1530,7 +1531,7 @@ static inline void atl1c_clear_phy_int(struct atl1c_adapter *adapter)
 	spin_unlock(&adapter->mdio_lock);
 }
 
-static bool atl1c_clean_tx_irq(struct atl1c_adapter *adapter,
+static unsigned atl1c_clean_tx_irq(struct atl1c_adapter *adapter,
 				enum atl1c_trans_queue type)
 {
 	struct atl1c_tpd_ring *tpd_ring = &adapter->tpd_ring[type];
@@ -1564,7 +1565,31 @@ static bool atl1c_clean_tx_irq(struct atl1c_adapter *adapter,
 		netif_wake_queue(adapter->netdev);
 	}
 
-	return true;
+	return total_packets;
+}
+
+static void atl1c_schedule_tx_napi(void *data)
+{
+	struct atl1c_adapter *adapter = data;
+	__napi_schedule(&adapter->tx_napi);
+}
+
+static int atl1c_clean_tx(struct napi_struct *napi, int budget)
+{
+	struct atl1c_adapter *adapter =
+		container_of(napi, struct atl1c_adapter, tx_napi);
+	unsigned long flags;
+	int work_done = atl1c_clean_tx_irq(adapter, atl1c_trans_normal);
+
+	if (work_done < budget) {
+		napi_complete_done(napi, work_done);
+		spin_lock_irqsave(&adapter->irq_mask_lock, flags);
+		adapter->hw.intr_mask |= ISR_TX_PKT;
+		AT_WRITE_REG(&adapter->hw, REG_IMR, adapter->hw.intr_mask);
+		spin_unlock_irqrestore(&adapter->irq_mask_lock, flags);
+		return work_done;
+	}
+	return budget;
 }
 
 /**
@@ -1599,13 +1624,25 @@ static irqreturn_t atl1c_intr(int irq, void *data)
 		AT_WRITE_REG(hw, REG_ISR, status | ISR_DIS_INT);
 		if (status & ISR_RX_PKT) {
 			if (likely(napi_schedule_prep(&adapter->napi))) {
+				spin_lock(&adapter->irq_mask_lock);
 				hw->intr_mask &= ~ISR_RX_PKT;
 				AT_WRITE_REG(hw, REG_IMR, hw->intr_mask);
+				spin_unlock(&adapter->irq_mask_lock);
 				__napi_schedule(&adapter->napi);
 			}
 		}
-		if (status & ISR_TX_PKT)
-			atl1c_clean_tx_irq(adapter, atl1c_trans_normal);
+		if (status & ISR_TX_PKT) {
+			if (napi_schedule_prep(&adapter->tx_napi)) {
+				int tx_cpu = (smp_processor_id() + 1) %
+					num_online_cpus();
+				spin_lock(&adapter->irq_mask_lock);
+				hw->intr_mask &= ~ISR_TX_PKT;
+				AT_WRITE_REG(hw, REG_IMR, hw->intr_mask);
+				spin_unlock(&adapter->irq_mask_lock);
+				smp_call_function_single_async(tx_cpu,
+							       &adapter->csd);
+			}
+		}
 
 		handled = IRQ_HANDLED;
 		/* check if PCIE PHY Link down */
@@ -1870,6 +1907,7 @@ static int atl1c_clean(struct napi_struct *napi, int budget)
 	struct atl1c_adapter *adapter =
 			container_of(napi, struct atl1c_adapter, napi);
 	int work_done = 0;
+	unsigned long flags;
 
 	/* Keep link state information with original netdev */
 	if (!netif_carrier_ok(adapter->netdev))
@@ -1880,8 +1918,10 @@ static int atl1c_clean(struct napi_struct *napi, int budget)
 	if (work_done < budget) {
 quit_polling:
 		napi_complete_done(napi, work_done);
+		spin_lock_irqsave(&adapter->irq_mask_lock, flags);
 		adapter->hw.intr_mask |= ISR_RX_PKT;
 		AT_WRITE_REG(&adapter->hw, REG_IMR, adapter->hw.intr_mask);
+		spin_unlock_irqrestore(&adapter->irq_mask_lock, flags);
 	}
 	return work_done;
 }
@@ -2319,6 +2359,7 @@ static int atl1c_up(struct atl1c_adapter *adapter)
 	atl1c_check_link_status(adapter);
 	clear_bit(__AT_DOWN, &adapter->flags);
 	napi_enable(&adapter->napi);
+	napi_enable(&adapter->tx_napi);
 	atl1c_irq_enable(adapter);
 	netif_start_queue(netdev);
 	return err;
@@ -2339,6 +2380,7 @@ static void atl1c_down(struct atl1c_adapter *adapter)
 	set_bit(__AT_DOWN, &adapter->flags);
 	netif_carrier_off(netdev);
 	napi_disable(&adapter->napi);
+	napi_disable(&adapter->tx_napi);
 	atl1c_irq_disable(adapter);
 	atl1c_free_irq(adapter);
 	/* disable ASPM if device inactive */
@@ -2588,6 +2630,8 @@ static int atl1c_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	adapter->mii.phy_id_mask = 0x1f;
 	adapter->mii.reg_num_mask = MDIO_CTRL_REG_MASK;
 	netif_napi_add(netdev, &adapter->napi, atl1c_clean, 64);
+	netif_napi_add(netdev, &adapter->tx_napi, atl1c_clean_tx, 64);
+	INIT_CSD(&adapter->csd, atl1c_schedule_tx_napi, adapter);
 	timer_setup(&adapter->phy_config_timer, atl1c_phy_config, 0);
 	/* setup the private structure */
 	err = atl1c_sw_init(adapter);
