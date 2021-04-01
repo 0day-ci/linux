@@ -531,19 +531,15 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	val |= intel_psr2_get_tp_time(intel_dp);
 
 	if (DISPLAY_VER(dev_priv) >= 12) {
-		/*
-		 * TODO: 7 lines of IO_BUFFER_WAKE and FAST_WAKE are default
-		 * values from BSpec. In order to setting an optimal power
-		 * consumption, lower than 4k resoluition mode needs to decrese
-		 * IO_BUFFER_WAKE and FAST_WAKE. And higher than 4K resolution
-		 * mode needs to increase IO_BUFFER_WAKE and FAST_WAKE.
-		 */
-		val |= TGL_EDP_PSR2_BLOCK_COUNT_NUM_2;
-		val |= TGL_EDP_PSR2_IO_BUFFER_WAKE(7);
-		val |= TGL_EDP_PSR2_FAST_WAKE(7);
+		if (intel_dp->psr.io_buffer_wake < 9 || intel_dp->psr.fast_wake < 9)
+			val |= TGL_EDP_PSR2_BLOCK_COUNT_NUM_2;
+		else
+			val |= TGL_EDP_PSR2_BLOCK_COUNT_NUM_3;
+		val |= TGL_EDP_PSR2_IO_BUFFER_WAKE(intel_dp->psr.io_buffer_wake);
+		val |= TGL_EDP_PSR2_FAST_WAKE(intel_dp->psr.fast_wake);
 	} else if (DISPLAY_VER(dev_priv) >= 9) {
-		val |= EDP_PSR2_IO_BUFFER_WAKE(7);
-		val |= EDP_PSR2_FAST_WAKE(7);
+		val |= EDP_PSR2_IO_BUFFER_WAKE(intel_dp->psr.io_buffer_wake);
+		val |= EDP_PSR2_FAST_WAKE(intel_dp->psr.fast_wake);
 	}
 
 	if (intel_dp->psr.psr2_sel_fetch_enabled) {
@@ -721,7 +717,9 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	int crtc_hdisplay = crtc_state->hw.adjusted_mode.crtc_hdisplay;
 	int crtc_vdisplay = crtc_state->hw.adjusted_mode.crtc_vdisplay;
+	u32 io_buffer_wake, io_buffer_wake_max, io_buffer_wake_min;
 	int psr_max_h = 0, psr_max_v = 0, max_bpp = 0;
+	u32 fast_wake, fast_wake_max, fast_wake_min;
 
 	if (!intel_dp->psr.sink_psr2_support)
 		return false;
@@ -765,14 +763,26 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 		psr_max_h = 5120;
 		psr_max_v = 3200;
 		max_bpp = 30;
+		io_buffer_wake_max = TGL_EDP_PSR2_IO_BUFFER_WAKE_MAX_LINES;
+		io_buffer_wake_min = TGL_EDP_PSR2_IO_BUFFER_WAKE_MIN_LINES;
+		fast_wake_max = TGL_EDP_PSR2_FAST_WAKE_MAX_LINES;
+		fast_wake_min = TGL_EDP_PSR2_FAST_WAKE_MIN_LINES;
 	} else if (DISPLAY_VER(dev_priv) >= 10) {
 		psr_max_h = 4096;
 		psr_max_v = 2304;
 		max_bpp = 24;
+		io_buffer_wake_max = EDP_PSR2_IO_BUFFER_WAKE_MAX_LINES;
+		io_buffer_wake_min = EDP_PSR2_IO_BUFFER_WAKE_MIN_LINES;
+		fast_wake_max = EDP_PSR2_FAST_WAKE_MAX_LINES;
+		fast_wake_min = EDP_PSR2_FAST_WAKE_MIN_LINES;
 	} else if (IS_DISPLAY_VER(dev_priv, 9)) {
 		psr_max_h = 3640;
 		psr_max_v = 2304;
 		max_bpp = 24;
+		io_buffer_wake_max = EDP_PSR2_IO_BUFFER_WAKE_MAX_LINES;
+		io_buffer_wake_min = EDP_PSR2_IO_BUFFER_WAKE_MIN_LINES;
+		fast_wake_max = EDP_PSR2_FAST_WAKE_MAX_LINES;
+		fast_wake_min = EDP_PSR2_FAST_WAKE_MIN_LINES;
 	}
 
 	if (crtc_state->pipe_bpp > max_bpp) {
@@ -781,6 +791,37 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 			    crtc_state->pipe_bpp, max_bpp);
 		return false;
 	}
+
+	/*
+	 * B.Spec 49274
+	 * IO buffer wake lines = ROUNDUP(PSR2 IO wake time / total line time in microseconds)
+	 * Fast wake lines = ROUNDUP(PSR2 aux transaction time / total line time in microseconds)
+	 * For both fields limit the minimum to 7 lines and maximum to 12 lines
+	 * PSR2 IO wake time = 50us, PSR2 aux transaction time = 32us.
+	 */
+	io_buffer_wake = intel_usecs_to_scanlines(&crtc_state->uapi.adjusted_mode,
+						  EDP_PSR2_IO_WAKE_TIME);
+	fast_wake = intel_usecs_to_scanlines(&crtc_state->uapi.adjusted_mode,
+					     EDP_PSR2_AUX_TRANSACTION_TIME);
+
+	if (io_buffer_wake < io_buffer_wake_min || io_buffer_wake > io_buffer_wake_max) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "PSR condition failed: Invalid PSR2 IO Buffer Wake lines (%d)\n",
+			    io_buffer_wake);
+		return false;
+	}
+
+	if (fast_wake < fast_wake_min || fast_wake > fast_wake_max) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "PSR condition failed: Invalid PSR2 FAST Wake lines (%d)\n",
+			    fast_wake);
+		return false;
+	}
+
+	intel_dp->psr.io_buffer_wake =
+		io_buffer_wake < EDP_PSR2_IO_BUFFER_WAKE_DEFAULT ? EDP_PSR2_IO_BUFFER_WAKE_DEFAULT : io_buffer_wake;
+	intel_dp->psr.fast_wake =
+		fast_wake < EDP_PSR2_FAST_WAKE_DEFAULT ? EDP_PSR2_FAST_WAKE_DEFAULT : fast_wake;
 
 	/*
 	 * HW sends SU blocks of size four scan lines, which means the starting

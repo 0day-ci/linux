@@ -1496,6 +1496,8 @@ struct intel_psr {
 	u16 su_x_granularity;
 	bool dc3co_enabled;
 	u32 dc3co_exit_delay;
+	u32 io_buffer_wake;
+	u32 fast_wake;
 	struct delayed_work dc3co_work;
 	struct drm_dp_vsc_sdp vsc;
 };
