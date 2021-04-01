@@ -347,7 +347,6 @@ struct rsnd_mod_ops {
 	int (*id_cmd)(struct rsnd_mod *mod);
 };
 
-struct rsnd_dai_stream;
 struct rsnd_mod {
 	int id;
 	enum rsnd_mod_type type;
