@@ -589,37 +589,41 @@ static int __init test_ww_mutex_init(void)
 
 	ret = test_mutex();
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = test_aa();
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = test_abba(false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = test_abba(true);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = test_cycle(ncpus);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = stress(16, 2*ncpus, STRESS_INORDER);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = stress(16, 2*ncpus, STRESS_REORDER);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = stress(4095, hweight32(STRESS_ALL)*ncpus, STRESS_ALL);
 	if (ret)
-		return ret;
+		goto out;
 
 	return 0;
+
+out:
+	destroy_workqueue(wq);
+	return ret;
 }
 
 static void __exit test_ww_mutex_exit(void)
