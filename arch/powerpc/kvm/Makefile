@@ -43,6 +43,9 @@ kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
 kvm-book3s_64-builtin-objs-$(CONFIG_SPAPR_TCE_IOMMU) := \
 	book3s_64_vio_hv.o
 
+kvm-book3s_64-builtin-objs-y += \
+	book3s_hv_interrupt.o
+
 kvm-pr-y := \
 	fpu.o \
 	emulate.o \
