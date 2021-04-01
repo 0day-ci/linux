@@ -148,6 +148,15 @@ static void cxl_root_release(struct device *dev)
 	kfree(cxl_root);
 }
 
+static void cxl_port_release(struct device *dev)
+{
+	struct cxl_port *port = to_cxl_port(dev);
+
+	ida_free(&cxl_port_ida, port->id);
+	put_device(port->port_host);
+	kfree(port);
+}
+
 static ssize_t target_id_show(struct device *dev, struct device_attribute *attr,
 			      char *buf)
 {
@@ -178,6 +187,12 @@ static const struct device_type cxl_root_type = {
 	.groups = cxl_port_attribute_groups,
 };
 
+static const struct device_type cxl_port_type = {
+	.name = "cxl_port",
+	.release = cxl_port_release,
+	.groups = cxl_port_attribute_groups,
+};
+
 struct cxl_root *to_cxl_root(struct device *dev)
 {
 	if (dev_WARN_ONCE(dev, dev->type != &cxl_root_type,
@@ -188,7 +203,9 @@ struct cxl_root *to_cxl_root(struct device *dev)
 
 struct cxl_port *to_cxl_port(struct device *dev)
 {
-	if (dev_WARN_ONCE(dev, dev->type != &cxl_root_type,
+	if (dev_WARN_ONCE(dev,
+			  dev->type != &cxl_root_type &&
+			  dev->type != &cxl_port_type,
 			  "not a cxl_port device\n"))
 		return NULL;
 	return container_of(dev, struct cxl_port, dev);
@@ -359,6 +376,108 @@ err:
 	return ERR_PTR(rc);
 }
 EXPORT_SYMBOL_GPL(devm_cxl_add_root);
+
+static void cxl_unlink_port(void *_port)
+{
+	struct cxl_port *port = _port;
+
+	sysfs_remove_link(&port->dev.kobj, "host");
+}
+
+static int devm_cxl_link_port(struct device *dev, struct cxl_port *port)
+{
+	int rc;
+
+	rc = sysfs_create_link(&port->dev.kobj, &port->port_host->kobj, "host");
+	if (rc)
+		return rc;
+	return devm_add_action_or_reset(dev, cxl_unlink_port, port);
+}
+
+static struct cxl_port *cxl_port_alloc(struct cxl_port *parent_port,
+				       struct device *port_dev, int target_id,
+				       resource_size_t component_regs_phys)
+{
+	struct cxl_port *port;
+	struct device *dev;
+	int rc;
+
+	if (!port_dev)
+		return ERR_PTR(-EINVAL);
+
+	port = kzalloc(sizeof(*port), GFP_KERNEL);
+	if (!port)
+		return ERR_PTR(-ENOMEM);
+
+	rc = ida_alloc(&cxl_port_ida, GFP_KERNEL);
+	if (rc < 0)
+		goto err;
+
+	port->id = rc;
+	port->target_id = target_id;
+	port->port_host = get_device(port_dev);
+	port->component_regs_phys = component_regs_phys;
+
+	dev = &port->dev;
+	device_initialize(dev);
+	device_set_pm_not_required(dev);
+	dev->parent = &parent_port->dev;
+	dev->bus = &cxl_bus_type;
+	dev->type = &cxl_port_type;
+
+	return port;
+
+err:
+	kfree(port);
+	return ERR_PTR(rc);
+}
+
+/**
+ * devm_cxl_add_port() - add a cxl_port to the topology
+ * @host: devm context / discovery agent
+ * @parent_port: immediate ancestor towards cxl_root
+ * @port_host: PCI or platform-firmware device hosting this port
+ * @target_id: ordinal id relative to other siblings under @parent_port
+ * @component_regs_phys: CXL component register base address
+ */
+struct cxl_port *devm_cxl_add_port(struct device *host,
+				   struct cxl_port *parent_port,
+				   struct device *port_host, int target_id,
+				   resource_size_t component_regs_phys)
+{
+	struct cxl_port *port;
+	struct device *dev;
+	int rc;
+
+	port = cxl_port_alloc(parent_port, port_host, target_id,
+			      component_regs_phys);
+	if (IS_ERR(port))
+		return port;
+
+	dev = &port->dev;
+	rc = dev_set_name(dev, "port%d", port->id);
+	if (rc)
+		goto err;
+
+	rc = device_add(dev);
+	if (rc)
+		goto err;
+
+	rc = devm_add_action_or_reset(host, unregister_dev, dev);
+	if (rc)
+		return ERR_PTR(rc);
+
+	rc = devm_cxl_link_port(host, port);
+	if (rc)
+		return ERR_PTR(rc);
+
+	return port;
+
+err:
+	put_device(dev);
+	return ERR_PTR(rc);
+}
+EXPORT_SYMBOL_GPL(devm_cxl_add_port);
 
 /*
  * cxl_setup_device_regs() - Detect CXL Device register blocks

@@ -134,5 +134,10 @@ struct cxl_address_space_dev *to_cxl_address_space(struct device *dev);
 struct cxl_root *devm_cxl_add_root(struct device *parent,
 				   struct cxl_address_space *cxl_space,
 				   int nr_spaces);
+struct cxl_port *devm_cxl_add_port(struct device *host,
+				   struct cxl_port *parent_port,
+				   struct device *port_host, int target_id,
+				   resource_size_t component_regs_phys);
+
 extern struct bus_type cxl_bus_type;
 #endif /* __CXL_H__ */
