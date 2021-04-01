@@ -169,7 +169,7 @@ static inline void plat_swiotlb_setup(void) {}
  */
 extern void *plat_get_fdt(void);
 
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 
 /**
  * plat_fdt_relocated() - Update platform's information about relocated dtb
@@ -180,7 +180,7 @@ extern void *plat_get_fdt(void);
  */
 void plat_fdt_relocated(void *new_location);
 
-#endif /* CONFIG_RELOCATABLE */
+#endif /* CONFIG_RANDOMIZE_BASE */
 #endif /* CONFIG_USE_OF */
 
 #endif /* _ASM_BOOTINFO_H */

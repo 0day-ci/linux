@@ -28,9 +28,9 @@
 volatile unsigned long octeon_processor_boot = 0xff;
 volatile unsigned long octeon_processor_sp;
 volatile unsigned long octeon_processor_gp;
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 volatile unsigned long octeon_processor_relocated_kernel_entry;
-#endif /* CONFIG_RELOCATABLE */
+#endif /* CONFIG_RANDOMIZE_BASE */
 
 #ifdef CONFIG_HOTPLUG_CPU
 uint64_t octeon_bootloader_entry_addr;
@@ -190,7 +190,7 @@ static void __init octeon_smp_setup(void)
 }
 
 
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 int plat_post_relocation(long offset)
 {
 	unsigned long entry = (unsigned long)kernel_entry;
@@ -200,7 +200,7 @@ int plat_post_relocation(long offset)
 
 	return 0;
 }
-#endif /* CONFIG_RELOCATABLE */
+#endif /* CONFIG_RANDOMIZE_BASE */
 
 /**
  * Firmware CPU startup hook

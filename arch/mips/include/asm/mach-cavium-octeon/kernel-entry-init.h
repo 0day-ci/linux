@@ -100,7 +100,7 @@
 	#
 
 octeon_spin_wait_boot:
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 	PTR_LA	t0, octeon_processor_relocated_kernel_entry
 	LONG_L	t0, (t0)
 	beq	zero, t0, 1f
@@ -109,7 +109,7 @@ octeon_spin_wait_boot:
 	jr	t0
 	nop
 1:
-#endif /* CONFIG_RELOCATABLE */
+#endif /* CONFIG_RANDOMIZE_BASE */
 
 	# This is the variable where the next core to boot is stored
 	PTR_LA	t0, octeon_processor_boot
