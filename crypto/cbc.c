@@ -140,7 +140,8 @@ static int crypto_cbc_decrypt_inplace(struct skcipher_walk *walk,
 
 	for (;;) {
 		fn(tfm, src, src);
-		if ((nbytes -= bsize) < bsize)
+		nbytes -= bsize;
+		if (nbytes < bsize)
 			break;
 		crypto_xor(src, src - bsize, bsize);
 		src -= bsize;
