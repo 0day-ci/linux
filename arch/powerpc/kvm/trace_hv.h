@@ -46,6 +46,7 @@
 	{H_CEDE,			"H_CEDE"}, \
 	{H_CONFER,			"H_CONFER"}, \
 	{H_PROD,			"H_PROD"}, \
+	{H_IDLE_HINT,			"H_IDLE_HINT"}, \
 	{H_GET_PPP,			"H_GET_PPP"}, \
 	{H_SET_PPP,			"H_SET_PPP"}, \
 	{H_PURR,			"H_PURR"}, \

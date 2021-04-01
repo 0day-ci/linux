@@ -1880,6 +1880,7 @@ struct sched_class {
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	void (*task_change_group)(struct task_struct *p, int type);
 #endif
+	unsigned long (*get_idle_hint)(struct task_struct *p);
 };
 
 static inline void put_prev_task(struct rq *rq, struct task_struct *prev)

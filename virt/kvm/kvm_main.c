@@ -2940,6 +2940,23 @@ int kvm_vcpu_yield_to(struct kvm_vcpu *target)
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_yield_to);
 
+unsigned long kvm_vcpu_provide_idle_hint(struct kvm_vcpu *target)
+{
+	struct pid *pid;
+	struct task_struct *task = NULL;
+
+	rcu_read_lock();
+	pid = rcu_dereference(target->pid);
+	if (pid)
+		task = get_pid_task(pid, PIDTYPE_PID);
+	rcu_read_unlock();
+	if (!task)
+		return 0;
+
+	return get_idle_hint(task);
+}
+EXPORT_SYMBOL_GPL(kvm_vcpu_provide_idle_hint);
+
 /*
  * Helper that checks whether a VCPU is eligible for directed yield.
  * Most eligible candidate to yield is decided by following heuristics:

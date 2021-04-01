@@ -1690,6 +1690,7 @@ static inline int set_cpus_allowed_ptr(struct task_struct *p, const struct cpuma
 extern int yield_to(struct task_struct *p, bool preempt);
 extern void set_user_nice(struct task_struct *p, long nice);
 extern int task_prio(const struct task_struct *p);
+extern unsigned long get_idle_hint(struct task_struct *p);
 
 /**
  * task_nice - return the nice value of a given task.

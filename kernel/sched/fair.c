@@ -7250,6 +7250,16 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
 	return true;
 }
 
+static unsigned long get_idle_hint_fair(struct task_struct *p)
+{
+	unsigned int prev_cpu = task_cpu(p);
+
+	if (available_idle_cpu(prev_cpu) || sched_idle_cpu(prev_cpu))
+		return 1;
+
+	return 0;
+}
+
 #ifdef CONFIG_SMP
 /**************************************************
  * Fair scheduling class load-balancing methods.
@@ -11269,6 +11279,8 @@ DEFINE_SCHED_CLASS(fair) = {
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	.task_change_group	= task_change_group_fair,
 #endif
+
+	.get_idle_hint		= get_idle_hint_fair,
 
 #ifdef CONFIG_UCLAMP_TASK
 	.uclamp_enabled		= 1,

@@ -7175,6 +7175,19 @@ out_irq:
 }
 EXPORT_SYMBOL_GPL(yield_to);
 
+/*
+ * Provide hint to the VM indicating if the previous vCPU can be scheduled
+ * instantly or not.
+ */
+unsigned long __sched get_idle_hint(struct task_struct *p)
+{
+	unsigned long ret = 0;
+	if (p->sched_class->get_idle_hint)
+		ret = p->sched_class->get_idle_hint(p);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(get_idle_hint);
+
 int io_schedule_prepare(void)
 {
 	int old_iowait = current->in_iowait;
