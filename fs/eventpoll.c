@@ -306,6 +306,7 @@ static void unlist_file(struct epitems_head *head)
 
 static long long_zero;
 static long long_max = LONG_MAX;
+static atomic_t wakesource_create_id  = ATOMIC_INIT(0);
 
 struct ctl_table epoll_table[] = {
 	{
@@ -1358,15 +1359,23 @@ static int ep_create_wakeup_source(struct epitem *epi)
 {
 	struct name_snapshot n;
 	struct wakeup_source *ws;
+	pid_t task_pid;
+	char buf[64];
+	int id;
+
+	task_pid = task_pid_nr(current);
 
 	if (!epi->ep->ws) {
-		epi->ep->ws = wakeup_source_register(NULL, "eventpoll");
+		snprintf(buf, sizeof(buf), "epoll:%d", task_pid);
+		epi->ep->ws = wakeup_source_register(NULL, buf);
 		if (!epi->ep->ws)
 			return -ENOMEM;
 	}
 
+	id = atomic_inc_return(&wakesource_create_id);
 	take_dentry_name_snapshot(&n, epi->ffd.file->f_path.dentry);
-	ws = wakeup_source_register(NULL, n.name.name);
+	snprintf(buf, sizeof(buf), "epollitem%d:%d.%s", id, task_pid, n.name.name);
+	ws = wakeup_source_register(NULL, buf);
 	release_dentry_name_snapshot(&n);
 
 	if (!ws)
