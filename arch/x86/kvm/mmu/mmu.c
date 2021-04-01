@@ -5430,6 +5430,18 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 		 * will drop their references and allow the root count to
 		 * go to 0.
 		 *
+		 * Also take a reference on all roots so that this thread
+		 * can do the bulk of the work required to free the roots
+		 * once they are invalidated. Without this reference, a
+		 * vCPU thread might drop the last reference to a root and
+		 * get stuck with tearing down the entire paging structure.
+		 *
+		 * Roots which have a zero refcount should be skipped as
+		 * they're already being torn down.
+		 * Already invalid roots should be referenced again so that
+		 * they aren't freed before kvm_tdp_mmu_zap_all_fast is
+		 * done with them.
+		 *
 		 * This has essentially the same effect for the TDP MMU
 		 * as updating mmu_valid_gen above does for the shadow
 		 * MMU.
@@ -5441,7 +5453,8 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 		 * could drop the MMU lock and yield.
 		 */
 		list_for_each_entry(root, &kvm->arch.tdp_mmu_roots, link)
-			root->role.invalid = true;
+			if (refcount_inc_not_zero(&root->tdp_mmu_root_count))
+				root->role.invalid = true;
 	}
 
 	/*
@@ -5457,6 +5470,12 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	kvm_zap_obsolete_pages(kvm);
 
 	write_unlock(&kvm->mmu_lock);
+
+	if (is_tdp_mmu_enabled(kvm)) {
+		read_lock(&kvm->mmu_lock);
+		kvm_tdp_mmu_zap_invalidated_roots(kvm);
+		read_unlock(&kvm->mmu_lock);
+	}
 }
 
 static bool kvm_has_zapped_obsolete_pages(struct kvm *kvm)
