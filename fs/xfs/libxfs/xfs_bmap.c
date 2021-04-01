@@ -927,13 +927,16 @@ xfs_bmap_add_attrfork_btree(
 	xfs_inode_t		*ip,		/* incore inode pointer */
 	int			*flags)		/* inode logging flags */
 {
+	struct xfs_btree_block	*block;
 	xfs_btree_cur_t		*cur;		/* btree cursor */
 	int			error;		/* error return value */
 	xfs_mount_t		*mp;		/* file system mount struct */
 	int			stat;		/* newroot status */
 
 	mp = ip->i_mount;
-	if (ip->i_df.if_broot_bytes <= XFS_IFORK_DSIZE(ip))
+	block = ip->i_df.if_broot;
+
+	if (XFS_BMAP_BMDR_SPACE(block) <= XFS_IFORK_DSIZE(ip))
 		*flags |= XFS_ILOG_DBROOT;
 	else {
 		cur = xfs_bmbt_init_cursor(mp, tp, ip, XFS_DATA_FORK);
