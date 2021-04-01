@@ -124,7 +124,7 @@
 	status = "disabled";
 };
 
-&usbdrd_dwc3_0 {
+&usbdrd3_0 {
 	dr_mode = "host";
 };
 
