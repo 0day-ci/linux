@@ -180,6 +180,7 @@ i915_gem_shrink(struct i915_gem_ww_ctx *ww,
 		 * the unbound/bound list until actually freed.
 		 */
 		spin_lock_irqsave(&i915->mm.obj_lock, flags);
+		err = 0;
 		while (count < target &&
 		       (obj = list_first_entry_or_null(phase->list,
 						       typeof(*obj),
@@ -202,7 +203,6 @@ i915_gem_shrink(struct i915_gem_ww_ctx *ww,
 
 			spin_unlock_irqrestore(&i915->mm.obj_lock, flags);
 
-			err = 0;
 			if (unsafe_drop_pages(obj, shrink)) {
 				/* May arrive from get_pages on another bo */
 				if (!ww) {
