@@ -74,53 +74,52 @@ static int sbtsi_read(struct device *dev, enum hwmon_sensor_types type,
 		      u32 attr, int channel, long *val)
 {
 	struct sbtsi_data *data = dev_get_drvdata(dev);
+	u8 temp_int_reg, temp_dec_reg;
 	s32 temp_int, temp_dec;
 	int err;
 
 	switch (attr) {
 	case hwmon_temp_input:
-		/*
-		 * ReadOrder bit specifies the reading order of integer and
-		 * decimal part of CPU temp for atomic reads. If bit == 0,
-		 * reading integer part triggers latching of the decimal part,
-		 * so integer part should be read first. If bit == 1, read
-		 * order should be reversed.
-		 */
-		err = i2c_smbus_read_byte_data(data->client, SBTSI_REG_CONFIG);
-		if (err < 0)
-			return err;
-
-		mutex_lock(&data->lock);
-		if (err & BIT(SBTSI_CONFIG_READ_ORDER_SHIFT)) {
-			temp_dec = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_DEC);
-			temp_int = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_INT);
-		} else {
-			temp_int = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_INT);
-			temp_dec = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_DEC);
-		}
-		mutex_unlock(&data->lock);
+		temp_int_reg = SBTSI_REG_TEMP_INT;
+		temp_dec_reg = SBTSI_REG_TEMP_DEC;
 		break;
 	case hwmon_temp_max:
-		mutex_lock(&data->lock);
-		temp_int = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_HIGH_INT);
-		temp_dec = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_HIGH_DEC);
-		mutex_unlock(&data->lock);
+		temp_int_reg = SBTSI_REG_TEMP_HIGH_INT;
+		temp_dec_reg = SBTSI_REG_TEMP_HIGH_DEC;
 		break;
 	case hwmon_temp_min:
-		mutex_lock(&data->lock);
-		temp_int = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_LOW_INT);
-		temp_dec = i2c_smbus_read_byte_data(data->client, SBTSI_REG_TEMP_LOW_DEC);
-		mutex_unlock(&data->lock);
+		temp_int_reg = SBTSI_REG_TEMP_LOW_INT;
+		temp_dec_reg = SBTSI_REG_TEMP_LOW_DEC;
 		break;
 	default:
 		return -EINVAL;
 	}
 
+	/*
+	 * ReadOrder bit specifies the reading order of integer and
+	 * decimal part of CPU temp for atomic reads. If bit == 0,
+	 * reading integer part triggers latching of the decimal part,
+	 * so integer part should be read first. If bit == 1, read
+	 * order should be reversed.
+	 */
+	err = i2c_smbus_read_byte_data(data->client, SBTSI_REG_CONFIG);
+	if (err < 0)
+		return err;
 
-	if (temp_int < 0)
-		return temp_int;
+	mutex_lock(&data->lock);
+	if (err & BIT(SBTSI_CONFIG_READ_ORDER_SHIFT)) {
+		temp_dec = i2c_smbus_read_byte_data(data->client, temp_dec_reg);
+		temp_int = i2c_smbus_read_byte_data(data->client, temp_int_reg);
+	} else {
+		temp_int = i2c_smbus_read_byte_data(data->client, temp_int_reg);
+		temp_dec = i2c_smbus_read_byte_data(data->client, temp_dec_reg);
+	}
+	mutex_unlock(&data->lock);
+
 	if (temp_dec < 0)
 		return temp_dec;
+	if (temp_int < 0)
+		return temp_int;
 
 	*val = sbtsi_reg_to_mc(temp_int, temp_dec);
 
