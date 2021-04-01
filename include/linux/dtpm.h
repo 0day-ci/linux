@@ -8,11 +8,13 @@
 #define ___DTPM_H__
 
 #include <linux/powercap.h>
+#include <linux/configfs.h>
 
 #define MAX_DTPM_DESCR 8
 #define MAX_DTPM_CONSTRAINTS 1
 
 struct dtpm {
+	struct config_group cfg;
 	struct powercap_zone zone;
 	struct dtpm *parent;
 	struct list_head sibling;
