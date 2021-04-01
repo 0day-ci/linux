@@ -2341,9 +2341,20 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 				 * removed to make room for superpage(s).
 				 * We're adding new large pages, so make sure
 				 * we don't remove their parent tables.
+				 *
+				 * We also need to flush the iotlb before creating
+				 * superpage to ensure it does not perserves any
+				 * obsolete info.
 				 */
-				dma_pte_free_pagetable(domain, iov_pfn, end_pfn,
-						       largepage_lvl + 1);
+				if (dma_pte_present(pte)) {
+					int i;
+
+					dma_pte_free_pagetable(domain, iov_pfn, end_pfn,
+							       largepage_lvl + 1);
+					for_each_domain_iommu(i, domain)
+						iommu_flush_iotlb_psi(g_iommus[i], domain,
+								      iov_pfn, nr_pages, 0, 0);
+				}
 			} else {
 				pteval &= ~(uint64_t)DMA_PTE_LARGE_PAGE;
 			}
