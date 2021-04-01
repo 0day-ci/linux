@@ -4905,6 +4905,7 @@ static int get_initial_state(struct sk_buff *skb, struct netlink_callback *cb)
 	struct drbd_state_change *state_change = (struct drbd_state_change *)cb->args[0];
 	unsigned int seq = cb->args[2];
 	unsigned int n;
+	unsigned int skb_len = skb->len;
 	enum drbd_notification_type flags = 0;
 
 	/* There is no need for taking notification_mutex here: it doesn't
@@ -4915,7 +4916,7 @@ static int get_initial_state(struct sk_buff *skb, struct netlink_callback *cb)
 	cb->args[5]--;
 	if (cb->args[5] == 1) {
 		notify_initial_state_done(skb, seq);
-		goto out;
+		return skb_len;
 	}
 	n = cb->args[4]++;
 	if (cb->args[4] < cb->args[3])
