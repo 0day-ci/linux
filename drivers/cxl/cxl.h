@@ -70,5 +70,69 @@ struct cxl_regs {
 void cxl_setup_device_regs(struct device *dev, void __iomem *base,
 			   struct cxl_device_regs *regs);
 
+/*
+ * Address space properties derived from:
+ * CXL 2.0 8.2.5.12.7 CXL HDM Decoder 0 Control Register
+ */
+#define CXL_ADDRSPACE_RAM   BIT(0)
+#define CXL_ADDRSPACE_PMEM  BIT(1)
+#define CXL_ADDRSPACE_TYPE2 BIT(2)
+#define CXL_ADDRSPACE_TYPE3 BIT(3)
+#define CXL_ADDRSPACE_MASK  GENMASK(3, 0)
+
+struct cxl_address_space {
+	struct range range;
+	int interleave_size;
+	unsigned long flags;
+	unsigned long targets;
+};
+
+struct cxl_address_space_dev {
+	struct device dev;
+	struct resource res;
+	struct cxl_address_space *address_space;
+};
+
+/**
+ * struct cxl_port - object representing a root, upstream, or downstream port
+ * @dev: this port's device
+ * @port_host: PCI or platform device host of the CXL capability
+ * @id: id for port device-name
+ * @target_id: this port's HDM decoder id in the parent port
+ * @component_regs_phys: component register capability array base address
+ */
+struct cxl_port {
+	struct device dev;
+	struct device *port_host;
+	int id;
+	int target_id;
+	resource_size_t component_regs_phys;
+};
+
+/*
+ * struct cxl_root - platform object parent of CXL host bridges
+ *
+ * A cxl_root object represents a set of address spaces that are
+ * interleaved across a set of child host bridges, but never interleaved
+ * to another cxl_root object. It contains a cxl_port that is a special
+ * case in that it does not have a parent port and related HDMs, instead
+ * its decode is derived from the root (platform firmware defined)
+ * address space description. Not to be confused with CXL Root Ports
+ * that are the PCIE Root Ports within PCIE Host Bridges that are
+ * flagged by platform firmware (ACPI0016 on ACPI platforms) as having
+ * CXL capabilities.
+ */
+struct cxl_root {
+	struct cxl_port port;
+	int nr_spaces;
+	struct cxl_address_space address_space[];
+};
+
+struct cxl_root *to_cxl_root(struct device *dev);
+struct cxl_port *to_cxl_port(struct device *dev);
+struct cxl_address_space_dev *to_cxl_address_space(struct device *dev);
+struct cxl_root *devm_cxl_add_root(struct device *parent,
+				   struct cxl_address_space *cxl_space,
+				   int nr_spaces);
 extern struct bus_type cxl_bus_type;
 #endif /* __CXL_H__ */
