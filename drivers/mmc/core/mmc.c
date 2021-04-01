@@ -28,6 +28,7 @@
 
 #define DEFAULT_CMD6_TIMEOUT_MS	500
 #define MIN_CACHE_EN_TIMEOUT_MS 1600
+#define MMC_SANITIZE_TIMEOUT_MS	(240 * 1000) /* 240s */
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -835,6 +836,37 @@ static ssize_t mmc_dsr_show(struct device *dev,
 
 static DEVICE_ATTR(dsr, S_IRUGO, mmc_dsr_show, NULL);
 
+static ssize_t sanitize_timeout_ms_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	return sysfs_emit(buf, "%d\n", card->sanitize_timeout_ms);
+}
+
+static ssize_t sanitize_timeout_ms_store(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t len)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+	unsigned int new;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &new);
+	if (ret < 0)
+		return ret;
+
+	if (new == 0)
+		return -EINVAL;
+
+	card->sanitize_timeout_ms = new;
+
+	return len;
+}
+static DEVICE_ATTR_RW(sanitize_timeout_ms);
+
+
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
 	&dev_attr_csd.attr,
@@ -861,6 +893,7 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_rca.attr,
 	&dev_attr_dsr.attr,
 	&dev_attr_cmdq_en.attr,
+	&dev_attr_sanitize_timeout_ms.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(mmc_std);
@@ -1623,6 +1656,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		card->ocr = ocr;
 		card->type = MMC_TYPE_MMC;
 		card->rca = 1;
+		card->sanitize_timeout_ms = MMC_SANITIZE_TIMEOUT_MS;
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
 	}
 
