@@ -538,4 +538,10 @@ config EDAC_DMC520
 	  Support for error detection and correction on the
 	  SoCs with ARM DMC-520 DRAM controller.
 
+config EDAC_CORTEX_ARM64_L1_L2
+	tristate "ARM Cortex A57/A53"
+	depends on ARM64
+	help
+	  Support for L1/L2 cache error detection on ARM Cortex A57 and A53.
+
 endif # EDAC
