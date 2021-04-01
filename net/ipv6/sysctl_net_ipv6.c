@@ -167,6 +167,13 @@ static struct ctl_table ipv6_table_template[] = {
 		.extra1         = SYSCTL_ZERO,
 		.extra2         = &two,
 	},
+	{
+		.procname	= "ioam6_id",
+		.data		= &init_net.ipv6.sysctl.ioam6_id,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
 	{ }
 };
 

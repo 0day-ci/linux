@@ -237,6 +237,8 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.addr_gen_mode		= IN6_ADDR_GEN_MODE_EUI64,
 	.disable_policy		= 0,
 	.rpl_seg_enabled	= 0,
+	.ioam6_enabled		= 0,
+	.ioam6_id               = 0,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -293,6 +295,8 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.addr_gen_mode		= IN6_ADDR_GEN_MODE_EUI64,
 	.disable_policy		= 0,
 	.rpl_seg_enabled	= 0,
+	.ioam6_enabled		= 0,
+	.ioam6_id               = 0,
 };
 
 /* Check if link is ready: is it up and is a valid qdisc available */
@@ -5524,6 +5528,8 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_DISABLE_POLICY] = cnf->disable_policy;
 	array[DEVCONF_NDISC_TCLASS] = cnf->ndisc_tclass;
 	array[DEVCONF_RPL_SEG_ENABLED] = cnf->rpl_seg_enabled;
+	array[DEVCONF_IOAM6_ENABLED] = cnf->ioam6_enabled;
+	array[DEVCONF_IOAM6_ID] = cnf->ioam6_id;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -6906,6 +6912,20 @@ static const struct ctl_table addrconf_sysctl[] = {
 	{
 		.procname	= "rpl_seg_enabled",
 		.data		= &ipv6_devconf.rpl_seg_enabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "ioam6_enabled",
+		.data		= &ipv6_devconf.ioam6_enabled,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "ioam6_id",
+		.data		= &ipv6_devconf.ioam6_id,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,

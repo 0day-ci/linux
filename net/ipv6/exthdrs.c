@@ -49,6 +49,9 @@
 #include <net/seg6_hmac.h>
 #endif
 #include <net/rpl.h>
+#include <linux/ioam6.h>
+#include <net/ioam6.h>
+#include <net/dst_metadata.h>
 
 #include <linux/uaccess.h>
 
@@ -929,6 +932,50 @@ static bool ipv6_hop_ra(struct sk_buff *skb, int optoff)
 	return false;
 }
 
+/* IOAM */
+
+static bool ipv6_hop_ioam(struct sk_buff *skb, int optoff)
+{
+	struct ioam6_trace_hdr *trace;
+	struct ioam6_namespace *ns;
+	struct ioam6_hdr *hdr;
+
+	/* Must be 4n-aligned */
+	if (optoff & 3)
+		goto drop;
+
+	/* Ignore if IOAM is not enabled on ingress */
+	if (!__in6_dev_get(skb->dev)->cnf.ioam6_enabled)
+		goto ignore;
+
+	hdr = (struct ioam6_hdr *)(skb_network_header(skb) + optoff);
+
+	switch (hdr->type) {
+	case IOAM6_TYPE_PREALLOC:
+		trace = (struct ioam6_trace_hdr *)((u8 *)hdr + sizeof(*hdr));
+		ns = ioam6_namespace(ipv6_skb_net(skb), trace->namespace_id);
+
+		/* Ignore if the IOAM namespace is unknown */
+		if (!ns)
+			goto ignore;
+
+		if (!skb_valid_dst(skb))
+			ip6_route_input(skb);
+
+		ioam6_fill_trace_data(skb, ns, trace);
+		break;
+	default:
+		break;
+	}
+
+ignore:
+	return true;
+
+drop:
+	kfree_skb(skb);
+	return false;
+}
+
 /* Jumbo payload */
 
 static bool ipv6_hop_jumbo(struct sk_buff *skb, int optoff)
@@ -999,6 +1046,10 @@ static const struct tlvtype_proc tlvprochopopt_lst[] = {
 	{
 		.type	= IPV6_TLV_ROUTERALERT,
 		.func	= ipv6_hop_ra,
+	},
+	{
+		.type	= IPV6_TLV_IOAM,
+		.func	= ipv6_hop_ioam,
 	},
 	{
 		.type	= IPV6_TLV_JUMBO,

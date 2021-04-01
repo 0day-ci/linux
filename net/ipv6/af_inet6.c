@@ -62,6 +62,7 @@
 #include <net/rpl.h>
 #include <net/compat.h>
 #include <net/xfrm.h>
+#include <net/ioam6.h>
 
 #include <linux/uaccess.h>
 #include <linux/mroute6.h>
@@ -1190,6 +1191,10 @@ static int __init inet6_init(void)
 	if (err)
 		goto rpl_fail;
 
+	err = ioam6_init();
+	if (err)
+		goto ioam6_fail;
+
 	err = igmp6_late_init();
 	if (err)
 		goto igmp6_late_err;
@@ -1213,6 +1218,8 @@ sysctl_fail:
 #endif
 igmp6_late_err:
 	rpl_exit();
+ioam6_fail:
+	ioam6_exit();
 rpl_fail:
 	seg6_exit();
 seg6_fail:
