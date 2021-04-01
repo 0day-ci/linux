@@ -37,6 +37,12 @@ struct seq_operations {
 
 #define SEQ_SKIP 1
 
+/*
+ * op->start must return a non-NULL pointer for single_open(),
+ * this is used when we don't care about the specific value.
+ */
+#define SEQ_OPEN_SINGLE ((void *)1)
+
 /**
  * seq_has_overflowed - check if the buffer has overflowed
  * @m: the seq_file handle
