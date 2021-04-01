@@ -346,8 +346,8 @@ struct snd_soc_tplg_hw_config {
 	__u8 fsync_provider;	/* SND_SOC_TPLG_FSYNC_ value */
 	__u8 mclk_direction;    /* SND_SOC_TPLG_MCLK_ value */
 	__le16 reserved;	/* for 32bit alignment */
-	__le32 mclk_rate;	/* MCLK or SYSCLK freqency in Hz */
-	__le32 bclk_rate;	/* BCLK freqency in Hz */
+	__le32 mclk_rate;	/* MCLK or SYSCLK frequency in Hz */
+	__le32 bclk_rate;	/* BCLK frequency in Hz */
 	__le32 fsync_rate;	/* frame clock in Hz */
 	__le32 tdm_slots;	/* number of TDM slots in use */
 	__le32 tdm_slot_width;	/* width in bits for each slot */
