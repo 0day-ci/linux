@@ -957,8 +957,10 @@ give_sigsegv:
 		si_code = SEGV_ACCERR;
 	else {
 		struct mm_struct *mm = current->mm;
+		unsigned long addr = (unsigned long)va;
+
 		mmap_read_lock(mm);
-		if (find_vma(mm, (unsigned long)va))
+		if (find_vma_intersection(mm, addr, addr + 1))
 			si_code = SEGV_ACCERR;
 		else
 			si_code = SEGV_MAPERR;
