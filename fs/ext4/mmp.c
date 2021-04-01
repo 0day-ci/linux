@@ -171,7 +171,7 @@ static int kmmpd(void *data)
 		 */
 		if (retval) {
 			if ((failed_writes % 60) == 0) {
-				ext4_error_err(sb, -retval,
+				ext4_error_err(sb, retval,
 					       "Error writing to MMP block");
 			}
 			failed_writes++;
