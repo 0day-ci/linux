@@ -882,6 +882,18 @@ static void stmmac_validate(struct phylink_config *config,
 	phylink_set(mac_supported, Asym_Pause);
 	phylink_set_port_modes(mac_supported);
 
+	/* 2.5G mode only support 2500baseT full duplex only */
+	if (priv->plat->has_gmac4 && priv->plat->speed_2500_en) {
+		phylink_set(mac_supported, 2500baseT_Full);
+		phylink_set(mask, 10baseT_Half);
+		phylink_set(mask, 10baseT_Full);
+		phylink_set(mask, 100baseT_Half);
+		phylink_set(mask, 100baseT_Full);
+		phylink_set(mask, 1000baseT_Half);
+		phylink_set(mask, 1000baseT_Full);
+		phylink_set(mask, 1000baseKX_Full);
+	}
+
 	/* Cut down 1G if asked to */
 	if ((max_speed > 0) && (max_speed < 1000)) {
 		phylink_set(mask, 1000baseT_Full);
@@ -1192,8 +1204,13 @@ static int stmmac_phy_setup(struct stmmac_priv *priv)
 	priv->phylink_config.dev = &priv->dev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
 	priv->phylink_config.pcs_poll = true;
-	priv->phylink_config.ovr_an_inband =
-		priv->plat->mdio_bus_data->xpcs_an_inband;
+	/* For 2.5G, we do not use SGMII in-band AN */
+	if (priv->plat->speed_2500_en) {
+		priv->phylink_config.ovr_an_inband = false;
+	} else {
+		priv->phylink_config.ovr_an_inband =
+			priv->plat->mdio_bus_data->xpcs_an_inband;
+	}
 
 	if (!fwnode)
 		fwnode = dev_fwnode(priv->device);
@@ -5813,6 +5830,11 @@ int stmmac_dvr_probe(struct device *device,
 				__func__, priv->plat->bus_id);
 			goto error_mdio_register;
 		}
+	}
+
+	if (priv->plat->speed_mode_2500) {
+		priv->plat->speed_2500_en = priv->plat->speed_mode_2500(ndev,
+									priv->plat->bsp_priv);
 	}
 
 	ret = stmmac_phy_setup(priv);
