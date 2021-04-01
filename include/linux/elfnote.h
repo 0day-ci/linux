@@ -100,5 +100,6 @@
  * The types for "Linux" owned notes.
  */
 #define LINUX_ELFNOTE_BUILD_SALT	0x100
+#define LINUX_ELFNOTE_BUILD_LTO		0x101
 
 #endif /* _LINUX_ELFNOTE_H */
