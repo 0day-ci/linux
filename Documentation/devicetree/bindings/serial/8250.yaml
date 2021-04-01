@@ -12,8 +12,9 @@ maintainers:
 allOf:
   - $ref: /schemas/serial.yaml#
   - if:
-      required:
-        - aspeed,sirq-polarity-sense
+      anyOf:
+        - required: [ aspeed,sirq-active-high ]
+        - required: [ aspeed,sirq-polarity-sense ]
     then:
       properties:
         compatible:
@@ -190,6 +191,12 @@ properties:
       applicable to aspeed,ast2500-vuart.
     deprecated: true
 
+  aspeed,sirq-active-high:
+    type: boolean
+    description: |
+      Set to indicate that the SIRQ polarity is active-high (default
+      is active-low).  Only applicable to aspeed,ast2500-vuart.
+
 required:
   - reg
   - interrupts
@@ -228,7 +235,7 @@ examples:
         interrupts = <8>;
         clocks = <&syscon ASPEED_CLK_APB>;
         no-loopback-test;
-        aspeed,sirq-polarity-sense = <&syscon 0x70 25>;
+        aspeed,sirq-active-high;
     };
 
 ...
