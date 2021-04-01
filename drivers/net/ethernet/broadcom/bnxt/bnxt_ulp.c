@@ -24,8 +24,8 @@
 #include "bnxt.h"
 #include "bnxt_ulp.h"
 
-static int bnxt_register_dev(struct bnxt_en_dev *edev, int ulp_id,
-			     struct bnxt_ulp_ops *ulp_ops, void *handle)
+int bnxt_register_dev(struct bnxt_en_dev *edev, struct bnxt_ulp_ops *ulp_ops,
+		      void *handle)
 {
 	struct net_device *dev = edev->net;
 	struct bnxt *bp = netdev_priv(dev);
@@ -45,15 +45,16 @@ static int bnxt_register_dev(struct bnxt_en_dev *edev, int ulp_id,
 
 	edev->ulp_tbl = ulp;
 	ulp->handle = handle;
-	rcu_assign_pointer(ulp->ulp_ops, ulp_ops);
+	ulp->ulp_ops = ulp_ops;
 
 	if (test_bit(BNXT_STATE_OPEN, &bp->state))
 		bnxt_hwrm_vnic_cfg(bp, 0);
 
 	return 0;
 }
+EXPORT_SYMBOL(bnxt_register_dev);
 
-static int bnxt_unregister_dev(struct bnxt_en_dev *edev, int ulp_id)
+void bnxt_unregister_dev(struct bnxt_en_dev *edev)
 {
 	struct net_device *dev = edev->net;
 	struct bnxt *bp = netdev_priv(dev);
@@ -64,13 +65,11 @@ static int bnxt_unregister_dev(struct bnxt_en_dev *edev, int ulp_id)
 
 	ulp = edev->ulp_tbl;
 	if (ulp->msix_requested)
-		edev->en_ops->bnxt_free_msix(edev, ulp_id);
+		bnxt_free_msix_vecs(edev);
 
 	if (ulp->max_async_event_id)
 		bnxt_hwrm_func_drv_rgtr(bp, NULL, 0, true);
 
-	RCU_INIT_POINTER(ulp->ulp_ops, NULL);
-	synchronize_rcu();
 	ulp->max_async_event_id = 0;
 	ulp->async_events_bmap = NULL;
 	while (atomic_read(&ulp->ref_count) != 0 && i < 10) {
@@ -79,8 +78,8 @@ static int bnxt_unregister_dev(struct bnxt_en_dev *edev, int ulp_id)
 	}
 	kfree(ulp);
 	edev->ulp_tbl = NULL;
-	return 0;
 }
+EXPORT_SYMBOL(bnxt_unregister_dev);
 
 static void bnxt_fill_msix_vecs(struct bnxt *bp, struct bnxt_msix_entry *ent)
 {
@@ -102,8 +101,8 @@ static void bnxt_fill_msix_vecs(struct bnxt *bp, struct bnxt_msix_entry *ent)
 	}
 }
 
-static int bnxt_req_msix_vecs(struct bnxt_en_dev *edev, int ulp_id,
-			      struct bnxt_msix_entry *ent, int num_msix)
+int bnxt_req_msix_vecs(struct bnxt_en_dev *edev, struct bnxt_msix_entry *ent,
+		       int num_msix)
 {
 	struct net_device *dev = edev->net;
 	struct bnxt *bp = netdev_priv(dev);
@@ -163,8 +162,9 @@ static int bnxt_req_msix_vecs(struct bnxt_en_dev *edev, int ulp_id,
 	edev->flags |= BNXT_EN_FLAG_MSIX_REQUESTED;
 	return avail_msix;
 }
+EXPORT_SYMBOL(bnxt_req_msix_vecs);
 
-static int bnxt_free_msix_vecs(struct bnxt_en_dev *edev, int ulp_id)
+void bnxt_free_msix_vecs(struct bnxt_en_dev *edev)
 {
 	struct net_device *dev = edev->net;
 	struct bnxt *bp = netdev_priv(dev);
@@ -172,7 +172,7 @@ static int bnxt_free_msix_vecs(struct bnxt_en_dev *edev, int ulp_id)
 	ASSERT_RTNL();
 
 	if (!(edev->flags & BNXT_EN_FLAG_MSIX_REQUESTED))
-		return 0;
+		return;
 
 	edev->ulp_tbl->msix_requested = 0;
 	edev->flags &= ~BNXT_EN_FLAG_MSIX_REQUESTED;
@@ -180,12 +180,12 @@ static int bnxt_free_msix_vecs(struct bnxt_en_dev *edev, int ulp_id)
 		bnxt_close_nic(bp, true, false);
 		bnxt_open_nic(bp, true, false);
 	}
-	return 0;
 }
+EXPORT_SYMBOL(bnxt_free_msix_vecs);
 
 int bnxt_get_ulp_msix_num(struct bnxt *bp)
 {
-	if (bnxt_ulp_registered(bp->edev, BNXT_ROCE_ULP)) {
+	if (bnxt_ulp_registered(bp->edev)) {
 		struct bnxt_en_dev *edev = bp->edev;
 
 		return edev->ulp_tbl->msix_requested;
@@ -195,7 +195,7 @@ int bnxt_get_ulp_msix_num(struct bnxt *bp)
 
 int bnxt_get_ulp_msix_base(struct bnxt *bp)
 {
-	if (bnxt_ulp_registered(bp->edev, BNXT_ROCE_ULP)) {
+	if (bnxt_ulp_registered(bp->edev)) {
 		struct bnxt_en_dev *edev = bp->edev;
 
 		if (edev->ulp_tbl->msix_requested)
@@ -206,7 +206,7 @@ int bnxt_get_ulp_msix_base(struct bnxt *bp)
 
 int bnxt_get_ulp_stat_ctxs(struct bnxt *bp)
 {
-	if (bnxt_ulp_registered(bp->edev, BNXT_ROCE_ULP)) {
+	if (bnxt_ulp_registered(bp->edev)) {
 		struct bnxt_en_dev *edev = bp->edev;
 
 		if (edev->ulp_tbl->msix_requested)
@@ -216,8 +216,7 @@ int bnxt_get_ulp_stat_ctxs(struct bnxt *bp)
 	return 0;
 }
 
-static int bnxt_send_msg(struct bnxt_en_dev *edev, int ulp_id,
-			 struct bnxt_fw_msg *fw_msg)
+int bnxt_send_msg(struct bnxt_en_dev *edev, struct bnxt_fw_msg *fw_msg)
 {
 	struct net_device *dev = edev->net;
 	struct bnxt *bp = netdev_priv(dev);
@@ -241,6 +240,7 @@ static int bnxt_send_msg(struct bnxt_en_dev *edev, int ulp_id,
 	mutex_unlock(&bp->hwrm_cmd_lock);
 	return rc;
 }
+EXPORT_SYMBOL(bnxt_send_msg);
 
 static void bnxt_ulp_get(struct bnxt_ulp *ulp)
 {
@@ -263,8 +263,7 @@ void bnxt_ulp_stop(struct bnxt *bp)
 
 	edev->flags |= BNXT_EN_FLAG_ULP_STOPPED;
 	ulp = edev->ulp_tbl;
-
-	ops = rtnl_dereference(ulp->ulp_ops);
+	ops = ulp->ulp_ops;
 	if (!ops || !ops->ulp_stop)
 		return;
 	ops->ulp_stop(ulp->handle);
@@ -285,8 +284,7 @@ void bnxt_ulp_start(struct bnxt *bp, int err)
 		return;
 
 	ulp = edev->ulp_tbl;
-
-	ops = rtnl_dereference(ulp->ulp_ops);
+	ops = ulp->ulp_ops;
 	if (!ops || !ops->ulp_start)
 		return;
 	ops->ulp_start(ulp->handle);
@@ -303,14 +301,11 @@ void bnxt_ulp_sriov_cfg(struct bnxt *bp, int num_vfs)
 
 	ulp = edev->ulp_tbl;
 
-	rcu_read_lock();
-	ops = rcu_dereference(ulp->ulp_ops);
-	if (!ops || !ops->ulp_sriov_config) {
-		rcu_read_unlock();
+	ops = ulp->ulp_ops;
+	if (!ops || !ops->ulp_sriov_config)
 		return;
-	}
+
 	bnxt_ulp_get(ulp);
-	rcu_read_unlock();
 	ops->ulp_sriov_config(ulp->handle, num_vfs);
 	bnxt_ulp_put(ulp);
 }
@@ -325,8 +320,7 @@ void bnxt_ulp_shutdown(struct bnxt *bp)
 		return;
 
 	ulp = edev->ulp_tbl;
-
-	ops = rtnl_dereference(ulp->ulp_ops);
+	ops = ulp->ulp_ops;
 	if (!ops || !ops->ulp_shutdown)
 		return;
 
@@ -341,13 +335,13 @@ void bnxt_ulp_irq_stop(struct bnxt *bp)
 	if (!edev || !(edev->flags & BNXT_EN_FLAG_MSIX_REQUESTED))
 		return;
 
-	if (bnxt_ulp_registered(bp->edev, BNXT_ROCE_ULP)) {
+	if (bnxt_ulp_registered(bp->edev)) {
 		struct bnxt_ulp *ulp = edev->ulp_tbl;
 
 		if (!ulp->msix_requested)
 			return;
 
-		ops = rtnl_dereference(ulp->ulp_ops);
+		ops = ulp->ulp_ops;
 		if (!ops || !ops->ulp_irq_stop)
 			return;
 		ops->ulp_irq_stop(ulp->handle);
@@ -362,14 +356,14 @@ void bnxt_ulp_irq_restart(struct bnxt *bp, int err)
 	if (!edev || !(edev->flags & BNXT_EN_FLAG_MSIX_REQUESTED))
 		return;
 
-	if (bnxt_ulp_registered(bp->edev, BNXT_ROCE_ULP)) {
+	if (bnxt_ulp_registered(bp->edev)) {
 		struct bnxt_ulp *ulp = edev->ulp_tbl;
 		struct bnxt_msix_entry *ent = NULL;
 
 		if (!ulp->msix_requested)
 			return;
 
-		ops = rtnl_dereference(ulp->ulp_ops);
+		ops = ulp->ulp_ops;
 		if (!ops || !ops->ulp_irq_restart)
 			return;
 
@@ -395,31 +389,19 @@ void bnxt_ulp_async_events(struct bnxt *bp, struct hwrm_async_event_cmpl *cmpl)
 	if (!edev)
 		return;
 
-	rcu_read_lock();
 	ulp = edev->ulp_tbl;
-
-	ops = rcu_dereference(ulp->ulp_ops);
+	ops = ulp->ulp_ops;
 	if (!ops || !ops->ulp_async_notifier)
-		goto out;
+		return;
+
 	if (!ulp->async_events_bmap || event_id > ulp->max_async_event_id)
-		goto out;
+		return;
 
 	/* Read max_async_event_id first before testing the bitmap. */
 	smp_rmb();
 	if (test_bit(event_id, ulp->async_events_bmap))
 		ops->ulp_async_notifier(ulp->handle, cmpl);
-
-out:
-	rcu_read_unlock();
 }
-
-static const struct bnxt_en_ops bnxt_en_ops_tbl = {
-	.bnxt_register_device	= bnxt_register_dev,
-	.bnxt_unregister_device	= bnxt_unregister_dev,
-	.bnxt_request_msix	= bnxt_req_msix_vecs,
-	.bnxt_free_msix		= bnxt_free_msix_vecs,
-	.bnxt_send_fw_msg	= bnxt_send_msg,
-};
 
 struct bnxt_en_dev *bnxt_ulp_probe(struct net_device *dev)
 {
@@ -431,7 +413,6 @@ struct bnxt_en_dev *bnxt_ulp_probe(struct net_device *dev)
 		edev = kzalloc(sizeof(*edev), GFP_KERNEL);
 		if (!edev)
 			return ERR_PTR(-ENOMEM);
-		edev->en_ops = &bnxt_en_ops_tbl;
 		if (bp->flags & BNXT_FLAG_ROCEV1_CAP)
 			edev->flags |= BNXT_EN_FLAG_ROCEV1_CAP;
 		if (bp->flags & BNXT_FLAG_ROCEV2_CAP)
