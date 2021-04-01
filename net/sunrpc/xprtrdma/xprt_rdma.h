@@ -239,7 +239,6 @@ struct rpcrdma_frwr {
 	};
 };
 
-struct rpcrdma_req;
 struct rpcrdma_mr {
 	struct list_head	mr_list;
 	struct rpcrdma_req	*mr_req;
