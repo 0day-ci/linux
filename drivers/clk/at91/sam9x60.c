@@ -272,7 +272,7 @@ static void __init sam9x60_pmc_setup(struct device_node *np)
 	hw = at91_clk_register_master_pres(regmap, "masterck_pres", 3,
 					   parent_names, &sam9x60_master_layout,
 					   &mck_characteristics, &mck_lock,
-					   CLK_SET_RATE_GATE, INT_MIN);
+					   CLK_SET_RATE_GATE, INT_MIN, 0);
 	if (IS_ERR(hw))
 		goto err_free;
 

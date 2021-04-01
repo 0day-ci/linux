@@ -5,6 +5,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
+#include <linux/clk.h>
 #include <linux/clk/at91_pmc.h>
 #include <linux/of.h>
 #include <linux/mfd/syscon.h>
@@ -37,6 +38,9 @@ struct clk_master {
 	u8 parent;
 	u8 div;
 };
+
+/* MCK div reference to be used by notifier. */
+static struct clk_master *master_div;
 
 static inline bool clk_master_ready(struct clk_master *master)
 {
@@ -153,107 +157,127 @@ static const struct clk_ops master_div_ops = {
 	.restore_context = clk_master_div_restore_context,
 };
 
-static int clk_master_div_set_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long parent_rate)
+static int clk_master_div_set(struct clk_master *master,
+			      unsigned long parent_rate, int div)
 {
-	struct clk_master *master = to_clk_master(hw);
 	const struct clk_master_characteristics *characteristics =
 						master->characteristics;
-	unsigned long flags;
-	unsigned int mckr, tmp;
-	int div, i;
+	unsigned long rate = parent_rate;
+	unsigned int max_div = 0, div_index = 0, max_div_index = 0;
+	unsigned int i, mckr, tmp;
 	int ret;
-
-	div = DIV_ROUND_CLOSEST(parent_rate, rate);
-	if (div > ARRAY_SIZE(characteristics->divisors))
-		return -EINVAL;
 
 	for (i = 0; i < ARRAY_SIZE(characteristics->divisors); i++) {
 		if (!characteristics->divisors[i])
 			break;
 
-		if (div == characteristics->divisors[i]) {
-			div = i;
-			break;
+		if (div == characteristics->divisors[i])
+			div_index = i;
+
+		if (max_div < characteristics->divisors[i]) {
+			max_div = characteristics->divisors[i];
+			max_div_index = i;
 		}
 	}
 
-	if (i == ARRAY_SIZE(characteristics->divisors))
-		return -EINVAL;
+	if (div > max_div)
+		div_index = max_div_index;
 
-	spin_lock_irqsave(master->lock, flags);
 	ret = regmap_read(master->regmap, master->layout->offset, &mckr);
 	if (ret)
-		goto unlock;
+		return ret;
 
 	tmp = mckr & master->layout->mask;
 	tmp = (tmp >> MASTER_DIV_SHIFT) & MASTER_DIV_MASK;
-	if (tmp == div)
-		goto unlock;
+	if (tmp == div_index)
+		return 0;
+
+	rate /= characteristics->divisors[div_index];
+	if (rate < characteristics->output.min)
+		pr_warn("master clk div is underclocked");
+	else if (rate > characteristics->output.max)
+		pr_warn("master clk div is overclocked");
 
 	mckr &= ~(MASTER_DIV_MASK << MASTER_DIV_SHIFT);
-	mckr |= (div << MASTER_DIV_SHIFT);
+	mckr |= (div_index << MASTER_DIV_SHIFT);
 	ret = regmap_write(master->regmap, master->layout->offset, mckr);
 	if (ret)
-		goto unlock;
+		return ret;
 
 	while (!clk_master_ready(master))
 		cpu_relax();
-unlock:
-	spin_unlock_irqrestore(master->lock, flags);
+
+	master->div = characteristics->divisors[div_index];
 
 	return 0;
 }
 
-static int clk_master_div_determine_rate(struct clk_hw *hw,
-					 struct clk_rate_request *req)
+static int at91_clk_master_div_notifier(struct notifier_block *notifier,
+					unsigned long code, void *data)
 {
-	struct clk_master *master = to_clk_master(hw);
 	const struct clk_master_characteristics *characteristics =
-						master->characteristics;
-	struct clk_hw *parent;
-	unsigned long parent_rate, tmp_rate, best_rate = 0;
-	int i, best_diff = INT_MIN, tmp_diff;
+						master_div->characteristics;
+	struct clk_notifier_data *cnd = data;
+	unsigned long cur_rate, flags;
+	unsigned int mckr, cur_div, diff_div;
+	static unsigned int new_div;
 
-	parent = clk_hw_get_parent(hw);
-	if (!parent)
-		return -EINVAL;
+	/*
+	 * Need to increase/decrease div to avoid master div clock over/under
+	 * clocking
+	 */
+	spin_lock_irqsave(master_div->lock, flags);
+	switch (code) {
+	case PRE_RATE_CHANGE:
+		regmap_read(master_div->regmap, master_div->layout->offset,
+			    &mckr);
+		mckr &= master_div->layout->mask;
+		mckr = (mckr >> MASTER_DIV_SHIFT) & MASTER_DIV_MASK;
 
-	parent_rate = clk_hw_get_rate(parent);
-	if (!parent_rate)
-		return -EINVAL;
+		cur_div = characteristics->divisors[mckr];
+		cur_rate = DIV_ROUND_CLOSEST_ULL(cnd->old_rate, cur_div);
+		new_div = DIV_ROUND_CLOSEST(cnd->new_rate, cur_rate);
+		diff_div = abs(cur_div - new_div);
 
-	for (i = 0; i < ARRAY_SIZE(characteristics->divisors); i++) {
-		if (!characteristics->divisors[i])
-			break;
+		clk_master_div_set(master_div, cnd->old_rate,
+				   cur_div + diff_div);
+		break;
 
-		tmp_rate = DIV_ROUND_CLOSEST_ULL(parent_rate,
-						 characteristics->divisors[i]);
-		tmp_diff = abs(tmp_rate - req->rate);
+	case POST_RATE_CHANGE:
+		clk_master_div_set(master_div, cnd->new_rate, new_div);
+		break;
 
-		if (!best_rate || best_diff > tmp_diff) {
-			best_diff = tmp_diff;
-			best_rate = tmp_rate;
-		}
-
-		if (!best_diff)
-			break;
+	default:
+		break;
 	}
-
-	req->best_parent_rate = best_rate;
-	req->best_parent_hw = parent;
-	req->rate = best_rate;
+	spin_unlock_irqrestore(master_div->lock, flags);
 
 	return 0;
+}
+
+static struct notifier_block clk_master_notifier = {
+	.notifier_call = at91_clk_master_div_notifier,
+};
+
+static unsigned long clk_master_div_recalc_rate_chg(struct clk_hw *hw,
+						    unsigned long parent_rate)
+{
+	struct clk_master *master = to_clk_master(hw);
+
+	return DIV_ROUND_CLOSEST_ULL(parent_rate, master->div);
 }
 
 static void clk_master_div_restore_context_chg(struct clk_hw *hw)
 {
 	struct clk_master *master = to_clk_master(hw);
+	unsigned long flags;
 	int ret;
 
-	ret = clk_master_div_set_rate(hw, master->pms.rate,
-				      master->pms.parent_rate);
+	spin_lock_irqsave(master->lock, flags);
+	ret = clk_master_div_set(master, master->pms.parent_rate,
+				 DIV_ROUND_CLOSEST(master->pms.parent_rate,
+						   master->pms.rate));
+	spin_unlock_irqrestore(master->lock, flags);
 	if (ret)
 		pr_warn("Failed to restore MCK DIV clock\n");
 }
@@ -261,9 +285,7 @@ static void clk_master_div_restore_context_chg(struct clk_hw *hw)
 static const struct clk_ops master_div_ops_chg = {
 	.prepare = clk_master_prepare,
 	.is_prepared = clk_master_is_prepared,
-	.recalc_rate = clk_master_div_recalc_rate,
-	.determine_rate = clk_master_div_determine_rate,
-	.set_rate = clk_master_div_set_rate,
+	.recalc_rate = clk_master_div_recalc_rate_chg,
 	.save_context = clk_master_div_save_context,
 	.restore_context = clk_master_div_restore_context_chg,
 };
@@ -488,6 +510,8 @@ at91_clk_register_master_internal(struct regmap *regmap,
 	struct clk_master *master;
 	struct clk_init_data init;
 	struct clk_hw *hw;
+	unsigned int mckr;
+	unsigned long irqflags;
 	int ret;
 
 	if (!name || !num_parents || !parent_names || !lock)
@@ -510,6 +534,16 @@ at91_clk_register_master_internal(struct regmap *regmap,
 	master->chg_pid = chg_pid;
 	master->lock = lock;
 
+	if (ops == &master_div_ops_chg) {
+		spin_lock_irqsave(master->lock, irqflags);
+		regmap_read(master->regmap, master->layout->offset, &mckr);
+		spin_unlock_irqrestore(master->lock, irqflags);
+
+		mckr &= layout->mask;
+		mckr = (mckr >> MASTER_DIV_SHIFT) & MASTER_DIV_MASK;
+		master->div = characteristics->divisors[mckr];
+	}
+
 	hw = &master->hw;
 	ret = clk_hw_register(NULL, &master->hw);
 	if (ret) {
@@ -526,19 +560,24 @@ at91_clk_register_master_pres(struct regmap *regmap,
 		const char **parent_names,
 		const struct clk_master_layout *layout,
 		const struct clk_master_characteristics *characteristics,
-		spinlock_t *lock, u32 flags, int chg_pid)
+		spinlock_t *lock, u32 flags, int chg_pid, bool notifier)
 {
 	const struct clk_ops *ops;
+	struct clk_hw *hw;
 
 	if (flags & CLK_SET_RATE_GATE)
 		ops = &master_pres_ops;
 	else
 		ops = &master_pres_ops_chg;
 
-	return at91_clk_register_master_internal(regmap, name, num_parents,
-						 parent_names, layout,
-						 characteristics, ops,
-						 lock, flags, chg_pid);
+	hw = at91_clk_register_master_internal(regmap, name, num_parents,
+					       parent_names, layout,
+					       characteristics, ops,
+					       lock, flags, chg_pid);
+	if (!IS_ERR(hw) && notifier)
+		clk_notifier_register(hw->clk, &clk_master_notifier);
+
+	return hw;
 }
 
 struct clk_hw * __init
@@ -549,16 +588,22 @@ at91_clk_register_master_div(struct regmap *regmap,
 		spinlock_t *lock, u32 flags)
 {
 	const struct clk_ops *ops;
+	struct clk_hw *hw;
 
 	if (flags & CLK_SET_RATE_GATE)
 		ops = &master_div_ops;
 	else
 		ops = &master_div_ops_chg;
 
-	return at91_clk_register_master_internal(regmap, name, 1,
-						 &parent_name, layout,
-						 characteristics, ops,
-						 lock, flags, -EINVAL);
+	hw = at91_clk_register_master_internal(regmap, name, 1,
+					       &parent_name, layout,
+					       characteristics, ops,
+					       lock, flags, -EINVAL);
+
+	if (!IS_ERR(hw))
+		master_div = to_clk_master(hw);
+
+	return hw;
 }
 
 static unsigned long

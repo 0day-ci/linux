@@ -155,7 +155,7 @@ static void __init at91sam9g45_pmc_setup(struct device_node *np)
 					   &at91rm9200_master_layout,
 					   &mck_characteristics,
 					   &at91sam9g45_mck_lock,
-					   CLK_SET_RATE_GATE, INT_MIN);
+					   CLK_SET_RATE_GATE, INT_MIN, 0);
 	if (IS_ERR(hw))
 		goto err_free;
 
