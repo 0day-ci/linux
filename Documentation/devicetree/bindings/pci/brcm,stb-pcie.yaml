@@ -64,6 +64,9 @@ properties:
 
   aspm-no-l0s: true
 
+  vpcie12v-supply: true
+  vpcie3v3-supply: true
+
   brcm,scb-sizes:
     description: u64 giving the 64bit PCIe memory
       viewport size of a memory controller.  There may be up to
@@ -156,5 +159,6 @@ examples:
                                  <0x42000000 0x1 0x80000000 0x3 0x00000000 0x0 0x80000000>;
                     brcm,enable-ssc;
                     brcm,scb-sizes =  <0x0000000080000000 0x0000000080000000>;
+                    vpcie12v-supply = <&vreg12>;
             };
     };
