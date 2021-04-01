@@ -140,7 +140,7 @@ $(obj)/configs.o: $(obj)/config_data.gz
 
 targets += config_data.gz
 $(obj)/config_data.gz: $(KCONFIG_CONFIG) FORCE
-	$(call if_changed,gzip)
+	$(call filechk,gzip)
 
 $(obj)/kheaders.o: $(obj)/kheaders_data.tar.xz
 
