@@ -96,4 +96,9 @@
 #define ELFNOTE64(name, type, desc) ELFNOTE(64, name, type, desc)
 #endif	/* __ASSEMBLER__ */
 
+/*
+ * The types for "Linux" owned notes.
+ */
+#define LINUX_ELFNOTE_BUILD_SALT	0x100
+
 #endif /* _LINUX_ELFNOTE_H */

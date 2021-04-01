@@ -3,8 +3,6 @@
 
 #include <linux/elfnote.h>
 
-#define LINUX_ELFNOTE_BUILD_SALT       0x100
-
 #ifdef __ASSEMBLER__
 
 #define BUILD_SALT \
