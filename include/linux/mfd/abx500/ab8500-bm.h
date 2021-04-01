@@ -296,9 +296,6 @@ struct batres_vs_temp {
 	int resist;
 };
 
-/* Forward declaration */
-struct ab8500_fg;
-
 /**
  * struct ab8500_fg_parameters - Fuel gauge algorithm parameters, in seconds
  * if not specified
@@ -452,6 +449,7 @@ struct ab8500_bm_data {
 	const struct ab8500_fg_parameters *fg_params;
 };
 
+/* Forward declaration */
 struct ab8500_btemp;
 struct ab8500_gpadc;
 struct ab8500_fg;
