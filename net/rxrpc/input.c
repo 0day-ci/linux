@@ -1281,10 +1281,8 @@ int rxrpc_input_packet(struct sock *udp_sk, struct sk_buff *skb)
 		 */
 		if (sp->hdr.securityIndex != 0) {
 			struct sk_buff *nskb = skb_unshare(skb, GFP_ATOMIC);
-			if (!nskb) {
-				rxrpc_eaten_skb(skb, rxrpc_skb_unshared_nomem);
+			if (!nskb)
 				goto out;
-			}
 
 			if (nskb != skb) {
 				rxrpc_eaten_skb(skb, rxrpc_skb_received);
