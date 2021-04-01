@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/pci-ecam.h>
 #include <linux/printk.h>
+#include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
@@ -169,6 +170,7 @@
 #define SSC_STATUS_SSC_MASK		0x400
 #define SSC_STATUS_PLL_LOCK_MASK	0x800
 #define PCIE_BRCM_MAX_MEMC		3
+#define PCIE_BRCM_MAX_EP_REGULATORS	4
 
 #define IDX_ADDR(pcie)			(pcie->reg_offsets[EXT_CFG_INDEX])
 #define DATA_ADDR(pcie)			(pcie->reg_offsets[EXT_CFG_DATA])
@@ -191,6 +193,11 @@ static inline void brcm_pcie_bridge_sw_init_set_generic(struct brcm_pcie *pcie, 
 static inline void brcm_pcie_perst_set_4908(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_7278(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_generic(struct brcm_pcie *pcie, u32 val);
+
+static const char * const supplies[] = {
+	"vpcie12v-supply",
+	"vpcie3v3-supply",
+};
 
 enum {
 	RGR1_SW_INIT_1,
@@ -295,7 +302,26 @@ struct brcm_pcie {
 	u32			hw_rev;
 	void			(*perst_set)(struct brcm_pcie *pcie, u32 val);
 	void			(*bridge_sw_init_set)(struct brcm_pcie *pcie, u32 val);
+	struct regulator_bulk_data supplies[PCIE_BRCM_MAX_EP_REGULATORS];
+	unsigned int		num_supplies;
 };
+
+static int brcm_set_regulators(struct brcm_pcie *pcie, bool on)
+{
+	struct device *dev = pcie->dev;
+	int ret;
+
+	if (!pcie->num_supplies)
+		return 0;
+	if (on)
+		ret = regulator_bulk_enable(pcie->num_supplies, pcie->supplies);
+	else
+		ret = regulator_bulk_disable(pcie->num_supplies, pcie->supplies);
+	if (ret)
+		dev_err(dev, "failed to %s EP regulators\n",
+			on ? "enable" : "disable");
+	return ret;
+}
 
 /*
  * This is to convert the size of the inbound "BAR" region to the
@@ -1112,9 +1138,10 @@ static inline int brcm_phy_start(struct brcm_pcie *pcie)
 	return pcie->rescal ? brcm_phy_cntl(pcie, 1) : 0;
 }
 
-static inline int brcm_phy_stop(struct brcm_pcie *pcie)
+static inline void brcm_phy_stop(struct brcm_pcie *pcie)
 {
-	return pcie->rescal ? brcm_phy_cntl(pcie, 0) : 0;
+	if (pcie->rescal)
+		brcm_phy_cntl(pcie, 0);
 }
 
 static void brcm_pcie_turn_off(struct brcm_pcie *pcie)
@@ -1141,16 +1168,45 @@ static void brcm_pcie_turn_off(struct brcm_pcie *pcie)
 	pcie->bridge_sw_init_set(pcie, 1);
 }
 
+static int brcm_pcie_get_regulators(struct brcm_pcie *pcie)
+{
+	struct device_node *np = pcie->np;
+	struct property *pp;
+	const unsigned int ns = ARRAY_SIZE(supplies);
+	unsigned int i;
+	int ret = 0;
+
+	/* Look for specific pcie regulators in the RC DT node. */
+	for_each_property_of_node(np, pp) {
+		for (i = 0; i < ns; i++)
+			if (strcmp(supplies[i], pp->name) == 0)
+				break;
+		if (i >= ns)
+			continue;
+
+		if (pcie->num_supplies < PCIE_BRCM_MAX_EP_REGULATORS)
+			pcie->supplies[pcie->num_supplies++].supply
+				= supplies[i];
+		else
+			dev_warn(pcie->dev, "No room for supply %s\n",
+				 supplies[i]);
+	}
+
+	if (pcie->num_supplies)
+		ret = devm_regulator_bulk_get(pcie->dev, pcie->num_supplies,
+					      pcie->supplies);
+	return ret;
+}
+
 static int brcm_pcie_suspend(struct device *dev)
 {
 	struct brcm_pcie *pcie = dev_get_drvdata(dev);
-	int ret;
 
 	brcm_pcie_turn_off(pcie);
-	ret = brcm_phy_stop(pcie);
+	brcm_phy_stop(pcie);
 	clk_disable_unprepare(pcie->clk);
 
-	return ret;
+	return brcm_set_regulators(pcie, false);
 }
 
 static int brcm_pcie_resume(struct device *dev)
@@ -1162,6 +1218,10 @@ static int brcm_pcie_resume(struct device *dev)
 
 	base = pcie->base;
 	ret = clk_prepare_enable(pcie->clk);
+	if (ret)
+		return ret;
+
+	ret = brcm_set_regulators(pcie, true);
 	if (ret)
 		return ret;
 
@@ -1201,6 +1261,7 @@ static void __brcm_pcie_remove(struct brcm_pcie *pcie)
 	brcm_phy_stop(pcie);
 	reset_control_assert(pcie->rescal);
 	clk_disable_unprepare(pcie->clk);
+	brcm_set_regulators(pcie, false);
 }
 
 static int brcm_pcie_remove(struct platform_device *pdev)
@@ -1290,6 +1351,18 @@ static int brcm_pcie_probe(struct platform_device *pdev)
 		clk_disable_unprepare(pcie->clk);
 		return ret;
 	}
+
+	ret = brcm_pcie_get_regulators(pcie);
+	if (ret) {
+		pcie->num_supplies = 0;
+		if (ret != -EPROBE_DEFER)
+			dev_err(pcie->dev, "failed to get regulators (err=%d)\n", ret);
+		goto fail;
+	}
+
+	ret = brcm_set_regulators(pcie, true);
+	if (ret)
+		goto fail;
 
 	ret = brcm_pcie_setup(pcie);
 	if (ret)
