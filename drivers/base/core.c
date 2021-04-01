@@ -3415,6 +3415,9 @@ void device_del(struct device *dev)
 	struct class_interface *class_intf;
 	unsigned int noio_flag;
 
+	if (!dev->p)
+		return;
+
 	device_lock(dev);
 	kill_device(dev);
 	device_unlock(dev);
