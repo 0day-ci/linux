@@ -5835,6 +5835,7 @@ int stmmac_dvr_probe(struct device *device,
 	if (priv->plat->speed_mode_2500) {
 		priv->plat->speed_2500_en = priv->plat->speed_mode_2500(ndev,
 									priv->plat->bsp_priv);
+		priv->hw->xpcs_args.speed_2500_en = priv->plat->speed_2500_en;
 	}
 
 	ret = stmmac_phy_setup(priv);
