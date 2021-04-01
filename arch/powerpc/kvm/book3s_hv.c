@@ -1403,11 +1403,20 @@ static int kvmppc_handle_exit_hv(struct kvm_vcpu *vcpu,
 		int i;
 
 		if (unlikely(vcpu->arch.shregs.msr & MSR_PR)) {
-			/*
-			 * Guest userspace executed sc 1, reflect it back as a
-			 * syscall as it may be a PR KVM hcall.
-			 */
-			kvmppc_core_queue_syscall(vcpu);
+			if (!kvmhv_vcpu_is_radix(vcpu)) {
+				/*
+				 * Guest userspace executed sc 1, reflect it
+				 * back as a syscall as it may be a PR KVM
+				 * hcall.
+				 */
+				kvmppc_core_queue_syscall(vcpu);
+			} else {
+				/*
+				 * radix guests can not run PR KVM so send a
+				 * program check.
+				 */
+				kvmppc_core_queue_program(vcpu, SRR1_PROGPRIV);
+			}
 			r = RESUME_GUEST;
 			break;
 		}
