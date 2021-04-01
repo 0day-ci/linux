@@ -4,6 +4,7 @@
 #include <asm/asm-prototypes.h>
 #include <asm/dbell.h>
 #include <asm/kvm_ppc.h>
+#include <asm/ppc-opcode.h>
 
 #ifdef CONFIG_KVM_BOOK3S_HV_EXIT_TIMING
 static void __start_timing(struct kvm_vcpu *vcpu, struct kvmhv_tb_accumulator *next)
@@ -55,6 +56,50 @@ static void __accumulate_time(struct kvm_vcpu *vcpu, struct kvmhv_tb_accumulator
 #define accumulate_time(vcpu, next) do {} while (0)
 #endif
 
+static inline void mfslb(unsigned int idx, u64 *slbee, u64 *slbev)
+{
+	asm volatile("slbmfev  %0,%1" : "=r" (*slbev) : "r" (idx));
+	asm volatile("slbmfee  %0,%1" : "=r" (*slbee) : "r" (idx));
+}
+
+static inline void __mtslb(u64 slbee, u64 slbev)
+{
+	asm volatile("slbmte %0,%1" :: "r" (slbev), "r" (slbee));
+}
+
+static inline void mtslb(unsigned int idx, u64 slbee, u64 slbev)
+{
+	BUG_ON((slbee & 0xfff) != idx);
+
+	__mtslb(slbee, slbev);
+}
+
+static inline void slb_invalidate(unsigned int ih)
+{
+	asm volatile(PPC_SLBIA(%0) :: "i"(ih));
+}
+
+/*
+ * Malicious or buggy radix guests may have inserted SLB entries
+ * (only 0..3 because radix always runs with UPRT=1), so these must
+ * be cleared here to avoid side-channels. slbmte is used rather
+ * than slbia, as it won't clear cached translations.
+ */
+static void radix_clear_slb(void)
+{
+	u64 slbee, slbev;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		mfslb(i, &slbee, &slbev);
+		if (unlikely(slbee || slbev)) {
+			slbee = i;
+			slbev = 0;
+			mtslb(i, slbee, slbev);
+		}
+	}
+}
+
 static void switch_mmu_to_guest_radix(struct kvm *kvm, struct kvm_vcpu *vcpu, u64 lpcr)
 {
 	struct kvmppc_vcore *vc = vcpu->arch.vcore;
@@ -80,6 +125,31 @@ static void switch_mmu_to_guest_radix(struct kvm *kvm, struct kvm_vcpu *vcpu, u6
 	kvmppc_check_need_tlb_flush(kvm, vc->pcpu, nested);
 }
 
+static void switch_mmu_to_guest_hpt(struct kvm *kvm, struct kvm_vcpu *vcpu, u64 lpcr)
+{
+	struct kvm_nested_guest *nested = vcpu->arch.nested;
+	u32 lpid;
+	int i;
+
+	BUG_ON(nested);
+
+	lpid = kvm->arch.lpid;
+
+	mtspr(SPRN_LPID, lpid);
+	mtspr(SPRN_LPCR, lpcr);
+	mtspr(SPRN_PID, vcpu->arch.pid);
+
+	for (i = 0; i < vcpu->arch.slb_max; i++)
+		__mtslb(vcpu->arch.slb[i].orige, vcpu->arch.slb[i].origv);
+
+	isync();
+
+	/*
+	 * TLBIEL is not virtualised for HPT guests, so check_need_tlb_flush
+	 * is not required here.
+	 */
+}
+
 static void switch_mmu_to_host_radix(struct kvm *kvm, u32 pid)
 {
 	isync();
@@ -91,37 +161,30 @@ static void switch_mmu_to_host_radix(struct kvm *kvm, u32 pid)
 	isync();
 }
 
-static inline void mfslb(unsigned int idx, u64 *slbee, u64 *slbev)
+static void save_clear_guest_mmu(struct kvm *kvm, struct kvm_vcpu *vcpu)
 {
-	asm volatile("slbmfev  %0,%1" : "=r" (*slbev) : "r" (idx));
-	asm volatile("slbmfee  %0,%1" : "=r" (*slbee) : "r" (idx));
-}
+	if (kvm_is_radix(kvm)) {
+		radix_clear_slb();
+	} else {
+		int i;
+		int nr = 0;
 
-static inline void mtslb(unsigned int idx, u64 slbee, u64 slbev)
-{
-	BUG_ON((slbee & 0xfff) != idx);
-
-	asm volatile("slbmte %0,%1" :: "r" (slbev), "r" (slbee));
-}
-
-/*
- * Malicious or buggy radix guests may have inserted SLB entries
- * (only 0..3 because radix always runs with UPRT=1), so these must
- * be cleared here to avoid side-channels. slbmte is used rather
- * than slbia, as it won't clear cached translations.
- */
-static void radix_clear_slb(void)
-{
-	u64 slbee, slbev;
-	int i;
-
-	for (i = 0; i < 4; i++) {
-		mfslb(i, &slbee, &slbev);
-		if (unlikely(slbee || slbev)) {
-			slbee = i;
-			slbev = 0;
-			mtslb(i, slbee, slbev);
+		/*
+		 * This must run before switching to host (radix host can't
+		 * access all SLBs).
+		 */
+		for (i = 0; i < vcpu->arch.slb_nr; i++) {
+			u64 slbee, slbev;
+			mfslb(i, &slbee, &slbev);
+			if (slbee & SLB_ESID_V) {
+				vcpu->arch.slb[nr].orige = slbee | i;
+				vcpu->arch.slb[nr].origv = slbev;
+				nr++;
+			}
 		}
+		vcpu->arch.slb_max = nr;
+		mtslb(0, 0, 0);
+		slb_invalidate(6);
 	}
 }
 
@@ -229,19 +292,24 @@ int kvmhv_vcpu_entry_p9(struct kvm_vcpu *vcpu, u64 time_limit, unsigned long lpc
 
 	mtspr(SPRN_AMOR, ~0UL);
 
-	if (cpu_has_feature(CPU_FTR_P9_RADIX_PREFETCH_BUG))
-		__mtmsrd(msr & ~(MSR_IR|MSR_DR|MSR_RI), 0);
+	local_paca->kvm_hstate.in_guest = KVM_GUEST_MODE_GUEST_HV_FAST;
+	if (kvm_is_radix(kvm)) {
+		if (cpu_has_feature(CPU_FTR_P9_RADIX_PREFETCH_BUG))
+			__mtmsrd(msr & ~(MSR_IR|MSR_DR|MSR_RI), 0);
+		switch_mmu_to_guest_radix(kvm, vcpu, lpcr);
+		if (!cpu_has_feature(CPU_FTR_P9_RADIX_PREFETCH_BUG))
+			__mtmsrd(0, 1); /* clear RI */
 
-	switch_mmu_to_guest_radix(kvm, vcpu, lpcr);
+	} else {
+		__mtmsrd(msr & ~(MSR_IR|MSR_DR|MSR_RI), 0);
+		switch_mmu_to_guest_hpt(kvm, vcpu, lpcr);
+	}
 
 	/*
 	 * P9 suppresses the HDEC exception when LPCR[HDICE] = 0,
 	 * so set guest LPCR (with HDICE) before writing HDEC.
 	 */
 	mtspr(SPRN_HDEC, hdec);
-
-	if (!cpu_has_feature(CPU_FTR_P9_RADIX_PREFETCH_BUG))
-		__mtmsrd(0, 1); /* clear RI */
 
 	mtspr(SPRN_DAR, vcpu->arch.shregs.dar);
 	mtspr(SPRN_DSISR, vcpu->arch.shregs.dsisr);
@@ -250,10 +318,7 @@ int kvmhv_vcpu_entry_p9(struct kvm_vcpu *vcpu, u64 time_limit, unsigned long lpc
 
 	accumulate_time(vcpu, &vcpu->arch.guest_time);
 
-	local_paca->kvm_hstate.in_guest = KVM_GUEST_MODE_GUEST_HV_FAST;
 	kvmppc_p9_enter_guest(vcpu);
-	// Radix host and guest means host never runs with guest MMU state
-	local_paca->kvm_hstate.in_guest = KVM_GUEST_MODE_NONE;
 
 	accumulate_time(vcpu, &vcpu->arch.rm_intr);
 
@@ -354,8 +419,6 @@ int kvmhv_vcpu_entry_p9(struct kvm_vcpu *vcpu, u64 time_limit, unsigned long lpc
 #endif
 	}
 
-	radix_clear_slb();
-
 	accumulate_time(vcpu, &vcpu->arch.rm_exit);
 
 	/* Advance host PURR/SPURR by the amount used by guest */
@@ -389,11 +452,14 @@ int kvmhv_vcpu_entry_p9(struct kvm_vcpu *vcpu, u64 time_limit, unsigned long lpc
 		mtspr(SPRN_DAWRX1, host_dawrx1);
 	}
 
-	/*
-	 * Since this is radix, do a eieio; tlbsync; ptesync sequence in
-	 * case we interrupted the guest between a tlbie and a ptesync.
-	 */
-	asm volatile("eieio; tlbsync; ptesync");
+	if (kvm_is_radix(kvm)) {
+		/*
+		 * Since this is radix, do a eieio; tlbsync; ptesync sequence
+		 * in case we interrupted the guest between a tlbie and a
+		 * ptesync.
+		 */
+		asm volatile("eieio; tlbsync; ptesync");
+	}
 
 	/*
 	 * cp_abort is required if the processor supports local copy-paste
@@ -420,7 +486,9 @@ int kvmhv_vcpu_entry_p9(struct kvm_vcpu *vcpu, u64 time_limit, unsigned long lpc
 	/* HDEC must be at least as large as DEC, so decrementer_max fits */
 	mtspr(SPRN_HDEC, decrementer_max);
 
+	save_clear_guest_mmu(kvm, vcpu);
 	switch_mmu_to_host_radix(kvm, host_pidr);
+	local_paca->kvm_hstate.in_guest = KVM_GUEST_MODE_NONE;
 
 	/*
 	 * If we are in real mode, only switch MMU on after the MMU is
