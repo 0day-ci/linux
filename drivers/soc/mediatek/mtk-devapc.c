@@ -32,9 +32,6 @@ struct mtk_devapc_vio_dbgs {
 };
 
 struct mtk_devapc_data {
-	/* numbers of violation index */
-	u32 vio_idx_num;
-
 	/* reg offset */
 	u32 vio_mask_offset;
 	u32 vio_sta_offset;
@@ -49,6 +46,7 @@ struct mtk_devapc_data {
 struct mtk_devapc_context {
 	struct device *dev;
 	void __iomem *infra_base;
+	u32 vio_idx_num;
 	struct clk *infra_clk;
 	const struct mtk_devapc_data *data;
 };
@@ -60,10 +58,10 @@ static void clear_vio_status(struct mtk_devapc_context *ctx)
 
 	reg = ctx->infra_base + ctx->data->vio_sta_offset;
 
-	for (i = 0; i < VIO_MOD_TO_REG_IND(ctx->data->vio_idx_num) - 1; i++)
+	for (i = 0; i < VIO_MOD_TO_REG_IND(ctx->vio_idx_num - 1); i++)
 		writel(GENMASK(31, 0), reg + 4 * i);
 
-	writel(GENMASK(VIO_MOD_TO_REG_OFF(ctx->data->vio_idx_num) - 1, 0),
+	writel(GENMASK(VIO_MOD_TO_REG_OFF(ctx->vio_idx_num - 1), 0),
 	       reg + 4 * i);
 }
 
@@ -80,15 +78,15 @@ static void mask_module_irq(struct mtk_devapc_context *ctx, bool mask)
 	else
 		val = 0;
 
-	for (i = 0; i < VIO_MOD_TO_REG_IND(ctx->data->vio_idx_num) - 1; i++)
+	for (i = 0; i < VIO_MOD_TO_REG_IND(ctx->vio_idx_num - 1); i++)
 		writel(val, reg + 4 * i);
 
 	val = readl(reg + 4 * i);
 	if (mask)
-		val |= GENMASK(VIO_MOD_TO_REG_OFF(ctx->data->vio_idx_num) - 1,
+		val |= GENMASK(VIO_MOD_TO_REG_OFF(ctx->vio_idx_num - 1),
 			       0);
 	else
-		val &= ~GENMASK(VIO_MOD_TO_REG_OFF(ctx->data->vio_idx_num) - 1,
+		val &= ~GENMASK(VIO_MOD_TO_REG_OFF(ctx->vio_idx_num - 1),
 				0);
 
 	writel(val, reg + 4 * i);
@@ -216,7 +214,6 @@ static void stop_devapc(struct mtk_devapc_context *ctx)
 }
 
 static const struct mtk_devapc_data devapc_mt6779 = {
-	.vio_idx_num = 511,
 	.vio_mask_offset = 0x0,
 	.vio_sta_offset = 0x400,
 	.vio_dbg0_offset = 0x900,
@@ -254,6 +251,9 @@ static int mtk_devapc_probe(struct platform_device *pdev)
 
 	ctx->infra_base = of_iomap(node, 0);
 	if (!ctx->infra_base)
+		return -EINVAL;
+
+	if (of_property_read_u32(node, "vio_idx_num", &ctx->vio_idx_num))
 		return -EINVAL;
 
 	devapc_irq = irq_of_parse_and_map(node, 0);
