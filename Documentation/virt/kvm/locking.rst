@@ -16,6 +16,13 @@ The acquisition orders for mutexes are as follows:
 - kvm->slots_lock is taken outside kvm->irq_lock, though acquiring
   them together is quite rare.
 
+- The kvm->mmu_notifier_slots_lock rwsem ensures that pairs of
+  invalidate_range_start() and invalidate_range_end() callbacks
+  use the same memslots array.  kvm->slots_lock is taken outside the
+  write-side critical section of kvm->mmu_notifier_slots_lock, so
+  MMU notifiers must not take kvm->slots_lock.  No other write-side
+  critical sections should be added.
+
 On x86:
 
 - vcpu->mutex is taken outside kvm->arch.hyperv.hv_lock
