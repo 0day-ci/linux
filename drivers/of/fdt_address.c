@@ -19,8 +19,10 @@
 
 /* Max address size we deal with */
 #define OF_MAX_ADDR_CELLS	4
-#define OF_CHECK_COUNTS(na, ns)	((na) > 0 && (na) <= OF_MAX_ADDR_CELLS && \
-			(ns) > 0)
+#define OF_CHECK_COUNTS(na, ns)						\
+	((na) > 0 && (na) <= OF_MAX_ADDR_CELLS &&			\
+	 ((ns) > 0 || (IS_ENABLED(CONFIG_OF_TRANSLATE_ZERO_SIZE_CELLS) && \
+		       (ns) == 0)))
 
 /* Debug utility */
 #ifdef DEBUG

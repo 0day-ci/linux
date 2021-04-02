@@ -100,4 +100,17 @@ config OF_DMA_DEFAULT_COHERENT
 	# arches should select this if DMA is coherent by default for OF devices
 	bool
 
+
+config OF_TRANSLATE_ZERO_SIZE_CELLS
+	bool "Enable translation for zero size cells"
+	depends on OF_EARLY_FLATTREE || OF_ADDRESS
+	default y if SOC_AM33XX
+	help
+	  The routine used to translate an FDT address into a physical CPU
+	  address was developed by IBM. It considers that crossing any level
+	  with #size-cells = <0> makes translation impossible, even if it is
+	  not the way it was specified.
+	  Enabling this option makes translation possible even in the case
+	  of crossing levels with #size-cells = <0>.
+
 endif # OF

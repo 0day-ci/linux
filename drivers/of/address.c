@@ -20,7 +20,10 @@
 /* Max address size we deal with */
 #define OF_MAX_ADDR_CELLS	4
 #define OF_CHECK_ADDR_COUNT(na)	((na) > 0 && (na) <= OF_MAX_ADDR_CELLS)
-#define OF_CHECK_COUNTS(na, ns)	(OF_CHECK_ADDR_COUNT(na) && (ns) > 0)
+#define OF_CHECK_COUNTS(na, ns)						\
+	(OF_CHECK_ADDR_COUNT(na) &&					\
+	 ((ns) > 0 || (IS_ENABLED(CONFIG_OF_TRANSLATE_ZERO_SIZE_CELLS) && \
+		      (ns) == 0)))
 
 static struct of_bus *of_match_bus(struct device_node *np);
 static int __of_address_to_resource(struct device_node *dev,
@@ -420,6 +423,9 @@ static struct of_bus *of_match_bus(struct device_node *np)
 
 static int of_empty_ranges_quirk(struct device_node *np)
 {
+	if (IS_ENABLED(CONFIG_OF_TRANSLATE_ZERO_SIZE_CELLS))
+		return true;
+
 	if (IS_ENABLED(CONFIG_PPC)) {
 		/* To save cycles, we cache the result for global "Mac" setting */
 		static int quirk_state = -1;
