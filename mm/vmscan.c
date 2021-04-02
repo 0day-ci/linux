@@ -702,7 +702,7 @@ void drop_slab_node(int nid)
 			return;
 
 		freed = 0;
-		memcg = mem_cgroup_iter(NULL, NULL, NULL);
+		memcg = mem_cgroup_from_task(current);
 		do {
 			freed += shrink_slab(GFP_KERNEL, nid, memcg, 0);
 		} while ((memcg = mem_cgroup_iter(NULL, memcg, NULL)) != NULL);
