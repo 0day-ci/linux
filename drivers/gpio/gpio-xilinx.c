@@ -18,6 +18,7 @@
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
+#include "gpiolib.h"
 
 /* Register Offset Definitions */
 #define XGPIO_DATA_OFFSET   (0x0)	/* Data register  */
@@ -161,37 +162,36 @@ static void xgpio_set_multiple(struct gpio_chip *gc, unsigned long *mask,
 {
 	unsigned long flags;
 	struct xgpio_instance *chip = gpiochip_get_data(gc);
-	int index = xgpio_index(chip, 0);
-	int offset, i;
 
-	spin_lock_irqsave(&chip->gpio_lock, flags);
+    u32 *state = chip->gpio_state;
+    unsigned int *width = chip->gpio_width;
+    DECLARE_BITMAP(old, 64);
+    DECLARE_BITMAP(new, 64);
+    DECLARE_BITMAP(changed, 64);
 
-	/* Write to GPIO signals */
-	for (i = 0; i < gc->ngpio; i++) {
-		if (*mask == 0)
-			break;
-		/* Once finished with an index write it out to the register */
-		if (index !=  xgpio_index(chip, i)) {
-			xgpio_writereg(chip->regs + XGPIO_DATA_OFFSET +
-				       index * XGPIO_CHANNEL_OFFSET,
-				       chip->gpio_state[index]);
-			spin_unlock_irqrestore(&chip->gpio_lock, flags);
-			index =  xgpio_index(chip, i);
-			spin_lock_irqsave(&chip->gpio_lock, flags);
-		}
-		if (__test_and_clear_bit(i, mask)) {
-			offset =  xgpio_offset(chip, i);
-			if (test_bit(i, bits))
-				chip->gpio_state[index] |= BIT(offset);
-			else
-				chip->gpio_state[index] &= ~BIT(offset);
-		}
-	}
+    spin_lock_irqsave(&chip->gpio_lock, flags);
 
-	xgpio_writereg(chip->regs + XGPIO_DATA_OFFSET +
-		       index * XGPIO_CHANNEL_OFFSET, chip->gpio_state[index]);
+    /* Copy initial value of state bits into 'old' bit-wise */
+    bitmap_set_value(old, 64, state[0], width[0], 0);
+    bitmap_set_value(old, 64, state[1], width[1], width[0]);
+    /* Copy value from 'old' into 'new' with mask applied */
+    bitmap_replace(new, old, bits, mask, gc->ngpio);
 
-	spin_unlock_irqrestore(&chip->gpio_lock, flags);
+    bitmap_from_arr32(old, state, 64);
+    /* Update 'state' */
+    state[0] = bitmap_get_value(new, 0, width[0]);
+    state[1] = bitmap_get_value(new, width[0], width[1]);
+    bitmap_from_arr32(new, state, 64);
+    /* XOR operation sets only changed bits */
+    bitmap_xor(changed, old, new, 64);
+
+    if (((u32 *)changed)[0])
+        xgpio_writereg(chip->regs + XGPIO_DATA_OFFSET, state[0]);
+    if (((u32 *)changed)[1])
+        xgpio_writereg(chip->regs + XGPIO_DATA_OFFSET +
+                XGPIO_CHANNEL_OFFSET, state[1]);
+
+    spin_unlock_irqrestore(&chip->gpio_lock, flags);
 }
 
 /**
