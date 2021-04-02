@@ -175,7 +175,8 @@ static int __cpuidle_cooling_register(struct device_node *np,
 	struct cpuidle_cooling_device *idle_cdev;
 	struct thermal_cooling_device *cdev;
 	unsigned int idle_duration_us = TICK_USEC;
-	unsigned int latency_us = UINT_MAX;
+	unsigned int latency_us = 0;
+	unsigned int residency_us = UINT_MAX;
 	char dev_name[THERMAL_NAME_LENGTH];
 	int id, ret;
 
@@ -199,6 +200,11 @@ static int __cpuidle_cooling_register(struct device_node *np,
 
 	of_property_read_u32(np, "duration-us", &idle_duration_us);
 	of_property_read_u32(np, "exit-latency-us", &latency_us);
+	of_property_read_u32(np, "min-residency-us", &residency_us);
+	if (idle_duration_us <= residency_us) {
+		ret = -EINVAL;
+		goto out_unregister;
+	}
 
 	idle_inject_set_duration(ii_dev, TICK_USEC, idle_duration_us);
 	idle_inject_set_latency(ii_dev, latency_us);
