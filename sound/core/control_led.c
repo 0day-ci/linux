@@ -715,7 +715,7 @@ static struct snd_ctl_layer_ops snd_ctl_led_lops = {
 static int __init snd_ctl_led_init(void)
 {
 	struct snd_ctl_led *led;
-	unsigned int group;
+	int group;
 
 	device_initialize(&snd_ctl_led_dev);
 	snd_ctl_led_dev.class = sound_class;
@@ -733,7 +733,7 @@ static int __init snd_ctl_led_init(void)
 		dev_set_name(&led->dev, led->name);
 		if (device_add(&led->dev)) {
 			put_device(&led->dev);
-			for (; group > 0; group--) {
+			for (; group >= 0; group--) {
 				led = &snd_ctl_leds[group];
 				device_del(&led->dev);
 			}
