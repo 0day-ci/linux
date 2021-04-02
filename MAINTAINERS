@@ -12856,9 +12856,11 @@ NXP i.MX 8M(M|N|P) POWER DOMAIN DRIVER
 M:	Adrien Grassein <adrien.grassein@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/power/fsl,imx-power-domain.yaml
+F:	drivers/soc/imx/imx8m_pm_domains.c
 F:	include/dt-bindings/power/imx8mm-power.h
 F:	include/dt-bindings/power/imx8mn-power.h
 F:	include/dt-bindings/power/imx8mp-power.h
+F:	include/soc/imx/imx_sip.h
 
 NXP i.MX 8MQ DCSS DRIVER
 M:	Laurentiu Palcu <laurentiu.palcu@oss.nxp.com>
