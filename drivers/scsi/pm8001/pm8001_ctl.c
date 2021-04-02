@@ -371,7 +371,7 @@ static ssize_t pm8001_ctl_aap_log_show(struct device *cdev,
 	struct pm8001_hba_info *pm8001_ha = sha->lldd_ha;
 	int i;
 #define AAP1_MEMMAP(r, c) \
-	(*(u32 *)((u8*)pm8001_ha->memoryMap.region[AAP1].virt_ptr + (r) * 32 \
+	(*(u32 *)((u8 *)pm8001_ha->memoryMap.region[AAP1].virt_ptr + (r) * 32 \
 	+ (c)))
 
 	char *str = buf;
