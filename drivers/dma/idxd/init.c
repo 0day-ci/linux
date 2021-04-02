@@ -21,6 +21,7 @@
 #include "../dmaengine.h"
 #include "registers.h"
 #include "idxd.h"
+#include "perfmon.h"
 
 MODULE_VERSION(IDXD_DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");
@@ -378,6 +379,10 @@ static int idxd_probe(struct idxd_device *idxd)
 
 	idxd->major = idxd_cdev_get_major(idxd);
 
+	rc = perfmon_pmu_init(idxd);
+	if (rc < 0)
+		dev_warn(dev, "Failed to initialize perfmon. No PMU support: %d\n", rc);
+
 	dev_dbg(dev, "IDXD device %d probed successfully\n", idxd->id);
 	return 0;
 
@@ -522,6 +527,7 @@ static void idxd_remove(struct pci_dev *pdev)
 	idxd_shutdown(pdev);
 	if (device_pasid_enabled(idxd))
 		idxd_disable_system_pasid(idxd);
+	perfmon_pmu_remove(idxd);
 	mutex_lock(&idxd_idr_lock);
 	idr_remove(&idxd_idrs[idxd->type], idxd->id);
 	mutex_unlock(&idxd_idr_lock);
@@ -556,6 +562,8 @@ static int __init idxd_init_module(void)
 	for (i = 0; i < IDXD_TYPE_MAX; i++)
 		idr_init(&idxd_idrs[i]);
 
+	perfmon_init();
+
 	err = idxd_register_bus_type();
 	if (err < 0)
 		return err;
@@ -589,5 +597,6 @@ static void __exit idxd_exit_module(void)
 	pci_unregister_driver(&idxd_pci_driver);
 	idxd_cdev_remove();
 	idxd_unregister_bus_type();
+	perfmon_exit();
 }
 module_exit(idxd_exit_module);
