@@ -11093,6 +11093,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
 	return ret;
 }
 
+static bool perf_event_is_hw_pmu_type(struct perf_event *event)
+{
+	int type = event->attr.type;
+
+	return type == PERF_TYPE_HARDWARE_PMU ||
+	       type == PERF_TYPE_HW_CACHE_PMU;
+}
+
 static struct pmu *perf_init_event(struct perf_event *event)
 {
 	int idx, type, ret;
@@ -11116,13 +11124,17 @@ static struct pmu *perf_init_event(struct perf_event *event)
 	if (type == PERF_TYPE_HARDWARE || type == PERF_TYPE_HW_CACHE)
 		type = PERF_TYPE_RAW;
 
+	if (perf_event_is_hw_pmu_type(event))
+		type = event->attr.config >> PERF_PMU_TYPE_SHIFT;
+
 again:
 	rcu_read_lock();
 	pmu = idr_find(&pmu_idr, type);
 	rcu_read_unlock();
 	if (pmu) {
 		ret = perf_try_init_event(pmu, event);
-		if (ret == -ENOENT && event->attr.type != type) {
+		if (ret == -ENOENT && event->attr.type != type &&
+		    !perf_event_is_hw_pmu_type(event)) {
 			type = event->attr.type;
 			goto again;
 		}
