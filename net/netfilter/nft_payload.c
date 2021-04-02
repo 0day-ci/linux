@@ -229,7 +229,7 @@ static int nft_payload_offload_ll(struct nft_offload_ctx *ctx,
 		NFT_OFFLOAD_MATCH(FLOW_DISSECTOR_KEY_VLAN, vlan,
 				  vlan_tci, sizeof(__be16), reg);
 		break;
-	case offsetof(struct vlan_ethhdr, h_vlan_encapsulated_proto):
+	case offsetof(struct vlan_ethhdr, h_vlan_proto):
 		if (!nft_payload_offload_mask(reg, priv->len, sizeof(__be16)))
 			return -EOPNOTSUPP;
 
@@ -244,7 +244,7 @@ static int nft_payload_offload_ll(struct nft_offload_ctx *ctx,
 		NFT_OFFLOAD_MATCH(FLOW_DISSECTOR_KEY_CVLAN, vlan,
 				  vlan_tci, sizeof(__be16), reg);
 		break;
-	case offsetof(struct vlan_ethhdr, h_vlan_encapsulated_proto) +
+	case offsetof(struct vlan_ethhdr, h_vlan_proto) +
 							sizeof(struct vlan_hdr):
 		if (!nft_payload_offload_mask(reg, priv->len, sizeof(__be16)))
 			return -EOPNOTSUPP;
