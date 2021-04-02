@@ -55,6 +55,74 @@ module_param(inter_copy_offload_enable, bool, 0644);
 MODULE_PARM_DESC(inter_copy_offload_enable,
 		 "Enable inter server to server copy offload. Default: false");
 
+#ifdef CONFIG_NFSD_V4_2_INTER_SSC
+static int nfsd4_ssc_umount_timeout = 900000;		/* default to 15 mins */
+module_param(nfsd4_ssc_umount_timeout, int, 0644);
+MODULE_PARM_DESC(nfsd4_ssc_umount_timeout,
+		"idle msecs before unmount export from source server");
+
+static void nfsd4_ssc_expire_umount(struct work_struct *work);
+static struct nfsd4_ssc_umount nfsd4_ssc_umount;
+
+/* nfsd4_ssc_umount.nsu_lock must be held */
+static void nfsd4_scc_update_umnt_timo(void)
+{
+	struct nfsd4_ssc_umount_item *ni = 0;
+
+	if (!list_empty(&nfsd4_ssc_umount.nsu_list)) {
+		ni = list_first_entry(&nfsd4_ssc_umount.nsu_list,
+			struct nfsd4_ssc_umount_item, nsui_list);
+		nfsd4_ssc_umount.nsu_expire = ni->nsui_expire;
+		schedule_delayed_work(&nfsd4_ssc_umount.nsu_umount_work,
+			ni->nsui_expire - jiffies);
+	} else
+		nfsd4_ssc_umount.nsu_expire = 0;
+}
+
+static void nfsd4_ssc_expire_umount(struct work_struct *work)
+{
+	struct nfsd4_ssc_umount_item *ni = 0;
+	struct nfsd4_ssc_umount_item *tmp;
+
+	down_write(&nfsd4_ssc_umount.nsu_sem);
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list, nsui_list) {
+		if (time_after(jiffies, ni->nsui_expire)) {
+			list_del(&ni->nsui_list);
+			cancel_delayed_work(&nfsd4_ssc_umount.nsu_umount_work);
+			spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+			up_write(&nfsd4_ssc_umount.nsu_sem);
+
+			mntput(ni->nsui_vfsmount);
+			kfree(ni);
+
+			down_write(&nfsd4_ssc_umount.nsu_sem);
+			spin_lock(&nfsd4_ssc_umount.nsu_lock);
+			continue;
+		}
+		break;
+	}
+	nfsd4_scc_update_umnt_timo();
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+	up_write(&nfsd4_ssc_umount.nsu_sem);
+}
+
+static DECLARE_DELAYED_WORK(nfsd4, nfsd4_ssc_expire_umount);
+
+void nfsd4_ssc_init_umount_work(void)
+{
+	if (nfsd4_ssc_umount.nsu_inited)
+		return;
+	INIT_DELAYED_WORK(&nfsd4_ssc_umount.nsu_umount_work,
+		nfsd4_ssc_expire_umount);
+	INIT_LIST_HEAD(&nfsd4_ssc_umount.nsu_list);
+	spin_lock_init(&nfsd4_ssc_umount.nsu_lock);
+	init_rwsem(&nfsd4_ssc_umount.nsu_sem);
+	nfsd4_ssc_umount.nsu_inited = true;
+}
+EXPORT_SYMBOL_GPL(nfsd4_ssc_init_umount_work);
+#endif
+
 #ifdef CONFIG_NFSD_V4_SECURITY_LABEL
 #include <linux/security.h>
 
@@ -1181,6 +1249,8 @@ nfsd4_interssc_connect(struct nl4_server *nss, struct svc_rqst *rqstp,
 	char *ipaddr, *dev_name, *raw_data;
 	int len, raw_len;
 	__be32 status = nfserr_inval;
+	struct nfsd4_ssc_umount_item *ni = 0;
+	struct nfsd4_ssc_umount_item *tmp;
 
 	naddr = &nss->u.nl4_addr;
 	tmp_addrlen = rpc_uaddr2sockaddr(SVC_NET(rqstp), naddr->addr,
@@ -1229,11 +1299,33 @@ nfsd4_interssc_connect(struct nl4_server *nss, struct svc_rqst *rqstp,
 		goto out_free_rawdata;
 	snprintf(dev_name, len + 5, "%s%s%s:/", startsep, ipaddr, endsep);
 
+	/* wait for ssc unmount task */
+	down_read(&nfsd4_ssc_umount.nsu_sem);
+
 	/* Use an 'internal' mount: SB_KERNMOUNT -> MNT_INTERNAL */
 	ss_mnt = vfs_kern_mount(type, SB_KERNMOUNT, dev_name, raw_data);
 	module_put(type->owner);
-	if (IS_ERR(ss_mnt))
+	if (IS_ERR(ss_mnt)) {
+		up_read(&nfsd4_ssc_umount.nsu_sem);
 		goto out_free_devname;
+	}
+
+	 /* delete work entry if it exists */
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list, nsui_list) {
+		if (ni->nsui_vfsmount->mnt_sb != ss_mnt->mnt_sb)
+			continue;
+		list_del(&ni->nsui_list);
+		cancel_delayed_work(&nfsd4_ssc_umount.nsu_umount_work);
+		nfsd4_scc_update_umnt_timo();
+		spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+		mntput(ni->nsui_vfsmount);
+		kfree(ni);
+		goto out_done;
+	}
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+out_done:
+	up_read(&nfsd4_ssc_umount.nsu_sem);
 
 	status = 0;
 	*mount = ss_mnt;
@@ -1301,10 +1393,48 @@ static void
 nfsd4_cleanup_inter_ssc(struct vfsmount *ss_mnt, struct nfsd_file *src,
 			struct nfsd_file *dst)
 {
+	long timeout;
+	struct nfsd4_ssc_umount_item *work, *tmp;
+	struct nfsd4_ssc_umount_item *ni = 0;
+
 	nfs42_ssc_close(src->nf_file);
-	fput(src->nf_file);
 	nfsd_file_put(dst);
-	mntput(ss_mnt);
+	fput(src->nf_file);
+
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
+	if (!work) {
+		mntput(ss_mnt);
+		return;
+	}
+	timeout = msecs_to_jiffies(nfsd4_ssc_umount_timeout);
+	work->nsui_vfsmount = ss_mnt;
+	work->nsui_expire = jiffies + timeout;
+
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	/*
+	 * check if entry for vfsmount->mnt_sb exists, if it does
+	 * then remove it, update expire time and re-insert at tail,
+	 * do the mntput for this call and return. Otherwise create
+	 * new work entry.
+	 */
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list,
+		nsui_list) {
+		if (ni->nsui_vfsmount->mnt_sb == ss_mnt->mnt_sb) {
+			list_del(&ni->nsui_list);
+			mntput(ss_mnt);
+			kfree(work);
+			ni->nsui_expire = jiffies + timeout;
+			work = ni;
+			break;
+		}
+	}
+	list_add_tail(&work->nsui_list, &nfsd4_ssc_umount.nsu_list);
+	if (!nfsd4_ssc_umount.nsu_expire) {
+		nfsd4_ssc_umount.nsu_expire = work->nsui_expire;
+		schedule_delayed_work(&nfsd4_ssc_umount.nsu_umount_work,
+			timeout);
+	}
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
 }
 
 #else /* CONFIG_NFSD_V4_2_INTER_SSC */

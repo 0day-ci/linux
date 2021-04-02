@@ -322,6 +322,9 @@ static int nfsd_startup_generic(int nrservs)
 	ret = nfs4_state_start();
 	if (ret)
 		goto out_file_cache;
+#ifdef CONFIG_NFSD_V4_2_INTER_SSC
+	nfsd4_ssc_init_umount_work();
+#endif
 	return 0;
 
 out_file_cache:
