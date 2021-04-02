@@ -1177,7 +1177,7 @@ static int tegra_channel_host1x_syncpt_init(struct tegra_vi_channel *chan)
 		mw_sp = host1x_syncpt_request(&vi->client, flags);
 		if (!mw_sp) {
 			dev_err(vi->dev, "failed to request memory ack syncpoint\n");
-			host1x_syncpt_free(fs_sp);
+			host1x_syncpt_put(fs_sp);
 			ret = -ENOMEM;
 			goto free_syncpts;
 		}
