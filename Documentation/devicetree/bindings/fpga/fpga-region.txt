@@ -177,6 +177,8 @@ Optional properties:
 	it indicates that the FPGA has already been programmed with this image.
 	If this property is in an overlay targeting a FPGA region, it is a
 	request to program the FPGA with that image.
+- fpga-config-from-dmabuf : boolean, set if the FPGA configured done from the
+	pre-allocated dma-buffer.
 - fpga-bridges : should contain a list of phandles to FPGA Bridges that must be
 	controlled during FPGA programming along with the parent FPGA bridge.
 	This property is optional if the FPGA Manager handles the bridges.
