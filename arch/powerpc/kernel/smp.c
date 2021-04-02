@@ -976,6 +976,13 @@ static bool has_coregroup_support(void)
 	return coregroup_enabled;
 }
 
+static int powerpc_mc_flags(void)
+{
+	if(has_coregroup_support())
+		return SD_SHARE_PKG_RESOURCES;
+	return 0;
+}
+
 static const struct cpumask *cpu_mc_mask(int cpu)
 {
 	return cpu_coregroup_mask(cpu);
@@ -986,7 +993,7 @@ static struct sched_domain_topology_level powerpc_topology[] = {
 	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
 #endif
 	{ shared_cache_mask, powerpc_shared_cache_flags, SD_INIT_NAME(CACHE) },
-	{ cpu_mc_mask, SD_INIT_NAME(MC) },
+	{ cpu_mc_mask, powerpc_mc_flags, SD_INIT_NAME(MC) },
 	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
 	{ NULL, },
 };
