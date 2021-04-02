@@ -101,6 +101,7 @@ struct page {
 			 * 32-bit architectures.
 			 */
 			dma_addr_t dma_addr;
+			unsigned long signature;
 		};
 		struct {	/* slab, slob and slub */
 			union {
