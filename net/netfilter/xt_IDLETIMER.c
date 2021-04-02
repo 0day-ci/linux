@@ -283,18 +283,19 @@ static unsigned int idletimer_tg_target_v1(struct sk_buff *skb,
 	return XT_CONTINUE;
 }
 
-static int idletimer_tg_helper(struct idletimer_tg_info *info)
+static int idletimer_tg_helper(__u32 timeout,
+			       char (*plabel)[MAX_IDLETIMER_LABEL_SIZE])
 {
-	if (info->timeout == 0) {
+	if (timeout == 0) {
 		pr_debug("timeout value is zero\n");
 		return -EINVAL;
 	}
-	if (info->timeout >= INT_MAX / 1000) {
+	if (timeout >= INT_MAX / 1000) {
 		pr_debug("timeout value is too big\n");
 		return -EINVAL;
 	}
-	if (info->label[0] == '\0' ||
-	    strnlen(info->label,
+	if ((*plabel)[0] == '\0' ||
+	    strnlen(*plabel,
 		    MAX_IDLETIMER_LABEL_SIZE) == MAX_IDLETIMER_LABEL_SIZE) {
 		pr_debug("label is empty or not nul-terminated\n");
 		return -EINVAL;
@@ -310,9 +311,8 @@ static int idletimer_tg_checkentry(const struct xt_tgchk_param *par)
 
 	pr_debug("checkentry targinfo%s\n", info->label);
 
-	ret = idletimer_tg_helper(info);
-	if(ret < 0)
-	{
+	ret = idletimer_tg_helper(info->timeout, &info->label);
+	if (ret < 0) {
 		pr_debug("checkentry helper return invalid\n");
 		return -EINVAL;
 	}
@@ -349,9 +349,8 @@ static int idletimer_tg_checkentry_v1(const struct xt_tgchk_param *par)
 	if (info->send_nl_msg)
 		return -EOPNOTSUPP;
 
-	ret = idletimer_tg_helper((struct idletimer_tg_info *)info);
-	if(ret < 0)
-	{
+	ret = idletimer_tg_helper(info->timeout, &info->label);
+	if (ret < 0) {
 		pr_debug("checkentry helper return invalid\n");
 		return -EINVAL;
 	}
