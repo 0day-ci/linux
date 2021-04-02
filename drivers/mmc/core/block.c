@@ -836,7 +836,7 @@ static inline int mmc_blk_part_switch(struct mmc_card *card,
 
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_PART_CONFIG, part_config,
-				 card->ext_csd.part_time);
+				 card->ext_csd.part_time, MMC_CMD_RETRIES);
 		if (ret) {
 			mmc_blk_part_switch_post(card, part_type);
 			return ret;
@@ -1007,7 +1007,7 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BOOT_WP,
 				 card->ext_csd.boot_ro_lock |
 				 EXT_CSD_BOOT_WP_B_PWR_WP_EN,
-				 card->ext_csd.part_time);
+				 card->ext_csd.part_time, MMC_CMD_RETRIES);
 		if (ret)
 			pr_err("%s: Locking boot partition ro until next power on failed: %d\n",
 			       md->disk->disk_name, ret);
@@ -1058,7 +1058,8 @@ static void mmc_blk_issue_discard_rq(struct mmc_queue *mq, struct request *req)
 					 card->erase_arg == MMC_TRIM_ARG ?
 					 INAND_CMD38_ARG_TRIM :
 					 INAND_CMD38_ARG_ERASE,
-					 card->ext_csd.generic_cmd6_time);
+					 card->ext_csd.generic_cmd6_time,
+					 MMC_CMD_RETRIES);
 		}
 		if (!err)
 			err = mmc_erase(card, from, nr, card->erase_arg);
@@ -1100,7 +1101,8 @@ retry:
 				 arg == MMC_SECURE_TRIM1_ARG ?
 				 INAND_CMD38_ARG_SECTRIM1 :
 				 INAND_CMD38_ARG_SECERASE,
-				 card->ext_csd.generic_cmd6_time);
+				 card->ext_csd.generic_cmd6_time,
+				 MMC_CMD_RETRIES);
 		if (err)
 			goto out_retry;
 	}
@@ -1118,7 +1120,8 @@ retry:
 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					 INAND_CMD38_ARG_EXT_CSD,
 					 INAND_CMD38_ARG_SECTRIM2,
-					 card->ext_csd.generic_cmd6_time);
+					 card->ext_csd.generic_cmd6_time,
+					 MMC_CMD_RETRIES);
 			if (err)
 				goto out_retry;
 		}
