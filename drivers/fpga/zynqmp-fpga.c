@@ -66,6 +66,40 @@ static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
 	return ret;
 }
 
+static unsigned long zynqmp_fpga_get_contiguous_size(struct sg_table *sgt)
+{
+	dma_addr_t expected = sg_dma_address(sgt->sgl);
+	unsigned long size = 0;
+	struct scatterlist *s;
+	unsigned int i;
+
+	for_each_sg(sgt->sgl, s, sgt->nents, i) {
+		if (sg_dma_address(s) != expected)
+			break;
+		expected = sg_dma_address(s) + sg_dma_len(s);
+		size += sg_dma_len(s);
+	}
+
+	return size;
+}
+
+static int zynqmp_fpga_ops_write_sg(struct fpga_manager *mgr,
+				    struct sg_table *sgt)
+{
+	struct zynqmp_fpga_priv *priv;
+	unsigned long contig_size;
+	dma_addr_t dma_addr;
+	u32 eemi_flags = 0;
+
+	priv = mgr->priv;
+	dma_addr = sg_dma_address(sgt->sgl);
+	contig_size = zynqmp_fpga_get_contiguous_size(sgt);
+	if (priv->flags & FPGA_MGR_PARTIAL_RECONFIG)
+		eemi_flags |= XILINX_ZYNQMP_PM_FPGA_PARTIAL;
+
+	return zynqmp_pm_fpga_load(dma_addr, contig_size, eemi_flags);
+}
+
 static int zynqmp_fpga_ops_write_complete(struct fpga_manager *mgr,
 					  struct fpga_image_info *info)
 {
@@ -87,6 +121,7 @@ static const struct fpga_manager_ops zynqmp_fpga_ops = {
 	.state = zynqmp_fpga_ops_state,
 	.write_init = zynqmp_fpga_ops_write_init,
 	.write = zynqmp_fpga_ops_write,
+	.write_sg = zynqmp_fpga_ops_write_sg,
 	.write_complete = zynqmp_fpga_ops_write_complete,
 };
 
