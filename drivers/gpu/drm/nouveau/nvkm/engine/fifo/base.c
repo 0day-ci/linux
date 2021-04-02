@@ -95,6 +95,7 @@ nvkm_fifo_chan_inst(struct nvkm_fifo *fifo, u64 inst, unsigned long *rflags)
 	spin_lock_irqsave(&fifo->lock, flags);
 	if ((chan = nvkm_fifo_chan_inst_locked(fifo, inst))) {
 		*rflags = flags;
+		spin_unlock_irqrestore(&fifo->lock, flags);
 		return chan;
 	}
 	spin_unlock_irqrestore(&fifo->lock, flags);
@@ -112,6 +113,7 @@ nvkm_fifo_chan_chid(struct nvkm_fifo *fifo, int chid, unsigned long *rflags)
 			list_del(&chan->head);
 			list_add(&chan->head, &fifo->chan);
 			*rflags = flags;
+			spin_unlock_irqrestore(&fifo->lock, flags);
 			return chan;
 		}
 	}
