@@ -52,6 +52,13 @@ struct sev_device {
 	u8 api_major;
 	u8 api_minor;
 	u8 build;
+
+	/*
+	 * Buffer used for incoming commands whose physical address cannot be
+	 * resolved via __pa(), e.g. stack pointers when CONFIG_VMAP_STACK=y.
+	 * Note, alignment isn't strictly required.
+	 */
+	u8 cmd_buf[] __aligned(8);
 };
 
 int sev_dev_init(struct psp_device *psp);

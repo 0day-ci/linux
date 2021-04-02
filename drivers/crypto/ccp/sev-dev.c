@@ -135,13 +135,14 @@ static int sev_cmd_buffer_len(int cmd)
 	return 0;
 }
 
-static int __sev_do_cmd_locked(int cmd, void *data, int *psp_ret)
+static int __sev_do_cmd_locked(int cmd, void *__data, int *psp_ret)
 {
 	struct psp_device *psp = psp_master;
 	struct sev_device *sev;
 	unsigned int phys_lsb, phys_msb;
 	unsigned int reg, ret = 0;
 	int buf_len;
+	void *data;
 
 	if (!psp || !psp->sev_data)
 		return -ENODEV;
@@ -152,11 +153,21 @@ static int __sev_do_cmd_locked(int cmd, void *data, int *psp_ret)
 	sev = psp->sev_data;
 
 	buf_len = sev_cmd_buffer_len(cmd);
-	if (WARN_ON_ONCE(!!data != !!buf_len))
+	if (WARN_ON_ONCE(!!__data != !!buf_len))
 		return -EINVAL;
 
-	if (WARN_ON_ONCE(data && is_vmalloc_addr(data)))
-		return -EINVAL;
+	if (__data && is_vmalloc_addr(__data)) {
+		/*
+		 * If the incoming buffer is virtually allocated, copy it to
+		 * the driver's scratch buffer as __pa() will not work for such
+		 * addresses, vmalloc_to_page() is not guaranteed to succeed,
+		 * and vmalloc'd data may not be physically contiguous.
+		 */
+		data = sev->cmd_buf;
+		memcpy(data, __data, buf_len);
+	} else {
+		data = __data;
+	}
 
 	/* Get the physical address of the command buffer */
 	phys_lsb = data ? lower_32_bits(__psp_pa(data)) : 0;
@@ -203,6 +214,13 @@ static int __sev_do_cmd_locked(int cmd, void *data, int *psp_ret)
 
 	print_hex_dump_debug("(out): ", DUMP_PREFIX_OFFSET, 16, 2, data,
 			     buf_len, false);
+
+	/*
+	 * Copy potential output from the PSP back to __data.  Do this even on
+	 * failure in case the caller wants to glean something from the error.
+	 */
+	if (__data && data != __data)
+		memcpy(__data, data, buf_len);
 
 	return ret;
 }
@@ -978,9 +996,12 @@ int sev_dev_init(struct psp_device *psp)
 {
 	struct device *dev = psp->dev;
 	struct sev_device *sev;
-	int ret = -ENOMEM;
+	int ret = -ENOMEM, cmd_buf_size = 0, i;
 
-	sev = devm_kzalloc(dev, sizeof(*sev), GFP_KERNEL);
+	for (i = 0; i < SEV_CMD_MAX; i++)
+		cmd_buf_size = max(cmd_buf_size, sev_cmd_buffer_len(i));
+
+	sev = devm_kzalloc(dev, sizeof(*sev) + cmd_buf_size, GFP_KERNEL);
 	if (!sev)
 		goto e_err;
 
