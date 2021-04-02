@@ -9,6 +9,7 @@
 #define _LINUX_FPGA_MGR_H
 
 #include <linux/mutex.h>
+#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 
 struct fpga_manager;
@@ -73,7 +74,7 @@ enum fpga_mgr_states {
 #define FPGA_MGR_ENCRYPTED_BITSTREAM	BIT(2)
 #define FPGA_MGR_BITSTREAM_LSB_FIRST	BIT(3)
 #define FPGA_MGR_COMPRESSED_BITSTREAM	BIT(4)
-
+#define FPGA_MGR_CONFIG_DMA_BUF		BIT(5)
 /**
  * struct fpga_image_info - information specific to a FPGA image
  * @flags: boolean flags as defined above
@@ -167,6 +168,8 @@ struct fpga_compat_id {
 struct fpga_manager {
 	const char *name;
 	struct device dev;
+	struct miscdevice miscdev;
+	struct dma_buf *dmabuf;
 	struct mutex ref_mutex;
 	enum fpga_mgr_states state;
 	struct fpga_compat_id *compat_id;
@@ -204,4 +207,5 @@ struct fpga_manager *devm_fpga_mgr_create(struct device *dev, const char *name,
 					  const struct fpga_manager_ops *mops,
 					  void *priv);
 
+#define FPGA_IOCTL_LOAD_DMA_BUFF	_IOWR('R', 1, __u32)
 #endif /*_LINUX_FPGA_MGR_H */
