@@ -1315,6 +1315,10 @@ octeon_mgmt_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	spin_unlock_irqrestore(&p->tx_list.lock, flags);
 
+	/* Make sure there is no reorder of filling the ring and ringing
+	 * the bell
+	 */
+	wmb();
 	dma_sync_single_for_device(p->dev, p->tx_ring_handle,
 				   ring_size_to_bytes(OCTEON_MGMT_TX_RING_SIZE),
 				   DMA_BIDIRECTIONAL);
