@@ -2194,7 +2194,7 @@ static long __vma_reservation_common(struct hstate *h,
 			return 1;
 	}
 	else
-		return ret < 0 ? ret : 0;
+		return ret;
 }
 
 static long vma_needs_reservation(struct hstate *h,
