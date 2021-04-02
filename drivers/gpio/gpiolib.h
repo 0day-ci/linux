@@ -141,6 +141,34 @@ int gpio_set_debounce_timeout(struct gpio_desc *desc, unsigned int debounce);
 int gpiod_hog(struct gpio_desc *desc, const char *name,
 		unsigned long lflags, enum gpiod_flags dflags);
 
+unsigned long bitmap_get_value(const unsigned long *map,
+				unsigned long start,
+				unsigned long nbits);
+
+void bitmap_set_value(unsigned long *map, unsigned long nbits,
+			unsigned long value, unsigned long value_width,
+			unsigned long start);
+
+unsigned long find_next_clump(unsigned long *clump, const unsigned long *addr,
+				unsigned long size, unsigned long offset,
+				unsigned long clump_size);
+
+#define find_first_clump(clump, bits, size, clump_size) \
+	find_next_clump((clump), (bits), (size), 0, (clump_size))
+
+/**
+ * for_each_set_nbits - iterate over bitmap for each clump with set bits
+ * @start: bit offset to start search and to store the current iteration offset
+ * @clump: location to store copy of current 8-bit clump
+ * @bits: bitmap address to base the search on
+ * @size: bitmap size in number of bits
+ * @clump_size: clump size in bits
+ */
+#define for_each_set_nbits(start, clump, bits, size, clump_size) \
+	for ((start) = find_first_clump(&(clump), (bits), (size), (clump_size)); \
+	     (start) < (size); \
+	     (start) = find_next_clump(&(clump), (bits), (size), (start) + (clump_size), (clump_size)))
+
 /*
  * Return the GPIO number of the passed descriptor relative to its chip
  */
