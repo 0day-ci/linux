@@ -47,7 +47,7 @@ static int __init aoe_iflist_setup(char *str)
 __setup("aoe_iflist=", aoe_iflist_setup);
 #endif
 
-static spinlock_t txlock;
+static DEFINE_SPINLOCK(txlock);
 static struct sk_buff_head skbtxq;
 
 /* enters with txlock held */
@@ -201,7 +201,6 @@ aoenet_init(void)
 {
 	skb_queue_head_init(&skbtxq);
 	init_waitqueue_head(&txwq);
-	spin_lock_init(&txlock);
 	kts.lock = &txlock;
 	kts.fn = tx;
 	kts.waitq = &txwq;
