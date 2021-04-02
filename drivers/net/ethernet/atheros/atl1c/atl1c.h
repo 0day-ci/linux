@@ -506,6 +506,7 @@ struct atl1c_adapter {
 	struct net_device   *netdev;
 	struct pci_dev      *pdev;
 	struct napi_struct  napi;
+	struct napi_struct  tx_napi;
 	struct page         *rx_page;
 	unsigned int	    rx_page_offset;
 	unsigned int	    rx_frag_size;
@@ -529,6 +530,7 @@ struct atl1c_adapter {
 	u16 link_duplex;
 
 	spinlock_t mdio_lock;
+	spinlock_t irq_mask_lock;
 	atomic_t irq_sem;
 
 	struct work_struct common_task;
