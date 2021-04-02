@@ -265,8 +265,20 @@ int __init ti_clk_retry_init(struct device_node *node, void *user,
 int ti_clk_get_reg_addr(struct device_node *node, int index,
 			struct clk_omap_reg *reg)
 {
+	const __be32 *addrp;
+	u64 size, addr = OF_BAD_ADDR;
+	unsigned int flags;
 	u32 val;
 	int i;
+
+	addrp = of_get_address(node, index, &size, &flags);
+	if (addrp)
+		addr = of_translate_address(node, addrp);
+
+	if (addr != OF_BAD_ADDR) {
+		reg->ptr = ioremap(addr, sizeof(u32));
+		return 0;
+	}
 
 	for (i = 0; i < CLK_MAX_MEMMAPS; i++) {
 		if (clocks_node_ptr[i] == node->parent)
@@ -287,7 +299,6 @@ int ti_clk_get_reg_addr(struct device_node *node, int index,
 
 	reg->offset = val;
 	reg->ptr = NULL;
-
 	return 0;
 }
 
