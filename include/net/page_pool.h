@@ -65,6 +65,8 @@
 #define PP_ALLOC_CACHE_REFILL	64
 #define PP_SIGNATURE		0x20210303
 
+struct xdp_mem_info;
+
 struct pp_alloc_cache {
 	u32 count;
 	void *cache[PP_ALLOC_CACHE_SIZE];
@@ -147,6 +149,8 @@ inline enum dma_data_direction page_pool_get_dma_dir(struct page_pool *pool)
 {
 	return pool->p.dma_dir;
 }
+
+bool page_pool_return_skb_page(void *data);
 
 struct page_pool *page_pool_create(const struct page_pool_params *params);
 
@@ -241,6 +245,15 @@ static inline void page_pool_ring_unlock(struct page_pool *pool)
 		spin_unlock(&pool->ring.producer_lock);
 	else
 		spin_unlock_bh(&pool->ring.producer_lock);
+}
+
+/* Store mem_info on struct page and use it while recycling skb frags */
+static inline
+void page_pool_store_mem_info(struct page *page, struct xdp_mem_info *mem)
+{
+	u32 *xmi = (u32 *)mem;
+
+	set_page_private(page, *xmi);
 }
 
 #endif /* _NET_PAGE_POOL_H */
