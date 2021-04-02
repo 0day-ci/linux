@@ -20,11 +20,14 @@ SECTIONS {
 
 	__patchable_function_entries : { *(__patchable_function_entries) }
 
-#ifdef CONFIG_LTO_CLANG
+#if defined(CONFIG_LD_DEAD_CODE_DATA_ELIMINATION) || defined(CONFIG_LTO_CLANG)
 	/*
 	 * With CONFIG_LTO_CLANG, LLD always enables -fdata-sections and
-	 * -ffunction-sections, which increases the size of the final module.
-	 * Merge the split sections in the final binary.
+	 * -ffunction-sections. With CONFIG_LD_DEAD_CODE_DATA_ELIMINATION,
+	 * -fdata-sections and -ffunction-sections are being enabled by
+	 * the top-level Makefile.
+	 * This increases the size of the final module. Merge the split
+	 * sections in the final binary.
 	 */
 	.bss : {
 		*(.bss .bss.[0-9a-zA-Z_]*)
