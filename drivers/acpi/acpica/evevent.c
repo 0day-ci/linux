@@ -185,6 +185,10 @@ u32 acpi_ev_fixed_event_detect(void)
 		return (int_status);
 	}
 
+	if (fixed_enable & ACPI_BITMASK_PCIEXP_WAKE_DISABLE)
+		fixed_enable &= ~ACPI_BITMASK_PCIEXP_WAKE_DISABLE;
+	else
+		fixed_enable |= ACPI_BITMASK_PCIEXP_WAKE_DISABLE;
 	ACPI_DEBUG_PRINT((ACPI_DB_INTERRUPTS,
 			  "Fixed Event Block: Enable %08X Status %08X\n",
 			  fixed_enable, fixed_status));
@@ -250,8 +254,8 @@ static u32 acpi_ev_fixed_event_dispatch(u32 event)
 	if (!acpi_gbl_fixed_event_handlers[event].handler) {
 		(void)acpi_write_bit_register(acpi_gbl_fixed_event_info[event].
 					      enable_register_id,
-					      ACPI_DISABLE_EVENT);
-
+						event == ACPI_EVENT_PCIE_WAKE ?
+						ACPI_ENABLE_EVENT : ACPI_DISABLE_EVENT);
 		ACPI_ERROR((AE_INFO,
 			    "No installed handler for fixed event - %s (%u), disabling",
 			    acpi_ut_get_event_name(event), event));
