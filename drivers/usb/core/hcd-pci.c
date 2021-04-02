@@ -520,6 +520,11 @@ static int resume_common(struct device *dev, int event)
 
 #ifdef	CONFIG_PM_SLEEP
 
+static int hcd_pci_freeze(struct device *dev)
+{
+	return suspend_common(dev, device_may_wakeup(dev));
+}
+
 static int hcd_pci_suspend(struct device *dev)
 {
 	return suspend_common(dev, device_may_wakeup(dev));
@@ -616,8 +621,8 @@ const struct dev_pm_ops usb_hcd_pci_pm_ops = {
 	.suspend_noirq	= hcd_pci_suspend_noirq,
 	.resume_noirq	= hcd_pci_resume_noirq,
 	.resume		= hcd_pci_resume,
-	.freeze		= check_root_hub_suspended,
-	.freeze_noirq	= check_root_hub_suspended,
+	.freeze		= hcd_pci_freeze,
+	.freeze_noirq	= hcd_pci_freeze,
 	.thaw_noirq	= NULL,
 	.thaw		= NULL,
 	.poweroff	= hcd_pci_suspend,
