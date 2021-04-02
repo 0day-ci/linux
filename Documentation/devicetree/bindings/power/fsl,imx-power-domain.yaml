@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/power/fsl,imx-power-domain.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Freescale i.MX 8mm, 8mn and 8mp Power Domain
+
+maintainers:
+  - Adrien Grassein <adrien.grassein@gmail.com>
+
+description: |+
+  i.MX processors include support for multiple power domains which are used
+  to gate power to one or more peripherals on the processor.
+
+allOf:
+  - $ref: power-domain.yaml#
+
+properties:
+  compatible:
+    enum:
+      - fsl,imx8mm-pm-domain
+      - fsl,imx8mn-pm-domain
+      - fsl,imx8mp-pm-domain
+
+  domain-name:
+    $ref: /schemas/types.yaml#/definitions/string
+    description: |
+      Human readable string with domain name. Will be visible in userspace
+      to let user to distinguish between multiple domains in SoC.
+
+  domain-index:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: |
+      Power domain index. Valid values are defined in
+      include/dt-bindings/power/imx8mm-power.h for i.MX 8mm
+      include/dt-bindings/power/imx8mn-power.h for i.MX 8mn
+      include/dt-bindings/power/imx8mp-power.h for i.MX 8mp
+
+    maxItems: 1
+
+  clocks:
+    description: |
+      A number of phandles to clocks that need to be enabled during domain
+      power-up sequencing to ensure reset propagation into devices located
+      inside this power domain.
+    minItems: 1
+    maxItems: 6
+
+  power-supply:
+    description:
+      A phandle to a supply to enable when powering on the domain.
+
+  fsl,active-wakeup:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Instructs genpd to keep the PM domain powered on.
+
+  fsl,rpm-always-on:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Instructs genpd to always keep the PM domain powered on except
+      for system suspend.
+
+  "#power-domain-cells":
+    const: 0
+
+  power-domains:
+    maxItems: 1
+
+required:
+  - compatible
+  - domain-name
+  - domain-index
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/power/imx8mm-power.h>
+    #include <dt-bindings/clock/imx8mm-clock.h>
+
+    hsiomix_pd: power-domain-hsio {
+        compatible = "fsl,imx8mm-pm-domain";
+        domain-index = <IMX8MM_POWER_DOMAIN_HSIOMIX>;
+        #power-domain-cells = <0>;
+        domain-name = "hsiomix";
+        clocks = <&clk IMX8MM_CLK_USB1_CTRL_ROOT>;
+    };
