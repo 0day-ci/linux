@@ -86,6 +86,9 @@ unsigned int scsi_logging_level;
 EXPORT_SYMBOL(scsi_logging_level);
 #endif
 
+int storage_quiet_discovery = 0;
+EXPORT_SYMBOL(storage_quiet_discovery);
+
 /*
  * Domain for asynchronous system resume operations.  It is marked 'exclusive'
  * to avoid being included in the async_synchronize_full() that is invoked by
@@ -762,6 +765,9 @@ MODULE_LICENSE("GPL");
 
 module_param(scsi_logging_level, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(scsi_logging_level, "a bit mask of logging levels");
+module_param(storage_quiet_discovery, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(storage_quiet_discovery, "If set to 1 will silence SCSI and \
+		ALUA discovery logging on boot");
 
 static int __init init_scsi(void)
 {

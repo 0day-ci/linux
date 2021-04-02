@@ -133,11 +133,16 @@ static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
 	return container_of(disk->private_data, struct scsi_disk, driver);
 }
 
+extern int storage_quiet_discovery;
+
 #define sd_printk(prefix, sdsk, fmt, a...)				\
-        (sdsk)->disk ?							\
-	      sdev_prefix_printk(prefix, (sdsk)->device,		\
+	do {								\
+		if (!storage_quiet_discovery)				\
+		 (sdsk)->disk ?						\
+			sdev_prefix_printk(prefix, (sdsk)->device,	\
 				 (sdsk)->disk->disk_name, fmt, ##a) :	\
-	      sdev_printk(prefix, (sdsk)->device, fmt, ##a)
+			sdev_printk(prefix, (sdsk)->device, fmt, ##a);	\
+	} while (0)
 
 #define sd_first_printk(prefix, sdsk, fmt, a...)			\
 	do {								\

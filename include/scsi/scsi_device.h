@@ -259,8 +259,12 @@ __printf(4, 5) void
 sdev_prefix_printk(const char *, const struct scsi_device *, const char *,
 		const char *, ...);
 
-#define sdev_printk(l, sdev, fmt, a...)				\
-	sdev_prefix_printk(l, sdev, NULL, fmt, ##a)
+extern int storage_quiet_discovery;
+
+#define sdev_printk(l, sdev, fmt, a...) ({			\
+	if (!storage_quiet_discovery)				\
+		sdev_prefix_printk(l, sdev, NULL, fmt, ##a);	\
+	})
 
 __printf(3, 4) void
 scmd_printk(const char *, const struct scsi_cmnd *, const char *, ...);

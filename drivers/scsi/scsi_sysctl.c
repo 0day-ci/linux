@@ -18,6 +18,11 @@ static struct ctl_table scsi_table[] = {
 	  .maxlen	= sizeof(scsi_logging_level),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec },
+	{ .procname	= "storage_quiet_discovery",
+	  .data		= &storage_quiet_discovery,
+	  .maxlen	= sizeof(storage_quiet_discovery),
+	  .mode		= 0644,
+	  .proc_handler	= proc_dointvec },
 	{ }
 };
 

@@ -93,6 +93,22 @@ parameters may be changed at runtime by the command
 			S390-tools package, available for download at
 			https://github.com/ibm-s390-linux/s390-tools/blob/master/scripts/scsi_logging_level
 
+	scsi_mod.storage_quiet_discovery=
+                       [SCSI] a parameter to control the printing from
+                        sdev_printk and sd_printk for systems with large
+                        amounts of LUNS.
+                        Defaults to 0 so unchanged behavior.
+                        If scsi_mod.storage_quiet_discovery=1 is added boot line
+                        then the messages are not printed and can be enabled
+                        after boot via
+                        echo 0 >
+                        /sys/module/scsi_mod/parameters/storage_quiet_discovery
+                        Another option is using
+                        sysctl -w dev.scsi.storage_quiet_discovery=0.
+                        Leaving this set to 0 in /etc/sysctl.conf and setting
+                        it to 1 on the kernel line will help for these large
+                        LUN count configurations and ensure its back on after boot.
+
 	scsi_mod.scan=	[SCSI] sync (default) scans SCSI busses as they are
 			discovered.  async scans them in kernel threads,
 			allowing boot to proceed.  none ignores them, expecting
