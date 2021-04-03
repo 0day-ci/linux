@@ -40,6 +40,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/if_bridge.h>
 #include <linux/module.h>
 #include <linux/of_irq.h>
 #include <linux/of_mdio.h>
@@ -1134,6 +1135,76 @@ static int ar9331_sw_set_ageing_time(struct dsa_switch *ds,
 				  val);
 }
 
+static int ar9331_sw_port_bridge_join(struct dsa_switch *ds, int port,
+				      struct net_device *br)
+{
+	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
+	struct regmap *regmap = priv->regmap;
+	int port_mask = BIT(priv->cpu_port);
+	int i, ret;
+	u32 val;
+
+	for (i = 0; i < ds->num_ports; i++) {
+		if (dsa_to_port(ds, i)->bridge_dev != br)
+			continue;
+
+		if (!dsa_is_user_port(ds, port))
+			continue;
+
+		val = FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, BIT(port));
+		ret = regmap_set_bits(regmap, AR9331_SW_REG_PORT_VLAN(i), val);
+		if (ret)
+			goto error;
+
+		if (i != port)
+			port_mask |= BIT(i);
+	}
+
+	val = FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, port_mask);
+	ret = regmap_update_bits(regmap, AR9331_SW_REG_PORT_VLAN(port),
+				 AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, val);
+	if (ret)
+		goto error;
+
+	return 0;
+error:
+	dev_err_ratelimited(priv->dev, "%s: error: %i\n", __func__, ret);
+
+	return ret;
+}
+
+static void ar9331_sw_port_bridge_leave(struct dsa_switch *ds, int port,
+					struct net_device *br)
+{
+	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
+	struct regmap *regmap = priv->regmap;
+	int i, ret;
+	u32 val;
+
+	for (i = 0; i < ds->num_ports; i++) {
+		if (dsa_to_port(ds, i)->bridge_dev != br)
+			continue;
+
+		if (!dsa_is_user_port(ds, port))
+			continue;
+
+		val = FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, BIT(port));
+		ret = regmap_clear_bits(regmap, AR9331_SW_REG_PORT_VLAN(i), val);
+		if (ret)
+			goto error;
+	}
+
+	val = FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, BIT(priv->cpu_port));
+	ret = regmap_update_bits(regmap, AR9331_SW_REG_PORT_VLAN(port),
+				 AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, val);
+	if (ret)
+		goto error;
+
+	return;
+error:
+	dev_err_ratelimited(priv->dev, "%s: error: %i\n", __func__, ret);
+}
+
 static const struct dsa_switch_ops ar9331_sw_ops = {
 	.get_tag_protocol	= ar9331_sw_get_tag_protocol,
 	.setup			= ar9331_sw_setup,
@@ -1150,6 +1221,8 @@ static const struct dsa_switch_ops ar9331_sw_ops = {
 	.port_mdb_add           = ar9331_sw_port_mdb_add,
 	.port_mdb_del           = ar9331_sw_port_mdb_del,
 	.set_ageing_time	= ar9331_sw_set_ageing_time,
+	.port_bridge_join	= ar9331_sw_port_bridge_join,
+	.port_bridge_leave	= ar9331_sw_port_bridge_leave,
 };
 
 static irqreturn_t ar9331_sw_irq(int irq, void *data)
