@@ -1228,8 +1228,8 @@ hwi_complete_drvr_msgs(struct beiscsi_conn *beiscsi_conn,
 	uint16_t wrb_index, cid, cri_index;
 	struct hwi_controller *phwi_ctrlr;
 	struct wrb_handle *pwrb_handle;
-	struct iscsi_session *session;
 	struct iscsi_task *task;
+	unsigned long flags;
 
 	phwi_ctrlr = phba->phwi_ctrlr;
 	if (is_chip_be2_be3r(phba)) {
@@ -1247,12 +1247,21 @@ hwi_complete_drvr_msgs(struct beiscsi_conn *beiscsi_conn,
 	cri_index = BE_GET_CRI_FROM_CID(cid);
 	pwrb_context = &phwi_ctrlr->wrb_context[cri_index];
 	pwrb_handle = pwrb_context->pwrb_handle_basestd[wrb_index];
-	session = beiscsi_conn->conn->session;
-	spin_lock_bh(&session->back_lock);
+
+	spin_lock_irqsave(&pwrb_context->wrb_lock, flags);
 	task = pwrb_handle->pio_handle;
+	if (task) {
+		spin_lock(&task->lock);
+		if (!iscsi_task_is_completed(task))
+			__iscsi_get_task(task);
+		else
+			task = NULL;
+		spin_unlock(&task->lock);
+	}
+	spin_unlock_irqrestore(&pwrb_context->wrb_lock, flags);
+
 	if (task)
-		__iscsi_put_task(task);
-	spin_unlock_bh(&session->back_lock);
+		iscsi_put_task(task);
 }
 
 static void
@@ -1338,6 +1347,7 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 	struct wrb_handle *pwrb_handle;
 	struct iscsi_task *task;
 	uint16_t cri_index = 0;
+	unsigned long flags;
 	uint8_t type;
 
 	phwi_ctrlr = phba->phwi_ctrlr;
@@ -1351,12 +1361,22 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 	pwrb_handle = pwrb_context->pwrb_handle_basestd[
 		      csol_cqe.wrb_index];
 
-	spin_lock_bh(&session->back_lock);
+	spin_lock_irqsave(&pwrb_context->wrb_lock, flags);
 	task = pwrb_handle->pio_handle;
-	if (!task) {
-		spin_unlock_bh(&session->back_lock);
-		return;
+	if (task) {
+		spin_lock(&task->lock);
+		if (!iscsi_task_is_completed(task))
+			__iscsi_get_task(task);
+		else
+			task = NULL;
+		spin_unlock(&task->lock);
 	}
+	spin_unlock_irqrestore(&pwrb_context->wrb_lock, flags);
+
+	if (!task)
+		return;
+
+	spin_lock_bh(&session->back_lock);
 	type = ((struct beiscsi_io_task *)task->dd_data)->wrb_type;
 
 	switch (type) {
@@ -1398,6 +1418,7 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 	}
 
 	spin_unlock_bh(&session->back_lock);
+	iscsi_put_task(task);
 }
 
 /*
