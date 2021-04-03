@@ -454,8 +454,11 @@ static void __iscsi_free_task(struct iscsi_task *task)
 			  task->itt, task->state, task->sc);
 
 	session->tt->cleanup_task(task);
+
+	spin_lock_bh(&task->lock);
 	task->state = ISCSI_TASK_FREE;
 	task->sc = NULL;
+	spin_unlock_bh(&task->lock);
 	/*
 	 * login task is preallocated so do not free
 	 */
@@ -1097,10 +1100,12 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 						 "Invalid pdu reject. Could "
 						 "not lookup rejected task.\n");
 				rc = ISCSI_ERR_BAD_ITT;
-			} else
+			} else {
 				rc = iscsi_nop_out_rsp(task,
 					(struct iscsi_nopin*)&rejected_pdu,
 					NULL, 0);
+				iscsi_put_task(task);
+			}
 		}
 		break;
 	default:
@@ -1121,11 +1126,13 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
  * This should be used for mgmt tasks like login and nops, or if
  * the LDD's itt space does not include the session age.
  *
- * The session back_lock must be held.
+ * If the itt is valid a task will be returned with the reference held. The
+ * caller must call iscsi_put_task.
  */
 struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 {
 	struct iscsi_session *session = conn->session;
+	struct iscsi_task *task;
 	uint32_t i;
 
 	if (itt == RESERVED_ITT)
@@ -1142,7 +1149,12 @@ struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 		if (i >= ISCSI_MGMT_CMDS_MAX)
 			return NULL;
 
-		return session->mgmt_cmds[i];
+		task = session->mgmt_cmds[i];
+		if (iscsi_task_is_completed(task))
+			return NULL;
+
+		__iscsi_get_task(task);
+		return task;
 	} else {
 		return iscsi_itt_to_ctask(conn, itt);
 	}
@@ -1200,7 +1212,9 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	if (!task)
 		return ISCSI_ERR_BAD_OPCODE;
 
-	return iscsi_complete_task(conn, task, hdr, data, datalen);
+	rc = iscsi_complete_task(conn, task, hdr, data, datalen);
+	iscsi_put_task(task);
+	return rc;
 }
 EXPORT_SYMBOL_GPL(__iscsi_complete_pdu);
 
@@ -1374,7 +1388,8 @@ EXPORT_SYMBOL_GPL(iscsi_verify_itt);
  *
  * This should be used for cmd tasks.
  *
- * The session back_lock must be held.
+ * If the itt is valid a task will be returned with the reference held. The
+ * caller must call iscsi_put_task.
  */
 struct iscsi_task *iscsi_itt_to_ctask(struct iscsi_conn *conn, itt_t itt)
 {
@@ -1395,15 +1410,21 @@ struct iscsi_task *iscsi_itt_to_ctask(struct iscsi_conn *conn, itt_t itt)
 		return NULL;
 
 	task = scsi_cmd_priv(sc);
-	if (!task->sc)
+	spin_lock_bh(&task->lock);
+	if (!task->sc || iscsi_task_is_completed(task)) {
+		spin_unlock_bh(&task->lock);
 		return NULL;
+	}
 
 	if (task->sc->SCp.phase != session->age) {
 		iscsi_session_printk(KERN_ERR, conn->session,
 				  "task's session age %d, expected %d\n",
 				  task->sc->SCp.phase, session->age);
+		spin_unlock_bh(&task->lock);
 		return NULL;
 	}
+	__iscsi_get_task(task);
+	spin_unlock_bh(&task->lock);
 
 	return task;
 }
@@ -1709,14 +1730,18 @@ static struct iscsi_task *iscsi_init_scsi_task(struct iscsi_conn *conn,
 
 	refcount_set(&task->refcount, 1);
 	task->itt = blk_mq_unique_tag(sc->request);
-	task->state = ISCSI_TASK_PENDING;
 	task->conn = conn;
-	task->sc = sc;
 	task->have_checked_conn = false;
 	task->last_timeout = jiffies;
 	task->last_xfer = jiffies;
 	task->protected = false;
 	INIT_LIST_HEAD(&task->running);
+
+	spin_lock_bh(&task->lock);
+	task->state = ISCSI_TASK_PENDING;
+	task->sc = sc;
+	spin_unlock_bh(&task->lock);
+
 	return task;
 }
 
@@ -2951,6 +2976,7 @@ static void iscsi_init_task(struct iscsi_task *task, int dd_task_size)
 	task->itt = ISCSI_RESERVED_TAG;
 	task->state = ISCSI_TASK_FREE;
 	INIT_LIST_HEAD(&task->running);
+	spin_lock_init(&task->lock);
 }
 
 int iscsi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)

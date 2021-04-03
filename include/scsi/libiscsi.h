@@ -142,7 +142,11 @@ struct iscsi_task {
 	/* T10 protection information */
 	bool			protected;
 
-	/* state set/tested under session->lock */
+	/*
+	 * task lock must be held when using sc or state to check if task has
+	 * completed
+	 */
+	spinlock_t		lock;
 	int			state;
 	refcount_t		refcount;
 	struct list_head	running;	/* running cmd list */
@@ -160,6 +164,12 @@ static inline int iscsi_task_has_unsol_data(struct iscsi_task *task)
 static inline void* iscsi_next_hdr(struct iscsi_task *task)
 {
 	return (void*)task->hdr + task->hdr_len;
+}
+
+static inline bool iscsi_task_is_completed(struct iscsi_task *task)
+{
+	return task->state == ISCSI_TASK_COMPLETED ||
+	       task->state == ISCSI_TASK_ABRT_TMF;
 }
 
 /* Connection's states */

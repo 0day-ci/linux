@@ -1540,10 +1540,11 @@ skb_read_pdu_bhs(struct cxgbi_sock *csk, struct iscsi_conn *conn,
 		struct iscsi_task *task = iscsi_itt_to_ctask(conn, itt);
 		u32 data_sn = be32_to_cpu(((struct iscsi_data *)
 							skb->data)->datasn);
-		if (task && task->sc) {
+		if (task) {
 			struct iscsi_tcp_task *tcp_task = task->dd_data;
 
 			tcp_task->exp_datasn = data_sn;
+			iscsi_put_task(task);
 		}
 	}
 

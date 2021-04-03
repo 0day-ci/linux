@@ -3382,7 +3382,8 @@ static void qla4xxx_task_work(struct work_struct *wdata)
 			   sts->completionStatus);
 		break;
 	}
-	return;
+	/* Release ref taken in qla4xxx_passthru_status_entry */
+	iscsi_put_task(task);
 }
 
 static int qla4xxx_alloc_pdu(struct iscsi_task *task, uint8_t opcode)

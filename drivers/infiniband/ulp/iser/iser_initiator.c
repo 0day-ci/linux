@@ -632,15 +632,20 @@ iser_check_remote_inv(struct iser_conn *iser_conn,
 
 			if (iser_task->dir[ISER_DIR_IN]) {
 				desc = iser_task->rdma_reg[ISER_DIR_IN].mem_h;
-				if (unlikely(iser_inv_desc(desc, rkey)))
+				if (unlikely(iser_inv_desc(desc, rkey))) {
+					iscsi_put_task(task);
 					return -EINVAL;
+				}
 			}
 
 			if (iser_task->dir[ISER_DIR_OUT]) {
 				desc = iser_task->rdma_reg[ISER_DIR_OUT].mem_h;
-				if (unlikely(iser_inv_desc(desc, rkey)))
+				if (unlikely(iser_inv_desc(desc, rkey))) {
+					iscsi_put_task(task);
 					return -EINVAL;
+				}
 			}
+			iscsi_put_task(task);
 		} else {
 			iser_err("failed to get task for itt=%d\n", hdr->itt);
 			return -EINVAL;

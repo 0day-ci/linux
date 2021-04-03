@@ -1469,14 +1469,16 @@ int qedi_send_iscsi_tmf(struct qedi_conn *qedi_conn, struct iscsi_task *mtask)
 
 	if ((tmf_hdr->flags & ISCSI_FLAG_TM_FUNC_MASK) ==
 	     ISCSI_TM_FUNC_ABORT_TASK) {
-		ctask = iscsi_itt_to_task(conn, tmf_hdr->rtt);
-		if (!ctask || !ctask->sc) {
+		ctask = iscsi_itt_to_ctask(conn, tmf_hdr->rtt);
+		if (!ctask) {
 			QEDI_ERR(&qedi->dbg_ctx,
 				 "Could not get reference task\n");
 			return 0;
 		}
+
 		cmd = (struct qedi_cmd *)ctask->dd_data;
 		tmf_pdu_header.rtt = cmd->task_id;
+		iscsi_put_task(ctask);
 	} else {
 		tmf_pdu_header.rtt = ISCSI_RESERVED_TAG;
 	}
