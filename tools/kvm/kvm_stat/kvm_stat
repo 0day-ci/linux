@@ -154,17 +154,19 @@ SVM_EXIT_REASONS = {
     'NPF':            0x400,
 }
 
-# EC definition of HSR (from arch/arm64/include/asm/kvm_arm.h)
+# EC definition of HSR (from arch/arm64/include/asm/esr.h)
 AARCH64_EXIT_REASONS = {
     'UNKNOWN':      0x00,
-    'WFI':          0x01,
+    'WFx':          0x01,
     'CP15_32':      0x03,
     'CP15_64':      0x04,
     'CP14_MR':      0x05,
     'CP14_LS':      0x06,
     'FP_ASIMD':     0x07,
     'CP10_ID':      0x08,
+    'PAC':          0x09,
     'CP14_64':      0x0C,
+    'BTI':          0x0D,
     'ILL_ISS':      0x0E,
     'SVC32':        0x11,
     'HVC32':        0x12,
@@ -173,6 +175,10 @@ AARCH64_EXIT_REASONS = {
     'HVC64':        0x16,
     'SMC64':        0x17,
     'SYS64':        0x18,
+    'SVE':          0x19,
+    'ERET':         0x1a,
+    'FPAC':         0x1c,
+    'IMP_DEF':      0x1f,
     'IABT':         0x20,
     'IABT_HYP':     0x21,
     'PC_ALIGN':     0x22,
