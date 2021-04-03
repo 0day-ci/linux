@@ -26,6 +26,7 @@
 #include "symbol.h"
 #include "thread.h"
 #include "thread-stack.h"
+#include "tsc.h"
 #include "tool.h"
 #include "util/synthetic-events.h"
 
@@ -44,6 +45,8 @@ struct arm_spe {
 	struct perf_session		*session;
 	struct machine			*machine;
 	u32				pmu_type;
+
+	struct perf_tsc_conversion	tc;
 
 	u8				timeless_decoding;
 	u8				data_queued;
@@ -803,14 +806,23 @@ static bool arm_spe_evsel_is_auxtrace(struct perf_session *session,
 
 static const char * const arm_spe_info_fmts[] = {
 	[ARM_SPE_PMU_TYPE]		= "  PMU Type           %"PRId64"\n",
+	[ARM_SPE_TIME_SHIFT]		= "  Time Shift         %"PRIu64"\n",
+	[ARM_SPE_TIME_MULT]		= "  Time Muliplier     %"PRIu64"\n",
+	[ARM_SPE_TIME_ZERO]		= "  Time Zero          %"PRIu64"\n",
+	[ARM_SPE_TIME_CYCLES]		= "  Time Cycles        %"PRIu64"\n",
+	[ARM_SPE_TIME_MASK]		= "  Time Mask          %#"PRIx64"\n",
+	[ARM_SPE_CAP_USER_TIME_SHORT]	= "  Cap Time Short     %"PRId64"\n",
 };
 
-static void arm_spe_print_info(__u64 *arr)
+static void arm_spe_print_info(__u64 *arr, int start, int finish)
 {
+	int i;
+
 	if (!dump_trace)
 		return;
 
-	fprintf(stdout, arm_spe_info_fmts[ARM_SPE_PMU_TYPE], arr[ARM_SPE_PMU_TYPE]);
+	for (i = start; i <= finish; i++)
+		fprintf(stdout, arm_spe_info_fmts[i], arr[i]);
 }
 
 struct arm_spe_synth {
@@ -1001,11 +1013,19 @@ arm_spe_synth_events(struct arm_spe *spe, struct perf_session *session)
 	return 0;
 }
 
+static bool arm_spe_has(struct perf_record_auxtrace_info *auxtrace_info,
+			int pos)
+{
+	return auxtrace_info->header.size >=
+		(sizeof(struct perf_record_auxtrace_info) +
+		 (sizeof(u64) * (pos + 1)));
+}
+
 int arm_spe_process_auxtrace_info(union perf_event *event,
 				  struct perf_session *session)
 {
 	struct perf_record_auxtrace_info *auxtrace_info = &event->auxtrace_info;
-	size_t min_sz = sizeof(u64) * ARM_SPE_AUXTRACE_PRIV_MAX;
+	size_t min_sz = sizeof(u64) * ARM_SPE_TIME_SHIFT;
 	struct arm_spe *spe;
 	int err;
 
@@ -1025,6 +1045,20 @@ int arm_spe_process_auxtrace_info(union perf_event *event,
 	spe->machine = &session->machines.host; /* No kvm support */
 	spe->auxtrace_type = auxtrace_info->type;
 	spe->pmu_type = auxtrace_info->priv[ARM_SPE_PMU_TYPE];
+	arm_spe_print_info(&auxtrace_info->priv[0], ARM_SPE_PMU_TYPE,
+			   ARM_SPE_PMU_TYPE);
+
+	if (arm_spe_has(auxtrace_info, ARM_SPE_CAP_USER_TIME_SHORT)) {
+		spe->tc.time_shift = auxtrace_info->priv[ARM_SPE_TIME_SHIFT];
+		spe->tc.time_mult = auxtrace_info->priv[ARM_SPE_TIME_MULT];
+		spe->tc.time_zero = auxtrace_info->priv[ARM_SPE_TIME_ZERO];
+		spe->tc.time_cycles = auxtrace_info->priv[ARM_SPE_TIME_CYCLES];
+		spe->tc.time_mask = auxtrace_info->priv[ARM_SPE_TIME_MASK];
+		spe->tc.cap_user_time_short =
+			auxtrace_info->priv[ARM_SPE_CAP_USER_TIME_SHORT];
+		arm_spe_print_info(&auxtrace_info->priv[0], ARM_SPE_TIME_SHIFT,
+				   ARM_SPE_CAP_USER_TIME_SHORT);
+	}
 
 	spe->timeless_decoding = arm_spe__is_timeless_decoding(spe);
 	spe->auxtrace.process_event = arm_spe_process_event;
@@ -1034,8 +1068,6 @@ int arm_spe_process_auxtrace_info(union perf_event *event,
 	spe->auxtrace.free = arm_spe_free;
 	spe->auxtrace.evsel_is_auxtrace = arm_spe_evsel_is_auxtrace;
 	session->auxtrace = &spe->auxtrace;
-
-	arm_spe_print_info(&auxtrace_info->priv[0]);
 
 	if (dump_trace)
 		return 0;
