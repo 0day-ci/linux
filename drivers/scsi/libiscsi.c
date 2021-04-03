@@ -1821,22 +1821,22 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	}
 
 	spin_lock_bh(&session->frwd_lock);
-	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
-		spin_unlock_bh(&session->frwd_lock);
-		reason = FAILURE_SESSION_IN_RECOVERY;
-		sc->result = DID_REQUEUE << 16;
-		goto fault;
-	}
-
 	if (iscsi_check_cmdsn_window_closed(conn)) {
 		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_WINDOW_CLOSED;
 		goto reject;
 	}
 
-	task = iscsi_init_scsi_task(conn, sc);
-
 	if (!ihost->workq) {
+		if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
+			spin_unlock_bh(&session->frwd_lock);
+			reason = FAILURE_SESSION_IN_RECOVERY;
+			sc->result = DID_REQUEUE << 16;
+			goto fault;
+		}
+
+		task = iscsi_init_scsi_task(conn, sc);
+
 		reason = iscsi_prep_scsi_cmd_pdu(task);
 		if (reason) {
 			if (reason == -ENOMEM ||  reason == -EACCES) {
@@ -1853,6 +1853,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 			goto prepd_reject;
 		}
 	} else {
+		task = iscsi_init_scsi_task(conn, sc);
 		list_add_tail(&task->running, &conn->cmdqueue);
 		iscsi_conn_queue_work(conn);
 	}
