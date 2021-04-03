@@ -216,12 +216,12 @@ static char const *cqe_desc[] = {
 
 static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 {
-	struct iscsi_task *abrt_task = (struct iscsi_task *)sc->SCp.ptr;
 	struct iscsi_cls_session *cls_session;
 	struct beiscsi_io_task *abrt_io_task;
 	struct beiscsi_conn *beiscsi_conn;
 	struct iscsi_session *session;
 	struct invldt_cmd_tbl inv_tbl;
+	struct iscsi_task *abrt_task;
 	struct beiscsi_hba *phba;
 	struct iscsi_conn *conn;
 	int rc;
@@ -231,7 +231,8 @@ static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 
 	/* check if we raced, task just got cleaned up under us */
 	spin_lock_bh(&session->back_lock);
-	if (!abrt_task || !abrt_task->sc) {
+	abrt_task = scsi_cmd_priv(sc);
+	if (!abrt_task->sc) {
 		spin_unlock_bh(&session->back_lock);
 		return SUCCESS;
 	}
