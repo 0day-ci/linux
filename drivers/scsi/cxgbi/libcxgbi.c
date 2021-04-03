@@ -2727,7 +2727,6 @@ struct iscsi_cls_session *cxgbi_create_session(struct iscsi_endpoint *ep,
 	struct cxgbi_hba *chba;
 	struct Scsi_Host *shost;
 	struct iscsi_cls_session *cls_session;
-	struct iscsi_session *session;
 
 	if (!ep) {
 		pr_err("missing endpoint.\n");
@@ -2748,17 +2747,9 @@ struct iscsi_cls_session *cxgbi_create_session(struct iscsi_endpoint *ep,
 	if (!cls_session)
 		return NULL;
 
-	session = cls_session->dd_data;
-	if (iscsi_tcp_r2tpool_alloc(session))
-		goto remove_session;
-
 	log_debug(1 << CXGBI_DBG_ISCSI,
 		"ep 0x%p, cls sess 0x%p.\n", ep, cls_session);
 	return cls_session;
-
-remove_session:
-	iscsi_session_teardown(cls_session);
-	return NULL;
 }
 EXPORT_SYMBOL_GPL(cxgbi_create_session);
 
@@ -2767,7 +2758,6 @@ void cxgbi_destroy_session(struct iscsi_cls_session *cls_session)
 	log_debug(1 << CXGBI_DBG_ISCSI,
 		"cls sess 0x%p.\n", cls_session);
 
-	iscsi_tcp_r2tpool_free(cls_session->dd_data);
 	iscsi_session_teardown(cls_session);
 }
 EXPORT_SYMBOL_GPL(cxgbi_destroy_session);

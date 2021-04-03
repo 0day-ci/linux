@@ -883,13 +883,8 @@ iscsi_sw_tcp_session_create(struct iscsi_endpoint *ep, uint16_t cmds_max,
 	session = cls_session->dd_data;
 	tcp_sw_host = iscsi_host_priv(shost);
 	tcp_sw_host->session = session;
-
-	if (iscsi_tcp_r2tpool_alloc(session))
-		goto remove_session;
 	return cls_session;
 
-remove_session:
-	iscsi_session_teardown(cls_session);
 remove_host:
 	iscsi_host_remove(shost);
 free_host:
@@ -905,7 +900,6 @@ static void iscsi_sw_tcp_session_destroy(struct iscsi_cls_session *cls_session)
 	if (WARN_ON_ONCE(session->leadconn))
 		return;
 
-	iscsi_tcp_r2tpool_free(cls_session->dd_data);
 	iscsi_session_teardown(cls_session);
 
 	iscsi_host_remove(shost);
@@ -1000,6 +994,11 @@ static struct scsi_host_template iscsi_sw_tcp_sht = {
 	.proc_name		= "iscsi_tcp",
 	.this_id		= -1,
 	.track_queue_depth	= 1,
+	.cmd_size		= sizeof(struct iscsi_tcp_task) +
+				  sizeof(struct iscsi_sw_tcp_hdrbuf) +
+				  sizeof(struct iscsi_task),
+	.init_cmd_priv		= iscsi_tcp_init_cmd_priv,
+	.exit_cmd_priv		= iscsi_tcp_exit_cmd_priv,
 };
 
 static struct iscsi_transport iscsi_sw_tcp_transport = {

@@ -1147,68 +1147,75 @@ void iscsi_tcp_conn_teardown(struct iscsi_cls_conn *cls_conn)
 }
 EXPORT_SYMBOL_GPL(iscsi_tcp_conn_teardown);
 
-int iscsi_tcp_r2tpool_alloc(struct iscsi_session *session)
+static int iscsi_tcp_calc_max_r2t(struct device *dev, void *data)
 {
-	int i;
-	int cmd_i;
+	struct iscsi_cls_session *cls_session;
+	struct iscsi_session *session;
+	int *max_r2t = data;
+
+	if (!iscsi_is_session_dev(dev))
+		return 0;
+
+	cls_session = iscsi_dev_to_session(dev);
+	session = cls_session->dd_data;
+	if (session->max_r2t > *max_r2t)
+		*max_r2t = session->max_r2t;
+	return 0;
+}
+
+int iscsi_tcp_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	struct iscsi_task *task;
+	struct iscsi_tcp_task *tcp_task;
+	int max_r2t = 1;
+
+	iscsi_init_cmd_priv(shost, sc);
 
 	/*
-	 * initialize per-task: R2T pool and xmit queue
+	 * cxgbi does not have access to the session so we use the max of all
+	 * sessions on the host.
 	 */
-	for (cmd_i = 0; cmd_i < session->cmds_max; cmd_i++) {
-	        struct iscsi_task *task = session->cmds[cmd_i];
-		struct iscsi_tcp_task *tcp_task = task->dd_data;
+	device_for_each_child(&shost->shost_gendev, &max_r2t,
+			      iscsi_tcp_calc_max_r2t);
 
-		/*
-		 * pre-allocated x2 as much r2ts to handle race when
-		 * target acks DataOut faster than we data_xmit() queues
-		 * could replenish r2tqueue.
-		 */
+	task = scsi_cmd_priv(sc);
+	tcp_task = task->dd_data;
 
-		/* R2T pool */
-		if (iscsi_pool_init(&tcp_task->r2tpool,
-				    session->max_r2t * 2, NULL,
-				    sizeof(struct iscsi_r2t_info))) {
-			goto r2t_alloc_fail;
-		}
+	/*
+	 * pre-allocated x2 as much r2ts to handle race when
+	 * target acks DataOut faster than we data_xmit() queues
+	 * could replenish r2tqueue.
+	 */
+	if (iscsi_pool_init(&tcp_task->r2tpool, max_r2t * 2, NULL,
+			    sizeof(struct iscsi_r2t_info)))
+		return -ENOMEM;
 
-		/* R2T xmit queue */
-		if (kfifo_alloc(&tcp_task->r2tqueue,
-		      session->max_r2t * 4 * sizeof(void*), GFP_KERNEL)) {
-			iscsi_pool_free(&tcp_task->r2tpool);
-			goto r2t_alloc_fail;
-		}
-		spin_lock_init(&tcp_task->pool2queue);
-		spin_lock_init(&tcp_task->queue2pool);
+	/* R2T xmit queue */
+	if (kfifo_alloc(&tcp_task->r2tqueue, max_r2t * 4 * sizeof(void *),
+			GFP_KERNEL)) {
+		iscsi_pool_free(&tcp_task->r2tpool);
+		goto r2t_queue_alloc_fail;
 	}
-
+	spin_lock_init(&tcp_task->pool2queue);
+	spin_lock_init(&tcp_task->queue2pool);
 	return 0;
 
-r2t_alloc_fail:
-	for (i = 0; i < cmd_i; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct iscsi_tcp_task *tcp_task = task->dd_data;
-
-		kfifo_free(&tcp_task->r2tqueue);
-		iscsi_pool_free(&tcp_task->r2tpool);
-	}
+r2t_queue_alloc_fail:
+	iscsi_pool_free(&tcp_task->r2tpool);
 	return -ENOMEM;
 }
-EXPORT_SYMBOL_GPL(iscsi_tcp_r2tpool_alloc);
+EXPORT_SYMBOL_GPL(iscsi_tcp_init_cmd_priv);
 
-void iscsi_tcp_r2tpool_free(struct iscsi_session *session)
+int iscsi_tcp_exit_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
 {
-	int i;
+	struct iscsi_task *task = scsi_cmd_priv(sc);
+	struct iscsi_tcp_task *tcp_task = task->dd_data;
 
-	for (i = 0; i < session->cmds_max; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct iscsi_tcp_task *tcp_task = task->dd_data;
-
-		kfifo_free(&tcp_task->r2tqueue);
-		iscsi_pool_free(&tcp_task->r2tpool);
-	}
+	kfifo_free(&tcp_task->r2tqueue);
+	iscsi_pool_free(&tcp_task->r2tpool);
+	return 0;
 }
-EXPORT_SYMBOL_GPL(iscsi_tcp_r2tpool_free);
+EXPORT_SYMBOL_GPL(iscsi_tcp_exit_cmd_priv);
 
 int iscsi_tcp_set_max_r2t(struct iscsi_conn *conn, char *buf)
 {
@@ -1223,8 +1230,7 @@ int iscsi_tcp_set_max_r2t(struct iscsi_conn *conn, char *buf)
 		return -EINVAL;
 
 	session->max_r2t = r2ts;
-	iscsi_tcp_r2tpool_free(session);
-	return iscsi_tcp_r2tpool_alloc(session);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(iscsi_tcp_set_max_r2t);
 
