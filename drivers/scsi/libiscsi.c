@@ -2850,6 +2850,23 @@ static void iscsi_host_dec_session_cnt(struct Scsi_Host *shost)
 	scsi_host_put(shost);
 }
 
+static void iscsi_init_task(struct iscsi_task *task)
+{
+	task->dd_data = &task[1];
+	task->itt = ISCSI_RESERVED_TAG;
+	task->state = ISCSI_TASK_FREE;
+	INIT_LIST_HEAD(&task->running);
+}
+
+int iscsi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	struct iscsi_task *task = scsi_cmd_priv(sc);
+
+	iscsi_init_task(task);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iscsi_init_cmd_priv);
+
 /**
  * iscsi_session_setup - create iscsi cls session and host and session
  * @iscsit: iscsi transport template

@@ -239,6 +239,9 @@ static struct scsi_host_template qla4xxx_driver_template = {
 	.this_id		= -1,
 	.cmd_per_lun		= 3,
 	.sg_tablesize		= SG_ALL,
+	.cmd_size		= sizeof(struct ql4_task_data) +
+				  sizeof(struct iscsi_task),
+	.init_cmd_priv		= iscsi_init_cmd_priv,
 
 	.max_sectors		= 0xFFFF,
 	.shost_attrs		= qla4xxx_host_attrs,

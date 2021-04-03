@@ -402,6 +402,8 @@ static struct scsi_host_template beiscsi_sht = {
 	.cmd_per_lun = BEISCSI_CMD_PER_LUN,
 	.vendor_id = SCSI_NL_VID_TYPE_PCI | BE_VENDOR_ID,
 	.track_queue_depth = 1,
+	.cmd_size = sizeof(struct beiscsi_io_task) + sizeof(struct iscsi_task),
+	.init_cmd_priv = iscsi_init_cmd_priv,
 };
 
 static struct scsi_transport_template *beiscsi_scsi_transport;
