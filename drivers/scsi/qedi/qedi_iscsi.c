@@ -47,14 +47,9 @@ static int qedi_eh_abort(struct scsi_cmnd *cmd)
 {
 	struct Scsi_Host *shost = cmd->device->host;
 	struct qedi_ctx *qedi = iscsi_host_priv(shost);
-	struct iscsi_cls_session *cls_session;
-	struct iscsi_session *session;
 	struct qedi_conn *qedi_conn;
 	struct iscsi_task *task;
 	int rc;
-
-	cls_session = starget_to_session(scsi_target(cmd->device));
-	session = cls_session->dd_data;
 
 	if (qedi_do_not_recover) {
 		QEDI_ERR(&qedi->dbg_ctx, "dont send cleanup/abort %d\n",
@@ -63,15 +58,15 @@ static int qedi_eh_abort(struct scsi_cmnd *cmd)
 	}
 
 	/* check if we raced, task just got cleaned up under us */
-	spin_lock_bh(&session->back_lock);
-	task = (struct iscsi_task *)cmd->SCp.ptr;
-	if (!task || !task->sc) {
-		spin_unlock_bh(&session->back_lock);
+	task = scsi_cmd_priv(cmd);
+	spin_lock_bh(&task->lock);
+	if (!task->sc || iscsi_task_is_completed(task)) {
+		spin_unlock_bh(&task->lock);
 		return SUCCESS;
 	}
 
 	__iscsi_get_task(task);
-	spin_unlock_bh(&session->back_lock);
+	spin_unlock_bh(&task->lock);
 
 	qedi_conn = task->conn->dd_data;
 	set_bit(QEDI_CONN_FW_CLEANUP, &qedi_conn->flags);
