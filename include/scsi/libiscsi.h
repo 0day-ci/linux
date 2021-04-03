@@ -328,15 +328,21 @@ struct iscsi_session {
 	 * can enclose the mutual exclusion zone protected by the backward lock
 	 * but not vice versa.
 	 */
-	spinlock_t		frwd_lock;	/* protects session state, *
-						 * cmdsn, queued_cmdsn     *
-						 * session resources:      *
+	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
+						 * cmdsn, suspend_bit,     *
+						 * leadconn, _stage,       *
+						 * tmf_state and session   *
+						 * resources:              *
 						 * - cmdpool kfifo_out ,   *
 						 * - mgmtpool, queues	   */
 	spinlock_t		back_lock;	/* protects cmdsn_exp      *
 						 * cmdsn_max,              *
 						 * cmdpool kfifo_in        */
-	int			state;		/* session state           */
+	/*
+	 * frwd_lock must be held when transitioning states, but not needed
+	 * if just checking the state in the scsi-ml or iscsi callouts.
+	 */
+	int			state;
 	int			age;		/* counts session re-opens */
 
 	int			scsi_cmds_max; 	/* max scsi commands */

@@ -2056,7 +2056,8 @@ int bnx2i_hw_ep_disconnect(struct bnx2i_endpoint *bnx2i_ep)
 	if (session) {
 		spin_lock_bh(&session->frwd_lock);
 		if (bnx2i_ep->state != EP_STATE_TCP_FIN_RCVD) {
-			if (session->state == ISCSI_STATE_LOGGING_OUT) {
+			if (READ_ONCE(session->state) ==
+			    ISCSI_STATE_LOGGING_OUT) {
 				if (bnx2i_ep->state == EP_STATE_LOGOUT_SENT) {
 					/* Logout sent, but no resp */
 					printk(KERN_ALERT "bnx2i (%s): WARNING"

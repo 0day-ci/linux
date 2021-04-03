@@ -633,7 +633,7 @@ static int iscsi_prep_mgmt_task(struct iscsi_conn *conn,
 	struct iscsi_nopout *nop = (struct iscsi_nopout *)hdr;
 	uint8_t opcode = hdr->opcode & ISCSI_OPCODE_MASK;
 
-	if (conn->session->state == ISCSI_STATE_LOGGING_OUT)
+	if (READ_ONCE(session->state) == ISCSI_STATE_LOGGING_OUT)
 		return -ENOTCONN;
 
 	if (opcode != ISCSI_OP_LOGIN && opcode != ISCSI_OP_TEXT)
@@ -662,7 +662,7 @@ static int iscsi_prep_mgmt_task(struct iscsi_conn *conn,
 		return -EIO;
 
 	if ((hdr->opcode & ISCSI_OPCODE_MASK) == ISCSI_OP_LOGOUT)
-		session->state = ISCSI_STATE_LOGGING_OUT;
+		WRITE_ONCE(session->state, ISCSI_STATE_LOGGING_OUT);
 
 	task->state = ISCSI_TASK_RUNNING;
 	ISCSI_DBG_SESSION(session, "mgmtpdu [op 0x%x hdr->itt 0x%x "
@@ -679,9 +679,10 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	struct iscsi_host *ihost = shost_priv(session->host);
 	uint8_t opcode = hdr->opcode & ISCSI_OPCODE_MASK;
 	struct iscsi_task *task;
+	int sess_state = READ_ONCE(session->state);
 	itt_t itt;
 
-	if (session->state == ISCSI_STATE_TERMINATE)
+	if (sess_state == ISCSI_STATE_TERMINATE)
 		return NULL;
 
 	if (opcode == ISCSI_OP_LOGIN || opcode == ISCSI_OP_TEXT) {
@@ -704,7 +705,7 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 
 		task = conn->login_task;
 	} else {
-		if (session->state != ISCSI_STATE_LOGGED_IN)
+		if (sess_state != ISCSI_STATE_LOGGED_IN)
 			return NULL;
 
 		if (data_size != 0) {
@@ -1368,7 +1369,7 @@ void iscsi_session_failure(struct iscsi_session *session,
 
 	spin_lock_bh(&session->frwd_lock);
 	conn = session->leadconn;
-	if (session->state == ISCSI_STATE_TERMINATE || !conn) {
+	if (READ_ONCE(session->state) == ISCSI_STATE_TERMINATE || !conn) {
 		spin_unlock_bh(&session->frwd_lock);
 		return;
 	}
@@ -1395,13 +1396,13 @@ void iscsi_conn_failure(struct iscsi_conn *conn, enum iscsi_err err)
 	struct iscsi_session *session = conn->session;
 
 	spin_lock_bh(&session->frwd_lock);
-	if (session->state == ISCSI_STATE_FAILED) {
+	if (READ_ONCE(session->state) == ISCSI_STATE_FAILED) {
 		spin_unlock_bh(&session->frwd_lock);
 		return;
 	}
 
 	if (conn->stop_stage == 0)
-		session->state = ISCSI_STATE_FAILED;
+		WRITE_ONCE(session->state, ISCSI_STATE_FAILED);
 	spin_unlock_bh(&session->frwd_lock);
 
 	set_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx);
@@ -1570,7 +1571,7 @@ check_requeue:
 		/*
 		 * we always do fastlogout - conn stop code will clean up.
 		 */
-		if (conn->session->state == ISCSI_STATE_LOGGING_OUT)
+		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT)
 			break;
 
 		task = list_entry(conn->requeue.next, struct iscsi_task,
@@ -1593,7 +1594,7 @@ check_requeue:
 		task = list_entry(conn->cmdqueue.next, struct iscsi_task,
 				  running);
 		list_del_init(&task->running);
-		if (conn->session->state == ISCSI_STATE_LOGGING_OUT) {
+		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT) {
 			fail_scsi_task(task, DID_IMM_RETRY);
 			continue;
 		}
@@ -1695,6 +1696,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	struct iscsi_session *session;
 	struct iscsi_conn *conn;
 	struct iscsi_task *task = NULL;
+	int sess_state;
 
 	sc->result = 0;
 	sc->SCp.ptr = NULL;
@@ -1703,7 +1705,6 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
-	spin_lock_bh(&session->frwd_lock);
 
 	reason = iscsi_session_chkready(cls_session);
 	if (reason) {
@@ -1711,14 +1712,15 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto fault;
 	}
 
-	if (session->state != ISCSI_STATE_LOGGED_IN) {
+	sess_state = READ_ONCE(session->state);
+	if (sess_state != ISCSI_STATE_LOGGED_IN) {
 		/*
 		 * to handle the race between when we set the recovery state
 		 * and block the session we requeue here (commands could
 		 * be entering our queuecommand while a block is starting
 		 * up because the block code is not locked)
 		 */
-		switch (session->state) {
+		switch (sess_state) {
 		case ISCSI_STATE_FAILED:
 			/*
 			 * cmds should fail during shutdown, if the session
@@ -1753,26 +1755,31 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto fault;
 	}
 
+	spin_lock_bh(&session->frwd_lock);
 	conn = session->leadconn;
 	if (!conn) {
+		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_SESSION_FREED;
 		sc->result = DID_NO_CONNECT << 16;
 		goto fault;
 	}
 
 	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
+		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_SESSION_IN_RECOVERY;
 		sc->result = DID_REQUEUE << 16;
 		goto fault;
 	}
 
 	if (iscsi_check_cmdsn_window_closed(conn)) {
+		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_WINDOW_CLOSED;
 		goto reject;
 	}
 
 	task = iscsi_alloc_task(conn, sc);
 	if (!task) {
+		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_OOM;
 		goto reject;
 	}
@@ -1803,21 +1810,23 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	return 0;
 
 prepd_reject:
+	spin_unlock_bh(&session->frwd_lock);
+
 	spin_lock_bh(&session->back_lock);
 	iscsi_complete_task(task, ISCSI_TASK_REQUEUE_SCSIQ);
 	spin_unlock_bh(&session->back_lock);
 reject:
-	spin_unlock_bh(&session->frwd_lock);
 	ISCSI_DBG_SESSION(session, "cmd 0x%x rejected (%d)\n",
 			  sc->cmnd[0], reason);
 	return SCSI_MLQUEUE_TARGET_BUSY;
 
 prepd_fault:
+	spin_unlock_bh(&session->frwd_lock);
+
 	spin_lock_bh(&session->back_lock);
 	iscsi_complete_task(task, ISCSI_TASK_REQUEUE_SCSIQ);
 	spin_unlock_bh(&session->back_lock);
 fault:
-	spin_unlock_bh(&session->frwd_lock);
 	ISCSI_DBG_SESSION(session, "iscsi: cmd 0x%x is not queued (%d)\n",
 			  sc->cmnd[0], reason);
 	scsi_set_resid(sc, scsi_bufflen(sc));
@@ -1885,8 +1894,8 @@ static int iscsi_exec_task_mgmt_fn(struct iscsi_conn *conn,
 	 * given up on recovery
 	 */
 	wait_event_interruptible(conn->ehwait, age != session->age ||
-				 session->state != ISCSI_STATE_LOGGED_IN ||
-				 conn->tmf_state != TMF_QUEUED);
+			READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN ||
+			conn->tmf_state != TMF_QUEUED);
 	if (signal_pending(current))
 		flush_signals(current);
 	del_timer_sync(&conn->tmf_timer);
@@ -1895,7 +1904,7 @@ static int iscsi_exec_task_mgmt_fn(struct iscsi_conn *conn,
 	spin_lock_bh(&session->frwd_lock);
 	/* if the session drops it will clean up the task */
 	if (age != session->age ||
-	    session->state != ISCSI_STATE_LOGGED_IN)
+	    READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN)
 		return -ENOTCONN;
 	return 0;
 }
@@ -2025,7 +2034,7 @@ enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 	__iscsi_get_task(task);
 	spin_unlock(&session->back_lock);
 
-	if (session->state != ISCSI_STATE_LOGGED_IN) {
+	if (READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN) {
 		/*
 		 * During shutdown, if session is prematurely disconnected,
 		 * recovery won't happen and there will be hung cmds. Not
@@ -2161,7 +2170,7 @@ static void iscsi_check_transport_timeouts(struct timer_list *t)
 	unsigned long recv_timeout, next_timeout = 0, last_recv;
 
 	spin_lock(&session->frwd_lock);
-	if (session->state != ISCSI_STATE_LOGGED_IN)
+	if (READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN)
 		goto done;
 
 	recv_timeout = conn->recv_timeout;
@@ -2242,7 +2251,8 @@ int iscsi_eh_abort(struct scsi_cmnd *sc)
 	 * If we are not logged in or we have started a new session
 	 * then let the host reset code handle this
 	 */
-	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN ||
+	if (!session->leadconn ||
+	    READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN ||
 	    sc->SCp.phase != session->age) {
 		spin_unlock_bh(&session->frwd_lock);
 		mutex_unlock(&session->eh_mutex);
@@ -2375,7 +2385,8 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 	 * Just check if we are not logged in. We cannot check for
 	 * the phase because the reset could come from a ioctl.
 	 */
-	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN)
+	if (!session->leadconn ||
+	    READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN)
 		goto unlock;
 	conn = session->leadconn;
 
@@ -2434,8 +2445,8 @@ void iscsi_session_recovery_timedout(struct iscsi_cls_session *cls_session)
 	struct iscsi_session *session = cls_session->dd_data;
 
 	spin_lock_bh(&session->frwd_lock);
-	if (session->state != ISCSI_STATE_LOGGED_IN) {
-		session->state = ISCSI_STATE_RECOVERY_FAILED;
+	if (READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN) {
+		WRITE_ONCE(session->state, ISCSI_STATE_RECOVERY_FAILED);
 		if (session->leadconn)
 			wake_up(&session->leadconn->ehwait);
 	}
@@ -2461,19 +2472,15 @@ int iscsi_eh_session_reset(struct scsi_cmnd *sc)
 	conn = session->leadconn;
 
 	mutex_lock(&session->eh_mutex);
-	spin_lock_bh(&session->frwd_lock);
-	if (session->state == ISCSI_STATE_TERMINATE) {
+	if (READ_ONCE(session->state) == ISCSI_STATE_TERMINATE) {
 failed:
 		ISCSI_DBG_EH(session,
 			     "failing session reset: Could not log back into "
 			     "%s [age %d]\n", session->targetname,
 			     session->age);
-		spin_unlock_bh(&session->frwd_lock);
 		mutex_unlock(&session->eh_mutex);
 		return FAILED;
 	}
-
-	spin_unlock_bh(&session->frwd_lock);
 	mutex_unlock(&session->eh_mutex);
 	/*
 	 * we drop the lock here but the leadconn cannot be destoyed while
@@ -2483,21 +2490,19 @@ failed:
 
 	ISCSI_DBG_EH(session, "wait for relogin\n");
 	wait_event_interruptible(conn->ehwait,
-				 session->state == ISCSI_STATE_TERMINATE ||
-				 session->state == ISCSI_STATE_LOGGED_IN ||
-				 session->state == ISCSI_STATE_RECOVERY_FAILED);
+			READ_ONCE(session->state) == ISCSI_STATE_TERMINATE ||
+			READ_ONCE(session->state) == ISCSI_STATE_LOGGED_IN ||
+			READ_ONCE(session->state) == ISCSI_STATE_RECOVERY_FAILED);
 	if (signal_pending(current))
 		flush_signals(current);
 
 	mutex_lock(&session->eh_mutex);
-	spin_lock_bh(&session->frwd_lock);
-	if (session->state == ISCSI_STATE_LOGGED_IN) {
+	if (READ_ONCE(session->state) == ISCSI_STATE_LOGGED_IN) {
 		ISCSI_DBG_EH(session,
 			     "session reset succeeded for %s,%s\n",
 			     session->targetname, conn->persistent_address);
 	} else
 		goto failed;
-	spin_unlock_bh(&session->frwd_lock);
 	mutex_unlock(&session->eh_mutex);
 	return SUCCESS;
 }
@@ -2538,7 +2543,8 @@ static int iscsi_eh_target_reset(struct scsi_cmnd *sc)
 	 * Just check if we are not logged in. We cannot check for
 	 * the phase because the reset could come from a ioctl.
 	 */
-	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN)
+	if (!session->leadconn ||
+	    READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN)
 		goto unlock;
 	conn = session->leadconn;
 
@@ -2892,7 +2898,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	session = cls_session->dd_data;
 	session->cls_session = cls_session;
 	session->host = shost;
-	session->state = ISCSI_STATE_FREE;
+	WRITE_ONCE(session->state, ISCSI_STATE_FREE);
 	session->fast_abort = 1;
 	session->tgt_reset_timeout = 30;
 	session->lu_reset_timeout = 15;
@@ -3070,7 +3076,7 @@ void iscsi_conn_teardown(struct iscsi_cls_conn *cls_conn)
 		/*
 		 * leading connection? then give up on recovery.
 		 */
-		session->state = ISCSI_STATE_TERMINATE;
+		WRITE_ONCE(session->state, ISCSI_STATE_TERMINATE);
 		wake_up(&conn->ehwait);
 	}
 	spin_unlock_bh(&session->frwd_lock);
@@ -3130,7 +3136,7 @@ int iscsi_conn_start(struct iscsi_cls_conn *cls_conn)
 
 	spin_lock_bh(&session->frwd_lock);
 	conn->c_stage = ISCSI_CONN_STARTED;
-	session->state = ISCSI_STATE_LOGGED_IN;
+	WRITE_ONCE(session->state, ISCSI_STATE_LOGGED_IN);
 	session->queued_cmdsn = session->cmdsn;
 
 	conn->last_recv = jiffies;
@@ -3216,9 +3222,9 @@ static void iscsi_start_session_recovery(struct iscsi_session *session,
 	 * the recovery state again
 	 */
 	if (flag == STOP_CONN_TERM)
-		session->state = ISCSI_STATE_TERMINATE;
+		WRITE_ONCE(session->state, ISCSI_STATE_TERMINATE);
 	else if (conn->stop_stage != STOP_CONN_RECOVER)
-		session->state = ISCSI_STATE_IN_RECOVERY;
+		WRITE_ONCE(session->state, ISCSI_STATE_IN_RECOVERY);
 
 	old_stop_stage = conn->stop_stage;
 	conn->stop_stage = flag;

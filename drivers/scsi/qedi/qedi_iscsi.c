@@ -1436,7 +1436,8 @@ void qedi_start_conn_recovery(struct qedi_ctx *qedi,
 		qedi_conn->abrt_conn = 1;
 		QEDI_ERR(&qedi->dbg_ctx,
 			 "Failing connection, state=0x%x, cid=0x%x\n",
-			 conn->session->state, qedi_conn->iscsi_conn_id);
+			 READ_ONCE(conn->session->state),
+			 qedi_conn->iscsi_conn_id);
 		iscsi_conn_failure(qedi_conn->cls_conn->dd_data,
 				   ISCSI_ERR_CONN_FAILED);
 	}

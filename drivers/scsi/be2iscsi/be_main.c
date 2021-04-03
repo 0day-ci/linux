@@ -285,7 +285,8 @@ static int beiscsi_eh_device_reset(struct scsi_cmnd *sc)
 	session = cls_session->dd_data;
 
 	spin_lock_bh(&session->frwd_lock);
-	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN) {
+	if (!session->leadconn ||
+	    READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN) {
 		spin_unlock_bh(&session->frwd_lock);
 		return FAILED;
 	}
