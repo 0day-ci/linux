@@ -434,6 +434,31 @@ static void bnx2i_free_ep(struct iscsi_endpoint *ep)
 	iscsi_destroy_endpoint(ep);
 }
 
+static void __bnx2i_free_task_priv(struct Scsi_Host *shost,
+				   struct iscsi_task *task)
+{
+	struct bnx2i_hba *hba = iscsi_host_priv(shost);
+	struct bnx2i_cmd *cmd = task->dd_data;
+
+	if (!cmd->io_tbl.bd_tbl)
+		return;
+
+	dma_free_coherent(&hba->pcidev->dev,
+			  ISCSI_MAX_BDS_PER_CMD * sizeof(struct iscsi_bd),
+			  cmd->io_tbl.bd_tbl, cmd->io_tbl.bd_tbl_dma);
+}
+
+static void bnx2i_free_task_priv(struct iscsi_session *session,
+				 struct iscsi_task *task)
+{
+	__bnx2i_free_task_priv(session->host, task);
+}
+
+static int bnx2i_exit_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	__bnx2i_free_task_priv(shost, scsi_cmd_priv(sc));
+	return 0;
+}
 
 /**
  * bnx2i_alloc_bdt - allocates buffer descriptor (BD) table for the command
@@ -456,30 +481,28 @@ static int bnx2i_alloc_bdt(struct bnx2i_hba *hba, struct bnx2i_cmd *cmd)
 	return 0;
 }
 
-static void bnx2i_free_task_priv(struct iscsi_session *session,
-				 struct iscsi_task *task)
+static int __bnx2i_alloc_task_priv(struct Scsi_Host *shost,
+				   struct iscsi_task *task)
 {
-	struct bnx2i_hba *hba = iscsi_host_priv(session->host);
-	struct bnx2i_cmd *cmd = task->dd_data;
-
-	if (!cmd->io_tbl.bd_tbl)
-		return;
-
-	dma_free_coherent(&hba->pcidev->dev,
-			  ISCSI_MAX_BDS_PER_CMD * sizeof(struct iscsi_bd),
-			  cmd->io_tbl.bd_tbl, cmd->io_tbl.bd_tbl_dma);
-}
-
-static int bnx2i_alloc_task_priv(struct iscsi_session *session,
-				 struct iscsi_task *task)
-{
-	struct bnx2i_hba *hba = iscsi_host_priv(session->host);
+	struct bnx2i_hba *hba = iscsi_host_priv(shost);
 	struct bnx2i_cmd *cmd = task->dd_data;
 
 	task->hdr = &cmd->hdr;
 	task->hdr_max = sizeof(struct iscsi_hdr);
 
 	return bnx2i_alloc_bdt(hba, cmd);
+}
+
+static int bnx2i_alloc_task_priv(struct iscsi_session *session,
+				 struct iscsi_task *task)
+{
+	return __bnx2i_alloc_task_priv(session->host, task);
+}
+
+static int bnx2i_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	iscsi_init_cmd_priv(shost, sc);
+	return __bnx2i_alloc_task_priv(shost, scsi_cmd_priv(sc));
 }
 
 /**
@@ -2203,6 +2226,10 @@ static struct scsi_host_template bnx2i_host_template = {
 	.sg_tablesize		= ISCSI_MAX_BDS_PER_CMD,
 	.shost_attrs		= bnx2i_dev_attributes,
 	.track_queue_depth	= 1,
+	.cmd_size		= sizeof(struct bnx2i_cmd) +
+				  sizeof(struct iscsi_task),
+	.init_cmd_priv		= bnx2i_init_cmd_priv,
+	.exit_cmd_priv		= bnx2i_exit_cmd_priv,
 };
 
 struct iscsi_transport bnx2i_iscsi_transport = {
