@@ -462,8 +462,12 @@ static void __iscsi_free_task(struct iscsi_task *task)
 	if (conn->login_task == task)
 		return;
 
-	if (!sc)
-		kfifo_in(&session->mgmt_pool.queue, (void *)&task, sizeof(void *));
+	if (sc)
+		return;
+
+	spin_lock_bh(&session->mgmt_lock);
+	kfifo_in(&session->mgmt_pool.queue, (void *)&task, sizeof(void *));
+	spin_unlock_bh(&session->mgmt_lock);
 }
 
 static void iscsi_free_task(struct iscsi_task *task)
@@ -716,9 +720,13 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		BUG_ON(conn->c_stage == ISCSI_CONN_INITIAL_STAGE);
 		BUG_ON(conn->c_stage == ISCSI_CONN_STOPPED);
 
+		spin_lock_bh(&session->mgmt_lock);
 		if (!kfifo_out(&session->mgmt_pool.queue, (void *)&task,
-			       sizeof(void *)))
+			       sizeof(void *))) {
+			spin_unlock_bh(&session->mgmt_lock);
 			return NULL;
+		}
+		spin_unlock_bh(&session->mgmt_lock);
 	}
 	/*
 	 * released in complete pdu for task we expect a response for, and
@@ -3017,6 +3025,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	session->dd_data = cls_session->dd_data + sizeof(*session);
 
 	mutex_init(&session->eh_mutex);
+	spin_lock_init(&session->mgmt_lock);
 	spin_lock_init(&session->frwd_lock);
 	spin_lock_init(&session->back_lock);
 
@@ -3144,13 +3153,13 @@ iscsi_conn_setup(struct iscsi_cls_session *cls_session, int dd_size,
 	INIT_WORK(&conn->xmitwork, iscsi_xmitworker);
 
 	/* allocate login_task used for the login/text sequences */
-	spin_lock_bh(&session->frwd_lock);
+	spin_lock_bh(&session->mgmt_lock);
 	if (!kfifo_out(&session->mgmt_pool.queue, (void *)&conn->login_task,
 		       sizeof(void *))) {
-		spin_unlock_bh(&session->frwd_lock);
+		spin_unlock_bh(&session->mgmt_lock);
 		goto login_task_alloc_fail;
 	}
-	spin_unlock_bh(&session->frwd_lock);
+	spin_unlock_bh(&session->mgmt_lock);
 
 	data = (char *) __get_free_pages(GFP_KERNEL,
 					 get_order(ISCSI_DEF_MAX_RECV_SEG_LEN));
@@ -3164,8 +3173,10 @@ iscsi_conn_setup(struct iscsi_cls_session *cls_session, int dd_size,
 	return cls_conn;
 
 login_task_data_alloc_fail:
+	spin_lock_bh(&session->mgmt_lock);
 	kfifo_in(&session->mgmt_pool.queue, (void *)&conn->login_task,
 		 sizeof(void *));
+	spin_unlock_bh(&session->mgmt_lock);
 login_task_alloc_fail:
 	iscsi_destroy_conn(cls_conn);
 	return NULL;
@@ -3206,11 +3217,12 @@ void iscsi_conn_teardown(struct iscsi_cls_conn *cls_conn)
 		   get_order(ISCSI_DEF_MAX_RECV_SEG_LEN));
 	kfree(conn->persistent_address);
 	kfree(conn->local_ipaddr);
-	/* regular RX path uses back_lock */
-	spin_lock_bh(&session->back_lock);
+
+	spin_lock_bh(&session->mgmt_lock);
 	kfifo_in(&session->mgmt_pool.queue, (void *)&conn->login_task,
 		 sizeof(void *));
-	spin_unlock_bh(&session->back_lock);
+	spin_unlock_bh(&session->mgmt_lock);
+
 	if (session->leadconn == conn)
 		session->leadconn = NULL;
 	spin_unlock_bh(&session->frwd_lock);

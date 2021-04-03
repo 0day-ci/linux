@@ -348,10 +348,9 @@ struct iscsi_session {
 	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
 						 * cmdsn, suspend_bit,     *
 						 * leadconn, _stage,       *
-						 * tmf_state and mgmt      *
-						 * queues                  */
-	spinlock_t		back_lock;	/* protects cmdsn_exp      *
-						 * cmdsn_max, mgmt queues  */
+						 * tmf_state and queues    */
+	spinlock_t		back_lock;	/* protects cmdsn_exp and  *
+						 * cmdsn_max               */
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.
@@ -363,6 +362,7 @@ struct iscsi_session {
 	int			cmds_max;	/* Total number of tasks */
 	struct iscsi_task	**mgmt_cmds;
 	struct iscsi_pool	mgmt_pool;	/* mgmt task pool */
+	spinlock_t		mgmt_lock;	/* protects mgmt pool/arr */
 	void			*dd_data;	/* LLD private data */
 };
 
