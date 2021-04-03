@@ -216,24 +216,19 @@ static char const *cqe_desc[] = {
 
 static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 {
-	struct iscsi_cls_session *cls_session;
 	struct beiscsi_io_task *abrt_io_task;
 	struct beiscsi_conn *beiscsi_conn;
-	struct iscsi_session *session;
 	struct invldt_cmd_tbl inv_tbl;
 	struct iscsi_task *abrt_task;
 	struct beiscsi_hba *phba;
 	struct iscsi_conn *conn;
 	int rc;
 
-	cls_session = starget_to_session(scsi_target(sc->device));
-	session = cls_session->dd_data;
-
 	/* check if we raced, task just got cleaned up under us */
-	spin_lock_bh(&session->back_lock);
 	abrt_task = scsi_cmd_priv(sc);
-	if (!abrt_task->sc) {
-		spin_unlock_bh(&session->back_lock);
+	spin_lock_bh(&abrt_task->lock);
+	if (!abrt_task->sc || iscsi_task_is_completed(abrt_task)) {
+		spin_unlock_bh(&abrt_task->lock);
 		return SUCCESS;
 	}
 	/* get a task ref till FW processes the req for the ICD used */
@@ -252,7 +247,7 @@ static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 	}
 	inv_tbl.cid = beiscsi_conn->beiscsi_conn_cid;
 	inv_tbl.icd = abrt_io_task->psgl_handle->sgl_index;
-	spin_unlock_bh(&session->back_lock);
+	spin_unlock_bh(&abrt_task->lock);
 
 	rc = beiscsi_mgmt_invalidate_icds(phba, &inv_tbl, 1);
 	iscsi_put_task(abrt_task);
@@ -274,7 +269,7 @@ struct beiscsi_invldt_cmd_tbl {
 static bool beiscsi_dev_reset_sc_iter(struct scsi_cmnd *sc, void *data,
 				      bool rsvd)
 {
-	struct iscsi_task *task = (struct iscsi_task *)sc->SCp.ptr;
+	struct iscsi_task *task = scsi_cmd_priv(sc);
 	struct iscsi_sc_iter_data *iter_data = data;
 	struct beiscsi_invldt_cmd_tbl *inv_tbl = iter_data->data;
 	struct beiscsi_conn *beiscsi_conn = iter_data->conn->dd_data;
