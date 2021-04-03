@@ -538,8 +538,6 @@ static void iscsi_finish_task(struct iscsi_task *task, int state)
  *
  * This is used when drivers do not need or cannot perform
  * lower level pdu processing.
- *
- * Called with session back_lock
  */
 void iscsi_complete_scsi_task(struct iscsi_task *task,
 			      uint32_t exp_cmdsn, uint32_t max_cmdsn)
@@ -831,7 +829,7 @@ EXPORT_SYMBOL_GPL(iscsi_conn_send_pdu);
  * @datalen: len of buffer
  *
  * iscsi_cmd_rsp sets up the scsi_cmnd fields based on the PDU and
- * then completes the command and task. called under back_lock
+ * then completes the command and task.
  **/
 static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 			       struct iscsi_task *task, char *data,
@@ -929,7 +927,7 @@ out:
  * @task: scsi command task
  *
  * iscsi_data_in_rsp sets up the scsi_cmnd fields based on the data received
- * then completes the command and task. called under back_lock
+ * then completes the command and task.
  **/
 static void
 iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
@@ -1033,7 +1031,7 @@ static int iscsi_send_nopout(struct iscsi_conn *conn, struct iscsi_nopin *rhdr)
  * @datalen: length of data
  *
  * iscsi_nop_out_rsp handles nop response from use or
- * from user space. called under back_lock
+ * from user space.
  **/
 static int iscsi_nop_out_rsp(struct iscsi_task *task,
 			     struct iscsi_nopin *nop, char *data, int datalen)
@@ -1103,13 +1101,10 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 			 * nop-out in response to target's nop-out rejected.
 			 * Just resend.
 			 */
-			/* In RX path we are under back lock */
-			spin_unlock(&conn->session->back_lock);
-			spin_lock(&conn->session->frwd_lock);
+			spin_lock_bh(&conn->session->frwd_lock);
 			iscsi_send_nopout(conn,
 					  (struct iscsi_nopin*)&rejected_pdu);
-			spin_unlock(&conn->session->frwd_lock);
-			spin_lock(&conn->session->back_lock);
+			spin_unlock_bh(&conn->session->frwd_lock);
 		} else {
 			struct iscsi_task *task;
 			/*
@@ -1184,17 +1179,16 @@ struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 EXPORT_SYMBOL_GPL(iscsi_itt_to_task);
 
 /**
- * __iscsi_complete_pdu - complete pdu
+ * iscsi_complete_pdu - complete pdu
  * @conn: iscsi conn
  * @hdr: iscsi header
  * @data: data buffer
  * @datalen: len of data buffer
  *
  * Completes pdu processing by freeing any resources allocated at
- * queuecommand or send generic. session back_lock must be held and verify
- * itt must have been called.
+ * queuecommand or send generic.
  */
-int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
+int iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, int datalen)
 {
 	int opcode = hdr->opcode & ISCSI_OPCODE_MASK, rc = 0;
@@ -1238,7 +1232,7 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	iscsi_put_task(task);
 	return rc;
 }
-EXPORT_SYMBOL_GPL(__iscsi_complete_pdu);
+EXPORT_SYMBOL_GPL(iscsi_complete_pdu);
 
 /**
  * iscsi_complete_task - complete iscsi task
@@ -1254,8 +1248,6 @@ EXPORT_SYMBOL_GPL(__iscsi_complete_pdu);
  * This function should be used by drivers that do not use the libiscsi
  * itt for the PDU that was sent to the target and has access to the
  * iscsi_task struct directly.
- *
- * Session back_lock must be held.
  */
 int iscsi_complete_task(struct iscsi_conn *conn, struct iscsi_task *task,
 			struct iscsi_hdr *hdr, char *data, int datalen)
@@ -1280,11 +1272,9 @@ int iscsi_complete_task(struct iscsi_conn *conn, struct iscsi_task *task,
 				break;
 
 			/* In RX path we are under back lock */
-			spin_unlock(&session->back_lock);
 			spin_lock(&session->frwd_lock);
 			iscsi_send_nopout(conn, (struct iscsi_nopin*)hdr);
 			spin_unlock(&session->frwd_lock);
-			spin_lock(&session->back_lock);
 			break;
 		case ISCSI_OP_REJECT:
 			rc = iscsi_handle_reject(conn, hdr, data, datalen);
@@ -1364,18 +1354,6 @@ recv_pdu:
 	return rc;
 }
 EXPORT_SYMBOL_GPL(iscsi_complete_task);
-
-int iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
-		       char *data, int datalen)
-{
-	int rc;
-
-	spin_lock(&conn->session->back_lock);
-	rc = __iscsi_complete_pdu(conn, hdr, data, datalen);
-	spin_unlock(&conn->session->back_lock);
-	return rc;
-}
-EXPORT_SYMBOL_GPL(iscsi_complete_pdu);
 
 int iscsi_verify_itt(struct iscsi_conn *conn, itt_t itt)
 {
@@ -3068,7 +3046,6 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	mutex_init(&session->eh_mutex);
 	spin_lock_init(&session->mgmt_lock);
 	spin_lock_init(&session->frwd_lock);
-	spin_lock_init(&session->back_lock);
 	spin_lock_init(&session->back_cmdsn_lock);
 
 	/* initialize mgmt task pool */

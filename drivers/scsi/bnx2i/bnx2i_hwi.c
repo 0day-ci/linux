@@ -1415,10 +1415,8 @@ int bnx2i_process_scsi_cmd_resp(struct iscsi_session *session,
 	}
 
 done:
-	spin_lock_bh(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr,
-			     conn->data, datalen);
-	spin_unlock_bh(&session->back_lock);
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr,
+			   conn->data, datalen);
 	iscsi_put_task(task);
 fail:
 	return 0;
@@ -1483,11 +1481,9 @@ static int bnx2i_process_login_resp(struct iscsi_session *session,
 		}
 	}
 
-	spin_lock(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr,
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr,
 		bnx2i_conn->gen_pdu.resp_buf,
 		bnx2i_conn->gen_pdu.resp_wr_ptr - bnx2i_conn->gen_pdu.resp_buf);
-	spin_unlock(&session->back_lock);
 	iscsi_put_task(task);
 done:
 	return 0;
@@ -1544,12 +1540,10 @@ static int bnx2i_process_text_resp(struct iscsi_session *session,
 			bnx2i_conn->gen_pdu.resp_wr_ptr++;
 		}
 	}
-	spin_lock(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr,
-			     bnx2i_conn->gen_pdu.resp_buf,
-			     bnx2i_conn->gen_pdu.resp_wr_ptr -
-			     bnx2i_conn->gen_pdu.resp_buf);
-	spin_unlock(&session->back_lock);
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr,
+			   bnx2i_conn->gen_pdu.resp_buf,
+			   bnx2i_conn->gen_pdu.resp_wr_ptr -
+			   bnx2i_conn->gen_pdu.resp_buf);
 	iscsi_put_task(task);
 done:
 	return 0;
@@ -1587,9 +1581,7 @@ static int bnx2i_process_tmf_resp(struct iscsi_session *session,
 	resp_hdr->itt = task->hdr->itt;
 	resp_hdr->response = tmf_cqe->response;
 
-	spin_lock(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr, NULL, 0);
-	spin_unlock(&session->back_lock);
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr, NULL, 0);
 	iscsi_put_task(task);
 done:
 	return 0;
@@ -1633,10 +1625,7 @@ static int bnx2i_process_logout_resp(struct iscsi_session *session,
 	resp_hdr->t2wait = cpu_to_be32(logout->time_to_wait);
 	resp_hdr->t2retain = cpu_to_be32(logout->time_to_retain);
 
-	spin_lock(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr, NULL, 0);
-	spin_unlock(&session->back_lock);
-
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)resp_hdr, NULL, 0);
 	iscsi_put_task(task);
 
 	bnx2i_conn->ep->state = EP_STATE_LOGOUT_RESP_RCVD;
@@ -1727,10 +1716,7 @@ static int bnx2i_process_nopin_mesg(struct iscsi_session *session,
 		memcpy(&hdr->lun, nop_in->lun, 8);
 	}
 done:
-	spin_lock(&session->back_lock);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, NULL, 0);
-	spin_unlock(&session->back_lock);
-
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, NULL, 0);
 	if (task)
 		iscsi_put_task(task);
 
@@ -1765,7 +1751,6 @@ static void bnx2i_process_async_mesg(struct iscsi_session *session,
 		return;
 	}
 
-	spin_lock(&session->back_lock);
 	resp_hdr = (struct iscsi_async *) &bnx2i_conn->gen_pdu.resp_hdr;
 	memset(resp_hdr, 0, sizeof(struct iscsi_hdr));
 	resp_hdr->opcode = async_cqe->op_code;
@@ -1782,9 +1767,8 @@ static void bnx2i_process_async_mesg(struct iscsi_session *session,
 	resp_hdr->param2 = cpu_to_be16(async_cqe->param2);
 	resp_hdr->param3 = cpu_to_be16(async_cqe->param3);
 
-	__iscsi_complete_pdu(bnx2i_conn->cls_conn->dd_data,
-			     (struct iscsi_hdr *)resp_hdr, NULL, 0);
-	spin_unlock(&session->back_lock);
+	iscsi_complete_pdu(bnx2i_conn->cls_conn->dd_data,
+			   (struct iscsi_hdr *)resp_hdr, NULL, 0);
 }
 
 
@@ -1811,7 +1795,6 @@ static void bnx2i_process_reject_mesg(struct iscsi_session *session,
 	} else
 		bnx2i_unsol_pdu_adjust_rq(bnx2i_conn);
 
-	spin_lock(&session->back_lock);
 	hdr = (struct iscsi_reject *) &bnx2i_conn->gen_pdu.resp_hdr;
 	memset(hdr, 0, sizeof(struct iscsi_hdr));
 	hdr->opcode = reject->op_code;
@@ -1820,9 +1803,8 @@ static void bnx2i_process_reject_mesg(struct iscsi_session *session,
 	hdr->max_cmdsn = cpu_to_be32(reject->max_cmd_sn);
 	hdr->exp_cmdsn = cpu_to_be32(reject->exp_cmd_sn);
 	hdr->ffffffff = cpu_to_be32(RESERVED_ITT);
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, conn->data,
-			     reject->data_length);
-	spin_unlock(&session->back_lock);
+	iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, conn->data,
+			   reject->data_length);
 }
 
 /**

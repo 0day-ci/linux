@@ -349,16 +349,10 @@ struct iscsi_session {
 	struct iscsi_transport	*tt;
 	struct Scsi_Host	*host;
 	struct iscsi_conn	*leadconn;	/* leading connection */
-	/* Between the forward and the backward locks exists a strict locking
-	 * hierarchy. The mutual exclusion zone protected by the forward lock
-	 * can enclose the mutual exclusion zone protected by the backward lock
-	 * but not vice versa.
-	 */
 	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
 						 * cmdsn, suspend_bit,     *
 						 * leadconn, _stage,       *
 						 * tmf_state and queues    */
-	spinlock_t		back_lock;
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.

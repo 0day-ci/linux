@@ -1339,8 +1339,6 @@ static void adapter_get_sol_cqe(struct beiscsi_hba *phba,
 static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 			     struct beiscsi_hba *phba, struct sol_cqe *psol)
 {
-	struct iscsi_conn *conn = beiscsi_conn->conn;
-	struct iscsi_session *session = conn->session;
 	struct common_sol_cqe csol_cqe = {0};
 	struct hwi_wrb_context *pwrb_context;
 	struct hwi_controller *phwi_ctrlr;
@@ -1376,9 +1374,7 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 	if (!task)
 		return;
 
-	spin_lock_bh(&session->back_lock);
 	type = ((struct beiscsi_io_task *)task->dd_data)->wrb_type;
-
 	switch (type) {
 	case HWH_TYPE_IO:
 	case HWH_TYPE_IO_RD:
@@ -1417,7 +1413,6 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 		break;
 	}
 
-	spin_unlock_bh(&session->back_lock);
 	iscsi_put_task(task);
 }
 
@@ -1610,7 +1605,6 @@ beiscsi_hdl_fwd_pdu(struct beiscsi_conn *beiscsi_conn,
 		    struct hd_async_context *pasync_ctx,
 		    u16 cri)
 {
-	struct iscsi_session *session = beiscsi_conn->conn->session;
 	struct hd_async_handle *pasync_handle, *plast_handle;
 	struct beiscsi_hba *phba = beiscsi_conn->phba;
 	void *phdr = NULL, *pdata = NULL;
@@ -1651,9 +1645,7 @@ beiscsi_hdl_fwd_pdu(struct beiscsi_conn *beiscsi_conn,
 			    pasync_ctx->async_entry[cri].wq.bytes_needed,
 			    pasync_ctx->async_entry[cri].wq.bytes_received);
 	}
-	spin_lock_bh(&session->back_lock);
 	status = beiscsi_complete_pdu(beiscsi_conn, phdr, pdata, dlen);
-	spin_unlock_bh(&session->back_lock);
 	beiscsi_hdl_purge_handles(phba, pasync_ctx, cri);
 	return status;
 }
@@ -4325,7 +4317,6 @@ beiscsi_offload_connection(struct beiscsi_conn *beiscsi_conn,
 	struct hwi_wrb_context *pwrb_context = NULL;
 	struct beiscsi_hba *phba = beiscsi_conn->phba;
 	struct iscsi_task *task = beiscsi_conn->task;
-	struct iscsi_session *session = task->conn->session;
 	u32 doorbell = 0;
 
 	/*
@@ -4333,9 +4324,7 @@ beiscsi_offload_connection(struct beiscsi_conn *beiscsi_conn,
 	 * login/startup related tasks.
 	 */
 	beiscsi_conn->login_in_progress = 0;
-	spin_lock_bh(&session->back_lock);
 	beiscsi_cleanup_task(task);
-	spin_unlock_bh(&session->back_lock);
 
 	pwrb_handle = alloc_wrb_handle(phba, beiscsi_conn->beiscsi_conn_cid,
 				       &pwrb_context);
