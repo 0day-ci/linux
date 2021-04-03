@@ -14,6 +14,9 @@
 #include "qedi_iscsi.h"
 #include "qedi_gbl.h"
 
+static int qedi_exit_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc);
+static int qedi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc);
+
 int qedi_recover_all_conns(struct qedi_ctx *qedi)
 {
 	struct qedi_conn *qedi_conn;
@@ -59,6 +62,9 @@ struct scsi_host_template qedi_host_template = {
 	.dma_boundary = QEDI_HW_DMA_BOUNDARY,
 	.cmd_per_lun = 128,
 	.shost_attrs = qedi_shost_attrs,
+	.cmd_size = sizeof(struct qedi_cmd) + sizeof(struct iscsi_task),
+	.init_cmd_priv = qedi_init_cmd_priv,
+	.exit_cmd_priv = qedi_exit_cmd_priv,
 };
 
 static void qedi_conn_free_login_resources(struct qedi_ctx *qedi,
@@ -170,10 +176,10 @@ static void qedi_free_sget(struct qedi_ctx *qedi, struct qedi_cmd *cmd)
 			  cmd->io_tbl.sge_tbl, cmd->io_tbl.sge_tbl_dma);
 }
 
-static void qedi_free_task_priv(struct iscsi_session *session,
-				struct iscsi_task *task)
+static void __qedi_free_task_priv(struct Scsi_Host *shost,
+				  struct iscsi_task *task)
 {
-	struct qedi_ctx *qedi = iscsi_host_priv(session->host);
+	struct qedi_ctx *qedi = iscsi_host_priv(shost);
 	struct qedi_cmd *cmd = task->dd_data;
 
 	qedi_free_sget(qedi, cmd);
@@ -181,6 +187,18 @@ static void qedi_free_task_priv(struct iscsi_session *session,
 	if (cmd->sense_buffer)
 		dma_free_coherent(&qedi->pdev->dev, SCSI_SENSE_BUFFERSIZE,
 				  cmd->sense_buffer, cmd->sense_buffer_dma);
+}
+
+static void qedi_free_task_priv(struct iscsi_session *session,
+				struct iscsi_task *task)
+{
+	return __qedi_free_task_priv(session->host, task);
+}
+
+static int qedi_exit_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	__qedi_free_task_priv(shost, scsi_cmd_priv(sc));
+	return 0;
 }
 
 static int qedi_alloc_sget(struct qedi_ctx *qedi, struct qedi_cmd *cmd)
@@ -202,10 +220,10 @@ static int qedi_alloc_sget(struct qedi_ctx *qedi, struct qedi_cmd *cmd)
 	return 0;
 }
 
-static int qedi_alloc_task_priv(struct iscsi_session *session,
-				struct iscsi_task *task)
+static int __qedi_alloc_task_priv(struct Scsi_Host *shost,
+				  struct iscsi_task *task)
 {
-	struct qedi_ctx *qedi = iscsi_host_priv(session->host);
+	struct qedi_ctx *qedi = iscsi_host_priv(shost);
 	struct qedi_cmd *cmd = task->dd_data;
 
 	task->hdr = &cmd->hdr;
@@ -226,6 +244,18 @@ static int qedi_alloc_task_priv(struct iscsi_session *session,
 free_sgets:
 	qedi_free_sget(qedi, cmd);
 	return -ENOMEM;
+}
+
+static int qedi_alloc_task_priv(struct iscsi_session *session,
+				struct iscsi_task *task)
+{
+	return __qedi_alloc_task_priv(session->host, task);
+}
+
+static int qedi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
+{
+	iscsi_init_cmd_priv(shost, sc);
+	return __qedi_alloc_task_priv(shost, scsi_cmd_priv(sc));
 }
 
 static struct iscsi_cls_session *
