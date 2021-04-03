@@ -310,10 +310,7 @@ struct iscsi_session {
 	spinlock_t		back_cmdsn_lock;
 	uint32_t		exp_cmdsn;
 	uint32_t		max_cmdsn;
-
 	uint32_t		cmdsn;
-	/* This tracks the reqs queued into the initiator */
-	uint32_t		queued_cmdsn;
 
 	/* configuration */
 	int			abort_timeout;
@@ -359,10 +356,9 @@ struct iscsi_session {
 	struct iscsi_transport	*tt;
 	struct Scsi_Host	*host;
 	struct iscsi_conn	*leadconn;	/* leading connection */
-	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
-						 * cmdsn, suspend_bit,     *
-						 * _stage, exec lists, and
-						 * tmf_state    */
+	spinlock_t		frwd_lock;	/* protects cmdsn for offload,*
+						 * suspend_bit, _stage, exec  *
+						 * lists, and tmf_state       */
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.
@@ -474,7 +470,7 @@ extern void iscsi_conn_queue_work(struct iscsi_conn *conn);
 /*
  * pdu and task processing
  */
-extern void iscsi_update_cmdsn(struct iscsi_session *, struct iscsi_nopin *);
+extern void iscsi_update_cmdsn(struct iscsi_conn *conn, struct iscsi_nopin *hdr);
 extern void iscsi_prep_data_out_pdu(struct iscsi_task *task,
 				    struct iscsi_r2t_info *r2t,
 				    struct iscsi_data *hdr);
