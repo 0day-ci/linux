@@ -633,13 +633,19 @@ static DECLARE_DELAYED_WORK(kfence_timer, toggle_allocation_gate);
 
 void __init kfence_alloc_pool(void)
 {
+	void *pool;
+
 	if (!kfence_sample_interval)
 		return;
 
-	__kfence_pool = memblock_alloc(KFENCE_POOL_SIZE, PAGE_SIZE);
-
-	if (!__kfence_pool)
+	pool = memblock_alloc(KFENCE_POOL_SIZE, PAGE_SIZE);
+	if (!pool) {
 		pr_err("failed to allocate pool\n");
+		return;
+	}
+
+	kasan_unpoison_range(pool, KFENCE_POOL_SIZE);
+	__kfence_pool = pool;
 }
 
 void __init kfence_init(void)
