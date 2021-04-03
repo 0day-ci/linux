@@ -654,8 +654,6 @@ static struct qedi_ctx *qedi_host_alloc(struct pci_dev *pdev)
 	qedi->max_active_conns = ISCSI_MAX_SESS_PER_HBA;
 	qedi->max_sqes = QEDI_SQ_SIZE;
 
-	shost->nr_hw_queues = MIN_NUM_CPUS_MSIX(qedi);
-
 	pci_set_drvdata(pdev, qedi);
 
 exit_setup_shost:
