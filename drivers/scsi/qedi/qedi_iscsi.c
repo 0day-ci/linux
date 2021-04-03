@@ -65,7 +65,7 @@ static int qedi_eh_abort(struct scsi_cmnd *cmd)
 		return SUCCESS;
 	}
 
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	spin_unlock_bh(&task->lock);
 
 	qedi_conn = task->conn->dd_data;

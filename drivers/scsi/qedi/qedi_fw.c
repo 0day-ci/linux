@@ -706,11 +706,8 @@ static void qedi_mtask_completion(struct qedi_ctx *qedi,
 
 static void qedi_process_nopin_local_cmpl(struct qedi_ctx *qedi,
 					  struct iscsi_cqe_solicited *cqe,
-					  struct iscsi_task *task,
-					  struct qedi_conn *qedi_conn)
+					  struct iscsi_task *task)
 {
-	struct iscsi_conn *conn = qedi_conn->cls_conn->dd_data;
-	struct iscsi_session *session = conn->session;
 	struct qedi_cmd *cmd = task->dd_data;
 
 	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_UNSOL,
@@ -720,9 +717,7 @@ static void qedi_process_nopin_local_cmpl(struct qedi_ctx *qedi,
 	cmd->state = RESPONSE_RECEIVED;
 	qedi_clear_task_idx(qedi, cmd->task_id);
 
-	spin_lock_bh(&session->back_lock);
-	__iscsi_put_task(task);
-	spin_unlock_bh(&session->back_lock);
+	iscsi_put_task(task);
 }
 
 static void qedi_process_cmd_cleanup_resp(struct qedi_ctx *qedi,
@@ -904,7 +899,7 @@ void qedi_fp_process_cqes(struct qedi_work *work)
 		if ((nopout_hdr->itt == RESERVED_ITT) &&
 		    (cqe->cqe_solicited.itid != (u16)RESERVED_ITT)) {
 			qedi_process_nopin_local_cmpl(qedi, &cqe->cqe_solicited,
-						      task, q_conn);
+						      task);
 		} else {
 			/* Process other solicited responses */
 			qedi_mtask_completion(qedi, cqe, task, q_conn, que_idx);

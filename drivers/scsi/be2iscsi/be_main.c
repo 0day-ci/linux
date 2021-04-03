@@ -232,7 +232,7 @@ static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 		return SUCCESS;
 	}
 	/* get a task ref till FW processes the req for the ICD used */
-	__iscsi_get_task(abrt_task);
+	iscsi_get_task(abrt_task);
 	abrt_io_task = abrt_task->dd_data;
 	conn = abrt_task->conn;
 	beiscsi_conn = conn->dd_data;
@@ -287,7 +287,7 @@ static bool beiscsi_dev_reset_sc_iter(struct scsi_cmnd *sc, void *data,
 	}
 
 	/* get a task ref till FW processes the req for the ICD used */
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	io_task = task->dd_data;
 	/* mark WRB invalid which have been not processed by FW yet */
 	if (is_chip_be2_be3r(phba)) {
@@ -1253,7 +1253,7 @@ hwi_complete_drvr_msgs(struct beiscsi_conn *beiscsi_conn,
 	if (task) {
 		spin_lock(&task->lock);
 		if (!iscsi_task_is_completed(task))
-			__iscsi_get_task(task);
+			iscsi_get_task(task);
 		else
 			task = NULL;
 		spin_unlock(&task->lock);
@@ -1366,7 +1366,7 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 	if (task) {
 		spin_lock(&task->lock);
 		if (!iscsi_task_is_completed(task))
-			__iscsi_get_task(task);
+			iscsi_get_task(task);
 		else
 			task = NULL;
 		spin_unlock(&task->lock);

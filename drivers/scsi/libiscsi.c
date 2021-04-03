@@ -486,27 +486,16 @@ static void iscsi_free_task(struct iscsi_task *task)
 	sc->scsi_done(sc);
 }
 
-void __iscsi_get_task(struct iscsi_task *task)
+void iscsi_get_task(struct iscsi_task *task)
 {
 	refcount_inc(&task->refcount);
 }
-EXPORT_SYMBOL_GPL(__iscsi_get_task);
-
-void __iscsi_put_task(struct iscsi_task *task)
-{
-	if (refcount_dec_and_test(&task->refcount))
-		iscsi_free_task(task);
-}
-EXPORT_SYMBOL_GPL(__iscsi_put_task);
+EXPORT_SYMBOL_GPL(iscsi_get_task);
 
 void iscsi_put_task(struct iscsi_task *task)
 {
-	struct iscsi_session *session = task->conn->session;
-
-	/* regular RX path uses back_lock */
-	spin_lock_bh(&session->back_lock);
-	__iscsi_put_task(task);
-	spin_unlock_bh(&session->back_lock);
+	if (refcount_dec_and_test(&task->refcount))
+		iscsi_free_task(task);
 }
 EXPORT_SYMBOL_GPL(iscsi_put_task);
 
@@ -536,7 +525,7 @@ static void iscsi_finish_task(struct iscsi_task *task, int state)
 		WRITE_ONCE(conn->ping_task, NULL);
 
 	/* release get from queueing */
-	__iscsi_put_task(task);
+	iscsi_put_task(task);
 }
 
 /**
@@ -587,12 +576,12 @@ static bool cleanup_queued_task(struct iscsi_task *task)
 		 */
 		if (task->state == ISCSI_TASK_RUNNING ||
 		    task->state == ISCSI_TASK_COMPLETED)
-			__iscsi_put_task(task);
+			iscsi_put_task(task);
 	}
 
 	if (conn->task == task) {
 		conn->task = NULL;
-		__iscsi_put_task(task);
+		iscsi_put_task(task);
 	}
 
 	return early_complete;
@@ -788,10 +777,7 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	return task;
 
 free_task:
-	/* regular RX path uses back_lock */
-	spin_lock(&session->back_lock);
-	__iscsi_put_task(task);
-	spin_unlock(&session->back_lock);
+	iscsi_put_task(task);
 	return NULL;
 }
 
@@ -1156,7 +1142,7 @@ struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 		if (iscsi_task_is_completed(task))
 			return NULL;
 
-		__iscsi_get_task(task);
+		iscsi_get_task(task);
 		return task;
 	} else {
 		return iscsi_itt_to_ctask(conn, itt);
@@ -1426,7 +1412,7 @@ struct iscsi_task *iscsi_itt_to_ctask(struct iscsi_conn *conn, itt_t itt)
 		spin_unlock_bh(&task->lock);
 		return NULL;
 	}
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	spin_unlock_bh(&task->lock);
 
 	return task;
@@ -1505,11 +1491,9 @@ static int iscsi_xmit_task(struct iscsi_conn *conn, struct iscsi_task *task,
 {
 	int rc;
 
-	spin_lock_bh(&conn->session->back_lock);
-
 	if (!conn->task) {
 		/* Take a ref so we can access it after xmit_task() */
-		__iscsi_get_task(task);
+		iscsi_get_task(task);
 	} else {
 		/* Already have a ref from when we failed to send it last call */
 		conn->task = NULL;
@@ -1520,7 +1504,7 @@ static int iscsi_xmit_task(struct iscsi_conn *conn, struct iscsi_task *task,
 	 * case a bad target sends a cmd rsp before we have handled the task.
 	 */
 	if (was_requeue)
-		__iscsi_put_task(task);
+		iscsi_put_task(task);
 
 	/*
 	 * Do this after dropping the extra ref because if this was a requeue
@@ -1532,31 +1516,26 @@ static int iscsi_xmit_task(struct iscsi_conn *conn, struct iscsi_task *task,
 		 * task and get woken up again.
 		 */
 		conn->task = task;
-		spin_unlock_bh(&conn->session->back_lock);
 		return -ENODATA;
 	}
-	spin_unlock_bh(&conn->session->back_lock);
 
 	spin_unlock_bh(&conn->session->frwd_lock);
 	rc = conn->session->tt->xmit_task(task);
-	spin_lock_bh(&conn->session->frwd_lock);
 	if (!rc) {
 		/* done with this task */
 		task->last_xfer = jiffies;
+		iscsi_put_task(task);
 	}
-	/* regular RX path uses back_lock */
-	spin_lock(&conn->session->back_lock);
+
+	spin_lock_bh(&conn->session->frwd_lock);
 	if (rc) {
 		/*
-		 * get an extra ref that is released next time we access it
-		 * as conn->task above.
+		 * Keep ref from above. Will be released next time we access it
+		 * as conn->task.
 		 */
-		__iscsi_get_task(task);
 		conn->task = task;
 	}
 
-	__iscsi_put_task(task);
-	spin_unlock(&conn->session->back_lock);
 	return rc;
 }
 
@@ -1627,10 +1606,7 @@ check_mgmt:
 				  running);
 		list_del_init(&task->running);
 		if (iscsi_prep_mgmt_task(conn, task)) {
-			/* regular RX path uses back_lock */
-			spin_lock_bh(&conn->session->back_lock);
-			__iscsi_put_task(task);
-			spin_unlock_bh(&conn->session->back_lock);
+			iscsi_put_task(task);
 			continue;
 		}
 		rc = iscsi_xmit_task(conn, task, false);
@@ -1999,7 +1975,7 @@ static bool iscsi_sc_iter(struct scsi_cmnd *sc, void *data, bool rsvd)
 		spin_unlock_bh(&task->lock);
 		return true;
 	}
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	spin_unlock_bh(&task->lock);
 
 	if (iter_data->lun != -1 && iter_data->lun != task->sc->device->lun) {
@@ -2163,7 +2139,7 @@ enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 		spin_unlock(&task->lock);
 		goto done;
 	}
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	spin_unlock(&task->lock);
 
 	if (READ_ONCE(session->state) != ISCSI_STATE_LOGGED_IN) {
@@ -2364,7 +2340,7 @@ check_done:
 		goto check_done;
 	}
 
-	__iscsi_get_task(task);
+	iscsi_get_task(task);
 	spin_unlock_bh(&task->lock);
 
 	/*
