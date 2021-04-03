@@ -160,32 +160,30 @@ login_req_buf_failure:
 	return -ENOMEM;
 }
 
-static void qedi_destroy_cmd_pool(struct qedi_ctx *qedi,
-				  struct iscsi_session *session)
+static void qedi_free_sget(struct qedi_ctx *qedi, struct qedi_cmd *cmd)
 {
-	int i;
+	if (!cmd->io_tbl.sge_tbl)
+		return;
 
-	for (i = 0; i < session->cmds_max; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct qedi_cmd *cmd = task->dd_data;
-
-		if (cmd->io_tbl.sge_tbl)
-			dma_free_coherent(&qedi->pdev->dev,
-					  QEDI_ISCSI_MAX_BDS_PER_CMD *
-					  sizeof(struct scsi_sge),
-					  cmd->io_tbl.sge_tbl,
-					  cmd->io_tbl.sge_tbl_dma);
-
-		if (cmd->sense_buffer)
-			dma_free_coherent(&qedi->pdev->dev,
-					  SCSI_SENSE_BUFFERSIZE,
-					  cmd->sense_buffer,
-					  cmd->sense_buffer_dma);
-	}
+	dma_free_coherent(&qedi->pdev->dev,
+			  QEDI_ISCSI_MAX_BDS_PER_CMD * sizeof(struct scsi_sge),
+			  cmd->io_tbl.sge_tbl, cmd->io_tbl.sge_tbl_dma);
 }
 
-static int qedi_alloc_sget(struct qedi_ctx *qedi, struct iscsi_session *session,
-			   struct qedi_cmd *cmd)
+static void qedi_free_task_priv(struct iscsi_session *session,
+				struct iscsi_task *task)
+{
+	struct qedi_ctx *qedi = iscsi_host_priv(session->host);
+	struct qedi_cmd *cmd = task->dd_data;
+
+	qedi_free_sget(qedi, cmd);
+
+	if (cmd->sense_buffer)
+		dma_free_coherent(&qedi->pdev->dev, SCSI_SENSE_BUFFERSIZE,
+				  cmd->sense_buffer, cmd->sense_buffer_dma);
+}
+
+static int qedi_alloc_sget(struct qedi_ctx *qedi, struct qedi_cmd *cmd)
 {
 	struct qedi_io_bdt *io = &cmd->io_tbl;
 	struct scsi_sge *sge;
@@ -195,8 +193,8 @@ static int qedi_alloc_sget(struct qedi_ctx *qedi, struct iscsi_session *session,
 					 sizeof(*sge),
 					 &io->sge_tbl_dma, GFP_KERNEL);
 	if (!io->sge_tbl) {
-		iscsi_session_printk(KERN_ERR, session,
-				     "Could not allocate BD table.\n");
+		shost_printk(KERN_ERR, qedi->shost,
+			    "Could not allocate BD table.\n");
 		return -ENOMEM;
 	}
 
@@ -204,33 +202,29 @@ static int qedi_alloc_sget(struct qedi_ctx *qedi, struct iscsi_session *session,
 	return 0;
 }
 
-static int qedi_setup_cmd_pool(struct qedi_ctx *qedi,
-			       struct iscsi_session *session)
+static int qedi_alloc_task_priv(struct iscsi_session *session,
+				struct iscsi_task *task)
 {
-	int i;
+	struct qedi_ctx *qedi = iscsi_host_priv(session->host);
+	struct qedi_cmd *cmd = task->dd_data;
 
-	for (i = 0; i < session->cmds_max; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct qedi_cmd *cmd = task->dd_data;
+	task->hdr = &cmd->hdr;
+	task->hdr_max = sizeof(struct iscsi_hdr);
 
-		task->hdr = &cmd->hdr;
-		task->hdr_max = sizeof(struct iscsi_hdr);
+	if (qedi_alloc_sget(qedi, cmd))
+		return -ENOMEM;
 
-		if (qedi_alloc_sget(qedi, session, cmd))
-			goto free_sgets;
-
-		cmd->sense_buffer = dma_alloc_coherent(&qedi->pdev->dev,
-						       SCSI_SENSE_BUFFERSIZE,
-						       &cmd->sense_buffer_dma,
-						       GFP_KERNEL);
-		if (!cmd->sense_buffer)
-			goto free_sgets;
-	}
+	cmd->sense_buffer = dma_alloc_coherent(&qedi->pdev->dev,
+					       SCSI_SENSE_BUFFERSIZE,
+					       &cmd->sense_buffer_dma,
+					       GFP_KERNEL);
+	if (!cmd->sense_buffer)
+		goto free_sgets;
 
 	return 0;
 
 free_sgets:
-	qedi_destroy_cmd_pool(qedi, session);
+	qedi_free_sget(qedi, cmd);
 	return -ENOMEM;
 }
 
@@ -264,27 +258,7 @@ qedi_session_create(struct iscsi_endpoint *ep, u16 cmds_max,
 		return NULL;
 	}
 
-	if (qedi_setup_cmd_pool(qedi, cls_session->dd_data)) {
-		QEDI_ERR(&qedi->dbg_ctx,
-			 "Failed to setup cmd pool for ep=%p\n", qedi_ep);
-		goto session_teardown;
-	}
-
 	return cls_session;
-
-session_teardown:
-	iscsi_session_teardown(cls_session);
-	return NULL;
-}
-
-static void qedi_session_destroy(struct iscsi_cls_session *cls_session)
-{
-	struct iscsi_session *session = cls_session->dd_data;
-	struct Scsi_Host *shost = iscsi_session_to_shost(cls_session);
-	struct qedi_ctx *qedi = iscsi_host_priv(shost);
-
-	qedi_destroy_cmd_pool(qedi, session);
-	iscsi_session_teardown(cls_session);
 }
 
 static struct iscsi_cls_conn *
@@ -1398,7 +1372,7 @@ struct iscsi_transport qedi_iscsi_transport = {
 	.caps = CAP_RECOVERY_L0 | CAP_HDRDGST | CAP_MULTI_R2T | CAP_DATADGST |
 		CAP_DATA_PATH_OFFLOAD | CAP_TEXT_NEGO,
 	.create_session = qedi_session_create,
-	.destroy_session = qedi_session_destroy,
+	.destroy_session = iscsi_session_teardown,
 	.create_conn = qedi_conn_create,
 	.bind_conn = qedi_conn_bind,
 	.start_conn = qedi_conn_start,
@@ -1410,6 +1384,8 @@ struct iscsi_transport qedi_iscsi_transport = {
 	.get_session_param = iscsi_session_get_param,
 	.get_host_param = qedi_host_get_param,
 	.send_pdu = iscsi_conn_send_pdu,
+	.alloc_task_priv = qedi_alloc_task_priv,
+	.free_task_priv = qedi_free_task_priv,
 	.get_stats = qedi_conn_get_stats,
 	.xmit_task = qedi_task_xmit,
 	.cleanup_task = qedi_cleanup_task,
@@ -1626,7 +1602,7 @@ void qedi_clear_session_ctx(struct iscsi_cls_session *cls_sess)
 
 	qedi_conn_destroy(qedi_conn->cls_conn);
 
-	qedi_session_destroy(cls_sess);
+	iscsi_session_teardown(cls_sess);
 }
 
 void qedi_process_tcp_error(struct qedi_endpoint *ep,
