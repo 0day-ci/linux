@@ -150,7 +150,8 @@ struct iscsi_task {
 	spinlock_t		lock;
 	int			state;
 	refcount_t		refcount;
-	struct list_head	running;	/* running cmd list */
+	struct llist_node	queue;
+	struct list_head	running;
 	void			*dd_data;	/* driver/transport data */
 };
 
@@ -212,10 +213,18 @@ struct iscsi_conn {
 	struct iscsi_task	*task;		/* xmit task in progress */
 
 	/* xmit */
-	/* items must be added/deleted under frwd lock */
-	struct list_head	mgmtqueue;	/* mgmt (control) xmit queue */
-	struct list_head	cmdqueue;	/* data-path cmd queue */
-	struct list_head	requeue;	/* tasks needing another run */
+	struct llist_head	cmdqueue;	/* data-path cmd queue */
+	struct llist_head	requeue;	/* tasks needing another run */
+
+	/* The frwd_lock is used to access these lists in the xmit and eh path */
+	struct list_head	cmd_exec_list;
+	struct list_head	requeue_exec_list;
+	/*
+	 * The frwd_lock is used to access this list in the xmit, eh and
+	 * submission paths.
+	 */
+	struct list_head	mgmt_exec_list;
+
 	struct work_struct	xmitwork;	/* per-conn. xmit workqueue */
 	unsigned long		suspend_tx;	/* suspend Tx */
 	unsigned long		suspend_rx;	/* suspend Rx */
@@ -352,8 +361,8 @@ struct iscsi_session {
 	struct iscsi_conn	*leadconn;	/* leading connection */
 	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
 						 * cmdsn, suspend_bit,     *
-						 * _stage, tmf_state and   *
-						 * queues                  */
+						 * _stage, exec lists, and
+						 * tmf_state    */
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.

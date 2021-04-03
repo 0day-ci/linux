@@ -730,7 +730,6 @@ iscsi_alloc_mgmt_task(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	refcount_set(&task->refcount, 1);
 	task->conn = conn;
 	task->sc = NULL;
-	INIT_LIST_HEAD(&task->running);
 	task->state = ISCSI_TASK_PENDING;
 
 	if (data_size) {
@@ -782,7 +781,7 @@ static int iscsi_send_mgmt_task(struct iscsi_task *task)
 		if (rc)
 			return rc;
 	} else {
-		list_add_tail(&task->running, &conn->mgmtqueue);
+		list_add_tail(&task->running, &conn->mgmt_exec_list);
 		iscsi_conn_queue_work(conn);
 	}
 
@@ -1564,7 +1563,6 @@ void iscsi_requeue_task(struct iscsi_task *task)
 	 * this may be on the requeue list already if the xmit_task callout
 	 * is handling the r2ts while we are adding new ones
 	 */
-	spin_lock_bh(&conn->session->frwd_lock);
 	spin_lock(&task->lock);
 	if (task->state == ISCSI_TASK_REQUEUED) {
 		/*
@@ -1574,14 +1572,192 @@ void iscsi_requeue_task(struct iscsi_task *task)
 		iscsi_put_task(task);
 	} else {
 		task->state = ISCSI_TASK_REQUEUED;
-		list_add_tail(&task->running, &conn->requeue);
+		llist_add(&task->queue, &conn->requeue);
 	}
 	spin_unlock(&task->lock);
 
 	iscsi_conn_queue_work(conn);
-	spin_unlock_bh(&conn->session->frwd_lock);
 }
 EXPORT_SYMBOL_GPL(iscsi_requeue_task);
+
+static bool iscsi_move_tasks(struct llist_head *submit_queue,
+			     struct list_head *exec_queue)
+{
+	struct iscsi_task *task, *next_task;
+	struct list_head *list_end;
+	struct llist_node *node;
+
+	/*
+	 * The llist_head is in the reverse order cmds were submitted in. We
+	 * are going to reverse it here. If the exec_queue is empty we want
+	 * to add cmds at starting at head. If the exec_queue has cmds from a
+	 * previous call then we need to start adding this batch at the end of
+	 * the last batch.
+	 */
+	list_end = exec_queue->prev;
+
+	node = llist_del_all(submit_queue);
+	llist_for_each_entry_safe(task, next_task, node, queue)
+		list_add(&task->running, list_end);
+
+	return !list_empty(exec_queue);
+}
+
+static void iscsi_move_all_tasks(struct iscsi_conn *conn)
+{
+	iscsi_move_tasks(&conn->requeue, &conn->requeue_exec_list);
+	iscsi_move_tasks(&conn->cmdqueue, &conn->cmd_exec_list);
+}
+
+static int iscsi_exec_mgmt_tasks(struct iscsi_conn *conn)
+{
+	struct iscsi_task *task;
+	int rc;
+
+	while (!list_empty(&conn->mgmt_exec_list)) {
+		task = list_entry(conn->mgmt_exec_list.next, struct iscsi_task,
+				  running);
+		list_del_init(&task->running);
+
+		if (iscsi_prep_mgmt_task(conn, task)) {
+			iscsi_put_task(task);
+			continue;
+		}
+
+		rc = iscsi_xmit_task(conn, task, false);
+		if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+
+static int iscsi_exec_requeued_tasks(struct iscsi_conn *conn, unsigned int *cnt)
+{
+	struct iscsi_task *task;
+	int rc = 0;
+
+	while (!list_empty(&conn->requeue_exec_list)) {
+		/*
+		 * we always do fastlogout - conn stop code will clean up.
+		 */
+		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT)
+			break;
+
+		task = list_entry(conn->requeue_exec_list.next,
+				  struct iscsi_task, running);
+
+		if (iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_DATA_OUT))
+			break;
+
+		spin_lock_bh(&task->lock);
+		/*
+		 * We might have raced and handld multiple R2Ts in one run.
+		 */
+		list_del_init(&task->running);
+		if (task->state == ISCSI_TASK_COMPLETED) {
+			spin_unlock_bh(&task->lock);
+			iscsi_put_task(task);
+			continue;
+		}
+
+		task->state = ISCSI_TASK_RUNNING;
+		spin_unlock_bh(&task->lock);
+
+		rc = iscsi_xmit_task(conn, task, true);
+		if (rc)
+			break;
+		(*cnt)++;
+
+		rc = iscsi_exec_mgmt_tasks(conn);
+		if (rc)
+			break;
+	}
+
+	ISCSI_DBG_CONN(conn, "executed %u requeued cmds.\n", *cnt);
+	return rc;
+}
+
+static int iscsi_exec_tasks(struct iscsi_conn *conn,
+			    struct llist_head *submit_queue,
+			    struct list_head *exec_queue,
+			    int (*exec_fn)(struct iscsi_conn *conn,
+					   unsigned int *cnt))
+{
+	unsigned int cnt = 0;
+	int rc = 0;
+
+	while (iscsi_move_tasks(submit_queue, exec_queue)) {
+		rc = exec_fn(conn, &cnt);
+		if (rc)
+			break;
+
+	}
+
+	ISCSI_DBG_CONN(conn, "executed %u total %s cmds.\n", cnt,
+		       exec_fn == iscsi_exec_requeued_tasks ?
+		       "requeued" : "new");
+	return 0;
+}
+
+static int iscsi_exec_cmd_tasks(struct iscsi_conn *conn, unsigned int *cnt)
+{
+	struct iscsi_task *task;
+	int rc = 0;
+
+	while (!list_empty(&conn->cmd_exec_list)) {
+		task = list_entry(conn->cmd_exec_list.next, struct iscsi_task,
+				  running);
+		list_del_init(&task->running);
+
+		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT) {
+			fail_scsi_task(task, DID_IMM_RETRY);
+			continue;
+		}
+
+		rc = iscsi_prep_scsi_cmd_pdu(task);
+		if (rc) {
+			if (rc == -ENOMEM || rc == -EACCES)
+				fail_scsi_task(task, DID_IMM_RETRY);
+			else
+				fail_scsi_task(task, DID_ABORT);
+			rc = 0;
+			continue;
+		}
+
+		rc = iscsi_xmit_task(conn, task, false);
+		if (rc)
+			break;
+		(*cnt)++;
+
+		/*
+		 * Make sure we handle target pings quickly so it doesn't
+		 * timeout and drop the conn on us.
+		 */
+		rc = iscsi_exec_mgmt_tasks(conn);
+		if (rc)
+			break;
+		/*
+		 * Avoid starving the requeue list if new cmds keep coming in.
+		 * Incase the app tried to batch cmds to us, we allow up to
+		 * queueing limit.
+		 */
+		if (*cnt == conn->session->host->cmd_per_lun) {
+			*cnt = 0;
+
+			ISCSI_DBG_CONN(conn, "hit dequeue limit.\n");
+
+			rc = iscsi_exec_tasks(conn, &conn->requeue,
+					      &conn->requeue_exec_list,
+					      iscsi_exec_requeued_tasks);
+			if (rc)
+				break;
+		}
+	}
+
+	ISCSI_DBG_CONN(conn, "executed %u cmds.\n", *cnt);
+	return rc;
+}
 
 /**
  * iscsi_data_xmit - xmit any command into the scheduled connection
@@ -1594,8 +1770,7 @@ EXPORT_SYMBOL_GPL(iscsi_requeue_task);
  **/
 static int iscsi_data_xmit(struct iscsi_conn *conn)
 {
-	struct iscsi_task *task;
-	int rc = 0, cnt;
+	int rc = 0;
 
 	spin_lock_bh(&conn->session->frwd_lock);
 	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
@@ -1606,8 +1781,8 @@ static int iscsi_data_xmit(struct iscsi_conn *conn)
 
 	if (conn->task) {
 		rc = iscsi_xmit_task(conn, conn->task, false);
-	        if (rc)
-		        goto done;
+		if (rc)
+			goto done;
 	}
 
 	/*
@@ -1615,87 +1790,19 @@ static int iscsi_data_xmit(struct iscsi_conn *conn)
 	 * only have one nop-out as a ping from us and targets should not
 	 * overflow us with nop-ins
 	 */
-check_mgmt:
-	while (!list_empty(&conn->mgmtqueue)) {
-		task = list_entry(conn->mgmtqueue.next, struct iscsi_task,
-				  running);
-		list_del_init(&task->running);
-		if (iscsi_prep_mgmt_task(conn, task)) {
-			iscsi_put_task(task);
-			continue;
-		}
-		rc = iscsi_xmit_task(conn, task, false);
-		if (rc)
-			goto done;
-	}
+	rc = iscsi_exec_mgmt_tasks(conn);
+	if (rc)
+		goto done;
 
-check_requeue:
-	while (!list_empty(&conn->requeue)) {
-		/*
-		 * we always do fastlogout - conn stop code will clean up.
-		 */
-		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT)
-			break;
+	rc = iscsi_exec_tasks(conn, &conn->requeue, &conn->requeue_exec_list,
+			      iscsi_exec_requeued_tasks);
+	if (rc)
+		goto done;
 
-		task = list_entry(conn->requeue.next, struct iscsi_task,
-				  running);
-
-		if (iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_DATA_OUT))
-			break;
-
-		spin_lock_bh(&task->lock);
-		task->state = ISCSI_TASK_RUNNING;
-		list_del_init(&task->running);
-		spin_unlock_bh(&task->lock);
-
-		rc = iscsi_xmit_task(conn, task, true);
-		if (rc)
-			goto done;
-		if (!list_empty(&conn->mgmtqueue))
-			goto check_mgmt;
-	}
-
-	/* process pending command queue */
-	cnt = 0;
-	while (!list_empty(&conn->cmdqueue)) {
-		task = list_entry(conn->cmdqueue.next, struct iscsi_task,
-				  running);
-		list_del_init(&task->running);
-		if (READ_ONCE(conn->session->state) == ISCSI_STATE_LOGGING_OUT) {
-			fail_scsi_task(task, DID_IMM_RETRY);
-			continue;
-		}
-		rc = iscsi_prep_scsi_cmd_pdu(task);
-		if (rc) {
-			if (rc == -ENOMEM || rc == -EACCES)
-				fail_scsi_task(task, DID_IMM_RETRY);
-			else
-				fail_scsi_task(task, DID_ABORT);
-			continue;
-		}
-		rc = iscsi_xmit_task(conn, task, false);
-		if (rc)
-			goto done;
-		/*
-		 * we could continuously get new task requests so
-		 * we need to check the mgmt queue for nops that need to
-		 * be sent to aviod starvation
-		 */
-		if (!list_empty(&conn->mgmtqueue))
-			goto check_mgmt;
-		/*
-		 * Avoid starving the requeue list if new cmds keep coming in.
-		 * Incase the app tried to batch cmds to us, we allow up to
-		 * queueing limit.
-		 */
-		cnt++;
-		if (cnt == conn->session->host->cmd_per_lun) {
-			cnt = 0;
-
-			if (!list_empty(&conn->requeue))
-				goto check_requeue;
-		}
-	}
+	rc = iscsi_exec_tasks(conn, &conn->cmdqueue, &conn->cmd_exec_list,
+			      iscsi_exec_cmd_tasks);
+	if (rc)
+		goto done;
 
 	spin_unlock_bh(&conn->session->frwd_lock);
 	return -ENODATA;
@@ -1732,7 +1839,6 @@ static struct iscsi_task *iscsi_init_scsi_task(struct iscsi_conn *conn,
 	task->last_timeout = jiffies;
 	task->last_xfer = jiffies;
 	task->protected = false;
-	INIT_LIST_HEAD(&task->running);
 
 	spin_lock_bh(&task->lock);
 	task->state = ISCSI_TASK_PENDING;
@@ -1862,7 +1968,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		}
 	} else {
 		task = iscsi_init_scsi_task(conn, sc);
-		list_add_tail(&task->running, &conn->cmdqueue);
+		llist_add(&task->queue, &conn->cmdqueue);
 		iscsi_conn_queue_work(conn);
 	}
 
@@ -2028,6 +2134,8 @@ static void fail_scsi_tasks(struct iscsi_conn *conn, u64 lun, int error)
 		.data = &error,
 	};
 
+	/* Make sure we don't leave cmds in the queues */
+	iscsi_move_all_tasks(conn);
 	iscsi_conn_for_each_sc(conn, &iter_data);
 }
 
@@ -2381,7 +2489,12 @@ check_done:
 	ISCSI_DBG_EH(session, "aborting [sc %p itt 0x%x]\n", sc, task->itt);
 
 	spin_lock_bh(&task->lock);
-	if (task->state == ISCSI_TASK_PENDING) {
+	/*
+	 * If we haven't sent the cmd, but it's still on the cmdqueue we
+	 * don't have an easy way to dequeue that single cmd here.
+	 * iscsi_check_tmf_restrictions will end up handling it.
+	 */
+	if (task->state == ISCSI_TASK_PENDING && !list_empty(&task->running)) {
 		spin_unlock_bh(&task->lock);
 
 		fail_scsi_task(task, DID_ABORT);
@@ -3174,9 +3287,12 @@ iscsi_conn_setup(struct iscsi_cls_session *cls_session, int dd_size,
 
 	timer_setup(&conn->transport_timer, iscsi_check_transport_timeouts, 0);
 
-	INIT_LIST_HEAD(&conn->mgmtqueue);
-	INIT_LIST_HEAD(&conn->cmdqueue);
-	INIT_LIST_HEAD(&conn->requeue);
+	init_llist_head(&conn->cmdqueue);
+	init_llist_head(&conn->requeue);
+	INIT_LIST_HEAD(&conn->cmd_exec_list);
+	INIT_LIST_HEAD(&conn->mgmt_exec_list);
+	INIT_LIST_HEAD(&conn->requeue_exec_list);
+
 	INIT_WORK(&conn->xmitwork, iscsi_xmitworker);
 
 	/* allocate login_task used for the login/text sequences */
