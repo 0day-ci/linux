@@ -327,6 +327,7 @@ struct ar9331_sw_priv {
 	struct reset_control *sw_reset;
 	struct ar9331_sw_port port[AR9331_SW_PORTS];
 	int cpu_port;
+	u32 isolated_ports;
 };
 
 static struct ar9331_sw_priv *ar9331_sw_port_to_priv(struct ar9331_sw_port *port)
@@ -1151,6 +1152,10 @@ static int ar9331_sw_port_bridge_join(struct dsa_switch *ds, int port,
 		if (!dsa_is_user_port(ds, port))
 			continue;
 
+		/* part of the bridge but should be isolated for now */
+		if (priv->isolated_ports & BIT(i))
+			continue;
+
 		val = FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, BIT(port));
 		ret = regmap_set_bits(regmap, AR9331_SW_REG_PORT_VLAN(i), val);
 		if (ret)
@@ -1205,6 +1210,69 @@ error:
 	dev_err_ratelimited(priv->dev, "%s: error: %i\n", __func__, ret);
 }
 
+static void ar9331_sw_port_stp_state_set(struct dsa_switch *ds, int port,
+					 u8 state)
+{
+	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
+	struct net_device *br = dsa_to_port(ds, port)->bridge_dev;
+	struct regmap *regmap = priv->regmap;
+	u32 port_ctrl = 0, port_state = 0;
+	bool join = false;
+	int ret;
+
+	/*
+	 * STP hw support is buggy or I didn't understood it. So, it seems to
+	 * be easier to make hand crafted implementation by using bridge
+	 * functionality. Similar implementation can be found on ksz9477 switch
+	 * and may be we need some generic code to so for all related devices
+	 */
+	switch (state) {
+	case BR_STATE_FORWARDING:
+		join = true;
+		fallthrough;
+	case BR_STATE_LEARNING:
+		port_ctrl = AR9331_SW_PORT_CTRL_LEARN_EN;
+		fallthrough;
+	case BR_STATE_LISTENING:
+	case BR_STATE_BLOCKING:
+		port_state = AR9331_SW_PORT_CTRL_PORT_STATE_FORWARD;
+		break;
+	case BR_STATE_DISABLED:
+	default:
+		port_state = AR9331_SW_PORT_CTRL_PORT_STATE_DISABLED;
+		break;
+	}
+
+	port_ctrl |= FIELD_PREP(AR9331_SW_PORT_CTRL_PORT_STATE, port_state);
+
+	ret = regmap_update_bits(regmap, AR9331_SW_REG_PORT_CTRL(port),
+				 AR9331_SW_PORT_CTRL_LEARN_EN |
+				 AR9331_SW_PORT_CTRL_PORT_STATE, port_ctrl);
+	if (ret)
+		goto error;
+
+	if (!dsa_is_user_port(ds, port))
+		return;
+
+	/*
+	 * here we care only about user ports. CPU port do not need this
+	 * configuration
+	 */
+	if (join) {
+		priv->isolated_ports &= ~BIT(port);
+		if (br)
+			ar9331_sw_port_bridge_join(ds, port, br);
+	} else {
+		priv->isolated_ports |= BIT(port);
+		if (br)
+			ar9331_sw_port_bridge_leave(ds, port, br);
+	}
+
+	return;
+error:
+	dev_err_ratelimited(priv->dev, "%s: error: %i\n", __func__, ret);
+}
+
 static const struct dsa_switch_ops ar9331_sw_ops = {
 	.get_tag_protocol	= ar9331_sw_get_tag_protocol,
 	.setup			= ar9331_sw_setup,
@@ -1223,6 +1291,7 @@ static const struct dsa_switch_ops ar9331_sw_ops = {
 	.set_ageing_time	= ar9331_sw_set_ageing_time,
 	.port_bridge_join	= ar9331_sw_port_bridge_join,
 	.port_bridge_leave	= ar9331_sw_port_bridge_leave,
+	.port_stp_state_set	= ar9331_sw_port_stp_state_set,
 };
 
 static irqreturn_t ar9331_sw_irq(int irq, void *data)
