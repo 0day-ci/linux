@@ -517,7 +517,6 @@ static void iscsi_finish_task(struct iscsi_task *task, int state)
 			  task->itt, task->state, task->sc);
 	if (task->state == ISCSI_TASK_COMPLETED ||
 	    task->state == ISCSI_TASK_ABRT_TMF ||
-	    task->state == ISCSI_TASK_ABRT_SESS_RECOV ||
 	    task->state == ISCSI_TASK_REQUEUE_SCSIQ)
 		return;
 	WARN_ON_ONCE(task->state == ISCSI_TASK_FREE);
@@ -614,7 +613,7 @@ static void fail_scsi_task(struct iscsi_task *task, int err)
 		/* it was never sent so just complete like normal */
 		state = ISCSI_TASK_COMPLETED;
 	} else if (err == DID_TRANSPORT_DISRUPTED)
-		state = ISCSI_TASK_ABRT_SESS_RECOV;
+		state = ISCSI_TASK_COMPLETED;
 	else
 		state = ISCSI_TASK_ABRT_TMF;
 
@@ -3310,7 +3309,7 @@ fail_mgmt_tasks(struct iscsi_session *session, struct iscsi_conn *conn)
 			continue;
 		}
 
-		state = ISCSI_TASK_ABRT_SESS_RECOV;
+		state = ISCSI_TASK_COMPLETED;
 		if (task->state == ISCSI_TASK_PENDING)
 			state = ISCSI_TASK_COMPLETED;
 		iscsi_finish_task(task, state);
