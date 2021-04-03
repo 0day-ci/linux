@@ -15,6 +15,7 @@
 #include <linux/irq.h>
 
 #include <asm/bcache.h>
+#include <asm/bugs.h>
 #include <asm/mips-cps.h>
 #include <asm/mips_mt.h>
 #include <asm/mipsregs.h>
@@ -60,6 +61,7 @@ static void __init cps_smp_setup(void)
 		pr_cont("{");
 
 		ncores = mips_cps_numcores(cl);
+		cm_gcr_pcores_bug(&ncores);
 		for (c = 0; c < ncores; c++) {
 			core_vpes = core_vpe_count(cl, c);
 
@@ -170,6 +172,7 @@ static void __init cps_prepare_cpus(unsigned int max_cpus)
 
 	/* Allocate core boot configuration structs */
 	ncores = mips_cps_numcores(0);
+	cm_gcr_pcores_bug(&ncores);
 	mips_cps_core_bootcfg = kcalloc(ncores, sizeof(*mips_cps_core_bootcfg),
 					GFP_KERNEL);
 	if (!mips_cps_core_bootcfg) {

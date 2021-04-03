@@ -16,6 +16,7 @@
 
 #include <asm/cpu.h>
 #include <asm/cpu-info.h>
+#include <asm/mips-boards/launch.h>
 
 extern int daddiu_bug;
 
@@ -48,6 +49,23 @@ static inline int r4k_daddiu_bug(void)
 
 	WARN_ON(daddiu_bug < 0);
 	return daddiu_bug != 0;
+}
+
+static inline void cm_gcr_pcores_bug(unsigned int *ncores)
+{
+	struct cpulaunch *launch;
+
+	if (!IS_ENABLED(CONFIG_SOC_MT7621) || !ncores)
+		return;
+
+	/*
+	 * Ralink MT7621S SoC is single core, but GCR_CONFIG always reports 2 cores.
+	 * Use legacy amon method to detect if the second core is missing.
+	 */
+	launch = (struct cpulaunch *)CKSEG0ADDR(CPULAUNCH);
+	launch += 2; /* MT7621 has 2 VPEs per core */
+	if (!(launch->flags & LAUNCH_FREADY))
+		*ncores = 1;
 }
 
 #endif /* _ASM_BUGS_H */
