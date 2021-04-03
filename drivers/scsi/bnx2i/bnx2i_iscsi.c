@@ -438,11 +438,9 @@ static void bnx2i_free_ep(struct iscsi_endpoint *ep)
 /**
  * bnx2i_alloc_bdt - allocates buffer descriptor (BD) table for the command
  * @hba:	adapter instance pointer
- * @session:	iscsi session pointer
  * @cmd:	iscsi command structure
  */
-static int bnx2i_alloc_bdt(struct bnx2i_hba *hba, struct iscsi_session *session,
-			   struct bnx2i_cmd *cmd)
+static int bnx2i_alloc_bdt(struct bnx2i_hba *hba, struct bnx2i_cmd *cmd)
 {
 	struct io_bdt *io = &cmd->io_tbl;
 	struct iscsi_bd *bd;
@@ -451,67 +449,38 @@ static int bnx2i_alloc_bdt(struct bnx2i_hba *hba, struct iscsi_session *session,
 					ISCSI_MAX_BDS_PER_CMD * sizeof(*bd),
 					&io->bd_tbl_dma, GFP_KERNEL);
 	if (!io->bd_tbl) {
-		iscsi_session_printk(KERN_ERR, session, "Could not "
-				     "allocate bdt.\n");
+		shost_printk(KERN_ERR, hba->shost, "Could not allocate bdt.\n");
 		return -ENOMEM;
 	}
 	io->bd_valid = 0;
 	return 0;
 }
 
-/**
- * bnx2i_destroy_cmd_pool - destroys iscsi command pool and release BD table
- * @hba:	adapter instance pointer
- * @session:	iscsi session pointer
- */
-static void bnx2i_destroy_cmd_pool(struct bnx2i_hba *hba,
-				   struct iscsi_session *session)
+static void bnx2i_free_task_priv(struct iscsi_session *session,
+				 struct iscsi_task *task)
 {
-	int i;
+	struct bnx2i_hba *hba = iscsi_host_priv(session->host);
+	struct bnx2i_cmd *cmd = task->dd_data;
 
-	for (i = 0; i < session->cmds_max; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct bnx2i_cmd *cmd = task->dd_data;
+	if (!cmd->io_tbl.bd_tbl)
+		return;
 
-		if (cmd->io_tbl.bd_tbl)
-			dma_free_coherent(&hba->pcidev->dev,
-					  ISCSI_MAX_BDS_PER_CMD *
-					  sizeof(struct iscsi_bd),
-					  cmd->io_tbl.bd_tbl,
-					  cmd->io_tbl.bd_tbl_dma);
-	}
-
+	dma_free_coherent(&hba->pcidev->dev,
+			  ISCSI_MAX_BDS_PER_CMD * sizeof(struct iscsi_bd),
+			  cmd->io_tbl.bd_tbl, cmd->io_tbl.bd_tbl_dma);
 }
 
-
-/**
- * bnx2i_setup_cmd_pool - sets up iscsi command pool for the session
- * @hba:	adapter instance pointer
- * @session:	iscsi session pointer
- */
-static int bnx2i_setup_cmd_pool(struct bnx2i_hba *hba,
-				struct iscsi_session *session)
+static int bnx2i_alloc_task_priv(struct iscsi_session *session,
+				 struct iscsi_task *task)
 {
-	int i;
+	struct bnx2i_hba *hba = iscsi_host_priv(session->host);
+	struct bnx2i_cmd *cmd = task->dd_data;
 
-	for (i = 0; i < session->cmds_max; i++) {
-		struct iscsi_task *task = session->cmds[i];
-		struct bnx2i_cmd *cmd = task->dd_data;
+	task->hdr = &cmd->hdr;
+	task->hdr_max = sizeof(struct iscsi_hdr);
 
-		task->hdr = &cmd->hdr;
-		task->hdr_max = sizeof(struct iscsi_hdr);
-
-		if (bnx2i_alloc_bdt(hba, session, cmd))
-			goto free_bdts;
-	}
-
-	return 0;
-
-free_bdts:
-	bnx2i_destroy_cmd_pool(hba, session);
-	return -ENOMEM;
+	return bnx2i_alloc_bdt(hba, cmd);
 }
-
 
 /**
  * bnx2i_setup_mp_bdt - allocate BD table resources
@@ -1286,7 +1255,6 @@ bnx2i_session_create(struct iscsi_endpoint *ep,
 		     uint32_t initial_cmdsn)
 {
 	struct Scsi_Host *shost;
-	struct iscsi_cls_session *cls_session;
 	struct bnx2i_hba *hba;
 	struct bnx2i_endpoint *bnx2i_ep;
 
@@ -1310,39 +1278,10 @@ bnx2i_session_create(struct iscsi_endpoint *ep,
 	else if (cmds_max < BNX2I_SQ_WQES_MIN)
 		cmds_max = BNX2I_SQ_WQES_MIN;
 
-	cls_session = iscsi_session_setup(&bnx2i_iscsi_transport, shost,
-					  cmds_max, 0, sizeof(struct bnx2i_cmd),
-					  initial_cmdsn, ISCSI_MAX_TARGET);
-	if (!cls_session)
-		return NULL;
-
-	if (bnx2i_setup_cmd_pool(hba, cls_session->dd_data))
-		goto session_teardown;
-	return cls_session;
-
-session_teardown:
-	iscsi_session_teardown(cls_session);
-	return NULL;
+	return iscsi_session_setup(&bnx2i_iscsi_transport, shost,
+				   cmds_max, 0, sizeof(struct bnx2i_cmd),
+				   initial_cmdsn, ISCSI_MAX_TARGET);
 }
-
-
-/**
- * bnx2i_session_destroy - destroys iscsi session
- * @cls_session:	pointer to iscsi cls session
- *
- * Destroys previously created iSCSI session instance and releases
- *	all resources held by it
- */
-static void bnx2i_session_destroy(struct iscsi_cls_session *cls_session)
-{
-	struct iscsi_session *session = cls_session->dd_data;
-	struct Scsi_Host *shost = iscsi_session_to_shost(cls_session);
-	struct bnx2i_hba *hba = iscsi_host_priv(shost);
-
-	bnx2i_destroy_cmd_pool(hba, session);
-	iscsi_session_teardown(cls_session);
-}
-
 
 /**
  * bnx2i_conn_create - create iscsi connection instance
@@ -2274,7 +2213,7 @@ struct iscsi_transport bnx2i_iscsi_transport = {
 				  CAP_DATA_PATH_OFFLOAD |
 				  CAP_TEXT_NEGO,
 	.create_session		= bnx2i_session_create,
-	.destroy_session	= bnx2i_session_destroy,
+	.destroy_session	= iscsi_session_teardown,
 	.create_conn		= bnx2i_conn_create,
 	.bind_conn		= bnx2i_conn_bind,
 	.destroy_conn		= bnx2i_conn_destroy,
@@ -2286,6 +2225,8 @@ struct iscsi_transport bnx2i_iscsi_transport = {
 	.start_conn		= bnx2i_conn_start,
 	.stop_conn		= iscsi_conn_stop,
 	.send_pdu		= iscsi_conn_send_pdu,
+	.alloc_task_priv	= bnx2i_alloc_task_priv,
+	.free_task_priv		= bnx2i_free_task_priv,
 	.xmit_task		= bnx2i_task_xmit,
 	.get_stats		= bnx2i_conn_get_stats,
 	/* TCP connect - disconnect - option-2 interface calls */
