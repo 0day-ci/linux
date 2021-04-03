@@ -343,7 +343,7 @@ nosy_read(struct file *file, char __user *buffer, size_t count, loff_t *offset)
 static long
 nosy_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	struct client *client = file->private_data;
+	struct client *tmp, *client = file->private_data;
 	spinlock_t *client_list_lock = &client->lynx->client_list_lock;
 	struct nosy_stats stats;
 
@@ -360,6 +360,10 @@ nosy_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return 0;
 
 	case NOSY_IOC_START:
+		list_for_each_entry(tmp, &client->lynx->client_list, link)
+			if (tmp == client)
+				return -EINVAL;
+
 		spin_lock_irq(client_list_lock);
 		list_add_tail(&client->link, &client->lynx->client_list);
 		spin_unlock_irq(client_list_lock);
