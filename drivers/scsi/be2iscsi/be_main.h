@@ -461,7 +461,6 @@ struct beiscsi_io_task {
 	struct scsi_cmnd *scsi_cmnd;
 	int num_sg;
 	struct hwi_wrb_context *pwrb_context;
-	itt_t libiscsi_itt;
 	struct be_cmd_bhs *cmd_bhs;
 	struct be_bus_address bhs_pa;
 	unsigned short bhs_len;

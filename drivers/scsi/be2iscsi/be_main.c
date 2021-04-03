@@ -1187,7 +1187,6 @@ be_complete_logout(struct beiscsi_conn *beiscsi_conn,
 		    struct common_sol_cqe *csol_cqe)
 {
 	struct iscsi_logout_rsp *hdr;
-	struct beiscsi_io_task *io_task = task->dd_data;
 	struct iscsi_conn *conn = beiscsi_conn->conn;
 
 	hdr = (struct iscsi_logout_rsp *)task->hdr;
@@ -1204,8 +1203,7 @@ be_complete_logout(struct beiscsi_conn *beiscsi_conn,
 	hdr->dlength[1] = 0;
 	hdr->dlength[2] = 0;
 	hdr->hlength = 0;
-	hdr->itt = io_task->libiscsi_itt;
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, NULL, 0);
+	iscsi_complete_task(conn, task, (struct iscsi_hdr *)hdr, NULL, 0);
 }
 
 static void
@@ -1215,7 +1213,6 @@ be_complete_tmf(struct beiscsi_conn *beiscsi_conn,
 {
 	struct iscsi_tm_rsp *hdr;
 	struct iscsi_conn *conn = beiscsi_conn->conn;
-	struct beiscsi_io_task *io_task = task->dd_data;
 
 	hdr = (struct iscsi_tm_rsp *)task->hdr;
 	hdr->opcode = ISCSI_OP_SCSI_TMFUNC_RSP;
@@ -1224,9 +1221,7 @@ be_complete_tmf(struct beiscsi_conn *beiscsi_conn,
 	hdr->exp_cmdsn = cpu_to_be32(csol_cqe->exp_cmdsn);
 	hdr->max_cmdsn = cpu_to_be32(csol_cqe->exp_cmdsn +
 				     csol_cqe->cmd_wnd - 1);
-
-	hdr->itt = io_task->libiscsi_itt;
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, NULL, 0);
+	iscsi_complete_task(conn, task, (struct iscsi_hdr *)hdr, NULL, 0);
 }
 
 static void
@@ -1271,7 +1266,6 @@ be_complete_nopin_resp(struct beiscsi_conn *beiscsi_conn,
 {
 	struct iscsi_nopin *hdr;
 	struct iscsi_conn *conn = beiscsi_conn->conn;
-	struct beiscsi_io_task *io_task = task->dd_data;
 
 	hdr = (struct iscsi_nopin *)task->hdr;
 	hdr->flags = csol_cqe->i_flags;
@@ -1280,8 +1274,7 @@ be_complete_nopin_resp(struct beiscsi_conn *beiscsi_conn,
 				     csol_cqe->cmd_wnd - 1);
 
 	hdr->opcode = ISCSI_OP_NOOP_IN;
-	hdr->itt = io_task->libiscsi_itt;
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)hdr, NULL, 0);
+	iscsi_complete_task(conn, task, (struct iscsi_hdr *)hdr, NULL, 0);
 }
 
 static void adapter_get_sol_cqe(struct beiscsi_hba *phba,
@@ -1426,9 +1419,7 @@ beiscsi_complete_pdu(struct beiscsi_conn *beiscsi_conn,
 {
 	struct beiscsi_hba *phba = beiscsi_conn->phba;
 	struct iscsi_conn *conn = beiscsi_conn->conn;
-	struct beiscsi_io_task *io_task;
-	struct iscsi_hdr *login_hdr;
-	struct iscsi_task *task;
+	struct iscsi_task *task = NULL;
 	u8 code;
 
 	code = AMAP_GET_BITS(struct amap_pdu_base, opcode, phdr);
@@ -1449,9 +1440,6 @@ beiscsi_complete_pdu(struct beiscsi_conn *beiscsi_conn,
 	case ISCSI_OP_LOGIN_RSP:
 	case ISCSI_OP_TEXT_RSP:
 		task = conn->login_task;
-		io_task = task->dd_data;
-		login_hdr = (struct iscsi_hdr *)phdr;
-		login_hdr->itt = io_task->libiscsi_itt;
 		break;
 	default:
 		beiscsi_log(phba, KERN_WARNING,
@@ -1460,7 +1448,7 @@ beiscsi_complete_pdu(struct beiscsi_conn *beiscsi_conn,
 			    code);
 		return 1;
 	}
-	__iscsi_complete_pdu(conn, (struct iscsi_hdr *)phdr, pdata, dlen);
+	iscsi_complete_task(conn, task, (struct iscsi_hdr *)phdr, pdata, dlen);
 	return 0;
 }
 
@@ -4384,8 +4372,7 @@ static void beiscsi_parse_pdu(struct iscsi_conn *conn, itt_t itt,
  *
  * This is called with the session lock held. It will allocate
  * the wrb and sgl if needed for the command. And it will prep
- * the pdu's itt. beiscsi_parse_pdu will later translate
- * the pdu itt to the libiscsi task itt.
+ * the pdu's itt.
  */
 static int beiscsi_alloc_pdu(struct iscsi_task *task, uint8_t opcode)
 {
@@ -4405,7 +4392,6 @@ static int beiscsi_alloc_pdu(struct iscsi_task *task, uint8_t opcode)
 	if (!io_task->cmd_bhs)
 		return -ENOMEM;
 	io_task->bhs_pa.u.a64.address = paddr;
-	io_task->libiscsi_itt = (itt_t)task->itt;
 	io_task->conn = beiscsi_conn;
 
 	task->hdr = (struct iscsi_hdr *)&io_task->cmd_bhs->iscsi_hdr;
@@ -4803,9 +4789,9 @@ static int beiscsi_task_xmit(struct iscsi_task *task)
 		beiscsi_log(phba, KERN_ERR,
 			    BEISCSI_LOG_IO | BEISCSI_LOG_ISCSI,
 			    "BM_%d : scsi_dma_map Failed "
-			    "Driver_ITT : 0x%x ITT : 0x%x Xferlen : 0x%x\n",
+			    "Driver_ITT : 0x%x Xferlen : 0x%x\n",
 			    be32_to_cpu(io_task->cmd_bhs->iscsi_hdr.itt),
-			    io_task->libiscsi_itt, scsi_bufflen(sc));
+			    scsi_bufflen(sc));
 
 		return num_sg;
 	}
