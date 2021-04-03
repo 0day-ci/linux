@@ -344,6 +344,8 @@ static int cros_ec_sysfs_probe(struct platform_device *pd)
 	ret = sysfs_create_group(&ec_dev->class_dev.kobj, &cros_ec_attr_group);
 	if (ret < 0)
 		dev_err(dev, "failed to create attributes. err=%d\n", ret);
+	else
+		ec_dev->group = &cros_ec_attr_group;
 
 	return ret;
 }
