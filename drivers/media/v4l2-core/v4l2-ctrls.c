@@ -1826,6 +1826,15 @@ static void std_log(const struct v4l2_ctrl *ctrl)
 	case V4L2_CTRL_TYPE_VP8_FRAME:
 		pr_cont("VP8_FRAME");
 		break;
+	case V4L2_CTRL_TYPE_MPEG2_QUANTISATION:
+		pr_cont("MPEG2_QUANTISATION");
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_SEQUENCE:
+		pr_cont("MPEG2_SEQUENCE");
+		break;
+	case V4L2_CTRL_TYPE_MPEG2_PICTURE:
+		pr_cont("MPEG2_PICTURE");
+		break;
 	default:
 		pr_cont("unknown type %d", ctrl->type);
 		break;
