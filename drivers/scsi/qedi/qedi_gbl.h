@@ -31,8 +31,7 @@ int qedi_send_iscsi_login(struct qedi_conn *qedi_conn,
 			  struct iscsi_task *task);
 int qedi_send_iscsi_logout(struct qedi_conn *qedi_conn,
 			   struct iscsi_task *task);
-int qedi_iscsi_abort_work(struct qedi_conn *qedi_conn,
-			  struct iscsi_task *mtask);
+int qedi_send_iscsi_tmf(struct qedi_conn *qedi_conn, struct iscsi_task *mtask);
 int qedi_send_iscsi_text(struct qedi_conn *qedi_conn,
 			 struct iscsi_task *task);
 int qedi_send_iscsi_nopout(struct qedi_conn *qedi_conn,
@@ -60,6 +59,7 @@ void qedi_mark_device_available(struct iscsi_cls_session *cls_session);
 void qedi_reset_host_mtu(struct qedi_ctx *qedi, u16 mtu);
 int qedi_recover_all_conns(struct qedi_ctx *qedi);
 void qedi_fp_process_cqes(struct qedi_work *work);
+int qedi_fw_cleanup_cmd(struct iscsi_task *ctask);
 int qedi_cleanup_all_io(struct qedi_ctx *qedi,
 			struct qedi_conn *qedi_conn,
 			struct iscsi_task *task, bool in_recovery);

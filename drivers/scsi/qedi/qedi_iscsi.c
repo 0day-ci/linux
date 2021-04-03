@@ -43,13 +43,57 @@ static int qedi_eh_host_reset(struct scsi_cmnd *cmd)
 	return qedi_recover_all_conns(qedi);
 }
 
+static int qedi_eh_abort(struct scsi_cmnd *cmd)
+{
+	struct Scsi_Host *shost = cmd->device->host;
+	struct qedi_ctx *qedi = iscsi_host_priv(shost);
+	struct iscsi_cls_session *cls_session;
+	struct iscsi_session *session;
+	struct qedi_conn *qedi_conn;
+	struct iscsi_task *task;
+	int rc;
+
+	cls_session = starget_to_session(scsi_target(cmd->device));
+	session = cls_session->dd_data;
+
+	if (qedi_do_not_recover) {
+		QEDI_ERR(&qedi->dbg_ctx, "dont send cleanup/abort %d\n",
+			 qedi_do_not_recover);
+		return FAILED;
+	}
+
+	/* check if we raced, task just got cleaned up under us */
+	spin_lock_bh(&session->back_lock);
+	task = (struct iscsi_task *)cmd->SCp.ptr;
+	if (!task || !task->sc) {
+		spin_unlock_bh(&session->back_lock);
+		return SUCCESS;
+	}
+
+	__iscsi_get_task(task);
+	spin_unlock_bh(&session->back_lock);
+
+	qedi_conn = task->conn->dd_data;
+	set_bit(QEDI_CONN_FW_CLEANUP, &qedi_conn->flags);
+
+	rc = qedi_fw_cleanup_cmd(task);
+
+	iscsi_put_task(task);
+	clear_bit(QEDI_CONN_FW_CLEANUP, &qedi_conn->flags);
+
+	if (rc)
+		return FAILED;
+
+	return iscsi_eh_abort(cmd);
+}
+
 struct scsi_host_template qedi_host_template = {
 	.module = THIS_MODULE,
 	.name = "QLogic QEDI 25/40/100Gb iSCSI Initiator Driver",
 	.proc_name = QEDI_MODULE_NAME,
 	.queuecommand = iscsi_queuecommand,
 	.eh_timed_out = iscsi_eh_cmd_timed_out,
-	.eh_abort_handler = iscsi_eh_abort,
+	.eh_abort_handler = qedi_eh_abort,
 	.eh_device_reset_handler = iscsi_eh_device_reset,
 	.eh_target_reset_handler = iscsi_eh_recover_target,
 	.eh_host_reset_handler = qedi_eh_host_reset,
@@ -746,7 +790,7 @@ static int qedi_iscsi_send_generic_request(struct iscsi_task *task)
 		rc = qedi_send_iscsi_logout(qedi_conn, task);
 		break;
 	case ISCSI_OP_SCSI_TMFUNC:
-		rc = qedi_iscsi_abort_work(qedi_conn, task);
+		rc = qedi_send_iscsi_tmf(qedi_conn, task);
 		break;
 	case ISCSI_OP_TEXT:
 		rc = qedi_send_iscsi_text(qedi_conn, task);
