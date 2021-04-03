@@ -249,6 +249,10 @@ static int dsa_switch_rcv(struct sk_buff *skb, struct net_device *dev,
 	skb->pkt_type = PACKET_HOST;
 	skb->protocol = eth_type_trans(skb, skb->dev);
 
+
+	if (cpu_dp->rcv_post)
+		cpu_dp->rcv_post(skb);
+
 	if (unlikely(!dsa_slave_dev_check(skb->dev))) {
 		/* Packet is to be injected directly on an upper
 		 * device, e.g. a team/bond, so skip all DSA-port

@@ -84,6 +84,7 @@ struct dsa_device_ops {
 	struct sk_buff *(*xmit)(struct sk_buff *skb, struct net_device *dev);
 	struct sk_buff *(*rcv)(struct sk_buff *skb, struct net_device *dev,
 			       struct packet_type *pt);
+	void (*rcv_post)(struct sk_buff *skb);
 	void (*flow_dissect)(const struct sk_buff *skb, __be16 *proto,
 			     int *offset);
 	/* Used to determine which traffic should match the DSA filter in
@@ -247,6 +248,7 @@ struct dsa_port {
 	struct dsa_switch_tree *dst;
 	struct sk_buff *(*rcv)(struct sk_buff *skb, struct net_device *dev,
 			       struct packet_type *pt);
+	void (*rcv_post)(struct sk_buff *skb);
 	bool (*filter)(const struct sk_buff *skb, struct net_device *dev);
 
 	enum {
