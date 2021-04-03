@@ -574,7 +574,7 @@ static bool cleanup_queued_task(struct iscsi_task *task)
 		 * If it's on a list but still running this could be cleanup
 		 * from a TMF or session recovery.
 		 */
-		if (task->state == ISCSI_TASK_RUNNING ||
+		if (task->state == ISCSI_TASK_REQUEUED ||
 		    task->state == ISCSI_TASK_COMPLETED)
 			iscsi_put_task(task);
 	}
@@ -1565,15 +1565,19 @@ void iscsi_requeue_task(struct iscsi_task *task)
 	 * is handling the r2ts while we are adding new ones
 	 */
 	spin_lock_bh(&conn->session->frwd_lock);
-	if (list_empty(&task->running)) {
-		list_add_tail(&task->running, &conn->requeue);
-	} else {
+	spin_lock(&task->lock);
+	if (task->state == ISCSI_TASK_REQUEUED) {
 		/*
 		 * Don't need the extra ref since it's already requeued and
 		 * has a ref.
 		 */
 		iscsi_put_task(task);
+	} else {
+		task->state = ISCSI_TASK_REQUEUED;
+		list_add_tail(&task->running, &conn->requeue);
 	}
+	spin_unlock(&task->lock);
+
 	iscsi_conn_queue_work(conn);
 	spin_unlock_bh(&conn->session->frwd_lock);
 }
@@ -1639,7 +1643,11 @@ check_requeue:
 		if (iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_DATA_OUT))
 			break;
 
+		spin_lock_bh(&task->lock);
+		task->state = ISCSI_TASK_RUNNING;
 		list_del_init(&task->running);
+		spin_unlock_bh(&task->lock);
+
 		rc = iscsi_xmit_task(conn, task, true);
 		if (rc)
 			goto done;
