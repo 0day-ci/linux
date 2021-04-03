@@ -1525,7 +1525,7 @@ EXPORT_SYMBOL_GPL(iscsi_requeue_task);
 static int iscsi_data_xmit(struct iscsi_conn *conn)
 {
 	struct iscsi_task *task;
-	int rc = 0;
+	int rc = 0, cnt;
 
 	spin_lock_bh(&conn->session->frwd_lock);
 	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
@@ -1562,7 +1562,30 @@ check_mgmt:
 			goto done;
 	}
 
+check_requeue:
+	while (!list_empty(&conn->requeue)) {
+		/*
+		 * we always do fastlogout - conn stop code will clean up.
+		 */
+		if (conn->session->state == ISCSI_STATE_LOGGING_OUT)
+			break;
+
+		task = list_entry(conn->requeue.next, struct iscsi_task,
+				  running);
+
+		if (iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_DATA_OUT))
+			break;
+
+		list_del_init(&task->running);
+		rc = iscsi_xmit_task(conn, task, true);
+		if (rc)
+			goto done;
+		if (!list_empty(&conn->mgmtqueue))
+			goto check_mgmt;
+	}
+
 	/* process pending command queue */
+	cnt = 0;
 	while (!list_empty(&conn->cmdqueue)) {
 		task = list_entry(conn->cmdqueue.next, struct iscsi_task,
 				  running);
@@ -1589,28 +1612,20 @@ check_mgmt:
 		 */
 		if (!list_empty(&conn->mgmtqueue))
 			goto check_mgmt;
-	}
-
-	while (!list_empty(&conn->requeue)) {
 		/*
-		 * we always do fastlogout - conn stop code will clean up.
+		 * Avoid starving the requeue list if new cmds keep coming in.
+		 * Incase the app tried to batch cmds to us, we allow up to
+		 * queueing limit.
 		 */
-		if (conn->session->state == ISCSI_STATE_LOGGING_OUT)
-			break;
+		cnt++;
+		if (cnt == conn->session->host->cmd_per_lun) {
+			cnt = 0;
 
-		task = list_entry(conn->requeue.next, struct iscsi_task,
-				  running);
-
-		if (iscsi_check_tmf_restrictions(task, ISCSI_OP_SCSI_DATA_OUT))
-			break;
-
-		list_del_init(&task->running);
-		rc = iscsi_xmit_task(conn, task, true);
-		if (rc)
-			goto done;
-		if (!list_empty(&conn->mgmtqueue))
-			goto check_mgmt;
+			if (!list_empty(&conn->requeue))
+				goto check_requeue;
+		}
 	}
+
 	spin_unlock_bh(&conn->session->frwd_lock);
 	return -ENODATA;
 
