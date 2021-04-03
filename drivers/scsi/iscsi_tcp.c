@@ -246,7 +246,8 @@ iscsi_sw_tcp_conn_restore_callbacks(struct iscsi_conn *conn)
 /**
  * iscsi_sw_tcp_xmit_segment - transmit segment
  * @tcp_conn: the iSCSI TCP connection
- * @segment: the buffer to transmnit
+ * @task: iscsi task we are transmitting data for
+ * @segment: the buffer to transmit
  *
  * This function transmits as much of the buffer as
  * the network layer will accept, and returns the number of
@@ -257,6 +258,7 @@ iscsi_sw_tcp_conn_restore_callbacks(struct iscsi_conn *conn)
  * it will retrieve the hash value and send it as well.
  */
 static int iscsi_sw_tcp_xmit_segment(struct iscsi_tcp_conn *tcp_conn,
+				     struct iscsi_task *task,
 				     struct iscsi_segment *segment)
 {
 	struct iscsi_sw_tcp_conn *tcp_sw_conn = tcp_conn->dd_data;
@@ -273,7 +275,10 @@ static int iscsi_sw_tcp_xmit_segment(struct iscsi_tcp_conn *tcp_conn,
 		offset = segment->copied;
 		copy = segment->size - offset;
 
-		if (segment->total_copied + segment->size < segment->total_size)
+		if (segment->total_copied + segment->size <
+		    segment->total_size ||
+		    !(task->hdr->flags & ISCSI_FLAG_CMD_FINAL) ||
+		    !iscsi_xmit_list_is_empty(tcp_conn->iscsi_conn))
 			flags |= MSG_MORE;
 
 		/* Use sendpage if we can; else fall back to sendmsg */
@@ -304,8 +309,9 @@ static int iscsi_sw_tcp_xmit_segment(struct iscsi_tcp_conn *tcp_conn,
 /**
  * iscsi_sw_tcp_xmit - TCP transmit
  * @conn: iscsi connection
+ * @task: iscsi task to send data for
  **/
-static int iscsi_sw_tcp_xmit(struct iscsi_conn *conn)
+static int iscsi_sw_tcp_xmit(struct iscsi_conn *conn, struct iscsi_task *task)
 {
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
 	struct iscsi_sw_tcp_conn *tcp_sw_conn = tcp_conn->dd_data;
@@ -314,7 +320,7 @@ static int iscsi_sw_tcp_xmit(struct iscsi_conn *conn)
 	int rc = 0;
 
 	while (1) {
-		rc = iscsi_sw_tcp_xmit_segment(tcp_conn, segment);
+		rc = iscsi_sw_tcp_xmit_segment(tcp_conn, task, segment);
 		/*
 		 * We may not have been able to send data because the conn
 		 * is getting stopped. libiscsi will know so propagate err
@@ -382,7 +388,7 @@ static int iscsi_sw_tcp_pdu_xmit(struct iscsi_task *task)
 	noreclaim_flag = memalloc_noreclaim_save();
 
 	while (iscsi_sw_tcp_xmit_qlen(conn)) {
-		rc = iscsi_sw_tcp_xmit(conn);
+		rc = iscsi_sw_tcp_xmit(conn, task);
 		if (rc == 0) {
 			rc = -EAGAIN;
 			break;

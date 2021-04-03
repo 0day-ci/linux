@@ -1609,6 +1609,16 @@ static bool iscsi_move_tasks(struct llist_head *submit_queue,
 	return !list_empty(exec_queue);
 }
 
+inline bool iscsi_xmit_list_is_empty(struct iscsi_conn *conn)
+{
+	if (!list_empty(&conn->cmd_exec_list) ||
+	    !list_empty(&conn->requeue_exec_list))
+		return false;
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(iscsi_xmit_list_is_empty);
+
 static void iscsi_move_all_tasks(struct iscsi_conn *conn)
 {
 	iscsi_move_tasks(&conn->requeue, &conn->requeue_exec_list);
