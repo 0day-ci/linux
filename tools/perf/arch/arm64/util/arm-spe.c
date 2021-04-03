@@ -15,7 +15,9 @@
 #include "../../../util/event.h"
 #include "../../../util/evsel.h"
 #include "../../../util/evlist.h"
+#include "../../../util/mmap.h"
 #include "../../../util/session.h"
+#include "../../../util/tsc.h"
 #include <internal/lib.h> // page_size
 #include "../../../util/pmu.h"
 #include "../../../util/debug.h"
@@ -47,6 +49,9 @@ static int arm_spe_info_fill(struct auxtrace_record *itr,
 	struct arm_spe_recording *sper =
 			container_of(itr, struct arm_spe_recording, itr);
 	struct perf_pmu *arm_spe_pmu = sper->arm_spe_pmu;
+	struct perf_event_mmap_page *pc;
+	struct perf_tsc_conversion tc = { .time_mult = 0, };
+	int err;
 
 	if (priv_size != ARM_SPE_AUXTRACE_PRIV_SIZE)
 		return -EINVAL;
@@ -54,8 +59,26 @@ static int arm_spe_info_fill(struct auxtrace_record *itr,
 	if (!session->evlist->core.nr_mmaps)
 		return -EINVAL;
 
+	pc = session->evlist->mmap[0].core.base;
+	if (pc) {
+		err = perf_read_tsc_conversion(pc, &tc);
+		if (err) {
+			if (err != -EOPNOTSUPP)
+				return err;
+		}
+
+		if (!tc.time_mult)
+			ui__warning("Arm SPE: arch timer not available\n");
+	}
+
 	auxtrace_info->type = PERF_AUXTRACE_ARM_SPE;
 	auxtrace_info->priv[ARM_SPE_PMU_TYPE] = arm_spe_pmu->type;
+	auxtrace_info->priv[ARM_SPE_TIME_SHIFT] = tc.time_shift;
+	auxtrace_info->priv[ARM_SPE_TIME_MULT] = tc.time_mult;
+	auxtrace_info->priv[ARM_SPE_TIME_ZERO] = tc.time_zero;
+	auxtrace_info->priv[ARM_SPE_TIME_CYCLES] = tc.time_cycles;
+	auxtrace_info->priv[ARM_SPE_TIME_MASK] = tc.time_mask;
+	auxtrace_info->priv[ARM_SPE_CAP_USER_TIME_SHORT] = tc.cap_user_time_short;
 
 	return 0;
 }
