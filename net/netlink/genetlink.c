@@ -719,6 +719,8 @@ static int genl_family_rcv_msg_doit(const struct genl_family *family,
 						  GENL_DONT_VALIDATE_STRICT);
 	if (IS_ERR(attrbuf))
 		return PTR_ERR(attrbuf);
+	if (!attrbuf)
+		return -EINVAL;
 
 	info.snd_seq = nlh->nlmsg_seq;
 	info.snd_portid = NETLINK_CB(skb).portid;
