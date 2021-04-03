@@ -2051,6 +2051,92 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 	return 0;
 }
 
+static int pci_10bit_tag_comp_support(struct pci_dev *dev, void *data)
+{
+	u8 *support = data;
+	int ret;
+	u32 cap;
+
+	if (*support == 0)
+		return 0;
+
+	if (!pci_is_pcie(dev)) {
+		*support = 0;
+		return 0;
+	}
+
+	/*
+	 * PCIe spec 5.0r1.0 section 2.2.6.2 implementation note
+	 * For configurations where a Requester with 10-Bit Tag Requester capability
+	 * targets Completers where some do and some do not have 10-Bit Tag
+	 * Completer capability, how the Requester determines which NPRs include
+	 * 10-Bit Tags is outside the scope of this specification.  So we do not consider
+	 * hotplug scenario.
+	 */
+	if (dev->is_hotplug_bridge) {
+		*support = 0;
+		return 0;
+	}
+
+	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
+	if (ret) {
+		*support = 0;
+		return 0;
+	}
+
+	if (!(cap & PCI_EXP_DEVCAP2_10BIT_TAG_COMP)) {
+		*support = 0;
+		return 0;
+	}
+
+
+	return 0;
+}
+
+void pci_configure_rp_10bit_tag(struct pci_dev *dev)
+{
+	u8 support = 1;
+	u32 cap;
+	int ret;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	if (pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
+		return;
+
+	if (dev->subordinate == NULL)
+		return;
+
+	pci_10bit_tag_comp_support(dev, &support);
+	if (!support)
+		return;
+
+	/*
+	 * PCIe spec 5.0r1.0 section 2.2.6.2 implementation note
+	 * In configurations where a Requester with 10-Bit Tag Requester capability
+	 * needs to target multiple Completers, one needs to ensure that the
+	 * Requester sends 10-Bit Tag Requests only to Completers that have 10-Bit
+	 * Tag Completer capability. So we enable 10-Bit Tag Requester for root port
+	 * only when the devices under the root port support 10-Bit Tag Completer.
+	 */
+	pci_walk_bus(dev->subordinate, pci_10bit_tag_comp_support, &support);
+	if (!support)
+		return;
+
+	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
+	if (ret)
+		return;
+
+	if (!(cap & PCI_EXP_DEVCAP2_10BIT_TAG_REQ))
+		return;
+
+	pci_info(dev, "enabling 10-Bit Tag Requester\n");
+	pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
+				 PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+}
+
+
 static void pci_configure_10bit_tags(struct pci_dev *dev)
 {
 	u32 cap;
