@@ -227,9 +227,6 @@ struct qedi_boot_target {
 	u32 ipv6_en;
 };
 
-#define qedi_set_itt(task_id, itt) ((u32)(((task_id) & 0xffff) | ((itt) << 16)))
-#define qedi_get_itt(cqe) (cqe.iscsi_hdr.cmd.itt >> 16)
-
 #define QEDI_OFLD_WAIT_STATE(q) ((q)->state == EP_STATE_OFLDCONN_FAILED || \
 				(q)->state == EP_STATE_OFLDCONN_COMPL)
 

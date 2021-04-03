@@ -62,7 +62,6 @@ static LIST_HEAD(qedi_udev_list);
 /* Static function declaration */
 static int qedi_alloc_global_queues(struct qedi_ctx *qedi);
 static void qedi_free_global_queues(struct qedi_ctx *qedi);
-static struct qedi_cmd *qedi_get_cmd_from_tid(struct qedi_ctx *qedi, u32 tid);
 static void qedi_reset_uio_rings(struct qedi_uio_dev *udev);
 static void qedi_ll2_free_skbs(struct qedi_ctx *qedi);
 static struct nvm_iscsi_block *qedi_get_nvram_block(struct qedi_ctx *qedi);
@@ -1221,7 +1220,8 @@ static int qedi_queue_cqe(struct qedi_ctx *qedi, union iscsi_cqe *cqe,
 	switch (cqe->cqe_common.cqe_type) {
 	case ISCSI_CQE_TYPE_SOLICITED:
 	case ISCSI_CQE_TYPE_SOLICITED_WITH_SENSE:
-		qedi_cmd = qedi_get_cmd_from_tid(qedi, cqe->cqe_solicited.itid);
+		qedi_cmd = qedi_get_cmd_from_tid(qedi, cqe->cqe_solicited.itid,
+						 true);
 		if (!qedi_cmd) {
 			rc = -1;
 			break;
@@ -1848,10 +1848,8 @@ void qedi_clear_task_idx(struct qedi_ctx *qedi, int idx)
 			 "FW task context, already cleared, tid=0x%x\n", idx);
 }
 
-void qedi_update_itt_map(struct qedi_ctx *qedi, u32 tid, u32 proto_itt,
-			 struct qedi_cmd *cmd)
+void qedi_update_itt_map(struct qedi_ctx *qedi, u32 tid, struct qedi_cmd *cmd)
 {
-	qedi->itt_map[tid].itt = proto_itt;
 	qedi->itt_map[tid].p_cmd = cmd;
 
 	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_CONN,
@@ -1876,15 +1874,8 @@ void qedi_get_task_tid(struct qedi_ctx *qedi, u32 itt, s16 *tid)
 	WARN_ON(1);
 }
 
-void qedi_get_proto_itt(struct qedi_ctx *qedi, u32 tid, u32 *proto_itt)
-{
-	*proto_itt = qedi->itt_map[tid].itt;
-	QEDI_INFO(&qedi->dbg_ctx, QEDI_LOG_CONN,
-		  "Get itt map tid [0x%x with proto itt[0x%x]",
-		  tid, *proto_itt);
-}
-
-struct qedi_cmd *qedi_get_cmd_from_tid(struct qedi_ctx *qedi, u32 tid)
+struct qedi_cmd *qedi_get_cmd_from_tid(struct qedi_ctx *qedi, u32 tid,
+				       bool clear_mapping)
 {
 	struct qedi_cmd *cmd = NULL;
 
@@ -1895,7 +1886,8 @@ struct qedi_cmd *qedi_get_cmd_from_tid(struct qedi_ctx *qedi, u32 tid)
 	if (cmd->task_id != tid)
 		return NULL;
 
-	qedi->itt_map[tid].p_cmd = NULL;
+	if (clear_mapping)
+		qedi->itt_map[tid].p_cmd = NULL;
 
 	return cmd;
 }
