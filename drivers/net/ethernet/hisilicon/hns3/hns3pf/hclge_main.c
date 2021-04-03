@@ -3976,8 +3976,6 @@ static void hclge_reset_event(struct pci_dev *pdev, struct hnae3_handle *handle)
 	 * want to make sure we throttle the reset request. Therefore, we will
 	 * not allow it again before 3*HZ times.
 	 */
-	if (!handle)
-		handle = &hdev->vport[0].nic;
 
 	if (time_before(jiffies, (hdev->last_reset_time +
 				  HCLGE_RESET_INTERVAL))) {
