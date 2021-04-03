@@ -35,8 +35,18 @@ struct iscsi_session;
 struct iscsi_nopin;
 struct device;
 
-#define ISCSI_DEF_XMIT_CMDS_MAX	128	/* must be power of 2 */
-#define ISCSI_MGMT_CMDS_MAX	15
+#define ISCSI_DEF_XMIT_CMDS_MAX		128
+/*
+ * Max number of mgmt cmds we will preallocate and add to our mgmt fifo.
+ * This must be a pow of 2 due to the kfifo use.
+ */
+#define ISCSI_MGMT_CMDS_MAX		16
+/*
+ * For userspace compat we must allow at least 16 total cmds, so we have the
+ * the mgmt allocation limit above and this limit is the number of mgmt cmds
+ * that can be running.
+ */
+#define ISCSI_INFLIGHT_MGMT_MAX		15
 
 #define ISCSI_DEF_CMD_PER_LUN	32
 
@@ -55,10 +65,19 @@ enum {
 /* Connection suspend "bit" */
 #define ISCSI_SUSPEND_BIT		1
 
-#define ISCSI_ITT_MASK			0x1fff
-#define ISCSI_TOTAL_CMDS_MAX		4096
-/* this must be a power of two greater than ISCSI_MGMT_CMDS_MAX */
-#define ISCSI_TOTAL_CMDS_MIN		16
+/*
+ * Note:
+ * - bnx2i needs the tag to be <= 0x3fff to fit in its fw req, and has a
+ *   different itt space for scsi and mgmt cmds.
+ * - cxgbi assumes the tag will be at most 0x7fff.
+ * - iser needs the total cmds to be a pow of 2.
+ * - qedi, qla4xxx and be2iscsi ignore or pass through the libiscsi itt.
+ */
+#define ISCSI_ITT_MASK			0x3fff
+#define ISCSI_TOTAL_CMDS_MAX		8192
+/* bit 14 is set for MGMT tasks and cleared for scsi cmds */
+#define ISCSI_TASK_TYPE_MGMT		0x2000
+#define ISCSI_TOTAL_CMDS_MIN		(ISCSI_INFLIGHT_MGMT_MAX + 1)
 #define ISCSI_AGE_SHIFT			28
 #define ISCSI_AGE_MASK			0xf
 
@@ -331,13 +350,10 @@ struct iscsi_session {
 	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
 						 * cmdsn, suspend_bit,     *
 						 * leadconn, _stage,       *
-						 * tmf_state and session   *
-						 * resources:              *
-						 * - cmdpool kfifo_out ,   *
-						 * - mgmtpool, queues	   */
+						 * tmf_state and mgmt      *
+						 * queues                  */
 	spinlock_t		back_lock;	/* protects cmdsn_exp      *
-						 * cmdsn_max,              *
-						 * cmdpool kfifo_in        */
+						 * cmdsn_max, mgmt queues  */
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.
@@ -346,9 +362,9 @@ struct iscsi_session {
 	int			age;		/* counts session re-opens */
 
 	int			scsi_cmds_max; 	/* max scsi commands */
-	int			cmds_max;	/* size of cmds array */
-	struct iscsi_task	**cmds;		/* Original Cmds arr */
-	struct iscsi_pool	cmdpool;	/* PDU's pool */
+	int			cmds_max;	/* Total number of tasks */
+	struct iscsi_task	**mgmt_cmds;
+	struct iscsi_pool	mgmt_pool;	/* mgmt task pool */
 	void			*dd_data;	/* LLD private data */
 };
 

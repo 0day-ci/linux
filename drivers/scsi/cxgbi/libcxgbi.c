@@ -366,7 +366,7 @@ int cxgbi_hbas_add(struct cxgbi_device *cdev, u64 max_lun,
 		chba->ndev = cdev->ports[i];
 		chba->shost = shost;
 
-		shost->can_queue = sht->can_queue - ISCSI_MGMT_CMDS_MAX;
+		shost->can_queue = sht->can_queue - ISCSI_INFLIGHT_MGMT_MAX;
 
 		log_debug(1 << CXGBI_DBG_DEV,
 			"cdev 0x%p, p#%d %s: chba 0x%p.\n",

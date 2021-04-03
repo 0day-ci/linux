@@ -463,9 +463,9 @@ static void iscsi_free_task(struct iscsi_task *task)
 	if (conn->login_task == task)
 		return;
 
-	kfifo_in(&session->cmdpool.queue, (void*)&task, sizeof(void*));
-
-	if (sc) {
+	if (!sc) {
+		kfifo_in(&session->mgmt_pool.queue, (void *)&task, sizeof(void *));
+	} else {
 		/* SCSI eh reuses commands to verify us */
 		sc->SCp.ptr = NULL;
 		/*
@@ -716,8 +716,8 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		BUG_ON(conn->c_stage == ISCSI_CONN_INITIAL_STAGE);
 		BUG_ON(conn->c_stage == ISCSI_CONN_STOPPED);
 
-		if (!kfifo_out(&session->cmdpool.queue,
-				 (void*)&task, sizeof(void*)))
+		if (!kfifo_out(&session->mgmt_pool.queue, (void *)&task,
+			       sizeof(void *)))
 			return NULL;
 	}
 	/*
@@ -1118,7 +1118,7 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 {
 	struct iscsi_session *session = conn->session;
-	int i;
+	uint32_t i;
 
 	if (itt == RESERVED_ITT)
 		return NULL;
@@ -1127,10 +1127,17 @@ struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 		session->tt->parse_pdu_itt(conn, itt, &i, NULL);
 	else
 		i = get_itt(itt);
-	if (i >= session->cmds_max)
-		return NULL;
 
-	return session->cmds[i];
+	if (i & ISCSI_TASK_TYPE_MGMT) {
+		i &= ~ISCSI_TASK_TYPE_MGMT;
+
+		if (i >= ISCSI_MGMT_CMDS_MAX)
+			return NULL;
+
+		return session->mgmt_cmds[i];
+	} else {
+		return iscsi_itt_to_ctask(conn, itt);
+	}
 }
 EXPORT_SYMBOL_GPL(iscsi_itt_to_task);
 
@@ -1348,12 +1355,6 @@ int iscsi_verify_itt(struct iscsi_conn *conn, itt_t itt)
 		return ISCSI_ERR_BAD_ITT;
 	}
 
-	if (i >= session->cmds_max) {
-		iscsi_conn_printk(KERN_ERR, conn,
-				  "received invalid itt index %u (max cmds "
-				   "%u.\n", i, session->cmds_max);
-		return ISCSI_ERR_BAD_ITT;
-	}
 	return 0;
 }
 EXPORT_SYMBOL_GPL(iscsi_verify_itt);
@@ -1369,19 +1370,30 @@ EXPORT_SYMBOL_GPL(iscsi_verify_itt);
  */
 struct iscsi_task *iscsi_itt_to_ctask(struct iscsi_conn *conn, itt_t itt)
 {
+	struct iscsi_session *session = conn->session;
 	struct iscsi_task *task;
+	struct scsi_cmnd *sc;
+	int tag;
 
 	if (iscsi_verify_itt(conn, itt))
 		return NULL;
 
-	task = iscsi_itt_to_task(conn, itt);
-	if (!task || !task->sc)
+	if (session->tt->parse_pdu_itt)
+		session->tt->parse_pdu_itt(conn, itt, &tag, NULL);
+	else
+		tag = get_itt(itt);
+	sc = scsi_host_find_tag(session->host, tag);
+	if (!sc)
 		return NULL;
 
-	if (task->sc->SCp.phase != conn->session->age) {
+	task = scsi_cmd_priv(sc);
+	if (!task->sc)
+		return NULL;
+
+	if (task->sc->SCp.phase != session->age) {
 		iscsi_session_printk(KERN_ERR, conn->session,
 				  "task's session age %d, expected %d\n",
-				  task->sc->SCp.phase, conn->session->age);
+				  task->sc->SCp.phase, session->age);
 		return NULL;
 	}
 
@@ -1679,19 +1691,16 @@ static void iscsi_xmitworker(struct work_struct *work)
 	} while (rc >= 0 || rc == -EAGAIN);
 }
 
-static inline struct iscsi_task *iscsi_alloc_task(struct iscsi_conn *conn,
-						  struct scsi_cmnd *sc)
+static struct iscsi_task *iscsi_init_scsi_task(struct iscsi_conn *conn,
+					       struct scsi_cmnd *sc)
 {
-	struct iscsi_task *task;
-
-	if (!kfifo_out(&conn->session->cmdpool.queue,
-			 (void *) &task, sizeof(void *)))
-		return NULL;
+	struct iscsi_task *task = scsi_cmd_priv(sc);
 
 	sc->SCp.phase = conn->session->age;
 	sc->SCp.ptr = (char *) task;
 
 	refcount_set(&task->refcount, 1);
+	task->itt = blk_mq_unique_tag(sc->request);
 	task->state = ISCSI_TASK_PENDING;
 	task->conn = conn;
 	task->sc = sc;
@@ -1805,12 +1814,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto reject;
 	}
 
-	task = iscsi_alloc_task(conn, sc);
-	if (!task) {
-		spin_unlock_bh(&session->frwd_lock);
-		reason = FAILURE_OOM;
-		goto reject;
-	}
+	task = iscsi_init_scsi_task(conn, sc);
 
 	if (!ihost->workq) {
 		reason = iscsi_prep_scsi_cmd_pdu(task);
@@ -2745,9 +2749,8 @@ check:
 	if (!total_cmds)
 		total_cmds = ISCSI_DEF_XMIT_CMDS_MAX;
 	/*
-	 * The iscsi layer needs some tasks for nop handling and tmfs,
-	 * so the cmds_max must at least be greater than ISCSI_MGMT_CMDS_MAX
-	 * + 1 command for scsi IO.
+	 * The iscsi layer needs some tasks for nop handling and tmfs, so the
+	 * cmds_max must at least be greater than ISCSI_INFLIGHT_MGMT_MAX
 	 */
 	if (total_cmds < ISCSI_TOTAL_CMDS_MIN) {
 		printk(KERN_ERR "iscsi: invalid max cmds of %d. Must be a power of two that is at least %d.\n",
@@ -2773,7 +2776,7 @@ check:
 		       requested_cmds_max, total_cmds);
 	}
 
-	scsi_cmds = total_cmds - ISCSI_MGMT_CMDS_MAX;
+	scsi_cmds = total_cmds - ISCSI_INFLIGHT_MGMT_MAX;
 	if (shost->can_queue && scsi_cmds > shost->can_queue) {
 		total_cmds = shost->can_queue;
 
@@ -2799,8 +2802,24 @@ int iscsi_host_add(struct Scsi_Host *shost, struct device *pdev)
 	if (!shost->can_queue)
 		shost->can_queue = ISCSI_DEF_XMIT_CMDS_MAX;
 
+	if (shost->can_queue > ISCSI_TOTAL_CMDS_MAX) {
+		shost_printk(KERN_INFO, shost,
+			     "Requested scsi host can_queue was %u. Limiting to %u\n",
+			     shost->can_queue, ISCSI_TOTAL_CMDS_MAX);
+		shost->can_queue = ISCSI_TOTAL_CMDS_MAX;
+	}
+
 	if (!shost->cmd_per_lun)
 		shost->cmd_per_lun = ISCSI_DEF_CMD_PER_LUN;
+
+	shost->host_tagset = 1;
+	/*
+	 * We currently do not support nr_hw_queues >  1 because the iscsi spec
+	 * itt is limited to 32 bits, and for drivers that support it, libiscsi
+	 * uses some of the bits past BLK_MQ_UNIQUE_TAG_BITS for target sanity
+	 * checks. Plus other drivers/fw can limit the itt to less than 16 bits.
+	 */
+	BUG_ON(shost->nr_hw_queues > 1);
 
 	return scsi_add_host(shost, pdev);
 }
@@ -2914,9 +2933,11 @@ static void iscsi_host_dec_session_cnt(struct Scsi_Host *shost)
 	scsi_host_put(shost);
 }
 
-static void iscsi_init_task(struct iscsi_task *task)
+static void iscsi_init_task(struct iscsi_task *task, int dd_task_size)
 {
 	task->dd_data = &task[1];
+	if (dd_task_size > 0)
+		memset(task->dd_data, 0, dd_task_size);
 	task->itt = ISCSI_RESERVED_TAG;
 	task->state = ISCSI_TASK_FREE;
 	INIT_LIST_HEAD(&task->running);
@@ -2926,7 +2947,7 @@ int iscsi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *sc)
 {
 	struct iscsi_task *task = scsi_cmd_priv(sc);
 
-	iscsi_init_task(task);
+	iscsi_init_task(task, shost->hostt->cmd_size - sizeof(*task));
 	return 0;
 }
 EXPORT_SYMBOL_GPL(iscsi_init_cmd_priv);
@@ -2945,8 +2966,8 @@ EXPORT_SYMBOL_GPL(iscsi_init_cmd_priv);
  * a session per scsi host.
  *
  * Callers should set cmds_max to the largest total numer (mgmt + scsi) of
- * tasks they support. The iscsi layer reserves ISCSI_MGMT_CMDS_MAX tasks
- * for nop handling and login/logout requests.
+ * tasks they support. The iscsi layer reserves ISCSI_INFLIGHT_MGMT_MAX
+ * tasks for nop handling and login/logout requests.
  */
 struct iscsi_cls_session *
 iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
@@ -2985,7 +3006,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	session->lu_reset_timeout = 15;
 	session->abort_timeout = 10;
 	session->scsi_cmds_max = scsi_cmds;
-	session->cmds_max = scsi_cmds + ISCSI_MGMT_CMDS_MAX;
+	session->cmds_max = scsi_cmds + ISCSI_INFLIGHT_MGMT_MAX;
 	session->queued_cmdsn = session->cmdsn = initial_cmdsn;
 	session->exp_cmdsn = initial_cmdsn + 1;
 	session->max_cmdsn = initial_cmdsn + 1;
@@ -2997,21 +3018,18 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	spin_lock_init(&session->frwd_lock);
 	spin_lock_init(&session->back_lock);
 
-	/* initialize SCSI PDU commands pool */
-	if (iscsi_pool_init(&session->cmdpool, session->cmds_max,
-			    (void***)&session->cmds,
+	/* initialize mgmt task pool */
+	if (iscsi_pool_init(&session->mgmt_pool, ISCSI_MGMT_CMDS_MAX,
+			    (void ***)&session->mgmt_cmds,
 			    cmd_task_size + sizeof(struct iscsi_task)))
-		goto cmdpool_alloc_fail;
+		goto mgmt_pool_alloc_fail;
 
 	/* pre-format cmds pool with ITT */
-	for (cmd_i = 0; cmd_i < session->cmds_max; cmd_i++) {
-		struct iscsi_task *task = session->cmds[cmd_i];
+	for (cmd_i = 0; cmd_i < ISCSI_MGMT_CMDS_MAX; cmd_i++) {
+		struct iscsi_task *task = session->mgmt_cmds[cmd_i];
 
-		if (cmd_task_size)
-			task->dd_data = &task[1];
-		task->itt = cmd_i;
-		task->state = ISCSI_TASK_FREE;
-		INIT_LIST_HEAD(&task->running);
+		iscsi_init_task(task, cmd_task_size);
+		task->itt = cmd_i | ISCSI_TASK_TYPE_MGMT;
 
 		if (iscsit->alloc_task_priv) {
 			if (iscsit->alloc_task_priv(session, task))
@@ -3032,11 +3050,11 @@ cls_session_fail:
 free_task_priv:
 	for (cmd_i--; cmd_i >= 0; cmd_i--) {
 		if (iscsit->free_task_priv)
-			iscsit->free_task_priv(session, session->cmds[cmd_i]);
+			iscsit->free_task_priv(session, session->mgmt_cmds[cmd_i]);
 	}
 
-	iscsi_pool_free(&session->cmdpool);
-cmdpool_alloc_fail:
+	iscsi_pool_free(&session->mgmt_pool);
+mgmt_pool_alloc_fail:
 	iscsi_free_session(cls_session);
 dec_session_count:
 	iscsi_host_dec_session_cnt(shost);
@@ -3055,13 +3073,13 @@ void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 	struct Scsi_Host *shost = session->host;
 	int cmd_i;
 
-	for (cmd_i = 0; cmd_i < session->cmds_max; cmd_i++) {
+	for (cmd_i = 0; cmd_i < ISCSI_MGMT_CMDS_MAX; cmd_i++) {
 		if (session->tt->free_task_priv)
 			session->tt->free_task_priv(session,
-						    session->cmds[cmd_i]);
+						    session->mgmt_cmds[cmd_i]);
 	}
 
-	iscsi_pool_free(&session->cmdpool);
+	iscsi_pool_free(&session->mgmt_pool);
 
 	iscsi_remove_session(cls_session);
 
@@ -3125,9 +3143,8 @@ iscsi_conn_setup(struct iscsi_cls_session *cls_session, int dd_size,
 
 	/* allocate login_task used for the login/text sequences */
 	spin_lock_bh(&session->frwd_lock);
-	if (!kfifo_out(&session->cmdpool.queue,
-                         (void*)&conn->login_task,
-			 sizeof(void*))) {
+	if (!kfifo_out(&session->mgmt_pool.queue, (void *)&conn->login_task,
+		       sizeof(void *))) {
 		spin_unlock_bh(&session->frwd_lock);
 		goto login_task_alloc_fail;
 	}
@@ -3145,8 +3162,8 @@ iscsi_conn_setup(struct iscsi_cls_session *cls_session, int dd_size,
 	return cls_conn;
 
 login_task_data_alloc_fail:
-	kfifo_in(&session->cmdpool.queue, (void*)&conn->login_task,
-		    sizeof(void*));
+	kfifo_in(&session->mgmt_pool.queue, (void *)&conn->login_task,
+		 sizeof(void *));
 login_task_alloc_fail:
 	iscsi_destroy_conn(cls_conn);
 	return NULL;
@@ -3189,8 +3206,8 @@ void iscsi_conn_teardown(struct iscsi_cls_conn *cls_conn)
 	kfree(conn->local_ipaddr);
 	/* regular RX path uses back_lock */
 	spin_lock_bh(&session->back_lock);
-	kfifo_in(&session->cmdpool.queue, (void*)&conn->login_task,
-		    sizeof(void*));
+	kfifo_in(&session->mgmt_pool.queue, (void *)&conn->login_task,
+		 sizeof(void *));
 	spin_unlock_bh(&session->back_lock);
 	if (session->leadconn == conn)
 		session->leadconn = NULL;
@@ -3275,8 +3292,8 @@ fail_mgmt_tasks(struct iscsi_session *session, struct iscsi_conn *conn)
 	struct iscsi_task *task;
 	int i, state;
 
-	for (i = 0; i < conn->session->cmds_max; i++) {
-		task = conn->session->cmds[i];
+	for (i = 0; i < ISCSI_MGMT_CMDS_MAX; i++) {
+		task = conn->session->mgmt_cmds[i];
 		if (task->sc)
 			continue;
 
