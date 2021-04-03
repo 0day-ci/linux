@@ -40,8 +40,7 @@ int qedi_send_iscsi_nopout(struct qedi_conn *qedi_conn,
 int qedi_iscsi_send_ioreq(struct iscsi_task *task);
 int qedi_get_task_idx(struct qedi_ctx *qedi);
 void qedi_clear_task_idx(struct qedi_ctx *qedi, int idx);
-int qedi_iscsi_cleanup_task(struct iscsi_task *task,
-			    bool mark_cmd_node_deleted);
+int qedi_iscsi_cleanup_task(struct iscsi_task *task);
 void qedi_iscsi_unmap_sg_list(struct qedi_cmd *cmd);
 void qedi_update_itt_map(struct qedi_ctx *qedi, u32 tid, u32 proto_itt,
 			 struct qedi_cmd *qedi_cmd);

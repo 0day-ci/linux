@@ -219,8 +219,6 @@ struct qedi_work_map {
 #define QEDI_WORK_QUEUED	1
 #define QEDI_WORK_SCHEDULED	2
 #define QEDI_WORK_EXIT		3
-
-	struct work_struct *ptr_tmf_work;
 };
 
 struct qedi_boot_target {
