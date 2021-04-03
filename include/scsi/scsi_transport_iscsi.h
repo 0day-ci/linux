@@ -22,6 +22,7 @@ struct Scsi_Host;
 struct scsi_cmnd;
 struct iscsi_cls_conn;
 struct iscsi_conn;
+struct iscsi_session;
 struct iscsi_task;
 struct sockaddr;
 struct iscsi_iface;
@@ -106,6 +107,10 @@ struct iscsi_transport {
 	void (*get_stats) (struct iscsi_cls_conn *conn,
 			   struct iscsi_stats *stats);
 
+	int (*alloc_task_priv) (struct iscsi_session *session,
+				struct iscsi_task *task);
+	void (*free_task_priv) (struct iscsi_session *session,
+				struct iscsi_task *task);
 	int (*init_task) (struct iscsi_task *task);
 	int (*xmit_task) (struct iscsi_task *task);
 	void (*cleanup_task) (struct iscsi_task *task);

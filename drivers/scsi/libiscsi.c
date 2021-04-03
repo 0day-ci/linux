@@ -2931,10 +2931,15 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 		task->itt = cmd_i;
 		task->state = ISCSI_TASK_FREE;
 		INIT_LIST_HEAD(&task->running);
+
+		if (iscsit->alloc_task_priv) {
+			if (iscsit->alloc_task_priv(session, task))
+				goto free_task_priv;
+		}
 	}
 
 	if (!try_module_get(iscsit->owner))
-		goto module_get_fail;
+		goto free_task_priv;
 
 	if (iscsi_add_session(cls_session, id))
 		goto cls_session_fail;
@@ -2943,7 +2948,12 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 
 cls_session_fail:
 	module_put(iscsit->owner);
-module_get_fail:
+free_task_priv:
+	for (cmd_i--; cmd_i >= 0; cmd_i--) {
+		if (iscsit->free_task_priv)
+			iscsit->free_task_priv(session, session->cmds[cmd_i]);
+	}
+
 	iscsi_pool_free(&session->cmdpool);
 cmdpool_alloc_fail:
 	iscsi_free_session(cls_session);
@@ -2962,6 +2972,13 @@ void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 	struct iscsi_session *session = cls_session->dd_data;
 	struct module *owner = cls_session->transport->owner;
 	struct Scsi_Host *shost = session->host;
+	int cmd_i;
+
+	for (cmd_i = 0; cmd_i < session->cmds_max; cmd_i++) {
+		if (session->tt->free_task_priv)
+			session->tt->free_task_priv(session,
+						    session->cmds[cmd_i]);
+	}
 
 	iscsi_pool_free(&session->cmdpool);
 
