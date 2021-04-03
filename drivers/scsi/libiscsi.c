@@ -1909,40 +1909,68 @@ static int iscsi_exec_task_mgmt_fn(struct iscsi_conn *conn,
 	return 0;
 }
 
+static bool fail_scsi_task_iter(struct scsi_cmnd *sc, void *data, bool rsvd)
+{
+	struct iscsi_task *task = (struct iscsi_task *)sc->SCp.ptr;
+	struct iscsi_sc_iter_data *iter_data = data;
+	struct iscsi_conn *conn = iter_data->conn;
+	struct iscsi_session *session = conn->session;
+
+	ISCSI_DBG_SESSION(session, "failing sc %p itt 0x%x state %d\n",
+			  task->sc, task->itt, task->state);
+	__iscsi_get_task(task);
+	spin_unlock_bh(&session->back_lock);
+
+	fail_scsi_task(task, *(int *)iter_data->data);
+
+	spin_unlock_bh(&session->frwd_lock);
+	iscsi_put_task(task);
+	spin_lock_bh(&session->frwd_lock);
+
+	spin_lock_bh(&session->back_lock);
+	return true;
+}
+
+static bool iscsi_sc_iter(struct scsi_cmnd *sc, void *data, bool rsvd)
+{
+	struct iscsi_task *task = (struct iscsi_task *)sc->SCp.ptr;
+	struct iscsi_sc_iter_data *iter_data = data;
+
+	if (!task || !task->sc || task->state == ISCSI_TASK_FREE ||
+	    task->conn != iter_data->conn)
+		return true;
+
+	if (iter_data->lun != -1 && iter_data->lun != task->sc->device->lun)
+		return true;
+
+	return iter_data->fn(sc, iter_data, rsvd);
+}
+
+void iscsi_conn_for_each_sc(struct iscsi_conn *conn,
+			    struct iscsi_sc_iter_data *iter_data)
+{
+	struct iscsi_session *session = conn->session;
+	struct Scsi_Host *shost = session->host;
+
+	iter_data->conn = conn;
+	spin_lock_bh(&session->back_lock);
+	scsi_host_busy_iter(shost, iscsi_sc_iter, iter_data);
+	spin_unlock_bh(&session->back_lock);
+}
+EXPORT_SYMBOL_GPL(iscsi_conn_for_each_sc);
+
 /*
  * Fail commands. session frwd lock held and xmit thread flushed.
  */
 static void fail_scsi_tasks(struct iscsi_conn *conn, u64 lun, int error)
 {
-	struct iscsi_session *session = conn->session;
-	struct iscsi_task *task;
-	int i;
+	struct iscsi_sc_iter_data iter_data = {
+		.lun = lun,
+		.fn = fail_scsi_task_iter,
+		.data = &error,
+	};
 
-	spin_lock_bh(&session->back_lock);
-	for (i = 0; i < session->cmds_max; i++) {
-		task = session->cmds[i];
-		if (!task->sc || task->state == ISCSI_TASK_FREE)
-			continue;
-
-		if (lun != -1 && lun != task->sc->device->lun)
-			continue;
-
-		__iscsi_get_task(task);
-		spin_unlock_bh(&session->back_lock);
-
-		ISCSI_DBG_SESSION(session,
-				  "failing sc %p itt 0x%x state %d\n",
-				  task->sc, task->itt, task->state);
-		fail_scsi_task(task, error);
-
-		spin_unlock_bh(&session->frwd_lock);
-		iscsi_put_task(task);
-		spin_lock_bh(&session->frwd_lock);
-
-		spin_lock_bh(&session->back_lock);
-	}
-
-	spin_unlock_bh(&session->back_lock);
+	iscsi_conn_for_each_sc(conn, &iter_data);
 }
 
 /**
@@ -2005,14 +2033,51 @@ static int iscsi_has_ping_timed_out(struct iscsi_conn *conn)
 		return 0;
 }
 
+static bool check_scsi_task_iter(struct scsi_cmnd *sc, void *data, bool rsvd)
+{
+	struct iscsi_task *task = (struct iscsi_task *)sc->SCp.ptr;
+	struct iscsi_sc_iter_data *iter_data = data;
+	struct iscsi_task *timed_out_task = iter_data->data;
+
+	if (task == timed_out_task)
+		return true;
+	/*
+	 * Only check if cmds started before this one have made
+	 * progress, or this could never fail
+	 */
+	if (time_after(task->sc->jiffies_at_alloc,
+		       timed_out_task->sc->jiffies_at_alloc))
+		return true;
+
+	if (time_after(task->last_xfer, timed_out_task->last_timeout)) {
+		/*
+		 * The timed out task has not made progress, but a task
+		 * started before us has transferred data since we
+		 * started/last-checked. We could be queueing too many tasks
+		 * or the LU is bad.
+		 *
+		 * If the device is bad the cmds ahead of us on other devs will
+		 * complete, and this loop will eventually fail starting the
+		 * scsi eh.
+		 */
+		ISCSI_DBG_EH(task->conn->session,
+			     "Command has not made progress but commands ahead of it have. Asking scsi-ml for more time to complete. Our last xfer vs running task last xfer %lu/%lu. Last check %lu.\n",
+			     timed_out_task->last_xfer, task->last_xfer,
+			     timed_out_task->last_timeout);
+		iter_data->rc = BLK_EH_RESET_TIMER;
+		return false;
+	}
+	return true;
+}
+
 enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 {
 	enum blk_eh_timer_return rc = BLK_EH_DONE;
-	struct iscsi_task *task = NULL, *running_task;
+	struct iscsi_task *task;
 	struct iscsi_cls_session *cls_session;
+	struct iscsi_sc_iter_data iter_data;
 	struct iscsi_session *session;
 	struct iscsi_conn *conn;
-	int i;
 
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
@@ -2091,45 +2156,16 @@ enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 		goto done;
 	}
 
-	spin_lock(&session->back_lock);
-	for (i = 0; i < conn->session->cmds_max; i++) {
-		running_task = conn->session->cmds[i];
-		if (!running_task->sc || running_task == task ||
-		     running_task->state != ISCSI_TASK_RUNNING)
-			continue;
+	iter_data.data = task;
+	iter_data.rc = BLK_EH_DONE;
+	iter_data.fn = check_scsi_task_iter;
+	iter_data.lun = -1;
 
-		/*
-		 * Only check if cmds started before this one have made
-		 * progress, or this could never fail
-		 */
-		if (time_after(running_task->sc->jiffies_at_alloc,
-			       task->sc->jiffies_at_alloc))
-			continue;
-
-		if (time_after(running_task->last_xfer, task->last_timeout)) {
-			/*
-			 * This task has not made progress, but a task
-			 * started before us has transferred data since
-			 * we started/last-checked. We could be queueing
-			 * too many tasks or the LU is bad.
-			 *
-			 * If the device is bad the cmds ahead of us on
-			 * other devs will complete, and this loop will
-			 * eventually fail starting the scsi eh.
-			 */
-			ISCSI_DBG_EH(session, "Command has not made progress "
-				     "but commands ahead of it have. "
-				     "Asking scsi-ml for more time to "
-				     "complete. Our last xfer vs running task "
-				     "last xfer %lu/%lu. Last check %lu.\n",
-				     task->last_xfer, running_task->last_xfer,
-				     task->last_timeout);
-			spin_unlock(&session->back_lock);
-			rc = BLK_EH_RESET_TIMER;
-			goto done;
-		}
+	iscsi_conn_for_each_sc(conn, &iter_data);
+	if (iter_data.rc != BLK_EH_DONE) {
+		rc = iter_data.rc;
+		goto done;
 	}
-	spin_unlock(&session->back_lock);
 
 	/* Assumes nop timeout is shorter than scsi cmd timeout */
 	if (task->have_checked_conn)

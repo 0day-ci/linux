@@ -469,6 +469,18 @@ extern void iscsi_complete_scsi_task(struct iscsi_task *task,
 				     uint32_t exp_cmdsn, uint32_t max_cmdsn);
 extern int iscsi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *cmd);
 
+struct iscsi_sc_iter_data {
+	struct iscsi_conn *conn;
+	/* optional: if set to -1. It will be ignored */
+	u64 lun;
+	void *data;
+	int rc;
+	bool (*fn)(struct scsi_cmnd *sc, void *data, bool rsvd);
+};
+
+extern void iscsi_conn_for_each_sc(struct iscsi_conn *conn,
+				   struct iscsi_sc_iter_data *iter_data);
+
 /*
  * generic helpers
  */
