@@ -467,6 +467,8 @@ extern void __iscsi_put_task(struct iscsi_task *task);
 extern void __iscsi_get_task(struct iscsi_task *task);
 extern void iscsi_complete_scsi_task(struct iscsi_task *task,
 				     uint32_t exp_cmdsn, uint32_t max_cmdsn);
+extern int iscsi_complete_task(struct iscsi_conn *conn, struct iscsi_task *task,
+			       struct iscsi_hdr *hdr, char *data, int datalen);
 extern int iscsi_init_cmd_priv(struct Scsi_Host *shost, struct scsi_cmnd *cmd);
 
 struct iscsi_sc_iter_data {

@@ -1148,9 +1148,8 @@ EXPORT_SYMBOL_GPL(iscsi_itt_to_task);
 int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, int datalen)
 {
-	struct iscsi_session *session = conn->session;
 	int opcode = hdr->opcode & ISCSI_OPCODE_MASK, rc = 0;
-	struct iscsi_task *task;
+	struct iscsi_task *task = NULL;
 	uint32_t itt;
 
 	conn->last_recv = jiffies;
@@ -1163,10 +1162,60 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	else
 		itt = ~0U;
 
-	ISCSI_DBG_SESSION(session, "[op 0x%x cid %d itt 0x%x len %d]\n",
-			  opcode, conn->id, itt, datalen);
+	if (itt == ~0U)
+		return iscsi_complete_task(conn, NULL, hdr, data, datalen);
 
-	if (itt == ~0U) {
+	switch (opcode) {
+	case ISCSI_OP_SCSI_CMD_RSP:
+	case ISCSI_OP_SCSI_DATA_IN:
+		task = iscsi_itt_to_ctask(conn, hdr->itt);
+		break;
+	case ISCSI_OP_R2T:
+		/* LLD handles R2Ts if they need to. */
+		return 0;
+	case ISCSI_OP_LOGOUT_RSP:
+	case ISCSI_OP_LOGIN_RSP:
+	case ISCSI_OP_TEXT_RSP:
+	case ISCSI_OP_SCSI_TMFUNC_RSP:
+	case ISCSI_OP_NOOP_IN:
+		task = iscsi_itt_to_task(conn, hdr->itt);
+		break;
+	}
+
+	if (!task)
+		return ISCSI_ERR_BAD_OPCODE;
+
+	return iscsi_complete_task(conn, task, hdr, data, datalen);
+}
+EXPORT_SYMBOL_GPL(__iscsi_complete_pdu);
+
+/**
+ * iscsi_complete_task - complete iscsi task
+ * @conn: iscsi conn
+ * @task: iscsi task
+ * @hdr: iscsi response header with all fields set except the itt
+ * @data: data buffer
+ * @datalen: len of data buffer
+ *
+ * Completes task processing by freeing any resources allocated at
+ * queuecommand or send generic.
+ *
+ * This function should be used by drivers that do not use the libiscsi
+ * itt for the PDU that was sent to the target and has access to the
+ * iscsi_task struct directly.
+ *
+ * Session back_lock must be held.
+ */
+int iscsi_complete_task(struct iscsi_conn *conn, struct iscsi_task *task,
+			struct iscsi_hdr *hdr, char *data, int datalen)
+{
+	struct iscsi_session *session = conn->session;
+	int opcode = hdr->opcode & ISCSI_OPCODE_MASK, rc = 0;
+
+	ISCSI_DBG_SESSION(session, "[op 0x%x cid %d itt 0x%x len %d]\n",
+			  opcode, conn->id, task ? task->itt : ~0U, datalen);
+
+	if (!task) {
 		iscsi_update_cmdsn(session, (struct iscsi_nopin*)hdr);
 
 		switch(opcode) {
@@ -1201,33 +1250,12 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		goto out;
 	}
 
-	switch(opcode) {
-	case ISCSI_OP_SCSI_CMD_RSP:
-	case ISCSI_OP_SCSI_DATA_IN:
-		task = iscsi_itt_to_ctask(conn, hdr->itt);
-		if (!task)
-			return ISCSI_ERR_BAD_ITT;
-		task->last_xfer = jiffies;
-		break;
-	case ISCSI_OP_R2T:
-		/*
-		 * LLD handles R2Ts if they need to.
-		 */
-		return 0;
-	case ISCSI_OP_LOGOUT_RSP:
-	case ISCSI_OP_LOGIN_RSP:
-	case ISCSI_OP_TEXT_RSP:
-	case ISCSI_OP_SCSI_TMFUNC_RSP:
-	case ISCSI_OP_NOOP_IN:
-		task = iscsi_itt_to_task(conn, hdr->itt);
-		if (!task)
-			return ISCSI_ERR_BAD_ITT;
-		break;
-	default:
-		return ISCSI_ERR_BAD_OPCODE;
-	}
+	task->last_xfer = jiffies;
 
 	switch(opcode) {
+	case ISCSI_OP_R2T:
+		/* LLD handles R2Ts if they need to. */
+		break;
 	case ISCSI_OP_SCSI_CMD_RSP:
 		iscsi_scsi_cmd_rsp(conn, hdr, task, data, datalen);
 		break;
@@ -1284,7 +1312,7 @@ recv_pdu:
 	iscsi_finish_task(task, ISCSI_TASK_COMPLETED);
 	return rc;
 }
-EXPORT_SYMBOL_GPL(__iscsi_complete_pdu);
+EXPORT_SYMBOL_GPL(iscsi_complete_task);
 
 int iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		       char *data, int datalen)
