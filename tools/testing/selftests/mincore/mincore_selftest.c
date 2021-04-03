@@ -15,6 +15,11 @@
 #include <string.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/sysmacros.h>
+#include <sys/mount.h>
 
 #include "../kselftest.h"
 #include "../kselftest_harness.h"
@@ -195,10 +200,42 @@ TEST(check_file_mmap)
 	int fd;
 	int i;
 	int ra_pages = 0;
+	long ra_size, file_size;
+	struct stat stats;
+	dev_t devt;
+	unsigned int major, minor;
+	char devpath[32];
+
+	retval = stat(".", &stats);
+	ASSERT_EQ(0, retval) {
+		TH_LOG("Can't stat pwd: %s", strerror(errno));
+	}
+
+	devt = stats.st_dev;
+	major = major(devt);
+	minor = minor(devt);
+	snprintf(devpath, sizeof(devpath), "/dev/block/%u:%u", major, minor);
+
+	fd = open(devpath, O_RDONLY);
+	ASSERT_NE(-1, fd) {
+		TH_LOG("Can't open underlying disk %s", strerror(errno));
+	}
+
+	retval = ioctl(fd, BLKRAGET, &ra_size);
+	ASSERT_EQ(0, retval) {
+		TH_LOG("Error ioctl with the underlying disk: %s", strerror(errno));
+	}
+
+	/*
+	 * BLKRAGET ioctl returns the readahead size in sectors (512 bytes).
+	 * Make file_size large enough to contain the readahead window.
+	 */
+	ra_size *= 512;
+	file_size = ra_size * 2;
 
 	page_size = sysconf(_SC_PAGESIZE);
-	vec_size = FILE_SIZE / page_size;
-	if (FILE_SIZE % page_size)
+	vec_size = file_size / page_size;
+	if (file_size % page_size)
 		vec_size++;
 
 	vec = calloc(vec_size, sizeof(unsigned char));
@@ -213,7 +250,7 @@ TEST(check_file_mmap)
 			strerror(errno));
 	}
 	errno = 0;
-	retval = fallocate(fd, 0, 0, FILE_SIZE);
+	retval = fallocate(fd, 0, 0, file_size);
 	ASSERT_EQ(0, retval) {
 		TH_LOG("Error allocating space for the temporary file: %s",
 			strerror(errno));
@@ -223,12 +260,12 @@ TEST(check_file_mmap)
 	 * Map the whole file, the pages shouldn't be fetched yet.
 	 */
 	errno = 0;
-	addr = mmap(NULL, FILE_SIZE, PROT_READ | PROT_WRITE,
+	addr = mmap(NULL, file_size, PROT_READ | PROT_WRITE,
 			MAP_SHARED, fd, 0);
 	ASSERT_NE(MAP_FAILED, addr) {
 		TH_LOG("mmap error: %s", strerror(errno));
 	}
-	retval = mincore(addr, FILE_SIZE, vec);
+	retval = mincore(addr, file_size, vec);
 	ASSERT_EQ(0, retval);
 	for (i = 0; i < vec_size; i++) {
 		ASSERT_EQ(0, vec[i]) {
@@ -240,14 +277,14 @@ TEST(check_file_mmap)
 	 * Touch a page in the middle of the mapping. We expect the next
 	 * few pages (the readahead window) to be populated too.
 	 */
-	addr[FILE_SIZE / 2] = 1;
-	retval = mincore(addr, FILE_SIZE, vec);
+	addr[file_size / 2] = 1;
+	retval = mincore(addr, file_size, vec);
 	ASSERT_EQ(0, retval);
-	ASSERT_EQ(1, vec[FILE_SIZE / 2 / page_size]) {
+	ASSERT_EQ(1, vec[file_size / 2 / page_size]) {
 		TH_LOG("Page not found in memory after use");
 	}
 
-	i = FILE_SIZE / 2 / page_size + 1;
+	i = file_size / 2 / page_size + 1;
 	while (i < vec_size && vec[i]) {
 		ra_pages++;
 		i++;
@@ -271,7 +308,7 @@ TEST(check_file_mmap)
 		}
 	}
 
-	munmap(addr, FILE_SIZE);
+	munmap(addr, file_size);
 	close(fd);
 	free(vec);
 }
