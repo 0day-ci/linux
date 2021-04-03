@@ -1115,6 +1115,25 @@ error:
 	dev_err_ratelimited(priv->dev, "%s: error: %i\n", __func__, ret);
 }
 
+static int ar9331_sw_set_ageing_time(struct dsa_switch *ds,
+				     unsigned int ageing_time)
+{
+	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
+	struct regmap *regmap = priv->regmap;
+	u32 time, val;
+
+	time = DIV_ROUND_UP(ageing_time, AR9331_SW_AT_AGE_TIME_COEF);
+	if (!time)
+		time = 1;
+	else if (time > U16_MAX)
+		time = U16_MAX;
+
+	val = FIELD_PREP(AR9331_SW_AT_AGE_TIME, time) | AR9331_SW_AT_AGE_EN;
+	return regmap_update_bits(regmap, AR9331_SW_REG_ADDR_TABLE_CTRL,
+				  AR9331_SW_AT_AGE_EN | AR9331_SW_AT_AGE_TIME,
+				  val);
+}
+
 static const struct dsa_switch_ops ar9331_sw_ops = {
 	.get_tag_protocol	= ar9331_sw_get_tag_protocol,
 	.setup			= ar9331_sw_setup,
@@ -1130,6 +1149,7 @@ static const struct dsa_switch_ops ar9331_sw_ops = {
 	.port_fdb_dump		= ar9331_sw_port_fdb_dump,
 	.port_mdb_add           = ar9331_sw_port_mdb_add,
 	.port_mdb_del           = ar9331_sw_port_mdb_del,
+	.set_ageing_time	= ar9331_sw_set_ageing_time,
 };
 
 static irqreturn_t ar9331_sw_irq(int irq, void *data)
@@ -1476,6 +1496,8 @@ static int ar9331_sw_probe(struct mdio_device *mdiodev)
 	priv->ops = ar9331_sw_ops;
 	ds->ops = &priv->ops;
 	dev_set_drvdata(&mdiodev->dev, priv);
+	ds->ageing_time_min = AR9331_SW_AT_AGE_TIME_COEF;
+	ds->ageing_time_max = AR9331_SW_AT_AGE_TIME_COEF * U16_MAX;
 
 	for (i = 0; i < ARRAY_SIZE(priv->port); i++) {
 		struct ar9331_sw_port *port = &priv->port[i];
