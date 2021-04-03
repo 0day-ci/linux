@@ -265,21 +265,63 @@ static int beiscsi_eh_abort(struct scsi_cmnd *sc)
 	return iscsi_eh_abort(sc);
 }
 
+struct beiscsi_invldt_cmd_tbl {
+	struct invldt_cmd_tbl tbl[BE_INVLDT_CMD_TBL_SZ];
+	struct iscsi_task *task[BE_INVLDT_CMD_TBL_SZ];
+};
+
+static bool beiscsi_dev_reset_sc_iter(struct scsi_cmnd *sc, void *data,
+				      bool rsvd)
+{
+	struct iscsi_task *task = (struct iscsi_task *)sc->SCp.ptr;
+	struct iscsi_sc_iter_data *iter_data = data;
+	struct beiscsi_invldt_cmd_tbl *inv_tbl = iter_data->data;
+	struct beiscsi_conn *beiscsi_conn = iter_data->conn->dd_data;
+	struct beiscsi_hba *phba = beiscsi_conn->phba;
+	int nents = iter_data->rc;
+	struct beiscsi_io_task *io_task;
+
+	/*
+	 * Can't fit in more cmds? Normally this won't happen b'coz
+	 * BEISCSI_CMD_PER_LUN is same as BE_INVLDT_CMD_TBL_SZ.
+	 */
+	if (iter_data->rc == BE_INVLDT_CMD_TBL_SZ) {
+		iter_data->rc = BE_INVLDT_CMD_TBL_SZ + 1;
+		return false;
+	}
+
+	/* get a task ref till FW processes the req for the ICD used */
+	__iscsi_get_task(task);
+	io_task = task->dd_data;
+	/* mark WRB invalid which have been not processed by FW yet */
+	if (is_chip_be2_be3r(phba)) {
+		AMAP_SET_BITS(struct amap_iscsi_wrb, invld,
+			      io_task->pwrb_handle->pwrb, 1);
+	} else {
+		AMAP_SET_BITS(struct amap_iscsi_wrb_v2, invld,
+			      io_task->pwrb_handle->pwrb, 1);
+	}
+
+	inv_tbl->tbl[nents].cid = beiscsi_conn->beiscsi_conn_cid;
+	inv_tbl->tbl[nents].icd = io_task->psgl_handle->sgl_index;
+	inv_tbl->task[nents] = task;
+	nents++;
+
+	iter_data->rc = nents;
+	return true;
+}
+
 static int beiscsi_eh_device_reset(struct scsi_cmnd *sc)
 {
-	struct beiscsi_invldt_cmd_tbl {
-		struct invldt_cmd_tbl tbl[BE_INVLDT_CMD_TBL_SZ];
-		struct iscsi_task *task[BE_INVLDT_CMD_TBL_SZ];
-	} *inv_tbl;
+	struct iscsi_sc_iter_data iter_data;
+	struct beiscsi_invldt_cmd_tbl *inv_tbl;
 	struct iscsi_cls_session *cls_session;
 	struct beiscsi_conn *beiscsi_conn;
-	struct beiscsi_io_task *io_task;
 	struct iscsi_session *session;
 	struct beiscsi_hba *phba;
 	struct iscsi_conn *conn;
-	struct iscsi_task *task;
 	unsigned int i, nents;
-	int rc, more = 0;
+	int rc;
 
 	cls_session = starget_to_session(scsi_target(sc->device));
 	session = cls_session->dd_data;
@@ -302,55 +344,27 @@ static int beiscsi_eh_device_reset(struct scsi_cmnd *sc)
 			    "BM_%d : invldt_cmd_tbl alloc failed\n");
 		return FAILED;
 	}
-	nents = 0;
-	/* take back_lock to prevent task from getting cleaned up under us */
-	spin_lock(&session->back_lock);
-	for (i = 0; i < conn->session->cmds_max; i++) {
-		task = conn->session->cmds[i];
-		if (!task->sc)
-			continue;
 
-		if (sc->device->lun != task->sc->device->lun)
-			continue;
-		/**
-		 * Can't fit in more cmds? Normally this won't happen b'coz
-		 * BEISCSI_CMD_PER_LUN is same as BE_INVLDT_CMD_TBL_SZ.
-		 */
-		if (nents == BE_INVLDT_CMD_TBL_SZ) {
-			more = 1;
-			break;
-		}
+	iter_data.data = inv_tbl;
+	iter_data.lun = sc->device->lun;
+	iter_data.rc = 0;
+	iter_data.fn = beiscsi_dev_reset_sc_iter;
 
-		/* get a task ref till FW processes the req for the ICD used */
-		__iscsi_get_task(task);
-		io_task = task->dd_data;
-		/* mark WRB invalid which have been not processed by FW yet */
-		if (is_chip_be2_be3r(phba)) {
-			AMAP_SET_BITS(struct amap_iscsi_wrb, invld,
-				      io_task->pwrb_handle->pwrb, 1);
-		} else {
-			AMAP_SET_BITS(struct amap_iscsi_wrb_v2, invld,
-				      io_task->pwrb_handle->pwrb, 1);
-		}
-
-		inv_tbl->tbl[nents].cid = beiscsi_conn->beiscsi_conn_cid;
-		inv_tbl->tbl[nents].icd = io_task->psgl_handle->sgl_index;
-		inv_tbl->task[nents] = task;
-		nents++;
-	}
-	spin_unlock(&session->back_lock);
+	iscsi_conn_for_each_sc(conn, &iter_data);
 	spin_unlock_bh(&session->frwd_lock);
+
+	nents = iter_data.rc;
+	if (nents > BE_INVLDT_CMD_TBL_SZ) {
+		beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_EH,
+			    "BM_%d : number of cmds exceeds size of invalidation table\n");
+		nents = BE_INVLDT_CMD_TBL_SZ;
+		rc = FAILED;
+		goto end_reset;
+	}
 
 	rc = SUCCESS;
 	if (!nents)
 		goto end_reset;
-
-	if (more) {
-		beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_EH,
-			    "BM_%d : number of cmds exceeds size of invalidation table\n");
-		rc = FAILED;
-		goto end_reset;
-	}
 
 	if (beiscsi_mgmt_invalidate_icds(phba, &inv_tbl->tbl[0], nents)) {
 		beiscsi_log(phba, KERN_WARNING, BEISCSI_LOG_EH,
