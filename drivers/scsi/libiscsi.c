@@ -1813,15 +1813,14 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto fault;
 	}
 
-	spin_lock_bh(&session->frwd_lock);
 	conn = session->leadconn;
 	if (!conn) {
-		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_SESSION_FREED;
 		sc->result = DID_NO_CONNECT << 16;
 		goto fault;
 	}
 
+	spin_lock_bh(&session->frwd_lock);
 	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
 		spin_unlock_bh(&session->frwd_lock);
 		reason = FAILURE_SESSION_IN_RECOVERY;
@@ -3441,11 +3440,8 @@ int iscsi_conn_bind(struct iscsi_cls_session *cls_session,
 	struct iscsi_session *session = cls_session->dd_data;
 	struct iscsi_conn *conn = cls_conn->dd_data;
 
-	spin_lock_bh(&session->frwd_lock);
 	if (is_leading)
 		session->leadconn = conn;
-	spin_unlock_bh(&session->frwd_lock);
-
 	/*
 	 * The target could have reduced it's window size between logins, so
 	 * we have to reset max/exp cmdsn so we can see the new values.

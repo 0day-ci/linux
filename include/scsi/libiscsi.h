@@ -351,8 +351,8 @@ struct iscsi_session {
 	struct iscsi_conn	*leadconn;	/* leading connection */
 	spinlock_t		frwd_lock;	/* protects queued_cmdsn,  *
 						 * cmdsn, suspend_bit,     *
-						 * leadconn, _stage,       *
-						 * tmf_state and queues    */
+						 * _stage, tmf_state and   *
+						 * queues                  */
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.
