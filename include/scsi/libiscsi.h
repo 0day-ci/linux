@@ -296,10 +296,12 @@ struct iscsi_session {
 	struct mutex		eh_mutex;
 
 	/* iSCSI session-wide sequencing */
-	uint32_t		cmdsn;
+	/* Protects exp and max cmdsn */
+	spinlock_t		back_cmdsn_lock;
 	uint32_t		exp_cmdsn;
 	uint32_t		max_cmdsn;
 
+	uint32_t		cmdsn;
 	/* This tracks the reqs queued into the initiator */
 	uint32_t		queued_cmdsn;
 
@@ -356,8 +358,7 @@ struct iscsi_session {
 						 * cmdsn, suspend_bit,     *
 						 * leadconn, _stage,       *
 						 * tmf_state and queues    */
-	spinlock_t		back_lock;	/* protects cmdsn_exp and  *
-						 * cmdsn_max               */
+	spinlock_t		back_lock;
 	/*
 	 * frwd_lock must be held when transitioning states, but not needed
 	 * if just checking the state in the scsi-ml or iscsi callouts.

@@ -103,6 +103,7 @@ static void __iscsi_update_cmdsn(struct iscsi_session *session,
 	if (iscsi_sna_lt(max_cmdsn, exp_cmdsn - 1))
 		return;
 
+	spin_lock_bh(&session->back_cmdsn_lock);
 	if (exp_cmdsn != session->exp_cmdsn &&
 	    !iscsi_sna_lt(exp_cmdsn, session->exp_cmdsn))
 		session->exp_cmdsn = exp_cmdsn;
@@ -110,6 +111,7 @@ static void __iscsi_update_cmdsn(struct iscsi_session *session,
 	if (max_cmdsn != session->max_cmdsn &&
 	    !iscsi_sna_lt(max_cmdsn, session->max_cmdsn))
 		session->max_cmdsn = max_cmdsn;
+	spin_unlock_bh(&session->back_cmdsn_lock);
 }
 
 void iscsi_update_cmdsn(struct iscsi_session *session, struct iscsi_nopin *hdr)
@@ -3067,6 +3069,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	spin_lock_init(&session->mgmt_lock);
 	spin_lock_init(&session->frwd_lock);
 	spin_lock_init(&session->back_lock);
+	spin_lock_init(&session->back_cmdsn_lock);
 
 	/* initialize mgmt task pool */
 	if (iscsi_pool_init(&session->mgmt_pool, ISCSI_MGMT_CMDS_MAX,
@@ -3470,9 +3473,9 @@ int iscsi_conn_bind(struct iscsi_cls_session *cls_session,
 	 * The target could have reduced it's window size between logins, so
 	 * we have to reset max/exp cmdsn so we can see the new values.
 	 */
-	spin_lock_bh(&session->back_lock);
+	spin_lock_bh(&session->back_cmdsn_lock);
 	session->max_cmdsn = session->exp_cmdsn = session->cmdsn + 1;
-	spin_unlock_bh(&session->back_lock);
+	spin_unlock_bh(&session->back_cmdsn_lock);
 	/*
 	 * Unblock xmitworker(), Login Phase will pass through.
 	 */

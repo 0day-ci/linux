@@ -559,9 +559,7 @@ static int iscsi_tcp_r2t_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr)
 	tcp_conn = conn->dd_data;
 	rhdr = (struct iscsi_r2t_rsp *)tcp_conn->in.hdr;
 	/* fill-in new R2T associated with the task */
-	spin_lock(&session->back_lock);
 	iscsi_update_cmdsn(session, (struct iscsi_nopin *)rhdr);
-	spin_unlock(&session->back_lock);
 
 	if (tcp_conn->in.datalen) {
 		iscsi_conn_printk(KERN_ERR, conn,
