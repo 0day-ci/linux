@@ -4,6 +4,7 @@
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/page_ext.h>
+#include <linux/page_owner.h>
 #include <linux/poison.h>
 #include <linux/ratelimit.h>
 #include <linux/kasan.h>
@@ -63,7 +64,7 @@ static bool single_bit_flip(unsigned char a, unsigned char b)
 	return error && !(error & (error - 1));
 }
 
-static void check_poison_mem(unsigned char *mem, size_t bytes)
+static void check_poison_mem(struct page *page, unsigned char *mem, size_t bytes)
 {
 	static DEFINE_RATELIMIT_STATE(ratelimit, 5 * HZ, 10);
 	unsigned char *start;
@@ -91,6 +92,7 @@ static void check_poison_mem(unsigned char *mem, size_t bytes)
 	print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 1, start,
 			end - start + 1, 1);
 	dump_stack();
+	dump_page_owner(page);
 }
 
 static void unpoison_page(struct page *page)
@@ -103,7 +105,7 @@ static void unpoison_page(struct page *page)
 	 * that is freed to buddy. Thus no extra check is done to
 	 * see if a page was poisoned.
 	 */
-	check_poison_mem(addr, PAGE_SIZE);
+	check_poison_mem(page, addr, PAGE_SIZE);
 	kunmap_atomic(addr);
 }
 
