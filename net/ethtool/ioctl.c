@@ -436,12 +436,16 @@ int __ethtool_get_link_ksettings(struct net_device *dev,
 
 	memset(link_ksettings, 0, sizeof(*link_ksettings));
 
-	link_ksettings->link_mode = -1;
 	err = dev->ethtool_ops->get_link_ksettings(dev, link_ksettings);
 	if (err)
 		return err;
 
-	if (link_ksettings->link_mode != -1) {
+	if (dev->ethtool_ops->cap_link_mode_supported &&
+	    link_ksettings->link_mode != -1) {
+		if (WARN_ON_ONCE(link_ksettings->link_mode >=
+				 __ETHTOOL_LINK_MODE_MASK_NBITS))
+			return -EINVAL;
+
 		link_info = &link_mode_params[link_ksettings->link_mode];
 		link_ksettings->base.speed = link_info->speed;
 		link_ksettings->lanes = link_info->lanes;
