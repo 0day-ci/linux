@@ -306,6 +306,13 @@ static __maybe_unused int mdio_bus_phy_resume(struct device *dev)
 	ret = phy_resume(phydev);
 	if (ret < 0)
 		return ret;
+
+	/* PHY state could be changed to PHY_NOLINK from MAC controller resume
+	 * rounte with phy_start(), here change to PHY_UP after re-initializing
+	 * PHY hardware, let PHY state machine to start/config auto-nego again.
+	 */
+	phydev->state = PHY_UP;
+
 no_resume:
 	if (phydev->attached_dev && phydev->adjust_link)
 		phy_start_machine(phydev);
