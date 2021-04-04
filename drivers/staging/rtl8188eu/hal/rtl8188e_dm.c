@@ -139,7 +139,9 @@ void rtw_hal_dm_watchdog(struct adapter *Adapter)
 	hw_init_completed = Adapter->hw_init_completed;
 
 	if (!hw_init_completed)
-		goto skip_dm;
+		/*  Check GPIO to determine current RF on/off and Pbc status. */
+		/*  Check Hardware Radio ON/OFF or not */
+		return;
 
 	/* ODM */
 	pmlmepriv = &Adapter->mlmepriv;
@@ -156,10 +158,8 @@ void rtw_hal_dm_watchdog(struct adapter *Adapter)
 
 	Adapter->HalData->odmpriv.bLinked = bLinked;
 	ODM_DMWatchdog(&Adapter->HalData->odmpriv);
-skip_dm:
 	/*  Check GPIO to determine current RF on/off and Pbc status. */
 	/*  Check Hardware Radio ON/OFF or not */
-	return;
 }
 
 void rtw_hal_dm_init(struct adapter *Adapter)
