@@ -2048,12 +2048,12 @@ void ieee80211_softmac_xmit(struct ieee80211_txb *txb, struct ieee80211_device *
 	/* if xmit available, just xmit it immediately, else just insert it to the wait queue */
 	for (i = 0; i < txb->nr_frags; i++) {
 #ifdef USB_TX_DRIVER_AGGREGATION_ENABLE
-		if ((skb_queue_len(&ieee->skb_drv_aggQ[queue_index]) != 0) ||
+		if ((skb_queue_len(&ieee->skb_drv_aggQ[queue_index]) != 0)
 #else
-		if ((skb_queue_len(&ieee->skb_waitQ[queue_index]) != 0) ||
+		if ((skb_queue_len(&ieee->skb_waitQ[queue_index]) != 0)
 #endif
-		    (!ieee->check_nic_enough_desc(ieee->dev, queue_index)) || \
-		    (ieee->queue_stop)) {
+		 || (!ieee->check_nic_enough_desc(ieee->dev, queue_index)) \
+		 || (ieee->queue_stop)) {
 			/* insert the skb packet to the wait queue */
 			/* as for the completion function, it does not need
 			 * to check it any more.
