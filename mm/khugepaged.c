@@ -517,8 +517,8 @@ int khugepaged_enter_vma_merge(struct vm_area_struct *vma,
 	if (!hugepage_vma_check(vma, vm_flags))
 		return 0;
 
-	hstart = (vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK;
-	hend = vma->vm_end & HPAGE_PMD_MASK;
+	hstart = ALIGN(vma->vm_start, HPAGE_PMD_SIZE);
+	hend = ALIGN_DOWN(vma->vm_end, HPAGE_PMD_SIZE);
 	if (hstart < hend)
 		return khugepaged_enter(vma, vm_flags);
 	return 0;
@@ -979,8 +979,8 @@ static int hugepage_vma_revalidate(struct mm_struct *mm, unsigned long address,
 	if (!vma)
 		return SCAN_VMA_NULL;
 
-	hstart = (vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK;
-	hend = vma->vm_end & HPAGE_PMD_MASK;
+	hstart = ALIGN(vma->vm_start, HPAGE_PMD_SIZE);
+	hend = ALIGN_DOWN(vma->vm_end, HPAGE_PMD_SIZE);
 	if (address < hstart || address + HPAGE_PMD_SIZE > hend)
 		return SCAN_ADDRESS_RANGE;
 	if (!hugepage_vma_check(vma, vma->vm_flags))
@@ -1070,7 +1070,7 @@ static void collapse_huge_page(struct mm_struct *mm,
 	struct mmu_notifier_range range;
 	gfp_t gfp;
 
-	VM_BUG_ON(address & ~HPAGE_PMD_MASK);
+	VM_BUG_ON(!IS_ALIGNED(address, HPAGE_PMD_SIZE));
 
 	/* Only allocate from the target node */
 	gfp = alloc_hugepage_khugepaged_gfpmask() | __GFP_THISNODE;
@@ -1235,7 +1235,7 @@ static int khugepaged_scan_pmd(struct mm_struct *mm,
 	int node = NUMA_NO_NODE, unmapped = 0;
 	bool writable = false;
 
-	VM_BUG_ON(address & ~HPAGE_PMD_MASK);
+	VM_BUG_ON(!IS_ALIGNED(address, HPAGE_PMD_SIZE));
 
 	pmd = mm_find_pmd(mm, address);
 	if (!pmd) {
@@ -1414,7 +1414,7 @@ static int khugepaged_add_pte_mapped_thp(struct mm_struct *mm,
 {
 	struct mm_slot *mm_slot;
 
-	VM_BUG_ON(addr & ~HPAGE_PMD_MASK);
+	VM_BUG_ON(!IS_ALIGNED(addr, HPAGE_PMD_SIZE));
 
 	spin_lock(&khugepaged_mm_lock);
 	mm_slot = get_mm_slot(mm);
@@ -1437,7 +1437,7 @@ static int khugepaged_add_pte_mapped_thp(struct mm_struct *mm,
  */
 void collapse_pte_mapped_thp(struct mm_struct *mm, unsigned long addr)
 {
-	unsigned long haddr = addr & HPAGE_PMD_MASK;
+	unsigned long haddr = ALIGN_DOWN(addr, HPAGE_PMD_SIZE);
 	struct vm_area_struct *vma = find_vma(mm, haddr);
 	struct page *hpage;
 	pte_t *start_pte, *pte;
@@ -1584,7 +1584,7 @@ static void retract_page_tables(struct address_space *mapping, pgoff_t pgoff)
 		if (vma->anon_vma)
 			continue;
 		addr = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
-		if (addr & ~HPAGE_PMD_MASK)
+		if (!IS_ALIGNED(addr, HPAGE_PMD_SIZE))
 			continue;
 		if (vma->vm_end < addr + HPAGE_PMD_SIZE)
 			continue;
@@ -2070,7 +2070,7 @@ static unsigned int khugepaged_scan_mm_slot(unsigned int pages,
 {
 	struct mm_slot *mm_slot;
 	struct mm_struct *mm;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
 	int progress = 0;
 
 	VM_BUG_ON(!pages);
@@ -2092,7 +2092,6 @@ static unsigned int khugepaged_scan_mm_slot(unsigned int pages,
 	 * Don't wait for semaphore (to avoid long wait times).  Just move to
 	 * the next mm on the list.
 	 */
-	vma = NULL;
 	if (unlikely(!mmap_read_trylock(mm)))
 		goto breakouterloop_mmap_lock;
 	if (likely(!khugepaged_test_exit(mm)))
@@ -2112,15 +2111,16 @@ skip:
 			progress++;
 			continue;
 		}
-		hstart = (vma->vm_start + ~HPAGE_PMD_MASK) & HPAGE_PMD_MASK;
-		hend = vma->vm_end & HPAGE_PMD_MASK;
+		hstart = ALIGN(vma->vm_start, HPAGE_PMD_SIZE);
+		hend = ALIGN_DOWN(vma->vm_end, HPAGE_PMD_SIZE);
 		if (hstart >= hend)
 			goto skip;
 		if (khugepaged_scan.address > hend)
 			goto skip;
 		if (khugepaged_scan.address < hstart)
 			khugepaged_scan.address = hstart;
-		VM_BUG_ON(khugepaged_scan.address & ~HPAGE_PMD_MASK);
+		VM_BUG_ON(!IS_ALIGNED(khugepaged_scan.address, HPAGE_PMD_SIZE));
+
 		if (shmem_file(vma->vm_file) && !shmem_huge_enabled(vma))
 			goto skip;
 
