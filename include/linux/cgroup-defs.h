@@ -417,6 +417,7 @@ struct cgroup {
 	u16 subtree_ss_mask;
 	u16 old_subtree_control;
 	u16 old_subtree_ss_mask;
+	u16 priority;
 
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
@@ -640,6 +641,7 @@ struct cgroup_subsys {
 	void (*exit)(struct task_struct *task);
 	void (*release)(struct task_struct *task);
 	void (*bind)(struct cgroup_subsys_state *root_css);
+	int (*css_priority_change)(struct cgroup_subsys_state *css, u16 old, u16 new);
 
 	bool early_init:1;
 

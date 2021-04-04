@@ -47,6 +47,7 @@ struct kernel_clone_args;
 
 /* internal flags */
 #define CSS_TASK_ITER_SKIPPED		(1U << 16)
+#define CGROUP_PRIORITY_MAX		8
 
 /* a css_task_iter should be treated as an opaque object */
 struct css_task_iter {
@@ -957,5 +958,6 @@ static inline void cgroup_bpf_get(struct cgroup *cgrp) {}
 static inline void cgroup_bpf_put(struct cgroup *cgrp) {}
 
 #endif /* CONFIG_CGROUP_BPF */
+ssize_t cgroup_priority(struct cgroup_subsys_state *css);
 
 #endif /* _LINUX_CGROUP_H */

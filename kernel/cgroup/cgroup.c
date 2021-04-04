@@ -1892,6 +1892,7 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 	cgrp->dom_cgrp = cgrp;
 	cgrp->max_descendants = INT_MAX;
 	cgrp->max_depth = INT_MAX;
+	cgrp->priority = 0;
 	INIT_LIST_HEAD(&cgrp->rstat_css_list);
 	prev_cputime_init(&cgrp->prev_cputime);
 
@@ -4783,6 +4784,88 @@ static ssize_t cgroup_threads_write(struct kernfs_open_file *of,
 	return __cgroup_procs_write(of, buf, false) ?: nbytes;
 }
 
+static int cgroup_priority_show(struct seq_file *seq, void *v)
+{
+	struct cgroup *cgrp = seq_css(seq)->cgroup;
+	u16 prio = cgrp->priority;
+
+	seq_printf(seq, "%d\n", prio);
+
+	return 0;
+}
+
+static void cgroup_set_priority(struct cgroup *cgrp, unsigned int priority)
+{
+	u16 old = cgrp->priority;
+	struct cgroup_subsys_state *css;
+	int ssid;
+
+	cgrp->priority = priority;
+	for_each_css(css, ssid, cgrp) {
+		if (css->ss->css_priority_change)
+			css->ss->css_priority_change(css, old, priority);
+	}
+}
+
+static void cgroup_priority_propagate(struct cgroup *cgrp)
+{
+	struct cgroup *dsct;
+	struct cgroup_subsys_state *d_css;
+	u16 priority = cgrp->priority;
+
+	lockdep_assert_held(&cgroup_mutex);
+	cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp) {
+		if (dsct->priority < priority)
+			cgroup_set_priority(dsct, priority);
+	}
+}
+
+static ssize_t cgroup_priority_write(struct kernfs_open_file *of,
+				      char *buf, size_t nbytes, loff_t off)
+{
+	struct cgroup *cgrp, *parent;
+	ssize_t ret;
+	u16 prio, orig;
+
+	buf = strstrip(buf);
+	ret = kstrtoint(buf, 0, &prio);
+	if (ret)
+		return ret;
+
+	if (prio < 0 || prio >= CGROUP_PRIORITY_MAX)
+		return -ERANGE;
+
+	cgrp = cgroup_kn_lock_live(of->kn, false);
+	if (!cgrp)
+		return -ENOENT;
+	parent = cgroup_parent(cgrp);
+	if (parent && prio < parent->priority) {
+		ret = -EINVAL;
+		goto unlock_out;
+	}
+	orig = cgrp->priority;
+	if (prio == orig)
+		goto unlock_out;
+
+	cgroup_set_priority(cgrp, prio);
+	cgroup_priority_propagate(cgrp);
+unlock_out:
+	cgroup_kn_unlock(of->kn);
+
+	return ret ?: nbytes;
+}
+
+ssize_t cgroup_priority(struct cgroup_subsys_state *css)
+{
+	struct cgroup *cgrp = css->cgroup;
+	unsigned int prio = 0;
+
+	if (cgrp)
+		prio = cgrp->priority;
+	return prio;
+}
+EXPORT_SYMBOL(cgroup_priority);
+
 /* cgroup core interface files for the default hierarchy */
 static struct cftype cgroup_base_files[] = {
 	{
@@ -4835,6 +4918,12 @@ static struct cftype cgroup_base_files[] = {
 		.name = "cgroup.max.depth",
 		.seq_show = cgroup_max_depth_show,
 		.write = cgroup_max_depth_write,
+	},
+	{
+		.name = "cgroup.priority",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = cgroup_priority_show,
+		.write = cgroup_priority_write,
 	},
 	{
 		.name = "cgroup.stat",
@@ -5178,6 +5267,7 @@ static struct cgroup *cgroup_create(struct cgroup *parent, const char *name,
 	cgrp->self.parent = &parent->self;
 	cgrp->root = root;
 	cgrp->level = level;
+	cgrp->priority = parent->priority;
 
 	ret = psi_cgroup_alloc(cgrp);
 	if (ret)
