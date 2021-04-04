@@ -422,11 +422,31 @@ struct ethtool_link_usettings {
 	} link_modes;
 };
 
+static int
+ethtool_params_from_link_mode(const struct net_device *dev,
+			      struct ethtool_link_ksettings *link_ksettings)
+{
+	const struct link_mode_info *link_info;
+
+	if (dev->ethtool_ops->cap_link_mode_supported &&
+	    link_ksettings->link_mode != -1) {
+		if (WARN_ON_ONCE(link_ksettings->link_mode >=
+				 __ETHTOOL_LINK_MODE_MASK_NBITS))
+			return -EINVAL;
+
+		link_info = &link_mode_params[link_ksettings->link_mode];
+		link_ksettings->base.speed = link_info->speed;
+		link_ksettings->lanes = link_info->lanes;
+		link_ksettings->base.duplex = link_info->duplex;
+	}
+
+	return 0;
+}
+
 /* Internal kernel helper to query a device ethtool_link_settings. */
 int __ethtool_get_link_ksettings(struct net_device *dev,
 				 struct ethtool_link_ksettings *link_ksettings)
 {
-	const struct link_mode_info *link_info;
 	int err;
 
 	ASSERT_RTNL();
@@ -440,17 +460,7 @@ int __ethtool_get_link_ksettings(struct net_device *dev,
 	if (err)
 		return err;
 
-	if (dev->ethtool_ops->cap_link_mode_supported &&
-	    link_ksettings->link_mode != -1) {
-		if (WARN_ON_ONCE(link_ksettings->link_mode >=
-				 __ETHTOOL_LINK_MODE_MASK_NBITS))
-			return -EINVAL;
-
-		link_info = &link_mode_params[link_ksettings->link_mode];
-		link_ksettings->base.speed = link_info->speed;
-		link_ksettings->lanes = link_info->lanes;
-		link_ksettings->base.duplex = link_info->duplex;
-	}
+	ethtool_params_from_link_mode(dev, link_ksettings);
 
 	return 0;
 }
@@ -572,6 +582,8 @@ static int ethtool_get_link_ksettings(struct net_device *dev,
 	if (err < 0)
 		return err;
 
+	ethtool_params_from_link_mode(dev, &link_ksettings);
+
 	/* make sure we tell the right values to user */
 	link_ksettings.base.cmd = ETHTOOL_GLINKSETTINGS;
 	link_ksettings.base.link_mode_masks_nwords
@@ -672,6 +684,8 @@ static int ethtool_get_settings(struct net_device *dev, void __user *useraddr)
 	if (err < 0)
 		return err;
 	convert_link_ksettings_to_legacy_settings(&cmd, &link_ksettings);
+
+	ethtool_params_from_link_mode(dev, &link_ksettings);
 
 	/* send a sensible cmd tag back to user */
 	cmd.cmd = ETHTOOL_GSET;
