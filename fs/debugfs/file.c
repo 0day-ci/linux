@@ -1100,6 +1100,7 @@ EXPORT_SYMBOL_GPL(debugfs_create_regset32);
 struct debugfs_devm_entry {
 	int (*read)(struct seq_file *seq, void *data);
 	struct device *dev;
+	struct dentry *dentry;
 };
 
 static int debugfs_devm_entry_open(struct inode *inode, struct file *f)
@@ -1116,6 +1117,13 @@ static const struct file_operations debugfs_devm_entry_ops = {
 	.read = seq_read,
 	.llseek = seq_lseek
 };
+
+static void debugfs_devm_entry_release(struct device *dev, void *res)
+{
+	struct debugfs_devm_entry *entry = res;
+
+	debugfs_remove(entry->dentry);
+}
 
 /**
  * debugfs_create_devm_seqfile - create a debugfs file that is bound to device.
@@ -1136,14 +1144,19 @@ void debugfs_create_devm_seqfile(struct device *dev, const char *name,
 	if (IS_ERR(parent))
 		return;
 
-	entry = devm_kzalloc(dev, sizeof(*entry), GFP_KERNEL);
+	entry = devres_alloc(debugfs_devm_entry_release, sizeof(*entry), GFP_KERNEL);
 	if (!entry)
 		return;
 
 	entry->read = read_fn;
 	entry->dev = dev;
+	entry->dentry = debugfs_create_file(name, S_IRUGO, parent, entry,
+					    &debugfs_devm_entry_ops);
+	if (IS_ERR(entry->dentry)) {
+		devres_free(entry);
+		return;
+	}
 
-	debugfs_create_file(name, S_IRUGO, parent, entry,
-			    &debugfs_devm_entry_ops);
+	devres_add(dev, entry);
 }
 EXPORT_SYMBOL_GPL(debugfs_create_devm_seqfile);
