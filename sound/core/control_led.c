@@ -161,6 +161,7 @@ static void snd_ctl_led_set_state(struct snd_card *card, unsigned int access,
 			list_add(&lctl->list, &led->controls);
 			UPDATE_ROUTE(route, snd_ctl_led_get(lctl));
 		}
+		kfree(lctl);
 	}
 	mutex_unlock(&snd_ctl_led_mutex);
 	switch (led->mode) {
