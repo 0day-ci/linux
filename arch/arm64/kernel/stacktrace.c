@@ -18,6 +18,84 @@
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
+struct function_range {
+	unsigned long	start;
+	unsigned long	end;
+};
+
+/*
+ * Special functions where the stack trace is unreliable.
+ */
+static struct function_range	special_functions[] = {
+	{ /* sentinel */ }
+};
+
+static bool is_reliable_function(unsigned long pc)
+{
+	static bool inited = false;
+	struct function_range *func;
+
+	if (!inited) {
+		static char sym[KSYM_NAME_LEN];
+		unsigned long size, offset;
+
+		for (func = special_functions; func->start; func++) {
+			if (kallsyms_lookup(func->start, &size, &offset,
+					    NULL, sym)) {
+				func->start -= offset;
+				func->end = func->start + size;
+			} else {
+				/*
+				 * This is just a label. So, we only need to
+				 * consider that particular location. So, size
+				 * is the size of one Aarch64 instruction.
+				 */
+				func->end = func->start + 4;
+			}
+		}
+		inited = true;
+	}
+
+	for (func = special_functions; func->start; func++) {
+		if (pc >= func->start && pc < func->end)
+			return false;
+	}
+	return true;
+}
+
+/*
+ * Check for the presence of features and conditions that render the stack
+ * trace unreliable.
+ *
+ * Once all such cases have been addressed, this function can aid live
+ * patching (and this comment can be removed).
+ */
+static void check_reliability(struct stackframe *frame)
+{
+	/*
+	 * If the stack trace has already been marked unreliable, just return.
+	 */
+	if (!frame->reliable)
+		return;
+
+	/*
+	 * First, make sure that the return address is a proper kernel text
+	 * address. A NULL or invalid return address probably means there's
+	 * some generated code which __kernel_text_address() doesn't know
+	 * about. Mark the stack trace as not reliable.
+	 */
+	if (!__kernel_text_address(frame->pc)) {
+		frame->reliable = false;
+		return;
+	}
+
+	/*
+	 * Check the reliability of the return PC's function.
+	 */
+	if (!is_reliable_function(frame->pc))
+		frame->reliable = false;
+}
+
 /*
  * AArch64 PCS assigns the frame pointer to x29.
  *
@@ -107,6 +185,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
+
+	check_reliability(frame);
 
 	return 0;
 }
