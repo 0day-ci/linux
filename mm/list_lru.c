@@ -112,16 +112,32 @@ list_lru_from_kmem(struct list_lru_node *nlru, void *ptr,
 }
 #endif /* CONFIG_MEMCG_KMEM */
 
+static void init_one_lru(struct list_lru_one *l)
+{
+	INIT_LIST_HEAD(&l->list);
+	l->nr_items = 0;
+}
+
 bool list_lru_add(struct list_lru *lru, struct list_head *item)
 {
 	int nid = page_to_nid(virt_to_page(item));
 	struct list_lru_node *nlru = &lru->node[nid];
 	struct mem_cgroup *memcg;
 	struct list_lru_one *l;
+	struct list_lru_memcg *memcg_lrus;
 
 	spin_lock(&nlru->lock);
 	if (list_empty(item)) {
 		l = list_lru_from_kmem(nlru, item, &memcg);
+		if (!l) {
+			l = kmalloc(sizeof(struct list_lru_one), GFP_ATOMIC);
+			if (!l)
+				goto out;
+
+			init_one_lru(l);
+			memcg_lrus = rcu_dereference_protected(nlru->memcg_lrus, true);
+			memcg_lrus->lru[memcg_cache_id(memcg)] = l;
+		}
 		list_add_tail(item, &l->list);
 		/* Set shrinker bit if the first element was added */
 		if (!l->nr_items++)
@@ -131,6 +147,7 @@ bool list_lru_add(struct list_lru *lru, struct list_head *item)
 		spin_unlock(&nlru->lock);
 		return true;
 	}
+out:
 	spin_unlock(&nlru->lock);
 	return false;
 }
@@ -176,11 +193,12 @@ unsigned long list_lru_count_one(struct list_lru *lru,
 {
 	struct list_lru_node *nlru = &lru->node[nid];
 	struct list_lru_one *l;
-	unsigned long count;
+	unsigned long count = 0;
 
 	rcu_read_lock();
 	l = list_lru_from_memcg_idx(nlru, memcg_cache_id(memcg));
-	count = READ_ONCE(l->nr_items);
+	if (l)
+		count = READ_ONCE(l->nr_items);
 	rcu_read_unlock();
 
 	return count;
@@ -207,6 +225,9 @@ __list_lru_walk_one(struct list_lru_node *nlru, int memcg_idx,
 	unsigned long isolated = 0;
 
 	l = list_lru_from_memcg_idx(nlru, memcg_idx);
+	if (!l)
+		goto out;
+
 restart:
 	list_for_each_safe(item, n, &l->list) {
 		enum lru_status ret;
@@ -251,6 +272,7 @@ restart:
 			BUG();
 		}
 	}
+out:
 	return isolated;
 }
 
@@ -312,12 +334,6 @@ unsigned long list_lru_walk_node(struct list_lru *lru, int nid,
 }
 EXPORT_SYMBOL_GPL(list_lru_walk_node);
 
-static void init_one_lru(struct list_lru_one *l)
-{
-	INIT_LIST_HEAD(&l->list);
-	l->nr_items = 0;
-}
-
 #ifdef CONFIG_MEMCG_KMEM
 static void __memcg_destroy_list_lru_node(struct list_lru_memcg *memcg_lrus,
 					  int begin, int end)
@@ -328,41 +344,16 @@ static void __memcg_destroy_list_lru_node(struct list_lru_memcg *memcg_lrus,
 		kfree(memcg_lrus->lru[i]);
 }
 
-static int __memcg_init_list_lru_node(struct list_lru_memcg *memcg_lrus,
-				      int begin, int end)
-{
-	int i;
-
-	for (i = begin; i < end; i++) {
-		struct list_lru_one *l;
-
-		l = kmalloc(sizeof(struct list_lru_one), GFP_KERNEL);
-		if (!l)
-			goto fail;
-
-		init_one_lru(l);
-		memcg_lrus->lru[i] = l;
-	}
-	return 0;
-fail:
-	__memcg_destroy_list_lru_node(memcg_lrus, begin, i);
-	return -ENOMEM;
-}
-
 static int memcg_init_list_lru_node(struct list_lru_node *nlru)
 {
 	struct list_lru_memcg *memcg_lrus;
 	int size = memcg_nr_cache_ids;
 
-	memcg_lrus = kvmalloc(sizeof(*memcg_lrus) +
+	memcg_lrus = kvzalloc(sizeof(*memcg_lrus) +
 			      size * sizeof(void *), GFP_KERNEL);
 	if (!memcg_lrus)
 		return -ENOMEM;
 
-	if (__memcg_init_list_lru_node(memcg_lrus, 0, size)) {
-		kvfree(memcg_lrus);
-		return -ENOMEM;
-	}
 	RCU_INIT_POINTER(nlru->memcg_lrus, memcg_lrus);
 
 	return 0;
@@ -389,14 +380,9 @@ static int memcg_update_list_lru_node(struct list_lru_node *nlru,
 
 	old = rcu_dereference_protected(nlru->memcg_lrus,
 					lockdep_is_held(&list_lrus_mutex));
-	new = kvmalloc(sizeof(*new) + new_size * sizeof(void *), GFP_KERNEL);
+	new = kvzalloc(sizeof(*new) + new_size * sizeof(void *), GFP_KERNEL);
 	if (!new)
 		return -ENOMEM;
-
-	if (__memcg_init_list_lru_node(new, old_size, new_size)) {
-		kvfree(new);
-		return -ENOMEM;
-	}
 
 	memcpy(&new->lru, &old->lru, old_size * sizeof(void *));
 
@@ -526,6 +512,7 @@ static void memcg_drain_list_lru_node(struct list_lru *lru, int nid,
 	struct list_lru_node *nlru = &lru->node[nid];
 	int dst_idx = dst_memcg->kmemcg_id;
 	struct list_lru_one *src, *dst;
+	struct list_lru_memcg *memcg_lrus;
 
 	/*
 	 * Since list_lru_{add,del} may be called under an IRQ-safe lock,
@@ -534,7 +521,17 @@ static void memcg_drain_list_lru_node(struct list_lru *lru, int nid,
 	spin_lock_irq(&nlru->lock);
 
 	src = list_lru_from_memcg_idx(nlru, src_idx);
+	if (!src)
+		goto out;
+
 	dst = list_lru_from_memcg_idx(nlru, dst_idx);
+	if (!dst) {
+		/* TODO: Use __GFP_NOFAIL? */
+		dst = kmalloc(sizeof(struct list_lru_one), GFP_ATOMIC);
+		init_one_lru(dst);
+		memcg_lrus = rcu_dereference_protected(nlru->memcg_lrus, true);
+		memcg_lrus->lru[dst_idx] = dst;
+	}
 
 	list_splice_init(&src->list, &dst->list);
 
@@ -543,7 +540,7 @@ static void memcg_drain_list_lru_node(struct list_lru *lru, int nid,
 		memcg_set_shrinker_bit(dst_memcg, nid, lru_shrinker_id(lru));
 		src->nr_items = 0;
 	}
-
+out:
 	spin_unlock_irq(&nlru->lock);
 }
 
