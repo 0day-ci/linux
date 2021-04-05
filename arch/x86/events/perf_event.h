@@ -632,6 +632,29 @@ enum {
 	x86_lbr_exclusive_max,
 };
 
+struct x86_hybrid_pmu {
+	struct pmu			pmu;
+	union perf_capabilities		intel_cap;
+};
+
+static __always_inline struct x86_hybrid_pmu *hybrid_pmu(struct pmu *pmu)
+{
+	return container_of(pmu, struct x86_hybrid_pmu, pmu);
+}
+
+/* The number of hybrid PMUs implies whether it's a hybrid system */
+#define is_hybrid()			(!!x86_pmu.num_hybrid_pmus)
+
+#define hybrid(_pmu, _field)				\
+({							\
+	typeof(x86_pmu._field) __F = x86_pmu._field;	\
+							\
+	if (is_hybrid() && (_pmu))			\
+		__F = hybrid_pmu(_pmu)->_field;		\
+							\
+	__F;						\
+})
+
 /*
  * struct x86_pmu - generic x86 pmu
  */
@@ -818,6 +841,17 @@ struct x86_pmu {
 	int (*check_period) (struct perf_event *event, u64 period);
 
 	int (*aux_output_match) (struct perf_event *event);
+
+	/*
+	 * Hybrid support
+	 *
+	 * Most PMU capabilities are the same among different hybrid PMUs.
+	 * The global x86_pmu saves the architecture capabilities, which
+	 * are available for all PMUs. The hybrid_pmu only includes the
+	 * unique capabilities.
+	 */
+	int				num_hybrid_pmus;
+	struct x86_hybrid_pmu		*hybrid_pmu;
 };
 
 struct x86_perf_task_context_opt {
