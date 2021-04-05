@@ -340,11 +340,21 @@ static const struct attribute_group *cros_ec_attr_groups[] = {
 	NULL,
 };
 
+static int cros_ec_sysfs_probe(struct platform_device *pd)
+{
+	struct cros_ec_dev *ec_dev = dev_get_drvdata(pd->dev.parent);
+
+	ec_dev->groups = cros_ec_attr_groups;
+
+	return 0;
+}
+
 static struct platform_driver cros_ec_sysfs_driver = {
 	.driver = {
 		.name = DRV_NAME,
 		.dev_groups = cros_ec_attr_groups,
 	},
+	.probe = cros_ec_sysfs_probe,
 };
 
 module_platform_driver(cros_ec_sysfs_driver);
