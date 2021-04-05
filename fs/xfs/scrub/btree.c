@@ -9,6 +9,7 @@
 #include "xfs_format.h"
 #include "xfs_trans_resv.h"
 #include "xfs_mount.h"
+#include "xfs_inode.h"
 #include "xfs_btree.h"
 #include "scrub/scrub.h"
 #include "scrub/common.h"
@@ -469,14 +470,17 @@ xchk_btree_check_minrecs(
 	 */
 	if ((cur->bc_flags & XFS_BTREE_ROOT_IN_INODE) &&
 	    level == cur->bc_nlevels - 2) {
+		struct xfs_inode 	*ip = bs->sc->ip;
 		struct xfs_btree_block	*root_block;
 		struct xfs_buf		*root_bp;
 		int			root_maxrecs;
+		int			whichfork = cur->bc_ino.whichfork;
 
 		root_block = xfs_btree_get_block(cur, root_level, &root_bp);
 		root_maxrecs = cur->bc_ops->get_dmaxrecs(cur, root_level);
 		if (be16_to_cpu(root_block->bb_numrecs) != 1 ||
-		    numrecs <= root_maxrecs)
+		    (!(whichfork == XFS_DATA_FORK && XFS_IFORK_Q(ip)) &&
+		     numrecs <= root_maxrecs))
 			xchk_btree_set_corrupt(bs->sc, cur, level);
 		return;
 	}
