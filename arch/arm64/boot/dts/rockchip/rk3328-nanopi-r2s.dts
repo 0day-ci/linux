@@ -13,6 +13,10 @@
 	model = "FriendlyElec NanoPi R2S";
 	compatible = "friendlyarm,nanopi-r2s", "rockchip,rk3328";
 
+	aliases {
+		ethernet1 = &r8153;
+	};
+
 	chosen {
 		stdout-path = "serial2:1500000n8";
 	};
@@ -35,6 +39,16 @@
 			linux,code = <KEY_RESTART>;
 			debounce-interval = <50>;
 		};
+	};
+
+	vcc_rtl8153: vcc-rtl8153-regulator {
+		compatible = "regulator-fixed";
+		gpio = <&gpio2 RK_PC6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&rtl8153_en_drv>;
+		regulator-always-on;
+		regulator-name = "vcc_rtl8153";
+		enable-active-high;
 	};
 
 	leds {
@@ -265,6 +279,12 @@
 			};
 		};
 	};
+
+	usb {
+		rtl8153_en_drv: rtl8153-en-drv {
+			rockchip,pins = <2 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
 };
 
 &io_domains {
@@ -362,6 +382,18 @@
 &usb20_otg {
 	status = "okay";
 	dr_mode = "host";
+};
+
+&usbdrd3 {
+	dr_mode = "host";
+	status = "okay";
+
+	r8153: usb-eth@2 {
+		compatible = "realtek,rtl8153";
+		reg = <2>;
+
+		local-mac-address = [ 00 00 00 00 00 00 ]; /* Filled in by U-Boot */
+	};
 };
 
 &usb_host0_ehci {
