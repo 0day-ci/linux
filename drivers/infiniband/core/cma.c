@@ -157,11 +157,13 @@ EXPORT_SYMBOL(rdma_res_to_id);
 
 static int cma_add_one(struct ib_device *device);
 static void cma_remove_one(struct ib_device *device, void *client_data);
+static bool cma_supported(struct ib_device *device);
 
 static struct ib_client cma_client = {
 	.name   = "cma",
 	.add    = cma_add_one,
-	.remove = cma_remove_one
+	.remove = cma_remove_one,
+	.is_supported = cma_supported,
 };
 
 static struct ib_sa_client sa_client;
@@ -4854,6 +4856,17 @@ static void cma_process_remove(struct cma_device *cma_dev)
 
 	cma_dev_put(cma_dev);
 	wait_for_completion(&cma_dev->comp);
+}
+
+static bool cma_supported(struct ib_device *device)
+{
+	u32 i;
+
+	rdma_for_each_port(device, i) {
+		if (rdma_cap_ib_cm(device, i) || rdma_cap_iw_cm(device, i))
+			return true;
+	}
+	return false;
 }
 
 static int cma_add_one(struct ib_device *device)
