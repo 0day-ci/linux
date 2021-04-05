@@ -203,6 +203,15 @@ config FPGA_DFL_NIOS_INTEL_PAC_N3000
 	  the card. It also instantiates the SPI master (spi-altera) for
 	  the card's BMC (Board Management Controller).
 
+config FPGA_DFL_SPI_ALTERA
+	tristate "FPGA DFL Altera SPI Master Driver"
+	depends on FPGA_DFL
+	select REGMAP
+	help
+	  This is a DFL bus driver for the Altera SPI master controller.
+	  The SPI master is connected to a SPI slave to Avalon Master
+	  bridge in a Intel MAX BMC.
+
 config FPGA_DFL_PCI
 	tristate "FPGA DFL PCIe Device Driver"
 	depends on PCI && FPGA_DFL
