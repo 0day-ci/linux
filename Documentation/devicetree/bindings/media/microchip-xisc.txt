@@ -1,0 +1,64 @@
+Microchip eXtended Image Sensor Controller (XISC)
+----------------------------------------------
+
+Required properties for XISC:
+- compatible
+	Must be "microchip,sama7g5-xisc".
+- reg
+	Physical base address and length of the registers set for the device.
+- interrupts
+	Should contain IRQ line for the XISC.
+- clocks
+	List of clock specifiers, corresponding to entries in
+	the clock-names property;
+	Please refer to clock-bindings.txt.
+- clock-names
+	Required elements: "hclock".
+	This is the clock that clocks the sensor controller, and is usually
+	fed from the clock tree. It is used for the internal controller logic.
+- #clock-cells
+	Should be 0.
+- clock-output-names
+	Should be "isc-mck".
+- pinctrl-names, pinctrl-0
+	Please refer to pinctrl-bindings.txt.
+
+Optional properties for XISC:
+- microchip,mipi-mode;
+	As the XISC is usually connected to a demux/bridge, the XISC receives
+	the same type of input, however, it should be aware of the type of
+	signals received. The mipi-mode enables different internal handling
+	of the data and clock lines.
+
+XISC supports a single port node with internal parallel bus.
+It should contain one 'port' child node with child 'endpoint' node.
+Please refer to the bindings defined in
+Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+This endpoint has to be connected to a bridge that acts as a demux from either
+a serial interface or acts as a simple direct bridge to a parallel sensor.
+
+Example:
+xisc: xisc@e1408000 {
+	compatible = "microchip,sama7g5-isc";
+	reg = <0xe1408000 0x2000>;
+	interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clocks = <&pmc PMC_TYPE_PERIPHERAL 56>;
+	clock-names = "hclock";
+	#clock-cells = <0>;
+	clock-output-names = "isc-mck";
+	microchip,mipi-mode;
+
+	port@1 {
+		reg = <1>;
+		xisc_in: endpoint {
+		bus-width = <12>;
+		hsync-active = <1>;
+		vsync-active = <1>;
+		remote-endpoint = <&csi2dc_out>;
+		};
+	};
+};
+
