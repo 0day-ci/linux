@@ -348,6 +348,14 @@ config DRM_PANEL_SAMSUNG_S6D16D0
 	depends on DRM_MIPI_DSI
 	select VIDEOMODE_HELPERS
 
+config DRM_PANEL_SAMSUNG_LMS397KF04
+	tristate "Samsung LMS397KF04 DPI panel"
+	depends on OF && SPI && GPIOLIB
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the Samsung
+	  LMS397KF04 480x800 DPI panel.
+
 config DRM_PANEL_SAMSUNG_S6E3HA2
 	tristate "Samsung S6E3HA2 DSI video mode panel"
 	depends on OF
