@@ -532,9 +532,8 @@ static int nvme_rdma_create_queue_ib(struct nvme_rdma_queue *queue)
 	 */
 	pages_per_mr = nvme_rdma_get_max_fr_pages(ibdev, queue->pi_support) + 1;
 	ret = ib_mr_pool_init(queue->qp, &queue->qp->rdma_mrs,
-			      queue->queue_size,
-			      IB_MR_TYPE_MEM_REG,
-			      pages_per_mr, 0, 0);
+			      queue->queue_size, IB_MR_TYPE_MEM_REG,
+			      pages_per_mr, 0, IB_ACCESS_RELAXED_ORDERING);
 	if (ret) {
 		dev_err(queue->ctrl->ctrl.device,
 			"failed to initialize MR pool sized %d for QID %d\n",
@@ -545,7 +544,8 @@ static int nvme_rdma_create_queue_ib(struct nvme_rdma_queue *queue)
 	if (queue->pi_support) {
 		ret = ib_mr_pool_init(queue->qp, &queue->qp->sig_mrs,
 				      queue->queue_size, IB_MR_TYPE_INTEGRITY,
-				      pages_per_mr, pages_per_mr, 0);
+				      pages_per_mr, pages_per_mr,
+				      IB_ACCESS_RELAXED_ORDERING);
 		if (ret) {
 			dev_err(queue->ctrl->ctrl.device,
 				"failed to initialize PI MR pool sized %d for QID %d\n",
@@ -1382,9 +1382,9 @@ static int nvme_rdma_map_sg_fr(struct nvme_rdma_queue *queue,
 	req->reg_wr.wr.num_sge = 0;
 	req->reg_wr.mr = req->mr;
 	req->reg_wr.key = req->mr->rkey;
-	req->reg_wr.access = IB_ACCESS_LOCAL_WRITE |
-			     IB_ACCESS_REMOTE_READ |
-			     IB_ACCESS_REMOTE_WRITE;
+	req->reg_wr.access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_READ |
+			     IB_ACCESS_REMOTE_WRITE |
+			     IB_ACCESS_RELAXED_ORDERING;
 
 	sg->addr = cpu_to_le64(req->mr->iova);
 	put_unaligned_le24(req->mr->length, sg->length);
@@ -1488,9 +1488,8 @@ static int nvme_rdma_map_sg_pi(struct nvme_rdma_queue *queue,
 	wr->wr.send_flags = 0;
 	wr->mr = req->mr;
 	wr->key = req->mr->rkey;
-	wr->access = IB_ACCESS_LOCAL_WRITE |
-		     IB_ACCESS_REMOTE_READ |
-		     IB_ACCESS_REMOTE_WRITE;
+	wr->access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_READ |
+		     IB_ACCESS_REMOTE_WRITE | IB_ACCESS_RELAXED_ORDERING;
 
 	sg->addr = cpu_to_le64(req->mr->iova);
 	put_unaligned_le24(req->mr->length, sg->length);
