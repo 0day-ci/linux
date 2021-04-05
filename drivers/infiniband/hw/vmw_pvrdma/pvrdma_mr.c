@@ -198,11 +198,12 @@ err_umem:
  * @pd: protection domain
  * @mr_type: type of memory region
  * @max_num_sg: maximum number of pages
+ * @access: access flags of memory region
  *
  * @return: ib_mr pointer on success, otherwise returns an errno.
  */
 struct ib_mr *pvrdma_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			      u32 max_num_sg)
+			      u32 max_num_sg, u32 access)
 {
 	struct pvrdma_dev *dev = to_vdev(pd->device);
 	struct pvrdma_user_mr *mr;

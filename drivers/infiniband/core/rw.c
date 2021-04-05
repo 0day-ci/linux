@@ -110,7 +110,7 @@ static int rdma_rw_init_one_mr(struct ib_qp *qp, u32 port_num,
 
 	reg->reg_wr.wr.opcode = IB_WR_REG_MR;
 	reg->reg_wr.mr = reg->mr;
-	reg->reg_wr.access = IB_ACCESS_LOCAL_WRITE;
+	reg->reg_wr.access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_RELAXED_ORDERING;
 	if (rdma_protocol_iwarp(qp->device, port_num))
 		reg->reg_wr.access |= IB_ACCESS_REMOTE_WRITE;
 	count++;
@@ -437,7 +437,8 @@ int rdma_rw_ctx_signature_init(struct rdma_rw_ctx *ctx, struct ib_qp *qp,
 	ctx->reg->reg_wr.wr.wr_cqe = NULL;
 	ctx->reg->reg_wr.wr.num_sge = 0;
 	ctx->reg->reg_wr.wr.send_flags = 0;
-	ctx->reg->reg_wr.access = IB_ACCESS_LOCAL_WRITE;
+	ctx->reg->reg_wr.access =
+		IB_ACCESS_LOCAL_WRITE | IB_ACCESS_RELAXED_ORDERING;
 	if (rdma_protocol_iwarp(qp->device, port_num))
 		ctx->reg->reg_wr.access |= IB_ACCESS_REMOTE_WRITE;
 	ctx->reg->reg_wr.mr = ctx->reg->mr;
@@ -711,8 +712,8 @@ int rdma_rw_init_mrs(struct ib_qp *qp, struct ib_qp_init_attr *attr)
 
 	if (nr_mrs) {
 		ret = ib_mr_pool_init(qp, &qp->rdma_mrs, nr_mrs,
-				IB_MR_TYPE_MEM_REG,
-				max_num_sg, 0);
+				      IB_MR_TYPE_MEM_REG, max_num_sg, 0,
+				      IB_ACCESS_RELAXED_ORDERING);
 		if (ret) {
 			pr_err("%s: failed to allocated %d MRs\n",
 				__func__, nr_mrs);
@@ -722,7 +723,8 @@ int rdma_rw_init_mrs(struct ib_qp *qp, struct ib_qp_init_attr *attr)
 
 	if (nr_sig_mrs) {
 		ret = ib_mr_pool_init(qp, &qp->sig_mrs, nr_sig_mrs,
-				IB_MR_TYPE_INTEGRITY, max_num_sg, max_num_sg);
+				      IB_MR_TYPE_INTEGRITY, max_num_sg,
+				      max_num_sg, IB_ACCESS_RELAXED_ORDERING);
 		if (ret) {
 			pr_err("%s: failed to allocated %d SIG MRs\n",
 				__func__, nr_sig_mrs);

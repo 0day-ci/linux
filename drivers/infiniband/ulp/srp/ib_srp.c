@@ -436,7 +436,7 @@ static struct srp_fr_pool *srp_create_fr_pool(struct ib_device *device,
 		mr_type = IB_MR_TYPE_MEM_REG;
 
 	for (i = 0, d = &pool->desc[0]; i < pool->size; i++, d++) {
-		mr = ib_alloc_mr(pd, mr_type, max_page_list_len);
+		mr = ib_alloc_mr(pd, mr_type, max_page_list_len, 0);
 		if (IS_ERR(mr)) {
 			ret = PTR_ERR(mr);
 			if (ret == -ENOMEM)

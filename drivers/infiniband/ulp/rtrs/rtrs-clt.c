@@ -1260,7 +1260,7 @@ static int alloc_sess_reqs(struct rtrs_clt_sess *sess)
 			goto out;
 
 		req->mr = ib_alloc_mr(sess->s.dev->ib_pd, IB_MR_TYPE_MEM_REG,
-				      sess->max_pages_per_mr);
+				      sess->max_pages_per_mr, 0);
 		if (IS_ERR(req->mr)) {
 			err = PTR_ERR(req->mr);
 			req->mr = NULL;

@@ -2444,10 +2444,10 @@ struct ib_device_ops {
 				       struct ib_udata *udata);
 	int (*dereg_mr)(struct ib_mr *mr, struct ib_udata *udata);
 	struct ib_mr *(*alloc_mr)(struct ib_pd *pd, enum ib_mr_type mr_type,
-				  u32 max_num_sg);
+				  u32 max_num_sg, u32 access);
 	struct ib_mr *(*alloc_mr_integrity)(struct ib_pd *pd,
 					    u32 max_num_data_sg,
-					    u32 max_num_meta_sg);
+					    u32 max_num_meta_sg, u32 access);
 	int (*advise_mr)(struct ib_pd *pd,
 			 enum ib_uverbs_advise_mr_advice advice, u32 flags,
 			 struct ib_sge *sg_list, u32 num_sge,
@@ -4142,11 +4142,10 @@ static inline int ib_dereg_mr(struct ib_mr *mr)
 }
 
 struct ib_mr *ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			  u32 max_num_sg);
+			  u32 max_num_sg, u32 access);
 
-struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
-				    u32 max_num_data_sg,
-				    u32 max_num_meta_sg);
+struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd, u32 max_num_data_sg,
+				    u32 max_num_meta_sg, u32 access);
 
 /**
  * ib_update_fast_reg_key - updates the key portion of the fast_reg MR

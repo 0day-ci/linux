@@ -34,7 +34,8 @@ void ib_mr_pool_put(struct ib_qp *qp, struct list_head *list, struct ib_mr *mr)
 EXPORT_SYMBOL(ib_mr_pool_put);
 
 int ib_mr_pool_init(struct ib_qp *qp, struct list_head *list, int nr,
-		enum ib_mr_type type, u32 max_num_sg, u32 max_num_meta_sg)
+		    enum ib_mr_type type, u32 max_num_sg, u32 max_num_meta_sg,
+		    u32 access)
 {
 	struct ib_mr *mr;
 	unsigned long flags;
@@ -43,9 +44,9 @@ int ib_mr_pool_init(struct ib_qp *qp, struct list_head *list, int nr,
 	for (i = 0; i < nr; i++) {
 		if (type == IB_MR_TYPE_INTEGRITY)
 			mr = ib_alloc_mr_integrity(qp->pd, max_num_sg,
-						   max_num_meta_sg);
+						   max_num_meta_sg, access);
 		else
-			mr = ib_alloc_mr(qp->pd, type, max_num_sg);
+			mr = ib_alloc_mr(qp->pd, type, max_num_sg, access);
 		if (IS_ERR(mr)) {
 			ret = PTR_ERR(mr);
 			goto out;

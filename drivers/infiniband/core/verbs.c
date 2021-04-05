@@ -2136,6 +2136,7 @@ EXPORT_SYMBOL(ib_dereg_mr_user);
  * @pd:            protection domain associated with the region
  * @mr_type:       memory region type
  * @max_num_sg:    maximum sg entries available for registration.
+ * @access:	   access flags for the memory region.
  *
  * Notes:
  * Memory registeration page/sg lists must not exceed max_num_sg.
@@ -2144,7 +2145,7 @@ EXPORT_SYMBOL(ib_dereg_mr_user);
  *
  */
 struct ib_mr *ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			  u32 max_num_sg)
+			  u32 max_num_sg, u32 access)
 {
 	struct ib_mr *mr;
 
@@ -2159,7 +2160,12 @@ struct ib_mr *ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
 		goto out;
 	}
 
-	mr = pd->device->ops.alloc_mr(pd, mr_type, max_num_sg);
+	if (access & ~IB_ACCESS_RELAXED_ORDERING) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
+	mr = pd->device->ops.alloc_mr(pd, mr_type, max_num_sg, access);
 	if (IS_ERR(mr))
 		goto out;
 
@@ -2187,15 +2193,15 @@ EXPORT_SYMBOL(ib_alloc_mr);
  * @max_num_data_sg:         maximum data sg entries available for registration
  * @max_num_meta_sg:         maximum metadata sg entries available for
  *                           registration
+ * @access:		     access flags for the memory region.
  *
  * Notes:
  * Memory registration page/sg lists must not exceed max_num_sg,
  * also the integrity page/sg lists must not exceed max_num_meta_sg.
  *
  */
-struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
-				    u32 max_num_data_sg,
-				    u32 max_num_meta_sg)
+struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd, u32 max_num_data_sg,
+				    u32 max_num_meta_sg, u32 access)
 {
 	struct ib_mr *mr;
 	struct ib_sig_attrs *sig_attrs;
@@ -2211,6 +2217,11 @@ struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
 		goto out;
 	}
 
+	if (access & ~IB_ACCESS_RELAXED_ORDERING) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
 	sig_attrs = kzalloc(sizeof(struct ib_sig_attrs), GFP_KERNEL);
 	if (!sig_attrs) {
 		mr = ERR_PTR(-ENOMEM);
@@ -2218,7 +2229,7 @@ struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
 	}
 
 	mr = pd->device->ops.alloc_mr_integrity(pd, max_num_data_sg,
-						max_num_meta_sg);
+						max_num_meta_sg, access);
 	if (IS_ERR(mr)) {
 		kfree(sig_attrs);
 		goto out;

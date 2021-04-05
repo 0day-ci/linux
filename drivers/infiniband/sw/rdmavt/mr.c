@@ -571,11 +571,12 @@ out:
  * @pd: protection domain for this memory region
  * @mr_type: mem region type
  * @max_num_sg: Max number of segments allowed
+ * @access: access flags of memory region
  *
  * Return: the memory region on success, otherwise return an errno.
  */
 struct ib_mr *rvt_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			   u32 max_num_sg)
+			   u32 max_num_sg, u32 access)
 {
 	struct rvt_mr *mr;
 

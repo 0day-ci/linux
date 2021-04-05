@@ -638,7 +638,7 @@ static int map_cont_bufs(struct rtrs_srv_sess *sess)
 			goto free_sg;
 		}
 		mr = ib_alloc_mr(sess->s.dev->ib_pd, IB_MR_TYPE_MEM_REG,
-				 sgt->nents);
+				 sgt->nents, 0);
 		if (IS_ERR(mr)) {
 			err = PTR_ERR(mr);
 			goto unmap_sg;

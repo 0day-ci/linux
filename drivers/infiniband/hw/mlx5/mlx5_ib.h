@@ -656,6 +656,9 @@ struct mlx5_ib_mr {
 	struct mlx5_cache_ent *cache_ent;
 	struct ib_umem *umem;
 
+	/* Current access_flags */
+	int access_flags;
+
 	/* This is zero'd when the MR is allocated */
 	union {
 		/* Used only while the MR is in the cache */
@@ -691,8 +694,6 @@ struct mlx5_ib_mr {
 		/* Used only by User MRs (umem != NULL) */
 		struct {
 			unsigned int page_shift;
-			/* Current access_flags */
-			int access_flags;
 
 			/* For User ODP */
 			struct mlx5_ib_mr *parent;
@@ -1292,10 +1293,9 @@ struct ib_mr *mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 				    struct ib_pd *pd, struct ib_udata *udata);
 int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata);
 struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			       u32 max_num_sg);
-struct ib_mr *mlx5_ib_alloc_mr_integrity(struct ib_pd *pd,
-					 u32 max_num_sg,
-					 u32 max_num_meta_sg);
+			       u32 max_num_sg, u32 access);
+struct ib_mr *mlx5_ib_alloc_mr_integrity(struct ib_pd *pd, u32 max_num_sg,
+					 u32 max_num_meta_sg, u32 access);
 int mlx5_ib_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
 		      unsigned int *sg_offset);
 int mlx5_ib_map_mr_sg_pi(struct ib_mr *ibmr, struct scatterlist *data_sg,

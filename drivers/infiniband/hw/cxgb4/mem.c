@@ -596,7 +596,7 @@ err_free_mhp:
 }
 
 struct ib_mr *c4iw_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			    u32 max_num_sg)
+			    u32 max_num_sg, u32 access)
 {
 	struct c4iw_dev *rhp;
 	struct c4iw_pd *php;

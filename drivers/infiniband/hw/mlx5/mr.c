@@ -2002,14 +2002,14 @@ int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 }
 
 static void mlx5_set_umr_free_mkey(struct ib_pd *pd, u32 *in, int ndescs,
-				   int access_mode, int page_shift)
+				   int access_mode, u32 access, int page_shift)
 {
 	void *mkc;
 
 	mkc = MLX5_ADDR_OF(create_mkey_in, in, memory_key_mkey_entry);
 
 	/* This is only used from the kernel, so setting the PD is OK. */
-	set_mkc_access_pd_addr_fields(mkc, 0, 0, pd);
+	set_mkc_access_pd_addr_fields(mkc, access, 0, pd);
 	MLX5_SET(mkc, mkc, free, 1);
 	MLX5_SET(mkc, mkc, translations_octword_size, ndescs);
 	MLX5_SET(mkc, mkc, access_mode_1_0, access_mode & 0x3);
@@ -2020,7 +2020,8 @@ static void mlx5_set_umr_free_mkey(struct ib_pd *pd, u32 *in, int ndescs,
 
 static int _mlx5_alloc_mkey_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 				  int ndescs, int desc_size, int page_shift,
-				  int access_mode, u32 *in, int inlen)
+				  int access_mode, u32 access, u32 *in,
+				  int inlen)
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	int err;
@@ -2033,7 +2034,7 @@ static int _mlx5_alloc_mkey_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 	if (err)
 		return err;
 
-	mlx5_set_umr_free_mkey(pd, in, ndescs, access_mode, page_shift);
+	mlx5_set_umr_free_mkey(pd, in, ndescs, access_mode, access, page_shift);
 
 	err = mlx5_ib_create_mkey(dev, &mr->mmkey, in, inlen);
 	if (err)
@@ -2042,6 +2043,7 @@ static int _mlx5_alloc_mkey_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 	mr->mmkey.type = MLX5_MKEY_MR;
 	mr->ibmr.lkey = mr->mmkey.key;
 	mr->ibmr.rkey = mr->mmkey.key;
+	mr->access_flags = access;
 
 	return 0;
 
@@ -2050,9 +2052,10 @@ err_free_descs:
 	return err;
 }
 
-static struct mlx5_ib_mr *mlx5_ib_alloc_pi_mr(struct ib_pd *pd,
-				u32 max_num_sg, u32 max_num_meta_sg,
-				int desc_size, int access_mode)
+static struct mlx5_ib_mr *mlx5_ib_alloc_pi_mr(struct ib_pd *pd, u32 max_num_sg,
+					      u32 max_num_meta_sg,
+					      int desc_size, int access_mode,
+					      u32 access)
 {
 	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
 	int ndescs = ALIGN(max_num_sg + max_num_meta_sg, 4);
@@ -2078,7 +2081,7 @@ static struct mlx5_ib_mr *mlx5_ib_alloc_pi_mr(struct ib_pd *pd,
 		page_shift = PAGE_SHIFT;
 
 	err = _mlx5_alloc_mkey_descs(pd, mr, ndescs, desc_size, page_shift,
-				     access_mode, in, inlen);
+				     access_mode, access, in, inlen);
 	if (err)
 		goto err_free_in;
 
@@ -2095,23 +2098,24 @@ err_free:
 }
 
 static int mlx5_alloc_mem_reg_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
-				    int ndescs, u32 *in, int inlen)
+				    int ndescs, u32 access, u32 *in, int inlen)
 {
 	return _mlx5_alloc_mkey_descs(pd, mr, ndescs, sizeof(struct mlx5_mtt),
-				      PAGE_SHIFT, MLX5_MKC_ACCESS_MODE_MTT, in,
-				      inlen);
+				      PAGE_SHIFT, MLX5_MKC_ACCESS_MODE_MTT,
+				      access, in, inlen);
 }
 
 static int mlx5_alloc_sg_gaps_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
-				    int ndescs, u32 *in, int inlen)
+				    int ndescs, u32 access, u32 *in, int inlen)
 {
 	return _mlx5_alloc_mkey_descs(pd, mr, ndescs, sizeof(struct mlx5_klm),
-				      0, MLX5_MKC_ACCESS_MODE_KLMS, in, inlen);
+				      0, MLX5_MKC_ACCESS_MODE_KLMS, access, in,
+				      inlen);
 }
 
 static int mlx5_alloc_integrity_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 				      int max_num_sg, int max_num_meta_sg,
-				      u32 *in, int inlen)
+				      u32 access, u32 *in, int inlen)
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	u32 psv_index[2];
@@ -2136,14 +2140,14 @@ static int mlx5_alloc_integrity_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 	++mr->sig->sigerr_count;
 	mr->klm_mr = mlx5_ib_alloc_pi_mr(pd, max_num_sg, max_num_meta_sg,
 					 sizeof(struct mlx5_klm),
-					 MLX5_MKC_ACCESS_MODE_KLMS);
+					 MLX5_MKC_ACCESS_MODE_KLMS, access);
 	if (IS_ERR(mr->klm_mr)) {
 		err = PTR_ERR(mr->klm_mr);
 		goto err_destroy_psv;
 	}
 	mr->mtt_mr = mlx5_ib_alloc_pi_mr(pd, max_num_sg, max_num_meta_sg,
 					 sizeof(struct mlx5_mtt),
-					 MLX5_MKC_ACCESS_MODE_MTT);
+					 MLX5_MKC_ACCESS_MODE_MTT, access);
 	if (IS_ERR(mr->mtt_mr)) {
 		err = PTR_ERR(mr->mtt_mr);
 		goto err_free_klm_mr;
@@ -2155,7 +2159,8 @@ static int mlx5_alloc_integrity_descs(struct ib_pd *pd, struct mlx5_ib_mr *mr,
 	MLX5_SET(mkc, mkc, bsf_octword_size, MLX5_MKEY_BSF_OCTO_SIZE);
 
 	err = _mlx5_alloc_mkey_descs(pd, mr, 4, sizeof(struct mlx5_klm), 0,
-				     MLX5_MKC_ACCESS_MODE_KLMS, in, inlen);
+				     MLX5_MKC_ACCESS_MODE_KLMS, access, in,
+				     inlen);
 	if (err)
 		goto err_free_mtt_mr;
 
@@ -2189,7 +2194,7 @@ err_free_sig:
 
 static struct ib_mr *__mlx5_ib_alloc_mr(struct ib_pd *pd,
 					enum ib_mr_type mr_type, u32 max_num_sg,
-					u32 max_num_meta_sg)
+					u32 max_num_meta_sg, u32 access)
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
@@ -2213,14 +2218,16 @@ static struct ib_mr *__mlx5_ib_alloc_mr(struct ib_pd *pd,
 
 	switch (mr_type) {
 	case IB_MR_TYPE_MEM_REG:
-		err = mlx5_alloc_mem_reg_descs(pd, mr, ndescs, in, inlen);
+		err = mlx5_alloc_mem_reg_descs(pd, mr, ndescs, access, in,
+					       inlen);
 		break;
 	case IB_MR_TYPE_SG_GAPS:
-		err = mlx5_alloc_sg_gaps_descs(pd, mr, ndescs, in, inlen);
+		err = mlx5_alloc_sg_gaps_descs(pd, mr, ndescs, access, in,
+					       inlen);
 		break;
 	case IB_MR_TYPE_INTEGRITY:
-		err = mlx5_alloc_integrity_descs(pd, mr, max_num_sg,
-						 max_num_meta_sg, in, inlen);
+		err = mlx5_alloc_integrity_descs(
+			pd, mr, max_num_sg, max_num_meta_sg, access, in, inlen);
 		break;
 	default:
 		mlx5_ib_warn(dev, "Invalid mr type %d\n", mr_type);
@@ -2242,16 +2249,16 @@ err_free:
 }
 
 struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
-			       u32 max_num_sg)
+			       u32 max_num_sg, u32 access)
 {
-	return __mlx5_ib_alloc_mr(pd, mr_type, max_num_sg, 0);
+	return __mlx5_ib_alloc_mr(pd, mr_type, max_num_sg, 0, access);
 }
 
-struct ib_mr *mlx5_ib_alloc_mr_integrity(struct ib_pd *pd,
-					 u32 max_num_sg, u32 max_num_meta_sg)
+struct ib_mr *mlx5_ib_alloc_mr_integrity(struct ib_pd *pd, u32 max_num_sg,
+					 u32 max_num_meta_sg, u32 access)
 {
 	return __mlx5_ib_alloc_mr(pd, IB_MR_TYPE_INTEGRITY, max_num_sg,
-				  max_num_meta_sg);
+				  max_num_meta_sg, access);
 }
 
 int mlx5_ib_alloc_mw(struct ib_mw *ibmw, struct ib_udata *udata)

@@ -2178,9 +2178,8 @@ static void smbd_mr_recovery_work(struct work_struct *work)
 				continue;
 			}
 
-			smbdirect_mr->mr = ib_alloc_mr(
-				info->pd, info->mr_type,
-				info->max_frmr_depth);
+			smbdirect_mr->mr = ib_alloc_mr(info->pd, info->mr_type,
+						       info->max_frmr_depth, 0);
 			if (IS_ERR(smbdirect_mr->mr)) {
 				log_rdma_mr(ERR, "ib_alloc_mr failed mr_type=%x max_frmr_depth=%x\n",
 					    info->mr_type,
@@ -2245,7 +2244,7 @@ static int allocate_mr_list(struct smbd_connection *info)
 		if (!smbdirect_mr)
 			goto out;
 		smbdirect_mr->mr = ib_alloc_mr(info->pd, info->mr_type,
-					info->max_frmr_depth);
+					       info->max_frmr_depth, 0);
 		if (IS_ERR(smbdirect_mr->mr)) {
 			log_rdma_mr(ERR, "ib_alloc_mr failed mr_type=%x max_frmr_depth=%x\n",
 				    info->mr_type, info->max_frmr_depth);

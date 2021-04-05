@@ -135,7 +135,7 @@ int frwr_mr_init(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr *mr)
 	struct ib_mr *frmr;
 	int rc;
 
-	frmr = ib_alloc_mr(ep->re_pd, ep->re_mrtype, depth);
+	frmr = ib_alloc_mr(ep->re_pd, ep->re_mrtype, depth, 0);
 	if (IS_ERR(frmr))
 		goto out_mr_err;
 

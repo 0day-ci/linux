@@ -2904,7 +2904,7 @@ int ocrdma_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags cq_flags)
 }
 
 struct ib_mr *ocrdma_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type,
-			      u32 max_num_sg)
+			      u32 max_num_sg, u32 access)
 {
 	int status;
 	struct ocrdma_mr *mr;
