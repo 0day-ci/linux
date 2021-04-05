@@ -555,7 +555,8 @@ static void smc_wr_init_sge(struct smc_link *lnk)
 	lnk->wr_reg.wr.num_sge = 0;
 	lnk->wr_reg.wr.send_flags = IB_SEND_SIGNALED;
 	lnk->wr_reg.wr.opcode = IB_WR_REG_MR;
-	lnk->wr_reg.access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE;
+	lnk->wr_reg.access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+			     IB_ACCESS_RELAXED_ORDERING;
 }
 
 void smc_wr_free_link(struct smc_link *lnk)
