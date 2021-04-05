@@ -1519,8 +1519,6 @@ void page_address_init(void);
 #define page_address_init()  do { } while(0)
 #endif
 
-extern struct address_space *page_mapping(struct page *page);
-
 extern struct address_space *__page_file_mapping(struct page *);
 
 static inline
