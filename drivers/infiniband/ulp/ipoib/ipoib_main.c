@@ -93,6 +93,7 @@ static struct net_device *ipoib_get_net_dev_by_params(
 		struct ib_device *dev, u32 port, u16 pkey,
 		const union ib_gid *gid, const struct sockaddr *addr,
 		void *client_data);
+static bool ipoib_client_supported(struct ib_device *device);
 static int ipoib_set_mac(struct net_device *dev, void *addr);
 static int ipoib_ioctl(struct net_device *dev, struct ifreq *ifr,
 		       int cmd);
@@ -102,6 +103,7 @@ static struct ib_client ipoib_client = {
 	.add    = ipoib_add_one,
 	.remove = ipoib_remove_one,
 	.get_net_dev_by_params = ipoib_get_net_dev_by_params,
+	.is_supported = ipoib_client_supported,
 };
 
 #ifdef CONFIG_INFINIBAND_IPOIB_DEBUG
@@ -2528,6 +2530,17 @@ sysfs_failed:
 	ipoib_parent_unregister_pre(ndev);
 	unregister_netdev(ndev);
 	return ERR_PTR(-ENOMEM);
+}
+
+static bool ipoib_client_supported(struct ib_device *device)
+{
+	u32 i;
+
+	rdma_for_each_port(device, i) {
+		if (rdma_protocol_ib(device, i))
+			return true;
+	}
+	return false;
 }
 
 static int ipoib_add_one(struct ib_device *device)
