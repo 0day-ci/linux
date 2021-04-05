@@ -176,11 +176,13 @@ static const struct nla_policy ib_nl_policy[LS_NLA_TYPE_MAX] = {
 
 static int ib_sa_add_one(struct ib_device *device);
 static void ib_sa_remove_one(struct ib_device *device, void *client_data);
+static bool ib_sa_client_supported(struct ib_device *device);
 
 static struct ib_client sa_client = {
 	.name   = "sa",
 	.add    = ib_sa_add_one,
-	.remove = ib_sa_remove_one
+	.remove = ib_sa_remove_one,
+	.is_supported = ib_sa_client_supported,
 };
 
 static DEFINE_XARRAY_FLAGS(queries, XA_FLAGS_ALLOC | XA_FLAGS_LOCK_IRQ);
@@ -2293,6 +2295,17 @@ static void ib_sa_event(struct ib_event_handler *handler,
 		}
 		queue_work(ib_wq, &sa_dev->port[port_num].update_task);
 	}
+}
+
+static bool ib_sa_client_supported(struct ib_device *device)
+{
+	unsigned int i;
+
+	rdma_for_each_port(device, i) {
+		if (rdma_cap_ib_sa(device, i))
+			return true;
+	}
+	return false;
 }
 
 static int ib_sa_add_one(struct ib_device *device)

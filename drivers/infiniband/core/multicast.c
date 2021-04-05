@@ -44,11 +44,13 @@
 
 static int mcast_add_one(struct ib_device *device);
 static void mcast_remove_one(struct ib_device *device, void *client_data);
+static bool mcast_client_supported(struct ib_device *device);
 
 static struct ib_client mcast_client = {
 	.name   = "ib_multicast",
 	.add    = mcast_add_one,
-	.remove = mcast_remove_one
+	.remove = mcast_remove_one,
+	.is_supported = mcast_client_supported,
 };
 
 static struct ib_sa_client	sa_client;
@@ -814,6 +816,17 @@ static void mcast_event_handler(struct ib_event_handler *handler,
 	default:
 		break;
 	}
+}
+
+static bool mcast_client_supported(struct ib_device *device)
+{
+	u32 i;
+
+	rdma_for_each_port(device, i) {
+		if (rdma_cap_ib_mcast(device, i))
+			return true;
+	}
+	return false;
 }
 
 static int mcast_add_one(struct ib_device *device)
