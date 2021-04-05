@@ -370,7 +370,7 @@ static void btrfsic_cmp_log_and_dev_bytenr(struct btrfsic_state *state,
 					   struct btrfsic_dev_state *dev_state,
 					   u64 dev_bytenr);
 
-static struct mutex btrfsic_mutex;
+static DEFINE_MUTEX(btrfsic_mutex);
 static int btrfsic_is_initialized;
 static struct btrfsic_dev_state_hashtable btrfsic_dev_state_hashtable;
 
@@ -2787,7 +2787,6 @@ int btrfsic_mount(struct btrfs_fs_info *fs_info,
 		return -ENOMEM;
 
 	if (!btrfsic_is_initialized) {
-		mutex_init(&btrfsic_mutex);
 		btrfsic_dev_state_hashtable_init(&btrfsic_dev_state_hashtable);
 		btrfsic_is_initialized = 1;
 	}
