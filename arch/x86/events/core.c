@@ -488,7 +488,7 @@ int x86_setup_perfctr(struct perf_event *event)
 	if (attr->type == event->pmu->type)
 		return x86_pmu_extra_regs(event->attr.config, event);
 
-	if (attr->type == PERF_TYPE_HW_CACHE)
+	if ((attr->type == PERF_TYPE_HW_CACHE) || (attr->type == PERF_TYPE_HW_CACHE_PMU))
 		return set_ext_hw_attr(hwc, event);
 
 	if (attr->config >= x86_pmu.max_events)
@@ -2452,8 +2452,14 @@ static int x86_pmu_event_init(struct perf_event *event)
 
 	if ((event->attr.type != event->pmu->type) &&
 	    (event->attr.type != PERF_TYPE_HARDWARE) &&
-	    (event->attr.type != PERF_TYPE_HW_CACHE))
+	    (event->attr.type != PERF_TYPE_HW_CACHE) &&
+	    (event->attr.type != PERF_TYPE_HARDWARE_PMU) &&
+	    (event->attr.type != PERF_TYPE_HW_CACHE_PMU))
 		return -ENOENT;
+
+	if ((event->attr.type == PERF_TYPE_HARDWARE_PMU) ||
+	    (event->attr.type == PERF_TYPE_HW_CACHE_PMU))
+		event->attr.config &= PERF_HW_CACHE_EVENT_MASK;
 
 	if (is_hybrid() && (event->cpu != -1)) {
 		pmu = hybrid_pmu(event->pmu);
