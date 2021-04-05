@@ -436,7 +436,8 @@ static struct srp_fr_pool *srp_create_fr_pool(struct ib_device *device,
 		mr_type = IB_MR_TYPE_MEM_REG;
 
 	for (i = 0, d = &pool->desc[0]; i < pool->size; i++, d++) {
-		mr = ib_alloc_mr(pd, mr_type, max_page_list_len, 0);
+		mr = ib_alloc_mr(pd, mr_type, max_page_list_len,
+				 IB_ACCESS_RELAXED_ORDERING);
 		if (IS_ERR(mr)) {
 			ret = PTR_ERR(mr);
 			if (ret == -ENOMEM)
@@ -1487,9 +1488,8 @@ static int srp_map_finish_fr(struct srp_map_state *state,
 	wr.wr.send_flags = 0;
 	wr.mr = desc->mr;
 	wr.key = desc->mr->rkey;
-	wr.access = (IB_ACCESS_LOCAL_WRITE |
-		     IB_ACCESS_REMOTE_READ |
-		     IB_ACCESS_REMOTE_WRITE);
+	wr.access = (IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_READ |
+		     IB_ACCESS_REMOTE_WRITE | IB_ACCESS_RELAXED_ORDERING);
 
 	*state->fr.next++ = desc;
 	state->nmdesc++;
