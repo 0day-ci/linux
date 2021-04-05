@@ -97,6 +97,36 @@ struct function_range {
  *     if return_to_handler is detected on the stack.
  *
  * NOTE: The unwinder must do (1) before (2).
+ *
+ * KPROBES
+ * =======
+ *
+ * There are two types of kprobes:
+ *
+ * (1) Regular kprobes that are placed anywhere in a probed function.
+ *     This is implemented by replacing the probed instruction with a
+ *     breakpoint. When the breakpoint is hit, the kprobe code emulates
+ *     the original instruction in-situ and returns to the next
+ *     instruction.
+ *
+ *     Breakpoints are EL1 exceptions. When the unwinder detects them,
+ *     the stack trace is marked as unreliable as it does not know where
+ *     exactly the exception happened. Detection of EL1 exceptions in
+ *     a stack trace will be done separately.
+ *
+ * (2) Return kprobes that are placed on the return of a probed function.
+ *     In this case, Kprobes sets up an initial breakpoint at the
+ *     beginning of the probed function. When the breakpoint is hit,
+ *     Kprobes replaces the return address in the stack frame with the
+ *     kretprobe_trampoline and records the original return address.
+ *     When the probed function returns, control goes to the trampoline
+ *     which eventually returns to the original return address.
+ *
+ *     Stack traces taken while in the probed function or while in the
+ *     trampoline will show kretprobe_trampoline instead of the original
+ *     return address. Detect this and mark the stack trace unreliable.
+ *     The detection is done by checking if the return PC falls anywhere
+ *     in kretprobe_trampoline.
  */
 static struct function_range	special_functions[] = {
 	/*
@@ -123,6 +153,13 @@ static struct function_range	special_functions[] = {
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	{ (unsigned long) ftrace_graph_caller, 0 },
 	{ (unsigned long) return_to_handler, 0 },
+#endif
+
+	/*
+	 * Kprobe trampolines.
+	 */
+#ifdef CONFIG_KRETPROBES
+	{ (unsigned long) kretprobe_trampoline, 0 },
 #endif
 
 	{ /* sentinel */ }
