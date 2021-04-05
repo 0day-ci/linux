@@ -1099,7 +1099,8 @@ static int rtrs_clt_read_req(struct rtrs_clt_io_req *req)
 			.mr = req->mr,
 			.key = req->mr->rkey,
 			.access = (IB_ACCESS_LOCAL_WRITE |
-				   IB_ACCESS_REMOTE_WRITE),
+				   IB_ACCESS_REMOTE_WRITE |
+				   IB_ACCESS_RELAXED_ORDERING),
 		};
 		wr = &rwr.wr;
 
@@ -1260,7 +1261,8 @@ static int alloc_sess_reqs(struct rtrs_clt_sess *sess)
 			goto out;
 
 		req->mr = ib_alloc_mr(sess->s.dev->ib_pd, IB_MR_TYPE_MEM_REG,
-				      sess->max_pages_per_mr, 0);
+				      sess->max_pages_per_mr,
+				      IB_ACCESS_RELAXED_ORDERING);
 		if (IS_ERR(req->mr)) {
 			err = PTR_ERR(req->mr);
 			req->mr = NULL;

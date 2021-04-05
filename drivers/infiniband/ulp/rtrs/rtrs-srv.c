@@ -312,8 +312,8 @@ static int rdma_write_sg(struct rtrs_srv_op *id)
 		rwr.mr = srv_mr->mr;
 		rwr.wr.send_flags = 0;
 		rwr.key = srv_mr->mr->rkey;
-		rwr.access = (IB_ACCESS_LOCAL_WRITE |
-			      IB_ACCESS_REMOTE_WRITE);
+		rwr.access = (IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+			      IB_ACCESS_RELAXED_ORDERING);
 		msg = srv_mr->iu->buf;
 		msg->buf_id = cpu_to_le16(id->msg_id);
 		msg->type = cpu_to_le16(RTRS_MSG_RKEY_RSP);
@@ -432,8 +432,8 @@ static int send_io_resp_imm(struct rtrs_srv_con *con, struct rtrs_srv_op *id,
 		rwr.wr.send_flags = 0;
 		rwr.mr = srv_mr->mr;
 		rwr.key = srv_mr->mr->rkey;
-		rwr.access = (IB_ACCESS_LOCAL_WRITE |
-			      IB_ACCESS_REMOTE_WRITE);
+		rwr.access = (IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+			      IB_ACCESS_RELAXED_ORDERING);
 		msg = srv_mr->iu->buf;
 		msg->buf_id = cpu_to_le16(id->msg_id);
 		msg->type = cpu_to_le16(RTRS_MSG_RKEY_RSP);
@@ -638,7 +638,7 @@ static int map_cont_bufs(struct rtrs_srv_sess *sess)
 			goto free_sg;
 		}
 		mr = ib_alloc_mr(sess->s.dev->ib_pd, IB_MR_TYPE_MEM_REG,
-				 sgt->nents, 0);
+				 sgt->nents, IB_ACCESS_RELAXED_ORDERING);
 		if (IS_ERR(mr)) {
 			err = PTR_ERR(mr);
 			goto unmap_sg;
@@ -823,8 +823,9 @@ static int process_info_req(struct rtrs_srv_con *con,
 		rwr[mri].wr.send_flags = 0;
 		rwr[mri].mr = mr;
 		rwr[mri].key = mr->rkey;
-		rwr[mri].access = (IB_ACCESS_LOCAL_WRITE |
-				   IB_ACCESS_REMOTE_WRITE);
+		rwr[mri].access =
+			(IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+			 IB_ACCESS_RELAXED_ORDERING);
 		reg_wr = &rwr[mri].wr;
 	}
 
