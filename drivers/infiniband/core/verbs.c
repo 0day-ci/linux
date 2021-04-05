@@ -287,7 +287,8 @@ struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
 	if (device->attrs.device_cap_flags & IB_DEVICE_LOCAL_DMA_LKEY)
 		pd->local_dma_lkey = device->local_dma_lkey;
 	else
-		mr_access_flags |= IB_ACCESS_LOCAL_WRITE;
+		mr_access_flags |=
+			IB_ACCESS_LOCAL_WRITE | IB_ACCESS_RELAXED_ORDERING;
 
 	if (flags & IB_PD_UNSAFE_GLOBAL_RKEY) {
 		pr_warn("%s: enabling unsafe global rkey\n", caller);

@@ -66,6 +66,7 @@ struct ib_mr *pvrdma_get_dma_mr(struct ib_pd *pd, int acc)
 	int ret;
 
 	/* Support only LOCAL_WRITE flag for DMA MRs */
+	acc &= ~IB_ACCESS_RELAXED_ORDERING;
 	if (acc & ~IB_ACCESS_LOCAL_WRITE) {
 		dev_warn(&dev->pdev->dev,
 			 "unsupported dma mr access flags %#x\n", acc);
