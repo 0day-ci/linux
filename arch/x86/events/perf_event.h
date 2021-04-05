@@ -15,6 +15,7 @@
 #include <linux/perf_event.h>
 
 #include <asm/intel_ds.h>
+#include <asm/cpu.h>
 
 /* To enable MSR tracing please use the generic trace points. */
 
@@ -634,6 +635,9 @@ enum {
 
 struct x86_hybrid_pmu {
 	struct pmu			pmu;
+	const char			*name;
+	u8				cpu_type;
+	cpumask_t			supported_cpus;
 	union perf_capabilities		intel_cap;
 	u64				intel_ctrl;
 	int				max_pebs_events;
@@ -671,6 +675,13 @@ static __always_inline struct x86_hybrid_pmu *hybrid_pmu(struct pmu *pmu)
 							\
 	__F;						\
 })
+
+enum hybrid_pmu_type {
+	hybrid_big		= 0x40,
+	hybrid_small		= 0x20,
+
+	hybrid_big_small	= hybrid_big | hybrid_small,
+};
 
 /*
  * struct x86_pmu - generic x86 pmu
@@ -869,6 +880,7 @@ struct x86_pmu {
 	 */
 	int				num_hybrid_pmus;
 	struct x86_hybrid_pmu		*hybrid_pmu;
+	u8 (*get_hybrid_cpu_type)	(void);
 };
 
 struct x86_perf_task_context_opt {
@@ -1085,6 +1097,8 @@ int x86_pmu_handle_irq(struct pt_regs *regs);
 
 void x86_pmu_show_pmu_cap(int num_counters, int num_counters_fixed,
 			  u64 intel_ctrl);
+
+void x86_pmu_update_cpu_context(struct pmu *pmu, int cpu);
 
 extern struct event_constraint emptyconstraint;
 
