@@ -51,6 +51,52 @@ struct function_range {
  * unreliable. Breakpoints are used for executing probe code. Stack traces
  * taken while in the probe code will show an EL1 frame and will be considered
  * unreliable. This is correct behavior.
+ *
+ * FTRACE
+ * ======
+ *
+ * When CONFIG_DYNAMIC_FTRACE_WITH_REGS is enabled, the FTRACE trampoline code
+ * is called from a traced function even before the frame pointer prolog.
+ * FTRACE sets up two stack frames (one for the traced function and one for
+ * its caller) so that the unwinder can provide a sensible stack trace for
+ * any tracer function called from the FTRACE trampoline code.
+ *
+ * There are two cases where the stack trace is not reliable.
+ *
+ * (1) The task gets preempted before the two frames are set up. Preemption
+ *     involves an interrupt which is an EL1 exception. The unwinder already
+ *     handles EL1 exceptions.
+ *
+ * (2) The tracer function that gets called by the FTRACE trampoline code
+ *     changes the return PC (e.g., livepatch).
+ *
+ *     Not all tracer functions do that. But to err on the side of safety,
+ *     consider the stack trace as unreliable in all cases.
+ *
+ * When Function Graph Tracer is used, FTRACE modifies the return address of
+ * the traced function in its stack frame to an FTRACE return trampoline
+ * (return_to_handler). When the traced function returns, control goes to
+ * return_to_handler. return_to_handler calls FTRACE to gather tracing data
+ * and to obtain the original return address. Then, return_to_handler returns
+ * to the original return address.
+ *
+ * There are two cases to consider from a stack trace reliability point of
+ * view:
+ *
+ * (1) Stack traces taken within the traced function (and functions that get
+ *     called from there) will show return_to_handler instead of the original
+ *     return address. The original return address can be obtained from FTRACE.
+ *     The unwinder already obtains it and modifies the return PC in its copy
+ *     of the stack frame to the original return address. So, this is handled.
+ *
+ * (2) return_to_handler calls FTRACE as mentioned before. FTRACE discards
+ *     the record of the original return address along the way as it does not
+ *     need to maintain it anymore. This means that the unwinder cannot get
+ *     the original return address beyond that point while the task is still
+ *     executing in return_to_handler. So, consider the stack trace unreliable
+ *     if return_to_handler is detected on the stack.
+ *
+ * NOTE: The unwinder must do (1) before (2).
  */
 static struct function_range	special_functions[] = {
 	/*
@@ -63,6 +109,21 @@ static struct function_range	special_functions[] = {
 	{ (unsigned long) el1_irq_invalid, 0 },
 	{ (unsigned long) el1_fiq_invalid, 0 },
 	{ (unsigned long) el1_error_invalid, 0 },
+
+	/*
+	 * FTRACE trampolines.
+	 *
+	 * Tracer function gets patched at the label ftrace_call. Its return
+	 * address is the next instruction address.
+	 */
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	{ (unsigned long) ftrace_call + 4, 0 },
+#endif
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	{ (unsigned long) ftrace_graph_caller, 0 },
+	{ (unsigned long) return_to_handler, 0 },
+#endif
 
 	{ /* sentinel */ }
 };

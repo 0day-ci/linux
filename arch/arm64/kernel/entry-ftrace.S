@@ -86,6 +86,18 @@ SYM_CODE_START(ftrace_caller)
 	b	ftrace_common
 SYM_CODE_END(ftrace_caller)
 
+/*
+ * A stack trace taken from anywhere in the FTRACE trampoline code should be
+ * considered unreliable as a tracer function (patched at ftrace_call) could
+ * potentially set pt_regs->pc and redirect execution to a function different
+ * than the traced function. E.g., livepatch.
+ *
+ * No stack traces are taken in this FTRACE trampoline assembly code. But
+ * they can be taken from C functions that get called from here. The unwinder
+ * checks if a return address falls in this FTRACE trampoline code. See
+ * stacktrace.c. If function calls in this code are changed, please keep the
+ * special_functions[] array in stacktrace.c in sync.
+ */
 SYM_CODE_START(ftrace_common)
 	sub	x0, x30, #AARCH64_INSN_SIZE	// ip (callsite's BL insn)
 	mov	x1, x9				// parent_ip (callsite's LR)
