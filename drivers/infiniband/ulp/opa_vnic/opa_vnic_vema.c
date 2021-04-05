@@ -121,6 +121,7 @@ static struct ib_client opa_vnic_client = {
 	.name   = opa_vnic_driver_name,
 	.add    = opa_vnic_vema_add_one,
 	.remove = opa_vnic_vema_rem_one,
+	.is_supported = rdma_cap_opa_vnic,
 };
 
 /**
@@ -992,9 +993,6 @@ static int opa_vnic_vema_add_one(struct ib_device *device)
 {
 	struct opa_vnic_ctrl_port *cport;
 	int rc, size = sizeof(*cport);
-
-	if (!rdma_cap_opa_vnic(device))
-		return -EOPNOTSUPP;
 
 	size += device->phys_port_cnt * sizeof(struct opa_vnic_vema_port);
 	cport = kzalloc(size, GFP_KERNEL);
