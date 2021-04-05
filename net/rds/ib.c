@@ -125,18 +125,23 @@ void rds_ib_dev_put(struct rds_ib_device *rds_ibdev)
 		queue_work(rds_wq, &rds_ibdev->free_work);
 }
 
+static bool rds_client_supported(struct ib_device *device)
+{
+	/* Only handle IB (no iWARP) devices */
+	if (device->node_type != RDMA_NODE_IB_CA)
+		return false;
+
+	/* Device must support FRWR */
+	if (!(device->attrs.device_cap_flags & IB_DEVICE_MEM_MGT_EXTENSIONS))
+		return false;
+
+	return true;
+}
+
 static int rds_ib_add_one(struct ib_device *device)
 {
 	struct rds_ib_device *rds_ibdev;
 	int ret;
-
-	/* Only handle IB (no iWARP) devices */
-	if (device->node_type != RDMA_NODE_IB_CA)
-		return -EOPNOTSUPP;
-
-	/* Device must support FRWR */
-	if (!(device->attrs.device_cap_flags & IB_DEVICE_MEM_MGT_EXTENSIONS))
-		return -EOPNOTSUPP;
 
 	rds_ibdev = kzalloc_node(sizeof(struct rds_ib_device), GFP_KERNEL,
 				 ibdev_to_node(device));
@@ -288,7 +293,8 @@ static void rds_ib_remove_one(struct ib_device *device, void *client_data)
 struct ib_client rds_ib_client = {
 	.name   = "rds_ib",
 	.add    = rds_ib_add_one,
-	.remove = rds_ib_remove_one
+	.remove = rds_ib_remove_one,
+	.is_supported = rds_client_supported,
 };
 
 static int rds_ib_conn_info_visitor(struct rds_connection *conn,
