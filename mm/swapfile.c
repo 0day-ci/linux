@@ -90,7 +90,7 @@ static DEFINE_SPINLOCK(swap_avail_lock);
 
 struct swap_info_struct *swap_info[MAX_SWAPFILES];
 
-static DEFINE_MUTEX(swapon_mutex);
+DEFINE_MUTEX(swapon_mutex);
 
 static DECLARE_WAIT_QUEUE_HEAD(proc_poll_wait);
 /* Activity counter to indicate that a swapon or swapoff has occurred */
@@ -2973,6 +2973,17 @@ unsigned long generic_max_swapfile_size(void)
 __weak unsigned long max_swapfile_size(void)
 {
 	return generic_max_swapfile_size();
+}
+
+struct swap_info_struct *swap_info_get_if_under_swapoff(int type)
+{
+	struct swap_info_struct *si = swap_type_to_swap_info(type);
+
+	if (!si || !si->swap_map)
+		return NULL;
+	if ((si->flags & SWP_USED) && !(si->flags & SWP_WRITEOK))
+		return si;
+	return NULL;
 }
 
 static unsigned long read_swap_header(struct swap_info_struct *p,

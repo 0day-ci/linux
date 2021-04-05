@@ -119,12 +119,26 @@ void frontswap_register_ops(struct frontswap_ops *ops)
 
 	bitmap_zero(a, MAX_SWAPFILES);
 	bitmap_zero(b, MAX_SWAPFILES);
-
+	mutex_lock(&swapon_mutex);
 	spin_lock(&swap_lock);
 	plist_for_each_entry(si, &swap_active_head, list) {
 		if (!WARN_ON(!si->frontswap_map))
 			set_bit(si->type, a);
 	}
+	/*
+	 * There might be some swap devices under swapoff, i.e. they are
+	 * removed from swap_active_head but frontswap_invalidate_area()
+	 * is not called yet due to swapon_mutex is held here. We must
+	 * collect these swap devices and call ops->init on them or they
+	 * might invalidate frontswap area while frontswap is uninitialized.
+	 */
+	for_each_clear_bit(i, a, MAX_SWAPFILES) {
+		si = swap_info_get_if_under_swapoff(i);
+		if (!si || !si->frontswap_map)
+			continue;
+		set_bit(si->type, b);
+	}
+	bitmap_or(a, a, b, MAX_SWAPFILES);
 	spin_unlock(&swap_lock);
 
 	/* the new ops needs to know the currently active swap devices */
@@ -140,29 +154,9 @@ void frontswap_register_ops(struct frontswap_ops *ops)
 		ops->next = frontswap_ops;
 	} while (cmpxchg(&frontswap_ops, ops->next, ops) != ops->next);
 
+	mutex_unlock(&swapon_mutex);
+
 	static_branch_inc(&frontswap_enabled_key);
-
-	spin_lock(&swap_lock);
-	plist_for_each_entry(si, &swap_active_head, list) {
-		if (si->frontswap_map)
-			set_bit(si->type, b);
-	}
-	spin_unlock(&swap_lock);
-
-	/*
-	 * On the very unlikely chance that a swap device was added or
-	 * removed between setting the "a" list bits and the ops init
-	 * calls, we re-check and do init or invalidate for any changed
-	 * bits.
-	 */
-	if (unlikely(!bitmap_equal(a, b, MAX_SWAPFILES))) {
-		for (i = 0; i < MAX_SWAPFILES; i++) {
-			if (!test_bit(i, a) && test_bit(i, b))
-				ops->init(i);
-			else if (test_bit(i, a) && !test_bit(i, b))
-				ops->invalidate_area(i);
-		}
-	}
 }
 EXPORT_SYMBOL(frontswap_register_ops);
 
