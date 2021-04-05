@@ -335,34 +335,16 @@ static const struct attribute_group cros_ec_attr_group = {
 	.is_visible = cros_ec_ctrl_visible,
 };
 
-static int cros_ec_sysfs_probe(struct platform_device *pd)
-{
-	struct cros_ec_dev *ec_dev = dev_get_drvdata(pd->dev.parent);
-	struct device *dev = &pd->dev;
-	int ret;
-
-	ret = sysfs_create_group(&ec_dev->class_dev.kobj, &cros_ec_attr_group);
-	if (ret < 0)
-		dev_err(dev, "failed to create attributes. err=%d\n", ret);
-
-	return ret;
-}
-
-static int cros_ec_sysfs_remove(struct platform_device *pd)
-{
-	struct cros_ec_dev *ec_dev = dev_get_drvdata(pd->dev.parent);
-
-	sysfs_remove_group(&ec_dev->class_dev.kobj, &cros_ec_attr_group);
-
-	return 0;
-}
+static const struct attribute_group *cros_ec_attr_groups[] = {
+	&cros_ec_attr_group,
+	NULL,
+};
 
 static struct platform_driver cros_ec_sysfs_driver = {
 	.driver = {
 		.name = DRV_NAME,
+		.dev_groups = cros_ec_attr_groups,
 	},
-	.probe = cros_ec_sysfs_probe,
-	.remove = cros_ec_sysfs_remove,
 };
 
 module_platform_driver(cros_ec_sysfs_driver);
