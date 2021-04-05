@@ -35,6 +35,14 @@ asmlinkage void el1_sync_handler(struct pt_regs *regs);
 asmlinkage void el0_sync_handler(struct pt_regs *regs);
 asmlinkage void el0_sync_compat_handler(struct pt_regs *regs);
 
+asmlinkage void el1_sync(void);
+asmlinkage void el1_irq(void);
+asmlinkage void el1_error(void);
+asmlinkage void el1_sync_invalid(void);
+asmlinkage void el1_irq_invalid(void);
+asmlinkage void el1_fiq_invalid(void);
+asmlinkage void el1_error_invalid(void);
+
 asmlinkage void noinstr enter_el1_irq_or_nmi(struct pt_regs *regs);
 asmlinkage void noinstr exit_el1_irq_or_nmi(struct pt_regs *regs);
 asmlinkage void enter_from_user_mode(void);

@@ -14,6 +14,7 @@
 #include <linux/stacktrace.h>
 
 #include <asm/irq.h>
+#include <asm/exception.h>
 #include <asm/pointer_auth.h>
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
@@ -25,8 +26,44 @@ struct function_range {
 
 /*
  * Special functions where the stack trace is unreliable.
+ *
+ * EL1 exceptions
+ * ==============
+ *
+ * EL1 exceptions can happen on any instruction including instructions in
+ * the frame pointer prolog or epilog. Depending on where exactly they happen,
+ * they could render the stack trace unreliable.
+ *
+ * If an EL1 exception frame is found on the stack, mark the stack trace as
+ * unreliable. Now, the EL1 exception frame is not at any well-known offset
+ * on the stack. It can be anywhere on the stack. In order to properly detect
+ * an EL1 exception frame, the return address must be checked against all of
+ * the possible EL1 exception handlers.
+ *
+ * Interrupts encountered in kernel code are also EL1 exceptions. At the end
+ * of an interrupt, the current task can get preempted. A stack trace taken
+ * on the task after the preemption will show the EL1 frame and will be
+ * considered unreliable. This is correct behavior as preemption can happen
+ * practically at any point in code.
+ *
+ * Breakpoints encountered in kernel code are also EL1 exceptions. Breakpoints
+ * can happen practically on any instruction. Mark the stack trace as
+ * unreliable. Breakpoints are used for executing probe code. Stack traces
+ * taken while in the probe code will show an EL1 frame and will be considered
+ * unreliable. This is correct behavior.
  */
 static struct function_range	special_functions[] = {
+	/*
+	 * EL1 exception handlers.
+	 */
+	{ (unsigned long) el1_sync, 0 },
+	{ (unsigned long) el1_irq, 0 },
+	{ (unsigned long) el1_error, 0 },
+	{ (unsigned long) el1_sync_invalid, 0 },
+	{ (unsigned long) el1_irq_invalid, 0 },
+	{ (unsigned long) el1_fiq_invalid, 0 },
+	{ (unsigned long) el1_error_invalid, 0 },
+
 	{ /* sentinel */ }
 };
 
