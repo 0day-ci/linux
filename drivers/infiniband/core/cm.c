@@ -87,6 +87,7 @@ struct cm_id_private;
 struct cm_work;
 static int cm_add_one(struct ib_device *device);
 static void cm_remove_one(struct ib_device *device, void *client_data);
+static bool cm_supported(struct ib_device *device);
 static void cm_process_work(struct cm_id_private *cm_id_priv,
 			    struct cm_work *work);
 static int cm_send_sidr_rep_locked(struct cm_id_private *cm_id_priv,
@@ -103,7 +104,8 @@ static int cm_send_rej_locked(struct cm_id_private *cm_id_priv,
 static struct ib_client cm_client = {
 	.name   = "cm",
 	.add    = cm_add_one,
-	.remove = cm_remove_one
+	.remove = cm_remove_one,
+	.is_supported = cm_supported,
 };
 
 static struct ib_cm {
@@ -4319,6 +4321,17 @@ static void cm_remove_port_fs(struct cm_port *port)
 	for (i = 0; i < CM_COUNTER_GROUPS; i++)
 		ib_port_unregister_module_stat(&port->counter_group[i].obj);
 
+}
+
+static bool cm_supported(struct ib_device *device)
+{
+	u32 i;
+
+	rdma_for_each_port(device, i) {
+		if (rdma_cap_ib_cm(device, i))
+			return true;
+	}
+	return false;
 }
 
 static int cm_add_one(struct ib_device *ib_device)
