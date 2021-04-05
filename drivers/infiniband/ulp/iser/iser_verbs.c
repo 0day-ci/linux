@@ -121,7 +121,8 @@ iser_create_fastreg_desc(struct iser_device *device,
 	else
 		mr_type = IB_MR_TYPE_MEM_REG;
 
-	desc->rsc.mr = ib_alloc_mr(pd, mr_type, size, 0);
+	desc->rsc.mr = ib_alloc_mr(pd, mr_type, size,
+		IB_ACCESS_RELAXED_ORDERING);
 	if (IS_ERR(desc->rsc.mr)) {
 		ret = PTR_ERR(desc->rsc.mr);
 		iser_err("Failed to allocate ib_fast_reg_mr err=%d\n", ret);
@@ -129,7 +130,8 @@ iser_create_fastreg_desc(struct iser_device *device,
 	}
 
 	if (pi_enable) {
-		desc->rsc.sig_mr = ib_alloc_mr_integrity(pd, size, size, 0);
+		desc->rsc.sig_mr = ib_alloc_mr_integrity(pd, size, size,
+			IB_ACCESS_RELAXED_ORDERING);
 		if (IS_ERR(desc->rsc.sig_mr)) {
 			ret = PTR_ERR(desc->rsc.sig_mr);
 			iser_err("Failed to allocate sig_mr err=%d\n", ret);

@@ -271,9 +271,8 @@ iser_reg_sig_mr(struct iscsi_iser_task *iser_task,
 	wr->wr.send_flags = 0;
 	wr->mr = mr;
 	wr->key = mr->rkey;
-	wr->access = IB_ACCESS_LOCAL_WRITE |
-		     IB_ACCESS_REMOTE_READ |
-		     IB_ACCESS_REMOTE_WRITE;
+	wr->access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_READ |
+		     IB_ACCESS_REMOTE_WRITE | IB_ACCESS_RELAXED_ORDERING;
 	rsc->mr_valid = 1;
 
 	sig_reg->sge.lkey = mr->lkey;
@@ -318,9 +317,8 @@ static int iser_fast_reg_mr(struct iscsi_iser_task *iser_task,
 	wr->wr.num_sge = 0;
 	wr->mr = mr;
 	wr->key = mr->rkey;
-	wr->access = IB_ACCESS_LOCAL_WRITE  |
-		     IB_ACCESS_REMOTE_WRITE |
-		     IB_ACCESS_REMOTE_READ;
+	wr->access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+		     IB_ACCESS_REMOTE_READ | IB_ACCESS_RELAXED_ORDERING;
 
 	rsc->mr_valid = 1;
 
