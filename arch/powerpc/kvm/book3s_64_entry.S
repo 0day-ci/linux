@@ -35,7 +35,7 @@
 .balign IFETCH_ALIGN_BYTES
 kvmppc_hcall:
 	lbz	r10,HSTATE_IN_GUEST(r13)
-	cmpwi	r10,KVM_GUEST_MODE_GUEST_HV_FAST
+	cmpwi	r10,KVM_GUEST_MODE_GUEST_HV_P9
 	beq	kvmppc_p9_exit_hcall
 	ld	r10,PACA_EXGEN+EX_R13(r13)
 	SET_SCRATCH0(r10)
@@ -65,7 +65,7 @@ kvmppc_hcall:
 kvmppc_interrupt:
 	std	r10,HSTATE_SCRATCH0(r13)
 	lbz	r10,HSTATE_IN_GUEST(r13)
-	cmpwi	r10,KVM_GUEST_MODE_GUEST_HV_FAST
+	cmpwi	r10,KVM_GUEST_MODE_GUEST_HV_P9
 	beq	kvmppc_p9_exit_interrupt
 	ld	r10,HSTATE_SCRATCH0(r13)
 	lbz	r11,HSTATE_IN_GUEST(r13)
@@ -280,7 +280,7 @@ kvmppc_p9_exit_hcall:
 .balign	IFETCH_ALIGN_BYTES
 kvmppc_p9_exit_interrupt:
 	/*
-	 * If set to KVM_GUEST_MODE_GUEST_HV_FAST but we're still in the
+	 * If set to KVM_GUEST_MODE_GUEST_HV_P9 but we're still in the
 	 * hypervisor, that means we can't return from the entry stack.
 	 */
 	rldicl. r10,r12,64-MSR_HV_LG,63
@@ -354,6 +354,12 @@ kvmppc_p9_exit_interrupt:
  * effort for a small bit of code. Lots of other things to do first.
  */
 kvmppc_p9_bad_interrupt:
+BEGIN_MMU_FTR_SECTION
+	/*
+	 * Hash host doesn't try to recover MMU (requires host SLB reload)
+	 */
+	b	.
+END_MMU_FTR_SECTION_IFCLR(MMU_FTR_TYPE_RADIX)
 	/*
 	 * Set GUEST_MODE_NONE so the handler won't branch to KVM, and clear
 	 * MSR_RI in r12 ([H]SRR1) so the handler won't try to return.
