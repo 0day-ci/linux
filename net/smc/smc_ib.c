@@ -766,15 +766,17 @@ void smc_ib_ndev_change(struct net_device *ndev, unsigned long event)
 	mutex_unlock(&smc_ib_devices.mutex);
 }
 
+static bool smc_client_supported(struct ib_device *ibdev)
+{
+	return ibdev->node_type == RDMA_NODE_IB_CA;
+}
+
 /* callback function for ib_register_client() */
 static int smc_ib_add_dev(struct ib_device *ibdev)
 {
 	struct smc_ib_device *smcibdev;
 	u8 port_cnt;
 	int i;
-
-	if (ibdev->node_type != RDMA_NODE_IB_CA)
-		return -EOPNOTSUPP;
 
 	smcibdev = kzalloc(sizeof(*smcibdev), GFP_KERNEL);
 	if (!smcibdev)
@@ -839,6 +841,7 @@ static struct ib_client smc_ib_client = {
 	.name	= "smc_ib",
 	.add	= smc_ib_add_dev,
 	.remove = smc_ib_remove_dev,
+	.is_supported = smc_client_supported,
 };
 
 int __init smc_ib_register_client(void)
