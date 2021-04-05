@@ -691,6 +691,9 @@ static int add_client_context(struct ib_device *device,
 	if (!device->kverbs_provider && !client->no_kverbs_req)
 		return 0;
 
+	if (client->is_supported && !client->is_supported(device))
+		return 0;
+
 	down_write(&device->client_data_rwsem);
 	/*
 	 * So long as the client is registered hold both the client and device

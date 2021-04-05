@@ -2756,6 +2756,15 @@ struct ib_client {
 			const union ib_gid *gid,
 			const struct sockaddr *addr,
 			void *client_data);
+	/*
+	 * Returns if the client is supported for a given device or not.
+	 * @dev: An RDMA device to check if client can support this RDMA or not.
+	 *
+	 * A client that is interested in specific device attributes, should
+	 * implement it to check if client can be supported for this device or
+	 * not.
+	 */
+	bool (*is_supported)(struct ib_device *dev);
 
 	refcount_t uses;
 	struct completion uses_zero;
