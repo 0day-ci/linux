@@ -76,7 +76,7 @@ static struct rds_ib_mr *rds_ib_alloc_frmr(struct rds_ib_device *rds_ibdev,
 
 	frmr = &ibmr->u.frmr;
 	frmr->mr = ib_alloc_mr(rds_ibdev->pd, IB_MR_TYPE_MEM_REG,
-			       pool->max_pages, 0);
+			       pool->max_pages, IB_ACCESS_RELAXED_ORDERING);
 	if (IS_ERR(frmr->mr)) {
 		pr_warn("RDS/IB: %s failed to allocate MR", __func__);
 		err = PTR_ERR(frmr->mr);
@@ -156,9 +156,8 @@ static int rds_ib_post_reg_frmr(struct rds_ib_mr *ibmr)
 	reg_wr.wr.num_sge = 0;
 	reg_wr.mr = frmr->mr;
 	reg_wr.key = frmr->mr->rkey;
-	reg_wr.access = IB_ACCESS_LOCAL_WRITE |
-			IB_ACCESS_REMOTE_READ |
-			IB_ACCESS_REMOTE_WRITE;
+	reg_wr.access = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_READ |
+			IB_ACCESS_REMOTE_WRITE | IB_ACCESS_RELAXED_ORDERING;
 	reg_wr.wr.send_flags = IB_SEND_SIGNALED;
 
 	ret = ib_post_send(ibmr->ic->i_cm_id->qp, &reg_wr.wr, NULL);
