@@ -2178,8 +2178,10 @@ static void smbd_mr_recovery_work(struct work_struct *work)
 				continue;
 			}
 
-			smbdirect_mr->mr = ib_alloc_mr(info->pd, info->mr_type,
-						       info->max_frmr_depth, 0);
+			smbdirect_mr->mr =
+				ib_alloc_mr(info->pd, info->mr_type,
+					    info->max_frmr_depth,
+					    IB_ACCESS_RELAXED_ORDERING);
 			if (IS_ERR(smbdirect_mr->mr)) {
 				log_rdma_mr(ERR, "ib_alloc_mr failed mr_type=%x max_frmr_depth=%x\n",
 					    info->mr_type,
@@ -2244,7 +2246,8 @@ static int allocate_mr_list(struct smbd_connection *info)
 		if (!smbdirect_mr)
 			goto out;
 		smbdirect_mr->mr = ib_alloc_mr(info->pd, info->mr_type,
-					       info->max_frmr_depth, 0);
+					       info->max_frmr_depth,
+					       IB_ACCESS_RELAXED_ORDERING);
 		if (IS_ERR(smbdirect_mr->mr)) {
 			log_rdma_mr(ERR, "ib_alloc_mr failed mr_type=%x max_frmr_depth=%x\n",
 				    info->mr_type, info->max_frmr_depth);
@@ -2406,9 +2409,10 @@ skip_multiple_pages:
 	reg_wr->wr.send_flags = IB_SEND_SIGNALED;
 	reg_wr->mr = smbdirect_mr->mr;
 	reg_wr->key = smbdirect_mr->mr->rkey;
-	reg_wr->access = writing ?
-			IB_ACCESS_REMOTE_WRITE | IB_ACCESS_LOCAL_WRITE :
-			IB_ACCESS_REMOTE_READ;
+	reg_wr->access =
+		(writing ? IB_ACCESS_REMOTE_WRITE | IB_ACCESS_LOCAL_WRITE :
+			   IB_ACCESS_REMOTE_READ) |
+		IB_ACCESS_RELAXED_ORDERING;
 
 	/*
 	 * There is no need for waiting for complemtion on ib_post_send
