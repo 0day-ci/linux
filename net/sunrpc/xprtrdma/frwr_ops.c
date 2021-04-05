@@ -135,7 +135,8 @@ int frwr_mr_init(struct rpcrdma_xprt *r_xprt, struct rpcrdma_mr *mr)
 	struct ib_mr *frmr;
 	int rc;
 
-	frmr = ib_alloc_mr(ep->re_pd, ep->re_mrtype, depth, 0);
+	frmr = ib_alloc_mr(ep->re_pd, ep->re_mrtype, depth,
+			   IB_ACCESS_RELAXED_ORDERING);
 	if (IS_ERR(frmr))
 		goto out_mr_err;
 
@@ -339,9 +340,10 @@ struct rpcrdma_mr_seg *frwr_map(struct rpcrdma_xprt *r_xprt,
 	reg_wr = &mr->frwr.fr_regwr;
 	reg_wr->mr = ibmr;
 	reg_wr->key = ibmr->rkey;
-	reg_wr->access = writing ?
-			 IB_ACCESS_REMOTE_WRITE | IB_ACCESS_LOCAL_WRITE :
-			 IB_ACCESS_REMOTE_READ;
+	reg_wr->access =
+		(writing ? IB_ACCESS_REMOTE_WRITE | IB_ACCESS_LOCAL_WRITE :
+			   IB_ACCESS_REMOTE_READ) |
+		IB_ACCESS_RELAXED_ORDERING;
 
 	mr->mr_handle = ibmr->rkey;
 	mr->mr_length = ibmr->length;
