@@ -94,6 +94,7 @@ enum lpi2c_imx_pincfg {
 
 struct lpi2c_imx_struct {
 	struct i2c_adapter	adapter;
+	int			irq;
 	struct clk		*clk_per;
 	struct clk		*clk_ipg;
 	void __iomem		*base;
@@ -571,7 +572,7 @@ static int lpi2c_imx_probe(struct platform_device *pdev)
 {
 	struct lpi2c_imx_struct *lpi2c_imx;
 	unsigned int temp;
-	int irq, ret;
+	int ret;
 
 	lpi2c_imx = devm_kzalloc(&pdev->dev, sizeof(*lpi2c_imx), GFP_KERNEL);
 	if (!lpi2c_imx)
@@ -581,9 +582,9 @@ static int lpi2c_imx_probe(struct platform_device *pdev)
 	if (IS_ERR(lpi2c_imx->base))
 		return PTR_ERR(lpi2c_imx->base);
 
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
+	lpi2c_imx->irq = platform_get_irq(pdev, 0);
+	if (lpi2c_imx->irq < 0)
+		return lpi2c_imx->irq;
 
 	lpi2c_imx->adapter.owner	= THIS_MODULE;
 	lpi2c_imx->adapter.algo		= &lpi2c_imx_algo;
@@ -608,13 +609,6 @@ static int lpi2c_imx_probe(struct platform_device *pdev)
 				   "clock-frequency", &lpi2c_imx->bitrate);
 	if (ret)
 		lpi2c_imx->bitrate = I2C_MAX_STANDARD_MODE_FREQ;
-
-	ret = devm_request_irq(&pdev->dev, irq, lpi2c_imx_isr, 0,
-			       pdev->name, lpi2c_imx);
-	if (ret) {
-		dev_err(&pdev->dev, "can't claim irq %d\n", irq);
-		return ret;
-	}
 
 	i2c_set_adapdata(&lpi2c_imx->adapter, lpi2c_imx);
 	platform_set_drvdata(pdev, lpi2c_imx);
@@ -668,6 +662,7 @@ static int __maybe_unused lpi2c_runtime_suspend(struct device *dev)
 {
 	struct lpi2c_imx_struct *lpi2c_imx = dev_get_drvdata(dev);
 
+	free_irq(lpi2c_imx->irq, lpi2c_imx);
 	lpi2c_imx_clocks_unprepare(lpi2c_imx);
 	pinctrl_pm_select_sleep_state(dev);
 
@@ -677,10 +672,21 @@ static int __maybe_unused lpi2c_runtime_suspend(struct device *dev)
 static int __maybe_unused lpi2c_runtime_resume(struct device *dev)
 {
 	struct lpi2c_imx_struct *lpi2c_imx = dev_get_drvdata(dev);
+	int ret = 0;
 
 	pinctrl_pm_select_default_state(dev);
+	ret = lpi2c_imx_clocks_prepare(lpi2c_imx);
+	if (ret)
+		return ret;
 
-	return lpi2c_imx_clocks_prepare(lpi2c_imx);
+	ret = request_irq(lpi2c_imx->irq, lpi2c_imx_isr, 0,
+			       dev_name(dev), lpi2c_imx);
+	if (ret) {
+		dev_err(dev, "can't claim irq %d\n", lpi2c_imx->irq);
+		return ret;
+	}
+
+	return ret;
 }
 
 static const struct dev_pm_ops lpi2c_pm_ops = {
