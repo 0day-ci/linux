@@ -838,9 +838,13 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages,
 	int ret;
 	struct memory_notify arg;
 
-	/* We can only online full sections (e.g., SECTION_IS_ONLINE) */
+	/* We can only offline full sections (e.g., SECTION_IS_ONLINE).
+	 * However, when using e.g: memmap_on_memory, some pages are initialized
+	 * prior to calling in here. The remaining amount of pages must be
+	 * pageblock aligned.
+	 */
 	if (WARN_ON_ONCE(!nr_pages ||
-			 !IS_ALIGNED(pfn | nr_pages, PAGES_PER_SECTION)))
+			 !IS_ALIGNED(pfn | nr_pages, pageblock_nr_pages)))
 		return -EINVAL;
 
 	mem_hotplug_begin();
@@ -1573,9 +1577,13 @@ int __ref offline_pages(unsigned long start_pfn, unsigned long nr_pages)
 	int ret, node;
 	char *reason;
 
-	/* We can only offline full sections (e.g., SECTION_IS_ONLINE) */
+	/* We can only offline full sections (e.g., SECTION_IS_ONLINE).
+	 * However, when using e.g: memmap_on_memory, some pages are initialized
+	 * prior to calling in here. The remaining amount of pages must be
+	 * pageblock aligned.
+	 */
 	if (WARN_ON_ONCE(!nr_pages ||
-			 !IS_ALIGNED(start_pfn | nr_pages, PAGES_PER_SECTION)))
+			 !IS_ALIGNED(start_pfn | nr_pages, pageblock_nr_pages)))
 		return -EINVAL;
 
 	mem_hotplug_begin();
