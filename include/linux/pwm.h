@@ -41,6 +41,7 @@ enum pwm_polarity {
 struct pwm_args {
 	u64 period;
 	enum pwm_polarity polarity;
+	bool staggering_allowed;
 };
 
 enum {
