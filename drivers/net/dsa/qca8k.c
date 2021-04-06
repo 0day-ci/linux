@@ -724,11 +724,6 @@ qca8k_setup(struct dsa_switch *ds)
 	/* Enable MIB counters */
 	qca8k_mib_init(priv);
 
-	/* Enable QCA header mode on the cpu port */
-	qca8k_write(priv, QCA8K_REG_PORT_HDR_CTRL(QCA8K_CPU_PORT),
-		    QCA8K_PORT_HDR_CTRL_ALL << QCA8K_PORT_HDR_CTRL_TX_S |
-		    QCA8K_PORT_HDR_CTRL_ALL << QCA8K_PORT_HDR_CTRL_RX_S);
-
 	/* Disable forwarding by default on all ports */
 	for (i = 0; i < QCA8K_NUM_PORTS; i++)
 		qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
@@ -749,7 +744,12 @@ qca8k_setup(struct dsa_switch *ds)
 	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
 		/* CPU port gets connected to all user ports of the switch */
 		if (dsa_is_cpu_port(ds, i)) {
-			qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(QCA8K_CPU_PORT),
+			/* Enable QCA header mode on the cpu port */
+			qca8k_write(priv, QCA8K_REG_PORT_HDR_CTRL(i),
+				    QCA8K_PORT_HDR_CTRL_ALL << QCA8K_PORT_HDR_CTRL_TX_S |
+					QCA8K_PORT_HDR_CTRL_ALL << QCA8K_PORT_HDR_CTRL_RX_S);
+
+			qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
 				  QCA8K_PORT_LOOKUP_MEMBER, dsa_user_ports(ds));
 		}
 
@@ -759,7 +759,7 @@ qca8k_setup(struct dsa_switch *ds)
 
 			qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
 				  QCA8K_PORT_LOOKUP_MEMBER,
-				  BIT(QCA8K_CPU_PORT));
+				  dsa_cpu_ports(ds));
 
 			/* Enable ARP Auto-learning by default */
 			qca8k_reg_set(priv, QCA8K_PORT_LOOKUP_CTRL(i),
@@ -1140,7 +1140,7 @@ static int
 qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
-	int port_mask = BIT(QCA8K_CPU_PORT);
+	int port_mask = dsa_cpu_ports(ds);
 	int i;
 
 	for (i = 1; i < QCA8K_NUM_PORTS; i++) {
@@ -1183,7 +1183,7 @@ qca8k_port_bridge_leave(struct dsa_switch *ds, int port, struct net_device *br)
 	 * this port
 	 */
 	qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(port),
-		  QCA8K_PORT_LOOKUP_MEMBER, BIT(QCA8K_CPU_PORT));
+		  QCA8K_PORT_LOOKUP_MEMBER, dsa_cpu_ports(ds));
 }
 
 static int
