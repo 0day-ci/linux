@@ -149,8 +149,6 @@ bool is_perf_magic(u64 magic);
 
 #define NAME_ALIGN 64
 
-struct feat_fd;
-
 int do_write(struct feat_fd *fd, const void *buf, size_t size);
 
 int write_padded(struct feat_fd *fd, const void *bf,
