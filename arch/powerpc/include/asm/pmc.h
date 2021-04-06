@@ -34,11 +34,22 @@ static inline void ppc_set_pmu_inuse(int inuse)
 #endif
 }
 
+static inline int clear_paca_irq_pmi(void)
+{
+	if (get_paca()->irq_happened & PACA_IRQ_PMI) {
+		WARN_ON_ONCE(mfmsr() & MSR_EE);
+		get_paca()->irq_happened &= ~PACA_IRQ_PMI;
+		return 1;
+	}
+	return 0;
+}
+
 extern void power4_enable_pmcs(void);
 
 #else /* CONFIG_PPC64 */
 
 static inline void ppc_set_pmu_inuse(int inuse) { }
+static inline int clear_paca_irq_pmi(void) { return 0; }
 
 #endif
 

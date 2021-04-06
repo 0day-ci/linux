@@ -847,6 +847,20 @@ static void write_pmc(int idx, unsigned long val)
 	}
 }
 
+static int pmc_overflown(int idx)
+{
+	unsigned long val[8];
+	int i;
+
+	for (i = 0; i < ppmu->n_counter; i++)
+		val[i] = read_pmc(i + 1);
+
+	if ((int)val[idx-1] < 0)
+		return 1;
+
+	return 0;
+}
+
 /* Called from sysrq_handle_showregs() */
 void perf_event_print_debug(void)
 {
@@ -1438,6 +1452,15 @@ static void power_pmu_enable(struct pmu *pmu)
 		event = cpuhw->event[i];
 		if (event->hw.idx && event->hw.idx != hwc_index[i] + 1) {
 			power_pmu_read(event);
+			/*
+			 * if the PMC corresponding to event->hw.idx is
+			 * overflown, check if there is any pending perf
+			 * interrupt set in paca. If so, disable the interrupt
+			 * by clearing the paca bit for PMI since we are going
+			 * to reset the PMC.
+			 */
+			if (pmc_overflown(event->hw.idx))
+				clear_paca_irq_pmi();
 			write_pmc(event->hw.idx, 0);
 			event->hw.idx = 0;
 		}
@@ -1474,6 +1497,10 @@ static void power_pmu_enable(struct pmu *pmu)
 		event->hw.idx = idx;
 		if (event->hw.state & PERF_HES_STOPPED)
 			val = 0;
+
+		/* See above for clear_paca_irq_pmi */
+		if (pmc_overflown(event->hw.idx))
+			clear_paca_irq_pmi();
 		write_pmc(idx, val);
 
 		perf_event_update_userpage(event);
@@ -1619,6 +1646,7 @@ static void power_pmu_del(struct perf_event *event, int ef_flags)
 	struct cpu_hw_events *cpuhw;
 	long i;
 	unsigned long flags;
+	unsigned long val_mmcr0;
 
 	local_irq_save(flags);
 	perf_pmu_disable(event->pmu);
@@ -1636,6 +1664,22 @@ static void power_pmu_del(struct perf_event *event, int ef_flags)
 			--cpuhw->n_events;
 			ppmu->disable_pmc(event->hw.idx - 1, &cpuhw->mmcr);
 			if (event->hw.idx) {
+				/*
+				 * if the PMC corresponding to event->hw.idx is
+				 * overflown, check if there is any pending perf
+				 * interrupt set in paca. If so, disable the interrupt
+				 * and clear the MMCR0 PMAO bit since we are going
+				 * to reset the PMC and delete the event.
+				 */
+				if (pmc_overflown(event->hw.idx)) {
+					if (clear_paca_irq_pmi()) {
+						val_mmcr0 = mfspr(SPRN_MMCR0);
+						val_mmcr0 &= ~MMCR0_PMAO;
+						write_mmcr0(cpuhw, val_mmcr0);
+						mb();
+						isync();
+					}
+				}
 				write_pmc(event->hw.idx, 0);
 				event->hw.idx = 0;
 			}
@@ -1714,6 +1758,8 @@ static void power_pmu_stop(struct perf_event *event, int ef_flags)
 
 	local_irq_save(flags);
 	perf_pmu_disable(event->pmu);
+	if (pmc_overflown(event->hw.idx))
+		clear_paca_irq_pmi();
 
 	power_pmu_read(event);
 	event->hw.state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
@@ -2343,6 +2389,15 @@ static void __perf_event_interrupt(struct pt_regs *regs)
 			}
 		}
 	}
+
+	/*
+	 * During system wide profling or while specific CPU
+	 * is monitored for an event, some corner cases could
+	 * cause PMC to overflow in idle path. This will trigger
+	 * a PMI after waking up from idle. Since counter values
+	 * are _not_ saved/restored in idle path, can lead to
+	 * below "Can't find PMC" message.
+	 */
 	if (unlikely(!found) && !arch_irq_disabled_regs(regs))
 		printk_ratelimited(KERN_WARNING "Can't find PMC that caused IRQ\n");
 
