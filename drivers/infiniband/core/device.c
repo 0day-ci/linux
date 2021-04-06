@@ -343,7 +343,7 @@ static struct ib_device *__ib_device_get_by_name(const char *name)
 	struct ib_device *device;
 	unsigned long index;
 
-	xa_for_each (&devices, index, device)
+	xa_for_each(&devices, index, device)
 		if (!strcmp(name, dev_name(&device->dev)))
 			return device;
 
@@ -385,7 +385,7 @@ static int rename_compat_devs(struct ib_device *device)
 	int ret = 0;
 
 	mutex_lock(&device->compat_devs_mutex);
-	xa_for_each (&device->compat_devs, index, cdev) {
+	xa_for_each(&device->compat_devs, index, cdev) {
 		ret = device_rename(&cdev->dev, dev_name(&device->dev));
 		if (ret) {
 			dev_warn(&cdev->dev,
@@ -459,7 +459,7 @@ static int alloc_name(struct ib_device *ibdev, const char *name)
 
 	lockdep_assert_held_write(&devices_rwsem);
 	ida_init(&inuse);
-	xa_for_each (&devices, index, device) {
+	xa_for_each(&devices, index, device) {
 		char buf[IB_DEVICE_NAME_MAX];
 
 		if (sscanf(dev_name(&device->dev), name, &i) != 1)
@@ -811,7 +811,7 @@ static int alloc_port_data(struct ib_device *device)
 	 */
 	device->port_data = pdata_rcu->pdata;
 
-	rdma_for_each_port (device, port) {
+	rdma_for_each_port(device, port) {
 		struct ib_port_data *pdata = &device->port_data[port];
 
 		pdata->ib_dev = device;
@@ -838,7 +838,7 @@ static int setup_port_data(struct ib_device *device)
 	if (ret)
 		return ret;
 
-	rdma_for_each_port (device, port) {
+	rdma_for_each_port(device, port) {
 		struct ib_port_data *pdata = &device->port_data[port];
 
 		ret = device->ops.get_port_immutable(device, port,
@@ -881,10 +881,10 @@ static void ib_policy_change_task(struct work_struct *work)
 	unsigned long index;
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, dev, DEVICE_REGISTERED) {
+	xa_for_each_marked(&devices, index, dev, DEVICE_REGISTERED) {
 		unsigned int i;
 
-		rdma_for_each_port (dev, i) {
+		rdma_for_each_port(dev, i) {
 			u64 sp;
 			int ret = ib_get_cached_subnet_prefix(dev,
 							      i,
@@ -1013,7 +1013,7 @@ static void remove_compat_devs(struct ib_device *device)
 	struct ib_core_device *cdev;
 	unsigned long index;
 
-	xa_for_each (&device->compat_devs, index, cdev)
+	xa_for_each(&device->compat_devs, index, cdev)
 		remove_one_compat_dev(device, index);
 }
 
@@ -1026,7 +1026,7 @@ static int add_compat_devs(struct ib_device *device)
 	lockdep_assert_held(&devices_rwsem);
 
 	down_read(&rdma_nets_rwsem);
-	xa_for_each (&rdma_nets, index, rnet) {
+	xa_for_each(&rdma_nets, index, rnet) {
 		ret = add_one_compat_dev(device, rnet);
 		if (ret)
 			break;
@@ -1042,14 +1042,14 @@ static void remove_all_compat_devs(void)
 	unsigned long index;
 
 	down_read(&devices_rwsem);
-	xa_for_each (&devices, index, dev) {
+	xa_for_each(&devices, index, dev) {
 		unsigned long c_index = 0;
 
 		/* Hold nets_rwsem so that any other thread modifying this
 		 * system param can sync with this thread.
 		 */
 		down_read(&rdma_nets_rwsem);
-		xa_for_each (&dev->compat_devs, c_index, cdev)
+		xa_for_each(&dev->compat_devs, c_index, cdev)
 			remove_one_compat_dev(dev, c_index);
 		up_read(&rdma_nets_rwsem);
 	}
@@ -1064,14 +1064,14 @@ static int add_all_compat_devs(void)
 	int ret = 0;
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, dev, DEVICE_REGISTERED) {
+	xa_for_each_marked(&devices, index, dev, DEVICE_REGISTERED) {
 		unsigned long net_index = 0;
 
 		/* Hold nets_rwsem so that any other thread modifying this
 		 * system param can sync with this thread.
 		 */
 		down_read(&rdma_nets_rwsem);
-		xa_for_each (&rdma_nets, net_index, rnet) {
+		xa_for_each(&rdma_nets, net_index, rnet) {
 			ret = add_one_compat_dev(dev, rnet);
 			if (ret)
 				break;
@@ -1099,7 +1099,7 @@ int rdma_compatdev_set(u8 enable)
 	/* enable/disable of compat devices is not supported
 	 * when more than default init_net exists.
 	 */
-	xa_for_each (&rdma_nets, index, rnet) {
+	xa_for_each(&rdma_nets, index, rnet) {
 		ret++;
 		break;
 	}
@@ -1132,7 +1132,7 @@ static void rdma_dev_exit_net(struct net *net)
 	up_write(&rdma_nets_rwsem);
 
 	down_read(&devices_rwsem);
-	xa_for_each (&devices, index, dev) {
+	xa_for_each(&devices, index, dev) {
 		get_device(&dev->dev);
 		/*
 		 * Release the devices_rwsem so that pontentially blocking
@@ -1180,7 +1180,7 @@ static __net_init int rdma_dev_init_net(struct net *net)
 	}
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, dev, DEVICE_REGISTERED) {
+	xa_for_each_marked(&devices, index, dev, DEVICE_REGISTERED) {
 		/* Hold nets_rwsem so that netlink command cannot change
 		 * system configuration for device sharing mode.
 		 */
@@ -1331,7 +1331,7 @@ static int enable_device_and_get(struct ib_device *device)
 	}
 
 	down_read(&clients_rwsem);
-	xa_for_each_marked (&clients, index, client, CLIENT_REGISTERED) {
+	xa_for_each_marked(&clients, index, client, CLIENT_REGISTERED) {
 		ret = add_client_context(device, client);
 		if (ret)
 			break;
@@ -1557,7 +1557,7 @@ void ib_unregister_driver(enum rdma_driver_id driver_id)
 	unsigned long index;
 
 	down_read(&devices_rwsem);
-	xa_for_each (&devices, index, ib_dev) {
+	xa_for_each(&devices, index, ib_dev) {
 		if (ib_dev->ops.driver_id != driver_id)
 			continue;
 
@@ -1783,7 +1783,7 @@ int ib_register_client(struct ib_client *client)
 		return ret;
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, device, DEVICE_REGISTERED) {
+	xa_for_each_marked(&devices, index, device, DEVICE_REGISTERED) {
 		ret = add_client_context(device, client);
 		if (ret) {
 			up_read(&devices_rwsem);
@@ -1819,7 +1819,7 @@ void ib_unregister_client(struct ib_client *client)
 
 	/* We do not want to have locks while calling client->remove() */
 	rcu_read_lock();
-	xa_for_each (&devices, index, device) {
+	xa_for_each(&devices, index, device) {
 		if (!ib_device_try_get(device))
 			continue;
 		rcu_read_unlock();
@@ -1848,7 +1848,7 @@ static int __ib_get_global_client_nl_info(const char *client_name,
 	int ret = -ENOENT;
 
 	down_read(&clients_rwsem);
-	xa_for_each_marked (&clients, index, client, CLIENT_REGISTERED) {
+	xa_for_each_marked(&clients, index, client, CLIENT_REGISTERED) {
 		if (strcmp(client->name, client_name) != 0)
 			continue;
 		if (!client->get_global_nl_info) {
@@ -1875,8 +1875,8 @@ static int __ib_get_client_nl_info(struct ib_device *ibdev,
 	int ret = -ENOENT;
 
 	down_read(&ibdev->client_data_rwsem);
-	xan_for_each_marked (&ibdev->client_data, index, client_data,
-			     CLIENT_DATA_REGISTERED) {
+	xan_for_each_marked(&ibdev->client_data, index, client_data,
+			    CLIENT_DATA_REGISTERED) {
 		struct ib_client *client = xa_load(&clients, index);
 
 		if (!client || strcmp(client->name, client_name) != 0)
@@ -2182,7 +2182,7 @@ static void free_netdevs(struct ib_device *ib_dev)
 	if (!ib_dev->port_data)
 		return;
 
-	rdma_for_each_port (ib_dev, port) {
+	rdma_for_each_port(ib_dev, port) {
 		struct ib_port_data *pdata = &ib_dev->port_data[port];
 		struct net_device *ndev;
 
@@ -2261,8 +2261,8 @@ struct ib_device *ib_device_get_by_netdev(struct net_device *ndev,
 	struct ib_port_data *cur;
 
 	rcu_read_lock();
-	hash_for_each_possible_rcu (ndev_hash, cur, ndev_hash_link,
-				    (uintptr_t)ndev) {
+	hash_for_each_possible_rcu(ndev_hash, cur, ndev_hash_link,
+				   (uintptr_t)ndev) {
 		if (rcu_access_pointer(cur->netdev) == ndev &&
 		    (driver_id == RDMA_DRIVER_UNKNOWN ||
 		     cur->ib_dev->ops.driver_id == driver_id) &&
@@ -2297,7 +2297,7 @@ void ib_enum_roce_netdev(struct ib_device *ib_dev,
 {
 	u32 port;
 
-	rdma_for_each_port (ib_dev, port)
+	rdma_for_each_port(ib_dev, port)
 		if (rdma_protocol_roce(ib_dev, port)) {
 			struct net_device *idev =
 				ib_device_get_netdev(ib_dev, port);
@@ -2330,7 +2330,7 @@ void ib_enum_all_roce_netdevs(roce_netdev_filter filter,
 	unsigned long index;
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, dev, DEVICE_REGISTERED)
+	xa_for_each_marked(&devices, index, dev, DEVICE_REGISTERED)
 		ib_enum_roce_netdev(dev, filter, filter_cookie, cb, cookie);
 	up_read(&devices_rwsem);
 }
@@ -2350,7 +2350,7 @@ int ib_enum_all_devs(nldev_callback nldev_cb, struct sk_buff *skb,
 	int ret = 0;
 
 	down_read(&devices_rwsem);
-	xa_for_each_marked (&devices, index, dev, DEVICE_REGISTERED) {
+	xa_for_each_marked(&devices, index, dev, DEVICE_REGISTERED) {
 		if (!rdma_dev_access_netns(dev, sock_net(skb->sk)))
 			continue;
 
@@ -2456,7 +2456,7 @@ int ib_find_gid(struct ib_device *device, union ib_gid *gid,
 	u32 port;
 	int ret, i;
 
-	rdma_for_each_port (device, port) {
+	rdma_for_each_port(device, port) {
 		if (!rdma_protocol_ib(device, port))
 			continue;
 
@@ -2547,8 +2547,8 @@ struct net_device *ib_get_net_dev_by_params(struct ib_device *dev,
 	 * unregistered while we are calling get_net_dev_by_params()
 	 */
 	down_read(&dev->client_data_rwsem);
-	xan_for_each_marked (&dev->client_data, index, client_data,
-			     CLIENT_DATA_REGISTERED) {
+	xan_for_each_marked(&dev->client_data, index, client_data,
+			    CLIENT_DATA_REGISTERED) {
 		struct ib_client *client = xa_load(&clients, index);
 
 		if (!client || !client->get_net_dev_by_params)

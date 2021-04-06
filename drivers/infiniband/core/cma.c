@@ -625,7 +625,7 @@ static int cma_acquire_dev_by_src_ip(struct rdma_id_private *id_priv)
 
 	mutex_lock(&lock);
 	list_for_each_entry(cma_dev, &dev_list, list) {
-		rdma_for_each_port (cma_dev->device, port) {
+		rdma_for_each_port(cma_dev->device, port) {
 			gidp = rdma_protocol_roce(cma_dev->device, port) ?
 			       &iboe_gid : &gid;
 			gid_type = cma_dev->default_gid_type[port - 1];
@@ -727,7 +727,7 @@ static int cma_iw_acquire_dev(struct rdma_id_private *id_priv,
 	}
 
 	list_for_each_entry(cma_dev, &dev_list, list) {
-		rdma_for_each_port (cma_dev->device, port) {
+		rdma_for_each_port(cma_dev->device, port) {
 			if (listen_id_priv->cma_dev == cma_dev &&
 			    listen_id_priv->id.port_num == port)
 				continue;
@@ -772,7 +772,7 @@ static int cma_resolve_ib_dev(struct rdma_id_private *id_priv)
 
 	mutex_lock(&lock);
 	list_for_each_entry(cur_dev, &dev_list, list) {
-		rdma_for_each_port (cur_dev->device, p) {
+		rdma_for_each_port(cur_dev->device, p) {
 			if (!rdma_cap_af_ib(cur_dev->device, p))
 				continue;
 
@@ -3128,7 +3128,7 @@ static int cma_bind_loopback(struct rdma_id_private *id_priv)
 		if (!cma_dev)
 			cma_dev = cur_dev;
 
-		rdma_for_each_port (cur_dev->device, p) {
+		rdma_for_each_port(cur_dev->device, p) {
 			if (!ib_get_cached_port_state(cur_dev->device, p, &port_state) &&
 			    port_state == IB_PORT_ACTIVE) {
 				cma_dev = cur_dev;
@@ -4886,7 +4886,7 @@ static int cma_add_one(struct ib_device *device)
 		goto free_gid_type;
 	}
 
-	rdma_for_each_port (device, i) {
+	rdma_for_each_port(device, i) {
 		supported_gids = roce_gid_type_mask_support(device, i);
 		WARN_ON(!supported_gids);
 		if (supported_gids & (1 << CMA_PREFERRED_ROCE_GID_TYPE))

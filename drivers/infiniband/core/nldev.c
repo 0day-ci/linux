@@ -1077,7 +1077,7 @@ static int nldev_port_get_dumpit(struct sk_buff *skb,
 	if (!device)
 		return -EINVAL;
 
-	rdma_for_each_port (device, p) {
+	rdma_for_each_port(device, p) {
 		/*
 		 * The dumpit function returns all information from specific
 		 * index. This specific index is taken from the netlink

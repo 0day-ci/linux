@@ -50,8 +50,8 @@ static struct pkey_index_qp_list *get_pkey_idx_qp_list(struct ib_port_pkey *pp)
 	struct ib_device *dev = pp->sec->dev;
 
 	spin_lock(&dev->port_data[pp->port_num].pkey_list_lock);
-	list_for_each_entry (tmp_pkey, &dev->port_data[pp->port_num].pkey_list,
-			     pkey_index_list) {
+	list_for_each_entry(tmp_pkey, &dev->port_data[pp->port_num].pkey_list,
+			    pkey_index_list) {
 		if (tmp_pkey->pkey_index == pp->pkey_index) {
 			pkey = tmp_pkey;
 			break;
@@ -418,7 +418,7 @@ int ib_create_qp_security(struct ib_qp *qp, struct ib_device *dev)
 	bool is_ib = false;
 	int ret;
 
-	rdma_for_each_port (dev, i) {
+	rdma_for_each_port(dev, i) {
 		is_ib = rdma_protocol_ib(dev, i);
 		if (is_ib)
 			break;
@@ -543,8 +543,8 @@ void ib_security_cache_change(struct ib_device *device,
 {
 	struct pkey_index_qp_list *pkey;
 
-	list_for_each_entry (pkey, &device->port_data[port_num].pkey_list,
-			     pkey_index_list) {
+	list_for_each_entry(pkey, &device->port_data[port_num].pkey_list,
+			    pkey_index_list) {
 		check_pkey_qps(pkey,
 			       device,
 			       port_num,
@@ -557,7 +557,7 @@ void ib_security_release_port_pkey_list(struct ib_device *device)
 	struct pkey_index_qp_list *pkey, *tmp_pkey;
 	unsigned int i;
 
-	rdma_for_each_port (device, i) {
+	rdma_for_each_port(device, i) {
 		list_for_each_entry_safe(pkey,
 					 tmp_pkey,
 					 &device->port_data[i].pkey_list,

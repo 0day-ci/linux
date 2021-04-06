@@ -360,8 +360,8 @@ uapi_finalize_ioctl_method(struct uverbs_api *uapi,
 	void __rcu **slot;
 
 	method_elm->destroy_bkey = UVERBS_API_ATTR_BKEY_LEN;
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter,
-				  uapi_key_attrs_start(method_key)) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter,
+				 uapi_key_attrs_start(method_key)) {
 		struct uverbs_api_attr *elm =
 			rcu_dereference_protected(*slot, true);
 		u32 attr_key = iter.index & UVERBS_API_ATTR_KEY_MASK;
@@ -422,7 +422,7 @@ static int uapi_finalize(struct uverbs_api *uapi)
 	int rc;
 	int i;
 
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, 0) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, 0) {
 		struct uverbs_api_ioctl_method *method_elm =
 			rcu_dereference_protected(*slot, true);
 
@@ -452,7 +452,7 @@ static int uapi_finalize(struct uverbs_api *uapi)
 	uapi->write_methods = data;
 	uapi->write_ex_methods = data + uapi->num_write;
 
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, 0) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, 0) {
 		if (uapi_key_is_write_method(iter.index))
 			uapi->write_methods[iter.index &
 					    UVERBS_API_ATTR_KEY_MASK] =
@@ -471,7 +471,7 @@ static void uapi_remove_range(struct uverbs_api *uapi, u32 start, u32 last)
 	struct radix_tree_iter iter;
 	void __rcu **slot;
 
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, start) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, start) {
 		if (iter.index > last)
 			return;
 		kfree(rcu_dereference_protected(*slot, true));
@@ -528,7 +528,7 @@ static void uapi_finalize_disable(struct uverbs_api *uapi)
 	void __rcu **slot;
 
 again:
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, starting_key) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, starting_key) {
 		uapi_key_okay(iter.index);
 
 		if (uapi_key_is_object(iter.index)) {
@@ -686,7 +686,7 @@ void uverbs_disassociate_api_pre(struct ib_uverbs_device *uverbs_dev)
 
 	rcu_assign_pointer(uverbs_dev->ib_dev, NULL);
 
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, 0) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, 0) {
 		if (uapi_key_is_ioctl_method(iter.index)) {
 			struct uverbs_api_ioctl_method *method_elm =
 				rcu_dereference_protected(*slot, true);
@@ -709,7 +709,7 @@ void uverbs_disassociate_api(struct uverbs_api *uapi)
 	struct radix_tree_iter iter;
 	void __rcu **slot;
 
-	radix_tree_for_each_slot (slot, &uapi->radix, &iter, 0) {
+	radix_tree_for_each_slot(slot, &uapi->radix, &iter, 0) {
 		if (uapi_key_is_object(iter.index)) {
 			struct uverbs_api_object *object_elm =
 				rcu_dereference_protected(*slot, true);

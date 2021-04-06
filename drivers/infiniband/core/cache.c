@@ -886,7 +886,7 @@ static void gid_table_release_one(struct ib_device *ib_dev)
 {
 	u32 p;
 
-	rdma_for_each_port (ib_dev, p) {
+	rdma_for_each_port(ib_dev, p) {
 		release_gid_table(ib_dev, ib_dev->port_data[p].cache.gid);
 		ib_dev->port_data[p].cache.gid = NULL;
 	}
@@ -897,7 +897,7 @@ static int _gid_table_setup_one(struct ib_device *ib_dev)
 	struct ib_gid_table *table;
 	u32 rdma_port;
 
-	rdma_for_each_port (ib_dev, rdma_port) {
+	rdma_for_each_port(ib_dev, rdma_port) {
 		table = alloc_gid_table(
 			ib_dev->port_data[rdma_port].immutable.gid_tbl_len);
 		if (!table)
@@ -917,7 +917,7 @@ static void gid_table_cleanup_one(struct ib_device *ib_dev)
 {
 	u32 p;
 
-	rdma_for_each_port (ib_dev, p)
+	rdma_for_each_port(ib_dev, p)
 		cleanup_gid_table_port(ib_dev, p,
 				       ib_dev->port_data[p].cache.gid);
 }
@@ -1622,7 +1622,7 @@ int ib_cache_setup_one(struct ib_device *device)
 	if (err)
 		return err;
 
-	rdma_for_each_port (device, p) {
+	rdma_for_each_port(device, p) {
 		err = ib_cache_update(device, p, true);
 		if (err)
 			return err;
@@ -1641,7 +1641,7 @@ void ib_cache_release_one(struct ib_device *device)
 	 * all the device's resources when the cache could no
 	 * longer be accessed.
 	 */
-	rdma_for_each_port (device, p)
+	rdma_for_each_port(device, p)
 		kfree(device->port_data[p].cache.pkey);
 
 	gid_table_release_one(device);

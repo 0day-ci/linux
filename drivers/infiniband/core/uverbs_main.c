@@ -849,8 +849,7 @@ void uverbs_user_mmap_disassociate(struct ib_uverbs_file *ufile)
 		 */
 		mmap_read_lock(mm);
 		mutex_lock(&ufile->umap_lock);
-		list_for_each_entry_safe (priv, next_priv, &ufile->umaps,
-					  list) {
+		list_for_each_entry_safe(priv, next_priv, &ufile->umaps, list) {
 			struct vm_area_struct *vma = priv->vma;
 
 			if (vma->vm_mm != mm)
