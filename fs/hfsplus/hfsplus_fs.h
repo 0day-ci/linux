@@ -139,7 +139,6 @@ struct hfs_bnode {
  */
 
 struct hfsplus_vh;
-struct hfs_btree;
 
 struct hfsplus_sb_info {
 	void *s_vhdr_buf;
