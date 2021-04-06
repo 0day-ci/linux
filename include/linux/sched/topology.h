@@ -57,6 +57,7 @@ static inline int cpu_numa_flags(void)
 #endif
 
 extern int arch_asym_cpu_priority(int cpu);
+extern bool arch_sched_asym_prefer_early(int a, int b);
 
 struct sched_domain_attr {
 	int relax_domain_level;

@@ -107,6 +107,15 @@ int __weak arch_asym_cpu_priority(int cpu)
 }
 
 /*
+ * For asym packing, early check if CPUs with higher priority should be
+ * preferred. On some architectures, more data is needed to make a decision.
+ */
+bool __weak arch_sched_asym_prefer_early(int a, int b)
+{
+	return sched_asym_prefer(a, b);
+}
+
+/*
  * The margin used when comparing utilization with CPU capacity.
  *
  * (default: ~20%)
@@ -8480,7 +8489,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 	if (!local_group && env->sd->flags & SD_ASYM_PACKING &&
 	    env->idle != CPU_NOT_IDLE &&
 	    sgs->sum_h_nr_running &&
-	    sched_asym_prefer(env->dst_cpu, group->asym_prefer_cpu)) {
+	    arch_sched_asym_prefer_early(env->dst_cpu, group->asym_prefer_cpu)) {
 		sgs->group_asym_packing = 1;
 	}
 
