@@ -116,6 +116,14 @@ bool __weak arch_sched_asym_prefer_early(int a, int b)
 }
 
 /*
+ * For asym packing, first check the state of SMT siblings before deciding to
+ * pull tasks.
+ */
+bool __weak arch_asym_check_smt_siblings(void)
+{
+	return false;
+}
+/*
  * The margin used when comparing utilization with CPU capacity.
  *
  * (default: ~20%)
@@ -8505,6 +8513,110 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 				sgs->group_capacity;
 }
 
+static bool cpu_group_is_smt(int cpu, struct sched_group *sg)
+{
+#ifdef CONFIG_SCHED_SMT
+	if (!static_branch_likely(&sched_smt_present))
+		return false;
+
+	if (sg->group_weight == 1)
+		return false;
+
+	if (cpumask_weight(cpu_smt_mask(cpu)) == 1)
+		return false;
+
+	return cpumask_equal(sched_group_span(sg), cpu_smt_mask(cpu));
+#else
+	return false;
+#endif
+}
+
+/**
+ * asym_can_pull_tasks - Check whether the load balancing CPU can pull tasks
+ * @dst_cpu:	CPU doing the load balancing
+ * @sds:	Load-balancing data with statistics of the local group
+ * @sgs:	Load-balancing statistics of the candidate busiest group
+ * @sg:		The candidate busiet group
+ *
+ * Check the state of the SMT siblings of both @sds::local and @sg and decide
+ * if @dst_cpu can pull tasks. If @dst_cpu does not have SMT siblings, it can
+ * pull tasks if two or more of the SMT siblings of @sg are busy. If only one
+ * CPU in @sg is busy, pull tasks only if @dst_cpu has higher priority.
+ *
+ * If both @dst_cpu and @sg have SMT siblings. Even the number of idle CPUs
+ * between @sds::local and @sg. Thus, pull tasks from @sg if the difference
+ * between the number of busy CPUs is 2 or more. If the difference is of 1,
+ * only pull if @dst_cpu has higher priority. If @sg does not have SMT siblings
+ * only pull tasks if all of the SMT siblings of @dst_cpu are idle and @sg
+ * has lower priority.
+ */
+static bool asym_can_pull_tasks(int dst_cpu, struct sd_lb_stats *sds,
+				struct sg_lb_stats *sgs, struct sched_group *sg)
+{
+#ifdef CONFIG_SCHED_SMT
+	int cpu, local_busy_cpus, sg_busy_cpus;
+	bool local_is_smt, sg_is_smt;
+
+	if (!arch_asym_check_smt_siblings())
+		return true;
+
+	cpu = group_first_cpu(sg);
+	local_is_smt = cpu_group_is_smt(dst_cpu, sds->local);
+	sg_is_smt = cpu_group_is_smt(cpu, sg);
+
+	sg_busy_cpus = sgs->group_weight - sgs->idle_cpus;
+
+	if (!local_is_smt) {
+		/*
+		 * If we are here, @dst_cpu is idle and does not have SMT
+		 * siblings. Pull tasks if candidate group has two or more
+		 * busy CPUs.
+		 */
+		if (sg_is_smt && sg_busy_cpus >= 2)
+			return true;
+
+		/*
+		 * @dst_cpu does not have SMT siblings. @sg may have SMT
+		 * siblings and only one is busy. In such case, @dst_cpu
+		 * can help if it has higher priority and is idle.
+		 */
+		return !sds->local_stat.group_util &&
+		       sched_asym_prefer(dst_cpu, sg->asym_prefer_cpu);
+	}
+
+	/* @dst_cpu has SMT siblings. */
+
+	local_busy_cpus = sds->local->group_weight - sds->local_stat.idle_cpus;
+
+	if (sg_is_smt) {
+		int busy_cpus_delta = sg_busy_cpus - local_busy_cpus;
+
+		/* Local can always help to even the number busy CPUs. */
+		if (busy_cpus_delta >= 2)
+			return true;
+
+		if (busy_cpus_delta == 1)
+			return sched_asym_prefer(dst_cpu,
+						 sg->asym_prefer_cpu);
+
+		return false;
+	}
+
+	/*
+	 * @sg does not have SMT siblings. Ensure that @sds::local does not end
+	 * up with more than one busy SMT sibling and only pull tasks if there
+	 * are not busy CPUs. As CPUs move in and out of idle state frequently,
+	 * also check the group utilization to smoother the decision.
+	 */
+	if (!local_busy_cpus && !sds->local_stat.group_util)
+		return sched_asym_prefer(dst_cpu, sg->asym_prefer_cpu);
+
+	return false;
+#else
+	return true;
+#endif
+}
+
 /**
  * update_sd_pick_busiest - return 1 on busiest group
  * @env: The load balancing environment.
@@ -8527,6 +8639,10 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 
 	/* Make sure that there is at least one task to pull */
 	if (!sgs->sum_h_nr_running)
+		return false;
+
+	if (sgs->group_type == group_asym_packing &&
+	    !asym_can_pull_tasks(env->dst_cpu, sds, sgs, sg))
 		return false;
 
 	/*
@@ -9421,6 +9537,12 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		 */
 		if (env->sd->flags & SD_ASYM_CPUCAPACITY &&
 		    capacity_of(env->dst_cpu) < capacity &&
+		    nr_running == 1)
+			continue;
+
+		/* Make sure we only pull tasks from a CPU of lower priority */
+		if ((env->sd->flags & SD_ASYM_PACKING) &&
+		    sched_asym_prefer(i, env->dst_cpu) &&
 		    nr_running == 1)
 			continue;
 
