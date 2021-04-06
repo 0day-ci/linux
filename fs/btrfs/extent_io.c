@@ -5211,7 +5211,7 @@ int extent_fiemap(struct btrfs_inode *inode, struct fiemap_extent_info *fieinfo,
 		  u64 start, u64 len)
 {
 	int ret = 0;
-	u64 off = start;
+	u64 off = 0;
 	u64 max = start + len;
 	u32 flags = 0;
 	u32 found_type;
