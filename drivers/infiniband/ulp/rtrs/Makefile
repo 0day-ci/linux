@@ -3,10 +3,12 @@
 rtrs-client-y := rtrs-clt.o \
 		  rtrs-clt-stats.o \
 		  rtrs-clt-sysfs.o
+rtrs-client-$(CONFIG_FAULT_INJECTION_DEBUG_FS) += rtrs-fault.o
 
 rtrs-server-y := rtrs-srv.o \
 		  rtrs-srv-stats.o \
 		  rtrs-srv-sysfs.o
+rtrs-server-$(CONFIG_FAULT_INJECTION_DEBUG_FS) += rtrs-fault.o
 
 rtrs-core-y := rtrs.o
 
