@@ -112,6 +112,7 @@ struct lpi2c_imx_struct {
 	struct completion	complete;
 	unsigned int		msglen;
 	unsigned int		delivered;
+	unsigned int		remain_chunk_num;
 	unsigned int		block_data;
 	unsigned int		bitrate;
 	unsigned int		txfifosize;
@@ -413,6 +414,28 @@ static void lpi2c_imx_write_txfifo(struct lpi2c_imx_struct *lpi2c_imx)
 		complete(&lpi2c_imx->complete);
 }
 
+static void lpi2c_imx_pio_push_rx_cmd(struct lpi2c_imx_struct *lpi2c_imx)
+{
+	unsigned int remaining, temp;
+	u8 last_chunk_num = lpi2c_imx->msglen % CHUNK_DATA;
+
+	if (lpi2c_imx->remain_chunk_num > 0 &&
+		(lpi2c_imx->delivered % CHUNK_DATA) > (CHUNK_DATA >> 1)) {
+		if ((readl(lpi2c_imx->base + LPI2C_MFSR) & 0xff) <=
+						(lpi2c_imx->rxfifosize >> 1)) {
+			if (last_chunk_num)
+				remaining = (lpi2c_imx->remain_chunk_num - 1) *
+					    CHUNK_DATA + last_chunk_num;
+			else
+				remaining = lpi2c_imx->remain_chunk_num * CHUNK_DATA;
+			temp = (remaining > CHUNK_DATA ? CHUNK_DATA : remaining) - 1;
+			temp |= (RECV_DATA << 8);
+			writel(temp, lpi2c_imx->base + LPI2C_MTDR);
+			lpi2c_imx->remain_chunk_num--;
+		}
+	}
+}
+
 static void lpi2c_imx_read_rxfifo(struct lpi2c_imx_struct *lpi2c_imx)
 {
 	unsigned int blocklen, remaining;
@@ -420,10 +443,16 @@ static void lpi2c_imx_read_rxfifo(struct lpi2c_imx_struct *lpi2c_imx)
 
 	do {
 		data = readl(lpi2c_imx->base + LPI2C_MRDR);
-		if (data & MRDR_RXEMPTY)
-			break;
+		if (data & MRDR_RXEMPTY) {
+			if (lpi2c_imx->delivered == lpi2c_imx->msglen ||
+			    lpi2c_imx->block_data)
+				break;
+			else
+				continue;
+		}
 
 		lpi2c_imx->rx_buf[lpi2c_imx->delivered++] = data & 0xff;
+		lpi2c_imx_pio_push_rx_cmd(lpi2c_imx);
 	} while (1);
 
 	/*
@@ -451,13 +480,9 @@ static void lpi2c_imx_read_rxfifo(struct lpi2c_imx_struct *lpi2c_imx)
 		temp = remaining;
 		temp |= (RECV_DATA << 8);
 		writel(temp, lpi2c_imx->base + LPI2C_MTDR);
-	} else if (!(lpi2c_imx->delivered & 0xff)) {
-		temp = (remaining > CHUNK_DATA ? CHUNK_DATA : remaining) - 1;
-		temp |= (RECV_DATA << 8);
-		writel(temp, lpi2c_imx->base + LPI2C_MTDR);
 	}
 
-	lpi2c_imx_intctrl(lpi2c_imx, MIER_RDIE);
+	lpi2c_imx_intctrl(lpi2c_imx, MIER_RDIE | MIER_NDIE);
 }
 
 static void lpi2c_imx_write(struct lpi2c_imx_struct *lpi2c_imx,
@@ -477,6 +502,10 @@ static void lpi2c_imx_read(struct lpi2c_imx_struct *lpi2c_imx,
 	lpi2c_imx->block_data = msgs->flags & I2C_M_RECV_LEN;
 
 	lpi2c_imx_set_rx_watermark(lpi2c_imx);
+	if (msgs->len > CHUNK_DATA) {
+		temp = CHUNK_DATA - 1;
+		lpi2c_imx->remain_chunk_num = DIV_ROUND_UP(msgs->len, CHUNK_DATA) - 1;
+	}
 	temp = msgs->len > CHUNK_DATA ? CHUNK_DATA - 1 : msgs->len - 1;
 	temp |= (RECV_DATA << 8);
 	writel(temp, lpi2c_imx->base + LPI2C_MTDR);
