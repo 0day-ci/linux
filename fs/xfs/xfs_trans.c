@@ -74,7 +74,7 @@ xfs_trans_free(
 	trace_xfs_trans_free(tp, _RET_IP_);
 	xfs_trans_clear_context(tp);
 	if (!(tp->t_flags & XFS_TRANS_NO_WRITECOUNT))
-		sb_end_intwrite(tp->t_mountp->m_super);
+		xfs_trans_end(tp->t_mountp);
 	xfs_trans_free_dqinfo(tp);
 	kmem_cache_free(xfs_trans_zone, tp);
 }
@@ -265,7 +265,7 @@ xfs_trans_alloc(
 retry:
 	tp = kmem_cache_zalloc(xfs_trans_zone, GFP_KERNEL | __GFP_NOFAIL);
 	if (!(flags & XFS_TRANS_NO_WRITECOUNT))
-		sb_start_intwrite(mp->m_super);
+		xfs_trans_start(mp);
 	xfs_trans_set_context(tp);
 
 	/*

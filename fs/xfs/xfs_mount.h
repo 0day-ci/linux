@@ -171,6 +171,9 @@ typedef struct xfs_mount {
 	 */
 	struct percpu_counter	m_delalloc_blks;
 
+	/* lock for transaction quiesce (used by quotaoff) */
+	struct percpu_rw_semaphore	m_trans_rwsem;
+
 	struct radix_tree_root	m_perag_tree;	/* per-ag accounting info */
 	spinlock_t		m_perag_lock;	/* lock for m_perag_tree */
 	uint64_t		m_resblks;	/* total reserved blocks */

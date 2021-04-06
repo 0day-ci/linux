@@ -58,6 +58,7 @@ xfs_setfilesize_trans_alloc(
 	 * we released it.
 	 */
 	__sb_writers_release(ioend->io_inode->i_sb, SB_FREEZE_FS);
+	percpu_rwsem_release(&mp->m_trans_rwsem, true, _THIS_IP_);
 	/*
 	 * We hand off the transaction to the completion thread now, so
 	 * clear the flag here.
@@ -127,6 +128,7 @@ xfs_setfilesize_ioend(
 	 */
 	xfs_trans_set_context(tp);
 	__sb_writers_acquired(VFS_I(ip)->i_sb, SB_FREEZE_FS);
+	percpu_rwsem_acquire(&ip->i_mount->m_trans_rwsem, true, _THIS_IP_);
 
 	/* we abort the update if there was an IO error */
 	if (error) {

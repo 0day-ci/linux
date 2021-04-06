@@ -1001,8 +1001,15 @@ xfs_init_percpu_counters(
 	if (error)
 		goto free_fdblocks;
 
+	/* not a counter, but close enough... */
+	error = percpu_init_rwsem(&mp->m_trans_rwsem);
+	if (error)
+		goto free_delalloc;
+
 	return 0;
 
+free_delalloc:
+	percpu_counter_destroy(&mp->m_delalloc_blks);
 free_fdblocks:
 	percpu_counter_destroy(&mp->m_fdblocks);
 free_ifree:
@@ -1025,6 +1032,7 @@ static void
 xfs_destroy_percpu_counters(
 	struct xfs_mount	*mp)
 {
+	percpu_free_rwsem(&mp->m_trans_rwsem);
 	percpu_counter_destroy(&mp->m_icount);
 	percpu_counter_destroy(&mp->m_ifree);
 	percpu_counter_destroy(&mp->m_fdblocks);

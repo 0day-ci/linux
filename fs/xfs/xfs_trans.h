@@ -226,6 +226,26 @@ xfs_trans_read_buf(
 				      flags, bpp, ops);
 }
 
+/*
+ * Context tracking helpers for external (i.e. fs freeze) and internal
+ * transaction quiesce.
+ */
+static inline void
+xfs_trans_start(
+	struct xfs_mount	*mp)
+{
+	sb_start_intwrite(mp->m_super);
+	percpu_down_read(&mp->m_trans_rwsem);
+}
+
+static inline void
+xfs_trans_end(
+	struct xfs_mount	*mp)
+{
+	percpu_up_read(&mp->m_trans_rwsem);
+	sb_end_intwrite(mp->m_super);
+}
+
 struct xfs_buf	*xfs_trans_getsb(struct xfs_trans *);
 
 void		xfs_trans_brelse(xfs_trans_t *, struct xfs_buf *);
