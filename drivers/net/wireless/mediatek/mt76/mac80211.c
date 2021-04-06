@@ -517,10 +517,14 @@ static void mt76_rx_release_burst(struct mt76_phy *phy, enum mt76_rxq_id q,
 
 	/* first amsdu subframe */
 	if (status->amsdu && !phy->rx_amsdu[q].head) {
+		if (status->last_amsdu) {
+			nskb = skb;
+			goto reset_burst;
+		}
 		phy->rx_amsdu[q].tail = &skb_shinfo(skb)->frag_list;
 		phy->rx_amsdu[q].seqno = status->seqno;
 		phy->rx_amsdu[q].head = skb;
-		goto enqueue;
+		return;
 	}
 
 	/* ampdu or out-of-order amsdu subframes */
@@ -543,7 +547,6 @@ static void mt76_rx_release_burst(struct mt76_phy *phy, enum mt76_rxq_id q,
 reset_burst:
 	phy->rx_amsdu[q].head = NULL;
 	phy->rx_amsdu[q].tail = NULL;
-enqueue:
 	if (nskb)
 		__skb_queue_tail(&dev->rx_skb[q], nskb);
 }
