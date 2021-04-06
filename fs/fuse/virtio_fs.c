@@ -1447,6 +1447,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	if (fsc->s_fs_info) {
 		fuse_conn_put(fc);
 		kfree(fm);
+		fm = NULL;
 	}
 	if (IS_ERR(sb))
 		return PTR_ERR(sb);
