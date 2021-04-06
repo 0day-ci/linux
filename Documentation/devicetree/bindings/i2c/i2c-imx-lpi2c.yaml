@@ -42,6 +42,15 @@ properties:
   power-domains:
     maxItems: 1
 
+  pinctrl-names:
+    minItems: 1
+
+  scl-gpios:
+    maxItems: 1
+
+  sda-gpios:
+    maxItems: 1
+
 required:
   - compatible
   - reg
@@ -61,4 +70,9 @@ examples:
         interrupt-parent = <&intc>;
         interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
         clocks = <&clks IMX7ULP_CLK_LPI2C7>;
+        pinctrl-names = "default","gpio";
+        pinctrl-0 = <&pinctrl_i2c>;
+        pinctrl-1 = <&pinctrl_i2c_recovery>;
+        scl-gpios = <&gpio5 14 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+        sda-gpios = <&gpio5 15 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
     };
