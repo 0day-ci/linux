@@ -132,21 +132,37 @@ static void save_hv_return_state(struct kvm_vcpu *vcpu, int trap,
 	}
 }
 
-static void sanitise_hv_regs(struct kvm_vcpu *vcpu, struct hv_guest_state *hr)
+static void sanitise_vcpu_entry_state(struct kvm_vcpu *vcpu,
+				      const struct hv_guest_state *l2_hv,
+				      const struct hv_guest_state *l1_hv)
 {
 	/*
 	 * Don't let L1 enable features for L2 which we've disabled for L1,
 	 * but preserve the interrupt cause field.
 	 */
-	hr->hfscr &= (HFSCR_INTR_CAUSE | vcpu->arch.hfscr);
+	vcpu->arch.hfscr = l2_hv->hfscr & (HFSCR_INTR_CAUSE | l1_hv->hfscr);
 
 	/* Don't let data address watchpoint match in hypervisor state */
-	hr->dawrx0 &= ~DAWRX_HYP;
-	hr->dawrx1 &= ~DAWRX_HYP;
+	vcpu->arch.dawrx0 = l2_hv->dawrx0 & ~DAWRX_HYP;
+	vcpu->arch.dawrx1 = l2_hv->dawrx1 & ~DAWRX_HYP;
 
 	/* Don't let completed instruction address breakpt match in HV state */
-	if ((hr->ciabr & CIABR_PRIV) == CIABR_PRIV_HYPER)
-		hr->ciabr &= ~CIABR_PRIV;
+	if ((l2_hv->ciabr & CIABR_PRIV) == CIABR_PRIV_HYPER)
+		vcpu->arch.ciabr = l2_hv->ciabr & ~CIABR_PRIV;
+}
+
+
+/*
+ * During sanitise_vcpu_entry_state() we might have used bits from L1
+ * state to restrict what the L2 state is allowed to be. Since L1 is
+ * not allowed to read the HV registers, do not include these
+ * modifications in the return state.
+ */
+static void sanitise_vcpu_return_state(struct kvm_vcpu *vcpu,
+				       const struct hv_guest_state *l2_hv)
+{
+	vcpu->arch.hfscr = ((~HFSCR_INTR_CAUSE & l2_hv->hfscr) |
+			(HFSCR_INTR_CAUSE & vcpu->arch.hfscr));
 }
 
 static void restore_hv_regs(struct kvm_vcpu *vcpu, struct hv_guest_state *hr)
@@ -324,8 +340,9 @@ long kvmhv_enter_nested_guest(struct kvm_vcpu *vcpu)
 	mask = LPCR_DPFD | LPCR_ILE | LPCR_TC | LPCR_AIL | LPCR_LD |
 		LPCR_LPES | LPCR_MER;
 	lpcr = (vc->lpcr & ~mask) | (l2_hv.lpcr & mask);
-	sanitise_hv_regs(vcpu, &l2_hv);
 	restore_hv_regs(vcpu, &l2_hv);
+
+	sanitise_vcpu_entry_state(vcpu, &l2_hv, &saved_l1_hv);
 
 	vcpu->arch.ret = RESUME_GUEST;
 	vcpu->arch.trap = 0;
@@ -337,6 +354,8 @@ long kvmhv_enter_nested_guest(struct kvm_vcpu *vcpu)
 		}
 		r = kvmhv_run_single_vcpu(vcpu, hdec_exp, lpcr);
 	} while (is_kvmppc_resume_guest(r));
+
+	sanitise_vcpu_return_state(vcpu, &l2_hv);
 
 	/* save L2 state for return */
 	l2_regs = vcpu->arch.regs;
