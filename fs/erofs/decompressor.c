@@ -154,6 +154,7 @@ static void *z_erofs_handle_inplace_io(struct z_erofs_decompress_req *rq,
 	}
 	kunmap_atomic(inpage);
 	might_sleep();
+	i = 0;
 	while (1) {
 		src = vm_map_ram(rq->in, nrpages_in, -1);
 		/* retry two more times (totally 3 times) */
