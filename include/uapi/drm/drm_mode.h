@@ -340,6 +340,9 @@ struct drm_mode_get_plane {
 	/**
 	 * @format_type_ptr: Pointer to ``__u32`` array of formats that are
 	 * supported by the plane. These formats do not require modifiers.
+	 *
+	 * To find out the list of formats that support modifiers, userspace
+	 * must use the plane IN_FORMATS blob property.
 	 */
 	__u64 format_type_ptr;
 };

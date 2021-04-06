@@ -78,6 +78,10 @@
  *     pairs supported by this plane. The blob is a struct
  *     drm_format_modifier_blob. Without this property the plane doesn't
  *     support buffers with modifiers. Userspace cannot change this property.
+ *
+ *     To find out the list of buffer formats which are supported without a
+ *     modifier, userspace should not look at this blob property, but at the
+ *     formats list of the plane: &drm_mode_get_plane.format_type_ptr.
  */
 
 static unsigned int drm_num_planes(struct drm_device *dev)
