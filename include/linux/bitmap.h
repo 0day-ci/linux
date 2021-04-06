@@ -8,6 +8,7 @@
 #include <linux/bitops.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/variadic-macro.h>
 
 /*
  * bitmaps provide bit arrays that consume one or more unsigned
@@ -113,6 +114,29 @@
  * to declare an array named 'name' of just enough unsigned longs to
  * contain all bit positions from 0 to 'bits' - 1.
  */
+
+/**
+ * DOC: initialize bitmap
+ * The INITIALIZE_BITMAP(bits, args...) macro expands to a designated
+ * initializer for bitmap of length 'bits', setting each bit specified
+ * in 'args...'.
+ */
+#define _BIT_MEMBER(bit) ((bit) / BITS_PER_LONG)
+#define _VERIFY_BIT(bit, nbits)						\
+	BUILD_BUG_ON_ZERO((bit) < 0 || (bit) >= (nbits))
+#define _INIT_BITMAP_MEMBER_VALUE(bit, member_bit)			\
+	| (_BIT_MEMBER(bit) == _BIT_MEMBER(member_bit)			\
+		? BIT((bit) % BITS_PER_LONG)				\
+		: 0)
+#define _INIT_BITMAP_MEMBER(bit, nbits, ...)				\
+	[_VERIFY_BIT((bit), (nbits)) + _BIT_MEMBER(bit)] =		\
+		(0 EXPAND_FOR_EACH(_INIT_BITMAP_MEMBER_VALUE,		\
+				   (bit), ##__VA_ARGS__)),
+#define INITIALIZE_BITMAP(nbits, ...)					\
+	{								\
+		EXPAND_FOR_EACH_PASS_ARGS(_INIT_BITMAP_MEMBER, (nbits),	\
+					  ##__VA_ARGS__)		\
+	}
 
 /*
  * Allocation and deallocation of bitmap.
