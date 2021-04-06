@@ -13,7 +13,7 @@ void __init ufs_debugfs_init(void)
 	ufs_debugfs_root = debugfs_create_dir("ufshcd", NULL);
 }
 
-void __exit ufs_debugfs_exit(void)
+void ufs_debugfs_exit(void)
 {
 	debugfs_remove_recursive(ufs_debugfs_root);
 }
