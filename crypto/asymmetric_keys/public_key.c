@@ -83,6 +83,11 @@ int software_key_determine_akcipher(const char *encoding,
 				     "pkcs1pad(%s,%s)",
 				     pkey->pkey_algo, hash_algo);
 		return n >= CRYPTO_MAX_ALG_NAME ? -EINVAL : 0;
+	} else if (strcmp(encoding, "pss") == 0) {
+		n = snprintf(alg_name, CRYPTO_MAX_ALG_NAME,
+			     "psspad(%s)",
+			     pkey->pkey_algo);
+		return n >= CRYPTO_MAX_ALG_NAME ? -EINVAL : 0;
 	}
 
 	if (strcmp(encoding, "raw") == 0) {

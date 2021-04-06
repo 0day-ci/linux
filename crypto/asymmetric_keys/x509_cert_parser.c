@@ -15,6 +15,7 @@
 #include "x509_parser.h"
 #include "x509.asn1.h"
 #include "x509_akid.asn1.h"
+#include "x509_rsapss_params.asn1.h"
 
 struct x509_parse_context {
 	struct x509_certificate	*cert;		/* Certificate being constructed */
@@ -115,6 +116,17 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 	cert->pub->paramlen = ctx->params_size;
 	cert->pub->algo = ctx->key_algo;
 
+	if (!strcmp(cert->sig->pkey_algo, "rsa") &&
+	    !strcmp(cert->sig->encoding, "pss") &&
+	    cert->pub->paramlen) {
+		ret = asn1_ber_decoder(&x509_rsapss_params_decoder, ctx,
+				       cert->pub->params, cert->pub->paramlen);
+		if (ret < 0) {
+			pr_warn("Couldn't decode rsapss params\n");
+			goto error_decode;
+		}
+	}
+
 	/* Grab the signature bits */
 	ret = x509_get_sig_params(cert);
 	if (ret < 0)
@@ -211,6 +223,10 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 		ctx->cert->sig->hash_algo = "sha1";
 		goto rsa_pkcs1;
 
+	case OID_rsa_pss:
+		ctx->cert->sig->hash_algo = "sha1";
+		goto rsa_pss;
+
 	case OID_sha256WithRSAEncryption:
 		ctx->cert->sig->hash_algo = "sha256";
 		goto rsa_pkcs1;
@@ -243,6 +259,11 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 rsa_pkcs1:
 	ctx->cert->sig->pkey_algo = "rsa";
 	ctx->cert->sig->encoding = "pkcs1";
+	ctx->algo_oid = ctx->last_oid;
+	return 0;
+rsa_pss:
+	ctx->cert->sig->pkey_algo = "rsa";
+	ctx->cert->sig->encoding = "pss";
 	ctx->algo_oid = ctx->last_oid;
 	return 0;
 ecrdsa:
@@ -440,14 +461,56 @@ int x509_note_params(void *context, size_t hdrlen,
 	struct x509_parse_context *ctx = context;
 
 	/*
-	 * AlgorithmIdentifier is used three times in the x509, we should skip
-	 * first and ignore third, using second one which is after subject and
-	 * before subjectPublicKey.
+	 * AlgorithmIdentifier is used three times in the x509,
+	 * rsapss:
+	 * we skip first(same as third) and second(may omit params).
+	 * others:
+	 * we should skip first and ignore third, using second one
+	 * which is after subject and before subjectPublicKey.
 	 */
-	if (!ctx->cert->raw_subject || ctx->key)
+	if (!ctx->cert->raw_subject) {
 		return 0;
+	} else if (strcmp(ctx->cert->sig->pkey_algo, "rsa") ||
+		   strcmp(ctx->cert->sig->encoding, "pss")) {
+		if (ctx->key)
+			return 0;
+	} else if (!ctx->key) {
+		return 0;
+	}
+
 	ctx->params = value - hdrlen;
 	ctx->params_size = vlen + hdrlen;
+	return 0;
+}
+
+int x509_note_rsapss_hash(void *context, size_t hdrlen,
+			  unsigned char tag,
+			  const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+	enum OID oid;
+
+	oid = look_up_OID(value, vlen);
+	switch (oid) {
+	case OID_sha1:
+		ctx->cert->sig->hash_algo = "sha1";
+		break;
+	case OID_sha224:
+		ctx->cert->sig->hash_algo = "sha224";
+		break;
+	case OID_sha256:
+		ctx->cert->sig->hash_algo = "sha256";
+		break;
+	case OID_sha384:
+		ctx->cert->sig->hash_algo = "sha384";
+		break;
+	case OID_sha512:
+		ctx->cert->sig->hash_algo = "sha512";
+		break;
+	default:
+		return -ENOPKG;
+	}
+
 	return 0;
 }
 

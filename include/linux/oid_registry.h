@@ -28,6 +28,8 @@ enum OID {
 	OID_md3WithRSAEncryption,	/* 1.2.840.113549.1.1.3 */
 	OID_md4WithRSAEncryption,	/* 1.2.840.113549.1.1.4 */
 	OID_sha1WithRSAEncryption,	/* 1.2.840.113549.1.1.5 */
+	OID_rsa_mgf1,			/* 1.2.840.113549.1.1.8 */
+	OID_rsa_pss,			/* 1.2.840.113549.1.1.10 */
 	OID_sha256WithRSAEncryption,	/* 1.2.840.113549.1.1.11 */
 	OID_sha384WithRSAEncryption,	/* 1.2.840.113549.1.1.12 */
 	OID_sha512WithRSAEncryption,	/* 1.2.840.113549.1.1.13 */
