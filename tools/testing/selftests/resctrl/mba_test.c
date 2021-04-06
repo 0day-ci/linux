@@ -80,9 +80,7 @@ static void show_mba_info(unsigned long *bw_imc, unsigned long *bw_resc)
 		avg_diff = (float)labs(avg_bw_resc - avg_bw_imc) / avg_bw_imc;
 		avg_diff_per = (int)(avg_diff * 100);
 
-		ksft_print_msg("%s MBA: diff within %d%% for schemata %u\n",
-			       avg_diff_per > MAX_DIFF_PERCENT ?
-			       "Fail:" : "Pass:",
+		ksft_print_msg("Check MBA diff within %d%% for schemata %u\n",
 			       MAX_DIFF_PERCENT,
 			       ALLOCATION_MAX - ALLOCATION_STEP * allocation);
 
@@ -93,10 +91,9 @@ static void show_mba_info(unsigned long *bw_imc, unsigned long *bw_resc)
 			failed = true;
 	}
 
-	ksft_print_msg("%s schemata change using MBA\n",
-		       failed ? "Fail:" : "Pass:");
+	ksft_print_msg("Check schemata change using MBA\n");
 	if (failed)
-		ksft_print_msg("At least one test failed");
+		ksft_print_msg("At least one test failed\n");
 }
 
 static int check_results(void)
