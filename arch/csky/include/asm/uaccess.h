@@ -11,7 +11,6 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/version.h>
 #include <asm/segment.h>
 
 static inline int access_ok(const void *addr, unsigned long size)
