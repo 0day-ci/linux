@@ -30,39 +30,47 @@ optinsn_slot:
 	.global optprobe_template_entry
 optprobe_template_entry:
 	/* Create an in-memory pt_regs */
-	stdu	r1,-INT_FRAME_SIZE(r1)
+	PPC_STLU	r1,-INT_FRAME_SIZE(r1)
 	SAVE_GPR(0,r1)
 	/* Save the previous SP into stack */
 	addi	r0,r1,INT_FRAME_SIZE
-	std	r0,GPR1(r1)
+	PPC_STL	r0,GPR1(r1)
+#ifdef CONFIG_PPC64
 	SAVE_10GPRS(2,r1)
 	SAVE_10GPRS(12,r1)
 	SAVE_10GPRS(22,r1)
+#else
+	stmw	r2, GPR2(r1)
+#endif
 	/* Save SPRS */
 	mfmsr	r5
-	std	r5,_MSR(r1)
+	PPC_STL	r5,_MSR(r1)
 	li	r5,0x700
-	std	r5,_TRAP(r1)
+	PPC_STL	r5,_TRAP(r1)
 	li	r5,0
-	std	r5,ORIG_GPR3(r1)
-	std	r5,RESULT(r1)
+	PPC_STL	r5,ORIG_GPR3(r1)
+	PPC_STL	r5,RESULT(r1)
 	mfctr	r5
-	std	r5,_CTR(r1)
+	PPC_STL	r5,_CTR(r1)
 	mflr	r5
-	std	r5,_LINK(r1)
+	PPC_STL	r5,_LINK(r1)
 	mfspr	r5,SPRN_XER
-	std	r5,_XER(r1)
+	PPC_STL	r5,_XER(r1)
 	mfcr	r5
-	std	r5,_CCR(r1)
+	PPC_STL	r5,_CCR(r1)
+#ifdef CONFIG_PPC64
 	lbz     r5,PACAIRQSOFTMASK(r13)
 	std     r5,SOFTE(r1)
+#endif
 
 	/*
 	 * We may get here from a module, so load the kernel TOC in r2.
 	 * The original TOC gets restored when pt_regs is restored
 	 * further below.
 	 */
+#ifdef CONFIG_PPC64
 	ld	r2,PACATOC(r13)
+#endif
 
 	.global optprobe_template_op_address
 optprobe_template_op_address:
@@ -72,9 +80,11 @@ optprobe_template_op_address:
 	 */
 	nop
 	nop
+#ifdef CONFIG_PPC64
 	nop
 	nop
 	nop
+#endif
 	/* 2. pt_regs pointer in r4 */
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 
@@ -94,9 +104,11 @@ optprobe_template_insn:
 	/* 2, Pass instruction to be emulated in r4 */
 	nop
 	nop
+#ifdef CONFIG_PPC64
 	nop
 	nop
 	nop
+#endif
 
 	.global optprobe_template_call_emulate
 optprobe_template_call_emulate:
@@ -107,20 +119,24 @@ optprobe_template_call_emulate:
 	 * All done.
 	 * Now, restore the registers...
 	 */
-	ld	r5,_MSR(r1)
+	PPC_LL	r5,_MSR(r1)
 	mtmsr	r5
-	ld	r5,_CTR(r1)
+	PPC_LL	r5,_CTR(r1)
 	mtctr	r5
-	ld	r5,_LINK(r1)
+	PPC_LL	r5,_LINK(r1)
 	mtlr	r5
-	ld	r5,_XER(r1)
+	PPC_LL	r5,_XER(r1)
 	mtxer	r5
-	ld	r5,_CCR(r1)
+	PPC_LL	r5,_CCR(r1)
 	mtcr	r5
 	REST_GPR(0,r1)
+#ifdef CONFIG_PPC64
 	REST_10GPRS(2,r1)
 	REST_10GPRS(12,r1)
 	REST_10GPRS(22,r1)
+#else
+	lmw	r2, GPR2(r1)
+#endif
 	/* Restore the previous SP */
 	addi	r1,r1,INT_FRAME_SIZE
 
