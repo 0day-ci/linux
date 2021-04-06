@@ -40,14 +40,12 @@ xfs_trans_dqjoin(
 }
 
 /*
- * This is called to mark the dquot as needing
- * to be logged when the transaction is committed.  The dquot must
- * already be associated with the given transaction.
- * Note that it marks the entire transaction as dirty. In the ordinary
- * case, this gets called via xfs_trans_commit, after the transaction
- * is already dirty. However, there's nothing stop this from getting
- * called directly, as done by xfs_qm_scall_setqlim. Hence, the TRANS_DIRTY
- * flag.
+ * This is called to mark the dquot as needing to be logged when the transaction
+ * is committed. The dquot must already be associated with the given
+ * transaction. Note that it marks the entire transaction as dirty. In the
+ * ordinary case, this gets called via xfs_trans_commit, after the transaction
+ * is already dirty. However, there's nothing stop this from getting called
+ * directly, as done by xfs_qm_scall_setqlim. Hence, the TRANS_DIRTY flag.
  */
 void
 xfs_trans_log_dquot(
@@ -743,19 +741,19 @@ xfs_trans_reserve_quota_bydquots(
 
 	ASSERT(flags & XFS_QMOPT_RESBLK_MASK);
 
-	if (udqp) {
+	if (XFS_IS_UQUOTA_ON(mp) && udqp) {
 		error = xfs_trans_dqresv(tp, mp, udqp, nblks, ninos, flags);
 		if (error)
 			return error;
 	}
 
-	if (gdqp) {
+	if (XFS_IS_GQUOTA_ON(mp) && gdqp) {
 		error = xfs_trans_dqresv(tp, mp, gdqp, nblks, ninos, flags);
 		if (error)
 			goto unwind_usr;
 	}
 
-	if (pdqp) {
+	if (XFS_IS_PQUOTA_ON(mp) && pdqp) {
 		error = xfs_trans_dqresv(tp, mp, pdqp, nblks, ninos, flags);
 		if (error)
 			goto unwind_grp;
