@@ -51,6 +51,16 @@ properties:
   sda-gpios:
     maxItems: 1
 
+  dmas:
+    minItems: 2
+    maxItems: 2
+
+  dma-names:
+    minItems: 2
+    maxItems: 2
+    items:
+      enum: [ "tx", "rx" ]
+
 required:
   - compatible
   - reg
@@ -75,4 +85,6 @@ examples:
         pinctrl-1 = <&pinctrl_i2c_recovery>;
         scl-gpios = <&gpio5 14 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
         sda-gpios = <&gpio5 15 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+        dmas = <&edma1 0 16>, <&edma1 0 15>;
+        dma-names = "tx","rx";
     };
