@@ -3720,7 +3720,7 @@ struct reada_control {
 };
 struct reada_control *btrfs_reada_add(struct btrfs_root *root,
 			      struct btrfs_key *start, struct btrfs_key *end);
-int btrfs_reada_wait(void *handle);
+int btrfs_reada_wait(struct reada_control *rc);
 int btree_readahead_hook(struct extent_buffer *eb, int err);
 void btrfs_reada_remove_dev(struct btrfs_device *dev);
 void btrfs_reada_undo_remove_dev(struct btrfs_device *dev);

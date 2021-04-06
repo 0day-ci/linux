@@ -998,9 +998,8 @@ struct reada_control *btrfs_reada_add(struct btrfs_root *root,
 }
 
 #ifdef DEBUG
-int btrfs_reada_wait(void *handle)
+int btrfs_reada_wait(struct reada_control *rc)
 {
-	struct reada_control *rc = handle;
 	struct btrfs_fs_info *fs_info = rc->fs_info;
 
 	while (atomic_read(&rc->elems)) {
@@ -1018,9 +1017,8 @@ int btrfs_reada_wait(void *handle)
 	return 0;
 }
 #else
-int btrfs_reada_wait(void *handle)
+int btrfs_reada_wait(struct reada_control *rc)
 {
-	struct reada_control *rc = handle;
 	struct btrfs_fs_info *fs_info = rc->fs_info;
 
 	while (atomic_read(&rc->elems)) {
