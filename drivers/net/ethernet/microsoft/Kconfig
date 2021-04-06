@@ -1,0 +1,29 @@
+#
+# Microsoft Azure network device configuration
+#
+
+config NET_VENDOR_MICROSOFT
+	bool "Microsoft Azure Network Device"
+	default y
+	help
+	  If you have a network (Ethernet) device belonging to this class, say Y.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip the
+	  question about Microsoft Azure network device. If you say Y, you
+	  will be asked for your specific device in the following question.
+
+if NET_VENDOR_MICROSOFT
+
+config MICROSOFT_MANA
+	tristate "Microsoft Azure Network Adapter (MANA) support"
+	default m
+	depends on PCI_MSI
+	select PCI_HYPERV
+	help
+	  This driver supports Microsoft Azure Network Adapter (MANA).
+
+	  To compile this driver as a module, choose M here.
+	  The module will be called mana.
+
+endif #NET_VENDOR_MICROSOFT
