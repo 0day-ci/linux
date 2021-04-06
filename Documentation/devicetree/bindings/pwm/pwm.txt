@@ -46,6 +46,7 @@ period in nanoseconds.
 Optionally, the pwm-specifier can encode a number of flags (defined in
 <dt-bindings/pwm/pwm.h>) in a third cell:
 - PWM_POLARITY_INVERTED: invert the PWM signal polarity
+- PWM_STAGGERING_ALLOWED: allow delayed ON-time for improved EMI
 
 Example with optional PWM specifier for inverse polarity
 
