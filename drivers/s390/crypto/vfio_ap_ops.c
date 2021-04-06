@@ -667,10 +667,14 @@ static void vfio_ap_mdev_link_adapter(struct ap_matrix_mdev *matrix_mdev,
  *	   driver; or, if no APQIs have yet been assigned, the APID is not
  *	   contained in an APQN bound to the vfio_ap device driver.
  *
- *	4. -EBUSY
+ *	4. -EADDRINUSE
  *	   An APQN derived from the cross product of the APID being assigned
  *	   and the APQIs previously assigned is being used by another mediated
- *	   matrix device or the mdev lock could not be acquired.
+ *	   matrix device.
+ *
+ *	5. -EAGAIN
+ *	   The mdev lock could not be acquired which is required in order to
+ *	   change the AP configuration for the mdev
  */
 static ssize_t assign_adapter_store(struct device *dev,
 				    struct device_attribute *attr,
@@ -681,7 +685,8 @@ static ssize_t assign_adapter_store(struct device *dev,
 	struct mdev_device *mdev = mdev_from_dev(dev);
 	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 
-	mutex_lock(&matrix_dev->lock);
+	if (!mutex_trylock(&matrix_dev->lock))
+		return -EAGAIN;
 
 	/*
 	 * If the KVM pointer is in flux or the guest is running, disallow
@@ -820,10 +825,14 @@ static void vfio_ap_mdev_link_domain(struct ap_matrix_mdev *matrix_mdev,
  *	   driver; or, if no APIDs have yet been assigned, the APQI is not
  *	   contained in an APQN bound to the vfio_ap device driver.
  *
- *	4. -BUSY
+ *	4. -EADDRINUSE
  *	   An APQN derived from the cross product of the APQI being assigned
  *	   and the APIDs previously assigned is being used by another mediated
- *	   matrix device or the mdev lock could not be acquired.
+ *	   matrix device.
+ *
+ *	5. -EAGAIN
+ *	   The mdev lock could not be acquired which is required in order to
+ *	   change the AP configuration for the mdev
  */
 static ssize_t assign_domain_store(struct device *dev,
 				   struct device_attribute *attr,
@@ -835,7 +844,8 @@ static ssize_t assign_domain_store(struct device *dev,
 	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 	unsigned long max_apqi = matrix_mdev->matrix.aqm_max;
 
-	mutex_lock(&matrix_dev->lock);
+	if (!mutex_trylock(&matrix_dev->lock))
+		return -EAGAIN;
 
 	/*
 	 * If the KVM pointer is in flux or the guest is running, disallow
@@ -963,6 +973,7 @@ static void vfio_ap_mdev_hot_plug_cdom(struct ap_matrix_mdev *matrix_mdev,
  * returns one of the following errors:
  *	-EINVAL if the ID is not a number
  *	-ENODEV if the ID exceeds the maximum value configured for the system
+ *	-EAGAIN if the mdev lock could not be acquired
  */
 static ssize_t assign_control_domain_store(struct device *dev,
 					   struct device_attribute *attr,
@@ -973,7 +984,8 @@ static ssize_t assign_control_domain_store(struct device *dev,
 	struct mdev_device *mdev = mdev_from_dev(dev);
 	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 
-	mutex_lock(&matrix_dev->lock);
+	if (!mutex_trylock(&matrix_dev->lock))
+		return -EAGAIN;
 
 	/*
 	 * If the KVM pointer is in flux or the guest is running, disallow
@@ -1603,4 +1615,16 @@ void vfio_ap_mdev_remove_queue(struct ap_device *apdev)
 	dev_set_drvdata(&apdev->device, NULL);
 	kfree(q);
 	mutex_unlock(&matrix_dev->lock);
+}
+
+int vfio_ap_mdev_resource_in_use(unsigned long *apm, unsigned long *aqm)
+{
+	int ret;
+
+	if (!mutex_trylock(&matrix_dev->lock))
+		return -EBUSY;
+	ret = vfio_ap_mdev_verify_no_sharing(apm, aqm);
+	mutex_unlock(&matrix_dev->lock);
+
+	return ret;
 }
