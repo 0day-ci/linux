@@ -1469,6 +1469,7 @@ err:
 
 void free_sess(struct rtrs_clt_sess *sess)
 {
+	rtrs_clt_fault_inject_final(&sess->fault_inject);
 	free_percpu(sess->mp_skip_entry);
 	mutex_destroy(&sess->init_mutex);
 	kfree(sess->s.con);
@@ -2686,6 +2687,8 @@ struct rtrs_clt *rtrs_clt_open(struct rtrs_clt_ops *ops,
 			free_sess(sess);
 			goto close_all_sess;
 		}
+
+		rtrs_clt_fault_inject_init(&sess->fault_inject, sess);
 	}
 	err = alloc_permits(clt);
 	if (err)
@@ -2856,6 +2859,10 @@ int rtrs_clt_request(int dir, struct rtrs_clt_req_ops *ops,
 	for (path_it_init(&it, clt);
 	     (sess = it.next_path(&it)) && it.i < it.clt->paths_num; it.i++) {
 		if (unlikely(READ_ONCE(sess->state) != RTRS_CLT_CONNECTED))
+			continue;
+
+		err = rtrs_clt_should_fail_request(&sess->fault_inject);
+		if (unlikely(err))
 			continue;
 
 		if (unlikely(usr_len + hdr_len > sess->max_hdr_size)) {

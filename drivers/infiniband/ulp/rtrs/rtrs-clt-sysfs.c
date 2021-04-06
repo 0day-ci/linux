@@ -479,3 +479,47 @@ void rtrs_clt_destroy_sysfs_root(struct rtrs_clt *clt)
 		kobject_put(clt->kobj_paths);
 	}
 }
+
+#ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
+void rtrs_clt_fault_inject_init(struct rtrs_clt_fault_inject *fault_inject,
+				struct rtrs_clt_sess *sess)
+{
+	char str[NAME_MAX];
+	int cnt;
+
+	cnt = sockaddr_to_str((struct sockaddr *)&sess->s.src_addr,
+			      str, sizeof(str));
+	cnt += scnprintf(str + cnt, sizeof(str) - cnt, "@");
+	sockaddr_to_str((struct sockaddr *)&sess->s.dst_addr,
+			str + cnt, sizeof(str) - cnt);
+
+	rtrs_fault_inject_init(&fault_inject->fj, str, -EBUSY);
+	/* injection points */
+	rtrs_fault_inject_add(fault_inject->fj.dir,
+			      "fail-request", &fault_inject->fail_request);
+}
+
+void rtrs_clt_fault_inject_final(struct rtrs_clt_fault_inject *fault_inject)
+{
+	rtrs_fault_inject_final(&fault_inject->fj);
+}
+
+int rtrs_clt_should_fail_request(struct rtrs_clt_fault_inject *fault_inject)
+{
+	if (fault_inject->fail_request && should_fail(&fault_inject->fj.attr, 1))
+		return fault_inject->fj.status;
+	return 0;
+}
+#else
+void rtrs_clt_fault_inject_init(struct rtrs_clt_fault_inject *fault_inject,
+				struct rtrs_clt_sess *sess)
+{
+}
+void rtrs_clt_fault_inject_final(struct rtrs_clt_fault_inject *fault_inject)
+{
+}
+int rtrs_clt_should_fail_request(struct rtrs_clt_fault_inject *fault_inject)
+{
+	return 0;
+}
+#endif
