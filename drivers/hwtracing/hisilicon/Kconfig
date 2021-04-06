@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config HISI_PTT
+	tristate "HiSilicon PCIe Tune and Trace Device"
+	depends on (ARM64 && PCI && HAS_DMA && HAS_IOMEM && DEBUG_FS) || COMPILE_TEST
+	help
+	  HiSilicon PCIe Tune and Trace Device exist as a PCIe iEP
+	  device, provides support for PCIe traffic tuning and
+	  tracing TLP headers to the memory.
