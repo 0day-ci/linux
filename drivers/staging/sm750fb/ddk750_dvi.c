@@ -11,26 +11,26 @@
  * function API. Please set the function pointer to NULL whenever the function
  * is not supported.
  */
-static struct dvi_ctrl_device g_dcftSupportedDviController[] = {
+static struct dvi_ctrl_device g_dcft_supported_dvi_controller[] = {
 #ifdef DVI_CTRL_SII164
 	{
-		.pfnInit = sii164InitChip,
-		.pfnGetVendorId = sii164GetVendorID,
-		.pfnGetDeviceId = sii164GetDeviceID,
+		.pfn_init = sii164_init_chip,
+		.pfn_get_vendor_id = sii164_get_vendor_id,
+		.pfn_get_device_id = sii164_get_device_id,
 #ifdef SII164_FULL_FUNCTIONS
-		.pfnResetChip = sii164ResetChip,
-		.pfnGetChipString = sii164GetChipString,
-		.pfnSetPower = sii164SetPower,
-		.pfnEnableHotPlugDetection = sii164EnableHotPlugDetection,
-		.pfnIsConnected = sii164IsConnected,
-		.pfnCheckInterrupt = sii164CheckInterrupt,
-		.pfnClearInterrupt = sii164ClearInterrupt,
+		.pfn_reset_chip = sii164_reset_chip,
+		.pfn_get_chip_string = sii164_get_chip_string,
+		.pfn_set_power = sii164_set_power,
+		.pfn_enable_hot_plug_detection = sii164_enable_hot_plug_detection,
+		.pfn_is_connected = sii164_is_connected,
+		.pfn_check_interrupt = sii164_check_interrupt,
+		.pfn_clear_interrupt = sii164_clear_interrupt,
 #endif
 	},
 #endif
 };
 
-int dviInit(unsigned char edge_select,
+int dvi_init(unsigned char edge_select,
 	    unsigned char bus_select,
 	    unsigned char dual_edge_clk_select,
 	    unsigned char hsync_enable,
@@ -41,11 +41,11 @@ int dviInit(unsigned char edge_select,
 	    unsigned char pll_filter_enable,
 	    unsigned char pll_filter_value)
 {
-	struct dvi_ctrl_device *pCurrentDviCtrl;
+	struct dvi_ctrl_device *p_current_dvi_ctrl;
 
-	pCurrentDviCtrl = g_dcftSupportedDviController;
-	if (pCurrentDviCtrl->pfnInit) {
-		return pCurrentDviCtrl->pfnInit(edge_select,
+	p_current_dvi_ctrl = g_dcft_supported_dvi_controller;
+	if (p_current_dvi_ctrl->pfn_init) {
+		return p_current_dvi_ctrl->pfn_init(edge_select,
 						bus_select,
 						dual_edge_clk_select,
 						hsync_enable,
