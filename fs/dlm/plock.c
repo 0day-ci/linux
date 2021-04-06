@@ -13,7 +13,7 @@
 #include "dlm_internal.h"
 #include "lockspace.h"
 
-static spinlock_t ops_lock;
+static DEFINE_SPINLOCK(ops_lock);
 static struct list_head send_list;
 static struct list_head recv_list;
 static wait_queue_head_t send_wq;
@@ -492,7 +492,6 @@ int dlm_plock_init(void)
 {
 	int rv;
 
-	spin_lock_init(&ops_lock);
 	INIT_LIST_HEAD(&send_list);
 	INIT_LIST_HEAD(&recv_list);
 	init_waitqueue_head(&send_wq);
