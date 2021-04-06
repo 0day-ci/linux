@@ -38,6 +38,7 @@
 #include <linux/avf/virtchnl.h>
 #include "iavf_txrx.h"
 #include "iavf_fdir.h"
+#include "iavf_adv_rss.h"
 
 #define DEFAULT_DEBUG_LEVEL_SHIFT 3
 #define PFX "iavf: "
@@ -304,6 +305,8 @@ struct iavf_adapter {
 #define IAVF_FLAG_AQ_DEL_CLOUD_FILTER		BIT(24)
 #define IAVF_FLAG_AQ_ADD_FDIR_FILTER		BIT(25)
 #define IAVF_FLAG_AQ_DEL_FDIR_FILTER		BIT(26)
+#define IAVF_FLAG_AQ_ADD_ADV_RSS_CFG		BIT(27)
+#define IAVF_FLAG_AQ_DEL_ADV_RSS_CFG		BIT(28)
 
 	/* OS defined structs */
 	struct net_device *netdev;
@@ -346,6 +349,8 @@ struct iavf_adapter {
 			      VIRTCHNL_VF_CAP_ADV_LINK_SPEED)
 #define FDIR_FLTR_SUPPORT(_a) ((_a)->vf_res->vf_cap_flags & \
 			       VIRTCHNL_VF_OFFLOAD_FDIR_PF)
+#define ADV_RSS_SUPPORT(_a) ((_a)->vf_res->vf_cap_flags & \
+			     VIRTCHNL_VF_OFFLOAD_ADV_RSS_PF)
 	struct virtchnl_vf_resource *vf_res; /* incl. all VSIs */
 	struct virtchnl_vsi_resource *vsi_res; /* our LAN VSI */
 	struct virtchnl_version_info pf_version;
@@ -373,6 +378,9 @@ struct iavf_adapter {
 	u16 fdir_active_fltr;
 	struct list_head fdir_list_head;
 	spinlock_t fdir_fltr_lock;	/* protect the Flow Director filter list */
+
+	struct list_head adv_rss_list_head;
+	spinlock_t adv_rss_lock;	/* protect the RSS management list */
 };
 
 
@@ -445,6 +453,8 @@ void iavf_add_cloud_filter(struct iavf_adapter *adapter);
 void iavf_del_cloud_filter(struct iavf_adapter *adapter);
 void iavf_add_fdir_filter(struct iavf_adapter *adapter);
 void iavf_del_fdir_filter(struct iavf_adapter *adapter);
+void iavf_add_adv_rss_cfg(struct iavf_adapter *adapter);
+void iavf_del_adv_rss_cfg(struct iavf_adapter *adapter);
 struct iavf_mac_filter *iavf_add_filter(struct iavf_adapter *adapter,
 					const u8 *macaddr);
 #endif /* _IAVF_H_ */
