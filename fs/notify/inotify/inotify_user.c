@@ -381,7 +381,7 @@ static int inotify_add_to_idr(struct idr *idr, spinlock_t *idr_lock,
 
 	spin_unlock(idr_lock);
 	idr_preload_end();
-	return ret < 0 ? ret : 0;
+	return min(ret, 0);
 }
 
 static struct inotify_inode_mark *inotify_idr_find_locked(struct fsnotify_group *group,
