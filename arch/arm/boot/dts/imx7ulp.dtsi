@@ -22,8 +22,10 @@
 		gpio1 = &gpio_ptd;
 		gpio2 = &gpio_pte;
 		gpio3 = &gpio_ptf;
-		i2c0 = &lpi2c6;
-		i2c1 = &lpi2c7;
+		i2c0 = &lpi2c4;
+		i2c1 = &lpi2c5;
+		i2c2 = &lpi2c6;
+		i2c3 = &lpi2c7;
 		mmc0 = &usdhc0;
 		mmc1 = &usdhc1;
 		serial0 = &lpuart4;
@@ -143,6 +145,31 @@
 				reg = <0x2000 0x1000>;
 				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 			};
+		};
+
+		lpi2c4: lpi2c4@402b0000 {
+			compatible = "fsl,imx7ulp-lpi2c";
+			reg = <0x402b0000 0x10000>;
+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&pcc2 IMX7ULP_CLK_LPI2C4>,
+				 <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>;
+			clock-names = "per", "ipg";
+			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPI2C4>;
+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
+			assigned-clock-rates = <48000000>;
+			status = "disabled";
+		};
+
+		lpi2c5: lpi2c5@402c0000 {
+			compatible = "fsl,imx7ulp-lpi2c";
+			reg = <0x402c0000 0x10000>;
+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&pcc2 IMX7ULP_CLK_LPI2C5>,
+				 <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>;
+			clock-names = "per", "ipg";
+			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPI2C5>;
+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
+			assigned-clock-rates = <48000000>;
 		};
 
 		lpuart4: serial@402d0000 {
