@@ -24,7 +24,7 @@
  * To trigger a readahead, btrfs_reada_add must be called. It will start
  * a read ahead for the given range [start, end) on tree root. The returned
  * handle can either be used to wait on the readahead to finish
- * (btrfs_reada_wait), or to send it to the background (btrfs_reada_detach).
+ * (btrfs_reada_wait).
  *
  * The read ahead works as follows:
  * On btrfs_reada_add, the root of the tree is inserted into a radix_tree.
@@ -1035,13 +1035,6 @@ int btrfs_reada_wait(void *handle)
 	return 0;
 }
 #endif
-
-void btrfs_reada_detach(void *handle)
-{
-	struct reada_control *rc = handle;
-
-	kref_put(&rc->refcnt, reada_control_release);
-}
 
 /*
  * Before removing a device (device replace or device remove ioctls), call this
