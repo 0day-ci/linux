@@ -428,6 +428,14 @@
 			snps,blen = <0 0 0 0 16 0 0>;
 		};
 
+		fpga_bridge0: fpga_bridge@ff200000 {
+			compatible = "altr,socfpga-lwhps2fpga-bridge";
+			reg = <0xff200000 0x100000>;
+			resets = <&rst LWHPS2FPGA_RESET>;
+			clocks = <&l4_main_clk>;
+			status = "disabled";
+		};
+
 		gmac0: ethernet@ff800000 {
 			compatible = "altr,socfpga-stmmac-a10-s10", "snps,dwmac-3.72a", "snps,dwmac";
 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
