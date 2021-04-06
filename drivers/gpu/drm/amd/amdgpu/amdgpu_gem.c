@@ -41,6 +41,36 @@
 
 static const struct drm_gem_object_funcs amdgpu_gem_object_funcs;
 
+static vm_fault_t amdgpu_ttm_fault(struct vm_fault *vmf)
+{
+	struct ttm_buffer_object *bo = vmf->vma->vm_private_data;
+	vm_fault_t ret;
+
+	ret = ttm_bo_vm_reserve(bo, vmf);
+	if (ret)
+		return ret;
+
+	ret = amdgpu_bo_fault_reserve_notify(bo);
+	if (ret)
+		goto unlock;
+
+	ret = ttm_bo_vm_fault_reserved(vmf, vmf->vma->vm_page_prot,
+				       TTM_BO_VM_NUM_PREFAULT, 1);
+	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
+		return ret;
+
+unlock:
+	dma_resv_unlock(bo->base.resv);
+	return ret;
+}
+
+static const struct vm_operations_struct amdgpu_ttm_vm_ops = {
+	.fault = amdgpu_ttm_fault,
+	.open = ttm_bo_vm_open,
+	.close = ttm_bo_vm_close,
+	.access = ttm_bo_vm_access
+};
+
 static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 {
 	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
@@ -205,6 +235,38 @@ out_unlock:
 	ttm_eu_backoff_reservation(&ticket, &list);
 }
 
+static int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	unsigned long asize = amdgpu_bo_size(bo);
+
+	if (!vma->vm_file)
+		return -ENODEV;
+
+	if (!adev)
+		return -ENODEV;
+
+	/* Check for valid size. */
+	if (asize < vma->vm_end - vma->vm_start)
+		return -EINVAL;
+
+	/*
+	 * Don't verify access for KFD BOs. They don't have a GEM
+	 * object associated with them.
+	 */
+	if (bo->kfd_bo)
+		goto out;
+
+	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) ||
+	    (bo->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS)) {
+		return -EPERM;
+	}
+
+out:
+	return drm_gem_ttm_mmap(obj, vma);
+}
+
 static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.free = amdgpu_gem_object_free,
 	.open = amdgpu_gem_object_open,
@@ -212,6 +274,8 @@ static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.export = amdgpu_gem_prime_export,
 	.vmap = drm_gem_ttm_vmap,
 	.vunmap = drm_gem_ttm_vunmap,
+	.mmap = amdgpu_gem_prime_mmap,
+	.vm_ops = &amdgpu_ttm_vm_ops,
 };
 
 /*
