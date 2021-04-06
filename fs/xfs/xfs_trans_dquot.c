@@ -53,6 +53,8 @@ xfs_trans_log_dquot(
 	struct xfs_dquot	*dqp)
 {
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
+	/* quotaoff expects no dquots logged after deactivation */
+	ASSERT(xfs_this_quota_on(tp->t_mountp, xfs_dquot_type(dqp)));
 
 	/* Upgrade the dquot to bigtime format if possible. */
 	if (dqp->q_id != 0 &&

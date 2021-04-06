@@ -29,7 +29,8 @@ xfs_qm_log_quotaoff(
 	int			error;
 	struct xfs_qoff_logitem	*qoffi;
 
-	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_qm_quotaoff, 0, 0, 0, &tp);
+	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_qm_quotaoff, 0, 0,
+				XFS_TRANS_NO_WRITECOUNT, &tp);
 	if (error)
 		goto out;
 
@@ -67,7 +68,8 @@ xfs_qm_log_quotaoff_end(
 	int			error;
 	struct xfs_qoff_logitem	*qoffi;
 
-	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_qm_equotaoff, 0, 0, 0, &tp);
+	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_qm_equotaoff, 0, 0,
+				XFS_TRANS_NO_WRITECOUNT, &tp);
 	if (error)
 		return error;
 
@@ -106,8 +108,8 @@ xfs_qm_scall_quotaoff(
 
 	/*
 	 * No file system can have quotas enabled on disk but not in core.
-	 * Note that quota utilities (like quotaoff) _expect_
-	 * errno == -EEXIST here.
+	 * Note that quota utilities (like quotaoff) _expect_ errno == -EEXIST
+	 * here.
 	 */
 	if ((mp->m_qflags & flags) == 0)
 		return -EEXIST;
@@ -116,17 +118,14 @@ xfs_qm_scall_quotaoff(
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
 
 	/*
-	 * We don't want to deal with two quotaoffs messing up each other,
-	 * so we're going to serialize it. quotaoff isn't exactly a performance
+	 * We don't want to deal with two quotaoffs messing up each other, so
+	 * we're going to serialize it. quotaoff isn't exactly a performance
 	 * critical thing.
-	 * If quotaoff, then we must be dealing with the root filesystem.
 	 */
 	ASSERT(q);
 	mutex_lock(&q->qi_quotaofflock);
 
-	/*
-	 * If we're just turning off quota enforcement, change mp and go.
-	 */
+	/* if we're just turning off quota enforcement, change mp and go */
 	if ((flags & XFS_ALL_QUOTA_ACCT) == 0) {
 		mp->m_qflags &= ~(flags);
 
@@ -142,9 +141,9 @@ xfs_qm_scall_quotaoff(
 	dqtype = 0;
 	inactivate_flags = 0;
 	/*
-	 * If accounting is off, we must turn enforcement off, clear the
-	 * quota 'CHKD' certificate to make it known that we have to
-	 * do a quotacheck the next time this quota is turned on.
+	 * If accounting is off, we must turn enforcement off, clear the quota
+	 * 'CHKD' certificate to make it known that we have to do a quotacheck
+	 * the next time this quota is turned on.
 	 */
 	if (flags & XFS_UQUOTA_ACCT) {
 		dqtype |= XFS_QMOPT_UQUOTA;
@@ -163,89 +162,87 @@ xfs_qm_scall_quotaoff(
 	}
 
 	/*
-	 * Nothing to do?  Don't complain. This happens when we're just
-	 * turning off quota enforcement.
+	 * Nothing to do? Don't complain. This happens when we're just turning
+	 * off quota enforcement.
 	 */
 	if ((mp->m_qflags & flags) == 0)
 		goto out_unlock;
 
 	/*
-	 * Write the LI_QUOTAOFF log record, and do SB changes atomically,
-	 * and synchronously. If we fail to write, we should abort the
-	 * operation as it cannot be recovered safely if we crash.
-	 */
-	error = xfs_qm_log_quotaoff(mp, &qoffstart, flags);
-	if (error)
-		goto out_unlock;
-
-	/*
-	 * Next we clear the XFS_MOUNT_*DQ_ACTIVE bit(s) in the mount struct
-	 * to take care of the race between dqget and quotaoff. We don't take
-	 * any special locks to reset these bits. All processes need to check
-	 * these bits *after* taking inode lock(s) to see if the particular
-	 * quota type is in the process of being turned off. If *ACTIVE, it is
-	 * guaranteed that all dquot structures and all quotainode ptrs will all
-	 * stay valid as long as that inode is kept locked.
+	 * Quotaoff must deactivate the associated quota mode(s), release dquots
+	 * from inodes and purge them from the system all while the filesystem
+	 * remains active. We have two quotaoff log records that traditionally
+	 * bound the start and end of this sequence. This guarantees that no
+	 * dquots are modified after the end item hits the log, but quotaoff can
+	 * be time consuming and thus prone to deadlock because the start item
+	 * pins the tail the of log in the meantime (and we can't hold the end
+	 * transaction open across the dqrele scan).
 	 *
-	 * There is no turning back after this.
+	 * The critical aspect of correctly logging quotaoff is that no dquots
+	 * are modified after the quotaoff end item hits the on-disk log.
+	 * Otherwise the quotaoff can fall off the tail and log recovery can
+	 * replay incorrect data. Instead of letting the start item sit in the
+	 * log while quotaoff completes, we can provide the same guarantee via a
+	 * runtime barrier for dquot modifications. Specifically, we pause all
+	 * transactions on the system via the transaction subsystem lock, log
+	 * both start and end items (via sync transactions, which drains the
+	 * CIL), deactivate the quota, and then resume the transaction subsystem
+	 * while quotaoff completes.
+	 *
+	 * This is safe because the remaining quotaoff work is in-core cleanup
+	 * and all subsequent transactions should see the updated quota state
+	 * due to memory ordering provided by the lock. We also avoid deadlock
+	 * by committing both items sequentially with near exclusive access to
+	 * the transaction subsystem.
 	 */
+	percpu_down_write(&mp->m_trans_rwsem);
+
+	error = xfs_qm_log_quotaoff(mp, &qoffstart, flags);
+	if (error) {
+		percpu_up_write(&mp->m_trans_rwsem);
+		goto out_unlock;
+	}
+
 	mp->m_qflags &= ~inactivate_flags;
 
-	/*
-	 * Give back all the dquot reference(s) held by inodes.
-	 * Here we go thru every single incore inode in this file system, and
-	 * do a dqrele on the i_udquot/i_gdquot that it may have.
-	 * Essentially, as long as somebody has an inode locked, this guarantees
-	 * that quotas will not be turned off. This is handy because in a
-	 * transaction once we lock the inode(s) and check for quotaon, we can
-	 * depend on the quota inodes (and other things) being valid as long as
-	 * we keep the lock(s).
-	 */
-	xfs_qm_dqrele_all_inodes(mp, flags);
-
-	/*
-	 * Next we make the changes in the quota flag in the mount struct.
-	 * This isn't protected by a particular lock directly, because we
-	 * don't want to take a mrlock every time we depend on quotas being on.
-	 */
-	mp->m_qflags &= ~flags;
-
-	/*
-	 * Go through all the dquots of this file system and purge them,
-	 * according to what was turned off.
-	 */
-	xfs_qm_dqpurge_all(mp, dqtype);
-
-	/*
-	 * Transactions that had started before ACTIVE state bit was cleared
-	 * could have logged many dquots, so they'd have higher LSNs than
-	 * the first QUOTAOFF log record does. If we happen to crash when
-	 * the tail of the log has gone past the QUOTAOFF record, but
-	 * before the last dquot modification, those dquots __will__
-	 * recover, and that's not good.
-	 *
-	 * So, we have QUOTAOFF start and end logitems; the start
-	 * logitem won't get overwritten until the end logitem appears...
-	 */
 	error = xfs_qm_log_quotaoff_end(mp, &qoffstart, flags);
 	if (error) {
+		percpu_up_write(&mp->m_trans_rwsem);
 		/* We're screwed now. Shutdown is the only option. */
 		xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
 		goto out_unlock;
 	}
 
+	percpu_up_write(&mp->m_trans_rwsem);
+
 	/*
-	 * If all quotas are completely turned off, close shop.
+	 * Release dquot references held by inodes. Technically some contexts
+	 * might not pick up the quota state change until the inode lock is
+	 * cycled if there is no transaction. We don't care about that above
+	 * because a dquot can't be logged without a transaction and we can't
+	 * release/purge a dquot here until we've cycled the locks of all inodes
+	 * that reference it.
 	 */
+	xfs_qm_dqrele_all_inodes(mp, flags);
+
+	/*
+	 * Next we make the changes in the quota flag in the mount struct.
+	 * This isn't protected by a particular lock directly, because we don't
+	 * want to take a mrlock every time we depend on quotas being on.
+	 */
+	mp->m_qflags &= ~flags;
+
+	/* purge all deactivated dquots from the filesystem */
+	xfs_qm_dqpurge_all(mp, dqtype);
+
+	/* if all quotas are completely turned off, close shop */
 	if (mp->m_qflags == 0) {
 		mutex_unlock(&q->qi_quotaofflock);
 		xfs_qm_destroy_quotainfo(mp);
 		return 0;
 	}
 
-	/*
-	 * Release our quotainode references if we don't need them anymore.
-	 */
+	/* release our quotainode references if we don't need them anymore */
 	if ((dqtype & XFS_QMOPT_UQUOTA) && q->qi_uquotaip) {
 		xfs_irele(q->qi_uquotaip);
 		q->qi_uquotaip = NULL;
