@@ -335,24 +335,14 @@ static void vfio_ap_mdev_commit_apcb(struct ap_matrix_mdev *matrix_mdev)
 static void vfio_ap_mdev_filter_apcb(struct ap_matrix_mdev *matrix_mdev,
 				     struct ap_matrix *shadow_apcb)
 {
-	int ret;
 	unsigned long apid, apqi, apqn;
 
-	ret = ap_qci(&matrix_dev->info);
-	if (ret)
-		return;
-
-	/*
-	 * Copy the adapters, domains and control domains to the shadow_apcb
-	 * from the matrix mdev, but only those that are assigned to the host's
-	 * AP configuration.
-	 */
 	bitmap_and(shadow_apcb->apm, matrix_mdev->matrix.apm,
-		   (unsigned long *)matrix_dev->info.apm, AP_DEVICES);
+		   (unsigned long *)matrix_dev->config_info.apm, AP_DEVICES);
 	bitmap_and(shadow_apcb->aqm, matrix_mdev->matrix.aqm,
-		   (unsigned long *)matrix_dev->info.aqm, AP_DOMAINS);
+		   (unsigned long *)matrix_dev->config_info.aqm, AP_DOMAINS);
 	bitmap_and(shadow_apcb->adm, matrix_mdev->matrix.adm,
-		   (unsigned long *)matrix_dev->info.adm, AP_DOMAINS);
+		   (unsigned long *)matrix_dev->config_info.adm, AP_DOMAINS);
 
 	for_each_set_bit_inv(apid, shadow_apcb->apm, AP_DEVICES) {
 		for_each_set_bit_inv(apqi, shadow_apcb->aqm, AP_DOMAINS) {
@@ -385,7 +375,7 @@ static void vfio_ap_mdev_refresh_apcb(struct ap_matrix_mdev *matrix_mdev)
 {
 	struct ap_matrix shadow_apcb;
 
-	vfio_ap_matrix_init(&matrix_dev->info, &shadow_apcb);
+	vfio_ap_matrix_init(&matrix_dev->config_info, &shadow_apcb);
 	vfio_ap_mdev_filter_apcb(matrix_mdev, &shadow_apcb);
 
 	if (memcmp(&shadow_apcb, &matrix_mdev->shadow_apcb,
@@ -410,9 +400,9 @@ static int vfio_ap_mdev_create(struct kobject *kobj, struct mdev_device *mdev)
 	}
 
 	matrix_mdev->mdev = mdev;
-	vfio_ap_matrix_init(&matrix_dev->info, &matrix_mdev->matrix);
+	vfio_ap_matrix_init(&matrix_dev->config_info, &matrix_mdev->matrix);
 	init_waitqueue_head(&matrix_mdev->wait_for_kvm);
-	vfio_ap_matrix_init(&matrix_dev->info, &matrix_mdev->shadow_apcb);
+	vfio_ap_matrix_init(&matrix_dev->config_info, &matrix_mdev->shadow_apcb);
 	hash_init(matrix_mdev->qtable);
 	mdev_set_drvdata(mdev, matrix_mdev);
 	matrix_mdev->pqap_hook.hook = handle_pqap;
@@ -952,7 +942,8 @@ static void vfio_ap_mdev_hot_plug_cdom(struct ap_matrix_mdev *matrix_mdev,
 				       unsigned long domid)
 {
 	if (!test_bit_inv(domid, matrix_mdev->shadow_apcb.adm) &&
-	    test_bit_inv(domid, (unsigned long *)matrix_dev->info.adm)) {
+	    test_bit_inv(domid,
+			 (unsigned long *)matrix_dev->config_info.adm)) {
 		set_bit_inv(domid, matrix_mdev->shadow_apcb.adm);
 		vfio_ap_mdev_commit_apcb(matrix_mdev);
 	}
@@ -1596,15 +1587,27 @@ int vfio_ap_mdev_probe_queue(struct ap_device *apdev)
 	vfio_ap_queue_link_mdev(q);
 	if (q->matrix_mdev) {
 		/*
-		 * If the KVM pointer is in the process of being set, wait until the
-		 * process has completed.
+		 * If we are in the process of adding adapters and/or domains
+		 * due to a change to the host's AP configuration, it is more
+		 * efficient to refresh the guest's APCB in a single operation
+		 * after the AP bus scan is complete (see the
+		 * vfio_ap_on_scan_complete function) rather than to do the
+		 * refresh for each queue added, so if that is not the case,
+		 * let's go ahead and refresh the guest's APCB here.
 		 */
-		wait_event_cmd(q->matrix_mdev->wait_for_kvm,
-			       !q->matrix_mdev->kvm_busy,
-			       mutex_unlock(&matrix_dev->lock),
-			       mutex_lock(&matrix_dev->lock));
+		if (bitmap_empty(matrix_dev->ap_add, AP_DEVICES) &&
+		    bitmap_empty(matrix_dev->aq_add, AP_DOMAINS)) {
+			/*
+			 * If the KVM pointer is in the process of being set, wait until the
+			 * process has completed.
+			 */
+			wait_event_cmd(q->matrix_mdev->wait_for_kvm,
+				       !q->matrix_mdev->kvm_busy,
+				       mutex_unlock(&matrix_dev->lock),
+				       mutex_lock(&matrix_dev->lock));
 
-		vfio_ap_mdev_refresh_apcb(q->matrix_mdev);
+			vfio_ap_mdev_refresh_apcb(q->matrix_mdev);
+		}
 	}
 	dev_set_drvdata(&apdev->device, q);
 	mutex_unlock(&matrix_dev->lock);
@@ -1646,8 +1649,172 @@ int vfio_ap_mdev_resource_in_use(unsigned long *apm, unsigned long *aqm)
 
 	if (!mutex_trylock(&matrix_dev->lock))
 		return -EBUSY;
+
 	ret = vfio_ap_mdev_verify_no_sharing(apm, aqm);
 	mutex_unlock(&matrix_dev->lock);
 
 	return ret;
+}
+
+/*
+ * vfio_ap_mdev_unlink_apids
+ *
+ * @matrix_mdev: The matrix mediated device
+ *
+ * @apid_rem: The bitmap specifying the APIDs of the adapters removed from
+ *	      the host's AP configuration
+ *
+ * Unlinks @matrix_mdev from each queue assigned to @matrix_mdev whose APQN
+ * contains an APID specified in @apid_rem.
+ *
+ * Returns true if one or more AP queue devices were unlinked; otherwise,
+ * returns false.
+ */
+static bool vfio_ap_mdev_unlink_apids(struct ap_matrix_mdev *matrix_mdev,
+				      unsigned long *apid_rem)
+{
+	int bkt, apid;
+	bool q_unlinked = false;
+	struct vfio_ap_queue *q;
+
+	hash_for_each(matrix_mdev->qtable, bkt, q, mdev_qnode) {
+		apid = AP_QID_CARD(q->apqn);
+		if (test_bit_inv(apid, apid_rem)) {
+			vfio_ap_mdev_reset_queue(q, 1);
+			vfio_ap_mdev_unlink_queue(q);
+			q_unlinked = true;
+		}
+	}
+
+	return q_unlinked;
+}
+
+/*
+ * vfio_ap_mdev_unlink_apqis
+ *
+ * @matrix_mdev: The matrix mediated device
+ *
+ * @apqi_rem: The bitmap specifying the APQIs of the domains removed from
+ *	      the host's AP configuration
+ *
+ * Unlinks @matrix_mdev from each queue assigned to @matrix_mdev whose APQN
+ * contains an APQI specified in @apqi_rem.
+ *
+ * Returns true if one or more AP queue devices were unlinked; otherwise,
+ * returns false.
+ */
+static bool vfio_ap_mdev_unlink_apqis(struct ap_matrix_mdev *matrix_mdev,
+				      unsigned long *apqi_rem)
+{
+	int bkt, apqi;
+	bool q_unlinked = false;
+	struct vfio_ap_queue *q;
+
+	hash_for_each(matrix_mdev->qtable, bkt, q, mdev_qnode) {
+		apqi = AP_QID_QUEUE(q->apqn);
+		if (test_bit_inv(apqi, apqi_rem)) {
+			vfio_ap_mdev_reset_queue(q, 1);
+			vfio_ap_mdev_unlink_queue(q);
+			q_unlinked = true;
+		}
+	}
+
+	return q_unlinked;
+}
+
+static void vfio_ap_mdev_on_cfg_remove(void)
+{
+	bool refresh_apcb = false;
+	int ap_remove, aq_remove;
+	struct ap_matrix_mdev *matrix_mdev;
+	DECLARE_BITMAP(aprem, AP_DEVICES);
+	DECLARE_BITMAP(aqrem, AP_DOMAINS);
+	unsigned long *cur_apm, *cur_aqm, *prev_apm, *prev_aqm;
+
+	cur_apm = (unsigned long *)matrix_dev->config_info.apm;
+	cur_aqm = (unsigned long *)matrix_dev->config_info.aqm;
+	prev_apm = (unsigned long *)matrix_dev->config_info_prev.apm;
+	prev_aqm = (unsigned long *)matrix_dev->config_info_prev.aqm;
+
+	ap_remove = bitmap_andnot(aprem, prev_apm, cur_apm, AP_DEVICES);
+	aq_remove = bitmap_andnot(aqrem, prev_aqm, cur_aqm, AP_DOMAINS);
+
+	if (!ap_remove && !aq_remove)
+		return;
+
+	list_for_each_entry(matrix_mdev, &matrix_dev->mdev_list, node) {
+		if (ap_remove)
+			refresh_apcb = vfio_ap_mdev_unlink_apids(matrix_mdev,
+								 aprem);
+
+		if (aq_remove)
+			refresh_apcb = vfio_ap_mdev_unlink_apqis(matrix_mdev,
+								 aqrem);
+
+		if (refresh_apcb)
+			vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	}
+}
+
+static void vfio_ap_mdev_on_cfg_add(void)
+{
+	unsigned long *cur_apm, *cur_aqm, *cur_adm;
+	unsigned long *prev_apm, *prev_aqm, *prev_adm;
+
+	cur_apm = (unsigned long *)matrix_dev->config_info.apm;
+	cur_aqm = (unsigned long *)matrix_dev->config_info.aqm;
+	cur_adm = (unsigned long *)matrix_dev->config_info.adm;
+
+	prev_apm = (unsigned long *)matrix_dev->config_info_prev.apm;
+	prev_aqm = (unsigned long *)matrix_dev->config_info_prev.aqm;
+	prev_adm = (unsigned long *)matrix_dev->config_info_prev.adm;
+
+	bitmap_andnot(matrix_dev->ap_add, cur_apm, prev_apm, AP_DEVICES);
+	bitmap_andnot(matrix_dev->aq_add, cur_aqm, prev_aqm, AP_DOMAINS);
+	bitmap_andnot(matrix_dev->ad_add, cur_adm, prev_adm, AP_DOMAINS);
+}
+
+void vfio_ap_init_mdev_matrixes(struct ap_config_info *config_info)
+{
+	struct ap_matrix_mdev *matrix_mdev;
+
+	list_for_each_entry(matrix_mdev, &matrix_dev->mdev_list, node) {
+		vfio_ap_matrix_init(config_info, &matrix_mdev->matrix);
+		vfio_ap_matrix_init(config_info, &matrix_mdev->shadow_apcb);
+	}
+}
+
+void vfio_ap_on_cfg_changed(struct ap_config_info *new_config_info,
+			    struct ap_config_info *old_config_info)
+{
+	mutex_lock(&matrix_dev->lock);
+	memcpy(&matrix_dev->config_info, new_config_info,
+	       sizeof(struct ap_config_info));
+	memcpy(&matrix_dev->config_info_prev, old_config_info,
+	       sizeof(struct ap_config_info));
+	vfio_ap_init_mdev_matrixes(new_config_info);
+	vfio_ap_mdev_on_cfg_remove();
+	vfio_ap_mdev_on_cfg_add();
+	mutex_unlock(&matrix_dev->lock);
+}
+
+void vfio_ap_on_scan_complete(struct ap_config_info *new_config_info,
+			      struct ap_config_info *old_config_info)
+{
+	struct ap_matrix_mdev *matrix_mdev;
+
+	mutex_lock(&matrix_dev->lock);
+	list_for_each_entry(matrix_mdev, &matrix_dev->mdev_list, node) {
+		if (bitmap_intersects(matrix_mdev->matrix.apm,
+				      matrix_dev->ap_add, AP_DEVICES) ||
+		    bitmap_intersects(matrix_mdev->matrix.aqm,
+				      matrix_dev->aq_add, AP_DOMAINS) ||
+		    bitmap_intersects(matrix_mdev->matrix.adm,
+				      matrix_dev->ad_add, AP_DOMAINS))
+			vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	}
+
+	bitmap_clear(matrix_dev->ap_add, 0, AP_DEVICES);
+	bitmap_clear(matrix_dev->aq_add, 0, AP_DOMAINS);
+	mutex_unlock(&matrix_dev->lock);
 }
