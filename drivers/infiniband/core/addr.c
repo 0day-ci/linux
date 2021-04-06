@@ -883,6 +883,7 @@ int addr_init(void)
 void addr_cleanup(void)
 {
 	unregister_netevent_notifier(&nb);
+	flush_workqueue(addr_wq);
 	destroy_workqueue(addr_wq);
 	WARN_ON(!list_empty(&req_list));
 }
