@@ -19,26 +19,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "nouveau_dmem.h"
-#include "nouveau_drv.h"
-#include "nouveau_chan.h"
-#include "nouveau_dma.h"
-#include "nouveau_mem.h"
-#include "nouveau_bo.h"
-#include "nouveau_svm.h"
-
+#include <linux/hmm.h>
+#include <linux/sched/mm.h>
+#include <nvhw/class/cla0b5.h>
 #include <nvif/class.h>
-#include <nvif/object.h>
-#include <nvif/push906f.h>
 #include <nvif/if000c.h>
 #include <nvif/if500b.h>
 #include <nvif/if900b.h>
-#include <nvif/if000c.h>
+#include <nvif/object.h>
+#include <nvif/push906f.h>
 
-#include <nvhw/class/cla0b5.h>
-
-#include <linux/sched/mm.h>
-#include <linux/hmm.h>
+#include "nouveau_bo.h"
+#include "nouveau_chan.h"
+#include "nouveau_dma.h"
+#include "nouveau_dmem.h"
+#include "nouveau_drv.h"
+#include "nouveau_mem.h"
+#include "nouveau_svm.h"
 
 /*
  * FIXME: this is ugly right now we are using TTM to allocate vram and we pin
