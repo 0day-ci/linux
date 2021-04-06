@@ -198,7 +198,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (ret)
 		return ret;
 
-	pwm_get_state(pwm, &curstate);
+	pwm_get_last_applied_state(pwm, &curstate);
 	enabled = curstate.enabled;
 
 	if (state->polarity != curstate.polarity && enabled &&

@@ -627,7 +627,7 @@ static u32 ext_pwm_get_backlight(struct intel_connector *connector, enum pipe un
 	struct intel_panel *panel = &connector->panel;
 	struct pwm_state state;
 
-	pwm_get_state(panel->backlight.pwm, &state);
+	pwm_get_last_applied_state(panel->backlight.pwm, &state);
 	return pwm_get_relative_duty_cycle(&state, 100);
 }
 
@@ -1915,7 +1915,7 @@ static int ext_pwm_setup_backlight(struct intel_connector *connector,
 
 	if (pwm_is_enabled(panel->backlight.pwm)) {
 		/* PWM is already enabled, use existing settings */
-		pwm_get_state(panel->backlight.pwm, &panel->backlight.pwm_state);
+		pwm_get_last_applied_state(panel->backlight.pwm, &panel->backlight.pwm_state);
 
 		level = pwm_get_relative_duty_cycle(&panel->backlight.pwm_state,
 						    100);

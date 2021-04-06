@@ -41,7 +41,7 @@ static int stm32_pwm_lp_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	bool reenable;
 	int ret;
 
-	pwm_get_state(pwm, &cstate);
+	pwm_get_last_applied_state(pwm, &cstate);
 	reenable = !cstate.enabled;
 
 	if (!state->enabled) {
@@ -234,7 +234,7 @@ static int __maybe_unused stm32_pwm_lp_suspend(struct device *dev)
 	struct stm32_pwm_lp *priv = dev_get_drvdata(dev);
 	struct pwm_state state;
 
-	pwm_get_state(&priv->chip.pwms[0], &state);
+	pwm_get_last_applied_state(&priv->chip.pwms[0], &state);
 	if (state.enabled) {
 		dev_err(dev, "The consumer didn't stop us (%s)\n",
 			priv->chip.pwms[0].label);

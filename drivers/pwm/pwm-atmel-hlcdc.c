@@ -198,7 +198,7 @@ static int atmel_hlcdc_pwm_resume(struct device *dev)
 	struct pwm_state state;
 	int ret;
 
-	pwm_get_state(&chip->chip.pwms[0], &state);
+	pwm_get_last_applied_state(&chip->chip.pwms[0], &state);
 
 	/* Re-enable the periph clock it was stopped during suspend. */
 	if (!state.enabled) {

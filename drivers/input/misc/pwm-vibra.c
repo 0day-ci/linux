@@ -48,7 +48,7 @@ static int pwm_vibrator_start(struct pwm_vibrator *vibrator)
 		vibrator->vcc_on = true;
 	}
 
-	pwm_get_state(vibrator->pwm, &state);
+	pwm_get_last_applied_state(vibrator->pwm, &state);
 	pwm_set_relative_duty_cycle(&state, vibrator->level, 0xffff);
 	state.enabled = true;
 
@@ -59,7 +59,7 @@ static int pwm_vibrator_start(struct pwm_vibrator *vibrator)
 	}
 
 	if (vibrator->pwm_dir) {
-		pwm_get_state(vibrator->pwm_dir, &state);
+		pwm_get_last_applied_state(vibrator->pwm_dir, &state);
 		state.duty_cycle = vibrator->direction_duty_cycle;
 		state.enabled = true;
 

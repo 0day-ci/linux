@@ -40,7 +40,7 @@ static ssize_t period_show(struct device *child,
 	const struct pwm_device *pwm = child_to_pwm_device(child);
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return sprintf(buf, "%llu\n", state.period);
 }
@@ -60,7 +60,7 @@ static ssize_t period_store(struct device *child,
 		return ret;
 
 	mutex_lock(&export->lock);
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	state.period = val;
 	ret = pwm_apply_state(pwm, &state);
 	mutex_unlock(&export->lock);
@@ -75,7 +75,7 @@ static ssize_t duty_cycle_show(struct device *child,
 	const struct pwm_device *pwm = child_to_pwm_device(child);
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return sprintf(buf, "%llu\n", state.duty_cycle);
 }
@@ -95,7 +95,7 @@ static ssize_t duty_cycle_store(struct device *child,
 		return ret;
 
 	mutex_lock(&export->lock);
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	state.duty_cycle = val;
 	ret = pwm_apply_state(pwm, &state);
 	mutex_unlock(&export->lock);
@@ -110,7 +110,7 @@ static ssize_t enable_show(struct device *child,
 	const struct pwm_device *pwm = child_to_pwm_device(child);
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return sprintf(buf, "%d\n", state.enabled);
 }
@@ -130,7 +130,7 @@ static ssize_t enable_store(struct device *child,
 
 	mutex_lock(&export->lock);
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	switch (val) {
 	case 0:
@@ -159,7 +159,7 @@ static ssize_t polarity_show(struct device *child,
 	const char *polarity = "unknown";
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	switch (state.polarity) {
 	case PWM_POLARITY_NORMAL:
@@ -192,7 +192,7 @@ static ssize_t polarity_store(struct device *child,
 		return -EINVAL;
 
 	mutex_lock(&export->lock);
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	state.polarity = polarity;
 	ret = pwm_apply_state(pwm, &state);
 	mutex_unlock(&export->lock);
@@ -392,7 +392,7 @@ static struct pwm_export *pwm_class_get_state(struct device *parent,
 	put_device(child);	/* for device_find_child() */
 
 	mutex_lock(&export->lock);
-	pwm_get_state(pwm, state);
+	pwm_get_last_applied_state(pwm, state);
 
 	return export;
 }

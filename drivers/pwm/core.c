@@ -667,7 +667,7 @@ int pwm_adjust_config(struct pwm_device *pwm)
 	struct pwm_args pargs;
 
 	pwm_get_args(pwm, &pargs);
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	/*
 	 * If the current period is zero it means that either the PWM driver
@@ -1244,7 +1244,7 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
 		struct pwm_device *pwm = &chip->pwms[i];
 		struct pwm_state state;
 
-		pwm_get_state(pwm, &state);
+		pwm_get_last_applied_state(pwm, &state);
 
 		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
 

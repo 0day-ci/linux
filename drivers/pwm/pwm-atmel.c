@@ -241,7 +241,7 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	u32 pres, val;
 	int ret;
 
-	pwm_get_state(pwm, &cstate);
+	pwm_get_last_applied_state(pwm, &cstate);
 
 	if (state->enabled) {
 		if (cstate.enabled &&

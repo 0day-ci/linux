@@ -239,7 +239,7 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	unsigned long now;
 	bool bypass;
 
-	pwm_get_state(pwm, &cstate);
+	pwm_get_last_applied_state(pwm, &cstate);
 
 	if (!cstate.enabled) {
 		ret = clk_prepare_enable(sun4i_pwm->clk);

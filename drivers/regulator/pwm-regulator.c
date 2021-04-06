@@ -58,7 +58,7 @@ static void pwm_regulator_init_state(struct regulator_dev *rdev)
 	unsigned int dutycycle;
 	int i;
 
-	pwm_get_state(drvdata->pwm, &pwm_state);
+	pwm_get_last_applied_state(drvdata->pwm, &pwm_state);
 	dutycycle = pwm_get_relative_duty_cycle(&pwm_state, 100);
 
 	for (i = 0; i < rdev->desc->n_voltages; i++) {
@@ -155,7 +155,7 @@ static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
 	unsigned int diff_duty;
 	unsigned int voltage;
 
-	pwm_get_state(drvdata->pwm, &pstate);
+	pwm_get_last_applied_state(drvdata->pwm, &pstate);
 
 	voltage = pwm_get_relative_duty_cycle(&pstate, duty_unit);
 

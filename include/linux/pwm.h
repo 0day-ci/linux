@@ -88,12 +88,18 @@ struct pwm_device {
 };
 
 /**
- * pwm_get_state() - retrieve the current PWM state
+ * pwm_get_last_applied_state() - retrieve the PWM state that was passed to
+ *                                pwm_apply_state() before
+ *
+ * If pwm_apply_state() wasn't called before the state returned might be what is
+ * actually implemented in the hardware (if supported by the driver) or a
+ * default setting.
+ *
  * @pwm: PWM device
  * @state: state to fill with the current PWM state
  */
-static inline void pwm_get_state(const struct pwm_device *pwm,
-				 struct pwm_state *state)
+static inline void pwm_get_last_applied_state(const struct pwm_device *pwm,
+					      struct pwm_state *state)
 {
 	*state = pwm->state;
 }
@@ -102,7 +108,7 @@ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
 {
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return state.enabled;
 }
@@ -117,7 +123,7 @@ static inline u64 pwm_get_period(const struct pwm_device *pwm)
 {
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return state.period;
 }
@@ -132,7 +138,7 @@ static inline u64 pwm_get_duty_cycle(const struct pwm_device *pwm)
 {
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return state.duty_cycle;
 }
@@ -141,7 +147,7 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
 {
 	struct pwm_state state;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 
 	return state.polarity;
 }
@@ -175,7 +181,7 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
 	struct pwm_args args;
 
 	/* First get the current state. */
-	pwm_get_state(pwm, state);
+	pwm_get_last_applied_state(pwm, state);
 
 	/* Then fill it with the reference config */
 	pwm_get_args(pwm, &args);
@@ -195,8 +201,12 @@ static inline void pwm_init_state(const struct pwm_device *pwm,
  *
  * For example if you want to get the duty_cycle expressed in percent, call:
  *
- * pwm_get_state(pwm, &state);
+ * pwm_get_last_applied_state(pwm, &state);
  * duty = pwm_get_relative_duty_cycle(&state, 100);
+ *
+ * Note however that this example yields the relative duty cycle that was
+ * requested before which doesn't necessarily exactly matches what is actually
+ * provided by the hardware.
  */
 static inline unsigned int
 pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
@@ -337,7 +347,7 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
 	if (duty_ns < 0 || period_ns < 0)
 		return -EINVAL;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	if (state.duty_cycle == duty_ns && state.period == period_ns)
 		return 0;
 
@@ -359,7 +369,7 @@ static inline int pwm_enable(struct pwm_device *pwm)
 	if (!pwm)
 		return -EINVAL;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	if (state.enabled)
 		return 0;
 
@@ -378,7 +388,7 @@ static inline void pwm_disable(struct pwm_device *pwm)
 	if (!pwm)
 		return;
 
-	pwm_get_state(pwm, &state);
+	pwm_get_last_applied_state(pwm, &state);
 	if (!state.enabled)
 		return;
 

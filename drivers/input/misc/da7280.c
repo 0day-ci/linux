@@ -333,7 +333,7 @@ static int da7280_haptic_set_pwm(struct da7280_haptic *haptics, bool enabled)
 		return -EINVAL;
 	}
 
-	pwm_get_state(haptics->pwm_dev, &state);
+	pwm_get_last_applied_state(haptics->pwm_dev, &state);
 	state.enabled = enabled;
 	if (enabled) {
 		period_mag_multi = (u64)state.period * haptics->gain;

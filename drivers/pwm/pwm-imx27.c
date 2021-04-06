@@ -223,7 +223,7 @@ static int pwm_imx27_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	int ret;
 	u32 cr;
 
-	pwm_get_state(pwm, &cstate);
+	pwm_get_last_applied_state(pwm, &cstate);
 
 	clkrate = clk_get_rate(imx->clk_per);
 	c = clkrate * state->period;

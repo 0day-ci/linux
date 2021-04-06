@@ -44,7 +44,7 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb)
 	struct pwm_state state;
 	int err;
 
-	pwm_get_state(pb->pwm, &state);
+	pwm_get_last_applied_state(pb->pwm, &state);
 	if (pb->enabled)
 		return;
 
@@ -68,7 +68,7 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
 {
 	struct pwm_state state;
 
-	pwm_get_state(pb->pwm, &state);
+	pwm_get_last_applied_state(pb->pwm, &state);
 	if (!pb->enabled)
 		return;
 
@@ -92,7 +92,7 @@ static int compute_duty_cycle(struct pwm_bl_data *pb, int brightness)
 	struct pwm_state state;
 	u64 duty_cycle;
 
-	pwm_get_state(pb->pwm, &state);
+	pwm_get_last_applied_state(pb->pwm, &state);
 
 	if (pb->levels)
 		duty_cycle = pb->levels[brightness];
@@ -115,7 +115,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 		brightness = pb->notify(pb->dev, brightness);
 
 	if (brightness > 0) {
-		pwm_get_state(pb->pwm, &state);
+		pwm_get_last_applied_state(pb->pwm, &state);
 		state.duty_cycle = compute_duty_cycle(pb, brightness);
 		pwm_apply_state(pb->pwm, &state);
 		pwm_backlight_power_on(pb);
@@ -567,7 +567,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 		 */
 
 		/* Get the PWM period (in nanoseconds) */
-		pwm_get_state(pb->pwm, &state);
+		pwm_get_last_applied_state(pb->pwm, &state);
 
 		ret = pwm_backlight_brightness_default(&pdev->dev, data,
 						       state.period);

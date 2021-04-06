@@ -49,7 +49,7 @@ static int clk_pwm_get_duty_cycle(struct clk_hw *hw, struct clk_duty *duty)
 	struct clk_pwm *clk_pwm = to_clk_pwm(hw);
 	struct pwm_state state;
 
-	pwm_get_state(clk_pwm->pwm, &state);
+	pwm_get_last_applied_state(clk_pwm->pwm, &state);
 
 	duty->num = state.duty_cycle;
 	duty->den = state.period;
