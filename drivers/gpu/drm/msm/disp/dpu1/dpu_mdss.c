@@ -204,6 +204,9 @@ static int dpu_mdss_enable(struct msm_mdss *mdss)
 	case DPU_HW_VER_620:
 		writel_relaxed(0x1e, dpu_mdss->mmio + UBWC_STATIC);
 		break;
+	case DPU_HW_VER_720:
+		writel_relaxed(0x101e, dpu_mdss->mmio + UBWC_STATIC);
+		break;
 	}
 
 	return ret;
@@ -276,7 +279,8 @@ int dpu_mdss_init(struct drm_device *dev)
 
 	DRM_DEBUG("mapped mdss address space @%pK\n", dpu_mdss->mmio);
 
-	if (!of_device_is_compatible(dev->dev->of_node, "qcom,sc7180-mdss")) {
+	if (!of_device_is_compatible(dev->dev->of_node, "qcom,sc7180-mdss") &&
+		!of_device_is_compatible(dev->dev->of_node, "qcom,sc7280-mdss")) {
 		ret = dpu_mdss_parse_data_bus_icc_path(dev, dpu_mdss);
 		if (ret)
 			return ret;
