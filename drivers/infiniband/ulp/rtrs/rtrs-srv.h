@@ -13,6 +13,7 @@
 #include <linux/device.h>
 #include <linux/refcount.h>
 #include "rtrs-pri.h"
+#include "rtrs-fault.h"
 
 /*
  * enum rtrs_srv_state - Server states.
@@ -73,6 +74,13 @@ struct rtrs_srv_mr {
 	struct rtrs_iu	*iu;		/* send buffer for new rkey msg */
 };
 
+struct rtrs_srv_fault_inject {
+#ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
+	struct rtrs_fault_inject fj;
+	bool fail_hb_ack;
+#endif
+};
+
 struct rtrs_srv_sess {
 	struct rtrs_sess	s;
 	struct rtrs_srv	*srv;
@@ -90,6 +98,7 @@ struct rtrs_srv_sess {
 	unsigned int		mem_bits;
 	struct kobject		kobj;
 	struct rtrs_srv_stats	*stats;
+	struct rtrs_srv_fault_inject	fault_inject;
 };
 
 struct rtrs_srv {
@@ -152,4 +161,8 @@ ssize_t rtrs_srv_reset_all_help(struct rtrs_srv_stats *stats,
 int rtrs_srv_create_sess_files(struct rtrs_srv_sess *sess);
 void rtrs_srv_destroy_sess_files(struct rtrs_srv_sess *sess);
 
+void rtrs_srv_fault_inject_init(struct rtrs_srv_fault_inject *fault_inject,
+				struct rtrs_srv_sess *sess);
+void rtrs_srv_fault_inject_final(struct rtrs_srv_fault_inject *fault_inject);
+int rtrs_should_fail_hb_ack(struct rtrs_srv_fault_inject *fault_inject);
 #endif /* RTRS_SRV_H */

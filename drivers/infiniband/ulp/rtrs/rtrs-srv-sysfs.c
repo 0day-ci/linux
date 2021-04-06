@@ -309,3 +309,47 @@ void rtrs_srv_destroy_sess_files(struct rtrs_srv_sess *sess)
 		rtrs_srv_destroy_once_sysfs_root_folders(sess);
 	}
 }
+
+#ifdef CONFIG_FAULT_INJECTION_DEBUG_FS
+void rtrs_srv_fault_inject_init(struct rtrs_srv_fault_inject *fault_inject,
+				struct rtrs_srv_sess *sess)
+{
+	char str[NAME_MAX];
+	int cnt;
+
+	cnt = sockaddr_to_str((struct sockaddr *)&sess->s.src_addr,
+			      str, sizeof(str));
+	cnt += scnprintf(str + cnt, sizeof(str) - cnt, "@");
+	sockaddr_to_str((struct sockaddr *)&sess->s.dst_addr,
+			str + cnt, sizeof(str) - cnt);
+
+	rtrs_fault_inject_init(&fault_inject->fj, str, -EBUSY);
+	/* injection points */
+	rtrs_fault_inject_add(fault_inject->fj.dir,
+			      "fail-hb-ack", &fault_inject->fail_hb_ack);
+}
+
+void rtrs_srv_fault_inject_final(struct rtrs_srv_fault_inject *fault_inject)
+{
+	rtrs_fault_inject_final(&fault_inject->fj);
+}
+
+int rtrs_should_fail_hb_ack(struct rtrs_srv_fault_inject *fault_inject)
+{
+	if (fault_inject->fail_hb_ack && should_fail(&fault_inject->fj.attr, 1))
+		return fault_inject->fj.status;
+	return 0;
+}
+#else
+void rtrs_srv_fault_inject_init(struct rtrs_srv_fault_inject *fault_inject,
+				struct rtrs_srv_sess *sess_name)
+{
+}
+void rtrs_srv_fault_inject_final(struct rtrs_srv_fault_inject *fault_inject)
+{
+}
+int rtrs_should_fail_hb_ack(struct rtrs_srv_fault_inject *fault_inject)
+{
+	return 0;
+}
+#endif

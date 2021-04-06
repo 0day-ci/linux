@@ -1232,6 +1232,8 @@ static void rtrs_srv_rdma_done(struct ib_cq *cq, struct ib_wc *wc)
 			}
 		} else if (imm_type == RTRS_HB_MSG_IMM) {
 			WARN_ON(con->c.cid);
+			if (unlikely(rtrs_should_fail_hb_ack(&sess->fault_inject)))
+				break;
 			rtrs_send_hb_ack(&sess->s);
 		} else if (imm_type == RTRS_HB_ACK_IMM) {
 			WARN_ON(con->c.cid);
@@ -1489,6 +1491,7 @@ static void rtrs_srv_close_work(struct work_struct *work)
 
 	sess = container_of(work, typeof(*sess), close_work);
 
+	rtrs_srv_fault_inject_final(&sess->fault_inject);
 	rtrs_srv_destroy_sess_files(sess);
 	rtrs_srv_stop_hb(sess);
 
@@ -1747,6 +1750,8 @@ static struct rtrs_srv_sess *__alloc_sess(struct rtrs_srv *srv,
 		goto err_unmap_bufs;
 
 	__add_path_to_srv(srv, sess);
+
+	rtrs_srv_fault_inject_init(&sess->fault_inject, sess);
 
 	return sess;
 
