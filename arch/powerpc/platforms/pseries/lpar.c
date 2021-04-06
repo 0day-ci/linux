@@ -1629,7 +1629,7 @@ static int pseries_lpar_resize_hpt(unsigned long shift)
 		}
 		msleep(delay);
 		rc = plpar_resize_hpt_prepare(0, shift);
-	};
+	}
 
 	switch (rc) {
 	case H_SUCCESS:
