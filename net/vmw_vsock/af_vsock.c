@@ -449,8 +449,6 @@ int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 
 	switch (sk->sk_type) {
 	case SOCK_DGRAM:
-		new_transport = transport_dgram;
-		break;
 	case SOCK_STREAM:
 		if (vsock_use_local_transport(remote_cid))
 			new_transport = transport_local;
@@ -1096,7 +1094,6 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 	struct sock *sk;
 	struct vsock_sock *vsk;
 	struct sockaddr_vm *remote_addr;
-	const struct vsock_transport *transport;
 
 	if (msg->msg_flags & MSG_OOB)
 		return -EOPNOTSUPP;
@@ -1108,12 +1105,9 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 
 	lock_sock(sk);
 
-	transport = vsk->transport;
-
 	err = vsock_auto_bind(vsk);
 	if (err)
 		goto out;
-
 
 	/* If the provided message contains an address, use that.  Otherwise
 	 * fall back on the socket's remote handle (if it has been connected).
@@ -1121,12 +1115,20 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 	if (msg->msg_name &&
 	    vsock_addr_cast(msg->msg_name, msg->msg_namelen,
 			    &remote_addr) == 0) {
+		vsock_addr_init(&vsk->remote_addr, remote_addr->svm_cid,
+			remote_addr->svm_port);
+
+		err = vsock_assign_transport(vsk, NULL);
+		if (err) {
+			err = -EINVAL;
+			goto out;
+		}
+
 		/* Ensure this address is of the right type and is a valid
 		 * destination.
 		 */
-
 		if (remote_addr->svm_cid == VMADDR_CID_ANY)
-			remote_addr->svm_cid = transport->get_local_cid();
+			remote_addr->svm_cid = vsk->transport->get_local_cid();
 
 		if (!vsock_addr_bound(remote_addr)) {
 			err = -EINVAL;
@@ -1136,7 +1138,7 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 		remote_addr = &vsk->remote_addr;
 
 		if (remote_addr->svm_cid == VMADDR_CID_ANY)
-			remote_addr->svm_cid = transport->get_local_cid();
+			remote_addr->svm_cid = vsk->transport->get_local_cid();
 
 		/* XXX Should connect() or this function ensure remote_addr is
 		 * bound?
@@ -1150,13 +1152,13 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 		goto out;
 	}
 
-	if (!transport->dgram_allow(remote_addr->svm_cid,
+	if (!vsk->transport->dgram_allow(remote_addr->svm_cid,
 				    remote_addr->svm_port)) {
 		err = -EINVAL;
 		goto out;
 	}
 
-	err = transport->dgram_enqueue(vsk, remote_addr, msg, len);
+	err = vsk->transport->dgram_enqueue(vsk, remote_addr, msg, len);
 
 out:
 	release_sock(sk);
@@ -1191,13 +1193,20 @@ static int vsock_dgram_connect(struct socket *sock,
 	if (err)
 		goto out;
 
+	memcpy(&vsk->remote_addr, remote_addr, sizeof(vsk->remote_addr));
+
+	err = vsock_assign_transport(vsk, NULL);
+	if (err) {
+		err = -EINVAL;
+		goto out;
+	}
+
 	if (!vsk->transport->dgram_allow(remote_addr->svm_cid,
 					 remote_addr->svm_port)) {
 		err = -EINVAL;
 		goto out;
 	}
 
-	memcpy(&vsk->remote_addr, remote_addr, sizeof(vsk->remote_addr));
 	sock->state = SS_CONNECTED;
 
 out:
@@ -1209,6 +1218,16 @@ static int vsock_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 			       size_t len, int flags)
 {
 	struct vsock_sock *vsk = vsock_sk(sock->sk);
+	long timeo;
+
+	timeo = sock_rcvtimeo(sock->sk, flags & MSG_DONTWAIT);
+	do {
+		if (vsk->transport)
+			break;
+	} while (timeo && !vsk->transport);
+
+	if (!vsk->transport)
+		return -EAGAIN;
 
 	return vsk->transport->dgram_dequeue(vsk, msg, len, flags);
 }
@@ -2055,14 +2074,6 @@ static int vsock_create(struct net *net, struct socket *sock,
 
 	vsk = vsock_sk(sk);
 
-	if (sock->type == SOCK_DGRAM) {
-		ret = vsock_assign_transport(vsk, NULL);
-		if (ret < 0) {
-			sock_put(sk);
-			return ret;
-		}
-	}
-
 	vsock_insert_unbound(vsk);
 
 	return 0;
@@ -2182,7 +2193,7 @@ EXPORT_SYMBOL_GPL(vsock_core_get_transport);
 
 int vsock_core_register(const struct vsock_transport *t, int features)
 {
-	const struct vsock_transport *t_h2g, *t_g2h, *t_dgram, *t_local;
+	const struct vsock_transport *t_h2g, *t_g2h, *t_local;
 	int err = mutex_lock_interruptible(&vsock_register_mutex);
 
 	if (err)
@@ -2190,7 +2201,6 @@ int vsock_core_register(const struct vsock_transport *t, int features)
 
 	t_h2g = transport_h2g;
 	t_g2h = transport_g2h;
-	t_dgram = transport_dgram;
 	t_local = transport_local;
 
 	if (features & VSOCK_TRANSPORT_F_H2G) {
@@ -2209,14 +2219,6 @@ int vsock_core_register(const struct vsock_transport *t, int features)
 		t_g2h = t;
 	}
 
-	if (features & VSOCK_TRANSPORT_F_DGRAM) {
-		if (t_dgram) {
-			err = -EBUSY;
-			goto err_busy;
-		}
-		t_dgram = t;
-	}
-
 	if (features & VSOCK_TRANSPORT_F_LOCAL) {
 		if (t_local) {
 			err = -EBUSY;
@@ -2227,7 +2229,6 @@ int vsock_core_register(const struct vsock_transport *t, int features)
 
 	transport_h2g = t_h2g;
 	transport_g2h = t_g2h;
-	transport_dgram = t_dgram;
 	transport_local = t_local;
 
 err_busy:

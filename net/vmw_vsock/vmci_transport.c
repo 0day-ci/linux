@@ -613,6 +613,7 @@ static int vmci_transport_recv_dgram_cb(void *data, struct vmci_datagram *dg)
 	size_t size;
 	struct sk_buff *skb;
 	struct vsock_sock *vsk;
+	int err;
 
 	sk = (struct sock *)data;
 
@@ -628,6 +629,17 @@ static int vmci_transport_recv_dgram_cb(void *data, struct vmci_datagram *dg)
 	vsk = vsock_sk(sk);
 	if (!vmci_transport_allow_dgram(vsk, dg->src.context))
 		return VMCI_ERROR_NO_ACCESS;
+
+	vsock_addr_init(&vsk->remote_addr, dg->src.context,
+				dg->src.resource);
+
+	bh_lock_sock(sk);
+	if (!sock_owned_by_user(sk)) {
+		err = vsock_assign_transport(vsk, NULL);
+		if (err)
+			return err;
+	}
+	bh_unlock_sock(sk);
 
 	size = VMCI_DG_SIZE(dg);
 
@@ -2093,13 +2105,7 @@ static int __init vmci_transport_init(void)
 		goto err_destroy_stream_handle;
 	}
 
-	/* Register only with dgram feature, other features (H2G, G2H) will be
-	 * registered when the first host or guest becomes active.
-	 */
-	err = vsock_core_register(&vmci_transport, VSOCK_TRANSPORT_F_DGRAM);
-	if (err < 0)
-		goto err_unsubscribe;
-
+	/* H2G, G2H will be registered when the first host or guest becomes active. */
 	err = vmci_register_vsock_callback(vmci_vsock_transport_cb);
 	if (err < 0)
 		goto err_unregister;
