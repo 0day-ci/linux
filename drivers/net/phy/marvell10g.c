@@ -553,6 +553,21 @@ static int mv3310_init_interface(struct phy_device *phydev, int mactype)
 	return 0;
 }
 
+static int mv3340_init_interface(struct phy_device *phydev, int mactype)
+{
+	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	int err = 0;
+
+	priv->rate_match = false;
+
+	if (mactype == MV_V2_3340_PORT_CTRL_MACTYPE_RXAUI_NO_SGMII_AN)
+		priv->const_interface = PHY_INTERFACE_MODE_RXAUI;
+	else
+		err = mv3310_init_interface(phydev, mactype);
+
+	return err;
+}
+
 static int mv3310_config_init(struct phy_device *phydev)
 {
 	const struct mv3310_chip *chip = to_mv3310_chip(phydev);
@@ -886,6 +901,23 @@ static const struct mv3310_chip mv3310_type = {
 #endif
 };
 
+static const struct mv3310_chip mv3340_type = {
+	.supported_interfaces =
+		INITIALIZE_BITMAP(PHY_INTERFACE_MODE_MAX,
+				  PHY_INTERFACE_MODE_SGMII,
+				  PHY_INTERFACE_MODE_2500BASEX,
+				  PHY_INTERFACE_MODE_5GBASER,
+				  PHY_INTERFACE_MODE_RXAUI,
+				  PHY_INTERFACE_MODE_10GBASER,
+				  PHY_INTERFACE_MODE_USXGMII),
+	.get_mactype = mv3310_get_mactype,
+	.init_interface = mv3340_init_interface,
+
+#ifdef CONFIG_HWMON
+	.hwmon_read_temp_reg = mv3310_hwmon_read_temp_reg,
+#endif
+};
+
 static const struct mv3310_chip mv2110_type = {
 	.supported_interfaces =
 		INITIALIZE_BITMAP(PHY_INTERFACE_MODE_MAX,
@@ -905,9 +937,27 @@ static const struct mv3310_chip mv2110_type = {
 static struct phy_driver mv3310_drivers[] = {
 	{
 		.phy_id		= MARVELL_PHY_ID_88X3310,
-		.phy_id_mask	= MARVELL_PHY_ID_MASK,
+		.phy_id_mask	= MARVELL_PHY_ID_88X33X0_MASK,
 		.name		= "mv88x3310",
 		.driver_data	= &mv3310_type,
+		.get_features	= mv3310_get_features,
+		.config_init	= mv3310_config_init,
+		.probe		= mv3310_probe,
+		.suspend	= mv3310_suspend,
+		.resume		= mv3310_resume,
+		.config_aneg	= mv3310_config_aneg,
+		.aneg_done	= mv3310_aneg_done,
+		.read_status	= mv3310_read_status,
+		.get_tunable	= mv3310_get_tunable,
+		.set_tunable	= mv3310_set_tunable,
+		.remove		= mv3310_remove,
+		.set_loopback	= genphy_c45_loopback,
+	},
+	{
+		.phy_id		= MARVELL_PHY_ID_88X3340,
+		.phy_id_mask	= MARVELL_PHY_ID_88X33X0_MASK,
+		.name		= "mv88x3340",
+		.driver_data	= &mv3340_type,
 		.get_features	= mv3310_get_features,
 		.config_init	= mv3310_config_init,
 		.probe		= mv3310_probe,
@@ -943,7 +993,8 @@ static struct phy_driver mv3310_drivers[] = {
 module_phy_driver(mv3310_drivers);
 
 static struct mdio_device_id __maybe_unused mv3310_tbl[] = {
-	{ MARVELL_PHY_ID_88X3310, MARVELL_PHY_ID_MASK },
+	{ MARVELL_PHY_ID_88X3310, MARVELL_PHY_ID_88X33X0_MASK },
+	{ MARVELL_PHY_ID_88X3340, MARVELL_PHY_ID_88X33X0_MASK },
 	{ MARVELL_PHY_ID_88E2110, MARVELL_PHY_ID_MASK },
 	{ },
 };
