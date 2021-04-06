@@ -51,7 +51,10 @@ static inline bool rtrs_clt_is_connected(const struct rtrs_clt *clt)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(sess, &clt->paths_list, s.entry)
-		connected |= READ_ONCE(sess->state) == RTRS_CLT_CONNECTED;
+		if (READ_ONCE(sess->state) == RTRS_CLT_CONNECTED) {
+			connected = true;
+			break;
+		}
 	rcu_read_unlock();
 
 	return connected;
