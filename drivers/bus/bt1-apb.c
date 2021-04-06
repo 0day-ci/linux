@@ -8,22 +8,21 @@
  * Baikal-T1 APB-bus driver
  */
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/types.h>
-#include <linux/device.h>
 #include <linux/atomic.h>
-#include <linux/platform_device.h>
+#include <linux/clk.h>
+#include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/nmi.h>
 #include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/regmap.h>
-#include <linux/clk.h>
 #include <linux/reset.h>
-#include <linux/time64.h>
-#include <linux/clk.h>
 #include <linux/sysfs.h>
+#include <linux/time64.h>
+#include <linux/types.h>
 
 #define APB_EHB_ISR			0x00
 #define APB_EHB_ISR_PENDING		BIT(0)
