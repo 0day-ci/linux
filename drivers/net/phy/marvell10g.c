@@ -109,6 +109,7 @@ enum {
 };
 
 struct mv3310_chip {
+	DECLARE_BITMAP(supported_interfaces, PHY_INTERFACE_MODE_MAX);
 	int (*get_mactype)(struct phy_device *phydev);
 	int (*init_interface)(struct phy_device *phydev, int mactype);
 };
@@ -545,13 +546,7 @@ static int mv3310_config_init(struct phy_device *phydev)
 	int err, mactype;
 
 	/* Check that the PHY interface type is compatible */
-	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
-	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
-	    phydev->interface != PHY_INTERFACE_MODE_5GBASER &&
-	    phydev->interface != PHY_INTERFACE_MODE_XAUI &&
-	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
-	    phydev->interface != PHY_INTERFACE_MODE_10GBASER &&
-	    phydev->interface != PHY_INTERFACE_MODE_USXGMII)
+	if (!test_bit(phydev->interface, chip->supported_interfaces))
 		return -ENODEV;
 
 	phydev->mdix_ctrl = ETH_TP_MDI_AUTO;
@@ -859,11 +854,27 @@ static int mv3310_set_tunable(struct phy_device *phydev,
 }
 
 static const struct mv3310_chip mv3310_type = {
+	.supported_interfaces =
+		INITIALIZE_BITMAP(PHY_INTERFACE_MODE_MAX,
+				  PHY_INTERFACE_MODE_SGMII,
+				  PHY_INTERFACE_MODE_2500BASEX,
+				  PHY_INTERFACE_MODE_5GBASER,
+				  PHY_INTERFACE_MODE_XAUI,
+				  PHY_INTERFACE_MODE_RXAUI,
+				  PHY_INTERFACE_MODE_10GBASER,
+				  PHY_INTERFACE_MODE_USXGMII),
 	.get_mactype = mv3310_get_mactype,
 	.init_interface = mv3310_init_interface,
 };
 
 static const struct mv3310_chip mv2110_type = {
+	.supported_interfaces =
+		INITIALIZE_BITMAP(PHY_INTERFACE_MODE_MAX,
+				  PHY_INTERFACE_MODE_SGMII,
+				  PHY_INTERFACE_MODE_2500BASEX,
+				  PHY_INTERFACE_MODE_5GBASER,
+				  PHY_INTERFACE_MODE_10GBASER,
+				  PHY_INTERFACE_MODE_USXGMII),
 	.get_mactype = mv2110_get_mactype,
 	.init_interface = mv2110_init_interface,
 };
