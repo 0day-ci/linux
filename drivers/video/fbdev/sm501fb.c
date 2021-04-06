@@ -2060,11 +2060,11 @@ static int sm501fb_remove(struct platform_device *pdev)
 		unregister_framebuffer(fbinfo_pnl);
 
 	sm501fb_stop(info);
-	kfree(info);
 
 	framebuffer_release(fbinfo_pnl);
 	framebuffer_release(fbinfo_crt);
 
+	kfree(info);
 	return 0;
 }
 
