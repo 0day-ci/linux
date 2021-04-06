@@ -33,21 +33,20 @@
 #include <linux/etherdevice.h>
 #include <linux/idr.h>
 #include <linux/mlx5/driver.h>
+#include <linux/mlx5/fs.h>
 #include <linux/mlx5/mlx5_ifc.h>
 #include <linux/mlx5/vport.h>
-#include <linux/mlx5/fs.h>
-#include "mlx5_core.h"
-#include "eswitch.h"
-#include "esw/indir_table.h"
+#include "en.h"
+#include "en_tc.h"
 #include "esw/acl/ofld.h"
 #include "esw/indir_table.h"
-#include "rdma.h"
-#include "en.h"
+#include "eswitch.h"
 #include "fs_core.h"
 #include "lib/devcom.h"
 #include "lib/eq.h"
 #include "lib/fs_chains.h"
-#include "en_tc.h"
+#include "mlx5_core.h"
+#include "rdma.h"
 
 /* There are two match-all miss flows, one for unicast dst mac and
  * one for multicast.
