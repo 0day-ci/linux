@@ -35,6 +35,14 @@ MODULE_PARM_DESC(soft_margin,
 	"Watchdog soft_margin in seconds. (0 < soft_margin < 65536, default="
 					__MODULE_STRING(TIMER_MARGIN) ")");
 
+#ifdef CONFIG_SOFT_WATCHDOG_PRETIMEOUT
+#define PRE_TIMER_MARGIN	1		/* Default is 1 seconds */
+static unsigned int soft_pretimeout = PRE_TIMER_MARGIN;	/* in seconds */
+module_param(soft_pretimeout, uint, 0);
+MODULE_PARM_DESC(soft_pretimeout,
+	"Watchdog soft_pretimeout in seconds. (0 < soft_pretimeout < soft_margin, default=1)");
+#endif
+
 static bool nowayout = WATCHDOG_NOWAYOUT;
 module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout,
@@ -177,6 +185,9 @@ static struct watchdog_device softdog_dev = {
 	.min_timeout = 1,
 	.max_timeout = 65535,
 	.timeout = TIMER_MARGIN,
+#ifdef CONFIG_SOFT_WATCHDOG_PRETIMEOUT
+	.pretimeout = PRE_TIMER_MARGIN,
+#endif
 };
 
 static int __init softdog_init(void)
