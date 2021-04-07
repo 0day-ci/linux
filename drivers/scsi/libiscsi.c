@@ -2929,11 +2929,7 @@ dec_session_count:
 }
 EXPORT_SYMBOL_GPL(iscsi_session_setup);
 
-/**
- * iscsi_session_teardown - destroy session, host, and cls_session
- * @cls_session: iscsi session
- */
-void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
+void iscsi_session_destroy(struct iscsi_cls_session *cls_session)
 {
 	struct iscsi_session *session = cls_session->dd_data;
 	struct module *owner = cls_session->transport->owner;
@@ -2957,10 +2953,19 @@ void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 	kfree(session->portal_type);
 	kfree(session->discovery_parent_type);
 
-	iscsi_free_session(cls_session);
-
 	iscsi_host_dec_session_cnt(shost);
 	module_put(owner);
+}
+EXPORT_SYMBOL_GPL(iscsi_session_destroy);
+
+/**
+ * iscsi_session_teardown - destroy session, host, and cls_session
+ * @cls_session: iscsi session
+ */
+void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
+{
+	iscsi_session_destroy(cls_session);
+	iscsi_free_session(cls_session);
 }
 EXPORT_SYMBOL_GPL(iscsi_session_teardown);
 
