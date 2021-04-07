@@ -1015,7 +1015,7 @@ out:
 int of_overlay_fdt_apply(const void *overlay_fdt, u32 overlay_fdt_size,
 			 int *ovcs_id)
 {
-	const void *new_fdt;
+	void *new_fdt;
 	int ret;
 	u32 size;
 	struct device_node *overlay_root;
@@ -1037,9 +1037,13 @@ int of_overlay_fdt_apply(const void *overlay_fdt, u32 overlay_fdt_size,
 	 * Must create permanent copy of FDT because of_fdt_unflatten_tree()
 	 * will create pointers to the passed in FDT in the unflattened tree.
 	 */
-	new_fdt = kmemdup(overlay_fdt, size, GFP_KERNEL);
+	size += FDT_ALIGN_SIZE;
+	new_fdt = kmalloc(size, GFP_KERNEL);
 	if (!new_fdt)
 		return -ENOMEM;
+
+	new_fdt = PTR_ALIGN(new_fdt, FDT_ALIGN_SIZE);
+	memcpy(new_fdt, overlay_fdt, size);
 
 	of_fdt_unflatten_tree(new_fdt, NULL, &overlay_root);
 	if (!overlay_root) {
