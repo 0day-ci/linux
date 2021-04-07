@@ -839,6 +839,18 @@ iscsi_sw_tcp_conn_get_stats(struct iscsi_cls_conn *cls_conn,
 	iscsi_tcp_conn_get_stats(cls_conn, stats);
 }
 
+static void
+iscsi_sw_tcp_session_teardown(struct iscsi_cls_session *cls_session)
+{
+	struct Scsi_Host *shost = iscsi_session_to_shost(cls_session);
+
+	iscsi_session_destroy(cls_session);
+	iscsi_host_remove(shost);
+
+	iscsi_free_session(cls_session);
+	iscsi_host_free(shost);
+}
+
 static struct iscsi_cls_session *
 iscsi_sw_tcp_session_create(struct iscsi_endpoint *ep, uint16_t cmds_max,
 			    uint16_t qdepth, uint32_t initial_cmdsn)
@@ -884,12 +896,13 @@ iscsi_sw_tcp_session_create(struct iscsi_endpoint *ep, uint16_t cmds_max,
 	tcp_sw_host = iscsi_host_priv(shost);
 	tcp_sw_host->session = session;
 
-	if (iscsi_tcp_r2tpool_alloc(session))
-		goto remove_session;
+	if (iscsi_tcp_r2tpool_alloc(session)) {
+		iscsi_sw_tcp_session_teardown(cls_session);
+		return NULL;
+	}
+
 	return cls_session;
 
-remove_session:
-	iscsi_session_teardown(cls_session);
 remove_host:
 	iscsi_host_remove(shost);
 free_host:
@@ -899,17 +912,13 @@ free_host:
 
 static void iscsi_sw_tcp_session_destroy(struct iscsi_cls_session *cls_session)
 {
-	struct Scsi_Host *shost = iscsi_session_to_shost(cls_session);
 	struct iscsi_session *session = cls_session->dd_data;
 
 	if (WARN_ON_ONCE(session->leadconn))
 		return;
 
 	iscsi_tcp_r2tpool_free(cls_session->dd_data);
-	iscsi_session_teardown(cls_session);
-
-	iscsi_host_remove(shost);
-	iscsi_host_free(shost);
+	iscsi_sw_tcp_session_teardown(cls_session);
 }
 
 static umode_t iscsi_sw_tcp_attr_is_visible(int param_type, int param)
