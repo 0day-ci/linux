@@ -1368,14 +1368,6 @@ static void tcpm_queue_vdm(struct tcpm_port *port, const u32 header,
 	mod_vdm_delayed_work(port, 0);
 }
 
-static void tcpm_queue_vdm_unlocked(struct tcpm_port *port, const u32 header,
-				    const u32 *data, int cnt)
-{
-	mutex_lock(&port->lock);
-	tcpm_queue_vdm(port, header, data, cnt);
-	mutex_unlock(&port->lock);
-}
-
 static void svdm_consume_identity(struct tcpm_port *port, const u32 *p, int cnt)
 {
 	u32 vdo = p[VDO_INDEX_IDH];
@@ -1708,8 +1700,6 @@ static void tcpm_handle_vdm_request(struct tcpm_port *port,
 	 *
 	 * And we also have this ordering:
 	 * 1. alt-mode driver takes the alt-mode's lock
-	 * 2. alt-mode driver calls tcpm_altmode_enter which takes the
-	 *    tcpm port lock
 	 *
 	 * Dropping our lock here avoids this.
 	 */
@@ -2062,56 +2052,6 @@ static int tcpm_validate_caps(struct tcpm_port *port, const u32 *pdo,
 
 	return 0;
 }
-
-static int tcpm_altmode_enter(struct typec_altmode *altmode, u32 *vdo)
-{
-	struct tcpm_port *port = typec_altmode_get_drvdata(altmode);
-	int svdm_version;
-	u32 header;
-
-	svdm_version = typec_get_negotiated_svdm_version(port->typec_port);
-	if (svdm_version < 0)
-		return svdm_version;
-
-	header = VDO(altmode->svid, vdo ? 2 : 1, svdm_version, CMD_ENTER_MODE);
-	header |= VDO_OPOS(altmode->mode);
-
-	tcpm_queue_vdm_unlocked(port, header, vdo, vdo ? 1 : 0);
-	return 0;
-}
-
-static int tcpm_altmode_exit(struct typec_altmode *altmode)
-{
-	struct tcpm_port *port = typec_altmode_get_drvdata(altmode);
-	int svdm_version;
-	u32 header;
-
-	svdm_version = typec_get_negotiated_svdm_version(port->typec_port);
-	if (svdm_version < 0)
-		return svdm_version;
-
-	header = VDO(altmode->svid, 1, svdm_version, CMD_EXIT_MODE);
-	header |= VDO_OPOS(altmode->mode);
-
-	tcpm_queue_vdm_unlocked(port, header, NULL, 0);
-	return 0;
-}
-
-static int tcpm_altmode_vdm(struct typec_altmode *altmode,
-			    u32 header, const u32 *data, int count)
-{
-	struct tcpm_port *port = typec_altmode_get_drvdata(altmode);
-
-	tcpm_queue_vdm_unlocked(port, header, data, count - 1);
-
-	return 0;
-}
-
-static const struct typec_altmode_ops tcpm_altmode_ops = {
-	.enter = tcpm_altmode_enter,
-	.exit = tcpm_altmode_exit,
-	.vdm = tcpm_altmode_vdm,
-};
 
 /*
  * PD (data, control) command handling functions
