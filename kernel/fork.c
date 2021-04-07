@@ -389,10 +389,12 @@ static void __vm_area_free(struct rcu_head *head)
 void vm_area_free(struct vm_area_struct *vma)
 {
 #ifdef CONFIG_SPECULATIVE_PAGE_FAULT
-	call_rcu(&vma->vm_rcu, __vm_area_free);
-#else
-	____vm_area_free(vma);
+	if (atomic_read(&vma->vm_mm->mm_users) > 1) {
+		call_rcu(&vma->vm_rcu, __vm_area_free);
+		return;
+	}
 #endif
+	____vm_area_free(vma);
 }
 
 static void account_kernel_stack(struct task_struct *tsk, int account)
