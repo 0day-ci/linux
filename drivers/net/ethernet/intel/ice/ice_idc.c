@@ -584,6 +584,109 @@ static const struct iidc_core_ops ops = {
 };
 
 /**
+ * ice_cdev_info_adev_release - function to be mapped to AUX dev's release op
+ * @dev: pointer to device to free
+ */
+static void ice_cdev_info_adev_release(struct device *dev)
+{
+	struct iidc_auxiliary_dev *iadev;
+
+	iadev = container_of(dev, struct iidc_auxiliary_dev, adev.dev);
+	kfree(iadev->adev.name);
+	kfree(iadev);
+}
+
+/**
+ * ice_plug_aux_devs - allocate and register one AUX dev per cdev_info in PF
+ * @pf: pointer to PF struct
+ */
+int ice_plug_aux_devs(struct ice_pf *pf)
+{
+	struct iidc_auxiliary_dev *iadev;
+	int ret, i;
+
+	if (!pf->cdev_infos)
+		return 0;
+
+	for (i = 0; i < ARRAY_SIZE(ice_cdev_ids); i++) {
+		struct iidc_core_dev_info *cdev_info;
+		struct auxiliary_device *adev;
+
+		cdev_info = pf->cdev_infos[i];
+		if (!cdev_info)
+			continue;
+
+		iadev = kzalloc(sizeof(*iadev), GFP_KERNEL);
+		if (!iadev)
+			return -ENOMEM;
+
+		adev = &iadev->adev;
+		cdev_info->adev = adev;
+		iadev->cdev_info = cdev_info;
+
+		if (ice_cdev_ids[i].id == IIDC_RDMA_ID) {
+			if (cdev_info->rdma_protocol ==
+			    IIDC_RDMA_PROTOCOL_IWARP)
+				adev->name = kasprintf(GFP_KERNEL, "%s_%s",
+						       ice_cdev_ids[i].name,
+						       "iwarp");
+			else
+				adev->name = kasprintf(GFP_KERNEL, "%s_%s",
+						       ice_cdev_ids[i].name,
+						       "roce");
+		} else {
+			adev->name = kasprintf(GFP_KERNEL, "%s",
+					       ice_cdev_ids[i].name);
+		}
+		adev->id = pf->aux_idx;
+		adev->dev.release = ice_cdev_info_adev_release;
+		adev->dev.parent = &cdev_info->pdev->dev;
+
+		ret = auxiliary_device_init(adev);
+		if (ret) {
+			cdev_info->adev = NULL;
+			kfree(adev->name);
+			kfree(iadev);
+			return ret;
+		}
+
+		ret = auxiliary_device_add(adev);
+		if (ret) {
+			cdev_info->adev = NULL;
+			auxiliary_device_uninit(adev);
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * ice_unplug_aux_devs - unregister and free AUX devs
+ * @pf: pointer to PF struct
+ */
+void ice_unplug_aux_devs(struct ice_pf *pf)
+{
+	int i;
+
+	if (!pf->cdev_infos)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(ice_cdev_ids); i++) {
+		struct iidc_core_dev_info *cdev_info;
+
+		cdev_info = pf->cdev_infos[i];
+		/* if this AUX dev has already been unplugged move on */
+		if (!cdev_info->adev)
+			continue;
+
+		auxiliary_device_delete(cdev_info->adev);
+		auxiliary_device_uninit(cdev_info->adev);
+		cdev_info->adev = NULL;
+	}
+}
+
+/**
  * ice_init_aux_devices - initializes cdev_info objects and AUX devices
  * @pf: ptr to ice_pf
  */
@@ -615,6 +718,19 @@ int ice_init_aux_devices(struct ice_pf *pf)
 		struct msix_entry *entry = NULL;
 		int j;
 
+		/* structure layout needed for container_of's looks like:
+		 * iidc_auxiliary_dev (container_of super-struct for adev)
+		 * |--> auxiliary_device
+		 * |--> *iidc_core_dev_info (pointer from cdev_info struct)
+		 *
+		 * The iidc_auxiliary_device has a lifespan as long as it
+		 * is on the bus.  Once removed it will be freed and a new
+		 * one allocated if needed to re-add.
+		 *
+		 * The iidc_core_dev_info is tied to the life of the PF, and
+		 * will exist as long as the PF driver is loaded.  It will be
+		 * freed in the remove flow for the PF driver.
+		 */
 		cdev_info = kzalloc(sizeof(*cdev_info), GFP_KERNEL);
 		if (!cdev_info) {
 			ida_simple_remove(&ice_cdev_info_ida, pf->aux_idx);
@@ -664,6 +780,13 @@ int ice_init_aux_devices(struct ice_pf *pf)
 		}
 
 		cdev_info->msix_entries = entry;
+	}
+
+	ret = ice_plug_aux_devs(pf);
+	if (ret) {
+		ice_unplug_aux_devs(pf);
+		ice_for_each_aux(pf, NULL, ice_unroll_cdev_info);
+		ida_simple_remove(&ice_cdev_info_ida, pf->aux_idx);
 	}
 
 	return ret;

@@ -34,6 +34,7 @@
 #include <linux/if_bridge.h>
 #include <linux/ctype.h>
 #include <linux/bpf.h>
+#include <linux/auxiliary_bus.h>
 #include <linux/avf/virtchnl.h>
 #include <linux/cpu_rmap.h>
 #include <net/devlink.h>
@@ -633,6 +634,8 @@ int ice_get_rss(struct ice_vsi *vsi, u8 *seed, u8 *lut, u16 lut_size);
 void ice_fill_rss_lut(u8 *lut, u16 rss_table_size, u16 rss_size);
 int ice_schedule_reset(struct ice_pf *pf, enum ice_reset_req reset);
 void ice_print_link_msg(struct ice_vsi *vsi, bool isup);
+int ice_plug_aux_devs(struct ice_pf *pf);
+void ice_unplug_aux_devs(struct ice_pf *pf);
 int ice_init_aux_devices(struct ice_pf *pf);
 int
 ice_for_each_aux(struct ice_pf *pf, void *data,
@@ -667,8 +670,10 @@ void ice_service_task_schedule(struct ice_pf *pf);
  */
 static inline void ice_set_rdma_cap(struct ice_pf *pf)
 {
-	if (pf->hw.func_caps.common_cap.iwarp && pf->num_rdma_msix)
+	if (pf->hw.func_caps.common_cap.iwarp && pf->num_rdma_msix) {
 		set_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+		ice_plug_aux_devs(pf);
+	}
 }
 
 /**
@@ -677,6 +682,7 @@ static inline void ice_set_rdma_cap(struct ice_pf *pf)
  */
 static inline void ice_clear_rdma_cap(struct ice_pf *pf)
 {
+	ice_unplug_aux_devs(pf);
 	clear_bit(ICE_FLAG_IWARP_ENA, pf->flags);
 }
 #endif /* _ICE_H_ */

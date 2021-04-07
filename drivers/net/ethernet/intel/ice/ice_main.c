@@ -466,6 +466,8 @@ ice_prepare_for_reset(struct ice_pf *pf)
 	if (test_bit(__ICE_PREPARED_FOR_RESET, pf->state))
 		return;
 
+	ice_unplug_aux_devs(pf);
+
 	/* Notify VFs of impending reset */
 	if (ice_check_sq_alive(hw, &hw->mailboxq))
 		ice_vc_notify_reset(pf);
@@ -2121,6 +2123,8 @@ int ice_schedule_reset(struct ice_pf *pf, enum ice_reset_req reset)
 		dev_dbg(dev, "Reset already in progress\n");
 		return -EBUSY;
 	}
+
+	ice_unplug_aux_devs(pf);
 
 	switch (reset) {
 	case ICE_RESET_PFR:
@@ -4463,6 +4467,7 @@ static void ice_remove(struct pci_dev *pdev)
 	ice_service_task_stop(pf);
 
 	ice_aq_cancel_waiting_tasks(pf);
+	ice_unplug_aux_devs(pf);
 	ice_for_each_aux(pf, NULL, ice_unroll_cdev_info);
 	set_bit(__ICE_DOWN, pf->state);
 
@@ -4619,6 +4624,8 @@ static int __maybe_unused ice_suspend(struct device *dev)
 	 * store and honor whatever state that bit is in at this point.
 	 */
 	disabled = ice_service_task_stop(pf);
+
+	ice_unplug_aux_devs(pf);
 
 	/* Already suspended?, then there is nothing to do */
 	if (test_and_set_bit(__ICE_SUSPENDED, pf->state)) {
@@ -6193,6 +6200,8 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 
 	/* if we get here, reset flow is successful */
 	clear_bit(__ICE_RESET_FAILED, pf->state);
+
+	ice_plug_aux_devs(pf);
 	return;
 
 err_vsi_rebuild:
