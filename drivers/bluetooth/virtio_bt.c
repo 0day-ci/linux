@@ -300,7 +300,8 @@ static int virtbt_probe(struct virtio_device *vdev)
 	if (virtio_has_feature(vdev, VIRTIO_BT_F_VND_HCI)) {
 		__u16 vendor;
 
-		virtio_cread(vdev, struct virtio_bt_config, vendor, &vendor);
+		vendor = virtio_cread16(vdev, offsetof(struct virtio_bt_config,
+						       vendor));
 
 		switch (vendor) {
 		case VIRTIO_BT_CONFIG_VENDOR_ZEPHYR:
@@ -331,12 +332,11 @@ static int virtbt_probe(struct virtio_device *vdev)
 	}
 
 	if (virtio_has_feature(vdev, VIRTIO_BT_F_MSFT_EXT)) {
-		__u16 msft_opcode;
+		__u16 opcode;
 
-		virtio_cread(vdev, struct virtio_bt_config,
-			     msft_opcode, &msft_opcode);
-
-		hci_set_msft_opcode(hdev, msft_opcode);
+		opcode = virtio_cread16(vdev, offsetof(struct virtio_bt_config,
+						       msft_opcode));
+		hci_set_msft_opcode(hdev, opcode);
 	}
 
 	if (virtio_has_feature(vdev, VIRTIO_BT_F_AOSP_EXT))
