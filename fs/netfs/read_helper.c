@@ -293,7 +293,7 @@ static void netfs_rreq_do_write_to_cache(struct netfs_read_request *rreq)
 	struct netfs_cache_resources *cres = &rreq->cache_resources;
 	struct netfs_read_subrequest *subreq, *next, *p;
 	struct iov_iter iter;
-	loff_t pos;
+	int ret;
 
 	trace_netfs_rreq(rreq, netfs_rreq_trace_write);
 
@@ -311,21 +311,20 @@ static void netfs_rreq_do_write_to_cache(struct netfs_read_request *rreq)
 
 	list_for_each_entry(subreq, &rreq->subrequests, rreq_link) {
 		/* Amalgamate adjacent writes */
-		pos = round_down(subreq->start, PAGE_SIZE);
-		if (pos != subreq->start) {
-			subreq->len += subreq->start - pos;
-			subreq->start = pos;
-		}
-		subreq->len = round_up(subreq->len, PAGE_SIZE);
-
 		while (!list_is_last(&subreq->rreq_link, &rreq->subrequests)) {
 			next = list_next_entry(subreq, rreq_link);
-			if (next->start > subreq->start + subreq->len)
+			if (next->start != subreq->start + subreq->len)
 				break;
 			subreq->len += next->len;
-			subreq->len = round_up(subreq->len, PAGE_SIZE);
 			list_del_init(&next->rreq_link);
 			netfs_put_subrequest(next, false);
+		}
+
+		ret = cres->ops->prepare_write(cres, &subreq->start, &subreq->len,
+					       rreq->i_size);
+		if (ret < 0) {
+			trace_netfs_sreq(subreq, netfs_sreq_trace_write_skip);
+			continue;
 		}
 
 		iov_iter_xarray(&iter, WRITE, &rreq->mapping->i_pages,
