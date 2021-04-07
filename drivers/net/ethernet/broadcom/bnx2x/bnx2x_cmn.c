@@ -2959,7 +2959,8 @@ load_error0:
 
 int bnx2x_drain_tx_queues(struct bnx2x *bp)
 {
-	u8 rc = 0, cos, i;
+	u8 rc = 0, cos;
+	int i;
 
 	/* Wait until tx fastpath tasks complete */
 	for_each_tx_queue(bp, i) {
