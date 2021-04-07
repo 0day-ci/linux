@@ -857,10 +857,8 @@ static void *ade_hw_ctx_alloc(struct platform_device *pdev,
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	ctx->base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(ctx->base)) {
-		DRM_ERROR("failed to remap ade io base\n");
+	if (IS_ERR(ctx->base))
 		return ERR_PTR(-EIO);
-	}
 
 	ctx->reset = devm_reset_control_get(dev, NULL);
 	if (IS_ERR(ctx->reset))
