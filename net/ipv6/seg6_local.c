@@ -93,6 +93,20 @@ struct seg6_end_dt_info {
 	int hdrlen;
 };
 
+struct pcpu_seg6_local_counters {
+	u64_stats_t rx_packets;
+	u64_stats_t rx_bytes;
+	u64_stats_t rx_errors;
+
+	struct u64_stats_sync syncp;
+};
+
+#define seg6_local_alloc_pcpu_counters(__gfp)				\
+	__netdev_alloc_pcpu_stats(struct pcpu_seg6_local_counters,	\
+				  ((__gfp) | __GFP_ZERO))
+
+#define SEG6_F_LOCAL_COUNTERS	SEG6_F_ATTR(SEG6_LOCAL_COUNTERS)
+
 struct seg6_local_lwt {
 	int action;
 	struct ipv6_sr_hdr *srh;
@@ -105,6 +119,7 @@ struct seg6_local_lwt {
 #ifdef CONFIG_NET_L3_MASTER_DEV
 	struct seg6_end_dt_info dt_info;
 #endif
+	struct pcpu_seg6_local_counters __percpu *pcpu_counters;
 
 	int headroom;
 	struct seg6_action_desc *desc;
@@ -878,36 +893,43 @@ static struct seg6_action_desc seg6_action_table[] = {
 	{
 		.action		= SEG6_LOCAL_ACTION_END,
 		.attrs		= 0,
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_X,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_NH6),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_x,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_T,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_TABLE),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_t,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_DX2,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_OIF),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_dx2,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_DX6,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_NH6),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_dx6,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_DX4,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_NH4),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_dx4,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_DT4,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_VRFTABLE),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 #ifdef CONFIG_NET_L3_MASTER_DEV
 		.input		= input_action_end_dt4,
 		.slwt_ops	= {
@@ -919,30 +941,35 @@ static struct seg6_action_desc seg6_action_table[] = {
 		.action		= SEG6_LOCAL_ACTION_END_DT6,
 #ifdef CONFIG_NET_L3_MASTER_DEV
 		.attrs		= 0,
-		.optattrs	= SEG6_F_ATTR(SEG6_LOCAL_TABLE) |
+		.optattrs	= SEG6_F_LOCAL_COUNTERS		|
+				  SEG6_F_ATTR(SEG6_LOCAL_TABLE) |
 				  SEG6_F_ATTR(SEG6_LOCAL_VRFTABLE),
 		.slwt_ops	= {
 					.build_state = seg6_end_dt6_build,
 				  },
 #else
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_TABLE),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 #endif
 		.input		= input_action_end_dt6,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_B6,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_SRH),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_b6,
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_B6_ENCAP,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_SRH),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_b6_encap,
 		.static_headroom	= sizeof(struct ipv6hdr),
 	},
 	{
 		.action		= SEG6_LOCAL_ACTION_END_BPF,
 		.attrs		= SEG6_F_ATTR(SEG6_LOCAL_BPF),
+		.optattrs	= SEG6_F_LOCAL_COUNTERS,
 		.input		= input_action_end_bpf,
 	},
 
@@ -963,11 +990,36 @@ static struct seg6_action_desc *__get_action_desc(int action)
 	return NULL;
 }
 
+static bool seg6_lwtunnel_counters_enabled(struct seg6_local_lwt *slwt)
+{
+	return slwt->parsed_optattrs & SEG6_F_LOCAL_COUNTERS;
+}
+
+static void seg6_local_update_rx_counters(struct seg6_local_lwt *slwt,
+					  int len, int err)
+{
+	struct pcpu_seg6_local_counters *pcounters;
+
+	pcounters = this_cpu_ptr(slwt->pcpu_counters);
+	u64_stats_update_begin(&pcounters->syncp);
+
+	if (likely(!err)) {
+		u64_stats_inc(&pcounters->rx_packets);
+		u64_stats_add(&pcounters->rx_bytes, len);
+	} else {
+		u64_stats_inc(&pcounters->rx_errors);
+	}
+
+	u64_stats_update_end(&pcounters->syncp);
+}
+
 static int seg6_local_input(struct sk_buff *skb)
 {
 	struct dst_entry *orig_dst = skb_dst(skb);
 	struct seg6_action_desc *desc;
 	struct seg6_local_lwt *slwt;
+	int len = skb->len;
+	int rc;
 
 	if (skb->protocol != htons(ETH_P_IPV6)) {
 		kfree_skb(skb);
@@ -977,7 +1029,14 @@ static int seg6_local_input(struct sk_buff *skb)
 	slwt = seg6_local_lwtunnel(orig_dst->lwtstate);
 	desc = slwt->desc;
 
-	return desc->input(skb, slwt);
+	rc = desc->input(skb, slwt);
+
+	if (!seg6_lwtunnel_counters_enabled(slwt))
+		return rc;
+
+	seg6_local_update_rx_counters(slwt, len, rc);
+
+	return rc;
 }
 
 static const struct nla_policy seg6_local_policy[SEG6_LOCAL_MAX + 1] = {
@@ -992,6 +1051,8 @@ static const struct nla_policy seg6_local_policy[SEG6_LOCAL_MAX + 1] = {
 	[SEG6_LOCAL_IIF]	= { .type = NLA_U32 },
 	[SEG6_LOCAL_OIF]	= { .type = NLA_U32 },
 	[SEG6_LOCAL_BPF]	= { .type = NLA_NESTED },
+	[SEG6_LOCAL_COUNTERS]	= { .type = NLA_BINARY,
+				    .len = sizeof(struct seg6_local_counters) },
 };
 
 static int parse_nla_srh(struct nlattr **attrs, struct seg6_local_lwt *slwt)
@@ -1296,6 +1357,67 @@ static void destroy_attr_bpf(struct seg6_local_lwt *slwt)
 		bpf_prog_put(slwt->bpf.prog);
 }
 
+static int parse_nla_counters(struct nlattr **attrs,
+			      struct seg6_local_lwt *slwt)
+{
+	struct pcpu_seg6_local_counters __percpu *pcounters;
+
+	pcounters = seg6_local_alloc_pcpu_counters(GFP_KERNEL);
+	if (!pcounters)
+		return -ENOMEM;
+
+	slwt->pcpu_counters = pcounters;
+
+	return 0;
+}
+
+static int put_nla_counters(struct sk_buff *skb, struct seg6_local_lwt *slwt)
+{
+	struct seg6_local_counters counters = { 0, 0, 0 };
+	struct nlattr *nla;
+	int i;
+
+	nla = nla_reserve(skb, SEG6_LOCAL_COUNTERS, sizeof(counters));
+	if (!nla)
+		return -EMSGSIZE;
+
+	for_each_possible_cpu(i) {
+		struct pcpu_seg6_local_counters *pcounters;
+		u64 rx_packets, rx_bytes, rx_errors;
+		unsigned int start;
+
+		pcounters = per_cpu_ptr(slwt->pcpu_counters, i);
+		do {
+			start = u64_stats_fetch_begin_irq(&pcounters->syncp);
+
+			rx_packets = u64_stats_read(&pcounters->rx_packets);
+			rx_bytes = u64_stats_read(&pcounters->rx_bytes);
+			rx_errors = u64_stats_read(&pcounters->rx_errors);
+
+		} while (u64_stats_fetch_retry_irq(&pcounters->syncp, start));
+
+		counters.rx_packets += rx_packets;
+		counters.rx_bytes += rx_bytes;
+		counters.rx_errors += rx_errors;
+	}
+
+	memcpy(nla_data(nla), &counters, sizeof(counters));
+
+	return 0;
+}
+
+static int cmp_nla_counters(struct seg6_local_lwt *a, struct seg6_local_lwt *b)
+{
+	/* a and b are equals if both have pcpu_counters set or not */
+	return (!!((unsigned long)a->pcpu_counters)) ^
+		(!!((unsigned long)b->pcpu_counters));
+}
+
+static void destroy_attr_counters(struct seg6_local_lwt *slwt)
+{
+	free_percpu(slwt->pcpu_counters);
+}
+
 struct seg6_action_param {
 	int (*parse)(struct nlattr **attrs, struct seg6_local_lwt *slwt);
 	int (*put)(struct sk_buff *skb, struct seg6_local_lwt *slwt);
@@ -1343,6 +1465,10 @@ static struct seg6_action_param seg6_action_params[SEG6_LOCAL_MAX + 1] = {
 				    .put = put_nla_vrftable,
 				    .cmp = cmp_nla_vrftable },
 
+	[SEG6_LOCAL_COUNTERS]	= { .parse = parse_nla_counters,
+				    .put = put_nla_counters,
+				    .cmp = cmp_nla_counters,
+				    .destroy = destroy_attr_counters },
 };
 
 /* call the destroy() callback (if available) for each set attribute in
@@ -1644,6 +1770,9 @@ static int seg6_local_get_encap_size(struct lwtunnel_state *lwt)
 
 	if (attrs & SEG6_F_ATTR(SEG6_LOCAL_VRFTABLE))
 		nlsize += nla_total_size(4);
+
+	if (attrs & SEG6_F_LOCAL_COUNTERS)
+		nlsize += nla_total_size(sizeof(struct seg6_local_counters));
 
 	return nlsize;
 }

@@ -27,6 +27,7 @@ enum {
 	SEG6_LOCAL_OIF,
 	SEG6_LOCAL_BPF,
 	SEG6_LOCAL_VRFTABLE,
+	SEG6_LOCAL_COUNTERS,
 	__SEG6_LOCAL_MAX,
 };
 #define SEG6_LOCAL_MAX (__SEG6_LOCAL_MAX - 1)
@@ -77,5 +78,12 @@ enum {
 };
 
 #define SEG6_LOCAL_BPF_PROG_MAX (__SEG6_LOCAL_BPF_PROG_MAX - 1)
+
+/* SRv6 Behavior counters */
+struct seg6_local_counters {
+	__u64 rx_packets;
+	__u64 rx_bytes;
+	__u64 rx_errors;
+};
 
 #endif
