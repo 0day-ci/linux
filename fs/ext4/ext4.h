@@ -724,6 +724,7 @@ enum {
 #define EXT4_IOC_CLEAR_ES_CACHE		_IO('f', 40)
 #define EXT4_IOC_GETSTATE		_IOW('f', 41, __u32)
 #define EXT4_IOC_GET_ES_CACHE		_IOWR('f', 42, struct fiemap)
+/* ioctl code 43 reserved for FS_IOC_JRNL_CHKPT */
 
 #define EXT4_IOC_SHUTDOWN _IOR ('X', 125, __u32)
 

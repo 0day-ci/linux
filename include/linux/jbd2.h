@@ -307,6 +307,9 @@ typedef struct journal_superblock_s
 					JBD2_FEATURE_INCOMPAT_CSUM_V3 | \
 					JBD2_FEATURE_INCOMPAT_FAST_COMMIT)
 
+/* discard journal blocks flag for jbd2_journal_flush */
+#define JBD2_FLAG_DO_DISCARD		1
+
 #ifdef __KERNEL__
 
 #include <linux/fs.h>
@@ -1491,7 +1494,7 @@ extern int	 jbd2_journal_invalidatepage(journal_t *,
 				struct page *, unsigned int, unsigned int);
 extern int	 jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page);
 extern int	 jbd2_journal_stop(handle_t *);
-extern int	 jbd2_journal_flush (journal_t *);
+extern int	 jbd2_journal_flush(journal_t *journal, unsigned long long flags);
 extern void	 jbd2_journal_lock_updates (journal_t *);
 extern void	 jbd2_journal_unlock_updates (journal_t *);
 

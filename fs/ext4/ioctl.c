@@ -756,7 +756,7 @@ static long ext4_ioctl_group_add(struct file *file,
 	err = ext4_group_add(sb, input);
 	if (EXT4_SB(sb)->s_journal) {
 		jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
-		err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal);
+		err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
 		jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
 	}
 	if (err == 0)
@@ -939,7 +939,7 @@ setversion_out:
 		err = ext4_group_extend(sb, EXT4_SB(sb)->s_es, n_blocks_count);
 		if (EXT4_SB(sb)->s_journal) {
 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
-			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal);
+			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
 		}
 		if (err == 0)
@@ -1082,7 +1082,7 @@ mext_out:
 		if (EXT4_SB(sb)->s_journal) {
 			ext4_fc_mark_ineligible(sb, EXT4_FC_REASON_RESIZE);
 			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
-			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal);
+			err2 = jbd2_journal_flush(EXT4_SB(sb)->s_journal, 0);
 			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
 		}
 		if (err == 0)
@@ -1318,6 +1318,33 @@ out:
 			return -EOPNOTSUPP;
 		return fsverity_ioctl_read_metadata(filp,
 						    (const void __user *)arg);
+	case FS_IOC_CHKPT_JRNL:
+	{
+		int err = 0;
+		unsigned long long flags = 0;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		/* file argument is not the mount point */
+		if (file_dentry(filp) != sb->s_root)
+			return -EINVAL;
+
+		/* filesystem is not backed by block device */
+		if (sb->s_bdev == NULL)
+			return -EINVAL;
+
+		if (copy_from_user(&flags, (__u64 __user *)arg,
+					sizeof(__u64)))
+			return -EFAULT;
+
+		if (EXT4_SB(sb)->s_journal) {
+			jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+			err = jbd2_journal_flush(EXT4_SB(sb)->s_journal, flags);
+			jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+		}
+		return err;
+	}
 
 	default:
 		return -ENOTTY;
@@ -1407,6 +1434,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_GET_ES_CACHE:
 	case FS_IOC_FSGETXATTR:
 	case FS_IOC_FSSETXATTR:
+	case FS_IOC_CHKPT_JRNL:
 		break;
 	default:
 		return -ENOIOCTLCMD;

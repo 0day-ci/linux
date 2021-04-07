@@ -214,6 +214,7 @@ struct fsxattr {
 #define FS_IOC_FSSETXATTR		_IOW('X', 32, struct fsxattr)
 #define FS_IOC_GETFSLABEL		_IOR(0x94, 49, char[FSLABEL_MAX])
 #define FS_IOC_SETFSLABEL		_IOW(0x94, 50, char[FSLABEL_MAX])
+#define FS_IOC_CHKPT_JRNL		_IOW('f', 43, __u64)
 
 /*
  * Inode flags (FS_IOC_GETFLAGS / FS_IOC_SETFLAGS)
@@ -303,5 +304,8 @@ typedef int __bitwise __kernel_rwf_t;
 /* mask of flags supported by the kernel */
 #define RWF_SUPPORTED	(RWF_HIPRI | RWF_DSYNC | RWF_SYNC | RWF_NOWAIT |\
 			 RWF_APPEND)
+
+/* flag for ioctl FS_IOC_JRNL_CHKPT */
+#define CHKPT_JRNL_DO_DISCARD	1
 
 #endif /* _UAPI_LINUX_FS_H */
