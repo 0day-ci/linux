@@ -119,6 +119,10 @@
 
 #define GPC_CLK_MAX		6
 
+/* Quirks */
+//Refuse to poweroff the domain
+#define GPC_QUIRKS_DONT_POWEROFF BIT(0)
+
 static DEFINE_MUTEX(gpc_pd_mutex);
 
 struct imx_pgc_domain {
@@ -139,6 +143,7 @@ struct imx_pgc_domain {
 
 	const int voltage;
 	struct device *dev;
+	const unsigned int quirks;
 };
 
 struct imx_pgc_domain_data {
@@ -262,6 +267,9 @@ static int imx_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
 						      genpd);
 	int i, ret = 0;
 	u32 value;
+
+	if (domain->quirks & GPC_QUIRKS_DONT_POWEROFF)
+		return 0;
 
 	mutex_lock(&gpc_pd_mutex);
 
@@ -606,6 +614,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.map = IMX8MM_OTG1_A53_DOMAIN,
 		},
 		.pgc        = IMX8MM_PGC_OTG1,
+		.quirks     = GPC_QUIRKS_DONT_POWEROFF,
 	},
 
 	[IMX8MM_POWER_DOMAIN_USB_OTG2] = {
@@ -617,6 +626,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.map = IMX8MM_OTG2_A53_DOMAIN,
 		},
 		.pgc        = IMX8MM_PGC_OTG2,
+		.quirks     = GPC_QUIRKS_DONT_POWEROFF,
 	},
 };
 
