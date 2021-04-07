@@ -700,6 +700,84 @@ out:
 }
 #endif
 
+static void restore_exclusive_pte(struct vm_area_struct *vma,
+				  struct page *page, unsigned long address,
+				  pte_t *ptep)
+{
+	pte_t pte;
+	swp_entry_t entry;
+
+	pte = pte_mkold(mk_pte(page, READ_ONCE(vma->vm_page_prot)));
+	if (pte_swp_soft_dirty(*ptep))
+		pte = pte_mksoft_dirty(pte);
+
+	entry = pte_to_swp_entry(*ptep);
+	if (pte_swp_uffd_wp(*ptep))
+		pte = pte_mkuffd_wp(pte);
+	else if (is_writable_device_exclusive_entry(entry))
+		pte = maybe_mkwrite(pte_mkdirty(pte), vma);
+
+	set_pte_at(vma->vm_mm, address, ptep, pte);
+
+	/*
+	 * No need to take a page reference as one was already
+	 * created when the swap entry was made.
+	 */
+	if (PageAnon(page))
+		page_add_anon_rmap(page, vma, address, false);
+	else
+		page_add_file_rmap(page, false);
+
+	if (vma->vm_flags & VM_LOCKED)
+		mlock_vma_page(page);
+
+	/*
+	 * No need to invalidate - it was non-present before. However
+	 * secondary CPUs may have mappings that need invalidating.
+	 */
+	update_mmu_cache(vma, address, ptep);
+}
+
+/*
+ * Tries to restore an exclusive pte if the page lock can be acquired without
+ * sleeping. Returns 0 on success or -EBUSY if the page could not be locked or
+ * the entry no longer points at locked_page in which case locked_page should be
+ * locked before retrying the call.
+ */
+static unsigned long
+try_restore_exclusive_pte(struct mm_struct *src_mm, pte_t *src_pte,
+			  struct vm_area_struct *vma, unsigned long addr,
+			  struct page **locked_page)
+{
+	swp_entry_t entry = pte_to_swp_entry(*src_pte);
+	struct page *page = pfn_swap_entry_to_page(entry);
+
+	if (*locked_page) {
+		/* The entry changed, retry */
+		if (unlikely(*locked_page != page)) {
+			unlock_page(*locked_page);
+			put_page(*locked_page);
+			*locked_page = page;
+			return -EBUSY;
+		}
+		restore_exclusive_pte(vma, page, addr, src_pte);
+		unlock_page(page);
+		put_page(page);
+		*locked_page = NULL;
+		return 0;
+	}
+
+	if (trylock_page(page)) {
+		restore_exclusive_pte(vma, page, addr, src_pte);
+		unlock_page(page);
+		return 0;
+	}
+
+	/* The page couldn't be locked so drop the locks and retry. */
+	*locked_page = page;
+	return -EBUSY;
+}
+
 /*
  * copy one vm_area from one task to the other. Assumes the page tables
  * already present in the new task to be cleared in the whole range
@@ -781,6 +859,12 @@ copy_nonpresent_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 				pte = pte_swp_mkuffd_wp(pte);
 			set_pte_at(src_mm, addr, src_pte, pte);
 		}
+	} else if (is_device_exclusive_entry(entry)) {
+		/* COW mappings should be dealt with by removing the entry */
+		VM_BUG_ON(is_cow_mapping(vm_flags));
+		page = pfn_swap_entry_to_page(entry);
+		get_page(page);
+		rss[mm_counter(page)]++;
 	}
 	set_pte_at(dst_mm, addr, dst_pte, pte);
 	return 0;
@@ -941,6 +1025,7 @@ copy_pte_range(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma,
 	int rss[NR_MM_COUNTERS];
 	swp_entry_t entry = (swp_entry_t){0};
 	struct page *prealloc = NULL;
+	struct page *locked_page = NULL;
 
 again:
 	progress = 0;
@@ -974,13 +1059,36 @@ again:
 			continue;
 		}
 		if (unlikely(!pte_present(*src_pte))) {
-			entry.val = copy_nonpresent_pte(dst_mm, src_mm,
-							dst_pte, src_pte,
-							src_vma, addr, rss);
-			if (entry.val)
-				break;
-			progress += 8;
-			continue;
+			swp_entry_t swp_entry = pte_to_swp_entry(*src_pte);
+
+			if (unlikely(is_cow_mapping(src_vma->vm_flags) &&
+			    is_device_exclusive_entry(swp_entry))) {
+				/*
+				 * Normally this would require sending mmu
+				 * notifiers, but copy_page_range() has already
+				 * done that for COW mappings.
+				 */
+				ret = try_restore_exclusive_pte(src_mm, src_pte,
+								src_vma, addr,
+								&locked_page);
+				if (ret == -EBUSY)
+					break;
+			} else {
+				entry.val = copy_nonpresent_pte(dst_mm, src_mm,
+								dst_pte, src_pte,
+								src_vma, addr,
+								rss);
+				if (entry.val)
+					break;
+				progress += 8;
+				continue;
+			}
+		}
+		/* a non-present pte became present after dropping the ptl */
+		if (unlikely(locked_page)) {
+			unlock_page(locked_page);
+			put_page(locked_page);
+			locked_page = NULL;
 		}
 		/* copy_present_pte() will clear `*prealloc' if consumed */
 		ret = copy_present_pte(dst_vma, src_vma, dst_pte, src_pte,
@@ -1017,6 +1125,11 @@ again:
 			goto out;
 		}
 		entry.val = 0;
+	} else if (ret == -EBUSY) {
+		if (get_page_unless_zero(locked_page))
+			lock_page(locked_page);
+		else
+			locked_page = NULL;
 	} else if (ret) {
 		WARN_ON_ONCE(ret != -EAGAIN);
 		prealloc = page_copy_prealloc(src_mm, src_vma, addr);
@@ -1281,7 +1394,8 @@ again:
 		}
 
 		entry = pte_to_swp_entry(ptent);
-		if (is_device_private_entry(entry)) {
+		if (is_device_private_entry(entry) ||
+		    is_device_exclusive_entry(entry)) {
 			struct page *page = pfn_swap_entry_to_page(entry);
 
 			if (unlikely(details && details->check_mapping)) {
@@ -1297,7 +1411,10 @@ again:
 
 			pte_clear_not_present_full(mm, addr, pte, tlb->fullmm);
 			rss[mm_counter(page)]--;
-			page_remove_rmap(page, false);
+
+			if (is_device_private_entry(entry))
+				page_remove_rmap(page, false);
+
 			put_page(page);
 			continue;
 		}
@@ -3259,6 +3376,44 @@ void unmap_mapping_range(struct address_space *mapping,
 EXPORT_SYMBOL(unmap_mapping_range);
 
 /*
+ * Restore a potential device exclusive pte to a working pte entry
+ */
+static vm_fault_t remove_device_exclusive_entry(struct vm_fault *vmf)
+{
+	struct page *page = vmf->page;
+	struct vm_area_struct *vma = vmf->vma;
+	struct page_vma_mapped_walk pvmw = {
+		.page = page,
+		.vma = vma,
+		.address = vmf->address,
+		.flags = PVMW_SYNC,
+	};
+	vm_fault_t ret = 0;
+	struct mmu_notifier_range range;
+
+	if (!lock_page_or_retry(page, vma->vm_mm, vmf->flags))
+		return VM_FAULT_RETRY;
+	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, vma, vma->vm_mm,
+				vmf->address & PAGE_MASK,
+				(vmf->address & PAGE_MASK) + PAGE_SIZE);
+	mmu_notifier_invalidate_range_start(&range);
+
+	while (page_vma_mapped_walk(&pvmw)) {
+		if (unlikely(!pte_same(*pvmw.pte, vmf->orig_pte))) {
+			page_vma_mapped_walk_done(&pvmw);
+			break;
+		}
+
+		restore_exclusive_pte(vma, page, pvmw.address, pvmw.pte);
+	}
+
+	unlock_page(page);
+
+	mmu_notifier_invalidate_range_end(&range);
+	return ret;
+}
+
+/*
  * We enter with non-exclusive mmap_lock (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with pte unmapped and unlocked.
@@ -3285,6 +3440,9 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(vma->vm_mm, vmf->pmd,
 					     vmf->address);
+		} else if (is_device_exclusive_entry(entry)) {
+			vmf->page = pfn_swap_entry_to_page(entry);
+			ret = remove_device_exclusive_entry(vmf);
 		} else if (is_device_private_entry(entry)) {
 			vmf->page = pfn_swap_entry_to_page(entry);
 			ret = vmf->page->pgmap->ops->migrate_to_ram(vmf);
