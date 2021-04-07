@@ -369,10 +369,19 @@ struct vm_area_struct *vm_area_dup(struct vm_area_struct *orig)
 	return new;
 }
 
-void vm_area_free(struct vm_area_struct *vma)
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+static void __vm_area_free(struct rcu_head *head)
 {
+	struct vm_area_struct *vma = container_of(head, struct vm_area_struct,
+						  vm_rcu);
 	kmem_cache_free(vm_area_cachep, vma);
 }
+
+void vm_area_free(struct vm_area_struct *vma)
+{
+	call_rcu(&vma->vm_rcu, __vm_area_free);
+}
+#endif	/* CONFIG_SPECULATIVE_PAGE_FAULT */
 
 static void account_kernel_stack(struct task_struct *tsk, int account)
 {
