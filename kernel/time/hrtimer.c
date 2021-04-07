@@ -871,6 +871,28 @@ static void hrtimer_reprogram(struct hrtimer *timer, bool reprogram)
 	tick_program_event(expires, 1);
 }
 
+#define CLOCK_SET_BASES ((1U << HRTIMER_BASE_REALTIME)|		\
+			 (1U << HRTIMER_BASE_REALTIME_SOFT)|	\
+			 (1U << HRTIMER_BASE_BOOTTIME)|		\
+			 (1U << HRTIMER_BASE_BOOTTIME_SOFT)|	\
+			 (1U << HRTIMER_BASE_TAI)|		\
+			 (1U << HRTIMER_BASE_TAI_SOFT))
+
+static bool need_reprogram_timer(struct hrtimer_cpu_base *cpu_base)
+{
+	unsigned int active = 0;
+
+	if (!cpu_base->softirq_activated)
+		active = cpu_base->active_bases & HRTIMER_ACTIVE_SOFT;
+
+	active = active | (cpu_base->active_bases & HRTIMER_ACTIVE_HARD);
+
+	if ((active & CLOCK_SET_BASES) == 0)
+		return false;
+
+	return true;
+}
+
 /*
  * Clock realtime was set
  *
@@ -885,9 +907,41 @@ static void hrtimer_reprogram(struct hrtimer *timer, bool reprogram)
 void clock_was_set(void)
 {
 #ifdef CONFIG_HIGH_RES_TIMERS
-	/* Retrigger the CPU local events everywhere */
-	on_each_cpu(retrigger_next_event, NULL, 1);
+	cpumask_var_t mask;
+	int cpu;
+
+	if (!tick_nohz_full_enabled()) {
+		/* Retrigger the CPU local events everywhere */
+		on_each_cpu(retrigger_next_event, NULL, 1);
+		goto set_timerfd;
+	}
+
+	if (!zalloc_cpumask_var(&mask, GFP_KERNEL)) {
+		on_each_cpu(retrigger_next_event, NULL, 1);
+		goto set_timerfd;
+	}
+
+	/* Avoid interrupting nohz_full CPUs if possible */
+	preempt_disable();
+	for_each_online_cpu(cpu) {
+		if (tick_nohz_full_cpu(cpu)) {
+			unsigned long flags;
+			struct hrtimer_cpu_base *cpu_base = &per_cpu(hrtimer_bases, cpu);
+
+			raw_spin_lock_irqsave(&cpu_base->lock, flags);
+			if (need_reprogram_timer(cpu_base))
+				cpumask_set_cpu(cpu, mask);
+			else
+				hrtimer_update_base(cpu_base);
+			raw_spin_unlock_irqrestore(&cpu_base->lock, flags);
+		}
+	}
+
+	smp_call_function_many(mask, retrigger_next_event, NULL, 1);
+	preempt_enable();
+	free_cpumask_var(mask);
 #endif
+set_timerfd:
 	timerfd_clock_was_set();
 }
 
