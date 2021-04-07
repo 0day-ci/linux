@@ -34,7 +34,7 @@ static u8 uniphier_clk_mux_get_parent(struct clk_hw *hw)
 	int num_parents = clk_hw_get_num_parents(hw);
 	int ret;
 	unsigned int val;
-	u8 i;
+	int i;
 
 	ret = regmap_read(mux->regmap, mux->reg, &val);
 	if (ret)
