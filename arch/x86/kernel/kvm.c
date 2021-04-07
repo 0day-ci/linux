@@ -451,16 +451,17 @@ static void __init sev_map_percpu_data(void)
 	}
 }
 
+
+static DEFINE_PER_CPU(cpumask_var_t, __pv_cpu_mask);
+
+#ifdef CONFIG_SMP
+
 static bool pv_tlb_flush_supported(void)
 {
 	return (kvm_para_has_feature(KVM_FEATURE_PV_TLB_FLUSH) &&
 		!kvm_para_has_hint(KVM_HINTS_REALTIME) &&
 		kvm_para_has_feature(KVM_FEATURE_STEAL_TIME));
 }
-
-static DEFINE_PER_CPU(cpumask_var_t, __pv_cpu_mask);
-
-#ifdef CONFIG_SMP
 
 static bool pv_ipi_supported(void)
 {
@@ -574,6 +575,32 @@ static void kvm_smp_send_call_func_ipi(const struct cpumask *mask)
 	}
 }
 
+static void kvm_flush_tlb_others(const struct cpumask *cpumask,
+			const struct flush_tlb_info *info)
+{
+	u8 state;
+	int cpu;
+	struct kvm_steal_time *src;
+	struct cpumask *flushmask = this_cpu_cpumask_var_ptr(__pv_cpu_mask);
+
+	cpumask_copy(flushmask, cpumask);
+	/*
+	 * We have to call flush only on online vCPUs. And
+	 * queue flush_on_enter for pre-empted vCPUs
+	 */
+	for_each_cpu(cpu, flushmask) {
+		src = &per_cpu(steal_time, cpu);
+		state = READ_ONCE(src->preempted);
+		if ((state & KVM_VCPU_PREEMPTED)) {
+			if (try_cmpxchg(&src->preempted, &state,
+					state | KVM_VCPU_FLUSH_TLB))
+				__cpumask_clear_cpu(cpu, flushmask);
+		}
+	}
+
+	native_flush_tlb_others(flushmask, info);
+}
+
 static void __init kvm_smp_prepare_boot_cpu(void)
 {
 	/*
@@ -611,33 +638,16 @@ static int kvm_cpu_down_prepare(unsigned int cpu)
 	local_irq_enable();
 	return 0;
 }
-#endif
 
+#else
+
+static bool pv_tlb_flush_supported(void) { return false; }
+static bool pv_ipi_supported(void) { return false; }
 static void kvm_flush_tlb_others(const struct cpumask *cpumask,
-			const struct flush_tlb_info *info)
-{
-	u8 state;
-	int cpu;
-	struct kvm_steal_time *src;
-	struct cpumask *flushmask = this_cpu_cpumask_var_ptr(__pv_cpu_mask);
+			const struct flush_tlb_info *info) { }
+static void kvm_setup_pv_ipi(void) { }
 
-	cpumask_copy(flushmask, cpumask);
-	/*
-	 * We have to call flush only on online vCPUs. And
-	 * queue flush_on_enter for pre-empted vCPUs
-	 */
-	for_each_cpu(cpu, flushmask) {
-		src = &per_cpu(steal_time, cpu);
-		state = READ_ONCE(src->preempted);
-		if ((state & KVM_VCPU_PREEMPTED)) {
-			if (try_cmpxchg(&src->preempted, &state,
-					state | KVM_VCPU_FLUSH_TLB))
-				__cpumask_clear_cpu(cpu, flushmask);
-		}
-	}
-
-	native_flush_tlb_others(flushmask, info);
-}
+#endif
 
 static void __init kvm_guest_init(void)
 {
@@ -734,10 +744,8 @@ static uint32_t __init kvm_detect(void)
 
 static void __init kvm_apic_init(void)
 {
-#if defined(CONFIG_SMP)
 	if (pv_ipi_supported())
 		kvm_setup_pv_ipi();
-#endif
 }
 
 static bool __init kvm_msi_ext_dest_id(void)
@@ -797,20 +805,11 @@ arch_initcall(activate_jump_labels);
 static __init int kvm_alloc_cpumask(void)
 {
 	int cpu;
-	bool alloc = false;
 
 	if (!kvm_para_available() || nopv)
 		return 0;
 
-	if (pv_tlb_flush_supported())
-		alloc = true;
-
-#if defined(CONFIG_SMP)
-	if (pv_ipi_supported())
-		alloc = true;
-#endif
-
-	if (alloc)
+	if (pv_tlb_flush_supported() || pv_ipi_supported())
 		for_each_possible_cpu(cpu) {
 			zalloc_cpumask_var_node(per_cpu_ptr(&__pv_cpu_mask, cpu),
 				GFP_KERNEL, cpu_to_node(cpu));
