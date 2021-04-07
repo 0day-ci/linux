@@ -13,6 +13,7 @@
 #include <linux/mutex.h>
 #include "sja1105_static_config.h"
 
+#define SJA1105_DEFAULT_VLAN		(VLAN_N_VID - 1)
 #define SJA1105_NUM_PORTS		5
 #define SJA1105_NUM_TC			8
 #define SJA1105ET_FDB_BIN_SIZE		4
