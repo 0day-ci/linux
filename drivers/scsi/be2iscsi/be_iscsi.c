@@ -274,11 +274,13 @@ void beiscsi_iface_create_default(struct beiscsi_hba *phba)
 	if (!beiscsi_if_get_info(phba, BEISCSI_IP_TYPE_V4, &if_info)) {
 		beiscsi_iface_create_ipv4(phba);
 		kfree(if_info);
+		if_info = NULL;
 	}
 
 	if (!beiscsi_if_get_info(phba, BEISCSI_IP_TYPE_V6, &if_info)) {
 		beiscsi_iface_create_ipv6(phba);
 		kfree(if_info);
+		if_info = NULL;
 	}
 }
 
