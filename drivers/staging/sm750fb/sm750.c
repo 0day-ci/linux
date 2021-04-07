@@ -873,9 +873,9 @@ static void sm750fb_setup(struct sm750_dev *sm750_dev, char *src)
 	sm750_dev->initParm.chip_clk = 0;
 	sm750_dev->initParm.mem_clk = 0;
 	sm750_dev->initParm.master_clk = 0;
-	sm750_dev->initParm.powerMode = 0;
-	sm750_dev->initParm.setAllEngOff = 0;
-	sm750_dev->initParm.resetMemory = 1;
+	sm750_dev->initParm.power_mode = 0;
+	sm750_dev->initParm.set_all_eng_off = 0;
+	sm750_dev->initParm.reset_memory = 1;
 
 	/* defaultly turn g_hwcursor on for both view */
 	g_hwcursor = 3;
