@@ -37,7 +37,12 @@ static vm_fault_t f2fs_filemap_fault(struct vm_fault *vmf)
 	struct inode *inode = file_inode(vmf->vma->vm_file);
 	vm_fault_t ret;
 
-	down_read(&F2FS_I(inode)->i_mmap_sem);
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE) {
+		if (!down_read_trylock(&F2FS_I(inode)->i_mmap_sem))
+			return VM_FAULT_RETRY;
+	} else {
+		down_read(&F2FS_I(inode)->i_mmap_sem);
+	}
 	ret = filemap_fault(vmf);
 	up_read(&F2FS_I(inode)->i_mmap_sem);
 
@@ -171,6 +176,7 @@ static const struct vm_operations_struct f2fs_file_vm_ops = {
 	.fault		= f2fs_filemap_fault,
 	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= f2fs_vm_page_mkwrite,
+	.speculative	= true,
 };
 
 static int get_parent_ino(struct inode *inode, nid_t *pino)
