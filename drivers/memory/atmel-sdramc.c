@@ -45,6 +45,8 @@ static int atmel_ramc_probe(struct platform_device *pdev)
 	struct clk *clk;
 
 	caps = of_device_get_match_data(&pdev->dev);
+	if (!caps)
+		return -EINVAL;
 
 	if (caps->has_ddrck) {
 		clk = devm_clk_get(&pdev->dev, "ddrck");
