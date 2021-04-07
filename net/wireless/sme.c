@@ -529,8 +529,10 @@ static int cfg80211_sme_connect(struct wireless_dev *wdev,
 		cfg80211_sme_free(wdev);
 	}
 
-	if (WARN_ON(wdev->conn))
+	if (wdev->conn) {
+		pr_warn("%s: wdev->conn != NULL, sme connect in progress", __func__);
 		return -EINPROGRESS;
+	}
 
 	wdev->conn = kzalloc(sizeof(*wdev->conn), GFP_KERNEL);
 	if (!wdev->conn)
