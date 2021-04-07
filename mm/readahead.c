@@ -661,6 +661,7 @@ void readahead_expand(struct readahead_control *ractl,
 		      loff_t new_start, size_t new_len)
 {
 	struct address_space *mapping = ractl->mapping;
+	struct file_ra_state *ra = ractl->ra;
 	pgoff_t new_index, new_nr_pages;
 	gfp_t gfp_mask = readahead_gfp_mask(mapping);
 
@@ -705,6 +706,8 @@ void readahead_expand(struct readahead_control *ractl,
 			return;
 		}
 		ractl->_nr_pages++;
+		ra->size++;
+		ra->async_size++;
 	}
 }
 EXPORT_SYMBOL(readahead_expand);
