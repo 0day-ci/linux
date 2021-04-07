@@ -570,6 +570,7 @@ static int mpi3mr_scan_finished(struct Scsi_Host *shost,
 	if (mrioc->scan_started)
 		return 0;
 	ioc_info(mrioc, "%s :port enable: SUCCESS\n", __func__);
+	mpi3mr_start_watchdog(mrioc);
 	mrioc->is_driver_loading = 0;
 
 	return 1;
@@ -856,9 +857,11 @@ mpi3mr_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&mrioc->admin_req_lock);
 	spin_lock_init(&mrioc->reply_free_queue_lock);
 	spin_lock_init(&mrioc->sbq_lock);
+	spin_lock_init(&mrioc->watchdog_lock);
 	spin_lock_init(&mrioc->chain_buf_lock);
 
 	mpi3mr_init_drv_cmd(&mrioc->init_cmds, MPI3MR_HOSTTAG_INITCMDS);
+
 	if (pdev->revision)
 		mrioc->enable_segqueue = true;
 
