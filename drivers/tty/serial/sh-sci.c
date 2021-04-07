@@ -2899,13 +2899,6 @@ static int sci_init_single(struct platform_device *dev,
 	port->mapbase = res->start;
 	sci_port->reg_size = resource_size(res);
 
-	for (i = 0; i < ARRAY_SIZE(sci_port->irqs); ++i) {
-		if (i)
-			sci_port->irqs[i] = platform_get_irq_optional(dev, i);
-		else
-			sci_port->irqs[i] = platform_get_irq(dev, i);
-	}
-
 	/* The SCI generates several interrupts. They can be muxed together or
 	 * connected to different interrupt lines. In the muxed case only one
 	 * interrupt resource is specified as there is only one interrupt ID.
@@ -2913,12 +2906,17 @@ static int sci_init_single(struct platform_device *dev,
 	 * from the SCI, however those signals might have their own individual
 	 * interrupt ID numbers, or muxed together with another interrupt.
 	 */
+	sci_port->irqs[0] = platform_get_irq(dev, i);
 	if (sci_port->irqs[0] < 0)
-		return -ENXIO;
+		return sci_port->irqs[0];
 
-	if (sci_port->irqs[1] < 0)
-		for (i = 1; i < ARRAY_SIZE(sci_port->irqs); i++)
+	for (i = 1; i < ARRAY_SIZE(sci_port->irqs); ++i) {
+		sci_port->irqs[i] = platform_get_irq_optional(dev, i);
+		if (sci_port->irqs[i] < 0)
+			return sci_port->irqs[i];
+		if (sci_port->irqs[i] == 0)
 			sci_port->irqs[i] = sci_port->irqs[0];
+	}
 
 	sci_port->params = sci_probe_regmap(p);
 	if (unlikely(sci_port->params == NULL))
