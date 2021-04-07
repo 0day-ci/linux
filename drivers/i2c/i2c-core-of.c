@@ -58,6 +58,8 @@ int of_i2c_get_board_info(struct device *dev, struct device_node *node,
 	if (of_get_property(node, "wakeup-source", NULL))
 		info->flags |= I2C_CLIENT_WAKE;
 
+	of_property_read_string(node, "dev-name", &(info->dev_name));
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(of_i2c_get_board_info);
