@@ -412,49 +412,45 @@ void task_join_group_stop(struct task_struct *task)
 static struct sigqueue *
 __sigqueue_alloc(int sig, struct task_struct *t, gfp_t flags, int override_rlimit)
 {
-	struct sigqueue *q = NULL;
-	struct user_struct *user;
-	int sigpending;
+	struct sigqueue *q = kmem_cache_alloc(sigqueue_cachep, flags);
 
-	/*
-	 * Protect access to @t credentials. This can go away when all
-	 * callers hold rcu read lock.
-	 *
-	 * NOTE! A pending signal will hold on to the user refcount,
-	 * and we get/put the refcount only when the sigpending count
-	 * changes from/to zero.
-	 */
-	rcu_read_lock();
-	user = __task_cred(t)->user;
-	sigpending = atomic_inc_return(&user->sigpending);
-	if (sigpending == 1)
-		get_uid(user);
-	rcu_read_unlock();
+	if (likely(q != NULL)) {
+		bool overlimit;
 
-	if (override_rlimit || likely(sigpending <= task_rlimit(t, RLIMIT_SIGPENDING))) {
-		q = kmem_cache_alloc(sigqueue_cachep, flags);
-	} else {
-		print_dropped_signal(sig);
-	}
-
-	if (unlikely(q == NULL)) {
-		if (atomic_dec_and_test(&user->sigpending))
-			free_uid(user);
-	} else {
 		INIT_LIST_HEAD(&q->list);
 		q->flags = 0;
-		q->user = user;
+
+		/*
+		 * Protect access to @t credentials. This can go away when all
+		 * callers hold rcu read lock.
+		 */
+		rcu_read_lock();
+		q->ucounts = get_ucounts(task_ucounts(t));
+		if (q->ucounts) {
+			overlimit = inc_rlimit_ucounts_and_test(q->ucounts, UCOUNT_RLIMIT_SIGPENDING,
+					1, task_rlimit(t, RLIMIT_SIGPENDING));
+
+			if (override_rlimit || likely(!overlimit)) {
+				rcu_read_unlock();
+				return q;
+			}
+		}
+		rcu_read_unlock();
+		kmem_cache_free(sigqueue_cachep, q);
 	}
 
-	return q;
+	print_dropped_signal(sig);
+	return NULL;
 }
 
 static void __sigqueue_free(struct sigqueue *q)
 {
 	if (q->flags & SIGQUEUE_PREALLOC)
 		return;
-	if (atomic_dec_and_test(&q->user->sigpending))
-		free_uid(q->user);
+	if (q->ucounts) {
+		dec_rlimit_ucounts(q->ucounts, UCOUNT_RLIMIT_SIGPENDING, 1);
+		put_ucounts(q->ucounts);
+	}
 	kmem_cache_free(sigqueue_cachep, q);
 }
 
