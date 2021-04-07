@@ -676,6 +676,20 @@ static void target_remove_from_state_list(struct se_cmd *cmd)
 	spin_unlock_irqrestore(&dev->queues[cmd->cpuid].lock, flags);
 }
 
+static void target_remove_from_tmr_list(struct se_cmd *cmd)
+{
+	struct se_device *dev = NULL;
+	unsigned long flags;
+
+	if (cmd->se_cmd_flags & SCF_SCSI_TMR_CDB)
+		dev = cmd->se_tmr_req->tmr_dev;
+
+	if (dev) {
+		spin_lock_irqsave(&dev->se_tmr_lock, flags);
+		list_del_init(&cmd->se_tmr_req->tmr_list);
+		spin_unlock_irqrestore(&dev->se_tmr_lock, flags);
+	}
+}
 /*
  * This function is called by the target core after the target core has
  * finished processing a SCSI command or SCSI TMF. Both the regular command
@@ -686,8 +700,6 @@ static void target_remove_from_state_list(struct se_cmd *cmd)
 static int transport_cmd_check_stop_to_fabric(struct se_cmd *cmd)
 {
 	unsigned long flags;
-
-	target_remove_from_state_list(cmd);
 
 	/*
 	 * Clear struct se_cmd->se_lun before the handoff to FE.
@@ -727,6 +739,9 @@ static void transport_lun_remove_cmd(struct se_cmd *cmd)
 
 	if (!lun)
 		return;
+
+	target_remove_from_state_list(cmd);
+	target_remove_from_tmr_list(cmd);
 
 	if (cmpxchg(&cmd->lun_ref_active, true, false))
 		percpu_ref_put(&lun->lun_ref);
