@@ -78,6 +78,8 @@
  */
 #define MB_DEFAULT_MAX_INODE_PREALLOC	512
 
+#define MB_DISCARD_RETRIES_FOREVER	(-1UL)
+
 struct ext4_free_data {
 	/* this links the free block information from sb_info */
 	struct list_head		efd_list;

@@ -2860,6 +2860,8 @@ int ext4_mb_init(struct super_block *sb)
 	sbi->s_mb_stream_request = MB_DEFAULT_STREAM_THRESHOLD;
 	sbi->s_mb_order2_reqs = MB_DEFAULT_ORDER2_REQS;
 	sbi->s_mb_max_inode_prealloc = MB_DEFAULT_MAX_INODE_PREALLOC;
+	sbi->s_mb_max_retries_per_group = MB_DISCARD_RETRIES_FOREVER; 
+
 	/*
 	 * The default group preallocation is 512, which for 4k block
 	 * sizes translates to 2 megabytes.  However for bigalloc file
@@ -4213,6 +4215,7 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 					ext4_group_t group, int needed)
 {
 	struct ext4_group_info *grp = ext4_get_group_info(sb, group);
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	struct buffer_head *bitmap_bh = NULL;
 	struct ext4_prealloc_space *pa, *tmp;
 	struct list_head list;
@@ -4220,6 +4223,7 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 	int err;
 	int busy = 0;
 	int free, free_total = 0;
+	int discard_retries = 0;
 
 	mb_debug(sb, "discard preallocation for group %u\n", group);
 	if (list_empty(&grp->bb_prealloc_list))
@@ -4298,11 +4302,18 @@ repeat:
 
 	/* if we still need more blocks and some PAs were used, try again */
 	if (free_total < needed && busy) {
-		ext4_unlock_group(sb, group);
-		cond_resched();
-		busy = 0;
-		goto repeat;
+		++discard_retries;
+		if (sbi && sbi->s_mb_max_retries_per_group < discard_retries) {
+			ext4_warning(sb, "The retry count has exceeded the limit: %lu",
+					sbi->s_mb_max_retries_per_group);
+		} else  {
+			ext4_unlock_group(sb, group);
+			cond_resched();
+			busy = 0;
+			goto repeat;
+		}
 	}
+
 	ext4_unlock_group(sb, group);
 	ext4_mb_unload_buddy(&e4b);
 	put_bh(bitmap_bh);
