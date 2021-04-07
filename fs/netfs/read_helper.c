@@ -270,10 +270,8 @@ static void netfs_rreq_copy_terminated(void *priv, ssize_t transferred_or_error,
 	struct netfs_read_request *rreq = subreq->rreq;
 
 	if (IS_ERR_VALUE(transferred_or_error)) {
-		subreq->error = transferred_or_error;
 		netfs_stat(&netfs_n_rh_write_failed);
 	} else {
-		subreq->error = 0;
 		netfs_stat(&netfs_n_rh_write_done);
 	}
 
