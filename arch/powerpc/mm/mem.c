@@ -472,6 +472,8 @@ void flush_dcache_page(struct page *page)
 }
 EXPORT_SYMBOL(flush_dcache_page);
 
+static void __flush_dcache_icache(void *p);
+
 static void flush_dcache_icache_hugepage(struct page *page)
 {
 	int i;
@@ -522,7 +524,7 @@ EXPORT_SYMBOL(flush_dcache_icache_page);
  *
  * @page: the address of the page to flush
  */
-void __flush_dcache_icache(void *p)
+static void __flush_dcache_icache(void *p)
 {
 	unsigned long addr = (unsigned long)p;
 
