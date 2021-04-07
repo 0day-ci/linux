@@ -31,7 +31,7 @@ static unsigned int stm_core_up;
  * stm_source_write() caller, which may want to have as little overhead as
  * possible.
  */
-static struct srcu_struct stm_source_srcu;
+DEFINE_STATIC_SRCU(stm_source_srcu);
 
 static ssize_t masters_show(struct device *dev,
 			    struct device_attribute *attr,
@@ -366,8 +366,8 @@ static int major_match(struct device *dev, const void *data)
  * Modules can implement STM protocol drivers and (un-)register them
  * with the STM class framework.
  */
-static struct list_head stm_pdrv_head;
-static struct mutex stm_pdrv_mutex;
+static LIST_HEAD(stm_pdrv_head);
+static DEFINE_MUTEX(stm_pdrv_mutex);
 
 struct stm_pdrv_entry {
 	struct list_head			entry;
@@ -1323,10 +1323,6 @@ static int __init stm_core_init(void)
 	err = stp_configfs_init();
 	if (err)
 		goto err_src;
-
-	init_srcu_struct(&stm_source_srcu);
-	INIT_LIST_HEAD(&stm_pdrv_head);
-	mutex_init(&stm_pdrv_mutex);
 
 	/*
 	 * So as to not confuse existing users with a requirement
