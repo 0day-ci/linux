@@ -12,6 +12,7 @@
 
 #include <uapi/linux/wireguard.h>
 
+#include <linux/fips.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/genetlink.h>
@@ -20,6 +21,9 @@
 static int __init mod_init(void)
 {
 	int ret;
+
+	if (fips_enabled)
+		return -EOPNOTSUPP;
 
 #ifdef DEBUG
 	if (!wg_allowedips_selftest() || !wg_packet_counter_selftest() ||
