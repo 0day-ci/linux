@@ -4,7 +4,7 @@
 
 /* dvi chip stuffs structros */
 
-typedef long (*PFN_DVICTRL_INIT)(unsigned char edge_select,
+typedef long (*DVICTRL_INIT)(unsigned char edge_select,
 				 unsigned char bus_select,
 				 unsigned char dual_edge_clk_select,
 				 unsigned char hsync_enable,
@@ -15,28 +15,28 @@ typedef long (*PFN_DVICTRL_INIT)(unsigned char edge_select,
 				 unsigned char pll_filter_enable,
 				 unsigned char pll_filter_value);
 
-typedef void (*PFN_DVICTRL_RESETCHIP)(void);
-typedef char* (*PFN_DVICTRL_GETCHIPSTRING)(void);
-typedef unsigned short (*PFN_DVICTRL_GETVENDORID)(void);
-typedef unsigned short (*PFN_DVICTRL_GETDEVICEID)(void);
-typedef void (*PFN_DVICTRL_SETPOWER)(unsigned char powerUp);
-typedef void (*PFN_DVICTRL_HOTPLUGDETECTION)(unsigned char enableHotPlug);
-typedef unsigned char (*PFN_DVICTRL_ISCONNECTED)(void);
-typedef unsigned char (*PFN_DVICTRL_CHECKINTERRUPT)(void);
-typedef void (*PFN_DVICTRL_CLEARINTERRUPT)(void);
+typedef void (*DVICTRL_RESETCHIP)(void);
+typedef char* (*DVICTRL_GETCHIPSTRING)(void);
+typedef unsigned short (*DVICTRL_GETVENDORID)(void);
+typedef unsigned short (*DVICTRL_GETDEVICEID)(void);
+typedef void (*DVICTRL_SETPOWER)(unsigned char powerUp);
+typedef void (*DVICTRL_HOTPLUGDETECTION)(unsigned char enableHotPlug);
+typedef unsigned char (*DVICTRL_ISCONNECTED)(void);
+typedef unsigned char (*DVICTRL_CHECKINTERRUPT)(void);
+typedef void (*DVICTRL_CLEARINTERRUPT)(void);
 
 /* Structure to hold all the function pointer to the DVI Controller. */
 struct dvi_ctrl_device {
-	PFN_DVICTRL_INIT		pfn_init;
-	PFN_DVICTRL_RESETCHIP		pfn_reset_chip;
-	PFN_DVICTRL_GETCHIPSTRING	pfn_get_chip_string;
-	PFN_DVICTRL_GETVENDORID		pfn_get_vendor_id;
-	PFN_DVICTRL_GETDEVICEID		pfn_get_device_id;
-	PFN_DVICTRL_SETPOWER		pfn_set_power;
-	PFN_DVICTRL_HOTPLUGDETECTION	pfn_enable_hot_plug_detection;
-	PFN_DVICTRL_ISCONNECTED		pfn_is_connected;
-	PFN_DVICTRL_CHECKINTERRUPT	pfn_check_interrupt;
-	PFN_DVICTRL_CLEARINTERRUPT	pfn_clear_interrupt;
+	DVICTRL_INIT			init;
+	DVICTRL_RESETCHIP		reset_chip;
+	DVICTRL_GETCHIPSTRING		get_chip_string;
+	DVICTRL_GETVENDORID		get_vendor_id;
+	DVICTRL_GETDEVICEID		get_device_id;
+	DVICTRL_SETPOWER		set_power;
+	DVICTRL_HOTPLUGDETECTION	enable_hot_plug_detection;
+	DVICTRL_ISCONNECTED		is_connected;
+	DVICTRL_CHECKINTERRUPT	check_interrupt;
+	DVICTRL_CLEARINTERRUPT	clear_interrupt;
 };
 
 #define DVI_CTRL_SII164
