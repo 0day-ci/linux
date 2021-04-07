@@ -310,14 +310,14 @@ static unsigned int de_get_transparency(struct lynx_accel *accel)
  * @dy: Starting y coordinate of destination surface
  * @width: width of rectangle in pixel value
  * @height: height of rectangle in pixel value
- * @fColor: Foreground color (corresponding to a 1 in the monochrome data
+ * @f_color: Foreground color (corresponding to a 1 in the monochrome data
  * @b_olor: Background color (corresponding to a 0 in the monochrome data
  * @rop2: ROP value
  */
 int sm750_hw_imageblit(struct lynx_accel *accel, const char *src_buf,
 		       u32 src_delta, u32 start_bit, u32 d_base, u32 d_pitch,
 		       u32 byte_per_pixel, u32 dx, u32 dy, u32 width,
-		       u32 height, u32 fColor, u32 b_olor, u32 rop2)
+		       u32 height, u32 f_color, u32 b_olor, u32 rop2)
 {
 	unsigned int ul_bytes_per_scan;
 	unsigned int ul4_bytes_per_scan;
@@ -383,7 +383,7 @@ int sm750_hw_imageblit(struct lynx_accel *accel, const char *src_buf,
 		  ((width << DE_DIMENSION_X_SHIFT) & DE_DIMENSION_X_MASK) |
 		  (height & DE_DIMENSION_Y_ET_MASK)); /* dpr08 */
 
-	write_dpr(accel, DE_FOREGROUND, fColor);
+	write_dpr(accel, DE_FOREGROUND, f_color);
 	write_dpr(accel, DE_BACKGROUND, b_olor);
 
 	de_ctrl = (rop2 & DE_CONTROL_ROP_MASK) |
