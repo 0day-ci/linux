@@ -12,6 +12,7 @@
 #include <crypto/internal/rsa.h>
 #include "rsapubkey.asn1.h"
 #include "rsaprivkey.asn1.h"
+#include "rsapss_params.asn1.h"
 
 int rsa_get_n(void *context, size_t hdrlen, unsigned char tag,
 	      const void *value, size_t vlen)
@@ -148,6 +149,115 @@ int rsa_get_qinv(void *context, size_t hdrlen, unsigned char tag,
 	return 0;
 }
 
+int rsa_get_pss_hash(void *context, size_t hdrlen, unsigned char tag,
+		     const void *value, size_t vlen)
+{
+	struct rsa_pss_ctx *ctx = context;
+	enum OID oid;
+
+	if (!value || !vlen)
+		return -EINVAL;
+
+	oid = look_up_OID(value, vlen);
+	switch (oid) {
+	case OID_sha1:
+		ctx->hash_algo = "sha1";
+		break;
+	case OID_sha224:
+		ctx->hash_algo = "sha224";
+		break;
+	case OID_sha256:
+		ctx->hash_algo = "sha256";
+		break;
+	case OID_sha384:
+		ctx->hash_algo = "sha384";
+		break;
+	case OID_sha512:
+		ctx->hash_algo = "sha512";
+		break;
+	default:
+		return -ENOPKG;
+
+	}
+
+	return 0;
+}
+
+int rsa_get_pss_mgf(void *context, size_t hdrlen, unsigned char tag,
+		    const void *value, size_t vlen)
+{
+	struct rsa_pss_ctx *ctx = context;
+	enum OID oid;
+
+	if (!value || !vlen)
+		return -EINVAL;
+
+	oid = look_up_OID(value, vlen);
+	if (oid != OID_rsa_mgf1)
+		return -ENOPKG;
+	ctx->mgf_algo = "mgf1";
+
+	return 0;
+}
+
+int rsa_get_pss_mgf_hash(void *context, size_t hdrlen, unsigned char tag,
+			 const void *value, size_t vlen)
+{
+	struct rsa_pss_ctx *ctx = context;
+	enum OID oid;
+
+	if (!value || !vlen)
+		return -EINVAL;
+	/* todo, merge with get_pss_hash */
+	oid = look_up_OID(value, vlen);
+	switch (oid) {
+	case OID_sha1:
+		ctx->mgf_hash_algo = "sha1";
+		break;
+	case OID_sha224:
+		ctx->mgf_hash_algo = "sha224";
+		break;
+	case OID_sha256:
+		ctx->mgf_hash_algo = "sha256";
+		break;
+	case OID_sha384:
+		ctx->mgf_hash_algo = "sha384";
+		break;
+	case OID_sha512:
+		ctx->mgf_hash_algo = "sha512";
+		break;
+	default:
+		return -ENOPKG;
+	}
+
+	return 0;
+}
+
+int rsa_get_pss_saltlen(void *context, size_t hdrlen, unsigned char tag,
+			const void *value, size_t vlen)
+{
+	struct rsa_pss_ctx *ctx = context;
+
+	if (!value || vlen < 1 || vlen > 2)
+		return -EINVAL;
+
+	if (vlen == 1)
+		ctx->salt_len = *(u8 *)value;
+	else if (vlen == 2)
+		ctx->salt_len = ntohs(*(u16 *)value);
+
+	return 0;
+}
+
+int rsa_get_pss_trailerfield(void *context, size_t hdrlen, unsigned char tag,
+			     const void *value, size_t vlen)
+{
+	if (!value || !vlen || *(u8 *)value != 1)
+		return -EINVAL;
+
+	return 0;
+}
+
 /**
  * rsa_parse_pub_key() - decodes the BER encoded buffer and stores in the
  *                       provided struct rsa_key, pointers to the raw key as is,
@@ -184,3 +294,20 @@ int rsa_parse_priv_key(struct rsa_key *rsa_key, const void *key,
 	return asn1_ber_decoder(&rsaprivkey_decoder, rsa_key, key, key_len);
 }
 EXPORT_SYMBOL_GPL(rsa_parse_priv_key);
+
+/**
+ * rsa_parse_pss_params() - decodes the BER encoded pss padding params
+ *
+ * @ctx:	struct rsa_pss_ctx, pss padding context
+ * @params:	params in BER format
+ * @params_len:	length of params
+ *
+ * Return:	0 on success or error code in case of error
+ */
+int rsa_parse_pss_params(struct rsa_pss_ctx *ctx, const void *params,
+			 unsigned int params_len)
+{
+	return asn1_ber_decoder(&rsapss_params_decoder, ctx, params,
+				params_len);
+}
+EXPORT_SYMBOL_GPL(rsa_parse_pss_params);

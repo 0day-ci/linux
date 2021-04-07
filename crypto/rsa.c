@@ -6,17 +6,10 @@
  */
 
 #include <linux/module.h>
-#include <linux/mpi.h>
 #include <crypto/internal/rsa.h>
 #include <crypto/internal/akcipher.h>
 #include <crypto/akcipher.h>
 #include <crypto/algapi.h>
-
-struct rsa_mpi_key {
-	MPI n;
-	MPI e;
-	MPI d;
-};
 
 /*
  * RSAEP function [RFC3447 sec 5.1.1]
@@ -269,12 +262,19 @@ static int rsa_init(void)
 		return err;
 	}
 
+	err = crypto_register_template(&rsa_psspad_tmpl);
+	if (err) {
+		crypto_unregister_akcipher(&rsa);
+		return err;
+	}
+
 	return 0;
 }
 
 static void rsa_exit(void)
 {
 	crypto_unregister_template(&rsa_pkcs1pad_tmpl);
+	crypto_unregister_template(&rsa_psspad_tmpl);
 	crypto_unregister_akcipher(&rsa);
 }
 
