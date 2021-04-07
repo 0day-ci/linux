@@ -171,7 +171,13 @@ extern void ima_inode_post_setattr(struct user_namespace *mnt_userns,
 				   struct dentry *dentry);
 extern int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
 		       const void *xattr_value, size_t xattr_value_len);
+extern void ima_inode_post_setxattr(struct dentry *dentry,
+				    const char *xattr_name,
+				    const void *xattr_value,
+				    size_t xattr_value_len);
 extern int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name);
+extern void ima_inode_post_removexattr(struct dentry *dentry,
+				       const char *xattr_name);
 #else
 static inline bool is_ima_appraise_enabled(void)
 {
@@ -192,10 +198,22 @@ static inline int ima_inode_setxattr(struct dentry *dentry,
 	return 0;
 }
 
+static inline void ima_inode_post_setxattr(struct dentry *dentry,
+					   const char *xattr_name,
+					   const void *xattr_value,
+					   size_t xattr_value_len)
+{
+}
+
 static inline int ima_inode_removexattr(struct dentry *dentry,
 					const char *xattr_name)
 {
 	return 0;
+}
+
+static inline void ima_inode_post_removexattr(struct dentry *dentry,
+					      const char *xattr_name)
+{
 }
 #endif /* CONFIG_IMA_APPRAISE */
 
