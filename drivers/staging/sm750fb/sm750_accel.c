@@ -28,7 +28,7 @@ static inline u32 read_dpr(struct lynx_accel *accel, int offset)
 	return readl(accel->dprBase + offset);
 }
 
-static inline void write_dpPort(struct lynx_accel *accel, u32 data)
+static inline void write_dp_port(struct lynx_accel *accel, u32 data)
 {
 	writel(data, accel->dpPortBase);
 }
@@ -396,12 +396,12 @@ int sm750_hw_imageblit(struct lynx_accel *accel, const char *src_buf,
 	for (i = 0; i < height; i++) {
 		/* For each line, send the data in chunks of 4 bytes */
 		for (j = 0; j < (ul4BytesPerScan / 4); j++)
-			write_dpPort(accel, *(unsigned int *)(src_buf + (j * 4)));
+			write_dp_port(accel, *(unsigned int *)(src_buf + (j * 4)));
 
 		if (ulBytesRemain) {
 			memcpy(ajRemain, src_buf + ul4BytesPerScan,
 			       ulBytesRemain);
-			write_dpPort(accel, *(unsigned int *)ajRemain);
+			write_dp_port(accel, *(unsigned int *)ajRemain);
 		}
 
 		src_buf += src_delta;
