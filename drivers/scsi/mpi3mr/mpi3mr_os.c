@@ -649,6 +649,34 @@ out:
 }
 
 /**
+ * mpi3mr_change_queue_depth- Change QD callback handler
+ * @sdev: SCSI device reference
+ * @q_depth: Queue depth
+ *
+ * Validate and limit QD and call scsi_change_queue_depth.
+ *
+ * Return: return value of scsi_change_queue_depth
+ */
+static int mpi3mr_change_queue_depth(struct scsi_device *sdev,
+	int q_depth)
+{
+	struct scsi_target *starget = scsi_target(sdev);
+	struct Scsi_Host *shost = dev_to_shost(&starget->dev);
+	int retval = 0;
+
+	if (!sdev->tagged_supported)
+		q_depth = 1;
+	if (q_depth > shost->can_queue)
+		q_depth = shost->can_queue;
+	else if (!q_depth)
+		q_depth = MPI3MR_DEFAULT_SDEV_QD;
+	retval = scsi_change_queue_depth(sdev, q_depth);
+
+	return retval;
+}
+
+
+/**
  * mpi3mr_update_sdev - Update SCSI device information
  * @sdev: SCSI device reference
  * @data: target device reference
@@ -668,6 +696,7 @@ mpi3mr_update_sdev(struct scsi_device *sdev, void *data)
 	if (!tgtdev)
 		return;
 
+	mpi3mr_change_queue_depth(sdev, tgtdev->q_depth);
 	switch (tgtdev->dev_type) {
 	case MPI3_DEVICE_DEVFORM_PCIE:
 		/*The block layer hw sector size = 512*/
@@ -2726,9 +2755,12 @@ static int mpi3mr_slave_configure(struct scsi_device *sdev)
 	spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
 	tgt_dev = __mpi3mr_get_tgtdev_by_perst_id(mrioc, starget->id);
 	spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
-	if (!tgt_dev)
+	if (!tgt_dev) {
+		mpi3mr_change_queue_depth(sdev, MPI3MR_DEFAULT_SDEV_QD);
 		return retval;
+	}
 
+	mpi3mr_change_queue_depth(sdev, tgt_dev->q_depth);
 	switch (tgt_dev->dev_type) {
 	case MPI3_DEVICE_DEVFORM_PCIE:
 		/*The block layer hw sector size = 512*/
@@ -2968,6 +3000,7 @@ static struct scsi_host_template mpi3mr_driver_template = {
 	.slave_destroy			= mpi3mr_slave_destroy,
 	.scan_finished			= mpi3mr_scan_finished,
 	.scan_start			= mpi3mr_scan_start,
+	.change_queue_depth		= mpi3mr_change_queue_depth,
 	.eh_abort_handler		= mpi3mr_eh_abort,
 	.eh_device_reset_handler	= mpi3mr_eh_dev_reset,
 	.eh_target_reset_handler	= mpi3mr_eh_target_reset,
