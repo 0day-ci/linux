@@ -15212,6 +15212,10 @@ F:	Documentation/devicetree/bindings/regmap/
 F:	drivers/base/regmap/
 F:	include/linux/regmap.h
 
+REGRESSIONS
+L:	regressions@lists.linux.dev
+K:	regression
+
 REISERFS FILE SYSTEM
 L:	reiserfs-devel@vger.kernel.org
 S:	Supported
