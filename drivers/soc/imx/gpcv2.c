@@ -140,8 +140,12 @@ static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
 	int i, ret = 0;
 	u32 pxx_req;
 
-	regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
-			   domain->bits.map, domain->bits.map);
+	ret = regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
+				 domain->bits.map, domain->bits.map);
+	if (ret) {
+		dev_err(domain->dev, "failed to map GPC PGC domain\n");
+		return ret;
+	}
 
 	if (has_regulator && on) {
 		ret = regulator_enable(domain->regulator);
@@ -152,19 +156,39 @@ static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
 	}
 
 	/* Enable reset clocks for all devices in the domain */
-	for (i = 0; i < domain->num_clks; i++)
-		clk_prepare_enable(domain->clk[i]);
+	for (i = 0; i < domain->num_clks; i++) {
+		ret = clk_prepare_enable(domain->clk[i]);
+		if (ret) {
+			dev_err(domain->dev, "failed to enable clocks\n");
+			goto disable_clocks;
+		}
+	}
 
-	if (enable_power_control)
-		regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
-				   GPC_PGC_CTRL_PCR, GPC_PGC_CTRL_PCR);
+	if (enable_power_control) {
+		ret = regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
+					 GPC_PGC_CTRL_PCR, GPC_PGC_CTRL_PCR);
+		if (ret) {
+			dev_err(domain->dev, "failed to enable power control\n");
+			goto disable_clocks;
+		}
+	}
 
-	if (domain->bits.hsk)
-		regmap_update_bits(domain->regmap, GPC_PU_PWRHSK,
-				   domain->bits.hsk, on ? domain->bits.hsk : 0);
+	if (domain->bits.hsk) {
+		ret = regmap_update_bits(domain->regmap, GPC_PU_PWRHSK,
+					 domain->bits.hsk,
+					 on ? domain->bits.hsk : 0);
+		if (ret) {
+			dev_err(domain->dev, "Failed to initiate handshake\n");
+			goto disable_power_control;
+		}
+	}
 
-	regmap_update_bits(domain->regmap, offset,
-			   domain->bits.pxx, domain->bits.pxx);
+	ret = regmap_update_bits(domain->regmap, offset,
+				 domain->bits.pxx, domain->bits.pxx);
+	if (ret) {
+		dev_err(domain->dev, "failed to command PGC\n");
+		goto disable_power_control;
+	}
 
 	/*
 	 * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
@@ -173,8 +197,15 @@ static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
 	ret = regmap_read_poll_timeout(domain->regmap, offset, pxx_req,
 				       !(pxx_req & domain->bits.pxx),
 				       0, USEC_PER_MSEC);
-	if (ret) {
+	if (ret)
 		dev_err(domain->dev, "failed to command PGC\n");
+
+disable_power_control:
+	if (enable_power_control)
+		regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
+				   GPC_PGC_CTRL_PCR, 0);
+
+	if (ret) {
 		/*
 		 * If we were in a process of enabling a
 		 * domain and failed we might as well disable
@@ -185,10 +216,7 @@ static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
 		on = !on;
 	}
 
-	if (enable_power_control)
-		regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
-				   GPC_PGC_CTRL_PCR, 0);
-
+disable_clocks:
 	/* Disable reset clocks for all devices in the domain */
 	for (i = 0; i < domain->num_clks; i++)
 		clk_disable_unprepare(domain->clk[i]);
