@@ -30,7 +30,7 @@ static struct dvi_ctrl_device dcft_supported_dvi_controller[] = {
 #endif
 };
 
-int dviInit(unsigned char edge_select,
+int dvi_init(unsigned char edge_select,
 	    unsigned char bus_select,
 	    unsigned char dual_edge_clk_select,
 	    unsigned char hsync_enable,
