@@ -6,7 +6,6 @@
 #include <linux/zalloc.h>
 #include <linux/string.h>
 #include <linux/limits.h>
-#include <linux/string.h>
 #include <string.h>
 #include <sys/file.h>
 #include <signal.h>
