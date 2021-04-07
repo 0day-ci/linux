@@ -275,6 +275,7 @@ int ice_pf_dcb_cfg(struct ice_pf *pf, struct ice_dcbx_cfg *new_cfg, bool locked)
 	struct ice_dcbx_cfg *old_cfg, *curr_cfg;
 	struct device *dev = ice_pf_to_dev(pf);
 	int ret = ICE_DCB_NO_HW_CHG;
+	struct iidc_event *event;
 	struct ice_vsi *pf_vsi;
 
 	curr_cfg = &pf->hw.port_info->qos_cfg.local_dcbx_cfg;
@@ -312,6 +313,15 @@ int ice_pf_dcb_cfg(struct ice_pf *pf, struct ice_dcbx_cfg *new_cfg, bool locked)
 		ret = -EINVAL;
 		goto free_cfg;
 	}
+
+	/* Notify AUX drivers about impending change to TCs */
+	event = kzalloc(sizeof(*event), GFP_KERNEL);
+	if (!event)
+		return -ENOMEM;
+
+	set_bit(IIDC_EVENT_BEFORE_TC_CHANGE, event->type);
+	ice_send_event_to_auxs(pf, event);
+	kfree(event);
 
 	/* avoid race conditions by holding the lock while disabling and
 	 * re-enabling the VSI
@@ -676,9 +686,22 @@ void ice_pf_dcb_recfg(struct ice_pf *pf)
 		if (vsi->type == ICE_VSI_PF)
 			ice_dcbnl_set_all(vsi);
 	}
+	/* Notify the AUX drivers that TC change is finished */
 	rcdi = ice_find_cdev_info_by_id(pf, IIDC_RDMA_ID);
-	if (rcdi)
+	if (rcdi) {
+		struct iidc_event *event;
+
 		ice_setup_dcb_qos_info(pf, &rcdi->qos_info);
+
+		event = kzalloc(sizeof(*event), GFP_KERNEL);
+		if (!event)
+			return;
+
+		set_bit(IIDC_EVENT_AFTER_TC_CHANGE, event->type);
+		event->info.port_qos = rcdi->qos_info;
+		ice_send_event_to_auxs(pf, event);
+		kfree(event);
+	}
 }
 
 /**

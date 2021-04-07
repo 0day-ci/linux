@@ -3680,6 +3680,37 @@ error_param:
 }
 
 /**
+ * ice_vc_rdma_msg - send msg to RDMA PF from VF
+ * @vf: pointer to VF info
+ * @msg: pointer to msg buffer
+ * @len: length of the message
+ *
+ * This function is called indirectly from the AQ clean function.
+ */
+static int ice_vc_rdma_msg(struct ice_vf *vf, u8 *msg, u16 len)
+{
+	struct iidc_core_dev_info *rcdi;
+	struct iidc_auxiliary_ops *ops;
+	int ret = 0;
+
+	rcdi = ice_find_cdev_info_by_id(vf->pf, IIDC_RDMA_ID);
+	if (!rcdi) {
+		pr_err("VF attempted to send message to invalid RDMA driver\n");
+		return -EIO;
+	}
+
+	device_lock(&rcdi->adev->dev);
+	ops = ice_get_auxiliary_ops(rcdi);
+	if (ops && ops->vc_receive)
+		ret = ops->vc_receive(rcdi, vf->vf_id, msg, len);
+	device_unlock(&rcdi->adev->dev);
+	if (ret)
+		pr_err("Failed to send message to RDMA driver, error %d\n", ret);
+
+	return ret;
+}
+
+/**
  * ice_vf_init_vlan_stripping - enable/disable VLAN stripping on initialization
  * @vf: VF to enable/disable VLAN stripping for on initialization
  *
@@ -3815,6 +3846,9 @@ error_handler:
 		break;
 	case VIRTCHNL_OP_DISABLE_VLAN_STRIPPING:
 		err = ice_vc_dis_vlan_stripping(vf);
+		break;
+	case VIRTCHNL_OP_IWARP:
+		err = ice_vc_rdma_msg(vf, msg, msglen);
 		break;
 	case VIRTCHNL_OP_UNKNOWN:
 	default:

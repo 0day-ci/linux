@@ -9,6 +9,9 @@
 
 struct ice_pf;
 
+int ice_send_event_to_auxs(struct ice_pf *pf, struct iidc_event *event);
+struct iidc_auxiliary_ops *
+ice_get_auxiliary_ops(struct iidc_core_dev_info *cdev_info);
 int ice_cdev_info_update_vsi(struct iidc_core_dev_info *cdev_info, void *data);
 int ice_unroll_cdev_info(struct iidc_core_dev_info *cdev_info, void *data);
 struct iidc_core_dev_info *
