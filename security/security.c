@@ -1347,7 +1347,7 @@ int security_inode_setxattr(struct user_namespace *mnt_userns,
 	ret = ima_inode_setxattr(dentry, name, value, size);
 	if (ret)
 		return ret;
-	return evm_inode_setxattr(dentry, name, value, size);
+	return evm_inode_setxattr(mnt_userns, dentry, name, value, size);
 }
 
 void security_inode_post_setxattr(struct dentry *dentry, const char *name,
@@ -1393,7 +1393,7 @@ int security_inode_removexattr(struct user_namespace *mnt_userns,
 	ret = ima_inode_removexattr(dentry, name);
 	if (ret)
 		return ret;
-	return evm_inode_removexattr(dentry, name);
+	return evm_inode_removexattr(mnt_userns, dentry, name);
 }
 
 int security_inode_need_killpriv(struct dentry *dentry)
