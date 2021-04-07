@@ -1,0 +1,19 @@
+RSAPSS_Params ::= SEQUENCE {
+	hashAlgorithm		[0] HashAlgorithm OPTIONAL,
+	maskGenAlgorithm	[1] MaskGenAlgorithm OPTIONAL,
+	saltLen			[2] INTEGER OPTIONAL,
+	trailerField		[3] INTEGER OPTIONAL
+	}
+
+HashAlgorithm ::= SEQUENCE {
+	algorithm	OBJECT IDENTIFIER ({ x509_note_rsapss_hash })
+	}
+
+MaskGenAlgorithm ::= SEQUENCE {
+	algorithm	OBJECT IDENTIFIER,
+	hashAlgorithm	MgfHashAlgorithm
+	}
+
+MgfHashAlgorithm ::= SEQUENCE {
+	algorithm	OBJECT IDENTIFIER
+	}
