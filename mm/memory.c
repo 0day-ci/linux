@@ -2572,6 +2572,77 @@ int apply_to_existing_page_range(struct mm_struct *mm, unsigned long addr,
 }
 EXPORT_SYMBOL_GPL(apply_to_existing_page_range);
 
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+
+bool __pte_map_lock(struct vm_fault *vmf)
+{
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	pmd_t pmdval;
+#endif
+	pte_t *pte = vmf->pte;
+	spinlock_t *ptl;
+
+	if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
+		vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
+		if (!pte)
+			vmf->pte = pte_offset_map(vmf->pmd, vmf->address);
+		spin_lock(vmf->ptl);
+		return true;
+	}
+
+	local_irq_disable();
+	if (!mmap_seq_read_check(vmf->vma->vm_mm, vmf->seq))
+		goto fail;
+	/*
+	 * The mmap sequence count check guarantees that the page
+	 * tables are still valid at that point, and having IRQs
+	 * disabled ensures that they stay around (see Fast GUP
+	 * comment in mm/gup.c).
+	 */
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	/*
+	 * We check if the pmd value is still the same to ensure that there
+	 * is not a huge collapse operation in progress in our back.
+	 */
+	pmdval = READ_ONCE(*vmf->pmd);
+	if (!pmd_same(pmdval, vmf->orig_pmd))
+		goto fail;
+#endif
+	ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
+	if (!pte)
+		pte = pte_offset_map(vmf->pmd, vmf->address);
+	/*
+	 * Try locking the page table.
+	 *
+	 * Note that we might race against zap_pte_range() which
+	 * invalidates TLBs while holding the page table lock.
+	 * We still have local IRQs disabled here to prevent the
+	 * page table from being reclaimed, and zap_pte_range() could
+	 * thus deadlock with us if we tried using spin_lock() here.
+	 *
+	 * We also don't want to retry until spin_trylock() succeeds,
+	 * because of the starvation potential against a stream of lockers.
+	 */
+	if (unlikely(!spin_trylock(ptl)))
+		goto fail;
+	if (!mmap_seq_read_check(vmf->vma->vm_mm, vmf->seq))
+		goto unlock_fail;
+	local_irq_enable();
+	vmf->pte = pte;
+	vmf->ptl = ptl;
+	return true;
+
+unlock_fail:
+	spin_unlock(ptl);
+fail:
+	if (pte)
+		pte_unmap(pte);
+	local_irq_enable();
+	return false;
+}
+
+#endif	/* CONFIG_SPECULATIVE_PAGE_FAULT */
+
 /*
  * handle_pte_fault chooses page fault handler according to an entry which was
  * read non-atomically.  Before making any commitment, on those architectures
