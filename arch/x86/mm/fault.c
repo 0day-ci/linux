@@ -1324,7 +1324,8 @@ void do_user_addr_fault(struct pt_regs *regs,
 		goto spf_abort;
 	rcu_read_lock();
 	vma = find_vma(mm, address);
-	if (!vma || vma->vm_start > address || !vma_is_anonymous(vma)) {
+	if (!vma || vma->vm_start > address ||
+	    !vma_can_speculate(vma, flags)) {
 		rcu_read_unlock();
 		goto spf_abort;
 	}
