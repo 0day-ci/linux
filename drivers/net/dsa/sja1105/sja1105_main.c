@@ -2240,10 +2240,10 @@ static int sja1105_commit_pvid(struct sja1105_private *priv)
 	struct list_head *vlan_list;
 	int rc = 0;
 
-	if (priv->vlan_state == SJA1105_VLAN_FILTERING_FULL)
-		vlan_list = &priv->bridge_vlans;
-	else
+	if (priv->vlan_state == SJA1105_VLAN_UNAWARE)
 		vlan_list = &priv->dsa_8021q_vlans;
+	else
+		vlan_list = &priv->bridge_vlans;
 
 	list_for_each_entry(v, vlan_list, list) {
 		if (v->pvid) {
@@ -2289,6 +2289,21 @@ sja1105_build_dsa_8021q_vlans(struct sja1105_private *priv,
 
 	list_for_each_entry(v, &priv->dsa_8021q_vlans, list) {
 		int match = v->vid;
+
+		/* In best-effort VLAN filtering mode, the pvid of the port is
+		 * no longer the tag_8021q rx_vid, but the bridge pvid is.
+		 * The tag_8021q rx_vid is just used for retagging the bridge
+		 * pvid towards the CPU. So let's install only the rx_vid
+		 * values which are strictly required. This means that the
+		 * rxvlan is still installed on the port on which tag_8021q
+		 * thinks it must be pvid (the source port) - this is required
+		 * by the retagging table - but not on the ports where this
+		 * VLAN isn't a pvid (the destination ports).
+		 */
+		if (priv->vlan_state == SJA1105_VLAN_BEST_EFFORT &&
+		    vid_is_dsa_8021q_rxvlan(v->vid) &&
+		    dsa_8021q_rx_subvlan(v->vid) == 0 && !v->pvid)
+			continue;
 
 		new_vlan[match].vlanid = v->vid;
 		new_vlan[match].vmemb_port |= BIT(v->port);
