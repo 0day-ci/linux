@@ -64,6 +64,7 @@
 #include <linux/memory.h>
 #include <linux/ipc_namespace.h>
 #include <linux/rhashtable.h>
+#include <linux/log2.h>
 
 #include <asm/unistd.h>
 
@@ -451,6 +452,40 @@ static void ipc_kht_remove(struct ipc_ids *ids, struct kern_ipc_perm *ipcp)
 }
 
 /**
+ * ipc_get_maxusedidx - get highest in-use index
+ * @ids: ipc identifier set
+ * @limit: highest possible index.
+ *
+ * The function determines the highest in use index value.
+ * ipc_ids.rwsem needs to be owned by the caller.
+ * If no ipc object is allocated, then -1 is returned.
+ */
+static int ipc_get_maxusedidx(struct ipc_ids *ids, int limit)
+{
+	void *val;
+	int tmpidx;
+	int i;
+	int retval;
+
+	i = ilog2(limit+1);
+
+	retval = 0;
+	for (; i >= 0; i--) {
+		tmpidx = retval | (1<<i);
+		/*
+		 * "0" is a possible index value, thus search using
+		 * e.g. 15,7,3,1,0 instead of 16,8,4,2,1.
+		 */
+		tmpidx = tmpidx-1;
+		val = idr_get_next(&ids->ipcs_idr, &tmpidx);
+		if (val)
+			retval |= (1<<i);
+	}
+	retval--;
+	return retval;
+}
+
+/**
  * ipc_rmid - remove an ipc identifier
  * @ids: ipc identifier set
  * @ipcp: ipc perm structure containing the identifier to remove
@@ -468,11 +503,10 @@ void ipc_rmid(struct ipc_ids *ids, struct kern_ipc_perm *ipcp)
 	ipcp->deleted = true;
 
 	if (unlikely(idx == ids->max_idx)) {
-		do {
-			idx--;
-			if (idx == -1)
-				break;
-		} while (!idr_find(&ids->ipcs_idr, idx));
+
+		idx = ids->max_idx-1;
+		if (idx >= 0)
+			idx = ipc_get_maxusedidx(ids, idx);
 		ids->max_idx = idx;
 	}
 }
