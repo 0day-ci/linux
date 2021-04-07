@@ -59,5 +59,10 @@
 #define SYSFS_OFFSET                    1024
 #define PM80XX_IB_OB_QUEUE_SIZE         (32 * 1024)
 #define PM8001_IB_OB_QUEUE_SIZE         (16 * 1024)
+
+static inline u32 AAP1_MEMMAP(u8 *ptr, int idx, int off)
+{
+	return *(u32 *)(ptr + idx * 32 + off);
+}
 #endif /* PM8001_CTL_H_INCLUDED */
 
