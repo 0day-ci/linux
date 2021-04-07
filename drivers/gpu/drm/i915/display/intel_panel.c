@@ -1372,6 +1372,8 @@ int intel_backlight_device_register(struct intel_connector *connector)
 	struct drm_i915_private *i915 = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
 	struct backlight_properties props;
+	const char *name;
+	int ret = 0;
 
 	if (WARN_ON(panel->backlight.device))
 		return -ENODEV;
@@ -1398,28 +1400,33 @@ int intel_backlight_device_register(struct intel_connector *connector)
 	else
 		props.power = FB_BLANK_POWERDOWN;
 
-	/*
-	 * Note: using the same name independent of the connector prevents
-	 * registration of multiple backlight devices in the driver.
-	 */
+	name = kasprintf(GFP_KERNEL, "card%d-%s-backlight", i915->drm.primary->index,
+			 connector->base.name);
+	if (!name)
+		return -ENOMEM;
+
 	panel->backlight.device =
-		backlight_device_register("intel_backlight",
+		backlight_device_register(name,
 					  connector->base.kdev,
 					  connector,
 					  &intel_backlight_device_ops, &props);
 
 	if (IS_ERR(panel->backlight.device)) {
-		drm_err(&i915->drm, "Failed to register backlight: %ld\n",
-			PTR_ERR(panel->backlight.device));
+		drm_err(&i915->drm, "Failed to register backlight %s: %ld\n",
+			name, PTR_ERR(panel->backlight.device));
 		panel->backlight.device = NULL;
-		return -ENODEV;
+		ret = -ENODEV;
+		goto out;
 	}
 
 	drm_dbg_kms(&i915->drm,
-		    "Connector %s backlight sysfs interface registered\n",
-		    connector->base.name);
+		    "Connector %s backlight sysfs interface %s registered\n",
+		    name, connector->base.name);
 
-	return 0;
+out:
+	kfree(name);
+
+	return ret;
 }
 
 void intel_backlight_device_unregister(struct intel_connector *connector)
