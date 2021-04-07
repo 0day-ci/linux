@@ -1,0 +1,21 @@
+-- rfc4055 section 3.1.
+
+RSAPSS_Params ::= SEQUENCE {
+	hashAlgorithm		[0] HashAlgorithm OPTIONAL,
+	maskGenAlgorithm	[1] MaskGenAlgorithm OPTIONAL,
+	saltLen			[2] INTEGER OPTIONAL ({ rsa_get_pss_saltlen }),
+	trailerField		[3] INTEGER OPTIONAL ({ rsa_get_pss_trailerfield })
+	}
+
+HashAlgorithm ::= SEQUENCE {
+	algorithm		OBJECT IDENTIFIER ({ rsa_get_pss_hash })
+	}
+
+MaskGenAlgorithm ::= SEQUENCE {
+	algorithm	OBJECT IDENTIFIER  ({ rsa_get_pss_mgf }),
+	hashAlgorithm	MgfHashAlgorithm
+	}
+
+MgfHashAlgorithm ::= SEQUENCE {
+	algorithm	OBJECT IDENTIFIER ({ rsa_get_pss_mgf_hash })
+	}
