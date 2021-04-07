@@ -14,8 +14,10 @@
 
 #include "mpi30_type.h"
 #include "mpi30_transport.h"
+#include "mpi30_cnfg.h"
 #include "mpi30_image.h"
 #include "mpi30_init.h"
 #include "mpi30_ioc.h"
+#include "mpi30_sas.h"
 
 #endif  /* MPI30_API_H */
