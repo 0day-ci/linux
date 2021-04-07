@@ -51,6 +51,7 @@
 #include "ice_switch.h"
 #include "ice_common.h"
 #include "ice_sched.h"
+#include "ice_idc_int.h"
 #include "ice_virtchnl_pf.h"
 #include "ice_sriov.h"
 #include "ice_fdir.h"
@@ -74,6 +75,8 @@
 #define ICE_MIN_LAN_OICR_MSIX	1
 #define ICE_MIN_MSIX		(ICE_MIN_LAN_TXRX_MSIX + ICE_MIN_LAN_OICR_MSIX)
 #define ICE_FDIR_MSIX		1
+#define ICE_RDMA_NUM_AEQ_MSIX	4
+#define ICE_MIN_RDMA_MSIX	2
 #define ICE_NO_VSI		0xffff
 #define ICE_VSI_MAP_CONTIG	0
 #define ICE_VSI_MAP_SCATTER	1
@@ -84,6 +87,7 @@
 #define ICE_MAX_LG_RSS_QS	256
 #define ICE_RES_VALID_BIT	0x8000
 #define ICE_RES_MISC_VEC_ID	(ICE_RES_VALID_BIT - 1)
+#define ICE_RES_RDMA_VEC_ID	(ICE_RES_MISC_VEC_ID - 1)
 #define ICE_INVAL_Q_INDEX	0xffff
 #define ICE_INVAL_VFID		256
 
@@ -362,12 +366,14 @@ struct ice_q_vector {
 
 enum ice_pf_flags {
 	ICE_FLAG_FLTR_SYNC,
+	ICE_FLAG_IWARP_ENA,
 	ICE_FLAG_RSS_ENA,
 	ICE_FLAG_SRIOV_ENA,
 	ICE_FLAG_SRIOV_CAPABLE,
 	ICE_FLAG_DCB_CAPABLE,
 	ICE_FLAG_DCB_ENA,
 	ICE_FLAG_FD_ENA,
+	ICE_FLAG_AUX_ENA,
 	ICE_FLAG_ADV_FEATURES,
 	ICE_FLAG_LINK_DOWN_ON_CLOSE_ENA,
 	ICE_FLAG_TOTAL_PORT_SHUTDOWN_ENA,
@@ -427,6 +433,8 @@ struct ice_pf {
 	struct mutex sw_mutex;		/* lock for protecting VSI alloc flow */
 	struct mutex tc_mutex;		/* lock to protect TC changes */
 	u32 msg_enable;
+	u16 num_rdma_msix;		/* Total MSIX vectors for RDMA driver */
+	u16 rdma_base_vector;
 
 	/* spinlock to protect the AdminQ wait list */
 	spinlock_t aq_wait_lock;
@@ -459,6 +467,8 @@ struct ice_pf {
 	unsigned long tx_timeout_last_recovery;
 	u32 tx_timeout_recovery_level;
 	char int_name[ICE_INT_NAME_STR_LEN];
+	struct iidc_core_dev_info **cdev_infos;
+	int aux_idx;
 	u32 sw_int_count;
 
 	__le64 nvm_phy_type_lo; /* NVM PHY type low */
@@ -622,6 +632,11 @@ int ice_get_rss(struct ice_vsi *vsi, u8 *seed, u8 *lut, u16 lut_size);
 void ice_fill_rss_lut(u8 *lut, u16 rss_table_size, u16 rss_size);
 int ice_schedule_reset(struct ice_pf *pf, enum ice_reset_req reset);
 void ice_print_link_msg(struct ice_vsi *vsi, bool isup);
+int ice_init_aux_devices(struct ice_pf *pf);
+int
+ice_for_each_aux(struct ice_pf *pf, void *data,
+		 int (*fn)(struct iidc_core_dev_info *, void *));
+void ice_cdev_info_refresh_msix(struct ice_pf *pf);
 const char *ice_stat_str(enum ice_status stat_err);
 const char *ice_aq_str(enum ice_aq_err aq_err);
 bool ice_is_wol_supported(struct ice_pf *pf);
@@ -645,4 +660,22 @@ int ice_open(struct net_device *netdev);
 int ice_stop(struct net_device *netdev);
 void ice_service_task_schedule(struct ice_pf *pf);
 
+/**
+ * ice_set_rdma_cap - enable RDMA support
+ * @pf: PF struct
+ */
+static inline void ice_set_rdma_cap(struct ice_pf *pf)
+{
+	if (pf->hw.func_caps.common_cap.iwarp && pf->num_rdma_msix)
+		set_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+}
+
+/**
+ * ice_clear_rdma_cap - disable RDMA support
+ * @pf: PF struct
+ */
+static inline void ice_clear_rdma_cap(struct ice_pf *pf)
+{
+	clear_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+}
 #endif /* _ICE_H_ */

@@ -3312,6 +3312,12 @@ static void ice_set_pf_caps(struct ice_pf *pf)
 {
 	struct ice_hw_func_caps *func_caps = &pf->hw.func_caps;
 
+	clear_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+	clear_bit(ICE_FLAG_AUX_ENA, pf->flags);
+	if (func_caps->common_cap.iwarp) {
+		set_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+		set_bit(ICE_FLAG_AUX_ENA, pf->flags);
+	}
 	clear_bit(ICE_FLAG_DCB_CAPABLE, pf->flags);
 	if (func_caps->common_cap.dcb)
 		set_bit(ICE_FLAG_DCB_CAPABLE, pf->flags);
@@ -3391,11 +3397,12 @@ static int ice_init_pf(struct ice_pf *pf)
  */
 static int ice_ena_msix_range(struct ice_pf *pf)
 {
-	int v_left, v_actual, v_other, v_budget = 0;
+	int num_cpus, v_left, v_actual, v_other, v_budget = 0;
 	struct device *dev = ice_pf_to_dev(pf);
 	int needed, err, i;
 
 	v_left = pf->hw.func_caps.common_cap.num_msix_vectors;
+	num_cpus = num_online_cpus();
 
 	/* reserve for LAN miscellaneous handler */
 	needed = ICE_MIN_LAN_OICR_MSIX;
@@ -3417,12 +3424,22 @@ static int ice_ena_msix_range(struct ice_pf *pf)
 	v_other = v_budget;
 
 	/* reserve vectors for LAN traffic */
-	needed = min_t(int, num_online_cpus(), v_left);
+	needed = num_cpus;
 	if (v_left < needed)
 		goto no_hw_vecs_left_err;
 	pf->num_lan_msix = needed;
 	v_budget += needed;
 	v_left -= needed;
+
+	/* reserve vectors for RDMA auxiliary driver */
+	if (test_bit(ICE_FLAG_IWARP_ENA, pf->flags)) {
+		needed = num_cpus + ICE_RDMA_NUM_AEQ_MSIX;
+		if (v_left < needed)
+			goto no_hw_vecs_left_err;
+		pf->num_rdma_msix = needed;
+		v_budget += needed;
+		v_left -= needed;
+	}
 
 	pf->msix_entries = devm_kcalloc(dev, v_budget,
 					sizeof(*pf->msix_entries), GFP_KERNEL);
@@ -3453,16 +3470,46 @@ static int ice_ena_msix_range(struct ice_pf *pf)
 			err = -ERANGE;
 			goto msix_err;
 		} else {
-			int v_traffic = v_actual - v_other;
+			int v_remain = v_actual - v_other;
+			int v_rdma = 0, v_min_rdma = 0;
+
+			if (test_bit(ICE_FLAG_IWARP_ENA, pf->flags)) {
+				/* Need at least 1 interrupt in addition to
+				 * AEQ MSIX
+				 */
+				v_rdma = ICE_RDMA_NUM_AEQ_MSIX + 1;
+				v_min_rdma = ICE_MIN_RDMA_MSIX;
+			}
 
 			if (v_actual == ICE_MIN_MSIX ||
-			    v_traffic < ICE_MIN_LAN_TXRX_MSIX)
+			    v_remain < ICE_MIN_LAN_TXRX_MSIX + v_min_rdma) {
+				dev_warn(dev, "Not enough MSI-X vectors to support RDMA.\n");
+				clear_bit(ICE_FLAG_IWARP_ENA, pf->flags);
+
+				pf->num_rdma_msix = 0;
 				pf->num_lan_msix = ICE_MIN_LAN_TXRX_MSIX;
-			else
-				pf->num_lan_msix = v_traffic;
+			} else if ((v_remain < ICE_MIN_LAN_TXRX_MSIX + v_rdma) ||
+				   (v_remain - v_rdma < v_rdma)) {
+				/* Support minimum RDMA and give remaining
+				 * vectors to LAN MSIX
+				 */
+				pf->num_rdma_msix = v_min_rdma;
+				pf->num_lan_msix = v_remain - v_min_rdma;
+			} else {
+				/* Split remaining MSIX with RDMA after
+				 * accounting for AEQ MSIX
+				 */
+				pf->num_rdma_msix = (v_remain - ICE_RDMA_NUM_AEQ_MSIX) / 2 +
+						    ICE_RDMA_NUM_AEQ_MSIX;
+				pf->num_lan_msix = v_remain - pf->num_rdma_msix;
+			}
 
 			dev_notice(dev, "Enabled %d MSI-X vectors for LAN traffic.\n",
 				   pf->num_lan_msix);
+
+			if (test_bit(ICE_FLAG_IWARP_ENA, pf->flags))
+				dev_notice(dev, "Enabled %d MSI-X vectors for RDMA.\n",
+					   pf->num_rdma_msix);
 		}
 	}
 
@@ -3477,6 +3524,7 @@ no_hw_vecs_left_err:
 		needed, v_left);
 	err = -ERANGE;
 exit_err:
+	pf->num_rdma_msix = 0;
 	pf->num_lan_msix = 0;
 	return err;
 }
@@ -4267,8 +4315,37 @@ ice_probe(struct pci_dev *pdev, const struct pci_device_id __always_unused *ent)
 probe_done:
 	/* ready to go, so clear down state bit */
 	clear_bit(__ICE_DOWN, pf->state);
+	/* init AUX devices only if supported */
+	if (ice_is_aux_ena(pf)) {
+		pf->cdev_infos = devm_kcalloc(dev, IIDC_MAX_NUM_AUX,
+					      sizeof(*pf->cdev_infos),
+					      GFP_KERNEL);
+		if (!pf->cdev_infos) {
+			err = -ENOMEM;
+			goto err_init_aux_unroll;
+		}
+
+		err = ice_init_aux_devices(pf);
+		if (err) {
+			dev_err(dev, "Failed to initialize aux devs: %d\n",
+				err);
+			err = -EIO;
+			goto err_init_aux_unroll;
+		}
+	} else {
+		dev_warn(dev, "RDMA is not supported on this device\n");
+	}
+
 	return 0;
 
+err_init_aux_unroll:
+	if (ice_is_aux_ena(pf)) {
+		ice_for_each_aux(pf, NULL, ice_unroll_cdev_info);
+		if (pf->cdev_infos) {
+			devm_kfree(dev, pf->cdev_infos);
+			pf->cdev_infos = NULL;
+		}
+	}
 err_send_version_unroll:
 	ice_vsi_release_all(pf);
 err_alloc_sw_unroll:
@@ -4613,6 +4690,8 @@ static int __maybe_unused ice_resume(struct device *dev)
 	ret = ice_reinit_interrupt_scheme(pf);
 	if (ret)
 		dev_err(dev, "Cannot restore interrupt scheme: %d\n", ret);
+
+	ice_cdev_info_refresh_msix(pf);
 
 	clear_bit(__ICE_DOWN, pf->state);
 	/* Now perform PF reset and rebuild */
@@ -5980,6 +6059,7 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
 	enum ice_status ret;
+	struct ice_vsi *vsi;
 	int err;
 
 	if (test_bit(__ICE_DOWN, pf->state))
@@ -6066,6 +6146,13 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 		dev_err(dev, "PF VSI rebuild failed: %d\n", err);
 		goto err_vsi_rebuild;
 	}
+
+	vsi = ice_get_main_vsi(pf);
+	if (!vsi) {
+		dev_err(dev, "No PF_VSI to update aux drivers\n");
+		goto err_vsi_rebuild;
+	}
+	ice_for_each_aux(pf, vsi, ice_cdev_info_update_vsi);
 
 	/* If Flow Director is active */
 	if (test_bit(ICE_FLAG_FD_ENA, pf->flags)) {
