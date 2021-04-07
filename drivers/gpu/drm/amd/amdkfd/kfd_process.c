@@ -1383,13 +1383,12 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 
 	ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
 		dev->kgd, drm_file, p->pasid,
-		&pdd->vm, &p->kgd_process_info, &p->ef);
+		&p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
 	}
-
-	amdgpu_vm_set_task_info(pdd->vm);
+	pdd->vm = drm_file->private_data;
 
 	ret = kfd_process_device_reserve_ib_mem(pdd);
 	if (ret)
