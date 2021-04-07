@@ -53,6 +53,20 @@ enum {
 	DDW_EXT_QUERY_OUT_SIZE = 2
 };
 
+#define QUERY_DDW_PGSIZE_4K	0x01
+#define QUERY_DDW_PGSIZE_64K	0x02
+#define QUERY_DDW_PGSIZE_16M	0x04
+#define QUERY_DDW_PGSIZE_32M	0x08
+#define QUERY_DDW_PGSIZE_64M	0x10
+#define QUERY_DDW_PGSIZE_128M	0x20
+#define QUERY_DDW_PGSIZE_256M	0x40
+#define QUERY_DDW_PGSIZE_16G	0x80
+
+struct iommu_ddw_pagesize {
+	u32 mask;
+	int shift;
+};
+
 static struct iommu_table_group *iommu_pseries_alloc_group(int node)
 {
 	struct iommu_table_group *table_group;
@@ -1099,6 +1113,31 @@ static void reset_dma_window(struct pci_dev *dev, struct device_node *par_dn)
 			 ret);
 }
 
+/* Returns page shift based on "IO Page Sizes" output at ibm,query-pe-dma-window. See LoPAR */
+static int iommu_get_page_shift(u32 query_page_size)
+{
+	const struct iommu_ddw_pagesize ddw_pagesize[] = {
+		{ QUERY_DDW_PGSIZE_16G,  __builtin_ctz(SZ_16G)  },
+		{ QUERY_DDW_PGSIZE_256M, __builtin_ctz(SZ_256M) },
+		{ QUERY_DDW_PGSIZE_128M, __builtin_ctz(SZ_128M) },
+		{ QUERY_DDW_PGSIZE_64M,  __builtin_ctz(SZ_64M)  },
+		{ QUERY_DDW_PGSIZE_32M,  __builtin_ctz(SZ_32M)  },
+		{ QUERY_DDW_PGSIZE_16M,  __builtin_ctz(SZ_16M)  },
+		{ QUERY_DDW_PGSIZE_64K,  __builtin_ctz(SZ_64K)  },
+		{ QUERY_DDW_PGSIZE_4K,   __builtin_ctz(SZ_4K)   }
+	};
+
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ddw_pagesize); i++) {
+		if (query_page_size & ddw_pagesize[i].mask)
+			return ddw_pagesize[i].shift;
+	}
+
+	/* No valid page size found. */
+	return 0;
+}
+
 /*
  * If the PE supports dynamic dma windows, and there is space for a table
  * that can map all pages in a linear offset, then setup such a table,
@@ -1206,13 +1245,9 @@ static u64 enable_ddw(struct pci_dev *dev, struct device_node *pdn)
 			goto out_failed;
 		}
 	}
-	if (query.page_size & 4) {
-		page_shift = 24; /* 16MB */
-	} else if (query.page_size & 2) {
-		page_shift = 16; /* 64kB */
-	} else if (query.page_size & 1) {
-		page_shift = 12; /* 4kB */
-	} else {
+
+	page_shift = iommu_get_page_shift(query.page_size);
+	if (!page_shift) {
 		dev_dbg(&dev->dev, "no supported direct page size in mask %x",
 			  query.page_size);
 		goto out_failed;
