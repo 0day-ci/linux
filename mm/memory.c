@@ -3913,23 +3913,25 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 			return ret;
 	}
 
-	if (pmd_none(*vmf->pmd)) {
-		if (PageTransCompound(page)) {
-			ret = do_set_pmd(vmf, page);
-			if (ret != VM_FAULT_FALLBACK)
-				return ret;
+	if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
+		if (pmd_none(*vmf->pmd)) {
+			if (PageTransCompound(page)) {
+				ret = do_set_pmd(vmf, page);
+				if (ret != VM_FAULT_FALLBACK)
+					return ret;
+			}
+
+			if (unlikely(pte_alloc(vma->vm_mm, vmf->pmd)))
+				return VM_FAULT_OOM;
 		}
 
-		if (unlikely(pte_alloc(vma->vm_mm, vmf->pmd)))
-			return VM_FAULT_OOM;
+		/* See comment in __handle_mm_fault() */
+		if (pmd_devmap_trans_unstable(vmf->pmd))
+			return 0;
 	}
 
-	/* See comment in __handle_mm_fault() */
-	if (pmd_devmap_trans_unstable(vmf->pmd))
-		return 0;
-
-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
-				      vmf->address, &vmf->ptl);
+	if (!pte_map_lock(vmf))
+		return VM_FAULT_RETRY;
 	ret = 0;
 	/* Re-check under ptl */
 	if (likely(pte_none(*vmf->pte)))
