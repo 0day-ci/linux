@@ -193,3 +193,16 @@ Users can request an immediate capture of a snapshot via the
     0000000000000210 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
     $ devlink region delete pci/0000:01:00.0/device-caps snapshot 1
+
+Parameters
+==========
+
+The ``ice`` driver implements the following generic and driver-specific
+parameters.
+
+.. list-table:: Generic parameters implemented
+
+   * - Name
+     - Mode
+   * - ``rdma_protocol``
+     - runtime

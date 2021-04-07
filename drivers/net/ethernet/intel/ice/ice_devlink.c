@@ -449,6 +449,64 @@ static const struct devlink_ops ice_devlink_ops = {
 	.flash_update = ice_devlink_flash_update,
 };
 
+static int
+ice_devlink_rdma_prot_get(struct devlink *devlink, u32 id,
+			  struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct iidc_core_dev_info *cdev_info =
+		ice_find_cdev_info_by_id(pf, IIDC_RDMA_ID);
+
+	if (cdev_info->rdma_protocol == IIDC_RDMA_PROTOCOL_IWARP)
+		strcpy(ctx->val.vstr, "iwarp");
+	else
+		strcpy(ctx->val.vstr, "roce");
+
+	return 0;
+}
+
+static int
+ice_devlink_rdma_prot_set(struct devlink *devlink, u32 id,
+			  struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct iidc_core_dev_info *cdev_info =
+		ice_find_cdev_info_by_id(pf, IIDC_RDMA_ID);
+	enum iidc_rdma_protocol prot = !strcmp(ctx->val.vstr, "iwarp") ?
+					IIDC_RDMA_PROTOCOL_IWARP :
+					IIDC_RDMA_PROTOCOL_ROCEV2;
+
+	if (cdev_info->rdma_protocol != prot) {
+		ice_unplug_aux_devs(pf);
+		cdev_info->rdma_protocol = prot;
+		ice_plug_aux_devs(pf);
+	}
+
+	return 0;
+}
+
+static int
+ice_devlink_rdma_prot_validate(struct devlink *devlink, u32 id,
+			       union devlink_param_value val,
+			       struct netlink_ext_ack *extack)
+{
+	char *value = val.vstr;
+
+	if (!strcmp(value, "iwarp") || !strcmp(value, "roce"))
+		return 0;
+
+	NL_SET_ERR_MSG_MOD(extack, "\"iwarp\" and \"roce\" are the only supported values");
+
+	return -EINVAL;
+}
+
+static const struct devlink_param ice_devlink_params[] = {
+	DEVLINK_PARAM_GENERIC(RDMA_PROTOCOL, BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			      ice_devlink_rdma_prot_get,
+			      ice_devlink_rdma_prot_set,
+			      ice_devlink_rdma_prot_validate),
+};
+
 static void ice_devlink_free(void *devlink_ptr)
 {
 	devlink_free((struct devlink *)devlink_ptr);
@@ -491,15 +549,31 @@ int ice_devlink_register(struct ice_pf *pf)
 {
 	struct devlink *devlink = priv_to_devlink(pf);
 	struct device *dev = ice_pf_to_dev(pf);
+	union devlink_param_value value;
 	int err;
 
 	err = devlink_register(devlink, dev);
+	if (err)
+		goto err;
+
+	err = devlink_params_register(devlink, ice_devlink_params,
+				      ARRAY_SIZE(ice_devlink_params));
 	if (err) {
-		dev_err(dev, "devlink registration failed: %d\n", err);
-		return err;
+		devlink_unregister(devlink);
+		goto err;
 	}
 
+	strcpy(value.vstr, "iwarp");
+	devlink_param_driverinit_value_set(devlink,
+					   DEVLINK_PARAM_GENERIC_ID_RDMA_PROTOCOL,
+					   value);
+
 	return 0;
+
+err:
+	dev_err(dev, "devlink registration failed: %d\n", err);
+
+	return err;
 }
 
 /**
@@ -510,7 +584,21 @@ int ice_devlink_register(struct ice_pf *pf)
  */
 void ice_devlink_unregister(struct ice_pf *pf)
 {
+	devlink_params_unregister(priv_to_devlink(pf), ice_devlink_params,
+				  ARRAY_SIZE(ice_devlink_params));
 	devlink_unregister(priv_to_devlink(pf));
+}
+
+/**
+ * ice_devlink_params_publish - Publish devlink param
+ * @pf: the PF structure to cleanup
+ *
+ * Publish previously registered devlink parameters after driver
+ * is initialized
+ */
+void ice_devlink_params_publish(struct ice_pf *pf)
+{
+	devlink_params_publish(priv_to_devlink(pf));
 }
 
 /**

@@ -114,3 +114,9 @@ own name.
        will NACK any attempt of other host to reset the device. This parameter
        is useful for setups where a device is shared by different hosts, such
        as multi-host setup.
+   * - ``rdma_protocol``
+     - string
+     - Selects the RDMA protocol selected for multi-protocol devices.
+        - ``iwarp`` iWARP
+	- ``roce`` RoCE
+	- ``ib`` Infiniband

@@ -4346,6 +4346,8 @@ probe_done:
 		dev_warn(dev, "RDMA is not supported on this device\n");
 	}
 
+	ice_devlink_params_publish(pf);
+
 	return 0;
 
 err_init_aux_unroll:

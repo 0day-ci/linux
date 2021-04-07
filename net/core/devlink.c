@@ -3766,6 +3766,11 @@ static const struct devlink_param devlink_param_generic[] = {
 		.name = DEVLINK_PARAM_GENERIC_ENABLE_REMOTE_DEV_RESET_NAME,
 		.type = DEVLINK_PARAM_GENERIC_ENABLE_REMOTE_DEV_RESET_TYPE,
 	},
+	{
+		.id = DEVLINK_PARAM_GENERIC_ID_RDMA_PROTOCOL,
+		.name = DEVLINK_PARAM_GENERIC_RDMA_PROTOCOL_NAME,
+		.type = DEVLINK_PARAM_GENERIC_RDMA_PROTOCOL_TYPE,
+	},
 };
 
 static int devlink_param_generic_verify(const struct devlink_param *param)
