@@ -1169,6 +1169,8 @@ have_page_no_wait:
 	_leave(" = 0");
 	return 0;
 
+error_put:
+	netfs_put_read_request(rreq, false);
 error:
 	unlock_page(page);
 	put_page(page);
