@@ -82,7 +82,7 @@ void sm750_hw_cursor_set_color(struct lynx_cursor *cursor, u32 fg, u32 bg)
 	poke32(HWC_COLOR_3, 0xffe0);
 }
 
-void sm750_hw_cursor_setData(struct lynx_cursor *cursor, u16 rop,
+void sm750_hw_cursor_set_data(struct lynx_cursor *cursor, u16 rop,
 			     const u8 *pcol, const u8 *pmsk)
 {
 	int i, j, count, pitch, offset;
