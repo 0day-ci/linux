@@ -238,11 +238,9 @@ void drm_panel_bridge_remove(struct drm_bridge *bridge)
 }
 EXPORT_SYMBOL(drm_panel_bridge_remove);
 
-static void devm_drm_panel_bridge_release(struct device *dev, void *res)
+static void devm_drm_panel_bridge_release(void *bridge)
 {
-	struct drm_bridge **bridge = res;
-
-	drm_panel_bridge_remove(*bridge);
+	drm_panel_bridge_remove(bridge);
 }
 
 /**
@@ -283,20 +281,17 @@ struct drm_bridge *devm_drm_panel_bridge_add_typed(struct device *dev,
 						   struct drm_panel *panel,
 						   u32 connector_type)
 {
-	struct drm_bridge **ptr, *bridge;
-
-	ptr = devres_alloc(devm_drm_panel_bridge_release, sizeof(*ptr),
-			   GFP_KERNEL);
-	if (!ptr)
-		return ERR_PTR(-ENOMEM);
+	struct drm_bridge *bridge;
+	int ret;
 
 	bridge = drm_panel_bridge_add_typed(panel, connector_type);
-	if (!IS_ERR(bridge)) {
-		*ptr = bridge;
-		devres_add(dev, ptr);
-	} else {
-		devres_free(ptr);
-	}
+	if (IS_ERR(bridge))
+		return bridge;
+
+	ret = devm_add_action_or_reset(dev, devm_drm_panel_bridge_release,
+				       bridge);
+	if (ret)
+		return ERR_PTR(ret);
 
 	return bridge;
 }
