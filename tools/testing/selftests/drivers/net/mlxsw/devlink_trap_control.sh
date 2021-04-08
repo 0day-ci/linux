@@ -83,6 +83,7 @@ ALL_TESTS="
 	ptp_general_test
 	flow_action_sample_test
 	flow_action_trap_test
+	flow_action_trap_fwd_test
 "
 NUM_NETIFS=4
 source $lib_dir/lib.sh
@@ -663,19 +664,35 @@ flow_action_sample_test()
 	tc qdisc del dev $rp1 clsact
 }
 
-flow_action_trap_test()
+__flow_action_trap_test()
 {
+	local action=$1; shift
+	local trap=$1; shift
+	local description=$1; shift
+
 	# Install a filter that traps a specific flow.
 	tc qdisc add dev $rp1 clsact
 	tc filter add dev $rp1 ingress proto ip pref 1 handle 101 flower \
-		skip_sw ip_proto udp src_port 12345 dst_port 54321 action trap
+		skip_sw ip_proto udp src_port 12345 dst_port 54321 action $action
 
-	devlink_trap_stats_test "Flow Trapping (Logging)" "flow_action_trap" \
+	devlink_trap_stats_test "$description" $trap \
 		$MZ $h1 -c 1 -a own -b $(mac_get $rp1) \
 		-A 192.0.2.1 -B 198.51.100.1 -t udp sp=12345,dp=54321 -p 100 -q
 
 	tc filter del dev $rp1 ingress proto ip pref 1 handle 101 flower
 	tc qdisc del dev $rp1 clsact
+}
+
+flow_action_trap_test()
+{
+	__flow_action_trap_test trap flow_action_trap \
+				"Flow Trapping (Logging)"
+}
+
+flow_action_trap_fwd_test()
+{
+	__flow_action_trap_test trap_fwd flow_action_trap_fwd \
+				"Flow Trap-and-forwarding (Logging)"
 }
 
 trap cleanup EXIT
