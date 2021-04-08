@@ -1450,14 +1450,16 @@ static int bdev_try_to_free_page(struct super_block *sb, struct page *page,
 				 gfp_t wait)
 {
 	journal_t *journal = EXT4_SB(sb)->s_journal;
+	int ret = 0;
 
 	WARN_ON(PageChecked(page));
 	if (!page_has_buffers(page))
 		return 0;
 	if (journal)
-		return jbd2_journal_try_to_free_buffers(journal, page);
-
-	return try_to_free_buffers(page);
+		ret = jbd2_journal_try_to_free_buffers(journal, page);
+	if (!ret)
+		return try_to_free_buffers(page);
+	return 0;
 }
 
 #ifdef CONFIG_FS_ENCRYPTION

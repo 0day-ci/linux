@@ -2089,10 +2089,9 @@ out:
  * if they are fully written out ordered data, move them onto BUF_CLEAN
  * so try_to_free_buffers() can reap them.
  *
- * This function returns non-zero if we wish try_to_free_buffers()
- * to be called. We do this if the page is releasable by try_to_free_buffers().
- * We also do it if the page has locked or dirty buffers and the caller wants
- * us to perform sync or async writeout.
+ * This function returns zero if all the buffers on this page are
+ * journal cleaned and the caller should invoke try_to_free_buffers() and
+ * could release page if the page is releasable by try_to_free_buffers().
  *
  * This complicates JBD locking somewhat.  We aren't protected by the
  * BKL here.  We wish to remove the buffer from its committing or
@@ -2112,7 +2111,7 @@ out:
  * cannot happen because we never reallocate freed data as metadata
  * while the data is part of a transaction.  Yes?
  *
- * Return 0 on failure, 1 on success
+ * Return 0 on success, -EBUSY if any buffer is still journal busy.
  */
 int jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page)
 {
@@ -2142,8 +2141,10 @@ int jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page)
 		__journal_try_to_free_buffer(journal, bh);
 		spin_unlock(&jh->b_state_lock);
 		jbd2_journal_put_journal_head(jh);
-		if (buffer_jbd(bh))
-			goto busy;
+		if (buffer_jbd(bh)) {
+			ret = -EBUSY;
+			break;
+		}
 
 		/*
 		 * If we free a metadata buffer which has been failed to
@@ -2158,9 +2159,6 @@ int jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page)
 		}
 	} while ((bh = bh->b_this_page) != head);
 
-	ret = try_to_free_buffers(page);
-
-busy:
 	if (has_write_io_error)
 		jbd2_journal_abort(journal, -EIO);
 
