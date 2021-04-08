@@ -627,21 +627,26 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 			return ret;
 		}
 		ret = v4l2_subdev_call(state->src_sd, core, s_power, 1);
-		if (ret < 0)
+		if (ret < 0) {
+			pm_runtime_put_noidle(&state->pdev->dev);
 			return ret;
+		}
 	}
 
 	mutex_lock(&state->lock);
 	if (enable) {
 		if (state->flags & ST_SUSPENDED) {
 			ret = -EBUSY;
+			pm_runtime_put_noidle(&state->pdev->dev);
 			goto unlock;
 		}
 
 		mipi_csis_start_stream(state);
 		ret = v4l2_subdev_call(state->src_sd, video, s_stream, 1);
-		if (ret < 0)
+		if (ret < 0) {
+			pm_runtime_put_noidle(&state->pdev->dev);
 			goto unlock;
+		}
 
 		mipi_csis_log_counters(state, true);
 
