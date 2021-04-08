@@ -59,6 +59,7 @@ struct xfs_scrub {
 	struct xfs_scrub_metadata	*sm;
 	const struct xchk_meta_ops	*ops;
 	struct xfs_trans		*tp;
+	struct file			*filp;
 	struct xfs_inode		*ip;
 	void				*buf;
 	uint				ilock_flags;
