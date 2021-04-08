@@ -384,14 +384,11 @@ _clk_hw_register_gate(struct device_node *np,
 {
 	struct gate_cfg *gate_cfg = cfg->cfg;
 
-	return clk_hw_register_gate(NULL,
-				    cfg->name,
-				    cfg->parent_name,
-				    cfg->flags,
-				    gate_cfg->reg_off + base,
-				    gate_cfg->bit_idx,
-				    gate_cfg->gate_flags,
-				    lock);
+	return __clk_hw_register_gate(NULL, np, cfg->name, cfg->parent_name,
+				      NULL, NULL, cfg->flags,
+				      gate_cfg->reg_off + base,
+				      gate_cfg->bit_idx,
+				      gate_cfg->gate_flags, lock);
 }
 
 static struct clk_hw *
@@ -415,16 +412,12 @@ _clk_hw_register_divider_table(struct device_node *np,
 {
 	struct div_cfg *div_cfg = cfg->cfg;
 
-	return clk_hw_register_divider_table(NULL,
-					     cfg->name,
-					     cfg->parent_name,
-					     cfg->flags,
-					     div_cfg->reg_off + base,
-					     div_cfg->shift,
-					     div_cfg->width,
-					     div_cfg->div_flags,
-					     div_cfg->table,
-					     lock);
+	return __clk_hw_register_divider(NULL, np, cfg->name, cfg->parent_name,
+					 NULL, NULL, cfg->flags,
+					 div_cfg->reg_off + base,
+					 div_cfg->shift, div_cfg->width,
+					 div_cfg->div_flags, div_cfg->table,
+					 lock);
 }
 
 static struct clk_hw *
@@ -435,10 +428,11 @@ _clk_hw_register_mux(struct device_node *np,
 {
 	struct mux_cfg *mux_cfg = cfg->cfg;
 
-	return clk_hw_register_mux(NULL, cfg->name, cfg->parent_names,
-				   cfg->num_parents, cfg->flags,
-				   mux_cfg->reg_off + base, mux_cfg->shift,
-				   mux_cfg->width, mux_cfg->mux_flags, lock);
+	return __clk_hw_register_mux(NULL, np, cfg->name, cfg->num_parents,
+				     cfg->parent_names, NULL, NULL, cfg->flags,
+				     mux_cfg->reg_off + base, mux_cfg->shift,
+				     BIT(mux_cfg->width) - 1,
+				     mux_cfg->mux_flags, NULL, lock);
 }
 
 /* MP1 Gate clock with set & clear registers */
@@ -598,7 +592,7 @@ clk_stm32_register_gate_ops(struct device_node *np,
 
 	hw->init = &init;
 
-	ret = clk_hw_register(NULL, hw);
+	ret = of_clk_hw_register(np, hw);
 	if (ret)
 		hw = ERR_PTR(ret);
 
@@ -889,7 +883,7 @@ static struct clk_hw *clk_register_pll(struct device_node *np, const char *name,
 	element->lock = lock;
 
 	hw = &element->hw;
-	err = clk_hw_register(NULL, hw);
+	err = of_clk_hw_register(np, hw);
 
 	if (err) {
 		kfree(element);
@@ -1021,7 +1015,7 @@ static struct clk_hw *clk_register_cktim(struct device_node *np, const char *nam
 	tim_ker->timpre = timpre;
 
 	hw = &tim_ker->hw;
-	err = clk_hw_register(NULL, hw);
+	err = of_clk_hw_register(np, hw);
 
 	if (err) {
 		kfree(tim_ker);
