@@ -2304,7 +2304,7 @@ retry:
 	} else if (!HPageFreed(old_page)) {
 		/*
 		 * Page's refcount is 0 but it has not been enqueued in the
-		 * freelist yet. Race window is small, so we can succed here if
+		 * freelist yet. Race window is small, so we can succeed here if
 		 * we retry.
 		 */
 		spin_unlock(&hugetlb_lock);
