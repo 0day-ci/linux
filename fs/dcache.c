@@ -96,6 +96,7 @@ EXPORT_SYMBOL(slash_name);
 
 static unsigned int d_hash_shift __read_mostly;
 
+static DEFINE_SPLIT_LOCK(d_hash_lock);
 static struct hlist_bl_head *dentry_hashtable __read_mostly;
 
 static inline struct hlist_bl_head *d_hash(unsigned int hash)
@@ -469,9 +470,9 @@ static void ___d_drop(struct dentry *dentry)
 	else
 		b = d_hash(dentry->d_name.hash);
 
-	hlist_bl_lock(b);
+	hlist_bl_lock(b, &d_hash_lock);
 	__hlist_bl_del(&dentry->d_hash);
-	hlist_bl_unlock(b);
+	hlist_bl_unlock(b, &d_hash_lock);
 }
 
 void __d_drop(struct dentry *dentry)
@@ -2074,9 +2075,9 @@ static struct dentry *__d_instantiate_anon(struct dentry *dentry,
 	__d_set_inode_and_type(dentry, inode, add_flags);
 	hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
 	if (!disconnected) {
-		hlist_bl_lock(&dentry->d_sb->s_roots);
+		hlist_bl_lock(&dentry->d_sb->s_roots, &d_hash_lock);
 		hlist_bl_add_head(&dentry->d_hash, &dentry->d_sb->s_roots);
-		hlist_bl_unlock(&dentry->d_sb->s_roots);
+		hlist_bl_unlock(&dentry->d_sb->s_roots, &d_hash_lock);
 	}
 	spin_unlock(&dentry->d_lock);
 	spin_unlock(&inode->i_lock);
@@ -2513,9 +2514,9 @@ static void __d_rehash(struct dentry *entry)
 {
 	struct hlist_bl_head *b = d_hash(entry->d_name.hash);
 
-	hlist_bl_lock(b);
+	hlist_bl_lock(b, &d_hash_lock);
 	hlist_bl_add_head_rcu(&entry->d_hash, b);
-	hlist_bl_unlock(b);
+	hlist_bl_unlock(b, &d_hash_lock);
 }
 
 /**
@@ -2606,9 +2607,9 @@ retry:
 		goto retry;
 	}
 
-	hlist_bl_lock(b);
+	hlist_bl_lock(b, &d_hash_lock);
 	if (unlikely(READ_ONCE(parent->d_inode->i_dir_seq) != seq)) {
-		hlist_bl_unlock(b);
+		hlist_bl_unlock(b, &d_hash_lock);
 		rcu_read_unlock();
 		goto retry;
 	}
@@ -2626,7 +2627,7 @@ retry:
 			continue;
 		if (!d_same_name(dentry, parent, name))
 			continue;
-		hlist_bl_unlock(b);
+		hlist_bl_unlock(b, &d_hash_lock);
 		/* now we can try to grab a reference */
 		if (!lockref_get_not_dead(&dentry->d_lockref)) {
 			rcu_read_unlock();
@@ -2664,7 +2665,7 @@ retry:
 	new->d_flags |= DCACHE_PAR_LOOKUP;
 	new->d_wait = wq;
 	hlist_bl_add_head_rcu(&new->d_u.d_in_lookup_hash, b);
-	hlist_bl_unlock(b);
+	hlist_bl_unlock(b, &d_hash_lock);
 	return new;
 mismatch:
 	spin_unlock(&dentry->d_lock);
@@ -2677,12 +2678,12 @@ void __d_lookup_done(struct dentry *dentry)
 {
 	struct hlist_bl_head *b = in_lookup_hash(dentry->d_parent,
 						 dentry->d_name.hash);
-	hlist_bl_lock(b);
+	hlist_bl_lock(b, &d_hash_lock);
 	dentry->d_flags &= ~DCACHE_PAR_LOOKUP;
 	__hlist_bl_del(&dentry->d_u.d_in_lookup_hash);
 	wake_up_all(dentry->d_wait);
 	dentry->d_wait = NULL;
-	hlist_bl_unlock(b);
+	hlist_bl_unlock(b, &d_hash_lock);
 	INIT_HLIST_NODE(&dentry->d_u.d_alias);
 	INIT_LIST_HEAD(&dentry->d_lru);
 }

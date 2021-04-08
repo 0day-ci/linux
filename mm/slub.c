@@ -349,19 +349,21 @@ static inline unsigned int oo_objects(struct kmem_cache_order_objects x)
 	return x.x & OO_MASK;
 }
 
+static DEFINE_SPLIT_LOCK(slab_split_lock);
+
 /*
  * Per slab locking using the pagelock
  */
 static __always_inline void slab_lock(struct page *page)
 {
 	VM_BUG_ON_PAGE(PageTail(page), page);
-	bit_spin_lock(PG_locked, &page->flags);
+	bit_spin_lock(PG_locked, &page->flags, &slab_split_lock);
 }
 
 static __always_inline void slab_unlock(struct page *page)
 {
 	VM_BUG_ON_PAGE(PageTail(page), page);
-	__bit_spin_unlock(PG_locked, &page->flags);
+	__bit_spin_unlock(PG_locked, &page->flags, &slab_split_lock);
 }
 
 /* Interrupts must be disabled (for the fallback code to work right) */
