@@ -10,6 +10,7 @@
 
 #include "sched.h"
 
+#include <linux/energy_model.h>
 #include <linux/sched/cpufreq.h>
 #include <trace/events/power.h>
 
@@ -152,6 +153,9 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 				policy->cpuinfo.max_freq : policy->cur;
 
 	freq = map_util_freq(util, freq, max);
+
+	/* Avoid inefficient performance states */
+	freq = em_pd_get_efficient_freq(em_cpu_get(policy->cpu), freq);
 
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;

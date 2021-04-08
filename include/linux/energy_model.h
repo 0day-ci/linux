@@ -17,19 +17,60 @@
  *		device). It can be a total power: static and dynamic.
  * @cost:	The cost coefficient associated with this level, used during
  *		energy calculation. Equal to: power * max_frequency / frequency
+ * @flags:	see "em_perf_state flags" description below.
  */
 struct em_perf_state {
 	unsigned long frequency;
 	unsigned long power;
 	unsigned long cost;
+	unsigned long flags;
+};
+
+/*
+ * em_perf_state flags:
+ *
+ * EM_PERF_STATE_INEFFICIENT: The performance state is inefficient. There is
+ * in this em_perf_domain, another performance state with a higher frequency
+ * but a lower or equal power cost. Such inefficient states are ignored when
+ * using em_pd_get_efficient_*() functions.
+ */
+#define EM_PERF_STATE_INEFFICIENT BIT(0)
+
+/**
+ * em_efficient_table - Efficient em_perf_state lookup table.
+ * @table:	Lookup table for the efficient em_perf_state
+ * @min_state:  Minimum efficient state for the perf_domain
+ * @max_state:  Maximum state for the perf_domain
+ * @min_freq:	Minimum efficient frequency for the perf_domain
+ * @max_freq:	Maximum frequency for the perf_domain
+ * @shift:	Shift value used to resolve the lookup table
+ *
+ * Resolving a frequency to an efficient em_perf_state is as follows:
+ *
+ *   1. Check frequency against min_freq and max_freq
+ *   2. idx = (frequency - min_freq) >> shift;
+ *   3. idx = table[idx].frequency < frequency ? idx + 1 : idx;
+ *   4. table[idx]
+ *
+ *   3. Intends to resolve undershoot, when an OPP is in the middle of the
+ *   lookup table bin.
+ */
+struct em_efficient_table {
+	struct em_perf_state **table;
+	struct em_perf_state *min_state;
+	struct em_perf_state *max_state;
+	unsigned long min_freq;
+	unsigned long max_freq;
+	int shift;
 };
 
 /**
  * em_perf_domain - Performance domain
  * @table:		List of performance states, in ascending order
+ * @efficient_table:	List of efficient performance states, in a lookup
+ *			table. This is filled only for CPU devices.
  * @nr_perf_states:	Number of performance states
- * @milliwatts:		Flag indicating the power values are in milli-Watts
- *			or some other scale.
+ * @flags:		See "em_perf_domain flags"
  * @cpus:		Cpumask covering the CPUs of the domain. It's here
  *			for performance reasons to avoid potential cache
  *			misses during energy calculations in the scheduler
@@ -43,10 +84,23 @@ struct em_perf_state {
  */
 struct em_perf_domain {
 	struct em_perf_state *table;
+	struct em_efficient_table efficient_table;
 	int nr_perf_states;
-	int milliwatts;
+	int flags;
 	unsigned long cpus[];
 };
+
+/*
+ *  em_perf_domain flags:
+ *
+ *  EM_PERF_DOMAIN_MILLIWATTS: The power values are in milli-Watts or some
+ *  other scale.
+ *
+ *  EM_PERF_DOMAIN_INEFFICIENCIES: This perf domain contains inefficient perf
+ *  states.
+ */
+#define EM_PERF_DOMAIN_MILLIWATTS BIT(0)
+#define EM_PERF_DOMAIN_INEFFICIENCIES BIT(1)
 
 #define em_span_cpus(em) (to_cpumask((em)->cpus))
 
@@ -86,6 +140,63 @@ int em_dev_register_perf_domain(struct device *dev, unsigned int nr_states,
 void em_dev_unregister_perf_domain(struct device *dev);
 
 /**
+ * em_pd_get_efficient_state() - Get an efficient performance state from the EM
+ * @pd   : Performance domain for which we want an efficient frequency
+ * @freq : Frequency to map with the EM
+ *
+ * This function must be used only for CPU devices. It is called from the
+ * scheduler code quite frequently and as a consequence doesn't implement any
+ * check.
+ *
+ * Return: An efficient performance state, high enough to meet @freq
+ * requirement.
+ */
+static inline
+struct em_perf_state *em_pd_get_efficient_state(struct em_perf_domain *pd,
+						unsigned long freq)
+{
+	struct em_efficient_table *efficients = &pd->efficient_table;
+	int idx;
+
+	if (freq <= efficients->min_freq)
+		return efficients->min_state;
+
+	if (freq >= efficients->max_freq)
+		return efficients->max_state;
+
+	idx = (freq - efficients->min_freq) >> efficients->shift;
+
+	/* Undershoot due to the bin size. Use the higher perf_state */
+	if (efficients->table[idx]->frequency < freq)
+		idx++;
+
+	return efficients->table[idx];
+}
+
+/**
+ * em_pd_get_efficient_freq() - Get the efficient frequency from the EM
+ * @pd	 : Performance domain for which we want an efficient frequency
+ * @freq : Frequency to map with the EM
+ *
+ * This function will return @freq if no inefficiencies have been found for
+ * that @pd. This is to avoid a useless lookup table resolution.
+ *
+ * Return: An efficient frequency, high enough to meet @freq requirement.
+ */
+static inline unsigned long em_pd_get_efficient_freq(struct em_perf_domain *pd,
+						     unsigned long freq)
+{
+	struct em_perf_state *ps;
+
+	if (!pd || !(pd->flags & EM_PERF_DOMAIN_INEFFICIENCIES))
+		return freq;
+
+	ps = em_pd_get_efficient_state(pd, freq);
+
+	return ps->frequency;
+}
+
+/**
  * em_cpu_energy() - Estimates the energy consumed by the CPUs of a
 		performance domain
  * @pd		: performance domain for which energy has to be estimated
@@ -104,7 +215,7 @@ static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
 {
 	unsigned long freq, scale_cpu;
 	struct em_perf_state *ps;
-	int i, cpu;
+	int cpu;
 
 	if (!sum_util)
 		return 0;
@@ -123,11 +234,7 @@ static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
 	 * Find the lowest performance state of the Energy Model above the
 	 * requested frequency.
 	 */
-	for (i = 0; i < pd->nr_perf_states; i++) {
-		ps = &pd->table[i];
-		if (ps->frequency >= freq)
-			break;
-	}
+	ps = em_pd_get_efficient_state(pd, freq);
 
 	/*
 	 * The capacity of a CPU in the domain at the performance state (ps)
@@ -216,6 +323,12 @@ static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
 static inline int em_pd_nr_perf_states(struct em_perf_domain *pd)
 {
 	return 0;
+}
+
+static inline unsigned long
+em_pd_get_efficient_freq(struct em_perf_domain *pd, unsigned long freq)
+{
+	return freq;
 }
 #endif
 

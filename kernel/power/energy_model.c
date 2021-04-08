@@ -2,7 +2,7 @@
 /*
  * Energy Model of devices
  *
- * Copyright (c) 2018-2020, Arm ltd.
+ * Copyright (c) 2018-2021, Arm ltd.
  * Written by: Quentin Perret, Arm ltd.
  * Improvements provided by: Lukasz Luba, Arm ltd.
  */
@@ -42,6 +42,7 @@ static void em_debug_create_ps(struct em_perf_state *ps, struct dentry *pd)
 	debugfs_create_ulong("frequency", 0444, d, &ps->frequency);
 	debugfs_create_ulong("power", 0444, d, &ps->power);
 	debugfs_create_ulong("cost", 0444, d, &ps->cost);
+	debugfs_create_ulong("inefficient", 0444, d, &ps->flags);
 }
 
 static int em_debug_cpus_show(struct seq_file *s, void *unused)
@@ -55,7 +56,8 @@ DEFINE_SHOW_ATTRIBUTE(em_debug_cpus);
 static int em_debug_units_show(struct seq_file *s, void *unused)
 {
 	struct em_perf_domain *pd = s->private;
-	char *units = pd->milliwatts ? "milliWatts" : "bogoWatts";
+	char *units = (pd->flags & EM_PERF_DOMAIN_MILLIWATTS) ?
+		"milliWatts" : "bogoWatts";
 
 	seq_printf(s, "%s\n", units);
 
@@ -107,7 +109,6 @@ static void em_debug_remove_pd(struct device *dev) {}
 static int em_create_perf_table(struct device *dev, struct em_perf_domain *pd,
 				int nr_states, struct em_data_callback *cb)
 {
-	unsigned long opp_eff, prev_opp_eff = ULONG_MAX;
 	unsigned long power, freq, prev_freq = 0;
 	struct em_perf_state *table;
 	int i, ret;
@@ -153,18 +154,6 @@ static int em_create_perf_table(struct device *dev, struct em_perf_domain *pd,
 
 		table[i].power = power;
 		table[i].frequency = prev_freq = freq;
-
-		/*
-		 * The hertz/watts efficiency ratio should decrease as the
-		 * frequency grows on sane platforms. But this isn't always
-		 * true in practice so warn the user if a higher OPP is more
-		 * power efficient than a lower one.
-		 */
-		opp_eff = freq / power;
-		if (opp_eff >= prev_opp_eff)
-			dev_dbg(dev, "EM: hertz/watts ratio non-monotonically decreasing: em_perf_state %d >= em_perf_state%d\n",
-					i, i - 1);
-		prev_opp_eff = opp_eff;
 	}
 
 	/* Compute the cost of each performance state. */
@@ -184,12 +173,88 @@ free_ps_table:
 	return -EINVAL;
 }
 
+static inline int em_create_efficient_table(struct em_perf_domain *pd)
+{
+	unsigned long min_freq, max_freq, min_delta = ULONG_MAX;
+	struct em_perf_state *prev = NULL, *ps, *min_perf_state = NULL;
+	int i, j, nr_entries, shift = 0;
+
+	max_freq = pd->table[pd->nr_perf_states - 1].frequency;
+
+	for (i = 0 ; i < pd->nr_perf_states; i++) {
+		ps  = &pd->table[i];
+		if (ps->flags & EM_PERF_STATE_INEFFICIENT)
+			continue;
+
+		if (!min_perf_state)
+			min_perf_state = ps;
+
+		if (prev) {
+			unsigned long delta = ps->frequency - prev->frequency;
+
+			if (delta < min_delta)
+				min_delta = delta;
+		}
+
+		prev = ps;
+	}
+	min_freq = min_perf_state->frequency;
+
+	/*
+	 * Use, as a bin size, a power of two. This allows lookup table
+	 * resolution with a quick shift, instead of a division. Also, use a
+	 * minimum of 1024kHz to avoid creating to many entries in the table for
+	 * the very unlikely case where two efficient OPPs have a small
+	 * frequency delta.
+	 */
+	min_delta = rounddown_pow_of_two(max(min_delta, 1024UL));
+	shift = ilog2(min_delta);
+	/* +1 for the division remainder below */
+	nr_entries = ((max_freq - min_freq) >> shift) + 1;
+
+	pd->efficient_table.table = kcalloc(nr_entries,
+					sizeof(*pd->efficient_table.table),
+					GFP_KERNEL);
+	if (!pd->efficient_table.table)
+		return -ENOMEM;
+
+	pd->efficient_table.min_freq = min_freq;
+	pd->efficient_table.min_state = min_perf_state;
+	pd->efficient_table.max_freq = max_freq;
+	pd->efficient_table.max_state = &pd->table[pd->nr_perf_states - 1];
+	pd->efficient_table.shift = shift;
+
+	for (i = 0; i < nr_entries; i++) {
+		unsigned long lower_bin_bound = min_freq + ((1 << shift) * i);
+
+		for (j = 0; j < pd->nr_perf_states; j++) {
+			ps = &pd->table[j];
+
+			/*
+			 * The first OPP that covers the lower bound of the bin
+			 * is the right one. It ensures we'll never overshoot.
+			 * Undershoot must be handled during the lookup table
+			 * resolution.
+			 */
+			if (ps->flags & EM_PERF_STATE_INEFFICIENT ||
+			    ps->frequency < lower_bin_bound)
+				continue;
+
+			pd->efficient_table.table[i] = ps;
+			break;
+		}
+	}
+
+	return 0;
+}
+
 static int em_create_pd(struct device *dev, int nr_states,
 			struct em_data_callback *cb, cpumask_t *cpus)
 {
 	struct em_perf_domain *pd;
 	struct device *cpu_dev;
-	int cpu, ret;
+	unsigned int prev_cost;
+	int cpu, ret, i;
 
 	if (_is_cpu_device(dev)) {
 		pd = kzalloc(sizeof(*pd) + cpumask_size(), GFP_KERNEL);
@@ -209,11 +274,35 @@ static int em_create_pd(struct device *dev, int nr_states,
 		return ret;
 	}
 
-	if (_is_cpu_device(dev))
+	if (_is_cpu_device(dev)) {
+		/* Identify inefficient perf states */
+		i = pd->nr_perf_states - 1;
+		prev_cost = pd->table[i].cost;
+		for (--i; i >= 0; i--) {
+			if (pd->table[i].cost >= prev_cost) {
+				pd->table[i].flags = EM_PERF_STATE_INEFFICIENT;
+				pd->flags |= EM_PERF_DOMAIN_INEFFICIENCIES;
+				dev_dbg(dev,
+					"EM: pd%d OPP:%lu is inefficient\n",
+					cpumask_first(to_cpumask(pd->cpus)),
+					pd->table[i].frequency);
+				continue;
+			}
+			prev_cost = pd->table[i].cost;
+		}
+
+		ret = em_create_efficient_table(pd);
+		if (ret) {
+			kfree(pd->table);
+			kfree(pd);
+			return ret;
+		}
+
 		for_each_cpu(cpu, cpus) {
 			cpu_dev = get_cpu_device(cpu);
 			cpu_dev->em_pd = pd;
 		}
+	}
 
 	dev->em_pd = pd;
 
@@ -333,7 +422,8 @@ int em_dev_register_perf_domain(struct device *dev, unsigned int nr_states,
 	if (ret)
 		goto unlock;
 
-	dev->em_pd->milliwatts = milliwatts;
+	if (milliwatts)
+		dev->em_pd->flags |= EM_PERF_DOMAIN_MILLIWATTS;
 
 	em_debug_create_pd(dev);
 	dev_info(dev, "EM: created perf domain\n");
