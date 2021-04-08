@@ -191,6 +191,7 @@ struct btrfs_inode {
 
 	/* flags field from the on disk inode */
 	u32 flags;
+	u64 compat_flags;
 
 	/*
 	 * Counters to keep track of the number of extent item's we may use due

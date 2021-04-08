@@ -575,10 +575,15 @@ struct btrfs_inode_item {
 	__le64 sequence;
 
 	/*
+	 * flags which aren't checked for corruption at mount
+	 * and can be added in a backwards compatible way
+	 */
+	__le64 compat_flags;
+	/*
 	 * a little future expansion, for more than this we can
 	 * just grow the inode item and version it
 	 */
-	__le64 reserved[4];
+	__le64 reserved[3];
 	struct btrfs_timespec atime;
 	struct btrfs_timespec ctime;
 	struct btrfs_timespec mtime;
