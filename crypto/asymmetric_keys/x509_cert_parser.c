@@ -15,6 +15,7 @@
 #include "x509_parser.h"
 #include "x509.asn1.h"
 #include "x509_akid.asn1.h"
+#include "x509_rsassa.asn1.h"
 
 struct x509_parse_context {
 	struct x509_certificate	*cert;		/* Certificate being constructed */
@@ -38,6 +39,8 @@ struct x509_parse_context {
 	const void	*raw_akid;		/* Raw authorityKeyId in ASN.1 */
 	const void	*akid_raw_issuer;	/* Raw directoryName in authorityKeyId */
 	unsigned	akid_raw_issuer_size;
+	const void	*raw_sig_params;	/* Signature AlgorithmIdentifier.parameters */
+	unsigned	raw_sig_params_size;
 };
 
 /*
@@ -99,6 +102,15 @@ struct x509_certificate *x509_cert_parse(const void *data, size_t datalen)
 			pr_warn("Couldn't decode AuthKeyIdentifier\n");
 			goto error_decode;
 		}
+	}
+
+	if (strcmp(ctx->cert->sig->encoding, "pss") == 0) {
+		pr_devel("rsa enc=pss hash=%s mgf=%s mgf_hash=%s salt=0x%x tf=0x%x\n",
+			 ctx->cert->sig->hash_algo,
+			 ctx->cert->sig->mgf,
+			 ctx->cert->sig->mgf_hash_algo,
+			 ctx->cert->sig->salt_length,
+			 ctx->cert->sig->trailer_field);
 	}
 
 	ret = -ENOMEM;
@@ -194,6 +206,7 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 			const void *value, size_t vlen)
 {
 	struct x509_parse_context *ctx = context;
+	int ret = 0;
 
 	pr_debug("PubKey Algo: %u\n", ctx->last_oid);
 
@@ -258,6 +271,35 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 	case OID_SM2_with_SM3:
 		ctx->cert->sig->hash_algo = "sm3";
 		goto sm2;
+
+	case OID_rsassaPSS:
+		/* For rsassaPSS, the hash algorithm is packed as a mandatory
+		 * parameter in AlgorithmIdentifier.parameters.
+		 */
+		if (ctx->raw_sig_params == NULL && ctx->raw_sig_params_size != 1)
+			return -EBADMSG;
+
+		ctx->cert->sig->pkey_algo = "rsa";
+		ctx->cert->sig->encoding = "pss";
+		ctx->algo_oid = ctx->last_oid;
+		if (ctx->raw_sig_params) {
+			ret = asn1_ber_decoder(&x509_rsassa_decoder, ctx,
+					       ctx->raw_sig_params,
+					       ctx->raw_sig_params_size);
+			if (ret < 0)
+				return ret;
+		}
+
+		/* Fill in RSASSA-PSS-params defaults if left out. */
+		if (!ctx->cert->sig->hash_algo)
+			ctx->cert->sig->hash_algo = "sha1";
+		if (!ctx->cert->sig->mgf)
+			ctx->cert->sig->mgf = "mgf1";
+		if (!ctx->cert->sig->mgf_hash_algo)
+			ctx->cert->sig->mgf_hash_algo = "sha1";
+		ctx->cert->sig->trailer_field = 0xbc;
+
+		return 0;
 	}
 
 rsa_pkcs1:
@@ -464,6 +506,18 @@ int x509_note_params(void *context, size_t hdrlen,
 		     const void *value, size_t vlen)
 {
 	struct x509_parse_context *ctx = context;
+
+	if (ctx->last_oid == OID_rsassaPSS && !ctx->raw_sig_params) {
+		/* Stash AlgorithmIdentifier.parameters for RSASSA-PSS. */
+		ctx->raw_sig_params_size = vlen + hdrlen;
+		if (ctx->raw_sig_params_size) {
+			ctx->raw_sig_params = value - hdrlen;
+		} else {
+			ctx->raw_sig_params = NULL;
+			ctx->raw_sig_params_size = 1;
+		}
+		return 0;
+	}
 
 	/*
 	 * AlgorithmIdentifier is used three times in the x509, we should skip
@@ -748,5 +802,99 @@ int x509_akid_note_serial(void *context, size_t hdrlen,
 
 	pr_debug("authkeyid %*phN\n", kid->len, kid->data);
 	ctx->cert->sig->auth_ids[0] = kid;
+	return 0;
+}
+
+int x509_note_hash_algo(void *context, size_t hdrlen,
+			unsigned char tag,
+			const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+	const char **ptr = NULL;
+
+	if (ctx->last_oid != OID_rsassaPSS)
+		return -EBADMSG;
+
+	if (ctx->cert->sig->mgf)
+		ptr = &ctx->cert->sig->mgf_hash_algo;
+	else
+		ptr = &ctx->cert->sig->hash_algo;
+
+	switch (look_up_OID(value, vlen)) {
+	case OID_sha224:
+		*ptr = "sha224";
+		break;
+	case OID_sha256:
+		*ptr = "sha256";
+		break;
+	case OID_sha384:
+		*ptr = "sha384";
+		break;
+	case OID_sha512:
+		*ptr = "sha512";
+		break;
+	case OID_sha1:
+	default:
+		*ptr = "sha1";
+		break;
+	}
+
+	return 0;
+}
+
+int x509_note_hash_algo_params(void *context, size_t hdrlen,
+			       unsigned char tag,
+			       const void *value, size_t vlen)
+{
+	return -EOPNOTSUPP;
+}
+
+int x509_note_mgf(void *context, size_t hdrlen,
+		  unsigned char tag,
+		  const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+
+	if (ctx->last_oid != OID_rsassaPSS)
+		return -EBADMSG;
+
+	/* RFC8017 PKCS1MGFAlgorithms */
+	if (look_up_OID(value, vlen) != OID_mgf1)
+		return -EINVAL;
+
+	ctx->cert->sig->mgf = "mgf1";
+
+	return 0;
+}
+
+int x509_note_salt_length(void *context, size_t hdrlen,
+			  unsigned char tag,
+			  const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+
+	if (ctx->last_oid != OID_rsassaPSS)
+		return -EBADMSG;
+
+	if (!value || !vlen || vlen > sizeof(ctx->cert->sig->salt_length))
+		return -EINVAL;
+
+	ctx->cert->sig->salt_length = (vlen == 2) ?
+		be16_to_cpu(*((__force __be16 *) value)) : *((u8 *) value);
+
+	return 0;
+}
+
+int x509_note_trailer_field(void *context, size_t hdrlen,
+			    unsigned char tag,
+			    const void *value, size_t vlen)
+{
+	struct x509_parse_context *ctx = context;
+
+	if (ctx->last_oid != OID_rsassaPSS)
+		return -EBADMSG;
+
+	/* trailerField 0xbc per RFC8017 A.2.3 regardless of if
+	 * specified. */
 	return 0;
 }
