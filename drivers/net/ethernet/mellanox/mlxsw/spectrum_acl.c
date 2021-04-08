@@ -401,6 +401,12 @@ int mlxsw_sp_acl_rulei_act_trap(struct mlxsw_sp_acl_rule_info *rulei)
 					   MLXSW_TRAP_ID_ACL0);
 }
 
+int mlxsw_sp_acl_rulei_act_trap_fwd(struct mlxsw_sp_acl_rule_info *rulei)
+{
+	return mlxsw_afa_block_append_trap_and_forward(rulei->act_block,
+						       MLXSW_TRAP_ID_ACL3);
+}
+
 int mlxsw_sp_acl_rulei_act_fwd(struct mlxsw_sp *mlxsw_sp,
 			       struct mlxsw_sp_acl_rule_info *rulei,
 			       struct net_device *out_dev,

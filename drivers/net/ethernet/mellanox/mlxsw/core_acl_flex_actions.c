@@ -94,7 +94,8 @@ struct mlxsw_afa_set {
 		      * kvdl_index is valid).
 		      */
 	   has_trap:1,
-	   has_police:1;
+	   has_police:1,
+	   has_trap_fwd:1;
 	unsigned int ref_count;
 	struct mlxsw_afa_set *next; /* Pointer to the next set. */
 	struct mlxsw_afa_set *prev; /* Pointer to the previous set,
@@ -263,14 +264,23 @@ static void mlxsw_afa_set_goto_set(struct mlxsw_afa_set *set,
 	mlxsw_afa_set_goto_next_binding_set(actions, group_id);
 }
 
-static void mlxsw_afa_set_next_set(struct mlxsw_afa_set *set,
+static int mlxsw_afa_set_next_set(struct mlxsw_afa_set *set,
 				  u32 next_set_kvdl_index,
 				  struct netlink_ext_ack *extack)
 {
 	char *actions = set->ht_key.enc_actions;
 
+	/* If the forwarding action is not drop, the next/goto record must not
+	 * be a next, it must be a goto.
+	 */
+	if (set->has_trap_fwd) {
+		NL_SET_ERR_MSG_MOD(extack, "Only goto permissible after a trap_fwd action");
+		return -EINVAL;
+	}
+
 	mlxsw_afa_set_type_set(actions, MLXSW_AFA_SET_TYPE_NEXT);
 	mlxsw_afa_set_next_action_set_ptr_set(actions, next_set_kvdl_index);
+	return 0;
 }
 
 static struct mlxsw_afa_set *mlxsw_afa_set_create(bool is_first)
@@ -461,6 +471,7 @@ int mlxsw_afa_block_commit(struct mlxsw_afa_block *block,
 {
 	struct mlxsw_afa_set *set = block->cur_set;
 	struct mlxsw_afa_set *prev_set;
+	int err;
 
 	block->cur_set = NULL;
 	block->finished = true;
@@ -481,8 +492,10 @@ int mlxsw_afa_block_commit(struct mlxsw_afa_block *block,
 			return PTR_ERR(set);
 		if (prev_set) {
 			prev_set->next = set;
-			mlxsw_afa_set_next_set(prev_set, set->kvdl_index,
-					       extack);
+			err = mlxsw_afa_set_next_set(prev_set, set->kvdl_index,
+						     extack);
+			if (err)
+				return err;
 			set = prev_set;
 		}
 	} while (prev_set);
@@ -1346,6 +1359,8 @@ int mlxsw_afa_block_append_trap_and_forward(struct mlxsw_afa_block *block,
 
 	if (IS_ERR(act))
 		return PTR_ERR(act);
+
+	block->cur_set->has_trap_fwd = true;
 	mlxsw_afa_trap_pack(act, MLXSW_AFA_TRAP_TRAP_ACTION_TRAP,
 			    MLXSW_AFA_TRAP_FORWARD_ACTION_FORWARD, trap_id);
 	return 0;

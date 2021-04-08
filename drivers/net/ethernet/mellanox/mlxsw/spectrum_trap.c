@@ -1155,6 +1155,14 @@ static const struct mlxsw_sp_trap_item mlxsw_sp_trap_items_arr[] = {
 		},
 	},
 	{
+		.trap = MLXSW_SP_TRAP_CONTROL(FLOW_ACTION_TRAP_FWD,
+					      ACL_TRAP, MIRROR),
+		.listeners_arr = {
+			MLXSW_SP_RXL_L3_MARK(ACL3, FLOW_LOGGING, MIRROR_TO_CPU,
+					     false),
+		},
+	},
+	{
 		.trap = MLXSW_SP_TRAP_DROP(BLACKHOLE_NEXTHOP, L3_DROPS),
 		.listeners_arr = {
 			MLXSW_SP_RXL_DISCARD(ROUTER3, L3_DISCARDS),

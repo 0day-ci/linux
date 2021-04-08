@@ -86,6 +86,13 @@ static int mlxsw_sp_flower_parse_actions(struct mlxsw_sp *mlxsw_sp,
 				return err;
 			}
 			break;
+		case FLOW_ACTION_TRAP_FWD:
+			err = mlxsw_sp_acl_rulei_act_trap_fwd(rulei);
+			if (err) {
+				NL_SET_ERR_MSG_MOD(extack, "Cannot append trap_fwd action");
+				return err;
+			}
+			break;
 		case FLOW_ACTION_GOTO: {
 			u32 chain_index = act->chain_index;
 			struct mlxsw_sp_acl_ruleset *ruleset;
