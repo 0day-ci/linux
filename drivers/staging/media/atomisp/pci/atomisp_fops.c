@@ -840,7 +840,7 @@ dev_init:
 	ret = pm_runtime_get_sync(vdev->v4l2_dev->dev);
 	if (ret < 0) {
 		dev_err(isp->dev, "Failed to power on device\n");
-		goto error;
+		goto pm_error;
 	}
 
 	if (dypool_enable) {
@@ -881,9 +881,10 @@ done:
 
 css_error:
 	atomisp_css_uninit(isp);
-error:
 	hmm_pool_unregister(HMM_POOL_TYPE_DYNAMIC);
+pm_error:
 	pm_runtime_put(vdev->v4l2_dev->dev);
+error:
 	rt_mutex_unlock(&isp->mutex);
 	return ret;
 }
