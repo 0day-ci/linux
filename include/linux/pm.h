@@ -301,50 +301,37 @@ struct dev_pm_ops {
 	int (*runtime_idle)(struct device *dev);
 };
 
-#ifdef CONFIG_PM_SLEEP
+#define pm_ptr(_ptr)		PTR_IF(IS_ENABLED(CONFIG_PM), _ptr)
+#define pm_sleep_ptr(_ptr)	PTR_IF(IS_ENABLED(CONFIG_PM_SLEEP), _ptr)
+
 #define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-	.suspend = suspend_fn, \
-	.resume = resume_fn, \
-	.freeze = suspend_fn, \
-	.thaw = resume_fn, \
-	.poweroff = suspend_fn, \
-	.restore = resume_fn,
-#else
-#define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-#endif
+	.suspend  = pm_sleep_ptr(suspend_fn), \
+	.resume   = pm_sleep_ptr(resume_fn), \
+	.freeze   = pm_sleep_ptr(suspend_fn), \
+	.thaw     = pm_sleep_ptr(resume_fn), \
+	.poweroff = pm_sleep_ptr(suspend_fn), \
+	.restore  = pm_sleep_ptr(resume_fn),
 
-#ifdef CONFIG_PM_SLEEP
 #define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-	.suspend_late = suspend_fn, \
-	.resume_early = resume_fn, \
-	.freeze_late = suspend_fn, \
-	.thaw_early = resume_fn, \
-	.poweroff_late = suspend_fn, \
-	.restore_early = resume_fn,
-#else
-#define SET_LATE_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-#endif
+	.suspend_late  = pm_sleep_ptr(suspend_fn), \
+	.resume_early  = pm_sleep_ptr(resume_fn), \
+	.freeze_late   = pm_sleep_ptr(suspend_fn), \
+	.thaw_early    = pm_sleep_ptr(resume_fn), \
+	.poweroff_late = pm_sleep_ptr(suspend_fn), \
+	.restore_early = pm_sleep_ptr(resume_fn),
 
-#ifdef CONFIG_PM_SLEEP
 #define SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
-	.suspend_noirq = suspend_fn, \
-	.resume_noirq = resume_fn, \
-	.freeze_noirq = suspend_fn, \
-	.thaw_noirq = resume_fn, \
-	.poweroff_noirq = suspend_fn, \
-	.restore_noirq = resume_fn,
-#else
-#define SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
-#endif
+	.suspend_noirq  = pm_sleep_ptr(suspend_fn), \
+	.resume_noirq   = pm_sleep_ptr(resume_fn), \
+	.freeze_noirq   = pm_sleep_ptr(suspend_fn), \
+	.thaw_noirq     = pm_sleep_ptr(resume_fn), \
+	.poweroff_noirq = pm_sleep_ptr(suspend_fn), \
+	.restore_noirq  = pm_sleep_ptr(resume_fn),
 
-#ifdef CONFIG_PM
 #define SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
-	.runtime_suspend = suspend_fn, \
-	.runtime_resume = resume_fn, \
-	.runtime_idle = idle_fn,
-#else
-#define SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn)
-#endif
+	.runtime_suspend = pm_ptr(suspend_fn), \
+	.runtime_resume  = pm_ptr(resume_fn), \
+	.runtime_idle    = pm_ptr(idle_fn),
 
 /*
  * Use this if you want to use the same suspend and resume callbacks for suspend
@@ -373,12 +360,6 @@ const struct dev_pm_ops __maybe_unused name = { \
 	SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
 	SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
 }
-
-#ifdef CONFIG_PM
-#define pm_ptr(_ptr) (_ptr)
-#else
-#define pm_ptr(_ptr) NULL
-#endif
 
 /*
  * PM_EVENT_ messages
