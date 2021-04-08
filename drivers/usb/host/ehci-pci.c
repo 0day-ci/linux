@@ -47,6 +47,29 @@ static inline bool is_bypassed_id(struct pci_dev *pdev)
 	return !!pci_match_id(bypass_pci_id_table, pdev);
 }
 
+static const struct usb_nosbrn_whitelist_entry {
+	u16 vendor;
+	u16 device;
+} usb_nosbrn_whitelist[] = {
+	/* STMICRO ConneXT has no sbrn register */
+	{PCI_VENDOR_ID_STMICRO, PCI_DEVICE_ID_STMICRO_USB_HOST},
+	/* End of list */
+	{NULL, NULL}
+};
+
+static bool usb_forbid_sbrn_read(struct pci_dev *pdev)
+{
+	const struct usb_nosbrn_whitelist_entry *entry;
+
+	for (entry = usb_nosbrn_whitelist; entry->vendor; entry++) {
+		if (pdev->vendor == entry->vendor &&
+		    pdev->device == entry->device)
+			return true;
+	}
+
+	return false;
+}
+
 /*
  * 0x84 is the offset of in/out threshold register,
  * and it is the same offset as the register of 'hostpc'.
@@ -294,10 +317,7 @@ static int ehci_pci_setup(struct usb_hcd *hcd)
 	}
 
 	/* Serial Bus Release Number is at PCI 0x60 offset */
-	if (pdev->vendor == PCI_VENDOR_ID_STMICRO
-	    && pdev->device == PCI_DEVICE_ID_STMICRO_USB_HOST)
-		;	/* ConneXT has no sbrn register */
-	else
+	if (!usb_forbid_sbrn_read(pdev))
 		pci_read_config_byte(pdev, 0x60, &ehci->sbrn);
 
 	/* Keep this around for a while just in case some EHCI
