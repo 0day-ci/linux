@@ -1477,7 +1477,7 @@ err_module_put:
 	/* call the tty release_tty routine to clean out this slot */
 err_release_tty:
 	tty_ldisc_unlock(tty);
-	tty_info_ratelimited(tty, "ldisc open failed (%d), clearing slot %d\n",
+	dev_info_ratelimited(tty->dev, "ldisc open failed (%d), clearing slot %d\n",
 			     retval, idx);
 err_release_lock:
 	tty_unlock(tty);
