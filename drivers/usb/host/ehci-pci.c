@@ -53,6 +53,8 @@ static const struct usb_nosbrn_whitelist_entry {
 } usb_nosbrn_whitelist[] = {
 	/* STMICRO ConneXT has no sbrn register */
 	{PCI_VENDOR_ID_STMICRO, PCI_DEVICE_ID_STMICRO_USB_HOST},
+	/* HUAWEI Kunpeng920 HiSilicon USB EHCI has no sbrn register */
+	{PCI_VENDOR_ID_HUAWEI, 0xa239},
 	/* End of list */
 	{NULL, NULL}
 };
