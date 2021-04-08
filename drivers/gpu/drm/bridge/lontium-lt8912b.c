@@ -3,6 +3,7 @@
  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  */
 
+#include <linux/gpio/consumer.h>
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
