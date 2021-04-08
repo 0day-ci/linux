@@ -15,6 +15,12 @@ Optional properties:
 	When not specified the device will use in-band SDIO interrupts.
  - interrupt-names : name of the out-of-band interrupt, which must be set
 	to "host-wake".
+ - brcm,ccode-map : multiple strings for translating ISO3166 country code to
+	brcmfmac firmware country code and revision.  Each string must be in
+	format "AA-BB-num" where:
+	  AA is the ISO3166 country code which must be 2 characters.
+	  BB is the firmware country code which must be 2 characters.
+	  num is the revision number which must fit into signed integer.
 
 Example:
 
@@ -34,5 +40,6 @@ mmc3: mmc@1c12000 {
 		interrupt-parent = <&pio>;
 		interrupts = <10 8>; /* PH10 / EINT10 */
 		interrupt-names = "host-wake";
+		brcm,ccode-map = "JP-JP-78", "US-Q2-86";
 	};
 };
