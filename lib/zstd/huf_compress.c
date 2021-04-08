@@ -79,7 +79,8 @@ unsigned HUF_optimalTableLog(unsigned maxTableLog, size_t srcSize, unsigned maxS
  * Note : all elements within weightTable are supposed to be <= HUF_TABLELOG_MAX.
  */
 #define MAX_FSE_TABLELOG_FOR_HUFF_HEADER 6
-size_t HUF_compressWeights_wksp(void *dst, size_t dstSize, const void *weightTable, size_t wtSize, void *workspace, size_t workspaceSize)
+static size_t HUF_compressWeights_wksp(void *dst, size_t dstSize, const void *weightTable,
+				       size_t wtSize, void *workspace, size_t workspaceSize)
 {
 	BYTE *const ostart = (BYTE *)dst;
 	BYTE *op = ostart;
