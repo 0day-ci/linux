@@ -76,10 +76,19 @@ in /sys/kernel/tracing:
  - hwlat_detector/width - specified amount of time to spin within window (usecs)
  - hwlat_detector/window        - amount of time between (width) runs (usecs)
  - hwlat_detector/cpus  - the CPUs to move the hwlat thread across
+ - hwlat_detector/mode	- the thread mode
 
-The hwlat detector's kernel thread will migrate across each CPU specified in
-cpus list between each window. The hwlat detector will also obey the
-tracing_cpumask, so the thread will migrate on the set of cpus that is
-both on its cpus list and in the global tracing_cpumask file.
-To limit the migration, either modify cpumask, or modify the hwlat kernel
-thread (named [hwlatd]) CPU affinity directly, and the migration will stop.
+By default, the hwlat detector's kernel thread will migrate across each CPU
+specified in cpumask at the beginning of a new window, in a round-robin
+fashion. This behavior can be changed by changing the thread mode,
+the available options are:
+
+ - none:        do not force migration
+ - round-robin: migrate across each CPU specified in cpus between each window
+
+By default, hwlat detector will also obey the tracing_cpumask, so the thread
+will be placed only in the set of cpus that is both on the hwlat detector's
+cpus and in the global tracing_cpumask file. The user can overwrite the
+cpumask by setting it manually. Changing the hwlatd affinity externally,
+e.g., via taskset tool, will disable the round-robin migration.
+
