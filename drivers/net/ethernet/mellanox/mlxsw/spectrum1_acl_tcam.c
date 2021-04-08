@@ -75,7 +75,7 @@ mlxsw_sp1_acl_ctcam_region_catchall_add(struct mlxsw_sp *mlxsw_sp,
 	err = mlxsw_sp_acl_rulei_act_continue(rulei);
 	if (WARN_ON(err))
 		goto err_rulei_act_continue;
-	err = mlxsw_sp_acl_rulei_commit(rulei);
+	err = mlxsw_sp_acl_rulei_commit(rulei, NULL);
 	if (err)
 		goto err_rulei_commit;
 	err = mlxsw_sp_acl_ctcam_entry_add(mlxsw_sp, &region->cregion,

@@ -45,7 +45,8 @@ struct mlxsw_afa *mlxsw_afa_create(unsigned int max_acts_per_set,
 void mlxsw_afa_destroy(struct mlxsw_afa *mlxsw_afa);
 struct mlxsw_afa_block *mlxsw_afa_block_create(struct mlxsw_afa *mlxsw_afa);
 void mlxsw_afa_block_destroy(struct mlxsw_afa_block *block);
-int mlxsw_afa_block_commit(struct mlxsw_afa_block *block);
+int mlxsw_afa_block_commit(struct mlxsw_afa_block *block,
+			   struct netlink_ext_ack *extack);
 char *mlxsw_afa_block_first_set(struct mlxsw_afa_block *block);
 char *mlxsw_afa_block_cur_set(struct mlxsw_afa_block *block);
 u32 mlxsw_afa_block_first_kvdl_index(struct mlxsw_afa_block *block);

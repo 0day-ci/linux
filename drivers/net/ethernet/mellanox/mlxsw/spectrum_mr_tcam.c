@@ -241,7 +241,7 @@ mlxsw_sp_mr_tcam_afa_block_create(struct mlxsw_sp *mlxsw_sp,
 		goto err;
 	}
 
-	err = mlxsw_afa_block_commit(afa_block);
+	err = mlxsw_afa_block_commit(afa_block, NULL);
 	if (err)
 		goto err;
 	return afa_block;

@@ -611,7 +611,7 @@ int mlxsw_sp_flower_replace(struct mlxsw_sp *mlxsw_sp,
 	if (err)
 		goto err_flower_parse;
 
-	err = mlxsw_sp_acl_rulei_commit(rulei);
+	err = mlxsw_sp_acl_rulei_commit(rulei, f->common.extack);
 	if (err)
 		goto err_rulei_commit;
 

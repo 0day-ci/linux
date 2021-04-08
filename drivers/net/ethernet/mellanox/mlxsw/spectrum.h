@@ -905,7 +905,8 @@ struct mlxsw_sp_acl_rule_info *
 mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl,
 			  struct mlxsw_afa_block *afa_block);
 void mlxsw_sp_acl_rulei_destroy(struct mlxsw_sp_acl_rule_info *rulei);
-int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei);
+int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei,
+			      struct netlink_ext_ack *extack);
 void mlxsw_sp_acl_rulei_priority(struct mlxsw_sp_acl_rule_info *rulei,
 				 unsigned int priority);
 void mlxsw_sp_acl_rulei_keymask_u32(struct mlxsw_sp_acl_rule_info *rulei,

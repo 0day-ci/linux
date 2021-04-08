@@ -341,9 +341,10 @@ void mlxsw_sp_acl_rulei_destroy(struct mlxsw_sp_acl_rule_info *rulei)
 	kfree(rulei);
 }
 
-int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei)
+int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei,
+			      struct netlink_ext_ack *extack)
 {
-	return mlxsw_afa_block_commit(rulei->act_block);
+	return mlxsw_afa_block_commit(rulei->act_block, extack);
 }
 
 void mlxsw_sp_acl_rulei_priority(struct mlxsw_sp_acl_rule_info *rulei,

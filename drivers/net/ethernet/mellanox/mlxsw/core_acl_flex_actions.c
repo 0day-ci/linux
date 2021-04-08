@@ -264,7 +264,8 @@ static void mlxsw_afa_set_goto_set(struct mlxsw_afa_set *set,
 }
 
 static void mlxsw_afa_set_next_set(struct mlxsw_afa_set *set,
-				   u32 next_set_kvdl_index)
+				  u32 next_set_kvdl_index,
+				  struct netlink_ext_ack *extack)
 {
 	char *actions = set->ht_key.enc_actions;
 
@@ -455,7 +456,8 @@ void mlxsw_afa_block_destroy(struct mlxsw_afa_block *block)
 }
 EXPORT_SYMBOL(mlxsw_afa_block_destroy);
 
-int mlxsw_afa_block_commit(struct mlxsw_afa_block *block)
+int mlxsw_afa_block_commit(struct mlxsw_afa_block *block,
+			   struct netlink_ext_ack *extack)
 {
 	struct mlxsw_afa_set *set = block->cur_set;
 	struct mlxsw_afa_set *prev_set;
@@ -479,7 +481,8 @@ int mlxsw_afa_block_commit(struct mlxsw_afa_block *block)
 			return PTR_ERR(set);
 		if (prev_set) {
 			prev_set->next = set;
-			mlxsw_afa_set_next_set(prev_set, set->kvdl_index);
+			mlxsw_afa_set_next_set(prev_set, set->kvdl_index,
+					       extack);
 			set = prev_set;
 		}
 	} while (prev_set);
