@@ -2123,6 +2123,7 @@ int jbd2_journal_try_to_free_buffers(journal_t *journal, struct page *page)
 
 	J_ASSERT(PageLocked(page));
 
+	mutex_lock(&journal->j_checkpoint_mutex);
 	head = page_buffers(page);
 	bh = head;
 	do {
@@ -2163,6 +2164,7 @@ busy:
 	if (has_write_io_error)
 		jbd2_journal_abort(journal, -EIO);
 
+	mutex_unlock(&journal->j_checkpoint_mutex);
 	return ret;
 }
 
