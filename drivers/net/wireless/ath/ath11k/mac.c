@@ -4833,6 +4833,9 @@ static int ath11k_mac_op_add_interface(struct ieee80211_hw *hw,
 	}
 
 	ath11k_dp_vdev_tx_attach(ar, arvif);
+	ret = ath11k_debugfs_add_interface(arvif);
+	if (ret)
+		goto err_peer_del;
 
 	mutex_unlock(&ar->conf_mutex);
 
@@ -4868,6 +4871,7 @@ err_vdev_del:
 	spin_unlock_bh(&ar->data_lock);
 
 err:
+	ath11k_debugfs_remove_interface(arvif);
 	mutex_unlock(&ar->conf_mutex);
 
 	return ret;
@@ -4951,6 +4955,8 @@ err_vdev_del:
 	/* Recalc txpower for remaining vdev */
 	ath11k_mac_txpower_recalc(ar);
 	clear_bit(ATH11K_FLAG_MONITOR_ENABLED, &ar->monitor_flags);
+
+	ath11k_debugfs_remove_interface(arvif);
 
 	/* TODO: recal traffic pause state based on the available vdevs */
 
