@@ -909,10 +909,9 @@ void handle_strict_flow_irq(struct irq_desc *desc)
 	struct irq_chip *chip = desc->irq_data.chip;
 
 	raw_spin_lock(&desc->lock);
-	mask_ack_irq(desc);
 
 	if (!irq_may_run(desc))
-		goto out;
+		goto out_mask;
 
 	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
 
@@ -922,10 +921,21 @@ void handle_strict_flow_irq(struct irq_desc *desc)
 	 */
 	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
 		desc->istate |= IRQS_PENDING;
-		goto out;
+		goto out_mask;
 	}
 
 	kstat_incr_irqs_this_cpu(desc);
+	/*
+	 * Masking is required if IRQ is ONESHOT and we can't rely on the
+	 * flow-masking persisting down to irq_finalize_oneshot()
+	 * (in the IRQ thread).
+	 */
+	if ((desc->istate & IRQS_ONESHOT) &&
+	    (!(chip->flags & IRQCHIP_AUTOMASKS_FLOW) ||
+	     !(chip->flags & IRQCHIP_EOI_THREADED)))
+		mask_ack_irq(desc);
+	else
+		ack_irq(desc);
 
 	handle_irq_event(desc);
 
@@ -933,7 +943,8 @@ void handle_strict_flow_irq(struct irq_desc *desc)
 
 	raw_spin_unlock(&desc->lock);
 	return;
-out:
+out_mask:
+	mask_ack_irq(desc);
 	/*
 	 * XXX: this is where IRQCHIP_EOI_IF_HANDLED would be checked, but
 	 * it's conceptually incompatible with this handler (it breaks the
