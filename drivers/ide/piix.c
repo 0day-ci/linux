@@ -143,13 +143,11 @@ static void piix_set_dma_mode(ide_hwif_t *hwif, ide_drive_t *drive)
 	int v_flag		= 0x01 << drive->dn;
 	int w_flag		= 0x10 << drive->dn;
 	int u_speed		= 0;
-	int			sitre;
 	u16			reg4042, reg4a;
 	u8			reg48, reg54, reg55;
 	const u8 speed		= drive->dma_mode;
 
 	pci_read_config_word(dev, maslave, &reg4042);
-	sitre = (reg4042 & 0x4000) ? 1 : 0;
 	pci_read_config_byte(dev, 0x48, &reg48);
 	pci_read_config_word(dev, 0x4a, &reg4a);
 	pci_read_config_byte(dev, 0x54, &reg54);
