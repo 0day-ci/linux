@@ -405,6 +405,10 @@ be added to the following table:
      - ``control``
      - Traps packets logged during processing of flow action trap (e.g., via
        tc's trap action)
+   * - ``flow_action_trap_fwd``
+     - ``control``
+     - Traps packets logged during processing of flow action trap_fwd (e.g., via
+       tc's trap_fwd action)
    * - ``early_drop``
      - ``drop``
      - Traps packets dropped due to the RED (Random Early Detection) algorithm
