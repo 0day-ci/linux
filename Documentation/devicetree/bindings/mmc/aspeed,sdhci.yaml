@@ -37,6 +37,14 @@ properties:
   clocks:
     maxItems: 1
     description: The SD/SDIO controller clock gate
+  power-gpio:
+    description:
+      The GPIO for enabling/disabling SD bus power.
+    maxItems: 1
+  power-switch-gpio:
+    description:
+      The GPIO for toggling the signal voltage between 3.3v and 1.8v.
+    maxItems: 1
 
 patternProperties:
   "^sdhci@[0-9a-f]+$":
@@ -61,6 +69,14 @@ patternProperties:
       sdhci,auto-cmd12:
         type: boolean
         description: Specifies that controller should use auto CMD12
+      power-gpio:
+        description:
+          The GPIO for enabling/disabling SD bus power.
+        maxItems: 1
+      power-switch-gpio:
+        description:
+          The GPIO for toggling the signal voltage between 3.3v and 1.8v.
+        maxItems: 1
     required:
       - compatible
       - reg
@@ -80,6 +96,7 @@ required:
 examples:
   - |
     #include <dt-bindings/clock/aspeed-clock.h>
+    #include <dt-bindings/gpio/aspeed-gpio.h>
     sdc@1e740000 {
             compatible = "aspeed,ast2500-sd-controller";
             reg = <0x1e740000 0x100>;
@@ -94,6 +111,10 @@ examples:
                     interrupts = <26>;
                     sdhci,auto-cmd12;
                     clocks = <&syscon ASPEED_CLK_SDIO>;
+                    power-gpio = <&gpio0 ASPEED_GPIO(V, 0)
+                                     GPIO_ACTIVE_HIGH>;
+                    power-switch-gpio = <&gpio0 ASPEED_GPIO(V, 1)
+                                     GPIO_ACTIVE_HIGH>;
             };
 
             sdhci1: sdhci@200 {
@@ -102,5 +123,9 @@ examples:
                     interrupts = <26>;
                     sdhci,auto-cmd12;
                     clocks = <&syscon ASPEED_CLK_SDIO>;
+                    power-gpio = <&gpio0 ASPEED_GPIO(V, 2)
+                                     GPIO_ACTIVE_HIGH>;
+                    power-switch-gpio = <&gpio0 ASPEED_GPIO(V, 3)
+                                     GPIO_ACTIVE_HIGH>;
             };
     };
