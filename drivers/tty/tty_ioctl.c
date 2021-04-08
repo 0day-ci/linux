@@ -28,7 +28,7 @@
 #undef TTY_DEBUG_WAIT_UNTIL_SENT
 
 #ifdef TTY_DEBUG_WAIT_UNTIL_SENT
-# define tty_debug_wait_until_sent(tty, f, args...)    tty_debug(tty, f, ##args)
+# define tty_debug_wait_until_sent(tty, f, args...)    dev_dbg(tty->dev, f, ##args)
 #else
 # define tty_debug_wait_until_sent(tty, f, args...)    do {} while (0)
 #endif

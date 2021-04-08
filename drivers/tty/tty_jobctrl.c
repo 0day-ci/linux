@@ -109,8 +109,8 @@ static void __proc_set_tty(struct tty_struct *tty)
 	tty->session = get_pid(task_session(current));
 	spin_unlock_irqrestore(&tty->ctrl_lock, flags);
 	if (current->signal->tty) {
-		tty_debug(tty, "current tty %s not NULL!!\n",
-			  current->signal->tty->name);
+		dev_dbg(tty->dev, "current tty %s not NULL!!\n",
+			current->signal->tty->name);
 		tty_kref_put(current->signal->tty);
 	}
 	put_pid(current->signal->tty_old_pgrp);

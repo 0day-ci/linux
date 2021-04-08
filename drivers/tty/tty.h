@@ -6,9 +6,4 @@
 #ifndef _TTY_INTERNAL_H
 #define _TTY_INTERNAL_H
 
-#define tty_msg(fn, tty, f, ...) \
-	fn("%s %s: " f, tty_driver_name(tty), tty_name(tty), ##__VA_ARGS__)
-
-#define tty_debug(tty, f, ...)	tty_msg(pr_debug, tty, f, ##__VA_ARGS__)
-
 #endif

@@ -24,7 +24,7 @@
 #undef LDISC_DEBUG_HANGUP
 
 #ifdef LDISC_DEBUG_HANGUP
-#define tty_ldisc_debug(tty, f, args...)	tty_debug(tty, f, ##args)
+#define tty_ldisc_debug(tty, f, args...)	dev_dbg(tty->dev, f, ##args)
 #else
 #define tty_ldisc_debug(tty, f, args...)
 #endif
