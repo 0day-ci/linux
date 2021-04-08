@@ -491,7 +491,7 @@ sector_t swap_page_sector(struct page *page);
 
 static inline void put_swap_device(struct swap_info_struct *si)
 {
-	rcu_read_unlock();
+	percpu_ref_put(&si->users);
 }
 
 #else /* CONFIG_SWAP */
