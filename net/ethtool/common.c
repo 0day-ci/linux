@@ -484,6 +484,20 @@ convert_legacy_settings_to_link_ksettings(
 	return retval;
 }
 
+/* Internal kernel helper to query a device ethtool_link_settings. */
+int __ethtool_get_link_ksettings(struct net_device *dev,
+				 struct ethtool_link_ksettings *link_ksettings)
+{
+	ASSERT_RTNL();
+
+	if (!dev->ethtool_ops->get_link_ksettings)
+		return -EOPNOTSUPP;
+
+	memset(link_ksettings, 0, sizeof(*link_ksettings));
+	return dev->ethtool_ops->get_link_ksettings(dev, link_ksettings);
+}
+EXPORT_SYMBOL(__ethtool_get_link_ksettings);
+
 int __ethtool_get_link(struct net_device *dev)
 {
 	if (!dev->ethtool_ops->get_link)
