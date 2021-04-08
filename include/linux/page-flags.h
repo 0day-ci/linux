@@ -832,14 +832,27 @@ static inline void ClearPageSlabPfmemalloc(struct page *page)
 
 #define PAGE_FLAGS_PRIVATE				\
 	(1UL << PG_private | 1UL << PG_private_2)
+
 /**
- * page_has_private - Determine if page has private stuff
+ * page_private_count - Find out how many refs a page's private data contribute
+ * @page: The page to be checked
+ *
+ * Return the contribution to the pagecount of the private data attached to a
+ * page.
+ */
+static inline int page_private_count(struct page *page)
+{
+	return test_bit(PG_private, &page->flags) ? 1 : 0;
+}
+
+/**
+ * page_needs_cleanup - Determine if page has private stuff that needs cleaning
  * @page: The page to be checked
  *
  * Determine if a page has private stuff, indicating that release routines
  * should be invoked upon it.
  */
-static inline int page_has_private(struct page *page)
+static inline int page_needs_cleanup(struct page *page)
 {
 	return !!(page->flags & PAGE_FLAGS_PRIVATE);
 }
