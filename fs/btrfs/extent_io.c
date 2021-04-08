@@ -13,6 +13,7 @@
 #include <linux/pagevec.h>
 #include <linux/prefetch.h>
 #include <linux/cleancache.h>
+#include <linux/fsverity.h>
 #include "misc.h"
 #include "extent_io.h"
 #include "extent-io-tree.h"
@@ -2862,15 +2863,28 @@ static void begin_page_read(struct btrfs_fs_info *fs_info, struct page *page)
 	btrfs_subpage_start_reader(fs_info, page, page_offset(page), PAGE_SIZE);
 }
 
-static void end_page_read(struct page *page, bool uptodate, u64 start, u32 len)
+static int end_page_read(struct page *page, bool uptodate, u64 start, u32 len)
 {
-	struct btrfs_fs_info *fs_info = btrfs_sb(page->mapping->host->i_sb);
+	int ret = 0;
+	struct inode *inode = page->mapping->host;
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 
 	ASSERT(page_offset(page) <= start &&
 		start + len <= page_offset(page) + PAGE_SIZE);
 
 	if (uptodate) {
-		btrfs_page_set_uptodate(fs_info, page, start, len);
+		/*
+		 * buffered reads of a file with page alignment will issue a
+		 * 0 length read for one page past the end of file, so we must
+		 * explicitly skip checking verity on that page of zeros.
+		 */
+		if (!PageError(page) && !PageUptodate(page) &&
+		    start < i_size_read(inode) &&
+		    fsverity_active(inode) &&
+		    !fsverity_verify_page(page))
+			ret = -EIO;
+		else
+			btrfs_page_set_uptodate(fs_info, page, start, len);
 	} else {
 		btrfs_page_clear_uptodate(fs_info, page, start, len);
 		btrfs_page_set_error(fs_info, page, start, len);
@@ -2878,12 +2892,13 @@ static void end_page_read(struct page *page, bool uptodate, u64 start, u32 len)
 
 	if (fs_info->sectorsize == PAGE_SIZE)
 		unlock_page(page);
-	else if (is_data_inode(page->mapping->host))
+	else if (is_data_inode(inode))
 		/*
 		 * For subpage data, unlock the page if we're the last reader.
 		 * For subpage metadata, page lock is not utilized for read.
 		 */
 		btrfs_subpage_end_reader(fs_info, page, start, len);
+	return ret;
 }
 
 /*
@@ -3059,7 +3074,9 @@ readpage_ok:
 		bio_offset += len;
 
 		/* Update page status and unlock */
-		end_page_read(page, uptodate, start, len);
+		ret = end_page_read(page, uptodate, start, len);
+		if (ret)
+			uptodate = 0;
 		endio_readpage_release_extent(&processed, BTRFS_I(inode),
 					      start, end, uptodate);
 	}
