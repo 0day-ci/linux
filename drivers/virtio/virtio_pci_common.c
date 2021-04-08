@@ -24,6 +24,11 @@ MODULE_PARM_DESC(force_legacy,
 		 "Force legacy mode for transitional virtio 1 devices");
 #endif
 
+unsigned int reset_timeout = 180;
+module_param_named(reset_timeout, reset_timeout, uint, 0644);
+MODULE_PARM_DESC(reset_timeout,
+		 "timeout in seconds for reset virtio device operation");
+
 /* wait for pending irq handlers */
 void vp_synchronize_vectors(struct virtio_device *vdev)
 {

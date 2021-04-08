@@ -162,7 +162,8 @@ static int vp_reset(struct virtio_device *vdev)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
 	struct virtio_pci_modern_device *mdev = &vp_dev->mdev;
-	unsigned long timeout = jiffies + msecs_to_jiffies(180000);
+	unsigned long timeout = jiffies +
+		msecs_to_jiffies(reset_timeout * 1000);
 
 	/* 0 status means a reset. */
 	vp_modern_set_status(mdev, 0);

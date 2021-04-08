@@ -29,6 +29,8 @@
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 
+extern unsigned int reset_timeout;
+
 struct virtio_pci_vq_info {
 	/* the actual virtqueue */
 	struct virtqueue *vq;
