@@ -716,7 +716,7 @@ struct i915_ppgtt *gen8_ppgtt_create(struct intel_gt *gt)
 	 *
 	 * Gen12 has inherited the same read-only fault issue from gen11.
 	 */
-	ppgtt->vm.has_read_only = !IS_GEN_RANGE(gt->i915, 11, 12);
+	ppgtt->vm.has_read_only = !IS_GRAPHICS_RANGE(gt->i915, 11, 12);
 
 	ppgtt->vm.alloc_pt_dma = alloc_pt_dma;
 

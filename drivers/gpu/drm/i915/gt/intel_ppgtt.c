@@ -147,9 +147,9 @@ int i915_ppgtt_init_hw(struct intel_gt *gt)
 
 	gtt_write_workarounds(gt);
 
-	if (IS_GEN(i915, 6))
+	if (IS_GRAPHICS_VER(i915, 6))
 		gen6_ppgtt_enable(gt);
-	else if (IS_GEN(i915, 7))
+	else if (IS_GRAPHICS_VER(i915, 7))
 		gen7_ppgtt_enable(gt);
 
 	return 0;
@@ -158,7 +158,7 @@ int i915_ppgtt_init_hw(struct intel_gt *gt)
 static struct i915_ppgtt *
 __ppgtt_create(struct intel_gt *gt)
 {
-	if (INTEL_GEN(gt->i915) < 8)
+	if (GRAPHICS_VER(gt->i915) < 8)
 		return gen6_ppgtt_create(gt);
 	else
 		return gen8_ppgtt_create(gt);
