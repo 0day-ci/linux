@@ -83,11 +83,14 @@ void show_swap_cache_info(void)
 
 void *get_shadow_from_swap_cache(swp_entry_t entry)
 {
-	struct address_space *address_space = swap_address_space(entry);
-	pgoff_t idx = swp_offset(entry);
+	struct swap_info_struct *si;
 	struct page *page;
 
-	page = xa_load(&address_space->i_pages, idx);
+	si = get_swap_device(entry);
+	if (!si)
+		return NULL;
+	page = xa_load(&swap_address_space(entry)->i_pages, swp_offset(entry));
+	put_swap_device(si);
 	if (xa_is_value(page))
 		return page;
 	return NULL;
