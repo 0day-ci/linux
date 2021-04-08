@@ -1518,6 +1518,21 @@ static inline struct vmw_surface *vmw_surface_reference(struct vmw_surface *srf)
 	return srf;
 }
 
+/*
+ * vmw_bo_unpin_safe - currently pinning requires a reservation to be held
+ * but sometimes it's hard to tell if we're in a callback whose parent
+ * is already holding a reservation, to avoid deadloacks we have to try
+ * to get a reservation explicitly to also try to avoid messing up the
+ * internal ttm lru bo list
+ */
+static inline void vmw_bo_unpin_safe(struct ttm_buffer_object *bo)
+{
+	bool locked = dma_resv_trylock(bo->base.resv);
+	ttm_bo_unpin(bo);
+	if (locked)
+		dma_resv_unlock(bo->base.resv);
+}
+
 static inline void vmw_bo_unreference(struct vmw_buffer_object **buf)
 {
 	struct vmw_buffer_object *tmp_buf = *buf;
@@ -1525,7 +1540,7 @@ static inline void vmw_bo_unreference(struct vmw_buffer_object **buf)
 	*buf = NULL;
 	if (tmp_buf != NULL) {
 		if (tmp_buf->base.pin_count > 0)
-			ttm_bo_unpin(&tmp_buf->base);
+			vmw_bo_unpin_safe(&tmp_buf->base);
 		ttm_bo_put(&tmp_buf->base);
 	}
 }
