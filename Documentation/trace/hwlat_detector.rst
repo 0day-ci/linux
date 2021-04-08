@@ -73,11 +73,13 @@ in /sys/kernel/tracing:
 
  - tracing_threshold	- minimum latency value to be considered (usecs)
  - tracing_max_latency	- maximum hardware latency actually observed (usecs)
- - tracing_cpumask	- the CPUs to move the hwlat thread across
- - hwlat_detector/width	- specified amount of time to spin within window (usecs)
- - hwlat_detector/window	- amount of time between (width) runs (usecs)
+ - hwlat_detector/width - specified amount of time to spin within window (usecs)
+ - hwlat_detector/window        - amount of time between (width) runs (usecs)
+ - hwlat_detector/cpus  - the CPUs to move the hwlat thread across
 
 The hwlat detector's kernel thread will migrate across each CPU specified in
-tracing_cpumask between each window. To limit the migration, either modify
-tracing_cpumask, or modify the hwlat kernel thread (named [hwlatd]) CPU
-affinity directly, and the migration will stop.
+cpus list between each window. The hwlat detector will also obey the
+tracing_cpumask, so the thread will migrate on the set of cpus that is
+both on its cpus list and in the global tracing_cpumask file.
+To limit the migration, either modify cpumask, or modify the hwlat kernel
+thread (named [hwlatd]) CPU affinity directly, and the migration will stop.

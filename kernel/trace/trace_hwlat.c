@@ -59,6 +59,7 @@ static struct task_struct *hwlat_kthread;
 
 static struct dentry *hwlat_sample_width;	/* sample width us */
 static struct dentry *hwlat_sample_window;	/* sample window us */
+static struct dentry *hwlat_cpumask_dentry;	/* hwlat cpus allowed */
 
 /* Save the previous tracing_thresh value */
 static unsigned long save_tracing_thresh;
@@ -272,6 +273,7 @@ out:
 	return ret;
 }
 
+static struct cpumask hwlat_cpumask;
 static struct cpumask save_cpumask;
 static bool disable_migrate;
 
@@ -292,7 +294,14 @@ static void move_to_next_cpu(void)
 		goto disable;
 
 	get_online_cpus();
-	cpumask_and(current_mask, cpu_online_mask, tr->tracing_cpumask);
+	/*
+	 * Run only on CPUs in which trace and hwlat are allowed to run.
+	 */
+	cpumask_and(current_mask, tr->tracing_cpumask, &hwlat_cpumask);
+	/*
+	 * And the CPU is online.
+	 */
+	cpumask_and(current_mask, cpu_online_mask, current_mask);
 	next_cpu = cpumask_next(smp_processor_id(), current_mask);
 	put_online_cpus();
 
@@ -368,7 +377,14 @@ static int start_kthread(struct trace_array *tr)
 
 	/* Just pick the first CPU on first iteration */
 	get_online_cpus();
-	cpumask_and(current_mask, cpu_online_mask, tr->tracing_cpumask);
+	/*
+	 * Run only on CPUs in which trace and hwlat are allowed to run.
+	 */
+	cpumask_and(current_mask, tr->tracing_cpumask, &hwlat_cpumask);
+	/*
+	 * And the CPU is online.
+	 */
+	cpumask_and(current_mask, cpu_online_mask, current_mask);
 	put_online_cpus();
 	next_cpu = cpumask_first(current_mask);
 
@@ -400,6 +416,94 @@ static void stop_kthread(void)
 		return;
 	kthread_stop(hwlat_kthread);
 	hwlat_kthread = NULL;
+}
+
+/*
+ * hwlat_cpus_read - Read function for reading the "cpus" file
+ * @filp: The active open file structure
+ * @ubuf: The userspace provided buffer to read value into
+ * @cnt: The maximum number of bytes to read
+ * @ppos: The current "file" position
+ *
+ * Prints the "cpus" output into the user-provided buffer.
+ */
+static ssize_t
+hwlat_cpus_read(struct file *filp, char __user *ubuf, size_t count,
+		   loff_t *ppos)
+{
+	char *mask_str;
+	int len;
+
+	len = snprintf(NULL, 0, "%*pbl\n",
+		       cpumask_pr_args(&hwlat_cpumask)) + 1;
+	mask_str = kmalloc(len, GFP_KERNEL);
+	if (!mask_str)
+		return -ENOMEM;
+
+	len = snprintf(mask_str, len, "%*pbl\n",
+		       cpumask_pr_args(&hwlat_cpumask));
+	if (len >= count) {
+		count = -EINVAL;
+		goto out_err;
+	}
+	count = simple_read_from_buffer(ubuf, count, ppos, mask_str, len);
+
+out_err:
+	kfree(mask_str);
+
+	return count;
+}
+
+/**
+ * hwlat_cpus_write - Write function for "cpus" entry
+ * @filp: The active open file structure
+ * @ubuf: The user buffer that contains the value to write
+ * @cnt: The maximum number of bytes to write to "file"
+ * @ppos: The current position in @file
+ *
+ * This function provides a write implementation for the "cpus"
+ * interface to the hardware latency detector. By default, it lists all
+ * CPUs, in this way, allowing hwlatd threads to run on any online CPU
+ * of the system. It serves to restrict the execution of hwlatd to the
+ * set of CPUs writing via this interface. Note that hwlatd also
+ * respects the "tracing_cpumask." Hence, hwlatd threads will run only
+ * on the set of CPUs allowed here AND on "tracing_cpumask." Why not
+ * have just "tracing_cpumask?" Because the user might be interested
+ * in tracing what is running on other CPUs. For instance, one might
+ * run hwlatd in one HT CPU while observing what is running on the
+ * sibling HT CPU.
+ */
+static ssize_t
+hwlat_cpus_write(struct file *filp, const char __user *ubuf, size_t count,
+		    loff_t *ppos)
+{
+	cpumask_var_t hwlat_cpumask_new;
+	char buf[256];
+	int err;
+
+	if (count >= 256)
+		return -EINVAL;
+
+	if (copy_from_user(buf, ubuf, count))
+		return -EFAULT;
+
+	if (!zalloc_cpumask_var(&hwlat_cpumask_new, GFP_KERNEL))
+		return -ENOMEM;
+
+	err = cpulist_parse(buf, hwlat_cpumask_new);
+	if (err)
+		goto err_free;
+
+	cpumask_copy(&hwlat_cpumask, hwlat_cpumask_new);
+
+	free_cpumask_var(hwlat_cpumask_new);
+
+	return count;
+
+err_free:
+	free_cpumask_var(hwlat_cpumask_new);
+
+	return err;
 }
 
 /*
@@ -523,6 +627,14 @@ static const struct file_operations window_fops = {
 	.write		= hwlat_window_write,
 };
 
+static const struct file_operations cpus_fops = {
+	.open		= tracing_open_generic,
+	.read		= hwlat_cpus_read,
+	.write		= hwlat_cpus_write,
+	.llseek		= generic_file_llseek,
+};
+
+
 /**
  * init_tracefs - A function to initialize the tracefs interface files
  *
@@ -556,6 +668,13 @@ static int init_tracefs(void)
 						 &hwlat_data.sample_width,
 						 &width_fops);
 	if (!hwlat_sample_width)
+		goto err;
+
+	hwlat_cpumask_dentry = trace_create_file("cpus", 0644,
+						 top_dir,
+						 NULL,
+						 &cpus_fops);
+	if (!hwlat_cpumask_dentry)
 		goto err;
 
 	return 0;
@@ -636,6 +755,8 @@ __init static int init_hwlat_tracer(void)
 	ret = register_tracer(&hwlat_tracer);
 	if (ret)
 		return ret;
+
+	cpumask_copy(&hwlat_cpumask, cpu_all_mask);
 
 	init_tracefs();
 
