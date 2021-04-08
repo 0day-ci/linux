@@ -152,6 +152,10 @@ static const char * const eth_src[] = {
 	"pll4_p", "pll3_q"
 };
 
+const struct clk_parent_data ethrx_src[] = {
+	{ .name = "ethck_k", .fw_name = "ETH_RX_CLK/ETH_REF_CLK" },
+};
+
 static const char * const rng_src[] = {
 	"ck_csi", "pll4_r", "ck_lse", "ck_lsi"
 };
@@ -314,6 +318,7 @@ struct clock_config {
 	const char *name;
 	const char *parent_name;
 	const char * const *parent_names;
+	const struct clk_parent_data *parent_data;
 	int num_parents;
 	unsigned long flags;
 	void *cfg;
@@ -567,6 +572,7 @@ static struct clk_hw *
 clk_stm32_register_gate_ops(struct device_node *np,
 			    const char *name,
 			    const char *parent_name,
+			    const struct clk_parent_data *parent_data,
 			    unsigned long flags,
 			    void __iomem *base,
 			    const struct stm32_gate_cfg *cfg,
@@ -577,7 +583,10 @@ clk_stm32_register_gate_ops(struct device_node *np,
 	int ret;
 
 	init.name = name;
-	init.parent_names = &parent_name;
+	if (parent_name)
+		init.parent_names = &parent_name;
+	if (parent_data)
+		init.parent_data = parent_data;
 	init.num_parents = 1;
 	init.flags = flags;
 
@@ -602,6 +611,7 @@ clk_stm32_register_gate_ops(struct device_node *np,
 static struct clk_hw *
 clk_stm32_register_composite(struct device_node *np,
 			     const char *name, const char * const *parent_names,
+			     const struct clk_parent_data *parent_data,
 			     int num_parents, void __iomem *base,
 			     const struct stm32_composite_cfg *cfg,
 			     unsigned long flags, spinlock_t *lock)
@@ -1066,6 +1076,7 @@ _clk_stm32_register_gate(struct device_node *np,
 	return clk_stm32_register_gate_ops(np,
 				    cfg->name,
 				    cfg->parent_name,
+				    cfg->parent_data,
 				    cfg->flags,
 				    base,
 				    cfg->cfg,
@@ -1079,8 +1090,8 @@ _clk_stm32_register_composite(struct device_node *np,
 			      const struct clock_config *cfg)
 {
 	return clk_stm32_register_composite(np, cfg->name, cfg->parent_names,
-					    cfg->num_parents, base, cfg->cfg,
-					    cfg->flags, lock);
+					    cfg->parent_data, cfg->num_parents,
+					    base, cfg->cfg, cfg->flags, lock);
 }
 
 #define GATE(_id, _name, _parent, _flags, _offset, _bit_idx, _gate_flags)\
@@ -1187,6 +1198,16 @@ _clk_stm32_register_composite(struct device_node *np,
 	.func		= _clk_stm32_register_gate,\
 }
 
+#define STM32_GATE_PDATA(_id, _name, _parent, _flags, _gate)\
+{\
+	.id		= _id,\
+	.name		= _name,\
+	.parent_data	= _parent,\
+	.flags		= _flags,\
+	.cfg		= (struct stm32_gate_cfg *) {_gate},\
+	.func		= _clk_stm32_register_gate,\
+}
+
 #define _STM32_GATE(_gate_offset, _gate_bit_idx, _gate_flags, _mgate, _ops)\
 	(&(struct stm32_gate_cfg) {\
 		&(struct gate_cfg) {\
@@ -1218,6 +1239,10 @@ _clk_stm32_register_composite(struct device_node *np,
 
 #define MGATE_MP1(_id, _name, _parent, _flags, _mgate)\
 	STM32_GATE(_id, _name, _parent, _flags,\
+		   _STM32_MGATE(_mgate))
+
+#define MGATE_MP1_PDATA(_id, _name, _parent, _flags, _mgate)\
+	STM32_GATE_PDATA(_id, _name, _parent, _flags,\
 		   _STM32_MGATE(_mgate))
 
 #define _STM32_DIV(_div_offset, _div_shift, _div_width,\
@@ -1278,6 +1303,9 @@ _clk_stm32_register_composite(struct device_node *np,
 
 #define PCLK(_id, _name, _parent, _flags, _mgate)\
 	MGATE_MP1(_id, _name, _parent, _flags, _mgate)
+
+#define PCLK_PDATA(_id, _name, _parent, _flags, _mgate)\
+	MGATE_MP1_PDATA(_id, _name, _parent, _flags, _mgate)
 
 #define KCLK(_id, _name, _parents, _flags, _mgate, _mmux)\
 	     COMPOSITE(_id, _name, _parents, CLK_OPS_PARENT_ENABLE |\
@@ -1886,7 +1914,7 @@ static const struct clock_config stm32mp1_clock_cfg[] = {
 	PCLK(MDMA, "mdma", "ck_axi", 0, G_MDMA),
 	PCLK(GPU, "gpu", "ck_axi", 0, G_GPU),
 	PCLK(ETHTX, "ethtx", "ck_axi", 0, G_ETHTX),
-	PCLK(ETHRX, "ethrx", "ck_axi", 0, G_ETHRX),
+	PCLK_PDATA(ETHRX, "ethrx", ethrx_src, 0, G_ETHRX),
 	PCLK(ETHMAC, "ethmac", "ck_axi", 0, G_ETHMAC),
 	PCLK(FMC, "fmc", "ck_axi", CLK_IGNORE_UNUSED, G_FMC),
 	PCLK(QSPI, "qspi", "ck_axi", CLK_IGNORE_UNUSED, G_QSPI),
