@@ -85,10 +85,12 @@ the available options are:
 
  - none:        do not force migration
  - round-robin: migrate across each CPU specified in cpus between each window
+ - per-cpu:     create a per-cpu thread for each cpu in cpus
 
 By default, hwlat detector will also obey the tracing_cpumask, so the thread
 will be placed only in the set of cpus that is both on the hwlat detector's
 cpus and in the global tracing_cpumask file. The user can overwrite the
 cpumask by setting it manually. Changing the hwlatd affinity externally,
-e.g., via taskset tool, will disable the round-robin migration.
-
+e.g., via taskset tool, will disable the round-robin migration. In the
+per-cpu mode, the per-cpu thread (hwlatd/CPU) will be pinned to its relative
+cpu, and its affinity cannot be changed.
