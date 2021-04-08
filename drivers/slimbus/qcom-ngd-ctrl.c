@@ -1268,6 +1268,7 @@ static int qcom_slim_ngd_enable(struct qcom_slim_ngd_ctrl *ctrl, bool enable)
 		ret = slim_register_controller(&ctrl->ctrl);
 		if (ret) {
 			dev_err(ctrl->dev, "error adding slim controller\n");
+			pm_runtime_get_noresume(ctrl->dev);
 			return ret;
 		}
 
