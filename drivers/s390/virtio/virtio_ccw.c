@@ -732,14 +732,15 @@ out:
 	return ret;
 }
 
-static void virtio_ccw_reset(struct virtio_device *vdev)
+static int virtio_ccw_reset(struct virtio_device *vdev)
 {
 	struct virtio_ccw_device *vcdev = to_vc_device(vdev);
 	struct ccw1 *ccw;
+	int ret;
 
 	ccw = ccw_device_dma_zalloc(vcdev->cdev, sizeof(*ccw));
 	if (!ccw)
-		return;
+		return -ENOMEM;
 
 	/* Zero status bits. */
 	vcdev->dma_area->status = 0;
@@ -749,8 +750,10 @@ static void virtio_ccw_reset(struct virtio_device *vdev)
 	ccw->flags = 0;
 	ccw->count = 0;
 	ccw->cda = 0;
-	ccw_io_helper(vcdev, ccw, VIRTIO_CCW_DOING_RESET);
+	ret = ccw_io_helper(vcdev, ccw, VIRTIO_CCW_DOING_RESET);
 	ccw_device_dma_free(vcdev->cdev, ccw, sizeof(*ccw));
+
+	return ret;
 }
 
 static u64 virtio_ccw_get_features(struct virtio_device *vdev)
