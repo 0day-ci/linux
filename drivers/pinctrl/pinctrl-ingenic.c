@@ -2498,43 +2498,43 @@ static int __init ingenic_pinctrl_probe(struct platform_device *pdev)
 static const struct of_device_id ingenic_pinctrl_of_match[] = {
 	{
 		.compatible = "ingenic,jz4740-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4740, &jz4740_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4740), &jz4740_chip_info)
 	},
 	{
 		.compatible = "ingenic,jz4725b-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4725B, &jz4725b_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4725B), &jz4725b_chip_info)
 	},
 	{
 		.compatible = "ingenic,jz4760-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4760, &jz4760_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4760), &jz4760_chip_info)
 	},
 	{
 		.compatible = "ingenic,jz4760b-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4760, &jz4760_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4760), &jz4760_chip_info)
 	},
 	{
 		.compatible = "ingenic,jz4770-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4770, &jz4770_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4770), &jz4770_chip_info)
 	},
 	{
 		.compatible = "ingenic,jz4780-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_JZ4780, &jz4780_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_JZ4780), &jz4780_chip_info)
 	},
 	{
 		.compatible = "ingenic,x1000-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_X1000, &x1000_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_X1000), &x1000_chip_info)
 	},
 	{
 		.compatible = "ingenic,x1000e-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_X1000, &x1000_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_X1000), &x1000_chip_info)
 	},
 	{
 		.compatible = "ingenic,x1500-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_X1500, &x1500_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_X1500), &x1500_chip_info)
 	},
 	{
 		.compatible = "ingenic,x1830-pinctrl",
-		.data = IF_ENABLED(CONFIG_MACH_X1830, &x1830_chip_info)
+		.data = PTR_IF(IS_ENABLED(CONFIG_MACH_X1830), &x1830_chip_info)
 	},
 	{ /* sentinel */ },
 };
