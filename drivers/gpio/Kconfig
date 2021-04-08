@@ -520,6 +520,15 @@ config GPIO_REG
 	  A 32-bit single register GPIO fixed in/out implementation.  This
 	  can be used to represent any register as a set of GPIO signals.
 
+config GPIO_RTL8231
+	tristate "Realtek RTL8231 GPIO expander"
+	select REGMAP_I2C
+	select REGMAP_MIIM
+	select OF_MDIO
+	help
+	  RTL8231 GPIO and LED expander support.
+	  When built as a module, the module will be called rtl8231_expander.
+
 config GPIO_SAMA5D2_PIOBU
 	tristate "SAMA5D2 PIOBU GPIO support"
 	depends on MFD_SYSCON
