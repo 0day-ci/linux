@@ -49,6 +49,11 @@ static inline bool is_tcf_gact_trap(const struct tc_action *a)
 	return __is_tcf_gact_act(a, TC_ACT_TRAP, false);
 }
 
+static inline bool is_tcf_gact_trap_fwd(const struct tc_action *a)
+{
+	return __is_tcf_gact_act(a, TC_ACT_TRAP_FWD, false);
+}
+
 static inline bool is_tcf_gact_goto_chain(const struct tc_action *a)
 {
 	return __is_tcf_gact_act(a, TC_ACT_GOTO_CHAIN, true);
