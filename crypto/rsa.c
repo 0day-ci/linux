@@ -258,17 +258,31 @@ static int rsa_init(void)
 		return err;
 
 	err = crypto_register_template(&rsa_pkcs1pad_tmpl);
-	if (err) {
-		crypto_unregister_akcipher(&rsa);
-		return err;
-	}
+	if (err)
+		goto out_err;
 
-	return 0;
+#ifdef CONFIG_CRYPTO_RSASSA_PSS
+	err = crypto_register_template(&rsa_psspad_tmpl);
+	if (err) {
+		crypto_unregister_template(&rsa_pkcs1pad_tmpl);
+		goto out_err;
+	}
+#endif
+
+	goto out;
+
+out_err:
+	crypto_unregister_akcipher(&rsa);
+out:
+	return err;
 }
 
 static void rsa_exit(void)
 {
 	crypto_unregister_template(&rsa_pkcs1pad_tmpl);
+#ifdef CONFIG_CRYPTO_RSASSA_PSS
+	crypto_unregister_template(&rsa_psspad_tmpl);
+#endif
 	crypto_unregister_akcipher(&rsa);
 }
 
