@@ -631,11 +631,16 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 	unsigned long offset = entry_offset;
 	unsigned long start_offset, end_offset;
 	unsigned long mask;
-	struct swap_info_struct *si = swp_swap_info(entry);
+	struct swap_info_struct *si;
 	struct blk_plug plug;
 	bool do_poll = true, page_allocated;
 	struct vm_area_struct *vma = vmf->vma;
 	unsigned long addr = vmf->address;
+
+	si = get_swap_device(entry);
+	/* In case we raced with swapoff. */
+	if (!si)
+		return NULL;
 
 	mask = swapin_nr_pages(offset) - 1;
 	if (!mask)
@@ -678,7 +683,9 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 
 	lru_add_drain();	/* Push any new pages onto the LRU now */
 skip:
-	return read_swap_cache_async(entry, gfp_mask, vma, addr, do_poll);
+	page = read_swap_cache_async(entry, gfp_mask, vma, addr, do_poll);
+	put_swap_device(si);
+	return page;
 }
 
 int init_swap_address_space(unsigned int type, unsigned long nr_pages)
