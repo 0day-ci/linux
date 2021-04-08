@@ -232,6 +232,12 @@ const struct of_device_id dwc2_of_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
 
+const struct acpi_device_id dwc2_acpi_match[] = {
+	{ "BCM2848", dwc2_set_bcm_params },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, dwc2_acpi_match);
+
 static void dwc2_set_param_otg_cap(struct dwc2_hsotg *hsotg)
 {
 	u8 val;
@@ -878,6 +884,14 @@ int dwc2_init_params(struct dwc2_hsotg *hsotg)
 	if (match && match->data) {
 		set_params = match->data;
 		set_params(hsotg);
+	} else {
+		struct acpi_device_id *amatch;
+
+		amatch = acpi_match_device(dwc2_acpi_match, hsotg->dev);
+		if (amatch && amatch->driver_data) {
+			set_params = amatch->driver_data;
+			set_params(hsotg);
+		}
 	}
 
 	dwc2_check_params(hsotg);
