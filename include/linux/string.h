@@ -184,6 +184,7 @@ extern char **argv_split(gfp_t gfp, const char *str, int *argcp);
 extern void argv_free(char **argv);
 
 extern bool sysfs_streq(const char *s1, const char *s2);
+extern bool sysfs_streqcase(const char *s1, const char *s2);
 extern int kstrtobool(const char *s, bool *res);
 static inline int strtobool(const char *s, bool *res)
 {

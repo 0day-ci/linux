@@ -687,6 +687,17 @@ char *strsep(char **s, const char *ct)
 EXPORT_SYMBOL(strsep);
 #endif
 
+static inline bool __streq_terminal(const char *s1, const char *s2)
+{
+	if (*s1 == *s2)
+		return true;
+	if (!*s1 && *s2 == '\n' && !s2[1])
+		return true;
+	if (*s1 == '\n' && !s1[1] && !*s2)
+		return true;
+	return false;
+}
+
 /**
  * sysfs_streq - return true if strings are equal, modulo trailing newline
  * @s1: one string
@@ -703,16 +714,25 @@ bool sysfs_streq(const char *s1, const char *s2)
 		s1++;
 		s2++;
 	}
-
-	if (*s1 == *s2)
-		return true;
-	if (!*s1 && *s2 == '\n' && !s2[1])
-		return true;
-	if (*s1 == '\n' && !s1[1] && !*s2)
-		return true;
-	return false;
+	return __streq_terminal(s1, s2);
 }
 EXPORT_SYMBOL(sysfs_streq);
+
+/**
+ * sysfs_streqcase - same to sysfs_streq and case insensitive
+ * @s1: one string
+ * @s2: another string
+ *
+ */
+bool sysfs_streqcase(const char *s1, const char *s2)
+{
+	while (*s1 && tolower(*s1) == tolower(*s2)) {
+		s1++;
+		s2++;
+	}
+	return __streq_terminal(s1, s2);
+}
+EXPORT_SYMBOL(sysfs_streqcase);
 
 /**
  * match_string - matches given string in an array
