@@ -295,7 +295,7 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
 	if (tty_port_kopened(tty->port))
 		kopen_count++;
 	if (tty->count != (count + kopen_count)) {
-		tty_warn(tty, "%s: tty->count(%d) != (#fd's(%d) + #kopen's(%d))\n",
+		dev_warn(tty->dev, "%s: tty->count(%d) != (#fd's(%d) + #kopen's(%d))\n",
 			 routine, tty->count, count, kopen_count);
 		return (count + kopen_count);
 	}
@@ -1823,7 +1823,7 @@ int tty_release(struct inode *inode, struct file *filp)
 
 		if (once) {
 			once = 0;
-			tty_warn(tty, "read/write wait queue active!\n");
+			dev_warn(tty->dev, "read/write wait queue active!\n");
 		}
 		schedule_timeout_killable(timeout);
 		if (timeout < 120 * HZ)
@@ -1834,12 +1834,12 @@ int tty_release(struct inode *inode, struct file *filp)
 
 	if (o_tty) {
 		if (--o_tty->count < 0) {
-			tty_warn(tty, "bad slave count (%d)\n", o_tty->count);
+			dev_warn(tty->dev, "bad slave count (%d)\n", o_tty->count);
 			o_tty->count = 0;
 		}
 	}
 	if (--tty->count < 0) {
-		tty_warn(tty, "bad tty->count (%d)\n", tty->count);
+		dev_warn(tty->dev, "bad tty->count (%d)\n", tty->count);
 		tty->count = 0;
 	}
 

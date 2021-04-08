@@ -567,12 +567,12 @@ int tty_port_close_start(struct tty_port *port,
 
 	spin_lock_irqsave(&port->lock, flags);
 	if (tty->count == 1 && port->count != 1) {
-		tty_warn(tty, "%s: tty->count = 1 port count = %d\n", __func__,
+		dev_warn(tty->dev, "%s: tty->count = 1 port count = %d\n", __func__,
 			 port->count);
 		port->count = 1;
 	}
 	if (--port->count < 0) {
-		tty_warn(tty, "%s: bad port count (%d)\n", __func__,
+		dev_warn(tty->dev, "%s: bad port count (%d)\n", __func__,
 			 port->count);
 		port->count = 0;
 	}

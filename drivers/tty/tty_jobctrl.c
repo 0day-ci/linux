@@ -61,7 +61,7 @@ int __tty_check_change(struct tty_struct *tty, int sig)
 	rcu_read_unlock();
 
 	if (!tty_pgrp)
-		tty_warn(tty, "sig=%d, tty->pgrp == NULL!\n", sig);
+		dev_warn(tty->dev, "sig=%d, tty->pgrp == NULL!\n", sig);
 
 	return ret;
 }
