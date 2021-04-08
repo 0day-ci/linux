@@ -688,6 +688,62 @@ old_is_alloced:
 	spin_unlock_irqrestore(&stor_device->lock, flags);
 }
 
+u64 storvsc_next_request_id(struct vmbus_channel *channel, u64 rqst_addr)
+{
+	struct storvsc_cmd_request *request =
+		(struct storvsc_cmd_request *)(unsigned long)rqst_addr;
+	struct storvsc_device *stor_device;
+	struct hv_device *device;
+
+	device = (channel->primary_channel != NULL) ?
+		channel->primary_channel->device_obj : channel->device_obj;
+	if (device == NULL)
+		return VMBUS_RQST_ERROR;
+
+	stor_device = get_out_stor_device(device);
+	if (stor_device == NULL)
+		return VMBUS_RQST_ERROR;
+
+	if (request == &stor_device->init_request)
+		return VMBUS_RQST_INIT;
+	if (request == &stor_device->reset_request)
+		return VMBUS_RQST_RESET;
+
+	return blk_mq_unique_tag(request->cmd->request);
+}
+
+u64 storvsc_request_addr(struct vmbus_channel *channel, u64 rqst_id)
+{
+	struct storvsc_cmd_request *request;
+	struct storvsc_device *stor_device;
+	struct hv_device *device;
+	struct Scsi_Host *shost;
+	struct scsi_cmnd *scmnd;
+
+	device = (channel->primary_channel != NULL) ?
+		channel->primary_channel->device_obj : channel->device_obj;
+	if (device == NULL)
+		return VMBUS_RQST_ERROR;
+
+	stor_device = get_out_stor_device(device);
+	if (stor_device == NULL)
+		return VMBUS_RQST_ERROR;
+
+	if (rqst_id == VMBUS_RQST_INIT)
+		return (unsigned long)&stor_device->init_request;
+	if (rqst_id == VMBUS_RQST_RESET)
+		return (unsigned long)&stor_device->reset_request;
+
+	shost = stor_device->host;
+
+	scmnd = scsi_host_find_tag(shost, rqst_id);
+	if (scmnd == NULL)
+		return VMBUS_RQST_ERROR;
+
+	request = (struct storvsc_cmd_request *)(unsigned long)scsi_cmd_priv(scmnd);
+	return (unsigned long)request;
+}
+
 static void handle_sc_creation(struct vmbus_channel *new_sc)
 {
 	struct hv_device *device = new_sc->primary_channel->device_obj;
@@ -702,11 +758,8 @@ static void handle_sc_creation(struct vmbus_channel *new_sc)
 
 	memset(&props, 0, sizeof(struct vmstorage_channel_properties));
 
-	/*
-	 * The size of vmbus_requestor is an upper bound on the number of requests
-	 * that can be in-progress at any one time across all channels.
-	 */
-	new_sc->rqstor_size = scsi_driver.can_queue;
+	new_sc->next_request_id_callback = storvsc_next_request_id;
+	new_sc->request_addr_callback = storvsc_request_addr;
 
 	ret = vmbus_open(new_sc,
 			 storvsc_ringbuffer_size,
@@ -1259,8 +1312,7 @@ static void storvsc_on_channel_callback(void *context)
 		struct storvsc_cmd_request *request;
 		u64 cmd_rqst;
 
-		cmd_rqst = vmbus_request_addr(&channel->requestor,
-					      desc->trans_id);
+		cmd_rqst = channel->request_addr_callback(channel, desc->trans_id);
 		if (cmd_rqst == VMBUS_RQST_ERROR) {
 			dev_err(&device->device,
 				"Incorrect transaction id\n");
@@ -1294,11 +1346,8 @@ static int storvsc_connect_to_vsp(struct hv_device *device, u32 ring_size,
 
 	memset(&props, 0, sizeof(struct vmstorage_channel_properties));
 
-	/*
-	 * The size of vmbus_requestor is an upper bound on the number of requests
-	 * that can be in-progress at any one time across all channels.
-	 */
-	device->channel->rqstor_size = scsi_driver.can_queue;
+	device->channel->next_request_id_callback = storvsc_next_request_id;
+	device->channel->request_addr_callback = storvsc_request_addr;
 
 	ret = vmbus_open(device->channel,
 			 ring_size,
