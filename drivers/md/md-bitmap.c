@@ -1722,6 +1722,7 @@ void md_bitmap_flush(struct mddev *mddev)
 	md_bitmap_daemon_work(mddev);
 	bitmap->daemon_lastrun -= sleep;
 	md_bitmap_daemon_work(mddev);
+	md_bitmap_wait_writes(mddev->bitmap);
 	md_bitmap_update_sb(bitmap);
 }
 
