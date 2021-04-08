@@ -453,6 +453,11 @@ typedef int flow_setup_cb_t(enum tc_setup_type type, void *type_data,
 
 struct flow_block_cb;
 
+typedef int flow_indr_block_bind_cb_t(struct net_device *dev, struct Qdisc *sch, void *cb_priv,
+				      enum tc_setup_type type, void *type_data,
+				      void *data,
+				      void (*cleanup)(struct flow_block_cb *block_cb));
+
 struct flow_block_indr {
 	struct list_head		list;
 	struct net_device		*dev;
@@ -460,6 +465,7 @@ struct flow_block_indr {
 	enum flow_block_binder_type	binder_type;
 	void				*data;
 	void				*cb_priv;
+	flow_indr_block_bind_cb_t	*setup_cb;
 	void				(*cleanup)(struct flow_block_cb *block_cb);
 };
 
@@ -555,11 +561,6 @@ static inline void flow_block_init(struct flow_block *flow_block)
 {
 	INIT_LIST_HEAD(&flow_block->cb_list);
 }
-
-typedef int flow_indr_block_bind_cb_t(struct net_device *dev, struct Qdisc *sch, void *cb_priv,
-				      enum tc_setup_type type, void *type_data,
-				      void *data,
-				      void (*cleanup)(struct flow_block_cb *block_cb));
 
 int flow_indr_dev_register(flow_indr_block_bind_cb_t *cb, void *cb_priv);
 void flow_indr_dev_unregister(flow_indr_block_bind_cb_t *cb, void *cb_priv,

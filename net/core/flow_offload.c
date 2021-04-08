@@ -373,7 +373,8 @@ int flow_indr_dev_register(flow_indr_block_bind_cb_t *cb, void *cb_priv)
 }
 EXPORT_SYMBOL(flow_indr_dev_register);
 
-static void __flow_block_indr_cleanup(void (*release)(void *cb_priv),
+static void __flow_block_indr_cleanup(struct flow_indr_dev *indr_dev,
+				      void (*release)(void *cb_priv),
 				      void *cb_priv,
 				      struct list_head *cleanup_list)
 {
@@ -381,8 +382,10 @@ static void __flow_block_indr_cleanup(void (*release)(void *cb_priv),
 
 	list_for_each_entry_safe(this, next, &flow_block_indr_list, indr.list) {
 		if (this->release == release &&
-		    this->indr.cb_priv == cb_priv)
+		    this->indr.cb_priv == cb_priv) {
+			this->indr.setup_cb = indr_dev->cb;
 			list_move(&this->indr.list, cleanup_list);
+		}
 	}
 }
 
@@ -390,10 +393,8 @@ static void flow_block_indr_notify(struct list_head *cleanup_list)
 {
 	struct flow_block_cb *this, *next;
 
-	list_for_each_entry_safe(this, next, cleanup_list, indr.list) {
-		list_del(&this->indr.list);
+	list_for_each_entry_safe(this, next, cleanup_list, indr.list)
 		this->indr.cleanup(this);
-	}
 }
 
 void flow_indr_dev_unregister(flow_indr_block_bind_cb_t *cb, void *cb_priv,
@@ -418,7 +419,7 @@ void flow_indr_dev_unregister(flow_indr_block_bind_cb_t *cb, void *cb_priv,
 		return;
 	}
 
-	__flow_block_indr_cleanup(release, cb_priv, &cleanup_list);
+	__flow_block_indr_cleanup(this, release, cb_priv, &cleanup_list);
 	mutex_unlock(&flow_indr_block_lock);
 
 	flow_block_indr_notify(&cleanup_list);
