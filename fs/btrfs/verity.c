@@ -378,6 +378,69 @@ out:
 	return ret;
 }
 
+static int add_orphan(struct btrfs_inode *inode)
+{
+	struct btrfs_trans_handle *trans;
+	struct btrfs_root *root = inode->root;
+	int ret = 0;
+
+	trans = btrfs_start_transaction(root, 1);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+	ret = btrfs_orphan_add(trans, inode);
+	if (ret) {
+		btrfs_abort_transaction(trans, ret);
+		goto out;
+	}
+	btrfs_end_transaction(trans);
+
+out:
+	return ret;
+}
+
+static int del_orphan(struct btrfs_inode *inode)
+{
+	struct btrfs_trans_handle *trans;
+	struct btrfs_root *root = inode->root;
+	int ret;
+
+	if (!inode->vfs_inode.i_nlink)
+		return 0;
+
+	trans = btrfs_start_transaction(root, 1);
+	if (IS_ERR(trans))
+		return PTR_ERR(trans);
+
+	ret = btrfs_del_orphan_item(trans, root, btrfs_ino(inode));
+	if (ret) {
+		btrfs_abort_transaction(trans, ret);
+		return ret;
+	}
+
+	btrfs_end_transaction(trans);
+	return ret;
+}
+
+int btrfs_drop_verity_items(struct btrfs_inode *inode)
+{
+	int ret;
+	struct inode *ino = &inode->vfs_inode;
+	pgoff_t index;
+
+	ret = get_verity_mapping_index(ino, 0, &index);
+	if (ret)
+		return ret;
+	truncate_inode_pages(inode->vfs_inode.i_mapping, index << PAGE_SHIFT);
+
+	ret = drop_verity_items(inode, BTRFS_VERITY_DESC_ITEM_KEY);
+	if (ret)
+		return ret;
+
+	return drop_verity_items(inode, BTRFS_VERITY_MERKLE_ITEM_KEY);
+}
+
 /*
  * fsverity op that begins enabling verity.
  * fsverity calls this to ask us to setup the inode for enabling.  We
@@ -391,17 +454,13 @@ static int btrfs_begin_enable_verity(struct file *filp)
 	if (test_bit(BTRFS_INODE_VERITY_IN_PROGRESS, &BTRFS_I(inode)->runtime_flags))
 		return -EBUSY;
 
-	/*
-	 * ext4 adds the inode to the orphan list here, presumably because the
-	 * truncate done at orphan processing time will delete partial
-	 * measurements.  TODO: setup orphans
-	 */
 	set_bit(BTRFS_INODE_VERITY_IN_PROGRESS, &BTRFS_I(inode)->runtime_flags);
-	ret = drop_verity_items(BTRFS_I(inode), BTRFS_VERITY_DESC_ITEM_KEY);
+
+	ret = btrfs_drop_verity_items(BTRFS_I(inode));
 	if (ret)
 		goto err;
 
-	ret = drop_verity_items(BTRFS_I(inode), BTRFS_VERITY_MERKLE_ITEM_KEY);
+	ret = add_orphan(BTRFS_I(inode));
 	if (ret)
 		goto err;
 
@@ -428,6 +487,7 @@ static int btrfs_end_enable_verity(struct file *filp, const void *desc,
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_verity_descriptor_item item;
 	int ret;
+	int keep_orphan = 0;
 
 	if (desc != NULL) {
 		/* write out the descriptor item */
@@ -459,11 +519,20 @@ static int btrfs_end_enable_verity(struct file *filp, const void *desc,
 
 out:
 	if (desc == NULL || ret) {
-		/* If we failed, drop all the verity items */
-		drop_verity_items(BTRFS_I(inode), BTRFS_VERITY_DESC_ITEM_KEY);
-		drop_verity_items(BTRFS_I(inode), BTRFS_VERITY_MERKLE_ITEM_KEY);
+		/*
+		 * If verity failed (here or in the generic code), drop all the
+		 * verity items.
+		 */
+		keep_orphan = btrfs_drop_verity_items(BTRFS_I(inode));
 	} else
 		btrfs_set_fs_compat_ro(root->fs_info, VERITY);
+	/*
+	 * If we are handling an error, but failed to drop the verity items,
+	 * we still need the orphan.
+	 */
+	if (!keep_orphan)
+		del_orphan(BTRFS_I(inode));
+
 	clear_bit(BTRFS_INODE_VERITY_IN_PROGRESS, &BTRFS_I(inode)->runtime_flags);
 	return ret;
 }
