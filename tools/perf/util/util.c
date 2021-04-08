@@ -416,3 +416,65 @@ char *perf_exe(char *buf, int len)
 	}
 	return strcpy(buf, "perf");
 }
+
+char *perf_exe_path(void)
+{
+	int i;
+	char *buf;
+
+	buf = malloc(PATH_MAX);
+	buf = perf_exe(buf, PATH_MAX);
+
+	for (i = strlen(buf) - 1; i != 0 && buf[i] != '/'; i--)
+		;
+
+	if (!i) {
+		free(buf);
+		return NULL;
+	}
+
+	buf[i + 1] = 0;
+
+	return buf;
+}
+
+int perf_src_doc(const char *exec_path, char **strp)
+{
+	FILE *file;
+	char *line = NULL;
+	size_t line_len = 0;
+	ssize_t nread;
+	int ret = -1;
+	char *config_detected = NULL;
+	static const char srcdir[] = "srcdir_SQ";
+
+	if (asprintf(&config_detected, "%s.config-detected", exec_path) < 0)
+		return -1;
+
+	file = fopen(config_detected, "r");
+	if (!file)
+		goto out;
+
+	while (!feof(file)) {
+		nread = getline(&line, &line_len, file);
+		if (nread < 0)
+			break;
+
+		if (!strncmp(line, srcdir, sizeof(srcdir) - 1)) {
+
+			if (line[nread - 1] == '\n')
+				line[nread - 1] = 0;
+
+			if (asprintf(strp, "%s/Documentation", &line[sizeof(srcdir)]) != -1)
+				ret = 0;
+
+			break;
+		}
+	}
+
+	fclose(file);
+out:
+	free(line);
+	free(config_detected);
+	return ret;
+}
