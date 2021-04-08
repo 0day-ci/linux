@@ -69,6 +69,7 @@ static int cls_bpf_exec_opcode(int code)
 	case TC_ACT_SHOT:
 	case TC_ACT_STOLEN:
 	case TC_ACT_TRAP:
+	case TC_ACT_TRAP_FWD:
 	case TC_ACT_REDIRECT:
 	case TC_ACT_UNSPEC:
 		return code;

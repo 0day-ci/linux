@@ -258,6 +258,7 @@ static int dsmark_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 			goto drop;
 #endif
 		case TC_ACT_OK:
+		case TC_ACT_TRAP_FWD:
 			skb->tc_index = TC_H_MIN(res.classid);
 			break;
 

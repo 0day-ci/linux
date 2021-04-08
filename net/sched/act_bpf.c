@@ -54,8 +54,16 @@ static int tcf_bpf_act(struct sk_buff *skb, const struct tc_action *act,
 		bpf_compute_data_pointers(skb);
 		filter_res = BPF_PROG_RUN(filter, skb);
 	}
-	if (skb_sk_is_prefetched(skb) && filter_res != TC_ACT_OK)
-		skb_orphan(skb);
+	if (skb_sk_is_prefetched(skb)) {
+		switch (filter_res) {
+		case TC_ACT_OK:
+		case TC_ACT_TRAP_FWD:
+			break;
+		default:
+			skb_orphan(skb);
+			break;
+		}
+	}
 	rcu_read_unlock();
 
 	/* A BPF program may overwrite the default action opcode.
@@ -72,6 +80,7 @@ static int tcf_bpf_act(struct sk_buff *skb, const struct tc_action *act,
 	case TC_ACT_PIPE:
 	case TC_ACT_RECLASSIFY:
 	case TC_ACT_OK:
+	case TC_ACT_TRAP_FWD:
 	case TC_ACT_REDIRECT:
 		action = filter_res;
 		break;

@@ -72,7 +72,11 @@ enum {
 				   * the skb and act like everything
 				   * is alright.
 				   */
-#define TC_ACT_VALUE_MAX	TC_ACT_TRAP
+#define TC_ACT_TRAP_FWD		9 /* For hw path, this means "send a copy
+				   * of the packet to the cpu". For sw
+				   * datapath, this is like TC_ACT_OK.
+				   */
+#define TC_ACT_VALUE_MAX	TC_ACT_TRAP_FWD
 
 /* There is a special kind of actions called "extended actions",
  * which need a value parameter. These have a local opcode located in
