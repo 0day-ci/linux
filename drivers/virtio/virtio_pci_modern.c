@@ -162,6 +162,7 @@ static int vp_reset(struct virtio_device *vdev)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
 	struct virtio_pci_modern_device *mdev = &vp_dev->mdev;
+	unsigned long timeout = jiffies + msecs_to_jiffies(180000);
 
 	/* 0 status means a reset. */
 	vp_modern_set_status(mdev, 0);
@@ -169,9 +170,16 @@ static int vp_reset(struct virtio_device *vdev)
 	 * device_status to return 0 before reinitializing the device.
 	 * This will flush out the status write, and flush in device writes,
 	 * including MSI-X interrupts, if any.
+	 * Set a timeout before giving up on the device.
 	 */
-	while (vp_modern_get_status(mdev))
+	while (vp_modern_get_status(mdev)) {
+		if (time_after(jiffies, timeout)) {
+			dev_err(&vdev->dev, "virtio: device not ready. "
+				"Aborting. Try again later\n");
+			return -EAGAIN;
+		}
 		msleep(1);
+	}
 	/* Flush pending VQ/configuration callbacks. */
 	vp_synchronize_vectors(vdev);
 	return 0;
