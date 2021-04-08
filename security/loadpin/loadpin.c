@@ -45,7 +45,6 @@ static struct super_block *pinned_root;
 static DEFINE_SPINLOCK(pinned_root_spinlock);
 
 #ifdef CONFIG_SYSCTL
-
 static struct ctl_path loadpin_sysctl_path[] = {
 	{ .procname = "kernel", },
 	{ .procname = "loadpin", },
@@ -59,69 +58,81 @@ static struct ctl_table loadpin_sysctl_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec_minmax,
-		.extra1         = SYSCTL_ZERO,
+		.extra1         = SYSCTL_ONE,
 		.extra2         = SYSCTL_ONE,
 	},
 	{ }
 };
 
-/*
- * This must be called after early kernel init, since then the rootdev
- * is available.
- */
-static void check_pinning_enforcement(struct super_block *mnt_sb)
+static void set_sysctl(bool is_writable)
 {
-	bool ro = false;
-
 	/*
 	 * If load pinning is not enforced via a read-only block
 	 * device, allow sysctl to change modes for testing.
 	 */
-	if (mnt_sb->s_bdev) {
-		char bdev[BDEVNAME_SIZE];
-
-		ro = bdev_read_only(mnt_sb->s_bdev);
-		bdevname(mnt_sb->s_bdev, bdev);
-		pr_info("%s (%u:%u): %s\n", bdev,
-			MAJOR(mnt_sb->s_bdev->bd_dev),
-			MINOR(mnt_sb->s_bdev->bd_dev),
-			ro ? "read-only" : "writable");
-	} else
-		pr_info("mnt_sb lacks block device, treating as: writable\n");
-
-	if (!ro) {
-		if (!register_sysctl_paths(loadpin_sysctl_path,
-					   loadpin_sysctl_table))
-			pr_notice("sysctl registration failed!\n");
-		else
-			pr_info("enforcement can be disabled.\n");
-	} else
-		pr_info("load pinning engaged.\n");
+	if (is_writable)
+		loadpin_sysctl_table[0].extra1 = SYSCTL_ZERO;
+	else
+		loadpin_sysctl_table[0].extra1 = SYSCTL_ONE;
 }
 #else
-static void check_pinning_enforcement(struct super_block *mnt_sb)
-{
-	pr_info("load pinning engaged.\n");
-}
+static bool set_sysctl(bool is_writable) { }
 #endif
+
+/*
+ * This must be called after early kernel init, since then the rootdev
+ * is available.
+ */
+static bool sb_is_writable(struct super_block *mnt_sb, struct block_device **bdev)
+{
+	bool writable = true;
+
+	*bdev = mnt_sb->s_bdev;
+	if (*bdev)
+		writable = !bdev_read_only(*bdev);
+
+	return writable;
+}
+
+static void report_writable(struct block_device *bdev)
+{
+	if (bdev) {
+		char name[BDEVNAME_SIZE];
+
+		bdevname(bdev, name);
+		pr_info("%s (%u:%u): %s\n", name,
+			MAJOR(bdev->bd_dev),
+			MINOR(bdev->bd_dev),
+			load_root_writable ? "writable" : "read-only");
+	} else {
+		pr_info("pinned filesystem lacks block device, treating as: writable\n");
+	}
+}
 
 static void loadpin_sb_free_security(struct super_block *mnt_sb)
 {
 	/*
 	 * When unmounting the filesystem we were using for load
 	 * pinning, we acknowledge the superblock release, but make sure
-	 * no other modules or firmware can be loaded.
+	 * no other modules or firmware can be loaded when we are in
+	 * enforcing mode. Otherwise, allow the root to be reestablished.
 	 */
 	if (!IS_ERR_OR_NULL(pinned_root) && mnt_sb == pinned_root) {
-		pinned_root = ERR_PTR(-EIO);
-		pr_info("umount pinned fs: refusing further loads\n");
+		if (enforced) {
+			pinned_root = ERR_PTR(-EIO);
+			pr_info("umount pinned fs: refusing further loads\n");
+		} else {
+			pinned_root = NULL;
+		}
 	}
 }
 
 static int loadpin_read_file(struct file *file, enum kernel_read_file_id id,
 			     bool contents)
 {
+	struct block_device *bdev = NULL;
 	struct super_block *load_root;
+	bool load_root_writable, first_root_pin, sysctl_needed;
 	const char *origin = kernel_read_file_id_str(id);
 
 	/*
@@ -152,26 +163,27 @@ static int loadpin_read_file(struct file *file, enum kernel_read_file_id id,
 	}
 
 	load_root = file->f_path.mnt->mnt_sb;
+	load_root_writable = sb_is_writable(load_root, &bdev);
+	sysctl_needed = false;
+	first_root_pin = false;
 
 	/* First loaded module/firmware defines the root for all others. */
 	spin_lock(&pinned_root_spinlock);
 	/*
-	 * pinned_root is only NULL at startup. Otherwise, it is either
-	 * a valid reference, or an ERR_PTR.
+	 * pinned_root is only NULL at startup or when the pinned root has
+	 * been unmounted while we are not in enforcing mode. Otherwise, it
+	 * is either a valid reference, or an ERR_PTR.
 	 */
 	if (!pinned_root) {
 		pinned_root = load_root;
-		/*
-		 * Unlock now since it's only pinned_root we care about.
-		 * In the worst case, we will (correctly) report pinning
-		 * failures before we have announced that pinning is
-		 * enforcing. This would be purely cosmetic.
-		 */
-		spin_unlock(&pinned_root_spinlock);
-		check_pinning_enforcement(pinned_root);
+		first_root_pin = true;
+	}
+	spin_unlock(&pinned_root_spinlock);
+
+	if (first_root_pin) {
+		report_writable(bdev);
+		set_sysctl(load_root_writable);
 		report_load(origin, file, "pinned");
-	} else {
-		spin_unlock(&pinned_root_spinlock);
 	}
 
 	if (IS_ERR_OR_NULL(pinned_root) || load_root != pinned_root) {
@@ -239,6 +251,10 @@ static int __init loadpin_init(void)
 	pr_info("ready to pin (currently %senforcing)\n",
 		enforce ? "" : "not ");
 	parse_exclude();
+#ifdef CONFIG_SYSCTL
+	if (!register_sysctl_paths(loadpin_sysctl_path, loadpin_sysctl_table))
+		pr_notice("sysctl registration failed!\n");
+#endif
 	security_add_hooks(loadpin_hooks, ARRAY_SIZE(loadpin_hooks), "loadpin");
 	return 0;
 }
