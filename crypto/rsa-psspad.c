@@ -6,8 +6,32 @@
  * Authors: Varad Gautam <varad.gautam@suse.com>
  */
 
+#include <crypto/hash.h>
 #include <crypto/internal/akcipher.h>
 #include <crypto/internal/rsa-common.h>
+
+static int psspad_setup_shash(struct crypto_shash **hash_tfm, struct shash_desc **desc,
+			      const char *hash_algo)
+{
+	*hash_tfm = crypto_alloc_shash(hash_algo, 0, 0);
+	if (IS_ERR(*hash_tfm))
+		return PTR_ERR(*hash_tfm);
+
+	*desc = kzalloc(crypto_shash_descsize(*hash_tfm) + sizeof(**desc),
+			GFP_KERNEL);
+	if (!desc)
+		return -ENOMEM;
+
+	(*desc)->tfm = *hash_tfm;
+
+	return 0;
+}
+
+static void psspad_free_shash(struct crypto_shash *hash_tfm, struct shash_desc *desc)
+{
+	kfree(desc);
+	crypto_free_shash(hash_tfm);
+}
 
 static int psspad_s_v_e_d(struct akcipher_request *req)
 {
