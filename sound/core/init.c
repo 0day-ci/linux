@@ -662,6 +662,33 @@ void snd_card_set_id(struct snd_card *card, const char *nid)
 }
 EXPORT_SYMBOL(snd_card_set_id);
 
+#define EXTRA_ID_CHARS		"_-"
+#define EXTRA_NAME_CHARS	" _-.:"
+
+static bool safe_attr_strcpy(char *dst, size_t dst_count,
+			     const char *src, size_t src_count,
+			     const char *extra_characters)
+{
+	size_t idx, copy;
+	int c;
+
+	copy = src_count >= dst_count ? dst_count - 1 : src_count;
+	for (idx = 0; idx < copy; idx++) {
+		c = src[idx];
+		if (c < ' ') {
+			copy = idx;
+			break;
+		}
+		if (!isalnum(c) && !strchr(extra_characters, c))
+			return false;
+	}
+	if (copy < 3)
+		return false;
+	memcpy(dst, src, copy);
+	dst[copy] = '\0';
+	return true;
+}
+
 static ssize_t
 card_id_show_attr(struct device *dev,
 		  struct device_attribute *attr, char *buf)
@@ -676,18 +703,10 @@ card_id_store_attr(struct device *dev, struct device_attribute *attr,
 {
 	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
 	char buf1[sizeof(card->id)];
-	size_t copy = count > sizeof(card->id) - 1 ?
-					sizeof(card->id) - 1 : count;
-	size_t idx;
-	int c;
 
-	for (idx = 0; idx < copy; idx++) {
-		c = buf[idx];
-		if (!isalnum(c) && c != '_' && c != '-')
-			return -EINVAL;
-	}
-	memcpy(buf1, buf, copy);
-	buf1[copy] = '\0';
+	if (!safe_attr_strcpy(buf1, sizeof(buf1), buf, count, EXTRA_ID_CHARS))
+		return -EINVAL;
+
 	mutex_lock(&snd_card_mutex);
 	if (!card_id_ok(NULL, buf1)) {
 		mutex_unlock(&snd_card_mutex);
@@ -712,9 +731,134 @@ card_number_show_attr(struct device *dev,
 
 static DEVICE_ATTR(number, 0444, card_number_show_attr, NULL);
 
+static ssize_t
+card_driver_show_attr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", card->driver);
+}
+
+static ssize_t
+card_driver_store_attr(struct device *dev, struct device_attribute *attr,
+		       const char *buf, size_t count)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	char driver1[sizeof(card->driver)];
+
+	if (!safe_attr_strcpy(driver1, sizeof(driver1), buf, count, EXTRA_NAME_CHARS))
+		return -EINVAL;
+	mutex_lock(&snd_card_mutex);
+	strcpy(card->driver, driver1);
+	mutex_unlock(&snd_card_mutex);
+	return count;
+}
+
+static DEVICE_ATTR(driver, 0644, card_driver_show_attr, card_driver_store_attr);
+
+static ssize_t
+card_name_show_attr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", card->shortname);
+}
+
+static ssize_t
+card_name_store_attr(struct device *dev, struct device_attribute *attr,
+		     const char *buf, size_t count)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	char name1[sizeof(card->shortname)];
+
+	if (!safe_attr_strcpy(name1, sizeof(name1), buf, count, EXTRA_NAME_CHARS))
+		return -EINVAL;
+	mutex_lock(&snd_card_mutex);
+	strcpy(card->shortname, name1);
+	mutex_unlock(&snd_card_mutex);
+	return count;
+}
+
+static DEVICE_ATTR(name, 0644, card_name_show_attr, card_name_store_attr);
+
+static ssize_t
+card_longname_show_attr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", card->longname);
+}
+
+static ssize_t
+card_longname_store_attr(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	char longname1[sizeof(card->longname)];
+
+	if (!safe_attr_strcpy(longname1, sizeof(longname1), buf, count, EXTRA_NAME_CHARS))
+		return -EINVAL;
+	mutex_lock(&snd_card_mutex);
+	strcpy(card->longname, longname1);
+	mutex_unlock(&snd_card_mutex);
+	return count;
+}
+
+static DEVICE_ATTR(longname, 0644, card_longname_show_attr, card_longname_store_attr);
+
+static ssize_t
+card_mixername_show_attr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", card->mixername);
+}
+
+static ssize_t
+card_mixername_store_attr(struct device *dev, struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	char mixername1[sizeof(card->mixername)];
+
+	if (!safe_attr_strcpy(mixername1, sizeof(mixername1), buf, count, EXTRA_NAME_CHARS))
+		return -EINVAL;
+	mutex_lock(&snd_card_mutex);
+	strcpy(card->mixername, mixername1);
+	mutex_unlock(&snd_card_mutex);
+	return count;
+}
+
+static DEVICE_ATTR(mixername, 0644, card_mixername_show_attr, card_mixername_store_attr);
+
+static ssize_t
+card_components_show_attr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", card->components);
+}
+
+static ssize_t
+card_components_store_attr(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct snd_card *card = container_of(dev, struct snd_card, card_dev);
+	char components1[sizeof(card->components)];
+
+	if (!safe_attr_strcpy(components1, sizeof(components1), buf, count, EXTRA_NAME_CHARS))
+		return -EINVAL;
+	mutex_lock(&snd_card_mutex);
+	strcpy(card->components, components1);
+	mutex_unlock(&snd_card_mutex);
+	return count;
+}
+
+static DEVICE_ATTR(components, 0644, card_components_show_attr, card_components_store_attr);
+
 static struct attribute *card_dev_attrs[] = {
 	&dev_attr_id.attr,
 	&dev_attr_number.attr,
+	&dev_attr_driver.attr,
+	&dev_attr_name.attr,
+	&dev_attr_longname.attr,
+	&dev_attr_mixername.attr,
+	&dev_attr_components.attr,
 	NULL
 };
 
