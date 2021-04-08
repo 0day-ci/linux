@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/kernel.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
@@ -1408,6 +1409,7 @@ static void attach_node_and_children(struct device_node *np)
 static int __init unittest_data_add(void)
 {
 	void *unittest_data;
+	void *unittest_data_align;
 	struct device_node *unittest_data_node, *np;
 	/*
 	 * __dtb_testcases_begin[] and __dtb_testcases_end[] are magically
@@ -1415,7 +1417,8 @@ static int __init unittest_data_add(void)
 	 */
 	extern uint8_t __dtb_testcases_begin[];
 	extern uint8_t __dtb_testcases_end[];
-	const int size = __dtb_testcases_end - __dtb_testcases_begin;
+	u32 size = __dtb_testcases_end - __dtb_testcases_begin;
+	u32 size_alloc;
 	int rc;
 
 	if (!size) {
@@ -1425,11 +1428,15 @@ static int __init unittest_data_add(void)
 	}
 
 	/* creating copy */
-	unittest_data = kmemdup(__dtb_testcases_begin, size, GFP_KERNEL);
+	size_alloc = size + FDT_ALIGN_SIZE;
+	unittest_data = kmalloc(size_alloc, GFP_KERNEL);
 	if (!unittest_data)
 		return -ENOMEM;
 
-	of_fdt_unflatten_tree(unittest_data, NULL, &unittest_data_node);
+	unittest_data_align = PTR_ALIGN(unittest_data, FDT_ALIGN_SIZE);
+	memcpy(unittest_data_align, __dtb_testcases_begin, size);
+
+	of_fdt_unflatten_tree(unittest_data_align, NULL, &unittest_data_node);
 	if (!unittest_data_node) {
 		pr_warn("%s: No tree to attach; not running tests\n", __func__);
 		kfree(unittest_data);
