@@ -171,6 +171,38 @@ static void rsapad_akcipher_sg_set_buf(struct scatterlist *sg, void *buf,
 		sg_chain(sg, nsegs, next);
 }
 
+typedef int (*rsa_akcipher_complete_cb)(struct akcipher_request *, int);
+static void rsapad_akcipher_req_complete(struct crypto_async_request *child_async_req,
+					 int err, rsa_akcipher_complete_cb cb)
+{
+	struct akcipher_request *req = child_async_req->data;
+	struct crypto_async_request async_req;
+
+	if (err == -EINPROGRESS)
+		return;
+
+	async_req.data = req->base.data;
+	async_req.tfm = crypto_akcipher_tfm(crypto_akcipher_reqtfm(req));
+	async_req.flags = child_async_req->flags;
+	req->base.complete(&async_req, cb(req, err));
+}
+
+static void rsapad_akcipher_setup_child(struct akcipher_request *req,
+					struct scatterlist *src_sg,
+					struct scatterlist *dst_sg,
+					unsigned int src_len,
+					unsigned int dst_len,
+					crypto_completion_t cb)
+{
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+	struct pkcs1pad_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct pkcs1pad_request *req_ctx = akcipher_request_ctx(req);
+
+	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
+	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags, cb, req);
+	akcipher_request_set_crypt(&req_ctx->child_req, src_sg, dst_sg, src_len, dst_len);
+}
+
 static int pkcs1pad_encrypt_sign_complete(struct akcipher_request *req, int err)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
@@ -213,17 +245,8 @@ out:
 static void pkcs1pad_encrypt_sign_complete_cb(
 		struct crypto_async_request *child_async_req, int err)
 {
-	struct akcipher_request *req = child_async_req->data;
-	struct crypto_async_request async_req;
-
-	if (err == -EINPROGRESS)
-		return;
-
-	async_req.data = req->base.data;
-	async_req.tfm = crypto_akcipher_tfm(crypto_akcipher_reqtfm(req));
-	async_req.flags = child_async_req->flags;
-	req->base.complete(&async_req,
-			pkcs1pad_encrypt_sign_complete(req, err));
+	rsapad_akcipher_req_complete(child_async_req, err,
+				     pkcs1pad_encrypt_sign_complete);
 }
 
 static int pkcs1pad_encrypt(struct akcipher_request *req)
@@ -259,13 +282,10 @@ static int pkcs1pad_encrypt(struct akcipher_request *req)
 	rsapad_akcipher_sg_set_buf(req_ctx->in_sg, req_ctx->in_buf,
 			ctx->key_size - 1 - req->src_len, req->src);
 
-	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
-	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags,
-			pkcs1pad_encrypt_sign_complete_cb, req);
-
 	/* Reuse output buffer */
-	akcipher_request_set_crypt(&req_ctx->child_req, req_ctx->in_sg,
-				   req->dst, ctx->key_size - 1, req->dst_len);
+	rsapad_akcipher_setup_child(req, req_ctx->in_sg, req->dst,
+				    ctx->key_size - 1, req->dst_len,
+				    pkcs1pad_encrypt_sign_complete_cb);
 
 	err = crypto_akcipher_encrypt(&req_ctx->child_req);
 	if (err != -EINPROGRESS && err != -EBUSY)
@@ -331,16 +351,7 @@ done:
 static void pkcs1pad_decrypt_complete_cb(
 		struct crypto_async_request *child_async_req, int err)
 {
-	struct akcipher_request *req = child_async_req->data;
-	struct crypto_async_request async_req;
-
-	if (err == -EINPROGRESS)
-		return;
-
-	async_req.data = req->base.data;
-	async_req.tfm = crypto_akcipher_tfm(crypto_akcipher_reqtfm(req));
-	async_req.flags = child_async_req->flags;
-	req->base.complete(&async_req, pkcs1pad_decrypt_complete(req, err));
+	rsapad_akcipher_req_complete(child_async_req, err, pkcs1pad_decrypt_complete);
 }
 
 static int pkcs1pad_decrypt(struct akcipher_request *req)
@@ -360,14 +371,10 @@ static int pkcs1pad_decrypt(struct akcipher_request *req)
 	rsapad_akcipher_sg_set_buf(req_ctx->out_sg, req_ctx->out_buf,
 			    ctx->key_size, NULL);
 
-	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
-	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags,
-			pkcs1pad_decrypt_complete_cb, req);
-
 	/* Reuse input buffer, output to a new buffer */
-	akcipher_request_set_crypt(&req_ctx->child_req, req->src,
-				   req_ctx->out_sg, req->src_len,
-				   ctx->key_size);
+	rsapad_akcipher_setup_child(req, req->src, req_ctx->out_sg,
+				    req->src_len, ctx->key_size,
+				    pkcs1pad_decrypt_complete_cb);
 
 	err = crypto_akcipher_decrypt(&req_ctx->child_req);
 	if (err != -EINPROGRESS && err != -EBUSY)
@@ -418,13 +425,10 @@ static int pkcs1pad_sign(struct akcipher_request *req)
 	rsapad_akcipher_sg_set_buf(req_ctx->in_sg, req_ctx->in_buf,
 			ctx->key_size - 1 - req->src_len, req->src);
 
-	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
-	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags,
-			pkcs1pad_encrypt_sign_complete_cb, req);
-
 	/* Reuse output buffer */
-	akcipher_request_set_crypt(&req_ctx->child_req, req_ctx->in_sg,
-				   req->dst, ctx->key_size - 1, req->dst_len);
+	rsapad_akcipher_setup_child(req, req_ctx->in_sg, req->dst,
+				    ctx->key_size - 1, req->dst_len,
+				    pkcs1pad_encrypt_sign_complete_cb);
 
 	err = crypto_akcipher_decrypt(&req_ctx->child_req);
 	if (err != -EINPROGRESS && err != -EBUSY)
@@ -509,16 +513,8 @@ done:
 static void pkcs1pad_verify_complete_cb(
 		struct crypto_async_request *child_async_req, int err)
 {
-	struct akcipher_request *req = child_async_req->data;
-	struct crypto_async_request async_req;
-
-	if (err == -EINPROGRESS)
-		return;
-
-	async_req.data = req->base.data;
-	async_req.tfm = crypto_akcipher_tfm(crypto_akcipher_reqtfm(req));
-	async_req.flags = child_async_req->flags;
-	req->base.complete(&async_req, pkcs1pad_verify_complete(req, err));
+	rsapad_akcipher_req_complete(child_async_req, err,
+				     pkcs1pad_verify_complete);
 }
 
 /*
@@ -548,14 +544,10 @@ static int pkcs1pad_verify(struct akcipher_request *req)
 	rsapad_akcipher_sg_set_buf(req_ctx->out_sg, req_ctx->out_buf,
 			    ctx->key_size, NULL);
 
-	akcipher_request_set_tfm(&req_ctx->child_req, ctx->child);
-	akcipher_request_set_callback(&req_ctx->child_req, req->base.flags,
-			pkcs1pad_verify_complete_cb, req);
-
 	/* Reuse input buffer, output to a new buffer */
-	akcipher_request_set_crypt(&req_ctx->child_req, req->src,
-				   req_ctx->out_sg, req->src_len,
-				   ctx->key_size);
+	rsapad_akcipher_setup_child(req, req->src, req_ctx->out_sg,
+				    req->src_len, ctx->key_size,
+				    pkcs1pad_verify_complete_cb);
 
 	err = crypto_akcipher_encrypt(&req_ctx->child_req);
 	if (err != -EINPROGRESS && err != -EBUSY)
