@@ -34,4 +34,17 @@ struct rsapad_akciper_req_ctx {
 	struct akcipher_request child_req;
 };
 
+int rsapad_set_pub_key(struct crypto_akcipher *tfm, const void *key,
+		       unsigned int keylen);
+int rsapad_set_priv_key(struct crypto_akcipher *tfm, const void *key,
+			unsigned int keylen);
+unsigned int rsapad_get_max_size(struct crypto_akcipher *tfm);
+void rsapad_akcipher_sg_set_buf(struct scatterlist *sg, void *buf,
+				size_t len, struct scatterlist *next);
+int rsapad_akcipher_init_tfm(struct crypto_akcipher *tfm);
+void rsapad_akcipher_exit_tfm(struct crypto_akcipher *tfm);
+void rsapad_akcipher_free(struct akcipher_instance *inst);
+int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **tb,
+			   struct akcipher_alg *alg);
+
 #endif
