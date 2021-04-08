@@ -182,6 +182,19 @@ static LIST_HEAD(pcpu_map_extend_chunks);
 int pcpu_nr_empty_pop_pages[PCPU_NR_CHUNK_TYPES];
 
 /*
+ * List of chunks with a lot of free pages.  Used to depopulate them
+ * asynchronously.
+ */
+static struct list_head pcpu_depopulate_list[PCPU_NR_CHUNK_TYPES];
+
+/*
+ * List of previously depopulated chunks.  They are not usually used for new
+ * allocations, but can be returned back to service if a need arises.
+ */
+static struct list_head pcpu_sideline_list[PCPU_NR_CHUNK_TYPES];
+
+
+/*
  * The number of populated pages in use by the allocator, protected by
  * pcpu_lock.  This number is kept per a unit per chunk (i.e. when a page gets
  * allocated/deallocated, it is allocated/deallocated in all units of a chunk
@@ -561,6 +574,12 @@ static void pcpu_chunk_move(struct pcpu_chunk *chunk, int slot)
 static void pcpu_chunk_relocate(struct pcpu_chunk *chunk, int oslot)
 {
 	int nslot = pcpu_chunk_slot(chunk);
+
+	/*
+	 * Keep isolated and depopulated chunks on a sideline.
+	 */
+	if (chunk->isolated || chunk->depopulated)
+		return;
 
 	if (oslot != nslot)
 		__pcpu_chunk_move(chunk, nslot, oslot < nslot);
@@ -1790,6 +1809,19 @@ restart:
 		}
 	}
 
+	/* search through sidelined depopulated chunks */
+	list_for_each_entry(chunk, &pcpu_sideline_list[type], list) {
+		/*
+		 * If the allocation can fit the chunk, place the chunk back
+		 * into corresponding slot and restart the scanning.
+		 */
+		if (pcpu_check_chunk_hint(&chunk->chunk_md, bits, bit_align)) {
+			chunk->depopulated = false;
+			pcpu_chunk_relocate(chunk, -1);
+			goto restart;
+		}
+	}
+
 	spin_unlock_irqrestore(&pcpu_lock, flags);
 
 	/*
@@ -2061,6 +2093,106 @@ retry_pop:
 }
 
 /**
+ * pcpu_shrink_populated - scan chunks and release unused pages to the system
+ * @type: chunk type
+ *
+ * Scan over chunks in the depopulate list, try to release unused populated
+ * pages to the system.  Depopulated chunks are sidelined to prevent further
+ * allocations without a need.  Skipped and fully free chunks are returned
+ * to corresponding slots.  Stop depopulating if the number of empty populated
+ * pages reaches the threshold.  Each chunk is scanned in the reverse order to
+ * keep populated pages close to the beginning of the chunk.
+ */
+static void pcpu_shrink_populated(enum pcpu_chunk_type type)
+{
+	struct pcpu_block_md *block;
+	struct pcpu_chunk *chunk, *tmp;
+	LIST_HEAD(to_depopulate);
+	bool depopulated;
+	int i, end;
+
+	spin_lock_irq(&pcpu_lock);
+
+	list_splice_init(&pcpu_depopulate_list[type], &to_depopulate);
+
+	list_for_each_entry_safe(chunk, tmp, &to_depopulate, list) {
+		WARN_ON(chunk->immutable);
+		depopulated = false;
+
+		/*
+		 * Scan chunk's pages in the reverse order to keep populated
+		 * pages close to the beginning of the chunk.
+		 */
+		for (i = chunk->nr_pages - 1, end = -1; i >= 0; i--) {
+			/*
+			 * If the chunk has no empty pages or
+			 * we're short on empty pages in general,
+			 * just put the chunk back into the original slot.
+			 */
+			if (!chunk->nr_empty_pop_pages ||
+			    pcpu_nr_empty_pop_pages[type] <=
+			    PCPU_EMPTY_POP_PAGES_HIGH)
+				break;
+
+			/*
+			 * If the page is empty and populated, start or
+			 * extend the (i, end) range.  If i == 0, decrease
+			 * i and perform the depopulation to cover the last
+			 * (first) page in the chunk.
+			 */
+			block = chunk->md_blocks + i;
+			if (block->contig_hint == PCPU_BITMAP_BLOCK_BITS &&
+			    test_bit(i, chunk->populated)) {
+				if (end == -1)
+					end = i;
+				if (i > 0)
+					continue;
+				i--;
+			}
+
+			/*
+			 * Otherwise check if there is an active range,
+			 * and if yes, depopulate it.
+			 */
+			if (end == -1)
+				continue;
+
+			depopulated = true;
+
+			spin_unlock_irq(&pcpu_lock);
+			pcpu_depopulate_chunk(chunk, i + 1, end + 1);
+			cond_resched();
+			spin_lock_irq(&pcpu_lock);
+
+			pcpu_chunk_depopulated(chunk, i + 1, end + 1);
+
+			/*
+			 * Reset the range and continue.
+			 */
+			end = -1;
+		}
+
+		chunk->isolated = false;
+		if (chunk->free_bytes == pcpu_unit_size || !depopulated) {
+			/*
+			 * If the chunk is empty or hasn't been depopulated,
+			 * return it to the original slot.
+			 */
+			pcpu_chunk_relocate(chunk, -1);
+		} else {
+			/*
+			 * Otherwise put the chunk to the list of depopulated
+			 * chunks.
+			 */
+			chunk->depopulated = true;
+			list_move(&chunk->list, &pcpu_sideline_list[type]);
+		}
+	}
+
+	spin_unlock_irq(&pcpu_lock);
+}
+
+/**
  * pcpu_balance_populated - manage the amount of populated pages
  * @type: chunk type
  *
@@ -2090,6 +2222,8 @@ static void pcpu_balance_populated(enum pcpu_chunk_type type)
 	} else if (pcpu_nr_empty_pop_pages[type] < PCPU_EMPTY_POP_PAGES_HIGH) {
 		nr_to_pop = PCPU_EMPTY_POP_PAGES_HIGH - pcpu_nr_empty_pop_pages[type];
 		pcpu_grow_populated(type, nr_to_pop);
+	} else if (!list_empty(&pcpu_depopulate_list[type])) {
+		pcpu_shrink_populated(type);
 	}
 }
 
@@ -2147,7 +2281,13 @@ void free_percpu(void __percpu *ptr)
 
 	pcpu_memcg_free_hook(chunk, off, size);
 
-	/* if there are more than one fully free chunks, wake up grim reaper */
+	/*
+	 * If there are more than one fully free chunks, wake up grim reaper.
+	 * Otherwise if at least 1/4 of its pages are empty and there is no
+	 * system-wide shortage of empty pages aside from this chunk, isolate
+	 * the chunk and schedule an async depopulation.  If the chunk was
+	 * depopulated previously and got free pages, depopulate it too.
+	 */
 	if (chunk->free_bytes == pcpu_unit_size) {
 		struct pcpu_chunk *pos;
 
@@ -2156,6 +2296,16 @@ void free_percpu(void __percpu *ptr)
 				need_balance = true;
 				break;
 			}
+	} else if (chunk != pcpu_first_chunk && chunk != pcpu_reserved_chunk &&
+		   !chunk->isolated &&
+		   (pcpu_nr_empty_pop_pages[pcpu_chunk_type(chunk)] >
+		    PCPU_EMPTY_POP_PAGES_HIGH + chunk->nr_empty_pop_pages) &&
+		   ((chunk->depopulated && chunk->nr_empty_pop_pages) ||
+		    (chunk->nr_empty_pop_pages >= chunk->nr_pages / 4))) {
+		list_move(&chunk->list, &pcpu_depopulate_list[pcpu_chunk_type(chunk)]);
+		chunk->isolated = true;
+		chunk->depopulated = false;
+		need_balance = true;
 	}
 
 	trace_percpu_free_percpu(chunk->base_addr, off, ptr);
@@ -2583,9 +2733,13 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		      pcpu_nr_slots * sizeof(pcpu_chunk_lists[0]) *
 		      PCPU_NR_CHUNK_TYPES);
 
-	for (type = 0; type < PCPU_NR_CHUNK_TYPES; type++)
+	for (type = 0; type < PCPU_NR_CHUNK_TYPES; type++) {
 		for (i = 0; i < pcpu_nr_slots; i++)
 			INIT_LIST_HEAD(&pcpu_chunk_list(type)[i]);
+
+		INIT_LIST_HEAD(&pcpu_depopulate_list[type]);
+		INIT_LIST_HEAD(&pcpu_sideline_list[type]);
+	}
 
 	/*
 	 * The end of the static region needs to be aligned with the
