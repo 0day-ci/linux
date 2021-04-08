@@ -12,27 +12,33 @@ static DECLARE_IOASID_SET(iommu_sva_pasid);
 
 /**
  * iommu_sva_alloc_pasid - Allocate a PASID for the mm
- * @mm: the mm
  * @min: minimum PASID value (inclusive)
  * @max: maximum PASID value (inclusive)
  *
- * Try to allocate a PASID for this mm, or take a reference to the existing one
- * provided it fits within the [@min, @max] range. On success the PASID is
- * available in mm->pasid, and must be released with iommu_sva_free_pasid().
+ * Try to allocate a PASID for the current mm, or take a reference to the
+ * existing one provided it fits within the [@min, @max] range. On success
+ * the PASID is available in the current mm->pasid, and must be released with
+ * iommu_sva_free_pasid().
  * @min must be greater than 0, because 0 indicates an unused mm->pasid.
  *
  * Returns 0 on success and < 0 on error.
  */
-int iommu_sva_alloc_pasid(struct mm_struct *mm, ioasid_t min, ioasid_t max)
+int iommu_sva_alloc_pasid(ioasid_t min, ioasid_t max)
 {
 	int ret = 0;
 	ioasid_t pasid;
+	struct mm_struct *mm;
 
 	if (min == INVALID_IOASID || max == INVALID_IOASID ||
 	    min == 0 || max < min)
 		return -EINVAL;
 
 	mutex_lock(&iommu_sva_lock);
+	mm = get_task_mm(current);
+	if (!mm) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
 	if (mm->pasid) {
 		if (mm->pasid >= min && mm->pasid <= max)
 			ioasid_get(mm->pasid);
@@ -45,22 +51,32 @@ int iommu_sva_alloc_pasid(struct mm_struct *mm, ioasid_t min, ioasid_t max)
 		else
 			mm->pasid = pasid;
 	}
+	mmput(mm);
+out_unlock:
 	mutex_unlock(&iommu_sva_lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iommu_sva_alloc_pasid);
 
 /**
- * iommu_sva_free_pasid - Release the mm's PASID
+ * iommu_sva_free_pasid - Release the current mm's PASID
  * @mm: the mm
  *
  * Drop one reference to a PASID allocated with iommu_sva_alloc_pasid()
  */
-void iommu_sva_free_pasid(struct mm_struct *mm)
+void iommu_sva_free_pasid(void)
 {
+	struct mm_struct *mm;
+
 	mutex_lock(&iommu_sva_lock);
+	mm = get_task_mm(current);
+	if (!mm)
+		goto out_unlock;
+
 	if (ioasid_put(mm->pasid))
 		mm->pasid = 0;
+	mmput(mm);
+out_unlock:
 	mutex_unlock(&iommu_sva_lock);
 }
 EXPORT_SYMBOL_GPL(iommu_sva_free_pasid);

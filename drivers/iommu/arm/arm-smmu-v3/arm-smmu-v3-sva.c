@@ -329,7 +329,7 @@ __arm_smmu_sva_bind(struct device *dev, struct mm_struct *mm)
 		return ERR_PTR(-ENOMEM);
 
 	/* Allocate a PASID for this mm if necessary */
-	ret = iommu_sva_alloc_pasid(mm, 1, (1U << master->ssid_bits) - 1);
+	ret = iommu_sva_alloc_pasid(1, (1U << master->ssid_bits) - 1);
 	if (ret)
 		goto err_free_bond;
 
@@ -347,7 +347,7 @@ __arm_smmu_sva_bind(struct device *dev, struct mm_struct *mm)
 	return &bond->sva;
 
 err_free_pasid:
-	iommu_sva_free_pasid(mm);
+	iommu_sva_free_pasid();
 err_free_bond:
 	kfree(bond);
 	return ERR_PTR(ret);
@@ -377,7 +377,7 @@ void arm_smmu_sva_unbind(struct iommu_sva *handle)
 	if (refcount_dec_and_test(&bond->refs)) {
 		list_del(&bond->list);
 		arm_smmu_mmu_notifier_put(bond->smmu_mn);
-		iommu_sva_free_pasid(bond->mm);
+		iommu_sva_free_pasid();
 		kfree(bond);
 	}
 	mutex_unlock(&sva_lock);
