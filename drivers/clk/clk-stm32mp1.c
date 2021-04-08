@@ -317,7 +317,7 @@ struct clock_config {
 	int num_parents;
 	unsigned long flags;
 	void *cfg;
-	struct clk_hw * (*func)(struct device *dev,
+	struct clk_hw * (*func)(struct device_node *np,
 				struct clk_hw_onecell_data *clk_data,
 				void __iomem *base, spinlock_t *lock,
 				const struct clock_config *cfg);
@@ -377,14 +377,14 @@ struct stm32_composite_cfg {
 };
 
 static struct clk_hw *
-_clk_hw_register_gate(struct device *dev,
+_clk_hw_register_gate(struct device_node *np,
 		      struct clk_hw_onecell_data *clk_data,
 		      void __iomem *base, spinlock_t *lock,
 		      const struct clock_config *cfg)
 {
 	struct gate_cfg *gate_cfg = cfg->cfg;
 
-	return clk_hw_register_gate(dev,
+	return clk_hw_register_gate(NULL,
 				    cfg->name,
 				    cfg->parent_name,
 				    cfg->flags,
@@ -395,27 +395,27 @@ _clk_hw_register_gate(struct device *dev,
 }
 
 static struct clk_hw *
-_clk_hw_register_fixed_factor(struct device *dev,
+_clk_hw_register_fixed_factor(struct device_node *np,
 			      struct clk_hw_onecell_data *clk_data,
 			      void __iomem *base, spinlock_t *lock,
 			      const struct clock_config *cfg)
 {
 	struct fixed_factor_cfg *ff_cfg = cfg->cfg;
 
-	return clk_hw_register_fixed_factor(dev, cfg->name, cfg->parent_name,
+	return clk_hw_register_fixed_factor(NULL, cfg->name, cfg->parent_name,
 					    cfg->flags, ff_cfg->mult,
 					    ff_cfg->div);
 }
 
 static struct clk_hw *
-_clk_hw_register_divider_table(struct device *dev,
+_clk_hw_register_divider_table(struct device_node *np,
 			       struct clk_hw_onecell_data *clk_data,
 			       void __iomem *base, spinlock_t *lock,
 			       const struct clock_config *cfg)
 {
 	struct div_cfg *div_cfg = cfg->cfg;
 
-	return clk_hw_register_divider_table(dev,
+	return clk_hw_register_divider_table(NULL,
 					     cfg->name,
 					     cfg->parent_name,
 					     cfg->flags,
@@ -428,14 +428,14 @@ _clk_hw_register_divider_table(struct device *dev,
 }
 
 static struct clk_hw *
-_clk_hw_register_mux(struct device *dev,
+_clk_hw_register_mux(struct device_node *np,
 		     struct clk_hw_onecell_data *clk_data,
 		     void __iomem *base, spinlock_t *lock,
 		     const struct clock_config *cfg)
 {
 	struct mux_cfg *mux_cfg = cfg->cfg;
 
-	return clk_hw_register_mux(dev, cfg->name, cfg->parent_names,
+	return clk_hw_register_mux(NULL, cfg->name, cfg->parent_names,
 				   cfg->num_parents, cfg->flags,
 				   mux_cfg->reg_off + base, mux_cfg->shift,
 				   mux_cfg->width, mux_cfg->mux_flags, lock);
@@ -570,7 +570,7 @@ _get_stm32_gate(void __iomem *base,
 }
 
 static struct clk_hw *
-clk_stm32_register_gate_ops(struct device *dev,
+clk_stm32_register_gate_ops(struct device_node *np,
 			    const char *name,
 			    const char *parent_name,
 			    unsigned long flags,
@@ -598,7 +598,7 @@ clk_stm32_register_gate_ops(struct device *dev,
 
 	hw->init = &init;
 
-	ret = clk_hw_register(dev, hw);
+	ret = clk_hw_register(NULL, hw);
 	if (ret)
 		hw = ERR_PTR(ret);
 
@@ -606,7 +606,7 @@ clk_stm32_register_gate_ops(struct device *dev,
 }
 
 static struct clk_hw *
-clk_stm32_register_composite(struct device *dev,
+clk_stm32_register_composite(struct device_node *np,
 			     const char *name, const char * const *parent_names,
 			     int num_parents, void __iomem *base,
 			     const struct stm32_composite_cfg *cfg,
@@ -655,7 +655,7 @@ clk_stm32_register_composite(struct device *dev,
 		}
 	}
 
-	return clk_hw_register_composite(dev, name, parent_names, num_parents,
+	return clk_hw_register_composite(NULL, name, parent_names, num_parents,
 				       mux_hw, mux_ops, div_hw, div_ops,
 				       gate_hw, gate_ops, flags);
 }
@@ -863,7 +863,7 @@ static const struct clk_ops pll_ops = {
 	.is_enabled	= pll_is_enabled,
 };
 
-static struct clk_hw *clk_register_pll(struct device *dev, const char *name,
+static struct clk_hw *clk_register_pll(struct device_node *np, const char *name,
 				       const char *parent_name,
 				       void __iomem *reg,
 				       unsigned long flags,
@@ -889,7 +889,7 @@ static struct clk_hw *clk_register_pll(struct device *dev, const char *name,
 	element->lock = lock;
 
 	hw = &element->hw;
-	err = clk_hw_register(dev, hw);
+	err = clk_hw_register(NULL, hw);
 
 	if (err) {
 		kfree(element);
@@ -993,7 +993,7 @@ static const struct clk_ops timer_ker_ops = {
 
 };
 
-static struct clk_hw *clk_register_cktim(struct device *dev, const char *name,
+static struct clk_hw *clk_register_cktim(struct device_node *np, const char *name,
 					 const char *parent_name,
 					 unsigned long flags,
 					 void __iomem *apbdiv,
@@ -1021,7 +1021,7 @@ static struct clk_hw *clk_register_cktim(struct device *dev, const char *name,
 	tim_ker->timpre = timpre;
 
 	hw = &tim_ker->hw;
-	err = clk_hw_register(dev, hw);
+	err = clk_hw_register(NULL, hw);
 
 	if (err) {
 		kfree(tim_ker);
@@ -1035,14 +1035,14 @@ struct stm32_pll_cfg {
 	u32 offset;
 };
 
-static struct clk_hw *_clk_register_pll(struct device *dev,
+static struct clk_hw *_clk_register_pll(struct device_node *np,
 					struct clk_hw_onecell_data *clk_data,
 					void __iomem *base, spinlock_t *lock,
 					const struct clock_config *cfg)
 {
 	struct stm32_pll_cfg *stm_pll_cfg = cfg->cfg;
 
-	return clk_register_pll(dev, cfg->name, cfg->parent_name,
+	return clk_register_pll(np, cfg->name, cfg->parent_name,
 				base + stm_pll_cfg->offset, cfg->flags, lock);
 }
 
@@ -1051,25 +1051,25 @@ struct stm32_cktim_cfg {
 	u32 offset_timpre;
 };
 
-static struct clk_hw *_clk_register_cktim(struct device *dev,
+static struct clk_hw *_clk_register_cktim(struct device_node *np,
 					  struct clk_hw_onecell_data *clk_data,
 					  void __iomem *base, spinlock_t *lock,
 					  const struct clock_config *cfg)
 {
 	struct stm32_cktim_cfg *cktim_cfg = cfg->cfg;
 
-	return clk_register_cktim(dev, cfg->name, cfg->parent_name, cfg->flags,
+	return clk_register_cktim(np, cfg->name, cfg->parent_name, cfg->flags,
 				  cktim_cfg->offset_apbdiv + base,
 				  cktim_cfg->offset_timpre + base, lock);
 }
 
 static struct clk_hw *
-_clk_stm32_register_gate(struct device *dev,
+_clk_stm32_register_gate(struct device_node *np,
 			 struct clk_hw_onecell_data *clk_data,
 			 void __iomem *base, spinlock_t *lock,
 			 const struct clock_config *cfg)
 {
-	return clk_stm32_register_gate_ops(dev,
+	return clk_stm32_register_gate_ops(np,
 				    cfg->name,
 				    cfg->parent_name,
 				    cfg->flags,
@@ -1079,12 +1079,12 @@ _clk_stm32_register_gate(struct device *dev,
 }
 
 static struct clk_hw *
-_clk_stm32_register_composite(struct device *dev,
+_clk_stm32_register_composite(struct device_node *np,
 			      struct clk_hw_onecell_data *clk_data,
 			      void __iomem *base, spinlock_t *lock,
 			      const struct clock_config *cfg)
 {
-	return clk_stm32_register_composite(dev, cfg->name, cfg->parent_names,
+	return clk_stm32_register_composite(np, cfg->name, cfg->parent_names,
 					    cfg->num_parents, base, cfg->cfg,
 					    cfg->flags, lock);
 }
@@ -2020,7 +2020,7 @@ static const struct of_device_id stm32mp1_match_data[] = {
 	{ }
 };
 
-static int stm32_register_hw_clk(struct device *dev,
+static int stm32_register_hw_clk(struct device_node *np,
 				 struct clk_hw_onecell_data *clk_data,
 				 void __iomem *base, spinlock_t *lock,
 				 const struct clock_config *cfg)
@@ -2031,7 +2031,7 @@ static int stm32_register_hw_clk(struct device *dev,
 	hws = clk_data->hws;
 
 	if (cfg->func)
-		hw = (*cfg->func)(dev, clk_data, base, lock, cfg);
+		hw = (*cfg->func)(np, clk_data, base, lock, cfg);
 
 	if (IS_ERR(hw)) {
 		pr_err("Unable to register %s\n", cfg->name);
@@ -2077,7 +2077,7 @@ static int stm32_rcc_init(struct device_node *np,
 		hws[n] = ERR_PTR(-ENOENT);
 
 	for (n = 0; n < data->num; n++) {
-		err = stm32_register_hw_clk(NULL, clk_data, base, &rlock,
+		err = stm32_register_hw_clk(np, clk_data, base, &rlock,
 					    &data->cfg[n]);
 		if (err) {
 			pr_err("%s: can't register  %s\n", __func__,
