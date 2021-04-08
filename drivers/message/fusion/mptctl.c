@@ -2326,7 +2326,7 @@ mptctl_hp_hostinfo(MPT_ADAPTER *ioc, unsigned long arg, unsigned int data_size)
 	ToolboxIstwiReadWriteRequest_t	*IstwiRWRequest;
 	MPT_FRAME_HDR		*mf = NULL;
 	unsigned long		timeleft;
-	int			retval;
+	int			retval = 0;
 	u32			msgcontext;
 
 	/* Reset long to int. Should affect IA64 and SPARC only
@@ -2453,6 +2453,7 @@ mptctl_hp_hostinfo(MPT_ADAPTER *ioc, unsigned long arg, unsigned int data_size)
 	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL) {
 		dfailprintk(ioc, printk(MYIOC_s_WARN_FMT
 			"%s, no msg frames!!\n", ioc->name, __func__));
+		retval = -EFAULT;
 		goto out;
 	}
 
@@ -2471,12 +2472,13 @@ mptctl_hp_hostinfo(MPT_ADAPTER *ioc, unsigned long arg, unsigned int data_size)
 		IstwiRWRequest->DeviceAddr = 0xB0;
 
 	pbuf = pci_alloc_consistent(ioc->pcidev, 4, &buf_dma);
-	if (!pbuf)
+	if (!pbuf) {
+		retval = -ENOMEM;
 		goto out;
+	}
 	ioc->add_sge((char *)&IstwiRWRequest->SGL,
 	    (MPT_SGE_FLAGS_SSIMPLE_READ|4), buf_dma);
 
-	retval = 0;
 	SET_MGMT_MSG_CONTEXT(ioc->ioctl_cmds.msg_context,
 				IstwiRWRequest->MsgContext);
 	INITIALIZE_MGMT_STATUS(ioc->ioctl_cmds.status)
@@ -2486,10 +2488,10 @@ retry_wait:
 	timeleft = wait_for_completion_timeout(&ioc->ioctl_cmds.done,
 			HZ*MPT_IOCTL_DEFAULT_TIMEOUT);
 	if (!(ioc->ioctl_cmds.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
-		retval = -ETIME;
 		printk(MYIOC_s_WARN_FMT "%s: failed\n", ioc->name, __func__);
 		if (ioc->ioctl_cmds.status & MPT_MGMT_STATUS_DID_IOCRESET) {
 			mpt_free_msg_frame(ioc, mf);
+			retval = -ETIME;
 			goto out;
 		}
 		if (!timeleft) {
@@ -2497,9 +2499,11 @@ retry_wait:
 			       "HOST INFO command timeout, doorbell=0x%08x\n",
 			       ioc->name, mpt_GetIocState(ioc, 0));
 			mptctl_timeout_expired(ioc, mf);
-		} else
-			goto retry_wait;
-		goto out;
+			retval = -ETIME;
+			goto out;
+		}
+
+		goto retry_wait;
 	}
 
 	/*
@@ -2530,7 +2534,7 @@ retry_wait:
 		return -EFAULT;
 	}
 
-	return 0;
+	return retval;
 
 }
 
