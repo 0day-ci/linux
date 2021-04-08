@@ -1483,7 +1483,7 @@ n_tty_receive_char_flagged(struct tty_struct *tty, unsigned char c, char flag)
 		n_tty_receive_overrun(tty);
 		break;
 	default:
-		tty_err(tty, "unknown flag %d\n", flag);
+		dev_err(tty->dev, "unknown flag %d\n", flag);
 		break;
 	}
 }

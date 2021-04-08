@@ -1124,7 +1124,7 @@ static ssize_t file_tty_write(struct file *file, struct kiocb *iocb, struct iov_
 			return -EIO;
 	/* Short term debug to catch buggy drivers */
 	if (tty->ops->write_room == NULL)
-		tty_err(tty, "missing write_room method\n");
+		dev_err(tty->dev, "missing write_room method\n");
 	ld = tty_ldisc_ref_wait(tty);
 	if (!ld)
 		return hung_up_tty_write(iocb, from);
