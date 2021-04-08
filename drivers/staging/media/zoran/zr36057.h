@@ -8,6 +8,8 @@
 #ifndef _ZR36057_H_
 #define _ZR36057_H_
 
+#include <linux/bitops.h>
+
 /* Zoran ZR36057 registers */
 
 #define ZR36057_VFEHCR          0x000	/* Video Front End, Horizontal Configuration Register */
@@ -31,12 +33,12 @@
 #define ZR36057_VFESPFR_VER_DCM          8
 #define ZR36057_VFESPFR_DISP_MODE        6
 #define ZR36057_VFESPFR_YUV422          (0 << 3)
-#define ZR36057_VFESPFR_RGB888          (1 << 3)
+#define ZR36057_VFESPFR_RGB888          BIT(3)
 #define ZR36057_VFESPFR_RGB565          (2 << 3)
 #define ZR36057_VFESPFR_RGB555          (3 << 3)
-#define ZR36057_VFESPFR_ERR_DIF          (1 << 2)
-#define ZR36057_VFESPFR_PACK24          (1 << 1)
-#define ZR36057_VFESPFR_LITTLE_ENDIAN    (1 << 0)
+#define ZR36057_VFESPFR_ERR_DIF          BIT(2)
+#define ZR36057_VFESPFR_PACK24          BIT(1)
+#define ZR36057_VFESPFR_LITTLE_ENDIAN    BIT(0)
 
 #define ZR36057_VDTR            0x00c	/* Video Display "Top" Register */
 
