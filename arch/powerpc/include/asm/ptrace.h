@@ -21,6 +21,7 @@
 
 #include <uapi/asm/ptrace.h>
 #include <asm/asm-const.h>
+#include <asm/traps.h>
 
 #ifndef __ASSEMBLY__
 struct pt_regs
@@ -237,7 +238,7 @@ static inline bool trap_is_unsupported_scv(struct pt_regs *regs)
 
 static inline bool trap_is_syscall(struct pt_regs *regs)
 {
-	return (trap_is_scv(regs) || TRAP(regs) == 0xc00);
+	return (trap_is_scv(regs) || TRAP(regs) == INTERRUPT_SYSCALL);
 }
 
 static inline bool trap_norestart(struct pt_regs *regs)
