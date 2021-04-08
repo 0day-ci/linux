@@ -1238,6 +1238,13 @@ struct journal_s
 	 */
 	__u32 j_csum_seed;
 
+	/**
+	 * @j_rcu:
+	 *
+	 * Prevent racing between accessing and destroy at the same time.
+	 */
+	struct rcu_head j_rcu;
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	/**
 	 * @j_trans_commit_map:
@@ -1509,7 +1516,9 @@ extern int	   jbd2_journal_set_features
 extern void	   jbd2_journal_clear_features
 		   (journal_t *, unsigned long, unsigned long, unsigned long);
 extern int	   jbd2_journal_load       (journal_t *journal);
-extern int	   jbd2_journal_destroy    (journal_t *);
+extern void	   jbd2_journal_destroy    (journal_t *);
+extern int	   jbd2_journal_release    (journal_t *);
+extern void	   jbd2_journal_release_rcu     (struct rcu_head *rcu);
 extern int	   jbd2_journal_recover    (journal_t *journal);
 extern int	   jbd2_journal_wipe       (journal_t *, int);
 extern int	   jbd2_journal_skip_recovery	(journal_t *);

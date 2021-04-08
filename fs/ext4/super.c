@@ -1150,6 +1150,21 @@ static inline void ext4_quota_off_umount(struct super_block *sb)
 }
 #endif
 
+static int ext4_journal_release(struct ext4_sb_info *sbi)
+{
+	journal_t *journal = sbi->s_journal;
+	int ret;
+
+	ret = jbd2_journal_release(journal);
+	sbi->s_journal = NULL;
+	/*
+	 * Call rcu to prevent racing with bdev_try_to_free_page()
+	 * accessing the journal at the same time.
+	 */
+	call_rcu(&journal->j_rcu, jbd2_journal_release_rcu);
+	return ret;
+}
+
 static void ext4_put_super(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
@@ -1174,11 +1189,9 @@ static void ext4_put_super(struct super_block *sb)
 
 	if (sbi->s_journal) {
 		aborted = is_journal_aborted(sbi->s_journal);
-		err = jbd2_journal_destroy(sbi->s_journal);
-		sbi->s_journal = NULL;
-		if ((err < 0) && !aborted) {
+		err = ext4_journal_release(sbi);
+		if ((err < 0) && !aborted)
 			ext4_abort(sb, -err, "Couldn't clean up the journal");
-		}
 	}
 
 	ext4_es_unregister_shrinker(sbi);
@@ -1449,14 +1462,18 @@ static int ext4_nfs_commit_metadata(struct inode *inode)
 static int bdev_try_to_free_page(struct super_block *sb, struct page *page,
 				 gfp_t wait)
 {
-	journal_t *journal = EXT4_SB(sb)->s_journal;
+	journal_t *journal;
 	int ret = 0;
 
 	WARN_ON(PageChecked(page));
 	if (!page_has_buffers(page))
 		return 0;
+
+	rcu_read_lock();
+	journal = READ_ONCE(EXT4_SB(sb)->s_journal);
 	if (journal)
 		ret = jbd2_journal_try_to_free_buffers(journal, page);
+	rcu_read_unlock();
 	if (!ret)
 		return try_to_free_buffers(page);
 	return 0;
@@ -5149,10 +5166,8 @@ failed_mount_wq:
 	ext4_xattr_destroy_cache(sbi->s_ea_block_cache);
 	sbi->s_ea_block_cache = NULL;
 
-	if (sbi->s_journal) {
-		jbd2_journal_destroy(sbi->s_journal);
-		sbi->s_journal = NULL;
-	}
+	if (sbi->s_journal)
+		ext4_journal_release(sbi);
 failed_mount3a:
 	ext4_es_unregister_shrinker(sbi);
 failed_mount3:

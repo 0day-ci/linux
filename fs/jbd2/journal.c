@@ -76,6 +76,8 @@ EXPORT_SYMBOL(jbd2_journal_check_available_features);
 EXPORT_SYMBOL(jbd2_journal_set_features);
 EXPORT_SYMBOL(jbd2_journal_load);
 EXPORT_SYMBOL(jbd2_journal_destroy);
+EXPORT_SYMBOL(jbd2_journal_release);
+EXPORT_SYMBOL(jbd2_journal_release_rcu);
 EXPORT_SYMBOL(jbd2_journal_abort);
 EXPORT_SYMBOL(jbd2_journal_errno);
 EXPORT_SYMBOL(jbd2_journal_ack_err);
@@ -1951,14 +1953,14 @@ recovery_error:
 }
 
 /**
- * jbd2_journal_destroy() - Release a journal_t structure.
+ * jbd2_journal_release() - Release a journal_t structure.
  * @journal: Journal to act on.
  *
  * Release a journal_t structure once it is no longer in use by the
  * journaled object.
  * Return <0 if we couldn't clean up the journal.
  */
-int jbd2_journal_destroy(journal_t *journal)
+int jbd2_journal_release(journal_t *journal)
 {
 	int err = 0;
 
@@ -2021,11 +2023,33 @@ int jbd2_journal_destroy(journal_t *journal)
 		crypto_free_shash(journal->j_chksum_driver);
 	kfree(journal->j_fc_wbuf);
 	kfree(journal->j_wbuf);
-	kfree(journal);
 
 	return err;
 }
 
+/**
+ * jbd2_journal_release_rcu() - Free a journal_t structure.
+ * @rcu: rcu list node relate to the journal want to free.
+ *
+ * Freeing a journal_t structure after a rcu grace period.
+ */
+void jbd2_journal_release_rcu(struct rcu_head *rcu)
+{
+	kfree(container_of(rcu, journal_t, j_rcu));
+}
+
+/**
+ * jbd2_journal_destroy() - Release and free a journal_t structure.
+ * @journal: Journal to act on.
+ *
+ * Release and free a journal_t structure once it is no longer in use
+ * by the journaled object.
+ */
+void jbd2_journal_destroy(journal_t *journal)
+{
+	jbd2_journal_release(journal);
+	kfree(journal);
+}
 
 /**
  * jbd2_journal_check_used_features() - Check if features specified are used.
