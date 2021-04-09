@@ -66,13 +66,13 @@ xattr_resolve_name(struct inode *inode, const char **name)
 
 		n = strcmp_prefix(*name, xattr_prefix(handler));
 		if (n) {
-			if (!handler->prefix ^ !*n) {
-				if (*n)
-					continue;
-				return ERR_PTR(-EINVAL);
+			if (!handler->prefix == !*n) {
+				*name = n;
+				return handler;
 			}
-			*name = n;
-			return handler;
+			if (*n)
+				continue;
+			return ERR_PTR(-EINVAL);
 		}
 	}
 	return ERR_PTR(-EOPNOTSUPP);
