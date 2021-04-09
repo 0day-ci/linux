@@ -143,12 +143,19 @@ static inline void hlist_bl_del_init(struct hlist_bl_node *n)
 	}
 }
 
-static inline void hlist_bl_lock(struct hlist_bl_head *b)
+static inline void hlist_bl_lock(struct hlist_bl_head *b, ...)
 {
 	bit_spin_lock(0, (unsigned long *)b);
 }
 
-static inline void hlist_bl_unlock(struct hlist_bl_head *b)
+static inline void hlist_bl_lock_nested(struct hlist_bl_head *b,
+		struct split_lock *sl, unsigned int subclass)
+{
+	bit_spin_lock_nested(0, (unsigned long *)b, sl, subclass);
+}
+
+static inline void hlist_bl_unlock(struct hlist_bl_head *b,
+					...)
 {
 	__bit_spin_unlock(0, (unsigned long *)b);
 }
