@@ -27,7 +27,7 @@
 #include <linux/pmu.h>
 #include <asm/prom.h>
 
-static spinlock_t pmu_blink_lock;
+static DEFINE_SPINLOCK(pmu_blink_lock);
 static struct adb_request pmu_blink_req;
 /* -1: no change, 0: request off, 1: request on */
 static int requested_change;
@@ -105,8 +105,6 @@ static int __init via_pmu_led_init(void)
 		return -ENODEV;
 	}
 	of_node_put(dt);
-
-	spin_lock_init(&pmu_blink_lock);
 	/* no outstanding req */
 	pmu_blink_req.complete = 1;
 	pmu_blink_req.done = pmu_req_done;
