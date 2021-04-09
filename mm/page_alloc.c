@@ -8799,18 +8799,29 @@ void zone_pcp_disable(struct zone *zone)
 
 void zone_pcp_enable(struct zone *zone)
 {
-	__zone_set_pageset_high_and_batch(zone, zone->pageset_high, zone->pageset_batch);
+	/*
+	 * If the zone is populated, restore the high and batch counts.
+	 * If unpopulated, leave the high and batch count as 0 and 1
+	 * respectively as done by zone_pcp_disable. The per-cpu
+	 * structures will later be freed by zone_pcp_destroy.
+	 */
+	if (populated_zone(zone))
+		__zone_set_pageset_high_and_batch(zone, zone->pageset_high, zone->pageset_batch);
+
 	mutex_unlock(&pcp_batch_high_lock);
 }
 
-void zone_pcp_reset(struct zone *zone)
+/*
+ * Called when a zone has been hot-removed. At this point, the PCP has been
+ * drained, disabled and the zone is removed from the zonelists so the
+ * structures are no longer in use. PCP was disabled/drained by
+ * zone_pcp_disable. This function will drain any remaining vmstat deltas.
+ */
+void zone_pcp_destroy(struct zone *zone)
 {
-	unsigned long flags;
 	int cpu;
 	struct per_cpu_pageset *pset;
 
-	/* avoid races with drain_pages()  */
-	local_irq_save(flags);
 	if (zone->pageset != &boot_pageset) {
 		for_each_online_cpu(cpu) {
 			pset = per_cpu_ptr(zone->pageset, cpu);
@@ -8819,7 +8830,6 @@ void zone_pcp_reset(struct zone *zone)
 		free_percpu(zone->pageset);
 		zone->pageset = &boot_pageset;
 	}
-	local_irq_restore(flags);
 }
 
 #ifdef CONFIG_MEMORY_HOTREMOVE

@@ -1687,11 +1687,15 @@ int __ref offline_pages(unsigned long start_pfn, unsigned long nr_pages)
 	zone->nr_isolate_pageblock -= nr_pages / pageblock_nr_pages;
 	spin_unlock_irqrestore(&zone->lock, flags);
 
-	zone_pcp_enable(zone);
-
 	/* removal success */
 	adjust_managed_page_count(pfn_to_page(start_pfn), -nr_pages);
 	zone->present_pages -= nr_pages;
+
+	/*
+	 * Restore PCP after managed pages has been updated. Unpopulated
+	 * zones PCP structures will remain unusable.
+	 */
+	zone_pcp_enable(zone);
 
 	pgdat_resize_lock(zone->zone_pgdat, &flags);
 	zone->zone_pgdat->node_present_pages -= nr_pages;
@@ -1700,8 +1704,8 @@ int __ref offline_pages(unsigned long start_pfn, unsigned long nr_pages)
 	init_per_zone_wmark_min();
 
 	if (!populated_zone(zone)) {
-		zone_pcp_reset(zone);
 		build_all_zonelists(NULL);
+		zone_pcp_destroy(zone);
 	} else
 		zone_pcp_update(zone);
 
