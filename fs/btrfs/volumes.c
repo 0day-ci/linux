@@ -3103,6 +3103,10 @@ static int btrfs_relocate_chunk(struct btrfs_fs_info *fs_info, u64 chunk_offset)
 	struct btrfs_root *root = fs_info->chunk_root;
 	struct btrfs_trans_handle *trans;
 	struct btrfs_block_group *block_group;
+	const bool trim = btrfs_is_zoned(fs_info) ||
+				btrfs_test_opt(fs_info, DISCARD_SYNC);
+	u64 trimmed;
+	u64 length;
 	int ret;
 
 	/*
@@ -3130,6 +3134,7 @@ static int btrfs_relocate_chunk(struct btrfs_fs_info *fs_info, u64 chunk_offset)
 	if (!block_group)
 		return -ENOENT;
 	btrfs_discard_cancel_work(&fs_info->discard_ctl, block_group);
+	length = block_group->length;
 	btrfs_put_block_group(block_group);
 
 	trans = btrfs_start_trans_remove_block_group(root->fs_info,
@@ -3144,6 +3149,14 @@ static int btrfs_relocate_chunk(struct btrfs_fs_info *fs_info, u64 chunk_offset)
 	 * step two, delete the device extents and the
 	 * chunk tree entries
 	 */
+	if (trim) {
+		ret = btrfs_discard_extent(fs_info, chunk_offset, length,
+					   &trimmed);
+		if (ret) {
+			btrfs_abort_transaction(trans, ret);
+			return ret;
+		}
+	}
 	ret = btrfs_remove_chunk(trans, chunk_offset);
 	btrfs_end_transaction(trans);
 	return ret;
