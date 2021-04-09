@@ -12,14 +12,14 @@
 #include "hantro_hw.h"
 #include "hantro_g1_regs.h"
 
-#define HANTRO_PP_REG_WRITE(vpu, reg_name, val) \
+#define hantro_pp_reg_write(vpu, reg_name, val) \
 { \
 	hantro_reg_write(vpu, \
 			 &(vpu)->variant->postproc_regs->reg_name, \
 			 val); \
 }
 
-#define HANTRO_PP_REG_WRITE_S(vpu, reg_name, val) \
+#define hantro_pp_reg_write_s(vpu, reg_name, val) \
 { \
 	hantro_reg_write_s(vpu, \
 			   &(vpu)->variant->postproc_regs->reg_name, \
@@ -61,7 +61,7 @@ void hantro_postproc_enable(struct hantro_ctx *ctx)
 		return;
 
 	/* Turn on pipeline mode. Must be done first. */
-	HANTRO_PP_REG_WRITE_S(vpu, pipeline_en, 0x1);
+	hantro_pp_reg_write_s(vpu, pipeline_en, 0x1);
 
 	src_pp_fmt = VPU_PP_IN_NV12;
 
@@ -79,19 +79,19 @@ void hantro_postproc_enable(struct hantro_ctx *ctx)
 	dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
 	dst_dma = vb2_dma_contig_plane_dma_addr(&dst_buf->vb2_buf, 0);
 
-	HANTRO_PP_REG_WRITE(vpu, clk_gate, 0x1);
-	HANTRO_PP_REG_WRITE(vpu, out_endian, 0x1);
-	HANTRO_PP_REG_WRITE(vpu, out_swap32, 0x1);
-	HANTRO_PP_REG_WRITE(vpu, max_burst, 16);
-	HANTRO_PP_REG_WRITE(vpu, out_luma_base, dst_dma);
-	HANTRO_PP_REG_WRITE(vpu, input_width, MB_WIDTH(ctx->dst_fmt.width));
-	HANTRO_PP_REG_WRITE(vpu, input_height, MB_HEIGHT(ctx->dst_fmt.height));
-	HANTRO_PP_REG_WRITE(vpu, input_fmt, src_pp_fmt);
-	HANTRO_PP_REG_WRITE(vpu, output_fmt, dst_pp_fmt);
-	HANTRO_PP_REG_WRITE(vpu, output_width, ctx->dst_fmt.width);
-	HANTRO_PP_REG_WRITE(vpu, output_height, ctx->dst_fmt.height);
-	HANTRO_PP_REG_WRITE(vpu, orig_width, MB_WIDTH(ctx->dst_fmt.width));
-	HANTRO_PP_REG_WRITE(vpu, display_width, ctx->dst_fmt.width);
+	hantro_pp_reg_write(vpu, clk_gate, 0x1);
+	hantro_pp_reg_write(vpu, out_endian, 0x1);
+	hantro_pp_reg_write(vpu, out_swap32, 0x1);
+	hantro_pp_reg_write(vpu, max_burst, 16);
+	hantro_pp_reg_write(vpu, out_luma_base, dst_dma);
+	hantro_pp_reg_write(vpu, input_width, MB_WIDTH(ctx->dst_fmt.width));
+	hantro_pp_reg_write(vpu, input_height, MB_HEIGHT(ctx->dst_fmt.height));
+	hantro_pp_reg_write(vpu, input_fmt, src_pp_fmt);
+	hantro_pp_reg_write(vpu, output_fmt, dst_pp_fmt);
+	hantro_pp_reg_write(vpu, output_width, ctx->dst_fmt.width);
+	hantro_pp_reg_write(vpu, output_height, ctx->dst_fmt.height);
+	hantro_pp_reg_write(vpu, orig_width, MB_WIDTH(ctx->dst_fmt.width));
+	hantro_pp_reg_write(vpu, display_width, ctx->dst_fmt.width);
 }
 
 void hantro_postproc_free(struct hantro_ctx *ctx)
@@ -146,5 +146,5 @@ void hantro_postproc_disable(struct hantro_ctx *ctx)
 	if (!vpu->variant->postproc_regs)
 		return;
 
-	HANTRO_PP_REG_WRITE_S(vpu, pipeline_en, 0x0);
+	hantro_pp_reg_write_s(vpu, pipeline_en, 0x0);
 }
