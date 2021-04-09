@@ -2973,6 +2973,44 @@ static void xhci_check_bw_drop_ep_streams(struct xhci_hcd *xhci,
 	}
 }
 
+static void xhci_update_ess_max_interval(struct xhci_hcd *xhci)
+{
+	unsigned int max_ess_interval = 0;
+	int j;
+
+	for (j = 1; j < HCS_MAX_SLOTS(xhci->hcs_params1); j++) {
+		struct xhci_virt_device	*virt_dev;
+		int i;
+
+		virt_dev = xhci->devs[j];
+		if (!virt_dev)
+			continue;
+
+		/* Only update for eSS devices */
+		if (virt_dev->udev &&
+		    virt_dev->udev->speed < USB_SPEED_SUPER)
+			continue;
+
+		for (i = 0; i < 31; i++) {
+			struct xhci_ep_ctx *ep_ctx;
+			unsigned int ep_type;
+			unsigned int interval;
+
+			ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->out_ctx, i);
+			ep_type = CTX_TO_EP_TYPE(le32_to_cpu(ep_ctx->ep_info2));
+
+			if (xhci_is_async_ep(ep_type))
+				continue;
+
+			interval = CTX_TO_EP_INTERVAL(le32_to_cpu(ep_ctx->ep_info));
+			if (interval > max_ess_interval)
+				max_ess_interval = interval;
+		}
+	}
+
+	xhci->max_ess_interval = max_ess_interval;
+}
+
 /* Called after one or more calls to xhci_add_endpoint() or
  * xhci_drop_endpoint().  If this call fails, the USB core is expected
  * to call xhci_reset_bandwidth().
@@ -3046,6 +3084,17 @@ int xhci_check_bandwidth(struct usb_hcd *hcd, struct usb_device *udev)
 	if (ret)
 		/* Callee should call reset_bandwidth() */
 		goto command_cleanup;
+
+	if (xhci->quirks & XHCI_ISOC_BLOCKED_DISCONNECT) {
+		xhci_update_ess_max_interval(xhci);
+
+		/* Cancel disconnection check on change of context */
+		if (delayed_work_pending(&virt_dev->resume_isoc) &&
+		    ctrl_ctx->drop_flags) {
+			cancel_delayed_work(&virt_dev->resume_isoc);
+			virt_dev->flags &= ~VDEV_DISCONN_CHECK_PENDING;
+		}
+	}
 
 	/* Free any rings that were dropped, but not changed. */
 	for (i = 1; i < 31; i++) {

@@ -419,6 +419,14 @@ void xhci_ring_ep_doorbell(struct xhci_hcd *xhci,
 	struct xhci_virt_ep *ep = &xhci->devs[slot_id]->eps[ep_index];
 	unsigned int ep_state = ep->ep_state;
 
+	/*
+	 * Don't ring the doorbell for isoc IN endpoint while checking for
+	 * device disconnection.
+	 */
+	if (ep->ring && ep->ring->type == TYPE_ISOC && !(ep_index % 2) &&
+	    (xhci->devs[slot_id]->flags & VDEV_DISCONN_CHECK_PENDING))
+		return;
+
 	/* Don't ring the doorbell for this endpoint if there are pending
 	 * cancellations because we don't want to interrupt processing.
 	 * We don't want to restart any stream rings if there's a set dequeue
@@ -2330,6 +2338,8 @@ static int process_isoc_td(struct xhci_hcd *xhci, struct xhci_virt_ep *ep,
 		struct xhci_ring *ep_ring, struct xhci_td *td,
 		union xhci_trb *ep_trb, struct xhci_transfer_event *event)
 {
+	struct usb_device *udev;
+	struct xhci_virt_device *vdev;
 	struct urb_priv *urb_priv;
 	int idx;
 	struct usb_iso_packet_descriptor *frame;
@@ -2347,10 +2357,13 @@ static int process_isoc_td(struct xhci_hcd *xhci, struct xhci_virt_ep *ep,
 	ep_trb_len = TRB_LEN(le32_to_cpu(ep_trb->generic.field[2]));
 	short_framestatus = td->urb->transfer_flags & URB_SHORT_NOT_OK ?
 		-EREMOTEIO : 0;
+	udev = td->urb->dev;
+	vdev = xhci->devs[udev->slot_id];
 
 	/* handle completion code */
 	switch (trb_comp_code) {
 	case COMP_SUCCESS:
+		ep->ring->err_count = 0;
 		if (remaining) {
 			frame->status = short_framestatus;
 			if (xhci->quirks & XHCI_TRUST_TX_LENGTH)
@@ -2375,6 +2388,23 @@ static int process_isoc_td(struct xhci_hcd *xhci, struct xhci_virt_ep *ep,
 		frame->status = -EPROTO;
 		break;
 	case COMP_USB_TRANSACTION_ERROR:
+		if ((xhci->quirks & XHCI_ISOC_BLOCKED_DISCONNECT) &&
+		    usb_urb_dir_in(td->urb) &&
+		    udev->parent && udev->parent->parent &&
+		    udev->speed >= USB_SPEED_SUPER) {
+			if (!(vdev->flags & VDEV_DISCONN_CHECK_PENDING) &&
+			    ep->ring->err_count++ >= 3) {
+				unsigned long timeout;
+
+				/* Wait for at least max interval x 2 x 125us */
+				timeout = (1 << xhci->max_ess_interval) * 250;
+				vdev->flags |= VDEV_DISCONN_CHECK_PENDING;
+				queue_delayed_work(system_wq,
+						   &vdev->resume_isoc,
+						   usecs_to_jiffies(timeout));
+			}
+		}
+
 		frame->status = -EPROTO;
 		if (ep_trb != td->last_trb)
 			return 0;
@@ -4171,6 +4201,9 @@ int xhci_queue_isoc_tx_prepare(struct xhci_hcd *xhci, gfp_t mem_flags,
 	for (i = 0; i < num_tds; i++)
 		num_trbs += count_isoc_trbs_needed(urb, i);
 
+	if ((xdev->flags & VDEV_DISCONN_CHECK_PENDING) && usb_urb_dir_in(urb))
+		return -EINVAL;
+
 	/* Check the ring to guarantee there is enough room for the whole urb.
 	 * Do not insert any td of the urb to the ring if the check failed.
 	 */
@@ -4358,4 +4391,47 @@ int xhci_queue_reset_ep(struct xhci_hcd *xhci, struct xhci_command *cmd,
 
 	return queue_command(xhci, cmd, 0, 0, 0,
 			trb_slot_id | trb_ep_index | type, false);
+}
+
+void xhci_resume_isoc(struct work_struct *work)
+{
+	struct xhci_hcd *xhci;
+	struct xhci_virt_device *vdev;
+	unsigned int slot_id;
+	unsigned long flags;
+
+	vdev = container_of(to_delayed_work(work),
+			    struct xhci_virt_device, resume_isoc);
+	xhci = vdev->xhci;
+
+	spin_lock_irqsave(&xhci->lock, flags);
+
+	/* Check if the device is dropped before this work takes place */
+	if (!vdev->udev)
+		goto out;
+
+	slot_id = vdev->udev->slot_id;
+
+	vdev->flags &= ~VDEV_DISCONN_CHECK_PENDING;
+
+	/* Resume isoc transfers if the device is still connected */
+	if (xhci->devs[slot_id]) {
+		int i;
+
+		/* Ring doorbell for IN isoc endpoints only */
+		for (i = 2; i < 31; i += 2) {
+			struct xhci_virt_ep *ep = &vdev->eps[i];
+
+			if (!ep)
+				break;
+
+			if (ep->ring && ep->ring->type == TYPE_ISOC) {
+				ep->ring->err_count = 0;
+				ring_doorbell_for_active_rings(xhci, slot_id, i);
+			}
+		}
+	}
+
+out:
+	spin_unlock_irqrestore(&xhci->lock, flags);
 }
