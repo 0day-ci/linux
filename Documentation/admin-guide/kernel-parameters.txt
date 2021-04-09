@@ -1780,6 +1780,10 @@
 			appraised (with imasig requirement) instead of files
 			owned by root.
 
+			The "appraise_exec_immutable" policy requires immutable
+			metadata for executed files, if the "appraise_exec_tcb"
+			policy is selected.
+
 			The "appraise_tmpfs" policy excludes the dont_appraise
 			rule for the tmpfs and ramfs filesystems for the
 			"appraise_tcb" and "appraise_exec_tcb" policies.

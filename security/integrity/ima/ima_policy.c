@@ -243,6 +243,7 @@ __setup("ima_tcb", default_measure_policy_setup);
 static unsigned int ima_measure_skip_flags __initdata;
 static unsigned int ima_appraise_skip_flags __initdata;
 static bool ima_use_appraise_tcb __initdata;
+static bool ima_use_appraise_exec_immutable __initdata;
 static bool ima_use_secure_boot __initdata;
 static bool ima_use_critical_data __initdata;
 static bool ima_fail_unverifiable_sigs __ro_after_init;
@@ -267,7 +268,9 @@ static int __init policy_setup(char *str)
 		else if (strcmp(p, "appraise_exec_tcb") == 0) {
 			ima_use_appraise_tcb = true;
 			ima_appraise_skip_flags |= IMA_SKIP_OPEN;
-		} else if (strcmp(p, "secure_boot") == 0)
+		} else if (strcmp(p, "appraise_exec_immutable") == 0)
+			ima_use_appraise_exec_immutable = true;
+		else if (strcmp(p, "secure_boot") == 0)
 			ima_use_secure_boot = true;
 		else if (strcmp(p, "critical_data") == 0)
 			ima_use_critical_data = true;
@@ -912,6 +915,9 @@ void __init ima_init_policy(void)
 				  ARRAY_SIZE(appraise_exec_rules),
 				  IMA_DEFAULT_POLICY, 0);
 	}
+
+	if (ima_use_appraise_exec_immutable)
+		appraise_exec_rules[0].flags |= IMA_META_IMMUTABLE_REQUIRED;
 
 	if (ima_use_critical_data)
 		add_rules(critical_data_rules,
