@@ -17,6 +17,7 @@ struct kmem_cache *fscache_cookie_jar;
 
 static atomic_t fscache_object_debug_id = ATOMIC_INIT(0);
 
+static DEFINE_SPLIT_LOCK(cookie_hash_lock);
 #define fscache_cookie_hash_shift 15
 static struct hlist_bl_head fscache_cookie_hash[1 << fscache_cookie_hash_shift];
 
@@ -202,7 +203,7 @@ struct fscache_cookie *fscache_hash_cookie(struct fscache_cookie *candidate)
 	bucket = candidate->key_hash & (ARRAY_SIZE(fscache_cookie_hash) - 1);
 	h = &fscache_cookie_hash[bucket];
 
-	hlist_bl_lock(h);
+	hlist_bl_lock(h, &cookie_hash_lock);
 	hlist_bl_for_each_entry(cursor, p, h, hash_link) {
 		if (fscache_compare_cookie(candidate, cursor) == 0)
 			goto collision;
@@ -212,7 +213,7 @@ struct fscache_cookie *fscache_hash_cookie(struct fscache_cookie *candidate)
 	fscache_cookie_get(candidate->parent, fscache_cookie_get_acquire_parent);
 	atomic_inc(&candidate->parent->n_children);
 	hlist_bl_add_head(&candidate->hash_link, h);
-	hlist_bl_unlock(h);
+	hlist_bl_unlock(h, &cookie_hash_lock);
 	return candidate;
 
 collision:
@@ -222,12 +223,12 @@ collision:
 		pr_err("Duplicate cookie detected\n");
 		fscache_print_cookie(cursor, 'O');
 		fscache_print_cookie(candidate, 'N');
-		hlist_bl_unlock(h);
+		hlist_bl_unlock(h, &cookie_hash_lock);
 		return NULL;
 	}
 
 	fscache_cookie_get(cursor, fscache_cookie_get_reacquire);
-	hlist_bl_unlock(h);
+	hlist_bl_unlock(h, &cookie_hash_lock);
 	return cursor;
 }
 
@@ -845,9 +846,9 @@ static void fscache_unhash_cookie(struct fscache_cookie *cookie)
 	bucket = cookie->key_hash & (ARRAY_SIZE(fscache_cookie_hash) - 1);
 	h = &fscache_cookie_hash[bucket];
 
-	hlist_bl_lock(h);
+	hlist_bl_lock(h, &cookie_hash_lock);
 	hlist_bl_del(&cookie->hash_link);
-	hlist_bl_unlock(h);
+	hlist_bl_unlock(h, &cookie_hash_lock);
 }
 
 /*
