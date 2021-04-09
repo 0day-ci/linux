@@ -628,7 +628,7 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 		}
 		ret = v4l2_subdev_call(state->src_sd, core, s_power, 1);
 		if (ret < 0)
-			return ret;
+			goto pm_put;
 	}
 
 	mutex_lock(&state->lock);
@@ -657,7 +657,8 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 
 unlock:
 	mutex_unlock(&state->lock);
-	if (!enable)
+pm_put:
+	if (!enable || (ret < 0))
 		pm_runtime_put(&state->pdev->dev);
 
 	return ret;
