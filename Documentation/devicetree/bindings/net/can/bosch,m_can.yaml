@@ -109,6 +109,12 @@ properties:
   can-transceiver:
     $ref: can-transceiver.yaml#
 
+  phys:
+    minItems: 1
+
+  phy-names:
+    const: can_transceiver
+
 required:
   - compatible
   - reg
