@@ -536,7 +536,7 @@ static netdev_tx_t nixge_start_xmit(struct sk_buff *skb,
 	tx_skb->size = skb_headlen(skb);
 	tx_skb->mapped_as_page = false;
 
-	for (ii = 0; ii < num_frag; ii++) {
+	skb_for_each_frag(skb, ii) {
 		++priv->tx_bd_tail;
 		priv->tx_bd_tail %= TX_BD_NUM;
 		cur_p = &priv->tx_bd_v[priv->tx_bd_tail];

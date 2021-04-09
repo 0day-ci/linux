@@ -772,7 +772,7 @@ axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	desc_set_phys_addr(lp, phys, cur_p);
 	cur_p->cntrl = skb_headlen(skb) | XAXIDMA_BD_CTRL_TXSOF_MASK;
 
-	for (ii = 0; ii < num_frag; ii++) {
+	skb_for_each_frag(skb, ii) {
 		if (++lp->tx_bd_tail >= lp->tx_bd_num)
 			lp->tx_bd_tail = 0;
 		cur_p = &lp->tx_bd_v[lp->tx_bd_tail];

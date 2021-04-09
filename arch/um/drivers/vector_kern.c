@@ -315,7 +315,7 @@ static int prep_msg(struct vector_private *vp,
 	} else
 		iov[iov_index].iov_len = skb->len;
 	iov_index++;
-	for (frag = 0; frag < nr_frags; frag++) {
+	skb_for_each_frag(skb, frag) {
 		skb_frag = &skb_shinfo(skb)->frags[frag];
 		iov[iov_index].iov_base = skb_frag_address_safe(skb_frag);
 		iov[iov_index].iov_len = skb_frag_size(skb_frag);
@@ -657,7 +657,7 @@ static struct sk_buff *prep_skb(
 	iov_index++;
 
 	nr_frags = skb_shinfo(result)->nr_frags;
-	for (frag = 0; frag < nr_frags; frag++) {
+	skb_for_each_frag(result, frag) {
 		skb_frag = &skb_shinfo(result)->frags[frag];
 		iov[iov_index].iov_base = skb_frag_address_safe(skb_frag);
 		if (iov[iov_index].iov_base != NULL)

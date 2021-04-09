@@ -589,7 +589,7 @@ vxge_xmit_compl(struct __vxge_hw_fifo *fifo_hw, void *dtr,
 		dma_unmap_single(&fifo->pdev->dev, txd_priv->dma_buffers[i++],
 				 skb_headlen(skb), DMA_TO_DEVICE);
 
-		for (j = 0; j < frg_cnt; j++) {
+		skb_for_each_frag(skb, j) {
 			dma_unmap_page(&fifo->pdev->dev,
 				       txd_priv->dma_buffers[i++],
 				       skb_frag_size(frag), DMA_TO_DEVICE);
@@ -922,7 +922,7 @@ vxge_xmit(struct sk_buff *skb, struct net_device *dev)
 		first_frg_len);
 
 	frag = &skb_shinfo(skb)->frags[0];
-	for (i = 0; i < frg_cnt; i++) {
+	skb_for_each_frag(skb, i) {
 		/* ignore 0 length fragment */
 		if (!skb_frag_size(frag))
 			continue;
@@ -1052,7 +1052,7 @@ vxge_tx_term(void *dtrh, enum vxge_hw_txdl_state state, void *userdata)
 	dma_unmap_single(&fifo->pdev->dev, txd_priv->dma_buffers[i++],
 			 skb_headlen(skb), DMA_TO_DEVICE);
 
-	for (j = 0; j < frg_cnt; j++) {
+	skb_for_each_frag(skb, j) {
 		dma_unmap_page(&fifo->pdev->dev, txd_priv->dma_buffers[i++],
 			       skb_frag_size(frag), DMA_TO_DEVICE);
 		frag += 1;

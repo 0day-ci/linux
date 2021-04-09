@@ -487,7 +487,7 @@ void *inet_frag_reasm_prepare(struct inet_frag_queue *q, struct sk_buff *skb,
 			return NULL;
 		skb_shinfo(clone)->frag_list = skb_shinfo(head)->frag_list;
 		skb_frag_list_init(head);
-		for (i = 0; i < skb_shinfo(head)->nr_frags; i++)
+		skb_for_each_frag(head, i)
 			plen += skb_frag_size(&skb_shinfo(head)->frags[i]);
 		clone->data_len = head->data_len - plen;
 		clone->len = clone->data_len;

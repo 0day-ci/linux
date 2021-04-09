@@ -1640,7 +1640,7 @@ static netdev_tx_t lan743x_tx_xmit_frame(struct lan743x_tx *tx,
 	if (nr_frags <= 0)
 		goto finish;
 
-	for (j = 0; j < nr_frags; j++) {
+	skb_for_each_frag(skb, j) {
 		const skb_frag_t *frag = &(skb_shinfo(skb)->frags[j]);
 
 		if (lan743x_tx_frame_add_fragment(tx, frag, frame_length)) {

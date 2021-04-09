@@ -6681,7 +6681,7 @@ bnx2_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx_buf->nr_frags = last_frag;
 	tx_buf->is_gso = skb_is_gso(skb);
 
-	for (i = 0; i < last_frag; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		prod = BNX2_NEXT_TX_BD(prod);

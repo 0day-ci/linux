@@ -773,7 +773,7 @@ static netdev_tx_t ftgmac100_hard_start_xmit(struct sk_buff *skb,
 	pointer = ftgmac100_next_tx_pointer(priv, pointer);
 
 	/* Add the fragments */
-	for (i = 0; i < nfrags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		len = skb_frag_size(frag);

@@ -1692,7 +1692,7 @@ static int mlxsw_pci_skb_transmit(void *bus_priv, struct sk_buff *skb,
 	if (err)
 		goto unlock;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		err = mlxsw_pci_wqe_frag_map(mlxsw_pci, wqe, i + 1,

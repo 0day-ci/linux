@@ -2058,7 +2058,7 @@ static netdev_features_t macb_features_check(struct sk_buff *skb,
 	nr_frags = skb_shinfo(skb)->nr_frags;
 	/* No need to check last fragment */
 	nr_frags--;
-	for (f = 0; f < nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[f];
 
 		if (!IS_ALIGNED(skb_frag_size(frag), MACB_TX_LEN_ALIGN))
@@ -2200,7 +2200,7 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	else
 		desc_cnt = DIV_ROUND_UP(skb_headlen(skb), bp->max_tx_length);
 	nr_frags = skb_shinfo(skb)->nr_frags;
-	for (f = 0; f < nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		frag_size = skb_frag_size(&skb_shinfo(skb)->frags[f]);
 		desc_cnt += DIV_ROUND_UP(frag_size, bp->max_tx_length);
 	}

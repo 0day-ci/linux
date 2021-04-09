@@ -878,7 +878,7 @@ temac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	cur_p->phys = cpu_to_be32(skb_dma_addr);
 	ptr_to_txbd((void *)skb, cur_p);
 
-	for (ii = 0; ii < num_frag; ii++) {
+	skb_for_each_frag(skb, ii) {
 		if (++lp->tx_bd_tail >= lp->tx_bd_num)
 			lp->tx_bd_tail = 0;
 

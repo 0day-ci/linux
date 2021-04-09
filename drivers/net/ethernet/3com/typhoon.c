@@ -808,7 +808,7 @@ typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 		txd->frag.addrHi = 0;
 		first_txd->numDesc++;
 
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 			void *frag_addr;
 

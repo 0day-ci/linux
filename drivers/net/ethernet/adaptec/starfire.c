@@ -1368,7 +1368,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance)
 				entry = (entry + np->tx_info[entry].used_slots) % TX_RING_SIZE;
 				{
 					int i;
-					for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+					skb_for_each_frag(skb, i) {
 						dma_unmap_single(&np->pci_dev->dev,
 								 np->tx_info[entry].mapping,
 								 skb_frag_size(&skb_shinfo(skb)->frags[i]),

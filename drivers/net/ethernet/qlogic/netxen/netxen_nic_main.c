@@ -1986,7 +1986,7 @@ netxen_map_tx_skb(struct pci_dev *pdev,
 	nf->dma = map;
 	nf->length = skb_headlen(skb);
 
-	for (i = 0; i < nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 		nf = &pbuf->frag_array[i+1];
 

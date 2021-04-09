@@ -630,8 +630,7 @@ do_frag_list:
 			goto out;
 		}
 
-		for (fragidx = 0; fragidx < skb_shinfo(skb)->nr_frags;
-		     fragidx++) {
+		skb_for_each_frag(skb, fragidx) {
 			skb_frag_t *frag;
 
 			frag_offset = 0;

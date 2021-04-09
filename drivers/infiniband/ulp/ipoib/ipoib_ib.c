@@ -289,7 +289,7 @@ int ipoib_dma_map_tx(struct ib_device *ca, struct ipoib_tx_buf *tx_req)
 	} else
 		off = 0;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; ++i) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		mapping[i + off] = ib_dma_map_page(ca,
 						 skb_frag_page(frag),
@@ -329,7 +329,7 @@ void ipoib_dma_unmap_tx(struct ipoib_dev_priv *priv,
 	} else
 		off = 0;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; ++i) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		ib_dma_unmap_page(priv->ca, mapping[i + off],

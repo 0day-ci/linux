@@ -106,7 +106,7 @@ static void greth_print_tx_packet(struct sk_buff *skb)
 	print_hex_dump(KERN_DEBUG, "TX: ", DUMP_PREFIX_OFFSET, 16, 1,
 			skb->data, length, true);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 
 		print_hex_dump(KERN_DEBUG, "TX: ", DUMP_PREFIX_OFFSET, 16, 1,
 			       skb_frag_address(&skb_shinfo(skb)->frags[i]),
@@ -514,7 +514,7 @@ greth_start_xmit_gbit(struct sk_buff *skb, struct net_device *dev)
 	curr_tx = NEXT_TX(greth->tx_next);
 
 	/* Frags */
-	for (i = 0; i < nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		greth->tx_skbuff[curr_tx] = NULL;
 		bdp = greth->tx_bd_base + curr_tx;
@@ -710,7 +710,7 @@ static void greth_clean_tx_gbit(struct net_device *dev)
 				 skb_headlen(skb),
 				 DMA_TO_DEVICE);
 
-		for (i = 0; i < nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 			bdp = greth->tx_bd_base + tx_last;
 

@@ -2965,7 +2965,7 @@ static int ena_tx_map_skb(struct ena_ring *tx_ring,
 
 	last_frag = skb_shinfo(skb)->nr_frags;
 
-	for (i = 0; i < last_frag; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		frag_len = skb_frag_size(frag);

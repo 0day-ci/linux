@@ -101,7 +101,7 @@ static noinline int build_vnic_ulp_payload(struct sdma_engine *sde,
 	if (unlikely(ret))
 		goto bail_txadd;
 
-	for (i = 0; i < skb_shinfo(tx->skb)->nr_frags; i++) {
+	skb_for_each_frag(tx->skb, i) {
 		skb_frag_t *frag = &skb_shinfo(tx->skb)->frags[i];
 
 		/* combine physically continuous fragments later? */

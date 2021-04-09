@@ -1132,7 +1132,7 @@ retry_bounce:
 	descs[0].fields.address = dma_addr;
 
 	/* Map the frags */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		dma_addr = skb_frag_dma_map(&adapter->vdev->dev, frag, 0,

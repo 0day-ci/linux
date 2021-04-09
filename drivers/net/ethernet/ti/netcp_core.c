@@ -1113,7 +1113,7 @@ netcp_tx_map_skb(struct sk_buff *skb, struct netcp_intf *netcp)
 	pdesc = desc;
 
 	/* Handle the case where skb is fragmented in pages */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		struct page *page = skb_frag_page(frag);
 		u32 page_offset = skb_frag_off(frag);

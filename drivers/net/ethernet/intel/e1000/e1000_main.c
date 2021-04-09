@@ -3193,7 +3193,7 @@ static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 		count++;
 
 	nr_frags = skb_shinfo(skb)->nr_frags;
-	for (f = 0; f < nr_frags; f++)
+	skb_for_each_frag(skb, f)
 		count += TXD_USE_COUNT(skb_frag_size(&skb_shinfo(skb)->frags[f]),
 				       max_txd_pwr);
 	if (adapter->pcix_82544)

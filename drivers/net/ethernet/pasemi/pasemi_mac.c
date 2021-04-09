@@ -1450,7 +1450,7 @@ static int pasemi_mac_start_tx(struct sk_buff *skb, struct net_device *dev)
 	if (pci_dma_mapping_error(mac->dma_pdev, map[0]))
 		goto out_err_nolock;
 
-	for (i = 0; i < nfrags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		map[i + 1] = skb_frag_dma_map(&mac->dma_pdev->dev, frag, 0,

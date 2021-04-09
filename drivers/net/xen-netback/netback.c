@@ -1086,7 +1086,7 @@ static int xenvif_handle_frag_list(struct xenvif_queue *queue, struct sk_buff *s
 	}
 
 	/* Release all the original (foreign) frags. */
-	for (f = 0; f < skb_shinfo(skb)->nr_frags; f++)
+	skb_for_each_frag(skb, f)
 		skb_frag_unref(skb, f);
 	uarg = skb_shinfo(skb)->destructor_arg;
 	/* increase inflight counter to offset decrement in callback */

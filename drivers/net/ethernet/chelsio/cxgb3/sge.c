@@ -1021,7 +1021,7 @@ static inline unsigned int write_sgl(const struct sk_buff *skb,
 	}
 
 	nfrags = skb_shinfo(skb)->nr_frags;
-	for (i = 0; i < nfrags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		sgp->len[j] = cpu_to_be32(skb_frag_size(frag));
@@ -1595,7 +1595,7 @@ static void deferred_unmap_destructor(struct sk_buff *skb)
 				 skb_transport_header(skb), PCI_DMA_TODEVICE);
 
 	si = skb_shinfo(skb);
-	for (i = 0; i < si->nr_frags; i++)
+	skb_for_each_frag(skb, i)
 		pci_unmap_page(dui->pdev, *p++, skb_frag_size(&si->frags[i]),
 			       PCI_DMA_TODEVICE);
 }

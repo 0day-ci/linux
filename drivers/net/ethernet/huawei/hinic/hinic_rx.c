@@ -336,7 +336,7 @@ static void hinic_copy_lp_data(struct hinic_dev *nic_dev,
 	frag_len = (int)skb_headlen(skb);
 	memcpy(lb_buf + pkt_offset, skb->data, frag_len);
 	pkt_offset += frag_len;
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag_data = skb_frag_address(&skb_shinfo(skb)->frags[i]);
 		frag_len = (int)skb_frag_size(&skb_shinfo(skb)->frags[i]);
 		memcpy((lb_buf + pkt_offset), frag_data, frag_len);

@@ -5870,7 +5870,7 @@ static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 	count += DIV_ROUND_UP(len, adapter->tx_fifo_limit);
 
 	nr_frags = skb_shinfo(skb)->nr_frags;
-	for (f = 0; f < nr_frags; f++)
+	skb_for_each_frag(skb, f)
 		count += DIV_ROUND_UP(skb_frag_size(&skb_shinfo(skb)->frags[f]),
 				      adapter->tx_fifo_limit);
 

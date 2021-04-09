@@ -4132,7 +4132,7 @@ static netdev_tx_t s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	frg_cnt = skb_shinfo(skb)->nr_frags;
 	/* For fragmented SKB. */
-	for (i = 0; i < frg_cnt; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		/* A '0' length fragment will be ignored */
 		if (!skb_frag_size(frag))

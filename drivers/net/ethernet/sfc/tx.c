@@ -203,7 +203,7 @@ static void efx_skb_copy_bits_to_pio(struct efx_nic *efx, struct sk_buff *skb,
 	efx_memcpy_toio_aligned(efx, piobuf, skb->data, skb_headlen(skb),
 				copy_buf);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; ++i) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
 		u8 *vaddr;
 

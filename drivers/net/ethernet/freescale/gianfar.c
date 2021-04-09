@@ -1102,8 +1102,7 @@ static void free_skb_tx_queue(struct gfar_priv_tx_q *tx_queue)
 		dma_unmap_single(priv->dev, be32_to_cpu(txbdp->bufPtr),
 				 be16_to_cpu(txbdp->length), DMA_TO_DEVICE);
 		txbdp->lstatus = 0;
-		for (j = 0; j < skb_shinfo(tx_queue->tx_skbuff[i])->nr_frags;
-		     j++) {
+		skb_for_each_frag(tx_queue->tx_skbuff[i], j) {
 			txbdp++;
 			dma_unmap_page(priv->dev, be32_to_cpu(txbdp->bufPtr),
 				       be16_to_cpu(txbdp->length),
@@ -2250,7 +2249,7 @@ static void gfar_clean_tx_ring(struct gfar_priv_tx_q *tx_queue)
 		gfar_clear_txbd_status(bdp);
 		bdp = next_txbd(bdp, base, tx_ring_size);
 
-		for (i = 0; i < frags; i++) {
+		skb_for_each_frag(skb, i) {
 			dma_unmap_page(priv->dev, be32_to_cpu(bdp->bufPtr),
 				       be16_to_cpu(bdp->length),
 				       DMA_TO_DEVICE);

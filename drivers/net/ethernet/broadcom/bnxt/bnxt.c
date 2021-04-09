@@ -433,7 +433,7 @@ static netdev_tx_t bnxt_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		skb_copy_from_linear_data(skb, pdata, len);
 		pdata += len;
-		for (j = 0; j < last_frag; j++) {
+		skb_for_each_frag(skb, j) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[j];
 			void *fptr;
 
@@ -537,7 +537,7 @@ normal_tx:
 	txbd1->tx_bd_cfa_meta = cpu_to_le32(vlan_tag_flags);
 	txbd1->tx_bd_cfa_action =
 			cpu_to_le32(cfa_action << TX_BD_CFA_ACTION_SHIFT);
-	for (i = 0; i < last_frag; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		prod = NEXT_TX(prod);
@@ -606,7 +606,7 @@ tx_dma_error:
 	prod = NEXT_TX(prod);
 
 	/* unmap remaining mapped pages */
-	for (i = 0; i < last_frag; i++) {
+	skb_for_each_frag(skb, i) {
 		prod = NEXT_TX(prod);
 		tx_buf = &txr->tx_buf_ring[prod];
 		dma_unmap_page(&pdev->dev, dma_unmap_addr(tx_buf, mapping),

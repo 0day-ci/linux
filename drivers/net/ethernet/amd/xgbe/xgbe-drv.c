@@ -1806,7 +1806,7 @@ static void xgbe_packet_info(struct xgbe_prv_data *pdata,
 		len -= min_t(unsigned int, len, XGBE_TX_MAX_BUF_SIZE);
 	}
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 		for (len = skb_frag_size(frag); len; ) {
 			packet->rdesc_count++;

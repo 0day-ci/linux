@@ -949,7 +949,7 @@ static unsigned long atalk_sum_skb(const struct sk_buff *skb, int offset,
 	}
 
 	/* checksum stuff in frags */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		int end;
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		WARN_ON(start > offset + len);

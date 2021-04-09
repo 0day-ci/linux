@@ -2151,7 +2151,7 @@ static int atl1c_tx_map(struct atl1c_adapter *adapter,
 		use_tpd->buffer_len  = cpu_to_le16(buffer_info->length);
 	}
 
-	for (f = 0; f < nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[f];
 
 		use_tpd = atl1c_get_tpd(adapter, type);

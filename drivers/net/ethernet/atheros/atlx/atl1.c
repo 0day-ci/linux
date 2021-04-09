@@ -2255,7 +2255,7 @@ static void atl1_tx_map(struct atl1_adapter *adapter, struct sk_buff *skb,
 			next_to_use = 0;
 	}
 
-	for (f = 0; f < nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[f];
 		u16 i, nseg;
 
@@ -2358,7 +2358,7 @@ static netdev_tx_t atl1_xmit_frame(struct sk_buff *skb,
 	}
 
 	nr_frags = skb_shinfo(skb)->nr_frags;
-	for (f = 0; f < nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		unsigned int f_size = skb_frag_size(&skb_shinfo(skb)->frags[f]);
 		count += (f_size + ATL1_MAX_TX_BUF_LEN - 1) /
 			 ATL1_MAX_TX_BUF_LEN;

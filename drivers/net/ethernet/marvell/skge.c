@@ -2786,7 +2786,7 @@ static netdev_tx_t skge_xmit_frame(struct sk_buff *skb,
 		struct skge_tx_desc *tf = td;
 
 		control |= BMU_STFWD;
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			map = skb_frag_dma_map(&hw->pdev->dev, frag, 0,

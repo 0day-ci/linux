@@ -2796,7 +2796,7 @@ static inline int cas_xmit_tx_ringN(struct cas *cp, int ring,
 	}
 	entry = TX_DESC_NEXT(ring, entry);
 
-	for (frag = 0; frag < nr_frags; frag++) {
+	skb_for_each_frag(skb, frag) {
 		const skb_frag_t *fragp = &skb_shinfo(skb)->frags[frag];
 
 		len = skb_frag_size(fragp);

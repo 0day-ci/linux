@@ -537,7 +537,7 @@ static void skb_put_frags(struct sk_buff *skb, unsigned int hdr_space,
 	length -= size;
 
 	num_frags = skb_shinfo(skb)->nr_frags;
-	for (i = 0; i < num_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		if (length == 0) {

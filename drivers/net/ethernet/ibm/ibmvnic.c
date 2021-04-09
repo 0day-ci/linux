@@ -1675,7 +1675,7 @@ static netdev_tx_t ibmvnic_xmit(struct sk_buff *skb, struct net_device *netdev)
 		cur = skb_headlen(skb);
 
 		/* Copy the frags */
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			memcpy(dst + cur, skb_frag_address(frag),
