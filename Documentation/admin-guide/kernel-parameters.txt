@@ -1343,6 +1343,14 @@
 			Permit 'security.evm' to be updated regardless of
 			current integrity status.
 
+	evm_hash=	[EVM] Hash algorithm used to calculate the HMAC.
+			Format: { md5 | sha1 | rmd160 | sha256 | sha384
+				   | sha512 | ... }
+			default: "sha256"
+
+			The list of supported hash algorithms is defined
+			in crypto/hash_info.h.
+
 	failslab=
 	fail_usercopy=
 	fail_page_alloc=

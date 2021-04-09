@@ -17,6 +17,7 @@
 #include <crypto/sha1.h>
 #include <linux/key.h>
 #include <linux/audit.h>
+#include <crypto/hash_info.h>
 
 /* iint action cache flags */
 #define IMA_MEASURE		0x00000001
@@ -89,7 +90,7 @@ struct evm_ima_xattr_data {
 /* Only used in the EVM HMAC code. */
 struct evm_xattr {
 	struct evm_ima_xattr_data data;
-	u8 digest[SHA1_DIGEST_SIZE];
+	u8 digest[SHA512_DIGEST_SIZE];
 } __packed;
 
 #define IMA_MAX_DIGEST_SIZE	64
