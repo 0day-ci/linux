@@ -21,7 +21,6 @@
 #include <linux/usb/of.h>
 
 #include "xhci.h"
-#include "xhci-plat.h"
 #include "xhci-mvebu.h"
 #include "xhci-rcar.h"
 

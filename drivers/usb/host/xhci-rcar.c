@@ -14,7 +14,6 @@
 #include <linux/sys_soc.h>
 
 #include "xhci.h"
-#include "xhci-plat.h"
 #include "xhci-rcar.h"
 
 /*
