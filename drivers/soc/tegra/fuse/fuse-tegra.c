@@ -489,8 +489,10 @@ static int __init tegra_init_fuse(void)
 		size_t size = sizeof(*fuse->lookups) * fuse->soc->num_lookups;
 
 		fuse->lookups = kmemdup(fuse->soc->lookups, size, GFP_KERNEL);
-		if (!fuse->lookups)
+		if (!fuse->lookups) {
+			iounmap(fuse->base);
 			return -ENOMEM;
+		}
 
 		nvmem_add_cell_lookups(fuse->lookups, fuse->soc->num_lookups);
 	}
