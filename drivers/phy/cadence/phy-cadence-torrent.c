@@ -288,6 +288,11 @@ enum cdns_torrent_ssc_mode {
 	INTERNAL_SSC
 };
 
+enum cdns_torrent_dp_pll {
+	DP_PLL0 = 0x1,
+	DP_PLL1 = 0x2
+};
+
 struct cdns_torrent_inst {
 	struct phy *phy;
 	u32 mlane;
@@ -301,6 +306,7 @@ struct cdns_torrent_phy {
 	void __iomem *base;	/* DPTX registers base */
 	void __iomem *sd_base; /* SD0801 registers base */
 	u32 max_bit_rate; /* Maximum link bit rate to use (in Mbps) */
+	u32 dp_pll;
 	struct reset_control *phy_rst;
 	struct reset_control *apb_rst;
 	struct device *dev;
@@ -898,6 +904,30 @@ void cdns_torrent_dp_pma_cmn_vco_cfg_100mhz(struct cdns_torrent_phy *cdns_phy,
 		cdns_torrent_phy_write(regmap, CMN_PDIAG_PLL1_CTRL_M0, 0x0002);
 		break;
 	}
+}
+
+/* Set PLL used for DP configuration */
+static int cdns_torrent_dp_get_pll(struct cdns_torrent_phy *cdns_phy,
+				   enum cdns_torrent_phy_type phy_t2)
+{
+	switch (phy_t2) {
+	case TYPE_PCIE:
+	case TYPE_USB:
+		cdns_phy->dp_pll = DP_PLL1;
+		break;
+	case TYPE_SGMII:
+	case TYPE_QSGMII:
+		cdns_phy->dp_pll = DP_PLL0;
+		break;
+	case TYPE_NONE:
+		cdns_phy->dp_pll = DP_PLL0 | DP_PLL1;
+		break;
+	default:
+		dev_err(cdns_phy->dev, "Unsupported PHY configuration\n");
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 /*
@@ -1553,6 +1583,8 @@ static int cdns_torrent_dp_init(struct phy *phy)
 		dev_err(cdns_phy->dev, "Unsupported Ref Clock Rate\n");
 		return -EINVAL;
 	}
+
+	cdns_torrent_dp_get_pll(cdns_phy, TYPE_NONE);
 
 	cdns_torrent_dp_common_init(cdns_phy, inst);
 
