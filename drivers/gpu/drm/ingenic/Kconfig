@@ -2,7 +2,6 @@ config DRM_INGENIC
 	tristate "DRM Support for Ingenic SoCs"
 	depends on MIPS || COMPILE_TEST
 	depends on DRM
-	depends on CMA
 	depends on OF
 	depends on COMMON_CLK
 	select DRM_BRIDGE

@@ -2,7 +2,6 @@
 config DRM_TVE200
 	tristate "DRM Support for Faraday TV Encoder TVE200"
 	depends on DRM
-	depends on CMA
 	depends on ARM || COMPILE_TEST
 	depends on OF
 	select DRM_BRIDGE

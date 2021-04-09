@@ -9,8 +9,7 @@ config DRM_ETNAVIV
 	select THERMAL if DRM_ETNAVIV_THERMAL
 	select TMPFS
 	select WANT_DEV_COREDUMP
-	select CMA if HAVE_DMA_CONTIGUOUS
-	select DMA_CMA if HAVE_DMA_CONTIGUOUS
+	select WANT_DMA_CMA
 	select DRM_SCHED
 	help
 	  DRM driver for Vivante GPUs.

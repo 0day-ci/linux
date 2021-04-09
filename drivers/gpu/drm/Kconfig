@@ -201,12 +201,14 @@ config DRM_TTM_HELPER
 config DRM_GEM_CMA_HELPER
 	bool
 	depends on DRM
+	select WANT_DMA_CMA
 	help
 	  Choose this if you need the GEM CMA helper functions
 
 config DRM_KMS_CMA_HELPER
 	bool
 	depends on DRM
+	select WANT_DMA_CMA
 	select DRM_GEM_CMA_HELPER
 	help
 	  Choose this if you need the KMS CMA helper functions

@@ -485,6 +485,7 @@ config FRONTSWAP
 
 config CMA
 	bool "Contiguous Memory Allocator"
+	default y if WANT_DMA_CMA
 	depends on MMU
 	select MIGRATION
 	select MEMORY_ISOLATION

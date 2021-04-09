@@ -103,8 +103,15 @@ config DMA_DIRECT_REMAP
 	select DMA_REMAP
 	select DMA_COHERENT_POOL
 
+config WANT_DMA_CMA
+	bool
+	help
+	  Drivers should "select" this option if they desire to use the
+	  DMA_CMA mechanism.
+
 config DMA_CMA
 	bool "DMA Contiguous Memory Allocator"
+	default y if WANT_DMA_CMA
 	depends on HAVE_DMA_CONTIGUOUS && CMA
 	help
 	  This enables the Contiguous Memory Allocator which allows drivers
