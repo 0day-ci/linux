@@ -476,6 +476,7 @@ static struct file_system_type ecryptfs_fs_type;
 static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags,
 			const char *dev_name, void *raw_data)
 {
+	struct vfsmount *mnt = NULL;
 	struct super_block *s;
 	struct ecryptfs_sb_info *sbi;
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
@@ -537,6 +538,14 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 		goto out_free;
 	}
 
+	mnt = clone_private_mount(&path);
+	if (IS_ERR(mnt)) {
+		rc = PTR_ERR(mnt);
+		mnt = NULL;
+		pr_warn("Failed to create private mount for ecryptfs\n");
+		goto out_free;
+	}
+
 	if (check_ruid && !uid_eq(d_inode(path.dentry)->i_uid, current_uid())) {
 		rc = -EPERM;
 		printk(KERN_ERR "Mount of device (uid: %d) not owned by "
@@ -592,6 +601,13 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 
 	/* ->kill_sb() will take care of root_info */
 	ecryptfs_set_dentry_private(s->s_root, root_info);
+
+	/* We've created a private clone of this mount above so drop it now. */
+	mntput(path.mnt);
+
+	/* Use our private mount from now on. */
+	path.mnt = mnt;
+
 	root_info->lower_path = path;
 
 	s->s_flags |= SB_ACTIVE;
@@ -599,6 +615,7 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 
 out_free:
 	path_put(&path);
+	mntput(mnt);
 out1:
 	deactivate_locked_super(s);
 out:
