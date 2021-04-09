@@ -35,9 +35,9 @@
 
 #define VML_TOHW(_val, _width) ((((_val) << (_width)) + 0x7FFF - (_val)) >> 16)
 
-static struct mutex vml_mutex;
-static struct list_head global_no_mode;
-static struct list_head global_has_mode;
+static DEFINE_MUTEX(vml_mutex);
+static LIST_HEAD(global_no_mode);
+static LIST_HEAD(global_has_mode);
 static struct fb_ops vmlfb_ops;
 static struct vml_sys *subsys = NULL;
 static char *vml_default_mode = "1024x768@60";
@@ -1058,9 +1058,6 @@ static int __init vmlfb_init(void)
 #endif
 
 	printk(KERN_DEBUG MODULE_NAME ": initializing\n");
-	mutex_init(&vml_mutex);
-	INIT_LIST_HEAD(&global_no_mode);
-	INIT_LIST_HEAD(&global_has_mode);
 
 	return pci_register_driver(&vmlfb_pci_driver);
 }
