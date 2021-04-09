@@ -440,10 +440,16 @@ int phy_configure(struct phy *phy, union phy_configure_opts *opts)
 	if (!phy->ops->configure)
 		return -EOPNOTSUPP;
 
+	ret = phy_pm_runtime_get_sync(phy);
+	if (ret < 0 && ret != -ENOTSUPP)
+		return ret;
+	ret = 0; /* Override possible ret == -ENOTSUPP */
+
 	mutex_lock(&phy->mutex);
 	ret = phy->ops->configure(phy, opts);
 	mutex_unlock(&phy->mutex);
 
+	phy_pm_runtime_put(phy);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(phy_configure);
