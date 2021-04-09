@@ -34,15 +34,11 @@
  * user and kernel mode.
  */
 	.macro user_exit_irqoff
-#if defined(CONFIG_CONTEXT_TRACKING) || defined(CONFIG_TRACE_IRQFLAGS)
 	bl	enter_from_user_mode
-#endif
 	.endm
 
 	.macro user_enter_irqoff
-#if defined(CONFIG_CONTEXT_TRACKING) || defined(CONFIG_TRACE_IRQFLAGS)
 	bl	exit_to_user_mode
-#endif
 	.endm
 
 	.macro	clear_gp_regs
@@ -147,32 +143,6 @@ alternative_cb_end
 .L__asm_ssbd_skip\@:
 	.endm
 
-	/* Check for MTE asynchronous tag check faults */
-	.macro check_mte_async_tcf, flgs, tmp
-#ifdef CONFIG_ARM64_MTE
-alternative_if_not ARM64_MTE
-	b	1f
-alternative_else_nop_endif
-	mrs_s	\tmp, SYS_TFSRE0_EL1
-	tbz	\tmp, #SYS_TFSR_EL1_TF0_SHIFT, 1f
-	/* Asynchronous TCF occurred for TTBR0 access, set the TI flag */
-	orr	\flgs, \flgs, #_TIF_MTE_ASYNC_FAULT
-	str	\flgs, [tsk, #TSK_TI_FLAGS]
-	msr_s	SYS_TFSRE0_EL1, xzr
-1:
-#endif
-	.endm
-
-	/* Clear the MTE asynchronous tag check faults */
-	.macro clear_mte_async_tcf
-#ifdef CONFIG_ARM64_MTE
-alternative_if ARM64_MTE
-	dsb	ish
-	msr_s	SYS_TFSRE0_EL1, xzr
-alternative_else_nop_endif
-#endif
-	.endm
-
 	.macro mte_set_gcr, tmp, tmp2
 #ifdef CONFIG_ARM64_MTE
 	/*
@@ -243,8 +213,6 @@ alternative_else_nop_endif
 	ldr	x19, [tsk, #TSK_TI_FLAGS]
 	disable_step_tsk x19, x20
 
-	/* Check for asynchronous tag check faults in user space */
-	check_mte_async_tcf x19, x22
 	apply_ssbd 1, x22, x23
 
 	ptrauth_keys_install_kernel tsk, x20, x22, x23
@@ -775,8 +743,6 @@ SYM_CODE_START_LOCAL(ret_to_user)
 	cbnz	x2, work_pending
 finish_ret_to_user:
 	user_enter_irqoff
-	/* Ignore asynchronous tag check faults in the uaccess routines */
-	clear_mte_async_tcf
 	enable_step_tsk x19, x2
 #ifdef CONFIG_GCC_PLUGIN_STACKLEAK
 	bl	stackleak_erase

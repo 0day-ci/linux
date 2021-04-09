@@ -166,14 +166,43 @@ static void set_gcr_el1_excl(u64 excl)
 	 */
 }
 
+void noinstr check_mte_async_tcf0(void)
+{
+	u64 tcf0;
+
+	if (!system_supports_mte())
+		return;
+
+	/*
+	 * dsb(ish) is not required before the register read
+	 * because the TFSRE0_EL1 is automatically synchronized
+	 * by the hardware on exception entry as SCTLR_EL1.ITFSB
+	 * is set.
+	 */
+	tcf0 = read_sysreg_s(SYS_TFSRE0_EL1);
+
+	if (tcf0 & SYS_TFSR_EL1_TF0)
+		set_thread_flag(TIF_MTE_ASYNC_FAULT);
+
+	write_sysreg_s(0, SYS_TFSRE0_EL1);
+}
+
+void noinstr clear_mte_async_tcf0(void)
+{
+	if (!system_supports_mte())
+		return;
+
+	dsb(ish);
+	write_sysreg_s(0, SYS_TFSRE0_EL1);
+}
+
 void flush_mte_state(void)
 {
 	if (!system_supports_mte())
 		return;
 
 	/* clear any pending asynchronous tag fault */
-	dsb(ish);
-	write_sysreg_s(0, SYS_TFSRE0_EL1);
+	clear_mte_async_tcf0();
 	clear_thread_flag(TIF_MTE_ASYNC_FAULT);
 	/* disable tag checking */
 	set_sctlr_el1_tcf0(SCTLR_EL1_TCF0_NONE);

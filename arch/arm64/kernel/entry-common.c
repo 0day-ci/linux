@@ -289,10 +289,16 @@ asmlinkage void noinstr enter_from_user_mode(void)
 	CT_WARN_ON(ct_state() != CONTEXT_USER);
 	user_exit_irqoff();
 	trace_hardirqs_off_finish();
+
+	/* Check for asynchronous tag check faults in user space */
+	check_mte_async_tcf0();
 }
 
 asmlinkage void noinstr exit_to_user_mode(void)
 {
+	/* Ignore asynchronous tag check faults in the uaccess routines */
+	clear_mte_async_tcf0();
+
 	trace_hardirqs_on_prepare();
 	lockdep_hardirqs_on_prepare(CALLER_ADDR0);
 	user_enter_irqoff();

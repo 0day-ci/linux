@@ -31,6 +31,8 @@ void mte_invalidate_tags(int type, pgoff_t offset);
 void mte_invalidate_tags_area(int type);
 void *mte_allocate_tag_storage(void);
 void mte_free_tag_storage(char *storage);
+void noinstr check_mte_async_tcf0(void);
+void noinstr clear_mte_async_tcf0(void);
 
 #ifdef CONFIG_ARM64_MTE
 
@@ -82,6 +84,12 @@ static inline int mte_ptrace_copy_tags(struct task_struct *child,
 				       unsigned long data)
 {
 	return -EIO;
+}
+static inline void check_mte_async_tcf0(void)
+{
+}
+static inline void clear_mte_async_tcf0(void)
+{
 }
 
 static inline void mte_assign_mem_tag_range(void *addr, size_t size)
