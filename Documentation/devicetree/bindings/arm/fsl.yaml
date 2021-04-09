@@ -92,6 +92,7 @@ properties:
               - fsl,imx28-evk
               - i2se,duckbill
               - i2se,duckbill-2
+              - lwn,imx28-xea
               - technologic,imx28-ts4600
           - const: fsl,imx28
       - description: i.MX28 Duckbill 2 based Boards
