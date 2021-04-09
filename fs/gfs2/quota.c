@@ -80,6 +80,7 @@
 static DEFINE_SPINLOCK(qd_lock);
 struct list_lru gfs2_qd_lru;
 
+static DEFINE_SPLIT_LOCK(qd_hash_lock);
 static struct hlist_bl_head qd_hash_table[GFS2_QD_HASH_SIZE];
 
 static unsigned int gfs2_qd_hash(const struct gfs2_sbd *sdp,
@@ -95,12 +96,12 @@ static unsigned int gfs2_qd_hash(const struct gfs2_sbd *sdp,
 
 static inline void spin_lock_bucket(unsigned int hash)
 {
-        hlist_bl_lock(&qd_hash_table[hash]);
+        hlist_bl_lock(&qd_hash_table[hash], &qd_hash_lock);
 }
 
 static inline void spin_unlock_bucket(unsigned int hash)
 {
-        hlist_bl_unlock(&qd_hash_table[hash]);
+        hlist_bl_unlock(&qd_hash_table[hash], &qd_hash_lock);
 }
 
 static void gfs2_qd_dealloc(struct rcu_head *rcu)
