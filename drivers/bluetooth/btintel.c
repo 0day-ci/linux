@@ -515,6 +515,7 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 	 */
 	while (skb->len) {
 		struct intel_tlv *tlv;
+		int len;
 
 		tlv = (struct intel_tlv *)skb->data;
 		switch (tlv->type) {
@@ -580,7 +581,8 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 			version->sbe_type = tlv->val[0];
 			break;
 		case INTEL_TLV_OTP_BDADDR:
-			memcpy(&version->otp_bd_addr, tlv->val, tlv->len);
+			len = min_t(int, tlv->len, sizeof(version->otp_bd_addr));
+			memcpy(&version->otp_bd_addr, tlv->val, len);
 			break;
 		default:
 			/* Ignore rest of information */
