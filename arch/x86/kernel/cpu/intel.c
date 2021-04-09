@@ -602,7 +602,7 @@ static void init_intel_misc_features(struct cpuinfo_x86 *c)
 	wrmsrl(MSR_MISC_FEATURES_ENABLES, msr);
 }
 
-static void split_lock_init(void);
+static void sld_init(void);
 static void bus_lock_init(void);
 
 static void init_intel(struct cpuinfo_x86 *c)
@@ -720,7 +720,7 @@ static void init_intel(struct cpuinfo_x86 *c)
 	if (tsx_ctrl_state == TSX_CTRL_DISABLE)
 		tsx_disable();
 
-	split_lock_init();
+	sld_init();
 	bus_lock_init();
 
 	intel_init_thermal(c);
@@ -1080,7 +1080,7 @@ static void sld_update_msr(bool on)
 	wrmsrl(MSR_TEST_CTRL, test_ctrl_val);
 }
 
-static void split_lock_init(void)
+static void sld_init(void)
 {
 	if (cpu_model_supports_sld)
 		split_lock_verify_msr(sld_state != sld_off);
