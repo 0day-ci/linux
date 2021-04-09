@@ -2568,6 +2568,11 @@ static void mt753x_phylink_mac_link_up(struct dsa_switch *ds, int port,
 			mcr |= PMCR_TX_FC_EN;
 		if (rx_pause)
 			mcr |= PMCR_RX_FC_EN;
+
+		if (mode == MLO_AN_PHY && phydev &&
+		    !(priv->eee_disabled & BIT(port)) &&
+		    phy_init_eee(phydev, 0) >= 0)
+			mcr |= PMCR_FORCE_EEE1G | PMCR_FORCE_EEE100;
 	}
 
 	mt7530_set(priv, MT7530_PMCR_P(port), mcr);
@@ -2800,6 +2805,49 @@ mt753x_phy_write(struct dsa_switch *ds, int port, int regnum, u16 val)
 	return priv->info->phy_write(ds, port, regnum, val);
 }
 
+static int mt753x_get_mac_eee(struct dsa_switch *ds, int port,
+			      struct ethtool_eee *e)
+{
+	struct mt7530_priv *priv = ds->priv;
+	u32 eeecr, pmsr;
+
+	e->eee_enabled = !(priv->eee_disabled & BIT(port));
+
+	if (e->eee_enabled) {
+		eeecr = mt7530_read(priv, MT7530_PMEEECR_P(port));
+		e->tx_lpi_enabled = !(eeecr & LPI_MODE_EN);
+		e->tx_lpi_timer = GET_LPI_THRESH(eeecr);
+		pmsr = mt7530_read(priv, MT7530_PMSR_P(port));
+		e->eee_active = e->eee_enabled && !!(pmsr & PMSR_EEE1G);
+	}
+
+	return 0;
+}
+
+static int mt753x_set_mac_eee(struct dsa_switch *ds, int port,
+			      struct ethtool_eee *e)
+{
+	struct mt7530_priv *priv = ds->priv;
+	u32 eeecr;
+
+	if (e->eee_enabled) {
+		if (e->tx_lpi_timer > 0xFFF)
+			return -EINVAL;
+		priv->eee_disabled &= ~BIT(port);
+		eeecr = mt7530_read(priv, MT7530_PMEEECR_P(port));
+		eeecr &= ~(LPI_THRESH_MASK | LPI_MODE_EN);
+		if (!e->tx_lpi_enabled)
+			/* Force LPI Mode without a delay */
+			eeecr |= LPI_MODE_EN;
+		eeecr |= SET_LPI_THRESH(e->tx_lpi_timer);
+		mt7530_write(priv, MT7530_PMEEECR_P(port), eeecr);
+	} else {
+		priv->eee_disabled |= BIT(port);
+	}
+
+	return 0;
+}
+
 static const struct dsa_switch_ops mt7530_switch_ops = {
 	.get_tag_protocol	= mtk_get_tag_protocol,
 	.setup			= mt753x_setup,
@@ -2835,6 +2883,8 @@ static const struct dsa_switch_ops mt7530_switch_ops = {
 	.phylink_mac_an_restart	= mt753x_phylink_mac_an_restart,
 	.phylink_mac_link_down	= mt753x_phylink_mac_link_down,
 	.phylink_mac_link_up	= mt753x_phylink_mac_link_up,
+	.get_mac_eee		= mt753x_get_mac_eee,
+	.set_mac_eee		= mt753x_set_mac_eee,
 };
 
 static const struct mt753x_info mt753x_table[] = {
