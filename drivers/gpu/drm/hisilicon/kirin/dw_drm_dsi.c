@@ -836,10 +836,8 @@ static int dsi_parse_dt(struct platform_device *pdev, struct dw_dsi *dsi)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	ctx->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(ctx->base)) {
-		DRM_ERROR("failed to remap dsi io region\n");
+	if (IS_ERR(ctx->base))
 		return PTR_ERR(ctx->base);
-	}
 
 	return 0;
 }
