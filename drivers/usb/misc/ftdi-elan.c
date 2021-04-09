@@ -61,9 +61,9 @@ extern struct platform_driver u132_platform_driver;
  * ftdi_module_lock exists to protect access to global variables
  *
  */
-static struct mutex ftdi_module_lock;
+static DEFINE_MUTEX(ftdi_module_lock);
 static int ftdi_instances = 0;
-static struct list_head ftdi_static_list;
+static LIST_HEAD(ftdi_static_list);
 /*
  * end of the global variables protected by ftdi_module_lock
  */
@@ -2761,8 +2761,6 @@ static int __init ftdi_elan_init(void)
 {
 	int result;
 	pr_info("driver %s\n", ftdi_elan_driver.name);
-	mutex_init(&ftdi_module_lock);
-	INIT_LIST_HEAD(&ftdi_static_list);
 	result = usb_register(&ftdi_elan_driver);
 	if (result) {
 		pr_err("usb_register failed. Error number %d\n", result);
