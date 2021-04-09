@@ -213,7 +213,8 @@ static int __init msm_dt_timer_init(struct device_node *np)
 	irq = irq_of_parse_and_map(np, 1);
 	if (irq <= 0) {
 		pr_err("Can't get irq\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unmap_base;
 	}
 
 	/* We use CPU0's DGT for the clocksource */
@@ -223,18 +224,19 @@ static int __init msm_dt_timer_init(struct device_node *np)
 	ret = of_address_to_resource(np, 0, &res);
 	if (ret) {
 		pr_err("Failed to parse DGT resource\n");
-		return ret;
+		goto err_unmap_base;
 	}
 
 	cpu0_base = ioremap(res.start + percpu_offset, resource_size(&res));
 	if (!cpu0_base) {
 		pr_err("Failed to map source base\n");
-		return -EINVAL;
+		goto err_unmap_base;
 	}
 
 	if (of_property_read_u32(np, "clock-frequency", &freq)) {
 		pr_err("Unknown frequency\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unmap_cpu0_base;
 	}
 
 	event_base = base + 0x4;
@@ -243,7 +245,18 @@ static int __init msm_dt_timer_init(struct device_node *np)
 	freq /= 4;
 	writel_relaxed(DGT_CLK_CTL_DIV_4, source_base + DGT_CLK_CTL);
 
-	return msm_timer_init(freq, 32, irq, !!percpu_offset);
+	ret = msm_timer_init(freq, 32, irq, !!percpu_offset);
+	if (ret)
+		goto err_unmap_cpu0_base;
+
+	return 0;
+
+err_unmap_cpu0_base:
+	iounmap(cpu0_base);
+err_unmap_base:
+	iounmap(base);
+
+	return ret;
 }
 TIMER_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
 TIMER_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
