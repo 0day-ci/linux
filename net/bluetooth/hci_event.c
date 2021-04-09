@@ -1033,6 +1033,33 @@ static void hci_cc_read_local_codecs_v2(struct hci_dev *hdev,
 	}
 }
 
+static void hci_cc_read_local_codec_caps(struct hci_dev *hdev,
+					 struct sk_buff *skb)
+{
+	struct hci_op_read_local_codec_caps *sent;
+	struct hci_rp_read_local_codec_caps *rp;
+
+	rp = (void *)skb->data;
+
+	bt_dev_dbg(hdev, "status 0x%2.2x", rp->status);
+
+	if (rp->status)
+		return;
+
+	sent = hci_sent_cmd_data(hdev, HCI_OP_READ_LOCAL_CODEC_CAPS);
+
+	if (!sent)
+		return;
+
+	hci_dev_lock(hdev);
+
+	bt_dev_info(hdev, "Adding Codec. No of caps: %u", rp->num_caps);
+
+	hci_codec_list_add(&hdev->local_codecs, rp, skb->len - 2, sent);
+
+	hci_dev_unlock(hdev);
+}
+
 static void hci_cc_read_clock(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_rp_read_clock *rp = (void *) skb->data;
@@ -3589,6 +3616,10 @@ static void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *skb,
 
 	case HCI_OP_READ_LOCAL_CODECS_V2:
 		hci_cc_read_local_codecs_v2(hdev, skb);
+		break;
+
+	case HCI_OP_READ_LOCAL_CODEC_CAPS:
+		hci_cc_read_local_codec_caps(hdev, skb);
 		break;
 
 	case HCI_OP_READ_FLOW_CONTROL_MODE:
