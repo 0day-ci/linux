@@ -839,7 +839,9 @@ static int hci_init4_req(struct hci_request *req, unsigned long opt)
 		hci_set_event_mask_page_2(req);
 
 	/* Read local codec list if the HCI command is supported */
-	if (hdev->commands[29] & 0x20)
+	if (hdev->commands[45] & 0x04)
+		hci_req_add(req, HCI_OP_READ_LOCAL_CODECS_V2, 0, NULL);
+	else if (hdev->commands[29] & 0x20)
 		hci_req_add(req, HCI_OP_READ_LOCAL_CODECS, 0, NULL);
 
 	/* Read local pairing options if the HCI command is supported */
