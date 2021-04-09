@@ -71,9 +71,9 @@
 
 #undef SHOW_GATWICK_IRQS
 
-int ppc_override_l2cr = 0;
-int ppc_override_l2cr_value;
-int has_l2cache = 0;
+static int ppc_override_l2cr;
+static int ppc_override_l2cr_value;
+static int has_l2cache;
 
 int pmac_newworld;
 
