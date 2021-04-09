@@ -1754,6 +1754,10 @@ i40e_status i40e_aq_get_link_info(struct i40e_hw *hw,
 	hw_link_info->max_frame_size = le16_to_cpu(resp->max_frame_size);
 	hw_link_info->pacing = resp->config & I40E_AQ_CONFIG_PACING_MASK;
 
+	if (hw_link_info->phy_type == I40E_PHY_TYPE_1000BASE_SX &&
+	    hw->mac.type == I40E_MAC_XL710)
+		i40e_aq_set_link_restart_an(hw, true, NULL);
+
 	/* update fc info */
 	tx_pause = !!(resp->an_info & I40E_AQ_LINK_PAUSE_TX);
 	rx_pause = !!(resp->an_info & I40E_AQ_LINK_PAUSE_RX);
