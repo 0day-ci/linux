@@ -328,16 +328,14 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
 
 	rc = ima_collect_measurement(iint, file, buf, size, hash_algo, modsig);
-	if (rc != 0 && rc != -EBADF && rc != -EINVAL)
+	if (rc != 0 && rc != -EBADF && rc != -EINVAL) {
+		action &= ~(IMA_MEASURE | IMA_AUDIT);
 		goto out_locked;
+	}
 
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
-	if (action & IMA_MEASURE)
-		ima_store_measurement(iint, file, pathname,
-				      xattr_value, xattr_len, modsig, pcr,
-				      template_desc);
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {
 		rc = ima_check_blacklist(iint, modsig, pcr);
 		if (rc != -EPERM) {
@@ -351,15 +349,21 @@ static int process_measurement(struct file *file, const struct cred *cred,
 			rc = mmap_violation_check(func, file, &pathbuf,
 						  &pathname, filename);
 	}
-	if (action & IMA_AUDIT)
-		ima_audit_measurement(iint, pathname);
-
 	if ((file->f_flags & O_DIRECT) && (iint->flags & IMA_PERMIT_DIRECTIO))
 		rc = 0;
 out_locked:
 	if ((mask & MAY_WRITE) && test_bit(IMA_DIGSIG, &iint->atomic_flags) &&
 	     !(iint->flags & IMA_NEW_FILE))
 		rc = -EACCES;
+	if (must_appraise)
+		if (rc && (ima_appraise & IMA_APPRAISE_ENFORCE))
+			action &= ~(IMA_MEASURE | IMA_AUDIT);
+	if (action & IMA_MEASURE)
+		ima_store_measurement(iint, file, pathname,
+				      xattr_value, xattr_len, modsig, pcr,
+				      template_desc);
+	if (action & IMA_AUDIT)
+		ima_audit_measurement(iint, pathname);
 	mutex_unlock(&iint->mutex);
 	kfree(xattr_value);
 	ima_free_modsig(modsig);
