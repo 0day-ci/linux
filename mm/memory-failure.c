@@ -629,7 +629,7 @@ static int truncate_error_page(struct page *p, unsigned long pfn,
 		if (err != 0) {
 			pr_info("Memory failure: %#lx: Failed to punch page: %d\n",
 				pfn, err);
-		} else if (page_has_private(p) &&
+		} else if (page_needs_cleanup(p) &&
 			   !try_to_release_page(p, GFP_NOIO)) {
 			pr_info("Memory failure: %#lx: failed to release buffers\n",
 				pfn);

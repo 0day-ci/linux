@@ -175,7 +175,7 @@ static int expected_page_refs(struct page *page)
 		res++;
 	} else if (page_mapping(page)) {
 		res++;
-		if (page_has_private(page))
+		if (page_private_count(page))
 			res++;
 	}
 	return res;
