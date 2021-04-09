@@ -14,10 +14,8 @@ description: |
   offloading TX/RX checksum calculation off the processor.
 
   Management configuration is done through the AXI interface, while payload is
-  sent and received through means of an AXI DMA controller. This driver
-  includes the DMA driver code, so this driver is incompatible with AXI DMA
-  driver.
-
+  sent and received through means of an AXI DMA controller using dmaengine
+  framework.
 
 allOf:
   - $ref: "ethernet-controller.yaml#"
@@ -36,19 +34,13 @@ properties:
 
   reg:
     description:
-      Address and length of the IO space, as well as the address
-      and length of the AXI DMA controller IO space, unless
-      axistream-connected is specified, in which case the reg
-      attribute of the node referenced by it is used.
-    maxItems: 2
+      Address and length of the IO space.
+    maxItems: 1
 
   interrupts:
     description:
-      Can point to at most 3 interrupts. TX DMA, RX DMA, and optionally Ethernet
-      core. If axistream-connected is specified, the TX/RX DMA interrupts should
-      be on that node instead, and only the Ethernet core interrupt is optionally
-      specified here.
-    maxItems: 3
+      Ethernet core interrupt.
+    maxItems: 1
 
   phy-handle: true
 
@@ -109,8 +101,20 @@ properties:
       for the AXI DMA controller used by this device. If this is specified,
       the DMA-related resources from that device (DMA registers and DMA
       TX/RX interrupts) rather than this one will be used.
+    deprecated: true
 
   mdio: true
+
+  dmas:
+    items:
+      - description: TX DMA Channel phandle and DMA request line number
+      - description: RX DMA Channel phandle and DMA request line number
+
+  dma-names:
+    items:
+      - const: tx_chan0
+      - const: rx_chan0
+
 
 required:
   - compatible
@@ -118,6 +122,8 @@ required:
   - interrupts
   - xlnx,rxmem
   - phy-handle
+  - dmas
+  - dma-names
 
 additionalProperties: false
 
@@ -127,11 +133,13 @@ examples:
       compatible = "xlnx,axi-ethernet-1.00.a";
       device_type = "network";
       interrupt-parent = <&microblaze_0_axi_intc>;
-      interrupts = <2>, <0>, <1>;
+      interrupts = <1>;
       clock-names = "s_axi_lite_clk", "axis_clk", "ref_clk", "mgt_clk";
       clocks = <&axi_clk>, <&axi_clk>, <&pl_enet_ref_clk>, <&mgt_clk>;
       phy-mode = "mii";
-      reg = <0x40c00000 0x40000>,<0x50c00000 0x40000>;
+      reg = <0x40c00000 0x40000>;
+      dmas = <&xilinx_dma 0>, <&xilinx_dma 1>;
+      dma-names = "tx_chan0", "rx_chan0";
       xlnx,rxcsum = <0x2>;
       xlnx,rxmem = <0x800>;
       xlnx,txcsum = <0x2>;
