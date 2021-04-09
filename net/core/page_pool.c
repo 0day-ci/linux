@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/skbuff.h>
 
 #include <net/page_pool.h>
 #include <net/xdp.h>
@@ -17,11 +18,18 @@
 #include <linux/dma-mapping.h>
 #include <linux/page-flags.h>
 #include <linux/mm.h> /* for __put_page() */
+#include <net/xdp.h>
 
 #include <trace/events/page_pool.h>
 
 #define DEFER_TIME (msecs_to_jiffies(1000))
 #define DEFER_WARN_INTERVAL (60 * HZ)
+
+/* Used to store/retrieve hi/lo bytes from xdp_mem_info to page->private */
+union page_pool_xmi {
+	u32 raw;
+	struct xdp_mem_info mem_info;
+};
 
 static int page_pool_init(struct page_pool *pool,
 			  const struct page_pool_params *params)
@@ -587,3 +595,38 @@ void page_pool_update_nid(struct page_pool *pool, int new_nid)
 	}
 }
 EXPORT_SYMBOL(page_pool_update_nid);
+
+bool page_pool_return_skb_page(void *data)
+{
+	struct xdp_mem_info mem_info;
+	union page_pool_xmi info;
+	struct page *page;
+
+	page = virt_to_head_page(data);
+	if (unlikely(page->signature != PP_SIGNATURE))
+		return false;
+
+	info.raw = page_private(page);
+	mem_info = info.mem_info;
+
+	/* If a buffer is marked for recycle and does not belong to
+	 * MEM_TYPE_PAGE_POOL, the buffers will be eventually freed from the
+	 * network stack and kfree_skb, but the DMA region will *not* be
+	 * correctly unmapped. WARN here for the recycling misusage
+	 */
+	if (unlikely(mem_info.type != MEM_TYPE_PAGE_POOL)) {
+		WARN_ONCE(true, "Tried to recycle non MEM_TYPE_PAGE_POOL");
+		return false;
+	}
+
+	/* Driver set this to memory recycling info. Reset it on recycle
+	 * This will *not* work for NIC using a split-page memory model.
+	 * The page will be returned to the pool here regardless of the
+	 * 'flipped' fragment being in use or not
+	 */
+	set_page_private(page, 0);
+	xdp_return_skb_frame(data, &mem_info);
+
+	return true;
+}
+EXPORT_SYMBOL(page_pool_return_skb_page);

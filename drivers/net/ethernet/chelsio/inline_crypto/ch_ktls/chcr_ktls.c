@@ -2125,7 +2125,7 @@ static int chcr_ktls_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* clear the frag ref count which increased locally before */
 		for (i = 0; i < record->num_frags; i++) {
 			/* clear the frag ref count */
-			__skb_frag_unref(&record->frags[i]);
+			__skb_frag_unref(&record->frags[i], false);
 		}
 		/* if any failure, come out from the loop. */
 		if (ret) {

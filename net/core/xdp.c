@@ -372,6 +372,12 @@ static void __xdp_return(void *data, struct xdp_mem_info *mem, bool napi_direct,
 	}
 }
 
+void xdp_return_skb_frame(void *data, struct xdp_mem_info *mem)
+{
+	__xdp_return(data, mem, false, NULL);
+}
+EXPORT_SYMBOL_GPL(xdp_return_skb_frame);
+
 void xdp_return_frame(struct xdp_frame *xdpf)
 {
 	__xdp_return(xdpf->data, &xdpf->mem, false, NULL);
