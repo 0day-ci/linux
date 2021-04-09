@@ -111,7 +111,7 @@
 /* An array, which is set to true when the device is registered. */
 static DEFINE_MUTEX(hwicap_mutex);
 static bool probed_devices[HWICAP_DEVICES];
-static struct mutex icap_sem;
+static DEFINE_MUTEX(icap_sem);
 
 static struct class *icap_class;
 
@@ -857,7 +857,6 @@ static int __init hwicap_module_init(void)
 	int retval;
 
 	icap_class = class_create(THIS_MODULE, "xilinx_config");
-	mutex_init(&icap_sem);
 
 	devt = MKDEV(XHWICAP_MAJOR, XHWICAP_MINOR);
 	retval = register_chrdev_region(devt,
