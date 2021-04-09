@@ -46,6 +46,11 @@ struct block_device {
 	spinlock_t		bd_size_lock; /* for bd_inode->i_size updates */
 	struct gendisk *	bd_disk;
 	struct backing_dev_info *bd_bdi;
+	/* The interposer allows to redirect bio to another device */
+	struct block_device	*bd_interposer;
+	/* Lock the queue of block device to attach or detach interposer.
+	 * Allows to safely suspend and flush interposer. */
+	struct percpu_rw_semaphore bd_interposer_lock;
 
 	/* The counter of freeze processes */
 	int			bd_fsfreeze_count;
@@ -304,6 +309,7 @@ enum {
 	BIO_CGROUP_ACCT,	/* has been accounted to a cgroup */
 	BIO_TRACKED,		/* set if bio goes through the rq_qos path */
 	BIO_REMAPPED,
+	BIO_INTERPOSED,		/* bio was reassigned to another block device */
 	BIO_FLAG_LAST
 };
 

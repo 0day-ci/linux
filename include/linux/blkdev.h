@@ -2014,4 +2014,36 @@ int fsync_bdev(struct block_device *bdev);
 int freeze_bdev(struct block_device *bdev);
 int thaw_bdev(struct block_device *bdev);
 
+/**
+ * bdev_interposer_lock - Lock bio processing
+ * @bdev: locking block device
+ *
+ * Lock the bio processing in submit_bio_noacct() for the new requests in the
+ * original block device. Requests from interposer will not be locked.
+ *
+ * To unlock, use the function bdev_interposer_unlock().
+ *
+ * This lock should be used to attach/detach interposer to the device.
+ */
+static inline void bdev_interposer_lock(struct block_device *bdev)
+{
+	percpu_down_write(&bdev->bd_interposer_lock);
+}
+
+/**
+ * bdev_interposer_unlock - Unlock bio processing
+ * @bdev: locked block device
+ *
+ * Unlock the bio processing that was locked by function bdev_interposer_lock().
+ *
+ * This lock should be used to attach/detach interposer to the device.
+ */
+static inline void bdev_interposer_unlock(struct block_device *bdev)
+{
+	percpu_up_write(&bdev->bd_interposer_lock);
+}
+
+int bdev_interposer_attach(struct block_device *original,
+			   struct block_device *interposer);
+void bdev_interposer_detach(struct block_device *original);
 #endif /* _LINUX_BLKDEV_H */

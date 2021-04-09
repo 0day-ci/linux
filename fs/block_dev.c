@@ -809,6 +809,7 @@ static void bdev_free_inode(struct inode *inode)
 {
 	struct block_device *bdev = I_BDEV(inode);
 
+	percpu_free_rwsem(&bdev->bd_interposer_lock);
 	free_percpu(bdev->bd_stats);
 	kfree(bdev->bd_meta_info);
 
@@ -909,6 +910,8 @@ struct block_device *bdev_alloc(struct gendisk *disk, u8 partno)
 		iput(inode);
 		return NULL;
 	}
+	bdev->bd_interposer = NULL;
+	percpu_init_rwsem(&bdev->bd_interposer_lock);
 	return bdev;
 }
 
