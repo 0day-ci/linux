@@ -6651,10 +6651,17 @@ void __init set_pageblock_order(void)
 	if (pageblock_order)
 		return;
 
-	if (HPAGE_SHIFT > PAGE_SHIFT)
+	if (HPAGE_SHIFT > PAGE_SHIFT) {
+		/*
+		 * pageblock_order must always be less than
+		 * MAX_ORDER. So does HUGETLB_PAGE_ORDER if
+		 * that is being assigned here.
+		 */
+		WARN_ON(HUGETLB_PAGE_ORDER >= MAX_ORDER);
 		order = HUGETLB_PAGE_ORDER;
-	else
+	} else {
 		order = MAX_ORDER - 1;
+	}
 
 	/*
 	 * Assume the largest contiguous order of interest is a huge page.
