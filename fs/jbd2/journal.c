@@ -2733,6 +2733,8 @@ static void journal_free_journal_head(struct journal_head *jh)
  *	jbd2_journal_put_journal_head(jh);
  */
 
+static DEFINE_SPLIT_LOCK(jbd2_jh_lock);
+
 /*
  * Give a buffer_head a journal_head.
  *
@@ -2747,7 +2749,7 @@ repeat:
 	if (!buffer_jbd(bh))
 		new_jh = journal_alloc_journal_head();
 
-	jbd_lock_bh_journal_head(bh);
+	jbd_lock_bh_journal_head(bh, &jbd2_jh_lock);
 	if (buffer_jbd(bh)) {
 		jh = bh2jh(bh);
 	} else {
@@ -2756,7 +2758,7 @@ repeat:
 			(bh->b_page && bh->b_page->mapping));
 
 		if (!new_jh) {
-			jbd_unlock_bh_journal_head(bh);
+			jbd_unlock_bh_journal_head(bh, &jbd2_jh_lock);
 			goto repeat;
 		}
 
@@ -2769,7 +2771,7 @@ repeat:
 		BUFFER_TRACE(bh, "added journal_head");
 	}
 	jh->b_jcount++;
-	jbd_unlock_bh_journal_head(bh);
+	jbd_unlock_bh_journal_head(bh, &jbd2_jh_lock);
 	if (new_jh)
 		journal_free_journal_head(new_jh);
 	return bh->b_private;
@@ -2783,12 +2785,12 @@ struct journal_head *jbd2_journal_grab_journal_head(struct buffer_head *bh)
 {
 	struct journal_head *jh = NULL;
 
-	jbd_lock_bh_journal_head(bh);
+	jbd_lock_bh_journal_head(bh, &jbd2_jh_lock);
 	if (buffer_jbd(bh)) {
 		jh = bh2jh(bh);
 		jh->b_jcount++;
 	}
-	jbd_unlock_bh_journal_head(bh);
+	jbd_unlock_bh_journal_head(bh, &jbd2_jh_lock);
 	return jh;
 }
 
@@ -2831,16 +2833,16 @@ void jbd2_journal_put_journal_head(struct journal_head *jh)
 {
 	struct buffer_head *bh = jh2bh(jh);
 
-	jbd_lock_bh_journal_head(bh);
+	jbd_lock_bh_journal_head(bh, &jbd2_jh_lock);
 	J_ASSERT_JH(jh, jh->b_jcount > 0);
 	--jh->b_jcount;
 	if (!jh->b_jcount) {
 		__journal_remove_journal_head(bh);
-		jbd_unlock_bh_journal_head(bh);
+		jbd_unlock_bh_journal_head(bh, &jbd2_jh_lock);
 		journal_release_journal_head(jh, bh->b_size);
 		__brelse(bh);
 	} else {
-		jbd_unlock_bh_journal_head(bh);
+		jbd_unlock_bh_journal_head(bh, &jbd2_jh_lock);
 	}
 }
 

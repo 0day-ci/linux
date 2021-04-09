@@ -348,14 +348,16 @@ static inline struct journal_head *bh2jh(struct buffer_head *bh)
 	return bh->b_private;
 }
 
-static inline void jbd_lock_bh_journal_head(struct buffer_head *bh)
+static inline void jbd_lock_bh_journal_head(struct buffer_head *bh,
+		struct split_lock *sl)
 {
-	bit_spin_lock(BH_JournalHead, &bh->b_state);
+	bit_spin_lock(BH_JournalHead, &bh->b_state, sl);
 }
 
-static inline void jbd_unlock_bh_journal_head(struct buffer_head *bh)
+static inline void jbd_unlock_bh_journal_head(struct buffer_head *bh,
+		struct split_lock *sl)
 {
-	bit_spin_unlock(BH_JournalHead, &bh->b_state);
+	bit_spin_unlock(BH_JournalHead, &bh->b_state, sl);
 }
 
 #define J_ASSERT(assert)	BUG_ON(!(assert))
