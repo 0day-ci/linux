@@ -6,6 +6,7 @@
 #include <linux/preempt.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
+#include <linux/split_lock.h>
 
 /*
  *  bit-based spin_lock()
@@ -13,7 +14,8 @@
  * Don't use this unless you really need to: spin_lock() and spin_unlock()
  * are significantly faster.
  */
-static inline void bit_spin_lock(int bitnum, unsigned long *addr)
+static inline void bit_spin_lock_nested(int bitnum, unsigned long *addr,
+		struct split_lock *lock, unsigned int subclass)
 {
 	/*
 	 * Assuming the lock is uncontended, this never enters
@@ -35,10 +37,27 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 	__acquire(bitlock);
 }
 
+static inline void bit_spin_lock(int bitnum, unsigned long *addr,
+		...)
+{
+	preempt_disable();
+#if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
+	while (unlikely(test_and_set_bit_lock(bitnum, addr))) {
+		preempt_enable();
+		do {
+			cpu_relax();
+		} while (test_bit(bitnum, addr));
+		preempt_disable();
+	}
+#endif
+	__acquire(bitlock);
+}
+
 /*
  * Return true if it was acquired
  */
-static inline int bit_spin_trylock(int bitnum, unsigned long *addr)
+static inline int bit_spin_trylock(int bitnum, unsigned long *addr,
+		...)
 {
 	preempt_disable();
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
@@ -54,7 +73,8 @@ static inline int bit_spin_trylock(int bitnum, unsigned long *addr)
 /*
  *  bit-based spin_unlock()
  */
-static inline void bit_spin_unlock(int bitnum, unsigned long *addr)
+static inline void bit_spin_unlock(int bitnum, unsigned long *addr,
+		...)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(!test_bit(bitnum, addr));
@@ -71,7 +91,8 @@ static inline void bit_spin_unlock(int bitnum, unsigned long *addr)
  *  non-atomic version, which can be used eg. if the bit lock itself is
  *  protecting the rest of the flags in the word.
  */
-static inline void __bit_spin_unlock(int bitnum, unsigned long *addr)
+static inline void __bit_spin_unlock(int bitnum, unsigned long *addr,
+		...)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(!test_bit(bitnum, addr));
@@ -79,6 +100,20 @@ static inline void __bit_spin_unlock(int bitnum, unsigned long *addr)
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
 	__clear_bit_unlock(bitnum, addr);
 #endif
+	preempt_enable();
+	__release(bitlock);
+}
+
+/**
+ * bit_spin_unlock_assign - Unlock a bitlock by assignment of new value.
+ * @addr: Address to assign the value to.
+ * @val: New value to assign.
+ * @lock: Split lock that this bitlock is part of.
+ */
+static inline void bit_spin_unlock_assign(unsigned long *addr,
+		unsigned long val, struct split_lock *lock)
+{
+	smp_store_release(addr, val);
 	preempt_enable();
 	__release(bitlock);
 }
