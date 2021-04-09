@@ -19,7 +19,7 @@
 
 .. important::
 
-   本文档将取代“Documentation/admin-guide/reporting-bugs.rst”。主要的工作
+   本文档将取代“Documentation/admin-guide/reporting-issues.rst”。主要的工作
    已经完成，你可以自由地按照其指示来向Linux内核开发者报告问题。但请留意，
    下面的文字还需要一些润色和校审。现阶段它被合并到Linux内核源代码中，以使
    这个过程更容易，并增加文本的可见性。
@@ -726,7 +726,7 @@ tar 存档包。
 .. note::
 
    FIXME: 本节文字暂时是占位符，与目前
-   “Documentation/admin-guide/reporting-bugs.rst”中的旧文字非常相似。它和它
+   “Documentation/admin-guide/reporting-issues.rst”中的旧文字非常相似。它和它
    所引用的文档已经过时，因此需要重新审视。因此，请将此说明视为一个求助：如
    果你熟悉这个主题，请写几行适合这里的文字。或者只需向本文件的主要作者（见
    导言）大致概述一下当前的情况，因为他们也许能写出一些东西来。

@@ -280,7 +280,7 @@ bugzilla.kernel.org是Linux内核开发者们用来跟踪内核Bug的网站。�
 
 	http://test.kernel.org/bugzilla/faq.html
 
-内核源码主目录中的:ref:`admin-guide/reporting-bugs.rst <reportingbugs>`
+内核源码主目录中的:ref:`admin-guide/reporting-issues.rst <reportingbugs>`
 文件里有一个很好的模板。它指导用户如何报告可能的内核bug以及需要提供哪些信息
 来帮助内核开发者们找到问题的根源。
 

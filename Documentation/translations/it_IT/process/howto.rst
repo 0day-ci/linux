@@ -364,7 +364,7 @@ Per maggiori dettagli su come usare il bugzilla del kernel, guardare:
 
 	https://bugzilla.kernel.org/page.cgi?id=faq.html
 
-Il file admin-guide/reporting-bugs.rst nella cartella principale del kernel
+Il file admin-guide/reporting-issues.rst nella cartella principale del kernel
 fornisce un buon modello sul come segnalare un baco nel kernel, e spiega quali
 informazioni sono necessarie agli sviluppatori per poter aiutare il
 rintracciamento del problema.

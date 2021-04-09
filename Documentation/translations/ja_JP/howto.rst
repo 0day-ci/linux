@@ -367,7 +367,7 @@ kernel bugzilla を使うかの詳細は、以下を参照してください -
 	https://bugzilla.kernel.org/page.cgi?id=faq.html
 
 メインカーネルソースディレクトリにあるファイル
-admin-guide/reporting-bugs.rstはカーネルバグらしいものについてどうレポー
+admin-guide/reporting-issues.rstはカーネルバグらしいものについてどうレポー
 トするかの良いテンプレートであり、問題の追跡を助けるためにカーネル開発
 者にとってどんな情報が必要なのかの詳細が書かれています。
 
