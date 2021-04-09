@@ -14,6 +14,7 @@
 #include <linux/of_platform.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 /* DPHY registers */
@@ -469,20 +470,32 @@ static int mixel_dphy_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(dev, priv);
 
+	pm_runtime_enable(dev);
+
 	phy = devm_phy_create(dev, np, &mixel_dphy_phy_ops);
 	if (IS_ERR(phy)) {
+		pm_runtime_disable(&pdev->dev);
 		dev_err(dev, "Failed to create phy %ld\n", PTR_ERR(phy));
 		return PTR_ERR(phy);
 	}
 	phy_set_drvdata(phy, priv);
 
 	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	if (IS_ERR(phy_provider))
+		pm_runtime_disable(&pdev->dev);
 
 	return PTR_ERR_OR_ZERO(phy_provider);
 }
 
+static int mixel_dphy_remove(struct platform_device *pdev)
+{
+	pm_runtime_disable(&pdev->dev);
+	return 0;
+}
+
 static struct platform_driver mixel_dphy_driver = {
 	.probe	= mixel_dphy_probe,
+	.remove = mixel_dphy_remove,
 	.driver = {
 		.name = "mixel-mipi-dphy",
 		.of_match_table	= mixel_dphy_of_match,
