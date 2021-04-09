@@ -83,10 +83,6 @@ extern struct machdep_calls pmac_md;
 
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 
-#ifdef CONFIG_PPC64
-int sccdbg;
-#endif
-
 sys_ctrler_t sys_ctrler = SYS_CTRLER_UNKNOWN;
 EXPORT_SYMBOL(sys_ctrler);
 
