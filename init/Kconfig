@@ -2265,6 +2265,14 @@ config MODULE_COMPRESS_ZSTD
 
 endchoice
 
+config MODULE_COMPRESS_ZSTD_LEVEL
+    int "Compression level (1-19)"
+    depends on MODULE_COMPRESS_ZSTD
+    range 1 19
+    default 3
+    help
+        Compression level used by zstd for compressing modules.
+
 config MODULE_ALLOW_MISSING_NAMESPACE_IMPORTS
 	bool "Allow loading of modules with missing namespace imports"
 	help
