@@ -868,6 +868,11 @@ static void xhci_hub_report_usb3_link_state(struct xhci_hcd *xhci,
 		if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 				(pls == USB_SS_PORT_LS_COMP_MOD))
 			pls |= USB_PORT_STAT_CONNECTION;
+
+		/* Fake a connection change */
+		if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) &&
+				pls == XDEV_INACTIVE)
+			pls |= USB_PORT_STAT_CONNECTION;
 	}
 
 	/* update status field */
@@ -887,7 +892,8 @@ static void xhci_del_comp_mod_timer(struct xhci_hcd *xhci, u32 status,
 	u32 all_ports_seen_u0 = ((1 << xhci->usb3_rhub.num_ports) - 1);
 	bool port_in_u0 = ((status & PORT_PLS_MASK) == XDEV_U0);
 
-	if (!(xhci->quirks & XHCI_COMP_MODE_QUIRK))
+	if (!(xhci->quirks & XHCI_COMP_MODE_QUIRK) ||
+	    (xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK))
 		return;
 
 	if ((xhci->port_status_u0 != all_ports_seen_u0) && port_in_u0) {
@@ -1654,6 +1660,8 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 		trace_xhci_hub_status_data(i, temp);
 
 		if ((temp & mask) != 0 ||
+			((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) &&
+				(temp & PORT_PLS_MASK) == XDEV_INACTIVE) ||
 			(bus_state->port_c_suspend & 1 << i) ||
 			(bus_state->resume_done[i] && time_after_eq(
 			    jiffies, bus_state->resume_done[i]))) {
