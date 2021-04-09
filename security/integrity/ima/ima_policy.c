@@ -154,8 +154,8 @@ static struct ima_rule_entry default_appraise_rules[] __ro_after_init = {
 	{.action = DONT_APPRAISE, .fsmagic = PROC_SUPER_MAGIC, .flags = IMA_FSMAGIC},
 	{.action = DONT_APPRAISE, .fsmagic = SYSFS_MAGIC, .flags = IMA_FSMAGIC},
 	{.action = DONT_APPRAISE, .fsmagic = DEBUGFS_MAGIC, .flags = IMA_FSMAGIC},
-	{.action = DONT_APPRAISE, .fsmagic = TMPFS_MAGIC, .flags = IMA_FSMAGIC},
-	{.action = DONT_APPRAISE, .fsmagic = RAMFS_MAGIC, .flags = IMA_FSMAGIC},
+	{.action = DONT_APPRAISE, .fsmagic = TMPFS_MAGIC, .flags = IMA_FSMAGIC | IMA_SKIP_TMPFS},
+	{.action = DONT_APPRAISE, .fsmagic = RAMFS_MAGIC, .flags = IMA_FSMAGIC | IMA_SKIP_TMPFS},
 	{.action = DONT_APPRAISE, .fsmagic = DEVPTS_SUPER_MAGIC, .flags = IMA_FSMAGIC},
 	{.action = DONT_APPRAISE, .fsmagic = BINFMTFS_MAGIC, .flags = IMA_FSMAGIC},
 	{.action = DONT_APPRAISE, .fsmagic = SECURITYFS_MAGIC, .flags = IMA_FSMAGIC},
@@ -171,12 +171,19 @@ static struct ima_rule_entry default_appraise_rules[] __ro_after_init = {
 #endif
 #ifndef CONFIG_IMA_APPRAISE_SIGNED_INIT
 	{.action = APPRAISE, .fowner = GLOBAL_ROOT_UID, .fowner_op = &uid_eq,
-	 .flags = IMA_FOWNER},
+	 .flags = IMA_FOWNER | IMA_SKIP_OPEN},
 #else
 	/* force signature */
 	{.action = APPRAISE, .fowner = GLOBAL_ROOT_UID, .fowner_op = &uid_eq,
-	 .flags = IMA_FOWNER | IMA_DIGSIG_REQUIRED},
+	 .flags = IMA_FOWNER | IMA_DIGSIG_REQUIRED | IMA_SKIP_OPEN},
 #endif
+};
+
+static struct ima_rule_entry appraise_exec_rules[] __ro_after_init = {
+	{.action = APPRAISE, .func = BPRM_CHECK,
+	 .flags = IMA_FUNC | IMA_DIGSIG_REQUIRED},
+	{.action = APPRAISE, .func = MMAP_CHECK,
+	 .flags = IMA_FUNC | IMA_DIGSIG_REQUIRED},
 };
 
 static struct ima_rule_entry build_appraise_rules[] __ro_after_init = {
@@ -234,6 +241,7 @@ static int __init default_measure_policy_setup(char *str)
 __setup("ima_tcb", default_measure_policy_setup);
 
 static unsigned int ima_measure_skip_flags __initdata;
+static unsigned int ima_appraise_skip_flags __initdata;
 static bool ima_use_appraise_tcb __initdata;
 static bool ima_use_secure_boot __initdata;
 static bool ima_use_critical_data __initdata;
@@ -254,7 +262,12 @@ static int __init policy_setup(char *str)
 			ima_measure_skip_flags |= IMA_SKIP_OPEN;
 		} else if (strcmp(p, "appraise_tcb") == 0)
 			ima_use_appraise_tcb = true;
-		else if (strcmp(p, "secure_boot") == 0)
+		else if ((strcmp(p, "appraise_tmpfs") == 0))
+			ima_appraise_skip_flags |= IMA_SKIP_TMPFS;
+		else if (strcmp(p, "appraise_exec_tcb") == 0) {
+			ima_use_appraise_tcb = true;
+			ima_appraise_skip_flags |= IMA_SKIP_OPEN;
+		} else if (strcmp(p, "secure_boot") == 0)
 			ima_use_secure_boot = true;
 		else if (strcmp(p, "critical_data") == 0)
 			ima_use_critical_data = true;
@@ -889,10 +902,16 @@ void __init ima_init_policy(void)
 				  IMA_DEFAULT_POLICY | IMA_CUSTOM_POLICY, 0);
 	}
 
-	if (ima_use_appraise_tcb)
+	if (ima_use_appraise_tcb) {
 		add_rules(default_appraise_rules,
 			  ARRAY_SIZE(default_appraise_rules),
-			  IMA_DEFAULT_POLICY, 0);
+			  IMA_DEFAULT_POLICY, ima_appraise_skip_flags);
+
+		if (ima_appraise_skip_flags & IMA_SKIP_OPEN)
+			add_rules(appraise_exec_rules,
+				  ARRAY_SIZE(appraise_exec_rules),
+				  IMA_DEFAULT_POLICY, 0);
+	}
 
 	if (ima_use_critical_data)
 		add_rules(critical_data_rules,

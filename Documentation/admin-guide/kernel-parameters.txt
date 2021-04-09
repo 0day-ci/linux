@@ -1775,6 +1775,15 @@
 			The "appraise_tcb" policy appraises the integrity of
 			all files owned by root.
 
+			The "appraise_exec_tcb" is similar to the "appraise_tcb"
+			policy except for files executed or mmapped, which are
+			appraised (with imasig requirement) instead of files
+			owned by root.
+
+			The "appraise_tmpfs" policy excludes the dont_appraise
+			rule for the tmpfs and ramfs filesystems for the
+			"appraise_tcb" and "appraise_exec_tcb" policies.
+
 			The "secure_boot" policy appraises the integrity
 			of files (eg. kexec kernel image, kernel modules,
 			firmware, policy, etc) based on file signatures.
