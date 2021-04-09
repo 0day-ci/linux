@@ -9,6 +9,7 @@
 
 #include <linux/acpi.h>
 #include <linux/platform_device.h>
+#include <linux/usb/xhci-quirks.h>
 
 #include "core.h"
 
@@ -42,6 +43,17 @@ out:
 	return irq;
 }
 
+static void dwc3_host_init_quirks(struct dwc3 *dwc, struct xhci_plat_priv *priv)
+{
+	memset(priv, 0, sizeof(*priv));
+
+	if (DWC3_VER_IS_WITHIN(DWC31, ANY, 190A)) {
+		priv->quirks |= XHCI_ISOC_BLOCKED_DISCONNECT;
+		priv->quirks |= XHCI_LIMIT_FS_BI_INTR_EP;
+		priv->quirks |= XHCI_LOST_DISCONNECT_QUIRK;
+	}
+}
+
 int dwc3_host_init(struct dwc3 *dwc)
 {
 	struct property_entry	props[4];
@@ -49,6 +61,7 @@ int dwc3_host_init(struct dwc3 *dwc)
 	int			ret, irq;
 	struct resource		*res;
 	struct platform_device	*dwc3_pdev = to_platform_device(dwc->dev);
+	struct xhci_plat_priv	dwc3_priv;
 	int			prop_idx = 0;
 
 	irq = dwc3_host_get_irq(dwc);
@@ -84,6 +97,14 @@ int dwc3_host_init(struct dwc3 *dwc)
 						DWC3_XHCI_RESOURCES_NUM);
 	if (ret) {
 		dev_err(dwc->dev, "couldn't add resources to xHCI device\n");
+		goto err;
+	}
+
+	dwc3_host_init_quirks(dwc, &dwc3_priv);
+
+	ret = platform_device_add_data(xhci, &dwc3_priv, sizeof(dwc3_priv));
+	if (ret) {
+		dev_err(dwc->dev, "couldn't add platform data to xHCI device\n");
 		goto err;
 	}
 
