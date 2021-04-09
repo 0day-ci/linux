@@ -342,6 +342,12 @@ FTRACE_ENTRY(hwlat, hwlat_entry,
 #define FUNC_REPEATS_GET_DELTA_TS(entry)			\
 (((u64)entry->top_delta_ts << 32) | entry->bottom_delta_ts)	\
 
+#define FUNC_REPEATS_SET_DELTA_TS(entry, delta)			\
+	do {							\
+		entry->bottom_delta_ts = delta & U32_MAX;	\
+		entry->top_delta_ts = (delta >> 32);		\
+	} while (0);						\
+
 FTRACE_ENTRY(func_repeats, func_repeats_entry,
 
 	TRACE_FUNC_REPEATS,
