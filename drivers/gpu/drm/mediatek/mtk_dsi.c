@@ -205,6 +205,7 @@ struct mtk_dsi {
 	u32 irq_data;
 	wait_queue_head_t irq_wait_queue;
 	const struct mtk_dsi_driver_data *driver_data;
+	enum drm_panel_orientation orientation;
 };
 
 static inline struct mtk_dsi *bridge_to_dsi(struct drm_bridge *b)
@@ -962,6 +963,8 @@ static int mtk_dsi_encoder_init(struct drm_device *drm, struct mtk_dsi *dsi)
 	}
 	drm_connector_attach_encoder(dsi->connector, &dsi->encoder);
 
+	drm_connector_set_panel_orientation(dsi->connector, dsi->orientation);
+
 	return 0;
 
 err_cleanup_encoder:
@@ -1024,6 +1027,12 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 		if (IS_ERR(dsi->next_bridge)) {
 			ret = PTR_ERR(dsi->next_bridge);
 			goto err_unregister_host;
+		}
+
+		ret = of_drm_get_panel_orientation(panel->dev->of_node, &dsi->orientation);
+		if (ret) {
+			dev_err(dev, "failed to get panel orientation %d\n", ret);
+			return ret;
 		}
 	}
 
