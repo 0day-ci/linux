@@ -6,6 +6,7 @@
 // Copyright (C) 2018-19 Texas Instruments Incorporated - http://www.ti.com/
 
 #include <linux/platform_device.h>
+#include <linux/phy/phy.h>
 
 #include "m_can.h"
 
@@ -67,7 +68,9 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	struct resource *res;
 	void __iomem *addr;
 	void __iomem *mram_addr;
+	struct phy *transceiver;
 	int irq, ret = 0;
+	u32 bitrate_max;
 
 	mcan_class = m_can_class_allocate_dev(&pdev->dev,
 					      sizeof(struct m_can_plat_priv));
@@ -99,6 +102,28 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	if (!mram_addr) {
 		ret = -ENOMEM;
 		goto probe_fail;
+	}
+
+	transceiver = devm_phy_optional_get(&pdev->dev, "can_transceiver");
+	if (IS_ERR(transceiver)) {
+		ret = PTR_ERR(transceiver);
+		dev_err(&pdev->dev, "error while getting phy, err=%d\n", ret);
+		return ret;
+	}
+
+	if (!transceiver) {
+		dev_warn(&pdev->dev, "No transceiver phy found\n");
+	} else {
+		ret = phy_power_on(transceiver);
+		if (ret) {
+			dev_err(&pdev->dev, "error powering on phy, err=%d\n", ret);
+			return ret;
+		}
+		/* converting from Mbps to bps */
+		bitrate_max = (transceiver->attrs.max_link_rate) * 1000000;
+		if (!bitrate_max)
+			dev_warn(&pdev->dev, "Invalid value for transceiver max bitrate. Ignoring bitrate limit\n");
+		priv->cdev.can.bitrate_max = bitrate_max;
 	}
 
 	priv->base = addr;
