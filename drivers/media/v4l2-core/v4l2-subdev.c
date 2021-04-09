@@ -26,19 +26,18 @@
 #if defined(CONFIG_VIDEO_V4L2_SUBDEV_API)
 static int subdev_fh_init(struct v4l2_subdev_fh *fh, struct v4l2_subdev *sd)
 {
-	if (sd->entity.num_pads) {
-		fh->pad = v4l2_subdev_alloc_pad_config(sd);
-		if (fh->pad == NULL)
-			return -ENOMEM;
-	}
+	int ret;
+
+	ret = v4l2_subdev_init_config(sd, &fh->cfg);
+	if (ret)
+		return ret;
 
 	return 0;
 }
 
 static void subdev_fh_free(struct v4l2_subdev_fh *fh)
 {
-	v4l2_subdev_free_pad_config(fh->pad);
-	fh->pad = NULL;
+	v4l2_subdev_uninit_config(&fh->cfg);
 }
 
 static int subdev_open(struct file *file)
@@ -146,7 +145,7 @@ static inline int check_pad(struct v4l2_subdev *sd, u32 pad)
 	return 0;
 }
 
-static int check_cfg(u32 which, struct v4l2_subdev_pad_config *cfg)
+static int check_cfg(u32 which, struct v4l2_subdev_config *cfg)
 {
 	if (which == V4L2_SUBDEV_FORMAT_TRY && !cfg)
 		return -EINVAL;
@@ -155,7 +154,7 @@ static int check_cfg(u32 which, struct v4l2_subdev_pad_config *cfg)
 }
 
 static inline int check_format(struct v4l2_subdev *sd,
-			       struct v4l2_subdev_pad_config *cfg,
+			       struct v4l2_subdev_config *cfg,
 			       struct v4l2_subdev_format *format)
 {
 	if (!format)
@@ -166,7 +165,7 @@ static inline int check_format(struct v4l2_subdev *sd,
 }
 
 static int call_get_fmt(struct v4l2_subdev *sd,
-			struct v4l2_subdev_pad_config *cfg,
+			struct v4l2_subdev_config *cfg,
 			struct v4l2_subdev_format *format)
 {
 	return check_format(sd, cfg, format) ? :
@@ -174,7 +173,7 @@ static int call_get_fmt(struct v4l2_subdev *sd,
 }
 
 static int call_set_fmt(struct v4l2_subdev *sd,
-			struct v4l2_subdev_pad_config *cfg,
+			struct v4l2_subdev_config *cfg,
 			struct v4l2_subdev_format *format)
 {
 	return check_format(sd, cfg, format) ? :
@@ -182,7 +181,7 @@ static int call_set_fmt(struct v4l2_subdev *sd,
 }
 
 static int call_enum_mbus_code(struct v4l2_subdev *sd,
-			       struct v4l2_subdev_pad_config *cfg,
+			       struct v4l2_subdev_config *cfg,
 			       struct v4l2_subdev_mbus_code_enum *code)
 {
 	if (!code)
@@ -194,7 +193,7 @@ static int call_enum_mbus_code(struct v4l2_subdev *sd,
 }
 
 static int call_enum_frame_size(struct v4l2_subdev *sd,
-				struct v4l2_subdev_pad_config *cfg,
+				struct v4l2_subdev_config *cfg,
 				struct v4l2_subdev_frame_size_enum *fse)
 {
 	if (!fse)
@@ -229,7 +228,7 @@ static int call_s_frame_interval(struct v4l2_subdev *sd,
 }
 
 static int call_enum_frame_interval(struct v4l2_subdev *sd,
-				    struct v4l2_subdev_pad_config *cfg,
+				    struct v4l2_subdev_config *cfg,
 				    struct v4l2_subdev_frame_interval_enum *fie)
 {
 	if (!fie)
@@ -241,7 +240,7 @@ static int call_enum_frame_interval(struct v4l2_subdev *sd,
 }
 
 static inline int check_selection(struct v4l2_subdev *sd,
-				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_config *cfg,
 				  struct v4l2_subdev_selection *sel)
 {
 	if (!sel)
@@ -252,7 +251,7 @@ static inline int check_selection(struct v4l2_subdev *sd,
 }
 
 static int call_get_selection(struct v4l2_subdev *sd,
-			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_config *cfg,
 			      struct v4l2_subdev_selection *sel)
 {
 	return check_selection(sd, cfg, sel) ? :
@@ -260,7 +259,7 @@ static int call_get_selection(struct v4l2_subdev *sd,
 }
 
 static int call_set_selection(struct v4l2_subdev *sd,
-			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_config *cfg,
 			      struct v4l2_subdev_selection *sel)
 {
 	return check_selection(sd, cfg, sel) ? :
@@ -506,7 +505,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 
 		memset(format->reserved, 0, sizeof(format->reserved));
 		memset(format->format.reserved, 0, sizeof(format->format.reserved));
-		return v4l2_subdev_call(sd, pad, get_fmt, subdev_fh->pad, format);
+		return v4l2_subdev_call(sd, pad, get_fmt, &subdev_fh->cfg, format);
 	}
 
 	case VIDIOC_SUBDEV_S_FMT: {
@@ -517,7 +516,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 
 		memset(format->reserved, 0, sizeof(format->reserved));
 		memset(format->format.reserved, 0, sizeof(format->format.reserved));
-		return v4l2_subdev_call(sd, pad, set_fmt, subdev_fh->pad, format);
+		return v4l2_subdev_call(sd, pad, set_fmt, &subdev_fh->cfg, format);
 	}
 
 	case VIDIOC_SUBDEV_G_CROP: {
@@ -531,7 +530,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 		sel.target = V4L2_SEL_TGT_CROP;
 
 		rval = v4l2_subdev_call(
-			sd, pad, get_selection, subdev_fh->pad, &sel);
+			sd, pad, get_selection, &subdev_fh->cfg, &sel);
 
 		crop->rect = sel.r;
 
@@ -553,7 +552,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 		sel.r = crop->rect;
 
 		rval = v4l2_subdev_call(
-			sd, pad, set_selection, subdev_fh->pad, &sel);
+			sd, pad, set_selection, &subdev_fh->cfg, &sel);
 
 		crop->rect = sel.r;
 
@@ -564,7 +563,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 		struct v4l2_subdev_mbus_code_enum *code = arg;
 
 		memset(code->reserved, 0, sizeof(code->reserved));
-		return v4l2_subdev_call(sd, pad, enum_mbus_code, subdev_fh->pad,
+		return v4l2_subdev_call(sd, pad, enum_mbus_code, &subdev_fh->cfg,
 					code);
 	}
 
@@ -572,7 +571,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 		struct v4l2_subdev_frame_size_enum *fse = arg;
 
 		memset(fse->reserved, 0, sizeof(fse->reserved));
-		return v4l2_subdev_call(sd, pad, enum_frame_size, subdev_fh->pad,
+		return v4l2_subdev_call(sd, pad, enum_frame_size, &subdev_fh->cfg,
 					fse);
 	}
 
@@ -597,7 +596,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 		struct v4l2_subdev_frame_interval_enum *fie = arg;
 
 		memset(fie->reserved, 0, sizeof(fie->reserved));
-		return v4l2_subdev_call(sd, pad, enum_frame_interval, subdev_fh->pad,
+		return v4l2_subdev_call(sd, pad, enum_frame_interval, &subdev_fh->cfg,
 					fie);
 	}
 
@@ -606,7 +605,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 
 		memset(sel->reserved, 0, sizeof(sel->reserved));
 		return v4l2_subdev_call(
-			sd, pad, get_selection, subdev_fh->pad, sel);
+			sd, pad, get_selection, &subdev_fh->cfg, sel);
 	}
 
 	case VIDIOC_SUBDEV_S_SELECTION: {
@@ -617,7 +616,7 @@ static long subdev_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 
 		memset(sel->reserved, 0, sizeof(sel->reserved));
 		return v4l2_subdev_call(
-			sd, pad, set_selection, subdev_fh->pad, sel);
+			sd, pad, set_selection, &subdev_fh->cfg, sel);
 	}
 
 	case VIDIOC_G_EDID: {
@@ -892,35 +891,35 @@ int v4l2_subdev_link_validate(struct media_link *link)
 }
 EXPORT_SYMBOL_GPL(v4l2_subdev_link_validate);
 
-struct v4l2_subdev_pad_config *
-v4l2_subdev_alloc_pad_config(struct v4l2_subdev *sd)
+int v4l2_subdev_init_config(struct v4l2_subdev *sd, struct v4l2_subdev_config *cfg)
 {
-	struct v4l2_subdev_pad_config *cfg;
 	int ret;
 
-	if (!sd->entity.num_pads)
-		return NULL;
-
-	cfg = kvmalloc_array(sd->entity.num_pads, sizeof(*cfg),
-			     GFP_KERNEL | __GFP_ZERO);
-	if (!cfg)
-		return NULL;
+	if (sd->entity.num_pads) {
+		cfg->pad_configs = kvmalloc_array(sd->entity.num_pads, sizeof(*cfg->pad_configs),
+				     GFP_KERNEL | __GFP_ZERO);
+		if (!cfg->pad_configs)
+			return -ENOMEM;
+	} else {
+		cfg->pad_configs = NULL;
+	}
 
 	ret = v4l2_subdev_call(sd, pad, init_cfg, cfg);
 	if (ret < 0 && ret != -ENOIOCTLCMD) {
-		kvfree(cfg);
-		return NULL;
+		kvfree(cfg->pad_configs);
+		return ret;
 	}
 
-	return cfg;
+	return 0;
 }
-EXPORT_SYMBOL_GPL(v4l2_subdev_alloc_pad_config);
+EXPORT_SYMBOL_GPL(v4l2_subdev_init_config);
 
-void v4l2_subdev_free_pad_config(struct v4l2_subdev_pad_config *cfg)
+void v4l2_subdev_uninit_config(struct v4l2_subdev_config *cfg)
 {
-	kvfree(cfg);
+	kvfree(cfg->pad_configs);
 }
-EXPORT_SYMBOL_GPL(v4l2_subdev_free_pad_config);
+EXPORT_SYMBOL_GPL(v4l2_subdev_uninit_config);
+
 #endif /* CONFIG_MEDIA_CONTROLLER */
 
 void v4l2_subdev_init(struct v4l2_subdev *sd, const struct v4l2_subdev_ops *ops)
