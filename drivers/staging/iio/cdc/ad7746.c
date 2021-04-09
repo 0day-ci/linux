@@ -18,8 +18,6 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 
-#include "ad7746.h"
-
 /*
  * AD7746 Register Definition
  */
@@ -676,11 +674,10 @@ static const struct iio_info ad7746_info = {
 static int ad7746_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
-	struct ad7746_platform_data *pdata = client->dev.platform_data;
 	struct device_node *np = client->dev.of_node;
 	struct ad7746_chip_info *chip;
 	struct iio_dev *indio_dev;
-	unsigned int exca_en, excb_en;
+	unsigned int exca_en, excb_en, exclvl;
 	unsigned char regval = 0;
 	int ret = 0;
 
@@ -721,12 +718,11 @@ static int ad7746_probe(struct i2c_client *client,
 			regval |= AD7746_EXCSETUP_NEXCB;
 	}
 
-	if (pdata) {
-		regval |= AD7746_EXCSETUP_EXCLVL(pdata->exclvl);
-	} else {
-		dev_warn(&client->dev, "No platform data? using default\n");
-		regval = AD7746_EXCSETUP_EXCLVL(3);
-	}
+	ret = of_property_read_u32(np, "adi,excitation-voltage-level", &exclvl);
+	if (!ret)
+		regval |= AD7746_EXCSETUP_EXCLVL(exclvl);
+	else
+		regval |= AD7746_EXCSETUP_EXCLVL(3);
 
 	ret = i2c_smbus_write_byte_data(chip->client,
 					AD7746_REG_EXC_SETUP, regval);
