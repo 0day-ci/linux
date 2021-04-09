@@ -31,6 +31,9 @@ static struct hlist_head airq_lists[MAX_ISC+1];
 
 static struct dma_pool *airq_iv_cache;
 
+DEFINE_SPLIT_LOCK(airq_iv_lock);
+EXPORT_SYMBOL(airq_iv_lock);
+
 /**
  * register_adapter_interrupt() - register adapter interrupt handler
  * @airq: pointer to adapter interrupt descriptor

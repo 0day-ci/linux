@@ -26,6 +26,7 @@ struct airq_struct {
 
 int register_adapter_interrupt(struct airq_struct *airq);
 void unregister_adapter_interrupt(struct airq_struct *airq);
+extern struct iv_lock airq_iv_lock;
 
 /* Adapter interrupt bit vector */
 struct airq_iv {
@@ -72,13 +73,13 @@ static inline unsigned long airq_iv_end(struct airq_iv *iv)
 static inline void airq_iv_lock(struct airq_iv *iv, unsigned long bit)
 {
 	const unsigned long be_to_le = BITS_PER_LONG - 1;
-	bit_spin_lock(bit ^ be_to_le, iv->bitlock);
+	bit_spin_lock(bit ^ be_to_le, iv->bitlock, &airq_iv_lock);
 }
 
 static inline void airq_iv_unlock(struct airq_iv *iv, unsigned long bit)
 {
 	const unsigned long be_to_le = BITS_PER_LONG - 1;
-	bit_spin_unlock(bit ^ be_to_le, iv->bitlock);
+	bit_spin_unlock(bit ^ be_to_le, iv->bitlock, &airq_iv_lock);
 }
 
 static inline void airq_iv_set_data(struct airq_iv *iv, unsigned long bit,
