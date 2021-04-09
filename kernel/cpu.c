@@ -621,6 +621,10 @@ static int cpuhp_up_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 		st->state++;
 		ret = cpuhp_invoke_callback(cpu, st->state, true, NULL, NULL);
 		if (ret) {
+			pr_debug("CPUHP up callback failure (%d) for cpu %u at %s (%d)\n",
+				 ret, cpu, cpuhp_get_step(st->state)->name,
+				 st->state);
+
 			if (can_rollback_cpu(st)) {
 				st->target = prev_state;
 				undo_cpu_up(cpu, st);
@@ -990,6 +994,10 @@ static int cpuhp_down_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 	for (; st->state > target; st->state--) {
 		ret = cpuhp_invoke_callback(cpu, st->state, false, NULL, NULL);
 		if (ret) {
+			pr_debug("CPUHP down callback failure (%d) for cpu %u at %s (%d)\n",
+				 ret, cpu, cpuhp_get_step(st->state)->name,
+				 st->state);
+
 			st->target = prev_state;
 			if (st->state < prev_state)
 				undo_cpu_down(cpu, st);
