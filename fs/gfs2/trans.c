@@ -206,7 +206,7 @@ void gfs2_trans_add_data(struct gfs2_glock *gl, struct buffer_head *bh)
 	}
 	gfs2_log_lock(sdp);
 	if (bh->b_private) {
-		kfree(bd);
+		kmem_cache_free(gfs2_bufdata_cachep, bd);
 		bd = bh->b_private;
 	} else {
 		bh->b_private = bd;
@@ -246,12 +246,12 @@ void gfs2_trans_add_meta(struct gfs2_glock *gl, struct buffer_head *bh)
 	}
 	gfs2_log_lock(sdp);
 	if (bh->b_private) {
-		kfree(bd);
+		kmem_cache_free(gfs2_bufdata_cachep, bd);
 		bd = bh->b_private;
 	} else {
 		lock_page(bh->b_page);
 		if (bh->b_private) {
-			kfree(bd);
+			kmem_cache_free(gfs2_bufdata_cachep, bd);
 			bd = bh->b_private;
 		} else {
 			bh->b_private = bd;
