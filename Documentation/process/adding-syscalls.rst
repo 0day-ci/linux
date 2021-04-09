@@ -172,6 +172,13 @@ arguments (i.e. parameter 1, 3, 5), to allow use of contiguous pairs of 32-bit
 registers.  (This concern does not apply if the arguments are part of a
 structure that's passed in by pointer.)
 
+Whenever possible, try to use ABI-agnostic types for passing parameters to
+a syscall in order to avoid creating compat entry for it. Linux supports two
+ABI models - ILP32 and LP64. The types like ``void *``, ``long``, ``size_t``,
+``off_t`` have different size in those ABIs; types like ``char`` and  ``int``
+have the same size and don't require a compat layer support. For flags, it's
+always better to use ``unsigned int``.
+
 
 Proposing the API
 -----------------
