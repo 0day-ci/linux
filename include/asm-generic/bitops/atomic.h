@@ -29,7 +29,7 @@ static __always_inline void change_bit(unsigned int nr, volatile unsigned long *
 	atomic_long_xor(BIT_MASK(nr), (atomic_long_t *)p);
 }
 
-static inline int test_and_set_bit(unsigned int nr, volatile unsigned long *p)
+static inline bool test_and_set_bit(unsigned int nr, volatile unsigned long *p)
 {
 	long old;
 	unsigned long mask = BIT_MASK(nr);
@@ -42,7 +42,7 @@ static inline int test_and_set_bit(unsigned int nr, volatile unsigned long *p)
 	return !!(old & mask);
 }
 
-static inline int test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
+static inline bool test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
 {
 	long old;
 	unsigned long mask = BIT_MASK(nr);
@@ -55,7 +55,7 @@ static inline int test_and_clear_bit(unsigned int nr, volatile unsigned long *p)
 	return !!(old & mask);
 }
 
-static inline int test_and_change_bit(unsigned int nr, volatile unsigned long *p)
+static inline bool test_and_change_bit(unsigned int nr, volatile unsigned long *p)
 {
 	long old;
 	unsigned long mask = BIT_MASK(nr);

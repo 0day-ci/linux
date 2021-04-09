@@ -15,8 +15,8 @@
  * the returned value is 0.
  * It can be used to implement bit locks.
  */
-static inline int test_and_set_bit_lock(unsigned int nr,
-					volatile unsigned long *p)
+static inline bool test_and_set_bit_lock(unsigned int nr,
+					 volatile unsigned long *p)
 {
 	long old;
 	unsigned long mask = BIT_MASK(nr);
