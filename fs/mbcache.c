@@ -47,6 +47,7 @@ static struct kmem_cache *mb_entry_cache;
 static unsigned long mb_cache_shrink(struct mb_cache *cache,
 				     unsigned long nr_to_scan);
 
+static DEFINE_SPLIT_LOCK(mb_cache_lock);
 static inline struct hlist_bl_head *mb_cache_entry_head(struct mb_cache *cache,
 							u32 key)
 {
@@ -97,16 +98,16 @@ int mb_cache_entry_create(struct mb_cache *cache, gfp_t mask, u32 key,
 	entry->e_reusable = reusable;
 	entry->e_referenced = 0;
 	head = mb_cache_entry_head(cache, key);
-	hlist_bl_lock(head);
+	hlist_bl_lock(head, &mb_cache_lock);
 	hlist_bl_for_each_entry(dup, dup_node, head, e_hash_list) {
 		if (dup->e_key == key && dup->e_value == value) {
-			hlist_bl_unlock(head);
+			hlist_bl_unlock(head, &mb_cache_lock);
 			kmem_cache_free(mb_entry_cache, entry);
 			return -EBUSY;
 		}
 	}
 	hlist_bl_add_head(&entry->e_hash_list, head);
-	hlist_bl_unlock(head);
+	hlist_bl_unlock(head, &mb_cache_lock);
 
 	spin_lock(&cache->c_list_lock);
 	list_add_tail(&entry->e_list, &cache->c_list);
@@ -134,7 +135,7 @@ static struct mb_cache_entry *__entry_find(struct mb_cache *cache,
 	struct hlist_bl_head *head;
 
 	head = mb_cache_entry_head(cache, key);
-	hlist_bl_lock(head);
+	hlist_bl_lock(head, &mb_cache_lock);
 	if (entry && !hlist_bl_unhashed(&entry->e_hash_list))
 		node = entry->e_hash_list.next;
 	else
@@ -150,7 +151,7 @@ static struct mb_cache_entry *__entry_find(struct mb_cache *cache,
 	}
 	entry = NULL;
 out:
-	hlist_bl_unlock(head);
+	hlist_bl_unlock(head, &mb_cache_lock);
 	if (old_entry)
 		mb_cache_entry_put(cache, old_entry);
 
@@ -203,7 +204,7 @@ struct mb_cache_entry *mb_cache_entry_get(struct mb_cache *cache, u32 key,
 	struct mb_cache_entry *entry;
 
 	head = mb_cache_entry_head(cache, key);
-	hlist_bl_lock(head);
+	hlist_bl_lock(head, &mb_cache_lock);
 	hlist_bl_for_each_entry(entry, node, head, e_hash_list) {
 		if (entry->e_key == key && entry->e_value == value) {
 			atomic_inc(&entry->e_refcnt);
@@ -212,7 +213,7 @@ struct mb_cache_entry *mb_cache_entry_get(struct mb_cache *cache, u32 key,
 	}
 	entry = NULL;
 out:
-	hlist_bl_unlock(head);
+	hlist_bl_unlock(head, &mb_cache_lock);
 	return entry;
 }
 EXPORT_SYMBOL(mb_cache_entry_get);
@@ -231,12 +232,12 @@ void mb_cache_entry_delete(struct mb_cache *cache, u32 key, u64 value)
 	struct mb_cache_entry *entry;
 
 	head = mb_cache_entry_head(cache, key);
-	hlist_bl_lock(head);
+	hlist_bl_lock(head, &mb_cache_lock);
 	hlist_bl_for_each_entry(entry, node, head, e_hash_list) {
 		if (entry->e_key == key && entry->e_value == value) {
 			/* We keep hash list reference to keep entry alive */
 			hlist_bl_del_init(&entry->e_hash_list);
-			hlist_bl_unlock(head);
+			hlist_bl_unlock(head, &mb_cache_lock);
 			spin_lock(&cache->c_list_lock);
 			if (!list_empty(&entry->e_list)) {
 				list_del_init(&entry->e_list);
@@ -250,7 +251,7 @@ void mb_cache_entry_delete(struct mb_cache *cache, u32 key, u64 value)
 			return;
 		}
 	}
-	hlist_bl_unlock(head);
+	hlist_bl_unlock(head, &mb_cache_lock);
 }
 EXPORT_SYMBOL(mb_cache_entry_delete);
 
@@ -301,12 +302,12 @@ static unsigned long mb_cache_shrink(struct mb_cache *cache,
 		 */
 		spin_unlock(&cache->c_list_lock);
 		head = mb_cache_entry_head(cache, entry->e_key);
-		hlist_bl_lock(head);
+		hlist_bl_lock(head, &mb_cache_lock);
 		if (!hlist_bl_unhashed(&entry->e_hash_list)) {
 			hlist_bl_del_init(&entry->e_hash_list);
 			atomic_dec(&entry->e_refcnt);
 		}
-		hlist_bl_unlock(head);
+		hlist_bl_unlock(head, &mb_cache_lock);
 		if (mb_cache_entry_put(cache, entry))
 			shrunk++;
 		cond_resched();
