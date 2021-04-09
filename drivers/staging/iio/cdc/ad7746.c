@@ -677,8 +677,10 @@ static int ad7746_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 	struct ad7746_platform_data *pdata = client->dev.platform_data;
+	struct device_node *np = client->dev.of_node;
 	struct ad7746_chip_info *chip;
 	struct iio_dev *indio_dev;
+	unsigned int exca_en, excb_en;
 	unsigned char regval = 0;
 	int ret = 0;
 
@@ -703,26 +705,27 @@ static int ad7746_probe(struct i2c_client *client,
 	indio_dev->num_channels = ARRAY_SIZE(ad7746_channels);
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
+	ret = of_property_read_u32(np, "adi,exca-output", &exca_en);
+	if (!ret && exca_en) {
+		if (exca_en == 1)
+			regval |= AD7746_EXCSETUP_EXCA;
+		else
+			regval |= AD7746_EXCSETUP_NEXCA;
+	}
+
+	ret = of_property_read_u32(np, "adi,excb-output", &excb_en);
+	if (!ret && excb_en) {
+		if (excb_en == 1)
+			regval |= AD7746_EXCSETUP_EXCB;
+		else
+			regval |= AD7746_EXCSETUP_NEXCB;
+	}
+
 	if (pdata) {
-		if (pdata->exca_en) {
-			if (pdata->exca_inv_en)
-				regval |= AD7746_EXCSETUP_NEXCA;
-			else
-				regval |= AD7746_EXCSETUP_EXCA;
-		}
-
-		if (pdata->excb_en) {
-			if (pdata->excb_inv_en)
-				regval |= AD7746_EXCSETUP_NEXCB;
-			else
-				regval |= AD7746_EXCSETUP_EXCB;
-		}
-
 		regval |= AD7746_EXCSETUP_EXCLVL(pdata->exclvl);
 	} else {
 		dev_warn(&client->dev, "No platform data? using default\n");
-		regval = AD7746_EXCSETUP_EXCA | AD7746_EXCSETUP_EXCB |
-			AD7746_EXCSETUP_EXCLVL(3);
+		regval = AD7746_EXCSETUP_EXCLVL(3);
 	}
 
 	ret = i2c_smbus_write_byte_data(chip->client,
