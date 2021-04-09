@@ -1339,9 +1339,11 @@
 			has equivalent usage. See its documentation for details.
 
 	evm=		[EVM]
-			Format: { "fix" }
-			Permit 'security.evm' to be updated regardless of
-			current integrity status.
+			Format: { "fix" | "allow_metadata_writes" | "complete" }
+			fix: permit 'security.evm' to be updated regardless of
+			current integrity status;
+			allow_metadata_writes: permit metadata modificatons;
+			complete: don't allow further changes of the EVM mode.
 
 	evm_hash=	[EVM] Hash algorithm used to calculate the HMAC.
 			Format: { md5 | sha1 | rmd160 | sha256 | sha384
