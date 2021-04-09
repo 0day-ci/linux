@@ -2107,12 +2107,6 @@ static int tcpm_altmode_vdm(struct typec_altmode *altmode,
 	return 0;
 }
 
-static const struct typec_altmode_ops tcpm_altmode_ops = {
-	.enter = tcpm_altmode_enter,
-	.exit = tcpm_altmode_exit,
-	.vdm = tcpm_altmode_vdm,
-};
-
 /*
  * PD (data, control) command handling functions
  */
