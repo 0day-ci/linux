@@ -70,76 +70,10 @@
 				 XAE_OPTION_RXEN)
 
 /* Axi DMA Register definitions */
-
-#define XAXIDMA_TX_CR_OFFSET	0x00000000 /* Channel control */
-#define XAXIDMA_TX_SR_OFFSET	0x00000004 /* Status */
-#define XAXIDMA_TX_CDESC_OFFSET	0x00000008 /* Current descriptor pointer */
-#define XAXIDMA_TX_TDESC_OFFSET	0x00000010 /* Tail descriptor pointer */
-
-#define XAXIDMA_RX_CR_OFFSET	0x00000030 /* Channel control */
-#define XAXIDMA_RX_SR_OFFSET	0x00000034 /* Status */
-#define XAXIDMA_RX_CDESC_OFFSET	0x00000038 /* Current descriptor pointer */
-#define XAXIDMA_RX_TDESC_OFFSET	0x00000040 /* Tail descriptor pointer */
-
-#define XAXIDMA_CR_RUNSTOP_MASK	0x00000001 /* Start/stop DMA channel */
-#define XAXIDMA_CR_RESET_MASK	0x00000004 /* Reset DMA engine */
-
-#define XAXIDMA_SR_HALT_MASK	0x00000001 /* Indicates DMA channel halted */
-
-#define XAXIDMA_BD_NDESC_OFFSET		0x00 /* Next descriptor pointer */
-#define XAXIDMA_BD_BUFA_OFFSET		0x08 /* Buffer address */
-#define XAXIDMA_BD_CTRL_LEN_OFFSET	0x18 /* Control/buffer length */
-#define XAXIDMA_BD_STS_OFFSET		0x1C /* Status */
-#define XAXIDMA_BD_USR0_OFFSET		0x20 /* User IP specific word0 */
-#define XAXIDMA_BD_USR1_OFFSET		0x24 /* User IP specific word1 */
-#define XAXIDMA_BD_USR2_OFFSET		0x28 /* User IP specific word2 */
-#define XAXIDMA_BD_USR3_OFFSET		0x2C /* User IP specific word3 */
-#define XAXIDMA_BD_USR4_OFFSET		0x30 /* User IP specific word4 */
-#define XAXIDMA_BD_ID_OFFSET		0x34 /* Sw ID */
-#define XAXIDMA_BD_HAS_STSCNTRL_OFFSET	0x38 /* Whether has stscntrl strm */
-#define XAXIDMA_BD_HAS_DRE_OFFSET	0x3C /* Whether has DRE */
-
-#define XAXIDMA_BD_HAS_DRE_SHIFT	8 /* Whether has DRE shift */
-#define XAXIDMA_BD_HAS_DRE_MASK		0xF00 /* Whether has DRE mask */
-#define XAXIDMA_BD_WORDLEN_MASK		0xFF /* Whether has DRE mask */
-
-#define XAXIDMA_BD_CTRL_LENGTH_MASK	0x007FFFFF /* Requested len */
-#define XAXIDMA_BD_CTRL_TXSOF_MASK	0x08000000 /* First tx packet */
-#define XAXIDMA_BD_CTRL_TXEOF_MASK	0x04000000 /* Last tx packet */
-#define XAXIDMA_BD_CTRL_ALL_MASK	0x0C000000 /* All control bits */
-
-#define XAXIDMA_DELAY_MASK		0xFF000000 /* Delay timeout counter */
-#define XAXIDMA_COALESCE_MASK		0x00FF0000 /* Coalesce counter */
-
-#define XAXIDMA_DELAY_SHIFT		24
-#define XAXIDMA_COALESCE_SHIFT		16
-
-#define XAXIDMA_IRQ_IOC_MASK		0x00001000 /* Completion intr */
-#define XAXIDMA_IRQ_DELAY_MASK		0x00002000 /* Delay interrupt */
-#define XAXIDMA_IRQ_ERROR_MASK		0x00004000 /* Error interrupt */
-#define XAXIDMA_IRQ_ALL_MASK		0x00007000 /* All interrupts */
-
-/* Default TX/RX Threshold and waitbound values for SGDMA mode */
-#define XAXIDMA_DFT_TX_THRESHOLD	24
-#define XAXIDMA_DFT_TX_WAITBOUND	254
-#define XAXIDMA_DFT_RX_THRESHOLD	24
-#define XAXIDMA_DFT_RX_WAITBOUND	254
-
-#define XAXIDMA_BD_CTRL_TXSOF_MASK	0x08000000 /* First tx packet */
-#define XAXIDMA_BD_CTRL_TXEOF_MASK	0x04000000 /* Last tx packet */
-#define XAXIDMA_BD_CTRL_ALL_MASK	0x0C000000 /* All control bits */
-
-#define XAXIDMA_BD_STS_ACTUAL_LEN_MASK	0x007FFFFF /* Actual len */
-#define XAXIDMA_BD_STS_COMPLETE_MASK	0x80000000 /* Completed */
-#define XAXIDMA_BD_STS_DEC_ERR_MASK	0x40000000 /* Decode error */
-#define XAXIDMA_BD_STS_SLV_ERR_MASK	0x20000000 /* Slave error */
-#define XAXIDMA_BD_STS_INT_ERR_MASK	0x10000000 /* Internal err */
-#define XAXIDMA_BD_STS_ALL_ERR_MASK	0x70000000 /* All errors */
-#define XAXIDMA_BD_STS_RXSOF_MASK	0x08000000 /* First rx pkt */
-#define XAXIDMA_BD_STS_RXEOF_MASK	0x04000000 /* Last rx pkt */
-#define XAXIDMA_BD_STS_ALL_MASK		0xFC000000 /* All status bits */
-
-#define XAXIDMA_BD_MINIMUM_ALIGNMENT	0x40
+#define XAXIDMA_DFT_TX_THRESHOLD        24
+#define XAXIDMA_DFT_TX_WAITBOUND        254
+#define XAXIDMA_DFT_RX_THRESHOLD        24
+#define XAXIDMA_DFT_RX_WAITBOUND        254
 
 /* Axi Ethernet registers definition */
 #define XAE_RAF_OFFSET		0x00000000 /* Reset and Address filter */
@@ -344,39 +278,6 @@
 #define XLNX_MII_STD_SELECT_SGMII	BIT(0)
 
 /**
- * struct axidma_bd - Axi Dma buffer descriptor layout
- * @next:         MM2S/S2MM Next Descriptor Pointer
- * @next_msb:     MM2S/S2MM Next Descriptor Pointer (high 32 bits)
- * @phys:         MM2S/S2MM Buffer Address
- * @phys_msb:     MM2S/S2MM Buffer Address (high 32 bits)
- * @reserved3:    Reserved and not used
- * @reserved4:    Reserved and not used
- * @cntrl:        MM2S/S2MM Control value
- * @status:       MM2S/S2MM Status value
- * @app0:         MM2S/S2MM User Application Field 0.
- * @app1:         MM2S/S2MM User Application Field 1.
- * @app2:         MM2S/S2MM User Application Field 2.
- * @app3:         MM2S/S2MM User Application Field 3.
- * @app4:         MM2S/S2MM User Application Field 4.
- */
-struct axidma_bd {
-	u32 next;	/* Physical address of next buffer descriptor */
-	u32 next_msb;	/* high 32 bits for IP >= v7.1, reserved on older IP */
-	u32 phys;
-	u32 phys_msb;	/* for IP >= v7.1, reserved for older IP */
-	u32 reserved3;
-	u32 reserved4;
-	u32 cntrl;
-	u32 status;
-	u32 app0;
-	u32 app1;	/* TX start << 16 | insert */
-	u32 app2;	/* TX csum seed */
-	u32 app3;
-	u32 app4;   /* Last field used by HW */
-	struct sk_buff *skb;
-} __aligned(XAXIDMA_BD_MINIMUM_ALIGNMENT);
-
-/**
  * struct axienet_local - axienet private per device data
  * @ndev:	Pointer for net_device to which it will be attached.
  * @dev:	Pointer to device structure
@@ -390,27 +291,12 @@ struct axidma_bd {
  * @mii_clk_div: MII bus clock divider value
  * @regs_start: Resource start for axienet device addresses
  * @regs:	Base address for the axienet_local device address space
- * @dma_regs:	Base address for the axidma device address space
- * @dma_err_task: Work structure to process Axi DMA errors
- * @tx_irq:	Axidma TX IRQ number
- * @rx_irq:	Axidma RX IRQ number
  * @eth_irq:	Ethernet core IRQ number
  * @phy_mode:	Phy type to identify between MII/GMII/RGMII/SGMII/1000 Base-X
  * @options:	AxiEthernet option word
  * @features:	Stores the extended features supported by the axienet hw
- * @tx_bd_v:	Virtual address of the TX buffer descriptor ring
- * @tx_bd_p:	Physical address(start address) of the TX buffer descr. ring
  * @tx_bd_num:	Size of TX buffer descriptor ring
- * @rx_bd_v:	Virtual address of the RX buffer descriptor ring
- * @rx_bd_p:	Physical address(start address) of the RX buffer descr. ring
  * @rx_bd_num:	Size of RX buffer descriptor ring
- * @tx_bd_ci:	Stores the index of the Tx buffer descriptor in the ring being
- *		accessed currently. Used while alloc. BDs before a TX starts
- * @tx_bd_tail:	Stores the index of the Tx buffer descriptor in the ring being
- *		accessed currently. Used while processing BDs after the TX
- *		completed.
- * @rx_bd_ci:	Stores the index of the Rx buffer descriptor in the ring being
- *		accessed currently.
  * @max_frm_size: Stores the maximum size of the frame that can be that
  *		  Txed/Rxed in the existing hardware. If jumbo option is
  *		  supported, the maximum frame size would be 9k. Else it is
@@ -420,6 +306,9 @@ struct axidma_bd {
  * @csum_offload_on_rx_path:	Stores the checksum selection on RX side.
  * @coalesce_count_rx:	Store the irq coalesce on RX side.
  * @coalesce_count_tx:	Store the irq coalesce on TX side.
+ * @tx_chan: TX DMA channel.
+ * @rx_chan: RX DMA channel.
+ * @skb_cache: Custom skb slab allocator.
  */
 struct axienet_local {
 	struct net_device *ndev;
@@ -441,27 +330,15 @@ struct axienet_local {
 
 	resource_size_t regs_start;
 	void __iomem *regs;
-	void __iomem *dma_regs;
 
-	struct work_struct dma_err_task;
-
-	int tx_irq;
-	int rx_irq;
 	int eth_irq;
 	phy_interface_t phy_mode;
 
 	u32 options;
 	u32 features;
 
-	struct axidma_bd *tx_bd_v;
-	dma_addr_t tx_bd_p;
 	u32 tx_bd_num;
-	struct axidma_bd *rx_bd_v;
-	dma_addr_t rx_bd_p;
 	u32 rx_bd_num;
-	u32 tx_bd_ci;
-	u32 tx_bd_tail;
-	u32 rx_bd_ci;
 
 	u32 max_frm_size;
 	u32 rxmem;
@@ -471,6 +348,10 @@ struct axienet_local {
 
 	u32 coalesce_count_rx;
 	u32 coalesce_count_tx;
+
+	struct dma_chan *tx_chan;
+	struct dma_chan *rx_chan;
+	struct kmem_cache *skb_cache;
 };
 
 /**
