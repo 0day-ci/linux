@@ -1528,6 +1528,10 @@ static inline void skb_mark_not_on_list(struct sk_buff *skb)
 	for ((skb) = (first), (next_skb) = (skb) ? (skb)->next : NULL; (skb);  \
 	     (skb) = (next_skb), (next_skb) = (skb) ? (skb)->next : NULL)
 
+/* Iterate through skb fragments. */
+#define skb_for_each_frag(skb, __i) \
+	for (__i = 0; __i < skb_shinfo(skb)->nr_frags; __i++)
+
 static inline void skb_list_del_init(struct sk_buff *skb)
 {
 	__list_del_entry(&skb->list);
