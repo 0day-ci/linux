@@ -1862,12 +1862,12 @@ struct xhci_hcd {
 	/* cached extended protocol port capabilities */
 	struct xhci_port_cap	*port_caps;
 	unsigned int		num_port_caps;
-	/* Compliance Mode Recovery Data */
-	struct timer_list	comp_mode_recovery_timer;
+	/* For quirks that require to poll for port status */
+	struct timer_list	port_check_timer;
 	u32			port_status_u0;
 	u16			test_mode;
-/* Compliance Mode Timer Triggered every 2 seconds */
-#define COMP_MODE_RCVRY_MSECS 2000
+/* Port polling frequency */
+#define PORT_CHECK_MSECS 2000
 
 	/* Track max eSS interval for XHCI_ISOC_BLOCKED_DISCONNECT */
 	unsigned int		max_ess_interval;
