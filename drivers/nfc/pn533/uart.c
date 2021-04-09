@@ -239,9 +239,8 @@ static int pn532_uart_probe(struct serdev_device *serdev)
 {
 	struct pn532_uart_phy *pn532;
 	struct pn533 *priv;
-	int err;
+	int err = -ENOMEM;
 
-	err = -ENOMEM;
 	pn532 = kzalloc(sizeof(*pn532), GFP_KERNEL);
 	if (!pn532)
 		goto err_exit;
