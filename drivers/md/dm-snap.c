@@ -644,16 +644,18 @@ static void dm_exception_table_lock_init(struct dm_snapshot *s, chunk_t chunk,
 	lock->pending_slot = &pending->table[exception_hash(pending, chunk)];
 }
 
+static DEFINE_SPLIT_LOCK(dm_exception_lock);
+
 static void dm_exception_table_lock(struct dm_exception_table_lock *lock)
 {
-	hlist_bl_lock(lock->complete_slot);
-	hlist_bl_lock(lock->pending_slot);
+	hlist_bl_lock(lock->complete_slot, &dm_exception_lock);
+	hlist_bl_lock_nested(lock->pending_slot, &dm_exception_lock, 1);
 }
 
 static void dm_exception_table_unlock(struct dm_exception_table_lock *lock)
 {
-	hlist_bl_unlock(lock->pending_slot);
-	hlist_bl_unlock(lock->complete_slot);
+	hlist_bl_unlock(lock->pending_slot, &dm_exception_lock);
+	hlist_bl_unlock(lock->complete_slot, &dm_exception_lock);
 }
 
 static int dm_exception_table_init(struct dm_exception_table *et,
