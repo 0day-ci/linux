@@ -265,6 +265,11 @@ void pciehp_handle_presence_or_link_change(struct controller *ctrl, u32 events)
 		cancel_delayed_work(&ctrl->button_work);
 		fallthrough;
 	case OFF_STATE:
+		if ((events & PCI_EXP_SLTSTA_DLLSC) && !link_active) {
+			mutex_unlock(&ctrl->state_lock);
+			break;
+		}
+
 		ctrl->state = POWERON_STATE;
 		mutex_unlock(&ctrl->state_lock);
 		if (present)
