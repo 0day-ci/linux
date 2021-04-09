@@ -149,6 +149,7 @@ EXPORT_SYMBOL_GPL(dm_bio_get_target_bio_nr);
 #define DMF_DEFERRED_REMOVE 6
 #define DMF_SUSPENDED_INTERNALLY 7
 #define DMF_POST_SUSPENDING 8
+#define DMF_INTERPOSER_ATTACHED 9
 
 #define DM_NUMA_NODE NUMA_NO_NODE
 static int dm_numa_node = DM_NUMA_NODE;
@@ -757,18 +758,24 @@ static int open_table_device(struct table_device *td, dev_t dev,
 			     struct mapped_device *md)
 {
 	struct block_device *bdev;
-
+	fmode_t mode = td->dm_dev.mode;
+	void *holder = NULL;
 	int r;
 
 	BUG_ON(td->dm_dev.bdev);
 
-	bdev = blkdev_get_by_dev(dev, td->dm_dev.mode | FMODE_EXCL, _dm_claim_ptr);
+	if (!td->dm_dev.interpose) {
+		mode |= FMODE_EXCL;
+		holder = _dm_claim_ptr;
+	}
+
+	bdev = blkdev_get_by_dev(dev, mode, holder);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 
 	r = bd_link_disk_holder(bdev, dm_disk(md));
 	if (r) {
-		blkdev_put(bdev, td->dm_dev.mode | FMODE_EXCL);
+		blkdev_put(bdev, mode);
 		return r;
 	}
 
@@ -782,11 +789,16 @@ static int open_table_device(struct table_device *td, dev_t dev,
  */
 static void close_table_device(struct table_device *td, struct mapped_device *md)
 {
+	fmode_t mode = td->dm_dev.mode;
+
 	if (!td->dm_dev.bdev)
 		return;
 
 	bd_unlink_disk_holder(td->dm_dev.bdev, dm_disk(md));
-	blkdev_put(td->dm_dev.bdev, td->dm_dev.mode | FMODE_EXCL);
+	if (!td->dm_dev.interpose)
+		mode |= FMODE_EXCL;
+	blkdev_put(td->dm_dev.bdev, mode);
+
 	put_dax(td->dm_dev.dax_dev);
 	td->dm_dev.bdev = NULL;
 	td->dm_dev.dax_dev = NULL;
@@ -805,7 +817,7 @@ static struct table_device *find_table_device(struct list_head *l, dev_t dev,
 }
 
 int dm_get_table_device(struct mapped_device *md, dev_t dev, fmode_t mode,
-			struct dm_dev **result)
+			bool interpose, struct dm_dev **result)
 {
 	int r;
 	struct table_device *td;
@@ -821,6 +833,7 @@ int dm_get_table_device(struct mapped_device *md, dev_t dev, fmode_t mode,
 
 		td->dm_dev.mode = mode;
 		td->dm_dev.bdev = NULL;
+		td->dm_dev.interpose = interpose;
 
 		if ((r = open_table_device(td, dev, md))) {
 			mutex_unlock(&md->table_devices_lock);
@@ -1496,13 +1509,12 @@ static int __send_empty_flush(struct clone_info *ci)
 static int __clone_and_map_data_bio(struct clone_info *ci, struct dm_target *ti,
 				    sector_t sector, unsigned *len)
 {
-	struct bio *bio = ci->bio;
 	struct dm_target_io *tio;
 	int r;
 
 	tio = alloc_tio(ci, ti, 0, GFP_NOIO);
 	tio->len_ptr = len;
-	r = clone_bio(tio, bio, sector, *len);
+	r = clone_bio(tio, ci->bio, sector, *len);
 	if (r < 0) {
 		free_tio(tio);
 		return r;
@@ -1695,6 +1707,13 @@ static blk_qc_t dm_submit_bio(struct bio *bio)
 		bio_io_error(bio);
 		goto out;
 	}
+
+	/*
+	 * If md is an interposer, then we must set the BIO_INTERPOSE flag
+	 * so that the request is not re-interposed.
+	 */
+	if (md->interpose)
+		bio_set_flag(bio, BIO_INTERPOSED);
 
 	/* If suspended, queue this IO for later */
 	if (unlikely(test_bit(DMF_BLOCK_IO_FOR_SUSPEND, &md->flags))) {
@@ -2410,7 +2429,8 @@ static void dm_queue_flush(struct mapped_device *md)
  */
 struct dm_table *dm_swap_table(struct mapped_device *md, struct dm_table *table)
 {
-	struct dm_table *live_map = NULL, *map = ERR_PTR(-EINVAL);
+	struct dm_table *live_map = NULL;
+	struct dm_table *map = ERR_PTR(-EINVAL);
 	struct queue_limits limits;
 	int r;
 
@@ -2453,24 +2473,48 @@ out:
  * Functions to lock and unlock any filesystem running on the
  * device.
  */
-static int lock_fs(struct mapped_device *md)
+static int lock_bdev_fs(struct mapped_device *md, struct block_device *bdev)
 {
 	int r;
 
 	WARN_ON(test_bit(DMF_FROZEN, &md->flags));
 
-	r = freeze_bdev(md->disk->part0);
+	r = freeze_bdev(bdev);
 	if (!r)
 		set_bit(DMF_FROZEN, &md->flags);
 	return r;
 }
 
-static void unlock_fs(struct mapped_device *md)
+static void unlock_bdev_fs(struct mapped_device *md, struct block_device *bdev)
 {
 	if (!test_bit(DMF_FROZEN, &md->flags))
 		return;
-	thaw_bdev(md->disk->part0);
+	thaw_bdev(bdev);
 	clear_bit(DMF_FROZEN, &md->flags);
+}
+
+static inline int lock_fs(struct mapped_device *md)
+{
+	return lock_bdev_fs(md, md->disk->part0);
+}
+
+static inline void unlock_fs(struct mapped_device *md)
+{
+	unlock_bdev_fs(md, md->disk->part0);
+}
+
+static inline struct block_device *get_interposed_bdev(struct dm_table *t)
+{
+	struct dm_dev_internal *dd;
+
+	/*
+	 * For interposer should be only one device in dm table
+	 */
+	list_for_each_entry(dd, dm_table_get_devices(t), list)
+		if (dd->dm_dev->interpose)
+			return bdgrab(dd->dm_dev->bdev);
+
+	return NULL;
 }
 
 /*
@@ -2488,7 +2532,10 @@ static int __dm_suspend(struct mapped_device *md, struct dm_table *map,
 {
 	bool do_lockfs = suspend_flags & DM_SUSPEND_LOCKFS_FLAG;
 	bool noflush = suspend_flags & DM_SUSPEND_NOFLUSH_FLAG;
-	int r;
+	bool detach_ip = suspend_flags & DM_SUSPEND_DETACH_IP_FLAG
+			 && md->interpose;
+	struct block_device *original_bdev = NULL;
+	int r = 0;
 
 	lockdep_assert_held(&md->suspend_lock);
 
@@ -2507,18 +2554,50 @@ static int __dm_suspend(struct mapped_device *md, struct dm_table *map,
 	 */
 	dm_table_presuspend_targets(map);
 
-	/*
-	 * Flush I/O to the device.
-	 * Any I/O submitted after lock_fs() may not be flushed.
-	 * noflush takes precedence over do_lockfs.
-	 * (lock_fs() flushes I/Os and waits for them to complete.)
-	 */
-	if (!noflush && do_lockfs) {
-		r = lock_fs(md);
-		if (r) {
-			dm_table_presuspend_undo_targets(map);
-			return r;
+	if (!md->interpose) {
+		/*
+		 * Flush I/O to the device.
+		 * Any I/O submitted after lock_fs() may not be flushed.
+		 * noflush takes precedence over do_lockfs.
+		 * (lock_fs() flushes I/Os and waits for them to complete.)
+		 */
+		if (!noflush && do_lockfs)
+			r = lock_fs(md);
+	} else if (map) {
+		/*
+		 * Interposer should not lock mapped device, but
+		 * should freeze interposed device and lock it.
+		 */
+		original_bdev = get_interposed_bdev(map);
+		if (!original_bdev) {
+			r = -EINVAL;
+			DMERR("%s: interposer cannot get interposed device from table",
+				dm_device_name(md));
+			goto presuspend_undo;
 		}
+
+		if (!noflush && do_lockfs) {
+			r = lock_bdev_fs(md, original_bdev);
+			if (r) {
+				DMERR("%s: interposer cannot freeze interposed device",
+					dm_device_name(md));
+				goto presuspend_undo;
+			}
+		}
+
+		bdev_interposer_lock(original_bdev);
+	}
+	/*
+	 * If map is not initialized, then we cannot suspend
+	 * interposed device
+	 */
+
+presuspend_undo:
+	if (r) {
+		if (original_bdev)
+			bdput(original_bdev);
+		dm_table_presuspend_undo_targets(map);
+		return r;
 	}
 
 	/*
@@ -2559,14 +2638,40 @@ static int __dm_suspend(struct mapped_device *md, struct dm_table *map,
 	if (map)
 		synchronize_srcu(&md->io_barrier);
 
-	/* were we interrupted ? */
-	if (r < 0) {
+	if (r == 0) { /* the wait ended successfully */
+		if (md->interpose && original_bdev) {
+			if (detach_ip) {
+				bdev_interposer_detach(original_bdev);
+				clear_bit(DMF_INTERPOSER_ATTACHED, &md->flags);
+			}
+
+			bdev_interposer_unlock(original_bdev);
+
+			if (detach_ip) {
+				/*
+				 * If th interposer is detached, then there is
+				 * no reason in keeping the queue of the
+				 * interposed device stopped.
+				 */
+				unlock_bdev_fs(md, original_bdev);
+			}
+
+			bdput(original_bdev);
+		}
+	} else { /* were we interrupted ? */
 		dm_queue_flush(md);
 
 		if (dm_request_based(md))
 			dm_start_queue(md->queue);
 
-		unlock_fs(md);
+		if (md->interpose && original_bdev) {
+			bdev_interposer_unlock(original_bdev);
+			unlock_bdev_fs(md, original_bdev);
+
+			bdput(original_bdev);
+		} else
+			unlock_fs(md);
+
 		dm_table_presuspend_undo_targets(map);
 		/* pushback list is already flushed, so skip flush */
 	}
@@ -2574,6 +2679,88 @@ static int __dm_suspend(struct mapped_device *md, struct dm_table *map,
 	return r;
 }
 
+int __dm_attach_interposer(struct mapped_device *md)
+{
+	int r;
+	struct dm_table *map;
+	struct block_device *original_bdev = NULL;
+
+	if (dm_interposer_attached(md))
+		return 0;
+
+	map = rcu_dereference_protected(md->map,
+					lockdep_is_held(&md->suspend_lock));
+	if (!map) {
+		DMERR("%s: interposers table is not initialized",
+			dm_device_name(md));
+		return -EINVAL;
+	}
+
+	original_bdev = get_interposed_bdev(map);
+	if (!original_bdev) {
+		DMERR("%s: interposer cannot get interposed device from table",
+			dm_device_name(md));
+		return -EINVAL;
+	}
+
+	bdev_interposer_lock(original_bdev);
+
+	r = bdev_interposer_attach(original_bdev, dm_disk(md)->part0);
+	if (r)
+		DMERR("%s: failed to attach interposer",
+			dm_device_name(md));
+	else
+		set_bit(DMF_INTERPOSER_ATTACHED, &md->flags);
+
+	bdev_interposer_unlock(original_bdev);
+
+	unlock_bdev_fs(md, original_bdev);
+
+	bdput(original_bdev);
+
+	return r;
+}
+
+int __dm_detach_interposer(struct mapped_device *md)
+{
+	struct dm_table *map = NULL;
+	struct block_device *original_bdev;
+
+	if (!dm_interposer_attached(md))
+		return 0;
+	/*
+	 * If mapped device is suspended, but should be detached
+	 * we just detach without freeze fs on interposed device.
+	 */
+	map = rcu_dereference_protected(md->map,
+			lockdep_is_held(&md->suspend_lock));
+	if (!map) {
+		/*
+		 * If table is not initialized then interposed device
+		 * cannot be attached
+		 */
+		DMERR("%s: table is not initialized for device",
+			dm_device_name(md));
+		return -EINVAL;
+	}
+
+	original_bdev = get_interposed_bdev(map);
+	if (!original_bdev) {
+		DMERR("%s: interposer cannot get interposed device from table",
+			dm_device_name(md));
+		return -EINVAL;
+	}
+
+	bdev_interposer_lock(original_bdev);
+
+	bdev_interposer_detach(original_bdev);
+	clear_bit(DMF_INTERPOSER_ATTACHED, &md->flags);
+
+	bdev_interposer_unlock(original_bdev);
+
+	bdput(original_bdev);
+	return 0;
+}
 /*
  * We need to be able to change a mapping table under a mounted
  * filesystem.  For example we might want to move some data in
@@ -2599,7 +2786,11 @@ retry:
 	mutex_lock_nested(&md->suspend_lock, SINGLE_DEPTH_NESTING);
 
 	if (dm_suspended_md(md)) {
-		r = -EINVAL;
+		if (suspend_flags & DM_SUSPEND_DETACH_IP_FLAG)
+			r = __dm_detach_interposer(md);
+		else
+			r = -EINVAL;
+
 		goto out_unlock;
 	}
 
@@ -2645,8 +2836,10 @@ static int __dm_resume(struct mapped_device *md, struct dm_table *map)
 	if (dm_request_based(md))
 		dm_start_queue(md->queue);
 
-	unlock_fs(md);
+	if (md->interpose)
+		return __dm_attach_interposer(md);
 
+	unlock_fs(md);
 	return 0;
 }
 
@@ -2878,6 +3071,11 @@ out:
 int dm_suspended_md(struct mapped_device *md)
 {
 	return test_bit(DMF_SUSPENDED, &md->flags);
+}
+
+int dm_interposer_attached(struct mapped_device *md)
+{
+	return test_bit(DMF_INTERPOSER_ATTACHED, &md->flags);
 }
 
 static int dm_post_suspending_md(struct mapped_device *md)

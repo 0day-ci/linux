@@ -294,11 +294,29 @@ retry:
 			md = hc->md;
 			dm_get(md);
 
-			if (keep_open_devices &&
-			    dm_lock_for_deletion(md, mark_deferred, only_deferred)) {
-				dm_put(md);
-				dev_skipped++;
-				continue;
+			if (md->interpose) {
+				int r;
+
+				/*
+				 * Interposer should be suspended and detached
+				 * from the interposed block device.
+				 */
+				r = dm_suspend(md, DM_SUSPEND_DETACH_IP_FLAG |
+						   DM_SUSPEND_LOCKFS_FLAG);
+				if (r) {
+					DMERR("%s: unable to suspend and detach interposer",
+						dm_device_name(md));
+					dm_put(md);
+					dev_skipped++;
+					continue;
+				}
+			} else {
+				if (keep_open_devices &&
+				    dm_lock_for_deletion(md, mark_deferred, only_deferred)) {
+					dm_put(md);
+					dev_skipped++;
+					continue;
+				}
 			}
 
 			t = __hash_remove(hc);
@@ -732,6 +750,9 @@ static void __dev_status(struct mapped_device *md, struct dm_ioctl *param)
 	if (dm_test_deferred_remove_flag(md))
 		param->flags |= DM_DEFERRED_REMOVE;
 
+	if (dm_interposer_attached(md))
+		param->flags |= DM_INTERPOSE_FLAG;
+
 	param->dev = huge_encode_dev(disk_devt(disk));
 
 	/*
@@ -878,20 +899,37 @@ static int dev_remove(struct file *filp, struct dm_ioctl *param, size_t param_si
 
 	md = hc->md;
 
-	/*
-	 * Ensure the device is not open and nothing further can open it.
-	 */
-	r = dm_lock_for_deletion(md, !!(param->flags & DM_DEFERRED_REMOVE), false);
-	if (r) {
-		if (r == -EBUSY && param->flags & DM_DEFERRED_REMOVE) {
+	if (!md->interpose) {
+		/*
+		 * Ensure the device is not open and nothing further can open it.
+		 */
+		r = dm_lock_for_deletion(md, !!(param->flags & DM_DEFERRED_REMOVE), false);
+		if (r) {
+			if (r == -EBUSY && param->flags & DM_DEFERRED_REMOVE) {
+				up_write(&_hash_lock);
+				dm_put(md);
+				return 0;
+			}
+			DMDEBUG_LIMIT("unable to remove open device %s",
+					hc->name);
 			up_write(&_hash_lock);
 			dm_put(md);
-			return 0;
+			return r;
 		}
-		DMDEBUG_LIMIT("unable to remove open device %s", hc->name);
-		up_write(&_hash_lock);
-		dm_put(md);
-		return r;
+	} else {
+		/*
+		 * Interposer should be suspended and detached from
+		 * the interposed block device.
+		 */
+		r = dm_suspend(md, DM_SUSPEND_DETACH_IP_FLAG |
+				   DM_SUSPEND_LOCKFS_FLAG);
+		if (r) {
+			DMERR("%s: unable to suspend and detach interposer",
+				dm_device_name(md));
+			up_write(&_hash_lock);
+			dm_put(md);
+			return r;
+		}
 	}
 
 	t = __hash_remove(hc);
@@ -1050,6 +1088,7 @@ static int do_resume(struct dm_ioctl *param)
 
 	md = hc->md;
 
+
 	new_map = hc->new_map;
 	hc->new_map = NULL;
 	param->flags &= ~DM_INACTIVE_PRESENT_FLAG;
@@ -1063,8 +1102,14 @@ static int do_resume(struct dm_ioctl *param)
 			suspend_flags &= ~DM_SUSPEND_LOCKFS_FLAG;
 		if (param->flags & DM_NOFLUSH_FLAG)
 			suspend_flags |= DM_SUSPEND_NOFLUSH_FLAG;
-		if (!dm_suspended_md(md))
-			dm_suspend(md, suspend_flags);
+
+		if (md->interpose) {
+			if (!dm_suspended_md(md) || dm_interposer_attached(md))
+				dm_suspend(md, suspend_flags | DM_SUSPEND_DETACH_IP_FLAG);
+		} else {
+			if (!dm_suspended_md(md))
+				dm_suspend(md, suspend_flags);
+		}
 
 		old_map = dm_swap_table(md, new_map);
 		if (IS_ERR(old_map)) {
@@ -1267,6 +1312,11 @@ static inline fmode_t get_mode(struct dm_ioctl *param)
 	return mode;
 }
 
+static inline bool get_interpose_flag(struct dm_ioctl *param)
+{
+	return (param->flags & DM_INTERPOSE_FLAG);
+}
+
 static int next_target(struct dm_target_spec *last, uint32_t next, void *end,
 		       struct dm_target_spec **spec, char **target_params)
 {
@@ -1288,11 +1338,6 @@ static int populate_table(struct dm_table *table,
 	uint32_t next = param->data_start;
 	void *end = (void *) param + param_size;
 	char *target_params;
-
-	if (!param->target_count) {
-		DMWARN("populate_table: no targets specified");
-		return -EINVAL;
-	}
 
 	for (i = 0; i < param->target_count; i++) {
 
@@ -1337,6 +1382,8 @@ static int table_load(struct file *filp, struct dm_ioctl *param, size_t param_si
 	md = find_device(param);
 	if (!md)
 		return -ENXIO;
+
+	md->interpose = get_interpose_flag(param);
 
 	r = dm_table_create(&t, get_mode(param), param->target_count, md);
 	if (r)
@@ -2097,6 +2144,8 @@ int __init dm_early_create(struct dm_ioctl *dmi,
 	r = dm_table_create(&t, get_mode(dmi), dmi->target_count, md);
 	if (r)
 		goto err_hash_remove;
+
+	md->interpose = get_interpose_flag(dmi);
 
 	/* add targets */
 	for (i = 0; i < dmi->target_count; i++) {

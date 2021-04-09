@@ -327,14 +327,14 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
  * it is accessed concurrently.
  */
 static int upgrade_mode(struct dm_dev_internal *dd, fmode_t new_mode,
-			struct mapped_device *md)
+			bool interpose, struct mapped_device *md)
 {
 	int r;
 	struct dm_dev *old_dev, *new_dev;
 
 	old_dev = dd->dm_dev;
 
-	r = dm_get_table_device(md, dd->dm_dev->bdev->bd_dev,
+	r = dm_get_table_device(md, dd->dm_dev->bdev->bd_dev, interpose,
 				dd->dm_dev->mode | new_mode, &new_dev);
 	if (r)
 		return r;
@@ -367,6 +367,8 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 {
 	int r;
 	dev_t dev;
+	size_t ofs = 0;
+	bool interpose = false;
 	unsigned int major, minor;
 	char dummy;
 	struct dm_dev_internal *dd;
@@ -374,13 +376,40 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 
 	BUG_ON(!t);
 
-	if (sscanf(path, "%u:%u%c", &major, &minor, &dummy) == 2) {
+	/*
+	 * Extract extended options for device
+	 */
+	if (path[0] == '[') {
+		const char *interpose_opt = "interpose";
+		size_t opt_pos = 1;
+		size_t opt_len;
+
+		/*
+		 * Because only one option is supported yet, the parser
+		 * can be simplest.
+		 */
+		opt_len = strlen(interpose_opt);
+		if ((opt_pos + opt_len) < strlen(path) &&
+		    memcmp(&path[opt_pos], interpose_opt, opt_len) == 0) {
+			interpose = true;
+
+			if (!t->md->interpose)
+				t->md->interpose = true;
+		} else {
+			DMERR("Invalid devices extended options %s", path);
+			return -EINVAL;
+		}
+
+		ofs = opt_pos + opt_len + 1;
+	}
+
+	if (sscanf(&path[ofs], "%u:%u%c", &major, &minor, &dummy) == 2) {
 		/* Extract the major/minor numbers */
 		dev = MKDEV(major, minor);
 		if (MAJOR(dev) != major || MINOR(dev) != minor)
 			return -EOVERFLOW;
 	} else {
-		dev = dm_get_dev_t(path);
+		dev = dm_get_dev_t(&path[ofs]);
 		if (!dev)
 			return -ENODEV;
 	}
@@ -391,7 +420,8 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 		if (!dd)
 			return -ENOMEM;
 
-		if ((r = dm_get_table_device(t->md, dev, mode, &dd->dm_dev))) {
+		r = dm_get_table_device(t->md, dev, mode, interpose, &dd->dm_dev);
+		if (r) {
 			kfree(dd);
 			return r;
 		}
@@ -401,14 +431,40 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 		goto out;
 
 	} else if (dd->dm_dev->mode != (mode | dd->dm_dev->mode)) {
-		r = upgrade_mode(dd, mode, t->md);
+		r = upgrade_mode(dd, mode, interpose, t->md);
 		if (r)
 			return r;
 	}
 	refcount_inc(&dd->count);
 out:
+	if (interpose) {
+		struct block_device *original = dd->dm_dev->bdev;
+		/*
+		 * Interposer target should cover all underlying device
+		 */
+		if (ti->begin != 0) {
+			DMERR("%s: target offset should be zero for dm interposer",
+			      dm_device_name(t->md));
+			r = -EINVAL;
+			goto fail;
+		}
+		if (bdev_nr_sectors(original) != ti->len) {
+			DMERR("%s: interposer and interposed block device size should be equal",
+			      dm_device_name(t->md));
+			r = -EINVAL;
+			goto fail;
+		}
+	}
+
 	*result = dd->dm_dev;
 	return 0;
+fail:
+	if (refcount_dec_and_test(&dd->count)) {
+		dm_put_table_device(t->md, dd->dm_dev);
+		list_del(&dd->list);
+		kfree(dd);
+	}
+	return r;
 }
 EXPORT_SYMBOL(dm_get_device);
 
