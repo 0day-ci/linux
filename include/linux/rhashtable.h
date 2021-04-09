@@ -65,12 +65,11 @@ struct rhash_lock_head {};
  * struct bucket_table - Table of hash buckets
  * @size: Number of hash buckets
  * @nest: Number of bits of first-level nested table.
- * @rehash: Current bucket being rehashed
  * @hash_rnd: Random seed to fold into hash
  * @walkers: List of active walkers
  * @rcu: RCU structure for freeing the table
  * @future_tbl: Table under construction during rehashing
- * @ntbl: Nested table used when out of memory.
+ * @sl: Conceptual spinlock representing every per-bucket lock.
  * @buckets: size * hash buckets
  */
 struct bucket_table {
@@ -82,7 +81,7 @@ struct bucket_table {
 
 	struct bucket_table __rcu *future_tbl;
 
-	struct lockdep_map	dep_map;
+	struct split_lock	sl;
 
 	struct rhash_lock_head __rcu *buckets[] ____cacheline_aligned_in_smp;
 };
@@ -327,8 +326,7 @@ static inline void rht_lock(struct bucket_table *tbl,
 			    struct rhash_lock_head __rcu **bkt)
 {
 	local_bh_disable();
-	bit_spin_lock(0, (unsigned long *)bkt);
-	lock_map_acquire(&tbl->dep_map);
+	bit_spin_lock(0, (unsigned long *)bkt, &tbl->sl);
 }
 
 static inline void rht_lock_nested(struct bucket_table *tbl,
@@ -336,15 +334,13 @@ static inline void rht_lock_nested(struct bucket_table *tbl,
 				   unsigned int subclass)
 {
 	local_bh_disable();
-	bit_spin_lock(0, (unsigned long *)bucket);
-	lock_acquire_exclusive(&tbl->dep_map, subclass, 0, NULL, _THIS_IP_);
+	bit_spin_lock_nested(0, (unsigned long *)bucket, &tbl->sl, subclass);
 }
 
 static inline void rht_unlock(struct bucket_table *tbl,
 			      struct rhash_lock_head __rcu **bkt)
 {
-	lock_map_release(&tbl->dep_map);
-	bit_spin_unlock(0, (unsigned long *)bkt);
+	bit_spin_unlock(0, (unsigned long *)bkt, &tbl->sl);
 	local_bh_enable();
 }
 
@@ -397,10 +393,8 @@ static inline void rht_assign_unlock(struct bucket_table *tbl,
 {
 	if (rht_is_a_nulls(obj))
 		obj = NULL;
-	lock_map_release(&tbl->dep_map);
-	rcu_assign_pointer(*bkt, (void *)obj);
-	preempt_enable();
-	__release(bitlock);
+	bit_spin_unlock_assign((unsigned long *)bkt, (unsigned long)obj,
+				&tbl->sl);
 	local_bh_enable();
 }
 

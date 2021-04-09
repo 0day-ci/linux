@@ -179,7 +179,6 @@ static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
 	struct bucket_table *tbl = NULL;
 	size_t size;
 	int i;
-	static struct lock_class_key __key;
 
 	tbl = kvzalloc(struct_size(tbl, buckets, nbuckets), gfp);
 
@@ -193,10 +192,8 @@ static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
 	if (tbl == NULL)
 		return NULL;
 
-	lockdep_init_map(&tbl->dep_map, "rhashtable_bucket", &__key, 0);
-
+	split_lock_init(&tbl->sl);
 	tbl->size = size;
-
 	rcu_head_init(&tbl->rcu);
 	INIT_LIST_HEAD(&tbl->walkers);
 
