@@ -266,3 +266,8 @@ fail:
 	return ret;
 }
 
+void msm_dsi_dump_regs(struct msm_dsi *msm_dsi)
+{
+	msm_dsi_host_dump_regs(msm_dsi->host);
+}
+

@@ -9,6 +9,7 @@
 #include <drm/drm_modes.h>
 
 #include "dp_parser.h"
+#include "dpu_dbg.h"
 
 /* interrupts */
 #define DP_INTR_HPD		BIT(0)
@@ -70,6 +71,10 @@ struct dp_catalog {
 	enum dp_catalog_audio_header_type sdp_header;
 	u32 audio_data;
 };
+
+/* Debug module */
+void dp_catalog_dump_dbg_regs(struct dp_catalog *dp_catalog, u32 **regs, u8 reg_dump_method,
+		struct drm_printer *p);
 
 /* AUX APIs */
 u32 dp_catalog_aux_read_data(struct dp_catalog *dp_catalog);

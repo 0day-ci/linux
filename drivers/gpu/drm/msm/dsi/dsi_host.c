@@ -2489,3 +2489,28 @@ struct drm_bridge *msm_dsi_host_get_bridge(struct mipi_dsi_host *host)
 
 	return of_drm_find_bridge(msm_host->device_node);
 }
+
+void msm_dsi_host_dump_regs(struct mipi_dsi_host *host)
+{
+	struct msm_dsi_host *msm_host = to_msm_dsi_host(host);
+	struct drm_device *dev = msm_host->dev;
+	struct dpu_dbg_base *dpu_dbg;
+
+	dpu_dbg = dpu_dbg_get(dev);
+
+	if (dpu_dbg_is_drm_printer_needed(dpu_dbg) &&
+			!dpu_dbg->dpu_dbg_printer) {
+		pr_err("invalid drm printer\n");
+		return;
+	}
+
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM)
+		pm_runtime_get_sync(&msm_host->pdev->dev);
+
+	dpu_dbg_dump_regs(&dpu_dbg->dsi_ctrl_regs[msm_host->id],
+			msm_iomap_size(msm_host->pdev, "dsi_ctrl"), msm_host->ctrl_base,
+			dpu_dbg->reg_dump_method, dpu_dbg->dpu_dbg_printer);
+
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM)
+		pm_runtime_put_sync(&msm_host->pdev->dev);
+}

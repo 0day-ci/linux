@@ -1009,6 +1009,43 @@ int dp_display_get_test_bpp(struct msm_dp *dp)
 		dp_display->link->test_video.test_bit_depth);
 }
 
+void msm_dp_dump_regs(struct msm_dp *dp)
+{
+	struct dp_display_private *dp_display;
+	struct drm_device *drm;
+	struct dpu_dbg_base *dpu_dbg;
+
+	dp_display = container_of(dp, struct dp_display_private, dp_display);
+	drm = dp->drm_dev;
+	dpu_dbg = dpu_dbg_get(drm);
+
+	/*
+	 * if we are reading registers we need the link clocks to be on
+	 * however till DP cable is connected this will not happen as we
+	 * do not know the resolution to power up with. Hence check the
+	 * power_on status before dumping DP registers to avoid crash due
+	 * to unclocked access
+	 */
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM) {
+		mutex_lock(&dp_display->event_mutex);
+		if (!dp->power_on) {
+			mutex_unlock(&dp_display->event_mutex);
+			return;
+		}
+	}
+
+	if (dpu_dbg_is_drm_printer_needed(dpu_dbg) && !dpu_dbg->dpu_dbg_printer) {
+		pr_err("invalid drm printer\n");
+		return;
+	}
+
+	dp_catalog_dump_dbg_regs(dp_display->catalog, &dpu_dbg->dp_ctrl_regs,
+			dpu_dbg->reg_dump_method, dpu_dbg->dpu_dbg_printer);
+
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM)
+		mutex_unlock(&dp_display->event_mutex);
+}
+
 static void dp_display_config_hpd(struct dp_display_private *dp)
 {
 

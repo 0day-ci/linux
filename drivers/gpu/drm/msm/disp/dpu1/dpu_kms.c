@@ -795,6 +795,92 @@ static void dpu_irq_uninstall(struct msm_kms *kms)
 	dpu_core_irq_uninstall(dpu_kms);
 }
 
+void dpu_kms_dump_mdp_regs(struct drm_device *dev)
+{
+	int i;
+	struct msm_drm_private *priv;
+	struct dpu_kms *dpu_kms;
+	struct dpu_mdss_cfg *cat;
+	struct dpu_hw_mdp *top;
+	struct dpu_dbg_base *dpu_dbg;
+	struct drm_printer *p;
+	bool in_drm_printer = false;
+
+	priv = dev->dev_private;
+	dpu_kms = to_dpu_kms(priv->kms);
+	dpu_dbg = dpu_kms->dpu_dbg;
+	p = dpu_dbg->dpu_dbg_printer;
+
+	cat = dpu_kms->catalog;
+	top = dpu_kms->hw_mdp;
+
+	in_drm_printer = dpu_dbg_is_drm_printer_needed(dpu_dbg);
+
+	if (in_drm_printer && !p) {
+		DRM_ERROR("invalid drm printer\n");
+		return;
+	}
+
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM)
+		pm_runtime_get_sync(&dpu_kms->pdev->dev);
+
+	/* dump CTL sub-blocks HW regs info */
+	for (i = 0; i < cat->ctl_count; i++) {
+		if (in_drm_printer)
+			drm_printf(p, "===================ctl %d regs================\n", i);
+		dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->ctl[i],
+			cat->ctl[i].len, dpu_kms->mmio + cat->ctl[i].base,
+			dpu_dbg->reg_dump_method, p);
+	}
+
+	/* dump DSPP sub-blocks HW regs info */
+	for (i = 0; i < cat->dspp_count; i++) {
+		if (in_drm_printer)
+			drm_printf(p, "===================dspp %d regs================\n", i);
+		dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->dspp[i],
+			cat->dspp[i].len, dpu_kms->mmio + cat->dspp[i].base,
+			dpu_dbg->reg_dump_method, p);
+	}
+
+	/* dump INTF sub-blocks HW regs info */
+	for (i = 0; i < cat->intf_count; i++) {
+		if (in_drm_printer)
+			drm_printf(p, "===================intf %d regs================\n", i);
+		dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->intf[i],
+			cat->intf[i].len, dpu_kms->mmio + cat->intf[i].base,
+			dpu_dbg->reg_dump_method, p);
+	}
+
+	/* dump PP sub-blocks HW regs info */
+	for (i = 0; i < cat->pingpong_count; i++) {
+		if (in_drm_printer)
+			drm_printf(p, "===================ping-pong %d regs================\n", i);
+		dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->pp[i],
+			cat->pingpong[i].len, dpu_kms->mmio + cat->pingpong[i].base,
+			dpu_dbg->reg_dump_method, p);
+	}
+
+	/* dump SSPP sub-blocks HW regs info */
+	for (i = 0; i < cat->sspp_count; i++) {
+		if (in_drm_printer)
+			drm_printf(p, "===================sspp %d regs================\n", i);
+		dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->sspp[i],
+			cat->sspp[i].len, dpu_kms->mmio + cat->sspp[i].base,
+			dpu_dbg->reg_dump_method, p);
+	}
+
+	if (in_drm_printer)
+		drm_printf(p, "===================mdp top regs================\n");
+
+	/* dump TOP sub-blocks HW regs info */
+	dpu_dbg_dump_regs(&dpu_dbg->mdp_regs->top,
+			top->hw.length, dpu_kms->mmio + top->hw.blk_off,
+			dpu_dbg->reg_dump_method, p);
+
+	if (dpu_dbg->reg_dump_method == DPU_DBG_DUMP_IN_MEM)
+		pm_runtime_put_sync(&dpu_kms->pdev->dev);
+}
+
 static const struct msm_kms_funcs kms_funcs = {
 	.hw_init         = dpu_kms_hw_init,
 	.irq_preinstall  = dpu_irq_preinstall,

@@ -24,6 +24,7 @@
 #include "dpu_io_util.h"
 #include "dpu_rm.h"
 #include "dpu_core_perf.h"
+#include "dpu_dbg.h"
 
 #define DRMID(x) ((x) ? (x)->base.id : -1)
 
@@ -131,6 +132,8 @@ struct dpu_kms {
 	bool rpm_enabled;
 
 	struct opp_table *opp_table;
+
+	struct dpu_dbg_base *dpu_dbg;
 
 	struct dss_module_power mp;
 
@@ -264,5 +267,7 @@ void dpu_kms_encoder_enable(struct drm_encoder *encoder);
  * Return: current clock rate
  */
 u64 dpu_kms_get_clk_rate(struct dpu_kms *dpu_kms, char *clock_name);
+
+void dpu_kms_dump_mdp_regs(struct drm_device *dev);
 
 #endif /* __dpu_kms_H__ */
