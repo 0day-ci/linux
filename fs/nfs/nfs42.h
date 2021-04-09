@@ -60,5 +60,7 @@ static inline u32 nfs42_listxattr_xdrsize(u32 buflen)
 {
 	return ((buflen / (XATTR_USER_PREFIX_LEN + 2)) * 8) + 4;
 }
+
+extern unsigned int nfs4_ssc_inter_server_min_size;
 #endif /* CONFIG_NFS_V4_2 */
 #endif /* __LINUX_FS_NFS_NFS4_2_H */

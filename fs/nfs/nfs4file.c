@@ -20,6 +20,12 @@
 
 #ifdef CONFIG_NFS_V4_2
 #include "nfs42.h"
+
+unsigned int nfs4_ssc_inter_server_min_size = (1024*1024*16);
+EXPORT_SYMBOL_GPL(nfs4_ssc_inter_server_min_size);
+module_param(nfs4_ssc_inter_server_min_size, uint, 0644);
+MODULE_PARM_DESC(nfs4_ssc_inter_server_min_size,
+			"threshold to do inter-server copy");
 #endif
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
@@ -158,13 +164,11 @@ static ssize_t __nfs4_copy_file_range(struct file *file_in, loff_t pos_in,
 		sync = true;
 retry:
 	if (!nfs42_files_from_same_server(file_in, file_out)) {
-		/* for inter copy, if copy size if smaller than 12 RPC
-		 * payloads, fallback to traditional copy. There are
-		 * 14 RPCs during an NFSv4.x mount between source/dest
-		 * servers.
+		/*
+		 * for inter copy, if copy size is too small
+		 * then fallback to generic copy.
 		 */
-		if (sync ||
-			count <= 14 * NFS_SERVER(file_inode(file_in))->rsize)
+		if (sync || count <= nfs4_ssc_inter_server_min_size)
 			return -EOPNOTSUPP;
 		cn_resp = kzalloc(sizeof(struct nfs42_copy_notify_res),
 				GFP_NOFS);
