@@ -3918,6 +3918,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 				 enum devlink_command cmd,
 				 u32 portid, u32 seq, int flags)
 {
+	struct devlink_port *dl_port;
 	union devlink_param_value param_value[DEVLINK_PARAM_CMODE_MAX + 1];
 	bool param_value_set[DEVLINK_PARAM_CMODE_MAX + 1] = {};
 	const struct devlink_param *param = param_item->param;
@@ -3941,7 +3942,20 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 			if (!param_item->published)
 				continue;
 			ctx.cmode = i;
-			err = devlink_param_get(devlink, param, &ctx);
+			if ((cmd == DEVLINK_CMD_PORT_PARAM_GET ||
+			    cmd == DEVLINK_CMD_PORT_PARAM_NEW ||
+			    cmd == DEVLINK_CMD_PORT_PARAM_DEL) &&
+			    devlink->ops->port_param_ops) {
+
+				dl_port = devlink_port_get_by_index(devlink,
+								    port_index);
+				err = devlink->ops->port_param_ops->get(dl_port,
+									param->id,
+									&ctx);
+			} else {
+				err = devlink_param_get(devlink, param, &ctx);
+			}
+
 			if (err)
 				return err;
 			param_value[i] = ctx.val;

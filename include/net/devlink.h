@@ -1189,6 +1189,16 @@ enum devlink_trap_group_generic_id {
 		.min_burst = _min_burst,				      \
 	}
 
+struct devlink_port_param_ops {
+	int (*get)(struct devlink_port *port, u32 id,
+		   struct devlink_param_gset_ctx *ctx);
+	int (*set)(struct devlink_port *port, u32 id,
+		   struct devlink_param_gset_ctx *ctx);
+	int (*validate)(struct devlink_port *port, u32 id,
+			union devlink_param_value val,
+			struct netlink_ext_ack *extack);
+};
+
 struct devlink_ops {
 	/**
 	 * @supported_flash_update_params:
@@ -1451,6 +1461,7 @@ struct devlink_ops {
 				 struct devlink_port *port,
 				 enum devlink_port_fn_state state,
 				 struct netlink_ext_ack *extack);
+	struct devlink_port_param_ops *port_param_ops;
 };
 
 static inline void *devlink_priv(struct devlink *devlink)

@@ -186,6 +186,7 @@ struct nsim_dev_port {
 	unsigned int port_index;
 	struct dentry *ddir;
 	struct netdevsim *ns;
+	u32 test_parameter_value;
 };
 
 struct nsim_dev {

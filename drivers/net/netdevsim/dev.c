@@ -39,6 +39,11 @@ static struct dentry *nsim_dev_ddir;
 
 #define NSIM_DEV_DUMMY_REGION_SIZE (1024 * 32)
 
+static int nsim_dev_port_param_set(struct devlink_port *port, u32 id,
+				   struct devlink_param_gset_ctx *ctx);
+static int nsim_dev_port_param_get(struct devlink_port *port, u32 id,
+				   struct devlink_param_gset_ctx *ctx);
+
 static int
 nsim_dev_take_snapshot(struct devlink *devlink,
 		       const struct devlink_region_ops *ops,
@@ -339,6 +344,7 @@ out:
 enum nsim_devlink_param_id {
 	NSIM_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
 	NSIM_DEVLINK_PARAM_ID_TEST1,
+	NSIM_DEVLINK_PARAM_ID_TEST2,
 };
 
 static const struct devlink_param nsim_devlink_params[] = {
@@ -347,6 +353,10 @@ static const struct devlink_param nsim_devlink_params[] = {
 			      NULL, NULL, NULL),
 	DEVLINK_PARAM_DRIVER(NSIM_DEVLINK_PARAM_ID_TEST1,
 			     "test1", DEVLINK_PARAM_TYPE_BOOL,
+			     BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
+			     NULL, NULL, NULL),
+	DEVLINK_PARAM_DRIVER(NSIM_DEVLINK_PARAM_ID_TEST2,
+			     "test1", DEVLINK_PARAM_TYPE_U32,
 			     BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
 			     NULL, NULL, NULL),
 };
@@ -892,6 +902,11 @@ nsim_dev_devlink_trap_policer_counter_get(struct devlink *devlink,
 	return 0;
 }
 
+static const struct devlink_port_param_ops nsim_dev_port_param_ops = {
+	.get = nsim_dev_port_param_get,
+	.set = nsim_dev_port_param_set,
+};
+
 static const struct devlink_ops nsim_dev_devlink_ops = {
 	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_COMPONENT |
 					 DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK,
@@ -905,6 +920,7 @@ static const struct devlink_ops nsim_dev_devlink_ops = {
 	.trap_group_set = nsim_dev_devlink_trap_group_set,
 	.trap_policer_set = nsim_dev_devlink_trap_policer_set,
 	.trap_policer_counter_get = nsim_dev_devlink_trap_policer_counter_get,
+	.port_param_ops = &nsim_dev_port_param_ops,
 };
 
 #define NSIM_DEV_MAX_MACS_DEFAULT 32
@@ -1224,6 +1240,36 @@ int nsim_dev_port_del(struct nsim_bus_dev *nsim_bus_dev,
 		__nsim_dev_port_del(nsim_dev_port);
 	mutex_unlock(&nsim_dev->port_list_lock);
 	return err;
+}
+
+static int nsim_dev_port_param_get(struct devlink_port *port, u32 id,
+				   struct devlink_param_gset_ctx *ctx)
+{
+	struct nsim_dev *nsim_dev = devlink_priv(port->devlink);
+	struct nsim_dev_port *nsim_port =
+		__nsim_dev_port_lookup(nsim_dev, port->index);
+
+	if (id == NSIM_DEVLINK_PARAM_ID_TEST2) {
+		ctx->val.vu32 = nsim_port->test_parameter_value;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int nsim_dev_port_param_set(struct devlink_port *port, u32 id,
+				   struct devlink_param_gset_ctx *ctx)
+{
+	struct nsim_dev *nsim_dev = devlink_priv(port->devlink);
+	struct nsim_dev_port *nsim_port =
+		__nsim_dev_port_lookup(nsim_dev, port->index);
+
+	if (id == NSIM_DEVLINK_PARAM_ID_TEST2) {
+		nsim_port->test_parameter_value = ctx->val.vu32;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 int nsim_dev_init(void)
