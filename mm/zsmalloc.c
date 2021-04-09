@@ -874,6 +874,8 @@ static unsigned long obj_to_head(struct page *page, void *obj)
 		return *(unsigned long *)obj;
 }
 
+static DEFINE_SPLIT_LOCK(zs_pin_lock);
+
 static inline int testpin_tag(unsigned long handle)
 {
 	return bit_spin_is_locked(HANDLE_PIN_BIT, (unsigned long *)handle);
@@ -881,17 +883,20 @@ static inline int testpin_tag(unsigned long handle)
 
 static inline int trypin_tag(unsigned long handle)
 {
-	return bit_spin_trylock(HANDLE_PIN_BIT, (unsigned long *)handle);
+	return bit_spin_trylock(HANDLE_PIN_BIT, (unsigned long *)handle,
+				&zs_pin_lock);
 }
 
 static void pin_tag(unsigned long handle) __acquires(bitlock)
 {
-	bit_spin_lock(HANDLE_PIN_BIT, (unsigned long *)handle);
+	bit_spin_lock(HANDLE_PIN_BIT, (unsigned long *)handle,
+			&zs_pin_lock);
 }
 
 static void unpin_tag(unsigned long handle) __releases(bitlock)
 {
-	bit_spin_unlock(HANDLE_PIN_BIT, (unsigned long *)handle);
+	bit_spin_unlock(HANDLE_PIN_BIT, (unsigned long *)handle,
+			&zs_pin_lock);
 }
 
 static void reset_page(struct page *page)
