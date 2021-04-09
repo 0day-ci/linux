@@ -108,7 +108,6 @@ static long gio_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 	default:
 		return -EFAULT;
-		break;
 	}
 
 	if ((cmd & 0x01) == 0) {	/* read */
