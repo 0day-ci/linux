@@ -4402,7 +4402,7 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
 	 * Allocate the dynamic array first and then allocate individual
 	 * commands.
 	 */
-	instance->cmd_list = kcalloc(max_cmd, sizeof(struct megasas_cmd*), GFP_KERNEL);
+	instance->cmd_list = kcalloc(max_cmd, sizeof(struct megasas_cmd *), GFP_KERNEL);
 
 	if (!instance->cmd_list) {
 		dev_printk(KERN_DEBUG, &instance->pdev->dev, "out of memory\n");
@@ -8150,7 +8150,7 @@ static int megasas_set_crash_dump_params_ioctl(struct megasas_cmd *cmd)
  */
 static int
 megasas_mgmt_fw_ioctl(struct megasas_instance *instance,
-		      struct megasas_iocpacket __user * user_ioc,
+		      struct megasas_iocpacket __user *user_ioc,
 		      struct megasas_iocpacket *ioc)
 {
 	struct megasas_sge64 *kern_sge64 = NULL;

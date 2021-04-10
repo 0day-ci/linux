@@ -126,7 +126,7 @@ typedef struct uioc {
 	uint8_t			reserved[128];
 
 /* Driver Data: */
-	void __user *		user_data;
+	void __user		*user_data;
 	uint32_t		user_data_len;
 
 	/* 64bit alignment */
@@ -138,7 +138,7 @@ typedef struct uioc {
 	dma_addr_t		pthru32_h;
 
 	struct list_head	list;
-	void			(*done)(struct uioc*);
+	void			(*done)(struct uioc *);
 
 	caddr_t			buf_vaddr;
 	dma_addr_t		buf_paddr;

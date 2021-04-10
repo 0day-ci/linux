@@ -582,7 +582,7 @@ static uioc_t *
 mraid_mm_alloc_kioc(mraid_mmadp_t *adp)
 {
 	uioc_t			*kioc;
-	struct list_head*	head;
+	struct list_head	*head;
 	unsigned long		flags;
 
 	down(&adp->kioc_semaphore);
@@ -722,7 +722,7 @@ ioctl_done(uioc_t *kioc)
 {
 	uint32_t	adapno;
 	int		iterator;
-	mraid_mmadp_t*	adapter;
+	mraid_mmadp_t	*adapter;
 
 	/*
 	 * When the kioc returns from driver, make sure it still doesn't
