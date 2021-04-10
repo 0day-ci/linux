@@ -63,6 +63,36 @@ static int dsa_slave_get_iflink(const struct net_device *dev)
 	return dsa_slave_to_master(dev)->ifindex;
 }
 
+static int dsa_slave_set_iflink(struct net_device *dev, int iflink)
+{
+	struct net_device *master = dsa_slave_to_master(dev);
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct net_device *cpu_dev;
+	struct dsa_port *cpu_dp;
+
+	cpu_dev = dev_get_by_index(dev_net(dev), iflink);
+	if (!cpu_dev)
+		return -ENODEV;
+
+	cpu_dp = cpu_dev->dsa_ptr;
+	if (!cpu_dp)
+		return -EINVAL;
+
+	/* new CPU port has to be on the same switch tree */
+	if (cpu_dp->dst != dp->cpu_dp->dst)
+		return -EINVAL;
+
+	if (ether_addr_equal(dev->dev_addr, master->dev_addr))
+		eth_hw_addr_inherit(dev, cpu_dev);
+
+	/* should this be done atomically? */
+	dp->cpu_dp = cpu_dp;
+	p->xmit = cpu_dp->tag_ops->xmit;
+
+	return 0;
+}
+
 static int dsa_slave_open(struct net_device *dev)
 {
 	struct net_device *master = dsa_slave_to_master(dev);
@@ -1666,6 +1696,7 @@ static const struct net_device_ops dsa_slave_netdev_ops = {
 	.ndo_fdb_dump		= dsa_slave_fdb_dump,
 	.ndo_do_ioctl		= dsa_slave_ioctl,
 	.ndo_get_iflink		= dsa_slave_get_iflink,
+	.ndo_set_iflink		= dsa_slave_set_iflink,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_netpoll_setup	= dsa_slave_netpoll_setup,
 	.ndo_netpoll_cleanup	= dsa_slave_netpoll_cleanup,
