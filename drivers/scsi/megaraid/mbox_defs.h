@@ -588,7 +588,7 @@ typedef struct {
 typedef struct {
 	uint8_t		channel;
 	uint8_t		target;
-}__attribute__ ((packed)) adap_device_t;
+} __attribute__ ((packed)) adap_device_t;
 
 
 /**
@@ -600,7 +600,7 @@ typedef struct {
 	uint32_t	start_blk;
 	uint32_t	num_blks;
 	adap_device_t	device[MAX_ROW_SIZE_40LD];
-}__attribute__ ((packed)) adap_span_40ld_t;
+} __attribute__ ((packed)) adap_span_40ld_t;
 
 
 /**
@@ -612,7 +612,7 @@ typedef struct {
 	uint32_t	start_blk;
 	uint32_t	num_blks;
 	adap_device_t	device[MAX_ROW_SIZE_8LD];
-}__attribute__ ((packed)) adap_span_8ld_t;
+} __attribute__ ((packed)) adap_span_8ld_t;
 
 
 /**
@@ -647,7 +647,7 @@ typedef struct {
 typedef struct {
 	logdrv_param_t		lparam;
 	adap_span_40ld_t	span[SPAN_DEPTH_8_SPANS];
-}__attribute__ ((packed)) logdrv_40ld_t;
+} __attribute__ ((packed)) logdrv_40ld_t;
 
 
 /**
@@ -660,7 +660,7 @@ typedef struct {
 typedef struct {
 	logdrv_param_t	lparam;
 	adap_span_8ld_t	span[SPAN_DEPTH_8_SPANS];
-}__attribute__ ((packed)) logdrv_8ld_span8_t;
+} __attribute__ ((packed)) logdrv_8ld_span8_t;
 
 
 /**
@@ -673,7 +673,7 @@ typedef struct {
 typedef struct {
 	logdrv_param_t	lparam;
 	adap_span_8ld_t	span[SPAN_DEPTH_4_SPANS];
-}__attribute__ ((packed)) logdrv_8ld_span4_t;
+} __attribute__ ((packed)) logdrv_8ld_span4_t;
 
 
 /**
@@ -690,7 +690,7 @@ typedef struct {
 	uint8_t		tag_depth;
 	uint8_t		sync_neg;
 	uint32_t	size;
-}__attribute__ ((packed)) phys_drive_t;
+} __attribute__ ((packed)) phys_drive_t;
 
 
 /**
@@ -705,7 +705,7 @@ typedef struct {
 	uint8_t		resvd[3];
 	logdrv_40ld_t	ldrv[MAX_LOGICAL_DRIVES_40LD];
 	phys_drive_t	pdrv[MBOX_MAX_PHYSICAL_DRIVES];
-}__attribute__ ((packed)) disk_array_40ld_t;
+} __attribute__ ((packed)) disk_array_40ld_t;
 
 
 /**
@@ -722,7 +722,7 @@ typedef struct {
 	uint8_t			resvd[3];
 	logdrv_8ld_span8_t	ldrv[MAX_LOGICAL_DRIVES_8LD];
 	phys_drive_t		pdrv[MBOX_MAX_PHYSICAL_DRIVES];
-}__attribute__ ((packed)) disk_array_8ld_span8_t;
+} __attribute__ ((packed)) disk_array_8ld_span8_t;
 
 
 /**
@@ -739,7 +739,7 @@ typedef struct {
 	uint8_t			resvd[3];
 	logdrv_8ld_span4_t	ldrv[MAX_LOGICAL_DRIVES_8LD];
 	phys_drive_t		pdrv[MBOX_MAX_PHYSICAL_DRIVES];
-}__attribute__ ((packed)) disk_array_8ld_span4_t;
+} __attribute__ ((packed)) disk_array_8ld_span4_t;
 
 
 /**

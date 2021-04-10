@@ -1666,26 +1666,33 @@ static inline void
 megasas_dump_pending_frames(struct megasas_instance *instance)
 {
 	struct megasas_cmd *cmd;
-	int i,n;
+	int i, n;
 	union megasas_sgl *mfi_sgl;
 	struct megasas_io_frame *ldio;
 	struct megasas_pthru_frame *pthru;
 	u32 sgcount;
 	u16 max_cmd = instance->max_fw_cmds;
 
-	dev_err(&instance->pdev->dev, "[%d]: Dumping Frame Phys Address of all pending cmds in FW\n",instance->host->host_no);
-	dev_err(&instance->pdev->dev, "[%d]: Total OS Pending cmds : %d\n",instance->host->host_no,atomic_read(&instance->fw_outstanding));
+	dev_err(&instance->pdev->dev, "[%d]: Dumping Frame Phys Address of all pending cmds in FW\n",
+		instance->host->host_no);
+	dev_err(&instance->pdev->dev, "[%d]: Total OS Pending cmds : %d\n",
+		instance->host->host_no, atomic_read(&instance->fw_outstanding));
 	if (IS_DMA64)
-		dev_err(&instance->pdev->dev, "[%d]: 64 bit SGLs were sent to FW\n",instance->host->host_no);
+		dev_err(&instance->pdev->dev, "[%d]: 64 bit SGLs were sent to FW\n",
+			instance->host->host_no);
 	else
-		dev_err(&instance->pdev->dev, "[%d]: 32 bit SGLs were sent to FW\n",instance->host->host_no);
+		dev_err(&instance->pdev->dev, "[%d]: 32 bit SGLs were sent to FW\n",
+			instance->host->host_no);
 
-	dev_err(&instance->pdev->dev, "[%d]: Pending OS cmds in FW : \n",instance->host->host_no);
+	dev_err(&instance->pdev->dev, "[%d]: Pending OS cmds in FW :\n",
+		instance->host->host_no);
 	for (i = 0; i < max_cmd; i++) {
 		cmd = instance->cmd_list[i];
 		if (!cmd->scmd)
 			continue;
-		dev_err(&instance->pdev->dev, "[%d]: Frame addr :0x%08lx : ",instance->host->host_no,(unsigned long)cmd->frame_phys_addr);
+		dev_err(&instance->pdev->dev, "[%d]: Frame addr :0x%08lx : ",
+			instance->host->host_no,
+			(unsigned long)cmd->frame_phys_addr);
 		if (megasas_cmd_type(cmd->scmd) == READ_WRITE_LDIO) {
 			ldio = (struct megasas_io_frame *)cmd->frame;
 			mfi_sgl = &ldio->sgl;
@@ -1718,7 +1725,8 @@ megasas_dump_pending_frames(struct megasas_instance *instance)
 			}
 		}
 	} /*for max_cmd*/
-	dev_err(&instance->pdev->dev, "[%d]: Pending Internal cmds in FW : \n",instance->host->host_no);
+	dev_err(&instance->pdev->dev, "[%d]: Pending Internal cmds in FW :\n",
+		instance->host->host_no);
 	for (i = 0; i < max_cmd; i++) {
 
 		cmd = instance->cmd_list[i];
@@ -1726,7 +1734,8 @@ megasas_dump_pending_frames(struct megasas_instance *instance)
 		if (cmd->sync_cmd == 1)
 			dev_err(&instance->pdev->dev, "0x%08lx : ", (unsigned long)cmd->frame_phys_addr);
 	}
-	dev_err(&instance->pdev->dev, "[%d]: Dumping Done\n\n",instance->host->host_no);
+	dev_err(&instance->pdev->dev, "[%d]: Dumping Done\n\n",
+		instance->host->host_no);
 }
 
 u32
@@ -2779,7 +2788,7 @@ static int megasas_wait_for_outstanding(struct megasas_instance *instance)
 
 		if (!(i % MEGASAS_RESET_NOTICE_INTERVAL)) {
 			dev_notice(&instance->pdev->dev, "[%2d]waiting for %d "
-			       "commands to complete\n",i,outstanding);
+			       "commands to complete\n", i, outstanding);
 			/*
 			 * Call cmd completion routine. Cmd to be
 			 * be completed directly without depending on isr.
@@ -4412,7 +4421,7 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
 		return -ENOMEM;
 	}
 
-	memset(instance->cmd_list, 0, sizeof(struct megasas_cmd *) *max_cmd);
+	memset(instance->cmd_list, 0, sizeof(struct megasas_cmd *) * max_cmd);
 
 	for (i = 0; i < max_cmd; i++) {
 		instance->cmd_list[i] = kmalloc(sizeof(struct megasas_cmd),
@@ -6494,7 +6503,7 @@ fail_ioremap:
  */
 static void megasas_release_mfi(struct megasas_instance *instance)
 {
-	u32 reply_q_sz = sizeof(u32) *(instance->max_mfi_cmds + 1);
+	u32 reply_q_sz = sizeof(u32) * (instance->max_mfi_cmds + 1);
 
 	if (instance->reply_queue)
 		dma_free_coherent(&instance->pdev->dev, reply_q_sz,

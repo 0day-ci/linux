@@ -136,7 +136,7 @@ mraid_mm_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	/*
 	 * At present, we don't support the new ioctl packet
 	 */
-	if (!old_ioctl )
+	if (!old_ioctl)
 		return (-EINVAL);
 
 	/*
@@ -162,7 +162,7 @@ mraid_mm_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	if (!adp->quiescent) {
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid cmm: controller cannot accept cmds due to "
-			"earlier errors\n" ));
+			"earlier errors\n"));
 		return -EFAULT;
 	}
 
@@ -611,7 +611,7 @@ mraid_mm_alloc_kioc(mraid_mmadp_t *adp)
 
 	kioc->buf_vaddr		= NULL;
 	kioc->buf_paddr		= 0;
-	kioc->pool_index	=-1;
+	kioc->pool_index	= -1;
 	kioc->free_buf		= 0;
 	kioc->user_data		= NULL;
 	kioc->user_data_len	= 0;
@@ -639,15 +639,15 @@ mraid_mm_dealloc_kioc(mraid_mmadp_t *adp, uioc_t *kioc)
 		spin_lock_irqsave(&pool->lock, flags);
 
 		/*
-		 * While attaching the dma buffer, if we didn't get the 
-		 * required buffer from the pool, we would have allocated 
-		 * it at the run time and set the free_buf flag. We must 
-		 * free that buffer. Otherwise, just mark that the buffer is 
+		 * While attaching the dma buffer, if we didn't get the
+		 * required buffer from the pool, we would have allocated
+		 * it at the run time and set the free_buf flag. We must
+		 * free that buffer. Otherwise, just mark that the buffer is
 		 * not in use
 		 */
 		if (kioc->free_buf == 1)
-			dma_pool_free(pool->handle, kioc->buf_vaddr, 
-							kioc->buf_paddr);
+			dma_pool_free(pool->handle, kioc->buf_vaddr,
+				      kioc->buf_paddr);
 		else
 			pool->in_use = 0;
 
@@ -748,7 +748,7 @@ ioctl_done(uioc_t *kioc)
 		adapter		= NULL;
 		adapno		= kioc->adapno;
 
-		con_log(CL_ANN, ( KERN_WARNING "megaraid cmm: completed "
+		con_log(CL_ANN, (KERN_WARNING "megaraid cmm: completed "
 					"ioctl that was timedout before\n"));
 
 		list_for_each_entry(adapter, &adapters_list_g, list) {
@@ -758,7 +758,7 @@ ioctl_done(uioc_t *kioc)
 		kioc->timedout = 0;
 
 		if (adapter) {
-			mraid_mm_dealloc_kioc( adapter, kioc );
+			mraid_mm_dealloc_kioc(adapter, kioc);
 		}
 	}
 	else {
@@ -1067,7 +1067,7 @@ mraid_mm_setup_dma_pools(mraid_mmadp_t *adp)
 	 */
 	bufsize = MRAID_MM_INIT_BUFF_SIZE;
 
-	for (i = 0; i < MAX_DMA_POOLS; i++){
+	for (i = 0; i < MAX_DMA_POOLS; i++) {
 
 		pool = &adp->dma_pool_list[i];
 
@@ -1226,7 +1226,7 @@ mraid_mm_init(void)
 static void __exit
 mraid_mm_exit(void)
 {
-	con_log(CL_DLEVEL1 , ("exiting common mod\n"));
+	con_log(CL_DLEVEL1, ("exiting common mod\n"));
 
 	misc_deregister(&megaraid_mm_dev);
 }

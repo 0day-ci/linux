@@ -76,7 +76,7 @@
 #define DRVRTYPE_MBOX		0x00000001	/* regular mbox driver	*/
 #define DRVRTYPE_HPE		0x00000002	/* new hpe driver	*/
 
-#define MKADAP(adapno)	(MEGAIOC_MAGIC << 8 | (adapno) )
+#define MKADAP(adapno)	(MEGAIOC_MAGIC << 8 | (adapno))
 #define GETADAP(mkadap)	((mkadap) ^ MEGAIOC_MAGIC << 8)
 
 #define MAX_DMA_POOLS		5		/* 4k, 8k, 16k, 32k, 64k*/
@@ -148,7 +148,7 @@ typedef struct uioc {
 
 	uint8_t			timedout;
 
-} __attribute__ ((aligned(1024),packed)) uioc_t;
+} __attribute__ ((aligned(1024), packed)) uioc_t;
 
 /* For on-stack uioc timers. */
 struct uioc_timeout {

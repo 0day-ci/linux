@@ -736,7 +736,7 @@ megaraid_init_mbox(adapter_t *adapter)
 	if (!raid_dev->baseaddr) {
 
 		con_log(CL_ANN, (KERN_WARNING
-			"megaraid: could not map hba memory\n") );
+			"megaraid: could not map hba memory\n"));
 
 		goto out_release_regions;
 	}
@@ -1396,7 +1396,7 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 			udelay(1);
 			i++;
 			rmb();
-		} while(mbox->busy && (i < max_mbox_busy_wait));
+		} while (mbox->busy && (i < max_mbox_busy_wait));
 
 		if (mbox->busy) {
 
@@ -1629,7 +1629,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 							scb);
 
 			mbox->xferaddr		= 0xFFFFFFFF;
-			mbox64->xferaddr_lo	= (uint32_t )ccb->pthru_dma_h;
+			mbox64->xferaddr_lo	= (uint32_t)ccb->pthru_dma_h;
 			mbox64->xferaddr_hi	= 0;
 
 			return scb;
@@ -1660,7 +1660,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 			 * A little HACK: 2nd bit is zero for all scsi read
 			 * commands and is set for all scsi write commands
 			 */
-			mbox->cmd = (scp->cmnd[0] & 0x02) ?  MBOXCMD_LWRITE64:
+			mbox->cmd = (scp->cmnd[0] & 0x02) ?  MBOXCMD_LWRITE64 :
 					MBOXCMD_LREAD64 ;
 
 			/*
@@ -1719,7 +1719,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 			scb->dma_direction = scp->sc_data_direction;
 
 			// Calculate Scatter-Gather info
-			mbox64->xferaddr_lo	= (uint32_t )ccb->sgl_dma_h;
+			mbox64->xferaddr_lo	= (uint32_t)ccb->sgl_dma_h;
 			mbox->numsge		= megaraid_mbox_mksgl(adapter,
 							scb);
 			mbox->xferaddr		= 0xFFFFFFFF;
@@ -1775,7 +1775,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 		// over, reset the fast_load flag so that during a possible
 		// next scan, devices can be made available
 		if (rdev->fast_load && (target == 15) &&
-			(SCP2CHANNEL(scp) == adapter->max_channel -1)) {
+			(SCP2CHANNEL(scp) == adapter->max_channel - 1)) {
 
 			con_log(CL_ANN, (KERN_INFO
 			"megaraid[%d]: physical device scan re-enabled\n",
@@ -1946,7 +1946,7 @@ megaraid_mbox_prepare_pthru(adapter_t *adapter, scb_t *scb,
 	target	= scb->dev_target;
 
 	// 0=6sec, 1=60sec, 2=10min, 3=3hrs, 4=NO timeout
-	pthru->timeout		= 4;	
+	pthru->timeout		= 4;
 	pthru->ars		= 1;
 	pthru->islogical	= 0;
 	pthru->channel		= 0;
@@ -1995,7 +1995,7 @@ megaraid_mbox_prepare_epthru(adapter_t *adapter, scb_t *scb,
 	target	= scb->dev_target;
 
 	// 0=6sec, 1=60sec, 2=10min, 3=3hrs, 4=NO timeout
-	epthru->timeout		= 4;	
+	epthru->timeout		= 4;
 	epthru->ars		= 1;
 	epthru->islogical	= 0;
 	epthru->channel		= 0;
@@ -2113,7 +2113,7 @@ megaraid_ack_sequence(adapter_t *adapter)
 		// Acknowledge interrupt
 		WRINDOOR(raid_dev, 0x02);
 
-	} while(1);
+	} while (1);
 
 	spin_unlock_irqrestore(MAILBOX_LOCK(raid_dev), flags);
 
@@ -2267,7 +2267,7 @@ megaraid_mbox_dpc(unsigned long devp)
 				c = 0;
 			}
 
-			if ((c & 0x1F ) == TYPE_DISK) {
+			if ((c & 0x1F) == TYPE_DISK) {
 				pdev_index = (scb->dev_channel * 16) +
 					scb->dev_target;
 				pdev_state =
@@ -2785,7 +2785,7 @@ mbox_post_sync_cmd(adapter_t *adapter, uint8_t raw_mbox[])
 
 blocked_mailbox:
 
-	con_log(CL_ANN, (KERN_WARNING "megaraid: blocked mailbox\n") );
+	con_log(CL_ANN, (KERN_WARNING "megaraid: blocked mailbox\n"));
 	return -1;
 }
 
@@ -3291,7 +3291,7 @@ megaraid_mbox_fire_sync_cmd(adapter_t *adapter)
 	/* Check for interrupt line */
 	dword = RDOUTDOOR(raid_dev);
 	WROUTDOOR(raid_dev, dword);
-	WRINDOOR(raid_dev,2);
+	WRINDOOR(raid_dev, 2);
 
 	return status;
 
