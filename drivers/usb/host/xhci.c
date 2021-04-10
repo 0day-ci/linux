@@ -475,7 +475,7 @@ static inline void xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 
 #endif
 
-static void compliance_mode_recovery(struct timer_list *t)
+static void port_check(struct timer_list *t)
 {
 	struct xhci_hcd *xhci;
 	struct usb_hcd *hcd;
@@ -483,7 +483,7 @@ static void compliance_mode_recovery(struct timer_list *t)
 	u32 temp;
 	int i;
 
-	xhci = from_timer(xhci, t, comp_mode_recovery_timer);
+	xhci = from_timer(xhci, t, port_check_timer);
 	rhub = &xhci->usb3_rhub;
 
 	for (i = 0; i < rhub->num_ports; i++) {
@@ -508,8 +508,8 @@ static void compliance_mode_recovery(struct timer_list *t)
 	}
 
 	if (xhci->port_status_u0 != ((1 << rhub->num_ports) - 1))
-		mod_timer(&xhci->comp_mode_recovery_timer,
-			jiffies + msecs_to_jiffies(COMP_MODE_RCVRY_MSECS));
+		mod_timer(&xhci->port_check_timer,
+			jiffies + msecs_to_jiffies(PORT_CHECK_MSECS));
 }
 
 /*
@@ -522,15 +522,14 @@ static void compliance_mode_recovery(struct timer_list *t)
  * status event is generated when entering compliance mode (per xhci spec),
  * this quirk is needed on systems that have the failing hardware installed.
  */
-static void compliance_mode_recovery_timer_init(struct xhci_hcd *xhci)
+static void port_check_timer_init(struct xhci_hcd *xhci)
 {
 	xhci->port_status_u0 = 0;
-	timer_setup(&xhci->comp_mode_recovery_timer, compliance_mode_recovery,
-		    0);
-	xhci->comp_mode_recovery_timer.expires = jiffies +
-			msecs_to_jiffies(COMP_MODE_RCVRY_MSECS);
+	timer_setup(&xhci->port_check_timer, port_check, 0);
+	xhci->port_check_timer.expires = jiffies +
+			msecs_to_jiffies(PORT_CHECK_MSECS);
 
-	add_timer(&xhci->comp_mode_recovery_timer);
+	add_timer(&xhci->port_check_timer);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 			"Compliance mode recovery timer initialized");
 }
@@ -596,7 +595,7 @@ static int xhci_init(struct usb_hcd *hcd)
 	/* Initializing Compliance Mode Recovery Data If Needed */
 	if (xhci_compliance_mode_recovery_timer_quirk_check()) {
 		xhci->quirks |= XHCI_COMP_MODE_QUIRK;
-		compliance_mode_recovery_timer_init(xhci);
+		port_check_timer_init(xhci);
 	}
 
 	return retval;
@@ -739,10 +738,9 @@ static void xhci_stop(struct usb_hcd *hcd)
 	/* Deleting Compliance Mode Recovery Timer */
 	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 			(!(xhci_all_ports_seen_u0(xhci)))) {
-		del_timer_sync(&xhci->comp_mode_recovery_timer);
+		del_timer_sync(&xhci->port_check_timer);
 		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
-				"%s: compliance mode recovery timer deleted",
-				__func__);
+				"%s: port check timer deleted", __func__);
 	}
 
 	if (xhci->quirks & XHCI_AMD_PLL_FIX)
@@ -1057,15 +1055,14 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	spin_unlock_irq(&xhci->lock);
 
 	/*
-	 * Deleting Compliance Mode Recovery Timer because the xHCI Host
+	 * Deleting Port Check Timer because the xHCI Host
 	 * is about to be suspended.
 	 */
 	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 			(!(xhci_all_ports_seen_u0(xhci)))) {
-		del_timer_sync(&xhci->comp_mode_recovery_timer);
+		del_timer_sync(&xhci->port_check_timer);
 		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
-				"%s: compliance mode recovery timer deleted",
-				__func__);
+				"%s: port check timer deleted", __func__);
 	}
 
 	/* step 5: remove core well power */
@@ -1150,9 +1147,9 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 
 		if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
 				!(xhci_all_ports_seen_u0(xhci))) {
-			del_timer_sync(&xhci->comp_mode_recovery_timer);
+			del_timer_sync(&xhci->port_check_timer);
 			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
-				"Compliance Mode Recovery Timer deleted!");
+				"Port Check Timer deleted!");
 		}
 
 		/* Let the USB core know _both_ roothubs lost power. */
@@ -1245,13 +1242,13 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 		}
 	}
 	/*
-	 * If system is subject to the Quirk, Compliance Mode Timer needs to
+	 * If system is subject to the Quirk, Port Check Timer needs to
 	 * be re-initialized Always after a system resume. Ports are subject
 	 * to suffer the Compliance Mode issue again. It doesn't matter if
 	 * ports have entered previously to U0 before system's suspension.
 	 */
 	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) && !comp_timer_running)
-		compliance_mode_recovery_timer_init(xhci);
+		port_check_timer_init(xhci);
 
 	if (xhci->quirks & XHCI_ASMEDIA_MODIFY_FLOWCONTROL)
 		usb_asmedia_modifyflowcontrol(to_pci_dev(hcd->self.controller));
