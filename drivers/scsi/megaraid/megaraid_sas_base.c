@@ -3199,8 +3199,7 @@ megasas_service_aen(struct megasas_instance *instance, struct megasas_cmd *cmd)
 		spin_unlock_irqrestore(&poll_aen_lock, flags);
 		wake_up(&megasas_poll_wait);
 		kill_fasync(&megasas_async_queue, SIGIO, POLL_IN);
-	}
-	else
+	} else
 		cmd->abort_aen = 0;
 
 	instance->aen_cmd = NULL;
@@ -5686,8 +5685,8 @@ megasas_setup_irqs_msix(struct megasas_instance *instance, u8 is_probe)
  * return:				void
  */
 static void
-megasas_destroy_irqs(struct megasas_instance *instance) {
-
+megasas_destroy_irqs(struct megasas_instance *instance)
+{
 	int i;
 	int count;
 	struct megasas_irq_context *irq_ctx;

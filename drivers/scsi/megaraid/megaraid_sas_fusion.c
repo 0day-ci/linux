@@ -908,8 +908,8 @@ megasas_alloc_rdpq_fusion(struct megasas_instance *instance)
 }
 
 static void
-megasas_free_rdpq_fusion(struct megasas_instance *instance) {
-
+megasas_free_rdpq_fusion(struct megasas_instance *instance)
+{
 	int i;
 	struct fusion_context *fusion;
 
@@ -932,8 +932,8 @@ megasas_free_rdpq_fusion(struct megasas_instance *instance) {
 }
 
 static void
-megasas_free_reply_fusion(struct megasas_instance *instance) {
-
+megasas_free_reply_fusion(struct megasas_instance *instance)
+{
 	struct fusion_context *fusion;
 
 	fusion = instance->ctrl_context;
@@ -1296,7 +1296,8 @@ fail_fw_init:
  * issue and receive command.
  */
 int
-megasas_sync_pd_seq_num(struct megasas_instance *instance, bool pend) {
+megasas_sync_pd_seq_num(struct megasas_instance *instance, bool pend)
+{
 	int ret = 0;
 	size_t pd_seq_map_sz;
 	struct megasas_cmd *cmd;

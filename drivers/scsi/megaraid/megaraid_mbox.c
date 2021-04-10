@@ -537,8 +537,7 @@ megaraid_detach_one(struct pci_dev *pdev)
 			pdev->subsystem_device));
 
 		return;
-	}
-	else {
+	} else {
 		con_log(CL_ANN, (KERN_NOTICE
 		"megaraid: detaching device %#4.04x:%#4.04x:%#4.04x:%#4.04x\n",
 			pdev->vendor, pdev->device, pdev->subsystem_vendor,
@@ -1545,8 +1544,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 				vaddr = (caddr_t) sg_virt(&sgl[0]);
 
 				memset(vaddr, 0, scp->cmnd[4]);
-			}
-			else {
+			} else {
 				con_log(CL_ANN, (KERN_WARNING
 						 "megaraid mailbox: invalid sg:%d\n",
 						 __LINE__));
@@ -1705,8 +1703,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 					((uint32_t)scp->cmnd[7] << 16) |
 					((uint32_t)scp->cmnd[8] << 8) |
 					(uint32_t)scp->cmnd[9];
-			}
-			else {
+			} else {
 				con_log(CL_ANN, (KERN_WARNING
 					"megaraid: unsupported CDB length\n"));
 
@@ -1762,8 +1759,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 			scp->result = (DID_BAD_TARGET << 16);
 			return NULL;
 		}
-	}
-	else { // Passthru device commands
+	} else { // Passthru device commands
 
 		// Do not allow access to target id > 15 or LUN > 7
 		if (target > 15 || SCP2LUN(scp) > 7) {
@@ -1830,8 +1826,7 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 			mbox64->xferaddr_lo	= (uint32_t)ccb->epthru_dma_h;
 			mbox64->xferaddr_hi	= 0;
 			mbox->xferaddr		= 0xFFFFFFFF;
-		}
-		else {
+		} else {
 			mbox->cmd = MBOXCMD_PASSTHRU64;
 
 			megaraid_mbox_prepare_pthru(adapter, scb, scp);
@@ -1961,8 +1956,7 @@ megaraid_mbox_prepare_pthru(adapter_t *adapter, scb_t *scb,
 		pthru->dataxferlen	= scsi_bufflen(scp);
 		pthru->dataxferaddr	= ccb->sgl_dma_h;
 		pthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
-	}
-	else {
+	} else {
 		pthru->dataxferaddr	= 0;
 		pthru->dataxferlen	= 0;
 		pthru->numsge		= 0;
@@ -2010,8 +2004,7 @@ megaraid_mbox_prepare_epthru(adapter_t *adapter, scb_t *scb,
 		epthru->dataxferlen	= scsi_bufflen(scp);
 		epthru->dataxferaddr	= ccb->sgl_dma_h;
 		epthru->numsge		= megaraid_mbox_mksgl(adapter, scb);
-	}
-	else {
+	} else {
 		epthru->dataxferaddr	= 0;
 		epthru->dataxferlen	= 0;
 		epthru->numsge		= 0;
@@ -2100,8 +2093,7 @@ megaraid_ack_sequence(adapter_t *adapter)
 				// a cmm command
 				scb = adapter->uscb_list + (completed[i] -
 						MBOX_MAX_SCSI_CMDS);
-			}
-			else {
+			} else {
 				// an os command
 				scb = adapter->kscb_list + completed[i];
 			}
@@ -2303,8 +2295,7 @@ megaraid_mbox_dpc(unsigned long devp)
 
 				scp->result = DRIVER_SENSE << 24 |
 					DID_OK << 16 | CHECK_CONDITION << 1;
-			}
-			else {
+			} else {
 				if (mbox->cmd == MBOXCMD_EXTPTHRU) {
 
 					memcpy(scp->sense_buffer,
@@ -2335,8 +2326,7 @@ megaraid_mbox_dpc(unsigned long devp)
 			if (scp->cmnd[0] == TEST_UNIT_READY) {
 				scp->result = DID_ERROR << 16 |
 					RESERVATION_CONFLICT << 1;
-			}
-			else
+			} else
 			/*
 			 * Error code returned is 1 if Reserve or Release
 			 * failed or the input parameter is invalid
@@ -2346,8 +2336,7 @@ megaraid_mbox_dpc(unsigned long devp)
 
 				scp->result = DID_ERROR << 16 |
 					RESERVATION_CONFLICT << 1;
-			}
-			else {
+			} else {
 				scp->result = DID_BAD_TARGET << 16 | status;
 			}
 		}
@@ -2485,8 +2474,7 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 				"megaraid abort: %d[%d:%d], invalid state\n",
 				scb->sno, scb->dev_channel, scb->dev_target));
 				BUG();
-			}
-			else {
+			} else {
 				con_log(CL_ANN, (KERN_WARNING
 				"megaraid abort: %d[%d:%d], fw owner\n",
 				scb->sno, scb->dev_channel, scb->dev_target));
@@ -2621,8 +2609,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 
 		rval = FAILED;
 		goto out;
-	}
-	else {
+	} else {
 		con_log(CL_ANN, (KERN_NOTICE
 		"megaraid mbox: reset sequence completed successfully\n"));
 	}
@@ -2642,8 +2629,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 	if (mbox_post_sync_cmd_fast(adapter, raw_mbox) == 0) {
 		con_log(CL_ANN,
 			(KERN_INFO "megaraid: reservation reset\n"));
-	}
-	else {
+	} else {
 		rval = FAILED;
 		con_log(CL_ANN, (KERN_WARNING
 				"megaraid: reservation reset failed\n"));
@@ -3147,8 +3133,7 @@ megaraid_mbox_get_max_sg(adapter_t *adapter)
 	// Issue the command
 	if (mbox_post_sync_cmd(adapter, raw_mbox) == 0) {
 		nsg =  *(uint8_t *)adapter->ibuf;
-	}
-	else {
+	} else {
 		nsg =  MBOX_DEFAULT_SG_SIZE;
 	}
 
@@ -3940,21 +3925,18 @@ megaraid_sysfs_get_ldmap(adapter_t *adapter)
 				"megaraid: sysfs get ld map timed out\n"));
 
 			rval = -ETIME;
-		}
-		else {
+		} else {
 			rval = mbox->status;
 		}
 
 		if (rval == 0) {
 			memcpy(raid_dev->curr_ldmap, ldmap,
 				sizeof(raid_dev->curr_ldmap));
-		}
-		else {
+		} else {
 			con_log(CL_ANN, (KERN_NOTICE
 				"megaraid: get ld map failed with %x\n", rval));
 		}
-	}
-	else {
+	} else {
 		con_log(CL_ANN, (KERN_NOTICE
 			"megaraid: could not issue ldmap command:%x\n", rval));
 	}
@@ -4050,8 +4032,7 @@ megaraid_sysfs_show_ldnum(struct device *dev, struct device_attribute *attr, cha
 					break;
 				}
 			}
-		}
-		else {
+		} else {
 			con_log(CL_ANN, (KERN_NOTICE
 				"megaraid: sysfs get ld map failed: %x\n",
 				rval));

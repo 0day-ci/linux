@@ -390,8 +390,7 @@ mimd_to_kioc(mimd_t __user *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
 
 			if (mraid_mm_attach_buf(adp, kioc, kioc->xferlen))
 				return (-ENOMEM);
-		}
-		else {
+		} else {
 			con_log(CL_ANN, (KERN_WARNING
 					"megaraid cmm: Invalid subop\n"));
 			return (-EINVAL);
@@ -539,8 +538,7 @@ mraid_mm_attach_buf(mraid_mmadp_t *adp, uioc_t *kioc, int xferlen)
 
 			spin_unlock_irqrestore(&pool->lock, flags);
 			return 0;
-		}
-		else {
+		} else {
 			spin_unlock_irqrestore(&pool->lock, flags);
 			continue;
 		}
@@ -760,10 +758,8 @@ ioctl_done(uioc_t *kioc)
 		if (adapter) {
 			mraid_mm_dealloc_kioc(adapter, kioc);
 		}
-	}
-	else {
+	} else
 		wake_up(&wait_q);
-	}
 }
 
 
