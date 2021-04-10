@@ -244,7 +244,6 @@ typedef struct {
 } __attribute__ ((packed)) mraid_passthru_t;
 
 typedef struct {
-
 	uint32_t		dataxferaddr_lo;
 	uint32_t		dataxferaddr_hi;
 	mraid_passthru_t	pthru32;

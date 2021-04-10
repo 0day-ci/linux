@@ -1191,7 +1191,6 @@ struct MR_DRV_RAID_MAP {
  * And it is mainly for code re-use purpose.
  */
 struct MR_DRV_RAID_MAP_ALL {
-
 	struct MR_DRV_RAID_MAP raidMap;
 	struct MR_LD_SPAN_MAP ldSpanMap[MAX_LOGICAL_DRIVES_DYN - 1];
 } __packed;

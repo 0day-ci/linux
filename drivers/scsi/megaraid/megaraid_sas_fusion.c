@@ -576,7 +576,6 @@ static int megasas_create_sg_sense_fusion(struct megasas_instance *instance)
 		offset = SCSI_SENSE_BUFFERSIZE * i;
 		cmd->sense = (u8 *)fusion->sense + offset;
 		cmd->sense_phys_addr = fusion->sense_phys_addr + offset;
-
 	}
 
 	return 0;
@@ -921,7 +920,6 @@ megasas_free_rdpq_fusion(struct megasas_instance *instance) {
 			dma_pool_free(fusion->rdpq_tracker[i].dma_pool_ptr,
 				      fusion->rdpq_tracker[i].pool_entry_virt,
 				      fusion->rdpq_tracker[i].pool_entry_phys);
-
 	}
 
 	dma_pool_destroy(fusion->reply_frames_desc_pool);
@@ -946,7 +944,6 @@ megasas_free_reply_fusion(struct megasas_instance *instance) {
 			fusion->reply_frames_desc_phys[0]);
 
 	dma_pool_destroy(fusion->reply_frames_desc_pool);
-
 }
 
 
@@ -4602,7 +4599,6 @@ megasas_issue_tm(struct megasas_instance *instance, u16 device_handle,
 	}
 
 	return rc;
-
 }
 
 /*
@@ -4761,7 +4757,6 @@ out:
 
 int megasas_reset_target_fusion(struct scsi_cmnd *scmd)
 {
-
 	struct megasas_instance *instance;
 	int ret = FAILED;
 	u16 devhandle;

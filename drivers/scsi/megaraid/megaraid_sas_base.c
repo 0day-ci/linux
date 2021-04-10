@@ -146,7 +146,6 @@ static void megasas_get_pd_info(struct megasas_instance *instance,
  * PCI ID table for all supported controllers
  */
 static struct pci_device_id megasas_pci_table[] = {
-
 	{PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1064R)},
 	/* xscale IOP */
 	{PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1078R)},
@@ -369,7 +368,6 @@ megasas_return_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd)
 	list_add(&cmd->list, (&instance->cmd_pool)->next);
 
 	spin_unlock_irqrestore(&instance->mfi_pool_lock, flags);
-
 }
 
 static const char *
@@ -598,7 +596,6 @@ megasas_check_reset_xscale(struct megasas_instance *instance,
 }
 
 static struct megasas_instance_template megasas_instance_template_xscale = {
-
 	.fire_cmd = megasas_fire_cmd_xscale,
 	.enable_intr = megasas_enable_intr_xscale,
 	.disable_intr = megasas_disable_intr_xscale,
@@ -737,7 +734,6 @@ megasas_check_reset_ppc(struct megasas_instance *instance,
 }
 
 static struct megasas_instance_template megasas_instance_template_ppc = {
-
 	.fire_cmd = megasas_fire_cmd_ppc,
 	.enable_intr = megasas_enable_intr_ppc,
 	.disable_intr = megasas_disable_intr_ppc,
@@ -878,7 +874,6 @@ megasas_check_reset_skinny(struct megasas_instance *instance,
 }
 
 static struct megasas_instance_template megasas_instance_template_skinny = {
-
 	.fire_cmd = megasas_fire_cmd_skinny,
 	.enable_intr = megasas_enable_intr_skinny,
 	.disable_intr = megasas_disable_intr_skinny,
@@ -1078,7 +1073,6 @@ megasas_check_reset_gen2(struct megasas_instance *instance,
 }
 
 static struct megasas_instance_template megasas_instance_template_gen2 = {
-
 	.fire_cmd = megasas_fire_cmd_gen2,
 	.enable_intr = megasas_enable_intr_gen2,
 	.disable_intr = megasas_disable_intr_gen2,
@@ -1589,7 +1583,6 @@ megasas_build_ldio(struct megasas_instance *instance, struct scsi_cmnd *scp,
 						 ((u32) scp->cmnd[3] << 16) |
 						 ((u32) scp->cmnd[4] << 8) |
 						 (u32) scp->cmnd[5]);
-
 	}
 
 	/*
@@ -2995,7 +2988,6 @@ megasas_dump_fusion_io(struct scsi_cmnd *scmd)
 		megasas_dump(cmd->sg_frame,
 			     instance->max_chain_frame_sz, 8);
 	}
-
 }
 
 /*
@@ -3473,7 +3465,6 @@ static struct device_attribute *megaraid_host_attrs[] = {
  * Scsi host template for megaraid_sas driver
  */
 static struct scsi_host_template megasas_template = {
-
 	.module = THIS_MODULE,
 	.name = "Avago SAS based MegaRAID driver",
 	.proc_name = "megaraid_sas",
@@ -4246,7 +4237,6 @@ static void megasas_teardown_frame_pool(struct megasas_instance *instance)
 	 * Return all frames to pool
 	 */
 	for (i = 0; i < max_cmd; i++) {
-
 		cmd = instance->cmd_list[i];
 
 		if (cmd->frame)
@@ -4331,7 +4321,6 @@ static int megasas_create_frame_pool(struct megasas_instance *instance)
 	 * always use 32bit context regardless of the architecture
 	 */
 	for (i = 0; i < max_cmd; i++) {
-
 		cmd = instance->cmd_list[i];
 
 		cmd->frame = dma_pool_zalloc(instance->frame_dma_pool,
@@ -4428,7 +4417,6 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
 						GFP_KERNEL);
 
 		if (!instance->cmd_list[i]) {
-
 			for (j = 0; j < i; j++)
 				kfree(instance->cmd_list[j]);
 
@@ -4470,7 +4458,6 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
  */
 inline int
 dcmd_timeout_ocr_possible(struct megasas_instance *instance) {
-
 	if (instance->adapter_type == MFI_SERIES)
 		return KILL_ADAPTER;
 	else if (instance->unload ||
@@ -4684,7 +4671,6 @@ megasas_get_pd_list(struct megasas_instance *instance)
 		memcpy(instance->pd_list, instance->local_pd_list,
 			sizeof(instance->pd_list));
 		break;
-
 	}
 
 	if (ret != DCMD_TIMEOUT)
@@ -5342,7 +5328,6 @@ megasas_get_ctrl_info(struct megasas_instance *instance)
 	case DCMD_FAILED:
 		megaraid_sas_kill_hba(instance);
 		break;
-
 	}
 
 	if (ret != DCMD_TIMEOUT)
@@ -5939,7 +5924,6 @@ megasas_alloc_irq_vectors(struct megasas_instance *instance)
 
 		instance->iopoll_q_count = 0;
 		i = __megasas_alloc_irq_vectors(instance);
-
 	}
 
 	dev_info(&instance->pdev->dev,
@@ -6099,7 +6083,6 @@ static int megasas_init_fw(struct megasas_instance *instance)
 	msix_enable = (instance->instancet->read_fw_status_reg(instance) &
 		       0x4000000) >> 0x1a;
 	if (msix_enable && !msix_disable) {
-
 		scratch_pad_1 = megasas_readl
 			(instance, &instance->reg_set->outbound_scratch_pad_1);
 		/* Check max MSI-X vectors */
@@ -6223,7 +6206,6 @@ static int megasas_init_fw(struct megasas_instance *instance)
 			 */
 			if (!intr_coalescing)
 				instance->perf_mode = MR_LATENCY_PERF_MODE;
-
 		}
 
 		if (instance->perf_mode == MR_BALANCED_PERF_MODE)
@@ -7002,7 +6984,6 @@ megasas_set_dma_mask(struct megasas_instance *instance)
 fail_set_dma_mask:
 	dev_err(&pdev->dev, "Failed to set DMA mask\n");
 	return -1;
-
 }
 
 /*
@@ -7194,7 +7175,6 @@ int megasas_alloc_ctrl_dma_buffers(struct megasas_instance *instance)
 				"Failed to allocate targetid list buffer\n");
 			return -ENOMEM;
 		}
-
 	}
 
 	instance->pd_list_buf =
@@ -7350,7 +7330,6 @@ void megasas_free_ctrl_dma_buffers(struct megasas_instance *instance)
 				  HOST_DEVICE_LIST_SZ,
 				  instance->host_device_list_buf,
 				  instance->host_device_list_buf_h);
-
 }
 
 /*
@@ -8606,7 +8585,6 @@ static SIMPLE_DEV_PM_OPS(megasas_pm_ops, megasas_suspend, megasas_resume);
  * PCI hotplug support registration structure
  */
 static struct pci_driver megasas_pci_driver = {
-
 	.name = "megaraid_sas",
 	.id_table = megasas_pci_table,
 	.probe = megasas_probe_one,
@@ -8815,7 +8793,6 @@ void megasas_add_remove_devices(struct megasas_instance *instance,
 			}
 		}
 	}
-
 }
 
 static void

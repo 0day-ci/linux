@@ -112,7 +112,6 @@
  *		: format sent by applications would be converted to this.
  */
 typedef struct uioc {
-
 /* User Apps: */
 
 	uint8_t			signature[EXT_IOCTL_SIGN_SZ];
@@ -175,7 +174,6 @@ struct uioc_timeout {
  * that total size of the structure remains 256 bytes.
  */
 typedef struct mraid_hba_info {
-
 	uint16_t	pci_vendor_id;
 	uint16_t	pci_device_id;
 	uint16_t	subsys_vendor_id;
@@ -209,7 +207,6 @@ typedef struct mraid_hba_info {
  * @uid		: unique id
  */
 typedef struct mcontroller {
-
 	uint64_t	base;
 	uint8_t		irq;
 	uint8_t		numldrv;
@@ -267,7 +264,6 @@ typedef struct mm_dmapool {
  */
 
 typedef struct mraid_mmadp {
-
 /* Filled by driver */
 
 	uint32_t		unique_id;

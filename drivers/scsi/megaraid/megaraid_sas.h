@@ -336,7 +336,6 @@ enum _MR_CRASH_BUF_STATUS {
 #define MFI_MBOX_SIZE				12
 
 enum MR_EVT_CLASS {
-
 	MR_EVT_CLASS_DEBUG = -2,
 	MR_EVT_CLASS_PROGRESS = -1,
 	MR_EVT_CLASS_INFO = 0,
@@ -344,11 +343,9 @@ enum MR_EVT_CLASS {
 	MR_EVT_CLASS_CRITICAL = 2,
 	MR_EVT_CLASS_FATAL = 3,
 	MR_EVT_CLASS_DEAD = 4,
-
 };
 
 enum MR_EVT_LOCALE {
-
 	MR_EVT_LOCALE_LD = 0x0001,
 	MR_EVT_LOCALE_PD = 0x0002,
 	MR_EVT_LOCALE_ENCL = 0x0004,
@@ -362,7 +359,6 @@ enum MR_EVT_LOCALE {
 };
 
 enum MR_EVT_ARGS {
-
 	MR_EVT_ARGS_NONE,
 	MR_EVT_ARGS_CDB_SENSE,
 	MR_EVT_ARGS_LD,
@@ -824,7 +820,6 @@ struct MR_HOST_DEVICE_LIST {
  * SAS controller properties
  */
 struct megasas_ctrl_prop {
-
 	u16 seq_num;
 	u16 pred_fail_poll_interval;
 	u16 intr_throttle_count;
@@ -939,7 +934,6 @@ struct megasas_ctrl_info {
 	 * Host interface information
 	 */
 	struct {
-
 		u8 PCIX:1;
 		u8 PCIE:1;
 		u8 iSCSI:1;
@@ -949,14 +943,12 @@ struct megasas_ctrl_info {
 		u8 reserved_1[6];
 		u8 port_count;
 		u64 port_addr[8];
-
 	} __attribute__ ((packed)) host_interface;
 
 	/*
 	 * Device (backend) interface information
 	 */
 	struct {
-
 		u8 SPI:1;
 		u8 SAS_3G:1;
 		u8 SATA_1_5G:1;
@@ -965,7 +957,6 @@ struct megasas_ctrl_info {
 		u8 reserved_1[6];
 		u8 port_count;
 		u64 port_addr[8];
-
 	} __attribute__ ((packed)) device_interface;
 
 	/*
@@ -975,12 +966,10 @@ struct megasas_ctrl_info {
 	__le32 image_component_count;
 
 	struct {
-
 		char name[8];
 		char version[32];
 		char build_date[16];
 		char built_time[16];
-
 	} __attribute__ ((packed)) image_component[8];
 
 	/*
@@ -992,12 +981,10 @@ struct megasas_ctrl_info {
 	__le32 pending_image_component_count;
 
 	struct {
-
 		char name[8];
 		char version[32];
 		char build_date[16];
 		char build_time[16];
-
 	} __attribute__ ((packed)) pending_image_component[8];
 
 	u8 max_arms;
@@ -1013,13 +1000,11 @@ struct megasas_ctrl_info {
 	 * presence of the hardware
 	 */
 	struct {
-
 		u32 bbu:1;
 		u32 alarm:1;
 		u32 nvram:1;
 		u32 uart:1;
 		u32 reserved:28;
-
 	} __attribute__ ((packed)) hw_present;
 
 	__le32 current_fw_time;
@@ -1071,18 +1056,15 @@ struct megasas_ctrl_info {
 	 * Controller capabilities structures
 	 */
 	struct {
-
 		u32 raid_level_0:1;
 		u32 raid_level_1:1;
 		u32 raid_level_5:1;
 		u32 raid_level_1E:1;
 		u32 raid_level_6:1;
 		u32 reserved:27;
-
 	} __attribute__ ((packed)) raid_levels;
 
 	struct {
-
 		u32 rbld_rate:1;
 		u32 cc_rate:1;
 		u32 bgi_rate:1;
@@ -1099,22 +1081,18 @@ struct megasas_ctrl_info {
 		u32 mixed_redundancy_arr:1;
 		u32 global_hot_spares:1;
 		u32 reserved:17;
-
 	} __attribute__ ((packed)) adapter_operations;
 
 	struct {
-
 		u32 read_policy:1;
 		u32 write_policy:1;
 		u32 io_policy:1;
 		u32 access_policy:1;
 		u32 disk_cache_policy:1;
 		u32 reserved:27;
-
 	} __attribute__ ((packed)) ld_operations;
 
 	struct {
-
 		u8 min;
 		u8 max;
 		u8 reserved[2];
@@ -1122,7 +1100,6 @@ struct megasas_ctrl_info {
 	} __attribute__ ((packed)) stripe_sz_ops;
 
 	struct {
-
 		u32 force_online:1;
 		u32 force_offline:1;
 		u32 force_rebuild:1;
@@ -1131,7 +1108,6 @@ struct megasas_ctrl_info {
 	} __attribute__ ((packed)) pd_operations;
 
 	struct {
-
 		u32 ctrl_supports_sas:1;
 		u32 ctrl_supports_sata:1;
 		u32 allow_mix_in_encl:1;
@@ -1698,14 +1674,12 @@ struct megasas_register_set {
 } __attribute__ ((packed));
 
 struct megasas_sge32 {
-
 	__le32 phys_addr;
 	__le32 length;
 
 } __attribute__ ((packed));
 
 struct megasas_sge64 {
-
 	__le64 phys_addr;
 	__le32 length;
 
@@ -1718,7 +1692,6 @@ struct megasas_sge_skinny {
 } __packed;
 
 union megasas_sgl {
-
 	struct megasas_sge32 sge32[1];
 	struct megasas_sge64 sge64[1];
 	struct megasas_sge_skinny sge_skinny[1];
@@ -1726,7 +1699,6 @@ union megasas_sgl {
 } __attribute__ ((packed));
 
 struct megasas_header {
-
 	u8 cmd;			/*00h */
 	u8 sense_len;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1747,7 +1719,6 @@ struct megasas_header {
 } __attribute__ ((packed));
 
 union megasas_sgl_frame {
-
 	struct megasas_sge32 sge32[8];
 	struct megasas_sge64 sge64[5];
 
@@ -1797,7 +1768,6 @@ typedef union _MFI_CAPABILITIES {
 } MFI_CAPABILITIES;
 
 struct megasas_init_frame {
-
 	u8 cmd;			/*00h */
 	u8 reserved_0;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1824,7 +1794,6 @@ struct megasas_init_frame {
 } __attribute__ ((packed));
 
 struct megasas_init_queue_info {
-
 	__le32 init_flags;		/*00h */
 	__le32 reply_queue_entries;	/*04h */
 
@@ -1838,7 +1807,6 @@ struct megasas_init_queue_info {
 } __attribute__ ((packed));
 
 struct megasas_io_frame {
-
 	u8 cmd;			/*00h */
 	u8 sense_len;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1867,7 +1835,6 @@ struct megasas_io_frame {
 } __attribute__ ((packed));
 
 struct megasas_pthru_frame {
-
 	u8 cmd;			/*00h */
 	u8 sense_len;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1894,7 +1861,6 @@ struct megasas_pthru_frame {
 } __attribute__ ((packed));
 
 struct megasas_dcmd_frame {
-
 	u8 cmd;			/*00h */
 	u8 reserved_0;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1921,7 +1887,6 @@ struct megasas_dcmd_frame {
 } __attribute__ ((packed));
 
 struct megasas_abort_frame {
-
 	u8 cmd;			/*00h */
 	u8 reserved_0;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1947,7 +1912,6 @@ struct megasas_abort_frame {
 } __attribute__ ((packed));
 
 struct megasas_smp_frame {
-
 	u8 cmd;			/*00h */
 	u8 reserved_1;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -1973,7 +1937,6 @@ struct megasas_smp_frame {
 } __attribute__ ((packed));
 
 struct megasas_stp_frame {
-
 	u8 cmd;			/*00h */
 	u8 reserved_1;		/*01h */
 	u8 cmd_status;		/*02h */
@@ -2002,7 +1965,6 @@ struct megasas_stp_frame {
 } __attribute__ ((packed));
 
 union megasas_frame {
-
 	struct megasas_header hdr;
 	struct megasas_init_frame init;
 	struct megasas_io_frame io;
@@ -2033,7 +1995,6 @@ struct MR_PRIV_DEVICE {
 struct megasas_cmd;
 
 union megasas_evt_class_locale {
-
 	struct {
 #ifndef __BIG_ENDIAN_BITFIELD
 		u16 locale;
@@ -2060,14 +2021,12 @@ struct megasas_evt_log_info {
 } __attribute__ ((packed));
 
 struct megasas_progress {
-
 	__le16 progress;
 	__le16 elapsed_seconds;
 
 } __attribute__ ((packed));
 
 struct megasas_evtarg_ld {
-
 	u16 target_id;
 	u8 ld_index;
 	u8 reserved;
@@ -2082,7 +2041,6 @@ struct megasas_evtarg_pd {
 } __attribute__ ((packed));
 
 struct megasas_evt_detail {
-
 	__le32 seq_num;
 	__le32 time_stamp;
 	__le32 code;
@@ -2263,7 +2221,6 @@ enum MR_PERF_MODE {
 		 "Unknown")
 
 struct megasas_instance {
-
 	unsigned int *reply_map;
 	__le32 *producer;
 	dma_addr_t producer_h;
@@ -2555,7 +2512,6 @@ struct megasas_instance_template {
 	scp->device->id)
 
 struct megasas_cmd {
-
 	union megasas_frame *frame;
 	dma_addr_t frame_phys_addr;
 	u8 *sense;
@@ -2586,7 +2542,6 @@ struct megasas_cmd {
 #define MAX_IOCTL_SGE			16
 
 struct megasas_iocpacket {
-
 	u16 host_no;
 	u16 __pad1;
 	u32 sgl_off;
@@ -2629,7 +2584,6 @@ struct compat_megasas_iocpacket {
 #define MEGASAS_IOC_GET_AEN	_IOW('M', 3, struct megasas_aen)
 
 struct megasas_mgmt_info {
-
 	u16 count;
 	struct megasas_instance *instance[MAX_MGMT_ADAPTERS];
 	int max_index;

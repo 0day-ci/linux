@@ -58,7 +58,6 @@
  */
 
 typedef struct mimd {
-
 	uint32_t inlen;
 	uint32_t outlen;
 

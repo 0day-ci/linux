@@ -151,7 +151,6 @@ megasas_setup_debugfs(struct megasas_instance *instance)
 			return;
 		}
 	}
-
 }
 
 /*
