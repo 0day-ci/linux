@@ -1922,12 +1922,11 @@ static void fail_scsi_tasks(struct iscsi_conn *conn, u64 lun, int error)
  * iscsi_suspend_queue - suspend iscsi_queuecommand
  * @conn: iscsi conn to stop queueing IO on
  *
- * This grabs the session frwd_lock to make sure no one is in
- * xmit_task/queuecommand, and then sets suspend to prevent
- * new commands from being queued. This only needs to be called
- * by offload drivers that need to sync a path like ep disconnect
- * with the iscsi_queuecommand/xmit_task. To start IO again libiscsi
- * will call iscsi_start_tx and iscsi_unblock_session when in FFP.
+ * This grabs the session frwd_lock to make sure no one is in queuecommand, and
+ * then sets suspend to prevent new commands from being queued. This only needs
+ * to be called by libiscsi or offload drivers that need to sync a path like
+ * ep disconnect with the iscsi_queuecommand. To start IO again libiscsi will
+ * call iscsi_start_tx and/or iscsi_unblock_session when in FFP.
  */
 void iscsi_suspend_queue(struct iscsi_conn *conn)
 {
@@ -2365,6 +2364,13 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 	if (conn->tmf_state != TMF_INITIAL)
 		goto unlock;
 	conn->tmf_state = TMF_QUEUED;
+	/*
+	 * For sg based ioctls stop IO so we can sync up with the drivers
+	 * on what commands need to be cleaned up. If this function fails
+	 * we can leave suspended since the session will be droppped or
+	 * has already dropped.
+	 */
+	set_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx);
 
 	hdr = &conn->tmhdr;
 	iscsi_prep_lun_reset_pdu(sc, hdr);
@@ -2384,6 +2390,7 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 		goto done;
 	default:
 		conn->tmf_state = TMF_INITIAL;
+		iscsi_start_tx(conn);
 		goto unlock;
 	}
 
@@ -2528,6 +2535,13 @@ static int iscsi_eh_target_reset(struct scsi_cmnd *sc)
 	if (conn->tmf_state != TMF_INITIAL)
 		goto unlock;
 	conn->tmf_state = TMF_QUEUED;
+	/*
+	 * For sg based ioctls stop IO so we can sync up with the drivers
+	 * on what commands need to be cleaned up. If this function fails
+	 * we can leave suspended since the session will be droppped or
+	 * has already dropped.
+	 */
+	set_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx);
 
 	hdr = &conn->tmhdr;
 	iscsi_prep_tgt_reset_pdu(sc, hdr);
@@ -2547,6 +2561,7 @@ static int iscsi_eh_target_reset(struct scsi_cmnd *sc)
 		goto done;
 	default:
 		conn->tmf_state = TMF_INITIAL;
+		iscsi_start_tx(conn);
 		goto unlock;
 	}
 
