@@ -298,6 +298,8 @@ static void hpre_hw_data_clr_all(struct hpre_ctx *ctx,
 	dma_addr_t tmp;
 
 	tmp = le64_to_cpu(sqe->in);
+	if (unlikely(dma_mapping_error(dev, tmp)))
+		return;
 
 	if (src) {
 		if (req->src)
@@ -307,6 +309,8 @@ static void hpre_hw_data_clr_all(struct hpre_ctx *ctx,
 	}
 
 	tmp = le64_to_cpu(sqe->out);
+	if (unlikely(dma_mapping_error(dev, tmp)))
+		return;
 
 	if (req->dst) {
 		if (dst)
@@ -517,6 +521,8 @@ static int hpre_msg_request_set(struct hpre_ctx *ctx, void *req, bool is_rsa)
 		msg->key = cpu_to_le64(ctx->dh.dma_xa_p);
 	}
 
+	msg->in = DMA_MAPPING_ERROR;
+	msg->out = DMA_MAPPING_ERROR;
 	msg->dw0 |= cpu_to_le32(0x1 << HPRE_SQE_DONE_SHIFT);
 	msg->task_len1 = (ctx->key_sz >> HPRE_BITS_2_BYTES_SHIFT) - 1;
 	h_req->ctx = ctx;
@@ -1365,11 +1371,15 @@ static void hpre_ecdh_hw_data_clr_all(struct hpre_ctx *ctx,
 	dma_addr_t dma;
 
 	dma = le64_to_cpu(sqe->in);
+	if (unlikely(dma_mapping_error(dev, dma)))
+		return;
 
 	if (src && req->src)
 		dma_free_coherent(dev, ctx->key_sz << 2, req->src, dma);
 
 	dma = le64_to_cpu(sqe->out);
+	if (unlikely(dma_mapping_error(dev, dma)))
+		return;
 
 	if (req->dst)
 		dma_free_coherent(dev, ctx->key_sz << 1, req->dst, dma);
@@ -1424,6 +1434,8 @@ static int hpre_ecdh_msg_request_set(struct hpre_ctx *ctx,
 	h_req->areq.ecdh = req;
 	msg = &h_req->req;
 	memset(msg, 0, sizeof(*msg));
+	msg->in = DMA_MAPPING_ERROR;
+	msg->out = DMA_MAPPING_ERROR;
 	msg->key = cpu_to_le64(ctx->ecdh.dma_p);
 
 	msg->dw0 |= cpu_to_le32(0x1U << HPRE_SQE_DONE_SHIFT);
@@ -1660,11 +1672,15 @@ static void hpre_curve25519_hw_data_clr_all(struct hpre_ctx *ctx,
 	dma_addr_t dma;
 
 	dma = le64_to_cpu(sqe->in);
+	if (unlikely(dma_mapping_error(dev, dma)))
+		return;
 
 	if (src && req->src)
 		dma_free_coherent(dev, ctx->key_sz, req->src, dma);
 
 	dma = le64_to_cpu(sqe->out);
+	if (unlikely(dma_mapping_error(dev, dma)))
+		return;
 
 	if (req->dst)
 		dma_free_coherent(dev, ctx->key_sz, req->dst, dma);
@@ -1715,6 +1731,8 @@ static int hpre_curve25519_msg_request_set(struct hpre_ctx *ctx,
 	h_req->areq.curve25519 = req;
 	msg = &h_req->req;
 	memset(msg, 0, sizeof(*msg));
+	msg->in = DMA_MAPPING_ERROR;
+	msg->out = DMA_MAPPING_ERROR;
 	msg->key = cpu_to_le64(ctx->curve25519.dma_p);
 
 	msg->dw0 |= cpu_to_le32(0x1U << HPRE_SQE_DONE_SHIFT);
