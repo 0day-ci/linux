@@ -4821,7 +4821,7 @@ megasas_ld_list_query(struct megasas_instance *instance, u8 query_type)
 
 	if (!cmd) {
 		dev_warn(&instance->pdev->dev,
-		         "megasas_ld_list_query: Failed to get cmd\n");
+			 "%s: Failed to get cmd\n", __func__);
 		return -ENOMEM;
 	}
 
