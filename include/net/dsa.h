@@ -512,6 +512,13 @@ struct dsa_switch_ops {
 	u32	(*get_phy_flags)(struct dsa_switch *ds, int port);
 
 	/*
+	 * Get preferred CPU port for the provided port.
+	 * Return -1 if there isn't a preferred CPU port, a round-robin logic
+	 * is used to chose the CPU port to link to the provided port.
+	 */
+	int	(*port_get_preferred_cpu)(struct dsa_switch *ds, int port);
+
+	/*
 	 * Access to the switch's PHY registers.
 	 */
 	int	(*phy_read)(struct dsa_switch *ds, int port, int regnum);
