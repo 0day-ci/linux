@@ -1000,6 +1000,7 @@ struct xhci_interval_bw_table {
 
 struct xhci_virt_device {
 	int				slot_id;
+	struct xhci_hcd			*xhci;
 	struct usb_device		*udev;
 	/*
 	 * Commands to the hardware are passed an "input context" that
@@ -1025,11 +1026,15 @@ struct xhci_virt_device {
 	 */
 	unsigned long			flags;
 #define VDEV_PORT_ERROR			BIT(0) /* Port error, link inactive */
+#define VDEV_DISCONN_CHECK_PENDING	BIT(1) /* Disconnection check */
 
 	/* The current max exit latency for the enabled USB3 link states. */
 	u16				current_mel;
 	/* Used for the debugfs interfaces. */
 	void				*debugfs_private;
+
+	/* For undetected disconnection quirk */
+	struct delayed_work		resume_isoc;
 };
 
 /*
@@ -1864,6 +1869,9 @@ struct xhci_hcd {
 /* Compliance Mode Timer Triggered every 2 seconds */
 #define COMP_MODE_RCVRY_MSECS 2000
 
+	/* Track max eSS interval for XHCI_ISOC_BLOCKED_DISCONNECT */
+	unsigned int		max_ess_interval;
+
 	struct dentry		*debugfs_root;
 	struct dentry		*debugfs_slots;
 	struct list_head	regset_list;
@@ -1947,6 +1955,8 @@ char *xhci_get_slot_state(struct xhci_hcd *xhci,
 		struct xhci_container_ctx *ctx);
 void xhci_dbg_trace(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
 			const char *fmt, ...);
+
+void xhci_resume_isoc(struct work_struct *work);
 
 /* xHCI memory management */
 void xhci_mem_cleanup(struct xhci_hcd *xhci);

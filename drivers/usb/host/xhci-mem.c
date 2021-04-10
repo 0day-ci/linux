@@ -995,6 +995,8 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 	xhci_dbg(xhci, "Slot %d input ctx = 0x%llx (dma)\n", slot_id,
 			(unsigned long long)dev->in_ctx->dma);
 
+	INIT_DELAYED_WORK(&dev->resume_isoc, xhci_resume_isoc);
+
 	/* Initialize the cancellation list and watchdog timers for each ep */
 	for (i = 0; i < 31; i++) {
 		dev->eps[i].ep_index = i;
@@ -1010,6 +1012,7 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 		goto fail;
 
 	dev->udev = udev;
+	dev->xhci = xhci;
 
 	/* Point to output device context in dcbaa. */
 	xhci->dcbaa->dev_context_ptrs[slot_id] = cpu_to_le64(dev->out_ctx->dma);
