@@ -34,7 +34,7 @@ static void RxPktPendingTimeout(struct timer_list *t)
 		while (!list_empty(&pRxTs->rx_pending_pkt_list)) {
 			pReorderEntry = (struct rx_reorder_entry *)
 					list_entry(pRxTs->rx_pending_pkt_list.prev,
-					struct rx_reorder_entry, List);
+						   struct rx_reorder_entry, List);
 			if (index == 0)
 				pRxTs->rx_indicate_seq = pReorderEntry->SeqNum;
 
@@ -45,7 +45,7 @@ static void RxPktPendingTimeout(struct timer_list *t)
 				list_del_init(&pReorderEntry->List);
 
 				if (SN_EQUAL(pReorderEntry->SeqNum,
-				    pRxTs->rx_indicate_seq))
+					     pRxTs->rx_indicate_seq))
 					pRxTs->rx_indicate_seq =
 					      (pRxTs->rx_indicate_seq + 1) % 4096;
 
@@ -158,7 +158,7 @@ void TSInitialize(struct rtllib_device *ieee)
 
 		ResetTxTsEntry(pTxTS);
 		list_add_tail(&pTxTS->TsCommonInfo.List,
-				&ieee->Tx_TS_Unused_List);
+			      &ieee->Tx_TS_Unused_List);
 		pTxTS++;
 	}
 
@@ -276,7 +276,7 @@ static void MakeTSEntry(struct ts_common_info *pTsCommonInfo, u8 *Addr,
 
 	if (pTSPEC != NULL)
 		memcpy((u8 *)(&(pTsCommonInfo->TSpec)), (u8 *)pTSPEC,
-			sizeof(union tspec_body));
+		       sizeof(union tspec_body));
 
 	for (count = 0; count < TCLAS_Num; count++)
 		memcpy((u8 *)(&(pTsCommonInfo->TClass[count])),
@@ -355,14 +355,14 @@ bool GetTs(struct rtllib_device *ieee, struct ts_common_info **ppTS,
 		if (TxRxSelect == TX_DIR) {
 			struct tx_ts_record *tmp =
 				container_of(*ppTS,
-				struct tx_ts_record,
-				TsCommonInfo);
+					     struct tx_ts_record,
+					     TsCommonInfo);
 			ResetTxTsEntry(tmp);
 		} else {
 			struct rx_ts_record *tmp =
 				 container_of(*ppTS,
-				 struct rx_ts_record,
-				 ts_common_info);
+					      struct rx_ts_record,
+					      ts_common_info);
 			ResetRxTsEntry(tmp);
 		}
 
@@ -409,7 +409,7 @@ static void RemoveTsEntry(struct rtllib_device *ieee,
 		while (!list_empty(&pRxTS->rx_pending_pkt_list)) {
 			pRxReorderEntry = (struct rx_reorder_entry *)
 					list_entry(pRxTS->rx_pending_pkt_list.prev,
-					struct rx_reorder_entry, List);
+						   struct rx_reorder_entry, List);
 			netdev_dbg(ieee->dev,  "%s(): Delete SeqNum %d!\n",
 				   __func__, pRxReorderEntry->SeqNum);
 			list_del_init(&pRxReorderEntry->List);
