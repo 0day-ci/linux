@@ -5,21 +5,21 @@
  * Copyright (C) 2015 Renesas Electronics Corporation
  */
 
-#ifndef _XHCI_PLAT_H
-#define _XHCI_PLAT_H
+#ifndef __LINUX_USB_XHCI_PLAT_H
+#define __LINUX_USB_XHCI_PLAT_H
 
-#include "xhci.h"	/* for hcd_to_xhci() */
+struct usb_hcd;
 
 struct xhci_plat_priv {
 	const char *firmware_name;
 	unsigned long long quirks;
-	int (*plat_setup)(struct usb_hcd *);
-	void (*plat_start)(struct usb_hcd *);
-	int (*init_quirk)(struct usb_hcd *);
-	int (*suspend_quirk)(struct usb_hcd *);
-	int (*resume_quirk)(struct usb_hcd *);
+	int (*plat_setup)(struct usb_hcd *hcd);
+	void (*plat_start)(struct usb_hcd *hcd);
+	int (*init_quirk)(struct usb_hcd *hcd);
+	int (*suspend_quirk)(struct usb_hcd *hcd);
+	int (*resume_quirk)(struct usb_hcd *hcd);
 };
 
 #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
 #define xhci_to_priv(x) ((struct xhci_plat_priv *)(x)->priv)
-#endif	/* _XHCI_PLAT_H */
+#endif	/* __LINUX_USB_XHCI_PLAT_H */
