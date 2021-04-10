@@ -1526,8 +1526,19 @@ static inline void vmw_bo_unreference(struct vmw_buffer_object **buf)
 
 	*buf = NULL;
 	if (tmp_buf != NULL) {
+		/*
+		 * currently pinning requires a reservation to be held
+		 * but unreference can be called either reserved or not.
+		 * To avoid deadloacks we have to try to get a reservation.
+		 * This is exlusively to satisfy the requirements of the
+		 * unpin, ttm_bo_put will handle delayed deletion for us
+		 * in case the bo is really busy.
+		 */
+		bool locked = dma_resv_trylock(tmp_buf->base.base.resv);
 		if (tmp_buf->base.pin_count > 0)
 			ttm_bo_unpin(&tmp_buf->base);
+		if (locked)
+			dma_resv_unlock(tmp_buf->base.base.resv);
 		ttm_bo_put(&tmp_buf->base);
 	}
 }
