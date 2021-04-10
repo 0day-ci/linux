@@ -517,12 +517,8 @@ static int __init rtw_drv_entry(void)
 	if (ret != 0) {
 		sdio_drvpriv.drv_registered = false;
 		rtw_ndev_notifier_unregister();
-		goto exit;
 	}
 
-	goto exit;
-
-exit:
 	DBG_871X_LEVEL(_drv_always_, "module init ret =%d\n", ret);
 	return ret;
 }
@@ -539,7 +535,6 @@ static void __exit rtw_drv_halt(void)
 
 	DBG_871X_LEVEL(_drv_always_, "module exit success\n");
 }
-
 
 module_init(rtw_drv_entry);
 module_exit(rtw_drv_halt);
