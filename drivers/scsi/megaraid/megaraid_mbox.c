@@ -709,7 +709,8 @@ megaraid_init_mbox(adapter_t *adapter)
 	 * controllers
 	 */
 	raid_dev = kzalloc(sizeof(mraid_device_t), GFP_KERNEL);
-	if (raid_dev == NULL) return -1;
+	if (!raid_dev)
+		return -1;
 
 
 	/*
@@ -2051,7 +2052,8 @@ megaraid_ack_sequence(adapter_t *adapter)
 		 * interrupt line low.
 		 */
 		dword = RDOUTDOOR(raid_dev);
-		if (dword != 0x10001234) break;
+		if (dword != 0x10001234)
+			break;
 
 		handled = 1;
 
@@ -2074,7 +2076,8 @@ megaraid_ack_sequence(adapter_t *adapter)
 
 			// wait for valid command index to post
 			for (j = 0; j < 0xFFFFF; j++) {
-				if (mbox->completed[i] != 0xFF) break;
+				if (mbox->completed[i] != 0xFF)
+					break;
 				rmb();
 			}
 			completed[i]		= mbox->completed[i];
@@ -2182,7 +2185,8 @@ megaraid_mbox_dpc(unsigned long devp)
 	uioc_t			*kioc;
 
 
-	if (!adapter) return;
+	if (!adapter)
+		return;
 
 	raid_dev = ADAP2RAIDDEV(adapter);
 
@@ -2796,7 +2800,8 @@ mbox_post_sync_cmd_fast(adapter_t *adapter, uint8_t raw_mbox[])
 	mbox	= raid_dev->mbox;
 
 	// return immediately if the mailbox is busy
-	if (mbox->busy) return -1;
+	if (mbox->busy)
+		return -1;
 
 	// Copy mailbox data into host structure
 	memcpy((caddr_t)mbox, (caddr_t)raw_mbox, 14);
@@ -2811,7 +2816,8 @@ mbox_post_sync_cmd_fast(adapter_t *adapter, uint8_t raw_mbox[])
 	WRINDOOR(raid_dev, raid_dev->mbox_dma | 0x1);
 
 	for (i = 0; i < MBOX_SYNC_WAIT_CNT; i++) {
-		if (mbox->numstatus != 0xFF) break;
+		if (mbox->numstatus != 0xFF)
+			break;
 		rmb();
 		udelay(MBOX_SYNC_DELAY_200);
 	}
@@ -2848,8 +2854,10 @@ megaraid_busywait_mbox(mraid_device_t *raid_dev)
 			msleep(1);
 	}
 
-	if (i < 1000) return 0;
-	else return -1;
+	if (i < 1000)
+		return 0;
+	else
+		return -1;
 }
 
 
@@ -3137,7 +3145,8 @@ megaraid_mbox_get_max_sg(adapter_t *adapter)
 		nsg =  MBOX_DEFAULT_SG_SIZE;
 	}
 
-	if (nsg > MBOX_MAX_SG_SIZE) nsg = MBOX_MAX_SG_SIZE;
+	if (nsg > MBOX_MAX_SG_SIZE)
+		nsg = MBOX_MAX_SG_SIZE;
 
 	return nsg;
 }
@@ -3317,7 +3326,8 @@ megaraid_mbox_display_scb(adapter_t *adapter, scb_t *scb)
 		mbox->numsectors, mbox->lba, mbox->xferaddr, mbox->logdrv,
 		mbox->numsge));
 
-	if (!scp) return;
+	if (!scp)
+		return;
 
 	con_log(level, (KERN_NOTICE "scsi cmnd: "));
 

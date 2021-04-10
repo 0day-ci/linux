@@ -88,7 +88,8 @@ mraid_mm_open(struct inode *inode, struct file *filep)
 	/*
 	 * Only allow superuser to access private ioctl interface
 	 */
-	if (!capable(CAP_SYS_ADMIN)) return (-EACCES);
+	if (!capable(CAP_SYS_ADMIN))
+		return (-EACCES);
 
 	return 0;
 }
@@ -256,7 +257,8 @@ mraid_mm_get_adapter(mimd_t __user *umimd, int *rval)
 	iterator = 0;
 
 	list_for_each_entry(adapter, &adapters_list_g, list) {
-		if (iterator++ == adapno) break;
+		if (iterator++ == adapno)
+			break;
 	}
 
 	if (!adapter) {
@@ -408,8 +410,10 @@ mimd_to_kioc(mimd_t __user *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
 		if (mraid_mm_attach_buf(adp, kioc, kioc->xferlen))
 			return (-ENOMEM);
 
-		if (mimd.outlen) kioc->data_dir  = UIOC_RD;
-		if (mimd.inlen) kioc->data_dir |= UIOC_WR;
+		if (mimd.outlen)
+			kioc->data_dir  = UIOC_RD;
+		if (mimd.inlen)
+			kioc->data_dir |= UIOC_WR;
 
 		break;
 
@@ -424,8 +428,10 @@ mimd_to_kioc(mimd_t __user *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
 		if (mraid_mm_attach_buf(adp, kioc, kioc->xferlen))
 			return (-ENOMEM);
 
-		if (mimd.outlen) kioc->data_dir  = UIOC_RD;
-		if (mimd.inlen) kioc->data_dir |= UIOC_WR;
+		if (mimd.outlen)
+			kioc->data_dir  = UIOC_RD;
+		if (mimd.inlen)
+			kioc->data_dir |= UIOC_WR;
 
 		break;
 
@@ -677,7 +683,8 @@ lld_ioctl(mraid_mmadp_t *adp, uioc_t *kioc)
 	kioc->status	= -ENODATA;
 	rval		= adp->issue_uioc(adp->drvr_data, kioc, IOCTL_ISSUE);
 
-	if (rval) return rval;
+	if (rval)
+		return rval;
 
 	/*
 	 * Start the timer
@@ -750,7 +757,8 @@ ioctl_done(uioc_t *kioc)
 					"ioctl that was timedout before\n"));
 
 		list_for_each_entry(adapter, &adapters_list_g, list) {
-			if (iterator++ == adapno) break;
+			if (iterator++ == adapno)
+				break;
 		}
 
 		kioc->timedout = 0;
