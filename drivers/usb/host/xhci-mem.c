@@ -1463,6 +1463,29 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 		}
 	}
 
+	/*
+	 * Check for undercalculated bandwidth quirk for interrupt endpoints
+	 * associated with fullspeed BI.
+	 */
+	if ((xhci->quirks & XHCI_LIMIT_FS_BI_INTR_EP) &&
+	    usb_endpoint_xfer_int(&ep->desc) &&
+	    udev->speed == USB_SPEED_FULL &&
+	    interval == 5) {
+		struct usb_device *top_dev;
+
+		for (top_dev = udev;
+		     top_dev->parent && top_dev->parent->parent;
+		     top_dev = top_dev->parent)
+			/* Found device below root hub */;
+
+		/*
+		 * If the top device is operating at fullspeed, then the
+		 * controller is using fullspeed BI for this device.
+		 */
+		if (top_dev->speed == USB_SPEED_FULL)
+			interval = 4;
+	}
+
 	mult = xhci_get_endpoint_mult(udev, ep);
 	max_packet = usb_endpoint_maxp(&ep->desc);
 	max_burst = xhci_get_endpoint_max_burst(udev, ep);
