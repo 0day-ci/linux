@@ -196,22 +196,22 @@ typedef struct {
 
 
 // conversion from scsi command
-#define SCP2HOST(scp)			(scp)->device->host	// to host
-#define SCP2HOSTDATA(scp)		SCP2HOST(scp)->hostdata	// to soft state
-#define SCP2CHANNEL(scp)		(scp)->device->channel	// to channel
-#define SCP2TARGET(scp)			(scp)->device->id	// to target
-#define SCP2LUN(scp)			(u32)(scp)->device->lun	// to LUN
+#define SCP2HOST(scp)			((scp)->device->host)	// to host
+#define SCP2HOSTDATA(scp)		(SCP2HOST(scp)->hostdata)	// to soft state
+#define SCP2CHANNEL(scp)		((scp)->device->channel)	// to channel
+#define SCP2TARGET(scp)			((scp)->device->id)	// to target
+#define SCP2LUN(scp)			((u32)(scp)->device->lun)	// to LUN
 
 // generic macro to convert scsi command and host to controller's soft state
 #define SCSIHOST2ADAP(host)	(((caddr_t *)(host->hostdata))[0])
-#define SCP2ADAPTER(scp)	(adapter_t *)SCSIHOST2ADAP(SCP2HOST(scp))
+#define SCP2ADAPTER(scp)	((adapter_t *)SCSIHOST2ADAP(SCP2HOST(scp)))
 
 
 #define MRAID_IS_LOGICAL(adp, scp)	\
-	(SCP2CHANNEL(scp) == (adp)->max_channel) ? 1 : 0
+	((SCP2CHANNEL(scp) == (adp)->max_channel) ? 1 : 0)
 
 #define MRAID_IS_LOGICAL_SDEV(adp, sdev)	\
-	(sdev->channel == (adp)->max_channel) ? 1 : 0
+	((sdev->channel == (adp)->max_channel) ? 1 : 0)
 
 /**
  * MRAID_GET_DEVICE_MAP - device ids
