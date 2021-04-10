@@ -268,6 +268,9 @@ static int handle_ftm_req_send(struct nl80211_state *state, struct nl_msg *msg,
 	const char *file;
 	int err;
 
+	if (argc < 1)
+		return HANDLER_RET_USAGE;
+
 	file = argv[0];
 	argc--;
 	argv++;
