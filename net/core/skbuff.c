@@ -429,6 +429,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	 * to allow max possible filling before reallocation.
 	 */
 	size = SKB_WITH_OVERHEAD(ksize(data));
+	memset(data, 0, size);
 	prefetchw(data + size);
 
 	/*
