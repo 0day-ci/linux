@@ -160,7 +160,7 @@ struct dpu_hw_intr_ops {
  * @ops:              function pointer mapping for IRQ handling
  * @cache_irq_mask:   array of IRQ enable masks reg storage created during init
  * @save_irq_status:  array of IRQ status reg storage created during init
- * @irq_idx_tbl_size: total number of irq_idx mapped in the hw_interrupts
+ * @total_irqs: total number of irq_idx mapped in the hw_interrupts
  * @irq_lock:         spinlock for accessing IRQ resources
  */
 struct dpu_hw_intr {
@@ -168,7 +168,7 @@ struct dpu_hw_intr {
 	struct dpu_hw_intr_ops ops;
 	u32 *cache_irq_mask;
 	u32 *save_irq_status;
-	u32 irq_idx_tbl_size;
+	u32 total_irqs;
 	spinlock_t irq_lock;
 	unsigned long irq_mask;
 };
