@@ -485,10 +485,14 @@ static void port_check(struct timer_list *t)
 
 	xhci = from_timer(xhci, t, port_check_timer);
 	rhub = &xhci->usb3_rhub;
+	hcd = xhci->shared_hcd;
 
 	for (i = 0; i < rhub->num_ports; i++) {
+		bool poll_rhub = false;
+
 		temp = readl(rhub->ports[i]->addr);
-		if ((temp & PORT_PLS_MASK) == USB_SS_PORT_LS_COMP_MOD) {
+		if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
+		    ((temp & PORT_PLS_MASK) == USB_SS_PORT_LS_COMP_MOD)) {
 			/*
 			 * Compliance Mode Detected. Letting USB Core
 			 * handle the Warm Reset
@@ -498,8 +502,15 @@ static void port_check(struct timer_list *t)
 					i + 1);
 			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 					"Attempting compliance mode recovery");
-			hcd = xhci->shared_hcd;
 
+			poll_rhub = true;
+		}
+
+		if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) &&
+		    ((temp & PORT_PLS_MASK) == XDEV_INACTIVE))
+			poll_rhub = true;
+
+		if (poll_rhub) {
 			if (hcd->state == HC_STATE_SUSPENDED)
 				usb_hcd_resume_root_hub(hcd);
 
@@ -507,7 +518,9 @@ static void port_check(struct timer_list *t)
 		}
 	}
 
-	if (xhci->port_status_u0 != ((1 << rhub->num_ports) - 1))
+	if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) ||
+	    ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
+	     xhci->port_status_u0 != ((1 << rhub->num_ports) - 1)))
 		mod_timer(&xhci->port_check_timer,
 			jiffies + msecs_to_jiffies(PORT_CHECK_MSECS));
 }
@@ -593,10 +606,12 @@ static int xhci_init(struct usb_hcd *hcd)
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Finished xhci_init");
 
 	/* Initializing Compliance Mode Recovery Data If Needed */
-	if (xhci_compliance_mode_recovery_timer_quirk_check()) {
+	if (xhci_compliance_mode_recovery_timer_quirk_check())
 		xhci->quirks |= XHCI_COMP_MODE_QUIRK;
+
+	if (xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK ||
+	    xhci->quirks & XHCI_COMP_MODE_QUIRK)
 		port_check_timer_init(xhci);
-	}
 
 	return retval;
 }
@@ -736,8 +751,9 @@ static void xhci_stop(struct usb_hcd *hcd)
 	xhci_cleanup_msix(xhci);
 
 	/* Deleting Compliance Mode Recovery Timer */
-	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
-			(!(xhci_all_ports_seen_u0(xhci)))) {
+	if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) ||
+	    ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
+	     !(xhci_all_ports_seen_u0(xhci)))) {
 		del_timer_sync(&xhci->port_check_timer);
 		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"%s: port check timer deleted", __func__);
@@ -1058,8 +1074,9 @@ int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup)
 	 * Deleting Port Check Timer because the xHCI Host
 	 * is about to be suspended.
 	 */
-	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
-			(!(xhci_all_ports_seen_u0(xhci)))) {
+	if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) ||
+	    ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
+	     !(xhci_all_ports_seen_u0(xhci)))) {
 		del_timer_sync(&xhci->port_check_timer);
 		xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"%s: port check timer deleted", __func__);
@@ -1145,8 +1162,9 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 	/* If restore operation fails, re-initialize the HC during resume */
 	if ((temp & STS_SRE) || hibernated) {
 
-		if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
-				!(xhci_all_ports_seen_u0(xhci))) {
+		if ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) ||
+		    ((xhci->quirks & XHCI_COMP_MODE_QUIRK) &&
+		     !(xhci_all_ports_seen_u0(xhci)))) {
 			del_timer_sync(&xhci->port_check_timer);
 			xhci_dbg_trace(xhci, trace_xhci_dbg_quirks,
 				"Port Check Timer deleted!");
@@ -1247,7 +1265,9 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 	 * to suffer the Compliance Mode issue again. It doesn't matter if
 	 * ports have entered previously to U0 before system's suspension.
 	 */
-	if ((xhci->quirks & XHCI_COMP_MODE_QUIRK) && !comp_timer_running)
+	if (!comp_timer_running &&
+	    ((xhci->quirks & XHCI_LOST_DISCONNECT_QUIRK) ||
+	     (xhci->quirks & XHCI_COMP_MODE_QUIRK)))
 		port_check_timer_init(xhci);
 
 	if (xhci->quirks & XHCI_ASMEDIA_MODIFY_FLOWCONTROL)
