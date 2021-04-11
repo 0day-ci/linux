@@ -210,4 +210,7 @@ int vas_register_coproc_api(struct module *mod, enum vas_cop_type cop_type,
 void vas_unregister_coproc_api(void);
 
 int vas_reference_task(struct vas_win_task *vtask);
+void vas_update_csb(struct coprocessor_request_block *crb,
+		    struct vas_win_task *vtask);
+void vas_dump_crb(struct coprocessor_request_block *crb);
 #endif /* __ASM_POWERPC_VAS_H */
