@@ -239,6 +239,9 @@ struct stmmac_priv {
 	int use_riwt;
 	int irq_wake;
 	spinlock_t ptp_lock;
+	/* Mutex lock for Auxiliary Snapshots */
+	struct mutex aux_ts_lock;
+
 	void __iomem *mmcaddr;
 	void __iomem *ptpaddr;
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
