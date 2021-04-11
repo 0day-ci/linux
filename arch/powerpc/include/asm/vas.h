@@ -69,6 +69,54 @@ struct vas_win_task {
 	struct mm_struct *mm;	/* Linux process mm_struct */
 };
 
+/*
+ * In-kernel state a VAS window. One per window.
+ * powerVM: Used only for Tx windows.
+ * powerNV: Used for both Tx and Rx windows.
+ */
+struct vas_window {
+	u32 winid;
+	u32 wcreds_max;	/* Window credits */
+	enum vas_cop_type cop;
+	struct vas_win_task task;
+	char *dbgname;
+	struct dentry *dbgdir;
+	union {
+		/* powerNV specific data */
+		struct {
+			void *vinst;	/* points to VAS instance */
+			bool tx_win;	/* True if send window */
+			bool nx_win;	/* True if NX window */
+			bool user_win;	/* True if user space window */
+			void *hvwc_map;	/* HV window context */
+			void *uwc_map;	/* OS/User window context */
+
+			/* Fields applicable only to send windows */
+			void *paste_kaddr;
+			char *paste_addr_name;
+			struct vas_window *rxwin;
+
+			atomic_t num_txwins;	/* Only for receive windows */
+		} pnv;
+		struct {
+			u64 win_addr;	/* Physical paste address */
+			u8 win_type;	/* QoS or Default window */
+			u8 status;
+			u32 complete_irq;	/* Completion interrupt */
+			u32 fault_irq;	/* Fault interrupt */
+			u64 domain[6];	/* Associativity domain Ids */
+					/* this window is allocated */
+			u64 util;
+
+			/* List of windows opened which is used for LPM */
+			struct list_head win_list;
+			u64 flags;
+			char *name;
+			int fault_virq;
+		} lpar;
+	};
+};
+
 static inline void vas_drop_reference_task(struct vas_win_task *task)
 {
 	/* Drop references to pid and mm */

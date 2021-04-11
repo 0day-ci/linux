@@ -95,9 +95,11 @@ TRACE_EVENT(	vas_paste_crb,
 
 		TP_fast_assign(
 			__entry->pid = tsk->pid;
-			__entry->vasid = win->vinst->vas_id;
+			__entry->vasid =
+				((struct vas_instance *)win->pnv.vinst)->vas_id;
 			__entry->winid = win->winid;
-			__entry->paste_kaddr = (unsigned long)win->paste_kaddr
+			__entry->paste_kaddr =
+				(unsigned long)win->pnv.paste_kaddr;
 		),
 
 		TP_printk("pid=%d, vasid=%d, winid=%d, paste_kaddr=0x%016lx\n",
