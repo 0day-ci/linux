@@ -643,6 +643,7 @@ __sso_led_dt_parse(struct sso_led_priv *priv, struct fwnode_handle *fw_ssoled)
 							      GPIOD_ASIS, NULL);
 		if (IS_ERR(led->gpiod)) {
 			dev_err(dev, "led: get gpio fail!\n");
+			ret = PTR_ERR(led->gpiod);
 			goto __dt_err;
 		}
 
@@ -664,6 +665,7 @@ __sso_led_dt_parse(struct sso_led_priv *priv, struct fwnode_handle *fw_ssoled)
 		ret = fwnode_property_read_u32(fwnode_child, "reg", &prop);
 		if (ret != 0 || prop >= SSO_LED_MAX_NUM) {
 			dev_err(dev, "invalid LED pin:%u\n", prop);
+			ret = ret ? ret : -EINVAL;
 			goto __dt_err;
 		}
 		desc->pin = prop;
@@ -699,8 +701,10 @@ __sso_led_dt_parse(struct sso_led_priv *priv, struct fwnode_handle *fw_ssoled)
 				desc->brightness = LED_FULL;
 		}
 
-		if (sso_create_led(priv, led, fwnode_child))
+		if (sso_create_led(priv, led, fwnode_child)) {
+			ret = -EINVAL;
 			goto __dt_err;
+		}
 	}
 	fwnode_handle_put(fw_ssoled);
 
@@ -713,7 +717,7 @@ __dt_err:
 		sso_led_shutdown(led);
 	}
 
-	return -EINVAL;
+	return ret;
 }
 
 static int sso_led_dt_parse(struct sso_led_priv *priv)
