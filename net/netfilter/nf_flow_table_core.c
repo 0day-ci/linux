@@ -410,6 +410,8 @@ static bool flow_offload_stale_dst(struct flow_offload_tuple *tuple)
 	if (tuple->xmit_type == FLOW_OFFLOAD_XMIT_NEIGH ||
 	    tuple->xmit_type == FLOW_OFFLOAD_XMIT_XFRM) {
 		dst = tuple->dst_cache;
+		if (!dst)
+			return false;
 		if (!dst_check(dst, tuple->dst_cookie))
 			return true;
 	}
