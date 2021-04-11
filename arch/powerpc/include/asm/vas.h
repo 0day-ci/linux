@@ -5,6 +5,9 @@
 
 #ifndef _ASM_POWERPC_VAS_H
 #define _ASM_POWERPC_VAS_H
+#include <linux/sched/mm.h>
+#include <linux/mmu_context.h>
+#include <asm/icswx.h>
 #include <uapi/asm/vas-api.h>
 
 
@@ -59,6 +62,22 @@ struct vas_user_win_ops {
 	u64 (*paste_addr)(void *);
 	int (*close_win)(void *);
 };
+
+struct vas_win_task {
+	struct pid *pid;	/* Thread group ID of owner */
+	struct pid *tgid;	/* Linux process mm_struct */
+	struct mm_struct *mm;	/* Linux process mm_struct */
+};
+
+static inline void vas_drop_reference_task(struct vas_win_task *task)
+{
+	/* Drop references to pid and mm */
+	put_pid(task->pid);
+	if (task->mm) {
+		mm_context_remove_vas_window(task->mm);
+		mmdrop(task->mm);
+	}
+}
 
 /*
  * Receive window attributes specified by the (in-kernel) owner of window.
@@ -190,4 +209,5 @@ int vas_register_coproc_api(struct module *mod, enum vas_cop_type cop_type,
 			    struct vas_user_win_ops *vops);
 void vas_unregister_coproc_api(void);
 
+int vas_reference_task(struct vas_win_task *vtask);
 #endif /* __ASM_POWERPC_VAS_H */
