@@ -250,7 +250,7 @@ void tlb_flush_mmu(struct mmu_gather *tlb)
 }
 
 /**
- * tlb_gather_mmu - initialize an mmu_gather structure for page-table tear-down
+ * __tlb_gather_mmu - initialize an mmu_gather structure for page-table tear-down
  * @tlb: the mmu_gather structure to initialize
  * @mm: the mm_struct of the target address space
  * @fullmm: @mm is without users and we're going to destroy the full address

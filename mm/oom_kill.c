@@ -171,10 +171,11 @@ static bool oom_unkillable_task(struct task_struct *p)
 }
 
 /**
- * Check whether unreclaimable slab amount is greater than
- * all user memory(LRU pages).
+ * should_dump_unreclaim_slab - Check whether unreclaimable slab amount
+ * is greater than all user memory (LRU pages).
+ *
  * dump_unreclaimable_slab() could help in the case that
- * oom due to too much unreclaimable slab used by kernel.
+ * oom is due to too much unreclaimable slab used by kernel.
 */
 static bool should_dump_unreclaim_slab(void)
 {
