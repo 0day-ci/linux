@@ -594,6 +594,10 @@ static int get_vas_capabilities(u8 feat, enum vas_cop_feat_type type,
 		}
 	}
 
+	rc = sysfs_add_vas_capabs(capab);
+	if (rc)
+		return rc;
+
 	copypaste_feat = 1;
 
 	return 0;
@@ -628,6 +632,8 @@ static int __init pseries_vas_init(void)
 		 (char *)&capabs_be->descriptor);
 	capabs_all.descriptor = be64_to_cpu(capabs_be->descriptor);
 	capabs_all.feat_type = be64_to_cpu(capabs_be->feat_type);
+
+	sysfs_pseries_vas_init(&capabs_all);
 
 	ct_capabs_be = kmalloc(sizeof(*ct_capabs_be), GFP_KERNEL);
 	if (!ct_capabs_be) {

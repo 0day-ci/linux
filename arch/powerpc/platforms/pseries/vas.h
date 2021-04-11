@@ -93,4 +93,6 @@ struct vas_win_lpar_be {
 	__be64	win_util;	/* Number of bytes processed */
 } __packed __aligned(0x1000);
 
+int sysfs_add_vas_capabs(struct vas_ct_capabs *capabs);
+int __init sysfs_pseries_vas_init(struct vas_all_capabs *vas_caps);
 #endif /* _VAS_H */
