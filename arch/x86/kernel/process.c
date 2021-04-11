@@ -163,6 +163,55 @@ int copy_thread(unsigned long clone_flags, unsigned long sp, unsigned long arg,
 	/* Kernel thread ? */
 	if (unlikely(p->flags & (PF_KTHREAD | PF_IO_WORKER))) {
 		memset(childregs, 0, sizeof(struct pt_regs));
+		/*
+		 * gdb sees all userspace threads,
+		 * including io threads (PF_IO_WORKER)!
+		 *
+		 * gdb uses:
+		 * PTRACE_PEEKUSR, offsetof (struct user_regs_struct, cs)
+		 *  returning with 0x33 (51) to detect 64 bit
+		 * and:
+		 * PTRACE_PEEKUSR, offsetof (struct user_regs_struct, ds)
+		 *  returning 0x2b (43) to detect 32 bit.
+		 *
+		 * GDB relies on that the kernel returns the
+		 * same values for all threads, which means
+		 * we don't zero these out.
+		 *
+		 * Note that CONFIG_X86_64 handles 'es' and 'ds'
+		 * differently, see the following above:
+		 *   savesegment(es, p->thread.es);
+		 *   savesegment(ds, p->thread.ds);
+		 * and the CONFIG_X86_64 version of get_segment_reg().
+		 *
+		 * Linus proposed something like this:
+		 * (https://lore.kernel.org/io-uring/CAHk-=whEObPkZBe4766DmR46-=5QTUiatWbSOaD468eTgYc1tg@mail.gmail.com/)
+		 *
+		 *   childregs->cs = __USER_CS;
+		 *   childregs->ss = __USER_DS;
+		 *   childregs->ds = __USER_DS;
+		 *   childregs->es = __USER_DS;
+		 *
+		 * might make sense (just do it unconditionally, rather than making it
+		 * special to PF_IO_WORKER).
+		 *
+		 * But that doesn't make gdb happy in all cases.
+		 *
+		 * While 32bit userspace on a 64bit kernel is legacy,
+		 * it's still useful to allow 32bit libraries or nss modules
+		 * use the same code as the 64bit version of that library, which
+		 * can use io-uring just fine.
+		 *
+		 * So we better just inherit the values from
+		 * the originating process instead of hardcoding
+		 * values, which would imply 64bit userspace.
+		 */
+		childregs->cs = current_pt_regs()->cs;
+		childregs->ss = current_pt_regs()->ss;
+#ifdef CONFIG_X86_32
+		childregs->ds = current_pt_regs()->ds;
+		childregs->es = current_pt_regs()->es;
+#endif
 		kthread_frame_init(frame, sp, arg);
 		return 0;
 	}
