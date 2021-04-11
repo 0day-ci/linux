@@ -42,12 +42,10 @@ endif
 export LD_BFD
 
 ifneq ($(SUBARCH),$(UTS_MACHINE))
-	ifeq ($(CROSS_COMPILE),)
-		CC_SUFFIXES = linux linux-gnu unknown-linux-gnu
-		CROSS_COMPILE := $(call cc-cross-prefix, \
+	CC_SUFFIXES = linux linux-gnu unknown-linux-gnu
+	CROSS_COMPILE ?= $(call cc-cross-prefix, \
 			$(foreach a,$(CC_ARCHES), \
 			$(foreach s,$(CC_SUFFIXES),$(a)-$(s)-)))
-	endif
 endif
 
 ifdef CONFIG_DYNAMIC_FTRACE

@@ -5,9 +5,7 @@
 
 KBUILD_DEFCONFIG := haps_hs_smp_defconfig
 
-ifeq ($(CROSS_COMPILE),)
-CROSS_COMPILE := $(call cc-cross-prefix, arc-linux- arceb-linux-)
-endif
+CROSS_COMPILE ?= $(call cc-cross-prefix, arc-linux- arceb-linux-)
 
 cflags-y	+= -fno-common -pipe -fno-builtin -mmedium-calls -D__linux__
 

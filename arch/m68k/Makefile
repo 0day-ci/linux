@@ -17,10 +17,8 @@
 KBUILD_DEFCONFIG := multi_defconfig
 
 ifneq ($(SUBARCH),$(ARCH))
-	ifeq ($(CROSS_COMPILE),)
-		CROSS_COMPILE := $(call cc-cross-prefix, \
+	CROSS_COMPILE ?= $(call cc-cross-prefix, \
 			m68k-linux-gnu- m68k-linux- m68k-unknown-linux-gnu-)
-	endif
 endif
 
 #

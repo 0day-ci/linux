@@ -26,9 +26,7 @@ KBUILD_LDFLAGS += $(ldflags-y)
 
 CHECKFLAGS += -msize-long
 
-ifeq ($(CROSS_COMPILE),)
-CROSS_COMPILE := $(call cc-cross-prefix, h8300-unknown-linux- h8300-linux-)
-endif
+CROSS_COMPILE ?= $(call cc-cross-prefix, h8300-unknown-linux- h8300-linux-)
 
 core-y	+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/
 core-y	+= arch/$(ARCH)/boot/dts/
