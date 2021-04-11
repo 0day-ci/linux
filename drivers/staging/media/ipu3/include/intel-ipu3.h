@@ -5,6 +5,7 @@
 #define __IPU3_UAPI_H
 
 #include <linux/types.h>
+#include <linux/bitops.h>
 
 /* from /drivers/staging/media/ipu3/include/videodev2.h */
 
@@ -22,11 +23,11 @@
 #define IPU3_UAPI_MAX_BUBBLE_SIZE			10
 
 #define IPU3_UAPI_GRID_START_MASK			((1 << 12) - 1)
-#define IPU3_UAPI_GRID_Y_START_EN			(1 << 15)
+#define IPU3_UAPI_GRID_Y_START_EN			BIT(15)
 
 /* controls generation of meta_data (like FF enable/disable) */
-#define IPU3_UAPI_AWB_RGBS_THR_B_EN			(1 << 14)
-#define IPU3_UAPI_AWB_RGBS_THR_B_INCL_SAT		(1 << 15)
+#define IPU3_UAPI_AWB_RGBS_THR_B_EN			BIT(14)
+#define IPU3_UAPI_AWB_RGBS_THR_B_INCL_SAT		BIT(15)
 
 /**
  * struct ipu3_uapi_grid_config - Grid plane config
