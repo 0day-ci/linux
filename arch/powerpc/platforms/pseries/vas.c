@@ -30,6 +30,13 @@
 /* phyp allows one credit per window right now */
 #define DEF_WIN_CREDS		1
 
+static struct vas_all_capabs capabs_all;
+static int copypaste_feat;
+
+struct vas_capabs vcapabs[VAS_MAX_FEAT_TYPE];
+
+DEFINE_MUTEX(vas_pseries_mutex);
+
 static int64_t hcall_return_busy_check(int64_t rc)
 {
 	/* Check if we are stalled for some time */
@@ -215,3 +222,126 @@ int plpar_vas_query_capabilities(const u64 hcall, u8 query_type,
 		return -EIO;
 	}
 }
+
+/*
+ * Get the specific capabilities based on the feature type.
+ * Right now supports GZIP default and GZIP QoS capabilities.
+ */
+static int get_vas_capabilities(u8 feat, enum vas_cop_feat_type type,
+				struct vas_ct_capabs_be *capab_be)
+{
+	struct vas_ct_capabs *capab;
+	struct vas_capabs *vcapab;
+	int rc = 0;
+
+	vcapab = &vcapabs[type];
+	memset(vcapab, 0, sizeof(*vcapab));
+	INIT_LIST_HEAD(&vcapab->list);
+
+	capab = &vcapab->capab;
+
+	rc = plpar_vas_query_capabilities(H_QUERY_VAS_CAPABILITIES, feat,
+					  (u64)virt_to_phys(capab_be));
+	if (rc)
+		return rc;
+
+	capab->user_mode = capab_be->user_mode;
+	if (!(capab->user_mode & VAS_COPY_PASTE_USER_MODE)) {
+		pr_err("User space COPY/PASTE is not supported\n");
+		return -ENOTSUPP;
+	}
+
+	snprintf(capab->name, VAS_DESCR_LEN + 1, "%.8s",
+		 (char *)&capab_be->descriptor);
+	capab->descriptor = be64_to_cpu(capab_be->descriptor);
+	capab->win_type = capab_be->win_type;
+	if (capab->win_type >= VAS_MAX_FEAT_TYPE) {
+		pr_err("Unsupported window type %u\n", capab->win_type);
+		return -EINVAL;
+	}
+	capab->max_lpar_creds = be16_to_cpu(capab_be->max_lpar_creds);
+	capab->max_win_creds = be16_to_cpu(capab_be->max_win_creds);
+	atomic_set(&capab->target_lpar_creds,
+		   be16_to_cpu(capab_be->target_lpar_creds));
+	if (feat == VAS_GZIP_DEF_FEAT) {
+		capab->def_lpar_creds = be16_to_cpu(capab_be->def_lpar_creds);
+
+		if (capab->max_win_creds < DEF_WIN_CREDS) {
+			pr_err("Window creds(%u) > max allowed window creds(%u)\n",
+			       DEF_WIN_CREDS, capab->max_win_creds);
+			return -EINVAL;
+		}
+	}
+
+	copypaste_feat = 1;
+
+	return 0;
+}
+
+static int __init pseries_vas_init(void)
+{
+	struct vas_ct_capabs_be *ct_capabs_be;
+	struct vas_all_capabs_be *capabs_be;
+	int rc;
+
+	/*
+	 * Linux supports user space COPY/PASTE only with Radix
+	 */
+	if (!radix_enabled()) {
+		pr_err("API is supported only with radix page tables\n");
+		return -ENOTSUPP;
+	}
+
+	capabs_be = kmalloc(sizeof(*capabs_be), GFP_KERNEL);
+	if (!capabs_be)
+		return -ENOMEM;
+	/*
+	 * Get VAS overall capabilities by passing 0 to feature type.
+	 */
+	rc = plpar_vas_query_capabilities(H_QUERY_VAS_CAPABILITIES, 0,
+					  (u64)virt_to_phys(capabs_be));
+	if (rc)
+		goto out;
+
+	snprintf(capabs_all.name, VAS_DESCR_LEN, "%.7s",
+		 (char *)&capabs_be->descriptor);
+	capabs_all.descriptor = be64_to_cpu(capabs_be->descriptor);
+	capabs_all.feat_type = be64_to_cpu(capabs_be->feat_type);
+
+	ct_capabs_be = kmalloc(sizeof(*ct_capabs_be), GFP_KERNEL);
+	if (!ct_capabs_be) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	/*
+	 * QOS capabilities available
+	 */
+	if (capabs_all.feat_type & VAS_GZIP_QOS_FEAT_BIT) {
+		rc = get_vas_capabilities(VAS_GZIP_QOS_FEAT,
+					  VAS_GZIP_QOS_FEAT_TYPE, ct_capabs_be);
+
+		if (rc)
+			goto out_ct;
+	}
+	/*
+	 * Default capabilities available
+	 */
+	if (capabs_all.feat_type & VAS_GZIP_DEF_FEAT_BIT) {
+		rc = get_vas_capabilities(VAS_GZIP_DEF_FEAT,
+					  VAS_GZIP_DEF_FEAT_TYPE, ct_capabs_be);
+		if (rc)
+			goto out_ct;
+	}
+
+	if (!copypaste_feat)
+		pr_err("GZIP feature is not supported\n");
+
+	pr_info("GZIP feature is available\n");
+
+out_ct:
+	kfree(ct_capabs_be);
+out:
+	kfree(capabs_be);
+	return rc;
+}
+machine_device_initcall(pseries, pseries_vas_init);
