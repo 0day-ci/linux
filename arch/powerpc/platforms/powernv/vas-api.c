@@ -207,8 +207,8 @@ static struct file_operations coproc_fops = {
  * Supporting only nx-gzip coprocessor type now, but this API code
  * extended to other coprocessor types later.
  */
-int vas_register_coproc_api(struct module *mod, enum vas_cop_type cop_type,
-				const char *name)
+int vas_register_api_powernv(struct module *mod, enum vas_cop_type cop_type,
+			     const char *name)
 {
 	int rc = -EINVAL;
 	dev_t devno;
@@ -262,9 +262,9 @@ err_class:
 	unregister_chrdev_region(coproc_device.devt, 1);
 	return rc;
 }
-EXPORT_SYMBOL_GPL(vas_register_coproc_api);
+EXPORT_SYMBOL_GPL(vas_register_api_powernv);
 
-void vas_unregister_coproc_api(void)
+void vas_unregister_api_powernv(void)
 {
 	dev_t devno;
 
@@ -275,4 +275,4 @@ void vas_unregister_coproc_api(void)
 	class_destroy(coproc_device.class);
 	unregister_chrdev_region(coproc_device.devt, 1);
 }
-EXPORT_SYMBOL_GPL(vas_unregister_coproc_api);
+EXPORT_SYMBOL_GPL(vas_unregister_api_powernv);
