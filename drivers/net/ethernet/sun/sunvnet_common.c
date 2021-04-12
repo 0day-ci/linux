@@ -1080,7 +1080,7 @@ static inline int vnet_skb_map(struct ldc_channel *lp, struct sk_buff *skb,
 		return err;
 	nc = err;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
 		u8 *vaddr;
 
@@ -1121,7 +1121,7 @@ static inline struct sk_buff *vnet_skb_shape(struct sk_buff *skb, int ncookies)
 
 	/* make sure we have enough cookies and alignment in every frag */
 	docopy = skb_shinfo(skb)->nr_frags >= ncookies;
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
 
 		docopy |= skb_frag_off(f) & 7;

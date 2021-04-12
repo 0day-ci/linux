@@ -1910,7 +1910,7 @@ static netdev_tx_t rocker_port_xmit(struct sk_buff *skb, struct net_device *dev)
 			goto unmap_frags;
 	}
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		err = rocker_tx_desc_frag_map_put(rocker_port, desc_info,

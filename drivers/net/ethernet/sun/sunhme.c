@@ -2339,7 +2339,7 @@ static netdev_tx_t happy_meal_start_xmit(struct sk_buff *skb,
 			goto out_dma_error;
 		entry = NEXT_TX(entry);
 
-		for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
+		skb_for_each_frag(skb, frag) {
 			const skb_frag_t *this_frag = &skb_shinfo(skb)->frags[frag];
 			u32 len, mapping, this_txflags;
 

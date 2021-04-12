@@ -1079,7 +1079,7 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 			/* skip iucv_array lying in the headroom */
 			iba[0].address = (u32)(addr_t)skb->data;
 			iba[0].length = (u32)skb_headlen(skb);
-			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			skb_for_each_frag(skb, i) {
 				skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 				iba[i + 1].address =
@@ -1181,7 +1181,7 @@ static void iucv_process_message(struct sock *sk, struct sk_buff *skb,
 
 			iba[0].address = (u32)(addr_t)skb->data;
 			iba[0].length = (u32)skb_headlen(skb);
-			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			skb_for_each_frag(skb, i) {
 				skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 				iba[i + 1].address =

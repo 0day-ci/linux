@@ -576,7 +576,7 @@ static int xlgmac_map_tx_skb(struct xlgmac_channel *channel,
 		desc_data = XLGMAC_GET_DESC_DATA(ring, cur_index);
 	}
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		netif_dbg(pdata, tx_queued, pdata->netdev,
 			  "mapping frag %u\n", i);
 

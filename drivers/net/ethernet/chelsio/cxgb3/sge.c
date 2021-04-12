@@ -1595,7 +1595,7 @@ static void deferred_unmap_destructor(struct sk_buff *skb)
 				 skb_transport_header(skb), PCI_DMA_TODEVICE);
 
 	si = skb_shinfo(skb);
-	for (i = 0; i < si->nr_frags; i++)
+	skb_for_each_frag(skb, i)
 		pci_unmap_page(dui->pdev, *p++, skb_frag_size(&si->frags[i]),
 			       PCI_DMA_TODEVICE);
 }

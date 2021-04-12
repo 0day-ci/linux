@@ -149,7 +149,7 @@ static int tx_map_skb(struct hinic_dev *nic_dev, struct sk_buff *skb,
 
 	hinic_set_sge(&sges[0], dma_addr, skb_headlen(skb));
 
-	for (i = 0 ; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 
 		dma_addr = skb_frag_dma_map(&pdev->dev, frag, 0,
@@ -189,7 +189,7 @@ static void tx_unmap_skb(struct hinic_dev *nic_dev, struct sk_buff *skb,
 	struct pci_dev *pdev = hwif->pdev;
 	int i;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags ; i++)
+	skb_for_each_frag(skb, i)
 		dma_unmap_page(&pdev->dev, hinic_sge_to_dma(&sges[i + 1]),
 			       sges[i + 1].len, DMA_TO_DEVICE);
 

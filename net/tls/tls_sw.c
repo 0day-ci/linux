@@ -63,7 +63,7 @@ static int __skb_nsg(struct sk_buff *skb, int offset, int len,
                 offset += chunk;
         }
 
-        for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+        skb_for_each_frag(skb, i) {
                 int end;
 
                 WARN_ON(start > offset + len);

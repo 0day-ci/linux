@@ -551,7 +551,7 @@ static int gve_tx_add_skb_no_copy(struct gve_priv *priv, struct gve_tx_ring *tx,
 				     1 + payload_nfrags, hlen, addr);
 	}
 
-	for (i = 0; i < shinfo->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &shinfo->frags[i];
 
 		idx = (idx + 1) & tx->mask;

@@ -544,7 +544,7 @@ static int iwl_txq_gen2_tx_add_frags(struct iwl_trans *trans,
 {
 	int i;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		dma_addr_t tb_phys;
 		unsigned int fragsz = skb_frag_size(frag);

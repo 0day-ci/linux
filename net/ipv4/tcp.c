@@ -4357,7 +4357,7 @@ int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 	if (crypto_ahash_update(req))
 		return 1;
 
-	for (i = 0; i < shi->nr_frags; ++i) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *f = &shi->frags[i];
 		unsigned int offset = skb_frag_off(f);
 		struct page *page = skb_frag_page(f) + (offset >> PAGE_SHIFT);

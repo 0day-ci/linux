@@ -317,7 +317,7 @@ u32 fcoe_fc_crc(struct fc_frame *fp)
 
 	crc = crc32(~0, skb->data, skb_headlen(skb));
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 		off = skb_frag_off(frag);
 		len = skb_frag_size(frag);

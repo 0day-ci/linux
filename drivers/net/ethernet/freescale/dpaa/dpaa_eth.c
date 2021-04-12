@@ -2119,7 +2119,7 @@ static int dpaa_a050385_wa_skb(struct net_device *net_dev, struct sk_buff **s)
 	if (!IS_ALIGNED(skb_headlen(skb), DPAA_A050385_ALIGN))
 		goto workaround;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		/* all fragments need to have aligned start addresses */

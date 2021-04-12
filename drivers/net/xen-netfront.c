@@ -744,7 +744,7 @@ static netdev_tx_t xennet_start_xmit(struct sk_buff *skb, struct net_device *dev
 	tx = xennet_make_txreqs(queue, tx, skb, page, offset, len);
 
 	/* Requests for all the frags. */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		tx = xennet_make_txreqs(queue, tx, skb, skb_frag_page(frag),
 					skb_frag_off(frag),

@@ -3939,7 +3939,7 @@ static int qeth_get_elements_for_frags(struct sk_buff *skb)
 {
 	int cnt, elements = 0;
 
-	for (cnt = 0; cnt < skb_shinfo(skb)->nr_frags; cnt++) {
+	skb_for_each_frag(skb, cnt) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[cnt];
 
 		elements += qeth_get_elements_for_range(
@@ -4152,7 +4152,7 @@ static unsigned int qeth_fill_buffer(struct qeth_qdio_out_buffer *buf,
 	}
 
 	/* map page frags into buffer element(s) */
-	for (cnt = 0; cnt < skb_shinfo(skb)->nr_frags; cnt++) {
+	skb_for_each_frag(skb, cnt) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[cnt];
 
 		data = skb_frag_address(frag);

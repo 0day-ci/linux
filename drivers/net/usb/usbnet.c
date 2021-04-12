@@ -1321,7 +1321,7 @@ static int build_dma_sg(const struct sk_buff *skb, struct urb *urb)
 	sg_set_buf(&urb->sg[s++], skb->data, skb_headlen(skb));
 	total_len += skb_headlen(skb);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
 
 		total_len += skb_frag_size(f);

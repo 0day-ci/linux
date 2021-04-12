@@ -2165,7 +2165,7 @@ static inline int igbvf_tx_map_adv(struct igbvf_adapter *adapter,
 	if (dma_mapping_error(&pdev->dev, buffer_info->dma))
 		goto dma_error;
 
-	for (f = 0; f < skb_shinfo(skb)->nr_frags; f++) {
+	skb_for_each_frag(skb, f) {
 		const skb_frag_t *frag;
 
 		count++;

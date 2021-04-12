@@ -1199,7 +1199,7 @@ static void sky2_rx_submit(struct sky2_port *sky2,
 
 	sky2_rx_add(sky2, OP_PACKET, re->data_addr, sky2->rx_data_size);
 
-	for (i = 0; i < skb_shinfo(re->skb)->nr_frags; i++)
+	skb_for_each_frag(re->skb, i)
 		sky2_rx_add(sky2, OP_BUFFER, re->frag_addr[i], PAGE_SIZE);
 }
 
@@ -1217,7 +1217,7 @@ static int sky2_rx_map_skb(struct pci_dev *pdev, struct rx_ring_info *re,
 
 	dma_unmap_len_set(re, data_size, size);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		re->frag_addr[i] = skb_frag_dma_map(&pdev->dev, frag, 0,
@@ -1254,7 +1254,7 @@ static void sky2_rx_unmap_skb(struct pci_dev *pdev, struct rx_ring_info *re)
 	dma_unmap_single(&pdev->dev, re->data_addr,
 			 dma_unmap_len(re, data_size), DMA_FROM_DEVICE);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+	skb_for_each_frag(skb, i)
 		dma_unmap_page(&pdev->dev, re->frag_addr[i],
 			       skb_frag_size(&skb_shinfo(skb)->frags[i]),
 			       DMA_FROM_DEVICE);
@@ -1932,7 +1932,7 @@ static netdev_tx_t sky2_xmit_frame(struct sk_buff *skb,
 	le->opcode = mss ? (OP_LARGESEND | HW_OWNER) : (OP_PACKET | HW_OWNER);
 
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		mapping = skb_frag_dma_map(&hw->pdev->dev, frag, 0,

@@ -177,7 +177,7 @@ static void xlgmac_prep_tx_pkt(struct xlgmac_pdata *pdata,
 		len -= min_t(unsigned int, len, XLGMAC_TX_MAX_BUF_SIZE);
 	}
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 		for (len = skb_frag_size(frag); len; ) {
 			pkt_info->desc_count++;

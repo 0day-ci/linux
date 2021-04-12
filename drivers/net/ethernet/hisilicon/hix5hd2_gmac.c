@@ -577,7 +577,7 @@ static void hix5hd2_clean_sg_desc(struct hix5hd2_priv *priv,
 	len = le32_to_cpu(desc->linear_len);
 	dma_unmap_single(priv->dev, addr, len, DMA_TO_DEVICE);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		addr = le32_to_cpu(desc->frags[i].addr);
 		len = le32_to_cpu(desc->frags[i].size);
 		dma_unmap_page(priv->dev, addr, len, DMA_TO_DEVICE);
@@ -717,7 +717,7 @@ static int hix5hd2_fill_sg_desc(struct hix5hd2_priv *priv,
 	desc->linear_addr = cpu_to_le32(addr);
 	desc->linear_len = cpu_to_le32(skb_headlen(skb));
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 		int len = skb_frag_size(frag);
 

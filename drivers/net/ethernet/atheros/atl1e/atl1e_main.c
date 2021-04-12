@@ -1601,7 +1601,7 @@ static u16 atl1e_cal_tdp_req(const struct sk_buff *skb)
 	u16 fg_size = 0;
 	u16 proto_hdr_len = 0;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		fg_size = skb_frag_size(&skb_shinfo(skb)->frags[i]);
 		tpd_req += ((fg_size + MAX_TX_BUF_LEN - 1) >> MAX_TX_BUF_SHIFT);
 	}

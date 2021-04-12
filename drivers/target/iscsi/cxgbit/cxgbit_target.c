@@ -1384,7 +1384,7 @@ static void cxgbit_lro_skb_dump(struct sk_buff *skb)
 			"frags %u.\n",
 			skb, i, pdu_cb->pdulen, pdu_cb->flags, pdu_cb->seq,
 			pdu_cb->ddigest, pdu_cb->frags);
-	for (i = 0; i < ssi->nr_frags; i++)
+	skb_for_each_frag(skb, i)
 		pr_info("skb 0x%p, frag %d, off %u, sz %u.\n",
 			skb, i, skb_frag_off(&ssi->frags[i]),
 			skb_frag_size(&ssi->frags[i]));
@@ -1397,7 +1397,7 @@ static void cxgbit_lro_hskb_reset(struct cxgbit_sock *csk)
 	u8 i;
 
 	memset(skb->data, 0, LRO_SKB_MIN_HEADROOM);
-	for (i = 0; i < ssi->nr_frags; i++)
+	skb_for_each_frag(skb, i)
 		put_page(skb_frag_page(&ssi->frags[i]));
 	ssi->nr_frags = 0;
 	skb->data_len = 0;

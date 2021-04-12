@@ -269,7 +269,7 @@ int cvm_oct_xmit(struct sk_buff *skb, struct net_device *dev)
 		hw_buffer.s.pool = 0;
 		hw_buffer.s.size = skb_headlen(skb);
 		CVM_OCT_SKB_CB(skb)[0] = hw_buffer.u64;
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			skb_frag_t *fs = skb_shinfo(skb)->frags + i;
 
 			hw_buffer.s.addr =

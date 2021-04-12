@@ -4001,7 +4001,7 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 	struct skb_shared_info *info = skb_shinfo(skb);
 	unsigned int cur_frag;
 
-	for (cur_frag = 0; cur_frag < info->nr_frags; cur_frag++) {
+	skb_for_each_frag(skb, cur_frag) {
 		const skb_frag_t *frag = info->frags + cur_frag;
 		void *addr = skb_frag_address(frag);
 		u32 len = skb_frag_size(frag);

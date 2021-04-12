@@ -2556,7 +2556,7 @@ he_send(struct atm_vcc *vcc, struct sk_buff *skb)
 	tpd->iovec[slot].len = skb_headlen(skb);
 	++slot;
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 		if (slot == TPD_MAXIOV) {	/* queue tpd; start new tpd */

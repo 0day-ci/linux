@@ -1106,8 +1106,7 @@ static void free_skb_tx_queue(struct gfar_priv_tx_q *tx_queue)
 		dma_unmap_single(priv->dev, be32_to_cpu(txbdp->bufPtr),
 				 be16_to_cpu(txbdp->length), DMA_TO_DEVICE);
 		txbdp->lstatus = 0;
-		for (j = 0; j < skb_shinfo(tx_queue->tx_skbuff[i])->nr_frags;
-		     j++) {
+		skb_for_each_frag(tx_queue->tx_skbuff[i], j) {
 			txbdp++;
 			dma_unmap_page(priv->dev, be32_to_cpu(txbdp->bufPtr),
 				       be16_to_cpu(txbdp->length),

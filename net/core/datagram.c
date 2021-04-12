@@ -432,7 +432,7 @@ static int __skb_datagram_iter(const struct sk_buff *skb, int offset,
 	}
 
 	/* Copy paged appendix. Hmm... why does this look so complicated? */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		int end;
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
@@ -564,7 +564,7 @@ int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
 	}
 
 	/* Copy paged appendix. Hmm... why does this look so complicated? */
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		int end;
 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 

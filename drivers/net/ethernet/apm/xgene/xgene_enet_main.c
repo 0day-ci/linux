@@ -244,7 +244,7 @@ static int xgene_enet_tx_completion(struct xgene_enet_desc_ring *cp_ring,
 			 skb_headlen(skb),
 			 DMA_TO_DEVICE);
 
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+	skb_for_each_frag(skb, i) {
 		frag = &skb_shinfo(skb)->frags[i];
 		dma_unmap_page(dev, frag_dma_addr[i], skb_frag_size(frag),
 			       DMA_TO_DEVICE);

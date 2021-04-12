@@ -1054,7 +1054,7 @@ static netdev_tx_t gem_start_xmit(struct sk_buff *skb,
 					     first_len, DMA_TO_DEVICE);
 		entry = NEXT_TX(entry);
 
-		for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
+		skb_for_each_frag(skb, frag) {
 			const skb_frag_t *this_frag = &skb_shinfo(skb)->frags[frag];
 			u32 len;
 			dma_addr_t mapping;

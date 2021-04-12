@@ -2453,7 +2453,7 @@ restart:
 
 		idx = (idx + 1) % ACE_TX_RING_ENTRIES(ap);
 
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_for_each_frag(skb, i) {
 			const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 			struct tx_ring_info *info;
 
