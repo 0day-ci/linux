@@ -505,6 +505,7 @@ static int as3645a_parse_node(struct as3645a *flash,
 			break;
 		}
 	}
+	fwnode_handle_put(fwnode);
 
 	if (!flash->flash_node) {
 		dev_err(&flash->client->dev, "can't find flash node\n");
