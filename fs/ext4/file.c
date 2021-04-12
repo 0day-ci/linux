@@ -369,7 +369,8 @@ truncate:
 }
 
 static int ext4_dio_write_end_io(struct kiocb *iocb, ssize_t size,
-				 int error, unsigned int flags)
+				 ssize_t orig_size, int error,
+				 unsigned int flags)
 {
 	loff_t offset = iocb->ki_pos;
 	struct inode *inode = file_inode(iocb->ki_filp);

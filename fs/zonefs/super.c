@@ -652,7 +652,8 @@ static loff_t zonefs_file_llseek(struct file *file, loff_t offset, int whence)
 }
 
 static int zonefs_file_write_dio_end_io(struct kiocb *iocb, ssize_t size,
-					int error, unsigned int flags)
+					ssize_t orig_size, int error,
+					unsigned int flags)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct zonefs_inode_info *zi = ZONEFS_I(inode);

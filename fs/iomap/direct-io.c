@@ -28,6 +28,7 @@ struct iomap_dio {
 	const struct iomap_dio_ops *dops;
 	loff_t			i_size;
 	loff_t			size;
+	loff_t			orig_size;
 	atomic_t		ref;
 	unsigned		flags;
 	int			error;
@@ -85,7 +86,8 @@ ssize_t iomap_dio_complete(struct iomap_dio *dio)
 	ssize_t ret = dio->error;
 
 	if (dops && dops->end_io)
-		ret = dops->end_io(iocb, dio->size, ret, dio->flags);
+		ret = dops->end_io(iocb, dio->size, dio->orig_size, ret,
+				   dio->flags);
 
 	if (likely(!ret)) {
 		ret = dio->size;
@@ -473,6 +475,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	dio->iocb = iocb;
 	atomic_set(&dio->ref, 1);
 	dio->size = 0;
+	dio->orig_size = count;
 	dio->i_size = i_size_read(inode);
 	dio->dops = dops;
 	dio->error = 0;

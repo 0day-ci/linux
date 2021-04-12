@@ -442,6 +442,7 @@ static int
 xfs_dio_write_end_io(
 	struct kiocb		*iocb,
 	ssize_t			size,
+	ssize_t			orig_size,
 	int			error,
 	unsigned		flags)
 {

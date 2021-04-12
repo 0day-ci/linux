@@ -252,8 +252,8 @@ int iomap_writepages(struct address_space *mapping,
 #define IOMAP_DIO_COW		(1 << 1)	/* covers COW extent(s) */
 
 struct iomap_dio_ops {
-	int (*end_io)(struct kiocb *iocb, ssize_t size, int error,
-		      unsigned flags);
+	int (*end_io)(struct kiocb *iocb, ssize_t size, ssize_t orig_size,
+		      int error, unsigned flags);
 	blk_qc_t (*submit_io)(struct inode *inode, struct iomap *iomap,
 			struct bio *bio, loff_t file_offset);
 };
