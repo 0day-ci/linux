@@ -12,6 +12,7 @@ How to write kernel documentation
    parse-headers
    contributing
    maintainer-profile
+   trslt
 
 .. only::  subproject and html
 
