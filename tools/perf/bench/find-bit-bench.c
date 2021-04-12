@@ -120,7 +120,7 @@ static int do_for_each_set_bit(unsigned int num_bits)
 
 int bench_mem_find_bit(int argc, const char **argv)
 {
-	int err = 0, i;
+	int i;
 
 	argc = parse_options(argc, argv, options, bench_usage, 0);
 	if (argc) {
@@ -131,5 +131,5 @@ int bench_mem_find_bit(int argc, const char **argv)
 	for (i = 1; i <= 2048; i <<= 1)
 		do_for_each_set_bit(i);
 
-	return err;
+	return 0;
 }
