@@ -121,6 +121,7 @@ extern int unregister_oom_notifier(struct notifier_block *nb);
 extern bool oom_killer_disable(signed long timeout);
 extern void oom_killer_enable(void);
 
+extern int oom_evaluate_task(struct task_struct *task, void *arg);
 extern struct task_struct *find_lock_task_mm(struct task_struct *p);
 
 /* sysctls */

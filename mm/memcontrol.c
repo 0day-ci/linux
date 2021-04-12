@@ -1284,8 +1284,6 @@ int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
 	struct mem_cgroup *iter;
 	int ret = 0;
 
-	BUG_ON(memcg == root_mem_cgroup);
-
 	for_each_mem_cgroup_tree(iter, memcg) {
 		struct css_task_iter it;
 		struct task_struct *task;
@@ -1300,6 +1298,73 @@ int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
 		}
 	}
 	return ret;
+}
+
+int mem_cgroup_select_victim(struct cgroup_subsys_state *css, struct oom_control *oc)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+	int ret = 0;
+
+	css_task_iter_start(css, CSS_TASK_ITER_PROCS, &it);
+	while (!ret && (task = css_task_iter_next(&it)))
+		ret = oom_evaluate_task(task, oc);
+	css_task_iter_end(&it);
+
+	return ret;
+}
+
+void mem_cgroup_priority_select_task(struct oom_control *oc)
+{
+	struct cgroup_subsys_state *chosen = NULL;
+	struct mem_cgroup *memcg, *chosen_memcg, *iter;
+	int chosen_priority = -1;
+	int ret = 0;
+
+	memcg = oc->memcg;
+	if (!memcg)
+		memcg = root_mem_cgroup;
+
+	for_each_mem_cgroup_tree(iter, memcg) {
+		struct cgroup_subsys_state *css = &iter->css;
+		int prio = cgroup_priority(css);
+
+		if (prio < chosen_priority)
+			continue;
+
+		else if (prio > chosen_priority || !chosen) {
+			chosen_priority = prio;
+			chosen_memcg = iter;
+			chosen = css;
+		} else {
+			/* equal priority check memory usage */
+			if (do_memsw_account()) {
+				if (page_counter_read(&iter->memsw) <=
+					page_counter_read(&chosen_memcg->memsw))
+					continue;
+			} else if (page_counter_read(&iter->memory) <=
+				page_counter_read(&chosen_memcg->memory))
+				continue;
+			chosen = css;
+		}
+		ret = mem_cgroup_select_victim(chosen, oc);
+		if (!ret && oc->chosen)
+			chosen_memcg = iter;
+	}
+}
+
+void mem_cgroup_oom_select_bad_process(struct oom_control *oc)
+{
+	struct mem_cgroup *memcg;
+
+	memcg = oc->memcg;
+	if (!memcg)
+		memcg = root_mem_cgroup;
+
+	if (memcg->use_priority_oom)
+		mem_cgroup_priority_select_task(oc);
+	else
+		mem_cgroup_scan_tasks(memcg, oom_evaluate_task, oc);
 }
 
 #ifdef CONFIG_DEBUG_VM
@@ -3544,6 +3609,26 @@ static int mem_cgroup_hierarchy_write(struct cgroup_subsys_state *css,
 	return -EINVAL;
 }
 
+static u64 mem_cgroup_priority_oom_read(struct cgroup_subsys_state *css,
+					struct cftype *cft)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	return memcg->use_priority_oom;
+}
+
+static int mem_cgroup_priority_oom_write(struct cgroup_subsys_state *css,
+					struct cftype *cft, u64 val)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	if (val > 1)
+		return -EINVAL;
+
+	memcg->use_priority_oom = val;
+	return 0;
+}
+
 static unsigned long mem_cgroup_usage(struct mem_cgroup *memcg, bool swap)
 {
 	unsigned long val;
@@ -4990,6 +5075,11 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.name = "use_hierarchy",
 		.write_u64 = mem_cgroup_hierarchy_write,
 		.read_u64 = mem_cgroup_hierarchy_read,
+	},
+	{
+		.name = "use_priority_oom",
+		.write_u64 = mem_cgroup_priority_oom_write,
+		.read_u64 = mem_cgroup_priority_oom_read,
 	},
 	{
 		.name = "cgroup.event_control",		/* XXX: for compat */
@@ -6462,6 +6552,11 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_max_show,
 		.write = memory_max_write,
+	},
+	{
+		.name = "use_priority_oom",
+		.write_u64 = mem_cgroup_priority_oom_write,
+		.read_u64 = mem_cgroup_priority_oom_read,
 	},
 	{
 		.name = "events",

@@ -27,6 +27,7 @@ struct obj_cgroup;
 struct page;
 struct mm_struct;
 struct kmem_cache;
+struct oom_control;
 
 /* Cgroup-specific page state, on top of universal node page state */
 enum memcg_stat_item {
@@ -252,6 +253,9 @@ struct mem_cgroup {
 	/* protected by memcg_oom_lock */
 	bool		oom_lock;
 	int		under_oom;
+
+	/* memcg priority */
+	bool use_priority_oom;
 
 	int	swappiness;
 	/* OOM-Killer disable */
@@ -813,6 +817,24 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 }
 
 /*
+ * memcg priority
+ */
+void mem_cgroup_select_bad_process(struct oom_control *oc);
+
+void mem_cgroup_oom_select_bad_process(struct oom_control *oc);
+
+static inline bool root_memcg_use_priority_oom(void)
+{
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (root_mem_cgroup->use_priority_oom)
+		return true;
+
+	return false;
+}
+
+/*
  * For memory reclaim.
  */
 int mem_cgroup_select_victim_node(struct mem_cgroup *memcg);
@@ -1260,6 +1282,22 @@ static inline struct mem_cgroup *lruvec_memcg(struct lruvec *lruvec)
 static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 {
 	return true;
+}
+
+/*
+ * memcg priority
+ */
+static inline void mem_cgroup_select_bad_process(struct oom_control *oc)
+{
+}
+
+static inline void mem_cgroup_oom_select_bad_process(struct oom_control *oc)
+{
+}
+
+static inline bool root_memcg_use_priority_oom(void)
+{
+	return false;
 }
 
 static inline
