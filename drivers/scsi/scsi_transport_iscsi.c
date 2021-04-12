@@ -93,7 +93,7 @@ static void stop_conn_work_fn(struct work_struct *work);
 static DECLARE_WORK(stop_conn_work, stop_conn_work_fn);
 
 static atomic_t iscsi_session_nr; /* sysfs session id for next new session */
-static struct workqueue_struct *iscsi_eh_timer_workq;
+static struct workqueue_struct *iscsi_mgmt_workq;
 
 static struct workqueue_struct *iscsi_destroy_workq;
 
@@ -1976,7 +1976,7 @@ static void __iscsi_unblock_session(struct work_struct *work)
  */
 void iscsi_unblock_session(struct iscsi_cls_session *session)
 {
-	queue_work(iscsi_eh_timer_workq, &session->unblock_work);
+	queue_work(iscsi_mgmt_workq, &session->unblock_work);
 	/*
 	 * Blocking the session can be done from any context so we only
 	 * queue the block work. Make sure the unblock work has completed
@@ -2000,14 +2000,14 @@ static void __iscsi_block_session(struct work_struct *work)
 	scsi_target_block(&session->dev);
 	ISCSI_DBG_TRANS_SESSION(session, "Completed SCSI target blocking\n");
 	if (session->recovery_tmo >= 0)
-		queue_delayed_work(iscsi_eh_timer_workq,
+		queue_delayed_work(iscsi_mgmt_workq,
 				   &session->recovery_work,
 				   session->recovery_tmo * HZ);
 }
 
 void iscsi_block_session(struct iscsi_cls_session *session)
 {
-	queue_work(iscsi_eh_timer_workq, &session->block_work);
+	queue_work(iscsi_mgmt_workq, &session->block_work);
 }
 EXPORT_SYMBOL_GPL(iscsi_block_session);
 
@@ -4802,10 +4802,10 @@ static __init int iscsi_transport_init(void)
 		goto unregister_flashnode_bus;
 	}
 
-	iscsi_eh_timer_workq = alloc_workqueue("%s",
+	iscsi_mgmt_workq = alloc_workqueue("%s",
 			WQ_SYSFS | __WQ_LEGACY | WQ_MEM_RECLAIM | WQ_UNBOUND,
-			1, "iscsi_eh");
-	if (!iscsi_eh_timer_workq) {
+			0, "iscsi_mgmt");
+	if (!iscsi_mgmt_workq) {
 		err = -ENOMEM;
 		goto release_nls;
 	}
@@ -4821,7 +4821,7 @@ static __init int iscsi_transport_init(void)
 	return 0;
 
 destroy_wq:
-	destroy_workqueue(iscsi_eh_timer_workq);
+	destroy_workqueue(iscsi_mgmt_workq);
 release_nls:
 	netlink_kernel_release(nls);
 unregister_flashnode_bus:
@@ -4844,7 +4844,7 @@ unregister_transport_class:
 static void __exit iscsi_transport_exit(void)
 {
 	destroy_workqueue(iscsi_destroy_workq);
-	destroy_workqueue(iscsi_eh_timer_workq);
+	destroy_workqueue(iscsi_mgmt_workq);
 	netlink_kernel_release(nls);
 	bus_unregister(&iscsi_flashnode_bus);
 	transport_class_unregister(&iscsi_connection_class);
