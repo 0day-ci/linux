@@ -599,6 +599,7 @@ ieee802154_setup_sdata(struct ieee802154_sub_if_data *sdata,
 
 		break;
 	case NL802154_IFTYPE_MONITOR:
+		mutex_init(&sdata->sec_mtx);
 		sdata->dev->needs_free_netdev = true;
 		sdata->dev->netdev_ops = &mac802154_monitor_ops;
 		wpan_dev->promiscuous_mode = true;
