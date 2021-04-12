@@ -1230,7 +1230,7 @@ static __always_inline bool free_pages_prepare(struct page *page,
 		 * Untie memcg state and reset page's owner
 		 */
 		if (memcg_kmem_enabled() && PageMemcgKmem(page))
-			__memcg_kmem_uncharge_page(page, order);
+			__memcg_kmem_uncharge_page(page, order, NULL);
 		reset_page_owner(page, order);
 		return false;
 	}
@@ -1260,7 +1260,7 @@ static __always_inline bool free_pages_prepare(struct page *page,
 	if (PageMappingFlags(page))
 		page->mapping = NULL;
 	if (memcg_kmem_enabled() && PageMemcgKmem(page))
-		__memcg_kmem_uncharge_page(page, order);
+		__memcg_kmem_uncharge_page(page, order, NULL);
 	if (check_free)
 		bad += check_free_page(page);
 	if (bad)
@@ -4976,6 +4976,8 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = { };
+	struct mem_cgroup *memcg;
+	bool charged = false;
 
 	/*
 	 * There are several places where we assume that the order value is sane
@@ -4987,6 +4989,15 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	}
 
 	gfp_mask &= gfp_allowed_mask;
+	memcg = get_mem_cgroup_from_current();
+	if (memcg && memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) &&
+	    !mem_cgroup_is_root(memcg)) {
+		if (unlikely(__memcg_kmem_charge_page(memcg, gfp_mask, order) != 0)) {
+			css_put(&memcg->css);
+			return NULL;
+		}
+		charged = true;
+	}
 	alloc_mask = gfp_mask;
 	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
 		return NULL;
@@ -5020,11 +5031,10 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 	page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 
 out:
-	if (memcg_kmem_enabled() && (gfp_mask & __GFP_ACCOUNT) && page &&
-	    unlikely(__memcg_kmem_charge_page(page, gfp_mask, order) != 0)) {
-		__free_pages(page, order);
-		page = NULL;
-	}
+	if (page && charged)
+		page->memcg_data = (unsigned long)memcg | MEMCG_DATA_KMEM;
+	else if (charged)
+		__memcg_kmem_uncharge_page(NULL, order, memcg);
 
 	trace_mm_page_alloc(page, order, alloc_mask, ac.migratetype);
 

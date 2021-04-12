@@ -1583,8 +1583,9 @@ static inline void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
 #endif
 
 #ifdef CONFIG_MEMCG_KMEM
-int __memcg_kmem_charge_page(struct page *page, gfp_t gfp, int order);
-void __memcg_kmem_uncharge_page(struct page *page, int order);
+int __memcg_kmem_charge_page(struct mem_cgroup *memcg, gfp_t gfp, int order);
+void __memcg_kmem_uncharge_page(struct page *page, int order,
+				struct mem_cgroup *memcg);
 
 struct obj_cgroup *get_obj_cgroup_from_current(void);
 
@@ -1610,18 +1611,30 @@ static inline bool memcg_kmem_enabled(void)
 	return static_branch_likely(&memcg_kmem_enabled_key);
 }
 
+extern struct mem_cgroup *get_mem_cgroup_from_current(void);
+
 static inline int memcg_kmem_charge_page(struct page *page, gfp_t gfp,
 					 int order)
 {
-	if (memcg_kmem_enabled())
-		return __memcg_kmem_charge_page(page, gfp, order);
-	return 0;
+	struct mem_cgroup *memcg;
+	int ret = 0;
+
+	memcg = get_mem_cgroup_from_current();
+	if (memcg && memcg_kmem_enabled() && !mem_cgroup_is_root(memcg)) {
+		ret = __memcg_kmem_charge_page(memcg, gfp, order);
+		if (!ret) {
+			page->memcg_data = (unsigned long)memcg | MEMCG_DATA_KMEM;
+			return 0;
+		}
+		css_put(&memcg->css);
+	}
+	return ret;
 }
 
 static inline void memcg_kmem_uncharge_page(struct page *page, int order)
 {
 	if (memcg_kmem_enabled())
-		__memcg_kmem_uncharge_page(page, order);
+		__memcg_kmem_uncharge_page(page, order, NULL);
 }
 
 /*
@@ -1647,13 +1660,14 @@ static inline void memcg_kmem_uncharge_page(struct page *page, int order)
 {
 }
 
-static inline int __memcg_kmem_charge_page(struct page *page, gfp_t gfp,
+static inline int __memcg_kmem_charge_page(struct mem_cgroup *memcg, gfp_t gfp,
 					   int order)
 {
 	return 0;
 }
 
-static inline void __memcg_kmem_uncharge_page(struct page *page, int order)
+static inline void __memcg_kmem_uncharge_page(struct page *page, int order,
+					    struct mem_cgroup *memcg)
 {
 }
 

@@ -1085,7 +1085,7 @@ static __always_inline bool memcg_kmem_bypass(void)
 /**
  * If active memcg is set, do not fallback to current->mm->memcg.
  */
-static __always_inline struct mem_cgroup *get_mem_cgroup_from_current(void)
+struct mem_cgroup *get_mem_cgroup_from_current(void)
 {
 	if (memcg_kmem_bypass())
 		return NULL;
@@ -3113,21 +3113,11 @@ static void __memcg_kmem_uncharge(struct mem_cgroup *memcg, unsigned int nr_page
  *
  * Returns 0 on success, an error code on failure.
  */
-int __memcg_kmem_charge_page(struct page *page, gfp_t gfp, int order)
+int __memcg_kmem_charge_page(struct mem_cgroup *memcg, gfp_t gfp, int order)
 {
-	struct mem_cgroup *memcg;
-	int ret = 0;
+	int ret;
 
-	memcg = get_mem_cgroup_from_current();
-	if (memcg && !mem_cgroup_is_root(memcg)) {
-		ret = __memcg_kmem_charge(memcg, gfp, 1 << order);
-		if (!ret) {
-			page->memcg_data = (unsigned long)memcg |
-				MEMCG_DATA_KMEM;
-			return 0;
-		}
-		css_put(&memcg->css);
-	}
+	ret = __memcg_kmem_charge(memcg, gfp, 1 << order);
 	return ret;
 }
 
@@ -3136,17 +3126,25 @@ int __memcg_kmem_charge_page(struct page *page, gfp_t gfp, int order)
  * @page: page to uncharge
  * @order: allocation order
  */
-void __memcg_kmem_uncharge_page(struct page *page, int order)
+void __memcg_kmem_uncharge_page(struct page *page, int order,
+		struct mem_cgroup *memcg_in)
 {
-	struct mem_cgroup *memcg = page_memcg(page);
+	struct mem_cgroup *memcg;
 	unsigned int nr_pages = 1 << order;
+
+	if (page)
+		memcg = page_memcg(page);
+	else
+		memcg = memcg_in;
 
 	if (!memcg)
 		return;
 
-	VM_BUG_ON_PAGE(mem_cgroup_is_root(memcg), page);
+	if (page)
+		VM_BUG_ON_PAGE(mem_cgroup_is_root(memcg), page);
 	__memcg_kmem_uncharge(memcg, nr_pages);
-	page->memcg_data = 0;
+	if (page)
+		page->memcg_data = 0;
 	css_put(&memcg->css);
 }
 
