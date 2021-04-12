@@ -1228,7 +1228,7 @@ static int memory_failure_hugetlb(unsigned long pfn, int flags)
 	if (TestSetPageHWPoison(head)) {
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 		       pfn);
-		return 0;
+		return -EHWPOISON;
 	}
 
 	num_poisoned_pages_inc();
@@ -1438,7 +1438,7 @@ try_again:
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 			pfn);
 		mutex_unlock(&mf_mutex);
-		return 0;
+		return -EHWPOISON;
 	}
 
 	orig_head = hpage = compound_head(p);
