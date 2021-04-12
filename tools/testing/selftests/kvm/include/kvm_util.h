@@ -43,6 +43,7 @@ enum vm_guest_mode {
 	VM_MODE_P40V48_4K,
 	VM_MODE_P40V48_64K,
 	VM_MODE_PXXV48_4K,	/* For 48bits VA but ANY bits PA */
+	VM_MODE_P51V52_64K,	/* ???: include/asm/book3s/64/pgtable.h says P53 */
 	NUM_VM_MODES,
 };
 
@@ -63,6 +64,12 @@ enum vm_guest_mode {
 #define VM_MODE_DEFAULT			VM_MODE_P52V48_4K
 #define MIN_PAGE_SHIFT			12U
 #define ptes_per_page(page_size)	((page_size) / 16)
+
+#elif defined(__powerpc__)
+
+#define VM_MODE_DEFAULT			VM_MODE_P51V52_64K
+#define MIN_PAGE_SHIFT			16U
+#define ptes_per_page(page_size)	((page_size) / 8)
 
 #endif
 
