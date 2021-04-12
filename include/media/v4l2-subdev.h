@@ -148,9 +148,18 @@ struct v4l2_subdev_io_pin_config {
  *	each pin being configured.  This function could be called at times
  *	other than just subdevice initialization.
  *
- * @init: initialize the sensor registers to some sort of reasonable default
- *	values. Do not use for new drivers and should be removed in existing
- *	drivers.
+ * @init: initialize the subdevice registers to some sort of reasonable default
+ *	values. Do not use for new drivers (and should be removed in existing
+ *	ones) for regular architectures where the image sensor is connected to
+ *	the host receiver. For more complex architectures where the subdevice
+ *	initialization should be deferred to the completion of the probe
+ *	sequence of some intermediate component, or the communication bus
+ *	requires configurations on the host side that depend on the completion
+ *	of the probe sequence of the remote subdevices, the usage of this
+ *	operation could be considered to allow the devices along the pipeline to
+ *	probe and register in the media graph and to defer any operation that
+ *	require actual access to the communication bus to their init() function
+ *	implementation.
  *
  * @load_fw: load firmware.
  *
