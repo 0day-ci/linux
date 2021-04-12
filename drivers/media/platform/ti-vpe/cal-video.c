@@ -864,14 +864,16 @@ static int cal_ctx_v4l2_init_formats(struct cal_ctx *ctx)
 	return 0;
 }
 
-int cal_ctx_v4l2_register(struct cal_ctx *ctx)
+void cal_ctx_v4l2_register(struct cal_ctx *ctx)
 {
 	struct video_device *vfd = &ctx->vdev;
 	int ret;
 
 	ret = cal_ctx_v4l2_init_formats(ctx);
-	if (ret)
-		return ret;
+	if (ret) {
+		ctx_err(ctx, "Failed to init formats: %d\n", ret);
+		return;
+	}
 
 	if (!cal_mc_api) {
 		struct v4l2_ctrl_handler *hdl = &ctx->ctrl_handler;
@@ -880,14 +882,14 @@ int cal_ctx_v4l2_register(struct cal_ctx *ctx)
 					    NULL, true);
 		if (ret < 0) {
 			ctx_err(ctx, "Failed to add source ctrl handler\n");
-			return ret;
+			return;
 		}
 	}
 
 	ret = video_register_device(vfd, VFL_TYPE_VIDEO, cal_video_nr);
 	if (ret < 0) {
 		ctx_err(ctx, "Failed to register video device\n");
-		return ret;
+		return;
 	}
 
 	ret = media_create_pad_link(&ctx->phy->subdev.entity,
@@ -899,13 +901,11 @@ int cal_ctx_v4l2_register(struct cal_ctx *ctx)
 		ctx_err(ctx, "Failed to create media link for context %u\n",
 			ctx->dma_ctx);
 		video_unregister_device(vfd);
-		return ret;
+		return;
 	}
 
 	ctx_info(ctx, "V4L2 device registered as %s\n",
 		 video_device_node_name(vfd));
-
-	return 0;
 }
 
 void cal_ctx_v4l2_unregister(struct cal_ctx *ctx)

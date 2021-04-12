@@ -310,7 +310,7 @@ void cal_ctx_set_dma_addr(struct cal_ctx *ctx, dma_addr_t addr);
 void cal_ctx_start(struct cal_ctx *ctx);
 void cal_ctx_stop(struct cal_ctx *ctx);
 
-int cal_ctx_v4l2_register(struct cal_ctx *ctx);
+void cal_ctx_v4l2_register(struct cal_ctx *ctx);
 void cal_ctx_v4l2_unregister(struct cal_ctx *ctx);
 int cal_ctx_v4l2_init(struct cal_ctx *ctx);
 void cal_ctx_v4l2_cleanup(struct cal_ctx *ctx);
