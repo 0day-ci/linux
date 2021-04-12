@@ -604,6 +604,9 @@ struct hci_dev {
 	int (*set_bdaddr)(struct hci_dev *hdev, const bdaddr_t *bdaddr);
 	void (*cmd_timeout)(struct hci_dev *hdev);
 	bool (*prevent_wake)(struct hci_dev *hdev);
+#ifdef CONFIG_BT_FEATURE_VS_DBG_EVT
+	int (*set_vs_dbg_evt)(struct hci_dev *hdev, bool enable);
+#endif
 };
 
 #define HCI_PHY_HANDLE(handle)	(handle & 0xff)
@@ -751,12 +754,19 @@ extern struct mutex hci_cb_list_lock;
 #define hci_dev_test_and_clear_flag(hdev, nr)  test_and_clear_bit((nr), (hdev)->dev_flags)
 #define hci_dev_test_and_change_flag(hdev, nr) test_and_change_bit((nr), (hdev)->dev_flags)
 
+#ifdef CONFIG_BT_FEATURE_VS_DBG_EVT
+#define hci_dev_clear_flag_vs_dbg_evt(x) { hci_dev_clear_flag(hdev, x); }
+#else
+#define hci_dev_clear_flag_vs_dbg_evt(x) {}
+#endif
+
 #define hci_dev_clear_volatile_flags(hdev)			\
 	do {							\
 		hci_dev_clear_flag(hdev, HCI_LE_SCAN);		\
 		hci_dev_clear_flag(hdev, HCI_LE_ADV);		\
 		hci_dev_clear_flag(hdev, HCI_LL_RPA_RESOLUTION);\
 		hci_dev_clear_flag(hdev, HCI_PERIODIC_INQ);	\
+		hci_dev_clear_flag_vs_dbg_evt(HCI_VS_DBG_EVT)	\
 	} while (0)
 
 /* ----- HCI interface to upper protocols ----- */
