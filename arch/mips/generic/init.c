@@ -82,7 +82,7 @@ void __init *plat_get_fdt(void)
 	return (void *)fdt;
 }
 
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 
 void __init plat_fdt_relocated(void *new_location)
 {
@@ -97,7 +97,7 @@ void __init plat_fdt_relocated(void *new_location)
 		fw_arg1 = (unsigned long)new_location;
 }
 
-#endif /* CONFIG_RELOCATABLE */
+#endif /* CONFIG_RANDOMIZE_BASE */
 
 void __init plat_mem_setup(void)
 {

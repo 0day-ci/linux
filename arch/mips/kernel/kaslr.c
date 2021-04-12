@@ -188,8 +188,6 @@ static int __init relocate_exception_table(long offset)
 	return 0;
 }
 
-#ifdef CONFIG_RANDOMIZE_BASE
-
 static inline __init unsigned long rotate_xor(unsigned long hash,
 					      const void *area, size_t size)
 {
@@ -279,19 +277,6 @@ static inline void __init *determine_relocation_address(void)
 
 	return RELOCATED(dest);
 }
-
-#else
-
-static inline void __init *determine_relocation_address(void)
-{
-	/*
-	 * Choose a new address for the kernel
-	 * For now we'll hard code the destination
-	 */
-	return (void *)0xffffffff81000000;
-}
-
-#endif
 
 static inline int __init relocation_addr_valid(void *loc_new)
 {

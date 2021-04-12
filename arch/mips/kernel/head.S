@@ -118,7 +118,7 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	set_saved_sp	sp, t0, t1
 	PTR_SUBU	sp, 4 * SZREG		# init stack pointer
 
-#ifdef CONFIG_RELOCATABLE
+#ifdef CONFIG_RANDOMIZE_BASE
 	/* Copy kernel and apply the relocations */
 	jal		relocate_kernel
 
@@ -136,9 +136,9 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	 * newly sync'd icache.
 	 */
 	jr.hb		v0
-#else  /* !CONFIG_RELOCATABLE */
+#else  /* !CONFIG_RANDOMIZE_BASE */
 	j		start_kernel
-#endif /* !CONFIG_RELOCATABLE */
+#endif /* !CONFIG_RANDOMIZE_BASE */
 	END(kernel_entry)
 
 #ifdef CONFIG_SMP
