@@ -2089,7 +2089,7 @@ static int mlx5v_probe(struct auxiliary_device *adev,
 	return 0;
 
 reg_err:
-	kfree(mdev);
+	kfree(mgtdev);
 	return err;
 }
 
