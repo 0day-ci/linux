@@ -180,7 +180,8 @@ static int rcar_usb2_clock_sel_probe(struct platform_device *pdev)
 
 	if (!priv->extal && !priv->xtal) {
 		dev_err(dev, "This driver needs usb_extal or usb_xtal\n");
-		return -ENOENT;
+		ret = -ENOENT;
+		goto pm_put;
 	}
 
 	platform_set_drvdata(pdev, priv);
@@ -191,10 +192,23 @@ static int rcar_usb2_clock_sel_probe(struct platform_device *pdev)
 	priv->hw.init = &init;
 
 	clk = clk_register(NULL, &priv->hw);
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
+	if (IS_ERR(clk)) {
+		ret = PTR_ERR(clk);
+		goto pm_put;
+	}
 
-	return of_clk_add_hw_provider(np, of_clk_hw_simple_get, &priv->hw);
+	ret = of_clk_add_hw_provider(np, of_clk_hw_simple_get, &priv->hw);
+	if (ret)
+		goto clk_unregister;
+
+	return 0;
+
+clk_unregister:
+	clk_hw_unregister(&priv->hw);
+pm_put:
+	pm_runtime_put(dev);
+	pm_runtime_disable(dev);
+	return ret;
 }
 
 static const struct dev_pm_ops rcar_usb2_clock_sel_pm_ops = {
