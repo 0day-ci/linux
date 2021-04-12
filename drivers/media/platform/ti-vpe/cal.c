@@ -657,7 +657,7 @@ static irqreturn_t cal_irq(int irq_cal, void *data)
 		/* Clear Interrupt status */
 		cal_write(cal, CAL_HL_IRQSTATUS(1), status);
 
-		for (i = 0; i < ARRAY_SIZE(cal->ctx); ++i) {
+		for (i = 0; i < cal->num_contexts; ++i) {
 			if (status & CAL_HL_IRQ_WDMA_END_MASK(i))
 				cal_irq_wdma_end(cal->ctx[i]);
 		}
@@ -671,7 +671,7 @@ static irqreturn_t cal_irq(int irq_cal, void *data)
 		/* Clear Interrupt status */
 		cal_write(cal, CAL_HL_IRQSTATUS(2), status);
 
-		for (i = 0; i < ARRAY_SIZE(cal->ctx); ++i) {
+		for (i = 0; i < cal->num_contexts; ++i) {
 			if (status & CAL_HL_IRQ_WDMA_START_MASK(i))
 				cal_irq_wdma_start(cal->ctx[i]);
 		}
@@ -741,10 +741,8 @@ static int cal_async_notifier_complete(struct v4l2_async_notifier *notifier)
 	unsigned int i;
 	int ret = 0;
 
-	for (i = 0; i < ARRAY_SIZE(cal->ctx); ++i) {
-		if (cal->ctx[i])
-			cal_ctx_v4l2_register(cal->ctx[i]);
-	}
+	for (i = 0; i < cal->num_contexts; ++i)
+		cal_ctx_v4l2_register(cal->ctx[i]);
 
 	if (cal_mc_api)
 		ret = v4l2_device_register_subdev_nodes(&cal->v4l2_dev);
@@ -846,10 +844,8 @@ static void cal_media_unregister(struct cal_dev *cal)
 	unsigned int i;
 
 	/* Unregister all the V4L2 video devices. */
-	for (i = 0; i < ARRAY_SIZE(cal->ctx); i++) {
-		if (cal->ctx[i])
-			cal_ctx_v4l2_unregister(cal->ctx[i]);
-	}
+	for (i = 0; i < cal->num_contexts; i++)
+		cal_ctx_v4l2_unregister(cal->ctx[i]);
 
 	cal_async_notifier_unregister(cal);
 	media_device_unregister(&cal->mdev);
@@ -896,10 +892,8 @@ static void cal_media_cleanup(struct cal_dev *cal)
 {
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(cal->ctx); i++) {
-		if (cal->ctx[i])
-			cal_ctx_v4l2_cleanup(cal->ctx[i]);
-	}
+	for (i = 0; i < cal->num_contexts; i++)
+		cal_ctx_v4l2_cleanup(cal->ctx[i]);
 
 	v4l2_device_unregister(&cal->v4l2_dev);
 	media_device_cleanup(&cal->mdev);
@@ -1048,7 +1042,6 @@ static int cal_init_camerarx_regmap(struct cal_dev *cal)
 static int cal_probe(struct platform_device *pdev)
 {
 	struct cal_dev *cal;
-	struct cal_ctx *ctx;
 	bool connected = false;
 	unsigned int i;
 	int ret;
@@ -1132,12 +1125,14 @@ static int cal_probe(struct platform_device *pdev)
 		if (!cal->phy[i]->source_node)
 			continue;
 
-		cal->ctx[i] = cal_ctx_create(cal, i);
-		if (!cal->ctx[i]) {
-			cal_err(cal, "Failed to create context %u\n", i);
+		cal->ctx[cal->num_contexts] = cal_ctx_create(cal, i);
+		if (!cal->ctx[cal->num_contexts]) {
+			cal_err(cal, "Failed to create context %u\n", cal->num_contexts);
 			ret = -ENODEV;
 			goto error_context;
 		}
+
+		cal->num_contexts++;
 	}
 
 	/* Register the media device. */
@@ -1148,11 +1143,8 @@ static int cal_probe(struct platform_device *pdev)
 	return 0;
 
 error_context:
-	for (i = 0; i < ARRAY_SIZE(cal->ctx); i++) {
-		ctx = cal->ctx[i];
-		if (ctx)
-			cal_ctx_v4l2_cleanup(ctx);
-	}
+	for (i = 0; i < cal->num_contexts; i++)
+		cal_ctx_v4l2_cleanup(cal->ctx[i]);
 
 error_camerarx:
 	for (i = 0; i < cal->data->num_csi2_phy; i++)
