@@ -319,8 +319,6 @@ static bool can_open_cifile(void)
 
 int test_alignment_handler_vsx_206(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap(PPC_FEATURE_ARCH_2_06));
 
@@ -332,13 +330,11 @@ int test_alignment_handler_vsx_206(void)
 	STORE_VSX_XFORM_TEST(stxvd2x);
 	STORE_VSX_XFORM_TEST(stxvw4x);
 	STORE_VSX_XFORM_TEST(stxsdx);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_vsx_207(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap2(PPC_FEATURE2_ARCH_2_07));
 
@@ -348,13 +344,11 @@ int test_alignment_handler_vsx_207(void)
 	LOAD_VSX_XFORM_TEST(lxsiwzx);
 	STORE_VSX_XFORM_TEST(stxsspx);
 	STORE_VSX_XFORM_TEST(stxsiwx);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_vsx_300(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 
 	SKIP_IF(!have_hwcap2(PPC_FEATURE2_ARCH_3_00));
@@ -380,13 +374,11 @@ int test_alignment_handler_vsx_300(void)
 	STORE_VSX_XFORM_TEST(stxvx);
 	STORE_VSX_XFORM_TEST(stxvl);
 	STORE_VSX_XFORM_TEST(stxvll);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_vsx_prefix(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap2(PPC_FEATURE2_ARCH_3_1));
 
@@ -399,13 +391,11 @@ int test_alignment_handler_vsx_prefix(void)
 	STORE_VSX_8LS_PREFIX_TEST(PSTXSSP, 0);
 	STORE_VSX_8LS_PREFIX_TEST(PSTXV0, 0);
 	STORE_VSX_8LS_PREFIX_TEST(PSTXV1, 1);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_integer(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 
 	printf("Integer\n");
@@ -458,13 +448,11 @@ int test_alignment_handler_integer(void)
 	STORE_DFORM_TEST(stmw);
 #endif
 
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_integer_206(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap(PPC_FEATURE_ARCH_2_06));
 
@@ -473,13 +461,11 @@ int test_alignment_handler_integer_206(void)
 	LOAD_XFORM_TEST(ldbrx);
 	STORE_XFORM_TEST(stdbrx);
 
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_integer_prefix(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap2(PPC_FEATURE2_ARCH_3_1));
 
@@ -494,13 +480,11 @@ int test_alignment_handler_integer_prefix(void)
 	STORE_MLS_PREFIX_TEST(PSTH);
 	STORE_MLS_PREFIX_TEST(PSTW);
 	STORE_8LS_PREFIX_TEST(PSTD);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_vmx(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap(PPC_FEATURE_HAS_ALTIVEC));
 
@@ -522,13 +506,11 @@ int test_alignment_handler_vmx(void)
 	STORE_VMX_XFORM_TEST(stvehx);
 	STORE_VMX_XFORM_TEST(stvewx);
 	STORE_VMX_XFORM_TEST(stvxl);
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_fp(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 
 	printf("Floating point\n");
@@ -550,13 +532,11 @@ int test_alignment_handler_fp(void)
 	STORE_FLOAT_XFORM_TEST(stfsux);
 	STORE_FLOAT_XFORM_TEST(stfiwx);
 
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_fp_205(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap(PPC_FEATURE_ARCH_2_05));
 
@@ -568,13 +548,11 @@ int test_alignment_handler_fp_205(void)
 	STORE_FLOAT_DFORM_TEST(stfdp);
 	STORE_FLOAT_XFORM_TEST(stfdpx);
 
-	return rc;
+	return 0;
 }
 
 int test_alignment_handler_fp_206(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap(PPC_FEATURE_ARCH_2_06));
 
@@ -582,14 +560,12 @@ int test_alignment_handler_fp_206(void)
 
 	LOAD_FLOAT_XFORM_TEST(lfiwzx);
 
-	return rc;
+	return 0;
 }
 
 
 int test_alignment_handler_fp_prefix(void)
 {
-	int rc = 0;
-
 	SKIP_IF(!can_open_cifile());
 	SKIP_IF(!have_hwcap2(PPC_FEATURE2_ARCH_3_1));
 
@@ -599,7 +575,7 @@ int test_alignment_handler_fp_prefix(void)
 	LOAD_FLOAT_MLS_PREFIX_TEST(PLFD);
 	STORE_FLOAT_MLS_PREFIX_TEST(PSTFS);
 	STORE_FLOAT_MLS_PREFIX_TEST(PSTFD);
-	return rc;
+	return 0;
 }
 
 void usage(char *prog)
