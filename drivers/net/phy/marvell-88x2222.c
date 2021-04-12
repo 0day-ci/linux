@@ -51,6 +51,7 @@
 struct mv2222_data {
 	phy_interface_t line_interface;
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported);
+	bool sfp_link;
 };
 
 /* SFI PMA transmit enable */
@@ -147,6 +148,9 @@ static int mv2222_read_status(struct phy_device *phydev)
 	phydev->link = 0;
 	phydev->speed = SPEED_UNKNOWN;
 	phydev->duplex = DUPLEX_UNKNOWN;
+
+	if (!priv->sfp_link)
+		return 0;
 
 	if (priv->line_interface == PHY_INTERFACE_MODE_10GBASER)
 		link = mv2222_read_status_10g(phydev);
@@ -446,9 +450,31 @@ static void mv2222_sfp_remove(void *upstream)
 	linkmode_zero(priv->supported);
 }
 
+static void mv2222_sfp_link_up(void *upstream)
+{
+	struct phy_device *phydev = upstream;
+	struct mv2222_data *priv;
+
+	priv = (struct mv2222_data *)phydev->priv;
+
+	priv->sfp_link = true;
+}
+
+static void mv2222_sfp_link_down(void *upstream)
+{
+	struct phy_device *phydev = upstream;
+	struct mv2222_data *priv;
+
+	priv = (struct mv2222_data *)phydev->priv;
+
+	priv->sfp_link = false;
+}
+
 static const struct sfp_upstream_ops sfp_phy_ops = {
 	.module_insert = mv2222_sfp_insert,
 	.module_remove = mv2222_sfp_remove,
+	.link_up = mv2222_sfp_link_up,
+	.link_down = mv2222_sfp_link_down,
 	.attach = phy_sfp_attach,
 	.detach = phy_sfp_detach,
 };
