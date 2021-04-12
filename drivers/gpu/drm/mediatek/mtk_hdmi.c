@@ -148,6 +148,7 @@ struct hdmi_audio_param {
 
 struct mtk_hdmi_conf {
 	bool tz_disabled;
+	bool cea_modes_only;
 };
 
 struct mtk_hdmi {
@@ -1258,6 +1259,9 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
 						 &adjusted_mode))
 			return MODE_BAD;
 	}
+
+	if (hdmi->conf->cea_modes_only && !drm_match_cea_mode(mode))
+		return MODE_BAD;
 
 	if (mode->clock < 27000)
 		return MODE_CLOCK_LOW;
