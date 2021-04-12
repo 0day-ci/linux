@@ -1381,6 +1381,8 @@ out:
 	return rc;
 }
 
+static DEFINE_MUTEX(mf_mutex);
+
 /**
  * memory_failure - Handle memory failure of a page.
  * @pfn: Page Number of the corrupted page
@@ -1424,12 +1426,18 @@ int memory_failure(unsigned long pfn, int flags)
 		return -ENXIO;
 	}
 
+	mutex_lock(&mf_mutex);
+
 try_again:
-	if (PageHuge(p))
-		return memory_failure_hugetlb(pfn, flags);
+	if (PageHuge(p)) {
+		res = memory_failure_hugetlb(pfn, flags);
+		goto out2;
+	}
+
 	if (TestSetPageHWPoison(p)) {
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 			pfn);
+		mutex_unlock(&mf_mutex);
 		return 0;
 	}
 
@@ -1463,9 +1471,11 @@ try_again:
 				res = MF_FAILED;
 			}
 			action_result(pfn, MF_MSG_BUDDY, res);
+			mutex_unlock(&mf_mutex);
 			return res == MF_RECOVERED ? 0 : -EBUSY;
 		} else {
 			action_result(pfn, MF_MSG_KERNEL_HIGH_ORDER, MF_IGNORED);
+			mutex_unlock(&mf_mutex);
 			return -EBUSY;
 		}
 	}
@@ -1473,6 +1483,7 @@ try_again:
 	if (PageTransHuge(hpage)) {
 		if (try_to_split_thp_page(p, "Memory Failure") < 0) {
 			action_result(pfn, MF_MSG_UNSPLIT_THP, MF_IGNORED);
+			mutex_unlock(&mf_mutex);
 			return -EBUSY;
 		}
 		VM_BUG_ON_PAGE(!page_count(p), p);
@@ -1517,6 +1528,7 @@ try_again:
 		num_poisoned_pages_dec();
 		unlock_page(p);
 		put_page(p);
+		mutex_unlock(&mf_mutex);
 		return 0;
 	}
 	if (hwpoison_filter(p)) {
@@ -1524,6 +1536,7 @@ try_again:
 			num_poisoned_pages_dec();
 		unlock_page(p);
 		put_page(p);
+		mutex_unlock(&mf_mutex);
 		return 0;
 	}
 
@@ -1559,6 +1572,8 @@ identify_page_state:
 	res = identify_page_state(pfn, p, page_flags);
 out:
 	unlock_page(p);
+out2:
+	mutex_unlock(&mf_mutex);
 	return res;
 }
 EXPORT_SYMBOL_GPL(memory_failure);
