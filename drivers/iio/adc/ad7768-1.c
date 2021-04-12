@@ -565,6 +565,7 @@ static int ad7768_set_channel_label(struct iio_dev *indio_dev,
 
 		st->labels[crt_ch] = label;
 	}
+	fwnode_handle_put(fwnode);
 
 	return 0;
 }
