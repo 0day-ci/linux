@@ -490,9 +490,15 @@ static int __init tegra_init_fuse(void)
 
 		fuse->lookups = kmemdup(fuse->soc->lookups, size, GFP_KERNEL);
 		if (!fuse->lookups)
-			return -ENOMEM;
-
-		nvmem_add_cell_lookups(fuse->lookups, fuse->soc->num_lookups);
+			/*
+			 * fuse->base can not be unmapped if allocate lookups failed,
+			 * because it will be accessed by other functions later.
+			 * To make less confusing, remove the return -ENOMEM and
+			 * skip registering the nvmem cell lookups.
+			 */
+			pr_err("failed to allocate lookups");
+		else
+			nvmem_add_cell_lookups(fuse->lookups, fuse->soc->num_lookups);
 	}
 
 	return 0;
