@@ -30,6 +30,12 @@ static inline void flush_dcache_page(struct page *page)
 #define flush_icache_user_page(vma, pg, addr, len) \
 	flush_icache_mm(vma->vm_mm, 0)
 
+/*
+ * flush_cache_vmap is invoked after map_kernel_range() has installed the page
+ * table entries, which modifies PTE, SFENCE.VMA should be inserted.
+ */
+#define flush_cache_vmap(start, end) flush_tlb_all()
+
 #ifndef CONFIG_SMP
 
 #define flush_icache_all() local_flush_icache_all()
