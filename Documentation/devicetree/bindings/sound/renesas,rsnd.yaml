@@ -115,6 +115,12 @@ properties:
     $ref: audio-graph-port.yaml#
     unevaluatedProperties: false
 
+  ports:
+    $ref: /schemas/graph.yaml#/properties/ports
+    patternProperties:
+      '^port@[0-9]':
+        $ref: audio-graph-port.yaml#
+
 # use patternProperties to avoid naming "xxx,yyy" issue
 patternProperties:
   "^rcar_sound,dvc$":
@@ -258,6 +264,12 @@ required:
   - "#sound-dai-cells"
 
 allOf:
+  - if:
+      required:
+        - ports
+    then:
+      properties:
+        port: false
   - if:
       properties:
         compatible:
