@@ -597,9 +597,12 @@ static int csi2_configure(struct iss_csi2_device *csi2)
 /*
  * csi2_print_status - Prints CSI2 debug information.
  */
-#define CSI2_PRINT_REGISTER(iss, regs, name)\
-	dev_dbg(iss->dev, "###CSI2 " #name "=0x%08x\n", \
-		iss_reg_read(iss, regs, CSI2_##name))
+static inline csi2_print_register(iss, regs, name)
+{
+	dev_dbg(iss->dev, "###CSI2 " #name "=0x%08x\n",
+		iss_reg_read(iss, regs, CSI2_##name));
+}
+
 
 static void csi2_print_status(struct iss_csi2_device *csi2)
 {
@@ -610,26 +613,26 @@ static void csi2_print_status(struct iss_csi2_device *csi2)
 
 	dev_dbg(iss->dev, "-------------CSI2 Register dump-------------\n");
 
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, SYSCONFIG);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, SYSSTATUS);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, IRQENABLE);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, IRQSTATUS);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTRL);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, DBG_H);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, COMPLEXIO_CFG);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, COMPLEXIO_IRQSTATUS);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, SHORT_PACKET);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, COMPLEXIO_IRQENABLE);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, DBG_P);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, TIMING);
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_CTRL1(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_CTRL2(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_DAT_OFST(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_PING_ADDR(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_PONG_ADDR(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_IRQENABLE(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_IRQSTATUS(0));
-	CSI2_PRINT_REGISTER(iss, csi2->regs1, CTX_CTRL3(0));
+	csi2_print_register(iss, csi2->regs1, SYSCONFIG);
+	csi2_print_register(iss, csi2->regs1, SYSSTATUS);
+	csi2_print_register(iss, csi2->regs1, IRQENABLE);
+	csi2_print_register(iss, csi2->regs1, IRQSTATUS);
+	csi2_print_register(iss, csi2->regs1, CTRL);
+	csi2_print_register(iss, csi2->regs1, DBG_H);
+	csi2_print_register(iss, csi2->regs1, COMPLEXIO_CFG);
+	csi2_print_register(iss, csi2->regs1, COMPLEXIO_IRQSTATUS);
+	csi2_print_register(iss, csi2->regs1, SHORT_PACKET);
+	csi2_print_register(iss, csi2->regs1, COMPLEXIO_IRQENABLE);
+	csi2_print_register(iss, csi2->regs1, DBG_P);
+	csi2_print_register(iss, csi2->regs1, TIMING);
+	csi2_print_register(iss, csi2->regs1, CTX_CTRL1(0));
+	csi2_print_register(iss, csi2->regs1, CTX_CTRL2(0));
+	csi2_print_register(iss, csi2->regs1, CTX_DAT_OFST(0));
+	csi2_print_register(iss, csi2->regs1, CTX_PING_ADDR(0));
+	csi2_print_register(iss, csi2->regs1, CTX_PONG_ADDR(0));
+	csi2_print_register(iss, csi2->regs1, CTX_IRQENABLE(0));
+	csi2_print_register(iss, csi2->regs1, CTX_IRQSTATUS(0));
+	csi2_print_register(iss, csi2->regs1, CTX_CTRL3(0));
 
 	dev_dbg(iss->dev, "--------------------------------------------\n");
 }
