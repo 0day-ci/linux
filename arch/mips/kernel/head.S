@@ -79,6 +79,9 @@ FEXPORT(__kernel_entry)
 	j	kernel_entry
 #endif /* CONFIG_BOOT_RAW */
 
+#define PC_REGION_SHIFT 28
+#define PC_REGION_MASK (~(1 << PC_REGION_SHIFT - 1))
+
 	__REF
 
 NESTED(kernel_entry, 16, sp)			# kernel entry point
@@ -89,9 +92,17 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 
 	/* We might not get launched at the address the kernel is linked to,
 	   so we jump there.  */
-	PTR_LA	t0, 0f
-	jr	t0
-0:
+	PTR_LA	t0, 1f
+	bal		1f
+1:	move	t1, ra
+	PTR_LI	t2, PC_REGION_MASK
+	and		t0, t2
+	PTR_LI	t2, ~PC_REGION_MASK
+	and		t1, t2
+	or		t0, t1
+	PTR_ADDIU	t0, 2f-1b
+	jr		t0
+2:
 
 	PTR_LA		t0, __bss_start		# clear .bss
 	LONG_S		zero, (t0)
