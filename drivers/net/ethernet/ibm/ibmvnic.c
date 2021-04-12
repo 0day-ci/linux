@@ -5277,6 +5277,8 @@ static int ibmvnic_reset_init(struct ibmvnic_adapter *adapter, bool reset)
 	return rc;
 }
 
+static struct device_attribute dev_attr_timeout;
+static struct device_attribute dev_attr_fatal;
 static struct device_attribute dev_attr_failover;
 
 static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
@@ -5355,9 +5357,15 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	netdev->min_mtu = adapter->min_mtu - ETH_HLEN;
 	netdev->max_mtu = adapter->max_mtu - ETH_HLEN;
 
+	rc = device_create_file(&dev->dev, &dev_attr_timeout);
+	if (rc)
+		goto ibmvnic_dev_file_timeout_err;
+	rc = device_create_file(&dev->dev, &dev_attr_fatal);
+	if (rc)
+		goto ibmvnic_dev_file_fatal_err;
 	rc = device_create_file(&dev->dev, &dev_attr_failover);
 	if (rc)
-		goto ibmvnic_dev_file_err;
+		goto ibmvnic_dev_file_failover_err;
 
 	netif_carrier_off(netdev);
 	rc = register_netdev(netdev);
@@ -5376,7 +5384,13 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 ibmvnic_register_fail:
 	device_remove_file(&dev->dev, &dev_attr_failover);
 
-ibmvnic_dev_file_err:
+ibmvnic_dev_file_failover_err:
+	device_remove_file(&dev->dev, &dev_attr_fatal);
+
+ibmvnic_dev_file_fatal_err:
+	device_remove_file(&dev->dev, &dev_attr_timeout);
+
+ibmvnic_dev_file_timeout_err:
 	release_stats_token(adapter);
 
 ibmvnic_stats_fail:
@@ -5429,10 +5443,42 @@ static void ibmvnic_remove(struct vio_dev *dev)
 
 	rtnl_unlock();
 	mutex_destroy(&adapter->fw_lock);
+	device_remove_file(&dev->dev, &dev_attr_timeout);
+	device_remove_file(&dev->dev, &dev_attr_fatal);
 	device_remove_file(&dev->dev, &dev_attr_failover);
 	free_netdev(netdev);
 	dev_set_drvdata(&dev->dev, NULL);
 }
+
+static ssize_t timeout_store(struct device *dev, struct device_attribute *attr,
+			     const char *buf, size_t count)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct ibmvnic_adapter *adapter = netdev_priv(netdev);
+
+	if (!sysfs_streq(buf, "1"))
+		return -EINVAL;
+
+	ibmvnic_reset(adapter, VNIC_RESET_TIMEOUT);
+
+	return count;
+}
+static DEVICE_ATTR_WO(timeout);
+
+static ssize_t fatal_store(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct net_device *netdev = dev_get_drvdata(dev);
+	struct ibmvnic_adapter *adapter = netdev_priv(netdev);
+
+	if (!sysfs_streq(buf, "1"))
+		return -EINVAL;
+
+	ibmvnic_reset(adapter, VNIC_RESET_FATAL);
+
+	return count;
+}
+static DEVICE_ATTR_WO(fatal);
 
 static ssize_t failover_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
