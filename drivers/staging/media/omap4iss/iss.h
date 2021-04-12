@@ -29,11 +29,6 @@
 
 struct regmap;
 
-#define to_iss_device(ptr_module)				\
-	container_of(ptr_module, struct iss_device, ptr_module)
-#define to_device(ptr_module)						\
-	(to_iss_device(ptr_module)->dev)
-
 enum iss_mem_resources {
 	OMAP4_ISS_MEM_TOP,
 	OMAP4_ISS_MEM_CSI2_A_REGS1,
@@ -118,9 +113,6 @@ struct iss_device {
 	unsigned int subclk_resources;
 	unsigned int isp_subclk_resources;
 };
-
-#define v4l2_dev_to_iss_device(dev) \
-	container_of(dev, struct iss_device, v4l2_dev)
 
 int omap4iss_get_external_info(struct iss_pipeline *pipe,
 			       struct media_link *link);
