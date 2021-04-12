@@ -688,7 +688,8 @@ EXPORT_SYMBOL(strsep);
 #endif
 
 /**
- * sysfs_streq - return true if strings are equal, modulo trailing newline
+ * sysfs_streq - return true if strings are equal case-insentively,
+ *               modulo trailing newline
  * @s1: one string
  * @s2: another string
  *
@@ -696,10 +697,11 @@ EXPORT_SYMBOL(strsep);
  * NUL and newline-then-NUL as equivalent string terminations.  It's
  * geared for use with sysfs input strings, which generally terminate
  * with newlines but are compared against values without newlines.
+ * And case does not matter for the sysfs input strings comparison.
  */
 bool sysfs_streq(const char *s1, const char *s2)
 {
-	while (*s1 && *s1 == *s2) {
+	while (*s1 && tolower(*s1) == tolower(*s2)) {
 		s1++;
 		s2++;
 	}
