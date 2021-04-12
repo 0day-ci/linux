@@ -230,8 +230,6 @@ struct i915_address_space {
 	u64 total;		/* size addr space maps (ex. 2GB for ggtt) */
 	u64 reserved;		/* size addr space reserved */
 
-	unsigned int bind_async_flags;
-
 	/*
 	 * Each active user context has its own address space (in full-ppgtt).
 	 * Since the vm may be shared between multiple contexts, we count how
