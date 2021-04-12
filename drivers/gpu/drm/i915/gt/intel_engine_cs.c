@@ -664,7 +664,8 @@ retry:
 	if (ret)
 		goto err;
 
-	vaddr = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(obj,
+					i915_coherent_map_type(engine->i915, obj, true));
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
 		goto err_unpin;
