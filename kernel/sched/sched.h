@@ -905,11 +905,6 @@ DECLARE_STATIC_KEY_FALSE(sched_uclamp_used);
 struct rq {
 	/* runqueue lock: */
 	raw_spinlock_t		lock;
-
-	/*
-	 * nr_running and cpu_load should be in the same cacheline because
-	 * remote CPUs use both these fields when doing load calculation.
-	 */
 	unsigned int		nr_running;
 #ifdef CONFIG_NUMA_BALANCING
 	unsigned int		nr_numa_running;
