@@ -5460,14 +5460,14 @@ static ssize_t failover_store(struct device *dev, struct device_attribute *attr,
 	rc = plpar_hcall_norets(H_VIOCTL, adapter->vdev->unit_address,
 				H_SESSION_ERR_DETECTED, session_token, 0, 0);
 	if (rc) {
-		netdev_err(netdev, "Client initiated failover failed, rc %ld\n",
+		netdev_err(netdev,
+			   "H_VIOCTL initiated failover failed, rc %ld, trying to send CRQ_CMD, the last resort\n",
 			   rc);
-		return -EINVAL;
+		ibmvnic_reset(adapter, VNIC_RESET_FAILOVER);
 	}
 
 	return count;
 }
-
 static DEVICE_ATTR_WO(failover);
 
 static unsigned long ibmvnic_get_desired_dma(struct vio_dev *vdev)
