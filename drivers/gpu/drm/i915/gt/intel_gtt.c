@@ -132,7 +132,10 @@ void i915_address_space_init(struct i915_address_space *vm, int subclass)
 	 */
 	mutex_init(&vm->mutex);
 	lockdep_set_subclass(&vm->mutex, subclass);
-	i915_gem_shrinker_taints_mutex(vm->i915, &vm->mutex);
+
+	/* CHV + VTD workaround use stop_machine(), so can't lock the vm->mutex in the shrinker */
+	if (!intel_vm_no_concurrent_access_wa(vm->i915))
+		i915_gem_shrinker_taints_mutex(vm->i915, &vm->mutex);
 	dma_resv_init(&vm->resv);
 
 	GEM_BUG_ON(!vm->total);
