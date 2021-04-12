@@ -17,7 +17,9 @@ archscripts: scripts_basic
 ifeq ($(CONFIG_CPU_LOONGSON3_WORKAROUNDS),y)
 	$(Q)$(MAKE) $(build)=arch/mips/tools loongson3-llsc-check
 endif
+ifeq ($(CONFIG_RELOCATABLE),y)
 	$(Q)$(MAKE) $(build)=arch/mips/boot/tools relocs
+endif
 
 KBUILD_DEFCONFIG := 32r2el_defconfig
 KBUILD_DTBS      := dtbs
