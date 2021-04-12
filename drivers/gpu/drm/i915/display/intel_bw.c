@@ -23,6 +23,53 @@ struct intel_qgv_info {
 	u8 t_bl;
 };
 
+#define SA_PERF_STATUS_0_0_0_MCHBAR_PC _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5918)
+#define  DG1_QCLK_RATIO_MASK (0xFF << 2)
+#define  DG1_QCLK_RATIO_SHIFT 2
+#define  DG1_QCLK_REFERENCE (1 << 10)
+
+#define MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4000)
+#define MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR_HIGH _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4004)
+#define MCHBAR_CH1_CR_TC_PRE_0_0_0_MCHBAR _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4400)
+#define MCHBAR_CH1_CR_TC_PRE_0_0_0_MCHBAR_HIGH _MMIO(MCHBAR_MIRROR_BASE_SNB + 0x4404)
+#define  DG1_DRAM_T_RCD_MASK (0x7F << 9)
+#define  DG1_DRAM_T_RCD_SHIFT 9
+#define  DG1_DRAM_T_RDPRE_MASK (0x3F << 11)
+#define  DG1_DRAM_T_RDPRE_SHIFT 11
+#define  DG1_DRAM_T_RAS_MASK (0xFF << 1)
+#define  DG1_DRAM_T_RAS_SHIFT 1
+#define  DG1_DRAM_T_RP_MASK (0x7F << 0)
+#define  DG1_DRAM_T_RP_SHIFT 0
+
+static int dg1_mchbar_read_qgv_point_info(struct drm_i915_private *dev_priv,
+					  struct intel_qgv_point *sp,
+					  int point)
+{
+	u32 val = 0;
+	u32 dclk_ratio = 0, dclk_reference = 0;
+
+	val = intel_uncore_read(&dev_priv->uncore, SA_PERF_STATUS_0_0_0_MCHBAR_PC);
+	dclk_ratio = (val & DG1_QCLK_RATIO_MASK) >> DG1_QCLK_RATIO_SHIFT;
+	if (val & DG1_QCLK_REFERENCE)
+		dclk_reference = 6; /* 6 * 16.666 MHz = 100 MHz */
+	else
+		dclk_reference = 8; /* 8 * 16.666 MHz = 133 MHz */
+	sp->dclk = dclk_ratio * dclk_reference;
+	if (sp->dclk == 0)
+		return -EINVAL;
+
+	val = intel_uncore_read(&dev_priv->uncore, MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR);
+	sp->t_rp = (val & DG1_DRAM_T_RP_MASK) >> DG1_DRAM_T_RP_SHIFT;
+	sp->t_rdpre = (val & DG1_DRAM_T_RDPRE_MASK) >> DG1_DRAM_T_RDPRE_SHIFT;
+
+	val = intel_uncore_read(&dev_priv->uncore, MCHBAR_CH0_CR_TC_PRE_0_0_0_MCHBAR_HIGH);
+	sp->t_rcd = (val & DG1_DRAM_T_RCD_MASK) >> DG1_DRAM_T_RCD_SHIFT;
+	sp->t_ras = (val & DG1_DRAM_T_RAS_MASK) >> DG1_DRAM_T_RAS_SHIFT;
+
+	sp->t_rc = sp->t_rp + sp->t_ras;
+	return 0;
+}
+
 static int icl_pcode_read_qgv_point_info(struct drm_i915_private *dev_priv,
 					 struct intel_qgv_point *sp,
 					 int point)
@@ -100,7 +147,12 @@ static int icl_get_qgv_points(struct drm_i915_private *dev_priv,
 		struct intel_qgv_point *sp = &qi->points[i];
 
 		ret = icl_pcode_read_qgv_point_info(dev_priv, sp, i);
-		if (ret)
+		if (IS_DG1(dev_priv) && (ret || sp->dclk == 0)) {
+			drm_dbg_kms(&dev_priv->drm, "Failed to get memory subsystem information via pcode. IFWI needs update. Trying with MCHBAR\n");
+			ret = dg1_mchbar_read_qgv_point_info(dev_priv, sp, i);
+			if (ret)
+				return ret;
+		} else if (ret)
 			return ret;
 
 		drm_dbg_kms(&dev_priv->drm,
