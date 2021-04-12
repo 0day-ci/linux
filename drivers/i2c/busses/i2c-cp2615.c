@@ -38,7 +38,9 @@ enum cp2615_iop_msg_type {
 };
 
 struct __packed cp2615_iop_msg {
-	__be16 preamble, length, msg;
+	/* always 0x2A2A, which is the same in either endianness */
+	u16 preamble;
+	__be16 length, msg;
 	u8 data[MAX_IOP_PAYLOAD_SIZE];
 };
 
