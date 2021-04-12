@@ -254,6 +254,7 @@ xfs_ag_resv_init(
 	xfs_extlen_t			ask;
 	xfs_extlen_t			used;
 	int				error = 0;
+	bool				has_resv = false;
 
 	/* Create the metadata reservation. */
 	if (pag->pag_meta_resv.ar_asked == 0) {
@@ -291,6 +292,8 @@ xfs_ag_resv_init(
 			if (error)
 				goto out;
 		}
+		if (ask)
+			has_resv = true;
 	}
 
 	/* Create the RMAPBT metadata reservation */
@@ -304,18 +307,19 @@ xfs_ag_resv_init(
 		error = __xfs_ag_resv_init(pag, XFS_AG_RESV_RMAPBT, ask, used);
 		if (error)
 			goto out;
+		if (ask)
+			has_resv = true;
 	}
 
-#ifdef DEBUG
-	/* need to read in the AGF for the ASSERT below to work */
-	error = xfs_alloc_pagf_init(pag->pag_mount, tp, pag->pag_agno, 0);
-	if (error)
-		return error;
-
-	ASSERT(xfs_perag_resv(pag, XFS_AG_RESV_METADATA)->ar_reserved +
-	       xfs_perag_resv(pag, XFS_AG_RESV_RMAPBT)->ar_reserved <=
-	       pag->pagf_freeblks + pag->pagf_flcount);
-#endif
+	if (has_resv) {
+		mp->m_has_agresv = true;
+		error = xfs_alloc_pagf_init(mp, tp, pag->pag_agno, 0);
+		if (error)
+			return error;
+		ASSERT(xfs_perag_resv(pag, XFS_AG_RESV_METADATA)->ar_reserved +
+		       xfs_perag_resv(pag, XFS_AG_RESV_RMAPBT)->ar_reserved <=
+		       pag->pagf_freeblks + pag->pagf_flcount);
+	}
 out:
 	return error;
 }

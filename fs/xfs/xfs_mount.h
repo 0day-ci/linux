@@ -139,6 +139,7 @@ typedef struct xfs_mount {
 	bool			m_fail_unmount;
 	bool			m_finobt_nores; /* no per-AG finobt resv. */
 	bool			m_update_sb;	/* sb needs update in mount */
+	bool			m_has_agresv;	/* perag reservations active */
 
 	/*
 	 * Bitsets of per-fs metadata that have been checked and/or are sick.
