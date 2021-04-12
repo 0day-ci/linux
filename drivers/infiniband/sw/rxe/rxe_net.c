@@ -620,6 +620,11 @@ static int rxe_net_ipv6_init(void)
 	recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
 						htons(ROCE_V2_UDP_DPORT), true);
 	if (IS_ERR(recv_sockets.sk6)) {
+		/* Though IPv6 is not supported, IPv4 still needs to continue
+		 */
+		if (PTR_ERR(recv_sockets.sk6) == -EAFNOSUPPORT)
+			return 0;
+
 		recv_sockets.sk6 = NULL;
 		pr_err("Failed to create IPv6 UDP tunnel\n");
 		return -1;
