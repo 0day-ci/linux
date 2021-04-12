@@ -983,6 +983,175 @@ err_out:
 	return err;
 }
 
+static int oprom_image_parse_helper(u8 *parse_ptr, u8 *last_img, u8 *code_type,
+				    struct drm_i915_private *i915)
+{
+	u8 size_512_bytes;
+
+	if (((union oprom_header *)parse_ptr)->signature != OPROM_IMAGE_MAGIC) {
+		drm_err(&i915->drm, "Wrong OPROM header signature.\n");
+		return -EINVAL;
+	}
+
+	size_512_bytes = parse_ptr[((struct expansion_rom_header *)parse_ptr)->pcistructoffset + PCI_IMAGE_LENGTH_OFFSET];
+	*code_type = parse_ptr[((struct expansion_rom_header *)parse_ptr)->pcistructoffset + PCI_CODE_TYPE_OFFSET];
+	*last_img = parse_ptr[((struct expansion_rom_header *)parse_ptr)->pcistructoffset + PCI_LAST_IMAGE_INDICATOR_OFFSET];
+
+	return size_512_bytes;
+}
+
+static void spi_read_oprom_helper(size_t len, u32 offset, u32 *buf,
+				  struct drm_i915_private *dev_priv)
+{
+	u32 count, data;
+
+	for (count = 0; count < len; count += 4) {
+		intel_uncore_write(&dev_priv->uncore, PRIMARY_SPI_ADDRESS, offset + count);
+		data = intel_uncore_read(&dev_priv->uncore, PRIMARY_SPI_TRIGGER);
+		buf[count / 4] = data;
+	}
+}
+
+/**
+ *	+        DASH+G OPROM IMAGE LAYOUT           +
+ *	+--------+-------+---------------------------+
+ *	| Offset | Value |   ROM Header Fields       +-----> Image 1 (CSS)
+ *	+--------------------------------------------+
+ *	|    0h  |  55h  |   ROM Signature Byte1     |
+ *	|    1h  |  AAh  |   ROM Signature Byte2     |
+ *	|    2h  |  xx   |        Reserved           |
+ *	|  18+19h|  xx   |  Ptr to PCI DataStructure |
+ *	+----------------+---------------------------+
+ *	|           PCI Data Structure               |
+ *	+--------------------------------------------+
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|    10  +  xx   +     Image Length          |
+ *	|    14  +  xx   +     Code Type             |
+ *	|    15  +  xx   +  Last Image Indicator     |
+ *	|    .       .             .                 |
+ *	+--------------------------------------------+
+ *	|               MEU BLOB                     |
+ *	+--------------------------------------------+
+ *	|              CPD Header                    |
+ *	|              CPD Entry                     |
+ *	|              Reserved                      |
+ *	|           SignedDataPart1                  |
+ *	|              PublicKey                     |
+ *	|            RSA Signature                   |
+ *	|           SignedDataPart2                  |
+ *	|            IFWI Metadata                   |
+ *	+--------+-------+---------------------------+
+ *	|    .   |   .   |         .                 |
+ *	|    .   |   .   |         .                 |
+ *	+--------------------------------------------+
+ *	| Offset | Value |   ROM Header Fields       +-----> Image 2 (Config Data) (Offset: 0x800)
+ *	+--------------------------------------------+
+ *	|    0h  |  55h  |   ROM Signature Byte1     |
+ *	|    1h  |  AAh  |   ROM Signature Byte2     |
+ *	|    2h  |  xx   |        Reserved           |
+ *	|  18+19h|  xx   |  Ptr to PCI DataStructure |
+ *	+----------------+---------------------------+
+ *	|           PCI Data Structure               |
+ *	+--------------------------------------------+
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|    10  +  xx   +     Image Length          |
+ *	|    14  +  xx   +      Code Type            |
+ *	|    15  +  xx   +   Last Image Indicator    |
+ *	|    .       .             .                 |
+ *	|    1A  +  3C   + Ptr to Opregion Signature |
+ *	|    .       .             .                 |
+ *	|    .       .             .                 |
+ *	|   83Ch + IntelGraphicsMem                  | <---+ Opregion Signature
+ *	+--------+-----------------------------------+
+ *
+ * intel_spi_get_oprom_opreg() get OPROM image.
+ * @i915: pointer to i915 device.
+ * @opreg: pointer to opregion buffer output.
+ * @opreg_size: pointer to opregion size output.
+ */
+int
+intel_spi_get_oprom_opreg(struct drm_i915_private *i915, u32 **opreg,
+			  u32 *opreg_size)
+{
+	u8 img_sig[sizeof(OPREGION_SIGNATURE)];
+	u8 code_type, last_img;
+	u32 static_region, offset, img_len;
+	u32 *oprom_img, *oprom_img_hdr;
+	u16 opreg_base;
+	u8 *parse_ptr;
+	int img_size;
+	int ret = -EINVAL;
+
+	/* initialize SPI to read the OPROM */
+	static_region = intel_uncore_read(&i915->uncore, SPI_STATIC_REGIONS);
+	static_region &= OPTIONROM_SPI_REGIONID_MASK;
+	intel_uncore_write(&i915->uncore, PRIMARY_SPI_REGIONID, static_region);
+	/* read OPROM offset in SPI flash */
+	offset = intel_uncore_read(&i915->uncore, OROM_OFFSET);
+	offset &= OROM_OFFSET_MASK;
+
+	oprom_img_hdr = kzalloc(OPROM_INITIAL_READ_SIZE, GFP_KERNEL);
+	if (!oprom_img_hdr)
+		return -ENOMEM;
+
+	do {
+		spi_read_oprom_helper(OPROM_INITIAL_READ_SIZE, offset,
+				      oprom_img_hdr, i915);
+		img_size = oprom_image_parse_helper((u8 *)oprom_img_hdr, &last_img,
+						    &code_type, i915);
+		if (img_size <= 0) {
+			ret = -EINVAL;
+			goto err_free_hdr;
+		}
+
+		img_len = img_size * OPROM_BYTE_BOUNDARY;
+		oprom_img = kzalloc(img_len, GFP_KERNEL);
+		if (!oprom_img) {
+			ret = -ENOMEM;
+			goto err_free_hdr;
+		}
+
+		spi_read_oprom_helper(img_len, offset, oprom_img, i915);
+		parse_ptr = (u8 *)oprom_img;
+		offset = offset + img_len;
+
+		/* opregion base offset */
+		opreg_base = ((struct expansion_rom_header *)parse_ptr)->opregion_base;
+		/* CPD or opreg signature is present at opregion_base offset */
+		memcpy(img_sig, parse_ptr + opreg_base, sizeof(OPREGION_SIGNATURE));
+
+		if (!memcmp(img_sig, OPREGION_SIGNATURE, sizeof(OPREGION_SIGNATURE) - 1)) {
+			*opreg = oprom_img;
+			*opreg_size = img_len;
+			drm_dbg_kms(&i915->drm, "Found opregion image\n");
+			ret = 0;
+			break;
+		} else if (!memcmp(img_sig, CPD_SIGNATURE, NUM_CPD_BYTES)) {
+			if (code_type != OPROM_CSS_CODE_TYPE) {
+				drm_err(&i915->drm, "Invalid OPROM\n");
+				ret = -EINVAL;
+				goto err_free_img;
+			}
+			drm_dbg_kms(&i915->drm, "Found CSS image\n");
+			/* proceed here onwards for signature authentication */
+			kfree(oprom_img);
+			continue;
+		}
+
+	} while (last_img != LAST_IMG_INDICATOR);
+
+	return ret;
+
+err_free_img:
+	kfree(oprom_img);
+err_free_hdr:
+	kfree(oprom_img_hdr);
+
+	return ret;
+}
+
 static int intel_use_opregion_panel_type_callback(const struct dmi_system_id *id)
 {
 	DRM_INFO("Using panel type from OpRegion on %s\n", id->ident);

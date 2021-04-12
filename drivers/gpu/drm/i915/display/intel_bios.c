@@ -2240,37 +2240,36 @@ bool intel_bios_is_valid_vbt(const void *buf, size_t size)
 
 static struct vbt_header *spi_oprom_get_vbt(struct drm_i915_private *i915)
 {
-	u32 count, data, found, store = 0;
-	u32 static_region, oprom_offset;
-	u32 oprom_size = 0x200000;
+	u32 count, found, opreg_size;
+	u32 *vbt, *oprom_opreg = NULL;
 	u16 vbt_size;
-	u32 *vbt;
+	u8 *parse_ptr;
 
-	static_region = intel_uncore_read(&i915->uncore, SPI_STATIC_REGIONS);
-	static_region &= OPTIONROM_SPI_REGIONID_MASK;
-	intel_uncore_write(&i915->uncore, PRIMARY_SPI_REGIONID, static_region);
+	if (intel_spi_get_oprom_opreg(i915, &oprom_opreg, &opreg_size)) {
+		drm_err(&i915->drm, "oprom signature verification failed\n");
+		goto err_not_found;
+	}
 
-	oprom_offset = intel_uncore_read(&i915->uncore, OROM_OFFSET);
-	oprom_offset &= OROM_OFFSET_MASK;
+	if (!oprom_opreg) {
+		drm_err(&i915->drm, "opregion not found\n");
+		goto err_not_found;
+	}
 
-	for (count = 0; count < oprom_size; count += 4) {
-		intel_uncore_write(&i915->uncore, PRIMARY_SPI_ADDRESS, oprom_offset + count);
-		data = intel_uncore_read(&i915->uncore, PRIMARY_SPI_TRIGGER);
-
-		if (data == *((const u32 *)"$VBT")) {
-			found = oprom_offset + count;
+	for (count = 0; count < opreg_size; count += 4) {
+		if (oprom_opreg[count / 4] == *((const u32 *)"$VBT")) {
+			found = count;
 			break;
 		}
 	}
 
-	if (count >= oprom_size)
+	if (count >= opreg_size) {
+		drm_err(&i915->drm, "VBT not found in opregion\n");
 		goto err_not_found;
+	}
 
 	/* Get VBT size and allocate space for the VBT */
-	intel_uncore_write(&i915->uncore, PRIMARY_SPI_ADDRESS, found +
-		   offsetof(struct vbt_header, vbt_size));
-	vbt_size = intel_uncore_read(&i915->uncore, PRIMARY_SPI_TRIGGER);
-	vbt_size &= 0xffff;
+	parse_ptr = (u8 *)oprom_opreg + found;
+	vbt_size = ((struct vbt_header *)parse_ptr)->vbt_size;
 
 	vbt = kzalloc(vbt_size, GFP_KERNEL);
 	if (!vbt) {
@@ -2279,16 +2278,12 @@ static struct vbt_header *spi_oprom_get_vbt(struct drm_i915_private *i915)
 		goto err_not_found;
 	}
 
-	for (count = 0; count < vbt_size; count += 4) {
-		intel_uncore_write(&i915->uncore, PRIMARY_SPI_ADDRESS, found + count);
-		data = intel_uncore_read(&i915->uncore, PRIMARY_SPI_TRIGGER);
-		*(vbt + store++) = data;
-	}
-
+	memcpy(vbt, parse_ptr, vbt_size);
 	if (!intel_bios_is_valid_vbt(vbt, vbt_size))
 		goto err_free_vbt;
 
 	DRM_DEBUG_KMS("Found valid VBT in SPI flash\n");
+	kfree(oprom_opreg);
 
 	return (struct vbt_header *)vbt;
 

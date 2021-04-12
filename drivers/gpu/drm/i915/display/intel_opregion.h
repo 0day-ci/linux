@@ -54,6 +54,34 @@ struct intel_opregion {
 
 #define OPREGION_SIZE            (8 * 1024)
 
+#define CPD_SIGNATURE "$CPD"                  /* CPD Signature */
+#define NUM_CPD_BYTES 4
+#define PCI_IMAGE_LENGTH_OFFSET 0x10
+#define PCI_CODE_TYPE_OFFSET 0x14
+#define PCI_LAST_IMAGE_INDICATOR_OFFSET 0x15
+#define LAST_IMG_INDICATOR 0x80
+#define OPROM_IMAGE_MAGIC 0xAA55       /* Little Endian */
+#define OPROM_CSS_CODE_TYPE 0xF0
+#define OPROM_BYTE_BOUNDARY 512        /* OPROM image sizes are indicated in 512 byte boundaries */
+#define OPROM_INITIAL_READ_SIZE 60     /* Read 60 bytes to compute the Img Len from PCI structure */
+
+union oprom_header {
+	u32 data;
+	struct {
+		u16 signature;  /* Offset[0x0]: Header 0x55 0xAA */
+		u8 sizein512bytes;
+		u8 reserved;
+	};
+};
+
+struct expansion_rom_header {
+	union oprom_header header;      /* Offset[0x0]: Oprom Header */
+	u16 vbiospostoffset;    /* Offset[0x4]: pointer to VBIOS entry point */
+	u8 resvd[0x12];
+	u16 pcistructoffset;    /* Offset[0x18]: Contains pointer PCI Data Structure */
+	u16 opregion_base;      /* Offset[0x1A]: Offset to Opregion Base start */
+};
+
 #ifdef CONFIG_ACPI
 
 int intel_opregion_setup(struct drm_i915_private *dev_priv);
@@ -71,6 +99,9 @@ int intel_opregion_notify_encoder(struct intel_encoder *intel_encoder,
 int intel_opregion_notify_adapter(struct drm_i915_private *dev_priv,
 				  pci_power_t state);
 int intel_opregion_get_panel_type(struct drm_i915_private *dev_priv);
+
+int intel_spi_get_oprom_opreg(struct drm_i915_private *i915, u32 **opreg,
+			      u32 *opreg_size);
 
 #else /* CONFIG_ACPI*/
 
@@ -117,6 +148,11 @@ static inline int intel_opregion_get_panel_type(struct drm_i915_private *dev)
 	return -ENODEV;
 }
 
-#endif /* CONFIG_ACPI */
+static int intel_spi_get_oprom_opreg(struct drm_i915_private *i915, u32 **opreg,
+				     u32 *opreg_size)
+{
+	return 0;
+}
 
+#endif /* CONFIG_ACPI */
 #endif
