@@ -23,6 +23,7 @@ void dp_aux_isr(struct drm_dp_aux *dp_aux);
 void dp_aux_init(struct drm_dp_aux *dp_aux);
 void dp_aux_deinit(struct drm_dp_aux *dp_aux);
 void dp_aux_reconfig(struct drm_dp_aux *dp_aux);
+void dp_aux_abort(struct drm_dp_aux *dp_aux, bool abort);
 
 struct drm_dp_aux *dp_aux_get(struct device *dev, struct dp_catalog *catalog);
 void dp_aux_put(struct drm_dp_aux *aux);

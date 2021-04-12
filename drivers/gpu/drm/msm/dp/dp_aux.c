@@ -28,6 +28,7 @@ struct dp_aux_private {
 	u32 offset;
 	u32 segment;
 	u32 isr;
+	atomic_t aborted;
 
 	struct drm_dp_aux dp_aux;
 };
@@ -343,6 +344,11 @@ static ssize_t dp_aux_transfer(struct drm_dp_aux *dp_aux,
 
 	mutex_lock(&aux->mutex);
 
+	if (atomic_read(&aux->aborted)) {
+		ret = -ETIMEDOUT;
+		goto unlock_exit;
+	}
+
 	aux->native = msg->request & (DP_AUX_NATIVE_WRITE & DP_AUX_NATIVE_READ);
 
 	/* Ignore address only message */
@@ -532,4 +538,16 @@ void dp_aux_put(struct drm_dp_aux *dp_aux)
 	mutex_destroy(&aux->mutex);
 
 	devm_kfree(aux->dev, aux);
+}
+
+void dp_aux_abort(struct drm_dp_aux *dp_aux, bool abort)
+{
+	struct dp_aux_private *aux;
+
+	if (!dp_aux)
+		return;
+
+	aux = container_of(dp_aux, struct dp_aux_private, dp_aux);
+
+	atomic_set(&aux->aborted, abort);
 }

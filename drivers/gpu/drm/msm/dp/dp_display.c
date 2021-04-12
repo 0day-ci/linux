@@ -898,8 +898,10 @@ static int dp_display_disable(struct dp_display_private *dp, u32 data)
 	/* wait only if audio was enabled */
 	if (dp_display->audio_enabled) {
 		/* signal the disconnect event */
-		reinit_completion(&dp->audio_comp);
-		dp_display_handle_plugged_change(dp_display, false);
+		if (dp->hpd_state != ST_DISCONNECT_PENDING) {
+			reinit_completion(&dp->audio_comp);
+			dp_display_handle_plugged_change(dp_display, false);
+		}
 		if (!wait_for_completion_timeout(&dp->audio_comp,
 				HZ * 5))
 			DRM_ERROR("audio comp timeout\n");
@@ -1137,20 +1139,26 @@ static irqreturn_t dp_display_irq_handler(int irq, void *dev_id)
 		/* hpd related interrupts */
 		if (hpd_isr_status & DP_DP_HPD_PLUG_INT_MASK ||
 			hpd_isr_status & DP_DP_HPD_REPLUG_INT_MASK) {
+			dp_aux_abort(dp->aux, false);
 			dp_add_event(dp, EV_HPD_PLUG_INT, 0, 0);
 		}
 
 		if (hpd_isr_status & DP_DP_IRQ_HPD_INT_MASK) {
 			/* stop sentinel connect pending checking */
+			dp_aux_abort(dp->aux, false);
 			dp_del_event(dp, EV_CONNECT_PENDING_TIMEOUT);
 			dp_add_event(dp, EV_IRQ_HPD_INT, 0, 0);
 		}
 
-		if (hpd_isr_status & DP_DP_HPD_REPLUG_INT_MASK)
+		if (hpd_isr_status & DP_DP_HPD_REPLUG_INT_MASK) {
+			dp_aux_abort(dp->aux, false);
 			dp_add_event(dp, EV_HPD_REPLUG_INT, 0, 0);
+		}
 
-		if (hpd_isr_status & DP_DP_HPD_UNPLUG_INT_MASK)
+		if (hpd_isr_status & DP_DP_HPD_UNPLUG_INT_MASK) {
+			dp_aux_abort(dp->aux, true);
 			dp_add_event(dp, EV_HPD_UNPLUG_INT, 0, 0);
+		}
 	}
 
 	/* DP controller isr */
