@@ -1911,6 +1911,7 @@ int fib_multipath_hash(const struct net *net, const struct flowi4 *fl4,
 		       const struct sk_buff *skb, struct flow_keys *flkeys)
 {
 	u32 multipath_hash = fl4 ? fl4->flowi4_multipath_hash : 0;
+	struct multipath_seed_ctx *seed_ctx;
 	struct flow_keys hash_keys;
 	u32 mhash;
 
@@ -1989,7 +1990,14 @@ int fib_multipath_hash(const struct net *net, const struct flowi4 *fl4,
 		}
 		break;
 	}
-	mhash = flow_hash_from_keys(&hash_keys);
+
+	rcu_read_lock();
+	seed_ctx = fib_multipath_seed_get_ctx(&net->ipv4);
+	if (seed_ctx)
+		mhash = flow_multipath_hash_from_keys(&hash_keys, &seed_ctx->seed);
+	else
+		mhash = flow_hash_from_keys(&hash_keys);
+	rcu_read_unlock();
 
 	if (multipath_hash)
 		mhash = jhash_2words(mhash, multipath_hash, 0);
