@@ -587,7 +587,7 @@ static int dp_connect_pending_timeout(struct dp_display_private *dp, u32 data)
 
 	state = dp->hpd_state;
 	if (state == ST_CONNECT_PENDING) {
-		dp_display_enable(dp, 0);
+		DRM_ERROR("EV_CONNECT_PENDING_TIMEOUT error\n");
 		dp->hpd_state = ST_CONNECTED;
 	}
 
@@ -670,7 +670,7 @@ static int dp_disconnect_pending_timeout(struct dp_display_private *dp, u32 data
 
 	state =  dp->hpd_state;
 	if (state == ST_DISCONNECT_PENDING) {
-		dp_display_disable(dp, 0);
+		DRM_ERROR("EV_DISCONNECT_PENDING_TIMEOUT error\n");
 		dp->hpd_state = ST_DISCONNECTED;
 	}
 
@@ -1272,7 +1272,7 @@ static int dp_pm_resume(struct device *dev)
 
 	status = dp_catalog_link_is_connected(dp->catalog);
 
-	if (status)
+	if (status && dp->link->sink_count)
 		dp->dp_display.is_connected = true;
 	else
 		dp->dp_display.is_connected = false;
