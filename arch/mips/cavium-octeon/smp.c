@@ -28,9 +28,13 @@
 volatile unsigned long octeon_processor_boot = 0xff;
 volatile unsigned long octeon_processor_sp;
 volatile unsigned long octeon_processor_gp;
+
+#ifdef CONFIG_RELOCATABLE
+volatile unsigned long relocate_finished = 1;
 #ifdef CONFIG_RANDOMIZE_BASE
 volatile unsigned long octeon_processor_relocated_kernel_entry;
 #endif /* CONFIG_RANDOMIZE_BASE */
+#endif /* CONFIG_RELOCATABLE */
 
 #ifdef CONFIG_HOTPLUG_CPU
 uint64_t octeon_bootloader_entry_addr;
@@ -188,7 +192,6 @@ static void __init octeon_smp_setup(void)
 
 	octeon_smp_hotplug_setup();
 }
-
 
 #ifdef CONFIG_RANDOMIZE_BASE
 int plat_post_relocation(long offset)

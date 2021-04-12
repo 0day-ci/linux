@@ -101,6 +101,19 @@
 
 #ifdef CONFIG_SMP
 
+#ifdef CONFIG_RELOCATABLE
+	# Wait main processor finished relocation
+	bal	1f
+1:	move	t0, ra
+	PTR_LA	t1, 1b
+	PTR_SUBU	t0, t1
+	PTR_LA	t1, relocate_finished
+	PTR_ADDU	t0, t1
+2:	nop
+	LONG_L	t1, 0(t0)
+	bnez	t1, 2b
+#endif /* CONFIG_RELOCATABLE */
+
 	#
 	# All cores other than the master need to wait here for SMP bootstrap
 	# to begin
