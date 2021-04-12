@@ -1953,17 +1953,17 @@ xfs_init_zones(void)
 		goto out_destroy_trans_zone;
 
 	xfs_efd_zone = kmem_cache_create("xfs_efd_item",
-					(sizeof(struct xfs_efd_log_item) +
-					(XFS_EFD_MAX_FAST_EXTENTS - 1) *
-					sizeof(struct xfs_extent)),
-					0, 0, NULL);
+					 struct_size((struct xfs_efd_log_item *)0,
+					 efd_format.efd_extents,
+					 XFS_EFD_MAX_FAST_EXTENTS),
+					 0, 0, NULL);
 	if (!xfs_efd_zone)
 		goto out_destroy_buf_item_zone;
 
 	xfs_efi_zone = kmem_cache_create("xfs_efi_item",
-					 (sizeof(struct xfs_efi_log_item) +
-					 (XFS_EFI_MAX_FAST_EXTENTS - 1) *
-					 sizeof(struct xfs_extent)),
+					 struct_size((struct xfs_efi_log_item *)0,
+					 efi_format.efi_extents,
+					 XFS_EFI_MAX_FAST_EXTENTS),
 					 0, 0, NULL);
 	if (!xfs_efi_zone)
 		goto out_destroy_efd_zone;

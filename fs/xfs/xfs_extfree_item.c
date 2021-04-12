@@ -73,8 +73,8 @@ static inline int
 xfs_efi_item_sizeof(
 	struct xfs_efi_log_item *efip)
 {
-	return sizeof(struct xfs_efi_log_format) +
-	       (efip->efi_format.efi_nextents - 1) * sizeof(xfs_extent_t);
+	return struct_size(&efip->efi_format, efi_extents,
+			   efip->efi_format.efi_nextents);
 }
 
 STATIC void
@@ -153,17 +153,14 @@ xfs_efi_init(
 
 {
 	struct xfs_efi_log_item	*efip;
-	uint			size;
 
 	ASSERT(nextents > 0);
-	if (nextents > XFS_EFI_MAX_FAST_EXTENTS) {
-		size = (uint)(sizeof(struct xfs_efi_log_item) +
-			((nextents - 1) * sizeof(xfs_extent_t)));
-		efip = kmem_zalloc(size, 0);
-	} else {
+	if (nextents > XFS_EFI_MAX_FAST_EXTENTS)
+		efip = kmem_zalloc(struct_size(efip, efi_format.efi_extents,
+					       nextents), 0);
+	else
 		efip = kmem_cache_zalloc(xfs_efi_zone,
 					 GFP_KERNEL | __GFP_NOFAIL);
-	}
 
 	xfs_log_item_init(mp, &efip->efi_item, XFS_LI_EFI, &xfs_efi_item_ops);
 	efip->efi_format.efi_nextents = nextents;
@@ -172,6 +169,36 @@ xfs_efi_init(
 	atomic_set(&efip->efi_refcount, 2);
 
 	return efip;
+}
+
+/*
+ * Calculates the size of structure xfs_efi_log_format followed by an
+ * array of n number of efi_extents elements.
+ */
+static inline size_t
+sizeof_efi_log_format(size_t n)
+{
+	return struct_size((struct xfs_efi_log_format *)0, efi_extents, n);
+}
+
+/*
+ * Calculates the size of structure xfs_efi_log_format_32 followed by an
+ * array of n number of efi_extents elements.
+ */
+static inline size_t
+sizeof_efi_log_format_32(size_t n)
+{
+	return struct_size((struct xfs_efi_log_format_32 *)0, efi_extents, n);
+}
+
+/*
+ * Calculates the size of structure xfs_efi_log_format_64 followed by an
+ * array of n number of efi_extents elements.
+ */
+static inline size_t
+sizeof_efi_log_format_64(size_t n)
+{
+	return struct_size((struct xfs_efi_log_format_64 *)0, efi_extents, n);
 }
 
 /*
@@ -186,12 +213,9 @@ xfs_efi_copy_format(xfs_log_iovec_t *buf, xfs_efi_log_format_t *dst_efi_fmt)
 {
 	xfs_efi_log_format_t *src_efi_fmt = buf->i_addr;
 	uint i;
-	uint len = sizeof(xfs_efi_log_format_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_t);  
-	uint len32 = sizeof(xfs_efi_log_format_32_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_32_t);  
-	uint len64 = sizeof(xfs_efi_log_format_64_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_64_t);  
+	size_t len = sizeof_efi_log_format(src_efi_fmt->efi_nextents);
+	size_t len32 = sizeof_efi_log_format_32(src_efi_fmt->efi_nextents);
+	size_t len64 = sizeof_efi_log_format_64(src_efi_fmt->efi_nextents);
 
 	if (buf->i_len == len) {
 		memcpy((char *)dst_efi_fmt, (char*)src_efi_fmt, len);
@@ -253,8 +277,8 @@ static inline int
 xfs_efd_item_sizeof(
 	struct xfs_efd_log_item *efdp)
 {
-	return sizeof(xfs_efd_log_format_t) +
-	       (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
+	return struct_size(&efdp->efd_format, efd_extents,
+			   efdp->efd_format.efd_nextents);
 }
 
 STATIC void
@@ -328,14 +352,12 @@ xfs_trans_get_efd(
 
 	ASSERT(nextents > 0);
 
-	if (nextents > XFS_EFD_MAX_FAST_EXTENTS) {
-		efdp = kmem_zalloc(sizeof(struct xfs_efd_log_item) +
-				(nextents - 1) * sizeof(struct xfs_extent),
-				0);
-	} else {
+	if (nextents > XFS_EFD_MAX_FAST_EXTENTS)
+		efdp = kmem_zalloc(struct_size(efdp, efd_format.efd_extents,
+					nextents), 0);
+	else
 		efdp = kmem_cache_zalloc(xfs_efd_zone,
 					GFP_KERNEL | __GFP_NOFAIL);
-	}
 
 	xfs_log_item_init(tp->t_mountp, &efdp->efd_item, XFS_LI_EFD,
 			  &xfs_efd_item_ops);
@@ -666,11 +688,13 @@ xfs_efi_item_relog(
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	efdp = xfs_trans_get_efd(tp, EFI_ITEM(intent), count);
 	efdp->efd_next_extent = count;
-	memcpy(efdp->efd_format.efd_extents, extp, count * sizeof(*extp));
+	memcpy(efdp->efd_format.efd_extents, extp,
+	       flex_array_size(&efdp->efd_format, efd_extents, count));
 	set_bit(XFS_LI_DIRTY, &efdp->efd_item.li_flags);
 
 	efip = xfs_efi_init(tp->t_mountp, count);
-	memcpy(efip->efi_format.efi_extents, extp, count * sizeof(*extp));
+	memcpy(efip->efi_format.efi_extents, extp,
+	       flex_array_size(&efip->efi_format, efi_extents, count));
 	atomic_set(&efip->efi_next_extent, count);
 	xfs_trans_add_item(tp, &efip->efi_item);
 	set_bit(XFS_LI_DIRTY, &efip->efi_item.li_flags);
@@ -730,6 +754,26 @@ const struct xlog_recover_item_ops xlog_efi_item_ops = {
 };
 
 /*
+ * Calculates the size of structure xfs_efd_log_format_32 followed by an
+ * array of n number of efd_extents elements.
+ */
+static inline size_t
+sizeof_efd_log_format_32(size_t n)
+{
+	return struct_size((struct xfs_efd_log_format_32 *)0, efd_extents, n);
+}
+
+/*
+ * Calculates the size of structure xfs_efd_log_format_64 followed by an
+ * array of n number of efd_extents elements.
+ */
+static inline size_t
+sizeof_efd_log_format_64(size_t n)
+{
+	return struct_size((struct xfs_efd_log_format_64 *)0, efd_extents, n);
+}
+
+/*
  * This routine is called when an EFD format structure is found in a committed
  * transaction in the log. Its purpose is to cancel the corresponding EFI if it
  * was still in the log. To do this it searches the AIL for the EFI with an id
@@ -746,10 +790,10 @@ xlog_recover_efd_commit_pass2(
 	struct xfs_efd_log_format	*efd_formatp;
 
 	efd_formatp = item->ri_buf[0].i_addr;
-	ASSERT((item->ri_buf[0].i_len == (sizeof(xfs_efd_log_format_32_t) +
-		((efd_formatp->efd_nextents - 1) * sizeof(xfs_extent_32_t)))) ||
-	       (item->ri_buf[0].i_len == (sizeof(xfs_efd_log_format_64_t) +
-		((efd_formatp->efd_nextents - 1) * sizeof(xfs_extent_64_t)))));
+	ASSERT(item->ri_buf[0].i_len ==
+			sizeof_efd_log_format_32(efd_formatp->efd_nextents) ||
+	       item->ri_buf[0].i_len ==
+			sizeof_efd_log_format_64(efd_formatp->efd_nextents));
 
 	xlog_recover_release_intent(log, XFS_LI_EFI, efd_formatp->efd_efi_id);
 	return 0;
