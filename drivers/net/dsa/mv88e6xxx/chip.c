@@ -3026,6 +3026,8 @@ out_resources:
 	return err;
 }
 
+static u16 mv88e6xxx_physid_for_family(enum mv88e6xxx_family family);
+
 static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
 {
 	struct mv88e6xxx_mdio_bus *mdio_bus = bus->priv;
@@ -3040,24 +3042,9 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
 	err = chip->info->ops->phy_read(chip, bus, phy, reg, &val);
 	mv88e6xxx_reg_unlock(chip);
 
-	if (reg == MII_PHYSID2) {
-		/* Some internal PHYs don't have a model number. */
-		if (chip->info->family != MV88E6XXX_FAMILY_6165)
-			/* Then there is the 6165 family. It gets is
-			 * PHYs correct. But it can also have two
-			 * SERDES interfaces in the PHY address
-			 * space. And these don't have a model
-			 * number. But they are not PHYs, so we don't
-			 * want to give them something a PHY driver
-			 * will recognise.
-			 *
-			 * Use the mv88e6390 family model number
-			 * instead, for anything which really could be
-			 * a PHY,
-			 */
-			if (!(val & 0x3f0))
-				val |= MV88E6XXX_PORT_SWITCH_ID_PROD_6390 >> 4;
-	}
+	/* Some internal PHYs don't have a model number. */
+	if (reg == MII_PHYSID2 && !(val & 0x3f0))
+		val |= mv88e6xxx_physid_for_family(chip->info->family);
 
 	return err ? err : val;
 }
@@ -5242,6 +5229,39 @@ static const struct mv88e6xxx_info *mv88e6xxx_lookup_info(unsigned int prod_num)
 			return &mv88e6xxx_table[i];
 
 	return NULL;
+}
+
+/* This table contains representative model for every family */
+static const enum mv88e6xxx_model family_model_table[] = {
+	[MV88E6XXX_FAMILY_6095] = MV88E6095,
+	[MV88E6XXX_FAMILY_6097] = MV88E6097,
+	[MV88E6XXX_FAMILY_6185] = MV88E6185,
+	[MV88E6XXX_FAMILY_6250] = MV88E6250,
+	[MV88E6XXX_FAMILY_6320] = MV88E6320,
+	[MV88E6XXX_FAMILY_6341] = MV88E6341,
+	[MV88E6XXX_FAMILY_6351] = MV88E6351,
+	[MV88E6XXX_FAMILY_6352] = MV88E6352,
+	[MV88E6XXX_FAMILY_6390] = MV88E6390,
+};
+static_assert(ARRAY_SIZE(family_model_table) == MV88E6XXX_FAMILY_LAST);
+
+static u16 mv88e6xxx_physid_for_family(enum mv88e6xxx_family family)
+{
+	enum mv88e6xxx_model model;
+
+	/* 6165 family gets it's PHYs correct. But it can also have two SERDES
+	 * interfaces in the PHY address space. And these don't have a model
+	 * number. But they are not PHYs, so we don't want to give them
+	 * something a PHY driver will recognise.
+	 */
+	if (family == MV88E6XXX_FAMILY_6165)
+		return 0;
+
+	model = family_model_table[family];
+	if (model == MV88E_NA)
+		return 0;
+
+	return mv88e6xxx_table[model].prod_num >> 4;
 }
 
 static int mv88e6xxx_detect(struct mv88e6xxx_chip *chip)
