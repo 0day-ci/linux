@@ -127,6 +127,18 @@ patternProperties:
     type: object
     $ref: "/schemas/extcon/extcon-usbc-cros-ec.yaml#"
 
+  "^cbas$":
+    type: object
+    properties:
+      compatible:
+        const: google,cros-cbas
+    required:
+      - compatible
+    additionalProperties: false
+    description:
+      This device is used to signal when a detachable base is attached
+      to a Chrome OS tablet.
+
 required:
   - compatible
 
@@ -180,6 +192,10 @@ examples:
             interrupts = <99 0>;
             interrupt-parent = <&gpio7>;
             spi-max-frequency = <5000000>;
+
+            base_detection: cbas {
+                compatible = "google,cros-cbas";
+            };
         };
     };
 
