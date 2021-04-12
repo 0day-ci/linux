@@ -175,6 +175,7 @@ static int icl_get_bw_info(struct drm_i915_private *dev_priv, const struct intel
 			    "Failed to get memory subsystem information, ignoring bandwidth limits");
 		return ret;
 	}
+	num_channels = max_t(u8, 1, num_channels);
 
 	deinterleave = DIV_ROUND_UP(num_channels, is_y_tile ? 4 : 2);
 	dclk_max = icl_sagv_max_dclk(&qi);
