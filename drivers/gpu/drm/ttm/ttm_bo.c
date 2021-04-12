@@ -217,6 +217,9 @@ out_err:
 
 static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 {
+	if (kref_read(&bo->kref))
+		dma_resv_assert_held(bo->base.resv);
+
 	if (bo->bdev->funcs->delete_mem_notify)
 		bo->bdev->funcs->delete_mem_notify(bo);
 
@@ -239,13 +242,18 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 		return r;
 
 	if (bo->type != ttm_bo_type_sg) {
-		/* This works because the BO is about to be destroyed and nobody
-		 * reference it any more. The only tricky case is the trylock on
-		 * the resv object while holding the lru_lock.
+		/*
+		 * This works because nobody besides us can lock the bo or
+		 * assume it is locked while its refcount is zero.
 		 */
-		spin_lock(&bo->bdev->lru_lock);
+		WARN_ON_ONCE(kref_read(&bo->kref));
 		bo->base.resv = &bo->base._resv;
-		spin_unlock(&bo->bdev->lru_lock);
+		/*
+		 * Don't reorder against kref_init().
+		 * Matches the implicit full barrier of a successful
+		 * kref_get_unless_zero() after a lru_list_lookup.
+		 */
+		smp_mb();
 	}
 
 	return r;
@@ -274,122 +282,66 @@ static void ttm_bo_flush_all_fences(struct ttm_buffer_object *bo)
 }
 
 /**
- * function ttm_bo_cleanup_refs
- * If bo idle, remove from lru lists, and unref.
- * If not idle, block if possible.
- *
- * Must be called with lru_lock and reservation held, this function
- * will drop the lru lock and optionally the reservation lock before returning.
+ * ttm_bo_cleanup_refs - idle and remove pages and gpu-bindings and remove
+ * from lru_lists.
  *
  * @bo:                    The buffer object to clean-up
  * @interruptible:         Any sleeps should occur interruptibly.
- * @no_wait_gpu:           Never wait for gpu. Return -EBUSY instead.
- * @unlock_resv:           Unlock the reservation lock as well.
+ * @no_wait_gpu:           Never wait for gpu. Return -EBUSY if not idle.
  */
-
 static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
-			       bool interruptible, bool no_wait_gpu,
-			       bool unlock_resv)
+			       bool interruptible, bool no_wait_gpu)
 {
-	struct dma_resv *resv = &bo->base._resv;
 	int ret;
 
-	if (dma_resv_test_signaled_rcu(resv, true))
-		ret = 0;
-	else
-		ret = -EBUSY;
-
-	if (ret && !no_wait_gpu) {
-		long lret;
-
-		if (unlock_resv)
-			dma_resv_unlock(bo->base.resv);
-		spin_unlock(&bo->bdev->lru_lock);
-
-		lret = dma_resv_wait_timeout_rcu(resv, true, interruptible,
-						 30 * HZ);
-
-		if (lret < 0)
-			return lret;
-		else if (lret == 0)
-			return -EBUSY;
-
-		spin_lock(&bo->bdev->lru_lock);
-		if (unlock_resv && !dma_resv_trylock(bo->base.resv)) {
-			/*
-			 * We raced, and lost, someone else holds the reservation now,
-			 * and is probably busy in ttm_bo_cleanup_memtype_use.
-			 *
-			 * Even if it's not the case, because we finished waiting any
-			 * delayed destruction would succeed, so just return success
-			 * here.
-			 */
-			spin_unlock(&bo->bdev->lru_lock);
-			return 0;
-		}
-		ret = 0;
-	}
-
-	if (ret || unlikely(list_empty(&bo->ddestroy))) {
-		if (unlock_resv)
-			dma_resv_unlock(bo->base.resv);
-		spin_unlock(&bo->bdev->lru_lock);
+	dma_resv_assert_held(bo->base.resv);
+	WARN_ON_ONCE(!bo->deleted);
+	ret = ttm_bo_wait(bo, interruptible, no_wait_gpu);
+	if (ret)
 		return ret;
-	}
 
-	ttm_bo_del_from_lru(bo);
-	list_del_init(&bo->ddestroy);
-	spin_unlock(&bo->bdev->lru_lock);
 	ttm_bo_cleanup_memtype_use(bo);
-
-	if (unlock_resv)
-		dma_resv_unlock(bo->base.resv);
-
-	ttm_bo_put(bo);
+	spin_lock(&bo->bdev->lru_lock);
+	ttm_bo_del_from_lru(bo);
+	spin_unlock(&bo->bdev->lru_lock);
 
 	return 0;
 }
 
 /*
- * Traverse the delayed list, and call ttm_bo_cleanup_refs on all
- * encountered buffers.
+ * Isolate a part of the delayed destroy list and check for idle on all
+ * buffer objects on it. If idle, remove from the list and drop the
+ * delayed destroy refcount. Return all busy buffers to the delayed
+ * destroy list.
  */
 bool ttm_bo_delayed_delete(struct ttm_device *bdev, bool remove_all)
 {
-	struct list_head removed;
-	bool empty;
+	struct ttm_buffer_object *bo, *next;
+	struct list_head isolated;
+	bool empty, idle;
 
-	INIT_LIST_HEAD(&removed);
+	INIT_LIST_HEAD(&isolated);
 
-	spin_lock(&bdev->lru_lock);
-	while (!list_empty(&bdev->ddestroy)) {
-		struct ttm_buffer_object *bo;
-
-		bo = list_first_entry(&bdev->ddestroy, struct ttm_buffer_object,
-				      ddestroy);
-		list_move_tail(&bo->ddestroy, &removed);
-		if (!ttm_bo_get_unless_zero(bo))
-			continue;
-
-		if (remove_all || bo->base.resv != &bo->base._resv) {
-			spin_unlock(&bdev->lru_lock);
-			dma_resv_lock(bo->base.resv, NULL);
-
-			spin_lock(&bdev->lru_lock);
-			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
-
-		} else if (dma_resv_trylock(bo->base.resv)) {
-			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
-		} else {
-			spin_unlock(&bdev->lru_lock);
+	spin_lock(&bdev->ddestroy_lock);
+	list_splice_init(&bdev->ddestroy, &isolated);
+	spin_unlock(&bdev->ddestroy_lock);
+	list_for_each_entry_safe(bo, next, &isolated, ddestroy) {
+		WARN_ON_ONCE(!kref_read(&bo->kref) ||
+			     bo->base.resv != &bo->base._resv);
+		if (!remove_all)
+			idle = dma_resv_test_signaled_rcu(bo->base.resv, true);
+		else
+			idle = (dma_resv_wait_timeout_rcu(bo->base.resv, true,
+							  false, 30 * HZ) > 0);
+		if (idle) {
+			list_del_init(&bo->ddestroy);
+			ttm_bo_put(bo);
 		}
-
-		ttm_bo_put(bo);
-		spin_lock(&bdev->lru_lock);
 	}
-	list_splice_tail(&removed, &bdev->ddestroy);
+	spin_lock(&bdev->ddestroy_lock);
+	list_splice(&isolated, &bdev->ddestroy);
 	empty = list_empty(&bdev->ddestroy);
-	spin_unlock(&bdev->lru_lock);
+	spin_unlock(&bdev->ddestroy_lock);
 
 	return empty;
 }
@@ -405,10 +357,16 @@ static void ttm_bo_release(struct kref *kref)
 		ret = ttm_bo_individualize_resv(bo);
 		if (ret) {
 			/* Last resort, if we fail to allocate memory for the
-			 * fences block for the BO to become idle
+			 * fences block for the BO to become idle, and then
+			 * we are free to update the resv pointer.
 			 */
 			dma_resv_wait_timeout_rcu(bo->base.resv, true, false,
 						  30 * HZ);
+			if (bo->type != ttm_bo_type_sg) {
+				bo->base.resv = &bo->base._resv;
+				/* Please see ttm_bo_individualize_resv() */
+				smp_mb();
+			}
 		}
 
 		if (bo->bdev->funcs->release_notify)
@@ -422,9 +380,8 @@ static void ttm_bo_release(struct kref *kref)
 	    !dma_resv_trylock(bo->base.resv)) {
 		/* The BO is not idle, resurrect it for delayed destroy */
 		ttm_bo_flush_all_fences(bo);
-		bo->deleted = true;
-
 		spin_lock(&bo->bdev->lru_lock);
+		bo->deleted = true;
 
 		/*
 		 * Make pinned bos immediately available to
@@ -439,8 +396,10 @@ static void ttm_bo_release(struct kref *kref)
 			ttm_bo_move_to_lru_tail(bo, &bo->mem, NULL);
 		}
 
+		spin_lock(&bo->bdev->ddestroy_lock);
 		kref_init(&bo->kref);
 		list_add_tail(&bo->ddestroy, &bdev->ddestroy);
+		spin_unlock(&bo->bdev->ddestroy_lock);
 		spin_unlock(&bo->bdev->lru_lock);
 
 		schedule_delayed_work(&bdev->wq,
@@ -450,8 +409,10 @@ static void ttm_bo_release(struct kref *kref)
 
 	spin_lock(&bo->bdev->lru_lock);
 	ttm_bo_del_from_lru(bo);
-	list_del(&bo->ddestroy);
 	spin_unlock(&bo->bdev->lru_lock);
+
+	pr_info("Deleting.\n");
+	WARN_ON_ONCE(!list_empty_careful(&bo->ddestroy));
 
 	ttm_bo_cleanup_memtype_use(bo);
 	dma_resv_unlock(bo->base.resv);
@@ -630,25 +591,26 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 		list_for_each_entry(bo, &man->lru[i], lru) {
 			bool busy;
 
+			if (!ttm_bo_get_unless_zero(bo))
+				continue;
+
 			if (!ttm_bo_evict_swapout_allowable(bo, ctx, &locked,
 							    &busy)) {
 				if (busy && !busy_bo && ticket !=
 				    dma_resv_locking_ctx(bo->base.resv))
 					busy_bo = bo;
+				ttm_bo_put(bo);
 				continue;
 			}
 
 			if (place && !bdev->funcs->eviction_valuable(bo,
 								      place)) {
+				ttm_bo_put(bo);
 				if (locked)
 					dma_resv_unlock(bo->base.resv);
 				continue;
 			}
-			if (!ttm_bo_get_unless_zero(bo)) {
-				if (locked)
-					dma_resv_unlock(bo->base.resv);
-				continue;
-			}
+
 			break;
 		}
 
@@ -670,8 +632,11 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 	}
 
 	if (bo->deleted) {
+		spin_unlock(&bdev->lru_lock);
 		ret = ttm_bo_cleanup_refs(bo, ctx->interruptible,
-					  ctx->no_wait_gpu, locked);
+					  ctx->no_wait_gpu);
+		if (locked)
+			dma_resv_unlock(bo->base.resv);
 		ttm_bo_put(bo);
 		return ret;
 	}
@@ -1168,17 +1133,19 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 	bool locked;
 	int ret;
 
-	if (!ttm_bo_evict_swapout_allowable(bo, ctx, &locked, NULL))
+	if (!ttm_bo_get_unless_zero(bo))
 		return -EBUSY;
 
-	if (!ttm_bo_get_unless_zero(bo)) {
-		if (locked)
-			dma_resv_unlock(bo->base.resv);
+	if (!ttm_bo_evict_swapout_allowable(bo, ctx, &locked, NULL)) {
+		ttm_bo_put(bo);
 		return -EBUSY;
 	}
 
 	if (bo->deleted) {
-		ttm_bo_cleanup_refs(bo, false, false, locked);
+		spin_unlock(&bo->bdev->lru_lock);
+		ttm_bo_cleanup_refs(bo, false, false);
+		if (locked)
+			dma_resv_unlock(bo->base.resv);
 		ttm_bo_put(bo);
 		return 0;
 	}

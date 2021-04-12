@@ -279,6 +279,7 @@ struct ttm_device {
 	 * Protection for the per manager LRU and ddestroy lists.
 	 */
 	spinlock_t lru_lock;
+	spinlock_t ddestroy_lock;
 	struct list_head ddestroy;
 
 	/*
