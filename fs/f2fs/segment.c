@@ -325,6 +325,7 @@ void f2fs_drop_inmem_pages(struct inode *inode)
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 
 	do {
+		down_write(&F2FS_I(inode)->i_mmap_sem);
 		mutex_lock(&fi->inmem_lock);
 		if (list_empty(&fi->inmem_pages)) {
 			fi->i_gc_failures[GC_FAILURE_ATOMIC] = 0;
@@ -339,11 +340,13 @@ void f2fs_drop_inmem_pages(struct inode *inode)
 			spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
 
 			mutex_unlock(&fi->inmem_lock);
+			up_write(&F2FS_I(inode)->i_mmap_sem);
 			break;
 		}
 		__revoke_inmem_pages(inode, &fi->inmem_pages,
 						true, false, true);
 		mutex_unlock(&fi->inmem_lock);
+		up_write(&F2FS_I(inode)->i_mmap_sem);
 	} while (1);
 }
 
@@ -468,6 +471,7 @@ int f2fs_commit_inmem_pages(struct inode *inode)
 	f2fs_balance_fs(sbi, true);
 
 	down_write(&fi->i_gc_rwsem[WRITE]);
+	down_write(&F2FS_I(inode)->i_mmap_sem);
 
 	f2fs_lock_op(sbi);
 	set_inode_flag(inode, FI_ATOMIC_COMMIT);
@@ -479,6 +483,8 @@ int f2fs_commit_inmem_pages(struct inode *inode)
 	clear_inode_flag(inode, FI_ATOMIC_COMMIT);
 
 	f2fs_unlock_op(sbi);
+
+	up_write(&F2FS_I(inode)->i_mmap_sem);
 	up_write(&fi->i_gc_rwsem[WRITE]);
 
 	return err;
