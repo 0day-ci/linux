@@ -104,6 +104,10 @@ NESTED(kernel_entry, 16, sp)			# kernel entry point
 	jr		t0
 2:
 
+#ifdef SMP_IN_KERNEL_ENTRY
+	smp_in_kernel_entry_handle
+#endif
+
 	PTR_LA		t0, __bss_start		# clear .bss
 	LONG_S		zero, (t0)
 	PTR_LA		t1, __bss_stop - LONGSIZE

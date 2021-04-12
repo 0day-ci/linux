@@ -86,6 +86,13 @@
 	dli	v0, 0x27
 	dmtc0	v0, CP0_DCACHE_ERR_REG
 1:
+	.set pop
+.endm
+
+#define SMP_IN_KERNEL_ENTRY
+.macro	smp_in_kernel_entry_handle
+	.set push
+	.set arch=octeon
 	# Get my core id
 	rdhwr	v0, $0
 	# Jump the master to kernel_entry
