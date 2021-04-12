@@ -5,6 +5,7 @@
  */
 
 /dts-v1/;
+#include <dt-bindings/gce/mt8192-gce.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/pinctrl/mt8192-pinfunc.h>
@@ -289,6 +290,15 @@
 			interrupts = <GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&clk26m>;
 			clock-names = "clk13m";
+		};
+
+		gce: mailbox@10228000 {
+			compatible = "mediatek,mt8192-gce";
+			reg = <0 0x10228000 0 0x4000>;
+			interrupts = <GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH 0>;
+			#mbox-cells = <3>;
+			clocks = <&infracfg CLK_INFRA_GCE>;
+			clock-names = "gce";
 		};
 
 		uart0: serial@11002000 {
