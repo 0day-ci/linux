@@ -19,12 +19,9 @@
 #ifndef __INC_HAL8723BREG_H
 #define __INC_HAL8723BREG_H
 
-
-
 /*  */
 /*  */
 /*  */
-
 /*  */
 /*  */
 /*	0x0000h ~ 0x00FFh	System Configuration */
@@ -142,7 +139,6 @@
 #define REG_RQPN_NPQ_8723B			0x0214
 #define REG_DWBCN1_CTRL_8723B			0x0228
 
-
 /*  */
 /*  */
 /*	0x0280h ~ 0x02FFh	RXDMA Configuration */
@@ -157,7 +153,6 @@
 #define REG_EARLY_MODE_CONTROL_8723B	0x02BC
 #define REG_RSVD5_8723B					0x02F0
 #define REG_RSVD6_8723B					0x02F4
-
 
 /*  */
 /*  */
@@ -355,7 +350,6 @@
 #define REG_BFMEE_SEL_8723B		0x0714
 #define REG_SND_PTCL_CTRL_8723B		0x0718
 
-
 /*	Redifine 8192C register definition for compatibility */
 
 /*	TODO: use these definition when using REG_xxx naming rule. */
@@ -365,7 +359,6 @@
 #define	MSR_8723B		(REG_CR_8723B + 2)	/*  Media Status register */
 #define	ISR_8723B		REG_HISR0_8723B
 #define	TSFR_8723B		REG_TSFTR_8723B		/*  Timing Sync Function Timer Register. */
-
 #define PBP_8723B		REG_PBP_8723B
 
 /*  Redifine MACID register, to compatible prior ICs. */
