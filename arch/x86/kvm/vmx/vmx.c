@@ -6613,11 +6613,12 @@ static noinstr void vmx_vcpu_enter_exit(struct kvm_vcpu *vcpu,
 	 * accordingly.
 	 */
 	instrumentation_begin();
+	vtime_account_guest_enter();
 	trace_hardirqs_on_prepare();
 	lockdep_hardirqs_on_prepare(CALLER_ADDR0);
 	instrumentation_end();
 
-	guest_enter_irqoff();
+	context_guest_enter_irqoff();
 	lockdep_hardirqs_on(CALLER_ADDR0);
 
 	/* L1D Flush includes CPU buffer clear to mitigate MDS */
@@ -6647,10 +6648,11 @@ static noinstr void vmx_vcpu_enter_exit(struct kvm_vcpu *vcpu,
 	 * into world and some more.
 	 */
 	lockdep_hardirqs_off(CALLER_ADDR0);
-	guest_exit_irqoff();
+	context_guest_exit_irqoff();
 
 	instrumentation_begin();
 	trace_hardirqs_off_finish();
+	__vtime_account_guest_exit();
 	instrumentation_end();
 }
 
