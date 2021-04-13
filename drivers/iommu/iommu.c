@@ -2762,6 +2762,81 @@ int iommu_split_block(struct iommu_domain *domain, unsigned long iova,
 }
 EXPORT_SYMBOL_GPL(iommu_split_block);
 
+static int __iommu_merge_page(struct iommu_domain *domain,
+			      unsigned long iova, phys_addr_t paddr,
+			      size_t size, int prot)
+{
+	const struct iommu_ops *ops = domain->ops;
+	unsigned int min_pagesz;
+	size_t pgsize;
+	int ret = 0;
+
+	if (unlikely(!ops || !ops->merge_page))
+		return -ENODEV;
+
+	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
+	if (!IS_ALIGNED(iova | paddr | size, min_pagesz)) {
+		pr_err("unaligned: iova 0x%lx pa %pa size 0x%zx min_pagesz 0x%x\n",
+			iova, &paddr, size, min_pagesz);
+		return -EINVAL;
+	}
+
+	while (size) {
+		pgsize = iommu_pgsize(domain, iova | paddr, size);
+
+		ret = ops->merge_page(domain, iova, paddr, pgsize, prot);
+		if (ret)
+			break;
+
+		pr_debug("merge handled: iova 0x%lx pa %pa size 0x%zx\n",
+			 iova, &paddr, pgsize);
+
+		iova += pgsize;
+		paddr += pgsize;
+		size -= pgsize;
+	}
+
+	return ret;
+}
+
+int iommu_merge_page(struct iommu_domain *domain, unsigned long iova,
+		     size_t size, int prot)
+{
+	phys_addr_t phys;
+	dma_addr_t p, i;
+	size_t cont_size;
+	bool flush = false;
+	int ret = 0;
+
+	while (size) {
+		flush = true;
+
+		phys = iommu_iova_to_phys(domain, iova);
+		cont_size = PAGE_SIZE;
+		p = phys + cont_size;
+		i = iova + cont_size;
+
+		while (cont_size < size && p == iommu_iova_to_phys(domain, i)) {
+			p += PAGE_SIZE;
+			i += PAGE_SIZE;
+			cont_size += PAGE_SIZE;
+		}
+
+		ret = __iommu_merge_page(domain, iova, phys, cont_size, prot);
+		if (ret)
+			break;
+
+		iova += cont_size;
+		size -= cont_size;
+	}
+
+	if (flush)
+		iommu_flush_iotlb_all(domain);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_merge_page);
+
 int iommu_switch_dirty_log(struct iommu_domain *domain, bool enable,
 			   unsigned long iova, size_t size, int prot)
 {
