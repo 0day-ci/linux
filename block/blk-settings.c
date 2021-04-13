@@ -928,6 +928,23 @@ void blk_queue_set_zoned(struct gendisk *disk, enum blk_zoned_model model)
 }
 EXPORT_SYMBOL_GPL(blk_queue_set_zoned);
 
+/**
+ * blk_queue_set_limit_bio_size - set limit bio size flag
+ * @q:		the request queue for the device
+ * @limit:	limit bio size on(true), or off
+ *
+ * bio max size will be limited to queue max sectors size,
+ * if limit is true.
+ */
+void blk_queue_set_limit_bio_size(struct request_queue *q, bool limit)
+{
+	if (limit)
+		blk_queue_flag_set(QUEUE_FLAG_LIMIT_BIO_SIZE, q);
+	else
+		blk_queue_flag_clear(QUEUE_FLAG_LIMIT_BIO_SIZE, q);
+}
+EXPORT_SYMBOL_GPL(blk_queue_set_limit_bio_size);
+
 static int __init blk_settings_init(void)
 {
 	blk_max_low_pfn = max_low_pfn - 1;
