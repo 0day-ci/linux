@@ -5498,13 +5498,50 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 	int i;
 	bool flush = false;
 
+	if (gfn_end == gfn_start || WARN_ON(gfn_end < gfn_start))
+		return;
+
 	write_lock(&kvm->mmu_lock);
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
-		int ctr;
+		int idxactive;
+		struct rb_node *node;
 
 		slots = __kvm_memslots(kvm, i);
-		kvm_for_each_memslot(memslot, ctr, slots) {
+		idxactive = kvm_memslots_idx(slots);
+
+		/*
+		 * Find the slot with the lowest gfn that can possibly intersect with
+		 * the range, so we'll ideally have slot start <= range start
+		 */
+		node = kvm_memslots_gfn_upper_bound(slots, gfn_start);
+		if (node) {
+			struct rb_node *pnode;
+
+			/*
+			 * A NULL previous node means that the very first slot
+			 * already has a higher start gfn.
+			 * In this case slot start > range start.
+			 */
+			pnode = rb_prev(node);
+			if (pnode)
+				node = pnode;
+		} else {
+			/* a NULL node below means no slots */
+			node = rb_last(&slots->gfn_tree);
+		}
+
+		for ( ; node; node = rb_next(node)) {
 			gfn_t start, end;
+
+			memslot = container_of(node, struct kvm_memory_slot,
+					       gfn_node[idxactive]);
+
+			/*
+			 * If this slot starts beyond or at the end of the range so does
+			 * every next one
+			 */
+			if (memslot->base_gfn >= gfn_start + gfn_end)
+				break;
 
 			start = max(gfn_start, memslot->base_gfn);
 			end = min(gfn_end, memslot->base_gfn + memslot->npages);
