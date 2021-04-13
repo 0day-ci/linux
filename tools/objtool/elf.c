@@ -733,7 +733,7 @@ struct symbol *elf_create_undef_symbol(struct elf *elf, const char *name)
 
 	sym->sym.st_name = elf_add_string(elf, NULL, sym->name);
 	if (sym->sym.st_name == -1)
-		return NULL;
+		goto err;
 
 	sym->sym.st_info = GELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
 	// st_other 0
@@ -744,19 +744,19 @@ struct symbol *elf_create_undef_symbol(struct elf *elf, const char *name)
 	symtab = find_section_by_name(elf, ".symtab");
 	if (!symtab) {
 		WARN("can't find .symtab");
-		return NULL;
+		goto err;
 	}
 
 	s = elf_getscn(elf->elf, symtab->idx);
 	if (!s) {
 		WARN_ELF("elf_getscn");
-		return NULL;
+		goto err;
 	}
 
 	data = elf_newdata(s);
 	if (!data) {
 		WARN_ELF("elf_newdata");
-		return NULL;
+		goto err;
 	}
 
 	data->d_buf = &sym->sym;
@@ -773,6 +773,10 @@ struct symbol *elf_create_undef_symbol(struct elf *elf, const char *name)
 	elf_add_symbol(elf, sym);
 
 	return sym;
+err:
+	free(sym->name);
+	free(sym);
+	return NULL;
 }
 
 struct section *elf_create_section(struct elf *elf, const char *name,
