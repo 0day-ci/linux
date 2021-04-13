@@ -1275,16 +1275,6 @@ static  void mk_tid_release(struct sk_buff *skb,
 	INIT_TP_WR_CPL(req, CPL_TID_RELEASE, tid);
 }
 
-static int chtls_get_module(struct sock *sk)
-{
-	struct inet_connection_sock *icsk = inet_csk(sk);
-
-	if (!try_module_get(icsk->icsk_ulp_ops->owner))
-		return -1;
-
-	return 0;
-}
-
 static void chtls_pass_accept_request(struct sock *sk,
 				      struct sk_buff *skb)
 {
@@ -1401,8 +1391,6 @@ static void chtls_pass_accept_request(struct sock *sk,
 	if (!newsk)
 		goto reject;
 
-	if (chtls_get_module(newsk))
-		goto reject;
 	inet_csk_reqsk_queue_added(sk);
 	reply_skb->sk = newsk;
 	chtls_install_cpl_ops(newsk);

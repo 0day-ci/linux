@@ -569,11 +569,8 @@ out:
 static int chtls_setsockopt(struct sock *sk, int level, int optname,
 			    sockptr_t optval, unsigned int optlen)
 {
-	struct tls_context *ctx = tls_get_ctx(sk);
-
 	if (level != SOL_TLS)
-		return ctx->sk_proto->setsockopt(sk, level,
-						 optname, optval, optlen);
+		return -EOPNOTSUPP;
 
 	return do_chtls_setsockopt(sk, optname, optval, optlen);
 }

@@ -718,8 +718,12 @@ static int tls_init(struct sock *sk)
 	tls_build_proto(sk);
 
 #ifdef CONFIG_TLS_TOE
+	/* if tls_toe is supported by a device, return failure
+	 * for this TCP_ULP operation. TLS TOE will take over
+	 * from here.
+	 */
 	if (tls_toe_bypass(sk))
-		return 0;
+		return -EOPNOTSUPP;
 #endif
 
 	/* The TLS ulp is currently supported only for TCP sockets

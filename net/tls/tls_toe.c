@@ -47,9 +47,13 @@ static void tls_toe_sk_destruct(struct sock *sk)
 	struct tls_context *ctx = tls_get_ctx(sk);
 
 	ctx->sk_destruct(sk);
-	/* Free ctx */
-	rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
-	tls_ctx_free(sk, ctx);
+	/* toe_tls ctx is created only for listen sockets,
+	 * don't free it for any other socket type.
+	 */
+	if (sk->sk_state == TCP_LISTEN) {
+		rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
+		tls_ctx_free(sk, ctx);
+	}
 }
 
 int tls_toe_bypass(struct sock *sk)
@@ -61,15 +65,20 @@ int tls_toe_bypass(struct sock *sk)
 	spin_lock_bh(&device_spinlock);
 	list_for_each_entry(dev, &device_list, dev_list) {
 		if (dev->feature && dev->feature(dev)) {
-			ctx = tls_ctx_create(sk);
-			if (!ctx)
-				goto out;
+			/* ESTABLISHED socket may also reach here, make
+			 * sure new context is not created for that.
+			 */
+			if (sk->sk_state == TCP_CLOSE) {
+				ctx = tls_ctx_create(sk);
+				if (!ctx)
+					goto out;
 
-			ctx->sk_destruct = sk->sk_destruct;
-			sk->sk_destruct = tls_toe_sk_destruct;
-			ctx->rx_conf = TLS_HW_RECORD;
-			ctx->tx_conf = TLS_HW_RECORD;
-			update_sk_prot(sk, ctx);
+				ctx->sk_destruct = sk->sk_destruct;
+				sk->sk_destruct = tls_toe_sk_destruct;
+				ctx->rx_conf = TLS_HW_RECORD;
+				ctx->tx_conf = TLS_HW_RECORD;
+				update_sk_prot(sk, ctx);
+			}
 			rc = 1;
 			break;
 		}
