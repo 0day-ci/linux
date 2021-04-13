@@ -46,6 +46,11 @@ module_param(napi_tx, bool, 0644);
 #define VIRTIO_XDP_REDIR	BIT(1)
 
 #define VIRTIO_XDP_FLAG	BIT(0)
+#define VIRTIO_XSK_FLAG	BIT(1)
+
+#define VIRTIO_XSK_PTR_SHIFT       4
+
+static struct virtio_net_hdr_mrg_rxbuf xsk_hdr;
 
 /* RX packet size EWMA. The average packet size is used to determine the packet
  * buffer size when refilling RX rings. As the entire RX ring may be refilled
@@ -138,6 +143,12 @@ struct send_queue {
 	struct {
 		/* xsk pool */
 		struct xsk_buff_pool __rcu *pool;
+
+		/* save the desc for next xmit, when xmit fail. */
+		struct xdp_desc last_desc;
+
+		/* xsk wait for tx inter or softirq */
+		bool need_wakeup;
 	} xsk;
 };
 
@@ -255,6 +266,15 @@ struct padded_vnet_hdr {
 	char padding[4];
 };
 
+static int virtnet_xsk_run(struct send_queue *sq, struct xsk_buff_pool *pool,
+			   int budget, bool in_napi);
+static void virtnet_xsk_complete(struct send_queue *sq, u32 num);
+
+static bool is_skb_ptr(void *ptr)
+{
+	return !((unsigned long)ptr & (VIRTIO_XDP_FLAG | VIRTIO_XSK_FLAG));
+}
+
 static bool is_xdp_frame(void *ptr)
 {
 	return (unsigned long)ptr & VIRTIO_XDP_FLAG;
@@ -265,6 +285,19 @@ static void *xdp_to_ptr(struct xdp_frame *ptr)
 	return (void *)((unsigned long)ptr | VIRTIO_XDP_FLAG);
 }
 
+static void *xsk_to_ptr(struct xdp_desc *desc)
+{
+	/* save the desc len to ptr */
+	u64 p = desc->len << VIRTIO_XSK_PTR_SHIFT;
+
+	return (void *)((unsigned long)p | VIRTIO_XSK_FLAG);
+}
+
+static void ptr_to_xsk(void *ptr, struct xdp_desc *desc)
+{
+	desc->len = ((unsigned long)ptr) >> VIRTIO_XSK_PTR_SHIFT;
+}
+
 static struct xdp_frame *ptr_to_xdp(void *ptr)
 {
 	return (struct xdp_frame *)((unsigned long)ptr & ~VIRTIO_XDP_FLAG);
@@ -273,25 +306,35 @@ static struct xdp_frame *ptr_to_xdp(void *ptr)
 static void __free_old_xmit(struct send_queue *sq, bool in_napi,
 			    struct virtnet_sq_stats *stats)
 {
+	unsigned int xsknum = 0;
 	unsigned int len;
 	void *ptr;
 
 	while ((ptr = virtqueue_get_buf(sq->vq, &len)) != NULL) {
-		if (likely(!is_xdp_frame(ptr))) {
+		if (is_skb_ptr(ptr)) {
 			struct sk_buff *skb = ptr;
 
 			pr_debug("Sent skb %p\n", skb);
 
 			stats->bytes += skb->len;
 			napi_consume_skb(skb, in_napi);
-		} else {
+		} else if (is_xdp_frame(ptr)) {
 			struct xdp_frame *frame = ptr_to_xdp(ptr);
 
 			stats->bytes += frame->len;
 			xdp_return_frame(frame);
+		} else {
+			struct xdp_desc desc;
+
+			ptr_to_xsk(ptr, &desc);
+			stats->bytes += desc.len;
+			++xsknum;
 		}
 		stats->packets++;
 	}
+
+	if (xsknum)
+		virtnet_xsk_complete(sq, xsknum);
 }
 
 /* Converting between virtqueue no. and kernel tx/rx queue no.
@@ -1533,6 +1576,19 @@ static int virtnet_open(struct net_device *dev)
 	return 0;
 }
 
+static int virtnet_poll_xsk(struct send_queue *sq, int budget)
+{
+	struct xsk_buff_pool *pool;
+	int work_done = 0;
+
+	rcu_read_lock();
+	pool = rcu_dereference(sq->xsk.pool);
+	if (pool)
+		work_done = virtnet_xsk_run(sq, pool, budget, true);
+	rcu_read_unlock();
+	return work_done;
+}
+
 static int virtnet_poll_tx(struct napi_struct *napi, int budget)
 {
 	struct send_queue *sq = container_of(napi, struct send_queue, napi);
@@ -1549,6 +1605,7 @@ static int virtnet_poll_tx(struct napi_struct *napi, int budget)
 
 	txq = netdev_get_tx_queue(vi->dev, index);
 	__netif_tx_lock(txq, raw_smp_processor_id());
+	work_done += virtnet_poll_xsk(sq, budget);
 	free_old_xmit(sq, true);
 	__netif_tx_unlock(txq);
 
@@ -2539,6 +2596,234 @@ err:
 	return err;
 }
 
+static void virtnet_xsk_check_queue(struct send_queue *sq)
+{
+	struct virtnet_info *vi = sq->vq->vdev->priv;
+	struct net_device *dev = vi->dev;
+	int qnum = sq - vi->sq;
+
+	/* If this sq is not the exclusive queue of the current cpu,
+	 * then it may be called by start_xmit, so check it running out
+	 * of space.
+	 *
+	 * And if it is a raw buffer queue, it does not check whether the status
+	 * of the queue is stopped when sending. So there is no need to check
+	 * the situation of the raw buffer queue.
+	 */
+	if (is_xdp_raw_buffer_queue(vi, qnum))
+		return;
+
+	/* Stop the queue to avoid getting packets that we are
+	 * then unable to transmit. Then wait the tx interrupt.
+	 */
+	if (sq->vq->num_free < 2 + MAX_SKB_FRAGS)
+		netif_stop_subqueue(dev, qnum);
+}
+
+static void virtnet_xsk_complete(struct send_queue *sq, u32 num)
+{
+	struct xsk_buff_pool *pool;
+
+	rcu_read_lock();
+
+	pool = rcu_dereference(sq->xsk.pool);
+	if (!pool) {
+		rcu_read_unlock();
+		return;
+	}
+	xsk_tx_completed(pool, num);
+	rcu_read_unlock();
+
+	if (sq->xsk.need_wakeup) {
+		sq->xsk.need_wakeup = false;
+		virtqueue_napi_schedule(&sq->napi, sq->vq);
+	}
+}
+
+static int virtnet_xsk_xmit(struct send_queue *sq, struct xsk_buff_pool *pool,
+			    struct xdp_desc *desc)
+{
+	struct virtnet_info *vi;
+	u32 offset, n, len;
+	struct page *page;
+	void *data;
+	u64 addr;
+	int err;
+
+	vi = sq->vq->vdev->priv;
+	addr = desc->addr;
+
+	data = xsk_buff_raw_get_data(pool, addr);
+	offset = offset_in_page(data);
+
+	/* xsk unaligned mode, desc may use two pages */
+	if (desc->len > PAGE_SIZE - offset)
+		n = 3;
+	else
+		n = 2;
+
+	sg_init_table(sq->sg, n);
+	sg_set_buf(sq->sg, &xsk_hdr, vi->hdr_len);
+
+	/* handle for xsk first page */
+	len = min_t(int, desc->len, PAGE_SIZE - offset);
+	page = xsk_buff_xdp_get_page(pool, addr);
+	sg_set_page(sq->sg + 1, page, len, offset);
+
+	/* xsk unaligned mode, handle for the second page */
+	if (len < desc->len) {
+		page = xsk_buff_xdp_get_page(pool, addr + len);
+		len = min_t(int, desc->len - len, PAGE_SIZE);
+		sg_set_page(sq->sg + 2, page, len, 0);
+	}
+
+	err = virtqueue_add_outbuf(sq->vq, sq->sg, n, xsk_to_ptr(desc),
+				   GFP_ATOMIC);
+	if (unlikely(err))
+		sq->xsk.last_desc = *desc;
+
+	return err;
+}
+
+static int virtnet_xsk_xmit_batch(struct send_queue *sq,
+				  struct xsk_buff_pool *pool,
+				  unsigned int budget,
+				  bool in_napi, int *done,
+				  struct virtnet_sq_stats *stats)
+{
+	struct xdp_desc desc;
+	int err, packet = 0;
+	int ret = -EAGAIN;
+
+	if (sq->xsk.last_desc.addr) {
+		if (sq->vq->num_free < 2 + MAX_SKB_FRAGS)
+			return -EBUSY;
+
+		err = virtnet_xsk_xmit(sq, pool, &sq->xsk.last_desc);
+		if (unlikely(err))
+			return -EBUSY;
+
+		++packet;
+		--budget;
+		sq->xsk.last_desc.addr = 0;
+	}
+
+	while (budget-- > 0) {
+		if (sq->vq->num_free < 2 + MAX_SKB_FRAGS) {
+			ret = -EBUSY;
+			break;
+		}
+
+		if (!xsk_tx_peek_desc(pool, &desc)) {
+			/* done */
+			ret = 0;
+			break;
+		}
+
+		err = virtnet_xsk_xmit(sq, pool, &desc);
+		if (unlikely(err)) {
+			ret = -EBUSY;
+			break;
+		}
+
+		++packet;
+	}
+
+	if (packet) {
+		if (virtqueue_kick_prepare(sq->vq) && virtqueue_notify(sq->vq))
+			++stats->kicks;
+
+		*done = packet;
+		stats->xdp_tx += packet;
+
+		xsk_tx_release(pool);
+	}
+
+	return ret;
+}
+
+static int virtnet_xsk_run(struct send_queue *sq, struct xsk_buff_pool *pool,
+			   int budget, bool in_napi)
+{
+	struct virtnet_sq_stats stats = {};
+	int done = 0;
+	int err;
+
+	sq->xsk.need_wakeup = false;
+	__free_old_xmit(sq, in_napi, &stats);
+
+	/* return err:
+	 * -EAGAIN: done == budget
+	 * -EBUSY:  done < budget
+	 *  0    :  done < budget
+	 */
+	err = virtnet_xsk_xmit_batch(sq, pool, budget, in_napi, &done, &stats);
+	if (err == -EBUSY) {
+		__free_old_xmit(sq, in_napi, &stats);
+
+		/* If the space is enough, let napi run again. */
+		if (sq->vq->num_free >= 2 + MAX_SKB_FRAGS)
+			done = budget;
+		else
+			sq->xsk.need_wakeup = true;
+	}
+
+	virtnet_xsk_check_queue(sq);
+
+	u64_stats_update_begin(&sq->stats.syncp);
+	sq->stats.packets += stats.packets;
+	sq->stats.bytes += stats.bytes;
+	sq->stats.kicks += stats.kicks;
+	sq->stats.xdp_tx += stats.xdp_tx;
+	u64_stats_update_end(&sq->stats.syncp);
+
+	return done;
+}
+
+static int virtnet_xsk_wakeup(struct net_device *dev, u32 qid, u32 flag)
+{
+	struct virtnet_info *vi = netdev_priv(dev);
+	struct xsk_buff_pool *pool;
+	struct netdev_queue *txq;
+	struct send_queue *sq;
+
+	if (!netif_running(dev))
+		return -ENETDOWN;
+
+	if (qid >= vi->curr_queue_pairs)
+		return -EINVAL;
+
+	sq = &vi->sq[qid];
+
+	rcu_read_lock();
+
+	pool = rcu_dereference(sq->xsk.pool);
+	if (!pool)
+		goto end;
+
+	if (napi_if_scheduled_mark_missed(&sq->napi))
+		goto end;
+
+	txq = netdev_get_tx_queue(dev, qid);
+
+	__netif_tx_lock_bh(txq);
+
+	/* Send part of the packet directly to reduce the delay in sending the
+	 * packet, and this can actively trigger the tx interrupts.
+	 *
+	 * If no packet is sent out, the ring of the device is full. In this
+	 * case, we will still get a tx interrupt response. Then we will deal
+	 * with the subsequent packet sending work.
+	 */
+	virtnet_xsk_run(sq, pool, napi_weight, false);
+
+	__netif_tx_unlock_bh(txq);
+
+end:
+	rcu_read_unlock();
+	return 0;
+}
+
 static int virtnet_xsk_pool_enable(struct net_device *dev,
 				   struct xsk_buff_pool *pool,
 				   u16 qid)
@@ -2563,6 +2848,8 @@ static int virtnet_xsk_pool_enable(struct net_device *dev,
 		return -EPERM;
 
 	rcu_read_lock();
+	memset(&sq->xsk, 0, sizeof(sq->xsk));
+
 	/* Here is already protected by rtnl_lock, so rcu_assign_pointer is
 	 * safe.
 	 */
@@ -2662,6 +2949,7 @@ static const struct net_device_ops virtnet_netdev = {
 	.ndo_vlan_rx_kill_vid = virtnet_vlan_rx_kill_vid,
 	.ndo_bpf		= virtnet_xdp,
 	.ndo_xdp_xmit		= virtnet_xdp_xmit,
+	.ndo_xsk_wakeup         = virtnet_xsk_wakeup,
 	.ndo_features_check	= passthru_features_check,
 	.ndo_get_phys_port_name	= virtnet_get_phys_port_name,
 	.ndo_set_features	= virtnet_set_features,
@@ -2765,9 +3053,9 @@ static void free_unused_bufs(struct virtnet_info *vi)
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		struct virtqueue *vq = vi->sq[i].vq;
 		while ((buf = virtqueue_detach_unused_buf(vq)) != NULL) {
-			if (!is_xdp_frame(buf))
+			if (is_skb_ptr(buf))
 				dev_kfree_skb(buf);
-			else
+			else if (is_xdp_frame(buf))
 				xdp_return_frame(ptr_to_xdp(buf));
 		}
 	}
