@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/aliases.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: '/aliases' node properties
+
+maintainers:
+  - Rob Herring <robh@kernel.org>
+
+description: |
+  This schema defines the list of known alias names.
+
+properties:
+  $nodename:
+    const: aliases
+
+patternProperties:
+  '^ethernet[0-9]+$': true
+  '^i2c[0-9]+$': true
+  '^mmc[0-9]+$': true
+  '^serial[0-9]+$': true
+  '^spi[0-9]+$': true
+  '^rtc[0-9]+$': true
+  '^watchdog[0-9]+$': true
+  '^usb[0-9]+$': true
+
+  # Deprecated aliases in use. Don't add to this list.
+  '^display[0-9]+$':
+    deprecated: true
+
+  '^dmc[0-9]+$':
+    deprecated: true
+
+  '^fimc[0-9]+$':
+    deprecated: true
+
+  '^fimc-lite[0-9]+$':
+    deprecated: true
+
+  '^fiu[0-9]+$':
+    deprecated: true
+
+  '^gpio[0-9]+$':
+    deprecated: true
+
+  '^gsc[0-9]+$':
+    deprecated: true
+
+  '^hsuart[0-9]+$':
+    deprecated: true
+
+  '^ipu[0-9]+$':
+    deprecated: true
+
+  '^mdio-gpio[0-9]+$':
+    deprecated: true
+
+  '^mshc[0-9]+$':
+    deprecated: true
+
+  '^mu[0-9]+$':
+    deprecated: true
+
+  '^phy[0-9]+$':
+    deprecated: true
+
+  '^pinctrl[0-9]+$':
+    deprecated: true
+
+  '^rproc[0-9]+$':
+    deprecated: true
+
+  '^sai[0-9]+$':
+    deprecated: true
+
+  '^saif[0-9]+$':
+    deprecated: true
+
+  '^ssc[0-9]+$':
+    deprecated: true
+
+  '^stmpe-i2c[0-9]+$':
+    deprecated: true
+
+  '^timer[0-9]+$':
+    deprecated: true
+
+  '^tmuctrl[0-9]+$':
+    deprecated: true
+
+  '^usbdrdphy[0-9]+$':
+    deprecated: true
+
+  '^usbphy[0-9]+$':
+    deprecated: true
+
+additionalProperties: false
+
+...
