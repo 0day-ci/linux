@@ -622,6 +622,8 @@ struct Scsi_Host {
 	unsigned int max_segment_size;
 	unsigned long dma_boundary;
 	unsigned long virt_boundary_mask;
+	unsigned int limit_bio_size;
+
 	/*
 	 * In scsi-mq mode, the number of hardware queues supported by the LLD.
 	 *
