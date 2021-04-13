@@ -4379,7 +4379,12 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 {
 	unsigned long ideal_runtime, delta_exec;
 	struct sched_entity *se;
+	struct rq *rq = rq_of(cfs_rq);
 	s64 delta;
+
+	/* If the TIF_NEED_RESCHED has been set, it is no need to check again */
+	if (test_tsk_need_resched(rq->curr))
+		return;
 
 	ideal_runtime = sched_slice(cfs_rq, curr);
 	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
