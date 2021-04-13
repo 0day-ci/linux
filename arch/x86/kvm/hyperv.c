@@ -1257,6 +1257,10 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		break;
 	}
 	case HV_X64_MSR_REFERENCE_TSC:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_REFERENCE_TSC_AVAILABLE)))
+			return 1;
+
 		hv->hv_tsc_page = data;
 		if (hv->hv_tsc_page & HV_X64_MSR_TSC_REFERENCE_ENABLE) {
 			if (!host)
@@ -1478,6 +1482,10 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		data = get_time_ref_counter(kvm);
 		break;
 	case HV_X64_MSR_REFERENCE_TSC:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_REFERENCE_TSC_AVAILABLE)))
+			return 1;
+
 		data = hv->hv_tsc_page;
 		break;
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
