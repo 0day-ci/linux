@@ -572,11 +572,13 @@ static int validate_change(struct cpuset *cur, struct cpuset *trial)
 
 	rcu_read_lock();
 
-	/* Each of our child cpusets must be a subset of us */
+	/* On legacy hierarchy, each of our child cpusets must be a subset of us */
 	ret = -EBUSY;
-	cpuset_for_each_child(c, css, cur)
-		if (!is_cpuset_subset(c, trial))
-			goto out;
+	if (!is_in_v2_mode()) {
+		cpuset_for_each_child(c, css, cur)
+			if (!is_cpuset_subset(c, trial))
+				goto out;
+	}
 
 	/* Remaining checks don't apply to root cpuset */
 	ret = 0;
