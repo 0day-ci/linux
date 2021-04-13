@@ -1300,10 +1300,18 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		}
 		break;
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_edx &
+					HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_msr_set_crash_data(kvm,
 						 msr - HV_X64_MSR_CRASH_P0,
 						 data);
 	case HV_X64_MSR_CRASH_CTL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_edx &
+					HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE)))
+			return 1;
+
 		if (host)
 			return kvm_hv_msr_set_crash_ctl(kvm, data);
 
@@ -1541,10 +1549,18 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		data = hv->hv_tsc_page;
 		break;
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_edx &
+					HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_msr_get_crash_data(kvm,
 						 msr - HV_X64_MSR_CRASH_P0,
 						 pdata);
 	case HV_X64_MSR_CRASH_CTL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_edx &
+					HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_msr_get_crash_ctl(kvm, pdata);
 	case HV_X64_MSR_RESET:
 		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
