@@ -160,6 +160,10 @@ static bool dirty_ring_vcpu_ring_full;
  * verifying process, we let it pass.
  */
 static uint64_t dirty_ring_last_page;
+/*
+ * Record how many loops the guest vcpu thread has went through
+ */
+static volatile uint64_t guest_vcpu_loops;
 
 enum log_mode_t {
 	/* Only use KVM_GET_DIRTY_LOG for logging */
@@ -526,6 +530,7 @@ static void *vcpu_worker(void *data)
 			assert(sig == SIG_IPI);
 		}
 		log_mode_after_vcpu_run(vm, ret, errno);
+		guest_vcpu_loops++;
 	}
 
 	pr_info("Dirtied %"PRIu64" pages\n", pages_count);
@@ -553,6 +558,7 @@ static void vm_dirty_log_verify(enum vm_guest_mode mode, unsigned long *bmap)
 		}
 
 		if (test_and_clear_bit_le(page, bmap)) {
+			uint64_t current_loop;
 			bool matched;
 
 			host_dirty_count++;
@@ -565,7 +571,12 @@ static void vm_dirty_log_verify(enum vm_guest_mode mode, unsigned long *bmap)
 			matched = (*value_ptr == iteration ||
 				   *value_ptr == iteration - 1);
 
-			if (host_log_mode == LOG_MODE_DIRTY_RING && !matched) {
+			if (matched)
+				continue;
+
+			/* Didn't match..  Let's figure out what's wrong.. */
+			switch (host_log_mode) {
+			case LOG_MODE_DIRTY_RING:
 				if (*value_ptr == iteration - 2 && min_iter <= iteration - 2) {
 					/*
 					 * Short answer: this case is special
@@ -608,6 +619,46 @@ static void vm_dirty_log_verify(enum vm_guest_mode mode, unsigned long *bmap)
 					 */
 					continue;
 				}
+				break;
+			case LOG_MODE_DIRTY_LOG:
+			case LOG_MODE_CLEAR_LOG:
+				/*
+				 * This fixes a bug that can trigger with
+				 * e.g. "taskset -c 0 ./dirty_log_test" or when
+				 * the testing host is very busy. If the vcpu
+				 * thread got the dirty bit set but got
+				 * preempted by other threads _before_ the data
+				 * is written, we won't be able to see the
+				 * latest data until the vcpu threads do another
+				 * KVM_RUN and the write finally lands to the
+				 * memory.  So when !matched happened, we give
+				 * the vcpu thread _one_ more chance to do a
+				 * KVM_RUN so as to flush the written data.  We
+				 * do that by observing guest_vcpu_loops to
+				 * increase +2: as +1 is not enough to
+				 * guarantee a complete KVM_RUN.
+				 *
+				 * Dirty ring does not need this since
+				 * dirty_ring_last_page would already help
+				 * avoid it.
+				 */
+				current_loop = guest_vcpu_loops;
+
+				/*
+				 * Wait until the vcpu thread at least
+				 * completes one KVM_RUN again.  the usleep()
+				 * gives the vcpu thread a better chance to be
+				 * scheduled earlier.
+				 */
+				while (guest_vcpu_loops <= current_loop + 2)
+					usleep(1);
+				/* Recalculate */
+				matched = (*value_ptr == iteration ||
+					   *value_ptr == iteration - 1);
+				break;
+			default:
+				/* Just to avoid some strict compile warning */
+				break;
 			}
 
 			TEST_ASSERT(matched,
