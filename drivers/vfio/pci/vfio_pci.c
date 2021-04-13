@@ -407,6 +407,17 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 		}
 	}
 
+	if (pdev->vendor == PCI_VENDOR_ID_HUAWEI &&
+	    IS_ENABLED(CONFIG_VFIO_PCI_HISI_MIGRATION)) {
+		ret = vfio_pci_hisilicon_acc_init(vdev);
+		if (ret && ret != -ENODEV) {
+			dev_warn(&vdev->pdev->dev,
+				 "Failed to setup Hisilicon ACC region\n");
+			vfio_pci_disable(vdev);
+			return ret;
+		}
+	}
+
 	vfio_pci_probe_mmaps(vdev);
 
 	return 0;
