@@ -161,13 +161,13 @@ static void stage2_flush_vm(struct kvm *kvm)
 {
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
-	int idx;
+	int idx, ctr;
 
 	idx = srcu_read_lock(&kvm->srcu);
 	spin_lock(&kvm->mmu_lock);
 
 	slots = kvm_memslots(kvm);
-	kvm_for_each_memslot(memslot, slots)
+	kvm_for_each_memslot(memslot, ctr, slots)
 		stage2_flush_memslot(kvm, memslot);
 
 	spin_unlock(&kvm->mmu_lock);
@@ -452,14 +452,14 @@ void stage2_unmap_vm(struct kvm *kvm)
 {
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
-	int idx;
+	int idx, ctr;
 
 	idx = srcu_read_lock(&kvm->srcu);
 	mmap_read_lock(current->mm);
 	spin_lock(&kvm->mmu_lock);
 
 	slots = kvm_memslots(kvm);
-	kvm_for_each_memslot(memslot, slots)
+	kvm_for_each_memslot(memslot, ctr, slots)
 		stage2_unmap_memslot(kvm, memslot);
 
 	spin_unlock(&kvm->mmu_lock);
@@ -1073,6 +1073,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 			     void *data)
 {
 	struct kvm_memslots *slots;
+	int idxactive;
 	struct interval_tree_node *node;
 	struct kvm_memory_slot *memslot;
 	int ret = 0;
@@ -1081,6 +1082,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 		return 0;
 
 	slots = kvm_memslots(kvm);
+	idxactive = kvm_memslots_idx(slots);
 
 	/* we only care about the pages that the guest sees */
 	kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
@@ -1088,7 +1090,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 		gfn_t gpa;
 
 		memslot = container_of(node, struct kvm_memory_slot,
-				       hva_node);
+				       hva_node[idxactive]);
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));

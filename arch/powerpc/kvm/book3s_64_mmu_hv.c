@@ -734,11 +734,11 @@ void kvmppc_rmap_reset(struct kvm *kvm)
 {
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
-	int srcu_idx;
+	int srcu_idx, ctr;
 
 	srcu_idx = srcu_read_lock(&kvm->srcu);
 	slots = kvm_memslots(kvm);
-	kvm_for_each_memslot(memslot, slots) {
+	kvm_for_each_memslot(memslot, ctr, slots) {
 		/* Mutual exclusion with kvm_unmap_hva_range etc. */
 		spin_lock(&kvm->mmu_lock);
 		/*
@@ -763,6 +763,7 @@ static int kvm_handle_hva_range(struct kvm *kvm,
 	int ret;
 	int retval = 0;
 	struct kvm_memslots *slots;
+	int idxactive;
 	struct interval_tree_node *node;
 	struct kvm_memory_slot *memslot;
 
@@ -770,12 +771,13 @@ static int kvm_handle_hva_range(struct kvm *kvm,
 		return 0;
 
 	slots = kvm_memslots(kvm);
+	idxactive = kvm_memslots_idx(slots);
 	kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
 		unsigned long hva_start, hva_end;
 		gfn_t gfn, gfn_end;
 
 		memslot = container_of(node, struct kvm_memory_slot,
-				       hva_node);
+				       hva_node[idxactive]);
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));

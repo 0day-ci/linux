@@ -449,6 +449,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 			     void *data)
 {
 	struct kvm_memslots *slots;
+	int idxactive;
 	struct interval_tree_node *node;
 	struct kvm_memory_slot *memslot;
 	int ret = 0;
@@ -457,6 +458,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 		return 0;
 
 	slots = kvm_memslots(kvm);
+	idxactive = kvm_memslots_idx(slots);
 
 	/* we only care about the pages that the guest sees */
 	kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
@@ -464,7 +466,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 		gfn_t gfn, gfn_end;
 
 		memslot = container_of(node, struct kvm_memory_slot,
-				       hva_node);
+				       hva_node[idxactive]);
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));

@@ -1434,15 +1434,17 @@ static __always_inline int kvm_handle_hva_range(struct kvm *kvm,
 		return 0;
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		int idxactive;
 		struct interval_tree_node *node;
 
 		slots = __kvm_memslots(kvm, i);
+		idxactive = kvm_memslots_idx(slots);
 		kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
 			unsigned long hva_start, hva_end;
 			gfn_t gfn_start, gfn_end;
 
 			memslot = container_of(node, struct kvm_memory_slot,
-					       hva_node);
+					       hva_node[idxactive]);
 			hva_start = max(start, memslot->userspace_addr);
 			hva_end = min(end, memslot->userspace_addr +
 				      (memslot->npages << PAGE_SHIFT));
@@ -5498,8 +5500,10 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 
 	write_lock(&kvm->mmu_lock);
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		int ctr;
+
 		slots = __kvm_memslots(kvm, i);
-		kvm_for_each_memslot(memslot, slots) {
+		kvm_for_each_memslot(memslot, ctr, slots) {
 			gfn_t start, end;
 
 			start = max(gfn_start, memslot->base_gfn);

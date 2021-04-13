@@ -29,6 +29,7 @@
 #include <linux/nospec.h>
 #include <linux/interval_tree.h>
 #include <linux/hashtable.h>
+#include <linux/rbtree.h>
 #include <asm/signal.h>
 
 #include <linux/kvm.h>
@@ -352,8 +353,9 @@ static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
 #define KVM_MEM_MAX_NR_PAGES ((1UL << 31) - 1)
 
 struct kvm_memory_slot {
-	struct hlist_node id_node;
-	struct interval_tree_node hva_node;
+	struct hlist_node id_node[2];
+	struct interval_tree_node hva_node[2];
+	struct rb_node gfn_node[2];
 	gfn_t base_gfn;
 	unsigned long npages;
 	unsigned long *dirty_bitmap;
@@ -448,19 +450,14 @@ static inline int kvm_arch_vcpu_memslots_id(struct kvm_vcpu *vcpu)
 }
 #endif
 
-/*
- * Note:
- * memslots are not sorted by id anymore, please use id_to_memslot()
- * to get the memslot by its id.
- */
 struct kvm_memslots {
 	u64 generation;
+	atomic_long_t lru_slot;
 	struct rb_root_cached hva_tree;
-	/* The mapping table from slot id to the index in memslots[]. */
+	struct rb_root gfn_tree;
+	/* The mapping table from slot id to memslot. */
 	DECLARE_HASHTABLE(id_hash, 7);
-	atomic_t lru_slot;
-	int used_slots;
-	struct kvm_memory_slot memslots[];
+	bool is_idx_0;
 };
 
 struct kvm {
@@ -472,6 +469,7 @@ struct kvm {
 
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
+	struct kvm_memslots memslots_all[KVM_ADDRESS_SPACE_NUM][2];
 	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
 	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
 
@@ -611,12 +609,6 @@ static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
 	return vcpu->vcpu_idx;
 }
 
-#define kvm_for_each_memslot(memslot, slots)				\
-	for (memslot = &slots->memslots[0];				\
-	     memslot < slots->memslots + slots->used_slots; memslot++)	\
-		if (WARN_ON_ONCE(!memslot->npages)) {			\
-		} else
-
 void kvm_vcpu_destroy(struct kvm_vcpu *vcpu);
 
 void vcpu_load(struct kvm_vcpu *vcpu);
@@ -676,6 +668,22 @@ static inline struct kvm_memslots *kvm_vcpu_memslots(struct kvm_vcpu *vcpu)
 	return __kvm_memslots(vcpu->kvm, as_id);
 }
 
+static inline bool kvm_memslots_empty(struct kvm_memslots *slots)
+{
+	return RB_EMPTY_ROOT(&slots->gfn_tree);
+}
+
+static inline int kvm_memslots_idx(struct kvm_memslots *slots)
+{
+	return slots->is_idx_0 ? 0 : 1;
+}
+
+#define kvm_for_each_memslot(memslot, ctr, slots)	\
+	hash_for_each(slots->id_hash, ctr, memslot,	\
+		      id_node[kvm_memslots_idx(slots)]) \
+		if (WARN_ON_ONCE(!memslot->npages)) {	\
+		} else
+
 #define kvm_for_each_hva_range_memslot(node, slots, start, last)	     \
 	for (node = interval_tree_iter_first(&slots->hva_tree, start, last); \
 	     node;							     \
@@ -684,9 +692,10 @@ static inline struct kvm_memslots *kvm_vcpu_memslots(struct kvm_vcpu *vcpu)
 static inline
 struct kvm_memory_slot *id_to_memslot(struct kvm_memslots *slots, int id)
 {
+	int idxactive = kvm_memslots_idx(slots);
 	struct kvm_memory_slot *slot;
 
-	hash_for_each_possible(slots->id_hash, slot, id_node, id) {
+	hash_for_each_possible(slots->id_hash, slot, id_node[idxactive], id) {
 		if (slot->id == id)
 			return slot;
 	}
@@ -1095,42 +1104,39 @@ bool kvm_arch_irqfd_allowed(struct kvm *kvm, struct kvm_irqfd *args);
  * With "approx" set returns the memslot also when the address falls
  * in a hole. In that case one of the memslots bordering the hole is
  * returned.
- *
- * IMPORTANT: Slots are sorted from highest GFN to lowest GFN!
  */
 static inline struct kvm_memory_slot *
 search_memslots(struct kvm_memslots *slots, gfn_t gfn, bool approx)
 {
-	int start = 0, end = slots->used_slots;
-	int slot = atomic_read(&slots->lru_slot);
-	struct kvm_memory_slot *memslots = slots->memslots;
+	int idxactive = kvm_memslots_idx(slots);
+	struct kvm_memory_slot *slot;
+	struct rb_node *prevnode, *node;
 
-	if (unlikely(!slots->used_slots))
-		return NULL;
+	slot = (struct kvm_memory_slot *)atomic_long_read(&slots->lru_slot);
+	if (slot &&
+	    gfn >= slot->base_gfn && gfn < slot->base_gfn + slot->npages)
+		return slot;
 
-	if (gfn >= memslots[slot].base_gfn &&
-	    gfn < memslots[slot].base_gfn + memslots[slot].npages)
-		return &memslots[slot];
-
-	while (start < end) {
-		slot = start + (end - start) / 2;
-
-		if (gfn >= memslots[slot].base_gfn)
-			end = slot;
-		else
-			start = slot + 1;
+	for (prevnode = NULL, node = slots->gfn_tree.rb_node; node; ) {
+		prevnode = node;
+		slot = container_of(node, struct kvm_memory_slot,
+				    gfn_node[idxactive]);
+		if (gfn >= slot->base_gfn) {
+			if (gfn < slot->base_gfn + slot->npages) {
+				atomic_long_set(&slots->lru_slot,
+						(unsigned long)slot);
+				return slot;
+			}
+			node = node->rb_right;
+		} else
+			node = node->rb_left;
 	}
 
-	if (approx && start >= slots->used_slots)
-		return &memslots[slots->used_slots - 1];
+	if (approx && prevnode)
+		return container_of(prevnode, struct kvm_memory_slot,
+				    gfn_node[idxactive]);
 
-	if (start < slots->used_slots && gfn >= memslots[start].base_gfn &&
-	    gfn < memslots[start].base_gfn + memslots[start].npages) {
-		atomic_set(&slots->lru_slot, start);
-		return &memslots[start];
-	}
-
-	return approx ? &memslots[start] : NULL;
+	return NULL;
 }
 
 static inline struct kvm_memory_slot *
