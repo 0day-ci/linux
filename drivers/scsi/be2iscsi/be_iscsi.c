@@ -1314,7 +1314,7 @@ void beiscsi_ep_disconnect(struct iscsi_endpoint *ep)
 
 	if (beiscsi_ep->conn) {
 		beiscsi_conn = beiscsi_ep->conn;
-		iscsi_suspend_queue(beiscsi_conn->conn);
+		iscsi_ep_prep_disconnect(beiscsi_conn->conn);
 	}
 
 	if (!beiscsi_hba_is_online(phba)) {

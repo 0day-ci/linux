@@ -899,6 +899,8 @@ iscsi_iser_ep_disconnect(struct iscsi_endpoint *ep)
 
 	iser_info("ep %p iser conn %p\n", ep, iser_conn);
 
+	iscsi_ep_prep_disconnect(iser_conn->iscsi_conn);
+
 	mutex_lock(&iser_conn->state_mutex);
 	iser_conn_terminate(iser_conn);
 

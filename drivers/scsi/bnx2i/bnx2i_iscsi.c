@@ -2129,7 +2129,7 @@ static void bnx2i_ep_disconnect(struct iscsi_endpoint *ep)
 	if (bnx2i_ep->conn) {
 		bnx2i_conn = bnx2i_ep->conn;
 		conn = bnx2i_conn->cls_conn->dd_data;
-		iscsi_suspend_queue(conn);
+		iscsi_ep_prep_disconnect(conn);
 	}
 	hba = bnx2i_ep->hba;
 

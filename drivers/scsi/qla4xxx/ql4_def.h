@@ -838,6 +838,7 @@ struct ql4_task_data {
 struct qla_endpoint {
 	struct Scsi_Host *host;
 	struct sockaddr_storage dst_addr;
+	struct iscsi_conn *conn;
 };
 
 struct qla_conn {

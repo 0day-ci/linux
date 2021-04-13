@@ -1008,7 +1008,7 @@ static void qedi_ep_disconnect(struct iscsi_endpoint *ep)
 	if (qedi_ep->conn) {
 		qedi_conn = qedi_ep->conn;
 		conn = qedi_conn->cls_conn->dd_data;
-		iscsi_suspend_queue(conn);
+		iscsi_ep_prep_disconnect(conn);
 		abrt_conn = qedi_conn->abrt_conn;
 
 		while (count--)	{

@@ -1772,6 +1772,7 @@ static void qla4xxx_ep_disconnect(struct iscsi_endpoint *ep)
 	ha = to_qla_host(qla_ep->host);
 	DEBUG2(ql4_printk(KERN_INFO, ha, "%s: host: %ld\n", __func__,
 			  ha->host_no));
+	iscsi_ep_prep_disconnect(qla_ep->conn);
 	iscsi_destroy_endpoint(ep);
 }
 
@@ -3234,6 +3235,7 @@ static int qla4xxx_conn_bind(struct iscsi_cls_session *cls_session,
 	conn = cls_conn->dd_data;
 	qla_conn = conn->dd_data;
 	qla_conn->qla_ep = ep->dd_data;
+	qla_conn->qla_ep->conn = conn;
 	return 0;
 }
 
