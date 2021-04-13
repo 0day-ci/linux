@@ -4,6 +4,7 @@
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_fourcc.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_gem_shmem_helper.h>
 #include <drm/drm_vblank.h>
@@ -76,6 +77,11 @@ static void alpha_blending(const u8 *argb_src, u8 *argb_dst)
 	argb_dst[3] = 0xFF;
 }
 
+static void x_blending(const u8 *xrgb_src, u8 *xrgb_dst)
+{
+	memcpy(xrgb_dst, xrgb_src, sizeof(u8) * 3);
+}
+
 /**
  * blend - blend value at vaddr_src with value at vaddr_dst
  * @vaddr_dst: destination address
@@ -91,7 +97,8 @@ static void alpha_blending(const u8 *argb_src, u8 *argb_dst)
  */
 static void blend(void *vaddr_dst, void *vaddr_src,
 		  struct vkms_composer *dst_composer,
-		  struct vkms_composer *src_composer)
+		  struct vkms_composer *src_composer,
+		  void (*pixel_blend)(const u8 *, u8 *))
 {
 	int i, j, j_dst, i_dst;
 	int offset_src, offset_dst;
@@ -119,7 +126,7 @@ static void blend(void *vaddr_dst, void *vaddr_src,
 
 			pixel_src = (u8 *)(vaddr_src + offset_src);
 			pixel_dst = (u8 *)(vaddr_dst + offset_dst);
-			alpha_blending(pixel_src, pixel_dst);
+			pixel_blend(pixel_src, pixel_dst);
 		}
 		i_dst++;
 	}
@@ -131,6 +138,8 @@ static void compose_planes(struct vkms_composer *primary_composer,
 {
 	struct drm_gem_object *plane_obj;
 	struct drm_gem_shmem_object *plane_shmem_obj;
+	struct drm_framebuffer *fb = &plane_composer->fb;
+	void (*pixel_blend)(const u8 *p_src, u8 *p_dst);
 
 	plane_obj = drm_gem_fb_get_obj(&plane_composer->fb, 0);
 	plane_shmem_obj = to_drm_gem_shmem_obj(plane_obj);
@@ -138,8 +147,13 @@ static void compose_planes(struct vkms_composer *primary_composer,
 	if (WARN_ON(!plane_shmem_obj->vaddr))
 		return;
 
-	blend(vaddr_out, plane_shmem_obj->vaddr,
-	      primary_composer, plane_composer);
+	if (fb->format->format == DRM_FORMAT_ARGB8888)
+		pixel_blend = &alpha_blending;
+	else
+		pixel_blend = &x_blending;
+
+	blend(vaddr_out, plane_shmem_obj->vaddr, primary_composer,
+	      plane_composer, pixel_blend);
 }
 
 static int composite(void **vaddr_out,
