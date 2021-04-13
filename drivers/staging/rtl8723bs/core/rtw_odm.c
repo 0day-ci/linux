@@ -157,14 +157,15 @@ void rtw_odm_adaptivity_parm_msg(void *sel, struct adapter *adapter)
 
 	netdev_dbg(adapter->pnetdev, "%10s %16s %8s %10s %11s %14s\n",
 		   "TH_L2H_ini", "TH_EDCCA_HL_diff", "IGI_Base", "ForceEDCCA",
-		   "AdapEn_RSSI", "IGI_LowerBound");netdev_dbg(adapter->pnetdev,
-							       "0x%-8x %-16d 0x%-6x %-10d %-11u %-14u\n",
-							       (u8)odm->TH_L2H_ini,
-							       odm->TH_EDCCA_HL_diff,
-							       odm->IGI_Base,
-							       odm->ForceEDCCA,
-							       odm->AdapEn_RSSI,
-							       odm->IGI_LowerBound);
+		   "AdapEn_RSSI", "IGI_LowerBound");
+	netdev_dbg(adapter->pnetdev,
+		   "0x%-8x %-16d 0x%-6x %-10d %-11u %-14u\n",
+		   (u8)odm->TH_L2H_ini,
+		   odm->TH_EDCCA_HL_diff,
+		   odm->IGI_Base,
+		   odm->ForceEDCCA,
+		   odm->AdapEn_RSSI,
+		   odm->IGI_LowerBound);
 }
 
 void rtw_odm_adaptivity_parm_set(struct adapter *adapter, s8 TH_L2H_ini,
