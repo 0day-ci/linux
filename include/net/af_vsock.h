@@ -69,6 +69,7 @@ struct vsock_sock {
 	u64 buffer_size;
 	u64 buffer_min_size;
 	u64 buffer_max_size;
+	pid_t tid_owner;
 
 	/* Private to transport. */
 	void *trans;

@@ -1765,7 +1765,9 @@ static int vsock_connectible_sendmsg(struct socket *sock, struct msghdr *msg,
 		ssize_t written;
 
 		add_wait_queue(sk_sleep(sk), &wait);
-		while (vsock_stream_has_space(vsk) == 0 &&
+		while ((vsock_stream_has_space(vsk) == 0 ||
+			(vsk->tid_owner != current->pid &&
+			 vsk->tid_owner != -1)) &&
 		       sk->sk_err == 0 &&
 		       !(sk->sk_shutdown & SEND_SHUTDOWN) &&
 		       !(vsk->peer_shutdown & RCV_SHUTDOWN)) {
@@ -1796,6 +1798,8 @@ static int vsock_connectible_sendmsg(struct socket *sock, struct msghdr *msg,
 				goto out_err;
 			}
 		}
+
+		vsk->tid_owner = current->pid;
 		remove_wait_queue(sk_sleep(sk), &wait);
 
 		/* These checks occur both as part of and after the loop
@@ -1852,7 +1856,10 @@ out_err:
 			err = total_written;
 	}
 out:
+	vsk->tid_owner = -1;
 	release_sock(sk);
+	sk->sk_write_space(sk);
+
 	return err;
 }
 
@@ -2199,6 +2206,7 @@ static int vsock_create(struct net *net, struct socket *sock,
 		return -ENOMEM;
 
 	vsk = vsock_sk(sk);
+	vsk->tid_owner = -1;
 
 	if (sock->type == SOCK_DGRAM) {
 		ret = vsock_assign_transport(vsk, NULL);
