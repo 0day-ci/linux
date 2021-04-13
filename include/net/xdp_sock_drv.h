@@ -72,6 +72,12 @@ static inline dma_addr_t xsk_buff_xdp_get_frame_dma(struct xdp_buff *xdp)
 	return xp_get_frame_dma(xskb);
 }
 
+static inline struct page *xsk_buff_xdp_get_page(struct xsk_buff_pool *pool, u64 addr)
+{
+	addr = pool->unaligned ? xp_unaligned_add_offset_to_addr(addr) : addr;
+	return pool->umem->pgs[addr >> PAGE_SHIFT];
+}
+
 static inline struct xdp_buff *xsk_buff_alloc(struct xsk_buff_pool *pool)
 {
 	return xp_alloc(pool);
@@ -205,6 +211,11 @@ static inline dma_addr_t xsk_buff_xdp_get_dma(struct xdp_buff *xdp)
 static inline dma_addr_t xsk_buff_xdp_get_frame_dma(struct xdp_buff *xdp)
 {
 	return 0;
+}
+
+static inline struct page *xsk_buff_xdp_get_page(struct xsk_buff_pool *pool, u64 addr)
+{
+	return NULL;
 }
 
 static inline struct xdp_buff *xsk_buff_alloc(struct xsk_buff_pool *pool)
