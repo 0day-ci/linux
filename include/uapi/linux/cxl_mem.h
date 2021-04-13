@@ -69,6 +69,13 @@ static const struct {
  *  - @size_in = -1
  *  - @size_out = 0
  *
+ * Commands which have a variable length input likely have a minimum length.
+ * This is not enforced by the UAPI, and therefore might look like the command
+ * succeeded when sending too small of an input payload. Caution should be taken
+ * by checking the @cxl_send_command.retval for such cases. For commands with a
+ * variable length output, the caller is free to consume as little or as much as
+ * they want.
+ *
  * See struct cxl_mem_query_commands.
  */
 struct cxl_command_info {
