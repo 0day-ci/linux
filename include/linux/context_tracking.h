@@ -102,6 +102,40 @@ extern void context_tracking_init(void);
 static inline void context_tracking_init(void) { }
 #endif /* CONFIG_CONTEXT_TRACKING_FORCE */
 
+static __always_inline void vtime_account_guest_enter(void)
+{
+	if (IS_ENABLED(CONFIG_VIRT_CPU_ACCOUNTING_GEN)) {
+		if (vtime_accounting_enabled_this_cpu())
+			vtime_guest_enter(current);
+		else
+			current->flags |= PF_VCPU;
+	} else {
+		vtime_account_kernel(current);
+		current->flags |= PF_VCPU;
+	}
+}
+
+static __always_inline void __vtime_account_guest_exit(void)
+{
+	if (IS_ENABLED(CONFIG_VIRT_CPU_ACCOUNTING_GEN)) {
+		if (vtime_accounting_enabled_this_cpu())
+			vtime_guest_exit(current);
+	} else {
+		vtime_account_kernel(current);
+	}
+}
+
+static __always_inline void vtime_account_guest_exit(void)
+{
+	__vtime_account_guest_exit();
+	current->flags &= ~PF_VCPU;
+}
+
+static __always_inline void vcpu_account_guest_exit(void)
+{
+	if (!vtime_accounting_enabled_this_cpu())
+		current->flags &= ~PF_VCPU;
+}
 
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 static __always_inline void context_guest_enter_irqoff(void)
@@ -127,10 +161,7 @@ static __always_inline void context_guest_enter_irqoff(void)
 static __always_inline void guest_enter_irqoff(void)
 {
 	instrumentation_begin();
-	if (vtime_accounting_enabled_this_cpu())
-		vtime_guest_enter(current);
-	else
-		current->flags |= PF_VCPU;
+	vtime_account_guest_enter();
 	instrumentation_end();
 
 	context_guest_enter_irqoff();
@@ -147,10 +178,7 @@ static __always_inline void guest_exit_irqoff(void)
 	context_guest_exit_irqoff();
 
 	instrumentation_begin();
-	if (vtime_accounting_enabled_this_cpu())
-		vtime_guest_exit(current);
-	else
-		current->flags &= ~PF_VCPU;
+	vtime_account_guest_exit();
 	instrumentation_end();
 }
 
@@ -170,8 +198,7 @@ static __always_inline void guest_enter_irqoff(void)
 	 * to flush.
 	 */
 	instrumentation_begin();
-	vtime_account_kernel(current);
-	current->flags |= PF_VCPU;
+	vtime_account_guest_enter();
 	instrumentation_end();
 
 	context_guest_enter_irqoff();
@@ -183,8 +210,7 @@ static __always_inline void guest_exit_irqoff(void)
 {
 	instrumentation_begin();
 	/* Flush the guest cputime we spent on the guest */
-	vtime_account_kernel(current);
-	current->flags &= ~PF_VCPU;
+	vtime_account_guest_exit();
 	instrumentation_end();
 }
 #endif /* CONFIG_VIRT_CPU_ACCOUNTING_GEN */
