@@ -2113,6 +2113,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 
 	switch (code) {
 	case HVCALL_NOTIFY_LONG_SPIN_WAIT:
+		if (unlikely(!hv_vcpu->cpuid_cache.enlightenments_ebx ||
+			     hv_vcpu->cpuid_cache.enlightenments_ebx == U32_MAX)) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
