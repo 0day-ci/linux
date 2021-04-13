@@ -208,7 +208,13 @@ static struct socket *rxe_setup_udp_tunnel(struct net *net, __be16 port,
 	/* Create UDP socket */
 	err = udp_sock_create(net, &udp_cfg, &sock);
 	if (err < 0) {
-		pr_err("failed to create udp socket. err = %d\n", err);
+		/* If UDP tunnel over ipv6 fails with -EAFNOSUPPORT, the tunnel
+		 * over ipv4 still works. This error message will not pop out.
+		 * If UDP tunnle over ipv4 fails or other errors with ipv6
+		 * tunnel, this error should pop out.
+		 */
+		if (!((err == -EAFNOSUPPORT) && (ipv6)))
+			pr_err("failed to create udp socket. err = %d\n", err);
 		return ERR_PTR(err);
 	}
 
@@ -620,6 +626,11 @@ static int rxe_net_ipv6_init(void)
 	recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
 						htons(ROCE_V2_UDP_DPORT), true);
 	if (IS_ERR(recv_sockets.sk6)) {
+		/* Though IPv6 is not supported, IPv4 still needs to continue
+		 */
+		if (PTR_ERR(recv_sockets.sk6) == -EAFNOSUPPORT)
+			return 0;
+
 		recv_sockets.sk6 = NULL;
 		pr_err("Failed to create IPv6 UDP tunnel\n");
 		return -1;
