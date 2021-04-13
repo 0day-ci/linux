@@ -2211,6 +2211,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_hv_flush_tlb(vcpu, ingpa, rep_cnt, true);
 		break;
 	case HVCALL_SEND_IPI:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_CLUSTER_IPI_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
@@ -2218,6 +2224,14 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_hv_send_ipi(vcpu, ingpa, outgpa, false, fast);
 		break;
 	case HVCALL_SEND_IPI_EX:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_CLUSTER_IPI_RECOMMENDED) ||
+			     !(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(fast || rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
