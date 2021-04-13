@@ -2120,6 +2120,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		kvm_vcpu_on_spin(vcpu, true);
 		break;
 	case HVCALL_SIGNAL_EVENT:
+		if (unlikely(!(hv_vcpu->cpuid_cache.features_ebx &
+			       HV_SIGNAL_EVENTS))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
