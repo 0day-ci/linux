@@ -166,6 +166,9 @@ static int max31790_read_fan(struct device *dev, u32 attr, int channel,
 
 	switch (attr) {
 	case hwmon_fan_input:
+		if (!(data->fan_config[channel] & MAX31790_FAN_CFG_TACH_INPUT_EN))
+			return -ENODATA;
+
 		tach = read_reg_word(regmap, MAX31790_REG_TACH_COUNT(channel));
 		if (tach < 0)
 			return tach;
@@ -180,6 +183,11 @@ static int max31790_read_fan(struct device *dev, u32 attr, int channel,
 		*val = RPM_FROM_REG(tach, get_tach_period(data->fan_dynamics[channel]));
 		return 0;
 	case hwmon_fan_fault:
+		if (!(data->fan_config[channel] & MAX31790_FAN_CFG_TACH_INPUT_EN)) {
+			*val = 0;
+			return 0;
+		}
+
 		if (channel > 6)
 			fault = read_reg_byte(regmap, MAX31790_REG_FAN_FAULT_STATUS2);
 		else
