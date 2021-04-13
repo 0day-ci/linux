@@ -1440,6 +1440,7 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 	u64 data = 0;
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_hv *hv = to_kvm_hv(kvm);
+	struct kvm_vcpu_hv *hv_vcpu = to_hv_vcpu(vcpu);
 
 	switch (msr) {
 	case HV_X64_MSR_GUEST_OS_ID:
@@ -1449,6 +1450,10 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		data = hv->hv_hypercall;
 		break;
 	case HV_X64_MSR_TIME_REF_COUNT:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_TIME_REF_COUNT_AVAILABLE)))
+			return 1;
+
 		data = get_time_ref_counter(kvm);
 		break;
 	case HV_X64_MSR_REFERENCE_TSC:
