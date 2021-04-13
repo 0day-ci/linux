@@ -29,15 +29,13 @@ bool i915_mitigate_clear_residuals(void)
 static int mitigations_set(const char *val, const struct kernel_param *kp)
 {
 	unsigned long new = ~0UL;
-	char *str, *sep, *tok;
+	char str[64], *sep, *tok;
 	bool first = true;
 	int err = 0;
 
 	BUILD_BUG_ON(ARRAY_SIZE(names) >= BITS_PER_TYPE(mitigations));
 
-	str = kstrdup(val, GFP_KERNEL);
-	if (!str)
-		return -ENOMEM;
+	strncpy(str, val, sizeof(str) - 1);
 
 	for (sep = str; (tok = strsep(&sep, ","));) {
 		bool enable = true;
@@ -86,7 +84,6 @@ static int mitigations_set(const char *val, const struct kernel_param *kp)
 			break;
 		}
 	}
-	kfree(str);
 	if (err)
 		return err;
 
