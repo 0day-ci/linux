@@ -211,7 +211,9 @@ static int synic_set_msr(struct kvm_vcpu_hv_synic *synic,
 	struct kvm_vcpu *vcpu = hv_synic_to_vcpu(synic);
 	int ret;
 
-	if (!synic->active && !host)
+	if (unlikely(!host &&
+		     (!synic->active || !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+					  HV_MSR_SYNIC_AVAILABLE))))
 		return 1;
 
 	trace_kvm_hv_synic_set_msr(vcpu->vcpu_id, msr, data, host);
@@ -383,9 +385,12 @@ static int syndbg_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata, bool host)
 static int synic_get_msr(struct kvm_vcpu_hv_synic *synic, u32 msr, u64 *pdata,
 			 bool host)
 {
+	struct kvm_vcpu *vcpu = hv_synic_to_vcpu(synic);
 	int ret;
 
-	if (!synic->active && !host)
+	if (unlikely(!host &&
+		     (!synic->active || !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+					  HV_MSR_SYNIC_AVAILABLE))))
 		return 1;
 
 	ret = 0;
