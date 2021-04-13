@@ -391,11 +391,6 @@ static int solo_send_desc(struct solo_enc_dev *solo_enc, int skip,
 }
 
 /* Extract values from VOP header - VE_STATUSxx */
-static inline int vop_interlaced(const vop_header *vh)
-{
-	return (__le32_to_cpu((*vh)[0]) >> 30) & 1;
-}
-
 static inline u8 vop_channel(const vop_header *vh)
 {
 	return (__le32_to_cpu((*vh)[0]) >> 24) & 0x1F;
