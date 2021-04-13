@@ -2746,7 +2746,7 @@ static ssize_t target_tg_pt_gp_alua_access_state_store(struct config_item *item,
 
 	if (!tg_pt_gp->tg_pt_gp_valid_id) {
 		pr_err("Unable to do implicit ALUA on non valid"
-			" tg_pt_gp ID: %hu\n", tg_pt_gp->tg_pt_gp_valid_id);
+			" tg_pt_gp ID: %u\n", tg_pt_gp->tg_pt_gp_valid_id);
 		return -EINVAL;
 	}
 	if (!target_dev_configured(dev)) {
@@ -2798,7 +2798,7 @@ static ssize_t target_tg_pt_gp_alua_access_status_store(
 
 	if (!tg_pt_gp->tg_pt_gp_valid_id) {
 		pr_err("Unable to do set ALUA access status on non"
-			" valid tg_pt_gp ID: %hu\n",
+			" valid tg_pt_gp ID: %u\n",
 			tg_pt_gp->tg_pt_gp_valid_id);
 		return -EINVAL;
 	}
@@ -2853,7 +2853,7 @@ static ssize_t target_tg_pt_gp_alua_support_##_name##_store(		\
 									\
 	if (!t->tg_pt_gp_valid_id) {					\
 		pr_err("Unable to do set " #_name " ALUA state on non"	\
-		       " valid tg_pt_gp ID: %hu\n",			\
+		       " valid tg_pt_gp ID: %u\n",			\
 		       t->tg_pt_gp_valid_id);				\
 		return -EINVAL;						\
 	}								\
