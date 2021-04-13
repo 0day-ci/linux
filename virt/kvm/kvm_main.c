@@ -656,15 +656,13 @@ static int kvm_init_mmu_notifier(struct kvm *kvm)
 
 static struct kvm_memslots *kvm_alloc_memslots(void)
 {
-	int i;
 	struct kvm_memslots *slots;
 
 	slots = kvzalloc(sizeof(struct kvm_memslots), GFP_KERNEL_ACCOUNT);
 	if (!slots)
 		return NULL;
 
-	for (i = 0; i < KVM_MEM_SLOTS_NUM; i++)
-		slots->id_to_index[i] = -1;
+	hash_init(slots->id_hash);
 
 	return slots;
 }
@@ -972,14 +970,16 @@ static int kvm_alloc_dirty_bitmap(struct kvm_memory_slot *memslot)
 /*
  * Delete a memslot by decrementing the number of used slots and shifting all
  * other entries in the array forward one spot.
+ * @memslot is a detached dummy struct with just .id and .as_id filled.
  */
 static inline void kvm_memslot_delete(struct kvm_memslots *slots,
 				      struct kvm_memory_slot *memslot)
 {
 	struct kvm_memory_slot *mslots = slots->memslots;
+	struct kvm_memory_slot *dmemslot = id_to_memslot(slots, memslot->id);
 	int i;
 
-	if (WARN_ON(slots->id_to_index[memslot->id] == -1))
+	if (WARN_ON(!dmemslot))
 		return;
 
 	slots->used_slots--;
@@ -987,12 +987,13 @@ static inline void kvm_memslot_delete(struct kvm_memslots *slots,
 	if (atomic_read(&slots->lru_slot) >= slots->used_slots)
 		atomic_set(&slots->lru_slot, 0);
 
-	for (i = slots->id_to_index[memslot->id]; i < slots->used_slots; i++) {
+	for (i = dmemslot - mslots; i < slots->used_slots; i++) {
+		hash_del(&mslots[i].id_node);
 		mslots[i] = mslots[i + 1];
-		slots->id_to_index[mslots[i].id] = i;
+		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
+	hash_del(&mslots[i].id_node);
 	mslots[i] = *memslot;
-	slots->id_to_index[memslot->id] = -1;
 }
 
 /*
@@ -1010,31 +1011,41 @@ static inline int kvm_memslot_insert_back(struct kvm_memslots *slots)
  * itself is not preserved in the array, i.e. not swapped at this time, only
  * its new index into the array is tracked.  Returns the changed memslot's
  * current index into the memslots array.
+ * The memslot at the returned index will not be in @slots->id_hash by then.
+ * @memslot is a detached struct with desired final data of the changed slot.
  */
 static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
 					    struct kvm_memory_slot *memslot)
 {
 	struct kvm_memory_slot *mslots = slots->memslots;
+	struct kvm_memory_slot *mmemslot = id_to_memslot(slots, memslot->id);
 	int i;
 
-	if (WARN_ON_ONCE(slots->id_to_index[memslot->id] == -1) ||
+	if (WARN_ON_ONCE(!mmemslot) ||
 	    WARN_ON_ONCE(!slots->used_slots))
 		return -1;
+
+	/*
+	 * update_memslots() will unconditionally overwrite and re-add the
+	 * target memslot so it has to be removed here first
+	 */
+	hash_del(&mmemslot->id_node);
 
 	/*
 	 * Move the target memslot backward in the array by shifting existing
 	 * memslots with a higher GFN (than the target memslot) towards the
 	 * front of the array.
 	 */
-	for (i = slots->id_to_index[memslot->id]; i < slots->used_slots - 1; i++) {
+	for (i = mmemslot - mslots; i < slots->used_slots - 1; i++) {
 		if (memslot->base_gfn > mslots[i + 1].base_gfn)
 			break;
 
 		WARN_ON_ONCE(memslot->base_gfn == mslots[i + 1].base_gfn);
 
 		/* Shift the next memslot forward one and update its index. */
+		hash_del(&mslots[i + 1].id_node);
 		mslots[i] = mslots[i + 1];
-		slots->id_to_index[mslots[i].id] = i;
+		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
 	return i;
 }
@@ -1045,6 +1056,10 @@ static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
  * is not preserved in the array, i.e. not swapped at this time, only its new
  * index into the array is tracked.  Returns the changed memslot's final index
  * into the memslots array.
+ * The memslot at the returned index will not be in @slots->id_hash by then.
+ * @memslot is a detached struct with desired final data of the new or
+ * changed slot.
+ * Assumes that the memslot at @start index is not in @slots->id_hash.
  */
 static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
 					   struct kvm_memory_slot *memslot,
@@ -1060,8 +1075,9 @@ static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
 		WARN_ON_ONCE(memslot->base_gfn == mslots[i - 1].base_gfn);
 
 		/* Shift the next memslot back one and update its index. */
+		hash_del(&mslots[i - 1].id_node);
 		mslots[i] = mslots[i - 1];
-		slots->id_to_index[mslots[i].id] = i;
+		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
 	return i;
 }
@@ -1106,6 +1122,9 @@ static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
  * most likely to be referenced, sorting it to the front of the array was
  * advantageous.  The current binary search starts from the middle of the array
  * and uses an LRU pointer to improve performance for all memslots and GFNs.
+ *
+ * @memslot is a detached struct, not a part of the current or new memslot
+ * array.
  */
 static void update_memslots(struct kvm_memslots *slots,
 			    struct kvm_memory_slot *memslot,
@@ -1122,12 +1141,16 @@ static void update_memslots(struct kvm_memslots *slots,
 			i = kvm_memslot_move_backward(slots, memslot);
 		i = kvm_memslot_move_forward(slots, memslot, i);
 
+		if (i < 0)
+			return;
+
 		/*
 		 * Copy the memslot to its new position in memslots and update
 		 * its index accordingly.
 		 */
 		slots->memslots[i] = *memslot;
-		slots->id_to_index[memslot->id] = i;
+		hash_add(slots->id_hash, &slots->memslots[i].id_node,
+			 memslot->id);
 	}
 }
 
@@ -1191,6 +1214,7 @@ static struct kvm_memslots *kvm_dup_memslots(struct kvm_memslots *old,
 {
 	struct kvm_memslots *slots;
 	size_t old_size, new_size;
+	struct kvm_memory_slot *memslot;
 
 	old_size = sizeof(struct kvm_memslots) +
 		   (sizeof(struct kvm_memory_slot) * old->used_slots);
@@ -1201,8 +1225,14 @@ static struct kvm_memslots *kvm_dup_memslots(struct kvm_memslots *old,
 		new_size = old_size;
 
 	slots = kvzalloc(new_size, GFP_KERNEL_ACCOUNT);
-	if (likely(slots))
-		memcpy(slots, old, old_size);
+	if (unlikely(!slots))
+		return NULL;
+
+	memcpy(slots, old, old_size);
+
+	hash_init(slots->id_hash);
+	kvm_for_each_memslot(memslot, slots)
+		hash_add(slots->id_hash, &memslot->id_node, memslot->id);
 
 	return slots;
 }
