@@ -2073,12 +2073,16 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 	u64 param, ingpa, outgpa, ret = HV_STATUS_SUCCESS;
 	uint16_t code, rep_idx, rep_cnt;
 	bool fast, rep;
+	struct kvm_vcpu_hv *hv_vcpu = to_hv_vcpu(vcpu);
 
 	/*
 	 * hypercall generates UD from non zero cpl and real mode
-	 * per HYPER-V spec
+	 * per HYPER-V spec. Fail the call when 'hv_vcpu' context
+	 * was not allocated (e.g. per-vCPU Hyper-V CPUID entries
+	 * are unset) as well.
 	 */
-	if (static_call(kvm_x86_get_cpl)(vcpu) != 0 || !is_protmode(vcpu)) {
+	if (static_call(kvm_x86_get_cpl)(vcpu) != 0 || !is_protmode(vcpu) ||
+	    !hv_vcpu) {
 		kvm_queue_exception(vcpu, UD_VECTOR);
 		return 1;
 	}
@@ -2125,6 +2129,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 			break;
 		fallthrough;	/* maybe userspace knows this conn_id */
 	case HVCALL_POST_MESSAGE:
+		if (unlikely(!(hv_vcpu->cpuid_cache.features_ebx &
+			       HV_POST_MESSAGES))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		/* don't bother userspace if it has no way to handle it */
 		if (unlikely(rep || !to_hv_synic(vcpu)->active)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
