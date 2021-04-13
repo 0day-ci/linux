@@ -208,6 +208,7 @@ struct iommu_iotlb_gather {
  * @device_group: find iommu group for a particular device
  * @domain_get_attr: Query domain attributes
  * @domain_set_attr: Change domain attributes
+ * @split_block: Split block mapping into page mapping
  * @switch_dirty_log: Perform actions to start|stop dirty log tracking
  * @sync_dirty_log: Sync dirty log from IOMMU into a dirty bitmap
  * @clear_dirty_log: Clear dirty log of IOMMU by a mask bitmap
@@ -267,6 +268,8 @@ struct iommu_ops {
 			       enum iommu_attr attr, void *data);
 
 	/* Track dirty log */
+	int (*split_block)(struct iommu_domain *domain, unsigned long iova,
+			   size_t size);
 	int (*switch_dirty_log)(struct iommu_domain *domain, bool enable,
 				unsigned long iova, size_t size, int prot);
 	int (*sync_dirty_log)(struct iommu_domain *domain,
@@ -529,6 +532,8 @@ extern int iommu_domain_get_attr(struct iommu_domain *domain, enum iommu_attr,
 				 void *data);
 extern int iommu_domain_set_attr(struct iommu_domain *domain, enum iommu_attr,
 				 void *data);
+extern int iommu_split_block(struct iommu_domain *domain, unsigned long iova,
+			     size_t size);
 extern int iommu_switch_dirty_log(struct iommu_domain *domain, bool enable,
 				  unsigned long iova, size_t size, int prot);
 extern int iommu_sync_dirty_log(struct iommu_domain *domain, unsigned long iova,
@@ -925,6 +930,12 @@ static inline int iommu_domain_get_attr(struct iommu_domain *domain,
 
 static inline int iommu_domain_set_attr(struct iommu_domain *domain,
 					enum iommu_attr attr, void *data)
+{
+	return -EINVAL;
+}
+
+static inline int iommu_split_block(struct iommu_domain *domain,
+				    unsigned long iova, size_t size)
 {
 	return -EINVAL;
 }
