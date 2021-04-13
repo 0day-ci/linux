@@ -3378,8 +3378,11 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 	 * descendants is enabled for remote wakeup.
 	 */
 	else if (PMSG_IS_AUTO(msg) || usb_wakeup_enabled_descendants(udev) > 0)
-		status = set_port_feature(hub->hdev, port1,
-				USB_PORT_FEAT_SUSPEND);
+		if (hub->hdev->quirks & USB_QUIRK_NO_SET_FEAT_SUSPEND)
+			status = 0;
+		else
+			status = set_port_feature(hub->hdev, port1,
+					USB_PORT_FEAT_SUSPEND);
 	else {
 		really_suspend = false;
 		status = 0;

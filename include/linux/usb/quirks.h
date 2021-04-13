@@ -72,4 +72,7 @@
 /* device has endpoints that should be ignored */
 #define USB_QUIRK_ENDPOINT_IGNORE		BIT(15)
 
+/* Hub can't handle set-port-feature-suspend request correctly */
+#define USB_QUIRK_NO_SET_FEAT_SUSPEND		BIT(16)
+
 #endif /* __LINUX_USB_QUIRKS_H */
