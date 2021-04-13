@@ -312,7 +312,9 @@ static int syndbg_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data, bool host)
 {
 	struct kvm_hv_syndbg *syndbg = to_hv_syndbg(vcpu);
 
-	if (!kvm_hv_is_syndbg_enabled(vcpu) && !host)
+	if (unlikely(!host && (!kvm_hv_is_syndbg_enabled(vcpu) ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_edx &
+				 HV_FEATURE_DEBUG_MSRS_AVAILABLE))))
 		return 1;
 
 	trace_kvm_hv_syndbg_set_msr(vcpu->vcpu_id,
@@ -351,7 +353,9 @@ static int syndbg_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata, bool host)
 {
 	struct kvm_hv_syndbg *syndbg = to_hv_syndbg(vcpu);
 
-	if (!kvm_hv_is_syndbg_enabled(vcpu) && !host)
+	if (unlikely(!host && (!kvm_hv_is_syndbg_enabled(vcpu) ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_edx &
+				 HV_FEATURE_DEBUG_MSRS_AVAILABLE))))
 		return 1;
 
 	switch (msr) {
