@@ -1198,9 +1198,14 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 {
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_hv *hv = to_kvm_hv(kvm);
+	struct kvm_vcpu_hv *hv_vcpu = to_hv_vcpu(vcpu);
 
 	switch (msr) {
 	case HV_X64_MSR_GUEST_OS_ID:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_HYPERCALL_AVAILABLE)))
+			return 1;
+
 		hv->hv_guest_os_id = data;
 		/* setting guest os id to zero disables hypercall page */
 		if (!hv->hv_guest_os_id)
@@ -1210,6 +1215,10 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		u8 instructions[9];
 		int i = 0;
 		u64 addr;
+
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_HYPERCALL_AVAILABLE)))
+			return 1;
 
 		/* if guest os id is not set hypercall should remain disabled */
 		if (!hv->hv_guest_os_id)
@@ -1444,9 +1453,17 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 
 	switch (msr) {
 	case HV_X64_MSR_GUEST_OS_ID:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_HYPERCALL_AVAILABLE)))
+			return 1;
+
 		data = hv->hv_guest_os_id;
 		break;
 	case HV_X64_MSR_HYPERCALL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_HYPERCALL_AVAILABLE)))
+			return 1;
+
 		data = hv->hv_hypercall;
 		break;
 	case HV_X64_MSR_TIME_REF_COUNT:
