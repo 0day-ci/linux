@@ -1514,6 +1514,10 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 
 	switch (msr) {
 	case HV_X64_MSR_VP_INDEX:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_VP_INDEX_AVAILABLE)))
+			return 1;
+
 		data = hv_vcpu->vp_index;
 		break;
 	case HV_X64_MSR_EOI:
