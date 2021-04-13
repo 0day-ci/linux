@@ -119,23 +119,46 @@ static int rseq_reset_rseq_cpu_id(struct task_struct *t)
 	return 0;
 }
 
+#ifdef CONFIG_64BIT
+static int rseq_get_cs_ptr(struct rseq_cs __user **uptrp,
+			   const struct rseq __user *rseq)
+{
+	u64 ptr;
+
+	if (get_user(ptr, &rseq->rseq_cs.ptr64))
+		return -EFAULT;
+	*uptrp = (struct rseq_cs __user *)ptr;
+	return 0;
+}
+#else
+static int rseq_get_cs_ptr(struct rseq_cs __user **uptrp,
+			   const struct rseq __user *rseq)
+{
+	u32 ptr;
+
+	if (get_user(ptr, &rseq->rseq_cs.ptr.ptr32))
+		return -EFAULT;
+	*uptrp = (struct rseq_cs __user *)ptr;
+	return 0;
+}
+#endif
+
 static int rseq_get_rseq_cs(struct task_struct *t, struct rseq_cs *rseq_cs)
 {
 	struct rseq_cs __user *urseq_cs;
-	u64 ptr;
 	u32 __user *usig;
 	u32 sig;
 	int ret;
 
-	if (copy_from_user(&ptr, &t->rseq->rseq_cs.ptr64, sizeof(ptr)))
+	if (rseq_get_cs_ptr(&urseq_cs, t->rseq))
 		return -EFAULT;
-	if (!ptr) {
+	if (!urseq_cs) {
 		memset(rseq_cs, 0, sizeof(*rseq_cs));
 		return 0;
 	}
-	if (ptr >= TASK_SIZE)
+	if ((unsigned long)urseq_cs >= TASK_SIZE)
 		return -EINVAL;
-	urseq_cs = (struct rseq_cs __user *)(unsigned long)ptr;
+
 	if (copy_from_user(rseq_cs, urseq_cs, sizeof(*rseq_cs)))
 		return -EFAULT;
 
@@ -211,9 +234,11 @@ static int clear_rseq_cs(struct task_struct *t)
 	 *
 	 * Set rseq_cs to NULL.
 	 */
-	if (clear_user(&t->rseq->rseq_cs.ptr64, sizeof(t->rseq->rseq_cs.ptr64)))
-		return -EFAULT;
-	return 0;
+#ifdef CONFIG_64BIT
+	return put_user(0UL, &t->rseq->rseq_cs.ptr64);
+#else
+	return put_user(0UL, &t->rseq->rseq_cs.ptr.ptr32);
+#endif
 }
 
 /*
