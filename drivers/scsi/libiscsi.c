@@ -3587,10 +3587,11 @@ int iscsi_conn_get_addr_param(struct sockaddr_storage *addr,
 	case ISCSI_PARAM_CONN_PORT:
 	case ISCSI_PARAM_LOCAL_PORT:
 		if (sin)
-			len = sprintf(buf, "%hu\n", be16_to_cpu(sin->sin_port));
+			len = sprintf(buf, "%hu\n",
+				      (u16)be16_to_cpu(sin->sin_port));
 		else
 			len = sprintf(buf, "%hu\n",
-				      be16_to_cpu(sin6->sin6_port));
+				      (u16)be16_to_cpu(sin6->sin6_port));
 		break;
 	default:
 		return -EINVAL;
