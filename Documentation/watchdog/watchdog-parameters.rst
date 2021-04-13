@@ -21,6 +21,9 @@ watchdog core:
 	timeout. Setting this to a non-zero value can be useful to ensure that
 	either userspace comes up properly, or the board gets reset and allows
 	fallback logic in the bootloader to try something else.
+    start_enabled:
+	Watchdog is started on module insertion. This option can be also
+	selected by kernel config (default=kernel config parameter).
 
 -------------------------------------------------
 

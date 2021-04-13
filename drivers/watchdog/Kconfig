@@ -47,6 +47,15 @@ config WATCHDOG_NOWAYOUT
 	  get killed. If you say Y here, the watchdog cannot be stopped once
 	  it has been started.
 
+config WATCHDOG_START_ENABLED
+	bool "Start watchdog on module insertion"
+	help
+	  Say Y if you want to start the watchdog at the same time when the
+	  driver is loaded.
+	  This feature is very useful in embedded systems, to avoid cases where
+	  the system could hang before reaching userspace.
+	  This parameter applies to all watchdog drivers.
+
 config WATCHDOG_HANDLE_BOOT_ENABLED
 	bool "Update boot-enabled watchdog until userspace takes over"
 	default y
