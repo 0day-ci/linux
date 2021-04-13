@@ -1016,11 +1016,6 @@ static int dpu_kms_hw_init(struct msm_kms *kms)
 	dev->mode_config.max_height = 4096;
 
 	/*
-	 * Support format modifiers for compression etc.
-	 */
-	dev->mode_config.allow_fb_modifiers = true;
-
-	/*
 	 * _dpu_kms_drm_obj_init should create the DRM related objects
 	 * i.e. CRTCs, planes, encoders, connectors and so forth
 	 */
