@@ -142,3 +142,11 @@ config PCIE_EDR
 	  the PCI Firmware Specification r3.2.  Enable this if you want to
 	  support hybrid DPC model which uses both firmware and OS to
 	  implement DPC.
+
+config PCIE_DOE
+       bool
+       help
+         This enables library support PCI Data Object Exchange capability.
+         DOE provides a simple mailbox in PCI express config space that is
+         used by a number of different protocols.
+         It is defined in the Data Object Exchange ECN to PCI 5.0.
