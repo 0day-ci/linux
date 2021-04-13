@@ -2211,6 +2211,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 			break;
 		}
 
+		if (unlikely(!(hv_vcpu->cpuid_cache.features_ebx &
+			       HV_DEBUGGING))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (!(syndbg->options & HV_X64_SYNDBG_OPTION_USE_HCALLS)) {
 			ret = HV_STATUS_OPERATION_DENIED;
 			break;
