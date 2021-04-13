@@ -61,6 +61,7 @@
 #include <drm/drm_connector.h>
 #include <drm/i915_mei_hdcp_interface.h>
 
+#include "i915_hwmon.h"
 #include "i915_params.h"
 #include "i915_reg.h"
 #include "i915_utils.h"
@@ -1108,6 +1109,8 @@ struct drm_i915_private {
 	struct intel_runtime_pm runtime_pm;
 
 	struct i915_perf perf;
+
+	struct i915_hwmon hwmon;
 
 	/* Abstract the submission mechanism (legacy ringbuffer or execlists) away */
 	struct intel_gt gt;
