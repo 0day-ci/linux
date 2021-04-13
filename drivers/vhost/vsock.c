@@ -31,7 +31,8 @@
 
 enum {
 	VHOST_VSOCK_FEATURES = VHOST_FEATURES |
-			       (1ULL << VIRTIO_F_ACCESS_PLATFORM)
+			       (1ULL << VIRTIO_F_ACCESS_PLATFORM) |
+			       (1ULL << VIRTIO_VSOCK_F_SEQPACKET)
 };
 
 enum {
@@ -112,6 +113,7 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 		size_t nbytes;
 		size_t iov_len, payload_len;
 		int head;
+		bool restore_flag = false;
 
 		spin_lock_bh(&vsock->send_pkt_list_lock);
 		if (list_empty(&vsock->send_pkt_list)) {
@@ -174,12 +176,21 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 		/* Set the correct length in the header */
 		pkt->hdr.len = cpu_to_le32(payload_len);
 
+		if (pkt->off + payload_len < pkt->len &&
+		    pkt->hdr.flags & VIRTIO_VSOCK_SEQ_EOR) {
+			pkt->hdr.flags &= ~VIRTIO_VSOCK_SEQ_EOR;
+			restore_flag = true;
+		}
+
 		nbytes = copy_to_iter(&pkt->hdr, sizeof(pkt->hdr), &iov_iter);
 		if (nbytes != sizeof(pkt->hdr)) {
 			virtio_transport_free_pkt(pkt);
 			vq_err(vq, "Faulted on copying pkt hdr\n");
 			break;
 		}
+
+		if (restore_flag)
+			pkt->hdr.flags |= VIRTIO_VSOCK_SEQ_EOR;
 
 		nbytes = copy_to_iter(pkt->buf + pkt->off, payload_len,
 				      &iov_iter);
@@ -354,8 +365,7 @@ vhost_vsock_alloc_pkt(struct vhost_virtqueue *vq,
 		return NULL;
 	}
 
-	if (le16_to_cpu(pkt->hdr.type) == VIRTIO_VSOCK_TYPE_STREAM)
-		pkt->len = le32_to_cpu(pkt->hdr.len);
+	pkt->len = le32_to_cpu(pkt->hdr.len);
 
 	/* No payload */
 	if (!pkt->len)
@@ -398,6 +408,8 @@ static bool vhost_vsock_more_replies(struct vhost_vsock *vsock)
 	return val < vq->num;
 }
 
+static bool vhost_transport_seqpacket_allow(void);
+
 static struct virtio_transport vhost_transport = {
 	.transport = {
 		.module                   = THIS_MODULE,
@@ -424,6 +436,10 @@ static struct virtio_transport vhost_transport = {
 		.stream_is_active         = virtio_transport_stream_is_active,
 		.stream_allow             = virtio_transport_stream_allow,
 
+		.seqpacket_dequeue        = virtio_transport_seqpacket_dequeue,
+		.seqpacket_enqueue        = virtio_transport_seqpacket_enqueue,
+		.seqpacket_allow          = vhost_transport_seqpacket_allow,
+
 		.notify_poll_in           = virtio_transport_notify_poll_in,
 		.notify_poll_out          = virtio_transport_notify_poll_out,
 		.notify_recv_init         = virtio_transport_notify_recv_init,
@@ -439,7 +455,13 @@ static struct virtio_transport vhost_transport = {
 	},
 
 	.send_pkt = vhost_transport_send_pkt,
+	.seqpacket_allow = false
 };
+
+static bool vhost_transport_seqpacket_allow(void)
+{
+	return vhost_transport.seqpacket_allow;
+}
 
 static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 {
@@ -784,6 +806,9 @@ static int vhost_vsock_set_features(struct vhost_vsock *vsock, u64 features)
 		if (vhost_init_device_iotlb(&vsock->dev, true))
 			goto err;
 	}
+
+	if (features & (1ULL << VIRTIO_VSOCK_F_SEQPACKET))
+		vhost_transport.seqpacket_allow = true;
 
 	for (i = 0; i < ARRAY_SIZE(vsock->vqs); i++) {
 		vq = &vsock->vqs[i];
