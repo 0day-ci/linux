@@ -447,6 +447,8 @@ static int proc_tcp_available_ulp(struct ctl_table *ctl,
 }
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
+#define FIB_MULTIPATH_SEED_KEY_LENGTH sizeof(siphash_key_t)
+#define FIB_MULTIPATH_SEED_RANDOM "random"
 static int proc_fib_multipath_hash_policy(struct ctl_table *table, int write,
 					  void *buffer, size_t *lenp,
 					  loff_t *ppos)
@@ -459,6 +461,100 @@ static int proc_fib_multipath_hash_policy(struct ctl_table *table, int write,
 	if (write && ret == 0)
 		call_netevent_notifiers(NETEVENT_IPV4_MPATH_HASH_UPDATE, net);
 
+	return ret;
+}
+
+static void fib_multipath_seed_ctx_free(struct rcu_head *head)
+{
+	struct multipath_seed_ctx *ctx =
+	    container_of(head, struct multipath_seed_ctx, rcu);
+
+	kfree_sensitive(ctx);
+}
+
+static int proc_fib_multipath_hash_seed(struct ctl_table *table, int write,
+					  void *buffer, size_t *lenp,
+					  loff_t *ppos)
+{
+	struct net *net = container_of(table->data, struct net,
+	    ipv4.sysctl_fib_multipath_hash_seed);
+	/* maxlen to print the keys in hex (*2) and a comma in between keys. */
+	struct ctl_table tbl = {
+		.maxlen = ((FIB_MULTIPATH_SEED_KEY_LENGTH * 2) + 2)
+	};
+	siphash_key_t user_key;
+	__le64 key[2];
+	int ret;
+	struct multipath_seed_ctx *ctx;
+
+	tbl.data = kmalloc(tbl.maxlen, GFP_KERNEL);
+
+	if (!tbl.data)
+		return -ENOMEM;
+
+	rcu_read_lock();
+	ctx = rcu_dereference(net->ipv4.fib_multipath_hash_seed_ctx);
+	if (ctx) {
+		put_unaligned_le64(ctx->seed.key[0], &key[0]);
+		put_unaligned_le64(ctx->seed.key[1], &key[1]);
+		user_key.key[0] = le64_to_cpu(key[0]);
+		user_key.key[1] = le64_to_cpu(key[1]);
+
+		snprintf(tbl.data, tbl.maxlen, "%016llx,%016llx",
+				user_key.key[0], user_key.key[1]);
+	} else {
+		snprintf(tbl.data, tbl.maxlen, "%s", FIB_MULTIPATH_SEED_RANDOM);
+	}
+	rcu_read_unlock();
+
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+
+	if (write && ret == 0) {
+		struct multipath_seed_ctx *new_ctx, *old_ctx;
+
+		if (!strcmp(tbl.data, FIB_MULTIPATH_SEED_RANDOM)) {
+			spin_lock(&net->ipv4.fib_multipath_hash_seed_ctx_lock);
+			old_ctx = rcu_dereference_protected(net->ipv4.fib_multipath_hash_seed_ctx,
+					lockdep_is_held(&net->ipv4.fib_multipath_hash_seed_ctx_lock));
+			RCU_INIT_POINTER(net->ipv4.fib_multipath_hash_seed_ctx, NULL);
+			spin_unlock(&net->ipv4.fib_multipath_hash_seed_ctx_lock);
+			if (old_ctx)
+				call_rcu(&old_ctx->rcu, fib_multipath_seed_ctx_free);
+
+			pr_debug("multipath hash seed set to random value\n");
+			goto out;
+		}
+
+		if (sscanf(tbl.data, "%llx,%llx", user_key.key, user_key.key + 1) != 2) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		key[0] = cpu_to_le64(user_key.key[0]);
+		key[1] = cpu_to_le64(user_key.key[1]);
+		pr_debug("multipath hash seed set to 0x%llx,0x%llx\n",
+				user_key.key[0], user_key.key[1]);
+
+		new_ctx = kmalloc(sizeof(*new_ctx), GFP_KERNEL);
+		if (!new_ctx) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		new_ctx->seed.key[0] = get_unaligned_le64(&key[0]);
+		new_ctx->seed.key[1] = get_unaligned_le64(&key[1]);
+
+		spin_lock(&net->ipv4.fib_multipath_hash_seed_ctx_lock);
+		old_ctx = rcu_dereference_protected(net->ipv4.fib_multipath_hash_seed_ctx,
+				lockdep_is_held(&net->ipv4.fib_multipath_hash_seed_ctx_lock));
+		rcu_assign_pointer(net->ipv4.fib_multipath_hash_seed_ctx, new_ctx);
+		spin_unlock(&net->ipv4.fib_multipath_hash_seed_ctx_lock);
+		if (old_ctx)
+			call_rcu(&old_ctx->rcu, fib_multipath_seed_ctx_free);
+	}
+
+out:
+	kfree(tbl.data);
 	return ret;
 }
 #endif
@@ -1051,6 +1147,14 @@ static struct ctl_table ipv4_net_table[] = {
 		.proc_handler	= proc_fib_multipath_hash_policy,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &two,
+	},
+	{
+		.procname	= "fib_multipath_hash_seed",
+		.data		= &init_net.ipv4.sysctl_fib_multipath_hash_seed,
+		/* maxlen to print the keys in hex (*2) and a comma in between keys. */
+		.maxlen		= (FIB_MULTIPATH_SEED_KEY_LENGTH * 2) + 2,
+		.mode		= 0600,
+		.proc_handler	= proc_fib_multipath_hash_seed,
 	},
 #endif
 	{

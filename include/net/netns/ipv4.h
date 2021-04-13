@@ -11,6 +11,14 @@
 #include <linux/rcupdate.h>
 #include <linux/siphash.h>
 
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
+/* Multipath seed key context */
+struct multipath_seed_ctx {
+	siphash_key_t	seed;
+	struct rcu_head	rcu;
+};
+#endif
+
 struct ctl_table_header;
 struct ipv4_devconf;
 struct fib_rules_ops;
@@ -222,6 +230,9 @@ struct netns_ipv4 {
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	u8 sysctl_fib_multipath_use_neigh;
 	u8 sysctl_fib_multipath_hash_policy;
+	int sysctl_fib_multipath_hash_seed;
+	struct multipath_seed_ctx __rcu *fib_multipath_hash_seed_ctx;
+	spinlock_t fib_multipath_hash_seed_ctx_lock;
 #endif
 
 	struct fib_notifier_ops	*notifier_ops;
@@ -233,4 +244,13 @@ struct netns_ipv4 {
 	atomic_t	rt_genid;
 	siphash_key_t	ip_id_key;
 };
+
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
+/* Caller needs to wrap with rcu_read_(un)lock() */
+static inline
+struct multipath_seed_ctx *fib_multipath_seed_get_ctx(const struct netns_ipv4 *ipv4)
+{
+	return rcu_dereference(ipv4->fib_multipath_hash_seed_ctx);
+}
+#endif
 #endif

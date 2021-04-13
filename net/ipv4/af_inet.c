@@ -1874,6 +1874,11 @@ static __net_init int inet_init_net(struct net *net)
 
 	net->ipv4.sysctl_fib_notify_on_flag_change = 0;
 
+#ifdef CONFIG_IP_ROUTE_MULTIPATH
+	net->ipv4.fib_multipath_hash_seed_ctx = NULL;
+	spin_lock_init(&net->ipv4.fib_multipath_hash_seed_ctx_lock);
+#endif
+
 	return 0;
 }
 
