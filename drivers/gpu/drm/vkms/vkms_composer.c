@@ -158,11 +158,12 @@ static void compose_planes(struct vkms_composer *primary_composer,
 
 static int composite(void **vaddr_out,
 		     struct vkms_composer *primary_composer,
-		     struct vkms_composer *cursor_composer)
+		     struct vkms_crtc_state *crtc_state)
 {
 	struct drm_framebuffer *fb = &primary_composer->fb;
 	struct drm_gem_object *gem_obj = drm_gem_fb_get_obj(fb, 0);
 	struct drm_gem_shmem_object *shmem_obj = to_drm_gem_shmem_obj(gem_obj);
+	int i;
 
 	if (!*vaddr_out) {
 		*vaddr_out = kzalloc(shmem_obj->base.size, GFP_KERNEL);
@@ -177,8 +178,14 @@ static int composite(void **vaddr_out,
 
 	memcpy(*vaddr_out, shmem_obj->vaddr, shmem_obj->base.size);
 
-	if (cursor_composer)
-		compose_planes(primary_composer, cursor_composer, *vaddr_out);
+	/* If there are other planes besides primary, we consider the active
+	 * planes should be in z-order and compose them associatively:
+	 * ((primary <- overlay) <- cursor)
+	 */
+	for (i = 1; i < crtc_state->num_active_planes; i++)
+		compose_planes(primary_composer,
+			       crtc_state->active_planes[i]->composer,
+			       *vaddr_out);
 
 	return 0;
 }
@@ -200,7 +207,7 @@ void vkms_composer_worker(struct work_struct *work)
 	struct drm_crtc *crtc = crtc_state->base.crtc;
 	struct vkms_output *out = drm_crtc_to_vkms_output(crtc);
 	struct vkms_composer *primary_composer = NULL;
-	struct vkms_composer *cursor_composer = NULL;
+	struct vkms_plane_state *act_plane = NULL;
 	bool crc_pending, wb_pending;
 	void *vaddr_out = NULL;
 	u32 crc32 = 0;
@@ -224,11 +231,11 @@ void vkms_composer_worker(struct work_struct *work)
 	if (!crc_pending)
 		return;
 
-	if (crtc_state->num_active_planes >= 1)
-		primary_composer = crtc_state->active_planes[0]->composer;
-
-	if (crtc_state->num_active_planes == 2)
-		cursor_composer = crtc_state->active_planes[1]->composer;
+	if (crtc_state->num_active_planes >= 1) {
+		act_plane = crtc_state->active_planes[0];
+		if (act_plane->base.plane->type == DRM_PLANE_TYPE_PRIMARY)
+			primary_composer = act_plane->composer;
+	}
 
 	if (!primary_composer)
 		return;
@@ -236,7 +243,7 @@ void vkms_composer_worker(struct work_struct *work)
 	if (wb_pending)
 		vaddr_out = crtc_state->active_writeback;
 
-	ret = composite(&vaddr_out, primary_composer, cursor_composer);
+	ret = composite(&vaddr_out, primary_composer, crtc_state);
 	if (ret) {
 		if (ret == -EINVAL && !wb_pending)
 			kfree(vaddr_out);
