@@ -10959,9 +10959,21 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
 				const struct kvm_memory_slot *new,
 				enum kvm_mr_change change)
 {
-	if (!kvm->arch.n_requested_mmu_pages)
-		kvm_mmu_change_mmu_pages(kvm,
-				kvm_mmu_calculate_default_mmu_pages(kvm));
+	if (change == KVM_MR_CREATE)
+		kvm->arch.n_memslots_pages += new->npages;
+	else if (change == KVM_MR_DELETE) {
+		WARN_ON(kvm->arch.n_memslots_pages < old->npages);
+		kvm->arch.n_memslots_pages -= old->npages;
+	}
+
+	if (!kvm->arch.n_requested_mmu_pages) {
+		unsigned long nr_mmu_pages;
+
+		nr_mmu_pages = kvm->arch.n_memslots_pages *
+			       KVM_PERMILLE_MMU_PAGES / 1000;
+		nr_mmu_pages = max(nr_mmu_pages, KVM_MIN_ALLOC_MMU_PAGES);
+		kvm_mmu_change_mmu_pages(kvm, nr_mmu_pages);
+	}
 
 	/*
 	 * FIXME: const-ify all uses of struct kvm_memory_slot.
