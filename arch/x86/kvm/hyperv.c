@@ -1637,9 +1637,17 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 					pdata, host);
 	}
 	case HV_X64_MSR_TSC_FREQUENCY:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_FREQUENCY_MSRS)))
+			return 1;
+
 		data = (u64)vcpu->arch.virtual_tsc_khz * 1000;
 		break;
 	case HV_X64_MSR_APIC_FREQUENCY:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_FREQUENCY_MSRS)))
+			return 1;
+
 		data = APIC_BUS_FREQUENCY;
 		break;
 	default:
