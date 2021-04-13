@@ -1084,10 +1084,14 @@ bool kvm_arch_irqfd_allowed(struct kvm *kvm, struct kvm_irqfd *args);
  * gfn_to_memslot() itself isn't here as an inline because that would
  * bloat other code too much.
  *
+ * With "approx" set returns the memslot also when the address falls
+ * in a hole. In that case one of the memslots bordering the hole is
+ * returned.
+ *
  * IMPORTANT: Slots are sorted from highest GFN to lowest GFN!
  */
 static inline struct kvm_memory_slot *
-search_memslots(struct kvm_memslots *slots, gfn_t gfn)
+search_memslots(struct kvm_memslots *slots, gfn_t gfn, bool approx)
 {
 	int start = 0, end = slots->used_slots;
 	int slot = atomic_read(&slots->lru_slot);
@@ -1109,19 +1113,22 @@ search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 			start = slot + 1;
 	}
 
+	if (approx && start >= slots->used_slots)
+		return &memslots[slots->used_slots - 1];
+
 	if (start < slots->used_slots && gfn >= memslots[start].base_gfn &&
 	    gfn < memslots[start].base_gfn + memslots[start].npages) {
 		atomic_set(&slots->lru_slot, start);
 		return &memslots[start];
 	}
 
-	return NULL;
+	return approx ? &memslots[start] : NULL;
 }
 
 static inline struct kvm_memory_slot *
 __gfn_to_memslot(struct kvm_memslots *slots, gfn_t gfn)
 {
-	return search_memslots(slots, gfn);
+	return search_memslots(slots, gfn, false);
 }
 
 static inline unsigned long
