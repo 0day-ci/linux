@@ -165,13 +165,13 @@ static inline bool __ref_is_percpu(struct percpu_ref *ref,
 	 * !__PERCPU_REF_ATOMIC, which may be set asynchronously, and then
 	 * used as a pointer.  If the compiler generates a separate fetch
 	 * when using it as a pointer, __PERCPU_REF_ATOMIC may be set in
-	 * between contaminating the pointer value, meaning that
-	 * READ_ONCE() is required when fetching it.
+	 * between contaminating the pointer value, smp_load_acquire()
+	 * will prevent this.
 	 *
-	 * The dependency ordering from the READ_ONCE() pairs
+	 * The dependency ordering from the smp_load_acquire() pairs
 	 * with smp_store_release() in __percpu_ref_switch_to_percpu().
 	 */
-	percpu_ptr = READ_ONCE(ref->percpu_count_ptr);
+	percpu_ptr = smp_load_acquire(&ref->percpu_count_ptr);
 
 	/*
 	 * Theoretically, the following could test just ATOMIC; however,
@@ -231,6 +231,9 @@ static inline void percpu_ref_get(struct percpu_ref *ref)
  * Returns %true on success; %false on failure.
  *
  * This function is safe to call as long as @ref is between init and exit.
+ *
+ * This function is an ACQUIRE operation, that is, all memory operations
+ * after will appear to happen after checking the refcount.
  */
 static inline bool percpu_ref_tryget_many(struct percpu_ref *ref,
 					  unsigned long nr)
@@ -260,6 +263,9 @@ static inline bool percpu_ref_tryget_many(struct percpu_ref *ref,
  * Returns %true on success; %false on failure.
  *
  * This function is safe to call as long as @ref is between init and exit.
+ *
+ * This function is an ACQUIRE operation, that is, all memory operations
+ * after will appear to happen after checking the refcount.
  */
 static inline bool percpu_ref_tryget(struct percpu_ref *ref)
 {
@@ -280,6 +286,9 @@ static inline bool percpu_ref_tryget(struct percpu_ref *ref)
  * percpu_ref_tryget_live().
  *
  * This function is safe to call as long as @ref is between init and exit.
+ *
+ * This function is an ACQUIRE operation, that is, all memory operations
+ * after will appear to happen after checking the refcount.
  */
 static inline bool percpu_ref_tryget_live(struct percpu_ref *ref)
 {
