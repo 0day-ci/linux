@@ -148,4 +148,14 @@ config BT_FEATURE_DEBUG
 	  This provides an option to enable/disable debugging statements
 	  at runtime via the experimental features interface.
 
+config BT_FEATURE_VS_DBG_EVT
+	bool "Enable runtime option for logging vendor specific debug events"
+	depends on BT && !DYNAMIC_DEBUG
+	default n
+	help
+	  This provides an option to enable/disable vendor specific debug
+	  events logging at runtime via the experimental features interface.
+	  The debug events may include the categories of system exceptions,
+	  connections/disconnection, the link quality statistics, etc.
+
 source "drivers/bluetooth/Kconfig"
