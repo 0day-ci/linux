@@ -4553,17 +4553,17 @@ static long ext4_zero_range(struct file *file, loff_t offset,
 		 * Prevent page faults from reinstantiating pages we have
 		 * released from page cache.
 		 */
-		down_write(&EXT4_I(inode)->i_mmap_sem);
+		down_write(&inode->i_mapping_sem);
 
 		ret = ext4_break_layouts(inode);
 		if (ret) {
-			up_write(&EXT4_I(inode)->i_mmap_sem);
+			up_write(&inode->i_mapping_sem);
 			goto out_mutex;
 		}
 
 		ret = ext4_update_disksize_before_punch(inode, offset, len);
 		if (ret) {
-			up_write(&EXT4_I(inode)->i_mmap_sem);
+			up_write(&inode->i_mapping_sem);
 			goto out_mutex;
 		}
 		/* Now release the pages and zero block aligned part of pages */
@@ -4572,7 +4572,7 @@ static long ext4_zero_range(struct file *file, loff_t offset,
 
 		ret = ext4_alloc_file_blocks(file, lblk, max_blocks, new_size,
 					     flags);
-		up_write(&EXT4_I(inode)->i_mmap_sem);
+		up_write(&inode->i_mapping_sem);
 		if (ret)
 			goto out_mutex;
 	}
@@ -5267,7 +5267,7 @@ static int ext4_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	 * Prevent page faults from reinstantiating pages we have released from
 	 * page cache.
 	 */
-	down_write(&EXT4_I(inode)->i_mmap_sem);
+	down_write(&inode->i_mapping_sem);
 
 	ret = ext4_break_layouts(inode);
 	if (ret)
@@ -5288,7 +5288,7 @@ static int ext4_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	/*
 	 * Write data that will be shifted to preserve them when discarding
 	 * page cache below. We are also protected from pages becoming dirty
-	 * by i_mmap_sem.
+	 * by i_mapping_sem.
 	 */
 	ret = filemap_write_and_wait_range(inode->i_mapping, offset + len,
 					   LLONG_MAX);
@@ -5343,7 +5343,7 @@ out_stop:
 	ext4_journal_stop(handle);
 	ext4_fc_stop_ineligible(sb);
 out_mmap:
-	up_write(&EXT4_I(inode)->i_mmap_sem);
+	up_write(&inode->i_mapping_sem);
 out_mutex:
 	inode_unlock(inode);
 	return ret;
@@ -5418,7 +5418,7 @@ static int ext4_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	 * Prevent page faults from reinstantiating pages we have released from
 	 * page cache.
 	 */
-	down_write(&EXT4_I(inode)->i_mmap_sem);
+	down_write(&inode->i_mapping_sem);
 
 	ret = ext4_break_layouts(inode);
 	if (ret)
@@ -5519,7 +5519,7 @@ out_stop:
 	ext4_journal_stop(handle);
 	ext4_fc_stop_ineligible(sb);
 out_mmap:
-	up_write(&EXT4_I(inode)->i_mmap_sem);
+	up_write(&inode->i_mapping_sem);
 out_mutex:
 	inode_unlock(inode);
 	return ret;
