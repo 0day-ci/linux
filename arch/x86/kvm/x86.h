@@ -38,15 +38,18 @@ static __always_inline void kvm_guest_exit_irqoff(void)
 	 * have them in state 'on' as recorded before entering guest mode.
 	 * Same as enter_from_user_mode().
 	 *
-	 * guest_exit_irqoff() restores host context and reinstates RCU if
-	 * enabled and required.
+	 * context_tracking_guest_exit_irqoff() restores host context and
+	 * reinstates RCU if enabled and required.
 	 *
 	 * This needs to be done before the below as native_read_msr()
 	 * contains a tracepoint and x86_spec_ctrl_restore_host() calls
 	 * into world and some more.
 	 */
 	lockdep_hardirqs_off(CALLER_ADDR0);
-	guest_exit_irqoff();
+	context_tracking_guest_exit_irqoff();
+
+	if (IS_ENABLED(CONFIG_VIRT_CPU_ACCOUNTING_GEN))
+		kvm_vtime_account_guest_exit();
 
 	instrumentation_begin();
 	trace_hardirqs_off_finish();
