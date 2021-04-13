@@ -889,18 +889,25 @@ static __always_inline int kvm_tdp_mmu_handle_hva_range(struct kvm *kvm,
 	int ret = 0;
 	int as_id;
 
+	if (end == start || WARN_ON(end < start))
+		return 0;
+
 	for (as_id = 0; as_id < KVM_ADDRESS_SPACE_NUM; as_id++) {
 		for_each_tdp_mmu_root_yield_safe(kvm, root, as_id) {
+			struct interval_tree_node *node;
+
 			slots = __kvm_memslots(kvm, as_id);
-			kvm_for_each_memslot(memslot, slots) {
+			kvm_for_each_hva_range_memslot(node, slots,
+						       start, end - 1) {
 				unsigned long hva_start, hva_end;
 				gfn_t gfn_start, gfn_end;
 
+				memslot = container_of(node,
+						       struct kvm_memory_slot,
+						       hva_node);
 				hva_start = max(start, memslot->userspace_addr);
 				hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));
-				if (hva_start >= hva_end)
-					continue;
 				/*
 				 * {gfn(page) | page intersects with [hva_start, hva_end)} =
 				 * {gfn_start, gfn_start+1, ..., gfn_end-1}.

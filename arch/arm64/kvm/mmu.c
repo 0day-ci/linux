@@ -1073,21 +1073,25 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 			     void *data)
 {
 	struct kvm_memslots *slots;
+	struct interval_tree_node *node;
 	struct kvm_memory_slot *memslot;
 	int ret = 0;
+
+	if (end == start || WARN_ON(end < start))
+		return 0;
 
 	slots = kvm_memslots(kvm);
 
 	/* we only care about the pages that the guest sees */
-	kvm_for_each_memslot(memslot, slots) {
+	kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
 		unsigned long hva_start, hva_end;
 		gfn_t gpa;
 
+		memslot = container_of(node, struct kvm_memory_slot,
+				       hva_node);
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));
-		if (hva_start >= hva_end)
-			continue;
 
 		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
 		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);

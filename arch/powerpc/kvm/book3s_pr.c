@@ -431,18 +431,22 @@ static void do_kvm_unmap_hva(struct kvm *kvm, unsigned long start,
 	long i;
 	struct kvm_vcpu *vcpu;
 	struct kvm_memslots *slots;
+	struct interval_tree_node *node;
 	struct kvm_memory_slot *memslot;
 
+	if (end == start || WARN_ON(end < start))
+		return;
+
 	slots = kvm_memslots(kvm);
-	kvm_for_each_memslot(memslot, slots) {
+	kvm_for_each_hva_range_memslot(node, slots, start, end - 1) {
 		unsigned long hva_start, hva_end;
 		gfn_t gfn, gfn_end;
 
+		memslot = container_of(node, struct kvm_memory_slot,
+				       hva_node);
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
 					(memslot->npages << PAGE_SHIFT));
-		if (hva_start >= hva_end)
-			continue;
 		/*
 		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
 		 * {gfn, gfn+1, ..., gfn_end-1}.
