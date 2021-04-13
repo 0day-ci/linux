@@ -6445,6 +6445,17 @@ void sched_set_fifo_low(struct task_struct *p)
 }
 EXPORT_SYMBOL_GPL(sched_set_fifo_low);
 
+/*
+ * For when you want a specific priority.
+ */
+void sched_set_fifo_with_prio(struct task_struct *p, int prio)
+{
+	struct sched_param sp = { .sched_priority =
+		(prio > 0 && prio < MAX_RT_PRIO) ? prio : DEFAULT_RT_PRIO };
+	WARN_ON_ONCE(sched_setscheduler_nocheck(p, SCHED_FIFO, &sp) != 0);
+}
+EXPORT_SYMBOL_GPL(sched_set_fifo_with_prio);
+
 void sched_set_normal(struct task_struct *p, int nice)
 {
 	struct sched_attr attr = {

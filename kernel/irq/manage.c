@@ -1390,7 +1390,7 @@ setup_irq_thread(struct irqaction *new, unsigned int irq, bool secondary)
 	if (IS_ERR(t))
 		return PTR_ERR(t);
 
-	sched_set_fifo(t);
+	sched_set_fifo_with_prio(t, new->prio);
 
 	/*
 	 * We keep the reference to the task struct even if
@@ -2028,7 +2028,7 @@ const void *free_nmi(unsigned int irq, void *dev_id)
 }
 
 /**
- *	request_threaded_irq - allocate an interrupt line
+ *	request_threaded_irq_with_prio - allocate an interrupt line
  *	@irq: Interrupt line to allocate
  *	@handler: Function to be called when the IRQ occurs.
  *		  Primary handler for threaded interrupts
@@ -2039,6 +2039,7 @@ const void *free_nmi(unsigned int irq, void *dev_id)
  *	@irqflags: Interrupt type flags
  *	@devname: An ascii name for the claiming device
  *	@dev_id: A cookie passed back to the handler function
+ *	@prio: priority of the irq handler thread
  *
  *	This call allocates interrupt resources and enables the
  *	interrupt line and IRQ handling. From the point this
@@ -2063,15 +2064,18 @@ const void *free_nmi(unsigned int irq, void *dev_id)
  *	If your interrupt is shared you must pass a non NULL dev_id
  *	as this is required when freeing the interrupt.
  *
+ *	If you want to assign a priority for your irq handler thread
+ *	instead of default value, you need to supply @prio.
+ *
  *	Flags:
  *
  *	IRQF_SHARED		Interrupt is shared
  *	IRQF_TRIGGER_*		Specify active edge(s) or level
  *
  */
-int request_threaded_irq(unsigned int irq, irq_handler_t handler,
+int request_threaded_irq_with_prio(unsigned int irq, irq_handler_t handler,
 			 irq_handler_t thread_fn, unsigned long irqflags,
-			 const char *devname, void *dev_id)
+			 const char *devname, void *dev_id, int prio)
 {
 	struct irqaction *action;
 	struct irq_desc *desc;
@@ -2117,6 +2121,7 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	action->flags = irqflags;
 	action->name = devname;
 	action->dev_id = dev_id;
+	action->prio = prio;
 
 	retval = irq_chip_pm_get(&desc->irq_data);
 	if (retval < 0) {
@@ -2152,6 +2157,57 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	}
 #endif
 	return retval;
+}
+EXPORT_SYMBOL(request_threaded_irq_with_prio);
+
+/**
+ *	request_threaded_irq - allocate an interrupt line
+ *	@irq: Interrupt line to allocate
+ *	@handler: Function to be called when the IRQ occurs.
+ *		  Primary handler for threaded interrupts
+ *		  If NULL and thread_fn != NULL the default
+ *		  primary handler is installed
+ *	@thread_fn: Function called from the irq handler thread
+ *		    If NULL, no irq thread is created
+ *	@irqflags: Interrupt type flags
+ *	@devname: An ascii name for the claiming device
+ *	@dev_id: A cookie passed back to the handler function
+ *
+ *	This call allocates interrupt resources and enables the
+ *	interrupt line and IRQ handling. From the point this
+ *	call is made your handler function may be invoked. Since
+ *	your handler function must clear any interrupt the board
+ *	raises, you must take care both to initialise your hardware
+ *	and to set up the interrupt handler in the right order.
+ *
+ *	If you want to set up a threaded irq handler for your device
+ *	then you need to supply @handler and @thread_fn. @handler is
+ *	still called in hard interrupt context and has to check
+ *	whether the interrupt originates from the device. If yes it
+ *	needs to disable the interrupt on the device and return
+ *	IRQ_WAKE_THREAD which will wake up the handler thread and run
+ *	@thread_fn. This split handler design is necessary to support
+ *	shared interrupts.
+ *
+ *	Dev_id must be globally unique. Normally the address of the
+ *	device data structure is used as the cookie. Since the handler
+ *	receives this value it makes sense to use it.
+ *
+ *	If your interrupt is shared you must pass a non NULL dev_id
+ *	as this is required when freeing the interrupt.
+ *
+ *	Flags:
+ *
+ *	IRQF_SHARED		Interrupt is shared
+ *	IRQF_TRIGGER_*		Specify active edge(s) or level
+ *
+ */
+int request_threaded_irq(unsigned int irq, irq_handler_t handler,
+			 irq_handler_t thread_fn, unsigned long irqflags,
+			 const char *devname, void *dev_id)
+{
+	return request_threaded_irq_with_prio(irq, handler, thread_fn,
+				irqflags, devname, dev_id, DEFAULT_RT_PRIO);
 }
 EXPORT_SYMBOL(request_threaded_irq);
 

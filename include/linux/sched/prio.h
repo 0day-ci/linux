@@ -15,6 +15,7 @@
 
 #define MAX_RT_PRIO		100
 
+#define DEFAULT_RT_PRIO	(MAX_RT_PRIO / 2)
 #define MAX_PRIO		(MAX_RT_PRIO + NICE_WIDTH)
 #define DEFAULT_PRIO		(MAX_RT_PRIO + NICE_WIDTH / 2)
 

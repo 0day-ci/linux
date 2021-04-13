@@ -121,6 +121,7 @@ struct irqaction {
 	unsigned long		thread_mask;
 	const char		*name;
 	struct proc_dir_entry	*dir;
+	int prio;
 } ____cacheline_internodealigned_in_smp;
 
 extern irqreturn_t no_action(int cpl, void *dev_id);
@@ -134,6 +135,12 @@ extern irqreturn_t no_action(int cpl, void *dev_id);
  * and easy to distinguish from other possible incorrect values.
  */
 #define IRQ_NOTCONNECTED	(1U << 31)
+
+extern int __must_check
+request_threaded_irq_with_prio(unsigned int irq, irq_handler_t handler,
+		     irq_handler_t thread_fn,
+		     unsigned long flags, const char *name, void *dev,
+			 int prio);
 
 extern int __must_check
 request_threaded_irq(unsigned int irq, irq_handler_t handler,
