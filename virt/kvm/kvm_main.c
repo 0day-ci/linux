@@ -1341,6 +1341,59 @@ static int kvm_delete_memslot(struct kvm *kvm,
 	return kvm_set_memslot(kvm, mem, old, &new, as_id, KVM_MR_DELETE);
 }
 
+static bool kvm_check_memslot_overlap(struct kvm_memslots *slots,
+				      struct kvm_memory_slot *nslot)
+{
+	int idxactive = kvm_memslots_idx(slots);
+	struct rb_node *node;
+
+	/*
+	 * Find the slot with the lowest gfn that can possibly intersect with
+	 * the new slot, so we'll ideally have slot start <= nslot start
+	 */
+	node = kvm_memslots_gfn_upper_bound(slots, nslot->base_gfn);
+	if (node) {
+		struct rb_node *pnode;
+
+		/*
+		 * A NULL previous node means that the very first slot
+		 * already has a higher start gfn.
+		 * In this case slot start > nslot start.
+		 */
+		pnode = rb_prev(node);
+		if (pnode)
+			node = pnode;
+	} else {
+		/* a NULL node below means no existing slots */
+		node = rb_last(&slots->gfn_tree);
+	}
+
+	for ( ; node; node = rb_next(node)) {
+		struct kvm_memory_slot *cslot;
+
+		cslot = container_of(node, struct kvm_memory_slot,
+				     gfn_node[idxactive]);
+
+		/*
+		 * if this slot starts beyond or at the end of the new slot
+		 * so does every next one
+		 */
+		if (cslot->base_gfn >= nslot->base_gfn + nslot->npages)
+			break;
+
+		if (cslot->id == nslot->id)
+			continue;
+
+		if (cslot->base_gfn >= nslot->base_gfn)
+			return true;
+
+		if (cslot->base_gfn + cslot->npages > nslot->base_gfn)
+			return true;
+	}
+
+	return false;
+}
+
 /*
  * Allocate some memory and give it an address in the guest physical address
  * space.
@@ -1426,16 +1479,10 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	}
 
 	if ((change == KVM_MR_CREATE) || (change == KVM_MR_MOVE)) {
-		int ctr;
-
 		/* Check for overlaps */
-		kvm_for_each_memslot(tmp, ctr, __kvm_memslots(kvm, as_id)) {
-			if (tmp->id == id)
-				continue;
-			if (!((new.base_gfn + new.npages <= tmp->base_gfn) ||
-			      (new.base_gfn >= tmp->base_gfn + tmp->npages)))
-				return -EEXIST;
-		}
+		if (kvm_check_memslot_overlap(__kvm_memslots(kvm, as_id),
+					      &new))
+			return -EEXIST;
 	}
 
 	/* Allocate/free page dirty bitmap as needed */
