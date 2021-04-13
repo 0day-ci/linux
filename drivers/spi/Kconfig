@@ -334,7 +334,7 @@ config SPI_FSL_QUADSPI
 
 config SPI_HISI_KUNPENG
 	tristate "HiSilicon SPI Controller for Kunpeng SoCs"
-	depends on (ARM64 && ACPI) || COMPILE_TEST
+	depends on (ARM64 && ARCH_HISI && ACPI) || COMPILE_TEST
 	help
 	  This enables support for HiSilicon SPI controller found on
 	  Kunpeng SoCs.
