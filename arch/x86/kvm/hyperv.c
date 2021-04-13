@@ -1289,6 +1289,10 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		}
 		break;
 	case HV_X64_MSR_RESET:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_RESET_AVAILABLE)))
+			return 1;
+
 		if (data == 1) {
 			vcpu_debug(vcpu, "hyper-v reset requested\n");
 			kvm_make_request(KVM_REQ_HV_RESET, vcpu);
@@ -1483,6 +1487,10 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 	case HV_X64_MSR_CRASH_CTL:
 		return kvm_hv_msr_get_crash_ctl(kvm, pdata);
 	case HV_X64_MSR_RESET:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_RESET_AVAILABLE)))
+			return 1;
+
 		data = 0;
 		break;
 	case HV_X64_MSR_REENLIGHTENMENT_CONTROL:
