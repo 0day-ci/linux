@@ -609,11 +609,12 @@ static int validate_change(struct cpuset *cur, struct cpuset *trial)
 	}
 
 	/*
-	 * Cpusets with tasks - existing or newly being attached - can't
-	 * be changed to have empty cpus_allowed or mems_allowed.
+	 * On legacy hierarchy, cpusets with tasks - existing or newly being
+	 * attached - can't be changed to have empty cpus_allowed or
+	 * mems_allowed.
 	 */
 	ret = -ENOSPC;
-	if ((cgroup_is_populated(cur->css.cgroup) || cur->attach_in_progress)) {
+	if (!is_in_v2_mode() && (cgroup_is_populated(cur->css.cgroup) || cur->attach_in_progress)) {
 		if (!cpumask_empty(cur->cpus_allowed) &&
 		    cpumask_empty(trial->cpus_allowed))
 			goto out;
