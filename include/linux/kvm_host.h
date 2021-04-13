@@ -358,14 +358,19 @@ static __always_inline void guest_enter_irqoff(void)
 	}
 }
 
-static __always_inline void guest_exit_irqoff(void)
+static __always_inline void kvm_vtime_account_guest_exit(void)
 {
-	context_tracking_guest_exit_irqoff();
-
 	instrumentation_begin();
 	/* Flush the guest cputime we spent on the guest */
 	vtime_account_guest_exit();
 	instrumentation_end();
+}
+
+static __always_inline void guest_exit_irqoff(void)
+{
+	context_tracking_guest_exit_irqoff();
+
+	kvm_vtime_account_guest_exit();
 }
 
 static inline void guest_exit(void)
