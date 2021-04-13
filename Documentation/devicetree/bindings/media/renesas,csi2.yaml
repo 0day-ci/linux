@@ -78,7 +78,6 @@ properties:
           modules connected the CSI-2 receiver.
 
     required:
-      - port@0
       - port@1
 
 required:
