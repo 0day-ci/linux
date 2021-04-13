@@ -2232,13 +2232,24 @@ static void perf_add_cgrp_node_list(struct perf_event *event,
 {
 	struct list_head *cgrp_ctx_list = this_cpu_ptr(&cgroup_ctx_list);
 	struct perf_cgroup *cgrp = perf_cgroup_from_task(current, ctx);
+	struct perf_event *sibling;
 	bool is_first;
 
 	lockdep_assert_irqs_disabled();
 	lockdep_assert_held(&ctx->lock);
 
+	/* only group leader can be added directly */
+	if (event->group_leader != event)
+		return;
+
+	if (!event_has_cgroup_node(event))
+		return;
+
 	is_first = list_empty(&ctx->cgrp_node_list);
+
 	list_add_tail(&event->cgrp_node_entry, &ctx->cgrp_node_list);
+	for_each_sibling_event(sibling, event)
+		list_add_tail(&sibling->cgrp_node_entry, &ctx->cgrp_node_list);
 
 	if (is_first)
 		list_add_tail(&ctx->cgrp_ctx_entry, cgrp_ctx_list);
@@ -2250,15 +2261,25 @@ static void perf_del_cgrp_node_list(struct perf_event *event,
 				    struct perf_event_context *ctx)
 {
 	struct perf_cgroup *cgrp = perf_cgroup_from_task(current, ctx);
+	struct perf_event *sibling;
 
 	lockdep_assert_irqs_disabled();
 	lockdep_assert_held(&ctx->lock);
+
+	/* only group leader can be deleted directly */
+	if (event->group_leader != event)
+		return;
+
+	if (!event_has_cgroup_node(event))
+		return;
 
 	update_cgroup_node(event, cgrp->css.cgroup);
 	/* to refresh delta when it's enabled */
 	event->cgrp_node_count = 0;
 
 	list_del(&event->cgrp_node_entry);
+	for_each_sibling_event(sibling, event)
+		list_del(&sibling->cgrp_node_entry);
 
 	if (list_empty(&ctx->cgrp_node_list))
 		list_del(&ctx->cgrp_ctx_entry);
@@ -2333,7 +2354,7 @@ static int perf_event_attach_cgroup_node(struct perf_event *event, u64 nr_cgrps,
 
 	raw_spin_unlock_irqrestore(&ctx->lock, flags);
 
-	if (is_first && enabled)
+	if (is_first && enabled && event->group_leader == event)
 		event_function_call(event, perf_attach_cgroup_node, NULL);
 
 	return 0;
@@ -2370,8 +2391,8 @@ static void __perf_read_cgroup_node(struct perf_event *event)
 	}
 }
 
-static int perf_event_read_cgroup_node(struct perf_event *event, u64 read_size,
-				       u64 cgrp_id, char __user *buf)
+static int perf_event_read_cgrp_node_one(struct perf_event *event, u64 cgrp_id,
+					 char __user *buf)
 {
 	struct perf_cgroup_node *cgrp;
 	struct perf_event_context *ctx = event->ctx;
@@ -2405,6 +2426,92 @@ static int perf_event_read_cgroup_node(struct perf_event *event, u64 read_size,
 		return -EFAULT;
 
 	return n * sizeof(u64);
+}
+
+static int perf_event_read_cgrp_node_sibling(struct perf_event *event,
+					     u64 read_format, u64 cgrp_id,
+					     u64 *values)
+{
+	struct perf_cgroup_node *cgrp;
+	int n = 0;
+
+	cgrp = find_cgroup_node(event, cgrp_id);
+	if (cgrp == NULL)
+		return (read_format & PERF_FORMAT_ID) ? 2 : 1;
+
+	values[n++] = cgrp->count;
+	if (read_format & PERF_FORMAT_ID)
+		values[n++] = primary_event_id(event);
+	return n;
+}
+
+static int perf_event_read_cgrp_node_group(struct perf_event *event, u64 cgrp_id,
+					   char __user *buf)
+{
+	struct perf_cgroup_node *cgrp;
+	struct perf_event_context *ctx = event->ctx;
+	struct perf_event *sibling;
+	u64 read_format = event->attr.read_format;
+	unsigned long flags;
+	u64 *values;
+	int n = 1;
+	int ret;
+
+	values = kzalloc(event->read_size, GFP_KERNEL);
+	if (!values)
+		return -ENOMEM;
+
+	values[0] = 1 + event->nr_siblings;
+
+	/* update event count and times (possibly run on other cpu) */
+	(void)perf_event_read(event, true);
+
+	raw_spin_lock_irqsave(&ctx->lock, flags);
+
+	cgrp = find_cgroup_node(event, cgrp_id);
+	if (cgrp == NULL) {
+		raw_spin_unlock_irqrestore(&ctx->lock, flags);
+		kfree(values);
+		return -ENOENT;
+	}
+
+	if (read_format & PERF_FORMAT_TOTAL_TIME_ENABLED)
+		values[n++] = cgrp->time_enabled;
+	if (read_format & PERF_FORMAT_TOTAL_TIME_RUNNING)
+		values[n++] = cgrp->time_running;
+
+	values[n++] = cgrp->count;
+	if (read_format & PERF_FORMAT_ID)
+		values[n++] = primary_event_id(event);
+
+	for_each_sibling_event(sibling, event) {
+		n += perf_event_read_cgrp_node_sibling(sibling, read_format,
+						       cgrp_id, &values[n]);
+	}
+
+	raw_spin_unlock_irqrestore(&ctx->lock, flags);
+
+	ret = copy_to_user(buf, values, n * sizeof(u64));
+	kfree(values);
+	if (ret)
+		return -EFAULT;
+
+	return n * sizeof(u64);
+}
+
+static int perf_event_read_cgroup_node(struct perf_event *event, u64 read_size,
+				       u64 cgrp_id, char __user *buf)
+{
+	u64 read_format = event->attr.read_format;
+
+	/* buf = bufsize + cgroup_id + read_buffer */
+	if (read_size < 2 * sizeof(u64) + event->read_size)
+		return -EINVAL;
+
+	if (read_format & PERF_FORMAT_GROUP)
+		return perf_event_read_cgrp_node_group(event, cgrp_id, buf);
+
+	return perf_event_read_cgrp_node_one(event, cgrp_id, buf);
 }
 #else  /* !CONFIG_CGROUP_PERF */
 static inline bool event_can_attach_cgroup(struct perf_event *event)
@@ -2511,6 +2618,7 @@ static void perf_group_detach(struct perf_event *event)
 			if (sibling->state == PERF_EVENT_STATE_ACTIVE)
 				list_add_tail(&sibling->active_list, get_event_list(sibling));
 		}
+		perf_add_cgrp_node_list(sibling, event->ctx);
 
 		WARN_ON_ONCE(sibling->ctx != event->ctx);
 	}
@@ -2653,6 +2761,9 @@ __perf_remove_from_context(struct perf_event *event,
 	if (flags & DETACH_GROUP)
 		perf_group_detach(event);
 	list_del_event(event, ctx);
+
+	if (event->state > PERF_EVENT_STATE_OFF)
+		perf_del_cgrp_node_list(event, ctx);
 
 	if (!ctx->nr_events && ctx->is_active) {
 		ctx->is_active = 0;
@@ -3112,6 +3223,9 @@ static int  __perf_install_in_context(void *info)
 		reprogram = cgroup_is_descendant(cgrp->css.cgroup,
 					event->cgrp->css.cgroup);
 	}
+
+	if (event->state > PERF_EVENT_STATE_OFF)
+		perf_add_cgrp_node_list(event, ctx);
 #endif
 
 	if (reprogram) {
