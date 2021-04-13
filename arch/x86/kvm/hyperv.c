@@ -1401,6 +1401,10 @@ static int kvm_hv_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data, bool host)
 		u64 gfn;
 		unsigned long addr;
 
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		if (!(data & HV_X64_MSR_VP_ASSIST_PAGE_ENABLE)) {
 			hv_vcpu->hv_vapic = data;
 			if (kvm_lapic_enable_pv_eoi(vcpu, 0, 0))
@@ -1428,10 +1432,22 @@ static int kvm_hv_set_msr(struct kvm_vcpu *vcpu, u32 msr, u64 data, bool host)
 		break;
 	}
 	case HV_X64_MSR_EOI:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_write(vcpu, APIC_EOI, data);
 	case HV_X64_MSR_ICR:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_write(vcpu, APIC_ICR, data);
 	case HV_X64_MSR_TPR:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_write(vcpu, APIC_TASKPRI, data);
 	case HV_X64_MSR_VP_RUNTIME:
 		if (!host)
@@ -1564,12 +1580,28 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		data = hv_vcpu->vp_index;
 		break;
 	case HV_X64_MSR_EOI:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_read(vcpu, APIC_EOI, pdata);
 	case HV_X64_MSR_ICR:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_read(vcpu, APIC_ICR, pdata);
 	case HV_X64_MSR_TPR:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		return kvm_hv_vapic_msr_read(vcpu, APIC_TASKPRI, pdata);
 	case HV_X64_MSR_VP_ASSIST_PAGE:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_MSR_APIC_ACCESS_AVAILABLE)))
+			return 1;
+
 		data = hv_vcpu->hv_vapic;
 		break;
 	case HV_X64_MSR_VP_RUNTIME:
