@@ -157,11 +157,13 @@ struct acc_vf_migration {
 	struct hisi_qm			*vf_qm;
 	int				vf_id;
 	u8				acc_type;
+	struct mutex			reflock;
 
 	struct vfio_device_migration_info *mig_ctl;
 	struct acc_vf_data		*vf_data;
 	struct vfio_pci_region		*regions;
 	int				num_regions;
+	struct dentry			*debug_root;
 };
 
 #endif /* ACC_MIG_H */
