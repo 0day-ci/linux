@@ -28,6 +28,11 @@ static int fsm_io_helper(struct vfio_ccw_private *private)
 
 	spin_lock_irqsave(sch->lock, flags);
 
+	if (work_pending(&private->io_work)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
 	orb = cp_get_orb(&private->cp, (u32)(addr_t)sch, sch->lpm);
 	if (!orb) {
 		ret = -EIO;
