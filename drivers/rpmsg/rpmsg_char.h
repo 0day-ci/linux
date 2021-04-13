@@ -6,6 +6,8 @@
 #ifndef __RPMSG_CHRDEV_H__
 #define __RPMSG_CHRDEV_H__
 
+#define RPMSG_DEV_MAX	(MINORMASK + 1)
+
 #if IS_REACHABLE(CONFIG_RPMSG_CHAR)
 /**
  * rpmsg_chrdev_create_eptdev() - register char device based on an endpoint
