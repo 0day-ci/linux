@@ -2124,7 +2124,7 @@ static void sci_break_ctl(struct uart_port *port, int break_state)
 	unsigned short scscr, scsptr;
 	unsigned long flags;
 
-	/* check wheter the port has SCSPTR */
+	/* check whether the port has SCSPTR */
 	if (!sci_getreg(port, SCSPTR)->size) {
 		/*
 		 * Not supported by hardware. Most parts couple break and rx
@@ -2972,10 +2972,7 @@ static int sci_init_single(struct platform_device *dev,
 	port->fifosize		= sci_port->params->fifosize;
 
 	if (port->type == PORT_SCI) {
-		if (sci_port->reg_size >= 0x20)
-			port->regshift = 2;
-		else
-			port->regshift = 1;
+		port->regshift = sci_port->reg_size >> 4;
 	}
 
 	/*

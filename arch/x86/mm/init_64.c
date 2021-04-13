@@ -172,7 +172,7 @@ static void sync_global_pgds_l4(unsigned long start, unsigned long end)
 
 		/*
 		 * With folded p4d, pgd_none() is always false, we need to
-		 * handle synchonization on p4d level.
+		 * handle synchronization on p4d level.
 		 */
 		MAYBE_BUILD_BUG_ON(pgd_none(*pgd_ref));
 		p4d_ref = p4d_offset(pgd_ref, addr);
