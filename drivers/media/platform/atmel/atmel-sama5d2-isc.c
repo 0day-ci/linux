@@ -58,6 +58,7 @@ void isc_sama5d2_config_csc(struct isc_device *isc);
 void isc_sama5d2_config_cbc(struct isc_device *isc);
 void isc_sama5d2_config_cc(struct isc_device *isc);
 void isc_sama5d2_config_dpc(struct isc_device *isc);
+void isc_sama5d2_config_gam(struct isc_device *isc);
 
 void isc_sama5d2_config_ctrls(struct isc_device *isc,
 			      const struct v4l2_ctrl_ops *ops);
@@ -118,6 +119,11 @@ void isc_sama5d2_config_ctrls(struct isc_device *isc,
 void isc_sama5d2_config_dpc(struct isc_device *isc)
 {
 	/* This module is not present on sama5d2 pipeline */
+}
+
+void isc_sama5d2_config_gam(struct isc_device *isc)
+{
+	/* No specific gamma configuration */
 }
 
 /* Gamma table with gamma 1/2.2 */
@@ -269,6 +275,7 @@ static int atmel_isc_probe(struct platform_device *pdev)
 	isc->config_csc = isc_sama5d2_config_csc;
 	isc->config_cbc = isc_sama5d2_config_cbc;
 	isc->config_cc = isc_sama5d2_config_cc;
+	isc->config_gam = isc_sama5d2_config_gam;
 	isc->config_ctrls = isc_sama5d2_config_ctrls;
 
 	isc->offsets.csc = ISC_SAMA5D2_CSC_OFFSET;
