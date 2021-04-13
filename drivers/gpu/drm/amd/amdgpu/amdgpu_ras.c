@@ -1815,10 +1815,8 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 		return 0;
 
 	*data = kmalloc(sizeof(**data), GFP_KERNEL | __GFP_ZERO);
-	if (!*data) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!*data)
+		return -ENOMEM;
 
 	mutex_init(&con->recovery_lock);
 	INIT_WORK(&con->recovery_work, amdgpu_ras_do_recovery);
@@ -1848,7 +1846,7 @@ free:
 	kfree((*data)->bps);
 	kfree(*data);
 	con->eh_data = NULL;
-out:
+
 	dev_warn(adev->dev, "Failed to initialize ras recovery!\n");
 
 	/*
