@@ -1598,6 +1598,7 @@ typedef u64 netdev_priv_flags_t;
  * @IFF_LIVE_RENAME_OK: rename is allowed while device is up and running
  * @IFF_TX_SKB_NO_LINEAR: device/driver is capable of xmitting frames with
  *	skb_headlen(skb) == 0 (data starts from frag0)
+ * @IFF_NOT_USE_DMA_ADDR: driver not use dma addr directly. such as virtio-net
  */
 enum netdev_priv_flags {
 	IFF_802_1Q_VLAN_BIT,
@@ -1632,6 +1633,7 @@ enum netdev_priv_flags {
 	IFF_L3MDEV_RX_HANDLER_BIT,
 	IFF_LIVE_RENAME_OK_BIT,
 	IFF_TX_SKB_NO_LINEAR_BIT,
+	IFF_NOT_USE_DMA_ADDR_BIT,
 };
 
 #define __IFF_BIT(bit)		((netdev_priv_flags_t)1 << (bit))
@@ -1669,6 +1671,7 @@ enum netdev_priv_flags {
 #define IFF_L3MDEV_RX_HANDLER		__IFF(L3MDEV_RX_HANDLER)
 #define IFF_LIVE_RENAME_OK		__IFF(LIVE_RENAME_OK)
 #define IFF_TX_SKB_NO_LINEAR		__IFF(TX_SKB_NO_LINEAR)
+#define IFF_NOT_USE_DMA_ADDR		__IFF(NOT_USE_DMA_ADDR)
 
 /* Specifies the type of the struct net_device::ml_priv pointer */
 enum netdev_ml_priv_type {
