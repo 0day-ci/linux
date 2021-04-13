@@ -34,12 +34,6 @@ static inline void xlnx_pr_decoupler_write(struct xlnx_pr_decoupler_data *d,
 	writel(val, d->io_base + offset);
 }
 
-static inline u32 xlnx_pr_decouple_read(const struct xlnx_pr_decoupler_data *d,
-					u32 offset)
-{
-	return readl(d->io_base + offset);
-}
-
 static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
 {
 	int err;
