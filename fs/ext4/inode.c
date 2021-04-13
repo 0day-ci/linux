@@ -6062,8 +6062,6 @@ vm_fault_t ext4_page_mkwrite(struct vm_fault *vmf)
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vma->vm_file);
 
-	down_read(&inode->i_mapping_sem);
-
 	err = ext4_convert_inline_data(inode);
 	if (err)
 		goto out_ret;
@@ -6175,7 +6173,6 @@ retry_alloc:
 out_ret:
 	ret = block_page_mkwrite_return(err);
 out:
-	up_read(&inode->i_mapping_sem);
 	sb_end_pagefault(inode->i_sb);
 	return ret;
 out_error:

@@ -594,10 +594,7 @@ static vm_fault_t zonefs_filemap_page_mkwrite(struct vm_fault *vmf)
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vmf->vma->vm_file);
 
-	/* Serialize against truncates */
-	down_read(&inode->i_mapping_sem);
 	ret = iomap_page_mkwrite(vmf, &zonefs_iomap_ops);
-	up_read(&inode->i_mapping_sem);
 
 	sb_end_pagefault(inode->i_sb);
 	return ret;
