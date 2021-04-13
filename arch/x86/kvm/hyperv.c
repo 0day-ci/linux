@@ -1330,13 +1330,22 @@ static int kvm_hv_set_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 data,
 		}
 		break;
 	case HV_X64_MSR_REENLIGHTENMENT_CONTROL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT)))
+			return 1;
+
 		hv->hv_reenlightenment_control = data;
 		break;
 	case HV_X64_MSR_TSC_EMULATION_CONTROL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT)))
+			return 1;
+
 		hv->hv_tsc_emulation_control = data;
 		break;
 	case HV_X64_MSR_TSC_EMULATION_STATUS:
-		if (data && !host)
+		if (unlikely(!host && (!(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT) || data)))
 			return 1;
 
 		hv->hv_tsc_emulation_status = data;
@@ -1545,12 +1554,24 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		data = 0;
 		break;
 	case HV_X64_MSR_REENLIGHTENMENT_CONTROL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT)))
+			return 1;
+
 		data = hv->hv_reenlightenment_control;
 		break;
 	case HV_X64_MSR_TSC_EMULATION_CONTROL:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT)))
+			return 1;
+
 		data = hv->hv_tsc_emulation_control;
 		break;
 	case HV_X64_MSR_TSC_EMULATION_STATUS:
+		if (unlikely(!host && !(hv_vcpu->cpuid_cache.features_eax &
+					HV_ACCESS_REENLIGHTENMENT)))
+			return 1;
+
 		data = hv->hv_tsc_emulation_status;
 		break;
 	case HV_X64_MSR_SYNDBG_OPTIONS:
