@@ -660,6 +660,7 @@ struct inode {
 	/* Misc */
 	unsigned long		i_state;
 	struct rw_semaphore	i_rwsem;
+	struct rw_semaphore	i_mapping_sem;
 
 	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 	unsigned long		dirtied_time_when;
@@ -2351,6 +2352,7 @@ struct file_system_type {
 
 	struct lock_class_key i_lock_key;
 	struct lock_class_key i_mutex_key;
+	struct lock_class_key i_mapping_sem_key;
 	struct lock_class_key i_mutex_dir_key;
 };
 

@@ -175,6 +175,9 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
 
 	init_rwsem(&inode->i_rwsem);
 	lockdep_set_class(&inode->i_rwsem, &sb->s_type->i_mutex_key);
+	init_rwsem(&inode->i_mapping_sem);
+	lockdep_set_class(&inode->i_mapping_sem,
+			  &sb->s_type->i_mapping_sem_key);
 
 	atomic_set(&inode->i_dio_count, 0);
 
