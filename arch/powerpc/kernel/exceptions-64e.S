@@ -1249,7 +1249,7 @@ fast_exception_return:
 	/* The interrupt should not have soft enabled. */
 	lbz	r7,PACAIRQSOFTMASK(r13)
 1:	tdeqi	r7,IRQS_ENABLED
-	EMIT_BUG_ENTRY 1b,__FILE__,__LINE__,BUGFLAG_WARNING
+	EMIT_WARN_ENTRY 1b,__FILE__,__LINE__,BUGFLAG_WARNING
 #endif
 	b	fast_exception_return
 

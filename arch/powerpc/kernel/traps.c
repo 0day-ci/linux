@@ -1467,8 +1467,13 @@ static void do_program_check(struct pt_regs *regs)
 
 		if (!(regs->msr & MSR_PR) &&  /* not user-mode */
 		    report_bug(bugaddr, regs) == BUG_TRAP_TYPE_WARN) {
-			regs->nip += 4;
-			return;
+			const struct exception_table_entry *entry;
+
+			entry = search_exception_tables(bugaddr);
+			if (entry) {
+				regs->nip = extable_fixup(entry) + regs->nip - bugaddr;
+				return;
+			}
 		}
 		_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
 		return;
