@@ -2712,6 +2712,9 @@ static bool arm_smmu_dev_has_feature(struct device *dev,
 	switch (feat) {
 	case IOMMU_DEV_FEAT_SVA:
 		return arm_smmu_master_sva_supported(master);
+	case IOMMU_DEV_FEAT_HWDBM:
+		/* No requirement for device, require HTTU HD of smmu */
+		return !!(master->smmu->features & ARM_SMMU_FEAT_HD);
 	default:
 		return false;
 	}
@@ -2728,6 +2731,9 @@ static bool arm_smmu_dev_feature_enabled(struct device *dev,
 	switch (feat) {
 	case IOMMU_DEV_FEAT_SVA:
 		return arm_smmu_master_sva_enabled(master);
+	case IOMMU_DEV_FEAT_HWDBM:
+		/* HTTU HD is enabled if supported */
+		return arm_smmu_dev_has_feature(dev, feat);
 	default:
 		return false;
 	}
