@@ -637,7 +637,9 @@ static int stimer_set_config(struct kvm_vcpu_hv_stimer *stimer, u64 config,
 	struct kvm_vcpu *vcpu = hv_stimer_to_vcpu(stimer);
 	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
 
-	if (!synic->active && !host)
+	if (unlikely(!host && (!synic->active ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+				 HV_MSR_SYNTIMER_AVAILABLE))))
 		return 1;
 
 	trace_kvm_hv_stimer_set_config(hv_stimer_to_vcpu(stimer)->vcpu_id,
@@ -661,7 +663,9 @@ static int stimer_set_count(struct kvm_vcpu_hv_stimer *stimer, u64 count,
 	struct kvm_vcpu *vcpu = hv_stimer_to_vcpu(stimer);
 	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
 
-	if (!synic->active && !host)
+	if (unlikely(!host && (!synic->active ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+				 HV_MSR_SYNTIMER_AVAILABLE))))
 		return 1;
 
 	trace_kvm_hv_stimer_set_count(hv_stimer_to_vcpu(stimer)->vcpu_id,
@@ -680,14 +684,32 @@ static int stimer_set_count(struct kvm_vcpu_hv_stimer *stimer, u64 count,
 	return 0;
 }
 
-static int stimer_get_config(struct kvm_vcpu_hv_stimer *stimer, u64 *pconfig)
+static int stimer_get_config(struct kvm_vcpu_hv_stimer *stimer, u64 *pconfig,
+			     bool host)
 {
+	struct kvm_vcpu *vcpu = hv_stimer_to_vcpu(stimer);
+	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
+
+	if (unlikely(!host && (!synic->active ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+				 HV_MSR_SYNTIMER_AVAILABLE))))
+		return 1;
+
 	*pconfig = stimer->config.as_uint64;
 	return 0;
 }
 
-static int stimer_get_count(struct kvm_vcpu_hv_stimer *stimer, u64 *pcount)
+static int stimer_get_count(struct kvm_vcpu_hv_stimer *stimer, u64 *pcount,
+			    bool host)
 {
+	struct kvm_vcpu *vcpu = hv_stimer_to_vcpu(stimer);
+	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
+
+	if (unlikely(!host && (!synic->active ||
+			       !(to_hv_vcpu(vcpu)->cpuid_cache.features_eax &
+				 HV_MSR_SYNTIMER_AVAILABLE))))
+		return 1;
+
 	*pcount = stimer->count;
 	return 0;
 }
@@ -1571,7 +1593,7 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		int timer_index = (msr - HV_X64_MSR_STIMER0_CONFIG)/2;
 
 		return stimer_get_config(to_hv_stimer(vcpu, timer_index),
-					 pdata);
+					 pdata, host);
 	}
 	case HV_X64_MSR_STIMER0_COUNT:
 	case HV_X64_MSR_STIMER1_COUNT:
@@ -1580,7 +1602,7 @@ static int kvm_hv_get_msr(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata,
 		int timer_index = (msr - HV_X64_MSR_STIMER0_COUNT)/2;
 
 		return stimer_get_count(to_hv_stimer(vcpu, timer_index),
-					pdata);
+					pdata, host);
 	}
 	case HV_X64_MSR_TSC_FREQUENCY:
 		data = (u64)vcpu->arch.virtual_tsc_khz * 1000;
