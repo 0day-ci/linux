@@ -1107,11 +1107,20 @@ wait:
 	err = wait_for_completion_interruptible(&n.ready);
 	mutex_lock(&match->notify_lock);
 	if (err == 0) {
-		/* Check if we were woken up by a addfd message */
-		addfd = list_first_entry_or_null(&n.addfd,
-						 struct seccomp_kaddfd, list);
-		if (addfd && n.state != SECCOMP_NOTIFY_REPLIED) {
-			seccomp_handle_addfd(addfd);
+
+		if (n.state != SECCOMP_NOTIFY_REPLIED) {
+			/*
+			 * It is possible to be waken-up by an addfd message but
+			 * the list be empty. This can happen if the addfd
+			 * ioctl() is interrupted, as it deletes the element.
+			 *
+			 * So, check if indeed there is an element in the list.
+			 */
+			addfd = list_first_entry_or_null(&n.addfd,
+							 struct seccomp_kaddfd, list);
+			if (addfd)
+				seccomp_handle_addfd(addfd);
+
 			mutex_unlock(&match->notify_lock);
 			goto wait;
 		}
