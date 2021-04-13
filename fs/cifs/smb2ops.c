@@ -847,14 +847,6 @@ int open_cached_dir(unsigned int xid, struct cifs_tcon *tcon,
 			.volatile_fid = pfid->volatile_fid,
 		};
 
-		/*
-		 * caller expects this func to set pfid to a valid
-		 * cached root, so we copy the existing one and get a
-		 * reference.
-		 */
-		memcpy(pfid, tcon->crfid.fid, sizeof(*pfid));
-		kref_get(&tcon->crfid.refcount);
-
 		mutex_unlock(&tcon->crfid.fid_mutex);
 
 		if (rc == 0) {
@@ -885,7 +877,6 @@ int open_cached_dir(unsigned int xid, struct cifs_tcon *tcon,
 	oparms.fid->mid = le64_to_cpu(o_rsp->sync_hdr.MessageId);
 #endif /* CIFS_DEBUG2 */
 
-	memcpy(tcon->crfid.fid, pfid, sizeof(struct cifs_fid));
 	tcon->crfid.tcon = tcon;
 	tcon->crfid.is_valid = true;
 	tcon->crfid.dentry = dentry;
