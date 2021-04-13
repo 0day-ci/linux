@@ -73,6 +73,7 @@ struct vfio_iommu {
 	unsigned int		vaddr_invalid_count;
 	uint64_t		pgsize_bitmap;
 	uint64_t		num_non_pinned_groups;
+	uint64_t		num_non_hwdbm_groups;
 	wait_queue_head_t	vaddr_wait;
 	bool			v2;
 	bool			nesting;
@@ -85,6 +86,7 @@ struct vfio_domain {
 	struct iommu_domain	*domain;
 	struct list_head	next;
 	struct list_head	group_list;
+	uint64_t		num_non_hwdbm_groups;
 	int			prot;		/* IOMMU_CACHE */
 	bool			fgsp;		/* Fine-grained super pages */
 };
@@ -116,6 +118,7 @@ struct vfio_group {
 	struct list_head	next;
 	bool			mdev_group;	/* An mdev group */
 	bool			pinned_page_dirty_scope;
+	bool			iommu_hwdbm;	/* For iommu-backed group */
 };
 
 struct vfio_iova {
@@ -2252,6 +2255,44 @@ static void vfio_iommu_iova_insert_copy(struct vfio_iommu *iommu,
 	list_splice_tail(iova_copy, iova);
 }
 
+static int vfio_dev_enable_feature(struct device *dev, void *data)
+{
+	enum iommu_dev_features *feat = data;
+
+	if (iommu_dev_feature_enabled(dev, *feat))
+		return 0;
+
+	return iommu_dev_enable_feature(dev, *feat);
+}
+
+static bool vfio_group_supports_hwdbm(struct vfio_group *group)
+{
+	enum iommu_dev_features feat = IOMMU_DEV_FEAT_HWDBM;
+
+	return !iommu_group_for_each_dev(group->iommu_group, &feat,
+					 vfio_dev_enable_feature);
+}
+
+/*
+ * Called after a new group is added to the group_list of domain, or before an
+ * old group is removed from the group_list of domain.
+ */
+static void vfio_iommu_update_hwdbm(struct vfio_iommu *iommu,
+				    struct vfio_domain *domain,
+				    struct vfio_group *group,
+				    bool attach)
+{
+	/* Update the HWDBM status of group, domain and iommu */
+	group->iommu_hwdbm = vfio_group_supports_hwdbm(group);
+	if (!group->iommu_hwdbm && attach) {
+		domain->num_non_hwdbm_groups++;
+		iommu->num_non_hwdbm_groups++;
+	} else if (!group->iommu_hwdbm && !attach) {
+		domain->num_non_hwdbm_groups--;
+		iommu->num_non_hwdbm_groups--;
+	}
+}
+
 static int vfio_iommu_type1_attach_group(void *iommu_data,
 					 struct iommu_group *iommu_group)
 {
@@ -2409,6 +2450,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 			vfio_iommu_detach_group(domain, group);
 			if (!vfio_iommu_attach_group(d, group)) {
 				list_add(&group->next, &d->group_list);
+				vfio_iommu_update_hwdbm(iommu, d, group, true);
 				iommu_domain_free(domain->domain);
 				kfree(domain);
 				goto done;
@@ -2435,6 +2477,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 
 	list_add(&domain->next, &iommu->domain_list);
 	vfio_update_pgsize_bitmap(iommu);
+	vfio_iommu_update_hwdbm(iommu, domain, group, true);
 done:
 	/* Delete the old one and insert new iova list */
 	vfio_iommu_iova_insert_copy(iommu, &iova_copy);
@@ -2618,6 +2661,7 @@ static void vfio_iommu_type1_detach_group(void *iommu_data,
 			continue;
 
 		vfio_iommu_detach_group(domain, group);
+		vfio_iommu_update_hwdbm(iommu, domain, group, false);
 		update_dirty_scope = !group->pinned_page_dirty_scope;
 		list_del(&group->next);
 		kfree(group);
