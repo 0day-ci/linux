@@ -771,6 +771,19 @@ struct perf_event {
 
 #ifdef CONFIG_CGROUP_PERF
 	struct perf_cgroup		*cgrp; /* cgroup event is attach to */
+
+	/* to share an event for multiple cgroups */
+	struct hlist_head		*cgrp_node_hash;
+	struct perf_cgroup_node		*cgrp_node_entries;
+	int				nr_cgrp_nodes;
+	int				cgrp_node_hash_bits;
+
+	struct list_head		cgrp_node_entry;
+
+	/* snapshot of previous reading (for perf_cgroup_node below) */
+	u64				cgrp_node_count;
+	u64				cgrp_node_time_enabled;
+	u64				cgrp_node_time_running;
 #endif
 
 #ifdef CONFIG_SECURITY
@@ -780,6 +793,13 @@ struct perf_event {
 #endif /* CONFIG_PERF_EVENTS */
 };
 
+struct perf_cgroup_node {
+	struct hlist_node		node;
+	u64				id;
+	u64				count;
+	u64				time_enabled;
+	u64				time_running;
+} ____cacheline_aligned;
 
 struct perf_event_groups {
 	struct rb_root	tree;
@@ -843,6 +863,8 @@ struct perf_event_context {
 	int				pin_count;
 #ifdef CONFIG_CGROUP_PERF
 	int				nr_cgroups;	 /* cgroup evts */
+	struct list_head		cgrp_node_list;
+	struct list_head		cgrp_ctx_entry;
 #endif
 	void				*task_ctx_data; /* pmu specific data */
 	struct rcu_head			rcu_head;
