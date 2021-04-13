@@ -2155,6 +2155,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 				kvm_hv_hypercall_complete_userspace;
 		return 0;
 	case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(fast || !rep_cnt || rep_idx)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
@@ -2162,6 +2168,12 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_hv_flush_tlb(vcpu, ingpa, rep_cnt, false);
 		break;
 	case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(fast || rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
@@ -2169,6 +2181,14 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_hv_flush_tlb(vcpu, ingpa, rep_cnt, false);
 		break;
 	case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED) ||
+			     !(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(fast || !rep_cnt || rep_idx)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
@@ -2176,6 +2196,14 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		ret = kvm_hv_flush_tlb(vcpu, ingpa, rep_cnt, true);
 		break;
 	case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX:
+		if (unlikely(!(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_REMOTE_TLB_FLUSH_RECOMMENDED) ||
+			     !(hv_vcpu->cpuid_cache.enlightenments_eax &
+			       HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))) {
+			ret = HV_STATUS_ACCESS_DENIED;
+			break;
+		}
+
 		if (unlikely(fast || rep)) {
 			ret = HV_STATUS_INVALID_HYPERCALL_INPUT;
 			break;
