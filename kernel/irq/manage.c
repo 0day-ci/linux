@@ -2193,7 +2193,7 @@ int request_any_context_irq(unsigned int irq, irq_handler_t handler,
 
 	if (irq_settings_is_nested_thread(desc)) {
 		ret = request_threaded_irq(irq, NULL, handler,
-					   flags, name, dev_id);
+					   flags | IRQF_ONESHOT, name, dev_id);
 		return !ret ? IRQC_IS_NESTED : ret;
 	}
 
