@@ -66,9 +66,13 @@ static int rt2880_pci_config_read(struct pci_bus *bus, unsigned int devfn,
 	unsigned long flags;
 	u32 address;
 	u32 data;
+	int busn = 0;
 
-	address = rt2880_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
-					 PCI_FUNC(devfn), where);
+	if (bus)
+		busn = bus->number;
+
+	address = rt2880_pci_get_cfgaddr(busn, PCI_SLOT(devfn), PCI_FUNC(devfn),
+					 where);
 
 	spin_lock_irqsave(&rt2880_pci_lock, flags);
 	rt2880_pci_reg_write(address, RT2880_PCI_REG_CONFIG_ADDR);
@@ -96,9 +100,13 @@ static int rt2880_pci_config_write(struct pci_bus *bus, unsigned int devfn,
 	unsigned long flags;
 	u32 address;
 	u32 data;
+	int busn = 0;
 
-	address = rt2880_pci_get_cfgaddr(bus->number, PCI_SLOT(devfn),
-					 PCI_FUNC(devfn), where);
+	if (bus)
+		busn = bus->number;
+
+	address = rt2880_pci_get_cfgaddr(busn, PCI_SLOT(devfn), PCI_FUNC(devfn),
+					 where);
 
 	spin_lock_irqsave(&rt2880_pci_lock, flags);
 	rt2880_pci_reg_write(address, RT2880_PCI_REG_CONFIG_ADDR);
@@ -180,7 +188,6 @@ static inline void rt2880_pci_write_u32(unsigned long reg, u32 val)
 
 int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
-	u16 cmd;
 	int irq = -1;
 
 	if (dev->bus->number != 0)
@@ -188,8 +195,6 @@ int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 
 	switch (PCI_SLOT(dev->devfn)) {
 	case 0x00:
-		rt2880_pci_write_u32(PCI_BASE_ADDRESS_0, 0x08000000);
-		(void) rt2880_pci_read_u32(PCI_BASE_ADDRESS_0);
 		break;
 	case 0x11:
 		irq = RT288X_CPU_IRQ_PCI;
@@ -201,16 +206,6 @@ int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 		break;
 	}
 
-	pci_write_config_byte((struct pci_dev *) dev,
-		PCI_CACHE_LINE_SIZE, 0x14);
-	pci_write_config_byte((struct pci_dev *) dev, PCI_LATENCY_TIMER, 0xFF);
-	pci_read_config_word((struct pci_dev *) dev, PCI_COMMAND, &cmd);
-	cmd |= PCI_COMMAND_MASTER | PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-		PCI_COMMAND_INVALIDATE | PCI_COMMAND_FAST_BACK |
-		PCI_COMMAND_SERR | PCI_COMMAND_WAIT | PCI_COMMAND_PARITY;
-	pci_write_config_word((struct pci_dev *) dev, PCI_COMMAND, cmd);
-	pci_write_config_byte((struct pci_dev *) dev, PCI_INTERRUPT_LINE,
-			      dev->irq);
 	return irq;
 }
 
@@ -251,6 +246,27 @@ static int rt288x_pci_probe(struct platform_device *pdev)
 
 int pcibios_plat_dev_init(struct pci_dev *dev)
 {
+	static bool slot0_init;
+
+	/*
+	 * Nobody seems to initialize slot 0, but this platform requires it, so
+	 * do it once when some other slot is being enabled. The PCI subsystem
+	 * should configure other slots properly, so no need to do anything
+	 * special for those.
+	 */
+	if (!slot0_init) {
+		u32 cmd;
+
+		slot0_init = true;
+
+		rt2880_pci_write_u32(PCI_BASE_ADDRESS_0, 0x08000000);
+		(void) rt2880_pci_read_u32(PCI_BASE_ADDRESS_0);
+
+		rt2880_pci_config_read(NULL, 0, PCI_COMMAND, 2, &cmd);
+		cmd |= PCI_COMMAND_MASTER | PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
+		rt2880_pci_config_write(NULL, 0, PCI_COMMAND, 2, cmd);
+	}
+
 	return 0;
 }
 
