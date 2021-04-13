@@ -5,10 +5,12 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/align.h>
-#include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/limits.h>
 #include <linux/string.h>
+#include <linux/types.h>
+
+struct device;
 
 /*
  * bitmaps provide bit arrays that consume one or more unsigned
