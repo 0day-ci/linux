@@ -646,6 +646,11 @@ static int stimer_set_config(struct kvm_vcpu_hv_stimer *stimer, u64 config,
 				 HV_MSR_SYNTIMER_AVAILABLE))))
 		return 1;
 
+	if (unlikely(!host && new_config.direct_mode &&
+		     !(to_hv_vcpu(vcpu)->cpuid_cache.features_edx &
+		       HV_STIMER_DIRECT_MODE_AVAILABLE)))
+		return 1;
+
 	trace_kvm_hv_stimer_set_config(hv_stimer_to_vcpu(stimer)->vcpu_id,
 				       stimer->index, config, host);
 
