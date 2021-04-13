@@ -104,16 +104,8 @@ static inline void context_tracking_init(void) { }
 
 
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
-/* must be called with irqs disabled */
-static __always_inline void guest_enter_irqoff(void)
+static __always_inline void context_guest_enter_irqoff(void)
 {
-	instrumentation_begin();
-	if (vtime_accounting_enabled_this_cpu())
-		vtime_guest_enter(current);
-	else
-		current->flags |= PF_VCPU;
-	instrumentation_end();
-
 	if (context_tracking_enabled())
 		__context_tracking_enter(CONTEXT_GUEST);
 
@@ -131,10 +123,28 @@ static __always_inline void guest_enter_irqoff(void)
 	}
 }
 
-static __always_inline void guest_exit_irqoff(void)
+/* must be called with irqs disabled */
+static __always_inline void guest_enter_irqoff(void)
+{
+	instrumentation_begin();
+	if (vtime_accounting_enabled_this_cpu())
+		vtime_guest_enter(current);
+	else
+		current->flags |= PF_VCPU;
+	instrumentation_end();
+
+	context_guest_enter_irqoff();
+}
+
+static __always_inline void context_guest_exit_irqoff(void)
 {
 	if (context_tracking_enabled())
 		__context_tracking_exit(CONTEXT_GUEST);
+}
+
+static __always_inline void guest_exit_irqoff(void)
+{
+	context_guest_exit_irqoff();
 
 	instrumentation_begin();
 	if (vtime_accounting_enabled_this_cpu())
@@ -145,6 +155,13 @@ static __always_inline void guest_exit_irqoff(void)
 }
 
 #else
+static __always_inline void context_guest_enter_irqoff(void)
+{
+	instrumentation_begin();
+	rcu_virt_note_context_switch(smp_processor_id());
+	instrumentation_end();
+}
+
 static __always_inline void guest_enter_irqoff(void)
 {
 	/*
@@ -155,9 +172,12 @@ static __always_inline void guest_enter_irqoff(void)
 	instrumentation_begin();
 	vtime_account_kernel(current);
 	current->flags |= PF_VCPU;
-	rcu_virt_note_context_switch(smp_processor_id());
 	instrumentation_end();
+
+	context_guest_enter_irqoff();
 }
+
+static __always_inline void context_guest_exit_irqoff(void) { }
 
 static __always_inline void guest_exit_irqoff(void)
 {
