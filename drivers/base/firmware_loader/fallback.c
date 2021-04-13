@@ -526,9 +526,14 @@ static int fw_load_sysfs_fallback(struct fw_sysfs *fw_sysfs, long timeout)
 	}
 
 	retval = fw_sysfs_wait_timeout(fw_priv, timeout);
-	if (retval < 0 && retval != -ENOENT) {
+	if (retval < 0) {
 		mutex_lock(&fw_lock);
-		fw_load_abort(fw_sysfs);
+
+		if (retval != -ENOENT)
+			fw_load_abort(fw_sysfs);
+		else
+			list_del_init(&fw_priv->pending_list);
+
 		mutex_unlock(&fw_lock);
 	}
 
