@@ -45,3 +45,11 @@ config VFIO_PCI_NVLINK2
 	depends on VFIO_PCI && PPC_POWERNV && SPAPR_TCE_IOMMU
 	help
 	  VFIO PCI support for P9 Witherspoon machine with NVIDIA V100 GPUs
+
+config VFIO_PCI_HISI_MIGRATION
+	bool "Support for Hisilicon Live Migaration"
+	depends on ARM64 && ACPI
+	select PCI_IOV
+	default y
+	help
+	  Support for HiSilicon vfio pci to support VF live migration.
