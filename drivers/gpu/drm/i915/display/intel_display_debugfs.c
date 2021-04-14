@@ -38,14 +38,35 @@ static int i915_frontbuffer_tracking(struct seq_file *m, void *unused)
 	return 0;
 }
 
+static bool i915_fbc_is_compressing(struct drm_i915_private *dev_priv)
+{
+	if (!intel_fbc_is_active(dev_priv))
+		return false;
+
+	if (DISPLAY_VER(dev_priv) >= 8)
+		return intel_de_read(dev_priv, IVB_FBC_STATUS2) & BDW_FBC_COMP_SEG_MASK;
+	else if (DISPLAY_VER(dev_priv) >= 7)
+		return intel_de_read(dev_priv, IVB_FBC_STATUS2) & IVB_FBC_COMP_SEG_MASK;
+	else if (DISPLAY_VER(dev_priv) >= 5)
+		return intel_de_read(dev_priv, ILK_DPFC_STATUS) & ILK_DPFC_COMP_SEG_MASK;
+	else if (IS_G4X(dev_priv))
+		return intel_de_read(dev_priv, DPFC_STATUS) & DPFC_COMP_SEG_MASK;
+	else
+		return intel_de_read(dev_priv, FBC_STATUS) &
+			(FBC_STAT_COMPRESSING | FBC_STAT_COMPRESSED);
+}
+
 static int i915_fbc_status(struct seq_file *m, void *unused)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
 	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct intel_crtc *crtc;
 	intel_wakeref_t wakeref;
 
 	if (!HAS_FBC(dev_priv))
 		return -ENODEV;
+
+	drm_modeset_lock_all(&dev_priv->drm);
 
 	wakeref = intel_runtime_pm_get(&dev_priv->runtime_pm);
 	mutex_lock(&fbc->lock);
@@ -55,26 +76,27 @@ static int i915_fbc_status(struct seq_file *m, void *unused)
 	else
 		seq_printf(m, "FBC disabled: %s\n", fbc->no_fbc_reason);
 
-	if (intel_fbc_is_active(dev_priv)) {
-		u32 mask;
+	seq_printf(m, "Compressing: %s\n", yesno(i915_fbc_is_compressing(dev_priv)));
 
-		if (DISPLAY_VER(dev_priv) >= 8)
-			mask = intel_de_read(dev_priv, IVB_FBC_STATUS2) & BDW_FBC_COMP_SEG_MASK;
-		else if (DISPLAY_VER(dev_priv) >= 7)
-			mask = intel_de_read(dev_priv, IVB_FBC_STATUS2) & IVB_FBC_COMP_SEG_MASK;
-		else if (DISPLAY_VER(dev_priv) >= 5)
-			mask = intel_de_read(dev_priv, ILK_DPFC_STATUS) & ILK_DPFC_COMP_SEG_MASK;
-		else if (IS_G4X(dev_priv))
-			mask = intel_de_read(dev_priv, DPFC_STATUS) & DPFC_COMP_SEG_MASK;
-		else
-			mask = intel_de_read(dev_priv, FBC_STATUS) &
-				(FBC_STAT_COMPRESSING | FBC_STAT_COMPRESSED);
+	for_each_intel_crtc(&dev_priv->drm, crtc) {
+		struct intel_plane *plane = to_intel_plane(crtc->base.primary);
+		const struct intel_crtc_state *crtc_state =
+			to_intel_crtc_state(crtc->base.state);
 
-		seq_printf(m, "Compressing: %s\n", yesno(mask));
+		if (!plane->has_fbc)
+			continue;
+
+		seq_printf(m, "%c [CRTC:%d:%s]/[PLANE:%d:%s]: %s\n",
+			   fbc->crtc == crtc ? '*' : ' ',
+			   crtc->base.base.id, crtc->base.name,
+			   plane->base.base.id, plane->base.name,
+			   crtc_state->no_fbc_reason ?: "FBC possible");
 	}
 
 	mutex_unlock(&fbc->lock);
 	intel_runtime_pm_put(&dev_priv->runtime_pm, wakeref);
+
+	drm_modeset_unlock_all(&dev_priv->drm);
 
 	return 0;
 }
