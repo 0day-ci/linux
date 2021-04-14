@@ -165,9 +165,10 @@ static bool check_update_reserved_asid(struct asid_info *info, u64 asid,
 	return hit;
 }
 
-static u64 new_context(struct asid_info *info, struct mm_struct *mm)
+static u64 new_context(struct asid_info *info, atomic64_t *pasid,
+		       refcount_t *pinned)
 {
-	u64 asid = atomic64_read(&mm->context.id);
+	u64 asid = atomic64_read(pasid);
 	u64 generation = atomic64_read(&info->generation);
 
 	if (asid != 0) {
@@ -185,7 +186,7 @@ static u64 new_context(struct asid_info *info, struct mm_struct *mm)
 		 * takes priority, because even if it is also pinned, we need to
 		 * update the generation into the reserved_asids.
 		 */
-		if (refcount_read(&mm->context.pinned))
+		if (pinned && refcount_read(pinned))
 			return newasid;
 
 		/*
@@ -257,7 +258,7 @@ void check_and_switch_context(struct mm_struct *mm)
 	/* Check that our ASID belongs to the current generation. */
 	asid = atomic64_read(&mm->context.id);
 	if (!asid_gen_match(asid, info)) {
-		asid = new_context(info, mm);
+		asid = new_context(info, &mm->context.id, &mm->context.pinned);
 		atomic64_set(&mm->context.id, asid);
 	}
 
@@ -306,7 +307,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 		 * We went through one or more rollover since that ASID was
 		 * used. Ensure that it is still valid, or generate a new one.
 		 */
-		asid = new_context(info, mm);
+		asid = new_context(info, &mm->context.id, &mm->context.pinned);
 		atomic64_set(&mm->context.id, asid);
 	}
 
