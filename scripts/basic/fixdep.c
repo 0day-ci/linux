@@ -34,7 +34,7 @@
  * the config symbols are rebuilt.
  *
  * So if the user changes his CONFIG_HIS_DRIVER option, only the objects
- * which depend on "include/config/his/driver.h" will be rebuilt,
+ * which depend on "include/config/HIS_DRIVER" will be rebuilt,
  * so most likely only his driver ;-)
  *
  * The idea above dates, by the way, back to Michael E Chastain, AFAIK.
@@ -74,7 +74,7 @@
  *
  * and then basically copies the .<target>.d file to stdout, in the
  * process filtering out the dependency on autoconf.h and adding
- * dependencies on include/config/my/option.h for every
+ * dependencies on include/config/MY_OPTION for every
  * CONFIG_MY_OPTION encountered in any of the prerequisites.
  *
  * We don't even try to really parse the header files, but
@@ -124,36 +124,12 @@ static void xprintf(const char *format, ...)
 	va_end(ap);
 }
 
-static void xputchar(int c)
-{
-	int ret;
-
-	ret = putchar(c);
-	if (ret == EOF) {
-		perror("fixdep");
-		exit(1);
-	}
-}
-
 /*
  * Print out a dependency path from a symbol name
  */
 static void print_dep(const char *m, int slen, const char *dir)
 {
-	int c, prev_c = '/', i;
-
-	xprintf("    $(wildcard %s/", dir);
-	for (i = 0; i < slen; i++) {
-		c = m[i];
-		if (c == '_')
-			c = '/';
-		else
-			c = tolower(c);
-		if (c != '/' || prev_c != '/')
-			xputchar(c);
-		prev_c = c;
-	}
-	xprintf(".h) \\\n");
+	xprintf("    $(wildcard %s/%.*s) \\\n", dir, slen, m);
 }
 
 struct item {
