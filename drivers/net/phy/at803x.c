@@ -144,6 +144,9 @@
 #define ATH8035_PHY_ID 0x004dd072
 #define AT8030_PHY_ID_MASK			0xffffffef
 
+#define AT803X_PAGE_FIBER		0
+#define AT803X_PAGE_COPPER		1
+
 MODULE_DESCRIPTION("Qualcomm Atheros AR803x PHY driver");
 MODULE_AUTHOR("Matus Ujhelyi");
 MODULE_LICENSE("GPL");
@@ -196,6 +199,35 @@ static int at803x_debug_reg_mask(struct phy_device *phydev, u16 reg,
 	val |= set;
 
 	return phy_write(phydev, AT803X_DEBUG_DATA, val);
+}
+
+static int at803x_write_page(struct phy_device *phydev, int page)
+{
+	int mask;
+	int set;
+
+	if (page == AT803X_PAGE_COPPER) {
+		set = AT803X_BT_BX_REG_SEL;
+		mask = 0;
+	} else {
+		set = 0;
+		mask = AT803X_BT_BX_REG_SEL;
+	}
+
+	return __phy_modify(phydev, AT803X_REG_CHIP_CONFIG, mask, set);
+}
+
+static int at803x_read_page(struct phy_device *phydev)
+{
+	int ccr = __phy_read(phydev, AT803X_REG_CHIP_CONFIG);
+
+	if (ccr < 0)
+		return ccr;
+
+	if (ccr & AT803X_BT_BX_REG_SEL)
+		return AT803X_PAGE_COPPER;
+
+	return AT803X_PAGE_FIBER;
 }
 
 static int at803x_enable_rx_delay(struct phy_device *phydev)
@@ -753,6 +785,7 @@ static void at803x_link_change_notify(struct phy_device *phydev)
 
 static int at803x_aneg_done(struct phy_device *phydev)
 {
+	int pssr;
 	int ccr;
 
 	int aneg_done = genphy_aneg_done(phydev);
@@ -767,16 +800,13 @@ static int at803x_aneg_done(struct phy_device *phydev)
 	if ((ccr & AT803X_MODE_CFG_MASK) != AT803X_MODE_CFG_SGMII)
 		return aneg_done;
 
-	/* switch to SGMII/fiber page */
-	phy_write(phydev, AT803X_REG_CHIP_CONFIG, ccr & ~AT803X_BT_BX_REG_SEL);
+	pssr = phy_read_paged(phydev, AT803X_PAGE_FIBER, AT803X_PSSR);
 
 	/* check if the SGMII link is OK. */
-	if (!(phy_read(phydev, AT803X_PSSR) & AT803X_PSSR_MR_AN_COMPLETE)) {
+	if (!(pssr & AT803X_PSSR_MR_AN_COMPLETE)) {
 		phydev_warn(phydev, "803x_aneg_done: SGMII link is not ok\n");
 		aneg_done = 0;
 	}
-	/* switch back to copper page */
-	phy_write(phydev, AT803X_REG_CHIP_CONFIG, ccr | AT803X_BT_BX_REG_SEL);
 
 	return aneg_done;
 }
@@ -1196,6 +1226,8 @@ static struct phy_driver at803x_driver[] = {
 	.get_wol		= at803x_get_wol,
 	.suspend		= at803x_suspend,
 	.resume			= at803x_resume,
+	.read_page		= at803x_read_page,
+	.write_page		= at803x_write_page,
 	/* PHY_GBIT_FEATURES */
 	.read_status		= at803x_read_status,
 	.aneg_done		= at803x_aneg_done,
