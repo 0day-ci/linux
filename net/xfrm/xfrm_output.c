@@ -565,6 +565,36 @@ static int xfrm_output_gso(struct net *net, struct sock *sk, struct sk_buff *skb
 	return 0;
 }
 
+/* Save inner ip protocol for vendor offload usage */
+static void get_inner_ipproto(struct sk_buff *skb, struct sec_path *sp)
+{
+	const struct ethhdr *eth;
+
+	if (!skb->inner_protocol)
+		return;
+
+	if (skb->inner_protocol_type == ENCAP_TYPE_IPPROTO) {
+		sp->inner_ipproto = skb->inner_protocol;
+		return;
+	}
+
+	if (skb->inner_protocol_type != ENCAP_TYPE_ETHER)
+		return;
+
+	eth = (struct ethhdr *)skb_inner_mac_header(skb);
+
+	switch (eth->h_proto) {
+	case ntohs(ETH_P_IPV6):
+		sp->inner_ipproto = inner_ipv6_hdr(skb)->nexthdr;
+		break;
+	case ntohs(ETH_P_IP):
+		sp->inner_ipproto = inner_ip_hdr(skb)->protocol;
+		break;
+	default:
+		return;
+	}
+}
+
 int xfrm_output(struct sock *sk, struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb_dst(skb)->dev);
@@ -594,8 +624,12 @@ int xfrm_output(struct sock *sk, struct sk_buff *skb)
 			kfree_skb(skb);
 			return -ENOMEM;
 		}
-		skb->encapsulation = 1;
 
+		sp->inner_ipproto = 0;
+		if (skb->encapsulation)
+			get_inner_ipproto(skb, sp);
+
+		skb->encapsulation = 1;
 		sp->olen++;
 		sp->xvec[sp->len++] = x;
 		xfrm_state_hold(x);

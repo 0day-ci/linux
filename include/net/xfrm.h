@@ -1032,6 +1032,7 @@ struct sec_path {
 
 	struct xfrm_state	*xvec[XFRM_MAX_DEPTH];
 	struct xfrm_offload	ovec[XFRM_MAX_OFFLOAD_DEPTH];
+	u8			inner_ipproto;
 };
 
 struct sec_path *secpath_set(struct sk_buff *skb);
