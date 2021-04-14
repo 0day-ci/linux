@@ -34,6 +34,8 @@ static struct asid_info
 	unsigned long		nr_pinned_asids;
 	/* Callback to locally flush the context. */
 	void			(*flush_cpu_ctxt_cb)(void);
+	/* Callback to set the list of reserved ASIDs */
+	void			(*set_reserved_bits)(struct asid_info *info);
 } asid_info;
 
 #define active_asid(info, cpu)	 (*per_cpu_ptr((info)->active, cpu))
@@ -118,7 +120,8 @@ static void flush_context(struct asid_info *info)
 	u64 asid;
 
 	/* Update the list of reserved ASIDs and the ASID bitmap. */
-	set_reserved_asid_bits(info);
+	if (info->set_reserved_bits)
+		info->set_reserved_bits(info);
 
 	for_each_possible_cpu(i) {
 		asid = atomic64_xchg_relaxed(&active_asid(info, i), 0);
@@ -508,6 +511,7 @@ static int asids_init(void)
 	info->active = &active_asids;
 	info->reserved = &reserved_asids;
 	info->flush_cpu_ctxt_cb = asid_flush_cpu_ctxt;
+	info->set_reserved_bits = set_reserved_asid_bits;
 
 	/*
 	 * We cannot call set_reserved_asid_bits() here because CPU
