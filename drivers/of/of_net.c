@@ -63,6 +63,7 @@ static int of_get_mac_addr_nvmem(struct device_node *np, u8 *addr)
 	struct nvmem_cell *cell;
 	const void *mac;
 	size_t len;
+	u32 offset;
 	int ret;
 
 	/* Try lookup by device first, there might be a nvmem_cell_lookup
@@ -91,6 +92,9 @@ static int of_get_mac_addr_nvmem(struct device_node *np, u8 *addr)
 
 	memcpy(addr, mac, ETH_ALEN);
 	kfree(mac);
+
+	if (!of_property_read_u32(np, "nvmem-mac-address-offset", &offset))
+		eth_addr_add(addr, offset);
 
 	return 0;
 }

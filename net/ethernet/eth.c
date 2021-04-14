@@ -541,6 +541,7 @@ int nvmem_get_mac_address(struct device *dev, void *addrbuf)
 {
 	struct nvmem_cell *cell;
 	const void *mac;
+	u32 offset;
 	size_t len;
 
 	cell = nvmem_cell_get(dev, "mac-address");
@@ -560,6 +561,10 @@ int nvmem_get_mac_address(struct device *dev, void *addrbuf)
 
 	ether_addr_copy(addrbuf, mac);
 	kfree(mac);
+
+	if (!device_property_read_u32(dev, "nvmem-mac-address-offset",
+				      &offset))
+		eth_addr_add(addrbuf, offset);
 
 	return 0;
 }
