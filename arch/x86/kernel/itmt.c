@@ -28,6 +28,8 @@ DEFINE_PER_CPU_READ_MOSTLY(int, sched_core_priority);
 
 /* Boolean to track if system has ITMT capabilities */
 static bool __read_mostly sched_itmt_capable;
+/* Boolean to activate checks on the state of SMT siblings */
+static bool __read_mostly sched_itmt_smt_checks;
 
 /*
  * Boolean to control whether we want to move processes to cpu capable
@@ -124,6 +126,8 @@ int sched_set_itmt_support(void)
 
 	sysctl_sched_itmt_enabled = 1;
 
+	sched_itmt_smt_checks = true;
+
 	x86_topology_update = true;
 	rebuild_sched_domains();
 
@@ -160,11 +164,22 @@ void sched_clear_itmt_support(void)
 	if (sysctl_sched_itmt_enabled) {
 		/* disable sched_itmt if we are no longer ITMT capable */
 		sysctl_sched_itmt_enabled = 0;
+		sched_itmt_smt_checks = false;
 		x86_topology_update = true;
 		rebuild_sched_domains();
 	}
 
 	mutex_unlock(&itmt_update_mutex);
+}
+
+bool arch_asym_check_smt_siblings(void)
+{
+	return sched_itmt_smt_checks;
+}
+
+bool arch_sched_asym_prefer_early(int a, int b)
+{
+	return sched_itmt_smt_checks;
 }
 
 int arch_asym_cpu_priority(int cpu)
