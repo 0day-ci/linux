@@ -7,6 +7,8 @@ be used to work on the kernel. For now, the documents have been pulled
 together without any significant effort to integrate them into a coherent
 whole; patches welcome!
 
+A brief overview of testing-specific tools can be found in :doc:`testing-overview`.
+
 .. class:: toc-title
 
 	   Table of contents
@@ -14,6 +16,7 @@ whole; patches welcome!
 .. toctree::
    :maxdepth: 2
 
+   testing-overview
    coccinelle
    sparse
    kcov
