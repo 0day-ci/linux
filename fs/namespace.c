@@ -1271,6 +1271,22 @@ bool path_is_mountpoint(const struct path *path)
 }
 EXPORT_SYMBOL(path_is_mountpoint);
 
+/**
+ * mnt_clone_internal - create a private clone of a path
+ * @path: path from which the mnt to clone will be taken
+ *
+ * This creates a new vfsmount, which will be a clone of @path's vfsmount.
+ *
+ * In contrast to clone_private_mount() the new mount will be marked
+ * MNT_INTERNAL and will note have any mount namespace attached making it
+ * suitable for short-lived internal mounts since mntput()ing it will always
+ * hit the slowpath taking the mount lock.
+ *
+ * Since the mount is not reachable anwyhere mount properties and propagation
+ * properties remain stable, i.e. cannot change.
+ *
+ * Return: A clone of @path's vfsmount on success, an error pointer on failure.
+ */
 struct vfsmount *mnt_clone_internal(const struct path *path)
 {
 	struct mount *p;
