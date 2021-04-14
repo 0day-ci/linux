@@ -841,6 +841,11 @@ static int intel_crtc_fbc_check(struct intel_atomic_state *state,
 		return 0;
 	}
 
+	if (crtc_state->double_wide) {
+		crtc_state->no_fbc_reason = "double wide pipe";
+		return 0;
+	}
+
 	if (!intel_fbc_hw_tracking_covers_screen(plane_state)) {
 		crtc_state->no_fbc_reason = "plane too large";
 		return 0;
