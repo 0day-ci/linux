@@ -204,6 +204,13 @@ static const u32 brcmstb_rate_table_7278[] = {
 	MHZ(48),
 };
 
+static const u32 brcmstb_rate_table_16550a[] = {
+	MHZ(81),
+	0,
+	0,
+	0,
+};
+
 struct brcmuart_priv {
 	int		line;
 	struct clk	*baud_mux_clk;
@@ -864,6 +871,10 @@ static const struct of_device_id brcmuart_dt_ids[] = {
 	{
 		.compatible = "brcm,bcm7271-uart",
 		.data = brcmstb_rate_table,
+	},
+	{
+		.compatible = "ns16550a",
+		.data = brcmstb_rate_table_16550a,
 	},
 	{},
 };
