@@ -251,8 +251,7 @@
 
 &dsi0 {
 	status = "okay";
-	#address-cells = <1>;
-	#size-cells = <0>;
+
 	panel: panel@0 {
 		/* compatible will be set in board dts */
 		reg = <0>;
