@@ -30,19 +30,6 @@
 
 static DEFINE_SPINLOCK(die_lock);
 
-/*
- * this must be called very early as the kernel might
- * use some instruction that are emulated on the 060
- */
-
-void __init base_trap_init(void)
-{
-}
-
-void __init trap_init(void)
-{
-}
-
 asmlinkage void set_esp0(unsigned long ssp)
 {
 	current->thread.esp0 = ssp;

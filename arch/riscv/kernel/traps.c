@@ -194,8 +194,3 @@ int is_valid_bugaddr(unsigned long pc)
 		return ((insn & __COMPRESSED_INSN_MASK) == __BUG_INSN_16);
 }
 #endif /* CONFIG_GENERIC_BUG */
-
-/* stvec & scratch is already set from head.S */
-void trap_init(void)
-{
-}

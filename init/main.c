@@ -790,6 +790,8 @@ static inline void initcall_debug_enable(void)
 }
 #endif
 
+void __init __weak trap_init(void) { }
+
 /* Report memory auto-initialization states for this boot. */
 static void __init report_meminit(void)
 {
