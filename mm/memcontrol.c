@@ -2220,7 +2220,10 @@ struct memcg_stock_pcp {
 
 #ifdef CONFIG_MEMCG_KMEM
 	struct obj_cgroup *cached_objcg;
+	struct pglist_data *cached_pgdat;
 	unsigned int nr_bytes;
+	int vmstat_idx;
+	int vmstat_bytes;
 #endif
 
 	struct work_struct work;
@@ -3157,6 +3160,21 @@ void __memcg_kmem_uncharge_page(struct page *page, int order)
 	css_put(&memcg->css);
 }
 
+static inline void mod_objcg_state(struct obj_cgroup *objcg,
+				   struct pglist_data *pgdat,
+				   enum node_stat_item idx, int nr)
+{
+	struct mem_cgroup *memcg;
+	struct lruvec *lruvec = NULL;
+
+	rcu_read_lock();
+	memcg = obj_cgroup_memcg(objcg);
+	if (pgdat)
+		lruvec = mem_cgroup_lruvec(memcg, pgdat);
+	__mod_memcg_lruvec_state(memcg, lruvec, idx, nr);
+	rcu_read_unlock();
+}
+
 static bool consume_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
 {
 	struct memcg_stock_pcp *stock;
@@ -3207,6 +3225,14 @@ static void drain_obj_stock(struct memcg_stock_pcp *stock)
 		stock->nr_bytes = 0;
 	}
 
+	if (stock->vmstat_bytes) {
+		mod_objcg_state(old, stock->cached_pgdat, stock->vmstat_idx,
+				stock->vmstat_bytes);
+		stock->vmstat_bytes = 0;
+		stock->vmstat_idx = 0;
+		stock->cached_pgdat = NULL;
+	}
+
 	obj_cgroup_put(old);
 	stock->cached_objcg = NULL;
 }
@@ -3248,6 +3274,48 @@ static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
 
 	local_irq_save(flags);
 	__refill_obj_stock(objcg, nr_bytes);
+	local_irq_restore(flags);
+}
+
+static void __mod_obj_stock_state(struct obj_cgroup *objcg,
+				  struct pglist_data *pgdat, int idx, int nr)
+{
+	struct memcg_stock_pcp *stock = this_cpu_ptr(&memcg_stock);
+
+	if (stock->cached_objcg != objcg) {
+		/* Output the current data as is */
+	} else if (!stock->vmstat_bytes) {
+		/* Save the current data */
+		stock->vmstat_bytes = nr;
+		stock->vmstat_idx = idx;
+		stock->cached_pgdat = pgdat;
+		nr = 0;
+	} else if ((stock->cached_pgdat != pgdat) ||
+		   (stock->vmstat_idx != idx)) {
+		/* Output the cached data & save the current data */
+		swap(nr, stock->vmstat_bytes);
+		swap(idx, stock->vmstat_idx);
+		swap(pgdat, stock->cached_pgdat);
+	} else {
+		stock->vmstat_bytes += nr;
+		if (abs(nr) > PAGE_SIZE) {
+			nr = stock->vmstat_bytes;
+			stock->vmstat_bytes = 0;
+		} else {
+			nr = 0;
+		}
+	}
+	if (nr)
+		mod_objcg_state(objcg, pgdat, idx, nr);
+}
+
+void mod_obj_stock_state(struct obj_cgroup *objcg, struct pglist_data *pgdat,
+			 int idx, int nr)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__mod_obj_stock_state(objcg, pgdat, idx, nr);
 	local_irq_restore(flags);
 }
 
@@ -3300,18 +3368,10 @@ void obj_cgroup_uncharge_mod_state(struct obj_cgroup *objcg, size_t size,
 				   struct pglist_data *pgdat, int idx)
 {
 	unsigned long flags;
-	struct mem_cgroup *memcg;
-	struct lruvec *lruvec = NULL;
 
 	local_irq_save(flags);
 	__refill_obj_stock(objcg, size);
-
-	rcu_read_lock();
-	memcg = obj_cgroup_memcg(objcg);
-	if (pgdat)
-		lruvec = mem_cgroup_lruvec(memcg, pgdat);
-	__mod_memcg_lruvec_state(memcg, lruvec, idx, -(int)size);
-	rcu_read_unlock();
+	__mod_obj_stock_state(objcg, pgdat, idx, -(int)size);
 	local_irq_restore(flags);
 }
 
