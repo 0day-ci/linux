@@ -1399,6 +1399,11 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)
 		if (ret == -EAGAIN)
 			return ret;
 
+		/* Avoid canceling current request, as it has not been started */
+		if (req->trb)
+			memset(req->trb, 0, sizeof(struct dwc3_trb));
+		dwc3_gadget_del_and_unmap_request(dep, req, ret);
+
 		dwc3_stop_active_transfer(dep, true, true);
 
 		list_for_each_entry_safe(req, tmp, &dep->started_list, list)
