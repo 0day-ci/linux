@@ -2474,6 +2474,103 @@ xfs_defer_agfl_block(
 	xfs_defer_add(tp, XFS_DEFER_OPS_TYPE_AGFL_FREE, &new->xefi_list);
 }
 
+int
+xfs_ag_emptify_agfl(
+	struct xfs_buf		*agfbp)
+{
+	struct xfs_mount	*mp = agfbp->b_mount;
+	struct xfs_perag	*pag = agfbp->b_pag;
+	struct xfs_trans	*tp;
+	int			error;
+	struct xfs_owner_info	oinfo = XFS_RMAP_OINFO_AG;
+
+	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_growdata, 0, 0,
+				XFS_TRANS_RESERVE, &tp);
+	if (error)
+		return error;
+
+	/* attach to the transaction and keep it from unlocked */
+	xfs_trans_bjoin(tp, agfbp);
+	xfs_trans_bhold(tp, agfbp);
+
+	while (pag->pagf_flcount) {
+		xfs_agblock_t	bno;
+		int		error;
+
+		error = xfs_alloc_get_freelist(tp, agfbp, &bno, 0);
+		if (error)
+			break;
+
+		ASSERT(bno != NULLAGBLOCK);
+		xfs_defer_agfl_block(tp, pag->pag_agno, bno, &oinfo);
+	}
+	xfs_trans_set_sync(tp);
+	xfs_trans_commit(tp);
+	return error;
+}
+
+int
+xfs_ag_is_empty(
+	struct xfs_buf		*agfbp)
+{
+	struct xfs_mount	*mp = agfbp->b_mount;
+	struct xfs_perag	*pag = agfbp->b_pag;
+	struct xfs_agf		*agf = agfbp->b_addr;
+	struct xfs_btree_cur	*cnt_cur;
+	xfs_agblock_t		nfbno;
+	xfs_extlen_t		nflen;
+	int			error, i;
+
+	if (!pag->pag_inactive)
+		return -EINVAL;
+
+	if (pag->pagf_freeblks + pag->pagf_flcount !=
+	    be32_to_cpu(agf->agf_length) - mp->m_ag_prealloc_blocks)
+		return -ENOTEMPTY;
+
+	if (pag->pagf_flcount) {
+		error = xfs_ag_emptify_agfl(agfbp);
+		if (error)
+			return error;
+
+		if (pag->pagf_freeblks !=
+		    be32_to_cpu(agf->agf_length) - mp->m_ag_prealloc_blocks)
+			return -ENOTEMPTY;
+	}
+
+	if (pag->pagi_count > 0 || pag->pagi_freecount > 0)
+		return -ENOTEMPTY;
+
+	if (be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]) > 1 ||
+	    be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]) > 1)
+		return -ENOTEMPTY;
+
+	cnt_cur = xfs_allocbt_init_cursor(mp, NULL, agfbp,
+					  pag->pag_agno, XFS_BTNUM_CNT);
+	ASSERT(cnt_cur->bc_nlevels == 1);
+	error = xfs_alloc_lookup_ge(cnt_cur, 0,
+				    be32_to_cpu(agf->agf_longest), &i);
+	if (error || !i)
+		goto out;
+
+	error = xfs_alloc_get_rec(cnt_cur, &nfbno, &nflen, &i);
+	if (error)
+		goto out;
+
+	if (XFS_IS_CORRUPT(mp, i != 1)) {
+		error = -EFSCORRUPTED;
+		goto out;
+	}
+
+	error = -ENOTEMPTY;
+	if (nfbno == mp->m_ag_prealloc_blocks &&
+	    nflen == pag->pagf_freeblks)
+		error = 0;
+out:
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
+	return error;
+}
+
 #ifdef DEBUG
 /*
  * Check if an AGF has a free extent record whose length is equal to

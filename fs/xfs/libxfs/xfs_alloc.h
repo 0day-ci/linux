@@ -156,6 +156,10 @@ xfs_alloc_read_agf(
 	int		flags,		/* XFS_ALLOC_FLAG_... */
 	struct xfs_buf	**bpp);		/* buffer for the ag freelist header */
 
+int
+xfs_ag_is_empty(
+	struct xfs_buf		*agfbp);
+
 /*
  * Allocate an extent (variable-size).
  */
