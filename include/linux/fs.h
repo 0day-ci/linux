@@ -41,6 +41,7 @@
 #include <linux/stddef.h>
 #include <linux/mount.h>
 #include <linux/cred.h>
+#include <linux/percpu-refcount.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -1547,6 +1548,13 @@ struct super_block {
 
 	spinlock_t		s_inode_wblist_lock;
 	struct list_head	s_inodes_wb;	/* writeback inodes */
+
+	/*
+	 * Count users who are using the super_block, used to protect
+	 * umount filesystem concurrently with others.
+	 */
+	struct percpu_ref	s_usage_counter;
+	wait_queue_head_t	s_usage_waitq;
 } __randomize_layout;
 
 /* Helper functions so that in most cases filesystems will
@@ -1764,6 +1772,27 @@ static inline bool sb_start_intwrite_trylock(struct super_block *sb)
 
 bool inode_owner_or_capable(struct user_namespace *mnt_userns,
 			    const struct inode *inode);
+
+static inline void sb_usage_counter_release(struct percpu_ref *ref)
+{
+	struct super_block *sb;
+
+	sb = container_of(ref, struct super_block, s_usage_counter);
+	wake_up(&sb->s_usage_waitq);
+}
+
+static inline int sb_usage_counter_init(struct super_block *sb)
+{
+	init_waitqueue_head(&sb->s_usage_waitq);
+	return percpu_ref_init(&sb->s_usage_counter, sb_usage_counter_release,
+			       0, GFP_KERNEL);
+}
+
+static inline void sb_usage_counter_wait(struct super_block *sb)
+{
+	percpu_ref_kill(&sb->s_usage_counter);
+	wait_event(sb->s_usage_waitq, percpu_ref_is_zero(&sb->s_usage_counter));
+}
 
 /*
  * VFS helper functions..
