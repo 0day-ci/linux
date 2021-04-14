@@ -76,7 +76,7 @@ enum sys_t_message_string_subtype {
 				 MIPI_SYST_SEVERITY(MAX))
 
 struct sys_t_policy_node {
-	uuid_t		uuid;
+	u8		uuid[UUID_SIZE];
 	bool		do_len;
 	unsigned long	ts_interval;
 	unsigned long	clocksync_interval;
@@ -92,7 +92,7 @@ static void sys_t_policy_node_init(void *priv)
 {
 	struct sys_t_policy_node *pn = priv;
 
-	generate_random_uuid(pn->uuid.b);
+	generate_random_uuid(pn->uuid);
 }
 
 static int sys_t_output_open(void *priv, struct stm_output *output)
@@ -120,7 +120,7 @@ static ssize_t sys_t_policy_uuid_show(struct config_item *item,
 {
 	struct sys_t_policy_node *pn = to_pdrv_policy_node(item);
 
-	return sprintf(page, "%pU\n", &pn->uuid);
+	return sprintf(page, "%pU\n", pn->uuid);
 }
 
 static ssize_t
@@ -129,13 +129,17 @@ sys_t_policy_uuid_store(struct config_item *item, const char *page,
 {
 	struct mutex *mutexp = &item->ci_group->cg_subsys->su_mutex;
 	struct sys_t_policy_node *pn = to_pdrv_policy_node(item);
+	uuid_t uuid;
 	int ret;
 
 	mutex_lock(mutexp);
-	ret = uuid_parse(page, &pn->uuid);
+	ret = uuid_parse(page, &uuid);
 	mutex_unlock(mutexp);
+	if (ret)
+		return ret;
 
-	return ret < 0 ? ret : count;
+	export_uuid(pn->uuid, &uuid);
+	return count;
 }
 
 CONFIGFS_ATTR(sys_t_policy_, uuid);
@@ -322,7 +326,7 @@ static ssize_t sys_t_write(struct stm_data *data, struct stm_output *output,
 		return sz;
 
 	/* GUID */
-	sz = stm_data_write(data, m, c, false, op->node.uuid.b, UUID_SIZE);
+	sz = stm_data_write(data, m, c, false, op->node.uuid, sizeof(op->node.uuid));
 	if (sz <= 0)
 		return sz;
 
