@@ -41,9 +41,9 @@ static unsigned long nr_pinned_asids;
 static unsigned long *pinned_asid_map;
 
 #define ASID_MASK(info)			(~GENMASK((info)->bits - 1, 0))
-#define ASID_FIRST_VERSION(info)	(1UL << (info)->bits)
+#define NUM_CTXT_ASIDS(info)		(1UL << ((info)->bits))
+#define ASID_FIRST_VERSION(info)        NUM_CTXT_ASIDS(info)
 
-#define NUM_USER_ASIDS(info)		ASID_FIRST_VERSION(info)
 #define asid2idx(info, asid)		((asid) & ~ASID_MASK(info))
 #define idx2asid(info, idx)		asid2idx(info, idx)
 
@@ -87,7 +87,7 @@ void verify_cpu_asid_bits(void)
 
 static void set_kpti_asid_bits(struct asid_info *info, unsigned long *map)
 {
-	unsigned int len = BITS_TO_LONGS(NUM_USER_ASIDS(info)) * sizeof(unsigned long);
+	unsigned int len = BITS_TO_LONGS(NUM_CTXT_ASIDS(info)) * sizeof(unsigned long);
 	/*
 	 * In case of KPTI kernel/user ASIDs are allocated in
 	 * pairs, the bottom bit distinguishes the two: if it
@@ -100,11 +100,11 @@ static void set_kpti_asid_bits(struct asid_info *info, unsigned long *map)
 static void set_reserved_asid_bits(struct asid_info *info)
 {
 	if (pinned_asid_map)
-		bitmap_copy(info->map, pinned_asid_map, NUM_USER_ASIDS(info));
+		bitmap_copy(info->map, pinned_asid_map, NUM_CTXT_ASIDS(info));
 	else if (arm64_kernel_unmapped_at_el0())
 		set_kpti_asid_bits(info, info->map);
 	else
-		bitmap_clear(info->map, 0, NUM_USER_ASIDS(info));
+		bitmap_clear(info->map, 0, NUM_CTXT_ASIDS(info));
 }
 
 #define asid_gen_match(asid, info) \
@@ -204,8 +204,8 @@ static u64 new_context(struct asid_info *info, atomic64_t *pasid,
 	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
 	 * pairs.
 	 */
-	asid = find_next_zero_bit(info->map, NUM_USER_ASIDS(info), info->map_idx);
-	if (asid != NUM_USER_ASIDS(info))
+	asid = find_next_zero_bit(info->map, NUM_CTXT_ASIDS(info), info->map_idx);
+	if (asid != NUM_CTXT_ASIDS(info))
 		goto set_asid;
 
 	/* We're out of ASIDs, so increment the global generation count */
@@ -214,7 +214,7 @@ static u64 new_context(struct asid_info *info, atomic64_t *pasid,
 	flush_context(info);
 
 	/* We have more ASIDs than CPUs, so this will always succeed */
-	asid = find_next_zero_bit(info->map, NUM_USER_ASIDS(info), 1);
+	asid = find_next_zero_bit(info->map, NUM_CTXT_ASIDS(info), 1);
 
 set_asid:
 	__set_bit(asid, info->map);
@@ -387,7 +387,7 @@ void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm)
 static int asids_update_limit(void)
 {
 	struct asid_info *info = &asid_info;
-	unsigned long num_available_asids = NUM_USER_ASIDS(info);
+	unsigned long num_available_asids = NUM_CTXT_ASIDS(info);
 
 	if (arm64_kernel_unmapped_at_el0()) {
 		num_available_asids /= 2;
@@ -418,18 +418,18 @@ static int asids_init(void)
 
 	info->bits = get_cpu_asid_bits();
 	atomic64_set(&info->generation, ASID_FIRST_VERSION(info));
-	info->map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS(info)),
+	info->map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
 			    sizeof(*info->map), GFP_KERNEL);
 	if (!info->map)
 		panic("Failed to allocate bitmap for %lu ASIDs\n",
-		      NUM_USER_ASIDS(info));
+		      NUM_CTXT_ASIDS(info));
 
 	info->map_idx = 1;
 	info->active = &active_asids;
 	info->reserved = &reserved_asids;
 	raw_spin_lock_init(&info->lock);
 
-	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS(info)),
+	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
 				  sizeof(*pinned_asid_map), GFP_KERNEL);
 	nr_pinned_asids = 0;
 
