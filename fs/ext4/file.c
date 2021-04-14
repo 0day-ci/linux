@@ -371,15 +371,27 @@ truncate:
 static int ext4_dio_write_end_io(struct kiocb *iocb, ssize_t size,
 				 int error, unsigned int flags)
 {
-	loff_t offset = iocb->ki_pos;
+	loff_t pos = iocb->ki_pos;
 	struct inode *inode = file_inode(iocb->ki_filp);
 
 	if (error)
 		return error;
 
-	if (size && flags & IOMAP_DIO_UNWRITTEN)
-		return ext4_convert_unwritten_extents(NULL, inode,
-						      offset, size);
+	if (size && flags & IOMAP_DIO_UNWRITTEN) {
+		error = ext4_convert_unwritten_extents(NULL, inode, pos, size);
+		if (error < 0)
+			return error;
+	}
+	/*
+	 * If we are extending the file, we have to update i_size here before
+	 * page cache gets invalidated in iomap_dio_rw(). Otherwise racing
+	 * buffered reads could zero out too much from page cache pages. Update
+	 * of on-disk size will happen later in ext4_dio_write_iter() where
+	 * we have enough information to also perform orphan list handling etc.
+	 */
+	pos += size;
+	if (pos > i_size_read(inode))
+		i_size_write(inode, pos);
 
 	return 0;
 }
