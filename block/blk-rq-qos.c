@@ -260,19 +260,17 @@ void rq_qos_wait(struct rq_wait *rqw, void *private_data,
 		.cb = acquire_inflight_cb,
 		.private_data = private_data,
 	};
-	bool has_sleeper;
 
-	has_sleeper = wq_has_sleeper(&rqw->wait);
-	if (!has_sleeper && acquire_inflight_cb(rqw, private_data))
+	if (!wq_has_sleeper(&rqw->wait)
+		&& acquire_inflight_cb(rqw, private_data))
 		return;
 
 	prepare_to_wait_exclusive(&rqw->wait, &data.wq, TASK_UNINTERRUPTIBLE);
-	has_sleeper = !wq_has_single_sleeper(&rqw->wait);
 	do {
 		/* The memory barrier in set_task_state saves us here. */
 		if (data.got_token)
 			break;
-		if (!has_sleeper && acquire_inflight_cb(rqw, private_data)) {
+		if (acquire_inflight_cb(rqw, private_data)) {
 			finish_wait(&rqw->wait, &data.wq);
 
 			/*
@@ -286,7 +284,6 @@ void rq_qos_wait(struct rq_wait *rqw, void *private_data,
 			break;
 		}
 		io_schedule();
-		has_sleeper = true;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 	} while (1);
 	finish_wait(&rqw->wait, &data.wq);
