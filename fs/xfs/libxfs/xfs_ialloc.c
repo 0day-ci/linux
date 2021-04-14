@@ -969,10 +969,14 @@ xfs_ialloc_ag_select(
 	flags = XFS_ALLOC_FLAG_TRYLOCK;
 	for (;;) {
 		pag = xfs_perag_get(mp, agno);
+		down_read(&pag->pag_inactive_rwsem);
 		if (!pag->pagi_inodeok) {
 			xfs_ialloc_next_ag(mp);
 			goto nextag;
 		}
+
+		if (pag->pag_inactive)
+			goto nextag;
 
 		if (!pag->pagi_init) {
 			error = xfs_ialloc_pagi_init(mp, tp, agno);
@@ -981,6 +985,7 @@ xfs_ialloc_ag_select(
 		}
 
 		if (pag->pagi_freecount) {
+			up_read(&pag->pag_inactive_rwsem);
 			xfs_perag_put(pag);
 			return agno;
 		}
@@ -1016,10 +1021,12 @@ xfs_ialloc_ag_select(
 
 		if (pag->pagf_freeblks >= needspace + ineed &&
 		    longest >= ineed) {
+			up_read(&pag->pag_inactive_rwsem);
 			xfs_perag_put(pag);
 			return agno;
 		}
 nextag:
+		up_read(&pag->pag_inactive_rwsem);
 		xfs_perag_put(pag);
 		/*
 		 * No point in iterating over the rest, if we're shutting
@@ -1776,10 +1783,13 @@ xfs_dialloc_select_ag(
 	agno = start_agno;
 	for (;;) {
 		pag = xfs_perag_get(mp, agno);
+		down_read(&pag->pag_inactive_rwsem);
 		if (!pag->pagi_inodeok) {
 			xfs_ialloc_next_ag(mp);
 			goto nextag;
 		}
+		if (pag->pag_inactive)
+			goto nextag;
 
 		if (!pag->pagi_init) {
 			error = xfs_ialloc_pagi_init(mp, *tpp, agno);
@@ -1802,6 +1812,7 @@ xfs_dialloc_select_ag(
 			break;
 
 		if (pag->pagi_freecount) {
+			up_read(&pag->pag_inactive_rwsem);
 			xfs_perag_put(pag);
 			goto found_ag;
 		}
@@ -1825,6 +1836,7 @@ xfs_dialloc_select_ag(
 			 * allocate one of the new inodes.
 			 */
 			ASSERT(pag->pagi_freecount > 0);
+			up_read(&pag->pag_inactive_rwsem);
 			xfs_perag_put(pag);
 
 			error = xfs_dialloc_roll(tpp, agbp);
@@ -1838,13 +1850,14 @@ xfs_dialloc_select_ag(
 nextag_relse_buffer:
 		xfs_trans_brelse(*tpp, agbp);
 nextag:
+		up_read(&pag->pag_inactive_rwsem);
 		xfs_perag_put(pag);
 		if (++agno == mp->m_sb.sb_agcount)
 			agno = 0;
 		if (agno == start_agno)
 			return noroom ? -ENOSPC : 0;
 	}
-
+	up_read(&pag->pag_inactive_rwsem);
 	xfs_perag_put(pag);
 	return error;
 found_ag:
@@ -2263,11 +2276,22 @@ xfs_imap_lookup(
 {
 	struct xfs_inobt_rec_incore rec;
 	struct xfs_btree_cur	*cur;
+	struct xfs_perag	*pag;
 	struct xfs_buf		*agbp;
 	int			error;
 	int			i;
 
+	pag = xfs_perag_get(mp, agno);
+	down_read(&pag->pag_inactive_rwsem);
+	if (pag->pag_inactive) {
+		up_read(&pag->pag_inactive_rwsem);
+		xfs_perag_put(pag);
+		return -EINVAL;
+	}
+
 	error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
+	up_read(&pag->pag_inactive_rwsem);
+	xfs_perag_put(pag);
 	if (error) {
 		xfs_alert(mp,
 			"%s: xfs_ialloc_read_agi() returned error %d, agno %d",

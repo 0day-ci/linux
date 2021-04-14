@@ -309,6 +309,12 @@ typedef struct xfs_perag {
 	struct xfs_mount *pag_mount;	/* owner filesystem */
 	xfs_agnumber_t	pag_agno;	/* AG this structure belongs to */
 	atomic_t	pag_ref;	/* perag reference count */
+
+	struct rw_semaphore	pag_inactive_rwsem;
+	bool			pag_inactive;
+
+	/* zero the following fields when growfs pag_inactive == true pags */
+
 	char		pagf_init;	/* this agf's entry is initialized */
 	char		pagi_init;	/* this agi's entry is initialized */
 	char		pagf_metadata;	/* the agf is preferred to be metadata */

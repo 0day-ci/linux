@@ -2537,12 +2537,17 @@ xfs_alloc_fix_freelist(
 	/* deferred ops (AGFL block frees) require permanent transactions */
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
 
+	down_read(&pag->pag_inactive_rwsem);
+	if (pag->pag_inactive)
+		goto out_no_agbp;
+
 	if (!pag->pagf_init) {
 		error = xfs_alloc_read_agf(mp, tp, args->agno, flags, &agbp);
 		if (error) {
 			/* Couldn't lock the AGF so skip this AG. */
 			if (error == -EAGAIN)
 				error = 0;
+			up_read(&pag->pag_inactive_rwsem);
 			goto out_no_agbp;
 		}
 	}
@@ -2555,13 +2560,16 @@ xfs_alloc_fix_freelist(
 	if (pag->pagf_metadata && (args->datatype & XFS_ALLOC_USERDATA) &&
 	    (flags & XFS_ALLOC_FLAG_TRYLOCK)) {
 		ASSERT(!(flags & XFS_ALLOC_FLAG_FREEING));
+		up_read(&pag->pag_inactive_rwsem);
 		goto out_agbp_relse;
 	}
 
 	need = xfs_alloc_min_freelist(mp, pag);
 	if (!xfs_alloc_space_available(args, need, flags |
-			XFS_ALLOC_FLAG_CHECK))
+			XFS_ALLOC_FLAG_CHECK)) {
+		up_read(&pag->pag_inactive_rwsem);
 		goto out_agbp_relse;
+	}
 
 	/*
 	 * Get the a.g. freespace buffer.
@@ -2573,9 +2581,11 @@ xfs_alloc_fix_freelist(
 			/* Couldn't lock the AGF so skip this AG. */
 			if (error == -EAGAIN)
 				error = 0;
+			up_read(&pag->pag_inactive_rwsem);
 			goto out_no_agbp;
 		}
 	}
+	up_read(&pag->pag_inactive_rwsem);
 
 	/* reset a padding mismatched agfl before final free space check */
 	if (pag->pagf_agflreset)

@@ -676,15 +676,23 @@ xfs_ag_get_geometry(
 	if (agno >= mp->m_sb.sb_agcount)
 		return -EINVAL;
 
+	pag = xfs_perag_get(mp, agno);
+	down_read(&pag->pag_inactive_rwsem);
+
+	if (pag->pag_inactive) {
+		error = -EBUSY;
+		up_read(&pag->pag_inactive_rwsem);
+		goto out;
+	}
+
 	/* Lock the AG headers. */
 	error = xfs_ialloc_read_agi(mp, NULL, agno, &agi_bp);
+	up_read(&pag->pag_inactive_rwsem);
 	if (error)
-		return error;
+		goto out;
 	error = xfs_alloc_read_agf(mp, NULL, agno, 0, &agf_bp);
 	if (error)
 		goto out_agi;
-
-	pag = agi_bp->b_pag;
 
 	/* Fill out form. */
 	memset(ageo, 0, sizeof(*ageo));
@@ -707,5 +715,7 @@ xfs_ag_get_geometry(
 	xfs_buf_relse(agf_bp);
 out_agi:
 	xfs_buf_relse(agi_bp);
+out:
+	xfs_perag_put(pag);
 	return error;
 }

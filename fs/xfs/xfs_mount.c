@@ -235,6 +235,8 @@ xfs_initialize_perag(
 		if (error)
 			goto out_hash_destroy;
 		spin_lock_init(&pag->pag_state_lock);
+
+		init_rwsem(&pag->pag_inactive_rwsem);
 	}
 
 	index = xfs_set_inode_alloc(mp, agcount);
