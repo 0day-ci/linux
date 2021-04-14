@@ -52,6 +52,12 @@ properties:
   nvmem-cell-names:
     const: mac-address
 
+  nvmem-mac-address-offset:
+    maxItems: 1
+    description:
+      Specifies an offset which will be added to the MAC address when
+      fetched from a nvmem cell.
+
   phy-connection-type:
     description:
       Specifies interface type between the Ethernet device and a physical
