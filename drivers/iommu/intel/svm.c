@@ -1020,9 +1020,10 @@ no_pasid:
 			resp.qw2 = 0;
 			resp.qw3 = 0;
 
-			if (req->priv_data_present)
-				memcpy(&resp.qw2, req->priv_data,
-				       sizeof(req->priv_data));
+			if (req->priv_data_present) {
+				resp.qw2 = req->priv_data[0];
+				resp.qw3 = req->priv_data[1];
+			}
 			qi_submit_sync(iommu, &resp, 1, 0);
 		}
 prq_advance:
@@ -1194,9 +1195,10 @@ int intel_svm_page_response(struct device *dev,
 		desc.qw1 = QI_PGRP_IDX(prm->grpid) | QI_PGRP_LPIG(last_page);
 		desc.qw2 = 0;
 		desc.qw3 = 0;
-		if (private_present)
-			memcpy(&desc.qw2, prm->private_data,
-			       sizeof(prm->private_data));
+		if (private_present) {
+			desc.qw2 = prm->private_data[0];
+			desc.qw3 = prm->private_data[1];
+		}
 
 		qi_submit_sync(iommu, &desc, 1, 0);
 	}
