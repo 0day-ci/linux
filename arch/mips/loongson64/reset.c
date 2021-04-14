@@ -18,9 +18,16 @@
 static void loongson_restart(char *command)
 {
 
-	void (*fw_restart)(void) = (void *)loongson_sysconf.restart_addr;
+	if ((read_c0_prid() & PRID_IMP_MASK) == PRID_IMP_LOONGSON_64R) {
+		unsigned long base;
 
-	fw_restart();
+		base = CKSEG1ADDR(LOONGSON_REG_BASE) + ACPI_OFF;
+		writel(1, (void *)(base + RST_CNT));
+	} else {
+		void (*fw_restart)(void) = (void *)loongson_sysconf.restart_addr;
+
+		fw_restart();
+	}
 	while (1) {
 		if (cpu_wait)
 			cpu_wait();
@@ -29,9 +36,22 @@ static void loongson_restart(char *command)
 
 static void loongson_poweroff(void)
 {
-	void (*fw_poweroff)(void) = (void *)loongson_sysconf.poweroff_addr;
 
-	fw_poweroff();
+	if ((read_c0_prid() & PRID_IMP_MASK) == PRID_IMP_LOONGSON_64R) {
+		unsigned long base;
+		unsigned int acpi_ctrl;
+
+		base = CKSEG1ADDR(LOONGSON_REG_BASE) + ACPI_OFF;
+		acpi_ctrl = readl((void *)(base + PM1_STS));
+		acpi_ctrl &= 0xffffffff;
+		writel(acpi_ctrl, (void *)(base + PM1_STS));
+		acpi_ctrl = SLP_EN | SLP_TYP;
+		writel(acpi_ctrl, (void *)(base + PM1_CNT));
+	} else {
+		void (*fw_poweroff)(void) = (void *)loongson_sysconf.poweroff_addr;
+
+		fw_poweroff();
+	}
 	while (1) {
 		if (cpu_wait)
 			cpu_wait();

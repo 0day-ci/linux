@@ -238,4 +238,12 @@ extern u64 loongson_freqctrl[MAX_PACKAGES];
 #define LOONGSON_PCIMAP_WIN(WIN, ADDR)	\
 	((((ADDR)>>26) & LOONGSON_PCIMAP_PCIMAP_LO0) << ((WIN)*6))
 
+/* Loongson-2K1000 Power management related registers */
+#define	PM1_STS         0x0C /* Power Management1 Status Register */
+#define	PM1_CNT         0x14 /* Power Management 1 Control Register */
+#define	RST_CNT         0x30 /* Reset Control Register */
+#define	SLP_TYP		GENMASK(12, 10) /* Sleep Enable */
+#define	SLP_EN          BIT(13) /* Soft Off */
+#define	ACPI_OFF        0x7000
+
 #endif /* __ASM_MACH_LOONGSON64_LOONGSON_H */
