@@ -798,6 +798,67 @@ static void dpu_irq_uninstall(struct msm_kms *kms)
 	dpu_core_irq_uninstall(dpu_kms);
 }
 
+void dpu_kms_mdp_snapshot(struct drm_device *dev)
+{
+	int i;
+	struct msm_drm_private *priv;
+	struct dpu_kms *dpu_kms;
+	struct dpu_mdss_cfg *cat;
+	struct dpu_hw_mdp *top;
+	struct msm_disp_state *disp_state;
+	char name[SZ_128];
+
+	priv = dev->dev_private;
+	dpu_kms = to_dpu_kms(priv->kms);
+	disp_state = dpu_kms->disp_state;
+
+	cat = dpu_kms->catalog;
+	top = dpu_kms->hw_mdp;
+
+	pm_runtime_get_sync(&dpu_kms->pdev->dev);
+
+	/* dump CTL sub-blocks HW regs info */
+	for (i = 0; i < cat->ctl_count; i++) {
+		snprintf(name, SZ_128, "ctl_%d", i);
+		msm_disp_snapshot_add_block(disp_state, name, cat->ctl[i].len,
+				dpu_kms->mmio + cat->ctl[i].base);
+	}
+
+	/* dump DSPP sub-blocks HW regs info */
+	for (i = 0; i < cat->dspp_count; i++) {
+		snprintf(name, SZ_128, "dspp_%d", i);
+		msm_disp_snapshot_add_block(disp_state, name, cat->dspp[i].len,
+				dpu_kms->mmio + cat->dspp[i].base);
+	}
+
+	/* dump INTF sub-blocks HW regs info */
+	for (i = 0; i < cat->intf_count; i++) {
+		snprintf(name, SZ_128, "intf_%d", i);
+		msm_disp_snapshot_add_block(disp_state, name, cat->intf[i].len,
+				dpu_kms->mmio + cat->intf[i].base);
+	}
+
+	/* dump PP sub-blocks HW regs info */
+	for (i = 0; i < cat->pingpong_count; i++) {
+		snprintf(name, SZ_128, "ping-pong_%d", i);
+		msm_disp_snapshot_add_block(disp_state, name, cat->pingpong[i].len,
+				dpu_kms->mmio + cat->pingpong[i].base);
+	}
+
+	/* dump SSPP sub-blocks HW regs info */
+	for (i = 0; i < cat->sspp_count; i++) {
+		snprintf(name, SZ_128, "sspp_%d", i);
+		msm_disp_snapshot_add_block(disp_state, name, cat->sspp[i].len,
+				dpu_kms->mmio + cat->sspp[i].base);
+	}
+
+	snprintf(name, SZ_128, "top");
+	msm_disp_snapshot_add_block(disp_state, name, top->hw.length,
+			dpu_kms->mmio + top->hw.blk_off);
+
+	pm_runtime_put_sync(&dpu_kms->pdev->dev);
+}
+
 static const struct msm_kms_funcs kms_funcs = {
 	.hw_init         = dpu_kms_hw_init,
 	.irq_preinstall  = dpu_irq_preinstall,

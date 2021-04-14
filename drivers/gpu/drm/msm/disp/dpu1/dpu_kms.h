@@ -13,6 +13,7 @@
 #include <drm/drm_drv.h>
 
 #include "msm_drv.h"
+#include "disp/msm_disp_snapshot.h"
 #include "msm_kms.h"
 #include "msm_mmu.h"
 #include "msm_gem.h"
@@ -131,6 +132,8 @@ struct dpu_kms {
 	bool rpm_enabled;
 
 	struct opp_table *opp_table;
+
+	struct msm_disp_state *disp_state;
 
 	struct dss_module_power mp;
 
@@ -264,5 +267,7 @@ void dpu_kms_encoder_enable(struct drm_encoder *encoder);
  * Return: current clock rate
  */
 u64 dpu_kms_get_clk_rate(struct dpu_kms *dpu_kms, char *clock_name);
+
+void dpu_kms_mdp_snapshot(struct drm_device *dev);
 
 #endif /* __dpu_kms_H__ */
