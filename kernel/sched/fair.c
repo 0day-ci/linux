@@ -4379,19 +4379,26 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 {
 	unsigned long ideal_runtime, delta_exec;
 	struct sched_entity *se;
+	struct rq *rq = rq_of(cfs_rq);
 	s64 delta;
 
 	ideal_runtime = sched_slice(cfs_rq, curr);
 	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 	if (delta_exec > ideal_runtime) {
-		resched_curr(rq_of(cfs_rq));
+		if (!test_tsk_need_resched(rq->curr))
+			resched_curr(rq_of(cfs_rq));
 		/*
 		 * The current task ran long enough, ensure it doesn't get
 		 * re-elected due to buddy favours.
 		 */
 		clear_buddies(cfs_rq, curr);
 		return;
-	}
+	/*
+	 * If here with TIF_NEED_RESCHED already set from the early entity_tick,
+	 * there is no need to check again.
+	 */
+	} else if (test_tsk_need_resched(rq->curr))
+		return;
 
 	/*
 	 * Ensure that a task that missed wakeup preemption by a
