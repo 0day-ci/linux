@@ -82,4 +82,6 @@ void asid_context_pinned_put(struct asid_info *info, atomic64_t *pasid,
 			     refcount_t *pinned);
 int asid_allocator_init(struct asid_info *info, u32 bits, bool pinned);
 
+void asid_allocator_free(struct asid_info *info);
+
 #endif

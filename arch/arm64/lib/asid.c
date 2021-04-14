@@ -256,3 +256,9 @@ int asid_allocator_init(struct asid_info *info, u32 bits, bool pinned)
 
 	return 0;
 }
+
+void asid_allocator_free(struct asid_info *info)
+{
+	kfree(info->map);
+	kfree(info->pinned_map);
+}
