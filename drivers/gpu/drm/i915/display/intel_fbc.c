@@ -411,6 +411,17 @@ bool intel_fbc_is_active(struct drm_i915_private *dev_priv)
 	return dev_priv->fbc.active;
 }
 
+static void intel_fbc_activate(struct drm_i915_private *dev_priv)
+{
+	struct intel_fbc *fbc = &dev_priv->fbc;
+
+	drm_WARN_ON(&dev_priv->drm, !mutex_is_locked(&fbc->lock));
+
+	intel_fbc_hw_activate(dev_priv);
+
+	fbc->no_fbc_reason = NULL;
+}
+
 static void intel_fbc_deactivate(struct drm_i915_private *dev_priv,
 				 const char *reason)
 {
@@ -1094,7 +1105,7 @@ static void __intel_fbc_post_update(struct intel_crtc *crtc)
 		return;
 
 	if (!fbc->busy_bits)
-		intel_fbc_hw_activate(dev_priv);
+		intel_fbc_activate(dev_priv);
 	else
 		intel_fbc_deactivate(dev_priv, "frontbuffer write");
 }
