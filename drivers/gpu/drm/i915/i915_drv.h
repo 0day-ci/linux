@@ -385,25 +385,8 @@ struct intel_fbc {
 	 */
 	struct intel_fbc_state_cache {
 		struct {
-			unsigned int mode_flags;
-			u32 hsw_bdw_pixel_rate;
-		} crtc;
-
-		struct {
-			unsigned int rotation;
 			int src_w;
 			int src_h;
-			bool visible;
-			/*
-			 * Display surface base address adjustement for
-			 * pageflips. Note that on gen4+ this only adjusts up
-			 * to a tile, offsets within a tile are handled in
-			 * the hw itself (with the TILEOFF register).
-			 */
-			int adjusted_x;
-			int adjusted_y;
-
-			u16 pixel_blend_mode;
 		} plane;
 
 		struct {
@@ -416,7 +399,7 @@ struct intel_fbc {
 		u16 gen9_wa_cfb_stride;
 		u16 interval;
 		s8 fence_id;
-		bool psr2_active;
+		const char *no_fbc_reason;
 	} state_cache;
 
 	/*
@@ -443,9 +426,7 @@ struct intel_fbc {
 		u16 gen9_wa_cfb_stride;
 		u16 interval;
 		s8 fence_id;
-		bool plane_visible;
 	} params;
-
 	const char *no_fbc_reason;
 };
 

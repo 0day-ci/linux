@@ -1084,7 +1084,7 @@ struct intel_crtc_state {
 
 	bool crc_enabled;
 
-	bool enable_fbc;
+	const char *no_fbc_reason;
 
 	bool double_wide;
 

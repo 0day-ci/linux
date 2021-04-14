@@ -16,8 +16,7 @@ struct intel_crtc;
 struct intel_crtc_state;
 struct intel_plane_state;
 
-void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
-			   struct intel_atomic_state *state);
+int intel_fbc_atomic_check(struct intel_atomic_state *state);
 bool intel_fbc_is_active(struct drm_i915_private *dev_priv);
 bool intel_fbc_pre_update(struct intel_atomic_state *state,
 			  struct intel_crtc *crtc);

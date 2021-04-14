@@ -43,6 +43,7 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 #include "i915_vgpu.h"
+#include "intel_cdclk.h"
 #include "intel_display_types.h"
 #include "intel_fbc.h"
 #include "intel_frontbuffer.h"
@@ -588,9 +589,16 @@ void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv)
 	mutex_unlock(&fbc->lock);
 }
 
-static bool stride_is_valid(struct drm_i915_private *dev_priv,
-			    u64 modifier, unsigned int stride)
+static bool stride_is_valid(const struct intel_plane_state *plane_state)
 {
+	struct drm_i915_private *dev_priv = to_i915(plane_state->uapi.plane->dev);
+	const struct drm_framebuffer *fb = plane_state->hw.fb;
+	unsigned int stride;
+
+	stride = plane_state->view.color_plane[0].stride;
+	if (drm_rotation_90_or_270(plane_state->hw.rotation))
+		stride *= fb->format->cpp[0];
+
 	/* This should have been caught earlier. */
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, (stride & (64 - 1)) != 0))
 		return false;
@@ -607,7 +615,7 @@ static bool stride_is_valid(struct drm_i915_private *dev_priv,
 
 	/* Display WA #1105: skl,bxt,kbl,cfl,glk */
 	if (IS_DISPLAY_VER(dev_priv, 9) &&
-	    modifier == DRM_FORMAT_MOD_LINEAR && stride & 511)
+	    fb->modifier == DRM_FORMAT_MOD_LINEAR && stride & 511)
 		return false;
 
 	if (stride > 16384)
@@ -616,10 +624,12 @@ static bool stride_is_valid(struct drm_i915_private *dev_priv,
 	return true;
 }
 
-static bool pixel_format_is_valid(struct drm_i915_private *dev_priv,
-				  u32 pixel_format)
+static bool pixel_format_is_valid(const struct intel_plane_state *plane_state)
 {
-	switch (pixel_format) {
+	struct drm_i915_private *dev_priv = to_i915(plane_state->uapi.plane->dev);
+	const struct drm_framebuffer *fb = plane_state->hw.fb;
+
+	switch (fb->format->format) {
 	case DRM_FORMAT_XRGB8888:
 	case DRM_FORMAT_XBGR8888:
 		return true;
@@ -637,10 +647,14 @@ static bool pixel_format_is_valid(struct drm_i915_private *dev_priv,
 	}
 }
 
-static bool rotation_is_valid(struct drm_i915_private *dev_priv,
-			      u32 pixel_format, unsigned int rotation)
+static bool rotation_is_valid(const struct intel_plane_state *plane_state)
 {
-	if (DISPLAY_VER(dev_priv) >= 9 && pixel_format == DRM_FORMAT_RGB565 &&
+	struct drm_i915_private *dev_priv = to_i915(plane_state->uapi.plane->dev);
+	const struct drm_framebuffer *fb = plane_state->hw.fb;
+	unsigned int rotation = plane_state->hw.rotation;
+
+	if (DISPLAY_VER(dev_priv) >= 9 &&
+	    fb->format->format == DRM_FORMAT_RGB565 &&
 	    drm_rotation_90_or_270(rotation))
 		return false;
 	else if (DISPLAY_VER(dev_priv) <= 4 && !IS_G4X(dev_priv) &&
@@ -656,10 +670,10 @@ static bool rotation_is_valid(struct drm_i915_private *dev_priv,
  * the X and Y offset registers. That's why we include the src x/y offsets
  * instead of just looking at the plane size.
  */
-static bool intel_fbc_hw_tracking_covers_screen(struct intel_crtc *crtc)
+static bool
+intel_fbc_hw_tracking_covers_screen(const struct intel_plane_state *plane_state)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
-	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct drm_i915_private *dev_priv = to_i915(plane_state->uapi.plane->dev);
 	unsigned int effective_w, effective_h, max_w, max_h;
 
 	if (DISPLAY_VER(dev_priv) >= 10) {
@@ -676,18 +690,20 @@ static bool intel_fbc_hw_tracking_covers_screen(struct intel_crtc *crtc)
 		max_h = 1536;
 	}
 
-	intel_fbc_get_plane_source_size(&fbc->state_cache, &effective_w,
-					&effective_h);
-	effective_w += fbc->state_cache.plane.adjusted_x;
-	effective_h += fbc->state_cache.plane.adjusted_y;
+	effective_w = plane_state->view.color_plane[0].x +
+		(drm_rect_width(&plane_state->uapi.src) >> 16);
+	effective_h = plane_state->view.color_plane[0].y +
+		(drm_rect_height(&plane_state->uapi.src) >> 16);
 
 	return effective_w <= max_w && effective_h <= max_h;
 }
 
-static bool tiling_is_valid(struct drm_i915_private *dev_priv,
-			    u64 modifier)
+static bool tiling_is_valid(const struct intel_plane_state *plane_state)
 {
-	switch (modifier) {
+	struct drm_i915_private *dev_priv = to_i915(plane_state->uapi.plane->dev);
+	const struct drm_framebuffer *fb = plane_state->hw.fb;
+
+	switch (fb->modifier) {
 	case DRM_FORMAT_MOD_LINEAR:
 	case I915_FORMAT_MOD_Y_TILED:
 		return DISPLAY_VER(dev_priv) >= 9;
@@ -707,15 +723,10 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc,
 	struct intel_fbc_state_cache *cache = &fbc->state_cache;
 	struct drm_framebuffer *fb = plane_state->hw.fb;
 
-	cache->plane.visible = plane_state->uapi.visible;
-	if (!cache->plane.visible)
+	cache->no_fbc_reason = crtc_state->no_fbc_reason;
+	if (cache->no_fbc_reason)
 		return;
 
-	cache->crtc.mode_flags = crtc_state->hw.adjusted_mode.flags;
-	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
-		cache->crtc.hsw_bdw_pixel_rate = crtc_state->pixel_rate;
-
-	cache->plane.rotation = plane_state->hw.rotation;
 	/*
 	 * Src coordinates are already rotated by 270 degrees for
 	 * the 90/270 degree plane rotation cases (to match the
@@ -723,10 +734,6 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc,
 	 */
 	cache->plane.src_w = drm_rect_width(&plane_state->uapi.src) >> 16;
 	cache->plane.src_h = drm_rect_height(&plane_state->uapi.src) >> 16;
-	cache->plane.adjusted_x = plane_state->view.color_plane[0].x;
-	cache->plane.adjusted_y = plane_state->view.color_plane[0].y;
-
-	cache->plane.pixel_blend_mode = plane_state->hw.pixel_blend_mode;
 
 	cache->fb.format = fb->format;
 	cache->fb.modifier = fb->modifier;
@@ -749,8 +756,6 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc,
 		cache->fence_id = plane_state->vma->fence->id;
 	else
 		cache->fence_id = -1;
-
-	cache->psr2_active = crtc_state->has_psr2;
 }
 
 static bool intel_fbc_cfb_size_changed(struct drm_i915_private *dev_priv)
@@ -784,6 +789,11 @@ static bool intel_fbc_can_enable(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
 
+	if (!HAS_FBC(dev_priv)) {
+		fbc->no_fbc_reason = "unsupported by this chipset";
+		return false;
+	}
+
 	if (intel_vgpu_active(dev_priv)) {
 		fbc->no_fbc_reason = "VGPU is active";
 		return false;
@@ -802,6 +812,114 @@ static bool intel_fbc_can_enable(struct drm_i915_private *dev_priv)
 	return true;
 }
 
+static int intel_crtc_fbc_check(struct intel_atomic_state *state,
+				struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
+	struct intel_plane *plane = to_intel_plane(crtc->base.primary);
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
+	const struct intel_plane_state *plane_state =
+		intel_atomic_get_new_plane_state(state, plane);
+	const struct drm_framebuffer *fb;
+
+	if (!plane->has_fbc)
+		return 0;
+
+	if (!plane_state)
+		return 0;
+
+	fb = plane_state->hw.fb;
+
+	if (!plane_state->uapi.visible) {
+		crtc_state->no_fbc_reason = "plane not visible";
+		return 0;
+	}
+
+	if (crtc_state->hw.adjusted_mode.flags & DRM_MODE_FLAG_INTERLACE) {
+		crtc_state->no_fbc_reason = "interlaced mode";
+		return 0;
+	}
+
+	if (!intel_fbc_hw_tracking_covers_screen(plane_state)) {
+		crtc_state->no_fbc_reason = "plane too large";
+		return 0;
+	}
+
+	if (!pixel_format_is_valid(plane_state)) {
+		crtc_state->no_fbc_reason = "incompatible pixel format";
+		return 0;
+	}
+
+	if (!tiling_is_valid(plane_state)) {
+		crtc_state->no_fbc_reason = "incompatible tiling";
+		return 0;
+	}
+
+	if (!rotation_is_valid(plane_state)) {
+		crtc_state->no_fbc_reason = "incompatible rotation";
+		return 0;
+	}
+
+	if (!stride_is_valid(plane_state)) {
+		crtc_state->no_fbc_reason = "incompatible stride";
+		return 0;
+	}
+
+	if (plane_state->hw.pixel_blend_mode != DRM_MODE_BLEND_PIXEL_NONE &&
+	    plane_state->hw.fb->format->has_alpha) {
+		crtc_state->no_fbc_reason = "alpha blending enabled";
+		return 0;
+	}
+
+	/*
+	 * Work around a problem on GEN9+ HW, where enabling FBC on a plane
+	 * having a Y offset that isn't divisible by 4 causes FIFO underrun
+	 * and screen flicker.
+	 */
+	if (DISPLAY_VER(dev_priv) >= 9 &&
+	    plane_state->view.color_plane[0].y & 3) {
+		crtc_state->no_fbc_reason = "plane start Y offset misaligned";
+		return 0;
+	}
+
+	/* Wa_22010751166: icl, ehl, tgl, dg1, rkl */
+	if (DISPLAY_VER(dev_priv) >= 11 &&
+	    (plane_state->view.color_plane[0].y + (drm_rect_height(&plane_state->uapi.src) >> 16)) & 3) {
+		crtc_state->no_fbc_reason = "plane end Y offset misaligned";
+		return 0;
+	}
+
+	/*
+	 * Tigerlake is not supporting FBC with PSR2.
+	 * Recommendation is to keep this combination disabled
+	 * Bspec: 50422 HSD: 14010260002
+	 */
+	if (IS_TIGERLAKE(dev_priv) && crtc_state->has_psr2) {
+		crtc_state->no_fbc_reason = "PSR2 enabled";
+		return 0;
+	}
+
+	/* WaFbcExceedCdClockThreshold:hsw,bdw */
+	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) {
+		const struct intel_cdclk_state *cdclk_state;
+
+		cdclk_state = intel_atomic_get_cdclk_state(state);
+		if (IS_ERR(cdclk_state))
+			return PTR_ERR(cdclk_state);
+
+		if (crtc_state->pixel_rate >
+		    cdclk_state->logical.cdclk * 95 / 100) {
+			crtc_state->no_fbc_reason = "pixel rate too high";
+			return 0;
+		}
+	}
+
+	crtc_state->no_fbc_reason = NULL;
+
+	return 0;
+}
+
 static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
@@ -811,26 +929,8 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	if (!intel_fbc_can_enable(dev_priv))
 		return false;
 
-	if (!cache->plane.visible) {
-		fbc->no_fbc_reason = "primary plane not visible";
-		return false;
-	}
-
-	/* We don't need to use a state cache here since this information is
-	 * global for all CRTC.
-	 */
-	if (fbc->underrun_detected) {
-		fbc->no_fbc_reason = "underrun detected";
-		return false;
-	}
-
-	if (cache->crtc.mode_flags & DRM_MODE_FLAG_INTERLACE) {
-		fbc->no_fbc_reason = "incompatible mode";
-		return false;
-	}
-
-	if (!intel_fbc_hw_tracking_covers_screen(crtc)) {
-		fbc->no_fbc_reason = "mode too large for compression";
+	if (cache->no_fbc_reason) {
+		fbc->no_fbc_reason = cache->no_fbc_reason;
 		return false;
 	}
 
@@ -852,41 +952,7 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	 * rotation.
 	 */
 	if (DISPLAY_VER(dev_priv) < 9 && cache->fence_id < 0) {
-		fbc->no_fbc_reason = "framebuffer not tiled or fenced";
-		return false;
-	}
-
-	if (!pixel_format_is_valid(dev_priv, cache->fb.format->format)) {
-		fbc->no_fbc_reason = "pixel format is invalid";
-		return false;
-	}
-
-	if (!rotation_is_valid(dev_priv, cache->fb.format->format,
-			       cache->plane.rotation)) {
-		fbc->no_fbc_reason = "rotation unsupported";
-		return false;
-	}
-
-	if (!tiling_is_valid(dev_priv, cache->fb.modifier)) {
-		fbc->no_fbc_reason = "tiling unsupported";
-		return false;
-	}
-
-	if (!stride_is_valid(dev_priv, cache->fb.modifier, cache->fb.stride)) {
-		fbc->no_fbc_reason = "framebuffer stride not supported";
-		return false;
-	}
-
-	if (cache->plane.pixel_blend_mode != DRM_MODE_BLEND_PIXEL_NONE &&
-	    cache->fb.format->has_alpha) {
-		fbc->no_fbc_reason = "per-pixel alpha blending is incompatible with FBC";
-		return false;
-	}
-
-	/* WaFbcExceedCdClockThreshold:hsw,bdw */
-	if ((IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv)) &&
-	    cache->crtc.hsw_bdw_pixel_rate >= dev_priv->cdclk.hw.cdclk * 95 / 100) {
-		fbc->no_fbc_reason = "pixel rate is too big";
+		fbc->no_fbc_reason = "framebuffer not fenced";
 		return false;
 	}
 
@@ -902,34 +968,6 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 	 * important case, we can implement it later. */
 	if (intel_fbc_cfb_size_changed(dev_priv)) {
 		fbc->no_fbc_reason = "CFB requirements changed";
-		return false;
-	}
-
-	/*
-	 * Work around a problem on GEN9+ HW, where enabling FBC on a plane
-	 * having a Y offset that isn't divisible by 4 causes FIFO underrun
-	 * and screen flicker.
-	 */
-	if (DISPLAY_VER(dev_priv) >= 9 &&
-	    (fbc->state_cache.plane.adjusted_y & 3)) {
-		fbc->no_fbc_reason = "plane Y offset is misaligned";
-		return false;
-	}
-
-	/* Wa_22010751166: icl, ehl, tgl, dg1, rkl */
-	if (DISPLAY_VER(dev_priv) >= 11 &&
-	    (cache->plane.src_h + cache->plane.adjusted_y) % 4) {
-		fbc->no_fbc_reason = "plane height + offset is non-modulo of 4";
-		return false;
-	}
-
-	/*
-	 * Tigerlake is not supporting FBC with PSR2.
-	 * Recommendation is to keep this combination disabled
-	 * Bspec: 50422 HSD: 14010260002
-	 */
-	if (fbc->state_cache.psr2_active && IS_TIGERLAKE(dev_priv)) {
-		fbc->no_fbc_reason = "not supported with PSR2";
 		return false;
 	}
 
@@ -963,8 +1001,6 @@ static void intel_fbc_get_reg_params(struct intel_crtc *crtc,
 	params->cfb_size = intel_fbc_calculate_cfb_size(dev_priv, cache);
 
 	params->gen9_wa_cfb_stride = cache->gen9_wa_cfb_stride;
-
-	params->plane_visible = cache->plane.visible;
 }
 
 static bool intel_fbc_can_flip_nuke(const struct intel_crtc_state *crtc_state)
@@ -978,7 +1014,7 @@ static bool intel_fbc_can_flip_nuke(const struct intel_crtc_state *crtc_state)
 	if (drm_atomic_crtc_needs_modeset(&crtc_state->uapi))
 		return false;
 
-	if (!params->plane_visible)
+	if (fbc->no_fbc_reason)
 		return false;
 
 	if (!intel_fbc_can_activate(crtc))
@@ -1012,7 +1048,6 @@ bool intel_fbc_pre_update(struct intel_atomic_state *state,
 		intel_atomic_get_new_plane_state(state, plane);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct intel_fbc *fbc = &dev_priv->fbc;
-	const char *reason = "update pending";
 	bool need_vblank_wait = false;
 
 	if (!plane->has_fbc || !plane_state)
@@ -1027,7 +1062,7 @@ bool intel_fbc_pre_update(struct intel_atomic_state *state,
 	fbc->flip_pending = true;
 
 	if (!intel_fbc_can_flip_nuke(crtc_state)) {
-		intel_fbc_deactivate(dev_priv, reason);
+		intel_fbc_deactivate(dev_priv, "update pending");
 
 		/*
 		 * Display WA #1198: glk+
@@ -1063,6 +1098,7 @@ unlock:
 static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct intel_fbc_state_cache *cache = &fbc->state_cache;
 	struct intel_crtc *crtc = fbc->crtc;
 
 	drm_WARN_ON(&dev_priv->drm, !mutex_is_locked(&fbc->lock));
@@ -1074,6 +1110,7 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 
 	__intel_fbc_cleanup_cfb(dev_priv);
 
+	fbc->no_fbc_reason = cache->no_fbc_reason;
 	fbc->crtc = NULL;
 }
 
@@ -1088,13 +1125,6 @@ static void __intel_fbc_post_update(struct intel_crtc *crtc)
 		return;
 
 	fbc->flip_pending = false;
-
-	if (!dev_priv->params.enable_fbc) {
-		intel_fbc_deactivate(dev_priv, "disabled at runtime per module param");
-		__intel_fbc_disable(dev_priv);
-
-		return;
-	}
 
 	intel_fbc_get_reg_params(crtc, &fbc->params);
 
@@ -1189,75 +1219,23 @@ out:
 	mutex_unlock(&fbc->lock);
 }
 
-/**
- * intel_fbc_choose_crtc - select a CRTC to enable FBC on
- * @dev_priv: i915 device instance
- * @state: the atomic state structure
- *
- * This function looks at the proposed state for CRTCs and planes, then chooses
- * which pipe is going to have FBC by setting intel_crtc_state->enable_fbc to
- * true.
- *
- * Later, intel_fbc_enable is going to look for state->enable_fbc and then maybe
- * enable FBC for the chosen CRTC. If it does, it will set dev_priv->fbc.crtc.
- */
-void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
-			   struct intel_atomic_state *state)
+int intel_fbc_atomic_check(struct intel_atomic_state *state)
 {
-	struct intel_fbc *fbc = &dev_priv->fbc;
-	struct intel_plane *plane;
-	struct intel_plane_state *plane_state;
-	bool crtc_chosen = false;
+	struct intel_crtc_state *crtc_state;
+	struct intel_crtc *crtc;
 	int i;
 
-	mutex_lock(&fbc->lock);
+	for_each_new_intel_crtc_in_state(state, crtc, crtc_state, i) {
+		int ret;
 
-	/* Does this atomic commit involve the CRTC currently tied to FBC? */
-	if (fbc->crtc &&
-	    !intel_atomic_get_new_crtc_state(state, fbc->crtc))
-		goto out;
-
-	if (!intel_fbc_can_enable(dev_priv))
-		goto out;
-
-	/* Simply choose the first CRTC that is compatible and has a visible
-	 * plane. We could go for fancier schemes such as checking the plane
-	 * size, but this would just affect the few platforms that don't tie FBC
-	 * to pipe or plane A. */
-	for_each_new_intel_plane_in_state(state, plane, plane_state, i) {
-		struct intel_crtc_state *crtc_state;
-		struct intel_crtc *crtc = to_intel_crtc(plane_state->hw.crtc);
-
-		if (!plane->has_fbc)
-			continue;
-
-		if (!plane_state->uapi.visible)
-			continue;
-
-		crtc_state = intel_atomic_get_new_crtc_state(state, crtc);
-
-		crtc_state->enable_fbc = true;
-		crtc_chosen = true;
-		break;
+		ret = intel_crtc_fbc_check(state, crtc);
+		if (ret)
+			return ret;
 	}
 
-	if (!crtc_chosen)
-		fbc->no_fbc_reason = "no suitable CRTC for FBC";
-
-out:
-	mutex_unlock(&fbc->lock);
+	return 0;
 }
 
-/**
- * intel_fbc_enable: tries to enable FBC on the CRTC
- * @crtc: the CRTC
- * @state: corresponding &drm_crtc_state for @crtc
- *
- * This function checks if the given CRTC was chosen for FBC, then enables it if
- * possible. Notice that it doesn't activate FBC. It is valid to call
- * intel_fbc_enable multiple times for the same pipe without an
- * intel_fbc_disable in the middle, as long as it is deactivated.
- */
 static void intel_fbc_enable(struct intel_atomic_state *state,
 			     struct intel_crtc *crtc)
 {
@@ -1287,15 +1265,14 @@ static void intel_fbc_enable(struct intel_atomic_state *state,
 	drm_WARN_ON(&dev_priv->drm, fbc->active);
 
 	intel_fbc_update_state_cache(crtc, crtc_state, plane_state);
-
-	/* FIXME crtc_state->enable_fbc lies :( */
-	if (!cache->plane.visible)
+	if (cache->no_fbc_reason) {
+		fbc->no_fbc_reason = cache->no_fbc_reason;
 		goto out;
+	}
 
 	if (intel_fbc_alloc_cfb(dev_priv,
 				intel_fbc_calculate_cfb_size(dev_priv, cache),
 				plane_state->hw.fb->format->cpp[0])) {
-		cache->plane.visible = false;
 		fbc->no_fbc_reason = "not enough stolen memory";
 		goto out;
 	}
@@ -1348,7 +1325,7 @@ void intel_fbc_update(struct intel_atomic_state *state,
 	const struct intel_crtc_state *crtc_state =
 		intel_atomic_get_new_crtc_state(state, crtc);
 
-	if (crtc_state->update_pipe && !crtc_state->enable_fbc)
+	if (crtc_state->update_pipe && crtc_state->no_fbc_reason)
 		intel_fbc_disable(crtc);
 	else
 		intel_fbc_enable(state, crtc);
