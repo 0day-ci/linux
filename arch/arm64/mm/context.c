@@ -307,20 +307,21 @@ void check_and_switch_context(struct mm_struct *mm)
 		cpu_switch_mm(mm->pgd, mm);
 }
 
-unsigned long arm64_mm_context_get(struct mm_struct *mm)
+static unsigned long asid_context_pinned_get(struct asid_info *info,
+					     atomic64_t *pasid,
+					     refcount_t *pinned)
 {
 	unsigned long flags;
 	u64 asid;
-	struct asid_info *info = &asid_info;
 
 	if (!info->pinned_map)
 		return 0;
 
 	raw_spin_lock_irqsave(&info->lock, flags);
 
-	asid = atomic64_read(&mm->context.id);
+	asid = atomic64_read(pasid);
 
-	if (refcount_inc_not_zero(&mm->context.pinned))
+	if (refcount_inc_not_zero(pinned))
 		goto out_unlock;
 
 	if (info->nr_pinned_asids >= info->max_pinned_asids) {
@@ -333,18 +334,46 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 		 * We went through one or more rollover since that ASID was
 		 * used. Ensure that it is still valid, or generate a new one.
 		 */
-		asid = new_context(info, &mm->context.id, &mm->context.pinned);
-		atomic64_set(&mm->context.id, asid);
+		asid = new_context(info, pasid, pinned);
+		atomic64_set(pasid, asid);
 	}
 
 	info->nr_pinned_asids++;
 	__set_bit(asid2idx(info, asid), info->pinned_map);
-	refcount_set(&mm->context.pinned, 1);
+	refcount_set(pinned, 1);
 
 out_unlock:
 	raw_spin_unlock_irqrestore(&info->lock, flags);
-
 	asid &= ~ASID_MASK(info);
+	return asid;
+}
+
+static void asid_context_pinned_put(struct asid_info *info, atomic64_t *pasid,
+				    refcount_t *pinned)
+{
+	unsigned long flags;
+	u64 asid = atomic64_read(pasid);
+
+	if (!info->pinned_map)
+		return;
+
+	raw_spin_lock_irqsave(&info->lock, flags);
+
+	if (refcount_dec_and_test(pinned)) {
+		__clear_bit(asid2idx(info, asid), info->pinned_map);
+		info->nr_pinned_asids--;
+	}
+
+	raw_spin_unlock_irqrestore(&info->lock, flags);
+}
+
+unsigned long arm64_mm_context_get(struct mm_struct *mm)
+{
+	u64 asid;
+	struct asid_info *info = &asid_info;
+
+	asid = asid_context_pinned_get(info, &mm->context.id,
+				       &mm->context.pinned);
 
 	/* Set the equivalent of USER_ASID_BIT */
 	if (asid && arm64_kernel_unmapped_at_el0())
@@ -356,21 +385,9 @@ EXPORT_SYMBOL_GPL(arm64_mm_context_get);
 
 void arm64_mm_context_put(struct mm_struct *mm)
 {
-	unsigned long flags;
 	struct asid_info *info = &asid_info;
-	u64 asid = atomic64_read(&mm->context.id);
 
-	if (!info->pinned_map)
-		return;
-
-	raw_spin_lock_irqsave(&info->lock, flags);
-
-	if (refcount_dec_and_test(&mm->context.pinned)) {
-		__clear_bit(asid2idx(info, asid), info->pinned_map);
-		info->nr_pinned_asids--;
-	}
-
-	raw_spin_unlock_irqrestore(&info->lock, flags);
+	asid_context_pinned_put(info, &mm->context.id, &mm->context.pinned);
 }
 EXPORT_SYMBOL_GPL(arm64_mm_context_put);
 
