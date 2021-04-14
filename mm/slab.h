@@ -366,9 +366,9 @@ static inline void memcg_slab_free_hook(struct kmem_cache *s_orig,
 			continue;
 
 		objcgs[off] = NULL;
-		obj_cgroup_uncharge(objcg, obj_full_size(s));
-		mod_objcg_state(objcg, page_pgdat(page), cache_vmstat_idx(s),
-				-obj_full_size(s));
+		obj_cgroup_uncharge_mod_state(objcg, obj_full_size(s),
+					      page_pgdat(page),
+					      cache_vmstat_idx(s));
 		obj_cgroup_put(objcg);
 	}
 }

@@ -1592,6 +1592,8 @@ struct obj_cgroup *get_obj_cgroup_from_current(void);
 
 int obj_cgroup_charge(struct obj_cgroup *objcg, gfp_t gfp, size_t size);
 void obj_cgroup_uncharge(struct obj_cgroup *objcg, size_t size);
+void obj_cgroup_uncharge_mod_state(struct obj_cgroup *objcg, size_t size,
+				   struct pglist_data *pgdat, int idx);
 
 extern struct static_key_false memcg_kmem_enabled_key;
 

@@ -3225,12 +3225,9 @@ static bool obj_stock_flush_required(struct memcg_stock_pcp *stock,
 	return false;
 }
 
-static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
+static void __refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
 {
 	struct memcg_stock_pcp *stock;
-	unsigned long flags;
-
-	local_irq_save(flags);
 
 	stock = this_cpu_ptr(&memcg_stock);
 	if (stock->cached_objcg != objcg) { /* reset if necessary */
@@ -3243,7 +3240,14 @@ static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
 
 	if (stock->nr_bytes > PAGE_SIZE)
 		drain_obj_stock(stock);
+}
 
+static void refill_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	__refill_obj_stock(objcg, nr_bytes);
 	local_irq_restore(flags);
 }
 
@@ -3290,6 +3294,25 @@ retry:
 void obj_cgroup_uncharge(struct obj_cgroup *objcg, size_t size)
 {
 	refill_obj_stock(objcg, size);
+}
+
+void obj_cgroup_uncharge_mod_state(struct obj_cgroup *objcg, size_t size,
+				   struct pglist_data *pgdat, int idx)
+{
+	unsigned long flags;
+	struct mem_cgroup *memcg;
+	struct lruvec *lruvec = NULL;
+
+	local_irq_save(flags);
+	__refill_obj_stock(objcg, size);
+
+	rcu_read_lock();
+	memcg = obj_cgroup_memcg(objcg);
+	if (pgdat)
+		lruvec = mem_cgroup_lruvec(memcg, pgdat);
+	__mod_memcg_lruvec_state(memcg, lruvec, idx, -(int)size);
+	rcu_read_unlock();
+	local_irq_restore(flags);
 }
 
 #endif /* CONFIG_MEMCG_KMEM */
