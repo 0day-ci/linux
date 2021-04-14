@@ -62,6 +62,9 @@ struct nf_conntrack_tuple {
 			struct {
 				__be16 key;
 			} gre;
+			struct {
+				__be16 spi;
+			} esp;
 		} u;
 
 		/* The protocol. */

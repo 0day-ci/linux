@@ -88,6 +88,11 @@ print_tuple(struct seq_file *s, const struct nf_conntrack_tuple *tuple,
 			   ntohs(tuple->src.u.gre.key),
 			   ntohs(tuple->dst.u.gre.key));
 		break;
+	case IPPROTO_ESP:
+		seq_printf(s, "srcspi=0x%x dstspi=0x%x ",
+			   ntohs(tuple->src.u.esp.spi),
+			   ntohs(tuple->dst.u.esp.spi));
+		break;
 	default:
 		break;
 	}

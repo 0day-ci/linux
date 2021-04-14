@@ -204,6 +204,16 @@ config NF_CT_PROTO_UDPLITE
 
 	  If unsure, say Y.
 
+config NF_CT_PROTO_ESP
+	bool "ESP protocol support"
+	depends on NETFILTER_ADVANCED
+	help
+	  ESP connection tracking helper. Provides connection tracking for IPsec
+	  clients behind this device based on SPI, especially useful for
+	  distinguishing multiple clients when using NAT.
+
+	  If unsure, say N.
+
 config NF_CONNTRACK_AMANDA
 	tristate "Amanda backup protocol support"
 	depends on NETFILTER_ADVANCED

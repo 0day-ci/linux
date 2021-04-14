@@ -300,6 +300,10 @@ nf_ct_get_tuple(const struct sk_buff *skb,
 	case IPPROTO_GRE:
 		return gre_pkt_to_tuple(skb, dataoff, net, tuple);
 #endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	case IPPROTO_ESP:
+		return esp_pkt_to_tuple(skb, dataoff, net, tuple);
+#endif
 	case IPPROTO_TCP:
 	case IPPROTO_UDP: /* fallthrough */
 		return nf_ct_get_tuple_ports(skb, dataoff, tuple);
@@ -443,6 +447,10 @@ nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
 #if IS_ENABLED(CONFIG_IPV6)
 	case IPPROTO_ICMPV6:
 		return nf_conntrack_invert_icmpv6_tuple(inverse, orig);
+#endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	case IPPROTO_ESP:
+		return nf_conntrack_invert_esp_tuple(inverse, orig);
 #endif
 	}
 
@@ -597,6 +605,13 @@ static void destroy_gre_conntrack(struct nf_conn *ct)
 #endif
 }
 
+static void destroy_esp_conntrack(struct nf_conn *ct)
+{
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	destroy_esp_conntrack_entry(ct);
+#endif
+}
+
 static void
 destroy_conntrack(struct nf_conntrack *nfct)
 {
@@ -612,6 +627,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 
 	if (unlikely(nf_ct_protonum(ct) == IPPROTO_GRE))
 		destroy_gre_conntrack(ct);
+
+	if (unlikely(nf_ct_protonum(ct) == IPPROTO_ESP))
+		destroy_esp_conntrack(ct);
 
 	local_bh_disable();
 	/* Expectations will have been removed in clean_from_lists,
@@ -1797,6 +1815,11 @@ static int nf_conntrack_handle_packet(struct nf_conn *ct,
 #ifdef CONFIG_NF_CT_PROTO_GRE
 	case IPPROTO_GRE:
 		return nf_conntrack_gre_packet(ct, skb, dataoff,
+					       ctinfo, state);
+#endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	case IPPROTO_ESP:
+		return nf_conntrack_esp_packet(ct, skb, dataoff,
 					       ctinfo, state);
 #endif
 	}

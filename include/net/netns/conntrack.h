@@ -69,6 +69,27 @@ struct nf_gre_net {
 };
 #endif
 
+#ifdef CONFIG_NF_CT_PROTO_ESP
+#define ESP_MAX_PORTS      1000
+#define HASH_TAB_SIZE  ESP_MAX_PORTS
+
+enum esp_conntrack {
+	ESP_CT_UNREPLIED,
+	ESP_CT_REPLIED,
+	ESP_CT_MAX
+};
+
+struct nf_esp_net {
+	rwlock_t esp_table_lock;
+	struct hlist_head ltable[HASH_TAB_SIZE];
+	struct hlist_head rtable[HASH_TAB_SIZE];
+	/* Initial lookup for remote end until rspi is known */
+	struct hlist_head incmpl_rtable[HASH_TAB_SIZE];
+	struct _esp_table *esp_table[ESP_MAX_PORTS];
+	unsigned int esp_timeouts[ESP_CT_MAX];
+};
+#endif
+
 struct nf_ip_net {
 	struct nf_generic_net   generic;
 	struct nf_tcp_net	tcp;
@@ -83,6 +104,9 @@ struct nf_ip_net {
 #endif
 #ifdef CONFIG_NF_CT_PROTO_GRE
 	struct nf_gre_net	gre;
+#endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	struct nf_esp_net	esp;
 #endif
 };
 

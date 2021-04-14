@@ -25,5 +25,8 @@ extern const struct nf_conntrack_l4proto nf_conntrack_l4proto_udplite;
 #ifdef CONFIG_NF_CT_PROTO_GRE
 extern const struct nf_conntrack_l4proto nf_conntrack_l4proto_gre;
 #endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+extern const struct nf_conntrack_l4proto nf_conntrack_l4proto_esp;
+#endif
 
 #endif /*_NF_CONNTRACK_IPV4_H*/

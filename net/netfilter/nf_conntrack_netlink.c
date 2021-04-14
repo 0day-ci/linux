@@ -1372,7 +1372,9 @@ static const struct nla_policy tuple_nla_policy[CTA_TUPLE_MAX+1] = {
    CTA_FILTER_F_CTA_PROTO_ICMP_ID | \
    CTA_FILTER_F_CTA_PROTO_ICMPV6_TYPE | \
    CTA_FILTER_F_CTA_PROTO_ICMPV6_CODE | \
-   CTA_FILTER_F_CTA_PROTO_ICMPV6_ID)
+   CTA_FILTER_F_CTA_PROTO_ICMPV6_ID | \
+   CTA_FILTER_F_CTA_PROTO_SRC_ESP_SPI | \
+   CTA_FILTER_F_CTA_PROTO_DST_ESP_SPI)
 
 static int
 ctnetlink_parse_tuple_filter(const struct nlattr * const cda[],

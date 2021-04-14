@@ -112,6 +112,9 @@ const struct nf_conntrack_l4proto *nf_ct_l4proto_find(u8 l4proto)
 #ifdef CONFIG_NF_CT_PROTO_GRE
 	case IPPROTO_GRE: return &nf_conntrack_l4proto_gre;
 #endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	case IPPROTO_ESP: return &nf_conntrack_l4proto_esp;
+#endif
 #if IS_ENABLED(CONFIG_IPV6)
 	case IPPROTO_ICMPV6: return &nf_conntrack_l4proto_icmpv6;
 #endif /* CONFIG_IPV6 */
@@ -690,6 +693,9 @@ void nf_conntrack_proto_pernet_init(struct net *net)
 #endif
 #ifdef CONFIG_NF_CT_PROTO_GRE
 	nf_conntrack_gre_init_net(net);
+#endif
+#ifdef CONFIG_NF_CT_PROTO_ESP
+	nf_conntrack_esp_init_net(net);
 #endif
 }
 

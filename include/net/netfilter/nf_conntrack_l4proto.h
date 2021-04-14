@@ -75,6 +75,8 @@ bool nf_conntrack_invert_icmp_tuple(struct nf_conntrack_tuple *tuple,
 				    const struct nf_conntrack_tuple *orig);
 bool nf_conntrack_invert_icmpv6_tuple(struct nf_conntrack_tuple *tuple,
 				      const struct nf_conntrack_tuple *orig);
+bool nf_conntrack_invert_esp_tuple(struct nf_conntrack_tuple *tuple,
+				   const struct nf_conntrack_tuple *orig);
 
 int nf_conntrack_inet_error(struct nf_conn *tmpl, struct sk_buff *skb,
 			    unsigned int dataoff,
@@ -132,6 +134,11 @@ int nf_conntrack_gre_packet(struct nf_conn *ct,
 			    unsigned int dataoff,
 			    enum ip_conntrack_info ctinfo,
 			    const struct nf_hook_state *state);
+int nf_conntrack_esp_packet(struct nf_conn *ct,
+			    struct sk_buff *skb,
+			    unsigned int dataoff,
+			    enum ip_conntrack_info ctinfo,
+			    const struct nf_hook_state *state);
 
 void nf_conntrack_generic_init_net(struct net *net);
 void nf_conntrack_tcp_init_net(struct net *net);
@@ -141,6 +148,7 @@ void nf_conntrack_dccp_init_net(struct net *net);
 void nf_conntrack_sctp_init_net(struct net *net);
 void nf_conntrack_icmp_init_net(struct net *net);
 void nf_conntrack_icmpv6_init_net(struct net *net);
+void nf_conntrack_esp_init_net(struct net *net);
 
 /* Existing built-in generic protocol */
 extern const struct nf_conntrack_l4proto nf_conntrack_l4proto_generic;
@@ -237,6 +245,13 @@ static inline struct nf_sctp_net *nf_sctp_pernet(struct net *net)
 static inline struct nf_gre_net *nf_gre_pernet(struct net *net)
 {
 	return &net->ct.nf_ct_proto.gre;
+}
+#endif
+
+#ifdef CONFIG_NF_CT_PROTO_ESP
+static inline struct nf_esp_net *nf_esp_pernet(struct net *net)
+{
+	return &net->ct.nf_ct_proto.esp;
 }
 #endif
 
