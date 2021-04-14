@@ -1173,6 +1173,12 @@ static void ext4_put_super(struct super_block *sb)
 	 */
 	ext4_unregister_sysfs(sb);
 
+	/*
+	 * Prevent racing with bdev_try_to_free_page() access the sbi and
+	 * journal concurrently.
+	 */
+	sb_usage_counter_wait(sb);
+
 	if (sbi->s_journal) {
 		aborted = is_journal_aborted(sbi->s_journal);
 		err = jbd2_journal_destroy(sbi->s_journal);
@@ -1249,6 +1255,7 @@ static void ext4_put_super(struct super_block *sb)
 		kthread_stop(sbi->s_mmp_tsk);
 	brelse(sbi->s_sbh);
 	sb->s_fs_info = NULL;
+	percpu_ref_exit(&sb->s_usage_counter);
 	/*
 	 * Now that we are completely done shutting down the
 	 * superblock, we need to actually destroy the kobject.
@@ -1451,15 +1458,22 @@ static int ext4_nfs_commit_metadata(struct inode *inode)
 static int bdev_try_to_free_page(struct super_block *sb, struct page *page,
 				 gfp_t wait)
 {
-	journal_t *journal = EXT4_SB(sb)->s_journal;
+	int ret = 0;
 
 	WARN_ON(PageChecked(page));
 	if (!page_has_buffers(page))
 		return 0;
-	if (journal)
-		return jbd2_journal_try_to_free_buffers(journal, page);
 
-	return 0;
+	/* Racing with umount filesystem concurrently? */
+	if (percpu_ref_tryget_live(&sb->s_usage_counter)) {
+		journal_t *journal = EXT4_SB(sb)->s_journal;
+
+		if (journal)
+			ret = jbd2_journal_try_to_free_buffers(journal, page);
+		percpu_ref_put(&sb->s_usage_counter);
+	}
+
+	return ret;
 }
 
 #ifdef CONFIG_FS_ENCRYPTION
@@ -4720,6 +4734,9 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	spin_lock_init(&sbi->s_error_lock);
 	INIT_WORK(&sbi->s_error_work, flush_stashed_error_work);
 
+	if (sb_usage_counter_init(sb))
+		goto failed_mount2a;
+
 	/* Register extent status tree shrinker */
 	if (ext4_es_register_shrinker(sbi))
 		goto failed_mount3;
@@ -5172,6 +5189,8 @@ failed_mount_wq:
 	ext4_xattr_destroy_cache(sbi->s_ea_block_cache);
 	sbi->s_ea_block_cache = NULL;
 
+	sb->s_bdev->bd_super = NULL;
+	sb_usage_counter_wait(sb);
 	if (sbi->s_journal) {
 		jbd2_journal_destroy(sbi->s_journal);
 		sbi->s_journal = NULL;
@@ -5179,6 +5198,8 @@ failed_mount_wq:
 failed_mount3a:
 	ext4_es_unregister_shrinker(sbi);
 failed_mount3:
+	percpu_ref_exit(&sb->s_usage_counter);
+failed_mount2a:
 	flush_work(&sbi->s_error_work);
 	del_timer_sync(&sbi->s_err_report);
 	if (sbi->s_mmp_tsk)
