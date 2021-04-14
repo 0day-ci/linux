@@ -198,15 +198,13 @@ static int jz4760_codec_startup(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_component *codec = dai->component;
 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(codec);
-	int ret;
-
 	/*
 	 * SYSCLK output from the codec to the AIC is required to keep the
 	 * DMA transfer going during playback when all audible outputs have
 	 * been disabled.
 	 */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		ret = snd_soc_dapm_force_enable_pin(dapm, "SYSCLK");
+		snd_soc_dapm_force_enable_pin(dapm, "SYSCLK");
 	return 0;
 }
 
