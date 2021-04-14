@@ -101,7 +101,7 @@ config EXT4_DEBUG
 	  If you select Y here, then you will be able to turn on debugging
 	  using dynamic debug control for mb_debug() / ext_debug() msgs.
 
-config EXT4_KUNIT_TESTS
+config EXT4_KUNIT_TEST
 	tristate "KUnit tests for ext4" if !KUNIT_ALL_TESTS
 	depends on EXT4_FS && KUNIT
 	default KUNIT_ALL_TESTS
