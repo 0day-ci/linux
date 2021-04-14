@@ -25,7 +25,12 @@ static struct asid_info
 	atomic64_t	generation;
 	unsigned long	*map;
 	unsigned int	map_idx;
+	atomic64_t __percpu	*active;
+	u64 __percpu		*reserved;
 } asid_info;
+
+#define active_asid(info, cpu)	 (*per_cpu_ptr((info)->active, cpu))
+#define reserved_asid(info, cpu) (*per_cpu_ptr((info)->reserved, cpu))
 
 static DEFINE_PER_CPU(atomic64_t, active_asids);
 static DEFINE_PER_CPU(u64, reserved_asids);
@@ -114,7 +119,7 @@ static void flush_context(struct asid_info *info)
 	set_reserved_asid_bits(info);
 
 	for_each_possible_cpu(i) {
-		asid = atomic64_xchg_relaxed(&per_cpu(active_asids, i), 0);
+		asid = atomic64_xchg_relaxed(&active_asid(info, i), 0);
 		/*
 		 * If this CPU has already been through a
 		 * rollover, but hasn't run another task in
@@ -123,9 +128,9 @@ static void flush_context(struct asid_info *info)
 		 * the process it is still running.
 		 */
 		if (asid == 0)
-			asid = per_cpu(reserved_asids, i);
+			asid = reserved_asid(info, i);
 		__set_bit(asid2idx(asid), info->map);
-		per_cpu(reserved_asids, i) = asid;
+		reserved_asid(info, i) = asid;
 	}
 
 	/*
@@ -135,7 +140,8 @@ static void flush_context(struct asid_info *info)
 	cpumask_setall(&tlb_flush_pending);
 }
 
-static bool check_update_reserved_asid(u64 asid, u64 newasid)
+static bool check_update_reserved_asid(struct asid_info *info, u64 asid,
+				       u64 newasid)
 {
 	int cpu;
 	bool hit = false;
@@ -150,9 +156,9 @@ static bool check_update_reserved_asid(u64 asid, u64 newasid)
 	 * generation.
 	 */
 	for_each_possible_cpu(cpu) {
-		if (per_cpu(reserved_asids, cpu) == asid) {
+		if (reserved_asid(info, cpu) == asid) {
 			hit = true;
-			per_cpu(reserved_asids, cpu) = newasid;
+			reserved_asid(info, cpu) = newasid;
 		}
 	}
 
@@ -171,7 +177,7 @@ static u64 new_context(struct asid_info *info, struct mm_struct *mm)
 		 * If our current ASID was active during a rollover, we
 		 * can continue to use it and this was just a false alarm.
 		 */
-		if (check_update_reserved_asid(asid, newasid))
+		if (check_update_reserved_asid(info, asid, newasid))
 			return newasid;
 
 		/*
@@ -229,8 +235,8 @@ void check_and_switch_context(struct mm_struct *mm)
 
 	/*
 	 * The memory ordering here is subtle.
-	 * If our active_asids is non-zero and the ASID matches the current
-	 * generation, then we update the active_asids entry with a relaxed
+	 * If our active_asid is non-zero and the ASID matches the current
+	 * generation, then we update the active_asid entry with a relaxed
 	 * cmpxchg. Racing with a concurrent rollover means that either:
 	 *
 	 * - We get a zero back from the cmpxchg and end up waiting on the
@@ -241,9 +247,9 @@ void check_and_switch_context(struct mm_struct *mm)
 	 *   relaxed xchg in flush_context will treat us as reserved
 	 *   because atomic RmWs are totally ordered for a given location.
 	 */
-	old_active_asid = atomic64_read(this_cpu_ptr(&active_asids));
+	old_active_asid = atomic64_read(this_cpu_ptr(info->active));
 	if (old_active_asid && asid_gen_match(asid, info) &&
-	    atomic64_cmpxchg_relaxed(this_cpu_ptr(&active_asids),
+	    atomic64_cmpxchg_relaxed(this_cpu_ptr(info->active),
 				     old_active_asid, asid))
 		goto switch_mm_fastpath;
 
@@ -259,7 +265,7 @@ void check_and_switch_context(struct mm_struct *mm)
 	if (cpumask_test_and_clear_cpu(cpu, &tlb_flush_pending))
 		local_flush_tlb_all();
 
-	atomic64_set(this_cpu_ptr(&active_asids), asid);
+	atomic64_set(&active_asid(info, cpu), asid);
 	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
 
 switch_mm_fastpath:
@@ -416,6 +422,8 @@ static int asids_init(void)
 		      NUM_USER_ASIDS);
 
 	info->map_idx = 1;
+	info->active = &active_asids;
+	info->reserved = &reserved_asids;
 
 	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS),
 				  sizeof(*pinned_asid_map), GFP_KERNEL);
