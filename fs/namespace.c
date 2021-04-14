@@ -1939,12 +1939,21 @@ void drop_collected_mounts(struct vfsmount *mnt)
 
 /**
  * clone_private_mount - create a private clone of a path
+ * @path: path from which the mnt to clone will be taken
  *
- * This creates a new vfsmount, which will be the clone of @path.  The new will
- * not be attached anywhere in the namespace and will be private (i.e. changes
- * to the originating mount won't be propagated into this).
+ * This creates a new vfsmount, which will be a clone of @path's vfsmount.
  *
- * Release with mntput().
+ * In contrast to mnt_clone_internal() the new mount will not be marked
+ * MNT_INTERNAL but will have MNT_NS_INTERNAL attached as its mount namespace
+ * making it suitable for long-term mounts since mntput()ing it will always hit
+ * the fastpath as long as kern_unmount() hasn't been called.
+ *
+ * Since the mount is not reachable anwyhere mount properties and propagation
+ * properties remain stable, i.e. cannot change.
+ *
+ * Useable with mntget()/mntput() but needs to be released with kern_unmount().
+ *
+ * Return: A clone of @path's vfsmount on success, an error pointer on failure.
  */
 struct vfsmount *clone_private_mount(const struct path *path)
 {
