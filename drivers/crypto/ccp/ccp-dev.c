@@ -556,7 +556,7 @@ int ccp_dev_suspend(struct sp_device *sp)
 
 	/* If there's no device there's nothing to do */
 	if (!ccp)
-		return 0;
+		return -ENXIO;
 
 	spin_lock_irqsave(&ccp->cmd_lock, flags);
 
@@ -584,7 +584,7 @@ int ccp_dev_resume(struct sp_device *sp)
 
 	/* If there's no device there's nothing to do */
 	if (!ccp)
-		return 0;
+		return -ENXIO;
 
 	spin_lock_irqsave(&ccp->cmd_lock, flags);
 
