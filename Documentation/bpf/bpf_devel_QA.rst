@@ -29,7 +29,7 @@ list:
 This may also include issues related to XDP, BPF tracing, etc.
 
 Given netdev has a high volume of traffic, please also add the BPF
-maintainers to Cc (from kernel MAINTAINERS_ file):
+maintainers to Cc (from kernel :ref:`MAINTAINERS <maintainers>` file):
 
 * Alexei Starovoitov <ast@kernel.org>
 * Daniel Borkmann <daniel@iogearbox.net>
@@ -217,11 +217,11 @@ page run by David S. Miller on net-next that provides guidance:
 Q: Verifier changes and test cases
 ----------------------------------
 Q: I made a BPF verifier change, do I need to add test cases for
-BPF kernel selftests_?
+BPF kernel selftests?
 
 A: If the patch has changes to the behavior of the verifier, then yes,
 it is absolutely necessary to add test cases to the BPF kernel
-selftests_ suite. If they are not present and we think they are
+selftests suite. If they are not present and we think they are
 needed, then we might ask for them before accepting any changes.
 
 In particular, test_verifier.c is tracking a high number of BPF test
@@ -234,11 +234,11 @@ be subject to change.
 
 Q: samples/bpf preference vs selftests?
 ---------------------------------------
-Q: When should I add code to `samples/bpf/`_ and when to BPF kernel
-selftests_ ?
+Q: When should I add code to ``samples/bpf/`` and when to BPF kernel
+selftests?
 
-A: In general, we prefer additions to BPF kernel selftests_ rather than
-`samples/bpf/`_. The rationale is very simple: kernel selftests are
+A: In general, we prefer additions to BPF kernel selftests rather than
+``samples/bpf/``. The rationale is very simple: kernel selftests are
 regularly run by various bots to test for kernel regressions.
 
 The more test cases we add to BPF selftests, the better the coverage
@@ -246,9 +246,9 @@ and the less likely it is that those could accidentally break. It is
 not that BPF kernel selftests cannot demo how a specific feature can
 be used.
 
-That said, `samples/bpf/`_ may be a good place for people to get started,
+That said, ``samples/bpf/`` may be a good place for people to get started,
 so it might be advisable that simple demos of features could go into
-`samples/bpf/`_, but advanced functional and corner-case testing rather
+``samples/bpf/``, but advanced functional and corner-case testing rather
 into kernel selftests.
 
 If your sample looks like a test case, then go for BPF kernel selftests
@@ -413,7 +413,7 @@ Testing patches
 Q: How to run BPF selftests
 ---------------------------
 A: After you have booted into the newly compiled kernel, navigate to
-the BPF selftests_ suite in order to test BPF functionality (current
+the BPF selftests suite in order to test BPF functionality (current
 working directory points to the root of the cloned git tree)::
 
   $ cd tools/testing/selftests/bpf/
@@ -645,10 +645,7 @@ when:
 
 .. Links
 .. _Documentation/process/: https://www.kernel.org/doc/html/latest/process/
-.. _MAINTAINERS: ../../MAINTAINERS
 .. _netdev-FAQ: ../networking/netdev-FAQ.rst
-.. _samples/bpf/: ../../samples/bpf/
-.. _selftests: ../../tools/testing/selftests/bpf/
 .. _Documentation/dev-tools/kselftest.rst:
    https://www.kernel.org/doc/html/latest/dev-tools/kselftest.html
 .. _Documentation/bpf/btf.rst: btf.rst
