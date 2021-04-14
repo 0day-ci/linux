@@ -67,7 +67,11 @@ static void ecryptfs_d_release(struct dentry *dentry)
 {
 	struct ecryptfs_dentry_info *p = dentry->d_fsdata;
 	if (p) {
-		path_put(&p->lower_path);
+		/*
+		 * p->lower_path.mnt is a private mount which will be released
+		 * when the superblock shuts down so we only need to dput here.
+		 */
+		dput(p->lower_path.dentry);
 		call_rcu(&p->rcu, ecryptfs_dentry_free_rcu);
 	}
 }

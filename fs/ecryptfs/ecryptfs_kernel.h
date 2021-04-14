@@ -352,6 +352,7 @@ struct ecryptfs_mount_crypt_stat {
 struct ecryptfs_sb_info {
 	struct super_block *wsi_sb;
 	struct ecryptfs_mount_crypt_stat mount_crypt_stat;
+	struct vfsmount *mnt;
 };
 
 /* file private data. */
@@ -494,6 +495,14 @@ ecryptfs_set_superblock_lower(struct super_block *sb,
 			      struct super_block *lower_sb)
 {
 	((struct ecryptfs_sb_info *)sb->s_fs_info)->wsi_sb = lower_sb;
+}
+
+static inline void
+ecryptfs_set_superblock_lower_mnt(struct super_block *sb,
+				  struct vfsmount *mnt)
+{
+	struct ecryptfs_sb_info *sbi = sb->s_fs_info;
+	sbi->mnt = mnt;
 }
 
 static inline struct ecryptfs_dentry_info *

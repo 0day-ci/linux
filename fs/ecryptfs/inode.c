@@ -324,6 +324,7 @@ static struct dentry *ecryptfs_lookup_interpose(struct dentry *dentry,
 				     struct dentry *lower_dentry)
 {
 	struct path *path = ecryptfs_dentry_to_lower_path(dentry->d_parent);
+	struct ecryptfs_sb_info *sb_info = ecryptfs_superblock_to_private(dentry->d_sb);
 	struct inode *inode, *lower_inode;
 	struct ecryptfs_dentry_info *dentry_info;
 	int rc = 0;
@@ -339,7 +340,9 @@ static struct dentry *ecryptfs_lookup_interpose(struct dentry *dentry,
 	BUG_ON(!d_count(lower_dentry));
 
 	ecryptfs_set_dentry_private(dentry, dentry_info);
-	dentry_info->lower_path.mnt = mntget(path->mnt);
+	/* Warn if we somehow ended up with an unexpected path. */
+	WARN_ON_ONCE(path->mnt != sb_info->mnt);
+	dentry_info->lower_path.mnt = path->mnt;
 	dentry_info->lower_path.dentry = lower_dentry;
 
 	/*
