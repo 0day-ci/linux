@@ -37,6 +37,7 @@ struct snd_ctl_led {
 	unsigned int group;
 	enum led_audio trigger_type;
 	enum snd_ctl_led_mode mode;
+	void *info_and_value;
 	struct snd_ctl_led_card *cards[SNDRV_CARDS];
 };
 
@@ -94,34 +95,41 @@ static struct snd_ctl_led *snd_ctl_led_get_by_access(unsigned int access)
 	return &snd_ctl_leds[group];
 }
 
-static int snd_ctl_led_get(struct snd_ctl_led_ctl *lctl)
+static int snd_ctl_led_get(struct snd_ctl_led *led, struct snd_ctl_led_ctl *lctl)
 {
 	struct snd_kcontrol *kctl = lctl->kctl;
-	struct snd_ctl_elem_info info;
-	struct snd_ctl_elem_value value;
+	struct snd_ctl_elem_info *info = led->info_and_value;
+	struct snd_ctl_elem_value *value;
 	unsigned int i;
 	int result;
 
-	memset(&info, 0, sizeof(info));
-	info.id = kctl->id;
-	info.id.index += lctl->index_offset;
-	info.id.numid += lctl->index_offset;
-	result = kctl->info(kctl, &info);
+	if (info == NULL) {
+		info = kmalloc(sizeof(*info) + sizeof(*value), GFP_KERNEL);
+		if (info == NULL)
+			return -1;
+		led->info_and_value = info;
+	}
+	value = (void *)(info + 1);
+	memset(info, 0, sizeof(*info));
+	info->id = kctl->id;
+	info->id.index += lctl->index_offset;
+	info->id.numid += lctl->index_offset;
+	result = kctl->info(kctl, info);
 	if (result < 0)
 		return -1;
-	memset(&value, 0, sizeof(value));
-	value.id = info.id;
-	result = kctl->get(kctl, &value);
+	memset(value, 0, sizeof(*value));
+	value->id = info->id;
+	result = kctl->get(kctl, value);
 	if (result < 0)
 		return -1;
-	if (info.type == SNDRV_CTL_ELEM_TYPE_BOOLEAN ||
-	    info.type == SNDRV_CTL_ELEM_TYPE_INTEGER) {
-		for (i = 0; i < info.count; i++)
-			if (value.value.integer.value[i] != info.value.integer.min)
+	if (info->type == SNDRV_CTL_ELEM_TYPE_BOOLEAN ||
+	    info->type == SNDRV_CTL_ELEM_TYPE_INTEGER) {
+		for (i = 0; i < info->count; i++)
+			if (value->value.integer.value[i] != info->value.integer.min)
 				return 1;
-	} else if (info.type == SNDRV_CTL_ELEM_TYPE_INTEGER64) {
-		for (i = 0; i < info.count; i++)
-			if (value.value.integer64.value[i] != info.value.integer64.min)
+	} else if (info->type == SNDRV_CTL_ELEM_TYPE_INTEGER64) {
+		for (i = 0; i < info->count; i++)
+			if (value->value.integer64.value[i] != info->value.integer64.min)
 				return 1;
 	}
 	return 0;
@@ -149,7 +157,7 @@ static void snd_ctl_led_set_state(struct snd_card *card, unsigned int access,
 	list_for_each_entry(lctl, &led->controls, list) {
 		if (lctl->kctl == kctl && lctl->index_offset == ioff)
 			found = true;
-		UPDATE_ROUTE(route, snd_ctl_led_get(lctl));
+		UPDATE_ROUTE(route, snd_ctl_led_get(led, lctl));
 	}
 	if (!found && kctl && card) {
 		lctl = kzalloc(sizeof(*lctl), GFP_KERNEL);
@@ -159,7 +167,7 @@ static void snd_ctl_led_set_state(struct snd_card *card, unsigned int access,
 			lctl->kctl = kctl;
 			lctl->index_offset = ioff;
 			list_add(&lctl->list, &led->controls);
-			UPDATE_ROUTE(route, snd_ctl_led_get(lctl));
+			UPDATE_ROUTE(route, snd_ctl_led_get(led, lctl));
 		}
 	}
 	mutex_unlock(&snd_ctl_led_mutex);
@@ -300,6 +308,10 @@ repeat:
 				snd_ctl_led_ctl_destroy(lctl);
 				goto repeat;
 			}
+		if (!card) {
+			kfree(led->info_and_value);
+			led->info_and_value = NULL;
+		}
 	}
 }
 
