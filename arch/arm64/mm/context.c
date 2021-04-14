@@ -17,8 +17,6 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 
-static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-
 static struct asid_info
 {
 	atomic64_t	generation;
@@ -27,6 +25,9 @@ static struct asid_info
 	atomic64_t __percpu	*active;
 	u64 __percpu		*reserved;
 	u32			bits;
+	raw_spinlock_t		lock;
+	/* Which CPU requires context flush on next call */
+	cpumask_t		flush_pending;
 } asid_info;
 
 #define active_asid(info, cpu)	 (*per_cpu_ptr((info)->active, cpu))
@@ -34,7 +35,6 @@ static struct asid_info
 
 static DEFINE_PER_CPU(atomic64_t, active_asids);
 static DEFINE_PER_CPU(u64, reserved_asids);
-static cpumask_t tlb_flush_pending;
 
 static unsigned long max_pinned_asids;
 static unsigned long nr_pinned_asids;
@@ -137,7 +137,7 @@ static void flush_context(struct asid_info *info)
 	 * Queue a TLB invalidation for each CPU to perform on next
 	 * context-switch
 	 */
-	cpumask_setall(&tlb_flush_pending);
+	cpumask_setall(&info->flush_pending);
 }
 
 static bool check_update_reserved_asid(struct asid_info *info, u64 asid,
@@ -253,7 +253,7 @@ void check_and_switch_context(struct mm_struct *mm)
 				     old_active_asid, asid))
 		goto switch_mm_fastpath;
 
-	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+	raw_spin_lock_irqsave(&info->lock, flags);
 	/* Check that our ASID belongs to the current generation. */
 	asid = atomic64_read(&mm->context.id);
 	if (!asid_gen_match(asid, info)) {
@@ -262,11 +262,11 @@ void check_and_switch_context(struct mm_struct *mm)
 	}
 
 	cpu = smp_processor_id();
-	if (cpumask_test_and_clear_cpu(cpu, &tlb_flush_pending))
+	if (cpumask_test_and_clear_cpu(cpu, &info->flush_pending))
 		local_flush_tlb_all();
 
 	atomic64_set(&active_asid(info, cpu), asid);
-	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+	raw_spin_unlock_irqrestore(&info->lock, flags);
 
 switch_mm_fastpath:
 
@@ -289,7 +289,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 	if (!pinned_asid_map)
 		return 0;
 
-	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+	raw_spin_lock_irqsave(&info->lock, flags);
 
 	asid = atomic64_read(&mm->context.id);
 
@@ -315,7 +315,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 	refcount_set(&mm->context.pinned, 1);
 
 out_unlock:
-	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+	raw_spin_unlock_irqrestore(&info->lock, flags);
 
 	asid &= ~ASID_MASK(info);
 
@@ -336,14 +336,14 @@ void arm64_mm_context_put(struct mm_struct *mm)
 	if (!pinned_asid_map)
 		return;
 
-	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+	raw_spin_lock_irqsave(&info->lock, flags);
 
 	if (refcount_dec_and_test(&mm->context.pinned)) {
 		__clear_bit(asid2idx(info, asid), pinned_asid_map);
 		nr_pinned_asids--;
 	}
 
-	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+	raw_spin_unlock_irqrestore(&info->lock, flags);
 }
 EXPORT_SYMBOL_GPL(arm64_mm_context_put);
 
@@ -426,6 +426,7 @@ static int asids_init(void)
 	info->map_idx = 1;
 	info->active = &active_asids;
 	info->reserved = &reserved_asids;
+	raw_spin_lock_init(&info->lock);
 
 	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS(info)),
 				  sizeof(*pinned_asid_map), GFP_KERNEL);
