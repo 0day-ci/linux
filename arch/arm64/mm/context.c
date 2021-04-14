@@ -412,26 +412,50 @@ static int asids_update_limit(void)
 }
 arch_initcall(asids_update_limit);
 
-static int asids_init(void)
+/*
+ * Initialize the ASID allocator
+ *
+ * @info: Pointer to the asid allocator structure
+ * @bits: Number of ASIDs available
+ * @pinned: Support for Pinned ASIDs
+ */
+static int asid_allocator_init(struct asid_info *info, u32 bits, bool pinned)
 {
-	struct asid_info *info = &asid_info;
+	info->bits = bits;
 
-	info->bits = get_cpu_asid_bits();
+	/*
+	 * Expect allocation after rollover to fail if we don't have at least
+	 * one more ASID than CPUs. ASID #0 is always reserved.
+	 */
+	WARN_ON(NUM_CTXT_ASIDS(info) - 1 <= num_possible_cpus());
 	atomic64_set(&info->generation, ASID_FIRST_VERSION(info));
 	info->map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
 			    sizeof(*info->map), GFP_KERNEL);
 	if (!info->map)
-		panic("Failed to allocate bitmap for %lu ASIDs\n",
-		      NUM_CTXT_ASIDS(info));
+		return -ENOMEM;
 
 	info->map_idx = 1;
-	info->active = &active_asids;
-	info->reserved = &reserved_asids;
 	raw_spin_lock_init(&info->lock);
 
-	info->pinned_map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
-				   sizeof(*info->pinned_map), GFP_KERNEL);
-	info->nr_pinned_asids = 0;
+	if (pinned) {
+		info->pinned_map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
+					   sizeof(*info->pinned_map), GFP_KERNEL);
+		info->nr_pinned_asids = 0;
+	}
+
+	return 0;
+}
+
+static int asids_init(void)
+{
+	struct asid_info *info = &asid_info;
+
+	if (asid_allocator_init(info, get_cpu_asid_bits(), true))
+		panic("Unable to initialize ASID allocator for %lu ASIDs\n",
+		      NUM_CTXT_ASIDS(info));
+
+	info->active = &active_asids;
+	info->reserved = &reserved_asids;
 
 	/*
 	 * We cannot call set_reserved_asid_bits() here because CPU
