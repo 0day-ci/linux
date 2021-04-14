@@ -1730,11 +1730,14 @@ EXPORT_SYMBOL_GPL(blkdev_read_iter);
  */
 static int blkdev_releasepage(struct page *page, gfp_t wait)
 {
-	struct super_block *super = BDEV_I(page->mapping->host)->bdev.bd_super;
+	struct super_block *super;
 	int ret = 0;
 
+	rcu_read_lock();
+	super = READ_ONCE(BDEV_I(page->mapping->host)->bdev.bd_super);
 	if (super && super->s_op->bdev_try_to_free_page)
 		ret = super->s_op->bdev_try_to_free_page(super, page, wait);
+	rcu_read_unlock();
 	if (!ret)
 		return try_to_free_buffers(page);
 	return 0;
