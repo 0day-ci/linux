@@ -305,7 +305,7 @@ static int idxd_enable_system_pasid(struct idxd_device *idxd)
 
 	flags = IOMMU_SVA_BIND_SUPERVISOR;
 
-	sva = iommu_sva_bind_device(&idxd->pdev->dev, NULL, flags);
+	sva = iommu_sva_bind_device(&idxd->pdev->dev, flags);
 	if (IS_ERR(sva)) {
 		dev_warn(&idxd->pdev->dev,
 			 "iommu sva bind failed: %ld\n", PTR_ERR(sva));
