@@ -1445,7 +1445,8 @@ static int ext4_nfs_commit_metadata(struct inode *inode)
  * Try to release metadata pages (indirect blocks, directories) which are
  * mapped via the block device.  Since these pages could have journal heads
  * which would prevent try_to_free_buffers() from freeing them, we must use
- * jbd2 layer's try_to_free_buffers() function to release them.
+ * jbd2 layer's try_to_free_buffers() function to check and we could
+ * release them if it return 0.
  */
 static int bdev_try_to_free_page(struct super_block *sb, struct page *page,
 				 gfp_t wait)
@@ -1458,7 +1459,7 @@ static int bdev_try_to_free_page(struct super_block *sb, struct page *page,
 	if (journal)
 		return jbd2_journal_try_to_free_buffers(journal, page);
 
-	return try_to_free_buffers(page);
+	return 0;
 }
 
 #ifdef CONFIG_FS_ENCRYPTION

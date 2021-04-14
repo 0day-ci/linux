@@ -3299,6 +3299,7 @@ static void ext4_journalled_invalidatepage(struct page *page,
 static int ext4_releasepage(struct page *page, gfp_t wait)
 {
 	journal_t *journal = EXT4_JOURNAL(page->mapping->host);
+	int ret = 0;
 
 	trace_ext4_releasepage(page);
 
@@ -3306,9 +3307,10 @@ static int ext4_releasepage(struct page *page, gfp_t wait)
 	if (PageChecked(page))
 		return 0;
 	if (journal)
-		return jbd2_journal_try_to_free_buffers(journal, page);
-	else
+		ret = jbd2_journal_try_to_free_buffers(journal, page);
+	if (!ret)
 		return try_to_free_buffers(page);
+	return 0;
 }
 
 static bool ext4_inode_datasync_dirty(struct inode *inode)

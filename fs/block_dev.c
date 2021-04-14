@@ -1731,11 +1731,13 @@ EXPORT_SYMBOL_GPL(blkdev_read_iter);
 static int blkdev_releasepage(struct page *page, gfp_t wait)
 {
 	struct super_block *super = BDEV_I(page->mapping->host)->bdev.bd_super;
+	int ret = 0;
 
 	if (super && super->s_op->bdev_try_to_free_page)
-		return super->s_op->bdev_try_to_free_page(super, page, wait);
-
-	return try_to_free_buffers(page);
+		ret = super->s_op->bdev_try_to_free_page(super, page, wait);
+	if (!ret)
+		return try_to_free_buffers(page);
+	return 0;
 }
 
 static int blkdev_writepages(struct address_space *mapping,
