@@ -3674,8 +3674,8 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 			spin_lock(&cache->lock);
 			if (!cache->to_copy) {
 				spin_unlock(&cache->lock);
-				ro_set = 0;
-				goto done;
+				btrfs_put_block_group(cache);
+				goto skip;
 			}
 			spin_unlock(&cache->lock);
 		}
