@@ -20,8 +20,12 @@
 static u32 asid_bits;
 static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
 
-static atomic64_t asid_generation;
-static unsigned long *asid_map;
+static struct asid_info
+{
+	atomic64_t	generation;
+	unsigned long	*map;
+	unsigned int	map_idx;
+} asid_info;
 
 static DEFINE_PER_CPU(atomic64_t, active_asids);
 static DEFINE_PER_CPU(u64, reserved_asids);
@@ -88,26 +92,26 @@ static void set_kpti_asid_bits(unsigned long *map)
 	memset(map, 0xaa, len);
 }
 
-static void set_reserved_asid_bits(void)
+static void set_reserved_asid_bits(struct asid_info *info)
 {
 	if (pinned_asid_map)
-		bitmap_copy(asid_map, pinned_asid_map, NUM_USER_ASIDS);
+		bitmap_copy(info->map, pinned_asid_map, NUM_USER_ASIDS);
 	else if (arm64_kernel_unmapped_at_el0())
-		set_kpti_asid_bits(asid_map);
+		set_kpti_asid_bits(info->map);
 	else
-		bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+		bitmap_clear(info->map, 0, NUM_USER_ASIDS);
 }
 
-#define asid_gen_match(asid) \
-	(!(((asid) ^ atomic64_read(&asid_generation)) >> asid_bits))
+#define asid_gen_match(asid, info) \
+	(!(((asid) ^ atomic64_read(&(info)->generation)) >> asid_bits))
 
-static void flush_context(void)
+static void flush_context(struct asid_info *info)
 {
 	int i;
 	u64 asid;
 
 	/* Update the list of reserved ASIDs and the ASID bitmap. */
-	set_reserved_asid_bits();
+	set_reserved_asid_bits(info);
 
 	for_each_possible_cpu(i) {
 		asid = atomic64_xchg_relaxed(&per_cpu(active_asids, i), 0);
@@ -120,7 +124,7 @@ static void flush_context(void)
 		 */
 		if (asid == 0)
 			asid = per_cpu(reserved_asids, i);
-		__set_bit(asid2idx(asid), asid_map);
+		__set_bit(asid2idx(asid), info->map);
 		per_cpu(reserved_asids, i) = asid;
 	}
 
@@ -155,11 +159,10 @@ static bool check_update_reserved_asid(u64 asid, u64 newasid)
 	return hit;
 }
 
-static u64 new_context(struct mm_struct *mm)
+static u64 new_context(struct asid_info *info, struct mm_struct *mm)
 {
-	static u32 cur_idx = 1;
 	u64 asid = atomic64_read(&mm->context.id);
-	u64 generation = atomic64_read(&asid_generation);
+	u64 generation = atomic64_read(&info->generation);
 
 	if (asid != 0) {
 		u64 newasid = generation | (asid & ~ASID_MASK);
@@ -183,7 +186,7 @@ static u64 new_context(struct mm_struct *mm)
 		 * We had a valid ASID in a previous life, so try to re-use
 		 * it if possible.
 		 */
-		if (!__test_and_set_bit(asid2idx(asid), asid_map))
+		if (!__test_and_set_bit(asid2idx(asid), info->map))
 			return newasid;
 	}
 
@@ -194,21 +197,21 @@ static u64 new_context(struct mm_struct *mm)
 	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
 	 * pairs.
 	 */
-	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
+	asid = find_next_zero_bit(info->map, NUM_USER_ASIDS, info->map_idx);
 	if (asid != NUM_USER_ASIDS)
 		goto set_asid;
 
 	/* We're out of ASIDs, so increment the global generation count */
 	generation = atomic64_add_return_relaxed(ASID_FIRST_VERSION,
-						 &asid_generation);
-	flush_context();
+						 &info->generation);
+	flush_context(info);
 
 	/* We have more ASIDs than CPUs, so this will always succeed */
-	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
+	asid = find_next_zero_bit(info->map, NUM_USER_ASIDS, 1);
 
 set_asid:
-	__set_bit(asid, asid_map);
-	cur_idx = asid;
+	__set_bit(asid, info->map);
+	info->map_idx = asid;
 	return idx2asid(asid) | generation;
 }
 
@@ -217,6 +220,7 @@ void check_and_switch_context(struct mm_struct *mm)
 	unsigned long flags;
 	unsigned int cpu;
 	u64 asid, old_active_asid;
+	struct asid_info *info = &asid_info;
 
 	if (system_supports_cnp())
 		cpu_set_reserved_ttbr0();
@@ -238,7 +242,7 @@ void check_and_switch_context(struct mm_struct *mm)
 	 *   because atomic RmWs are totally ordered for a given location.
 	 */
 	old_active_asid = atomic64_read(this_cpu_ptr(&active_asids));
-	if (old_active_asid && asid_gen_match(asid) &&
+	if (old_active_asid && asid_gen_match(asid, info) &&
 	    atomic64_cmpxchg_relaxed(this_cpu_ptr(&active_asids),
 				     old_active_asid, asid))
 		goto switch_mm_fastpath;
@@ -246,8 +250,8 @@ void check_and_switch_context(struct mm_struct *mm)
 	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
 	/* Check that our ASID belongs to the current generation. */
 	asid = atomic64_read(&mm->context.id);
-	if (!asid_gen_match(asid)) {
-		asid = new_context(mm);
+	if (!asid_gen_match(asid, info)) {
+		asid = new_context(info, mm);
 		atomic64_set(&mm->context.id, asid);
 	}
 
@@ -274,6 +278,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 {
 	unsigned long flags;
 	u64 asid;
+	struct asid_info *info = &asid_info;
 
 	if (!pinned_asid_map)
 		return 0;
@@ -290,12 +295,12 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 		goto out_unlock;
 	}
 
-	if (!asid_gen_match(asid)) {
+	if (!asid_gen_match(asid, info)) {
 		/*
 		 * We went through one or more rollover since that ASID was
 		 * used. Ensure that it is still valid, or generate a new one.
 		 */
-		asid = new_context(mm);
+		asid = new_context(info, mm);
 		atomic64_set(&mm->context.id, asid);
 	}
 
@@ -400,13 +405,17 @@ arch_initcall(asids_update_limit);
 
 static int asids_init(void)
 {
+	struct asid_info *info = &asid_info;
+
 	asid_bits = get_cpu_asid_bits();
-	atomic64_set(&asid_generation, ASID_FIRST_VERSION);
-	asid_map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS), sizeof(*asid_map),
-			   GFP_KERNEL);
-	if (!asid_map)
+	atomic64_set(&info->generation, ASID_FIRST_VERSION);
+	info->map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS), sizeof(*info->map),
+			    GFP_KERNEL);
+	if (!info->map)
 		panic("Failed to allocate bitmap for %lu ASIDs\n",
 		      NUM_USER_ASIDS);
+
+	info->map_idx = 1;
 
 	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_USER_ASIDS),
 				  sizeof(*pinned_asid_map), GFP_KERNEL);
@@ -418,7 +427,7 @@ static int asids_init(void)
 	 * and reserve kernel ASID's from beginning.
 	 */
 	if (IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0))
-		set_kpti_asid_bits(asid_map);
+		set_kpti_asid_bits(info->map);
 	return 0;
 }
 early_initcall(asids_init);
