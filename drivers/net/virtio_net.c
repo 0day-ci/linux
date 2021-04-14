@@ -383,17 +383,11 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 {
 	struct sk_buff *skb;
 	struct virtio_net_hdr_mrg_rxbuf *hdr;
-	unsigned int copy, hdr_len, hdr_padded_len;
-	char *p;
+	unsigned int copy, hdr_len, hdr_padded_len, tailroom, shinfo_size;
+	char *p, *hdr_p;
 
 	p = page_address(page) + offset;
-
-	/* copy small packet so we can reuse these pages for small data */
-	skb = napi_alloc_skb(&rq->napi, GOOD_COPY_LEN);
-	if (unlikely(!skb))
-		return NULL;
-
-	hdr = skb_vnet_hdr(skb);
+	hdr_p = p;
 
 	hdr_len = vi->hdr_len;
 	if (vi->mergeable_rx_bufs)
@@ -401,13 +395,27 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 	else
 		hdr_padded_len = sizeof(struct padded_vnet_hdr);
 
-	/* hdr_valid means no XDP, so we can copy the vnet header */
-	if (hdr_valid)
-		memcpy(hdr, p, hdr_len);
+	tailroom = truesize - len;
 
 	len -= hdr_len;
 	offset += hdr_padded_len;
 	p += hdr_padded_len;
+
+	shinfo_size = SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+	if (len > GOOD_COPY_LEN && tailroom >= shinfo_size) {
+		skb = build_skb(p, truesize);
+		if (unlikely(!skb))
+			return NULL;
+
+		skb_put(skb, len);
+		goto ok;
+	}
+
+	/* copy small packet so we can reuse these pages for small data */
+	skb = napi_alloc_skb(&rq->napi, GOOD_COPY_LEN);
+	if (unlikely(!skb))
+		return NULL;
 
 	/* Copy all frame if it fits skb->head, otherwise
 	 * we let virtio_net_hdr_to_skb() and GRO pull headers as needed.
@@ -418,11 +426,6 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 		copy = ETH_HLEN + metasize;
 	skb_put_data(skb, p, copy);
 
-	if (metasize) {
-		__skb_pull(skb, metasize);
-		skb_metadata_set(skb, metasize);
-	}
-
 	len -= copy;
 	offset += copy;
 
@@ -431,7 +434,7 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 			skb_add_rx_frag(skb, 0, page, offset, len, truesize);
 		else
 			put_page(page);
-		return skb;
+		goto ok;
 	}
 
 	/*
@@ -457,6 +460,18 @@ static struct sk_buff *page_to_skb(struct virtnet_info *vi,
 
 	if (page)
 		give_pages(rq, page);
+
+ok:
+	/* hdr_valid means no XDP, so we can copy the vnet header */
+	if (hdr_valid) {
+		hdr = skb_vnet_hdr(skb);
+		memcpy(hdr, hdr_p, hdr_len);
+	}
+
+	if (metasize) {
+		__skb_pull(skb, metasize);
+		skb_metadata_set(skb, metasize);
+	}
 
 	return skb;
 }
