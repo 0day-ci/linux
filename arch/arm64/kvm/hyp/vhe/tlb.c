@@ -142,10 +142,10 @@ void __kvm_flush_cpu_context(struct kvm_s2_mmu *mmu)
 	__tlb_switch_to_host(&cxt);
 }
 
-void __kvm_flush_vm_context(void)
+void __kvm_tlb_flush_local_all(void)
 {
-	dsb(ishst);
-	__tlbi(alle1is);
+	dsb(nshst);
+	__tlbi(alle1);
 
 	/*
 	 * VIPT and PIPT caches are not affected by VMID, so no maintenance
@@ -157,7 +157,7 @@ void __kvm_flush_vm_context(void)
 	 *
 	 */
 	if (icache_is_vpipt())
-		asm volatile("ic ialluis");
+		asm volatile("ic iallu" : : );
 
-	dsb(ish);
+	dsb(nsh);
 }
