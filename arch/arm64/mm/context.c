@@ -28,6 +28,10 @@ static struct asid_info
 	raw_spinlock_t		lock;
 	/* Which CPU requires context flush on next call */
 	cpumask_t		flush_pending;
+	/* Pinned ASIDs info */
+	unsigned long		*pinned_map;
+	unsigned long		max_pinned_asids;
+	unsigned long		nr_pinned_asids;
 } asid_info;
 
 #define active_asid(info, cpu)	 (*per_cpu_ptr((info)->active, cpu))
@@ -35,10 +39,6 @@ static struct asid_info
 
 static DEFINE_PER_CPU(atomic64_t, active_asids);
 static DEFINE_PER_CPU(u64, reserved_asids);
-
-static unsigned long max_pinned_asids;
-static unsigned long nr_pinned_asids;
-static unsigned long *pinned_asid_map;
 
 #define ASID_MASK(info)			(~GENMASK((info)->bits - 1, 0))
 #define NUM_CTXT_ASIDS(info)		(1UL << ((info)->bits))
@@ -99,8 +99,8 @@ static void set_kpti_asid_bits(struct asid_info *info, unsigned long *map)
 
 static void set_reserved_asid_bits(struct asid_info *info)
 {
-	if (pinned_asid_map)
-		bitmap_copy(info->map, pinned_asid_map, NUM_CTXT_ASIDS(info));
+	if (info->pinned_map)
+		bitmap_copy(info->map, info->pinned_map, NUM_CTXT_ASIDS(info));
 	else if (arm64_kernel_unmapped_at_el0())
 		set_kpti_asid_bits(info, info->map);
 	else
@@ -287,7 +287,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 	u64 asid;
 	struct asid_info *info = &asid_info;
 
-	if (!pinned_asid_map)
+	if (!info->pinned_map)
 		return 0;
 
 	raw_spin_lock_irqsave(&info->lock, flags);
@@ -297,7 +297,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 	if (refcount_inc_not_zero(&mm->context.pinned))
 		goto out_unlock;
 
-	if (nr_pinned_asids >= max_pinned_asids) {
+	if (info->nr_pinned_asids >= info->max_pinned_asids) {
 		asid = 0;
 		goto out_unlock;
 	}
@@ -311,8 +311,8 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 		atomic64_set(&mm->context.id, asid);
 	}
 
-	nr_pinned_asids++;
-	__set_bit(asid2idx(info, asid), pinned_asid_map);
+	info->nr_pinned_asids++;
+	__set_bit(asid2idx(info, asid), info->pinned_map);
 	refcount_set(&mm->context.pinned, 1);
 
 out_unlock:
@@ -334,14 +334,14 @@ void arm64_mm_context_put(struct mm_struct *mm)
 	struct asid_info *info = &asid_info;
 	u64 asid = atomic64_read(&mm->context.id);
 
-	if (!pinned_asid_map)
+	if (!info->pinned_map)
 		return;
 
 	raw_spin_lock_irqsave(&info->lock, flags);
 
 	if (refcount_dec_and_test(&mm->context.pinned)) {
-		__clear_bit(asid2idx(info, asid), pinned_asid_map);
-		nr_pinned_asids--;
+		__clear_bit(asid2idx(info, asid), info->pinned_map);
+		info->nr_pinned_asids--;
 	}
 
 	raw_spin_unlock_irqrestore(&info->lock, flags);
@@ -391,8 +391,8 @@ static int asids_update_limit(void)
 
 	if (arm64_kernel_unmapped_at_el0()) {
 		num_available_asids /= 2;
-		if (pinned_asid_map)
-			set_kpti_asid_bits(info, pinned_asid_map);
+		if (info->pinned_map)
+			set_kpti_asid_bits(info, info->pinned_map);
 	}
 	/*
 	 * Expect allocation after rollover to fail if we don't have at least
@@ -407,7 +407,7 @@ static int asids_update_limit(void)
 	 * even if all CPUs have a reserved ASID and the maximum number of ASIDs
 	 * are pinned, there still is at least one empty slot in the ASID map.
 	 */
-	max_pinned_asids = num_available_asids - num_possible_cpus() - 2;
+	info->max_pinned_asids = num_available_asids - num_possible_cpus() - 2;
 	return 0;
 }
 arch_initcall(asids_update_limit);
@@ -429,9 +429,9 @@ static int asids_init(void)
 	info->reserved = &reserved_asids;
 	raw_spin_lock_init(&info->lock);
 
-	pinned_asid_map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
-				  sizeof(*pinned_asid_map), GFP_KERNEL);
-	nr_pinned_asids = 0;
+	info->pinned_map = kcalloc(BITS_TO_LONGS(NUM_CTXT_ASIDS(info)),
+				   sizeof(*info->pinned_map), GFP_KERNEL);
+	info->nr_pinned_asids = 0;
 
 	/*
 	 * We cannot call set_reserved_asid_bits() here because CPU
