@@ -222,17 +222,49 @@ set_asid:
 	return idx2asid(info, asid) | generation;
 }
 
-void check_and_switch_context(struct mm_struct *mm)
+/*
+ * Generate a new ASID for the context.
+ *
+ * @pasid: Pointer to the current ASID batch allocated. It will be updated
+ * with the new ASID batch.
+ * @pinned: refcount if asid is pinned.
+ * Caller needs to make sure preempt is disabled before calling this function.
+ */
+static void asid_new_context(struct asid_info *info, atomic64_t *pasid,
+			     refcount_t *pinned)
 {
 	unsigned long flags;
-	unsigned int cpu;
+	u64 asid;
+	unsigned int cpu = smp_processor_id();
+
+	raw_spin_lock_irqsave(&info->lock, flags);
+	/* Check that our ASID belongs to the current generation. */
+	asid = atomic64_read(pasid);
+	if (!asid_gen_match(asid, info)) {
+		asid = new_context(info, pasid, pinned);
+		atomic64_set(pasid, asid);
+	}
+
+	if (cpumask_test_and_clear_cpu(cpu, &info->flush_pending))
+		local_flush_tlb_all();
+
+	atomic64_set(&active_asid(info, cpu), asid);
+	raw_spin_unlock_irqrestore(&info->lock, flags);
+}
+
+/*
+ * Check the ASID is still valid for the context. If not generate a new ASID.
+ *
+ * @pasid: Pointer to the current ASID batch
+ * @pinned: refcount if asid is pinned
+ * Caller needs to make sure preempt is disabled before calling this function.
+ */
+static void asid_check_context(struct asid_info *info, atomic64_t *pasid,
+			       refcount_t *pinned)
+{
 	u64 asid, old_active_asid;
-	struct asid_info *info = &asid_info;
 
-	if (system_supports_cnp())
-		cpu_set_reserved_ttbr0();
-
-	asid = atomic64_read(&mm->context.id);
+	asid = atomic64_read(pasid);
 
 	/*
 	 * The memory ordering here is subtle.
@@ -252,24 +284,18 @@ void check_and_switch_context(struct mm_struct *mm)
 	if (old_active_asid && asid_gen_match(asid, info) &&
 	    atomic64_cmpxchg_relaxed(this_cpu_ptr(info->active),
 				     old_active_asid, asid))
-		goto switch_mm_fastpath;
+		return;
 
-	raw_spin_lock_irqsave(&info->lock, flags);
-	/* Check that our ASID belongs to the current generation. */
-	asid = atomic64_read(&mm->context.id);
-	if (!asid_gen_match(asid, info)) {
-		asid = new_context(info, &mm->context.id, &mm->context.pinned);
-		atomic64_set(&mm->context.id, asid);
-	}
+	asid_new_context(info, pasid, pinned);
+}
 
-	cpu = smp_processor_id();
-	if (cpumask_test_and_clear_cpu(cpu, &info->flush_pending))
-		local_flush_tlb_all();
+void check_and_switch_context(struct mm_struct *mm)
+{
+	if (system_supports_cnp())
+		cpu_set_reserved_ttbr0();
 
-	atomic64_set(&active_asid(info, cpu), asid);
-	raw_spin_unlock_irqrestore(&info->lock, flags);
-
-switch_mm_fastpath:
+	asid_check_context(&asid_info, &mm->context.id,
+			   &mm->context.pinned);
 
 	arm64_apply_bp_hardening();
 
