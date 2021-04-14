@@ -58,6 +58,12 @@ properties:
   clock-names:
     const: refclk
 
+  use-aux-backlight:
+    type: boolean
+    description:
+      The panel backlight to be controlled using DPCD registers on
+      the DP aux channel.
+
   gpio-controller: true
   '#gpio-cells':
     const: 2
@@ -187,6 +193,8 @@ examples:
         clock-names = "refclk";
 
         no-hpd;
+
+        use-aux-backlight;
 
         ports {
           #address-cells = <1>;
