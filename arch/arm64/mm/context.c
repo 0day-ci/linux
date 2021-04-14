@@ -32,6 +32,8 @@ static struct asid_info
 	unsigned long		*pinned_map;
 	unsigned long		max_pinned_asids;
 	unsigned long		nr_pinned_asids;
+	/* Callback to locally flush the context. */
+	void			(*flush_cpu_ctxt_cb)(void);
 } asid_info;
 
 #define active_asid(info, cpu)	 (*per_cpu_ptr((info)->active, cpu))
@@ -245,8 +247,9 @@ static void asid_new_context(struct asid_info *info, atomic64_t *pasid,
 		atomic64_set(pasid, asid);
 	}
 
-	if (cpumask_test_and_clear_cpu(cpu, &info->flush_pending))
-		local_flush_tlb_all();
+	if (cpumask_test_and_clear_cpu(cpu, &info->flush_pending) &&
+	    info->flush_cpu_ctxt_cb)
+		info->flush_cpu_ctxt_cb();
 
 	atomic64_set(&active_asid(info, cpu), asid);
 	raw_spin_unlock_irqrestore(&info->lock, flags);
@@ -427,6 +430,11 @@ void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm)
 	post_ttbr_update_workaround();
 }
 
+static void asid_flush_cpu_ctxt(void)
+{
+	local_flush_tlb_all();
+}
+
 static int asids_update_limit(void)
 {
 	struct asid_info *info = &asid_info;
@@ -499,6 +507,7 @@ static int asids_init(void)
 
 	info->active = &active_asids;
 	info->reserved = &reserved_asids;
+	info->flush_cpu_ctxt_cb = asid_flush_cpu_ctxt;
 
 	/*
 	 * We cannot call set_reserved_asid_bits() here because CPU
