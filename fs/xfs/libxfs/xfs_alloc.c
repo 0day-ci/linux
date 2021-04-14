@@ -3220,7 +3220,7 @@ xfs_alloc_vextent(
 		args->maxlen = agsize;
 	if (args->alignment == 0)
 		args->alignment = 1;
-	ASSERT(XFS_FSB_TO_AGNO(mp, args->fsbno) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGNO(mp, args->fsbno) < mp->m_maxagcount);
 	ASSERT(XFS_FSB_TO_AGBNO(mp, args->fsbno) < agsize);
 	ASSERT(args->minlen <= args->maxlen);
 	ASSERT(args->minlen <= agsize);

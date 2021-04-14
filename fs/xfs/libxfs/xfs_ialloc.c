@@ -1852,7 +1852,7 @@ nextag_relse_buffer:
 nextag:
 		up_read(&pag->pag_inactive_rwsem);
 		xfs_perag_put(pag);
-		if (++agno == mp->m_sb.sb_agcount)
+		if (++agno == mp->m_maxagcount)
 			agno = 0;
 		if (agno == start_agno)
 			return noroom ? -ENOSPC : 0;

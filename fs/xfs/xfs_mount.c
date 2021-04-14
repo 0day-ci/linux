@@ -141,7 +141,7 @@ xfs_free_perag(
 	xfs_agnumber_t	agno;
 	struct xfs_perag *pag;
 
-	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+	for (agno = 0; agno < mp->m_maxagcount; agno++) {
 		spin_lock(&mp->m_perag_lock);
 		pag = radix_tree_delete(&mp->m_perag_tree, agno);
 		spin_unlock(&mp->m_perag_lock);
@@ -633,7 +633,7 @@ xfs_check_summary_counts(
 	    !xfs_fs_has_sickness(mp, XFS_SICK_FS_COUNTERS))
 		return 0;
 
-	return xfs_initialize_perag_data(mp, mp->m_sb.sb_agcount);
+	return xfs_initialize_perag_data(mp, mp->m_maxagcount);
 }
 
 /*

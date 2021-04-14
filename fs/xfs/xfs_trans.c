@@ -632,6 +632,8 @@ xfs_trans_unreserve_and_mod_sb(
 	mp->m_sb.sb_frextents += rtxdelta;
 	mp->m_sb.sb_dblocks += tp->t_dblocks_delta;
 	mp->m_sb.sb_agcount += tp->t_agcount_delta;
+	if (mp->m_sb.sb_agcount > mp->m_maxagcount)
+		mp->m_maxagcount = mp->m_sb.sb_agcount;
 	mp->m_sb.sb_imax_pct += tp->t_imaxpct_delta;
 	mp->m_sb.sb_rextsize += tp->t_rextsize_delta;
 	mp->m_sb.sb_rbmblocks += tp->t_rbmblocks_delta;

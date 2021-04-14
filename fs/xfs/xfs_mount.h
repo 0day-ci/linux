@@ -192,6 +192,7 @@ typedef struct xfs_mount {
 	 */
 	struct work_struct	m_flush_inodes_work;
 
+	xfs_agnumber_t		m_maxagcount;
 	/*
 	 * Generation of the filesysyem layout.  This is incremented by each
 	 * growfs, and used by the pNFS server to ensure the client updates

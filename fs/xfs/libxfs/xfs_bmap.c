@@ -352,7 +352,7 @@ xfs_bmap_check_leaf_extents(
 	bno = be64_to_cpu(*pp);
 
 	ASSERT(bno != NULLFSBLOCK);
-	ASSERT(XFS_FSB_TO_AGNO(mp, bno) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGNO(mp, bno) < mp->m_maxagcount);
 	ASSERT(XFS_FSB_TO_AGBNO(mp, bno) < mp->m_sb.sb_agblocks);
 
 	/*
@@ -548,7 +548,7 @@ __xfs_bmap_add_free(
 	ASSERT(!isnullstartblock(bno));
 	agno = XFS_FSB_TO_AGNO(mp, bno);
 	agbno = XFS_FSB_TO_AGBNO(mp, bno);
-	ASSERT(agno < mp->m_sb.sb_agcount);
+	ASSERT(agno < mp->m_maxagcount);
 	ASSERT(agbno < mp->m_sb.sb_agblocks);
 	ASSERT(len < mp->m_sb.sb_agblocks);
 	ASSERT(agbno + len <= mp->m_sb.sb_agblocks);
@@ -3135,7 +3135,7 @@ xfs_bmap_adjacent(
 	(rt ? \
 		(x) < mp->m_sb.sb_rblocks : \
 		XFS_FSB_TO_AGNO(mp, x) == XFS_FSB_TO_AGNO(mp, y) && \
-		XFS_FSB_TO_AGNO(mp, x) < mp->m_sb.sb_agcount && \
+		XFS_FSB_TO_AGNO(mp, x) < mp->m_maxagcount && \
 		XFS_FSB_TO_AGBNO(mp, x) < mp->m_sb.sb_agblocks)
 
 	mp = ap->ip->i_mount;
@@ -3359,7 +3359,7 @@ xfs_bmap_btalloc_nullfb(
 		if (error)
 			return error;
 
-		if (++ag == mp->m_sb.sb_agcount)
+		if (++ag == mp->m_maxagcount)
 			ag = 0;
 		if (ag == startag)
 			break;

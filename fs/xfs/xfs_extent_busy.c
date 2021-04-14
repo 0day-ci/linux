@@ -608,7 +608,7 @@ xfs_extent_busy_wait_all(
 	DEFINE_WAIT		(wait);
 	xfs_agnumber_t		agno;
 
-	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+	for (agno = 0; agno < mp->m_maxagcount; agno++) {
 		struct xfs_perag *pag = xfs_perag_get(mp, agno);
 
 		do {
