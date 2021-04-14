@@ -74,6 +74,8 @@ properties:
       - st,lps33hw
       - st,lps35hw
       - st,lps22hh
+        # IMU
+      - st,lsm9ds0-imu
 
   reg:
     maxItems: 1
