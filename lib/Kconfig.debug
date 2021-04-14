@@ -2279,9 +2279,10 @@ config TEST_SYSCTL
 
 	  If unsure, say N.
 
-config BITFIELD_KUNIT
-	tristate "KUnit test bitfield functions at runtime"
+config BITFIELD_KUNIT_TEST
+	tristate "KUnit test bitfield functions at runtime" if !KUNIT_ALL_TESTS
 	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	help
 	  Enable this option to test the bitfield functions at boot.
 
@@ -2296,8 +2297,9 @@ config BITFIELD_KUNIT
 	  If unsure, say N.
 
 config RESOURCE_KUNIT_TEST
-	tristate "KUnit test for resource API"
+	tristate "KUnit test for resource API" if !KUNIT_ALL_TESTS
 	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	help
 	  This builds the resource API unit test.
 	  Tests the logic of API provided by resource.c and ioport.h.
@@ -2337,9 +2339,10 @@ config LIST_KUNIT_TEST
 
 	  If unsure, say N.
 
-config LINEAR_RANGES_TEST
-	tristate "KUnit test for linear_ranges"
+config LINEAR_RANGES_KUNIT_TEST
+	tristate "KUnit test for linear_ranges" if !KUNIT_ALL_TESTS
 	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	select LINEAR_RANGES
 	help
 	  This builds the linear_ranges unit test, which runs on boot.
@@ -2350,8 +2353,9 @@ config LINEAR_RANGES_TEST
 	  If unsure, say N.
 
 config CMDLINE_KUNIT_TEST
-	tristate "KUnit test for cmdline API"
+	tristate "KUnit test for cmdline API" if !KUNIT_ALL_TESTS
 	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	help
 	  This builds the cmdline API unit test.
 	  Tests the logic of API provided by cmdline.c.
@@ -2360,9 +2364,10 @@ config CMDLINE_KUNIT_TEST
 
 	  If unsure, say N.
 
-config BITS_TEST
-	tristate "KUnit test for bits.h"
+config BITS_KUNIT_TEST
+	tristate "KUnit test for bits.h" if !KUNIT_ALL_TESTS
 	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	help
 	  This builds the bits unit test.
 	  Tests the logic of macros defined in bits.h.
