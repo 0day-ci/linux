@@ -101,11 +101,28 @@ mlx5e_ipsec_feature_check(struct sk_buff *skb, netdev_features_t features)
 	if (sp && sp->len) {
 		struct xfrm_state *x = sp->xvec[0];
 
-		if (x && x->xso.offload_handle)
-			return features;
+		if (!x || !x->xso.offload_handle)
+			goto out_disable;
+
+		if (sp->inner_ipproto) {
+			/* Cannot support tunnel packet over IPsec tunnel mode
+			 * because we cannot offload three IP header csum
+			 */
+			if (x->props.mode == XFRM_MODE_TUNNEL)
+				goto out_disable;
+
+			/* Only support UDP or TCP L4 checksum */
+			if (sp->inner_ipproto != IPPROTO_UDP &&
+			    sp->inner_ipproto != IPPROTO_TCP)
+				goto out_disable;
+		}
+
+		return features;
+
 	}
 
 	/* Disable CSUM and GSO for software IPsec */
+out_disable:
 	return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
 
