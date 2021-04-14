@@ -361,10 +361,15 @@ int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 
 	/*
 	 * Ask for all the pages supported by this device.  Determine the
-	 * actual data length first if so required by the host, e.g.
-	 * BusLogic BT-958.
+	 * actual data length first if the length requested is beyond 255
+	 * bytes as the high order length byte used to be reserved with
+	 * older SCSI standard revisions and a non-zero value there may
+	 * cause either such an INQUIRY command to be rejected by a target
+	 * or undefined behaviour to occur.  Also do so if so required by
+	 * the host, e.g. BusLogic BT-958.
 	 */
-	if (sdev->host->no_trailing_allocation_length) {
+	if (buf_len > SCSI_VPD_PG_LEN ||
+	    sdev->host->no_trailing_allocation_length) {
 		result = scsi_vpd_inquiry(sdev, buf, 0, min(4, buf_len));
 		if (result < 4)
 			goto fail;
@@ -390,7 +395,8 @@ int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 	goto fail;
 
  found:
-	if (sdev->host->no_trailing_allocation_length) {
+	if (buf_len > SCSI_VPD_PG_LEN ||
+	    sdev->host->no_trailing_allocation_length) {
 		result = scsi_vpd_inquiry(sdev, buf, page, min(4, buf_len));
 		if (result < 4)
 			goto fail;
