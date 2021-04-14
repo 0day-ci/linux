@@ -72,7 +72,6 @@ static unsigned long *__cpu_capacity;
 #define cpu_capacity(cpu)	__cpu_capacity[cpu]
 
 static unsigned long middle_capacity = 1;
-static bool cap_from_dt = true;
 
 /*
  * Iterate all CPUs' descriptor in DT and compute the efficiency
@@ -82,7 +81,7 @@ static bool cap_from_dt = true;
  * 'average' CPU is of middle capacity. Also see the comments near
  * table_efficiency[] and update_cpu_capacity().
  */
-static void __init parse_dt_topology(void)
+static void __init get_coretype_capacity(void)
 {
 	const struct cpu_efficiency *cpu_eff;
 	struct device_node *cn = NULL;
@@ -104,13 +103,6 @@ static void __init parse_dt_topology(void)
 			pr_err("missing device node for CPU %d\n", cpu);
 			continue;
 		}
-
-		if (topology_parse_cpu_capacity(cn, cpu)) {
-			of_node_put(cn);
-			continue;
-		}
-
-		cap_from_dt = false;
 
 		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
 			if (of_device_is_compatible(cn, cpu_eff->compatible))
@@ -151,9 +143,6 @@ static void __init parse_dt_topology(void)
 	else
 		middle_capacity = ((max_capacity / 3)
 				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
-
-	if (cap_from_dt)
-		topology_normalize_cpu_scale();
 }
 
 /*
@@ -163,7 +152,7 @@ static void __init parse_dt_topology(void)
  */
 static void update_cpu_capacity(unsigned int cpu)
 {
-	if (!cpu_capacity(cpu) || cap_from_dt)
+	if (!cpu_capacity(cpu))
 		return;
 
 	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
@@ -173,7 +162,7 @@ static void update_cpu_capacity(unsigned int cpu)
 }
 
 #else
-static inline void parse_dt_topology(void) {}
+static inline void get_cputype_capacity(void) {}
 static inline void update_cpu_capacity(unsigned int cpuid) {}
 #endif
 
@@ -186,6 +175,8 @@ void store_cpu_topology(unsigned int cpuid)
 {
 	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
 	unsigned int mpidr;
+
+	update_cpu_capacity(cpuid);
 
 	if (cpuid_topo->package_id != -1)
 		goto topology_populated;
@@ -221,8 +212,6 @@ void store_cpu_topology(unsigned int cpuid)
 		cpuid_topo->package_id = -1;
 	}
 
-	update_cpu_capacity(cpuid);
-
 	pr_info("CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",
 		cpuid, cpu_topology[cpuid].thread_id,
 		cpu_topology[cpuid].core_id,
@@ -241,5 +230,6 @@ void __init init_cpu_topology(void)
 	reset_cpu_topology();
 	smp_wmb();
 
+	get_coretype_capacity();
 	parse_dt_topology();
 }

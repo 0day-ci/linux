@@ -295,7 +295,7 @@ static void parsing_done_workfn(struct work_struct *work)
 core_initcall(free_raw_capacity);
 #endif
 
-#if defined(CONFIG_ARM64) || defined(CONFIG_RISCV)
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_RISCV)
 /*
  * This function returns the logic cpu number of the node.
  * There are basically three kinds of return values:
@@ -441,7 +441,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
 	return 0;
 }
 
-static int __init parse_dt_topology(void)
+int __init parse_dt_topology(void)
 {
 	struct device_node *cn, *map;
 	int ret = 0;
