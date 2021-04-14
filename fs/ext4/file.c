@@ -280,13 +280,66 @@ out:
 	return ret;
 }
 
-static ssize_t ext4_handle_inode_extension(struct inode *inode, loff_t offset,
-					   ssize_t written, size_t count)
+static int ext4_prepare_dio_extend(struct inode *inode)
 {
 	handle_t *handle;
-	bool truncate = false;
+	int ret;
+
+	handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
+
+	ext4_fc_start_update(inode);
+	ret = ext4_orphan_add(handle, inode);
+	ext4_fc_stop_update(inode);
+	if (ret) {
+		ext4_journal_stop(handle);
+		return ret;
+	}
+	ext4_journal_stop(handle);
+	return 0;
+}
+
+static void ext4_cleanup_dio_extend(struct inode *inode, loff_t offset,
+				    ssize_t written, size_t count)
+{
+	handle_t *handle;
 	u8 blkbits = inode->i_blkbits;
 	ext4_lblk_t written_blk, end_blk;
+
+	/* Error? Nothing was written... */
+	if (written < 0)
+		written = 0;
+
+	written_blk = ALIGN(offset + written, 1 << blkbits);
+	end_blk = ALIGN(offset + count, 1 << blkbits);
+	if (written_blk < end_blk && ext4_can_truncate(inode)) {
+		ext4_truncate_failed_write(inode);
+		/*
+		 * If the truncate operation failed early, then the inode may
+		 * still be on the orphan list. In that case, we need to try
+		 * remove the inode from the in-memory linked list.
+		 */
+		if (inode->i_nlink)
+			ext4_orphan_del(NULL, inode);
+		return;
+	}
+
+	if (!list_empty(&EXT4_I(inode)->i_orphan) && inode->i_nlink) {
+		handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
+		if (IS_ERR(handle)) {
+			ext4_orphan_del(NULL, inode);
+			return;
+		}
+		ext4_orphan_del(handle, inode);
+		ext4_journal_stop(handle);
+	}
+}
+
+static int ext4_handle_inode_extension(struct inode *inode, loff_t offset,
+				       ssize_t written)
+{
+	handle_t *handle;
 	int ret;
 
 	/*
@@ -298,74 +351,23 @@ static ssize_t ext4_handle_inode_extension(struct inode *inode, loff_t offset,
 	 * as much as we intended.
 	 */
 	WARN_ON_ONCE(i_size_read(inode) < EXT4_I(inode)->i_disksize);
-	if (offset + count <= EXT4_I(inode)->i_disksize) {
-		/*
-		 * We need to ensure that the inode is removed from the orphan
-		 * list if it has been added prematurely, due to writeback of
-		 * delalloc blocks.
-		 */
-		if (!list_empty(&EXT4_I(inode)->i_orphan) && inode->i_nlink) {
-			handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
-
-			if (IS_ERR(handle)) {
-				ext4_orphan_del(NULL, inode);
-				return PTR_ERR(handle);
-			}
-
-			ext4_orphan_del(handle, inode);
-			ext4_journal_stop(handle);
-		}
-
-		return written;
-	}
-
-	if (written < 0)
-		goto truncate;
+	if (offset + written <= EXT4_I(inode)->i_disksize)
+		return 0;
 
 	handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
-	if (IS_ERR(handle)) {
-		written = PTR_ERR(handle);
-		goto truncate;
-	}
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
 
 	if (ext4_update_inode_size(inode, offset + written)) {
 		ret = ext4_mark_inode_dirty(handle, inode);
 		if (unlikely(ret)) {
-			written = ret;
 			ext4_journal_stop(handle);
-			goto truncate;
+			return ret;
 		}
 	}
-
-	/*
-	 * We may need to truncate allocated but not written blocks beyond EOF.
-	 */
-	written_blk = ALIGN(offset + written, 1 << blkbits);
-	end_blk = ALIGN(offset + count, 1 << blkbits);
-	if (written_blk < end_blk && ext4_can_truncate(inode))
-		truncate = true;
-
-	/*
-	 * Remove the inode from the orphan list if it has been extended and
-	 * everything went OK.
-	 */
-	if (!truncate && inode->i_nlink)
-		ext4_orphan_del(handle, inode);
 	ext4_journal_stop(handle);
 
-	if (truncate) {
-truncate:
-		ext4_truncate_failed_write(inode);
-		/*
-		 * If the truncate operation failed early, then the inode may
-		 * still be on the orphan list. In that case, we need to try
-		 * remove the inode from the in-memory linked list.
-		 */
-		if (inode->i_nlink)
-			ext4_orphan_del(NULL, inode);
-	}
-
-	return written;
+	return 0;
 }
 
 static int ext4_dio_write_end_io(struct kiocb *iocb, ssize_t size,
@@ -380,12 +382,27 @@ static int ext4_dio_write_end_io(struct kiocb *iocb, ssize_t size,
 	if (size && flags & IOMAP_DIO_UNWRITTEN)
 		return ext4_convert_unwritten_extents(NULL, inode,
 						      offset, size);
-
 	return 0;
+}
+
+static int ext4_dio_extending_write_end_io(struct kiocb *iocb, ssize_t size,
+					   int error, unsigned int flags)
+{
+	struct inode *inode = file_inode(iocb->ki_filp);
+	int ret;
+
+	ret = ext4_dio_write_end_io(iocb, size, error, flags);
+	if (ret < 0)
+		return ret;
+	return ext4_handle_inode_extension(inode, iocb->ki_pos, size);
 }
 
 static const struct iomap_dio_ops ext4_dio_write_ops = {
 	.end_io = ext4_dio_write_end_io,
+};
+
+static const struct iomap_dio_ops ext4_dio_extending_write_ops = {
+	.end_io = ext4_dio_extending_write_end_io,
 };
 
 /*
@@ -454,11 +471,11 @@ out:
 static ssize_t ext4_dio_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	ssize_t ret;
-	handle_t *handle;
 	struct inode *inode = file_inode(iocb->ki_filp);
 	loff_t offset = iocb->ki_pos;
 	size_t count = iov_iter_count(from);
 	const struct iomap_ops *iomap_ops = &ext4_iomap_ops;
+	const struct iomap_dio_ops *dio_ops = &ext4_dio_write_ops;
 	bool extend = false, unaligned_io = false;
 	bool ilock_shared = true;
 
@@ -529,33 +546,21 @@ static ssize_t ext4_dio_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		inode_dio_wait(inode);
 
 	if (extend) {
-		handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
-		if (IS_ERR(handle)) {
-			ret = PTR_ERR(handle);
+		ret = ext4_prepare_dio_extend(inode);
+		if (ret)
 			goto out;
-		}
-
-		ext4_fc_start_update(inode);
-		ret = ext4_orphan_add(handle, inode);
-		ext4_fc_stop_update(inode);
-		if (ret) {
-			ext4_journal_stop(handle);
-			goto out;
-		}
-
-		ext4_journal_stop(handle);
+		dio_ops = &ext4_dio_extending_write_ops;
 	}
 
 	if (ilock_shared)
 		iomap_ops = &ext4_iomap_overwrite_ops;
-	ret = iomap_dio_rw(iocb, from, iomap_ops, &ext4_dio_write_ops,
-			   (unaligned_io || extend) ? IOMAP_DIO_FORCE_WAIT : 0);
+
+	ret = iomap_dio_rw(iocb, from, iomap_ops, dio_ops,
+			   (extend || unaligned_io) ? IOMAP_DIO_FORCE_WAIT : 0);
 	if (ret == -ENOTBLK)
 		ret = 0;
-
 	if (extend)
-		ret = ext4_handle_inode_extension(inode, offset, ret, count);
-
+		ext4_cleanup_dio_extend(inode, offset, ret, count);
 out:
 	if (ilock_shared)
 		inode_unlock_shared(inode);
@@ -598,7 +603,6 @@ ext4_dax_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	ssize_t ret;
 	size_t count;
 	loff_t offset;
-	handle_t *handle;
 	bool extend = false;
 	struct inode *inode = file_inode(iocb->ki_filp);
 
@@ -617,26 +621,24 @@ ext4_dax_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	count = iov_iter_count(from);
 
 	if (offset + count > EXT4_I(inode)->i_disksize) {
-		handle = ext4_journal_start(inode, EXT4_HT_INODE, 2);
-		if (IS_ERR(handle)) {
-			ret = PTR_ERR(handle);
+		ret = ext4_prepare_dio_extend(inode);
+		if (ret < 0)
 			goto out;
-		}
-
-		ret = ext4_orphan_add(handle, inode);
-		if (ret) {
-			ext4_journal_stop(handle);
-			goto out;
-		}
-
 		extend = true;
-		ext4_journal_stop(handle);
 	}
 
 	ret = dax_iomap_rw(iocb, from, &ext4_iomap_ops);
 
-	if (extend)
-		ret = ext4_handle_inode_extension(inode, offset, ret, count);
+	if (extend) {
+		if (ret > 0) {
+			int ret2;
+
+			ret2 = ext4_handle_inode_extension(inode, offset, ret);
+			if (ret2 < 0)
+				ret = ret2;
+		}
+		ext4_cleanup_dio_extend(inode, offset, ret, count);
+	}
 out:
 	inode_unlock(inode);
 	if (ret > 0)
