@@ -512,7 +512,6 @@ xfs_ag_shrink_space(
 	struct xfs_agf		*agf;
 	int			error, err2;
 
-	ASSERT(agno == mp->m_sb.sb_agcount - 1);
 	error = xfs_ialloc_read_agi(mp, *tpp, agno, &agibp);
 	if (error)
 		return error;

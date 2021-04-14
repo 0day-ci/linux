@@ -14,11 +14,14 @@
 #include "xfs_trans.h"
 #include "xfs_error.h"
 #include "xfs_alloc.h"
+#include "xfs_ialloc.h"
+#include "xfs_extent_busy.h"
 #include "xfs_fsops.h"
 #include "xfs_trans_space.h"
 #include "xfs_log.h"
 #include "xfs_ag.h"
 #include "xfs_ag_resv.h"
+#include "xfs_trans_priv.h"
 
 /*
  * Write new AG headers to disk. Non-transactional, but need to be
@@ -78,6 +81,112 @@ xfs_resizefs_init_new_ags(
 	return error;
 }
 
+static int
+xfs_shrinkfs_deactivate_ags(
+	struct xfs_mount        *mp,
+	xfs_agnumber_t		oagcount,
+	xfs_agnumber_t		nagcount)
+{
+	xfs_agnumber_t		agno;
+	int			error;
+
+	/* confirm AGs pending for shrinking are all inactive */
+	for (agno = nagcount; agno < oagcount; ++agno) {
+		struct xfs_buf *agfbp, *agibp;
+		struct xfs_perag *pag = xfs_perag_get(mp, agno);
+
+		down_write(&pag->pag_inactive_rwsem);
+		/* need to lock agi, agf buffers here to close all races */
+		error = xfs_read_agi(mp, NULL, agno, &agibp);
+		if (!error) {
+			error = xfs_alloc_read_agf(mp, NULL, agno, 0, &agfbp);
+			if (!error) {
+				pag->pag_inactive = true;
+				xfs_buf_relse(agfbp);
+			}
+			xfs_buf_relse(agibp);
+		}
+		up_write(&pag->pag_inactive_rwsem);
+		xfs_perag_put(pag);
+		if (error)
+			break;
+	}
+	return error;
+}
+
+static void
+xfs_shrinkfs_activate_ags(
+	struct xfs_mount        *mp,
+	xfs_agnumber_t		oagcount,
+	xfs_agnumber_t		nagcount)
+{
+	xfs_agnumber_t		agno;
+
+	for (agno = nagcount; agno < oagcount; ++agno) {
+		struct xfs_perag *pag = xfs_perag_get(mp, agno);
+
+		down_write(&pag->pag_inactive_rwsem);
+		pag->pag_inactive = false;
+		up_write(&pag->pag_inactive_rwsem);
+	}
+}
+
+static int
+xfs_shrinkfs_prepare_ags(
+	struct xfs_mount        *mp,
+	struct aghdr_init_data	*id,
+	xfs_agnumber_t		oagcount,
+	xfs_agnumber_t		nagcount)
+{
+	xfs_agnumber_t		agno;
+	int 			error;
+
+	error = xfs_shrinkfs_deactivate_ags(mp, oagcount, nagcount);
+	if (error)
+		goto err_out;
+
+	/* confirm AGs pending for shrinking are all empty */
+	for (agno = nagcount; agno < oagcount; ++agno) {
+		struct xfs_buf		*agfbp;
+		struct xfs_perag	*pag;
+
+		error = xfs_alloc_read_agf(mp, NULL, agno, 0, &agfbp);
+		if (error)
+			goto err_out;
+
+		pag = agfbp->b_pag;
+		error = xfs_ag_resv_free(pag);
+		if (!error) {
+			error = xfs_ag_is_empty(agfbp);
+			if (!error) {
+				ASSERT(!pag->pagf_flcount);
+				id->nfree -= pag->pagf_freeblks;
+			}
+		}
+		xfs_buf_relse(agfbp);
+		if (error)
+			goto err_out;
+	}
+	xfs_log_force(mp, XFS_LOG_SYNC);
+	/*
+	 * Wait for all busy extents to be freed, including completion of
+	 * any discard operation.
+	 */
+	xfs_extent_busy_wait_all(mp);
+	flush_workqueue(xfs_discard_wq);
+
+	/*
+	 * Also need to drain out all related cached buffers, at least,
+	 * in case of growfs back later (which uses uncached buffers.)
+	 */
+	xfs_ail_push_all_sync(mp->m_ail);
+	xfs_buftarg_drain(mp->m_ddev_targp);
+	return error;
+err_out:
+	xfs_shrinkfs_activate_ags(mp, oagcount, nagcount);
+	return error;
+}
+
 /*
  * growfs operations
  */
@@ -93,7 +202,7 @@ xfs_growfs_data_private(
 	xfs_rfsblock_t		nb, nb_div, nb_mod;
 	int64_t			delta;
 	bool			lastag_extended;
-	xfs_agnumber_t		oagcount;
+	xfs_agnumber_t		oagcount, agno;
 	struct xfs_trans	*tp;
 	struct aghdr_init_data	id = {};
 
@@ -130,14 +239,13 @@ xfs_growfs_data_private(
 	oagcount = mp->m_sb.sb_agcount;
 
 	/* allocate the new per-ag structures */
-	if (nagcount > oagcount) {
+	if (nagcount > oagcount)
 		error = xfs_initialize_perag(mp, nagcount, &nagimax);
-		if (error)
-			return error;
-	} else if (nagcount < oagcount) {
-		/* TODO: shrinking the entire AGs hasn't yet completed */
-		return -EINVAL;
-	}
+	else if (nagcount < oagcount)
+		error = xfs_shrinkfs_prepare_ags(mp, &id, oagcount, nagcount);
+
+	if (error)
+		return error;
 
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_growdata,
 			(delta > 0 ? XFS_GROWFS_SPACE_RES(mp) : -delta), 0,
@@ -151,13 +259,29 @@ xfs_growfs_data_private(
 	} else {
 		static struct ratelimit_state shrink_warning = \
 			RATELIMIT_STATE_INIT("shrink_warning", 86400 * HZ, 1);
+		xfs_agblock_t	agdelta;
+
 		ratelimit_set_flags(&shrink_warning, RATELIMIT_MSG_ON_RELEASE);
 
 		if (__ratelimit(&shrink_warning))
 			xfs_alert(mp,
 	"EXPERIMENTAL online shrink feature in use. Use at your own risk!");
 
-		error = xfs_ag_shrink_space(mp, &tp, nagcount - 1, -delta);
+		for (agno = nagcount; agno < oagcount; ++agno) {
+			struct xfs_perag *pag = xfs_perag_get(mp, agno);
+
+			pag->pagf_freeblks = 0;
+			pag->pagf_longest = 0;
+			xfs_perag_put(pag);
+		}
+
+		xfs_trans_agblocks_delta(tp, id.nfree);
+
+		if (nagcount != oagcount)
+			agdelta = nagcount * mp->m_sb.sb_agblocks - nb;
+		else
+			agdelta = -delta;
+		error = xfs_ag_shrink_space(mp, &tp, nagcount - 1, agdelta);
 	}
 	if (error)
 		goto out_trans_cancel;
@@ -167,8 +291,10 @@ xfs_growfs_data_private(
 	 * seen by the rest of the world until the transaction commit applies
 	 * them atomically to the superblock.
 	 */
-	if (nagcount > oagcount)
-		xfs_trans_mod_sb(tp, XFS_TRANS_SB_AGCOUNT, nagcount - oagcount);
+	if (nagcount != oagcount)
+		xfs_trans_mod_sb(tp, XFS_TRANS_SB_AGCOUNT,
+				 (int64_t)nagcount - (int64_t)oagcount);
+
 	if (delta)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_DBLOCKS, delta);
 	if (id.nfree)

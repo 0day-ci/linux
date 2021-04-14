@@ -15,7 +15,7 @@ struct aghdr_init_data {
 	xfs_agblock_t		agno;		/* ag to init */
 	xfs_extlen_t		agsize;		/* new AG size */
 	struct list_head	buffer_list;	/* buffer writeback list */
-	xfs_rfsblock_t		nfree;		/* cumulative new free space */
+	int64_t			nfree;		/* cumulative new free space */
 
 	/* per header data */
 	xfs_daddr_t		daddr;		/* header location */
