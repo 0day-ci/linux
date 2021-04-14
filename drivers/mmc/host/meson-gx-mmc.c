@@ -246,11 +246,8 @@ static void meson_mmc_get_transfer_mode(struct mmc_host *mmc,
 		 * size, otherwise chain mode could not be used.
 		 */
 		for_each_sg(data->sg, sg, data->sg_len, i) {
-			if (sg->length % data->blksz) {
-				WARN_ONCE(1, "unaligned sg len %u blksize %u\n",
-					  sg->length, data->blksz);
+			if (sg->length % data->blksz)
 				return;
-			}
 		}
 	}
 
