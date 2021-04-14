@@ -221,14 +221,15 @@ int jbd2_log_do_checkpoint(journal_t *journal)
 	result = jbd2_cleanup_journal_tail(journal);
 	trace_jbd2_checkpoint(journal, result);
 	jbd_debug(1, "cleanup_journal_tail returned %d\n", result);
-	if (result <= 0)
+	if (result == 0)
 		return result;
+	if (result < 0)
+		goto error;
 
 	/*
 	 * OK, we need to start writing disk blocks.  Take one transaction
 	 * and write it.
 	 */
-	result = 0;
 	spin_lock(&journal->j_list_lock);
 	if (!journal->j_checkpoint_transactions)
 		goto out;
@@ -295,8 +296,6 @@ restart:
 			goto restart;
 		}
 		if (!buffer_dirty(bh)) {
-			if (unlikely(buffer_write_io_error(bh)) && !result)
-				result = -EIO;
 			BUFFER_TRACE(bh, "remove from checkpoint");
 			if (__jbd2_journal_remove_checkpoint(jh))
 				/* The transaction was released; we're done */
@@ -356,9 +355,6 @@ restart2:
 			spin_lock(&journal->j_list_lock);
 			goto restart2;
 		}
-		if (unlikely(buffer_write_io_error(bh)) && !result)
-			result = -EIO;
-
 		/*
 		 * Now in whatever state the buffer currently is, we
 		 * know that it has been written out and so we can
@@ -369,12 +365,13 @@ restart2:
 	}
 out:
 	spin_unlock(&journal->j_list_lock);
-	if (result < 0)
+	result = jbd2_cleanup_journal_tail(journal);
+	if (result >= 0)
+		return 0;
+error:
+	if (!is_journal_aborted(journal))
 		jbd2_journal_abort(journal, result);
-	else
-		result = jbd2_cleanup_journal_tail(journal);
-
-	return (result < 0) ? result : 0;
+	return result;
 }
 
 /*
@@ -400,7 +397,7 @@ int jbd2_cleanup_journal_tail(journal_t *journal)
 	tid_t		first_tid;
 	unsigned long	blocknr;
 
-	if (is_journal_aborted(journal))
+	if (is_journal_aborted(journal) || journal->j_checkpoint_io_error)
 		return -EIO;
 
 	if (!jbd2_journal_get_log_tail(journal, &first_tid, &blocknr))
@@ -564,6 +561,7 @@ int __jbd2_journal_remove_checkpoint(struct journal_head *jh)
 	struct transaction_chp_stats_s *stats;
 	transaction_t *transaction;
 	journal_t *journal;
+	struct buffer_head *bh = jh2bh(jh);
 
 	JBUFFER_TRACE(jh, "entry");
 
@@ -575,6 +573,14 @@ int __jbd2_journal_remove_checkpoint(struct journal_head *jh)
 	journal = transaction->t_journal;
 
 	JBUFFER_TRACE(jh, "removing from transaction");
+	/*
+	 * If the buffer has been failed to write out to disk, it may probably
+	 * lead to filesystem inconsistency after remove it from the log, so
+	 * mark the journal checkpoint write back IO error.
+	 */
+	if (buffer_write_io_error(bh))
+		journal->j_checkpoint_io_error = true;
+
 	__buffer_unlink(jh);
 	jh->b_cp_transaction = NULL;
 	jbd2_journal_put_journal_head(jh);

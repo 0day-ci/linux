@@ -851,6 +851,13 @@ struct journal_s
 	transaction_t		*j_checkpoint_transactions;
 
 	/**
+	 * @j_checkpoint_io_error:
+	 *
+	 * Detect io error while writing back original buffer to disk.
+	 */
+	bool			j_checkpoint_io_error;
+
+	/**
 	 * @j_wait_transaction_locked:
 	 *
 	 * Wait queue for waiting for a locked transaction to start committing,
