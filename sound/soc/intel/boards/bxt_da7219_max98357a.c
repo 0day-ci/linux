@@ -253,6 +253,30 @@ static int broxton_da7219_codec_init(struct snd_soc_pcm_runtime *rtd)
 	return ret;
 }
 
+static int max98390_hw_params(struct snd_pcm_substream *substream,
+				struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai;
+	int j;
+
+	for_each_rtd_codec_dais(rtd, j, codec_dai) {
+		if (!strcmp(codec_dai->component->name, MAX98390_DEV0_NAME)) {
+			/* DEV0 tdm slot configuration */
+			snd_soc_dai_set_tdm_slot(codec_dai, 0x1, 3, 2, 32);
+		}
+		if (!strcmp(codec_dai->component->name, MAX98390_DEV1_NAME)) {
+			/* DEV1 tdm slot configuration */
+			snd_soc_dai_set_tdm_slot(codec_dai, 0x2, 3, 2, 32);
+		}
+	}
+	return 0;
+}
+
+struct snd_soc_ops max_98390_ops = {
+	.hw_params = max98390_hw_params,
+};
+
 static int broxton_hdmi_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct bxt_card_private *ctx = snd_soc_card_get_drvdata(rtd->card);
@@ -813,6 +837,7 @@ static int broxton_audio_probe(struct platform_device *pdev)
 				if (ctx->spkamp == SPKAMP_MAX98390) {
 					broxton_dais[i].codecs = max98390_codec;
 					broxton_dais[i].num_codecs = ARRAY_SIZE(max98390_codec);
+					broxton_dais[i].ops = &max_98390_ops;
 					broxton_dais[i].dpcm_capture = 1;
 				}
 			}
