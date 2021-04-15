@@ -51,7 +51,6 @@
 #include "fw.h"
 #include "fw_qos.h"
 #include "mlx4_stats.h"
-
 #define CMD_POLL_TOKEN 0xffff
 #define INBOX_MASK	0xffffffffffffff00ULL
 
@@ -2241,48 +2240,58 @@ void mlx4_master_comm_channel(struct work_struct *work)
 	struct mlx4_priv *priv =
 		container_of(mfunc, struct mlx4_priv, mfunc);
 	struct mlx4_dev *dev = &priv->dev;
-	__be32 *bit_vec;
 	u32 comm_cmd;
-	u32 vec;
-	int i, j, slave;
+	int i, slave;
 	int toggle;
 	int served = 0;
 	int reported = 0;
 	u32 slt;
+	u32 lbit_vec[COMM_CHANNEL_BIT_ARRAY_SIZE];
+	u32 nmbr_bits;
+	u32 prev_slave;
+	bool first = true;
 
-	bit_vec = master->comm_arm_bit_vector;
-	for (i = 0; i < COMM_CHANNEL_BIT_ARRAY_SIZE; i++) {
-		vec = be32_to_cpu(bit_vec[i]);
-		for (j = 0; j < 32; j++) {
-			if (!(vec & (1 << j)))
-				continue;
-			++reported;
-			slave = (i * 32) + j;
-			comm_cmd = swab32(readl(
-					  &mfunc->comm[slave].slave_write));
-			slt = swab32(readl(&mfunc->comm[slave].slave_read))
-				     >> 31;
-			toggle = comm_cmd >> 31;
-			if (toggle != slt) {
-				if (master->slave_state[slave].comm_toggle
-				    != slt) {
-					pr_info("slave %d out of sync. read toggle %d, state toggle %d. Resynching.\n",
-						slave, slt,
-						master->slave_state[slave].comm_toggle);
-					master->slave_state[slave].comm_toggle =
-						slt;
-				}
-				mlx4_master_do_cmd(dev, slave,
-						   comm_cmd >> 16 & 0xff,
-						   comm_cmd & 0xffff, toggle);
-				++served;
-			}
+	for (i = 0; i < COMM_CHANNEL_BIT_ARRAY_SIZE; i++)
+		lbit_vec[i] = be32_to_cpu(master->comm_arm_bit_vector[i]);
+	nmbr_bits = dev->persist->num_vfs + 1;
+	if (++priv->next_slave >= nmbr_bits)
+		priv->next_slave = 0;
+	slave = priv->next_slave;
+	while (true) {
+		slave = find_next_bit((const unsigned long *)&lbit_vec, nmbr_bits, slave);
+		if  (!first && slave >= priv->next_slave) {
+			break;
+		} else if (slave == nmbr_bits) {
+			if (!first)
+				break;
+			first = false;
+			slave = 0;
+			continue;
 		}
+		++reported;
+		comm_cmd = swab32(readl(&mfunc->comm[slave].slave_write));
+		slt = swab32(readl(&mfunc->comm[slave].slave_read)) >> 31;
+		toggle = comm_cmd >> 31;
+		if (toggle != slt) {
+			if (master->slave_state[slave].comm_toggle
+			    != slt) {
+				pr_info("slave %d out of sync. read toggle %d, state toggle %d. Resynching.\n",
+					slave, slt,
+					master->slave_state[slave].comm_toggle);
+				master->slave_state[slave].comm_toggle =
+					slt;
+			}
+			mlx4_master_do_cmd(dev, slave,
+					   comm_cmd >> 16 & 0xff,
+					   comm_cmd & 0xffff, toggle);
+			++served;
+		}
+		prev_slave = slave++;
 	}
 
 	if (reported && reported != served)
-		mlx4_warn(dev, "Got command event with bitmask from %d slaves but %d were served\n",
-			  reported, served);
+		mlx4_warn(dev, "Got command event with bitmask from %d slaves but %d were served %x %d\n",
+			  reported, served, lbit_vec[0], priv->next_slave);
 
 	if (mlx4_ARM_COMM_CHANNEL(dev))
 		mlx4_warn(dev, "Failed to arm comm channel events\n");

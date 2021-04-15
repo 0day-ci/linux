@@ -924,6 +924,7 @@ struct mlx4_priv {
 
 	atomic_t		opreq_count;
 	struct work_struct	opreq_task;
+	u32			next_slave; /* mlx4_master_comm_channel */
 };
 
 static inline struct mlx4_priv *mlx4_priv(struct mlx4_dev *dev)
