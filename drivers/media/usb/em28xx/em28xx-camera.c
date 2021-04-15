@@ -340,7 +340,7 @@ int em28xx_init_camera(struct em28xx *dev)
 		v4l2->sensor_xtal = 4300000;
 		pdata.xtal = v4l2->sensor_xtal;
 		if (NULL ==
-		    v4l2_i2c_new_subdev_board(&v4l2->v4l2_dev, adap,
+		    v4l2_i2c_new_subdev_board(v4l2->v4l2_dev, adap,
 					      &mt9v011_info, NULL))
 			return -ENODEV;
 		v4l2->vinmode = EM28XX_VINMODE_RGB8_GRBG;
@@ -394,7 +394,7 @@ int em28xx_init_camera(struct em28xx *dev)
 		v4l2->sensor_yres = 480;
 
 		subdev =
-		     v4l2_i2c_new_subdev_board(&v4l2->v4l2_dev, adap,
+		     v4l2_i2c_new_subdev_board(v4l2->v4l2_dev, adap,
 					       &ov2640_info, NULL);
 		if (!subdev)
 			return -ENODEV;

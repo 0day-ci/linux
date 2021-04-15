@@ -552,10 +552,10 @@ struct em28xx_v4l2 {
 	struct kref ref;
 	struct em28xx *dev;
 
-	struct v4l2_device v4l2_dev;
+	struct v4l2_device *v4l2_dev;
 	struct v4l2_ctrl_handler ctrl_handler;
 
-	struct video_device vdev;
+	struct video_device *vdev;
 	struct video_device vbi_dev;
 	struct video_device radio_dev;
 
@@ -601,7 +601,7 @@ struct em28xx_v4l2 {
 	unsigned int field_count;
 
 #ifdef CONFIG_MEDIA_CONTROLLER
-	struct media_pad video_pad, vbi_pad;
+	struct media_pad *video_pad, vbi_pad;
 	struct media_entity *decoder;
 #endif
 };
