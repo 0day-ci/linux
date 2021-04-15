@@ -138,6 +138,23 @@ static void save_hv_return_state(struct kvm_vcpu *vcpu, int trap,
 	case BOOK3S_INTERRUPT_H_EMUL_ASSIST:
 		hr->heir = vcpu->arch.emul_inst;
 		break;
+	case BOOK3S_INTERRUPT_H_FAC_UNAVAIL:
+	{
+		u8 cause = vcpu->arch.hfscr >> 56;
+
+		WARN_ON_ONCE(cause >= BITS_PER_LONG);
+
+		if (hr->hfscr & (1UL << cause)) {
+			hr->hfscr &= ~HFSCR_INTR_CAUSE;
+			/*
+			 * We have not restored L1 state yet, so queue
+			 * this interrupt instead of delivering it
+			 * immediately.
+			 */
+			kvmppc_book3s_queue_irqprio(vcpu, BOOK3S_INTERRUPT_PROGRAM);
+		}
+		break;
+	}
 	}
 }
 
