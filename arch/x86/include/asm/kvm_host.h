@@ -1047,6 +1047,8 @@ struct kvm_arch {
 
 	bool bus_lock_detection_enabled;
 
+	bool hypercall_exit_enabled;
+
 	/* Guest can access the SGX PROVISIONKEY. */
 	bool sgx_provisioning_allowed;
 

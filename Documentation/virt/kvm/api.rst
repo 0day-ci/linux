@@ -6766,3 +6766,14 @@ they will get passed on to user space. So user space still has to have
 an implementation for these despite the in kernel acceleration.
 
 This capability is always enabled.
+
+8.32 KVM_CAP_EXIT_HYPERCALL
+---------------------------
+
+:Capability: KVM_CAP_EXIT_HYPERCALL
+:Architectures: x86
+:Type: vm
+
+This capability, if enabled, will cause KVM to exit to userspace
+with KVM_EXIT_HYPERCALL exit reason to process some hypercalls.
+Right now, the only such hypercall is KVM_HC_PAGE_ENC_STATUS.
