@@ -925,7 +925,7 @@ static int cxl_mem_setup_regs(struct cxl_mem *cxlm)
 			cxlm->memdev_regs = register_block;
 			break;
 		default:
-			dev_dbg(dev, "Unknown cap ID: %d (0x%x)\n", cap_id, offset);
+			dev_dbg(dev, "Unknown cap ID: %x (0x%x)\n", cap_id, offset);
 			break;
 		}
 	}
