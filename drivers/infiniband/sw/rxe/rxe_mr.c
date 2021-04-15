@@ -55,21 +55,6 @@ static void rxe_mr_init(int access, struct rxe_mr *mr)
 	mr->map_shift = ilog2(RXE_BUF_PER_MAP);
 }
 
-void rxe_mr_cleanup(struct rxe_pool_entry *arg)
-{
-	struct rxe_mr *mr = container_of(arg, typeof(*mr), pelem);
-	int i;
-
-	ib_umem_release(mr->umem);
-
-	if (mr->map) {
-		for (i = 0; i < mr->num_map; i++)
-			kfree(mr->map[i]);
-
-		kfree(mr->map);
-	}
-}
-
 static int rxe_mr_alloc(struct rxe_mr *mr, int num_buf)
 {
 	int i;
@@ -539,4 +524,48 @@ struct rxe_mr *lookup_mr(struct rxe_pd *pd, int access, u32 key,
 	}
 
 	return mr;
+}
+
+int rxe_invalidate_mr(struct rxe_qp *qp, u32 rkey)
+{
+	struct rxe_dev *rxe = to_rdev(qp->ibqp.device);
+	struct rxe_mr *mr;
+	int ret;
+
+	mr = rxe_pool_get_index(&rxe->mr_pool, rkey >> 8);
+	if (!mr) {
+		pr_err("%s: No MR for rkey %#x\n", __func__, rkey);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (rkey != mr->ibmr.rkey) {
+		pr_err("%s: rkey (%#x) doesn't match mr->ibmr.rkey (%#x)\n",
+			__func__, rkey, mr->ibmr.rkey);
+		ret = -EINVAL;
+		goto err_drop_ref;
+	}
+
+	mr->state = RXE_MR_STATE_FREE;
+	ret = 0;
+
+err_drop_ref:
+	rxe_drop_ref(mr);
+err:
+	return ret;
+}
+
+void rxe_mr_cleanup(struct rxe_pool_entry *arg)
+{
+	struct rxe_mr *mr = container_of(arg, typeof(*mr), pelem);
+	int i;
+
+	ib_umem_release(mr->umem);
+
+	if (mr->map) {
+		for (i = 0; i < mr->num_map; i++)
+			kfree(mr->map[i]);
+
+		kfree(mr->map);
+	}
 }
