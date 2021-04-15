@@ -810,6 +810,32 @@ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
 EXPORT_SYMBOL_GPL(devm_of_phy_get);
 
 /**
+ * devm_of_phy_optional_get_by_index() - lookup and obtain a reference to an optional phy by index.
+ * @dev: device that requests this phy
+ * @np: node containing the phy
+ * @index: index of the phy
+ *
+ * Gets the phy using _of_phy_get(), then gets a refcount to it,
+ * and associates a device with it using devres. On driver detach,
+ * release function is invoked on the devres data, then,
+ * devres data is freed. This differs to devm_of_phy_get_by_index() in
+ * that if the phy does not exist, it is not considered an error and
+ * -ENODEV will not be returned. Instead the NULL phy is returned,
+ * which can be passed to all other phy consumer calls.
+ */
+struct phy *devm_of_phy_optional_get_by_index(struct device *dev, struct device_node *np,
+					      int index)
+{
+	struct phy *phy = devm_of_phy_get_by_index(dev, np, index);
+
+	if (PTR_ERR(phy) == -ENODEV)
+		phy = NULL;
+
+	return phy;
+}
+EXPORT_SYMBOL_GPL(devm_of_phy_optional_get_by_index);
+
+/**
  * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by index.
  * @dev: device that requests this phy
  * @np: node containing the phy
