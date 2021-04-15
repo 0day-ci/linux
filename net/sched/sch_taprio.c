@@ -901,6 +901,10 @@ static int parse_taprio_schedule(struct taprio_sched *q, struct nlattr **tb,
 
 		list_for_each_entry(entry, &new->entries, list)
 			cycle = ktime_add_ns(cycle, entry->interval);
+
+		if (!cycle)
+			return -EINVAL;
+
 		new->cycle_time = cycle;
 	}
 
