@@ -2031,7 +2031,8 @@ create_host_pipeline_structure(struct ia_css_stream *stream) {
 /* creates a host pipeline for all pipes in a stream. Called during
  * stream_start. */
 static int
-create_host_pipeline(struct ia_css_stream *stream) {
+create_host_pipeline(struct ia_css_stream *stream)
+{
 	struct ia_css_pipe *copy_pipe = NULL, *capture_pipe = NULL;
 	struct ia_css_pipe *acc_pipe = NULL;
 	enum ia_css_pipe_id pipe_id;
@@ -2040,8 +2041,7 @@ create_host_pipeline(struct ia_css_stream *stream) {
 	unsigned int max_input_width = 0;
 
 	IA_CSS_ENTER_PRIVATE("stream = %p", stream);
-	if (!stream)
-	{
+	if (!stream) {
 		IA_CSS_LEAVE_ERR_PRIVATE(-EINVAL);
 		return -EINVAL;
 	}
@@ -2052,8 +2052,7 @@ create_host_pipeline(struct ia_css_stream *stream) {
 	/* No continuous frame allocation for capture pipe. It uses the
 	 * "main" pipe's frames. */
 	if ((pipe_id == IA_CSS_PIPE_ID_PREVIEW) ||
-	    (pipe_id == IA_CSS_PIPE_ID_VIDEO))
-	{
+	    (pipe_id == IA_CSS_PIPE_ID_VIDEO)) {
 		/* About pipe_id == IA_CSS_PIPE_ID_PREVIEW && stream->config.mode != IA_CSS_INPUT_MODE_MEMORY:
 		 * The original condition pipe_id == IA_CSS_PIPE_ID_PREVIEW is too strong. E.g. in SkyCam (with memory
 		 * based input frames) there is no continuous mode and thus no need for allocated continuous frames
@@ -2071,24 +2070,21 @@ create_host_pipeline(struct ia_css_stream *stream) {
 
 #if !defined(ISP2401)
 	/* old isys: need to allocate_mipi_frames() even in IA_CSS_PIPE_MODE_COPY */
-	if (pipe_id != IA_CSS_PIPE_ID_ACC)
-	{
+	if (pipe_id != IA_CSS_PIPE_ID_ACC) {
 		err = allocate_mipi_frames(main_pipe, &stream->info);
 		if (err)
 			goto ERR;
 	}
 #elif defined(ISP2401)
 	if ((pipe_id != IA_CSS_PIPE_ID_ACC) &&
-	    (main_pipe->config.mode != IA_CSS_PIPE_MODE_COPY))
-	{
+	    (main_pipe->config.mode != IA_CSS_PIPE_MODE_COPY)) {
 		err = allocate_mipi_frames(main_pipe, &stream->info);
 		if (err)
 			goto ERR;
 	}
 #endif
 
-	switch (pipe_id)
-	{
+	switch (pipe_id) {
 	case IA_CSS_PIPE_ID_PREVIEW:
 		copy_pipe    = main_pipe->pipe_settings.preview.copy_pipe;
 		capture_pipe = main_pipe->pipe_settings.preview.capture_pipe;
@@ -2138,31 +2134,27 @@ create_host_pipeline(struct ia_css_stream *stream) {
 	if (err)
 		goto ERR;
 
-	if (copy_pipe)
-	{
+	if (copy_pipe) {
 		err = create_host_copy_pipeline(copy_pipe, max_input_width,
 						main_pipe->continuous_frames[0]);
 		if (err)
 			goto ERR;
 	}
 
-	if (capture_pipe)
-	{
+	if (capture_pipe) {
 		err = create_host_capture_pipeline(capture_pipe);
 		if (err)
 			goto ERR;
 	}
 
-	if (acc_pipe)
-	{
+	if (acc_pipe) {
 		err = create_host_acc_pipeline(acc_pipe);
 		if (err)
 			goto ERR;
 	}
 
 	/* DH regular multi pipe - not continuous mode: create the next pipelines too */
-	if (!stream->config.continuous)
-	{
+	if (!stream->config.continuous) {
 		int i;
 
 		for (i = 1; i < stream->num_pipes && 0 == err; i++) {
