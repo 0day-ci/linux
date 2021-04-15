@@ -25,9 +25,9 @@ static __always_inline void kvm_guest_enter_irqoff(void)
 	instrumentation_begin();
 	trace_hardirqs_on_prepare();
 	lockdep_hardirqs_on_prepare(CALLER_ADDR0);
+	guest_enter_irqoff();
 	instrumentation_end();
 
-	guest_enter_irqoff();
 	lockdep_hardirqs_on(CALLER_ADDR0);
 }
 
