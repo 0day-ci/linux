@@ -26,3 +26,11 @@
 		stdout-path = "serial0:115200n8";
 	};
 };
+
+&ltdc {
+	port {
+		ltdc_ep0_out: endpoint {
+			remote-endpoint = <&sii9022_in>;
+		};
+	};
+};

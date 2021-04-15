@@ -1471,11 +1471,7 @@
 			resets = <&rcc LTDC_R>;
 			status = "disabled";
 
-			port {
-				#address-cells = <1>;
-				#size-cells = <0>;
 			};
-		};
 
 		iwdg2: watchdog@5a002000 {
 			compatible = "st,stm32mp1-iwdg";
