@@ -6639,17 +6639,24 @@ static noinstr void vmx_vcpu_enter_exit(struct kvm_vcpu *vcpu,
 	 * have them in state 'on' as recorded before entering guest mode.
 	 * Same as enter_from_user_mode().
 	 *
-	 * guest_exit_irqoff() restores host context and reinstates RCU if
-	 * enabled and required.
+	 * context_tracking_guest_exit_irqoff() restores host context and
+	 * reinstates RCU if enabled and required.
 	 *
 	 * This needs to be done before the below as native_read_msr()
 	 * contains a tracepoint and x86_spec_ctrl_restore_host() calls
 	 * into world and some more.
 	 */
 	lockdep_hardirqs_off(CALLER_ADDR0);
-	guest_exit_irqoff();
+	context_tracking_guest_exit_irqoff();
 
 	instrumentation_begin();
+	/*
+	 * Account guest time when precise accounting based on context tracking
+	 * is enabled.  Tick based accounting is deferred until after IRQs that
+	 * occurred within the VM-Enter/VM-Exit "window" are handled.
+	 */
+	if (vtime_accounting_enabled_this_cpu())
+		vtime_account_guest_exit();
 	trace_hardirqs_off_finish();
 	instrumentation_end();
 }
