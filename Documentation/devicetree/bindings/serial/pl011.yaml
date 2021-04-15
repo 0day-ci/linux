@@ -34,6 +34,9 @@ properties:
   reg:
     maxItems: 1
 
+  label:
+    maxItems: 1
+
   interrupts:
     maxItems: 1
 
