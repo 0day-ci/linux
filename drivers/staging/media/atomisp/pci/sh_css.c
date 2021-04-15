@@ -1391,7 +1391,8 @@ start_binary(struct ia_css_pipe *pipe,
 /* start the copy function on the SP */
 static int
 start_copy_on_sp(struct ia_css_pipe *pipe,
-		 struct ia_css_frame *out_frame) {
+		 struct ia_css_frame *out_frame)
+{
 	(void)out_frame;
 	assert(pipe);
 	assert(pipe->stream);
@@ -1409,8 +1410,7 @@ start_copy_on_sp(struct ia_css_pipe *pipe,
 	sh_css_sp_start_binary_copy(ia_css_pipe_get_pipe_num(pipe), out_frame, pipe->stream->config.pixels_per_clock == 2);
 
 #if !defined(ISP2401)
-	if (pipe->stream->reconfigure_css_rx)
-	{
+	if (pipe->stream->reconfigure_css_rx) {
 		ia_css_isys_rx_configure(&pipe->stream->csi_rx_config,
 					 pipe->stream->config.mode);
 		pipe->stream->reconfigure_css_rx = false;
@@ -1599,7 +1599,8 @@ ia_css_reset_defaults(struct sh_css *css)
 
 int
 ia_css_load_firmware(struct device *dev, const struct ia_css_env *env,
-		     const struct ia_css_fw  *fw) {
+		     const struct ia_css_fw  *fw)
+{
 	int err;
 
 	if (!env)
@@ -1610,16 +1611,14 @@ ia_css_load_firmware(struct device *dev, const struct ia_css_env *env,
 	ia_css_debug_dtrace(IA_CSS_DEBUG_TRACE, "ia_css_load_firmware() enter\n");
 
 	/* make sure we initialize my_css */
-	if (my_css.flush != env->cpu_mem_env.flush)
-	{
+	if (my_css.flush != env->cpu_mem_env.flush) {
 		ia_css_reset_defaults(&my_css);
 		my_css.flush = env->cpu_mem_env.flush;
 	}
 
 	ia_css_unload_firmware(); /* in case we are called twice */
 	err = sh_css_load_firmware(dev, fw->data, fw->bytes);
-	if (!err)
-	{
+	if (!err) {
 		err = ia_css_binary_init_infos();
 		if (!err)
 			fw_explicitly_loaded = true;
@@ -1633,7 +1632,8 @@ int
 ia_css_init(struct device *dev, const struct ia_css_env *env,
 	    const struct ia_css_fw  *fw,
 	    u32                 mmu_l1_base,
-	    enum ia_css_irq_type     irq_type) {
+	    enum ia_css_irq_type     irq_type)
+{
 	int err;
 	ia_css_spctrl_cfg spctrl_cfg;
 
@@ -1707,16 +1707,14 @@ ia_css_init(struct device *dev, const struct ia_css_env *env,
 	my_css.flush     = flush_func;
 
 	err = ia_css_rmgr_init();
-	if (err)
-	{
+	if (err) {
 		IA_CSS_LEAVE_ERR(err);
 		return err;
 	}
 
 	IA_CSS_LOG("init: %d", my_css_save_initialized);
 
-	if (!my_css_save_initialized)
-	{
+	if (!my_css_save_initialized) {
 		my_css_save_initialized = true;
 		my_css_save.mode = sh_css_mode_working;
 		memset(my_css_save.stream_seeds, 0,
@@ -1744,19 +1742,16 @@ ia_css_init(struct device *dev, const struct ia_css_env *env,
 	gpio_reg_store(GPIO0_ID, _gpio_block_reg_do_0, 0);
 
 	err = ia_css_refcount_init(REFCOUNT_SIZE);
-	if (err)
-	{
+	if (err) {
 		IA_CSS_LEAVE_ERR(err);
 		return err;
 	}
 	err = sh_css_params_init();
-	if (err)
-	{
+	if (err) {
 		IA_CSS_LEAVE_ERR(err);
 		return err;
 	}
-	if (fw)
-	{
+	if (fw) {
 		ia_css_unload_firmware(); /* in case we already had firmware loaded */
 		err = sh_css_load_firmware(dev, fw->data, fw->bytes);
 		if (err) {
@@ -1777,23 +1772,20 @@ ia_css_init(struct device *dev, const struct ia_css_env *env,
 		return -EINVAL;
 
 	err = ia_css_spctrl_load_fw(SP0_ID, &spctrl_cfg);
-	if (err)
-	{
+	if (err) {
 		IA_CSS_LEAVE_ERR(err);
 		return err;
 	}
 
 #if WITH_PC_MONITORING
-	if (!thread_alive)
-	{
+	if (!thread_alive) {
 		thread_alive++;
 		sh_css_print("PC_MONITORING: %s() -- create thread DISABLED\n",
 			     __func__);
 		spying_thread_create();
 	}
 #endif
-	if (!sh_css_hrt_system_is_idle())
-	{
+	if (!sh_css_hrt_system_is_idle()) {
 		IA_CSS_LEAVE_ERR(-EBUSY);
 		return -EBUSY;
 	}
