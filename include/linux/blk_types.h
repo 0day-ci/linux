@@ -304,6 +304,7 @@ enum {
 	BIO_CGROUP_ACCT,	/* has been accounted to a cgroup */
 	BIO_TRACKED,		/* set if bio goes through the rq_qos path */
 	BIO_REMAPPED,
+	BIO_QUEUE_REFFED,	/* need to put queue refcnt */
 	BIO_FLAG_LAST
 };
 

@@ -922,7 +922,7 @@ extern int get_sg_io_hdr(struct sg_io_hdr *hdr, const void __user *argp);
 extern int put_sg_io_hdr(const struct sg_io_hdr *hdr, void __user *argp);
 
 extern int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags);
-extern void blk_queue_exit(struct request_queue *q);
+extern void __blk_queue_exit(struct request_queue *q, unsigned int nr);
 extern void blk_sync_queue(struct request_queue *q);
 extern int blk_rq_map_user(struct request_queue *, struct request *,
 			   struct rq_map_data *, void __user *, unsigned long,
@@ -943,6 +943,11 @@ int blk_status_to_errno(blk_status_t status);
 blk_status_t errno_to_blk_status(int errno);
 
 int blk_poll(struct request_queue *q, blk_qc_t cookie, bool spin);
+
+static inline void blk_queue_exit(struct request_queue *q)
+{
+	__blk_queue_exit(q, 1);
+}
 
 static inline struct request_queue *bdev_get_queue(struct block_device *bdev)
 {

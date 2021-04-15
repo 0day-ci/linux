@@ -312,6 +312,12 @@ blk_qc_t nvme_ns_head_submit_bio(struct bio *bio)
 	srcu_idx = srcu_read_lock(&head->srcu);
 	ns = nvme_find_path(head);
 	if (likely(ns)) {
+		/*
+		 * this bio's ownership is transferred to underlying queue, so
+		 * clear the queue reffed flag and let underlying queue to put
+		 * the multipath queue for us.
+		 */
+		bio_clear_flag(bio, BIO_QUEUE_REFFED);
 		bio_set_dev(bio, ns->disk->part0);
 		bio->bi_opf |= REQ_NVME_MPATH;
 		trace_block_bio_remap(bio, disk_devt(ns->head->disk),

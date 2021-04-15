@@ -1380,14 +1380,18 @@ static inline bool bio_remaining_done(struct bio *bio)
  **/
 void bio_endio(struct bio *bio)
 {
+	struct block_device *bdev;
+	bool put_queue;
 again:
+	bdev = bio->bi_bdev;
+	put_queue = bio_flagged(bio, BIO_QUEUE_REFFED);
 	if (!bio_remaining_done(bio))
 		return;
 	if (!bio_integrity_endio(bio))
 		return;
 
-	if (bio->bi_bdev)
-		rq_qos_done_bio(bio->bi_bdev->bd_disk->queue, bio);
+	if (bdev)
+		rq_qos_done_bio(bdev->bd_disk->queue, bio);
 
 	/*
 	 * Need to have a real endio function for chained bios, otherwise
@@ -1399,6 +1403,8 @@ again:
 	 */
 	if (bio->bi_end_io == bio_chain_endio) {
 		bio = __bio_chain_endio(bio);
+		if (bdev && put_queue)
+			blk_queue_exit(bdev->bd_disk->queue);
 		goto again;
 	}
 
@@ -1412,6 +1418,8 @@ again:
 	bio_uninit(bio);
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio);
+	if (bdev && put_queue)
+		blk_queue_exit(bdev->bd_disk->queue);
 }
 EXPORT_SYMBOL(bio_endio);
 

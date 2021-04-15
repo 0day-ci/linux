@@ -323,14 +323,30 @@ static inline enum nvme_disposition nvme_decide_disposition(struct request *req)
 static inline void nvme_end_req(struct request *req)
 {
 	blk_status_t status = nvme_error_status(nvme_req(req)->status);
+	const bool mpath = req->cmd_flags & REQ_NVME_MPATH;
+	unsigned int nr = 0;
+	struct bio *bio;
+	struct nvme_ns *ns;
 
 	if (IS_ENABLED(CONFIG_BLK_DEV_ZONED) &&
 	    req_op(req) == REQ_OP_ZONE_APPEND)
 		req->__sector = nvme_lba_to_sect(req->q->queuedata,
 			le64_to_cpu(nvme_req(req)->result.u64));
 
+	if (mpath) {
+		ns = req->q->queuedata;
+		__rq_for_each_bio(bio, req)
+			nr++;
+	}
 	nvme_trace_bio_complete(req);
 	blk_mq_end_request(req, status);
+
+	/*
+	 * We changed multipath bio->bi_bdev, so have to drop the queue
+	 * reference manually
+	 */
+	if (mpath && nr)
+		__blk_queue_exit(ns->head->disk->queue, nr);
 }
 
 void nvme_complete_rq(struct request *req)

@@ -431,12 +431,13 @@ EXPORT_SYMBOL(blk_cleanup_queue);
 int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 {
 	const bool pm = flags & BLK_MQ_REQ_PM;
+	const unsigned int nr = (flags & BLK_MQ_REQ_DOUBLE_REF) ? 2 : 1;
 
 	while (true) {
 		bool success = false;
 
 		rcu_read_lock();
-		if (percpu_ref_tryget_live(&q->q_usage_counter)) {
+		if (percpu_ref_tryget_many_live(&q->q_usage_counter, nr)) {
 			/*
 			 * The code that increments the pm_only counter is
 			 * responsible for ensuring that that counter is
@@ -446,7 +447,7 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 			    !blk_queue_pm_only(q)) {
 				success = true;
 			} else {
-				percpu_ref_put(&q->q_usage_counter);
+				percpu_ref_put_many(&q->q_usage_counter, nr);
 			}
 		}
 		rcu_read_unlock();
@@ -480,8 +481,18 @@ static inline int bio_queue_enter(struct bio *bio)
 	struct request_queue *q = bio->bi_bdev->bd_disk->queue;
 	bool nowait = bio->bi_opf & REQ_NOWAIT;
 	int ret;
+	blk_mq_req_flags_t flags = nowait ? BLK_MQ_REQ_NOWAIT : 0;
+	bool reffed = bio_flagged(bio, BIO_QUEUE_REFFED);
 
-	ret = blk_queue_enter(q, nowait ? BLK_MQ_REQ_NOWAIT : 0);
+	if (!reffed)
+		bio_set_flag(bio, BIO_QUEUE_REFFED);
+
+	/*
+	 * Grab two queue references for blk-mq, one is for bio, and
+	 * another is for blk-mq request.
+	 */
+	ret = blk_queue_enter(q, q->mq_ops && !reffed ?
+			(flags | BLK_MQ_REQ_DOUBLE_REF) : flags);
 	if (unlikely(ret)) {
 		if (nowait && !blk_queue_dying(q))
 			bio_wouldblock_error(bio);
@@ -492,10 +503,11 @@ static inline int bio_queue_enter(struct bio *bio)
 	return ret;
 }
 
-void blk_queue_exit(struct request_queue *q)
+void __blk_queue_exit(struct request_queue *q, unsigned int nr)
 {
-	percpu_ref_put(&q->q_usage_counter);
+	percpu_ref_put_many(&q->q_usage_counter, nr);
 }
+EXPORT_SYMBOL_GPL(__blk_queue_exit);
 
 static void blk_queue_usage_counter_release(struct percpu_ref *ref)
 {
@@ -920,7 +932,6 @@ static blk_qc_t __submit_bio(struct bio *bio)
 			return blk_mq_submit_bio(bio);
 		ret = disk->fops->submit_bio(bio);
 	}
-	blk_queue_exit(disk->queue);
 	return ret;
 }
 
