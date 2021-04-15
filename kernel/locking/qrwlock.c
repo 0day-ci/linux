@@ -73,8 +73,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
 
 	/* When no more readers or writers, set the locked flag */
 	do {
-		atomic_cond_read_acquire(&lock->cnts, VAL == _QW_WAITING);
-	} while (atomic_cmpxchg_relaxed(&lock->cnts, _QW_WAITING,
+		atomic_cond_read_relaxed(&lock->cnts, VAL == _QW_WAITING);
+	} while (atomic_cmpxchg_acquire(&lock->cnts, _QW_WAITING,
 					_QW_LOCKED) != _QW_WAITING);
 unlock:
 	arch_spin_unlock(&lock->wait_lock);
