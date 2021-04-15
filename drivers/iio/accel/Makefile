@@ -42,6 +42,10 @@ obj-$(CONFIG_MMA7660)	+= mma7660.o
 
 obj-$(CONFIG_MMA8452)	+= mma8452.o
 
+obj-$(CONFIG_FXLS8962AF)	+= fxls8962af-core.o
+obj-$(CONFIG_FXLS8962AF_I2C)	+= fxls8962af-i2c.o
+obj-$(CONFIG_FXLS8962AF_SPI)	+= fxls8962af-spi.o
+
 obj-$(CONFIG_MMA9551_CORE)	+= mma9551_core.o
 obj-$(CONFIG_MMA9551)		+= mma9551.o
 obj-$(CONFIG_MMA9553)		+= mma9553.o
