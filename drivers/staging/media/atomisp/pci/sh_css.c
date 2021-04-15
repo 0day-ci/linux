@@ -1826,7 +1826,8 @@ ia_css_init(struct device *dev, const struct ia_css_env *env,
 }
 
 int
-ia_css_enable_isys_event_queue(bool enable) {
+ia_css_enable_isys_event_queue(bool enable)
+{
 	if (sh_css_sp_is_running())
 		return -EBUSY;
 	sh_css_sp_enable_isys_event_queue(enable);
@@ -1847,7 +1848,8 @@ sh_css_flush(struct ia_css_acc_fw *fw)
  * doing it from stream_create since we could run out of sp threads due to
  * allocation on inactive pipelines. */
 static int
-map_sp_threads(struct ia_css_stream *stream, bool map) {
+map_sp_threads(struct ia_css_stream *stream, bool map)
+{
 	struct ia_css_pipe *main_pipe = NULL;
 	struct ia_css_pipe *copy_pipe = NULL;
 	struct ia_css_pipe *capture_pipe = NULL;
@@ -1859,8 +1861,7 @@ map_sp_threads(struct ia_css_stream *stream, bool map) {
 	IA_CSS_ENTER_PRIVATE("stream = %p, map = %s",
 			     stream, map ? "true" : "false");
 
-	if (!stream)
-	{
+	if (!stream) {
 		IA_CSS_LEAVE_ERR_PRIVATE(-EINVAL);
 		return -EINVAL;
 	}
@@ -1870,8 +1871,7 @@ map_sp_threads(struct ia_css_stream *stream, bool map) {
 
 	ia_css_pipeline_map(main_pipe->pipe_num, map);
 
-	switch (pipe_id)
-	{
+	switch (pipe_id) {
 	case IA_CSS_PIPE_ID_PREVIEW:
 		copy_pipe    = main_pipe->pipe_settings.preview.copy_pipe;
 		capture_pipe = main_pipe->pipe_settings.preview.capture_pipe;
@@ -1890,23 +1890,17 @@ map_sp_threads(struct ia_css_stream *stream, bool map) {
 	}
 
 	if (acc_pipe)
-	{
 		ia_css_pipeline_map(acc_pipe->pipe_num, map);
-	}
 
 	if (capture_pipe)
-	{
 		ia_css_pipeline_map(capture_pipe->pipe_num, map);
-	}
 
 	/* Firmware expects copy pipe to be the last pipe mapped. (if needed) */
 	if (copy_pipe)
-	{
 		ia_css_pipeline_map(copy_pipe->pipe_num, map);
-	}
+
 	/* DH regular multi pipe - not continuous mode: map the next pipes too */
-	if (!stream->config.continuous)
-	{
+	if (!stream->config.continuous) {
 		int i;
 
 		for (i = 1; i < stream->num_pipes; i++)
