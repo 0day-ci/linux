@@ -388,7 +388,7 @@ static int soc_pcm_params_symmetry(struct snd_pcm_substream *substream,
 
 #define __soc_pcm_params_symmetry(name)					\
 	symmetry = rtd->dai_link->symmetric_##name;			\
-	for_each_rtd_dais(rtd, i, dai)					\
+	for_each_rtd_cpu_dais(rtd, i, dai)					\
 		symmetry |= dai->driver->symmetric_##name;		\
 									\
 	if (symmetry)							\
