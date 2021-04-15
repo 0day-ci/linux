@@ -856,9 +856,10 @@ int es58x_rx_err_msg(struct net_device *netdev, enum es58x_err error,
 	 * consistency.
 	 */
 	netdev->stats.rx_packets++;
-	netdev->stats.rx_bytes += cf->can_dlc;
 
 	if (cf) {
+		netdev->stats.rx_bytes += cf->can_dlc;
+
 		if (cf->data[1])
 			cf->can_id |= CAN_ERR_CRTL;
 		if (cf->data[2] || cf->data[3]) {
