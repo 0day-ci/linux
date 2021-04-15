@@ -329,7 +329,7 @@ static ssize_t copy_event_to_user(struct fsnotify_group *group,
 	struct fanotify_info *info = fanotify_event_info(event);
 	unsigned int fid_mode = FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS);
 	struct file *f = NULL;
-	int ret, fd = FAN_NOFD;
+	int ret, pidfd, fd = FAN_NOFD;
 	int info_type = 0;
 
 	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
@@ -340,7 +340,25 @@ static ssize_t copy_event_to_user(struct fsnotify_group *group,
 	metadata.vers = FANOTIFY_METADATA_VERSION;
 	metadata.reserved = 0;
 	metadata.mask = event->mask & FANOTIFY_OUTGOING_EVENTS;
-	metadata.pid = pid_vnr(event->pid);
+
+	if (FAN_GROUP_FLAG(group, FAN_REPORT_PIDFD) &&
+		pid_has_task(event->pid, PIDTYPE_TGID)) {
+		/*
+		 * Given FAN_REPORT_PIDFD is to be mutually exclusive with
+		 * FAN_REPORT_TID, panic here if the mutual exclusion is ever
+		 * blindly lifted without pidfds for threads actually being
+		 * supported.
+		 */
+		WARN_ON(FAN_GROUP_FLAG(group, FAN_REPORT_TID));
+
+		pidfd = pidfd_create(event->pid, 0);
+		if (unlikely(pidfd < 0))
+			metadata.pid = FAN_NOPIDFD;
+		else
+			metadata.pid = pidfd;
+	} else {
+		metadata.pid = pid_vnr(event->pid);
+	}
 
 	if (path && path->mnt && path->dentry) {
 		fd = create_fd(group, path, &f);
@@ -941,6 +959,15 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 #endif
 		return -EINVAL;
 
+	/*
+	 * A pidfd can only be returned for a thread-group leader; thus
+	 * FAN_REPORT_TID and FAN_REPORT_PIDFD need to be mutually
+	 * exclusive. Once the pidfd API supports the creation of pidfds on
+	 * individual threads, then we can look at removing this conditional.
+	 */
+	if ((flags & FAN_REPORT_PIDFD) && (flags & FAN_REPORT_TID))
+		return -EINVAL;
+
 	if (event_f_flags & ~FANOTIFY_INIT_ALL_EVENT_F_BITS)
 		return -EINVAL;
 
@@ -1312,7 +1339,7 @@ SYSCALL32_DEFINE6(fanotify_mark,
  */
 static int __init fanotify_user_setup(void)
 {
-	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_INIT_FLAGS) != 10);
+	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_INIT_FLAGS) != 11);
 	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_MARK_FLAGS) != 9);
 
 	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark,
