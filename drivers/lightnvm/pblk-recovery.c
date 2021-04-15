@@ -661,6 +661,7 @@ struct pblk_line *pblk_recov_l2p(struct pblk *pblk)
 	int meta_line;
 	int i, valid_uuid = 0;
 	LIST_HEAD(recov_list);
+	guid_t guid;
 
 	/* TODO: Implement FTL snapshot */
 
@@ -704,14 +705,15 @@ struct pblk_line *pblk_recov_l2p(struct pblk *pblk)
 			return ERR_PTR(-EINVAL);
 		}
 
+		import_guid(&guid, smeta_buf->header.uuid);
+
 		/* The first valid instance uuid is used for initialization */
 		if (!valid_uuid) {
-			import_guid(&pblk->instance_uuid, smeta_buf->header.uuid);
+			guid_copy(&pblk->instance_uuid, &guid);
 			valid_uuid = 1;
 		}
 
-		if (!guid_equal(&pblk->instance_uuid,
-				(guid_t *)&smeta_buf->header.uuid)) {
+		if (!guid_equal(&pblk->instance_uuid, &guid)) {
 			pblk_debug(pblk, "ignore line %u due to uuid mismatch\n",
 					i);
 			continue;
