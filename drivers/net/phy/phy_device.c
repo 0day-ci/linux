@@ -2562,8 +2562,25 @@ EXPORT_SYMBOL(genphy_resume);
 
 int genphy_loopback(struct phy_device *phydev, bool enable)
 {
-	return phy_modify(phydev, MII_BMCR, BMCR_LOOPBACK,
-			  enable ? BMCR_LOOPBACK : 0);
+	if (enable) {
+		u16 ctl = BMCR_LOOPBACK;
+
+		if (phydev->speed == SPEED_1000)
+			ctl |= BMCR_SPEED1000;
+		else if (phydev->speed == SPEED_100)
+			ctl |= BMCR_SPEED100;
+
+		if (phydev->duplex == DUPLEX_FULL)
+			ctl |= BMCR_FULLDPLX;
+
+		phy_modify(phydev, MII_BMCR, ~0, ctl);
+	} else {
+		phy_modify(phydev, MII_BMCR, BMCR_LOOPBACK, 0);
+
+		phy_config_aneg(phydev);
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL(genphy_loopback);
 
