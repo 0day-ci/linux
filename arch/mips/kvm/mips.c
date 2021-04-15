@@ -71,12 +71,12 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VCPU_STAT("vz_cpucfg", vz_cpucfg_exits),
 #endif
 #endif
-	VCPU_STAT("halt_successful_poll", halt_successful_poll),
-	VCPU_STAT("halt_attempted_poll", halt_attempted_poll),
-	VCPU_STAT("halt_poll_invalid", halt_poll_invalid),
-	VCPU_STAT("halt_wakeup", halt_wakeup),
-	VCPU_STAT("halt_poll_success_ns", halt_poll_success_ns),
-	VCPU_STAT("halt_poll_fail_ns", halt_poll_fail_ns),
+	VCPU_STAT_COM("halt_successful_poll", halt_successful_poll),
+	VCPU_STAT_COM("halt_attempted_poll", halt_attempted_poll),
+	VCPU_STAT_COM("halt_poll_invalid", halt_poll_invalid),
+	VCPU_STAT_COM("halt_wakeup", halt_wakeup),
+	VCPU_STAT_COM("halt_poll_success_ns", halt_poll_success_ns),
+	VCPU_STAT_COM("halt_poll_fail_ns", halt_poll_fail_ns),
 	{NULL}
 };
 
