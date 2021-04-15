@@ -996,7 +996,7 @@ static int taprio_get_start_time(struct Qdisc *sch,
 	 * something went really wrong. In that case, we should warn about this
 	 * inconsistent state and return error.
 	 */
-	if (WARN_ON(!cycle))
+	if (!cycle) {
 		return -EFAULT;
 
 	/* Schedule the start time for the beginning of the next
