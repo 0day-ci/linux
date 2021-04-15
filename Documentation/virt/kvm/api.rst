@@ -6869,3 +6869,22 @@ they will get passed on to user space. So user space still has to have
 an implementation for these despite the in kernel acceleration.
 
 This capability is always enabled.
+
+8.32 KVM_CAP_EXIT_HYPERCALL
+---------------------------
+
+:Capability: KVM_CAP_EXIT_HYPERCALL
+:Architectures: x86
+:Type: vm
+
+This capability, if enabled, will cause KVM to exit to userspace
+with KVM_EXIT_HYPERCALL exit reason to process some hypercalls.
+
+The arguments to KVM_ENABLE_CAP are a bitmask of hypercalls that
+will exit to userspace.  The bits that can be set are returned by
+KVM_CHECK_EXTENSION.  The behavior of hypercalls that are not enabled
+depends on the individual hypercall.
+
+Right now, the only bit that can be set is bit 12, corresponding to
+KVM_HC_PAGE_ENC_STATUS.  The hypercall returns ENOSYS if bit 12 is not
+set or KVM_CAP_EXIT_HYPERCALL is not enabled.
