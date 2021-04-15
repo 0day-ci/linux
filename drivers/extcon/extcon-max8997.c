@@ -664,7 +664,7 @@ static int max8997_muic_probe(struct platform_device *pdev)
 
 		ret = request_threaded_irq(virq, NULL,
 				max8997_muic_irq_handler,
-				IRQF_NO_SUSPEND,
+				IRQF_NO_SUSPEND | IRQF_ONESHOT,
 				muic_irq->name, info);
 		if (ret) {
 			dev_err(&pdev->dev,
