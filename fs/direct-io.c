@@ -1166,7 +1166,7 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	dio->flags = flags;
 	if (dio->flags & DIO_LOCKING && iov_iter_rw(iter) == READ) {
 		/* will be released by direct_io_worker */
-		inode_lock(inode);
+		inode_lock_shared(inode);
 	}
 
 	/* Once we sampled i_size check for reads beyond EOF */
@@ -1316,7 +1316,7 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	 * of protecting us from looking up uninitialized blocks.
 	 */
 	if (iov_iter_rw(iter) == READ && (dio->flags & DIO_LOCKING))
-		inode_unlock(dio->inode);
+		inode_unlock_shared(dio->inode);
 
 	/*
 	 * The only time we want to leave bios in flight is when a successful
@@ -1341,7 +1341,7 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 
 fail_dio:
 	if (dio->flags & DIO_LOCKING && iov_iter_rw(iter) == READ)
-		inode_unlock(inode);
+		inode_unlock_shared(inode);
 
 	kmem_cache_free(dio_cache, dio);
 	return retval;
