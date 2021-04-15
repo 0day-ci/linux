@@ -36,6 +36,8 @@
 &dsi {
 	status = "okay";
 	phy-dsi-supply = <&reg18>;
+	#address-cells = <1>;
+	#size-cells = <0>;
 
 	ports {
 		port@0 {
