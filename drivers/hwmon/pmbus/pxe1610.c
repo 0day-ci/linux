@@ -41,7 +41,16 @@ static int pxe1610_identify(struct i2c_client *client,
 				info->vrm_version[i] = vr13;
 				break;
 			default:
-				return -ENODEV;
+				/*
+				 * If prior pages are available limit operation
+				 * to them
+				 */
+				if (i != 0) {
+					info->pages = i;
+					return 0;
+				} else {
+					return -ENODEV;
+				}
 			}
 		}
 	}
