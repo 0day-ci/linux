@@ -5682,6 +5682,9 @@
 					pause after every control message);
 				o = USB_QUIRK_HUB_SLOW_RESET (Hub needs extra
 					delay after resetting its port);
+				p = USB_QUIRK_NO_SET_FEAT_SUSPEND (Hub can't
+					handle set-port-feature-suspend request
+					correctly);
 			Example: quirks=0781:5580:bk,0a5c:5834:gij
 
 	usbhid.mousepoll=
