@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mailbox/ti,message-manager.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Texas Instruments' message manager node bindings
+
+maintainers:
+  - Nishanth Menon <nm@ti.com>
+
+description: |
+  The Texas Instruments' Message Manager is a mailbox controller that has
+  configurable queues selectable at SoC(System on Chip) integration. The Message
+  manager is broken up into queues in different address regions that are called
+  "proxies" - each instance is unidirectional and is instantiated at SoC
+  integration level to indicate receive or transmit path.
+
+properties:
+  $nodename:
+    pattern: "^mailbox@[0-9a-f]+$"
+
+  compatible:
+    const: ti,k2g-message-manager
+
+  "#mbox-cells":
+    const: 2
+    description:
+      Contains the queue ID and proxy ID in that order referring to the
+      transfer path.
+
+  reg-names:
+    items:
+      - const: queue_proxy_region
+      - const: queue_state_debug_region
+
+  reg:
+    minItems: 2
+
+  interrupt-names:
+    items:
+      - const: rx_005
+      - const: rx_057
+    description:
+      Contains interrupt names matching the Rx transfer path for a given SoC.
+      Receive interrupts shall be of the format "rx_<QID>".
+
+  interrupts:
+    minItems: 2
+    description:
+      Contains the interrupt information for the Rx interrupt paths for message
+      manager corresponding to the interrupt-names.
+
+required:
+  - compatible
+  - reg-names
+  - reg
+  - interrupt-names
+  - interrupts
+  - "#mbox-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    msgmgr: mailbox@2a00000 {
+          compatible = "ti,k2g-message-manager";
+          #mbox-cells = <2>;
+          reg-names = "queue_proxy_region", "queue_state_debug_region";
+          reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
+          interrupt-names = "rx_005", "rx_057";
+          interrupts = <GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH>,
+                       <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+    };
