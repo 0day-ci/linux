@@ -46,7 +46,7 @@ static int mtk_ppe_wait_busy(struct mtk_ppe *ppe)
 {
 	unsigned long timeout = jiffies + HZ;
 
-	while (time_is_before_jiffies(timeout)) {
+	while (time_is_after_jiffies(timeout)) {
 		if (!(ppe_r32(ppe, MTK_PPE_GLO_CFG) & MTK_PPE_GLO_CFG_BUSY))
 			return 0;
 
