@@ -7493,6 +7493,7 @@ struct lb_env {
 	enum fbq_type		fbq_type;
 	enum migration_type	migration_type;
 	enum group_type         src_grp_type;
+	enum group_type         dst_grp_type;
 	struct list_head	tasks;
 };
 
@@ -7531,6 +7532,31 @@ static int task_hot(struct task_struct *p, struct lb_env *env)
 	delta = rq_clock_task(env->src_rq) - p->se.exec_start;
 
 	return delta < (s64)sysctl_sched_migration_cost;
+}
+
+
+/*
+ * What does migrating this task do to our capacity-aware scheduling criterion?
+ *
+ * Returns 1, if the task needs more capacity than the dst CPU can provide.
+ * Returns 0, if the task needs the extra capacity provided by the dst CPU
+ * Returns -1, if the task isn't impacted by the migration wrt capacity.
+ */
+static int migrate_degrades_capacity(struct task_struct *p, struct lb_env *env)
+{
+	if (!(env->sd->flags & SD_ASYM_CPUCAPACITY))
+		return -1;
+
+	if (!task_fits_capacity(p, capacity_of(env->src_cpu))) {
+		if (cpu_capacity_greater(env->dst_cpu, env->src_cpu))
+			return 0;
+		else if (cpu_capacity_greater(env->src_cpu, env->dst_cpu))
+			return 1;
+		else
+			return -1;
+	}
+
+	return task_fits_capacity(p, capacity_of(env->dst_cpu)) ? -1 : 1;
 }
 
 #ifdef CONFIG_NUMA_BALANCING
@@ -7671,6 +7697,15 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	tsk_cache_hot = migrate_degrades_locality(p, env);
 	if (tsk_cache_hot == -1)
 		tsk_cache_hot = task_hot(p, env);
+
+	/*
+	 * On a (sane) asymmetric CPU capacity system, the increase in compute
+	 * capacity should offset any potential performance hit caused by a
+	 * migration.
+	 */
+	if ((env->dst_grp_type == group_has_spare) &&
+	    !migrate_degrades_capacity(p, env))
+		tsk_cache_hot = 0;
 
 	if (tsk_cache_hot <= 0 ||
 	    env->sd->nr_balance_failed > env->sd->cache_nice_tries) {
@@ -9310,6 +9345,7 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	if (!sds.busiest)
 		goto out_balanced;
 
+	env->dst_grp_type = local->group_type;
 	env->src_grp_type = busiest->group_type;
 
 	/* Misfit tasks should be dealt with regardless of the avg load */
