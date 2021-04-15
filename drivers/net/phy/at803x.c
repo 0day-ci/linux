@@ -1128,6 +1128,7 @@ static struct phy_driver at803x_driver[] = {
 	.get_wol		= at803x_get_wol,
 	.suspend		= at803x_suspend,
 	.resume			= at803x_resume,
+	.set_loopback		= genphy_loopback,
 	/* PHY_GBIT_FEATURES */
 	.read_status		= at803x_read_status,
 	.config_intr		= at803x_config_intr,
@@ -1207,6 +1208,7 @@ static struct phy_driver at803x_driver[] = {
 	.read_status		= at803x_read_status,
 	.soft_reset		= genphy_soft_reset,
 	.config_aneg		= at803x_config_aneg,
+	.set_loopback		= genphy_loopback,
 } };
 
 module_phy_driver(at803x_driver);
