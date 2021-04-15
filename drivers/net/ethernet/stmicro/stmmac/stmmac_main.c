@@ -1673,7 +1673,7 @@ static void stmmac_reinit_rx_buffers(struct stmmac_priv *priv)
 	return;
 
 err_reinit_rx_buffers:
-	while (queue >= 0) {
+	while (true) {
 		dma_free_rx_skbufs(priv, queue);
 
 		if (queue == 0)
@@ -1781,7 +1781,7 @@ static int init_dma_rx_desc_rings(struct net_device *dev, gfp_t flags)
 	return 0;
 
 err_init_rx_buffers:
-	while (queue >= 0) {
+	while (true) {
 		struct stmmac_rx_queue *rx_q = &priv->rx_queue[queue];
 
 		if (rx_q->xsk_pool)
