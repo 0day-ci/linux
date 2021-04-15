@@ -46,6 +46,9 @@ period in nanoseconds.
 Optionally, the pwm-specifier can encode a number of flags (defined in
 <dt-bindings/pwm/pwm.h>) in a third cell:
 - PWM_POLARITY_INVERTED: invert the PWM signal polarity
+- PWM_USAGE_POWER: Only care about the power output of the signal. This
+  allows drivers (if supported) to optimize the signals, for example to
+  improve EMI and reduce current spikes.
 
 Example with optional PWM specifier for inverse polarity
 
