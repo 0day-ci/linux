@@ -964,7 +964,6 @@ static bool ldm_parse_prt3(const u8 *buffer, int buflen, struct vblk *vb)
 		}
 		len = r_index;
 	} else {
-		r_index = 0;
 		len = r_diskid;
 	}
 	if (len < 0) {
