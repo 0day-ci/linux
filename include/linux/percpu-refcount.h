@@ -267,6 +267,42 @@ static inline bool percpu_ref_tryget(struct percpu_ref *ref)
 }
 
 /**
+ * percpu_ref_tryget_many_live - try to increment a live percpu refcount
+ * @ref: percpu_ref to try-get
+ * @nr: number of references to get
+ *
+ * Increment a percpu refcount unless it has already been killed.  Returns
+ * %true on success; %false on failure.
+ *
+ * Completion of percpu_ref_kill() in itself doesn't guarantee that this
+ * function will fail.  For such guarantee, percpu_ref_kill_and_confirm()
+ * should be used.  After the confirm_kill callback is invoked, it's
+ * guaranteed that no new reference will be given out by
+ * percpu_ref_tryget_live().
+ *
+ * This function is safe to call as long as @ref is between init and exit.
+ */
+static inline bool percpu_ref_tryget_many_live(struct percpu_ref *ref,
+					       unsigned long nr)
+{
+	unsigned long __percpu *percpu_count;
+	bool ret = false;
+
+	rcu_read_lock();
+
+	if (__ref_is_percpu(ref, &percpu_count)) {
+		this_cpu_add(*percpu_count, nr);
+		ret = true;
+	} else if (!(ref->percpu_count_ptr & __PERCPU_REF_DEAD)) {
+		ret = atomic_long_add_unless(&ref->data->count, nr, 0);
+	}
+
+	rcu_read_unlock();
+
+	return ret;
+}
+
+/**
  * percpu_ref_tryget_live - try to increment a live percpu refcount
  * @ref: percpu_ref to try-get
  *
@@ -283,21 +319,7 @@ static inline bool percpu_ref_tryget(struct percpu_ref *ref)
  */
 static inline bool percpu_ref_tryget_live(struct percpu_ref *ref)
 {
-	unsigned long __percpu *percpu_count;
-	bool ret = false;
-
-	rcu_read_lock();
-
-	if (__ref_is_percpu(ref, &percpu_count)) {
-		this_cpu_inc(*percpu_count);
-		ret = true;
-	} else if (!(ref->percpu_count_ptr & __PERCPU_REF_DEAD)) {
-		ret = atomic_long_inc_not_zero(&ref->data->count);
-	}
-
-	rcu_read_unlock();
-
-	return ret;
+	return percpu_ref_tryget_many_live(ref, 1);
 }
 
 /**
