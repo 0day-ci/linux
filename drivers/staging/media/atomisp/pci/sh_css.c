@@ -2204,10 +2204,10 @@ static const struct ia_css_yuvpp_settings yuvpp = IA_CSS_DEFAULT_YUVPP_SETTINGS;
 static int
 init_pipe_defaults(enum ia_css_pipe_mode mode,
 		   struct ia_css_pipe *pipe,
-		   bool copy_pipe) {
+		   bool copy_pipe)
+{
 
-	if (!pipe)
-	{
+	if (!pipe) {
 		IA_CSS_ERROR("NULL pipe parameter");
 		return -EINVAL;
 	}
@@ -2216,18 +2216,17 @@ init_pipe_defaults(enum ia_css_pipe_mode mode,
 	memcpy(pipe, &default_pipe, sizeof(default_pipe));
 
 	/* TODO: JB should not be needed, but temporary backward reference */
-	switch (mode)
-	{
+	switch (mode) {
 	case IA_CSS_PIPE_MODE_PREVIEW:
 		pipe->mode = IA_CSS_PIPE_ID_PREVIEW;
 		memcpy(&pipe->pipe_settings.preview, &preview, sizeof(preview));
 		break;
 	case IA_CSS_PIPE_MODE_CAPTURE:
-		if (copy_pipe) {
+		if (copy_pipe)
 			pipe->mode = IA_CSS_PIPE_ID_COPY;
-		} else {
+		else
 			pipe->mode = IA_CSS_PIPE_ID_CAPTURE;
-		}
+
 		memcpy(&pipe->pipe_settings.capture, &capture, sizeof(capture));
 		break;
 	case IA_CSS_PIPE_MODE_VIDEO:
@@ -2257,27 +2256,25 @@ pipe_global_init(void)
 	u8 i;
 
 	my_css.pipe_counter = 0;
-	for (i = 0; i < IA_CSS_PIPELINE_NUM_MAX; i++) {
+	for (i = 0; i < IA_CSS_PIPELINE_NUM_MAX; i++)
 		my_css.all_pipes[i] = NULL;
-	}
 }
 
 static int
 pipe_generate_pipe_num(const struct ia_css_pipe *pipe,
-		       unsigned int *pipe_number) {
+		       unsigned int *pipe_number)
+{
 	const u8 INVALID_PIPE_NUM = (uint8_t)~(0);
 	u8 pipe_num = INVALID_PIPE_NUM;
 	u8 i;
 
-	if (!pipe)
-	{
+	if (!pipe) {
 		IA_CSS_ERROR("NULL pipe parameter");
 		return -EINVAL;
 	}
 
 	/* Assign a new pipe_num .... search for empty place */
-	for (i = 0; i < IA_CSS_PIPELINE_NUM_MAX; i++)
-	{
+	for (i = 0; i < IA_CSS_PIPELINE_NUM_MAX; i++) {
 		if (!my_css.all_pipes[i]) {
 			/*position is reserved */
 			my_css.all_pipes[i] = (struct ia_css_pipe *)pipe;
@@ -2285,8 +2282,7 @@ pipe_generate_pipe_num(const struct ia_css_pipe *pipe,
 			break;
 		}
 	}
-	if (pipe_num == INVALID_PIPE_NUM)
-	{
+	if (pipe_num == INVALID_PIPE_NUM) {
 		/* Max number of pipes already allocated */
 		IA_CSS_ERROR("Max number of pipes already created");
 		return -ENOSPC;
