@@ -236,7 +236,7 @@ int optee_open_session(struct tee_context *ctx,
 	memcpy(&msg_arg->params[0].u.value, arg->uuid, sizeof(arg->uuid));
 	msg_arg->params[1].u.value.c = arg->clnt_login;
 
-	rc = tee_session_calc_client_uuid((uuid_t *)&msg_arg->params[1].u.value,
+	rc = tee_session_calc_client_uuid(&msg_arg->params[1].u.uuid,
 					  arg->clnt_login, arg->clnt_uuid);
 	if (rc)
 		goto out;
