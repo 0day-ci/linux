@@ -5759,6 +5759,12 @@ static unsigned long capacity_of(int cpu)
 	return cpu_rq(cpu)->cpu_capacity;
 }
 
+/* Is CPU a's capacity noticeably greater than CPU b's? */
+static inline bool cpu_capacity_greater(int a, int b)
+{
+	return capacity_greater(capacity_of(a), capacity_of(b));
+}
+
 static void record_wakee(struct task_struct *p)
 {
 	/*
@@ -7486,6 +7492,7 @@ struct lb_env {
 
 	enum fbq_type		fbq_type;
 	enum migration_type	migration_type;
+	enum group_type         src_grp_type;
 	struct list_head	tasks;
 };
 
@@ -8447,6 +8454,32 @@ static bool update_nohz_stats(struct rq *rq)
 #endif
 }
 
+static inline void update_sg_lb_misfit_stats(struct lb_env *env,
+					     struct sched_group *group,
+					     struct sg_lb_stats *sgs,
+					     int *sg_status,
+					     int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	if (!(env->sd->flags & SD_ASYM_CPUCAPACITY) ||
+	    !rq->misfit_task_load)
+		return;
+
+	*sg_status |= SG_OVERLOAD;
+
+	/*
+	 * Don't attempt to maximize load for misfit tasks that can't be
+	 * granted a CPU capacity uplift.
+	 */
+	if (cpu_capacity_greater(env->dst_cpu, cpu)) {
+		sgs->group_misfit_task_load = max(
+			sgs->group_misfit_task_load,
+			rq->misfit_task_load);
+	}
+
+}
+
 /**
  * update_sg_lb_stats - Update sched_group's statistics for load balancing.
  * @env: The load balancing environment.
@@ -8498,12 +8531,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 		if (local_group)
 			continue;
 
-		/* Check for a misfit task on the cpu */
-		if (env->sd->flags & SD_ASYM_CPUCAPACITY &&
-		    sgs->group_misfit_task_load < rq->misfit_task_load) {
-			sgs->group_misfit_task_load = rq->misfit_task_load;
-			*sg_status |= SG_OVERLOAD;
-		}
+		update_sg_lb_misfit_stats(env, group, sgs, sg_status, i);
 	}
 
 	/* Check if dst CPU is idle and preferred to this group */
@@ -8550,15 +8578,9 @@ static bool update_sd_pick_busiest(struct lb_env *env,
 	if (!sgs->sum_h_nr_running)
 		return false;
 
-	/*
-	 * Don't try to pull misfit tasks we can't help.
-	 * We can use max_capacity here as reduction in capacity on some
-	 * CPUs in the group should either be possible to resolve
-	 * internally or be covered by avg_load imbalance (eventually).
-	 */
+	/* Don't try to pull misfit tasks we can't help */
 	if (sgs->group_type == group_misfit_task &&
-	    (!capacity_greater(capacity_of(env->dst_cpu), sg->sgc->max_capacity) ||
-	     sds->local_stat.group_type != group_has_spare))
+	     sds->local_stat.group_type != group_has_spare)
 		return false;
 
 	if (sgs->group_type > busiest->group_type)
@@ -9288,6 +9310,8 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	if (!sds.busiest)
 		goto out_balanced;
 
+	env->src_grp_type = busiest->group_type;
+
 	/* Misfit tasks should be dealt with regardless of the avg load */
 	if (busiest->group_type == group_misfit_task)
 		goto force_balance;
@@ -9441,8 +9465,8 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		 * average load.
 		 */
 		if (env->sd->flags & SD_ASYM_CPUCAPACITY &&
-		    !capacity_greater(capacity_of(env->dst_cpu), capacity) &&
-		    nr_running == 1)
+		    env->src_grp_type <= group_fully_busy &&
+		    !capacity_greater(capacity_of(env->dst_cpu), capacity))
 			continue;
 
 		switch (env->migration_type) {
@@ -9504,15 +9528,18 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		case migrate_misfit:
 			/*
 			 * For ASYM_CPUCAPACITY domains with misfit tasks we
-			 * simply seek the "biggest" misfit task.
+			 * simply seek the "biggest" misfit task we can
+			 * accommodate.
 			 */
+			if (!cpu_capacity_greater(env->dst_cpu, i))
+				continue;
+
 			if (rq->misfit_task_load > busiest_load) {
 				busiest_load = rq->misfit_task_load;
 				busiest = rq;
 			}
 
 			break;
-
 		}
 	}
 
