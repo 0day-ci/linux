@@ -706,7 +706,8 @@ static void psi_group_change(struct psi_group *group, int cpu,
 					groupc->tasks[3], clear, set);
 			psi_bug = 1;
 		}
-		groupc->tasks[t]--;
+		if (groupc->tasks[t])
+			groupc->tasks[t]--;
 	}
 
 	for (t = 0; set; set &= ~(1 << t), t++)
