@@ -244,13 +244,14 @@ struct device *nd_btt_create(struct nd_region *nd_region)
  */
 bool nd_btt_arena_is_valid(struct nd_btt *nd_btt, struct btt_sb *super)
 {
+	static const u8 null_uuid[16];
 	const u8 *parent_uuid = nd_dev_to_uuid(&nd_btt->ndns->dev);
 	u64 checksum;
 
 	if (memcmp(super->signature, BTT_SIG, BTT_SIG_LEN) != 0)
 		return false;
 
-	if (!guid_is_null((guid_t *)&super->parent_uuid))
+	if (memcmp(super->parent_uuid, null_uuid, 16) != 0)
 		if (memcmp(super->parent_uuid, parent_uuid, 16) != 0)
 			return false;
 
