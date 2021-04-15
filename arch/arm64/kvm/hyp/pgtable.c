@@ -562,6 +562,12 @@ static bool stage2_pte_is_counted(kvm_pte_t pte)
 	return !!pte;
 }
 
+static bool stage2_pte_cacheable(struct kvm_pgtable *pgt, kvm_pte_t pte)
+{
+	u64 memattr = pte & KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR;
+	return memattr == KVM_S2_MEMATTR(pgt, NORMAL);
+}
+
 static void stage2_put_pte(kvm_pte_t *ptep, struct kvm_s2_mmu *mmu, u64 addr,
 			   u32 level, struct kvm_pgtable_mm_ops *mm_ops)
 {
@@ -583,6 +589,7 @@ static int stage2_map_walker_try_leaf(u64 addr, u64 end, u32 level,
 {
 	kvm_pte_t new, old = *ptep;
 	u64 granule = kvm_granule_size(level), phys = data->phys;
+	struct kvm_pgtable *pgt = data->mmu->pgt;
 	struct kvm_pgtable_mm_ops *mm_ops = data->mm_ops;
 
 	if (!kvm_block_mapping_supported(addr, end, phys, level))
@@ -604,6 +611,13 @@ static int stage2_map_walker_try_leaf(u64 addr, u64 end, u32 level,
 			return -EAGAIN;
 
 		stage2_put_pte(ptep, data->mmu, addr, level, mm_ops);
+	}
+
+	/* Perform CMOs before installation of the guest stage-2 PTE */
+	if (pgt->flags & KVM_PGTABLE_S2_GUEST) {
+		if (stage2_pte_cacheable(pgt, new) && !stage2_has_fwb(pgt))
+			__flush_dcache_area(mm_ops->phys_to_virt(phys),
+					    granule);
 	}
 
 	smp_store_release(ptep, new);
@@ -796,12 +810,6 @@ int kvm_pgtable_stage2_set_owner(struct kvm_pgtable *pgt, u64 addr, u64 size,
 
 	ret = kvm_pgtable_walk(pgt, addr, size, &walker);
 	return ret;
-}
-
-static bool stage2_pte_cacheable(struct kvm_pgtable *pgt, kvm_pte_t pte)
-{
-	u64 memattr = pte & KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR;
-	return memattr == KVM_S2_MEMATTR(pgt, NORMAL);
 }
 
 static int stage2_unmap_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
