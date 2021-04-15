@@ -316,7 +316,23 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 static int dwc2_driver_remove(struct platform_device *dev)
 {
 	struct dwc2_hsotg *hsotg = platform_get_drvdata(dev);
+	struct dwc2_gregs_backup *gr;
 	int ret = 0;
+
+	/* Exit Hibernation when driver is removed. */
+	if (hsotg->hibernated) {
+		if (gr->gotgctl & GOTGCTL_CURMODE_HOST) {
+			ret = dwc2_exit_hibernation(hsotg, 0, 0, 1);
+			if (ret)
+				dev_err(hsotg->dev,
+					"exit hibernation failed.\n");
+		} else {
+			ret = dwc2_exit_hibernation(hsotg, 0, 0, 0);
+			if (ret)
+				dev_err(hsotg->dev,
+					"exit hibernation failed.\n");
+		}
+	}
 
 	/* Exit Partial Power Down when driver is removed. */
 	if (hsotg->in_ppd) {
