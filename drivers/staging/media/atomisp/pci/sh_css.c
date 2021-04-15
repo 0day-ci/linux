@@ -1920,7 +1920,8 @@ map_sp_threads(struct ia_css_stream *stream, bool map) {
 /* creates a host pipeline skeleton for all pipes in a stream. Called during
  * stream_create. */
 static int
-create_host_pipeline_structure(struct ia_css_stream *stream) {
+create_host_pipeline_structure(struct ia_css_stream *stream)
+{
 	struct ia_css_pipe *copy_pipe = NULL, *capture_pipe = NULL;
 	struct ia_css_pipe *acc_pipe = NULL;
 	enum ia_css_pipe_id pipe_id;
@@ -1932,24 +1933,21 @@ create_host_pipeline_structure(struct ia_css_stream *stream) {
 	assert(stream);
 	IA_CSS_ENTER_PRIVATE("stream = %p", stream);
 
-	if (!stream)
-	{
+	if (!stream) {
 		IA_CSS_LEAVE_ERR_PRIVATE(-EINVAL);
 		return -EINVAL;
 	}
 
 	main_pipe	= stream->last_pipe;
 	assert(main_pipe);
-	if (!main_pipe)
-	{
+	if (!main_pipe) {
 		IA_CSS_LEAVE_ERR_PRIVATE(-EINVAL);
 		return -EINVAL;
 	}
 
 	pipe_id	= main_pipe->mode;
 
-	switch (pipe_id)
-	{
+	switch (pipe_id) {
 	case IA_CSS_PIPE_ID_PREVIEW:
 		copy_pipe    = main_pipe->pipe_settings.preview.copy_pipe;
 		copy_pipe_delay = main_pipe->dvs_frame_delay;
@@ -1989,30 +1987,23 @@ create_host_pipeline_structure(struct ia_css_stream *stream) {
 	}
 
 	if (!(err) && copy_pipe)
-	{
 		err = ia_css_pipeline_create(&copy_pipe->pipeline,
 					     copy_pipe->mode,
 					     copy_pipe->pipe_num,
 					     copy_pipe_delay);
-	}
 
 	if (!(err) && capture_pipe)
-	{
 		err = ia_css_pipeline_create(&capture_pipe->pipeline,
 					     capture_pipe->mode,
 					     capture_pipe->pipe_num,
 					     capture_pipe_delay);
-	}
 
 	if (!(err) && acc_pipe)
-	{
 		err = ia_css_pipeline_create(&acc_pipe->pipeline, acc_pipe->mode,
 					     acc_pipe->pipe_num, main_pipe->dvs_frame_delay);
-	}
 
 	/* DH regular multi pipe - not continuous mode: create the next pipelines too */
-	if (!stream->config.continuous)
-	{
+	if (!stream->config.continuous) {
 		int i;
 
 		for (i = 1; i < stream->num_pipes && 0 == err; i++) {
