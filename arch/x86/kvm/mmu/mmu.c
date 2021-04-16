@@ -1188,8 +1188,7 @@ static bool __rmap_clear_dirty(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
  * @gfn_offset: start of the BITS_PER_LONG pages we care about
  * @mask: indicates which pages we should protect
  *
- * Used when we do not need to care about huge page mappings: e.g. during dirty
- * logging we do not have any such mappings.
+ * Used when we do not need to care about huge page mappings.
  */
 static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
 				     struct kvm_memory_slot *slot,
@@ -1246,13 +1245,54 @@ static void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
  * It calls kvm_mmu_write_protect_pt_masked to write protect selected pages to
  * enable dirty logging for them.
  *
- * Used when we do not need to care about huge page mappings: e.g. during dirty
- * logging we do not have any such mappings.
+ * We need to care about huge page mappings: e.g. during dirty logging we may
+ * have any such mappings.
  */
 void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 				struct kvm_memory_slot *slot,
 				gfn_t gfn_offset, unsigned long mask)
 {
+	gfn_t start, end;
+
+	/*
+	 * Huge pages are NOT write protected when we start dirty log with
+	 * init-all-set, so we must write protect them at here.
+	 *
+	 * The gfn_offset is guaranteed to be aligned to 64, but the base_gfn
+	 * of memslot has no such restriction, so the range can cross two large
+	 * pages.
+	 */
+	if (kvm_dirty_log_manual_protect_and_init_set(kvm)) {
+		start = slot->base_gfn + gfn_offset + __ffs(mask);
+		end = slot->base_gfn + gfn_offset + __fls(mask);
+		kvm_mmu_slot_gfn_write_protect(kvm, slot, start, PG_LEVEL_2M);
+
+		/* Cross two large pages? */
+		if (ALIGN(start << PAGE_SHIFT, PMD_SIZE) !=
+		    ALIGN(end << PAGE_SHIFT, PMD_SIZE))
+			kvm_mmu_slot_gfn_write_protect(kvm, slot, end,
+						       PG_LEVEL_2M);
+	}
+
+	/*
+	 * RFC:
+	 *
+	 * 1. I don't return early when kvm_mmu_slot_gfn_write_protect() returns
+	 * true, because I am not very clear about the relationship between
+	 * legacy mmu and tdp mmu. AFAICS, the code logic is NOT an if/else
+	 * manner.
+	 *
+	 * The kvm_mmu_slot_gfn_write_protect() returns true when we hit a
+	 * writable large page mapping in legacy mmu mapping or tdp mmu mapping.
+	 * Do we still have normal mapping in that case? (e.g. We have large
+	 * mapping in legacy mmu and normal mapping in tdp mmu).
+	 *
+	 * 2. kvm_mmu_slot_gfn_write_protect() doesn't tell us whether the large
+	 * page mapping exist. If it exists but is clean, we can return early.
+	 * However, we have to do invasive change.
+	 */
+
+	/* Then we can handle the PT level pages */
 	if (kvm_x86_ops.cpu_dirty_log_size)
 		kvm_mmu_clear_dirty_pt_masked(kvm, slot, gfn_offset, mask);
 	else
