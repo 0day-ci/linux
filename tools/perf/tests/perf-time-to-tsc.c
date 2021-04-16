@@ -20,6 +20,7 @@
 #include "tsc.h"
 #include "mmap.h"
 #include "tests.h"
+#include "pmu.h"
 
 #define CHECK__(x) {				\
 	while ((x) < 0) {			\
@@ -66,6 +67,10 @@ int test__perf_time_to_tsc(struct test *test __maybe_unused, int subtest __maybe
 	u64 test_tsc, comm1_tsc, comm2_tsc;
 	u64 test_time, comm1_time = 0, comm2_time = 0;
 	struct mmap *md;
+	bool hybrid = false;
+
+	if (perf_pmu__has_hybrid())
+		hybrid = true;
 
 	threads = thread_map__new(-1, getpid(), UINT_MAX);
 	CHECK_NOT_NULL__(threads);
@@ -87,6 +92,17 @@ int test__perf_time_to_tsc(struct test *test __maybe_unused, int subtest __maybe
 	evsel->core.attr.comm = 1;
 	evsel->core.attr.disabled = 1;
 	evsel->core.attr.enable_on_exec = 0;
+
+	/*
+	 * For hybrid "cycles:u", it creates two events.
+	 * Init the second evsel here.
+	 */
+	if (hybrid) {
+		evsel = evsel__next(evsel);
+		evsel->core.attr.comm = 1;
+		evsel->core.attr.disabled = 1;
+		evsel->core.attr.enable_on_exec = 0;
+	}
 
 	CHECK__(evlist__open(evlist));
 
