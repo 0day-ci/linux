@@ -6233,6 +6233,22 @@ KVM_RUN_BUS_LOCK flag is used to distinguish between them.
 This capability can be used to check / enable 2nd DAWR feature provided
 by POWER10 processor.
 
+7.24 KVM_CAP_EXIT_ON_EMULATION_FAILURE
+--------------------------------------
+
+:Architectures: x86
+:Parameters: args[0] whether the feature should be enabled or not
+
+With this capability enabled, the in-kernel instruction emulator packs the exit
+struct of KVM_INTERNAL_ERROR with the instruction length and instruction bytes
+when an error occurs while emulating an instruction.  This allows userspace to
+then take a look at the instruction and see if it is able to handle it more
+gracefully than the in-kernel emulator.
+
+When this capability is enabled use the emulation_failure struct instead of the
+internal struct for the exit struct.  They have the same layout, but the
+emulation_failure struct matches the content better.
+
 8. Other capabilities.
 ======================
 
