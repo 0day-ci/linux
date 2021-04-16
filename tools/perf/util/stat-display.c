@@ -637,6 +637,20 @@ static void aggr_cb(struct perf_stat_config *config,
 	}
 }
 
+static bool aggr_id_hybrid_matched(struct perf_stat_config *config,
+				   struct evsel *counter, struct aggr_cpu_id id)
+{
+	struct aggr_cpu_id s;
+
+	for (int i = 0; i < evsel__nr_cpus(counter); i++) {
+		s = config->aggr_get_id(config, evsel__cpus(counter), i);
+		if (cpu_map__compare_aggr_cpu_id(s, id))
+			return true;
+	}
+
+	return false;
+}
+
 static void print_counter_aggrdata(struct perf_stat_config *config,
 				   struct evsel *counter, int s,
 				   char *prefix, bool metric_only,
@@ -650,6 +664,12 @@ static void print_counter_aggrdata(struct perf_stat_config *config,
 	double uval;
 
 	ad.id = id = config->aggr_map->map[s];
+
+	if (perf_pmu__has_hybrid() &&
+	    !aggr_id_hybrid_matched(config, counter, id)) {
+		return;
+	}
+
 	ad.val = ad.ena = ad.run = 0;
 	ad.nr = 0;
 	if (!collect_data(config, counter, aggr_cb, &ad))
