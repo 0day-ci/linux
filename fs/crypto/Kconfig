@@ -17,13 +17,22 @@ config FS_ENCRYPTION
 # allows the algorithms to be built as modules when all the filesystems are.
 config FS_ENCRYPTION_ALGS
 	tristate
-	select CRYPTO_AES
-	select CRYPTO_CBC
-	select CRYPTO_CTS
-	select CRYPTO_ECB
-	select CRYPTO_HMAC
-	select CRYPTO_SHA512
-	select CRYPTO_XTS
+	imply CRYPTO_AES
+	imply CRYPTO_CBC
+	imply CRYPTO_CTS
+	imply CRYPTO_ECB
+	imply CRYPTO_HMAC
+	imply CRYPTO_SHA512
+	imply CRYPTO_XTS
+	help
+	  This pulls in the generic implementations of the various
+	  cryptographic algorithms and chaining modes that filesystem
+	  encryption relies on. These are 'soft' dependencies only, as
+	  architectures may supersede these generic implementations with
+	  special, optimized ones.
+
+	  If unsure, keep the generic algorithms enabled, as they can
+	  happily co-exist with per-architecture implementations.
 
 config FS_ENCRYPTION_INLINE_CRYPT
 	bool "Enable fscrypt to use inline crypto"
