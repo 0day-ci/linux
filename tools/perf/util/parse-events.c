@@ -38,6 +38,7 @@
 #include "util/event.h"
 #include "util/pfm.h"
 #include "util/parse-events-hybrid.h"
+#include "util/pmu-hybrid.h"
 #include "perf.h"
 
 #define MAX_NAME_LEN 100
@@ -48,6 +49,9 @@ extern int parse_events_debug;
 int parse_events_parse(void *parse_state, void *scanner);
 static int get_config_terms(struct list_head *head_config,
 			    struct list_head *head_terms __maybe_unused);
+static int parse_events__with_hybrid_pmu(struct parse_events_state *parse_state,
+					 const char *str, char *pmu_name,
+					 struct list_head *list, bool *parsed);
 
 static struct perf_pmu_event_symbol *perf_pmu_events_list;
 /*
@@ -1567,6 +1571,27 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 	if (pmu->default_config && get_config_chgs(pmu, head_config, &config_terms))
 		return -ENOMEM;
 
+	if (!parse_state->fake_pmu && head_config &&
+	    perf_pmu__is_hybrid(name)) {
+		struct parse_events_term *term;
+		bool parsed;
+		int ret;
+
+		term = list_first_entry(head_config, struct parse_events_term,
+					list);
+		if (term && term->config && strcmp(term->config, "event")) {
+			ret = parse_events__with_hybrid_pmu(parse_state,
+							    term->config, name,
+							    list, &parsed);
+			/*
+			 * If the string inside the pmu can't be parsed,
+			 * don't return, try next steps.
+			 */
+			if (parsed)
+				return ret;
+		}
+	}
+
 	if (!parse_state->fake_pmu && perf_pmu__config(pmu, &attr, head_config, parse_state->error)) {
 		struct evsel_config_term *pos, *tmp;
 
@@ -1584,6 +1609,9 @@ int parse_events_add_pmu(struct parse_events_state *parse_state,
 			    &config_terms, auto_merge_stats, NULL);
 	if (!evsel)
 		return -ENOMEM;
+
+	if (evsel->name)
+		evsel->use_config_name = true;
 
 	evsel->pmu_name = name ? strdup(name) : NULL;
 	evsel->use_uncore_alias = use_uncore_alias;
@@ -2177,6 +2205,33 @@ int parse_events_terms(struct list_head *terms, const char *str)
 	}
 
 	parse_events_terms__delete(parse_state.terms);
+	return ret;
+}
+
+static int parse_events__with_hybrid_pmu(struct parse_events_state *parse_state,
+					 const char *str, char *pmu_name,
+					 struct list_head *list, bool *parsed)
+{
+	struct parse_events_state ps = {
+		.list            = LIST_HEAD_INIT(ps.list),
+		.stoken          = PE_START_EVENTS,
+		.hybrid_pmu_name = pmu_name,
+		.idx             = parse_state->idx,
+	};
+	int ret;
+
+	*parsed = false;
+	ret = parse_events__scanner(str, &ps);
+	perf_pmu__parse_cleanup();
+
+	if (!ret) {
+		if (!list_empty(&ps.list)) {
+			*parsed = true;
+			list_splice(&ps.list, list);
+			parse_state->idx = ps.idx;
+		}
+	}
+
 	return ret;
 }
 
