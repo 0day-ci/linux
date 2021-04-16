@@ -6,6 +6,7 @@
  */
 #include <linux/dsa/ocelot.h>
 #include <linux/if_bridge.h>
+#include <linux/ptp_classify.h>
 #include <soc/mscc/ocelot_vcap.h>
 #include "ocelot.h"
 #include "ocelot_vcap.h"
@@ -546,6 +547,50 @@ static void ocelot_port_add_txtstamp_skb(struct ocelot *ocelot, int port,
 	spin_unlock(&ocelot_port->ts_id_lock);
 }
 
+bool ocelot_ptp_rew_op(struct sk_buff *skb, struct sk_buff *clone, u32 *rew_op)
+{
+	/* For two-step timestamp, retrieve ptp_cmd in DSA_SKB_CB_PRIV
+	 * and timestamp ID in clone->cb[0].
+	 * For one-step timestamp, retrieve ptp_cmd in DSA_SKB_CB_PRIV.
+	 */
+	u8 *ptp_cmd = DSA_SKB_CB_PRIV(skb);
+
+	if (clone) {
+		*rew_op = *ptp_cmd;
+		*rew_op |= clone->cb[0] << 3;
+	} else if (*ptp_cmd) {
+		*rew_op = *ptp_cmd;
+	} else {
+		return false;
+	}
+
+	return true;
+}
+EXPORT_SYMBOL(ocelot_ptp_rew_op);
+
+static bool ocelot_ptp_is_onestep_sync(struct sk_buff *skb)
+{
+	struct ptp_header *hdr;
+	unsigned int ptp_class;
+	u8 msgtype, twostep;
+
+	ptp_class = ptp_classify_raw(skb);
+	if (ptp_class == PTP_CLASS_NONE)
+		return false;
+
+	hdr = ptp_parse_header(skb, ptp_class);
+	if (!hdr)
+		return false;
+
+	msgtype = ptp_get_msgtype(hdr, ptp_class);
+	twostep = hdr->flag_field[0] & 0x2;
+
+	if (msgtype == PTP_MSGTYPE_SYNC && twostep == 0)
+		return true;
+
+	return false;
+}
+
 int ocelot_port_txtstamp_request(struct ocelot *ocelot, int port,
 				 struct sk_buff *skb,
 				 struct sk_buff **clone)
@@ -553,12 +598,24 @@ int ocelot_port_txtstamp_request(struct ocelot *ocelot, int port,
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 	u8 ptp_cmd = ocelot_port->ptp_cmd;
 
+	/* Store ptp_cmd in first byte of DSA_SKB_CB_PRIV per skb */
+	if (ptp_cmd == IFH_REW_OP_ORIGIN_PTP) {
+		if (ocelot_ptp_is_onestep_sync(skb)) {
+			*(u8 *)DSA_SKB_CB_PRIV(skb) = ptp_cmd;
+			return 0;
+		}
+
+		/* Fall back to two-step timestamping */
+		ptp_cmd = IFH_REW_OP_TWO_STEP_PTP;
+	}
+
 	if (ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
 		*clone = skb_clone_sk(skb);
 		if (!(*clone))
 			return -ENOMEM;
 
 		ocelot_port_add_txtstamp_skb(ocelot, port, *clone);
+		*(u8 *)DSA_SKB_CB_PRIV(skb) = ptp_cmd;
 	}
 
 	return 0;
