@@ -2835,6 +2835,13 @@ static bool nvme_acpi_storage_d3(struct pci_dev *dev)
 	u8 val;
 
 	/*
+	 * If the device itself supports D3cold, use that instead of D0 ASPM +
+	 * NVMe APST.
+	 */
+	if (pci_pr3_present(dev))
+		return true;
+
+	/*
 	 * Look for _DSD property specifying that the storage device on the port
 	 * must use D3 to support deep platform power savings during
 	 * suspend-to-idle.
