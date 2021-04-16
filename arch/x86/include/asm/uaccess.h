@@ -517,15 +517,23 @@ do {										\
 		len -= sizeof(type);						\
 	}
 
+#define unsafe_copy_elem(dst, src, len, type, label)				\
+	if (len >= sizeof(type)) {						\
+		unsafe_put_user(*(type *)(src),(type __user *)(dst),label);	\
+		dst += sizeof(type);						\
+		src += sizeof(type);						\
+		len -= sizeof(type);						\
+	}
+
 #define unsafe_copy_to_user(_dst,_src,_len,label)			\
 do {									\
 	char __user *__ucu_dst = (_dst);				\
 	const char *__ucu_src = (_src);					\
 	size_t __ucu_len = (_len);					\
 	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u64, label);	\
-	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u32, label);	\
-	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u16, label);	\
-	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u8, label);	\
+	unsafe_copy_elem(__ucu_dst, __ucu_src, __ucu_len, u32, label);	\
+	unsafe_copy_elem(__ucu_dst, __ucu_src, __ucu_len, u16, label);	\
+	unsafe_copy_elem(__ucu_dst, __ucu_src, __ucu_len, u8, label);	\
 } while (0)
 
 #define HAVE_GET_KERNEL_NOFAULT
