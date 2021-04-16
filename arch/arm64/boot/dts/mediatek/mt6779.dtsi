@@ -206,6 +206,24 @@
 			clock-names = "devapc-infra-clock";
 		};
 
+		dramc: dramc@10230000 {
+			compatible = "mediatek,mt6779-dramc";
+			reg = <0 0x10230000 0 0x2000>, /* DRAMC AO CHA */
+				<0 0x10240000 0 0x2000>, /* DRAMC AO CHB */
+				<0 0x10234000 0 0x1000>, /* DRAMC NAO CHA */
+				<0 0x10244000 0 0x1000>, /* DRAMC NAO CHB */
+				<0 0x10238000 0 0x2000>, /* DDRPHY AO CHA */
+				<0 0x10248000 0 0x2000>; /* DDRPHY AO CHB */
+			mediatek,support-channel-cnt = <2>;
+			mediatek,freq-cnt = <6>;
+			mediatek,freq-step = <3718 3733>,
+				<3094 3200>,
+				<2392 2400>,
+				<1534 1600>,
+				<1196 1200>,
+				<754 800>;
+		};
+
 		uart0: serial@11002000 {
 			compatible = "mediatek,mt6779-uart",
 				     "mediatek,mt6577-uart";

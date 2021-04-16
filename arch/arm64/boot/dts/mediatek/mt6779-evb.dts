@@ -29,3 +29,12 @@
 &uart0 {
 	status = "okay";
 };
+
+&dramc {
+	mediatek,dram-type = <0>;
+	mediatek,channel-cnt = <2>;
+	mediatek,rank-cnt = <2>;
+	mediatek,rank-size = <0x0 0x0>;
+	mediatek,mr-cnt = <1>;
+	mediatek,mr = <0x5 0xff>;
+};
