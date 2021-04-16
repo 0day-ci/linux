@@ -11052,6 +11052,14 @@ bool kvm_arch_dy_runnable(struct kvm_vcpu *vcpu)
 	return false;
 }
 
+bool kvm_arch_interrupt_delivery(struct kvm_vcpu *vcpu)
+{
+	if (vcpu->arch.apicv_active && static_call(kvm_x86_dy_apicv_has_pending_interrupt)(vcpu))
+		return true;
+
+	return false;
+}
+
 bool kvm_arch_vcpu_in_kernel(struct kvm_vcpu *vcpu)
 {
 	return vcpu->arch.preempted_in_kernel;
