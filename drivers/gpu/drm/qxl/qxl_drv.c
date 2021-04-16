@@ -120,6 +120,9 @@ qxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto modeset_cleanup;
 
 	drm_fbdev_generic_setup(&qdev->ddev, 32);
+	if (qdev->fb_helper)
+		qdev->fb_helper->no_dpms_blank = true;
+
 	return 0;
 
 modeset_cleanup:

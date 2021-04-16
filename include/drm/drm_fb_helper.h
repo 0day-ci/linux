@@ -177,6 +177,14 @@ struct drm_fb_helper {
 	bool deferred_setup;
 
 	/**
+	 * @no_dpms_blank:
+	 *
+	 * A flag indicating that the driver doesn't support blanking.
+	 * Then fbcon core code falls back to its generic handler.
+	 */
+	bool no_dpms_blank;
+
+	/**
 	 * @preferred_bpp:
 	 *
 	 * Temporary storage for the driver's preferred BPP setting passed to

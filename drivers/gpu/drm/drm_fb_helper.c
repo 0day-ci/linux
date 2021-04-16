@@ -332,8 +332,13 @@ static void drm_fb_helper_dpms(struct fb_info *info, int dpms_mode)
  */
 int drm_fb_helper_blank(int blank, struct fb_info *info)
 {
+	struct drm_fb_helper *fb_helper = info->par;
+
 	if (oops_in_progress)
 		return -EBUSY;
+
+	if (fb_helper->no_dpms_blank)
+		return -EINVAL;
 
 	switch (blank) {
 	/* Display: On; HSync: On, VSync: On */

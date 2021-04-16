@@ -132,6 +132,9 @@ static int bochs_pci_probe(struct pci_dev *pdev,
 		goto err_unload;
 
 	drm_fbdev_generic_setup(dev, 32);
+	if (dev->fb_helper)
+		dev->fb_helper->no_dpms_blank = true;
+
 	return ret;
 
 err_unload:
