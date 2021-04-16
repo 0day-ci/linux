@@ -36,7 +36,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/nospec.h>
 #include <linux/pm_runtime.h>
-#include <asm/processor.h>
+#include <linux/processor.h>
 #include "hwmgr.h"
 
 static const struct cg_flag_name clocks[] = {
