@@ -879,6 +879,26 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (vma_pagesize == PAGE_SIZE && !force_pte)
 		vma_pagesize = transparent_hugepage_adjust(memslot, hva,
 							   &pfn, &fault_ipa);
+
+	if (fault_status != FSC_PERM && kvm_has_mte(kvm) && !device &&
+	    pfn_valid(pfn)) {
+		/*
+		 * VM will be able to see the page's tags, so we must ensure
+		 * they have been initialised. if PG_mte_tagged is set, tags
+		 * have already been initialised.
+		 */
+		unsigned long i, nr_pages = vma_pagesize >> PAGE_SHIFT;
+		struct page *page = pfn_to_online_page(pfn);
+
+		if (!page)
+			return -EFAULT;
+
+		for (i = 0; i < nr_pages; i++, page++) {
+			if (!test_and_set_bit(PG_mte_tagged, &page->flags))
+				mte_clear_page_tags(page_address(page));
+		}
+	}
+
 	if (writable)
 		prot |= KVM_PGTABLE_PROT_W;
 
