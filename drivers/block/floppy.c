@@ -145,8 +145,6 @@
  * Better audit of register_blkdev.
  */
 
-#undef  FLOPPY_SILENT_DCL_CLEAR
-
 #define REALLY_SLOW_IO
 
 #define DEBUGT 2
@@ -2988,8 +2986,6 @@ static const char *drive_name(int type, int drive)
 /* raw commands */
 static void raw_cmd_done(int flag)
 {
-	int i;
-
 	if (!flag) {
 		raw_cmd->flags |= FD_RAW_FAILURE;
 		raw_cmd->flags |= FD_RAW_HARDFAILURE;
@@ -2997,8 +2993,7 @@ static void raw_cmd_done(int flag)
 		raw_cmd->reply_count = inr;
 		if (raw_cmd->reply_count > FD_RAW_REPLY_SIZE)
 			raw_cmd->reply_count = 0;
-		for (i = 0; i < raw_cmd->reply_count; i++)
-			raw_cmd->reply[i] = reply_buffer[i];
+		memcpy(raw_cmd->reply, reply_buffer, raw_cmd->reply_count);
 
 		if (raw_cmd->flags & (FD_RAW_READ | FD_RAW_WRITE)) {
 			unsigned long flags;
@@ -3090,7 +3085,6 @@ static int raw_cmd_copyin(int cmd, void __user *param,
 {
 	struct floppy_raw_cmd *ptr;
 	int ret;
-	int i;
 
 	*rcmd = NULL;
 
@@ -3109,8 +3103,7 @@ loop:
 	if (ptr->cmd_count > FD_RAW_CMD_FULLSIZE)
 		return -EINVAL;
 
-	for (i = 0; i < FD_RAW_REPLY_SIZE; i++)
-		ptr->reply[i] = 0;
+	memset(ptr->reply, 0, FD_RAW_REPLY_SIZE);
 	ptr->resultcode = 0;
 
 	if (ptr->flags & (FD_RAW_READ | FD_RAW_WRITE)) {
@@ -4232,7 +4225,7 @@ static char __init get_fdc_version(int fdc)
 	r = result(fdc);
 	if (r <= 0x00)
 		return FDC_NONE;	/* No FDC present ??? */
-	if ((r == 1) && (reply_buffer[0] == 0x80)) {
+	if ((r == 1) && (reply_buffer[ST0] == 0x80)) {
 		pr_info("FDC %d is an 8272A\n", fdc);
 		return FDC_8272A;	/* 8272a/765 don't know DUMPREGS */
 	}
@@ -4257,12 +4250,12 @@ static char __init get_fdc_version(int fdc)
 
 	output_byte(fdc, FD_UNLOCK);
 	r = result(fdc);
-	if ((r == 1) && (reply_buffer[0] == 0x80)) {
+	if ((r == 1) && (reply_buffer[ST0] == 0x80)) {
 		pr_info("FDC %d is a pre-1991 82077\n", fdc);
 		return FDC_82077_ORIG;	/* Pre-1991 82077, doesn't know
 					 * LOCK/UNLOCK */
 	}
-	if ((r != 1) || (reply_buffer[0] != 0x00)) {
+	if ((r != 1) || (reply_buffer[ST0] != 0x00)) {
 		pr_info("FDC %d init: UNLOCK: unexpected return of %d bytes.\n",
 			fdc, r);
 		return FDC_UNKNOWN;
@@ -4274,11 +4267,11 @@ static char __init get_fdc_version(int fdc)
 			fdc, r);
 		return FDC_UNKNOWN;
 	}
-	if (reply_buffer[0] == 0x80) {
+	if (reply_buffer[ST0] == 0x80) {
 		pr_info("FDC %d is a post-1991 82077\n", fdc);
 		return FDC_82077;	/* Revised 82077AA passes all the tests */
 	}
-	switch (reply_buffer[0] >> 5) {
+	switch (reply_buffer[ST0] >> 5) {
 	case 0x0:
 		/* Either a 82078-1 or a 82078SL running at 5Volt */
 		pr_info("FDC %d is an 82078.\n", fdc);
@@ -4294,7 +4287,7 @@ static char __init get_fdc_version(int fdc)
 		return FDC_87306;
 	default:
 		pr_info("FDC %d init: 82078 variant with unknown PARTID=%d.\n",
-			fdc, reply_buffer[0] >> 5);
+			fdc, reply_buffer[ST0] >> 5);
 		return FDC_82078_UNKN;
 	}
 }				/* get_fdc_version */
