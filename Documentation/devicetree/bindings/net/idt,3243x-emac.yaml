@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/idt,3243x-emac.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: IDT 79rc3243x Ethernet controller
+
+description: Ethernet controller integrated into IDT 79RC3243x family SoCs
+
+maintainers:
+  - Thomas Bogendoerfer <tsbogend@alpha.franken.de>
+
+allOf:
+  - $ref: ethernet-controller.yaml#
+
+properties:
+  compatible:
+    const: idt,3243x-emac
+
+  reg:
+    maxItems: 3
+
+  reg-names:
+    items:
+      - const: korina_regs
+      - const: korina_dma_rx
+      - const: korina_dma_tx
+
+  interrupts:
+    items:
+      - description: RX interrupt
+      - description: TX interrupt
+
+  interrupt-names:
+    items:
+      - const: korina_rx
+      - const: korina_tx
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    items:
+      - const: mdioclk
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - interrupts
+  - interrupt-names
+
+additionalProperties: false
+
+examples:
+  - |
+
+    ethernet@60000 {
+        compatible = "idt,3243x-emac";
+
+        reg = <0x60000 0x10000>,
+              <0x40000 0x14>,
+              <0x40014 0x14>;
+        reg-names = "korina_regs",
+                    "korina_dma_rx",
+                    "korina_dma_tx";
+
+        interrupts-extended = <&rcpic3 0>, <&rcpic3 1>;
+        interrupt-names = "korina_rx", "korina_tx";
+
+        clocks = <&iclk>;
+        clock-names = "mdioclk";
+    };
