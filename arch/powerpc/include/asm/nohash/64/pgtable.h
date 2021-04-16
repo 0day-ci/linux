@@ -10,8 +10,6 @@
 #include <asm/barrier.h>
 #include <asm/asm-const.h>
 
-#define FIRST_USER_ADDRESS	0UL
-
 /*
  * Size of EA range mapped by our pagetables.
  */
