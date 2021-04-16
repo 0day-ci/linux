@@ -294,7 +294,7 @@ note_on_event(struct seq_oss_devinfo *dp, int dev, int ch, int note, int vel, st
 				/* set volume to zero -- note off */
 			//	type = SNDRV_SEQ_EVENT_NOTEOFF;
 			//else
-				if (info->ch[ch].vel)
+			if (info->ch[ch].vel)
 				/* sample already started -- volume change */
 				type = SNDRV_SEQ_EVENT_KEYPRESS;
 			else
