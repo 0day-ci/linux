@@ -696,10 +696,11 @@ static int smack_sb_eat_lsm_opts(char *options, void **mnt_opts)
 {
 	char *from = options, *to = options;
 	bool first = true;
+	int rc;
 
 	while (1) {
 		char *next = strchr(from, ',');
-		int token, len, rc;
+		int token, len;
 		char *arg = NULL;
 
 		if (next)
@@ -710,13 +711,14 @@ static int smack_sb_eat_lsm_opts(char *options, void **mnt_opts)
 		token = match_opt_prefix(from, len, &arg);
 		if (token != Opt_error) {
 			arg = kmemdup_nul(arg, from + len - arg, GFP_KERNEL);
+			if (!arg) {
+				rc = -ENOMEM;
+				goto free_mnt_opts;
 			rc = smack_add_opt(token, arg, mnt_opts);
+			}
 			if (unlikely(rc)) {
 				kfree(arg);
-				if (*mnt_opts)
-					smack_free_mnt_opts(*mnt_opts);
-				*mnt_opts = NULL;
-				return rc;
+				goto free_mnt_opts;
 			}
 		} else {
 			if (!first) {	// copy with preceding comma
@@ -734,6 +736,13 @@ static int smack_sb_eat_lsm_opts(char *options, void **mnt_opts)
 	}
 	*to = '\0';
 	return 0;
+
+free_mnt_opts:
+	if (*mnt_opts) {
+		smack_free_mnt_opts(*mnt_opts);
+		*mnt_opts = NULL;
+	}
+	return rc;
 }
 
 /**
