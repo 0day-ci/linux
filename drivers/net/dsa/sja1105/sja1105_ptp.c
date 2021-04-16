@@ -436,12 +436,16 @@ bool sja1105_port_rxtstamp(struct dsa_switch *ds, int port,
  * callback, where we will timestamp it synchronously.
  */
 bool sja1105_port_txtstamp(struct dsa_switch *ds, int port,
-			   struct sk_buff *skb, unsigned int type)
+			   struct sk_buff *skb, struct sk_buff **clone)
 {
 	struct sja1105_private *priv = ds->priv;
 	struct sja1105_port *sp = &priv->ports[port];
 
 	if (!sp->hwts_tx_en)
+		return false;
+
+	*clone = skb_clone_sk(skb);
+	if (!(*clone))
 		return false;
 
 	return true;

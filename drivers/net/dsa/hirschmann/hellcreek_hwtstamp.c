@@ -374,31 +374,39 @@ long hellcreek_hwtstamp_work(struct ptp_clock_info *ptp)
 }
 
 bool hellcreek_port_txtstamp(struct dsa_switch *ds, int port,
-			     struct sk_buff *clone, unsigned int type)
+			     struct sk_buff *skb, struct sk_buff **clone)
 {
 	struct hellcreek *hellcreek = ds->priv;
 	struct hellcreek_port_hwtstamp *ps;
 	struct ptp_header *hdr;
+	unsigned int type;
 
 	ps = &hellcreek->ports[port].port_hwtstamp;
 
-	/* Check if the driver is expected to do HW timestamping */
-	if (!(skb_shinfo(clone)->tx_flags & SKBTX_HW_TSTAMP))
+	type = ptp_classify_raw(skb);
+	if (type == PTP_CLASS_NONE)
 		return false;
 
 	/* Make sure the message is a PTP message that needs to be timestamped
 	 * and the interaction with the HW timestamping is enabled. If not, stop
 	 * here
 	 */
-	hdr = hellcreek_should_tstamp(hellcreek, port, clone, type);
+	hdr = hellcreek_should_tstamp(hellcreek, port, skb, type);
 	if (!hdr)
 		return false;
 
-	if (test_and_set_bit_lock(HELLCREEK_HWTSTAMP_TX_IN_PROGRESS,
-				  &ps->state))
+	*clone = skb_clone_sk(skb);
+	if (!(*clone))
 		return false;
 
-	ps->tx_skb = clone;
+	if (test_and_set_bit_lock(HELLCREEK_HWTSTAMP_TX_IN_PROGRESS,
+				  &ps->state)) {
+		kfree_skb(*clone);
+		*clone = NULL;
+		return false;
+	}
+
+	ps->tx_skb = *clone;
 
 	/* store the number of ticks occurred since system start-up till this
 	 * moment

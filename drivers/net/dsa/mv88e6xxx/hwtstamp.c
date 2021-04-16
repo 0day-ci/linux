@@ -469,24 +469,33 @@ long mv88e6xxx_hwtstamp_work(struct ptp_clock_info *ptp)
 }
 
 bool mv88e6xxx_port_txtstamp(struct dsa_switch *ds, int port,
-			     struct sk_buff *clone, unsigned int type)
+			     struct sk_buff *skb, struct sk_buff **clone)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
 	struct mv88e6xxx_port_hwtstamp *ps = &chip->port_hwtstamp[port];
 	struct ptp_header *hdr;
+	unsigned int type;
 
-	if (!(skb_shinfo(clone)->tx_flags & SKBTX_HW_TSTAMP))
-		return false;
+	type = ptp_classify_raw(skb);
+	if (type == PTP_CLASS_NONE)
+		return false
 
-	hdr = mv88e6xxx_should_tstamp(chip, port, clone, type);
+	hdr = mv88e6xxx_should_tstamp(chip, port, skb, type);
 	if (!hdr)
 		return false;
 
-	if (test_and_set_bit_lock(MV88E6XXX_HWTSTAMP_TX_IN_PROGRESS,
-				  &ps->state))
+	*clone = skb_clone_sk(skb);
+	if (!(*clone))
 		return false;
 
-	ps->tx_skb = clone;
+	if (test_and_set_bit_lock(MV88E6XXX_HWTSTAMP_TX_IN_PROGRESS,
+				  &ps->state)) {
+		kfree_skb(*clone);
+		*clone = NULL;
+		return false;
+	}
+
+	ps->tx_skb = *clone;
 	ps->tx_tstamp_start = jiffies;
 	ps->tx_seq_id = be16_to_cpu(hdr->sequence_id);
 

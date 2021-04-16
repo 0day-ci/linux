@@ -635,8 +635,8 @@ in generic code: a BPF classifier (``ptp_classify_raw``) is used to identify
 PTP event messages (any other packets, including PTP general messages, are not
 timestamped), and provides two hooks to drivers:
 
-- ``.port_txtstamp()``: The driver is passed a clone of the timestampable skb
-  to be transmitted, before actually transmitting it. Typically, a switch will
+- ``.port_txtstamp()``: A clone of the timestampable skb to be transmitted
+  is needed, before actually transmitting it. Typically, a switch will
   have a PTP TX timestamp register (or sometimes a FIFO) where the timestamp
   becomes available. There may be an IRQ that is raised upon this timestamp's
   availability, or the driver might have to poll after invoking
@@ -645,6 +645,9 @@ timestamped), and provides two hooks to drivers:
   later use (when the timestamp becomes available). Each skb is annotated with
   a pointer to its clone, in ``DSA_SKB_CB(skb)->clone``, to ease the driver's
   job of keeping track of which clone belongs to which skb.
+  But one-step timestamping request is handled differently with above two-step
+  timestamping. The skb clone is no longer needed since hardware will insert
+  TX time information on packet during egress.
 
 - ``.port_rxtstamp()``: The original (and only) timestampable skb is provided
   to the driver, for it to annotate it with a timestamp, if that is immediately

@@ -1396,14 +1396,17 @@ static bool felix_rxtstamp(struct dsa_switch *ds, int port,
 }
 
 static bool felix_txtstamp(struct dsa_switch *ds, int port,
-			   struct sk_buff *clone, unsigned int type)
+			   struct sk_buff *skb, struct sk_buff **clone)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 
-	if (ocelot->ptp && (skb_shinfo(clone)->tx_flags & SKBTX_HW_TSTAMP) &&
-	    ocelot_port->ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
-		ocelot_port_add_txtstamp_skb(ocelot, port, clone);
+	if (ocelot->ptp && ocelot_port->ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
+		*clone = skb_clone_sk(skb);
+		if (!(*clone))
+			return false;
+
+		ocelot_port_add_txtstamp_skb(ocelot, port, *clone);
 		return true;
 	}
 
