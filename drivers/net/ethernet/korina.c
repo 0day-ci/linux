@@ -43,6 +43,8 @@
 #include <linux/ioport.h>
 #include <linux/iopoll.h>
 #include <linux/in.h>
+#include <linux/of_device.h>
+#include <linux/of_net.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -1068,7 +1070,12 @@ static int korina_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	lp = netdev_priv(dev);
 
-	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+	if (mac_addr) {
+		ether_addr_copy(dev->dev_addr, mac_addr);
+	} else {
+		if (of_get_mac_address(pdev->dev.of_node, dev->dev_addr))
+			eth_hw_addr_random(dev);
+	}
 
 	lp->rx_irq = platform_get_irq_byname(pdev, "korina_rx");
 	lp->tx_irq = platform_get_irq_byname(pdev, "korina_tx");
@@ -1148,8 +1155,21 @@ static int korina_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id korina_match[] = {
+	{
+		.compatible = "idt,3243x-emac",
+	},
+	{ }
+};
+MODULE_DEVICE_TABLE(of, korina_match);
+#endif
+
 static struct platform_driver korina_driver = {
-	.driver.name = "korina",
+	.driver = {
+		.name = "korina",
+		.of_match_table = of_match_ptr(korina_match),
+	},
 	.probe = korina_probe,
 	.remove = korina_remove,
 };
