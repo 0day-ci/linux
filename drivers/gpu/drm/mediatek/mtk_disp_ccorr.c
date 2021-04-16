@@ -33,7 +33,7 @@ struct mtk_disp_ccorr_data {
 	u32 matrix_bits;
 };
 
-/**
+/*
  * struct mtk_disp_ccorr - DISP_CCORR driver structure
  * @ddp_comp - structure containing type enum and hardware resources
  * @crtc - associated crtc to report irq events to
