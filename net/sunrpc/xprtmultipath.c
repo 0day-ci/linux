@@ -33,6 +33,7 @@ static void xprt_switch_add_xprt_locked(struct rpc_xprt_switch *xps,
 {
 	if (unlikely(xprt_get(xprt) == NULL))
 		return;
+	rpc_sysfs_xprt_switch_xprt_setup(xps, xprt);
 	list_add_tail_rcu(&xprt->xprt_switch, &xps->xps_xprt_list);
 	smp_wmb();
 	if (xps->xps_nxprts == 0)
@@ -66,6 +67,7 @@ static void xprt_switch_remove_xprt_locked(struct rpc_xprt_switch *xps,
 		return;
 	xps->xps_nactive--;
 	xps->xps_nxprts--;
+	rpc_sysfs_xprt_switch_xprt_destroy(xprt);
 	if (xps->xps_nxprts == 0)
 		xps->xps_net = NULL;
 	smp_wmb();
