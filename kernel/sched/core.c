@@ -5472,7 +5472,7 @@ static ssize_t sched_dynamic_write(struct file *filp, const char __user *ubuf,
 
 static int sched_dynamic_show(struct seq_file *m, void *v)
 {
-	static const char * preempt_modes[] = {
+	static const char * const preempt_modes[] = {
 		"none", "voluntary", "full"
 	};
 	int i;
