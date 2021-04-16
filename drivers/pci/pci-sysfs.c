@@ -744,6 +744,51 @@ static const struct attribute_group pci_dev_rom_attr_group = {
 	.is_bin_visible = pci_dev_rom_attr_is_visible,
 };
 
+static ssize_t reset_store(struct device *dev,
+			   struct device_attribute *attr, const char *buf,
+			   size_t count)
+{
+	bool reset;
+	struct pci_dev *pdev = to_pci_dev(dev);
+	ssize_t ret;
+
+	if (kstrtobool(buf, &reset) < 0)
+		return -EINVAL;
+
+	if (!reset)
+		return -EINVAL;
+
+	pm_runtime_get_sync(dev);
+	ret = pci_reset_function(pdev);
+	pm_runtime_put(dev);
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+static DEVICE_ATTR_WO(reset);
+
+static struct attribute *pci_dev_reset_attrs[] = {
+	&dev_attr_reset.attr,
+	NULL,
+};
+
+static umode_t pci_dev_reset_attr_is_visible(struct kobject *kobj,
+					     struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (!pdev->reset_fn)
+		return 0;
+
+	return a->mode;
+}
+
+static const struct attribute_group pci_dev_reset_attr_group = {
+	.attrs = pci_dev_reset_attrs,
+	.is_visible = pci_dev_reset_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -1405,51 +1450,6 @@ static int pci_create_resource_files(struct pci_dev *pdev)
 int __weak pci_create_resource_files(struct pci_dev *pdev) { return 0; }
 void __weak pci_remove_resource_files(struct pci_dev *pdev) { return; }
 #endif
-
-static ssize_t reset_store(struct device *dev,
-			   struct device_attribute *attr, const char *buf,
-			   size_t count)
-{
-	bool reset;
-	struct pci_dev *pdev = to_pci_dev(dev);
-	ssize_t ret;
-
-	if (kstrtobool(buf, &reset) < 0)
-		return -EINVAL;
-
-	if (!reset)
-		return -EINVAL;
-
-	pm_runtime_get_sync(dev);
-	ret = pci_reset_function(pdev);
-	pm_runtime_put(dev);
-	if (ret < 0)
-		return ret;
-
-	return count;
-}
-static DEVICE_ATTR_WO(reset);
-
-static struct attribute *pci_dev_reset_attrs[] = {
-	&dev_attr_reset.attr,
-	NULL,
-};
-
-static umode_t pci_dev_reset_attr_is_visible(struct kobject *kobj,
-					     struct attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (!pdev->reset_fn)
-		return 0;
-
-	return a->mode;
-}
-
-static const struct attribute_group pci_dev_reset_attr_group = {
-	.attrs = pci_dev_reset_attrs,
-	.is_visible = pci_dev_reset_attr_is_visible,
-};
 
 int __must_check pci_create_sysfs_dev_files(struct pci_dev *pdev)
 {
