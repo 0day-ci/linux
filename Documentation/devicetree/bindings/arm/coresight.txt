@@ -106,6 +106,8 @@ its hardware characteristcs.
 	  powers down the coresight component also powers down and loses its
 	  context. This property is currently only used for the ETM 4.x driver.
 
+	* coresight-name: the name of the coresight devices.
+
 * Optional properties for ETM/PTMs:
 
 	* arm,cp14: must be present if the system accesses ETM/PTM management
