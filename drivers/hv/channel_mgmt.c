@@ -841,7 +841,7 @@ void vmbus_initiate_unload(bool crash)
 	if (vmbus_proto_version < VERSION_WIN8_1)
 		return;
 
-	init_completion(&vmbus_connection.unload_event);
+	reinit_completion(&vmbus_connection.unload_event);
 	memset(&hdr, 0, sizeof(struct vmbus_channel_message_header));
 	hdr.msgtype = CHANNELMSG_UNLOAD;
 	vmbus_post_msg(&hdr, sizeof(struct vmbus_channel_message_header),
