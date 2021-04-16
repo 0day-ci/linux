@@ -2146,11 +2146,30 @@ RDMA Interface Files
 HugeTLB
 -------
 
-The HugeTLB controller allows to limit the HugeTLB usage per control group and
-enforces the controller limit during page fault.
+The "HugeTLB" controller regulates usage of huge pages. The controller
+supports two forms of accounting: page fault accounting and reservation
+accounting. See
+:ref:`Documentation/admin-guide/cgroup-v1/hugetlb.rst <cgroup-v1-hugetlb>`
+for more details.
+
 
 HugeTLB Interface Files
 ~~~~~~~~~~~~~~~~~~~~~~~
+
+  hugetlb.<hugepagesize>.rsvd.current
+	Show current reservations and no-reserve faults for "hugepagesize"
+	hugetlb.  It exists for all the cgroup except root.
+
+  hugetlb.<hugepagesize>.rsvd.max
+	Set/show the hard limit of reservations and no-reserve faults for
+	"hugepagesize" hugetlb. The default value is "max".
+	It exists for all the cgroup except root.
+
+  hugetlb.<hugepagesize>.rsvd.events
+	A read-only flat-keyed file which exists on non-root cgroups.
+
+	  max
+		The number of allocation failure due to HugeTLB reservation limit
 
   hugetlb.<hugepagesize>.current
 	Show current usage for "hugepagesize" hugetlb.  It exists for all
