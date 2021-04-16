@@ -2176,6 +2176,39 @@ int mlx5e_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 	return mlx5e_ethtool_set_rxnfc(dev, cmd);
 }
 
+static void mlx5e_get_eth_phy_stats(struct net_device *netdev,
+				    struct ethtool_eth_phy_stats *phy_stats)
+{
+	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	mlx5e_stats_eth_phy_get(priv, phy_stats);
+}
+
+static void mlx5e_get_eth_mac_stats(struct net_device *netdev,
+				    struct ethtool_eth_mac_stats *mac_stats)
+{
+	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	mlx5e_stats_eth_mac_get(priv, mac_stats);
+}
+
+static void mlx5e_get_eth_ctrl_stats(struct net_device *netdev,
+				     struct ethtool_eth_ctrl_stats *ctrl_stats)
+{
+	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	mlx5e_stats_eth_ctrl_get(priv, ctrl_stats);
+}
+
+static void mlx5e_get_rmon_stats(struct net_device *netdev,
+				 struct ethtool_rmon_stats *rmon_stats,
+				 const struct ethtool_rmon_hist_range **ranges)
+{
+	struct mlx5e_priv *priv = netdev_priv(netdev);
+
+	mlx5e_stats_rmon_get(priv, rmon_stats, ranges);
+}
+
 const struct ethtool_ops mlx5e_ethtool_ops = {
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
 				     ETHTOOL_COALESCE_MAX_FRAMES |
@@ -2220,4 +2253,8 @@ const struct ethtool_ops mlx5e_ethtool_ops = {
 	.get_fec_stats     = mlx5e_get_fec_stats,
 	.get_fecparam      = mlx5e_get_fecparam,
 	.set_fecparam      = mlx5e_set_fecparam,
+	.get_eth_phy_stats = mlx5e_get_eth_phy_stats,
+	.get_eth_mac_stats = mlx5e_get_eth_mac_stats,
+	.get_eth_ctrl_stats = mlx5e_get_eth_ctrl_stats,
+	.get_rmon_stats    = mlx5e_get_rmon_stats,
 };
