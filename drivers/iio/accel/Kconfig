@@ -226,6 +226,36 @@ config DMARD10
 	  Choosing M will build the driver as a module. If so, the module
 	  will be called dmard10.
 
+config FXLS8962AF
+	tristate "NXP FXLS8962AF and similar Accelerometers Driver"
+	select REGMAP
+	help
+	  Say yes here to build support for the NXP 3-axis automotive
+	  accelerometer FXLS8962AF/FXLS8964AF.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called fxls8962af.
+
+config FXLS8962AF_I2C
+	tristate "NXP FXLS8962AF I2C transport"
+	depends on FXLS8962AF
+	depends on I2C
+	default FXLS8962AF
+	select REGMAP_I2C
+	help
+	  Say yes here to enable the NXP FXLS8962AF accelerometer
+	  I2C transport channel.
+
+config FXLS8962AF_SPI
+	tristate "NXP FXLS8962AF SPI transport"
+	depends on FXLS8962AF
+	depends on SPI
+	default FXLS8962AF
+	select REGMAP_SPI
+	help
+	  Say yes here to enable the NXP FXLS8962AF accelerometer
+	  SPI transport channel.
+
 config HID_SENSOR_ACCEL_3D
 	depends on HID_SENSOR_HUB
 	select IIO_BUFFER
