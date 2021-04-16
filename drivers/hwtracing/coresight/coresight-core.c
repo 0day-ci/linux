@@ -1698,6 +1698,12 @@ char *coresight_alloc_device_name(struct coresight_dev_list *dict,
 	int idx;
 	char *name = NULL;
 	struct fwnode_handle **list;
+	struct device_node *node = dev->of_node;
+
+	if (!node) {
+		if (!of_property_read_string(node, "coresight-name", &name))
+			return name;
+	}
 
 	mutex_lock(&coresight_mutex);
 
