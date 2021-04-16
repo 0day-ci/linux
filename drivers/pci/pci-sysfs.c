@@ -666,9 +666,9 @@ static ssize_t boot_vga_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(boot_vga);
 
-static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
-			       struct bin_attribute *bin_attr, char *buf,
-			       loff_t off, size_t count)
+static ssize_t config_read(struct file *filp, struct kobject *kobj,
+			   struct bin_attribute *bin_attr, char *buf,
+			   loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 	unsigned int size = 64;
@@ -743,9 +743,9 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 	return count;
 }
 
-static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
-				struct bin_attribute *bin_attr, char *buf,
-				loff_t off, size_t count)
+static ssize_t config_write(struct file *filp, struct kobject *kobj,
+			    struct bin_attribute *bin_attr, char *buf,
+			    loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 	unsigned int size = count;
@@ -808,7 +808,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 
 	return count;
 }
-static BIN_ATTR(config, 0644, pci_read_config, pci_write_config, 0);
+static BIN_ATTR_RW(config, 0);
 
 static struct bin_attribute *pci_dev_config_attrs[] = {
 	&bin_attr_config,
@@ -1243,7 +1243,7 @@ void __weak pci_remove_resource_files(struct pci_dev *dev) { return; }
 #endif
 
 /**
- * pci_write_rom - used to enable access to the PCI ROM display
+ * rom_write - used to enable access to the PCI ROM display
  * @filp: sysfs file
  * @kobj: kernel object handle
  * @bin_attr: struct bin_attribute for this file
@@ -1253,9 +1253,9 @@ void __weak pci_remove_resource_files(struct pci_dev *dev) { return; }
  *
  * writing anything except 0 enables it
  */
-static ssize_t pci_write_rom(struct file *filp, struct kobject *kobj,
-			     struct bin_attribute *bin_attr, char *buf,
-			     loff_t off, size_t count)
+static ssize_t rom_write(struct file *filp, struct kobject *kobj,
+			 struct bin_attribute *bin_attr, char *buf,
+			 loff_t off, size_t count)
 {
 	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
 
@@ -1268,7 +1268,7 @@ static ssize_t pci_write_rom(struct file *filp, struct kobject *kobj,
 }
 
 /**
- * pci_read_rom - read a PCI ROM
+ * rom_read - read a PCI ROM
  * @filp: sysfs file
  * @kobj: kernel object handle
  * @bin_attr: struct bin_attribute for this file
@@ -1279,9 +1279,9 @@ static ssize_t pci_write_rom(struct file *filp, struct kobject *kobj,
  * Put @count bytes starting at @off into @buf from the ROM in the PCI
  * device corresponding to @kobj.
  */
-static ssize_t pci_read_rom(struct file *filp, struct kobject *kobj,
-			    struct bin_attribute *bin_attr, char *buf,
-			    loff_t off, size_t count)
+static ssize_t rom_read(struct file *filp, struct kobject *kobj,
+			struct bin_attribute *bin_attr, char *buf,
+			loff_t off, size_t count)
 {
 	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
 	void __iomem *rom;
@@ -1306,7 +1306,7 @@ static ssize_t pci_read_rom(struct file *filp, struct kobject *kobj,
 
 	return count;
 }
-static BIN_ATTR(rom, 0600, pci_read_rom, pci_write_rom, 0);
+static BIN_ATTR_ADMIN_RW(rom, 0);
 
 static struct bin_attribute *pci_dev_rom_attrs[] = {
 	&bin_attr_rom,

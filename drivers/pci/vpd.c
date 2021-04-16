@@ -396,9 +396,9 @@ void pci_vpd_release(struct pci_dev *dev)
 	kfree(dev->vpd);
 }
 
-static ssize_t read_vpd_attr(struct file *filp, struct kobject *kobj,
-			     struct bin_attribute *bin_attr, char *buf,
-			     loff_t off, size_t count)
+static ssize_t vpd_read(struct file *filp, struct kobject *kobj,
+			struct bin_attribute *bin_attr, char *buf,
+			loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 
@@ -412,9 +412,9 @@ static ssize_t read_vpd_attr(struct file *filp, struct kobject *kobj,
 	return pci_read_vpd(dev, off, count, buf);
 }
 
-static ssize_t write_vpd_attr(struct file *filp, struct kobject *kobj,
-			      struct bin_attribute *bin_attr, char *buf,
-			      loff_t off, size_t count)
+static ssize_t vpd_write(struct file *filp, struct kobject *kobj,
+			 struct bin_attribute *bin_attr, char *buf,
+			 loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 
@@ -427,7 +427,7 @@ static ssize_t write_vpd_attr(struct file *filp, struct kobject *kobj,
 
 	return pci_write_vpd(dev, off, count, buf);
 }
-static BIN_ATTR(vpd, 0600, read_vpd_attr, write_vpd_attr, 0);
+static BIN_ATTR_ADMIN_RW(vpd, 0);
 
 static struct bin_attribute *vpd_attrs[] = {
 	&bin_attr_vpd,
