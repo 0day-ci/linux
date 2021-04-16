@@ -24,6 +24,7 @@ struct rpc_xprt_switch {
 
 	const struct rpc_xprt_iter_ops *xps_iter_ops;
 
+	void			*xps_sysfs;
 	struct rcu_head		xps_rcu;
 };
 
