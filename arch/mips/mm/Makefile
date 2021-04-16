@@ -12,6 +12,7 @@ obj-y				+= mmap.o
 obj-y				+= page.o
 obj-y				+= page-funcs.o
 obj-y				+= pgtable.o
+obj-y				+= pageattr.o
 obj-y				+= tlbex.o
 obj-y				+= tlbex-fault.o
 obj-y				+= tlb-funcs.o
