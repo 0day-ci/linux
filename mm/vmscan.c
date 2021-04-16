@@ -168,6 +168,7 @@ struct scan_control {
  * From 0 .. 200.  Higher means more swappy.
  */
 int vm_swappiness = 60;
+int lru_list_threshold = SWAP_CLUSTER_MAX << 3;
 
 static void set_task_reclaim_state(struct task_struct *task,
 				   struct reclaim_state *rs)
@@ -1981,7 +1982,7 @@ int isolate_lru_page(struct page *page)
 static int too_many_isolated(struct pglist_data *pgdat, int file,
 		struct scan_control *sc)
 {
-	unsigned long inactive, isolated;
+	unsigned long inactive, isolated, active, nr_lru_pages;
 
 	if (current_is_kswapd())
 		return 0;
@@ -1992,11 +1993,13 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 	if (file) {
 		inactive = node_page_state(pgdat, NR_INACTIVE_FILE);
 		isolated = node_page_state(pgdat, NR_ISOLATED_FILE);
+		active = node_page_state(pgdat, NR_ACTIVE_FILE);
 	} else {
 		inactive = node_page_state(pgdat, NR_INACTIVE_ANON);
 		isolated = node_page_state(pgdat, NR_ISOLATED_ANON);
+		active = node_page_state(pgdat, NR_ACTIVE_ANON);
 	}
-
+	nr_lru_pages = inactive + active;
 	/*
 	 * GFP_NOIO/GFP_NOFS callers are allowed to isolate more pages, so they
 	 * won't get blocked by normal direct-reclaimers, forming a circular
@@ -2004,6 +2007,10 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 	 */
 	if ((sc->gfp_mask & (__GFP_IO | __GFP_FS)) == (__GFP_IO | __GFP_FS))
 		inactive >>= 3;
+
+	if (isolated > inactive)
+		if (nr_lru_pages < lru_list_threshold)
+			return 0;
 
 	return isolated > inactive;
 }
