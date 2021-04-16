@@ -121,6 +121,9 @@ again:
 	if (S_ISREG(inode->i_mode))
 		HFSPLUS_I(inode)->linkid = linkid;
 out:
+	/* Prevent the negative dentry in the casefolded form from being cached */
+	if (!inode && test_bit(HFSPLUS_SB_CASEFOLD, &HFSPLUS_SB(sb)->flags))
+		return NULL;
 	return d_splice_alias(inode, dentry);
 fail:
 	hfs_find_exit(&fd);
@@ -407,6 +410,12 @@ static int hfsplus_unlink(struct inode *dir, struct dentry *dentry)
 		sbi->file_count--;
 	inode->i_ctime = current_time(inode);
 	mark_inode_dirty(inode);
+
+	/* VFS negative dentries are incompatible with encoding and
+	 * case-insensitiveness
+	 */
+	if (test_bit(HFSPLUS_SB_CASEFOLD, &sbi->flags))
+		d_invalidate(dentry);
 out:
 	mutex_unlock(&sbi->vh_mutex);
 	return res;
@@ -429,6 +438,12 @@ static int hfsplus_rmdir(struct inode *dir, struct dentry *dentry)
 	inode->i_ctime = current_time(inode);
 	hfsplus_delete_inode(inode);
 	mark_inode_dirty(inode);
+
+	/* VFS negative dentries are incompatible with encoding and
+	 * case-insensitiveness
+	 */
+	if (test_bit(HFSPLUS_SB_CASEFOLD, &sbi->flags))
+		d_invalidate(dentry);
 out:
 	mutex_unlock(&sbi->vh_mutex);
 	return res;
