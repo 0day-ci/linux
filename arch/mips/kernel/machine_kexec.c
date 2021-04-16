@@ -11,6 +11,7 @@
 
 #include <asm/cacheflush.h>
 #include <asm/page.h>
+#include <asm/set_memory.h>
 
 extern const unsigned char relocate_new_kernel[];
 extern const size_t relocate_new_kernel_size;
@@ -203,6 +204,45 @@ void kexec_reboot(void)
 
 	do_kexec = (void *)reboot_code_buffer;
 	do_kexec();
+}
+
+static int
+kexec_mark_range(unsigned long start, unsigned long end, bool protect)
+{
+	struct page *page;
+	unsigned int nr_pages;
+
+	/*
+	 * For physical range: [start, end]. We must skip the unassigned
+	 * crashk resource with zero-valued "end" member.
+	 */
+	if (!end || start > end)
+		return 0;
+
+	page = pfn_to_page(start >> PAGE_SHIFT);
+	nr_pages = (end >> PAGE_SHIFT) - (start >> PAGE_SHIFT) + 1;
+	if (protect)
+		return set_pages_ro(page, nr_pages);
+	else
+		return set_pages_rw(page, nr_pages);
+}
+
+static void
+kexec_mark_crashkres(bool protect)
+{
+	kexec_mark_range(crashk_res.start, crashk_res.end, protect);
+}
+
+void
+arch_kexec_protect_crashkres(void)
+{
+	kexec_mark_crashkres(true);
+}
+
+void
+arch_kexec_unprotect_crashkres(void)
+{
+	kexec_mark_crashkres(false);
 }
 
 void
