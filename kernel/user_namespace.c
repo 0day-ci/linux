@@ -106,6 +106,7 @@ int create_user_ns(struct cred *new)
 	if (!ns)
 		goto fail_dec;
 
+	ns->parent_could_setfcap = cap_raised(new->cap_effective, CAP_SETFCAP);
 	ret = ns_alloc_inum(&ns->ns);
 	if (ret)
 		goto fail_free;
@@ -841,6 +842,56 @@ static int sort_idmaps(struct uid_gid_map *map)
 	return 0;
 }
 
+/*
+ * If mapping uid 0, then file capabilities created by the new namespace will
+ * be effective in the parent namespace.  Adding file capabilities requires
+ * CAP_SETFCAP, which the child namespace will have, so creating such a
+ * mapping requires CAP_SETFCAP in the parent namespace.
+ */
+static bool disallowed_0_mapping(const struct file *file,
+				 struct user_namespace *map_ns,
+				 struct uid_gid_map *new_map)
+{
+	int idx;
+	bool zeromapping = false;
+	const struct user_namespace *file_ns = file->f_cred->user_ns;
+
+	for (idx = 0; idx < new_map->nr_extents; idx++) {
+		struct uid_gid_extent *e;
+		u32 lower_first;
+
+		if (new_map->nr_extents <= UID_GID_MAP_MAX_BASE_EXTENTS)
+			e = &new_map->extent[idx];
+		else
+			e = &new_map->forward[idx];
+		if (e->lower_first == 0) {
+			zeromapping = true;
+			break;
+		}
+	}
+
+	if (!zeromapping)
+		return false;
+
+	if (map_ns == file_ns) {
+		/* The user unshared first and is writing to
+		 * /proc/self/uid_map.  User already has full
+		 * capabilites in the new namespace, so verify
+		 * that the parent has CAP_SETFCAP. */
+		if (!file_ns->parent_could_setfcap)
+			return true;
+	} else {
+		/* Process p1 is writing to uid_map of p2, who
+		 * is in a child user namespace to p1's.  So
+		 * we verify that p1 has CAP_SETFCAP to its
+		 * own namespace */
+		if (!file_ns_capable(file, map_ns->parent, CAP_SETFCAP))
+			return true;
+	}
+
+	return false;
+}
+
 static ssize_t map_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos,
 			 int cap_setid,
@@ -848,7 +899,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 			 struct uid_gid_map *parent_map)
 {
 	struct seq_file *seq = file->private_data;
-	struct user_namespace *ns = seq->private;
+	struct user_namespace *map_ns = seq->private;
 	struct uid_gid_map new_map;
 	unsigned idx;
 	struct uid_gid_extent extent;
@@ -895,7 +946,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	/*
 	 * Adjusting namespace settings requires capabilities on the target.
 	 */
-	if (cap_valid(cap_setid) && !file_ns_capable(file, ns, CAP_SYS_ADMIN))
+	if (cap_valid(cap_setid) && !file_ns_capable(file, map_ns, CAP_SYS_ADMIN))
 		goto out;
 
 	/* Parse the user data */
@@ -965,7 +1016,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 
 	ret = -EPERM;
 	/* Validate the user is allowed to use user id's mapped to. */
-	if (!new_idmap_permitted(file, ns, cap_setid, &new_map))
+	if (!new_idmap_permitted(file, map_ns, cap_setid, &new_map))
 		goto out;
 
 	ret = -EPERM;
@@ -1086,6 +1137,10 @@ static bool new_idmap_permitted(const struct file *file,
 				struct uid_gid_map *new_map)
 {
 	const struct cred *cred = file->f_cred;
+
+	if (cap_setid == CAP_SETUID && disallowed_0_mapping(file, ns, new_map))
+		return false;
+
 	/* Don't allow mappings that would allow anything that wouldn't
 	 * be allowed without the establishment of unprivileged mappings.
 	 */
