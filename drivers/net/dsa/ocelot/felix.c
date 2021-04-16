@@ -1399,18 +1399,14 @@ static bool felix_txtstamp(struct dsa_switch *ds, int port,
 			   struct sk_buff *skb, struct sk_buff **clone)
 {
 	struct ocelot *ocelot = ds->priv;
-	struct ocelot_port *ocelot_port = ocelot->ports[port];
 
-	if (ocelot->ptp && ocelot_port->ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
-		*clone = skb_clone_sk(skb);
-		if (!(*clone))
-			return false;
+	if (!ocelot->ptp)
+		return false;
 
-		ocelot_port_add_txtstamp_skb(ocelot, port, *clone);
-		return true;
-	}
+	if (ocelot_port_txtstamp_request(ocelot, port, skb, clone))
+		return false;
 
-	return false;
+	return true;
 }
 
 static int felix_change_mtu(struct dsa_switch *ds, int port, int new_mtu)
