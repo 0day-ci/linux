@@ -1223,6 +1223,11 @@ static void ti_sn_bridge_parse_lanes(struct ti_sn65dsi86 *pdata,
 	pdata->ln_polrs = ln_polrs;
 }
 
+static void ti_sn65dsi86_runtime_disable(void *data)
+{
+	pm_runtime_disable(data);
+}
+
 static int ti_sn65dsi86_probe(struct i2c_client *client,
 			      const struct i2c_device_id *id)
 {
@@ -1278,12 +1283,13 @@ static int ti_sn65dsi86_probe(struct i2c_client *client,
 		return ret;
 
 	pm_runtime_enable(dev);
+	ret = devm_add_action_or_reset(dev, ti_sn65dsi86_runtime_disable, dev);
+	if (ret)
+		return ret;
 
 	ret = ti_sn_setup_gpio_controller(pdata);
-	if (ret) {
-		pm_runtime_disable(dev);
+	if (ret)
 		return ret;
-	}
 
 	pdata->aux.name = "ti-sn65dsi86-aux";
 	pdata->aux.dev = dev;
@@ -1315,8 +1321,6 @@ static int ti_sn65dsi86_remove(struct i2c_client *client)
 	kfree(pdata->edid);
 
 	drm_bridge_remove(&pdata->bridge);
-
-	pm_runtime_disable(pdata->dev);
 
 	of_node_put(pdata->host_node);
 
