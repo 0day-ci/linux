@@ -1010,26 +1010,6 @@ static const struct attribute_group pcie_dev_attr_group = {
 /*
  * PCI Bus Class Devices
  */
-static ssize_t cpuaffinity_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(false, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpuaffinity);
-
-static ssize_t cpulistaffinity_show(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(true, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpulistaffinity);
-
 static ssize_t rescan_store(struct bus_type *bus, const char *buf, size_t count)
 {
 	bool rescan;
@@ -1058,10 +1038,25 @@ static const struct attribute_group pci_bus_group = {
 	.attrs = pci_bus_attrs,
 };
 
-const struct attribute_group *pci_bus_groups[] = {
-	&pci_bus_group,
-	NULL,
-};
+static ssize_t cpuaffinity_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(false, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpuaffinity);
+
+static ssize_t cpulistaffinity_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(true, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpulistaffinity);
 
 static ssize_t bus_rescan_store(struct device *dev,
 				struct device_attribute *attr, const char *buf,
@@ -1600,6 +1595,11 @@ static const struct attribute_group *pci_dev_attr_groups[] = {
 #ifdef CONFIG_PCIEASPM
 	&aspm_ctrl_attr_group,
 #endif
+	NULL,
+};
+
+const struct attribute_group *pci_bus_groups[] = {
+	&pci_bus_group,
 	NULL,
 };
 
