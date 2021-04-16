@@ -195,6 +195,8 @@ static int max_sched_tunable_scaling = SCHED_TUNABLESCALING_END-1;
 #endif /* CONFIG_SMP */
 #endif /* CONFIG_SCHED_DEBUG */
 
+static int max_buddy_zone = MAX_ORDER - 1;
+
 #ifdef CONFIG_COMPACTION
 static int min_extfrag_threshold;
 static int max_extfrag_threshold = 1000;
@@ -2869,6 +2871,15 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &one_hundred,
+	},
+	{
+		.procname       = "compaction_order",
+		.data           = &sysctl_compaction_order,
+		.maxlen         = sizeof(sysctl_compaction_order),
+		.mode           = 0644,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = &max_buddy_zone,
 	},
 	{
 		.procname	= "extfrag_threshold",
