@@ -164,6 +164,19 @@ enum iommu_dev_features {
 
 #define IOMMU_PASID_INVALID	(-1U)
 
+/*
+ * The IOMMU_SVA_BIND_SUPERVISOR flag requests a PASID which can be used only
+ * for access to kernel addresses. No IOTLB flushes are automatically done
+ * for kernel mappings; it is valid only for access to the kernel's static
+ * 1:1 mapping of physical memory — not to vmalloc or even module mappings.
+ * A future API addition may permit the use of such ranges, by means of an
+ * explicit IOTLB flush call (akin to the DMA API's unmap method).
+ *
+ * It is unlikely that we will ever hook into flush_tlb_kernel_range() to
+ * do such IOTLB flushes automatically.
+ */
+#define IOMMU_SVA_BIND_SUPERVISOR       BIT(0)
+
 #ifdef CONFIG_IOMMU_API
 
 /**
@@ -287,7 +300,7 @@ struct iommu_ops {
 	int (*aux_get_pasid)(struct iommu_domain *domain, struct device *dev);
 
 	struct iommu_sva *(*sva_bind)(struct device *dev, struct mm_struct *mm,
-				      void *drvdata);
+				      unsigned int flags);
 	void (*sva_unbind)(struct iommu_sva *handle);
 	u32 (*sva_get_pasid)(struct iommu_sva *handle);
 
@@ -640,7 +653,7 @@ int iommu_aux_get_pasid(struct iommu_domain *domain, struct device *dev);
 
 struct iommu_sva *iommu_sva_bind_device(struct device *dev,
 					struct mm_struct *mm,
-					void *drvdata);
+					unsigned int flags);
 void iommu_sva_unbind_device(struct iommu_sva *handle);
 u32 iommu_sva_get_pasid(struct iommu_sva *handle);
 
@@ -1015,7 +1028,7 @@ iommu_aux_get_pasid(struct iommu_domain *domain, struct device *dev)
 }
 
 static inline struct iommu_sva *
-iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, void *drvdata)
+iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, unsigned int flags)
 {
 	return NULL;
 }

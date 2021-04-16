@@ -486,12 +486,9 @@ intel_svm_bind_mm(struct device *dev, unsigned int flags,
 	} else
 		pasid_max = 1 << 20;
 
-	/* Bind supervisor PASID shuld have mm = NULL */
-	if (flags & SVM_FLAG_SUPERVISOR_MODE) {
-		if (!ecap_srs(iommu->ecap) || mm) {
-			pr_err("Supervisor PASID with user provided mm.\n");
-			return -EINVAL;
-		}
+	if ((flags & IOMMU_SVA_BIND_SUPERVISOR) && !ecap_srs(iommu->ecap)) {
+		pr_err("Supervisor PASID not supported.\n");
+		return -EINVAL;
 	}
 
 	if (!(flags & SVM_FLAG_PRIVATE_PASID)) {
@@ -1059,11 +1056,10 @@ prq_advance:
 
 #define to_intel_svm_dev(handle) container_of(handle, struct intel_svm_dev, sva)
 struct iommu_sva *
-intel_svm_bind(struct device *dev, struct mm_struct *mm, void *drvdata)
+intel_svm_bind(struct device *dev, struct mm_struct *mm, unsigned int flags)
 {
 	struct iommu_sva *sva = ERR_PTR(-EINVAL);
 	struct intel_svm_dev *sdev = NULL;
-	unsigned int flags = 0;
 	int ret;
 
 	/*
@@ -1071,8 +1067,6 @@ intel_svm_bind(struct device *dev, struct mm_struct *mm, void *drvdata)
 	 * It will require shared SVM data structures, i.e. combine io_mm
 	 * and intel_svm etc.
 	 */
-	if (drvdata)
-		flags = *(unsigned int *)drvdata;
 	mutex_lock(&pasid_mutex);
 	ret = intel_svm_bind_mm(dev, flags, NULL, mm, &sdev);
 	if (ret)

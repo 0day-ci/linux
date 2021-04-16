@@ -354,11 +354,14 @@ err_free_bond:
 }
 
 struct iommu_sva *
-arm_smmu_sva_bind(struct device *dev, struct mm_struct *mm, void *drvdata)
+arm_smmu_sva_bind(struct device *dev, struct mm_struct *mm, unsigned int flags)
 {
 	struct iommu_sva *handle;
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+
+	if (flags)
+		return ERR_PTR(-EINVAL);
 
 	if (smmu_domain->stage != ARM_SMMU_DOMAIN_S1)
 		return ERR_PTR(-EINVAL);

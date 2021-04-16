@@ -14,7 +14,6 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/device.h>
 #include <linux/idr.h>
-#include <linux/intel-svm.h>
 #include <linux/iommu.h>
 #include <uapi/linux/idxd.h>
 #include <linux/dmaengine.h>
@@ -300,13 +299,11 @@ static struct idxd_device *idxd_alloc(struct pci_dev *pdev)
 
 static int idxd_enable_system_pasid(struct idxd_device *idxd)
 {
-	int flags;
 	unsigned int pasid;
 	struct iommu_sva *sva;
 
-	flags = SVM_FLAG_SUPERVISOR_MODE;
-
-	sva = iommu_sva_bind_device(&idxd->pdev->dev, NULL, &flags);
+	sva = iommu_sva_bind_device(&idxd->pdev->dev, NULL,
+				    IOMMU_SVA_BIND_SUPERVISOR);
 	if (IS_ERR(sva)) {
 		dev_warn(&idxd->pdev->dev,
 			 "iommu sva bind failed: %ld\n", PTR_ERR(sva));
