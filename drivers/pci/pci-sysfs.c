@@ -483,6 +483,174 @@ static const struct attribute_group pci_dev_group = {
 	.attrs = pci_dev_attrs,
 };
 
+static ssize_t config_read(struct file *filp, struct kobject *kobj,
+			   struct bin_attribute *bin_attr, char *buf,
+			   loff_t off, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+	unsigned int size = 64;
+	loff_t init_off = off;
+	u8 *data = (u8 *)buf;
+
+	/* Several chips lock up trying to read undefined config space */
+	if (file_ns_capable(filp, &init_user_ns, CAP_SYS_ADMIN))
+		size = pdev->cfg_size;
+	else if (pdev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
+		size = 128;
+
+	if (off > size)
+		return 0;
+
+	if (off + count > size) {
+		size -= off;
+		count = size;
+	} else {
+		size = count;
+	}
+
+	pci_config_pm_runtime_get(pdev);
+
+	if ((off & 1) && size) {
+		u8 val;
+		pci_user_read_config_byte(pdev, off, &val);
+		data[off - init_off] = val;
+		off++;
+		size--;
+	}
+
+	if ((off & 3) && size > 2) {
+		u16 val;
+		pci_user_read_config_word(pdev, off, &val);
+		data[off - init_off] = val & 0xff;
+		data[off - init_off + 1] = (val >> 8) & 0xff;
+		off += 2;
+		size -= 2;
+	}
+
+	while (size > 3) {
+		u32 val;
+		pci_user_read_config_dword(pdev, off, &val);
+		data[off - init_off] = val & 0xff;
+		data[off - init_off + 1] = (val >> 8) & 0xff;
+		data[off - init_off + 2] = (val >> 16) & 0xff;
+		data[off - init_off + 3] = (val >> 24) & 0xff;
+		off += 4;
+		size -= 4;
+		cond_resched();
+	}
+
+	if (size >= 2) {
+		u16 val;
+		pci_user_read_config_word(pdev, off, &val);
+		data[off - init_off] = val & 0xff;
+		data[off - init_off + 1] = (val >> 8) & 0xff;
+		off += 2;
+		size -= 2;
+	}
+
+	if (size > 0) {
+		u8 val;
+		pci_user_read_config_byte(pdev, off, &val);
+		data[off - init_off] = val;
+		off++;
+		--size;
+	}
+
+	pci_config_pm_runtime_put(pdev);
+
+	return count;
+}
+
+static ssize_t config_write(struct file *filp, struct kobject *kobj,
+			    struct bin_attribute *bin_attr, char *buf,
+			    loff_t off, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+	unsigned int size = count;
+	loff_t init_off = off;
+	u8 *data = (u8 *)buf;
+	size_t ret;
+
+	ret = security_locked_down(LOCKDOWN_PCI_ACCESS);
+	if (ret)
+		return ret;
+
+	if (off > pdev->cfg_size)
+		return 0;
+
+	if (off + count > pdev->cfg_size) {
+		size = pdev->cfg_size - off;
+		count = size;
+	}
+
+	pci_config_pm_runtime_get(pdev);
+
+	if ((off & 1) && size) {
+		pci_user_write_config_byte(pdev, off, data[off - init_off]);
+		off++;
+		size--;
+	}
+
+	if ((off & 3) && size > 2) {
+		u16 val = data[off - init_off];
+		val |= (u16) data[off - init_off + 1] << 8;
+		pci_user_write_config_word(pdev, off, val);
+		off += 2;
+		size -= 2;
+	}
+
+	while (size > 3) {
+		u32 val = data[off - init_off];
+		val |= (u32) data[off - init_off + 1] << 8;
+		val |= (u32) data[off - init_off + 2] << 16;
+		val |= (u32) data[off - init_off + 3] << 24;
+		pci_user_write_config_dword(pdev, off, val);
+		off += 4;
+		size -= 4;
+	}
+
+	if (size >= 2) {
+		u16 val = data[off - init_off];
+		val |= (u16) data[off - init_off + 1] << 8;
+		pci_user_write_config_word(pdev, off, val);
+		off += 2;
+		size -= 2;
+	}
+
+	if (size) {
+		pci_user_write_config_byte(pdev, off, data[off - init_off]);
+		off++;
+		--size;
+	}
+
+	pci_config_pm_runtime_put(pdev);
+
+	return count;
+}
+static BIN_ATTR_RW(config, 0);
+
+static struct bin_attribute *pci_dev_config_attrs[] = {
+	&bin_attr_config,
+	NULL,
+};
+
+static umode_t pci_dev_config_attr_is_visible(struct kobject *kobj,
+					      struct bin_attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	a->size = PCI_CFG_SPACE_SIZE;
+	if (pdev->cfg_size > PCI_CFG_SPACE_SIZE)
+		a->size = PCI_CFG_SPACE_EXP_SIZE;
+
+	return a->attr.mode;
+}
+
+static const struct attribute_group pci_dev_config_attr_group = {
+	.bin_attrs = pci_dev_config_attrs,
+	.is_bin_visible = pci_dev_config_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -720,174 +888,6 @@ static ssize_t boot_vga_show(struct device *dev,
 			     IORESOURCE_ROM_SHADOW));
 }
 static DEVICE_ATTR_RO(boot_vga);
-
-static ssize_t config_read(struct file *filp, struct kobject *kobj,
-			   struct bin_attribute *bin_attr, char *buf,
-			   loff_t off, size_t count)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-	unsigned int size = 64;
-	loff_t init_off = off;
-	u8 *data = (u8 *)buf;
-
-	/* Several chips lock up trying to read undefined config space */
-	if (file_ns_capable(filp, &init_user_ns, CAP_SYS_ADMIN))
-		size = pdev->cfg_size;
-	else if (pdev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
-		size = 128;
-
-	if (off > size)
-		return 0;
-
-	if (off + count > size) {
-		size -= off;
-		count = size;
-	} else {
-		size = count;
-	}
-
-	pci_config_pm_runtime_get(pdev);
-
-	if ((off & 1) && size) {
-		u8 val;
-		pci_user_read_config_byte(pdev, off, &val);
-		data[off - init_off] = val;
-		off++;
-		size--;
-	}
-
-	if ((off & 3) && size > 2) {
-		u16 val;
-		pci_user_read_config_word(pdev, off, &val);
-		data[off - init_off] = val & 0xff;
-		data[off - init_off + 1] = (val >> 8) & 0xff;
-		off += 2;
-		size -= 2;
-	}
-
-	while (size > 3) {
-		u32 val;
-		pci_user_read_config_dword(pdev, off, &val);
-		data[off - init_off] = val & 0xff;
-		data[off - init_off + 1] = (val >> 8) & 0xff;
-		data[off - init_off + 2] = (val >> 16) & 0xff;
-		data[off - init_off + 3] = (val >> 24) & 0xff;
-		off += 4;
-		size -= 4;
-		cond_resched();
-	}
-
-	if (size >= 2) {
-		u16 val;
-		pci_user_read_config_word(pdev, off, &val);
-		data[off - init_off] = val & 0xff;
-		data[off - init_off + 1] = (val >> 8) & 0xff;
-		off += 2;
-		size -= 2;
-	}
-
-	if (size > 0) {
-		u8 val;
-		pci_user_read_config_byte(pdev, off, &val);
-		data[off - init_off] = val;
-		off++;
-		--size;
-	}
-
-	pci_config_pm_runtime_put(pdev);
-
-	return count;
-}
-
-static ssize_t config_write(struct file *filp, struct kobject *kobj,
-			    struct bin_attribute *bin_attr, char *buf,
-			    loff_t off, size_t count)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-	unsigned int size = count;
-	loff_t init_off = off;
-	u8 *data = (u8 *)buf;
-	size_t ret;
-
-	ret = security_locked_down(LOCKDOWN_PCI_ACCESS);
-	if (ret)
-		return ret;
-
-	if (off > pdev->cfg_size)
-		return 0;
-
-	if (off + count > pdev->cfg_size) {
-		size = pdev->cfg_size - off;
-		count = size;
-	}
-
-	pci_config_pm_runtime_get(pdev);
-
-	if ((off & 1) && size) {
-		pci_user_write_config_byte(pdev, off, data[off - init_off]);
-		off++;
-		size--;
-	}
-
-	if ((off & 3) && size > 2) {
-		u16 val = data[off - init_off];
-		val |= (u16) data[off - init_off + 1] << 8;
-		pci_user_write_config_word(pdev, off, val);
-		off += 2;
-		size -= 2;
-	}
-
-	while (size > 3) {
-		u32 val = data[off - init_off];
-		val |= (u32) data[off - init_off + 1] << 8;
-		val |= (u32) data[off - init_off + 2] << 16;
-		val |= (u32) data[off - init_off + 3] << 24;
-		pci_user_write_config_dword(pdev, off, val);
-		off += 4;
-		size -= 4;
-	}
-
-	if (size >= 2) {
-		u16 val = data[off - init_off];
-		val |= (u16) data[off - init_off + 1] << 8;
-		pci_user_write_config_word(pdev, off, val);
-		off += 2;
-		size -= 2;
-	}
-
-	if (size) {
-		pci_user_write_config_byte(pdev, off, data[off - init_off]);
-		off++;
-		--size;
-	}
-
-	pci_config_pm_runtime_put(pdev);
-
-	return count;
-}
-static BIN_ATTR_RW(config, 0);
-
-static struct bin_attribute *pci_dev_config_attrs[] = {
-	&bin_attr_config,
-	NULL,
-};
-
-static umode_t pci_dev_config_attr_is_visible(struct kobject *kobj,
-					      struct bin_attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	a->size = PCI_CFG_SPACE_SIZE;
-	if (pdev->cfg_size > PCI_CFG_SPACE_SIZE)
-		a->size = PCI_CFG_SPACE_EXP_SIZE;
-
-	return a->attr.mode;
-}
-
-static const struct attribute_group pci_dev_config_attr_group = {
-	.bin_attrs = pci_dev_config_attrs,
-	.is_bin_visible = pci_dev_config_attr_is_visible,
-};
 
 #ifdef HAVE_PCI_LEGACY
 /**
