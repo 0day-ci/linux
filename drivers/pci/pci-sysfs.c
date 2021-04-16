@@ -651,6 +651,99 @@ static const struct attribute_group pci_dev_config_attr_group = {
 	.is_bin_visible = pci_dev_config_attr_is_visible,
 };
 
+/**
+ * rom_read - read a PCI ROM
+ * @filp: sysfs file
+ * @kobj: kernel object handle
+ * @bin_attr: struct bin_attribute for this file
+ * @buf: where to put the data we read from the ROM
+ * @off: file offset
+ * @count: number of bytes to read
+ *
+ * Put @count bytes starting at @off into @buf from the ROM in the PCI
+ * device corresponding to @kobj.
+ */
+static ssize_t rom_read(struct file *filp, struct kobject *kobj,
+			struct bin_attribute *bin_attr, char *buf,
+			loff_t off, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+	void __iomem *rom;
+	size_t size;
+
+	if (!pdev->rom_attr_enabled)
+		return -EINVAL;
+
+	rom = pci_map_rom(pdev, &size);	/* size starts out as PCI window size */
+	if (!rom || !size)
+		return -EIO;
+
+	if (off >= size) {
+		count = 0;
+	} else {
+		if (off + count > size)
+			count = size - off;
+
+		memcpy_fromio(buf, rom + off, count);
+	}
+	pci_unmap_rom(pdev, rom);
+
+	return count;
+}
+
+/**
+ * rom_write - used to enable access to the PCI ROM display
+ * @filp: sysfs file
+ * @kobj: kernel object handle
+ * @bin_attr: struct bin_attribute for this file
+ * @buf: user input
+ * @off: file offset
+ * @count: number of byte in input
+ *
+ * writing anything except 0 enables it
+ */
+static ssize_t rom_write(struct file *filp, struct kobject *kobj,
+			 struct bin_attribute *bin_attr, char *buf,
+			 loff_t off, size_t count)
+{
+	bool allowed;
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (kstrtobool(buf, &allowed) < 0)
+		return -EINVAL;
+
+	pdev->rom_attr_enabled = !!allowed;
+
+	return count;
+}
+static BIN_ATTR_ADMIN_RW(rom, 0);
+
+static struct bin_attribute *pci_dev_rom_attrs[] = {
+	&bin_attr_rom,
+	NULL,
+};
+
+static umode_t pci_dev_rom_attr_is_visible(struct kobject *kobj,
+					   struct bin_attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+	size_t rom_size;
+
+	/* If the device has a ROM, try to expose it in sysfs. */
+	rom_size = pci_resource_len(pdev, PCI_ROM_RESOURCE);
+	if (!rom_size)
+		return 0;
+
+	a->size = rom_size;
+
+	return a->attr.mode;
+}
+
+static const struct attribute_group pci_dev_rom_attr_group = {
+	.bin_attrs = pci_dev_rom_attrs,
+	.is_bin_visible = pci_dev_rom_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -1312,99 +1405,6 @@ static int pci_create_resource_files(struct pci_dev *pdev)
 int __weak pci_create_resource_files(struct pci_dev *pdev) { return 0; }
 void __weak pci_remove_resource_files(struct pci_dev *pdev) { return; }
 #endif
-
-/**
- * rom_write - used to enable access to the PCI ROM display
- * @filp: sysfs file
- * @kobj: kernel object handle
- * @bin_attr: struct bin_attribute for this file
- * @buf: user input
- * @off: file offset
- * @count: number of byte in input
- *
- * writing anything except 0 enables it
- */
-static ssize_t rom_write(struct file *filp, struct kobject *kobj,
-			 struct bin_attribute *bin_attr, char *buf,
-			 loff_t off, size_t count)
-{
-	bool allowed;
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (kstrtobool(buf, &allowed) < 0)
-		return -EINVAL;
-
-	pdev->rom_attr_enabled = !!allowed;
-
-	return count;
-}
-
-/**
- * rom_read - read a PCI ROM
- * @filp: sysfs file
- * @kobj: kernel object handle
- * @bin_attr: struct bin_attribute for this file
- * @buf: where to put the data we read from the ROM
- * @off: file offset
- * @count: number of bytes to read
- *
- * Put @count bytes starting at @off into @buf from the ROM in the PCI
- * device corresponding to @kobj.
- */
-static ssize_t rom_read(struct file *filp, struct kobject *kobj,
-			struct bin_attribute *bin_attr, char *buf,
-			loff_t off, size_t count)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-	void __iomem *rom;
-	size_t size;
-
-	if (!pdev->rom_attr_enabled)
-		return -EINVAL;
-
-	rom = pci_map_rom(pdev, &size);	/* size starts out as PCI window size */
-	if (!rom || !size)
-		return -EIO;
-
-	if (off >= size) {
-		count = 0;
-	} else {
-		if (off + count > size)
-			count = size - off;
-
-		memcpy_fromio(buf, rom + off, count);
-	}
-	pci_unmap_rom(pdev, rom);
-
-	return count;
-}
-static BIN_ATTR_ADMIN_RW(rom, 0);
-
-static struct bin_attribute *pci_dev_rom_attrs[] = {
-	&bin_attr_rom,
-	NULL,
-};
-
-static umode_t pci_dev_rom_attr_is_visible(struct kobject *kobj,
-					   struct bin_attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-	size_t rom_size;
-
-	/* If the device has a ROM, try to expose it in sysfs. */
-	rom_size = pci_resource_len(pdev, PCI_ROM_RESOURCE);
-	if (!rom_size)
-		return 0;
-
-	a->size = rom_size;
-
-	return a->attr.mode;
-}
-
-static const struct attribute_group pci_dev_rom_attr_group = {
-	.bin_attrs = pci_dev_rom_attrs,
-	.is_bin_visible = pci_dev_rom_attr_is_visible,
-};
 
 static ssize_t reset_store(struct device *dev,
 			   struct device_attribute *attr, const char *buf,
