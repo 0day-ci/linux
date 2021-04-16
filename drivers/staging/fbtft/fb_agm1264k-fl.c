@@ -181,12 +181,12 @@ static void write_reg8_bus8(struct fbtft_par *par, int len, ...)
 	/* select chip */
 	if (*buf) {
 		/* cs1 */
-		gpiod_set_value(par->CS0, 1);
-		gpiod_set_value(par->CS1, 0);
-	} else {
-		/* cs0 */
 		gpiod_set_value(par->CS0, 0);
 		gpiod_set_value(par->CS1, 1);
+	} else {
+		/* cs0 */
+		gpiod_set_value(par->CS0, 1);
+		gpiod_set_value(par->CS1, 0);
 	}
 
 	gpiod_set_value(par->RS, 0); /* RS->0 (command mode) */
@@ -384,8 +384,8 @@ static int write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 	}
 	kfree(convert_buf);
 
-	gpiod_set_value(par->CS0, 1);
-	gpiod_set_value(par->CS1, 1);
+	gpiod_set_value(par->CS0, 0);
+	gpiod_set_value(par->CS1, 0);
 
 	return ret;
 }
@@ -406,10 +406,10 @@ static int write(struct fbtft_par *par, void *buf, size_t len)
 		for (i = 0; i < 8; ++i)
 			gpiod_set_value(par->gpio.db[i], data & (1 << i));
 		/* set E */
-		gpiod_set_value(par->EPIN, 1);
+		gpiod_set_value(par->EPIN, 0);
 		udelay(5);
 		/* unset E - write */
-		gpiod_set_value(par->EPIN, 0);
+		gpiod_set_value(par->EPIN, 1);
 		udelay(1);
 	}
 
