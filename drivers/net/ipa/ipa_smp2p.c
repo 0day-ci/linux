@@ -183,7 +183,8 @@ static int ipa_smp2p_irq_init(struct ipa_smp2p *smp2p, const char *name,
 	}
 	irq = ret;
 
-	ret = request_threaded_irq(irq, NULL, handler, 0, name, smp2p);
+	ret = request_threaded_irq(irq, NULL, handler, IRQF_ONESHOT,
+				   name, smp2p);
 	if (ret) {
 		dev_err(dev, "error %d requesting \"%s\" IRQ\n", ret, name);
 		return ret;
