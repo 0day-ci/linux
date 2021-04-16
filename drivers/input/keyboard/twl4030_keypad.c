@@ -411,7 +411,7 @@ static int twl4030_kp_probe(struct platform_device *pdev)
 	 * NOTE:  we assume this host is wired to TWL4040 INT1, not INT2 ...
 	 */
 	error = devm_request_threaded_irq(&pdev->dev, kp->irq, NULL, do_kp_irq,
-					  0, pdev->name, kp);
+					  IRQF_ONESHOT, pdev->name, kp);
 	if (error) {
 		dev_info(kp->dbg_dev, "request_irq failed for irq no=%d: %d\n",
 			kp->irq, error);
