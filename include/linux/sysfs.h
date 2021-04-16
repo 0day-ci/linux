@@ -205,6 +205,13 @@ struct bin_attribute {
 	.size	= _size,						\
 }
 
+#define __BIN_ATTR_RO_MODE(_name, _mode, _size) {			\
+	.attr	= { .name = __stringify(_name),				\
+		    .mode = VERIFY_OCTAL_PERMISSIONS(_mode) },		\
+	.read	= _name##_read,						\
+	.size	= _size,						\
+}
+
 #define __BIN_ATTR_WO(_name, _size) {					\
 	.attr	= { .name = __stringify(_name), .mode = 0200 },		\
 	.write	= _name##_write,					\
@@ -213,6 +220,14 @@ struct bin_attribute {
 
 #define __BIN_ATTR_RW(_name, _size)					\
 	__BIN_ATTR(_name, 0644, _name##_read, _name##_write, _size)
+
+#define __BIN_ATTR_RW_MODE(_name, _mode, _size) {			\
+	.attr	= { .name = __stringify(_name),				\
+		    .mode = VERIFY_OCTAL_PERMISSIONS(_mode) },		\
+	.read	= _name##_read,						\
+	.write	= _name##_write,					\
+	.size	= _size,						\
+}
 
 #define __BIN_ATTR_NULL __ATTR_NULL
 
@@ -223,11 +238,19 @@ struct bin_attribute bin_attr_##_name = __BIN_ATTR(_name, _mode, _read,	\
 #define BIN_ATTR_RO(_name, _size)					\
 struct bin_attribute bin_attr_##_name = __BIN_ATTR_RO(_name, _size)
 
+#define BIN_ATTR_ADMIN_RO(_name, _size)					\
+struct bin_attribute bin_attr_##_name = __BIN_ATTR_RO_MODE(_name, 0400,	\
+					_size)
+
 #define BIN_ATTR_WO(_name, _size)					\
 struct bin_attribute bin_attr_##_name = __BIN_ATTR_WO(_name, _size)
 
 #define BIN_ATTR_RW(_name, _size)					\
 struct bin_attribute bin_attr_##_name = __BIN_ATTR_RW(_name, _size)
+
+#define BIN_ATTR_ADMIN_RW(_name, _size)					\
+struct bin_attribute bin_attr_##_name = __BIN_ATTR_RW_MODE(_name, 0600,	\
+					_size)
 
 struct sysfs_ops {
 	ssize_t	(*show)(struct kobject *, struct attribute *, char *);
