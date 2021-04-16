@@ -2327,6 +2327,12 @@ void bond_3ad_state_machine_handler(struct work_struct *work)
 
 			aggregator = __get_first_agg(port);
 			ad_agg_selection_logic(aggregator, &update_slave_arr);
+			if (!update_slave_arr) {
+				struct aggregator *active = __get_active_agg(aggregator);
+
+				if (active && active->is_active)
+					update_slave_arr = true;
+			}
 		}
 		bond_3ad_set_carrier(bond);
 	}
