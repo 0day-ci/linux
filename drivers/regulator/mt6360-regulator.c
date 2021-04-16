@@ -383,8 +383,8 @@ static int mt6360_regulator_irq_register(struct platform_device *pdev,
 		if (irq < 0)
 			return irq;
 
-		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL, irq_desc->handler, 0,
-						irq_desc->name, rdev);
+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL, irq_desc->handler,
+						IRQF_ONESHOT, irq_desc->name, rdev);
 		if (ret) {
 			dev_err(&pdev->dev, "Fail to request %s irq\n", irq_desc->name);
 			return ret;
