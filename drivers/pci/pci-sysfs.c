@@ -789,6 +789,43 @@ static const struct attribute_group pci_dev_reset_attr_group = {
 	.is_visible = pci_dev_reset_attr_is_visible,
 };
 
+static ssize_t boot_vga_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct pci_dev *vga_dev = vga_default_device();
+
+	if (vga_dev)
+		return sysfs_emit(buf, "%u\n", (pdev == vga_dev));
+
+	return sysfs_emit(buf, "%u\n",
+			  !!(pdev->resource[PCI_ROM_RESOURCE].flags &
+			     IORESOURCE_ROM_SHADOW));
+}
+static DEVICE_ATTR_RO(boot_vga);
+
+static struct attribute *pci_dev_dev_attrs[] = {
+	&dev_attr_boot_vga.attr,
+	NULL,
+};
+
+static umode_t pci_dev_attr_is_visible(struct kobject *kobj,
+				       struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (a == &dev_attr_boot_vga.attr)
+		if ((pdev->class >> 8) != PCI_CLASS_DISPLAY_VGA)
+			return 0;
+
+	return a->mode;
+}
+
+static const struct attribute_group pci_dev_attr_group = {
+	.attrs = pci_dev_dev_attrs,
+	.is_visible = pci_dev_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -1011,21 +1048,6 @@ const struct attribute_group *pcibus_groups[] = {
 	&pcibus_group,
 	NULL,
 };
-
-static ssize_t boot_vga_show(struct device *dev,
-			     struct device_attribute *attr, char *buf)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-	struct pci_dev *vga_dev = vga_default_device();
-
-	if (vga_dev)
-		return sysfs_emit(buf, "%u\n", (pdev == vga_dev));
-
-	return sysfs_emit(buf, "%u\n",
-			  !!(pdev->resource[PCI_ROM_RESOURCE].flags &
-			     IORESOURCE_ROM_SHADOW));
-}
-static DEVICE_ATTR_RO(boot_vga);
 
 #ifdef HAVE_PCI_LEGACY
 /**
@@ -1495,23 +1517,6 @@ static int __init pci_sysfs_init(void)
 }
 late_initcall(pci_sysfs_init);
 
-static struct attribute *pci_dev_dev_attrs[] = {
-	&dev_attr_boot_vga.attr,
-	NULL,
-};
-
-static umode_t pci_dev_attr_is_visible(struct kobject *kobj,
-				       struct attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (a == &dev_attr_boot_vga.attr)
-		if ((pdev->class >> 8) != PCI_CLASS_DISPLAY_VGA)
-			return 0;
-
-	return a->mode;
-}
-
 static struct attribute *pci_dev_hp_attrs[] = {
 	&dev_attr_remove.attr,
 	&dev_attr_dev_rescan.attr,
@@ -1569,11 +1574,6 @@ const struct attribute_group *pci_dev_groups[] = {
 static const struct attribute_group pci_dev_hp_attr_group = {
 	.attrs = pci_dev_hp_attrs,
 	.is_visible = pci_dev_hp_attr_is_visible,
-};
-
-static const struct attribute_group pci_dev_attr_group = {
-	.attrs = pci_dev_dev_attrs,
-	.is_visible = pci_dev_attr_is_visible,
 };
 
 static const struct attribute_group pci_bridge_attr_group = {
