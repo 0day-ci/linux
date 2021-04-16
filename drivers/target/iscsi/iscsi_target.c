@@ -2143,7 +2143,7 @@ attach:
 	 * TMR TASK_REASSIGN.
 	 */
 	iscsit_add_cmd_to_response_queue(cmd, conn, cmd->i_state);
-	target_put_sess_cmd(&cmd->se_cmd);
+	transport_generic_free_cmd(&cmd->se_cmd, false);
 	return 0;
 }
 EXPORT_SYMBOL(iscsit_handle_task_mgt_cmd);
