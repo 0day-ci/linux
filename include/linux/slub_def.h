@@ -110,6 +110,9 @@ struct kmem_cache {
 #ifdef CONFIG_SYSFS
 	struct kobject kobj;	/* For sysfs */
 #endif
+#ifdef CONFIG_SLUB_DEBUG
+	struct dentry *slab_cache_dentry;
+#endif
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	unsigned long random;
 #endif
@@ -159,6 +162,13 @@ static inline void sysfs_slab_release(struct kmem_cache *s)
 }
 #endif
 
+#ifdef CONFIG_DEBUG_FS
+void debugfs_slab_release(struct kmem_cache *);
+#else
+static inline void debugfs_slab_release(struct kmem_cache *s)
+{
+}
+#endif
 void object_err(struct kmem_cache *s, struct page *page,
 		u8 *object, char *reason);
 

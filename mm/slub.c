@@ -36,6 +36,7 @@
 #include <linux/memcontrol.h>
 #include <linux/random.h>
 
+#include <linux/debugfs.h>
 #include <trace/events/kmem.h>
 
 #include "internal.h"
@@ -222,6 +223,15 @@ static int sysfs_slab_alias(struct kmem_cache *, const char *);
 #else
 static inline int sysfs_slab_add(struct kmem_cache *s) { return 0; }
 static inline int sysfs_slab_alias(struct kmem_cache *s, const char *p)
+							{ return 0; }
+#endif
+
+#ifdef CONFIG_DEBUG_FS
+static void debugfs_slab_add(struct kmem_cache *);
+static int debugfs_slab_alias(struct kmem_cache *, const char *);
+#else
+static inline void debugfs_slab_add(struct kmem_cache *s) { }
+static inline int debugfs_slab_alias(struct kmem_cache *s, const char *p)
 							{ return 0; }
 #endif
 
@@ -4521,6 +4531,8 @@ __kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 			s->refcount--;
 			s = NULL;
 		}
+
+		debugfs_slab_alias(s, name);
 	}
 
 	return s;
@@ -4541,6 +4553,8 @@ int __kmem_cache_create(struct kmem_cache *s, slab_flags_t flags)
 	err = sysfs_slab_add(s);
 	if (err)
 		__kmem_cache_release(s);
+
+	debugfs_slab_add(s);
 
 	return err;
 }
@@ -4682,6 +4696,8 @@ static long validate_slab_cache(struct kmem_cache *s)
 
 	return count;
 }
+
+#ifdef CONFIG_DEBUG_FS
 /*
  * Generate lists of code addresses where slabcache objects are allocated
  * and freed.
@@ -4704,6 +4720,8 @@ struct loc_track {
 	unsigned long count;
 	struct location *loc;
 };
+
+static struct dentry *slab_debugfs_root;
 
 static void free_loc_track(struct loc_track *t)
 {
@@ -4822,10 +4840,9 @@ static void process_slab(struct loc_track *t, struct kmem_cache *s,
 	put_map(map);
 }
 
-static int list_locations(struct kmem_cache *s, char *buf,
+static int list_locations(struct seq_file *seq, struct kmem_cache *s,
 			  enum track_item alloc)
 {
-	int len = 0;
 	unsigned long i;
 	struct loc_track t = { 0, 0, NULL };
 	int node;
@@ -4833,7 +4850,8 @@ static int list_locations(struct kmem_cache *s, char *buf,
 
 	if (!alloc_loc_track(&t, PAGE_SIZE / sizeof(struct location),
 			     GFP_KERNEL)) {
-		return sysfs_emit(buf, "Out of memory\n");
+		seq_puts(seq, "Out of memory\n");
+		return -ENOMEM;
 	}
 	/* Push back cpu slabs */
 	flush_all(s);
@@ -4856,46 +4874,46 @@ static int list_locations(struct kmem_cache *s, char *buf,
 	for (i = 0; i < t.count; i++) {
 		struct location *l = &t.loc[i];
 
-		len += sysfs_emit_at(buf, len, "%7ld ", l->count);
+		seq_printf(seq, "%7ld ", l->count);
 
 		if (l->addr)
-			len += sysfs_emit_at(buf, len, "%pS", (void *)l->addr);
+			seq_printf(seq, "%pS", (void *)l->addr);
 		else
-			len += sysfs_emit_at(buf, len, "<not-available>");
+			seq_puts(seq, "<not-available>");
 
 		if (l->sum_time != l->min_time)
-			len += sysfs_emit_at(buf, len, " age=%ld/%ld/%ld",
+			seq_printf(seq, " age=%ld/%ld/%ld",
 					     l->min_time,
 					     (long)div_u64(l->sum_time,
 							   l->count),
 					     l->max_time);
 		else
-			len += sysfs_emit_at(buf, len, " age=%ld", l->min_time);
+			seq_printf(seq, " age=%ld", l->min_time);
 
 		if (l->min_pid != l->max_pid)
-			len += sysfs_emit_at(buf, len, " pid=%ld-%ld",
+			seq_printf(seq, " pid=%ld-%ld",
 					     l->min_pid, l->max_pid);
 		else
-			len += sysfs_emit_at(buf, len, " pid=%ld",
+			seq_printf(seq, " pid=%ld",
 					     l->min_pid);
 
 		if (num_online_cpus() > 1 &&
 		    !cpumask_empty(to_cpumask(l->cpus)))
-			len += sysfs_emit_at(buf, len, " cpus=%*pbl",
+			seq_printf(seq, " cpus=%*pbl",
 					     cpumask_pr_args(to_cpumask(l->cpus)));
 
 		if (nr_online_nodes > 1 && !nodes_empty(l->nodes))
-			len += sysfs_emit_at(buf, len, " nodes=%*pbl",
+			seq_printf(seq, " nodes=%*pbl",
 					     nodemask_pr_args(&l->nodes));
 
-		len += sysfs_emit_at(buf, len, "\n");
+		seq_puts(seq, "\n");
 	}
 
 	free_loc_track(&t);
 	if (!t.count)
-		len += sysfs_emit_at(buf, len, "No data\n");
+		seq_puts(seq, "No data\n");
 
-	return len;
+	return 0;
 }
 #endif	/* CONFIG_SLUB_DEBUG */
 
@@ -5348,17 +5366,23 @@ SLAB_ATTR(validate);
 
 static ssize_t alloc_calls_show(struct kmem_cache *s, char *buf)
 {
-	if (!(s->flags & SLAB_STORE_USER))
-		return -ENOSYS;
-	return list_locations(s, buf, TRACK_ALLOC);
+	int len = 0;
+
+	len += sprintf(buf, "Deprecated, use the equvalent under");
+	len += sprintf(buf, "/sys/kernel/debug/slab/%s/alloc_calls", s->name);
+
+	return len;
 }
 SLAB_ATTR_RO(alloc_calls);
 
 static ssize_t free_calls_show(struct kmem_cache *s, char *buf)
 {
-	if (!(s->flags & SLAB_STORE_USER))
-		return -ENOSYS;
-	return list_locations(s, buf, TRACK_FREE);
+	int len = 0;
+
+	len += sprintf(buf, "Deprecated, use the equvalent under");
+	len += sprintf(buf, "/sys/kernel/debug/slab/%s/free_calls", s->name);
+
+	return len;
 }
 SLAB_ATTR_RO(free_calls);
 #endif /* CONFIG_SLUB_DEBUG */
@@ -5814,6 +5838,142 @@ static int __init slab_sysfs_init(void)
 __initcall(slab_sysfs_init);
 #endif /* CONFIG_SYSFS */
 
+#if defined(CONFIG_SLUB_DEBUG) && defined(CONFIG_DEBUG_FS)
+static int debugfs_slab_alias(struct kmem_cache *s, const char *name)
+{
+	struct saved_alias *al;
+
+	if (slab_state == FULL) {
+		/*
+		 * If we have a leftover link then remove it.
+		 */
+		debugfs_remove(s->slab_cache_dentry);
+		s->slab_cache_dentry = debugfs_create_symlink(name, slab_debugfs_root, NULL);
+		return IS_ERR(s->slab_cache_dentry);
+	}
+
+	al = kmalloc(sizeof(struct saved_alias), GFP_KERNEL);
+	if (!al)
+		return -ENOMEM;
+
+	al->s = s;
+	al->name = name;
+	al->next = alias_list;
+	alias_list = al;
+	return 0;
+}
+
+static int slab_debug_trace(struct seq_file *seq, void *ignored)
+{
+	struct kmem_cache *s = seq->private;
+
+	if (!(s->flags & SLAB_STORE_USER))
+		return 0;
+
+	if (strcmp(seq->file->f_path.dentry->d_name.name, "alloc_trace") == 0)
+		return list_locations(seq, s, TRACK_ALLOC);
+	else
+		return list_locations(seq, s, TRACK_FREE);
+
+	return 0;
+}
+
+static int slab_debug_trace_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, slab_debug_trace,
+				file_inode(filp)->i_private);
+}
+
+static const struct file_operations slab_debug_fops = {
+	.open    = slab_debug_trace_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+static void debugfs_slab_add(struct kmem_cache *s)
+{
+	const char *name;
+	int unmergeable = slab_unmergeable(s);
+
+	if (unlikely(!slab_debugfs_root))
+		return;
+
+	if (!unmergeable && disable_higher_order_debug &&
+			(slub_debug & DEBUG_METADATA_FLAGS))
+		unmergeable = 1;
+
+	if (unmergeable) {
+		/*
+		 * Slabcache can never be merged so we can use the name proper.
+		 * This is typically the case for debug situations. In that
+		 * case we can catch duplicate names easily.
+		 */
+		debugfs_remove(s->slab_cache_dentry);
+		name = s->name;
+	} else {
+		/*
+		 * Create a unique name for the slab as a target
+		 * for the symlinks.
+		 */
+		name = create_unique_id(s);
+	}
+
+	s->slab_cache_dentry = debugfs_create_dir(s->name, slab_debugfs_root);
+	if (!IS_ERR(s->slab_cache_dentry)) {
+		debugfs_create_file("alloc_trace", 0400,
+			s->slab_cache_dentry, s, &slab_debug_fops);
+
+		debugfs_create_file("free_trace", 0400,
+			s->slab_cache_dentry, s, &slab_debug_fops);
+	}
+
+	if (!unmergeable) {
+		/* Setup first alias */
+		debugfs_slab_alias(s, s->name);
+	}
+}
+
+void debugfs_slab_release(struct kmem_cache *s)
+{
+	if (slab_state >= FULL)
+		debugfs_remove_recursive(s->slab_cache_dentry);
+}
+
+static int __init slab_debugfs_init(void)
+{
+	struct kmem_cache *s;
+	int err;
+
+	slab_debugfs_root = debugfs_create_dir("slab", NULL);
+	if (!IS_ERR(slab_debugfs_root)) {
+
+		slab_state = FULL;
+
+		list_for_each_entry(s, &slab_caches, list)
+			debugfs_slab_add(s);
+	} else {
+		pr_err("Cannot create slab debugfs.\n");
+		return IS_ERR(slab_debugfs_root);
+	}
+
+	while (alias_list) {
+		struct saved_alias *al = alias_list;
+
+		alias_list = alias_list->next;
+
+		err = debugfs_slab_alias(al->s, al->name);
+		if (err)
+			pr_err("SLUB: Unable to add boot slab alias %s to debugfs\n",
+			       al->name);
+		kfree(al);
+	}
+
+	return 0;
+
+}
+__initcall(slab_debugfs_init);
+#endif
 /*
  * The /proc/slabinfo ABI
  */
