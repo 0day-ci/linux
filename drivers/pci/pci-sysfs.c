@@ -826,6 +826,66 @@ static const struct attribute_group pci_dev_attr_group = {
 	.is_visible = pci_dev_attr_is_visible,
 };
 
+static ssize_t remove_store(struct device *dev,
+			    struct device_attribute *attr, const char *buf,
+			    size_t count)
+{
+	bool remove;
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (kstrtobool(buf, &remove) < 0)
+		return -EINVAL;
+
+	if (remove && device_remove_file_self(dev, attr))
+		pci_stop_and_remove_bus_device_locked(pdev);
+
+	return count;
+}
+static DEVICE_ATTR_IGNORE_LOCKDEP(remove, 0220, NULL, remove_store);
+
+static ssize_t dev_rescan_store(struct device *dev,
+				struct device_attribute *attr, const char *buf,
+				size_t count)
+{
+	bool rescan;
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (kstrtobool(buf, &rescan) < 0)
+		return -EINVAL;
+
+	if (rescan) {
+		pci_lock_rescan_remove();
+		pci_rescan_bus(pdev->bus);
+		pci_unlock_rescan_remove();
+	}
+
+	return count;
+}
+static struct device_attribute dev_attr_dev_rescan = __ATTR(rescan, 0200, NULL,
+							    dev_rescan_store);
+
+static struct attribute *pci_dev_hp_attrs[] = {
+	&dev_attr_remove.attr,
+	&dev_attr_dev_rescan.attr,
+	NULL,
+};
+
+static umode_t pci_dev_hp_attr_is_visible(struct kobject *kobj,
+					  struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (pdev->is_virtfn)
+		return 0;
+
+	return a->mode;
+}
+
+static const struct attribute_group pci_dev_hp_attr_group = {
+	.attrs = pci_dev_hp_attrs,
+	.is_visible = pci_dev_hp_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -956,44 +1016,6 @@ const struct attribute_group *pci_bus_groups[] = {
 	&pci_bus_group,
 	NULL,
 };
-
-static ssize_t dev_rescan_store(struct device *dev,
-				struct device_attribute *attr, const char *buf,
-				size_t count)
-{
-	bool rescan;
-	struct pci_dev *pdev = to_pci_dev(dev);
-
-	if (kstrtobool(buf, &rescan) < 0)
-		return -EINVAL;
-
-	if (rescan) {
-		pci_lock_rescan_remove();
-		pci_rescan_bus(pdev->bus);
-		pci_unlock_rescan_remove();
-	}
-
-	return count;
-}
-static struct device_attribute dev_attr_dev_rescan = __ATTR(rescan, 0200, NULL,
-							    dev_rescan_store);
-
-static ssize_t remove_store(struct device *dev,
-			    struct device_attribute *attr, const char *buf,
-			    size_t count)
-{
-	bool remove;
-	struct pci_dev *pdev = to_pci_dev(dev);
-
-	if (kstrtobool(buf, &remove) < 0)
-		return -EINVAL;
-
-	if (remove && device_remove_file_self(dev, attr))
-		pci_stop_and_remove_bus_device_locked(pdev);
-
-	return count;
-}
-static DEVICE_ATTR_IGNORE_LOCKDEP(remove, 0220, NULL, remove_store);
 
 static ssize_t bus_rescan_store(struct device *dev,
 				struct device_attribute *attr, const char *buf,
@@ -1517,23 +1539,6 @@ static int __init pci_sysfs_init(void)
 }
 late_initcall(pci_sysfs_init);
 
-static struct attribute *pci_dev_hp_attrs[] = {
-	&dev_attr_remove.attr,
-	&dev_attr_dev_rescan.attr,
-	NULL,
-};
-
-static umode_t pci_dev_hp_attr_is_visible(struct kobject *kobj,
-					  struct attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (pdev->is_virtfn)
-		return 0;
-
-	return a->mode;
-}
-
 static umode_t pci_bridge_attr_is_visible(struct kobject *kobj,
 					  struct attribute *a, int n)
 {
@@ -1569,11 +1574,6 @@ const struct attribute_group *pci_dev_groups[] = {
 	&acpi_attr_group,
 #endif
 	NULL,
-};
-
-static const struct attribute_group pci_dev_hp_attr_group = {
-	.attrs = pci_dev_hp_attrs,
-	.is_visible = pci_dev_hp_attr_is_visible,
 };
 
 static const struct attribute_group pci_bridge_attr_group = {
