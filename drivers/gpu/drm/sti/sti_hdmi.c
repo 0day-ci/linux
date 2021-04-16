@@ -184,7 +184,7 @@ void hdmi_write(struct sti_hdmi *hdmi, u32 val, int offset)
 }
 
 /**
- * HDMI interrupt handler threaded
+ * hdmi_irq_thread - HDMI interrupt handler threaded
  *
  * @irq: irq number
  * @arg: connector structure
@@ -216,7 +216,7 @@ static irqreturn_t hdmi_irq_thread(int irq, void *arg)
 }
 
 /**
- * HDMI interrupt handler
+ * hdmi_irq - HDMI interrupt handler
  *
  * @irq: irq number
  * @arg: connector structure
@@ -238,7 +238,7 @@ static irqreturn_t hdmi_irq(int irq, void *arg)
 }
 
 /**
- * Set hdmi active area depending on the drm display mode selected
+ * hdmi_active_area - Set hdmi active area depending on the drm display mode selected
  *
  * @hdmi: pointer on the hdmi internal structure
  */
@@ -259,7 +259,7 @@ static void hdmi_active_area(struct sti_hdmi *hdmi)
 }
 
 /**
- * Overall hdmi configuration
+ * hdmi_config - Overall hdmi configuration
  *
  * @hdmi: pointer on the hdmi internal structure
  */
@@ -337,7 +337,7 @@ static void hdmi_infoframe_reset(struct sti_hdmi *hdmi,
 }
 
 /**
- * Helper to concatenate infoframe in 32 bits word
+ * hdmi_infoframe_subpack - Helper to concatenate infoframe in 32 bits word
  *
  * @ptr: pointer on the hdmi internal structure
  * @size: size to write
@@ -354,7 +354,7 @@ static inline unsigned int hdmi_infoframe_subpack(const u8 *ptr, size_t size)
 }
 
 /**
- * Helper to write info frame
+ * hdmi_infoframe_write_infopack - Helper to write info frame
  *
  * @hdmi: pointer on the hdmi internal structure
  * @data: infoframe to write
@@ -424,7 +424,7 @@ static void hdmi_infoframe_write_infopack(struct sti_hdmi *hdmi,
 }
 
 /**
- * Prepare and configure the AVI infoframe
+ * hdmi_avi_infoframe_config - Prepare and configure the AVI infoframe
  *
  * AVI infoframe are transmitted at least once per two video field and
  * contains information about HDMI transmission mode such as color space,
@@ -467,7 +467,7 @@ static int hdmi_avi_infoframe_config(struct sti_hdmi *hdmi)
 }
 
 /**
- * Prepare and configure the AUDIO infoframe
+ * hdmi_audio_infoframe_config - Prepare and configure the AUDIO infoframe
  *
  * AUDIO infoframe are transmitted once per frame and
  * contains information about HDMI transmission mode such as audio codec,
@@ -552,7 +552,7 @@ static int hdmi_vendor_infoframe_config(struct sti_hdmi *hdmi)
 #define HDMI_TIMEOUT_SWRESET  100   /*milliseconds */
 
 /**
- * Software reset of the hdmi subsystem
+ * hdmi_swreset - Software reset of the hdmi subsystem
  *
  * @hdmi: pointer on the hdmi internal structure
  *
