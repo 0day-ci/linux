@@ -928,7 +928,13 @@ xfs_log_sb(
 
 	mp->m_sb.sb_icount = percpu_counter_sum(&mp->m_icount);
 	mp->m_sb.sb_ifree = percpu_counter_sum(&mp->m_ifree);
-	mp->m_sb.sb_fdblocks = percpu_counter_sum(&mp->m_fdblocks);
+	if (!xfs_sb_version_haslazysbcount(&mp->m_sb)) {
+		struct xfs_dsb	*dsb = bp->b_addr;
+
+		mp->m_sb.sb_fdblocks = be64_to_cpu(dsb->sb_fdblocks);
+	} else {
+		mp->m_sb.sb_fdblocks = percpu_counter_sum(&mp->m_fdblocks);
+	}
 
 	xfs_sb_to_disk(bp->b_addr, &mp->m_sb);
 	xfs_trans_buf_set_type(tp, bp, XFS_BLFT_SB_BUF);
