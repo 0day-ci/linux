@@ -496,7 +496,8 @@ static int goodix_request_irq(struct goodix_ts_data *ts)
 {
 	return devm_request_threaded_irq(&ts->client->dev, ts->client->irq,
 					 NULL, goodix_ts_irq_handler,
-					 ts->irq_flags, ts->client->name, ts);
+					 ts->irq_flags | IRQF_ONESHOT,
+					 ts->client->name, ts);
 }
 
 static int goodix_check_cfg_8(struct goodix_ts_data *ts, const u8 *cfg, int len)
@@ -1158,7 +1159,7 @@ static int goodix_configure_dev(struct goodix_ts_data *ts)
 		return error;
 	}
 
-	ts->irq_flags = goodix_irq_flags[ts->int_trigger_type] | IRQF_ONESHOT;
+	ts->irq_flags = goodix_irq_flags[ts->int_trigger_type];
 	error = goodix_request_irq(ts);
 	if (error) {
 		dev_err(&ts->client->dev, "request IRQ failed: %d\n", error);
