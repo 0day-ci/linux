@@ -1598,10 +1598,16 @@ static void io_req_complete_post(struct io_kiocb *req, long res,
 	}
 }
 
+static inline bool io_req_needs_clean(struct io_kiocb *req)
+{
+	return req->flags & (REQ_F_BUFFER_SELECTED | REQ_F_NEED_CLEANUP |
+				REQ_F_POLLED);
+}
+
 static void io_req_complete_state(struct io_kiocb *req, long res,
 				  unsigned int cflags)
 {
-	if (req->flags & (REQ_F_NEED_CLEANUP | REQ_F_BUFFER_SELECTED))
+	if (io_req_needs_clean(req))
 		io_clean_op(req);
 	req->result = res;
 	req->compl.cflags = cflags;
@@ -1713,10 +1719,8 @@ static void io_dismantle_req(struct io_kiocb *req)
 
 	if (!(flags & REQ_F_FIXED_FILE))
 		io_put_file(req->file);
-	if (flags & (REQ_F_NEED_CLEANUP | REQ_F_BUFFER_SELECTED |
-		     REQ_F_INFLIGHT)) {
+	if (io_req_needs_clean(req) || (req->flags & REQ_F_INFLIGHT)) {
 		io_clean_op(req);
-
 		if (req->flags & REQ_F_INFLIGHT) {
 			struct io_uring_task *tctx = req->task->io_uring;
 
@@ -2734,7 +2738,7 @@ static void kiocb_done(struct kiocb *kiocb, ssize_t ret,
 
 	if (check_reissue && req->flags & REQ_F_REISSUE) {
 		req->flags &= ~REQ_F_REISSUE;
-		if (!io_resubmit_prep(req)) {
+		if (io_resubmit_prep(req)) {
 			req_ref_get(req);
 			io_queue_async_work(req);
 		} else {
@@ -4976,6 +4980,12 @@ static void __io_queue_proc(struct io_poll_iocb *poll, struct io_poll_table *pt,
 			pt->error = -EINVAL;
 			return;
 		}
+		/*
+		 * Can't handle multishot for double wait for now, turn it
+		 * into one-shot mode.
+		 */
+		if (!(req->poll.events & EPOLLONESHOT))
+			req->poll.events |= EPOLLONESHOT;
 		/* double add on the same waitqueue head, ignore */
 		if (poll->head == head)
 			return;
@@ -5029,9 +5039,6 @@ static void io_async_task_func(struct callback_head *cb)
 		__io_req_task_submit(req);
 	else
 		io_req_complete_failed(req, -ECANCELED);
-
-	kfree(apoll->double_poll);
-	kfree(apoll);
 }
 
 static int io_async_wake(struct wait_queue_entry *wait, unsigned mode, int sync,
@@ -5147,8 +5154,6 @@ static bool io_arm_poll_handler(struct io_kiocb *req)
 	if (ret || ipt.error) {
 		io_poll_remove_double(req);
 		spin_unlock_irq(&ctx->completion_lock);
-		kfree(apoll->double_poll);
-		kfree(apoll);
 		return false;
 	}
 	spin_unlock_irq(&ctx->completion_lock);
@@ -5186,12 +5191,8 @@ static bool io_poll_remove_waitqs(struct io_kiocb *req)
 	do_complete = __io_poll_remove_one(req, io_poll_get_single(req), true);
 
 	if (req->opcode != IORING_OP_POLL_ADD && do_complete) {
-		struct async_poll *apoll = req->apoll;
-
 		/* non-poll requests have submit ref still */
 		req_ref_put(req);
-		kfree(apoll->double_poll);
-		kfree(apoll);
 	}
 	return do_complete;
 }
@@ -6044,6 +6045,11 @@ static void io_clean_op(struct io_kiocb *req)
 			break;
 		}
 		req->flags &= ~REQ_F_NEED_CLEANUP;
+	}
+	if ((req->flags & REQ_F_POLLED) && req->apoll) {
+		kfree(req->apoll->double_poll);
+		kfree(req->apoll);
+		req->apoll = NULL;
 	}
 }
 
