@@ -886,6 +886,60 @@ static const struct attribute_group pci_dev_hp_attr_group = {
 	.is_visible = pci_dev_hp_attr_is_visible,
 };
 
+static ssize_t subordinate_bus_number_show(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	u8 sub_bus;
+	int err;
+
+	err = pci_read_config_byte(pdev, PCI_SUBORDINATE_BUS, &sub_bus);
+	if (err)
+		return -EINVAL;
+
+	return sysfs_emit(buf, "%u\n", sub_bus);
+}
+static DEVICE_ATTR_RO(subordinate_bus_number);
+
+static ssize_t secondary_bus_number_show(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	u8 sec_bus;
+	int err;
+
+	err = pci_read_config_byte(pdev, PCI_SECONDARY_BUS, &sec_bus);
+	if (err)
+		return -EINVAL;
+
+	return sysfs_emit(buf, "%u\n", sec_bus);
+}
+static DEVICE_ATTR_RO(secondary_bus_number);
+
+static struct attribute *pci_bridge_attrs[] = {
+	&dev_attr_subordinate_bus_number.attr,
+	&dev_attr_secondary_bus_number.attr,
+	NULL,
+};
+
+static umode_t pci_bridge_attr_is_visible(struct kobject *kobj,
+					  struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (!pci_is_bridge(pdev))
+		return 0;
+
+	return a->mode;
+}
+
+static const struct attribute_group pci_bridge_attr_group = {
+	.attrs = pci_bridge_attrs,
+	.is_visible = pci_bridge_attr_is_visible,
+};
+
 /*
  * PCI Bus Class Devices
  */
@@ -952,38 +1006,6 @@ static ssize_t current_link_width_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(current_link_width);
 
-static ssize_t secondary_bus_number_show(struct device *dev,
-					 struct device_attribute *attr,
-					 char *buf)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-	u8 sec_bus;
-	int err;
-
-	err = pci_read_config_byte(pdev, PCI_SECONDARY_BUS, &sec_bus);
-	if (err)
-		return -EINVAL;
-
-	return sysfs_emit(buf, "%u\n", sec_bus);
-}
-static DEVICE_ATTR_RO(secondary_bus_number);
-
-static ssize_t subordinate_bus_number_show(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-	u8 sub_bus;
-	int err;
-
-	err = pci_read_config_byte(pdev, PCI_SUBORDINATE_BUS, &sub_bus);
-	if (err)
-		return -EINVAL;
-
-	return sysfs_emit(buf, "%u\n", sub_bus);
-}
-static DEVICE_ATTR_RO(subordinate_bus_number);
-
 static ssize_t rescan_store(struct bus_type *bus, const char *buf, size_t count)
 {
 	bool rescan;
@@ -1040,12 +1062,6 @@ static ssize_t bus_rescan_store(struct device *dev,
 }
 static struct device_attribute dev_attr_bus_rescan = __ATTR(rescan, 0200, NULL,
 							    bus_rescan_store);
-
-static struct attribute *pci_bridge_attrs[] = {
-	&dev_attr_subordinate_bus_number.attr,
-	&dev_attr_secondary_bus_number.attr,
-	NULL,
-};
 
 static struct attribute *pcie_dev_attrs[] = {
 	&dev_attr_current_link_speed.attr,
@@ -1539,17 +1555,6 @@ static int __init pci_sysfs_init(void)
 }
 late_initcall(pci_sysfs_init);
 
-static umode_t pci_bridge_attr_is_visible(struct kobject *kobj,
-					  struct attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (!pci_is_bridge(pdev))
-		return 0;
-
-	return a->mode;
-}
-
 static umode_t pcie_dev_attr_is_visible(struct kobject *kobj,
 					struct attribute *a, int n)
 {
@@ -1574,11 +1579,6 @@ const struct attribute_group *pci_dev_groups[] = {
 	&acpi_attr_group,
 #endif
 	NULL,
-};
-
-static const struct attribute_group pci_bridge_attr_group = {
-	.attrs = pci_bridge_attrs,
-	.is_visible = pci_bridge_attr_is_visible,
 };
 
 static const struct attribute_group pcie_dev_attr_group = {
