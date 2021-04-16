@@ -188,7 +188,7 @@ static int snd_opti9xx_init(struct snd_opti9xx *chip,
 		chip->mc_base_size = opti9xx_mc_size[hardware];
 	}
 #else
-		chip->mc_base_size = opti9xx_mc_size[hardware];
+	chip->mc_base_size = opti9xx_mc_size[hardware];
 #endif
 
 	switch (hardware) {
@@ -485,7 +485,7 @@ __skip_base:
 #endif	/* CS4231 || OPTi93X */
 
 #ifndef OPTi93X
-	 outb(irq_bits << 3 | dma_bits, chip->wss_base);
+	outb(irq_bits << 3 | dma_bits, chip->wss_base);
 #else /* OPTi93X */
 	snd_opti9xx_write(chip, OPTi9XX_MC_REG(3), (irq_bits << 3 | dma_bits));
 #endif /* OPTi93X */
