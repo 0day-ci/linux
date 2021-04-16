@@ -1950,3 +1950,13 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
 	else
 		return valid_native_regs(regs);
 }
+
+inline int is_syscall_success(struct pt_regs *regs)
+{
+	unsigned long val = regs->regs[0];
+
+	if (is_compat_thread(task_thread_info(current)))
+		val = sign_extend64(val, 31);
+
+	return !IS_ERR_VALUE(val);
+}
