@@ -119,9 +119,13 @@ setup_tmp_file()
 {
 	FWPATH=$(mktemp -d)
 	FW="$FWPATH/test-firmware.bin"
-	echo "ABCD0123" >"$FW"
+	if [[ "$1" != "--skip-file-creation" ]]; then
+		echo "ABCD0123" >"$FW"
+	fi
 	FW_INTO_BUF="$FWPATH/$TEST_FIRMWARE_INTO_BUF_FILENAME"
-	echo "EFGH4567" >"$FW_INTO_BUF"
+	if [[ "$1" != "--skip-file-creation" ]]; then
+		echo "EFGH4567" >"$FW_INTO_BUF"
+	fi
 	NAME=$(basename "$FW")
 	if [ "$TEST_REQS_FW_SET_CUSTOM_PATH" = "yes" ]; then
 		echo -n "$FWPATH" >/sys/module/firmware_class/parameters/path

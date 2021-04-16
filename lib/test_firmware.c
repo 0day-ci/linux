@@ -18,6 +18,7 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/platform_device.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -34,6 +35,8 @@ MODULE_IMPORT_NS(TEST_FIRMWARE);
 
 static DEFINE_MUTEX(test_fw_mutex);
 static const struct firmware *test_firmware;
+
+static struct platform_device *pdev;
 
 struct test_batched_req {
 	u8 idx;
@@ -58,6 +61,9 @@ struct test_batched_req {
  * @sync_direct: when the sync trigger is used if this is true
  *	request_firmware_direct() will be used instead.
  * @send_uevent: whether or not to send a uevent for async requests
+ * @enable_resume_test: if @senable_resume is true this will enable a test to
+ *	issue a request_firmware() upon resume. This is useful to test resume
+ *	after suspend filesystem races.
  * @num_requests: number of requests to try per test case. This is trigger
  *	specific.
  * @reqs: stores all requests information
@@ -99,6 +105,7 @@ struct test_config {
 	bool partial;
 	bool sync_direct;
 	bool send_uevent;
+	bool enable_resume_test;
 	u8 num_requests;
 	u8 read_fw_idx;
 
@@ -195,6 +202,7 @@ static int __test_firmware_config_init(void)
 	test_fw_config->file_offset = 0;
 	test_fw_config->partial = false;
 	test_fw_config->sync_direct = false;
+	test_fw_config->enable_resume_test = false;
 	test_fw_config->req_firmware = request_firmware;
 	test_fw_config->test_result = 0;
 	test_fw_config->reqs = NULL;
@@ -275,6 +283,9 @@ static ssize_t config_show(struct device *dev,
 	len += scnprintf(buf + len, PAGE_SIZE - len,
 			"sync_direct:\t\t%s\n",
 			test_fw_config->sync_direct ? "true" : "false");
+	len += scnprintf(buf+len, PAGE_SIZE - len,
+			"enable_resume_test:\t\t%s\n",
+			test_fw_config->enable_resume_test ? "true" : "false");
 	len += scnprintf(buf + len, PAGE_SIZE - len,
 			"read_fw_idx:\t%u\n", test_fw_config->read_fw_idx);
 
@@ -537,6 +548,22 @@ static ssize_t config_sync_direct_show(struct device *dev,
 	return test_dev_config_show_bool(buf, test_fw_config->sync_direct);
 }
 static DEVICE_ATTR_RW(config_sync_direct);
+
+static ssize_t config_enable_resume_test_store(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	return test_dev_config_update_bool(buf, count,
+					   &test_fw_config->enable_resume_test);
+}
+
+static ssize_t config_enable_resume_test_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	return test_dev_config_show_bool(buf, test_fw_config->enable_resume_test);
+}
+static DEVICE_ATTR_RW(config_enable_resume_test);
 
 static ssize_t config_send_uevent_store(struct device *dev,
 					struct device_attribute *attr,
@@ -1065,6 +1092,7 @@ static struct attribute *test_dev_attrs[] = {
 	TEST_FW_DEV_ATTR(config_partial),
 	TEST_FW_DEV_ATTR(config_sync_direct),
 	TEST_FW_DEV_ATTR(config_send_uevent),
+	TEST_FW_DEV_ATTR(config_enable_resume_test),
 	TEST_FW_DEV_ATTR(config_read_fw_idx),
 
 	/* These don't use the config at all - they could be ported! */
@@ -1094,6 +1122,81 @@ static struct miscdevice test_fw_misc_device = {
 	.groups 	= test_dev_groups,
 };
 
+static int __maybe_unused test_firmware_suspend(struct device *dev)
+{
+	return 0;
+}
+
+
+static int __maybe_unused test_firmware_resume(struct device *dev)
+{
+	int rc;
+
+	if (!test_fw_config->enable_resume_test)
+		return 0;
+
+	pr_info("resume test, loading '%s'\n", test_fw_config->name);
+
+	mutex_lock(&test_fw_mutex);
+	release_firmware(test_firmware);
+	test_firmware = NULL;
+	rc = request_firmware(&test_firmware, test_fw_config->name, dev);
+	if (rc) {
+		mutex_unlock(&test_fw_mutex);
+		pr_info("load of '%s' failed: %d\n", test_fw_config->name, rc);
+		goto out;
+	}
+
+	pr_info("loaded: %zu\n", test_firmware->size);
+	mutex_unlock(&test_fw_mutex);
+	pr_info("resume test, completed successfully\n");
+out:
+	return rc;
+}
+
+static SIMPLE_DEV_PM_OPS(test_dev_pm_ops, test_firmware_suspend, test_firmware_resume);
+
+static int test_firmware_probe(struct platform_device *dev)
+{
+	int rc;
+
+	rc = misc_register(&test_fw_misc_device);
+	if (rc) {
+		kfree(test_fw_config);
+		pr_err("could not register misc device: %d\n", rc);
+		return rc;
+	}
+
+	pr_info("interface ready\n");
+
+	return 0;
+}
+
+static int test_firmware_remove(struct platform_device *dev)
+{
+	mutex_lock(&test_fw_mutex);
+	release_firmware(test_firmware);
+	misc_deregister(&test_fw_misc_device);
+	mutex_unlock(&test_fw_mutex);
+
+	return 0;
+}
+
+static void test_firmware_shutdown(struct platform_device *dev)
+{
+}
+
+static struct platform_driver test_firmware_driver = {
+	.driver		= {
+		.name	= "test_firmware",
+		.pm	= &test_dev_pm_ops,
+	},
+	.probe		= test_firmware_probe,
+	.remove		= test_firmware_remove,
+	.shutdown	= test_firmware_shutdown,
+};
+
+
 static int __init test_firmware_init(void)
 {
 	int rc;
@@ -1109,28 +1212,39 @@ static int __init test_firmware_init(void)
 		return rc;
 	}
 
-	rc = misc_register(&test_fw_misc_device);
-	if (rc) {
-		kfree(test_fw_config);
-		pr_err("could not register misc device: %d\n", rc);
-		return rc;
-	}
+	rc = platform_driver_register(&test_firmware_driver);
+	if (rc)
+		goto err_alloc;
 
-	pr_warn("interface ready\n");
+	pdev = platform_device_alloc("test_firmware", -1);
+	if (!pdev)
+		goto err_driver_unregister;
+
+	rc = platform_device_add(pdev);
+	if (rc)
+		goto err_free_device;
 
 	return 0;
+
+ err_free_device:
+	platform_device_put(pdev);
+ err_driver_unregister:
+	platform_driver_unregister(&test_firmware_driver);
+ err_alloc:
+	__test_firmware_config_free();
+	kfree(test_fw_config);
+	return rc;
 }
 
 module_init(test_firmware_init);
 
 static void __exit test_firmware_exit(void)
 {
-	mutex_lock(&test_fw_mutex);
-	release_firmware(test_firmware);
-	misc_deregister(&test_fw_misc_device);
+	platform_device_unregister(pdev);
+	platform_driver_unregister(&test_firmware_driver);
+
 	__test_firmware_config_free();
 	kfree(test_fw_config);
-	mutex_unlock(&test_fw_mutex);
 
 	pr_warn("removed interface\n");
 }
