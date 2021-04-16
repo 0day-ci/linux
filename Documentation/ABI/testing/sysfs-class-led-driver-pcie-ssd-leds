@@ -1,0 +1,30 @@
+What:		/sys/class/leds/<led>/supported_states
+Date:		April 2021
+Contact:	linux-pci@vger.kernel.org
+Description:
+		This attribute indicates the status states supported by this
+		display.  Reading will show a verbose output with the value on
+		the final line (example below), writing only takes a single
+		numerical value.
+
+		>cat /sys/class/leds/0000:88:00.0::pcie_ssd_status/supported_states
+		ok                              0x0004 [ ]
+		locate                          0x0008 [*]
+		fail                            0x0010 [ ]
+		rebuild                         0x0020 [ ]
+		pfa                             0x0040 [ ]
+		hotspare                        0x0080 [ ]
+		criticalarray                   0x0100 [ ]
+		failedarray                     0x0200 [ ]
+		invaliddevice                   0x0400 [ ]
+		disabled                        0x0800 [ ]
+		--
+		supported_states = 0x0008
+
+What:		/sys/class/leds/<led>/current_states
+Date:		April 2021
+Contact:	linux-pci@vger.kernel.org
+Description:
+		This attribute indicates the currently active status states on
+		this display.  Reading will show a verbose output with the value
+		the final line, writing only takes a single numerical value.
