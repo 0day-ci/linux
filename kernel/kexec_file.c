@@ -226,10 +226,16 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
 	int ret;
 	void *ldata;
 
+	ret = usermodehelper_read_trylock();
+	if (ret)
+		return ret;
+
 	ret = kernel_read_file_from_fd(kernel_fd, 0, &image->kernel_buf,
 				       INT_MAX, NULL, READING_KEXEC_IMAGE);
-	if (ret < 0)
+	if (ret < 0) {
+		usermodehelper_read_unlock();
 		return ret;
+	}
 	image->kernel_buf_len = ret;
 
 	/* Call arch image probe handlers */
@@ -291,6 +297,7 @@ out:
 	/* In case of error, free up all allocated memory in this function */
 	if (ret)
 		kimage_file_post_load_cleanup(image);
+	usermodehelper_read_unlock();
 	return ret;
 }
 

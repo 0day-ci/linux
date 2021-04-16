@@ -4130,13 +4130,19 @@ SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)
 		      |MODULE_INIT_IGNORE_VERMAGIC))
 		return -EINVAL;
 
+	err = usermodehelper_read_trylock();
+	if (err)
+		return err;
 	err = kernel_read_file_from_fd(fd, 0, &hdr, INT_MAX, NULL,
 				       READING_MODULE);
-	if (err < 0)
+	if (err < 0) {
+		usermodehelper_read_unlock();
 		return err;
+	}
 	info.hdr = hdr;
 	info.len = err;
 
+	usermodehelper_read_unlock();
 	return load_module(&info, uargs, flags);
 }
 

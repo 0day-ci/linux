@@ -4,6 +4,7 @@
 #include <linux/kernel_read_file.h>
 #include <linux/security.h>
 #include <linux/vmalloc.h>
+#include <linux/umh.h>
 
 /**
  * kernel_read_file() - read file contents into a kernel buffer
@@ -134,12 +135,20 @@ int kernel_read_file_from_path(const char *path, loff_t offset, void **buf,
 	if (!path || !*path)
 		return -EINVAL;
 
+	ret = usermodehelper_read_trylock();
+	if (ret)
+		return ret;
+
 	file = filp_open(path, O_RDONLY, 0);
-	if (IS_ERR(file))
+	if (IS_ERR(file)) {
+		usermodehelper_read_unlock();
 		return PTR_ERR(file);
+	}
 
 	ret = kernel_read_file(file, offset, buf, buf_size, file_size, id);
 	fput(file);
+
+	usermodehelper_read_unlock();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(kernel_read_file_from_path);
@@ -160,13 +169,37 @@ int kernel_read_file_from_path_initns(const char *path, loff_t offset,
 	get_fs_root(init_task.fs, &root);
 	task_unlock(&init_task);
 
+	/*
+	 * Note: we may be incorrectly called on a driver's resume callback.
+	 *
+	 * The kernel's power management may be busy bringing us to suspend
+	 * or trying to get us back to resume. If we try to do a direct write
+	 * during this time a block driver may never get that request, and the
+	 * filesystem can wait forever. This requires proper VFS work, which
+	 * is not yet ready.
+	 *
+	 * Likewise busy trying here is not possible as well as we'd be holding
+	 * up the kernel's pm resume, and waiting will not allow use to thaw
+	 * the filesystem, we'd just wait forever. Best we can do is
+	 * communuicate the problem so that drivers use the firwmare cache or
+	 * implement their own prior to resume.
+	 */
+	ret = usermodehelper_read_trylock();
+	if (ret) {
+		pr_warn_once("Trying direct fs read while not allowed");
+		return ret;
+	}
+
 	file = file_open_root(root.dentry, root.mnt, path, O_RDONLY, 0);
 	path_put(&root);
-	if (IS_ERR(file))
+	if (IS_ERR(file)) {
+		usermodehelper_read_unlock();
 		return PTR_ERR(file);
+	}
 
 	ret = kernel_read_file(file, offset, buf, buf_size, file_size, id);
 	fput(file);
+	usermodehelper_read_unlock();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(kernel_read_file_from_path_initns);
