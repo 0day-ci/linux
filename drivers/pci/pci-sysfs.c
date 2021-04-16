@@ -1038,26 +1038,6 @@ static const struct attribute_group pci_bus_group = {
 	.attrs = pci_bus_attrs,
 };
 
-static ssize_t cpuaffinity_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(false, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpuaffinity);
-
-static ssize_t cpulistaffinity_show(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(true, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpulistaffinity);
-
 static ssize_t bus_rescan_store(struct device *dev,
 				struct device_attribute *attr, const char *buf,
 				size_t count)
@@ -1082,6 +1062,26 @@ static ssize_t bus_rescan_store(struct device *dev,
 static struct device_attribute dev_attr_bus_rescan = __ATTR(rescan, 0200, NULL,
 							    bus_rescan_store);
 
+static ssize_t cpuaffinity_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(false, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpuaffinity);
+
+static ssize_t cpulistaffinity_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(true, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpulistaffinity);
+
 static struct attribute *pcibus_attrs[] = {
 	&dev_attr_bus_rescan.attr,
 	&dev_attr_cpuaffinity.attr,
@@ -1091,11 +1091,6 @@ static struct attribute *pcibus_attrs[] = {
 
 static const struct attribute_group pcibus_group = {
 	.attrs = pcibus_attrs,
-};
-
-const struct attribute_group *pcibus_groups[] = {
-	&pcibus_group,
-	NULL,
 };
 
 #ifdef HAVE_PCI_LEGACY
@@ -1600,6 +1595,11 @@ static const struct attribute_group *pci_dev_attr_groups[] = {
 
 const struct attribute_group *pci_bus_groups[] = {
 	&pci_bus_group,
+	NULL,
+};
+
+const struct attribute_group *pcibus_groups[] = {
+	&pcibus_group,
 	NULL,
 };
 
