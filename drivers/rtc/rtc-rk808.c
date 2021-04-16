@@ -439,7 +439,7 @@ static int rk808_rtc_probe(struct platform_device *pdev)
 
 	/* request alarm irq of rk808 */
 	ret = devm_request_threaded_irq(&pdev->dev, rk808_rtc->irq, NULL,
-					rk808_alarm_irq, 0,
+					rk808_alarm_irq, IRQF_ONESHOT,
 					"RTC alarm", rk808_rtc);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request alarm IRQ %d: %d\n",

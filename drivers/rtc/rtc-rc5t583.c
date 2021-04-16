@@ -239,7 +239,7 @@ static int rc5t583_rtc_probe(struct platform_device *pdev)
 
 	irq += RC5T583_IRQ_YALE;
 	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-		rc5t583_rtc_interrupt, IRQF_TRIGGER_LOW,
+		rc5t583_rtc_interrupt, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 		"rtc-rc5t583", &pdev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "IRQ is not free.\n");

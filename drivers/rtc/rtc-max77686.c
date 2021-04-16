@@ -776,8 +776,8 @@ static int max77686_rtc_probe(struct platform_device *pdev)
 		goto err_rtc;
 	}
 
-	ret = request_threaded_irq(info->virq, NULL, max77686_rtc_alarm_irq, 0,
-				   "rtc-alarm1", info);
+	ret = request_threaded_irq(info->virq, NULL, max77686_rtc_alarm_irq,
+				   IRQF_ONESHOT, "rtc-alarm1", info);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to request alarm IRQ: %d: %d\n",
 			info->virq, ret);

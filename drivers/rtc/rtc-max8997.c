@@ -493,7 +493,7 @@ static int max8997_rtc_probe(struct platform_device *pdev)
 	info->virq = virq;
 
 	ret = devm_request_threaded_irq(&pdev->dev, virq, NULL,
-				max8997_rtc_alarm_irq, 0,
+				max8997_rtc_alarm_irq, IRQF_ONESHOT,
 				"rtc-alarm0", info);
 	if (ret < 0)
 		dev_err(&pdev->dev, "Failed to request alarm IRQ: %d: %d\n",

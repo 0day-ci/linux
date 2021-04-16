@@ -276,7 +276,7 @@ static int lp8788_alarm_irq_register(struct platform_device *pdev,
 
 	return devm_request_threaded_irq(&pdev->dev, rtc->irq, NULL,
 				lp8788_alarm_irq_handler,
-				0, LP8788_ALM_IRQ, rtc);
+				IRQF_ONESHOT, LP8788_ALM_IRQ, rtc);
 }
 
 static int lp8788_rtc_probe(struct platform_device *pdev)
