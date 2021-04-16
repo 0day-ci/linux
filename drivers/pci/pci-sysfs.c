@@ -940,48 +940,6 @@ static const struct attribute_group pci_bridge_attr_group = {
 	.is_visible = pci_bridge_attr_is_visible,
 };
 
-/*
- * PCI Bus Class Devices
- */
-static ssize_t cpuaffinity_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(false, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpuaffinity);
-
-static ssize_t cpulistaffinity_show(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct pci_bus *bus = to_pci_bus(dev);
-	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
-
-	return cpumap_print_to_pagebuf(true, buf, cpumask);
-}
-static DEVICE_ATTR_RO(cpulistaffinity);
-
-static ssize_t max_link_speed_show(struct device *dev,
-				   struct device_attribute *attr, char *buf)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-
-	return sysfs_emit(buf, "%s\n",
-			  pci_speed_string(pcie_get_speed_cap(pdev)));
-}
-static DEVICE_ATTR_RO(max_link_speed);
-
-static ssize_t max_link_width_show(struct device *dev,
-				   struct device_attribute *attr, char *buf)
-{
-	struct pci_dev *pdev = to_pci_dev(dev);
-
-	return sysfs_emit(buf, "%u\n", pcie_get_width_cap(pdev));
-}
-static DEVICE_ATTR_RO(max_link_width);
-
 static ssize_t current_link_speed_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
 {
@@ -1005,6 +963,72 @@ static ssize_t current_link_width_show(struct device *dev,
 	return sysfs_emit(buf, "%u\n", width);
 }
 static DEVICE_ATTR_RO(current_link_width);
+
+static ssize_t max_link_speed_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%s\n",
+			  pci_speed_string(pcie_get_speed_cap(pdev)));
+}
+static DEVICE_ATTR_RO(max_link_speed);
+
+static ssize_t max_link_width_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%u\n", pcie_get_width_cap(pdev));
+}
+static DEVICE_ATTR_RO(max_link_width);
+
+static struct attribute *pcie_dev_attrs[] = {
+	&dev_attr_current_link_speed.attr,
+	&dev_attr_current_link_width.attr,
+	&dev_attr_max_link_speed.attr,
+	&dev_attr_max_link_width.attr,
+	NULL,
+};
+
+static umode_t pcie_dev_attr_is_visible(struct kobject *kobj,
+					struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (!pci_is_pcie(pdev))
+		return 0;
+
+	return a->mode;
+}
+
+static const struct attribute_group pcie_dev_attr_group = {
+	.attrs = pcie_dev_attrs,
+	.is_visible = pcie_dev_attr_is_visible,
+};
+
+/*
+ * PCI Bus Class Devices
+ */
+static ssize_t cpuaffinity_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(false, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpuaffinity);
+
+static ssize_t cpulistaffinity_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct pci_bus *bus = to_pci_bus(dev);
+	const struct cpumask *cpumask = cpumask_of_pcibus(bus);
+
+	return cpumap_print_to_pagebuf(true, buf, cpumask);
+}
+static DEVICE_ATTR_RO(cpulistaffinity);
 
 static ssize_t rescan_store(struct bus_type *bus, const char *buf, size_t count)
 {
@@ -1062,14 +1086,6 @@ static ssize_t bus_rescan_store(struct device *dev,
 }
 static struct device_attribute dev_attr_bus_rescan = __ATTR(rescan, 0200, NULL,
 							    bus_rescan_store);
-
-static struct attribute *pcie_dev_attrs[] = {
-	&dev_attr_current_link_speed.attr,
-	&dev_attr_current_link_width.attr,
-	&dev_attr_max_link_width.attr,
-	&dev_attr_max_link_speed.attr,
-	NULL,
-};
 
 static struct attribute *pcibus_attrs[] = {
 	&dev_attr_bus_rescan.attr,
@@ -1555,17 +1571,6 @@ static int __init pci_sysfs_init(void)
 }
 late_initcall(pci_sysfs_init);
 
-static umode_t pcie_dev_attr_is_visible(struct kobject *kobj,
-					struct attribute *a, int n)
-{
-	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
-
-	if (!pci_is_pcie(pdev))
-		return 0;
-
-	return a->mode;
-}
-
 const struct attribute_group *pci_dev_groups[] = {
 	&pci_dev_group,
 	&pci_dev_config_attr_group,
@@ -1579,11 +1584,6 @@ const struct attribute_group *pci_dev_groups[] = {
 	&acpi_attr_group,
 #endif
 	NULL,
-};
-
-static const struct attribute_group pcie_dev_attr_group = {
-	.attrs = pcie_dev_attrs,
-	.is_visible = pcie_dev_attr_is_visible,
 };
 
 static const struct attribute_group *pci_dev_attr_groups[] = {
