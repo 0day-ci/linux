@@ -972,3 +972,64 @@ int bpf_prog_bind_map(int prog_fd, int map_fd,
 
 	return sys_bpf(BPF_PROG_BIND_MAP, &attr, sizeof(attr));
 }
+
+int bpf_load(const struct bpf_load_opts *opts)
+{
+	struct bpf_prog_test_run_attr tattr = {};
+	struct bpf_prog_load_params attr = {};
+	int map_fd = -1, prog_fd = -1, key = 0, err;
+
+	if (!OPTS_VALID(opts, bpf_load_opts))
+		return -EINVAL;
+
+	map_fd = bpf_create_map_name(BPF_MAP_TYPE_ARRAY, "__loader.map", 4,
+				     opts->data_sz, 1, 0);
+	if (map_fd < 0) {
+		pr_warn("failed to create loader map");
+		err = errno;
+		goto out;
+	}
+
+	err = bpf_map_update_elem(map_fd, &key, opts->data, 0);
+	if (err < 0) {
+		pr_warn("failed to update loader map");
+		err = errno;
+		goto out;
+	}
+
+	attr.prog_type = BPF_PROG_TYPE_SYSCALL;
+	attr.insns = opts->insns;
+	attr.insn_cnt = opts->insns_sz / sizeof(struct bpf_insn);
+	attr.license = "GPL";
+	attr.name = "__loader.prog";
+	attr.fd_array = &map_fd;
+	attr.log_level = opts->ctx->log_level;
+	attr.log_buf_sz = opts->ctx->log_size;
+	attr.log_buf = (void *) opts->ctx->log_buf;
+	prog_fd = libbpf__bpf_prog_load(&attr);
+	if (prog_fd < 0) {
+		pr_warn("failed to load loader prog %d", errno);
+		err = errno;
+		goto out;
+	}
+
+	tattr.prog_fd = prog_fd;
+	tattr.ctx_in = opts->ctx;
+	tattr.ctx_size_in = opts->ctx->sz;
+	err = bpf_prog_test_run_xattr(&tattr);
+	if (err < 0 || (int)tattr.retval < 0) {
+		pr_warn("failed to execute loader prog %d retval %d",
+			errno, tattr.retval);
+		if (err < 0)
+			err = errno;
+		else
+			err = -(int)tattr.retval;
+		goto out;
+	}
+	err = 0;
+out:
+	close(map_fd);
+	close(prog_fd);
+	return err;
+
+}

@@ -278,6 +278,41 @@ struct bpf_test_run_opts {
 LIBBPF_API int bpf_prog_test_run_opts(int prog_fd,
 				      struct bpf_test_run_opts *opts);
 
+/* The layout of bpf_map_prog_desc and bpf_loader_ctx is feature dependent
+ * and will change from one version of libbpf to another and features
+ * requested during loader program generation.
+ */
+union bpf_map_prog_desc {
+	struct {
+		__u32 map_fd;
+		__u32 max_entries;
+	};
+	struct {
+		__u32 prog_fd;
+		__u32 attach_prog_fd;
+	};
+};
+
+struct bpf_loader_ctx {
+	size_t sz;
+	__u32 log_level;
+	__u32 log_size;
+	__u64 log_buf;
+	union bpf_map_prog_desc u[];
+};
+
+struct bpf_load_opts {
+	size_t sz; /* size of this struct for forward/backward compatibility */
+	struct bpf_loader_ctx *ctx;
+	const void *data;
+	const void *insns;
+	__u32 data_sz;
+	__u32 insns_sz;
+};
+#define bpf_load_opts__last_field insns_sz
+
+LIBBPF_API int bpf_load(const struct bpf_load_opts *opts);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
