@@ -39,6 +39,7 @@
 #include <linux/export.h>
 #include <linux/swap_slots.h>
 #include <linux/sort.h>
+#include <linux/completion.h>
 
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
@@ -509,6 +510,14 @@ static void swap_discard_work(struct work_struct *work)
 	spin_lock(&si->lock);
 	swap_do_scheduled_discard(si);
 	spin_unlock(&si->lock);
+}
+
+static void swap_users_ref_free(struct percpu_ref *ref)
+{
+	struct swap_info_struct *si;
+
+	si = container_of(ref, struct swap_info_struct, users);
+	complete(&si->comp);
 }
 
 static void alloc_cluster(struct swap_info_struct *si, unsigned long idx)
@@ -2500,7 +2509,7 @@ static void enable_swap_info(struct swap_info_struct *p, int prio,
 	 * Guarantee swap_map, cluster_info, etc. fields are valid
 	 * between get/put_swap_device() if SWP_VALID bit is set
 	 */
-	synchronize_rcu();
+	percpu_ref_resurrect(&p->users);
 	spin_lock(&swap_lock);
 	spin_lock(&p->lock);
 	_enable_swap_info(p);
@@ -2621,11 +2630,18 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	p->flags &= ~SWP_VALID;		/* mark swap device as invalid */
 	spin_unlock(&p->lock);
 	spin_unlock(&swap_lock);
+
+	percpu_ref_kill(&p->users);
 	/*
-	 * wait for swap operations protected by get/put_swap_device()
-	 * to complete
+	 * We need synchronize_rcu() here to protect the accessing
+	 * to the swap cache data structure.
 	 */
 	synchronize_rcu();
+	/*
+	 * Wait for swap operations protected by get/put_swap_device()
+	 * to complete.
+	 */
+	wait_for_completion(&p->comp);
 
 	flush_work(&p->discard_work);
 
@@ -3132,7 +3148,7 @@ static bool swap_discardable(struct swap_info_struct *si)
 SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 {
 	struct swap_info_struct *p;
-	struct filename *name;
+	struct filename *name = NULL;
 	struct file *swap_file = NULL;
 	struct address_space *mapping;
 	int prio;
@@ -3162,6 +3178,15 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		return PTR_ERR(p);
 
 	INIT_WORK(&p->discard_work, swap_discard_work);
+
+	if (!p->ref_initialized) {
+		error = percpu_ref_init(&p->users, swap_users_ref_free,
+					PERCPU_REF_INIT_DEAD, GFP_KERNEL);
+		if (unlikely(error))
+			goto bad_swap;
+		init_completion(&p->comp);
+		p->ref_initialized = true;
+	}
 
 	name = getname(specialfile);
 	if (IS_ERR(name)) {
