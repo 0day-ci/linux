@@ -1279,18 +1279,12 @@ static unsigned char __swap_entry_free_locked(struct swap_info_struct *p,
  * via preventing the swap device from being swapoff, until
  * put_swap_device() is called.  Otherwise return NULL.
  *
- * The entirety of the RCU read critical section must come before the
- * return from or after the call to synchronize_rcu() in
- * enable_swap_info() or swapoff().  So if "si->flags & SWP_VALID" is
- * true, the si->map, si->cluster_info, etc. must be valid in the
- * critical section.
- *
  * Notice that swapoff or swapoff+swapon can still happen before the
- * rcu_read_lock() in get_swap_device() or after the rcu_read_unlock()
- * in put_swap_device() if there isn't any other way to prevent
- * swapoff, such as page lock, page table lock, etc.  The caller must
- * be prepared for that.  For example, the following situation is
- * possible.
+ * percpu_ref_tryget_live() in get_swap_device() or after the
+ * percpu_ref_put() in put_swap_device() if there isn't any other way
+ * to prevent swapoff, such as page lock, page table lock, etc.  The
+ * caller must be prepared for that.  For example, the following
+ * situation is possible.
  *
  *   CPU1				CPU2
  *   do_swap_page()
@@ -1318,21 +1312,24 @@ struct swap_info_struct *get_swap_device(swp_entry_t entry)
 	si = swp_swap_info(entry);
 	if (!si)
 		goto bad_nofile;
-
-	rcu_read_lock();
-	if (data_race(!(si->flags & SWP_VALID)))
-		goto unlock_out;
+	if (!percpu_ref_tryget_live(&si->users))
+		goto out;
+	/*
+	 * Guarantee we will not reference uninitialized fields
+	 * of swap_info_struct.
+	 */
+	smp_rmb();
 	offset = swp_offset(entry);
 	if (offset >= si->max)
-		goto unlock_out;
+		goto put_out;
 
 	return si;
 bad_nofile:
 	pr_err("%s: %s%08lx\n", __func__, Bad_file, entry.val);
 out:
 	return NULL;
-unlock_out:
-	rcu_read_unlock();
+put_out:
+	percpu_ref_put(&si->users);
 	return NULL;
 }
 
@@ -2475,7 +2472,7 @@ static void setup_swap_info(struct swap_info_struct *p, int prio,
 
 static void _enable_swap_info(struct swap_info_struct *p)
 {
-	p->flags |= SWP_WRITEOK | SWP_VALID;
+	p->flags |= SWP_WRITEOK;
 	atomic_long_add(p->pages, &nr_swap_pages);
 	total_swap_pages += p->pages;
 
@@ -2507,7 +2504,7 @@ static void enable_swap_info(struct swap_info_struct *p, int prio,
 	spin_unlock(&swap_lock);
 	/*
 	 * Guarantee swap_map, cluster_info, etc. fields are valid
-	 * between get/put_swap_device() if SWP_VALID bit is set
+	 * between get/put_swap_device().
 	 */
 	percpu_ref_resurrect(&p->users);
 	spin_lock(&swap_lock);
@@ -2624,12 +2621,6 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	}
 
 	reenable_swap_slots_cache_unlock();
-
-	spin_lock(&swap_lock);
-	spin_lock(&p->lock);
-	p->flags &= ~SWP_VALID;		/* mark swap device as invalid */
-	spin_unlock(&p->lock);
-	spin_unlock(&swap_lock);
 
 	percpu_ref_kill(&p->users);
 	/*
