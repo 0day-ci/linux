@@ -2602,6 +2602,19 @@ extern int user_statfs(const char __user *, struct kstatfs *);
 extern int fd_statfs(int, struct kstatfs *);
 extern int freeze_super(struct super_block *super);
 extern int thaw_super(struct super_block *super);
+#ifdef CONFIG_PM_SLEEP
+int fs_suspend_freeze(void);
+int fs_resume_unfreeze(void);
+#else
+static inline int fs_suspend_freeze(void)
+{
+	return 0;
+}
+static inline int fs_resume_unfreeze(void)
+{
+	return 0;
+}
+#endif
 extern bool our_mnt(struct vfsmount *mnt);
 extern __printf(2, 3)
 int super_setup_bdi_name(struct super_block *sb, char *fmt, ...);

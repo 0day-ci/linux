@@ -3954,7 +3954,7 @@ static noinline_for_stack int scrub_workers_get(struct btrfs_fs_info *fs_info,
 	struct btrfs_workqueue *scrub_workers = NULL;
 	struct btrfs_workqueue *scrub_wr_comp = NULL;
 	struct btrfs_workqueue *scrub_parity = NULL;
-	unsigned int flags = WQ_FREEZABLE | WQ_UNBOUND;
+	unsigned int flags = WQ_UNBOUND;
 	int max_active = fs_info->thread_pool_size;
 	int ret = -ENOMEM;
 

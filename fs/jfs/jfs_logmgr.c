@@ -2331,14 +2331,9 @@ int jfsIOWait(void *arg)
 			spin_lock_irq(&log_redrive_lock);
 		}
 
-		if (freezing(current)) {
-			spin_unlock_irq(&log_redrive_lock);
-			try_to_freeze();
-		} else {
-			set_current_state(TASK_INTERRUPTIBLE);
-			spin_unlock_irq(&log_redrive_lock);
-			schedule();
-		}
+		set_current_state(TASK_INTERRUPTIBLE);
+		spin_unlock_irq(&log_redrive_lock);
+		schedule();
 	} while (!kthread_should_stop());
 
 	jfs_info("jfsIOWait being killed!");

@@ -36,12 +36,11 @@ static int gc_thread_func(void *data)
 
 	wait_ms = gc_th->min_sleep_time;
 
-	set_freezable();
 	do {
 		bool sync_mode, foreground = false;
 
 		wait_event_interruptible_timeout(*wq,
-				kthread_should_stop() || freezing(current) ||
+				kthread_should_stop() ||
 				waitqueue_active(fggc_wq) ||
 				gc_th->gc_wake,
 				msecs_to_jiffies(wait_ms));
@@ -53,10 +52,6 @@ static int gc_thread_func(void *data)
 		if (gc_th->gc_wake)
 			gc_th->gc_wake = 0;
 
-		if (try_to_freeze()) {
-			stat_other_skip_bggc_count(sbi);
-			continue;
-		}
 		if (kthread_should_stop())
 			break;
 

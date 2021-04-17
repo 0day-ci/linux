@@ -2271,14 +2271,14 @@ int __init gfs2_glock_init(void)
 	if (ret < 0)
 		return ret;
 
-	glock_workqueue = alloc_workqueue("glock_workqueue", WQ_MEM_RECLAIM |
-					  WQ_HIGHPRI | WQ_FREEZABLE, 0);
+	glock_workqueue = alloc_workqueue("glock_workqueue",
+					  WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
 	if (!glock_workqueue) {
 		rhashtable_destroy(&gl_hash_table);
 		return -ENOMEM;
 	}
 	gfs2_delete_workqueue = alloc_workqueue("delete_workqueue",
-						WQ_MEM_RECLAIM | WQ_FREEZABLE,
+						WQ_MEM_RECLAIM,
 						0);
 	if (!gfs2_delete_workqueue) {
 		destroy_workqueue(glock_workqueue);

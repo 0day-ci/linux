@@ -285,7 +285,7 @@ int dfs_cache_init(void)
 	int i;
 
 	dfscache_wq = alloc_workqueue("cifs-dfscache",
-				      WQ_FREEZABLE | WQ_MEM_RECLAIM, 1);
+				      WQ_MEM_RECLAIM, 1);
 	if (!dfscache_wq)
 		return -ENOMEM;
 

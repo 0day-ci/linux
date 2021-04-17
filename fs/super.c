@@ -1890,3 +1890,91 @@ int thaw_super(struct super_block *sb)
 	return thaw_super_locked(sb, true);
 }
 EXPORT_SYMBOL(thaw_super);
+
+#ifdef CONFIG_PM_SLEEP
+static bool super_should_freeze(struct super_block *sb)
+{
+	if (!sb->s_root)
+		return false;
+	if (!(sb->s_flags & MS_BORN))
+		return false;
+	/*
+	 * We don't freeze virtual filesystems, we skip those filesystems with
+	 * no backing device.
+	 */
+	if (sb->s_bdi == &noop_backing_dev_info)
+		return false;
+
+	/* No need to freeze read-only filesystems */
+	if (sb_rdonly(sb))
+		return false;
+
+	return true;
+}
+
+static int fs_suspend_freeze_sb(struct super_block *sb, void *priv)
+{
+	int error = 0;
+
+	spin_lock(&sb_lock);
+	if (!super_should_freeze(sb))
+		goto out;
+
+	pr_info("%s (%s): freezing\n", sb->s_type->name, sb->s_id);
+
+	spin_unlock(&sb_lock);
+
+	atomic_inc(&sb->s_active);
+	error = freeze_locked_super(sb, false);
+	if (error)
+		atomic_dec(&sb->s_active);
+	else
+		lockdep_sb_freeze_release(sb);
+
+	spin_lock(&sb_lock);
+	if (error && error != -EBUSY)
+		pr_notice("%s (%s): Unable to freeze, error=%d",
+			  sb->s_type->name, sb->s_id, error);
+
+out:
+	spin_unlock(&sb_lock);
+	return error;
+}
+
+int fs_suspend_freeze(void)
+{
+	return iterate_supers_reverse_excl(fs_suspend_freeze_sb, NULL);
+}
+
+static int fs_suspend_thaw_sb(struct super_block *sb, void *priv)
+{
+	int error = 0;
+
+	spin_lock(&sb_lock);
+	if (!super_should_freeze(sb))
+		goto out;
+
+	pr_info("%s (%s): thawing\n", sb->s_type->name, sb->s_id);
+
+	spin_unlock(&sb_lock);
+
+	error = __thaw_super_locked(sb, false);
+	if (!error)
+		atomic_dec(&sb->s_active);
+
+	spin_lock(&sb_lock);
+	if (error && error != -EBUSY)
+		pr_notice("%s (%s): Unable to unfreeze, error=%d",
+			  sb->s_type->name, sb->s_id, error);
+
+out:
+	spin_unlock(&sb_lock);
+	return error;
+}
+
+int fs_resume_unfreeze(void)
+{
+	return iterate_supers_excl(fs_suspend_thaw_sb, NULL);
+}
+
+#endif
