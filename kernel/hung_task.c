@@ -72,6 +72,57 @@ unsigned int __read_mostly sysctl_hung_task_all_cpu_backtrace;
 unsigned int __read_mostly sysctl_hung_task_panic =
 				CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE;
 
+#define HUNG_TASK_WHITELIST		0x1
+#define HUNG_TASK_BLACKLIST		0x2
+
+typedef struct {
+	char *task_comm;
+	unsigned long flag;
+} task_t;
+
+static task_t task_whitelist[] = {
+	{NULL, 0},
+};
+
+static task_t task_blacklist[] = {
+	{"init", HUNG_TASK_BLACKLIST},
+	{NULL, 0},
+};
+
+static bool task_in_blacklist(struct task_struct *tsk)
+{
+	task_t *info = NULL;
+
+	if (tsk->hung_state & HUNG_TASK_BLACKLIST)
+		return true;
+
+	for (info = task_blacklist; info->task_comm; info++) {
+		if (!strcmp(tsk->comm, info->task_comm)) {
+			tsk->hung_state |= HUNG_TASK_BLACKLIST;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool task_in_whitelist(struct task_struct *tsk)
+{
+	task_t *info = NULL;
+
+	if (tsk->hung_state & HUNG_TASK_WHITELIST)
+		return true;
+
+	for (info = task_whitelist; info->task_comm; info++) {
+		if (!strcmp(tsk->comm, info->task_comm)) {
+			tsk->hung_state |= HUNG_TASK_WHITELIST;
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static int
 hung_task_panic(struct notifier_block *this, unsigned long event, void *ptr)
 {
@@ -111,6 +162,12 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 	if (time_is_after_jiffies(t->last_switch_time + timeout * HZ))
 		return;
 
+	/* Check if process 't' is in the whitelist. */
+	if (task_in_whitelist(t)) {
+		pr_info("skip hung task: %s\n", t->comm);
+		return;
+	}
+
 	trace_sched_process_hang(t);
 
 	if (sysctl_hung_task_panic) {
@@ -118,7 +175,6 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 		hung_task_show_lock = true;
 		hung_task_call_panic = true;
 	}
-
 	/*
 	 * Ok, the task did not get scheduled for more than 2 minutes,
 	 * complain:
@@ -139,6 +195,12 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 
 		if (sysctl_hung_task_all_cpu_backtrace)
 			hung_task_show_all_bt = true;
+	}
+
+	/* Check if process 't' is in the blacklist. */
+	if (task_in_blacklist(t)) {
+		pr_err("critical task blocked: (%d)%s\n", t->pid, t->comm);
+		hung_task_call_panic = true;
 	}
 
 	touch_nmi_watchdog();
@@ -253,8 +315,10 @@ static void check_hung_uninterruptible_tasks(unsigned long timeout)
 		trigger_all_cpu_backtrace();
 	}
 
-	if (hung_task_call_panic)
+	if (hung_task_call_panic) {
+		show_state_filter(TASK_UNINTERRUPTIBLE);
 		panic("hung_task: blocked tasks");
+	}
 }
 
 static long hung_timeout_jiffies(unsigned long last_checked,
@@ -322,6 +386,7 @@ static int watchdog(void *dummy)
 	unsigned long hung_last_checked = jiffies;
 
 	set_user_nice(current, 0);
+	pr_info("khungtaskd started...\n");
 
 	for ( ; ; ) {
 		unsigned long timeout = sysctl_hung_task_timeout_secs;
@@ -357,3 +422,22 @@ static int __init hung_task_init(void)
 	return 0;
 }
 subsys_initcall(hung_task_init);
+
+static int hung_task_test(const char *val, const struct kernel_param *kp)
+{
+	unsigned long sec = 0;
+	if (kstrtoul(val, 10, &sec))
+		return -EINVAL;
+
+	pr_info("Hung task Dsleep %ld s, start!\n", sec);
+	msleep(sec * 1000);
+	pr_info("Hung task Dsleep %ld s, end!\n", sec);
+
+	return 0;
+}
+
+static const struct kernel_param_ops hung_task_test_ops = {
+	.set = hung_task_test,
+};
+
+module_param_cb(hung_seconds, &hung_task_test_ops, NULL, 0600);

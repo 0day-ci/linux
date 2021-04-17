@@ -973,6 +973,7 @@ struct task_struct {
 	unsigned long			last_switch_count;
 	unsigned long			last_switch_time;
 	unsigned long			killed_time;
+	unsigned long			hung_state;
 #endif
 	/* Filesystem information: */
 	struct fs_struct		*fs;
