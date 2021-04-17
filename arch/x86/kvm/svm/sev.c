@@ -1040,7 +1040,6 @@ static int sev_send_cancel(struct kvm *kvm, struct kvm_sev_cmd *argp)
 {
 	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
 	struct sev_data_send_cancel data;
-	int ret;
 
 	if (!sev_guest(kvm))
 		return -ENOTTY;
