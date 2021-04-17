@@ -1252,7 +1252,7 @@ arch_atomic_dec_if_positive(atomic_t *v)
 
 #ifdef CONFIG_GENERIC_ATOMIC64
 #include <asm-generic/atomic64.h>
-#endif
+#else
 
 #ifndef arch_atomic64_read_acquire
 static __always_inline s64
@@ -2357,5 +2357,6 @@ arch_atomic64_dec_if_positive(atomic64_t *v)
 #define arch_atomic64_dec_if_positive arch_atomic64_dec_if_positive
 #endif
 
+#endif /* CONFIG_GENERIC_ATOMIC64 */
 #endif /* _LINUX_ATOMIC_FALLBACK_H */
-// cca554917d7ea73d5e3e7397dd70c484cad9b2c4
+// ae31a21075855e67a9b2927f8241dedddafda046
