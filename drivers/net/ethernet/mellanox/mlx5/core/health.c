@@ -802,12 +802,10 @@ int mlx5_health_init(struct mlx5_core_dev *dev)
 	mlx5_fw_reporters_create(dev);
 
 	health = &dev->priv.health;
-	name = kmalloc(64, GFP_KERNEL);
+	name = kasprintf(GFP_KERNEL, "mlx5_health%s", dev_name(dev->device));
 	if (!name)
 		goto out_err;
 
-	strcpy(name, "mlx5_health");
-	strcat(name, dev_name(dev->device));
 	health->wq = create_singlethread_workqueue(name);
 	kfree(name);
 	if (!health->wq)
