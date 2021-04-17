@@ -1624,6 +1624,59 @@ static void sb_freeze_unlock(struct super_block *sb)
 		percpu_up_write(sb->s_writers.rw_sem + level);
 }
 
+/* Caller takes lock and handles active count */
+static int freeze_locked_super(struct super_block *sb)
+{
+	int ret;
+
+	if (sb->s_writers.frozen != SB_UNFROZEN)
+		return -EBUSY;
+
+	if (!(sb->s_flags & SB_BORN))
+		return 0;	/* sic - it's "nothing to do" */
+
+	if (sb_rdonly(sb)) {
+		/* Nothing to do really... */
+		sb->s_writers.frozen = SB_FREEZE_COMPLETE;
+		return 0;
+	}
+
+	sb->s_writers.frozen = SB_FREEZE_WRITE;
+	/* Release s_umount to preserve sb_start_write -> s_umount ordering */
+	up_write(&sb->s_umount);
+	sb_wait_write(sb, SB_FREEZE_WRITE);
+	down_write(&sb->s_umount);
+
+	/* Now we go and block page faults... */
+	sb->s_writers.frozen = SB_FREEZE_PAGEFAULT;
+	sb_wait_write(sb, SB_FREEZE_PAGEFAULT);
+
+	/* All writers are done so after syncing there won't be dirty data */
+	sync_filesystem(sb);
+
+	/* Now wait for internal filesystem counter */
+	sb->s_writers.frozen = SB_FREEZE_FS;
+	sb_wait_write(sb, SB_FREEZE_FS);
+
+	if (sb->s_op->freeze_fs) {
+		ret = sb->s_op->freeze_fs(sb);
+		if (ret) {
+			printk(KERN_ERR
+				"VFS:Filesystem freeze failed\n");
+			sb->s_writers.frozen = SB_UNFROZEN;
+			sb_freeze_unlock(sb);
+			wake_up(&sb->s_writers.wait_unfrozen);
+			return ret;
+		}
+	}
+	/*
+	 * For debugging purposes so that fs can warn if it sees write activity
+	 * when frozen is set to SB_FREEZE_COMPLETE, and for thaw_super().
+	 */
+	sb->s_writers.frozen = SB_FREEZE_COMPLETE;
+	return 0;
+}
+
 /**
  * freeze_super - lock the filesystem and force it into a consistent state
  * @sb: the super to lock
@@ -1659,64 +1712,21 @@ static void sb_freeze_unlock(struct super_block *sb)
  */
 int freeze_super(struct super_block *sb)
 {
-	int ret;
+	int error;
 
 	atomic_inc(&sb->s_active);
+
 	down_write(&sb->s_umount);
-	if (sb->s_writers.frozen != SB_UNFROZEN) {
+	error = freeze_locked_super(sb);
+	if (error) {
 		deactivate_locked_super(sb);
-		return -EBUSY;
+		goto out;
 	}
-
-	if (!(sb->s_flags & SB_BORN)) {
-		up_write(&sb->s_umount);
-		return 0;	/* sic - it's "nothing to do" */
-	}
-
-	if (sb_rdonly(sb)) {
-		/* Nothing to do really... */
-		sb->s_writers.frozen = SB_FREEZE_COMPLETE;
-		up_write(&sb->s_umount);
-		return 0;
-	}
-
-	sb->s_writers.frozen = SB_FREEZE_WRITE;
-	/* Release s_umount to preserve sb_start_write -> s_umount ordering */
-	up_write(&sb->s_umount);
-	sb_wait_write(sb, SB_FREEZE_WRITE);
-	down_write(&sb->s_umount);
-
-	/* Now we go and block page faults... */
-	sb->s_writers.frozen = SB_FREEZE_PAGEFAULT;
-	sb_wait_write(sb, SB_FREEZE_PAGEFAULT);
-
-	/* All writers are done so after syncing there won't be dirty data */
-	sync_filesystem(sb);
-
-	/* Now wait for internal filesystem counter */
-	sb->s_writers.frozen = SB_FREEZE_FS;
-	sb_wait_write(sb, SB_FREEZE_FS);
-
-	if (sb->s_op->freeze_fs) {
-		ret = sb->s_op->freeze_fs(sb);
-		if (ret) {
-			printk(KERN_ERR
-				"VFS:Filesystem freeze failed\n");
-			sb->s_writers.frozen = SB_UNFROZEN;
-			sb_freeze_unlock(sb);
-			wake_up(&sb->s_writers.wait_unfrozen);
-			deactivate_locked_super(sb);
-			return ret;
-		}
-	}
-	/*
-	 * For debugging purposes so that fs can warn if it sees write activity
-	 * when frozen is set to SB_FREEZE_COMPLETE, and for thaw_super().
-	 */
-	sb->s_writers.frozen = SB_FREEZE_COMPLETE;
 	lockdep_sb_freeze_release(sb);
 	up_write(&sb->s_umount);
-	return 0;
+
+out:
+	return error;
 }
 EXPORT_SYMBOL(freeze_super);
 
