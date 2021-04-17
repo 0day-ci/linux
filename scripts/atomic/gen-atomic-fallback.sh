@@ -247,7 +247,7 @@ done
 cat <<EOF
 #ifdef CONFIG_GENERIC_ATOMIC64
 #include <asm-generic/atomic64.h>
-#endif
+#else
 
 EOF
 
@@ -256,5 +256,6 @@ grep '^[a-z]' "$1" | while read name meta args; do
 done
 
 cat <<EOF
+#endif /* CONFIG_GENERIC_ATOMIC64 */
 #endif /* _LINUX_ATOMIC_FALLBACK_H */
 EOF

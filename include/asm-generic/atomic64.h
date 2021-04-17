@@ -34,6 +34,18 @@ extern s64 atomic64_fetch_##op(s64 a, atomic64_t *v);
 ATOMIC64_OPS(add)
 ATOMIC64_OPS(sub)
 
+#define atomic64_add_relaxed atomic64_add
+#define atomic64_add_acquire atomic64_add
+#define atomic64_add_release atomic64_add
+
+#define atomic64_add_return_relaxed atomic64_add_return
+#define atomic64_add_return_acquire atomic64_add_return
+#define atomic64_add_return_release atomic64_add_return
+
+#define atomic64_fetch_add_relaxed atomic64_fetch_add
+#define atomic64_fetch_add_acquire atomic64_fetch_add
+#define atomic64_fetch_add_release atomic64_fetch_add
+
 #undef ATOMIC64_OPS
 #define ATOMIC64_OPS(op)	ATOMIC64_OP(op) ATOMIC64_FETCH_OP(op)
 
@@ -49,8 +61,85 @@ ATOMIC64_OPS(xor)
 extern s64 atomic64_dec_if_positive(atomic64_t *v);
 #define atomic64_dec_if_positive atomic64_dec_if_positive
 extern s64 atomic64_cmpxchg(atomic64_t *v, s64 o, s64 n);
+#define atomic64_cmpxchg_relaxed atomic64_cmpxchg
+#define atomic64_cmpxchg_acquire atomic64_cmpxchg
+#define atomic64_cmpxchg_release atomic64_cmpxchg
 extern s64 atomic64_xchg(atomic64_t *v, s64 new);
+#define atomic64_xchg_relaxed atomic64_xchg
+#define atomic64_xchg_acquire atomic64_xchg
+#define atomic64_xchg_release atomic64_xchg
 extern s64 atomic64_fetch_add_unless(atomic64_t *v, s64 a, s64 u);
 #define atomic64_fetch_add_unless atomic64_fetch_add_unless
 
+static __always_inline void
+atomic64_inc(atomic64_t *v)
+{
+	atomic64_add(1, v);
+}
+
+static __always_inline s64
+atomic64_inc_return(atomic64_t *v)
+{
+	return atomic64_add_return(1, v);
+}
+
+static __always_inline s64
+atomic64_fetch_inc(atomic64_t *v)
+{
+	return atomic64_fetch_add(1, v);
+}
+
+static __always_inline void
+atomic64_dec(atomic64_t *v)
+{
+	atomic64_sub(1, v);
+}
+
+static __always_inline s64
+atomic64_dec_return(atomic64_t *v)
+{
+	return atomic64_sub_return(1, v);
+}
+
+static __always_inline s64
+atomic64_fetch_dec(atomic64_t *v)
+{
+	return atomic64_fetch_sub(1, v);
+}
+
+static __always_inline void
+atomic64_andnot(s64 i, atomic64_t *v)
+{
+	atomic64_and(~i, v);
+}
+
+static __always_inline s64
+atomic64_fetch_andnot(s64 i, atomic64_t *v)
+{
+	return atomic64_fetch_and(~i, v);
+}
+
+static __always_inline bool
+atomic64_sub_and_test(int i, atomic64_t *v)
+{
+	return atomic64_sub_return(i, v) == 0;
+}
+
+static __always_inline bool
+atomic64_dec_and_test(atomic64_t *v)
+{
+	return atomic64_dec_return(v) == 0;
+}
+
+static __always_inline bool
+atomic64_inc_and_test(atomic64_t *v)
+{
+	return atomic64_inc_return(v) == 0;
+}
+
+static __always_inline bool
+atomic64_add_negative(s64 i, atomic64_t *v)
+{
+	return atomic64_add_return(i, v) < 0;
+}
 #endif  /*  _ASM_GENERIC_ATOMIC64_H  */
