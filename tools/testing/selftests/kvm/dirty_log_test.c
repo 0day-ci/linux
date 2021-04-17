@@ -534,6 +534,12 @@ static void *vcpu_worker(void *data)
 	sigemptyset(sigset);
 	sigaddset(sigset, SIG_IPI);
 
+	/*
+	 * Tell the main thread that signals are setup already; let's borrow
+	 * sem_vcpu_stop even if it's not for it.
+	 */
+	sem_post(&sem_vcpu_stop);
+
 	guest_array = addr_gva2hva(vm, (vm_vaddr_t)random_array);
 
 	while (!READ_ONCE(host_quit)) {
@@ -784,6 +790,8 @@ static void run_test(enum vm_guest_mode mode, void *arg)
 	host_track_next_count = 0;
 
 	pthread_create(&vcpu_thread, NULL, vcpu_worker, vm);
+
+	sem_wait_until(&sem_vcpu_stop);
 
 	while (iteration < p->iterations) {
 		/* Give the vcpu thread some time to dirty some pages */
