@@ -360,7 +360,7 @@ struct ieee80211_sta_he_cap {
 };
 
 /**
- * struct ieee80211_sband_iftype_data
+ * struct ieee80211_sband_iftype_data - sband data per interface type
  *
  * This structure encapsulates sband data that is relevant for the
  * interface types defined in @types_mask.  Each type in the
@@ -6633,15 +6633,14 @@ void cfg80211_notify_new_peer_candidate(struct net_device *dev,
  * They can do this with a few helper functions documented here.
  */
 
+void wiphy_rfkill_set_hw_state_reason(struct wiphy *wiphy, bool blocked,
+				      enum rfkill_hard_block_reasons reason);
+
 /**
  * wiphy_rfkill_set_hw_state - notify cfg80211 about hw block state
  * @wiphy: the wiphy
  * @blocked: block status
- * @reason: one of reasons in &enum rfkill_hard_block_reasons
  */
-void wiphy_rfkill_set_hw_state_reason(struct wiphy *wiphy, bool blocked,
-				      enum rfkill_hard_block_reasons reason);
-
 static inline void wiphy_rfkill_set_hw_state(struct wiphy *wiphy, bool blocked)
 {
 	wiphy_rfkill_set_hw_state_reason(wiphy, blocked,
@@ -6740,7 +6739,7 @@ cfg80211_vendor_cmd_alloc_reply_skb(struct wiphy *wiphy, int approxlen)
 int cfg80211_vendor_cmd_reply(struct sk_buff *skb);
 
 /**
- * cfg80211_vendor_cmd_get_sender
+ * cfg80211_vendor_cmd_get_sender - get the current netlink port ID of a wiphy
  * @wiphy: the wiphy
  *
  * Return the current netlink port ID in a vendor command handler.
