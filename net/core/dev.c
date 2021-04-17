@@ -5479,7 +5479,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 {
 	int ret;
 
-	if (sk_memalloc_socks() && skb_pfmemalloc(skb)) {
+	if (skb_pfmemalloc(skb)) {
 		unsigned int noreclaim_flag;
 
 		/*
@@ -5507,7 +5507,7 @@ static void __netif_receive_skb_list(struct list_head *head)
 	bool pfmemalloc = false; /* Is current sublist PF_MEMALLOC? */
 
 	list_for_each_entry_safe(skb, next, head, list) {
-		if ((sk_memalloc_socks() && skb_pfmemalloc(skb)) != pfmemalloc) {
+		if (skb_pfmemalloc(skb) != pfmemalloc) {
 			struct list_head sublist;
 
 			/* Handle the previous sublist */
