@@ -1406,9 +1406,10 @@ enum {
 	SB_FREEZE_FS = 3,		/* For internal FS use (e.g. to stop
 					 * internal threads if needed) */
 	SB_FREEZE_COMPLETE = 4,		/* ->freeze_fs finished successfully */
+	SB_FREEZE_COMPLETE_AUTO = 5,	/* same but initiated automatically */
 };
 
-#define SB_FREEZE_LEVELS (SB_FREEZE_COMPLETE - 1)
+#define SB_FREEZE_LEVELS (SB_FREEZE_COMPLETE_AUTO - 2)
 
 struct sb_writers {
 	int				frozen;		/* Is sb frozen? */
@@ -1898,6 +1899,18 @@ static inline bool sb_is_frozen_by_user(struct super_block *sb)
 }
 
 /**
+ * sb_is_frozen_by_kernel - is superblock frozen by the kernel automatically
+ * @sb: the super to check
+ *
+ * Returns true if the super freeze was initiated by the kernel, automatically,
+ * for instance during system sleep or hibernation.
+ */
+static inline bool sb_is_frozen_by_kernel(struct super_block *sb)
+{
+	return sb->s_writers.frozen == SB_FREEZE_COMPLETE_AUTO;
+}
+
+/**
  * sb_is_frozen - is superblock frozen
  * @sb: the super to check
  *
@@ -1905,7 +1918,7 @@ static inline bool sb_is_frozen_by_user(struct super_block *sb)
  */
 static inline bool sb_is_frozen(struct super_block *sb)
 {
-	return sb_is_frozen_by_user(sb);
+	return sb_is_frozen_by_user(sb) || sb_is_frozen_by_kernel(sb);
 }
 
 /**

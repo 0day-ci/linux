@@ -40,7 +40,7 @@
 #include <uapi/linux/mount.h>
 #include "internal.h"
 
-static int thaw_super_locked(struct super_block *sb);
+static int thaw_super_locked(struct super_block *sb, bool usercall);
 
 static LIST_HEAD(super_blocks);
 static DEFINE_SPINLOCK(sb_lock);
@@ -977,7 +977,7 @@ static void do_thaw_all_callback(struct super_block *sb)
 	down_write(&sb->s_umount);
 	if (sb->s_root && sb->s_flags & SB_BORN) {
 		emergency_thaw_bdev(sb);
-		thaw_super_locked(sb);
+		thaw_super_locked(sb, false);
 	} else {
 		up_write(&sb->s_umount);
 	}
@@ -1625,9 +1625,12 @@ static void sb_freeze_unlock(struct super_block *sb)
 }
 
 /* Caller takes lock and handles active count */
-static int freeze_locked_super(struct super_block *sb)
+static int freeze_locked_super(struct super_block *sb, bool usercall)
 {
 	int ret;
+
+	if (!usercall && sb_is_frozen(sb))
+		return 0;
 
 	if (!sb_is_unfrozen(sb))
 		return -EBUSY;
@@ -1673,7 +1676,10 @@ static int freeze_locked_super(struct super_block *sb)
 	 * For debugging purposes so that fs can warn if it sees write activity
 	 * when frozen is set to SB_FREEZE_COMPLETE, and for thaw_super().
 	 */
-	sb->s_writers.frozen = SB_FREEZE_COMPLETE;
+	if (usercall)
+		sb->s_writers.frozen = SB_FREEZE_COMPLETE;
+	else
+		sb->s_writers.frozen = SB_FREEZE_COMPLETE_AUTO;
 	return 0;
 }
 
@@ -1717,7 +1723,7 @@ int freeze_super(struct super_block *sb)
 	atomic_inc(&sb->s_active);
 
 	down_write(&sb->s_umount);
-	error = freeze_locked_super(sb);
+	error = freeze_locked_super(sb, true);
 	if (error) {
 		deactivate_locked_super(sb);
 		goto out;
@@ -1731,9 +1737,12 @@ out:
 EXPORT_SYMBOL(freeze_super);
 
 /* Caller deals with the sb->s_umount */
-static int __thaw_super_locked(struct super_block *sb)
+static int __thaw_super_locked(struct super_block *sb, bool usercall)
 {
 	int error;
+
+	if (!usercall && sb_is_unfrozen(sb))
+		return 0;
 
 	if (!sb_is_frozen(sb))
 		return -EINVAL;
@@ -1763,11 +1772,11 @@ out:
 }
 
 /* Handles unlocking of sb->s_umount for you */
-static int thaw_super_locked(struct super_block *sb)
+static int thaw_super_locked(struct super_block *sb, bool usercall)
 {
 	int error;
 
-	error = __thaw_super_locked(sb);
+	error = __thaw_super_locked(sb, usercall);
 	if (error) {
 		up_write(&sb->s_umount);
 		return error;
@@ -1787,6 +1796,6 @@ static int thaw_super_locked(struct super_block *sb)
 int thaw_super(struct super_block *sb)
 {
 	down_write(&sb->s_umount);
-	return thaw_super_locked(sb);
+	return thaw_super_locked(sb, true);
 }
 EXPORT_SYMBOL(thaw_super);
