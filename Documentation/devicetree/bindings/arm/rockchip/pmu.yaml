@@ -19,7 +19,11 @@ select:
     compatible:
       contains:
         enum:
+          - rockchip,px30-pmu
           - rockchip,rk3066-pmu
+          - rockchip,rk3288-pmu
+          - rockchip,rk3328-pmu
+          - rockchip,rk3399-pmu
 
   required:
     - compatible
@@ -28,7 +32,11 @@ properties:
   compatible:
     items:
       - enum:
+          - rockchip,px30-pmu
           - rockchip,rk3066-pmu
+          - rockchip,rk3288-pmu
+          - rockchip,rk3328-pmu
+          - rockchip,rk3399-pmu
       - const: syscon
       - const: simple-mfd
 
