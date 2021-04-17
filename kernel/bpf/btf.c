@@ -6085,3 +6085,54 @@ struct module *btf_try_get_module(const struct btf *btf)
 
 	return res;
 }
+
+BPF_CALL_5(bpf_btf_find_by_name_kind, int, btf_fd, char *, name, u32, kind, int *, attach_btf_obj_fd, int, flags)
+{
+	struct btf *btf;
+	int ret;
+
+	if (flags)
+		return -EINVAL;
+
+	if (btf_fd)
+		btf = btf_get_by_fd(btf_fd);
+	else
+		btf = bpf_get_btf_vmlinux();
+	if (IS_ERR(btf))
+		return PTR_ERR(btf);
+
+	*attach_btf_obj_fd = 0;
+	ret = btf_find_by_name_kind(btf, name, kind);
+	if (!btf_fd && ret < 0) {
+		struct btf *mod_btf;
+		int id = btf->id;
+
+		spin_lock_bh(&btf_idr_lock);
+		idr_for_each_entry_continue(&btf_idr, mod_btf, id) {
+			if (!btf_is_kernel(btf))
+				continue;
+			ret = btf_find_by_name_kind(mod_btf, name, kind);
+			if (ret > 0)
+				break;
+		}
+		if (mod_btf)
+			btf_get(mod_btf);
+		spin_unlock_bh(&btf_idr_lock);
+		if (mod_btf)
+			*attach_btf_obj_fd = __btf_new_fd(mod_btf);
+	}
+	if (btf_fd)
+		btf_put(btf);
+	return ret;
+}
+
+const struct bpf_func_proto bpf_btf_find_by_name_kind_proto = {
+	.func		= bpf_btf_find_by_name_kind,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_ANYTHING,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_ANYTHING,
+	.arg4_type	= ARG_PTR_TO_INT,
+	.arg5_type	= ARG_ANYTHING,
+};
