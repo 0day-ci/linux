@@ -337,7 +337,7 @@ static void rwb_arm_timer(struct rq_wb *rwb)
 		 * though.
 		 */
 		rwb->cur_win_nsec = div_u64(rwb->win_nsec << 4,
-					int_sqrt((rqd->scale_step + 1) << 8));
+					int_sqrt64((u64)(rqd->scale_step + 1) << 8));
 	} else {
 		/*
 		 * For step < 0, we don't want to increase/decrease the
