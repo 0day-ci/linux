@@ -425,13 +425,13 @@ struct workqueue_struct *alloc_workqueue(const char *fmt,
 	alloc_workqueue(fmt, WQ_UNBOUND | __WQ_ORDERED |		\
 			__WQ_ORDERED_EXPLICIT | (flags), 1, ##args)
 
-#define create_workqueue(name)						\
-	alloc_workqueue("%s", __WQ_LEGACY | WQ_MEM_RECLAIM, 1, (name))
-#define create_freezable_workqueue(name)				\
-	alloc_workqueue("%s", __WQ_LEGACY | WQ_FREEZABLE | WQ_UNBOUND |	\
-			WQ_MEM_RECLAIM, 1, (name))
-#define create_singlethread_workqueue(name)				\
-	alloc_ordered_workqueue("%s", __WQ_LEGACY | WQ_MEM_RECLAIM, name)
+#define create_workqueue(fmt, args...)					\
+	alloc_workqueue(fmt, __WQ_LEGACY | WQ_MEM_RECLAIM, 1, ##args)
+#define create_freezable_workqueue(fmt, args...)			\
+	alloc_workqueue(fmt, __WQ_LEGACY | WQ_FREEZABLE | WQ_UNBOUND |	\
+			WQ_MEM_RECLAIM, 1, ##args)
+#define create_singlethread_workqueue(fmt, args...)			\
+	alloc_ordered_workqueue(fmt, __WQ_LEGACY | WQ_MEM_RECLAIM, ##args)
 
 extern void destroy_workqueue(struct workqueue_struct *wq);
 
