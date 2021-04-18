@@ -797,19 +797,13 @@ void mlx5_health_cleanup(struct mlx5_core_dev *dev)
 int mlx5_health_init(struct mlx5_core_dev *dev)
 {
 	struct mlx5_core_health *health;
-	char *name;
 
 	mlx5_fw_reporters_create(dev);
 
 	health = &dev->priv.health;
-	name = kmalloc(64, GFP_KERNEL);
-	if (!name)
-		goto out_err;
 
-	strcpy(name, "mlx5_health");
-	strcat(name, dev_name(dev->device));
-	health->wq = create_singlethread_workqueue(name);
-	kfree(name);
+	health->wq = create_singlethread_workqueue("mlx5_health%s",
+						   dev_name(dev->device));
 	if (!health->wq)
 		goto out_err;
 	spin_lock_init(&health->wq_lock);
