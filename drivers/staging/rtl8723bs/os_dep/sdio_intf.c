@@ -440,14 +440,17 @@ static int rtw_sdio_suspend(struct device *dev)
 	struct debug_priv *pdbgpriv = &psdpriv->drv_dbg;
 
 	if (padapter->bDriverStopped)
-		return 0;
+		goto exit;
 
 	if (pwrpriv->bInSuspend) {
 		pdbgpriv->dbg_suspend_error_cnt++;
-		return 0;
+		goto exit;
 	}
 
-	return rtw_suspend_common(padapter);
+	rtw_suspend_common(padapter);
+exit:
+
+	return 0;
 }
 
 static int rtw_resume_process(struct adapter *padapter)
