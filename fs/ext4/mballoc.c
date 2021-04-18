@@ -351,6 +351,8 @@ static void ext4_mb_generate_from_freelist(struct super_block *sb, void *bitmap,
 						ext4_group_t group);
 static void ext4_mb_new_preallocation(struct ext4_allocation_context *ac);
 
+static inline void ext4_mb_show_pa(struct super_block *sb);
+
 /*
  * The algorithm using this percpu seq counter goes below:
  * 1. We sample the percpu discard_pa_seq counter before trying for block
@@ -4217,9 +4219,9 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 	struct ext4_prealloc_space *pa, *tmp;
 	struct list_head list;
 	struct ext4_buddy e4b;
+	int free_total = 0;
+	int busy, free;
 	int err;
-	int busy = 0;
-	int free, free_total = 0;
 
 	mb_debug(sb, "discard preallocation for group %u\n", group);
 	if (list_empty(&grp->bb_prealloc_list))
@@ -4247,6 +4249,7 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 
 	INIT_LIST_HEAD(&list);
 repeat:
+	busy = 0;
 	free = 0;
 	ext4_lock_group(sb, group);
 	list_for_each_entry_safe(pa, tmp,
@@ -4255,6 +4258,8 @@ repeat:
 		if (atomic_read(&pa->pa_count)) {
 			spin_unlock(&pa->pa_lock);
 			busy = 1;
+			mb_debug(sb, "used pa while discarding for group %u\n", group);
+			ext4_mb_show_pa(sb);
 			continue;
 		}
 		if (pa->pa_deleted) {
@@ -4299,8 +4304,7 @@ repeat:
 	/* if we still need more blocks and some PAs were used, try again */
 	if (free_total < needed && busy) {
 		ext4_unlock_group(sb, group);
-		cond_resched();
-		busy = 0;
+		schedule_timeout_uninterruptible(HZ/100);
 		goto repeat;
 	}
 	ext4_unlock_group(sb, group);
