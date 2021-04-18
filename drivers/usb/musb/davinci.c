@@ -36,7 +36,7 @@ struct davinci_glue {
 	struct device		*dev;
 	struct platform_device	*musb;
 	struct clk		*clk;
-	bool			vbus_state;
+	int			vbus_state;
 	struct gpio_desc	*vbus;
 	struct work_struct	vbus_work;
 };
