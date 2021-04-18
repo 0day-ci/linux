@@ -19,6 +19,11 @@ enum mmc_busy_cmd {
 struct mmc_host;
 struct mmc_card;
 
+static inline bool mmc_flush_allowed(struct mmc_card *card)
+{
+	return card->ext_csd.cache_size > 0 && (card->ext_csd.cache_ctrl & 1);
+}
+
 int mmc_select_card(struct mmc_card *card);
 int mmc_deselect_cards(struct mmc_host *host);
 int mmc_set_dsr(struct mmc_host *host);

@@ -1476,6 +1476,11 @@ static int mmc_blk_cqe_issue_flush(struct mmc_queue *mq, struct request *req)
 	struct mmc_queue_req *mqrq = req_to_mmc_queue_req(req);
 	struct mmc_request *mrq = mmc_blk_cqe_prep_dcmd(mqrq, req);
 
+	if (mmc_card_mmc(mq->card) && !mmc_flush_allowed(mq->card)) {
+		blk_mq_end_request(req, BLK_STS_OK);
+		return -EPERM;
+	}
+
 	mrq->cmd->opcode = MMC_SWITCH;
 	mrq->cmd->arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
 			(EXT_CSD_FLUSH_CACHE << 16) |
@@ -2225,6 +2230,8 @@ enum mmc_issued mmc_blk_mq_issue_rq(struct mmc_queue *mq, struct request *req)
 		switch (req_op(req)) {
 		case REQ_OP_FLUSH:
 			ret = mmc_blk_cqe_issue_flush(mq, req);
+			if (ret == -EPERM)
+				return MMC_REQ_FINISHED;
 			break;
 		case REQ_OP_READ:
 		case REQ_OP_WRITE:
