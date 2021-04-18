@@ -188,7 +188,8 @@ static int __init housekeeping_isolcpus_setup(char *str)
 		}
 
 		pr_info("isolcpus: Skipped unknown flag %.*s\n", len, par);
-		str++;
+		if (str[1] == ',')	/* above continue; match on "flag," */
+			str++;
 	}
 
 	/* Default behaviour for isolcpus without flags */
