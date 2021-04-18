@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/export.h>
 #include <linux/sched/signal.h>
+#include <asm/unaligned.h>
 #include "pci.h"
 
 /* VPD access through PCI 2.2+ VPD capability */
@@ -229,10 +230,9 @@ out:
 }
 
 static ssize_t pci_vpd_write(struct pci_dev *dev, loff_t pos, size_t count,
-			     const void *arg)
+			     const void *buf)
 {
 	struct pci_vpd *vpd = dev->vpd;
-	const u8 *buf = arg;
 	loff_t end = pos + count;
 	int ret = 0;
 
@@ -258,14 +258,8 @@ static ssize_t pci_vpd_write(struct pci_dev *dev, loff_t pos, size_t count,
 		goto out;
 
 	while (pos < end) {
-		u32 val;
-
-		val = *buf++;
-		val |= *buf++ << 8;
-		val |= *buf++ << 16;
-		val |= *buf++ << 24;
-
-		ret = pci_user_write_config_dword(dev, vpd->cap + PCI_VPD_DATA, val);
+		ret = pci_user_write_config_dword(dev, vpd->cap + PCI_VPD_DATA,
+						  get_unaligned_le32(buf));
 		if (ret < 0)
 			break;
 		ret = pci_user_write_config_word(dev, vpd->cap + PCI_VPD_ADDR,
@@ -280,6 +274,7 @@ static ssize_t pci_vpd_write(struct pci_dev *dev, loff_t pos, size_t count,
 			break;
 
 		pos += sizeof(u32);
+		buf += sizeof(u32);
 	}
 out:
 	mutex_unlock(&vpd->lock);
