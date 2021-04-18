@@ -8752,7 +8752,8 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	 * In the case of DeepSleep, the device is expected to remain powered
 	 * with the link off, so do not check for bkops.
 	 */
-	check_for_bkops = !ufshcd_is_ufs_dev_deepsleep(hba);
+	check_for_bkops = !ufshcd_is_ufs_dev_deepsleep(hba) ||
+			  hba->dev_info.b_rpm_dev_flush_capable;
 	ret = ufshcd_link_state_transition(hba, req_link_state, check_for_bkops);
 	if (ret)
 		goto set_dev_active;
