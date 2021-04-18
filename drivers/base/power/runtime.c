@@ -807,7 +807,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
 	}
 
 	/*
-	 * See if we can skip waking up the parent.  This is safe only if
+	 * See if we can skip waking up the parent. This is safe only if
 	 * power.no_callbacks is set, because otherwise we don't know whether
 	 * the resume will actually succeed.
 	 */
