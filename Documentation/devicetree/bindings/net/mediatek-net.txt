@@ -51,6 +51,10 @@ Required properties:
 	is equal to 0 and the MAC uses fixed-link to connect
 	with internal switch such as MT7530.
 
+Optional properties:
+- label: overrides the default netdevice name. Useful when a custom name for the
+	DSA master interface is desired.
+
 Example:
 
 eth: ethernet@1b100000 {
@@ -74,12 +78,14 @@ eth: ethernet@1b100000 {
 
 	gmac1: mac@0 {
 		compatible = "mediatek,eth-mac";
+		label = "gmac1";
 		reg = <0>;
 		phy-handle = <&phy0>;
 	};
 
 	gmac2: mac@1 {
 		compatible = "mediatek,eth-mac";
+		label = "gmac2";
 		reg = <1>;
 		phy-handle = <&phy1>;
 	};
