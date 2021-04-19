@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include <linux/vgaarb.h>
@@ -3695,14 +3696,17 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 
 	if (!amdgpu_device_has_dc_support(adev)) {
 		/* turn off display hw */
-		drm_modeset_lock_all(dev);
+		struct drm_modeset_acquire_ctx ctx;
+		int ret;
+
+		DRM_MODESET_LOCK_ALL_BEGIN(dev, ctx, 0, ret);
 		drm_connector_list_iter_begin(dev, &iter);
 		drm_for_each_connector_iter(connector, &iter)
 			drm_helper_connector_dpms(connector,
 						  DRM_MODE_DPMS_OFF);
 		drm_connector_list_iter_end(&iter);
-		drm_modeset_unlock_all(dev);
-			/* unpin the front buffers and cursors */
+		DRM_MODESET_LOCK_ALL_END(dev, ctx, ret);
+		/* unpin the front buffers and cursors */
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 			struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 			struct drm_framebuffer *fb = crtc->primary->fb;
@@ -3831,19 +3835,21 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 	/* blat the mode back in */
 	if (fbcon) {
 		if (!amdgpu_device_has_dc_support(adev)) {
+			struct drm_modeset_acquire_ctx ctx;
+			int ret;
+
 			/* pre DCE11 */
 			drm_helper_resume_force_mode(dev);
 
 			/* turn on display hw */
-			drm_modeset_lock_all(dev);
+			DRM_MODESET_LOCK_ALL_BEGIN(dev, ctx, 0, ret);
 
 			drm_connector_list_iter_begin(dev, &iter);
 			drm_for_each_connector_iter(connector, &iter)
 				drm_helper_connector_dpms(connector,
 							  DRM_MODE_DPMS_ON);
 			drm_connector_list_iter_end(&iter);
-
-			drm_modeset_unlock_all(dev);
+			DRM_MODESET_LOCK_ALL_END(dev, ctx, ret);
 		}
 		amdgpu_fbdev_set_suspend(adev, 0);
 	}
