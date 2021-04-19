@@ -622,7 +622,7 @@ KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
 
 # If we have only "make modules", don't compile built-in objects.
-ifeq ($(MAKECMDGOALS),modules)
+ifeq (modules,$(MAKECMDGOALS))
   KBUILD_BUILTIN :=
 endif
 
@@ -630,7 +630,8 @@ endif
 # in addition to whatever we do anyway.
 # Just "make" or "make all" shall build modules as well
 
-ifneq ($(filter all modules nsdeps %compile_commands.json clang-%,$(MAKECMDGOALS)),)
+ifneq ($(filter all modules nsdeps %compile_commands.json clang-% \
+	modules.img usr/modules.img,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
 endif
 
@@ -1461,15 +1462,17 @@ modules_prepare: prepare
 PHONY += modules_install
 modules_install: _modinst_ _modinst_post
 
+INSTALL_MOD_LN ?= ln -s
+
 PHONY += _modinst_
 _modinst_:
 	@rm -rf $(MODLIB)/kernel
 	@rm -f $(MODLIB)/source
 	@mkdir -p $(MODLIB)/kernel
-	@ln -s $(abspath $(srctree)) $(MODLIB)/source
+	@$(INSTALL_MOD_LN) $(abspath $(srctree)) $(MODLIB)/source
 	@if [ ! $(objtree) -ef  $(MODLIB)/build ]; then \
-		rm -f $(MODLIB)/build ; \
-		ln -s $(CURDIR) $(MODLIB)/build ; \
+		rm -rf $(MODLIB)/build ; \
+		$(INSTALL_MOD_LN) $(CURDIR) $(MODLIB)/build ; \
 	fi
 	@sed 's:^:kernel/:' modules.order > $(MODLIB)/modules.order
 	@cp -f modules.builtin $(MODLIB)/
@@ -1488,6 +1491,10 @@ PHONY += modules_sign
 modules_sign:
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modsign
 endif
+
+# initramfs image containing all modules
+modules.img usr/modules.img: modules
+	$(Q)$(MAKE) $(build)=usr usr/modules.img
 
 else # CONFIG_MODULES
 
