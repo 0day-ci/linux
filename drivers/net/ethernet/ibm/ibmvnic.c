@@ -141,6 +141,30 @@ static const struct ibmvnic_stat ibmvnic_stats[] = {
 	{"internal_mac_rx_errors", IBMVNIC_STAT_OFF(internal_mac_rx_errors)},
 };
 
+static int send_crq_init_complete(struct ibmvnic_adapter *adapter)
+{
+	union ibmvnic_crq crq;
+
+	memset(&crq, 0, sizeof(crq));
+	crq.generic.first = IBMVNIC_CRQ_INIT_CMD;
+	crq.generic.cmd = IBMVNIC_CRQ_INIT_COMPLETE;
+	netdev_dbg(adapter->netdev, "Sending CRQ init complete\n");
+
+	return ibmvnic_send_crq(adapter, &crq);
+}
+
+static int send_version_xchg(struct ibmvnic_adapter *adapter)
+{
+	union ibmvnic_crq crq;
+
+	memset(&crq, 0, sizeof(crq));
+	crq.version_exchange.first = IBMVNIC_CRQ_CMD;
+	crq.version_exchange.cmd = VERSION_EXCHANGE;
+	crq.version_exchange.version = cpu_to_be16(ibmvnic_version);
+
+	return ibmvnic_send_crq(adapter, &crq);
+}
+
 static long h_reg_sub_crq(unsigned long unit_address, unsigned long token,
 			  unsigned long length, unsigned long *number,
 			  unsigned long *irq)
@@ -2221,6 +2245,75 @@ static struct ibmvnic_rwi *get_next_rwi(struct ibmvnic_adapter *adapter)
 	return rwi;
 }
 
+/* ibmvnic_do_passive_init()
+ * Perform the initialization of the device at a later time
+ *
+ * If the ibmvnic was does not have a partner device to communicate with at boot
+ * and that partner device comes online at a later time, this function is called
+ * to complete the initalization process of ibmvnic.
+ * Caller should not hold rtnl_lock().
+ *
+ *
+ * Returns non-zero if sub-CRQs are not initialized properly leaving the device
+ * in the down state.
+ * Returns 0 upon success and the device is probed.
+ */
+
+static int do_passive_init(struct ibmvnic_adapter *adapter)
+{
+	unsigned long timeout = msecs_to_jiffies(30000);
+	struct net_device *netdev = adapter->netdev;
+	struct device *dev = &adapter->vdev->dev;
+	int rc;
+
+	netdev_dbg(adapter->netdev, "Partner device not found, probing.\n");
+
+	adapter->state = VNIC_PROBING;
+	reinit_completion(&adapter->init_done);
+	adapter->init_done_rc = 0;
+	adapter->crq.active = true;
+
+	rc = send_crq_init_complete(adapter);
+	if (rc)
+		goto out;
+
+	rc = send_version_xchg(adapter);
+	netdev_dbg(adapter->netdev, "send_version_xchg rc=%d", rc);
+
+	if (!wait_for_completion_timeout(&adapter->init_done, timeout)) {
+		dev_err(dev, "Initialization sequence timed out\n");
+		rc = -ETIMEDOUT;
+		goto out;
+	}
+
+	rc = init_sub_crqs(adapter);
+	if (rc) {
+		dev_err(dev, "Initialization of sub crqs failed, rc=%d\n", rc);
+		goto out;
+	}
+
+	rc = init_sub_crq_irqs(adapter);
+	if (rc) {
+		dev_err(dev, "Failed to initialize sub crq irqs\n, rc=%d", rc);
+		goto init_failed;
+	}
+
+	netdev->mtu = adapter->req_mtu - ETH_HLEN;
+	netdev->min_mtu = adapter->min_mtu - ETH_HLEN;
+	netdev->max_mtu = adapter->max_mtu - ETH_HLEN;
+
+	adapter->state = VNIC_PROBED;
+	netdev_dbg(adapter->netdev, "Probed successfully. Waiting for signal from partner device.\n");
+
+	return 0;
+
+init_failed:
+	release_sub_crqs(adapter, 1);
+out:
+	adapter->state = VNIC_DOWN;
+	return rc;
+}
+
 static void __ibmvnic_reset(struct work_struct *work)
 {
 	struct ibmvnic_rwi *rwi;
@@ -2256,7 +2349,13 @@ static void __ibmvnic_reset(struct work_struct *work)
 		}
 		spin_unlock_irqrestore(&adapter->state_lock, flags);
 
-		if (adapter->force_reset_recovery) {
+		if (rwi->reset_reason == VNIC_RESET_PASSIVE_INIT) {
+			rtnl_lock();
+			rc = do_passive_init(adapter);
+			rtnl_unlock();
+			if (!rc)
+				netif_carrier_on(adapter->netdev);
+		} else if (adapter->force_reset_recovery) {
 			/* Since we are doing a hard reset now, clear the
 			 * failover_pending flag so we don't ignore any
 			 * future MOBILITY or other resets.
@@ -3724,18 +3823,6 @@ static int ibmvnic_send_crq_init(struct ibmvnic_adapter *adapter)
 	return 0;
 }
 
-static int send_version_xchg(struct ibmvnic_adapter *adapter)
-{
-	union ibmvnic_crq crq;
-
-	memset(&crq, 0, sizeof(crq));
-	crq.version_exchange.first = IBMVNIC_CRQ_CMD;
-	crq.version_exchange.cmd = VERSION_EXCHANGE;
-	crq.version_exchange.version = cpu_to_be16(ibmvnic_version);
-
-	return ibmvnic_send_crq(adapter, &crq);
-}
-
 struct vnic_login_client_data {
 	u8	type;
 	__be16	len;
@@ -4855,7 +4942,12 @@ static void ibmvnic_handle_crq(union ibmvnic_crq *crq,
 				complete(&adapter->init_done);
 				adapter->init_done_rc = -EIO;
 			}
-			rc = ibmvnic_reset(adapter, VNIC_RESET_FAILOVER);
+
+			if (adapter->state == VNIC_DOWN)
+				rc = ibmvnic_reset(adapter, VNIC_RESET_PASSIVE_INIT);
+			else
+				rc = ibmvnic_reset(adapter, VNIC_RESET_FAILOVER);
+
 			if (rc && rc != -EBUSY) {
 				/* We were unable to schedule the failover
 				 * reset either because the adapter was still
@@ -5278,6 +5370,7 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	struct ibmvnic_adapter *adapter;
 	struct net_device *netdev;
 	unsigned char *mac_addr_p;
+	bool init_success;
 	int rc;
 
 	dev_dbg(&dev->dev, "entering ibmvnic_probe for UA 0x%x\n",
@@ -5324,6 +5417,7 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	init_completion(&adapter->stats_done);
 	clear_bit(0, &adapter->resetting);
 
+	init_success = false;
 	do {
 		rc = init_crq_queue(adapter);
 		if (rc) {
@@ -5333,9 +5427,15 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 		}
 
 		rc = ibmvnic_reset_init(adapter, false);
-		if (rc && rc != EAGAIN)
-			goto ibmvnic_init_fail;
 	} while (rc == EAGAIN);
+
+	/* We are ignoring the error from ibmvnic_reset_init() assuming that the
+	 * partner is not ready. When the partner becomes ready, we will do the
+	 * passive init reset.
+	 */
+
+	if (!rc)
+		init_success = true;
 
 	rc = init_stats_buffers(adapter);
 	if (rc)
@@ -5344,10 +5444,6 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	rc = init_stats_token(adapter);
 	if (rc)
 		goto ibmvnic_stats_fail;
-
-	netdev->mtu = adapter->req_mtu - ETH_HLEN;
-	netdev->min_mtu = adapter->min_mtu - ETH_HLEN;
-	netdev->max_mtu = adapter->max_mtu - ETH_HLEN;
 
 	rc = device_create_file(&dev->dev, &dev_attr_failover);
 	if (rc)
@@ -5361,7 +5457,14 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	}
 	dev_info(&dev->dev, "ibmvnic registered\n");
 
-	adapter->state = VNIC_PROBED;
+	if (init_success) {
+		adapter->state = VNIC_PROBED;
+		netdev->mtu = adapter->req_mtu - ETH_HLEN;
+		netdev->min_mtu = adapter->min_mtu - ETH_HLEN;
+		netdev->max_mtu = adapter->max_mtu - ETH_HLEN;
+	} else {
+		adapter->state = VNIC_DOWN;
+	}
 
 	adapter->wait_for_reset = false;
 	adapter->last_reset_time = jiffies;
