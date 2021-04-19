@@ -710,7 +710,10 @@ static int smack_sb_eat_lsm_opts(char *options, void **mnt_opts)
 		token = match_opt_prefix(from, len, &arg);
 		if (token != Opt_error) {
 			arg = kmemdup_nul(arg, from + len - arg, GFP_KERNEL);
-			rc = smack_add_opt(token, arg, mnt_opts);
+			if (arg)
+				rc = smack_add_opt(token, arg, mnt_opts);
+			else
+				rc = -ENOMEM;
 			if (unlikely(rc)) {
 				kfree(arg);
 				if (*mnt_opts)
