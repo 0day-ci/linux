@@ -116,11 +116,23 @@ $(obj)/compressed/vmlinux: FORCE
 
 # Set this if you want to pass append arguments to the
 # bzdisk/fdimage/hdimage/isoimage kernel
-FDARGS =
+FDARGS   :=
 # Set this if you want one or more initrds included in the image
-FDINITRD =
+FDINITRD :=
+# Set this to 1 if you want usr/modules.img included in the image
+FDMODS   :=
 
-imgdeps = $(obj)/bzImage $(obj)/mtools.conf $(src)/genimage.sh
+imgdeps   := $(obj)/bzImage $(obj)/mtools.conf $(src)/genimage.sh
+fdinitrds := $(FDINITRD)
+
+ifneq ($(FDMODS),)
+imgdeps   += $(objtree)/usr/modules.img
+fdinitrds += $(objtree)/usr/modules.img
+
+$(objtree)/usr/modules.img:
+	$(Q)$(MAKE) -f $(srctree)/Makefile usr/modules.img
+KBUILD_MODULES := 1
+endif
 
 $(obj)/mtools.conf: $(src)/mtools.conf.in
 	sed -e 's|@OBJ@|$(obj)|g' < $< > $@
@@ -131,7 +143,7 @@ targets += mtools.conf
 # external dependencies.
 quiet_cmd_genimage = GENIMAGE $3
 cmd_genimage = $(BASH) $(srctree)/$(src)/genimage.sh $2 $3 $(obj)/bzImage \
-		$(obj)/mtools.conf '$(FDARGS)' $(FDINITRD)
+		$(obj)/mtools.conf '$(FDARGS)' $(fdinitrds)
 
 PHONY += bzdisk fdimage fdimage144 fdimage288 hdimage isoimage install
 
