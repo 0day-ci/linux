@@ -1020,7 +1020,7 @@ static int gc0310_set_fmt(struct v4l2_subdev *sd,
 		return -EINVAL;
 	}
 
-	printk("%s: before gc0310_write_reg_array %s\n", __func__,
+	pr_info("%s: before gc0310_write_reg_array %s\n", __func__,
 	       gc0310_res[dev->fmt_idx].desc);
 	ret = startup(sd);
 	if (ret) {
