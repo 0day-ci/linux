@@ -359,7 +359,7 @@ static int __init early_parse_mem(char *p)
 	if (*p == '@')
 		start = memparse(p + 1, &p);
 
-	memblock_add(start, size);
+	memblock_add_node(start, size, pa_to_nid(start));
 
 	return 0;
 }
