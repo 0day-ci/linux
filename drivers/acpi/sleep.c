@@ -698,6 +698,7 @@ int acpi_s2idle_prepare(void)
 	}
 
 	acpi_enable_wakeup_devices(ACPI_STATE_S0);
+	acpi_enter_sleep_state_prep(ACPI_STATE_S0);
 
 	/* Change the configuration of GPEs to avoid spurious wakeup. */
 	acpi_enable_all_wakeup_gpes();
