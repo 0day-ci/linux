@@ -925,17 +925,17 @@ afunc_set_alt(struct usb_function *fn, unsigned intf, unsigned alt)
 	if (intf == uac2->as_out_intf) {
 		uac2->as_out_alt = alt;
 
+		u_audio_stop_capture(&uac2->g_audio);
+
 		if (alt)
 			ret = u_audio_start_capture(&uac2->g_audio);
-		else
-			u_audio_stop_capture(&uac2->g_audio);
 	} else if (intf == uac2->as_in_intf) {
 		uac2->as_in_alt = alt;
 
+		u_audio_stop_playback(&uac2->g_audio);
+
 		if (alt)
 			ret = u_audio_start_playback(&uac2->g_audio);
-		else
-			u_audio_stop_playback(&uac2->g_audio);
 	} else {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
 		return -EINVAL;
