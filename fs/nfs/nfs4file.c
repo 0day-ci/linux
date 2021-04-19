@@ -313,6 +313,7 @@ out:
 	return ret < 0 ? ret : count;
 }
 
+#ifdef CONFIG_NFSD_V4
 static int read_name_gen = 1;
 #define SSC_READ_NAME_BODY "ssc_read_%d"
 
@@ -411,6 +412,7 @@ static const struct nfs4_ssc_client_ops nfs4_ssc_clnt_ops_tbl = {
 	.sco_open = __nfs42_ssc_open,
 	.sco_close = __nfs42_ssc_close,
 };
+#endif	/* CONFIG_NFSD_V4 */
 
 /**
  * nfs42_ssc_register_ops - Wrapper to register NFS_V4 ops in nfs_common
