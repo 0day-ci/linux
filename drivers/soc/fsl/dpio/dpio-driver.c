@@ -55,14 +55,19 @@ static const struct soc_device_attribute lx2160a_soc[] = {
 
 static int dpaa2_dpio_get_cluster_sdest(struct fsl_mc_device *dpio_dev, int cpu)
 {
+	const struct soc_device_attribute *match1, *match2, *match3, *match4;
 	int cluster_base, cluster_size;
 
-	if (soc_device_match(ls1088a_soc)) {
+	match1 = soc_device_match(ls1088a_soc);
+	match2 = soc_device_match(ls2080a_soc);
+	match3 = soc_device_match(ls2088a_soc);
+	match4 = soc_device_match(lx2160a_soc);
+	if (!IS_ERR(match1) && match1) {
 		cluster_base = 2;
 		cluster_size = 4;
-	} else if (soc_device_match(ls2080a_soc) ||
-		   soc_device_match(ls2088a_soc) ||
-		   soc_device_match(lx2160a_soc)) {
+	} else if ((!IS_ERR(match2) && match2) ||
+		   (!IS_ERR(match3) && match3) ||
+		   (!IS_ERR(match4) && match4)) {
 		cluster_base = 0;
 		cluster_size = 2;
 	} else {

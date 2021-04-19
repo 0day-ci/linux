@@ -805,6 +805,7 @@ static const struct soc_device_attribute venc_soc_devices[] = {
 
 static int venc_probe(struct platform_device *pdev)
 {
+	const struct soc_device_attribute *match;
 	struct venc_device *venc;
 	struct resource *venc_mem;
 	int r;
@@ -818,7 +819,8 @@ static int venc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, venc);
 
 	/* The OMAP34xx, OMAP35xx and AM35xx VENC require the TV DAC clock. */
-	if (soc_device_match(venc_soc_devices))
+	match = soc_device_match(venc_soc_devices);
+	if (!IS_ERR(match) && match)
 		venc->requires_tv_dac_clk = true;
 
 	venc->config = &venc_config_pal_trm;

@@ -5188,7 +5188,7 @@ static int udma_probe(struct platform_device *pdev)
 	ud->match_data = match->data;
 
 	soc = soc_device_match(k3_soc_devices);
-	if (!soc) {
+	if (!IS_ERR(soc) && !soc) {
 		dev_err(dev, "No compatible SoC found\n");
 		return -ENODEV;
 	}

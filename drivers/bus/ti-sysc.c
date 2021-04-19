@@ -2834,7 +2834,7 @@ static int sysc_init_soc(struct sysc *ddata)
 	}
 
 	match = soc_device_match(sysc_soc_feat_match);
-	if (!match)
+	if (!match || IS_ERR(match))
 		return 0;
 
 	if (match->data)

@@ -1413,7 +1413,7 @@ static int rcar_vin_probe(struct platform_device *pdev)
 	 * uses different routing than r8a7795 ES2.0.
 	 */
 	attr = soc_device_match(r8a7795es1);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		vin->info = attr->data;
 
 	vin->base = devm_platform_ioremap_resource(pdev, 0);

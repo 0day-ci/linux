@@ -1446,6 +1446,9 @@ static int dss_probe(struct platform_device *pdev)
 	 * string, use SoC device matching.
 	 */
 	soc = soc_device_match(dss_soc_devices);
+	if (IS_ERR(soc))
+		return PTR_ERR(soc);
+
 	if (soc)
 		dss->feat = soc->data;
 	else

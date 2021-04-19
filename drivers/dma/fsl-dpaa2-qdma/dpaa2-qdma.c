@@ -651,6 +651,7 @@ static int dpaa2_dpdmai_init_channels(struct dpaa2_qdma_engine *dpaa2_qdma)
 
 static int dpaa2_qdma_probe(struct fsl_mc_device *dpdmai_dev)
 {
+	const struct soc_device_attribute *match;
 	struct device *dev = &dpdmai_dev->dev;
 	struct dpaa2_qdma_engine *dpaa2_qdma;
 	struct dpaa2_qdma_priv *priv;
@@ -718,7 +719,11 @@ static int dpaa2_qdma_probe(struct fsl_mc_device *dpdmai_dev)
 
 	dpaa2_dpdmai_init_channels(dpaa2_qdma);
 
-	if (soc_device_match(soc_fixup_tuning))
+	match = soc_device_match(soc_fixup_tuning);
+	if (IS_ERR(match))
+		return PTR_ERR(match);
+
+	if (match)
 		dpaa2_qdma->qdma_wrtype_fixup = true;
 	else
 		dpaa2_qdma->qdma_wrtype_fixup = false;

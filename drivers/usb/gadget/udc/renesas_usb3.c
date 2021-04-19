@@ -2753,7 +2753,7 @@ static int renesas_usb3_probe(struct platform_device *pdev)
 	const struct soc_device_attribute *attr;
 
 	attr = soc_device_match(renesas_usb3_quirks_match);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		priv = attr->data;
 	else
 		priv = of_device_get_match_data(&pdev->dev);

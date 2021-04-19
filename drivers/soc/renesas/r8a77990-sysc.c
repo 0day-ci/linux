@@ -36,7 +36,10 @@ static const struct soc_device_attribute r8a77990[] __initconst = {
 
 static int __init r8a77990_sysc_init(void)
 {
-	if (soc_device_match(r8a77990)) {
+	const struct soc_device_attribute *match;
+
+	match = soc_device_match(r8a77990);
+	if (!IS_ERR(match) && match) {
 		/* Fix incorrect 3DG hierarchy */
 		swap(r8a77990_areas[7], r8a77990_areas[8]);
 		r8a77990_areas[7].parent = R8A77990_PD_ALWAYS_ON;

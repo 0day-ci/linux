@@ -757,17 +757,20 @@ static const char * const devices_allowlist[] = {
 
 static bool ipmmu_device_is_allowed(struct device *dev)
 {
+	const struct soc_device_attribute *match1, *match2;
 	unsigned int i;
 
 	/*
 	 * R-Car Gen3 and RZ/G2 use the allow list to opt-in devices.
 	 * For Other SoCs, this returns true anyway.
 	 */
-	if (!soc_device_match(soc_needs_opt_in))
+	match1 = soc_device_match(soc_needs_opt_in);
+	if (!IS_ERR(match1) && !match1)
 		return true;
 
 	/* Check whether this SoC can use the IPMMU correctly or not */
-	if (soc_device_match(soc_denylist))
+	match2 = soc_device_match(soc_denylist);
+	if (!IS_ERR(match2) && !match2)
 		return false;
 
 	/* Check whether this device can work with the IPMMU */

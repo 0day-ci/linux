@@ -1368,7 +1368,7 @@ static int k3_ringacc_init(struct platform_device *pdev,
 		return ret;
 
 	soc = soc_device_match(k3_ringacc_socinfo);
-	if (soc && soc->data) {
+	if (!IS_ERR(soc) && soc && soc->data) {
 		const struct k3_ringacc_soc_data *soc_data = soc->data;
 
 		ringacc->dma_ring_reset_quirk = soc_data->dma_ring_reset_quirk;

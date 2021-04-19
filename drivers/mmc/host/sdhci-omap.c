@@ -1132,7 +1132,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
 		goto err_pltfm_free;
 
 	soc = soc_device_match(sdhci_omap_soc_devices);
-	if (soc) {
+	if (!IS_ERR(soc) && soc) {
 		omap_host->version = "rev11";
 		if (!strcmp(dev_name(dev), "4809c000.mmc"))
 			mmc->f_max = 96000000;

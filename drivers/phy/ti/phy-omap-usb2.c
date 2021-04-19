@@ -348,6 +348,7 @@ static void omap_usb2_init_errata(struct omap_usb *phy)
 		{ .family = "AM65X", .revision = "SR1.0" },
 		{ /* sentinel */ }
 	};
+	const struct soc_device_attribute *soc;
 
 	/*
 	 * Errata i2075: USB2PHY: USB2PHY Charger Detect is Enabled by
@@ -358,7 +359,8 @@ static void omap_usb2_init_errata(struct omap_usb *phy)
 	 * Disabling the USB2_PHY Charger Detect function will put D+
 	 * into the normal state.
 	 */
-	if (soc_device_match(am65x_sr10_soc_devices))
+	soc = soc_device_match(am65x_sr10_soc_devices);
+	if (!IS_ERR(soc) && soc)
 		phy->flags |= OMAP_USB2_DISABLE_CHRG_DET;
 }
 

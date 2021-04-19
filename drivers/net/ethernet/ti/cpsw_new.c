@@ -1930,7 +1930,7 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_dt_ret;
 
 	soc = soc_device_match(cpsw_soc_devices);
-	if (soc)
+	if (!IS_ERR(soc) && soc)
 		cpsw->quirk_irq = true;
 
 	cpsw->rx_packet_max = rx_packet_max;

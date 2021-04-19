@@ -887,6 +887,9 @@ static const struct soc_device_attribute soc_no_cpu_notifier[] = {
 static
 int ti_bandgap_probe(struct platform_device *pdev)
 {
+#ifdef CONFIG_PM_SLEEP
+	const struct soc_device_attribute *match;
+#endif
 	struct ti_bandgap *bgp;
 	int clk_rate, ret, i;
 
@@ -1038,7 +1041,8 @@ int ti_bandgap_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_PM_SLEEP
 	bgp->nb.notifier_call = bandgap_omap_cpu_notifier;
-	if (!soc_device_match(soc_no_cpu_notifier))
+	match = soc_device_match(soc_no_cpu_notifier);
+	if (!IS_ERR(match) && !match)
 		cpu_pm_register_notifier(&bgp->nb);
 #endif
 
@@ -1073,9 +1077,11 @@ static
 int ti_bandgap_remove(struct platform_device *pdev)
 {
 	struct ti_bandgap *bgp = platform_get_drvdata(pdev);
+	const struct soc_device_attribute *attr;
 	int i;
 
-	if (!soc_device_match(soc_no_cpu_notifier))
+	soc = soc_device_match(soc_no_cpu_notifier);
+	if (!IS_ERR(attr) && !attr)
 		cpu_pm_unregister_notifier(&bgp->nb);
 
 	/* Remove sensor interfaces */

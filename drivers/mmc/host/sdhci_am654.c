@@ -787,7 +787,7 @@ static int sdhci_am654_probe(struct platform_device *pdev)
 
 	/* Update drvdata based on SoC revision */
 	soc = soc_device_match(sdhci_am654_devices);
-	if (soc && soc->data)
+	if (!IS_ERR(soc) && soc && soc->data)
 		drvdata = soc->data;
 
 	host = sdhci_pltfm_init(pdev, drvdata->pdata, sizeof(*sdhci_am654));

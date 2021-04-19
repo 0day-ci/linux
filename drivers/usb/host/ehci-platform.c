@@ -243,6 +243,7 @@ static int ehci_platform_probe(struct platform_device *dev)
 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
 	struct ehci_platform_priv *priv;
 	struct ehci_hcd *ehci;
+	const struct soc_device_attribute *match;
 	int err, irq, clk = 0;
 
 	if (usb_disabled())
@@ -294,7 +295,8 @@ static int ehci_platform_probe(struct platform_device *dev)
 					  "has-transaction-translator"))
 			hcd->has_tt = 1;
 
-		if (soc_device_match(quirk_poll_match))
+		match = soc_device_match(quirk_poll_match);
+		if (!IS_ERR(match) && match)
 			priv->quirk_poll = true;
 
 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {

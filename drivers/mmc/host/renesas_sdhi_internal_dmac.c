@@ -408,7 +408,7 @@ static int renesas_sdhi_internal_dmac_probe(struct platform_device *pdev)
 	const struct soc_device_attribute *soc = soc_device_match(soc_dma_quirks);
 	struct device *dev = &pdev->dev;
 
-	if (soc)
+	if (!IS_ERR(soc) && soc)
 		global_flags |= (unsigned long)soc->data;
 
 	/* value is max of SD_SECCNT. Confirmed by HW engineers */

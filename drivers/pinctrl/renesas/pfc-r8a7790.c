@@ -5999,8 +5999,11 @@ static const struct soc_device_attribute r8a7790_tdsel[] = {
 
 static int r8a7790_pinmux_soc_init(struct sh_pfc *pfc)
 {
+	const struct soc_device_attribute *match;
+
 	/* Initialize TDSEL on old revisions */
-	if (soc_device_match(r8a7790_tdsel))
+	match = soc_device_match(r8a7790_tdsel);
+	if (!IS_ERR(match) && match)
 		sh_pfc_write(pfc, 0xe6060088, 0x00155554);
 
 	return 0;

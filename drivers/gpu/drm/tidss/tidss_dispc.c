@@ -2643,8 +2643,10 @@ static void dispc_init_errata(struct dispc_device *dispc)
 		{ .family = "AM65X", .revision = "SR1.0" },
 		{ /* sentinel */ }
 	};
+	const struct soc_device_attribute *match;
 
-	if (soc_device_match(am65x_sr10_soc_devices)) {
+	match = soc_device_match(am65x_sr10_soc_devices);
+	if (!IS_ERR(match) && match) {
 		dispc->errata.i2000 = true;
 		dev_info(dispc->dev, "WA for erratum i2000: YUV formats disabled\n");
 	}

@@ -1122,7 +1122,7 @@ static const void *sh_pfc_quirk_match(void)
 	};
 
 	match = soc_device_match(quirks);
-	if (match)
+	if (!IS_ERR(match) && match)
 		return match->data ?: ERR_PTR(-ENODEV);
 #endif /* CONFIG_PINCTRL_PFC_R8A77950 || CONFIG_PINCTRL_PFC_R8A77951 */
 

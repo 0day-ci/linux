@@ -195,6 +195,7 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	const struct meson_drm_match_data *match;
+	const struct soc_device_attribute *attr;
 	struct meson_drm *priv;
 	struct drm_device *drm;
 	struct resource *res;
@@ -291,7 +292,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
 
 	/* Assign limits per soc revision/package */
 	for (i = 0 ; i < ARRAY_SIZE(meson_drm_soc_attrs) ; ++i) {
-		if (soc_device_match(meson_drm_soc_attrs[i].attrs)) {
+		attr = soc_device_match(meson_drm_soc_attrs[i].attrs);
+		if (!IS_ERR(attr) && attr) {
 			priv->limits = &meson_drm_soc_attrs[i].limits;
 			break;
 		}

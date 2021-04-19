@@ -74,7 +74,7 @@ static int __init r8a7795_sysc_init(void)
 	u32 quirks = 0;
 
 	attr = soc_device_match(r8a7795_quirks_match);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		quirks = (uintptr_t)attr->data;
 
 	if (!(quirks & HAS_A2VC0))

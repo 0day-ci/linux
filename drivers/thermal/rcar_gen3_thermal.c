@@ -309,6 +309,7 @@ static int rcar_gen3_thermal_probe(struct platform_device *pdev)
 	const int *rcar_gen3_ths_tj_1 = of_device_get_match_data(dev);
 	struct resource *res;
 	struct thermal_zone_device *zone;
+	const struct soc_device_attribute *attr;
 	int ret, i;
 
 	/* default values if FUSEs are missing */
@@ -320,7 +321,8 @@ static int rcar_gen3_thermal_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	priv->thermal_init = rcar_gen3_thermal_init;
-	if (soc_device_match(r8a7795es1))
+	attr = soc_device_match(r8a7795es1);
+	if (!IS_ERR(attr) && attr)
 		priv->thermal_init = rcar_gen3_thermal_init_r8a7795es1;
 
 	platform_set_drvdata(pdev, priv);

@@ -951,7 +951,7 @@ int renesas_sdhi_probe(struct platform_device *pdev,
 	of_data = of_device_get_match_data(&pdev->dev);
 
 	attr = soc_device_match(sdhi_quirks_match);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		quirks = attr->data;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);

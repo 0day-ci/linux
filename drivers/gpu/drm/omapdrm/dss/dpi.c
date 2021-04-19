@@ -677,12 +677,14 @@ static const struct soc_device_attribute dpi_soc_devices[] = {
 static int dpi_init_regulator(struct dpi_data *dpi)
 {
 	struct regulator *vdds_dsi;
+	struct soc_device_attribute *soc;
 
 	/*
 	 * The DPI uses the DSI VDDS on OMAP34xx, OMAP35xx, OMAP36xx, AM37xx and
 	 * DM37xx only.
 	 */
-	if (!soc_device_match(dpi_soc_devices))
+	soc = soc_device_match(dpi_soc_devices);
+	if (!IS_ERR(soc) && !soc)
 		return 0;
 
 	vdds_dsi = devm_regulator_get(&dpi->pdev->dev, "vdds_dsi");

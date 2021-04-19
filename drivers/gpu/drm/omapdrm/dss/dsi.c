@@ -4950,6 +4950,9 @@ static int dsi_probe(struct platform_device *pdev)
 	}
 
 	soc = soc_device_match(dsi_soc_devices);
+	if (IS_ERR(soc))
+		return PTR_ERR(soc);
+
 	if (soc)
 		dsi->data = soc->data;
 	else

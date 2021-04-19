@@ -1014,6 +1014,7 @@ static int ravb_phy_init(struct net_device *ndev)
 	struct ravb_private *priv = netdev_priv(ndev);
 	struct phy_device *phydev;
 	struct device_node *pn;
+	const struct soc_device_attribute *soc;
 	phy_interface_t iface;
 	int err;
 
@@ -1047,7 +1048,8 @@ static int ravb_phy_init(struct net_device *ndev)
 	/* This driver only support 10/100Mbit speeds on R-Car H3 ES1.0
 	 * at this time.
 	 */
-	if (soc_device_match(r8a7795es10)) {
+	soc = soc_device_match(r8a7795es10);
+	if (!IS_ERR(soc) && soc) {
 		err = phy_set_max_speed(phydev, SPEED_100);
 		if (err) {
 			netdev_err(ndev, "failed to limit PHY to 100Mbit/s\n");

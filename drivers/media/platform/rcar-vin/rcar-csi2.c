@@ -1214,7 +1214,7 @@ static int rcsi2_probe(struct platform_device *pdev)
 	 * share the same compatible string.
 	 */
 	attr = soc_device_match(r8a7795);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		priv->info = attr->data;
 
 	priv->dev = &pdev->dev;

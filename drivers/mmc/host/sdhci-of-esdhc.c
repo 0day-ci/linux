@@ -1336,6 +1336,7 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
 	struct sdhci_esdhc *esdhc;
 	struct device_node *np;
 	struct clk *clk;
+	const struct soc_device_attribute *match1, *match2, *match3;
 	u32 val;
 	u16 host_ver;
 
@@ -1346,17 +1347,20 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
 			     SDHCI_VENDOR_VER_SHIFT;
 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
-	if (soc_device_match(soc_incorrect_hostver))
+	match1 = soc_device_match(soc_incorrect_hostver);
+	if (!IS_ERR(match1) && match1)
 		esdhc->quirk_incorrect_hostver = true;
 	else
 		esdhc->quirk_incorrect_hostver = false;
 
-	if (soc_device_match(soc_fixup_sdhc_clkdivs))
+	match2 = soc_device_match(soc_fixup_sdhc_clkdivs);
+	if (!IS_ERR(match2) && match2)
 		esdhc->quirk_limited_clk_division = true;
 	else
 		esdhc->quirk_limited_clk_division = false;
 
-	if (soc_device_match(soc_unreliable_pulse_detection))
+	match3 = soc_device_match(soc_unreliable_pulse_detection);
+	if (!IS_ERR(match3) && match3)
 		esdhc->quirk_unreliable_pulse_detection = true;
 	else
 		esdhc->quirk_unreliable_pulse_detection = false;
@@ -1417,6 +1421,7 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 	struct device_node *np;
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_esdhc *esdhc;
+	const struct soc_device_attribute *match1, *match2;
 	int ret;
 
 	np = pdev->dev.of_node;
@@ -1443,12 +1448,18 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 
 	pltfm_host = sdhci_priv(host);
 	esdhc = sdhci_pltfm_priv(pltfm_host);
-	if (soc_device_match(soc_tuning_erratum_type1))
+	match1 = soc_device_match(soc_tuning_erratum_type1);
+	if (IS_ERR(match1))
+		return PTR_ERR(match1);
+	if (match1)
 		esdhc->quirk_tuning_erratum_type1 = true;
 	else
 		esdhc->quirk_tuning_erratum_type1 = false;
 
-	if (soc_device_match(soc_tuning_erratum_type2))
+	match2 = soc_device_match(soc_tuning_erratum_type2);
+	if (IS_ERR(match2))
+		return PTR_ERR(match2);
+	if (match2)
 		esdhc->quirk_tuning_erratum_type2 = true;
 	else
 		esdhc->quirk_tuning_erratum_type2 = false;

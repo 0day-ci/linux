@@ -2597,7 +2597,7 @@ static void am65_cpsw_nuss_apply_socinfo(struct am65_cpsw_common *common)
 	const struct soc_device_attribute *soc;
 
 	soc = soc_device_match(am65_cpsw_socinfo);
-	if (soc && soc->data) {
+	if (!IS_ERR(soc) && soc && soc->data) {
 		const struct am65_cpsw_soc_pdata *socdata = soc->data;
 
 		/* disable quirks */

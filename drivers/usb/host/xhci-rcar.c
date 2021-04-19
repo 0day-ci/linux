@@ -135,7 +135,7 @@ static int xhci_rcar_download_firmware(struct usb_hcd *hcd)
 	const char *firmware_name;
 
 	attr = soc_device_match(rcar_quirks_match);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		quirks = (uintptr_t)attr->data;
 
 	if (quirks & RCAR_XHCI_FIRMWARE_V2)

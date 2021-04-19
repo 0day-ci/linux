@@ -667,7 +667,7 @@ static int mt7621_pci_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&pcie->ports);
 
 	attr = soc_device_match(mt7621_pci_quirks_match);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		pcie->resets_inverted = true;
 
 	err = mt7621_pcie_parse_dt(pcie);

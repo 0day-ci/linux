@@ -874,6 +874,9 @@ int hdmi4_core_init(struct platform_device *pdev, struct hdmi_core_data *core)
 	const struct soc_device_attribute *soc;
 
 	soc = soc_device_match(hdmi4_soc_devices);
+	if (IS_ERR(soc))
+		return PTR_ERR(soc);
+
 	if (!soc)
 		return -ENODEV;
 

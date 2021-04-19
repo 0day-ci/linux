@@ -240,6 +240,7 @@ static const struct soc_device_attribute vsp1_r8a7796[] = {
 struct vsp1_uif *vsp1_uif_create(struct vsp1_device *vsp1, unsigned int index)
 {
 	struct vsp1_uif *uif;
+	const struct soc_device_attribute *attr;
 	char name[6];
 	int ret;
 
@@ -247,7 +248,8 @@ struct vsp1_uif *vsp1_uif_create(struct vsp1_device *vsp1, unsigned int index)
 	if (!uif)
 		return ERR_PTR(-ENOMEM);
 
-	if (soc_device_match(vsp1_r8a7796))
+	attr = soc_device_match(vsp1_r8a7796);
+	if (!IS_ERR(attr) && attr)
 		uif->m3w_quirk = true;
 
 	uif->entity.ops = &uif_entity_ops;

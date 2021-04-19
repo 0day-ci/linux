@@ -4742,7 +4742,7 @@ static int dispc_bind(struct device *dev, struct device *master, void *data)
 	 * string, use SoC device matching.
 	 */
 	soc = soc_device_match(dispc_soc_devices);
-	if (soc)
+	if (!IS_ERR(soc) && soc)
 		dispc->feat = soc->data;
 	else
 		dispc->feat = of_match_device(dispc_of_match, &pdev->dev)->data;

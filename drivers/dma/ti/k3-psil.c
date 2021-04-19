@@ -33,6 +33,9 @@ struct psil_endpoint_config *psil_get_ep_config(u32 thread_id)
 		const struct soc_device_attribute *soc;
 
 		soc = soc_device_match(k3_soc_devices);
+		if (IS_ERR(soc))
+			return PTR_ERR(soc);
+
 		if (soc) {
 			soc_ep_map = soc->data;
 		} else {

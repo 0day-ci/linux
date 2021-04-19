@@ -439,6 +439,7 @@ static const unsigned int r8a7795es2_mod_nullify[] __initconst = {
 
 static int __init r8a7795_cpg_mssr_init(struct device *dev)
 {
+	const struct soc_device_attribute *match;
 	const struct rcar_gen3_cpg_pll_config *cpg_pll_config;
 	u32 cpg_mode;
 	int error;
@@ -453,7 +454,8 @@ static int __init r8a7795_cpg_mssr_init(struct device *dev)
 		return -EINVAL;
 	}
 
-	if (soc_device_match(r8a7795es1)) {
+	match = soc_device_match(r8a7795es1);
+	if (!IS_ERR(match) && match) {
 		cpg_core_nullify_range(r8a7795_core_clks,
 				       ARRAY_SIZE(r8a7795_core_clks),
 				       R8A7795_CLK_S0D2, R8A7795_CLK_S0D12);

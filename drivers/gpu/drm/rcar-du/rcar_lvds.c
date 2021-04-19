@@ -912,7 +912,7 @@ static int rcar_lvds_probe(struct platform_device *pdev)
 	lvds->info = of_device_get_match_data(&pdev->dev);
 
 	attr = soc_device_match(lvds_quirk_matches);
-	if (attr)
+	if (!IS_ERR(attr) && attr)
 		lvds->info = attr->data;
 
 	ret = rcar_lvds_parse_dt(lvds);
