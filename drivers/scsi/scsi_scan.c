@@ -277,7 +277,11 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	WARN_ON_ONCE(!blk_get_queue(sdev->request_queue));
 	sdev->request_queue->queuedata = sdev;
 
-	depth = sdev->host->cmd_per_lun ?: 1;
+	if (sdev->host->cmd_per_lun)
+		depth = min_t(unsigned int, sdev->host->cmd_per_lun,
+			      sdev->host->can_queue);
+	else
+		depth = 1;
 
 	/*
 	 * Use .can_queue as budget map's depth because we have to
