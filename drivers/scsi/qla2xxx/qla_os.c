@@ -338,6 +338,11 @@ static void qla2x00_free_device(scsi_qla_host_t *);
 static int qla2xxx_map_queues(struct Scsi_Host *shost);
 static void qla2x00_destroy_deferred_work(struct qla_hw_data *);
 
+int ql2xdev_loss_tmo = 60;
+module_param(ql2xdev_loss_tmo, int, 0444);
+MODULE_PARM_DESC(ql2xdev_loss_tmo,
+		"Time to wait for device to recover before reporting\n"
+		"an error. Default is 60 seconds\n");
 
 static struct scsi_transport_template *qla2xxx_transport_template = NULL;
 struct scsi_transport_template *qla2xxx_transport_vport_template = NULL;
