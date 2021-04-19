@@ -184,6 +184,7 @@ config E300C3_CPU
 config G4_CPU
 	bool "G4 (74xx)"
 	depends on PPC_BOOK3S_32
+	select PPC_FPU
 	select ALTIVEC
 
 endchoice
@@ -307,6 +308,7 @@ config PHYS_64BIT
 
 config ALTIVEC
 	bool "AltiVec Support"
+	depends on PPC_FPU
 	depends on PPC_BOOK3S_32 || PPC_BOOK3S_64 || (PPC_E500MC && PPC64)
 	help
 	  This option enables kernel support for the Altivec extensions to the
