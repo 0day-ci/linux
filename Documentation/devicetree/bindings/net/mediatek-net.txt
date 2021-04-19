@@ -10,6 +10,7 @@ Required properties:
 - compatible: Should be
 		"mediatek,mt2701-eth": for MT2701 SoC
 		"mediatek,mt7623-eth", "mediatek,mt2701-eth": for MT7623 SoC
+		"mediatek,mt7621-eth": for MT7621 SoC
 		"mediatek,mt7622-eth": for MT7622 SoC
 		"mediatek,mt7629-eth": for MT7629 SoC
 		"ralink,rt5350-eth": for Ralink Rt5350F and MT7628/88 SoC
