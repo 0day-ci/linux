@@ -195,11 +195,11 @@ xfs_efd_item_free(struct xfs_efd_log_item *efdp)
  * structure.
  */
 static inline int
-xfs_efd_item_sizeof(
-	struct xfs_efd_log_item *efdp)
+xfs_efd_log_item_sizeof(
+	struct xfs_efd_log_format *elf)
 {
 	return sizeof(struct xfs_efd_log_format) +
-	       (efdp->efd_format.efd_nextents - 1) * sizeof(struct xfs_extent);
+	       (elf->efd_nextents - 1) * sizeof(struct xfs_extent);
 }
 
 STATIC void
@@ -209,7 +209,7 @@ xfs_efd_item_size(
 	int			*nbytes)
 {
 	*nvecs += 1;
-	*nbytes += xfs_efd_item_sizeof(EFD_ITEM(lip));
+	*nbytes += xfs_efd_log_item_sizeof(&EFD_ITEM(lip)->efd_format);
 }
 
 /*
@@ -234,7 +234,7 @@ xfs_efd_item_format(
 
 	xlog_copy_iovec(lv, &vecp, XLOG_REG_TYPE_EFD_FORMAT,
 			&efdp->efd_format,
-			xfs_efd_item_sizeof(efdp));
+			xfs_efd_log_item_sizeof(&efdp->efd_format));
 }
 
 /*
