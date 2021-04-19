@@ -24,3 +24,4 @@ hmm-tests
 local_config.*
 protection_keys_32
 protection_keys_64
+madv_populate
