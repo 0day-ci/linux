@@ -10,6 +10,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/namei.h>
 #include <linux/nls.h>
 #include "hfsplus_fs.h"
 #include "hfsplus_raw.h"
@@ -517,4 +518,35 @@ int hfsplus_compare_dentry(const struct dentry *dentry,
 	if (len1 > len2)
 		return 1;
 	return 0;
+}
+
+int hfsplus_revalidate_dentry(struct dentry *dentry, unsigned int flags)
+{
+	/*
+	 * dentries are always valid when disabling casefold.
+	 */
+	if (!test_bit(HFSPLUS_SB_CASEFOLD, &HFSPLUS_SB(dentry->d_sb)->flags))
+		return 1;
+
+	/*
+	 * Positive dentries are valid when enabling casefold.
+	 *
+	 * Note, rename() to existing directory entry will have ->d_inode, and
+	 * will use existing name which isn't specified name by user.
+	 *
+	 * We may be able to drop this positive dentry here. But dropping
+	 * positive dentry isn't good idea. So it's unsupported like
+	 * rename("filename", "FILENAME") for now.
+	 */
+	if (d_really_is_positive(dentry))
+		return 1;
+
+	/*
+	 * Drop the negative dentry, in order to make sure to use the case
+	 * sensitive name which is specified by user if this is for creation.
+	 */
+	if (flags & (LOOKUP_CREATE | LOOKUP_RENAME_TARGET))
+		return 0;
+
+	return 1;
 }
