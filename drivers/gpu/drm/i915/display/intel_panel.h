@@ -53,6 +53,7 @@ void intel_panel_set_pwm_level(const struct drm_connector_state *conn_state, u32
 u32 intel_panel_invert_pwm_level(struct intel_connector *connector, u32 level);
 u32 intel_panel_backlight_level_to_pwm(struct intel_connector *connector, u32 level);
 u32 intel_panel_backlight_level_from_pwm(struct intel_connector *connector, u32 val);
+u32 get_backlight_min_vbt(struct intel_connector *connector);
 
 #if IS_ENABLED(CONFIG_BACKLIGHT_CLASS_DEVICE)
 int intel_backlight_device_register(struct intel_connector *connector);

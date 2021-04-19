@@ -1614,7 +1614,7 @@ static u32 get_backlight_max_vbt(struct intel_connector *connector)
 /*
  * Note: The setup hooks can't assume pipe is set!
  */
-static u32 get_backlight_min_vbt(struct intel_connector *connector)
+u32 get_backlight_min_vbt(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;

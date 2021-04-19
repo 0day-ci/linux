@@ -571,7 +571,7 @@ static int intel_dp_aux_vesa_setup_backlight(struct intel_connector *connector,
 	if (!panel->backlight.max)
 		return -ENODEV;
 
-	panel->backlight.min = 0;
+	panel->backlight.min = get_backlight_min_vbt(connector);
 	panel->backlight.level = intel_dp_aux_vesa_get_backlight(connector, pipe);
 	panel->backlight.enabled = intel_dp_aux_vesa_backlight_dpcd_mode(connector) &&
 				   panel->backlight.level != 0;
