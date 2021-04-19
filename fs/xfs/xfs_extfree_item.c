@@ -74,7 +74,7 @@ xfs_efi_item_sizeof(
 	struct xfs_efi_log_item *efip)
 {
 	return sizeof(struct xfs_efi_log_format) +
-	       (efip->efi_format.efi_nextents - 1) * sizeof(xfs_extent_t);
+	       (efip->efi_format.efi_nextents - 1) * sizeof(struct xfs_extent);
 }
 
 STATIC void
@@ -158,7 +158,7 @@ xfs_efi_init(
 	ASSERT(nextents > 0);
 	if (nextents > XFS_EFI_MAX_FAST_EXTENTS) {
 		size = (uint)(sizeof(struct xfs_efi_log_item) +
-			((nextents - 1) * sizeof(xfs_extent_t)));
+			((nextents - 1) * sizeof(struct xfs_extent)));
 		efip = kmem_zalloc(size, 0);
 	} else {
 		efip = kmem_cache_zalloc(xfs_efi_zone,
@@ -172,61 +172,6 @@ xfs_efi_init(
 	atomic_set(&efip->efi_refcount, 2);
 
 	return efip;
-}
-
-/*
- * Copy an EFI format buffer from the given buf, and into the destination
- * EFI format structure.
- * The given buffer can be in 32 bit or 64 bit form (which has different padding),
- * one of which will be the native format for this kernel.
- * It will handle the conversion of formats if necessary.
- */
-STATIC int
-xfs_efi_copy_format(xfs_log_iovec_t *buf, xfs_efi_log_format_t *dst_efi_fmt)
-{
-	xfs_efi_log_format_t *src_efi_fmt = buf->i_addr;
-	uint i;
-	uint len = sizeof(xfs_efi_log_format_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_t);  
-	uint len32 = sizeof(xfs_efi_log_format_32_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_32_t);  
-	uint len64 = sizeof(xfs_efi_log_format_64_t) + 
-		(src_efi_fmt->efi_nextents - 1) * sizeof(xfs_extent_64_t);  
-
-	if (buf->i_len == len) {
-		memcpy((char *)dst_efi_fmt, (char*)src_efi_fmt, len);
-		return 0;
-	} else if (buf->i_len == len32) {
-		xfs_efi_log_format_32_t *src_efi_fmt_32 = buf->i_addr;
-
-		dst_efi_fmt->efi_type     = src_efi_fmt_32->efi_type;
-		dst_efi_fmt->efi_size     = src_efi_fmt_32->efi_size;
-		dst_efi_fmt->efi_nextents = src_efi_fmt_32->efi_nextents;
-		dst_efi_fmt->efi_id       = src_efi_fmt_32->efi_id;
-		for (i = 0; i < dst_efi_fmt->efi_nextents; i++) {
-			dst_efi_fmt->efi_extents[i].ext_start =
-				src_efi_fmt_32->efi_extents[i].ext_start;
-			dst_efi_fmt->efi_extents[i].ext_len =
-				src_efi_fmt_32->efi_extents[i].ext_len;
-		}
-		return 0;
-	} else if (buf->i_len == len64) {
-		xfs_efi_log_format_64_t *src_efi_fmt_64 = buf->i_addr;
-
-		dst_efi_fmt->efi_type     = src_efi_fmt_64->efi_type;
-		dst_efi_fmt->efi_size     = src_efi_fmt_64->efi_size;
-		dst_efi_fmt->efi_nextents = src_efi_fmt_64->efi_nextents;
-		dst_efi_fmt->efi_id       = src_efi_fmt_64->efi_id;
-		for (i = 0; i < dst_efi_fmt->efi_nextents; i++) {
-			dst_efi_fmt->efi_extents[i].ext_start =
-				src_efi_fmt_64->efi_extents[i].ext_start;
-			dst_efi_fmt->efi_extents[i].ext_len =
-				src_efi_fmt_64->efi_extents[i].ext_len;
-		}
-		return 0;
-	}
-	XFS_ERROR_REPORT(__func__, XFS_ERRLEVEL_LOW, NULL);
-	return -EFSCORRUPTED;
 }
 
 static inline struct xfs_efd_log_item *EFD_ITEM(struct xfs_log_item *lip)
@@ -254,7 +199,7 @@ xfs_efd_item_sizeof(
 	struct xfs_efd_log_item *efdp)
 {
 	return sizeof(struct xfs_efd_log_format) +
-	       (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
+	       (efdp->efd_format.efd_nextents - 1) * sizeof(struct xfs_extent);
 }
 
 STATIC void
@@ -688,6 +633,36 @@ static const struct xfs_item_ops xfs_efi_item_ops = {
 };
 
 /*
+ * Convert from an unpadded EFI log item written by old 32-bit kernels to the
+ * proper format.
+ */
+static int
+xfs_efi_copy_format_32(
+	struct xfs_efi_log_format	*dst,
+	struct xfs_log_iovec		*buf)
+{
+	struct xfs_efi_log_format_32	*src = buf->i_addr;
+	unsigned int			i;
+
+	if (buf->i_len != sizeof(*src) +
+	    (src->efi_nextents - 1) * sizeof(struct xfs_extent_32)) {
+		XFS_ERROR_REPORT(__func__, XFS_ERRLEVEL_LOW, NULL);
+		return -EFSCORRUPTED;
+	}
+
+	dst->efi_type = src->efi_type;
+	dst->efi_size = src->efi_size;
+	dst->efi_nextents = src->efi_nextents;
+	dst->efi_id = src->efi_id;
+	for (i = 0; i < dst->efi_nextents; i++) {
+		dst->efi_extents[i].ext_start = src->efi_extents[i].ext_start;
+		dst->efi_extents[i].ext_len = src->efi_extents[i].ext_len;
+	}
+
+	return 0;
+}
+
+/*
  * This routine is called to create an in-core extent free intent
  * item from the efi format structure which was logged on disk.
  * It allocates an in-core efi, copies the extents from the format
@@ -703,18 +678,22 @@ xlog_recover_efi_commit_pass2(
 {
 	struct xfs_mount		*mp = log->l_mp;
 	struct xfs_efi_log_item		*efip;
-	struct xfs_efi_log_format	*efi_formatp;
+	struct xfs_log_iovec		*buf = &item->ri_buf[0];
+	struct xfs_efi_log_format	*src = buf->i_addr;
 	int				error;
 
-	efi_formatp = item->ri_buf[0].i_addr;
+	efip = xfs_efi_init(mp, src->efi_nextents);
 
-	efip = xfs_efi_init(mp, efi_formatp->efi_nextents);
-	error = xfs_efi_copy_format(&item->ri_buf[0], &efip->efi_format);
-	if (error) {
-		xfs_efi_item_free(efip);
-		return error;
+	if (buf->i_len != sizeof(*src) +
+	    (src->efi_nextents - 1) * sizeof(struct xfs_extent)) {
+		error = xfs_efi_copy_format_32(&efip->efi_format, buf);
+		if (error)
+			goto out_free_efi;
+	} else {
+		memcpy(&efip->efi_format, src, buf->i_len);
 	}
-	atomic_set(&efip->efi_next_extent, efi_formatp->efi_nextents);
+
+	atomic_set(&efip->efi_next_extent, efip->efi_format.efi_nextents);
 	/*
 	 * Insert the intent into the AIL directly and drop one reference so
 	 * that finishing or canceling the work will drop the other.
@@ -722,6 +701,10 @@ xlog_recover_efi_commit_pass2(
 	xfs_trans_ail_insert(log->l_ailp, &efip->efi_item, lsn);
 	xfs_efi_release(efip);
 	return 0;
+
+out_free_efi:
+	xfs_efi_item_free(efip);
+	return error;
 }
 
 const struct xlog_recover_item_ops xlog_efi_item_ops = {
