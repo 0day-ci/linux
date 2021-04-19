@@ -109,18 +109,23 @@ config RD_ZSTD
 	  If unsure, say N.
 
 choice
-	prompt "Built-in initramfs compression mode"
-	depends on INITRAMFS_SOURCE != ""
+	prompt "Preferred initramfs compression mode"
+	default INITRAMFS_COMPRESSION_XZ   if RD_XZ
+	default INITRAMFS_COMPRESSION_GZIP if RD_GZIP
+	default INITRAMFS_COMPRESSION_LZO  if RD_LZO
+	default INITRAMFS_COMPRESSION_LZ4  if RD_LZ4
+	default INITRAMFS_COMPRESSION_NONE
 	help
-	  This option allows you to decide by which algorithm the builtin
-	  initramfs will be compressed.  Several compression algorithms are
-	  available, which differ in efficiency, compression and
-	  decompression speed.  Compression speed is only relevant
-	  when building a kernel.  Decompression speed is relevant at
-	  each boot. Also the memory usage during decompression may become
-	  relevant on memory constrained systems. This is usually based on the
-	  dictionary size of the algorithm with algorithms like XZ and LZMA
-	  featuring large dictionary sizes.
+	  This option allows you to decide by which algorithm the
+	  builtin initramfs and usr/modules.img will be compressed.
+	  Several compression algorithms are available, which differ
+	  in efficiency, compression and decompression speed.
+	  Compression speed is only relevant when building a kernel.
+	  Decompression speed is relevant at each boot. Also the
+	  memory usage during decompression may become relevant on
+	  memory constrained systems. This is usually based on the
+	  dictionary size of the algorithm with algorithms like XZ and
+	  LZMA featuring large dictionary sizes.
 
 	  High compression options are mostly useful for users who are
 	  low on RAM, since it reduces the memory consumption during
@@ -129,8 +134,6 @@ choice
 	  Keep in mind that your build system needs to provide the appropriate
 	  compression tool to compress the generated initram cpio file for
 	  embedding.
-
-	  If in doubt, select 'None'
 
 config INITRAMFS_COMPRESSION_GZIP
 	bool "Gzip"

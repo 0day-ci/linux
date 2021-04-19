@@ -22,12 +22,14 @@ obj-$(CONFIG_BLK_DEV_INITRD) := initramfs_data.o
 $(obj)/initramfs_data.o: $(obj)/initramfs_inc_data
 
 ramfs-input := $(strip $(shell echo $(CONFIG_INITRAMFS_SOURCE)))
+ramfs-compress := $(compress-y)
 cpio-data :=
 
 # If CONFIG_INITRAMFS_SOURCE is empty, generate a small initramfs with the
-# default contents.
+# default contents. No point in compressing it separately from the kernel.
 ifeq ($(ramfs-input),)
 ramfs-input := $(srctree)/$(src)/default_cpio_list
+ramfs-compress := shipped
 endif
 
 ifeq ($(words $(ramfs-input)),1)
@@ -42,7 +44,7 @@ endif
 # .cpio.*, use it directly as an initramfs, and avoid double compression.
 ifeq ($(words $(subst .cpio.,$(space),$(ramfs-input))),2)
 cpio-data := $(ramfs-input)
-compress-y := shipped
+ramfs-compress := shipped
 endif
 
 endif
@@ -76,14 +78,43 @@ quiet_cmd_initfs = GEN     $@
 # 2) There are changes in which files are included (added or deleted)
 # 3) If gen_init_cpio are newer than initramfs_data.cpio
 # 4) Arguments to gen_initramfs.sh changes
-$(obj)/initramfs_data.cpio: $(src)/gen_initramfs.sh $(obj)/gen_init_cpio $(deps_initramfs) FORCE
+$(obj)/initramfs_data.cpio: $(src)/gen_initramfs.sh $(obj)/gen_init_cpio \
+			    $(deps_initramfs) FORCE
 	$(call if_changed,initfs)
 
 endif
 
 $(obj)/initramfs_inc_data: $(cpio-data) FORCE
-	$(call if_changed,$(compress-y))
+	$(call if_changed,$(ramfs-compress))
 
 targets += initramfs_data.cpio initramfs_inc_data
 
 subdir-$(CONFIG_UAPI_HEADER_TEST) += include
+
+# modules.img: an initramfs image containing all the modules
+quiet_cmd_modinst = MODINST $(obj)/modules
+      cmd_modinst = \
+	rm -rf '$(obj)/modules' && \
+	$(MAKE) -f '$(srctree)/Makefile' O='$(objtree)' \
+		INSTALL_MOD_PATH='$(obj)/modules' \
+		INSTALL_MOD_LN=: modules_install
+
+quiet_cmd_modcpio = MODCPIO $@
+      cmd_modcpio = \
+	$(CONFIG_SHELL) $< -o $@ \
+	$(if $(CONFIG_INITRAMFS_ROOT_UID), -u $(CONFIG_INITRAMFS_ROOT_UID)) \
+	$(if $(CONFIG_INITRAMFS_ROOT_GID), -g $(CONFIG_INITRAMFS_ROOT_GID)) \
+	'$(obj)/modules'
+
+modules_order := \
+	$(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD),$(objtree))/modules.order
+
+$(obj)/modules.cpio: $(src)/gen_initramfs.sh $(obj)/gen_init_cpio \
+	$(modules_order) FORCE
+	$(call if_changed,modinst)
+	$(call if_changed,modcpio)
+
+$(obj)/modules.img: $(obj)/modules.cpio FORCE
+	$(call if_changed,$(compress-y))
+
+targets += modules.cpio modules.img modules
