@@ -73,8 +73,7 @@ static inline int
 xfs_efi_log_item_sizeof(
 	struct xfs_efi_log_format *elf)
 {
-	return sizeof(*elf) +
-	       (elf->efi_nextents - 1) * sizeof(struct xfs_extent);
+	return struct_size(elf, efi_extents, elf->efi_nextents);
 }
 
 STATIC void
@@ -194,8 +193,7 @@ static inline int
 xfs_efd_log_item_sizeof(
 	struct xfs_efd_log_format *elf)
 {
-	return sizeof(struct xfs_efd_log_format) +
-	       (elf->efd_nextents - 1) * sizeof(struct xfs_extent);
+	return struct_size(elf, efd_extents, elf->efd_nextents);
 }
 
 STATIC void
@@ -636,8 +634,7 @@ xfs_efi_copy_format_32(
 	struct xfs_efi_log_format_32	*src = buf->i_addr;
 	unsigned int			i;
 
-	if (buf->i_len != sizeof(*src) +
-	    (src->efi_nextents - 1) * sizeof(struct xfs_extent_32)) {
+	if (buf->i_len != struct_size(src, efi_extents, src->efi_nextents)) {
 		XFS_ERROR_REPORT(__func__, XFS_ERRLEVEL_LOW, NULL);
 		return -EFSCORRUPTED;
 	}

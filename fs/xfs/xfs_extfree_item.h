@@ -55,7 +55,7 @@ struct xfs_efi_log_item {
 static inline int xfs_efi_item_sizeof(unsigned int nextents)
 {
 	return sizeof(struct xfs_efi_log_item) +
-		(nextents - 1) * sizeof(struct xfs_extent);
+		nextents * sizeof(struct xfs_extent);
 }
 
 /*
@@ -73,7 +73,7 @@ struct xfs_efd_log_item {
 static inline int xfs_efd_item_sizeof(unsigned int nextents)
 {
 	return sizeof(struct xfs_efd_log_item) +
-		(nextents - 1) * sizeof(struct xfs_extent);
+		nextents * sizeof(struct xfs_extent);
 }
 
 /*
