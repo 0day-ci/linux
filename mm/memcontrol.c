@@ -2212,8 +2212,8 @@ struct obj_stock {
 	struct obj_cgroup *cached_objcg;
 	struct pglist_data *cached_pgdat;
 	unsigned int nr_bytes;
-	int vmstat_idx;
-	int vmstat_bytes;
+	int reclaimable_bytes;		/* NR_SLAB_RECLAIMABLE_B */
+	int unreclaimable_bytes;	/* NR_SLAB_UNRECLAIMABLE_B */
 #else
 	int dummy[0];
 #endif
@@ -3217,40 +3217,56 @@ void mod_objcg_state(struct obj_cgroup *objcg, struct pglist_data *pgdat,
 		     enum node_stat_item idx, int nr)
 {
 	unsigned long flags;
-	struct obj_stock *stock = get_obj_stock(&flags);
+	struct obj_stock *stock;
+	int *bytes, *alt_bytes, alt_idx;
 
 	/*
-	 * Save vmstat data in stock and skip vmstat array update unless
-	 * accumulating over a page of vmstat data or when pgdat or idx
+	 * Directly update vmstat array for big object.
+	 */
+	if (unlikely(abs(nr) >= PAGE_SIZE))
+		goto update_vmstat;
+
+	stock = get_obj_stock(&flags);
+	if (idx == NR_SLAB_RECLAIMABLE_B) {
+		bytes = &stock->reclaimable_bytes;
+		alt_bytes = &stock->unreclaimable_bytes;
+		alt_idx = NR_SLAB_UNRECLAIMABLE_B;
+	} else {
+		bytes = &stock->unreclaimable_bytes;
+		alt_bytes = &stock->reclaimable_bytes;
+		alt_idx = NR_SLAB_RECLAIMABLE_B;
+	}
+
+	/*
+	 * Try to save vmstat data in stock and skip vmstat array update
+	 * unless accumulating over a page of vmstat data or when pgdat
 	 * changes.
 	 */
 	if (stock->cached_objcg != objcg) {
 		/* Output the current data as is */
-	} else if (!stock->vmstat_bytes) {
-		/* Save the current data */
-		stock->vmstat_bytes = nr;
-		stock->vmstat_idx = idx;
-		stock->cached_pgdat = pgdat;
-		nr = 0;
-	} else if ((stock->cached_pgdat != pgdat) ||
-		   (stock->vmstat_idx != idx)) {
-		/* Output the cached data & save the current data */
-		swap(nr, stock->vmstat_bytes);
-		swap(idx, stock->vmstat_idx);
+	} else if (stock->cached_pgdat != pgdat) {
+		/* Save the current data and output cached data, if any */
+		swap(nr, *bytes);
 		swap(pgdat, stock->cached_pgdat);
+		if (*alt_bytes) {
+			__mod_objcg_state(objcg, pgdat, alt_idx,
+					  *alt_bytes);
+			*alt_bytes = 0;
+		}
 	} else {
-		stock->vmstat_bytes += nr;
-		if (abs(stock->vmstat_bytes) > PAGE_SIZE) {
-			nr = stock->vmstat_bytes;
-			stock->vmstat_bytes = 0;
+		*bytes += nr;
+		if (abs(*bytes) > PAGE_SIZE) {
+			nr = *bytes;
+			*bytes = 0;
 		} else {
 			nr = 0;
 		}
 	}
-	if (nr)
-		__mod_objcg_state(objcg, pgdat, idx, nr);
-
 	put_obj_stock(flags);
+	if (!nr)
+		return;
+update_vmstat:
+	__mod_objcg_state(objcg, pgdat, idx, nr);
 }
 
 static bool consume_obj_stock(struct obj_cgroup *objcg, unsigned int nr_bytes)
@@ -3303,12 +3319,19 @@ static void drain_obj_stock(struct obj_stock *stock)
 	/*
 	 * Flush the vmstat data in current stock
 	 */
-	if (stock->vmstat_bytes) {
-		__mod_objcg_state(old, stock->cached_pgdat, stock->vmstat_idx,
-				  stock->vmstat_bytes);
+	if (stock->reclaimable_bytes || stock->unreclaimable_bytes) {
+		int bytes;
+
+		if ((bytes = stock->reclaimable_bytes))
+			__mod_objcg_state(old, stock->cached_pgdat,
+					  NR_SLAB_RECLAIMABLE_B, bytes);
+		if ((bytes = stock->unreclaimable_bytes))
+			__mod_objcg_state(old, stock->cached_pgdat,
+					  NR_SLAB_UNRECLAIMABLE_B, bytes);
+
 		stock->cached_pgdat = NULL;
-		stock->vmstat_bytes = 0;
-		stock->vmstat_idx = 0;
+		stock->reclaimable_bytes = 0;
+		stock->unreclaimable_bytes = 0;
 	}
 
 	obj_cgroup_put(old);
