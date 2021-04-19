@@ -1042,6 +1042,104 @@ static int cdat_to_buffer(struct pci_doe *doe, u32 *buffer, size_t length)
 	return 0;
 }
 
+static int cdat_dump(struct pci_doe *doe)
+{
+	struct pci_dev *dev = doe->pdev;
+	int entry_handle = 0;
+	int rc;
+
+	if (doe == NULL)
+		return 0;
+
+	dev = doe->pdev;
+	do {
+		/* Table access is available */
+		u32 cdat_request_pl = CDAT_DOE_REQ(entry_handle);
+		u32 cdat_response_pl[32];
+		struct pci_doe_exchange ex = {
+			.vid = PCI_DVSEC_VENDOR_ID_CXL,
+			.protocol = CXL_DOE_PROTOCOL_TABLE_ACCESS,
+			.request_pl = &cdat_request_pl,
+			.request_pl_sz = sizeof(cdat_request_pl),
+			.response_pl = cdat_response_pl,
+			.response_pl_sz = sizeof(cdat_response_pl),
+		};
+		u32 *entry;
+
+		rc = pci_doe_exchange_sync(doe, &ex);
+		if (rc < 0)
+			return rc;
+
+		/* Skip past table response header */
+		entry = cdat_response_pl + 1;
+		if (entry_handle == 0) {
+			pci_info(dev,
+				 "CDAT Header (Length=%u, Revision=%u, Checksum=0x%x, Sequence=%u\n",
+				 entry[0],
+				 FIELD_GET(CDAT_HEADER_DW1_REVISION, entry[1]),
+				 FIELD_GET(CDAT_HEADER_DW1_CHECKSUM, entry[1]),
+				 entry[2]);
+		} else {
+			u8 entry_type = FIELD_GET(CDAT_STRUCTURE_DW0_TYPE, entry[0]);
+
+			switch (entry_type) {
+			case CDAT_STRUCTURE_DW0_TYPE_DSMAS:
+				pci_info(dev,
+					 "CDAT DSMAS (handle=%u flags=0x%x, dpa(0x%llx 0x%llx)\n",
+					 FIELD_GET(CDAT_DSMAS_DW1_DSMAD_HANDLE, entry[1]),
+					 FIELD_GET(CDAT_DSMAS_DW1_FLAGS, entry[1]),
+					 CDAT_DSMAS_DPA_OFFSET(entry),
+					 CDAT_DSMAS_DPA_LEN(entry));
+				break;
+			case CDAT_STRUCTURE_DW0_TYPE_DSLBIS:
+				pci_info(dev,
+					 "CDAT DSLBIS (handle=%u flags=0x%x, ent_base=0x%llx, entry[%u %u %u])\n",
+					 FIELD_GET(CDAT_DSLBIS_DW1_HANDLE, entry[1]),
+					 FIELD_GET(CDAT_DSLBIS_DW1_FLAGS, entry[1]),
+					 CDAT_DSLBIS_BASE_UNIT(entry),
+					 FIELD_GET(CDAT_DSLBIS_DW4_ENTRY_0, entry[4]),
+					 FIELD_GET(CDAT_DSLBIS_DW4_ENTRY_1, entry[4]),
+					 FIELD_GET(CDAT_DSLBIS_DW5_ENTRY_2, entry[5]));
+				break;
+			case CDAT_STRUCTURE_DW0_TYPE_DSMSCIS:
+				pci_info(dev,
+					 "CDAT DSMSCIS (handle=%u sc_size=0x%llx attrs=0x%x)\n",
+					 FIELD_GET(CDAT_DSMSCIS_DW1_HANDLE, entry[1]),
+					 CDAT_DSMSCIS_MEMORY_SIDE_CACHE_SIZE(entry),
+					 FIELD_GET(CDAT_DSMSCIS_DW4_MEMORY_SIDE_CACHE_ATTRS,
+						   entry[4]));
+				break;
+			case CDAT_STRUCTURE_DW0_TYPE_DSIS:
+				pci_info(dev,
+					 "CDAT DSIS (handle=%u flags=0x%x)\n",
+					 FIELD_GET(CDAT_DSIS_DW1_HANDLE, entry[1]),
+					 FIELD_GET(CDAT_DSIS_DW1_FLAGS, entry[1]));
+				break;
+			case CDAT_STRUCTURE_DW0_TYPE_DSEMTS:
+				pci_info(dev,
+					 "CDAT DSEMTS (handle=%u EFI=0x%x dpa(0x%llx 0x%llx)\n",
+					 FIELD_GET(CDAT_DSEMTS_DW1_HANDLE, entry[1]),
+					 FIELD_GET(CDAT_DSEMTS_DW1_EFI_MEMORY_TYPE_ATTR,
+						   entry[1]),
+					 CDAT_DSEMTS_DPA_OFFSET(entry),
+					 CDAT_DSEMTS_DPA_LENGTH(entry));
+				break;
+			case CDAT_STRUCTURE_DW0_TYPE_SSLBIS:
+				pci_info(dev,
+					 "CDAT SSLBIS (type%u ent_base=%llu...)\n",
+					 FIELD_GET(CDAT_SSLBIS_DW1_DATA_TYPE,
+						   entry[1]),
+					 CDAT_SSLBIS_BASE_UNIT(entry));
+				break;
+			}
+		}
+		entry_handle = FIELD_GET(CXL_DOE_TABLE_ACCESS_ENTRY_HANDLE,
+					 cdat_response_pl[0]);
+	} while (entry_handle != 0xFFFF);
+
+	return 0;
+}
+
 static void cxl_mem_free_irq_vectors(void *data)
 {
 	pci_free_irq_vectors(data);
@@ -1135,6 +1233,10 @@ static struct cxl_mem *cxl_mem_create(struct pci_dev *pdev, u32 reg_lo,
 
 	cxlm->table_doe = pci_doe_find(pdev, PCI_DVSEC_VENDOR_ID_CXL,
 				       CXL_DOE_PROTOCOL_TABLE_ACCESS);
+
+	rc = cdat_dump(cxlm->table_doe);
+	if (rc)
+		return NULL;
 
 	dev_dbg(dev, "Mapped CXL Memory Device resource\n");
 	return cxlm;
