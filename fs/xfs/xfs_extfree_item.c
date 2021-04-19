@@ -253,7 +253,7 @@ static inline int
 xfs_efd_item_sizeof(
 	struct xfs_efd_log_item *efdp)
 {
-	return sizeof(xfs_efd_log_format_t) +
+	return sizeof(struct xfs_efd_log_format) +
 	       (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
 }
 
@@ -743,13 +743,7 @@ xlog_recover_efd_commit_pass2(
 	struct xlog_recover_item	*item,
 	xfs_lsn_t			lsn)
 {
-	struct xfs_efd_log_format	*efd_formatp;
-
-	efd_formatp = item->ri_buf[0].i_addr;
-	ASSERT((item->ri_buf[0].i_len == (sizeof(xfs_efd_log_format_32_t) +
-		((efd_formatp->efd_nextents - 1) * sizeof(xfs_extent_32_t)))) ||
-	       (item->ri_buf[0].i_len == (sizeof(xfs_efd_log_format_64_t) +
-		((efd_formatp->efd_nextents - 1) * sizeof(xfs_extent_64_t)))));
+	struct xfs_efd_log_format	*efd_formatp = item->ri_buf[0].i_addr;
 
 	xlog_recover_release_intent(log, XFS_LI_EFI, efd_formatp->efd_efi_id);
 	return 0;
