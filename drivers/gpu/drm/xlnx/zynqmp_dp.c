@@ -1083,6 +1083,7 @@ static int zynqmp_dp_aux_init(struct zynqmp_dp *dp)
 static void zynqmp_dp_aux_cleanup(struct zynqmp_dp *dp)
 {
 	drm_dp_aux_unregister(&dp->aux);
+	drm_dp_aux_fini(&dp->aux);
 }
 
 /* -----------------------------------------------------------------------------

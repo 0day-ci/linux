@@ -494,6 +494,7 @@ int dp_aux_register(struct drm_dp_aux *dp_aux)
 void dp_aux_unregister(struct drm_dp_aux *dp_aux)
 {
 	drm_dp_aux_unregister(dp_aux);
+	drm_dp_aux_fini(dp_aux);
 }
 
 struct drm_dp_aux *dp_aux_get(struct device *dev, struct dp_catalog *catalog)

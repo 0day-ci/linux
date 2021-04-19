@@ -24,7 +24,7 @@
 #ifndef __ATOMBIOS_DP_H__
 #define __ATOMBIOS_DP_H__
 
-void amdgpu_atombios_dp_aux_init(struct amdgpu_connector *amdgpu_connector);
+int amdgpu_atombios_dp_aux_init(struct amdgpu_connector *amdgpu_connector);
 u8 amdgpu_atombios_dp_get_sinktype(struct amdgpu_connector *amdgpu_connector);
 int amdgpu_atombios_dp_get_dpcd(struct amdgpu_connector *amdgpu_connector);
 int amdgpu_atombios_dp_get_panel_mode(struct drm_encoder *encoder,

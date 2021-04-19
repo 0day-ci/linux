@@ -1693,7 +1693,9 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	tc->aux.name = "TC358767 AUX i2c adapter";
 	tc->aux.dev = tc->dev;
 	tc->aux.transfer = tc_aux_transfer;
-	drm_dp_aux_init(&tc->aux);
+	ret = drm_dp_aux_init(&tc->aux);
+	if (ret)
+		return ret;
 
 	tc->bridge.funcs = &tc_bridge_funcs;
 	if (tc->hpd_pin >= 0)
@@ -1713,6 +1715,7 @@ static int tc_remove(struct i2c_client *client)
 	struct tc_data *tc = i2c_get_clientdata(client);
 
 	drm_bridge_remove(&tc->bridge);
+	drm_dp_aux_fini(&tc->aux);
 
 	return 0;
 }

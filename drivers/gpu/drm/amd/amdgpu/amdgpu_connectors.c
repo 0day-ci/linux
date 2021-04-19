@@ -1963,8 +1963,11 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 
 	connector->display_info.subpixel_order = subpixel_order;
 
-	if (has_aux)
-		amdgpu_atombios_dp_aux_init(amdgpu_connector);
+	if (has_aux) {
+		int ret = amdgpu_atombios_dp_aux_init(amdgpu_connector);
+		if (ret)
+			goto failed;
+	}
 
 	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
 	    connector_type == DRM_MODE_CONNECTOR_eDP) {

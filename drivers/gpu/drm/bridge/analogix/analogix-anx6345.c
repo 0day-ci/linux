@@ -794,6 +794,8 @@ static int anx6345_i2c_remove(struct i2c_client *client)
 
 	unregister_i2c_dummy_clients(anx6345);
 
+	drm_dp_aux_fini(&anx6345->aux);
+
 	kfree(anx6345->edid);
 
 	mutex_destroy(&anx6345->lock);

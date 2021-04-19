@@ -1731,10 +1731,18 @@ EXPORT_SYMBOL(drm_dp_remote_aux_init);
  * If you need to use the drm_dp_aux's i2c adapter prior to registering it
  * with the outside world, call drm_dp_aux_init() first. You must still
  * call drm_dp_aux_register() once the connector has been registered to
- * allow userspace access to the auxiliary DP channel.
+ * allow userspace access to the auxiliary DP channel. Once the AUX channel is
+ * no longer being used and has been unregistered with
+ * drm_dp_aux_unregister(), the driver must clean up any resources it's
+ * allocated with drm_dp_aux_fini().
+ *
+ * Returns:
+ * %0 on success, negative error code on failure
  */
-void drm_dp_aux_init(struct drm_dp_aux *aux)
+int drm_dp_aux_init(struct drm_dp_aux *aux)
 {
+	int ret;
+
 	mutex_init(&aux->hw_mutex);
 	mutex_init(&aux->cec.lock);
 	INIT_WORK(&aux->crc_work, drm_dp_aux_crc_work);
@@ -1744,16 +1752,55 @@ void drm_dp_aux_init(struct drm_dp_aux *aux)
 	aux->ddc.retries = 3;
 
 	aux->ddc.lock_ops = &drm_dp_i2c_lock_ops;
+
+	aux->ddc.class = I2C_CLASS_DDC;
+	aux->ddc.owner = THIS_MODULE;
+	aux->ddc.dev.parent = aux->dev;
+
+	strlcpy(aux->ddc.name, aux->name ?: dev_name(aux->dev), sizeof(aux->ddc.name));
+
+	ret = i2c_add_adapter(&aux->ddc);
+	if (ret) {
+		aux->ddc.algo = NULL;
+		mutex_destroy(&aux->hw_mutex);
+		mutex_destroy(&aux->cec.lock);
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_dp_aux_init);
 
 /**
- * drm_dp_aux_register() - initialise and register aux channel
+ * drm_dp_aux_fini() - release resources from an aux channel
  * @aux: DisplayPort AUX channel
  *
- * Automatically calls drm_dp_aux_init() if this hasn't been done yet.
+ * Cleans up any resources associated with a DP AUX channel, along with
+ * removing it's associated i2c adapter. Must always be called once an AUX
+ * channel is being removed. Note that if drm_dp_aux_init() was not called on
+ * @aux, this function is a no-op.
+ */
+void drm_dp_aux_fini(struct drm_dp_aux *aux)
+{
+	if (!aux->ddc.algo)
+		return;
+
+	i2c_del_adapter(&aux->ddc);
+	mutex_destroy(&aux->hw_mutex);
+	mutex_destroy(&aux->cec.lock);
+}
+EXPORT_SYMBOL(drm_dp_aux_fini);
+
+/**
+ * drm_dp_aux_register() - register aux channel
+ * @aux: DisplayPort AUX channel
+ *
+ * Automatically calls drm_dp_aux_init() if this hasn't been done yet. The
+ * driver must make sure to call drm_dp_aux_unregister() to unregister the
+ * device, and drm_dp_aux_fini() to cleanup the device after it's been
+ * unregistered.
+ *
  * This should only be called when the underlying &struct drm_connector is
- * initialiazed already. Therefore the best place to call this is from
+ * initialized already. Therefore the best place to call this is from
  * &drm_connector_funcs.late_register. Not that drivers which don't follow this
  * will Oops when CONFIG_DRM_DP_AUX_CHARDEV is enabled.
  *
@@ -1766,39 +1813,32 @@ EXPORT_SYMBOL(drm_dp_aux_init);
 int drm_dp_aux_register(struct drm_dp_aux *aux)
 {
 	int ret;
+	const bool init_aux = !aux->ddc.algo;
 
-	if (!aux->ddc.algo)
-		drm_dp_aux_init(aux);
-
-	aux->ddc.class = I2C_CLASS_DDC;
-	aux->ddc.owner = THIS_MODULE;
-	aux->ddc.dev.parent = aux->dev;
-
-	strlcpy(aux->ddc.name, aux->name ? aux->name : dev_name(aux->dev),
-		sizeof(aux->ddc.name));
-
-	ret = drm_dp_aux_register_devnode(aux);
-	if (ret)
-		return ret;
-
-	ret = i2c_add_adapter(&aux->ddc);
-	if (ret) {
-		drm_dp_aux_unregister_devnode(aux);
-		return ret;
+	if (init_aux) {
+		ret = drm_dp_aux_init(aux);
+		if (ret)
+			return ret;
 	}
 
-	return 0;
+	ret = drm_dp_aux_register_devnode(aux);
+	if (ret && init_aux)
+		drm_dp_aux_fini(aux);
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_dp_aux_register);
 
 /**
  * drm_dp_aux_unregister() - unregister an AUX adapter
  * @aux: DisplayPort AUX channel
+ *
+ * Note that this function does not take care of calling drm_dp_aux_fini(),
+ * the driver must handle this part itself.
  */
 void drm_dp_aux_unregister(struct drm_dp_aux *aux)
 {
 	drm_dp_aux_unregister_devnode(aux);
-	i2c_del_adapter(&aux->ddc);
 }
 EXPORT_SYMBOL(drm_dp_aux_unregister);
 

@@ -2436,14 +2436,17 @@ static int cdns_mhdp_probe(struct platform_device *pdev)
 	mutex_init(&mhdp->link_mutex);
 	spin_lock_init(&mhdp->start_lock);
 
-	drm_dp_aux_init(&mhdp->aux);
 	mhdp->aux.dev = dev;
 	mhdp->aux.transfer = cdns_mhdp_transfer;
+	ret = drm_dp_aux_init(&mhdp->aux);
+	if (ret)
+		return ret;
 
 	mhdp->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(mhdp->regs)) {
 		dev_err(dev, "Failed to get memory resource\n");
-		return PTR_ERR(mhdp->regs);
+		ret = PTR_ERR(mhdp->regs);
+		goto aux_fini;
 	}
 
 	mhdp->sapb_regs = devm_platform_ioremap_resource_byname(pdev, "mhdptx-sapb");
@@ -2458,7 +2461,8 @@ static int cdns_mhdp_probe(struct platform_device *pdev)
 	mhdp->phy = devm_of_phy_get_by_index(dev, pdev->dev.of_node, 0);
 	if (IS_ERR(mhdp->phy)) {
 		dev_err(dev, "no PHY configured\n");
-		return PTR_ERR(mhdp->phy);
+		ret = PTR_ERR(mhdp->phy);
+		goto aux_fini;
 	}
 
 	platform_set_drvdata(pdev, mhdp);
@@ -2555,6 +2559,8 @@ runtime_put:
 	pm_runtime_disable(dev);
 clk_disable:
 	clk_disable_unprepare(mhdp->clk);
+aux_fini:
+	drm_dp_aux_fini(&mhdp->aux);
 
 	return ret;
 }
@@ -2596,6 +2602,8 @@ static int cdns_mhdp_remove(struct platform_device *pdev)
 	flush_scheduled_work();
 
 	clk_disable_unprepare(mhdp->clk);
+
+	drm_dp_aux_fini(&mhdp->aux);
 
 	return ret;
 }

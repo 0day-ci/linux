@@ -2009,7 +2009,8 @@ bool drm_dp_lttpr_voltage_swing_level_3_supported(const u8 caps[DP_LTTPR_PHY_CAP
 bool drm_dp_lttpr_pre_emphasis_level_3_supported(const u8 caps[DP_LTTPR_PHY_CAP_SIZE]);
 
 void drm_dp_remote_aux_init(struct drm_dp_aux *aux);
-void drm_dp_aux_init(struct drm_dp_aux *aux);
+__must_check int drm_dp_aux_init(struct drm_dp_aux *aux);
+void drm_dp_aux_fini(struct drm_dp_aux *aux);
 __must_check int drm_dp_aux_register(struct drm_dp_aux *aux);
 void drm_dp_aux_unregister(struct drm_dp_aux *aux);
 

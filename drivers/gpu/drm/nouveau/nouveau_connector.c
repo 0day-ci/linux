@@ -402,6 +402,7 @@ nouveau_connector_destroy(struct drm_connector *connector)
 	if (nv_connector->aux.transfer) {
 		drm_dp_cec_unregister_connector(&nv_connector->aux);
 		drm_dp_aux_unregister(&nv_connector->aux);
+		drm_dp_aux_fini(&nv_connector->aux);
 		kfree(nv_connector->aux.name);
 	}
 	kfree(connector);

@@ -1364,6 +1364,8 @@ static int anx78xx_i2c_remove(struct i2c_client *client)
 
 	unregister_i2c_dummy_clients(anx78xx);
 
+	drm_dp_aux_fini(&anx78xx->aux);
+
 	kfree(anx78xx->edid);
 
 	return 0;

@@ -218,6 +218,7 @@ void msm_edp_aux_destroy(struct device *dev, struct edp_aux *aux)
 {
 	if (aux) {
 		drm_dp_aux_unregister(&aux->drm_aux);
+		drm_dp_aux_fini(&aux->drm_aux);
 		mutex_destroy(&aux->msg_mutex);
 	}
 }

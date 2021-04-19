@@ -1806,6 +1806,7 @@ EXPORT_SYMBOL_GPL(analogix_dp_unbind);
 void analogix_dp_remove(struct analogix_dp_device *dp)
 {
 	clk_disable_unprepare(dp->clock);
+	drm_dp_aux_fini(&dp->aux);
 }
 EXPORT_SYMBOL_GPL(analogix_dp_remove);
 

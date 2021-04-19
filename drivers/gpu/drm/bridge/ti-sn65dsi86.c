@@ -1291,17 +1291,16 @@ static int ti_sn_bridge_probe(struct i2c_client *client,
 	pm_runtime_enable(pdata->dev);
 
 	ret = ti_sn_setup_gpio_controller(pdata);
-	if (ret) {
-		pm_runtime_disable(pdata->dev);
-		return ret;
-	}
-
+	if (ret)
+		goto fail_pm;
 	i2c_set_clientdata(client, pdata);
 
 	pdata->aux.name = "ti-sn65dsi86-aux";
 	pdata->aux.dev = pdata->dev;
 	pdata->aux.transfer = ti_sn_aux_transfer;
-	drm_dp_aux_init(&pdata->aux);
+	ret = drm_dp_aux_init(&pdata->aux);
+	if (ret)
+		goto fail_pm;
 
 	pdata->bridge.funcs = &ti_sn_bridge_funcs;
 	pdata->bridge.of_node = client->dev.of_node;
@@ -1311,6 +1310,9 @@ static int ti_sn_bridge_probe(struct i2c_client *client,
 	ti_sn_debugfs_init(pdata);
 
 	return 0;
+fail_pm:
+	pm_runtime_disable(pdata->dev);
+	return ret;
 }
 
 static int ti_sn_bridge_remove(struct i2c_client *client)
@@ -1331,6 +1333,8 @@ static int ti_sn_bridge_remove(struct i2c_client *client)
 		mipi_dsi_detach(pdata->dsi);
 		mipi_dsi_device_unregister(pdata->dsi);
 	}
+
+	drm_dp_aux_fini(&pdata->aux);
 
 	drm_bridge_remove(&pdata->bridge);
 

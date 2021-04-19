@@ -644,15 +644,17 @@ void intel_dp_aux_fini(struct intel_dp *intel_dp)
 	if (cpu_latency_qos_request_active(&intel_dp->pm_qos))
 		cpu_latency_qos_remove_request(&intel_dp->pm_qos);
 
+	drm_dp_aux_fini(&intel_dp->aux);
 	kfree(intel_dp->aux.name);
 }
 
-void intel_dp_aux_init(struct intel_dp *intel_dp)
+int intel_dp_aux_init(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct intel_encoder *encoder = &dig_port->base;
 	enum aux_ch aux_ch = dig_port->aux_ch;
+	int ret;
 
 	if (DISPLAY_VER(dev_priv) >= 12) {
 		intel_dp->aux_ch_ctl_reg = tgl_aux_ctl_reg;
@@ -682,7 +684,9 @@ void intel_dp_aux_init(struct intel_dp *intel_dp)
 	else
 		intel_dp->get_aux_send_ctl = g4x_get_aux_send_ctl;
 
-	drm_dp_aux_init(&intel_dp->aux);
+	ret = drm_dp_aux_init(&intel_dp->aux);
+	if (ret)
+		return ret;
 
 	/* Failure to allocate our preferred name is not critical */
 	if (DISPLAY_VER(dev_priv) >= 12 && aux_ch >= AUX_CH_USBC1)
@@ -696,4 +700,6 @@ void intel_dp_aux_init(struct intel_dp *intel_dp)
 
 	intel_dp->aux.transfer = intel_dp_aux_transfer;
 	cpu_latency_qos_add_request(&intel_dp->pm_qos, PM_QOS_DEFAULT_VALUE);
+
+	return ret;
 }

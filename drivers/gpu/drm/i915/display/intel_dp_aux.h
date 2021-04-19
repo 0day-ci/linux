@@ -13,6 +13,6 @@ struct intel_dp;
 u32 intel_dp_pack_aux(const u8 *src, int src_bytes);
 
 void intel_dp_aux_fini(struct intel_dp *intel_dp);
-void intel_dp_aux_init(struct intel_dp *intel_dp);
+int intel_dp_aux_init(struct intel_dp *intel_dp);
 
 #endif /* __INTEL_DP_AUX_H__ */

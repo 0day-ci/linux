@@ -439,7 +439,10 @@ int amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	dm_aux->aux.transfer = dm_dp_aux_transfer;
 	dm_aux->ddc_service = aconnector->dc_link->ddc;
 
-	drm_dp_aux_init(&dm_aux->aux);
+	ret = drm_dp_aux_init(&dm_aux->aux);
+	if (ret)
+		goto free_name;
+
 	drm_dp_cec_register_connector(&dm_aux->aux, &aconnector->base);
 
 	if (aconnector->base.connector_type == DRM_MODE_CONNECTOR_eDP)
@@ -456,6 +459,7 @@ int amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	return 0;
 unreg_cec:
 	drm_dp_cec_unregister_connector(&dm_aux->aux);
+free_name:
 	kfree(dm_aux->aux.name);
 	return ret;
 }
