@@ -250,6 +250,7 @@ static inline void memcpy_swab32(u32 *dest, u32 *src, int cnt)
 static DEFINE_SPINLOCK(mdio_lock);
 static struct eth_regs __iomem *mdio_regs; /* mdio command and status only */
 static struct mii_bus *mdio_bus;
+static struct device_node *mdio_bus_np;
 static int ports_open;
 static struct port *npe_port_tab[MAX_NPES];
 static struct dma_pool *dma_pool;
@@ -533,7 +534,8 @@ static int ixp4xx_mdio_register(struct eth_regs __iomem *regs)
 	mdio_bus->write = &ixp4xx_mdio_write;
 	snprintf(mdio_bus->id, MII_BUS_ID_SIZE, "ixp4xx-eth-0");
 
-	if ((err = mdiobus_register(mdio_bus)))
+	err = of_mdiobus_register(mdio_bus, mdio_bus_np);
+	if (err)
 		mdiobus_free(mdio_bus);
 	return err;
 }
@@ -1364,7 +1366,6 @@ static struct eth_plat_info *ixp4xx_of_get_platdata(struct device *dev)
 	struct device_node *np = dev->of_node;
 	struct of_phandle_args queue_spec;
 	struct eth_plat_info *plat;
-	struct device_node *phy_np;
 	struct device_node *mdio_np;
 	u32 val;
 	int ret;
@@ -1381,25 +1382,12 @@ static struct eth_plat_info *ixp4xx_of_get_platdata(struct device *dev)
 	/* NPE ID 0x00, 0x10, 0x20... */
 	plat->npe = (val << 4);
 
-	phy_np = of_parse_phandle(np, "phy-handle", 0);
-	if (phy_np) {
-		ret = of_property_read_u32(phy_np, "reg", &val);
-		if (ret) {
-			dev_err(dev, "cannot find phy reg\n");
-			return NULL;
-		}
-		of_node_put(phy_np);
-	} else {
-		dev_err(dev, "cannot find phy instance\n");
-		val = 0;
-	}
-	plat->phy = val;
-
 	/* Check if this device has an MDIO bus */
 	mdio_np = of_get_child_by_name(np, "mdio");
 	if (mdio_np) {
 		plat->has_mdio = true;
-		of_node_put(mdio_np);
+		mdio_bus_np = mdio_np;
+		/* DO NOT put the mdio_np, it will be used */
 	}
 
 	/* Get the rx queue as a resource from queue manager */
@@ -1536,10 +1524,14 @@ static int ixp4xx_eth_probe(struct platform_device *pdev)
 	__raw_writel(DEFAULT_CORE_CNTRL, &port->regs->core_control);
 	udelay(50);
 
-	snprintf(phy_id, MII_BUS_ID_SIZE + 3, PHY_ID_FMT,
-		 mdio_bus->id, plat->phy);
-	phydev = phy_connect(ndev, phy_id, &ixp4xx_adjust_link,
-			     PHY_INTERFACE_MODE_MII);
+	if (np) {
+		phydev = of_phy_get_and_connect(ndev, np, ixp4xx_adjust_link);
+	} else {
+		snprintf(phy_id, MII_BUS_ID_SIZE + 3, PHY_ID_FMT,
+			 mdio_bus->id, plat->phy);
+		phydev = phy_connect(ndev, phy_id, &ixp4xx_adjust_link,
+				     PHY_INTERFACE_MODE_MII);
+	}
 	if (!phydev) {
 		err = -ENODEV;
 		dev_err(dev, "no phydev\n");
