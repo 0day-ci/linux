@@ -2024,6 +2024,17 @@ static u16 kvm_hvcall_signal_event(struct kvm_vcpu *vcpu, bool fast, u64 param)
 
 static bool hv_check_hypercall_access(struct kvm_vcpu_hv *hv_vcpu, u16 code)
 {
+	if (!hv_vcpu->enforce_cpuid)
+		return true;
+
+	switch (code) {
+	case HVCALL_NOTIFY_LONG_SPIN_WAIT:
+		return hv_vcpu->cpuid_cache.enlightenments_ebx &&
+			hv_vcpu->cpuid_cache.enlightenments_ebx != U32_MAX;
+	default:
+		break;
+	}
+
 	return true;
 }
 
