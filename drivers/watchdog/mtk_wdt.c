@@ -25,6 +25,7 @@
 #include <linux/reset-controller.h>
 #include <linux/types.h>
 #include <linux/watchdog.h>
+#include <linux/interrupt.h>
 
 #define WDT_MAX_TIMEOUT		31
 #define WDT_MIN_TIMEOUT		1
@@ -57,6 +58,7 @@
 
 static bool nowayout = WATCHDOG_NOWAYOUT;
 static unsigned int timeout;
+static bool dual_mode;
 
 struct mtk_wdt_dev {
 	struct watchdog_device wdt_dev;
@@ -239,11 +241,21 @@ static int mtk_wdt_start(struct watchdog_device *wdt_dev)
 		return ret;
 
 	reg = ioread32(wdt_base + WDT_MODE);
-	reg &= ~(WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
+	if (dual_mode)
+		reg |= (WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
+	else
+		reg &= ~(WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
 	reg |= (WDT_MODE_EN | WDT_MODE_KEY);
 	iowrite32(reg, wdt_base + WDT_MODE);
 
 	return 0;
+}
+
+static irqreturn_t mtk_wdt_isr(int irq, void *arg)
+{
+	panic("wdt bark!\n");
+
+	return IRQ_HANDLED;
 }
 
 static const struct watchdog_info mtk_wdt_info = {
@@ -267,7 +279,7 @@ static int mtk_wdt_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct mtk_wdt_dev *mtk_wdt;
 	const struct mtk_wdt_data *wdt_data;
-	int err;
+	int err, irq;
 
 	mtk_wdt = devm_kzalloc(dev, sizeof(*mtk_wdt), GFP_KERNEL);
 	if (!mtk_wdt)
@@ -278,6 +290,20 @@ static int mtk_wdt_probe(struct platform_device *pdev)
 	mtk_wdt->wdt_base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(mtk_wdt->wdt_base))
 		return PTR_ERR(mtk_wdt->wdt_base);
+
+	if (dual_mode) {
+		irq = platform_get_irq(pdev, 0);
+		if (irq > 0) {
+			err = devm_request_irq(&pdev->dev, irq, mtk_wdt_isr, 0, "wdt_bark",
+									&mtk_wdt->wdt_dev);
+			if (err)
+				return err;
+		} else {
+			dual_mode = 0;
+			dev_err(&pdev->dev,
+			"couldn't get wdt irq, set dual_mode = 0\n");
+		}
+	}
 
 	mtk_wdt->wdt_dev.info = &mtk_wdt_info;
 	mtk_wdt->wdt_dev.ops = &mtk_wdt_ops;
@@ -367,6 +393,9 @@ MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
 module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+
+module_param(dual_mode, bool, 0);
+MODULE_PARM_DESC(dual_mode, "Watchdog dual mode triggers irq before reset(default=0)");
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Matthias Brugger <matthias.bgg@gmail.com>");
