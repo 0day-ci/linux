@@ -110,6 +110,7 @@ static void soc_release(struct device *dev)
 }
 
 static struct soc_device_attribute *early_soc_dev_attr;
+static bool soc_dev_attr_init_done = false;
 
 struct soc_device *soc_device_register(struct soc_device_attribute *soc_dev_attr)
 {
@@ -157,6 +158,7 @@ struct soc_device *soc_device_register(struct soc_device_attribute *soc_dev_attr
 		return ERR_PTR(ret);
 	}
 
+	soc_dev_attr_init_done = true;
 	return soc_dev;
 
 out3:
@@ -245,6 +247,9 @@ const struct soc_device_attribute *soc_device_match(
 
 	if (!matches)
 		return NULL;
+
+	if (!soc_dev_attr_init_done && !early_soc_dev_attr)
+		return ERR_PTR(-EPROBE_DEFER);
 
 	while (!ret) {
 		if (!(matches->machine || matches->family ||
