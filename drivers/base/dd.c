@@ -216,9 +216,13 @@ void device_unblock_probing(void)
  * device_set_deferred_probe_reason() - Set defer probe reason message for device
  * @dev: the pointer to the struct device
  * @vaf: the pointer to va_format structure with message
+ *
+ * The ->deferred_probe_reason string is only ever read when debugfs
+ * is enabled, so this is a no-op for !CONFIG_DEBUG_FS.
  */
 void device_set_deferred_probe_reason(const struct device *dev, struct va_format *vaf)
 {
+#ifdef CONFIG_DEBUG_FS
 	const char *drv = dev_driver_string(dev);
 
 	mutex_lock(&deferred_probe_mutex);
@@ -227,6 +231,7 @@ void device_set_deferred_probe_reason(const struct device *dev, struct va_format
 	dev->p->deferred_probe_reason = kasprintf(GFP_KERNEL, "%s: %pV", drv, vaf);
 
 	mutex_unlock(&deferred_probe_mutex);
+#endif
 }
 
 /*
