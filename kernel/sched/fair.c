@@ -7200,6 +7200,14 @@ idle:
 	if (!rf)
 		return NULL;
 
+	/*
+	 * We have a woken up task pending here. No need to search for ones
+	 * elsewhere. This task will be enqueued the moment we unblock irqs
+	 * upon exiting the scheduler.
+	 */
+	if (rq->ttwu_pending)
+		return NULL;
+
 	new_tasks = newidle_balance(rq, rf);
 
 	/*
@@ -10661,7 +10669,8 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 		 * Stop searching for tasks to pull if there are
 		 * now runnable tasks on this rq.
 		 */
-		if (pulled_task || this_rq->nr_running > 0)
+		if (pulled_task || this_rq->nr_running > 0 ||
+						this_rq->ttwu_pending)
 			break;
 	}
 	rcu_read_unlock();
