@@ -2845,6 +2845,7 @@ static const struct net_device_ops mtk_netdev_ops = {
 
 static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
 {
+	const char *label = of_get_property(np, "label", NULL);
 	const __be32 *_id = of_get_property(np, "reg", NULL);
 	phy_interface_t phy_mode;
 	struct phylink *phylink;
@@ -2867,9 +2868,10 @@ static int mtk_add_mac(struct mtk_eth *eth, struct device_node *np)
 		return -EINVAL;
 	}
 
-	eth->netdev[id] = alloc_etherdev(sizeof(*mac));
+	eth->netdev[id] = alloc_netdev(sizeof(*mac), label ? label : "eth%d",
+				       NET_NAME_UNKNOWN, ether_setup);
 	if (!eth->netdev[id]) {
-		dev_err(eth->dev, "alloc_etherdev failed\n");
+		dev_err(eth->dev, "alloc_netdev failed\n");
 		return -ENOMEM;
 	}
 	mac = netdev_priv(eth->netdev[id]);
