@@ -152,6 +152,9 @@ $(BPF_IN_SHARED): force $(BPF_HELPER_DEFS)
 	@(test -f ../../include/uapi/linux/if_xdp.h -a -f ../../../include/uapi/linux/if_xdp.h && ( \
 	(diff -B ../../include/uapi/linux/if_xdp.h ../../../include/uapi/linux/if_xdp.h >/dev/null) || \
 	echo "Warning: Kernel ABI header at 'tools/include/uapi/linux/if_xdp.h' differs from latest version at 'include/uapi/linux/if_xdp.h'" >&2 )) || true
+	@(test -f ../../include/uapi/linux/pkt_cls.h -a -f ../../../include/uapi/linux/pkt_cls.h && ( \
+	(diff -B ../../include/uapi/linux/pkt_cls.h ../../../include/uapi/linux/pkt_cls.h >/dev/null) || \
+	echo "Warning: Kernel ABI header at 'tools/include/uapi/linux/pkt_cls.h' differs from latest version at 'include/uapi/linux/pkt_cls.h'" >&2 )) || true
 	$(Q)$(MAKE) $(build)=libbpf OUTPUT=$(SHARED_OBJDIR) CFLAGS="$(CFLAGS) $(SHLIB_FLAGS)"
 
 $(BPF_IN_STATIC): force $(BPF_HELPER_DEFS)
