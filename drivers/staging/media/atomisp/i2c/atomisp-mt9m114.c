@@ -478,7 +478,8 @@ static int gpio_ctrl(struct v4l2_subdev *sd, bool flag)
 	/* Note: current modules wire only one GPIO signal (RESET#),
 	 * but the schematic wires up two to the connector.  BIOS
 	 * versions have been unfortunately inconsistent with which
-	 * ACPI index RESET# is on, so hit both */
+	 * ACPI index RESET# is on, so hit both
+	 */
 
 	if (flag) {
 		ret = dev->platform_data->gpio0_ctrl(sd, 0);
@@ -1019,8 +1020,8 @@ static long mt9m114_s_exposure(struct v4l2_subdev *sd,
 		dev->first_gain = AnalogGain;
 		dev->first_diggain = DigitalGain;
 	}
-	/* DigitalGain = 0x400 * (((u16) DigitalGain) >> 8) +
-	((unsigned int)(0x400 * (((u16) DigitalGain) & 0xFF)) >>8); */
+	/* DigitalGain = 0x400 * (((u16) DigitalGain) >> 8) +		*/
+	/* ((unsigned int)(0x400 * (((u16) DigitalGain) & 0xFF)) >>8);	*/
 
 	/* set frame length */
 	if (FLines < coarse_integration + 6)
@@ -1035,7 +1036,8 @@ static long mt9m114_s_exposure(struct v4l2_subdev *sd,
 
 	/* set coarse integration */
 	/* 3A provide real exposure time.
-		should not translate to any value here. */
+	 * should not translate to any value here.
+	 */
 	ret = mt9m114_write_reg(client, MISENSOR_16BIT,
 				REG_EXPO_COARSE, (u16)(coarse_integration));
 	if (ret) {
@@ -1044,7 +1046,7 @@ static long mt9m114_s_exposure(struct v4l2_subdev *sd,
 	}
 
 	/*
-	// set analog/digital gain
+	 * set analog/digital gain
 	switch(AnalogGain)
 	{
 	case 0:
@@ -1069,8 +1071,9 @@ static long mt9m114_s_exposure(struct v4l2_subdev *sd,
 	*/
 	if (DigitalGain >= 16 || DigitalGain <= 1)
 		DigitalGain = 1;
-	/* AnalogGainToWrite =
-		(u16)((DigitalGain << 12) | AnalogGainToWrite); */
+
+	/* AnalogGainToWrite = (u16)((DigitalGain << 12) | AnalogGainToWrite);
+	 */
 	AnalogGainToWrite = (u16)((DigitalGain << 12) | (u16)AnalogGain);
 	ret = mt9m114_write_reg(client, MISENSOR_16BIT,
 				REG_GAIN, AnalogGainToWrite);
@@ -1096,7 +1099,8 @@ static long mt9m114_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 }
 
 /* This returns the exposure time being used. This should only be used
-   for filling in EXIF data, not for actual image processing. */
+ * for filling in EXIF data, not for actual image processing.
+ */
 static int mt9m114_g_exposure(struct v4l2_subdev *sd, s32 *value)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -1297,7 +1301,7 @@ static int mt9m114_g_ev(struct v4l2_subdev *sd, s32 *val)
 
 /* Fake interface
  * mt9m114 now can not support 3a_lock
-*/
+ */
 static int mt9m114_s_3a_lock(struct v4l2_subdev *sd, s32 val)
 {
 	aaalock = val;
