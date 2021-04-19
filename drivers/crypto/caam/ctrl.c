@@ -635,6 +635,9 @@ static int caam_probe(struct platform_device *pdev)
 	nprop = pdev->dev.of_node;
 
 	imx_soc_match = soc_device_match(caam_imx_soc_table);
+	if (IS_ERR(imx_soc_match))
+		return PTR_ERR(imx_soc_match);
+
 	caam_imx = (bool)imx_soc_match;
 
 	if (imx_soc_match) {
