@@ -584,6 +584,7 @@ struct bch_nvm_namespace *bch_register_namespace(const char *dev_path)
 		return ERR_PTR(PTR_ERR(bdev));
 	}
 
+	err = -ENOMEM;
 	ns = kzalloc(sizeof(struct bch_nvm_namespace), GFP_KERNEL);
 	if (!ns)
 		goto bdput;
