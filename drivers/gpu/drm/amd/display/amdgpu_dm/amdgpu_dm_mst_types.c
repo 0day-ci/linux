@@ -425,33 +425,39 @@ static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
 };
 
-void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
-				       struct amdgpu_dm_connector *aconnector,
-				       int link_index)
+int amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
+				      struct amdgpu_dm_connector *aconnector,
+				      int link_index)
 {
-	aconnector->dm_dp_aux.aux.name =
-		kasprintf(GFP_KERNEL, "AMDGPU DM aux hw bus %d",
-			  link_index);
-	aconnector->dm_dp_aux.aux.transfer = dm_dp_aux_transfer;
-	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
+	struct amdgpu_dm_dp_aux *dm_aux = &aconnector->dm_dp_aux;
+	int ret;
 
-	drm_dp_aux_init(&aconnector->dm_dp_aux.aux);
-	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
-				      &aconnector->base);
+	dm_aux->aux.name = kasprintf(GFP_KERNEL, "AMDGPU DM aux hw bus %d", link_index);
+	if (!dm_aux->aux.name)
+		return -ENOMEM;
+
+	dm_aux->aux.transfer = dm_dp_aux_transfer;
+	dm_aux->ddc_service = aconnector->dc_link->ddc;
+
+	drm_dp_aux_init(&dm_aux->aux);
+	drm_dp_cec_register_connector(&dm_aux->aux, &aconnector->base);
 
 	if (aconnector->base.connector_type == DRM_MODE_CONNECTOR_eDP)
-		return;
+		return 0;
 
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
-	drm_dp_mst_topology_mgr_init(
-		&aconnector->mst_mgr,
-		adev_to_drm(dm->adev),
-		&aconnector->dm_dp_aux.aux,
-		16,
-		4,
-		aconnector->connector_id);
+	ret = drm_dp_mst_topology_mgr_init(&aconnector->mst_mgr, adev_to_drm(dm->adev),
+					   &dm_aux->aux, 16, 4, aconnector->connector_id);
+	if (ret)
+		goto unreg_cec;
 
 	drm_connector_attach_dp_subconnector_property(&aconnector->base);
+
+	return 0;
+unreg_cec:
+	drm_dp_cec_unregister_connector(&dm_aux->aux);
+	kfree(dm_aux->aux.name);
+	return ret;
 }
 
 int dm_mst_get_pbn_divider(struct dc_link *link)

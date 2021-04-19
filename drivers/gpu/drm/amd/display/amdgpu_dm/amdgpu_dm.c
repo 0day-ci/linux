@@ -7608,10 +7608,9 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 
 	aconnector->i2c = i2c;
 	res = i2c_add_adapter(&i2c->base);
-
 	if (res) {
 		DRM_ERROR("Failed to register hw i2c %d\n", link->link_index);
-		goto out_free;
+		goto fail_free;
 	}
 
 	connector_type = to_drm_connector_type(link->connector_signal);
@@ -7625,8 +7624,7 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 
 	if (res) {
 		DRM_ERROR("connector_init failed\n");
-		aconnector->connector_id = -1;
-		goto out_free;
+		goto fail_id;
 	}
 
 	drm_connector_helper_add(
@@ -7643,15 +7641,22 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 	drm_connector_attach_encoder(
 		&aconnector->base, &aencoder->base);
 
-	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort
-		|| connector_type == DRM_MODE_CONNECTOR_eDP)
-		amdgpu_dm_initialize_dp_connector(dm, aconnector, link->link_index);
-
-out_free:
-	if (res) {
-		kfree(i2c);
-		aconnector->i2c = NULL;
+	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
+	    connector_type == DRM_MODE_CONNECTOR_eDP) {
+		res = amdgpu_dm_initialize_dp_connector(dm, aconnector, link->link_index);
+		if (res)
+			goto fail_cleanup;
 	}
+
+	return 0;
+fail_cleanup:
+	drm_connector_cleanup(&aconnector->base);
+fail_id:
+	aconnector->connector_id = -1;
+fail_free:
+	kfree(i2c);
+	aconnector->i2c = NULL;
+
 	return res;
 }
 
