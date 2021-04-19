@@ -52,6 +52,12 @@ struct xfs_efi_log_item {
 	struct xfs_efi_log_format efi_format;
 };
 
+static inline int xfs_efi_item_sizeof(unsigned int nextents)
+{
+	return sizeof(struct xfs_efi_log_item) +
+		(nextents - 1) * sizeof(struct xfs_extent);
+}
+
 /*
  * This is the "extent free done" log item.  It is used to log
  * the fact that some extents earlier mentioned in an efi item

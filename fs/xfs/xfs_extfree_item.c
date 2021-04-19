@@ -153,17 +153,13 @@ xfs_efi_init(
 
 {
 	struct xfs_efi_log_item	*efip;
-	uint			size;
 
 	ASSERT(nextents > 0);
-	if (nextents > XFS_EFI_MAX_FAST_EXTENTS) {
-		size = (uint)(sizeof(struct xfs_efi_log_item) +
-			((nextents - 1) * sizeof(struct xfs_extent)));
-		efip = kmem_zalloc(size, 0);
-	} else {
+	if (nextents > XFS_EFI_MAX_FAST_EXTENTS)
+		efip = kmem_zalloc(xfs_efi_item_sizeof(nextents), 0);
+	else
 		efip = kmem_cache_zalloc(xfs_efi_zone,
 					 GFP_KERNEL | __GFP_NOFAIL);
-	}
 
 	xfs_log_item_init(mp, &efip->efi_item, XFS_LI_EFI, &xfs_efi_item_ops);
 	efip->efi_format.efi_nextents = nextents;

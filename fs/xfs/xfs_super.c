@@ -1961,10 +1961,8 @@ xfs_init_zones(void)
 		goto out_destroy_buf_item_zone;
 
 	xfs_efi_zone = kmem_cache_create("xfs_efi_item",
-					 (sizeof(struct xfs_efi_log_item) +
-					 (XFS_EFI_MAX_FAST_EXTENTS - 1) *
-					 sizeof(struct xfs_extent)),
-					 0, 0, NULL);
+			xfs_efi_item_sizeof(XFS_EFI_MAX_FAST_EXTENTS),
+			0, 0, NULL);
 	if (!xfs_efi_zone)
 		goto out_destroy_efd_zone;
 
