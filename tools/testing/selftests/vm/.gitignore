@@ -22,3 +22,5 @@ map_fixed_noreplace
 write_to_hugetlbfs
 hmm-tests
 local_config.*
+protection_keys_32
+protection_keys_64
