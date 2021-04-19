@@ -1815,6 +1815,8 @@ int drm_dp_aux_register(struct drm_dp_aux *aux)
 	int ret;
 	const bool init_aux = !aux->ddc.algo;
 
+	WARN_ON_ONCE(!aux->drm_dev);
+
 	if (init_aux) {
 		ret = drm_dp_aux_init(aux);
 		if (ret)
