@@ -655,7 +655,10 @@ static unsigned long xprt_calc_majortimeo(struct rpc_rqst *req)
 	unsigned long majortimeo = req->rq_timeout;
 
 	if (to->to_exponential)
-		majortimeo <<= to->to_retries;
+		if (to->to_retries >= sizeof(majortimeo) * 8)
+			majortimeo = to->to_maxval;
+		else
+			majortimeo <<= to->to_retries;
 	else
 		majortimeo += to->to_increment * to->to_retries;
 	if (majortimeo > to->to_maxval || majortimeo == 0)
