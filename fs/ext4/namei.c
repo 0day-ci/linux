@@ -1855,6 +1855,11 @@ dx_move_dirents(struct inode *dir, char *from, char *to,
 		((struct ext4_dir_entry_2 *) to)->rec_len =
 				ext4_rec_len_to_disk(rec_len, blocksize);
 		de->inode = 0;
+
+		/* wipe name_len through and name field */
+		memset(&de->name_len, 0, ext4_rec_len_from_disk(de->rec_len,
+						blocksize) - 6);
+
 		map++;
 		to += rec_len;
 	}
@@ -2188,6 +2193,7 @@ static int make_indexed_dir(handle_t *handle, struct ext4_filename *fname,
 	data2 = bh2->b_data;
 
 	memcpy(data2, de, len);
+	memset(de, 0, len); /* wipe old data */
 	de = (struct ext4_dir_entry_2 *) data2;
 	top = data2 + len;
 	while ((char *)(de2 = ext4_next_entry(de, blocksize)) < top)
@@ -2587,6 +2593,11 @@ int ext4_generic_delete_entry(struct inode *dir,
 			else
 				de->inode = 0;
 			inode_inc_iversion(dir);
+
+			/* wipe name_len through name field */
+			memset(&de->name_len, 0,
+				ext4_rec_len_from_disk(de->rec_len, blocksize) - 6);
+
 			return 0;
 		}
 		i += ext4_rec_len_from_disk(de->rec_len, blocksize);
