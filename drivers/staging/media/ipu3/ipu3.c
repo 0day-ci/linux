@@ -16,7 +16,7 @@
 #include "ipu3-dmamap.h"
 #include "ipu3-mmu.h"
 
-#define IMGU_PCI_ID			0x1919
+#define IMGU_PCI_ID			PCI_DEVICE_ID_INTEL_IPU3
 #define IMGU_PCI_BAR			0
 #define IMGU_DMA_MASK			DMA_BIT_MASK(39)
 #define IMGU_MAX_QUEUE_DEPTH		(2 + 2)
