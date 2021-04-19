@@ -70,6 +70,12 @@ struct xfs_efd_log_item {
 	struct xfs_efd_log_format efd_format;
 };
 
+static inline int xfs_efd_item_sizeof(unsigned int nextents)
+{
+	return sizeof(struct xfs_efd_log_item) +
+		(nextents - 1) * sizeof(struct xfs_extent);
+}
+
 /*
  * Max number of extents in fast allocation path.
  */

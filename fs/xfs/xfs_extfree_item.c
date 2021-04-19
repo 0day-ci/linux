@@ -268,15 +268,11 @@ xfs_trans_get_efd(
 	struct xfs_efd_log_item		*efdp;
 
 	ASSERT(nextents > 0);
-
-	if (nextents > XFS_EFD_MAX_FAST_EXTENTS) {
-		efdp = kmem_zalloc(sizeof(struct xfs_efd_log_item) +
-				(nextents - 1) * sizeof(struct xfs_extent),
-				0);
-	} else {
+	if (nextents > XFS_EFD_MAX_FAST_EXTENTS)
+		efdp = kmem_zalloc(xfs_efd_item_sizeof(nextents), 0);
+	else
 		efdp = kmem_cache_zalloc(xfs_efd_zone,
 					GFP_KERNEL | __GFP_NOFAIL);
-	}
 
 	xfs_log_item_init(tp->t_mountp, &efdp->efd_item, XFS_LI_EFD,
 			  &xfs_efd_item_ops);
