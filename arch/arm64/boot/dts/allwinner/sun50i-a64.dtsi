@@ -17,6 +17,12 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	aliases {
+		mmc0 = &mmc0;
+		mmc1 = &mmc1;
+		mmc2 = &mmc2;
+	};
+
 	chosen {
 		#address-cells = <1>;
 		#size-cells = <1>;
