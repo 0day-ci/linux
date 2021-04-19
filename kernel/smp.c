@@ -242,6 +242,18 @@ static __always_inline void csd_lock(call_single_data_t *csd)
 	smp_wmb();
 }
 
+static __always_inline bool csd_trylock(call_single_data_t *csd)
+{
+	unsigned int flags = READ_ONCE(csd->node.u_flags);
+
+	if (flags & CSD_FLAG_LOCK)
+		return false;
+	csd->node.u_flags |= CSD_FLAG_LOCK;
+	/* See csd_trylock() */
+	smp_wmb();
+	return true;
+}
+
 static __always_inline void csd_unlock(call_single_data_t *csd)
 {
 	WARN_ON(!(csd->node.u_flags & CSD_FLAG_LOCK));
@@ -608,12 +620,14 @@ call:
 }
 EXPORT_SYMBOL_GPL(smp_call_function_any);
 
-static void smp_call_function_many_cond(const struct cpumask *mask,
-					smp_call_func_t func, void *info,
-					bool wait, smp_cond_func_t cond_func)
+static struct cpumask *smp_call_function_many_cond(const struct cpumask *mask,
+						   smp_call_func_t func,
+						   void *info, int mode,
+						   smp_cond_func_t cond_func)
 {
 	struct call_function_data *cfd;
 	int cpu, next_cpu, this_cpu = smp_processor_id();
+	bool busy = false, wait = (mode == SMP_CFM_WAIT);
 
 	/*
 	 * Can deadlock when called with interrupts disabled.
@@ -639,18 +653,18 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 
 	/* No online cpus?  We're done. */
 	if (cpu >= nr_cpu_ids)
-		return;
+		return NULL;
 
 	/* Do we have another CPU which isn't us? */
 	next_cpu = cpumask_next_and(cpu, mask, cpu_online_mask);
 	if (next_cpu == this_cpu)
 		next_cpu = cpumask_next_and(next_cpu, mask, cpu_online_mask);
 
-	/* Fastpath: do that cpu by itself. */
-	if (next_cpu >= nr_cpu_ids) {
+	/* Fastpath: if not best-effort do that cpu by itself. */
+	if (next_cpu >= nr_cpu_ids && mode != SMP_CFM_BEST_EFFORT) {
 		if (!cond_func || cond_func(cpu, info))
 			smp_call_function_single(cpu, func, info, wait);
-		return;
+		return NULL;
 	}
 
 	cfd = this_cpu_ptr(&cfd_data);
@@ -660,7 +674,7 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 
 	/* Some callers race with other cpus changing the passed mask */
 	if (unlikely(!cpumask_weight(cfd->cpumask)))
-		return;
+		return NULL;
 
 	cpumask_clear(cfd->cpumask_ipi);
 	for_each_cpu(cpu, cfd->cpumask) {
@@ -669,9 +683,17 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 		if (cond_func && !cond_func(cpu, info))
 			continue;
 
-		csd_lock(csd);
-		if (wait)
-			csd->node.u_flags |= CSD_TYPE_SYNC;
+		if (mode == SMP_CFM_BEST_EFFORT) {
+			if (!csd_trylock(csd)) {
+				cpumask_clear_cpu(cpu, cfd->cpumask);
+				busy = true;
+				continue;
+			}
+		} else {
+			csd_lock(csd);
+			if (wait)
+				csd->node.u_flags |= CSD_TYPE_SYNC;
+		}
 		csd->func = func;
 		csd->info = info;
 #ifdef CONFIG_CSD_LOCK_WAIT_DEBUG
@@ -693,7 +715,31 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 			csd_lock_wait(csd);
 		}
 	}
+	return busy ? cfd->cpumask : NULL;
 }
+
+/**
+ * Extended version of smp_call_function_many(). Same constraints.
+ * @mode == 0 same as wait = false, returns 0;
+ * @mode == 1 same as wait = true, returns 0;
+ * @mode = SMP_CFM_BEST_EFFORT: skips CPUs with previous pending requests,
+ *     returns 0 and *mask unmodified if no CPUs are skipped,
+ *     -EBUSY if CPUs are skipped, and *mask is the set of skipped CPUs
+ */
+int __smp_call_function_many(struct cpumask *mask, smp_call_func_t func,
+			     void *info, int mode)
+{
+	struct cpumask *ret = smp_call_function_many_cond(mask, func, info,
+							  mode, NULL);
+
+	if (!ret)
+		return 0;
+	cpumask_andnot(mask, mask, ret);
+	cpumask_and(mask, mask, cpu_online_mask);
+	cpumask_clear_cpu(smp_processor_id(), mask);
+	return -EBUSY;
+}
+EXPORT_SYMBOL(__smp_call_function_many);
 
 /**
  * smp_call_function_many(): Run a function on a set of other CPUs.
@@ -712,7 +758,9 @@ static void smp_call_function_many_cond(const struct cpumask *mask,
 void smp_call_function_many(const struct cpumask *mask,
 			    smp_call_func_t func, void *info, bool wait)
 {
-	smp_call_function_many_cond(mask, func, info, wait, NULL);
+	const int mode = wait ? SMP_CFM_WAIT : SMP_CFM_NOWAIT;
+
+	smp_call_function_many_cond(mask, func, info, mode, NULL);
 }
 EXPORT_SYMBOL(smp_call_function_many);
 
@@ -898,9 +946,10 @@ EXPORT_SYMBOL(on_each_cpu_mask);
 void on_each_cpu_cond_mask(smp_cond_func_t cond_func, smp_call_func_t func,
 			   void *info, bool wait, const struct cpumask *mask)
 {
+	const int mode = wait ? SMP_CFM_WAIT : SMP_CFM_NOWAIT;
 	int cpu = get_cpu();
 
-	smp_call_function_many_cond(mask, func, info, wait, cond_func);
+	smp_call_function_many_cond(mask, func, info, mode, cond_func);
 	if (cpumask_test_cpu(cpu, mask) && cond_func(cpu, info)) {
 		unsigned long flags;
 

@@ -75,6 +75,11 @@ void on_each_cpu_cond_mask(smp_cond_func_t cond_func, smp_call_func_t func,
 
 int smp_call_function_single_async(int cpu, call_single_data_t *csd);
 
+/* Modes for __smp_call_function_many() */
+#define SMP_CFM_NOWAIT		0
+#define SMP_CFM_WAIT		1
+#define SMP_CFM_BEST_EFFORT	2
+
 #ifdef CONFIG_SMP
 
 #include <linux/preempt.h>
@@ -120,6 +125,8 @@ extern void smp_cpus_done(unsigned int max_cpus);
 void smp_call_function(smp_call_func_t func, void *info, int wait);
 void smp_call_function_many(const struct cpumask *mask,
 			    smp_call_func_t func, void *info, bool wait);
+int __smp_call_function_many(struct cpumask *mask, smp_call_func_t func,
+			     void *info, int mode);
 
 int smp_call_function_any(const struct cpumask *mask,
 			  smp_call_func_t func, void *info, int wait);
@@ -170,6 +177,9 @@ static inline void smp_send_reschedule(int cpu) { }
 #define smp_prepare_boot_cpu()			do {} while (0)
 #define smp_call_function_many(mask, func, info, wait) \
 			(up_smp_call_function(func, info))
+#define ____smp_call_function_many(mask, func, info, mode) \
+		(up_smp_call_function(func, info), 0)
+
 static inline void call_function_init(void) { }
 
 static inline int
