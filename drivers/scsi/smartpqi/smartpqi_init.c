@@ -156,6 +156,18 @@ module_param_named(hide_vsep,
 MODULE_PARM_DESC(hide_vsep,
 	"Hide the virtual SEP for direct attached drives.");
 
+static int pqi_lun_reset_retries = 3;
+module_param_named(lun_reset_retries,
+	pqi_lun_reset_retries, int, 0644);
+MODULE_PARM_DESC(lun_reset_retries,
+	"Number of retries when resetting a LUN");
+
+static int pqi_lun_reset_tmo_interval = 10000;
+module_param_named(lun_reset_tmo_interval,
+	pqi_lun_reset_tmo_interval, int, 0644);
+MODULE_PARM_DESC(lun_reset_tmo_interval,
+	"LUN reset timeout interval (in miliseconds)");
+
 static char *raid_levels[] = {
 	"RAID-0",
 	"RAID-4",
@@ -5686,8 +5698,6 @@ static int pqi_lun_reset(struct pqi_ctrl_info *ctrl_info,
 
 /* Performs a reset at the LUN level. */
 
-#define PQI_LUN_RESET_RETRIES			3
-#define PQI_LUN_RESET_RETRY_INTERVAL_MSECS	10000
 #define PQI_LUN_RESET_PENDING_IO_TIMEOUT_SECS	120
 
 static int _pqi_device_reset(struct pqi_ctrl_info *ctrl_info,
@@ -5699,9 +5709,9 @@ static int _pqi_device_reset(struct pqi_ctrl_info *ctrl_info,
 
 	for (retries = 0;;) {
 		rc = pqi_lun_reset(ctrl_info, device);
-		if (rc == 0 || ++retries > PQI_LUN_RESET_RETRIES)
+		if (rc == 0 || ++retries > pqi_lun_reset_retries)
 			break;
-		msleep(PQI_LUN_RESET_RETRY_INTERVAL_MSECS);
+		msleep(pqi_lun_reset_tmo_interval);
 	}
 
 	timeout_secs = rc ? PQI_LUN_RESET_PENDING_IO_TIMEOUT_SECS : NO_TIMEOUT;
