@@ -14,6 +14,7 @@
 #include <linux/sysctl.h>
 #include <linux/delayacct.h>
 #include <linux/module.h>
+#include <linux/seq_file.h>
 
 int delayacct_on __read_mostly = 1;	/* Delay accounting turned on/off */
 EXPORT_SYMBOL_GPL(delayacct_on);
@@ -25,6 +26,18 @@ static int __init delayacct_setup_disable(char *str)
 	return 1;
 }
 __setup("nodelayacct", delayacct_setup_disable);
+
+struct delayacct_stat {
+	const char *name;
+	unsigned int idx;
+};
+
+static struct delayacct_stat delayacct_stats[] = {
+	{"blkio", DELAYACCT_BLKIO},
+	{"swapin", DELAYACCT_SWAPIN},
+	{"pagecache_thrashing", DELAYACCT_THRASHING},
+	{"mem_reclaim", DELAYACCT_FREEPAGES}
+};
 
 void delayacct_init(void)
 {
@@ -126,3 +139,31 @@ u64 __delayacct_blkio_ticks(struct task_struct *tsk)
 	return ret;
 }
 
+#define K(x) ({ u64 _tmp = x; do_div(_tmp, 1000); _tmp; })
+
+int proc_delayacct_show(struct seq_file *m, struct pid_namespace *ns,
+		       struct pid *pid, struct task_struct *task)
+{
+	struct delayacct_count *delays;
+	int idx;
+
+	if (!task->delays)
+		return 0;
+
+	delays = task->delays->delays;
+	for (idx = 0; idx < ARRAY_SIZE(delayacct_stats); idx++) {
+		u32 item = delayacct_stats[idx].idx;
+		u64 mean = delays[item].delay;
+
+		if (delays[item].count)
+			do_div(mean, delays[item].count);
+
+		seq_printf(m, "%s %llu %llu %u %llu\n",
+			   delayacct_stats[idx].name,
+			   K(mean),
+			   K(delays[item].max),
+			   delays[item].count,
+			   K(delays[item].delay));
+	}
+	return 0;
+}
