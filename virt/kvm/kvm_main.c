@@ -462,7 +462,6 @@ struct kvm_hva_range {
 	pte_t pte;
 	hva_handler_t handler;
 	on_lock_fn_t on_lock;
-	bool must_lock;
 	bool flush_on_ret;
 	bool may_block;
 };
@@ -480,25 +479,6 @@ static void kvm_null_fn(void)
 }
 #define IS_KVM_NULL_FN(fn) ((fn) == (void *)kvm_null_fn)
 
-
-/* Acquire mmu_lock if necessary.  Returns %true if @handler is "null" */
-static __always_inline bool kvm_mmu_lock_and_check_handler(struct kvm *kvm,
-							   const struct kvm_hva_range *range,
-							   bool *locked)
-{
-	if (*locked)
-		return false;
-
-	*locked = true;
-
-	KVM_MMU_LOCK(kvm);
-
-	if (!IS_KVM_NULL_FN(range->on_lock))
-		range->on_lock(kvm, range->start, range->end);
-
-	return IS_KVM_NULL_FN(range->handler);
-}
-
 static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 						  const struct kvm_hva_range *range)
 {
@@ -514,10 +494,6 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 		return 0;
 
 	idx = srcu_read_lock(&kvm->srcu);
-
-	if (range->must_lock &&
-	    kvm_mmu_lock_and_check_handler(kvm, range, &locked))
-		goto out_unlock;
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 		slots = __kvm_memslots(kvm, i);
@@ -547,8 +523,14 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 			gfn_range.end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, slot);
 			gfn_range.slot = slot;
 
-			if (kvm_mmu_lock_and_check_handler(kvm, range, &locked))
-				goto out_unlock;
+			if (!locked) {
+				locked = true;
+				KVM_MMU_LOCK(kvm);
+				if (!IS_KVM_NULL_FN(range->on_lock))
+					range->on_lock(kvm, range->start, range->end);
+				if (IS_KVM_NULL_FN(range->handler))
+					break;
+			}
 
 			ret |= range->handler(kvm, &gfn_range);
 		}
@@ -557,7 +539,6 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 	if (range->flush_on_ret && (ret || kvm->tlbs_dirty))
 		kvm_flush_remote_tlbs(kvm);
 
-out_unlock:
 	if (locked)
 		KVM_MMU_UNLOCK(kvm);
 
@@ -580,7 +561,6 @@ static __always_inline int kvm_handle_hva_range(struct mmu_notifier *mn,
 		.pte		= pte,
 		.handler	= handler,
 		.on_lock	= (void *)kvm_null_fn,
-		.must_lock	= false,
 		.flush_on_ret	= true,
 		.may_block	= false,
 	};
@@ -600,7 +580,6 @@ static __always_inline int kvm_handle_hva_range_no_flush(struct mmu_notifier *mn
 		.pte		= __pte(0),
 		.handler	= handler,
 		.on_lock	= (void *)kvm_null_fn,
-		.must_lock	= false,
 		.flush_on_ret	= false,
 		.may_block	= false,
 	};
@@ -620,13 +599,11 @@ static void kvm_mmu_notifier_change_pte(struct mmu_notifier *mn,
 	 * .change_pte() must be surrounded by .invalidate_range_{start,end}(),
 	 * If mmu_notifier_count is zero, then start() didn't find a relevant
 	 * memslot and wasn't forced down the slow path; rechecking here is
-	 * unnecessary.  This can only occur if memslot updates are blocked;
-	 * otherwise, mmu_notifier_count is incremented unconditionally.
+	 * unnecessary.
 	 */
-	if (!kvm->mmu_notifier_count) {
-		lockdep_assert_held(&kvm->mmu_notifier_slots_lock);
+	WARN_ON_ONCE(!READ_ONCE(kvm->mn_active_invalidate_count));
+	if (!kvm->mmu_notifier_count)
 		return;
-	}
 
 	kvm_handle_hva_range(mn, address, address + 1, pte, kvm_set_spte_gfn);
 }
@@ -663,7 +640,6 @@ static void kvm_inc_notifier_count(struct kvm *kvm, unsigned long start,
 static int kvm_mmu_notifier_invalidate_range_start(struct mmu_notifier *mn,
 					const struct mmu_notifier_range *range)
 {
-	bool blockable = mmu_notifier_range_blockable(range);
 	struct kvm *kvm = mmu_notifier_to_kvm(mn);
 	const struct kvm_hva_range hva_range = {
 		.start		= range->start,
@@ -671,9 +647,8 @@ static int kvm_mmu_notifier_invalidate_range_start(struct mmu_notifier *mn,
 		.pte		= __pte(0),
 		.handler	= kvm_unmap_gfn_range,
 		.on_lock	= kvm_inc_notifier_count,
-		.must_lock	= !blockable,
 		.flush_on_ret	= true,
-		.may_block	= blockable,
+		.may_block	= mmu_notifier_range_blockable(range),
 	};
 
 	trace_kvm_unmap_hva_range(range->start, range->end);
@@ -684,15 +659,11 @@ static int kvm_mmu_notifier_invalidate_range_start(struct mmu_notifier *mn,
 	 * functions.  Without that guarantee, the mmu_notifier_count
 	 * adjustments will be imbalanced.
 	 *
-	 * Skip the memslot-lookup lock elision (set @must_lock above) to avoid
-	 * having to take the semaphore on non-blockable calls, e.g. OOM kill.
-	 * The complexity required to handle conditional locking for this case
-	 * is not worth the marginal benefits, the VM is likely doomed anyways.
-	 *
-	 * Pairs with the up_read in range_end().
+	 * Pairs with the decrement in range_end().
 	 */
-	if (blockable)
-		down_read(&kvm->mmu_notifier_slots_lock);
+	spin_lock(&kvm->mn_invalidate_lock);
+	kvm->mn_active_invalidate_count++;
+	spin_unlock(&kvm->mn_invalidate_lock);
 
 	__kvm_handle_hva_range(kvm, &hva_range);
 
@@ -720,7 +691,6 @@ static void kvm_dec_notifier_count(struct kvm *kvm, unsigned long start,
 static void kvm_mmu_notifier_invalidate_range_end(struct mmu_notifier *mn,
 					const struct mmu_notifier_range *range)
 {
-	bool blockable = mmu_notifier_range_blockable(range);
 	struct kvm *kvm = mmu_notifier_to_kvm(mn);
 	const struct kvm_hva_range hva_range = {
 		.start		= range->start,
@@ -728,16 +698,24 @@ static void kvm_mmu_notifier_invalidate_range_end(struct mmu_notifier *mn,
 		.pte		= __pte(0),
 		.handler	= (void *)kvm_null_fn,
 		.on_lock	= kvm_dec_notifier_count,
-		.must_lock	= !blockable,
 		.flush_on_ret	= false,
-		.may_block	= blockable,
+		.may_block	= mmu_notifier_range_blockable(range),
 	};
+	bool wake;
 
 	__kvm_handle_hva_range(kvm, &hva_range);
 
-	/* Pairs with the down_read in range_start(). */
-	if (blockable)
-		up_read(&kvm->mmu_notifier_slots_lock);
+	/* Pairs with the increment in range_start(). */
+	spin_lock(&kvm->mn_invalidate_lock);
+	wake = (--kvm->mn_active_invalidate_count == 0);
+	spin_unlock(&kvm->mn_invalidate_lock);
+
+	/*
+	 * There can only be one waiter, since the wait happens under
+	 * slots_lock.
+	 */
+	if (wake)
+		rcuwait_wake_up(&kvm->mn_memslots_update_rcuwait);
 
 	BUG_ON(kvm->mmu_notifier_count < 0);
 }
@@ -951,7 +929,9 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	mutex_init(&kvm->lock);
 	mutex_init(&kvm->irq_lock);
 	mutex_init(&kvm->slots_lock);
-	init_rwsem(&kvm->mmu_notifier_slots_lock);
+	spin_lock_init(&kvm->mn_invalidate_lock);
+	rcuwait_init(&kvm->mn_memslots_update_rcuwait);
+
 	INIT_LIST_HEAD(&kvm->devices);
 
 	BUILD_BUG_ON(KVM_MEM_SLOTS_NUM > SHRT_MAX);
@@ -1073,15 +1053,15 @@ static void kvm_destroy_vm(struct kvm *kvm)
 #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
 	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
 	/*
-	 * Reset the lock used to prevent memslot updates between MMU notifier
-	 * invalidate_range_start() and invalidate_range_end().  At this point,
-	 * no more MMU notifiers will run and pending calls to ...start() have
-	 * completed.  But, the lock could still be held if KVM's notifier was
-	 * removed between ...start() and ...end().  No threads can be waiting
-	 * on the lock as the last reference on KVM has been dropped.  If the
-	 * lock is still held, freeing memslots will deadlock.
+	 * At this point, pending calls to invalidate_range_start()
+	 * have completed but no more MMU notifiers will run, so
+	 * mn_active_invalidate_count may remain unbalanced.
+	 * No threads can be waiting in install_new_memslots as the
+	 * last reference on KVM has been dropped, but freeing
+	 * memslots will deadlock without manual intervention.
 	 */
-	init_rwsem(&kvm->mmu_notifier_slots_lock);
+	WARN_ON(rcuwait_active(&kvm->mn_memslots_update_rcuwait));
+	kvm->mn_active_invalidate_count = 0;
 #else
 	kvm_arch_flush_shadow_all(kvm);
 #endif
@@ -1333,9 +1313,22 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 	WARN_ON(gen & KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS);
 	slots->generation = gen | KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS;
 
-	down_write(&kvm->mmu_notifier_slots_lock);
+	/*
+	 * Do not store the new memslots while there are invalidation in
+	 * progress, otherwise the locking in invalidate_range_start and
+	 * invalidate_range_end will be unbalanced.
+	 */
+	spin_lock(&kvm->mn_invalidate_lock);
+	prepare_to_rcuwait(&kvm->mn_memslots_update_rcuwait);
+	while (kvm->mn_active_invalidate_count) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		spin_unlock(&kvm->mn_invalidate_lock);
+		schedule();
+		spin_lock(&kvm->mn_invalidate_lock);
+	}
+	finish_rcuwait(&kvm->mn_memslots_update_rcuwait);
 	rcu_assign_pointer(kvm->memslots[as_id], slots);
-	up_write(&kvm->mmu_notifier_slots_lock);
+	spin_unlock(&kvm->mn_invalidate_lock);
 
 	synchronize_srcu_expedited(&kvm->srcu);
 
