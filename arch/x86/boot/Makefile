@@ -119,8 +119,19 @@ $(obj)/compressed/vmlinux: FORCE
 FDARGS =
 # Set this if you want one or more initrds included in the image
 FDINITRD =
+# Set this to 1 if you want usr/modules.img included in the image
+FDMODS =
 
 imgdeps = $(obj)/bzImage $(obj)/mtools.conf $(src)/genimage.sh
+
+ifneq ($(FDMODS),)
+imgdeps  += $(objtree)/usr/modules.img
+FDINITRD += $(objtree)/usr/modules.img
+
+$(objtree)/usr/modules.img:
+	$(Q)$(MAKE) -f $(srctree)/Makefile usr/modules.img
+KBUILD_MODULES := 1
+endif
 
 $(obj)/mtools.conf: $(src)/mtools.conf.in
 	sed -e 's|@OBJ@|$(obj)|g' < $< > $@
