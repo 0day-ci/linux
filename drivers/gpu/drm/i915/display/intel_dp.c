@@ -3063,7 +3063,8 @@ void intel_read_dp_sdp(struct intel_encoder *encoder,
 		       struct intel_crtc_state *crtc_state,
 		       unsigned int type)
 {
-	if (encoder->type != INTEL_OUTPUT_DDI)
+	if (encoder->type != INTEL_OUTPUT_DDI &&
+	    encoder->type != INTEL_OUTPUT_EDP)
 		return;
 
 	switch (type) {
