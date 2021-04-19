@@ -70,11 +70,11 @@ xfs_efi_release(
  * structure.
  */
 static inline int
-xfs_efi_item_sizeof(
-	struct xfs_efi_log_item *efip)
+xfs_efi_log_item_sizeof(
+	struct xfs_efi_log_format *elf)
 {
-	return sizeof(struct xfs_efi_log_format) +
-	       (efip->efi_format.efi_nextents - 1) * sizeof(struct xfs_extent);
+	return sizeof(*elf) +
+	       (elf->efi_nextents - 1) * sizeof(struct xfs_extent);
 }
 
 STATIC void
@@ -84,7 +84,7 @@ xfs_efi_item_size(
 	int			*nbytes)
 {
 	*nvecs += 1;
-	*nbytes += xfs_efi_item_sizeof(EFI_ITEM(lip));
+	*nbytes += xfs_efi_log_item_sizeof(&EFI_ITEM(lip)->efi_format);
 }
 
 /*
@@ -110,7 +110,7 @@ xfs_efi_item_format(
 
 	xlog_copy_iovec(lv, &vecp, XLOG_REG_TYPE_EFI_FORMAT,
 			&efip->efi_format,
-			xfs_efi_item_sizeof(efip));
+			xfs_efi_log_item_sizeof(&efip->efi_format));
 }
 
 
@@ -684,8 +684,7 @@ xlog_recover_efi_commit_pass2(
 
 	efip = xfs_efi_init(mp, src->efi_nextents);
 
-	if (buf->i_len != sizeof(*src) +
-	    (src->efi_nextents - 1) * sizeof(struct xfs_extent)) {
+	if (buf->i_len != xfs_efi_log_item_sizeof(src)) {
 		error = xfs_efi_copy_format_32(&efip->efi_format, buf);
 		if (error)
 			goto out_free_efi;
