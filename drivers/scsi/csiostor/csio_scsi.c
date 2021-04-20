@@ -1562,8 +1562,9 @@ csio_scsi_err_handler(struct csio_hw *hw, struct csio_ioreq *req)
 	struct fcp_resp_with_ext *fcp_resp;
 	struct fcp_resp_rsp_info *rsp_info;
 	struct csio_dma_buf *dma_buf;
-	uint8_t flags, scsi_status = 0;
-	uint32_t host_status = DID_OK;
+	uint8_t flags;
+	enum sam_status scsi_status = SAM_STAT_GOOD;
+	enum host_status host_status = DID_OK;
 	uint32_t rsp_len = 0, sns_len = 0;
 	struct csio_rnode *rn = (struct csio_rnode *)(cmnd->device->hostdata);
 
@@ -1719,7 +1720,8 @@ out:
 			host_status = csio_scsi_copy_to_sgl(hw, req);
 	}
 
-	cmnd->result = (((host_status) << 16) | scsi_status);
+	cmnd->status = (union scsi_status){.b.host = host_status,
+		.b.status = scsi_status};
 	cmnd->scsi_done(cmnd);
 
 	/* Wake up waiting threads */
@@ -1747,7 +1749,7 @@ csio_scsi_cbfn(struct csio_hw *hw, struct csio_ioreq *req)
 				host_status = csio_scsi_copy_to_sgl(hw, req);
 		}
 
-		cmnd->result = (((host_status) << 16) | scsi_status);
+		cmnd->status.combined = (((host_status) << 16) | scsi_status);
 		cmnd->scsi_done(cmnd);
 		csio_scsi_cmnd(req) = NULL;
 		CSIO_INC_STATS(csio_hw_to_scsim(hw), n_tot_success);
@@ -1790,13 +1792,13 @@ csio_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmnd)
 
 	nr = fc_remote_port_chkready(rport);
 	if (nr) {
-		cmnd->result = nr;
+		cmnd->status.combined = nr;
 		CSIO_INC_STATS(scsim, n_rn_nr_error);
 		goto err_done;
 	}
 
 	if (unlikely(!csio_is_hw_ready(hw))) {
-		cmnd->result = (DID_REQUEUE << 16);
+		cmnd->status.combined = (DID_REQUEUE << 16);
 		CSIO_INC_STATS(scsim, n_hw_nr_error);
 		goto err_done;
 	}
@@ -1978,14 +1980,14 @@ inval_scmnd:
 		csio_scsi_cmnd(ioreq) = NULL;
 		spin_unlock_irq(&hw->lock);
 
-		cmnd->result = (DID_ERROR << 16);
+		cmnd->status.combined = (DID_ERROR << 16);
 		cmnd->scsi_done(cmnd);
 
 		return FAILED;
 	}
 
 	/* FW successfully aborted the request */
-	if (host_byte(cmnd->result) == DID_REQUEUE) {
+	if (host_byte(cmnd->status) == DID_REQUEUE) {
 		csio_info(hw,
 			"Aborted SCSI command to (%d:%llu) tag %u\n",
 			cmnd->device->id, cmnd->device->lun,
