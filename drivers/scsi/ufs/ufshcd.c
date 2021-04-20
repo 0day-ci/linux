@@ -4898,7 +4898,7 @@ static void ufshcd_slave_destroy(struct scsi_device *sdev)
  * Returns value base on SCSI command status
  */
 static inline int
-ufshcd_scsi_cmd_status(struct ufshcd_lrb *lrbp, int scsi_status)
+ufshcd_scsi_cmd_status(struct ufshcd_lrb *lrbp, enum sam_status scsi_status)
 {
 	int result = 0;
 
