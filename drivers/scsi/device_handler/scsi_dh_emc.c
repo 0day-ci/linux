@@ -237,7 +237,8 @@ static int send_trespass_cmd(struct scsi_device *sdev,
 {
 	unsigned char *page22;
 	unsigned char cdb[MAX_COMMAND_SIZE];
-	int err, res = SCSI_DH_OK, len;
+	int res = SCSI_DH_OK, len;
+	union scsi_status err;
 	struct scsi_sense_hdr sshdr;
 	u64 req_flags = REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
 		REQ_FAILFAST_DRIVER;
@@ -266,13 +267,13 @@ static int send_trespass_cmd(struct scsi_device *sdev,
 	err = scsi_execute(sdev, cdb, DMA_TO_DEVICE, csdev->buffer, len, NULL,
 			&sshdr, CLARIION_TIMEOUT * HZ, CLARIION_RETRIES,
 			req_flags, 0, NULL);
-	if (err) {
+	if (err.combined) {
 		if (scsi_sense_valid(&sshdr))
 			res = trespass_endio(sdev, &sshdr);
 		else {
 			sdev_printk(KERN_INFO, sdev,
 				    "%s: failed to send MODE SELECT: %x\n",
-				    CLARIION_NAME, err);
+				    CLARIION_NAME, err.combined);
 			res = SCSI_DH_IO;
 		}
 	}

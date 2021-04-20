@@ -82,20 +82,21 @@ static int hp_sw_tur(struct scsi_device *sdev, struct hp_sw_dh_data *h)
 {
 	unsigned char cmd[6] = { TEST_UNIT_READY };
 	struct scsi_sense_hdr sshdr;
-	int ret = SCSI_DH_OK, res;
+	int ret = SCSI_DH_OK;
+	union scsi_status res;
 	u64 req_flags = REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
 		REQ_FAILFAST_DRIVER;
 
 retry:
 	res = scsi_execute(sdev, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			HP_SW_TIMEOUT, HP_SW_RETRIES, req_flags, 0, NULL);
-	if (res) {
+	if (res.combined) {
 		if (scsi_sense_valid(&sshdr))
 			ret = tur_done(sdev, h, &sshdr);
 		else {
 			sdev_printk(KERN_WARNING, sdev,
 				    "%s: sending tur failed with %x\n",
-				    HP_SW_NAME, res);
+				    HP_SW_NAME, res.combined);
 			ret = SCSI_DH_IO;
 		}
 	} else {
@@ -119,7 +120,8 @@ static int hp_sw_start_stop(struct hp_sw_dh_data *h)
 	unsigned char cmd[6] = { START_STOP, 0, 0, 0, 1, 0 };
 	struct scsi_sense_hdr sshdr;
 	struct scsi_device *sdev = h->sdev;
-	int res, rc = SCSI_DH_OK;
+	int rc = SCSI_DH_OK;
+	union scsi_status res;
 	int retry_cnt = HP_SW_RETRIES;
 	u64 req_flags = REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
 		REQ_FAILFAST_DRIVER;
@@ -127,7 +129,7 @@ static int hp_sw_start_stop(struct hp_sw_dh_data *h)
 retry:
 	res = scsi_execute(sdev, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			HP_SW_TIMEOUT, HP_SW_RETRIES, req_flags, 0, NULL);
-	if (res) {
+	if (res.combined) {
 		if (!scsi_sense_valid(&sshdr)) {
 			sdev_printk(KERN_WARNING, sdev,
 				    "%s: sending start_stop_unit failed, "

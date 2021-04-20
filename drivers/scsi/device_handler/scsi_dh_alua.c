@@ -122,8 +122,9 @@ static void release_port_group(struct kref *kref)
  * submit_rtpg - Issue a REPORT TARGET GROUP STATES command
  * @sdev: sdev the command should be sent to
  */
-static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
-		       int bufflen, struct scsi_sense_hdr *sshdr, int flags)
+static union scsi_status submit_rtpg(struct scsi_device *sdev,
+				      unsigned char *buff, int bufflen,
+				      struct scsi_sense_hdr *sshdr, int flags)
 {
 	u8 cdb[MAX_COMMAND_SIZE];
 	int req_flags = REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT |
@@ -150,8 +151,8 @@ static int submit_rtpg(struct scsi_device *sdev, unsigned char *buff,
  * to 'active/optimized' and let the array firmware figure out
  * the states of the remaining groups.
  */
-static int submit_stpg(struct scsi_device *sdev, int group_id,
-		       struct scsi_sense_hdr *sshdr)
+static union scsi_status submit_stpg(struct scsi_device *sdev, int group_id,
+				      struct scsi_sense_hdr *sshdr)
 {
 	u8 cdb[MAX_COMMAND_SIZE];
 	unsigned char stpg_data[8];
@@ -544,8 +545,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
-	retval.combined = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
-				      pg->flags);
+	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
 
 	if (retval.combined) {
 		/*
@@ -790,7 +790,7 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			    ALUA_DH_NAME, pg->state);
 		return SCSI_DH_NOSYS;
 	}
-	retval.combined = submit_stpg(sdev, pg->group_id, &sense_hdr);
+	retval = submit_stpg(sdev, pg->group_id, &sense_hdr);
 
 	if (retval.combined) {
 		if (!scsi_sense_valid(&sense_hdr)) {

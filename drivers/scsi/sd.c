@@ -700,7 +700,7 @@ static int sd_sec_submit(void *data, u16 spsp, u8 secp, void *buffer,
 	struct scsi_disk *sdkp = data;
 	struct scsi_device *sdev = sdkp->device;
 	u8 cdb[12] = { 0, };
-	int ret;
+	union scsi_status ret;
 
 	cdb[0] = send ? SECURITY_PROTOCOL_OUT : SECURITY_PROTOCOL_IN;
 	cdb[1] = secp;
@@ -710,7 +710,7 @@ static int sd_sec_submit(void *data, u16 spsp, u8 secp, void *buffer,
 	ret = scsi_execute(sdev, cdb, send ? DMA_TO_DEVICE : DMA_FROM_DEVICE,
 		buffer, len, NULL, NULL, SD_TIMEOUT, sdkp->max_retries, 0,
 		RQF_PM, NULL);
-	return ret <= 0 ? ret : -EIO;
+	return ret.combined <= 0 ? ret.combined : -EIO;
 }
 #endif /* CONFIG_BLK_SED_OPAL */
 
@@ -1712,7 +1712,7 @@ static int sd_sync_cache(struct scsi_disk *sdkp, struct scsi_sense_hdr *sshdr)
 		 * Leave the rest of the command zero to indicate
 		 * flush everything.
 		 */
-		res.combined = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, sshdr,
+		res = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, sshdr,
 				timeout, sdkp->max_retries, 0, RQF_PM, NULL);
 		if (res.combined == 0)
 			break;
@@ -3593,7 +3593,7 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 	if (!scsi_device_online(sdp))
 		return -ENODEV;
 
-	res.combined = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
+	res = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			SD_TIMEOUT, sdkp->max_retries, 0, RQF_PM, NULL);
 	if (res.combined) {
 		sd_print_result(sdkp, "Start/Stop Unit failed", res);

@@ -423,7 +423,7 @@ static int write_same16(struct scsi_device *sdev,
 	u8 *cmd_buf = NULL;
 	u8 *scsi_cmd = NULL;
 	int rc = 0;
-	int result = 0;
+	union scsi_status result = { };
 	u64 offset = lba;
 	int left = nblks;
 	struct cxlflash_cfg *cfg = shost_priv(sdev->host);
@@ -457,15 +457,15 @@ static int write_same16(struct scsi_device *sdev,
 		rc = check_state(cfg);
 		if (rc) {
 			dev_err(dev, "%s: Failed state result=%08x\n",
-				__func__, result);
+				__func__, result.combined);
 			rc = -ENODEV;
 			goto out;
 		}
 
-		if (result) {
+		if (result.combined) {
 			dev_err_ratelimited(dev, "%s: command failed for "
 					    "offset=%lld result=%08x\n",
-					    __func__, offset, result);
+					    __func__, offset, result.combined);
 			rc = -EIO;
 			goto out;
 		}

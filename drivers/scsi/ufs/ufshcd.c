@@ -8412,7 +8412,7 @@ ufshcd_send_request_sense(struct ufs_hba *hba, struct scsi_device *sdp)
 
 	ret = scsi_execute(sdp, cmd, DMA_FROM_DEVICE, buffer,
 			UFS_SENSE_SIZE, NULL, NULL,
-			msecs_to_jiffies(1000), 3, 0, RQF_PM, NULL);
+			msecs_to_jiffies(1000), 3, 0, RQF_PM, NULL).combined;
 	if (ret)
 		pr_err("%s: failed with err %d\n", __func__, ret);
 
@@ -8472,7 +8472,7 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 	 * callbacks hence set the RQF_PM flag so that it doesn't resume the
 	 * already suspended childs.
 	 */
-	start_stop_res.combined =
+	start_stop_res =
 		scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			START_STOP_TIMEOUT, 0, 0, RQF_PM, NULL);
 	ret = start_stop_res.combined;
