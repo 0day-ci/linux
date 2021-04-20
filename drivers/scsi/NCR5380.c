@@ -538,7 +538,7 @@ static void complete_cmd(struct Scsi_Host *instance,
 
 	if (hostdata->sensing == cmd) {
 		/* Autosense processing ends here */
-		if (status_byte(cmd->result) != GOOD) {
+		if (status_byte(cmd->status) != GOOD) {
 			scsi_eh_restore_cmnd(cmd, &hostdata->ses);
 		} else {
 			scsi_eh_restore_cmnd(cmd, &hostdata->ses);
@@ -572,13 +572,13 @@ static int NCR5380_queue_command(struct Scsi_Host *instance,
 	case WRITE_6:
 	case WRITE_10:
 		shost_printk(KERN_DEBUG, instance, "WRITE attempted with NDEBUG_NO_WRITE set\n");
-		cmd->result = (DID_ERROR << 16);
+		cmd->status.combined = (DID_ERROR << 16);
 		cmd->scsi_done(cmd);
 		return 0;
 	}
 #endif /* (NDEBUG & NDEBUG_NO_WRITE) */
 
-	cmd->result = 0;
+	cmd->status.combined = 0;
 
 	spin_lock_irqsave(&hostdata->lock, flags);
 
@@ -961,7 +961,7 @@ static irqreturn_t __maybe_unused NCR5380_intr(int irq, void *dev_id)
  * SELECT interrupt will be disabled.
  *
  * If failed (no target) : cmd->scsi_done() will be called, and the
- * cmd->result host byte set to DID_BAD_TARGET.
+ * cmd->status host byte set to DID_BAD_TARGET.
  */
 
 static bool NCR5380_select(struct Scsi_Host *instance, struct scsi_cmnd *cmd)
@@ -1154,7 +1154,7 @@ static bool NCR5380_select(struct Scsi_Host *instance, struct scsi_cmnd *cmd)
 		if (!hostdata->selecting)
 			return false;
 
-		cmd->result = DID_BAD_TARGET << 16;
+		cmd->status.combined = DID_BAD_TARGET << 16;
 		complete_cmd(instance, cmd);
 		dsprintk(NDEBUG_SELECTION, instance,
 			"target did not respond within 250ms\n");
@@ -1203,7 +1203,7 @@ static bool NCR5380_select(struct Scsi_Host *instance, struct scsi_cmnd *cmd)
 	NCR5380_transfer_pio(instance, &phase, &len, &data, 0);
 	if (len) {
 		NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);
-		cmd->result = DID_ERROR << 16;
+		cmd->status.combined = DID_ERROR << 16;
 		complete_cmd(instance, cmd);
 		dsprintk(NDEBUG_SELECTION, instance, "IDENTIFY message transfer failed\n");
 		ret = false;
@@ -1743,7 +1743,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				shost_printk(KERN_DEBUG, instance, "NDEBUG_NO_DATAOUT set, attempted DATAOUT aborted\n");
 				sink = 1;
 				do_abort(instance, 0);
-				cmd->result = DID_ERROR << 16;
+				cmd->status.combined = DID_ERROR << 16;
 				complete_cmd(instance, cmd);
 				hostdata->connected = NULL;
 				hostdata->busy[scmd_id(cmd)] &= ~(1 << cmd->device->lun);
@@ -1826,9 +1826,9 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 					hostdata->connected = NULL;
 					hostdata->busy[scmd_id(cmd)] &= ~(1 << cmd->device->lun);
 
-					cmd->result &= ~0xffff;
-					cmd->result |= cmd->SCp.Status;
-					cmd->result |= cmd->SCp.Message << 8;
+					cmd->status.combined &= ~0xffff;
+					cmd->status.combined |= cmd->SCp.Status;
+					cmd->status.combined |= cmd->SCp.Message << 8;
 
 					set_resid_from_SCp(cmd);
 
@@ -1980,7 +1980,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 				if (msgout == ABORT) {
 					hostdata->connected = NULL;
 					hostdata->busy[scmd_id(cmd)] &= ~(1 << cmd->device->lun);
-					cmd->result = DID_ERROR << 16;
+					cmd->status.combined = DID_ERROR << 16;
 					complete_cmd(instance, cmd);
 					return;
 				}
@@ -2261,7 +2261,7 @@ static int NCR5380_abort(struct scsi_cmnd *cmd)
 	if (list_del_cmd(&hostdata->unissued, cmd)) {
 		dsprintk(NDEBUG_ABORT, instance,
 		         "abort: removed %p from issue queue\n", cmd);
-		cmd->result = DID_ABORT << 16;
+		cmd->status.combined = DID_ABORT << 16;
 		cmd->scsi_done(cmd); /* No tag or busy flag to worry about */
 		goto out;
 	}
@@ -2270,7 +2270,7 @@ static int NCR5380_abort(struct scsi_cmnd *cmd)
 		dsprintk(NDEBUG_ABORT, instance,
 		         "abort: cmd %p == selecting\n", cmd);
 		hostdata->selecting = NULL;
-		cmd->result = DID_ABORT << 16;
+		cmd->status.combined = DID_ABORT << 16;
 		complete_cmd(instance, cmd);
 		goto out;
 	}
@@ -2341,7 +2341,7 @@ static void bus_reset_cleanup(struct Scsi_Host *instance)
 	 */
 
 	if (hostdata->selecting) {
-		hostdata->selecting->result = DID_RESET << 16;
+		hostdata->selecting->status.combined = DID_RESET << 16;
 		complete_cmd(instance, hostdata->selecting);
 		hostdata->selecting = NULL;
 	}
@@ -2399,7 +2399,7 @@ static int NCR5380_host_reset(struct scsi_cmnd *cmd)
 	list_for_each_entry(ncmd, &hostdata->unissued, list) {
 		struct scsi_cmnd *scmd = NCR5380_to_scmd(ncmd);
 
-		scmd->result = DID_RESET << 16;
+		scmd->status.combined = DID_RESET << 16;
 		scmd->scsi_done(scmd);
 	}
 	INIT_LIST_HEAD(&hostdata->unissued);
