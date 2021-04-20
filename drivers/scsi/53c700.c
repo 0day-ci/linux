@@ -634,7 +634,7 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 		NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) - 1);
 
 		SCp->host_scribble = NULL;
-		SCp->result = result;
+		SCp->status.combined = result;
 		SCp->scsi_done(SCp);
 	} else {
 		printk(KERN_ERR "53c700: SCSI DONE HAS NULL SCp\n");
@@ -1571,7 +1571,7 @@ NCR_700_intr(int irq, void *dev_id)
 				 * command again otherwise we'll
 				 * deadlock on the
 				 * hostdata->state_lock */
-				SCp->result = DID_RESET << 16;
+				SCp->status.combined = DID_RESET << 16;
 				SCp->scsi_done(SCp);
 			}
 			mdelay(25);
