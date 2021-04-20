@@ -2301,6 +2301,7 @@ static void __init blogic_inithoststruct(struct blogic_adapter *adapter,
 	host->sg_tablesize = adapter->drvr_sglimit;
 	host->unchecked_isa_dma = adapter->need_bouncebuf;
 	host->cmd_per_lun = adapter->untag_qdepth;
+	host->no_trailing_allocation_length = true;
 }
 
 /*

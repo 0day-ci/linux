@@ -359,8 +359,19 @@ int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 	if (sdev->skip_vpd_pages)
 		goto fail;
 
-	/* Ask for all the pages supported by this device */
-	result = scsi_vpd_inquiry(sdev, buf, 0, buf_len);
+	/*
+	 * Ask for all the pages supported by this device.  Determine the
+	 * actual data length first if so required by the host, e.g.
+	 * BusLogic BT-958.
+	 */
+	if (sdev->host->no_trailing_allocation_length) {
+		result = scsi_vpd_inquiry(sdev, buf, 0, min(4, buf_len));
+		if (result < 4)
+			goto fail;
+	} else {
+		result = buf_len;
+	}
+	result = scsi_vpd_inquiry(sdev, buf, 0, min(result, buf_len));
 	if (result < 4)
 		goto fail;
 
@@ -379,7 +390,14 @@ int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 	goto fail;
 
  found:
-	result = scsi_vpd_inquiry(sdev, buf, page, buf_len);
+	if (sdev->host->no_trailing_allocation_length) {
+		result = scsi_vpd_inquiry(sdev, buf, page, min(4, buf_len));
+		if (result < 4)
+			goto fail;
+	} else {
+		result = buf_len;
+	}
+	result = scsi_vpd_inquiry(sdev, buf, page, min(result, buf_len));
 	if (result < 0)
 		goto fail;
 

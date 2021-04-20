@@ -669,6 +669,9 @@ struct Scsi_Host {
 	/* The transport requires the LUN bits NOT to be stored in CDB[1] */
 	unsigned no_scsi2_lun_in_cdb:1;
 
+	/* Allocation length must not exceed actual data length. */
+	unsigned no_trailing_allocation_length:1;
+
 	/*
 	 * Optional work queue to be utilized by the transport
 	 */
