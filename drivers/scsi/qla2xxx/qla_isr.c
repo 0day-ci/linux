@@ -2578,7 +2578,7 @@ qla2x00_handle_sense(srb_t *sp, uint8_t *sense_data, uint32_t par_sense_len,
 
 	if (track_sense_len != 0) {
 		rsp->status_srb = sp;
-		cp->result = res;
+		cp->status.combined = res;
 	}
 
 	if (sense_len) {
@@ -2653,7 +2653,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 		    cmd->device->sector_size);
 
 		scsi_set_resid(cmd, resid);
-		cmd->result = DID_OK << 16;
+		cmd->status.combined = DID_OK << 16;
 
 		/* Update protection tag */
 		if (scsi_prot_sg_count(cmd)) {
@@ -2698,7 +2698,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 		    0x10, 0x1);
 		set_driver_byte(cmd, DRIVER_SENSE);
 		set_host_byte(cmd, DID_ABORT);
-		cmd->result |= SAM_STAT_CHECK_CONDITION;
+		cmd->status.combined |= SAM_STAT_CHECK_CONDITION;
 		return 1;
 	}
 
@@ -2708,7 +2708,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 		    0x10, 0x3);
 		set_driver_byte(cmd, DRIVER_SENSE);
 		set_host_byte(cmd, DID_ABORT);
-		cmd->result |= SAM_STAT_CHECK_CONDITION;
+		cmd->status.combined |= SAM_STAT_CHECK_CONDITION;
 		return 1;
 	}
 
@@ -2718,7 +2718,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 		    0x10, 0x2);
 		set_driver_byte(cmd, DRIVER_SENSE);
 		set_host_byte(cmd, DID_ABORT);
-		cmd->result |= SAM_STAT_CHECK_CONDITION;
+		cmd->status.combined |= SAM_STAT_CHECK_CONDITION;
 		return 1;
 	}
 
@@ -3216,7 +3216,7 @@ check_scsi_status:
 
 	case CS_DIF_ERROR:
 		logit = qla2x00_handle_dif_error(sp, sts24);
-		res = cp->result;
+		res = cp->status.combined;
 		break;
 
 	case CS_TRANSPORT:
@@ -3317,7 +3317,7 @@ qla2x00_status_cont_entry(struct rsp_que *rsp, sts_cont_entry_t *pkt)
 	/* Place command on done queue. */
 	if (sense_len == 0) {
 		rsp->status_srb = NULL;
-		sp->done(sp, cp->result);
+		sp->done(sp, cp->status.combined);
 	}
 }
 

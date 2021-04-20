@@ -2123,13 +2123,13 @@ qla2xxx_dif_start_scsi_mq(srb_t *sp)
 
 	/* Check for host side state */
 	if (!qpair->online) {
-		cmd->result = DID_NO_CONNECT << 16;
+		cmd->status.combined = DID_NO_CONNECT << 16;
 		return QLA_INTERFACE_ERROR;
 	}
 
 	if (!qpair->difdix_supported &&
 		scsi_get_prot_op(cmd) != SCSI_PROT_NORMAL) {
-		cmd->result = DID_NO_CONNECT << 16;
+		cmd->status.combined = DID_NO_CONNECT << 16;
 		return QLA_INTERFACE_ERROR;
 	}
 

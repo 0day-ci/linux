@@ -27,8 +27,8 @@ void qla2x00_bsg_job_done(srb_t *sp, int res)
 
 	sp->free(sp);
 
-	bsg_reply->result = res;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = res;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 }
 
@@ -156,10 +156,10 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 			ha->fcp_prio_cfg->attributes &=
 				~FCP_PRIO_ATTR_ENABLE;
 			qla24xx_update_all_fcp_prio(vha);
-			bsg_reply->result = DID_OK;
+			bsg_reply->status.combined = DID_OK;
 		} else {
 			ret = -EINVAL;
-			bsg_reply->result = (DID_ERROR << 16);
+			bsg_reply->status.combined = (DID_ERROR << 16);
 			goto exit_fcp_prio_cfg;
 		}
 		break;
@@ -171,10 +171,10 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 				ha->fcp_prio_cfg->attributes |=
 				    FCP_PRIO_ATTR_ENABLE;
 				qla24xx_update_all_fcp_prio(vha);
-				bsg_reply->result = DID_OK;
+				bsg_reply->status.combined = DID_OK;
 			} else {
 				ret = -EINVAL;
-				bsg_reply->result = (DID_ERROR << 16);
+				bsg_reply->status.combined = (DID_ERROR << 16);
 				goto exit_fcp_prio_cfg;
 			}
 		}
@@ -184,11 +184,11 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 		len = bsg_job->reply_payload.payload_len;
 		if (!len || len > FCP_PRIO_CFG_SIZE) {
 			ret = -EINVAL;
-			bsg_reply->result = (DID_ERROR << 16);
+			bsg_reply->status.combined = (DID_ERROR << 16);
 			goto exit_fcp_prio_cfg;
 		}
 
-		bsg_reply->result = DID_OK;
+		bsg_reply->status.combined = DID_OK;
 		bsg_reply->reply_payload_rcv_len =
 			sg_copy_from_buffer(
 			bsg_job->reply_payload.sg_list,
@@ -200,7 +200,7 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 	case QLFC_FCP_PRIO_SET_CONFIG:
 		len = bsg_job->request_payload.payload_len;
 		if (!len || len > FCP_PRIO_CFG_SIZE) {
-			bsg_reply->result = (DID_ERROR << 16);
+			bsg_reply->status.combined = (DID_ERROR << 16);
 			ret = -EINVAL;
 			goto exit_fcp_prio_cfg;
 		}
@@ -211,7 +211,7 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 				ql_log(ql_log_warn, vha, 0x7050,
 				    "Unable to allocate memory for fcp prio "
 				    "config data (%x).\n", FCP_PRIO_CFG_SIZE);
-				bsg_reply->result = (DID_ERROR << 16);
+				bsg_reply->status.combined = (DID_ERROR << 16);
 				ret = -ENOMEM;
 				goto exit_fcp_prio_cfg;
 			}
@@ -225,7 +225,7 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 		/* validate fcp priority data */
 
 		if (!qla24xx_fcp_prio_cfg_valid(vha, ha->fcp_prio_cfg, 1)) {
-			bsg_reply->result = (DID_ERROR << 16);
+			bsg_reply->status.combined = (DID_ERROR << 16);
 			ret = -EINVAL;
 			/* If buffer was invalidatic int
 			 * fcp_prio_cfg is of no use
@@ -239,7 +239,7 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 		if (ha->fcp_prio_cfg->attributes & FCP_PRIO_ATTR_ENABLE)
 			ha->flags.fcp_prio_enabled = 1;
 		qla24xx_update_all_fcp_prio(vha);
-		bsg_reply->result = DID_OK;
+		bsg_reply->status.combined = DID_OK;
 		break;
 	default:
 		ret = -EINVAL;
@@ -247,7 +247,7 @@ qla24xx_proc_fcp_prio_cfg_cmd(struct bsg_job *bsg_job)
 	}
 exit_fcp_prio_cfg:
 	if (!ret)
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return ret;
 }
@@ -917,12 +917,12 @@ qla2x00_process_loopback(struct bsg_job *bsg_job)
 		    "Vendor request %s failed.\n", type);
 
 		rval = 0;
-		bsg_reply->result = (DID_ERROR << 16);
+		bsg_reply->status.combined = (DID_ERROR << 16);
 		bsg_reply->reply_payload_rcv_len = 0;
 	} else {
 		ql_dbg(ql_dbg_user, vha, 0x702d,
 		    "Vendor request %s completed.\n", type);
-		bsg_reply->result = (DID_OK << 16);
+		bsg_reply->status.combined = (DID_OK << 16);
 		sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 			bsg_job->reply_payload.sg_cnt, rsp_data,
 			rsp_data_len);
@@ -951,7 +951,7 @@ done_unmap_req_sg:
 	    bsg_job->request_payload.sg_list,
 	    bsg_job->request_payload.sg_cnt, DMA_TO_DEVICE);
 	if (!rval)
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rval;
 }
@@ -984,8 +984,8 @@ qla84xx_reset(struct bsg_job *bsg_job)
 	} else {
 		ql_dbg(ql_dbg_user, vha, 0x7031,
 		    "Vendor request 84xx reset completed.\n");
-		bsg_reply->result = DID_OK;
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_reply->status.combined = DID_OK;
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 
@@ -1084,7 +1084,7 @@ qla84xx_updatefw(struct bsg_job *bsg_job)
 		    "Vendor request 84xx updatefw completed.\n");
 
 		bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-		bsg_reply->result = DID_OK;
+		bsg_reply->status.combined = DID_OK;
 	}
 
 	dma_pool_free(ha->s_dma_pool, mn, mn_dma);
@@ -1097,7 +1097,7 @@ done_unmap_sg:
 		bsg_job->request_payload.sg_cnt, DMA_TO_DEVICE);
 
 	if (!rval)
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rval;
 }
@@ -1265,7 +1265,7 @@ qla84xx_mgmt_cmd(struct bsg_job *bsg_job)
 		    "Vendor request 84xx mgmt completed.\n");
 
 		bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-		bsg_reply->result = DID_OK;
+		bsg_reply->status.combined = DID_OK;
 
 		if ((ql84_mgmt->mgmt.cmd == QLA84_MGMT_READ_MEM) ||
 			(ql84_mgmt->mgmt.cmd == QLA84_MGMT_GET_INFO)) {
@@ -1293,7 +1293,7 @@ exit_mgmt:
 	dma_pool_free(ha->s_dma_pool, mn, mn_dma);
 
 	if (!rval)
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rval;
 }
@@ -1379,8 +1379,8 @@ qla24xx_iidma(struct bsg_job *bsg_job)
 				sizeof(struct qla_port_param));
 		}
 
-		bsg_reply->result = DID_OK;
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_reply->status.combined = DID_OK;
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 
@@ -1484,12 +1484,12 @@ qla2x00_read_optrom(struct bsg_job *bsg_job)
 	    ha->optrom_region_size);
 
 	bsg_reply->reply_payload_rcv_len = ha->optrom_region_size;
-	bsg_reply->result = DID_OK;
+	bsg_reply->status.combined = DID_OK;
 	vfree(ha->optrom_buffer);
 	ha->optrom_buffer = NULL;
 	ha->optrom_state = QLA_SWAITING;
 	mutex_unlock(&ha->optrom_mutex);
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return rval;
 }
@@ -1521,16 +1521,16 @@ qla2x00_update_optrom(struct bsg_job *bsg_job)
 	    ha->optrom_region_start, ha->optrom_region_size);
 
 	if (rval) {
-		bsg_reply->result = -EINVAL;
+		bsg_reply->status.combined = -EINVAL;
 		rval = -EINVAL;
 	} else {
-		bsg_reply->result = DID_OK;
+		bsg_reply->status.combined = DID_OK;
 	}
 	vfree(ha->optrom_buffer);
 	ha->optrom_buffer = NULL;
 	ha->optrom_state = QLA_SWAITING;
 	mutex_unlock(&ha->optrom_mutex);
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return rval;
 }
@@ -1581,8 +1581,8 @@ dealloc:
 
 done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return 0;
@@ -1632,8 +1632,8 @@ dealloc:
 done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
 	bsg_reply->reply_payload_rcv_len = sizeof(*sr);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return 0;
@@ -1679,8 +1679,8 @@ dealloc:
 
 done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return 0;
@@ -1725,8 +1725,8 @@ dealloc:
 
 done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return 0;
@@ -1775,8 +1775,8 @@ dealloc:
 done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
 	bsg_reply->reply_payload_rcv_len = sizeof(*i2c);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return 0;
@@ -1953,8 +1953,8 @@ done:
 	bsg_reply->reply_data.vendor_reply.vendor_rsp[0] = rval;
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
 	bsg_reply->reply_payload_rcv_len = 0;
-	bsg_reply->result = (DID_OK) << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = (DID_OK) << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	/* Always return success, vendor rsp carries correct status */
 	return 0;
@@ -2119,8 +2119,8 @@ qla26xx_serdes_op(struct bsg_job *bsg_job)
 	    rval ? EXT_STATUS_MAILBOX : 0;
 
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -2161,8 +2161,8 @@ qla8044_serdes_op(struct bsg_job *bsg_job)
 	    rval ? EXT_STATUS_MAILBOX : 0;
 
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -2193,8 +2193,8 @@ qla27xx_get_flash_upd_cap(struct bsg_job *bsg_job)
 	    EXT_STATUS_OK;
 
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -2239,8 +2239,8 @@ qla27xx_set_flash_upd_cap(struct bsg_job *bsg_job)
 	    EXT_STATUS_OK;
 
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -2298,8 +2298,8 @@ done:
 	bsg_reply->reply_data.vendor_reply.vendor_rsp[0] = EXT_STATUS_OK;
 
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -2353,8 +2353,8 @@ qla2x00_get_priv_stats(struct bsg_job *bsg_job)
 	    rval ? EXT_STATUS_MAILBOX : EXT_STATUS_OK;
 
 	bsg_job->reply_len = sizeof(*bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	dma_free_coherent(&ha->pdev->dev, sizeof(*stats),
@@ -2398,8 +2398,8 @@ qla2x00_do_dport_diagnostics(struct bsg_job *bsg_job)
 	    rval ? EXT_STATUS_MAILBOX : EXT_STATUS_OK;
 
 	bsg_job->reply_len = sizeof(*bsg_reply);
-	bsg_reply->result = DID_OK << 16;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK << 16;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	kfree(dd);
@@ -2438,10 +2438,10 @@ qla2x00_get_flash_image_status(struct bsg_job *bsg_job)
 
 	bsg_reply->reply_data.vendor_reply.vendor_rsp[0] = EXT_STATUS_OK;
 	bsg_reply->reply_payload_rcv_len = sizeof(regions);
-	bsg_reply->result = DID_OK << 16;
+	bsg_reply->status.combined = DID_OK << 16;
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
-	bsg_job_done(bsg_job, bsg_reply->result,
-	    bsg_reply->reply_payload_rcv_len);
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
+		     bsg_reply->reply_payload_rcv_len);
 
 	return 0;
 }
@@ -2508,8 +2508,8 @@ qla2x00_manage_host_stats(struct bsg_job *bsg_job)
 				    &rsp_data,
 				    sizeof(struct ql_vnd_mng_host_stats_resp));
 
-	bsg_reply->result = DID_OK;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 
 	return ret;
@@ -2577,8 +2577,8 @@ qla2x00_get_host_stats(struct bsg_job *bsg_job)
 					    bsg_job->reply_payload.sg_cnt, &rsp_data,
 					    sizeof(struct ql_vnd_mng_host_stats_resp));
 
-		bsg_reply->result = DID_OK;
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_reply->status.combined = DID_OK;
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 		goto host_stat_out;
 	}
@@ -2598,8 +2598,8 @@ qla2x00_get_host_stats(struct bsg_job *bsg_job)
 	bsg_reply->reply_payload_rcv_len = sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 							       bsg_job->reply_payload.sg_cnt,
 							       data, response_len);
-	bsg_reply->result = DID_OK;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 
 	kfree(data);
@@ -2675,8 +2675,8 @@ qla2x00_get_tgt_stats(struct bsg_job *bsg_job)
 					    bsg_job->reply_payload.sg_cnt, data,
 					    sizeof(struct ql_vnd_tgt_stats_resp));
 
-		bsg_reply->result = DID_OK;
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_reply->status.combined = DID_OK;
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 		goto tgt_stat_out;
 	}
@@ -2698,8 +2698,8 @@ reply:
 		sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 				    bsg_job->reply_payload.sg_cnt, data,
 				    response_len);
-	bsg_reply->result = DID_OK;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 
 tgt_stat_out:
@@ -2760,8 +2760,8 @@ qla2x00_manage_host_port(struct bsg_job *bsg_job)
 		sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 				    bsg_job->reply_payload.sg_cnt, &rsp_data,
 				    sizeof(struct ql_vnd_mng_host_port_resp));
-	bsg_reply->result = DID_OK;
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_reply->status.combined = DID_OK;
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 
 	return ret;
@@ -2888,7 +2888,7 @@ qla24xx_bsg_request(struct bsg_job *bsg_job)
 		goto skip_chip_chk;
 
 	if (vha->hw->flags.port_isolated) {
-		bsg_reply->result = DID_ERROR;
+		bsg_reply->status.combined = DID_ERROR;
 		/* operation not permitted */
 		return -EPERM;
 	}
@@ -2956,12 +2956,12 @@ qla24xx_bsg_timeout(struct bsg_job *bsg_job)
 						ql_log(ql_log_warn, vha, 0x7089,
 						    "mbx abort_command "
 						    "failed.\n");
-						bsg_reply->result = -EIO;
+						bsg_reply->status.combined = -EIO;
 					} else {
 						ql_dbg(ql_dbg_user, vha, 0x708a,
 						    "mbx abort_command "
 						    "success.\n");
-						bsg_reply->result = 0;
+						bsg_reply->status.combined = 0;
 					}
 					spin_lock_irqsave(&ha->hardware_lock, flags);
 					goto done;
@@ -2971,7 +2971,7 @@ qla24xx_bsg_timeout(struct bsg_job *bsg_job)
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	ql_log(ql_log_info, vha, 0x708b, "SRB not found to abort.\n");
-	bsg_reply->result = -ENXIO;
+	bsg_reply->status.combined = -ENXIO;
 	return 0;
 
 done:

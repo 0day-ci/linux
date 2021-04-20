@@ -2154,7 +2154,7 @@ qlafx00_handle_sense(srb_t *sp, uint8_t *sense_data, uint32_t par_sense_len,
 	    sense_len, par_sense_len, track_sense_len);
 	if (GET_FW_SENSE_LEN(sp) > 0) {
 		rsp->status_srb = sp;
-		cp->result = res;
+		cp->status.combined = res;
 	}
 
 	if (sense_len) {
@@ -2255,7 +2255,7 @@ qlafx00_ioctl_iosb_entry(scsi_qla_host_t *vha, struct req_que *req,
 		    sp->vha, 0x5074,
 		    fw_sts_ptr, sizeof(fstatus));
 
-		res = bsg_reply->result = DID_OK << 16;
+		res = bsg_reply->status.combined = DID_OK << 16;
 		bsg_reply->reply_payload_rcv_len =
 		    bsg_job->reply_payload.payload_len;
 	}
@@ -2612,7 +2612,7 @@ qlafx00_status_cont_entry(struct rsp_que *rsp, sts_cont_entry_t *pkt)
 	/* Place command on done queue. */
 	if (sense_len == 0) {
 		rsp->status_srb = NULL;
-		sp->done(sp, cp->result);
+		sp->done(sp, cp->status.combined);
 	} else {
 		WARN_ON_ONCE(true);
 	}
