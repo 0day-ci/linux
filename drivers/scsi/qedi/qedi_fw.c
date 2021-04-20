@@ -2016,7 +2016,7 @@ void qedi_trace_io(struct qedi_ctx *qedi, struct iscsi_task *task,
 	io_log->cached_sge = qedi->use_cached_sge;
 	io_log->slow_sge = qedi->use_slow_sge;
 	io_log->fast_sge = qedi->use_fast_sge;
-	io_log->result = sc_cmd->result;
+	io_log->result = sc_cmd->status.combined;
 	io_log->jiffies = jiffies;
 	io_log->blk_req_cpu = smp_processor_id();
 
