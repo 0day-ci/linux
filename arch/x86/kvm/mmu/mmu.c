@@ -3598,9 +3598,10 @@ static int handle_mmio_page_fault(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 	return RET_PF_RETRY;
 }
 
-static bool page_fault_handle_page_track(struct kvm_vcpu *vcpu,
-					 u32 error_code, gfn_t gfn)
+static bool page_fault_handle_page_track(struct kvm_page_fault *kpf)
 {
+	u32 error_code = kpf->error_code;
+
 	if (unlikely(error_code & PFERR_RSVD_MASK))
 		return false;
 
@@ -3612,7 +3613,7 @@ static bool page_fault_handle_page_track(struct kvm_vcpu *vcpu,
 	 * guest is writing the page which is write tracked which can
 	 * not be fixed by page fault handler.
 	 */
-	if (kvm_page_track_is_active(vcpu, gfn, KVM_PAGE_TRACK_WRITE))
+	if (kvm_page_track_is_active(kpf->vcpu, kpf->gfn, KVM_PAGE_TRACK_WRITE))
 		return true;
 
 	return false;
@@ -3697,7 +3698,7 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 	unsigned long mmu_seq;
 	int r;
 
-	if (page_fault_handle_page_track(vcpu, error_code, gfn))
+	if (page_fault_handle_page_track(kpf))
 		return RET_PF_EMULATE;
 
 	if (!is_tdp_mmu_root(vcpu->kvm, vcpu->arch.mmu->root_hpa)) {

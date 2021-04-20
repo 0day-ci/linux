@@ -827,7 +827,8 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 		return RET_PF_RETRY;
 	}
 
-	if (page_fault_handle_page_track(vcpu, error_code, walker.gfn)) {
+	kpf->gfn = walker.gfn;
+	if (page_fault_handle_page_track(kpf)) {
 		shadow_page_table_clear_flood(vcpu, addr);
 		return RET_PF_EMULATE;
 	}
@@ -849,7 +850,6 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 	mmu_seq = vcpu->kvm->mmu_notifier_seq;
 	smp_rmb();
 
-	kpf->gfn = walker.gfn;
 	if (try_async_pf(kpf))
 		return RET_PF_RETRY;
 
