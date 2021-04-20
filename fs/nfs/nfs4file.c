@@ -313,6 +313,7 @@ out:
 	return ret < 0 ? ret : count;
 }
 
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 static int read_name_gen = 1;
 #define SSC_READ_NAME_BODY "ssc_read_%d"
 
@@ -411,6 +412,7 @@ static const struct nfs4_ssc_client_ops nfs4_ssc_clnt_ops_tbl = {
 	.sco_open = __nfs42_ssc_open,
 	.sco_close = __nfs42_ssc_close,
 };
+#endif	/* CONFIG_NFS_V4_2_SSC_HELPER */
 
 /**
  * nfs42_ssc_register_ops - Wrapper to register NFS_V4 ops in nfs_common
@@ -420,7 +422,7 @@ static const struct nfs4_ssc_client_ops nfs4_ssc_clnt_ops_tbl = {
  */
 void nfs42_ssc_register_ops(void)
 {
-#ifdef CONFIG_NFSD_V4
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 	nfs42_ssc_register(&nfs4_ssc_clnt_ops_tbl);
 #endif
 }
@@ -433,7 +435,7 @@ void nfs42_ssc_register_ops(void)
  */
 void nfs42_ssc_unregister_ops(void)
 {
-#ifdef CONFIG_NFSD_V4
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 	nfs42_ssc_unregister(&nfs4_ssc_clnt_ops_tbl);
 #endif
 }

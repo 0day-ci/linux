@@ -86,7 +86,7 @@ const struct super_operations nfs_sops = {
 };
 EXPORT_SYMBOL_GPL(nfs_sops);
 
-#ifdef CONFIG_NFS_V4_2
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 static const struct nfs_ssc_client_ops nfs_ssc_clnt_ops_tbl = {
 	.sco_sb_deactive = nfs_sb_deactive,
 };
@@ -116,14 +116,14 @@ static void unregister_nfs4_fs(void)
 #ifdef CONFIG_NFS_V4_2
 static void nfs_ssc_register_ops(void)
 {
-#ifdef CONFIG_NFSD_V4
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 	nfs_ssc_register(&nfs_ssc_clnt_ops_tbl);
 #endif
 }
 
 static void nfs_ssc_unregister_ops(void)
 {
-#ifdef CONFIG_NFSD_V4
+#ifdef CONFIG_NFS_V4_2_SSC_HELPER
 	nfs_ssc_unregister(&nfs_ssc_clnt_ops_tbl);
 #endif
 }
