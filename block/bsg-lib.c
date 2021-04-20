@@ -82,18 +82,18 @@ static int bsg_transport_complete_rq(struct request *rq, struct sg_io_v4 *hdr)
 	 * The assignments below don't make much sense, but are kept for
 	 * bug by bug backwards compatibility:
 	 */
-	hdr->device_status = job->result & 0xff;
-	hdr->transport_status = host_byte(job->result);
-	hdr->driver_status = driver_byte(job->result);
+	hdr->device_status = job->status.b.status;
+	hdr->transport_status = host_byte(job->status);
+	hdr->driver_status = driver_byte(job->status);
 	hdr->info = 0;
 	if (hdr->device_status || hdr->transport_status || hdr->driver_status)
 		hdr->info |= SG_INFO_CHECK;
 	hdr->response_len = 0;
 
-	if (job->result < 0) {
+	if (job->status.combined < 0) {
 		/* we're only returning the result field in the reply */
 		job->reply_len = sizeof(u32);
-		ret = job->result;
+		ret = job->status.combined;
 	}
 
 	if (job->reply_len && hdr->response) {
@@ -183,7 +183,7 @@ void bsg_job_done(struct bsg_job *job, int result,
 {
 	struct request *rq = blk_mq_rq_from_pdu(job);
 
-	job->result = result;
+	job->status.combined = result;
 	job->reply_payload_rcv_len = reply_payload_rcv_len;
 	if (likely(!blk_should_fake_timeout(rq->q)))
 		blk_mq_complete_request(rq);
@@ -247,7 +247,7 @@ static bool bsg_prepare_job(struct device *dev, struct request *req)
 failjob_rls_rqst_payload:
 	kfree(job->request_payload.sg_list);
 failjob_rls_job:
-	job->result = -ENOMEM;
+	job->status.combined = -ENOMEM;
 	return false;
 }
 
@@ -257,7 +257,7 @@ failjob_rls_job:
  * @bd: queue data
  *
  * On error the create_bsg_job function should return a -Exyz error value
- * that will be set to ->result.
+ * that will be set to ->status.
  *
  * Drivers/subsys should pass this to the queue init function.
  */
