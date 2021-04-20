@@ -2531,6 +2531,34 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
 	return iommu_fwspec_add_ids(dev, args->args, 1);
 }
 
+static bool arm_smmu_dev_has_rmr(struct arm_smmu_master *master,
+				 struct iommu_rmr *e)
+{
+	int i;
+
+	for (i = 0; i < master->num_sids; i++) {
+		if (e->sid == master->sids[i])
+			return true;
+	}
+
+	return false;
+}
+
+static void arm_smmu_rmr_get_resv_regions(struct device *dev,
+					  struct list_head *head)
+{
+	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
+	struct arm_smmu_device *smmu = master->smmu;
+	struct iommu_rmr *rmr;
+
+	list_for_each_entry(rmr, &smmu->rmr_list, list) {
+		if (!arm_smmu_dev_has_rmr(master, rmr))
+			continue;
+
+		iommu_dma_get_rmr_resv_regions(dev, rmr, head);
+	}
+}
+
 static void arm_smmu_get_resv_regions(struct device *dev,
 				      struct list_head *head)
 {
@@ -2545,6 +2573,7 @@ static void arm_smmu_get_resv_regions(struct device *dev,
 	list_add_tail(&region->list, head);
 
 	iommu_dma_get_resv_regions(dev, head);
+	arm_smmu_rmr_get_resv_regions(dev, head);
 }
 
 static bool arm_smmu_dev_has_feature(struct device *dev,
