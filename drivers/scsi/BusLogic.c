@@ -2615,11 +2615,11 @@ static void blogic_qcompleted_ccb(struct blogic_ccb *ccb)
   the Host Adapter Status and Target Device Status.
 */
 
-static int blogic_resultcode(struct blogic_adapter *adapter,
+static union scsi_status blogic_resultcode(struct blogic_adapter *adapter,
 		enum blogic_adapter_status adapter_status,
 		enum blogic_tgt_status tgt_status)
 {
-	int hoststatus;
+	enum host_status hoststatus;
 
 	switch (adapter_status) {
 	case BLOGIC_CMD_CMPLT_NORMAL:
@@ -2664,7 +2664,8 @@ static int blogic_resultcode(struct blogic_adapter *adapter,
 		hoststatus = DID_ERROR;
 		break;
 	}
-	return (hoststatus << 16) | tgt_status;
+	return (union scsi_status){
+		.b.host = hoststatus, .b.status = (enum sam_status)tgt_status};
 }
 
 
@@ -2775,7 +2776,7 @@ static void blogic_process_ccbs(struct blogic_adapter *adapter)
 				struct scsi_cmnd *nxt_cmd =
 					command->reset_chain;
 				command->reset_chain = NULL;
-				command->result = DID_RESET << 16;
+				command->status.combined = DID_RESET << 16;
 				command->scsi_done(command);
 				command = nxt_cmd;
 			}
@@ -2792,7 +2793,7 @@ static void blogic_process_ccbs(struct blogic_adapter *adapter)
 					command = ccb->command;
 					blogic_dealloc_ccb(ccb, 1);
 					adapter->active_cmds[tgt_id]--;
-					command->result = DID_RESET << 16;
+					command->status.combined = DID_RESET << 16;
 					command->scsi_done(command);
 				}
 			adapter->bdr_pend[tgt_id] = NULL;
@@ -2813,16 +2814,16 @@ static void blogic_process_ccbs(struct blogic_adapter *adapter)
 				    .cmds_complete++;
 				adapter->tgt_flags[ccb->tgt_id]
 				    .cmd_good = true;
-				command->result = DID_OK << 16;
+				command->status.combined = DID_OK << 16;
 				break;
 			case BLOGIC_CMD_ABORT_BY_HOST:
 				blogic_warn("CCB #%ld to Target %d Aborted\n",
 					adapter, ccb->serial, ccb->tgt_id);
 				blogic_inc_count(&adapter->tgt_stats[ccb->tgt_id].aborts_done);
-				command->result = DID_ABORT << 16;
+				command->status.combined = DID_ABORT << 16;
 				break;
 			case BLOGIC_CMD_COMPLETE_ERROR:
-				command->result = blogic_resultcode(adapter,
+				command->status = blogic_resultcode(adapter,
 					ccb->adapter_status, ccb->tgt_status);
 				if (ccb->adapter_status != BLOGIC_SELECT_TIMEOUT) {
 					adapter->tgt_stats[ccb->tgt_id]
@@ -2830,7 +2831,7 @@ static void blogic_process_ccbs(struct blogic_adapter *adapter)
 					if (blogic_global_options.trace_err) {
 						int i;
 						blogic_notice("CCB #%ld Target %d: Result %X Host "
-								"Adapter Status %02X Target Status %02X\n", adapter, ccb->serial, ccb->tgt_id, command->result, ccb->adapter_status, ccb->tgt_status);
+								"Adapter Status %02X Target Status %02X\n", adapter, ccb->serial, ccb->tgt_id, command->status.combined, ccb->adapter_status, ccb->tgt_status);
 						blogic_notice("CDB   ", adapter);
 						for (i = 0; i < ccb->cdblen; i++)
 							blogic_notice(" %02X", adapter, ccb->cdb[i]);
@@ -3042,7 +3043,7 @@ static int blogic_qcmd_lck(struct scsi_cmnd *command,
 	   occurred.
 	 */
 	if (cdb[0] == REQUEST_SENSE && command->sense_buffer[0] != 0) {
-		command->result = DID_OK << 16;
+		command->status.combined = DID_OK << 16;
 		comp_cb(command);
 		return 0;
 	}
@@ -3060,7 +3061,7 @@ static int blogic_qcmd_lck(struct scsi_cmnd *command,
 		spin_lock_irq(adapter->scsi_host->host_lock);
 		ccb = blogic_alloc_ccb(adapter);
 		if (ccb == NULL) {
-			command->result = DID_ERROR << 16;
+			command->status.combined = DID_ERROR << 16;
 			comp_cb(command);
 			return 0;
 		}
@@ -3211,7 +3212,7 @@ static int blogic_qcmd_lck(struct scsi_cmnd *command,
 						ccb)) {
 				blogic_warn("Still unable to write Outgoing Mailbox - Host Adapter Dead?\n", adapter);
 				blogic_dealloc_ccb(ccb, 1);
-				command->result = DID_ERROR << 16;
+				command->status.combined = DID_ERROR << 16;
 				command->scsi_done(command);
 			}
 		}
