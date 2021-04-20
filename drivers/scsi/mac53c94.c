@@ -347,7 +347,7 @@ static void cmd_done(struct fsc_state *state, int result)
 
 	cmd = state->current_req;
 	if (cmd) {
-		cmd->result = result;
+		cmd->status.combined = result;
 		(*cmd->scsi_done)(cmd);
 		state->current_req = NULL;
 	}
