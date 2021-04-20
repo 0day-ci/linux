@@ -9,6 +9,7 @@
 #include <crypto/hash.h>
 #include <crypto/internal/akcipher.h>
 #include <crypto/internal/rsa-common.h>
+#include <crypto/public_key.h>
 
 static bool psspad_check_hash_algo(const char *hash_algo)
 {
@@ -52,6 +53,23 @@ static void psspad_free_shash(struct crypto_shash *hash_tfm, struct shash_desc *
 	crypto_free_shash(hash_tfm);
 }
 
+static int psspad_set_sig_params(struct crypto_akcipher *tfm,
+				 const void *sig,
+				 unsigned int siglen)
+{
+	struct akcipher_instance *inst = akcipher_alg_instance(tfm);
+	struct rsapad_inst_ctx *ictx = akcipher_instance_ctx(inst);
+	const struct public_key_signature *s = sig;
+
+	if (!sig)
+		return -EINVAL;
+
+	ictx->salt_len = s->salt_length;
+	ictx->mgf_hash_algo = s->mgf_hash_algo;
+
+	return 0;
+}
+
 static int psspad_s_v_e_d(struct akcipher_request *req)
 {
 	return -EOPNOTSUPP;
@@ -67,7 +85,8 @@ static struct akcipher_alg psspad_alg = {
 	.verify = psspad_s_v_e_d,
 	.set_pub_key = rsapad_set_pub_key,
 	.set_priv_key = rsapad_set_priv_key,
-	.max_size = rsapad_get_max_size
+	.max_size = rsapad_get_max_size,
+	.set_sig_params = psspad_set_sig_params
 };
 
 static int psspad_create(struct crypto_template *tmpl, struct rtattr **tb)

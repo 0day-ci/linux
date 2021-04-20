@@ -26,6 +26,8 @@ struct rsapad_tfm_ctx {
 struct rsapad_inst_ctx {
 	struct crypto_akcipher_spawn spawn;
 	const struct rsa_asn1_template *digest_info;
+	u16 salt_len;
+	const char *mgf_hash_algo;
 };
 
 struct rsapad_akciper_req_ctx {
