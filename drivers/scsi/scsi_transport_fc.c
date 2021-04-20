@@ -4153,9 +4153,9 @@ fail_host_msg:
 	/* return the errno failure code as the only status */
 	BUG_ON(job->reply_len < sizeof(uint32_t));
 	bsg_reply->reply_payload_rcv_len = 0;
-	bsg_reply->result = ret;
+	bsg_reply->status.combined = ret;
 	job->reply_len = sizeof(uint32_t);
-	bsg_job_done(job, bsg_reply->result,
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
@@ -4222,9 +4222,9 @@ fail_rport_msg:
 	/* return the errno failure code as the only status */
 	BUG_ON(job->reply_len < sizeof(uint32_t));
 	bsg_reply->reply_payload_rcv_len = 0;
-	bsg_reply->result = ret;
+	bsg_reply->status.combined = ret;
 	job->reply_len = sizeof(uint32_t);
-	bsg_job_done(job, bsg_reply->result,
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 }
