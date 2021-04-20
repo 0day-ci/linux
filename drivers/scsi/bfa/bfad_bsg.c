@@ -3552,7 +3552,7 @@ bfad_im_bsg_request(struct bsg_job *job)
 {
 	struct fc_bsg_request *bsg_request = job->request;
 	struct fc_bsg_reply *bsg_reply = job->reply;
-	uint32_t rc = BFA_STATUS_OK;
+	int32_t rc = BFA_STATUS_OK;
 
 	switch (bsg_request->msgcode) {
 	case FC_BSG_HST_VENDOR:
