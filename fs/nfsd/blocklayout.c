@@ -255,9 +255,9 @@ again:
 	req->cmd_len = COMMAND_SIZE(INQUIRY);
 
 	blk_execute_rq(NULL, rq, 1);
-	if (req->result) {
+	if (req->status.combined) {
 		pr_err("pNFS: INQUIRY 0x83 failed with: %x\n",
-			req->result);
+			req->status.combined);
 		error = -EIO;
 		goto out_put_request;
 	}
