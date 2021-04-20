@@ -50,8 +50,7 @@ static int panel_lvds_unprepare(struct drm_panel *panel)
 {
 	struct panel_lvds *lvds = to_panel_lvds(panel);
 
-	if (lvds->enable_gpio)
-		gpiod_set_value_cansleep(lvds->enable_gpio, 0);
+	gpiod_set_value_cansleep(lvds->enable_gpio, 0);
 
 	if (lvds->supply)
 		regulator_disable(lvds->supply);
@@ -74,8 +73,7 @@ static int panel_lvds_prepare(struct drm_panel *panel)
 		}
 	}
 
-	if (lvds->enable_gpio)
-		gpiod_set_value_cansleep(lvds->enable_gpio, 1);
+	gpiod_set_value_cansleep(lvds->enable_gpio, 1);
 
 	return 0;
 }
