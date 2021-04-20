@@ -539,18 +539,18 @@ static int core_scsi3_pr_seq_non_holder(struct se_cmd *cmd, u32 pr_reg_type,
 			return 0;
 		}
        } else if (we && registered_nexus) {
-               /*
-                * Reads are allowed for Write Exclusive locks
-                * from all registrants.
-                */
-               if (cmd->data_direction == DMA_FROM_DEVICE) {
-                       pr_debug("Allowing READ CDB: 0x%02x for %s"
-                               " reservation\n", cdb[0],
-                               core_scsi3_pr_dump_type(pr_reg_type));
+		/*
+		 * Reads are allowed for Write Exclusive locks
+		 * from all registrants.
+		 */
+		if (cmd->data_direction == DMA_FROM_DEVICE) {
+			pr_debug("Allowing READ CDB: 0x%02x for %s"
+					" reservation\n", cdb[0],
+					core_scsi3_pr_dump_type(pr_reg_type));
 
-                       return 0;
-               }
-	}
+			return 0;
+		}
+		}
 	pr_debug("%s Conflict for %sregistered nexus %s CDB: 0x%2x"
 		" for %s reservation\n", transport_dump_cmd_direction(cmd),
 		(registered_nexus) ? "" : "un",
