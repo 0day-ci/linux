@@ -1583,8 +1583,11 @@ static int __dev_open(struct net_device *dev, struct netlink_ext_ack *extack)
 
 	if (!netif_device_present(dev)) {
 		/* may be detached because parent is runtime-suspended */
-		if (dev->dev.parent)
+		if (dev->dev.parent) {
+			rtnl_unlock();
 			pm_runtime_resume(dev->dev.parent);
+			rtnl_lock();
+		}
 		if (!netif_device_present(dev))
 			return -ENODEV;
 	}
