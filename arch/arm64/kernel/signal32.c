@@ -248,7 +248,7 @@ COMPAT_SYSCALL_DEFINE0(sigreturn)
 	frame = (struct compat_sigframe __user *)regs->compat_sp;
 
 	if (!access_ok(frame, sizeof (*frame)))
-		goto badframe;
+		goto e_access;
 
 	if (compat_restore_sigframe(regs, frame))
 		goto badframe;
@@ -256,7 +256,12 @@ COMPAT_SYSCALL_DEFINE0(sigreturn)
 	return regs->regs[0];
 
 badframe:
-	arm64_notify_segfault(regs->compat_sp);
+	arm64_notify_die("Bad frame", regs, SIGSEGV, SI_KERNEL,
+			 regs->compat_sp, 0);
+	return 0;
+
+e_access:
+	force_signal_inject(SIGSEGV, SEGV_ACCERR, regs->compat_sp, 0);
 	return 0;
 }
 
@@ -279,7 +284,7 @@ COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
 	frame = (struct compat_rt_sigframe __user *)regs->compat_sp;
 
 	if (!access_ok(frame, sizeof (*frame)))
-		goto badframe;
+		goto e_access;
 
 	if (compat_restore_sigframe(regs, &frame->sig))
 		goto badframe;
@@ -290,7 +295,12 @@ COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
 	return regs->regs[0];
 
 badframe:
-	arm64_notify_segfault(regs->compat_sp);
+	arm64_notify_die("Bad frame", regs, SIGSEGV, SI_KERNEL,
+			 regs->compat_sp, 0);
+	return 0;
+
+e_access:
+	force_signal_inject(SIGSEGV, SEGV_ACCERR, regs->compat_sp, 0);
 	return 0;
 }
 

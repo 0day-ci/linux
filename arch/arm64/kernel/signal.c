@@ -544,7 +544,7 @@ SYSCALL_DEFINE0(rt_sigreturn)
 	frame = (struct rt_sigframe __user *)regs->sp;
 
 	if (!access_ok(frame, sizeof (*frame)))
-		goto badframe;
+		goto e_access;
 
 	if (restore_sigframe(regs, frame))
 		goto badframe;
@@ -555,7 +555,11 @@ SYSCALL_DEFINE0(rt_sigreturn)
 	return regs->regs[0];
 
 badframe:
-	arm64_notify_segfault(regs->sp);
+	arm64_notify_die("Bad frame", regs, SIGSEGV, SI_KERNEL, regs->sp, 0);
+	return 0;
+
+e_access:
+	force_signal_inject(SIGSEGV, SEGV_ACCERR, regs->sp, 0);
 	return 0;
 }
 
