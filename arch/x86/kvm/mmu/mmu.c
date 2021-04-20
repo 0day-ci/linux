@@ -5006,6 +5006,7 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, u64 error_code,
 {
 	int r, emulation_type = EMULTYPE_PF;
 	bool direct = vcpu->arch.mmu->direct_map;
+	struct kvm_page_fault kpf;
 
 	if (WARN_ON(!VALID_PAGE(vcpu->arch.mmu->root_hpa)))
 		return RET_PF_RETRY;
@@ -5018,8 +5019,9 @@ int kvm_mmu_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa, u64 error_code,
 	}
 
 	if (r == RET_PF_INVALID) {
-		r = kvm_mmu_do_page_fault(vcpu, cr2_or_gpa,
-					  lower_32_bits(error_code), false);
+		kvm_page_fault_init(&kpf, vcpu, cr2_or_gpa,
+				    lower_32_bits(error_code), false);
+		r = kvm_mmu_do_page_fault(&kpf);
 		if (WARN_ON_ONCE(r == RET_PF_INVALID))
 			return -EIO;
 	}

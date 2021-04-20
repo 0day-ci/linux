@@ -106,17 +106,36 @@ static inline void kvm_mmu_load_pgd(struct kvm_vcpu *vcpu)
 				 vcpu->arch.mmu->shadow_root_level);
 }
 
+struct kvm_page_fault {
+	/* arguments to kvm page fault handler */
+	struct kvm_vcpu *vcpu;
+	gpa_t cr2_or_gpa;
+	u32 error_code;
+	bool prefault;
+};
+
+static inline void kvm_page_fault_init(
+	struct kvm_page_fault *kpf, struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
+	u32 error_code, bool prefault)
+{
+	kpf->vcpu = vcpu;
+	kpf->cr2_or_gpa = cr2_or_gpa;
+	kpf->error_code = error_code;
+	kpf->prefault = prefault;
+}
+
 int kvm_tdp_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
 		       bool prefault);
 
-static inline int kvm_mmu_do_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
-					u32 err, bool prefault)
+static inline int kvm_mmu_do_page_fault(struct kvm_page_fault *kpf)
 {
 #ifdef CONFIG_RETPOLINE
-	if (likely(vcpu->arch.mmu->page_fault == kvm_tdp_page_fault))
-		return kvm_tdp_page_fault(vcpu, cr2_or_gpa, err, prefault);
+	if (likely(kpf->vcpu->arch.mmu->page_fault == kvm_tdp_page_fault))
+		return kvm_tdp_page_fault(kpf->vcpu, kpf->cr2_or_gpa,
+					  kpf->error_code, kpf->prefault);
 #endif
-	return vcpu->arch.mmu->page_fault(vcpu, cr2_or_gpa, err, prefault);
+	return kpf->vcpu->arch.mmu->page_fault(kpf->vcpu, kpf->cr2_or_gpa,
+					       kpf->error_code, kpf->prefault);
 }
 
 /*

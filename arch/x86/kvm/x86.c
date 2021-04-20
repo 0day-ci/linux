@@ -11083,6 +11083,7 @@ EXPORT_SYMBOL_GPL(kvm_set_rflags);
 void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
 {
 	int r;
+	struct kvm_page_fault kpf;
 
 	if ((vcpu->arch.mmu->direct_map != work->arch.direct_map) ||
 	      work->wakeup_all)
@@ -11096,7 +11097,8 @@ void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu, struct kvm_async_pf *work)
 	      work->arch.cr3 != vcpu->arch.mmu->get_guest_pgd(vcpu))
 		return;
 
-	kvm_mmu_do_page_fault(vcpu, work->cr2_or_gpa, 0, true);
+	kvm_page_fault_init(&kpf, vcpu, work->cr2_or_gpa, 0, true);
+	kvm_mmu_do_page_fault(&kpf);
 }
 
 static inline u32 kvm_async_pf_hash_fn(gfn_t gfn)
