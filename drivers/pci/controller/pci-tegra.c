@@ -1593,7 +1593,7 @@ static void tegra_msi_top_irq_unmask(struct irq_data *d)
 }
 
 static struct irq_chip tegra_msi_top_chip = {
-	.name		= "tegra PCIe MSI",
+	.name		= "Tegra PCIe MSI",
 	.irq_ack	= tegra_msi_top_irq_ack,
 	.irq_mask	= tegra_msi_top_irq_mask,
 	.irq_unmask	= tegra_msi_top_irq_unmask,
