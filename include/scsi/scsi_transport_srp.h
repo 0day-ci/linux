@@ -5,6 +5,7 @@
 #include <linux/transport_class.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
+#include <scsi/scsi_status.h>
 
 #define SRP_RPORT_ROLE_INITIATOR 0
 #define SRP_RPORT_ROLE_TARGET 1
@@ -128,18 +129,24 @@ enum blk_eh_timer_return srp_timed_out(struct scsi_cmnd *scmd);
  * implementation. The role of this function is similar to that of
  * fc_remote_port_chkready().
  */
-static inline int srp_chkready(struct srp_rport *rport)
+static inline union scsi_status srp_chkready(struct srp_rport *rport)
 {
+	enum host_status status = 0;
+
 	switch (rport->state) {
 	case SRP_RPORT_RUNNING:
 	case SRP_RPORT_BLOCKED:
 	default:
-		return 0;
+		break;
 	case SRP_RPORT_FAIL_FAST:
-		return DID_TRANSPORT_FAILFAST << 16;
+		status = DID_TRANSPORT_FAILFAST;
+		break;
 	case SRP_RPORT_LOST:
-		return DID_NO_CONNECT << 16;
+		status = DID_NO_CONNECT;
+		break;
 	}
+
+	return (union scsi_status){.b.host = status};
 }
 
 #endif
