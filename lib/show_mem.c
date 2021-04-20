@@ -7,6 +7,7 @@
 
 #include <linux/mm.h>
 #include <linux/cma.h>
+#include <linux/dma-buf.h>
 
 void show_mem(unsigned int filter, nodemask_t *nodemask)
 {
@@ -41,4 +42,8 @@ void show_mem(unsigned int filter, nodemask_t *nodemask)
 #ifdef CONFIG_MEMORY_FAILURE
 	printk("%lu pages hwpoisoned\n", atomic_long_read(&num_poisoned_pages));
 #endif
+#ifdef CONFIG_DMA_SHARED_BUFFER
+	printk("%lu pages dma-buf\n", dma_buf_allocated_pages());
+#endif
+
 }
