@@ -1869,7 +1869,7 @@ int fc_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *sc_cmd)
 
 	rval = fc_remote_port_chkready(rport);
 	if (rval) {
-		sc_cmd->result = rval;
+		sc_cmd->status.combined = rval;
 		sc_cmd->scsi_done(sc_cmd);
 		return 0;
 	}
@@ -1879,7 +1879,7 @@ int fc_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *sc_cmd)
 		 * rport is transitioning from blocked/deleted to
 		 * online
 		 */
-		sc_cmd->result = DID_IMM_RETRY << 16;
+		sc_cmd->status.combined = DID_IMM_RETRY << 16;
 		sc_cmd->scsi_done(sc_cmd);
 		goto out;
 	}
@@ -1990,7 +1990,7 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 			/*
 			 * good I/O status
 			 */
-			sc_cmd->result = DID_OK << 16;
+			sc_cmd->status.combined = DID_OK << 16;
 			if (fsp->scsi_resid)
 				CMD_RESID_LEN(sc_cmd) = fsp->scsi_resid;
 		} else {
@@ -1998,13 +1998,13 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 			 * transport level I/O was ok but scsi
 			 * has non zero status
 			 */
-			sc_cmd->result = (DID_OK << 16) | fsp->cdb_status;
+			sc_cmd->status.combined = (DID_OK << 16) | fsp->cdb_status;
 		}
 		break;
 	case FC_ERROR:
 		FC_FCP_DBG(fsp, "Returning DID_ERROR to scsi-ml "
 			   "due to FC_ERROR\n");
-		sc_cmd->result = DID_ERROR << 16;
+		sc_cmd->status.combined = DID_ERROR << 16;
 		break;
 	case FC_DATA_UNDRUN:
 		if ((fsp->cdb_status == 0) && !(fsp->req_flags & FC_SRB_READ)) {
@@ -2013,11 +2013,11 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 			 * underrun.
 			 */
 			if (fsp->state & FC_SRB_RCV_STATUS) {
-				sc_cmd->result = DID_OK << 16;
+				sc_cmd->status.combined = DID_OK << 16;
 			} else {
 				FC_FCP_DBG(fsp, "Returning DID_ERROR to scsi-ml"
 					   " due to FC_DATA_UNDRUN (trans)\n");
-				sc_cmd->result = DID_ERROR << 16;
+				sc_cmd->status.combined = DID_ERROR << 16;
 			}
 		} else {
 			/*
@@ -2026,7 +2026,7 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 			FC_FCP_DBG(fsp, "Returning DID_ERROR to scsi-ml "
 				   "due to FC_DATA_UNDRUN (scsi)\n");
 			CMD_RESID_LEN(sc_cmd) = fsp->scsi_resid;
-			sc_cmd->result = (DID_ERROR << 16) | fsp->cdb_status;
+			sc_cmd->status.combined = (DID_ERROR << 16) | fsp->cdb_status;
 		}
 		break;
 	case FC_DATA_OVRRUN:
@@ -2035,10 +2035,10 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 		 */
 		FC_FCP_DBG(fsp, "Returning DID_ERROR to scsi-ml "
 			   "due to FC_DATA_OVRRUN\n");
-		sc_cmd->result = (DID_ERROR << 16) | fsp->cdb_status;
+		sc_cmd->status.combined = (DID_ERROR << 16) | fsp->cdb_status;
 		break;
 	case FC_CMD_ABORTED:
-		if (host_byte(sc_cmd->result) == DID_TIME_OUT)
+		if (host_byte(sc_cmd->status) == DID_TIME_OUT)
 			FC_FCP_DBG(fsp, "Returning DID_TIME_OUT to scsi-ml "
 				   "due to FC_CMD_ABORTED\n");
 		else {
@@ -2046,42 +2046,42 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 				   "due to FC_CMD_ABORTED\n");
 			set_host_byte(sc_cmd, DID_ERROR);
 		}
-		sc_cmd->result |= fsp->io_status;
+		sc_cmd->status.combined |= fsp->io_status;
 		break;
 	case FC_CMD_RESET:
 		FC_FCP_DBG(fsp, "Returning DID_RESET to scsi-ml "
 			   "due to FC_CMD_RESET\n");
-		sc_cmd->result = (DID_RESET << 16);
+		sc_cmd->status.combined = (DID_RESET << 16);
 		break;
 	case FC_TRANS_RESET:
 		FC_FCP_DBG(fsp, "Returning DID_SOFT_ERROR to scsi-ml "
 			   "due to FC_TRANS_RESET\n");
-		sc_cmd->result = (DID_SOFT_ERROR << 16);
+		sc_cmd->status.combined = (DID_SOFT_ERROR << 16);
 		break;
 	case FC_HRD_ERROR:
 		FC_FCP_DBG(fsp, "Returning DID_NO_CONNECT to scsi-ml "
 			   "due to FC_HRD_ERROR\n");
-		sc_cmd->result = (DID_NO_CONNECT << 16);
+		sc_cmd->status.combined = (DID_NO_CONNECT << 16);
 		break;
 	case FC_CRC_ERROR:
 		FC_FCP_DBG(fsp, "Returning DID_PARITY to scsi-ml "
 			   "due to FC_CRC_ERROR\n");
-		sc_cmd->result = (DID_PARITY << 16);
+		sc_cmd->status.combined = (DID_PARITY << 16);
 		break;
 	case FC_TIMED_OUT:
 		FC_FCP_DBG(fsp, "Returning DID_BUS_BUSY to scsi-ml "
 			   "due to FC_TIMED_OUT\n");
-		sc_cmd->result = (DID_BUS_BUSY << 16) | fsp->io_status;
+		sc_cmd->status.combined = (DID_BUS_BUSY << 16) | fsp->io_status;
 		break;
 	default:
 		FC_FCP_DBG(fsp, "Returning DID_ERROR to scsi-ml "
 			   "due to unknown error\n");
-		sc_cmd->result = (DID_ERROR << 16);
+		sc_cmd->status.combined = (DID_ERROR << 16);
 		break;
 	}
 
 	if (lport->state != LPORT_ST_READY && fsp->status_code != FC_COMPLETE)
-		sc_cmd->result = (DID_TRANSPORT_DISRUPTED << 16);
+		sc_cmd->status.combined = (DID_TRANSPORT_DISRUPTED << 16);
 
 	spin_lock_irqsave(&si->scsi_queue_lock, flags);
 	list_del(&fsp->list);
