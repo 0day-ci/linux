@@ -590,7 +590,7 @@ static bool cleanup_queued_task(struct iscsi_task *task)
  * session frwd lock must be held and if not called for a task that is still
  * pending or from the xmit thread, then xmit thread must be suspended
  */
-static void fail_scsi_task(struct iscsi_task *task, int err)
+static void fail_scsi_task(struct iscsi_task *task, enum host_status err)
 {
 	struct iscsi_conn *conn = task->conn;
 	struct scsi_cmnd *sc;
@@ -1885,7 +1885,8 @@ static int iscsi_exec_task_mgmt_fn(struct iscsi_conn *conn,
 /*
  * Fail commands. session frwd lock held and xmit thread flushed.
  */
-static void fail_scsi_tasks(struct iscsi_conn *conn, u64 lun, int error)
+static void fail_scsi_tasks(struct iscsi_conn *conn, u64 lun,
+			    enum host_status error)
 {
 	struct iscsi_session *session = conn->session;
 	struct iscsi_task *task;
