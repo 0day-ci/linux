@@ -822,9 +822,9 @@ static void rts51x_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 			if ((srb->cmnd[0] == TEST_UNIT_READY) &&
 			    (chip->pwr_state == US_SUSPEND)) {
 				if (TST_LUN_READY(chip, srb->device->lun)) {
-					srb->result = SAM_STAT_GOOD;
+					srb->status.combined = SAM_STAT_GOOD;
 				} else {
-					srb->result = SAM_STAT_CHECK_CONDITION;
+					srb->status.combined = SAM_STAT_CHECK_CONDITION;
 					memcpy(srb->sense_buffer,
 					       media_not_present,
 					       US_SENSE_SIZE);
@@ -835,12 +835,12 @@ static void rts51x_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 			if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
 				int prevent = srb->cmnd[4] & 0x1;
 				if (prevent) {
-					srb->result = SAM_STAT_CHECK_CONDITION;
+					srb->status.combined = SAM_STAT_CHECK_CONDITION;
 					memcpy(srb->sense_buffer,
 					       invalid_cmd_field,
 					       US_SENSE_SIZE);
 				} else {
-					srb->result = SAM_STAT_GOOD;
+					srb->status.combined = SAM_STAT_GOOD;
 				}
 				usb_stor_dbg(us, "ALLOW_MEDIUM_REMOVAL\n");
 				goto out;
@@ -850,7 +850,7 @@ static void rts51x_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 			chip->proto_handler_backup(srb, us);
 			/* Check whether card is plugged in */
 			if (srb->cmnd[0] == TEST_UNIT_READY) {
-				if (srb->result == SAM_STAT_GOOD) {
+				if (srb->status.combined == SAM_STAT_GOOD) {
 					SET_LUN_READY(chip, srb->device->lun);
 					if (card_first_show) {
 						card_first_show = 0;

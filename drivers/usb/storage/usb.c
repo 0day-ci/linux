@@ -325,7 +325,7 @@ static int usb_stor_control_thread(void * __us)
 
 		/* has the command timed out *already* ? */
 		if (test_bit(US_FLIDX_TIMED_OUT, &us->dflags)) {
-			srb->result = DID_ABORT << 16;
+			srb->status.combined = DID_ABORT << 16;
 			goto SkipForAbort;
 		}
 
@@ -337,7 +337,7 @@ static int usb_stor_control_thread(void * __us)
 		 */
 		if (srb->sc_data_direction == DMA_BIDIRECTIONAL) {
 			usb_stor_dbg(us, "UNKNOWN data direction\n");
-			srb->result = DID_ERROR << 16;
+			srb->status.combined = DID_ERROR << 16;
 		}
 
 		/*
@@ -349,14 +349,14 @@ static int usb_stor_control_thread(void * __us)
 			usb_stor_dbg(us, "Bad target number (%d:%llu)\n",
 				     srb->device->id,
 				     srb->device->lun);
-			srb->result = DID_BAD_TARGET << 16;
+			srb->status.combined = DID_BAD_TARGET << 16;
 		}
 
 		else if (srb->device->lun > us->max_lun) {
 			usb_stor_dbg(us, "Bad LUN (%d:%llu)\n",
 				     srb->device->id,
 				     srb->device->lun);
-			srb->result = DID_BAD_TARGET << 16;
+			srb->status.combined = DID_BAD_TARGET << 16;
 		}
 
 		/*
@@ -371,7 +371,7 @@ static int usb_stor_control_thread(void * __us)
 
 			usb_stor_dbg(us, "Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
-			srb->result = SAM_STAT_GOOD;
+			srb->status.combined = SAM_STAT_GOOD;
 		}
 
 		/* we've got a command, let's do it! */
@@ -385,7 +385,7 @@ static int usb_stor_control_thread(void * __us)
 		scsi_lock(host);
 
 		/* was the command aborted? */
-		if (srb->result == DID_ABORT << 16) {
+		if (srb->status.combined == DID_ABORT << 16) {
 SkipForAbort:
 			usb_stor_dbg(us, "scsi command aborted\n");
 			srb = NULL;	/* Don't call srb->scsi_done() */
@@ -416,7 +416,7 @@ SkipForAbort:
 		/* now that the locks are released, notify the SCSI core */
 		if (srb) {
 			usb_stor_dbg(us, "scsi cmd done, result=0x%x\n",
-					srb->result);
+					srb->status.combined);
 			srb->scsi_done(srb);
 		}
 	} /* for (;;) */

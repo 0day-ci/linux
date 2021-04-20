@@ -378,7 +378,7 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 	/* fail the command if we are disconnecting */
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->dflags)) {
 		usb_stor_dbg(us, "Fail command during disconnect\n");
-		srb->result = DID_NO_CONNECT << 16;
+		srb->status.combined = DID_NO_CONNECT << 16;
 		done(srb);
 		return 0;
 	}
@@ -387,7 +387,7 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 			(srb->cmnd[0] == ATA_12 || srb->cmnd[0] == ATA_16)) {
 		memcpy(srb->sense_buffer, usb_stor_sense_invalidCDB,
 		       sizeof(usb_stor_sense_invalidCDB));
-		srb->result = SAM_STAT_CHECK_CONDITION;
+		srb->status.combined = SAM_STAT_CHECK_CONDITION;
 		done(srb);
 		return 0;
 	}

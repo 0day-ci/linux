@@ -167,7 +167,7 @@ static void uas_zap_pending(struct uas_dev_info *devinfo, int result)
 		uas_log_cmd_state(cmnd, __func__, 0);
 		/* Sense urbs were killed, clear COMMAND_INFLIGHT manually */
 		cmdinfo->state &= ~COMMAND_INFLIGHT;
-		cmnd->result = result << 16;
+		cmnd->status.combined = result << 16;
 		err = uas_try_complete(cmnd, __func__);
 		WARN_ON(err != 0);
 	}
@@ -194,7 +194,7 @@ static void uas_sense(struct urb *urb, struct scsi_cmnd *cmnd)
 		memcpy(cmnd->sense_buffer, sense_iu->sense, len);
 	}
 
-	cmnd->result = sense_iu->status;
+	cmnd->status.combined = sense_iu->status;
 }
 
 static void uas_log_cmd_state(struct scsi_cmnd *cmnd, const char *prefix,
@@ -339,7 +339,7 @@ static void uas_stat_cmplt(struct urb *urb)
 	switch (iu->iu_id) {
 	case IU_ID_STATUS:
 		uas_sense(urb, cmnd);
-		if (cmnd->result != 0) {
+		if (cmnd->status.combined != 0) {
 			/* cancel data transfers on error */
 			data_in_urb = usb_get_urb(cmdinfo->data_in_urb);
 			data_out_urb = usb_get_urb(cmdinfo->data_out_urb);
@@ -652,7 +652,7 @@ static int uas_queuecommand_lck(struct scsi_cmnd *cmnd,
 			(cmnd->cmnd[0] == ATA_12 || cmnd->cmnd[0] == ATA_16)) {
 		memcpy(cmnd->sense_buffer, usb_stor_sense_invalidCDB,
 		       sizeof(usb_stor_sense_invalidCDB));
-		cmnd->result = SAM_STAT_CHECK_CONDITION;
+		cmnd->status.combined = SAM_STAT_CHECK_CONDITION;
 		cmnd->scsi_done(cmnd);
 		return 0;
 	}

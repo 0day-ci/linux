@@ -560,7 +560,7 @@ static void last_sector_hacks(struct us_data *us, struct scsi_cmnd *srb)
 	if (sector + 1 != sdkp->capacity)
 		goto done;
 
-	if (srb->result == SAM_STAT_GOOD && scsi_get_resid(srb) == 0) {
+	if (srb->status.combined == SAM_STAT_GOOD && scsi_get_resid(srb) == 0) {
 
 		/*
 		 * The command succeeded.  We know this device doesn't
@@ -580,7 +580,7 @@ static void last_sector_hacks(struct us_data *us, struct scsi_cmnd *srb)
 		 */
 		if (++us->last_sector_retries < 3)
 			return;
-		srb->result = SAM_STAT_CHECK_CONDITION;
+		srb->status.combined = SAM_STAT_CHECK_CONDITION;
 		memcpy(srb->sense_buffer, record_not_found,
 				sizeof(record_not_found));
 	}
@@ -616,25 +616,25 @@ void usb_stor_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 	 */
 	if (test_bit(US_FLIDX_TIMED_OUT, &us->dflags)) {
 		usb_stor_dbg(us, "-- command was aborted\n");
-		srb->result = DID_ABORT << 16;
+		srb->status.combined = DID_ABORT << 16;
 		goto Handle_Errors;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
 	if (result == USB_STOR_TRANSPORT_ERROR) {
 		usb_stor_dbg(us, "-- transport indicates error, resetting\n");
-		srb->result = DID_ERROR << 16;
+		srb->status.combined = DID_ERROR << 16;
 		goto Handle_Errors;
 	}
 
 	/* if the transport provided its own sense data, don't auto-sense */
 	if (result == USB_STOR_TRANSPORT_NO_SENSE) {
-		srb->result = SAM_STAT_CHECK_CONDITION;
+		srb->status.combined = SAM_STAT_CHECK_CONDITION;
 		last_sector_hacks(us, srb);
 		return;
 	}
 
-	srb->result = SAM_STAT_GOOD;
+	srb->status.combined = SAM_STAT_GOOD;
 
 	/*
 	 * Determine if we need to auto-sense
@@ -727,7 +727,7 @@ Retry_Sense:
 
 		if (test_bit(US_FLIDX_TIMED_OUT, &us->dflags)) {
 			usb_stor_dbg(us, "-- auto-sense aborted\n");
-			srb->result = DID_ABORT << 16;
+			srb->status.combined = DID_ABORT << 16;
 
 			/* If SANE_SENSE caused this problem, disable it */
 			if (sense_size != US_SENSE_SIZE) {
@@ -761,7 +761,7 @@ Retry_Sense:
 			 * multi-target device, since failure of an
 			 * auto-sense is perfectly valid
 			 */
-			srb->result = DID_ERROR << 16;
+			srb->status.combined = DID_ERROR << 16;
 			if (!(us->fflags & US_FL_SCM_MULT_TARG))
 				goto Handle_Errors;
 			return;
@@ -802,7 +802,7 @@ Retry_Sense:
 #endif
 
 		/* set the result so the higher layers expect this data */
-		srb->result = SAM_STAT_CHECK_CONDITION;
+		srb->status.combined = SAM_STAT_CHECK_CONDITION;
 
 		scdd = scsi_sense_desc_find(srb->sense_buffer,
 					    SCSI_SENSE_BUFFERSIZE, 4);
@@ -821,7 +821,7 @@ Retry_Sense:
 			 * won't realize we did an unsolicited auto-sense.
 			 */
 			if (result == USB_STOR_TRANSPORT_GOOD) {
-				srb->result = SAM_STAT_GOOD;
+				srb->status.combined = SAM_STAT_GOOD;
 				srb->sense_buffer[0] = 0x0;
 			}
 
@@ -842,7 +842,7 @@ Retry_Sense:
 			 * entering an infinite retry loop.
 			 */
 			else {
-				srb->result = DID_ERROR << 16;
+				srb->status.combined = DID_ERROR << 16;
 				if ((sshdr.response_code & 0x72) == 0x72)
 					srb->sense_buffer[1] = HARDWARE_ERROR;
 				else
@@ -861,7 +861,7 @@ Retry_Sense:
 	 */
 	if (unlikely((us->fflags & US_FL_INITIAL_READ10) &&
 			srb->cmnd[0] == READ_10)) {
-		if (srb->result == SAM_STAT_GOOD) {
+		if (srb->status.combined == SAM_STAT_GOOD) {
 			set_bit(US_FLIDX_READ10_WORKED, &us->dflags);
 		} else if (test_bit(US_FLIDX_READ10_WORKED, &us->dflags)) {
 			clear_bit(US_FLIDX_READ10_WORKED, &us->dflags);
@@ -875,15 +875,15 @@ Retry_Sense:
 		 */
 		if (test_bit(US_FLIDX_REDO_READ10, &us->dflags)) {
 			clear_bit(US_FLIDX_REDO_READ10, &us->dflags);
-			srb->result = DID_IMM_RETRY << 16;
+			srb->status.combined = DID_IMM_RETRY << 16;
 			srb->sense_buffer[0] = 0;
 		}
 	}
 
 	/* Did we transfer less than the minimum amount required? */
-	if ((srb->result == SAM_STAT_GOOD || srb->sense_buffer[2] == 0) &&
+	if ((srb->status.combined == SAM_STAT_GOOD || srb->sense_buffer[2] == 0) &&
 			scsi_bufflen(srb) - scsi_get_resid(srb) < srb->underflow)
-		srb->result = DID_ERROR << 16;
+		srb->status.combined = DID_ERROR << 16;
 
 	last_sector_hacks(us, srb);
 	return;
