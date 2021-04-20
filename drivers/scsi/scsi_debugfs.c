@@ -42,7 +42,7 @@ void scsi_show_rq(struct seq_file *m, struct request *rq)
 	if (cdb)
 		__scsi_format_command(buf, sizeof(buf), cdb, cmd->cmd_len);
 	seq_printf(m, ", .cmd=%s, .retries=%d, .result = %#x, .flags=", buf,
-		   cmd->retries, cmd->result);
+		   cmd->retries, cmd->status.combined);
 	scsi_flags_show(m, cmd->flags, scsi_cmd_flags,
 			ARRAY_SIZE(scsi_cmd_flags));
 	seq_printf(m, ", .timeout=%d.%03d, allocated %d.%03d s ago",

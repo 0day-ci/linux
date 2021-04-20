@@ -196,7 +196,7 @@ static void __scsi_queue_insert(struct scsi_cmnd *cmd, int reason, bool unbusy)
 	 * lock such that the kblockd_schedule_work() call happens
 	 * before blk_cleanup_queue() finishes.
 	 */
-	cmd->result = 0;
+	cmd->status.combined = 0;
 
 	blk_mq_requeue_request(cmd->request, true);
 }
@@ -286,7 +286,7 @@ int __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 		memcpy(sense, rq->sense, SCSI_SENSE_BUFFERSIZE);
 	if (sshdr)
 		scsi_normalize_sense(rq->sense, rq->sense_len, sshdr);
-	ret = rq->result;
+	ret = rq->status.combined;
  out:
 	blk_put_request(req);
 
@@ -616,9 +616,10 @@ static bool scsi_end_request(struct request *req, blk_status_t error,
  * @result:	scsi error code
  *
  * Translate a SCSI result code into a blk_status_t value. May reset the host
- * byte of @cmd->result.
+ * byte of @cmd->status.
  */
-static blk_status_t scsi_result_to_blk_status(struct scsi_cmnd *cmd, int result)
+static blk_status_t scsi_result_to_blk_status(struct scsi_cmnd *cmd,
+					      union scsi_status result)
 {
 	switch (host_byte(result)) {
 	case DID_OK:
@@ -627,7 +628,8 @@ static blk_status_t scsi_result_to_blk_status(struct scsi_cmnd *cmd, int result)
 		 * to handle the case when a SCSI LLD sets result to
 		 * DRIVER_SENSE << 24 without setting SAM_STAT_CHECK_CONDITION.
 		 */
-		if (scsi_status_is_good(result) && (result & ~0xff) == 0)
+		if (scsi_status_is_good(result) &&
+		    (result.combined & ~0xff) == 0)
 			return BLK_STS_OK;
 		return BLK_STS_IOERR;
 	case DID_TRANSPORT_FAILFAST:
@@ -676,7 +678,8 @@ static bool scsi_cmd_runtime_exceeced(struct scsi_cmnd *cmd)
 }
 
 /* Helper for scsi_io_completion() when special action required. */
-static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
+static void scsi_io_completion_action(struct scsi_cmnd *cmd,
+				      union scsi_status result)
 {
 	struct request_queue *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
@@ -844,12 +847,12 @@ static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
 }
 
 /*
- * Helper for scsi_io_completion() when cmd->result is non-zero. Returns a
+ * Helper for scsi_io_completion() when cmd->status is non-zero. Returns a
  * new result that may suppress further error checking. Also modifies
  * *blk_statp in some cases.
  */
-static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
-					blk_status_t *blk_statp)
+static union scsi_status scsi_io_completion_nz_result(struct scsi_cmnd *cmd,
+			union scsi_status result, blk_status_t *blk_statp)
 {
 	bool sense_valid;
 	bool sense_current = true;	/* false implies "deferred sense" */
@@ -882,7 +885,7 @@ static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
 	/*
 	 * Recovered errors need reporting, but they're always treated as
 	 * success, so fiddle the result code here.  For passthrough requests
-	 * we already took a copy of the original into sreq->result which
+	 * we already took a copy of the original into sreq->status which
 	 * is what gets returned to the user
 	 */
 	if (sense_valid && (sshdr.sense_key == RECOVERED_ERROR)) {
@@ -898,7 +901,7 @@ static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
 			do_print = false;
 		if (do_print)
 			scsi_print_sense(cmd);
-		result = 0;
+		result.combined = 0;
 		/* for passthrough, *blk_statp may be set */
 		*blk_statp = BLK_STS_OK;
 	}
@@ -910,7 +913,7 @@ static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
 	 * intermediate statuses (both obsolete in SAM-4) as good.
 	 */
 	if (status_byte(result) && scsi_status_is_good(result)) {
-		result = 0;
+		result.combined = 0;
 		*blk_statp = BLK_STS_OK;
 	}
 	return result;
@@ -940,19 +943,20 @@ static int scsi_io_completion_nz_result(struct scsi_cmnd *cmd, int result,
  */
 void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 {
-	int result = cmd->result;
+	union scsi_status result = cmd->status;
 	struct request_queue *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
 	blk_status_t blk_stat = BLK_STS_OK;
 
-	if (unlikely(result))	/* a nz result may or may not be an error */
+	/* a non-zero result may or may not be an error */
+	if (unlikely(result.combined))
 		result = scsi_io_completion_nz_result(cmd, result, &blk_stat);
 
 	if (unlikely(blk_rq_is_passthrough(req))) {
 		/*
 		 * scsi_result_to_blk_status may have reset the host_byte
 		 */
-		scsi_req(req)->result = cmd->result;
+		scsi_req(req)->status = cmd->status;
 	}
 
 	/*
@@ -984,7 +988,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 * If there had been no error, but we have leftover bytes in the
 	 * requeues just queue the command up again.
 	 */
-	if (likely(result == 0))
+	if (likely(result.combined == 0))
 		scsi_io_completion_reprep(cmd, q);
 	else
 		scsi_io_completion_action(cmd, result);
@@ -1446,7 +1450,7 @@ static void scsi_complete(struct request *rq)
 	INIT_LIST_HEAD(&cmd->eh_entry);
 
 	atomic_inc(&cmd->device->iodone_cnt);
-	if (cmd->result)
+	if (cmd->status.combined)
 		atomic_inc(&cmd->device->ioerr_cnt);
 
 	disposition = scsi_decide_disposition(cmd);
@@ -1490,7 +1494,7 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		/* in SDEV_DEL we error all commands. DID_NO_CONNECT
 		 * returns an immediate error upwards, and signals
 		 * that the device is no longer present */
-		cmd->result = DID_NO_CONNECT << 16;
+		cmd->status.combined = DID_NO_CONNECT << 16;
 		goto done;
 	}
 
@@ -1524,12 +1528,12 @@ static int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 			       "queuecommand : command too long. "
 			       "cdb_size=%d host->max_cmd_len=%d\n",
 			       cmd->cmd_len, cmd->device->host->max_cmd_len));
-		cmd->result = (DID_ABORT << 16);
+		cmd->status.combined = (DID_ABORT << 16);
 		goto done;
 	}
 
 	if (unlikely(host->shost_state == SHOST_DEL)) {
-		cmd->result = (DID_NO_CONNECT << 16);
+		cmd->status.combined = (DID_NO_CONNECT << 16);
 		goto done;
 
 	}
@@ -1742,15 +1746,15 @@ out_put_budget:
 			ret = BLK_STS_DEV_RESOURCE;
 		break;
 	case BLK_STS_AGAIN:
-		scsi_req(req)->result = DID_BUS_BUSY << 16;
+		scsi_req(req)->status.combined = DID_BUS_BUSY << 16;
 		if (req->rq_flags & RQF_DONTPREP)
 			scsi_mq_uninit_cmd(cmd);
 		break;
 	default:
 		if (unlikely(!scsi_device_online(sdev)))
-			scsi_req(req)->result = DID_NO_CONNECT << 16;
+			scsi_req(req)->status.combined = DID_NO_CONNECT << 16;
 		else
-			scsi_req(req)->result = DID_ERROR << 16;
+			scsi_req(req)->status.combined = DID_ERROR << 16;
 		/*
 		 * Make sure to release all allocated resources when
 		 * we hit an error, as we will never see this command
@@ -2147,7 +2151,8 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 	unsigned char cmd[12];
 	int use_10_for_ms;
 	int header_length;
-	int result, retry_count = retries;
+	union scsi_status result;
+	int retry_count = retries;
 	struct scsi_sense_hdr my_sshdr;
 
 	memset(data, 0, sizeof(*data));
@@ -2182,8 +2187,8 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 
 	memset(buffer, 0, len);
 
-	result = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer, len,
-				  sshdr, timeout, retries, NULL);
+	result.combined = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer,
+					   len, sshdr, timeout, retries, NULL);
 
 	/* This code looks awful: what it's doing is making sure an
 	 * ILLEGAL REQUEST sense return identifies the actual command
@@ -2235,7 +2240,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 		goto retry;
 	}
 
-	return result;
+	return result.combined;
 }
 EXPORT_SYMBOL(scsi_mode_sense);
 

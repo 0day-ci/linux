@@ -580,7 +580,8 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int first_inquiry_len, try_inquiry_len, next_inquiry_len;
 	int response_len = 0;
-	int pass, count, result;
+	int pass, count;
+	union scsi_status result;
 	struct scsi_sense_hdr sshdr;
 
 	*bflags = 0;
@@ -607,16 +608,18 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 
 		memset(inq_result, 0, try_inquiry_len);
 
-		result = scsi_execute_req(sdev,  scsi_cmd, DMA_FROM_DEVICE,
+		result.combined =
+			scsi_execute_req(sdev,  scsi_cmd, DMA_FROM_DEVICE,
 					  inq_result, try_inquiry_len, &sshdr,
 					  HZ / 2 + HZ * scsi_inq_timeout, 3,
 					  &resid);
 
 		SCSI_LOG_SCAN_BUS(3, sdev_printk(KERN_INFO, sdev,
 				"scsi scan: INQUIRY %s with code 0x%x\n",
-				result ? "failed" : "successful", result));
+				result.combined ? "failed" : "successful",
+				result.combined));
 
-		if (result) {
+		if (result.combined) {
 			/*
 			 * not-ready to ready transition [asc/ascq=0x28/0x0]
 			 * or power-on, reset [asc/ascq=0x29/0x0], continue.
@@ -643,7 +646,7 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 		break;
 	}
 
-	if (result == 0) {
+	if (result.combined == 0) {
 		scsi_sanitize_inquiry_string(&inq_result[8], 8);
 		scsi_sanitize_inquiry_string(&inq_result[16], 16);
 		scsi_sanitize_inquiry_string(&inq_result[32], 4);
@@ -695,7 +698,7 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 
 	/* If the last transfer attempt got an error, assume the
 	 * peripheral doesn't exist or is dead. */
-	if (result)
+	if (result.combined)
 		return -EIO;
 
 	/* Don't report any more data than the device says is valid */

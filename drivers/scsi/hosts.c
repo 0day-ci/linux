@@ -660,7 +660,7 @@ static bool complete_all_cmds_iter(struct request *rq, void *data, bool rsvd)
 	enum host_status status = *(enum host_status *)data;
 
 	scsi_dma_unmap(scmd);
-	scmd->result = 0;
+	scmd->status.combined = 0;
 	set_host_byte(scmd, status);
 	scmd->scsi_done(scmd);
 	return true;

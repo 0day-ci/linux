@@ -517,7 +517,8 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 	int len, k, off, bufflen = ALUA_RTPG_SIZE;
 	int group_id_old, state_old, pref_old, valid_states_old;
 	unsigned char *desc, *buff;
-	unsigned err, retval;
+	unsigned err;
+	union scsi_status retval;
 	unsigned int tpg_desc_tbl_off;
 	unsigned char orig_transition_tmo;
 	unsigned long flags;
@@ -543,9 +544,10 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 
  retry:
 	err = 0;
-	retval = submit_rtpg(sdev, buff, bufflen, &sense_hdr, pg->flags);
+	retval.combined = submit_rtpg(sdev, buff, bufflen, &sense_hdr,
+				      pg->flags);
 
-	if (retval) {
+	if (retval.combined) {
 		/*
 		 * Some (broken) implementations have a habit of returning
 		 * an error during things like firmware update etc.
@@ -558,14 +560,14 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
 		if ((pg->valid_states & ~TPGS_SUPPORT_OPTIMIZED) == 0) {
 			sdev_printk(KERN_INFO, sdev,
 				    "%s: ignoring rtpg result %d\n",
-				    ALUA_DH_NAME, retval);
+				    ALUA_DH_NAME, retval.combined);
 			kfree(buff);
 			return SCSI_DH_OK;
 		}
 		if (!scsi_sense_valid(&sense_hdr)) {
 			sdev_printk(KERN_INFO, sdev,
 				    "%s: rtpg failed, result %d\n",
-				    ALUA_DH_NAME, retval);
+				    ALUA_DH_NAME, retval.combined);
 			kfree(buff);
 			if (driver_byte(retval) == DRIVER_ERROR)
 				return SCSI_DH_DEV_TEMP_BUSY;
@@ -759,7 +761,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_port_group *pg)
  */
 static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 {
-	int retval;
+	union scsi_status retval;
 	struct scsi_sense_hdr sense_hdr;
 
 	if (!(pg->tpgs & TPGS_MODE_EXPLICIT)) {
@@ -788,13 +790,13 @@ static unsigned alua_stpg(struct scsi_device *sdev, struct alua_port_group *pg)
 			    ALUA_DH_NAME, pg->state);
 		return SCSI_DH_NOSYS;
 	}
-	retval = submit_stpg(sdev, pg->group_id, &sense_hdr);
+	retval.combined = submit_stpg(sdev, pg->group_id, &sense_hdr);
 
-	if (retval) {
+	if (retval.combined) {
 		if (!scsi_sense_valid(&sense_hdr)) {
 			sdev_printk(KERN_INFO, sdev,
 				    "%s: stpg failed, result %d",
-				    ALUA_DH_NAME, retval);
+				    ALUA_DH_NAME, retval.combined);
 			if (driver_byte(retval) == DRIVER_ERROR)
 				return SCSI_DH_DEV_TEMP_BUSY;
 		} else {

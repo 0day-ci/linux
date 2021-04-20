@@ -89,17 +89,17 @@ static int ioctl_probe(struct Scsi_Host *host, void __user *buffer)
 static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 				  int timeout, int retries)
 {
-	int result;
+	union scsi_status result;
 	struct scsi_sense_hdr sshdr;
 
 	SCSI_LOG_IOCTL(1, sdev_printk(KERN_INFO, sdev,
 				      "Trying ioctl with scsi command %d\n", *cmd));
 
-	result = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0,
+	result.combined = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0,
 				  &sshdr, timeout, retries, NULL);
 
 	SCSI_LOG_IOCTL(2, sdev_printk(KERN_INFO, sdev,
-				      "Ioctl returned  0x%x\n", result));
+				"Ioctl returned  0x%x\n", result.combined));
 
 	if (driver_byte(result) == DRIVER_SENSE &&
 	    scsi_sense_valid(&sshdr)) {
@@ -121,14 +121,14 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 		case UNIT_ATTENTION:
 			if (sdev->removable) {
 				sdev->changed = 1;
-				result = 0;	/* This is no longer considered an error */
+				result.combined = 0;	/* This is no longer considered an error */
 				break;
 			}
 			fallthrough;	/* for non-removable media */
 		default:
 			sdev_printk(KERN_INFO, sdev,
 				    "ioctl_internal_command return code = %x\n",
-				    result);
+				    result.combined);
 			scsi_print_sense_hdr(sdev, NULL, &sshdr);
 			break;
 		}
@@ -136,7 +136,7 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 
 	SCSI_LOG_IOCTL(2, sdev_printk(KERN_INFO, sdev,
 				      "IOCTL Releasing command\n"));
-	return result;
+	return result.combined;
 }
 
 int scsi_set_medium_removal(struct scsi_device *sdev, char state)

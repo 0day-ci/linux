@@ -140,11 +140,11 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 	if (unlikely(scsi_logging_level)) {
 		level = SCSI_LOG_LEVEL(SCSI_LOG_MLCOMPLETE_SHIFT,
 				       SCSI_LOG_MLCOMPLETE_BITS);
-		if (((level > 0) && (cmd->result || disposition != SUCCESS)) ||
+		if (((level > 0) && (cmd->status.combined || disposition != SUCCESS)) ||
 		    (level > 1)) {
 			scsi_print_result(cmd, "Done", disposition);
 			scsi_print_command(cmd);
-			if (status_byte(cmd->result) == CHECK_CONDITION)
+			if (status_byte(cmd->status) == CHECK_CONDITION)
 				scsi_print_sense(cmd);
 			if (level > 3)
 				scmd_printk(KERN_INFO, cmd,
@@ -190,11 +190,11 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	 * must have taken place.  Make a note of this.
 	 */
 	if (SCSI_SENSE_VALID(cmd))
-		cmd->result |= (DRIVER_SENSE << 24);
+		cmd->status.combined |= (DRIVER_SENSE << 24);
 
 	SCSI_LOG_MLCOMPLETE(4, sdev_printk(KERN_INFO, sdev,
 				"Notifying upper driver of completion "
-				"(result %x)\n", cmd->result));
+				"(result %x)\n", cmd->status.combined));
 
 	good_bytes = scsi_bufflen(cmd);
 	if (!blk_rq_is_passthrough(cmd->request)) {

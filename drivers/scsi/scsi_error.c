@@ -729,7 +729,7 @@ static enum scsi_disposition scsi_eh_completed_normally(struct scsi_cmnd *scmd)
 	 * first check the host byte, to see if there is anything in there
 	 * that would indicate what we need to do.
 	 */
-	if (host_byte(scmd->result) == DID_RESET) {
+	if (host_byte(scmd->status) == DID_RESET) {
 		/*
 		 * rats.  we are already in the error handler, so we now
 		 * get to try and figure out what to do next.  if the sense
@@ -738,20 +738,20 @@ static enum scsi_disposition scsi_eh_completed_normally(struct scsi_cmnd *scmd)
 		 */
 		return scsi_check_sense(scmd);
 	}
-	if (host_byte(scmd->result) != DID_OK)
+	if (host_byte(scmd->status) != DID_OK)
 		return FAILED;
 
 	/*
 	 * next, check the message byte.
 	 */
-	if (msg_byte(scmd->result) != COMMAND_COMPLETE)
+	if (msg_byte(scmd->status) != COMMAND_COMPLETE)
 		return FAILED;
 
 	/*
 	 * now, check the status byte to see if this indicates
 	 * anything special.
 	 */
-	switch (status_byte(scmd->result)) {
+	switch (status_byte(scmd->status)) {
 	case GOOD:
 		scsi_handle_queue_ramp_up(scmd->device);
 		fallthrough;
@@ -793,7 +793,7 @@ static void scsi_eh_done(struct scsi_cmnd *scmd)
 	struct completion *eh_action;
 
 	SCSI_LOG_ERROR_RECOVERY(3, scmd_printk(KERN_INFO, scmd,
-			"%s result: %x\n", __func__, scmd->result));
+			"%s result: %x\n", __func__, scmd->status.combined));
 
 	eh_action = scmd->device->host->eh_action;
 	if (eh_action)
@@ -986,7 +986,7 @@ void scsi_eh_prep_cmnd(struct scsi_cmnd *scmd, struct scsi_eh_save *ses,
 	ses->cmnd = scmd->cmnd;
 	ses->data_direction = scmd->sc_data_direction;
 	ses->sdb = scmd->sdb;
-	ses->result = scmd->result;
+	ses->status = scmd->status;
 	ses->resid_len = scmd->req.resid_len;
 	ses->underflow = scmd->underflow;
 	ses->prot_op = scmd->prot_op;
@@ -997,7 +997,7 @@ void scsi_eh_prep_cmnd(struct scsi_cmnd *scmd, struct scsi_eh_save *ses,
 	scmd->cmnd = ses->eh_cmnd;
 	memset(scmd->cmnd, 0, BLK_MAX_CDB);
 	memset(&scmd->sdb, 0, sizeof(scmd->sdb));
-	scmd->result = 0;
+	scmd->status.combined = 0;
 	scmd->req.resid_len = 0;
 
 	if (sense_bytes) {
@@ -1050,7 +1050,7 @@ void scsi_eh_restore_cmnd(struct scsi_cmnd* scmd, struct scsi_eh_save *ses)
 	scmd->cmnd = ses->cmnd;
 	scmd->sc_data_direction = ses->data_direction;
 	scmd->sdb = ses->sdb;
-	scmd->result = ses->result;
+	scmd->status = ses->status;
 	scmd->req.resid_len = ses->resid_len;
 	scmd->underflow = ses->underflow;
 	scmd->prot_op = ses->prot_op;
@@ -1258,7 +1258,7 @@ int scsi_eh_get_sense(struct list_head *work_q,
 					     current->comm));
 			break;
 		}
-		if (status_byte(scmd->result) != CHECK_CONDITION)
+		if (status_byte(scmd->status) != CHECK_CONDITION)
 			/*
 			 * don't request sense if there's no check condition
 			 * status because the error we're processing isn't one
@@ -1275,7 +1275,7 @@ int scsi_eh_get_sense(struct list_head *work_q,
 			continue;
 
 		SCSI_LOG_ERROR_RECOVERY(3, scmd_printk(KERN_INFO, scmd,
-			"sense requested, result %x\n", scmd->result));
+			"sense requested, result %x\n", scmd->status.combined));
 		SCSI_LOG_ERROR_RECOVERY(3, scsi_print_sense(scmd));
 
 		rtn = scsi_decide_disposition(scmd);
@@ -1756,7 +1756,7 @@ static void scsi_eh_offline_sdevs(struct list_head *work_q,
  */
 int scsi_noretry_cmd(struct scsi_cmnd *scmd)
 {
-	switch (host_byte(scmd->result)) {
+	switch (host_byte(scmd->status)) {
 	case DID_OK:
 		break;
 	case DID_TIME_OUT:
@@ -1766,8 +1766,8 @@ int scsi_noretry_cmd(struct scsi_cmnd *scmd)
 	case DID_PARITY:
 		return (scmd->request->cmd_flags & REQ_FAILFAST_DEV);
 	case DID_ERROR:
-		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
-		    status_byte(scmd->result) == RESERVATION_CONFLICT)
+		if (msg_byte(scmd->status) == COMMAND_COMPLETE &&
+		    status_byte(scmd->status) == RESERVATION_CONFLICT)
 			return 0;
 		fallthrough;
 	case DID_SOFT_ERROR:
@@ -1776,7 +1776,7 @@ int scsi_noretry_cmd(struct scsi_cmnd *scmd)
 		break;
 	}
 
-	if (status_byte(scmd->result) != CHECK_CONDITION)
+	if (status_byte(scmd->status) != CHECK_CONDITION)
 		return 0;
 
 check_type:
@@ -1823,14 +1823,14 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	 * first check the host byte, to see if there is anything in there
 	 * that would indicate what we need to do.
 	 */
-	switch (host_byte(scmd->result)) {
+	switch (host_byte(scmd->status)) {
 	case DID_PASSTHROUGH:
 		/*
 		 * no matter what, pass this through to the upper layer.
 		 * nuke this special code so that it looks like we are saying
 		 * did_ok.
 		 */
-		scmd->result &= 0xff00ffff;
+		set_host_byte(scmd, DID_OK);
 		return SUCCESS;
 	case DID_OK:
 		/*
@@ -1885,8 +1885,8 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 		return SUCCESS;
 	case DID_ERROR:
-		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
-		    status_byte(scmd->result) == RESERVATION_CONFLICT)
+		if (msg_byte(scmd->status) == COMMAND_COMPLETE &&
+		    status_byte(scmd->status) == RESERVATION_CONFLICT)
 			/*
 			 * execute reservation conflict processing code
 			 * lower down
@@ -1917,13 +1917,13 @@ enum scsi_disposition scsi_decide_disposition(struct scsi_cmnd *scmd)
 	/*
 	 * next, check the message byte.
 	 */
-	if (msg_byte(scmd->result) != COMMAND_COMPLETE)
+	if (msg_byte(scmd->status) != COMMAND_COMPLETE)
 		return FAILED;
 
 	/*
 	 * check the status byte to see if this indicates anything special.
 	 */
-	switch (status_byte(scmd->result)) {
+	switch (status_byte(scmd->status)) {
 	case QUEUE_FULL:
 		scsi_handle_queue_full(scmd->device);
 		/*
@@ -2141,8 +2141,8 @@ void scsi_eh_flush_done_q(struct list_head *done_q)
 			 * scsi_eh_get_sense), scmd->result is already
 			 * set, do not set DRIVER_TIMEOUT.
 			 */
-			if (!scmd->result)
-				scmd->result |= (DRIVER_TIMEOUT << 24);
+			if (!scmd->status.combined)
+				scmd->status.combined |= (DRIVER_TIMEOUT << 24);
 			SCSI_LOG_ERROR_RECOVERY(3,
 				scmd_printk(KERN_INFO, scmd,
 					     "%s: flush finish cmd\n",

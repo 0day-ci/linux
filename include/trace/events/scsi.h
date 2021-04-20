@@ -309,7 +309,7 @@ DECLARE_EVENT_CLASS(scsi_cmd_done_timeout_template,
 		__entry->channel	= cmd->device->channel;
 		__entry->id		= cmd->device->id;
 		__entry->lun		= cmd->device->lun;
-		__entry->result		= cmd->result;
+		__entry->result		= cmd->status.combined;
 		__entry->opcode		= cmd->cmnd[0];
 		__entry->cmd_len	= cmd->cmd_len;
 		__entry->data_sglen	= scsi_sg_count(cmd);
