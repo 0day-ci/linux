@@ -1593,7 +1593,7 @@ static int myrs_queuecommand(struct Scsi_Host *shost,
 	int nsge;
 
 	if (!scmd->device->hostdata) {
-		scmd->result = (DID_NO_CONNECT << 16);
+		scmd->status.combined = (DID_NO_CONNECT << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	}
@@ -1602,7 +1602,7 @@ static int myrs_queuecommand(struct Scsi_Host *shost,
 	case REPORT_LUNS:
 		scsi_build_sense_buffer(0, scmd->sense_buffer, ILLEGAL_REQUEST,
 					0x20, 0x0);
-		scmd->result = (DRIVER_SENSE << 24) | SAM_STAT_CHECK_CONDITION;
+		scmd->status.combined = (DRIVER_SENSE << 24) | SAM_STAT_CHECK_CONDITION;
 		scmd->scsi_done(scmd);
 		return 0;
 	case MODE_SENSE:
@@ -1614,11 +1614,11 @@ static int myrs_queuecommand(struct Scsi_Host *shost,
 				/* Illegal request, invalid field in CDB */
 				scsi_build_sense_buffer(0, scmd->sense_buffer,
 					ILLEGAL_REQUEST, 0x24, 0);
-				scmd->result = (DRIVER_SENSE << 24) |
+				scmd->status.combined = (DRIVER_SENSE << 24) |
 					SAM_STAT_CHECK_CONDITION;
 			} else {
 				myrs_mode_sense(cs, scmd, ldev_info);
-				scmd->result = (DID_OK << 16);
+				scmd->status.combined = (DID_OK << 16);
 			}
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1759,7 +1759,7 @@ static int myrs_queuecommand(struct Scsi_Host *shost,
 		scsi_for_each_sg(scmd, sgl, nsge, i) {
 			if (WARN_ON(!hw_sgl)) {
 				scsi_dma_unmap(scmd);
-				scmd->result = (DID_ERROR << 16);
+				scmd->status.combined = (DID_ERROR << 16);
 				scmd->scsi_done(scmd);
 				return 0;
 			}
@@ -2084,9 +2084,9 @@ static void myrs_handle_scsi(struct myrs_hba *cs, struct myrs_cmdblk *cmd_blk,
 		scsi_set_resid(scmd, cmd_blk->residual);
 	if (status == MYRS_STATUS_DEVICE_NON_RESPONSIVE ||
 	    status == MYRS_STATUS_DEVICE_NON_RESPONSIVE2)
-		scmd->result = (DID_BAD_TARGET << 16);
+		scmd->status.combined = (DID_BAD_TARGET << 16);
 	else
-		scmd->result = (DID_OK << 16) | status;
+		scmd->status.combined = (DID_OK << 16) | status;
 	scmd->scsi_done(scmd);
 }
 
