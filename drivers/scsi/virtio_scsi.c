@@ -115,7 +115,7 @@ static void virtscsi_complete_cmd(struct virtio_scsi *vscsi, void *buf)
 		"cmd %p response %u status %#02x sense_len %u\n",
 		sc, resp->response, resp->status, resp->sense_len);
 
-	sc->result = resp->status;
+	sc->status.combined = resp->status;
 	virtscsi_compute_resid(sc, virtio32_to_cpu(vscsi->vdev, resp->resid));
 	switch (resp->response) {
 	case VIRTIO_SCSI_S_OK:
@@ -336,7 +336,8 @@ static void virtscsi_rescan_hotunplug(struct virtio_scsi *vscsi)
 	struct scsi_device *sdev;
 	struct Scsi_Host *shost = virtio_scsi_host(vscsi->vdev);
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
-	int result, inquiry_len, inq_result_len = 256;
+	int inquiry_len, inq_result_len = 256;
+	union scsi_status result;
 	char *inq_result = kmalloc(inq_result_len, GFP_KERNEL);
 
 	shost_for_each_device(sdev, shost) {
@@ -348,11 +349,12 @@ static void virtscsi_rescan_hotunplug(struct virtio_scsi *vscsi)
 
 		memset(inq_result, 0, inq_result_len);
 
-		result = scsi_execute_req(sdev, scsi_cmd, DMA_FROM_DEVICE,
+		result.combined =
+			scsi_execute_req(sdev, scsi_cmd, DMA_FROM_DEVICE,
 					  inq_result, inquiry_len, NULL,
 					  SD_TIMEOUT, SD_MAX_RETRIES, NULL);
 
-		if (result == 0 && inq_result[0] >> 5) {
+		if (result.combined == 0 && inq_result[0] >> 5) {
 			/* PQ indicates the LUN is not attached */
 			scsi_remove_device(sdev);
 		} else if (host_byte(result) == DID_BAD_TARGET) {
