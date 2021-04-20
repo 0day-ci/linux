@@ -8,6 +8,12 @@
 
 struct drm_i915_private;
 
+#define DMC_PATH(platform, major, minor) \
+	"i915/"				 \
+	__stringify(platform) "_dmc_ver" \
+	__stringify(major) "_"		 \
+	__stringify(minor) ".bin"
+
 #define CSR_VERSION(major, minor)	((major) << 16 | (minor))
 #define CSR_VERSION_MAJOR(version)	((version) >> 16)
 #define CSR_VERSION_MINOR(version)	((version) & 0xffff)
