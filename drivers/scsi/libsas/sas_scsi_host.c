@@ -37,7 +37,8 @@
 static void sas_end_task(struct scsi_cmnd *sc, struct sas_task *task)
 {
 	struct task_status_struct *ts = &task->task_status;
-	int hs = 0, stat = 0;
+	enum host_status hs = 0;
+	enum sam_status stat = 0;
 
 	if (ts->resp == SAS_TASK_UNDELIVERED) {
 		/* transport error */
@@ -88,7 +89,7 @@ static void sas_end_task(struct scsi_cmnd *sc, struct sas_task *task)
 			stat = SAM_STAT_CHECK_CONDITION;
 			break;
 		default:
-			stat = ts->stat;
+			stat = (enum sam_status)ts->stat;
 			break;
 		}
 	}
