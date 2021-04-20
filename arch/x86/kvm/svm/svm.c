@@ -923,6 +923,13 @@ static __init void svm_set_cpu_caps(void)
 	if (boot_cpu_has(X86_FEATURE_LS_CFG_SSBD) ||
 	    boot_cpu_has(X86_FEATURE_AMD_SSBD))
 		kvm_cpu_cap_set(X86_FEATURE_VIRT_SSBD);
+
+	/* CPUID 0x8000001F */
+	if (sev) {
+		kvm_cpu_cap_set(X86_FEATURE_SEV);
+		if (sev_es)
+			kvm_cpu_cap_set(X86_FEATURE_SEV_ES);
+	}
 }
 
 static __init int svm_hardware_setup(void)
