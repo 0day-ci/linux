@@ -585,7 +585,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 
 		/* have just LUN 0 for each target on virtual channels */
 		if (cmd->device->lun) {
-			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->status.combined = (DID_BAD_TARGET << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 		}
@@ -604,7 +604,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 			max_ldrv_num += 0x80;
 
 		if(ldrv_num > max_ldrv_num ) {
-			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->status.combined = (DID_BAD_TARGET << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 		}
@@ -616,7 +616,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 			 * Do not support lun >7 for physically accessed
 			 * devices
 			 */
-			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->status.combined = (DID_BAD_TARGET << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 		}
@@ -636,7 +636,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 			 * If no, return success always
 			 */
 			if( !adapter->has_cluster ) {
-				cmd->result = (DID_OK << 16);
+				cmd->status.combined = (DID_OK << 16);
 				cmd->scsi_done(cmd);
 				return NULL;
 			}
@@ -654,7 +654,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 
 			return scb;
 #else
-			cmd->result = (DID_OK << 16);
+			cmd->status.combined = (DID_OK << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 #endif
@@ -669,7 +669,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 			memset(buf, 0, cmd->cmnd[4]);
 			kunmap_atomic(buf - sg->offset);
 
-			cmd->result = (DID_OK << 16);
+			cmd->status.combined = (DID_OK << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 		}
@@ -865,7 +865,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 			 */
 			if( ! adapter->has_cluster ) {
 
-				cmd->result = (DID_BAD_TARGET << 16);
+				cmd->status.combined = (DID_BAD_TARGET << 16);
 				cmd->scsi_done(cmd);
 				return NULL;
 			}
@@ -888,7 +888,7 @@ mega_build_cmd(adapter_t *adapter, struct scsi_cmnd *cmd, int *busy)
 #endif
 
 		default:
-			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->status.combined = (DID_BAD_TARGET << 16);
 			cmd->scsi_done(cmd);
 			return NULL;
 		}
@@ -1472,7 +1472,7 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 					"aborted cmd [%x] complete\n",
 					scb->idx);
 
-				scb->cmd->result = (DID_ABORT << 16);
+				scb->cmd->status.combined = (DID_ABORT << 16);
 
 				list_add_tail(SCSI_LIST(scb->cmd),
 						&adapter->completed_list);
@@ -1491,7 +1491,7 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 					"reset cmd [%x] complete\n",
 					scb->idx);
 
-				scb->cmd->result = (DID_RESET << 16);
+				scb->cmd->status.combined = (DID_RESET << 16);
 
 				list_add_tail(SCSI_LIST(scb->cmd),
 						&adapter->completed_list);
@@ -1565,12 +1565,12 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 		}
 
 		/* clear result; otherwise, success returns corrupt value */
-		cmd->result = 0;
+		cmd->status.combined = 0;
 
 		/* Convert MegaRAID status to Linux error code */
 		switch (status) {
 		case 0x00:	/* SUCCESS , i.e. SCSI_STATUS_GOOD */
-			cmd->result |= (DID_OK << 16);
+			cmd->status.combined |= (DID_OK << 16);
 			break;
 
 		case 0x02:	/* ERROR_ABORTED, i.e.
@@ -1583,9 +1583,9 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 				memcpy(cmd->sense_buffer, pthru->reqsensearea,
 						14);
 
-				cmd->result = (DRIVER_SENSE << 24) |
+				cmd->status.combined = (DRIVER_SENSE << 24) |
 					(DID_OK << 16) |
-					(CHECK_CONDITION << 1);
+					SAM_STAT_CHECK_CONDITION;
 			}
 			else {
 				if (mbox->m_out.cmd == MEGA_MBOXCMD_EXTPTHRU) {
@@ -1593,20 +1593,20 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 					memcpy(cmd->sense_buffer,
 						epthru->reqsensearea, 14);
 
-					cmd->result = (DRIVER_SENSE << 24) |
+					cmd->status.combined = (DRIVER_SENSE << 24) |
 						(DID_OK << 16) |
-						(CHECK_CONDITION << 1);
+						SAM_STAT_CHECK_CONDITION;
 				} else {
 					cmd->sense_buffer[0] = 0x70;
 					cmd->sense_buffer[2] = ABORTED_COMMAND;
-					cmd->result |= (CHECK_CONDITION << 1);
+					cmd->status.b.status = SAM_STAT_CHECK_CONDITION;
 				}
 			}
 			break;
 
 		case 0x08:	/* ERR_DEST_DRIVE_FAILED, i.e.
 				   SCSI_STATUS_BUSY */
-			cmd->result |= (DID_BUS_BUSY << 16) | status;
+			cmd->status.combined |= (DID_BUS_BUSY << 16) | status;
 			break;
 
 		default:
@@ -1616,8 +1616,8 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 			 * MEGA_RESERVATION_STATUS failed
 			 */
 			if( cmd->cmnd[0] == TEST_UNIT_READY ) {
-				cmd->result |= (DID_ERROR << 16) |
-					(RESERVATION_CONFLICT << 1);
+				cmd->status.combined |= (DID_ERROR << 16) |
+					SAM_STAT_RESERVATION_CONFLICT;
 			}
 			else
 			/*
@@ -1628,12 +1628,12 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 				(cmd->cmnd[0] == RESERVE ||
 					 cmd->cmnd[0] == RELEASE) ) {
 
-				cmd->result |= (DID_ERROR << 16) |
-					(RESERVATION_CONFLICT << 1);
+				cmd->status.combined |= (DID_ERROR << 16) |
+					SAM_STAT_RESERVATION_CONFLICT;
 			}
 			else
 #endif
-				cmd->result |= (DID_BAD_TARGET << 16)|status;
+				cmd->status.combined |= (DID_BAD_TARGET << 16)|status;
 		}
 
 		mega_free_scb(adapter, scb);
@@ -1983,10 +1983,10 @@ megaraid_abort_and_reset(adapter_t *adapter, struct scsi_cmnd *cmd, int aor)
 				mega_free_scb(adapter, scb);
 
 				if( aor == SCB_ABORT ) {
-					cmd->result = (DID_ABORT << 16);
+					cmd->status.combined = (DID_ABORT << 16);
 				}
 				else {
-					cmd->result = (DID_RESET << 16);
+					cmd->status.combined = (DID_RESET << 16);
 				}
 
 				list_add_tail(SCSI_LIST(cmd),

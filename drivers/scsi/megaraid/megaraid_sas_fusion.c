@@ -2035,23 +2035,23 @@ map_cmd_status(struct fusion_context *fusion,
 	switch (status) {
 
 	case MFI_STAT_OK:
-		scmd->result = DID_OK << 16;
+		scmd->status.combined = DID_OK << 16;
 		break;
 
 	case MFI_STAT_SCSI_IO_FAILED:
 	case MFI_STAT_LD_INIT_IN_PROGRESS:
-		scmd->result = (DID_ERROR << 16) | ext_status;
+		scmd->status.combined = (DID_ERROR << 16) | ext_status;
 		break;
 
 	case MFI_STAT_SCSI_DONE_WITH_ERROR:
 
-		scmd->result = (DID_OK << 16) | ext_status;
+		scmd->status.combined = (DID_OK << 16) | ext_status;
 		if (ext_status == SAM_STAT_CHECK_CONDITION) {
 			memset(scmd->sense_buffer, 0,
 			       SCSI_SENSE_BUFFERSIZE);
 			memcpy(scmd->sense_buffer, sense,
 			       SCSI_SENSE_BUFFERSIZE);
-			scmd->result |= DRIVER_SENSE << 24;
+			scmd->status.combined |= DRIVER_SENSE << 24;
 		}
 
 		/*
@@ -2073,13 +2073,13 @@ map_cmd_status(struct fusion_context *fusion,
 
 	case MFI_STAT_LD_OFFLINE:
 	case MFI_STAT_DEVICE_NOT_FOUND:
-		scmd->result = DID_BAD_TARGET << 16;
+		scmd->status.combined = DID_BAD_TARGET << 16;
 		break;
 	case MFI_STAT_CONFIG_SEQ_MISMATCH:
-		scmd->result = DID_IMM_RETRY << 16;
+		scmd->status.combined = DID_IMM_RETRY << 16;
 		break;
 	default:
-		scmd->result = DID_ERROR << 16;
+		scmd->status.combined = DID_ERROR << 16;
 		break;
 	}
 }
@@ -4699,7 +4699,7 @@ int megasas_task_abort_fusion(struct scsi_cmnd *scmd)
 	if (!mr_device_priv_data) {
 		sdev_printk(KERN_INFO, scmd->device, "device been deleted! "
 			"scmd(%p)\n", scmd);
-		scmd->result = DID_NO_CONNECT << 16;
+		scmd->status.combined = DID_NO_CONNECT << 16;
 		ret = SUCCESS;
 		goto out;
 	}
@@ -4780,7 +4780,7 @@ int megasas_reset_target_fusion(struct scsi_cmnd *scmd)
 	if (!mr_device_priv_data) {
 		sdev_printk(KERN_INFO, scmd->device,
 			    "device been deleted! scmd: (0x%p)\n", scmd);
-		scmd->result = DID_NO_CONNECT << 16;
+		scmd->status.combined = DID_NO_CONNECT << 16;
 		ret = SUCCESS;
 		goto out;
 	}
@@ -4959,7 +4959,7 @@ int megasas_reset_fusion(struct Scsi_Host *shost, int reason)
 					MPI2_FUNCTION_SCSI_IO_REQUEST)
 					fpio_count++;
 
-				scmd_local->result =
+				scmd_local->status.combined =
 					megasas_check_mpio_paths(instance,
 							scmd_local);
 				if (instance->ldio_threshold &&
