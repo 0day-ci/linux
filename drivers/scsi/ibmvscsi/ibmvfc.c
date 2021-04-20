@@ -1070,7 +1070,7 @@ static void ibmvfc_complete_purge(struct list_head *purge_list)
 static void ibmvfc_fail_request(struct ibmvfc_event *evt, int error_code)
 {
 	if (evt->cmnd) {
-		evt->cmnd->result = (error_code << 16);
+		evt->cmnd->status.combined = (error_code << 16);
 		evt->done = ibmvfc_scsi_eh_done;
 	} else
 		evt->xfer_iu->mad_common.status = cpu_to_be16(IBMVFC_MAD_DRIVER_FAILED);
@@ -1713,7 +1713,7 @@ static int ibmvfc_send_event(struct ibmvfc_event *evt,
 
 		dev_err(vhost->dev, "Send error (rc=%d)\n", rc);
 		if (evt->cmnd) {
-			evt->cmnd->result = DID_ERROR << 16;
+			evt->cmnd->status.combined = DID_ERROR << 16;
 			evt->done = ibmvfc_scsi_eh_done;
 		} else
 			evt->xfer_iu->mad_common.status = cpu_to_be16(IBMVFC_MAD_CRQ_ERROR);
@@ -1807,7 +1807,7 @@ static void ibmvfc_scsi_done(struct ibmvfc_event *evt)
 			scsi_set_resid(cmnd, 0);
 
 		if (vfc_cmd->status) {
-			cmnd->result = ibmvfc_get_err_result(evt->vhost, vfc_cmd);
+			cmnd->status.combined = ibmvfc_get_err_result(evt->vhost, vfc_cmd);
 
 			if (rsp->flags & FCP_RSP_LEN_VALID)
 				rsp_len = be32_to_cpu(rsp->fcp_rsp_len);
@@ -1819,15 +1819,15 @@ static void ibmvfc_scsi_done(struct ibmvfc_event *evt)
 			    (be16_to_cpu(vfc_cmd->error) == IBMVFC_PLOGI_REQUIRED))
 				ibmvfc_relogin(cmnd->device);
 
-			if (!cmnd->result && (!scsi_get_resid(cmnd) || (rsp->flags & FCP_RESID_OVER)))
-				cmnd->result = (DID_ERROR << 16);
+			if (!cmnd->status.combined && (!scsi_get_resid(cmnd) || (rsp->flags & FCP_RESID_OVER)))
+				cmnd->status.combined = (DID_ERROR << 16);
 
 			ibmvfc_log_error(evt);
 		}
 
-		if (!cmnd->result &&
+		if (!cmnd->status.combined &&
 		    (scsi_bufflen(cmnd) - scsi_get_resid(cmnd) < cmnd->underflow))
-			cmnd->result = (DID_ERROR << 16);
+			cmnd->status.combined = (DID_ERROR << 16);
 
 		scsi_dma_unmap(cmnd);
 		cmnd->scsi_done(cmnd);
@@ -1915,12 +1915,12 @@ static int ibmvfc_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *cmnd)
 
 	if (unlikely((rc = fc_remote_port_chkready(rport))) ||
 	    unlikely((rc = ibmvfc_host_chkready(vhost)))) {
-		cmnd->result = rc;
+		cmnd->status.combined = rc;
 		cmnd->scsi_done(cmnd);
 		return 0;
 	}
 
-	cmnd->result = (DID_OK << 16);
+	cmnd->status.combined = (DID_OK << 16);
 	if (vhost->using_channels) {
 		scsi_channel = hwq % vhost->scsi_scrqs.active_queues;
 		evt = ibmvfc_get_event(&vhost->scsi_scrqs.scrqs[scsi_channel]);
@@ -1955,7 +1955,7 @@ static int ibmvfc_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *cmnd)
 		scmd_printk(KERN_ERR, cmnd,
 			    "Failed to map DMA buffer for command. rc=%d\n", rc);
 
-	cmnd->result = DID_ERROR << 16;
+	cmnd->status.combined = DID_ERROR << 16;
 	cmnd->scsi_done(cmnd);
 	return 0;
 }
@@ -2235,8 +2235,8 @@ static int ibmvfc_bsg_request(struct bsg_job *job)
 	spin_lock_irqsave(vhost->host->host_lock, flags);
 	ibmvfc_free_event(evt);
 	spin_unlock_irqrestore(vhost->host->host_lock, flags);
-	bsg_reply->result = rc;
-	bsg_job_done(job, bsg_reply->result,
+	bsg_reply->status.combined = rc;
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	rc = 0;
 out:
