@@ -2316,6 +2316,11 @@ int rproc_add(struct rproc *rproc)
 	struct device *dev = &rproc->dev;
 	int ret;
 
+	/* add char device for this remoteproc */
+	ret = rproc_char_device_add(rproc);
+	if (ret < 0)
+		return ret;
+
 	ret = device_add(dev);
 	if (ret < 0)
 		return ret;
@@ -2328,11 +2333,6 @@ int rproc_add(struct rproc *rproc)
 
 	/* create debugfs entries */
 	rproc_create_debug_dir(rproc);
-
-	/* add char device for this remoteproc */
-	ret = rproc_char_device_add(rproc);
-	if (ret < 0)
-		return ret;
 
 	/* if rproc is marked always-on, request it to boot */
 	if (rproc->auto_boot) {
