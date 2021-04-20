@@ -4934,7 +4934,6 @@ static inline int
 ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 {
 	int result = 0;
-	int scsi_status;
 	int ocs;
 
 	/* overall command status of utrd */
@@ -4952,18 +4951,10 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 		hba->ufs_stats.last_hibern8_exit_tstamp = ktime_set(0, 0);
 		switch (result) {
 		case UPIU_TRANSACTION_RESPONSE:
-			/*
-			 * get the response UPIU result to extract
-			 * the SCSI command status
-			 */
-			result = ufshcd_get_rsp_upiu_result(lrbp->ucd_rsp_ptr);
-
-			/*
-			 * get the result based on SCSI status response
-			 * to notify the SCSI midlayer of the command status
-			 */
-			scsi_status = result & MASK_SCSI_STATUS;
-			result = ufshcd_scsi_cmd_status(lrbp, scsi_status);
+			/* Propagate the SCSI status to the SCSI midlayer. */
+			result = ufshcd_scsi_cmd_status(lrbp,
+				ufshcd_get_rsp_upiu_result(lrbp->ucd_rsp_ptr) &
+				MASK_SCSI_STATUS);
 
 			/*
 			 * Currently we are only supporting BKOPs exception
