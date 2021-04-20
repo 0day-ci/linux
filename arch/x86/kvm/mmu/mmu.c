@@ -3692,11 +3692,6 @@ static bool try_async_pf(struct kvm_page_fault *kpf)
 static int direct_page_fault(struct kvm_page_fault *kpf)
 {
 	struct kvm_vcpu *vcpu = kpf->vcpu;
-	gpa_t gpa = kpf->cr2_or_gpa;
-	u32 error_code = kpf->error_code;
-	bool prefault = kpf->prefault;
-	int max_level = kpf->max_level;
-
 	unsigned long mmu_seq;
 	int r;
 
@@ -3737,8 +3732,7 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 		goto out_unlock;
 
 	if (is_tdp_mmu_root(vcpu->kvm, vcpu->arch.mmu->root_hpa))
-		r = kvm_tdp_mmu_map(vcpu, gpa, error_code, kpf->map_writable,
-				    max_level, kpf->pfn, prefault);
+		r = kvm_tdp_mmu_map(kpf);
 	else
 		r = __direct_map(kpf);
 
