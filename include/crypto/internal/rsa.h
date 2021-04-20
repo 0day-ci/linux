@@ -7,6 +7,7 @@
  */
 #ifndef _RSA_HELPER_
 #define _RSA_HELPER_
+#include <linux/mpi.h>
 #include <linux/types.h>
 
 /**
@@ -52,6 +53,12 @@ int rsa_parse_pub_key(struct rsa_key *rsa_key, const void *key,
 
 int rsa_parse_priv_key(struct rsa_key *rsa_key, const void *key,
 		       unsigned int key_len);
+
+struct rsa_mpi_key {
+	MPI n;
+	MPI e;
+	MPI d;
+};
 
 extern struct crypto_template rsa_pkcs1pad_tmpl;
 #endif
