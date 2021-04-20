@@ -3245,8 +3245,11 @@ static int ext4_split_extent_at(handle_t *handle,
 		err = ext4_zeroout_es(inode, &zero_ex);
 
 		goto out;
-	} else if (err)
+	} else if (err == -EROFS) {
+		return err;
+	} else {
 		goto fix_extent_len;
+	}
 
 out:
 	ext4_ext_show_leaf(inode, path);
