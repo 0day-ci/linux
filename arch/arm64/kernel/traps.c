@@ -383,9 +383,10 @@ void force_signal_inject(int signal, int code, unsigned long address, unsigned i
 void arm64_notify_segfault(unsigned long addr)
 {
 	int code;
+	unsigned long ut_addr = untagged_addr(addr);
 
 	mmap_read_lock(current->mm);
-	if (find_vma(current->mm, untagged_addr(addr)) == NULL)
+	if (find_vma_intersection(current->mm, ut_addr, ut_addr + 1) == NULL)
 		code = SEGV_MAPERR;
 	else
 		code = SEGV_ACCERR;
