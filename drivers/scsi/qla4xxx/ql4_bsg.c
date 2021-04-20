@@ -55,17 +55,17 @@ qla4xxx_read_flash(struct bsg_job *bsg_job)
 	rval = qla4xxx_get_flash(ha, flash_dma, offset, length);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: get flash failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else {
 		bsg_reply->reply_payload_rcv_len =
 			sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 					    bsg_job->reply_payload.sg_cnt,
 					    flash, length);
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	}
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 	dma_free_coherent(&ha->pdev->dev, length, flash, flash_dma);
 leave:
@@ -125,12 +125,12 @@ qla4xxx_update_flash(struct bsg_job *bsg_job)
 	rval = qla4xxx_set_flash(ha, flash_dma, offset, length, options);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: set flash failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 	dma_free_coherent(&ha->pdev->dev, length, flash, flash_dma);
 leave:
@@ -179,17 +179,17 @@ qla4xxx_get_acb_state(struct bsg_job *bsg_job)
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: get ip state failed\n",
 			   __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else {
 		bsg_reply->reply_payload_rcv_len =
 			sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 					    bsg_job->reply_payload.sg_cnt,
 					    status, sizeof(status));
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	}
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 leave:
 	return rval;
@@ -250,17 +250,17 @@ qla4xxx_read_nvram(struct bsg_job *bsg_job)
 	rval = qla4xxx_get_nvram(ha, nvram_dma, offset, len);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: get nvram failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else {
 		bsg_reply->reply_payload_rcv_len =
 			sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 					    bsg_job->reply_payload.sg_cnt,
 					    nvram, len);
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	}
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 	dma_free_coherent(&ha->pdev->dev, len, nvram, nvram_dma);
 leave:
@@ -324,12 +324,12 @@ qla4xxx_update_nvram(struct bsg_job *bsg_job)
 	rval = qla4xxx_set_nvram(ha, nvram_dma, offset, len);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: set nvram failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 	dma_free_coherent(&ha->pdev->dev, len, nvram, nvram_dma);
 leave:
@@ -369,12 +369,12 @@ qla4xxx_restore_defaults(struct bsg_job *bsg_job)
 	rval = qla4xxx_restore_factory_defaults(ha, region, field0, field1);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: set nvram failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 leave:
 	return rval;
@@ -428,17 +428,17 @@ qla4xxx_bsg_get_acb(struct bsg_job *bsg_job)
 	rval = qla4xxx_get_acb(ha, acb_dma, acb_type, len);
 	if (rval) {
 		ql4_printk(KERN_ERR, ha, "%s: get acb failed\n", __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		rval = -EIO;
 	} else {
 		bsg_reply->reply_payload_rcv_len =
 			sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
 					    bsg_job->reply_payload.sg_cnt,
 					    acb, len);
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	}
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 	dma_free_coherent(&ha->pdev->dev, len, acb, acb_dma);
 leave:
@@ -461,7 +461,7 @@ static void ql4xxx_execute_diag_cmd(struct bsg_job *bsg_job)
 	if (test_bit(DPC_RESET_HA, &ha->dpc_flags)) {
 		ql4_printk(KERN_INFO, ha, "%s: Adapter reset in progress. Invalid Request\n",
 			   __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		goto exit_diag_mem_test;
 	}
 
@@ -485,9 +485,9 @@ static void ql4xxx_execute_diag_cmd(struct bsg_job *bsg_job)
 			  mbox_sts[7]));
 
 	if (status == QLA_SUCCESS)
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	else
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 
 	/* Send mbox_sts to application */
 	bsg_job->reply_len = sizeof(struct iscsi_bsg_reply) + sizeof(mbox_sts);
@@ -497,9 +497,9 @@ static void ql4xxx_execute_diag_cmd(struct bsg_job *bsg_job)
 exit_diag_mem_test:
 	DEBUG2(ql4_printk(KERN_INFO, ha,
 			  "%s: bsg_reply->result = x%x, status = %s\n",
-			  __func__, bsg_reply->result, STATUS(status)));
+			  __func__, bsg_reply->status.combined, STATUS(status)));
 
-	bsg_job_done(bsg_job, bsg_reply->result,
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 }
 
@@ -668,14 +668,14 @@ static void qla4xxx_execute_diag_loopback_cmd(struct bsg_job *bsg_job)
 	if (test_bit(AF_LOOPBACK, &ha->flags)) {
 		ql4_printk(KERN_INFO, ha, "%s: Loopback Diagnostics already in progress. Invalid Request\n",
 			   __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		goto exit_loopback_cmd;
 	}
 
 	if (test_bit(DPC_RESET_HA, &ha->dpc_flags)) {
 		ql4_printk(KERN_INFO, ha, "%s: Adapter reset in progress. Invalid Request\n",
 			   __func__);
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 		goto exit_loopback_cmd;
 	}
 
@@ -685,14 +685,14 @@ static void qla4xxx_execute_diag_loopback_cmd(struct bsg_job *bsg_job)
 	if (is_qla8032(ha) || is_qla8042(ha)) {
 		status = qla4_83xx_pre_loopback_config(ha, mbox_cmd);
 		if (status != QLA_SUCCESS) {
-			bsg_reply->result = DID_ERROR << 16;
+			bsg_reply->status.combined = DID_ERROR << 16;
 			goto exit_loopback_cmd;
 		}
 
 		status = qla4_83xx_wait_for_loopback_config_comp(ha,
 								 wait_for_link);
 		if (status != QLA_SUCCESS) {
-			bsg_reply->result = DID_TIME_OUT << 16;
+			bsg_reply->status.combined = DID_TIME_OUT << 16;
 			goto restore;
 		}
 	}
@@ -707,9 +707,9 @@ static void qla4xxx_execute_diag_loopback_cmd(struct bsg_job *bsg_job)
 				&mbox_sts[0]);
 
 	if (status == QLA_SUCCESS)
-		bsg_reply->result = DID_OK << 16;
+		bsg_reply->status.combined = DID_OK << 16;
 	else
-		bsg_reply->result = DID_ERROR << 16;
+		bsg_reply->status.combined = DID_ERROR << 16;
 
 	DEBUG2(ql4_printk(KERN_INFO, ha,
 			  "%s: mbox_sts: %08X %08X %08X %08X %08X %08X %08X %08X\n",
@@ -725,7 +725,7 @@ restore:
 	if (is_qla8032(ha) || is_qla8042(ha)) {
 		status = qla4_83xx_post_loopback_config(ha, mbox_cmd);
 		if (status != QLA_SUCCESS) {
-			bsg_reply->result = DID_ERROR << 16;
+			bsg_reply->status.combined = DID_ERROR << 16;
 			goto exit_loopback_cmd;
 		}
 
@@ -737,15 +737,15 @@ restore:
 		status = qla4_83xx_wait_for_loopback_config_comp(ha,
 								 wait_for_link);
 		if (status != QLA_SUCCESS) {
-			bsg_reply->result = DID_TIME_OUT << 16;
+			bsg_reply->status.combined = DID_TIME_OUT << 16;
 			goto exit_loopback_cmd;
 		}
 	}
 exit_loopback_cmd:
 	DEBUG2(ql4_printk(KERN_INFO, ha,
 			  "%s: bsg_reply->result = x%x, status = %s\n",
-			  __func__, bsg_reply->result, STATUS(status)));
-	bsg_job_done(bsg_job, bsg_reply->result,
+			  __func__, bsg_reply->status.combined, STATUS(status)));
+	bsg_job_done(bsg_job, bsg_reply->status.combined,
 		     bsg_reply->reply_payload_rcv_len);
 }
 
@@ -841,9 +841,9 @@ int qla4xxx_process_vendor_specific(struct bsg_job *bsg_job)
 	default:
 		ql4_printk(KERN_ERR, ha, "%s: invalid BSG vendor command: "
 			   "0x%x\n", __func__, bsg_req->msgcode);
-		bsg_reply->result = (DID_ERROR << 16);
+		bsg_reply->status.combined = (DID_ERROR << 16);
 		bsg_reply->reply_payload_rcv_len = 0;
-		bsg_job_done(bsg_job, bsg_reply->result,
+		bsg_job_done(bsg_job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 		return -ENOSYS;
 	}

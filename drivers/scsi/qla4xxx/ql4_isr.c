@@ -145,7 +145,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 
 	ddb_entry = srb->ddb;
 	if (ddb_entry == NULL) {
-		cmd->result = DID_NO_CONNECT << 16;
+		cmd->status.combined = DID_NO_CONNECT << 16;
 		goto status_entry_exit;
 	}
 
@@ -157,7 +157,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 	case SCS_COMPLETE:
 
 		if (sts_entry->iscsiFlags & ISCSI_FLAG_RESIDUAL_OVER) {
-			cmd->result = DID_ERROR << 16;
+			cmd->status.combined = DID_ERROR << 16;
 			break;
 		}
 
@@ -166,7 +166,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			if (!scsi_status && ((scsi_bufflen(cmd) - residual) <
 				cmd->underflow)) {
 
-				cmd->result = DID_ERROR << 16;
+				cmd->status.combined = DID_ERROR << 16;
 
 				DEBUG2(printk("scsi%ld:%d:%d:%llu: %s: "
 					"Mid-layer Data underrun0, "
@@ -180,7 +180,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			}
 		}
 
-		cmd->result = DID_OK << 16 | scsi_status;
+		cmd->status.combined = DID_OK << 16 | scsi_status;
 
 		if (scsi_status != SAM_STAT_CHECK_CONDITION)
 			break;
@@ -192,7 +192,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 	case SCS_INCOMPLETE:
 		/* Always set the status to DID_ERROR, since
 		 * all conditions result in that status anyway */
-		cmd->result = DID_ERROR << 16;
+		cmd->status.combined = DID_ERROR << 16;
 		break;
 
 	case SCS_RESET_OCCURRED:
@@ -200,7 +200,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			      ha->host_no, cmd->device->channel,
 			      cmd->device->id, cmd->device->lun, __func__));
 
-		cmd->result = DID_RESET << 16;
+		cmd->status.combined = DID_RESET << 16;
 		break;
 
 	case SCS_ABORTED:
@@ -208,7 +208,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			      ha->host_no, cmd->device->channel,
 			      cmd->device->id, cmd->device->lun, __func__));
 
-		cmd->result = DID_RESET << 16;
+		cmd->status.combined = DID_RESET << 16;
 		break;
 
 	case SCS_TIMEOUT:
@@ -216,7 +216,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			      ha->host_no, cmd->device->channel,
 			      cmd->device->id, cmd->device->lun));
 
-		cmd->result = DID_TRANSPORT_DISRUPTED << 16;
+		cmd->status.combined = DID_TRANSPORT_DISRUPTED << 16;
 
 		/*
 		 * Mark device missing so that we won't continue to send
@@ -236,7 +236,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 				      cmd->device->channel, cmd->device->id,
 				      cmd->device->lun, __func__));
 
-			cmd->result = DID_ERROR << 16;
+			cmd->status.combined = DID_ERROR << 16;
 			break;
 		}
 
@@ -266,7 +266,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 						   scsi_bufflen(cmd),
 						   residual));
 
-				cmd->result = DID_ERROR << 16;
+				cmd->status.combined = DID_ERROR << 16;
 				break;
 			}
 
@@ -298,11 +298,11 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 					  residual,
 					  scsi_bufflen(cmd)));
 
-			cmd->result = DID_ERROR << 16 | scsi_status;
+			cmd->status.combined = DID_ERROR << 16 | scsi_status;
 			goto check_scsi_status;
 		}
 
-		cmd->result = DID_OK << 16 | scsi_status;
+		cmd->status.combined = DID_OK << 16 | scsi_status;
 
 check_scsi_status:
 		if (scsi_status == SAM_STAT_CHECK_CONDITION)
@@ -324,14 +324,14 @@ check_scsi_status:
 		if (iscsi_is_session_online(ddb_entry->sess))
 			qla4xxx_mark_device_missing(ddb_entry->sess);
 
-		cmd->result = DID_TRANSPORT_DISRUPTED << 16;
+		cmd->status.combined = DID_TRANSPORT_DISRUPTED << 16;
 		break;
 
 	case SCS_QUEUE_FULL:
 		/*
 		 * SCSI Mid-Layer handles device queue full
 		 */
-		cmd->result = DID_OK << 16 | sts_entry->scsiStatus;
+		cmd->status.combined = DID_OK << 16 | sts_entry->scsiStatus;
 		DEBUG2(printk("scsi%ld:%d:%llu: %s: QUEUE FULL detected "
 			      "compl=%02x, scsi=%02x, state=%02x, iFlags=%02x,"
 			      " iResp=%02x\n", ha->host_no, cmd->device->id,
@@ -343,7 +343,7 @@ check_scsi_status:
 		break;
 
 	default:
-		cmd->result = DID_ERROR << 16;
+		cmd->status.combined = DID_ERROR << 16;
 		break;
 	}
 
@@ -529,7 +529,7 @@ void qla4xxx_process_response_queue(struct scsi_qla_host *ha)
 
 			/* ETRY normally by sending it back with
 			 * DID_BUS_BUSY */
-			srb->cmd->result = DID_BUS_BUSY << 16;
+			srb->cmd->status.combined = DID_BUS_BUSY << 16;
 			kref_put(&srb->srb_ref, qla4xxx_srb_compl);
 			break;
 

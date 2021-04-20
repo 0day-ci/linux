@@ -4106,20 +4106,20 @@ static int qla4xxx_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	if (test_bit(AF_EEH_BUSY, &ha->flags)) {
 		if (test_bit(AF_PCI_CHANNEL_IO_PERM_FAILURE, &ha->flags))
-			cmd->result = DID_NO_CONNECT << 16;
+			cmd->status.combined = DID_NO_CONNECT << 16;
 		else
-			cmd->result = DID_REQUEUE << 16;
+			cmd->status.combined = DID_REQUEUE << 16;
 		goto qc_fail_command;
 	}
 
 	if (!sess) {
-		cmd->result = DID_IMM_RETRY << 16;
+		cmd->status.combined = DID_IMM_RETRY << 16;
 		goto qc_fail_command;
 	}
 
 	rval = iscsi_session_chkready(sess);
 	if (rval) {
-		cmd->result = rval;
+		cmd->status.combined = rval;
 		goto qc_fail_command;
 	}
 
@@ -4802,7 +4802,7 @@ static void qla4xxx_abort_active_cmds(struct scsi_qla_host *ha, int res)
 	for (i = 0; i < ha->host->can_queue; i++) {
 		srb = qla4xxx_del_from_active_array(ha, i);
 		if (srb != NULL) {
-			srb->cmd->result = res;
+			srb->cmd->status.combined = res;
 			kref_put(&srb->srb_ref, qla4xxx_srb_compl);
 		}
 	}
@@ -9283,7 +9283,7 @@ static int qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
 		      "scsi%ld: DEVICE_RESET cmd=%p jiffies = 0x%lx, to=%x,"
 		      "dpc_flags=%lx, status=%x allowed=%d\n", ha->host_no,
 		      cmd, jiffies, cmd->request->timeout / HZ,
-		      ha->dpc_flags, cmd->result, cmd->allowed));
+		      ha->dpc_flags, cmd->status.combined, cmd->allowed));
 
 	rval = qla4xxx_isp_check_reg(ha);
 	if (rval != QLA_SUCCESS) {
@@ -9350,7 +9350,7 @@ static int qla4xxx_eh_target_reset(struct scsi_cmnd *cmd)
 		      "scsi%ld: TARGET_DEVICE_RESET cmd=%p jiffies = 0x%lx, "
 		      "to=%x,dpc_flags=%lx, status=%x allowed=%d\n",
 		      ha->host_no, cmd, jiffies, cmd->request->timeout / HZ,
-		      ha->dpc_flags, cmd->result, cmd->allowed));
+		      ha->dpc_flags, cmd->status.combined, cmd->allowed));
 
 	rval = qla4xxx_isp_check_reg(ha);
 	if (rval != QLA_SUCCESS) {
