@@ -61,18 +61,18 @@ xfs_fs_get_quota_state(
 	struct xfs_quotainfo *q = mp->m_quotainfo;
 
 	memset(state, 0, sizeof(*state));
-	if (!XFS_IS_QUOTA_RUNNING(mp))
+	if (!XFS_IS_QUOTA_ON(mp))
 		return 0;
 	state->s_incoredqs = q->qi_dquots;
-	if (XFS_IS_UQUOTA_RUNNING(mp))
+	if (XFS_IS_UQUOTA_ON(mp))
 		state->s_state[USRQUOTA].flags |= QCI_ACCT_ENABLED;
 	if (XFS_IS_UQUOTA_ENFORCED(mp))
 		state->s_state[USRQUOTA].flags |= QCI_LIMITS_ENFORCED;
-	if (XFS_IS_GQUOTA_RUNNING(mp))
+	if (XFS_IS_GQUOTA_ON(mp))
 		state->s_state[GRPQUOTA].flags |= QCI_ACCT_ENABLED;
 	if (XFS_IS_GQUOTA_ENFORCED(mp))
 		state->s_state[GRPQUOTA].flags |= QCI_LIMITS_ENFORCED;
-	if (XFS_IS_PQUOTA_RUNNING(mp))
+	if (XFS_IS_PQUOTA_ON(mp))
 		state->s_state[PRJQUOTA].flags |= QCI_ACCT_ENABLED;
 	if (XFS_IS_PQUOTA_ENFORCED(mp))
 		state->s_state[PRJQUOTA].flags |= QCI_LIMITS_ENFORCED;
@@ -115,10 +115,8 @@ xfs_fs_set_info(
 
 	if (sb_rdonly(sb))
 		return -EROFS;
-	if (!XFS_IS_QUOTA_RUNNING(mp))
-		return -ENOSYS;
 	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
+		return -ENOSYS;
 	if (info->i_fieldmask & ~XFS_QC_SETINFO_MASK)
 		return -EINVAL;
 	if ((info->i_fieldmask & XFS_QC_SETINFO_MASK) == 0)
@@ -165,7 +163,7 @@ xfs_quota_enable(
 
 	if (sb_rdonly(sb))
 		return -EROFS;
-	if (!XFS_IS_QUOTA_RUNNING(mp))
+	if (!XFS_IS_QUOTA_ON(mp))
 		return -ENOSYS;
 
 	return xfs_qm_scall_quotaon(mp, xfs_quota_flags(uflags));
@@ -180,10 +178,8 @@ xfs_quota_disable(
 
 	if (sb_rdonly(sb))
 		return -EROFS;
-	if (!XFS_IS_QUOTA_RUNNING(mp))
-		return -ENOSYS;
 	if (!XFS_IS_QUOTA_ON(mp))
-		return -EINVAL;
+		return -ENOSYS;
 
 	/*
 	 * No file system can have quotas enabled on disk but not in core.
@@ -246,10 +242,8 @@ xfs_fs_get_dqblk(
 	struct xfs_mount	*mp = XFS_M(sb);
 	xfs_dqid_t		id;
 
-	if (!XFS_IS_QUOTA_RUNNING(mp))
-		return -ENOSYS;
 	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
+		return -ENOSYS;
 
 	id = from_kqid(&init_user_ns, qid);
 	return xfs_qm_scall_getquota(mp, id, xfs_quota_type(qid.type), qdq);
@@ -266,10 +260,8 @@ xfs_fs_get_nextdqblk(
 	struct xfs_mount	*mp = XFS_M(sb);
 	xfs_dqid_t		id;
 
-	if (!XFS_IS_QUOTA_RUNNING(mp))
-		return -ENOSYS;
 	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
+		return -ENOSYS;
 
 	id = from_kqid(&init_user_ns, *qid);
 	ret = xfs_qm_scall_getquota_next(mp, &id, xfs_quota_type(qid->type),
@@ -292,10 +284,8 @@ xfs_fs_set_dqblk(
 
 	if (sb_rdonly(sb))
 		return -EROFS;
-	if (!XFS_IS_QUOTA_RUNNING(mp))
-		return -ENOSYS;
 	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
+		return -ENOSYS;
 
 	return xfs_qm_scall_setqlim(mp, from_kqid(&init_user_ns, qid),
 				     xfs_quota_type(qid.type), qdq);
