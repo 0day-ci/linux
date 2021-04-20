@@ -795,14 +795,12 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 	gpa_t addr = kpf->cr2_or_gpa;
 	u32 error_code = kpf->error_code;
 	bool prefault = kpf->prefault;
-	bool write_fault = error_code & PFERR_WRITE_MASK;
+	bool write_fault = kpf->write_fault;
 	bool user_fault = error_code & PFERR_USER_MASK;
 	struct guest_walker walker;
 	int r;
-	kvm_pfn_t pfn;
-	hva_t hva;
 	unsigned long mmu_seq;
-	bool map_writable, is_self_change_mapping;
+	bool is_self_change_mapping;
 	int max_level;
 
 	pgprintk("%s: addr %lx err %x\n", __func__, addr, error_code);
@@ -851,11 +849,11 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 	mmu_seq = vcpu->kvm->mmu_notifier_seq;
 	smp_rmb();
 
-	if (try_async_pf(vcpu, prefault, walker.gfn, addr, &pfn, &hva,
-			 write_fault, &map_writable))
+	kpf->gfn = walker.gfn;
+	if (try_async_pf(kpf))
 		return RET_PF_RETRY;
 
-	if (handle_abnormal_pfn(vcpu, addr, walker.gfn, pfn, walker.pte_access, &r))
+	if (handle_abnormal_pfn(vcpu, addr, walker.gfn, kpf->pfn, walker.pte_access, &r))
 		return r;
 
 	/*
@@ -864,7 +862,7 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 	 */
 	if (write_fault && !(walker.pte_access & ACC_WRITE_MASK) &&
 	     !is_write_protection(vcpu) && !user_fault &&
-	      !is_noslot_pfn(pfn)) {
+	      !is_noslot_pfn(kpf->pfn)) {
 		walker.pte_access |= ACC_WRITE_MASK;
 		walker.pte_access &= ~ACC_USER_MASK;
 
@@ -880,20 +878,21 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 
 	r = RET_PF_RETRY;
 	write_lock(&vcpu->kvm->mmu_lock);
-	if (!is_noslot_pfn(pfn) && mmu_notifier_retry_hva(vcpu->kvm, mmu_seq, hva))
+	if (!is_noslot_pfn(kpf->pfn) &&
+	    mmu_notifier_retry_hva(vcpu->kvm, mmu_seq, kpf->hva))
 		goto out_unlock;
 
 	kvm_mmu_audit(vcpu, AUDIT_PRE_PAGE_FAULT);
 	r = make_mmu_pages_available(vcpu);
 	if (r)
 		goto out_unlock;
-	r = FNAME(fetch)(vcpu, addr, &walker, error_code, max_level, pfn,
-			 map_writable, prefault);
+	r = FNAME(fetch)(vcpu, addr, &walker, error_code, max_level, kpf->pfn,
+			 kpf->map_writable, prefault);
 	kvm_mmu_audit(vcpu, AUDIT_POST_PAGE_FAULT);
 
 out_unlock:
 	write_unlock(&vcpu->kvm->mmu_lock);
-	kvm_release_pfn_clean(pfn);
+	kvm_release_pfn_clean(kpf->pfn);
 	return r;
 }
 

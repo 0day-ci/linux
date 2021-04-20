@@ -111,12 +111,17 @@ struct kvm_page_fault {
 	struct kvm_vcpu *vcpu;
 	gpa_t cr2_or_gpa;
 	u32 error_code;
+	bool write_fault;
 	bool prefault;
 
 	/* internal state */
 	gfn_t gfn;
 	bool is_tdp;
 	int max_level;
+
+	kvm_pfn_t pfn;
+	hva_t hva;
+	bool map_writable;
 };
 
 static inline void kvm_page_fault_init(
@@ -126,12 +131,16 @@ static inline void kvm_page_fault_init(
 	kpf->vcpu = vcpu;
 	kpf->cr2_or_gpa = cr2_or_gpa;
 	kpf->error_code = error_code;
+	kpf->write_fault = error_code & PFERR_WRITE_MASK;
 	kpf->prefault = prefault;
 
 	/* default value */
 	kpf->is_tdp = false;
 	kpf->gfn = cr2_or_gpa >> PAGE_SHIFT;
 	kpf->max_level = PG_LEVEL_4K;
+	kpf->pfn = KVM_PFN_NOSLOT;
+	kpf->hva = KVM_HVA_ERR_BAD;
+	kpf->map_writable = false;
 }
 
 int kvm_tdp_page_fault(struct kvm_page_fault *kpf);
