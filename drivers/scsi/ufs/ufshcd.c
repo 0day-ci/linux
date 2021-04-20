@@ -9455,6 +9455,8 @@ EXPORT_SYMBOL_GPL(ufshcd_init);
 
 static int __init ufshcd_core_init(void)
 {
+	BUILD_BUG_ON(offsetof(struct ufs_bsg_reply, upiu_rsp) != 8);
+
 	ufs_debugfs_init();
 	return 0;
 }
