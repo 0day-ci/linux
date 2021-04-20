@@ -2069,24 +2069,26 @@ void scsi_exit_queue(void)
  *	status on error
  *
  */
-int
+union scsi_status
 scsi_mode_select(struct scsi_device *sdev, int pf, int sp, int modepage,
 		 unsigned char *buffer, int len, int timeout, int retries,
 		 struct scsi_mode_data *data, struct scsi_sense_hdr *sshdr)
 {
 	unsigned char cmd[10];
 	unsigned char *real_buffer;
-	int ret;
+	union scsi_status ret;
 
 	memset(cmd, 0, sizeof(cmd));
 	cmd[1] = (pf ? 0x10 : 0) | (sp ? 0x01 : 0);
 
 	if (sdev->use_10_for_ms) {
+		ret.combined = -EINVAL;
 		if (len > 65535)
-			return -EINVAL;
+			return ret;
+		ret.combined = -ENOMEM;
 		real_buffer = kmalloc(8 + len, GFP_KERNEL);
 		if (!real_buffer)
-			return -ENOMEM;
+			return ret;
 		memcpy(real_buffer + 8, buffer, len);
 		len += 8;
 		real_buffer[0] = 0;
@@ -2102,13 +2104,15 @@ scsi_mode_select(struct scsi_device *sdev, int pf, int sp, int modepage,
 		cmd[7] = len >> 8;
 		cmd[8] = len;
 	} else {
+		ret.combined = -EINVAL;
 		if (len > 255 || data->block_descriptor_length > 255 ||
 		    data->longlba)
-			return -EINVAL;
+			return ret;
 
+		ret.combined = -ENOMEM;
 		real_buffer = kmalloc(4 + len, GFP_KERNEL);
 		if (!real_buffer)
-			return -ENOMEM;
+			return ret;
 		memcpy(real_buffer + 4, buffer, len);
 		len += 4;
 		real_buffer[0] = 0;
@@ -2121,7 +2125,7 @@ scsi_mode_select(struct scsi_device *sdev, int pf, int sp, int modepage,
 	}
 
 	ret = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, real_buffer, len,
-			       sshdr, timeout, retries, NULL).combined;
+			       sshdr, timeout, retries, NULL);
 	kfree(real_buffer);
 	return ret;
 }
