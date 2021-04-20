@@ -211,7 +211,6 @@ struct ufshcd_lrb {
 	struct scsi_cmnd *cmd;
 	u8 *sense_buffer;
 	unsigned int sense_bufflen;
-	int scsi_status;
 
 	int command_type;
 	int task_tag;
