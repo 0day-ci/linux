@@ -206,7 +206,7 @@ static void fdomain_finish_cmd(struct fdomain *fd, int result)
 {
 	outb(0, fd->base + REG_ICTL);
 	fdomain_make_bus_idle(fd);
-	fd->cur_cmd->result = result;
+	fd->cur_cmd->status.combined = result;
 	fd->cur_cmd->scsi_done(fd->cur_cmd);
 	fd->cur_cmd = NULL;
 }
@@ -439,7 +439,7 @@ static int fdomain_abort(struct scsi_cmnd *cmd)
 
 	fdomain_make_bus_idle(fd);
 	fd->cur_cmd->SCp.phase |= aborted;
-	fd->cur_cmd->result = DID_ABORT << 16;
+	fd->cur_cmd->status.combined = DID_ABORT << 16;
 
 	/* Aborts are not done well. . . */
 	fdomain_finish_cmd(fd, DID_ABORT << 16);
