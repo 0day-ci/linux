@@ -1043,13 +1043,13 @@ static void pscsi_req_done(struct request *req, blk_status_t status)
 {
 	struct se_cmd *cmd = req->end_io_data;
 	struct pscsi_plugin_task *pt = cmd->priv;
-	int result = scsi_req(req)->result;
+	union scsi_status result = scsi_req(req)->status;
 	enum sam_status scsi_status = status_byte(result) << 1;
 
 	if (scsi_status != SAM_STAT_GOOD) {
 		pr_debug("PSCSI Status Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, pt->pscsi_cdb[0],
-			result);
+			result.combined);
 	}
 
 	pscsi_complete_cmd(cmd, scsi_status, scsi_req(req)->sense);
@@ -1062,7 +1062,7 @@ static void pscsi_req_done(struct request *req, blk_status_t status)
 	default:
 		pr_debug("PSCSI Host Byte exception at cmd: %p CDB:"
 			" 0x%02x Result: 0x%08x\n", cmd, pt->pscsi_cdb[0],
-			result);
+			result.combined);
 		target_complete_cmd(cmd, SAM_STAT_CHECK_CONDITION);
 		break;
 	}
