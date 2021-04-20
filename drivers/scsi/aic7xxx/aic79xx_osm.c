@@ -582,7 +582,7 @@ ahd_linux_queue_lck(struct scsi_cmnd * cmd, void (*scsi_done) (struct scsi_cmnd 
 	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	cmd->scsi_done = scsi_done;
-	cmd->result = CAM_REQ_INPROG << 16;
+	cmd->status.combined = CAM_REQ_INPROG << 16;
 	rtn = ahd_linux_run_command(ahd, dev, cmd);
 
 	return rtn;
@@ -1772,8 +1772,8 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 	dev = scb->platform_data->dev;
 	dev->active--;
 	dev->openings++;
-	if ((cmd->result & (CAM_DEV_QFRZN << 16)) != 0) {
-		cmd->result &= ~(CAM_DEV_QFRZN << 16);
+	if ((cmd->status.combined & (CAM_DEV_QFRZN << 16)) != 0) {
+		cmd->status.combined &= ~(CAM_DEV_QFRZN << 16);
 		dev->qfrozen--;
 	}
 	ahd_linux_unmap_scb(ahd, scb);
@@ -1928,7 +1928,7 @@ ahd_linux_handle_scsi_status(struct ahd_softc *ahd,
 			memcpy(cmd->sense_buffer,
 			       ahd_get_sense_buf(ahd, scb)
 			       + sense_offset, sense_size);
-			cmd->result |= (DRIVER_SENSE << 24);
+			cmd->status.combined |= (DRIVER_SENSE << 24);
 
 #ifdef AHD_DEBUG
 			if (ahd_debug & AHD_SHOW_SENSE) {
@@ -2041,7 +2041,7 @@ ahd_linux_queue_cmd_complete(struct ahd_softc *ahd, struct scsi_cmnd *cmd)
 		switch(scsi_status) {
 		case SAM_STAT_COMMAND_TERMINATED:
 		case SAM_STAT_CHECK_CONDITION:
-			if ((cmd->result >> 24) != DRIVER_SENSE) {
+			if (cmd->status.b.driver != DRIVER_SENSE) {
 				do_fallback = 1;
 			} else {
 				struct scsi_sense_data *sense;

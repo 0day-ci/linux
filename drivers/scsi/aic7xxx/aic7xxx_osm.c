@@ -531,7 +531,7 @@ ahc_linux_queue_lck(struct scsi_cmnd * cmd, void (*scsi_done) (struct scsi_cmnd 
 	ahc_lock(ahc, &flags);
 	if (ahc->platform_data->qfrozen == 0) {
 		cmd->scsi_done = scsi_done;
-		cmd->result = CAM_REQ_INPROG << 16;
+		cmd->status.combined = CAM_REQ_INPROG << 16;
 		rtn = ahc_linux_run_command(ahc, dev, cmd);
 	}
 	ahc_unlock(ahc, &flags);
@@ -1698,8 +1698,8 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 	dev = scb->platform_data->dev;
 	dev->active--;
 	dev->openings++;
-	if ((cmd->result & (CAM_DEV_QFRZN << 16)) != 0) {
-		cmd->result &= ~(CAM_DEV_QFRZN << 16);
+	if ((cmd->status.combined & (CAM_DEV_QFRZN << 16)) != 0) {
+		cmd->status.combined &= ~(CAM_DEV_QFRZN << 16);
 		dev->qfrozen--;
 	}
 	ahc_linux_unmap_scb(ahc, scb);
@@ -1838,7 +1838,7 @@ ahc_linux_handle_scsi_status(struct ahc_softc *ahc,
 			if (sense_size < SCSI_SENSE_BUFFERSIZE)
 				memset(&cmd->sense_buffer[sense_size], 0,
 				       SCSI_SENSE_BUFFERSIZE - sense_size);
-			cmd->result |= (DRIVER_SENSE << 24);
+			cmd->status.b.driver = DRIVER_SENSE;
 #ifdef AHC_DEBUG
 			if (ahc_debug & AHC_SHOW_SENSE) {
 				int i;
