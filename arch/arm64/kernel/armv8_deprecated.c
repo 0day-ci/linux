@@ -324,7 +324,7 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
 	if ((type != TYPE_SWPB) && (address & 0x3)) {
 		/* SWP to unaligned address not permitted */
 		pr_debug("SWP instruction on unaligned pointer!\n");
-		return -EFAULT;
+		return -ENXIO;
 	}
 
 	while (1) {
@@ -406,15 +406,17 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
 	user_ptr = (const void __user *)(unsigned long)(address & ~3);
 	if (!access_ok(user_ptr, 4)) {
 		pr_debug("SWP{B} emulation: access to 0x%08x not allowed!\n",
-			address);
-		goto fault;
+			 address);
+		goto e_access;
 	}
 
 	res = emulate_swpX(address, &data, type);
-	if (res == -EFAULT)
-		goto fault;
-	else if (res == 0)
+	if (!res)
 		regs->user_regs.regs[destreg] = data;
+	else if (res == -EFAULT)
+		goto e_fault;
+	else if (res = -ENXIO) /* Unaligned pointer */
+		goto e_align;
 
 ret:
 	if (type == TYPE_SWPB)
@@ -428,10 +430,14 @@ ret:
 	arm64_skip_faulting_instruction(regs, 4);
 	return 0;
 
-fault:
+e_fault:
 	pr_debug("SWP{B} emulation: access caused memory abort!\n");
 	arm64_notify_segfault(address);
+	return 0;
 
+e_align:
+e_access:
+	force_signal_inject(SIGSEGV, SEGV_ACCERR, address, 0);
 	return 0;
 }
 
