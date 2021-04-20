@@ -202,7 +202,7 @@ static int nsp_queuecommand_lck(struct scsi_cmnd *SCpnt,
 
 	if (data->CurrentSC != NULL) {
 		nsp_msg(KERN_DEBUG, "CurrentSC!=NULL this can't be happen");
-		SCpnt->result   = DID_BAD_TARGET << 16;
+		SCpnt->status.combined = DID_BAD_TARGET << 16;
 		nsp_scsi_done(SCpnt);
 		return 0;
 	}
@@ -249,7 +249,7 @@ static int nsp_queuecommand_lck(struct scsi_cmnd *SCpnt,
 
 	if (nsphw_start_selection(SCpnt) == FALSE) {
 		nsp_dbg(NSP_DEBUG_QUEUECOMMAND, "selection fail");
-		SCpnt->result   = DID_BUS_BUSY << 16;
+		SCpnt->status.combined = DID_BUS_BUSY << 16;
 		nsp_scsi_done(SCpnt);
 		return 0;
 	}
@@ -1034,7 +1034,8 @@ static irqreturn_t nspintr(int irq, void *dev_id)
 
 		if(data->CurrentSC != NULL) {
 			tmpSC = data->CurrentSC;
-			tmpSC->result  = (DID_RESET                   << 16) |
+			tmpSC->status.combined =
+					 (DID_RESET                   << 16) |
 				         ((tmpSC->SCp.Message & 0xff) <<  8) |
 				         ((tmpSC->SCp.Status  & 0xff) <<  0);
 			nsp_scsi_done(tmpSC);
@@ -1083,7 +1084,7 @@ static irqreturn_t nspintr(int irq, void *dev_id)
 				data->SelectionTimeOut = 0;
 				nsp_index_write(base, SCSIBUSCTRL, 0);
 
-				tmpSC->result   = DID_TIME_OUT << 16;
+				tmpSC->status.combined = DID_TIME_OUT << 16;
 				nsp_scsi_done(tmpSC);
 
 				return IRQ_HANDLED;
@@ -1107,7 +1108,7 @@ static irqreturn_t nspintr(int irq, void *dev_id)
 		// *sync_neg = SYNC_NOT_YET;
 		if ((phase & BUSMON_PHASE_MASK) != BUSPHASE_MESSAGE_IN) {
 
-			tmpSC->result	= DID_ABORT << 16;
+			tmpSC->status.combined = DID_ABORT << 16;
 			nsp_scsi_done(tmpSC);
 			return IRQ_HANDLED;
 		}
@@ -1133,10 +1134,11 @@ static irqreturn_t nspintr(int irq, void *dev_id)
 
 		/* all command complete and return status */
 		if (tmpSC->SCp.Message == COMMAND_COMPLETE) {
-			tmpSC->result = (DID_OK		             << 16) |
+			tmpSC->status.combined =
+					(DID_OK		             << 16) |
 					((tmpSC->SCp.Message & 0xff) <<  8) |
 					((tmpSC->SCp.Status  & 0xff) <<  0);
-			nsp_dbg(NSP_DEBUG_INTR, "command complete result=0x%x", tmpSC->result);
+			nsp_dbg(NSP_DEBUG_INTR, "command complete result=0x%x", tmpSC->status.combined);
 			nsp_scsi_done(tmpSC);
 
 			return IRQ_HANDLED;
@@ -1151,7 +1153,7 @@ static irqreturn_t nspintr(int irq, void *dev_id)
 		nsp_msg(KERN_DEBUG, "unexpected bus free. irq_status=0x%x, phase=0x%x, irq_phase=0x%x", irq_status, phase, irq_phase);
 
 		*sync_neg       = SYNC_NG;
-		tmpSC->result   = DID_ERROR << 16;
+		tmpSC->status.combined = DID_ERROR << 16;
 		nsp_scsi_done(tmpSC);
 		return IRQ_HANDLED;
 	}
