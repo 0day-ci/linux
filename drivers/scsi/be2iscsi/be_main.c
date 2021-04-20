@@ -1125,22 +1125,22 @@ be_complete_io(struct beiscsi_conn *beiscsi_conn,
 
 		return;
 	}
-	task->sc->result = (DID_OK << 16) | status;
+	task->sc->status.combined = (DID_OK << 16) | status;
 	if (rsp != ISCSI_STATUS_CMD_COMPLETED) {
-		task->sc->result = DID_ERROR << 16;
+		task->sc->status.combined = DID_ERROR << 16;
 		goto unmap;
 	}
 
 	/* bidi not initially supported */
 	if (flags & (ISCSI_FLAG_CMD_UNDERFLOW | ISCSI_FLAG_CMD_OVERFLOW)) {
 		if (!status && (flags & ISCSI_FLAG_CMD_OVERFLOW))
-			task->sc->result = DID_ERROR << 16;
+			task->sc->status.combined = DID_ERROR << 16;
 
 		if (flags & ISCSI_FLAG_CMD_UNDERFLOW) {
 			scsi_set_resid(task->sc, resid);
 			if (!status && (scsi_bufflen(task->sc) - resid <
 			    task->sc->underflow))
-				task->sc->result = DID_ERROR << 16;
+				task->sc->status.combined = DID_ERROR << 16;
 		}
 	}
 
@@ -4877,8 +4877,8 @@ static int beiscsi_bsg_request(struct bsg_job *job)
 				    nonemb_cmd.va, (resp->response_length
 				    + sizeof(*resp)));
 		bsg_reply->reply_payload_rcv_len = resp->response_length;
-		bsg_reply->result = status;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = status;
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 		dma_free_coherent(&phba->ctrl.pdev->dev, nonemb_cmd.size,
 				    nonemb_cmd.va, nonemb_cmd.dma);
