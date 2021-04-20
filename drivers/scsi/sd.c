@@ -1622,7 +1622,7 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 {
 	struct scsi_disk *sdkp = scsi_disk_get(disk);
 	struct scsi_device *sdp;
-	int retval;
+	union scsi_status retval;
 	bool disk_changed;
 
 	if (!sdkp)
@@ -1654,7 +1654,8 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 	if (scsi_block_when_processing_errors(sdp)) {
 		struct scsi_sense_hdr sshdr = { 0, };
 
-		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, sdkp->max_retries,
+		retval.combined =
+			scsi_test_unit_ready(sdp, SD_TIMEOUT, sdkp->max_retries,
 					      &sshdr);
 
 		/* failed to execute TUR, assume media not present */
@@ -1689,7 +1690,8 @@ out:
 
 static int sd_sync_cache(struct scsi_disk *sdkp, struct scsi_sense_hdr *sshdr)
 {
-	int retries, res;
+	int retries;
+	union scsi_status res;
 	struct scsi_device *sdp = sdkp->device;
 	const int timeout = sdp->request_queue->rq_timeout
 		* SD_FLUSH_TIMEOUT_MULTIPLIER;
@@ -1710,13 +1712,13 @@ static int sd_sync_cache(struct scsi_disk *sdkp, struct scsi_sense_hdr *sshdr)
 		 * Leave the rest of the command zero to indicate
 		 * flush everything.
 		 */
-		res = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, sshdr,
+		res.combined = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, sshdr,
 				timeout, sdkp->max_retries, 0, RQF_PM, NULL);
-		if (res == 0)
+		if (res.combined == 0)
 			break;
 	}
 
-	if (res) {
+	if (res.combined) {
 		sd_print_result(sdkp, "Synchronize Cache(10) failed", res);
 
 		if (driver_byte(res) == DRIVER_SENSE)
@@ -1809,7 +1811,7 @@ static int sd_pr_command(struct block_device *bdev, u8 sa,
 	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdev = sdkp->device;
 	struct scsi_sense_hdr sshdr;
-	int result;
+	union scsi_status result;
 	u8 cmd[16] = { 0, };
 	u8 data[24] = { 0, };
 
@@ -1822,16 +1824,18 @@ static int sd_pr_command(struct block_device *bdev, u8 sa,
 	put_unaligned_be64(sa_key, &data[8]);
 	data[20] = flags;
 
-	result = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, &data, sizeof(data),
+	result.combined =
+		scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, &data, sizeof(data),
 			&sshdr, SD_TIMEOUT, sdkp->max_retries, NULL);
 
 	if (driver_byte(result) == DRIVER_SENSE &&
 	    scsi_sense_valid(&sshdr)) {
-		sdev_printk(KERN_INFO, sdev, "PR command failed: %d\n", result);
+		sdev_printk(KERN_INFO, sdev, "PR command failed: %d\n",
+			    result.combined);
 		scsi_print_sense_hdr(sdev, NULL, &sshdr);
 	}
 
-	return result;
+	return result.combined;
 }
 
 static int sd_pr_register(struct block_device *bdev, u64 old_key, u64 new_key,
@@ -1931,7 +1935,7 @@ static int sd_eh_action(struct scsi_cmnd *scmd, int eh_disp)
 
 	if (!scsi_device_online(sdev) ||
 	    !scsi_medium_access_command(scmd) ||
-	    host_byte(scmd->result) != DID_TIME_OUT ||
+	    host_byte(scmd->status) != DID_TIME_OUT ||
 	    eh_disp != SUCCESS)
 		return eh_disp;
 
@@ -2017,8 +2021,8 @@ static unsigned int sd_completed_bytes(struct scsi_cmnd *scmd)
  **/
 static int sd_done(struct scsi_cmnd *SCpnt)
 {
-	int result = SCpnt->result;
-	unsigned int good_bytes = result ? 0 : scsi_bufflen(SCpnt);
+	union scsi_status result = SCpnt->status;
+	unsigned int good_bytes = result.combined ? 0 : scsi_bufflen(SCpnt);
 	unsigned int sector_size = SCpnt->device->sector_size;
 	unsigned int resid;
 	struct scsi_sense_hdr sshdr;
@@ -2036,7 +2040,7 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 	case REQ_OP_ZONE_OPEN:
 	case REQ_OP_ZONE_CLOSE:
 	case REQ_OP_ZONE_FINISH:
-		if (!result) {
+		if (!result.combined) {
 			good_bytes = blk_rq_bytes(req);
 			scsi_set_resid(SCpnt, 0);
 		} else {
@@ -2062,7 +2066,7 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 		}
 	}
 
-	if (result) {
+	if (result.combined) {
 		sense_valid = scsi_command_normalize_sense(SCpnt, &sshdr);
 		if (sense_valid)
 			sense_deferred = scsi_sense_is_deferred(&sshdr);
@@ -2086,7 +2090,7 @@ static int sd_done(struct scsi_cmnd *SCpnt)
 		 * unknown amount of data was transferred so treat it as an
 		 * error.
 		 */
-		SCpnt->result = 0;
+		SCpnt->status.combined = 0;
 		memset(SCpnt->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
 		break;
 	case ABORTED_COMMAND:
@@ -2141,7 +2145,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 	unsigned char cmd[10];
 	unsigned long spintime_expire = 0;
 	int retries, spintime;
-	unsigned int the_result;
+	union scsi_status the_result;
 	struct scsi_sense_hdr sshdr;
 	int sense_valid = 0;
 
@@ -2156,7 +2160,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 			cmd[0] = TEST_UNIT_READY;
 			memset((void *) &cmd[1], 0, 9);
 
-			the_result = scsi_execute_req(sdkp->device, cmd,
+			the_result.combined = scsi_execute_req(sdkp->device, cmd,
 						      DMA_NONE, NULL, 0,
 						      &sshdr, SD_TIMEOUT,
 						      sdkp->max_retries, NULL);
@@ -2169,7 +2173,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 			if (media_not_present(sdkp, &sshdr))
 				return;
 
-			if (the_result)
+			if (the_result.combined)
 				sense_valid = scsi_sense_valid(&sshdr);
 			retries++;
 		} while (retries < 3 && 
@@ -2303,7 +2307,7 @@ static int sd_read_protection_type(struct scsi_disk *sdkp, unsigned char *buffer
 
 static void read_capacity_error(struct scsi_disk *sdkp, struct scsi_device *sdp,
 			struct scsi_sense_hdr *sshdr, int sense_valid,
-			int the_result)
+			union scsi_status the_result)
 {
 	if (driver_byte(the_result) == DRIVER_SENSE)
 		sd_print_sense_hdr(sdkp, sshdr);
@@ -2339,7 +2343,7 @@ static int read_capacity_16(struct scsi_disk *sdkp, struct scsi_device *sdp,
 	unsigned char cmd[16];
 	struct scsi_sense_hdr sshdr;
 	int sense_valid = 0;
-	int the_result;
+	union scsi_status the_result;
 	int retries = 3, reset_retries = READ_CAPACITY_RETRIES_ON_RESET;
 	unsigned int alignment;
 	unsigned long long lba;
@@ -2355,14 +2359,14 @@ static int read_capacity_16(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		cmd[13] = RC16_LEN;
 		memset(buffer, 0, RC16_LEN);
 
-		the_result = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
+		the_result.combined = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
 					buffer, RC16_LEN, &sshdr,
 					SD_TIMEOUT, sdkp->max_retries, NULL);
 
 		if (media_not_present(sdkp, &sshdr))
 			return -ENODEV;
 
-		if (the_result) {
+		if (the_result.combined) {
 			sense_valid = scsi_sense_valid(&sshdr);
 			if (sense_valid &&
 			    sshdr.sense_key == ILLEGAL_REQUEST &&
@@ -2382,9 +2386,9 @@ static int read_capacity_16(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		}
 		retries--;
 
-	} while (the_result && retries);
+	} while (the_result.combined && retries);
 
-	if (the_result) {
+	if (the_result.combined) {
 		sd_print_result(sdkp, "Read Capacity(16) failed", the_result);
 		read_capacity_error(sdkp, sdp, &sshdr, sense_valid, the_result);
 		return -EINVAL;
@@ -2430,7 +2434,7 @@ static int read_capacity_10(struct scsi_disk *sdkp, struct scsi_device *sdp,
 	unsigned char cmd[16];
 	struct scsi_sense_hdr sshdr;
 	int sense_valid = 0;
-	int the_result;
+	union scsi_status the_result;
 	int retries = 3, reset_retries = READ_CAPACITY_RETRIES_ON_RESET;
 	sector_t lba;
 	unsigned sector_size;
@@ -2440,14 +2444,14 @@ static int read_capacity_10(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		memset(&cmd[1], 0, 9);
 		memset(buffer, 0, 8);
 
-		the_result = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
+		the_result.combined = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
 					buffer, 8, &sshdr,
 					SD_TIMEOUT, sdkp->max_retries, NULL);
 
 		if (media_not_present(sdkp, &sshdr))
 			return -ENODEV;
 
-		if (the_result) {
+		if (the_result.combined) {
 			sense_valid = scsi_sense_valid(&sshdr);
 			if (sense_valid &&
 			    sshdr.sense_key == UNIT_ATTENTION &&
@@ -2459,9 +2463,9 @@ static int read_capacity_10(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		}
 		retries--;
 
-	} while (the_result && retries);
+	} while (the_result.combined && retries);
 
-	if (the_result) {
+	if (the_result.combined) {
 		sd_print_result(sdkp, "Read Capacity(10) failed", the_result);
 		read_capacity_error(sdkp, sdp, &sshdr, sense_valid, the_result);
 		return -EINVAL;
@@ -2643,7 +2647,7 @@ sd_do_mode_sense(struct scsi_disk *sdkp, int dbd, int modepage,
 static void
 sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 {
-	int res;
+	union scsi_status res;
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mode_data data;
 	int old_wp = sdkp->write_prot;
@@ -2655,14 +2659,14 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 	}
 
 	if (sdp->use_192_bytes_for_3f) {
-		res = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 192, &data, NULL);
+		res.combined = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 192, &data, NULL);
 	} else {
 		/*
 		 * First attempt: ask for all pages (0x3F), but only 4 bytes.
 		 * We have to start carefully: some devices hang if we ask
 		 * for more than is available.
 		 */
-		res = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 4, &data, NULL);
+		res.combined = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 4, &data, NULL);
 
 		/*
 		 * Second attempt: ask for page 0 When only page 0 is
@@ -2671,13 +2675,13 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 		 * CDB.
 		 */
 		if (!scsi_status_is_good(res))
-			res = sd_do_mode_sense(sdkp, 0, 0, buffer, 4, &data, NULL);
+			res.combined = sd_do_mode_sense(sdkp, 0, 0, buffer, 4, &data, NULL);
 
 		/*
 		 * Third attempt: ask 255 bytes, as we did earlier.
 		 */
 		if (!scsi_status_is_good(res))
-			res = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 255,
+			res.combined = sd_do_mode_sense(sdkp, 0, 0x3F, buffer, 255,
 					       &data, NULL);
 	}
 
@@ -2702,7 +2706,8 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, unsigned char *buffer)
 static void
 sd_read_cache_type(struct scsi_disk *sdkp, unsigned char *buffer)
 {
-	int len = 0, res;
+	int len = 0;
+	union scsi_status res;
 	struct scsi_device *sdp = sdkp->device;
 
 	int dbd;
@@ -2739,7 +2744,7 @@ sd_read_cache_type(struct scsi_disk *sdkp, unsigned char *buffer)
 	}
 
 	/* cautiously ask */
-	res = sd_do_mode_sense(sdkp, dbd, modepage, buffer, first_len,
+	res.combined = sd_do_mode_sense(sdkp, dbd, modepage, buffer, first_len,
 			&data, &sshdr);
 
 	if (!scsi_status_is_good(res))
@@ -2771,7 +2776,7 @@ sd_read_cache_type(struct scsi_disk *sdkp, unsigned char *buffer)
 
 	/* Get the data */
 	if (len > first_len)
-		res = sd_do_mode_sense(sdkp, dbd, modepage, buffer, len,
+		res.combined = sd_do_mode_sense(sdkp, dbd, modepage, buffer, len,
 				&data, &sshdr);
 
 	if (scsi_status_is_good(res)) {
@@ -2878,7 +2883,8 @@ defaults:
  */
 static void sd_read_app_tag_own(struct scsi_disk *sdkp, unsigned char *buffer)
 {
-	int res, offset;
+	union scsi_status res;
+	int offset;
 	struct scsi_device *sdp = sdkp->device;
 	struct scsi_mode_data data;
 	struct scsi_sense_hdr sshdr;
@@ -2889,7 +2895,7 @@ static void sd_read_app_tag_own(struct scsi_disk *sdkp, unsigned char *buffer)
 	if (sdkp->protection_type == 0)
 		return;
 
-	res = scsi_mode_sense(sdp, 1, 0x0a, buffer, 36, SD_TIMEOUT,
+	res.combined = scsi_mode_sense(sdp, 1, 0x0a, buffer, 36, SD_TIMEOUT,
 			      sdkp->max_retries, &data, &sshdr);
 
 	if (!scsi_status_is_good(res) || !data.header_length ||
@@ -3576,7 +3582,7 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 	unsigned char cmd[6] = { START_STOP };	/* START_VALID */
 	struct scsi_sense_hdr sshdr;
 	struct scsi_device *sdp = sdkp->device;
-	int res;
+	union scsi_status res;
 
 	if (start)
 		cmd[4] |= 1;	/* START */
@@ -3587,20 +3593,20 @@ static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
 	if (!scsi_device_online(sdp))
 		return -ENODEV;
 
-	res = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
+	res.combined = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			SD_TIMEOUT, sdkp->max_retries, 0, RQF_PM, NULL);
-	if (res) {
+	if (res.combined) {
 		sd_print_result(sdkp, "Start/Stop Unit failed", res);
 		if (driver_byte(res) == DRIVER_SENSE)
 			sd_print_sense_hdr(sdkp, &sshdr);
 		if (scsi_sense_valid(&sshdr) &&
 			/* 0x3a is medium not present */
 			sshdr.asc == 0x3a)
-			res = 0;
+			res.combined = 0;
 	}
 
 	/* SCSI error codes must not go to the generic layer */
-	if (res)
+	if (res.combined)
 		return -EIO;
 
 	return 0;
@@ -3803,10 +3809,11 @@ void sd_print_sense_hdr(struct scsi_disk *sdkp, struct scsi_sense_hdr *sshdr)
 			     sdkp->disk ? sdkp->disk->disk_name : NULL, sshdr);
 }
 
-void sd_print_result(const struct scsi_disk *sdkp, const char *msg, int result)
+void sd_print_result(const struct scsi_disk *sdkp, const char *msg,
+		     union scsi_status result)
 {
-	const char *hb_string = scsi_hostbyte_string(result);
-	const char *db_string = scsi_driverbyte_string(result);
+	const char *hb_string = scsi_hostbyte_string(result.combined);
+	const char *db_string = scsi_driverbyte_string(result.combined);
 
 	if (hb_string || db_string)
 		sd_printk(KERN_INFO, sdkp,

@@ -99,7 +99,7 @@ static int sd_zbc_do_report_zones(struct scsi_disk *sdkp, unsigned char *buf,
 	struct scsi_sense_hdr sshdr;
 	unsigned char cmd[16];
 	unsigned int rep_len;
-	int result;
+	union scsi_status result;
 
 	memset(cmd, 0, 16);
 	cmd[0] = ZBC_IN;
@@ -109,10 +109,10 @@ static int sd_zbc_do_report_zones(struct scsi_disk *sdkp, unsigned char *buf,
 	if (partial)
 		cmd[14] = ZBC_REPORT_ZONE_PARTIAL;
 
-	result = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
+	result.combined = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
 				  buf, buflen, &sshdr,
 				  timeout, SD_MAX_RETRIES, NULL);
-	if (result) {
+	if (result.combined) {
 		sd_printk(KERN_ERR, sdkp,
 			  "REPORT ZONES start lba %llu failed\n", lba);
 		sd_print_result(sdkp, "REPORT ZONES", result);
@@ -442,7 +442,7 @@ static bool sd_zbc_need_zone_wp_update(struct request *rq)
 static unsigned int sd_zbc_zone_wp_update(struct scsi_cmnd *cmd,
 					  unsigned int good_bytes)
 {
-	int result = cmd->result;
+	const union scsi_status result = cmd->status;
 	struct request *rq = cmd->request;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 	unsigned int zno = blk_rq_zone_no(rq);
@@ -457,7 +457,7 @@ static unsigned int sd_zbc_zone_wp_update(struct scsi_cmnd *cmd,
 	 */
 	spin_lock_irqsave(&sdkp->zones_wp_offset_lock, flags);
 
-	if (result && op != REQ_OP_ZONE_RESET_ALL) {
+	if (result.combined && op != REQ_OP_ZONE_RESET_ALL) {
 		if (op == REQ_OP_ZONE_APPEND) {
 			/* Force complete completion (no retry) */
 			good_bytes = 0;
@@ -516,11 +516,11 @@ unlock_wp_offset:
 unsigned int sd_zbc_complete(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		     struct scsi_sense_hdr *sshdr)
 {
-	int result = cmd->result;
+	const union scsi_status result = cmd->status;
 	struct request *rq = cmd->request;
 
 	if (op_is_zone_mgmt(req_op(rq)) &&
-	    result &&
+	    result.combined &&
 	    sshdr->sense_key == ILLEGAL_REQUEST &&
 	    sshdr->asc == 0x24) {
 		/*
