@@ -89,7 +89,7 @@ static int ses_recv_diag(struct scsi_device *sdev, int page_code,
 	unsigned char recv_page_code;
 
 	ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, bufflen,
-				NULL, SES_TIMEOUT, SES_RETRIES, NULL);
+				NULL, SES_TIMEOUT, SES_RETRIES, NULL).combined;
 	if (unlikely(ret))
 		return ret;
 
@@ -123,7 +123,7 @@ static int ses_send_diag(struct scsi_device *sdev, int page_code,
 	};
 
 	result = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, buf, bufflen,
-				  NULL, SES_TIMEOUT, SES_RETRIES, NULL);
+				NULL, SES_TIMEOUT, SES_RETRIES, NULL).combined;
 	if (result)
 		sdev_printk(KERN_ERR, sdev, "SEND DIAGNOSTIC result: %8x\n",
 			    result);

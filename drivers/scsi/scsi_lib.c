@@ -2121,7 +2121,7 @@ scsi_mode_select(struct scsi_device *sdev, int pf, int sp, int modepage,
 	}
 
 	ret = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, real_buffer, len,
-			       sshdr, timeout, retries, NULL);
+			       sshdr, timeout, retries, NULL).combined;
 	kfree(real_buffer);
 	return ret;
 }
@@ -2188,7 +2188,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 
 	memset(buffer, 0, len);
 
-	result.combined = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer,
+	result = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer,
 					   len, sshdr, timeout, retries, NULL);
 
 	/* This code looks awful: what it's doing is making sure an
@@ -2262,7 +2262,7 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 	char cmd[] = {
 		TEST_UNIT_READY, 0, 0, 0, 0, 0,
 	};
-	int result;
+	union scsi_status result;
 
 	/* try to eat the UNIT_ATTENTION if there are enough retries */
 	do {
@@ -2274,7 +2274,7 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 	} while (scsi_sense_valid(sshdr) &&
 		 sshdr->sense_key == UNIT_ATTENTION && --retries);
 
-	return result;
+	return result.combined;
 }
 EXPORT_SYMBOL(scsi_test_unit_ready);
 

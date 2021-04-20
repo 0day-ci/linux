@@ -146,7 +146,7 @@ static void pscsi_tape_read_blocksize(struct se_device *dev,
 	cdb[4] = 0x0c; /* 12 bytes */
 
 	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf, 12, NULL,
-			HZ, 1, NULL);
+			HZ, 1, NULL).combined;
 	if (ret)
 		goto out_free;
 
@@ -197,7 +197,7 @@ pscsi_get_inquiry_vpd_serial(struct scsi_device *sdev, struct t10_wwn *wwn)
 	put_unaligned_be16(INQUIRY_VPD_SERIAL_LEN, &cdb[3]);
 
 	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
-			      INQUIRY_VPD_SERIAL_LEN, NULL, HZ, 1, NULL);
+			INQUIRY_VPD_SERIAL_LEN, NULL, HZ, 1, NULL).combined;
 	if (ret)
 		goto out_free;
 
@@ -233,7 +233,7 @@ pscsi_get_inquiry_vpd_device_ident(struct scsi_device *sdev,
 
 	ret = scsi_execute_req(sdev, cdb, DMA_FROM_DEVICE, buf,
 			      INQUIRY_VPD_DEVICE_IDENTIFIER_LEN,
-			      NULL, HZ, 1, NULL);
+			      NULL, HZ, 1, NULL).combined;
 	if (ret)
 		goto out;
 

@@ -194,7 +194,7 @@ static int drivetemp_scsi_command(struct drivetemp_data *st,
 
 	return scsi_execute_req(st->sdev, scsi_cmd, data_dir,
 				st->smartdata, ATA_SECT_SIZE, NULL, HZ, 5,
-				NULL);
+				NULL).combined;
 }
 
 static int drivetemp_ata_command(struct drivetemp_data *st, u8 feature,

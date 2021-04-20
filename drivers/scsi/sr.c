@@ -206,7 +206,7 @@ static unsigned int sr_get_events(struct scsi_device *sdev)
 	int result;
 
 	result = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, sizeof(buf),
-				  &sshdr, SR_TIMEOUT, MAX_RETRIES, NULL);
+				&sshdr, SR_TIMEOUT, MAX_RETRIES, NULL).combined;
 	if (scsi_sense_valid(&sshdr) && sshdr.sense_key == UNIT_ATTENTION)
 		return DISK_EVENT_MEDIA_CHANGE;
 
@@ -813,8 +813,8 @@ static void get_sectorsize(struct scsi_cd *cd)
 
 		/* Do the command and wait.. */
 		the_result = scsi_execute_req(cd->device, cmd, DMA_FROM_DEVICE,
-					      buffer, sizeof(buffer), NULL,
-					      SR_TIMEOUT, MAX_RETRIES, NULL);
+					buffer, sizeof(buffer), NULL,
+					SR_TIMEOUT, MAX_RETRIES, NULL).combined;
 
 		retries--;
 

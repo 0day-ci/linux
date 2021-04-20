@@ -455,13 +455,13 @@ __scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 		       sense, sshdr, timeout, retries, flags, rq_flags,	\
 		       resid);						\
 })
-static inline int scsi_execute_req(struct scsi_device *sdev,
+static inline union scsi_status scsi_execute_req(struct scsi_device *sdev,
 	const unsigned char *cmd, int data_direction, void *buffer,
 	unsigned bufflen, struct scsi_sense_hdr *sshdr, int timeout,
 	int retries, int *resid)
 {
 	return scsi_execute(sdev, cmd, data_direction, buffer,
-		bufflen, NULL, sshdr, timeout, retries,  0, 0, resid).combined;
+		bufflen, NULL, sshdr, timeout, retries,  0, 0, resid);
 }
 extern void sdev_disable_disk_events(struct scsi_device *sdev);
 extern void sdev_enable_disk_events(struct scsi_device *sdev);

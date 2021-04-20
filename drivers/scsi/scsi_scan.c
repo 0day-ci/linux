@@ -608,8 +608,7 @@ static int scsi_probe_lun(struct scsi_device *sdev, unsigned char *inq_result,
 
 		memset(inq_result, 0, try_inquiry_len);
 
-		result.combined =
-			scsi_execute_req(sdev,  scsi_cmd, DMA_FROM_DEVICE,
+		result = scsi_execute_req(sdev,  scsi_cmd, DMA_FROM_DEVICE,
 					  inq_result, try_inquiry_len, &sshdr,
 					  HZ / 2 + HZ * scsi_inq_timeout, 3,
 					  &resid);
@@ -1315,7 +1314,7 @@ static int scsi_report_lun_scan(struct scsi_target *starget, blist_flags_t bflag
 	u64 lun;
 	unsigned int num_luns;
 	unsigned int retries;
-	int result;
+	union scsi_status result;
 	struct scsi_lun *lunp, *lun_data;
 	struct scsi_sense_hdr sshdr;
 	struct scsi_device *sdev;
@@ -1402,9 +1401,9 @@ retry:
 		SCSI_LOG_SCAN_BUS(3, sdev_printk (KERN_INFO, sdev,
 				"scsi scan: REPORT LUNS"
 				" %s (try %d) result 0x%x\n",
-				result ?  "failed" : "successful",
-				retries, result));
-		if (result == 0)
+				result.combined ?  "failed" : "successful",
+				retries, result.combined));
+		if (result.combined == 0)
 			break;
 		else if (scsi_sense_valid(&sshdr)) {
 			if (sshdr.sense_key != UNIT_ATTENTION)
@@ -1412,7 +1411,7 @@ retry:
 		}
 	}
 
-	if (result) {
+	if (result.combined) {
 		/*
 		 * The device probably does not support a REPORT LUN command
 		 */

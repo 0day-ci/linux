@@ -351,8 +351,8 @@ static void virtscsi_rescan_hotunplug(struct virtio_scsi *vscsi)
 
 		result.combined =
 			scsi_execute_req(sdev, scsi_cmd, DMA_FROM_DEVICE,
-					  inq_result, inquiry_len, NULL,
-					  SD_TIMEOUT, SD_MAX_RETRIES, NULL);
+				inq_result, inquiry_len, NULL,
+				SD_TIMEOUT, SD_MAX_RETRIES, NULL).combined;
 
 		if (result.combined == 0 && inq_result[0] >> 5) {
 			/* PQ indicates the LUN is not attached */

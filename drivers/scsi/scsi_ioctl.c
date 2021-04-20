@@ -95,7 +95,7 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 	SCSI_LOG_IOCTL(1, sdev_printk(KERN_INFO, sdev,
 				      "Trying ioctl with scsi command %d\n", *cmd));
 
-	result.combined = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0,
+	result = scsi_execute_req(sdev, cmd, DMA_NONE, NULL, 0,
 				  &sshdr, timeout, retries, NULL);
 
 	SCSI_LOG_IOCTL(2, sdev_printk(KERN_INFO, sdev,

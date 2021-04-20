@@ -308,7 +308,7 @@ EXPORT_SYMBOL(scsi_track_queue_full);
 static int scsi_vpd_inquiry(struct scsi_device *sdev, unsigned char *buffer,
 							u8 page, unsigned len)
 {
-	int result;
+	union scsi_status result;
 	unsigned char cmd[16];
 
 	if (len < 4)
@@ -327,7 +327,7 @@ static int scsi_vpd_inquiry(struct scsi_device *sdev, unsigned char *buffer,
 	 */
 	result = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer,
 				  len, NULL, 30 * HZ, 3, NULL);
-	if (result)
+	if (result.combined)
 		return -EIO;
 
 	/* Sanity check that we got the page back that we asked for */
@@ -492,7 +492,7 @@ int scsi_report_opcode(struct scsi_device *sdev, unsigned char *buffer,
 {
 	unsigned char cmd[16];
 	struct scsi_sense_hdr sshdr;
-	int result;
+	union scsi_status result;
 
 	if (sdev->no_report_opcodes || sdev->scsi_level < SCSI_SPC_3)
 		return -EINVAL;
@@ -508,7 +508,7 @@ int scsi_report_opcode(struct scsi_device *sdev, unsigned char *buffer,
 	result = scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buffer, len,
 				  &sshdr, 30 * HZ, 3, NULL);
 
-	if (result && scsi_sense_valid(&sshdr) &&
+	if (result.combined && scsi_sense_valid(&sshdr) &&
 	    sshdr.sense_key == ILLEGAL_REQUEST &&
 	    (sshdr.asc == 0x20 || sshdr.asc == 0x24) && sshdr.ascq == 0x00)
 		return -EINVAL;

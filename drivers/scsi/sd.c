@@ -1824,8 +1824,7 @@ static int sd_pr_command(struct block_device *bdev, u8 sa,
 	put_unaligned_be64(sa_key, &data[8]);
 	data[20] = flags;
 
-	result.combined =
-		scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, &data, sizeof(data),
+	result = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, &data, sizeof(data),
 			&sshdr, SD_TIMEOUT, sdkp->max_retries, NULL);
 
 	if (driver_byte(result) == DRIVER_SENSE &&
@@ -2160,7 +2159,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 			cmd[0] = TEST_UNIT_READY;
 			memset((void *) &cmd[1], 0, 9);
 
-			the_result.combined = scsi_execute_req(sdkp->device, cmd,
+			the_result = scsi_execute_req(sdkp->device, cmd,
 						      DMA_NONE, NULL, 0,
 						      &sshdr, SD_TIMEOUT,
 						      sdkp->max_retries, NULL);
@@ -2359,7 +2358,7 @@ static int read_capacity_16(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		cmd[13] = RC16_LEN;
 		memset(buffer, 0, RC16_LEN);
 
-		the_result.combined = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
+		the_result = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
 					buffer, RC16_LEN, &sshdr,
 					SD_TIMEOUT, sdkp->max_retries, NULL);
 
@@ -2444,7 +2443,7 @@ static int read_capacity_10(struct scsi_disk *sdkp, struct scsi_device *sdp,
 		memset(&cmd[1], 0, 9);
 		memset(buffer, 0, 8);
 
-		the_result.combined = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
+		the_result = scsi_execute_req(sdp, cmd, DMA_FROM_DEVICE,
 					buffer, 8, &sshdr,
 					SD_TIMEOUT, sdkp->max_retries, NULL);
 
