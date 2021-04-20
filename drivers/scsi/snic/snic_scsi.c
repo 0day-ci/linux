@@ -341,7 +341,7 @@ snic_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *sc)
 	if (ret) {
 		SNIC_HOST_ERR(shost, "Tgt %p id %d Not Ready.\n", tgt, tgt->id);
 		atomic64_inc(&snic->s_stats.misc.tgt_not_rdy);
-		sc->result = ret;
+		sc->status.combined = ret;
 		sc->scsi_done(sc);
 
 		return 0;
@@ -475,7 +475,7 @@ snic_process_io_failed_state(struct snic *snic,
 		      snic_io_status_to_str(cmpl_stat), CMD_FLAGS(sc));
 
 	/* Set sc->result */
-	sc->result = (res << 16) | icmnd_cmpl->scsi_status;
+	sc->status.combined = (res << 16) | icmnd_cmpl->scsi_status;
 } /* end of snic_process_io_failed_state */
 
 /*
@@ -508,7 +508,7 @@ snic_process_icmnd_cmpl_status(struct snic *snic,
 	CMD_STATE(sc) = SNIC_IOREQ_COMPLETE;
 
 	if (likely(cmpl_stat == SNIC_STAT_IO_SUCCESS)) {
-		sc->result = (DID_OK << 16) | scsi_stat;
+		sc->status.combined = (DID_OK << 16) | scsi_stat;
 
 		xfer_len = scsi_bufflen(sc);
 
@@ -846,7 +846,7 @@ snic_process_itmf_cmpl(struct snic *snic,
 		}
 
 		CMD_SP(sc) = NULL;
-		sc->result = (DID_ERROR << 16);
+		sc->status.combined = (DID_ERROR << 16);
 		SNIC_SCSI_DBG(snic->shost,
 			      "itmf_cmpl: Completing IO. sc %p flags 0x%llx\n",
 			      sc, CMD_FLAGS(sc));
@@ -1474,7 +1474,7 @@ snic_abort_finish(struct snic *snic, struct scsi_cmnd *sc)
 		 * the # IO timeouts == 2, will cause the LUN offline.
 		 * Call scsi_done to complete the IO.
 		 */
-		sc->result = (DID_ERROR << 16);
+		sc->status.combined = (DID_ERROR << 16);
 		sc->scsi_done(sc);
 		break;
 
@@ -1854,7 +1854,7 @@ snic_dr_clean_single_req(struct snic *snic,
 
 	snic_release_req_buf(snic, rqi, sc);
 
-	sc->result = (DID_ERROR << 16);
+	sc->status.combined = (DID_ERROR << 16);
 	sc->scsi_done(sc);
 
 	ret = 0;
@@ -2491,7 +2491,7 @@ snic_scsi_cleanup(struct snic *snic, int ex_tag)
 		snic_release_req_buf(snic, rqi, sc);
 
 cleanup:
-		sc->result = DID_TRANSPORT_DISRUPTED << 16;
+		sc->status.combined = DID_TRANSPORT_DISRUPTED << 16;
 		SNIC_HOST_INFO(snic->shost,
 			       "sc_clean: DID_TRANSPORT_DISRUPTED for sc %p, Tag %d flags 0x%llx rqi %p duration %u msecs\n",
 			       sc, sc->request->tag, CMD_FLAGS(sc), rqi,
