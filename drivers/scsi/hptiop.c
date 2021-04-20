@@ -735,32 +735,32 @@ static void hptiop_finish_scsi_req(struct hptiop_hba *hba, u32 tag,
 	case IOP_RESULT_SUCCESS:
 		scsi_set_resid(scp,
 			scsi_bufflen(scp) - le32_to_cpu(req->dataxfer_length));
-		scp->result = (DID_OK<<16);
+		scp->status.combined = (DID_OK<<16);
 		break;
 	case IOP_RESULT_BAD_TARGET:
-		scp->result = (DID_BAD_TARGET<<16);
+		scp->status.combined = (DID_BAD_TARGET<<16);
 		break;
 	case IOP_RESULT_BUSY:
-		scp->result = (DID_BUS_BUSY<<16);
+		scp->status.combined = (DID_BUS_BUSY<<16);
 		break;
 	case IOP_RESULT_RESET:
-		scp->result = (DID_RESET<<16);
+		scp->status.combined = (DID_RESET<<16);
 		break;
 	case IOP_RESULT_FAIL:
-		scp->result = (DID_ERROR<<16);
+		scp->status.combined = (DID_ERROR<<16);
 		break;
 	case IOP_RESULT_INVALID_REQUEST:
-		scp->result = (DID_ABORT<<16);
+		scp->status.combined = (DID_ABORT<<16);
 		break;
 	case IOP_RESULT_CHECK_CONDITION:
 		scsi_set_resid(scp,
 			scsi_bufflen(scp) - le32_to_cpu(req->dataxfer_length));
-		scp->result = SAM_STAT_CHECK_CONDITION;
+		scp->status.combined = SAM_STAT_CHECK_CONDITION;
 		memcpy(scp->sense_buffer, &req->sg_list, SCSI_SENSE_BUFFERSIZE);
 		goto skip_resid;
 
 	default:
-		scp->result = DRIVER_INVALID << 24 | DID_ABORT << 16;
+		scp->status.combined = DRIVER_INVALID << 24 | DID_ABORT << 16;
 		break;
 	}
 
@@ -1024,12 +1024,12 @@ static int hptiop_queuecommand_lck(struct scsi_cmnd *scp,
 			cpu_to_be32(((u32 *)scp->cmnd)[3]),
 			_req->index, _req->req_virt);
 
-	scp->result = 0;
+	scp->status.combined = 0;
 
 	if (scp->device->channel ||
 			(scp->device->id > hba->max_devices) ||
 			((scp->device->id == (hba->max_devices-1)) && scp->device->lun)) {
-		scp->result = DID_BAD_TARGET << 16;
+		scp->status.combined = DID_BAD_TARGET << 16;
 		free_req(hba, _req);
 		goto cmd_done;
 	}
