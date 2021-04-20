@@ -24,11 +24,15 @@ enum {
 	Opt_err,
 	Opt_enc,		/* "enc=<encoding>" eg. "enc=oaep" */
 	Opt_hash,		/* "hash=<digest-name>" eg. "hash=sha1" */
+	Opt_saltlen,		/* "saltlen=<salt-length>" eg. "saltlen=32" */
+	Opt_mgfhash,		/* "mgfhash=<digest-name>" eg. "mgfhash=sha1" */
 };
 
 static const match_table_t param_keys = {
 	{ Opt_enc,	"enc=%s" },
 	{ Opt_hash,	"hash=%s" },
+	{ Opt_saltlen,	"saltlen=%u" },
+	{ Opt_mgfhash,	"mgfhash=%s" },
 	{ Opt_err,	NULL }
 };
 
@@ -61,6 +65,15 @@ static int keyctl_pkey_params_parse(struct kernel_pkey_params *params)
 
 		case Opt_hash:
 			params->hash_algo = q;
+			break;
+
+		case Opt_saltlen:
+			if (kstrtou16(q, 0, &params->salt_len))
+				return -EINVAL;
+			break;
+
+		case Opt_mgfhash:
+			params->mgf_hash_algo = q;
 			break;
 
 		default:

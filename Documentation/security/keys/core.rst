@@ -1022,6 +1022,15 @@ The keyctl syscall functions are:
 			which hash function was used, the hash function can be
 			specified with this, eg. "hash=sha256".
 
+	``mgfhash=<algo>`` In case of "RSASSA-PSS" ("enc=pss"), this specifies
+			the hash function used with the Mask Generation Function
+			to generate a signature, eg. "mgfhash=sha256". Supported
+			hashes are: sha1, sha224, sha256, sha384, and sha512.
+
+	``saltlen=<salt_length>`` In case of "RSASSA-PSS" ("enc=pss"), this
+			specifies the salt length as a u16, used to generate a
+			signature. Eg. "saltlen=32".
+
      The ``__spare[]`` space in the parameter block must be set to 0.  This is
      intended, amongst other things, to allow the passing of passphrases
      required to unlock a key.
@@ -1700,6 +1709,8 @@ The structure has a number of fields, some of which are mandatory:
 			__u32	in2_len;
 		};
 		enum kernel_pkey_operation op : 8;
+		__u16		salt_len;
+		const char	*mgf_hash_algo;
 	};
 
      This includes the key to be used; a string indicating the encoding to use
@@ -1707,7 +1718,8 @@ The structure has a number of fields, some of which are mandatory:
      RSASSA-PKCS1-v1.5 or RSAES-PKCS1-v1.5 encoding or "raw" if no encoding);
      the name of the hash algorithm used to generate the data for a signature
      (if appropriate); the sizes of the input and output (or second input)
-     buffers; and the ID of the operation to be performed.
+     buffers; the ID of the operation to be performed; salt length to be used
+     in case of RSASSA-PSS; and hash algorithm used with MGF for RSASSA-PSS.
 
      For a given operation ID, the input and output buffers are used as
      follows::
