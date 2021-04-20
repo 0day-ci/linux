@@ -86,8 +86,8 @@ static int ioctl_probe(struct Scsi_Host *host, void __user *buffer)
  * The output area is then filled in starting from the command byte. 
  */
 
-static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
-				  int timeout, int retries)
+static union scsi_status ioctl_internal_command(struct scsi_device *sdev,
+				char *cmd, int timeout, int retries)
 {
 	union scsi_status result;
 	struct scsi_sense_hdr sshdr;
@@ -136,13 +136,13 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 
 	SCSI_LOG_IOCTL(2, sdev_printk(KERN_INFO, sdev,
 				      "IOCTL Releasing command\n"));
-	return result.combined;
+	return result;
 }
 
 int scsi_set_medium_removal(struct scsi_device *sdev, char state)
 {
 	char scsi_cmd[MAX_COMMAND_SIZE];
-	int ret;
+	union scsi_status ret;
 
 	if (!sdev->removable || !sdev->lockable)
 	       return 0;
@@ -156,9 +156,9 @@ int scsi_set_medium_removal(struct scsi_device *sdev, char state)
 
 	ret = ioctl_internal_command(sdev, scsi_cmd,
 			IOCTL_NORMAL_TIMEOUT, NORMAL_RETRIES);
-	if (ret == 0)
+	if (ret.combined == 0)
 		sdev->locked = (state == SCSI_REMOVAL_PREVENT);
-	return ret;
+	return ret.combined;
 }
 EXPORT_SYMBOL(scsi_set_medium_removal);
 
@@ -244,14 +244,14 @@ static int scsi_ioctl_common(struct scsi_device *sdev, int cmd, void __user *arg
 		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
 		scsi_cmd[4] = 1;
 		return ioctl_internal_command(sdev, scsi_cmd,
-				     START_STOP_TIMEOUT, NORMAL_RETRIES);
+				START_STOP_TIMEOUT, NORMAL_RETRIES).combined;
 	case SCSI_IOCTL_STOP_UNIT:
 		scsi_cmd[0] = START_STOP;
 		scsi_cmd[1] = 0;
 		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
 		scsi_cmd[4] = 0;
 		return ioctl_internal_command(sdev, scsi_cmd,
-				     START_STOP_TIMEOUT, NORMAL_RETRIES);
+				START_STOP_TIMEOUT, NORMAL_RETRIES).combined;
         case SCSI_IOCTL_GET_PCI:
                 return scsi_ioctl_get_pci(sdev, arg);
 	case SG_SCSI_RESET:
