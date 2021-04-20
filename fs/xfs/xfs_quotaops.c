@@ -14,6 +14,7 @@
 #include "xfs_trans.h"
 #include "xfs_icache.h"
 #include "xfs_qm.h"
+#include "xfs_sb.h"
 
 
 static void
@@ -173,7 +174,7 @@ xfs_quota_enable(
 STATIC int
 xfs_quota_disable(
 	struct super_block	*sb,
-	unsigned int		uflags)
+	unsigned int		flags)
 {
 	struct xfs_mount	*mp = XFS_M(sb);
 
@@ -184,7 +185,29 @@ xfs_quota_disable(
 	if (!XFS_IS_QUOTA_ON(mp))
 		return -EINVAL;
 
-	return xfs_qm_scall_quotaoff(mp, xfs_quota_flags(uflags));
+	/*
+	 * No file system can have quotas enabled on disk but not in core.
+	 * Note that quota utilities (like quotaoff) expect -EEXIST here.
+	 */
+	if ((mp->m_qflags & flags) == 0)
+		return -EEXIST;
+
+	/*
+	 * We do not support actually turning off quota accounting any more.
+	 * Just log a warning and ignored the accounting related flags.
+	 */
+	if (flags & XFS_ALL_QUOTA_ACCT)
+		xfs_info(mp, "disabling of quota accounting not supported.");
+
+	mutex_lock(&mp->m_quotainfo->qi_quotaofflock);
+	mp->m_qflags &= ~(flags & XFS_ALL_QUOTA_ENFD);
+	spin_lock(&mp->m_sb_lock);
+	mp->m_sb.sb_qflags = mp->m_qflags;
+	spin_unlock(&mp->m_sb_lock);
+	mutex_unlock(&mp->m_quotainfo->qi_quotaofflock);
+
+	/* XXX what to do if error ? Revert back to old vals incore ? */
+	return xfs_sync_sb(mp, false);
 }
 
 STATIC int
