@@ -948,6 +948,8 @@ static __init int fc_transport_init(void)
 {
 	int error;
 
+	BUILD_BUG_ON(offsetof(struct fc_bsg_reply, reply_data) != 8);
+
 	atomic_set(&fc_event_seq, 0);
 
 	error = transport_class_register(&fc_host_class);
