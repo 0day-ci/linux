@@ -295,10 +295,7 @@ struct fc_bsg_reply {
 	 *    will contain valid data.
 	 */
 #ifdef __KERNEL__
-	union {
-		__u32		  result; /* do not use in new kernel code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 #else
 	__u32 result;
 #endif

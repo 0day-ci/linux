@@ -11,10 +11,7 @@ struct scsi_request {
 	unsigned char	__cmd[BLK_MAX_CDB];
 	unsigned char	*cmd;
 	unsigned short	cmd_len;
-	union {
-		int		  result; /* do not use in new code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 	unsigned int	sense_len;
 	unsigned int	resid_len;	/* residual count */
 	int		retries;

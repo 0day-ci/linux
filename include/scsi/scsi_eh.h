@@ -33,10 +33,7 @@ extern int scsi_ioctl_reset(struct scsi_device *, int __user *);
 
 struct scsi_eh_save {
 	/* saved state */
-	union {
-		int		  result; /* do not use in new code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 	unsigned int resid_len;
 	int eh_eflags;
 	enum dma_data_direction data_direction;

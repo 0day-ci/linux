@@ -141,10 +141,7 @@ struct scsi_cmnd {
 					 * to be at an address < 16Mb). */
 
 	/* Status code from lower level driver */
-	union {
-		int		  result; /* do not use in new code. */
-		union scsi_status status;
-	};
+	union scsi_status status;
 	int flags;		/* Command flags */
 	unsigned long state;	/* Command completion state */
 

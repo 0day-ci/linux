@@ -92,7 +92,7 @@ struct ufs_bsg_request {
 /* response (request sense data) structure of the sg_io_v4 */
 struct ufs_bsg_reply {
 	/*
-	 * The completion result. Result exists in two forms:
+	 * The completion status. Exists in two forms:
 	 * if negative, it is an -Exxx system errno value. There will
 	 * be no further reply information supplied.
 	 * else, it's the 4-byte scsi error result, with driver, host,
@@ -100,10 +100,7 @@ struct ufs_bsg_reply {
 	 * will contain valid data.
 	 */
 #ifdef __KERNEL__
-	union {
-		__u32		  result; /* do not use in new kernel code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 #else
 	__u32 result;
 #endif

@@ -76,17 +76,14 @@ struct iscsi_bsg_request {
 /* response (request sense data) structure of the sg_io_v4 */
 struct iscsi_bsg_reply {
 	/*
-	 * The completion result. Result exists in two forms:
+	 * The completion status. Result exists in two forms:
 	 * if negative, it is an -Exxx system errno value. There will
 	 * be no further reply information supplied.
 	 * else, it's the 4-byte scsi error result, with driver, host,
 	 * msg and status fields. The per-msgcode reply structure
 	 * will contain valid data.
 	 */
-	union {
-		uint32_t	  result; /* do not use in new code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 
 	/* If there was reply_payload, how much was recevied ? */
 	uint32_t reply_payload_rcv_len;

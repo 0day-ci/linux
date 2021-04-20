@@ -53,10 +53,7 @@ struct bsg_job {
 	struct bsg_buffer request_payload;
 	struct bsg_buffer reply_payload;
 
-	union {
-		int		  result; /* do not use in new code */
-		union scsi_status status;
-	};
+	union scsi_status status;
 	unsigned int reply_payload_rcv_len;
 
 	/* BIDI support */
