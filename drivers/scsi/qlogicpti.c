@@ -1057,7 +1057,7 @@ toss_command:
 	 * we don't, the midlayer will ignore the return value,
 	 * which is insane.  We pick up the pieces like this.
 	 */
-	Cmnd->result = DID_BUS_BUSY;
+	Cmnd->status.combined = DID_BUS_BUSY;
 	done(Cmnd);
 	return 1;
 }
@@ -1180,10 +1180,10 @@ static struct scsi_cmnd *qlogicpti_intr_handler(struct qlogicpti *qpti)
 			       SCSI_SENSE_BUFFERSIZE);
 
 		if (sts->hdr.entry_type == ENTRY_STATUS)
-			Cmnd->result =
+			Cmnd->status.combined =
 			    qlogicpti_return_status(sts, qpti->qpti_id);
 		else
-			Cmnd->result = DID_ERROR << 16;
+			Cmnd->status.combined = DID_ERROR << 16;
 
 		if (scsi_bufflen(Cmnd))
 			dma_unmap_sg(&qpti->op->dev,
