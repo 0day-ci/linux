@@ -217,7 +217,7 @@ static unsigned long vaddr(struct vscsibk_pend *req, int seg)
 	return vaddr_page(req->pages[seg]);
 }
 
-static void scsiback_print_status(char *sense_buffer, int errors,
+static void scsiback_print_status(char *sense_buffer, union scsi_status errors,
 					struct vscsibk_pend *pending_req)
 {
 	struct scsiback_tpg *tpg = pending_req->v2p->tpg;
@@ -336,17 +336,18 @@ static void scsiback_cmd_done(struct vscsibk_pend *pending_req)
 	struct vscsibk_info *info = pending_req->info;
 	unsigned char *sense_buffer;
 	unsigned int resid;
-	int errors;
+	union scsi_status errors;
 
 	sense_buffer = pending_req->sense_buffer;
 	resid        = pending_req->se_cmd.residual_count;
-	errors       = pending_req->result;
+	errors.combined = pending_req->result;
 
-	if (errors && log_print_stat)
+	if (errors.combined && log_print_stat)
 		scsiback_print_status(sense_buffer, errors, pending_req);
 
 	scsiback_fast_flush_area(pending_req);
-	scsiback_do_resp_with_sense(sense_buffer, errors, resid, pending_req);
+	scsiback_do_resp_with_sense(sense_buffer, errors.combined, resid,
+				    pending_req);
 	scsiback_put(info);
 	/*
 	 * Drop the extra KREF_ACK reference taken by target_submit_cmd_map_sgls()
