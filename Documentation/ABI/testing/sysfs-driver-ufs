@@ -1172,3 +1172,12 @@ Description:	This node is used to set or display whether UFS WriteBooster is
 		(if the platform supports UFSHCD_CAP_CLK_SCALING). For a
 		platform that doesn't support UFSHCD_CAP_CLK_SCALING, we can
 		disable/enable WriteBooster through this sysfs node.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/wb_batched_flush
+Date:		April 2021
+Contact:	Daejun Park <daejun7.park@samsung.com>
+Description:	This entry shows whether batch flushing of UFS WriteBooster
+		buffers is enabled. Writing 1 to this entry allows the device to flush
+		the WriteBooster buffer only when it needs to perform a buffer flush
+		during runtime suspend. Writing 0 to this entry allows the device to
+		flush the WriteBooster buffer during link hibernation.
