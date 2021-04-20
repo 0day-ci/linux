@@ -253,6 +253,54 @@ out:
 	return res < 0 ? res : count;
 }
 
+
+static ssize_t wb_batched_flush_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%d\n", hba->vps->wb_batched_flush);
+}
+
+static ssize_t wb_batched_flush_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	unsigned int wb_batched_flush;
+	ssize_t res;
+
+	if (!ufshcd_is_wb_allowed(hba)) {
+		dev_warn(dev, "To control WB through wb_batched_flush is not allowed!\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (kstrtouint(buf, 0, &wb_batched_flush))
+		return -EINVAL;
+
+	if (wb_batched_flush != 0 && wb_batched_flush != 1)
+		return -EINVAL;
+
+	down(&hba->host_sem);
+	if (!ufshcd_is_user_access_allowed(hba)) {
+		res = -EBUSY;
+		goto out;
+	}
+
+	if (wb_batched_flush == hba->vps->wb_batched_flush)
+		goto out;
+
+	pm_runtime_get_sync(hba->dev);
+	res = ufshcd_wb_toggle_flush_during_h8(hba, !wb_batched_flush);
+	pm_runtime_put_sync(hba->dev);
+	if (!res)
+		hba->vps->wb_batched_flush = wb_batched_flush;
+
+out:
+	up(&hba->host_sem);
+	return res < 0 ? res : count;
+}
+
 static DEVICE_ATTR_RW(rpm_lvl);
 static DEVICE_ATTR_RO(rpm_target_dev_state);
 static DEVICE_ATTR_RO(rpm_target_link_state);
@@ -261,6 +309,7 @@ static DEVICE_ATTR_RO(spm_target_dev_state);
 static DEVICE_ATTR_RO(spm_target_link_state);
 static DEVICE_ATTR_RW(auto_hibern8);
 static DEVICE_ATTR_RW(wb_on);
+static DEVICE_ATTR_RW(wb_batched_flush);
 
 static struct attribute *ufs_sysfs_ufshcd_attrs[] = {
 	&dev_attr_rpm_lvl.attr,
@@ -271,6 +320,7 @@ static struct attribute *ufs_sysfs_ufshcd_attrs[] = {
 	&dev_attr_spm_target_link_state.attr,
 	&dev_attr_auto_hibern8.attr,
 	&dev_attr_wb_on.attr,
+	&dev_attr_wb_batched_flush.attr,
 	NULL
 };
 

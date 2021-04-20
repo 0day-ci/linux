@@ -244,7 +244,6 @@ static int ufshcd_setup_vreg(struct ufs_hba *hba, bool on);
 static inline int ufshcd_config_vreg_hpm(struct ufs_hba *hba,
 					 struct ufs_vreg *vreg);
 static int ufshcd_try_to_abort_task(struct ufs_hba *hba, int tag);
-static void ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set);
 static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba, bool enable);
 static void ufshcd_hba_vreg_set_lpm(struct ufs_hba *hba);
 static void ufshcd_hba_vreg_set_hpm(struct ufs_hba *hba);
@@ -277,7 +276,8 @@ static inline void ufshcd_wb_config(struct ufs_hba *hba)
 
 	ufshcd_wb_toggle(hba, true);
 
-	ufshcd_wb_toggle_flush_during_h8(hba, true);
+	ufshcd_wb_toggle_flush_during_h8(hba, !hba->vps->wb_batched_flush);
+
 	if (!(hba->quirks & UFSHCI_QUIRK_SKIP_MANUAL_WB_FLUSH_CTRL))
 		ufshcd_wb_toggle_flush(hba, true);
 }
@@ -5472,7 +5472,7 @@ int ufshcd_wb_toggle(struct ufs_hba *hba, bool enable)
 	return ret;
 }
 
-static void ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
+int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
 {
 	int ret;
 
@@ -5481,10 +5481,12 @@ static void ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set)
 	if (ret) {
 		dev_err(hba->dev, "%s: WB-Buf Flush during H8 %s failed: %d\n",
 			__func__, set ? "enable" : "disable", ret);
-		return;
+		return ret;
 	}
 	dev_dbg(hba->dev, "%s WB-Buf Flush during H8 %s\n",
 			__func__, set ? "enabled" : "disabled");
+
+	return ret;
 }
 
 static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba, bool enable)
@@ -8745,6 +8747,8 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 			ret = ufshcd_set_dev_pwr_mode(hba, req_dev_pwr_mode);
 			if (ret)
 				goto enable_gating;
+		} else if (hba->vps->wb_batched_flush) {
+			ufshcd_wb_toggle_flush_during_h8(hba, true);
 		}
 	}
 
@@ -8925,6 +8929,8 @@ static int ufshcd_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	ufshcd_auto_hibern8_enable(hba);
 
 	if (hba->dev_info.b_rpm_dev_flush_capable) {
+		if (hba->vps->wb_batched_flush)
+			ufshcd_wb_toggle_flush_during_h8(hba, false);
 		hba->dev_info.b_rpm_dev_flush_capable = false;
 		cancel_delayed_work(&hba->rpm_dev_flush_recheck_work);
 	}
