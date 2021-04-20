@@ -1999,7 +1999,7 @@ static void fas216_devicereset_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
  * fas216_rq_sns_done - Finish processing automatic request sense command
  * @info: interface that completed
  * @SCpnt: command that completed
- * @result: driver byte of result
+ * @result: host byte of result
  *
  * Finish processing automatic request sense command
  */
@@ -2033,7 +2033,7 @@ static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
  * fas216_std_done - finish processing of standard command
  * @info: interface that completed
  * @SCpnt: command that completed
- * @result: driver byte of result
+ * @result: host byte of result
  *
  * Finish processing of standard command
  */
