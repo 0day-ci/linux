@@ -1841,7 +1841,7 @@ static void ibmvfc_scsi_done(struct ibmvfc_event *evt)
  * @vhost:	 struct ibmvfc host
  *
  * Returns:
- *	1 if host can accept command / 0 if not
+ *	0 if host can accept command; a value != 0 if not
  **/
 static inline int ibmvfc_host_chkready(struct ibmvfc_host *vhost)
 {
