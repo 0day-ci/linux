@@ -160,18 +160,18 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 	 */
 	if (rtsx_chk_stat(chip, RTSX_STAT_ABORT)) {
 		dev_dbg(rtsx_dev(chip), "-- command was aborted\n");
-		srb->result = DID_ABORT << 16;
+		srb->status.combined = DID_ABORT << 16;
 		goto handle_errors;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
 	if (result == TRANSPORT_ERROR) {
 		dev_dbg(rtsx_dev(chip), "-- transport indicates error, resetting\n");
-		srb->result = DID_ERROR << 16;
+		srb->status.combined = DID_ERROR << 16;
 		goto handle_errors;
 	}
 
-	srb->result = SAM_STAT_GOOD;
+	srb->status.combined = SAM_STAT_GOOD;
 
 	/*
 	 * If we have a failure, we're going to do a REQUEST_SENSE
@@ -180,7 +180,7 @@ void rtsx_invoke_transport(struct scsi_cmnd *srb, struct rtsx_chip *chip)
 	 */
 	if (result == TRANSPORT_FAILED) {
 		/* set the result so the higher layers expect this data */
-		srb->result = SAM_STAT_CHECK_CONDITION;
+		srb->status.combined = SAM_STAT_CHECK_CONDITION;
 		memcpy(srb->sense_buffer,
 		       (unsigned char *)&chip->sense_buffer[SCSI_LUN(srb)],
 		       sizeof(struct sense_data_t));

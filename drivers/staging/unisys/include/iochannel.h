@@ -34,6 +34,7 @@
 #include <linux/uuid.h>
 #include <linux/skbuff.h>
 #include <linux/visorbus.h>
+#include <scsi/scsi_status.h>
 
 /*
  * Must increment these whenever you insert or delete fields within this channel
@@ -217,7 +218,7 @@ struct uiscmdrsp_scsi {
 	u32 data_dir;
 	struct uisscsi_dest vdest;
 	/* Needed to queue the rsp back to cmd originator. */
-	int linuxstat;
+	union scsi_status linuxstat;
 	u8 scsistat;
 	u8 addlstat;
 #define ADDL_SEL_TIMEOUT 4

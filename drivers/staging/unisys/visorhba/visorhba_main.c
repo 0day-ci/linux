@@ -343,7 +343,7 @@ static int visorhba_abort_handler(struct scsi_cmnd *scsicmd)
 		atomic_set(&vdisk->ios_threshold, IOS_ERROR_THRESHOLD);
 	rtn = forward_taskmgmt_command(TASK_MGMT_ABORT_TASK, scsidev);
 	if (rtn == SUCCESS) {
-		scsicmd->result = DID_ABORT << 16;
+		scsicmd->status.combined = DID_ABORT << 16;
 		scsicmd->scsi_done(scsicmd);
 	}
 	return rtn;
@@ -370,7 +370,7 @@ static int visorhba_device_reset_handler(struct scsi_cmnd *scsicmd)
 		atomic_set(&vdisk->ios_threshold, IOS_ERROR_THRESHOLD);
 	rtn = forward_taskmgmt_command(TASK_MGMT_LUN_RESET, scsidev);
 	if (rtn == SUCCESS) {
-		scsicmd->result = DID_RESET << 16;
+		scsicmd->status.combined = DID_RESET << 16;
 		scsicmd->scsi_done(scsicmd);
 	}
 	return rtn;
@@ -399,7 +399,7 @@ static int visorhba_bus_reset_handler(struct scsi_cmnd *scsicmd)
 	}
 	rtn = forward_taskmgmt_command(TASK_MGMT_BUS_RESET, scsidev);
 	if (rtn == SUCCESS) {
-		scsicmd->result = DID_RESET << 16;
+		scsicmd->status.combined = DID_RESET << 16;
 		scsicmd->scsi_done(scsicmd);
 	}
 	return rtn;
@@ -702,7 +702,7 @@ static void visorhba_serverdown_complete(struct visorhba_devdata *devdata)
 		switch (pendingdel->cmdtype) {
 		case CMD_SCSI_TYPE:
 			scsicmd = pendingdel->sent;
-			scsicmd->result = DID_RESET << 16;
+			scsicmd->status.combined = DID_RESET << 16;
 			if (scsicmd->scsi_done)
 				scsicmd->scsi_done(scsicmd);
 			break;
@@ -864,8 +864,8 @@ static void complete_scsi_command(struct uiscmdrsp *cmdrsp,
 				  struct scsi_cmnd *scsicmd)
 {
 	/* take what we need out of cmdrsp and complete the scsicmd */
-	scsicmd->result = cmdrsp->scsi.linuxstat;
-	if (cmdrsp->scsi.linuxstat)
+	scsicmd->status = cmdrsp->scsi.linuxstat;
+	if (cmdrsp->scsi.linuxstat.combined)
 		do_scsi_linuxstat(cmdrsp, scsicmd);
 	else
 		do_scsi_nolinuxstat(cmdrsp, scsicmd);

@@ -134,7 +134,7 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 	/* fail the command if we are disconnecting */
 	if (rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT)) {
 		dev_info(&dev->pci->dev, "Fail command during disconnect\n");
-		srb->result = DID_NO_CONNECT << 16;
+		srb->status.combined = DID_NO_CONNECT << 16;
 		done(srb);
 		return 0;
 	}
@@ -377,7 +377,7 @@ static int rtsx_control_thread(void *__dev)
 
 		/* has the command aborted ? */
 		if (rtsx_chk_stat(chip, RTSX_STAT_ABORT)) {
-			chip->srb->result = DID_ABORT << 16;
+			chip->srb->status.combined = DID_ABORT << 16;
 			goto skip_for_abort;
 		}
 
@@ -388,7 +388,7 @@ static int rtsx_control_thread(void *__dev)
 		 */
 		if (chip->srb->sc_data_direction == DMA_BIDIRECTIONAL) {
 			dev_err(&dev->pci->dev, "UNKNOWN data direction\n");
-			chip->srb->result = DID_ERROR << 16;
+			chip->srb->status.combined = DID_ERROR << 16;
 		}
 
 		/* reject if target != 0 or if LUN is higher than
@@ -398,14 +398,14 @@ static int rtsx_control_thread(void *__dev)
 			dev_err(&dev->pci->dev, "Bad target number (%d:%d)\n",
 				chip->srb->device->id,
 				(u8)chip->srb->device->lun);
-			chip->srb->result = DID_BAD_TARGET << 16;
+			chip->srb->status.combined = DID_BAD_TARGET << 16;
 		}
 
 		else if (chip->srb->device->lun > chip->max_lun) {
 			dev_err(&dev->pci->dev, "Bad LUN (%d:%d)\n",
 				chip->srb->device->id,
 				(u8)chip->srb->device->lun);
-			chip->srb->result = DID_BAD_TARGET << 16;
+			chip->srb->status.combined = DID_BAD_TARGET << 16;
 		}
 
 		/* we've got a command, let's do it! */
@@ -422,7 +422,7 @@ static int rtsx_control_thread(void *__dev)
 			;		/* nothing to do */
 
 		/* indicate that the command is done */
-		else if (chip->srb->result != DID_ABORT << 16) {
+		else if (chip->srb->status.combined != DID_ABORT << 16) {
 			chip->srb->scsi_done(chip->srb);
 		} else {
 skip_for_abort:
@@ -633,7 +633,7 @@ static void quiesce_and_remove_host(struct rtsx_dev *dev)
 	 */
 	mutex_lock(&dev->dev_mutex);
 	if (chip->srb) {
-		chip->srb->result = DID_NO_CONNECT << 16;
+		chip->srb->status.combined = DID_NO_CONNECT << 16;
 		scsi_lock(host);
 		chip->srb->scsi_done(dev->chip->srb);
 		chip->srb = NULL;
