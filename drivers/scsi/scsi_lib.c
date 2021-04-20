@@ -2144,7 +2144,7 @@ EXPORT_SYMBOL_GPL(scsi_mode_select);
  *	or 8 depending on whether a six or ten byte command was
  *	issued) if successful.
  */
-int
+union scsi_status
 scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 		  unsigned char *buffer, int len, int timeout, int retries,
 		  struct scsi_mode_data *data, struct scsi_sense_hdr *sshdr)
@@ -2241,7 +2241,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 		goto retry;
 	}
 
-	return result.combined;
+	return result;
 }
 EXPORT_SYMBOL(scsi_mode_sense);
 

@@ -402,10 +402,10 @@ extern int scsi_track_queue_full(struct scsi_device *, int);
 
 extern int scsi_set_medium_removal(struct scsi_device *, char);
 
-extern int scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
-			   unsigned char *buffer, int len, int timeout,
-			   int retries, struct scsi_mode_data *data,
-			   struct scsi_sense_hdr *);
+extern union scsi_status scsi_mode_sense(struct scsi_device *sdev, int dbd,
+			int modepage, unsigned char *buffer, int len,
+			int timeout, int retries, struct scsi_mode_data *data,
+			struct scsi_sense_hdr *);
 extern int scsi_mode_select(struct scsi_device *sdev, int pf, int sp,
 			    int modepage, unsigned char *buffer, int len,
 			    int timeout, int retries,

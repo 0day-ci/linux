@@ -1235,8 +1235,8 @@ int sas_read_port_mode_page(struct scsi_device *sdev)
 	if (!buffer)
 		return -ENOMEM;
 
-	res.combined = scsi_mode_sense(sdev, 1, 0x19, buffer, BUF_SIZE, 30*HZ,
-				       3, &mode_data, NULL);
+	res = scsi_mode_sense(sdev, 1, 0x19, buffer, BUF_SIZE, 30*HZ, 3,
+			      &mode_data, NULL);
 
 	error = -EINVAL;
 	if (!scsi_status_is_good(res))
