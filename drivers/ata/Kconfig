@@ -1139,7 +1139,7 @@ config PATA_QDI
 
 config PATA_RB532
 	tristate "RouterBoard 532 PATA CompactFlash support"
-	depends on MIKROTIK_RB532
+	depends on MIKROTIK_RB532 || COMPILE_TEST
 	help
 	  This option enables support for the RouterBoard 532
 	  PATA CompactFlash controller.
