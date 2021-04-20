@@ -639,6 +639,8 @@ struct arm_smmu_device {
 
 	/* IOMMU core code handle */
 	struct iommu_device		iommu;
+
+	struct list_head		rmr_list;
 };
 
 /* SMMU private data for each master */
