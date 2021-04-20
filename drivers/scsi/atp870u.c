@@ -494,13 +494,13 @@ static irqreturn_t atp870u_intr_handle(int irq, void *dev_id)
 			   dev->last_cmd[c] = 0xff;
 			}
 			if (i == 0x16) {
-				workreq->result = atp_readb_io(dev, c, 0x0f);
+				workreq->status.combined = atp_readb_io(dev, c, 0x0f);
 				if (((dev->r1f[c][target_id] & 0x10) != 0) && is885(dev)) {
 					printk(KERN_WARNING "AEC67162 CRC ERROR !\n");
-					workreq->result = SAM_STAT_CHECK_CONDITION;
+					workreq->status.combined = SAM_STAT_CHECK_CONDITION;
 				}
 			} else
-				workreq->result = SAM_STAT_CHECK_CONDITION;
+				workreq->status.combined = SAM_STAT_CHECK_CONDITION;
 
 			if (is885(dev)) {
 				j = atp_readb_base(dev, 0x29) | 0x01;
@@ -630,7 +630,7 @@ static int atp870u_queuecommand_lck(struct scsi_cmnd *req_p,
 	req_p->sense_buffer[0]=0;
 	scsi_set_resid(req_p, 0);
 	if (scmd_channel(req_p) > 1) {
-		req_p->result = DID_BAD_TARGET << 16;
+		req_p->status.combined = DID_BAD_TARGET << 16;
 		done(req_p);
 #ifdef ED_DBGP
 		printk("atp870u_queuecommand : req_p->device->channel > 1\n");
@@ -649,7 +649,7 @@ static int atp870u_queuecommand_lck(struct scsi_cmnd *req_p,
 	 */
 
 	if ((m & dev->active_id[c]) == 0) {
-		req_p->result = DID_BAD_TARGET << 16;
+		req_p->status.combined = DID_BAD_TARGET << 16;
 		done(req_p);
 		return 0;
 	}
@@ -660,7 +660,7 @@ static int atp870u_queuecommand_lck(struct scsi_cmnd *req_p,
 #ifdef ED_DBGP
 		printk( "atp870u_queuecommand: done can't be NULL\n");
 #endif
-		req_p->result = 0;
+		req_p->status.combined = 0;
 		done(req_p);
 		return 0;
 	}
@@ -684,7 +684,7 @@ static int atp870u_queuecommand_lck(struct scsi_cmnd *req_p,
 		printk("atp870u_queuecommand : dev->quhd[c] == dev->quend[c]\n");
 #endif
 		dev->quend[c]--;
-		req_p->result = DID_BUS_BUSY << 16;
+		req_p->status.combined = DID_BUS_BUSY << 16;
 		done(req_p);
 		return 0;
 	}
