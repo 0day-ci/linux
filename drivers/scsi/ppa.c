@@ -164,7 +164,7 @@ static inline void ppa_fail(ppa_struct *dev, int error_code)
 {
 	/* If we fail a device then we trash status / message bytes */
 	if (dev->cur_cmd) {
-		dev->cur_cmd->result = error_code << 16;
+		dev->cur_cmd->status.combined = error_code << 16;
 		dev->failed = 1;
 	}
 }
@@ -625,7 +625,7 @@ static void ppa_interrupt(struct work_struct *work)
 	}
 	/* Command must of completed hence it is safe to let go... */
 #if PPA_DEBUG > 0
-	switch ((cmd->result >> 16) & 0xff) {
+	switch ((cmd->status.combined >> 16) & 0xff) {
 	case DID_OK:
 		break;
 	case DID_NO_CONNECT:
@@ -654,7 +654,7 @@ static void ppa_interrupt(struct work_struct *work)
 		break;
 	default:
 		printk(KERN_WARNING "ppa: bad return code (%02x)\n",
-		       (cmd->result >> 16) & 0xff);
+		       (cmd->status.combined >> 16) & 0xff);
 	}
 #endif
 
@@ -765,7 +765,7 @@ static int ppa_engine(ppa_struct *dev, struct scsi_cmnd *cmd)
 		fallthrough;
 
 	case 6:		/* Phase 6 - Read status/message */
-		cmd->result = DID_OK << 16;
+		cmd->status.combined = DID_OK << 16;
 		/* Check for data overrun */
 		if (ppa_wait(dev) != (unsigned char) 0xf0) {
 			ppa_fail(dev, DID_ERROR);
@@ -775,7 +775,7 @@ static int ppa_engine(ppa_struct *dev, struct scsi_cmnd *cmd)
 			/* Check for optional message byte */
 			if (ppa_wait(dev) == (unsigned char) 0xf0)
 				ppa_in(dev, &h, 1);
-			cmd->result =
+			cmd->status.combined =
 			    (DID_OK << 16) + (h << 8) + (l & STATUS_MASK);
 		}
 		return 0;	/* Finished */
@@ -799,7 +799,7 @@ static int ppa_queuecommand_lck(struct scsi_cmnd *cmd,
 	dev->jstart = jiffies;
 	dev->cur_cmd = cmd;
 	cmd->scsi_done = done;
-	cmd->result = DID_ERROR << 16;	/* default return code */
+	cmd->status.combined = DID_ERROR << 16;	/* default return code */
 	cmd->SCp.phase = 0;	/* bus free */
 
 	schedule_delayed_work(&dev->ppa_tq, 0);
