@@ -373,8 +373,8 @@ lpfc_bsg_send_mgmt_cmd_cmp(struct lpfc_hba *phba,
 	/* Complete the job if the job is still active */
 
 	if (job) {
-		bsg_reply->result = rc;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = rc;
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 	return;
@@ -545,7 +545,7 @@ free_dd:
 	kfree(dd_data);
 no_dd_data:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->dd_data = NULL;
 	return rc;
 }
@@ -643,8 +643,8 @@ lpfc_bsg_rport_els_cmp(struct lpfc_hba *phba,
 	/* Complete the job if the job is still active */
 
 	if (job) {
-		bsg_reply->result = rc;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = rc;
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 	return;
@@ -782,7 +782,7 @@ free_dd_data:
 
 no_dd_data:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->dd_data = NULL;
 	return rc;
 }
@@ -1113,11 +1113,11 @@ lpfc_bsg_ct_unsol_event(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 			bsg_reply = job->reply;
 			bsg_reply->reply_payload_rcv_len = size;
 			/* make error code available to userspace */
-			bsg_reply->result = 0;
+			bsg_reply->status.combined = 0;
 			job->dd_data = NULL;
 			/* complete the job back to userspace */
 			spin_unlock_irqrestore(&phba->ct_ev_lock, flags);
-			bsg_job_done(job, bsg_reply->result,
+			bsg_job_done(job, bsg_reply->status.combined,
 				       bsg_reply->reply_payload_rcv_len);
 			spin_lock_irqsave(&phba->ct_ev_lock, flags);
 		}
@@ -1340,14 +1340,14 @@ lpfc_bsg_hba_get_event(struct bsg_job *job)
 	lpfc_bsg_event_unref(evt);
 	spin_unlock_irqrestore(&phba->ct_ev_lock, flags);
 	job->dd_data = NULL;
-	bsg_reply->result = 0;
-	bsg_job_done(job, bsg_reply->result,
+	bsg_reply->status.combined = 0;
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return 0;
 
 job_error:
 	job->dd_data = NULL;
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	return rc;
 }
 
@@ -1438,8 +1438,8 @@ lpfc_issue_ct_rsp_cmp(struct lpfc_hba *phba,
 	/* Complete the job if the job is still active */
 
 	if (job) {
-		bsg_reply->result = rc;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = rc;
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 	return;
@@ -1670,7 +1670,7 @@ send_mgmt_rsp_free_bmp:
 	kfree(bmp);
 send_mgmt_rsp_exit:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->dd_data = NULL;
 	return rc;
 }
@@ -1878,10 +1878,10 @@ loopback_mode_exit:
 
 job_error:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	/* complete the job back to userspace if no error */
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -2243,10 +2243,10 @@ loopback_mode_exit:
 
 job_done:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	/* complete the job back to userspace if no error */
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -2358,10 +2358,10 @@ lpfc_sli4_bsg_diag_mode_end(struct bsg_job *job)
 
 loopback_mode_end_exit:
 	/* make return code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	/* complete the job back to userspace if no error */
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -2507,10 +2507,10 @@ job_error:
 	/* make error code available to userspace */
 	if (rc1 && !rc)
 		rc = rc1;
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	/* complete the job back to userspace if no error */
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -3369,11 +3369,11 @@ err_loopback_test_exit:
 loopback_test_exit:
 	kfree(dataout);
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->dd_data = NULL;
 	/* complete the job back to userspace if no error */
 	if (rc == IOCB_SUCCESS)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -3414,9 +3414,9 @@ lpfc_bsg_get_dfc_rev(struct bsg_job *job)
 	event_reply->info.a_Major = MANAGEMENT_MAJOR_REV;
 	event_reply->info.a_Minor = MANAGEMENT_MINOR_REV;
 job_error:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -3481,8 +3481,8 @@ lpfc_bsg_issue_mbox_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 	/* Complete the job if the job is still active */
 
 	if (job) {
-		bsg_reply->result = 0;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = 0;
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 	return;
@@ -3671,7 +3671,7 @@ lpfc_bsg_issue_mbox_ext_handle_job(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 					    pmb_buf, size);
 
 		/* result for successful */
-		bsg_reply->result = 0;
+		bsg_reply->status.combined = 0;
 
 		lpfc_printf_log(phba, KERN_INFO, LOG_LIBDFC,
 				"2937 SLI_CONFIG ext-buffer mailbox command "
@@ -3732,7 +3732,7 @@ lpfc_bsg_issue_read_mbox_ext_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 	/* if the job is still active, call job done */
 	if (job) {
 		bsg_reply = job->reply;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 	return;
@@ -3770,7 +3770,7 @@ lpfc_bsg_issue_write_mbox_ext_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 	/* if the job is still active, call job done */
 	if (job) {
 		bsg_reply = job->reply;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 
@@ -4213,8 +4213,8 @@ lpfc_bsg_sli_cfg_write_cmd_ext(struct lpfc_hba *phba, struct bsg_job *job,
 
 	/* wait for additional external buffers */
 
-	bsg_reply->result = 0;
-	bsg_job_done(job, bsg_reply->result,
+	bsg_reply->status.combined = 0;
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return SLI_CONFIG_HANDLED;
 
@@ -4441,8 +4441,8 @@ lpfc_bsg_read_ebuf_get(struct lpfc_hba *phba, struct bsg_job *job)
 		lpfc_bsg_mbox_ext_session_reset(phba);
 	}
 
-	bsg_reply->result = 0;
-	bsg_job_done(job, bsg_reply->result,
+	bsg_reply->status.combined = 0;
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 
 	return SLI_CONFIG_HANDLED;
@@ -4560,8 +4560,8 @@ lpfc_bsg_write_ebuf_set(struct lpfc_hba *phba, struct bsg_job *job,
 	}
 
 	/* wait for additional external buffers */
-	bsg_reply->result = 0;
-	bsg_job_done(job, bsg_reply->result,
+	bsg_reply->status.combined = 0;
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return SLI_CONFIG_HANDLED;
 
@@ -5030,16 +5030,16 @@ lpfc_bsg_mbox_cmd(struct bsg_job *job)
 
 	if (rc == 0) {
 		/* job done */
-		bsg_reply->result = 0;
+		bsg_reply->status.combined = 0;
 		job->dd_data = NULL;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	} else if (rc == 1)
 		/* job submitted, will complete later*/
 		rc = 0; /* return zero, no error */
 	else {
 		/* some error occurred */
-		bsg_reply->result = rc;
+		bsg_reply->status.combined = rc;
 		job->dd_data = NULL;
 	}
 
@@ -5142,8 +5142,8 @@ lpfc_bsg_menlo_cmd_cmp(struct lpfc_hba *phba,
 	/* Complete the job if active */
 
 	if (job) {
-		bsg_reply->result = rc;
-		bsg_job_done(job, bsg_reply->result,
+		bsg_reply->status.combined = rc;
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	}
 
@@ -5318,7 +5318,7 @@ free_dd:
 	kfree(dd_data);
 no_dd_data:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->dd_data = NULL;
 	return rc;
 }
@@ -5358,9 +5358,9 @@ lpfc_forced_link_speed(struct bsg_job *job)
 				   ? LPFC_FORCED_LINK_SPEED_SUPPORTED
 				   : LPFC_FORCED_LINK_SPEED_NOT_SUPPORTED;
 job_error:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	if (rc == 0)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -5434,11 +5434,11 @@ lpfc_bsg_get_ras_config(struct bsg_job *job)
 
 ras_job_error:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 
 	/* complete the job back to userspace */
 	if (!rc)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 	return rc;
 }
@@ -5520,11 +5520,11 @@ lpfc_bsg_set_ras_config(struct bsg_job *job)
 	}
 ras_job_error:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 
 	/* complete the job back to userspace */
 	if (!rc)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 
 	return rc;
@@ -5582,11 +5582,11 @@ lpfc_bsg_get_ras_lwpd(struct bsg_job *job)
 
 ras_job_error:
 	/* make error code available to userspace */
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 
 	/* complete the job back to userspace */
 	if (!rc)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 
 	return rc;
@@ -5671,9 +5671,9 @@ lpfc_bsg_get_ras_fwlog(struct bsg_job *job)
 	vfree(fwlog_buff);
 
 ras_job_error:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	if (!rc)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 
 	return rc;
@@ -5743,9 +5743,9 @@ lpfc_get_trunk_info(struct bsg_job *job)
 	event_reply->logical_speed =
 				phba->sli4_hba.link_state.logical_speed / 1000;
 job_error:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	if (!rc)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			     bsg_reply->reply_payload_rcv_len);
 	return rc;
 
@@ -5817,7 +5817,7 @@ lpfc_bsg_hst_vendor(struct bsg_job *job)
 		rc = -EINVAL;
 		bsg_reply->reply_payload_rcv_len = 0;
 		/* make error code available to userspace */
-		bsg_reply->result = rc;
+		bsg_reply->status.combined = rc;
 		break;
 	}
 
@@ -5851,7 +5851,7 @@ lpfc_bsg_request(struct bsg_job *job)
 		rc = -EINVAL;
 		bsg_reply->reply_payload_rcv_len = 0;
 		/* make error code available to userspace */
-		bsg_reply->result = rc;
+		bsg_reply->status.combined = rc;
 		break;
 	}
 
