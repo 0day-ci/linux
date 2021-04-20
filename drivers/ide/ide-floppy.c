@@ -100,7 +100,7 @@ static int ide_floppy_callback(ide_drive_t *drive, int dsc)
 	}
 
 	if (ata_misc_request(rq))
-		scsi_req(rq)->result = uptodate ? 0 : IDE_DRV_ERROR_GENERAL;
+		scsi_req(rq)->status.combined = uptodate ? 0 : IDE_DRV_ERROR_GENERAL;
 
 	return uptodate;
 }
@@ -241,7 +241,7 @@ static ide_startstop_t ide_floppy_do_request(ide_drive_t *drive,
 					? rq->rq_disk->disk_name
 					: "dev?"));
 
-	if (scsi_req(rq)->result >= ERROR_MAX) {
+	if (scsi_req(rq)->status.combined >= ERROR_MAX) {
 		if (drive->failed_pc) {
 			ide_floppy_report_error(floppy, drive->failed_pc);
 			drive->failed_pc = NULL;
@@ -249,7 +249,7 @@ static ide_startstop_t ide_floppy_do_request(ide_drive_t *drive,
 			printk(KERN_ERR PFX "%s: I/O error\n", drive->name);
 
 		if (ata_misc_request(rq)) {
-			scsi_req(rq)->result = 0;
+			scsi_req(rq)->status.combined = 0;
 			ide_complete_rq(drive, BLK_STS_OK, blk_rq_bytes(rq));
 			return ide_stopped;
 		} else
@@ -303,8 +303,8 @@ static ide_startstop_t ide_floppy_do_request(ide_drive_t *drive,
 	return ide_floppy_issue_pc(drive, &cmd, pc);
 out_end:
 	drive->failed_pc = NULL;
-	if (blk_rq_is_passthrough(rq) && scsi_req(rq)->result == 0)
-		scsi_req(rq)->result = -EIO;
+	if (blk_rq_is_passthrough(rq) && scsi_req(rq)->status.combined == 0)
+		scsi_req(rq)->status.combined = -EIO;
 	ide_complete_rq(drive, BLK_STS_IOERR, blk_rq_bytes(rq));
 	return ide_stopped;
 }

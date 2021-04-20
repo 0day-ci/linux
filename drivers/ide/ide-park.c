@@ -38,7 +38,7 @@ static void issue_park_cmd(ide_drive_t *drive, unsigned long timeout)
 	ide_req(rq)->type = ATA_PRIV_MISC;
 	ide_req(rq)->special = &timeout;
 	blk_execute_rq(NULL, rq, 1);
-	rc = scsi_req(rq)->result ? -EIO : 0;
+	rc = scsi_req(rq)->status.combined ? -EIO : 0;
 	blk_put_request(rq);
 	if (rc)
 		goto out;

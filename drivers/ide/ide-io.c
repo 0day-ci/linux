@@ -151,12 +151,12 @@ void ide_kill_rq(ide_drive_t *drive, struct request *rq)
 	drive->failed_pc = NULL;
 
 	if ((media == ide_floppy || media == ide_tape) && drv_req) {
-		scsi_req(rq)->result = 0;
+		scsi_req(rq)->status.combined = 0;
 	} else {
 		if (media == ide_tape)
-			scsi_req(rq)->result = IDE_DRV_ERROR_GENERAL;
-		else if (blk_rq_is_passthrough(rq) && scsi_req(rq)->result == 0)
-			scsi_req(rq)->result = -EIO;
+			scsi_req(rq)->status.combined = IDE_DRV_ERROR_GENERAL;
+		else if (blk_rq_is_passthrough(rq) && scsi_req(rq)->status.combined == 0)
+			scsi_req(rq)->status.combined = -EIO;
 	}
 
 	ide_complete_rq(drive, BLK_STS_IOERR, blk_rq_bytes(rq));
@@ -284,7 +284,7 @@ static ide_startstop_t execute_drive_cmd (ide_drive_t *drive,
 #ifdef DEBUG
  	printk("%s: DRIVE_CMD (null)\n", drive->name);
 #endif
-	scsi_req(rq)->result = 0;
+	scsi_req(rq)->status.combined = 0;
 	ide_complete_rq(drive, BLK_STS_OK, blk_rq_bytes(rq));
 
  	return ide_stopped;

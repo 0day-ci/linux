@@ -108,7 +108,7 @@ int ide_queue_pc_tail(ide_drive_t *drive, struct gendisk *disk,
 	if (drive->media == ide_tape)
 		scsi_req(rq)->cmd[13] = REQ_IDETAPE_PC1;
 	blk_execute_rq(disk, rq, 0);
-	error = scsi_req(rq)->result ? -EIO : 0;
+	error = scsi_req(rq)->status.combined ? -EIO : 0;
 put_req:
 	blk_put_request(rq);
 	return error;
@@ -471,7 +471,7 @@ static ide_startstop_t ide_pc_intr(ide_drive_t *drive)
 			debug_log("%s: I/O error\n", drive->name);
 
 			if (drive->media != ide_tape)
-				scsi_req(pc->rq)->result++;
+				scsi_req(pc->rq)->status.combined++;
 
 			if (scsi_req(rq)->cmd[0] == REQUEST_SENSE) {
 				printk(KERN_ERR PFX "%s: I/O error in request "
@@ -505,13 +505,13 @@ static ide_startstop_t ide_pc_intr(ide_drive_t *drive)
 			drive->failed_pc = NULL;
 
 		if (ata_misc_request(rq)) {
-			scsi_req(rq)->result = 0;
+			scsi_req(rq)->status.combined = 0;
 			error = BLK_STS_OK;
 		} else {
 
 			if (blk_rq_is_passthrough(rq) && uptodate <= 0) {
-				if (scsi_req(rq)->result == 0)
-					scsi_req(rq)->result = -EIO;
+				if (scsi_req(rq)->status.combined == 0)
+					scsi_req(rq)->status.combined = -EIO;
 			}
 
 			error = uptodate ? BLK_STS_OK : BLK_STS_IOERR;

@@ -248,10 +248,10 @@ static int ide_cd_breathe(ide_drive_t *drive, struct request *rq)
 
 	struct cdrom_info *info = drive->driver_data;
 
-	if (!scsi_req(rq)->result)
+	if (!scsi_req(rq)->status.combined)
 		info->write_timeout = jiffies +	ATAPI_WAIT_WRITE_BUSY;
 
-	scsi_req(rq)->result = 1;
+	scsi_req(rq)->status.combined = 1;
 
 	if (time_after(jiffies, info->write_timeout))
 		return 0;
@@ -306,8 +306,8 @@ static int cdrom_decode_status(ide_drive_t *drive, u8 stat)
 	}
 
 	/* if we have an error, pass CHECK_CONDITION as the SCSI status byte */
-	if (blk_rq_is_scsi(rq) && !scsi_req(rq)->result)
-		scsi_req(rq)->result = SAM_STAT_CHECK_CONDITION;
+	if (blk_rq_is_scsi(rq) && !scsi_req(rq)->status.combined)
+		scsi_req(rq)->status.combined = SAM_STAT_CHECK_CONDITION;
 
 	if (blk_noretry_request(rq))
 		do_end_request = 1;
@@ -337,7 +337,7 @@ static int cdrom_decode_status(ide_drive_t *drive, u8 stat)
 		 * Arrange to retry the request but be sure to give up if we've
 		 * retried too many times.
 		 */
-		if (++scsi_req(rq)->result > ERROR_MAX)
+		if (++scsi_req(rq)->status.combined > ERROR_MAX)
 			do_end_request = 1;
 		break;
 	case ILLEGAL_REQUEST:
@@ -384,7 +384,7 @@ static int cdrom_decode_status(ide_drive_t *drive, u8 stat)
 			/* go to the default handler for other errors */
 			ide_error(drive, "cdrom_decode_status", stat);
 			return 1;
-		} else if (++scsi_req(rq)->result > ERROR_MAX)
+		} else if (++scsi_req(rq)->status.combined > ERROR_MAX)
 			/* we've racked up too many retries, abort */
 			do_end_request = 1;
 	}
@@ -468,7 +468,7 @@ int ide_cd_queue_pc(ide_drive_t *drive, const unsigned char *cmd,
 		}
 
 		blk_execute_rq(info->disk, rq, 0);
-		error = scsi_req(rq)->result ? -EIO : 0;
+		error = scsi_req(rq)->status.combined ? -EIO : 0;
 
 		if (buffer)
 			*bufflen = scsi_req(rq)->resid_len;
@@ -585,7 +585,7 @@ static bool ide_cdrom_prep_pc(struct request *rq)
 	 * appropriate action
 	 */
 	if (c[0] == MODE_SENSE || c[0] == MODE_SELECT) {
-		scsi_req(rq)->result = ILLEGAL_REQUEST;
+		scsi_req(rq)->status.combined = ILLEGAL_REQUEST;
 		return false;
 	}
 
@@ -773,8 +773,8 @@ out_end:
 			if (cmd->nleft == 0)
 				uptodate = 1;
 		} else {
-			if (uptodate <= 0 && scsi_req(rq)->result == 0)
-				scsi_req(rq)->result = -EIO;
+			if (uptodate <= 0 && scsi_req(rq)->status.combined == 0)
+				scsi_req(rq)->status.combined = -EIO;
 		}
 
 		if (uptodate == 0 && rq->bio)

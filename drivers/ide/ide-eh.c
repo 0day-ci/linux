@@ -13,7 +13,7 @@ static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq,
 	if ((stat & ATA_BUSY) ||
 	    ((stat & ATA_DF) && (drive->dev_flags & IDE_DFLAG_NOWERR) == 0)) {
 		/* other bits are useless when BUSY */
-		scsi_req(rq)->result |= ERROR_RESET;
+		scsi_req(rq)->status.combined |= ERROR_RESET;
 	} else if (stat & ATA_ERR) {
 		/* err has different meaning on cdrom and tape */
 		if (err == ATA_ABORTED) {
@@ -26,10 +26,10 @@ static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq,
 			drive->crc_count++;
 		} else if (err & (ATA_BBK | ATA_UNC)) {
 			/* retries won't help these */
-			scsi_req(rq)->result = ERROR_MAX;
+			scsi_req(rq)->status.combined = ERROR_MAX;
 		} else if (err & ATA_TRK0NF) {
 			/* help it find track zero */
-			scsi_req(rq)->result |= ERROR_RECAL;
+			scsi_req(rq)->status.combined |= ERROR_RECAL;
 		}
 	}
 
@@ -40,23 +40,23 @@ static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq,
 		ide_pad_transfer(drive, READ, nsect * SECTOR_SIZE);
 	}
 
-	if (scsi_req(rq)->result >= ERROR_MAX || blk_noretry_request(rq)) {
+	if (scsi_req(rq)->status.combined >= ERROR_MAX || blk_noretry_request(rq)) {
 		ide_kill_rq(drive, rq);
 		return ide_stopped;
 	}
 
 	if (hwif->tp_ops->read_status(hwif) & (ATA_BUSY | ATA_DRQ))
-		scsi_req(rq)->result |= ERROR_RESET;
+		scsi_req(rq)->status.combined |= ERROR_RESET;
 
-	if ((scsi_req(rq)->result & ERROR_RESET) == ERROR_RESET) {
-		++scsi_req(rq)->result;
+	if ((scsi_req(rq)->status.combined & ERROR_RESET) == ERROR_RESET) {
+		++scsi_req(rq)->status.combined;
 		return ide_do_reset(drive);
 	}
 
-	if ((scsi_req(rq)->result & ERROR_RECAL) == ERROR_RECAL)
+	if ((scsi_req(rq)->status.combined & ERROR_RECAL) == ERROR_RECAL)
 		drive->special_flags |= IDE_SFLAG_RECALIBRATE;
 
-	++scsi_req(rq)->result;
+	++scsi_req(rq)->status.combined;
 
 	return ide_stopped;
 }
@@ -69,7 +69,7 @@ static ide_startstop_t ide_atapi_error(ide_drive_t *drive, struct request *rq,
 	if ((stat & ATA_BUSY) ||
 	    ((stat & ATA_DF) && (drive->dev_flags & IDE_DFLAG_NOWERR) == 0)) {
 		/* other bits are useless when BUSY */
-		scsi_req(rq)->result |= ERROR_RESET;
+		scsi_req(rq)->status.combined |= ERROR_RESET;
 	} else {
 		/* add decoding error stuff */
 	}
@@ -78,14 +78,14 @@ static ide_startstop_t ide_atapi_error(ide_drive_t *drive, struct request *rq,
 		/* force an abort */
 		hwif->tp_ops->exec_command(hwif, ATA_CMD_IDLEIMMEDIATE);
 
-	if (scsi_req(rq)->result >= ERROR_MAX) {
+	if (scsi_req(rq)->status.combined >= ERROR_MAX) {
 		ide_kill_rq(drive, rq);
 	} else {
-		if ((scsi_req(rq)->result & ERROR_RESET) == ERROR_RESET) {
-			++scsi_req(rq)->result;
+		if ((scsi_req(rq)->status.combined & ERROR_RESET) == ERROR_RESET) {
+			++scsi_req(rq)->status.combined;
 			return ide_do_reset(drive);
 		}
-		++scsi_req(rq)->result;
+		++scsi_req(rq)->status.combined;
 	}
 
 	return ide_stopped;
@@ -131,11 +131,11 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, u8 stat)
 			if (cmd)
 				ide_complete_cmd(drive, cmd, stat, err);
 		} else if (ata_pm_request(rq)) {
-			scsi_req(rq)->result = 1;
+			scsi_req(rq)->status.combined = 1;
 			ide_complete_pm_rq(drive, rq);
 			return ide_stopped;
 		}
-		scsi_req(rq)->result = err;
+		scsi_req(rq)->status.combined = err;
 		ide_complete_rq(drive, err ? BLK_STS_IOERR : BLK_STS_OK, blk_rq_bytes(rq));
 		return ide_stopped;
 	}
@@ -150,8 +150,8 @@ static inline void ide_complete_drive_reset(ide_drive_t *drive, blk_status_t err
 
 	if (rq && ata_misc_request(rq) &&
 	    scsi_req(rq)->cmd[0] == REQ_DRIVE_RESET) {
-		if (err <= 0 && scsi_req(rq)->result == 0)
-			scsi_req(rq)->result = -EIO;
+		if (err <= 0 && scsi_req(rq)->status.combined == 0)
+			scsi_req(rq)->status.combined = -EIO;
 		ide_complete_rq(drive, err, blk_rq_bytes(rq));
 	}
 }

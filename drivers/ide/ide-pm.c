@@ -28,7 +28,7 @@ int generic_ide_suspend(struct device *dev, pm_message_t mesg)
 	rqpm.pm_state = mesg.event;
 
 	blk_execute_rq(NULL, rq, 0);
-	ret = scsi_req(rq)->result ? -EIO : 0;
+	ret = scsi_req(rq)->status.combined ? -EIO : 0;
 	blk_put_request(rq);
 
 	if (ret == 0 && ide_port_acpi(hwif)) {
@@ -46,13 +46,13 @@ static int ide_pm_execute_rq(struct request *rq)
 
 	if (unlikely(blk_queue_dying(q))) {
 		rq->rq_flags |= RQF_QUIET;
-		scsi_req(rq)->result = -ENXIO;
+		scsi_req(rq)->status.combined = -ENXIO;
 		blk_mq_end_request(rq, BLK_STS_OK);
 		return -ENXIO;
 	}
 	blk_execute_rq(NULL, rq, true);
 
-	return scsi_req(rq)->result ? -EIO : 0;
+	return scsi_req(rq)->status.combined ? -EIO : 0;
 }
 
 int generic_ide_resume(struct device *dev)
