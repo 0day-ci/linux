@@ -1,0 +1,17 @@
+-- RFC8017
+RSASSA-PSS-params ::= SEQUENCE {
+	hashAlgorithm      [0] HashAlgorithm DEFAULT,
+	maskGenAlgorithm   [1] MaskGenAlgorithm DEFAULT,
+	saltLength         [2] INTEGER DEFAULT ({ x509_note_salt_length }),
+	trailerField       [3] INTEGER DEFAULT ({ x509_note_trailer_field })
+}
+
+HashAlgorithm ::= SEQUENCE {
+	algorithm		OBJECT IDENTIFIER ({ x509_note_hash_algo }),
+	parameters		ANY OPTIONAL ({ x509_note_hash_algo_params })
+}
+
+MaskGenAlgorithm ::= SEQUENCE {
+	mgf	OBJECT IDENTIFIER ({ x509_note_mgf }),
+	parameters	HashAlgorithm
+}

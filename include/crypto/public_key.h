@@ -46,6 +46,10 @@ struct public_key_signature {
 	const char *encoding;
 	const void *data;
 	unsigned int data_size;
+	const char *mgf;
+	const char *mgf_hash_algo;
+	u16 salt_length;
+	u16 trailer_field;
 };
 
 extern void public_key_signature_free(struct public_key_signature *sig);
