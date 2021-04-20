@@ -1281,7 +1281,7 @@ static void done(struct Scsi_Host *shpnt, int error)
 
 		DONE_SC = CURRENT_SC;
 		CURRENT_SC = NULL;
-		DONE_SC->result = error;
+		DONE_SC->status.combined = error;
 	} else
 		printk(KERN_ERR "aha152x: done() called outside of command\n");
 }
@@ -2254,7 +2254,7 @@ static void rsti_run(struct Scsi_Host *shpnt)
 			kfree(ptr->host_scribble);
 			ptr->host_scribble=NULL;
 
-			ptr->result =  DID_RESET << 16;
+			ptr->status.combined = DID_RESET << 16;
 			ptr->scsi_done(ptr);
 		}
 

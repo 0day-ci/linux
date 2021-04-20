@@ -398,7 +398,7 @@ static irqreturn_t aha1542_interrupt(int irq, void *dev_id)
 		if (errstatus)
 			printk("aha1542_intr_handle: returning %6x\n", errstatus);
 #endif
-		tmp_cmd->result = errstatus;
+		tmp_cmd->status.combined = errstatus;
 		aha1542->int_cmds[mbo] = NULL;	/* This effectively frees up the mailbox slot, as
 						 * far as queuecommand is concerned
 						 */
@@ -422,7 +422,7 @@ static int aha1542_queuecommand(struct Scsi_Host *sh, struct scsi_cmnd *cmd)
 
 	if (*cmd->cmnd == REQUEST_SENSE) {
 		/* Don't do the command - we have the sense data already */
-		cmd->result = 0;
+		cmd->status.combined = 0;
 		cmd->scsi_done(cmd);
 		return 0;
 	}

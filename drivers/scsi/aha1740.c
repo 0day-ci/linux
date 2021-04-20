@@ -275,7 +275,7 @@ static irqreturn_t aha1740_intr_handle(int irq, void *dev_id)
 			DEB(if (errstatus)
 			    printk("aha1740_intr_handle: returning %6x\n",
 				   errstatus));
-			SCtmp->result = errstatus;
+			SCtmp->status.combined = errstatus;
 			my_done = ecbptr->done;
 			memset(ecbptr,0,sizeof(struct ecb)); 
 			if ( my_done )
@@ -326,7 +326,7 @@ static int aha1740_queuecommand_lck(struct scsi_cmnd * SCpnt,
 	DEB(int i);
 
 	if(*cmd == REQUEST_SENSE) {
-		SCpnt->result = 0;
+		SCpnt->status.combined = 0;
 		done(SCpnt); 
 		return 0;
 	}
