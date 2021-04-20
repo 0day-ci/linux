@@ -42,7 +42,7 @@ static void dump_maps(void)
 
 // Try a simple operation for to "test" for kernel support this prevents
 // reporting tests as failed when it's run on an older kernel.
-static int kernel_support_for_mremap_dontunmap()
+static int kernel_support_for_mremap_dontunmap(void)
 {
 	int ret = 0;
 	unsigned long num_pages = 1;
@@ -95,7 +95,7 @@ static int check_region_contains_byte(void *addr, unsigned long size, char byte)
 
 // this test validates that MREMAP_DONTUNMAP moves the pagetables while leaving
 // the source mapping mapped.
-static void mremap_dontunmap_simple()
+static void mremap_dontunmap_simple(void)
 {
 	unsigned long num_pages = 5;
 
@@ -128,7 +128,7 @@ static void mremap_dontunmap_simple()
 }
 
 // This test validates that MREMAP_DONTUNMAP on a shared mapping works as expected.
-static void mremap_dontunmap_simple_shmem()
+static void mremap_dontunmap_simple_shmem(void)
 {
 	unsigned long num_pages = 5;
 
@@ -181,7 +181,7 @@ static void mremap_dontunmap_simple_shmem()
 // This test validates MREMAP_DONTUNMAP will move page tables to a specific
 // destination using MREMAP_FIXED, also while validating that the source
 // remains intact.
-static void mremap_dontunmap_simple_fixed()
+static void mremap_dontunmap_simple_fixed(void)
 {
 	unsigned long num_pages = 5;
 
@@ -226,7 +226,7 @@ static void mremap_dontunmap_simple_fixed()
 
 // This test validates that we can MREMAP_DONTUNMAP for a portion of an
 // existing mapping.
-static void mremap_dontunmap_partial_mapping()
+static void mremap_dontunmap_partial_mapping(void)
 {
 	/*
 	 *  source mapping:
