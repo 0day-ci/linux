@@ -187,7 +187,8 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 {
 	struct scsi_device *SDev;
 	struct scsi_sense_hdr local_sshdr, *sshdr = &local_sshdr;
-	int result, err = 0, retries = 0;
+	union scsi_status result;
+	int err = 0, retries = 0;
 
 	SDev = cd->device;
 
@@ -200,7 +201,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 		goto out;
 	}
 
-	result = scsi_execute(SDev, cgc->cmd, cgc->data_direction,
+	result.combined = scsi_execute(SDev, cgc->cmd, cgc->data_direction,
 			      cgc->buffer, cgc->buflen, NULL, sshdr,
 			      cgc->timeout, IOCTL_RETRIES, 0, 0, NULL);
 

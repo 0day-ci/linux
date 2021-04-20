@@ -237,7 +237,7 @@ static unsigned int sr_check_events(struct cdrom_device_info *cdi,
 	bool last_present;
 	struct scsi_sense_hdr sshdr;
 	unsigned int events;
-	int ret;
+	union scsi_status ret;
 
 	/* no changer support */
 	if (CDSL_CURRENT != slot)
@@ -273,7 +273,8 @@ static unsigned int sr_check_events(struct cdrom_device_info *cdi,
 do_tur:
 	/* let's see whether the media is there with TUR */
 	last_present = cd->media_present;
-	ret = scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES, &sshdr);
+	ret.combined = scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES,
+					    &sshdr);
 
 	/*
 	 * Media is considered to be present if TUR succeeds or fails with
@@ -321,15 +322,15 @@ do_tur:
  */
 static int sr_done(struct scsi_cmnd *SCpnt)
 {
-	int result = SCpnt->result;
+	const union scsi_status result = SCpnt->status;
 	int this_count = scsi_bufflen(SCpnt);
-	int good_bytes = (result == 0 ? this_count : 0);
+	int good_bytes = result.combined == 0 ? this_count : 0;
 	int block_sectors = 0;
 	long error_sector;
 	struct scsi_cd *cd = scsi_cd(SCpnt->request->rq_disk);
 
 #ifdef DEBUG
-	scmd_printk(KERN_INFO, SCpnt, "done: %x\n", result);
+	scmd_printk(KERN_INFO, SCpnt, "done: %x\n", result.combined);
 #endif
 
 	/*
@@ -882,7 +883,8 @@ static void get_capabilities(struct scsi_cd *cd)
 	struct scsi_mode_data data;
 	struct scsi_sense_hdr sshdr;
 	unsigned int ms_len = 128;
-	int rc, n;
+	union scsi_status rc;
+	int n;
 
 	static const char *loadmech[] =
 	{
@@ -908,7 +910,7 @@ static void get_capabilities(struct scsi_cd *cd)
 	scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES, &sshdr);
 
 	/* ask for mode page 0x2a */
-	rc = scsi_mode_sense(cd->device, 0, 0x2a, buffer, ms_len,
+	rc.combined = scsi_mode_sense(cd->device, 0, 0x2a, buffer, ms_len,
 			     SR_TIMEOUT, 3, &data, NULL);
 
 	if (!scsi_status_is_good(rc) || data.length > ms_len ||
