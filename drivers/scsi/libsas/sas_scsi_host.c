@@ -94,7 +94,7 @@ static void sas_end_task(struct scsi_cmnd *sc, struct sas_task *task)
 		}
 	}
 
-	sc->result = (hs << 16) | stat;
+	sc->status.combined = (hs << 16) | stat;
 	ASSIGN_SAS_TASK(sc, NULL);
 	sas_free_task(task);
 }
@@ -170,7 +170,7 @@ int sas_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	/* If the device fell off, no sense in issuing commands */
 	if (test_bit(SAS_DEV_GONE, &dev->state)) {
-		cmd->result = DID_BAD_TARGET << 16;
+		cmd->status.combined = DID_BAD_TARGET << 16;
 		goto out_done;
 	}
 
@@ -195,9 +195,9 @@ out_free_task:
 	ASSIGN_SAS_TASK(cmd, NULL);
 	sas_free_task(task);
 	if (res == -SAS_QUEUE_FULL)
-		cmd->result = DID_SOFT_ERROR << 16; /* retry */
+		cmd->status.combined = DID_SOFT_ERROR << 16; /* retry */
 	else
-		cmd->result = DID_ERROR << 16;
+		cmd->status.combined = DID_ERROR << 16;
 out_done:
 	cmd->scsi_done(cmd);
 	return 0;
