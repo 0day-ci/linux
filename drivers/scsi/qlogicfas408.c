@@ -415,7 +415,7 @@ static void ql_ihandl(void *dev_id)
 		return;
 	}
 	icmd = priv->qlcmd;
-	icmd->result = ql_pcmd(icmd);
+	icmd->status.combined = ql_pcmd(icmd);
 	priv->qlcmd = NULL;
 	/*
 	 *	If result is CHECK CONDITION done calls qcommand to request 
@@ -444,7 +444,7 @@ static int qlogicfas408_queuecommand_lck(struct scsi_cmnd *cmd,
 {
 	struct qlogicfas408_priv *priv = get_priv_by_cmd(cmd);
 	if (scmd_id(cmd) == priv->qinitid) {
-		cmd->result = DID_BAD_TARGET << 16;
+		cmd->status.combined = DID_BAD_TARGET << 16;
 		done(cmd);
 		return 0;
 	}
