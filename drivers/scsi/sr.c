@@ -273,8 +273,7 @@ static unsigned int sr_check_events(struct cdrom_device_info *cdi,
 do_tur:
 	/* let's see whether the media is there with TUR */
 	last_present = cd->media_present;
-	ret.combined = scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES,
-					    &sshdr);
+	ret = scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES, &sshdr);
 
 	/*
 	 * Media is considered to be present if TUR succeeds or fails with
@@ -508,7 +507,8 @@ static void sr_revalidate_disk(struct scsi_cd *cd)
 	struct scsi_sense_hdr sshdr;
 
 	/* if the unit is not ready, nothing more to do */
-	if (scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES, &sshdr))
+	if (scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES, &sshdr)
+	    .combined)
 		return;
 	sr_cd_check(&cd->cdi);
 	get_sectorsize(cd);

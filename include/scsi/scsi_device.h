@@ -411,8 +411,8 @@ extern int scsi_mode_select(struct scsi_device *sdev, int pf, int sp,
 			    int timeout, int retries,
 			    struct scsi_mode_data *data,
 			    struct scsi_sense_hdr *);
-extern int scsi_test_unit_ready(struct scsi_device *sdev, int timeout,
-				int retries, struct scsi_sense_hdr *sshdr);
+extern union scsi_status scsi_test_unit_ready(struct scsi_device *sdev,
+			int timeout, int retries, struct scsi_sense_hdr *sshdr);
 extern int scsi_get_vpd_page(struct scsi_device *, u8 page, unsigned char *buf,
 			     int buf_len);
 extern int scsi_report_opcode(struct scsi_device *sdev, unsigned char *buffer,

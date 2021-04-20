@@ -2255,7 +2255,7 @@ EXPORT_SYMBOL(scsi_mode_sense);
  *	Returns zero if unsuccessful or an error if TUR failed.  For
  *	removable media, UNIT_ATTENTION sets ->changed flag.
  **/
-int
+union scsi_status
 scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 		     struct scsi_sense_hdr *sshdr)
 {
@@ -2274,7 +2274,7 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries,
 	} while (scsi_sense_valid(sshdr) &&
 		 sshdr->sense_key == UNIT_ATTENTION && --retries);
 
-	return result.combined;
+	return result;
 }
 EXPORT_SYMBOL(scsi_test_unit_ready);
 

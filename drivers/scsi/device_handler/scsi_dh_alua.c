@@ -490,14 +490,14 @@ static enum scsi_disposition alua_check_sense(struct scsi_device *sdev,
 static int alua_tur(struct scsi_device *sdev)
 {
 	struct scsi_sense_hdr sense_hdr;
-	int retval;
+	union scsi_status retval;
 
 	retval = scsi_test_unit_ready(sdev, ALUA_FAILOVER_TIMEOUT * HZ,
 				      ALUA_FAILOVER_RETRIES, &sense_hdr);
 	if (sense_hdr.sense_key == NOT_READY &&
 	    sense_hdr.asc == 0x04 && sense_hdr.ascq == 0x0a)
 		return SCSI_DH_RETRY;
-	else if (retval)
+	else if (retval.combined)
 		return SCSI_DH_IO;
 	else
 		return SCSI_DH_OK;

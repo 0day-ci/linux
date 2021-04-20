@@ -1654,9 +1654,8 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 	if (scsi_block_when_processing_errors(sdp)) {
 		struct scsi_sense_hdr sshdr = { 0, };
 
-		retval.combined =
-			scsi_test_unit_ready(sdp, SD_TIMEOUT, sdkp->max_retries,
-					      &sshdr);
+		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT,
+					      sdkp->max_retries, &sshdr);
 
 		/* failed to execute TUR, assume media not present */
 		if (host_byte(retval)) {
