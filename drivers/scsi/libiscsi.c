@@ -616,7 +616,7 @@ static void fail_scsi_task(struct iscsi_task *task, enum host_status err)
 		state = ISCSI_TASK_ABRT_TMF;
 
 	sc = task->sc;
-	sc->result = err << 16;
+	sc->status.combined = err << 16;
 	scsi_set_resid(sc, scsi_bufflen(sc));
 	iscsi_complete_task(task, state);
 	spin_unlock_bh(&conn->session->back_lock);
@@ -814,7 +814,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	iscsi_update_cmdsn(session, (struct iscsi_nopin*)rhdr);
 	conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
 
-	sc->result = (DID_OK << 16) | rhdr->cmd_status;
+	sc->status.combined = (DID_OK << 16) | rhdr->cmd_status;
 
 	if (task->protected) {
 		sector_t sector;
@@ -829,7 +829,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 
 		ascq = session->tt->check_protection(task, &sector);
 		if (ascq) {
-			sc->result = DRIVER_SENSE << 24 |
+			sc->status.combined = DRIVER_SENSE << 24 |
 				     SAM_STAT_CHECK_CONDITION;
 			scsi_build_sense_buffer(1, sc->sense_buffer,
 						ILLEGAL_REQUEST, 0x10, ascq);
@@ -841,7 +841,7 @@ static void iscsi_scsi_cmd_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	}
 
 	if (rhdr->response != ISCSI_STATUS_CMD_COMPLETED) {
-		sc->result = DID_ERROR << 16;
+		sc->status.combined = DID_ERROR << 16;
 		goto out;
 	}
 
@@ -853,7 +853,7 @@ invalid_datalen:
 			iscsi_conn_printk(KERN_ERR,  conn,
 					 "Got CHECK_CONDITION but invalid data "
 					 "buffer size of %d\n", datalen);
-			sc->result = DID_BAD_TARGET << 16;
+			sc->status.combined = DID_BAD_TARGET << 16;
 			goto out;
 		}
 
@@ -870,7 +870,7 @@ invalid_datalen:
 
 	if (rhdr->flags & (ISCSI_FLAG_CMD_BIDI_UNDERFLOW |
 			   ISCSI_FLAG_CMD_BIDI_OVERFLOW)) {
-		sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+		sc->status.combined = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
 	}
 
 	if (rhdr->flags & (ISCSI_FLAG_CMD_UNDERFLOW |
@@ -883,11 +883,11 @@ invalid_datalen:
 			/* write side for bidi or uni-io set_resid */
 			scsi_set_resid(sc, res_count);
 		else
-			sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+			sc->status.combined = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
 	}
 out:
 	ISCSI_DBG_SESSION(session, "cmd rsp done [sc %p res %d itt 0x%x]\n",
-			  sc, sc->result, task->itt);
+			  sc, sc->status.combined, task->itt);
 	conn->scsirsp_pdus_cnt++;
 	iscsi_complete_task(task, ISCSI_TASK_COMPLETED);
 }
@@ -912,7 +912,7 @@ iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		return;
 
 	iscsi_update_cmdsn(conn->session, (struct iscsi_nopin *)hdr);
-	sc->result = (DID_OK << 16) | rhdr->cmd_status;
+	sc->status.combined = (DID_OK << 16) | rhdr->cmd_status;
 	conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
 	if (rhdr->flags & (ISCSI_FLAG_DATA_UNDERFLOW |
 	                   ISCSI_FLAG_DATA_OVERFLOW)) {
@@ -923,12 +923,12 @@ iscsi_data_in_rsp(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		     res_count <= sc->sdb.length))
 			scsi_set_resid(sc, res_count);
 		else
-			sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+			sc->status.combined = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
 	}
 
 	ISCSI_DBG_SESSION(conn->session, "data in with status done "
 			  "[sc %p res %d itt 0x%x]\n",
-			  sc, sc->result, task->itt);
+			  sc, sc->status.combined, task->itt);
 	conn->scsirsp_pdus_cnt++;
 	iscsi_complete_task(task, ISCSI_TASK_COMPLETED);
 }
@@ -1678,7 +1678,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	struct iscsi_conn *conn;
 	struct iscsi_task *task = NULL;
 
-	sc->result = 0;
+	sc->status.combined = 0;
 	sc->SCp.ptr = NULL;
 
 	ihost = shost_priv(host);
@@ -1689,7 +1689,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 
 	reason = iscsi_session_chkready(cls_session);
 	if (reason) {
-		sc->result = reason;
+		sc->status.combined = reason;
 		goto fault;
 	}
 
@@ -1708,29 +1708,29 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 			 */
 			if (unlikely(system_state != SYSTEM_RUNNING)) {
 				reason = FAILURE_SESSION_FAILED;
-				sc->result = DID_NO_CONNECT << 16;
+				sc->status.combined = DID_NO_CONNECT << 16;
 				break;
 			}
 			fallthrough;
 		case ISCSI_STATE_IN_RECOVERY:
 			reason = FAILURE_SESSION_IN_RECOVERY;
-			sc->result = DID_IMM_RETRY << 16;
+			sc->status.combined = DID_IMM_RETRY << 16;
 			break;
 		case ISCSI_STATE_LOGGING_OUT:
 			reason = FAILURE_SESSION_LOGGING_OUT;
-			sc->result = DID_IMM_RETRY << 16;
+			sc->status.combined = DID_IMM_RETRY << 16;
 			break;
 		case ISCSI_STATE_RECOVERY_FAILED:
 			reason = FAILURE_SESSION_RECOVERY_TIMEOUT;
-			sc->result = DID_TRANSPORT_FAILFAST << 16;
+			sc->status.combined = DID_TRANSPORT_FAILFAST << 16;
 			break;
 		case ISCSI_STATE_TERMINATE:
 			reason = FAILURE_SESSION_TERMINATE;
-			sc->result = DID_NO_CONNECT << 16;
+			sc->status.combined = DID_NO_CONNECT << 16;
 			break;
 		default:
 			reason = FAILURE_SESSION_FREED;
-			sc->result = DID_NO_CONNECT << 16;
+			sc->status.combined = DID_NO_CONNECT << 16;
 		}
 		goto fault;
 	}
@@ -1738,13 +1738,13 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 	conn = session->leadconn;
 	if (!conn) {
 		reason = FAILURE_SESSION_FREED;
-		sc->result = DID_NO_CONNECT << 16;
+		sc->status.combined = DID_NO_CONNECT << 16;
 		goto fault;
 	}
 
 	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
 		reason = FAILURE_SESSION_IN_RECOVERY;
-		sc->result = DID_REQUEUE << 16;
+		sc->status.combined = DID_REQUEUE << 16;
 		goto fault;
 	}
 
@@ -1766,7 +1766,7 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 				reason = FAILURE_OOM;
 				goto prepd_reject;
 			} else {
-				sc->result = DID_ABORT << 16;
+				sc->status.combined = DID_ABORT << 16;
 				goto prepd_fault;
 			}
 		}
@@ -2017,7 +2017,7 @@ enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *sc)
 		 * upper layer to deal with the result.
 		 */
 		if (unlikely(system_state != SYSTEM_RUNNING)) {
-			sc->result = DID_NO_CONNECT << 16;
+			sc->status.combined = DID_NO_CONNECT << 16;
 			ISCSI_DBG_EH(session, "sc on shutdown, handled\n");
 			rc = BLK_EH_DONE;
 			goto done;

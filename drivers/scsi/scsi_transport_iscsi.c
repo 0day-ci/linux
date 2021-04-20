@@ -1534,7 +1534,7 @@ fail_host_msg:
 	/* return the errno failure code as the only status */
 	BUG_ON(job->reply_len < sizeof(uint32_t));
 	reply->reply_payload_rcv_len = 0;
-	reply->result = ret;
+	reply->status.combined = ret;
 	job->reply_len = sizeof(uint32_t);
 	bsg_job_done(job, ret, 0);
 	return 0;
