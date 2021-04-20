@@ -825,7 +825,7 @@ static void qedf_trace_io(struct qedf_rport *fcport, struct qedf_ioreq *io_req,
 	io_log->lba[3] = sc_cmd->cmnd[5];
 	io_log->bufflen = scsi_bufflen(sc_cmd);
 	io_log->sg_count = scsi_sg_count(sc_cmd);
-	io_log->result = sc_cmd->result;
+	io_log->result = sc_cmd->status.combined;
 	io_log->jiffies = jiffies;
 	io_log->refcount = kref_read(&io_req->refcount);
 
@@ -951,7 +951,7 @@ qedf_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc_cmd)
 		QEDF_ERR(&qedf->dbg_ctx,
 			 "Number of SG elements %d exceeds what hardware limitation of %d.\n",
 			 num_sgs, QEDF_MAX_BDS_PER_CMD);
-		sc_cmd->result = DID_ERROR;
+		sc_cmd->status.combined = DID_ERROR;
 		sc_cmd->scsi_done(sc_cmd);
 		return 0;
 	}
@@ -961,7 +961,7 @@ qedf_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc_cmd)
 		QEDF_INFO(&qedf->dbg_ctx, QEDF_LOG_IO,
 			  "Returning DNC as unloading or stop io, flags 0x%lx.\n",
 			  qedf->flags);
-		sc_cmd->result = DID_NO_CONNECT << 16;
+		sc_cmd->status.combined = DID_NO_CONNECT << 16;
 		sc_cmd->scsi_done(sc_cmd);
 		return 0;
 	}
@@ -970,7 +970,7 @@ qedf_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc_cmd)
 		QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO,
 		    "Completing sc_cmd=%p DID_NO_CONNECT as MSI-X is not enabled.\n",
 		    sc_cmd);
-		sc_cmd->result = DID_NO_CONNECT << 16;
+		sc_cmd->status.combined = DID_NO_CONNECT << 16;
 		sc_cmd->scsi_done(sc_cmd);
 		return 0;
 	}
@@ -980,7 +980,7 @@ qedf_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc_cmd)
 		QEDF_INFO(&qedf->dbg_ctx, QEDF_LOG_IO,
 			  "fc_remote_port_chkready failed=0x%x for port_id=0x%06x.\n",
 			  rval, rport->port_id);
-		sc_cmd->result = rval;
+		sc_cmd->status.combined = rval;
 		sc_cmd->scsi_done(sc_cmd);
 		return 0;
 	}
@@ -1204,7 +1204,7 @@ void qedf_scsi_completion(struct qedf_ctx *qedf, struct fcoe_cqe *cqe,
 		    "FCP I/O protocol failure xid=0x%x fcp_rsp_len=%d "
 		    "fcp_rsp_code=%d.\n", io_req->xid, io_req->fcp_rsp_len,
 		    io_req->fcp_rsp_code);
-		sc_cmd->result = DID_BUS_BUSY << 16;
+		sc_cmd->status.combined = DID_BUS_BUSY << 16;
 		goto out;
 	}
 
@@ -1219,9 +1219,9 @@ void qedf_scsi_completion(struct qedf_ctx *qedf, struct fcoe_cqe *cqe,
 			 sc_cmd->cmnd[3], sc_cmd->cmnd[4], sc_cmd->cmnd[5]);
 
 		if (io_req->cdb_status == 0)
-			sc_cmd->result = (DID_ERROR << 16) | io_req->cdb_status;
+			sc_cmd->status.combined = (DID_ERROR << 16) | io_req->cdb_status;
 		else
-			sc_cmd->result = (DID_OK << 16) | io_req->cdb_status;
+			sc_cmd->status.combined = (DID_OK << 16) | io_req->cdb_status;
 
 		/*
 		 * Set resid to the whole buffer length so we won't try to resue
@@ -1235,7 +1235,7 @@ void qedf_scsi_completion(struct qedf_ctx *qedf, struct fcoe_cqe *cqe,
 	case FC_GOOD:
 		if (io_req->cdb_status == 0) {
 			/* Good I/O completion */
-			sc_cmd->result = DID_OK << 16;
+			sc_cmd->status.combined = DID_OK << 16;
 		} else {
 			refcount = kref_read(&io_req->refcount);
 			QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO,
@@ -1248,7 +1248,7 @@ void qedf_scsi_completion(struct qedf_ctx *qedf, struct fcoe_cqe *cqe,
 			    sc_cmd->cmnd[4], sc_cmd->cmnd[5],
 			    io_req->cdb_status, io_req->fcp_resid,
 			    refcount);
-			sc_cmd->result = (DID_OK << 16) | io_req->cdb_status;
+			sc_cmd->status.combined = (DID_OK << 16) | io_req->cdb_status;
 
 			if (io_req->cdb_status == SAM_STAT_TASK_SET_FULL ||
 			    io_req->cdb_status == SAM_STAT_BUSY) {
@@ -1406,13 +1406,13 @@ void qedf_scsi_done(struct qedf_ctx *qedf, struct qedf_ioreq *io_req,
 
 	qedf_unmap_sg_list(qedf, io_req);
 
-	sc_cmd->result = result << 16;
+	sc_cmd->status.combined = result << 16;
 	refcount = kref_read(&io_req->refcount);
 	QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_IO, "%d:0:%d:%lld: Completing "
 	    "sc_cmd=%p result=0x%08x op=0x%02x lba=0x%02x%02x%02x%02x, "
 	    "allowed=%d retries=%d refcount=%d.\n",
 	    qedf->lport->host->host_no, sc_cmd->device->id,
-	    sc_cmd->device->lun, sc_cmd, sc_cmd->result, sc_cmd->cmnd[0],
+	    sc_cmd->device->lun, sc_cmd, sc_cmd->status.combined, sc_cmd->cmnd[0],
 	    sc_cmd->cmnd[2], sc_cmd->cmnd[3], sc_cmd->cmnd[4],
 	    sc_cmd->cmnd[5], sc_cmd->allowed, sc_cmd->retries,
 	    refcount);
