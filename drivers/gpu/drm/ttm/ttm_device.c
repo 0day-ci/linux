@@ -133,7 +133,7 @@ int ttm_device_swapout(struct ttm_device *bdev, struct ttm_operation_ctx *ctx,
 	struct ttm_resource_manager *man;
 	struct ttm_buffer_object *bo;
 	unsigned i, j;
-	int ret;
+	int ret=-EBUSY;
 
 	spin_lock(&bdev->lru_lock);
 	for (i = TTM_PL_SYSTEM; i < TTM_NUM_MEM_TYPES; ++i) {
@@ -161,7 +161,7 @@ int ttm_device_swapout(struct ttm_device *bdev, struct ttm_operation_ctx *ctx,
 		}
 	}
 	spin_unlock(&bdev->lru_lock);
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(ttm_device_swapout);
 
