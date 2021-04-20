@@ -191,6 +191,41 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
 }
 EXPORT_SYMBOL(iommu_dma_get_resv_regions);
 
+void iommu_dma_get_rmr_resv_regions(struct device *dev, struct iommu_rmr *rmr,
+				    struct list_head *list)
+{
+	int prot = IOMMU_READ | IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+	struct iommu_resv_region *region;
+	enum iommu_resv_type type;
+
+	/*
+	 * For ACPI, please make sure the OS has preserved the PCIe configuration
+	 * performed by the boot firmware(See IORT revision E.b).
+	 */
+	if (!is_of_node(dev_iommu_fwspec_get(dev)->iommu_fwnode) &&
+	    dev_is_pci(dev)) {
+		struct pci_dev *pdev = to_pci_dev(dev);
+		struct pci_host_bridge *host = pci_find_host_bridge(pdev->bus);
+
+		if (!host->preserve_config)
+			return;
+	}
+
+	if (rmr->flags & IOMMU_RMR_REMAP_PERMITTED)
+		type = IOMMU_RESV_DIRECT_RELAXABLE;
+	else
+		type = IOMMU_RESV_DIRECT;
+
+	region = iommu_alloc_resv_region(rmr->base_address,
+					 rmr->length, prot,
+					 type);
+	if (!region)
+		return;
+
+	list_add_tail(&region->list, list);
+}
+EXPORT_SYMBOL(iommu_dma_get_rmr_resv_regions);
+
 /**
  * iommu_dma_get_rmrs - Retrieve Reserved Memory Regions(RMRs) associated
  *                      with a given IOMMU

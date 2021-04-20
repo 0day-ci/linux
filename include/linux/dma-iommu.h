@@ -40,6 +40,8 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
 void iommu_dma_free_cpu_cached_iovas(unsigned int cpu,
 		struct iommu_domain *domain);
 
+void iommu_dma_get_rmr_resv_regions(struct device *dev, struct iommu_rmr *rmr,
+				    struct list_head *list);
 int iommu_dma_get_rmrs(struct fwnode_handle *iommu, struct list_head *list);
 struct iommu_rmr *iommu_dma_alloc_rmr(u64 base, u64 length, u32 sid, u32 flags);
 
@@ -86,6 +88,11 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
 
 static inline void iommu_dma_free_cpu_cached_iovas(unsigned int cpu,
 		struct iommu_domain *domain)
+{
+}
+
+static void iommu_dma_get_rmr_resv_regions(struct device *dev, struct iommu_rmr *rmr,
+					   struct list_head *list)
 {
 }
 
