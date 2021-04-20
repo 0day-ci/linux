@@ -62,18 +62,18 @@ bfa_cb_ioim_done(void *drv, struct bfad_ioim_s *dio,
 				host_status = DID_ERROR;
 			}
 		}
-		cmnd->result = host_status << 16 | scsi_status;
+		cmnd->status.combined = host_status << 16 | scsi_status;
 
 		break;
 
 	case BFI_IOIM_STS_TIMEDOUT:
-		cmnd->result = DID_TIME_OUT << 16;
+		cmnd->status.combined = DID_TIME_OUT << 16;
 		break;
 	case BFI_IOIM_STS_PATHTOV:
-		cmnd->result = DID_TRANSPORT_DISRUPTED << 16;
+		cmnd->status.combined = DID_TRANSPORT_DISRUPTED << 16;
 		break;
 	default:
-		cmnd->result = DID_ERROR << 16;
+		cmnd->status.combined = DID_ERROR << 16;
 	}
 
 	/* Unmap DMA, if host is NULL, it means a scsi passthru cmd */
@@ -81,16 +81,16 @@ bfa_cb_ioim_done(void *drv, struct bfad_ioim_s *dio,
 		scsi_dma_unmap(cmnd);
 
 	cmnd->host_scribble = NULL;
-	bfa_trc(bfad, cmnd->result);
+	bfa_trc(bfad, cmnd->status.combined);
 
 	itnim_data = cmnd->device->hostdata;
 	if (itnim_data) {
 		itnim = itnim_data->itnim;
-		if (!cmnd->result && itnim &&
+		if (!cmnd->status.combined && itnim &&
 			 (bfa_lun_queue_depth > cmnd->device->queue_depth)) {
 			/* Queue depth adjustment for good status completion */
 			bfad_ramp_up_qdepth(itnim, cmnd->device);
-		} else if (cmnd->result == SAM_STAT_TASK_SET_FULL && itnim) {
+		} else if (cmnd->status.combined == SAM_STAT_TASK_SET_FULL && itnim) {
 			/* qfull handling */
 			bfad_handle_qfull(itnim, cmnd->device);
 		}
@@ -106,7 +106,7 @@ bfa_cb_ioim_good_comp(void *drv, struct bfad_ioim_s *dio)
 	struct bfad_itnim_data_s *itnim_data;
 	struct bfad_itnim_s *itnim;
 
-	cmnd->result = DID_OK << 16 | SAM_STAT_GOOD;
+	cmnd->status.combined = DID_OK << 16 | SAM_STAT_GOOD;
 
 	/* Unmap DMA, if host is NULL, it means a scsi passthru cmd */
 	if (cmnd->device->host != NULL)
@@ -133,13 +133,13 @@ bfa_cb_ioim_abort(void *drv, struct bfad_ioim_s *dio)
 	struct scsi_cmnd *cmnd = (struct scsi_cmnd *)dio;
 	struct bfad_s         *bfad = drv;
 
-	cmnd->result = DID_ERROR << 16;
+	cmnd->status.combined = DID_ERROR << 16;
 
 	/* Unmap DMA, if host is NULL, it means a scsi passthru cmd */
 	if (cmnd->device->host != NULL)
 		scsi_dma_unmap(cmnd);
 
-	bfa_trc(bfad, cmnd->result);
+	bfa_trc(bfad, cmnd->status.combined);
 	cmnd->host_scribble = NULL;
 }
 
@@ -1215,16 +1215,16 @@ bfad_im_queuecommand_lck(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd 
 
 	rc = fc_remote_port_chkready(rport);
 	if (rc) {
-		cmnd->result = rc;
+		cmnd->status.combined = rc;
 		done(cmnd);
 		return 0;
 	}
 
 	if (bfad->bfad_flags & BFAD_EEH_BUSY) {
 		if (bfad->bfad_flags & BFAD_EEH_PCI_CHANNEL_IO_PERM_FAILURE)
-			cmnd->result = DID_NO_CONNECT << 16;
+			cmnd->status.combined = DID_NO_CONNECT << 16;
 		else
-			cmnd->result = DID_REQUEUE << 16;
+			cmnd->status.combined = DID_REQUEUE << 16;
 		done(cmnd);
 		return 0;
 	}
@@ -1240,14 +1240,14 @@ bfad_im_queuecommand_lck(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd 
 		printk(KERN_WARNING
 			"bfad%d, queuecommand %p %x failed, BFA stopped\n",
 		       bfad->inst_no, cmnd, cmnd->cmnd[0]);
-		cmnd->result = DID_NO_CONNECT << 16;
+		cmnd->status.combined = DID_NO_CONNECT << 16;
 		goto out_fail_cmd;
 	}
 
 
 	itnim = itnim_data->itnim;
 	if (!itnim) {
-		cmnd->result = DID_IMM_RETRY << 16;
+		cmnd->status.combined = DID_IMM_RETRY << 16;
 		goto out_fail_cmd;
 	}
 

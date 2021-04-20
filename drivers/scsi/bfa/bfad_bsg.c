@@ -3161,16 +3161,16 @@ bfad_im_bsg_vendor_request(struct bsg_job *job)
 	/* Fill the BSG job reply data */
 	job->reply_len = job->reply_payload.payload_len;
 	bsg_reply->reply_payload_rcv_len = job->reply_payload.payload_len;
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 
-	bsg_job_done(job, bsg_reply->result,
+	bsg_job_done(job, bsg_reply->status.combined,
 		       bsg_reply->reply_payload_rcv_len);
 	return rc;
 error:
 	/* free the command buffer */
 	kfree(payload_kbuf);
 out:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 	job->reply_len = sizeof(uint32_t);
 	bsg_reply->reply_payload_rcv_len = 0;
 	return rc;
@@ -3538,10 +3538,10 @@ out_free_mem:
 	kfree(bsg_fcpt);
 	kfree(drv_fcxp);
 out:
-	bsg_reply->result = rc;
+	bsg_reply->status.combined = rc;
 
 	if (rc == BFA_STATUS_OK)
-		bsg_job_done(job, bsg_reply->result,
+		bsg_job_done(job, bsg_reply->status.combined,
 			       bsg_reply->reply_payload_rcv_len);
 
 	return rc;
@@ -3567,7 +3567,7 @@ bfad_im_bsg_request(struct bsg_job *job)
 		rc = bfad_im_bsg_els_ct_request(job);
 		break;
 	default:
-		bsg_reply->result = rc = -EINVAL;
+		bsg_reply->status.combined = rc = -EINVAL;
 		bsg_reply->reply_payload_rcv_len = 0;
 		break;
 	}
