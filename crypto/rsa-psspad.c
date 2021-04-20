@@ -124,7 +124,50 @@ out_err:
 	return ret;
 }
 
-static int psspad_s_v_e_d(struct akcipher_request *req)
+static int psspad_verify_complete(struct akcipher_request *req, int err)
+{
+	return -EOPNOTSUPP;
+}
+
+static void psspad_verify_complete_cb(struct crypto_async_request *child_async_req,
+				      int err)
+{
+	rsapad_akcipher_req_complete(child_async_req, err,
+				     psspad_verify_complete);
+}
+
+static int psspad_verify(struct akcipher_request *req)
+{
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+	struct rsapad_tfm_ctx *ctx = akcipher_tfm_ctx(tfm);
+	struct rsapad_akciper_req_ctx *req_ctx = akcipher_request_ctx(req);
+	int err;
+
+	if (WARN_ON(req->dst) ||
+	    WARN_ON(!req->dst_len) ||
+	    !ctx->key_size || req->src_len < ctx->key_size)
+		return -EINVAL;
+
+	req_ctx->out_buf = kmalloc(ctx->key_size + req->dst_len, GFP_KERNEL);
+	if (!req_ctx->out_buf)
+		return -ENOMEM;
+
+	rsapad_akcipher_sg_set_buf(req_ctx->out_sg, req_ctx->out_buf,
+			    ctx->key_size, NULL);
+
+	/* Reuse input buffer, output to a new buffer */
+	rsapad_akcipher_setup_child(req, req->src, req_ctx->out_sg,
+				    req->src_len, ctx->key_size,
+				    psspad_verify_complete_cb);
+
+	err = crypto_akcipher_encrypt(&req_ctx->child_req);
+	if (err != -EINPROGRESS && err != -EBUSY)
+		return psspad_verify_complete(req, err);
+
+	return err;
+}
+
+static int psspad_s_e_d(struct akcipher_request *req)
 {
 	return -EOPNOTSUPP;
 }
@@ -133,10 +176,10 @@ static struct akcipher_alg psspad_alg = {
 	.init = rsapad_akcipher_init_tfm,
 	.exit = rsapad_akcipher_exit_tfm,
 
-	.encrypt = psspad_s_v_e_d,
-	.decrypt = psspad_s_v_e_d,
-	.sign = psspad_s_v_e_d,
-	.verify = psspad_s_v_e_d,
+	.encrypt = psspad_s_e_d,
+	.decrypt = psspad_s_e_d,
+	.sign = psspad_s_e_d,
+	.verify = psspad_verify,
 	.set_pub_key = rsapad_set_pub_key,
 	.set_priv_key = rsapad_set_priv_key,
 	.max_size = rsapad_get_max_size,
