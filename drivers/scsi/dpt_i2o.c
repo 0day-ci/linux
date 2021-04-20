@@ -430,7 +430,7 @@ static int adpt_queue_lck(struct scsi_cmnd * cmd, void (*done) (struct scsi_cmnd
 	 */
 
 	if ((cmd->cmnd[0] == REQUEST_SENSE) && (cmd->sense_buffer[0] != 0)) {
-		cmd->result = (DID_OK << 16);
+		cmd->status.combined = (DID_OK << 16);
 		cmd->scsi_done(cmd);
 		return 0;
 	}
@@ -455,7 +455,7 @@ static int adpt_queue_lck(struct scsi_cmnd * cmd, void (*done) (struct scsi_cmnd
 		if ((pDev = adpt_find_device(pHba, (u32)cmd->device->channel, (u32)cmd->device->id, cmd->device->lun)) == NULL) {
 			// TODO: if any luns are at this bus, scsi id then fake a TEST_UNIT_READY and INQUIRY response 
 			// with type 7F (for all luns less than the max for this bus,id) so the lun scan will continue.
-			cmd->result = (DID_NO_CONNECT << 16);
+			cmd->status.combined = (DID_NO_CONNECT << 16);
 			cmd->scsi_done(cmd);
 			return 0;
 		}
@@ -2226,7 +2226,7 @@ static s32 adpt_scsi_to_i2o(adpt_hba* pHba, struct scsi_cmnd* cmd, struct adpt_d
 		default:
 			printk(KERN_WARNING"%s: scsi opcode 0x%x not supported.\n",
 			     pHba->name, cmd->cmnd[0]);
-			cmd->result = (DID_ERROR <<16);
+			cmd->status.combined = DID_ERROR << 16;
 			cmd->scsi_done(cmd);
 			return 	0;
 		}
@@ -2359,15 +2359,15 @@ static void adpt_i2o_scsi_complete(void __iomem *reply, struct scsi_cmnd *cmd)
 	if(!(reply_flags & MSG_FAIL)) {
 		switch(detailed_status & I2O_SCSI_DSC_MASK) {
 		case I2O_SCSI_DSC_SUCCESS:
-			cmd->result = (DID_OK << 16);
+			cmd->status.combined = (DID_OK << 16);
 			// handle underflow
 			if (readl(reply+20) < cmd->underflow) {
-				cmd->result = (DID_ERROR <<16);
+				cmd->status.combined = DID_ERROR << 16;
 				printk(KERN_WARNING"%s: SCSI CMD underflow\n",pHba->name);
 			}
 			break;
 		case I2O_SCSI_DSC_REQUEST_ABORTED:
-			cmd->result = (DID_ABORT << 16);
+			cmd->status.combined = (DID_ABORT << 16);
 			break;
 		case I2O_SCSI_DSC_PATH_INVALID:
 		case I2O_SCSI_DSC_DEVICE_NOT_PRESENT:
@@ -2377,19 +2377,19 @@ static void adpt_i2o_scsi_complete(void __iomem *reply, struct scsi_cmnd *cmd)
 		case I2O_SCSI_DSC_RESOURCE_UNAVAILABLE:
 			printk(KERN_WARNING"%s: SCSI Timeout-Device (%d,%d,%llu) hba status=0x%x, dev status=0x%x, cmd=0x%x\n",
 				pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, cmd->device->lun, hba_status, dev_status, cmd->cmnd[0]);
-			cmd->result = (DID_TIME_OUT << 16);
+			cmd->status.combined = (DID_TIME_OUT << 16);
 			break;
 		case I2O_SCSI_DSC_ADAPTER_BUSY:
 		case I2O_SCSI_DSC_BUS_BUSY:
-			cmd->result = (DID_BUS_BUSY << 16);
+			cmd->status.combined = (DID_BUS_BUSY << 16);
 			break;
 		case I2O_SCSI_DSC_SCSI_BUS_RESET:
 		case I2O_SCSI_DSC_BDR_MESSAGE_SENT:
-			cmd->result = (DID_RESET << 16);
+			cmd->status.combined = (DID_RESET << 16);
 			break;
 		case I2O_SCSI_DSC_PARITY_ERROR_FAILURE:
 			printk(KERN_WARNING"%s: SCSI CMD parity error\n",pHba->name);
-			cmd->result = (DID_PARITY << 16);
+			cmd->status.combined = (DID_PARITY << 16);
 			break;
 		case I2O_SCSI_DSC_UNABLE_TO_ABORT:
 		case I2O_SCSI_DSC_COMPLETE_WITH_ERROR:
@@ -2418,7 +2418,7 @@ static void adpt_i2o_scsi_complete(void __iomem *reply, struct scsi_cmnd *cmd)
 			printk(KERN_WARNING"%s: SCSI error %0x-Device(%d,%d,%llu) hba_status=0x%x, dev_status=0x%x, cmd=0x%x\n",
 				pHba->name, detailed_status & I2O_SCSI_DSC_MASK, (u32)cmd->device->channel, (u32)cmd->device->id, cmd->device->lun,
 			       hba_status, dev_status, cmd->cmnd[0]);
-			cmd->result = (DID_ERROR << 16);
+			cmd->status.combined = (DID_ERROR << 16);
 			break;
 		}
 
@@ -2431,7 +2431,7 @@ static void adpt_i2o_scsi_complete(void __iomem *reply, struct scsi_cmnd *cmd)
 			if(cmd->sense_buffer[0] == 0x70 /* class 7 */ && 
 			   cmd->sense_buffer[2] == DATA_PROTECT ){
 				/* This is to handle an array failed */
-				cmd->result = (DID_TIME_OUT << 16);
+				cmd->status.combined = (DID_TIME_OUT << 16);
 				printk(KERN_WARNING"%s: SCSI Data Protect-Device (%d,%d,%llu) hba_status=0x%x, dev_status=0x%x, cmd=0x%x\n",
 					pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, cmd->device->lun,
 					hba_status, dev_status, cmd->cmnd[0]);
@@ -2443,13 +2443,13 @@ static void adpt_i2o_scsi_complete(void __iomem *reply, struct scsi_cmnd *cmd)
 		 * the card rejected it.  We should signal a retry
 		 * for a limitted number of retries.
 		 */
-		cmd->result = (DID_TIME_OUT << 16);
+		cmd->status.combined = (DID_TIME_OUT << 16);
 		printk(KERN_WARNING"%s: I2O MSG_FAIL - Device (%d,%d,%llu) tid=%d, cmd=0x%x\n",
 			pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, cmd->device->lun,
 			((struct adpt_device*)(cmd->device->hostdata))->tid, cmd->cmnd[0]);
 	}
 
-	cmd->result |= (dev_status);
+	cmd->status.combined |= (dev_status);
 
 	if(cmd->scsi_done != NULL){
 		cmd->scsi_done(cmd);
