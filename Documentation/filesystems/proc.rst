@@ -973,6 +973,7 @@ varies by architecture and compile options.  The following is from a
     AnonHugePages:   49152 kB
     ShmemHugePages:      0 kB
     ShmemPmdMapped:      0 kB
+    DmaBufTotal          0 kB
 
 MemTotal
               Total usable RAM (i.e. physical RAM minus a few reserved
@@ -1102,6 +1103,10 @@ VmallocChunk
 Percpu
               Memory allocated to the percpu allocator used to back percpu
               allocations. This stat excludes the cost of metadata.
+DmaBufTotal
+              Memory allocated by dma-buf driver.What memory is used
+	      is  arbitrary. (It might be kernel, local or even hardware vram).
+	      Details on buffers are found in debugfs if enabled.
 
 vmallocinfo
 ~~~~~~~~~~~
