@@ -213,6 +213,14 @@ void bochs_hw_setmode(struct bochs_device *bochs,
 	if (!drm_dev_enter(bochs->dev, &idx))
 		return;
 
+	if (!mode) {
+		DRM_DEBUG_DRIVER("crtc disabled\n");
+		/* set to blank mode; send twice for ar_flip_flop */
+		bochs_vga_writeb(bochs, 0x3c0, 0);
+		bochs_vga_writeb(bochs, 0x3c0, 0);
+		goto exit;
+	}
+
 	bochs->xres = mode->hdisplay;
 	bochs->yres = mode->vdisplay;
 	bochs->bpp = 32;
@@ -223,7 +231,9 @@ void bochs_hw_setmode(struct bochs_device *bochs,
 			 bochs->xres, bochs->yres, bochs->bpp,
 			 bochs->yres_virtual);
 
-	bochs_vga_writeb(bochs, 0x3c0, 0x20); /* unblank */
+	/* unblank; send twice for ar_flip_flop */
+	bochs_vga_writeb(bochs, 0x3c0, 0x20);
+	bochs_vga_writeb(bochs, 0x3c0, 0x20);
 
 	bochs_dispi_write(bochs, VBE_DISPI_INDEX_ENABLE,      0);
 	bochs_dispi_write(bochs, VBE_DISPI_INDEX_BPP,         bochs->bpp);
@@ -239,6 +249,7 @@ void bochs_hw_setmode(struct bochs_device *bochs,
 	bochs_dispi_write(bochs, VBE_DISPI_INDEX_ENABLE,
 			  VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 
+ exit:
 	drm_dev_exit(idx);
 }
 
