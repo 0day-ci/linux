@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/compiler_attributes.h>
+#include <asm/byteorder.h>
 #include <scsi/scsi_proto.h>
 
 /*
@@ -87,5 +88,33 @@ enum driver_status {
 	DRIVER_HARD	= 0x07,
 	DRIVER_SENSE	= 0x08,
 } __packed;
+
+/**
+ * SCSI status passed by LLDs to the midlayer.
+ * @combined: One of the following:
+ *	- A (driver, host, msg, status) quadruplet encoded as a 32-bit integer.
+ *	- A negative Unix error code.
+ *	- In the IDE code, a positive value that represents an error code, an
+ *	  error counter or a bitfield.
+ * @b: SCSI status code.
+ */
+union scsi_status {
+	int32_t combined;
+	struct {
+#if defined(__BIG_ENDIAN)
+		enum driver_status driver;
+		enum host_status host;
+		enum msg_byte msg;
+		enum sam_status status;
+#elif defined(__LITTLE_ENDIAN)
+		enum sam_status status;
+		enum msg_byte msg;
+		enum host_status host;
+		enum driver_status driver;
+#else
+#error Endianness?
+#endif
+	} b;
+};
 
 #endif /* _SCSI_SCSI_STATUS_H */

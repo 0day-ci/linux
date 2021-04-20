@@ -11,6 +11,7 @@
 
 #include <linux/blkdev.h>
 #include <scsi/scsi_request.h>
+#include <scsi/scsi_status.h>
 
 struct request;
 struct device;
@@ -52,7 +53,10 @@ struct bsg_job {
 	struct bsg_buffer request_payload;
 	struct bsg_buffer reply_payload;
 
-	int result;
+	union {
+		int		  result; /* do not use in new code */
+		union scsi_status status;
+	};
 	unsigned int reply_payload_rcv_len;
 
 	/* BIDI support */

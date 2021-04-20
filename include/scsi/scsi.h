@@ -39,7 +39,7 @@ enum scsi_timeouts {
  * This returns true for known good conditions that may be treated as
  * command completed normally
  */
-static inline int scsi_status_is_good(int status)
+static inline bool __scsi_status_is_good(int status)
 {
 	/*
 	 * FIXME: bit0 is listed as reserved in SCSI-2, but is
@@ -55,6 +55,20 @@ static inline int scsi_status_is_good(int status)
 		/* FIXME: this is obsolete in SAM-3 */
 		(status == SAM_STAT_COMMAND_TERMINATED));
 }
+
+/*
+ * If the 'status' argument has type int, unsigned int or union scsi_status,
+ * return the combined SCSI status. If the 'status' argument has another type,
+ * trigger a compiler error by passing a struct to a context where an integer
+ * is expected.
+ */
+#define scsi_status_to_int(status)			\
+	__builtin_choose_expr(sizeof(status) == 4,	\
+			      *(int32_t *)&(status),	\
+			      (union scsi_status){})
+
+#define scsi_status_is_good(status)				\
+	__scsi_status_is_good(scsi_status_to_int(status))
 
 
 /*
@@ -134,10 +148,10 @@ enum scsi_disposition {
  *      driver_byte = set by mid-level.
  */
 #define status_byte(result) ((enum sam_status_divided_by_two)	\
-			     (((result) >> 1) & 0x7f))
-#define msg_byte(result)    (((result) >> 8) & 0xff)
-#define host_byte(result)   (((result) >> 16) & 0xff)
-#define driver_byte(result) (((result) >> 24) & 0xff)
+			     ((scsi_status_to_int((result)) >> 1) & 0x7f))
+#define msg_byte(result)    ((scsi_status_to_int((result)) >> 8) & 0xff)
+#define host_byte(result)   ((scsi_status_to_int((result)) >> 16) & 0xff)
+#define driver_byte(result) ((scsi_status_to_int((result)) >> 24) & 0xff)
 
 #define sense_class(sense)  (((sense) >> 4) & 0x7)
 #define sense_error(sense)  ((sense) & 0xf)

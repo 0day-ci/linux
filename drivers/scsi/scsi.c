@@ -763,9 +763,18 @@ MODULE_LICENSE("GPL");
 module_param(scsi_logging_level, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(scsi_logging_level, "a bit mask of logging levels");
 
+#define TEST_STATUS ((union scsi_status){.combined = 0x01020308})
+
 static int __init init_scsi(void)
 {
 	int error;
+
+	BUILD_BUG_ON(sizeof(union scsi_status) != 4);
+	BUILD_BUG_ON(TEST_STATUS.combined != 0x01020308);
+	BUILD_BUG_ON(driver_byte(TEST_STATUS) != 1);
+	BUILD_BUG_ON(host_byte(TEST_STATUS) != 2);
+	BUILD_BUG_ON(msg_byte(TEST_STATUS) != 3);
+	BUILD_BUG_ON(status_byte(TEST_STATUS) != 4);
 
 	error = scsi_init_procfs();
 	if (error)

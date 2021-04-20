@@ -9,6 +9,9 @@
 #define SCSI_BSG_FC_H
 
 #include <linux/types.h>
+#ifdef __KERNEL__
+#include <scsi/scsi_status.h>
+#endif
 
 /*
  * This file intended to be included by both kernel and user space
@@ -291,7 +294,14 @@ struct fc_bsg_reply {
 	 *    msg and status fields. The per-msgcode reply structure
 	 *    will contain valid data.
 	 */
+#ifdef __KERNEL__
+	union {
+		__u32		  result; /* do not use in new kernel code */
+		union scsi_status status;
+	};
+#else
 	__u32 result;
+#endif
 
 	/* If there was reply_payload, how much was recevied ? */
 	__u32 reply_payload_rcv_len;

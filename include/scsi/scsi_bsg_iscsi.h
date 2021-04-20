@@ -13,6 +13,7 @@
  */
 
 #include <scsi/scsi.h>
+#include <scsi/scsi_status.h>
 
 /*
  * iSCSI Transport SGIO v4 BSG Message Support
@@ -82,7 +83,10 @@ struct iscsi_bsg_reply {
 	 * msg and status fields. The per-msgcode reply structure
 	 * will contain valid data.
 	 */
-	uint32_t result;
+	union {
+		uint32_t	  result; /* do not use in new code */
+		union scsi_status status;
+	};
 
 	/* If there was reply_payload, how much was recevied ? */
 	uint32_t reply_payload_rcv_len;

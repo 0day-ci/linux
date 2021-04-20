@@ -6,6 +6,8 @@
 
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_common.h>
+#include <scsi/scsi_status.h>
+
 struct scsi_device;
 struct Scsi_Host;
 
@@ -31,7 +33,10 @@ extern int scsi_ioctl_reset(struct scsi_device *, int __user *);
 
 struct scsi_eh_save {
 	/* saved state */
-	int result;
+	union {
+		int		  result; /* do not use in new code */
+		union scsi_status status;
+	};
 	unsigned int resid_len;
 	int eh_eflags;
 	enum dma_data_direction data_direction;

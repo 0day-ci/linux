@@ -3,6 +3,7 @@
 #define _SCSI_SCSI_REQUEST_H
 
 #include <linux/blk-mq.h>
+#include <scsi/scsi_status.h>
 
 #define BLK_MAX_CDB	16
 
@@ -10,7 +11,10 @@ struct scsi_request {
 	unsigned char	__cmd[BLK_MAX_CDB];
 	unsigned char	*cmd;
 	unsigned short	cmd_len;
-	int		result;
+	union {
+		int		  result; /* do not use in new code */
+		union scsi_status status;
+	};
 	unsigned int	sense_len;
 	unsigned int	resid_len;	/* residual count */
 	int		retries;

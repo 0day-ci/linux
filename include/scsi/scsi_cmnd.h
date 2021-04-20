@@ -140,7 +140,11 @@ struct scsi_cmnd {
 					 * obtained by scsi_malloc is guaranteed
 					 * to be at an address < 16Mb). */
 
-	int result;		/* Status code from lower level driver */
+	/* Status code from lower level driver */
+	union {
+		int		  result; /* do not use in new code. */
+		union scsi_status status;
+	};
 	int flags;		/* Command flags */
 	unsigned long state;	/* Command completion state */
 
@@ -315,23 +319,23 @@ static inline struct scsi_data_buffer *scsi_prot(struct scsi_cmnd *cmd)
 static inline void set_status_byte(struct scsi_cmnd *cmd,
 				   enum sam_status status)
 {
-	cmd->result = (cmd->result & 0xffffff00) | status;
+	cmd->status.b.status = status;
 }
 
 static inline void set_msg_byte(struct scsi_cmnd *cmd, enum msg_byte status)
 {
-	cmd->result = (cmd->result & 0xffff00ff) | (status << 8);
+	cmd->status.b.msg = status;
 }
 
 static inline void set_host_byte(struct scsi_cmnd *cmd, enum host_status status)
 {
-	cmd->result = (cmd->result & 0xff00ffff) | (status << 16);
+	cmd->status.b.host = status;
 }
 
 static inline void set_driver_byte(struct scsi_cmnd *cmd,
 				   enum driver_status status)
 {
-	cmd->result = (cmd->result & 0x00ffffff) | (status << 24);
+	cmd->status.b.driver = status;
 }
 
 static inline unsigned scsi_transfer_length(struct scsi_cmnd *scmd)
