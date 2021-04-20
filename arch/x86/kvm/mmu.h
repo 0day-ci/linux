@@ -112,6 +112,11 @@ struct kvm_page_fault {
 	gpa_t cr2_or_gpa;
 	u32 error_code;
 	bool prefault;
+
+	/* internal state */
+	gfn_t gfn;
+	bool is_tdp;
+	int max_level;
 };
 
 static inline void kvm_page_fault_init(
@@ -122,6 +127,11 @@ static inline void kvm_page_fault_init(
 	kpf->cr2_or_gpa = cr2_or_gpa;
 	kpf->error_code = error_code;
 	kpf->prefault = prefault;
+
+	/* default value */
+	kpf->is_tdp = false;
+	kpf->gfn = cr2_or_gpa >> PAGE_SHIFT;
+	kpf->max_level = PG_LEVEL_4K;
 }
 
 int kvm_tdp_page_fault(struct kvm_page_fault *kpf);

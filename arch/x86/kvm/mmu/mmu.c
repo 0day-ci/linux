@@ -3681,13 +3681,18 @@ static bool try_async_pf(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
 	return false;
 }
 
-static int direct_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
-			     bool prefault, int max_level, bool is_tdp)
+static int direct_page_fault(struct kvm_page_fault *kpf)
 {
+	struct kvm_vcpu *vcpu = kpf->vcpu;
+	gpa_t gpa = kpf->cr2_or_gpa;
+	u32 error_code = kpf->error_code;
+	bool prefault = kpf->prefault;
+	int max_level = kpf->max_level;
+	bool is_tdp = kpf->is_tdp;
 	bool write = error_code & PFERR_WRITE_MASK;
 	bool map_writable;
 
-	gfn_t gfn = gpa >> PAGE_SHIFT;
+	gfn_t gfn = kpf->gfn;
 	unsigned long mmu_seq;
 	kvm_pfn_t pfn;
 	hva_t hva;
@@ -3750,10 +3755,12 @@ static int nonpaging_page_fault(struct kvm_page_fault *kpf)
 	pgprintk("%s: gva %lx error %x\n", __func__,
 		 kpf->cr2_or_gpa, kpf->error_code);
 
+	kpf->cr2_or_gpa &= PAGE_MASK;
+	kpf->is_tdp = false;
+	kpf->max_level = PG_LEVEL_2M;
+
 	/* This path builds a PAE pagetable, we can map 2mb pages at maximum. */
-	return direct_page_fault(kpf->vcpu, kpf->cr2_or_gpa & PAGE_MASK,
-				 kpf->error_code,
-				 kpf->prefault, PG_LEVEL_2M, false);
+	return direct_page_fault(kpf);
 }
 
 int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
@@ -3791,21 +3798,22 @@ EXPORT_SYMBOL_GPL(kvm_handle_page_fault);
 
 int kvm_tdp_page_fault(struct kvm_page_fault *kpf)
 {
-	u32 gpa = kpf->cr2_or_gpa;
+	struct kvm_vcpu *vcpu = kpf->vcpu;
 	int max_level;
+	kpf->is_tdp = true;
 
 	for (max_level = KVM_MAX_HUGEPAGE_LEVEL;
 	     max_level > PG_LEVEL_4K;
 	     max_level--) {
 		int page_num = KVM_PAGES_PER_HPAGE(max_level);
-		gfn_t base = (gpa >> PAGE_SHIFT) & ~(page_num - 1);
+		gfn_t base = kpf->gfn & ~(page_num - 1);
 
-		if (kvm_mtrr_check_gfn_range_consistency(kpf->vcpu, base, page_num))
+		if (kvm_mtrr_check_gfn_range_consistency(vcpu, base, page_num))
 			break;
 	}
+	kpf->max_level = max_level;
 
-	return direct_page_fault(kpf->vcpu, gpa, kpf->error_code, kpf->prefault,
-				 max_level, true);
+	return direct_page_fault(kpf);
 }
 
 static void nonpaging_init_context(struct kvm_vcpu *vcpu,
