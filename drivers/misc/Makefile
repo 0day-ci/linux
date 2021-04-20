@@ -58,3 +58,4 @@ obj-$(CONFIG_UACCE)		+= uacce/
 obj-$(CONFIG_XILINX_SDFEC)	+= xilinx_sdfec.o
 obj-$(CONFIG_HISI_HIKEY_USB)	+= hisi_hikey_usb.o
 obj-$(CONFIG_ZYNQ_AFI)		+= zynq-afi.o
+obj-$(CONFIG_ZYNQMP_AFI)	+= zynqmp-afi.o

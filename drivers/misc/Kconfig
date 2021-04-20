@@ -458,6 +458,17 @@ config ZYNQ_AFI
 	  between PS and PL, the AXI port data path should be configured
 	  with the proper Bus-width values
 
+config ZYNQMP_AFI
+        tristate "Xilinx ZYNQMP AFI support"
+        help
+	  ZynqMP AFI driver support for writing to the AFI registers for
+	  configuring PS_PL Bus-width. Xilinx Zynq US+ MPSoC connect the
+	  PS to the programmable logic (PL) through the AXI port. This AXI
+	  port helps to establish the data path between the PS and PL.
+	  In-order to establish the proper communication path between
+	  PS and PL, the AXI port data path should be configured with
+	  the proper Bus-width values
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
