@@ -626,7 +626,7 @@ xfs_check_summary_counts(
 	 * superblock to be correct and we don't need to do anything here.
 	 * Otherwise, recalculate the summary counters.
 	 */
-	if ((!xfs_sb_version_haslazysbcount(&mp->m_sb) ||
+	if ((xfs_sb_version_haslazysbcount(&mp->m_sb) &&
 	     XFS_LAST_UNMOUNT_WAS_CLEAN(mp)) &&
 	    !xfs_fs_has_sickness(mp, XFS_SICK_FS_COUNTERS))
 		return 0;

@@ -18,6 +18,7 @@
 #include "xfs_trace.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
+#include "xfs_btree.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_log.h"
@@ -841,6 +842,55 @@ xfs_sb_mount_common(
 	mp->m_ag_max_usable = xfs_alloc_ag_max_usable(mp);
 }
 
+static int
+xfs_fixup_agf_btreeblks(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	struct xfs_buf		*agfbp,
+	xfs_agnumber_t		agno)
+{
+	struct xfs_btree_cur	*cur;
+	struct xfs_perag	*pag = agfbp->b_pag;
+	struct xfs_agf		*agf = agfbp->b_addr;
+	xfs_agblock_t		btreeblks, blocks;
+	int			error;
+
+	cur = xfs_allocbt_init_cursor(mp, tp, agfbp, agno, XFS_BTNUM_BNO);
+	error = xfs_btree_count_blocks(cur, &blocks);
+	if (error)
+		goto err;
+	xfs_btree_del_cursor(cur, error);
+	btreeblks = blocks - 1;
+
+	cur = xfs_allocbt_init_cursor(mp, tp, agfbp, agno, XFS_BTNUM_CNT);
+	error = xfs_btree_count_blocks(cur, &blocks);
+	if (error)
+		goto err;
+	xfs_btree_del_cursor(cur, error);
+	btreeblks += blocks - 1;
+
+	/*
+	 * although rmapbt doesn't exist in v4 fses, but it'd be better
+	 * to turn it as a generic helper.
+	 */
+	if (xfs_sb_version_hasrmapbt(&mp->m_sb)) {
+		cur = xfs_rmapbt_init_cursor(mp, tp, agfbp, agno);
+		error = xfs_btree_count_blocks(cur, &blocks);
+		if (error)
+			goto err;
+		xfs_btree_del_cursor(cur, error);
+		btreeblks += blocks - 1;
+	}
+
+	agf->agf_btreeblks = cpu_to_be32(btreeblks);
+	pag->pagf_btreeblks = btreeblks;
+	xfs_alloc_log_agf(tp, agfbp, XFS_AGF_BTREEBLKS);
+	return 0;
+err:
+	xfs_btree_del_cursor(cur, error);
+	return error;
+}
+
 /*
  * xfs_initialize_perag_data
  *
@@ -864,27 +914,51 @@ xfs_initialize_perag_data(
 	uint64_t	btree = 0;
 	uint64_t	fdblocks;
 	int		error = 0;
+	bool		conv = !(mp->m_flags & XFS_MOUNT_RDONLY) &&
+				!xfs_sb_version_haslazysbcount(sbp);
+
+	if (conv)
+		xfs_warn(mp, "enabling lazy-counters...");
 
 	for (index = 0; index < agcount; index++) {
+		struct xfs_trans	*tp = NULL;
+		struct xfs_buf		*agfbp;
+
+		if (conv) {
+			error = xfs_trans_alloc(mp, &M_RES(mp)->tr_sb,
+					0, 0, 0, &tp);
+			if (error)
+				return error;
+		}
+
 		/*
-		 * read the agf, then the agi. This gets us
+		 * read the agi, then the agf. This gets us
 		 * all the information we need and populates the
 		 * per-ag structures for us.
 		 */
-		error = xfs_alloc_pagf_init(mp, NULL, index, 0);
-		if (error)
+		error = xfs_ialloc_pagi_init(mp, tp, index);
+		if (error) {
+err_out:
+			if (tp)
+				xfs_trans_cancel(tp);
 			return error;
+		}
 
-		error = xfs_ialloc_pagi_init(mp, NULL, index);
+		error = xfs_alloc_read_agf(mp, tp, index, 0, &agfbp);
 		if (error)
-			return error;
-		pag = xfs_perag_get(mp, index);
+			goto err_out;
+		pag = agfbp->b_pag;
 		ifree += pag->pagi_freecount;
 		ialloc += pag->pagi_count;
 		bfree += pag->pagf_freeblks;
 		bfreelst += pag->pagf_flcount;
+		if (tp) {
+			error = xfs_fixup_agf_btreeblks(mp, tp, agfbp, index);
+			xfs_trans_commit(tp);
+		} else {
+			xfs_buf_relse(agfbp);
+		}
 		btree += pag->pagf_btreeblks;
-		xfs_perag_put(pag);
 	}
 	fdblocks = bfree + bfreelst + btree;
 
@@ -900,6 +974,11 @@ xfs_initialize_perag_data(
 		goto out;
 	}
 
+	if (conv) {
+		xfs_sb_version_addlazysbcount(sbp);
+		mp->m_update_sb = true;
+		xfs_warn(mp, "lazy-counters has been enabled.");
+	}
 	/* Overwrite incore superblock counters with just-read data */
 	spin_lock(&mp->m_sb_lock);
 	sbp->sb_ifree = ifree;

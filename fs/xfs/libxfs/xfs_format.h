@@ -385,6 +385,12 @@ static inline bool xfs_sb_version_haslazysbcount(struct xfs_sb *sbp)
 		(sbp->sb_features2 & XFS_SB_VERSION2_LAZYSBCOUNTBIT));
 }
 
+static inline void xfs_sb_version_addlazysbcount(struct xfs_sb *sbp)
+{
+	sbp->sb_versionnum |= XFS_SB_VERSION_MOREBITSBIT;
+	sbp->sb_features2 |= XFS_SB_VERSION2_LAZYSBCOUNTBIT;
+}
+
 static inline bool xfs_sb_version_hasattr2(struct xfs_sb *sbp)
 {
 	return (XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_5) ||

@@ -1678,6 +1678,11 @@ xfs_remount_rw(
 	}
 
 	mp->m_flags &= ~XFS_MOUNT_RDONLY;
+	if (!xfs_sb_version_haslazysbcount(sbp)) {
+		error = xfs_initialize_perag_data(mp, sbp->sb_agcount);
+		if (error)
+			return error;
+	}
 
 	/*
 	 * If this is the first remount to writeable state we might have some
