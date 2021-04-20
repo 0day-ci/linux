@@ -7,10 +7,11 @@
 #include <linux/mutex.h>
 #include <linux/kref.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_status.h>
 
 /* Descriptor for analyzed sense data */
 struct st_cmdstatus {
-	int midlevel_result;
+	union scsi_status midlevel_status;
 	struct scsi_sense_hdr sense_hdr;
 	int have_sense;
 	int residual;
@@ -27,7 +28,7 @@ struct scsi_tape;
 struct st_request {
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	unsigned char sense[SCSI_SENSE_BUFFERSIZE];
-	int result;
+	union scsi_status status;
 	struct scsi_tape *stp;
 	struct completion *waiting;
 	struct bio *bio;

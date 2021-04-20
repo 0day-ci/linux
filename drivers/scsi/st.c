@@ -360,13 +360,13 @@ static void st_analyze_sense(struct st_request *SRpnt, struct st_cmdstatus *s)
 /* Convert the result to success code */
 static int st_chk_result(struct scsi_tape *STp, struct st_request * SRpnt)
 {
-	int result = SRpnt->result;
+	union scsi_status result = SRpnt->status;
 	u8 scode;
 	DEB(const char *stp;)
 	char *name = tape_name(STp);
 	struct st_cmdstatus *cmdstatp;
 
-	if (!result)
+	if (!result.combined)
 		return 0;
 
 	cmdstatp = &STp->buffer->cmdstat;
@@ -380,7 +380,7 @@ static int st_chk_result(struct scsi_tape *STp, struct st_request * SRpnt)
 	DEB(
 	if (debugging) {
 		st_printk(ST_DEB_MSG, STp,
-			    "Error: %x, cmd: %x %x %x %x %x %x\n", result,
+			    "Error: %x, cmd: %x %x %x %x %x %x\n", result.combined,
 			    SRpnt->cmd[0], SRpnt->cmd[1], SRpnt->cmd[2],
 			    SRpnt->cmd[3], SRpnt->cmd[4], SRpnt->cmd[5]);
 		if (cmdstatp->have_sense)
@@ -390,8 +390,9 @@ static int st_chk_result(struct scsi_tape *STp, struct st_request * SRpnt)
 	if (!debugging) { /* Abnormal conditions for tape */
 		if (!cmdstatp->have_sense)
 			st_printk(KERN_WARNING, STp,
-			       "Error %x (driver bt 0x%x, host bt 0x%x).\n",
-			       result, driver_byte(result), host_byte(result));
+				"Error %x (driver bt 0x%x, host bt 0x%x).\n",
+				result.combined, driver_byte(result),
+				host_byte(result));
 		else if (cmdstatp->have_sense &&
 			 scode != NO_SENSE &&
 			 scode != RECOVERED_ERROR &&
@@ -484,7 +485,7 @@ static void st_do_stats(struct scsi_tape *STp, struct request *req)
 		atomic64_add(ktime_to_ns(now), &STp->stats->tot_write_time);
 		atomic64_add(ktime_to_ns(now), &STp->stats->tot_io_time);
 		atomic64_inc(&STp->stats->write_cnt);
-		if (scsi_req(req)->result) {
+		if (scsi_req(req)->status.combined) {
 			atomic64_add(atomic_read(&STp->stats->last_write_size)
 				- STp->buffer->cmdstat.residual,
 				&STp->stats->write_byte_cnt);
@@ -498,7 +499,7 @@ static void st_do_stats(struct scsi_tape *STp, struct request *req)
 		atomic64_add(ktime_to_ns(now), &STp->stats->tot_read_time);
 		atomic64_add(ktime_to_ns(now), &STp->stats->tot_io_time);
 		atomic64_inc(&STp->stats->read_cnt);
-		if (scsi_req(req)->result) {
+		if (scsi_req(req)->status.combined) {
 			atomic64_add(atomic_read(&STp->stats->last_read_size)
 				- STp->buffer->cmdstat.residual,
 				&STp->stats->read_byte_cnt);
@@ -522,7 +523,7 @@ static void st_scsi_execute_end(struct request *req, blk_status_t status)
 	struct scsi_tape *STp = SRpnt->stp;
 	struct bio *tmp;
 
-	STp->buffer->cmdstat.midlevel_result = SRpnt->result = rq->result;
+	STp->buffer->cmdstat.midlevel_status = SRpnt->status = rq->status;
 	STp->buffer->cmdstat.residual = rq->resid_len;
 
 	st_do_stats(STp, req);
@@ -718,7 +719,7 @@ static int write_behind_check(struct scsi_tape * STp)
 	DEB(if (debugging && retval)
 		    st_printk(ST_DEB_MSG, STp,
 				"Async write error %x, return value %d.\n",
-				STbuffer->cmdstat.midlevel_result, retval);) /* end DEB */
+				STbuffer->cmdstat.midlevel_status.combined, retval);) /* end DEB */
 
 	return retval;
 }
@@ -752,7 +753,7 @@ static int cross_eof(struct scsi_tape * STp, int forward)
 	st_release_request(SRpnt);
 	SRpnt = NULL;
 
-	if ((STp->buffer)->cmdstat.midlevel_result != 0)
+	if ((STp->buffer)->cmdstat.midlevel_status.combined != 0)
 		st_printk(KERN_ERR, STp,
 			  "Stepping over filemark %s failed.\n",
 			  forward ? "forward" : "backward");
@@ -1118,7 +1119,7 @@ static int check_tape(struct scsi_tape *STp, struct file *filp)
 			goto err_out;
 		}
 
-		if (!SRpnt->result && !STp->buffer->cmdstat.have_sense) {
+		if (!SRpnt->status.combined && !STp->buffer->cmdstat.have_sense) {
 			STp->max_block = ((STp->buffer)->b_data[1] << 16) |
 			    ((STp->buffer)->b_data[2] << 8) | (STp->buffer)->b_data[3];
 			STp->min_block = ((STp->buffer)->b_data[4] << 8) |
