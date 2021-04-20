@@ -16,6 +16,8 @@
 #include <stdbool.h>
 #include <sys/types.h>  // for size_t
 #include <linux/bpf.h>
+#include <linux/pkt_sched.h>
+#include <linux/tc_act/tc_bpf.h>
 
 #include "libbpf_common.h"
 
@@ -774,6 +776,48 @@ LIBBPF_API struct bpf_linker *bpf_linker__new(const char *filename, struct bpf_l
 LIBBPF_API int bpf_linker__add_file(struct bpf_linker *linker, const char *filename);
 LIBBPF_API int bpf_linker__finalize(struct bpf_linker *linker);
 LIBBPF_API void bpf_linker__free(struct bpf_linker *linker);
+
+/* Convenience macros for the clsact attach hooks */
+#define BPF_TC_CLSACT_INGRESS TC_H_MAKE(TC_H_CLSACT, TC_H_MIN_INGRESS)
+#define BPF_TC_CLSACT_EGRESS TC_H_MAKE(TC_H_CLSACT, TC_H_MIN_EGRESS)
+
+struct bpf_tc_opts {
+	size_t sz;
+	__u32 handle;
+	__u32 class_id;
+	__u16 priority;
+	bool replace;
+	size_t :0;
+};
+
+#define bpf_tc_opts__last_field replace
+
+/* Acts as a handle for an attached filter */
+struct bpf_tc_attach_id {
+	__u32 handle;
+	__u16 priority;
+};
+
+struct bpf_tc_info {
+	struct bpf_tc_attach_id id;
+	__u16 protocol;
+	__u32 chain_index;
+	__u32 prog_id;
+	__u8 tag[BPF_TAG_SIZE];
+	__u32 class_id;
+	__u32 bpf_flags;
+	__u32 bpf_flags_gen;
+};
+
+/* id is out parameter that will be written to, it must not be NULL */
+LIBBPF_API int bpf_tc_attach(int fd, __u32 ifindex, __u32 parent_id,
+			     const struct bpf_tc_opts *opts,
+			     struct bpf_tc_attach_id *id);
+LIBBPF_API int bpf_tc_detach(__u32 ifindex, __u32 parent_id,
+			     const struct bpf_tc_attach_id *id);
+LIBBPF_API int bpf_tc_get_info(__u32 ifindex, __u32 parent_id,
+			       const struct bpf_tc_attach_id *id,
+			       struct bpf_tc_info *info);
 
 #ifdef __cplusplus
 } /* extern "C" */
