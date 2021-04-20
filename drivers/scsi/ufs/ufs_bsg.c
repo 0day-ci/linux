@@ -152,7 +152,7 @@ static int ufs_bsg_request(struct bsg_job *job)
 	kfree(desc_buff);
 
 out:
-	bsg_reply->result = ret;
+	bsg_reply->status.combined = ret;
 	job->reply_len = sizeof(struct ufs_bsg_reply);
 	/* complete the job here only if no error */
 	if (ret == 0)

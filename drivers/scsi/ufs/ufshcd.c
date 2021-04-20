@@ -4933,7 +4933,7 @@ ufshcd_scsi_cmd_status(struct ufshcd_lrb *lrbp, enum sam_status scsi_status)
 static inline int
 ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 {
-	int result = 0;
+	union scsi_status result;
 	int ocs;
 
 	/* overall command status of utrd */
@@ -4951,7 +4951,7 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 		switch (ufshcd_get_req_rsp(lrbp->ucd_rsp_ptr)) {
 		case UPIU_TRANSACTION_RESPONSE:
 			/* Propagate the SCSI status to the SCSI midlayer. */
-			result = ufshcd_scsi_cmd_status(lrbp,
+			result.combined = ufshcd_scsi_cmd_status(lrbp,
 				ufshcd_get_rsp_upiu_result(lrbp->ucd_rsp_ptr) &
 				MASK_SCSI_STATUS);
 
@@ -4981,23 +4981,23 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 			break;
 		case UPIU_TRANSACTION_REJECT_UPIU:
 			/* TODO: handle Reject UPIU Response */
-			result = DID_ERROR << 16;
+			result.combined = DID_ERROR << 16;
 			dev_err(hba->dev,
 				"Reject UPIU not fully implemented\n");
 			break;
 		default:
 			dev_err(hba->dev,
 				"Unexpected request response code = %x\n",
-				result);
-			result = DID_ERROR << 16;
+				result.combined);
+			result.combined = DID_ERROR << 16;
 			break;
 		}
 		break;
 	case OCS_ABORTED:
-		result |= DID_ABORT << 16;
+		result.combined |= DID_ABORT << 16;
 		break;
 	case OCS_INVALID_COMMAND_STATUS:
-		result |= DID_REQUEUE << 16;
+		result.combined |= DID_REQUEUE << 16;
 		break;
 	case OCS_INVALID_CMD_TABLE_ATTR:
 	case OCS_INVALID_PRDT_ATTR:
@@ -5009,7 +5009,7 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	case OCS_INVALID_CRYPTO_CONFIG:
 	case OCS_GENERAL_CRYPTO_ERROR:
 	default:
-		result |= DID_ERROR << 16;
+		result.combined |= DID_ERROR << 16;
 		dev_err(hba->dev,
 				"OCS error from controller = %x for tag %d\n",
 				ocs, lrbp->task_tag);
@@ -5021,7 +5021,7 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	if ((host_byte(result) != DID_OK) &&
 	    (host_byte(result) != DID_REQUEUE) && !hba->silence_err_logs)
 		ufshcd_print_trs(hba, 1 << lrbp->task_tag, true);
-	return result;
+	return result.combined;
 }
 
 /**
@@ -5083,7 +5083,7 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			ufshcd_add_command_trace(hba, index, UFS_CMD_COMP);
 			result = ufshcd_transfer_rsp_status(hba, lrbp);
 			scsi_dma_unmap(cmd);
-			cmd->result = result;
+			cmd->status.combined = result;
 			/* Mark completed command as NULL in LRB */
 			lrbp->cmd = NULL;
 			/* Do not touch lrbp after scsi done */
@@ -8437,6 +8437,7 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 	struct scsi_sense_hdr sshdr;
 	struct scsi_device *sdp;
 	unsigned long flags;
+	union scsi_status start_stop_res;
 	int ret;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
@@ -8471,13 +8472,15 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 	 * callbacks hence set the RQF_PM flag so that it doesn't resume the
 	 * already suspended childs.
 	 */
-	ret = scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
+	start_stop_res.combined =
+		scsi_execute(sdp, cmd, DMA_NONE, NULL, 0, NULL, &sshdr,
 			START_STOP_TIMEOUT, 0, 0, RQF_PM, NULL);
+	ret = start_stop_res.combined;
 	if (ret) {
 		sdev_printk(KERN_WARNING, sdp,
 			    "START_STOP failed for power mode: %d, result %x\n",
 			    pwr_mode, ret);
-		if (driver_byte(ret) == DRIVER_SENSE)
+		if (driver_byte(start_stop_res) == DRIVER_SENSE)
 			scsi_print_sense_hdr(sdp, NULL, &sshdr);
 	}
 
