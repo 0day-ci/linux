@@ -533,7 +533,7 @@ netdev_tx_t efx_hard_start_xmit(struct sk_buff *skb,
 		return efx_ptp_tx(efx, skb);
 	}
 
-	tx_queue = efx_get_tx_queue(efx, index, type);
+	tx_queue = efx_get_tx_queue_by_type(efx, index, type);
 	if (WARN_ON_ONCE(!tx_queue)) {
 		/* We don't have a TXQ of the right type.
 		 * This should never happen, as we don't advertise offload

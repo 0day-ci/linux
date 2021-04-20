@@ -1091,7 +1091,7 @@ static void efx_ptp_xmit_skb_queue(struct efx_nic *efx, struct sk_buff *skb)
 	u8 type = efx_tx_csum_type_skb(skb);
 	struct efx_tx_queue *tx_queue;
 
-	tx_queue = efx_channel_get_tx_queue(ptp_data->channel, type);
+	tx_queue = efx_channel_get_tx_queue_by_type(ptp_data->channel, type);
 	if (tx_queue && tx_queue->timestamping) {
 		efx_enqueue_skb(tx_queue, skb);
 	} else {

@@ -1533,18 +1533,33 @@ static inline unsigned int efx_channel_num_tx_queues(struct efx_channel *channel
 }
 
 static inline struct efx_tx_queue *
-efx_channel_get_tx_queue(struct efx_channel *channel, unsigned int type)
+efx_channel_get_tx_queue_by_type(struct efx_channel *channel, unsigned int type)
 {
 	EFX_WARN_ON_ONCE_PARANOID(type >= EFX_TXQ_TYPES);
 	return channel->tx_queue_by_type[type];
 }
 
 static inline struct efx_tx_queue *
-efx_get_tx_queue(struct efx_nic *efx, unsigned int index, unsigned int type)
+efx_get_tx_queue_by_type(struct efx_nic *efx, unsigned int index, unsigned int type)
 {
 	struct efx_channel *channel = efx_get_tx_channel(efx, index);
 
-	return efx_channel_get_tx_queue(channel, type);
+	return efx_channel_get_tx_queue_by_type(channel, type);
+}
+
+static inline struct efx_tx_queue *
+efx_channel_get_tx_queue(struct efx_channel *channel, unsigned int label)
+{
+	EFX_WARN_ON_ONCE_PARANOID(label >= EFX_MAX_TXQ_PER_CHANNEL);
+	return &channel->tx_queue[label];
+}
+
+static inline struct efx_tx_queue *
+efx_get_tx_queue(struct efx_nic *efx, unsigned int index, unsigned int label)
+{
+	struct efx_channel *channel = efx_get_tx_channel(efx, index);
+
+	return efx_channel_get_tx_queue(channel, label);
 }
 
 /* Iterate over all TX queues belonging to a channel */
