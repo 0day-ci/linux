@@ -313,7 +313,7 @@ static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
 
 static bool dev_is_untrusted(struct device *dev)
 {
-	return dev_is_pci(dev) && to_pci_dev(dev)->untrusted;
+	return dev_is_pci(dev) && to_pci_dev(dev)->external;
 }
 
 /**
