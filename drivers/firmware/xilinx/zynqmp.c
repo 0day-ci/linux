@@ -714,6 +714,19 @@ int zynqmp_pm_read_pggs(u32 index, u32 *value)
 EXPORT_SYMBOL_GPL(zynqmp_pm_read_pggs);
 
 /**
+ * zynqmp_pm_afi()  - PM API for setting the PS-PL bus width
+ * @index:	Register index value
+ * @value:	value to be written into the register
+ *
+ * Return:      Returns status, either success or error+reason
+ */
+int zynqmp_pm_afi(u32 index, u32 value)
+{
+	return zynqmp_pm_invoke_fn(PM_IOCTL, 0, IOCTL_AFI, index, value, NULL);
+}
+EXPORT_SYMBOL_GPL(zynqmp_pm_afi);
+
+/**
  * zynqmp_pm_set_boot_health_status() - PM API for setting healthy boot status
  * @value:	Status value to be written
  *
