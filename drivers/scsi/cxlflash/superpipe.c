@@ -336,7 +336,7 @@ static int read_cap16(struct scsi_device *sdev, struct llun_info *lli)
 	u8 *cmd_buf = NULL;
 	u8 *scsi_cmd = NULL;
 	int rc = 0;
-	int result = 0;
+	union scsi_status result;
 	int retry_cnt = 0;
 	u32 to = CMD_TIMEOUT * HZ;
 
@@ -357,26 +357,26 @@ retry:
 
 	/* Drop the ioctl read semahpore across lengthy call */
 	up_read(&cfg->ioctl_rwsem);
-	result = scsi_execute(sdev, scsi_cmd, DMA_FROM_DEVICE, cmd_buf,
+	result.combined = scsi_execute(sdev, scsi_cmd, DMA_FROM_DEVICE, cmd_buf,
 			      CMD_BUFSIZE, NULL, &sshdr, to, CMD_RETRIES,
 			      0, 0, NULL);
 	down_read(&cfg->ioctl_rwsem);
 	rc = check_state(cfg);
 	if (rc) {
 		dev_err(dev, "%s: Failed state result=%08x\n",
-			__func__, result);
+			__func__, result.combined);
 		rc = -ENODEV;
 		goto out;
 	}
 
 	if (driver_byte(result) == DRIVER_SENSE) {
-		result &= ~(0xFF<<24); /* DRIVER_SENSE is not an error */
-		if (result & SAM_STAT_CHECK_CONDITION) {
+		result.b.driver = DRIVER_OK; /* DRIVER_SENSE is not an error */
+		if (result.b.status & SAM_STAT_CHECK_CONDITION) {
 			switch (sshdr.sense_key) {
 			case NO_SENSE:
 			case RECOVERED_ERROR:
 			case NOT_READY:
-				result &= ~SAM_STAT_CHECK_CONDITION;
+				result.b.status &= ~SAM_STAT_CHECK_CONDITION;
 				break;
 			case UNIT_ATTENTION:
 				switch (sshdr.asc) {
@@ -398,9 +398,9 @@ retry:
 		}
 	}
 
-	if (result) {
+	if (result.combined) {
 		dev_err(dev, "%s: command failed, result=%08x\n",
-			__func__, result);
+			__func__, result.combined);
 		rc = -EIO;
 		goto out;
 	}
