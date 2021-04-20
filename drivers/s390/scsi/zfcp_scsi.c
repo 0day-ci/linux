@@ -71,12 +71,12 @@ int zfcp_scsi_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scpnt)
 	int    status, scsi_result, ret;
 
 	/* reset the status for this request */
-	scpnt->result = 0;
+	scpnt->status.combined = 0;
 	scpnt->host_scribble = NULL;
 
 	scsi_result = fc_remote_port_chkready(rport);
 	if (unlikely(scsi_result)) {
-		scpnt->result = scsi_result;
+		scpnt->status.combined = scsi_result;
 		zfcp_dbf_scsi_fail_send(scpnt);
 		scpnt->scsi_done(scpnt);
 		return 0;
@@ -859,7 +859,7 @@ void zfcp_scsi_dif_sense_error(struct scsi_cmnd *scmd, int ascq)
 	scsi_build_sense_buffer(1, scmd->sense_buffer,
 				ILLEGAL_REQUEST, 0x10, ascq);
 	set_driver_byte(scmd, DRIVER_SENSE);
-	scmd->result |= SAM_STAT_CHECK_CONDITION;
+	scmd->status.combined |= SAM_STAT_CHECK_CONDITION;
 	set_host_byte(scmd, DID_SOFT_ERROR);
 }
 

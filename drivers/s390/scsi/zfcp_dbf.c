@@ -643,7 +643,7 @@ void zfcp_dbf_scsi_common(char *tag, int level, struct scsi_device *sdev,
 	memcpy(rec->tag, tag, ZFCP_DBF_TAG_LEN);
 	rec->id = ZFCP_DBF_SCSI_CMND;
 	if (sc) {
-		rec->scsi_result = sc->result;
+		rec->scsi_result = sc->status.combined;
 		rec->scsi_retries = sc->retries;
 		rec->scsi_allowed = sc->allowed;
 		rec->scsi_id = sc->device->id;

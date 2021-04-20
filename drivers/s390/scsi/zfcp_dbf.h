@@ -402,7 +402,7 @@ void _zfcp_dbf_scsi(char *tag, int level, struct scsi_cmnd *scmd,
 static inline
 void zfcp_dbf_scsi_result(struct scsi_cmnd *scmd, struct zfcp_fsf_req *req)
 {
-	if (scmd->result != 0)
+	if (scmd->status.combined != 0)
 		_zfcp_dbf_scsi("rsl_err", 3, scmd, req);
 	else if (scmd->retries > 0)
 		_zfcp_dbf_scsi("rsl_ret", 4, scmd, req);
