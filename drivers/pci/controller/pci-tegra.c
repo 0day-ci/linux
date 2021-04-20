@@ -1802,12 +1802,18 @@ static void tegra_pcie_enable_msi(struct tegra_pcie *pcie)
 {
 	const struct tegra_pcie_soc *soc = pcie->soc;
 	struct tegra_msi *msi = &pcie->msi;
-	u32 reg;
+	u32 reg, msi_state[INT_PCI_MSI_NR / 32];
+	int i;
 
 	afi_writel(pcie, msi->phys >> soc->msi_base_shift, AFI_MSI_FPCI_BAR_ST);
 	afi_writel(pcie, msi->phys, AFI_MSI_AXI_BAR_ST);
 	/* this register is in 4K increments */
 	afi_writel(pcie, 1, AFI_MSI_BAR_SZ);
+
+	/* Restore the MSI allocation state */
+	bitmap_to_arr32(msi_state, msi->used, INT_PCI_MSI_NR);
+	for (i = 0; i < ARRAY_SIZE(msi_state); i++)
+		afi_writel(pcie, msi_state[i], AFI_MSI_EN_VEC(i));
 
 	/* and unmask the MSI interrupt */
 	reg = afi_readl(pcie, AFI_INTR_MASK);
