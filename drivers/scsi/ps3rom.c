@@ -235,7 +235,7 @@ static int ps3rom_queuecommand_lck(struct scsi_cmnd *cmd,
 
 	if (res) {
 		memset(cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
-		cmd->result = res;
+		cmd->status.combined = res;
 		cmd->sense_buffer[0] = 0x70;
 		cmd->sense_buffer[2] = ILLEGAL_REQUEST;
 		priv->curr_cmd = NULL;
@@ -302,7 +302,7 @@ static irqreturn_t ps3rom_interrupt(int irq, void *data)
 
 			scsi_set_resid(cmd, scsi_bufflen(cmd) - len);
 		}
-		cmd->result = DID_OK << 16;
+		cmd->status.combined = DID_OK << 16;
 		goto done;
 	}
 
@@ -310,17 +310,17 @@ static irqreturn_t ps3rom_interrupt(int irq, void *data)
 		/* SCSI spec says request sense should never get error */
 		dev_err(&dev->sbd.core, "%s:%u: end error without autosense\n",
 			__func__, __LINE__);
-		cmd->result = DID_ERROR << 16 | SAM_STAT_CHECK_CONDITION;
+		cmd->status.combined = DID_ERROR << 16 | SAM_STAT_CHECK_CONDITION;
 		goto done;
 	}
 
 	if (decode_lv1_status(status, &sense_key, &asc, &ascq)) {
-		cmd->result = DID_ERROR << 16;
+		cmd->status.combined = DID_ERROR << 16;
 		goto done;
 	}
 
 	scsi_build_sense_buffer(0, cmd->sense_buffer, sense_key, asc, ascq);
-	cmd->result = SAM_STAT_CHECK_CONDITION;
+	cmd->status.combined = SAM_STAT_CHECK_CONDITION;
 
 done:
 	priv->curr_cmd = NULL;
