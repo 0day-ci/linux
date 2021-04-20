@@ -1344,7 +1344,8 @@ sg_rq_end_io(struct request *rq, blk_status_t status)
 	unsigned long iflags;
 	unsigned int ms;
 	char *sense;
-	int result, resid, done = 1;
+	union scsi_status result;
+	int resid, done = 1;
 
 	if (WARN_ON(srp->done != 0))
 		return;
@@ -1358,20 +1359,20 @@ sg_rq_end_io(struct request *rq, blk_status_t status)
 		pr_info("%s: device detaching\n", __func__);
 
 	sense = req->sense;
-	result = req->result;
+	result = req->status;
 	resid = req->resid_len;
 
 	SCSI_LOG_TIMEOUT(4, sg_printk(KERN_INFO, sdp,
 				      "sg_cmd_done: pack_id=%d, res=0x%x\n",
-				      srp->header.pack_id, result));
+				      srp->header.pack_id, result.combined));
 	srp->header.resid = resid;
 	ms = jiffies_to_msecs(jiffies);
 	srp->header.duration = (ms > srp->header.duration) ?
 				(ms - srp->header.duration) : 0;
-	if (0 != result) {
+	if (0 != result.combined) {
 		struct scsi_sense_hdr sshdr;
 
-		srp->header.status = 0xff & result;
+		srp->header.status = 0xff & result.combined;
 		srp->header.masked_status = status_byte(result);
 		srp->header.msg_status = msg_byte(result);
 		srp->header.host_status = host_byte(result);
