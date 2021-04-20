@@ -2037,7 +2037,7 @@ static int _mmc_flush_cache(struct mmc_card *card)
 {
 	int err = 0;
 
-	if (card->ext_csd.cache_size > 0 && card->ext_csd.cache_ctrl & 1) {
+	if (mmc_flush_allowed(card)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_FLUSH_CACHE, 1,
 				 CACHE_FLUSH_TIMEOUT_MS);
