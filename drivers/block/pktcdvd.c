@@ -723,7 +723,7 @@ static int pkt_generic_packet(struct pktcdvd_device *pd, struct packet_command *
 		rq->rq_flags |= RQF_QUIET;
 
 	blk_execute_rq(pd->bdev->bd_disk, rq, 0);
-	if (scsi_req(rq)->result)
+	if (scsi_req(rq)->status.combined)
 		ret = -EIO;
 out:
 	blk_put_request(rq);
