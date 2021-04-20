@@ -1010,7 +1010,7 @@ void esas2r_complete_request_cb(struct esas2r_adapter *a,
 void esas2r_reset_detected(struct esas2r_adapter *a);
 void esas2r_target_state_changed(struct esas2r_adapter *ha, u16 targ_id,
 				 u8 state);
-int esas2r_req_status_to_error(u8 req_stat);
+enum host_status esas2r_req_status_to_error(u8 req_stat);
 void esas2r_kill_adapter(int i);
 void esas2r_free_request(struct esas2r_adapter *a, struct esas2r_request *rq);
 struct esas2r_request *esas2r_alloc_request(struct esas2r_adapter *a);

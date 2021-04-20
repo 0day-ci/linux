@@ -824,10 +824,10 @@ int esas2r_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	unsigned bufflen;
 
 	/* Assume success, if it fails we will fix the result later. */
-	cmd->result = DID_OK << 16;
+	cmd->status.combined = DID_OK << 16;
 
 	if (unlikely(test_bit(AF_DEGRADED_MODE, &a->flags))) {
-		cmd->result = DID_NO_CONNECT << 16;
+		cmd->status.combined = DID_NO_CONNECT << 16;
 		cmd->scsi_done(cmd);
 		return 0;
 	}
@@ -984,7 +984,7 @@ int esas2r_eh_abort(struct scsi_cmnd *cmd)
 	esas2r_log(ESAS2R_LOG_INFO, "eh_abort (%p)", cmd);
 
 	if (test_bit(AF_DEGRADED_MODE, &a->flags)) {
-		cmd->result = DID_ABORT << 16;
+		cmd->status.combined = DID_ABORT << 16;
 
 		scsi_set_resid(cmd, 0);
 
@@ -1050,7 +1050,7 @@ check_active_queue:
 	 * freed it, or we didn't find it at all.  Either way, success!
 	 */
 
-	cmd->result = DID_ABORT << 16;
+	cmd->status.combined = DID_ABORT << 16;
 
 	scsi_set_resid(cmd, 0);
 
@@ -1523,7 +1523,7 @@ void esas2r_complete_request_cb(struct esas2r_adapter *a,
 			     rq->func_rsp.scsi_rsp.scsi_stat,
 			     rq->cmd);
 
-		rq->cmd->result =
+		rq->cmd->status.combined =
 			((esas2r_req_status_to_error(rq->req_stat) << 16)
 			 | (rq->func_rsp.scsi_rsp.scsi_stat & STATUS_MASK));
 
@@ -1873,7 +1873,7 @@ void esas2r_target_state_changed(struct esas2r_adapter *a, u16 targ_id,
 }
 
 /* Translate status to a Linux SCSI mid-layer error code */
-int esas2r_req_status_to_error(u8 req_stat)
+enum host_status esas2r_req_status_to_error(u8 req_stat)
 {
 	switch (req_stat) {
 	case RS_OVERRUN:
