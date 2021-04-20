@@ -8,6 +8,7 @@
 #include <linux/percpu-refcount.h>
 #include <linux/semaphore.h>     /* struct semaphore */
 #include <linux/completion.h>
+#include <scsi/scsi_proto.h>
 
 #define TARGET_CORE_VERSION		"v5.0"
 
@@ -453,7 +454,7 @@ enum target_core_dif_check {
 
 struct se_cmd {
 	/* SAM response code being sent to initiator */
-	u8			scsi_status;
+	enum sam_status		scsi_status;
 	u8			scsi_asc;
 	u8			scsi_ascq;
 	u16			scsi_sense_length;

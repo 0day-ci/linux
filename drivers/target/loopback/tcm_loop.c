@@ -550,7 +550,7 @@ static int tcm_loop_write_pending(struct se_cmd *se_cmd)
 }
 
 static int tcm_loop_queue_data_or_status(const char *func,
-		struct se_cmd *se_cmd, u8 scsi_status)
+		struct se_cmd *se_cmd, enum sam_status scsi_status)
 {
 	struct tcm_loop_cmd *tl_cmd = container_of(se_cmd,
 				struct tcm_loop_cmd, tl_se_cmd);

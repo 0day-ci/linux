@@ -855,7 +855,7 @@ static bool target_cmd_interrupted(struct se_cmd *cmd)
 }
 
 /* May be called from interrupt context so must not sleep. */
-void target_complete_cmd(struct se_cmd *cmd, u8 scsi_status)
+void target_complete_cmd(struct se_cmd *cmd, enum sam_status scsi_status)
 {
 	struct se_wwn *wwn = cmd->se_sess->se_tpg->se_tpg_wwn;
 	int success, cpu;
@@ -910,7 +910,8 @@ void target_set_cmd_data_length(struct se_cmd *cmd, int length)
 }
 EXPORT_SYMBOL(target_set_cmd_data_length);
 
-void target_complete_cmd_with_length(struct se_cmd *cmd, u8 scsi_status, int length)
+void target_complete_cmd_with_length(struct se_cmd *cmd,
+				     enum sam_status scsi_status, int length)
 {
 	if (scsi_status == SAM_STAT_GOOD ||
 	    cmd->se_cmd_flags & SCF_TREAT_READ_AS_NORMAL) {
