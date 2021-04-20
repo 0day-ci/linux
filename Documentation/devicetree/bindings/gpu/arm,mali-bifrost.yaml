@@ -69,6 +69,11 @@ properties:
 
       where voltage is in V, frequency is in MHz.
 
+  dma-coherent:
+    description: |
+      Present if page table walks made by the SMMU are cache coherent with the
+      CPU.
+
 required:
   - compatible
   - reg

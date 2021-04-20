@@ -41,6 +41,7 @@ required:
   - clocks
   - clock-names
   - resets
+  - reset-names
 
 additionalProperties: false
 

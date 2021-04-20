@@ -33,6 +33,7 @@ required:
   - interrupts
   - clocks
   - resets
+  - reset-names
 
 additionalProperties: false
 
