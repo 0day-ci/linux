@@ -949,6 +949,10 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 
 			ct->proto.tcp.last_flags =
 			ct->proto.tcp.last_wscale = 0;
+			/* Reset the max ack flag so in case the server replies
+			 * with RST/ACK it will not be marked as an invalid rst.
+			 */
+			ct->proto.tcp.seen[dir].flags &= ~IP_CT_TCP_FLAG_MAXACK_SET;
 			tcp_options(skb, dataoff, th, &seen);
 			if (seen.flags & IP_CT_TCP_FLAG_WINDOW_SCALE) {
 				ct->proto.tcp.last_flags |=
