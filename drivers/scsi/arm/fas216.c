@@ -399,7 +399,7 @@ static void print_debug_list(void)
 	printk("\n");
 }
 
-static void fas216_done(FAS216_Info *info, unsigned int result);
+static void fas216_done(FAS216_Info *info, enum host_status result);
 
 /**
  * fas216_get_last_msg - retrive last message from the list
@@ -1986,7 +1986,7 @@ static void fas216_kick(FAS216_Info *info)
  * Clean up from issuing a BUS DEVICE RESET message to a device.
  */
 static void fas216_devicereset_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
-				    unsigned int result)
+				    enum host_status result)
 {
 	fas216_log(info, LOG_ERROR, "fas216 device reset complete");
 
@@ -2004,7 +2004,7 @@ static void fas216_devicereset_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
  * Finish processing automatic request sense command
  */
 static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
-			       unsigned int result)
+			       enum host_status result)
 {
 	fas216_log_target(info, LOG_CONNECT, SCpnt->device->id,
 		   "request sense complete, result=0x%04x%02x%02x",
@@ -2020,7 +2020,7 @@ static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
 //printk("scsi%d.%c: sense buffer: ", info->host->host_no, '0' + SCpnt->device->id);
 //{ int i; for (i = 0; i < 32; i++) printk("%02x ", SCpnt->sense_buffer[i]); printk("\n"); }
 	/*
-	 * Note that we don't set SCpnt->result, since that should
+	 * Note that we don't set SCpnt->status since that should
 	 * reflect the status of the command that we were asked by
 	 * the upper layers to process.  This would have been set
 	 * correctly by fas216_std_done.
@@ -2038,36 +2038,38 @@ static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
  * Finish processing of standard command
  */
 static void
-fas216_std_done(FAS216_Info *info, struct scsi_cmnd *SCpnt, unsigned int result)
+fas216_std_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
+		enum host_status result)
 {
 	info->stats.fins += 1;
 
-	SCpnt->result = result << 16 | info->scsi.SCp.Message << 8 |
-			info->scsi.SCp.Status;
+	SCpnt->status = (union scsi_status){.b.host = result,
+		.b.msg = info->scsi.SCp.Message,
+		.b.status = info->scsi.SCp.Status};
 
 	fas216_log_command(info, LOG_CONNECT, SCpnt,
-		"command complete, result=0x%08x", SCpnt->result);
+		"command complete, result=0x%08x", SCpnt->status.combined);
 
 	/*
 	 * If the driver detected an error, we're all done.
 	 */
-	if (host_byte(SCpnt->result) != DID_OK ||
-	    msg_byte(SCpnt->result) != COMMAND_COMPLETE)
+	if (host_byte(SCpnt->status) != DID_OK ||
+	    msg_byte(SCpnt->status) != COMMAND_COMPLETE)
 		goto done;
 
 	/*
 	 * If the command returned CHECK_CONDITION or COMMAND_TERMINATED
 	 * status, request the sense information.
 	 */
-	if (status_byte(SCpnt->result) == CHECK_CONDITION ||
-	    status_byte(SCpnt->result) == COMMAND_TERMINATED)
+	if (status_byte(SCpnt->status) == CHECK_CONDITION ||
+	    status_byte(SCpnt->status) == COMMAND_TERMINATED)
 		goto request_sense;
 
 	/*
 	 * If the command did not complete with GOOD status,
 	 * we are all done here.
 	 */
-	if (status_byte(SCpnt->result) != GOOD)
+	if (status_byte(SCpnt->status) != GOOD)
 		goto done;
 
 	/*
@@ -2087,7 +2089,7 @@ fas216_std_done(FAS216_Info *info, struct scsi_cmnd *SCpnt, unsigned int result)
 		default:
 			scmd_printk(KERN_ERR, SCpnt,
 				    "incomplete data transfer detected: res=%08X ptr=%p len=%X\n",
-				    SCpnt->result, info->scsi.SCp.ptr,
+				    SCpnt->status.combined, info->scsi.SCp.ptr,
 				    info->scsi.SCp.this_residual);
 			scsi_print_command(SCpnt);
 			set_host_byte(SCpnt, DID_ERROR);
@@ -2132,13 +2134,13 @@ request_sense:
 /**
  * fas216_done - complete processing for current command
  * @info: interface that completed
- * @result: driver byte of result
+ * @result: host byte of result
  *
  * Complete processing for current command
  */
-static void fas216_done(FAS216_Info *info, unsigned int result)
+static void fas216_done(FAS216_Info *info, enum host_status result)
 {
-	void (*fn)(FAS216_Info *, struct scsi_cmnd *, unsigned int);
+	void (*fn)(FAS216_Info *, struct scsi_cmnd *, enum host_status);
 	struct scsi_cmnd *SCpnt;
 	unsigned long flags;
 
@@ -2178,7 +2180,7 @@ static void fas216_done(FAS216_Info *info, unsigned int result)
 	clear_bit(SCpnt->device->id * 8 +
 		  (u8)(SCpnt->device->lun & 0x7), info->busyluns);
 
-	fn = (void (*)(FAS216_Info *, struct scsi_cmnd *, unsigned int))SCpnt->host_scribble;
+	fn = (void *)SCpnt->host_scribble;
 	fn(info, SCpnt, result);
 
 	if (info->scsi.irq) {
@@ -2216,7 +2218,7 @@ static int fas216_queue_command_lck(struct scsi_cmnd *SCpnt,
 
 	SCpnt->scsi_done = done;
 	SCpnt->host_scribble = (void *)fas216_std_done;
-	SCpnt->result = 0;
+	SCpnt->status.combined = 0;
 
 	init_SCp(SCpnt);
 
