@@ -3043,9 +3043,11 @@ static bool is_access_allowed(u32 fault_err_code, u64 spte)
 /*
  * Returns one of RET_PF_INVALID, RET_PF_FIXED or RET_PF_SPURIOUS.
  */
-static int fast_page_fault(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
-			   u32 error_code)
+static int fast_page_fault(struct kvm_page_fault *kpf)
 {
+	struct kvm_vcpu *vcpu = kpf->vcpu;
+	gpa_t cr2_or_gpa = kpf->cr2_or_gpa;
+	u32 error_code = kpf->error_code;
 	struct kvm_shadow_walk_iterator iterator;
 	struct kvm_mmu_page *sp;
 	int ret = RET_PF_INVALID;
@@ -3704,7 +3706,7 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 		return RET_PF_EMULATE;
 
 	if (!is_tdp_mmu_root(vcpu->kvm, vcpu->arch.mmu->root_hpa)) {
-		r = fast_page_fault(vcpu, gpa, error_code);
+		r = fast_page_fault(kpf);
 		if (r != RET_PF_INVALID)
 			return r;
 	}
