@@ -4227,11 +4227,9 @@ lpfc_fcp_io_cmd_wqe_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pwqeIn,
 		if (lpfc_cmd->result & IOERR_DRVR_MASK)
 			lpfc_cmd->status = IOSTAT_DRIVER_REJECT;
 		if (lpfc_cmd->result == IOERR_ELXSEC_KEY_UNWRAP_ERROR ||
-		    lpfc_cmd->result ==
-		    IOERR_ELXSEC_KEY_UNWRAP_COMPARE_ERROR ||
+		    lpfc_cmd->result == IOERR_ELXSEC_KEY_UNWRAP_COMPARE_ERROR ||
 		    lpfc_cmd->result == IOERR_ELXSEC_CRYPTO_ERROR ||
-		    lpfc_cmd->result ==
-		    IOERR_ELXSEC_CRYPTO_COMPARE_ERROR) {
+		    lpfc_cmd->result == IOERR_ELXSEC_CRYPTO_COMPARE_ERROR) {
 			cmd->result = DID_NO_CONNECT << 16;
 			break;
 		}
@@ -4502,11 +4500,9 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 		case IOSTAT_LOCAL_REJECT:
 		case IOSTAT_REMOTE_STOP:
 			if (lpfc_cmd->result == IOERR_ELXSEC_KEY_UNWRAP_ERROR ||
-			    lpfc_cmd->result ==
-					IOERR_ELXSEC_KEY_UNWRAP_COMPARE_ERROR ||
+			    lpfc_cmd->result == IOERR_ELXSEC_KEY_UNWRAP_COMPARE_ERROR ||
 			    lpfc_cmd->result == IOERR_ELXSEC_CRYPTO_ERROR ||
-			    lpfc_cmd->result ==
-					IOERR_ELXSEC_CRYPTO_COMPARE_ERROR) {
+			    lpfc_cmd->result == IOERR_ELXSEC_CRYPTO_COMPARE_ERROR) {
 				cmd->result = DID_NO_CONNECT << 16;
 				break;
 			}
