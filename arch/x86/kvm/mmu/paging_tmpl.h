@@ -853,7 +853,7 @@ static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 	if (try_async_pf(kpf))
 		return RET_PF_RETRY;
 
-	if (handle_abnormal_pfn(vcpu, addr, walker.gfn, kpf->pfn, walker.pte_access, &r))
+	if (handle_abnormal_pfn(kpf, walker.pte_access, &r))
 		return r;
 
 	/*

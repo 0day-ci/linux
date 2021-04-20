@@ -2936,18 +2936,21 @@ static int kvm_handle_bad_page(struct kvm_vcpu *vcpu, gfn_t gfn, kvm_pfn_t pfn)
 	return -EFAULT;
 }
 
-static bool handle_abnormal_pfn(struct kvm_vcpu *vcpu, gva_t gva, gfn_t gfn,
-				kvm_pfn_t pfn, unsigned int access,
+static bool handle_abnormal_pfn(struct kvm_page_fault *kpf, unsigned int access,
 				int *ret_val)
 {
+	struct kvm_vcpu *vcpu = kpf->vcpu;
+	gva_t gva = kpf->is_tdp ? 0 : kpf->cr2_or_gpa;
+	kvm_pfn_t pfn = kpf->pfn;
+
 	/* The pfn is invalid, report the error! */
 	if (unlikely(is_error_pfn(pfn))) {
-		*ret_val = kvm_handle_bad_page(vcpu, gfn, pfn);
+		*ret_val = kvm_handle_bad_page(vcpu, kpf->gfn, pfn);
 		return true;
 	}
 
 	if (unlikely(is_noslot_pfn(pfn)))
-		vcpu_cache_mmio_info(vcpu, gva, gfn,
+		vcpu_cache_mmio_info(vcpu, gva, kpf->gfn,
 				     access & shadow_mmio_access_mask);
 
 	return false;
@@ -3694,7 +3697,6 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 	int max_level = kpf->max_level;
 	bool is_tdp = kpf->is_tdp;
 
-	gfn_t gfn = kpf->gfn;
 	unsigned long mmu_seq;
 	int r;
 
@@ -3717,7 +3719,7 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 	if (try_async_pf(kpf))
 		return RET_PF_RETRY;
 
-	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, kpf->pfn, ACC_ALL, &r))
+	if (handle_abnormal_pfn(kpf, ACC_ALL, &r))
 		return r;
 
 	r = RET_PF_RETRY;
