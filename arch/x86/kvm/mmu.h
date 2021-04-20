@@ -124,18 +124,15 @@ static inline void kvm_page_fault_init(
 	kpf->prefault = prefault;
 }
 
-int kvm_tdp_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
-		       bool prefault);
+int kvm_tdp_page_fault(struct kvm_page_fault *kpf);
 
 static inline int kvm_mmu_do_page_fault(struct kvm_page_fault *kpf)
 {
 #ifdef CONFIG_RETPOLINE
 	if (likely(kpf->vcpu->arch.mmu->page_fault == kvm_tdp_page_fault))
-		return kvm_tdp_page_fault(kpf->vcpu, kpf->cr2_or_gpa,
-					  kpf->error_code, kpf->prefault);
+		return kvm_tdp_page_fault(kpf);
 #endif
-	return kpf->vcpu->arch.mmu->page_fault(kpf->vcpu, kpf->cr2_or_gpa,
-					       kpf->error_code, kpf->prefault);
+	return kpf->vcpu->arch.mmu->page_fault(kpf);
 }
 
 /*

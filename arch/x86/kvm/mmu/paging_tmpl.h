@@ -789,9 +789,12 @@ FNAME(is_self_change_mapping)(struct kvm_vcpu *vcpu,
  *  Returns: 1 if we need to emulate the instruction, 0 otherwise, or
  *           a negative value on error.
  */
-static int FNAME(page_fault)(struct kvm_vcpu *vcpu, gpa_t addr, u32 error_code,
-			     bool prefault)
+static int FNAME(page_fault)(struct kvm_page_fault *kpf)
 {
+	struct kvm_vcpu *vcpu = kpf->vcpu;
+	gpa_t addr = kpf->cr2_or_gpa;
+	u32 error_code = kpf->error_code;
+	bool prefault = kpf->prefault;
 	bool write_fault = error_code & PFERR_WRITE_MASK;
 	bool user_fault = error_code & PFERR_USER_MASK;
 	struct guest_walker walker;

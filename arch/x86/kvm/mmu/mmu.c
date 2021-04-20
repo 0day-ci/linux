@@ -3745,14 +3745,15 @@ out_unlock:
 	return r;
 }
 
-static int nonpaging_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa,
-				u32 error_code, bool prefault)
+static int nonpaging_page_fault(struct kvm_page_fault *kpf)
 {
-	pgprintk("%s: gva %lx error %x\n", __func__, gpa, error_code);
+	pgprintk("%s: gva %lx error %x\n", __func__,
+		 kpf->cr2_or_gpa, kpf->error_code);
 
 	/* This path builds a PAE pagetable, we can map 2mb pages at maximum. */
-	return direct_page_fault(vcpu, gpa & PAGE_MASK, error_code, prefault,
-				 PG_LEVEL_2M, false);
+	return direct_page_fault(kpf->vcpu, kpf->cr2_or_gpa & PAGE_MASK,
+				 kpf->error_code,
+				 kpf->prefault, PG_LEVEL_2M, false);
 }
 
 int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
@@ -3788,9 +3789,9 @@ int kvm_handle_page_fault(struct kvm_vcpu *vcpu, u64 error_code,
 }
 EXPORT_SYMBOL_GPL(kvm_handle_page_fault);
 
-int kvm_tdp_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
-		       bool prefault)
+int kvm_tdp_page_fault(struct kvm_page_fault *kpf)
 {
+	u32 gpa = kpf->cr2_or_gpa;
 	int max_level;
 
 	for (max_level = KVM_MAX_HUGEPAGE_LEVEL;
@@ -3799,11 +3800,11 @@ int kvm_tdp_page_fault(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
 		int page_num = KVM_PAGES_PER_HPAGE(max_level);
 		gfn_t base = (gpa >> PAGE_SHIFT) & ~(page_num - 1);
 
-		if (kvm_mtrr_check_gfn_range_consistency(vcpu, base, page_num))
+		if (kvm_mtrr_check_gfn_range_consistency(kpf->vcpu, base, page_num))
 			break;
 	}
 
-	return direct_page_fault(vcpu, gpa, error_code, prefault,
+	return direct_page_fault(kpf->vcpu, gpa, kpf->error_code, kpf->prefault,
 				 max_level, true);
 }
 
