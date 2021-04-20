@@ -2856,27 +2856,26 @@ void disallowed_hugepage_adjust(u64 spte, gfn_t gfn, int cur_level,
 	}
 }
 
-static int __direct_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
-			int map_writable, int max_level, kvm_pfn_t pfn,
-			bool prefault, bool is_tdp)
+static int __direct_map(struct kvm_page_fault *kpf)
 {
+	struct kvm_vcpu *vcpu = kpf->vcpu;
 	bool nx_huge_page_workaround_enabled = is_nx_huge_page_enabled();
-	bool write = error_code & PFERR_WRITE_MASK;
-	bool exec = error_code & PFERR_FETCH_MASK;
+	bool exec = kpf->error_code & PFERR_FETCH_MASK;
 	bool huge_page_disallowed = exec && nx_huge_page_workaround_enabled;
 	struct kvm_shadow_walk_iterator it;
 	struct kvm_mmu_page *sp;
 	int level, req_level, ret;
-	gfn_t gfn = gpa >> PAGE_SHIFT;
+	gpa_t gpa = kpf->cr2_or_gpa;
+	gfn_t gfn = kpf->gfn;
 	gfn_t base_gfn = gfn;
 
 	if (WARN_ON(!VALID_PAGE(vcpu->arch.mmu->root_hpa)))
 		return RET_PF_RETRY;
 
-	level = kvm_mmu_hugepage_adjust(vcpu, gfn, max_level, &pfn,
+	level = kvm_mmu_hugepage_adjust(vcpu, gfn, kpf->max_level, &kpf->pfn,
 					huge_page_disallowed, &req_level);
 
-	trace_kvm_mmu_spte_requested(gpa, level, pfn);
+	trace_kvm_mmu_spte_requested(gpa, level, kpf->pfn);
 	for_each_shadow_entry(vcpu, gpa, it) {
 		/*
 		 * We cannot overwrite existing page tables with an NX
@@ -2884,7 +2883,7 @@ static int __direct_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
 		 */
 		if (nx_huge_page_workaround_enabled)
 			disallowed_hugepage_adjust(*it.sptep, gfn, it.level,
-						   &pfn, &level);
+						   &kpf->pfn, &level);
 
 		base_gfn = gfn & ~(KVM_PAGES_PER_HPAGE(it.level) - 1);
 		if (it.level == level)
@@ -2896,15 +2895,15 @@ static int __direct_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
 					      it.level - 1, true, ACC_ALL);
 
 			link_shadow_page(vcpu, it.sptep, sp);
-			if (is_tdp && huge_page_disallowed &&
+			if (kpf->is_tdp && huge_page_disallowed &&
 			    req_level >= it.level)
 				account_huge_nx_page(vcpu->kvm, sp);
 		}
 	}
 
 	ret = mmu_set_spte(vcpu, it.sptep, ACC_ALL,
-			   write, level, base_gfn, pfn, prefault,
-			   map_writable);
+			   kpf->write_fault, level, base_gfn, kpf->pfn, kpf->prefault,
+			   kpf->map_writable);
 	if (ret == RET_PF_SPURIOUS)
 		return ret;
 
@@ -3697,7 +3696,6 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 	u32 error_code = kpf->error_code;
 	bool prefault = kpf->prefault;
 	int max_level = kpf->max_level;
-	bool is_tdp = kpf->is_tdp;
 
 	unsigned long mmu_seq;
 	int r;
@@ -3742,8 +3740,7 @@ static int direct_page_fault(struct kvm_page_fault *kpf)
 		r = kvm_tdp_mmu_map(vcpu, gpa, error_code, kpf->map_writable,
 				    max_level, kpf->pfn, prefault);
 	else
-		r = __direct_map(vcpu, gpa, error_code, kpf->map_writable,
-				 max_level, kpf->pfn, prefault, is_tdp);
+		r = __direct_map(kpf);
 
 out_unlock:
 	if (is_tdp_mmu_root(vcpu->kvm, vcpu->arch.mmu->root_hpa))
