@@ -4729,6 +4729,9 @@ static __init int iscsi_transport_init(void)
 		.groups	= 1,
 		.input	= iscsi_if_rx,
 	};
+
+	BUILD_BUG_ON(offsetof(struct iscsi_bsg_reply, reply_data) != 8);
+
 	printk(KERN_INFO "Loading iSCSI transport class v%s.\n",
 		ISCSI_TRANSPORT_VERSION);
 
