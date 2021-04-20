@@ -595,7 +595,21 @@ static void rsapad_akcipher_free(struct akcipher_instance *inst)
 	kfree(inst);
 }
 
-static int pkcs1pad_create(struct crypto_template *tmpl, struct rtattr **tb)
+static struct akcipher_alg pkcs1pad_alg = {
+	.init = rsapad_akcipher_init_tfm,
+	.exit = rsapad_akcipher_exit_tfm,
+
+	.encrypt = pkcs1pad_encrypt,
+	.decrypt = pkcs1pad_decrypt,
+	.sign = pkcs1pad_sign,
+	.verify = pkcs1pad_verify,
+	.set_pub_key = rsapad_set_pub_key,
+	.set_priv_key = rsapad_set_priv_key,
+	.max_size = rsapad_get_max_size
+};
+
+static int rsapad_akcipher_create(struct crypto_template *tmpl, struct rtattr **tb,
+				  struct akcipher_alg *alg)
 {
 	u32 mask;
 	struct akcipher_instance *inst;
@@ -625,12 +639,12 @@ static int pkcs1pad_create(struct crypto_template *tmpl, struct rtattr **tb)
 	hash_name = crypto_attr_alg_name(tb[2]);
 	if (IS_ERR(hash_name)) {
 		if (snprintf(inst->alg.base.cra_name,
-			     CRYPTO_MAX_ALG_NAME, "pkcs1pad(%s)",
+			     CRYPTO_MAX_ALG_NAME, "%s(%s)", tmpl->name,
 			     rsa_alg->base.cra_name) >= CRYPTO_MAX_ALG_NAME)
 			goto err_free_inst;
 
 		if (snprintf(inst->alg.base.cra_driver_name,
-			     CRYPTO_MAX_ALG_NAME, "pkcs1pad(%s)",
+			     CRYPTO_MAX_ALG_NAME, "%s(%s)", tmpl->name,
 			     rsa_alg->base.cra_driver_name) >=
 			     CRYPTO_MAX_ALG_NAME)
 			goto err_free_inst;
@@ -642,12 +656,13 @@ static int pkcs1pad_create(struct crypto_template *tmpl, struct rtattr **tb)
 		}
 
 		if (snprintf(inst->alg.base.cra_name, CRYPTO_MAX_ALG_NAME,
-			     "pkcs1pad(%s,%s)", rsa_alg->base.cra_name,
+			     "%s(%s,%s)", tmpl->name, rsa_alg->base.cra_name,
 			     hash_name) >= CRYPTO_MAX_ALG_NAME)
 			goto err_free_inst;
 
 		if (snprintf(inst->alg.base.cra_driver_name,
-			     CRYPTO_MAX_ALG_NAME, "pkcs1pad(%s,%s)",
+			     CRYPTO_MAX_ALG_NAME, "%s(%s,%s)",
+			     tmpl->name,
 			     rsa_alg->base.cra_driver_name,
 			     hash_name) >= CRYPTO_MAX_ALG_NAME)
 			goto err_free_inst;
@@ -656,16 +671,16 @@ static int pkcs1pad_create(struct crypto_template *tmpl, struct rtattr **tb)
 	inst->alg.base.cra_priority = rsa_alg->base.cra_priority;
 	inst->alg.base.cra_ctxsize = sizeof(struct pkcs1pad_ctx);
 
-	inst->alg.init = rsapad_akcipher_init_tfm;
-	inst->alg.exit = rsapad_akcipher_exit_tfm;
+	inst->alg.init = alg->init;
+	inst->alg.exit = alg->exit;
 
-	inst->alg.encrypt = pkcs1pad_encrypt;
-	inst->alg.decrypt = pkcs1pad_decrypt;
-	inst->alg.sign = pkcs1pad_sign;
-	inst->alg.verify = pkcs1pad_verify;
-	inst->alg.set_pub_key = rsapad_set_pub_key;
-	inst->alg.set_priv_key = rsapad_set_priv_key;
-	inst->alg.max_size = rsapad_get_max_size;
+	inst->alg.encrypt = alg->encrypt;
+	inst->alg.decrypt = alg->decrypt;
+	inst->alg.sign = alg->sign;
+	inst->alg.verify = alg->verify;
+	inst->alg.set_pub_key = alg->set_pub_key;
+	inst->alg.set_priv_key = alg->set_priv_key;
+	inst->alg.max_size = alg->max_size;
 	inst->alg.reqsize = sizeof(struct pkcs1pad_request) + rsa_alg->reqsize;
 
 	inst->free = rsapad_akcipher_free;
@@ -676,6 +691,11 @@ err_free_inst:
 		rsapad_akcipher_free(inst);
 	}
 	return err;
+}
+
+static int pkcs1pad_create(struct crypto_template *tmpl, struct rtattr **tb)
+{
+	return rsapad_akcipher_create(tmpl, tb, &pkcs1pad_alg);
 }
 
 struct crypto_template rsa_pkcs1pad_tmpl = {
