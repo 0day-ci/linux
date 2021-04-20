@@ -5458,24 +5458,24 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 		ns_from_boot = ktime_get_boottime_ns();
 
 	/* one of the resp_*() response functions is called here */
-	cmnd->result = pfp ? pfp(cmnd, devip) : 0;
-	if (cmnd->result & SDEG_RES_IMMED_MASK) {
-		cmnd->result &= ~SDEG_RES_IMMED_MASK;
+	cmnd->status.combined = pfp ? pfp(cmnd, devip) : 0;
+	if (cmnd->status.combined & SDEG_RES_IMMED_MASK) {
+		cmnd->status.combined &= ~SDEG_RES_IMMED_MASK;
 		delta_jiff = ndelay = 0;
 	}
-	if (cmnd->result == 0 && scsi_result != 0)
-		cmnd->result = scsi_result;
-	if (cmnd->result == 0 && unlikely(sdebug_opts & SDEBUG_OPT_TRANSPORT_ERR)) {
+	if (cmnd->status.combined == 0 && scsi_result != 0)
+		cmnd->status.combined = scsi_result;
+	if (cmnd->status.combined == 0 && unlikely(sdebug_opts & SDEBUG_OPT_TRANSPORT_ERR)) {
 		if (atomic_read(&sdeb_inject_pending)) {
 			mk_sense_buffer(cmnd, ABORTED_COMMAND, TRANSPORT_PROBLEM, ACK_NAK_TO);
 			atomic_set(&sdeb_inject_pending, 0);
-			cmnd->result = check_condition_result;
+			cmnd->status.combined = check_condition_result;
 		}
 	}
 
-	if (unlikely(sdebug_verbose && cmnd->result))
+	if (unlikely(sdebug_verbose && cmnd->status.combined))
 		sdev_printk(KERN_INFO, sdp, "%s: non-zero result=0x%x\n",
-			    __func__, cmnd->result);
+			    __func__, cmnd->status.combined);
 
 	if (delta_jiff > 0 || ndelay > 0) {
 		ktime_t kt;
@@ -5582,10 +5582,10 @@ static int schedule_resp(struct scsi_cmnd *cmnd, struct sdebug_dev_info *devip,
 	return 0;
 
 respond_in_thread:	/* call back to mid-layer using invocation thread */
-	cmnd->result = pfp != NULL ? pfp(cmnd, devip) : 0;
-	cmnd->result &= ~SDEG_RES_IMMED_MASK;
-	if (cmnd->result == 0 && scsi_result != 0)
-		cmnd->result = scsi_result;
+	cmnd->status.combined = pfp != NULL ? pfp(cmnd, devip) : 0;
+	cmnd->status.combined &= ~SDEG_RES_IMMED_MASK;
+	if (cmnd->status.combined == 0 && scsi_result != 0)
+		cmnd->status.combined = scsi_result;
 	cmnd->scsi_done(cmnd);
 	return 0;
 }
