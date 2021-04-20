@@ -11,6 +11,7 @@
 #define _SCSI_PROTO_H_
 
 #include <linux/types.h>
+#include <linux/compiler_attributes.h>
 
 /*
  *      SCSI opcodes
@@ -187,20 +188,22 @@ struct scsi_varlen_cdb_hdr {
 };
 
 /*
- *  SCSI Architecture Model (SAM) Status codes. Taken from SAM-3 draft
- *  T10/1561-D Revision 4 Draft dated 7th November 2002.
+ *  SCSI Architecture Model (SAM) status codes. Taken from SAM-6 draft
+ *  revision 7 dated 17 February 2021.
  */
-#define SAM_STAT_GOOD            0x00
-#define SAM_STAT_CHECK_CONDITION 0x02
-#define SAM_STAT_CONDITION_MET   0x04
-#define SAM_STAT_BUSY            0x08
-#define SAM_STAT_INTERMEDIATE    0x10
-#define SAM_STAT_INTERMEDIATE_CONDITION_MET 0x14
-#define SAM_STAT_RESERVATION_CONFLICT 0x18
-#define SAM_STAT_COMMAND_TERMINATED 0x22	/* obsolete in SAM-3 */
-#define SAM_STAT_TASK_SET_FULL   0x28
-#define SAM_STAT_ACA_ACTIVE      0x30
-#define SAM_STAT_TASK_ABORTED    0x40
+enum sam_status {
+	SAM_STAT_GOOD				= 0x00,
+	SAM_STAT_CHECK_CONDITION		= 0x02,
+	SAM_STAT_CONDITION_MET			= 0x04,
+	SAM_STAT_BUSY				= 0x08,
+	SAM_STAT_INTERMEDIATE			= 0x10, /* obsolete in SAM-4 */
+	SAM_STAT_INTERMEDIATE_CONDITION_MET	= 0x14, /* obsolete in SAM-4 */
+	SAM_STAT_RESERVATION_CONFLICT		= 0x18,
+	SAM_STAT_COMMAND_TERMINATED		= 0x22,	/* obsolete in SAM-3 */
+	SAM_STAT_TASK_SET_FULL			= 0x28,
+	SAM_STAT_ACA_ACTIVE			= 0x30,
+	SAM_STAT_TASK_ABORTED			= 0x40,
+} __packed;
 
 /*
  *  Status codes. These are deprecated as they are shifted 1 bit right
@@ -209,17 +212,19 @@ struct scsi_varlen_cdb_hdr {
  *  above.
  */
 
-#define GOOD                 0x00
-#define CHECK_CONDITION      0x01
-#define CONDITION_GOOD       0x02
-#define BUSY                 0x04
-#define INTERMEDIATE_GOOD    0x08
-#define INTERMEDIATE_C_GOOD  0x0a
-#define RESERVATION_CONFLICT 0x0c
-#define COMMAND_TERMINATED   0x11
-#define QUEUE_FULL           0x14
-#define ACA_ACTIVE           0x18
-#define TASK_ABORTED         0x20
+enum sam_status_divided_by_two {
+	GOOD                 = 0x00,
+	CHECK_CONDITION      = 0x01,
+	CONDITION_GOOD       = 0x02,
+	BUSY                 = 0x04,
+	INTERMEDIATE_GOOD    = 0x08,
+	INTERMEDIATE_C_GOOD  = 0x0a,
+	RESERVATION_CONFLICT = 0x0c,
+	COMMAND_TERMINATED   = 0x11,
+	QUEUE_FULL           = 0x14,
+	ACA_ACTIVE           = 0x18,
+	TASK_ABORTED         = 0x20,
+} __packed;
 
 #define STATUS_MASK          0xfe
 

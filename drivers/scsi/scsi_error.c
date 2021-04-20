@@ -1772,6 +1772,8 @@ int scsi_noretry_cmd(struct scsi_cmnd *scmd)
 		fallthrough;
 	case DID_SOFT_ERROR:
 		return (scmd->request->cmd_flags & REQ_FAILFAST_DRIVER);
+	default:
+		break;
 	}
 
 	if (status_byte(scmd->result) != CHECK_CONDITION)
