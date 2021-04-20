@@ -4909,7 +4909,7 @@ void ncr_complete (struct ncb *np, struct ccb *cp)
 	/*
 	**	Check the status.
 	*/
-	cmd->result = 0;
+	cmd->status.combined = 0;
 	if (   (cp->host_status == HS_COMPLETE)
 		&& (cp->scsi_status == SAM_STAT_GOOD ||
 		    cp->scsi_status == SAM_STAT_CONDITION_MET)) {
