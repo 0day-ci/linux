@@ -447,6 +447,17 @@ config HISI_HIKEY_USB
 	  switching between the dual-role USB-C port and the USB-A host ports
 	  using only one USB controller.
 
+config ZYNQ_AFI
+	tristate "Xilinx ZYNQ AFI support"
+	help
+	  Zynq AFI driver support for writing to the AFI registers
+	  for configuring PS_PL Bus-width. Xilinx Zynq SoC connect
+	  the PS to the programmable logic (PL) through the AXI port.
+	  This AXI port helps to establish the data path between the
+	  PS and PL.In-order to establish the proper communication path
+	  between PS and PL, the AXI port data path should be configured
+	  with the proper Bus-width values
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
