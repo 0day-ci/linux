@@ -586,4 +586,9 @@ config MST_IRQ
 	help
 	  Support MStar Interrupt Controller.
 
+config IRQ_IDT3243X
+	bool
+	select GENERIC_IRQ_CHIP
+	select IRQ_DOMAIN
+
 endmenu
