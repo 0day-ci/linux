@@ -1280,7 +1280,7 @@ static int myrb_pthru_queuecommand(struct Scsi_Host *shost,
 	nsge = scsi_dma_map(scmd);
 	if (nsge > 1) {
 		dma_pool_free(cb->dcdb_pool, dcdb, dcdb_addr);
-		scmd->result = (DID_ERROR << 16);
+		scmd->status.combined = (DID_ERROR << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	}
@@ -1435,13 +1435,13 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 	    ldev_info->state != MYRB_DEVICE_WO) {
 		dev_dbg(&shost->shost_gendev, "ldev %u in state %x, skip\n",
 			sdev->id, ldev_info ? ldev_info->state : 0xff);
-		scmd->result = (DID_BAD_TARGET << 16);
+		scmd->status.combined = (DID_BAD_TARGET << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	}
 	switch (scmd->cmnd[0]) {
 	case TEST_UNIT_READY:
-		scmd->result = (DID_OK << 16);
+		scmd->status.combined = (DID_OK << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	case INQUIRY:
@@ -1449,16 +1449,16 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Illegal request, invalid field in CDB */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						ILLEGAL_REQUEST, 0x24, 0);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 		} else {
 			myrb_inquiry(cb, scmd);
-			scmd->result = (DID_OK << 16);
+			scmd->status.combined = (DID_OK << 16);
 		}
 		scmd->scsi_done(scmd);
 		return 0;
 	case SYNCHRONIZE_CACHE:
-		scmd->result = (DID_OK << 16);
+		scmd->status.combined = (DID_OK << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	case MODE_SENSE:
@@ -1467,11 +1467,11 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Illegal request, invalid field in CDB */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						ILLEGAL_REQUEST, 0x24, 0);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 		} else {
 			myrb_mode_sense(cb, scmd, ldev_info);
-			scmd->result = (DID_OK << 16);
+			scmd->status.combined = (DID_OK << 16);
 		}
 		scmd->scsi_done(scmd);
 		return 0;
@@ -1481,7 +1481,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Illegal request, invalid field in CDB */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						ILLEGAL_REQUEST, 0x24, 0);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1491,7 +1491,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Illegal request, invalid field in CDB */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						ILLEGAL_REQUEST, 0x24, 0);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1501,18 +1501,18 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 		return 0;
 	case REQUEST_SENSE:
 		myrb_request_sense(cb, scmd);
-		scmd->result = (DID_OK << 16);
+		scmd->status.combined = (DID_OK << 16);
 		return 0;
 	case SEND_DIAGNOSTIC:
 		if (scmd->cmnd[1] != 0x04) {
 			/* Illegal request, invalid field in CDB */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						ILLEGAL_REQUEST, 0x24, 0);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 		} else {
 			/* Assume good status */
-			scmd->result = (DID_OK << 16);
+			scmd->status.combined = (DID_OK << 16);
 		}
 		scmd->scsi_done(scmd);
 		return 0;
@@ -1521,7 +1521,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Data protect, attempt to read invalid data */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						DATA_PROTECT, 0x21, 0x06);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1538,7 +1538,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Data protect, attempt to read invalid data */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						DATA_PROTECT, 0x21, 0x06);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1555,7 +1555,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 			/* Data protect, attempt to read invalid data */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						DATA_PROTECT, 0x21, 0x06);
-			scmd->result = (DRIVER_SENSE << 24) |
+			scmd->status.combined = (DRIVER_SENSE << 24) |
 				SAM_STAT_CHECK_CONDITION;
 			scmd->scsi_done(scmd);
 			return 0;
@@ -1571,7 +1571,7 @@ static int myrb_ldev_queuecommand(struct Scsi_Host *shost,
 		/* Illegal request, invalid opcode */
 		scsi_build_sense_buffer(0, scmd->sense_buffer,
 					ILLEGAL_REQUEST, 0x20, 0);
-		scmd->result = (DRIVER_SENSE << 24) | SAM_STAT_CHECK_CONDITION;
+		scmd->status.combined = (DRIVER_SENSE << 24) | SAM_STAT_CHECK_CONDITION;
 		scmd->scsi_done(scmd);
 		return 0;
 	}
@@ -1635,7 +1635,7 @@ static int myrb_queuecommand(struct Scsi_Host *shost,
 	struct scsi_device *sdev = scmd->device;
 
 	if (sdev->channel > myrb_logical_channel(shost)) {
-		scmd->result = (DID_BAD_TARGET << 16);
+		scmd->status.combined = (DID_BAD_TARGET << 16);
 		scmd->scsi_done(scmd);
 		return 0;
 	}
@@ -2345,7 +2345,7 @@ static void myrb_handle_scsi(struct myrb_hba *cb, struct myrb_cmdblk *cmd_blk,
 	switch (status) {
 	case MYRB_STATUS_SUCCESS:
 	case MYRB_STATUS_DEVICE_BUSY:
-		scmd->result = (DID_OK << 16) | status;
+		scmd->status.combined = (DID_OK << 16) | status;
 		break;
 	case MYRB_STATUS_BAD_DATA:
 		dev_dbg(&scmd->device->sdev_gendev,
@@ -2358,7 +2358,7 @@ static void myrb_handle_scsi(struct myrb_hba *cb, struct myrb_cmdblk *cmd_blk,
 			/* Write error */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						MEDIUM_ERROR, 0x0C, 0);
-		scmd->result = (DID_OK << 16) | SAM_STAT_CHECK_CONDITION;
+		scmd->status.combined = (DID_OK << 16) | SAM_STAT_CHECK_CONDITION;
 		break;
 	case MYRB_STATUS_IRRECOVERABLE_DATA_ERROR:
 		scmd_printk(KERN_ERR, scmd, "Irrecoverable Data Error\n");
@@ -2370,12 +2370,12 @@ static void myrb_handle_scsi(struct myrb_hba *cb, struct myrb_cmdblk *cmd_blk,
 			/* Write error, auto-reallocation failed */
 			scsi_build_sense_buffer(0, scmd->sense_buffer,
 						MEDIUM_ERROR, 0x0C, 0x02);
-		scmd->result = (DID_OK << 16) | SAM_STAT_CHECK_CONDITION;
+		scmd->status.combined = (DID_OK << 16) | SAM_STAT_CHECK_CONDITION;
 		break;
 	case MYRB_STATUS_LDRV_NONEXISTENT_OR_OFFLINE:
 		dev_dbg(&scmd->device->sdev_gendev,
 			    "Logical Drive Nonexistent or Offline");
-		scmd->result = (DID_BAD_TARGET << 16);
+		scmd->status.combined = (DID_BAD_TARGET << 16);
 		break;
 	case MYRB_STATUS_ACCESS_BEYOND_END_OF_LDRV:
 		dev_dbg(&scmd->device->sdev_gendev,
@@ -2386,12 +2386,12 @@ static void myrb_handle_scsi(struct myrb_hba *cb, struct myrb_cmdblk *cmd_blk,
 		break;
 	case MYRB_STATUS_DEVICE_NONRESPONSIVE:
 		dev_dbg(&scmd->device->sdev_gendev, "Device nonresponsive\n");
-		scmd->result = (DID_BAD_TARGET << 16);
+		scmd->status.combined = (DID_BAD_TARGET << 16);
 		break;
 	default:
 		scmd_printk(KERN_ERR, scmd,
 			    "Unexpected Error Status %04X", status);
-		scmd->result = (DID_ERROR << 16);
+		scmd->status.combined = (DID_ERROR << 16);
 		break;
 	}
 	scmd->scsi_done(scmd);
