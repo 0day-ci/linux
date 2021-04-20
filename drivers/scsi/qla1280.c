@@ -488,7 +488,7 @@ __setup("qla1280=", qla1280_setup);
 #define	CMD_CDBP(Cmnd)		Cmnd->cmnd
 #define	CMD_SNSP(Cmnd)		Cmnd->sense_buffer
 #define	CMD_SNSLEN(Cmnd)	SCSI_SENSE_BUFFERSIZE
-#define	CMD_RESULT(Cmnd)	Cmnd->result
+#define	CMD_RESULT(Cmnd)	Cmnd->status.combined
 #define	CMD_HANDLE(Cmnd)	Cmnd->host_scribble
 #define CMD_REQUEST(Cmnd)	Cmnd->request->cmd
 
