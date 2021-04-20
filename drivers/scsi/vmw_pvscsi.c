@@ -567,18 +567,18 @@ static void pvscsi_complete_request(struct pvscsi_adapter *adapter,
 		return;
 	}
 
-	cmd->result = 0;
+	cmd->status.combined = 0;
 	if (sdstat != SAM_STAT_GOOD &&
 	    (btstat == BTSTAT_SUCCESS ||
 	     btstat == BTSTAT_LINKED_COMMAND_COMPLETED ||
 	     btstat == BTSTAT_LINKED_COMMAND_COMPLETED_WITH_FLAG)) {
 		if (sdstat == SAM_STAT_COMMAND_TERMINATED) {
-			cmd->result = (DID_RESET << 16);
+			cmd->status.combined = (DID_RESET << 16);
 		} else {
-			cmd->result = (DID_OK << 16) | sdstat;
+			cmd->status.combined = (DID_OK << 16) | sdstat;
 			if (sdstat == SAM_STAT_CHECK_CONDITION &&
 			    cmd->sense_buffer)
-				cmd->result |= (DRIVER_SENSE << 24);
+				cmd->status.combined |= (DRIVER_SENSE << 24);
 		}
 	} else
 		switch (btstat) {
@@ -586,25 +586,25 @@ static void pvscsi_complete_request(struct pvscsi_adapter *adapter,
 		case BTSTAT_LINKED_COMMAND_COMPLETED:
 		case BTSTAT_LINKED_COMMAND_COMPLETED_WITH_FLAG:
 			/* If everything went fine, let's move on..  */
-			cmd->result = (DID_OK << 16);
+			cmd->status.combined = (DID_OK << 16);
 			break;
 
 		case BTSTAT_DATARUN:
 		case BTSTAT_DATA_UNDERRUN:
 			/* Report residual data in underruns */
 			scsi_set_resid(cmd, scsi_bufflen(cmd) - e->dataLen);
-			cmd->result = (DID_ERROR << 16);
+			cmd->status.combined = (DID_ERROR << 16);
 			break;
 
 		case BTSTAT_SELTIMEO:
 			/* Our emulation returns this for non-connected devs */
-			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->status.combined = (DID_BAD_TARGET << 16);
 			break;
 
 		case BTSTAT_LUNMISMATCH:
 		case BTSTAT_TAGREJECT:
 		case BTSTAT_BADMSG:
-			cmd->result = (DRIVER_INVALID << 24);
+			cmd->status.combined = (DRIVER_INVALID << 24);
 			fallthrough;
 
 		case BTSTAT_HAHARDWARE:
@@ -615,25 +615,25 @@ static void pvscsi_complete_request(struct pvscsi_adapter *adapter,
 		case BTSTAT_HASOFTWARE:
 		case BTSTAT_BUSFREE:
 		case BTSTAT_SENSFAILED:
-			cmd->result |= (DID_ERROR << 16);
+			cmd->status.combined |= (DID_ERROR << 16);
 			break;
 
 		case BTSTAT_SENTRST:
 		case BTSTAT_RECVRST:
 		case BTSTAT_BUSRESET:
-			cmd->result = (DID_RESET << 16);
+			cmd->status.combined = (DID_RESET << 16);
 			break;
 
 		case BTSTAT_ABORTQUEUE:
-			cmd->result = (DID_BUS_BUSY << 16);
+			cmd->status.combined = (DID_BUS_BUSY << 16);
 			break;
 
 		case BTSTAT_SCSIPARITY:
-			cmd->result = (DID_PARITY << 16);
+			cmd->status.combined = (DID_PARITY << 16);
 			break;
 
 		default:
-			cmd->result = (DID_ERROR << 16);
+			cmd->status.combined = (DID_ERROR << 16);
 			scmd_printk(KERN_DEBUG, cmd,
 				    "Unknown completion status: 0x%x\n",
 				    btstat);
@@ -641,7 +641,7 @@ static void pvscsi_complete_request(struct pvscsi_adapter *adapter,
 
 	dev_dbg(&cmd->device->sdev_gendev,
 		"cmd=%p %x ctx=%p result=0x%x status=0x%x,%x\n",
-		cmd, cmd->cmnd[0], ctx, cmd->result, btstat, sdstat);
+		cmd, cmd->cmnd[0], ctx, cmd->status.combined, btstat, sdstat);
 
 	cmd->scsi_done(cmd);
 }
@@ -859,7 +859,7 @@ static int pvscsi_abort(struct scsi_cmnd *cmd)
 	/*
 	 * Successfully aborted the command.
 	 */
-	cmd->result = (DID_ABORT << 16);
+	cmd->status.combined = (DID_ABORT << 16);
 	cmd->scsi_done(cmd);
 
 out:
@@ -886,7 +886,7 @@ static void pvscsi_reset_all(struct pvscsi_adapter *adapter)
 			pvscsi_unmap_buffers(adapter, ctx);
 			pvscsi_patch_sense(cmd);
 			pvscsi_release_context(adapter, ctx);
-			cmd->result = (DID_RESET << 16);
+			cmd->status.combined = (DID_RESET << 16);
 			cmd->scsi_done(cmd);
 		}
 	}
