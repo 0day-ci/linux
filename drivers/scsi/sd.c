@@ -3812,8 +3812,8 @@ void sd_print_sense_hdr(struct scsi_disk *sdkp, struct scsi_sense_hdr *sshdr)
 void sd_print_result(const struct scsi_disk *sdkp, const char *msg,
 		     union scsi_status result)
 {
-	const char *hb_string = scsi_hostbyte_string(result.combined);
-	const char *db_string = scsi_driverbyte_string(result.combined);
+	const char *hb_string = scsi_hostbyte_string(result);
+	const char *db_string = scsi_driverbyte_string(result);
 
 	if (hb_string || db_string)
 		sd_printk(KERN_INFO, sdkp,

@@ -410,10 +410,10 @@ static const char * const driverbyte_table[]={
 "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT",  "DRIVER_MEDIA", "DRIVER_ERROR",
 "DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD", "DRIVER_SENSE"};
 
-const char *scsi_hostbyte_string(int result)
+const char *scsi_hostbyte_string(union scsi_status result)
 {
 	const char *hb_string = NULL;
-	int hb = host_byte(result);
+	enum host_status hb = host_byte(result);
 
 	if (hb < ARRAY_SIZE(hostbyte_table))
 		hb_string = hostbyte_table[hb];
@@ -421,10 +421,10 @@ const char *scsi_hostbyte_string(int result)
 }
 EXPORT_SYMBOL(scsi_hostbyte_string);
 
-const char *scsi_driverbyte_string(int result)
+const char *scsi_driverbyte_string(union scsi_status result)
 {
 	const char *db_string = NULL;
-	int db = driver_byte(result);
+	enum driver_status db = driver_byte(result);
 
 	if (db < ARRAY_SIZE(driverbyte_table))
 		db_string = driverbyte_table[db];

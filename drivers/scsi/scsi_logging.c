@@ -384,8 +384,8 @@ void scsi_print_result(const struct scsi_cmnd *cmd, const char *msg,
 	char *logbuf;
 	size_t off, logbuf_len;
 	const char *mlret_string = scsi_mlreturn_string(disposition);
-	const char *hb_string = scsi_hostbyte_string(cmd->status.combined);
-	const char *db_string = scsi_driverbyte_string(cmd->status.combined);
+	const char *hb_string = scsi_hostbyte_string(cmd->status);
+	const char *db_string = scsi_driverbyte_string(cmd->status);
 	unsigned long cmd_age = (jiffies - cmd->jiffies_at_alloc) / HZ;
 
 	logbuf = scsi_log_reserve_buffer(&logbuf_len);
