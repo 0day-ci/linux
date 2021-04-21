@@ -1256,15 +1256,6 @@ cnl_get_buf_trans(struct intel_encoder *encoder,
 }
 
 static const struct intel_ddi_buf_trans *
-icl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
-			     const struct intel_crtc_state *crtc_state,
-			     int *n_entries)
-{
-	return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi,
-				   n_entries);
-}
-
-static const struct intel_ddi_buf_trans *
 icl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1297,20 +1288,11 @@ icl_get_combo_buf_trans(struct intel_encoder *encoder,
 			int *n_entries)
 {
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return icl_get_combo_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi, n_entries);
 	else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
 		return icl_get_combo_buf_trans_edp(encoder, crtc_state, n_entries);
 	else
 		return icl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
-}
-
-static const struct intel_ddi_buf_trans *
-icl_get_mg_buf_trans_hdmi(struct intel_encoder *encoder,
-			  const struct intel_crtc_state *crtc_state,
-			  int *n_entries)
-{
-	return intel_get_buf_trans(&icl_mg_phy_ddi_translations_hdmi,
-				   n_entries);
 }
 
 static const struct intel_ddi_buf_trans *
@@ -1333,11 +1315,10 @@ icl_get_mg_buf_trans(struct intel_encoder *encoder,
 		     int *n_entries)
 {
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return icl_get_mg_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&icl_mg_phy_ddi_translations_hdmi, n_entries);
 	else
 		return icl_get_mg_buf_trans_dp(encoder, crtc_state, n_entries);
 }
-
 
 static const struct intel_ddi_buf_trans *
 ehl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
@@ -1394,15 +1375,6 @@ jsl_get_combo_buf_trans(struct intel_encoder *encoder,
 }
 
 static const struct intel_ddi_buf_trans *
-tgl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
-			     const struct intel_crtc_state *crtc_state,
-			     int *n_entries)
-{
-	return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi,
-				   n_entries);
-}
-
-static const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1451,7 +1423,7 @@ tgl_get_combo_buf_trans(struct intel_encoder *encoder,
 			int *n_entries)
 {
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return tgl_get_combo_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi, n_entries);
 	else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
 		return tgl_get_combo_buf_trans_edp(encoder, crtc_state, n_entries);
 	else
@@ -1494,7 +1466,7 @@ dg1_get_combo_buf_trans(struct intel_encoder *encoder,
 			int *n_entries)
 {
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return icl_get_combo_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi, n_entries);
 	else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
 		return dg1_get_combo_buf_trans_edp(encoder, crtc_state, n_entries);
 	else
@@ -1541,20 +1513,11 @@ rkl_get_combo_buf_trans(struct intel_encoder *encoder,
 {
 	/* FIXME unclear what values we should use for HDMI and eDP */
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return tgl_get_combo_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_hdmi, n_entries);
 	else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
 		return rkl_get_combo_buf_trans_edp(encoder, crtc_state, n_entries);
 	else
 		return rkl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
-}
-
-static const struct intel_ddi_buf_trans *
-tgl_get_dkl_buf_trans_hdmi(struct intel_encoder *encoder,
-			   const struct intel_crtc_state *crtc_state,
-			   int *n_entries)
-{
-	return intel_get_buf_trans(&tgl_dkl_phy_ddi_translations_hdmi,
-				   n_entries);
 }
 
 static const struct intel_ddi_buf_trans *
@@ -1577,7 +1540,7 @@ tgl_get_dkl_buf_trans(struct intel_encoder *encoder,
 		      int *n_entries)
 {
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
-		return tgl_get_dkl_buf_trans_hdmi(encoder, crtc_state, n_entries);
+		return intel_get_buf_trans(&tgl_dkl_phy_ddi_translations_hdmi, n_entries);
 	else
 		return tgl_get_dkl_buf_trans_dp(encoder, crtc_state, n_entries);
 }
