@@ -1634,10 +1634,7 @@ static int i40iw_open(struct i40e_info *ldev, struct i40e_client *client)
 	iwdev = &hdl->device;
 	iwdev->hdl = hdl;
 	dev = &iwdev->sc_dev;
-	if (i40iw_setup_cm_core(iwdev)) {
-		kfree(iwdev->hdl);
-		return -ENOMEM;
-	}
+	i40iw_setup_cm_core(iwdev);
 
 	dev->back_dev = (void *)iwdev;
 	iwdev->ldev = &hdl->ldev;
