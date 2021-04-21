@@ -140,7 +140,10 @@ struct devlink_rate {
 	u64 tx_share;
 	u64 tx_max;
 
-	struct devlink_port *devlink_port;
+	union {
+		struct devlink_port *devlink_port;
+		char *name;
+	};
 };
 
 struct devlink_port {
@@ -1473,6 +1476,14 @@ struct devlink_ops {
 				      u64 tx_share, struct netlink_ext_ack *extack);
 	int (*rate_leaf_tx_max_set)(struct devlink_rate *devlink_rate, void *priv,
 				    u64 tx_max, struct netlink_ext_ack *extack);
+	int (*rate_node_tx_share_set)(struct devlink_rate *devlink_rate, void *priv,
+				      u64 tx_share, struct netlink_ext_ack *extack);
+	int (*rate_node_tx_max_set)(struct devlink_rate *devlink_rate, void *priv,
+				    u64 tx_max, struct netlink_ext_ack *extack);
+	int (*rate_node_new)(struct devlink_rate *rate_node, void **priv,
+			     struct netlink_ext_ack *extack);
+	int (*rate_node_del)(struct devlink_rate *rate_node, void *priv,
+			     struct netlink_ext_ack *extack);
 };
 
 static inline void *devlink_priv(struct devlink *devlink)
