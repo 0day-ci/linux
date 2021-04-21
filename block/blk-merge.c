@@ -1038,7 +1038,6 @@ static enum bio_merge_status blk_attempt_bio_merge(struct request_queue *q,
  * @nr_segs: number of segments in @bio
  * @same_queue_rq: pointer to &struct request that gets filled in when
  * another request associated with @q is found on the plug list
- * (optional, may be %NULL)
  *
  * Determine whether @bio being queued on @q can be merged with a request
  * on %current's plugged list.  Returns %true if merge was successful,
@@ -1067,17 +1066,15 @@ bool blk_attempt_plug_merge(struct request_queue *q, struct bio *bio,
 	plug_list = &plug->mq_list;
 
 	list_for_each_entry_reverse(rq, plug_list, queuelist) {
-		if (rq->q == q && same_queue_rq) {
-			/*
-			 * Only blk-mq multiple hardware queues case checks the
-			 * rq in the same queue, there should be only one such
-			 * rq in a queue
-			 **/
-			*same_queue_rq = rq;
-		}
-
 		if (rq->q != q)
 			continue;
+
+		/*
+		 * Only blk-mq multiple hardware queues case checks the
+		 * rq in the same queue, there should be only one such
+		 * rq in a queue
+		 **/
+		*same_queue_rq = rq;
 
 		if (blk_attempt_bio_merge(q, rq, bio, nr_segs, false) ==
 		    BIO_MERGE_OK)
