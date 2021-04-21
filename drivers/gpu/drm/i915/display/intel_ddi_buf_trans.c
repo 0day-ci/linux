@@ -65,6 +65,7 @@ static const union intel_ddi_buf_trans_entry _hsw_ddi_translations_hdmi[] = {
 static const struct intel_ddi_buf_trans hsw_ddi_translations_hdmi = {
 	.entries = _hsw_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_hsw_ddi_translations_hdmi),
+	.hdmi_default_entry = 6,
 };
 
 static const union intel_ddi_buf_trans_entry _bdw_ddi_translations_edp[] = {
@@ -135,6 +136,7 @@ static const union intel_ddi_buf_trans_entry _bdw_ddi_translations_hdmi[] = {
 static const struct intel_ddi_buf_trans bdw_ddi_translations_hdmi = {
 	.entries = _bdw_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_bdw_ddi_translations_hdmi),
+	.hdmi_default_entry = 7,
 };
 
 /* Skylake H and S */
@@ -329,6 +331,7 @@ static const union intel_ddi_buf_trans_entry _skl_ddi_translations_hdmi[] = {
 static const struct intel_ddi_buf_trans skl_ddi_translations_hdmi = {
 	.entries = _skl_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_skl_ddi_translations_hdmi),
+	.hdmi_default_entry = 8,
 };
 
 /* Skylake/Kabylake Y */
@@ -349,6 +352,7 @@ static const union intel_ddi_buf_trans_entry _skl_y_ddi_translations_hdmi[] = {
 static const struct intel_ddi_buf_trans skl_y_ddi_translations_hdmi = {
 	.entries = _skl_y_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_skl_y_ddi_translations_hdmi),
+	.hdmi_default_entry = 8,
 };
 
 static const union intel_ddi_buf_trans_entry _bxt_ddi_translations_dp[] = {
@@ -409,6 +413,7 @@ static const union intel_ddi_buf_trans_entry _bxt_ddi_translations_hdmi[] = {
 static const struct intel_ddi_buf_trans bxt_ddi_translations_hdmi = {
 	.entries = _bxt_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_bxt_ddi_translations_hdmi),
+	.hdmi_default_entry = ARRAY_SIZE(_bxt_ddi_translations_hdmi) - 1,
 };
 
 /* Voltage Swing Programming for VccIO 0.85V for DP */
@@ -446,6 +451,7 @@ static const union intel_ddi_buf_trans_entry _cnl_ddi_translations_hdmi_0_85V[] 
 static const struct intel_ddi_buf_trans cnl_ddi_translations_hdmi_0_85V = {
 	.entries = _cnl_ddi_translations_hdmi_0_85V,
 	.num_entries = ARRAY_SIZE(_cnl_ddi_translations_hdmi_0_85V),
+	.hdmi_default_entry = ARRAY_SIZE(_cnl_ddi_translations_hdmi_0_85V) - 1,
 };
 
 /* Voltage Swing Programming for VccIO 0.85V for eDP */
@@ -506,6 +512,7 @@ static const union intel_ddi_buf_trans_entry _cnl_ddi_translations_hdmi_0_95V[] 
 static const struct intel_ddi_buf_trans cnl_ddi_translations_hdmi_0_95V = {
 	.entries = _cnl_ddi_translations_hdmi_0_95V,
 	.num_entries = ARRAY_SIZE(_cnl_ddi_translations_hdmi_0_95V),
+	.hdmi_default_entry = ARRAY_SIZE(_cnl_ddi_translations_hdmi_0_95V) - 1,
 };
 
 /* Voltage Swing Programming for VccIO 0.95V for eDP */
@@ -567,6 +574,7 @@ static const union intel_ddi_buf_trans_entry _cnl_ddi_translations_hdmi_1_05V[] 
 static const struct intel_ddi_buf_trans cnl_ddi_translations_hdmi_1_05V = {
 	.entries = _cnl_ddi_translations_hdmi_1_05V,
 	.num_entries = ARRAY_SIZE(_cnl_ddi_translations_hdmi_1_05V),
+	.hdmi_default_entry = ARRAY_SIZE(_cnl_ddi_translations_hdmi_1_05V) - 1,
 };
 
 /* Voltage Swing Programming for VccIO 1.05V for eDP */
@@ -660,6 +668,7 @@ static const union intel_ddi_buf_trans_entry _icl_combo_phy_ddi_translations_hdm
 static const struct intel_ddi_buf_trans icl_combo_phy_ddi_translations_hdmi = {
 	.entries = _icl_combo_phy_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_icl_combo_phy_ddi_translations_hdmi),
+	.hdmi_default_entry = ARRAY_SIZE(_icl_combo_phy_ddi_translations_hdmi) - 1,
 };
 
 static const union intel_ddi_buf_trans_entry _ehl_combo_phy_ddi_translations_dp[] = {
@@ -812,6 +821,7 @@ static const union intel_ddi_buf_trans_entry _icl_mg_phy_ddi_translations_hdmi[]
 static const struct intel_ddi_buf_trans icl_mg_phy_ddi_translations_hdmi = {
 	.entries = _icl_mg_phy_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_icl_mg_phy_ddi_translations_hdmi),
+	.hdmi_default_entry = ARRAY_SIZE(_icl_mg_phy_ddi_translations_hdmi) - 1,
 };
 
 static const union intel_ddi_buf_trans_entry _tgl_dkl_phy_ddi_translations_dp_hbr[] = {
@@ -869,6 +879,7 @@ static const union intel_ddi_buf_trans_entry _tgl_dkl_phy_ddi_translations_hdmi[
 static const struct intel_ddi_buf_trans tgl_dkl_phy_ddi_translations_hdmi = {
 	.entries = _tgl_dkl_phy_ddi_translations_hdmi,
 	.num_entries = ARRAY_SIZE(_tgl_dkl_phy_ddi_translations_hdmi),
+	.hdmi_default_entry = ARRAY_SIZE(_tgl_dkl_phy_ddi_translations_hdmi) - 1,
 };
 
 static const union intel_ddi_buf_trans_entry _tgl_combo_phy_ddi_translations_dp_hbr[] = {
@@ -1629,42 +1640,34 @@ int intel_ddi_hdmi_num_entries(struct intel_encoder *encoder,
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	enum phy phy = intel_port_to_phy(dev_priv, encoder->port);
+	const struct intel_ddi_buf_trans *ddi_translations = NULL;
 	int n_entries;
 
 	if (DISPLAY_VER(dev_priv) >= 12) {
 		if (intel_phy_is_combo(dev_priv, phy))
-			tgl_get_combo_buf_trans_hdmi(encoder, crtc_state, &n_entries);
+			ddi_translations = tgl_get_combo_buf_trans_hdmi(encoder, crtc_state, &n_entries);
 		else
-			tgl_get_dkl_buf_trans_hdmi(encoder, crtc_state, &n_entries);
-		*default_entry = n_entries - 1;
+			ddi_translations = tgl_get_dkl_buf_trans_hdmi(encoder, crtc_state, &n_entries);
 	} else if (DISPLAY_VER(dev_priv) == 11) {
 		if (intel_phy_is_combo(dev_priv, phy))
-			icl_get_combo_buf_trans_hdmi(encoder, crtc_state, &n_entries);
+			ddi_translations = icl_get_combo_buf_trans_hdmi(encoder, crtc_state, &n_entries);
 		else
-			icl_get_mg_buf_trans_hdmi(encoder, crtc_state, &n_entries);
-		*default_entry = n_entries - 1;
+			ddi_translations = icl_get_mg_buf_trans_hdmi(encoder, crtc_state, &n_entries);
 	} else if (IS_CANNONLAKE(dev_priv)) {
-		cnl_get_buf_trans_hdmi(encoder, &n_entries);
-		*default_entry = n_entries - 1;
+		ddi_translations = cnl_get_buf_trans_hdmi(encoder, &n_entries);
 	} else if (IS_GEMINILAKE(dev_priv) || IS_BROXTON(dev_priv)) {
-		bxt_get_buf_trans_hdmi(encoder, &n_entries);
-		*default_entry = n_entries - 1;
-	} else if (DISPLAY_VER(dev_priv) == 9) {
-		hsw_get_buf_trans_hdmi(encoder, &n_entries);
-		*default_entry = 8;
-	} else if (IS_BROADWELL(dev_priv)) {
-		hsw_get_buf_trans_hdmi(encoder, &n_entries);
-		*default_entry = 7;
-	} else if (IS_HASWELL(dev_priv)) {
-		hsw_get_buf_trans_hdmi(encoder, &n_entries);
-		*default_entry = 6;
-	} else {
-		drm_WARN(&dev_priv->drm, 1, "ddi translation table missing\n");
+		ddi_translations = bxt_get_buf_trans_hdmi(encoder, &n_entries);
+	} else if (DISPLAY_VER(dev_priv) == 9 ||
+		   IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv)) {
+		ddi_translations = hsw_get_buf_trans_hdmi(encoder, &n_entries);
+	}
+
+	if (drm_WARN_ON(&dev_priv->drm, !ddi_translations)) {
+		*default_entry = 0;
 		return 0;
 	}
 
-	if (drm_WARN_ON_ONCE(&dev_priv->drm, n_entries == 0))
-		return 0;
+	*default_entry = ddi_translations->hdmi_default_entry;
 
 	return n_entries;
 }
