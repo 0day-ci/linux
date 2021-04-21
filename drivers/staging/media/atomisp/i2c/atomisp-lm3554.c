@@ -680,7 +680,7 @@ static int lm3554_detect(struct v4l2_subdev *sd)
 	int ret;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
-		dev_err(&client->dev, "lm3554_detect i2c error\n");
+		dev_err(&client->dev, "%s i2c error\n", __func__);
 		return -ENODEV;
 	}
 
