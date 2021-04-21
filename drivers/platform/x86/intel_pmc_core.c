@@ -1360,18 +1360,19 @@ static ssize_t pmc_core_lpm_latch_mode_write(struct file *file,
 	struct pmc_dev *pmcdev = s->private;
 	bool clear = false, c10 = false;
 	unsigned char buf[8];
-	size_t ret;
-	int idx, m, mode;
+	int idx, m, mode, ret;
+	size_t len;
 	u32 reg;
 
-	if (count > sizeof(buf) - 1)
+	if (count > sizeof(buf))
 		return -EINVAL;
 
-	ret = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, userbuf, count);
+	len = min(count, sizeof(buf));
+	ret = strncpy_from_user(buf, userbuf, len);
 	if (ret < 0)
 		return ret;
-
-	buf[count] = '\0';
+	if (ret == len)
+		return -EINVAL;
 
 	/*
 	 * Allowed strings are:
