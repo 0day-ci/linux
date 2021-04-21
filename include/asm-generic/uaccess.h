@@ -243,6 +243,9 @@ static inline int __get_user_fn(size_t size, const void __user *ptr, void *x)
 
 extern int __get_user_bad(void) __attribute__((noreturn));
 
+#ifdef CONFIG_GENERIC_STRNCPY_FROM_USER
+long strncpy_from_user(char *dst, const char __user *src, long count);
+#else
 /*
  * Copy a null terminated string from userspace.
  */
@@ -265,7 +268,11 @@ strncpy_from_user(char *dst, const char __user *src, long count)
 		return -EFAULT;
 	return __strncpy_from_user(dst, src, count);
 }
+#endif /* CONFIG_GENERIC_STRNCPY_FROM_USER */
 
+#ifdef CONFIG_GENERIC_STRNLEN_USER
+long strnlen_user(const char __user *src, long n);
+#else
 /*
  * Return the size of a string (including the ending 0)
  *
@@ -286,6 +293,7 @@ static inline long strnlen_user(const char __user *src, long n)
 		return 0;
 	return __strnlen_user(src, n);
 }
+#endif /* CONFIG_GENERIC_STRNLEN_USER */
 
 /*
  * Zero Userspace
