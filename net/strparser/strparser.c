@@ -542,8 +542,6 @@ EXPORT_SYMBOL_GPL(strp_check_rcv);
 static int __init strp_dev_init(void)
 {
 	strp_wq = create_singlethread_workqueue("kstrp");
-	if (unlikely(!strp_wq))
-		return -ENOMEM;
 
 	return 0;
 }
