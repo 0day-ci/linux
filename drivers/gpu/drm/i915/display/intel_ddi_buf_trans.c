@@ -1286,12 +1286,6 @@ icl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 	} else if (dev_priv->vbt.edp.low_vswing) {
 		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_edp_hbr2,
 					   n_entries);
-	} else if (IS_DG1(dev_priv) && crtc_state->port_clock > 270000) {
-		return intel_get_buf_trans(&dg1_combo_phy_ddi_translations_dp_hbr2_hbr3,
-					   n_entries);
-	} else if (IS_DG1(dev_priv)) {
-		return intel_get_buf_trans(&dg1_combo_phy_ddi_translations_dp_rbr_hbr,
-					   n_entries);
 	}
 
 	return icl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
@@ -1507,6 +1501,49 @@ tgl_get_combo_buf_trans(struct intel_encoder *encoder,
 }
 
 static const struct intel_ddi_buf_trans *
+dg1_get_combo_buf_trans_dp(struct intel_encoder *encoder,
+			   const struct intel_crtc_state *crtc_state,
+			   int *n_entries)
+{
+	if (crtc_state->port_clock > 270000)
+		return intel_get_buf_trans(&dg1_combo_phy_ddi_translations_dp_hbr2_hbr3,
+					   n_entries);
+	else
+		return intel_get_buf_trans(&dg1_combo_phy_ddi_translations_dp_rbr_hbr,
+					   n_entries);
+}
+
+static const struct intel_ddi_buf_trans *
+dg1_get_combo_buf_trans_edp(struct intel_encoder *encoder,
+			    const struct intel_crtc_state *crtc_state,
+			    int *n_entries)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+
+	if (crtc_state->port_clock > 540000)
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_edp_hbr3,
+					   n_entries);
+	else if (dev_priv->vbt.edp.low_vswing)
+		return intel_get_buf_trans(&icl_combo_phy_ddi_translations_edp_hbr2,
+					   n_entries);
+	else
+		return dg1_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
+}
+
+static const struct intel_ddi_buf_trans *
+dg1_get_combo_buf_trans(struct intel_encoder *encoder,
+			const struct intel_crtc_state *crtc_state,
+			int *n_entries)
+{
+	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI))
+		return icl_get_combo_buf_trans_hdmi(encoder, crtc_state, n_entries);
+	else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
+		return dg1_get_combo_buf_trans_edp(encoder, crtc_state, n_entries);
+	else
+		return dg1_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
+}
+
+static const struct intel_ddi_buf_trans *
 rkl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1614,6 +1651,8 @@ void intel_ddi_buf_trans_init(struct intel_encoder *encoder)
 
 	if (IS_ROCKETLAKE(i915)) {
 		encoder->get_buf_trans = rkl_get_combo_buf_trans;
+	} else if (IS_DG1(i915)) {
+		encoder->get_buf_trans = dg1_get_combo_buf_trans;
 	} else if (DISPLAY_VER(i915) >= 12) {
 		if (intel_phy_is_combo(i915, phy))
 			encoder->get_buf_trans = tgl_get_combo_buf_trans;
