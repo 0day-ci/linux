@@ -767,26 +767,27 @@ static inline int bio_check_eod(struct bio *bio)
 		handle_bad_sector(bio, maxsector);
 		return -EIO;
 	}
+
+	if (unlikely(should_fail_request(bio->bi_bdev, bio->bi_iter.bi_size)))
+		return -EIO;
+
 	return 0;
 }
 
 /*
  * Remap block n of partition p to block n+start(p) of the disk.
  */
-static int blk_partition_remap(struct bio *bio)
+static inline void blk_partition_remap(struct bio *bio)
 {
-	struct block_device *p = bio->bi_bdev;
+	struct block_device *bdev = bio->bi_bdev;
 
-	if (unlikely(should_fail_request(p, bio->bi_iter.bi_size)))
-		return -EIO;
-	if (bio_sectors(bio)) {
-		bio->bi_iter.bi_sector += p->bd_start_sect;
-		trace_block_bio_remap(bio, p->bd_dev,
+	if (bdev->bd_partno && bio_sectors(bio)) {
+		bio->bi_iter.bi_sector += bdev->bd_start_sect;
+		trace_block_bio_remap(bio, bdev->bd_dev,
 				      bio->bi_iter.bi_sector -
-				      p->bd_start_sect);
+				      bdev->bd_start_sect);
 	}
 	bio_set_flag(bio, BIO_REMAPPED);
-	return 0;
 }
 
 /*
@@ -850,8 +851,6 @@ static noinline_for_stack bool submit_bio_checks(struct bio *bio)
 		goto end_io;
 	if (!bio_flagged(bio, BIO_REMAPPED)) {
 		if (unlikely(bio_check_eod(bio)))
-			goto end_io;
-		if (bdev->bd_partno && unlikely(blk_partition_remap(bio)))
 			goto end_io;
 	}
 
@@ -942,20 +941,6 @@ end_io:
 	return false;
 }
 
-static blk_qc_t __submit_bio(struct bio *bio)
-{
-	struct gendisk *disk = bio->bi_bdev->bd_disk;
-	blk_qc_t ret = BLK_QC_T_NONE;
-
-	if (blk_crypto_bio_prep(&bio)) {
-		if (!disk->fops->submit_bio)
-			return blk_mq_submit_bio(bio);
-		ret = disk->fops->submit_bio(bio);
-	}
-	blk_queue_exit(disk->queue);
-	return ret;
-}
-
 /*
  * The loop in this function may be a bit non-obvious, and so deserves some
  * explanation:
@@ -963,7 +948,7 @@ static blk_qc_t __submit_bio(struct bio *bio)
  *  - Before entering the loop, bio->bi_next is NULL (as all callers ensure
  *    that), so we have a list with a single bio.
  *  - We pretend that we have just taken it off a longer list, so we assign
- *    bio_list to a pointer to the bio_list_on_stack, thus initialising the
+ *    bio_list to a pointer to the current->bio_list, thus initialising the
  *    bio_list of new bios to be added.  ->submit_bio() may indeed add some more
  *    bios through a recursive call to submit_bio_noacct.  If it did, we find a
  *    non-NULL value in bio_list and re-enter the loop from the top.
@@ -971,83 +956,75 @@ static blk_qc_t __submit_bio(struct bio *bio)
  *    pretending) and so remove it from bio_list, and call into ->submit_bio()
  *    again.
  *
- * bio_list_on_stack[0] contains bios submitted by the current ->submit_bio.
- * bio_list_on_stack[1] contains bios that were submitted before the current
+ * current->bio_list[0] contains bios submitted by the current ->submit_bio.
+ * current->bio_list[1] contains bios that were submitted before the current
  *	->submit_bio_bio, but that haven't been processed yet.
  */
 static blk_qc_t __submit_bio_noacct(struct bio *bio)
 {
-	struct bio_list bio_list_on_stack[2];
-	blk_qc_t ret = BLK_QC_T_NONE;
+	struct gendisk *disk = bio->bi_bdev->bd_disk;
+	struct bio_list lower, same;
+	blk_qc_t ret;
 
-	BUG_ON(bio->bi_next);
+	if (!blk_crypto_bio_prep(&bio)) {
+		blk_queue_exit(disk->queue);
+		return BLK_QC_T_NONE;
+	}
 
-	bio_list_init(&bio_list_on_stack[0]);
-	current->bio_list = bio_list_on_stack;
+	if (queue_is_mq(disk->queue))
+		return blk_mq_submit_bio(bio);
 
-	do {
-		struct request_queue *q = bio->bi_bdev->bd_disk->queue;
-		struct bio_list lower, same;
+	/*
+	 * Create a fresh bio_list for all subordinate requests.
+	 */
+	current->bio_list[1] = current->bio_list[0];
+	bio_list_init(&current->bio_list[0]);
 
-		if (unlikely(bio_queue_enter(bio) != 0))
-			continue;
+	WARN_ON_ONCE(!disk->fops->submit_bio);
+	ret = disk->fops->submit_bio(bio);
+	blk_queue_exit(disk->queue);
+	/*
+	 * Sort new bios into those for a lower level and those
+	 * for the same level.
+	 */
+	bio_list_init(&lower);
+	bio_list_init(&same);
+	while ((bio = bio_list_pop(&current->bio_list[0])) != NULL)
+		if (disk->queue == bio->bi_bdev->bd_disk->queue)
+			bio_list_add(&same, bio);
+		else
+			bio_list_add(&lower, bio);
 
-		/*
-		 * Create a fresh bio_list for all subordinate requests.
-		 */
-		bio_list_on_stack[1] = bio_list_on_stack[0];
-		bio_list_init(&bio_list_on_stack[0]);
+	/*
+	 * Now assemble so we handle the lowest level first.
+	 */
+	bio_list_merge(&current->bio_list[0], &lower);
+	bio_list_merge(&current->bio_list[0], &same);
+	bio_list_merge(&current->bio_list[0], &current->bio_list[1]);
 
-		ret = __submit_bio(bio);
-
-		/*
-		 * Sort new bios into those for a lower level and those for the
-		 * same level.
-		 */
-		bio_list_init(&lower);
-		bio_list_init(&same);
-		while ((bio = bio_list_pop(&bio_list_on_stack[0])) != NULL)
-			if (q == bio->bi_bdev->bd_disk->queue)
-				bio_list_add(&same, bio);
-			else
-				bio_list_add(&lower, bio);
-
-		/*
-		 * Now assemble so we handle the lowest level first.
-		 */
-		bio_list_merge(&bio_list_on_stack[0], &lower);
-		bio_list_merge(&bio_list_on_stack[0], &same);
-		bio_list_merge(&bio_list_on_stack[0], &bio_list_on_stack[1]);
-	} while ((bio = bio_list_pop(&bio_list_on_stack[0])));
-
-	current->bio_list = NULL;
 	return ret;
 }
 
-static blk_qc_t __submit_bio_noacct_mq(struct bio *bio)
+static inline struct block_device *bio_interposer_lock(struct bio *bio)
 {
-	struct bio_list bio_list[2] = { };
-	blk_qc_t ret = BLK_QC_T_NONE;
+	bool locked;
+	struct block_device *bdev = bio->bi_bdev;
 
-	current->bio_list = bio_list;
-
-	do {
-		struct gendisk *disk = bio->bi_bdev->bd_disk;
-
-		if (unlikely(bio_queue_enter(bio) != 0))
-			continue;
-
-		if (!blk_crypto_bio_prep(&bio)) {
-			blk_queue_exit(disk->queue);
-			ret = BLK_QC_T_NONE;
-			continue;
+	if (bio->bi_opf & REQ_NOWAIT) {
+		locked = percpu_down_read_trylock(&bdev->bd_interposer_lock);
+		if (unlikely(!locked)) {
+			bio_wouldblock_error(bio);
+			return NULL;
 		}
+	} else
+		percpu_down_read(&bdev->bd_interposer_lock);
 
-		ret = blk_mq_submit_bio(bio);
-	} while ((bio = bio_list_pop(&bio_list[0])));
+	return bdev;
+}
 
-	current->bio_list = NULL;
-	return ret;
+static inline void bio_interposer_unlock(struct block_device *locked_bdev)
+{
+	percpu_up_read(&locked_bdev->bd_interposer_lock);
 }
 
 /**
@@ -1061,6 +1038,10 @@ static blk_qc_t __submit_bio_noacct_mq(struct bio *bio)
  */
 blk_qc_t submit_bio_noacct(struct bio *bio)
 {
+	struct block_device *locked_bdev;
+	struct bio_list bio_list_on_stack[2] = { };
+	blk_qc_t ret = BLK_QC_T_NONE;
+
 	if (!submit_bio_checks(bio))
 		return BLK_QC_T_NONE;
 
@@ -1075,9 +1056,46 @@ blk_qc_t submit_bio_noacct(struct bio *bio)
 		return BLK_QC_T_NONE;
 	}
 
-	if (!bio->bi_bdev->bd_disk->fops->submit_bio)
-		return __submit_bio_noacct_mq(bio);
-	return __submit_bio_noacct(bio);
+	BUG_ON(bio->bi_next);
+
+	locked_bdev = bio_interposer_lock(bio);
+	if (!locked_bdev)
+		return BLK_QC_T_NONE;
+
+	current->bio_list = bio_list_on_stack;
+
+	do {
+		if (unlikely(bio_queue_enter(bio) != 0)) {
+			ret = BLK_QC_T_NONE;
+			continue;
+		}
+
+		if (!bio_flagged(bio, BIO_INTERPOSED) &&
+		    bio->bi_bdev->bd_interposer) {
+			struct gendisk *disk = bio->bi_bdev->bd_disk;
+
+			bio_set_dev(bio, bio->bi_bdev->bd_interposer);
+			bio_set_flag(bio, BIO_INTERPOSED);
+
+			bio_list_add(&bio_list_on_stack[0], bio);
+
+			blk_queue_exit(disk->queue);
+			ret = BLK_QC_T_NONE;
+			continue;
+		}
+
+		if (!bio_flagged(bio, BIO_REMAPPED))
+			blk_partition_remap(bio);
+
+		ret = __submit_bio_noacct(bio);
+
+	} while ((bio = bio_list_pop(&bio_list_on_stack[0])));
+
+	current->bio_list = NULL;
+
+	bio_interposer_unlock(locked_bdev);
+
+	return ret;
 }
 EXPORT_SYMBOL(submit_bio_noacct);
 
