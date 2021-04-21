@@ -50,6 +50,10 @@ struct rkvdec_vp9_decoded_buffer_info {
 struct rkvdec_decoded_buffer {
 	/* Must be the first field in this struct. */
 	struct v4l2_m2m_buffer base;
+
+	union {
+		struct rkvdec_vp9_decoded_buffer_info vp9;
+	};
 };
 
 static inline struct rkvdec_decoded_buffer *
@@ -116,4 +120,6 @@ void rkvdec_run_preamble(struct rkvdec_ctx *ctx, struct rkvdec_run *run);
 void rkvdec_run_postamble(struct rkvdec_ctx *ctx, struct rkvdec_run *run);
 
 extern const struct rkvdec_coded_fmt_ops rkvdec_h264_fmt_ops;
+extern const struct rkvdec_coded_fmt_ops rkvdec_vp9_fmt_ops;
+
 #endif /* RKVDEC_H_ */

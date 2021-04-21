@@ -99,8 +99,28 @@ static const struct rkvdec_ctrls rkvdec_h264_ctrls = {
 	.num_ctrls = ARRAY_SIZE(rkvdec_h264_ctrl_descs),
 };
 
-static const u32 rkvdec_h264_decoded_fmts[] = {
+static const u32 rkvdec_h264_vp9_decoded_fmts[] = {
 	V4L2_PIX_FMT_NV12,
+};
+
+static const struct rkvdec_ctrl_desc rkvdec_vp9_ctrl_descs[] = {
+	{
+		.cfg.id = V4L2_CID_STATELESS_VP9_FRAME_DECODE_PARAMS,
+	},
+	{
+		.cfg.id = V4L2_CID_STATELESS_VP9_COMPRESSED_HDR_PROBS,
+	},
+	{
+		.cfg.id = V4L2_CID_MPEG_VIDEO_VP9_PROFILE,
+		.cfg.min = V4L2_MPEG_VIDEO_VP9_PROFILE_0,
+		.cfg.max = V4L2_MPEG_VIDEO_VP9_PROFILE_0,
+		.cfg.def = V4L2_MPEG_VIDEO_VP9_PROFILE_0,
+	},
+};
+
+static const struct rkvdec_ctrls rkvdec_vp9_ctrls = {
+	.ctrls = rkvdec_vp9_ctrl_descs,
+	.num_ctrls = ARRAY_SIZE(rkvdec_vp9_ctrl_descs),
 };
 
 static const struct rkvdec_coded_fmt_desc rkvdec_coded_fmts[] = {
@@ -116,8 +136,23 @@ static const struct rkvdec_coded_fmt_desc rkvdec_coded_fmts[] = {
 		},
 		.ctrls = &rkvdec_h264_ctrls,
 		.ops = &rkvdec_h264_fmt_ops,
-		.num_decoded_fmts = ARRAY_SIZE(rkvdec_h264_decoded_fmts),
-		.decoded_fmts = rkvdec_h264_decoded_fmts,
+		.num_decoded_fmts = ARRAY_SIZE(rkvdec_h264_vp9_decoded_fmts),
+		.decoded_fmts = rkvdec_h264_vp9_decoded_fmts,
+	},
+	{
+		.fourcc = V4L2_PIX_FMT_VP9_FRAME,
+		.frmsize = {
+			.min_width = 64,
+			.max_width = 4096,
+			.step_width = 64,
+			.min_height = 64,
+			.max_height = 2304,
+			.step_height = 64,
+		},
+		.ctrls = &rkvdec_vp9_ctrls,
+		.ops = &rkvdec_vp9_fmt_ops,
+		.num_decoded_fmts = ARRAY_SIZE(rkvdec_h264_vp9_decoded_fmts),
+		.decoded_fmts = rkvdec_h264_vp9_decoded_fmts,
 	}
 };
 
@@ -319,7 +354,7 @@ static int rkvdec_s_output_fmt(struct file *file, void *priv,
 	struct v4l2_m2m_ctx *m2m_ctx = ctx->fh.m2m_ctx;
 	const struct rkvdec_coded_fmt_desc *desc;
 	struct v4l2_format *cap_fmt;
-	struct vb2_queue *peer_vq;
+	struct vb2_queue *peer_vq, *vq;
 	int ret;
 
 	/*
@@ -330,6 +365,15 @@ static int rkvdec_s_output_fmt(struct file *file, void *priv,
 	peer_vq = v4l2_m2m_get_vq(m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
 	if (vb2_is_busy(peer_vq))
 		return -EBUSY;
+
+	/*
+	 * Some codecs like VP9 can contain dynamic resolution changes which
+	 * are currently not supported by the V4L2 API or driver, so return
+	 * an error if userspace tries to reconfigure the output format.
+	 */
+	vq = v4l2_m2m_get_vq(m2m_ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
+	if (vb2_is_busy(vq))
+		return -EINVAL;
 
 	ret = rkvdec_s_fmt(file, priv, f, rkvdec_try_output_fmt);
 	if (ret)
