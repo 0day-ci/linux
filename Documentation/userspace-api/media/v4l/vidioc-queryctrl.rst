@@ -495,6 +495,18 @@ See also the examples in :ref:`control`.
       - n/a
       - A struct :c:type:`v4l2_ctrl_vp8_frame`, containing VP8
 	frame parameters for stateless video decoders.
+    * - ``V4L2_CTRL_TYPE_VP9_COMPRESSED_HDR_PROBS``
+      - n/a
+      - n/a
+      - n/a
+      - A struct :c:type:`v4l2_ctrl_vp9_compressed_hdr_probs`, containing VP9
+	probabilities updates for stateless video decoders.
+    * - ``V4L2_CTRL_TYPE_VP9_FRAME_DECODE_PARAMS``
+      - n/a
+      - n/a
+      - n/a
+      - A struct :c:type:`v4l2_ctrl_vp9_compressed_hdr_probs`, containing VP9
+	frame decode parameters for stateless video decoders.
 
 .. raw:: latex
 
