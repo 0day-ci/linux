@@ -604,7 +604,7 @@ static const union intel_ddi_buf_trans_entry icl_mg_phy_ddi_translations_hdmi[] 
 	{ .mg = { 0x36, 0x0, 0x9 } },	/* 10		Full	-3 dB */
 };
 
-static const union intel_ddi_buf_trans_entry tgl_dkl_phy_dp_ddi_trans[] = {
+static const union intel_ddi_buf_trans_entry tgl_dkl_phy_ddi_translations_dp_hbr[] = {
 					/* VS	pre-emp	Non-trans mV	Pre-emph dB */
 	{ .dkl = { 0x7, 0x0, 0x00 } },	/* 0	0	400mV		0 dB */
 	{ .dkl = { 0x5, 0x0, 0x05 } },	/* 0	1	400mV		3.5 dB */
@@ -618,7 +618,7 @@ static const union intel_ddi_buf_trans_entry tgl_dkl_phy_dp_ddi_trans[] = {
 	{ .dkl = { 0x0, 0x0, 0x00 } },	/* 3	0	1200mV		0 dB HDMI default */
 };
 
-static const union intel_ddi_buf_trans_entry tgl_dkl_phy_dp_ddi_trans_hbr2[] = {
+static const union intel_ddi_buf_trans_entry tgl_dkl_phy_ddi_translations_dp_hbr2[] = {
 					/* VS	pre-emp	Non-trans mV	Pre-emph dB */
 	{ .dkl = { 0x7, 0x0, 0x00 } },	/* 0	0	400mV		0 dB */
 	{ .dkl = { 0x5, 0x0, 0x05 } },	/* 0	1	400mV		3.5 dB */
@@ -632,7 +632,7 @@ static const union intel_ddi_buf_trans_entry tgl_dkl_phy_dp_ddi_trans_hbr2[] = {
 	{ .dkl = { 0x0, 0x0, 0x00 } },	/* 3	0	1200mV		0 dB HDMI default */
 };
 
-static const union intel_ddi_buf_trans_entry tgl_dkl_phy_hdmi_ddi_trans[] = {
+static const union intel_ddi_buf_trans_entry tgl_dkl_phy_ddi_translations_hdmi[] = {
 					/* HDMI Preset	VS	Pre-emph */
 	{ .dkl = { 0x7, 0x0, 0x0 } },	/* 1		400mV	0dB */
 	{ .dkl = { 0x6, 0x0, 0x0 } },	/* 2		500mV	0dB */
@@ -1334,8 +1334,8 @@ tgl_get_dkl_buf_trans_hdmi(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
 {
-	*n_entries = ARRAY_SIZE(tgl_dkl_phy_hdmi_ddi_trans);
-	return tgl_dkl_phy_hdmi_ddi_trans;
+	*n_entries = ARRAY_SIZE(tgl_dkl_phy_ddi_translations_hdmi);
+	return tgl_dkl_phy_ddi_translations_hdmi;
 }
 
 static const union intel_ddi_buf_trans_entry *
@@ -1344,11 +1344,11 @@ tgl_get_dkl_buf_trans_dp(struct intel_encoder *encoder,
 			 int *n_entries)
 {
 	if (crtc_state->port_clock > 270000) {
-		*n_entries = ARRAY_SIZE(tgl_dkl_phy_dp_ddi_trans_hbr2);
-		return tgl_dkl_phy_dp_ddi_trans_hbr2;
+		*n_entries = ARRAY_SIZE(tgl_dkl_phy_ddi_translations_dp_hbr2);
+		return tgl_dkl_phy_ddi_translations_dp_hbr2;
 	} else {
-		*n_entries = ARRAY_SIZE(tgl_dkl_phy_dp_ddi_trans);
-		return tgl_dkl_phy_dp_ddi_trans;
+		*n_entries = ARRAY_SIZE(tgl_dkl_phy_ddi_translations_dp_hbr);
+		return tgl_dkl_phy_ddi_translations_dp_hbr;
 	}
 }
 
