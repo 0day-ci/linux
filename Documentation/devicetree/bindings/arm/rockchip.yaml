@@ -560,6 +560,11 @@ properties:
           - const: rockchip,rk3368-evb-act8846
           - const: rockchip,rk3368
 
+      - description: Rockchip RK3568 Evaluation board
+        items:
+          - const: rockchip,rk3568-evb1-v10
+          - const: rockchip,rk3568
+
       - description: Rockchip RK3399 Evaluation board
         items:
           - const: rockchip,rk3399-evb
