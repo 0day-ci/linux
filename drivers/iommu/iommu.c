@@ -596,7 +596,7 @@ struct iommu_group *iommu_group_alloc(void)
 				   NULL, "%d", group->id);
 	if (ret) {
 		ida_simple_remove(&iommu_group_ida, group->id);
-		kobject_put(&group->kobj);
+		kfree(group);
 		return ERR_PTR(ret);
 	}
 
