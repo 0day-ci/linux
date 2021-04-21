@@ -21,7 +21,7 @@ PMU_FORMAT_ATTR(thresh_stop,	"config:32-35");
 PMU_FORMAT_ATTR(thresh_start,	"config:36-39");
 PMU_FORMAT_ATTR(thresh_cmp,	"config:40-49");
 
-struct attribute *isa207_pmu_format_attr[] = {
+static struct attribute *isa207_pmu_format_attr[] = {
 	&format_attr_event.attr,
 	&format_attr_pmcxsel.attr,
 	&format_attr_mark.attr,
@@ -447,8 +447,8 @@ ebb_bhrb:
 	 * EBB events are pinned & exclusive, so this should never actually
 	 * hit, but we leave it as a fallback in case.
 	 */
-	mask  |= CNST_EBB_VAL(ebb);
-	value |= CNST_EBB_MASK;
+	mask  |= CNST_EBB_MASK;
+	value |= CNST_EBB_VAL(ebb);
 
 	*maskp = mask;
 	*valp = value;
@@ -693,4 +693,46 @@ int isa207_get_alternatives(u64 event, u64 alt[], int size, unsigned int flags,
 	}
 
 	return num_alt;
+}
+
+int isa3XX_check_attr_config(struct perf_event *ev)
+{
+	u64 val, sample_mode;
+	u64 event = ev->attr.config;
+
+	val = (event >> EVENT_SAMPLE_SHIFT) & EVENT_SAMPLE_MASK;
+	sample_mode = val & 0x3;
+
+	/*
+	 * MMCRA[61:62] is Random Sampling Mode (SM).
+	 * value of 0b11 is reserved.
+	 */
+	if (sample_mode == 0x3)
+		return -EINVAL;
+
+	/*
+	 * Check for all reserved value
+	 * Source: Performance Monitoring Unit User Guide
+	 */
+	switch (val) {
+	case 0x5:
+	case 0x9:
+	case 0xD:
+	case 0x19:
+	case 0x1D:
+	case 0x1A:
+	case 0x1E:
+		return -EINVAL;
+	}
+
+	/*
+	 * MMCRA[48:51]/[52:55]) Threshold Start/Stop
+	 * Events Selection.
+	 * 0b11110000/0b00001111 is reserved.
+	 */
+	val = (event >> EVENT_THR_CTL_SHIFT) & EVENT_THR_CTL_MASK;
+	if (((val & 0xF0) == 0xF0) || ((val & 0xF) == 0xF))
+		return -EINVAL;
+
+	return 0;
 }

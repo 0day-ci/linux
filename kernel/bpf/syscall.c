@@ -1694,7 +1694,9 @@ static void __bpf_prog_put_noref(struct bpf_prog *prog, bool deferred)
 {
 	bpf_prog_kallsyms_del_all(prog);
 	btf_put(prog->aux->btf);
-	bpf_prog_free_linfo(prog);
+	kvfree(prog->aux->jited_linfo);
+	kvfree(prog->aux->linfo);
+	kfree(prog->aux->kfunc_tab);
 	if (prog->aux->attach_btf)
 		btf_put(prog->aux->attach_btf);
 
@@ -2549,6 +2551,9 @@ static int bpf_tracing_link_fill_link_info(const struct bpf_link *link,
 		container_of(link, struct bpf_tracing_link, link);
 
 	info->tracing.attach_type = tr_link->attach_type;
+	bpf_trampoline_unpack_key(tr_link->trampoline->key,
+				  &info->tracing.target_obj_id,
+				  &info->tracing.target_btf_id);
 
 	return 0;
 }
@@ -2946,6 +2951,7 @@ attach_type_to_prog_type(enum bpf_attach_type attach_type)
 		return BPF_PROG_TYPE_SK_MSG;
 	case BPF_SK_SKB_STREAM_PARSER:
 	case BPF_SK_SKB_STREAM_VERDICT:
+	case BPF_SK_SKB_VERDICT:
 		return BPF_PROG_TYPE_SK_SKB;
 	case BPF_LIRC_MODE2:
 		return BPF_PROG_TYPE_LIRC_MODE2;

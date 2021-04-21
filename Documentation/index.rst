@@ -82,6 +82,7 @@ merged much easier.
    maintainer/index
    fault-injection/index
    livepatch/index
+   rust/index
 
 
 Kernel API documentation
@@ -149,27 +150,11 @@ Architecture-agnostic documentation
 Architecture-specific documentation
 -----------------------------------
 
-These books provide programming details about architecture-specific
-implementation.
-
 .. toctree::
    :maxdepth: 2
 
-   arm/index
-   arm64/index
-   ia64/index
-   m68k/index
-   mips/index
-   nios2/index
-   openrisc/index
-   parisc/index
-   powerpc/index
-   riscv/index
-   s390/index
-   sh/index
-   sparc/index
-   x86/index
-   xtensa/index
+   arch
+
 
 Other documentation
 -------------------

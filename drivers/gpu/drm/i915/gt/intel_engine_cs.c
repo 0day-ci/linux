@@ -1,25 +1,6 @@
+// SPDX-License-Identifier: MIT
 /*
  * Copyright © 2016 Intel Corporation
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next
- * paragraph) shall be included in all copies or substantial portions of the
- * Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
- *
  */
 
 #include <drm/drm_print.h>
@@ -64,9 +45,9 @@ struct engine_info {
 	unsigned int hw_id;
 	u8 class;
 	u8 instance;
-	/* mmio bases table *must* be sorted in reverse gen order */
+	/* mmio bases table *must* be sorted in reverse graphics_ver order */
 	struct engine_mmio_base {
-		u32 gen : 8;
+		u32 graphics_ver : 8;
 		u32 base : 24;
 	} mmio_bases[MAX_MMIO_BASES];
 };
@@ -77,7 +58,7 @@ static const struct engine_info intel_engines[] = {
 		.class = RENDER_CLASS,
 		.instance = 0,
 		.mmio_bases = {
-			{ .gen = 1, .base = RENDER_RING_BASE }
+			{ .graphics_ver = 1, .base = RENDER_RING_BASE }
 		},
 	},
 	[BCS0] = {
@@ -85,7 +66,7 @@ static const struct engine_info intel_engines[] = {
 		.class = COPY_ENGINE_CLASS,
 		.instance = 0,
 		.mmio_bases = {
-			{ .gen = 6, .base = BLT_RING_BASE }
+			{ .graphics_ver = 6, .base = BLT_RING_BASE }
 		},
 	},
 	[VCS0] = {
@@ -93,9 +74,9 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 0,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_BSD_RING_BASE },
-			{ .gen = 6, .base = GEN6_BSD_RING_BASE },
-			{ .gen = 4, .base = BSD_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_BSD_RING_BASE },
+			{ .graphics_ver = 6, .base = GEN6_BSD_RING_BASE },
+			{ .graphics_ver = 4, .base = BSD_RING_BASE }
 		},
 	},
 	[VCS1] = {
@@ -103,8 +84,8 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 1,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_BSD2_RING_BASE },
-			{ .gen = 8, .base = GEN8_BSD2_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_BSD2_RING_BASE },
+			{ .graphics_ver = 8, .base = GEN8_BSD2_RING_BASE }
 		},
 	},
 	[VCS2] = {
@@ -112,7 +93,7 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 2,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_BSD3_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_BSD3_RING_BASE }
 		},
 	},
 	[VCS3] = {
@@ -120,7 +101,7 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_DECODE_CLASS,
 		.instance = 3,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_BSD4_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_BSD4_RING_BASE }
 		},
 	},
 	[VECS0] = {
@@ -128,8 +109,8 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_ENHANCEMENT_CLASS,
 		.instance = 0,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_VEBOX_RING_BASE },
-			{ .gen = 7, .base = VEBOX_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_VEBOX_RING_BASE },
+			{ .graphics_ver = 7, .base = VEBOX_RING_BASE }
 		},
 	},
 	[VECS1] = {
@@ -137,7 +118,7 @@ static const struct engine_info intel_engines[] = {
 		.class = VIDEO_ENHANCEMENT_CLASS,
 		.instance = 1,
 		.mmio_bases = {
-			{ .gen = 11, .base = GEN11_VEBOX2_RING_BASE }
+			{ .graphics_ver = 11, .base = GEN11_VEBOX2_RING_BASE }
 		},
 	},
 };
@@ -165,9 +146,9 @@ u32 intel_engine_context_size(struct intel_gt *gt, u8 class)
 
 	switch (class) {
 	case RENDER_CLASS:
-		switch (INTEL_GEN(gt->i915)) {
+		switch (GRAPHICS_VER(gt->i915)) {
 		default:
-			MISSING_CASE(INTEL_GEN(gt->i915));
+			MISSING_CASE(GRAPHICS_VER(gt->i915));
 			return DEFAULT_LR_CONTEXT_RENDER_SIZE;
 		case 12:
 		case 11:
@@ -203,8 +184,8 @@ u32 intel_engine_context_size(struct intel_gt *gt, u8 class)
 			 */
 			cxt_size = intel_uncore_read(uncore, CXT_SIZE) + 1;
 			drm_dbg(&gt->i915->drm,
-				"gen%d CXT_SIZE = %d bytes [0x%08x]\n",
-				INTEL_GEN(gt->i915), cxt_size * 64,
+				"graphics_ver = %d CXT_SIZE = %d bytes [0x%08x]\n",
+				GRAPHICS_VER(gt->i915), cxt_size * 64,
 				cxt_size - 1);
 			return round_up(cxt_size * 64, PAGE_SIZE);
 		case 3:
@@ -220,7 +201,7 @@ u32 intel_engine_context_size(struct intel_gt *gt, u8 class)
 	case VIDEO_DECODE_CLASS:
 	case VIDEO_ENHANCEMENT_CLASS:
 	case COPY_ENGINE_CLASS:
-		if (INTEL_GEN(gt->i915) < 8)
+		if (GRAPHICS_VER(gt->i915) < 8)
 			return 0;
 		return GEN8_LR_CONTEXT_OTHER_SIZE;
 	}
@@ -232,7 +213,7 @@ static u32 __engine_mmio_base(struct drm_i915_private *i915,
 	int i;
 
 	for (i = 0; i < MAX_MMIO_BASES; i++)
-		if (INTEL_GEN(i915) >= bases[i].gen)
+		if (GRAPHICS_VER(i915) >= bases[i].graphics_ver)
 			break;
 
 	GEM_BUG_ON(i == MAX_MMIO_BASES);
@@ -619,6 +600,7 @@ static void cleanup_status_page(struct intel_engine_cs *engine)
 }
 
 static int pin_ggtt_status_page(struct intel_engine_cs *engine,
+				struct i915_gem_ww_ctx *ww,
 				struct i915_vma *vma)
 {
 	unsigned int flags;
@@ -639,12 +621,13 @@ static int pin_ggtt_status_page(struct intel_engine_cs *engine,
 	else
 		flags = PIN_HIGH;
 
-	return i915_ggtt_pin(vma, NULL, 0, flags);
+	return i915_ggtt_pin(vma, ww, 0, flags);
 }
 
 static int init_status_page(struct intel_engine_cs *engine)
 {
 	struct drm_i915_gem_object *obj;
+	struct i915_gem_ww_ctx ww;
 	struct i915_vma *vma;
 	void *vaddr;
 	int ret;
@@ -670,30 +653,39 @@ static int init_status_page(struct intel_engine_cs *engine)
 	vma = i915_vma_instance(obj, &engine->gt->ggtt->vm, NULL);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
-		goto err;
+		goto err_put;
 	}
+
+	i915_gem_ww_ctx_init(&ww, true);
+retry:
+	ret = i915_gem_object_lock(obj, &ww);
+	if (!ret && !HWS_NEEDS_PHYSICAL(engine->i915))
+		ret = pin_ggtt_status_page(engine, &ww, vma);
+	if (ret)
+		goto err;
 
 	vaddr = i915_gem_object_pin_map(obj, I915_MAP_WB);
 	if (IS_ERR(vaddr)) {
 		ret = PTR_ERR(vaddr);
-		goto err;
+		goto err_unpin;
 	}
 
 	engine->status_page.addr = memset(vaddr, 0, PAGE_SIZE);
 	engine->status_page.vma = vma;
 
-	if (!HWS_NEEDS_PHYSICAL(engine->i915)) {
-		ret = pin_ggtt_status_page(engine, vma);
-		if (ret)
-			goto err_unpin;
-	}
-
-	return 0;
-
 err_unpin:
-	i915_gem_object_unpin_map(obj);
+	if (ret)
+		i915_vma_unpin(vma);
 err:
-	i915_gem_object_put(obj);
+	if (ret == -EDEADLK) {
+		ret = i915_gem_ww_ctx_backoff(&ww);
+		if (!ret)
+			goto retry;
+	}
+	i915_gem_ww_ctx_fini(&ww);
+err_put:
+	if (ret)
+		i915_gem_object_put(obj);
 	return ret;
 }
 
@@ -763,6 +755,7 @@ static int measure_breadcrumb_dw(struct intel_context *ce)
 	frame->rq.engine = engine;
 	frame->rq.context = ce;
 	rcu_assign_pointer(frame->rq.timeline, ce->timeline);
+	frame->rq.hwsp_seqno = ce->timeline->hwsp_seqno;
 
 	frame->ring.vaddr = frame->cs;
 	frame->ring.size = sizeof(frame->cs);
@@ -1239,14 +1232,14 @@ void __intel_engine_flush_submission(struct intel_engine_cs *engine, bool sync)
 {
 	struct tasklet_struct *t = &engine->execlists.tasklet;
 
-	if (!t->func)
+	if (!t->callback)
 		return;
 
 	local_bh_disable();
 	if (tasklet_trylock(t)) {
 		/* Must wait for any GPU reset in progress. */
 		if (__tasklet_is_enabled(t))
-			t->func(t->data);
+			t->callback(t);
 		tasklet_unlock(t);
 	}
 	local_bh_enable();
@@ -1273,14 +1266,8 @@ bool intel_engine_is_idle(struct intel_engine_cs *engine)
 		return true;
 
 	/* Waiting to drain ELSP? */
-	if (execlists_active(&engine->execlists)) {
-		synchronize_hardirq(engine->i915->drm.pdev->irq);
-
-		intel_engine_flush_submission(engine);
-
-		if (execlists_active(&engine->execlists))
-			return false;
-	}
+	synchronize_hardirq(to_pci_dev(engine->i915->drm.dev)->irq);
+	intel_engine_flush_submission(engine);
 
 	/* ELSP is empty, but there are ready requests? E.g. after reset */
 	if (!RB_EMPTY_ROOT(&engine->execlists.queue.rb_root))

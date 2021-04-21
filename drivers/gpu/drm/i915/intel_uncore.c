@@ -465,6 +465,22 @@ fpga_check_for_unclaimed_mmio(struct intel_uncore *uncore)
 	if (likely(!(dbg & FPGA_DBG_RM_NOCLAIM)))
 		return false;
 
+	/*
+	 * Bugs in PCI programming (or failing hardware) can occasionally cause
+	 * us to lose access to the MMIO BAR.  When this happens, register
+	 * reads will come back with 0xFFFFFFFF for every register and things
+	 * go bad very quickly.  Let's try to detect that special case and at
+	 * least try to print a more informative message about what has
+	 * happened.
+	 *
+	 * During normal operation the FPGA_DBG register has several unused
+	 * bits that will always read back as 0's so we can use them as canaries
+	 * to recognize when MMIO accesses are just busted.
+	 */
+	if (unlikely(dbg == ~0))
+		drm_err(&uncore->i915->drm,
+			"Lost access to MMIO BAR; all registers now read back as 0xFFFFFFFF!\n");
+
 	__raw_uncore_write32(uncore, FPGA_DBG, FPGA_DBG_RM_NOCLAIM);
 
 	return true;
@@ -1780,7 +1796,7 @@ static int i915_pmic_bus_access_notifier(struct notifier_block *nb,
 static int uncore_mmio_setup(struct intel_uncore *uncore)
 {
 	struct drm_i915_private *i915 = uncore->i915;
-	struct pci_dev *pdev = i915->drm.pdev;
+	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
 	int mmio_bar;
 	int mmio_size;
 
@@ -1812,7 +1828,7 @@ static int uncore_mmio_setup(struct intel_uncore *uncore)
 
 static void uncore_mmio_cleanup(struct intel_uncore *uncore)
 {
-	struct pci_dev *pdev = uncore->i915->drm.pdev;
+	struct pci_dev *pdev = to_pci_dev(uncore->i915->drm.dev);
 
 	pci_iounmap(pdev, uncore->regs);
 }
@@ -1992,12 +2008,14 @@ void intel_uncore_fini_mmio(struct intel_uncore *uncore)
 static const struct reg_whitelist {
 	i915_reg_t offset_ldw;
 	i915_reg_t offset_udw;
-	u16 gen_mask;
+	u8 min_graphics_ver;
+	u8 max_graphics_ver;
 	u8 size;
 } reg_read_whitelist[] = { {
 	.offset_ldw = RING_TIMESTAMP(RENDER_RING_BASE),
 	.offset_udw = RING_TIMESTAMP_UDW(RENDER_RING_BASE),
-	.gen_mask = INTEL_GEN_MASK(4, 12),
+	.min_graphics_ver = 4,
+	.max_graphics_ver = 12,
 	.size = 8
 } };
 
@@ -2022,7 +2040,7 @@ int i915_reg_read_ioctl(struct drm_device *dev,
 		GEM_BUG_ON(entry->size > 8);
 		GEM_BUG_ON(entry_offset & (entry->size - 1));
 
-		if (INTEL_INFO(i915)->gen_mask & entry->gen_mask &&
+		if (IS_GRAPHICS_VER(i915, entry->min_graphics_ver, entry->max_graphics_ver) &&
 		    entry_offset == (reg->offset & -entry->size))
 			break;
 		entry++;

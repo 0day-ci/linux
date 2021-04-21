@@ -31,6 +31,7 @@
 #include <asm/fadump.h>
 #include <asm/fadump-internal.h>
 #include <asm/setup.h>
+#include <asm/interrupt.h>
 
 /*
  * The CPU who acquired the lock to trigger the fadump crash should
@@ -292,7 +293,7 @@ static void fadump_show_config(void)
  * that is required for a kernel to boot successfully.
  *
  */
-static inline u64 fadump_calculate_reserve_size(void)
+static __init u64 fadump_calculate_reserve_size(void)
 {
 	u64 base, size, bootmem_min;
 	int ret;
@@ -728,7 +729,7 @@ void crash_fadump(struct pt_regs *regs, const char *str)
 	 * If we came in via system reset, wait a while for the secondary
 	 * CPUs to enter.
 	 */
-	if (TRAP(&(fdh->regs)) == 0x100) {
+	if (TRAP(&(fdh->regs)) == INTERRUPT_SYSTEM_RESET) {
 		msecs = CRASH_TIMEOUT;
 		while ((atomic_read(&cpus_in_fadump) < ncpus) && (--msecs > 0))
 			mdelay(1);

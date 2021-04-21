@@ -66,6 +66,7 @@ static const char * const platform_names[] = {
 	PLATFORM_NAME(TIGERLAKE),
 	PLATFORM_NAME(ROCKETLAKE),
 	PLATFORM_NAME(DG1),
+	PLATFORM_NAME(ALDERLAKE_S),
 };
 #undef PLATFORM_NAME
 
@@ -94,7 +95,9 @@ static const char *iommu_name(void)
 void intel_device_info_print_static(const struct intel_device_info *info,
 				    struct drm_printer *p)
 {
-	drm_printf(p, "gen: %d\n", info->gen);
+	drm_printf(p, "graphics_ver: %u\n", info->graphics_ver);
+	drm_printf(p, "media_ver: %u\n", info->media_ver);
+	drm_printf(p, "display_ver: %u\n", info->display.ver);
 	drm_printf(p, "gt: %d\n", info->gt);
 	drm_printf(p, "iommu: %s\n", iommu_name());
 	drm_printf(p, "memory-regions: %x\n", info->memory_regions);
@@ -204,7 +207,7 @@ void intel_device_info_subplatform_init(struct drm_i915_private *i915)
 	}
 
 	if (IS_TIGERLAKE(i915)) {
-		struct pci_dev *root, *pdev = i915->drm.pdev;
+		struct pci_dev *root, *pdev = to_pci_dev(i915->drm.dev);
 
 		root = list_first_entry(&pdev->bus->devices, typeof(*root), bus_list);
 
@@ -222,7 +225,7 @@ void intel_device_info_subplatform_init(struct drm_i915_private *i915)
 		}
 	}
 
-	GEM_BUG_ON(mask & ~INTEL_SUBPLATFORM_BITS);
+	GEM_BUG_ON(mask & ~INTEL_SUBPLATFORM_MASK);
 
 	RUNTIME_INFO(i915)->platform_mask[pi] |= mask;
 }
@@ -249,7 +252,11 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 	struct intel_runtime_info *runtime = RUNTIME_INFO(dev_priv);
 	enum pipe pipe;
 
-	if (INTEL_GEN(dev_priv) >= 10) {
+	/* Wa_14011765242: adl-s A0 */
+	if (IS_ADLS_DISPLAY_STEP(dev_priv, STEP_A0, STEP_A0))
+		for_each_pipe(dev_priv, pipe)
+			runtime->num_scalers[pipe] = 0;
+	else if (INTEL_GEN(dev_priv) >= 10) {
 		for_each_pipe(dev_priv, pipe)
 			runtime->num_scalers[pipe] = 2;
 	} else if (IS_GEN(dev_priv, 9)) {
@@ -260,7 +267,7 @@ void intel_device_info_runtime_init(struct drm_i915_private *dev_priv)
 
 	BUILD_BUG_ON(BITS_PER_TYPE(intel_engine_mask_t) < I915_NUM_ENGINES);
 
-	if (IS_ROCKETLAKE(dev_priv))
+	if (HAS_D12_PLANE_MINIMIZATION(dev_priv))
 		for_each_pipe(dev_priv, pipe)
 			runtime->num_sprites[pipe] = 4;
 	else if (INTEL_GEN(dev_priv) >= 11)
