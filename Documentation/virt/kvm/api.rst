@@ -6233,6 +6233,24 @@ KVM_RUN_BUS_LOCK flag is used to distinguish between them.
 This capability can be used to check / enable 2nd DAWR feature provided
 by POWER10 processor.
 
+7.24 KVM_CAP_EXIT_ON_EMULATION_FAILURE
+--------------------------------------
+
+:Architectures: x86
+:Parameters: args[0] whether the feature should be enabled or not
+
+When this capability is enabled the in-kernel instruction emulator packs
+the exit struct of KVM_INTERNAL_ERROR with the instrution length and
+instruction bytes when an error occurs while emulating an instruction.  This
+will also happen when the emulation type is set to EMULTYPE_SKIP, but with this
+capability enabled this becomes the default behavior regarless of how the
+emulation type is set unless it is a VMware #GP; in that case a #GP is injected
+and KVM does not exit to userspace.
+
+When this capability is enabled use the emulation_failure struct instead of the
+internal struct for the exit struct.  They have the same layout, but the
+emulation_failure struct matches the content better.
+
 8. Other capabilities.
 ======================
 
