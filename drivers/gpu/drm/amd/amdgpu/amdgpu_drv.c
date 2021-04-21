@@ -1593,8 +1593,15 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 
 	if (amdgpu_device_has_dc_support(adev)) {
 		struct drm_crtc *crtc;
+		struct drm_modeset_acquire_ctx ctx;
+		int ret_lock = 0;
 
-		drm_modeset_lock_all(drm_dev);
+retry:
+		drm_modeset_lock_all_ctx(drm_dev, &ctx);
+		if(ret_lock == -EDEADLK) {
+			drm_modeset_backoff(&ctx);
+			goto retry;
+		}
 
 		drm_for_each_crtc(crtc, drm_dev) {
 			if (crtc->state->active) {
@@ -1603,7 +1610,7 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 			}
 		}
 
-		drm_modeset_unlock_all(drm_dev);
+		drm_modeset_drop_locks(&ctx);
 
 	} else {
 		struct drm_connector *list_connector;
