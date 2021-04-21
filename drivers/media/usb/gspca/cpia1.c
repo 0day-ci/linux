@@ -537,14 +537,10 @@ static int do_command(struct gspca_dev *gspca_dev, u16 command,
 		}
 		if (sd->params.qx3.button) {
 			/* button pressed - unlock the latch */
-			ret = do_command(gspca_dev, CPIA_COMMAND_WriteMCPort,
+			do_command(gspca_dev, CPIA_COMMAND_WriteMCPort,
 				   3, 0xdf, 0xdf, 0);
-			if (ret)
-				return ret;
-			ret = do_command(gspca_dev, CPIA_COMMAND_WriteMCPort,
+			do_command(gspca_dev, CPIA_COMMAND_WriteMCPort,
 				   3, 0xff, 0xff, 0);
-			if (ret)
-				return ret;
 		}
 
 		/* test whether microscope is cradled */
