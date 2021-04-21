@@ -1694,7 +1694,8 @@ static int init_subsystems(void)
 	if (err)
 		goto out;
 
-	kvm_perf_init();
+	if (IS_ENABLED(CONFIG_PERF_EVENTS))
+		kvm_perf_init();
 	kvm_sys_reg_table_init();
 
 out:
@@ -1899,7 +1900,8 @@ static int init_hyp_mode(void)
 	return 0;
 
 out_err:
-	teardown_hyp_mode();
+	if (IS_ENABLED(CONFIG_PERF_EVENTS))
+		teardown_hyp_mode();
 	kvm_err("error initializing Hyp mode: %d\n", err);
 	return err;
 }
@@ -2101,7 +2103,7 @@ int kvm_arch_init(void *opaque)
 
 out_hyp:
 	hyp_cpu_pm_exit();
-	if (!in_hyp_mode)
+	if (!IS_ENABLED(CONFIG_PERF_EVENTS) && in_hyp_mode)
 		teardown_hyp_mode();
 out_err:
 	return err;

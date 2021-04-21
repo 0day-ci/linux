@@ -13,12 +13,19 @@
 #define ARMV8_PMU_CYCLE_IDX		(ARMV8_PMU_MAX_COUNTERS - 1)
 #define ARMV8_PMU_MAX_COUNTER_PAIRS	((ARMV8_PMU_MAX_COUNTERS + 1) >> 1)
 
+#ifdef CONFIG_PERF_EVENTS
 DECLARE_STATIC_KEY_FALSE(kvm_arm_pmu_available);
 
 static __always_inline bool kvm_arm_support_pmu_v3(void)
 {
 	return static_branch_likely(&kvm_arm_pmu_available);
 }
+#else
+static __always_inline bool kvm_arm_support_pmu_v3(void)
+{
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_HW_PERF_EVENTS
 
