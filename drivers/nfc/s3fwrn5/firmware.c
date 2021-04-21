@@ -492,10 +492,7 @@ int s3fwrn5_fw_recv_frame(struct nci_dev *ndev, struct sk_buff *skb)
 	struct s3fwrn5_info *info = nci_get_drvdata(ndev);
 	struct s3fwrn5_fw_info *fw_info = &info->fw_info;
 
-	if (WARN_ON(fw_info->rsp)) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
+	BUG_ON(fw_info->rsp);
 
 	fw_info->rsp = skb;
 
