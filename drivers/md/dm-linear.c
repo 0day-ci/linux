@@ -51,7 +51,8 @@ static int linear_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 	lc->start = tmp;
 
-	ret = dm_get_device(ti, argv[0], dm_table_get_mode(ti->table), &lc->dev);
+	ret = dm_get_device_ex(ti, argv[0], dm_table_get_mode(ti->table),
+			       dm_table_is_interposer(ti->table), &lc->dev);
 	if (ret) {
 		ti->error = "Device lookup failed";
 		goto bad;

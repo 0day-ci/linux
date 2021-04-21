@@ -243,7 +243,8 @@ static int flakey_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	if (r)
 		goto bad;
 
-	r = dm_get_device(ti, devname, dm_table_get_mode(ti->table), &fc->dev);
+	r = dm_get_device_ex(ti, devname, dm_table_get_mode(ti->table),
+			     dm_table_is_interposer(ti->table), &fc->dev);
 	if (r) {
 		ti->error = "Device lookup failed";
 		goto bad;

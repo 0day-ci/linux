@@ -2646,7 +2646,8 @@ static int origin_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad_alloc;
 	}
 
-	r = dm_get_device(ti, argv[0], dm_table_get_mode(ti->table), &o->dev);
+	r = dm_get_device_ex(ti, argv[0], dm_table_get_mode(ti->table),
+			     dm_table_is_interposer(ti->table), &o->dev);
 	if (r) {
 		ti->error = "Cannot get target device";
 		goto bad_open;

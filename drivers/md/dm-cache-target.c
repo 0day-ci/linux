@@ -2140,8 +2140,9 @@ static int parse_origin_dev(struct cache_args *ca, struct dm_arg_set *as,
 	if (!at_least_one_arg(as, error))
 		return -EINVAL;
 
-	r = dm_get_device(ca->ti, dm_shift_arg(as), FMODE_READ | FMODE_WRITE,
-			  &ca->origin_dev);
+	r = dm_get_device_ex(ca->ti, dm_shift_arg(as), FMODE_READ | FMODE_WRITE,
+			     dm_table_is_interposer(ca->ti->table),
+			     &ca->origin_dev);
 	if (r) {
 		*error = "Error opening origin device";
 		return r;

@@ -2169,7 +2169,8 @@ static int writecache_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	string = dm_shift_arg(&as);
 	if (!string)
 		goto bad_arguments;
-	r = dm_get_device(ti, string, dm_table_get_mode(ti->table), &wc->dev);
+	r = dm_get_device_ex(ti, string, dm_table_get_mode(ti->table),
+			     dm_table_is_interposer(ti->table), &wc->dev);
 	if (r) {
 		ti->error = "Origin data device lookup failed";
 		goto bad;

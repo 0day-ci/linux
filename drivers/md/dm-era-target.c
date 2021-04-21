@@ -1462,7 +1462,9 @@ static int era_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		return -EINVAL;
 	}
 
-	r = dm_get_device(ti, argv[1], FMODE_READ | FMODE_WRITE, &era->origin_dev);
+	r = dm_get_device_ex(ti, argv[1], FMODE_READ | FMODE_WRITE,
+			     dm_table_is_interposer(ti->table),
+			     &era->origin_dev);
 	if (r) {
 		ti->error = "Error opening data device";
 		era_destroy(era);

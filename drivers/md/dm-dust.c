@@ -366,7 +366,8 @@ static int dust_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		return -ENOMEM;
 	}
 
-	if (dm_get_device(ti, argv[0], dm_table_get_mode(ti->table), &dd->dev)) {
+	if (dm_get_device_ex(ti, argv[0], dm_table_get_mode(ti->table),
+			     dm_table_is_interposer(ti->table), &dd->dev)) {
 		ti->error = "Device lookup failed";
 		kfree(dd);
 		return -EINVAL;

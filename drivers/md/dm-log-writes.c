@@ -554,7 +554,8 @@ static int log_writes_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	atomic_set(&lc->pending_blocks, 0);
 
 	devname = dm_shift_arg(&as);
-	ret = dm_get_device(ti, devname, dm_table_get_mode(ti->table), &lc->dev);
+	ret = dm_get_device_ex(ti, devname, dm_table_get_mode(ti->table),
+			       dm_table_is_interposer(ti->table), &lc->dev);
 	if (ret) {
 		ti->error = "Device lookup failed";
 		goto bad;
