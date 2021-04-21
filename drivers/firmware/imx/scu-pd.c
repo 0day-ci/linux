@@ -95,7 +95,7 @@ struct imx_sc_pd_soc {
 
 static int imx_con_rsrc;
 
-static const struct imx_sc_pd_range imx8qxp_scu_pd_ranges[] = {
+static const struct imx_sc_pd_range scu_pd_ranges[] = {
 	/* LSIO SS */
 	{ "pwm", IMX_SC_R_PWM_0, 8, true, 0 },
 	{ "gpio", IMX_SC_R_GPIO_0, 8, true, 0 },
@@ -266,9 +266,9 @@ static const struct imx_sc_pd_range imx8qxp_scu_pd_ranges[] = {
 	{ "board", IMX_SC_R_BOARD_R0, 8, true, 0},
 };
 
-static const struct imx_sc_pd_soc imx8qxp_scu_pd = {
-	.pd_ranges = imx8qxp_scu_pd_ranges,
-	.num_ranges = ARRAY_SIZE(imx8qxp_scu_pd_ranges),
+static const struct imx_sc_pd_soc scu_pd = {
+	.pd_ranges = scu_pd_ranges,
+	.num_ranges = ARRAY_SIZE(scu_pd_ranges),
 };
 
 static struct imx_sc_ipc *pm_ipc_handle;
@@ -463,8 +463,7 @@ static int imx_sc_pd_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id imx_sc_pd_match[] = {
-	{ .compatible = "fsl,imx8qxp-scu-pd", &imx8qxp_scu_pd},
-	{ .compatible = "fsl,scu-pd", &imx8qxp_scu_pd},
+	{ .compatible = "fsl,scu-pd", &scu_pd},
 	{ /* sentinel */ }
 };
 
