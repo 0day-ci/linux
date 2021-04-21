@@ -1865,8 +1865,14 @@ static void mlx5_vdpa_free(struct vdpa_device *vdev)
 
 static struct vdpa_notification_area mlx5_get_vq_notification(struct vdpa_device *vdev, u16 idx)
 {
+	struct mlx5_vdpa_dev *mvdev = to_mvdev(vdev);
 	struct vdpa_notification_area ret = {};
+	struct mlx5_vdpa_net *ndev;
 
+	ndev = to_mlx5_vdpa_ndev(mvdev);
+
+	ret.addr = (phys_addr_t)ndev->mvdev.res.phys_kick_addr;
+	ret.size = PAGE_SIZE;
 	return ret;
 }
 
