@@ -1863,3 +1863,55 @@ static void disk_release_events(struct gendisk *disk)
 	WARN_ON_ONCE(disk->ev && disk->ev->block != 1);
 	kfree(disk->ev);
 }
+
+/**
+ * bdev_interposer_attach - Attach an interposer block device to original
+ * @original: original block device
+ * @interposer: interposer block device
+ *
+ * Before attaching an interposer, it is necessary to lock the processing
+ * of bio requests of the original device by calling bdev_interposer_lock().
+ *
+ * The bdev_interposer_detach() function allows to detach the interposer
+ * from the original block device.
+ */
+int bdev_interposer_attach(struct block_device *original,
+			   struct block_device *interposer)
+{
+	struct block_device *bdev;
+
+	WARN_ON(!original);
+	if (original->bd_interposer)
+		return -EBUSY;
+
+	bdev = bdgrab(interposer);
+	if (!bdev)
+		return -ENODEV;
+
+	original->bd_interposer = bdev;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(bdev_interposer_attach);
+
+/**
+ * bdev_interposer_detach - Detach interposer from block device
+ * @original: original block device
+ *
+ * Before detaching an interposer, it is necessary to lock the processing
+ * of bio requests of the original device by calling bdev_interposer_lock().
+ *
+ * The interposer should be attached using the bdev_interposer_attach()
+ * function.
+ */
+void bdev_interposer_detach(struct block_device *original)
+{
+	if (WARN_ON(!original))
+		return;
+
+	if (!original->bd_interposer)
+		return;
+
+	bdput(original->bd_interposer);
+	original->bd_interposer = NULL;
+}
+EXPORT_SYMBOL_GPL(bdev_interposer_detach);
