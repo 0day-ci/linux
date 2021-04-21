@@ -627,9 +627,7 @@ static int mt312_set_frontend(struct dvb_frontend *fe)
 	if (ret < 0)
 		return ret;
 
-	ret = mt312_reset(state, 0);
-	if (ret < 0)
-		return ret;
+	mt312_reset(state, 0);
 
 	return 0;
 }
