@@ -1063,6 +1063,48 @@ static int sd_decode_ext_reg_power(struct mmc_card *card, u8 fno, u32 reg_addr)
 	return 0;
 }
 
+static int sd_decode_ext_reg_perf(struct mmc_card *card, u8 fno, u32 reg_addr)
+{
+	int err;
+	u8 *reg_buf;
+
+	err = sd_read_ext_reg_fno(card, fno, reg_addr, &reg_buf);
+	if (err) {
+		pr_warn("%s: error %d reading PERF func of ext reg\n",
+			mmc_hostname(card->host), err);
+		return err;
+	}
+
+	/* PERF revision. */
+	card->ext_perf.rev = reg_buf[0];
+
+	/* FX_EVENT support at bit 0. */
+	if (reg_buf[1] & 0x1)
+		card->ext_perf.feature_support |= SD_EXT_PERF_FX_EVENT;
+
+	/* Card initiated self-maintenance support at bit 0. */
+	if (reg_buf[2] & 0x1)
+		card->ext_perf.feature_support |= SD_EXT_PERF_CARD_MAINT;
+
+	/* Host initiated self-maintenance support at bit 1. */
+	if (reg_buf[2] & 0x2)
+		card->ext_perf.feature_support |= SD_EXT_PERF_HOST_MAINT;
+
+	/* Cache support at bit 0. */
+	if (reg_buf[4] & 0x1)
+		card->ext_perf.feature_support |= SD_EXT_PERF_CACHE;
+
+	/* Command queue support indicated via queue depth bits (0 to 4). */
+	if (reg_buf[6] & 0x1f)
+		card->ext_perf.feature_support |= SD_EXT_PERF_CMD_QUEUE;
+
+	card->ext_perf.reg_addr = reg_addr;
+	card->ext_perf.fno = fno;
+
+	kfree(reg_buf);
+	return 0;
+}
+
 static int sd_decode_ext_reg(struct mmc_card *card, u8 *gen_info_buf,
 			     u16 *next_ext_addr)
 {
@@ -1102,6 +1144,10 @@ static int sd_decode_ext_reg(struct mmc_card *card, u8 *gen_info_buf,
 	/* Standard Function Code for power management. */
 	if (sfc == 0x1)
 		return sd_decode_ext_reg_power(card, fno, reg_addr);
+
+	/* Standard Function Code for performance enhancement. */
+	if (sfc == 0x2)
+		return sd_decode_ext_reg_perf(card, fno, reg_addr);
 
 	return 0;
 }
