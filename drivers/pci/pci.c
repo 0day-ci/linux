@@ -1571,6 +1571,15 @@ static void pci_restore_ltr_state(struct pci_dev *dev)
 int pci_save_state(struct pci_dev *dev)
 {
 	int i;
+	u32 val;
+
+	/* Unable to read PCI device/manufacturer state? Something is seriously wrong! */
+	if (pci_read_config_dword(dev, 0, &val) || val == 0xffffffff) {
+		printk("Broken read from PCI device %s\n", pci_name(dev));
+		WARN_ON(1);
+		return -1;
+	}
+
 	/* XXX: 100% dword access ok here? */
 	for (i = 0; i < 16; i++) {
 		pci_read_config_dword(dev, i * 4, &dev->saved_config_space[i]);
