@@ -1241,7 +1241,7 @@ static int rxkad_verify_response(struct rxrpc_connection *conn,
 	ret = rxkad_decrypt_ticket(conn, server_key, skb, ticket, ticket_len,
 				   &session_key, &expiry, _abort_code);
 	if (ret < 0)
-		goto temporary_error_free_ticket;
+		goto temporary_error_free_resp;
 
 	/* use the session key from inside the ticket to decrypt the
 	 * response */
