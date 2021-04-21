@@ -118,28 +118,15 @@
 #define IS_MME_IDLE(mme_arch_sts) \
 	(((mme_arch_sts) & MME_ARCH_IDLE_MASK) == MME_ARCH_IDLE_MASK)
 
-/*
- * this enum kept here for compatibility with old FW (in which each asic has
- * unique PLL numbering
- */
-enum goya_pll_index {
-	GOYA_CPU_PLL = 0,
-	GOYA_IC_PLL,
-	GOYA_MC_PLL,
-	GOYA_MME_PLL,
-	GOYA_PCI_PLL,
-	GOYA_EMMC_PLL,
-	GOYA_TPC_PLL,
-};
-
+/* compatibility with old FW (in which each asic has unique PLL numbering */
 static enum pll_index goya_pll_map[PLL_MAX] = {
-	[CPU_PLL] = GOYA_CPU_PLL,
-	[IC_PLL] = GOYA_IC_PLL,
-	[MC_PLL] = GOYA_MC_PLL,
-	[MME_PLL] = GOYA_MME_PLL,
-	[PCI_PLL] = GOYA_PCI_PLL,
-	[EMMC_PLL] = GOYA_EMMC_PLL,
-	[TPC_PLL] = GOYA_TPC_PLL,
+	[CPU_PLL] = 0,
+	[IC_PLL] = 1,
+	[MC_PLL] = 2,
+	[MME_PLL] = 3,
+	[PCI_PLL] = 4,
+	[EMMC_PLL] = 5,
+	[TPC_PLL] = 6,
 };
 
 static const char goya_irq_name[GOYA_MSIX_ENTRIES][GOYA_MAX_STRING_LEN] = {

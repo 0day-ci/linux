@@ -105,34 +105,18 @@
 
 #define GAUDI_PLL_MAX 10
 
-/*
- * this enum kept here for compatibility with old FW (in which each asic has
- * unique PLL numbering
- */
-enum gaudi_pll_index {
-	GAUDI_CPU_PLL = 0,
-	GAUDI_PCI_PLL,
-	GAUDI_SRAM_PLL,
-	GAUDI_HBM_PLL,
-	GAUDI_NIC_PLL,
-	GAUDI_DMA_PLL,
-	GAUDI_MESH_PLL,
-	GAUDI_MME_PLL,
-	GAUDI_TPC_PLL,
-	GAUDI_IF_PLL,
-};
-
+/* compatibility with old FW (in which each asic has unique PLL numbering */
 static enum pll_index gaudi_pll_map[PLL_MAX] = {
-	[CPU_PLL] = GAUDI_CPU_PLL,
-	[PCI_PLL] = GAUDI_PCI_PLL,
-	[SRAM_PLL] = GAUDI_SRAM_PLL,
-	[HBM_PLL] = GAUDI_HBM_PLL,
-	[NIC_PLL] = GAUDI_NIC_PLL,
-	[DMA_PLL] = GAUDI_DMA_PLL,
-	[MESH_PLL] = GAUDI_MESH_PLL,
-	[MME_PLL] = GAUDI_MME_PLL,
-	[TPC_PLL] = GAUDI_TPC_PLL,
-	[IF_PLL] = GAUDI_IF_PLL,
+	[CPU_PLL] = 0,
+	[PCI_PLL] = 1,
+	[SRAM_PLL] = 2,
+	[HBM_PLL] = 3,
+	[NIC_PLL] = 4,
+	[DMA_PLL] = 5,
+	[MESH_PLL] = 6,
+	[MME_PLL] = 7,
+	[TPC_PLL] = 8,
+	[IF_PLL] = 9,
 };
 
 static const char gaudi_irq_name[GAUDI_MSI_ENTRIES][GAUDI_MAX_STRING_LEN] = {
