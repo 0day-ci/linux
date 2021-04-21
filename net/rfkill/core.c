@@ -1033,13 +1033,10 @@ static void rfkill_sync_work(struct work_struct *work)
 int __must_check rfkill_register(struct rfkill *rfkill)
 {
 	static unsigned long rfkill_no;
-	struct device *dev;
+	struct device *dev = &rfkill->dev;
 	int error;
 
-	if (!rfkill)
-		return -EINVAL;
-
-	dev = &rfkill->dev;
+	BUG_ON(!rfkill);
 
 	mutex_lock(&rfkill_global_mutex);
 
