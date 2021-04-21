@@ -3784,6 +3784,10 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define C0DRB3_BW		_MMIO(MCHBAR_MIRROR_BASE + 0x206)
 #define C1DRB3_BW		_MMIO(MCHBAR_MIRROR_BASE + 0x606)
 
+/* 965gm,ctg DRAM channel configuration */
+#define C0DRB3_CL		_MMIO(MCHBAR_MIRROR_BASE + 0x1206)
+#define C1DRB3_CL		_MMIO(MCHBAR_MIRROR_BASE + 0x1306)
+
 /* snb MCH registers for reading the DRAM channel configuration */
 #define MAD_DIMM_C0			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5004)
 #define MAD_DIMM_C1			_MMIO(MCHBAR_MIRROR_BASE_SNB + 0x5008)

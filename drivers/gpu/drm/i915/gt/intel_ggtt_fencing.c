@@ -693,14 +693,15 @@ static void detect_bit_6_swizzle(struct i915_ggtt *ggtt)
 				swizzle_x = I915_BIT_6_SWIZZLE_9_10_17;
 				swizzle_y = I915_BIT_6_SWIZZLE_9_17;
 			}
-			break;
-		}
 
-		/* check for L-shaped memory aka modified enhanced addressing */
-		if (IS_GEN(i915, 4) &&
-		    !(intel_uncore_read(uncore, DCC2) & DCC2_MODIFIED_ENHANCED_DISABLE)) {
-			swizzle_x = I915_BIT_6_SWIZZLE_UNKNOWN;
-			swizzle_y = I915_BIT_6_SWIZZLE_UNKNOWN;
+			/* check for L-shaped memory aka modified enhanced addressing */
+			if (IS_GEN(i915, 4) &&
+			    intel_uncore_read16(uncore, C0DRB3_CL) !=
+			    intel_uncore_read16(uncore, C1DRB3_CL)) {
+				swizzle_x = I915_BIT_6_SWIZZLE_UNKNOWN;
+				swizzle_y = I915_BIT_6_SWIZZLE_UNKNOWN;
+			}
+			break;
 		}
 
 		if (dcc == 0xffffffff) {
