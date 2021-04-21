@@ -354,6 +354,16 @@ static void uvcg_video_pump(struct work_struct *work)
 
 		video->encode(req, video, buf);
 
+		if (list_empty(&video->req_free) ||
+		    (buf->state == UVC_BUF_STATE_DONE) ||
+		    (!(video->req_int_count %
+		       DIV_ROUND_UP(video->uvc_num_requests, 4)))) {
+			video->req_int_count = 0;
+			req->no_interrupt = 0;
+		} else {
+			req->no_interrupt = 1;
+		}
+
 		/* Queue the USB request */
 		ret = uvcg_video_ep_queue(video, req);
 		spin_unlock_irqrestore(&queue->irqlock, flags);
@@ -362,6 +372,7 @@ static void uvcg_video_pump(struct work_struct *work)
 			uvcg_queue_cancel(queue, 0);
 			break;
 		}
+		video->req_int_count++;
 	}
 
 	spin_lock_irqsave(&video->req_lock, flags);
@@ -434,6 +445,7 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 	video->width = 320;
 	video->height = 240;
 	video->imagesize = 320 * 240 * 2;
+	video->req_int_count = 0;
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(uvc->v4l2_dev.dev, &video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
