@@ -2896,11 +2896,11 @@ static __always_inline int alloc_block(struct kmem_cache *cachep,
 	return batchcount;
 }
 
-static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
+static void *cache_alloc_refill(struct kmem_cache *cachep, struct array_cache *ac, gfp_t flags)
 {
 	int batchcount;
 	struct kmem_cache_node *n;
-	struct array_cache *ac, *shared;
+	struct array_cache *shared;
 	int node;
 	void *list = NULL;
 	struct page *page;
@@ -2908,7 +2908,6 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
 	check_irq_off();
 	node = numa_mem_id();
 
-	ac = cpu_cache_get(cachep);
 	batchcount = ac->batchcount;
 	if (!ac->touched && batchcount > BATCHREFILL_LIMIT) {
 		/*
@@ -3045,12 +3044,7 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 	}
 
 	STATS_INC_ALLOCMISS(cachep);
-	objp = cache_alloc_refill(cachep, flags);
-	/*
-	 * the 'ac' may be updated by cache_alloc_refill(),
-	 * and kmemleak_erase() requires its correct value.
-	 */
-	ac = cpu_cache_get(cachep);
+	objp = cache_alloc_refill(cachep, ac, flags);
 
 out:
 	/*
