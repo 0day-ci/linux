@@ -1044,6 +1044,11 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 			 * resources.
 			 */
 			align = pci_resource_alignment(dev, r);
+			if (!align) {
+				pci_warn(dev, "BAR %d: %pR has bogus alignment\n",
+					 i, r);
+				continue;
+			}
 			order = __ffs(align) - 20;
 			if (order < 0)
 				order = 0;
