@@ -327,14 +327,14 @@ static int device_area_is_invalid(struct dm_target *ti, struct dm_dev *dev,
  * it is accessed concurrently.
  */
 static int upgrade_mode(struct dm_dev_internal *dd, fmode_t new_mode,
-			struct mapped_device *md)
+			bool interpose, struct mapped_device *md)
 {
 	int r;
 	struct dm_dev *old_dev, *new_dev;
 
 	old_dev = dd->dm_dev;
 
-	r = dm_get_table_device(md, dd->dm_dev->bdev->bd_dev,
+	r = dm_get_table_device(md, dd->dm_dev->bdev->bd_dev, interpose,
 				dd->dm_dev->mode | new_mode, &new_dev);
 	if (r)
 		return r;
@@ -362,8 +362,8 @@ EXPORT_SYMBOL_GPL(dm_get_dev_t);
  * Add a device to the list, or just increment the usage count if
  * it's already present.
  */
-int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
-		  struct dm_dev **result)
+int dm_get_device_ex(struct dm_target *ti, const char *path, fmode_t mode,
+		     bool interpose, struct dm_dev **result)
 {
 	int r;
 	dev_t dev;
@@ -391,7 +391,8 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 		if (!dd)
 			return -ENOMEM;
 
-		if ((r = dm_get_table_device(t->md, dev, mode, &dd->dm_dev))) {
+		r = dm_get_table_device(t->md, dev, mode, interpose, &dd->dm_dev);
+		if (r) {
 			kfree(dd);
 			return r;
 		}
@@ -401,7 +402,7 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 		goto out;
 
 	} else if (dd->dm_dev->mode != (mode | dd->dm_dev->mode)) {
-		r = upgrade_mode(dd, mode, t->md);
+		r = upgrade_mode(dd, mode, interpose, t->md);
 		if (r)
 			return r;
 	}
@@ -410,7 +411,7 @@ out:
 	*result = dd->dm_dev;
 	return 0;
 }
-EXPORT_SYMBOL(dm_get_device);
+EXPORT_SYMBOL(dm_get_device_ex);
 
 static int dm_set_device_limits(struct dm_target *ti, struct dm_dev *dev,
 				sector_t start, sector_t len, void *data)
@@ -2205,6 +2206,12 @@ struct mapped_device *dm_table_get_md(struct dm_table *t)
 	return t->md;
 }
 EXPORT_SYMBOL(dm_table_get_md);
+
+bool dm_table_is_interposer(struct dm_table *t)
+{
+	return t->md->interpose;
+}
+EXPORT_SYMBOL(dm_table_is_interposer);
 
 const char *dm_table_device_name(struct dm_table *t)
 {

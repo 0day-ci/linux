@@ -112,6 +112,7 @@ struct mapped_device {
 	/* for blk-mq request-based DM support */
 	struct blk_mq_tag_set *tag_set;
 	bool init_tio_pdu:1;
+	bool interpose:1;
 
 	struct srcu_struct io_barrier;
 };

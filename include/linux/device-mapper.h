@@ -159,6 +159,7 @@ struct dm_dev {
 	struct block_device *bdev;
 	struct dax_device *dax_dev;
 	fmode_t mode;
+	bool interpose;
 	char name[16];
 };
 
@@ -168,8 +169,13 @@ dev_t dm_get_dev_t(const char *path);
  * Constructors should call these functions to ensure destination devices
  * are opened/closed correctly.
  */
-int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
-		  struct dm_dev **result);
+int dm_get_device_ex(struct dm_target *ti, const char *path, fmode_t mode,
+		     bool interpose, struct dm_dev **result);
+static inline int dm_get_device(struct dm_target *ti, const char *path,
+				fmode_t mode, struct dm_dev **result)
+{
+	return dm_get_device_ex(ti, path, mode, false, result);
+};
 void dm_put_device(struct dm_target *ti, struct dm_dev *d);
 
 /*
@@ -550,6 +556,7 @@ sector_t dm_table_get_size(struct dm_table *t);
 unsigned int dm_table_get_num_targets(struct dm_table *t);
 fmode_t dm_table_get_mode(struct dm_table *t);
 struct mapped_device *dm_table_get_md(struct dm_table *t);
+bool dm_table_is_interposer(struct dm_table *t);
 const char *dm_table_device_name(struct dm_table *t);
 
 /*
