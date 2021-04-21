@@ -40,6 +40,7 @@
 #define AXP209_FG_PERCENT		GENMASK(6, 0)
 #define AXP22X_FG_VALID			BIT(7)
 
+#define AXP20X_CHRG_CTRL1_ENABLE	BIT(7)
 #define AXP20X_CHRG_CTRL1_TGT_VOLT	GENMASK(6, 5)
 #define AXP20X_CHRG_CTRL1_TGT_4_1V	(0 << 5)
 #define AXP20X_CHRG_CTRL1_TGT_4_15V	(1 << 5)
@@ -249,11 +250,18 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
 		break;
 
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
-		ret = axp20x_get_constant_charge_current(axp20x_batt,
-							 &val->intval);
+		ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &val->intval);
 		if (ret)
 			return ret;
-		break;
+
+		if (val->intval & AXP20X_CHRG_CTRL1_ENABLE) {
+			val->intval &= AXP20X_CHRG_CTRL1_TGT_CURR;
+			val->intval = val->intval * axp20x_batt->data->ccc_scale +
+					axp20x_batt->data->ccc_offset;
+		} else
+			val->intval = 0;
+
+		return 0;
 
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		val->intval = axp20x_batt->max_ccc;
@@ -392,6 +400,10 @@ static int axp20x_battery_set_max_voltage(struct axp20x_batt_ps *axp20x_batt,
 static int axp20x_set_constant_charge_current(struct axp20x_batt_ps *axp_batt,
 					      int charge_current)
 {
+	if (charge_current == 0)
+		return regmap_update_bits(axp_batt->regmap, AXP20X_CHRG_CTRL1,
+				  AXP20X_CHRG_CTRL1_ENABLE, 0);
+
 	if (charge_current > axp_batt->max_ccc)
 		return -EINVAL;
 
@@ -402,7 +414,8 @@ static int axp20x_set_constant_charge_current(struct axp20x_batt_ps *axp_batt,
 		return -EINVAL;
 
 	return regmap_update_bits(axp_batt->regmap, AXP20X_CHRG_CTRL1,
-				  AXP20X_CHRG_CTRL1_TGT_CURR, charge_current);
+				  AXP20X_CHRG_CTRL1_TGT_CURR | AXP20X_CHRG_CTRL1_ENABLE,
+				  charge_current | AXP20X_CHRG_CTRL1_ENABLE);
 }
 
 static int axp20x_set_max_constant_charge_current(struct axp20x_batt_ps *axp,
