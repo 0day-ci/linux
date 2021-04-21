@@ -2010,17 +2010,14 @@ retry:
 
 	/* Free the needed pages to the hugetlb pool */
 	list_for_each_entry_safe(page, tmp, &surplus_list, lru) {
-		int zeroed;
-
 		if ((--needed) < 0)
 			break;
 		/*
-		 * This page is now managed by the hugetlb allocator and has
-		 * no users -- drop the buddy allocator's reference.
+		 * The refcount can possibly be increased by memory-failure or
+		 * soft_offline handlers.
 		 */
-		zeroed = put_page_testzero(page);
-		VM_BUG_ON_PAGE(!zeroed, page);
-		enqueue_huge_page(h, page);
+		if (likely(put_page_testzero(page)))
+			enqueue_huge_page(h, page);
 	}
 free:
 	spin_unlock_irq(&hugetlb_lock);
