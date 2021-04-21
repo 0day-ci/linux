@@ -7277,9 +7277,36 @@ static void yield_task_fair(struct rq *rq)
 	set_skip_buddy(se);
 }
 
+static void deboost_yield_task_vruntime(struct sched_entity *next_se, struct sched_entity *yield_se)
+{
+	if (wakeup_preempt_entity(next_se, yield_se) < 1)
+		return;
+	yield_se->vruntime = next_se->vruntime - wakeup_gran(yield_se);
+}
+
+static void deboost_yield_task(struct sched_entity *next_se, struct sched_entity *yield_se)
+{
+	struct sched_entity *next_se_base = next_se;
+
+	if (rq_of(cfs_rq_of(yield_se)) != rq_of(cfs_rq_of(next_se)))
+		return;
+
+	for_each_sched_entity(yield_se) {
+		next_se = next_se_base;
+		for_each_sched_entity(next_se) {
+			if (cfs_rq_of(yield_se) == cfs_rq_of(next_se)) {
+				deboost_yield_task_vruntime(next_se, yield_se);
+				return;
+			}
+		}
+	}
+}
+
 static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
 {
 	struct sched_entity *se = &p->se;
+	struct task_struct *curr;
+	struct sched_entity *yield_se;
 
 	/* throttled hierarchies are not runnable */
 	if (!se->on_rq || throttled_hierarchy(cfs_rq_of(se)))
@@ -7287,6 +7314,10 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
 
 	/* Tell the scheduler that we'd really like pse to run next. */
 	set_next_buddy(se);
+
+	curr = rq->curr;
+	yield_se = &curr->se;
+	deboost_yield_task(se, yield_se);
 
 	yield_task_fair(rq);
 
