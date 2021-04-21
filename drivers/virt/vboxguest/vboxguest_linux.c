@@ -142,9 +142,7 @@ static long vbg_misc_device_ioctl(struct file *filp, unsigned int req,
 	if (!buf)
 		return -ENOMEM;
 
-	*((struct vbg_ioctl_hdr *)buf) = hdr;
-	if (copy_from_user(buf + sizeof(hdr), (void *)arg + sizeof(hdr),
-			   hdr.size_in - sizeof(hdr))) {
+	if (copy_from_user(buf, (void *)arg, hdr.size_in)) {
 		ret = -EFAULT;
 		goto out;
 	}
