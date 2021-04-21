@@ -2320,10 +2320,8 @@ nv50_disp_atomic_commit(struct drm_device *dev,
 	int ret, i;
 
 	ret = pm_runtime_get_sync(dev->dev);
-	if (ret < 0 && ret != -EACCES) {
-		pm_runtime_put_autosuspend(dev->dev);
+	if (ret < 0 && ret != -EACCES)
 		return ret;
-	}
 
 	ret = drm_atomic_helper_setup_commit(state, nonblock);
 	if (ret)
