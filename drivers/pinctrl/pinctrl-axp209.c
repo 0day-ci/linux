@@ -365,8 +365,6 @@ static int axp20x_build_funcs_groups(struct platform_device *pdev)
 		pctl->funcs[i].groups = devm_kcalloc(&pdev->dev,
 						     npins, sizeof(char *),
 						     GFP_KERNEL);
-		if (!pctl->funcs[i].groups)
-			return -ENOMEM;
 		for (pin = 0; pin < npins; pin++)
 			pctl->funcs[i].groups[pin] = pctl->desc->pins[pin].name;
 	}
