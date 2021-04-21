@@ -1207,7 +1207,7 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 		err = alloc_ud_wq_attr(qp, rdi->dparms.node);
 		if (err) {
 			ret = (ERR_PTR(err));
-			goto bail_rq_rvt;
+			goto bail_driver_priv;
 		}
 
 		if (init_attr->create_flags & IB_QP_CREATE_NETDEV_USE)
@@ -1317,10 +1317,8 @@ bail_qpn:
 	rvt_free_qpn(&rdi->qp_dev->qpn_table, qp->ibqp.qp_num);
 
 bail_rq_wq:
-	free_ud_wq_attr(qp);
-
-bail_rq_rvt:
 	rvt_free_rq(&qp->r_rq);
+	free_ud_wq_attr(qp);
 
 bail_driver_priv:
 	rdi->driver_f.qp_priv_free(rdi, qp);
