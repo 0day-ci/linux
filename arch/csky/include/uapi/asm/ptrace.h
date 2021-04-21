@@ -45,6 +45,12 @@ struct user_fp {
 	unsigned long	fesr;
 	unsigned long	fid;
 	unsigned long	reserved;
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	unsigned long	user_fcr;
+	unsigned long	user_fesr;
+	unsigned long	reserved1;
+	unsigned long	reserved2;
+#endif
 };
 
 #endif /* __ASSEMBLY__ */

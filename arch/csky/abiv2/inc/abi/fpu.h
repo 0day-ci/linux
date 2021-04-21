@@ -9,7 +9,14 @@
 int fpu_libc_helper(struct pt_regs *regs);
 void fpu_fpe(struct pt_regs *regs);
 
-static inline void init_fpu(void) { mtcr("cr<1, 2>", 0); }
+static inline void init_fpu(void)
+{
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	mtcr("cr<1, 2>", 0x3f);
+#else
+	mtcr("cr<1, 2>", 0);
+#endif
+}
 
 void save_to_user_fp(struct user_fp *user_fp);
 void restore_from_user_fp(struct user_fp *user_fp);

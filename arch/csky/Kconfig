@@ -97,6 +97,9 @@ config CPU_HAS_CACHEV2
 config CPU_HAS_FPUV2
 	bool
 
+config CPU_HAS_MATHEMU
+	bool
+
 config CPU_HAS_HILO
 	bool
 
@@ -280,6 +283,11 @@ endif
 config CPU_HAS_VDSP
 	bool "CPU has VDSP coprocessor"
 	depends on CPU_HAS_FPU && CPU_HAS_FPUV2
+
+config CPU_HAS_MATHEMU
+	bool "CPU has FPU Mathemu Instructions"
+	depends on CPU_CK810 || CPU_CK860
+	default n
 
 config CPU_HAS_FPU
 	bool "CPU has FPU coprocessor"

@@ -64,6 +64,7 @@ head-y := arch/csky/kernel/head.o
 core-y += arch/csky/kernel/
 core-y += arch/csky/mm/
 core-y += arch/csky/$(CSKYABI)/
+core-$(CONFIG_CPU_HAS_MATHEMU) += arch/csky/math-emu/
 
 libs-y += arch/csky/lib/ \
 	$(shell $(CC) $(KBUILD_CFLAGS) $(KCFLAGS) -print-libgcc-file-name)

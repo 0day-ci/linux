@@ -38,8 +38,11 @@ int fpu_libc_helper(struct pt_regs *regs)
 		return 0;
 
 	tinstr = instr_hi | ((unsigned long)instr_low << 16);
-
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	if (((tinstr >> 21) & 0x1F) != 15)
+#else
 	if (((tinstr >> 21) & 0x1F) != 2)
+#endif
 		return 0;
 
 	if ((tinstr & MTCR_MASK) == MTCR_DIST) {
@@ -53,10 +56,19 @@ int fpu_libc_helper(struct pt_regs *regs)
 
 		regx =  *(&regs->a0 + index);
 
-		if (tmp == 1)
+		if (tmp == 1) {
+#ifdef CONFIG_CPU_HAS_MATHEMU
+			mtcr("cr<1, 2>", regx | 0x3f);
+			current->thread.user_fp.user_fcr = regx;
+#else
 			mtcr("cr<1, 2>", regx);
-		else if (tmp == 2)
+#endif
+		} else if (tmp == 2) {
 			mtcr("cr<2, 2>", regx);
+#ifdef CONFIG_CPU_HAS_MATHEMU
+			current->thread.user_fp.user_fesr = regx;
+#endif
+		}
 		else
 			return 0;
 
@@ -73,10 +85,19 @@ int fpu_libc_helper(struct pt_regs *regs)
 		if (tmp > 2)
 			return 0;
 
-		if (tmp == 1)
+		if (tmp == 1) {
+#ifndef CONFIG_CPU_HAS_MATHEMU
 			regx = mfcr("cr<1, 2>");
-		else if (tmp == 2)
+#else
+			regx = current->thread.user_fp.user_fcr;
+#endif
+		} else if (tmp == 2) {
+#ifndef CONFIG_CPU_HAS_MATHEMU
 			regx = mfcr("cr<2, 2>");
+#else
+			regx = current->thread.user_fp.user_fesr;
+#endif
+		}
 		else
 			return 0;
 

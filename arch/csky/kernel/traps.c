@@ -27,6 +27,10 @@
 
 #ifdef CONFIG_CPU_HAS_FPU
 #include <abi/fpu.h>
+#ifdef CONFIG_CPU_HAS_MATHEMU
+extern inline unsigned int get_fpu_insn(struct pt_regs *regs);
+extern inline int do_fpu_insn(unsigned int inst, struct pt_regs *regs);
+#endif
 #endif
 
 int show_unhandled_signals = 1;
@@ -186,8 +190,19 @@ asmlinkage void do_trap_bkpt(struct pt_regs *regs)
 
 asmlinkage void do_trap_illinsn(struct pt_regs *regs)
 {
-	current->thread.trap_no = trap_no(regs);
+#ifdef CONFIG_CPU_HAS_FPU
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	unsigned int inst;
 
+	inst = get_fpu_insn(regs);
+	if (inst && !do_fpu_insn(inst, regs)) {
+		regs->pc += 4;
+		return;
+	}
+#endif
+#endif
+
+	current->thread.trap_no = trap_no(regs);
 #ifdef CONFIG_KPROBES
 	if (kprobe_breakpoint_handler(regs))
 		return;
@@ -209,7 +224,16 @@ asmlinkage void do_trap_illinsn(struct pt_regs *regs)
 
 asmlinkage void do_trap_fpe(struct pt_regs *regs)
 {
-#ifdef CONFIG_CPU_HAS_FP
+#ifdef CONFIG_CPU_HAS_FPU
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	unsigned int inst;
+
+	inst = get_fpu_insn(regs);
+	if (inst && !do_fpu_insn(inst, regs)) {
+		regs->pc += 4;
+		return;
+	}
+#endif
 	return fpu_fpe(regs);
 #else
 	do_trap_error(regs, SIGILL, ILL_ILLOPC, regs->pc,
@@ -219,7 +243,7 @@ asmlinkage void do_trap_fpe(struct pt_regs *regs)
 
 asmlinkage void do_trap_priv(struct pt_regs *regs)
 {
-#ifdef CONFIG_CPU_HAS_FP
+#ifdef CONFIG_CPU_HAS_FPU
 	if (user_mode(regs) && fpu_libc_helper(regs))
 		return;
 #endif
