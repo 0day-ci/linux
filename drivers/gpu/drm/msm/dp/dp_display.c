@@ -707,6 +707,12 @@ static int dp_irq_hpd_handle(struct dp_display_private *dp, u32 data)
 		return 0;
 	}
 
+	/*
+	 * handle only one irq_hpd in case of multiple irq_hpd pending
+	 * since panel contains the lateset request at this time
+	 */
+	dp_del_event(dp, EV_IRQ_HPD_INT);
+
 	ret = dp_display_usbpd_attention_cb(&dp->pdev->dev);
 	if (ret == -ECONNRESET) { /* cable unplugged */
 		dp->core_initialized = false;
@@ -1300,6 +1306,9 @@ static int dp_pm_suspend(struct device *dev)
 	/* host_init will be called at pm_resume */
 	dp->core_initialized = false;
 
+	/* suspending, no need to handle pending irq_hdps */
+	dp_del_event(dp, EV_IRQ_HPD_INT);
+
 	mutex_unlock(&dp->event_mutex);
 
 	return 0;
@@ -1495,6 +1504,9 @@ int msm_dp_display_disable(struct msm_dp *dp, struct drm_encoder *encoder)
 
 	/* stop sentinel checking */
 	dp_del_event(dp_display, EV_DISCONNECT_PENDING_TIMEOUT);
+
+	/* link is teared down, no need to handle pending irq_hdps */
+	dp_del_event(dp_display, EV_IRQ_HPD_INT);
 
 	dp_display_disable(dp_display, 0);
 
