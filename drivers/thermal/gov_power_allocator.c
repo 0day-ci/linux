@@ -593,12 +593,9 @@ static void allow_maximum_power(struct thermal_zone_device *tz, bool update)
 		cdev->ops->get_requested_power(cdev, &req_power);
 
 		if (update)
-			instance->cdev->updated = false;
+			__thermal_cdev_update(instance->cdev);
 
 		mutex_unlock(&instance->cdev->lock);
-
-		if (update)
-			thermal_cdev_update(instance->cdev);
 	}
 	mutex_unlock(&tz->lock);
 }
