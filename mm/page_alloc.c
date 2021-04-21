@@ -9160,6 +9160,7 @@ bool take_page_off_buddy(struct page *page)
 			del_page_from_free_list(page_head, zone, page_order);
 			break_down_buddy_pages(zone, page_head, page, 0,
 						page_order, migratetype);
+			__mod_zone_page_state(zone, NR_FREE_PAGES, -1);
 			ret = true;
 			break;
 		}
