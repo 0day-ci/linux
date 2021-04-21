@@ -96,6 +96,71 @@ uvc_video_encode_bulk(struct usb_request *req, struct uvc_video *video,
 }
 
 static void
+uvc_video_encode_isoc_sg(struct usb_request *req, struct uvc_video *video,
+		struct uvc_buffer *buf)
+{
+	int pending = buf->bytesused - video->queue.buf_used;
+	struct uvc_request *ureq = req->context;
+	struct scatterlist *sg, *iter;
+	int len = video->req_size;
+	int sg_left, part = 0;
+	int ret;
+	int i;
+
+	sg = ureq->sgt.sgl;
+	sg_init_table(sg, ureq->sgt.nents);
+
+	/* Init the header. */
+	memset(ureq->header, 0, 2);
+	ret = uvc_video_encode_header(video, buf, ureq->header,
+				      video->req_size);
+	sg_set_buf(sg, ureq->header, 2);
+	len -= ret;
+
+	if (pending <= len)
+		len = pending;
+
+	req->length = (len == pending) ? len + 2 : video->req_size;
+
+	/* Init the pending sgs with payload */
+	sg = sg_next(sg);
+
+	for_each_sg(sg, iter, ureq->sgt.nents - 1, i) {
+		if (!len || !buf->sg)
+			break;
+
+		sg_left = sg_dma_len(buf->sg) - buf->offset;
+		part = min_t(unsigned int, len, sg_left);
+
+		sg_set_page(iter, sg_page(buf->sg), part, buf->offset);
+
+		if (part == sg_left) {
+			buf->offset = 0;
+			buf->sg = sg_next(buf->sg);
+		} else {
+			buf->offset += part;
+		}
+		len -= part;
+	}
+
+	/* Assign the video data with header. */
+	req->buf = NULL;
+	req->sg	= ureq->sgt.sgl;
+	req->num_sgs = i + 1;
+
+	req->length -= len;
+	video->queue.buf_used += req->length - 2;
+
+	if (buf->bytesused == video->queue.buf_used || !buf->sg) {
+		video->queue.buf_used = 0;
+		buf->state = UVC_BUF_STATE_DONE;
+		buf->offset = 0;
+		uvcg_queue_next_buffer(&video->queue, buf);
+		video->fid ^= UVC_STREAM_FID;
+	}
+}
+
+static void
 uvc_video_encode_isoc(struct usb_request *req, struct uvc_video *video,
 		struct uvc_buffer *buf)
 {
@@ -229,6 +294,10 @@ uvc_video_alloc_requests(struct uvc_video *video)
 		video->ureq[i].video = video;
 
 		list_add_tail(&video->ureq[i].req->list, &video->req_free);
+		/* req_size/PAGE_SIZE + 1 for overruns and + 1 for header */
+		sg_alloc_table(&video->ureq[i].sgt,
+			       DIV_ROUND_UP(req_size - 2, PAGE_SIZE) + 2,
+			       GFP_KERNEL);
 	}
 
 	video->req_size = req_size;
@@ -306,6 +375,7 @@ static void uvcg_video_pump(struct work_struct *work)
  */
 int uvcg_video_enable(struct uvc_video *video, int enable)
 {
+	struct usb_composite_dev *cdev = video->uvc->func.config->cdev;
 	unsigned int i;
 	int ret;
 
@@ -337,8 +407,12 @@ int uvcg_video_enable(struct uvc_video *video, int enable)
 	if (video->max_payload_size) {
 		video->encode = uvc_video_encode_bulk;
 		video->payload_size = 0;
-	} else
-		video->encode = uvc_video_encode_isoc;
+	} else {
+		if (cdev->gadget->sg_supported)
+			video->encode = uvc_video_encode_isoc_sg;
+		else
+			video->encode = uvc_video_encode_isoc;
+	}
 
 	schedule_work(&video->pump);
 
@@ -362,7 +436,7 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 	video->imagesize = 320 * 240 * 2;
 
 	/* Initialize the video buffers queue. */
-	uvcg_queue_init(&video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
+	uvcg_queue_init(uvc->v4l2_dev.dev, &video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
 			&video->mutex);
 	return 0;
 }
