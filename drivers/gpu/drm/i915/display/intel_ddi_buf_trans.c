@@ -988,19 +988,19 @@ static const struct intel_ddi_buf_trans rkl_combo_phy_ddi_translations_dp_hbr2_h
 	.num_entries = ARRAY_SIZE(_rkl_combo_phy_ddi_translations_dp_hbr2_hbr3),
 };
 
-bool is_hobl_buf_trans(const union intel_ddi_buf_trans_entry *table)
+bool is_hobl_buf_trans(const struct intel_ddi_buf_trans *table)
 {
-	return table == tgl_combo_phy_ddi_translations_edp_hbr2_hobl.entries;
+	return table == &tgl_combo_phy_ddi_translations_edp_hbr2_hobl;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 intel_get_buf_trans(const struct intel_ddi_buf_trans *ddi_translations, int *num_entries)
 {
 	*num_entries = ddi_translations->num_entries;
-	return ddi_translations->entries;
+	return ddi_translations;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 bdw_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1014,7 +1014,7 @@ bdw_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 	}
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 skl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1031,7 +1031,7 @@ skl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 	}
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 kbl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1052,7 +1052,7 @@ kbl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 	}
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 skl_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1084,7 +1084,7 @@ skl_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 		return skl_get_buf_trans_dp(encoder, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 skl_get_buf_trans_hdmi(struct drm_i915_private *dev_priv, int *n_entries)
 {
 	if (IS_SKL_ULX(dev_priv) ||
@@ -1108,7 +1108,7 @@ static int skl_buf_trans_num_entries(enum port port, int n_entries)
 		return min(n_entries, 9);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 hsw_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1116,12 +1116,12 @@ hsw_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 	if (IS_KABYLAKE(dev_priv) ||
 	    IS_COFFEELAKE(dev_priv) ||
 	    IS_COMETLAKE(dev_priv)) {
-		const union intel_ddi_buf_trans_entry *ddi_translations =
+		const struct intel_ddi_buf_trans *ddi_translations =
 			kbl_get_buf_trans_dp(encoder, n_entries);
 		*n_entries = skl_buf_trans_num_entries(encoder->port, *n_entries);
 		return ddi_translations;
 	} else if (IS_SKYLAKE(dev_priv)) {
-		const union intel_ddi_buf_trans_entry *ddi_translations =
+		const struct intel_ddi_buf_trans *ddi_translations =
 			skl_get_buf_trans_dp(encoder, n_entries);
 		*n_entries = skl_buf_trans_num_entries(encoder->port, *n_entries);
 		return ddi_translations;
@@ -1137,13 +1137,13 @@ hsw_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 	return NULL;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 hsw_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
 	if (DISPLAY_VER(dev_priv) == 9 && !IS_BROXTON(dev_priv)) {
-		const union intel_ddi_buf_trans_entry *ddi_translations =
+		const struct intel_ddi_buf_trans *ddi_translations =
 			skl_get_buf_trans_edp(encoder, n_entries);
 		*n_entries = skl_buf_trans_num_entries(encoder->port, *n_entries);
 		return ddi_translations;
@@ -1158,7 +1158,7 @@ hsw_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 	return NULL;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 hsw_get_buf_trans_fdi(struct intel_encoder *encoder,
 		      int *n_entries)
 {
@@ -1176,7 +1176,7 @@ hsw_get_buf_trans_fdi(struct intel_encoder *encoder,
 	return NULL;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 hsw_get_buf_trans_hdmi(struct intel_encoder *encoder,
 		       int *n_entries)
 {
@@ -1196,7 +1196,7 @@ hsw_get_buf_trans_hdmi(struct intel_encoder *encoder,
 	return NULL;
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 hsw_get_buf_trans(struct intel_encoder *encoder,
 		  const struct intel_crtc_state *crtc_state,
 		  int *n_entries)
@@ -1211,13 +1211,13 @@ hsw_get_buf_trans(struct intel_encoder *encoder,
 		return hsw_get_buf_trans_dp(encoder, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 bxt_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 {
 	return intel_get_buf_trans(&bxt_ddi_translations_dp, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 bxt_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1230,13 +1230,13 @@ bxt_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 	return bxt_get_buf_trans_dp(encoder, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 bxt_get_buf_trans_hdmi(struct intel_encoder *encoder, int *n_entries)
 {
 	return intel_get_buf_trans(&bxt_ddi_translations_hdmi, n_entries);
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 bxt_get_buf_trans(struct intel_encoder *encoder,
 		  const struct intel_crtc_state *crtc_state,
 		  int *n_entries)
@@ -1248,7 +1248,7 @@ bxt_get_buf_trans(struct intel_encoder *encoder,
 	return bxt_get_buf_trans_dp(encoder, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 cnl_get_buf_trans_hdmi(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1270,7 +1270,7 @@ cnl_get_buf_trans_hdmi(struct intel_encoder *encoder, int *n_entries)
 	return NULL;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 cnl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1292,7 +1292,7 @@ cnl_get_buf_trans_dp(struct intel_encoder *encoder, int *n_entries)
 	return NULL;
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 cnl_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
@@ -1318,7 +1318,7 @@ cnl_get_buf_trans_edp(struct intel_encoder *encoder, int *n_entries)
 	}
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 cnl_get_buf_trans(struct intel_encoder *encoder,
 		  const struct intel_crtc_state *crtc_state,
 		  int *n_entries)
@@ -1330,7 +1330,7 @@ cnl_get_buf_trans(struct intel_encoder *encoder,
 	return cnl_get_buf_trans_dp(encoder, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 icl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 			     const struct intel_crtc_state *crtc_state,
 			     int *n_entries)
@@ -1339,7 +1339,7 @@ icl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 icl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1348,7 +1348,7 @@ icl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 icl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 			    const struct intel_crtc_state *crtc_state,
 			    int *n_entries)
@@ -1372,7 +1372,7 @@ icl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 	return icl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 icl_get_combo_buf_trans(struct intel_encoder *encoder,
 			const struct intel_crtc_state *crtc_state,
 			int *n_entries)
@@ -1385,7 +1385,7 @@ icl_get_combo_buf_trans(struct intel_encoder *encoder,
 		return icl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 icl_get_mg_buf_trans_hdmi(struct intel_encoder *encoder,
 			  const struct intel_crtc_state *crtc_state,
 			  int *n_entries)
@@ -1394,7 +1394,7 @@ icl_get_mg_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 icl_get_mg_buf_trans_dp(struct intel_encoder *encoder,
 			const struct intel_crtc_state *crtc_state,
 			int *n_entries)
@@ -1408,7 +1408,7 @@ icl_get_mg_buf_trans_dp(struct intel_encoder *encoder,
 	}
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 icl_get_mg_buf_trans(struct intel_encoder *encoder,
 		     const struct intel_crtc_state *crtc_state,
 		     int *n_entries)
@@ -1419,7 +1419,7 @@ icl_get_mg_buf_trans(struct intel_encoder *encoder,
 		return icl_get_mg_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 ehl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 			     const struct intel_crtc_state *crtc_state,
 			     int *n_entries)
@@ -1428,7 +1428,7 @@ ehl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 ehl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1437,7 +1437,7 @@ ehl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 ehl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 			    const struct intel_crtc_state *crtc_state,
 			    int *n_entries)
@@ -1452,7 +1452,7 @@ ehl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 	return ehl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 ehl_get_combo_buf_trans(struct intel_encoder *encoder,
 			const struct intel_crtc_state *crtc_state,
 			int *n_entries)
@@ -1465,7 +1465,7 @@ ehl_get_combo_buf_trans(struct intel_encoder *encoder,
 		return ehl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 jsl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 			     const struct intel_crtc_state *crtc_state,
 			     int *n_entries)
@@ -1474,7 +1474,7 @@ jsl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 jsl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1483,7 +1483,7 @@ jsl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 jsl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 			    const struct intel_crtc_state *crtc_state,
 			    int *n_entries)
@@ -1503,7 +1503,7 @@ jsl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 	return jsl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 jsl_get_combo_buf_trans(struct intel_encoder *encoder,
 			const struct intel_crtc_state *crtc_state,
 			int *n_entries)
@@ -1516,7 +1516,7 @@ jsl_get_combo_buf_trans(struct intel_encoder *encoder,
 		return jsl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 			     const struct intel_crtc_state *crtc_state,
 			     int *n_entries)
@@ -1525,7 +1525,7 @@ tgl_get_combo_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1554,7 +1554,7 @@ tgl_get_combo_buf_trans_dp(struct intel_encoder *encoder,
 	}
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 			    const struct intel_crtc_state *crtc_state,
 			    int *n_entries)
@@ -1576,7 +1576,7 @@ tgl_get_combo_buf_trans_edp(struct intel_encoder *encoder,
 	return tgl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 tgl_get_combo_buf_trans(struct intel_encoder *encoder,
 			const struct intel_crtc_state *crtc_state,
 			int *n_entries)
@@ -1589,7 +1589,7 @@ tgl_get_combo_buf_trans(struct intel_encoder *encoder,
 		return tgl_get_combo_buf_trans_dp(encoder, crtc_state, n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 tgl_get_dkl_buf_trans_hdmi(struct intel_encoder *encoder,
 			   const struct intel_crtc_state *crtc_state,
 			   int *n_entries)
@@ -1598,7 +1598,7 @@ tgl_get_dkl_buf_trans_hdmi(struct intel_encoder *encoder,
 				   n_entries);
 }
 
-static const union intel_ddi_buf_trans_entry *
+static const struct intel_ddi_buf_trans *
 tgl_get_dkl_buf_trans_dp(struct intel_encoder *encoder,
 			 const struct intel_crtc_state *crtc_state,
 			 int *n_entries)
@@ -1612,7 +1612,7 @@ tgl_get_dkl_buf_trans_dp(struct intel_encoder *encoder,
 	}
 }
 
-const union intel_ddi_buf_trans_entry *
+const struct intel_ddi_buf_trans *
 tgl_get_dkl_buf_trans(struct intel_encoder *encoder,
 		      const struct intel_crtc_state *crtc_state,
 		      int *n_entries)
