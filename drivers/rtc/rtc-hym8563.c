@@ -94,8 +94,6 @@ static int hym8563_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	int ret;
 
 	ret = i2c_smbus_read_i2c_block_data(client, HYM8563_SEC, 7, buf);
-	if (ret < 0)
-		return ret;
 
 	if (buf[0] & HYM8563_SEC_VL) {
 		dev_warn(&client->dev,
