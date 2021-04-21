@@ -906,11 +906,6 @@ static bool __cluster_may_compress(struct compress_ctx *cc)
 
 		f2fs_bug_on(sbi, !page);
 
-		if (unlikely(f2fs_cp_error(sbi)))
-			return false;
-		if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
-			return false;
-
 		/* beyond EOF */
 		if (page->index >= nr_pages)
 			return false;
