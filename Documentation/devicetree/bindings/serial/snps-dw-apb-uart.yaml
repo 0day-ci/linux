@@ -30,6 +30,7 @@ properties:
               - rockchip,rk3308-uart
               - rockchip,rk3328-uart
               - rockchip,rk3368-uart
+              - rockchip,rk3568-uart
               - rockchip,rk3399-uart
               - rockchip,rv1108-uart
           - const: snps,dw-apb-uart
