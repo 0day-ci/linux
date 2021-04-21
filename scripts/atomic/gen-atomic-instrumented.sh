@@ -182,20 +182,39 @@ grep '^[a-z]' "$1" | while read name meta args; do
 	gen_proto "${meta}" "${name}" "atomic" "int" ${args}
 done
 
-grep '^[a-z]' "$1" | while read name meta args; do
-	gen_proto "${meta}" "${name}" "atomic64" "s64" ${args}
-done
-
-for xchg in "xchg" "cmpxchg" "cmpxchg64" "try_cmpxchg"; do
+for xchg in "xchg" "cmpxchg" "try_cmpxchg"; do
 	for order in "" "_acquire" "_release" "_relaxed"; do
 		gen_optional_xchg "${xchg}" "${order}"
 	done
 done
 
-for xchg in "cmpxchg_local" "cmpxchg64_local" "sync_cmpxchg"; do
+for xchg in "cmpxchg_local" "sync_cmpxchg"; do
 	gen_xchg "${xchg}" ""
 	printf "\n"
 done
+
+cat <<EOF
+#ifndef CONFIG_GENERIC_ATOMIC64
+EOF
+
+grep '^[a-z]' "$1" | while read name meta args; do
+	gen_proto "${meta}" "${name}" "atomic64" "s64" ${args}
+done
+
+for xchg in "cmpxchg64"; do
+	for order in "" "_acquire" "_release" "_relaxed"; do
+		gen_optional_xchg "${xchg}" "${order}"
+	done
+done
+
+for xchg in "cmpxchg64_local"; do
+	gen_xchg "${xchg}" ""
+	printf "\n"
+done
+
+cat <<EOF
+#endif
+EOF
 
 gen_xchg "cmpxchg_double" "2 * "
 

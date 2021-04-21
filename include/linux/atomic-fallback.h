@@ -1369,7 +1369,7 @@ atomic_dec_if_positive(atomic_t *v)
 
 #ifdef CONFIG_GENERIC_ATOMIC64
 #include <asm-generic/atomic64.h>
-#endif
+#else
 
 #define arch_atomic64_read atomic64_read
 #define arch_atomic64_read_acquire atomic64_read_acquire
@@ -2591,5 +2591,6 @@ atomic64_dec_if_positive(atomic64_t *v)
 #define atomic64_dec_if_positive atomic64_dec_if_positive
 #endif
 
+#endif /* CONFIG_GENERIC_ATOMIC64 */
 #endif /* _LINUX_ATOMIC_FALLBACK_H */
-// d78e6c293c661c15188f0ec05bce45188c8d5892
+// b809c8e3c88910826f765bdba4a74f21c527029d
