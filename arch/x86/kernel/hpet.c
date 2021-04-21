@@ -930,8 +930,6 @@ int __init hpet_enable(void)
 		return 0;
 
 	hpet_set_mapping();
-	if (!hpet_virt_address)
-		return 0;
 
 	/* Validate that the config register is working */
 	if (!hpet_cfg_working())
