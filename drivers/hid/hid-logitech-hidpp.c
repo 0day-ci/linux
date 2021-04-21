@@ -2547,13 +2547,6 @@ static int hidpp_ff_init(struct hidpp_device *hidpp,
 		kfree(data);
 		return -ENOMEM;
 	}
-	data->wq = create_singlethread_workqueue("hidpp-ff-sendqueue");
-	if (!data->wq) {
-		kfree(data->effect_ids);
-		kfree(data);
-		return -ENOMEM;
-	}
-
 	data->hidpp = hidpp;
 	data->version = version;
 	for (j = 0; j < num_slots; j++)
@@ -2575,6 +2568,7 @@ static int hidpp_ff_init(struct hidpp_device *hidpp,
 		hid_warn(hidpp->hid_dev, "Unable to create sysfs interface for \"range\", errno %d!\n", error);
 
 	/* init the hardware command queue */
+	data->wq = create_singlethread_workqueue("hidpp-ff-sendqueue");
 	atomic_set(&data->workqueue_size, 0);
 
 	hid_info(hid, "Force feedback support loaded (firmware release %d).\n",
