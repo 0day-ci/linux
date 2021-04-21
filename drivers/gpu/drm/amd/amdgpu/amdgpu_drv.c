@@ -1596,12 +1596,7 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 		struct drm_modeset_acquire_ctx ctx;
 		int ret_lock = 0;
 
-retry:
-		drm_modeset_lock_all_ctx(drm_dev, &ctx);
-		if(ret_lock == -EDEADLK) {
-			drm_modeset_backoff(&ctx);
-			goto retry;
-		}
+		DRM_MODESET_LOCK_ALL_BEGIN(drm_dev, ctx, 0, ret_lock);
 
 		drm_for_each_crtc(crtc, drm_dev) {
 			if (crtc->state->active) {
@@ -1610,7 +1605,7 @@ retry:
 			}
 		}
 
-		drm_modeset_drop_locks(&ctx);
+		DRM_MODESET_LOCK_ALL_END(drm_dev, ctx, ret_lock);
 
 	} else {
 		struct drm_connector *list_connector;
