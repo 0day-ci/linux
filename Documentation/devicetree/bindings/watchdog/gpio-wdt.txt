@@ -17,6 +17,13 @@ Optional Properties:
 - always-running: If the watchdog timer cannot be disabled, add this flag to
   have the driver keep toggling the signal without a client. It will only cease
   to toggle the signal when the device is open and the timeout elapsed.
+- start-at-boot: Start pinging hw watchdog at probe, in order to take advantage
+  of kernel configs:
+  - WATCHDOG_HANDLE_BOOT_ENABLED: Avoid possible reboot if hw watchdog was been
+    enabled before the kernel (by uboot for example) and userspace doesn't take
+    control of /dev/watchdog in time;
+  - WATCHDOG_OPEN_TIMEOUT: Reboot if userspace doesn't take control of
+    /dev/watchdog within the timeout.
 
 Example:
 	watchdog: watchdog {
