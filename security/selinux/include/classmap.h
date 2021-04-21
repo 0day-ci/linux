@@ -251,6 +251,8 @@ struct security_class_mapping secclass_map[] = {
 	  { "integrity", "confidentiality", NULL } },
 	{ "anon_inode",
 	  { COMMON_FILE_PERMS, NULL } },
+	{ "userfaultfd",
+	  { COMMON_FILE_PERMS, NULL } },
 	{ NULL }
   };
 

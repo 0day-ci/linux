@@ -3079,7 +3079,32 @@ static int selinux_inode_init_security_anon(struct inode *inode,
 		isec->sclass = context_isec->sclass;
 		isec->sid = context_isec->sid;
 	} else {
-		isec->sclass = SECCLASS_ANON_INODE;
+		/*
+		 * If the check below fails:
+		 *  1. Add the corresponding security class to
+		 *     security/selinux/include/classmap.h
+		 *  2. Map the new LSM_ANON_INODE_* value to the class in
+		 *     the switch statement below.
+		 *  3. Update the RHS of the comparison in the BUILD_BUG_ON().
+		 *  4. CC selinux@vger.kernel.org and
+		 *     linux-security-module@vger.kernel.org when submitting
+		 *     the patch or in case of any questions.
+		 */
+		BUILD_BUG_ON(LSM_ANON_INODE_MAX > LSM_ANON_INODE_USERFAULTFD);
+
+		if (selinux_policycap_extended_anon_inode()) {
+			switch (type) {
+			case LSM_ANON_INODE_USERFAULTFD:
+				isec->sclass = SECCLASS_USERFAULTFD;
+				break;
+			default:
+				pr_err("SELinux:  got invalid anon inode type: %d",
+				       (int)type);
+				return -EINVAL;
+			}
+		} else {
+			isec->sclass = SECCLASS_ANON_INODE;
+		}
 		rc = security_transition_sid(
 			&selinux_state, tsec->sid, tsec->sid,
 			isec->sclass, name, &isec->sid);
