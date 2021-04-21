@@ -30,6 +30,8 @@ extern char __end_interrupts[];
 
 extern char __prom_init_toc_start[];
 extern char __prom_init_toc_end[];
+extern char __branch_lt_start[];
+extern char __branch_lt_end[];
 
 #ifdef CONFIG_PPC_POWERNV
 extern char start_real_trampolines[];

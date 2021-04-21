@@ -317,7 +317,9 @@ SECTIONS
 #endif
 		*(.data.rel*)
 		*(.toc1)
+		__branch_lt_start = .;
 		*(.branch_lt)
+		__branch_lt_end = .;
 	}
 
 	.opd : AT(ADDR(.opd) - LOAD_OFFSET) {

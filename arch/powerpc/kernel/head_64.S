@@ -560,7 +560,10 @@ __boot_from_prom:
 	/* Relocate code for where we are now */
 	mr	r3,r26
 	bl	relocate
+#else
+	bl	relocate_plt
 #endif
+
 
 	/* Restore parameters */
 	mr	r3,r31
@@ -600,6 +603,8 @@ __after_prom_start:
 	/* IVPR needs to be set after relocation. */
 	bl	init_core_book3e
 #endif
+#else
+	bl	unrelocate_plt
 #endif
 
 /*
@@ -900,6 +905,67 @@ _GLOBAL(relative_toc)
 
 .balign 8
 p_toc:	.8byte	__toc_start + 0x8000 - 0b
+
+/*
+ * A large non relocatable kernel may generate branches that go though the plt,
+ * before the kernel is copied down to its link location, the target address in
+ * the .branch_lt section need to be offset with the run time address. The
+ * offset then needs to be removed before the kernel is running at the correct
+ * address.  When relocate_plt is called the current runtime address is added
+ * to all of the target address in .branch_lt and that address is stored in
+ * p_branch_lt_off.  When unrelocate_plt is called if there is an offset saved
+ * in p_branch_lt_off it is subtracted from the addresses in .branch_lt to
+ * return them to their original targets.
+ */
+#ifndef CONFIG_RELOCATABLE
+#define RELOCATE_MODE 0
+#define UNRELOCATE_MODE 1
+unrelocate_plt:
+	li	r16,UNRELOCATE_MODE
+	b	+8
+relocate_plt:
+	li	r16,RELOCATE_MODE
+	mflr	r0
+	bcl	20,31,$+4
+0:	mflr	r11
+
+	ld	r12,(p_branch_lt_start - 0b)(r11)
+	add	r12,r12,r11
+	ld	r14,(p_branch_lt_end - 0b)(r11)
+	add	r14,r14,r11
+	ld	r15,(p_branch_lt_off - 0b)(r11)
+
+	/* Adding runtime address or subtracting p_branch_lt_off? */
+	cmpdi	r16,UNRELOCATE_MODE
+	bne	5f
+	cmpdi	r15,0
+	beq	4f
+	mr	r10,r15
+	neg	r10,r10
+	b	2f
+5:	mr	r10,r26
+
+	/* Iterate over all targets in .branch_lt */
+2:	cmpd	r12,r14
+	bge	6f
+	ld	r13,0(r12)
+	add	r13,r13, r10
+	std	r13,0(r12)
+	addi	r12,r12, 8
+	b	2b
+
+6:	cmpdi	r16,RELOCATE_MODE
+	bne	4f
+	std	r26,(p_branch_lt_off - 0b)(r11)
+
+4:	mtlr	r0
+	blr
+
+.balign 8
+p_branch_lt_start:	.8byte	__branch_lt_start - 0b
+p_branch_lt_end:	.8byte	__branch_lt_end - 0b
+p_branch_lt_off:	.8byte	0
+#endif
 
 /*
  * This is where the main kernel code starts.
