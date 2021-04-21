@@ -1377,6 +1377,8 @@ static inline void tcp_slow_start_after_idle_check(struct sock *sk)
 	if (!sock_net(sk)->ipv4.sysctl_tcp_slow_start_after_idle || tp->packets_out ||
 	    ca_ops->cong_control)
 		return;
+	if (inet_csk(sk)->icsk_mtup.wait_data)
+		return;
 	delta = tcp_jiffies32 - tp->lsndtime;
 	if (delta > inet_csk(sk)->icsk_rto)
 		tcp_cwnd_restart(sk, delta);

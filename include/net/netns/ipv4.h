@@ -128,6 +128,7 @@ struct netns_ipv4 {
 	int sysctl_tcp_min_snd_mss;
 	int sysctl_tcp_probe_threshold;
 	u32 sysctl_tcp_probe_interval;
+	int sysctl_tcp_probe_wait;
 
 	int sysctl_tcp_keepalive_time;
 	int sysctl_tcp_keepalive_intvl;

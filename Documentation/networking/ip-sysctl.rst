@@ -552,6 +552,10 @@ tcp_probe_threshold - INTEGER
 	will stop in respect to the width of search range in bytes. Default
 	is 8 bytes.
 
+tcp_probe_wait - INTEGER
+	How long to wait for data for a tcp mtu probe. The default is 500
+	milliseconds, zero can be used to disable this feature.
+
 tcp_no_metrics_save - BOOLEAN
 	By default, TCP saves various connection metrics in the route cache
 	when the connection closes, so that connections established in the
