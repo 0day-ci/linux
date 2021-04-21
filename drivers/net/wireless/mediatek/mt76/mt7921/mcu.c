@@ -500,7 +500,7 @@ mt7921_mcu_debug_msg_event(struct mt7921_dev *dev, struct sk_buff *skb)
 			if (!msg->content[i])
 				msg->content[i] = ' ';
 		}
-		wiphy_info(mt76_hw(dev)->wiphy, "%*s", len, msg->content);
+		wiphy_info(mt76_hw(dev)->wiphy, "%.*s", len, msg->content);
 	}
 }
 
