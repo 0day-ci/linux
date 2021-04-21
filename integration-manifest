@@ -1,0 +1,38 @@
+drm drm-fixes 796b556cbfdbe0d65b9793e63653ad24f9fa033c
+	Merge tag 'vmwgfx-fixes-2021-04-14' of gitlab.freedesktop.org:zack/vmwgfx into drm-fixes
+drm-misc drm-misc-fixes ffe8768fb8f391cb478466778c55e2110525c15c
+	drm/vc4: remove unused function
+drm-intel drm-intel-fixes 2d292995bb8f49a2596bef522679c1e1454f3230
+	Merge tag 'gvt-fixes-2021-04-20' of https://github.com/intel/gvt-linux into drm-intel-fixes
+drm-amd drm-amd-fixes 2b702e72e33bbdec0764cfb6e1dd00fe1142ae55
+	Merge tag 'drm-misc-fixes-2017-09-28-1' of git://anongit.freedesktop.org/git/drm-misc into drm-fixes
+drm drm-next af8352f1ff54c4fecf84e36315fd1928809a580b
+	Merge tag 'drm-msm-next-2021-04-11' of https://gitlab.freedesktop.org/drm/msm into drm-next
+drm-misc drm-misc-next-fixes a4394b6d0a273941a75ebe86a86d6416d536ed0f
+	drm/ttm: Don't count pages in SG BOs against pages_limit
+drm-intel drm-intel-next-fixes e65a4d378480101f222e8f6978c22e590c1fb7b5
+	Merge tag 'gvt-next-fixes-2021-04-21' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-amd drm-amd-next-fixes 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e
+	Linux 4.14-rc1
+drm-misc drm-misc-next f05ca108672295851cab99ac8e4ed7e8b8b38ff9
+	MAINTAINERS: add it66121 HDMI bridge driver entry
+drm-intel drm-intel-next dc09b30969fd1cf4b9a9c8075d62efeb2303b9b7
+	drm/i915/dmc: Let's abstract the dmc path.
+drm-intel drm-intel-gt-next c256af0d6c1846db9af357a913b277b566ca3797
+	drm/i915/lmem: Fail driver init if LMEM training failed
+drm-amd drm-amd-next 754270c7c56292e97d0eff924a5d5d83f92add07
+	Merge branch 'drm-next-4.15' of git://people.freedesktop.org/~agd5f/linux into drm-next
+sound-upstream for-linus c8426b2700b57d2760ff335840a02f66a64b6044
+	ALSA: hda/realtek: Fix speaker amp setup on Acer Aspire E1
+sound-upstream for-next bd15b15523fd3197d1bb46403e02e92877a4f412
+	ALSA: hda/realtek: Enable mute/micmute LEDs and limit mic boost on EliteBook 845 G8
+drm-intel topic/core-for-CI 785b066b32b630e4735ca6e51acbb067703e2d3a
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/iomem-mmap-vs-gup ac8b8400620a4b0d9ca903ee9ad440bec736f5fa
+	mm: unexport follow_pfn
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-intel topic/intel-gen-to-ver 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
+drm-intel topic/adl-p-enabling 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
