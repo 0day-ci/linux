@@ -1269,6 +1269,18 @@ void kvm_apic_set_eoi_accelerated(struct kvm_vcpu *vcpu, int vector)
 }
 EXPORT_SYMBOL_GPL(kvm_apic_set_eoi_accelerated);
 
+static void mark_ipi_receiver(struct kvm_lapic *apic, struct kvm_lapic_irq *irq)
+{
+	struct kvm_vcpu *dest_vcpu;
+	u64 prev_ipi_received;
+
+	dest_vcpu = kvm_get_vcpu_by_id(apic->vcpu->kvm, irq->dest_id);
+	if (READ_ONCE(dest_vcpu->sched_outed)) {
+		prev_ipi_received = READ_ONCE(dest_vcpu->ipi_received);
+		WRITE_ONCE(dest_vcpu->ipi_received, prev_ipi_received | (1 << apic->vcpu->vcpu_id));
+	}
+}
+
 void kvm_apic_send_ipi(struct kvm_lapic *apic, u32 icr_low, u32 icr_high)
 {
 	struct kvm_lapic_irq irq;
@@ -1286,6 +1298,8 @@ void kvm_apic_send_ipi(struct kvm_lapic *apic, u32 icr_low, u32 icr_high)
 		irq.dest_id = GET_APIC_DEST_FIELD(icr_high);
 
 	trace_kvm_apic_ipi(icr_low, irq.dest_id);
+
+	mark_ipi_receiver(apic, &irq);
 
 	kvm_irq_delivery_to_apic(apic->vcpu->kvm, apic, &irq, NULL);
 }

@@ -6718,6 +6718,8 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		vmcs_write32(PLE_WINDOW, vmx->ple_window);
 	}
 
+	WRITE_ONCE(vcpu->ipi_received, 0);
+
 	/*
 	 * We did this in prepare_switch_to_guest, because it needs to
 	 * be within srcu_read_lock.

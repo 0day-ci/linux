@@ -320,6 +320,11 @@ struct kvm_vcpu {
 #endif
 	bool preempted;
 	bool ready;
+	bool sched_outed;
+	/*
+	 * The current implementation of strict boost supports up to 64 vCPUs
+	 */
+	u64 ipi_received;
 	struct kvm_vcpu_arch arch;
 	struct kvm_dirty_ring dirty_ring;
 };

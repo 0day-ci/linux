@@ -413,6 +413,10 @@ static void kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 	kvm_vcpu_set_dy_eligible(vcpu, false);
 	vcpu->preempted = false;
 	vcpu->ready = false;
+
+	vcpu->sched_outed = false;
+	vcpu->ipi_received = 0;
+
 	preempt_notifier_init(&vcpu->preempt_notifier, &kvm_preempt_ops);
 }
 
@@ -3011,6 +3015,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 	int try = 3;
 	int pass;
 	int i;
+	u64 prev_ipi_received;
 
 	kvm_vcpu_set_in_spin_loop(me, true);
 	/*
@@ -3031,12 +3036,25 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 				continue;
 			if (vcpu == me)
 				continue;
+			prev_ipi_received = READ_ONCE(vcpu->ipi_received);
+			if (!READ_ONCE(vcpu->preempted) &&
+			    !(prev_ipi_received & (1 << me->vcpu_id))) {
+				WRITE_ONCE(vcpu->ipi_received,
+					   prev_ipi_received | (1 << me->vcpu_id));
+				continue;
+			}
 			if (rcuwait_active(&vcpu->wait) &&
 			    !vcpu_dy_runnable(vcpu))
 				continue;
 			if (READ_ONCE(vcpu->preempted) && yield_to_kernel_mode &&
-				!kvm_arch_vcpu_in_kernel(vcpu))
-				continue;
+				!kvm_arch_vcpu_in_kernel(vcpu)) {
+				prev_ipi_received = READ_ONCE(vcpu->ipi_received);
+				if (!(prev_ipi_received & (1 << me->vcpu_id))) {
+					WRITE_ONCE(vcpu->ipi_received,
+						   prev_ipi_received | (1 << me->vcpu_id));
+					continue;
+				}
+			}
 			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
 				continue;
 
@@ -4859,6 +4877,9 @@ static void kvm_sched_in(struct preempt_notifier *pn, int cpu)
 	WRITE_ONCE(vcpu->preempted, false);
 	WRITE_ONCE(vcpu->ready, false);
 
+	WRITE_ONCE(vcpu->sched_outed, false);
+	WRITE_ONCE(vcpu->ipi_received, 0);
+
 	__this_cpu_write(kvm_running_vcpu, vcpu);
 	kvm_arch_sched_in(vcpu, cpu);
 	kvm_arch_vcpu_load(vcpu, cpu);
@@ -4873,6 +4894,7 @@ static void kvm_sched_out(struct preempt_notifier *pn,
 		WRITE_ONCE(vcpu->preempted, true);
 		WRITE_ONCE(vcpu->ready, true);
 	}
+	WRITE_ONCE(vcpu->sched_outed, true);
 	kvm_arch_vcpu_put(vcpu);
 	__this_cpu_write(kvm_running_vcpu, NULL);
 }
