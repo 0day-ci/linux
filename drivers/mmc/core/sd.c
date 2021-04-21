@@ -996,6 +996,171 @@ static bool mmc_sd_card_using_v18(struct mmc_card *card)
 	       (SD_MODE_UHS_SDR50 | SD_MODE_UHS_SDR104 | SD_MODE_UHS_DDR50);
 }
 
+static int sd_read_ext_reg_fno(struct mmc_card *card, u8 fno, u32 reg_addr,
+			       u8 **buf)
+{
+	int err;
+	u8 *tmp_buf;
+	u32 cmd_args;
+
+	/*
+	 * Arguments of CMD48 to read a page of 512 bytes:
+	 * [31:31] MIO (0 = memory).
+	 * [30:27] FNO (function number).
+	 * [26:26] reserved (0).
+	 * [25:18] page number.
+	 * [17:9] offset address.
+	 * [8:0] length (1FF = 512 bytes data).
+	 */
+	cmd_args = 0x000001ff | fno << 27 | reg_addr << 9;
+
+	tmp_buf = kzalloc(512, GFP_KERNEL);
+	if (!tmp_buf)
+		return -ENOMEM;
+
+	err = mmc_send_adtc_data(card, card->host, SD_READ_EXTR_SINGLE,
+				 cmd_args, tmp_buf, 512);
+	if (err)
+		kfree(tmp_buf);
+	else
+		*buf = tmp_buf;
+
+	return err;
+}
+
+static int sd_decode_ext_reg_power(struct mmc_card *card, u8 fno, u32 reg_addr)
+{
+	int err;
+	u8 *reg_buf;
+
+	/* Read the extension register for power management function. */
+	err = sd_read_ext_reg_fno(card, fno, reg_addr, &reg_buf);
+	if (err) {
+		pr_warn("%s: error %d reading PM func of ext reg\n",
+			mmc_hostname(card->host), err);
+		return err;
+	}
+
+	/* PM revision consists of 4 bits. */
+	card->ext_power.rev = reg_buf[0] & 0xf;
+
+	/* Power Off Notification support at bit 4. */
+	if (reg_buf[1] & 0x10)
+		card->ext_power.feature_support |= SD_EXT_POWER_OFF_NOTIFY;
+
+	/* Power Sustenance support at bit 5. */
+	if (reg_buf[1] & 0x20)
+		card->ext_power.feature_support |= SD_EXT_POWER_SUSTENANCE;
+
+	/* Power Down Mode support at bit 6. */
+	if (reg_buf[1] & 0x40)
+		card->ext_power.feature_support |= SD_EXT_POWER_DOWN_MODE;
+
+	card->ext_power.reg_addr = reg_addr;
+	card->ext_power.fno = fno;
+
+	kfree(reg_buf);
+	return 0;
+}
+
+static int sd_decode_ext_reg(struct mmc_card *card, u8 *gen_info_buf,
+			     u16 *next_ext_addr)
+{
+	u8 num_reg_sets, fno;
+	u16 ext = *next_ext_addr, sfc;
+	u32 reg_set_addr, reg_addr;
+
+	/*
+	 * Parse only one register set per extension, as that is sufficient to
+	 * support the Standard Functions. This means another 48 bytes in the
+	 * buffer must be available.
+	 */
+	if (ext + 48 > 512)
+		return -EFAULT;
+
+	/* Standard Function Code */
+	memcpy(&sfc, &gen_info_buf[ext], 2);
+
+	/* Address to the next extension. */
+	memcpy(next_ext_addr, &gen_info_buf[ext + 40], 2);
+
+	/* Number of registers sets for this extension. */
+	num_reg_sets = gen_info_buf[ext + 42];
+
+	if (num_reg_sets != 1)
+		return 0;
+
+	/* Extension register address. */
+	memcpy(&reg_set_addr, &gen_info_buf[ext + 44], 4);
+
+	/* First 17 bits contains the page and the offset. */
+	reg_addr = reg_set_addr & 0x1FFFF;
+
+	/* 4 bits (18 to 21) contains the Function Number. */
+	fno = reg_set_addr >> 18 & 0xf;
+
+	/* Standard Function Code for power management. */
+	if (sfc == 0x1)
+		return sd_decode_ext_reg_power(card, fno, reg_addr);
+
+	return 0;
+}
+
+static int sd_read_ext_regs(struct mmc_card *card)
+{
+	int err, i;
+	u8 num_ext, *gen_info_buf;
+	u16 rev, len, next_ext_addr;
+
+	if (mmc_host_is_spi(card->host))
+		return 0;
+
+	if (!(card->scr.cmds & SD_SCR_CMD48_SUPPORT))
+		return 0;
+
+	/* Read general info at page 0, with no offset and FNO=0. */
+	err = sd_read_ext_reg_fno(card, 0, 0, &gen_info_buf);
+	if (err) {
+		pr_warn("%s: error %d reading general info of SD ext reg\n",
+			mmc_hostname(card->host), err);
+		return err;
+	}
+
+	/* General info structure revision. */
+	memcpy(&rev, &gen_info_buf[0], 2);
+
+	/* Length of general info in bytes. */
+	memcpy(&len, &gen_info_buf[2], 2);
+
+	/* Number of extensions to be find. */
+	num_ext = gen_info_buf[4];
+
+	/* We support revision 0, but limit it to 512 bytes - for simplicity. */
+	if (rev != 0 || len > 512) {
+		pr_warn("%s: non-supported SD ext reg layout\n",
+			mmc_hostname(card->host));
+		goto out;
+	}
+
+	/*
+	 * Read/parse the extension registers. The first extension should start
+	 * immediately after the general info header (16 bytes).
+	 */
+	next_ext_addr = 16;
+	for (i = 0; i < num_ext; i++) {
+		err = sd_decode_ext_reg(card, gen_info_buf, &next_ext_addr);
+		if (err) {
+			pr_warn("%s: error %d parsing SD ext reg\n",
+				mmc_hostname(card->host), err);
+			goto out;
+		}
+	}
+
+out:
+	kfree(gen_info_buf);
+	return err;
+}
+
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -1142,6 +1307,13 @@ retry:
 
 			mmc_set_bus_width(host, MMC_BUS_WIDTH_4);
 		}
+	}
+
+	if (!oldcard) {
+		/* Read/parse the extension registers. */
+		err = sd_read_ext_regs(card);
+		if (err)
+			goto free_card;
 	}
 
 	if (host->cqe_ops && !host->cqe_enabled) {
