@@ -643,6 +643,7 @@ struct ufs_hba_variant_params {
 	struct devfreq_simple_ondemand_data ondemand_data;
 	u16 hba_enable_delay_us;
 	u32 wb_flush_threshold;
+	bool wb_batched_flush;
 };
 
 /**
@@ -1105,6 +1106,7 @@ int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
 			     enum query_opcode desc_op);
 
 int ufshcd_wb_toggle(struct ufs_hba *hba, bool enable);
+int ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set);
 
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
