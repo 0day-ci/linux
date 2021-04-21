@@ -37,6 +37,7 @@
 #include "intel_connector.h"
 #include "intel_crt.h"
 #include "intel_ddi.h"
+#include "intel_ddi_buf_trans.h"
 #include "intel_display_types.h"
 #include "intel_fdi.h"
 #include "intel_fifo_underrun.h"
@@ -1079,6 +1080,8 @@ void intel_crt_init(struct drm_i915_private *dev_priv)
 		crt->base.enable_clock = hsw_ddi_enable_clock;
 		crt->base.disable_clock = hsw_ddi_disable_clock;
 		crt->base.is_clock_enabled = hsw_ddi_is_clock_enabled;
+
+		intel_ddi_buf_trans_init(&crt->base);
 	} else {
 		if (HAS_PCH_SPLIT(dev_priv)) {
 			crt->base.compute_config = pch_crt_compute_config;

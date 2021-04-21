@@ -102,8 +102,7 @@ void hsw_prepare_dp_ddi_buffers(struct intel_encoder *encoder,
 	enum port port = encoder->port;
 	const struct intel_ddi_buf_trans *ddi_translations;
 
-	ddi_translations = hsw_get_buf_trans(encoder, crtc_state, &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 
@@ -135,8 +134,7 @@ static void hsw_prepare_hdmi_ddi_buffers(struct intel_encoder *encoder,
 	enum port port = encoder->port;
 	const struct intel_ddi_buf_trans *ddi_translations;
 
-	ddi_translations = hsw_get_buf_trans(encoder, crtc_state,  &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -911,8 +909,7 @@ static void skl_ddi_set_iboost(struct intel_encoder *encoder,
 		const struct intel_ddi_buf_trans *ddi_translations;
 		int n_entries;
 
-		ddi_translations = hsw_get_buf_trans(encoder, crtc_state, &n_entries);
-
+		ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 		if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 			return;
 		if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -942,7 +939,7 @@ static void bxt_ddi_vswing_sequence(struct intel_encoder *encoder,
 	enum port port = encoder->port;
 	int n_entries;
 
-	ddi_translations = bxt_get_buf_trans(encoder, crtc_state, &n_entries);
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -960,31 +957,9 @@ static u8 intel_ddi_dp_voltage_max(struct intel_dp *intel_dp,
 {
 	struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
-	enum port port = encoder->port;
-	enum phy phy = intel_port_to_phy(dev_priv, port);
 	int n_entries;
 
-	if (DISPLAY_VER(dev_priv) >= 12) {
-		if (intel_phy_is_combo(dev_priv, phy))
-			tgl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-		else
-			tgl_get_dkl_buf_trans(encoder, crtc_state, &n_entries);
-	} else if (DISPLAY_VER(dev_priv) == 11) {
-		if (IS_PLATFORM(dev_priv, INTEL_JASPERLAKE))
-			jsl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-		else if (IS_PLATFORM(dev_priv, INTEL_ELKHARTLAKE))
-			ehl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-		else if (intel_phy_is_combo(dev_priv, phy))
-			icl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-		else
-			icl_get_mg_buf_trans(encoder, crtc_state, &n_entries);
-	} else if (IS_CANNONLAKE(dev_priv)) {
-		cnl_get_buf_trans(encoder, crtc_state, &n_entries);
-	} else if (IS_GEMINILAKE(dev_priv) || IS_BROXTON(dev_priv)) {
-		bxt_get_buf_trans(encoder, crtc_state, &n_entries);
-	} else {
-		hsw_get_buf_trans(encoder, crtc_state, &n_entries);
-	}
+	encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 
 	if (drm_WARN_ON(&dev_priv->drm, n_entries < 1))
 		n_entries = 1;
@@ -1016,8 +991,7 @@ static void cnl_ddi_vswing_program(struct intel_encoder *encoder,
 	int n_entries, ln;
 	u32 val;
 
-	ddi_translations = cnl_get_buf_trans(encoder, crtc_state, &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -1137,15 +1111,7 @@ static void icl_ddi_combo_vswing_program(struct intel_encoder *encoder,
 	int n_entries, ln;
 	u32 val;
 
-	if (DISPLAY_VER(dev_priv) >= 12)
-		ddi_translations = tgl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-	else if (IS_PLATFORM(dev_priv, INTEL_JASPERLAKE))
-		ddi_translations = jsl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-	else if (IS_PLATFORM(dev_priv, INTEL_ELKHARTLAKE))
-		ddi_translations = ehl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-	else
-		ddi_translations = icl_get_combo_buf_trans(encoder, crtc_state, &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -1272,8 +1238,7 @@ static void icl_mg_phy_ddi_vswing_sequence(struct intel_encoder *encoder,
 	if (enc_to_dig_port(encoder)->tc_mode == TC_PORT_TBT_ALT)
 		return;
 
-	ddi_translations = icl_get_mg_buf_trans(encoder, crtc_state, &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -1410,8 +1375,7 @@ tgl_dkl_phy_ddi_vswing_sequence(struct intel_encoder *encoder,
 	if (enc_to_dig_port(encoder)->tc_mode == TC_PORT_TBT_ALT)
 		return;
 
-	ddi_translations = tgl_get_dkl_buf_trans(encoder, crtc_state, &n_entries);
-
+	ddi_translations = encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, !ddi_translations))
 		return;
 	if (drm_WARN_ON_ONCE(&dev_priv->drm, level >= n_entries))
@@ -4589,6 +4553,8 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 		encoder->is_clock_enabled = hsw_ddi_is_clock_enabled;
 		encoder->get_config = hsw_ddi_get_config;
 	}
+
+	intel_ddi_buf_trans_init(encoder);
 
 	if (IS_DG1(dev_priv))
 		encoder->hpd_pin = dg1_hpd_pin(dev_priv, port);
