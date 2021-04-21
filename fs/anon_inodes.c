@@ -56,6 +56,7 @@ static struct file_system_type anon_inode_fs_type = {
 };
 
 static struct inode *anon_inode_make_secure_inode(
+	enum lsm_anon_inode_type type,
 	const char *name,
 	const struct inode *context_inode)
 {
@@ -67,7 +68,8 @@ static struct inode *anon_inode_make_secure_inode(
 	if (IS_ERR(inode))
 		return inode;
 	inode->i_flags &= ~S_PRIVATE;
-	error =	security_inode_init_security_anon(inode, &qname, context_inode);
+	error =	security_inode_init_security_anon(inode, type, &qname,
+						  context_inode);
 	if (error) {
 		iput(inode);
 		return ERR_PTR(error);
@@ -75,11 +77,11 @@ static struct inode *anon_inode_make_secure_inode(
 	return inode;
 }
 
-static struct file *__anon_inode_getfile(const char *name,
+static struct file *__anon_inode_getfile(enum lsm_anon_inode_type type,
+					 const char *name,
 					 const struct file_operations *fops,
 					 void *priv, int flags,
-					 const struct inode *context_inode,
-					 bool secure)
+					 const struct inode *context_inode)
 {
 	struct inode *inode;
 	struct file *file;
@@ -87,8 +89,8 @@ static struct file *__anon_inode_getfile(const char *name,
 	if (fops->owner && !try_module_get(fops->owner))
 		return ERR_PTR(-ENOENT);
 
-	if (secure) {
-		inode =	anon_inode_make_secure_inode(name, context_inode);
+	if (type != LSM_ANON_INODE_NONE) {
+		inode =	anon_inode_make_secure_inode(type, name, context_inode);
 		if (IS_ERR(inode)) {
 			file = ERR_CAST(inode);
 			goto err;
@@ -144,15 +146,16 @@ struct file *anon_inode_getfile(const char *name,
 				const struct file_operations *fops,
 				void *priv, int flags)
 {
-	return __anon_inode_getfile(name, fops, priv, flags, NULL, false);
+	return __anon_inode_getfile(LSM_ANON_INODE_NONE, name, fops, priv,
+				    flags, NULL);
 }
 EXPORT_SYMBOL_GPL(anon_inode_getfile);
 
-static int __anon_inode_getfd(const char *name,
+static int __anon_inode_getfd(enum lsm_anon_inode_type type,
+			      const char *name,
 			      const struct file_operations *fops,
 			      void *priv, int flags,
-			      const struct inode *context_inode,
-			      bool secure)
+			      const struct inode *context_inode)
 {
 	int error, fd;
 	struct file *file;
@@ -162,8 +165,8 @@ static int __anon_inode_getfd(const char *name,
 		return error;
 	fd = error;
 
-	file = __anon_inode_getfile(name, fops, priv, flags, context_inode,
-				    secure);
+	file = __anon_inode_getfile(type, name, fops, priv, flags,
+				    context_inode);
 	if (IS_ERR(file)) {
 		error = PTR_ERR(file);
 		goto err_put_unused_fd;
@@ -197,7 +200,8 @@ err_put_unused_fd:
 int anon_inode_getfd(const char *name, const struct file_operations *fops,
 		     void *priv, int flags)
 {
-	return __anon_inode_getfd(name, fops, priv, flags, NULL, false);
+	return __anon_inode_getfd(LSM_ANON_INODE_NONE, name, fops, priv,
+				  flags, NULL);
 }
 EXPORT_SYMBOL_GPL(anon_inode_getfd);
 
@@ -207,7 +211,9 @@ EXPORT_SYMBOL_GPL(anon_inode_getfd);
  * the inode_init_security_anon() LSM hook. This allows the inode to have its
  * own security context and for a LSM to reject creation of the inode.
  *
- * @name:    [in]    name of the "class" of the new file
+ * @type:    [in]    type of the file recognizable by LSMs
+ * @name:    [in]    name of the "class" of the new file (may be more specific
+ *                   than @type)
  * @fops:    [in]    file operations for the new file
  * @priv:    [in]    private data for the new file (will be file's private_data)
  * @flags:   [in]    flags
@@ -217,11 +223,15 @@ EXPORT_SYMBOL_GPL(anon_inode_getfd);
  * The LSM may use @context_inode in inode_init_security_anon(), but a
  * reference to it is not held.
  */
-int anon_inode_getfd_secure(const char *name, const struct file_operations *fops,
+int anon_inode_getfd_secure(enum lsm_anon_inode_type type, const char *name,
+			    const struct file_operations *fops,
 			    void *priv, int flags,
 			    const struct inode *context_inode)
 {
-	return __anon_inode_getfd(name, fops, priv, flags, context_inode, true);
+	/* The caller must pass a valid type! */
+	if (WARN_ON(type <= LSM_ANON_INODE_NONE || type > LSM_ANON_INODE_MAX))
+		return -EINVAL;
+	return __anon_inode_getfd(type, name, fops, priv, flags, context_inode);
 }
 EXPORT_SYMBOL_GPL(anon_inode_getfd_secure);
 

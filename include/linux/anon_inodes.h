@@ -9,6 +9,8 @@
 #ifndef _LINUX_ANON_INODES_H
 #define _LINUX_ANON_INODES_H
 
+#include <linux/security.h>
+
 struct file_operations;
 struct inode;
 
@@ -17,7 +19,7 @@ struct file *anon_inode_getfile(const char *name,
 				void *priv, int flags);
 int anon_inode_getfd(const char *name, const struct file_operations *fops,
 		     void *priv, int flags);
-int anon_inode_getfd_secure(const char *name,
+int anon_inode_getfd_secure(enum lsm_anon_inode_type type, const char *name,
 			    const struct file_operations *fops,
 			    void *priv, int flags,
 			    const struct inode *context_inode);

@@ -80,6 +80,23 @@ enum lsm_event {
 };
 
 /*
+ * Types of anonymous inodes that may be interesting to LSMs.
+ * Passed to anon_inode_getfd_secure() and
+ * security_inode_init_security_anon().
+ */
+enum lsm_anon_inode_type {
+	/* anon inodes invisible to the LSMs */
+	LSM_ANON_INODE_NONE = 0,
+	/* userfaultfd anon inodes */
+	LSM_ANON_INODE_USERFAULTFD,
+	/* (add new types above this line) */
+
+	__LSM_ANON_INODE_MAX,
+	/* max value used for asserts */
+	LSM_ANON_INODE_MAX = __LSM_ANON_INODE_MAX - 1,
+};
+
+/*
  * These are reasons that can be passed to the security_locked_down()
  * LSM hook. Lockdown reasons that protect kernel integrity (ie, the
  * ability for userland to modify kernel code) are placed before
@@ -329,6 +346,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 initxattrs initxattrs, void *fs_data);
 int security_inode_init_security_anon(struct inode *inode,
+				      enum lsm_anon_inode_type type,
 				      const struct qstr *name,
 				      const struct inode *context_inode);
 int security_old_inode_init_security(struct inode *inode, struct inode *dir,
@@ -759,6 +777,7 @@ static inline int security_inode_init_security(struct inode *inode,
 }
 
 static inline int security_inode_init_security_anon(struct inode *inode,
+						    enum lsm_anon_inode_type type,
 						    const struct qstr *name,
 						    const struct inode *context_inode)
 {

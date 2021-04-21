@@ -1067,10 +1067,11 @@ out:
 EXPORT_SYMBOL(security_inode_init_security);
 
 int security_inode_init_security_anon(struct inode *inode,
+				      enum lsm_anon_inode_type type,
 				      const struct qstr *name,
 				      const struct inode *context_inode)
 {
-	return call_int_hook(inode_init_security_anon, 0, inode, name,
+	return call_int_hook(inode_init_security_anon, 0, inode, type, name,
 			     context_inode);
 }
 

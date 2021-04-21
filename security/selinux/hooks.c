@@ -3048,6 +3048,7 @@ static int selinux_inode_init_security(struct inode *inode, struct inode *dir,
 }
 
 static int selinux_inode_init_security_anon(struct inode *inode,
+					    enum lsm_anon_inode_type type,
 					    const struct qstr *name,
 					    const struct inode *context_inode)
 {
