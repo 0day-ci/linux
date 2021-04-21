@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
+#include <asm/bug.h>
 #include <asm/page.h>
 #include <asm/unaligned.h>
 
