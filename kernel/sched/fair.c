@@ -6037,6 +6037,39 @@ static inline int get_idle_core(int cpu, int def)
 	return def;
 }
 
+static void set_next_idle_core(struct sched_domain *sd, int target)
+{
+	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
+	int core, cpu;
+
+	cpumask_andnot(cpus, sched_domain_span(sd), cpu_smt_mask(target));
+	for_each_cpu_wrap(core, cpus, target) {
+		bool idle = true;
+
+		for_each_cpu(cpu, cpu_smt_mask(core)) {
+			if (!available_idle_cpu(cpu)) {
+				idle = false;
+				break;
+			}
+		}
+
+		if (idle) {
+			set_idle_core(core, per_cpu(smt_id, core));
+			return;
+		}
+
+		cpumask_andnot(cpus, cpus, cpu_smt_mask(core));
+	}
+}
+
+void set_core_busy(int core)
+{
+	rcu_read_lock();
+	if (get_idle_core(core, -1) == per_cpu(smt_id, core))
+		set_idle_core(core, -1);
+	rcu_read_unlock();
+}
+
 /*
  * Scans the local SMT mask to see if the entire core is idle, and records this
  * information in sd_llc_shared->idle_core.
@@ -6046,11 +6079,13 @@ static inline int get_idle_core(int cpu, int def)
  */
 void __update_idle_core(struct rq *rq)
 {
+	struct sched_domain *sd;
 	int core = cpu_of(rq);
 	int cpu;
 
 	rcu_read_lock();
-	if (get_idle_core(core, 0) != -1)
+	sd = rcu_dereference(per_cpu(sd_llc, core));
+	if (!sd || get_idle_core(core, 0) != -1)
 		goto unlock;
 
 	for_each_cpu(cpu, cpu_smt_mask(core)) {
@@ -6058,10 +6093,15 @@ void __update_idle_core(struct rq *rq)
 			continue;
 
 		if (!available_idle_cpu(cpu))
-			goto unlock;
+			goto try_next;
 	}
 
 	set_idle_core(core, per_cpu(smt_id, core));
+	goto unlock;
+
+try_next:
+	set_next_idle_core(sd, core);
+
 unlock:
 	rcu_read_unlock();
 }

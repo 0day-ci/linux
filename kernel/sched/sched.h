@@ -1102,6 +1102,7 @@ static inline bool is_migration_disabled(struct task_struct *p)
 
 #ifdef CONFIG_SCHED_SMT
 extern void __update_idle_core(struct rq *rq);
+extern void set_core_busy(int cpu);
 
 static inline void update_idle_core(struct rq *rq)
 {
@@ -1111,6 +1112,7 @@ static inline void update_idle_core(struct rq *rq)
 
 #else
 static inline void update_idle_core(struct rq *rq) { }
+static inline void set_core_busy(int cpu) { }
 #endif
 
 DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);

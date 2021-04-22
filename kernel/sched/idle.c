@@ -425,6 +425,12 @@ static void check_preempt_curr_idle(struct rq *rq, struct task_struct *p, int fl
 
 static void put_prev_task_idle(struct rq *rq, struct task_struct *prev)
 {
+#ifdef CONFIG_SCHED_SMT
+	int cpu = rq->cpu;
+
+	if (static_branch_likely(&sched_smt_present))
+		set_core_busy(cpu);
+#endif
 }
 
 static void set_next_task_idle(struct rq *rq, struct task_struct *next, bool first)
