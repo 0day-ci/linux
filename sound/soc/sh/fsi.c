@@ -1627,6 +1627,18 @@ static int fsi_set_fmt_spdif(struct fsi_priv *fsi)
 	return 0;
 }
 
+static u64 fsi_dai_get_fmt(struct snd_soc_dai *dai)
+{
+	return	SND_SOC_POSSIBLE_DAIFMT_I2S	|
+		SND_SOC_POSSIBLE_DAIFMT_LEFT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_CBP_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_IF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_IF;
+}
+
 static int fsi_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct fsi_priv *fsi = fsi_get_priv_frm_dai(dai);
@@ -1698,6 +1710,7 @@ static const struct snd_soc_dai_ops fsi_dai_ops = {
 	.startup	= fsi_dai_startup,
 	.shutdown	= fsi_dai_shutdown,
 	.trigger	= fsi_dai_trigger,
+	.get_fmt	= fsi_dai_get_fmt,
 	.set_fmt	= fsi_dai_set_fmt,
 	.hw_params	= fsi_dai_hw_params,
 };
