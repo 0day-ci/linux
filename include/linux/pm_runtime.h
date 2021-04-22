@@ -380,6 +380,9 @@ static inline int pm_runtime_get(struct device *dev)
  * The possible return values of this function are the same as for
  * pm_runtime_resume() and the runtime PM usage counter of @dev remains
  * incremented in all cases, even if it returns an error code.
+ * Lack of decrementing the runtime PM usage counter on errors is a common
+ * mistake, so consider using pm_runtime_resume_and_get() instead for a cleaner
+ * code.
  */
 static inline int pm_runtime_get_sync(struct device *dev)
 {
