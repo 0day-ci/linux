@@ -673,7 +673,7 @@ static int power_ctrl(struct v4l2_subdev *sd, bool flag)
 static int gpio_ctrl(struct v4l2_subdev *sd, bool flag)
 {
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
-	int ret = -1;
+	int ret;
 
 	if (!dev || !dev->platform_data)
 		return -ENODEV;

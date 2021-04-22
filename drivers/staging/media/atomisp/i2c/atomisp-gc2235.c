@@ -548,7 +548,7 @@ static int is_init;
 
 static int power_ctrl(struct v4l2_subdev *sd, bool flag)
 {
-	int ret = -1;
+	int ret;
 	struct gc2235_device *dev = to_gc2235_sensor(sd);
 
 	if (!dev || !dev->platform_data)

@@ -6259,7 +6259,7 @@ allocate_delay_frames(struct ia_css_pipe *pipe) {
 	unsigned int dvs_frame_delay = 0;
 	struct ia_css_frame_info ref_info;
 	int err = 0;
-	enum ia_css_pipe_id mode = IA_CSS_PIPE_ID_VIDEO;
+	enum ia_css_pipe_id mode;
 	struct ia_css_frame **delay_frames = NULL;
 
 	IA_CSS_ENTER_PRIVATE("");
@@ -8764,7 +8764,7 @@ int
 ia_css_pipe_create_extra(const struct ia_css_pipe_config *config,
 			    const struct ia_css_pipe_extra_config *extra_config,
 			    struct ia_css_pipe **pipe) {
-	int err = -EINVAL;
+	int err;
 	struct ia_css_pipe *internal_pipe = NULL;
 	unsigned int i;
 

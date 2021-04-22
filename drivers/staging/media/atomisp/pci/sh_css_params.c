@@ -3225,7 +3225,7 @@ sh_css_param_update_isp_params(struct ia_css_pipe *curr_pipe,
 	int err = 0;
 	ia_css_ptr cpy;
 	int i;
-	unsigned int raw_bit_depth = 10;
+	unsigned int raw_bit_depth;
 	unsigned int isp_pipe_version = SH_CSS_ISP_PIPE_VERSION_1;
 	bool acc_cluster_params_changed = false;
 	unsigned int thread_id, pipe_num;
