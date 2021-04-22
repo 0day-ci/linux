@@ -242,6 +242,7 @@ config IMA_APPRAISE_MODSIG
 	bool "Support module-style signatures for appraisal"
 	depends on IMA_APPRAISE
 	depends on INTEGRITY_ASYMMETRIC_KEYS
+	depends on MODULES
 	select PKCS7_MESSAGE_PARSER
 	select MODULE_SIG_FORMAT
 	default n
