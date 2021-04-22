@@ -950,6 +950,11 @@ static int powerpc_shared_cache_flags(void)
 	return SD_SHARE_PKG_RESOURCES;
 }
 
+static int powerpc_mc_flags(void)
+{
+	return SD_FALLBACK_LLC;
+}
+
 /*
  * We can't just pass cpu_l2_cache_mask() directly because
  * returns a non-const pointer and the compiler barfs on that.
@@ -986,7 +991,7 @@ static struct sched_domain_topology_level powerpc_topology[] = {
 	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
 #endif
 	{ shared_cache_mask, powerpc_shared_cache_flags, SD_INIT_NAME(CACHE) },
-	{ cpu_mc_mask, SD_INIT_NAME(MC) },
+	{ cpu_mc_mask, powerpc_mc_flags, SD_INIT_NAME(MC) },
 	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
 	{ NULL, },
 };
