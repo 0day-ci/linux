@@ -232,13 +232,33 @@ static bool nf_nat_inet_in_range(const struct nf_conntrack_tuple *t,
 static bool l4proto_in_range(const struct nf_conntrack_tuple *tuple,
 			     enum nf_nat_manip_type maniptype,
 			     const union nf_conntrack_man_proto *min,
-			     const union nf_conntrack_man_proto *max)
+			     const union nf_conntrack_man_proto *max,
+			     bool is_psid)
 {
 	__be16 port;
+
+	int m = 0;
+	u16 offset_mask = 0;
+	u16 psid_mask = 0;
+
+	/* In this case we are in PSID mode and the rules are all different */
+	if (is_psid) {
+		/* m = number of bits in each valid range */
+		m = 16 - min->psid.psid_length - min->psid.offset;
+		offset_mask = ((1 << min->psid.offset) - 1) <<
+				(16 - min->psid.offset);
+		psid_mask = ((1 << min->psid.psid_length) - 1) << m;
+	}
 
 	switch (tuple->dst.protonum) {
 	case IPPROTO_ICMP:
 	case IPPROTO_ICMPV6:
+		if (is_psid) {
+			return ((ntohs(tuple->src.u.icmp.id) & offset_mask) !=
+				0) &&
+				((ntohs(tuple->src.u.icmp.id) & psid_mask) ==
+				min->psid.psid);
+		}
 		return ntohs(tuple->src.u.icmp.id) >= ntohs(min->icmp.id) &&
 		       ntohs(tuple->src.u.icmp.id) <= ntohs(max->icmp.id);
 	case IPPROTO_GRE: /* all fall though */
@@ -252,6 +272,11 @@ static bool l4proto_in_range(const struct nf_conntrack_tuple *tuple,
 		else
 			port = tuple->dst.u.all;
 
+		if (is_psid) {
+			return ((ntohs(port) & offset_mask) != 0) &&
+				(((ntohs(port) & psid_mask) >> m) ==
+				  min->psid.psid);
+		}
 		return ntohs(port) >= ntohs(min->all) &&
 		       ntohs(port) <= ntohs(max->all);
 	default:
@@ -274,9 +299,9 @@ static int in_range(const struct nf_conntrack_tuple *tuple,
 
 	if (!(range->flags & NF_NAT_RANGE_PROTO_SPECIFIED))
 		return 1;
-
 	return l4proto_in_range(tuple, NF_NAT_MANIP_SRC,
-				&range->min_proto, &range->max_proto);
+				&range->min_proto, &range->max_proto,
+				range->flags & NF_NAT_RANGE_PSID);
 }
 
 static inline int
@@ -397,10 +422,10 @@ find_best_ips_proto(const struct nf_conntrack_zone *zone,
  *
  * Per-protocol part of tuple is initialized to the incoming packet.
  */
-static void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
-					const struct nf_nat_range2 *range,
-					enum nf_nat_manip_type maniptype,
-					const struct nf_conn *ct)
+void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
+				 const struct nf_nat_range2 *range,
+				 enum nf_nat_manip_type maniptype,
+				 const struct nf_conn *ct)
 {
 	unsigned int range_size, min, max, i, attempts;
 	__be16 *keyptr;
@@ -455,6 +480,50 @@ static void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
 		break;
 	default:
 		return;
+	}
+
+	if (range->flags & NF_NAT_RANGE_PSID) {
+		/* Find the non-PSID parts of the port.
+		 * To do this we look for an unused port that is
+		 * comprised of [t_chunk|PSID|b_chunk]. The size of
+		 * these pieces is defined by the psid_length and
+		 * offset.
+		 */
+		int m = 16 - range->min_proto.psid.psid_length -
+		    range->min_proto.psid.offset;
+		int available;
+		int range_count = ((1 << range->min_proto.psid.offset) - 1);
+
+		/* Calculate the size of the bottom block */
+		range_size = (1 << m);
+
+		/* Calculate the total IDs to check */
+		available = range_size * range_count;
+		if (!available)
+			available = range_size;
+
+		off = ntohs(*keyptr);
+		for (i = 0;; ++off) {
+			int b_chunk = off % range_size;
+			int t_chunk = 0;
+
+			/* Move up to avoid the all-zeroes reserved chunk
+			 * (if there is one).
+			 */
+			if (range->min_proto.psid.offset > 0) {
+				t_chunk = (off >> m) % range_count;
+				++t_chunk;
+				t_chunk <<= (m +
+					     range->min_proto.psid.psid_length);
+			}
+
+			*keyptr = htons(t_chunk |
+					 (range->min_proto.psid.psid << m)
+					 | b_chunk);
+
+			if (++i >= available || !nf_nat_used_tuple(tuple, ct))
+				return;
+		}
 	}
 
 	/* If no range specified... */
@@ -566,11 +635,18 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 
 	/* Only bother mapping if it's not already in range and unique */
 	if (!(range->flags & NF_NAT_RANGE_PROTO_RANDOM_ALL)) {
-		if (range->flags & NF_NAT_RANGE_PROTO_SPECIFIED) {
+		/* Now that the PSID mode is present we always need to check
+		 * to see if the source ports are in range.
+		 */
+		if (range->flags & NF_NAT_RANGE_PROTO_SPECIFIED ||
+		    (range->flags & NF_NAT_RANGE_PSID &&
+		    !in_range(orig_tuple, range))) {
 			if (!(range->flags & NF_NAT_RANGE_PROTO_OFFSET) &&
 			    l4proto_in_range(tuple, maniptype,
-			          &range->min_proto,
-			          &range->max_proto) &&
+					     &range->min_proto,
+					     &range->max_proto,
+					     range->flags &
+					     NF_NAT_RANGE_PSID) &&
 			    (range->min_proto.all == range->max_proto.all ||
 			     !nf_nat_used_tuple(tuple, ct)))
 				return;
@@ -623,6 +699,11 @@ nf_nat_setup_info(struct nf_conn *ct,
 			   &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 
 	get_unique_tuple(&new_tuple, &curr_tuple, range, ct, maniptype);
+	if (range) {
+		if (!ct->range)
+			ct->range = kmalloc(sizeof(*ct->range), 0);
+		memcpy(ct->range, range, sizeof(*ct->range));
+	}
 
 	if (!nf_ct_tuple_equal(&new_tuple, &curr_tuple)) {
 		struct nf_conntrack_tuple reply;

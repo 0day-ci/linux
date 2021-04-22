@@ -39,6 +39,11 @@ union nf_conntrack_man_proto {
 	struct {
 		__be16 key;	/* GRE key is 32bit, PPtP only uses 16bit */
 	} gre;
+	struct {
+		unsigned char psid_length;
+		unsigned char offset;
+		__be16 psid;
+	} psid;
 };
 
 #define CTINFO2DIR(ctinfo) ((ctinfo) >= IP_CT_IS_REPLY ? IP_CT_DIR_REPLY : IP_CT_DIR_ORIGINAL)

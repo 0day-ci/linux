@@ -106,6 +106,8 @@ struct nf_conn {
 	/* If we were expected by an expectation, this will be it */
 	struct nf_conn *master;
 
+	struct nf_nat_range2 *range;
+
 #if defined(CONFIG_NF_CONNTRACK_MARK)
 	u_int32_t mark;
 #endif

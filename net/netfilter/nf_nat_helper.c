@@ -184,11 +184,16 @@ void nf_nat_follow_master(struct nf_conn *ct,
 	/* This must be a fresh one. */
 	BUG_ON(ct->status & IPS_NAT_DONE_MASK);
 
-	/* Change src to where master sends to */
-	range.flags = NF_NAT_RANGE_MAP_IPS;
-	range.min_addr = range.max_addr
-		= ct->master->tuplehash[!exp->dir].tuple.dst.u3;
-	nf_nat_setup_info(ct, &range, NF_NAT_MANIP_SRC);
+	if (exp->master && exp->master->range && !exp->dir) {
+		range = *exp->master->range;
+		nf_nat_setup_info(ct, &range, NF_NAT_MANIP_SRC);
+	} else {
+		/* Change src to where master sends to */
+		range.flags = NF_NAT_RANGE_MAP_IPS;
+		range.min_addr = ct->master->tuplehash[!exp->dir].tuple.dst.u3;
+		range.max_addr = ct->master->tuplehash[!exp->dir].tuple.dst.u3;
+		nf_nat_setup_info(ct, &range, NF_NAT_MANIP_SRC);
+	}
 
 	/* For DST manip, map port here to where it's expected. */
 	range.flags = (NF_NAT_RANGE_MAP_IPS | NF_NAT_RANGE_PROTO_SPECIFIED);
