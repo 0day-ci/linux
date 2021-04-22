@@ -16,9 +16,10 @@
 #include <linux/regulator/driver.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/mfd/rohm-generic.h>
 #include <linux/mfd/rohm-bd71815.h>
+#include <linux/of.h>
 #include <linux/regulator/of_regulator.h>
 
 struct bd71815_regulator {
