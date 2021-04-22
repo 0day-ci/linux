@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/ampere,smpro.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Ampere Altra SMPro firmware driver
+
+maintainers:
+  - Quan Nguyen <quan@os.amperecomputing.com>
+
+description: |
+  Ampere Altra SMPro firmware may contain different blocks like hardware
+  monitoring, error monitoring and other miscellaneous features.
+
+properties:
+  compatible:
+    enum:
+      - ampere,smpro
+
+  reg:
+    description:
+      I2C device address.
+    maxItems: 1
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+patternProperties:
+  "^hwmon(@[0-9a-f]+)?$":
+    $ref: ../hwmon/ampere,ac01-hwmon.yaml
+
+  "^misc(@[0-9a-f]+)?$":
+    type: object
+    description: |
+      This module is part of the Ampere Altra SMPro multi-function device
+      to support miscellaneous features
+    properties:
+      compatible:
+        enum:
+          - ampere,ac01-misc
+      reg:
+        maxItems: 1
+
+    required:
+      - compatible
+      - reg
+
+  "^errmon(@[0-9a-f]+)?$":
+    type: object
+    description: |
+      This module is part of the Ampere Altra SMPro multi-function device
+      that supports error monitoring feature.
+
+    properties:
+      compatible:
+        enum:
+          - ampere,ac01-errmon
+      reg:
+        maxItems: 1
+
+    required:
+      - compatible
+      - reg
+
+required:
+  - "#address-cells"
+  - "#size-cells"
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        smpro@4f {
+            compatible = "ampere,smpro";
+            reg = <0x4f>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            hwmon@10 {
+                compatible = "ampere,ac01-hwmon";
+                reg = <0x10>;
+            };
+
+            misc@b0 {
+                compatible = "ampere,ac01-misc";
+                reg = <0xb0>;
+            };
+
+            errmon@80 {
+                compatible = "ampere,ac01-errmon";
+                reg = <0x80>;
+            };
+
+        };
+    };
