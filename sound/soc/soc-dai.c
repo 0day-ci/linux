@@ -135,6 +135,25 @@ int snd_soc_dai_set_bclk_ratio(struct snd_soc_dai *dai, unsigned int ratio)
 EXPORT_SYMBOL_GPL(snd_soc_dai_set_bclk_ratio);
 
 /**
+ * snd_soc_dai_get_fmt - get enable DAI hardware audio format.
+ * @dai: DAI
+ * @fmt: SND_SOC_POSSIBLE_DAIFMT_* format value.
+ *
+ * Configures the DAI hardware format and clocking.
+ */
+u64 snd_soc_dai_get_fmt(struct snd_soc_dai *dai)
+{
+	u64 fmt = 0;
+
+	if (dai->driver->ops &&
+	    dai->driver->ops->get_fmt)
+		fmt = dai->driver->ops->get_fmt(dai);
+
+	return fmt;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_get_fmt);
+
+/**
  * snd_soc_dai_set_fmt - configure DAI hardware audio format.
  * @dai: DAI
  * @fmt: SND_SOC_DAIFMT_* format value.
