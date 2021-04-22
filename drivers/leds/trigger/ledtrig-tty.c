@@ -14,6 +14,8 @@ struct ledtrig_tty_data {
 	const char *ttyname;
 	struct tty_struct *tty;
 	int rx, tx;
+	unsigned indirection:1;
+	unsigned outdirection:1;
 };
 
 static void ledtrig_tty_restart(struct ledtrig_tty_data *trigger_data)
@@ -76,6 +78,47 @@ static ssize_t ttyname_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(ttyname);
 
+static ssize_t dirfilter_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct ledtrig_tty_data *trigger_data = led_trigger_get_drvdata(dev);
+
+	if (trigger_data->indirection)
+		return (ssize_t)sprintf(buf, "in\n");
+	if (trigger_data->outdirection)
+		return (ssize_t)sprintf(buf, "out\n");
+	return (ssize_t)sprintf(buf, "inout\n");
+}
+
+static ssize_t dirfilter_store(struct device *dev,
+			       struct device_attribute *attr, const char *buf,
+			       size_t size)
+{
+	struct ledtrig_tty_data *trigger_data = led_trigger_get_drvdata(dev);
+	ssize_t ret = size;
+
+	if (size > 0 && buf[size - 1] == '\n')
+		size -= 1;
+
+	if (size) {
+		if (!strncmp(buf, "in", size)) {
+			trigger_data->indirection = 1;
+			trigger_data->outdirection = 0;
+			return ret;
+		}
+		if (!strncmp(buf, "out", size)) {
+			trigger_data->indirection = 0;
+			trigger_data->outdirection = 1;
+			return ret;
+		}
+	}
+
+	trigger_data->indirection = 0;
+	trigger_data->outdirection = 0;
+	return ret;
+}
+static DEVICE_ATTR_RW(dirfilter);
+
 static void ledtrig_tty_work(struct work_struct *work)
 {
 	struct ledtrig_tty_data *trigger_data =
@@ -122,7 +165,14 @@ static void ledtrig_tty_work(struct work_struct *work)
 
 	if (icount.rx != trigger_data->rx ||
 	    icount.tx != trigger_data->tx) {
-		led_set_brightness_sync(trigger_data->led_cdev, LED_ON);
+		if (trigger_data->indirection) {
+			if (icount.rx != trigger_data->rx)
+				led_set_brightness_sync(trigger_data->led_cdev, LED_ON);
+		} else if (trigger_data->outdirection) {
+			if (icount.tx != trigger_data->tx)
+				led_set_brightness_sync(trigger_data->led_cdev, LED_ON);
+		} else
+			led_set_brightness_sync(trigger_data->led_cdev, LED_ON);
 
 		trigger_data->rx = icount.rx;
 		trigger_data->tx = icount.tx;
@@ -137,6 +187,7 @@ out:
 
 static struct attribute *ledtrig_tty_attrs[] = {
 	&dev_attr_ttyname.attr,
+	&dev_attr_dirfilter.attr,
 	NULL
 };
 ATTRIBUTE_GROUPS(ledtrig_tty);
