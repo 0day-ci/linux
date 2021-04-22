@@ -2161,6 +2161,7 @@
 			device_type = "cpu";
 			reg = <0x000>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2175,6 +2176,7 @@
 			device_type = "cpu";
 			reg = <0x001>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2189,6 +2191,7 @@
 			device_type = "cpu";
 			reg = <0x100>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2203,6 +2206,7 @@
 			device_type = "cpu";
 			reg = <0x101>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2217,6 +2221,7 @@
 			device_type = "cpu";
 			reg = <0x200>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2231,6 +2236,7 @@
 			device_type = "cpu";
 			reg = <0x201>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2245,6 +2251,7 @@
 			device_type = "cpu";
 			reg = <0x300>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2259,6 +2266,7 @@
 			device_type = "cpu";
 			reg = <0x301>;
 			enable-method = "psci";
+			cpu-idle-states = <&C6>;
 			i-cache-size = <131072>;
 			i-cache-line-size = <64>;
 			i-cache-sets = <512>;
@@ -2342,6 +2350,17 @@
 			cache-size = <4194304>;
 			cache-line-size = <64>;
 			cache-sets = <4096>;
+		};
+
+		idle-states {
+			entry-method = "arm,psci";
+			C6: c6 {
+				compatible = "arm,idle-state";
+				wakeup-latency-us = <2000>;
+				min-residency-us = <30000>;
+				arm,psci-suspend-param = <0x6>;
+				status = "okay";
+			};
 		};
 	};
 
