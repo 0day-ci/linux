@@ -395,7 +395,7 @@ On success, the 'handle' field contains a new handle and on error, a negative va
 For more details, see SEV spec Section 6.12.
 
 16. KVM_SEV_RECEIVE_UPDATE_DATA
-----------------------------
+-------------------------------
 
 The KVM_SEV_RECEIVE_UPDATE_DATA command can be used by the hypervisor to copy
 the incoming buffers into the guest memory region with encryption context
