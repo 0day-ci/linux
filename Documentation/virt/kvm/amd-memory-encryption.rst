@@ -366,7 +366,7 @@ migration can restart with a new target later.
 Returns: 0 on success, -negative on error
 
 15. KVM_SEV_RECEIVE_START
-------------------------
+--------------------------
 
 The KVM_SEV_RECEIVE_START command is used for creating the memory encryption
 context for an incoming SEV guest. To create the encryption context, the user must
