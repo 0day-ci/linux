@@ -419,7 +419,7 @@ Returns: 0 on success, -negative on error
         };
 
 17. KVM_SEV_RECEIVE_FINISH
-------------------------
+--------------------------
 
 After completion of the migration flow, the KVM_SEV_RECEIVE_FINISH command can be
 issued by the hypervisor to make the guest ready for execution.
