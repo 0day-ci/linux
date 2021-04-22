@@ -454,24 +454,10 @@ struct kallsym_iter {
 	int show_value;
 };
 
-int __weak arch_get_kallsym(unsigned int symnum, unsigned long *value,
-			    char *type, char *name)
-{
-	return -EINVAL;
-}
-
 static int get_ksymbol_arch(struct kallsym_iter *iter)
 {
-	int ret = arch_get_kallsym(iter->pos - kallsyms_num_syms,
-				   &iter->value, &iter->type,
-				   iter->name);
-
-	if (ret < 0) {
-		iter->pos_arch_end = iter->pos;
-		return 0;
-	}
-
-	return 1;
+	iter->pos_arch_end = iter->pos;
+	return 0;
 }
 
 static int get_ksymbol_mod(struct kallsym_iter *iter)
