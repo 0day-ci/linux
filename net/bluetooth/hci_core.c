@@ -908,7 +908,9 @@ static int hci_init5_req(struct hci_request *req, unsigned long opt)
 	struct hci_dev *hdev = req->hdev;
 
 	/* Read local codec list if the HCI command is supported */
-	if (hdev->commands[29] & 0x20)
+	if (hdev->commands[45] & 0x04)
+		hci_req_add(req, HCI_OP_READ_LOCAL_CODECS_V2, 0, NULL);
+	else if (hdev->commands[29] & 0x20)
 		hci_req_add(req, HCI_OP_READ_LOCAL_CODECS, 0, NULL);
 	return 0;
 }

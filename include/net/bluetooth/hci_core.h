@@ -1848,4 +1848,14 @@ void hci_copy_identity_address(struct hci_dev *hdev, bdaddr_t *bdaddr,
 #define SCO_AIRMODE_CVSD       0x0000
 #define SCO_AIRMODE_TRANSP     0x0003
 
+#define LOCAL_CODEC_ACL_MASK	BIT(0)
+#define LOCAL_CODEC_SCO_MASK	BIT(1)
+#define LOCAL_CODEC_CIS_MASK	BIT(2)
+#define LOCAL_CODEC_BIS_MASK	BIT(3)
+
+#define LOCAL_CODEC_ACL		0x00
+#define LOCAL_CODEC_SCO		0x01
+#define LOCAL_CODEC_CIS		0x02
+#define LOCAL_CODEC_BIS		0x03
+
 #endif /* __HCI_CORE_H */
