@@ -69,6 +69,9 @@ struct stv06xx_sensor {
 
 	/* Instructs the sensor to dump all its contents */
 	int (*dump)(struct sd *sd);
+
+	/* Frees sensor_priv field during initial gspca probe errors */
+	int (*free_sensor_priv)(struct sd *sd);
 };
 
 #endif

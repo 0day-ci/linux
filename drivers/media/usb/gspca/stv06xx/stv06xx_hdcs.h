@@ -121,6 +121,7 @@ static int hdcs_init(struct sd *sd);
 static int hdcs_init_controls(struct sd *sd);
 static int hdcs_stop(struct sd *sd);
 static int hdcs_dump(struct sd *sd);
+static int hdcs_deallocate(struct sd *sd);
 
 static int hdcs_set_exposure(struct gspca_dev *gspca_dev, __s32 val);
 static int hdcs_set_gain(struct gspca_dev *gspca_dev, __s32 val);
@@ -142,6 +143,7 @@ const struct stv06xx_sensor stv06xx_sensor_hdcs1x00 = {
 	.start = hdcs_start,
 	.stop = hdcs_stop,
 	.dump = hdcs_dump,
+	.free_sensor_priv = hdcs_deallocate,
 };
 
 const struct stv06xx_sensor stv06xx_sensor_hdcs1020 = {
@@ -161,6 +163,7 @@ const struct stv06xx_sensor stv06xx_sensor_hdcs1020 = {
 	.start = hdcs_start,
 	.stop = hdcs_stop,
 	.dump = hdcs_dump,
+	.free_sensor_priv = hdcs_deallocate,
 };
 
 static const u16 stv_bridge_init[][2] = {

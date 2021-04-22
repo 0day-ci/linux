@@ -1577,6 +1577,8 @@ out:
 	v4l2_ctrl_handler_free(gspca_dev->vdev.ctrl_handler);
 	v4l2_device_unregister(&gspca_dev->v4l2_dev);
 	kfree(gspca_dev->usb_buf);
+	if (sd_desc->free_sensor_priv)
+		sd_desc->free_sensor_priv(gspca_dev);
 	kfree(gspca_dev);
 	return ret;
 }

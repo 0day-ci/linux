@@ -529,3 +529,12 @@ static int hdcs_dump(struct sd *sd)
 	}
 	return 0;
 }
+
+static int hdcs_deallocate(struct sd *sd)
+{
+	struct hdcs *hdcs = sd->sensor_priv;
+
+	kfree(hdcs);
+	sd->sensor_priv = NULL;
+	return 0;
+}

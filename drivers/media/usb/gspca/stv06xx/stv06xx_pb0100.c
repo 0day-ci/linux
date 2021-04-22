@@ -318,6 +318,15 @@ static int pb0100_dump(struct sd *sd)
 	return 0;
 }
 
+static int pb0100_free_ctrls(struct sd *sd)
+{
+	struct pb0100_ctrls *ctrls = sd->sensor_priv;
+
+	kfree(ctrls);
+	sd->sensor_priv = NULL;
+	return 0;
+}
+
 static int pb0100_set_gain(struct gspca_dev *gspca_dev, __s32 val)
 {
 	int err;

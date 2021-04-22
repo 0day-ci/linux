@@ -529,6 +529,8 @@ static int sd_int_pkt_scan(struct gspca_dev *gspca_dev,
 static int stv06xx_config(struct gspca_dev *gspca_dev,
 			  const struct usb_device_id *id);
 
+static int stv06xx_free_sensor_priv(struct gspca_dev *gspca_dev);
+
 /* sub-driver description */
 static const struct sd_desc sd_desc = {
 	.name = MODULE_NAME,
@@ -540,6 +542,7 @@ static const struct sd_desc sd_desc = {
 	.pkt_scan = stv06xx_pkt_scan,
 	.isoc_init = stv06xx_isoc_init,
 	.isoc_nego = stv06xx_isoc_nego,
+	.free_sensor_priv = stv06xx_free_sensor_priv,
 #if IS_ENABLED(CONFIG_INPUT)
 	.int_pkt_scan = sd_int_pkt_scan,
 #endif
@@ -583,7 +586,19 @@ static int stv06xx_config(struct gspca_dev *gspca_dev,
 	return -ENODEV;
 }
 
+/*
+ * Free the memory allocated to sd->sensor_priv field during initial phases of
+ * gspca (probe/init_control) which later encountered error in the same phase.
+ */
+static int stv06xx_free_sensor_priv(struct gspca_dev *gspca_dev)
+{
+	struct sd *sd = (struct sd *) gspca_dev;
 
+	if (sd->sensor->free_sensor_priv)
+		sd->sensor->free_sensor_priv(sd);
+
+	return 0;
+}
 
 /* -- module initialisation -- */
 static const struct usb_device_id device_table[] = {
