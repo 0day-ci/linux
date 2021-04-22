@@ -352,8 +352,13 @@ static int __init early_parse_mem(char *p)
 	 */
 	if (usermem == 0) {
 		usermem = 1;
-		memblock_remove(memblock_start_of_DRAM(),
-			memblock_end_of_DRAM() - memblock_start_of_DRAM());
+		/*
+		 * During the kdump operation, the old memory should be
+		 * visible to the capture kernel.
+		 */
+		if (!strstr(boot_command_line, "elfcorehdr"))
+			memblock_remove(memblock_start_of_DRAM(),
+				memblock_end_of_DRAM() - memblock_start_of_DRAM());
 	}
 	start = 0;
 	size = memparse(p, &p);
