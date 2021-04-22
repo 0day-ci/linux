@@ -306,6 +306,8 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id)
 		CONFIG_DRM_I915_STOP_TIMEOUT;
 	engine->props.timeslice_duration_ms =
 		CONFIG_DRM_I915_TIMESLICE_DURATION;
+	engine->props.banned_context_timeout_ms =
+		min(1, CONFIG_DRM_I915_BANNED_CONTEXT_TIMEOUT);
 
 	/* Override to uninterruptible for OpenCL workloads. */
 	if (INTEL_GEN(i915) == 12 && engine->class == RENDER_CLASS)
@@ -1623,6 +1625,7 @@ static void print_properties(struct intel_engine_cs *engine,
 		P(preempt_timeout_ms),
 		P(stop_timeout_ms),
 		P(timeslice_duration_ms),
+		P(banned_context_timeout_ms),
 
 		{},
 #undef P

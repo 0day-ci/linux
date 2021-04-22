@@ -1209,7 +1209,7 @@ static unsigned long active_preempt_timeout(struct intel_engine_cs *engine,
 
 	/* Force a fast reset for terminated contexts (ignoring sysfs!) */
 	if (unlikely(intel_context_is_banned(rq->context) || bad_request(rq)))
-		return 1;
+		return engine->props.banned_context_timeout_ms;
 
 	return READ_ONCE(engine->props.preempt_timeout_ms);
 }

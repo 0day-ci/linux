@@ -411,6 +411,52 @@ heartbeat_default(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 static struct kobj_attribute heartbeat_interval_def =
 __ATTR(heartbeat_interval_ms, 0444, heartbeat_default, NULL);
 
+static ssize_t
+banned_context_timeout_store(struct kobject *kobj, struct kobj_attribute *attr,
+			     const char *buf, size_t count)
+{
+	struct intel_engine_cs *engine = kobj_to_engine(kobj);
+	unsigned long long timeout;
+	int err;
+
+	err = kstrtoull(buf, 0, &timeout);
+	if (err)
+		return err;
+
+	if (timeout < 1 || timeout > jiffies_to_msecs(MAX_SCHEDULE_TIMEOUT))
+		return -EINVAL;
+
+	WRITE_ONCE(engine->props.banned_context_timeout_ms, timeout);
+
+	return count;
+}
+
+static ssize_t
+banned_context_timeout_show(struct kobject *kobj, struct kobj_attribute *attr,
+		     char *buf)
+{
+	struct intel_engine_cs *engine = kobj_to_engine(kobj);
+
+	return sprintf(buf, "%lu\n", engine->props.banned_context_timeout_ms);
+}
+
+static struct kobj_attribute banned_context_timeout_attr =
+__ATTR(banned_context_timeout_ms, 0644, banned_context_timeout_show,
+       banned_context_timeout_store);
+
+static ssize_t
+banned_context_timeout_default(struct kobject *kobj,
+			       struct kobj_attribute *attr, char *buf)
+{
+	struct intel_engine_cs *engine = kobj_to_engine(kobj);
+
+	return sprintf(buf, "%lu\n",
+		       engine->defaults.banned_context_timeout_ms);
+}
+
+static struct kobj_attribute banned_context_timeout_def =
+__ATTR(banned_context_timeout_ms, 0444, banned_context_timeout_default, NULL);
+
 static void kobj_engine_release(struct kobject *kobj)
 {
 	kfree(kobj);
@@ -476,6 +522,10 @@ static void add_defaults(struct kobj_engine *parent)
 	if (intel_engine_has_preempt_reset(ke->engine) &&
 	    sysfs_create_file(&ke->base, &preempt_timeout_def.attr))
 		return;
+
+	if (intel_engine_has_preempt_reset(ke->engine) &&
+	    sysfs_create_file(&ke->base, &banned_context_timeout_def.attr))
+		return;
 }
 
 void intel_engines_add_sysfs(struct drm_i915_private *i915)
@@ -519,6 +569,10 @@ void intel_engines_add_sysfs(struct drm_i915_private *i915)
 
 		if (intel_engine_has_preempt_reset(engine) &&
 		    sysfs_create_file(kobj, &preempt_timeout_attr.attr))
+			goto err_engine;
+
+		if (intel_engine_has_preempt_reset(engine) &&
+		    sysfs_create_file(kobj, &banned_context_timeout_attr.attr))
 			goto err_engine;
 
 		add_defaults(container_of(kobj, struct kobj_engine, base));

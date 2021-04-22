@@ -119,3 +119,16 @@ config DRM_I915_TIMESLICE_DURATION
 	  /sys/class/drm/card?/engine/*/timeslice_duration_ms
 
 	  May be 0 to disable timeslicing.
+
+config DRM_I915_BANNED_CONTEXT_TIMEOUT
+	int "Banned context timeout (ms)"
+	default 1 # milliseconds
+	help
+	  How long to wait (in milliseconds) for a banned context to cleanly
+	  terminate their workloads. If the context does not yield inside the
+	  configured time it will be forcibly reset.
+
+	  This is adjustable via
+	  /sys/class/drm/card?/engine/*/banned_context_timeout_ms
+
+	  If configured to zero a 1ms minimum will still apply.
