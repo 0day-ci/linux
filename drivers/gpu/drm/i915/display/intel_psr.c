@@ -739,6 +739,12 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 		return false;
 	}
 
+	/* Wa_2209313811 */
+	if (IS_TGL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B1)) {
+		drm_dbg_kms(&dev_priv->drm, "PSR2 is not supported this Display stepping\n");
+		return false;
+	}
+
 	/* Wa_16011181250 */
 	if (IS_ROCKETLAKE(dev_priv) || IS_ALDERLAKE_S(dev_priv)) {
 		drm_dbg_kms(&dev_priv->drm, "PSR2 is defeatured for this platform\n");
