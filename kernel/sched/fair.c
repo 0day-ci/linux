@@ -3083,11 +3083,47 @@ dequeue_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	sub_positive(&cfs_rq->avg.load_avg, se->avg.load_avg);
 	sub_positive(&cfs_rq->avg.load_sum, se_weight(se) * se->avg.load_sum);
 }
+
+static inline void
+enqueue_util_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	cfs_rq->avg.util_avg += se->avg.util_avg;
+	cfs_rq->avg.util_sum += se->avg.util_sum;
+}
+
+static inline void
+dequeue_util_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	sub_positive(&cfs_rq->avg.util_avg, se->avg.util_avg);
+	sub_positive(&cfs_rq->avg.util_sum, se->avg.util_sum);
+}
+
+static inline void
+enqueue_runnable_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	cfs_rq->avg.runnable_avg += se->avg.runnable_avg;
+	cfs_rq->avg.runnable_sum += se->avg.runnable_sum;
+}
+
+static inline void
+dequeue_runnable_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
+{
+	sub_positive(&cfs_rq->avg.runnable_avg, se->avg.runnable_avg);
+	sub_positive(&cfs_rq->avg.runnable_sum, se->avg.runnable_sum);
+}
 #else
 static inline void
 enqueue_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
 static inline void
 dequeue_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
+static inline void
+enqueue_util_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
+static inline void
+dequeue_util_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
+static inline void
+enqueue_runnable_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
+static inline void
+dequeue_runnable_avg(struct cfs_rq *cfs_rq, struct sched_entity *se) { }
 #endif
 
 static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
@@ -3744,10 +3780,8 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 	}
 
 	enqueue_load_avg(cfs_rq, se);
-	cfs_rq->avg.util_avg += se->avg.util_avg;
-	cfs_rq->avg.util_sum += se->avg.util_sum;
-	cfs_rq->avg.runnable_avg += se->avg.runnable_avg;
-	cfs_rq->avg.runnable_sum += se->avg.runnable_sum;
+	enqueue_util_avg(cfs_rq, se);
+	enqueue_runnable_avg(cfs_rq, se);
 
 	add_tg_cfs_propagate(cfs_rq, se->avg.load_sum);
 
@@ -3767,10 +3801,8 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	dequeue_load_avg(cfs_rq, se);
-	sub_positive(&cfs_rq->avg.util_avg, se->avg.util_avg);
-	sub_positive(&cfs_rq->avg.util_sum, se->avg.util_sum);
-	sub_positive(&cfs_rq->avg.runnable_avg, se->avg.runnable_avg);
-	sub_positive(&cfs_rq->avg.runnable_sum, se->avg.runnable_sum);
+	dequeue_util_avg(cfs_rq, se);
+	dequeue_runnable_avg(cfs_rq, se);
 
 	add_tg_cfs_propagate(cfs_rq, -se->avg.load_sum);
 
