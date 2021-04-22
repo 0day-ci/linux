@@ -715,7 +715,7 @@ static u64 sched_vslice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 #include "pelt.h"
 #ifdef CONFIG_SMP
 
-static int select_idle_sibling(struct task_struct *p, int prev_cpu, int cpu);
+static int select_idle_sibling(struct task_struct *p, int prev_cpu, int cpu, bool idle);
 static unsigned long task_h_load(struct task_struct *p);
 static unsigned long capacity_of(int cpu);
 
@@ -5868,7 +5868,8 @@ wake_affine_weight(struct sched_domain *sd, struct task_struct *p,
 	return this_eff_load < prev_eff_load ? this_cpu : nr_cpumask_bits;
 }
 
-static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_cpu, int sync)
+static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_cpu,
+				int sync, bool *idle)
 {
 	int pnr_busy, pllc_size, tnr_busy, tllc_size;
 	struct sched_domain_shared *tsds, *psds;
@@ -5913,8 +5914,10 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 	tllc_size = per_cpu(sd_llc_size, this_cpu);
 	pllc_size = per_cpu(sd_llc_size, prev_cpu);
 
-	if (pnr_busy == pllc_size && tnr_busy == tllc_size)
+	if (pnr_busy == pllc_size && tnr_busy == tllc_size) {
+		*idle = false;
 		return nr_cpumask_bits;
+	}
 
 	diff = pnr_busy * tllc_size - tnr_busy * pllc_size;
 	if (diff > 0)
@@ -5926,7 +5929,7 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 }
 
 static int wake_affine(struct sched_domain *sd, struct task_struct *p,
-		       int this_cpu, int prev_cpu, int sync)
+		       int this_cpu, int prev_cpu, int sync, bool *idle)
 {
 	bool share_caches = cpus_share_cache(prev_cpu, this_cpu);
 	int target = nr_cpumask_bits;
@@ -5935,7 +5938,7 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p,
 		target = wake_affine_idle(this_cpu, prev_cpu);
 
 	else if (sched_feat(WA_IDLER_LLC) && !share_caches)
-		target = wake_affine_idler_llc(p, this_cpu, prev_cpu, sync);
+		target = wake_affine_idler_llc(p, this_cpu, prev_cpu, sync, idle);
 
 	if (sched_feat(WA_WEIGHT) && target == nr_cpumask_bits)
 		target = wake_affine_weight(sd, p, this_cpu, prev_cpu, sync);
@@ -6333,7 +6336,7 @@ static inline bool asym_fits_capacity(int task_util, int cpu)
 /*
  * Try and locate an idle core/thread in the LLC cache domain.
  */
-static int select_idle_sibling(struct task_struct *p, int prev, int target)
+static int select_idle_sibling(struct task_struct *p, int prev, int target, bool idle)
 {
 	struct sched_domain *sd;
 	unsigned long task_util;
@@ -6409,6 +6412,9 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 			return ((unsigned)i < nr_cpumask_bits) ? i : target;
 		}
 	}
+
+	if (!idle)
+		return target;
 
 	sd = rcu_dereference(per_cpu(sd_llc, target));
 	if (!sd)
@@ -6818,6 +6824,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 	int want_affine = 0;
 	/* SD_flags and WF_flags share the first nibble */
 	int sd_flag = wake_flags & 0xF;
+	bool idle = true;
 
 	if (wake_flags & WF_TTWU) {
 		record_wakee(p);
@@ -6841,7 +6848,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 		if (want_affine && (tmp->flags & SD_WAKE_AFFINE) &&
 		    cpumask_test_cpu(prev_cpu, sched_domain_span(tmp))) {
 			if (cpu != prev_cpu)
-				new_cpu = wake_affine(tmp, p, cpu, prev_cpu, sync);
+				new_cpu = wake_affine(tmp, p, cpu, prev_cpu, sync, &idle);
 
 			sd = NULL; /* Prefer wake_affine over balance flags */
 			break;
@@ -6858,7 +6865,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 		new_cpu = find_idlest_cpu(sd, p, cpu, prev_cpu, sd_flag);
 	} else if (wake_flags & WF_TTWU) { /* XXX always ? */
 		/* Fast path */
-		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu);
+		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu, idle);
 
 		if (want_affine)
 			current->recent_used_cpu = cpu;
