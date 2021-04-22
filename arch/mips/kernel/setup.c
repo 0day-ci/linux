@@ -55,6 +55,8 @@ EXPORT_SYMBOL(cpu_data);
 struct screen_info screen_info;
 #endif
 
+static phys_addr_t crashmem_start, crashmem_size;
+
 /*
  * Setup information
  *
@@ -367,6 +369,11 @@ static int __init early_parse_mem(char *p)
 
 	memblock_add_node(start, size, pa_to_nid(start));
 
+	if (strstr(boot_command_line, "elfcorehdr") && start && size) {
+		crashmem_start = start;
+		crashmem_size = size;
+	}
+
 	return 0;
 }
 early_param("mem", early_parse_mem);
@@ -524,6 +531,36 @@ static void reserve_crashm_region(int node, unsigned long s0, unsigned long e0)
 {
 }
 #endif /* !defined(CONFIG_KEXEC)  */
+
+/*
+ * After the kdump operation is performed to enter the capture kernel, the
+ * memory area used by the previous production kernel should be reserved to
+ * avoid destroy to the captured data.
+ */
+static void reserve_oldmem_region(int node, unsigned long s0, unsigned long e0)
+{
+	unsigned long s1, e1;
+
+	if (!is_kdump_kernel())
+		return;
+
+	if ((e0 - s0) > (SZ_1G >> PAGE_SHIFT))
+		e0 = e0 - (SZ_128M >> PAGE_SHIFT);
+
+	/* crashmem_start is crashk_res reserved by primary production kernel */
+	s1 = PFN_UP(crashmem_start);
+	e1 = PFN_DOWN(crashmem_start + crashmem_size);
+
+	if (s1 == 0)
+		return;
+
+	if (node == 0) {
+		memblock_reserve(PFN_PHYS(s0), (s1 - s0) << PAGE_SHIFT);
+		memblock_reserve(PFN_PHYS(e1), (e0 - e1) << PAGE_SHIFT);
+	} else {
+		memblock_reserve(PFN_PHYS(s0), (e0 - s0) << PAGE_SHIFT);
+	}
+}
 
 static void __init check_kernel_sections_mem(void)
 {
@@ -696,6 +733,7 @@ static void __init arch_mem_init(char **cmdline_p)
 	for_each_online_node(node) {
 		get_pfn_range_for_nid(node, &start_pfn, &end_pfn);
 		reserve_crashm_region(node, start_pfn, end_pfn);
+		reserve_oldmem_region(node, start_pfn, end_pfn);
 	}
 
 	device_tree_init();
