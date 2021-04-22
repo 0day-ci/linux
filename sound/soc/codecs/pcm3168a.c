@@ -353,6 +353,18 @@ static void pcm3168a_update_fixup_pcm_stream(struct snd_soc_dai *dai)
 	}
 }
 
+static u64 pcm3168a_get_dai_fmt(struct snd_soc_dai *dai)
+{
+	return	SND_SOC_POSSIBLE_DAIFMT_LEFT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_I2S	|
+		SND_SOC_POSSIBLE_DAIFMT_RIGHT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_A	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_B	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_CBP_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_NF;
+}
+
 static int pcm3168a_set_dai_fmt(struct snd_soc_dai *dai, unsigned int format)
 {
 	struct snd_soc_component *component = dai->component;
@@ -574,6 +586,7 @@ static int pcm3168a_hw_params(struct snd_pcm_substream *substream,
 }
 
 static const struct snd_soc_dai_ops pcm3168a_dai_ops = {
+	.get_fmt	= pcm3168a_get_dai_fmt,
 	.set_fmt	= pcm3168a_set_dai_fmt,
 	.set_sysclk	= pcm3168a_set_dai_sysclk,
 	.hw_params	= pcm3168a_hw_params,
