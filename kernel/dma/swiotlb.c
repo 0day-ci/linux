@@ -106,7 +106,9 @@ void swiotlb_set_max_segment(unsigned int val)
 
 unsigned long swiotlb_size_or_default(void)
 {
-	return swiotlb_default_size;
+	if (swiotlb_default_size)
+		return swiotlb_default_size;
+	return IO_TLB_DEFAULT_SIZE;
 }
 
 void __init swiotlb_adjust_size(unsigned long size)
@@ -116,6 +118,8 @@ void __init swiotlb_adjust_size(unsigned long size)
 	 * architectures such as those supporting memory encryption to
 	 * adjust/expand SWIOTLB size for their use.
 	 */
+	if (swiotlb_default_size)
+		return;
 	swiotlb_default_size = ALIGN(size, IO_TLB_SEGSIZE << IO_TLB_SHIFT);
 	pr_info("SWIOTLB bounce buffer size adjusted to %luMB",
 		swiotlb_default_size >> 20);
