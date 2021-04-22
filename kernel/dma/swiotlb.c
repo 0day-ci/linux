@@ -71,7 +71,7 @@ struct io_tlb_mem *io_tlb_default_mem;
  */
 static unsigned int max_segment;
 
-static unsigned long default_nslabs = IO_TLB_DEFAULT_SIZE >> IO_TLB_SHIFT;
+static unsigned long swiotlb_default_size = IO_TLB_DEFAULT_SIZE;
 
 static int __init
 setup_io_tlb_npages(char *str)
@@ -106,7 +106,7 @@ void swiotlb_set_max_segment(unsigned int val)
 
 unsigned long swiotlb_size_or_default(void)
 {
-	return default_nslabs << IO_TLB_SHIFT;
+	return swiotlb_default_size;
 }
 
 void __init swiotlb_adjust_size(unsigned long size)
@@ -116,9 +116,9 @@ void __init swiotlb_adjust_size(unsigned long size)
 	 * architectures such as those supporting memory encryption to
 	 * adjust/expand SWIOTLB size for their use.
 	 */
-	size = ALIGN(size, IO_TLB_SIZE);
-	default_nslabs = ALIGN(size >> IO_TLB_SHIFT, IO_TLB_SEGSIZE);
-	pr_info("SWIOTLB bounce buffer size adjusted to %luMB", size >> 20);
+	swiotlb_default_size = ALIGN(size, IO_TLB_SEGSIZE << IO_TLB_SHIFT);
+	pr_info("SWIOTLB bounce buffer size adjusted to %luMB",
+		swiotlb_default_size >> 20);
 }
 
 void swiotlb_print_info(void)
