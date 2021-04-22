@@ -369,14 +369,25 @@ out_unlock:
 	return ret;
 }
 
+static bool is_port_connected(struct wwan_port *port)
+{
+	bool connected;
+
+	mutex_lock(&port->ops_lock);
+	connected = !!port->ops;
+	mutex_unlock(&port->ops_lock);
+
+	return connected;
+}
+
 static bool is_read_blocked(struct wwan_port *port)
 {
-	return skb_queue_empty(&port->rxq) && port->ops;
+	return skb_queue_empty(&port->rxq) && is_port_connected(port);
 }
 
 static bool is_write_blocked(struct wwan_port *port)
 {
-	return test_bit(WWAN_PORT_TX_OFF, &port->flags) && port->ops;
+	return test_bit(WWAN_PORT_TX_OFF, &port->flags) && is_port_connected(port);
 }
 
 static int wwan_wait_rx(struct wwan_port *port, bool nonblock)
@@ -508,6 +519,8 @@ static __poll_t wwan_port_fops_poll(struct file *filp, poll_table *wait)
 		mask |= EPOLLOUT | EPOLLWRNORM;
 	if (!is_read_blocked(port))
 		mask |= EPOLLIN | EPOLLRDNORM;
+	if (!is_port_connected(port))
+		mask |= EPOLLHUP | EPOLLERR;
 
 	return mask;
 }
