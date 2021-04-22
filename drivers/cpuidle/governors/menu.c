@@ -382,8 +382,10 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 			 * stuck in the shallow one for too long.
 			 */
 			if (drv->states[idx].target_residency_ns < TICK_NSEC &&
-			    s->target_residency_ns <= delta_tick)
+			    s->target_residency_ns <= delta_tick) {
+				drv->states[idx].idle_time = delta_tick / NSEC_PER_USEC;
 				idx = i;
+			}
 
 			return idx;
 		}
@@ -393,6 +395,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		idx = i;
 	}
 
+	drv->states[idx].idle_time = predicted_ns / NSEC_PER_USEC;
 	if (idx == -1)
 		idx = 0; /* No states enabled. Must use 0. */
 
@@ -419,6 +422,8 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 				if (drv->states[i].target_residency_ns <= delta_tick)
 					break;
 			}
+
+			drv->states[idx].idle_time = delta_tick / NSEC_PER_USEC;
 		}
 	}
 
