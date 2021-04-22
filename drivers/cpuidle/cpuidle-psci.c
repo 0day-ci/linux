@@ -151,6 +151,17 @@ static int psci_enter_idle_state(struct cpuidle_device *dev,
 {
 	u32 *state = __this_cpu_read(psci_cpuidle_data.psci_states);
 
+	/*
+	 * Some platforms use separate CPU firmware running in background to
+	 * handle state transition which may need runtime idle time of the
+	 * corresponding state from kernel.
+	 * So, pass the state idle time from kernel to TF-A firmware through
+	 * PSCI. Platform specific TF-A firmware may update this to CPU
+	 * firmware.
+	 */
+	if (idx)
+		psci_ops.set_state_idle_time(drv->states[idx].idle_time);
+
 	return psci_enter_state(idx, state[idx]);
 }
 
