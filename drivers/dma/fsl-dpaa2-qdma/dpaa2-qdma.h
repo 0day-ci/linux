@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright 2019 NXP */
+/* Copyright 2019-2021 NXP */
 
 #ifndef __DPAA2_QDMA_H
 #define __DPAA2_QDMA_H
 
 #define DPAA2_QDMA_STORE_SIZE 16
 #define NUM_CH 8
+#define DPAA2_QDMA_DEFAULT_PRIORITY 0
 
 struct dpaa2_qdma_sd_d {
 	u32 rsv:32;
@@ -122,14 +123,15 @@ struct dpaa2_qdma_priv {
 	struct dpaa2_qdma_engine	*dpaa2_qdma;
 	struct dpaa2_qdma_priv_per_prio	*ppriv;
 
-	struct dpdmai_rx_queue_attr rx_queue_attr[DPDMAI_PRIO_NUM];
-	u32 tx_fqid[DPDMAI_PRIO_NUM];
+	struct dpdmai_rx_queue_attr rx_queue_attr[DPDMAI_MAX_QUEUE_NUM];
+	struct dpdmai_tx_queue_attr tx_queue_attr[DPDMAI_MAX_QUEUE_NUM];
 };
 
 struct dpaa2_qdma_priv_per_prio {
 	int req_fqid;
 	int rsp_fqid;
 	int prio;
+	int chan_id;
 
 	struct dpaa2_io_store *store;
 	struct dpaa2_io_notification_ctx nctx;
