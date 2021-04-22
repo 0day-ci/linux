@@ -21,6 +21,7 @@
 #include <linux/reset.h>
 
 #include "pcie-designware.h"
+#include "../../pcie/portdrv.h"
 
 #define PCL_PINCTRL0			0x002c
 #define PCL_PERST_PLDN_REGEN		BIT(12)
@@ -44,7 +45,9 @@
 #define PCL_SYS_AUX_PWR_DET		BIT(8)
 
 #define PCL_RCV_INT			0x8108
+#define PCL_RCV_INT_ALL_INT_MASK	GENMASK(28, 25)
 #define PCL_RCV_INT_ALL_ENABLE		GENMASK(20, 17)
+#define PCL_RCV_INT_ALL_MSI_MASK	GENMASK(12, 9)
 #define PCL_CFG_BW_MGT_STATUS		BIT(4)
 #define PCL_CFG_LINK_AUTO_BW_STATUS	BIT(3)
 #define PCL_CFG_AER_RC_ERR_MSI_STATUS	BIT(2)
@@ -68,6 +71,8 @@ struct uniphier_pcie_priv {
 	struct reset_control *rst;
 	struct phy *phy;
 	struct irq_domain *legacy_irq_domain;
+	int aer_irq;
+	int pme_irq;
 };
 
 #define to_uniphier_pcie(x)	dev_get_drvdata((x)->dev)
@@ -164,7 +169,15 @@ static void uniphier_pcie_stop_link(struct dw_pcie *pci)
 
 static void uniphier_pcie_irq_enable(struct uniphier_pcie_priv *priv)
 {
-	writel(PCL_RCV_INT_ALL_ENABLE, priv->base + PCL_RCV_INT);
+	u32 val;
+
+	val = PCL_RCV_INT_ALL_ENABLE;
+	if (pci_msi_enabled())
+		val |= PCL_RCV_INT_ALL_INT_MASK;
+	else
+		val |= PCL_RCV_INT_ALL_MSI_MASK;
+
+	writel(val, priv->base + PCL_RCV_INT);
 	writel(PCL_RCV_INTX_ALL_ENABLE, priv->base + PCL_RCV_INTX);
 }
 
@@ -228,6 +241,41 @@ static const struct irq_domain_ops uniphier_intx_domain_ops = {
 	.map = uniphier_pcie_intx_map,
 };
 
+static void uniphier_pcie_misc_isr(struct pcie_port *pp, bool is_msi)
+{
+	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+	u32 val;
+
+	val = readl(priv->base + PCL_RCV_INT);
+
+	if (val & PCL_CFG_BW_MGT_STATUS)
+		dev_dbg(pci->dev, "Link Bandwidth Management Event\n");
+	if (val & PCL_CFG_LINK_AUTO_BW_STATUS)
+		dev_dbg(pci->dev, "Link Autonomous Bandwidth Event\n");
+
+	if (is_msi) {
+		if (val & PCL_CFG_AER_RC_ERR_MSI_STATUS) {
+			dev_dbg(pci->dev, "Root Error Status\n");
+			if (priv->aer_irq)
+				generic_handle_irq(priv->aer_irq);
+		}
+
+		if (val & PCL_CFG_PME_MSI_STATUS) {
+			dev_dbg(pci->dev, "PME Interrupt\n");
+			if (priv->pme_irq)
+				generic_handle_irq(priv->pme_irq);
+		}
+	}
+
+	writel(val, priv->base + PCL_RCV_INT);
+}
+
+static void uniphier_pcie_msi_host_isr(struct pcie_port *pp)
+{
+	uniphier_pcie_misc_isr(pp, true);
+}
+
 static void uniphier_pcie_irq_handler(struct irq_desc *desc)
 {
 	struct pcie_port *pp = irq_desc_get_handler_data(desc);
@@ -235,21 +283,9 @@ static void uniphier_pcie_irq_handler(struct irq_desc *desc)
 	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	unsigned long reg;
-	u32 val, bit, virq;
+	u32 val, bit, irq;
 
-	/* INT for debug */
-	val = readl(priv->base + PCL_RCV_INT);
-
-	if (val & PCL_CFG_BW_MGT_STATUS)
-		dev_dbg(pci->dev, "Link Bandwidth Management Event\n");
-	if (val & PCL_CFG_LINK_AUTO_BW_STATUS)
-		dev_dbg(pci->dev, "Link Autonomous Bandwidth Event\n");
-	if (val & PCL_CFG_AER_RC_ERR_MSI_STATUS)
-		dev_dbg(pci->dev, "Root Error\n");
-	if (val & PCL_CFG_PME_MSI_STATUS)
-		dev_dbg(pci->dev, "PME Interrupt\n");
-
-	writel(val, priv->base + PCL_RCV_INT);
+	uniphier_pcie_misc_isr(pp, false);
 
 	/* INTx */
 	chained_irq_enter(chip, desc);
@@ -258,8 +294,8 @@ static void uniphier_pcie_irq_handler(struct irq_desc *desc)
 	reg = FIELD_GET(PCL_RCV_INTX_ALL_STATUS, val);
 
 	for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
-		virq = irq_linear_revmap(priv->legacy_irq_domain, bit);
-		generic_handle_irq(virq);
+		irq = irq_linear_revmap(priv->legacy_irq_domain, bit);
+		generic_handle_irq(irq);
 	}
 
 	chained_irq_exit(chip, desc);
@@ -317,8 +353,45 @@ static int uniphier_pcie_host_init(struct pcie_port *pp)
 	return 0;
 }
 
+static int uniphier_pcie_port_get_irq(struct pcie_port *pp, u32 service)
+{
+	struct pci_dev *pcidev;
+	int irq = 0;
+
+	if (!IS_ENABLED(CONFIG_PCIEAER) && !IS_ENABLED(CONFIG_PCIE_PME))
+		return 0;
+
+	/*
+	 * Finds the device that matches 'service' from the devices
+	 * associated with Root Port, and returns its IRQ number.
+	 */
+	list_for_each_entry(pcidev, &pp->bridge->bus->devices, bus_list) {
+		irq = pcie_port_service_get_irq(pcidev, service);
+		if (irq)
+			break;
+	}
+
+	return irq;
+}
+
+static int uniphier_pcie_host_init_complete(struct pcie_port *pp)
+{
+	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+
+	if (IS_ENABLED(CONFIG_PCIE_PME))
+		priv->pme_irq =
+			uniphier_pcie_port_get_irq(pp, PCIE_PORT_SERVICE_PME);
+	if (IS_ENABLED(CONFIG_PCIEAER))
+		priv->aer_irq =
+			uniphier_pcie_port_get_irq(pp, PCIE_PORT_SERVICE_AER);
+
+	return 0;
+}
+
 static const struct dw_pcie_host_ops uniphier_pcie_host_ops = {
 	.host_init = uniphier_pcie_host_init,
+	.msi_host_isr = uniphier_pcie_msi_host_isr,
 };
 
 static int uniphier_pcie_host_enable(struct uniphier_pcie_priv *priv)
@@ -398,7 +471,11 @@ static int uniphier_pcie_probe(struct platform_device *pdev)
 
 	priv->pci.pp.ops = &uniphier_pcie_host_ops;
 
-	return dw_pcie_host_init(&priv->pci.pp);
+	ret = dw_pcie_host_init(&priv->pci.pp);
+	if (ret)
+		return ret;
+
+	return uniphier_pcie_host_init_complete(&priv->pci.pp);
 }
 
 static const struct of_device_id uniphier_pcie_match[] = {
