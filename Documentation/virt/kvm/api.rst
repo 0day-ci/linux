@@ -6327,7 +6327,7 @@ from accidentally clobbering each other with interrupts and the like (separate
 APIC/MSRs/etc).
 
 7.25 KVM_CAP_SGX_ATTRIBUTE
-----------------------
+--------------------------
 
 :Architectures: x86
 :Target: VM
