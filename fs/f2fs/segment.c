@@ -1977,20 +1977,6 @@ void f2fs_release_discard_addrs(struct f2fs_sb_info *sbi)
 		release_discard_addr(entry);
 }
 
-/*
- * Should call f2fs_clear_prefree_segments after checkpoint is done.
- */
-static void set_prefree_as_free_segments(struct f2fs_sb_info *sbi)
-{
-	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
-	unsigned int segno;
-
-	mutex_lock(&dirty_i->seglist_lock);
-	for_each_set_bit(segno, dirty_i->dirty_segmap[PRE], MAIN_SEGS(sbi))
-		__set_test_and_free(sbi, segno, false);
-	mutex_unlock(&dirty_i->seglist_lock);
-}
-
 void f2fs_clear_prefree_segments(struct f2fs_sb_info *sbi,
 						struct cp_control *cpc)
 {
@@ -2025,6 +2011,7 @@ void f2fs_clear_prefree_segments(struct f2fs_sb_info *sbi,
 		for (i = start; i < end; i++) {
 			if (test_and_clear_bit(i, prefree_map))
 				dirty_i->nr_dirty[PRE]--;
+			__set_test_and_free(sbi, i, false);
 		}
 
 		if (!f2fs_realtime_discard_enable(sbi))
@@ -4247,8 +4234,6 @@ out:
 		cpc->trim_start = trim_start;
 	}
 	up_write(&sit_i->sentry_lock);
-
-	set_prefree_as_free_segments(sbi);
 }
 
 static int build_sit_info(struct f2fs_sb_info *sbi)
