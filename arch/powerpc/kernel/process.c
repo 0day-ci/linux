@@ -1453,9 +1453,23 @@ static void print_msr_bits(unsigned long val)
 #define REGS_PER_LINE	8
 #endif
 
+static bool interrupt_detail_printable(int trap)
+{
+	switch (trap) {
+	case INTERRUPT_MACHINE_CHECK:
+	case INTERRUPT_DATA_STORAGE:
+	case INTERRUPT_ALIGNMENT:
+		return true;
+	default:
+		return false;
+	}
+
+	return false;
+}
+
 static void __show_regs(struct pt_regs *regs)
 {
-	int i, trap;
+	int i;
 
 	printk("NIP:  "REG" LR: "REG" CTR: "REG"\n",
 	       regs->nip, regs->link, regs->ctr);
@@ -1464,12 +1478,9 @@ static void __show_regs(struct pt_regs *regs)
 	printk("MSR:  "REG" ", regs->msr);
 	print_msr_bits(regs->msr);
 	pr_cont("  CR: %08lx  XER: %08lx\n", regs->ccr, regs->xer);
-	trap = TRAP(regs);
 	if (!trap_is_syscall(regs) && cpu_has_feature(CPU_FTR_CFAR))
 		pr_cont("CFAR: "REG" ", regs->orig_gpr3);
-	if (trap == INTERRUPT_MACHINE_CHECK ||
-	    trap == INTERRUPT_DATA_STORAGE ||
-	    trap == INTERRUPT_ALIGNMENT) {
+	if (interrupt_detail_printable(TRAP(regs))) {
 		if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
 			pr_cont("DEAR: "REG" ESR: "REG" ", regs->dar, regs->dsisr);
 		else
