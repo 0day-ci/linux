@@ -493,6 +493,24 @@ static int hdmi_codec_hw_params(struct snd_pcm_substream *substream,
 				       cf, &hp);
 }
 
+static u64 hdmi_codec_i2s_get_fmt(struct snd_soc_dai *dai)
+{
+	return	SND_SOC_POSSIBLE_DAIFMT_CBP_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_CBP_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_IF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_IF	|
+		SND_SOC_POSSIBLE_DAIFMT_I2S	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_A	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_B	|
+		SND_SOC_POSSIBLE_DAIFMT_RIGHT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_LEFT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_AC97;
+}
+
 static int hdmi_codec_i2s_set_fmt(struct snd_soc_dai *dai,
 				  unsigned int fmt)
 {
@@ -584,6 +602,7 @@ static const struct snd_soc_dai_ops hdmi_codec_i2s_dai_ops = {
 	.startup	= hdmi_codec_startup,
 	.shutdown	= hdmi_codec_shutdown,
 	.hw_params	= hdmi_codec_hw_params,
+	.get_fmt	= hdmi_codec_i2s_get_fmt,
 	.set_fmt	= hdmi_codec_i2s_set_fmt,
 	.mute_stream	= hdmi_codec_mute,
 };
