@@ -5870,9 +5870,7 @@ wake_affine_weight(struct sched_domain *sd, struct task_struct *p,
 
 static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_cpu, int sync)
 {
-#ifdef CONFIG_NO_HZ_COMMON
 	int pnr_busy, pllc_size, tnr_busy, tllc_size;
-#endif
 	struct sched_domain_shared *tsds, *psds;
 	int diff;
 
@@ -5909,7 +5907,6 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 		}
 	}
 
-#ifdef CONFIG_NO_HZ_COMMON
 	tnr_busy = atomic_read(&tsds->nr_busy_cpus);
 	pnr_busy = atomic_read(&psds->nr_busy_cpus);
 
@@ -5924,7 +5921,6 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 		return this_cpu;
 	if (diff < 0)
 		return prev_cpu;
-#endif /* CONFIG_NO_HZ_COMMON */
 
 	return nr_cpumask_bits;
 }
