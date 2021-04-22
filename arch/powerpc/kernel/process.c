@@ -1459,6 +1459,7 @@ static bool interrupt_detail_printable(int trap)
 	case INTERRUPT_MACHINE_CHECK:
 	case INTERRUPT_DATA_STORAGE:
 	case INTERRUPT_ALIGNMENT:
+	case INTERRUPT_PROGRAM:
 		return true;
 	default:
 		return false;
