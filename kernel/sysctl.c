@@ -2862,6 +2862,13 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= sysctl_compaction_handler,
 	},
 	{
+		.procname       = "proactive_compact_memory",
+		.data           = &sysctl_proactive_compact_memory,
+		.maxlen         = sizeof(int),
+		.mode           = 0200,
+		.proc_handler   = sysctl_proactive_compaction_handler,
+	},
+	{
 		.procname	= "compaction_proactiveness",
 		.data		= &sysctl_compaction_proactiveness,
 		.maxlen		= sizeof(sysctl_compaction_proactiveness),

@@ -2588,13 +2588,13 @@ enum compact_result try_to_compact_pages(gfp_t gfp_mask, unsigned int order,
  * due to various back-off conditions, such as, contention on per-node or
  * per-zone locks.
  */
-static void proactive_compact_node(pg_data_t *pgdat)
+static void proactive_compact_node(pg_data_t *pgdat, enum migrate_mode mode)
 {
 	int zoneid;
 	struct zone *zone;
 	struct compact_control cc = {
 		.order = -1,
-		.mode = MIGRATE_SYNC_LIGHT,
+		.mode = mode,
 		.ignore_skip_hint = true,
 		.whole_zone = true,
 		.gfp_mask = GFP_KERNEL,
@@ -2657,6 +2657,17 @@ static void compact_nodes(void)
 		compact_node(nid);
 }
 
+static void proactive_compact_nodes(void)
+{
+	int nid;
+
+	/* Flush pending updates to the LRU lists */
+	lru_add_drain_all();
+	for_each_online_node(nid)
+		proactive_compact_node(NODE_DATA(nid), MIGRATE_SYNC);
+}
+
+int sysctl_proactive_compact_memory;
 /* The written value is actually unused, all memory is compacted */
 int sysctl_compact_memory;
 
@@ -2680,6 +2691,14 @@ int sysctl_compaction_handler(struct ctl_table *table, int write,
 	return 0;
 }
 
+int sysctl_proactive_compaction_handler(struct ctl_table *table, int write,
+			void *buffer, size_t *length, loff_t *ppos)
+{
+	if (write)
+		proactive_compact_nodes();
+
+	return 0;
+}
 #if defined(CONFIG_SYSFS) && defined(CONFIG_NUMA)
 static ssize_t sysfs_compact_node(struct device *dev,
 			struct device_attribute *attr,
@@ -2881,7 +2900,7 @@ static int kcompactd(void *p)
 				continue;
 			}
 			prev_score = fragmentation_score_node(pgdat);
-			proactive_compact_node(pgdat);
+			proactive_compact_node(pgdat, MIGRATE_SYNC_LIGHT);
 			score = fragmentation_score_node(pgdat);
 			/*
 			 * Defer proactive compaction if the fragmentation
