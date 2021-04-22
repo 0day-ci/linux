@@ -79,18 +79,16 @@ static u32 mtk_m32(struct mtk_eth *eth, u32 mask, u32 set, unsigned reg)
 
 static int mtk_mdio_busy_wait(struct mtk_eth *eth)
 {
-	unsigned long t_start = jiffies;
+	int ret;
+	u32 val;
 
-	while (1) {
-		if (!(mtk_r32(eth, MTK_PHY_IAC) & PHY_IAC_ACCESS))
-			return 0;
-		if (time_after(jiffies, t_start + PHY_IAC_TIMEOUT))
-			break;
-		usleep_range(10, 20);
-	}
+	ret = readx_poll_timeout_atomic(__raw_readl, eth->base + MTK_PHY_IAC,
+					val, !(val & PHY_IAC_ACCESS),
+					5, PHY_IAC_TIMEOUT_US);
+	if (ret)
+		dev_err(eth->dev, "mdio: MDIO timeout\n");
 
-	dev_err(eth->dev, "mdio: MDIO timeout\n");
-	return -1;
+	return ret;
 }
 
 static u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
