@@ -5869,6 +5869,67 @@ wake_affine_weight(struct sched_domain *sd, struct task_struct *p,
 	return this_eff_load < prev_eff_load ? this_cpu : nr_cpumask_bits;
 }
 
+static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_cpu, int sync)
+{
+#ifdef CONFIG_NO_HZ_COMMON
+	int pnr_busy, pllc_size, tnr_busy, tllc_size;
+#endif
+	struct sched_domain_shared *tsds, *psds;
+	int diff;
+
+	tsds = rcu_dereference(per_cpu(sd_llc_shared, this_cpu));
+	psds = rcu_dereference(per_cpu(sd_llc_shared, prev_cpu));
+	if (!tsds || !psds)
+		return nr_cpumask_bits;
+
+	if (sync) {
+		if (available_idle_cpu(this_cpu) || sched_idle_cpu(this_cpu))
+			return this_cpu;
+		if (tsds->idle_core != -1) {
+			if (cpumask_test_cpu(tsds->idle_core, p->cpus_ptr))
+				return tsds->idle_core;
+			return this_cpu;
+		}
+	}
+
+	if (available_idle_cpu(prev_cpu) || sched_idle_cpu(prev_cpu))
+		return prev_cpu;
+	if (psds->idle_core != -1) {
+		if (cpumask_test_cpu(psds->idle_core, p->cpus_ptr))
+			return psds->idle_core;
+		return prev_cpu;
+	}
+
+	if (!sync) {
+		if (available_idle_cpu(this_cpu) || sched_idle_cpu(this_cpu))
+			return this_cpu;
+		if (tsds->idle_core != -1) {
+			if (cpumask_test_cpu(tsds->idle_core, p->cpus_ptr))
+				return tsds->idle_core;
+			return this_cpu;
+		}
+	}
+
+#ifdef CONFIG_NO_HZ_COMMON
+	tnr_busy = atomic_read(&tsds->nr_busy_cpus);
+	pnr_busy = atomic_read(&psds->nr_busy_cpus);
+
+	tllc_size = per_cpu(sd_llc_size, this_cpu);
+	pllc_size = per_cpu(sd_llc_size, prev_cpu);
+
+	if (pnr_busy == pllc_size && tnr_busy == tllc_size)
+		return nr_cpumask_bits;
+
+	diff = pnr_busy * tllc_size - tnr_busy * pllc_size;
+	if (diff > 0)
+		return this_cpu;
+	if (diff < 0)
+		return prev_cpu;
+#endif /* CONFIG_NO_HZ_COMMON */
+
+	return nr_cpumask_bits;
+}
+
 static int wake_affine(struct sched_domain *sd, struct task_struct *p,
 		       int this_cpu, int prev_cpu, int sync)
 {
@@ -5876,6 +5937,9 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p,
 
 	if (sched_feat(WA_IDLE))
 		target = wake_affine_idle(this_cpu, prev_cpu, sync);
+
+	if (sched_feat(WA_IDLER_LLC) && target == nr_cpumask_bits)
+		target = wake_affine_idler_llc(p, this_cpu, prev_cpu, sync);
 
 	if (sched_feat(WA_WEIGHT) && target == nr_cpumask_bits)
 		target = wake_affine_weight(sd, p, this_cpu, prev_cpu, sync);
