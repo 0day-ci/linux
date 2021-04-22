@@ -322,6 +322,15 @@ static int ak4613_dai_set_sysclk(struct snd_soc_dai *codec_dai,
 	return 0;
 }
 
+static u64 ak4613_dai_get_fmt(struct snd_soc_dai *dai)
+{
+	return	SND_SOC_POSSIBLE_DAIFMT_I2S	|
+		SND_SOC_POSSIBLE_DAIFMT_LEFT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_CBP_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_NF;
+}
+
 static int ak4613_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct snd_soc_component *component = dai->component;
@@ -543,6 +552,7 @@ static const struct snd_soc_dai_ops ak4613_dai_ops = {
 	.startup	= ak4613_dai_startup,
 	.shutdown	= ak4613_dai_shutdown,
 	.set_sysclk	= ak4613_dai_set_sysclk,
+	.get_fmt	= ak4613_dai_get_fmt,
 	.set_fmt	= ak4613_dai_set_fmt,
 	.trigger	= ak4613_dai_trigger,
 	.hw_params	= ak4613_dai_hw_params,
