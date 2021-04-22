@@ -123,8 +123,8 @@ struct dpaa2_qdma_priv {
 	struct dpaa2_qdma_engine	*dpaa2_qdma;
 	struct dpaa2_qdma_priv_per_prio	*ppriv;
 
-	struct dpdmai_rx_queue_attr rx_queue_attr[DPDMAI_MAX_QUEUE_NUM];
-	struct dpdmai_tx_queue_attr tx_queue_attr[DPDMAI_MAX_QUEUE_NUM];
+	struct dpdmai_rx_queue_attr *rx_queue_attr;
+	struct dpdmai_tx_queue_attr *tx_queue_attr;
 };
 
 struct dpaa2_qdma_priv_per_prio {

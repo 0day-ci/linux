@@ -314,6 +314,8 @@ static int __cold dpaa2_qdma_setup(struct fsl_mc_device *ls_dev)
 	struct dpaa2_qdma_priv_per_prio *ppriv;
 	struct device *dev = &ls_dev->dev;
 	struct dpaa2_qdma_priv *priv;
+	struct dpdmai_rx_queue_attr *rx_queue_attr;
+	struct dpdmai_tx_queue_attr *tx_queue_attr;
 	int err = -EINVAL;
 	int i;
 
@@ -335,33 +337,51 @@ static int __cold dpaa2_qdma_setup(struct fsl_mc_device *ls_dev)
 				    &priv->dpdmai_attr);
 	if (err) {
 		dev_err(dev, "dpdmai_get_attributes() failed\n");
-		goto exit;
+		goto err_get_attr;
 	}
 
 	priv->num_pairs = priv->dpdmai_attr.num_of_queues;
+	rx_queue_attr = kcalloc(priv->num_pairs, sizeof(*rx_queue_attr),
+				GFP_KERNEL);
+	if (!rx_queue_attr) {
+		err = -ENOMEM;
+		goto err_get_attr;
+	}
+	priv->rx_queue_attr = rx_queue_attr;
+
+	tx_queue_attr = kcalloc(priv->num_pairs, sizeof(*tx_queue_attr),
+				GFP_KERNEL);
+	if (!tx_queue_attr) {
+		err = -ENOMEM;
+		goto err_tx_queue;
+	}
+	priv->tx_queue_attr = tx_queue_attr;
+
 	ppriv = kcalloc(priv->num_pairs, sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
 		err = -ENOMEM;
-		goto exit;
+		goto err_ppriv;
 	}
 	priv->ppriv = ppriv;
 
 	for (i = 0; i < priv->num_pairs; i++) {
 		err = dpdmai_get_rx_queue(priv->mc_io, 0, ls_dev->mc_handle,
-					  i, 0, &priv->rx_queue_attr[i]);
+					  i, 0, priv->rx_queue_attr + i);
 		if (err) {
 			dev_err(dev, "dpdmai_get_rx_queue() failed\n");
 			goto exit;
 		}
-		ppriv->rsp_fqid = priv->rx_queue_attr[i].fqid;
+		ppriv->rsp_fqid = ((struct dpdmai_rx_queue_attr *)
+				   (priv->rx_queue_attr + i))->fqid;
 
 		err = dpdmai_get_tx_queue(priv->mc_io, 0, ls_dev->mc_handle,
-					  i, 0, &priv->tx_queue_attr[i]);
+					  i, 0, priv->tx_queue_attr + i);
 		if (err) {
 			dev_err(dev, "dpdmai_get_tx_queue() failed\n");
 			goto exit;
 		}
-		ppriv->req_fqid = priv->tx_queue_attr[i].fqid;
+		ppriv->req_fqid = ((struct dpdmai_tx_queue_attr *)
+				   (priv->tx_queue_attr + i))->fqid;
 		ppriv->prio = DPAA2_QDMA_DEFAULT_PRIORITY;
 		ppriv->priv = priv;
 		ppriv->chan_id = i;
@@ -370,6 +390,12 @@ static int __cold dpaa2_qdma_setup(struct fsl_mc_device *ls_dev)
 
 	return 0;
 exit:
+	kfree(ppriv);
+err_ppriv:
+	kfree(priv->tx_queue_attr);
+err_tx_queue:
+	kfree(priv->rx_queue_attr);
+err_get_attr:
 	dpdmai_close(priv->mc_io, 0, ls_dev->mc_handle);
 	return err;
 }
@@ -733,6 +759,8 @@ err_bind:
 	dpaa2_dpmai_store_free(priv);
 	dpaa2_dpdmai_dpio_free(priv);
 err_dpio_setup:
+	kfree(priv->rx_queue_attr);
+	kfree(priv->tx_queue_attr);
 	kfree(priv->ppriv);
 	dpdmai_close(priv->mc_io, 0, dpdmai_dev->mc_handle);
 err_dpdmai_setup:
@@ -763,6 +791,9 @@ static int dpaa2_qdma_remove(struct fsl_mc_device *ls_dev)
 	dpaa2_dpdmai_free_channels(dpaa2_qdma);
 
 	dma_async_device_unregister(&dpaa2_qdma->dma_dev);
+	kfree(priv->rx_queue_attr);
+	kfree(priv->tx_queue_attr);
+	kfree(priv->ppriv);
 	kfree(priv);
 	kfree(dpaa2_qdma);
 

@@ -51,11 +51,6 @@
  * Contains initialization APIs and runtime control APIs for DPDMAI
  */
 
-/*
- * Maximum number of Tx/Rx queues per DPDMAI object
- */
-#define DPDMAI_MAX_QUEUE_NUM	8
-
 /**
  * Maximum number of Tx/Rx priorities per DPDMAI object
  */
