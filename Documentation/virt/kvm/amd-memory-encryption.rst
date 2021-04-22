@@ -304,6 +304,7 @@ Parameters (in): struct kvm_sev_send_start
 Returns: 0 on success, -negative on error
 
 ::
+
         struct kvm_sev_send_start {
                 __u32 policy;                 /* guest policy */
 
