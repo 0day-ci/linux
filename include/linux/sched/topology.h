@@ -74,6 +74,7 @@ struct sched_domain_shared {
 	atomic_t	ref;
 	atomic_t	nr_busy_cpus;
 	int		idle_core;
+	int		fallback_llc_id;
 };
 
 struct sched_domain {

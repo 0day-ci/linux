@@ -130,6 +130,13 @@ SD_FLAG(SD_SERIALIZE, SDF_SHARED_PARENT | SDF_NEEDS_GROUPS)
 SD_FLAG(SD_ASYM_PACKING, SDF_SHARED_CHILD | SDF_NEEDS_GROUPS)
 
 /*
+ * Consider waking task on near-by idle LLC.
+ *
+ * NEEDS_GROUPS: Load balancing flag.
+ */
+SD_FLAG(SD_FALLBACK_LLC, SDF_NEEDS_GROUPS)
+
+/*
  * Prefer to place tasks in a sibling domain
  *
  * Set up until domains start spanning NUMA nodes. Close to being a SHARED_CHILD

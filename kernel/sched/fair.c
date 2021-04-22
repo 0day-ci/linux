@@ -5873,7 +5873,8 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 {
 	int pnr_busy, pllc_size, tnr_busy, tllc_size;
 	struct sched_domain_shared *tsds, *psds;
-	int diff;
+	bool try_fallback = false;
+	int diff, fcpu = -1;
 
 	tsds = rcu_dereference(per_cpu(sd_llc_shared, this_cpu));
 	psds = rcu_dereference(per_cpu(sd_llc_shared, prev_cpu));
@@ -5887,6 +5888,43 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 			if (cpumask_test_cpu(tsds->idle_core, p->cpus_ptr))
 				return tsds->idle_core;
 			return this_cpu;
+		}
+	}
+
+	tnr_busy = atomic_read(&tsds->nr_busy_cpus);
+	tllc_size = per_cpu(sd_llc_size, this_cpu);
+
+	if (sync) {
+		struct sched_domain *sd = rcu_dereference(per_cpu(sd_llc, this_cpu));
+
+		/*
+		 * task is a target of *sync* wakeup. However there are no
+		 * idle cores in the waking CPU. Ignore fallback LLC if the
+		 * previous CPU is part of the LLC's parent domain.
+		 */
+		try_fallback = !cpumask_test_cpu(prev_cpu, sched_domain_span(sd->parent));
+		fcpu = tsds->fallback_llc_id;
+	}
+
+	if (try_fallback && fcpu != -1 && cpumask_test_cpu(fcpu, p->cpus_ptr)) {
+		struct sched_domain_shared *fsds;
+		int fnr_busy, fllc_size;
+
+		fsds = rcu_dereference(per_cpu(sd_llc_shared, fcpu));
+		if (fsds && fsds != psds) {
+			if (fsds->idle_core != -1) {
+				if (cpumask_test_cpu(fsds->idle_core, p->cpus_ptr))
+					return fsds->idle_core;
+				return fcpu;
+			}
+
+			fnr_busy = atomic_read(&fsds->nr_busy_cpus);
+			fllc_size = per_cpu(sd_llc_size, fcpu);
+			if (fnr_busy * tllc_size < tnr_busy * fllc_size) {
+				tnr_busy = fnr_busy;
+				tllc_size = fllc_size;
+				this_cpu = fcpu;
+			}
 		}
 	}
 
@@ -5908,10 +5946,7 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 		}
 	}
 
-	tnr_busy = atomic_read(&tsds->nr_busy_cpus);
 	pnr_busy = atomic_read(&psds->nr_busy_cpus);
-
-	tllc_size = per_cpu(sd_llc_size, this_cpu);
 	pllc_size = per_cpu(sd_llc_size, prev_cpu);
 
 	if (pnr_busy == pllc_size && tnr_busy == tllc_size) {

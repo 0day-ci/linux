@@ -603,6 +603,8 @@ static void free_sched_groups(struct sched_group *sg, int free_sgc)
 
 static void destroy_sched_domain(struct sched_domain *sd)
 {
+	struct sched_domain_shared *sds = sd->shared;
+
 	/*
 	 * A normal sched domain may have multiple group references, an
 	 * overlapping domain, having private groups, only one.  Iterate,
@@ -610,8 +612,18 @@ static void destroy_sched_domain(struct sched_domain *sd)
 	 */
 	free_sched_groups(sd->groups, 1);
 
-	if (sd->shared && atomic_dec_and_test(&sd->shared->ref))
-		kfree(sd->shared);
+	if (sds && atomic_dec_and_test(&sds->ref)) {
+		struct sched_domain_shared *next_sds;
+
+		if (sds->fallback_llc_id != -1) {
+			next_sds = rcu_dereference(per_cpu(sd_llc_shared, sds->fallback_llc_id));
+			if (next_sds && next_sds->fallback_llc_id != -1)
+				next_sds->fallback_llc_id = -1;
+
+			sds->fallback_llc_id = -1;
+		}
+		kfree(sds);
+	}
 	kfree(sd);
 }
 
@@ -663,9 +675,36 @@ static void update_top_cache_domain(int cpu)
 
 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
 	if (sd) {
+		struct sched_domain *sd_parent = sd->parent;
+
 		id = cpumask_first(sched_domain_span(sd));
 		size = cpumask_weight(sched_domain_span(sd));
 		sds = sd->shared;
+
+		if (sds->fallback_llc_id == -1 && sd_parent &&
+				sd_parent->flags & SD_FALLBACK_LLC) {
+			const struct cpumask *parent_span = sched_domain_span(sd->parent);
+			struct cpumask *span = sched_domains_tmpmask;
+			int fcpu;
+
+			/*
+			 * If LLC's parent domain has SD_FALLBACK_LLC flag
+			 * set and this LLC's fallback_llc_id is not yet
+			 * set, then walk through the LLC parent's domain to
+			 * find a fallback_llc.
+			 */
+			cpumask_andnot(span, parent_span, sched_domain_span(sd));
+			for_each_cpu_wrap(fcpu, span, cpu) {
+				struct sched_domain_shared *next_sds;
+
+				next_sds = rcu_dereference(per_cpu(sd_llc_shared, fcpu));
+				if (next_sds && next_sds->fallback_llc_id == -1) {
+					sds->fallback_llc_id = fcpu;
+					next_sds->fallback_llc_id = cpu;
+					break;
+				}
+			}
+		}
 	}
 
 	rcu_assign_pointer(per_cpu(sd_llc, cpu), sd);
@@ -1370,6 +1409,7 @@ int __read_mostly		node_reclaim_distance = RECLAIM_DISTANCE;
 #define TOPOLOGY_SD_FLAGS		\
 	(SD_SHARE_CPUCAPACITY	|	\
 	 SD_SHARE_PKG_RESOURCES |	\
+	 SD_FALLBACK_LLC	|	\
 	 SD_NUMA		|	\
 	 SD_ASYM_PACKING)
 
@@ -1475,6 +1515,7 @@ sd_init(struct sched_domain_topology_level *tl,
 		atomic_inc(&sd->shared->ref);
 		atomic_set(&sd->shared->nr_busy_cpus, sd_weight);
 		sd->shared->idle_core = -1;
+		sd->shared->fallback_llc_id = -1;
 	}
 
 	sd->private = sdd;
