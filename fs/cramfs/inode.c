@@ -951,7 +951,7 @@ static const struct super_operations cramfs_ops = {
 
 static int cramfs_get_tree(struct fs_context *fc)
 {
-	int ret = -ENOPROTOOPT;
+	int ret = -EINVAL;
 
 	if (IS_ENABLED(CONFIG_CRAMFS_MTD)) {
 		ret = get_tree_mtd(fc, cramfs_mtd_fill_super);
