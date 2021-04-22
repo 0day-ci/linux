@@ -754,6 +754,21 @@ dai_trigger_end:
 	return ret;
 }
 
+static u64 rsnd_soc_dai_get_fmt(struct snd_soc_dai *dai)
+{
+	return	SND_SOC_POSSIBLE_DAIFMT_I2S	|
+		SND_SOC_POSSIBLE_DAIFMT_RIGHT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_LEFT_J	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_A	|
+		SND_SOC_POSSIBLE_DAIFMT_DSP_B	|
+		SND_SOC_POSSIBLE_DAIFMT_CBP_CFP	|
+		SND_SOC_POSSIBLE_DAIFMT_CBC_CFC	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_NB_IF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_NF	|
+		SND_SOC_POSSIBLE_DAIFMT_IB_IF;
+}
+
 static int rsnd_soc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct rsnd_dai *rdai = rsnd_dai_to_rdai(dai);
@@ -1047,6 +1062,7 @@ static const struct snd_soc_dai_ops rsnd_soc_dai_ops = {
 	.startup	= rsnd_soc_dai_startup,
 	.shutdown	= rsnd_soc_dai_shutdown,
 	.trigger	= rsnd_soc_dai_trigger,
+	.get_fmt	= rsnd_soc_dai_get_fmt,
 	.set_fmt	= rsnd_soc_dai_set_fmt,
 	.set_tdm_slot	= rsnd_soc_set_dai_tdm_slot,
 	.prepare	= rsnd_soc_dai_prepare,
