@@ -3858,6 +3858,8 @@ static void perf_event_context_sched_in(struct perf_event_context *ctx,
 
 	if (cpuctx->sched_cb_usage && pmu->sched_task)
 		pmu->sched_task(cpuctx->task_ctx, true);
+	if (pmu->check_leakage)
+		pmu->check_leakage();
 
 	perf_pmu_enable(pmu);
 
