@@ -854,6 +854,8 @@ int i915_driver_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ret)
 		goto out_cleanup_gem;
 
+	intel_bxt_dsm_detect(pdev);
+
 	i915_driver_register(i915);
 
 	enable_rpm_wakeref_asserts(&i915->runtime_pm);
@@ -1196,6 +1198,7 @@ int i915_suspend_switcheroo(struct drm_i915_private *i915, pm_message_t state)
 static int i915_drm_resume(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
 	int ret;
 
 	disable_rpm_wakeref_asserts(&dev_priv->runtime_pm);
@@ -1249,6 +1252,8 @@ static int i915_drm_resume(struct drm_device *dev)
 	intel_power_domains_enable(dev_priv);
 
 	intel_gvt_resume(dev_priv);
+
+	intel_bxt_dsm_detect(pdev);
 
 	enable_rpm_wakeref_asserts(&dev_priv->runtime_pm);
 
