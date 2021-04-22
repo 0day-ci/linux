@@ -1706,13 +1706,13 @@ static void nfs_set_open_stateid_locked(struct nfs4_state *state,
 		rcu_read_unlock();
 		trace_nfs4_open_stateid_update_wait(state->inode, stateid, 0);
 
-		if (!signal_pending(current)) {
+		if (!fatal_signal_pending(current)) {
 			if (schedule_timeout(5*HZ) == 0)
 				status = -EAGAIN;
 			else
 				status = 0;
 		} else
-			status = -EINTR;
+			status = -ERESTARTSYS;
 		finish_wait(&state->waitq, &wait);
 		rcu_read_lock();
 		spin_lock(&state->owner->so_lock);
@@ -3487,8 +3487,8 @@ static bool nfs4_refresh_open_old_stateid(nfs4_stateid *dst,
 		write_sequnlock(&state->seqlock);
 		trace_nfs4_close_stateid_update_wait(state->inode, dst, 0);
 
-		if (signal_pending(current))
-			status = -EINTR;
+		if (fatal_signal_pending(current))
+			status = -ERESTARTSYS;
 		else
 			if (schedule_timeout(5*HZ) != 0)
 				status = 0;
@@ -3497,7 +3497,7 @@ static bool nfs4_refresh_open_old_stateid(nfs4_stateid *dst,
 
 		if (!status)
 			continue;
-		if (status == -EINTR)
+		if (status == -ERESTARTSYS)
 			break;
 
 		/* we slept the whole 5 seconds, we must have lost a seqid */
