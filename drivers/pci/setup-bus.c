@@ -1044,10 +1044,11 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 			 * resources.
 			 */
 			align = pci_resource_alignment(dev, r);
-			order = __ffs(align) - 20;
-			if (order < 0)
-				order = 0;
-			if (order >= ARRAY_SIZE(aligns)) {
+			if (align) {
+				order = __ffs(align) - 20;
+				order = (order < 0) ? 0 : order;
+			}
+			if (!align || order >= ARRAY_SIZE(aligns)) {
 				pci_warn(dev, "disabling BAR %d: %pR (bad alignment %#llx)\n",
 					 i, r, (unsigned long long) align);
 				r->flags = 0;
