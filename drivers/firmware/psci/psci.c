@@ -179,6 +179,14 @@ static int psci_0_1_cpu_suspend(u32 state, unsigned long entry_point)
 				  state, entry_point);
 }
 
+static int psci_set_state_idle_time(u32 idle_time)
+{
+	int err;
+
+	err = invoke_psci_fn(PSCI_1_1_FN_SET_STATE_IDLE_TIME, idle_time, 0, 0);
+	return psci_to_linux_errno(err);
+}
+
 static int psci_0_2_cpu_suspend(u32 state, unsigned long entry_point)
 {
 	return __psci_cpu_suspend(PSCI_FN_NATIVE(0_2, CPU_SUSPEND),
@@ -466,6 +474,7 @@ static void __init psci_0_2_set_functions(void)
 		.migrate = psci_0_2_migrate,
 		.affinity_info = psci_affinity_info,
 		.migrate_info_type = psci_migrate_info_type,
+		.set_state_idle_time = psci_set_state_idle_time,
 	};
 
 	arm_pm_restart = psci_sys_reset;
