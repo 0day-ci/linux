@@ -52,6 +52,22 @@ void __do_once_done(bool *done, struct static_key_true *once_key,
 		___ret;							     \
 	})
 
+/* Call a function once. Similar to DO_ONCE(), but does not use jump label
+ * patching via static keys.
+ */
+#define DO_ONCE_LITE(func, ...)						     \
+	DO_ONCE_LITE_IF(true, func, ##__VA_ARGS__)
+#define DO_ONCE_LITE_IF(condition, func, ...)				     \
+	({								     \
+		static bool __section(".data.once") __already_done;	     \
+		bool __ret_do_once = !!(condition);			     \
+									     \
+		if (unlikely(__ret_do_once && !__already_done)) {	     \
+			__already_done = true;				     \
+			func(__VA_ARGS__);				     \
+		}							     \
+		unlikely(__ret_do_once);				     \
+	})
 #define get_random_once(buf, nbytes)					     \
 	DO_ONCE(get_random_bytes, (buf), (nbytes))
 #define get_random_once_wait(buf, nbytes)                                    \
