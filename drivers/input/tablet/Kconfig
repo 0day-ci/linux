@@ -14,8 +14,7 @@ if INPUT_TABLET
 
 config TABLET_USB_ACECAD
 	tristate "Acecad Flair tablet support (USB)"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the USB version of the Acecad Flair
 	  tablet.  Make sure to say Y to "Mouse support"
@@ -27,8 +26,7 @@ config TABLET_USB_ACECAD
 
 config TABLET_USB_AIPTEK
 	tristate "Aiptek 6000U/8000U and Genius G_PEN tablet support (USB)"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the USB version of the Aiptek 6000U,
 	  Aiptek 8000U or Genius G-PEN 560 tablet.  Make sure to say Y to
@@ -40,8 +38,7 @@ config TABLET_USB_AIPTEK
 
 config TABLET_USB_HANWANG
 	tristate "Hanwang Art Master III tablet support (USB)"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the USB version of the Hanwang Art
 	  Master III tablet.
@@ -51,8 +48,7 @@ config TABLET_USB_HANWANG
 
 config TABLET_USB_KBTAB
 	tristate "KB Gear JamStudio tablet support (USB)"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the USB version of the KB Gear
 	  JamStudio tablet.  Make sure to say Y to "Mouse support"
@@ -64,8 +60,7 @@ config TABLET_USB_KBTAB
 
 config TABLET_USB_PEGASUS
 	tristate "Pegasus Mobile Notetaker Pen input tablet support"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the Pegasus Mobile Notetaker,
 	  also known as:

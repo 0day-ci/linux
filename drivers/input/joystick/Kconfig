@@ -291,8 +291,7 @@ config JOYSTICK_JOYDUMP
 
 config JOYSTICK_XPAD
 	tristate "X-Box gamepad support"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the X-Box pad with your computer.
 	  Make sure to say Y to "Joystick support" (CONFIG_INPUT_JOYDEV)
@@ -364,8 +363,7 @@ config JOYSTICK_PSXPAD_SPI_FF
 
 config JOYSTICK_PXRC
 	tristate "PhoenixRC Flight Controller Adapter"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use the PhoenixRC Flight Controller Adapter.
 

@@ -356,8 +356,7 @@ config INPUT_ATLAS_BTNS
 
 config INPUT_ATI_REMOTE2
 	tristate "ATI / Philips USB RF remote control"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use an ATI or Philips USB RF remote control.
 	  These are RF remotes with USB receivers.
@@ -371,8 +370,7 @@ config INPUT_ATI_REMOTE2
 
 config INPUT_KEYSPAN_REMOTE
 	tristate "Keyspan DMR USB remote control"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use a Keyspan DMR USB remote control.
 	  Currently only the UIA-11 type of receiver has been tested.  The tag
@@ -396,8 +394,7 @@ config INPUT_KXTJ9
 
 config INPUT_POWERMATE
 	tristate "Griffin PowerMate and Contour Jog support"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to use Griffin PowerMate or Contour Jog devices.
 	  These are aluminum dials which can measure clockwise and anticlockwise
@@ -412,8 +409,7 @@ config INPUT_POWERMATE
 
 config INPUT_YEALINK
 	tristate "Yealink usb-p1k voip phone"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to enable keyboard and LCD functions of the
 	  Yealink usb-p1k usb phones. The audio part is enabled by the generic
@@ -427,8 +423,7 @@ config INPUT_YEALINK
 
 config INPUT_CM109
 	tristate "C-Media CM109 USB I/O Controller"
-	depends on USB_ARCH_HAS_HCD
-	select USB
+	depends on USB
 	help
 	  Say Y here if you want to enable keyboard and buzzer functions of the
 	  C-Media CM109 usb phones. The audio part is enabled by the generic
