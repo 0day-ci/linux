@@ -1563,11 +1563,11 @@ numa_type numa_classify(unsigned int imbalance_pct,
 
 #ifdef CONFIG_SCHED_SMT
 /* Forward declarations of select_idle_sibling helpers */
-static inline bool test_idle_cores(int cpu, bool def);
+static inline int get_idle_core(int cpu, int def);
 static inline int numa_idle_core(int idle_core, int cpu)
 {
 	if (!static_branch_likely(&sched_smt_present) ||
-	    idle_core >= 0 || !test_idle_cores(cpu, false))
+	    idle_core >= 0 || get_idle_core(cpu, -1) == -1)
 		return idle_core;
 
 	/*
@@ -6015,29 +6015,31 @@ static inline int __select_idle_cpu(int cpu)
 DEFINE_STATIC_KEY_FALSE(sched_smt_present);
 EXPORT_SYMBOL_GPL(sched_smt_present);
 
-static inline void set_idle_cores(int cpu, int val)
+static inline void set_idle_core(int cpu, int val)
 {
 	struct sched_domain_shared *sds;
 
 	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
 	if (sds)
-		WRITE_ONCE(sds->has_idle_cores, val);
+		WRITE_ONCE(sds->idle_core, val);
 }
 
-static inline bool test_idle_cores(int cpu, bool def)
+static inline int get_idle_core(int cpu, int def)
 {
 	struct sched_domain_shared *sds;
 
-	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
-	if (sds)
-		return READ_ONCE(sds->has_idle_cores);
+	if (static_branch_likely(&sched_smt_present)) {
+		sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
+		if (sds)
+			return READ_ONCE(sds->idle_core);
+	}
 
 	return def;
 }
 
 /*
  * Scans the local SMT mask to see if the entire core is idle, and records this
- * information in sd_llc_shared->has_idle_cores.
+ * information in sd_llc_shared->idle_core.
  *
  * Since SMT siblings share all cache levels, inspecting this limited remote
  * state should be fairly cheap.
@@ -6048,7 +6050,7 @@ void __update_idle_core(struct rq *rq)
 	int cpu;
 
 	rcu_read_lock();
-	if (test_idle_cores(core, true))
+	if (get_idle_core(core, 0) != -1)
 		goto unlock;
 
 	for_each_cpu(cpu, cpu_smt_mask(core)) {
@@ -6059,7 +6061,7 @@ void __update_idle_core(struct rq *rq)
 			goto unlock;
 	}
 
-	set_idle_cores(core, 1);
+	set_idle_core(core, per_cpu(smt_id, core));
 unlock:
 	rcu_read_unlock();
 }
@@ -6067,7 +6069,7 @@ unlock:
 /*
  * Scan the entire LLC domain for idle cores; this dynamically switches off if
  * there are no idle cores left in the system; tracked through
- * sd_llc->shared->has_idle_cores and enabled through update_idle_core() above.
+ * sd_llc->shared->idle_core and enabled through update_idle_core() above.
  */
 static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpus, int *idle_cpu)
 {
@@ -6102,11 +6104,11 @@ static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpu
 
 #else /* CONFIG_SCHED_SMT */
 
-static inline void set_idle_cores(int cpu, int val)
+static inline void set_idle_core(int cpu, int val)
 {
 }
 
-static inline bool test_idle_cores(int cpu, bool def)
+static inline bool get_idle_core(int cpu, int def)
 {
 	return def;
 }
@@ -6127,7 +6129,8 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
 	int i, cpu, idle_cpu = -1, nr = INT_MAX;
-	bool smt = test_idle_cores(target, false);
+	int idle_core = get_idle_core(target, -1);
+	bool smt = (idle_core != -1);
 	int this = smp_processor_id();
 	struct sched_domain *this_sd;
 	u64 time;
@@ -6160,8 +6163,13 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu_wrap(cpu, cpus, target) {
 		if (smt) {
 			i = select_idle_core(p, cpu, cpus, &idle_cpu);
-			if ((unsigned int)i < nr_cpumask_bits)
+			if ((unsigned int)i < nr_cpumask_bits) {
+#ifdef CONFIG_SCHED_SMT
+				if ((per_cpu(smt_id, i)) == idle_core)
+					set_idle_core(i, -1);
+#endif
 				return i;
+			}
 
 		} else {
 			if (!--nr)
@@ -6171,9 +6179,6 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 				break;
 		}
 	}
-
-	if (smt)
-		set_idle_cores(this, false);
 
 	if (sched_feat(SIS_PROP) && !smt) {
 		time = cpu_clock(this) - time;
