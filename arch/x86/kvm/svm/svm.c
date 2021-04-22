@@ -1206,7 +1206,7 @@ static void init_vmcb(struct vcpu_svm *svm)
 	save->dr6 = 0xffff0ff0;
 	kvm_set_rflags(&svm->vcpu, X86_EFLAGS_FIXED);
 	save->rip = 0x0000fff0;
-	svm->vcpu.arch.regs[VCPU_REGS_RIP] = save->rip;
+	kvm_rip_write(&svm->vcpu, save->rip);
 
 	/*
 	 * svm_set_cr0() sets PG and WP and clears NW and CD on save->cr0.
@@ -3825,9 +3825,9 @@ static __no_kcsan fastpath_t svm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	trace_kvm_entry(vcpu);
 
-	svm->vmcb->save.rax = vcpu->arch.regs[VCPU_REGS_RAX];
-	svm->vmcb->save.rsp = vcpu->arch.regs[VCPU_REGS_RSP];
-	svm->vmcb->save.rip = vcpu->arch.regs[VCPU_REGS_RIP];
+	svm->vmcb->save.rax = kvm_rax_read(vcpu);
+	svm->vmcb->save.rsp = kvm_rsp_read(vcpu);
+	svm->vmcb->save.rip = kvm_rip_read(vcpu);
 
 	/*
 	 * Disable singlestep if we're injecting an interrupt/exception.
@@ -3904,9 +3904,9 @@ static __no_kcsan fastpath_t svm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	if (!sev_es_guest(svm->vcpu.kvm)) {
 		vcpu->arch.cr2 = svm->vmcb->save.cr2;
-		vcpu->arch.regs[VCPU_REGS_RAX] = svm->vmcb->save.rax;
-		vcpu->arch.regs[VCPU_REGS_RSP] = svm->vmcb->save.rsp;
-		vcpu->arch.regs[VCPU_REGS_RIP] = svm->vmcb->save.rip;
+		kvm_rax_write(vcpu, svm->vmcb->save.rax);
+		kvm_rsp_write(vcpu, svm->vmcb->save.rsp);
+		kvm_rip_write(vcpu, svm->vmcb->save.rip);
 	}
 
 	if (unlikely(svm->vmcb->control.exit_code == SVM_EXIT_NMI))
@@ -4320,9 +4320,9 @@ static int svm_pre_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 		/* FEE0h - SVM Guest VMCB Physical Address */
 		put_smstate(u64, smstate, 0x7ee0, svm->nested.vmcb12_gpa);
 
-		svm->vmcb->save.rax = vcpu->arch.regs[VCPU_REGS_RAX];
-		svm->vmcb->save.rsp = vcpu->arch.regs[VCPU_REGS_RSP];
-		svm->vmcb->save.rip = vcpu->arch.regs[VCPU_REGS_RIP];
+		svm->vmcb->save.rax = kvm_rax_read(vcpu);
+		svm->vmcb->save.rsp = kvm_rsp_read(vcpu);
+		svm->vmcb->save.rip = kvm_rip_read(vcpu);
 
 		ret = nested_svm_vmexit(svm);
 		if (ret)
