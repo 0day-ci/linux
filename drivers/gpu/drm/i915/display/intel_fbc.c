@@ -232,7 +232,8 @@ static void intel_fbc_recompress(struct drm_i915_private *dev_priv)
 
 static void ilk_fbc_activate(struct drm_i915_private *dev_priv)
 {
-	struct intel_fbc_reg_params *params = &dev_priv->fbc.params;
+	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct intel_fbc_reg_params *params = &fbc->params;
 	u32 dpfc_ctl;
 	int threshold = dev_priv->fbc.threshold;
 
@@ -275,7 +276,8 @@ static void ilk_fbc_activate(struct drm_i915_private *dev_priv)
 	/* enable it... */
 	intel_de_write(dev_priv, ILK_DPFC_CONTROL, dpfc_ctl | DPFC_CTL_EN);
 
-	intel_fbc_recompress(dev_priv);
+	if (!fbc->active)
+		intel_fbc_recompress(dev_priv);
 }
 
 static void ilk_fbc_deactivate(struct drm_i915_private *dev_priv)
@@ -297,7 +299,8 @@ static bool ilk_fbc_is_active(struct drm_i915_private *dev_priv)
 
 static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 {
-	struct intel_fbc_reg_params *params = &dev_priv->fbc.params;
+	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct intel_fbc_reg_params *params = &fbc->params;
 	u32 dpfc_ctl;
 	int threshold = dev_priv->fbc.threshold;
 
@@ -349,7 +352,8 @@ static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 
 	intel_de_write(dev_priv, ILK_DPFC_CONTROL, dpfc_ctl | DPFC_CTL_EN);
 
-	intel_fbc_recompress(dev_priv);
+	if (!fbc->active)
+		intel_fbc_recompress(dev_priv);
 }
 
 static bool intel_fbc_hw_is_active(struct drm_i915_private *dev_priv)
@@ -368,9 +372,6 @@ static void intel_fbc_hw_activate(struct drm_i915_private *dev_priv)
 
 	trace_intel_fbc_activate(fbc->crtc);
 
-	fbc->active = true;
-	fbc->activated = true;
-
 	if (DISPLAY_VER(dev_priv) >= 7)
 		gen7_fbc_activate(dev_priv);
 	else if (DISPLAY_VER(dev_priv) >= 5)
@@ -379,6 +380,9 @@ static void intel_fbc_hw_activate(struct drm_i915_private *dev_priv)
 		g4x_fbc_activate(dev_priv);
 	else
 		i8xx_fbc_activate(dev_priv);
+
+	fbc->active = true;
+	fbc->activated = true;
 }
 
 static void intel_fbc_hw_deactivate(struct drm_i915_private *dev_priv)
