@@ -5799,8 +5799,7 @@ static int wake_wide(struct task_struct *p)
  *			  scheduling latency of the CPUs. This seems to work
  *			  for the overloaded case.
  */
-static int
-wake_affine_idle(int this_cpu, int prev_cpu, int sync)
+static int wake_affine_idle(int this_cpu, int prev_cpu)
 {
 	/*
 	 * If this_cpu is idle, it implies the wakeup is from interrupt
@@ -5814,14 +5813,11 @@ wake_affine_idle(int this_cpu, int prev_cpu, int sync)
 	 * a cpufreq perspective, it's better to have higher utilisation
 	 * on one CPU.
 	 */
-	if (available_idle_cpu(this_cpu) && cpus_share_cache(this_cpu, prev_cpu))
-		return available_idle_cpu(prev_cpu) ? prev_cpu : this_cpu;
-
-	if (sync && cpu_rq(this_cpu)->nr_running == 1)
-		return this_cpu;
-
-	if (available_idle_cpu(prev_cpu))
+	if (available_idle_cpu(prev_cpu) || sched_idle_cpu(prev_cpu))
 		return prev_cpu;
+
+	if (available_idle_cpu(this_cpu) || sched_idle_cpu(this_cpu))
+		return this_cpu;
 
 	return nr_cpumask_bits;
 }
@@ -5837,6 +5833,9 @@ wake_affine_weight(struct sched_domain *sd, struct task_struct *p,
 
 	if (sync) {
 		unsigned long current_load = task_h_load(current);
+
+		if (cpu_rq(this_cpu)->nr_running <= 1)
+			return this_cpu;
 
 		if (current_load > this_eff_load)
 			return this_cpu;
@@ -5933,12 +5932,13 @@ static int wake_affine_idler_llc(struct task_struct *p, int this_cpu, int prev_c
 static int wake_affine(struct sched_domain *sd, struct task_struct *p,
 		       int this_cpu, int prev_cpu, int sync)
 {
+	bool share_caches = cpus_share_cache(prev_cpu, this_cpu);
 	int target = nr_cpumask_bits;
 
-	if (sched_feat(WA_IDLE))
-		target = wake_affine_idle(this_cpu, prev_cpu, sync);
+	if (sched_feat(WA_IDLE) && share_caches)
+		target = wake_affine_idle(this_cpu, prev_cpu);
 
-	if (sched_feat(WA_IDLER_LLC) && target == nr_cpumask_bits)
+	else if (sched_feat(WA_IDLER_LLC) && !share_caches)
 		target = wake_affine_idler_llc(p, this_cpu, prev_cpu, sync);
 
 	if (sched_feat(WA_WEIGHT) && target == nr_cpumask_bits)
