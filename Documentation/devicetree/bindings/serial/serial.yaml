@@ -23,6 +23,8 @@ properties:
   $nodename:
     pattern: "^serial(@[0-9a-f,]+)?$"
 
+  label: true
+
   cts-gpios:
     maxItems: 1
     description:
