@@ -1950,3 +1950,8 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
 	else
 		return valid_native_regs(regs);
 }
+
+inline int is_syscall_success(struct pt_regs *regs)
+{
+	return !IS_ERR_VALUE(syscall_get_return_value(current, regs));
+}

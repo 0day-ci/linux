@@ -328,6 +328,9 @@ static inline void regs_set_return_value(struct pt_regs *regs, unsigned long rc)
 	regs->regs[0] = rc;
 }
 
+extern inline int is_syscall_success(struct pt_regs *regs);
+#define is_syscall_success(regs) is_syscall_success(regs)
+
 /**
  * regs_get_kernel_argument() - get Nth function argument in kernel
  * @regs:	pt_regs of that context
