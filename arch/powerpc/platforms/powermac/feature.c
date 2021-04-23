@@ -83,8 +83,7 @@ struct macio_chip *macio_find(struct device_node *child, int type)
 }
 EXPORT_SYMBOL_GPL(macio_find);
 
-static const char *macio_names[] =
-{
+static const char *macio_names[] = {
 	"Unknown",
 	"Grand Central",
 	"OHare",
@@ -119,8 +118,7 @@ struct feature_table_entry {
 	feature_call	function;
 };
 
-struct pmac_mb_def
-{
+struct pmac_mb_def {
 	const char*			model_string;
 	const char*			model_name;
 	int				model_id;
@@ -301,11 +299,10 @@ static long ohare_sleep_state(struct device_node *node, long param, long value)
 
 	if ((pmac_mb.board_flags & PMAC_MB_CAN_SLEEP) == 0)
 		return -EPERM;
-	if (value == 1) {
+	if (value == 1)
 		MACIO_BIC(OHARE_FCR, OH_IOBUS_ENABLE);
-	} else if (value == 0) {
+	else if (value == 0)
 		MACIO_BIS(OHARE_FCR, OH_IOBUS_ENABLE);
-	}
 
 	return 0;
 }
@@ -2992,7 +2989,6 @@ void pmac_register_agp_pm(struct pci_dev *bridge,
 	if (bridge != pmac_agp_bridge)
 		return;
 	pmac_agp_suspend = pmac_agp_resume = NULL;
-	return;
 }
 EXPORT_SYMBOL(pmac_register_agp_pm);
 
