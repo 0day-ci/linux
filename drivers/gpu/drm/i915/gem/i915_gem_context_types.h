@@ -46,6 +46,26 @@ struct i915_gem_engines_iter {
 	const struct i915_gem_engines *engines;
 };
 
+enum i915_gem_engine_type {
+	I915_GEM_ENGINE_TYPE_INVALID = 0,
+	I915_GEM_ENGINE_TYPE_PHYSICAL,
+	I915_GEM_ENGINE_TYPE_BALANCED,
+};
+
+struct i915_gem_proto_engine {
+	/** @type: Type of this engine */
+	enum i915_gem_engine_type type;
+
+	/** @num_siblings: Engine, for physical */
+	struct intel_engine_cs *engine;
+
+	/** @num_siblings: Number of balanced siblings */
+	unsigned int num_siblings;
+
+	/** @num_siblings: Balanced siblings */
+	struct intel_engine_cs **siblings;
+};
+
 /**
  * struct i915_gem_proto_context - prototype context
  *
@@ -63,6 +83,12 @@ struct i915_gem_proto_context {
 
 	/** @sched: See i915_gem_context::sched */
 	struct i915_sched_attr sched;
+
+	/** @num_user_engines: Number of user-specified engines or -1 */
+	int num_user_engines;
+
+	/** @num_user_engines: User-specified engines */
+	struct i915_gem_proto_engine *user_engines;
 
 	bool single_timeline;
 };

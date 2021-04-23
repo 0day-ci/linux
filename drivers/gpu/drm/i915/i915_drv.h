@@ -200,6 +200,9 @@ struct drm_i915_file_private {
 		struct rcu_head rcu;
 	};
 
+	struct mutex proto_context_lock;
+	struct xarray proto_context_xa;
+
 	struct xarray context_xa;
 	struct xarray vm_xa;
 
@@ -1824,20 +1827,6 @@ struct drm_gem_object *i915_gem_prime_import(struct drm_device *dev,
 				struct dma_buf *dma_buf);
 
 struct dma_buf *i915_gem_prime_export(struct drm_gem_object *gem_obj, int flags);
-
-static inline struct i915_gem_context *
-i915_gem_context_lookup(struct drm_i915_file_private *file_priv, u32 id)
-{
-	struct i915_gem_context *ctx;
-
-	rcu_read_lock();
-	ctx = xa_load(&file_priv->context_xa, id);
-	if (ctx && !kref_get_unless_zero(&ctx->ref))
-		ctx = NULL;
-	rcu_read_unlock();
-
-	return ctx ? ctx : ERR_PTR(-ENOENT);
-}
 
 /* i915_gem_evict.c */
 int __must_check i915_gem_evict_something(struct i915_address_space *vm,
