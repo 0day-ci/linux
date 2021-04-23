@@ -334,7 +334,7 @@ static inline void audit_syscall_exit(void *pt_regs)
 {
 	if (unlikely(audit_context())) {
 		int success = is_syscall_success(pt_regs);
-		long return_code = regs_return_value(pt_regs);
+		long return_code = syscall_get_return_value(current, pt_regs);
 
 		__audit_syscall_exit(success, return_code);
 	}
