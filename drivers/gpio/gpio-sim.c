@@ -409,6 +409,7 @@ struct gpio_sim_chip_config {
 	 * item is 'live'.
 	 */
 	struct platform_device *pdev;
+	int id;
 
 	/*
 	 * Each configfs filesystem operation is protected with the subsystem
@@ -442,7 +443,7 @@ static ssize_t gpio_sim_config_dev_name_show(struct config_item *item,
 	if (pdev)
 		ret = sprintf(page, "%s\n", dev_name(&pdev->dev));
 	else
-		ret = sprintf(page, "none\n");
+		ret = sprintf(page, "gpio-sim.%d\n", config->id);
 	mutex_unlock(&config->lock);
 
 	return ret;
@@ -724,6 +725,7 @@ static void gpio_sim_chip_config_release(struct config_item *item)
 	struct gpio_sim_chip_config *config = to_gpio_sim_chip_config(item);
 
 	mutex_destroy(&config->lock);
+	ida_free(&gpio_sim_ida, config->id);
 	kfree_strarray(config->line_names, config->num_line_names);
 	kfree(config);
 }
@@ -746,6 +748,12 @@ gpio_sim_config_make_item(struct config_group *group, const char *name)
 	config = kzalloc(sizeof(*config), GFP_KERNEL);
 	if (!config)
 		return ERR_PTR(-ENOMEM);
+
+	config->id = ida_alloc(&gpio_sim_ida, GFP_KERNEL);
+	if (config->id < 0) {
+		kfree(config);
+		return ERR_PTR(config->id);
+	}
 
 	config_item_init_type_name(&config->item, name,
 				   &gpio_sim_chip_config_type);
@@ -781,18 +789,12 @@ static int gpio_sim_config_commit_item(struct config_item *item)
 						config->line_names,
 						config->num_line_names);
 
-	pdevinfo.id = ida_alloc(&gpio_sim_ida, GFP_KERNEL);
-	if (pdevinfo.id < 0) {
-		mutex_unlock(&config->lock);
-		return pdevinfo.id;
-	}
-
 	pdevinfo.name = "gpio-sim";
 	pdevinfo.properties = properties;
+	pdevinfo.id = config->id;
 
 	pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(pdev)) {
-		ida_free(&gpio_sim_ida, pdevinfo.id);
 		mutex_unlock(&config->lock);
 		return PTR_ERR(pdev);
 	}
@@ -806,15 +808,12 @@ static int gpio_sim_config_commit_item(struct config_item *item)
 static int gpio_sim_config_uncommit_item(struct config_item *item)
 {
 	struct gpio_sim_chip_config *config = to_gpio_sim_chip_config(item);
-	int id;
 
 	mutex_lock(&config->lock);
-	id = config->pdev->id;
 	platform_device_unregister(config->pdev);
 	config->pdev = NULL;
 	mutex_unlock(&config->lock);
 
-	ida_free(&gpio_sim_ida, id);
 	return 0;
 }
 
