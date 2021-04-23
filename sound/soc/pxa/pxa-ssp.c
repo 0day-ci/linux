@@ -16,9 +16,10 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/io.h>
-#include <linux/pxa2xx_ssp.h>
 #include <linux/of.h>
 #include <linux/dmaengine.h>
+
+#include <linux/spi/pxa2xx_ssp.h>
 
 #include <asm/irq.h>
 

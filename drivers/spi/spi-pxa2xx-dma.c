@@ -15,8 +15,6 @@
 #include <linux/spi/pxa2xx_spi.h>
 #include <linux/spi/spi.h>
 
-#include <linux/pxa2xx_ssp.h>
-
 #include "spi-pxa2xx.h"
 
 static void pxa2xx_spi_dma_transfer_complete(struct driver_data *drv_data,

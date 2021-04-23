@@ -15,8 +15,9 @@
 #include <linux/input/navpoint.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
-#include <linux/pxa2xx_ssp.h>
 #include <linux/slab.h>
+
+#include <linux/spi/pxa2xx_ssp.h>
 
 /*
  * Synaptics Modular Embedded Protocol: Module Packet Format.

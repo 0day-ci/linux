@@ -12,7 +12,7 @@
 #include <linux/types.h>
 #include <linux/sizes.h>
 
-#include <linux/pxa2xx_ssp.h>
+#include <linux/spi/pxa2xx_ssp.h>
 
 struct gpio_desc;
 struct pxa2xx_spi_controller;
