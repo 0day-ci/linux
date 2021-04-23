@@ -732,9 +732,9 @@ EXPORT_SYMBOL_GPL(kvm_require_dr);
  * running guest. The difference to kvm_vcpu_read_guest_page is that this function
  * can read from guest physical or from the guest's guest physical memory.
  */
-int kvm_read_guest_page_mmu(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
-			    gfn_t ngfn, void *data, int offset, int len,
-			    u32 access)
+static int kvm_read_guest_page_mmu(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
+				   gfn_t ngfn, void *data, int offset, int len,
+				   u32 access)
 {
 	struct x86_exception exception;
 	gfn_t real_gfn;
@@ -749,7 +749,6 @@ int kvm_read_guest_page_mmu(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 
 	return kvm_vcpu_read_guest_page(vcpu, real_gfn, data, offset, len);
 }
-EXPORT_SYMBOL_GPL(kvm_read_guest_page_mmu);
 
 static inline u64 pdptr_rsvd_bits(struct kvm_vcpu *vcpu)
 {
