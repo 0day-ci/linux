@@ -1829,8 +1829,8 @@ void hcall_tracepoint_unregfunc(void)
 
 /*
  * Since the tracing code might execute hcalls we need to guard against
- * recursion. One example of this are spinlocks calling H_YIELD on
- * shared processor partitions.
+ * recursion. H_CONFER from spin locks must be treated separately though
+ * and use _notrace plpar_hcall variants, see yield_to_preempted().
  */
 static DEFINE_PER_CPU(unsigned int, hcall_trace_depth);
 
