@@ -195,17 +195,17 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 	for_each_of_cpu_node(dn) {
 		struct clk_init_data init;
 		struct clk *clk;
-		char *clk_name = kzalloc(5, GFP_KERNEL);
+		char *clk_name;
 		int cpu, err;
-
-		if (WARN_ON(!clk_name))
-			goto bail_out;
 
 		err = of_property_read_u32(dn, "reg", &cpu);
 		if (WARN_ON(err))
 			goto bail_out;
 
-		sprintf(clk_name, "cpu%d", cpu);
+		clk_name = kasprintf(GFP_KERNEL, "cpu%d", cpu);
+		if (WARN_ON(!clk_name)) {
+			goto bail_out;
+		}
 
 		cpuclk[cpu].parent_name = of_clk_get_parent_name(node, 0);
 		cpuclk[cpu].clk_name = clk_name;
