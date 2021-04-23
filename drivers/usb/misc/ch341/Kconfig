@@ -1,0 +1,17 @@
+config USB_CH341_CORE
+	tristate "USB WinChipHead CH341 in I2C/SPI/GPIO mode"
+	depends on USB && GPIOLIB && I2C && SPI
+	help
+
+	  If you say yes to this option, support for the CH341 chips,
+	  running in I2C/SPI/GPIO mode will be included. Some versions
+	  of the chip do not support all the functionnalities but
+	  there is no way to differentiate them. For instance the
+	  CH341A and CH341B support everything while the CH341T can
+	  only do I2C.
+
+	  The serial mode is not supported by this driver. Use the
+	  CH341 USB serial driver.
+
+	  This driver can also be built as a module.  If so, the
+	  module will be called ch341-buses.

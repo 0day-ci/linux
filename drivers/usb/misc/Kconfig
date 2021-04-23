@@ -284,3 +284,5 @@ config BRCM_USB_PINMAP
 	  This option enables support for remapping some USB external
 	  signals, which are typically on dedicated pins on the chip,
 	  to any gpio.
+
+source "drivers/usb/misc/ch341/Kconfig"
