@@ -700,8 +700,12 @@ static int
 qca8k_setup(struct dsa_switch *ds)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
+	const struct qca8k_match_data *data;
 	int ret, i;
 	u32 mask;
+
+	/* get the switches ID from the compatible */
+	data = of_device_get_match_data(priv->dev);
 
 	/* Make sure that port 0 is the cpu port */
 	if (!dsa_is_cpu_port(ds, 0)) {
@@ -790,41 +794,43 @@ qca8k_setup(struct dsa_switch *ds)
 	 * To fix this the original code has some specific priority values
 	 * suggested by the QCA switch team.
 	 */
-	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
-		switch (i) {
-		/* The 2 CPU port and port 5 requires some different
-		 * priority than any other ports.
-		 */
-		case 0:
-		case 5:
-		case 6:
-			mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x4) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x4) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI4(0x6) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI5(0x8) |
-				QCA8K_PORT_HOL_CTRL0_EG_PORT(0x1e);
-			break;
-		default:
-			mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x6) |
-				QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x8) |
-				QCA8K_PORT_HOL_CTRL0_EG_PORT(0x19);
-		}
-		qca8k_write(priv, QCA8K_REG_PORT_HOL_CTRL0(i), mask);
+	if (data->id == QCA8K_ID_QCA8337) {
+		for (i = 0; i < QCA8K_NUM_PORTS; i++) {
+			switch (i) {
+			/* The 2 CPU port and port 5 requires some different
+			 * priority than any other ports.
+			 */
+			case 0:
+			case 5:
+			case 6:
+				mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x4) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x4) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI4(0x6) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI5(0x8) |
+					QCA8K_PORT_HOL_CTRL0_EG_PORT(0x1e);
+				break;
+			default:
+				mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x6) |
+					QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x8) |
+					QCA8K_PORT_HOL_CTRL0_EG_PORT(0x19);
+			}
+			qca8k_write(priv, QCA8K_REG_PORT_HOL_CTRL0(i), mask);
 
-		mask = QCA8K_PORT_HOL_CTRL1_ING(0x6) |
-		       QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
-		       QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
-		       QCA8K_PORT_HOL_CTRL1_WRED_EN;
-		qca8k_rmw(priv, QCA8K_REG_PORT_HOL_CTRL1(i),
-			  QCA8K_PORT_HOL_CTRL1_ING_BUF |
-			  QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
-			  QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
-			  QCA8K_PORT_HOL_CTRL1_WRED_EN,
-			  mask);
+			mask = QCA8K_PORT_HOL_CTRL1_ING(0x6) |
+			QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
+			QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
+			QCA8K_PORT_HOL_CTRL1_WRED_EN;
+			qca8k_rmw(priv, QCA8K_REG_PORT_HOL_CTRL1(i),
+				  QCA8K_PORT_HOL_CTRL1_ING_BUF |
+				  QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
+				  QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
+				  QCA8K_PORT_HOL_CTRL1_WRED_EN,
+				  mask);
+		}
 	}
 
 	/* Flush the FDB table */
@@ -840,8 +846,12 @@ static void
 qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 			 const struct phylink_link_state *state)
 {
+	const struct qca8k_match_data *data;
 	struct qca8k_priv *priv = ds->priv;
 	u32 reg, val;
+
+	/* get the switches ID from the compatible */
+	data = of_device_get_match_data(priv->dev);
 
 	switch (port) {
 	case 0: /* 1st CPU port */
@@ -895,8 +905,10 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 			    QCA8K_PORT_PAD_RGMII_RX_DELAY(2) |
 			    QCA8K_PORT_PAD_RGMII_TX_DELAY_EN |
 			    QCA8K_PORT_PAD_RGMII_RX_DELAY_EN);
-		qca8k_write(priv, QCA8K_REG_PORT5_PAD_CTRL,
-			    QCA8K_PORT_PAD_RGMII_RX_DELAY_EN);
+		/* QCA8337 requires to set rgmii rx delay */
+		if (data->id == QCA8K_ID_QCA8337)
+			qca8k_write(priv, QCA8K_REG_PORT5_PAD_CTRL,
+				    QCA8K_PORT_PAD_RGMII_RX_DELAY_EN);
 		break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_1000BASEX:
