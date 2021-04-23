@@ -98,7 +98,9 @@
 #define XILINX_DMA_DMASR_FRAME_COUNT_MASK	GENMASK(23, 16)
 
 #define XILINX_DMA_REG_CURDESC			0x0008
+#define XILINX_DMA_REG_CURDESC_MSB		0x000C
 #define XILINX_DMA_REG_TAILDESC		0x0010
+#define XILINX_DMA_REG_TAILDESC_MSB	0x0014
 #define XILINX_DMA_REG_REG_INDEX		0x0014
 #define XILINX_DMA_REG_FRMSTORE		0x0018
 #define XILINX_DMA_REG_THRESHOLD		0x001c
@@ -184,6 +186,8 @@
 /* AXI CDMA Specific Registers/Offsets */
 #define XILINX_CDMA_REG_SRCADDR		0x18
 #define XILINX_CDMA_REG_DSTADDR		0x20
+#define XILINX_CDMA_REG_MSB_DSTADR	0x0024
+#define XILINX_CDMA_REG_MSB_SRCADDR	0x001C
 
 /* AXI CDMA Specific Masks */
 #define XILINX_CDMA_CR_SGMODE          BIT(3)
@@ -1459,8 +1463,18 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
 		dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
 			     XILINX_CDMA_CR_SGMODE);
 
+		if (chan->ext_addr) {
+			xilinx_write(chan, XILINX_DMA_REG_CURDESC_MSB,
+				     upper_32_bits(head_desc->async_tx.phys));
+		}
+
 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
 			     head_desc->async_tx.phys);
+
+		if (chan->ext_addr) {
+			xilinx_write(chan, XILINX_DMA_REG_TAILDESC_MSB,
+				     upper_32_bits(tail_segment->phys));
+		}
 
 		/* Update tail ptr register which will start the transfer */
 		xilinx_write(chan, XILINX_DMA_REG_TAILDESC,
@@ -1476,11 +1490,16 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
 
 		hw = &segment->hw;
 
-		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
-			     xilinx_prep_dma_addr_t(hw->src_addr));
-		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR,
-			     xilinx_prep_dma_addr_t(hw->dest_addr));
-
+		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
+		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
+		if (chan->ext_addr) {
+			xilinx_write(chan,
+				     XILINX_CDMA_REG_MSB_SRCADDR,
+				     hw->src_addr_msb);
+			xilinx_write(chan,
+				     XILINX_CDMA_REG_MSB_DSTADR,
+				     hw->dest_addr_msb);
+		}
 		/* Start the transfer */
 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
 				hw->control & chan->xdev->max_buffer_len);
