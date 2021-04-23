@@ -775,6 +775,98 @@ LIBBPF_API int bpf_linker__add_file(struct bpf_linker *linker, const char *filen
 LIBBPF_API int bpf_linker__finalize(struct bpf_linker *linker);
 LIBBPF_API void bpf_linker__free(struct bpf_linker *linker);
 
+enum bpf_tc_attach_point {
+	BPF_TC_INGRESS,
+	BPF_TC_EGRESS,
+	BPF_TC_CUSTOM_PARENT,
+	_BPF_TC_PARENT_MAX,
+};
+
+/* The opts structure is also used to return the created filters attributes
+ * (e.g. in case the user left them unset). Some of the options that were left
+ * out default to a reasonable value, documented below.
+ *
+ *	protocol - ETH_P_ALL
+ *	chain index - 0
+ *	class_id - 0 (can be set by bpf program using skb->tc_classid)
+ *	bpf_flags - TCA_BPF_FLAG_ACT_DIRECT (direct action mode)
+ *	bpf_flags_gen - 0
+ *
+ *	The user must fulfill documented requirements for each function.
+ */
+struct bpf_tc_opts {
+	size_t sz;
+	__u32 handle;
+	__u32 parent;
+	__u16 priority;
+	__u32 prog_id;
+	bool replace;
+	size_t :0;
+};
+
+#define bpf_tc_opts__last_field replace
+
+struct bpf_tc_ctx;
+
+struct bpf_tc_ctx_opts {
+	size_t sz;
+};
+
+#define bpf_tc_ctx_opts__last_field sz
+
+/* Requirements */
+/*
+ * @ifindex: Must be > 0.
+ * @parent: Must be one of the enum constants < _BPF_TC_PARENT_MAX
+ * @opts: Can be NULL, currently no options are supported.
+ */
+LIBBPF_API struct bpf_tc_ctx *bpf_tc_ctx_init(__u32 ifindex,
+					      enum bpf_tc_attach_point parent,
+					      struct bpf_tc_ctx_opts *opts);
+/*
+ * @ctx: Can be NULL, if not, must point to a valid object.
+ *	 If the qdisc was attached during ctx_init, it will be deleted if no
+ *	 filters are attached to it.
+ *	 When ctx == NULL, this is a no-op.
+ */
+LIBBPF_API int bpf_tc_ctx_destroy(struct bpf_tc_ctx *ctx);
+/*
+ * @ctx: Cannot be NULL.
+ * @fd: Must be >= 0.
+ * @opts: Cannot be NULL, prog_id must be unset, all other fields can be
+ *	  optionally set. All fields except replace  will be set as per created
+ *        filter's attributes. parent must only be set when attach_point of ctx is
+ *        BPF_TC_CUSTOM_PARENT, otherwise parent must be unset.
+ *
+ * Fills the following fields in opts:
+ *	handle
+ *	parent
+ *	priority
+ *	prog_id
+ */
+LIBBPF_API int bpf_tc_attach(struct bpf_tc_ctx *ctx, int fd,
+			     struct bpf_tc_opts *opts);
+/*
+ * @ctx: Cannot be NULL.
+ * @opts: Cannot be NULL, replace and prog_id must be unset, all other fields
+ *	  must be set.
+ */
+LIBBPF_API int bpf_tc_detach(struct bpf_tc_ctx *ctx,
+			     const struct bpf_tc_opts *opts);
+/*
+ * @ctx: Cannot be NULL.
+ * @opts: Cannot be NULL, replace and prog_id must be unset, all other fields
+ *	  must be set.
+ *
+ * Fills the following fields in opts:
+ *	handle
+ *	parent
+ *	priority
+ *	prog_id
+ */
+LIBBPF_API int bpf_tc_query(struct bpf_tc_ctx *ctx,
+			    struct bpf_tc_opts *opts);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
