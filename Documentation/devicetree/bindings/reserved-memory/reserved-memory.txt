@@ -52,6 +52,11 @@ compatible (optional) - standard definition
           be used by an operating system to instantiate the necessary pool
           management subsystem if necessary.
         - vendor specific string in the form <vendor>,[<device>-]<usage>
+#memory-region-cells (optional) -
+    - Defines how many cells are used to form the memory region specifier.
+      The memory region specifier contains additional information on how a
+      reserved memory region referenced by the corresponding phandle will
+      be used in a specific context.
 no-map (optional) - empty property
     - Indicates the operating system must not create a virtual mapping
       of the region as part of its standard mapping of system memory,
@@ -82,6 +87,22 @@ nodes by adding a memory-region property to the device node.
 memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
 memory-region-names (optional) - a list of names, one for each corresponding
   entry in the memory-region property
+
+Reserved memory region references can be accompanied by a memory region
+specifier, which provides additional information about how the memory region
+will be used in that specific context. If a reserved memory region does not
+have the #memory-region-cells property, 0 is implied and no information
+besides the phandle is conveyed. For reserved memory regions that contain
+#memory-region-cells = <1>, the following encoding applies if not otherwise
+overridden by the bindings selected by the region's compatible string:
+
+  - bit 0: If set, requests that the region be identity mapped if the system
+    uses an IOMMU for I/O virtual address translations. This is used, for
+    example, when a bootloader has configured a display controller to display
+    a boot splash. Once the OS takes over and enables the IOMMU for the given
+    display controller, the IOMMU may fault if the framebuffer hasn't been
+    mapped to the IOMMU at the address that the display controller tries to
+    access.
 
 Example
 -------

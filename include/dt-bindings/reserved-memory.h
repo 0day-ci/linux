@@ -1,0 +1,8 @@
+/* SPDX-License-Identifier: (GPL-2.0+ or MIT) */
+
+#ifndef _DT_BINDINGS_RESERVED_MEMORY_H
+#define _DT_BINDINGS_RESERVED_MEMORY_H
+
+#define MEMORY_REGION_IDENTITY_MAPPING 0x1
+
+#endif
