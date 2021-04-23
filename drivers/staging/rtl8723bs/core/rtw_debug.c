@@ -10,8 +10,6 @@
 #include <rtw_debug.h>
 #include <hal_btcoex.h>
 
-u32 GlobalDebugLevel = _drv_err_;
-
 #include <rtw_version.h>
 
 void mac_reg_dump(struct adapter *adapter)
