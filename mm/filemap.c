@@ -77,7 +77,8 @@
  *        ->i_pages lock
  *
  *  ->i_rwsem
- *    ->i_mmap_rwsem		(truncate->unmap_mapping_range)
+ *    ->invalidate_lock		(acquired by fs in truncate path)
+ *      ->i_mmap_rwsem		(truncate->unmap_mapping_range)
  *
  *  ->mmap_lock
  *    ->i_mmap_rwsem
@@ -85,7 +86,8 @@
  *        ->i_pages lock	(arch-dependent flush_dcache_mmap_lock)
  *
  *  ->mmap_lock
- *    ->lock_page		(access_process_vm)
+ *    ->invalidate_lock		(filemap_fault)
+ *      ->lock_page		(filemap_fault, access_process_vm)
  *
  *  ->i_rwsem			(generic_perform_write)
  *    ->mmap_lock		(fault_in_pages_readable->do_page_fault)
@@ -2276,20 +2278,30 @@ static int filemap_update_page(struct kiocb *iocb,
 {
 	int error;
 
-	if (!trylock_page(page)) {
-		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_NOIO))
+	if (iocb->ki_flags & IOCB_NOWAIT) {
+		if (!down_read_trylock(&mapping->invalidate_lock))
 			return -EAGAIN;
+	} else {
+		down_read(&mapping->invalidate_lock);
+	}
+
+	if (!trylock_page(page)) {
+		error = -EAGAIN;
+		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_NOIO))
+			goto unlock_mapping;
 		if (!(iocb->ki_flags & IOCB_WAITQ)) {
+			up_read(&mapping->invalidate_lock);
 			put_and_wait_on_page_locked(page, TASK_KILLABLE);
 			return AOP_TRUNCATED_PAGE;
 		}
 		error = __lock_page_async(page, iocb->ki_waitq);
 		if (error)
-			return error;
+			goto unlock_mapping;
 	}
 
+	error = AOP_TRUNCATED_PAGE;
 	if (!page->mapping)
-		goto truncated;
+		goto unlock;
 
 	error = 0;
 	if (filemap_range_uptodate(mapping, iocb->ki_pos, iter, page))
@@ -2300,15 +2312,13 @@ static int filemap_update_page(struct kiocb *iocb,
 		goto unlock;
 
 	error = filemap_read_page(iocb->ki_filp, mapping, page);
-	if (error == AOP_TRUNCATED_PAGE)
-		put_page(page);
-	return error;
-truncated:
-	unlock_page(page);
-	put_page(page);
-	return AOP_TRUNCATED_PAGE;
+	goto unlock_mapping;
 unlock:
 	unlock_page(page);
+unlock_mapping:
+	up_read(&mapping->invalidate_lock);
+	if (error == AOP_TRUNCATED_PAGE)
+		put_page(page);
 	return error;
 }
 
@@ -2323,6 +2333,19 @@ static int filemap_create_page(struct file *file,
 	if (!page)
 		return -ENOMEM;
 
+	/*
+	 * Protect against truncate / hole punch. Grabbing invalidate_lock here
+	 * assures we cannot instantiate and bring uptodate new pagecache pages
+	 * after evicting page cache during truncate and before actually
+	 * freeing blocks.  Note that we could release invalidate_lock after
+	 * inserting the page into page cache as the locked page would then be
+	 * enough to synchronize with hole punching. But there are code paths
+	 * such as filemap_update_page() filling in partially uptodate pages or
+	 * ->readpages() that need to hold invalidate_lock while mapping blocks
+	 * for IO so let's hold the lock here as well to keep locking rules
+	 * simple.
+	 */
+	down_read(&mapping->invalidate_lock);
 	error = add_to_page_cache_lru(page, mapping, index,
 			mapping_gfp_constraint(mapping, GFP_KERNEL));
 	if (error == -EEXIST)
@@ -2334,9 +2357,11 @@ static int filemap_create_page(struct file *file,
 	if (error)
 		goto error;
 
+	up_read(&mapping->invalidate_lock);
 	pagevec_add(pvec, page);
 	return 0;
 error:
+	up_read(&mapping->invalidate_lock);
 	put_page(page);
 	return error;
 }
@@ -2896,6 +2921,13 @@ vm_fault_t filemap_fault(struct vm_fault *vmf)
 		count_memcg_event_mm(vmf->vma->vm_mm, PGMAJFAULT);
 		ret = VM_FAULT_MAJOR;
 		fpin = do_sync_mmap_readahead(vmf);
+	}
+
+	/*
+	 * See comment in filemap_create_page() why we need invalidate_lock
+	 */
+	down_read(&mapping->invalidate_lock);
+	if (!page) {
 retry_find:
 		page = pagecache_get_page(mapping, offset,
 					  FGP_CREAT|FGP_FOR_MMAP,
@@ -2903,6 +2935,7 @@ retry_find:
 		if (!page) {
 			if (fpin)
 				goto out_retry;
+			up_read(&mapping->invalidate_lock);
 			return VM_FAULT_OOM;
 		}
 	}
@@ -2943,9 +2976,11 @@ retry_find:
 	if (unlikely(offset >= max_off)) {
 		unlock_page(page);
 		put_page(page);
+		up_read(&mapping->invalidate_lock);
 		return VM_FAULT_SIGBUS;
 	}
 
+	up_read(&mapping->invalidate_lock);
 	vmf->page = page;
 	return ret | VM_FAULT_LOCKED;
 
@@ -2971,6 +3006,7 @@ page_not_uptodate:
 	if (!error || error == AOP_TRUNCATED_PAGE)
 		goto retry_find;
 
+	up_read(&mapping->invalidate_lock);
 	shrink_readahead_size_eio(ra);
 	return VM_FAULT_SIGBUS;
 
@@ -2982,6 +3018,7 @@ out_retry:
 	 */
 	if (page)
 		put_page(page);
+	up_read(&mapping->invalidate_lock);
 	if (fpin)
 		fput(fpin);
 	return ret | VM_FAULT_RETRY;
