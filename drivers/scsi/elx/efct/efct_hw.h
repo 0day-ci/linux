@@ -607,6 +607,10 @@ efct_hw_setup(struct efct_hw *hw, void *os, struct pci_dev *pdev);
 enum efct_hw_rtn efct_hw_init(struct efct_hw *hw);
 enum efct_hw_rtn
 efct_hw_parse_filter(struct efct_hw *hw, void *value);
+enum efct_hw_rtn
+efct_hw_init_queues(struct efct_hw *hw);
+int
+efct_hw_map_wq_cpu(struct efct_hw *hw);
 uint64_t
 efct_get_wwnn(struct efct_hw *hw);
 uint64_t
