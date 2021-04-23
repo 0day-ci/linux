@@ -8,6 +8,7 @@
 #define SELFTEST_KVM_PROCESSOR_H
 
 #include "kvm_util.h"
+#include <linux/stringify.h>
 
 
 #define ARM64_CORE_REG(x) (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
@@ -18,6 +19,7 @@
 #define MAIR_EL1	3, 0, 10, 2, 0
 #define TTBR0_EL1	3, 0,  2, 0, 0
 #define SCTLR_EL1	3, 0,  1, 0, 0
+#define VBAR_EL1	3, 0, 12, 0, 0
 
 /*
  * Default MAIR
@@ -55,5 +57,72 @@ static inline void set_reg(struct kvm_vm *vm, uint32_t vcpuid, uint64_t id, uint
 void aarch64_vcpu_setup(struct kvm_vm *vm, int vcpuid, struct kvm_vcpu_init *init);
 void aarch64_vcpu_add_default(struct kvm_vm *vm, uint32_t vcpuid,
 			      struct kvm_vcpu_init *init, void *guest_code);
+
+struct ex_regs {
+	u64 pc;
+	u64 pstate;
+	u64 sp;
+	u64 lr;
+	u64 regs[31];
+};
+
+#define VECTOR_NUM	16
+
+enum {
+	VECTOR_SYNC_EL1_SP0,
+	VECTOR_IRQ_EL1_SP0,
+	VECTOR_FIQ_EL1_SP0,
+	VECTOR_ERROR_EL1_SP0,
+
+	VECTOR_SYNC_EL1,
+	VECTOR_IRQ_EL1,
+	VECTOR_FIQ_EL1,
+	VECTOR_ERROR_EL1,
+
+	VECTOR_SYNC_EL0_64,
+	VECTOR_IRQ_EL0_64,
+	VECTOR_FIQ_EL0_64,
+	VECTOR_ERROR_EL0_64,
+
+	VECTOR_SYNC_EL0_32,
+	VECTOR_IRQ_EL0_32,
+	VECTOR_FIQ_EL0_32,
+	VECTOR_ERROR_EL0_32,
+};
+
+/* Some common EC (Exception classes) */
+#define ESR_EC_ILLEGAL_INS	0x0e
+#define ESR_EC_SVC64		0x15
+#define ESR_EC_IABORT_EL1	0x21
+#define ESR_EC_DABORT_EL1	0x25
+#define ESR_EC_SERROR		0x2f
+#define ESR_EC_HW_BP_EL1	0x31
+#define ESR_EC_SSTEP_EL1	0x33
+#define ESR_EC_WP_EL1		0x35
+#define ESR_EC_BRK_INS		0x3C
+
+#define ESR_EC_NUM		64
+
+#define ESR_EC_SHIFT		26
+#define ESR_EC_MASK		0x3f
+
+void vm_init_descriptor_tables(struct kvm_vm *vm);
+void vcpu_init_descriptor_tables(struct kvm_vm *vm, uint32_t vcpuid);
+void vm_handle_exception(struct kvm_vm *vm, int vector, int ec,
+			void (*handler)(struct ex_regs *));
+
+#define SPSR_D          (1 << 9)
+#define SPSR_SS         (1 << 21)
+
+#define write_sysreg(reg, val)						  \
+({									  \
+	asm volatile("msr "__stringify(reg)", %0" : : "r"(val));	  \
+})
+
+#define read_sysreg(reg)						  \
+({	u64 val;							  \
+	asm volatile("mrs %0, "__stringify(reg) : "=r"(val) : : "memory");\
+	val;								  \
+})
 
 #endif /* SELFTEST_KVM_PROCESSOR_H */

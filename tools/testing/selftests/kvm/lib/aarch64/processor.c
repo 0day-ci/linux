@@ -6,6 +6,7 @@
  */
 
 #include <linux/compiler.h>
+#include <assert.h>
 
 #include "kvm_util.h"
 #include "../kvm_util_internal.h"
@@ -13,6 +14,8 @@
 
 #define KVM_GUEST_PAGE_TABLE_MIN_PADDR		0x180000
 #define DEFAULT_ARM64_GUEST_STACK_VADDR_MIN	0xac0000
+
+vm_vaddr_t exception_handlers;
 
 static uint64_t page_align(struct kvm_vm *vm, uint64_t v)
 {
@@ -336,4 +339,57 @@ void vcpu_args_set(struct kvm_vm *vm, uint32_t vcpuid, unsigned int num, ...)
 
 void assert_on_unhandled_exception(struct kvm_vm *vm, uint32_t vcpuid)
 {
+	struct ucall uc;
+
+	if (get_ucall(vm, vcpuid, &uc) == UCALL_UNHANDLED) {
+		TEST_ASSERT(false,
+			"Unexpected exception guest (vector:0x%lx, ec:0x%lx)",
+			uc.args[0], uc.args[1]);
+	}
+}
+
+void kvm_exit_unexpected_vector(int vector, uint64_t ec)
+{
+	ucall(UCALL_UNHANDLED, 2, vector, ec);
+}
+
+#define HANDLERS_IDX(_vector, _ec)	((_vector * ESR_EC_NUM) + _ec)
+
+void vm_init_descriptor_tables(struct kvm_vm *vm)
+{
+	vm->handlers = vm_vaddr_alloc(vm,
+			VECTOR_NUM * ESR_EC_NUM * sizeof(void *),
+			vm->page_size, 0, 0);
+	*(vm_vaddr_t *)addr_gva2hva(vm, (vm_vaddr_t)(&exception_handlers)) = vm->handlers;
+}
+
+void vcpu_init_descriptor_tables(struct kvm_vm *vm, uint32_t vcpuid)
+{
+	extern char vectors;
+
+	set_reg(vm, vcpuid, ARM64_SYS_REG(VBAR_EL1), (uint64_t)&vectors);
+}
+
+void route_exception(struct ex_regs *regs, int vector)
+{
+	typedef void(*handler)(struct ex_regs *);
+	uint64_t esr = read_sysreg(esr_el1);
+	uint64_t ec = (esr >> ESR_EC_SHIFT) & ESR_EC_MASK;
+
+	handler *handlers = (handler *)exception_handlers;
+
+	if (handlers && handlers[HANDLERS_IDX(vector, ec)])
+		handlers[HANDLERS_IDX(vector, ec)](regs);
+	else
+		kvm_exit_unexpected_vector(vector, ec);
+}
+
+void vm_handle_exception(struct kvm_vm *vm, int vector, int ec,
+			 void (*handler)(struct ex_regs *))
+{
+	vm_vaddr_t *handlers = (vm_vaddr_t *)addr_gva2hva(vm, vm->handlers);
+
+	assert(vector < VECTOR_NUM);
+	assert(ec < ESR_EC_NUM);
+	handlers[HANDLERS_IDX(vector, ec)] = (vm_vaddr_t)handler;
 }
