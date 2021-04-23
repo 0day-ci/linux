@@ -1459,12 +1459,22 @@ static const struct dsa_switch_ops qca8k_switch_ops = {
 	.phylink_mac_link_up	= qca8k_phylink_mac_link_up,
 };
 
+static u8 qca8k_read_switch_id(struct qca8k_priv *priv)
+{
+	u32 val;
+
+	val = qca8k_read(priv, QCA8K_REG_MASK_CTRL);
+
+	priv->switch_revision = (val & QCA8K_MASK_CTRL_REV_ID_MASK);
+
+	return QCA8K_MASK_CTRL_DEVICE_ID(val & QCA8K_MASK_CTRL_DEVICE_ID_MASK);
+}
+
 static int
 qca8k_sw_probe(struct mdio_device *mdiodev)
 {
 	const struct qca8k_match_data *data;
 	struct qca8k_priv *priv;
-	u32 id;
 
 	/* allocate the private data struct so that we can probe the switches
 	 * ID register
@@ -1496,10 +1506,7 @@ qca8k_sw_probe(struct mdio_device *mdiodev)
 		return -ENODEV;
 
 	/* read the switches ID register */
-	id = qca8k_read(priv, QCA8K_REG_MASK_CTRL);
-	id >>= QCA8K_MASK_CTRL_ID_S;
-	id &= QCA8K_MASK_CTRL_ID_M;
-	if (id != data->id)
+	if (qca8k_read_switch_id(priv) != data->id)
 		return -ENODEV;
 
 	priv->ds = devm_kzalloc(&mdiodev->dev, sizeof(*priv->ds), GFP_KERNEL);
