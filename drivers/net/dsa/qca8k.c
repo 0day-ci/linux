@@ -69,6 +69,57 @@ static const struct qca8k_mib_desc ar8327_mib[] = {
 	MIB_DESC(1, 0xa4, "TxLateCol"),
 };
 
+/* QCA specific MII registers access function */
+void qca8k_phy_dbg_read(struct qca8k_priv *priv, int phy_addr, u16 dbg_addr, u16 *dbg_data)
+{
+	struct mii_bus *bus = priv->bus;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+	bus->write(bus, phy_addr, MII_ATH_DBG_ADDR, dbg_addr);
+	*dbg_data = bus->read(bus, phy_addr, MII_ATH_DBG_DATA);
+	mutex_unlock(&bus->mdio_lock);
+}
+
+void qca8k_phy_dbg_write(struct qca8k_priv *priv, int phy_addr, u16 dbg_addr, u16 dbg_data)
+{
+	struct mii_bus *bus = priv->bus;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+	bus->write(bus, phy_addr, MII_ATH_DBG_ADDR, dbg_addr);
+	bus->write(bus, phy_addr, MII_ATH_DBG_DATA, dbg_data);
+	mutex_unlock(&bus->mdio_lock);
+}
+
+static inline void qca8k_phy_mmd_prep(struct mii_bus *bus, int phy_addr, u16 addr, u16 reg)
+{
+	bus->write(bus, phy_addr, MII_ATH_MMD_ADDR, addr);
+	bus->write(bus, phy_addr, MII_ATH_MMD_DATA, reg);
+	bus->write(bus, phy_addr, MII_ATH_MMD_ADDR, addr | 0x4000);
+}
+
+void qca8k_phy_mmd_write(struct qca8k_priv *priv, int phy_addr, u16 addr, u16 reg, u16 data)
+{
+	struct mii_bus *bus = priv->bus;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+	qca8k_phy_mmd_prep(bus, phy_addr, addr, reg);
+	bus->write(bus, phy_addr, MII_ATH_MMD_DATA, data);
+	mutex_unlock(&bus->mdio_lock);
+}
+
+u16 qca8k_phy_mmd_read(struct qca8k_priv *priv, int phy_addr, u16 addr, u16 reg)
+{
+	struct mii_bus *bus = priv->bus;
+	u16 data;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+	qca8k_phy_mmd_prep(bus, phy_addr, addr, reg);
+	data = bus->read(bus, phy_addr, MII_ATH_MMD_DATA);
+	mutex_unlock(&bus->mdio_lock);
+
+	return data;
+}
+
 /* The 32bit switch registers are accessed indirectly. To achieve this we need
  * to set the page of the register. Track the last page that was set to reduce
  * mdio writes
