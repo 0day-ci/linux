@@ -3036,6 +3036,7 @@ xfs_alloc_read_agf(
 	struct xfs_agf		*agf;		/* ag freelist header */
 	struct xfs_perag	*pag;		/* per allocation group data */
 	int			error;
+	uint32_t		allocbt_blks;
 
 	trace_xfs_alloc_read_agf(mp, agno);
 
@@ -3066,6 +3067,17 @@ xfs_alloc_read_agf(
 		pag->pagf_refcount_level = be32_to_cpu(agf->agf_refcount_level);
 		pag->pagf_init = 1;
 		pag->pagf_agflreset = xfs_agfl_needs_reset(mp, agf);
+
+		/*
+		 * Update the global in-core allocbt block counter. Filter
+		 * rmapbt blocks from the on-disk counter because those are
+		 * managed by perag reservation.
+		 */
+		if (pag->pagf_btreeblks > be32_to_cpu(agf->agf_rmap_blocks)) {
+			allocbt_blks = pag->pagf_btreeblks -
+					be32_to_cpu(agf->agf_rmap_blocks);
+			atomic64_add(allocbt_blks, &mp->m_allocbt_blks);
+		}
 	}
 #ifdef DEBUG
 	else if (!XFS_FORCED_SHUTDOWN(mp)) {
