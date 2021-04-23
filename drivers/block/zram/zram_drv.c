@@ -1729,7 +1729,7 @@ static ssize_t disksize_store(struct device *dev,
 
 	mutex_lock(&zram_index_mutex);
 
-	if (!zram_up) {
+	if (!zram_up || zram->claim) {
 		err = -ENODEV;
 		goto out;
 	}
