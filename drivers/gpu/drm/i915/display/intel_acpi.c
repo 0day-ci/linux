@@ -14,10 +14,15 @@
 
 #define INTEL_DSM_REVISION_ID 1 /* For Calpella anyway... */
 #define INTEL_DSM_FN_PLATFORM_MUX_INFO 1 /* No args */
+#define INTEL_DSM_FN_PLATFORM_BXT_MUX_INFO 0 /* No args */
 
 static const guid_t intel_dsm_guid =
 	GUID_INIT(0x7ed873d3, 0xc2d0, 0x4e4f,
 		  0xa8, 0x54, 0x0f, 0x13, 0x17, 0xb0, 0x1c, 0x2c);
+
+static const guid_t intel_bxt_dsm_guid =
+	GUID_INIT(0x3e5b41c6, 0xeb1d, 0x4260,
+		  0x9d, 0x15, 0xc7, 0x1f, 0xba, 0xda, 0xe4, 0x14);
 
 static char *intel_dsm_port_name(u8 id)
 {
@@ -174,6 +179,18 @@ void intel_register_dsm_handler(void)
 
 void intel_unregister_dsm_handler(void)
 {
+}
+
+void intel_bxt_dsm_detect(struct pci_dev *pdev)
+{
+	acpi_handle dhandle;
+
+	dhandle = ACPI_HANDLE(&pdev->dev);
+	if (!dhandle)
+		return;
+
+	acpi_evaluate_dsm(dhandle, &intel_bxt_dsm_guid, INTEL_DSM_REVISION_ID,
+			  INTEL_DSM_FN_PLATFORM_BXT_MUX_INFO, NULL);
 }
 
 /*
