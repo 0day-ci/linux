@@ -42,15 +42,21 @@ static void mqprio_destroy(struct Qdisc *sch)
 	}
 
 	if (priv->hw_offload && dev->netdev_ops->ndo_setup_tc) {
-		struct tc_mqprio_qopt_offload mqprio = { { 0 } };
-
 		switch (priv->mode) {
 		case TC_MQPRIO_MODE_DCB:
 		case TC_MQPRIO_MODE_CHANNEL:
+		{
+			struct tc_mqprio_qopt_offload *mqprio;
+
+			mqprio = kzalloc(sizeof(*mqprio), GFP_KERNEL);
+			if (!mqprio)
+				return;
 			dev->netdev_ops->ndo_setup_tc(dev,
 						      TC_SETUP_QDISC_MQPRIO,
-						      &mqprio);
+						      mqprio);
+			kfree(mqprio);
 			break;
+		}
 		default:
 			return;
 		}
@@ -68,7 +74,7 @@ static int mqprio_parse_opt(struct net_device *dev, struct tc_mqprio_qopt *qopt)
 		return -EINVAL;
 
 	/* Verify priority mapping uses valid tcs */
-	for (i = 0; i < TC_BITMASK + 1; i++) {
+	for (i = 0; i < TC_BITMASK; i++) {
 		if (qopt->prio_tc_map[i] >= qopt->num_tc)
 			return -EINVAL;
 	}
@@ -241,36 +247,48 @@ static int mqprio_init(struct Qdisc *sch, struct nlattr *opt,
 	 * supplied and verified mapping
 	 */
 	if (qopt->hw) {
-		struct tc_mqprio_qopt_offload mqprio = {.qopt = *qopt};
+		struct tc_mqprio_qopt_offload *mqprio;
+
+		mqprio = kzalloc(sizeof(*mqprio), GFP_KERNEL);
+		if (!mqprio)
+			return -ENOMEM;
+
+		mqprio->qopt = *qopt;
 
 		switch (priv->mode) {
 		case TC_MQPRIO_MODE_DCB:
-			if (priv->shaper != TC_MQPRIO_SHAPER_DCB)
+			if (priv->shaper != TC_MQPRIO_SHAPER_DCB) {
+				kfree(mqprio);
 				return -EINVAL;
+			}
 			break;
 		case TC_MQPRIO_MODE_CHANNEL:
-			mqprio.flags = priv->flags;
+			mqprio->flags = priv->flags;
 			if (priv->flags & TC_MQPRIO_F_MODE)
-				mqprio.mode = priv->mode;
+				mqprio->mode = priv->mode;
 			if (priv->flags & TC_MQPRIO_F_SHAPER)
-				mqprio.shaper = priv->shaper;
+				mqprio->shaper = priv->shaper;
 			if (priv->flags & TC_MQPRIO_F_MIN_RATE)
-				for (i = 0; i < mqprio.qopt.num_tc; i++)
-					mqprio.min_rate[i] = priv->min_rate[i];
+				for (i = 0; i < mqprio->qopt.num_tc; i++)
+					mqprio->min_rate[i] = priv->min_rate[i];
 			if (priv->flags & TC_MQPRIO_F_MAX_RATE)
-				for (i = 0; i < mqprio.qopt.num_tc; i++)
-					mqprio.max_rate[i] = priv->max_rate[i];
+				for (i = 0; i < mqprio->qopt.num_tc; i++)
+					mqprio->max_rate[i] = priv->max_rate[i];
 			break;
 		default:
+			kfree(mqprio);
 			return -EINVAL;
 		}
 		err = dev->netdev_ops->ndo_setup_tc(dev,
 						    TC_SETUP_QDISC_MQPRIO,
-						    &mqprio);
-		if (err)
+						    mqprio);
+		if (err) {
+			kfree(mqprio);
 			return err;
+		}
 
-		priv->hw_offload = mqprio.qopt.hw;
+		priv->hw_offload = mqprio->qopt.hw;
+		kfree(mqprio);
 	} else {
 		netdev_set_num_tc(dev, qopt->num_tc);
 		for (i = 0; i < qopt->num_tc; i++)
@@ -279,7 +297,7 @@ static int mqprio_init(struct Qdisc *sch, struct nlattr *opt,
 	}
 
 	/* Always use supplied priority mappings */
-	for (i = 0; i < TC_BITMASK + 1; i++)
+	for (i = 0; i < TC_BITMASK; i++)
 		netdev_set_prio_tc_map(dev, i, qopt->prio_tc_map[i]);
 
 	sch->flags |= TCQ_F_MQROOT;

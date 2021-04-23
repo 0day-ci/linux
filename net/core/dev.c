@@ -2430,7 +2430,7 @@ static void netif_setup_tc(struct net_device *dev, unsigned int txq)
 	}
 
 	/* Invalidated prio to tc mappings set to TC0 */
-	for (i = 1; i < TC_BITMASK + 1; i++) {
+	for (i = 1; i < TC_BITMASK; i++) {
 		int q = netdev_get_prio_tc_map(dev, i);
 
 		tc = &dev->tc_to_txq[q];

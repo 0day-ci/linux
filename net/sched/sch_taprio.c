@@ -938,7 +938,7 @@ static int taprio_parse_mqprio_opt(struct net_device *dev,
 	}
 
 	/* Verify priority mapping uses valid tcs */
-	for (i = 0; i <= TC_BITMASK; i++) {
+	for (i = 0; i < TC_BITMASK; i++) {
 		if (qopt->prio_tc_map[i] >= qopt->num_tc) {
 			NL_SET_ERR_MSG(extack, "Invalid traffic class in priority to traffic class mapping");
 			return -EINVAL;
@@ -1393,7 +1393,7 @@ static int taprio_mqprio_cmp(const struct net_device *dev,
 		    dev->tc_to_txq[i].offset != mqprio->offset[i])
 			return -1;
 
-	for (i = 0; i <= TC_BITMASK; i++)
+	for (i = 0; i < TC_BITMASK; i++)
 		if (dev->prio_tc_map[i] != mqprio->prio_tc_map[i])
 			return -1;
 
@@ -1504,7 +1504,7 @@ static int taprio_change(struct Qdisc *sch, struct nlattr *opt,
 					    mqprio->offset[i]);
 
 		/* Always use supplied priority mappings */
-		for (i = 0; i <= TC_BITMASK; i++)
+		for (i = 0; i < TC_BITMASK; i++)
 			netdev_set_prio_tc_map(dev, i,
 					       mqprio->prio_tc_map[i]);
 	}

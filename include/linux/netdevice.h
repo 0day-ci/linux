@@ -787,8 +787,8 @@ struct xps_dev_maps {
 
 #endif /* CONFIG_XPS */
 
-#define TC_MAX_QUEUE	16
-#define TC_BITMASK	15
+#define TC_MAX_QUEUE	255
+#define TC_BITMASK	255
 /* HW offloaded queuing disciplines txq count and offset maps */
 struct netdev_tc_txq {
 	u16 count;
@@ -2136,7 +2136,7 @@ struct net_device {
 #endif
 	s16			num_tc;
 	struct netdev_tc_txq	tc_to_txq[TC_MAX_QUEUE];
-	u8			prio_tc_map[TC_BITMASK + 1];
+	u8			prio_tc_map[TC_BITMASK];
 
 #if IS_ENABLED(CONFIG_FCOE)
 	unsigned int		fcoe_ddp_xid;
