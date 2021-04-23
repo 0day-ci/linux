@@ -10,6 +10,7 @@ PING6=${PING6:=ping6}
 MZ=${MZ:=mausezahn}
 ARPING=${ARPING:=arping}
 TEAMD=${TEAMD:=teamd}
+OPENSSL=${OPENSSL:=openssl}
 WAIT_TIME=${WAIT_TIME:=5}
 PAUSE_ON_FAIL=${PAUSE_ON_FAIL:=no}
 PAUSE_ON_CLEANUP=${PAUSE_ON_CLEANUP:=no}
@@ -693,9 +694,49 @@ link_stats_tx_packets_get()
 	link_stats_get $1 tx packets
 }
 
+link_stats_tx_packets_get()
+{
+	link_stats_get $1 tx packets
+}
+
 link_stats_rx_errors_get()
 {
 	link_stats_get $1 rx errors
+}
+
+ns_link_stats_get()
+{
+	local netns=$1; shift
+	local if_name=$1; shift
+	local dir=$1; shift
+	local stat=$1; shift
+
+	ip netns exec $netns ip -j -s link show dev $if_name \
+		| jq '.[]["stats64"]["'$dir'"]["'$stat'"]'
+}
+
+ns_link_stats_tx_packets_get()
+{
+	local netns=$1; shift
+	local if_name=$1; shift
+
+	ns_link_stats_get $netns $if_name tx packets
+}
+
+ns_link_stats_tx_packets_get()
+{
+	local netns=$1; shift
+	local if_name=$1; shift
+
+	ns_link_stats_get $netns $if_name tx packets
+}
+
+ns_link_stats_rx_errors_get()
+{
+	local netns=$1; shift
+	local if_name=$1; shift
+
+	ns_link_stats_get $netns $if_name rx errors
 }
 
 tc_rule_stats_get()

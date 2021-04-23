@@ -40,6 +40,94 @@ static int proc_rt6_multipath_hash_policy(struct ctl_table *table, int write,
 	return ret;
 }
 
+#define RT6_MULTIPATH_SEED_KEY_LENGTH sizeof(siphash_key_t)
+#define RT6_MULTIPATH_SEED_RANDOM "random"
+static int proc_rt6_multipath_hash_seed(struct ctl_table *table, int write,
+					void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct net *net = container_of(table->data, struct net,
+	    ipv6.sysctl.multipath_hash_seed);
+	/* maxlen to print the keys in hex (*2) and a comma in between keys. */
+	struct ctl_table tbl = {
+		.maxlen = ((RT6_MULTIPATH_SEED_KEY_LENGTH * 2) + 2)
+	};
+	siphash_key_t user_key, *ctx;
+	__le64 key[2];
+	int ret;
+
+	tbl.data = kmalloc(tbl.maxlen, GFP_KERNEL);
+
+	if (!tbl.data)
+		return -ENOMEM;
+
+	rcu_read_lock();
+	ctx = rcu_dereference(net->ipv6.multipath_hash_seed_ctx);
+	if (ctx) {
+		put_unaligned_le64(ctx->key[0], &key[0]);
+		put_unaligned_le64(ctx->key[1], &key[1]);
+		user_key.key[0] = le64_to_cpu(key[0]);
+		user_key.key[1] = le64_to_cpu(key[1]);
+
+		snprintf(tbl.data, tbl.maxlen, "%016llx,%016llx",
+			 user_key.key[0], user_key.key[1]);
+	} else {
+		snprintf(tbl.data, tbl.maxlen, "%s", RT6_MULTIPATH_SEED_RANDOM);
+	}
+	rcu_read_unlock();
+
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+
+	if (write && ret == 0) {
+		siphash_key_t *new_ctx, *old_ctx;
+
+		if (!strcmp(tbl.data, RT6_MULTIPATH_SEED_RANDOM)) {
+			rtnl_lock();
+			old_ctx = rtnl_dereference(net->ipv6.multipath_hash_seed_ctx);
+			RCU_INIT_POINTER(net->ipv6.multipath_hash_seed_ctx, NULL);
+			rtnl_unlock();
+			if (old_ctx) {
+				synchronize_net();
+				kfree_sensitive(old_ctx);
+			}
+
+			pr_debug("multipath hash seed set to random value\n");
+			goto out;
+		}
+
+		if (sscanf(tbl.data, "%llx,%llx", user_key.key, user_key.key + 1) != 2) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		key[0] = cpu_to_le64(user_key.key[0]);
+		key[1] = cpu_to_le64(user_key.key[1]);
+		pr_debug("multipath hash seed set to 0x%llx,0x%llx\n",
+			 user_key.key[0], user_key.key[1]);
+
+		new_ctx = kmalloc(sizeof(*new_ctx), GFP_KERNEL);
+		if (!new_ctx) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		new_ctx->key[0] = get_unaligned_le64(&key[0]);
+		new_ctx->key[1] = get_unaligned_le64(&key[1]);
+
+		rtnl_lock();
+		old_ctx = rtnl_dereference(net->ipv6.multipath_hash_seed_ctx);
+		rcu_assign_pointer(net->ipv6.multipath_hash_seed_ctx, new_ctx);
+		rtnl_unlock();
+		if (old_ctx) {
+			synchronize_net();
+			kfree_sensitive(old_ctx);
+		}
+	}
+
+out:
+	kfree(tbl.data);
+	return ret;
+}
+
 static struct ctl_table ipv6_table_template[] = {
 	{
 		.procname	= "bindv6only",
@@ -150,6 +238,14 @@ static struct ctl_table ipv6_table_template[] = {
 		.proc_handler   = proc_rt6_multipath_hash_policy,
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &two,
+	},
+	{
+		.procname	= "fib_multipath_hash_seed",
+		.data		= &init_net.ipv6.sysctl.multipath_hash_seed,
+		/* maxlen to print the keys in hex (*2) and a comma in between keys. */
+		.maxlen		= (RT6_MULTIPATH_SEED_KEY_LENGTH * 2) + 2,
+		.mode		= 0600,
+		.proc_handler	= proc_rt6_multipath_hash_seed,
 	},
 	{
 		.procname	= "seg6_flowlabel",

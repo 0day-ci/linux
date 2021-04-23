@@ -222,6 +222,8 @@ struct netns_ipv4 {
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	u8 sysctl_fib_multipath_use_neigh;
 	u8 sysctl_fib_multipath_hash_policy;
+	int sysctl_fib_multipath_hash_seed;
+	siphash_key_t __rcu *fib_multipath_hash_seed_ctx;
 #endif
 
 	struct fib_notifier_ops	*notifier_ops;
