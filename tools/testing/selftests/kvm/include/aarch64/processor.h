@@ -21,6 +21,8 @@
 #define SCTLR_EL1	3, 0,  1, 0, 0
 #define VBAR_EL1	3, 0, 12, 0, 0
 
+#define ID_AA64DFR0_EL1	3, 0,  0, 5, 0
+
 /*
  * Default MAIR
  *                  index   attribute
@@ -124,5 +126,20 @@ void vm_handle_exception(struct kvm_vm *vm, int vector, int ec,
 	asm volatile("mrs %0, "__stringify(reg) : "=r"(val) : : "memory");\
 	val;								  \
 })
+
+#define MDSCR_KDE	(1 << 13)
+#define MDSCR_MDE	(1 << 15)
+#define MDSCR_SS	(1 << 0)
+
+#define DBGBCR_LEN8	(0xff << 5)
+#define DBGBCR_EXEC	(0x0 << 3)
+#define DBGBCR_EL1	(0x1 << 1)
+#define DBGBCR_E	(0x1 << 0)
+
+#define DBGWCR_LEN8	(0xff << 5)
+#define DBGWCR_RD	(0x1 << 3)
+#define DBGWCR_WR	(0x2 << 3)
+#define DBGWCR_EL1	(0x1 << 1)
+#define DBGWCR_E	(0x1 << 0)
 
 #endif /* SELFTEST_KVM_PROCESSOR_H */
