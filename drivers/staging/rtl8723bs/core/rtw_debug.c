@@ -30,7 +30,7 @@ void mac_reg_dump(struct adapter *adapter)
 	}
 }
 
-void bb_reg_dump(void *sel, struct adapter *adapter)
+void bb_reg_dump(struct adapter *adapter)
 {
 	int i, j = 1;
 
