@@ -392,6 +392,7 @@ struct xilinx_dma_tx_descriptor {
  * @irq: Channel IRQ
  * @id: Channel ID
  * @direction: Transfer direction
+ * @cfg: DMA slave channel configuration
  * @num_frms: Number of frames
  * @has_sg: Support scatter transfers
  * @cyclic: Check for cyclic transfers.
@@ -429,6 +430,7 @@ struct xilinx_dma_chan {
 	int irq;
 	int id;
 	enum dma_transfer_direction direction;
+	struct dma_slave_config cfg;
 	int num_frms;
 	bool has_sg;
 	bool cyclic;
@@ -2565,6 +2567,21 @@ static void xilinx_dma_chan_remove(struct xilinx_dma_chan *chan)
 	list_del(&chan->common.device_node);
 }
 
+/**
+ * xilinx_dma_slave_config - Set the channel config
+ * @dchan: DMA channel
+ * @cfg: DMA slave channel configuration
+ */
+static int xilinx_dma_slave_config(struct dma_chan *dchan,
+				   struct dma_slave_config *cfg)
+{
+	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+
+	chan->cfg = *cfg;
+
+	return 0;
+}
+
 static int axidma_clk_init(struct platform_device *pdev, struct clk **axi_clk,
 			    struct clk **tx_clk, struct clk **rx_clk,
 			    struct clk **sg_clk, struct clk **tmp_clk)
@@ -3096,6 +3113,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
 	xdev->common.device_terminate_all = xilinx_dma_terminate_all;
 	xdev->common.device_tx_status = xilinx_dma_tx_status;
 	xdev->common.device_issue_pending = xilinx_dma_issue_pending;
+	xdev->common.device_config = xilinx_dma_slave_config;
 	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
 		dma_cap_set(DMA_CYCLIC, xdev->common.cap_mask);
 		xdev->common.device_prep_slave_sg = xilinx_dma_prep_slave_sg;
