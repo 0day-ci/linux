@@ -1060,6 +1060,7 @@ core99_reset_cpu(struct device_node *node, long param, long value)
 			continue;
 		if (param == *num) {
 			reset_io = *rst;
+			of_node_put(np);
 			break;
 		}
 	}
@@ -1506,6 +1507,7 @@ static long g5_reset_cpu(struct device_node *node, long param, long value)
 			continue;
 		if (param == *num) {
 			reset_io = *rst;
+			of_node_put(np);
 			break;
 		}
 	}
