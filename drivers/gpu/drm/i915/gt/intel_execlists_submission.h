@@ -39,10 +39,6 @@ intel_execlists_create_virtual(struct intel_engine_cs **siblings,
 struct intel_context *
 intel_execlists_clone_virtual(struct intel_engine_cs *src);
 
-int intel_virtual_engine_attach_bond(struct intel_engine_cs *engine,
-				     const struct intel_engine_cs *master,
-				     const struct intel_engine_cs *sibling);
-
 bool
 intel_engine_in_execlists_submission_mode(const struct intel_engine_cs *engine);
 
