@@ -7184,7 +7184,6 @@ static int snapshot_raw_open(struct inode *inode, struct file *filp)
 
 #endif /* CONFIG_TRACER_SNAPSHOT */
 
-
 static const struct file_operations tracing_thresh_fops = {
 	.open		= tracing_open_generic,
 	.read		= tracing_thresh_read,
@@ -7285,6 +7284,93 @@ static const struct file_operations snapshot_raw_fops = {
 };
 
 #endif /* CONFIG_TRACER_SNAPSHOT */
+
+/*
+ * trace_ull_config_write - Generic write function to save u64 value
+ * @filp: The active open file structure
+ * @ubuf: The userspace provided buffer to read value into
+ * @cnt: The maximum number of bytes to read
+ * @ppos: The current "file" position
+ *
+ * This function provides a generic write implementation to save u64 values
+ * from a file on tracefs. The filp->private_data must point to a
+ * trace_ull_config structure that defines where to write the value, the
+ * min and the max acceptable values, and a lock to protect the write.
+ */
+ssize_t
+trace_ull_config_write(struct file *filp, const char __user *ubuf, size_t cnt,
+		       loff_t *ppos)
+{
+	struct trace_ull_config *config = filp->private_data;
+	u64 val;
+	int err;
+
+	if (!config)
+		return -EFAULT;
+
+	err = kstrtoull_from_user(ubuf, cnt, 10, &val);
+	if (err)
+		return err;
+
+	if (config->lock)
+		mutex_lock(config->lock);
+
+	if (config->min && val < *config->min)
+		err = -EINVAL;
+
+	if (config->max && val > *config->max)
+		err = -EINVAL;
+
+	if (!err)
+		*config->val = val;
+
+	if (config->lock)
+		mutex_unlock(config->lock);
+
+	if (err)
+		return err;
+
+	return cnt;
+}
+
+/*
+ * trace_ull_config_read - Generic write function to read u64 value via tracefs
+ * @filp: The active open file structure
+ * @ubuf: The userspace provided buffer to read value into
+ * @cnt: The maximum number of bytes to read
+ * @ppos: The current "file" position
+ *
+ * This function provides a generic read implementation to read a u64 value
+ * from a file on tracefs. The filp->private_data must point to a
+ * trace_ull_config structure with valid data.
+ */
+ssize_t
+trace_ull_config_read(struct file *filp, char __user *ubuf, size_t cnt,
+		      loff_t *ppos)
+{
+	struct trace_ull_config *config = filp->private_data;
+	char buf[ULL_STR_SIZE];
+	u64 val;
+        int len;
+
+        if (!config)
+                return -EFAULT;
+
+	val = *config->val;
+
+        if (cnt > sizeof(buf))
+                cnt = sizeof(buf);
+
+        len = snprintf(buf, sizeof(buf), "%llu\n", val);
+
+        return simple_read_from_buffer(ubuf, cnt, ppos, buf, len);
+}
+
+const struct file_operations trace_ull_config_fops = {
+	.open		= tracing_open_generic,
+	.read		= trace_ull_config_read,
+	.write		= trace_ull_config_write,
+};
 
 #define TRACING_LOG_ERRS_MAX	8
 #define TRACING_LOG_LOC_MAX	128
