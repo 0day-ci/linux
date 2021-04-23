@@ -764,7 +764,6 @@ static int zx_crtc_bind(struct device *dev, struct device *master, void *data)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct drm_device *drm = data;
 	struct zx_vou_hw *vou;
-	struct resource *res;
 	int irq;
 	int ret;
 
@@ -772,16 +771,14 @@ static int zx_crtc_bind(struct device *dev, struct device *master, void *data)
 	if (!vou)
 		return -ENOMEM;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "osd");
-	vou->osd = devm_ioremap_resource(dev, res);
+	vou->osd = devm_platform_ioremap_resource_byname(pdev, "osd");
 	if (IS_ERR(vou->osd)) {
 		ret = PTR_ERR(vou->osd);
 		DRM_DEV_ERROR(dev, "failed to remap osd region: %d\n", ret);
 		return ret;
 	}
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "timing_ctrl");
-	vou->timing = devm_ioremap_resource(dev, res);
+	vou->timing = devm_platform_ioremap_resource_byname(pdev, "timing_ctrl");
 	if (IS_ERR(vou->timing)) {
 		ret = PTR_ERR(vou->timing);
 		DRM_DEV_ERROR(dev, "failed to remap timing_ctrl region: %d\n",
@@ -789,16 +786,14 @@ static int zx_crtc_bind(struct device *dev, struct device *master, void *data)
 		return ret;
 	}
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dtrc");
-	vou->dtrc = devm_ioremap_resource(dev, res);
+	vou->dtrc = devm_platform_ioremap_resource_byname(pdev, "dtrc");
 	if (IS_ERR(vou->dtrc)) {
 		ret = PTR_ERR(vou->dtrc);
 		DRM_DEV_ERROR(dev, "failed to remap dtrc region: %d\n", ret);
 		return ret;
 	}
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vou_ctrl");
-	vou->vouctl = devm_ioremap_resource(dev, res);
+	vou->vouctl = devm_platform_ioremap_resource_byname(pdev, "vou_ctrl");
 	if (IS_ERR(vou->vouctl)) {
 		ret = PTR_ERR(vou->vouctl);
 		DRM_DEV_ERROR(dev, "failed to remap vou_ctrl region: %d\n",
@@ -806,8 +801,7 @@ static int zx_crtc_bind(struct device *dev, struct device *master, void *data)
 		return ret;
 	}
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "otfppu");
-	vou->otfppu = devm_ioremap_resource(dev, res);
+	vou->otfppu = devm_platform_ioremap_resource_byname(pdev, "otfppu");
 	if (IS_ERR(vou->otfppu)) {
 		ret = PTR_ERR(vou->otfppu);
 		DRM_DEV_ERROR(dev, "failed to remap otfppu region: %d\n", ret);
