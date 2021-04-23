@@ -2087,6 +2087,7 @@ static long ceph_fallocate(struct file *file, int mode,
 	if (ret < 0)
 		goto unlock;
 
+	down_write(&inode->i_mapping->invalidate_lock);
 	ceph_zero_pagecache_range(inode, offset, length);
 	ret = ceph_zero_objects(inode, offset, length);
 
@@ -2099,6 +2100,7 @@ static long ceph_fallocate(struct file *file, int mode,
 		if (dirty)
 			__mark_inode_dirty(inode, dirty);
 	}
+	up_write(&inode->i_mapping->invalidate_lock);
 
 	ceph_put_cap_refs(ci, got);
 unlock:
