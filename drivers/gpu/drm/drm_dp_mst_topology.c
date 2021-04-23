@@ -5884,18 +5884,35 @@ struct drm_dp_aux *drm_dp_mst_dsc_aux_for_port(struct drm_dp_mst_port *port)
 		return NULL;
 
 	if (drm_dp_has_quirk(&desc, DP_DPCD_QUIRK_DSC_WITHOUT_VIRTUAL_DPCD) &&
-	    port->mgr->dpcd[DP_DPCD_REV] >= DP_DPCD_REV_14 &&
 	    port->parent == port->mgr->mst_primary) {
-		u8 downstreamport;
+		u8 training_aux_rd_interval = 0;
+		u8 dpcd_rev = 0;
+		unsigned int dpcd_caps_offset = 0;
 
-		if (drm_dp_dpcd_read(&port->aux, DP_DOWNSTREAMPORT_PRESENT,
-				     &downstreamport, 1) < 0)
+		if (drm_dp_dpcd_read(port->mgr->aux, DP_TRAINING_AUX_RD_INTERVAL,
+				     &training_aux_rd_interval, 1) < 1)
 			return NULL;
 
-		if ((downstreamport & DP_DWN_STRM_PORT_PRESENT) &&
-		   ((downstreamport & DP_DWN_STRM_PORT_TYPE_MASK)
-		     != DP_DWN_STRM_PORT_TYPE_ANALOG))
-			return port->mgr->aux;
+		/* If DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT is set, the Extended Receiver Capability field has to be used */
+		if (training_aux_rd_interval & DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT)
+			dpcd_caps_offset = 0x02200;
+
+		if (drm_dp_dpcd_read(port->mgr->aux, dpcd_caps_offset + DP_DPCD_REV,
+				     &dpcd_rev, 1) < 1)
+			return NULL;
+
+		if (dpcd_rev >= DP_DPCD_REV_14) {
+			u8 downstreamport = 0;
+
+			if (drm_dp_dpcd_read(port->mgr->aux, dpcd_caps_offset + DP_DOWNSTREAMPORT_PRESENT,
+					     &downstreamport, 1) < 1)
+				return NULL;
+
+			if ((downstreamport & DP_DWN_STRM_PORT_PRESENT) &&
+			   ((downstreamport & DP_DWN_STRM_PORT_TYPE_MASK)
+			     != DP_DWN_STRM_PORT_TYPE_ANALOG))
+				return port->mgr->aux;
+		}
 	}
 
 	/*
