@@ -55,6 +55,81 @@ module_param(inter_copy_offload_enable, bool, 0644);
 MODULE_PARM_DESC(inter_copy_offload_enable,
 		 "Enable inter server to server copy offload. Default: false");
 
+#ifdef CONFIG_NFSD_V4_2_INTER_SSC
+static int nfsd4_ssc_umount_timeout = 900000;		/* default to 15 mins */
+module_param(nfsd4_ssc_umount_timeout, int, 0644);
+MODULE_PARM_DESC(nfsd4_ssc_umount_timeout,
+		"idle msecs before unmount export from source server");
+
+static void nfsd4_ssc_expire_umount(struct work_struct *work);
+static struct nfsd4_ssc_umount nfsd4_ssc_umount;
+
+/* nfsd4_ssc_umount.nsu_lock must be held */
+static void nfsd4_scc_update_umnt_timo(void)
+{
+	struct nfsd4_ssc_umount_item *ni = 0;
+
+	cancel_delayed_work(&nfsd4_ssc_umount.nsu_umount_work);
+	if (!list_empty(&nfsd4_ssc_umount.nsu_list)) {
+		ni = list_first_entry(&nfsd4_ssc_umount.nsu_list,
+			struct nfsd4_ssc_umount_item, nsui_list);
+		nfsd4_ssc_umount.nsu_expire = ni->nsui_expire;
+		schedule_delayed_work(&nfsd4_ssc_umount.nsu_umount_work,
+			ni->nsui_expire - jiffies);
+	} else
+		nfsd4_ssc_umount.nsu_expire = 0;
+}
+
+static void nfsd4_ssc_expire_umount(struct work_struct *work)
+{
+	bool do_wakeup = false;
+	struct nfsd4_ssc_umount_item *ni = 0;
+	struct nfsd4_ssc_umount_item *tmp;
+
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list, nsui_list) {
+		if (time_after(jiffies, ni->nsui_expire)) {
+			if (refcount_read(&ni->nsui_refcnt) > 0)
+				continue;
+
+			/* mark being unmount */
+			ni->nsui_busy = true;
+			spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+			mntput(ni->nsui_vfsmount);
+			spin_lock(&nfsd4_ssc_umount.nsu_lock);
+
+			/* waiters need to start from begin of list */
+			list_del(&ni->nsui_list);
+			kfree(ni);
+
+			/* wakeup ssc_connect waiters */
+			do_wakeup = true;
+			continue;
+		}
+		break;
+	}
+	nfsd4_scc_update_umnt_timo();
+	if (do_wakeup)
+		wake_up_all(&nfsd4_ssc_umount.nsu_waitq);
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+}
+
+static DECLARE_DELAYED_WORK(nfsd4, nfsd4_ssc_expire_umount);
+
+void nfsd4_ssc_init_umount_work(void)
+{
+	if (nfsd4_ssc_umount.nsu_inited)
+		return;
+	INIT_DELAYED_WORK(&nfsd4_ssc_umount.nsu_umount_work,
+		nfsd4_ssc_expire_umount);
+	INIT_LIST_HEAD(&nfsd4_ssc_umount.nsu_list);
+	spin_lock_init(&nfsd4_ssc_umount.nsu_lock);
+	init_waitqueue_head(&nfsd4_ssc_umount.nsu_waitq);
+	nfsd4_ssc_umount.nsu_inited = true;
+}
+EXPORT_SYMBOL_GPL(nfsd4_ssc_init_umount_work);
+#endif
+
 #ifdef CONFIG_NFSD_V4_SECURITY_LABEL
 #include <linux/security.h>
 
@@ -1181,6 +1256,9 @@ nfsd4_interssc_connect(struct nl4_server *nss, struct svc_rqst *rqstp,
 	char *ipaddr, *dev_name, *raw_data;
 	int len, raw_len;
 	__be32 status = nfserr_inval;
+	struct nfsd4_ssc_umount_item *ni = 0;
+	struct nfsd4_ssc_umount_item *work, *tmp;
+	DEFINE_WAIT(wait);
 
 	naddr = &nss->u.nl4_addr;
 	tmp_addrlen = rpc_uaddr2sockaddr(SVC_NET(rqstp), naddr->addr,
@@ -1229,12 +1307,68 @@ nfsd4_interssc_connect(struct nl4_server *nss, struct svc_rqst *rqstp,
 		goto out_free_rawdata;
 	snprintf(dev_name, len + 5, "%s%s%s:/", startsep, ipaddr, endsep);
 
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
+try_again:
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list, nsui_list) {
+		if (strncmp(ni->nsui_ipaddr, ipaddr, sizeof(ni->nsui_ipaddr)))
+			continue;
+		/* found a match */
+		if (ni->nsui_busy) {
+			/*  wait - and try again */
+			prepare_to_wait(&nfsd4_ssc_umount.nsu_waitq, &wait,
+				TASK_INTERRUPTIBLE);
+			spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+
+			/* allow 20secs for mount/unmount for now - revisit */
+			if (signal_pending(current) ||
+					(schedule_timeout(20*HZ) == 0)) {
+				status = nfserr_eagain;
+				kfree(work);
+				goto out_free_devname;
+			}
+			finish_wait(&nfsd4_ssc_umount.nsu_waitq, &wait);
+			goto try_again;
+		}
+		ss_mnt = ni->nsui_vfsmount;
+		if (refcount_read(&ni->nsui_refcnt) == 0)
+			refcount_set(&ni->nsui_refcnt, 1);
+		else
+			refcount_inc(&ni->nsui_refcnt);
+		spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+		kfree(work);
+		goto out_done;
+	}
+	/* create new entry, set busy, insert list, clear busy after mount */
+	if (work) {
+		strncpy(work->nsui_ipaddr, ipaddr, sizeof(work->nsui_ipaddr));
+		refcount_set(&work->nsui_refcnt, 1);
+		work->nsui_busy = true;
+		list_add_tail(&work->nsui_list, &nfsd4_ssc_umount.nsu_list);
+	}
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+
 	/* Use an 'internal' mount: SB_KERNMOUNT -> MNT_INTERNAL */
 	ss_mnt = vfs_kern_mount(type, SB_KERNMOUNT, dev_name, raw_data);
 	module_put(type->owner);
-	if (IS_ERR(ss_mnt))
+	if (IS_ERR(ss_mnt)) {
+		if (work) {
+			spin_lock(&nfsd4_ssc_umount.nsu_lock);
+			list_del(&work->nsui_list);
+			wake_up_all(&nfsd4_ssc_umount.nsu_waitq);
+			spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+			kfree(work);
+		}
 		goto out_free_devname;
-
+	}
+	if (work) {
+		spin_lock(&nfsd4_ssc_umount.nsu_lock);
+		work->nsui_vfsmount = ss_mnt;
+		work->nsui_busy = false;
+		wake_up_all(&nfsd4_ssc_umount.nsu_waitq);
+		spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+	}
+out_done:
 	status = 0;
 	*mount = ss_mnt;
 
@@ -1301,10 +1435,46 @@ static void
 nfsd4_cleanup_inter_ssc(struct vfsmount *ss_mnt, struct nfsd_file *src,
 			struct nfsd_file *dst)
 {
+	bool found = false;
+	bool resched = false;
+	long timeout;
+	struct nfsd4_ssc_umount_item *tmp;
+	struct nfsd4_ssc_umount_item *ni = 0;
+
 	nfs42_ssc_close(src->nf_file);
-	fput(src->nf_file);
 	nfsd_file_put(dst);
-	mntput(ss_mnt);
+	fput(src->nf_file);
+
+	timeout = msecs_to_jiffies(nfsd4_ssc_umount_timeout);
+	spin_lock(&nfsd4_ssc_umount.nsu_lock);
+	list_for_each_entry_safe(ni, tmp, &nfsd4_ssc_umount.nsu_list,
+		nsui_list) {
+		if (ni->nsui_vfsmount->mnt_sb == ss_mnt->mnt_sb) {
+			list_del(&ni->nsui_list);
+			/*
+			 * vfsmount can be shared by multiple exports,
+			 * decrement refcnt and schedule delayed task
+			 * if it drops to 0.
+			 */
+			if (refcount_dec_and_test(&ni->nsui_refcnt))
+				resched = true;
+			ni->nsui_expire = jiffies + timeout;
+			list_add_tail(&ni->nsui_list, &nfsd4_ssc_umount.nsu_list);
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		spin_unlock(&nfsd4_ssc_umount.nsu_lock);
+		mntput(ss_mnt);
+		return;
+	}
+	if (resched && !nfsd4_ssc_umount.nsu_expire) {
+		nfsd4_ssc_umount.nsu_expire = ni->nsui_expire;
+		schedule_delayed_work(&nfsd4_ssc_umount.nsu_umount_work,
+				timeout);
+	}
+	spin_unlock(&nfsd4_ssc_umount.nsu_lock);
 }
 
 #else /* CONFIG_NFSD_V4_2_INTER_SSC */
