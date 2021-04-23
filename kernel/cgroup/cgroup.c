@@ -3654,6 +3654,76 @@ static ssize_t cgroup_freeze_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static void __cgroup_signal(struct cgroup *cgrp, int signr)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+
+	lockdep_assert_held(&cgroup_mutex);
+
+	css_task_iter_start(&cgrp->self, 0, &it);
+	while ((task = css_task_iter_next(&it))) {
+		/* Ignore kernel threads here. */
+		if (task->flags & PF_KTHREAD)
+			continue;
+
+		/* Skip dying tasks. */
+		if (__fatal_signal_pending(task))
+			continue;
+
+		send_sig(signr, task, 0);
+	}
+	css_task_iter_end(&it);
+}
+
+static void cgroup_signal(struct cgroup *cgrp, int signr)
+{
+	struct cgroup_subsys_state *css;
+	struct cgroup *dsct;
+
+	lockdep_assert_held(&cgroup_mutex);
+
+	/*
+	 * Propagate changes downwards the cgroup tree.
+	 */
+	read_lock(&tasklist_lock);
+	css_for_each_descendant_pre(css, &cgrp->self) {
+		dsct = css->cgroup;
+
+		if (cgroup_is_dead(dsct))
+			continue;
+
+		__cgroup_signal(dsct, signr);
+	}
+	read_unlock(&tasklist_lock);
+}
+
+static ssize_t cgroup_signal_write(struct kernfs_open_file *of, char *buf,
+				   size_t nbytes, loff_t off)
+{
+	struct cgroup *cgrp;
+	ssize_t ret;
+	int signr;
+
+	ret = kstrtoint(strstrip(buf), 0, &signr);
+	if (ret)
+		return ret;
+
+	/* Only allow SIGKILL for now. */
+	if (signr != SIGKILL)
+		return -EINVAL;
+
+	cgrp = cgroup_kn_lock_live(of->kn, false);
+	if (!cgrp)
+		return -ENOENT;
+
+	cgroup_signal(cgrp, signr);
+
+	cgroup_kn_unlock(of->kn);
+
+	return nbytes;
+}
+
 static int cgroup_file_open(struct kernfs_open_file *of)
 {
 	struct cftype *cft = of_cft(of);
@@ -4845,6 +4915,11 @@ static struct cftype cgroup_base_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = cgroup_freeze_show,
 		.write = cgroup_freeze_write,
+	},
+	{
+		.name = "cgroup.signal",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.write = cgroup_signal_write,
 	},
 	{
 		.name = "cpu.stat",
