@@ -92,3 +92,5 @@ More Memory Management Functions
    :export:
 
 .. kernel-doc:: mm/page_alloc.c
+
+.. kernel-doc:: include/linux/mmzone.h
