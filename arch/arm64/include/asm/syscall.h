@@ -44,7 +44,20 @@ static inline long syscall_get_error(struct task_struct *task,
 static inline long syscall_get_return_value(struct task_struct *task,
 					    struct pt_regs *regs)
 {
-	return regs->regs[0];
+	long val = regs->regs[0];
+	long error = val;
+
+	if (compat_user_mode(regs))
+		error = sign_extend64(error, 31);
+
+	/*
+	 * Return codes with bit 31 set may or may not be an error code.
+	 * For example, mmap may return a legal 32 bit address with bit 31 set
+	 * for 32 bit thread, in which case the untouched val should be
+	 * returned. Otherwise, the sign-extended error should be returned if
+	 * it still falls in error number range.
+	 */
+	return IS_ERR_VALUE(error) ? error : val;
 }
 
 static inline void syscall_set_return_value(struct task_struct *task,
