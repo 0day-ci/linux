@@ -14,7 +14,7 @@ u32 GlobalDebugLevel = _drv_err_;
 
 #include <rtw_version.h>
 
-void mac_reg_dump(void *sel, struct adapter *adapter)
+void mac_reg_dump(struct adapter *adapter)
 {
 	int i, j = 1;
 
