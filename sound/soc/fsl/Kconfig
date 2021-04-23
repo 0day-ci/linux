@@ -350,6 +350,18 @@ config SND_SOC_IMX_RPMSG
 	  Say Y if you want to add support for SoC audio on an i.MX board with
 	  a rpmsg devices.
 
+config SND_SOC_IMX_AKCODEC
+	tristate "SoC Audio support for i.MX boards with AKCODEC"
+	depends on OF && I2C
+	select SND_SOC_AK4458
+	select SND_SOC_AK5558
+	select SND_SOC_IMX_PCM_DMA
+	select SND_SOC_FSL_SAI
+	help
+	  SoC Audio support for i.MX boards with AK4458/AK4497/AK5558/AK5552
+	  Say Y if you want to add support for SoC audio on an i.MX board with
+	  an AK4458/AK4497/AK5558/AK5552 DAC/ADC.
+
 endif # SND_IMX_SOC
 
 endmenu
