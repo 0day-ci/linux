@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/leds/backlight/dp-aux-backlight.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: DisplayPort aux backlight driver bindings
+
+maintainers:
+  - Rajeev Nandan <rajeevny@codeaurora.org>
+
+description:
+  Backlight driver to control the brightness over DisplayPort aux channel.
+
+allOf:
+  - $ref: common.yaml#
+
+properties:
+  compatible:
+    const: dp-aux-backlight
+
+  ddc-i2c-bus:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description:
+      A phandle to the system I2C controller connected to the DDC bus used
+      for the DisplayPort AUX channel.
+
+  enable-gpios:
+    maxItems: 1
+    description: GPIO specifier for backlight enable pin.
+
+  max-brightness: true
+
+required:
+  - compatible
+  - ddc-i2c-bus
+
+additionalProperties: false
+
+examples:
+  - |
+    backlight {
+        compatible = "dp-aux-backlight";
+        ddc-i2c-bus = <&sn65dsi86_bridge>;
+        enable-gpios = <&tlmm 12 GPIO_ACTIVE_HIGH>;
+        max-brightness = <2047>;
+    };
+
+...
