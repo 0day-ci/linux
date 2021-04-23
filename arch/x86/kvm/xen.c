@@ -96,6 +96,7 @@ void kvm_xen_update_runstate_guest(struct kvm_vcpu *v, int state)
 	struct kvm_vcpu_xen *vx = &v->arch.xen;
 	uint64_t state_entry_time;
 	unsigned int offset;
+	int idx;
 
 	kvm_xen_update_runstate(v, state);
 
@@ -133,10 +134,16 @@ void kvm_xen_update_runstate_guest(struct kvm_vcpu *v, int state)
 	BUILD_BUG_ON(sizeof(((struct compat_vcpu_runstate_info *)0)->state_entry_time) !=
 		     sizeof(state_entry_time));
 
+	/*
+	 * Take the srcu lock as memslots will be accessed to check the gfn
+	 * cache generation against the memslots generation.
+	 */
+	idx = srcu_read_lock(&v->kvm->srcu);
+
 	if (kvm_write_guest_offset_cached(v->kvm, &v->arch.xen.runstate_cache,
 					  &state_entry_time, offset,
 					  sizeof(state_entry_time)))
-		return;
+		goto out;
 	smp_wmb();
 
 	/*
@@ -154,7 +161,7 @@ void kvm_xen_update_runstate_guest(struct kvm_vcpu *v, int state)
 					  &vx->current_runstate,
 					  offsetof(struct vcpu_runstate_info, state),
 					  sizeof(vx->current_runstate)))
-		return;
+		goto out;
 
 	/*
 	 * Write the actual runstate times immediately after the
@@ -173,7 +180,7 @@ void kvm_xen_update_runstate_guest(struct kvm_vcpu *v, int state)
 					  &vx->runstate_times[0],
 					  offset + sizeof(u64),
 					  sizeof(vx->runstate_times)))
-		return;
+		goto out;
 
 	smp_wmb();
 
@@ -186,7 +193,10 @@ void kvm_xen_update_runstate_guest(struct kvm_vcpu *v, int state)
 	if (kvm_write_guest_offset_cached(v->kvm, &v->arch.xen.runstate_cache,
 					  &state_entry_time, offset,
 					  sizeof(state_entry_time)))
-		return;
+		goto out;
+
+out:
+	srcu_read_unlock(&v->kvm->srcu, idx);
 }
 
 int __kvm_xen_has_interrupt(struct kvm_vcpu *v)
