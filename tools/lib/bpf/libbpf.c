@@ -5141,6 +5141,7 @@ recur:
 
 	switch (btf_kind(local_type)) {
 	case BTF_KIND_PTR:
+	case BTF_KIND_FLOAT:
 		return 1;
 	case BTF_KIND_FWD:
 	case BTF_KIND_ENUM: {
@@ -6245,8 +6246,8 @@ patch_insn:
 	/* bpf_core_patch_insn() should know how to handle missing targ_spec */
 	err = bpf_core_patch_insn(prog, relo, relo_idx, &targ_res);
 	if (err) {
-		pr_warn("prog '%s': relo #%d: failed to patch insn at offset %d: %d\n",
-			prog->name, relo_idx, relo->insn_off, err);
+		pr_warn("prog '%s': relo #%d: failed to patch insn #%zu: %d\n",
+			prog->name, relo_idx, relo->insn_off / BPF_INSN_SZ, err);
 		return -EINVAL;
 	}
 
