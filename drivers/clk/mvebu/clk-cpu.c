@@ -199,11 +199,14 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 		int cpu, err;
 
 		err = of_property_read_u32(dn, "reg", &cpu);
-		if (WARN_ON(err))
+		if (WARN_ON(err)) {
+			of_node_put(dn);
 			goto bail_out;
+		}
 
 		clk_name = kasprintf(GFP_KERNEL, "cpu%d", cpu);
 		if (WARN_ON(!clk_name)) {
+			of_node_put(dn);
 			goto bail_out;
 		}
 
@@ -222,8 +225,10 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 		init.num_parents = 1;
 
 		clk = clk_register(NULL, &cpuclk[cpu].hw);
-		if (WARN_ON(IS_ERR(clk)))
+		if (WARN_ON(IS_ERR(clk))) {
+			of_node_put(dn);
 			goto bail_out;
+		}
 		clks[cpu] = clk;
 	}
 	clk_data.clk_num = MAX_CPU;
