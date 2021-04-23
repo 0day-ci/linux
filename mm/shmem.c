@@ -94,18 +94,6 @@ static struct vfsmount *shm_mnt;
 /* Symlink up to this size is kmalloc'ed instead of using a swappable page */
 #define SHORT_SYMLINK_LEN 128
 
-/*
- * shmem_fallocate communicates with shmem_writepage via inode->i_private (with
- * i_rwsem making sure that it has only one user at a time): we would prefer
- * not to enlarge the shmem inode just for that.
- */
-struct shmem_falloc {
-	pgoff_t start;		/* start of range currently being fallocated */
-	pgoff_t next;		/* the next page offset to be fallocated */
-	pgoff_t nr_falloced;	/* how many new pages have been fallocated */
-	pgoff_t nr_unswapped;	/* how often writepage refused to swap out */
-};
-
 struct shmem_options {
 	unsigned long long blocks;
 	unsigned long long inodes;
@@ -1364,28 +1352,11 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	 * This is somewhat ridiculous, but without plumbing a SWAP_MAP_FALLOC
 	 * value into swapfile.c, the only way we can correctly account for a
 	 * fallocated page arriving here is now to initialize it and write it.
-	 *
-	 * That's okay for a page already fallocated earlier, but if we have
-	 * not yet completed the fallocation, then (a) we want to keep track
-	 * of this page in case we have to undo it, and (b) it may not be a
-	 * good idea to continue anyway, once we're pushing into swap.  So
-	 * reactivate the page, and let shmem_fallocate() quit when too many.
+	 * Since a page added by currently running fallocate call cannot be
+	 * dirtied and thus arrive here we know the fallocate has already
+	 * completed and we are fine writing it out.
 	 */
 	if (!PageUptodate(page)) {
-		if (inode->i_private) {
-			struct shmem_falloc *shmem_falloc;
-			spin_lock(&inode->i_lock);
-			shmem_falloc = inode->i_private;
-			if (shmem_falloc &&
-			    index >= shmem_falloc->start &&
-			    index < shmem_falloc->next)
-				shmem_falloc->nr_unswapped++;
-			else
-				shmem_falloc = NULL;
-			spin_unlock(&inode->i_lock);
-			if (shmem_falloc)
-				goto redirty;
-		}
 		clear_highpage(page);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
@@ -2629,9 +2600,9 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 							 loff_t len)
 {
 	struct inode *inode = file_inode(file);
+	struct address_space *mapping = file->f_mapping;
 	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
 	struct shmem_inode_info *info = SHMEM_I(inode);
-	struct shmem_falloc shmem_falloc;
 	pgoff_t start, index, end;
 	int error;
 
@@ -2641,7 +2612,6 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 	inode_lock(inode);
 
 	if (mode & FALLOC_FL_PUNCH_HOLE) {
-		struct address_space *mapping = file->f_mapping;
 		loff_t unmap_start = round_up(offset, PAGE_SIZE);
 		loff_t unmap_end = round_down(offset + len, PAGE_SIZE) - 1;
 
@@ -2680,14 +2650,7 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 		goto out;
 	}
 
-	shmem_falloc.start = start;
-	shmem_falloc.next  = start;
-	shmem_falloc.nr_falloced = 0;
-	shmem_falloc.nr_unswapped = 0;
-	spin_lock(&inode->i_lock);
-	inode->i_private = &shmem_falloc;
-	spin_unlock(&inode->i_lock);
-
+	down_write(&mapping->invalidate_lock);
 	for (index = start; index < end; index++) {
 		struct page *page;
 
@@ -2697,8 +2660,6 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 		 */
 		if (signal_pending(current))
 			error = -EINTR;
-		else if (shmem_falloc.nr_unswapped > shmem_falloc.nr_falloced)
-			error = -ENOMEM;
 		else
 			error = shmem_getpage(inode, index, &page, SGP_FALLOC);
 		if (error) {
@@ -2710,14 +2671,6 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 			}
 			goto undone;
 		}
-
-		/*
-		 * Inform shmem_writepage() how far we have reached.
-		 * No need for lock or barrier: we have the page lock.
-		 */
-		shmem_falloc.next++;
-		if (!PageUptodate(page))
-			shmem_falloc.nr_falloced++;
 
 		/*
 		 * If !PageUptodate, leave it that way so that freeable pages
@@ -2736,9 +2689,7 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 		i_size_write(inode, offset + len);
 	inode->i_ctime = current_time(inode);
 undone:
-	spin_lock(&inode->i_lock);
-	inode->i_private = NULL;
-	spin_unlock(&inode->i_lock);
+	up_write(&mapping->invalidate_lock);
 out:
 	inode_unlock(inode);
 	return error;
