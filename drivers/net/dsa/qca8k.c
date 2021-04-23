@@ -701,6 +701,7 @@ qca8k_setup(struct dsa_switch *ds)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	int ret, i;
+	u32 mask;
 
 	/* Make sure that port 0 is the cpu port */
 	if (!dsa_is_cpu_port(ds, 0)) {
@@ -784,6 +785,47 @@ qca8k_setup(struct dsa_switch *ds)
 	for (i = 0; i < QCA8K_NUM_PORTS; i++)
 		priv->port_mtu[i] = ETH_FRAME_LEN + ETH_FCS_LEN;
 	qca8k_write(priv, QCA8K_MAX_FRAME_SIZE, ETH_FRAME_LEN + ETH_FCS_LEN);
+
+	/* The port 5 of the switch ar8337 have some problem in flood condition.
+	 * To fix this the original code has some specific priority values
+	 * suggested by the QCA switch team.
+	 */
+	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
+		switch (i) {
+		/* The 2 CPU port and port 5 requires some different
+		 * priority than any other ports.
+		 */
+		case 0:
+		case 5:
+		case 6:
+			mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x4) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x4) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI4(0x6) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI5(0x8) |
+				QCA8K_PORT_HOL_CTRL0_EG_PORT(0x1e);
+			break;
+		default:
+			mask = QCA8K_PORT_HOL_CTRL0_EG_PRI0(0x3) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI1(0x4) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI2(0x6) |
+				QCA8K_PORT_HOL_CTRL0_EG_PRI3(0x8) |
+				QCA8K_PORT_HOL_CTRL0_EG_PORT(0x19);
+		}
+		qca8k_write(priv, QCA8K_REG_PORT_HOL_CTRL0(i), mask);
+
+		mask = QCA8K_PORT_HOL_CTRL1_ING(0x6) |
+		       QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
+		       QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
+		       QCA8K_PORT_HOL_CTRL1_WRED_EN;
+		qca8k_rmw(priv, QCA8K_REG_PORT_HOL_CTRL1(i),
+			  QCA8K_PORT_HOL_CTRL1_ING_BUF |
+			  QCA8K_PORT_HOL_CTRL1_EG_PRI_BUF_EN |
+			  QCA8K_PORT_HOL_CTRL1_EG_PORT_BUF_EN |
+			  QCA8K_PORT_HOL_CTRL1_WRED_EN,
+			  mask);
+	}
 
 	/* Flush the FDB table */
 	qca8k_fdb_flush(priv);
