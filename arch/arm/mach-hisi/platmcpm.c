@@ -82,8 +82,8 @@ static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
 {
 	unsigned long data;
 
-	if (!fabric)
-		BUG();
+	BUG_ON(!fabric);
+
 	data = readl_relaxed(fabric + FAB_SF_MODE);
 	if (on)
 		data |= 1 << cluster;

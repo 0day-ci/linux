@@ -193,8 +193,7 @@ void hix5hd2_set_cpu(int cpu, bool enable)
 	u32 val = 0;
 
 	if (!ctrl_base)
-		if (!hix5hd2_hotplug_init())
-			BUG();
+		BUG_ON(!hix5hd2_hotplug_init());
 
 	if (enable) {
 		/* power on cpu1 */
