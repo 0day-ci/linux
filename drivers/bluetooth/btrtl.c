@@ -38,42 +38,6 @@
 	.hci_ver = (hciv), \
 	.hci_bus = (bus)
 
-enum btrtl_chip_id {
-	CHIP_ID_8723A,
-	CHIP_ID_8723B,
-	CHIP_ID_8821A,
-	CHIP_ID_8761A,
-	CHIP_ID_8822B = 8,
-	CHIP_ID_8723D,
-	CHIP_ID_8821C,
-	CHIP_ID_8822C = 13,
-	CHIP_ID_8761B,
-	CHIP_ID_8852A = 18,
-};
-
-struct id_table {
-	__u16 match_flags;
-	__u16 lmp_subver;
-	__u16 hci_rev;
-	__u8 hci_ver;
-	__u8 hci_bus;
-	bool config_needed;
-	bool has_rom_version;
-	char *fw_name;
-	char *cfg_name;
-};
-
-struct btrtl_device_info {
-	const struct id_table *ic_info;
-	u8 rom_version;
-	u8 *fw_data;
-	int fw_len;
-	u8 *cfg_data;
-	int cfg_len;
-	bool drop_fw;
-	int project_id;
-};
-
 static const struct id_table ic_id_table[] = {
 	/* 8723A */
 	{ IC_INFO(RTL_ROM_LMP_8723A, 0xb, 0x6, HCI_USB),
