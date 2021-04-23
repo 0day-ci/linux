@@ -238,7 +238,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 	return;
 bail_out:
 	kfree(clks);
-	while(ncpus--)
+	while (ncpus--)
 		kfree(cpuclk[ncpus].clk_name);
 clks_out:
 	kfree(cpuclk);
