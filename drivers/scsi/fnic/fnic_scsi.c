@@ -2808,6 +2808,55 @@ call_fc_exch_mgr_reset:
 
 }
 
+struct fnic_is_abts_pending_data {
+	struct scsi_cmnd *lr_sc;
+	int ret;
+};
+
+static bool __fnic_is_abts_pending(struct scsi_cmnd *sc, void *data, bool rsvd)
+{
+	struct fnic_is_abts_pending_data *pdata = data;
+	struct fnic_io_req *io_req;
+	spinlock_t *io_lock;
+	unsigned long flags;
+	struct scsi_device *lun_dev = NULL;
+	struct fc_lport *lp = shost_priv(sc->device->host);
+	struct fnic *fnic = lport_priv(lp);
+
+	if (pdata->lr_sc)
+		lun_dev = pdata->lr_sc->device;
+
+	/*
+	 * ignore this lun reset cmd or cmds that do not belong to
+	 * this lun
+	 */
+	if (!sc || (pdata->lr_sc && (sc->device != lun_dev ||
+					sc == pdata->lr_sc)))
+		return true;
+
+	io_lock = fnic_io_lock_hash(fnic, sc);
+	spin_lock_irqsave(io_lock, flags);
+
+	io_req = (struct fnic_io_req *)CMD_SP(sc);
+
+	if (!io_req || sc->device != lun_dev)
+		goto unlock;
+
+	/*
+	 * Found IO that is still pending with firmware and
+	 * belongs to the LUN that we are resetting
+	 */
+	FNIC_SCSI_DBG(KERN_INFO, fnic->lport->host,
+		      "Found IO in %s on lun\n",
+		      fnic_ioreq_state_to_str(CMD_STATE(sc)));
+
+	if (CMD_STATE(sc) == FNIC_IOREQ_ABTS_PENDING)
+		pdata->ret = 1;
+ unlock:
+	spin_unlock_irqrestore(io_lock, flags);
+	return true;
+}
+
 /*
  * fnic_is_abts_pending() is a helper function that
  * walks through tag map to check if there is any IOs pending,if there is one,
@@ -2817,49 +2866,11 @@ call_fc_exch_mgr_reset:
  */
 int fnic_is_abts_pending(struct fnic *fnic, struct scsi_cmnd *lr_sc)
 {
-	int tag;
-	struct fnic_io_req *io_req;
-	spinlock_t *io_lock;
-	unsigned long flags;
-	int ret = 0;
-	struct scsi_cmnd *sc;
-	struct scsi_device *lun_dev = NULL;
+	struct fnic_is_abts_pending_data data = {
+		.lr_sc	=	lr_sc,
+		.ret	=	0,
+	};
 
-	if (lr_sc)
-		lun_dev = lr_sc->device;
-
-	/* walk again to check, if IOs are still pending in fw */
-	for (tag = 0; tag < fnic->fnic_max_tag_id; tag++) {
-		sc = scsi_host_find_tag(fnic->lport->host, tag);
-		/*
-		 * ignore this lun reset cmd or cmds that do not belong to
-		 * this lun
-		 */
-		if (!sc || (lr_sc && (sc->device != lun_dev || sc == lr_sc)))
-			continue;
-
-		io_lock = fnic_io_lock_hash(fnic, sc);
-		spin_lock_irqsave(io_lock, flags);
-
-		io_req = (struct fnic_io_req *)CMD_SP(sc);
-
-		if (!io_req || sc->device != lun_dev) {
-			spin_unlock_irqrestore(io_lock, flags);
-			continue;
-		}
-
-		/*
-		 * Found IO that is still pending with firmware and
-		 * belongs to the LUN that we are resetting
-		 */
-		FNIC_SCSI_DBG(KERN_INFO, fnic->lport->host,
-			      "Found IO in %s on lun\n",
-			      fnic_ioreq_state_to_str(CMD_STATE(sc)));
-
-		if (CMD_STATE(sc) == FNIC_IOREQ_ABTS_PENDING)
-			ret = 1;
-		spin_unlock_irqrestore(io_lock, flags);
-	}
-
-	return ret;
+	scsi_host_busy_iter(fnic->lport->host, __fnic_is_abts_pending, &data);
+	return data.ret;
 }
