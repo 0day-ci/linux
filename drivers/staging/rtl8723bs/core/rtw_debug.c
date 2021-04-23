@@ -45,7 +45,7 @@ void bb_reg_dump(struct adapter *adapter)
 	}
 }
 
-void rf_reg_dump(void *sel, struct adapter *adapter)
+void rf_reg_dump(struct adapter *adapter)
 {
 	int i, j = 1, path;
 	u32 value;
