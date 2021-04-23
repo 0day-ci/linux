@@ -110,7 +110,7 @@ config BATTERY_ACT8945A
 
 config BATTERY_CPCAP
 	tristate "Motorola CPCAP PMIC battery driver"
-	depends on MFD_CPCAP && IIO
+	depends on ( MFD_CPCAP && IIO ) && ( NVMEM || !NVMEM )
 	default MFD_CPCAP
 	help
 	  Say Y here to enable support for battery on Motorola
