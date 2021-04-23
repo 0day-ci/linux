@@ -3458,6 +3458,115 @@ static int kvm_vcpu_ioctl_set_sigmask(struct kvm_vcpu *vcpu, sigset_t *sigset)
 	return 0;
 }
 
+static ssize_t kvm_vcpu_stats_read(struct file *file, char __user *user_buffer,
+			      size_t size, loff_t *offset)
+{
+	char id[KVM_STATS_ID_MAXLEN];
+	struct kvm_vcpu *vcpu = file->private_data;
+	ssize_t copylen, len, remain = size;
+	size_t size_header, size_desc, size_stats;
+	loff_t pos = *offset;
+	char __user *dest = user_buffer;
+	void *src;
+
+	snprintf(id, sizeof(id), "kvm-%d/vcpu-%d",
+			task_pid_nr(current), vcpu->vcpu_id);
+	size_header = sizeof(kvm_vcpu_stats_header);
+	size_desc =
+		kvm_vcpu_stats_header.count * sizeof(struct _kvm_stats_desc);
+	size_stats = sizeof(vcpu->stat);
+
+	len = sizeof(id) + size_header + size_desc + size_stats - pos;
+	len = min(len, remain);
+	if (len <= 0)
+		return 0;
+	remain = len;
+
+	// Copy kvm vcpu stats header id string
+	copylen = sizeof(id) - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)id + pos;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vcpu stats header
+	copylen = sizeof(id) + size_header - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&kvm_vcpu_stats_header;
+		src += pos - sizeof(id);
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vcpu stats descriptors
+	copylen = kvm_vcpu_stats_header.desc_offset + size_desc - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&kvm_vcpu_stats_desc;
+		src += pos - kvm_vcpu_stats_header.desc_offset;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vcpu stats values
+	copylen = kvm_vcpu_stats_header.data_offset + size_stats - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&vcpu->stat;
+		src += pos - kvm_vcpu_stats_header.data_offset;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+
+	*offset = pos;
+	return len;
+}
+
+static struct file_operations kvm_vcpu_stats_fops = {
+	.read = kvm_vcpu_stats_read,
+	.llseek = noop_llseek,
+};
+
+static int kvm_vcpu_ioctl_get_statsfd(struct kvm_vcpu *vcpu)
+{
+	int error, fd;
+	struct file *file;
+	char name[15 + ITOA_MAX_LEN + 1];
+
+	snprintf(name, sizeof(name), "kvm-vcpu-stats:%d", vcpu->vcpu_id);
+
+	error = get_unused_fd_flags(O_CLOEXEC);
+	if (error < 0)
+		return error;
+	fd = error;
+
+	file = anon_inode_getfile(name, &kvm_vcpu_stats_fops, vcpu, O_RDONLY);
+	if (IS_ERR(file)) {
+		error = PTR_ERR(file);
+		goto err_put_unused_fd;
+	}
+	file->f_mode |= FMODE_PREAD;
+	fd_install(fd, file);
+
+	return fd;
+
+err_put_unused_fd:
+	put_unused_fd(fd);
+	return error;
+}
+
 static long kvm_vcpu_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
@@ -3653,6 +3762,10 @@ out_free1:
 			goto out;
 		}
 		r = kvm_arch_vcpu_ioctl_set_fpu(vcpu, fpu);
+		break;
+	}
+	case KVM_STATS_GETFD: {
+		r = kvm_vcpu_ioctl_get_statsfd(vcpu);
 		break;
 	}
 	default:
@@ -3913,6 +4026,8 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 #else
 		return 0;
 #endif
+	case KVM_CAP_STATS_BINARY_FD:
+		return 1;
 	default:
 		break;
 	}
@@ -4014,6 +4129,111 @@ static int kvm_vm_ioctl_enable_cap_generic(struct kvm *kvm,
 	default:
 		return kvm_vm_ioctl_enable_cap(kvm, cap);
 	}
+}
+
+static ssize_t kvm_vm_stats_read(struct file *file, char __user *user_buffer,
+			      size_t size, loff_t *offset)
+{
+	char id[KVM_STATS_ID_MAXLEN];
+	struct kvm *kvm = file->private_data;
+	ssize_t copylen, len, remain = size;
+	size_t size_header, size_desc, size_stats;
+	loff_t pos = *offset;
+	char __user *dest = user_buffer;
+	void *src;
+
+	snprintf(id, sizeof(id), "kvm-%d", task_pid_nr(current));
+	size_header = sizeof(kvm_vm_stats_header);
+	size_desc = kvm_vm_stats_header.count * sizeof(struct _kvm_stats_desc);
+	size_stats = sizeof(kvm->stat);
+
+	len = sizeof(id) + size_header + size_desc + size_stats - pos;
+	len = min(len, remain);
+	if (len <= 0)
+		return 0;
+	remain = len;
+
+	// Copy kvm vm stats header id string
+	copylen = sizeof(id) - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)id + pos;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vm stats header
+	copylen = sizeof(id) + size_header - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&kvm_vm_stats_header;
+		src += pos - sizeof(id);
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vm stats descriptors
+	copylen = kvm_vm_stats_header.desc_offset + size_desc - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&kvm_vm_stats_desc;
+		src += pos - kvm_vm_stats_header.desc_offset;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+	// Copy kvm vm stats values
+	copylen = kvm_vm_stats_header.data_offset + size_stats - pos;
+	copylen = min(copylen, remain);
+	if (copylen > 0) {
+		src = (void *)&kvm->stat;
+		src += pos - kvm_vm_stats_header.data_offset;
+		if (copy_to_user(dest, src, copylen))
+			return -EFAULT;
+		remain -= copylen;
+		pos += copylen;
+		dest += copylen;
+	}
+
+	*offset = pos;
+	return len;
+}
+
+static struct file_operations kvm_vm_stats_fops = {
+	.read = kvm_vm_stats_read,
+	.llseek = noop_llseek,
+};
+
+static int kvm_vm_ioctl_get_statsfd(struct kvm *kvm)
+{
+	int error, fd;
+	struct file *file;
+
+	error = get_unused_fd_flags(O_CLOEXEC);
+	if (error < 0)
+		return error;
+	fd = error;
+
+	file = anon_inode_getfile("kvm-vm-stats",
+			&kvm_vm_stats_fops, kvm, O_RDONLY);
+	if (IS_ERR(file)) {
+		error = PTR_ERR(file);
+		goto err_put_unused_fd;
+	}
+	file->f_mode |= FMODE_PREAD;
+	fd_install(fd, file);
+
+	return fd;
+
+err_put_unused_fd:
+	put_unused_fd(fd);
+	return error;
 }
 
 static long kvm_vm_ioctl(struct file *filp,
@@ -4197,6 +4417,9 @@ static long kvm_vm_ioctl(struct file *filp,
 		break;
 	case KVM_RESET_DIRTY_RINGS:
 		r = kvm_vm_ioctl_reset_dirty_pages(kvm);
+		break;
+	case KVM_STATS_GETFD:
+		r = kvm_vm_ioctl_get_statsfd(kvm);
 		break;
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
