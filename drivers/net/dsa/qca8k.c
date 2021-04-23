@@ -133,9 +133,12 @@ qca8k_set_page(struct mii_bus *bus, u16 page)
 	if (page == qca8k_current_page)
 		return;
 
-	if (bus->write(bus, 0x18, 0, page) < 0)
+	if (bus->write(bus, 0x18, 0, page)) {
 		dev_err_ratelimited(&bus->dev,
 				    "failed to set qca8k page\n");
+		return;
+	}
+
 	qca8k_current_page = page;
 }
 
