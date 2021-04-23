@@ -909,7 +909,7 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 {
 	const struct qca8k_match_data *data;
 	struct qca8k_priv *priv = ds->priv;
-	u32 reg, val;
+	u32 phy, reg, val;
 
 	/* get the switches ID from the compatible */
 	data = of_device_get_match_data(priv->dev);
@@ -928,7 +928,26 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 	case 3:
 	case 4:
 	case 5:
-		/* Internal PHY, nothing to do */
+		/* Internal PHY, apply revision fixup */
+		phy = qca8k_port_to_phy(port) % PHY_MAX_ADDR;
+		switch (priv->switch_revision) {
+		case 1:
+			/* For 100M waveform */
+			qca8k_phy_dbg_write(priv, phy, 0, 0x02ea);
+			/* Turn on Gigabit clock */
+			qca8k_phy_dbg_write(priv, phy, 0x3d, 0x68a0);
+			break;
+
+		case 2:
+			qca8k_phy_mmd_write(priv, phy, 0x7, 0x3c, 0x0);
+			fallthrough;
+		case 4:
+			qca8k_phy_mmd_write(priv, phy, 0x3, 0x800d, 0x803f);
+			qca8k_phy_dbg_write(priv, phy, 0x3d, 0x6860);
+			qca8k_phy_dbg_write(priv, phy, 0x5, 0x2c46);
+			qca8k_phy_dbg_write(priv, phy, 0x3c, 0x6000);
+			break;
+		}
 		return;
 	case 6: /* 2nd CPU port / external PHY */
 		if (state->interface != PHY_INTERFACE_MODE_RGMII &&
