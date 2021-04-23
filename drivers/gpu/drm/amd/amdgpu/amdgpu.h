@@ -302,6 +302,11 @@ int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
 				   enum amd_ip_block_type block_type);
 bool amdgpu_device_ip_is_idle(struct amdgpu_device *adev,
 			      enum amd_ip_block_type block_type);
+int kgd_arcturus_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
+				uint32_t __user *wptr, struct mm_struct *mm);
+bool kgd_arcturus_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
+int kgd_arcturus_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
+					unsigned int utimeout);
 
 #define AMDGPU_MAX_IP_NUM 16
 
