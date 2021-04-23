@@ -719,7 +719,8 @@ static int hci_uart_set_flags(struct hci_uart *hu, unsigned long flags)
 				    BIT(HCI_UART_CREATE_AMP) |
 				    BIT(HCI_UART_INIT_PENDING) |
 				    BIT(HCI_UART_EXT_CONFIG) |
-				    BIT(HCI_UART_VND_DETECT);
+				    BIT(HCI_UART_VND_DETECT) |
+				    BIT(HCI_UART_WAKEUP_ENABLE);
 
 	if (flags & ~valid_flags)
 		return -EINVAL;

@@ -911,6 +911,15 @@ static int h5_btrtl_setup(struct h5 *h5)
 	 */
 	set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &h5->hu->hdev->quirks);
 
+	switch (btrtl_dev->project_id) {
+	case CHIP_ID_8822C:
+	case CHIP_ID_8852A:
+		set_bit(HCI_UART_WAKEUP_ENABLE, &h5->hu->hdev_flags);
+		break;
+	default:
+		break;
+	}
+
 out_free:
 	btrtl_free(btrtl_dev);
 
@@ -945,8 +954,11 @@ static void h5_btrtl_close(struct h5 *h5)
 static int h5_btrtl_suspend(struct h5 *h5)
 {
 	serdev_device_set_flow_control(h5->hu->serdev, false);
-	gpiod_set_value_cansleep(h5->device_wake_gpio, 0);
-	gpiod_set_value_cansleep(h5->enable_gpio, 0);
+
+	if (!test_bit(HCI_UART_WAKEUP_ENABLE, &h5->hu->hdev_flags)) {
+		gpiod_set_value_cansleep(h5->device_wake_gpio, 0);
+		gpiod_set_value_cansleep(h5->enable_gpio, 0);
+	}
 	return 0;
 }
 
@@ -972,17 +984,19 @@ static void h5_btrtl_reprobe_worker(struct work_struct *work)
 
 static int h5_btrtl_resume(struct h5 *h5)
 {
-	struct h5_btrtl_reprobe *reprobe;
+	if (!test_bit(HCI_UART_WAKEUP_ENABLE, &h5->hu->hdev_flags)) {
+		struct h5_btrtl_reprobe *reprobe;
 
-	reprobe = kzalloc(sizeof(*reprobe), GFP_KERNEL);
-	if (!reprobe)
-		return -ENOMEM;
+		reprobe = kzalloc(sizeof(*reprobe), GFP_KERNEL);
+		if (!reprobe)
+			return -ENOMEM;
 
-	__module_get(THIS_MODULE);
+		__module_get(THIS_MODULE);
 
-	INIT_WORK(&reprobe->work, h5_btrtl_reprobe_worker);
-	reprobe->dev = get_device(&h5->hu->serdev->dev);
-	queue_work(system_long_wq, &reprobe->work);
+		INIT_WORK(&reprobe->work, h5_btrtl_reprobe_worker);
+		reprobe->dev = get_device(&h5->hu->serdev->dev);
+		queue_work(system_long_wq, &reprobe->work);
+	}
 	return 0;
 }
 
