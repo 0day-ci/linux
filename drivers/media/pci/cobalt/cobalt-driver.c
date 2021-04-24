@@ -189,6 +189,8 @@ void cobalt_pcie_status_show(struct cobalt *cobalt)
 	u32 capa;
 	u16 stat, ctrl;
 
+	if (!pci_bus_dev)
+		return;
 	if (!pci_is_pcie(pci_dev) || !pci_is_pcie(pci_bus_dev))
 		return;
 
@@ -247,6 +249,8 @@ static unsigned pcie_bus_link_get_lanes(struct cobalt *cobalt)
 	struct pci_dev *pci_dev = cobalt->pci_dev->bus->self;
 	u32 link;
 
+	if (!pci_dev)
+		return 0;
 	if (!pci_is_pcie(pci_dev))
 		return 0;
 	pcie_capability_read_dword(pci_dev, PCI_EXP_LNKCAP, &link);
