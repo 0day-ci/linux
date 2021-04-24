@@ -18,6 +18,7 @@
 #include <linux/spi/spi.h>
 #include <linux/nvmem-provider.h>
 #include <linux/eeprom_93xx46.h>
+#include <linux/log2.h>
 
 #define OP_START	0x4
 #define OP_WRITE	(OP_START | 0x1)
@@ -474,10 +475,22 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 	if (!edev)
 		return -ENOMEM;
 
+	if (pd->flags & EE_SIZE1K)
+		edev->size = 128;
+	else if (pd->flags & EE_SIZE2K)
+		edev->size = 256;
+	else if (pd->flags & EE_SIZE4K)
+		edev->size = 512;
+	else {
+		dev_err(&spi->dev, "unspecified size\n");
+		err = -EINVAL;
+		goto fail;
+	}
+
 	if (pd->flags & EE_ADDR8)
-		edev->addrlen = 7;
+		edev->addrlen = ilog2(edev->size);
 	else if (pd->flags & EE_ADDR16)
-		edev->addrlen = 6;
+		edev->addrlen = ilog2(edev->size) - 1;
 	else {
 		dev_err(&spi->dev, "unspecified address type\n");
 		return -EINVAL;
@@ -488,7 +501,6 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 	edev->spi = spi;
 	edev->pdata = pd;
 
-	edev->size = 128;
 	edev->nvmem_config.type = NVMEM_TYPE_EEPROM;
 	edev->nvmem_config.name = dev_name(&spi->dev);
 	edev->nvmem_config.dev = &spi->dev;
@@ -508,8 +520,9 @@ static int eeprom_93xx46_probe(struct spi_device *spi)
 	if (IS_ERR(edev->nvmem))
 		return PTR_ERR(edev->nvmem);
 
-	dev_info(&spi->dev, "%d-bit eeprom %s\n",
+	dev_info(&spi->dev, "%d-bit eeprom containing %d bytes %s\n",
 		(pd->flags & EE_ADDR8) ? 8 : 16,
+		edev->size,
 		(pd->flags & EE_READONLY) ? "(readonly)" : "");
 
 	if (!(pd->flags & EE_READONLY)) {
