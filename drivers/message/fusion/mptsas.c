@@ -406,7 +406,7 @@ static inline MPT_ADAPTER *rphy_to_ioc(struct sas_rphy *rphy)
 static struct mptsas_portinfo *
 mptsas_find_portinfo_by_handle(MPT_ADAPTER *ioc, u16 handle)
 {
-	struct mptsas_portinfo *port_info, *rc=NULL;
+	struct mptsas_portinfo *port_info, *rc = NULL;
 	int i;
 
 	list_for_each_entry(port_info, &ioc->sas_topology, list)
@@ -491,7 +491,7 @@ mptsas_port_delete(MPT_ADAPTER *ioc, struct mptsas_portinfo_details * port_detai
 	    port_details->phy_bitmask));
 
 	for (i = 0; i < port_info->num_phys; i++, phy_info++) {
-		if(phy_info->port_details != port_details)
+		if (phy_info->port_details != port_details)
 			continue;
 		memset(&phy_info->attached, 0, sizeof(struct mptsas_devinfo));
 		mptsas_set_rphy(ioc, phy_info, NULL);
@@ -684,8 +684,8 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc,
 	RaidPhysDiskPage0_t 		phys_disk;
 	struct mptsas_device_info	*sas_info, *next;
 
-	memset(&cfg, 0 , sizeof(CONFIGPARMS));
-	memset(&hdr, 0 , sizeof(ConfigPageHeader_t));
+	memset(&cfg, 0, sizeof(CONFIGPARMS));
+	memset(&hdr, 0, sizeof(ConfigPageHeader_t));
 	hdr.PageType = MPI_CONFIG_PAGETYPE_RAID_VOLUME;
 	/* assumption that all volumes on channel = 0 */
 	cfg.pageAddr = starget->id;
@@ -879,7 +879,7 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 		    "%s: [%p]: deleting phy = %d\n",
 		    ioc->name, __func__, port_details, i));
 		port_details->num_phys--;
-		port_details->phy_bitmask &= ~ (1 << phy_info->phy_id);
+		port_details->phy_bitmask &= ~(1 << phy_info->phy_id);
 		memset(&phy_info->attached, 0, sizeof(struct mptsas_devinfo));
 		if (phy_info->phy) {
 			devtprintk(ioc, dev_printk(KERN_DEBUG,
@@ -912,10 +912,10 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 				goto out;
 			port_details->num_phys = 1;
 			port_details->port_info = port_info;
-			if (phy_info->phy_id < 64 )
+			if (phy_info->phy_id < 64)
 				port_details->phy_bitmask |=
 				    (1 << phy_info->phy_id);
-			phy_info->sas_port_add_phy=1;
+			phy_info->sas_port_add_phy = 1;
 			dsaswideprintk(ioc, printk(MYIOC_s_DEBUG_FMT "\t\tForming port\n\t\t"
 			    "phy_id=%d sas_address=0x%018llX\n",
 			    ioc->name, i, (unsigned long long)sas_address));
@@ -931,7 +931,7 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 				continue;
 			if (sas_address != phy_info_cmp->attached.sas_address)
 				continue;
-			if (phy_info_cmp->port_details == port_details )
+			if (phy_info_cmp->port_details == port_details)
 				continue;
 			dsaswideprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 			    "\t\tphy_id=%d sas_address=0x%018llX\n",
@@ -949,12 +949,12 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 				if (!phy_info_cmp->port_details->num_phys)
 					kfree(phy_info_cmp->port_details);
 			} else
-				phy_info_cmp->sas_port_add_phy=1;
+				phy_info_cmp->sas_port_add_phy = 1;
 			/*
 			 * Adding a phy to a port
 			 */
 			phy_info_cmp->port_details = port_details;
-			if (phy_info_cmp->phy_id < 64 )
+			if (phy_info_cmp->phy_id < 64)
 				port_details->phy_bitmask |=
 				(1 << phy_info_cmp->phy_id);
 			port_details->num_phys++;
@@ -1218,8 +1218,8 @@ static int
 mptsas_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 {
 	MPT_SCSI_HOST	*hd = shost_priv(ioc->sh);
-        struct list_head *head = &hd->target_reset_list;
-	u8		id, channel;
+	struct list_head *head = &hd->target_reset_list;
+	u8 id, channel;
 	struct mptsas_target_reset_event	*target_reset_list;
 	SCSITaskMgmtReply_t *pScsiTmReply;
 
@@ -2585,7 +2585,7 @@ mptsas_sas_device_pg0(MPT_ADAPTER *ioc, struct mptsas_devinfo *device_info,
 	SasDevicePage0_t *buffer;
 	dma_addr_t dma_handle;
 	__le64 sas_address;
-	int error=0;
+	int error = 0;
 
 	hdr.PageVersion = MPI_SASDEVICE0_PAGEVERSION;
 	hdr.ExtPageLength = 0;
@@ -2748,7 +2748,7 @@ mptsas_sas_expander_pg1(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 	CONFIGPARMS cfg;
 	SasExpanderPage1_t *buffer;
 	dma_addr_t dma_handle;
-	int error=0;
+	int error = 0;
 
 	hdr.PageVersion = MPI_SASEXPANDER1_PAGEVERSION;
 	hdr.ExtPageLength = 0;
@@ -3307,7 +3307,7 @@ mptsas_probe_hba_phys(MPT_ADAPTER *ioc)
 	int error = -ENOMEM, i;
 
 	hba = kzalloc(sizeof(struct mptsas_portinfo), GFP_KERNEL);
-	if (! hba)
+	if (!hba)
 		goto out;
 
 	error = mptsas_sas_io_unit_pg0(ioc, hba);
@@ -4255,8 +4255,8 @@ mptsas_adding_inactive_raid_components(MPT_ADAPTER *ioc, u8 channel, u8 id)
 	struct mptsas_phyinfo	*phy_info;
 	struct mptsas_devinfo		sas_device;
 
-	memset(&cfg, 0 , sizeof(CONFIGPARMS));
-	memset(&hdr, 0 , sizeof(ConfigPageHeader_t));
+	memset(&cfg, 0, sizeof(CONFIGPARMS));
+	memset(&hdr, 0, sizeof(ConfigPageHeader_t));
 	hdr.PageType = MPI_CONFIG_PAGETYPE_RAID_VOLUME;
 	cfg.pageAddr = (channel << 8) + id;
 	cfg.cfghdr.hdr = &hdr;
@@ -5157,10 +5157,10 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int			 numSGE = 0;
 	int			 scale;
 	int			 ioc_cap;
-	int			error=0;
+	int			error = 0;
 	int			r;
 
-	r = mpt_attach(pdev,id);
+	r = mpt_attach(pdev, id);
 	if (r)
 		return r;
 
@@ -5211,9 +5211,8 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			"Unable to register controller with SCSI subsystem\n",
 			ioc->name);
 		error = -1;
-		goto out_mptsas_probe;
-        }
-
+		goto out_mptsas_probe
+	}
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
 
 	/* Attach the SCSI Host to the IOC structure
@@ -5310,7 +5309,7 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
-	if (ioc->sas_data.ptClear==1) {
+	if (ioc->sas_data.ptClear == 1) {
 		mptbase_sas_persist_operation(
 		    ioc, MPI_SAS_OP_CLEAR_ALL_PERSISTENT);
 	}
