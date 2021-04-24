@@ -1880,12 +1880,11 @@ static int ccs_pm_get_init(struct ccs_sensor *sensor)
 	struct i2c_client *client = v4l2_get_subdevdata(&sensor->src->sd);
 	int rval;
 
-	rval = pm_runtime_get_sync(&client->dev);
-	if (rval < 0) {
-		pm_runtime_put_noidle(&client->dev);
-
+	rval = pm_runtime_resume_and_get(&client->dev);
+	if (rval < 0)
 		return rval;
-	} else if (!rval) {
+
+	if (!rval) {
 		rval = v4l2_ctrl_handler_setup(&sensor->pixel_array->
 					       ctrl_handler);
 		if (rval)
@@ -3089,7 +3088,7 @@ static int __maybe_unused ccs_suspend(struct device *dev)
 	bool streaming = sensor->streaming;
 	int rval;
 
-	rval = pm_runtime_get_sync(dev);
+	rval = pm_runtime_resume_and_get(dev);
 	if (rval < 0) {
 		pm_runtime_put_noidle(dev);
 
