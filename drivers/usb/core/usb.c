@@ -569,6 +569,7 @@ struct device_type usb_device_type = {
 #ifdef CONFIG_PM
 	.pm =		&usb_device_pm_ops,
 #endif
+	.supports_removable = true,
 };
 
 
