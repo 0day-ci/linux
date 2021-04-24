@@ -823,16 +823,21 @@ bool pdptrs_changed(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(pdptrs_changed);
 
+static bool kvm_cr0_mmu_role_changed(unsigned long old_cr0, unsigned long cr0)
+{
+	unsigned long mmu_role_bits = X86_CR0_PG | X86_CR0_WP;
+
+	return (cr0 ^ old_cr0) & mmu_role_bits;
+}
+
 void kvm_post_set_cr0(struct kvm_vcpu *vcpu, unsigned long old_cr0, unsigned long cr0)
 {
-	unsigned long update_bits = X86_CR0_PG | X86_CR0_WP;
-
 	if ((cr0 ^ old_cr0) & X86_CR0_PG) {
 		kvm_clear_async_pf_completion_queue(vcpu);
 		kvm_async_pf_hash_reset(vcpu);
 	}
 
-	if ((cr0 ^ old_cr0) & update_bits)
+	if (kvm_cr0_mmu_role_changed(old_cr0, cr0))
 		kvm_mmu_reset_context(vcpu);
 
 	if (((cr0 ^ old_cr0) & X86_CR0_CD) &&
@@ -1009,13 +1014,18 @@ bool kvm_is_valid_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 }
 EXPORT_SYMBOL_GPL(kvm_is_valid_cr4);
 
-void kvm_post_set_cr4(struct kvm_vcpu *vcpu, unsigned long old_cr4, unsigned long cr4)
+static bool kvm_cr4_mmu_role_changed(unsigned long old_cr4, unsigned long cr4)
 {
 	unsigned long mmu_role_bits = X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE |
 				      X86_CR4_SMEP | X86_CR4_SMAP | X86_CR4_PKE;
 
-	if (((cr4 ^ old_cr4) & mmu_role_bits) ||
-	    (!(cr4 & X86_CR4_PCIDE) && (old_cr4 & X86_CR4_PCIDE)))
+	return (((cr4 ^ old_cr4) & mmu_role_bits) ||
+	       (!(cr4 & X86_CR4_PCIDE) && (old_cr4 & X86_CR4_PCIDE)));
+}
+
+void kvm_post_set_cr4(struct kvm_vcpu *vcpu, unsigned long old_cr4, unsigned long cr4)
+{
+	if (kvm_cr4_mmu_role_changed(old_cr4, cr4))
 		kvm_mmu_reset_context(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_post_set_cr4);
