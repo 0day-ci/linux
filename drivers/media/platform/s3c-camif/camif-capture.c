@@ -547,16 +547,15 @@ static int s3c_camif_open(struct file *file)
 	if (ret < 0)
 		goto unlock;
 
-	ret = pm_runtime_get_sync(camif->dev);
+	ret = pm_runtime_resume_and_get(camif->dev);
 	if (ret < 0)
-		goto err_pm;
+		goto unlock;
 
 	ret = sensor_set_power(camif, 1);
 	if (!ret)
 		goto unlock;
 
 	pm_runtime_put(camif->dev);
-err_pm:
 	v4l2_fh_release(file);
 unlock:
 	mutex_unlock(&camif->lock);
