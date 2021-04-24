@@ -109,12 +109,12 @@ static int eeprom_93xx46_read(void *priv, unsigned int off,
 		u16 cmd_addr = OP_READ << edev->addrlen;
 		size_t nbytes = count;
 
-		if (edev->addrlen == 7) {
-			cmd_addr |= off & 0x7f;
+		if (edev->pdata->flags & EE_ADDR8) {
+			cmd_addr |= off;
 			if (has_quirk_single_word_read(edev))
 				nbytes = 1;
 		} else {
-			cmd_addr |= (off >> 1) & 0x3f;
+			cmd_addr |= (off >> 1);
 			if (has_quirk_single_word_read(edev))
 				nbytes = 2;
 		}
@@ -173,7 +173,7 @@ static int eeprom_93xx46_ew(struct eeprom_93xx46_dev *edev, int is_on)
 	bits = edev->addrlen + 3;
 
 	cmd_addr = OP_START << edev->addrlen;
-	if (edev->addrlen == 7) {
+	if (edev->pdata->flags & EE_ADDR8) {
 		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS) << 1;
 	} else {
 		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS);
@@ -223,16 +223,19 @@ eeprom_93xx46_write_word(struct eeprom_93xx46_dev *edev,
 	int bits, data_len, ret;
 	u16 cmd_addr;
 
+	if (unlikely(off >= edev->size))
+		return -EINVAL;
+
 	/* The opcode in front of the address is three bits. */
 	bits = edev->addrlen + 3;
 
 	cmd_addr = OP_WRITE << edev->addrlen;
 
-	if (edev->addrlen == 7) {
-		cmd_addr |= off & 0x7f;
+	if (edev->pdata->flags & EE_ADDR8) {
+		cmd_addr |= off;
 		data_len = 1;
 	} else {
-		cmd_addr |= (off >> 1) & 0x3f;
+		cmd_addr |= (off >> 1);
 		data_len = 2;
 	}
 
@@ -272,7 +275,7 @@ static int eeprom_93xx46_write(void *priv, unsigned int off,
 		return count;
 
 	/* only write even number of bytes on 16-bit devices */
-	if (edev->addrlen == 6) {
+	if (edev->pdata->flags & EE_ADDR16) {
 		step = 2;
 		count &= ~1;
 	}
@@ -318,7 +321,7 @@ static int eeprom_93xx46_eral(struct eeprom_93xx46_dev *edev)
 	bits = edev->addrlen + 3;
 
 	cmd_addr = OP_START << edev->addrlen;
-	if (edev->addrlen == 7) {
+	if (edev->pdata->flags & EE_ADDR8) {
 		cmd_addr |= ADDR_ERAL << 1;
 	} else {
 		cmd_addr |= ADDR_ERAL;
