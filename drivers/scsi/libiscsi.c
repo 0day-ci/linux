@@ -1669,6 +1669,93 @@ enum {
 	FAILURE_SESSION_NOT_READY,
 };
 
+static bool iscsi_eh_running(struct iscsi_conn *conn, struct scsi_cmnd *sc,
+			     int *reason)
+{
+	struct iscsi_session *session = conn->session;
+	struct iscsi_tm *tmf;
+
+	if (session->state != ISCSI_STATE_LOGGED_IN) {
+		/*
+		 * to handle the race between when we set the recovery state
+		 * and block the session we requeue here (commands could
+		 * be entering our queuecommand while a block is starting
+		 * up because the block code is not locked)
+		 */
+		switch (session->state) {
+		case ISCSI_STATE_FAILED:
+			/*
+			 * cmds should fail during shutdown, if the session
+			 * state is bad, allowing completion to happen
+			 */
+			if (unlikely(system_state != SYSTEM_RUNNING)) {
+				*reason = FAILURE_SESSION_FAILED;
+				sc->result = DID_NO_CONNECT << 16;
+				break;
+			}
+			fallthrough;
+		case ISCSI_STATE_IN_RECOVERY:
+			*reason = FAILURE_SESSION_IN_RECOVERY;
+			sc->result = DID_IMM_RETRY << 16;
+			break;
+		case ISCSI_STATE_LOGGING_OUT:
+			*reason = FAILURE_SESSION_LOGGING_OUT;
+			sc->result = DID_IMM_RETRY << 16;
+			break;
+		case ISCSI_STATE_RECOVERY_FAILED:
+			*reason = FAILURE_SESSION_RECOVERY_TIMEOUT;
+			sc->result = DID_TRANSPORT_FAILFAST << 16;
+			break;
+		case ISCSI_STATE_TERMINATE:
+			*reason = FAILURE_SESSION_TERMINATE;
+			sc->result = DID_NO_CONNECT << 16;
+			break;
+		default:
+			*reason = FAILURE_SESSION_FREED;
+			sc->result = DID_NO_CONNECT << 16;
+		}
+		goto eh_running;
+	}
+
+	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
+		*reason = FAILURE_SESSION_IN_RECOVERY;
+		sc->result = DID_REQUEUE << 16;
+		goto eh_running;
+	}
+
+	/*
+	 * For sg resets make sure libiscsi, the drivers and their fw see the
+	 * same cmds. Once we get a TMF that can affect multiple cmds stop
+	 * queueing.
+	 */
+	if (conn->tmf_state != TMF_INITIAL) {
+		tmf = &conn->tmhdr;
+
+		switch (ISCSI_TM_FUNC_VALUE(tmf)) {
+		case ISCSI_TM_FUNC_LOGICAL_UNIT_RESET:
+			if (sc->device->lun != scsilun_to_int(&tmf->lun))
+				break;
+
+			ISCSI_DBG_EH(conn->session,
+				     "Requeue cmd sent during LU RESET processing.\n");
+			sc->result = DID_REQUEUE << 16;
+			goto eh_running;
+		case ISCSI_TM_FUNC_TARGET_WARM_RESET:
+			ISCSI_DBG_EH(conn->session,
+				     "Requeue cmd sent during TARGET RESET processing.\n");
+			sc->result = DID_REQUEUE << 16;
+			goto eh_running;
+		default:
+			break;
+		}
+	}
+
+	return false;
+
+eh_running:
+	return true;
+}
+
 int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 {
 	struct iscsi_cls_session *cls_session;
@@ -1693,48 +1780,6 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto fault;
 	}
 
-	if (session->state != ISCSI_STATE_LOGGED_IN) {
-		/*
-		 * to handle the race between when we set the recovery state
-		 * and block the session we requeue here (commands could
-		 * be entering our queuecommand while a block is starting
-		 * up because the block code is not locked)
-		 */
-		switch (session->state) {
-		case ISCSI_STATE_FAILED:
-			/*
-			 * cmds should fail during shutdown, if the session
-			 * state is bad, allowing completion to happen
-			 */
-			if (unlikely(system_state != SYSTEM_RUNNING)) {
-				reason = FAILURE_SESSION_FAILED;
-				sc->result = DID_NO_CONNECT << 16;
-				break;
-			}
-			fallthrough;
-		case ISCSI_STATE_IN_RECOVERY:
-			reason = FAILURE_SESSION_IN_RECOVERY;
-			sc->result = DID_IMM_RETRY << 16;
-			break;
-		case ISCSI_STATE_LOGGING_OUT:
-			reason = FAILURE_SESSION_LOGGING_OUT;
-			sc->result = DID_IMM_RETRY << 16;
-			break;
-		case ISCSI_STATE_RECOVERY_FAILED:
-			reason = FAILURE_SESSION_RECOVERY_TIMEOUT;
-			sc->result = DID_TRANSPORT_FAILFAST << 16;
-			break;
-		case ISCSI_STATE_TERMINATE:
-			reason = FAILURE_SESSION_TERMINATE;
-			sc->result = DID_NO_CONNECT << 16;
-			break;
-		default:
-			reason = FAILURE_SESSION_FREED;
-			sc->result = DID_NO_CONNECT << 16;
-		}
-		goto fault;
-	}
-
 	conn = session->leadconn;
 	if (!conn) {
 		reason = FAILURE_SESSION_FREED;
@@ -1742,11 +1787,8 @@ int iscsi_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *sc)
 		goto fault;
 	}
 
-	if (test_bit(ISCSI_SUSPEND_BIT, &conn->suspend_tx)) {
-		reason = FAILURE_SESSION_IN_RECOVERY;
-		sc->result = DID_REQUEUE << 16;
+	if (iscsi_eh_running(conn, sc, &reason))
 		goto fault;
-	}
 
 	if (iscsi_check_cmdsn_window_closed(conn)) {
 		reason = FAILURE_WINDOW_CLOSED;
