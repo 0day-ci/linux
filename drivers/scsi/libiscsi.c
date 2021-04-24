@@ -3124,6 +3124,24 @@ login_task_alloc_fail:
 }
 EXPORT_SYMBOL_GPL(iscsi_conn_setup);
 
+static bool iscsi_session_has_tasks(struct iscsi_session *session)
+{
+	struct iscsi_task *task;
+	int i;
+
+	spin_lock_bh(&session->back_lock);
+	for (i = 0; i < session->cmds_max; i++) {
+		task = session->cmds[i];
+
+		if (task->sc) {
+			spin_unlock_bh(&session->back_lock);
+			return true;
+		}
+	}
+	spin_unlock_bh(&session->back_lock);
+	return false;
+}
+
 /**
  * iscsi_conn_teardown - teardown iscsi connection
  * @cls_conn: iscsi class connection
@@ -3148,7 +3166,17 @@ void iscsi_conn_teardown(struct iscsi_cls_conn *cls_conn)
 		session->state = ISCSI_STATE_TERMINATE;
 		wake_up(&conn->ehwait);
 	}
+
 	spin_unlock_bh(&session->frwd_lock);
+	mutex_unlock(&session->eh_mutex);
+	/*
+	 * If the caller didn't do a target unbind we could be exiting a
+	 * scsi-ml entry point that had a task ref. Wait on them here.
+	 */
+	while (iscsi_session_has_tasks(session))
+		msleep(50);
+
+	mutex_lock(&session->eh_mutex);
 
 	/* flush queued up work because we free the connection below */
 	iscsi_suspend_tx(conn);
