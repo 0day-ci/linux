@@ -1099,7 +1099,10 @@ static int ceu_open(struct file *file)
 
 	mutex_lock(&ceudev->mlock);
 	/* Causes soft-reset and sensor power on on first open */
-	pm_runtime_get_sync(ceudev->dev);
+	ret = pm_runtime_resume_and_get(ceudev->dev);
+	if (ret < 0)
+		return ret;
+
 	mutex_unlock(&ceudev->mlock);
 
 	return 0;
