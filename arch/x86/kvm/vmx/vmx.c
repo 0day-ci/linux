@@ -1767,11 +1767,12 @@ static void vmx_setup_uret_msr(struct vcpu_vmx *vmx, unsigned int msr)
 }
 
 /*
- * Set up the vmcs to automatically save and restore system
- * msrs.  Don't touch the 64-bit msrs if the guest is in legacy
- * mode, as fiddling with msrs is very expensive.
+ * Configuring user return MSRs to automatically save, load, and restore MSRs
+ * that need to be shoved into hardware when running the guest.  Note, omitting
+ * an MSR here does _NOT_ mean it's not emulated, only that it will not be
+ * loaded into hardware when running the guest.
  */
-static void setup_msrs(struct vcpu_vmx *vmx)
+static void vmx_setup_uret_msrs(struct vcpu_vmx *vmx)
 {
 	vmx->guest_uret_msrs_loaded = false;
 	vmx->nr_active_uret_msrs = 0;
@@ -1793,9 +1794,6 @@ static void setup_msrs(struct vcpu_vmx *vmx)
 		vmx_setup_uret_msr(vmx, MSR_TSC_AUX);
 
 	vmx_setup_uret_msr(vmx, MSR_IA32_TSX_CTRL);
-
-	if (cpu_has_vmx_msr_bitmap())
-		vmx_update_msr_bitmap(&vmx->vcpu);
 }
 
 static u64 vmx_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
@@ -2982,7 +2980,7 @@ int vmx_set_efer(struct kvm_vcpu *vcpu, u64 efer)
 
 		msr->data = efer & ~EFER_LME;
 	}
-	setup_msrs(vmx);
+	vmx_setup_uret_msrs(vmx);
 	return 0;
 }
 
@@ -4572,7 +4570,10 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	if (kvm_mpx_supported())
 		vmcs_write64(GUEST_BNDCFGS, 0);
 
-	setup_msrs(vmx);
+	vmx_setup_uret_msrs(vmx);
+
+	if (cpu_has_vmx_msr_bitmap())
+		vmx_update_msr_bitmap(&vmx->vcpu);
 
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
 
