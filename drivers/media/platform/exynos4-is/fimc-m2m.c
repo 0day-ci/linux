@@ -75,7 +75,7 @@ static int start_streaming(struct vb2_queue *q, unsigned int count)
 	struct fimc_ctx *ctx = q->drv_priv;
 	int ret;
 
-	ret = pm_runtime_get_sync(&ctx->fimc_dev->pdev->dev);
+	ret = pm_runtime_resume_and_get(&ctx->fimc_dev->pdev->dev);
 	return ret > 0 ? 0 : ret;
 }
 

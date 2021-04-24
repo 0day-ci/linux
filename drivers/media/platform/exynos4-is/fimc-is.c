@@ -828,7 +828,7 @@ static int fimc_is_probe(struct platform_device *pdev)
 			goto err_irq;
 	}
 
-	ret = pm_runtime_get_sync(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret < 0)
 		goto err_pm;
 
@@ -862,6 +862,7 @@ err_dfs:
 	fimc_is_unregister_subdevs(is);
 err_pm:
 	pm_runtime_put_noidle(dev);
+err_suspend:
 	if (!pm_runtime_enabled(dev))
 		fimc_is_runtime_suspend(dev);
 err_irq:
