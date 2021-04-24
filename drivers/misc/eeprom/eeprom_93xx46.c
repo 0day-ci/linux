@@ -86,6 +86,7 @@ static int eeprom_93xx46_read(void *priv, unsigned int off,
 	struct eeprom_93xx46_dev *edev = priv;
 	char *buf = val;
 	int err = 0;
+	int bits;
 
 	if (unlikely(off >= edev->size))
 		return 0;
@@ -99,21 +100,21 @@ static int eeprom_93xx46_read(void *priv, unsigned int off,
 	if (edev->pdata->prepare)
 		edev->pdata->prepare(edev);
 
+	/* The opcode in front of the address is three bits. */
+	bits = edev->addrlen + 3;
+
 	while (count) {
 		struct spi_message m;
 		struct spi_transfer t[2] = { { 0 } };
 		u16 cmd_addr = OP_READ << edev->addrlen;
 		size_t nbytes = count;
-		int bits;
 
 		if (edev->addrlen == 7) {
 			cmd_addr |= off & 0x7f;
-			bits = 10;
 			if (has_quirk_single_word_read(edev))
 				nbytes = 1;
 		} else {
 			cmd_addr |= (off >> 1) & 0x3f;
-			bits = 9;
 			if (has_quirk_single_word_read(edev))
 				nbytes = 2;
 		}
@@ -168,13 +169,14 @@ static int eeprom_93xx46_ew(struct eeprom_93xx46_dev *edev, int is_on)
 	int bits, ret;
 	u16 cmd_addr;
 
+	/* The opcode in front of the address is three bits. */
+	bits = edev->addrlen + 3;
+
 	cmd_addr = OP_START << edev->addrlen;
 	if (edev->addrlen == 7) {
 		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS) << 1;
-		bits = 10;
 	} else {
 		cmd_addr |= (is_on ? ADDR_EWEN : ADDR_EWDS);
-		bits = 9;
 	}
 
 	if (has_quirk_instruction_length(edev)) {
@@ -221,15 +223,16 @@ eeprom_93xx46_write_word(struct eeprom_93xx46_dev *edev,
 	int bits, data_len, ret;
 	u16 cmd_addr;
 
+	/* The opcode in front of the address is three bits. */
+	bits = edev->addrlen + 3;
+
 	cmd_addr = OP_WRITE << edev->addrlen;
 
 	if (edev->addrlen == 7) {
 		cmd_addr |= off & 0x7f;
-		bits = 10;
 		data_len = 1;
 	} else {
 		cmd_addr |= (off >> 1) & 0x3f;
-		bits = 9;
 		data_len = 2;
 	}
 
@@ -311,13 +314,14 @@ static int eeprom_93xx46_eral(struct eeprom_93xx46_dev *edev)
 	int bits, ret;
 	u16 cmd_addr;
 
+	/* The opcode in front of the address is three bits. */
+	bits = edev->addrlen + 3;
+
 	cmd_addr = OP_START << edev->addrlen;
 	if (edev->addrlen == 7) {
 		cmd_addr |= ADDR_ERAL << 1;
-		bits = 10;
 	} else {
 		cmd_addr |= ADDR_ERAL;
-		bits = 9;
 	}
 
 	if (has_quirk_instruction_length(edev)) {
