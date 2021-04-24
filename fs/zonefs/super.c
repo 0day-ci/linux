@@ -1136,7 +1136,7 @@ static int zonefs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 enum {
 	Opt_errors_ro, Opt_errors_zro, Opt_errors_zol, Opt_errors_repair,
-	Opt_explicit_open, Opt_err,
+	Opt_explicit_open, Opt_uid, Opt_gid, Opt_perm, Opt_err,
 };
 
 static const match_table_t tokens = {
@@ -1145,7 +1145,10 @@ static const match_table_t tokens = {
 	{ Opt_errors_zol,	"errors=zone-offline"},
 	{ Opt_errors_repair,	"errors=repair"},
 	{ Opt_explicit_open,	"explicit-open" },
-	{ Opt_err,		NULL}
+	{ Opt_uid,	"uid=%d" },
+	{ Opt_gid,	"gid=%d" },
+	{ Opt_perm,	"perm=%d" },
+	{ Opt_err,	NULL}
 };
 
 static int zonefs_parse_options(struct super_block *sb, char *options)
@@ -1159,9 +1162,12 @@ static int zonefs_parse_options(struct super_block *sb, char *options)
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token;
+		int arg;
 
 		if (!*p)
 			continue;
+
+		args[0].to = args[0].from = NULL;
 
 		token = match_token(p, tokens, args);
 		switch (token) {
@@ -1184,6 +1190,32 @@ static int zonefs_parse_options(struct super_block *sb, char *options)
 		case Opt_explicit_open:
 			sbi->s_mount_opts |= ZONEFS_MNTOPT_EXPLICIT_OPEN;
 			break;
+		case Opt_uid:
+			sbi->s_mount_opts |= ZONEFS_MNTOPT_UID;
+			if(args->from && match_int(args, &arg))
+				return -EINVAL;
+			sbi->s_uid = make_kuid(current_user_ns(), arg);
+			if (!uid_valid(sbi->s_uid)) {
+				zonefs_err(sb, "Invalid uid value %d\n", arg);
+				return -EINVAL;
+			}
+			break;
+		case Opt_gid:
+			sbi->s_mount_opts |= ZONEFS_MNTOPT_GID;
+			if(args->from && match_int(args, &arg))
+				return -EINVAL;
+			sbi->s_gid = make_kgid(current_user_ns(), arg);
+			if (!gid_valid(sbi->s_gid)) {
+				zonefs_err(sb, "Invalid gid value %d\n", arg);
+				return -EINVAL;
+			}
+			break;
+		case Opt_perm:
+			sbi->s_mount_opts |= ZONEFS_MNTOPT_PERM;
+			if(args->from && match_int(args, &arg))
+				return -EINVAL;
+			sbi->s_perm = arg;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -1204,6 +1236,12 @@ static int zonefs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_puts(seq, ",errors=zone-offline");
 	if (sbi->s_mount_opts & ZONEFS_MNTOPT_ERRORS_REPAIR)
 		seq_puts(seq, ",errors=repair");
+	if (sbi->s_mount_opts & ZONEFS_MNTOPT_UID)
+		seq_printf(seq, ",uid=%u", from_kuid(&init_user_ns, sbi->s_uid));
+	if (sbi->s_mount_opts & ZONEFS_MNTOPT_GID)
+		seq_printf(seq, ",gid=%u", from_kgid(&init_user_ns, sbi->s_gid));
+	if (sbi->s_mount_opts & ZONEFS_MNTOPT_PERM)
+		seq_printf(seq, ",perm=0%o", sbi->s_perm);
 
 	return 0;
 }

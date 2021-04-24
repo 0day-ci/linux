@@ -161,6 +161,9 @@ enum zonefs_features {
 	(ZONEFS_MNTOPT_ERRORS_RO | ZONEFS_MNTOPT_ERRORS_ZRO | \
 	 ZONEFS_MNTOPT_ERRORS_ZOL | ZONEFS_MNTOPT_ERRORS_REPAIR)
 #define ZONEFS_MNTOPT_EXPLICIT_OPEN	(1 << 4) /* Explicit open/close of zones on open/close */
+#define ZONEFS_MNTOPT_UID	(1 << 5) /* Specify file uid */
+#define ZONEFS_MNTOPT_GID	(1 << 6) /* Specify file gid */
+#define ZONEFS_MNTOPT_PERM	(1 << 7) /* Specify file perm */
 
 /*
  * In-memory Super block information.
