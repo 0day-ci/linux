@@ -2307,6 +2307,13 @@ void kvm_lapic_reset(struct kvm_vcpu *vcpu, bool init_event)
 	struct kvm_lapic *apic = vcpu->arch.apic;
 	int i;
 
+	if (!init_event) {
+		vcpu->arch.apic_base = APIC_DEFAULT_PHYS_BASE |
+				       MSR_IA32_APICBASE_ENABLE;
+		if (kvm_vcpu_is_reset_bsp(vcpu))
+			vcpu->arch.apic_base |= MSR_IA32_APICBASE_BSP;
+	}
+
 	if (!apic)
 		return;
 
@@ -2314,11 +2321,6 @@ void kvm_lapic_reset(struct kvm_vcpu *vcpu, bool init_event)
 	hrtimer_cancel(&apic->lapic_timer.timer);
 
 	if (!init_event) {
-		vcpu->arch.apic_base = APIC_DEFAULT_PHYS_BASE |
-				       MSR_IA32_APICBASE_ENABLE;
-		if (kvm_vcpu_is_reset_bsp(vcpu))
-			vcpu->arch.apic_base |= MSR_IA32_APICBASE_BSP;
-
 		apic->base_address = MSR_IA32_APICBASE_ENABLE;
 
 		kvm_apic_set_xapic_id(apic, vcpu->vcpu_id);
