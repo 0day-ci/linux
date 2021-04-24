@@ -2827,8 +2827,6 @@ static __init int alloc_kvm_area(void)
 	return 0;
 }
 
-static void __vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, int seg);
-
 static void fix_pmode_seg(struct kvm_vcpu *vcpu, int seg,
 		struct kvm_segment *save)
 {
@@ -3401,7 +3399,7 @@ static u32 vmx_segment_access_rights(struct kvm_segment *var)
 	return ar;
 }
 
-static void __vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, int seg)
+void __vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, int seg)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	const struct kvm_vmx_segment_field *sf = &kvm_vmx_segment_fields[seg];
@@ -3438,7 +3436,7 @@ static void __vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, in
 	vmcs_write32(sf->ar_bytes, vmx_segment_access_rights(var));
 }
 
-void vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, int seg)
+static void vmx_set_segment(struct kvm_vcpu *vcpu, struct kvm_segment *var, int seg)
 {
 	__vmx_set_segment(vcpu, var, seg);
 
