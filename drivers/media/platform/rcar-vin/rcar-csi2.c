@@ -408,7 +408,7 @@ static void rcsi2_enter_standby(struct rcar_csi2 *priv)
 
 static void rcsi2_exit_standby(struct rcar_csi2 *priv)
 {
-	pm_runtime_get_sync(priv->dev);
+	pm_runtime_resume_and_get(priv->dev);
 	reset_control_deassert(priv->rstc);
 }
 
