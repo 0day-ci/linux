@@ -33,10 +33,10 @@
 #include <linux/spinlock.h>
 #include <linux/ftrace.h>
 
-static noinline void __down(struct semaphore *sem);
-static noinline int __down_interruptible(struct semaphore *sem);
-static noinline int __down_killable(struct semaphore *sem);
-static noinline int __down_timeout(struct semaphore *sem, long timeout);
+static noinline void __down(struct semaphore *sem, unsigned long flags);
+static noinline int __down_interruptible(struct semaphore *sem, unsigned long flags);
+static noinline int __down_killable(struct semaphore *sem, unsigned long flags);
+static noinline int __down_timeout(struct semaphore *sem, long timeout, unsigned long flags);
 static noinline void __up(struct semaphore *sem);
 
 /**
@@ -58,7 +58,7 @@ void down(struct semaphore *sem)
 	if (likely(sem->count > 0))
 		sem->count--;
 	else
-		__down(sem);
+		__down(sem, flags);
 	raw_spin_unlock_irqrestore(&sem->lock, flags);
 }
 EXPORT_SYMBOL(down);
@@ -81,7 +81,7 @@ int down_interruptible(struct semaphore *sem)
 	if (likely(sem->count > 0))
 		sem->count--;
 	else
-		result = __down_interruptible(sem);
+		result = __down_interruptible(sem, flags);
 	raw_spin_unlock_irqrestore(&sem->lock, flags);
 
 	return result;
@@ -107,7 +107,7 @@ int down_killable(struct semaphore *sem)
 	if (likely(sem->count > 0))
 		sem->count--;
 	else
-		result = __down_killable(sem);
+		result = __down_killable(sem, flags);
 	raw_spin_unlock_irqrestore(&sem->lock, flags);
 
 	return result;
@@ -161,7 +161,7 @@ int down_timeout(struct semaphore *sem, long timeout)
 	if (likely(sem->count > 0))
 		sem->count--;
 	else
-		result = __down_timeout(sem, timeout);
+		result = __down_timeout(sem, timeout, flags);
 	raw_spin_unlock_irqrestore(&sem->lock, flags);
 
 	return result;
@@ -202,7 +202,7 @@ struct semaphore_waiter {
  * 'timeout' parameter for the cases without timeouts.
  */
 static inline int __sched __down_common(struct semaphore *sem, long state,
-								long timeout)
+					long timeout, unsigned long flags)
 {
 	struct semaphore_waiter waiter;
 
@@ -216,9 +216,9 @@ static inline int __sched __down_common(struct semaphore *sem, long state,
 		if (unlikely(timeout <= 0))
 			goto timed_out;
 		__set_current_state(state);
-		raw_spin_unlock_irq(&sem->lock);
+		raw_spin_unlock_irqrestore(&sem->lock, flags);
 		timeout = schedule_timeout(timeout);
-		raw_spin_lock_irq(&sem->lock);
+		raw_spin_lock_irqsave(&sem->lock, flags);
 		if (waiter.up)
 			return 0;
 	}
@@ -232,24 +232,28 @@ static inline int __sched __down_common(struct semaphore *sem, long state,
 	return -EINTR;
 }
 
-static noinline void __sched __down(struct semaphore *sem)
+static noinline void __sched __down(struct semaphore *sem, unsigned long flags)
 {
-	__down_common(sem, TASK_UNINTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+	__down_common(sem, TASK_UNINTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT, flags);
 }
 
-static noinline int __sched __down_interruptible(struct semaphore *sem)
+static noinline int __sched __down_interruptible(struct semaphore *sem,
+							unsigned long flags)
 {
-	return __down_common(sem, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+	return __down_common(sem, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT,
+									flags);
 }
 
-static noinline int __sched __down_killable(struct semaphore *sem)
+static noinline int __sched __down_killable(struct semaphore *sem,
+							unsigned long flags)
 {
-	return __down_common(sem, TASK_KILLABLE, MAX_SCHEDULE_TIMEOUT);
+	return __down_common(sem, TASK_KILLABLE, MAX_SCHEDULE_TIMEOUT, flags);
 }
 
-static noinline int __sched __down_timeout(struct semaphore *sem, long timeout)
+static noinline int __sched __down_timeout(struct semaphore *sem,
+					long timeout, unsigned long flags)
 {
-	return __down_common(sem, TASK_UNINTERRUPTIBLE, timeout);
+	return __down_common(sem, TASK_UNINTERRUPTIBLE, timeout, flags);
 }
 
 static noinline void __sched __up(struct semaphore *sem)
