@@ -54,34 +54,54 @@ static const struct proc_ops isapnp_proc_bus_proc_ops = {
 	.proc_read	= isapnp_proc_bus_read,
 };
 
+static int isapnp_proc_detach_device(struct pnp_dev *dev)
+{
+	proc_remove(dev->procent);
+	dev->procent = NULL;
+	return 0;
+}
+
+static int isapnp_proc_detach_bus(struct pnp_card *bus)
+{
+	proc_remove(bus->procdir);
+	return 0;
+}
+
 static int isapnp_proc_attach_device(struct pnp_dev *dev)
 {
 	struct pnp_card *bus = dev->card;
-	struct proc_dir_entry *de, *e;
 	char name[16];
 
-	if (!(de = bus->procdir)) {
-		sprintf(name, "%02x", bus->number);
-		de = bus->procdir = proc_mkdir(name, isapnp_proc_bus_dir);
-		if (!de)
+	if (!bus->procdir) {
+		scnprintf(name, 16, "%02x", bus->number);
+		bus->procdir = proc_mkdir(name, isapnp_proc_bus_dir);
+		if (!bus->procdir)
 			return -ENOMEM;
 	}
-	sprintf(name, "%02x", dev->number);
-	e = dev->procent = proc_create_data(name, S_IFREG | S_IRUGO, de,
+	scnprintf(name, 16, "%02x", dev->number);
+	dev->procent = proc_create_data(name, S_IFREG | S_IRUGO, bus->procdir,
 					    &isapnp_proc_bus_proc_ops, dev);
-	if (!e)
+	if (!dev->procent) {
+		isapnp_proc_detach_bus(bus);
 		return -ENOMEM;
-	proc_set_size(e, 256);
+	}
+	proc_set_size(dev->procent, 256);
 	return 0;
 }
 
 int __init isapnp_proc_init(void)
 {
 	struct pnp_dev *dev;
+	int dev_attach;
 
 	isapnp_proc_bus_dir = proc_mkdir("bus/isapnp", NULL);
 	protocol_for_each_dev(&isapnp_protocol, dev) {
-		isapnp_proc_attach_device(dev);
+		dev_attach = isapnp_proc_attach_device(dev);
+		if (!dev_attach) {
+			pr_info("procfs: pnp: Unable to attach the device, not enough memory");
+			isapnp_proc_detach_device(dev);
+			return -ENOMEM;
+		}
 	}
 	return 0;
 }
