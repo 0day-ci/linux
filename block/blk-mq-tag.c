@@ -209,24 +209,14 @@ static bool bt_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 
 	if (!reserved)
 		bitnr += tags->nr_reserved_tags;
-	rcu_read_lock();
-	/*
-	 * The request 'rq' points at is protected by an RCU read lock until
-	 * its queue pointer has been verified and by q_usage_count while the
-	 * callback function is being invoked. See also the
-	 * percpu_ref_tryget() and blk_queue_exit() calls in
-	 * blk_mq_queue_tag_busy_iter().
-	 */
-	rq = rcu_dereference(tags->rqs[bitnr]);
+	rq = tags->rqs[bitnr];
+
 	/*
 	 * We can hit rq == NULL here, because the tagging functions
 	 * test and set the bit before assigning ->rqs[].
 	 */
-	if (rq && rq->q == hctx->queue && rq->mq_hctx == hctx) {
-		rcu_read_unlock();
+	if (rq && rq->q == hctx->queue && rq->mq_hctx == hctx)
 		return iter_data->fn(hctx, rq, iter_data->data, reserved);
-	}
-	rcu_read_unlock();
 	return true;
 }
 
@@ -264,17 +254,11 @@ struct bt_tags_iter_data {
 	unsigned int flags;
 };
 
-/* Include reserved tags. */
 #define BT_TAG_ITER_RESERVED		(1 << 0)
-/* Only include started requests. */
 #define BT_TAG_ITER_STARTED		(1 << 1)
-/* Iterate over tags->static_rqs[] instead of tags->rqs[]. */
 #define BT_TAG_ITER_STATIC_RQS		(1 << 2)
-/* The callback function may sleep. */
-#define BT_TAG_ITER_MAY_SLEEP		(1 << 3)
 
-static bool __bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr,
-			   void *data)
+static bool bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 {
 	struct bt_tags_iter_data *iter_data = data;
 	struct blk_mq_tags *tags = iter_data->tags;
@@ -291,33 +275,13 @@ static bool __bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr,
 	if (iter_data->flags & BT_TAG_ITER_STATIC_RQS)
 		rq = tags->static_rqs[bitnr];
 	else
-		rq = rcu_dereference_check(tags->rqs[bitnr],
-					   lockdep_is_held(&tags->iter_rwsem));
+		rq = tags->rqs[bitnr];
 	if (!rq)
 		return true;
 	if ((iter_data->flags & BT_TAG_ITER_STARTED) &&
 	    !blk_mq_request_started(rq))
 		return true;
 	return iter_data->fn(rq, iter_data->data, reserved);
-}
-
-static bool bt_tags_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
-{
-	struct bt_tags_iter_data *iter_data = data;
-	struct blk_mq_tags *tags = iter_data->tags;
-	bool res;
-
-	if (iter_data->flags & BT_TAG_ITER_MAY_SLEEP) {
-		down_read(&tags->iter_rwsem);
-		res = __bt_tags_iter(bitmap, bitnr, data);
-		up_read(&tags->iter_rwsem);
-	} else {
-		rcu_read_lock();
-		res = __bt_tags_iter(bitmap, bitnr, data);
-		rcu_read_unlock();
-	}
-
-	return res;
 }
 
 /**
@@ -393,12 +357,10 @@ void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 {
 	int i;
 
-	might_sleep();
-
 	for (i = 0; i < tagset->nr_hw_queues; i++) {
 		if (tagset->tags && tagset->tags[i])
 			__blk_mq_all_tag_iter(tagset->tags[i], fn, priv,
-				BT_TAG_ITER_STARTED | BT_TAG_ITER_MAY_SLEEP);
+					      BT_TAG_ITER_STARTED);
 	}
 }
 EXPORT_SYMBOL(blk_mq_tagset_busy_iter);
@@ -582,7 +544,6 @@ struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
 
 	tags->nr_tags = total_tags;
 	tags->nr_reserved_tags = reserved_tags;
-	init_rwsem(&tags->iter_rwsem);
 
 	if (blk_mq_is_sbitmap_shared(flags))
 		return tags;
