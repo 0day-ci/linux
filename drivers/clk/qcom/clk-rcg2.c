@@ -357,6 +357,83 @@ static int clk_rcg2_set_floor_rate_and_parent(struct clk_hw *hw,
 	return __clk_rcg2_set_rate(hw, rate, FLOOR);
 }
 
+static int clk_rcg2_get_duty_cycle(struct clk_hw *hw, struct clk_duty *duty)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	u32 notn_m_val, n_val, m_val, d_val, not2d_val, mask;
+
+	if (!rcg->mnd_width) {
+		/* 50 % duty-cycle for Non-MND RCGs */
+		duty->num = 1;
+		duty->den = 2;
+		return 0;
+	}
+
+	regmap_read(rcg->clkr.regmap, RCG_D_OFFSET(rcg), &not2d_val);
+	regmap_read(rcg->clkr.regmap, RCG_M_OFFSET(rcg), &m_val);
+	regmap_read(rcg->clkr.regmap, RCG_N_OFFSET(rcg), &notn_m_val);
+
+	if (!not2d_val && !m_val && !notn_m_val) {
+		/* 50 % duty-cycle always */
+		duty->num = 1;
+		duty->den = 2;
+		return 0;
+	}
+
+	mask = BIT(rcg->mnd_width) - 1;
+
+	d_val = ~(not2d_val) & mask;
+	d_val = DIV_ROUND_CLOSEST(d_val, 2);
+
+	n_val = (~(notn_m_val) + m_val) & mask;
+
+	duty->num = d_val;
+	duty->den = n_val;
+
+	return 0;
+}
+
+static int clk_rcg2_set_duty_cycle(struct clk_hw *hw, struct clk_duty *duty)
+{
+	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+	u32 notn_m_val, n_val, m_val, d_val, not2d_val, mask, duty_per;
+	int ret;
+
+	/* Duty-cycle cannot be modified for non-MND RCGs */
+	if (!rcg->mnd_width)
+		return -EINVAL;
+
+	mask = BIT(rcg->mnd_width) - 1;
+
+	regmap_read(rcg->clkr.regmap, RCG_N_OFFSET(rcg), &notn_m_val);
+	regmap_read(rcg->clkr.regmap, RCG_M_OFFSET(rcg), &m_val);
+
+	n_val = (~(notn_m_val) + m_val) & mask;
+
+	duty_per = (duty->num * 100) / duty->den;
+
+	/* Calculate 2d value */
+	d_val = DIV_ROUND_CLOSEST(n_val * duty_per * 2, 100);
+
+	 /* Check bit widths of 2d. If D is too big reduce duty cycle. */
+	if (d_val > mask)
+		d_val = mask;
+
+	if ((d_val / 2) > (n_val - m_val))
+		d_val = (n_val - m_val) * 2;
+	else if ((d_val / 2) < (m_val / 2))
+		d_val = m_val;
+
+	not2d_val = ~d_val & mask;
+
+	ret = regmap_update_bits(rcg->clkr.regmap, RCG_D_OFFSET(rcg), mask,
+				 not2d_val);
+	if (ret)
+		return ret;
+
+	return update_config(rcg);
+}
+
 const struct clk_ops clk_rcg2_ops = {
 	.is_enabled = clk_rcg2_is_enabled,
 	.get_parent = clk_rcg2_get_parent,
@@ -365,6 +442,8 @@ const struct clk_ops clk_rcg2_ops = {
 	.determine_rate = clk_rcg2_determine_rate,
 	.set_rate = clk_rcg2_set_rate,
 	.set_rate_and_parent = clk_rcg2_set_rate_and_parent,
+	.get_duty_cycle = clk_rcg2_get_duty_cycle,
+	.set_duty_cycle = clk_rcg2_set_duty_cycle,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_ops);
 
@@ -376,6 +455,8 @@ const struct clk_ops clk_rcg2_floor_ops = {
 	.determine_rate = clk_rcg2_determine_floor_rate,
 	.set_rate = clk_rcg2_set_floor_rate,
 	.set_rate_and_parent = clk_rcg2_set_floor_rate_and_parent,
+	.get_duty_cycle = clk_rcg2_get_duty_cycle,
+	.set_duty_cycle = clk_rcg2_set_duty_cycle,
 };
 EXPORT_SYMBOL_GPL(clk_rcg2_floor_ops);
 
