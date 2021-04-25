@@ -796,8 +796,7 @@ map_vcn:
 			get_bh(bh);
 			/* Set the entire contents of the buffer to 0xff. */
 			memset(bh->b_data, -1, block_size);
-			if (!buffer_uptodate(bh))
-				set_buffer_uptodate(bh);
+			set_buffer_uptodate(bh);
 			if (buffer_dirty(bh))
 				clear_buffer_dirty(bh);
 			/*
