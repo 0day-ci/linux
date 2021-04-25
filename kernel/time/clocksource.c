@@ -126,6 +126,7 @@ static void __clocksource_change_rating(struct clocksource *cs, int rating);
  */
 #define WATCHDOG_INTERVAL (HZ >> 1)
 #define WATCHDOG_THRESHOLD (NSEC_PER_SEC >> 4)
+#define WATCHDOG_SYNC_FORGIVENESS (HZ * 60UL)
 
 /*
  * Maximum permissible delay between two readouts of the watchdog
@@ -377,6 +378,7 @@ static void clocksource_watchdog(struct timer_list *unused)
 	int next_cpu, reset_pending;
 	int64_t wd_nsec, cs_nsec;
 	struct clocksource *cs;
+	u32 md;
 
 	spin_lock(&watchdog_lock);
 	if (!watchdog_running)
@@ -423,7 +425,22 @@ static void clocksource_watchdog(struct timer_list *unused)
 			continue;
 
 		/* Check the deviation from the watchdog clocksource. */
-		if (abs(cs_nsec - wd_nsec) > WATCHDOG_THRESHOLD) {
+		if (!cs->max_drift) {
+			md = WATCHDOG_THRESHOLD;
+		} else {
+			static unsigned long first_jiffies;
+			static bool beenhere;
+
+			if (beenhere) {
+				WARN_ON_ONCE(time_after(jiffies,
+							first_jiffies + WATCHDOG_SYNC_FORGIVENESS));
+			} else {
+				beenhere = true;
+				first_jiffies = jiffies;
+			}
+			md = cs->max_drift;
+		}
+		if (abs(cs_nsec - wd_nsec) > md) {
 			pr_warn("timekeeping watchdog on CPU%d: Marking clocksource '%s' as unstable because the skew is too large:\n",
 				smp_processor_id(), cs->name);
 			pr_warn("                      '%s' wd_now: %llx wd_last: %llx mask: %llx\n",
