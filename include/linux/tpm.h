@@ -133,7 +133,7 @@ struct tpm_chip {
 	struct tpm_chip_seqops bin_log_seqops;
 	struct tpm_chip_seqops ascii_log_seqops;
 
-	unsigned int flags;
+	unsigned long flags;
 
 	int dev_num;		/* /dev/tpm# */
 	unsigned long is_open;	/* only one allowed */
