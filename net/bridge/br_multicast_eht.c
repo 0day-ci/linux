@@ -209,7 +209,8 @@ static void br_multicast_eht_set_entry_expired(struct timer_list *t)
 	struct net_bridge_group_eht_set_entry *set_h = from_timer(set_h, t, timer);
 	struct net_bridge *br = set_h->br;
 
-	spin_lock(&br->multicast_lock);
+	rcu_read_lock();
+	br_multicast_lock_rcu(br);
 	if (RB_EMPTY_NODE(&set_h->rb_node) || timer_pending(&set_h->timer))
 		goto out;
 
@@ -217,7 +218,8 @@ static void br_multicast_eht_set_entry_expired(struct timer_list *t)
 				       &set_h->eht_set->src_addr,
 				       &set_h->h_addr);
 out:
-	spin_unlock(&br->multicast_lock);
+	br_multicast_unlock(br);
+	rcu_read_unlock();
 }
 
 static void br_multicast_eht_set_expired(struct timer_list *t)
@@ -226,13 +228,15 @@ static void br_multicast_eht_set_expired(struct timer_list *t)
 							      timer);
 	struct net_bridge *br = eht_set->br;
 
-	spin_lock(&br->multicast_lock);
+	rcu_read_lock();
+	br_multicast_lock_rcu(br);
 	if (RB_EMPTY_NODE(&eht_set->rb_node) || timer_pending(&eht_set->timer))
 		goto out;
 
 	br_multicast_del_eht_set(eht_set);
 out:
-	spin_unlock(&br->multicast_lock);
+	br_multicast_unlock(br);
+	rcu_read_unlock();
 }
 
 static struct net_bridge_group_eht_host *
@@ -870,9 +874,11 @@ int br_multicast_eht_set_hosts_limit(struct net_bridge_port *p,
 	if (!eht_hosts_limit)
 		return -EINVAL;
 
-	spin_lock_bh(&br->multicast_lock);
+	rcu_read_lock();
+	br_multicast_lock_rcu_bh(br);
 	p->multicast_eht_hosts_limit = eht_hosts_limit;
-	spin_unlock_bh(&br->multicast_lock);
+	br_multicast_unlock_bh(br);
+	rcu_read_unlock();
 
 	return 0;
 }

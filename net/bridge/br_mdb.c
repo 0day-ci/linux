@@ -490,7 +490,7 @@ static void br_mdb_complete(struct net_device *dev, int err, void *priv)
 	if (err)
 		goto err;
 
-	spin_lock_bh(&br->multicast_lock);
+	br_multicast_lock_rtnl_bh(br);
 	mp = br_mdb_ip_get(br, &data->ip);
 	if (!mp)
 		goto out;
@@ -501,7 +501,7 @@ static void br_mdb_complete(struct net_device *dev, int err, void *priv)
 		p->flags |= MDB_PG_FLAGS_OFFLOAD;
 	}
 out:
-	spin_unlock_bh(&br->multicast_lock);
+	br_multicast_unlock_bh(br);
 err:
 	kfree(priv);
 }
@@ -949,9 +949,9 @@ static int __br_mdb_add(struct net *net, struct net_bridge *br,
 {
 	int ret;
 
-	spin_lock_bh(&br->multicast_lock);
+	br_multicast_lock_rtnl_bh(br);
 	ret = br_mdb_add_group(br, p, entry, mdb_attrs, extack);
-	spin_unlock_bh(&br->multicast_lock);
+	br_multicast_unlock_bh(br);
 
 	return ret;
 }
@@ -1042,7 +1042,7 @@ static int __br_mdb_del(struct net_bridge *br, struct br_mdb_entry *entry,
 
 	__mdb_entry_to_br_ip(entry, &ip, mdb_attrs);
 
-	spin_lock_bh(&br->multicast_lock);
+	br_multicast_lock_rtnl_bh(br);
 	mp = br_mdb_ip_get(br, &ip);
 	if (!mp)
 		goto unlock;
@@ -1072,7 +1072,7 @@ static int __br_mdb_del(struct net_bridge *br, struct br_mdb_entry *entry,
 	}
 
 unlock:
-	spin_unlock_bh(&br->multicast_lock);
+	br_multicast_unlock_bh(br);
 	return err;
 }
 
