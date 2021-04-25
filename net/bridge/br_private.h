@@ -863,6 +863,54 @@ static inline bool br_group_is_l2(const struct br_ip *group)
 #define mlock_dereference(X, br) \
 	rcu_dereference_protected(X, lockdep_is_held(&br->multicast_lock))
 
+static inline void br_multicast_lock_rcu(struct net_bridge *br)
+{
+	unsigned char nest_level = netdev_get_nest_level_rcu(br->dev);
+
+	spin_lock_nested(&br->multicast_lock, nest_level);
+}
+
+static inline void br_multicast_lock_rcu_bh(struct net_bridge *br)
+{
+	unsigned char nest_level = netdev_get_nest_level_rcu(br->dev);
+
+	local_bh_disable();
+	spin_lock_nested(&br->multicast_lock, nest_level);
+}
+
+static inline void br_multicast_lock_rtnl(struct net_bridge *br)
+{
+	unsigned char nest_level = 0;
+
+#ifdef CONFIG_LOCKDEP
+	ASSERT_RTNL();
+	nest_level = br->dev->nested_level;
+#endif
+	spin_lock_nested(&br->multicast_lock, nest_level);
+}
+
+static inline void br_multicast_lock_rtnl_bh(struct net_bridge *br)
+{
+	unsigned char nest_level = 0;
+
+#ifdef CONFIG_LOCKDEP
+	ASSERT_RTNL();
+	nest_level = br->dev->nested_level;
+#endif
+	local_bh_disable();
+	spin_lock_nested(&br->multicast_lock, nest_level);
+}
+
+static inline void br_multicast_unlock(struct net_bridge *br)
+{
+	spin_unlock(&br->multicast_lock);
+}
+
+static inline void br_multicast_unlock_bh(struct net_bridge *br)
+{
+	spin_unlock_bh(&br->multicast_lock);
+}
+
 static inline bool br_multicast_is_router(struct net_bridge *br)
 {
 	return br->multicast_router == 2 ||
