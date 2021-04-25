@@ -3748,7 +3748,7 @@ static bool mtip_no_dev_cleanup(struct request *rq, void *data, bool reserv)
 	struct mtip_cmd *cmd = blk_mq_rq_to_pdu(rq);
 
 	cmd->status = BLK_STS_IOERR;
-	blk_mq_complete_request(rq);
+	blk_mq_complete_request_locally(rq);
 	return true;
 }
 

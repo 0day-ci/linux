@@ -1568,7 +1568,11 @@ static void scsi_mq_done(struct scsi_cmnd *cmd)
 	if (unlikely(test_and_set_bit(SCMD_STATE_COMPLETE, &cmd->state)))
 		return;
 	trace_scsi_dispatch_cmd_done(cmd);
-	blk_mq_complete_request(cmd->request);
+
+	if (unlikely(host_byte(cmd->result) != DID_OK))
+		blk_mq_complete_request_locally(cmd->request);
+	else
+		blk_mq_complete_request(cmd->request);
 }
 
 static void scsi_mq_put_budget(struct request_queue *q)

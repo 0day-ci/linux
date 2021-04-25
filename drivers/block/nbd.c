@@ -809,7 +809,7 @@ static bool nbd_clear_req(struct request *req, void *data, bool reserved)
 	cmd->status = BLK_STS_IOERR;
 	mutex_unlock(&cmd->lock);
 
-	blk_mq_complete_request(req);
+	blk_mq_complete_request_locally(req);
 	return true;
 }
 

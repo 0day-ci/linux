@@ -385,7 +385,7 @@ bool nvme_cancel_request(struct request *req, void *data, bool reserved)
 
 	nvme_req(req)->status = NVME_SC_HOST_ABORTED_CMD;
 	nvme_req(req)->flags |= NVME_REQ_CANCELLED;
-	blk_mq_complete_request(req);
+	blk_mq_complete_request_locally(req);
 	return true;
 }
 EXPORT_SYMBOL_GPL(nvme_cancel_request);
