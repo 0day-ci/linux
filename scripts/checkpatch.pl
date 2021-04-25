@@ -1859,7 +1859,7 @@ sub raw_line {
 	my $offset = $linenr - 1;
 	$cnt++;
 
-	my $line;
+	my $line = "";
 	while ($cnt) {
 		$line = $rawlines[$offset++];
 		next if (defined($line) && $line =~ /^-/);
