@@ -630,6 +630,7 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 			const char *name, const void *value, size_t size,
 			struct page *ipage, int flags)
 {
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_xattr_entry *here, *last;
 	void *base_addr, *last_base_addr;
 	int found, newsize;
@@ -745,8 +746,9 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 			!strcmp(name, F2FS_XATTR_NAME_ENCRYPTION_CONTEXT))
 		f2fs_set_encrypted_inode(inode);
 	f2fs_mark_inode_dirty_sync(inode, true);
-	if (!error && S_ISDIR(inode->i_mode))
-		set_sbi_flag(F2FS_I_SB(inode), SBI_NEED_CP);
+	if (!error && S_ISDIR(inode->i_mode) && f2fs_encrypted_file(inode) &&
+			f2fs_is_checkpointed_node(sbi, inode->i_ino))
+		f2fs_add_ino_entry(sbi, inode->i_ino, ENC_DIR_INO);
 
 same:
 	if (is_inode_flag_set(inode, FI_ACL_MODE)) {
