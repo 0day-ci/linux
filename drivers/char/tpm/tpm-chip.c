@@ -32,35 +32,6 @@ struct class *tpm_class;
 struct class *tpmrm_class;
 dev_t tpm_devt;
 
-static int tpm_request_locality(struct tpm_chip *chip)
-{
-	int rc;
-
-	if (!chip->ops->request_locality)
-		return 0;
-
-	rc = chip->ops->request_locality(chip, 0);
-	if (rc < 0)
-		return rc;
-
-	chip->locality = rc;
-	return 0;
-}
-
-static void tpm_relinquish_locality(struct tpm_chip *chip)
-{
-	int rc;
-
-	if (!chip->ops->relinquish_locality)
-		return;
-
-	rc = chip->ops->relinquish_locality(chip, chip->locality);
-	if (rc)
-		dev_err(&chip->dev, "%s: : error %d\n", __func__, rc);
-
-	chip->locality = -1;
-}
-
 static int tpm_cmd_ready(struct tpm_chip *chip)
 {
 	if (!chip->ops->cmd_ready)
@@ -103,17 +74,8 @@ int tpm_chip_start(struct tpm_chip *chip)
 
 	tpm_clk_enable(chip);
 
-	if (chip->locality == -1) {
-		ret = tpm_request_locality(chip);
-		if (ret) {
-			tpm_clk_disable(chip);
-			return ret;
-		}
-	}
-
 	ret = tpm_cmd_ready(chip);
 	if (ret) {
-		tpm_relinquish_locality(chip);
 		tpm_clk_disable(chip);
 		return ret;
 	}
@@ -133,7 +95,6 @@ EXPORT_SYMBOL_GPL(tpm_chip_start);
 void tpm_chip_stop(struct tpm_chip *chip)
 {
 	tpm_go_idle(chip);
-	tpm_relinquish_locality(chip);
 	tpm_clk_disable(chip);
 }
 EXPORT_SYMBOL_GPL(tpm_chip_stop);
@@ -392,7 +353,6 @@ struct tpm_chip *tpm_chip_alloc(struct device *pdev,
 		goto out;
 	}
 
-	chip->locality = -1;
 	return chip;
 
 out:

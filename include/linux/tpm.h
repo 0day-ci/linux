@@ -167,9 +167,6 @@ struct tpm_chip {
 	u32 last_cc;
 	u32 nr_commands;
 	u32 *cc_attrs_tbl;
-
-	/* active locality */
-	int locality;
 };
 
 #define TPM_HEADER_SIZE		10

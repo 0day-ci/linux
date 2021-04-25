@@ -626,9 +626,6 @@ static int probe_itpm(struct tpm_chip *chip)
 	if (vendor != TPM_VID_INTEL)
 		return 0;
 
-	if (request_locality(chip, 0) != 0)
-		return -EBUSY;
-
 	rc = tpm_tis_send_data(chip, cmd_getticks, len);
 	if (rc == 0)
 		goto out;
@@ -647,7 +644,6 @@ static int probe_itpm(struct tpm_chip *chip)
 
 out:
 	tpm_tis_ready(chip);
-	release_locality(chip, priv->locality);
 
 	return rc;
 }
@@ -707,22 +703,13 @@ static int tpm_tis_gen_interrupt(struct tpm_chip *chip)
 	const char *desc = "attempting to generate an interrupt";
 	u32 cap2;
 	cap_t cap;
-	int ret;
 
 	/* TPM 2.0 */
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
 		return tpm2_get_tpm_pt(chip, 0x100, &cap2, desc);
 
 	/* TPM 1.2 */
-	ret = request_locality(chip, 0);
-	if (ret < 0)
-		return ret;
-
-	ret = tpm1_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc, 0);
-
-	release_locality(chip, 0);
-
-	return ret;
+	return tpm1_getcap(chip, TPM_CAP_PROP_TIS_TIMEOUT, &cap, desc, 0);
 }
 
 /* Register the IRQ and issue a command that will cause an interrupt. If an
@@ -836,6 +823,7 @@ void tpm_tis_remove(struct tpm_chip *chip)
 
 	tpm_tis_write32(priv, reg, ~TPM_GLOBAL_INT_ENABLE & interrupt);
 
+	release_locality(chip, 0);
 	tpm_tis_clkrun_enable(chip, false);
 
 	if (priv->ilb_base_addr)
@@ -963,6 +951,14 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 		goto out_err;
 	}
 
+	rc = request_locality(chip, 0);
+	if (rc)
+		goto out_err;
+
+	rc = tpm_chip_start(chip);
+	if (rc)
+		goto out_err;
+
 	/* Take control of the TPM's interrupt hardware and shut it off */
 	rc = tpm_tis_read32(priv, TPM_INT_ENABLE(priv->locality), &intmask);
 	if (rc < 0)
@@ -973,9 +969,6 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 	intmask &= ~TPM_GLOBAL_INT_ENABLE;
 	tpm_tis_write32(priv, TPM_INT_ENABLE(priv->locality), intmask);
 
-	rc = tpm_chip_start(chip);
-	if (rc)
-		goto out_err;
 	rc = tpm2_probe(chip);
 	tpm_chip_stop(chip);
 	if (rc)
@@ -1036,15 +1029,7 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 		 * to make sure it works. May as well use that command to set the
 		 * proper timeouts for the driver.
 		 */
-
-		rc = request_locality(chip, 0);
-		if (rc < 0)
-			goto out_err;
-
 		rc = tpm_get_timeouts(chip);
-
-		release_locality(chip, 0);
-
 		if (rc) {
 			dev_err(dev, "Could not get TPM timeouts and durations\n");
 			rc = -ENODEV;
