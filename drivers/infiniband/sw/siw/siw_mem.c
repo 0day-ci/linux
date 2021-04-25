@@ -114,6 +114,7 @@ int siw_mr_add_mem(struct siw_mr *mr, struct ib_pd *pd, void *mem_obj,
 	if (xa_alloc_cyclic(&sdev->mem_xa, &id, mem, limit, &next,
 	    GFP_KERNEL) < 0) {
 		kfree(mem);
+		mr->mem = NULL;
 		return -ENOMEM;
 	}
 	/* Set the STag index part */
