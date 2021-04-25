@@ -1242,7 +1242,6 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	 */
 	inode_dio_begin(inode);
 
-	retval = 0;
 	sdio.blkbits = blkbits;
 	sdio.blkfactor = i_blkbits - blkbits;
 	sdio.block_in_file = offset >> blkbits;
