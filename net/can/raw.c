@@ -84,6 +84,7 @@ struct raw_sock {
 	struct notifier_block notifier;
 	int loopback;
 	int recv_own_msgs;
+	int recv_own_msgs_all;
 	int fd_frames;
 	int join_filters;
 	int count;                 /* number of active filters */
@@ -120,7 +121,7 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 	unsigned int *pflags;
 
 	/* check the received tx sock reference */
-	if (!ro->recv_own_msgs && oskb->sk == sk)
+	if (!ro->recv_own_msgs && !ro->recv_own_msgs_all && oskb->sk == sk)
 		return;
 
 	/* do not pass non-CAN2.0 frames to a legacy socket */
@@ -130,7 +131,8 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 	/* eliminate multiple filter matches for the same skb */
 	if (this_cpu_ptr(ro->uniq)->skb == oskb &&
 	    this_cpu_ptr(ro->uniq)->skbcnt == can_skb_prv(oskb)->skbcnt) {
-		if (ro->join_filters) {
+		if (ro->join_filters &&
+		    (!ro->recv_own_msgs_all || oskb->sk != sk)) {
 			this_cpu_inc(ro->uniq->join_rx_count);
 			/* drop frame until all enabled filters matched */
 			if (this_cpu_ptr(ro->uniq)->join_rx_count < ro->count)
@@ -143,8 +145,10 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 		this_cpu_ptr(ro->uniq)->skbcnt = can_skb_prv(oskb)->skbcnt;
 		this_cpu_ptr(ro->uniq)->join_rx_count = 1;
 		/* drop first frame to check all enabled filters? */
-		if (ro->join_filters && ro->count > 1)
+		if (ro->join_filters && ro->count > 1 &&
+		    (!ro->recv_own_msgs_all || oskb->sk != sk)) {
 			return;
+		}
 	}
 
 	/* clone the given skb to be able to enqueue it into the rcv queue */
@@ -212,6 +216,18 @@ static int raw_enable_errfilter(struct net *net, struct net_device *dev,
 	return err;
 }
 
+static int raw_enable_ownfilter(struct net *net, struct net_device *dev,
+				struct sock *sk, bool recv_own_msgs_all)
+{
+	int err = 0;
+
+	if (recv_own_msgs_all)
+		err = can_rx_register(net, dev, 0, MASK_ALL, true, raw_rcv,
+				      sk, "raw", sk);
+
+	return err;
+}
+
 static void raw_disable_filters(struct net *net, struct net_device *dev,
 				struct sock *sk, struct can_filter *filter,
 				int count)
@@ -234,6 +250,13 @@ static inline void raw_disable_errfilter(struct net *net,
 				  false, raw_rcv, sk);
 }
 
+static void raw_disable_ownfilter(struct net *net, struct net_device *dev,
+				  struct sock *sk, bool recv_own_msgs_all)
+{
+	if (recv_own_msgs_all)
+		can_rx_unregister(net, dev, 0, MASK_ALL, true, raw_rcv, sk);
+}
+
 static inline void raw_disable_allfilters(struct net *net,
 					  struct net_device *dev,
 					  struct sock *sk)
@@ -242,6 +265,7 @@ static inline void raw_disable_allfilters(struct net *net,
 
 	raw_disable_filters(net, dev, sk, ro->filter, ro->count);
 	raw_disable_errfilter(net, dev, sk, ro->err_mask);
+	raw_disable_ownfilter(net, dev, sk, ro->recv_own_msgs_all);
 }
 
 static int raw_enable_allfilters(struct net *net, struct net_device *dev,
@@ -251,13 +275,19 @@ static int raw_enable_allfilters(struct net *net, struct net_device *dev,
 	int err;
 
 	err = raw_enable_filters(net, dev, sk, ro->filter, ro->count);
-	if (!err) {
-		err = raw_enable_errfilter(net, dev, sk, ro->err_mask);
-		if (err)
-			raw_disable_filters(net, dev, sk, ro->filter,
-					    ro->count);
-	}
+	if (err)
+		goto out;
+	err = raw_enable_errfilter(net, dev, sk, ro->err_mask);
+	if (err)
+		goto out_disable;
+	err = raw_enable_ownfilter(net, dev, sk, ro->recv_own_msgs_all);
+	if (!err)
+		goto out;
 
+	raw_disable_errfilter(net, dev, sk, ro->err_mask);
+out_disable:
+	raw_disable_filters(net, dev, sk, ro->filter, ro->count);
+out:
 	return err;
 }
 
@@ -321,10 +351,11 @@ static int raw_init(struct sock *sk)
 	ro->count            = 1;
 
 	/* set default loopback behaviour */
-	ro->loopback         = 1;
-	ro->recv_own_msgs    = 0;
-	ro->fd_frames        = 0;
-	ro->join_filters     = 0;
+	ro->loopback          = 1;
+	ro->recv_own_msgs     = 0;
+	ro->recv_own_msgs_all = 0;
+	ro->fd_frames         = 0;
+	ro->join_filters      = 0;
 
 	/* alloc_percpu provides zero'ed memory */
 	ro->uniq = alloc_percpu(struct uniqframe);
@@ -493,6 +524,7 @@ static int raw_setsockopt(struct socket *sock, int level, int optname,
 	can_err_mask_t err_mask = 0;
 	int count = 0;
 	int err = 0;
+	int old_val;
 
 	if (level != SOL_CAN_RAW)
 		return -EINVAL;
@@ -637,6 +669,33 @@ static int raw_setsockopt(struct socket *sock, int level, int optname,
 
 		break;
 
+	case CAN_RAW_RECV_OWN_MSGS_ALL:
+		if (optlen != sizeof(ro->recv_own_msgs_all))
+			return -EINVAL;
+
+		old_val = ro->recv_own_msgs_all;
+		if (copy_from_sockptr(&ro->recv_own_msgs_all, optval, optlen))
+			return -EFAULT;
+
+		lock_sock(sk);
+
+		if (ro->bound && ro->ifindex)
+			dev = dev_get_by_index(sock_net(sk), ro->ifindex);
+
+		if (ro->bound) {
+			if (old_val && !ro->recv_own_msgs_all)
+				raw_disable_ownfilter(sock_net(sk), dev, sk, true);
+			else if (!old_val && ro->recv_own_msgs_all)
+				err = raw_enable_ownfilter(sock_net(sk), dev, sk, true);
+		}
+
+		if (dev)
+			dev_put(dev);
+
+		release_sock(sk);
+
+		break;
+
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -706,6 +765,12 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 		if (len > sizeof(int))
 			len = sizeof(int);
 		val = &ro->join_filters;
+		break;
+
+	case CAN_RAW_RECV_OWN_MSGS_ALL:
+		if (len > sizeof(int))
+			len = sizeof(int);
+		val = &ro->recv_own_msgs_all;
 		break;
 
 	default:
