@@ -994,7 +994,6 @@ void hfi1_put_irq_affinity(struct hfi1_devdata *dd,
 			set = &entry->rcv_intr;
 		break;
 	case IRQ_NETDEVCTXT:
-		rcd = (struct hfi1_ctxtdata *)msix->arg;
 		set = &entry->def_intr;
 		break;
 	default:
