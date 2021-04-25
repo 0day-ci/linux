@@ -10950,6 +10950,19 @@ static void attach_task_cfs_rq(struct task_struct *p)
 
 	if (!vruntime_normalized(p))
 		se->vruntime += cfs_rq->min_vruntime;
+
+	/*
+	 * Make sure the attached load will decay properly
+	 * in case the task is moved to another cpu before
+	 * being queued.
+	 */
+	if (!task_on_rq_queued(p)) {
+		for_each_sched_entity(se) {
+			if (se->on_rq)
+				break;
+			list_add_leaf_cfs_rq(cfs_rq_of(se));
+		}
+	}
 }
 
 static void switched_from_fair(struct rq *rq, struct task_struct *p)
