@@ -414,6 +414,7 @@ static struct hlist_head *can_rcv_list_find(canid_t *can_id, canid_t *mask,
  * @dev: pointer to netdevice (NULL => subscribe from 'all' CAN devices list)
  * @can_id: CAN identifier (see description)
  * @mask: CAN mask (see description)
+ * @match_sk: match socket pointer on received sk_buff (see description)
  * @func: callback function on filter match
  * @data: returned parameter for callback function
  * @ident: string for calling module identification
@@ -428,6 +429,9 @@ static struct hlist_head *can_rcv_list_find(canid_t *can_id, canid_t *mask,
  *  The filter can be inverted (CAN_INV_FILTER bit set in can_id) or it can
  *  filter for error message frames (CAN_ERR_FLAG bit set in mask).
  *
+ *  If match_sk is true, the received sk_buff's owning socket must also match
+ *  the given socket pointer.
+ *
  *  The provided pointer to the sk_buff is guaranteed to be valid as long as
  *  the callback function is running. The callback function must *not* free
  *  the given sk_buff while processing it's task. When the given sk_buff is
@@ -440,8 +444,9 @@ static struct hlist_head *can_rcv_list_find(canid_t *can_id, canid_t *mask,
  *  -ENODEV unknown device
  */
 int can_rx_register(struct net *net, struct net_device *dev, canid_t can_id,
-		    canid_t mask, void (*func)(struct sk_buff *, void *),
-		    void *data, char *ident, struct sock *sk)
+		    canid_t mask, bool match_sk,
+		    void (*func)(struct sk_buff *, void *), void *data,
+		    char *ident, struct sock *sk)
 {
 	struct receiver *rcv;
 	struct hlist_head *rcv_list;
@@ -468,6 +473,7 @@ int can_rx_register(struct net *net, struct net_device *dev, canid_t can_id,
 
 	rcv->can_id = can_id;
 	rcv->mask = mask;
+	rcv->match_sk = match_sk;
 	rcv->matches = 0;
 	rcv->func = func;
 	rcv->data = data;
@@ -503,6 +509,7 @@ static void can_rx_delete_receiver(struct rcu_head *rp)
  * @dev: pointer to netdevice (NULL => unsubscribe from 'all' CAN devices list)
  * @can_id: CAN identifier
  * @mask: CAN mask
+ * @match_sk: match socket pointer on received sk_buff
  * @func: callback function on filter match
  * @data: returned parameter for callback function
  *
@@ -510,8 +517,8 @@ static void can_rx_delete_receiver(struct rcu_head *rp)
  *  Removes subscription entry depending on given (subscription) values.
  */
 void can_rx_unregister(struct net *net, struct net_device *dev, canid_t can_id,
-		       canid_t mask, void (*func)(struct sk_buff *, void *),
-		       void *data)
+		       canid_t mask, bool match_sk,
+		       void (*func)(struct sk_buff *, void *), void *data)
 {
 	struct receiver *rcv = NULL;
 	struct hlist_head *rcv_list;
@@ -535,7 +542,8 @@ void can_rx_unregister(struct net *net, struct net_device *dev, canid_t can_id,
 	 */
 	hlist_for_each_entry_rcu(rcv, rcv_list, list) {
 		if (rcv->can_id == can_id && rcv->mask == mask &&
-		    rcv->func == func && rcv->data == data)
+		    rcv->match_sk == match_sk && rcv->func == func &&
+		    rcv->data == data)
 			break;
 	}
 
@@ -546,8 +554,8 @@ void can_rx_unregister(struct net *net, struct net_device *dev, canid_t can_id,
 	 * a warning here.
 	 */
 	if (!rcv) {
-		pr_warn("can: receive list entry not found for dev %s, id %03X, mask %03X\n",
-			DNAME(dev), can_id, mask);
+		pr_warn("can: receive list entry not found for dev %s, id %03X, mask %03X%s\n",
+			DNAME(dev), can_id, mask, match_sk ? " (match sk)" : "");
 		goto out;
 	}
 
@@ -569,10 +577,14 @@ void can_rx_unregister(struct net *net, struct net_device *dev, canid_t can_id,
 }
 EXPORT_SYMBOL(can_rx_unregister);
 
-static inline void deliver(struct sk_buff *skb, struct receiver *rcv)
+static inline int deliver(struct sk_buff *skb, struct receiver *rcv)
 {
-	rcv->func(skb, rcv->data);
-	rcv->matches++;
+	if (!rcv->match_sk || skb->sk == rcv->sk) {
+		rcv->func(skb, rcv->data);
+		rcv->matches++;
+		return 1;
+	}
+	return 0;
 }
 
 static int can_rcv_filter(struct can_dev_rcv_lists *dev_rcv_lists, struct sk_buff *skb)
@@ -589,8 +601,7 @@ static int can_rcv_filter(struct can_dev_rcv_lists *dev_rcv_lists, struct sk_buf
 		/* check for error message frame entries only */
 		hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx[RX_ERR], list) {
 			if (can_id & rcv->mask) {
-				deliver(skb, rcv);
-				matches++;
+				matches += deliver(skb, rcv);
 			}
 		}
 		return matches;
@@ -598,23 +609,20 @@ static int can_rcv_filter(struct can_dev_rcv_lists *dev_rcv_lists, struct sk_buf
 
 	/* check for unfiltered entries */
 	hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx[RX_ALL], list) {
-		deliver(skb, rcv);
-		matches++;
+		matches += deliver(skb, rcv);
 	}
 
 	/* check for can_id/mask entries */
 	hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx[RX_FIL], list) {
 		if ((can_id & rcv->mask) == rcv->can_id) {
-			deliver(skb, rcv);
-			matches++;
+			matches += deliver(skb, rcv);
 		}
 	}
 
 	/* check for inverted can_id/mask entries */
 	hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx[RX_INV], list) {
 		if ((can_id & rcv->mask) != rcv->can_id) {
-			deliver(skb, rcv);
-			matches++;
+			matches += deliver(skb, rcv);
 		}
 	}
 
@@ -625,15 +633,13 @@ static int can_rcv_filter(struct can_dev_rcv_lists *dev_rcv_lists, struct sk_buf
 	if (can_id & CAN_EFF_FLAG) {
 		hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx_eff[effhash(can_id)], list) {
 			if (rcv->can_id == can_id) {
-				deliver(skb, rcv);
-				matches++;
+				matches += deliver(skb, rcv);
 			}
 		}
 	} else {
 		can_id &= CAN_SFF_MASK;
 		hlist_for_each_entry_rcu(rcv, &dev_rcv_lists->rx_sff[can_id], list) {
-			deliver(skb, rcv);
-			matches++;
+			matches += deliver(skb, rcv);
 		}
 	}
 

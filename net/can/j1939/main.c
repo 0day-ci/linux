@@ -177,7 +177,7 @@ static int j1939_can_rx_register(struct j1939_priv *priv)
 
 	j1939_priv_get(priv);
 	ret = can_rx_register(dev_net(ndev), ndev, J1939_CAN_ID, J1939_CAN_MASK,
-			      j1939_can_recv, priv, "j1939", NULL);
+			      false, j1939_can_recv, priv, "j1939", NULL);
 	if (ret < 0) {
 		j1939_priv_put(priv);
 		return ret;
@@ -191,7 +191,7 @@ static void j1939_can_rx_unregister(struct j1939_priv *priv)
 	struct net_device *ndev = priv->ndev;
 
 	can_rx_unregister(dev_net(ndev), ndev, J1939_CAN_ID, J1939_CAN_MASK,
-			  j1939_can_recv, priv);
+			  false, j1939_can_recv, priv);
 
 	j1939_priv_put(priv);
 }
