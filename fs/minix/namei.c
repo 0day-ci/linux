@@ -215,6 +215,10 @@ static int minix_rename(struct user_namespace *mnt_userns,
 		struct page * new_page;
 		struct minix_dir_entry * new_de;
 
+		err = -EINVAL;
+		if (new_inode->i_nlink == 0)
+			goto out_dir;
+
 		err = -ENOTEMPTY;
 		if (dir_de && !minix_empty_dir(new_inode))
 			goto out_dir;
