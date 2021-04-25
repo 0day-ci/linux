@@ -2472,6 +2472,22 @@ xfs_defer_agfl_block(
 	trace_xfs_agfl_free_defer(mp, agno, 0, agbno, 1);
 
 	xfs_defer_add(tp, XFS_DEFER_OPS_TYPE_AGFL_FREE, &new->xefi_list);
+
+	/*
+	 * Debugging assertions in the transaction accounting code require that
+	 * updates to an AGF freelist count are cancelled out by an update to
+	 * an AGF free block count.  Prior to deferred AGFL freeing, we removed
+	 * a block from the AGFL and freed it in the same transaction, which
+	 * satisfied this invariant.
+	 *
+	 * Now that we defer the actual freeing to a subsequent transaction in
+	 * the chain, this no longer holds true.  Debug delta counters do not
+	 * roll over, so pretend that we updated an AGF free block count
+	 * somewhere.  The EFI for the AGFL block is logged in the same
+	 * transaction as the AGFL change, which is how we maintain integrity
+	 * even if the system goes down.
+	 */
+	xfs_trans_agblocks_delta(tp, 1);
 }
 
 #ifdef DEBUG
