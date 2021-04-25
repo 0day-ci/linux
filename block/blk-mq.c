@@ -681,6 +681,22 @@ void blk_mq_complete_request(struct request *rq)
 }
 EXPORT_SYMBOL(blk_mq_complete_request);
 
+/**
+ * blk_mq_complete_request_locally - end I/O on a request locally
+ * @rq:		the request being processed
+ *
+ * Description:
+ *	Complete a request by calling the ->complete_rq directly,
+ *	and it is usually used in error handling via
+ *	blk_mq_tagset_busy_iter().
+ **/
+void blk_mq_complete_request_locally(struct request *rq)
+{
+	WRITE_ONCE(rq->state, MQ_RQ_COMPLETE);
+	rq->q->mq_ops->complete(rq);
+}
+EXPORT_SYMBOL(blk_mq_complete_request_locally);
+
 static void hctx_unlock(struct blk_mq_hw_ctx *hctx, int srcu_idx)
 	__releases(hctx->srcu)
 {
