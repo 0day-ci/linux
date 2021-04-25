@@ -150,8 +150,8 @@
 			pci_bridge@9,0 {
 				compatible = "pci0014,7a19.0",
 						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x4800 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
@@ -163,10 +163,10 @@
 			};
 
 			pci_bridge@a,0 {
-				compatible = "pci0014,7a19.0",
-						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+				compatible = "pci0014,7a09.0",
+						   "pci0014,7a09",
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x5000 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
@@ -178,10 +178,10 @@
 			};
 
 			pci_bridge@b,0 {
-				compatible = "pci0014,7a19.0",
-						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+				compatible = "pci0014,7a09.0",
+						   "pci0014,7a09",
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x5800 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
@@ -193,10 +193,10 @@
 			};
 
 			pci_bridge@c,0 {
-				compatible = "pci0014,7a19.0",
-						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+				compatible = "pci0014,7a09.0",
+						   "pci0014,7a09",
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x6000 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
@@ -210,8 +210,8 @@
 			pci_bridge@d,0 {
 				compatible = "pci0014,7a19.0",
 						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x6800 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
@@ -223,10 +223,10 @@
 			};
 
 			pci_bridge@e,0 {
-				compatible = "pci0014,7a19.0",
-						   "pci0014,7a19",
-						   "pciclass060400",
-						   "pciclass0604";
+				compatible = "pci0014,7a09.0",
+						   "pci0014,7a09",
+						   "pciclass0b0300",
+						   "pciclass0b03";
 
 				reg = <0x7000 0x0 0x0 0x0 0x0>;
 				#interrupt-cells = <1>;
