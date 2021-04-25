@@ -205,8 +205,11 @@ static void can_print_recv_banner(struct seq_file *m)
 	 *                  can1.  00000000  00000000  00000000
 	 *                 .......          0  tp20
 	 */
-	seq_puts(m, "  device   can_id   can_mask  function"
-			"  userdata   matches  ident\n");
+	const char *pad = sizeof(void *) == 8 ? "    " : "";
+
+	seq_printf(m, "  device   can_id   can_mask  %sfunction%s"
+		   "  %suserdata%s   matches  ident\n",
+		   pad, pad, pad, pad);
 }
 
 static int can_stats_proc_show(struct seq_file *m, void *v)
