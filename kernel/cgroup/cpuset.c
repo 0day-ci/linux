@@ -212,6 +212,7 @@ typedef enum {
 	CS_MEM_EXCLUSIVE,
 	CS_MEM_HARDWALL,
 	CS_MEMORY_MIGRATE,
+	CS_MEMORY_MIGRATE_LAZY,
 	CS_SCHED_LOAD_BALANCE,
 	CS_SPREAD_PAGE,
 	CS_SPREAD_SLAB,
@@ -246,6 +247,11 @@ static inline int is_sched_load_balance(const struct cpuset *cs)
 static inline int is_memory_migrate(const struct cpuset *cs)
 {
 	return test_bit(CS_MEMORY_MIGRATE, &cs->flags);
+}
+
+static inline int is_memory_migrate_lazy(const struct cpuset *cs)
+{
+	return test_bit(CS_MEMORY_MIGRATE_LAZY, &cs->flags);
 }
 
 static inline int is_spread_page(const struct cpuset *cs)
@@ -1594,6 +1600,7 @@ struct cpuset_migrate_mm_work {
 	struct mm_struct	*mm;
 	nodemask_t		from;
 	nodemask_t		to;
+	int			flags;
 };
 
 static void cpuset_migrate_mm_workfn(struct work_struct *work)
@@ -1602,21 +1609,29 @@ static void cpuset_migrate_mm_workfn(struct work_struct *work)
 		container_of(work, struct cpuset_migrate_mm_work, work);
 
 	/* on a wq worker, no need to worry about %current's mems_allowed */
-	do_migrate_pages(mwork->mm, &mwork->from, &mwork->to, MPOL_MF_MOVE_ALL);
+	do_migrate_pages(mwork->mm, &mwork->from, &mwork->to, mwork->flags);
 	mmput(mwork->mm);
 	kfree(mwork);
 }
 
-static void cpuset_migrate_mm(struct mm_struct *mm, const nodemask_t *from,
-							const nodemask_t *to)
+static void cpuset_migrate_mm(struct cpuset *cs, struct mm_struct *mm,
+			      const nodemask_t *from, const nodemask_t *to)
 {
-	struct cpuset_migrate_mm_work *mwork;
+	struct cpuset_migrate_mm_work *mwork = NULL;
+	int flags = 0;
 
-	mwork = kzalloc(sizeof(*mwork), GFP_KERNEL);
+	if (is_memory_migrate_lazy(cs))
+		flags = MPOL_MF_LAZY;
+	else if (is_memory_migrate(cs))
+		flags = MPOL_MF_MOVE_ALL;
+
+	if (flags)
+		mwork = kzalloc(sizeof(*mwork), GFP_KERNEL);
 	if (mwork) {
 		mwork->mm = mm;
 		mwork->from = *from;
 		mwork->to = *to;
+		mwork->flags = flags;
 		INIT_WORK(&mwork->work, cpuset_migrate_mm_workfn);
 		queue_work(cpuset_migrate_mm_wq, &mwork->work);
 	} else {
@@ -1690,7 +1705,6 @@ static void update_tasks_nodemask(struct cpuset *cs)
 	css_task_iter_start(&cs->css, 0, &it);
 	while ((task = css_task_iter_next(&it))) {
 		struct mm_struct *mm;
-		bool migrate;
 
 		cpuset_change_task_nodemask(task, &newmems);
 
@@ -1698,13 +1712,8 @@ static void update_tasks_nodemask(struct cpuset *cs)
 		if (!mm)
 			continue;
 
-		migrate = is_memory_migrate(cs);
-
 		mpol_rebind_mm(mm, &cs->mems_allowed);
-		if (migrate)
-			cpuset_migrate_mm(mm, &cs->old_mems_allowed, &newmems);
-		else
-			mmput(mm);
+		cpuset_migrate_mm(cs, mm, &cs->old_mems_allowed, &newmems);
 	}
 	css_task_iter_end(&it);
 
@@ -1910,6 +1919,11 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 		set_bit(bit, &trialcs->flags);
 	else
 		clear_bit(bit, &trialcs->flags);
+
+	if (bit == CS_MEMORY_MIGRATE)
+		clear_bit(CS_MEMORY_MIGRATE_LAZY, &trialcs->flags);
+	if (bit == CS_MEMORY_MIGRATE_LAZY)
+		clear_bit(CS_MEMORY_MIGRATE, &trialcs->flags);
 
 	err = validate_change(cs, trialcs);
 	if (err < 0)
@@ -2237,11 +2251,8 @@ static void cpuset_attach(struct cgroup_taskset *tset)
 			 * @old_mems_allowed is the right nodesets that we
 			 * migrate mm from.
 			 */
-			if (is_memory_migrate(cs))
-				cpuset_migrate_mm(mm, &oldcs->old_mems_allowed,
-						  &cpuset_attach_nodemask_to);
-			else
-				mmput(mm);
+			cpuset_migrate_mm(cs, mm, &oldcs->old_mems_allowed,
+					  &cpuset_attach_nodemask_to);
 		}
 	}
 
@@ -2258,6 +2269,7 @@ static void cpuset_attach(struct cgroup_taskset *tset)
 
 typedef enum {
 	FILE_MEMORY_MIGRATE,
+	FILE_MEMORY_MIGRATE_LAZY,
 	FILE_CPULIST,
 	FILE_MEMLIST,
 	FILE_EFFECTIVE_CPULIST,
@@ -2275,11 +2287,8 @@ typedef enum {
 	FILE_SPREAD_SLAB,
 } cpuset_filetype_t;
 
-static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
-			    u64 val)
+static int __cpuset_write_u64(struct cpuset *cs, cpuset_filetype_t type, u64 val)
 {
-	struct cpuset *cs = css_cs(css);
-	cpuset_filetype_t type = cft->private;
 	int retval = 0;
 
 	get_online_cpus();
@@ -2305,6 +2314,9 @@ static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
 	case FILE_MEMORY_MIGRATE:
 		retval = update_flag(CS_MEMORY_MIGRATE, cs, val);
 		break;
+	case FILE_MEMORY_MIGRATE_LAZY:
+		retval = update_flag(CS_MEMORY_MIGRATE_LAZY, cs, val);
+		break;
 	case FILE_MEMORY_PRESSURE_ENABLED:
 		cpuset_memory_pressure_enabled = !!val;
 		break;
@@ -2322,6 +2334,12 @@ out_unlock:
 	percpu_up_write(&cpuset_rwsem);
 	put_online_cpus();
 	return retval;
+}
+
+static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
+			    u64 val)
+{
+	return __cpuset_write_u64(css_cs(css), cft->private, val);
 }
 
 static int cpuset_write_s64(struct cgroup_subsys_state *css, struct cftype *cft,
@@ -2473,6 +2491,8 @@ static u64 cpuset_read_u64(struct cgroup_subsys_state *css, struct cftype *cft)
 		return is_sched_load_balance(cs);
 	case FILE_MEMORY_MIGRATE:
 		return is_memory_migrate(cs);
+	case FILE_MEMORY_MIGRATE_LAZY:
+		return is_memory_migrate_lazy(cs);
 	case FILE_MEMORY_PRESSURE_ENABLED:
 		return cpuset_memory_pressure_enabled;
 	case FILE_MEMORY_PRESSURE:
@@ -2552,6 +2572,40 @@ out_unlock:
 	percpu_up_write(&cpuset_rwsem);
 	put_online_cpus();
 	css_put(&cs->css);
+	return retval ?: nbytes;
+}
+
+static int cpuset_mm_migration_show(struct seq_file *seq, void *v)
+{
+	struct cpuset *cs = css_cs(seq_css(seq));
+
+	if (is_memory_migrate_lazy(cs))
+		seq_puts(seq, "lazy\n");
+	else if (is_memory_migrate(cs))
+		seq_puts(seq, "sync\n");
+	else
+		seq_puts(seq, "none\n");
+	return 0;
+}
+
+static ssize_t cpuset_mm_migration_write(struct kernfs_open_file *of,
+					 char *buf, size_t nbytes, loff_t off)
+{
+	struct cpuset *cs = css_cs(of_css(of));
+	cpuset_filetype_t type = FILE_MEMORY_MIGRATE;
+	int turning_on = 1;
+	int retval;
+
+	buf = strstrip(buf);
+
+	if (!strcmp(buf, "none"))
+		turning_on = 0;
+	else if (!strcmp(buf, "lazy"))
+		type = FILE_MEMORY_MIGRATE_LAZY;
+	else if (strcmp(buf, "sync"))
+		return -EINVAL;
+
+	retval = __cpuset_write_u64(cs, type, turning_on);
 	return retval ?: nbytes;
 }
 
@@ -2709,6 +2763,14 @@ static struct cftype dfl_files[] = {
 		.seq_show = cpuset_common_seq_show,
 		.private = FILE_SUBPARTS_CPULIST,
 		.flags = CFTYPE_DEBUG,
+	},
+
+	{
+		.name = "mems.migration",
+		.seq_show = cpuset_mm_migration_show,
+		.write = cpuset_mm_migration_write,
+		.private = FILE_MEMORY_MIGRATE,
+		.flags = CFTYPE_NOT_ON_ROOT,
 	},
 
 	{ }	/* terminate */
