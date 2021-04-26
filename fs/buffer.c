@@ -1709,9 +1709,9 @@ static struct buffer_head *create_page_buffers(struct page *page, struct inode *
  * WB_SYNC_ALL, the writes are posted using REQ_SYNC; this
  * causes the writes to be flagged as synchronous writes.
  */
-int __block_write_full_page(struct inode *inode, struct page *page,
+int __block_write_full_page_eof(struct inode *inode, struct page *page,
 			get_block_t *get_block, struct writeback_control *wbc,
-			bh_end_io_t *handler)
+			bh_end_io_t *handler, bool eof_write)
 {
 	int err;
 	sector_t block;
@@ -1746,7 +1746,7 @@ int __block_write_full_page(struct inode *inode, struct page *page,
 	 * handle any aliases from the underlying blockdev's mapping.
 	 */
 	do {
-		if (block > last_block) {
+		if (block > last_block && !eof_write) {
 			/*
 			 * mapped buffers outside i_size will occur, because
 			 * this page can be outside i_size when there is a
@@ -1870,6 +1870,14 @@ recover:
 	} while (bh != head);
 	unlock_page(page);
 	goto done;
+}
+EXPORT_SYMBOL(__block_write_full_page_eof);
+
+int __block_write_full_page(struct inode *inode, struct page *page,
+			get_block_t *get_block, struct writeback_control *wbc,
+			bh_end_io_t *handler)
+{
+	return __block_write_full_page_eof(inode, page, get_block, wbc, handler, false);
 }
 EXPORT_SYMBOL(__block_write_full_page);
 
