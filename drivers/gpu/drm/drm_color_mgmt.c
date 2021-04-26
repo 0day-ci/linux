@@ -469,6 +469,10 @@ static const char * const color_encoding_name[] = {
 	[DRM_COLOR_YCBCR_BT601] = "ITU-R BT.601 YCbCr",
 	[DRM_COLOR_YCBCR_BT709] = "ITU-R BT.709 YCbCr",
 	[DRM_COLOR_YCBCR_BT2020] = "ITU-R BT.2020 YCbCr",
+	[DRM_COLOR_RGB_BT601] = "ITU-R BT.601 RGB",
+	[DRM_COLOR_RGB_BT709] = "ITU-R BT.709 RGB",
+	[DRM_COLOR_RGB_BT2020] = "ITU-R BT.2020 RGB",
+	[DRM_COLOR_P3] = "DCI-P3",
 };
 
 static const char * const color_range_name[] = {
