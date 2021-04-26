@@ -24,9 +24,9 @@
 #include <linux/slab.h>
 #include <linux/uio_driver.h>
 
-#define DRIVER_VERSION	"0.01.0"
-#define DRIVER_AUTHOR	"Michael S. Tsirkin <mst@redhat.com>"
-#define DRIVER_DESC	"Generic UIO driver for PCI 2.3 devices"
+#define DRIVER_VERSION "0.01.0"
+#define DRIVER_AUTHOR "Michael S. Tsirkin <mst@redhat.com>"
+#define DRIVER_DESC "Generic UIO driver for PCI 2.3 devices"
 
 struct uio_pci_generic_dev {
 	struct uio_info info;
@@ -56,7 +56,8 @@ static int release(struct uio_info *info, struct inode *inode)
 }
 
 /* Interrupt handler. Read/modify/write the command register to disable
- * the interrupt. */
+ * the interrupt.
+ */
 static irqreturn_t irqhandler(int irq, struct uio_info *info)
 {
 	struct uio_pci_generic_dev *gdev = to_uio_pci_generic_dev(info);
@@ -68,11 +69,12 @@ static irqreturn_t irqhandler(int irq, struct uio_info *info)
 	return IRQ_HANDLED;
 }
 
-static int probe(struct pci_dev *pdev,
-			   const struct pci_device_id *id)
+static int probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct uio_pci_generic_dev *gdev;
+	struct uio_mem *uiomem;
 	int err;
+	int i;
 
 	err = pcim_enable_device(pdev);
 	if (err) {
@@ -84,7 +86,8 @@ static int probe(struct pci_dev *pdev,
 	if (pdev->irq && !pci_intx_mask_supported(pdev))
 		return -ENOMEM;
 
-	gdev = devm_kzalloc(&pdev->dev, sizeof(struct uio_pci_generic_dev), GFP_KERNEL);
+	gdev = devm_kzalloc(&pdev->dev, sizeof(struct uio_pci_generic_dev),
+			    GFP_KERNEL);
 	if (!gdev)
 		return -ENOMEM;
 
@@ -97,8 +100,39 @@ static int probe(struct pci_dev *pdev,
 		gdev->info.irq_flags = IRQF_SHARED;
 		gdev->info.handler = irqhandler;
 	} else {
-		dev_warn(&pdev->dev, "No IRQ assigned to device: "
-			 "no support for interrupts?\n");
+		dev_warn(
+			&pdev->dev,
+			"No IRQ assigned to device: no support for interrupts?\n");
+	}
+
+	uiomem = &gdev->info.mem[0];
+	for (i = 0; i < MAX_UIO_MAPS; ++i) {
+		struct resource *r = &pdev->resource[i];
+
+		if (r->flags != (IORESOURCE_SIZEALIGN | IORESOURCE_MEM))
+			continue;
+
+		if (uiomem >= &gdev->info.mem[MAX_UIO_MAPS]) {
+			dev_warn(
+				&pdev->dev,
+				"device has more than " __stringify(
+					MAX_UIO_MAPS) " I/O memory resources.\n");
+			break;
+		}
+
+		uiomem->memtype = UIO_MEM_PHYS;
+		uiomem->addr = r->start & PAGE_MASK;
+		uiomem->offs = r->start & ~PAGE_MASK;
+		uiomem->size =
+			(uiomem->offs + resource_size(r) + PAGE_SIZE - 1) &
+			PAGE_MASK;
+		uiomem->name = r->name;
+		++uiomem;
+	}
+
+	while (uiomem < &gdev->info.mem[MAX_UIO_MAPS]) {
+		uiomem->size = 0;
+		++uiomem;
 	}
 
 	return devm_uio_register_device(&pdev->dev, &gdev->info);
