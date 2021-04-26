@@ -180,6 +180,14 @@ struct drm_plane_state {
 	enum drm_color_range color_range;
 
 	/**
+	 * @color_transfer_function:
+	 *
+	 * Transfer function for HDR color/luminance mapping. This will allow the
+	 * driver to know what transfer function should be used to for the current
+	 * format for a proper HDR color/luminance output.
+	 */
+	enum drm_color_transfer_function color_tf;
+	/**
 	 * @fb_damage_clips:
 	 *
 	 * Blob representing damage (area in plane framebuffer that changed
@@ -741,6 +749,14 @@ struct drm_plane {
 	 * See drm_plane_create_color_properties().
 	 */
 	struct drm_property *color_range_property;
+	/**
+	 * @color_tf_property:
+	 *
+	 * Optional "COLOR_TRANSFER_FUNCTION" enum property for specifying
+	 * color transfer function for non RGB formats, mostly used for HDR.
+	 * See drm_plane_create_color_properties().
+	 */
+	struct drm_property *color_tf_property;
 
 	/**
 	 * @scaling_filter_property: property to apply a particular filter while

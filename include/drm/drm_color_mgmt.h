@@ -91,11 +91,24 @@ enum drm_color_range {
 	DRM_COLOR_RANGE_MAX,
 };
 
+/**
+ * enum drm_color_transfer_function - common transfer function used for sdr/hdr formats
+ *
+ * DRM_COLOR_TF_SRGB - Based on gamma curve and is used for printer/monitors/web
+ * DRM_COLOR_TF_PQ2084 - Used for HDR and allows for up to 10,000 nit support.
+*/
+enum drm_color_transfer_function {
+	DRM_COLOR_TF_SRGB,
+	DRM_COLOR_TF_PQ2084,
+	DRM_COLOR_TF_MAX,
+};
 int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_encodings,
 				      u32 supported_ranges,
+				      u32 supported_tf,
 				      enum drm_color_encoding default_encoding,
-				      enum drm_color_range default_range);
+				      enum drm_color_range default_range,
+				      enum drm_color_transfer_function default_tf);
 
 /**
  * enum drm_color_lut_tests - hw-specific LUT tests to perform

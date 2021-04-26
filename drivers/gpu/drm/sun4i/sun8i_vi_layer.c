@@ -594,8 +594,10 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
 	ret = drm_plane_create_color_properties(&layer->plane,
 						supported_encodings,
 						supported_ranges,
+						BIT(DRM_COLOR_TF_SRGB),
 						DRM_COLOR_YCBCR_BT709,
-						DRM_COLOR_YCBCR_LIMITED_RANGE);
+						DRM_COLOR_YCBCR_LIMITED_RANGE,
+						DRM_COLOR_TF_SRGB);
 	if (ret) {
 		dev_err(drm->dev, "Couldn't add encoding and range properties!\n");
 		return ERR_PTR(ret);

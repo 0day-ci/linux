@@ -1025,7 +1025,9 @@ int malidp_de_planes_init(struct drm_device *drm)
 					BIT(DRM_COLOR_YCBCR_BT2020),
 					BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) | \
 					BIT(DRM_COLOR_YCBCR_FULL_RANGE),
-					enc, range);
+					BIT(DRM_COLOR_SRGB),
+					enc, range,
+					DRM_COLOR_SRGB);
 			if (!ret)
 				/* program the HW registers */
 				malidp_de_set_color_encoding(plane, enc, range);

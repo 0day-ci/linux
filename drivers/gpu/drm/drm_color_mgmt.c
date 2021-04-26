@@ -106,6 +106,11 @@
  * 	Optional plane enum property to support different non RGB
  * 	color parameter ranges. The driver can provide a subset of
  * 	standard enum values supported by the DRM plane.
+ *
+ * "COLOR_TRANFER_FUNCTION":
+ * 	Optional plane enum property to support different
+ * 	color luminance mappings. The driver can provide a subset of
+ * 	standard enum values supported by the DRM plane.
  */
 
 /**
@@ -480,6 +485,10 @@ static const char * const color_range_name[] = {
 	[DRM_COLOR_YCBCR_LIMITED_RANGE] = "YCbCr limited range",
 };
 
+static const char * const color_tf_name[] = {
+	[DRM_COLOR_TF_SRGB] = "sRGB",
+	[DRM_COLOR_TF_PQ2084] = "PQ2084",
+};
 /**
  * drm_get_color_encoding_name - return a string for color encoding
  * @encoding: color encoding to compute name of
@@ -511,29 +520,48 @@ const char *drm_get_color_range_name(enum drm_color_range range)
 }
 
 /**
+ * drm_get_color_transfer_function - return a string for color transfer function
+ * @tf: transfer function to compute name of
+ *
+ * In contrast to the other drm_get_*_name functions this one here returns a
+ * const pointer and hence is threadsafe.
+ */
+const char *drm_get_color_transfer_function_name(enum drm_color_transfer_function tf)
+{
+	if (WARN_ON(tf >= ARRAY_SIZE(color_tf_name)))
+		return "unknown";
+
+	return color_tf_name[tf];
+}
+/**
  * drm_plane_create_color_properties - color encoding related plane properties
  * @plane: plane object
  * @supported_encodings: bitfield indicating supported color encodings
  * @supported_ranges: bitfileld indicating supported color ranges
+ * @supported_tfs: bitfileld indicating supported color transfer functions
  * @default_encoding: default color encoding
  * @default_range: default color range
+ * @default_tf: default color transfer function
  *
- * Create and attach plane specific COLOR_ENCODING and COLOR_RANGE
- * properties to @plane. The supported encodings and ranges should
- * be provided in supported_encodings and supported_ranges bitmasks.
+ * Create and attach plane specific COLOR_ENCODING, COLOR_RANGE and COLOR_TRANSFER_FUNCTION
+ * properties to @plane. The supported encodings, ranges  and tfs should
+ * be provided in supported_encodings, supported_ranges and supported_tfs bitmasks.
  * Each bit set in the bitmask indicates that its number as enum
  * value is supported.
  */
 int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_encodings,
 				      u32 supported_ranges,
+				      u32 supported_tfs,
 				      enum drm_color_encoding default_encoding,
-				      enum drm_color_range default_range)
+				      enum drm_color_range default_range,
+				      enum drm_color_transfer_function default_tf)
 {
 	struct drm_device *dev = plane->dev;
 	struct drm_property *prop;
 	struct drm_prop_enum_list enum_list[max_t(int, DRM_COLOR_ENCODING_MAX,
-						       DRM_COLOR_RANGE_MAX)];
+						       max_t(int, DRM_COLOR_RANGE_MAX,
+							     DRM_COLOR_TF_MAX))];
 	int i, len;
 
 	if (WARN_ON(supported_encodings == 0 ||
@@ -544,6 +572,11 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	if (WARN_ON(supported_ranges == 0 ||
 		    (supported_ranges & -BIT(DRM_COLOR_RANGE_MAX)) != 0 ||
 		    (supported_ranges & BIT(default_range)) == 0))
+		return -EINVAL;
+
+	if (WARN_ON(supported_tfs == 0 ||
+		    (supported_tfs & -BIT(DRM_COLOR_TF_MAX)) != 0 ||
+		    (supported_tfs & BIT(default_tf)) == 0))
 		return -EINVAL;
 
 	len = 0;
@@ -583,6 +616,26 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	drm_object_attach_property(&plane->base, prop, default_range);
 	if (plane->state)
 		plane->state->color_range = default_range;
+
+
+	len = 0;
+	for (i = 0; i < DRM_COLOR_TF_MAX; i++) {
+		if ((supported_tfs & BIT(i)) == 0)
+			continue;
+
+		enum_list[len].type = i;
+		enum_list[len].name = color_tf_name[i];
+		len++;
+	}
+
+	prop = drm_property_create_enum(dev, 0, "COLOR_TRANSFER_FUNCTION",
+					enum_list, len);
+	if (!prop)
+		return -ENOMEM;
+	plane->color_tf_property = prop;
+	drm_object_attach_property(&plane->base, prop, default_tf);
+	if (plane->state)
+		plane->state->color_tf = default_tf;
 
 	return 0;
 }

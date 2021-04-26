@@ -596,8 +596,10 @@ int armada_overlay_plane_create(struct drm_device *dev, unsigned long crtcs)
 						BIT(DRM_COLOR_YCBCR_BT601) |
 						BIT(DRM_COLOR_YCBCR_BT709),
 						BIT(DRM_COLOR_YCBCR_LIMITED_RANGE),
+						BIT(DRM_COLOR_TF_SRGB),
 						DEFAULT_ENCODING,
-						DRM_COLOR_YCBCR_LIMITED_RANGE);
+						DRM_COLOR_YCBCR_LIMITED_RANGE,
+						DRM_COLOR_TF_SRGB);
 
 	return ret;
 }
