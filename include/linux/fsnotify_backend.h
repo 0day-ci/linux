@@ -48,6 +48,8 @@
 #define FS_ACCESS_PERM		0x00020000	/* access event in a permissions hook */
 #define FS_OPEN_EXEC_PERM	0x00040000	/* open/exec event in a permission hook */
 
+#define FS_ERROR		0x00100000	/* Used for filesystem error reporting */
+
 #define FS_EXCL_UNLINK		0x04000000	/* do not send events if object is unlinked */
 /*
  * Set on inode mark that cares about things that happen to its children.
@@ -74,6 +76,8 @@
 #define ALL_FSNOTIFY_PERM_EVENTS (FS_OPEN_PERM | FS_ACCESS_PERM | \
 				  FS_OPEN_EXEC_PERM)
 
+#define ALL_FSNOTIFY_ERROR_EVENTS	FS_ERROR
+
 #define FSN_SUBMISSION_RING_BUFFER	0x00000080
 
 /*
@@ -95,6 +99,7 @@
 
 /* Events that can be reported to backends */
 #define ALL_FSNOTIFY_EVENTS (ALL_FSNOTIFY_DIRENT_EVENTS | \
+			     ALL_FSNOTIFY_ERROR_EVENTS |  \
 			     FS_EVENTS_POSS_ON_CHILD | \
 			     FS_DELETE_SELF | FS_MOVE_SELF | FS_DN_RENAME | \
 			     FS_UNMOUNT | FS_Q_OVERFLOW | FS_IN_IGNORED)
@@ -272,6 +277,17 @@ enum fsnotify_data_type {
 	FSNOTIFY_EVENT_NONE,
 	FSNOTIFY_EVENT_PATH,
 	FSNOTIFY_EVENT_INODE,
+	FSNOTIFY_EVENT_ERROR,
+};
+
+struct fs_error_report {
+	int error;
+
+	int line;
+	const char *function;
+
+	size_t fs_data_size;
+	void *fs_data;
 };
 
 static inline struct inode *fsnotify_data_inode(const void *data, int data_type)
