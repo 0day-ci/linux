@@ -402,11 +402,28 @@ out_unlock:
  */
 static int ocfs2_writepage(struct page *page, struct writeback_control *wbc)
 {
+	struct inode * const inode = page->mapping->host;
+	loff_t i_size = i_size_read(inode);
+	const pgoff_t end_index = i_size >> PAGE_SHIFT;
+	unsigned int offset;
+
 	trace_ocfs2_writepage(
 		(unsigned long long)OCFS2_I(page->mapping->host)->ip_blkno,
 		page->index);
 
-	return block_write_full_page(page, ocfs2_get_block, wbc);
+	/*
+	 * The page straddles i_size.  It must be zeroed out on each and every
+	 * writepage invocation because it may be mmapped.  "A file is mapped
+	 * in multiples of the page size.  For a file that is not a multiple of
+	 * the  page size, the remaining memory is zeroed when mapped, and
+	 * writes to that region are not written out to the file."
+	 */
+	offset = i_size & (PAGE_SIZE-1);
+	if (page->index == end_index && offset)
+		zero_user_segment(page, offset, PAGE_SIZE);
+
+	return __block_write_full_page_eof(inode, page, ocfs2_get_block, wbc,
+			end_buffer_async_write, true);
 }
 
 /* Taken from ext3. We don't necessarily need the full blown
