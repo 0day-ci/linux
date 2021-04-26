@@ -1055,7 +1055,23 @@ out_destroy_group:
 }
 
 /* Check if filesystem can encode a unique fid */
-static int fanotify_test_fid(struct path *path, __kernel_fsid_t *fsid)
+static int fanotify_test_fid(struct path *path)
+{
+	/*
+	 * We need to make sure that the file system supports at least
+	 * encoding a file handle so user can use name_to_handle_at() to
+	 * compare fid returned with event to the file handle of watched
+	 * objects. However, name_to_handle_at() requires that the
+	 * filesystem also supports decoding file handles.
+	 */
+	if (!path->dentry->d_sb->s_export_op ||
+	    !path->dentry->d_sb->s_export_op->fh_to_dentry)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
+static int fanotify_check_path_fsid(struct path *path, __kernel_fsid_t *fsid)
 {
 	__kernel_fsid_t root_fsid;
 	int err;
@@ -1081,17 +1097,6 @@ static int fanotify_test_fid(struct path *path, __kernel_fsid_t *fsid)
 	if (root_fsid.val[0] != fsid->val[0] ||
 	    root_fsid.val[1] != fsid->val[1])
 		return -EXDEV;
-
-	/*
-	 * We need to make sure that the file system supports at least
-	 * encoding a file handle so user can use name_to_handle_at() to
-	 * compare fid returned with event to the file handle of watched
-	 * objects. However, name_to_handle_at() requires that the
-	 * filesystem also supports decoding file handles.
-	 */
-	if (!path->dentry->d_sb->s_export_op ||
-	    !path->dentry->d_sb->s_export_op->fh_to_dentry)
-		return -EOPNOTSUPP;
 
 	return 0;
 }
@@ -1230,7 +1235,11 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	}
 
 	if (fid_mode) {
-		ret = fanotify_test_fid(&path, &__fsid);
+		ret = fanotify_check_path_fsid(&path, &__fsid);
+		if (ret)
+			goto path_put_and_out;
+
+		ret = fanotify_test_fid(&path);
 		if (ret)
 			goto path_put_and_out;
 
