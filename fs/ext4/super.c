@@ -46,6 +46,8 @@
 #include <linux/part_stat.h>
 #include <linux/kthread.h>
 #include <linux/freezer.h>
+#include <linux/fsnotify.h>
+#include <uapi/linux/ext4-notify.h>
 
 #include "ext4.h"
 #include "ext4_extents.h"	/* Needed for trace points definition */
@@ -727,6 +729,22 @@ write_directly:
 	ext4_commit_super(sbi->s_sb);
 }
 
+static void ext4_fsnotify_error(int error, struct inode *inode, __u64 block,
+				const char *func, int line,
+				const char *desc, struct va_format *vaf)
+{
+	struct ext4_error_inode_report report;
+
+	if (inode->i_sb->s_fsnotify_marks) {
+		report.inode = inode ? inode->i_ino : -1L;
+		report.block = block ? block : -1L;
+
+		snprintf(report.desc, EXT4_FSN_DESC_LEN, "%s%pV\n", desc?:"", vaf);
+
+		fsnotify_error_event(error, inode, func, line, &report, sizeof(report));
+	}
+}
+
 #define ext4_error_ratelimit(sb)					\
 		___ratelimit(&(EXT4_SB(sb)->s_err_ratelimit_state),	\
 			     "EXT4-fs error")
@@ -742,15 +760,18 @@ void __ext4_error(struct super_block *sb, const char *function,
 		return;
 
 	trace_ext4_error(sb, function, line);
+
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
 	if (ext4_error_ratelimit(sb)) {
-		va_start(args, fmt);
-		vaf.fmt = fmt;
-		vaf.va = &args;
 		printk(KERN_CRIT
 		       "EXT4-fs error (device %s): %s:%d: comm %s: %pV\n",
 		       sb->s_id, function, line, current->comm, &vaf);
-		va_end(args);
+
 	}
+	ext4_fsnotify_error(error, sb->s_root->d_inode, block, function, line, NULL, &vaf);
+	va_end(args);
 	ext4_handle_error(sb, force_ro, error, 0, block, function, line);
 }
 
@@ -765,10 +786,10 @@ void __ext4_error_inode(struct inode *inode, const char *function,
 		return;
 
 	trace_ext4_error(inode->i_sb, function, line);
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
 	if (ext4_error_ratelimit(inode->i_sb)) {
-		va_start(args, fmt);
-		vaf.fmt = fmt;
-		vaf.va = &args;
 		if (block)
 			printk(KERN_CRIT "EXT4-fs error (device %s): %s:%d: "
 			       "inode #%lu: block %llu: comm %s: %pV\n",
@@ -779,8 +800,11 @@ void __ext4_error_inode(struct inode *inode, const char *function,
 			       "inode #%lu: comm %s: %pV\n",
 			       inode->i_sb->s_id, function, line, inode->i_ino,
 			       current->comm, &vaf);
-		va_end(args);
 	}
+
+	ext4_fsnotify_error(error, inode, block, function, line, NULL, &vaf);
+	va_end(args);
+
 	ext4_handle_error(inode->i_sb, false, error, inode->i_ino, block,
 			  function, line);
 }
@@ -798,13 +822,16 @@ void __ext4_error_file(struct file *file, const char *function,
 		return;
 
 	trace_ext4_error(inode->i_sb, function, line);
+
+	path = file_path(file, pathname, sizeof(pathname));
+	if (IS_ERR(path))
+		path = "(unknown)";
+
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
 	if (ext4_error_ratelimit(inode->i_sb)) {
-		path = file_path(file, pathname, sizeof(pathname));
-		if (IS_ERR(path))
-			path = "(unknown)";
-		va_start(args, fmt);
-		vaf.fmt = fmt;
-		vaf.va = &args;
 		if (block)
 			printk(KERN_CRIT
 			       "EXT4-fs error (device %s): %s:%d: inode #%lu: "
@@ -817,8 +844,10 @@ void __ext4_error_file(struct file *file, const char *function,
 			       "comm %s: path %s: %pV\n",
 			       inode->i_sb->s_id, function, line, inode->i_ino,
 			       current->comm, path, &vaf);
-		va_end(args);
 	}
+	ext4_fsnotify_error(EFSCORRUPTED, inode, block, function, line, NULL, &vaf);
+	va_end(args);
+
 	ext4_handle_error(inode->i_sb, false, EFSCORRUPTED, inode->i_ino, block,
 			  function, line);
 }
@@ -886,6 +915,7 @@ void __ext4_std_error(struct super_block *sb, const char *function,
 		printk(KERN_CRIT "EXT4-fs error (device %s) in %s:%d: %s\n",
 		       sb->s_id, function, line, errstr);
 	}
+	ext4_fsnotify_error(errno, NULL, -1L, function, line, errstr, NULL);
 
 	ext4_handle_error(sb, false, -errno, 0, 0, function, line);
 }
