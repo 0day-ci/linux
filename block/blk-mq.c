@@ -63,6 +63,12 @@ static int blk_mq_poll_stats_bkt(const struct request *rq)
 	return bucket;
 }
 
+static inline struct blk_mq_hw_ctx *blk_qc_to_hctx(struct request_queue *q,
+		blk_qc_t qc)
+{
+	return q->queue_hw_ctx[(qc & ~BLK_QC_T_INTERNAL) >> BLK_QC_T_SHIFT];
+}
+
 /*
  * Check if any of the ctx, dispatch list or elevator
  * have pending work in this hardware queue.
@@ -3854,7 +3860,7 @@ static bool blk_mq_poll_hybrid(struct request_queue *q,
 
 static int blk_mq_poll_classic(struct request_queue *q, blk_qc_t qc, bool spin)
 {
-	struct blk_mq_hw_ctx *hctx = q->queue_hw_ctx[blk_qc_t_to_queue_num(qc)];
+	struct blk_mq_hw_ctx *hctx = blk_qc_to_hctx(q, qc);
 	long state = current->state;
 
 	hctx->poll_considered++;
@@ -3908,7 +3914,7 @@ int blk_poll(struct request_queue *q, blk_qc_t cookie, bool spin)
 	if (current->plug)
 		blk_flush_plug_list(current->plug, false);
 
-	hctx = q->queue_hw_ctx[blk_qc_t_to_queue_num(cookie)];
+	hctx = blk_qc_to_hctx(q, cookie);
 
 	/*
 	 * If we sleep, have the caller restart the poll loop to reset
