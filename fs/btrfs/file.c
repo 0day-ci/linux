@@ -3,6 +3,7 @@
  * Copyright (C) 2007 Oracle.  All rights reserved.
  */
 
+#include <linux/encoded_io.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/time.h>
@@ -1987,6 +1988,32 @@ out:
 	return written ? written : err;
 }
 
+static ssize_t btrfs_encoded_write(struct kiocb *iocb, struct iov_iter *from)
+{
+	struct file *file = iocb->ki_filp;
+	struct inode *inode = file_inode(file);
+	struct encoded_iov encoded;
+	ssize_t ret;
+
+	ret = copy_encoded_iov_from_iter(&encoded, from);
+	if (ret)
+		return ret;
+
+	btrfs_inode_lock(inode, 0);
+	ret = generic_encoded_write_checks(iocb, &encoded);
+	if (ret || encoded.len == 0)
+		goto out;
+
+	ret = btrfs_write_check(iocb, from, encoded.len);
+	if (ret < 0)
+		goto out;
+
+	ret = btrfs_do_encoded_write(iocb, from, &encoded);
+out:
+	btrfs_inode_unlock(inode, 0);
+	return ret;
+}
+
 static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 				    struct iov_iter *from)
 {
@@ -2003,14 +2030,17 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 	if (test_bit(BTRFS_FS_STATE_ERROR, &inode->root->fs_info->fs_state))
 		return -EROFS;
 
-	if (!(iocb->ki_flags & IOCB_DIRECT) &&
-	    (iocb->ki_flags & IOCB_NOWAIT))
+	if ((iocb->ki_flags & IOCB_NOWAIT) &&
+	    (!(iocb->ki_flags & IOCB_DIRECT) ||
+	     (iocb->ki_flags & IOCB_ENCODED)))
 		return -EOPNOTSUPP;
 
 	if (sync)
 		atomic_inc(&inode->sync_writers);
 
-	if (iocb->ki_flags & IOCB_DIRECT)
+	if (iocb->ki_flags & IOCB_ENCODED)
+		num_written = btrfs_encoded_write(iocb, from);
+	else if (iocb->ki_flags & IOCB_DIRECT)
 		num_written = btrfs_direct_write(iocb, from);
 	else
 		num_written = btrfs_buffered_write(iocb, from);
@@ -3579,7 +3609,7 @@ static loff_t btrfs_file_llseek(struct file *file, loff_t offset, int whence)
 
 static int btrfs_file_open(struct inode *inode, struct file *filp)
 {
-	filp->f_mode |= FMODE_NOWAIT | FMODE_BUF_RASYNC;
+	filp->f_mode |= FMODE_NOWAIT | FMODE_BUF_RASYNC | FMODE_ENCODED_IO;
 	return generic_file_open(inode, filp);
 }
 
