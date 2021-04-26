@@ -2589,6 +2589,9 @@ static int lpuart_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 
+	if (!sdata)
+		return -ENODEV;
+
 	sport = devm_kzalloc(&pdev->dev, sizeof(*sport), GFP_KERNEL);
 	if (!sport)
 		return -ENOMEM;
