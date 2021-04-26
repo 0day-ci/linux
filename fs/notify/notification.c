@@ -51,6 +51,10 @@ EXPORT_SYMBOL_GPL(fsnotify_get_cookie);
 bool fsnotify_notify_queue_is_empty(struct fsnotify_group *group)
 {
 	assert_spin_locked(&group->notification_lock);
+
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER)
+		return fsnotify_ring_notify_queue_is_empty(group);
+
 	return list_empty(&group->notification_list) ? true : false;
 }
 
@@ -132,6 +136,9 @@ void fsnotify_remove_queued_event(struct fsnotify_group *group,
 				  struct fsnotify_event *event)
 {
 	assert_spin_locked(&group->notification_lock);
+
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER)
+		return;
 	/*
 	 * We need to init list head for the case of overflow event so that
 	 * check in fsnotify_add_event() works
@@ -165,6 +172,9 @@ struct fsnotify_event *fsnotify_remove_first_event(struct fsnotify_group *group)
 struct fsnotify_event *fsnotify_peek_first_event(struct fsnotify_group *group)
 {
 	assert_spin_locked(&group->notification_lock);
+
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER)
+		return fsnotify_ring_peek_first_event(group);
 
 	return list_first_entry(&group->notification_list,
 				struct fsnotify_event, list);

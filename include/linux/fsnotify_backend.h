@@ -74,6 +74,8 @@
 #define ALL_FSNOTIFY_PERM_EVENTS (FS_OPEN_PERM | FS_ACCESS_PERM | \
 				  FS_OPEN_EXEC_PERM)
 
+#define FSN_SUBMISSION_RING_BUFFER	0x00000080
+
 /*
  * This is a list of all events that may get sent to a parent that is watching
  * with flag FS_EVENT_ON_CHILD based on fs event on a child of that directory.
@@ -166,7 +168,11 @@ struct fsnotify_ops {
  * listener this structure is where you need to be adding fields.
  */
 struct fsnotify_event {
-	struct list_head list;
+	union {
+		struct list_head list;
+		int slot_len;
+	};
+
 	unsigned long objectid;	/* identifier for queue merges */
 };
 
@@ -191,7 +197,21 @@ struct fsnotify_group {
 
 	/* needed to send notification to userspace */
 	spinlock_t notification_lock;		/* protect the notification_list */
-	struct list_head notification_list;	/* list of event_holder this group needs to send to userspace */
+
+	union {
+		/*
+		 * list of event_holder this group needs to send to
+		 * userspace.  Either a linked list (default), or a ring
+		 * buffer(FSN_SUBMISSION_RING_BUFFER).
+		 */
+		struct list_head notification_list;
+		struct {
+			struct page **pages;
+			int nr_pages;
+			u64 head;
+			u64 tail;
+		} ring_buffer;
+	};
 	wait_queue_head_t notification_waitq;	/* read() on the notification file blocks on this waitq */
 	unsigned int q_len;			/* events on the queue */
 	unsigned int max_events;		/* maximum events allowed on the list */
@@ -492,6 +512,16 @@ extern int fsnotify_add_event(struct fsnotify_group *group,
 			      struct fsnotify_event *event,
 			      int (*merge)(struct list_head *,
 					   struct fsnotify_event *));
+
+extern int fsnotify_create_ring_buffer(struct fsnotify_group *group);
+extern void fsnotify_free_ring_buffer(struct fsnotify_group *group);
+extern struct fsnotify_event *fsnotify_ring_alloc_event_slot(struct fsnotify_group *group,
+							     size_t size);
+extern void fsnotify_ring_buffer_consume_event(struct fsnotify_group *group,
+					       struct fsnotify_event *event);
+extern bool fsnotify_ring_notify_queue_is_empty(struct fsnotify_group *group);
+struct fsnotify_event *fsnotify_ring_peek_first_event(struct fsnotify_group *group);
+extern void fsnotify_ring_commit_slot(struct fsnotify_group *group, struct fsnotify_event *fsn);
 /* Queue overflow event to a notification group */
 static inline void fsnotify_queue_overflow(struct fsnotify_group *group)
 {
@@ -583,7 +613,8 @@ static inline void fsnotify_init_event(struct fsnotify_group *group,
 				       struct fsnotify_event *event,
 				       unsigned long objectid)
 {
-	INIT_LIST_HEAD(&event->list);
+	if (!(group->flags & FSN_SUBMISSION_RING_BUFFER))
+		INIT_LIST_HEAD(&event->list);
 	event->objectid = objectid;
 }
 

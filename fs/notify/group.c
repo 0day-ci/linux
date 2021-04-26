@@ -81,7 +81,10 @@ void fsnotify_destroy_group(struct fsnotify_group *group)
 	 * notification against this group. So clearing the notification queue
 	 * of all events is reliable now.
 	 */
-	fsnotify_flush_notify(group);
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER)
+		fsnotify_free_ring_buffer(group);
+	else
+		fsnotify_flush_notify(group);
 
 	/*
 	 * Destroy overflow event (we cannot use fsnotify_destroy_event() as
@@ -135,6 +138,13 @@ static struct fsnotify_group *__fsnotify_alloc_group(
 
 	group->ops = ops;
 	group->flags = flags;
+
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER) {
+		if (fsnotify_create_ring_buffer(group)) {
+			kfree(group);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
 
 	return group;
 }
