@@ -161,6 +161,11 @@ struct fanotify_fid_event {
 	unsigned char _inline_fh_buf[FANOTIFY_INLINE_FH_LEN];
 };
 
+struct fanotify_event_location {
+	int line;
+	const char *function;
+};
+
 static inline struct fanotify_fid_event *
 FANOTIFY_FE(struct fanotify_event *event)
 {
@@ -183,6 +188,7 @@ struct fanotify_error_event {
 	struct fanotify_event fae;
 	int error;
 	__kernel_fsid_t fsid;
+	struct fanotify_event_location loc;
 
 	int fs_data_size;
 	/* Must be the last item in the structure */

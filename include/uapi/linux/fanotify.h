@@ -125,6 +125,7 @@ struct fanotify_event_metadata {
 #define FAN_EVENT_INFO_TYPE_DFID_NAME	2
 #define FAN_EVENT_INFO_TYPE_DFID	3
 #define FAN_EVENT_INFO_TYPE_ERROR	4
+#define FAN_EVENT_INFO_TYPE_LOCATION	5
 
 /* Variable length info record following event metadata */
 struct fanotify_event_info_header {
@@ -157,6 +158,12 @@ struct fanotify_event_info_error {
 	int version;
 	int error;
 	__kernel_fsid_t fsid;
+};
+
+struct fanotify_event_info_location {
+	struct fanotify_event_info_header hdr;
+	int line;
+	char function[0];
 };
 
 struct fanotify_response {

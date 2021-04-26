@@ -69,6 +69,16 @@ static size_t fanotify_error_info_len(struct fanotify_error_event *fee)
 	return sizeof(struct fanotify_event_info_error);
 }
 
+static size_t fanotify_location_info_len(const struct fanotify_event_location *loc)
+{
+	if (!loc->function)
+		return 0;
+
+	/* Includes NULL byte at end of loc->function */
+	return (sizeof(struct fanotify_event_info_location) +
+		strlen(loc->function) + 1);
+}
+
 static size_t fanotify_event_len(struct fanotify_event *event,
 				 unsigned int fid_mode)
 {
@@ -258,6 +268,31 @@ static size_t copy_error_info_to_user(struct fanotify_error_event *fee,
 
 	return info.hdr.len;
 
+}
+
+static size_t copy_location_info_to_user(struct fanotify_event_location *location,
+					 char __user *buf, int count)
+{
+	size_t len = fanotify_location_info_len(location);
+	size_t tail = len - sizeof(struct fanotify_event_info_location);
+	struct fanotify_event_info_location info;
+
+	if (!len)
+		return 0;
+
+	info.hdr.info_type = FAN_EVENT_INFO_TYPE_LOCATION;
+	info.hdr.len = len;
+	info.line = location->line;
+
+	if (copy_to_user(buf, &info, sizeof(info)))
+		return -EFAULT;
+
+	buf += sizeof(info);
+
+	if (copy_to_user(buf, location->function, tail))
+		return -EFAULT;
+
+	return info.hdr.len;
 }
 
 static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
