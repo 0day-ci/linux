@@ -188,6 +188,11 @@ struct drm_plane_state {
 	 */
 	enum drm_color_transfer_function color_tf;
 	/**
+	 * @sdr_white_level:
+	 * SDR white level boost for HDR+SDR multi plane usecases. max white level in nits
+	 */
+	unsigned int sdr_white_level;
+	/**
 	 * @fb_damage_clips:
 	 *
 	 * Blob representing damage (area in plane framebuffer that changed
@@ -757,6 +762,15 @@ struct drm_plane {
 	 * See drm_plane_create_color_properties().
 	 */
 	struct drm_property *color_tf_property;
+	/**
+	 * @sdr_white_level:
+	 *
+	 * Optional sdr_white_level. When HDR and SDR are combined in multi plane
+	 * overlay cases, the sdr plane will be very dim. This property allows
+	 * the driver to boost the sdr plane's white level. The value should be
+	 * max white level in nits.
+	 */
+	struct drm_property *sdr_white_level_property;
 
 	/**
 	 * @scaling_filter_property: property to apply a particular filter while

@@ -26,6 +26,12 @@
 #include <linux/ctype.h>
 #include <drm/drm_property.h>
 
+/**
+ * Default SDR white level in nits. Although there is no standard SDR nit level, 200
+ * is chosen as the default since that is the generally accepted value.
+ */
+#define DRM_DEFAULT_SDR_WHITE_LEVEL 200
+
 struct drm_crtc;
 struct drm_plane;
 

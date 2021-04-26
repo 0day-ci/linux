@@ -519,6 +519,23 @@ const char *drm_get_color_range_name(enum drm_color_range range)
 	return color_range_name[range];
 }
 
+int drm_plane_create_sdr_white_level_property(struct drm_plane *plane){
+
+	struct drm_property *prop;
+
+	prop = drm_property_create_range(plane->dev, 0, "SDR_WHITE_LEVEL", 0, UINT_MAX);
+
+	if (!prop)
+		return -ENOMEM;
+
+	plane->sdr_white_level_property = prop;
+	drm_object_attach_property(&plane->base, prop, DRM_DEFAULT_SDR_WHITE_LEVEL);
+
+	if (plane->state)
+		plane->state->sdr_white_level = DRM_DEFAULT_SDR_WHITE_LEVEL;
+
+	return 0;
+}
 /**
  * drm_get_color_transfer_function - return a string for color transfer function
  * @tf: transfer function to compute name of
