@@ -102,6 +102,9 @@ static int alcor_pci_find_cap_offset(struct alcor_pci_priv *priv,
 	u8 val8;
 	u32 val32;
 
+	if (!pci)
+		return 0;
+
 	where = ALCOR_CAP_START_OFFSET;
 	pci_read_config_byte(pci, where, &val8);
 	if (!val8)
