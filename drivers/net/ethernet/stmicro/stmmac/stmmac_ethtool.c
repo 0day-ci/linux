@@ -629,36 +629,28 @@ static void stmmac_get_strings(struct net_device *dev, u32 stringset, u8 *data)
 /* Currently only support WOL through Magic packet. */
 static void stmmac_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
+	struct ethtool_wolinfo wol_phy = { .cmd = ETHTOOL_GWOL };
 	struct stmmac_priv *priv = netdev_priv(dev);
 
-	if (!priv->plat->pmt)
-		return phylink_ethtool_get_wol(priv->phylink, wol);
-
 	mutex_lock(&priv->lock);
-	if (device_can_wakeup(priv->device)) {
+	if (priv->plat->pmt) {
 		wol->supported = WAKE_MAGIC | WAKE_UCAST;
 		if (priv->hw_cap_support && !priv->dma_cap.pmt_magic_frame)
 			wol->supported &= ~WAKE_MAGIC;
-		wol->wolopts = priv->wolopts;
 	}
+
+	phylink_ethtool_get_wol(priv->phylink, &wol_phy);
+
+	wol->supported |= wol_phy.supported;
+	wol->wolopts = priv->wolopts;
+
 	mutex_unlock(&priv->lock);
 }
 
 static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-	u32 support = WAKE_MAGIC | WAKE_UCAST;
-
-	if (!device_can_wakeup(priv->device))
-		return -EOPNOTSUPP;
-
-	if (!priv->plat->pmt) {
-		int ret = phylink_ethtool_set_wol(priv->phylink, wol);
-
-		if (!ret)
-			device_set_wakeup_enable(priv->device, !!wol->wolopts);
-		return ret;
-	}
+	u32 support = WAKE_MAGIC | WAKE_UCAST | WAKE_PHY;
 
 	/* By default almost all GMAC devices support the WoL via
 	 * magic frame but we can disable it if the HW capability
@@ -669,11 +661,23 @@ static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	if (wol->wolopts & ~support)
 		return -EINVAL;
 
+	if (wol->wolopts & WAKE_PHY) {
+		int ret = phylink_ethtool_set_wol(priv->phylink, wol);
+
+		if (!ret) {
+			device_set_wakeup_capable(priv->device, 1);
+			device_set_wakeup_enable(priv->device, 1);
+		}
+		return ret;
+	}
+
 	if (wol->wolopts) {
 		pr_info("stmmac: wakeup enable\n");
+		device_set_wakeup_capable(priv->device, 1);
 		device_set_wakeup_enable(priv->device, 1);
 		enable_irq_wake(priv->wol_irq);
 	} else {
+		device_set_wakeup_capable(priv->device, 0);
 		device_set_wakeup_enable(priv->device, 0);
 		disable_irq_wake(priv->wol_irq);
 	}
