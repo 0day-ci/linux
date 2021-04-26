@@ -144,10 +144,11 @@ struct fanotify_event {
 	struct pid *pid;
 };
 
-static inline void fanotify_init_event(struct fanotify_event *event,
+static inline void fanotify_init_event(struct fsnotify_group *group,
+				       struct fanotify_event *event,
 				       unsigned long id, u32 mask)
 {
-	fsnotify_init_event(&event->fse, id);
+	fsnotify_init_event(group, &event->fse, id);
 	event->mask = mask;
 	event->pid = NULL;
 }

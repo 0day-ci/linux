@@ -911,7 +911,7 @@ static int fanotify_add_inode_mark(struct fsnotify_group *group,
 				 FSNOTIFY_OBJ_TYPE_INODE, mask, flags, fsid);
 }
 
-static struct fsnotify_event *fanotify_alloc_overflow_event(void)
+static struct fsnotify_event *fanotify_alloc_overflow_event(struct fsnotify_group *group)
 {
 	struct fanotify_event *oevent;
 
@@ -919,7 +919,7 @@ static struct fsnotify_event *fanotify_alloc_overflow_event(void)
 	if (!oevent)
 		return NULL;
 
-	fanotify_init_event(oevent, 0, FS_Q_OVERFLOW);
+	fanotify_init_event(group, oevent, 0, FS_Q_OVERFLOW);
 	oevent->type = FANOTIFY_EVENT_TYPE_OVERFLOW;
 
 	return &oevent->fse;
@@ -993,7 +993,7 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 	atomic_inc(&user->fanotify_listeners);
 	group->memcg = get_mem_cgroup_from_mm(current->mm);
 
-	group->overflow_event = fanotify_alloc_overflow_event();
+	group->overflow_event = fanotify_alloc_overflow_event(group);
 	if (unlikely(!group->overflow_event)) {
 		fd = -ENOMEM;
 		goto out_destroy_group;

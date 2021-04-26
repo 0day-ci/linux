@@ -579,7 +579,8 @@ extern void fsnotify_put_mark(struct fsnotify_mark *mark);
 extern void fsnotify_finish_user_wait(struct fsnotify_iter_info *iter_info);
 extern bool fsnotify_prepare_user_wait(struct fsnotify_iter_info *iter_info);
 
-static inline void fsnotify_init_event(struct fsnotify_event *event,
+static inline void fsnotify_init_event(struct fsnotify_group *group,
+				       struct fsnotify_event *event,
 				       unsigned long objectid)
 {
 	INIT_LIST_HEAD(&event->list);
