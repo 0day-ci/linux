@@ -71,8 +71,8 @@ void __iomem *ioremap_prot(phys_addr_t paddr, unsigned long size,
 	prot = pgprot_noncached(prot);
 
 	/* Mappings have to be page-aligned */
-	off = paddr & ~PAGE_MASK;
-	paddr &= PAGE_MASK;
+	off = paddr & ~PHYSICAL_PAGE_MASK;
+	paddr &= PHYSICAL_PAGE_MASK;
 	size = PAGE_ALIGN(end + 1) - paddr;
 
 	/*
