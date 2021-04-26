@@ -612,6 +612,26 @@ out:
 	return event;
 }
 
+static struct fanotify_event *fanotify_ring_get_slot(struct fsnotify_group *group,
+						     u32 mask, const void *data,
+						     int data_type)
+{
+	size_t size = 0;
+
+	pr_debug("%s: group=%p mask=%x size=%lu\n", __func__, group, mask, size);
+
+	return FANOTIFY_E(fsnotify_ring_alloc_event_slot(group, size));
+}
+
+static void fanotify_ring_write_event(struct fsnotify_group *group,
+				      struct fanotify_event *event, u32 mask,
+				      const void *data, __kernel_fsid_t *fsid)
+{
+	fanotify_init_event(group, event, 0, mask);
+
+	event->pid = get_pid(task_tgid(current));
+}
+
 /*
  * Get cached fsid of the filesystem containing the object from any connector.
  * All connectors are supposed to have the same fsid, but we do not verify that
@@ -701,31 +721,38 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 			return 0;
 	}
 
-	event = fanotify_alloc_event(group, mask, data, data_type, dir,
-				     file_name, &fsid);
-	ret = -ENOMEM;
-	if (unlikely(!event)) {
-		/*
-		 * We don't queue overflow events for permission events as
-		 * there the access is denied and so no event is in fact lost.
-		 */
-		if (!fanotify_is_perm_event(mask))
-			fsnotify_queue_overflow(group);
-		goto finish;
-	}
+	if (group->flags & FSN_SUBMISSION_RING_BUFFER) {
+		event = fanotify_ring_get_slot(group, mask, data, data_type);
+		if (IS_ERR(event))
+			return PTR_ERR(event);
+		fanotify_ring_write_event(group, event, mask, data, &fsid);
+		fsnotify_ring_commit_slot(group, &event->fse);
+	} else {
+		event = fanotify_alloc_event(group, mask, data, data_type, dir,
+					     file_name, &fsid);
+		ret = -ENOMEM;
+		if (unlikely(!event)) {
+			/*
+			 * We don't queue overflow events for permission events as
+			 * there the access is denied and so no event is in fact lost.
+			 */
+			if (!fanotify_is_perm_event(mask))
+				fsnotify_queue_overflow(group);
+			goto finish;
+		}
+		fsn_event = &event->fse;
+		ret = fsnotify_add_event(group, fsn_event, fanotify_merge);
+		if (ret) {
+			/* Permission events shouldn't be merged */
+			BUG_ON(ret == 1 && mask & FANOTIFY_PERM_EVENTS);
+			/* Our event wasn't used in the end. Free it. */
+			fsnotify_destroy_event(group, fsn_event);
 
-	fsn_event = &event->fse;
-	ret = fsnotify_add_event(group, fsn_event, fanotify_merge);
-	if (ret) {
-		/* Permission events shouldn't be merged */
-		BUG_ON(ret == 1 && mask & FANOTIFY_PERM_EVENTS);
-		/* Our event wasn't used in the end. Free it. */
-		fsnotify_destroy_event(group, fsn_event);
-
-		ret = 0;
-	} else if (fanotify_is_perm_event(mask)) {
-		ret = fanotify_get_response(group, FANOTIFY_PERM(event),
-					    iter_info);
+			ret = 0;
+		} else if (fanotify_is_perm_event(mask)) {
+			ret = fanotify_get_response(group, FANOTIFY_PERM(event),
+						    iter_info);
+		}
 	}
 finish:
 	if (fanotify_is_perm_event(mask))

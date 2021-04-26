@@ -521,7 +521,9 @@ static ssize_t fanotify_read(struct file *file, char __user *buf,
 		 * Permission events get queued to wait for response.  Other
 		 * events can be destroyed now.
 		 */
-		if (!fanotify_is_perm_event(event->mask)) {
+		if (group->fanotify_data.flags & FAN_PREALLOC_QUEUE) {
+			fsnotify_ring_buffer_consume_event(group, &event->fse);
+		} else if (!fanotify_is_perm_event(event->mask)) {
 			fsnotify_destroy_event(group, &event->fse);
 		} else {
 			if (ret <= 0) {
@@ -587,40 +589,39 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 */
 	fsnotify_group_stop_queueing(group);
 
-	/*
-	 * Process all permission events on access_list and notification queue
-	 * and simulate reply from userspace.
-	 */
-	spin_lock(&group->notification_lock);
-	while (!list_empty(&group->fanotify_data.access_list)) {
-		struct fanotify_perm_event *event;
-
-		event = list_first_entry(&group->fanotify_data.access_list,
-				struct fanotify_perm_event, fae.fse.list);
-		list_del_init(&event->fae.fse.list);
-		finish_permission_event(group, event, FAN_ALLOW);
+	if (!(group->flags & FSN_SUBMISSION_RING_BUFFER)) {
+		/*
+		 * Process all permission events on access_list and notification queue
+		 * and simulate reply from userspace.
+		 */
 		spin_lock(&group->notification_lock);
-	}
-
-	/*
-	 * Destroy all non-permission events. For permission events just
-	 * dequeue them and set the response. They will be freed once the
-	 * response is consumed and fanotify_get_response() returns.
-	 */
-	while (!fsnotify_notify_queue_is_empty(group)) {
-		struct fanotify_event *event;
-
-		event = FANOTIFY_E(fsnotify_remove_first_event(group));
-		if (!(event->mask & FANOTIFY_PERM_EVENTS)) {
-			spin_unlock(&group->notification_lock);
-			fsnotify_destroy_event(group, &event->fse);
-		} else {
-			finish_permission_event(group, FANOTIFY_PERM(event),
-						FAN_ALLOW);
+		while (!list_empty(&group->fanotify_data.access_list)) {
+			struct fanotify_perm_event *event;
+			event = list_first_entry(&group->fanotify_data.access_list,
+						 struct fanotify_perm_event, fae.fse.list);
+			list_del_init(&event->fae.fse.list);
+			finish_permission_event(group, event, FAN_ALLOW);
+			spin_lock(&group->notification_lock);
 		}
-		spin_lock(&group->notification_lock);
+		/*
+		 * Destroy all non-permission events. For permission events just
+		 * dequeue them and set the response. They will be freed once the
+		 * response is consumed and fanotify_get_response() returns.
+		 */
+		while (!fsnotify_notify_queue_is_empty(group)) {
+			struct fanotify_event *event;
+			event = FANOTIFY_E(fsnotify_remove_first_event(group));
+			if (!(event->mask & FANOTIFY_PERM_EVENTS)) {
+				spin_unlock(&group->notification_lock);
+				fsnotify_destroy_event(group, &event->fse);
+			} else {
+				finish_permission_event(group, FANOTIFY_PERM(event),
+							FAN_ALLOW);
+			}
+			spin_lock(&group->notification_lock);
+		}
+		spin_unlock(&group->notification_lock);
 	}
-	spin_unlock(&group->notification_lock);
 
 	/* Response for all permission events it set, wakeup waiters */
 	wake_up(&group->fanotify_data.access_waitq);
@@ -981,6 +982,16 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 	if (flags & FAN_NONBLOCK)
 		f_flags |= O_NONBLOCK;
 
+	if (flags & FAN_PREALLOC_QUEUE) {
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		if (flags & FAN_UNLIMITED_QUEUE)
+			return -EINVAL;
+
+		fsn_flags = FSN_SUBMISSION_RING_BUFFER;
+	}
+
 	/* fsnotify_alloc_group takes a ref.  Dropped in fanotify_release */
 	group = fsnotify_alloc_user_group(&fanotify_fsnotify_ops, fsn_flags);
 	if (IS_ERR(group)) {
@@ -1223,6 +1234,10 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 		goto fput_and_out;
 	}
 
+	if ((group->flags & FSN_SUBMISSION_RING_BUFFER) &&
+	    (mask & ~FANOTIFY_SUBMISSION_BUFFER_EVENTS))
+		goto fput_and_out;
+
 	ret = fanotify_find_path(dfd, pathname, &path, flags,
 			(mask & ALL_FSNOTIFY_EVENTS), obj_type);
 	if (ret)
@@ -1327,7 +1342,7 @@ SYSCALL32_DEFINE6(fanotify_mark,
  */
 static int __init fanotify_user_setup(void)
 {
-	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_INIT_FLAGS) != 10);
+	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_INIT_FLAGS) != 11);
 	BUILD_BUG_ON(HWEIGHT32(FANOTIFY_MARK_FLAGS) != 9);
 
 	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark,
