@@ -172,6 +172,11 @@ struct dsa_switch_tree {
 	 */
 	struct net_device **lags;
 	unsigned int lags_len;
+
+	/* Give the switch driver somewhere to hang its tree-wide
+	 * private data structure.
+	 */
+	void *priv;
 };
 
 #define dsa_lags_foreach_id(_id, _dst)				\

@@ -33,6 +33,7 @@
 
 #include "chip.h"
 #include "devlink.h"
+#include "dst.h"
 #include "global1.h"
 #include "global2.h"
 #include "hwtstamp.h"
@@ -2371,6 +2372,10 @@ static int mv88e6xxx_port_bridge_join(struct dsa_switch *ds, int port,
 	struct mv88e6xxx_chip *chip = ds->priv;
 	int err;
 
+	err = mv88e6xxx_dst_bridge_join(ds->dst, br);
+	if (err)
+		return err;
+
 	mv88e6xxx_reg_lock(chip);
 	err = mv88e6xxx_bridge_map(chip, br);
 	mv88e6xxx_reg_unlock(chip);
@@ -2388,6 +2393,8 @@ static void mv88e6xxx_port_bridge_leave(struct dsa_switch *ds, int port,
 	    mv88e6xxx_port_vlan_map(chip, port))
 		dev_err(ds->dev, "failed to remap in-chip Port VLAN\n");
 	mv88e6xxx_reg_unlock(chip);
+
+	mv88e6xxx_dst_bridge_leave(ds->dst, br);
 }
 
 static int mv88e6xxx_crosschip_bridge_join(struct dsa_switch *ds,
@@ -3026,6 +3033,10 @@ static int mv88e6xxx_setup(struct dsa_switch *ds)
 	ds->slave_mii_bus = mv88e6xxx_default_mdio_bus(chip);
 
 	mv88e6xxx_reg_lock(chip);
+
+	err = mv88e6xxx_dst_add_chip(chip);
+	if (err)
+		goto unlock;
 
 	if (chip->info->ops->setup_errata) {
 		err = chip->info->ops->setup_errata(chip);
