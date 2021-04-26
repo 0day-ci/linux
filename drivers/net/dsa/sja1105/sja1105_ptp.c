@@ -432,7 +432,7 @@ bool sja1105_port_rxtstamp(struct dsa_switch *ds, int port,
 }
 
 /* Called from dsa_skb_tx_timestamp. This callback is just to make DSA clone
- * the skb and have it available in DSA_SKB_CB in the .port_deferred_xmit
+ * the skb and have it available in SJA1105_SKB_CB in the .port_deferred_xmit
  * callback, where we will timestamp it synchronously.
  */
 bool sja1105_port_txtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb)
@@ -442,6 +442,8 @@ bool sja1105_port_txtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb)
 
 	if (!sp->hwts_tx_en)
 		return false;
+
+	SJA1105_SKB_CB(skb)->clone = clone;
 
 	return true;
 }

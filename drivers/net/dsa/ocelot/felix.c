@@ -1403,6 +1403,7 @@ static bool felix_txtstamp(struct dsa_switch *ds, int port,
 
 	if (ocelot->ptp && ocelot_port->ptp_cmd == IFH_REW_OP_TWO_STEP_PTP) {
 		ocelot_port_add_txtstamp_skb(ocelot, port, clone);
+		OCELOT_SKB_CB(skb)->clone = clone;
 		return true;
 	}
 

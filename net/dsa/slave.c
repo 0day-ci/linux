@@ -568,7 +568,6 @@ static void dsa_skb_tx_timestamp(struct dsa_slave_priv *p,
 		return;
 
 	if (ds->ops->port_txtstamp(ds, p->dp->index, clone)) {
-		DSA_SKB_CB(skb)->clone = clone;
 		return;
 	}
 
@@ -624,7 +623,7 @@ static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	dev_sw_netstats_tx_add(dev, 1, skb->len);
 
-	DSA_SKB_CB(skb)->clone = NULL;
+	memset(skb->cb, 0, 48);
 
 	/* Handle tx timestamp if any */
 	dsa_skb_tx_timestamp(p, skb);
