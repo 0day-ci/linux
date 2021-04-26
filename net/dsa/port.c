@@ -651,8 +651,14 @@ int dsa_port_vlan_add(struct dsa_port *dp,
 		.vlan = vlan,
 		.extack = extack,
 	};
+	int err;
 
-	return dsa_port_notify(dp, DSA_NOTIFIER_VLAN_ADD, &info);
+	err = dsa_port_notify(dp, DSA_NOTIFIER_VLAN_ADD, &info);
+
+	if (!err && (vlan->flags & BRIDGE_VLAN_INFO_PVID))
+		dp->pvid = vlan->vid;
+
+	return err;
 }
 
 int dsa_port_vlan_del(struct dsa_port *dp,
@@ -663,8 +669,14 @@ int dsa_port_vlan_del(struct dsa_port *dp,
 		.port = dp->index,
 		.vlan = vlan,
 	};
+	int err;
 
-	return dsa_port_notify(dp, DSA_NOTIFIER_VLAN_DEL, &info);
+	err = dsa_port_notify(dp, DSA_NOTIFIER_VLAN_DEL, &info);
+
+	if (!err && vlan->vid == dp->pvid)
+		dp->pvid = 0;
+
+	return err;
 }
 
 int dsa_port_mrp_add(const struct dsa_port *dp,

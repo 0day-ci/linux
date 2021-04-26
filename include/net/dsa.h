@@ -270,6 +270,7 @@ struct dsa_port {
 	unsigned int		ageing_time;
 	bool			vlan_filtering;
 	u8			stp_state;
+	u16			pvid;
 	struct net_device	*bridge_dev;
 	struct devlink_port	devlink_port;
 	bool			devlink_port_setup;
