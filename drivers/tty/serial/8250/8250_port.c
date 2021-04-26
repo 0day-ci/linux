@@ -455,6 +455,33 @@ static void io_serial_out(struct uart_port *p, int offset, int value)
 
 static int serial8250_default_handle_irq(struct uart_port *port);
 
+static int needs_membase(int iotype)
+{
+	switch (iotype) {
+	case UPIO_MEM:
+	case UPIO_MEM16:
+	case UPIO_MEM32:
+	case UPIO_MEM32BE:
+#ifdef CONFIG_SERIAL_8250_RT288X
+	case UPIO_AU:
+#endif
+		return 1;
+	}
+
+	return 0;
+}
+
+static int needs_iobase(int iotype)
+{
+	switch (iotype) {
+	case UPIO_HUB6:
+	case UPIO_PORT:
+		return 1;
+	}
+
+	return 0;
+}
+
 static void set_io_from_upio(struct uart_port *p)
 {
 	struct uart_8250_port *up = up_to_u8250p(p);
@@ -2145,6 +2172,11 @@ int serial8250_do_startup(struct uart_port *port)
 	unsigned char lsr, iir;
 	int retval;
 
+	if (WARN_ON_ONCE(needs_membase(port->iotype) && !port->membase))
+		return -ENODEV;
+	if (WARN_ON_ONCE(needs_iobase(port->iotype) && !port->iobase))
+		return -ENODEV;
+
 	if (!port->fifosize)
 		port->fifosize = uart_config[port->type].fifo_size;
 	if (!up->tx_loadsz)
@@ -3151,6 +3183,17 @@ serial8250_verify_port(struct uart_port *port, struct serial_struct *ser)
 	    ser->type >= ARRAY_SIZE(uart_config) || ser->type == PORT_CIRRUS ||
 	    ser->type == PORT_STARTECH)
 		return -EINVAL;
+
+	/*
+	 * This driver clearly was intended to support switching between
+	 * io types (see serial8250_do_startup()), so we need to ensure that
+	 * the underlying port type will support the request.
+	 */
+	if (needs_membase(ser->io_type) && !port->membase)
+		return -EINVAL;
+	if (needs_iobase(ser->io_type) && !port->iobase)
+		return -EINVAL;
+
 	return 0;
 }
 
