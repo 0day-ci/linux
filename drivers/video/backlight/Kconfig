@@ -456,6 +456,13 @@ config BACKLIGHT_LED
 	  If you have a LCD backlight adjustable by LED class driver, say Y
 	  to enable this driver.
 
+config BACKLIGHT_DP_AUX
+       tristate "DisplayPort aux backlight driver"
+       depends on DRM && DRM_KMS_HELPER
+       help
+         If you have a panel backlight controlled by DPCD registers
+         on the DisplayPort aux channel, say Y to enable this driver.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endmenu
