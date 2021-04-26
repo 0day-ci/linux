@@ -519,7 +519,7 @@ static int mm_check_plugged(struct cardinfo *card)
 	return !!blk_check_plugged(mm_unplug, card, sizeof(struct blk_plug_cb));
 }
 
-static blk_qc_t mm_submit_bio(struct bio *bio)
+static void mm_submit_bio(struct bio *bio)
 {
 	struct cardinfo *card = bio->bi_bdev->bd_disk->private_data;
 
@@ -536,8 +536,6 @@ static blk_qc_t mm_submit_bio(struct bio *bio)
 	if (op_is_sync(bio->bi_opf) || !mm_check_plugged(card))
 		activate(card);
 	spin_unlock_irq(&card->lock);
-
-	return BLK_QC_T_NONE;
 }
 
 static irqreturn_t mm_interrupt(int irq, void *__card)

@@ -47,7 +47,7 @@ static struct pblk_global_caches pblk_caches = {
 
 struct bio_set pblk_bio_set;
 
-static blk_qc_t pblk_submit_bio(struct bio *bio)
+static void pblk_submit_bio(struct bio *bio)
 {
 	struct pblk *pblk = bio->bi_bdev->bd_disk->queue->queuedata;
 
@@ -55,7 +55,7 @@ static blk_qc_t pblk_submit_bio(struct bio *bio)
 		pblk_discard(pblk, bio);
 		if (!(bio->bi_opf & REQ_PREFLUSH)) {
 			bio_endio(bio);
-			return BLK_QC_T_NONE;
+			return;
 		}
 	}
 
@@ -75,8 +75,6 @@ static blk_qc_t pblk_submit_bio(struct bio *bio)
 
 		pblk_write_to_cache(pblk, bio, PBLK_IOTYPE_USER);
 	}
-
-	return BLK_QC_T_NONE;
 }
 
 static const struct block_device_operations pblk_bops = {
