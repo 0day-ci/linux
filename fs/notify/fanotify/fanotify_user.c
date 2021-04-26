@@ -64,6 +64,11 @@ static int fanotify_fid_info_len(int fh_len, int name_len)
 	return roundup(FANOTIFY_INFO_HDR_LEN + info_len, FANOTIFY_EVENT_ALIGN);
 }
 
+static size_t fanotify_error_info_len(struct fanotify_error_event *fee)
+{
+	return sizeof(struct fanotify_event_info_error);
+}
+
 static size_t fanotify_event_len(struct fanotify_event *event,
 				 unsigned int fid_mode)
 {
@@ -230,6 +235,29 @@ static int process_access_response(struct fsnotify_group *group,
 	spin_unlock(&group->notification_lock);
 
 	return -ENOENT;
+}
+
+static size_t copy_error_info_to_user(struct fanotify_error_event *fee,
+				      char __user *buf, int count)
+{
+	struct fanotify_event_info_error info;
+
+	info.hdr.info_type = FAN_EVENT_INFO_TYPE_ERROR;
+	info.hdr.pad = 0;
+	info.hdr.len = fanotify_error_info_len(fee);
+
+	if (WARN_ON(count < info.hdr.len))
+		return -EFAULT;
+
+	info.version = FANOTIFY_EVENT_INFO_ERROR_VERS_1;
+	info.error = fee->error;
+	info.fsid = fee->fsid;
+
+	if (copy_to_user(buf, &info, sizeof(info)))
+		return -EFAULT;
+
+	return info.hdr.len;
+
 }
 
 static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,

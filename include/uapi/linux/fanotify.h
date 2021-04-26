@@ -124,6 +124,7 @@ struct fanotify_event_metadata {
 #define FAN_EVENT_INFO_TYPE_FID		1
 #define FAN_EVENT_INFO_TYPE_DFID_NAME	2
 #define FAN_EVENT_INFO_TYPE_DFID	3
+#define FAN_EVENT_INFO_TYPE_ERROR	4
 
 /* Variable length info record following event metadata */
 struct fanotify_event_info_header {
@@ -147,6 +148,15 @@ struct fanotify_event_info_fid {
 	 * an argument to open_by_handle_at(2).
 	 */
 	unsigned char handle[0];
+};
+
+#define FANOTIFY_EVENT_INFO_ERROR_VERS_1   1
+
+struct fanotify_event_info_error {
+	struct fanotify_event_info_header hdr;
+	int version;
+	int error;
+	__kernel_fsid_t fsid;
 };
 
 struct fanotify_response {
