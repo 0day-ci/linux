@@ -929,7 +929,7 @@ static struct fsnotify_event *fanotify_alloc_overflow_event(void)
 SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 {
 	struct fsnotify_group *group;
-	int f_flags, fd;
+	int f_flags, fd, fsn_flags = 0;
 	struct user_struct *user;
 	unsigned int fid_mode = flags & FANOTIFY_FID_BITS;
 	unsigned int class = flags & FANOTIFY_CLASS_BITS;
@@ -982,7 +982,7 @@ SYSCALL_DEFINE2(fanotify_init, unsigned int, flags, unsigned int, event_f_flags)
 		f_flags |= O_NONBLOCK;
 
 	/* fsnotify_alloc_group takes a ref.  Dropped in fanotify_release */
-	group = fsnotify_alloc_user_group(&fanotify_fsnotify_ops);
+	group = fsnotify_alloc_user_group(&fanotify_fsnotify_ops, fsn_flags);
 	if (IS_ERR(group)) {
 		free_uid(user);
 		return PTR_ERR(group);

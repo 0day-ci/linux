@@ -221,6 +221,7 @@ struct fsnotify_group {
 						 * full */
 
 	struct mem_cgroup *memcg;	/* memcg to charge allocations */
+	unsigned int flags;
 
 	/* groups can define private fields here or use the void *private */
 	union {
@@ -469,8 +470,10 @@ static inline void fsnotify_update_flags(struct dentry *dentry)
 /* called from fsnotify listeners, such as fanotify or dnotify */
 
 /* create a new group */
-extern struct fsnotify_group *fsnotify_alloc_group(const struct fsnotify_ops *ops);
-extern struct fsnotify_group *fsnotify_alloc_user_group(const struct fsnotify_ops *ops);
+extern struct fsnotify_group *fsnotify_alloc_group(const struct fsnotify_ops *ops,
+						   unsigned int flags);
+extern struct fsnotify_group *fsnotify_alloc_user_group(const struct fsnotify_ops *ops,
+							unsigned int flags);
 /* get reference to a group */
 extern void fsnotify_get_group(struct fsnotify_group *group);
 /* drop reference on a group from fsnotify_alloc_group */
