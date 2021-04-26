@@ -594,8 +594,8 @@ EXPORT_SYMBOL(device_add_disk_no_queue_reg);
  * with put_disk(), which should be called after del_gendisk(), if
  * __device_add_disk() was used.
  *
- * Drivers exist which depend on the release of the gendisk to be synchronous,
- * it should not be deferred.
+ * Userspace software may depend on the release of the gendisk to be
+ * synchronous, it should not be deferred.
  *
  * Context: can sleep
  */
