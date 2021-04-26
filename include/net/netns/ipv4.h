@@ -124,6 +124,7 @@ struct netns_ipv4 {
 #endif
 	u8 sysctl_tcp_mtu_probing;
 	int sysctl_tcp_mtu_probe_floor;
+	int sysctl_tcp_mtu_probe_autocork;
 	int sysctl_tcp_base_mss;
 	int sysctl_tcp_min_snd_mss;
 	int sysctl_tcp_probe_threshold;

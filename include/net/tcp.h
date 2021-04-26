@@ -668,6 +668,7 @@ void tcp_initialize_rcv_mss(struct sock *sk);
 int tcp_mtu_to_mss(struct sock *sk, int pmtu);
 int tcp_mss_to_mtu(struct sock *sk, int mss);
 void tcp_mtup_init(struct sock *sk);
+int tcp_mtu_probe_size_needed(struct sock *sk);
 
 static inline void tcp_bound_rto(const struct sock *sk)
 {
@@ -1376,6 +1377,8 @@ static inline void tcp_slow_start_after_idle_check(struct sock *sk)
 
 	if (!sock_net(sk)->ipv4.sysctl_tcp_slow_start_after_idle || tp->packets_out ||
 	    ca_ops->cong_control)
+		return;
+	if (inet_csk(sk)->icsk_mtup.wait_data)
 		return;
 	delta = tcp_jiffies32 - tp->lsndtime;
 	if (delta > inet_csk(sk)->icsk_rto)
