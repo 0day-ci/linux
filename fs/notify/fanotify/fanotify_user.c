@@ -69,6 +69,14 @@ static size_t fanotify_error_info_len(struct fanotify_error_event *fee)
 	return sizeof(struct fanotify_event_info_error);
 }
 
+static size_t fanotify_error_fsdata_len(struct fanotify_error_event *fee)
+{
+	if (!fee->fs_data_size)
+		return 0;
+
+	return sizeof(struct fanotify_event_info_fsdata) + fee->fs_data_size;
+}
+
 static size_t fanotify_location_info_len(const struct fanotify_event_location *loc)
 {
 	if (!loc->function)
@@ -290,6 +298,25 @@ static size_t copy_location_info_to_user(struct fanotify_event_location *locatio
 	buf += sizeof(info);
 
 	if (copy_to_user(buf, location->function, tail))
+		return -EFAULT;
+
+	return info.hdr.len;
+}
+
+static ssize_t copy_error_fsdata_info_to_user(struct fanotify_error_event *fee,
+					      char __user *buf, int count)
+{
+	struct fanotify_event_info_fsdata info;
+
+	info.hdr.info_type = FAN_EVENT_INFO_TYPE_FSDATA;
+	info.hdr.len = fanotify_error_fsdata_len(fee);
+
+	if (copy_to_user(buf, &info, sizeof(info)))
+		return -EFAULT;
+
+	buf += sizeof(info);
+
+	if (copy_to_user(buf, fee->fs_data, fee->fs_data_size))
 		return -EFAULT;
 
 	return info.hdr.len;
