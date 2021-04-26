@@ -926,9 +926,11 @@ static void brcmf_del_if(struct brcmf_pub *drvr, s32 bsscfgidx,
 	if (ifp->ndev) {
 		if (bsscfgidx == 0) {
 			if (ifp->ndev->netdev_ops == &brcmf_netdev_ops_pri) {
-				rtnl_lock();
+				if (!locked)
+					rtnl_lock();
 				brcmf_netdev_stop(ifp->ndev);
-				rtnl_unlock();
+				if (!locked)
+					rtnl_unlock();
 			}
 		} else {
 			netif_stop_queue(ifp->ndev);
