@@ -135,6 +135,7 @@ enum fanotify_event_type {
 	FANOTIFY_EVENT_TYPE_PATH,
 	FANOTIFY_EVENT_TYPE_PATH_PERM,
 	FANOTIFY_EVENT_TYPE_OVERFLOW, /* struct fanotify_event */
+	FANOTIFY_EVENT_TYPE_ERROR,
 };
 
 struct fanotify_event {
@@ -207,6 +208,8 @@ static inline __kernel_fsid_t *fanotify_event_fsid(struct fanotify_event *event)
 		return &FANOTIFY_FE(event)->fsid;
 	else if (event->type == FANOTIFY_EVENT_TYPE_FID_NAME)
 		return &FANOTIFY_NE(event)->fsid;
+	else if (event->type == FANOTIFY_EVENT_TYPE_ERROR)
+		return &FANOTIFY_EE(event)->fsid;
 	else
 		return NULL;
 }
@@ -290,6 +293,11 @@ static inline bool fanotify_is_perm_event(u32 mask)
 static inline struct fanotify_event *FANOTIFY_E(struct fsnotify_event *fse)
 {
 	return container_of(fse, struct fanotify_event, fse);
+}
+
+static inline bool fanotify_is_error_event(u32 mask)
+{
+	return mask & FANOTIFY_ERROR_EVENTS;
 }
 
 static inline bool fanotify_event_has_path(struct fanotify_event *event)

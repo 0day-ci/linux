@@ -240,12 +240,14 @@ static u32 fanotify_group_event_mask(struct fsnotify_group *group,
 		 __func__, iter_info->report_mask, event_mask, data, data_type);
 
 	if (!fid_mode) {
-		/* Do we have path to open a file descriptor? */
-		if (!path)
-			return 0;
-		/* Path type events are only relevant for files and dirs */
-		if (!d_is_reg(path->dentry) && !d_can_lookup(path->dentry))
-			return 0;
+		if (!fanotify_is_error_event(event_mask)) {
+			/* Do we have path to open a file descriptor? */
+			if (!path)
+				return 0;
+			/* Path type events are only relevant for files and dirs */
+			if (!d_is_reg(path->dentry) && !d_can_lookup(path->dentry))
+				return 0;
+		}
 	} else if (!(fid_mode & FAN_REPORT_FID)) {
 		/* Do we have a directory inode to report? */
 		if (!dir && !(event_mask & FS_ISDIR))
@@ -458,6 +460,25 @@ static struct fanotify_event *fanotify_alloc_perm_event(const struct path *path,
 	return &pevent->fae;
 }
 
+static void fanotify_init_error_event(struct fanotify_event *fae,
+				      const struct fs_error_report *report,
+				      __kernel_fsid_t *fsid)
+{
+	struct fanotify_error_event *fee;
+
+	fae->type = FANOTIFY_EVENT_TYPE_ERROR;
+	fee = FANOTIFY_EE(fae);
+	fee->error = report->error;
+	fee->fsid = *fsid;
+
+	fee->loc.line = report->line;
+	fee->loc.function = report->function;
+
+	fee->fs_data_size = report->fs_data_size;
+
+	memcpy(&fee->fs_data, report->fs_data, report->fs_data_size);
+}
+
 static struct fanotify_event *fanotify_alloc_fid_event(struct inode *id,
 						       __kernel_fsid_t *fsid,
 						       gfp_t gfp)
@@ -618,6 +639,13 @@ static struct fanotify_event *fanotify_ring_get_slot(struct fsnotify_group *grou
 {
 	size_t size = 0;
 
+	if (fanotify_is_error_event(mask)) {
+		const struct fs_error_report *report = data;
+		size = sizeof(struct fanotify_error_event) + report->fs_data_size;
+	} else {
+		return ERR_PTR(-EINVAL);
+	}
+
 	pr_debug("%s: group=%p mask=%x size=%lu\n", __func__, group, mask, size);
 
 	return FANOTIFY_E(fsnotify_ring_alloc_event_slot(group, size));
@@ -628,6 +656,9 @@ static void fanotify_ring_write_event(struct fsnotify_group *group,
 				      const void *data, __kernel_fsid_t *fsid)
 {
 	fanotify_init_event(group, event, 0, mask);
+
+	if (fanotify_is_error_event(mask))
+		fanotify_init_error_event(event, data, fsid);
 
 	event->pid = get_pid(task_tgid(current));
 }
@@ -695,8 +726,9 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 	BUILD_BUG_ON(FAN_ONDIR != FS_ISDIR);
 	BUILD_BUG_ON(FAN_OPEN_EXEC != FS_OPEN_EXEC);
 	BUILD_BUG_ON(FAN_OPEN_EXEC_PERM != FS_OPEN_EXEC_PERM);
+	BUILD_BUG_ON(FAN_ERROR != FS_ERROR);
 
-	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 19);
+	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 20);
 
 	mask = fanotify_group_event_mask(group, iter_info, mask, data,
 					 data_type, dir);
@@ -714,7 +746,7 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 			return 0;
 	}
 
-	if (FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS)) {
+	if (FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS) || mask == FAN_ERROR) {
 		fsid = fanotify_get_fsid(iter_info);
 		/* Racing with mark destruction or creation? */
 		if (!fsid.val[0] && !fsid.val[1])

@@ -96,6 +96,24 @@ static size_t fanotify_event_len(struct fanotify_event *event,
 	int fh_len;
 	int dot_len = 0;
 
+	if (fanotify_is_error_event(event->mask)) {
+		struct fanotify_error_event *fee = FANOTIFY_EE(event);
+		/*
+		 *  Error events (FAN_ERROR) have a different format
+		 *  as follows:
+		 * [ event_metadata            ]
+		 * [ fs-generic error header   ]
+		 * [ error location (optional) ]
+		 * [ fs-specific blob          ]
+		 */
+		event_len = fanotify_error_info_len(fee);
+		if (fee->loc.function)
+			event_len += fanotify_location_info_len(&fee->loc);
+		if (fee->fs_data)
+			event_len += fanotify_error_fsdata_len(fee);
+		return event_len;
+	}
+
 	if (!fid_mode)
 		return event_len;
 
@@ -322,6 +340,38 @@ static ssize_t copy_error_fsdata_info_to_user(struct fanotify_error_event *fee,
 	return info.hdr.len;
 }
 
+static int copy_error_event_to_user(struct fanotify_event *event,
+				    char __user *buf, int count)
+{
+	struct fanotify_error_event *fee = FANOTIFY_EE(event);
+	ssize_t len;
+	int original_count = count;
+
+	len = copy_error_info_to_user(fee, buf, count);
+	if (len < 0)
+		return -EFAULT;
+	buf += len;
+	count -= len;
+
+	if (fee->loc.function) {
+		len = copy_location_info_to_user(&fee->loc, buf, count);
+		if (len < 0)
+			return len;
+		buf += len;
+		count -= len;
+	}
+
+	if (fee->fs_data_size) {
+		len = copy_error_fsdata_info_to_user(fee, buf, count);
+		if (len < 0)
+			return len;
+		buf += len;
+		count -= len;
+	}
+
+	return original_count - count;
+}
+
 static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
 			     int info_type, const char *name, size_t name_len,
 			     char __user *buf, size_t count)
@@ -527,6 +577,9 @@ static ssize_t copy_event_to_user(struct fsnotify_group *group,
 		buf += ret;
 		count -= ret;
 	}
+
+	if (fanotify_is_error_event(event->mask))
+		ret = copy_error_event_to_user(event, buf, count);
 
 	return metadata.event_len;
 
@@ -1328,6 +1381,10 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	    (mask & ~FANOTIFY_SUBMISSION_BUFFER_EVENTS))
 		goto fput_and_out;
 
+	if (fanotify_is_error_event(mask) &&
+	    !(group->flags & FSN_SUBMISSION_RING_BUFFER))
+		goto fput_and_out;
+
 	ret = fanotify_find_path(dfd, pathname, &path, flags,
 			(mask & ALL_FSNOTIFY_EVENTS), obj_type);
 	if (ret)
@@ -1348,6 +1405,12 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 		if (ret)
 			goto path_put_and_out;
 
+		fsid = &__fsid;
+	}
+	if (mask & FAN_ERROR) {
+		ret = fanotify_check_path_fsid(&path, &__fsid);
+		if (ret)
+			goto path_put_and_out;
 		fsid = &__fsid;
 	}
 
