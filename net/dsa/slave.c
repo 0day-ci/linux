@@ -657,6 +657,13 @@ static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 	return dsa_enqueue_skb(nskb, dev);
 }
 
+static u16 dsa_slave_select_queue(struct net_device *dev, struct sk_buff *skb,
+				  struct net_device *sb_dev)
+{
+	DSA_SKB_CB(skb)->sb_dev = sb_dev;
+	return netdev_pick_tx(dev, skb, sb_dev);
+}
+
 /* ethtool operations *******************************************************/
 
 static void dsa_slave_get_drvinfo(struct net_device *dev,
@@ -1708,10 +1715,33 @@ static int dsa_slave_fill_forward_path(struct net_device_path_ctx *ctx,
 	return 0;
 }
 
+static void *dsa_slave_dfwd_add_station(struct net_device *dev,
+					struct net_device *sb_dev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (ds->ops->dfwd_add_station)
+		return ds->ops->dfwd_add_station(ds, dp->index, sb_dev);
+
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static void dsa_slave_dfwd_del_station(struct net_device *dev,
+				       void *sb_dev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (ds->ops->dfwd_del_station)
+		ds->ops->dfwd_del_station(ds, dp->index, sb_dev);
+}
+
 static const struct net_device_ops dsa_slave_netdev_ops = {
 	.ndo_open	 	= dsa_slave_open,
 	.ndo_stop		= dsa_slave_close,
 	.ndo_start_xmit		= dsa_slave_xmit,
+	.ndo_select_queue	= dsa_slave_select_queue,
 	.ndo_change_rx_flags	= dsa_slave_change_rx_flags,
 	.ndo_set_rx_mode	= dsa_slave_set_rx_mode,
 	.ndo_set_mac_address	= dsa_slave_set_mac_address,
@@ -1734,6 +1764,8 @@ static const struct net_device_ops dsa_slave_netdev_ops = {
 	.ndo_get_devlink_port	= dsa_slave_get_devlink_port,
 	.ndo_change_mtu		= dsa_slave_change_mtu,
 	.ndo_fill_forward_path	= dsa_slave_fill_forward_path,
+	.ndo_dfwd_add_station	= dsa_slave_dfwd_add_station,
+	.ndo_dfwd_del_station	= dsa_slave_dfwd_del_station,
 };
 
 static struct device_type dsa_type = {
@@ -1914,8 +1946,8 @@ int dsa_slave_create(struct dsa_port *port)
 	slave_dev->features = master->vlan_features | NETIF_F_HW_TC;
 	if (ds->ops->port_vlan_add && ds->ops->port_vlan_del)
 		slave_dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
-	slave_dev->hw_features |= NETIF_F_HW_TC;
-	slave_dev->features |= NETIF_F_LLTX;
+	slave_dev->hw_features |= NETIF_F_HW_TC | NETIF_F_HW_L2FW_DOFFLOAD;
+	slave_dev->features |= NETIF_F_LLTX | NETIF_F_HW_L2FW_DOFFLOAD;
 	slave_dev->ethtool_ops = &dsa_slave_ethtool_ops;
 	if (!is_zero_ether_addr(port->mac))
 		ether_addr_copy(slave_dev->dev_addr, port->mac);
