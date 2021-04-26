@@ -719,8 +719,7 @@ map_buffer_cached:
 			 * error recovery.
 			 */
 			if (PageUptodate(page)) {
-				if (!buffer_uptodate(bh))
-					set_buffer_uptodate(bh);
+				set_buffer_uptodate(bh);
 				if (unlikely(was_hole)) {
 					/* We allocated the buffer. */
 					clean_bdev_bh_alias(bh);
@@ -814,8 +813,7 @@ map_buffer_cached:
 		read_unlock_irqrestore(&ni->size_lock, flags);
 		if (bh_pos > initialized_size) {
 			if (PageUptodate(page)) {
-				if (!buffer_uptodate(bh))
-					set_buffer_uptodate(bh);
+				set_buffer_uptodate(bh);
 			} else if (!buffer_uptodate(bh)) {
 				zero_user(page, bh_offset(bh), blocksize);
 				set_buffer_uptodate(bh);
@@ -938,8 +936,7 @@ rl_not_mapped_enoent:
 				 * debatable and this could be removed.
 				 */
 				if (PageUptodate(page)) {
-					if (!buffer_uptodate(bh))
-						set_buffer_uptodate(bh);
+					set_buffer_uptodate(bh);
 				} else if (!buffer_uptodate(bh)) {
 					zero_user(page, bh_offset(bh),
 						blocksize);
