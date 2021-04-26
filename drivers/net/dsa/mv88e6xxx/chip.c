@@ -12,6 +12,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/delay.h>
+#include <linux/dsa/mv88e6xxx.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_bridge.h>
@@ -1229,15 +1230,25 @@ static u16 mv88e6xxx_port_vlan(struct mv88e6xxx_chip *chip, int dev, int port)
 		}
 	}
 
-	/* Prevent frames from unknown switch or port */
-	if (!found)
-		return 0;
+	if (found) {
+		/* Frames from DSA links and CPU ports can egress any
+		 * local port.
+		 */
+		if (dp->type == DSA_PORT_TYPE_CPU ||
+		    dp->type == DSA_PORT_TYPE_DSA)
+			return mv88e6xxx_port_mask(chip);
 
-	/* Frames from DSA links and CPU ports can egress any local port */
-	if (dp->type == DSA_PORT_TYPE_CPU || dp->type == DSA_PORT_TYPE_DSA)
-		return mv88e6xxx_port_mask(chip);
+		br = dp->bridge_dev;
+	} else {
+		br = mv88e6xxx_dst_bridge_from_dsa(dst, dev, port);
 
-	br = dp->bridge_dev;
+		/* Reject frames from ports that are neither physical
+		 * nor virtual bridge ports.
+		 */
+		if (!br)
+			return 0;
+	}
+
 	pvlan = 0;
 
 	/* Frames from user ports can egress any local DSA links and CPU ports,
@@ -2340,6 +2351,7 @@ static int mv88e6xxx_bridge_map(struct mv88e6xxx_chip *chip,
 	struct dsa_switch *ds = chip->ds;
 	struct dsa_switch_tree *dst = ds->dst;
 	struct dsa_port *dp;
+	u8 dev, port;
 	int err;
 
 	list_for_each_entry(dp, &dst->ports, list) {
@@ -2363,7 +2375,12 @@ static int mv88e6xxx_bridge_map(struct mv88e6xxx_chip *chip,
 		}
 	}
 
-	return 0;
+	/* Map the virtual bridge port if one is assigned. */
+	err = mv88e6xxx_dst_bridge_to_dsa(dst, br, &dev, &port);
+	if (!err)
+		err = mv88e6xxx_pvt_map(chip, dev, port);
+
+	return err;
 }
 
 static int mv88e6xxx_port_bridge_join(struct dsa_switch *ds, int port,

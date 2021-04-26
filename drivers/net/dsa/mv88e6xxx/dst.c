@@ -33,6 +33,39 @@ struct mv88e6xxx_dst {
 #define PORT_FROM_BIT(_bit) ((_bit) % (MV88E6XXX_MAX_PVT_PORTS))
 };
 
+struct net_device *mv88e6xxx_dst_bridge_from_dsa(struct dsa_switch_tree *dst,
+						 u8 dev, u8 port)
+{
+	struct mv88e6xxx_dst *mvdst = dst->priv;
+	struct mv88e6xxx_br *mvbr;
+
+	list_for_each_entry(mvbr, &mvdst->bridges, list) {
+		if (mvbr->dev == dev && mvbr->port == port)
+			return mvbr->brdev;
+	}
+
+	return NULL;
+}
+
+int mv88e6xxx_dst_bridge_to_dsa(const struct dsa_switch_tree *dst,
+				const struct net_device *brdev,
+				u8 *dev, u8 *port)
+{
+	struct mv88e6xxx_dst *mvdst = dst->priv;
+	struct mv88e6xxx_br *mvbr;
+
+	list_for_each_entry(mvbr, &mvdst->bridges, list) {
+		if (mvbr->brdev == brdev) {
+			*dev = mvbr->dev;
+			*port = mvbr->port;
+			return 0;
+		}
+	}
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL_GPL(mv88e6xxx_dst_bridge_to_dsa);
+
 int mv88e6xxx_dst_bridge_join(struct dsa_switch_tree *dst,
 			      struct net_device *brdev)
 {
