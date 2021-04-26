@@ -509,6 +509,7 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 	}
 	inode_inc_iversion(new_dir);
 
+	fat_set_state(new_dir->i_sb, true);
 	fat_detach(old_inode);
 	fat_attach(old_inode, new_i_pos);
 	if (is_hid)

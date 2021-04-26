@@ -1033,6 +1033,7 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 	struct buffer_head *bh;
 	int err = 0, nr_slots;
 
+	fat_set_state(sb, true);
 	/*
 	 * First stage: Remove the shortname. By this, the directory
 	 * entry is removed.
@@ -1327,6 +1328,7 @@ int fat_add_entries(struct inode *dir, void *slots, int nr_slots,
 	}
 
 found:
+	fat_set_state(sb, true);
 	err = 0;
 	pos -= free_slots * sizeof(*de);
 	nr_slots -= free_slots;

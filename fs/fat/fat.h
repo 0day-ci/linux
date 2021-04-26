@@ -76,6 +76,7 @@ struct msdos_sb_info {
 	struct mutex fat_lock;
 	struct mutex nfs_build_inode_lock;
 	struct mutex s_lock;
+	struct mutex bootsec_lock;
 	unsigned int prev_free;      /* previously allocated cluster number */
 	unsigned int free_clusters;  /* -1 if undefined */
 	unsigned int free_clus_valid; /* is free_clusters valid? */
@@ -101,6 +102,8 @@ struct msdos_sb_info {
 	struct hlist_head dir_hashtable[FAT_HASH_SIZE];
 
 	unsigned int dirty;           /* fs state before mount */
+	u8 state;			/* current fs state */
+	struct buffer_head *boot_bh;
 	struct rcu_head rcu;
 };
 
@@ -425,6 +428,7 @@ static inline unsigned long fat_dir_hash(int logstart)
 	return hash_32(logstart, FAT_HASH_BITS);
 }
 extern int fat_add_cluster(struct inode *inode);
+extern void fat_set_state(struct super_block *sb, bool dirty);
 
 /* fat/misc.c */
 extern __printf(3, 4) __cold

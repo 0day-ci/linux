@@ -662,52 +662,45 @@ static void fat_evict_inode(struct inode *inode)
 	fat_detach(inode);
 }
 
-static void fat_set_state(struct super_block *sb,
-			unsigned int set, unsigned int force)
+void fat_set_state(struct super_block *sb, bool dirty)
 {
-	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	u8 newstate;
 
 	/* do not change any thing if mounted read only */
-	if (sb_rdonly(sb) && !force)
+	if (sb_rdonly(sb))
 		return;
 
 	/* do not change state if fs was dirty */
-	if (sbi->dirty) {
-		/* warn only on set (mount). */
-		if (set)
-			fat_msg(sb, KERN_WARNING, "Volume was not properly "
-				"unmounted. Some data may be corrupt. "
-				"Please run fsck.");
+	if (sbi->dirty)
 		return;
-	}
 
-	bh = sb_bread(sb, 0);
-	if (bh == NULL) {
-		fat_msg(sb, KERN_ERR, "unable to read boot sector "
-			"to mark fs as dirty");
+	if (dirty)
+		newstate = sbi->state | FAT_STATE_DIRTY;
+	else
+		newstate = sbi->state & ~FAT_STATE_DIRTY;
+
+	/* do nothing if state is same */
+	if (newstate == sbi->state)
 		return;
-	}
+	mutex_lock(&sbi->bootsec_lock);
+	if (newstate == READ_ONCE(sbi->state))
+		goto unlock;
 
-	b = (struct fat_boot_sector *) bh->b_data;
+	b = (struct fat_boot_sector *) sbi->boot_bh->b_data;
+	if (is_fat32(sbi))
+		b->fat32.state = newstate;
+	else /* fat 16 and 12 */
+		b->fat16.state = newstate;
 
-	if (is_fat32(sbi)) {
-		if (set)
-			b->fat32.state |= FAT_STATE_DIRTY;
-		else
-			b->fat32.state &= ~FAT_STATE_DIRTY;
-	} else /* fat 16 and 12 */ {
-		if (set)
-			b->fat16.state |= FAT_STATE_DIRTY;
-		else
-			b->fat16.state &= ~FAT_STATE_DIRTY;
-	}
-
-	mark_buffer_dirty(bh);
-	sync_dirty_buffer(bh);
-	brelse(bh);
+	mark_buffer_dirty(sbi->boot_bh);
+	sync_dirty_buffer(sbi->boot_bh);
+	sbi->state = newstate;
+unlock:
+	mutex_unlock(&sbi->bootsec_lock);
 }
+EXPORT_SYMBOL_GPL(fat_set_state);
 
 static void fat_reset_iocharset(struct fat_mount_options *opts)
 {
@@ -731,7 +724,8 @@ static void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	fat_set_state(sb, 0, 0);
+	fat_set_state(sb, false);
+	brelse(sbi->boot_bh);
 
 	iput(sbi->fsinfo_inode);
 	iput(sbi->fat_inode);
@@ -799,6 +793,15 @@ static void __exit fat_destroy_inodecache(void)
 	kmem_cache_destroy(fat_inode_cachep);
 }
 
+static void fat_warn_volume_dirty(struct super_block *sb)
+{
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+	if (sbi->dirty)
+		fat_msg(sb, KERN_WARNING,
+			"Volume was not properly unmounted. Some data may be corrupt. Please run fsck.");
+}
+
 static int fat_remount(struct super_block *sb, int *flags, char *data)
 {
 	bool new_rdonly;
@@ -811,9 +814,9 @@ static int fat_remount(struct super_block *sb, int *flags, char *data)
 	new_rdonly = *flags & SB_RDONLY;
 	if (new_rdonly != sb_rdonly(sb)) {
 		if (new_rdonly)
-			fat_set_state(sb, 0, 0);
+			fat_set_state(sb, false);
 		else
-			fat_set_state(sb, 1, 1);
+			fat_warn_volume_dirty(sb);
 	}
 	return 0;
 }
@@ -856,6 +859,7 @@ static int __fat_write_inode(struct inode *inode, int wait)
 	if (inode->i_ino == MSDOS_ROOT_INO)
 		return 0;
 
+	fat_set_state(sb, true);
 retry:
 	i_pos = fat_i_pos_read(sbi, inode);
 	if (!i_pos)
@@ -1604,7 +1608,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 {
 	struct inode *root_inode = NULL, *fat_inode = NULL;
 	struct inode *fsinfo_inode = NULL;
-	struct buffer_head *bh;
+	struct buffer_head *bh = NULL;
 	struct fat_bios_param_block bpb;
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
@@ -1657,7 +1661,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	if (error == -EINVAL && sbi->options.dos1xfloppy)
 		error = fat_read_static_bpb(sb,
 			(struct fat_boot_sector *)bh->b_data, silent, &bpb);
-	brelse(bh);
 
 	if (error == -EINVAL)
 		goto out_invalid;
@@ -1675,8 +1678,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	}
 
 	if (logical_sector_size > sb->s_blocksize) {
-		struct buffer_head *bh_resize;
-
+		brelse(bh);
+		bh = NULL;
 		if (!sb_set_blocksize(sb, logical_sector_size)) {
 			fat_msg(sb, KERN_ERR, "unable to set blocksize %u",
 			       logical_sector_size);
@@ -1684,15 +1687,15 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		}
 
 		/* Verify that the larger boot sector is fully readable */
-		bh_resize = sb_bread(sb, 0);
-		if (bh_resize == NULL) {
+		bh = sb_bread(sb, 0);
+		if (bh == NULL) {
 			fat_msg(sb, KERN_ERR, "unable to read boot sector"
 			       " (logical sector size = %lu)",
 			       sb->s_blocksize);
 			goto out_fail;
 		}
-		brelse(bh_resize);
 	}
+	sbi->boot_bh = bh;
 
 	mutex_init(&sbi->s_lock);
 	sbi->cluster_size = sb->s_blocksize * sbi->sec_per_clus;
@@ -1783,9 +1786,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 
 	/* some OSes set FAT_STATE_DIRTY and clean it on unmount. */
 	if (is_fat32(sbi))
-		sbi->dirty = bpb.fat32_state & FAT_STATE_DIRTY;
+		sbi->state = bpb.fat32_state;
 	else /* fat 16 or 12 */
-		sbi->dirty = bpb.fat16_state & FAT_STATE_DIRTY;
+		sbi->state = bpb.fat16_state;
+	sbi->dirty = sbi->state & FAT_STATE_DIRTY;
+	mutex_init(&sbi->bootsec_lock);
 
 	/* check that FAT table does not overflow */
 	fat_clusters = calc_fat_clusters(sb);
@@ -1881,7 +1886,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 					"the device does not support discard");
 	}
 
-	fat_set_state(sb, 1, 0);
+	if (!sb_rdonly(sb))
+		fat_warn_volume_dirty(sb);
+
 	return 0;
 
 out_invalid:
@@ -1897,6 +1904,7 @@ out_fail:
 	unload_nls(sbi->nls_io);
 	unload_nls(sbi->nls_disk);
 	fat_reset_iocharset(&sbi->options);
+	brelse(bh);
 	sb->s_fs_info = NULL;
 	kfree(sbi);
 	return error;
