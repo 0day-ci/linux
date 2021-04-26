@@ -133,8 +133,8 @@ static int gfs2_write_jdata_page(struct page *page,
 	if (page->index == end_index && offset)
 		zero_user_segment(page, offset, PAGE_SIZE);
 
-	return __block_write_full_page(inode, page, gfs2_get_block_noalloc, wbc,
-				       end_buffer_async_write);
+	return __block_write_full_page_eof(inode, page, gfs2_get_block_noalloc, wbc,
+				       end_buffer_async_write, true);
 }
 
 /**
