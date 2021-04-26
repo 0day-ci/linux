@@ -215,25 +215,35 @@ void bio_uninit(struct bio *bio)
 }
 EXPORT_SYMBOL(bio_uninit);
 
+static inline void bio_mempool_free(struct bio *bio)
+{
+	struct bio_set *bs = bio->bi_pool;
+	void *p = bio;
+
+	p -= bs->front_pad;
+	mempool_free(p, &bs->bio_pool);
+}
+
+static void bio_free_rcu(struct rcu_head *head)
+{
+	bio_mempool_free(container_of(head, struct bio, bi_rcu_free));
+}
+
 static void bio_free(struct bio *bio)
 {
 	struct bio_set *bs = bio->bi_pool;
-	void *p;
 
 	bio_uninit(bio);
 
 	if (bs) {
 		bvec_free(&bs->bvec_pool, bio->bi_io_vec, bio->bi_max_vecs);
-
-		/*
-		 * If we have front padding, adjust the bio pointer before freeing
-		 */
-		p = bio;
-		p -= bs->front_pad;
-
-		mempool_free(p, &bs->bio_pool);
+		if (bio->bi_opf & REQ_POLLED)
+			call_rcu(&bio->bi_rcu_free, bio_free_rcu);
+		else
+			bio_mempool_free(bio);
 	} else {
 		/* Bio was allocated by bio_kmalloc() */
+		WARN_ON_ONCE(bio->bi_opf & REQ_POLLED);
 		kfree(bio);
 	}
 }

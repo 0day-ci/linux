@@ -10,6 +10,7 @@
 #include <linux/bvec.h>
 #include <linux/device.h>
 #include <linux/ktime.h>
+#include <linux/rcupdate.h>
 
 struct bio_set;
 struct bio;
@@ -233,7 +234,10 @@ struct bio {
 	blk_status_t		bi_status;
 	atomic_t		__bi_remaining;
 
-	struct bvec_iter	bi_iter;
+	union {
+		struct bvec_iter	bi_iter;
+		struct rcu_head		bi_rcu_free;
+	};
 
 	bio_end_io_t		*bi_end_io;
 
