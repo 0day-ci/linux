@@ -3249,6 +3249,7 @@ static struct virtio_device_id id_table[] = {
 
 static unsigned int features[] = {
 	VIRTNET_FEATURES,
+	VIRTIO_F_SR_IOV,
 };
 
 static unsigned int features_legacy[] = {
