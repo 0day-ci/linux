@@ -547,7 +547,6 @@ acpi_db_walk_for_fields(acpi_handle obj_handle,
 	}
 
 	acpi_os_printf("%s ", (char *)buffer.pointer);
-	ACPI_FREE(buffer.pointer);
 
 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
 	acpi_evaluate_object(obj_handle, NULL, NULL, &buffer);
