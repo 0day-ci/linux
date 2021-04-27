@@ -95,6 +95,16 @@ config GPIO_CDEV_V1
 
 	  If unsure, say Y.
 
+config GPIO_LINE
+	bool "/sys/class/line/... (GPIO lines interface)"
+	depends on SYSFS
+	help
+	  Say Y here to add a sysfs interface to manage system's GPIO lines.
+
+	  Instead of the GPIO_SYSFS support, by using this support, you'll be
+	  able to use GPIOs from userspace as stated in the device-tree
+	  for well defined pourposes and by using proper names.
+
 config GPIO_GENERIC
 	depends on HAS_IOMEM # Only for IOMEM drivers
 	tristate
