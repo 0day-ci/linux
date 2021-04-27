@@ -608,6 +608,7 @@ void ice_free_vfs(struct ice_pf *pf)
 
 	tmp = pf->num_alloc_vfs;
 	pf->num_qps_per_vf = 0;
+	pf->num_msix_per_vf = 0;
 	pf->num_alloc_vfs = 0;
 	for (i = 0; i < tmp; i++) {
 		if (test_bit(ICE_VF_STATE_INIT, pf->vf[i].vf_states)) {
@@ -1204,7 +1205,9 @@ static int ice_set_per_vf_res(struct ice_pf *pf)
 	msix_avail_for_sriov = pf->hw.func_caps.common_cap.num_msix_vectors -
 		pf->irq_tracker->num_entries;
 	msix_avail_per_vf = msix_avail_for_sriov / pf->num_alloc_vfs;
-	if (msix_avail_per_vf >= ICE_NUM_VF_MSIX_MED) {
+	if (pf->num_msix_per_vf && msix_avail_per_vf >= pf->num_msix_per_vf) {
+		num_msix_per_vf = pf->num_msix_per_vf;
+	} else if (msix_avail_per_vf >= ICE_NUM_VF_MSIX_MED) {
 		num_msix_per_vf = ICE_NUM_VF_MSIX_MED;
 	} else if (msix_avail_per_vf >= ICE_NUM_VF_MSIX_SMALL) {
 		num_msix_per_vf = ICE_NUM_VF_MSIX_SMALL;
