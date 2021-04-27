@@ -156,6 +156,8 @@ COND_SYSCALL_COMPAT(futex_wait);
 COND_SYSCALL(futex_wake);
 COND_SYSCALL(futex_waitv);
 COND_SYSCALL_COMPAT(futex_waitv);
+COND_SYSCALL(futex_requeue);
+COND_SYSCALL_COMPAT(futex_requeue);
 
 /* kernel/hrtimer.c */
 
