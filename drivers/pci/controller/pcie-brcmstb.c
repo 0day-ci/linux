@@ -1340,6 +1340,15 @@ static int brcm_pcie_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void brcm_pcie_shutdown(struct platform_device *pdev)
+{
+	struct brcm_pcie *pcie = platform_get_drvdata(pdev);
+
+	if (pcie->has_err_report)
+		brcm_unregister_die_notifiers(pcie);
+	__brcm_pcie_remove(pcie);
+}
+
 static const struct of_device_id brcm_pcie_match[] = {
 	{ .compatible = "brcm,bcm2711-pcie", .data = &bcm2711_cfg },
 	{ .compatible = "brcm,bcm4908-pcie", .data = &bcm4908_cfg },
@@ -1460,6 +1469,7 @@ static const struct dev_pm_ops brcm_pcie_pm_ops = {
 static struct platform_driver brcm_pcie_driver = {
 	.probe = brcm_pcie_probe,
 	.remove = brcm_pcie_remove,
+	.shutdown = brcm_pcie_shutdown,
 	.driver = {
 		.name = "brcm-pcie",
 		.of_match_table = brcm_pcie_match,
