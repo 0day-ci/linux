@@ -57,7 +57,7 @@ static int page_log_to_page_real(int page_log, enum chips chip)
 		case YH5151E_PAGE_12V_LOG:
 			return YH5151E_PAGE_12V_REAL;
 		case YH5151E_PAGE_5V_LOG:
-			return YH5151E_PAGE_5V_LOG;
+			return YH5151E_PAGE_5V_REAL;
 		case YH5151E_PAGE_3V3_LOG:
 			return YH5151E_PAGE_3V3_REAL;
 		}
@@ -164,6 +164,7 @@ static struct pmbus_driver_info fsp3y_info[] = {
 	},
 	[yh5151e] = {
 		.pages = 3,
+		.format[PSC_VOLTAGE_OUT] = force_linear11,
 		.func[YH5151E_PAGE_12V_LOG] =
 			PMBUS_HAVE_VOUT | PMBUS_HAVE_IOUT |
 			PMBUS_HAVE_POUT  |

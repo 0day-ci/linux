@@ -405,7 +405,11 @@ enum pmbus_sensor_classes {
 #define PMBUS_PHASE_VIRTUAL	BIT(30)	/* Phases on this page are virtual */
 #define PMBUS_PAGE_VIRTUAL	BIT(31)	/* Page is virtual */
 
-enum pmbus_data_format { linear = 0, direct, vid };
+/*
+ * force_linear11 is for non-compliant devices that output VOUT in linear11
+ * instead of linear16.
+ */
+enum pmbus_data_format { linear = 0, force_linear11, direct, vid };
 enum vrm_version { vr11 = 0, vr12, vr13, imvp9, amd625mv };
 
 struct pmbus_driver_info {

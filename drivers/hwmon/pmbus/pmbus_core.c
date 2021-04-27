@@ -600,7 +600,8 @@ static s64 pmbus_reg2data_linear(struct pmbus_data *data,
 	s32 mantissa;
 	s64 val;
 
-	if (sensor->class == PSC_VOLTAGE_OUT) {	/* LINEAR16 */
+	if (sensor->class == PSC_VOLTAGE_OUT &&	/* LINEAR16 */
+	    data->info->format[sensor->class] != force_linear11) {
 		exponent = data->exponent[sensor->page];
 		mantissa = (u16) sensor->data;
 	} else {				/* LINEAR11 */
