@@ -2851,7 +2851,7 @@ retry_private:
 	/*
 	 * On PREEMPT_RT_FULL, when hb->lock becomes an rt_mutex, we must not
 	 * hold it while doing rt_mutex_start_proxy(), because then it will
-	 * include hb->lock in the blocking chain, even through we'll not in
+	 * include hb->lock in the blocking chain, even though we'll not in
 	 * fact hold it while blocking. This will lead it to report -EDEADLK
 	 * and BUG when futex_unlock_pi() interleaves with this.
 	 *
