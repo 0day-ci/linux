@@ -474,8 +474,8 @@ struct uiscmdrsp_scsitaskmgmt {
 	enum task_mgmt_types tasktype;
 	struct uisscsi_dest vdest;
 	u64 handle;
-	u64 notify_handle;
-	u64 notifyresult_handle;
+	u32 notify_handle;
+	u32 notifyresult_handle;
 	char result;
 
 #define TASK_MGMT_FAILED 0
