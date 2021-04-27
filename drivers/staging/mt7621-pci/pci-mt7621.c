@@ -306,7 +306,9 @@ static int mt7621_pci_parse_request_of_pci_ranges(struct pci_host_bridge *host)
 	 * resource manually instead.
 	 */
 	pcie->io.name = node->full_name;
-	pcie->io.parent = pcie->io.child = pcie->io.sibling = NULL;
+	pcie->io.parent = NULL;
+	pcie->io.child = NULL;
+	pcie->io.sibling = NULL;
 	for_each_of_pci_range(&parser, &range) {
 		switch (range.flags & IORESOURCE_TYPE_BITS) {
 		case IORESOURCE_IO:
