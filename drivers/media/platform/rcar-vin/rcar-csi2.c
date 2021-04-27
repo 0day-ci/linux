@@ -408,6 +408,12 @@ static void rcsi2_enter_standby(struct rcar_csi2 *priv)
 
 static void rcsi2_exit_standby(struct rcar_csi2 *priv)
 {
+	/*
+	 * The code at rcsi2_enter_standby() assumes
+	 * inconditionally that PM runtime usage count was
+	 * incremented. So, it shouldn't use pm_runtime_resume_and_get()
+	 * here.
+	 */
 	pm_runtime_get_sync(priv->dev);
 	reset_control_deassert(priv->rstc);
 }
