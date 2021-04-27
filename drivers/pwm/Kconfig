@@ -423,6 +423,15 @@ config PWM_PXA
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-pxa.
 
+config PWM_QCOM
+	tristate "Qcom PMIC PWM support"
+	depends on MFD_SPMI_PMIC && OF
+	help
+	  Generic PWM framework driver for PWM module in QCOM PMIC chips
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-qcom.
+
 config PWM_RCAR
 	tristate "Renesas R-Car PWM support"
 	depends on ARCH_RENESAS || COMPILE_TEST
