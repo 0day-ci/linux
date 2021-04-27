@@ -46,6 +46,39 @@ static u32 get_boot_hartid_from_fdt(void)
 	return fdt32_to_cpu(*prop);
 }
 
+static unsigned long get_dram_base_from_fdt(void)
+{
+	const void *fdt;
+	int node, len;
+	const fdt32_t *addr_cells;
+	const void *prop;
+
+	fdt = get_efi_config_table(DEVICE_TREE_GUID);
+	if (!fdt)
+		return ULONG_MAX;
+
+	node = fdt_path_offset(fdt, "/");
+	if (node < 0)
+		return ULONG_MAX;
+
+	addr_cells = fdt_getprop((void *)fdt, node, "#address-cells", &len);
+	if (!addr_cells)
+		return ULONG_MAX;
+
+	node = fdt_path_offset(fdt, "/memory");
+	if (node < 0)
+		return ULONG_MAX;
+
+	prop = fdt_getprop((void *)fdt, node, "reg", &len);
+	if (!prop)
+		return ULONG_MAX;
+
+	if (fdt32_to_cpu(*addr_cells) > 1)
+		return fdt64_to_cpu(*((fdt64_t *)prop));
+	else
+		return fdt32_to_cpu(*((fdt32_t *)prop));
+}
+
 efi_status_t check_platform_features(void)
 {
 	hartid = get_boot_hartid_from_fdt();
@@ -97,7 +130,11 @@ efi_status_t handle_kernel_image(unsigned long *image_addr,
 	 * lowest possible memory region as long as the address and size meets
 	 * the alignment constraints.
 	 */
-	preferred_addr = MIN_KIMG_ALIGN;
+	preferred_addr = get_dram_base_from_fdt();
+	if (preferred_addr == ULONG_MAX)
+		preferred_addr = MIN_KIMG_ALIGN;
+	else
+		preferred_addr += MIN_KIMG_ALIGN;
 	status = efi_relocate_kernel(image_addr, kernel_size, *image_size,
 				     preferred_addr, MIN_KIMG_ALIGN, 0x0);
 
