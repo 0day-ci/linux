@@ -887,8 +887,10 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
 
 error_cleanup_dev:
 	kfree(mc_dev->regions);
+	/* mc_dev is only allocated when it is not part of mc_bus */
+	if (!mc_bus)
+		kfree(mc_dev);
 	kfree(mc_bus);
-	kfree(mc_dev);
 
 	return error;
 }
