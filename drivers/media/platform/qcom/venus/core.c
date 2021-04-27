@@ -84,7 +84,11 @@ static void venus_sys_error_handler(struct work_struct *work)
 			container_of(work, struct venus_core, work.work);
 	int ret = 0;
 
-	pm_runtime_get_sync(core->dev);
+	ret = pm_runtime_get_sync(core->dev);
+	if (WARN_ON(ret < 0)) {
+		pm_runtime_put_noidle(core->dev);
+		return;
+	}
 
 	hfi_core_deinit(core, true);
 
@@ -106,9 +110,13 @@ static void venus_sys_error_handler(struct work_struct *work)
 
 	hfi_reinit(core);
 
-	pm_runtime_get_sync(core->dev);
+	ret = pm_runtime_get_sync(core->dev);
+	if (WARN_ON(ret < 0)) {
+		pm_runtime_put_noidle(core->dev);
+		return;
+	}
 
-	ret |= venus_boot(core);
+	ret = venus_boot(core);
 	ret |= hfi_core_resume(core, true);
 
 	enable_irq(core->irq);
