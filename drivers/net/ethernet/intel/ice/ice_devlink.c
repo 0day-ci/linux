@@ -490,6 +490,102 @@ struct ice_pf *ice_allocate_pf(struct device *dev)
 	return devlink_priv(devlink);
 }
 
+enum ice_devlink_param_id {
+	ICE_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
+	ICE_DEVLINK_PARAM_ID_NUM_QPS_PER_VF,
+};
+
+/**
+ * ice_devlink_num_qps_per_vf_get - Get the current number of qps per VF
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to get
+ * @ctx: context to return the parameter value
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_num_qps_per_vf_get(struct devlink *devlink, u32 id,
+			       struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = (struct ice_pf *)devlink_priv(devlink);
+
+	if (id != ICE_DEVLINK_PARAM_ID_NUM_QPS_PER_VF)
+		return -EINVAL;
+
+	ctx->val.vu16 = pf->num_qps_per_vf;
+
+	return 0;
+}
+
+/**
+ * ice_devlink_num_qps_per_vf_validate - Validate the number of qps per VF
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to validate
+ * @val: value to be validated
+ * @extack: netlink extended ACK structure
+ *
+ * Check that the value passed is less than the max qps allowed for a VF and
+ * no VFs are created yet.
+ * Returns: zero on success, or an error code on failure and extack with a
+ * reason for failure.
+ */
+static int
+ice_devlink_num_qps_per_vf_validate(struct devlink *devlink, u32 id,
+				    union devlink_param_value val,
+				    struct netlink_ext_ack *extack)
+{
+	struct ice_pf *pf = (struct ice_pf *)devlink_priv(devlink);
+
+	if (id != ICE_DEVLINK_PARAM_ID_NUM_QPS_PER_VF)
+		return -EINVAL;
+
+	if (val.vu16 > ICE_MAX_RSS_QS_PER_VF) {
+		NL_SET_ERR_MSG_MOD(extack, "Value is greater than max allowed");
+		return -EINVAL;
+	}
+
+	if (pf->num_alloc_vfs) {
+		NL_SET_ERR_MSG_MOD(extack, "Cannot set after VFs are created");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_num_qps_per_vf_set - Set the number of qps per VF
+ * @devlink: pointer to the devlink instance
+ * @id: the parameter ID to set
+ * @ctx: context to return the parameter value
+ *
+ * Returns: zero on success, or an error code on failure.
+ */
+static int
+ice_devlink_num_qps_per_vf_set(struct devlink *devlink, u32 id,
+			       struct devlink_param_gset_ctx *ctx)
+{
+	struct ice_pf *pf = (struct ice_pf *)devlink_priv(devlink);
+
+	if (id != ICE_DEVLINK_PARAM_ID_NUM_QPS_PER_VF)
+		return -EINVAL;
+
+	pf->num_qps_per_vf = ctx->val.vu16;
+	pf->num_msix_per_vf = pf->num_qps_per_vf + 1;
+
+	return 0;
+}
+
+/* devlink parameters for the ice driver */
+static const struct devlink_param ice_devlink_params[] = {
+	DEVLINK_PARAM_DRIVER(ICE_DEVLINK_PARAM_ID_NUM_QPS_PER_VF,
+			     "num_qps_per_vf",
+			     DEVLINK_PARAM_TYPE_U16,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     ice_devlink_num_qps_per_vf_get,
+			     ice_devlink_num_qps_per_vf_set,
+			     ice_devlink_num_qps_per_vf_validate),
+};
+
 /**
  * ice_devlink_register - Register devlink interface for this PF
  * @pf: the PF to register the devlink for.
@@ -510,6 +606,13 @@ int ice_devlink_register(struct ice_pf *pf)
 		return err;
 	}
 
+	err = devlink_params_register(devlink, ice_devlink_params,
+				      ARRAY_SIZE(ice_devlink_params));
+	if (err) {
+		dev_err(dev, "devlink params registration failed: %d\n", err);
+		return err;
+	}
+
 	return 0;
 }
 
@@ -521,7 +624,11 @@ int ice_devlink_register(struct ice_pf *pf)
  */
 void ice_devlink_unregister(struct ice_pf *pf)
 {
-	devlink_unregister(priv_to_devlink(pf));
+	struct devlink *devlink = priv_to_devlink(pf);
+
+	devlink_params_unregister(devlink, ice_devlink_params,
+				  ARRAY_SIZE(ice_devlink_params));
+	devlink_unregister(devlink);
 }
 
 /**
@@ -553,6 +660,7 @@ int ice_devlink_create_port(struct ice_vsi *vsi)
 	attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
 	attrs.phys.port_number = pi->lport;
 	devlink_port_attrs_set(&vsi->devlink_port, &attrs);
+
 	err = devlink_port_register(devlink, &vsi->devlink_port, vsi->idx);
 	if (err) {
 		dev_err(dev, "devlink_port_register failed: %d\n", err);
