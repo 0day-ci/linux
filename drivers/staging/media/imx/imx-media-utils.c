@@ -175,6 +175,18 @@ static const struct imx_media_pixfmt pixel_formats[] = {
 		.bpp    = 16,
 		.bayer  = true,
 	}, {
+		.fourcc = V4L2_PIX_FMT_SGRGB_IGIG_GBGR_IGIG8,
+		.codes  = IMX_BUS_FMTS(MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG8_1X8),
+		.cs     = IPUV3_COLORSPACE_RGB,
+		.bpp    = 8,
+		.bayer  = true,
+	}, {
+		.fourcc = V4L2_PIX_FMT_SGRGB_IGIG_GBGR_IGIG16,
+		.codes  = IMX_BUS_FMTS(MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG12_1X12),
+		.cs     = IPUV3_COLORSPACE_RGB,
+		.bpp    = 16,
+		.bayer  = true,
+	}, {
 		.fourcc = V4L2_PIX_FMT_GREY,
 		.codes = IMX_BUS_FMTS(
 			MEDIA_BUS_FMT_Y8_1X8,
