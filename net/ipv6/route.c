@@ -2331,6 +2331,7 @@ u32 rt6_multipath_hash(const struct net *net, const struct flowi6 *fl6,
 		       const struct sk_buff *skb, struct flow_keys *flkeys)
 {
 	struct flow_keys hash_keys;
+	siphash_key_t *seed_ctx;
 	u32 mhash;
 
 	switch (ip6_multipath_hash_policy(net)) {
@@ -2414,7 +2415,14 @@ u32 rt6_multipath_hash(const struct net *net, const struct flowi6 *fl6,
 		}
 		break;
 	}
-	mhash = flow_hash_from_keys(&hash_keys);
+
+	rcu_read_lock();
+	seed_ctx = rcu_dereference(net->ipv6.multipath_hash_seed_ctx);
+	if (seed_ctx)
+		mhash = flow_multipath_hash_from_keys(&hash_keys, seed_ctx);
+	else
+		mhash = flow_hash_from_keys(&hash_keys);
+	rcu_read_unlock();
 
 	return mhash >> 1;
 }
