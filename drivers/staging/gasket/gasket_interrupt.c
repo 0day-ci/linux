@@ -322,7 +322,6 @@ int gasket_interrupt_init(struct gasket_dev *gasket_dev)
 	interrupt_data = kzalloc(sizeof(*interrupt_data), GFP_KERNEL);
 	if (!interrupt_data)
 		return -ENOMEM;
-	gasket_dev->interrupt_data = interrupt_data;
 	interrupt_data->name = driver_desc->name;
 	interrupt_data->type = driver_desc->interrupt_type;
 	interrupt_data->pci_dev = gasket_dev->pci_dev;
@@ -348,6 +347,8 @@ int gasket_interrupt_init(struct gasket_dev *gasket_dev)
 		kfree(interrupt_data);
 		return -ENOMEM;
 	}
+
+	gasket_dev->interrupt_data = interrupt_data;
 
 	switch (interrupt_data->type) {
 	case PCI_MSIX:
