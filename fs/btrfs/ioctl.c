@@ -1688,8 +1688,6 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 		btrfs_set_fs_incompat(fs_info, COMPRESS_ZSTD);
 	}
 
-	ret = defrag_count;
-
 out_ra:
 	if (do_compress) {
 		btrfs_inode_lock(inode, 0);
