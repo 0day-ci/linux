@@ -394,7 +394,7 @@ static int host_control_smi(void)
 
 		/* wait a few to see if it executed */
 		num_ticks = TIMEOUT_USEC_SHORT_SEMA_BLOCKING;
-		while ((cmd_status = inb(PCAT_APM_STATUS_PORT))
+		while (inb(PCAT_APM_STATUS_PORT)
 		       == ESM_STATUS_CMD_UNSUCCESSFUL) {
 			num_ticks--;
 			if (num_ticks == EXPIRED_TIMER)
