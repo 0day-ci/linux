@@ -295,7 +295,8 @@ static int pid_maps_open(struct inode *inode, struct file *file)
 
 const struct file_operations proc_pid_maps_operations = {
 	.open		= pid_maps_open,
-	.read		= seq_read,
+	.read_iter	= seq_read_iter,
+	.splice_read    = generic_file_splice_read,
 	.llseek		= seq_lseek,
 	.release	= map_release,
 };

@@ -797,9 +797,10 @@ static int children_seq_open(struct inode *inode, struct file *file)
 }
 
 const struct file_operations proc_tid_children_operations = {
-	.open    = children_seq_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = seq_release,
+	.open		= children_seq_open,
+	.read_iter	= seq_read_iter,
+	.splice_read	= generic_file_splice_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 #endif /* CONFIG_PROC_CHILDREN */
