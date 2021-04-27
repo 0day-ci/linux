@@ -193,3 +193,26 @@ Users can request an immediate capture of a snapshot via the
     0000000000000210 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
     $ devlink region delete pci/0000:01:00.0/device-caps snapshot 1
+
+Parameters
+==========
+
+The ``ice`` driver implements the following driver-specific
+parameters.
+
+.. list-table:: Driver-specific parameters implemented
+   :widths: 5 5 5 85
+
+   * - Name
+     - Type
+     - Mode
+     - Description
+   * - ``num_qps_per_vf``
+     - u16
+     - runtime
+     - Number of queue pairs assigned to SR-IOV VFs. The default
+       value is 0 indicating that the driver will determine based
+       on the number of SR-IOV VFs created and the available resources.
+       It can be set to a value between 1 to 16 and is used as a
+       preferred value in determining the queues and vectors assigned
+       per VF.
