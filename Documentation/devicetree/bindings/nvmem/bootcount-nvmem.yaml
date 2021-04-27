@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+# Copyright (c) Vaisala Oyj. All rights reserved.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/nvmem/bootcount-nvmem.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Bootcount NVMEM bindings
+
+maintainers:
+  - Nandor Han <nandor.han@vaisala.com>
+
+description: |
+  This binding is intendent to describe the hardware location for
+  storing the bootcount value and magic combo.
+
+  The NVMEM cell size should be 2 or 4 bytes.
+
+properties:
+  compatible:
+    enum:
+      - linux,bootcount-nvmem
+
+  nvmem-cells:
+    description: Phandle to reboot mode nvmem data cell.
+    $ref: /schemas/types.yaml#/definitions/phandle
+
+  nvmem-cell-names:
+    description: Name of the NVMEM cell.
+    $ref: /schemas/types.yaml#/definitions/string
+    enum:
+      - bootcount-regs
+
+  linux,bootcount-magic:
+    description: Override default mask value.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+required:
+  - compatible
+  - nvmem-cells
+  - nvmem-cell-names
+
+additionalProperties: false
+
+examples:
+  # example with 16 bit nvram cell:
+  - |
+    bootcount {
+      compatible = "linux,bootcount-nvmem";
+      nvmem-cells = <&bootcount_regs>;
+      nvmem-cell-names = "bootcount-regs";
+    };
+
+    rtc@68 {
+      bootcount_regs: bootcount_nvmem_regs@e {
+      reg = <0x0e 0x2>;
+    };
+
+  # example with 32 bit nvram cell:
+  - |
+    bootcount {
+      compatible = "linux,bootcount-nvmem";
+      nvmem-cells = <&bootcount_regs>;
+      nvmem-cell-names = "bootcount-regs";
+    };
+
+    rtc@68 {
+      bootcount_regs: bootcount_nvmem_regs@e {
+      reg = <0x0e 0x4>;
+    };
+
+...
