@@ -751,8 +751,10 @@ gpio_sim_config_make_item(struct config_group *group, const char *name)
 
 	config->id = ida_alloc(&gpio_sim_ida, GFP_KERNEL);
 	if (config->id < 0) {
+		int id = config->id;
+
 		kfree(config);
-		return ERR_PTR(config->id);
+		return ERR_PTR(id);
 	}
 
 	config_item_init_type_name(&config->item, name,
