@@ -450,6 +450,11 @@ static inline void armv8pmu_pmcr_write(u32 val)
 	write_sysreg(val, pmcr_el0);
 }
 
+static void armv8pmu_clear_pmuserenr(void)
+{
+	write_sysreg(0, pmuserenr_el0);
+}
+
 static inline int armv8pmu_has_overflowed(u32 pmovsr)
 {
 	return pmovsr & ARMV8_PMU_OVERFLOWED_MASK;
@@ -931,6 +936,9 @@ static void armv8pmu_reset(void *info)
 	/* The counter and interrupt enable registers are unknown at reset. */
 	armv8pmu_disable_counter(U32_MAX);
 	armv8pmu_disable_intens(U32_MAX);
+
+	/* User access is unknown at reset. */
+	armv8pmu_clear_pmuserenr();
 
 	/* Clear the counters we flip at guest entry/exit */
 	kvm_clr_pmu_events(U32_MAX);
