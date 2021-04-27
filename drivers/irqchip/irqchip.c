@@ -15,6 +15,11 @@
 #include <linux/irqchip.h>
 #include <linux/platform_device.h>
 
+struct platform_irqchip_instance {
+	of_irq_init_cb_t irq_init_cb;
+	of_irq_remove_cb_t irq_remove_cb;
+};
+
 /*
  * This special of_device_id is the sentinel at the end of the
  * of_device_id[] array of all irqchips. It is automatically placed at
@@ -34,11 +39,22 @@ void __init irqchip_init(void)
 
 int platform_irqchip_probe(struct platform_device *pdev)
 {
+	struct platform_irqchip_instance *irqchip;
+	const struct irqc_init_remove_funps *irqchip_funps;
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *par_np = of_irq_find_parent(np);
-	of_irq_init_cb_t irq_init_cb = of_device_get_match_data(&pdev->dev);
 
-	if (!irq_init_cb)
+	irqchip = devm_kzalloc(&pdev->dev, sizeof(*irqchip), GFP_KERNEL);
+	if (!irqchip)
+		return -ENOMEM;
+
+	platform_set_drvdata(pdev, irqchip);
+
+	irqchip_funps = of_device_get_match_data(&pdev->dev);
+	irqchip->irq_init_cb =	irqchip_funps->irqchip_initp;
+	irqchip->irq_remove_cb = irqchip_funps->irqchip_removep;
+
+	if (!irqchip->irq_init_cb)
 		return -EINVAL;
 
 	if (par_np == np)
@@ -55,6 +71,22 @@ int platform_irqchip_probe(struct platform_device *pdev)
 	if (par_np && !irq_find_matching_host(par_np, DOMAIN_BUS_ANY))
 		return -EPROBE_DEFER;
 
-	return irq_init_cb(np, par_np);
+	return irqchip->irq_init_cb(np, par_np);
 }
 EXPORT_SYMBOL_GPL(platform_irqchip_probe);
+
+int platform_irqchip_remove(struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	struct device_node *par_np = of_irq_find_parent(np);
+	struct platform_irqchip_instance *irqchip = platform_get_drvdata(pdev);
+
+	if (!irqchip->irq_remove_cb)
+		return -EINVAL;
+
+	if (par_np == np)
+		par_np = NULL;
+
+	return irqchip->irq_remove_cb(np, par_np);
+}
+EXPORT_SYMBOL_GPL(platform_irqchip_remove);

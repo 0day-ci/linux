@@ -10,6 +10,7 @@
 #include <linux/of.h>
 
 typedef int (*of_irq_init_cb_t)(struct device_node *, struct device_node *);
+typedef int (*of_irq_remove_cb_t)(struct device_node *, struct device_node *);
 
 /*
  * Workarounds only applied to 32bit powermac machines
