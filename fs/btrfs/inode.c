@@ -51,6 +51,7 @@
 #include "block-group.h"
 #include "space-info.h"
 #include "zoned.h"
+#include "subpage.h"
 
 struct btrfs_iget_args {
 	u64 ino;
@@ -170,7 +171,8 @@ static inline void btrfs_cleanup_ordered_extents(struct btrfs_inode *inode,
 		index++;
 		if (!page)
 			continue;
-		ClearPageOrdered(page);
+		btrfs_page_clear_ordered(inode->root->fs_info, page,
+					 page_offset(page), PAGE_SIZE);
 		put_page(page);
 	}
 
@@ -8290,6 +8292,7 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 				 unsigned int length)
 {
 	struct btrfs_inode *inode = BTRFS_I(page->mapping->host);
+	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	struct extent_io_tree *tree = &inode->io_tree;
 	struct extent_state *cached_state = NULL;
 	u64 page_start = page_offset(page);
@@ -8325,6 +8328,7 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 		struct btrfs_ordered_extent *ordered;
 		bool delete_states;
 		u64 range_end;
+		u32 range_len;
 
 		ordered = btrfs_lookup_first_ordered_range(inode, cur, page_end + 1 - cur);
 		if (!ordered) {
@@ -8350,7 +8354,9 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 
 		range_end = min(ordered->file_offset + ordered->num_bytes - 1,
 				page_end);
-		if (!PageOrdered(page)) {
+		ASSERT(range_end + 1 - cur < U32_MAX);
+		range_len = range_end + 1 - cur;
+		if (!btrfs_page_test_ordered(fs_info, page, cur, range_len)) {
 			/*
 			 * If Ordered (Private2) is cleared, it means endio has
 			 * already been executed for the range.
@@ -8360,7 +8366,7 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 			delete_states = false;
 			goto next;
 		}
-		ClearPageOrdered(page);
+		btrfs_page_clear_ordered(fs_info, page, cur, range_len);
 
 		/*
 		 * IO on this page will never be started, so we need to account
