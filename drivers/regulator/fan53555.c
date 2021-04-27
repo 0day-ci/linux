@@ -55,9 +55,8 @@
 
 #define FAN53555_NVOLTAGES	64	/* Numbers of voltages */
 #define FAN53526_NVOLTAGES	128
-#define TCS4525_NVOLTAGES	127	/* Numbers of voltages */
+#define TCS4525_NVOLTAGES	128	/* Numbers of voltages */
 
-#define TCS_VSEL_NSEL_MASK	0x7f
 #define TCS_VSEL0_MODE		(1 << 7)
 #define TCS_VSEL1_MODE		(1 << 6)
 
