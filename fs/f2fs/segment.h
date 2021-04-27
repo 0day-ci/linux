@@ -497,19 +497,24 @@ skip_free:
 	spin_unlock(&free_i->segmap_lock);
 }
 
-static inline void __set_test_and_inuse(struct f2fs_sb_info *sbi,
+static inline bool __set_test_and_inuse(struct f2fs_sb_info *sbi,
 		unsigned int segno)
 {
 	struct free_segmap_info *free_i = FREE_I(sbi);
 	unsigned int secno = GET_SEC_FROM_SEG(sbi, segno);
+	bool is_inuse = false;
 
 	spin_lock(&free_i->segmap_lock);
 	if (!test_and_set_bit(segno, free_i->free_segmap)) {
 		free_i->free_segments--;
 		if (!test_and_set_bit(secno, free_i->free_secmap))
 			free_i->free_sections--;
+	} else {
+		is_inuse = true;
 	}
 	spin_unlock(&free_i->segmap_lock);
+
+	return is_inuse;
 }
 
 static inline void get_sit_bitmap(struct f2fs_sb_info *sbi,

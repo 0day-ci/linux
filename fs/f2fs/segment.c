@@ -1991,6 +1991,19 @@ static void set_prefree_as_free_segments(struct f2fs_sb_info *sbi)
 	mutex_unlock(&dirty_i->seglist_lock);
 }
 
+void f2fs_set_free_as_prefree_segments(struct f2fs_sb_info *sbi)
+{
+	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
+	unsigned int segno;
+
+	mutex_lock(&dirty_i->seglist_lock);
+	for_each_set_bit(segno, dirty_i->dirty_segmap[PRE], MAIN_SEGS(sbi)) {
+		if (__set_test_and_inuse(sbi, segno))
+			test_and_clear_bit(segno, dirty_i->dirty_segmap[PRE]);
+	}
+	mutex_unlock(&dirty_i->seglist_lock);
+}
+
 void f2fs_clear_prefree_segments(struct f2fs_sb_info *sbi,
 						struct cp_control *cpc)
 {
