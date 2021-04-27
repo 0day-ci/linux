@@ -561,11 +561,9 @@ int vsp1_device_get(struct vsp1_device *vsp1)
 {
 	int ret;
 
-	ret = pm_runtime_get_sync(vsp1->dev);
-	if (ret < 0) {
-		pm_runtime_put_noidle(vsp1->dev);
+	ret = pm_runtime_resume_and_get(vsp1->dev);
+	if (ret < 0)
 		return ret;
-	}
 
 	return 0;
 }
