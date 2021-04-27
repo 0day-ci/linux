@@ -218,7 +218,7 @@ irqreturn_t handle_irq_event(struct irq_desc *desc)
 }
 
 #ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
-int __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+int set_handle_irq(void (*handle_irq)(struct pt_regs *))
 {
 	if (handle_arch_irq)
 		return -EBUSY;

@@ -177,8 +177,8 @@ static void xil_intc_irq_handler(struct irq_desc *desc)
 	chained_irq_exit(chip, desc);
 }
 
-static int __init xilinx_intc_of_init(struct device_node *intc,
-					     struct device_node *parent)
+static int xilinx_intc_of_init(struct device_node *intc,
+			       struct device_node *parent)
 {
 	struct xintc_irq_chip *irqc;
 	int ret, irq;
