@@ -2568,7 +2568,7 @@ static int s5p_jpeg_start_streaming(struct vb2_queue *q, unsigned int count)
 	struct s5p_jpeg_ctx *ctx = vb2_get_drv_priv(q);
 	int ret;
 
-	ret = pm_runtime_get_sync(ctx->jpeg->dev);
+	ret = pm_runtime_resume_and_get(ctx->jpeg->dev);
 
 	return ret > 0 ? 0 : ret;
 }
