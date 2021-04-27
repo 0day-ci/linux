@@ -5072,6 +5072,35 @@ static void pci_dev_restore(struct pci_dev *dev)
 }
 
 /**
+ * pci_dev_acpi_reset - do a function level reset using _RST method
+ * @dev: device to reset
+ * @probe: check if _RST method is included in the acpi_device context.
+ */
+static int pci_dev_acpi_reset(struct pci_dev *dev, int probe)
+{
+#ifdef CONFIG_ACPI
+	acpi_handle handle = ACPI_HANDLE(&dev->dev);
+
+	/* Return -ENOTTY if _RST method is not included in the dev context */
+	if (!handle || !acpi_has_method(handle, "_RST"))
+		return -ENOTTY;
+
+	/* Return 0 for probe phase indicating that we can reset this device */
+	if (probe)
+		return 0;
+
+	/* Invoke _RST() method to perform a function level reset */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_RST", NULL, NULL))) {
+		pci_warn(dev, "Failed to reset the device\n");
+		return -EINVAL;
+	}
+	return 0;
+#else
+	return -ENOTTY;
+#endif
+}
+
+/**
  * __pci_reset_function_locked - reset a PCI device function while holding
  * the @dev mutex lock.
  * @dev: PCI device to reset
@@ -5106,6 +5135,9 @@ int __pci_reset_function_locked(struct pci_dev *dev)
 	 * reset mechanisms might be broken on the device.
 	 */
 	rc = pci_dev_specific_reset(dev, 0);
+	if (rc != -ENOTTY)
+		return rc;
+	rc = pci_dev_acpi_reset(dev, 0);
 	if (rc != -ENOTTY)
 		return rc;
 	if (pcie_has_flr(dev)) {
@@ -5144,6 +5176,9 @@ int pci_probe_reset_function(struct pci_dev *dev)
 	might_sleep();
 
 	rc = pci_dev_specific_reset(dev, 1);
+	if (rc != -ENOTTY)
+		return rc;
+	rc = pci_dev_acpi_reset(dev, 1);
 	if (rc != -ENOTTY)
 		return rc;
 	if (pcie_has_flr(dev))
