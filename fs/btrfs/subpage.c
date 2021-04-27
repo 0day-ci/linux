@@ -420,13 +420,16 @@ void btrfs_subpage_clear_writeback(const struct btrfs_fs_info *fs_info,
 {
 	struct btrfs_subpage *subpage = (struct btrfs_subpage *)page->private;
 	u16 tmp = btrfs_subpage_calc_bitmap(fs_info, page, start, len);
+	bool finished = false;
 	unsigned long flags;
 
 	spin_lock_irqsave(&subpage->lock, flags);
 	subpage->writeback_bitmap &= ~tmp;
 	if (subpage->writeback_bitmap == 0)
-		end_page_writeback(page);
+		finished = true;
 	spin_unlock_irqrestore(&subpage->lock, flags);
+	if (finished)
+		end_page_writeback(page);
 }
 
 void btrfs_subpage_set_ordered(const struct btrfs_fs_info *fs_info,
