@@ -2655,6 +2655,19 @@ static bool btrfs_io_needs_validation(struct inode *inode, struct bio *bio)
 		return false;
 
 	/*
+	 * For subpage case, read bio are always submitted as multiple-sector
+	 * bio if the range is in the same page.
+	 * For now, let's just skip the validation, and do page sized repair.
+	 *
+	 * This reduce the granularity for repair, meaning if we have two
+	 * copies with different csum mismatch at different location, we're
+	 * unable to repair in subpage case.
+	 *
+	 * TODO: Make validation code to be fully subpage compatible
+	 */
+	if (blocksize < PAGE_SIZE)
+		return false;
+	/*
 	 * We need to validate each sector individually if the failed I/O was
 	 * for multiple sectors.
 	 *
