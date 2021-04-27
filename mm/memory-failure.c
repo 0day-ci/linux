@@ -56,6 +56,7 @@
 #include <linux/kfifo.h>
 #include <linux/ratelimit.h>
 #include <linux/page-isolation.h>
+#include <linux/pagewalk.h>
 #include "internal.h"
 #include "ras/ras_event.h"
 
@@ -552,6 +553,140 @@ static void collect_procs(struct page *page, struct list_head *tokill,
 		collect_procs_anon(page, tokill, force_early);
 	else
 		collect_procs_file(page, tokill, force_early);
+}
+
+struct hwp_walk {
+	struct to_kill tk;
+	unsigned long pfn;
+	int flags;
+};
+
+static int set_to_kill(struct to_kill *tk, unsigned long addr, short shift)
+{
+	/* Abort pagewalk when finding multiple mappings to the error page. */
+	if (tk->addr)
+		return 1;
+	tk->addr = addr;
+	tk->size_shift = shift;
+	return 0;
+}
+
+static int check_hwpoisoned_entry(pte_t pte, unsigned long addr, short shift,
+				unsigned long poisoned_pfn, struct to_kill *tk)
+{
+	unsigned long pfn = 0;
+
+	if (pte_present(pte)) {
+		pfn = pte_pfn(pte);
+	} else {
+		swp_entry_t swp = pte_to_swp_entry(pte);
+
+		if (is_hwpoison_entry(swp))
+			pfn = hwpoison_entry_to_pfn(swp);
+	}
+
+	if (!pfn || pfn != poisoned_pfn)
+		return 0;
+
+	return set_to_kill(tk, addr, shift);
+}
+
+static int hwpoison_pte_range(pmd_t *pmdp, unsigned long addr,
+			      unsigned long end, struct mm_walk *walk)
+{
+	struct hwp_walk *hwp = (struct hwp_walk *)walk->private;
+	int ret = 0;
+	pte_t *ptep;
+	pmd_t pmd;
+	spinlock_t *ptl;
+	unsigned long pfn;
+	unsigned long hwpoison_vaddr;
+
+	ptl = pmd_trans_huge_lock(pmdp, walk->vma);
+	if (!ptl)
+		goto pte_loop;
+	pmd = *pmdp;
+	if (!pmd_present(pmd))
+		goto unlock;
+	pfn = pmd_pfn(pmd);
+	if (pfn <= hwp->pfn && hwp->pfn < pfn + HPAGE_PMD_NR) {
+		hwpoison_vaddr = addr + ((hwp->pfn - pfn) << PAGE_SHIFT);
+		ret = set_to_kill(&hwp->tk, hwpoison_vaddr, PAGE_SHIFT);
+	}
+unlock:
+	spin_unlock(ptl);
+	goto out;
+pte_loop:
+	if (pmd_trans_unstable(pmdp))
+		goto out;
+
+	ptep = pte_offset_map_lock(walk->vma->vm_mm, pmdp, addr, &ptl);
+	for (; addr != end; ptep++, addr += PAGE_SIZE) {
+		ret = check_hwpoisoned_entry(*ptep, addr, PAGE_SHIFT,
+					     hwp->pfn, &hwp->tk);
+		if (ret == 1)
+			break;
+	}
+	pte_unmap_unlock(ptep - 1, ptl);
+out:
+	cond_resched();
+	return ret;
+}
+
+#ifdef CONFIG_HUGETLB_PAGE
+static int hwpoison_hugetlb_range(pte_t *ptep, unsigned long hmask,
+			    unsigned long addr, unsigned long end,
+			    struct mm_walk *walk)
+{
+	struct hwp_walk *hwp = (struct hwp_walk *)walk->private;
+	pte_t pte = huge_ptep_get(ptep);
+	struct hstate *h = hstate_vma(walk->vma);
+
+	return check_hwpoisoned_entry(pte, addr, huge_page_shift(h),
+				      hwp->pfn, &hwp->tk);
+}
+#else
+#define hwpoison_hugetlb_range	NULL
+#endif
+
+static struct mm_walk_ops hwp_walk_ops = {
+	.pmd_entry = hwpoison_pte_range,
+	.hugetlb_entry = hwpoison_hugetlb_range,
+};
+
+/*
+ * Sends SIGBUS to the current process with the error info.
+ *
+ * This function is intended to handle "Action Required" MCEs on already
+ * hardware poisoned pages. They could happen, for example, when
+ * memory_failure() failed to unmap the error page at the first call, or
+ * when multiple local machine checks happened on different CPUs.
+ *
+ * MCE handler currently has no easy access to the error virtual address,
+ * so this function walks page table to find it. One challenge on this is
+ * to reliably get the proper virual address of the error to report to
+ * applications via SIGBUS. A process could map a page multiple times to
+ * different virtual addresses, then we now have no way to tell which virtual
+ * address was accessed when the Action Required MCE was generated.
+ * So in such a corner case, we now give up and fall back to sending SIGBUS
+ * with no error info.
+ */
+static int kill_accessing_process(struct task_struct *p, unsigned long pfn,
+				  int flags)
+{
+	int ret;
+	struct hwp_walk priv = {
+		.pfn = pfn,
+	};
+	priv.tk.tsk = p;
+
+	mmap_read_lock(p->mm);
+	ret = walk_page_range(p->mm, 0, TASK_SIZE_MAX, &hwp_walk_ops,
+			      (void *)&priv);
+	if (!ret && priv.tk.addr)
+		kill_proc(&priv.tk, pfn, flags);
+	mmap_read_unlock(p->mm);
+	return ret ? -EFAULT : -EHWPOISON;
 }
 
 static const char *action_name[] = {
@@ -1228,7 +1363,10 @@ static int memory_failure_hugetlb(unsigned long pfn, int flags)
 	if (TestSetPageHWPoison(head)) {
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 		       pfn);
-		return 0;
+		res = -EHWPOISON;
+		if (flags & MF_ACTION_REQUIRED)
+			res = kill_accessing_process(current, page_to_pfn(head), flags);
+		return res;
 	}
 
 	num_poisoned_pages_inc();
@@ -1437,6 +1575,9 @@ try_again:
 	if (TestSetPageHWPoison(p)) {
 		pr_err("Memory failure: %#lx: already hardware poisoned\n",
 			pfn);
+		res = -EHWPOISON;
+		if (flags & MF_ACTION_REQUIRED)
+			res = kill_accessing_process(current, pfn, flags);
 		goto unlock_mutex;
 	}
 
