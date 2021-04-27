@@ -1126,7 +1126,18 @@ struct kvm_arch {
 	bool shadow_mmu_active;
 
 	/*
-	 * Protects kvm->memslots.
+	 * If set, the rmap should be allocated for any newly created or
+	 * modified memslots. If allocating rmaps lazily, this may be set
+	 * before the rmaps are allocated for existing memslots, but
+	 * shadow_mmu_active will not be set until after the rmaps are fully
+	 * allocated. Protected by the memslot assignment lock, below.
+	 */
+	bool alloc_memslot_rmaps;
+
+	/*
+	 * Protects kvm->memslots and alloc_memslot_rmaps (above) to ensure
+	 * that once alloc_memslot_rmaps is set, no memslot is left without an
+	 * rmap.
 	 */
 	struct mutex memslot_assignment_lock;
 };
@@ -1859,5 +1870,7 @@ static inline int kvm_cpu_get_apicid(int mps_cpu)
 	(*(type *)((buf) + (offset) - 0x7e00))
 
 int kvm_cpu_dirty_log_size(void);
+
+int alloc_all_memslots_rmaps(struct kvm *kvm);
 
 #endif /* _ASM_X86_KVM_HOST_H */

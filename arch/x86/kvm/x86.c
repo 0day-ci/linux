@@ -10841,10 +10841,23 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *slot)
 	kvm_page_track_free_memslot(slot);
 }
 
-static int alloc_memslot_rmap(struct kvm_memory_slot *slot,
+static int alloc_memslot_rmap(struct kvm *kvm, struct kvm_memory_slot *slot,
 			      unsigned long npages)
 {
 	int i;
+
+	if (!kvm->arch.alloc_memslot_rmaps)
+		return 0;
+
+	/*
+	 * All rmaps for a memslot should be allocated either before
+	 * the memslot is installed (in which case no other threads
+	 * should have a pointer to it), or under the
+	 * memslot_assignment_lock. Avoid overwriting already allocated
+	 * rmaps.
+	 */
+	if (slot->arch.rmap[0])
+		return 0;
 
 	for (i = 0; i < KVM_NR_PAGE_SIZES; ++i) {
 		int lpages;
@@ -10867,17 +10880,62 @@ out_free:
 	return -ENOMEM;
 }
 
+int alloc_memslots_rmaps(struct kvm *kvm, struct kvm_memslots *slots)
+{
+	struct kvm_memory_slot *slot;
+	int r = 0;
 
-void kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
+	kvm_for_each_memslot(slot, slots) {
+		r = alloc_memslot_rmap(kvm, slot, slot->npages);
+		if (r)
+			break;
+	}
+	return r;
+}
+
+int alloc_all_memslots_rmaps(struct kvm *kvm)
+{
+	struct kvm_memslots *slots;
+	int r = 0;
+	int i;
+
+	mutex_lock(&kvm->arch.memslot_assignment_lock);
+	kvm->arch.alloc_memslot_rmaps = true;
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		r = alloc_memslots_rmaps(kvm, slots);
+		if (r)
+			break;
+	}
+	mutex_unlock(&kvm->arch.memslot_assignment_lock);
+	return r;
+}
+
+int kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
 			     struct kvm_memslots *slots)
 {
+	int r;
+
 	mutex_lock(&kvm->arch.memslot_assignment_lock);
+
+	if (kvm->arch.alloc_memslot_rmaps) {
+		r = alloc_memslots_rmaps(kvm, slots);
+		if (r) {
+			mutex_unlock(&kvm->arch.memslot_assignment_lock);
+			return r;
+		}
+	}
+
 	rcu_assign_pointer(kvm->memslots[as_id], slots);
 	mutex_unlock(&kvm->arch.memslot_assignment_lock);
+
+	return 0;
 }
 
 
-static int kvm_alloc_memslot_metadata(struct kvm_memory_slot *slot,
+static int kvm_alloc_memslot_metadata(struct kvm *kvm,
+				      struct kvm_memory_slot *slot,
 				      unsigned long npages)
 {
 	int i;
@@ -10890,7 +10948,7 @@ static int kvm_alloc_memslot_metadata(struct kvm_memory_slot *slot,
 	 */
 	memset(&slot->arch, 0, sizeof(slot->arch));
 
-	r = alloc_memslot_rmap(slot, npages);
+	r = alloc_memslot_rmap(kvm, slot, npages);
 	if (r)
 		return r;
 
@@ -10963,7 +11021,7 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				enum kvm_mr_change change)
 {
 	if (change == KVM_MR_CREATE || change == KVM_MR_MOVE)
-		return kvm_alloc_memslot_metadata(memslot,
+		return kvm_alloc_memslot_metadata(kvm, memslot,
 						  mem->memory_size >> PAGE_SHIFT);
 	return 0;
 }

@@ -720,7 +720,7 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				struct kvm_memory_slot *memslot,
 				const struct kvm_userspace_memory_region *mem,
 				enum kvm_mr_change change);
-void kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
+int kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
 			     struct kvm_memslots *slots);
 void kvm_arch_commit_memory_region(struct kvm *kvm,
 				const struct kvm_userspace_memory_region *mem,

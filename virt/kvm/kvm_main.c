@@ -1270,22 +1270,31 @@ static int check_memory_region_flags(const struct kvm_userspace_memory_region *m
 	return 0;
 }
 
-__weak void kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
+__weak int kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
 				    struct kvm_memslots *slots)
 {
 	rcu_assign_pointer(kvm->memslots[as_id], slots);
+	return 0;
 }
 
-static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
-		int as_id, struct kvm_memslots *slots)
+static int install_new_memslots(struct kvm *kvm, int as_id,
+				struct kvm_memslots *slots,
+				struct kvm_memslots **old_slots)
 {
-	struct kvm_memslots *old_memslots = __kvm_memslots(kvm, as_id);
-	u64 gen = old_memslots->generation;
+	u64 gen;
+	int r;
+
+	*old_slots = __kvm_memslots(kvm, as_id);
+	gen = (*old_slots)->generation;
 
 	WARN_ON(gen & KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS);
 	slots->generation = gen | KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS;
 
-	kvm_arch_assign_memslots(kvm, as_id, slots);
+	r = kvm_arch_assign_memslots(kvm, as_id, slots);
+	if (r) {
+		old_slots = NULL;
+		return r;
+	}
 
 	synchronize_srcu_expedited(&kvm->srcu);
 
@@ -1310,7 +1319,7 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 
 	slots->generation = gen;
 
-	return old_memslots;
+	return 0;
 }
 
 /*
@@ -1346,6 +1355,7 @@ static int kvm_set_memslot(struct kvm *kvm,
 			   enum kvm_mr_change change)
 {
 	struct kvm_memory_slot *slot;
+	struct kvm_memslots *old_slots;
 	struct kvm_memslots *slots;
 	int r;
 
@@ -1367,7 +1377,10 @@ static int kvm_set_memslot(struct kvm *kvm,
 		 * dropped by update_memslots anyway.  We'll also revert to the
 		 * old memslots if preparing the new memory region fails.
 		 */
-		slots = install_new_memslots(kvm, as_id, slots);
+		r = install_new_memslots(kvm, as_id, slots,  &old_slots);
+		if (r)
+			goto out_free;
+		slots = old_slots;
 
 		/* From this point no new shadow pages pointing to a deleted,
 		 * or moved, memslot will be created.
@@ -1384,7 +1397,10 @@ static int kvm_set_memslot(struct kvm *kvm,
 		goto out_slots;
 
 	update_memslots(slots, new, change);
-	slots = install_new_memslots(kvm, as_id, slots);
+	r = install_new_memslots(kvm, as_id, slots,  &old_slots);
+	if (r)
+		goto out_slots;
+	slots = old_slots;
 
 	kvm_arch_commit_memory_region(kvm, mem, old, new, change);
 
@@ -1392,8 +1408,13 @@ static int kvm_set_memslot(struct kvm *kvm,
 	return 0;
 
 out_slots:
-	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE)
-		slots = install_new_memslots(kvm, as_id, slots);
+	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
+		r = install_new_memslots(kvm, as_id, slots, &old_slots);
+		if (r)
+			goto out_slots;
+		slots = old_slots;
+	}
+out_free:
 	kvfree(slots);
 	return r;
 }
