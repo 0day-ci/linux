@@ -2252,6 +2252,27 @@ organization is given as an example for the first pixel only.
       - g\ :sub:`2`
       - g\ :sub:`1`
       - g\ :sub:`0`
+    * .. _MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG8_1X8:
+
+      - MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG8_1X8
+      - 0x3021
+      -
+      -
+      -
+      -
+      -
+      -
+      -
+      -
+      -
+      - g\ :sub:`7`
+      - g\ :sub:`6`
+      - g\ :sub:`5`
+      - g\ :sub:`4`
+      - g\ :sub:`3`
+      - g\ :sub:`2`
+      - g\ :sub:`1`
+      - g\ :sub:`0`
     * .. _MEDIA-BUS-FMT-SRGGB8-1X8:
 
       - MEDIA_BUS_FMT_SRGGB8_1X8
@@ -2731,6 +2752,27 @@ organization is given as an example for the first pixel only.
 
       - MEDIA_BUS_FMT_SGRBG12_1X12
       - 0x3011
+      -
+      -
+      -
+      -
+      -
+      - g\ :sub:`11`
+      - g\ :sub:`10`
+      - g\ :sub:`9`
+      - g\ :sub:`8`
+      - g\ :sub:`7`
+      - g\ :sub:`6`
+      - g\ :sub:`5`
+      - g\ :sub:`4`
+      - g\ :sub:`3`
+      - g\ :sub:`2`
+      - g\ :sub:`1`
+      - g\ :sub:`0`
+    * .. _MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG12_1X12:
+
+      - MEDIA_BUS_FMT_SGRGB_IGIG_GBGR_IGIG12_1X12
+      - 0x3022
       -
       -
       -
