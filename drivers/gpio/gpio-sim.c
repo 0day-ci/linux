@@ -744,20 +744,22 @@ static struct config_item *
 gpio_sim_config_make_item(struct config_group *group, const char *name)
 {
 	struct gpio_sim_chip_config *config;
+	int id;
 
 	config = kzalloc(sizeof(*config), GFP_KERNEL);
 	if (!config)
 		return ERR_PTR(-ENOMEM);
 
-	config->id = ida_alloc(&gpio_sim_ida, GFP_KERNEL);
-	if (config->id < 0) {
+	id = ida_alloc(&gpio_sim_ida, GFP_KERNEL);
+	if (id < 0) {
 		kfree(config);
-		return ERR_PTR(config->id);
+		return ERR_PTR(id);
 	}
 
 	config_item_init_type_name(&config->item, name,
 				   &gpio_sim_chip_config_type);
 	config->num_lines = 1;
+	config->id = id;
 	mutex_init(&config->lock);
 
 	return &config->item;
