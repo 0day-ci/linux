@@ -5841,7 +5841,12 @@ wake_affine_idle(int this_cpu, int prev_cpu, int sync)
 	if (available_idle_cpu(this_cpu) && cpus_share_cache(this_cpu, prev_cpu))
 		return available_idle_cpu(prev_cpu) ? prev_cpu : this_cpu;
 
-	if (sync && cpu_rq(this_cpu)->nr_running == 1)
+	/*
+	 * If this is a sync wake-up and the only running thread is just
+	 * waker, thus, waker is not interrupt, we assume wakee will get
+	 * the cpu of waker soon
+	 */
+	if (sync && cpu_rq(this_cpu)->nr_running == 1 && in_task())
 		return this_cpu;
 
 	if (available_idle_cpu(prev_cpu))
