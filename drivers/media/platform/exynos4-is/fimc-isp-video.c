@@ -315,6 +315,7 @@ static int isp_video_release(struct file *file)
 	}
 
 	_vb2_fop_release(file, NULL);
+	file->private_data = NULL;
 
 	if (v4l2_fh_is_singular_file(file)) {
 		fimc_pipeline_call(&ivc->ve, close);
