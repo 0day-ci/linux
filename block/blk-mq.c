@@ -3236,8 +3236,10 @@ struct request_queue *blk_mq_init_allocated_queue(struct blk_mq_tag_set *set,
 
 	q->queue_flags |= QUEUE_FLAG_MQ_DEFAULT;
 	if (set->nr_maps > HCTX_TYPE_POLL &&
-	    set->map[HCTX_TYPE_POLL].nr_queues)
+	    set->map[HCTX_TYPE_POLL].nr_queues) {
+		blk_queue_flag_set(QUEUE_FLAG_POLL_CAPABLE, q);
 		blk_queue_flag_set(QUEUE_FLAG_POLL, q);
+	}
 
 	q->sg_reserved_size = INT_MAX;
 
