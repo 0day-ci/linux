@@ -307,6 +307,54 @@ int __init walk_drmem_lmbs_early(unsigned long node, void *data,
 	return ret;
 }
 
+/*
+ * Update the LMB associativity index.
+ */
+static int update_lmb(struct drmem_lmb *updated_lmb,
+		      __maybe_unused const __be32 **usm,
+		      __maybe_unused void *data)
+{
+	struct drmem_lmb *lmb;
+
+	/*
+	 * Brut force there may be better way to fetch the LMB
+	 */
+	for_each_drmem_lmb(lmb) {
+		if (lmb->drc_index != updated_lmb->drc_index)
+			continue;
+
+		lmb->aa_index = updated_lmb->aa_index;
+		break;
+	}
+	return 0;
+}
+
+/*
+ * Update the LMB associativity index.
+ *
+ * This needs to be called when the hypervisor is updating the
+ * dynamic-reconfiguration-memory node property.
+ */
+void drmem_update_lmbs(void)
+{
+	struct device_node *node;
+	const __be32 *prop;
+
+	node = of_find_node_by_path("/ibm,dynamic-reconfiguration-memory");
+	if (!node)
+		return;
+
+	prop = of_get_property(node, "ibm,dynamic-memory", NULL);
+	if (prop) {
+		__walk_drmem_v1_lmbs(prop, NULL, NULL, update_lmb);
+	} else {
+		prop = of_get_property(node, "ibm,dynamic-memory-v2", NULL);
+		if (prop)
+			__walk_drmem_v2_lmbs(prop, NULL, NULL, update_lmb);
+	}
+
+	of_node_put(node);
+}
 #endif
 
 static int init_drmem_lmb_size(struct device_node *dn)

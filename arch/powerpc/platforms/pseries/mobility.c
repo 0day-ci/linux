@@ -25,6 +25,7 @@
 
 #include <asm/machdep.h>
 #include <asm/rtas.h>
+#include <asm/drmem.h>
 #include "pseries.h"
 #include "../../kernel/cacheinfo.h"
 
@@ -237,6 +238,7 @@ int pseries_devicetree_update(s32 scope)
 	__be32 *data;
 	int update_nodes_token;
 	int rc;
+	bool drmem_updated = false;
 
 	update_nodes_token = rtas_token("ibm,update-nodes");
 	if (update_nodes_token == RTAS_UNKNOWN_SERVICE)
@@ -271,6 +273,10 @@ int pseries_devicetree_update(s32 scope)
 					continue;
 				}
 
+				if (!strcmp(np->full_name,
+					    "ibm,dynamic-reconfiguration-memory"))
+					drmem_updated = true;
+
 				switch (action) {
 				case DELETE_DT_NODE:
 					delete_dt_node(np);
@@ -293,6 +299,9 @@ int pseries_devicetree_update(s32 scope)
 	} while (rc == 1);
 
 	kfree(rtas_buf);
+
+	if (drmem_updated)
+		drmem_update_lmbs();
 	return rc;
 }
 
