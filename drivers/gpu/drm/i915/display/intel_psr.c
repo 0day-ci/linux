@@ -524,7 +524,7 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 	val = psr_compute_idle_frames(intel_dp) << EDP_PSR2_IDLE_FRAME_SHIFT;
 
 	val |= EDP_PSR2_ENABLE | EDP_SU_TRACK_ENABLE;
-	if (DISPLAY_VER(dev_priv) >= 10)
+	if (DISPLAY_VER(dev_priv) >= 10 && DISPLAY_VER(dev_priv) <= 12)
 		val |= EDP_Y_COORDINATE_ENABLE;
 
 	val |= EDP_PSR2_FRAME_BEFORE_SU(intel_dp->psr.sink_sync_latency + 1);
@@ -655,6 +655,13 @@ tgl_dc3co_exitline_compute_config(struct intel_dp *intel_dp,
 	u32 exit_scanlines;
 
 	/*
+	 * FIXME: Due to the changed sequence of activating/deactivating DC3CO,
+	 * disable DC3CO until the changed dc3co activating/deactivating sequence
+	 * is applied. B.Specs:49196
+	 */
+	return;
+
+	/*
 	 * DMC's DC3CO exit mechanism has an issue with Selective Fecth
 	 * TODO: when the issue is addressed, this restriction should be removed.
 	 */
@@ -732,6 +739,12 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 		return false;
 	}
 
+	/* Wa_16011181250 */
+	if (IS_ROCKETLAKE(dev_priv) || IS_ALDERLAKE_S(dev_priv)) {
+		drm_dbg_kms(&dev_priv->drm, "PSR2 is defeatured for this platform\n");
+		return false;
+	}
+
 	if (!transcoder_has_psr2(dev_priv, crtc_state->cpu_transcoder)) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "PSR2 not supported in transcoder %s\n",
@@ -769,7 +782,7 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 		psr_max_h = 4096;
 		psr_max_v = 2304;
 		max_bpp = 24;
-	} else if (IS_DISPLAY_VER(dev_priv, 9)) {
+	} else if (DISPLAY_VER(dev_priv) == 9) {
 		psr_max_h = 3640;
 		psr_max_v = 2304;
 		max_bpp = 24;
@@ -802,6 +815,13 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 				    "PSR2 not enabled, selective fetch not valid and no HW tracking available\n");
 			return false;
 		}
+	}
+
+	/* Wa_2209313811 */
+	if (!crtc_state->enable_psr2_sel_fetch &&
+	    IS_TGL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B1)) {
+		drm_dbg_kms(&dev_priv->drm, "PSR2 HW tracking is not supported this Display stepping\n");
+		return false;
 	}
 
 	if (!crtc_state->enable_psr2_sel_fetch &&
@@ -909,7 +929,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 	if (IS_HASWELL(dev_priv) || IS_BROADWELL(dev_priv))
 		hsw_psr_setup_aux(intel_dp);
 
-	if (intel_dp->psr.psr2_enabled && IS_DISPLAY_VER(dev_priv, 9)) {
+	if (intel_dp->psr.psr2_enabled && DISPLAY_VER(dev_priv) == 9) {
 		i915_reg_t reg = CHICKEN_TRANS(cpu_transcoder);
 		u32 chicken = intel_de_read(dev_priv, reg);
 
@@ -1154,21 +1174,7 @@ static void psr_force_hw_tracking_exit(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	if (IS_TIGERLAKE(dev_priv))
-		/*
-		 * Writes to CURSURFLIVE in TGL are causing IOMMU errors and
-		 * visual glitches that are often reproduced when executing
-		 * CPU intensive workloads while a eDP 4K panel is attached.
-		 *
-		 * Manually exiting PSR causes the frontbuffer to be updated
-		 * without glitches and the IOMMU errors are also gone but
-		 * this comes at the cost of less time with PSR active.
-		 *
-		 * So using this workaround until this issue is root caused
-		 * and a better fix is found.
-		 */
-		intel_psr_exit(intel_dp);
-	else if (DISPLAY_VER(dev_priv) >= 9)
+	if (DISPLAY_VER(dev_priv) >= 9)
 		/*
 		 * Display WA #0884: skl+
 		 * This documented WA for bxt can be safely applied
