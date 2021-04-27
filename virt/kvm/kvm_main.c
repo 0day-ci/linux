@@ -1270,6 +1270,12 @@ static int check_memory_region_flags(const struct kvm_userspace_memory_region *m
 	return 0;
 }
 
+__weak void kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
+				    struct kvm_memslots *slots)
+{
+	rcu_assign_pointer(kvm->memslots[as_id], slots);
+}
+
 static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 		int as_id, struct kvm_memslots *slots)
 {
@@ -1279,7 +1285,8 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 	WARN_ON(gen & KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS);
 	slots->generation = gen | KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS;
 
-	rcu_assign_pointer(kvm->memslots[as_id], slots);
+	kvm_arch_assign_memslots(kvm, as_id, slots);
+
 	synchronize_srcu_expedited(&kvm->srcu);
 
 	/*

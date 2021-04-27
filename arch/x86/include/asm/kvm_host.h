@@ -1124,6 +1124,11 @@ struct kvm_arch {
 #endif /* CONFIG_X86_64 */
 
 	bool shadow_mmu_active;
+
+	/*
+	 * Protects kvm->memslots.
+	 */
+	struct mutex memslot_assignment_lock;
 };
 
 struct kvm_vm_stat {

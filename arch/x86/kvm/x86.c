@@ -10647,6 +10647,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	raw_spin_lock_init(&kvm->arch.tsc_write_lock);
 	mutex_init(&kvm->arch.apic_map_lock);
 	spin_lock_init(&kvm->arch.pvclock_gtod_sync_lock);
+	mutex_init(&kvm->arch.memslot_assignment_lock);
 
 	kvm->arch.kvmclock_offset = -get_kvmclock_base_ns();
 	pvclock_update_vm_gtod_copy(kvm);
@@ -10865,6 +10866,16 @@ out_free:
 	free_memslot_rmap(slot);
 	return -ENOMEM;
 }
+
+
+void kvm_arch_assign_memslots(struct kvm *kvm, int as_id,
+			     struct kvm_memslots *slots)
+{
+	mutex_lock(&kvm->arch.memslot_assignment_lock);
+	rcu_assign_pointer(kvm->memslots[as_id], slots);
+	mutex_unlock(&kvm->arch.memslot_assignment_lock);
+}
+
 
 static int kvm_alloc_memslot_metadata(struct kvm_memory_slot *slot,
 				      unsigned long npages)
