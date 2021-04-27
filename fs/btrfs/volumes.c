@@ -6133,10 +6133,11 @@ static bool need_full_stripe(enum btrfs_map_op op)
  * usually shouldn't happen unless @logical is corrupted, 0 otherwise.
  */
 int btrfs_get_io_geometry(struct btrfs_fs_info *fs_info, struct extent_map *em,
-			  enum btrfs_map_op op, u64 logical, u64 len,
+			  enum btrfs_map_op op, u64 logical,
 			  struct btrfs_io_geometry *io_geom)
 {
 	struct map_lookup *map;
+	u64 len;
 	u64 offset;
 	u64 stripe_offset;
 	u64 stripe_nr;
@@ -6242,7 +6243,7 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
 	em = btrfs_get_chunk_map(fs_info, logical, *length);
 	ASSERT(!IS_ERR(em));
 
-	ret = btrfs_get_io_geometry(fs_info, em, op, logical, *length, &geom);
+	ret = btrfs_get_io_geometry(fs_info, em, op, logical, &geom);
 	if (ret < 0)
 		return ret;
 
