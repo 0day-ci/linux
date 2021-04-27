@@ -412,10 +412,16 @@ static int init_bios_attributes(int attr_type, const char *guid)
 		return retval;
 
 	switch (attr_type) {
-	case ENUM:	min_elements = 8;	break;
-	case INT:	min_elements = 9;	break;
-	case STR:	min_elements = 8;	break;
-	case PO:	min_elements = 4;	break;
+	case ENUM:
+	case STR:
+		min_elements = 8;
+		break;
+	case INT:
+		min_elements = 9;
+		break;
+	case PO:
+		min_elements = 4;
+		break;
 	default:
 		pr_err("Error: Unknown attr_type: %d\n", attr_type);
 		return -EINVAL;
@@ -481,7 +487,8 @@ static int init_bios_attributes(int attr_type, const char *guid)
 		/* enumerate all of this attribute */
 		switch (attr_type) {
 		case ENUM:
-			retval = populate_enum_data(elements, instance_id, attr_name_kobj);
+			retval = populate_enum_data(elements, instance_id, attr_name_kobj,
+					obj->package.count);
 			break;
 		case INT:
 			retval = populate_int_data(elements, instance_id, attr_name_kobj);
