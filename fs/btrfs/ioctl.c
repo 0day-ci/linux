@@ -3161,6 +3161,13 @@ static int btrfs_ioctl_defrag(struct file *file, void __user *argp)
 	struct btrfs_ioctl_defrag_range_args *range;
 	int ret;
 
+	/*
+	 * Subpage defrag support is not really sector perfect yet.
+	 * Disable defrag fro subpage case for now.
+	 */
+	if (root->fs_info->sectorsize < PAGE_SIZE)
+		return -ENOTTY;
+
 	ret = mnt_want_write_file(file);
 	if (ret)
 		return ret;
