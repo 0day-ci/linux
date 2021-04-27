@@ -134,6 +134,8 @@ static int populate_ruleset(
 	ret = 0;
 
 out_free_name:
+	if (path_list)
+		free(path_list);
 	free(env_path_name);
 	return ret;
 }
