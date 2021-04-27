@@ -1339,7 +1339,7 @@ extern size_t mem_section_usage_size(void);
 #define SECTION_TAINT_ZONE_DEVICE	(1UL<<4)
 #define SECTION_MAP_LAST_BIT		(1UL<<5)
 #define SECTION_MAP_MASK		(~(SECTION_MAP_LAST_BIT-1))
-#define SECTION_NID_SHIFT		3
+#define SECTION_NID_SHIFT		order_base_2(SECTION_MAP_LAST_BIT)
 
 static inline struct page *__section_mem_map_addr(struct mem_section *section)
 {
