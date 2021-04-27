@@ -409,7 +409,8 @@ static void ql_pcmd(struct scsi_cmnd *cmd)
 	}
 
 	set_host_byte(cmd, result);
-	set_msg_byte(cmd, message);
+	if (result == DID_OK && message != COMMAND_COMPLETE)
+		scsi_msg_to_host_byte(cmd, message);
 	set_status_byte(cmd, status);
 	return;
 }
