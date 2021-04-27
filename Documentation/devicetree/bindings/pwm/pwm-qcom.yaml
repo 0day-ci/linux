@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/pwm/pwm-qcom.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Technologies, Inc. PMIC PWM bindings
+
+maintainers:
+  - Fenglin Wu <fenglinw@codeaurora.org>
+
+description:
+  PWM modules inside Qualcomm Technologies, Inc. PMICs can be accessed through
+  SPMI bus and normally one PMIC would have multiple PWM modules with adjacent
+  SPMI address space.
+
+Properties:
+  compatible:
+    const: qcom,pwm
+
+  reg:
+    description:
+      The SPMI address base of the PWM module, if there are multiple PWM
+      modules present with adjacent SPMI address space, only need to specify
+      the address base of the 1st PWM module.
+
+  "#pwm-cells":
+     # See pwm.yaml in this directory for a description of the cells format.
+     const: 2
+
+  qcom,num-channels:
+    description:
+      The number of the PWM channels (modules) with the adjacent SPMI address
+      space following the address base in "reg" property.
+
+required:
+  - compatible
+  - reg
+  - "#pwm-cells"
+  - qcom,num-channels
+
+additionalProperties: false
+
+examples:
+  - |
+    pm8350c_pwm: pwms@e800 {
+        compatible = "qcom,pwm";
+        reg = <0xe800>;
+        #pwm-cells = <2>;
+        qcom,num-channels = <4>;
+    };
