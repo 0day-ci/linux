@@ -838,10 +838,6 @@ static int hci_init4_req(struct hci_request *req, unsigned long opt)
 	if (hdev->commands[22] & 0x04)
 		hci_set_event_mask_page_2(req);
 
-	/* Read local codec list if the HCI command is supported */
-	if (hdev->commands[29] & 0x20)
-		hci_req_add(req, HCI_OP_READ_LOCAL_CODECS, 0, NULL);
-
 	/* Read local pairing options if the HCI command is supported */
 	if (hdev->commands[41] & 0x08)
 		hci_req_add(req, HCI_OP_READ_LOCAL_PAIRING_OPTS, 0, NULL);
@@ -907,6 +903,113 @@ static int hci_init4_req(struct hci_request *req, unsigned long opt)
 	return 0;
 }
 
+static void hci_read_codec_capabilities(struct hci_dev *hdev, __u8 *codec_id,
+					__u8 transport, bool is_vendor_codec)
+{
+	struct hci_op_read_local_codec_caps caps;
+	struct hci_rp_read_local_codec_caps *rp;
+	struct sk_buff *skb;
+
+	memset(&caps, 0, sizeof(caps));
+
+	if (is_vendor_codec) {
+		caps.codec_id[0] = 0xFF;
+		memcpy(&caps.codec_id[1], codec_id, 4);
+	} else {
+		caps.codec_id[0] = codec_id[0];
+	}
+
+	caps.direction = 0x00;
+	caps.transport = transport;
+
+	skb = __hci_cmd_sync(hdev, HCI_OP_READ_LOCAL_CODEC_CAPS, sizeof(caps),
+			     &caps, HCI_CMD_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Failed to read local supported codecs v2 (%ld)",
+			   PTR_ERR(skb));
+		return;
+	}
+
+	if (skb->len < sizeof(*rp))
+		goto error;
+
+	rp = (void *)skb->data;
+
+	if (rp->status)
+		goto error;
+
+	hci_dev_lock(hdev);
+	hci_codec_list_add(&hdev->local_codecs, rp, skb->len - 2, &caps);
+	hci_dev_unlock(hdev);
+
+error:
+	kfree_skb(skb);
+}
+
+static void hci_read_supported_codecs(struct hci_dev *hdev)
+{
+	struct sk_buff *skb;
+	__u8 num_codecs;
+
+	skb = __hci_cmd_sync(hdev, HCI_OP_READ_LOCAL_CODECS, 0, NULL,
+			     HCI_CMD_TIMEOUT);
+
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Failed to read local supported codecs (%ld)",
+			   PTR_ERR(skb));
+		return;
+	}
+
+	if (skb->len < 1 || skb->data[0])
+		goto error;
+
+	skb_pull(skb, 1);
+
+	if (skb->len < 1)
+		goto error;
+
+	/* enumerate standard codecs */
+	num_codecs = skb->data[0];
+
+	skb_pull(skb, 1);
+
+	if (num_codecs && skb->len  < num_codecs)
+		goto error;
+
+	while (num_codecs--) {
+		hci_read_codec_capabilities(hdev, skb->data, LOCAL_CODEC_ACL,
+					    false);
+		skb_pull(skb, 1);
+	}
+
+	/* enumerate vendor specific codecs */
+	if (skb->len < 1)
+		goto error;
+
+	num_codecs = skb->data[0];
+
+	skb_pull(skb, 1);
+
+	if (num_codecs && skb->len < (num_codecs * 4))
+		goto error;
+
+	while (num_codecs--) {
+		hci_read_codec_capabilities(hdev, skb->data, LOCAL_CODEC_ACL,
+					    true);
+		skb_pull(skb, 4);
+	}
+
+error:
+	kfree_skb(skb);
+}
+
+static void hci_init5_req(struct hci_dev *hdev)
+{
+	/* Read local codec list if the HCI command is supported */
+	if (hdev->commands[29] & 0x20)
+		hci_read_supported_codecs(hdev);
+}
+
 static int __hci_init(struct hci_dev *hdev)
 {
 	int err;
@@ -936,6 +1039,8 @@ static int __hci_init(struct hci_dev *hdev)
 	err = __hci_req_sync(hdev, hci_init4_req, 0, HCI_INIT_TIMEOUT, NULL);
 	if (err < 0)
 		return err;
+
+	hci_init5_req(hdev);
 
 	/* This function is only called when the controller is actually in
 	 * configured state. When the controller is marked as unconfigured,
@@ -3559,6 +3664,35 @@ void hci_conn_params_clear_disabled(struct hci_dev *hdev)
 	BT_DBG("All LE disabled connection parameters were removed");
 }
 
+int hci_codec_list_add(struct list_head *list, struct hci_rp_read_local_codec_caps *rp,
+		       __u32 len,
+		       struct hci_op_read_local_codec_caps *sent)
+{
+	struct codec_list *entry;
+
+	entry = kzalloc(sizeof(*entry) + len, GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+
+	memcpy(entry->codec_id, sent->codec_id, 5);
+	entry->transport = sent->transport;
+	entry->num_caps = rp->num_caps;
+	if (rp->num_caps)
+		memcpy(entry->caps, rp->caps, len);
+	list_add(&entry->list, list);
+
+	return 0;
+}
+
+void hci_codec_list_clear(struct list_head *codec_list)
+{
+	struct codec_list *c, *n;
+
+	list_for_each_entry_safe(c, n, codec_list, list) {
+		list_del(&c->list);
+		kfree(c);
+	}
+}
 /* This function requires the caller holds hdev->lock */
 static void hci_conn_params_clear_all(struct hci_dev *hdev)
 {
@@ -3818,6 +3952,7 @@ struct hci_dev *hci_alloc_dev(void)
 	INIT_LIST_HEAD(&hdev->conn_hash.list);
 	INIT_LIST_HEAD(&hdev->adv_instances);
 	INIT_LIST_HEAD(&hdev->blocked_keys);
+	INIT_LIST_HEAD(&hdev->local_codecs);
 
 	INIT_WORK(&hdev->rx_work, hci_rx_work);
 	INIT_WORK(&hdev->cmd_work, hci_cmd_work);
@@ -4036,6 +4171,7 @@ void hci_unregister_dev(struct hci_dev *hdev)
 	hci_conn_params_clear_all(hdev);
 	hci_discovery_filter_clear(hdev);
 	hci_blocked_keys_clear(hdev);
+	hci_codec_list_clear(&hdev->local_codecs);
 	hci_dev_unlock(hdev);
 
 	hci_dev_put(hdev);
