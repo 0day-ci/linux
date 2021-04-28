@@ -9534,7 +9534,7 @@ F:	drivers/media/radio/radio-isa*
 
 ISAPNP
 M:	Jaroslav Kysela <perex@perex.cz>
-S:	Maintained
+S:	Obsolete
 F:	Documentation/driver-api/isapnp.rst
 F:	drivers/pnp/isapnp/
 F:	include/linux/isapnp.h
