@@ -1830,7 +1830,7 @@ static ssize_t target_cpu_store(struct vmbus_channel *channel,
 	 * UNLOCK channel_mutex		UNLOCK channel_mutex
 	 *
 	 * Forbids: r1 == r2 == CHANNEL_OPENED (i.e., CPU1's LOCK precedes
-	 * 		CPU2's LOCK) && CPU2's SEND precedes CPU1's SEND
+	 *		CPU2's LOCK) && CPU2's SEND precedes CPU1's SEND
 	 *
 	 * Note.  The host processes the channel messages "sequentially", in
 	 * the order in which they are received on a per-partition basis.
