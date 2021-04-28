@@ -3238,15 +3238,12 @@ static int ext4_split_extent_at(handle_t *handle,
 		ex->ee_len = cpu_to_le16(ee_len);
 		ext4_ext_try_to_merge(handle, inode, path, ex);
 		err = ext4_ext_dirty(handle, inode, path + path->p_depth);
-		if (err)
-			goto fix_extent_len;
-
-		/* update extent status tree */
-		err = ext4_zeroout_es(inode, &zero_ex);
-
-		goto out;
-	} else if (err)
+		if (!err)
+		        /* update extent status tree */
+		        err = ext4_zeroout_es(inode, &zero_ex);
+	} else if (err && err != -EROFS) {
 		goto fix_extent_len;
+	}
 
 out:
 	ext4_ext_show_leaf(inode, path);
