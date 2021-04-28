@@ -378,7 +378,7 @@ int main(int argc, char **argv)
 	ret = ioctl(fd, IIO_GET_EVENT_FD_IOCTL, &event_fd);
 	if (ret == -1 || event_fd == -1) {
 		ret = -errno;
-		if (ret == -ENODEV)
+		if (ret == -EINVAL)
 			fprintf(stderr,
 				"This device does not support events\n");
 		else
