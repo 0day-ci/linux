@@ -9502,9 +9502,20 @@ imbalanced_active_balance(struct lb_env *env)
 	return 0;
 }
 
-static int need_active_balance(struct lb_env *env)
+static bool stop_balance_early(struct lb_env *env)
+{
+	return env->idle == CPU_NEWLY_IDLE && rq_has_higher_tasks(env->dst_rq);
+}
+
+static int need_active_balance(struct lb_env *env, int *continue_balancing)
 {
 	struct sched_domain *sd = env->sd;
+
+	/* Run the realtime task now; load balance later. */
+	if (stop_balance_early(env)) {
+		*continue_balancing = 0;
+		return 0;
+	}
 
 	if (asym_active_balance(env))
 		return 1;
@@ -9550,7 +9561,7 @@ static int should_we_balance(struct lb_env *env)
 	 * to do the newly idle load balance.
 	 */
 	if (env->idle == CPU_NEWLY_IDLE)
-		return 1;
+		return !rq_has_higher_tasks(env->dst_rq);
 
 	/* Try to find first idle CPU */
 	for_each_cpu_and(cpu, group_balance_mask(sg), env->cpus) {
@@ -9660,6 +9671,11 @@ more_balance:
 
 		local_irq_restore(rf.flags);
 
+		if (stop_balance_early(&env)) {
+			*continue_balancing = 0;
+			goto out;
+		}
+
 		if (env.flags & LBF_NEED_BREAK) {
 			env.flags &= ~LBF_NEED_BREAK;
 			goto more_balance;
@@ -9743,7 +9759,7 @@ more_balance:
 		if (idle != CPU_NEWLY_IDLE)
 			sd->nr_balance_failed++;
 
-		if (need_active_balance(&env)) {
+		if (need_active_balance(&env, continue_balancing)) {
 			unsigned long flags;
 
 			raw_spin_lock_irqsave(&busiest->lock, flags);
@@ -9787,7 +9803,7 @@ more_balance:
 		sd->nr_balance_failed = 0;
 	}
 
-	if (likely(!active_balance) || need_active_balance(&env)) {
+	if (likely(!active_balance) || need_active_balance(&env, continue_balancing)) {
 		/* We were unbalanced, so reset the balancing interval */
 		sd->balance_interval = sd->min_interval;
 	}

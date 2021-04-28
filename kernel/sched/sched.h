@@ -1987,6 +1987,12 @@ static inline struct cpuidle_state *idle_get_state(struct rq *rq)
 
 	return rq->idle_state;
 }
+
+/* Is there a task of a high priority class? */
+static inline bool rq_has_higher_tasks(struct rq *rq)
+{
+	return unlikely(rq->nr_running != rq->cfs.h_nr_running);
+}
 #else
 static inline void idle_set_state(struct rq *rq,
 				  struct cpuidle_state *idle_state)
