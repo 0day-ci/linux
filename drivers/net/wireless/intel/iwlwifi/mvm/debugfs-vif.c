@@ -752,7 +752,7 @@ void iwl_mvm_vif_dbgfs_register(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 	 * find
 	 * netdev:wlan0 -> ../../../ieee80211/phy0/netdev:wlan0/iwlmvm/
 	 */
-	snprintf(buf, 100, "../../../%pd3/%pd",
+	snprintf(buf, 100, "../../../%pd3/%pd1",
 		 dbgfs_dir,
 		 mvmvif->dbgfs_dir);
 
