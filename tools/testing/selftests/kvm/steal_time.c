@@ -27,6 +27,8 @@ static uint64_t guest_stolen_time[NR_VCPUS];
 
 #if defined(__x86_64__)
 
+#include "cpuid.h"
+
 /* steal_time must have 64-byte alignment */
 #define STEAL_TIME_SIZE		((sizeof(struct kvm_steal_time) + 63) & ~63)
 
@@ -64,8 +66,7 @@ static void steal_time_init(struct kvm_vm *vm)
 {
 	int i;
 
-	if (!(kvm_get_supported_cpuid_entry(KVM_CPUID_FEATURES)->eax &
-	      KVM_FEATURE_STEAL_TIME)) {
+	if (!kvm_pv_has(KVM_FEATURE_STEAL_TIME)) {
 		print_skip("steal-time not supported");
 		exit(KSFT_SKIP);
 	}

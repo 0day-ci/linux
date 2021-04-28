@@ -10,6 +10,7 @@
 #include "../kvm_util_internal.h"
 #include "processor.h"
 #include "vmx.h"
+#include "cpuid.h"
 
 #define PAGE_SHIFT_4K  12
 
@@ -381,9 +382,7 @@ void prepare_vmcs(struct vmx_pages *vmx, void *guest_rip, void *guest_rsp)
 
 bool nested_vmx_supported(void)
 {
-	struct kvm_cpuid_entry2 *entry = kvm_get_supported_cpuid_entry(1);
-
-	return entry->ecx & CPUID_VMX;
+	return kvm_cpuid_has(X86_FEATURE_VMX);
 }
 
 void nested_vmx_check_supported(void)

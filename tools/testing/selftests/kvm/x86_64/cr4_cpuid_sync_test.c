@@ -18,26 +18,17 @@
 
 #include "kvm_util.h"
 #include "processor.h"
+#include "cpuid.h"
 
-#define X86_FEATURE_XSAVE	(1<<26)
-#define X86_FEATURE_OSXSAVE	(1<<27)
 #define VCPU_ID			1
 
 static inline bool cr4_cpuid_is_sync(void)
 {
-	int func, subfunc;
-	uint32_t eax, ebx, ecx, edx;
-	uint64_t cr4;
+	uint64_t cr4 = get_cr4();
+	bool cpuid_has_osxsave = this_cpu_has(X86_FEATURE_OSXSAVE);
+	bool cr4_has_osxsave = cr4 & X86_CR4_OSXSAVE;
 
-	func = 0x1;
-	subfunc = 0x0;
-	__asm__ __volatile__("cpuid"
-			     : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-			     : "a"(func), "c"(subfunc));
-
-	cr4 = get_cr4();
-
-	return (!!(ecx & X86_FEATURE_OSXSAVE)) == (!!(cr4 & X86_CR4_OSXSAVE));
+	return cpuid_has_osxsave == cr4_has_osxsave;
 }
 
 static void guest_code(void)
@@ -66,12 +57,10 @@ int main(int argc, char *argv[])
 	struct kvm_run *run;
 	struct kvm_vm *vm;
 	struct kvm_sregs sregs;
-	struct kvm_cpuid_entry2 *entry;
 	struct ucall uc;
 	int rc;
 
-	entry = kvm_get_supported_cpuid_entry(1);
-	if (!(entry->ecx & X86_FEATURE_XSAVE)) {
+	if (!kvm_cpuid_has(X86_FEATURE_XSAVE)) {
 		print_skip("XSAVE feature not supported");
 		return 0;
 	}

@@ -12,9 +12,7 @@
 #include <stdint.h>
 #include "svm.h"
 #include "processor.h"
-
-#define CPUID_SVM_BIT		2
-#define CPUID_SVM		BIT_ULL(CPUID_SVM_BIT)
+#include "cpuid.h"
 
 #define SVM_EXIT_VMMCALL	0x081
 
@@ -38,12 +36,7 @@ void nested_svm_check_supported(void);
 
 static inline bool cpu_has_svm(void)
 {
-	u32 eax = 0x80000001, ecx;
-
-	asm("cpuid" :
-	    "=a" (eax), "=c" (ecx) : "0" (eax) : "ebx", "edx");
-
-	return ecx & CPUID_SVM;
+	return this_cpu_has(X86_FEATURE_SVM);
 }
 
 #endif /* SELFTEST_KVM_SVM_UTILS_H */

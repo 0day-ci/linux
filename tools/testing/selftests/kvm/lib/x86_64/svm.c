@@ -12,6 +12,7 @@
 #include "../kvm_util_internal.h"
 #include "processor.h"
 #include "svm_util.h"
+#include "cpuid.h"
 
 struct gpr64_regs guest_regs;
 u64 rflags;
@@ -150,10 +151,7 @@ void run_guest(struct vmcb *vmcb, uint64_t vmcb_gpa)
 
 bool nested_svm_supported(void)
 {
-	struct kvm_cpuid_entry2 *entry =
-		kvm_get_supported_cpuid_entry(0x80000001);
-
-	return entry->ecx & CPUID_SVM;
+	return kvm_cpuid_has(X86_FEATURE_SVM);
 }
 
 void nested_svm_check_supported(void)

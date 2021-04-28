@@ -17,10 +17,10 @@
 
 #include "kvm_util.h"
 #include "vmx.h"
+#include "cpuid.h"
 
 #define VCPU_ID	      0
 
-#define X86_FEATURE_PDCM	(1<<15)
 #define PMU_CAP_FW_WRITES	(1ULL << 13)
 #define PMU_CAP_LBR_FMT		0x3f
 
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	if (kvm_get_cpuid_max_basic() >= 0xa) {
 		entry_1_0 = kvm_get_supported_cpuid_index(1, 0);
 		entry_a_0 = kvm_get_supported_cpuid_index(0xa, 0);
-		pdcm_supported = entry_1_0 && !!(entry_1_0->ecx & X86_FEATURE_PDCM);
+		pdcm_supported = kvm_cpuid_has(X86_FEATURE_PDCM);
 		eax.full = entry_a_0->eax;
 	}
 	if (!pdcm_supported) {
@@ -111,13 +111,13 @@ int main(int argc, char *argv[])
 	TEST_ASSERT(ret == 0, "Bad PERF_CAPABILITIES didn't fail.");
 
 	/* testcase 4, set capabilities when we don't have PDCM bit */
-	entry_1_0->ecx &= ~X86_FEATURE_PDCM;
+	entry_1_0->ecx &= ~feature_bit(PDCM);
 	vcpu_set_cpuid(vm, VCPU_ID, cpuid);
 	ret = _vcpu_set_msr(vm, 0, MSR_IA32_PERF_CAPABILITIES, host_cap.capabilities);
 	TEST_ASSERT(ret == 0, "Bad PERF_CAPABILITIES didn't fail.");
 
 	/* testcase 5, set capabilities when we don't have PMU version bits */
-	entry_1_0->ecx |= X86_FEATURE_PDCM;
+	entry_1_0->ecx |= feature_bit(PDCM);
 	eax.split.version_id = 0;
 	entry_1_0->ecx = eax.full;
 	vcpu_set_cpuid(vm, VCPU_ID, cpuid);

@@ -11,6 +11,7 @@
 #include "kvm_util.h"
 #include "processor.h"
 #include "vmx.h"
+#include "cpuid.h"
 
 #include <errno.h>
 #include <linux/kvm.h>
@@ -255,9 +256,9 @@ void disable_vmx(struct kvm_vm *vm)
 			break;
 	TEST_ASSERT(i != cpuid->nent, "CPUID function 1 not found");
 
-	cpuid->entries[i].ecx &= ~CPUID_VMX;
+	cpuid->entries[i].ecx &= ~feature_bit(VMX);
 	vcpu_set_cpuid(vm, VCPU_ID, cpuid);
-	cpuid->entries[i].ecx |= CPUID_VMX;
+	cpuid->entries[i].ecx |= feature_bit(VMX);
 }
 
 int main(int argc, char *argv[])

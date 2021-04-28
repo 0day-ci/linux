@@ -11,11 +11,10 @@
 #include "test_util.h"
 #include "kvm_util.h"
 #include "vmx.h"
+#include "cpuid.h"
 
 #define VCPU_ID	      1
 #define MSR_BITS      64
-
-#define X86_FEATURE_XSAVES	(1<<3)
 
 bool is_supported_msr(u32 msr_index)
 {
@@ -37,7 +36,6 @@ bool is_supported_msr(u32 msr_index)
 
 int main(int argc, char *argv[])
 {
-	struct kvm_cpuid_entry2 *entry;
 	bool xss_supported = false;
 	struct kvm_vm *vm;
 	uint64_t xss_val;
@@ -46,10 +44,8 @@ int main(int argc, char *argv[])
 	/* Create VM */
 	vm = vm_create_default(VCPU_ID, 0, 0);
 
-	if (kvm_get_cpuid_max_basic() >= 0xd) {
-		entry = kvm_get_supported_cpuid_index(0xd, 1);
-		xss_supported = entry && !!(entry->eax & X86_FEATURE_XSAVES);
-	}
+	if (kvm_get_cpuid_max_basic() >= 0xd)
+		xss_supported = kvm_cpuid_has(X86_FEATURE_XSAVES);
 	if (!xss_supported) {
 		print_skip("IA32_XSS is not supported by the vCPU");
 		exit(KSFT_SKIP);
