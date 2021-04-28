@@ -1223,6 +1223,8 @@ struct drm_connector {
 	struct device *kdev;
 	/** @attr: sysfs attributes */
 	struct device_attribute *attr;
+	/** @fwnode: associated fwnode supplied by platform firmware */
+	struct fwnode_handle *fwnode;
 
 	/**
 	 * @head:
