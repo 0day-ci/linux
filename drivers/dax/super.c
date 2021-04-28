@@ -477,6 +477,7 @@ static struct dax_device *to_dax_dev(struct inode *inode)
 static void dax_free_inode(struct inode *inode)
 {
 	struct dax_device *dax_dev = to_dax_dev(inode);
+
 	kfree(dax_dev->host);
 	dax_dev->host = NULL;
 	if (inode->i_rdev)
@@ -487,6 +488,7 @@ static void dax_free_inode(struct inode *inode)
 static void dax_destroy_inode(struct inode *inode)
 {
 	struct dax_device *dax_dev = to_dax_dev(inode);
+
 	WARN_ONCE(test_bit(DAXDEV_ALIVE, &dax_dev->flags),
 			"kill_dax() must be called before final iput()\n");
 }
@@ -502,6 +504,7 @@ static const struct super_operations dax_sops = {
 static int dax_init_fs_context(struct fs_context *fc)
 {
 	struct pseudo_fs_context *ctx = init_pseudo(fc, DAXFS_MAGIC);
+
 	if (!ctx)
 		return -ENOMEM;
 	ctx->ops = &dax_sops;
