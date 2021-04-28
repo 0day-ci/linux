@@ -3280,7 +3280,7 @@ static void kfree_rcu_work(struct work_struct *work)
 	struct rcu_head *head, *next;
 	struct kfree_rcu_cpu *krcp;
 	struct kfree_rcu_cpu_work *krwp;
-	int i, j;
+	int i;
 
 	krwp = container_of(to_rcu_work(work),
 			    struct kfree_rcu_cpu_work, rcu_work);
@@ -3313,13 +3313,7 @@ static void kfree_rcu_work(struct work_struct *work)
 				kfree_bulk(bkvhead[i]->nr_records,
 					bkvhead[i]->records);
 			} else { // vmalloc() / vfree().
-				for (j = 0; j < bkvhead[i]->nr_records; j++) {
-					trace_rcu_invoke_kvfree_callback(
-						rcu_state.name,
-						bkvhead[i]->records[j], 0);
-
-					vfree(bkvhead[i]->records[j]);
-				}
+				vfree_bulk(bkvhead[i]->nr_records, bkvhead[i]->records);
 			}
 			rcu_lock_release(&rcu_callback_map);
 
