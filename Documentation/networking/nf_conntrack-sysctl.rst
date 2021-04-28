@@ -108,7 +108,7 @@ nf_conntrack_tcp_be_liberal - BOOLEAN
 	- not 0 - enabled
 
 	Be conservative in what you do, be liberal in what you accept from others.
-	If it's non-zero, we mark only out of window RST segments as INVALID.
+	If it's non-zero, we don't mark out of window segments as INVALID.
 
 nf_conntrack_tcp_loose - BOOLEAN
 	- 0 - disabled
