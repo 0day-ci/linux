@@ -683,6 +683,9 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	submitid = atomic_inc_return(&ident) - 1;
 
 	ring = gpu->rb[queue->prio];
+
+	GEM_WARN_ON(ring->overflow);
+
 	trace_msm_gpu_submit(pid_nr(pid), ring->id, submitid,
 		args->nr_bos, args->nr_cmds);
 
@@ -829,7 +832,9 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 		}
 	}
 
-	msm_gpu_submit(gpu, submit);
+	ret = msm_gpu_submit(gpu, submit);
+	if (ret)
+		goto out;
 
 	args->fence = submit->fence->seqno;
 

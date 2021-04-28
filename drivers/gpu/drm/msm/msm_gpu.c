@@ -789,7 +789,7 @@ void msm_gpu_retire(struct msm_gpu *gpu)
 }
 
 /* add bo's to gpu's ring, and kick gpu: */
-void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+int msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 {
 	struct drm_device *dev = gpu->dev;
 	struct msm_drm_private *priv = dev->dev_private;
@@ -836,9 +836,38 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 	spin_unlock(&ring->submit_lock);
 
 	gpu->funcs->submit(gpu, submit);
-	priv->lastctx = submit->queue->ctx;
 
 	hangcheck_timer_reset(gpu);
+
+	if (unlikely(ring->overflow)) {
+		/*
+		 * Reset the ptr back to before the submit, so the GPU
+		 * doesn't see a partial submit:
+		 */
+		ring->next = ring->cur;
+
+		/*
+		 * Clear the overflow flag, hopefully the next submit on
+		 * the ring actually fits
+		 */
+		ring->overflow = false;
+
+		/*
+		 * One might be tempted to remove the submit from the
+		 * submits list, and drop it's reference (and drop the
+		 * active reference for all the bos).  But we can't
+		 * really signal the fence attached to obj->resv without
+		 * disturbing other fences on the timeline.  So instead
+		 * just leave it and let it retire normally when a
+		 * later submit completes.
+		 */
+
+		return -ENOSPC;
+	}
+
+	priv->lastctx = submit->queue->ctx;
+
+	return 0;
 }
 
 /*

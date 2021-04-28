@@ -470,6 +470,9 @@ void adreno_flush(struct msm_gpu *gpu, struct msm_ringbuffer *ring, u32 reg)
 {
 	uint32_t wptr;
 
+	if (unlikely(ring->overflow))
+		return;
+
 	/* Copy the shadow to the actual register */
 	ring->cur = ring->next;
 
@@ -791,12 +794,31 @@ static uint32_t ring_freewords(struct msm_ringbuffer *ring)
 	return (rptr + (size - 1) - wptr) % size;
 }
 
+static bool space_avail(struct msm_ringbuffer *ring, uint32_t ndwords)
+{
+	if (ring_freewords(ring) >= ndwords)
+		return true;
+
+	/* We don't have a good way to know in general when the RPTR has
+	 * advanced.. newer things that use CP_WHERE_AM_I to update the
+	 * shadow rptr could possibly insert a packet to generate an irq.
+	 * But that doesn't cover older GPUs.  But if the ringbuffer is
+	 * full, it could take a while before it is empty again, so just
+	 * insert a blind sleep to avoid a busy loop.
+	 */
+	msleep(1);
+
+	return false;
+}
+
 void adreno_wait_ring(struct msm_ringbuffer *ring, uint32_t ndwords)
 {
-	if (spin_until(ring_freewords(ring) >= ndwords))
+	if (spin_until(space_avail(ring, ndwords))) {
 		DRM_DEV_ERROR(ring->gpu->dev->dev,
 			"timeout waiting for space in ringbuffer %d\n",
 			ring->id);
+		ring->overflow = true;
+	}
 }
 
 /* Get legacy powerlevels from qcom,gpu-pwrlevels and populate the opp table */

@@ -40,6 +40,8 @@ struct msm_ringbuffer {
 	struct drm_gem_object *bo;
 	uint32_t *start, *end, *cur, *next;
 
+	bool overflow;
+
 	/*
 	 * List of in-flight submits on this ring.  Protected by submit_lock.
 	 */
@@ -69,6 +71,9 @@ void msm_ringbuffer_destroy(struct msm_ringbuffer *ring);
 static inline void
 OUT_RING(struct msm_ringbuffer *ring, uint32_t data)
 {
+	if (ring->overflow)
+		return;
+
 	/*
 	 * ring->next points to the current command being written - it won't be
 	 * committed as ring->cur until the flush
