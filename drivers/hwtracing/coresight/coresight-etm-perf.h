@@ -49,12 +49,14 @@ struct etm_filters {
  * @mask:		Hold the CPU(s) this event was set for.
  * @snk_config:		The sink configuration.
  * @path:		An array of path, each slot for one CPU.
+ * @overwrite:		Flag for snapshot mode.
  */
 struct etm_event_data {
 	struct work_struct work;
 	cpumask_t mask;
 	void *snk_config;
 	struct list_head * __percpu *path;
+	bool overwrite;
 };
 
 #if IS_ENABLED(CONFIG_CORESIGHT)

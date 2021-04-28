@@ -245,6 +245,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
 	if (!event_data)
 		return NULL;
 	INIT_WORK(&event_data->work, free_event_data);
+	event_data->overwrite = overwrite;
 
 	/* First get the selected sink from user space. */
 	if (event->attr.config2) {
@@ -424,9 +425,23 @@ static void etm_event_stop(struct perf_event *event, int mode)
 		if (!sink_ops(sink)->update_buffer)
 			return;
 
-		size = sink_ops(sink)->update_buffer(sink, handle,
-					      event_data->snk_config);
-		perf_aux_output_end(handle, size);
+		/*
+		 * In the snapshot mode, here should avoid to record trace data
+		 * when the profiled program is scheduled out and only capture
+		 * trace data when the perf tool receives USR2 signal.
+		 *
+		 * This is distinguished by variable "event->ctx->is_active",
+		 * its value is zero for profiled task scheduling out, and it
+		 * is a non-zero value when perf tool invokes ioctl
+		 * PERF_EVENT_IOC_DISABLE.
+		 */
+		if (!event_data->overwrite || event->ctx->is_active) {
+			size = sink_ops(sink)->update_buffer(sink, handle,
+						      event_data->snk_config);
+			perf_aux_output_end(handle, size);
+		} else {
+			perf_aux_output_end(handle, 0);
+		}
 	}
 
 	/* Disabling the path make its elements available to other sessions */
