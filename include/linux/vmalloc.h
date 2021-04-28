@@ -138,6 +138,7 @@ void *__vmalloc_node(unsigned long size, unsigned long align, gfp_t gfp_mask,
 
 extern void vfree(const void *addr);
 extern void vfree_atomic(const void *addr);
+extern void vfree_bulk(size_t count, void **addrs);
 
 extern void *vmap(struct page **pages, unsigned int count,
 			unsigned long flags, pgprot_t prot);

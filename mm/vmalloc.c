@@ -2647,6 +2647,37 @@ void vfree(const void *addr)
 EXPORT_SYMBOL(vfree);
 
 /**
+ * vfree_bulk - Release memory allocated by vmalloc()
+ * @count: Number of elements in array
+ * @addrs: Array of elements to be freed
+ *
+ * Free the virtually continuous memory area starting at @addrs[i], as obtained
+ * from one of the vmalloc() family of APIs.  This will usually also free the
+ * physical memory underlying the virtual allocation, but that memory is
+ * reference counted, so it will not be freed until the last user goes away.
+ *
+ * If @addrs[i] is NULL, no operation is performed.
+ *
+ * Context:
+ * Same as for vfree()
+ */
+void vfree_bulk(size_t count, void **addrs)
+{
+	unsigned int i;
+
+	BUG_ON(in_nmi());
+	might_sleep_if(!in_interrupt());
+
+	for (i = 0; i < count; i++) {
+		kmemleak_free(addrs[i]);
+
+		if (addrs[i])
+			__vfree(addrs[i]);
+	}
+}
+EXPORT_SYMBOL(vfree_bulk);
+
+/**
  * vunmap - release virtual mapping obtained by vmap()
  * @addr:   memory base address
  *
