@@ -2252,13 +2252,31 @@ static u32 dw_hdmi_get_width(struct dw_hdmi_dev *dw_dev)
 	return width;
 }
 
+static int dw_hdmi_vic_to_cea861(u8 hdmi_vic)
+{
+	switch (hdmi_vic) {
+	case 1:
+		return 95;
+	case 2:
+		return 94;
+	case 3:
+		return 93;
+	case 4:
+		return 98;
+	default:
+		return 0;
+	}
+}
+
 static int dw_hdmi_query_dv_timings(struct v4l2_subdev *sd,
 				    struct v4l2_dv_timings *timings)
 {
 	struct dw_hdmi_dev *dw_dev = to_dw_dev(sd);
 	struct v4l2_bt_timings *bt = &timings->bt;
+	struct v4l2_dv_timings t = {0};
 	bool is_hdmi_vic;
 	u32 htot, hofs;
+	u8 cea861_vic;
 	u32 vtot;
 	u8 vic;
 
@@ -2353,8 +2371,40 @@ static int dw_hdmi_query_dv_timings(struct v4l2_subdev *sd,
 		}
 	}
 
-	dev_dbg(dw_dev->dev, "%s: width=%u, height=%u, mbuscode=%u\n", __func__,
-		bt->width, bt->height, dw_hdmi_get_mbus_code(dw_dev));
+	if (is_hdmi_vic)
+		cea861_vic = dw_hdmi_vic_to_cea861(bt->hdmi_vic);
+	else
+		cea861_vic = vic;
+
+	/* picture aspect ratio based on v4l2 dv timings array */
+	if (v4l2_find_dv_timings_cea861_vic(&t, cea861_vic)) {
+		/* when the numerator/denominator are zero means that the
+		 * picture aspect ratio is the same of the active measures ratio
+		 */
+		if (!t.bt.picture_aspect.numerator) {
+			unsigned long n, d;
+
+			rational_best_approximation(t.bt.width, t.bt.height,
+						    t.bt.width, t.bt.height,
+						    &n, &d);
+			t.bt.picture_aspect.numerator = n;
+			t.bt.picture_aspect.denominator = d;
+		}
+
+		bt->picture_aspect = t.bt.picture_aspect;
+	} else {
+		bt->picture_aspect.numerator = 0;
+		bt->picture_aspect.denominator = 0;
+		dev_dbg(dw_dev->dev,
+			"%s: cea861_vic=%d was not found in v4l2 dv timings",
+			__func__, cea861_vic);
+	}
+
+	dev_dbg(dw_dev->dev,
+		"%s: width=%u, height=%u, mbuscode=%u, cea861_vic=%d, ar={%d,%d}\n",
+		__func__, bt->width, bt->height, dw_hdmi_get_mbus_code(dw_dev),
+		cea861_vic, bt->picture_aspect.numerator,
+		bt->picture_aspect.denominator);
 
 	return 0;
 }
