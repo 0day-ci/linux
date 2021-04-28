@@ -2463,6 +2463,26 @@ out:
 	return ret;
 }
 
+/**
+ * drm_connector_oob_hotplug_event - Report out-of-band hotplug event to connector
+ * @connector: connector to report the event on
+ * @data: data related to the event
+ *
+ * On some hardware a hotplug event notification may come from outside the display
+ * driver / device. An example of this is some USB Type-C setups where the hardware
+ * muxes the DisplayPort data and aux-lines but does not pass the altmode HPD
+ * status bit to the GPU's DP HPD pin.
+ *
+ * This function can be used to report these out-of-band events after obtaining
+ * a drm_connector reference through calling drm_connector_find_by_fwnode().
+ */
+void drm_connector_oob_hotplug_event(struct drm_connector *connector,
+				     struct drm_connector_oob_hotplug_event_data *data)
+{
+	if (connector->funcs->oob_hotplug_event)
+		connector->funcs->oob_hotplug_event(connector, data);
+}
+EXPORT_SYMBOL(drm_connector_oob_hotplug_event);
 
 /**
  * DOC: Tile group

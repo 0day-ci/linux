@@ -27,6 +27,7 @@
 #include <linux/llist.h>
 #include <linux/ctype.h>
 #include <linux/hdmi.h>
+#include <linux/usb/typec.h> /* For enum typec_orientation */
 #include <drm/drm_mode_object.h>
 #include <drm/drm_util.h>
 
@@ -625,6 +626,27 @@ struct drm_connector_tv_margins {
 };
 
 /**
+ * struct drm_connector_oob_hotplug_event_data: OOB hotplug event data
+ *
+ * Contains data about out-of-band hotplug events, signalled through
+ * drm_connector_oob_hotplug_event().
+ */
+struct drm_connector_oob_hotplug_event_data {
+	/**
+	 * @connected: New connected status for the connector.
+	 */
+	bool connected;
+	/**
+	 * @dp_lanes: Number of available displayport lanes, 0 if unknown.
+	 */
+	int dp_lanes;
+	/**
+	 * @orientation: Connector orientation.
+	 */
+	enum typec_orientation orientation;
+};
+
+/**
  * struct drm_tv_connector_state - TV connector related states
  * @subconnector: selected subconnector
  * @margins: TV margins
@@ -1079,6 +1101,15 @@ struct drm_connector_funcs {
 	 */
 	void (*atomic_print_state)(struct drm_printer *p,
 				   const struct drm_connector_state *state);
+
+	/**
+	 * @oob_hotplug_event:
+	 *
+	 * This will get called when a hotplug-event for a drm-connector
+	 * has been received from a source outside the display driver / device.
+	 */
+	void (*oob_hotplug_event)(struct drm_connector *connector,
+				  struct drm_connector_oob_hotplug_event_data *data);
 };
 
 /**
@@ -1648,6 +1679,8 @@ drm_connector_is_unregistered(struct drm_connector *connector)
 }
 
 struct drm_connector *drm_connector_find_by_fwnode(struct fwnode_handle *fwnode);
+void drm_connector_oob_hotplug_event(struct drm_connector *connector,
+				     struct drm_connector_oob_hotplug_event_data *data);
 const char *drm_get_connector_type_name(unsigned int connector_type);
 const char *drm_get_connector_status_name(enum drm_connector_status status);
 const char *drm_get_subpixel_order_name(enum subpixel_order order);
