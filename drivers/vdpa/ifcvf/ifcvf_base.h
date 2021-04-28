@@ -85,6 +85,7 @@ struct ifcvf_hw {
 	char config_msix_name[256];
 	struct vdpa_callback config_cb;
 	unsigned int config_irq;
+	phys_addr_t  notify_pa;
 };
 
 struct ifcvf_adapter {
