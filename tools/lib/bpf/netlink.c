@@ -4,7 +4,11 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <unistd.h>
+#include <inttypes.h>
+#include <arpa/inet.h>
 #include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/pkt_cls.h>
 #include <linux/rtnetlink.h>
 #include <sys/socket.h>
 #include <errno.h>
@@ -73,6 +77,12 @@ cleanup:
 	return ret;
 }
 
+enum {
+	BPF_NL_CONT,
+	BPF_NL_NEXT,
+	BPF_NL_DONE,
+};
+
 static int bpf_netlink_recv(int sock, __u32 nl_pid, int seq,
 			    __dump_nlmsg_t _fn, libbpf_dump_nlmsg_t fn,
 			    void *cookie)
@@ -84,6 +94,7 @@ static int bpf_netlink_recv(int sock, __u32 nl_pid, int seq,
 	int len, ret;
 
 	while (multipart) {
+start:
 		multipart = false;
 		len = recv(sock, buf, sizeof(buf), 0);
 		if (len < 0) {
@@ -121,8 +132,18 @@ static int bpf_netlink_recv(int sock, __u32 nl_pid, int seq,
 			}
 			if (_fn) {
 				ret = _fn(nh, fn, cookie);
-				if (ret)
+				if (ret < 0)
 					return ret;
+				switch (ret) {
+				case BPF_NL_CONT:
+					break;
+				case BPF_NL_NEXT:
+					goto start;
+				case BPF_NL_DONE:
+					return 0;
+				default:
+					return ret;
+				}
 			}
 		}
 	}
@@ -355,5 +376,445 @@ static int libbpf_nl_send_recv(struct nlmsghdr *nh, __dump_nlmsg_t fn,
 
 end:
 	close(sock);
+	return ret;
+}
+
+/* TC-HOOK */
+
+typedef int (*qdisc_config_t)(struct nlmsghdr *nh, struct tcmsg *t,
+			      size_t maxsz);
+
+static int clsact_config(struct nlmsghdr *nh, struct tcmsg *t, size_t maxsz)
+{
+	int ret;
+
+	t->tcm_parent = TC_H_CLSACT;
+	t->tcm_handle = TC_H_MAKE(TC_H_CLSACT, 0);
+
+	ret = nlattr_add(nh, maxsz, TCA_KIND, "clsact", sizeof("clsact"));
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int attach_point_to_config(struct bpf_tc_hook *hook, qdisc_config_t *configp)
+{
+	if (!hook)
+		return -EINVAL;
+
+	switch ((int)OPTS_GET(hook, attach_point, 0)) {
+		case BPF_TC_INGRESS:
+		case BPF_TC_EGRESS:
+		case BPF_TC_INGRESS|BPF_TC_EGRESS:
+			if (OPTS_GET(hook, parent, 0))
+				return -EINVAL;
+			*configp = &clsact_config;
+			break;
+		case BPF_TC_CUSTOM:
+			return -EOPNOTSUPP;
+		default:
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+static long long int tc_get_tcm_parent(enum bpf_tc_attach_point attach_point,
+				       __u32 parent)
+{
+	long long int ret;
+
+	switch (attach_point) {
+	case BPF_TC_INGRESS:
+		if (parent)
+			return -EINVAL;
+		ret = TC_H_MAKE(TC_H_CLSACT, TC_H_MIN_INGRESS);
+		break;
+	case BPF_TC_EGRESS:
+		if (parent)
+			return -EINVAL;
+		ret = TC_H_MAKE(TC_H_CLSACT, TC_H_MIN_EGRESS);
+		break;
+	case BPF_TC_CUSTOM:
+		if (!parent)
+			return -EINVAL;
+		ret = parent;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+static int tc_qdisc_modify(struct bpf_tc_hook *hook, int cmd, int flags)
+{
+	qdisc_config_t config;
+	int ret = 0;
+	struct {
+		struct nlmsghdr nh;
+		struct tcmsg t;
+		char buf[256];
+	} req;
+
+	ret = attach_point_to_config(hook, &config);
+	if (ret < 0)
+		return ret;
+
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len = NLMSG_LENGTH(sizeof(struct tcmsg));
+	req.nh.nlmsg_flags =
+		NLM_F_REQUEST | NLM_F_ACK | flags;
+	req.nh.nlmsg_type = cmd;
+	req.t.tcm_family = AF_UNSPEC;
+	req.t.tcm_ifindex = OPTS_GET(hook, ifindex, 0);
+
+	ret = config(&req.nh, &req.t, sizeof(req));
+	if (ret < 0)
+		return ret;
+
+	ret = libbpf_nl_send_recv(&req.nh, NULL, NULL, NULL);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int tc_qdisc_create_excl(struct bpf_tc_hook *hook, int flags)
+{
+	flags = flags & BPF_TC_F_REPLACE ? NLM_F_REPLACE : NLM_F_EXCL;
+	return tc_qdisc_modify(hook, RTM_NEWQDISC, NLM_F_CREATE | flags);
+}
+
+static int tc_qdisc_delete(struct bpf_tc_hook *hook)
+{
+	return tc_qdisc_modify(hook, RTM_DELQDISC, 0);
+}
+
+int bpf_tc_hook_create(struct bpf_tc_hook *hook, int flags)
+{
+	if (!hook || !OPTS_VALID(hook, bpf_tc_hook))
+		return -EINVAL;
+	if (OPTS_GET(hook, ifindex, 0) <= 0 || flags & ~BPF_TC_F_REPLACE)
+		return -EINVAL;
+
+	return tc_qdisc_create_excl(hook, flags);
+}
+
+static int tc_cls_detach(const struct bpf_tc_hook *hook,
+			 const struct bpf_tc_opts *opts, bool flush);
+
+int bpf_tc_hook_destroy(struct bpf_tc_hook *hook)
+{
+	if (!hook || !OPTS_VALID(hook, bpf_tc_hook) ||
+	    OPTS_GET(hook, ifindex, 0) <= 0)
+		return -EINVAL;
+
+	switch ((int)OPTS_GET(hook, attach_point, 0)) {
+		case BPF_TC_INGRESS:
+		case BPF_TC_EGRESS:
+			return tc_cls_detach(hook, NULL, true);
+		case BPF_TC_INGRESS|BPF_TC_EGRESS:
+			return tc_qdisc_delete(hook);
+		case BPF_TC_CUSTOM:
+			return -EOPNOTSUPP;
+		default:
+			return -EINVAL;
+	}
+}
+
+struct pass_info {
+	struct bpf_tc_opts *opts;
+	__u32 match_prog_id;
+	bool processed;
+};
+
+/* TC-BPF */
+
+static int tc_cls_add_fd_and_name(struct nlmsghdr *nh, size_t maxsz, int fd)
+{
+	struct bpf_prog_info info = {};
+	char name[256] = {};
+	int len, ret;
+
+	ret = bpf_obj_get_info_by_fd(fd, &info, &(__u32){sizeof(info)});
+	if (ret < 0)
+		return ret;
+
+	ret = nlattr_add(nh, maxsz, TCA_BPF_FD, &fd, sizeof(fd));
+	if (ret < 0)
+		return ret;
+
+	len = snprintf(name, sizeof(name), "%s:[%" PRIu32 "]", info.name,
+		       info.id);
+	if (len < 0 || len >= sizeof(name))
+		return len < 0 ? -EINVAL : -ENAMETOOLONG;
+
+	return nlattr_add(nh, maxsz, TCA_BPF_NAME, name, len + 1);
+}
+
+
+static int cls_get_info(struct nlmsghdr *nh, libbpf_dump_nlmsg_t fn,
+			void *cookie);
+
+int bpf_tc_attach(const struct bpf_tc_hook *hook,
+		  struct bpf_tc_opts *opts, int flags)
+{
+	__u32 protocol = 0, bpf_flags;
+	struct pass_info info = {};
+	long long int tcm_parent;
+	struct nlattr *nla;
+	int ret;
+	struct {
+		struct nlmsghdr nh;
+		struct tcmsg t;
+		char buf[256];
+	} req;
+
+	if (!hook || !opts || !OPTS_VALID(hook, bpf_tc_opts) ||
+	    !OPTS_VALID(opts, bpf_tc_opts))
+		return -EINVAL;
+	if (OPTS_GET(hook, ifindex, 0) <= 0 || !OPTS_GET(opts, prog_fd, 0) ||
+	    OPTS_GET(opts, prog_id, 0))
+		return -EINVAL;
+	if (OPTS_GET(opts, priority, 0) > UINT16_MAX)
+		return -EINVAL;
+	if (flags & ~BPF_TC_F_REPLACE)
+		return -EINVAL;
+
+	protocol = ETH_P_ALL;
+	flags = flags & BPF_TC_F_REPLACE ? NLM_F_REPLACE : NLM_F_EXCL;
+
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len = NLMSG_LENGTH(sizeof(struct tcmsg));
+	req.nh.nlmsg_flags =
+		NLM_F_REQUEST | NLM_F_ACK | NLM_F_CREATE | NLM_F_ECHO | flags;
+	req.nh.nlmsg_type = RTM_NEWTFILTER;
+	req.t.tcm_family = AF_UNSPEC;
+	req.t.tcm_handle = OPTS_GET(opts, handle, 0);
+	req.t.tcm_ifindex = OPTS_GET(hook, ifindex, 0);
+	req.t.tcm_info = TC_H_MAKE(OPTS_GET(opts, priority, 0) << 16, htons(protocol));
+
+	tcm_parent = tc_get_tcm_parent(OPTS_GET(hook, attach_point, 0), OPTS_GET(hook, parent, 0));
+	if (tcm_parent < 0)
+		return tcm_parent;
+	req.t.tcm_parent = tcm_parent;
+
+	ret = nlattr_add(&req.nh, sizeof(req), TCA_KIND, "bpf", sizeof("bpf"));
+	if (ret < 0)
+		return ret;
+
+	nla = nlattr_begin_nested(&req.nh, sizeof(req), TCA_OPTIONS);
+	if (!nla)
+		return -EMSGSIZE;
+
+	ret = tc_cls_add_fd_and_name(&req.nh, sizeof(req), OPTS_GET(opts, prog_fd, 0));
+	if (ret < 0)
+		return ret;
+
+	/* direct action mode is always enabled */
+	bpf_flags = TCA_BPF_FLAG_ACT_DIRECT;
+	ret = nlattr_add(&req.nh, sizeof(req), TCA_BPF_FLAGS,
+			 &bpf_flags, sizeof(bpf_flags));
+	if (ret < 0)
+		return ret;
+
+	nlattr_end_nested(&req.nh, nla);
+
+	info.opts = opts;
+
+	ret = libbpf_nl_send_recv(&req.nh, &cls_get_info, NULL, &info);
+	if (ret < 0)
+		return ret;
+
+	/* Failed to process unicast response */
+	if (!info.processed)
+		ret = -ENOENT;
+
+	return ret;
+}
+
+static int tc_cls_detach(const struct bpf_tc_hook *hook,
+			 const struct bpf_tc_opts *opts, bool flush)
+{
+	long long int tcm_parent;
+	__u32 protocol = 0;
+	int ret, c;
+	struct {
+		struct nlmsghdr nh;
+		struct tcmsg t;
+		char buf[256];
+	} req;
+
+	if (!hook || !OPTS_VALID(hook, bpf_tc_opts) ||
+	    !OPTS_VALID(opts, bpf_tc_opts))
+		return -EINVAL;
+	if (OPTS_GET(hook, ifindex, 0) <= 0 || OPTS_GET(opts, prog_fd, 0) ||
+	    OPTS_GET(opts, prog_id, 0))
+		return -EINVAL;
+	c = !!OPTS_GET(opts, handle, 0) + !!OPTS_GET(opts, priority, 0);
+	if ((flush && c != 0) || (!flush && c != 2))
+		return -EINVAL;
+	if (OPTS_GET(opts, priority, 0) > UINT16_MAX)
+		return -EINVAL;
+
+	if (!flush)
+		protocol = ETH_P_ALL;
+
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len = NLMSG_LENGTH(sizeof(struct tcmsg));
+	req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+	req.nh.nlmsg_type = RTM_DELTFILTER;
+	req.t.tcm_family = AF_UNSPEC;
+	if (!flush)
+		req.t.tcm_handle = OPTS_GET(opts, handle, 0);
+	req.t.tcm_ifindex = OPTS_GET(hook, ifindex, 0);
+	if (!flush)
+		req.t.tcm_info = TC_H_MAKE(OPTS_GET(opts, priority, 0) << 16,
+					   htons(protocol));
+
+	tcm_parent = tc_get_tcm_parent(OPTS_GET(hook, attach_point, 0), OPTS_GET(hook, parent, 0));
+	if (tcm_parent < 0)
+		return tcm_parent;
+	req.t.tcm_parent = tcm_parent;
+
+	if (!flush) {
+		ret = nlattr_add(&req.nh, sizeof(req), TCA_KIND, "bpf", sizeof("bpf"));
+		if (ret < 0)
+			return ret;
+	}
+
+	return libbpf_nl_send_recv(&req.nh, NULL, NULL, NULL);
+}
+
+int bpf_tc_detach(const struct bpf_tc_hook *hook,
+		  const struct bpf_tc_opts *opts)
+{
+	if (!opts)
+		return -EINVAL;
+
+	return tc_cls_detach(hook, opts, false);
+}
+
+static int __cls_get_info(void *cookie, void *msg, struct nlattr **tb,
+			  bool unicast)
+{
+	struct nlattr *tbb[TCA_BPF_MAX + 1];
+	struct pass_info *info = cookie;
+	struct tcmsg *t = msg;
+	__u32 prog_id;
+
+	if (!info)
+		return -EINVAL;
+	if (unicast && info->processed)
+		return -EINVAL;
+	if (!tb[TCA_OPTIONS])
+		return BPF_NL_CONT;
+
+	libbpf_nla_parse_nested(tbb, TCA_BPF_MAX, tb[TCA_OPTIONS], NULL);
+	if (!tbb[TCA_BPF_ID])
+		return -EINVAL;
+
+	if (!info->opts) {
+		/* This is a special case, where user isn't really looking for
+		 * info for the filter, but just wants to detect if there's
+		 * atleast one attached. In that case, terminate processing as a
+		 * short cut.
+		 */
+		if (unicast)
+			return -EINVAL;
+		goto end;
+	}
+
+	prog_id = libbpf_nla_getattr_u32(tbb[TCA_BPF_ID]);
+	if (info->match_prog_id && info->match_prog_id != prog_id)
+		return BPF_NL_CONT;
+
+	OPTS_SET(info->opts, handle, t->tcm_handle);
+	OPTS_SET(info->opts, priority, TC_H_MAJ(t->tcm_info) >> 16);
+	OPTS_SET(info->opts, prog_id, prog_id);
+
+end:
+	info->processed = true;
+	return unicast ? BPF_NL_NEXT : BPF_NL_DONE;
+}
+
+static int cls_get_info(struct nlmsghdr *nh, libbpf_dump_nlmsg_t fn,
+			void *cookie)
+{
+	struct tcmsg *t = NLMSG_DATA(nh);
+	struct nlattr *tb[TCA_MAX + 1];
+
+	libbpf_nla_parse(tb, TCA_MAX,
+			 (struct nlattr *)((char *)t + NLMSG_ALIGN(sizeof(*t))),
+			 NLMSG_PAYLOAD(nh, sizeof(*t)), NULL);
+	if (!tb[TCA_KIND])
+		return -EINVAL;
+
+	return __cls_get_info(cookie, t, tb, nh->nlmsg_flags & NLM_F_ECHO);
+}
+
+int bpf_tc_query(const struct bpf_tc_hook *hook,
+	         struct bpf_tc_opts *opts)
+{
+	struct pass_info pinfo = {};
+	long long int tcm_parent;
+	__u32 protocol;
+	int ret;
+	struct {
+		struct nlmsghdr nh;
+		struct tcmsg t;
+		char buf[256];
+	} req;
+
+	if (!hook || !OPTS_VALID(hook, bpf_tc_hook) ||
+	    !OPTS_VALID(opts, bpf_tc_opts))
+		return -EINVAL;
+	if (OPTS_GET(hook, ifindex, 0) <= 0 || (OPTS_GET(opts, prog_fd, 0) &&
+	    OPTS_GET(opts, prog_id, 0)))
+		return -EINVAL;
+	if (OPTS_GET(opts, priority, 0) > UINT16_MAX)
+		return -EINVAL;
+
+	protocol = ETH_P_ALL;
+
+	memset(&req, 0, sizeof(req));
+	req.nh.nlmsg_len = NLMSG_LENGTH(sizeof(struct tcmsg));
+	req.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+	req.nh.nlmsg_type = RTM_GETTFILTER;
+	req.t.tcm_family = AF_UNSPEC;
+	req.t.tcm_handle = OPTS_GET(opts, handle, 0);
+	req.t.tcm_ifindex = OPTS_GET(hook, ifindex, 0);
+	req.t.tcm_info = TC_H_MAKE(OPTS_GET(opts, priority, 0) << 16, htons(protocol));
+
+	tcm_parent = tc_get_tcm_parent(OPTS_GET(hook, attach_point, 0), OPTS_GET(hook, parent, 0));
+	if (tcm_parent < 0)
+		return tcm_parent;
+	req.t.tcm_parent = tcm_parent;
+
+	ret = nlattr_add(&req.nh, sizeof(req), TCA_KIND, "bpf", sizeof("bpf"));
+	if (ret < 0)
+		return ret;
+
+	if (OPTS_GET(opts, prog_fd, 0)) {
+		struct bpf_prog_info info = {};
+		ret = bpf_obj_get_info_by_fd(OPTS_GET(opts, prog_fd, 0), &info, &(__u32){sizeof(info)});
+		if (ret < 0)
+			return ret;
+
+		pinfo.match_prog_id = info.id;
+	} else
+		pinfo.match_prog_id = OPTS_GET(opts, prog_id, 0);
+
+	pinfo.opts = opts;
+
+	ret = libbpf_nl_send_recv(&req.nh, cls_get_info, NULL, &pinfo);
+	if (ret < 0)
+		return ret;
+
+	if (!pinfo.processed)
+		ret = -ENOENT;
+
 	return ret;
 }
