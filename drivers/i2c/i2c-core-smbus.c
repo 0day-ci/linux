@@ -66,10 +66,11 @@ static inline void i2c_smbus_add_pec(struct i2c_msg *msg)
 }
 
 /* Return <0 on CRC error
-   If there was a write before this read (most cases) we need to take the
-   partial CRC from the write part into account.
-   Note that this function does modify the message (we need to decrease the
-   message length to hide the CRC byte from the caller). */
+ * If there was a write before this read (most cases) we need to take the
+ * partial CRC from the write part into account.
+ * Note that this function does modify the message (we need to decrease the
+ * message length to hide the CRC byte from the caller).
+ */
 static int i2c_smbus_check_pec(u8 cpec, struct i2c_msg *msg)
 {
 	u8 rpec = msg->buf[--msg->len];
@@ -113,7 +114,7 @@ EXPORT_SYMBOL(i2c_smbus_read_byte);
 s32 i2c_smbus_write_byte(const struct i2c_client *client, u8 value)
 {
 	return i2c_smbus_xfer(client->adapter, client->addr, client->flags,
-	                      I2C_SMBUS_WRITE, value, I2C_SMBUS_BYTE, NULL);
+			I2C_SMBUS_WRITE, value, I2C_SMBUS_BYTE, NULL);
 }
 EXPORT_SYMBOL(i2c_smbus_write_byte);
 
@@ -387,7 +388,8 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter *adapter, u16 addr,
 		if (read_write == I2C_SMBUS_READ) {
 			msg[1].flags |= I2C_M_RECV_LEN;
 			msg[1].len = 1; /* block length will be added by
-					   the underlying bus driver */
+					 * the underlying bus driver
+					 */
 			i2c_smbus_try_get_dmabuf(&msg[1], 0);
 		} else {
 			msg[0].len = data->block[0] + 2;
@@ -418,7 +420,8 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter *adapter, u16 addr,
 
 		msg[1].flags |= I2C_M_RECV_LEN;
 		msg[1].len = 1; /* block length will be added by
-				   the underlying bus driver */
+				 * the underlying bus driver
+				 */
 		i2c_smbus_try_get_dmabuf(&msg[1], 0);
 		break;
 	case I2C_SMBUS_I2C_BLOCK_DATA:
