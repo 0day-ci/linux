@@ -38,6 +38,7 @@ TEST_PROGS = bridge_igmp.sh \
 	router_mpath_nh.sh \
 	router_multicast.sh \
 	router_multipath.sh \
+	router_mpath_seed.sh \
 	router.sh \
 	router_vid_1.sh \
 	sch_ets.sh \
