@@ -6456,6 +6456,7 @@ static int do_md_stop(struct mddev *mddev, int mode,
 		md_clean(mddev);
 		if (mddev->hold_active == UNTIL_STOP)
 			mddev->hold_active = 0;
+		set_bit(MD_DELETING, &mddev->flags);
 	}
 	md_new_event(mddev);
 	sysfs_notify_dirent_safe(mddev->sysfs_state);
@@ -7843,7 +7844,8 @@ static int md_open(struct block_device *bdev, fmode_t mode)
 	if ((err = mutex_lock_interruptible(&mddev->open_mutex)))
 		goto out;
 
-	if (test_bit(MD_CLOSING, &mddev->flags)) {
+	if (test_bit(MD_CLOSING, &mddev->flags) ||
+            (test_bit(MD_DELETING, &mddev->flags) && mddev->pers == NULL)) {
 		mutex_unlock(&mddev->open_mutex);
 		err = -ENODEV;
 		goto out;
