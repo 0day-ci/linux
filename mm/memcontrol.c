@@ -362,6 +362,8 @@ static void memcg_reparent_objcgs(struct mem_cgroup *memcg,
 static DEFINE_IDA(memcg_cache_ida);
 int memcg_nr_cache_ids;
 
+static int kmemcg_max_id;
+
 /* Protects memcg_nr_cache_ids */
 static DECLARE_RWSEM(memcg_cache_ids_sem);
 
@@ -2856,8 +2858,11 @@ static int memcg_alloc_cache_id(void)
 	if (id < 0)
 		return id;
 
-	if (id < memcg_nr_cache_ids)
+	if (id < memcg_nr_cache_ids) {
+		if (id > kmemcg_max_id)
+			kmemcg_max_id = id;
 		return id;
+	}
 
 	/*
 	 * There's no space for the new id in memcg_caches arrays,
@@ -2865,15 +2870,17 @@ static int memcg_alloc_cache_id(void)
 	 */
 	down_write(&memcg_cache_ids_sem);
 
-	size = 2 * (id + 1);
+	size = 2 * id;
 	if (size < MEMCG_CACHES_MIN_SIZE)
 		size = MEMCG_CACHES_MIN_SIZE;
 	else if (size > MEMCG_CACHES_MAX_SIZE)
 		size = MEMCG_CACHES_MAX_SIZE;
 
 	err = memcg_update_all_list_lrus(size);
-	if (!err)
+	if (!err) {
 		memcg_nr_cache_ids = size;
+		kmemcg_max_id = id;
+	}
 
 	up_write(&memcg_cache_ids_sem);
 
@@ -2884,9 +2891,48 @@ static int memcg_alloc_cache_id(void)
 	return id;
 }
 
+static inline int nearest_fit_id(int id)
+{
+	if (unlikely(id < MEMCG_CACHES_MIN_SIZE))
+		return MEMCG_CACHES_MIN_SIZE;
+
+	return 1 << (__fls(id) + 1);
+}
+
+/*
+ * memcg_alloc_cache_id() and memcg_free_cache_id() are serialized by
+ * cgroup_mutex. So there is no race on kmemcg_max_id.
+ */
 static void memcg_free_cache_id(int id)
 {
 	ida_simple_remove(&memcg_cache_ida, id);
+
+	if (kmemcg_max_id == id) {
+		/*
+		 * In order to avoid @memcg_nr_cache_ids bouncing between
+		 * @memcg_nr_cache_ids / 2 and @memcg_nr_cache_ids. We only
+		 * shrink the list lru size when @kmemcg_max_id is smaller
+		 * than @memcg_nr_cache_ids / 3.
+		 */
+		int size = memcg_nr_cache_ids / 3;
+
+		kmemcg_max_id = ida_max(&memcg_cache_ida);
+		if (kmemcg_max_id < size) {
+			/*
+			 * Find the first value greater than @kmemcg_max_id
+			 * which can fit our need. And shrink the list lru
+			 * to this size.
+			 */
+			size = nearest_fit_id(kmemcg_max_id);
+
+			down_write(&memcg_cache_ids_sem);
+			if (size != memcg_nr_cache_ids) {
+				memcg_update_all_list_lrus(size);
+				memcg_nr_cache_ids = size;
+			}
+			up_write(&memcg_cache_ids_sem);
+		}
+	}
 }
 
 /*
