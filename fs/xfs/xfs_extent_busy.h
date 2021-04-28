@@ -49,7 +49,7 @@ xfs_extent_busy_reuse(struct xfs_mount *mp, xfs_agnumber_t agno,
 
 bool
 xfs_extent_busy_trim(struct xfs_alloc_arg *args, xfs_agblock_t *bno,
-		xfs_extlen_t *len, unsigned *busy_gen);
+		xfs_extlen_t *len, unsigned *busy_gen, bool *busy_in_trans);
 
 void
 xfs_extent_busy_flush(struct xfs_mount *mp, struct xfs_perag *pag,

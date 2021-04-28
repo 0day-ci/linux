@@ -274,7 +274,8 @@ xfs_alloc_compute_aligned(
 	xfs_extlen_t	foundlen,	/* length in found extent */
 	xfs_agblock_t	*resbno,	/* result block number */
 	xfs_extlen_t	*reslen,	/* result length */
-	unsigned	*busy_gen)
+	unsigned	*busy_gen,
+	bool		*busy_in_trans)
 {
 	xfs_agblock_t	bno = foundbno;
 	xfs_extlen_t	len = foundlen;
@@ -282,7 +283,7 @@ xfs_alloc_compute_aligned(
 	bool		busy;
 
 	/* Trim busy sections out of found extent */
-	busy = xfs_extent_busy_trim(args, &bno, &len, busy_gen);
+	busy = xfs_extent_busy_trim(args, &bno, &len, busy_gen, busy_in_trans);
 
 	/*
 	 * If we have a largish extent that happens to start before min_agbno,
@@ -852,7 +853,7 @@ xfs_alloc_cur_check(
 	}
 
 	busy = xfs_alloc_compute_aligned(args, bno, len, &bnoa, &lena,
-					 &busy_gen);
+					 &busy_gen, NULL);
 	acur->busy |= busy;
 	if (busy)
 		acur->busy_gen = busy_gen;
@@ -1248,7 +1249,7 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	tbno = fbno;
 	tlen = flen;
-	xfs_extent_busy_trim(args, &tbno, &tlen, &busy_gen);
+	xfs_extent_busy_trim(args, &tbno, &tlen, &busy_gen, NULL);
 
 	/*
 	 * Give up if the start of the extent is busy, or the freespace isn't
@@ -1669,6 +1670,9 @@ xfs_alloc_ag_vextent_size(
 	xfs_extlen_t	rlen;		/* length of returned extent */
 	bool		busy;
 	unsigned	busy_gen;
+	bool		busy_in_trans;
+	bool		all_busy_in_trans;
+	bool		alloc_small_extent;
 
 restart:
 	/*
@@ -1677,6 +1681,10 @@ restart:
 	cnt_cur = xfs_allocbt_init_cursor(args->mp, args->tp, args->agbp,
 		args->agno, XFS_BTNUM_CNT);
 	bno_cur = NULL;
+	alloc_small_extent = false;
+	all_busy_in_trans = true;
+
+restart_alloc_small_extent:
 	busy = false;
 
 	/*
@@ -1687,13 +1695,14 @@ restart:
 		goto error0;
 
 	/*
-	 * If none then we have to settle for a smaller extent. In the case that
-	 * there are no large extents, this will return the last entry in the
-	 * tree unless the tree is empty. In the case that there are only busy
-	 * large extents, this will return the largest small extent unless there
-	 * are no smaller extents available.
+	 * We have to settle for a smaller extent if there are no maxlen +
+	 * alignment - 1 sized extents or if all larger free extents are still
+	 * in current transaction's busy list. In either case, this will return
+	 * the last entry in the tree unless the tree is empty. In the case that
+	 * there are only busy large extents, this will return the largest small
+	 * extent unless there are no smaller extents available.
 	 */
-	if (!i) {
+	if (!i || alloc_small_extent) {
 		error = xfs_alloc_ag_vextent_small(args, cnt_cur,
 						   &fbno, &flen, &i);
 		if (error)
@@ -1705,7 +1714,9 @@ restart:
 		}
 		ASSERT(i == 1);
 		busy = xfs_alloc_compute_aligned(args, fbno, flen, &rbno,
-				&rlen, &busy_gen);
+				&rlen, &busy_gen, &busy_in_trans);
+		if (busy && !busy_in_trans)
+			all_busy_in_trans = false;
 	} else {
 		/*
 		 * Search for a non-busy extent that is large enough.
@@ -1720,15 +1731,32 @@ restart:
 			}
 
 			busy = xfs_alloc_compute_aligned(args, fbno, flen,
-					&rbno, &rlen, &busy_gen);
+					&rbno, &rlen, &busy_gen,
+					&busy_in_trans);
 
 			if (rlen >= args->maxlen)
 				break;
+
+			if (busy && !busy_in_trans)
+				all_busy_in_trans = false;
 
 			error = xfs_btree_increment(cnt_cur, 0, &i);
 			if (error)
 				goto error0;
 			if (i == 0) {
+				/*
+				 * All of the large free extents are busy in the
+				 * current transaction's t->t_busy
+				 * list. Hence, flushing the CIL's busy extent list
+				 * will be futile and also leads to the current
+				 * task waiting indefinitely. Hence try to
+				 * allocate smaller extents.
+				 */
+				if (all_busy_in_trans) {
+					alloc_small_extent = true;
+					goto restart_alloc_small_extent;
+				}
+
 				/*
 				 * Our only valid extents must have been busy.
 				 * Make it unbusy by forcing the log out and
@@ -1783,7 +1811,10 @@ restart:
 			if (flen < bestrlen)
 				break;
 			busy = xfs_alloc_compute_aligned(args, fbno, flen,
-					&rbno, &rlen, &busy_gen);
+					&rbno, &rlen, &busy_gen,
+					&busy_in_trans);
+			if (busy && !busy_in_trans)
+				all_busy_in_trans = false;
 			rlen = XFS_EXTLEN_MIN(args->maxlen, rlen);
 			if (XFS_IS_CORRUPT(args->mp,
 					   rlen != 0 &&
@@ -1819,7 +1850,7 @@ restart:
 	 */
 	args->len = rlen;
 	if (rlen < args->minlen) {
-		if (busy) {
+		if (busy && !all_busy_in_trans) {
 			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			trace_xfs_alloc_size_busy(args);
 			xfs_extent_busy_flush(args->mp, args->pag, busy_gen);

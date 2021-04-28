@@ -334,7 +334,8 @@ xfs_extent_busy_trim(
 	struct xfs_alloc_arg	*args,
 	xfs_agblock_t		*bno,
 	xfs_extlen_t		*len,
-	unsigned		*busy_gen)
+	unsigned		*busy_gen,
+	bool			*busy_in_trans)
 {
 	xfs_agblock_t		fbno;
 	xfs_extlen_t		flen;
@@ -361,6 +362,9 @@ xfs_extent_busy_trim(
 			rbp = rbp->rb_right;
 			continue;
 		}
+
+		if (busy_in_trans)
+			*busy_in_trans = busyp->flags & XFS_EXTENT_BUSY_IN_TRANS;
 
 		if (bbno <= fbno) {
 			/* start overlap */
