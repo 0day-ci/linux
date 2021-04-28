@@ -390,6 +390,7 @@ xlog_cil_insert_items(
 	struct xfs_cil		*cil = log->l_cilp;
 	struct xfs_cil_ctx	*ctx = cil->xc_ctx;
 	struct xfs_log_item	*lip;
+	struct xfs_extent_busy	*busy;
 	int			len = 0;
 	int			diff_iovecs = 0;
 	int			iclog_space;
@@ -409,6 +410,9 @@ xlog_cil_insert_items(
 	iovhdr_res = diff_iovecs * sizeof(xlog_op_header_t);
 	len += iovhdr_res;
 	ctx->nvecs += diff_iovecs;
+
+	list_for_each_entry(busy, &tp->t_busy, list)
+		busy->flags &= ~XFS_EXTENT_BUSY_IN_TRANS;
 
 	/* attach the transaction to the CIL if it has any busy extents */
 	if (!list_empty(&tp->t_busy))

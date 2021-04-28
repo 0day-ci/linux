@@ -3332,7 +3332,7 @@ __xfs_free_extent(
 	xfs_agblock_t			agbno = XFS_FSB_TO_AGBNO(mp, bno);
 	struct xfs_agf			*agf;
 	int				error;
-	unsigned int			busy_flags = 0;
+	unsigned int			busy_flags = XFS_EXTENT_BUSY_IN_TRANS;
 
 	ASSERT(len != 0);
 	ASSERT(type != XFS_AG_RESV_AGFL);

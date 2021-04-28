@@ -28,6 +28,7 @@ struct xfs_extent_busy {
 	unsigned int	flags;
 #define XFS_EXTENT_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
 #define XFS_EXTENT_BUSY_SKIP_DISCARD	0x02	/* do not discard */
+#define XFS_EXTENT_BUSY_IN_TRANS	0x04
 };
 
 void
