@@ -3415,37 +3415,44 @@ static inline bool queue_kfree_rcu_work(struct kfree_rcu_cpu *krcp)
 	return !repeat;
 }
 
-static inline void kfree_rcu_drain_unlock(struct kfree_rcu_cpu *krcp,
-					  unsigned long flags)
+/*
+ * This function queues a new batch. If success or nothing to
+ * drain it returns 1. Otherwise 0 is returned indicating that
+ * a reclaim kthread has not processed a previous batch.
+ */
+static inline int kfree_rcu_drain(struct kfree_rcu_cpu *krcp)
 {
+	unsigned long flags;
+	int ret;
+
+	raw_spin_lock_irqsave(&krcp->lock, flags);
+
 	// Attempt to start a new batch.
-	if (queue_kfree_rcu_work(krcp)) {
+	ret = queue_kfree_rcu_work(krcp);
+	if (ret)
 		// Success! Our job is done here.
 		krcp->monitor_todo = false;
-		raw_spin_unlock_irqrestore(&krcp->lock, flags);
-		return;
-	}
 
 	// Previous RCU batch still in progress, try again later.
-	schedule_delayed_work(&krcp->monitor_work, KFREE_DRAIN_JIFFIES);
 	raw_spin_unlock_irqrestore(&krcp->lock, flags);
+	return ret;
 }
 
 /*
  * This function is invoked after the KFREE_DRAIN_JIFFIES timeout.
- * It invokes kfree_rcu_drain_unlock() to attempt to start another batch.
+ * It invokes kfree_rcu_drain() to attempt to start another batch.
  */
 static void kfree_rcu_monitor(struct work_struct *work)
 {
-	unsigned long flags;
 	struct kfree_rcu_cpu *krcp = container_of(work, struct kfree_rcu_cpu,
 						 monitor_work.work);
 
-	raw_spin_lock_irqsave(&krcp->lock, flags);
-	if (krcp->monitor_todo)
-		kfree_rcu_drain_unlock(krcp, flags);
-	else
-		raw_spin_unlock_irqrestore(&krcp->lock, flags);
+	if (kfree_rcu_drain(krcp))
+		return;
+
+	// Not success. A previous batch is still in progress.
+	// Rearm a work to repeat an attempt of starting another batch.
+	schedule_delayed_work(&krcp->monitor_work, KFREE_DRAIN_JIFFIES);
 }
 
 static enum hrtimer_restart
