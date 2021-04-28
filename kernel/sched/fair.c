@@ -10521,6 +10521,8 @@ static void nohz_newidle_balance(struct rq *this_rq)
 		return;
 
 	raw_spin_unlock(&this_rq->lock);
+	if (newidle_balance_in_callback)
+		local_irq_enable();
 	/*
 	 * This CPU is going to be idle and blocked load of idle CPUs
 	 * need to be updated. Run the ilb locally as it is a good
@@ -10529,6 +10531,8 @@ static void nohz_newidle_balance(struct rq *this_rq)
 	 */
 	if (!_nohz_idle_balance(this_rq, NOHZ_STATS_KICK, CPU_NEWLY_IDLE))
 		kick_ilb(NOHZ_STATS_KICK);
+	if (newidle_balance_in_callback)
+		local_irq_disable();
 	raw_spin_lock(&this_rq->lock);
 }
 
@@ -10599,6 +10603,8 @@ static int do_newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	}
 
 	raw_spin_unlock(&this_rq->lock);
+	if (newidle_balance_in_callback)
+		local_irq_enable();
 
 	update_blocked_averages(this_cpu);
 	rcu_read_lock();
@@ -10636,6 +10642,8 @@ static int do_newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	}
 	rcu_read_unlock();
 
+	if (newidle_balance_in_callback)
+		local_irq_disable();
 	raw_spin_lock(&this_rq->lock);
 
 	if (curr_cost > this_rq->max_idle_balance_cost)
