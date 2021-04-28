@@ -1307,7 +1307,7 @@ void __init mem_init(void)
 
 	preallocate_vmalloc_pages();
 
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 }
 
 #ifdef CONFIG_DEFERRED_STRUCT_PAGE_INIT

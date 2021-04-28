@@ -210,7 +210,7 @@ void __init mem_init(void)
 
 	cmma_init_nodat();
 
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 }
 
 void free_initmem(void)

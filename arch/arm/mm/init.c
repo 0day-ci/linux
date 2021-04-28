@@ -316,7 +316,7 @@ void __init mem_init(void)
 
 	free_highpages();
 
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 
 	/*
 	 * Check boundaries twice: Some fundamental inconsistencies can

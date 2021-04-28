@@ -573,7 +573,7 @@ void __init mem_init(void)
 #endif
 		parisc_vmalloc_start = SET_MAP_OFFSET(MAP_START);
 
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 
 #if 0
 	/*

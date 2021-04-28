@@ -194,7 +194,7 @@ void __init mem_init(void)
 {
 	memblock_free_all();
 	highmem_init();
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 }
 
 #ifdef CONFIG_HIGHMEM

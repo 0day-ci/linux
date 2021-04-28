@@ -131,7 +131,7 @@ void __init mem_init(void)
 	highmem_setup();
 #endif
 
-	mem_init_print_info(NULL);
+	mem_init_print_info();
 	mem_init_done = 1;
 }
 
