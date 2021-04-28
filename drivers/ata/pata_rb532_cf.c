@@ -162,11 +162,20 @@ static int rb532_pata_driver_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id pata_rb532_match[] = {
+	{ .compatible = "mikrotik,rb532-pata", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, pata_rb532_match);
+#endif
+
 static struct platform_driver rb532_pata_platform_driver = {
 	.probe		= rb532_pata_driver_probe,
 	.remove		= rb532_pata_driver_remove,
 	.driver	 = {
 		.name   = DRV_NAME,
+		.of_match_table = of_match_ptr(pata_rb532_match),
 	},
 };
 
