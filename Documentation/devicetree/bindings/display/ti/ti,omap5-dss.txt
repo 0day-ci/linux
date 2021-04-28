@@ -89,8 +89,8 @@ Required properties:
 - interrupts: the HDMI interrupt line
 - ti,hwmods: "dss_hdmi"
 - vdda-supply: vdda power supply
-- clocks: handles to fclk and pll clock
-- clock-names: "fck", "sys_clk"
+- clocks: handles to fclk, pll and cec clock
+- clock-names: "fck", "sys_clk", "cec"
 
 Optional nodes:
 - Video port for HDMI output
