@@ -389,7 +389,8 @@ dentry names
 For printing dentry name; if we race with :c:func:`d_move`, the name might
 be a mix of old and new ones, but it won't oops.  %pd dentry is a safer
 equivalent of %s dentry->d_name.name we used to use, %pd<n> prints ``n``
-last components.  %pD does the same thing for struct file.
+last components.  %pD does the same thing for struct file. By default, %p{D,d}
+is equal to %p{D,d}4.
 
 Passed by reference.
 

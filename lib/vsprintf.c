@@ -880,11 +880,11 @@ char *dentry_name(char *buf, char *end, const struct dentry *d, struct printf_sp
 	int i, n;
 
 	switch (fmt[1]) {
-		case '2': case '3': case '4':
+		case '1': case '2': case '3': case '4':
 			depth = fmt[1] - '0';
 			break;
 		default:
-			depth = 1;
+			depth = 4;
 	}
 
 	rcu_read_lock();
