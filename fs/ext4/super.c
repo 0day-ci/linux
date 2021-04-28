@@ -5180,8 +5180,10 @@ failed_mount3a:
 failed_mount3:
 	flush_work(&sbi->s_error_work);
 	del_timer_sync(&sbi->s_err_report);
-	if (sbi->s_mmp_tsk)
-		kthread_stop(sbi->s_mmp_tsk);
+	if (sbi->s_mmp_tsk) {
+		if (kthread_stop(sbi->s_mmp_tsk) == -EINTR)
+			kfree(kthread_data(sbi->s_mmp_tsk));
+	}
 failed_mount2:
 	rcu_read_lock();
 	group_desc = rcu_dereference(sbi->s_group_desc);
