@@ -3305,16 +3305,18 @@ static void kfree_rcu_work(struct work_struct *work)
 			debug_rcu_bhead_unqueue(bkvhead[i]);
 
 			rcu_lock_acquire(&rcu_callback_map);
-			if (i == 0) { // kmalloc() / kfree().
-				trace_rcu_invoke_kfree_bulk_callback(
-					rcu_state.name, bkvhead[i]->nr_records,
-					bkvhead[i]->records);
 
+			trace_rcu_invoke_free_bulk_callback(
+				rcu_state.name, bkvhead[i]->nr_records,
+				bkvhead[i]->records);
+
+			if (i == 0) // kmalloc() / kfree().
 				kfree_bulk(bkvhead[i]->nr_records,
 					bkvhead[i]->records);
-			} else { // vmalloc() / vfree().
-				vfree_bulk(bkvhead[i]->nr_records, bkvhead[i]->records);
-			}
+			else // vmalloc() / vfree().
+				vfree_bulk(bkvhead[i]->nr_records,
+					bkvhead[i]->records);
+
 			rcu_lock_release(&rcu_callback_map);
 
 			raw_spin_lock_irqsave(&krcp->lock, flags);

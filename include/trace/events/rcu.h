@@ -681,11 +681,11 @@ TRACE_EVENT_RCU(rcu_invoke_kvfree_callback,
 
 /*
  * Tracepoint for the invocation of a single RCU callback of the special
- * kfree_bulk() form. The first argument is the RCU flavor, the second
+ * "free bulk" form. The first argument is the RCU flavor, the second
  * argument is a number of elements in array to free, the third is an
  * address of the array holding nr_records entries.
  */
-TRACE_EVENT_RCU(rcu_invoke_kfree_bulk_callback,
+TRACE_EVENT_RCU(rcu_invoke_free_bulk_callback,
 
 	TP_PROTO(const char *rcuname, unsigned long nr_records, void **p),
 
