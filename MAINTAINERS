@@ -17304,6 +17304,17 @@ S:	Supported
 F:	drivers/net/pcs/pcs-xpcs.c
 F:	include/linux/pcs/pcs-xpcs.h
 
+SYNOPSYS DESIGNWARE HDMI RECEIVERS AND PHY DRIVERS
+M:	Jose Abreu <jose.abreu@synopsys.com>
+M:	Nelson Costa <nelson.costa@synopsys.com>
+L:	linux-media@vger.kernel.org
+S:	Odd Fixes
+F:	Documentation/devicetree/bindings/media/snps,dw-hdmi-rx.yaml
+F:	drivers/media/platform/dwc/*
+F:	drivers/phy/dwc/*
+F:	include/linux/phy/dwc/*
+F:	include/media/dwc/*
+
 SYNOPSYS DESIGNWARE I2C DRIVER
 M:	Jarkko Nikula <jarkko.nikula@linux.intel.com>
 R:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
