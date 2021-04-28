@@ -630,34 +630,46 @@ static void stmmac_get_strings(struct net_device *dev, u32 stringset, u8 *data)
 static void stmmac_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-
-	if (!priv->plat->pmt)
-		return phylink_ethtool_get_wol(priv->phylink, wol);
+	struct ethtool_wolinfo wol_phy = { .cmd = ETHTOOL_GWOL };
 
 	mutex_lock(&priv->lock);
-	if (device_can_wakeup(priv->device)) {
+	if (priv->plat->pmt) {
 		wol->supported = WAKE_MAGIC | WAKE_UCAST;
 		if (priv->hw_cap_support && !priv->dma_cap.pmt_magic_frame)
 			wol->supported &= ~WAKE_MAGIC;
-		wol->wolopts = priv->wolopts;
 	}
+
+	phylink_ethtool_get_wol(priv->phylink, &wol_phy);
+
+	/* Combine WoL capabilities both PHY and MAC */
+	wol->supported |= wol_phy.supported;
+	wol->wolopts = priv->wolopts;
+
 	mutex_unlock(&priv->lock);
 }
 
 static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct stmmac_priv *priv = netdev_priv(dev);
-	u32 support = WAKE_MAGIC | WAKE_UCAST;
+	struct ethtool_wolinfo wol_phy = { .cmd = ETHTOOL_GWOL };
+	u32 support = WAKE_MAGIC | WAKE_UCAST | WAKE_MAGICSECURE | WAKE_BCAST;
 
-	if (!device_can_wakeup(priv->device))
-		return -EOPNOTSUPP;
+	if (wol->wolopts & ~support)
+		return -EINVAL;
 
-	if (!priv->plat->pmt) {
+	/* First check if can WoL from PHY */
+	phylink_ethtool_get_wol(priv->phylink, &wol_phy);
+	if (wol->wolopts & wol_phy.supported) {
 		int ret = phylink_ethtool_set_wol(priv->phylink, wol);
 
-		if (!ret)
-			device_set_wakeup_enable(priv->device, !!wol->wolopts);
-		return ret;
+		if (!ret) {
+			pr_info("stmmac: phy wakeup enable\n");
+			device_set_wakeup_capable(priv->device, 1);
+			device_set_wakeup_enable(priv->device, 1);
+			goto wolopts_update;
+		} else {
+			return ret;
+		}
 	}
 
 	/* By default almost all GMAC devices support the WoL via
@@ -666,18 +678,21 @@ static int stmmac_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	if ((priv->hw_cap_support) && (!priv->dma_cap.pmt_magic_frame))
 		wol->wolopts &= ~WAKE_MAGIC;
 
-	if (wol->wolopts & ~support)
-		return -EINVAL;
-
-	if (wol->wolopts) {
-		pr_info("stmmac: wakeup enable\n");
+	if (priv->plat->pmt && wol->wolopts) {
+		pr_info("stmmac: mac wakeup enable\n");
+		device_set_wakeup_capable(priv->device, 1);
 		device_set_wakeup_enable(priv->device, 1);
 		enable_irq_wake(priv->wol_irq);
-	} else {
+		goto wolopts_update;
+	}
+
+	if (!wol->wolopts) {
+		device_set_wakeup_capable(priv->device, 0);
 		device_set_wakeup_enable(priv->device, 0);
 		disable_irq_wake(priv->wol_irq);
 	}
 
+wolopts_update:
 	mutex_lock(&priv->lock);
 	priv->wolopts = wol->wolopts;
 	mutex_unlock(&priv->lock);

@@ -1076,7 +1076,6 @@ static void stmmac_check_pcs_mode(struct stmmac_priv *priv)
  */
 static int stmmac_init_phy(struct net_device *dev)
 {
-	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
 	struct stmmac_priv *priv = netdev_priv(dev);
 	struct device_node *node;
 	int ret;
@@ -1101,9 +1100,6 @@ static int stmmac_init_phy(struct net_device *dev)
 
 		ret = phylink_connect_phy(priv->phylink, phydev);
 	}
-
-	phylink_ethtool_get_wol(priv->phylink, &wol);
-	device_set_wakeup_capable(priv->device, !!wol.supported);
 
 	return ret;
 }
@@ -4787,10 +4783,8 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 	if (priv->plat->tx_coe)
 		dev_info(priv->device, "TX Checksum insertion supported\n");
 
-	if (priv->plat->pmt) {
+	if (priv->plat->pmt)
 		dev_info(priv->device, "Wake-Up On Lan supported\n");
-		device_set_wakeup_capable(priv->device, 1);
-	}
 
 	if (priv->dma_cap.tsoen)
 		dev_info(priv->device, "TSO supported\n");
