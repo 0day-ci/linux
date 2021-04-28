@@ -29,6 +29,8 @@ source "drivers/media/platform/cadence/Kconfig"
 
 source "drivers/media/platform/davinci/Kconfig"
 
+source "drivers/media/platform/dwc/Kconfig"
+
 source "drivers/media/platform/omap/Kconfig"
 
 config VIDEO_ASPEED

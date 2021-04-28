@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
+config VIDEO_DWC_HDMI_RX
+	tristate "Synopsys DesignWare HDMI Receiver driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	help
+	  Support for Synopsys DesignWare HDMI RX Controller.
+	  This driver supports HDMI 2.0 version.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called dw-hdmi-rx.
