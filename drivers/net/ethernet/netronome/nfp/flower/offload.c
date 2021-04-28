@@ -1227,7 +1227,6 @@ nfp_flower_validate_pre_tun_rule(struct nfp_app *app,
 				return -EOPNOTSUPP;
 			}
 		ext += size;
-		mask += size;
 	}
 
 	if ((priv->flower_ext_feats & NFP_FL_FEATS_VLAN_QINQ)) {
