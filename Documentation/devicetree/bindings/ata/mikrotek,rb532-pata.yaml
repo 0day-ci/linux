@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/ata/mikrotek,rb532-pata.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Mikrotek RB532 PATA Controller bindings
+
+maintainers:
+  - Thomas Bogendoerfer <tsbogend@alpha.franken.de>
+
+properties:
+  compatible:
+    const: mikrotik,rb532-pata
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  gpio:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - gpio
+
+additionalProperties: false
+
+examples:
+  - |
+    cf@18a10000 {
+        compatible = "mikrotik,rb532-pata";
+        reg = <0x18a10000 0xc04>;
+
+        gpio = <&gpio0 13 0>;
+
+        interrupt-parent = <&gpio0>;
+        interrupts = <13 0>;
+    };
