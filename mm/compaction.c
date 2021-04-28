@@ -1925,17 +1925,18 @@ static bool kswapd_is_running(pg_data_t *pgdat)
 
 /*
  * A zone's fragmentation score is the external fragmentation wrt to the
- * COMPACTION_HPAGE_ORDER. It returns a value in the range [0, 100].
+ * sysctl_proactive_compaction_order. It returns a value in the range
+ * [0, 100].
  */
 static unsigned int fragmentation_score_zone(struct zone *zone)
 {
-	return extfrag_for_order(zone, COMPACTION_HPAGE_ORDER);
+	return extfrag_for_order(zone, sysctl_proactive_compaction_order);
 }
 
 /*
  * A weighted zone's fragmentation score is the external fragmentation
- * wrt to the COMPACTION_HPAGE_ORDER scaled by the zone's size. It
- * returns a value in the range [0, 100].
+ * wrt to the sysctl_proactive_compaction_order scaled by the zone's size.
+ * It returns a value in the range [0, 100].
  *
  * The scaling factor ensures that proactive compaction focuses on larger
  * zones like ZONE_NORMAL, rather than smaller, specialized zones like
@@ -2666,6 +2667,7 @@ int sysctl_compact_memory;
  * background. It takes values in the range [0, 100].
  */
 unsigned int __read_mostly sysctl_compaction_proactiveness = 20;
+unsigned int __read_mostly sysctl_proactive_compaction_order;
 
 /*
  * This is the entry point for compacting all nodes via
@@ -2957,6 +2959,8 @@ static int __init kcompactd_init(void)
 {
 	int nid;
 	int ret;
+
+	sysctl_proactive_compaction_order = COMPACTION_HPAGE_ORDER;
 
 	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
 					"mm/compaction:online",
