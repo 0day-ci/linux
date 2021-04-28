@@ -478,18 +478,20 @@ static struct dentry test_dentry[4] __initdata = {
 static void __init
 dentry(void)
 {
-	test("foo", "%pd", &test_dentry[0]);
+	test("foo", "%pd1", &test_dentry[0]);
 	test("foo", "%pd2", &test_dentry[0]);
 
-	test("(null)", "%pd", NULL);
-	test("(efault)", "%pd", PTR_INVALID);
-	test("(null)", "%pD", NULL);
-	test("(efault)", "%pD", PTR_INVALID);
+	test("(null)", "%pd1", NULL);
+	test("(efault)", "%pd1", PTR_INVALID);
+	test("(null)", "%pD1", NULL);
+	test("(efault)", "%pD1", PTR_INVALID);
 
-	test("romeo", "%pd", &test_dentry[3]);
+	test("romeo", "%pd1", &test_dentry[3]);
 	test("alfa/romeo", "%pd2", &test_dentry[3]);
 	test("bravo/alfa/romeo", "%pd3", &test_dentry[3]);
 	test("/bravo/alfa/romeo", "%pd4", &test_dentry[3]);
+	test("/bravo/alfa/romeo", "%pd", &test_dentry[3]);
+	test("/bravo/alfa/romeo", "%pd5", &test_dentry[3]);
 	test("/bravo/alfa", "%pd4", &test_dentry[2]);
 
 	test("bravo/alfa  |bravo/alfa  ", "%-12pd2|%*pd2", &test_dentry[2], -12, &test_dentry[2]);
