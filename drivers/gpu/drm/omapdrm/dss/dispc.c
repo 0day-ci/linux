@@ -182,6 +182,7 @@ struct dispc_device {
 	const struct dispc_features *feat;
 
 	bool is_enabled;
+	bool needs_resume;
 
 	struct regmap *syscon_pol;
 	u32 syscon_pol_offset;
@@ -4886,10 +4887,34 @@ static int dispc_runtime_resume(struct device *dev)
 	return 0;
 }
 
+static int dispc_suspend(struct device *dev)
+{
+	struct dispc_device *dispc = dev_get_drvdata(dev);
+
+	if (!dispc->is_enabled)
+		return 0;
+
+	dispc->needs_resume = true;
+
+	return dispc_runtime_suspend(dev);
+}
+
+static int dispc_resume(struct device *dev)
+{
+	struct dispc_device *dispc = dev_get_drvdata(dev);
+
+	if (!dispc->needs_resume)
+		return 0;
+
+	dispc->needs_resume = false;
+
+	return dispc_runtime_resume(dev);
+}
+
 static const struct dev_pm_ops dispc_pm_ops = {
 	.runtime_suspend = dispc_runtime_suspend,
 	.runtime_resume = dispc_runtime_resume,
-	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(dispc_suspend, dispc_resume)
 };
 
 struct platform_driver omap_dispchw_driver = {
