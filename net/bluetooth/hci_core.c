@@ -1003,10 +1003,105 @@ error:
 	kfree_skb(skb);
 }
 
+static void hci_read_supported_codecs_v2(struct hci_dev *hdev)
+{
+	struct sk_buff *skb;
+	__u8 num_codecs;
+
+	skb = __hci_cmd_sync(hdev, HCI_OP_READ_LOCAL_CODECS_V2, 0, NULL,
+			     HCI_CMD_TIMEOUT);
+
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Failed to read local supported codecs v2 (%ld)",
+			   PTR_ERR(skb));
+		return;
+	}
+
+	if (skb->len < 1 || skb->data[0])
+		goto error;
+
+	skb_pull(skb, 1);
+
+	if (skb->len < 1)
+		goto error;
+
+	/* enumerate standard codecs */
+	num_codecs = skb->data[0];
+
+	skb_pull(skb, 1);
+
+	if (num_codecs && skb->len  < (num_codecs * 2))
+		goto error;
+
+	while (num_codecs--) {
+		__u8 transport;
+
+		transport = skb->data[1];
+
+		if (transport & LOCAL_CODEC_ACL_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_ACL, false);
+
+		if (transport & LOCAL_CODEC_SCO_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_SCO, false);
+
+		if (transport & LOCAL_CODEC_BIS_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_BIS, false);
+
+		if (transport & LOCAL_CODEC_CIS_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_CIS, false);
+
+		skb_pull(skb, 2);
+	}
+
+	/* enumerate vendor specific codecs */
+	if (skb->len < 1)
+		goto error;
+
+	num_codecs = skb->data[0];
+
+	skb_pull(skb, 1);
+
+	if (num_codecs && skb->len < (num_codecs * 5))
+		goto error;
+
+	while (num_codecs--) {
+		__u8 transport;
+
+		transport = skb->data[4];
+
+		if (transport & LOCAL_CODEC_ACL_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_ACL, true);
+
+		if (transport & LOCAL_CODEC_SCO_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_SCO, true);
+
+		if (transport & LOCAL_CODEC_BIS_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_BIS, true);
+
+		if (transport & LOCAL_CODEC_CIS_MASK)
+			hci_read_codec_capabilities(hdev, skb->data,
+						    LOCAL_CODEC_CIS, true);
+
+		skb_pull(skb, 5);
+	}
+
+error:
+	kfree_skb(skb);
+}
+
 static void hci_init5_req(struct hci_dev *hdev)
 {
 	/* Read local codec list if the HCI command is supported */
-	if (hdev->commands[29] & 0x20)
+	if (hdev->commands[45] & 0x04)
+		hci_read_supported_codecs_v2(hdev);
+	else if (hdev->commands[29] & 0x20)
 		hci_read_supported_codecs(hdev);
 }
 
