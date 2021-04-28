@@ -72,7 +72,7 @@ static int snvs_lpgpr_write(void *context, unsigned int offset, void *val,
 		return -EPERM;
 
 	return regmap_bulk_write(priv->regmap, dcfg->offset + offset, val,
-				bytes / 4);
+				 bytes / priv->cfg.stride);
 }
 
 static int snvs_lpgpr_read(void *context, unsigned int offset, void *val,
@@ -81,8 +81,8 @@ static int snvs_lpgpr_read(void *context, unsigned int offset, void *val,
 	struct snvs_lpgpr_priv *priv = context;
 	const struct snvs_lpgpr_cfg *dcfg = priv->dcfg;
 
-	return regmap_bulk_read(priv->regmap, dcfg->offset + offset,
-			       val, bytes / 4);
+	return regmap_bulk_read(priv->regmap, dcfg->offset + offset, val,
+				bytes / priv->cfg.stride);
 }
 
 static int snvs_lpgpr_probe(struct platform_device *pdev)
