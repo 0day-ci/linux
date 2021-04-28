@@ -998,11 +998,11 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		}
 
 		/*
-		 * Migration will fail if an anonymous page is pinned in memory,
-		 * so avoid taking lru_lock and isolating it unnecessarily in an
-		 * admittedly racy check.
+		 * Migration will fail if an anonymous or tmpfs page is pinned
+		 * in memory, so avoid taking lru_lock and isolating it
+		 * unnecessarily in an admittedly racy check.
 		 */
-		if (!page_mapping(page) &&
+		if (!page_is_file_lru(page) &&
 		    page_count(page) > page_mapcount(page))
 			goto isolate_fail;
 
