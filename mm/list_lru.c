@@ -640,7 +640,7 @@ int __list_lru_init(struct list_lru *lru, bool memcg_aware,
 	else
 		lru->shrinker_id = -1;
 #endif
-	memcg_get_cache_ids();
+	memcg_list_lru_resize_lock();
 
 	lru->node = kcalloc(nr_node_ids, sizeof(*lru->node), GFP_KERNEL);
 	if (!lru->node)
@@ -663,7 +663,7 @@ int __list_lru_init(struct list_lru *lru, bool memcg_aware,
 
 	list_lru_register(lru);
 out:
-	memcg_put_cache_ids();
+	memcg_list_lru_resize_unlock();
 	return err;
 }
 EXPORT_SYMBOL_GPL(__list_lru_init);
@@ -674,7 +674,7 @@ void list_lru_destroy(struct list_lru *lru)
 	if (!lru->node)
 		return;
 
-	memcg_get_cache_ids();
+	memcg_list_lru_resize_lock();
 
 	list_lru_unregister(lru);
 
@@ -685,6 +685,6 @@ void list_lru_destroy(struct list_lru *lru)
 #ifdef CONFIG_MEMCG_KMEM
 	lru->shrinker_id = -1;
 #endif
-	memcg_put_cache_ids();
+	memcg_list_lru_resize_unlock();
 }
 EXPORT_SYMBOL_GPL(list_lru_destroy);

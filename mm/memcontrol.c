@@ -367,12 +367,12 @@ static int kmemcg_max_id;
 /* Protects memcg_nr_cache_ids */
 static DECLARE_RWSEM(memcg_cache_ids_sem);
 
-void memcg_get_cache_ids(void)
+void memcg_list_lru_resize_lock(void)
 {
 	down_read(&memcg_cache_ids_sem);
 }
 
-void memcg_put_cache_ids(void)
+void memcg_list_lru_resize_unlock(void)
 {
 	up_read(&memcg_cache_ids_sem);
 }
