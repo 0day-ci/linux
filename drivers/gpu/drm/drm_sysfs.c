@@ -519,3 +519,41 @@ void drm_class_device_unregister(struct device *dev)
 	return device_unregister(dev);
 }
 EXPORT_SYMBOL_GPL(drm_class_device_unregister);
+
+/**
+ * drm_connector_find_by_fwnode - Find a connector based on the associated fwnode
+ * @fwnode: fwnode for which to find the matching drm_connector
+ *
+ * This functions looks up a drm_connector based on its associated fwnode. When
+ * a connector is found a reference to the connector is returned. The caller must
+ * call drm_connector_put() to release this reference when it is done with the
+ * connector.
+ *
+ * Returns: A reference to the found connector or NULL if no matching connector was found
+ */
+struct drm_connector *drm_connector_find_by_fwnode(struct fwnode_handle *fwnode)
+{
+	struct drm_connector *connector, *found = NULL;
+	struct class_dev_iter iter;
+	struct device *dev;
+
+	if (!fwnode)
+		return NULL;
+
+	class_dev_iter_init(&iter, drm_class, NULL, &drm_sysfs_device_connector);
+	while ((dev = class_dev_iter_next(&iter))) {
+		connector = to_drm_connector(dev);
+
+		if ((connector->fwnode == fwnode) ||
+		    (connector->fwnode && connector->fwnode->secondary == fwnode)) {
+			drm_connector_get(connector);
+			found = connector;
+			break;
+		}
+
+	}
+	class_dev_iter_exit(&iter);
+
+	return found;
+}
+EXPORT_SYMBOL(drm_connector_find_by_fwnode);
