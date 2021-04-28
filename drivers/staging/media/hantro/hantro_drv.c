@@ -160,12 +160,12 @@ static void device_run(void *priv)
 	src = hantro_get_src_buf(ctx);
 	dst = hantro_get_dst_buf(ctx);
 
-	ret = clk_bulk_enable(ctx->dev->variant->num_clocks, ctx->dev->clocks);
-	if (ret)
-		goto err_cancel_job;
-
 	ret = pm_runtime_resume_and_get(ctx->dev->dev);
 	if (ret < 0)
+		goto err_cancel_job;
+
+	ret = clk_bulk_enable(ctx->dev->variant->num_clocks, ctx->dev->clocks);
+	if (ret)
 		goto err_cancel_job;
 
 	v4l2_m2m_buf_copy_metadata(src, dst, true);
