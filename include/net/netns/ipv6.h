@@ -8,6 +8,7 @@
 #ifndef __NETNS_IPV6_H__
 #define __NETNS_IPV6_H__
 #include <net/dst_ops.h>
+#include <linux/siphash.h>
 #include <uapi/linux/icmpv6.h>
 
 struct ctl_table_header;
@@ -30,6 +31,7 @@ struct netns_sysctl_ipv6 {
 	int ip6_rt_min_advmss;
 	u8 bindv6only;
 	u8 multipath_hash_policy;
+	u8 multipath_hash_seed;
 	u8 flowlabel_consistency;
 	u8 auto_flowlabels;
 	int icmpv6_time;
@@ -98,6 +100,7 @@ struct netns_ipv6 {
 	struct fib_rules_ops	*mr6_rules_ops;
 #endif
 #endif
+	siphash_key_t __rcu	*multipath_hash_seed_ctx;
 	atomic_t		dev_addr_genid;
 	atomic_t		fib6_sernum;
 	struct seg6_pernet_data *seg6_data;
