@@ -553,6 +553,46 @@ void ida_destroy(struct ida *ida)
 }
 EXPORT_SYMBOL(ida_destroy);
 
+/**
+ * ida_max() - Return the maximum allocated ID.
+ * @ida: IDA handle.
+ *
+ * Context: Any context. It is safe to call this function without
+ * locking in your code.
+ *
+ * Return: The maximum allocated ID, or %-ENOSPC if the @ida is empty
+ */
+int ida_max(struct ida *ida)
+{
+	XA_STATE(xas, &ida->xa, 0);
+	struct ida_bitmap *curr, *prev;
+	unsigned long flags;
+	unsigned int bit, index;
+
+	xas_lock_irqsave(&xas, flags);
+	if (ida_is_empty(ida)) {
+		xas_unlock_irqrestore(&xas, flags);
+		return -ENOSPC;
+	}
+
+	xas_for_each(&xas, curr, ULONG_MAX) {
+		prev = curr;
+		index = xas.xa_index;
+	}
+
+	if (xa_is_value(prev)) {
+		unsigned long val = xa_to_value(prev);
+
+		bit = find_last_bit(&val, BITS_PER_XA_VALUE);
+	} else {
+		bit = find_last_bit(prev->bitmap, IDA_BITMAP_BITS);
+	}
+
+	xas_unlock_irqrestore(&xas, flags);
+
+	return index * IDA_BITMAP_BITS + bit;
+}
+
 #ifndef __KERNEL__
 extern void xa_dump_index(unsigned long index, unsigned int shift);
 #define IDA_CHUNK_SHIFT		ilog2(IDA_BITMAP_BITS)

@@ -255,6 +255,7 @@ struct ida {
 int ida_alloc_range(struct ida *, unsigned int min, unsigned int max, gfp_t);
 void ida_free(struct ida *, unsigned int id);
 void ida_destroy(struct ida *ida);
+int ida_max(struct ida *ida);
 
 /**
  * ida_alloc() - Allocate an unused ID.
