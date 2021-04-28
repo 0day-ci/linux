@@ -523,11 +523,11 @@ fail:
 	goto out;
 }
 
-static void memcg_drain_list_lru_node(struct list_lru *lru, int nid,
-				      int src_idx, struct mem_cgroup *dst_memcg)
+static void memcg_reparent_list_lru_node(struct list_lru *lru, int nid,
+					 struct mem_cgroup *memcg,
+					 struct mem_cgroup *parent)
 {
 	struct list_lru_node *nlru = &lru->node[nid];
-	int dst_idx = dst_memcg->kmemcg_id;
 	struct list_lru_one *src, *dst;
 
 	/*
@@ -536,22 +536,23 @@ static void memcg_drain_list_lru_node(struct list_lru *lru, int nid,
 	 */
 	spin_lock_irq(&nlru->lock);
 
-	src = list_lru_from_memcg_idx(nlru, src_idx);
-	dst = list_lru_from_memcg_idx(nlru, dst_idx);
+	src = list_lru_from_memcg_idx(nlru, memcg->kmemcg_id);
+	dst = list_lru_from_memcg_idx(nlru, parent->kmemcg_id);
 
 	list_splice_init(&src->list, &dst->list);
 
 	if (src->nr_items) {
 		dst->nr_items += src->nr_items;
-		set_shrinker_bit(dst_memcg, nid, lru_shrinker_id(lru));
+		set_shrinker_bit(parent, nid, lru_shrinker_id(lru));
 		src->nr_items = 0;
 	}
 
 	spin_unlock_irq(&nlru->lock);
 }
 
-static void memcg_drain_list_lru(struct list_lru *lru,
-				 int src_idx, struct mem_cgroup *dst_memcg)
+static void memcg_reparent_list_lru(struct list_lru *lru,
+				    struct mem_cgroup *memcg,
+				    struct mem_cgroup *parent)
 {
 	int i;
 
@@ -559,16 +560,16 @@ static void memcg_drain_list_lru(struct list_lru *lru,
 		return;
 
 	for_each_node(i)
-		memcg_drain_list_lru_node(lru, i, src_idx, dst_memcg);
+		memcg_reparent_list_lru_node(lru, i, memcg, parent);
 }
 
-void memcg_drain_all_list_lrus(int src_idx, struct mem_cgroup *dst_memcg)
+void memcg_reparent_list_lrus(struct mem_cgroup *memcg, struct mem_cgroup *parent)
 {
 	struct list_lru *lru;
 
 	mutex_lock(&list_lrus_mutex);
 	list_for_each_entry(lru, &list_lrus, list)
-		memcg_drain_list_lru(lru, src_idx, dst_memcg);
+		memcg_reparent_list_lru(lru, memcg, parent);
 	mutex_unlock(&list_lrus_mutex);
 }
 #else
