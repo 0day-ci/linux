@@ -793,7 +793,7 @@ static void __err_print_to_sgl(struct drm_i915_error_state_buf *m,
 		struct intel_csr *csr = &m->i915->csr;
 
 		err_printf(m, "DMC loaded: %s\n",
-			   yesno(csr->dmc_payload != NULL));
+			   yesno(intel_csr_has_dmc_payload(m->i915) != 0));
 		err_printf(m, "DMC fw version: %d.%d\n",
 			   CSR_VERSION_MAJOR(csr->version),
 			   CSR_VERSION_MINOR(csr->version));

@@ -541,10 +541,10 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 
 	wakeref = intel_runtime_pm_get(&dev_priv->runtime_pm);
 
-	seq_printf(m, "fw loaded: %s\n", yesno(csr->dmc_payload != NULL));
+	seq_printf(m, "fw loaded: %s\n", yesno(intel_csr_has_dmc_payload(dev_priv)));
 	seq_printf(m, "path: %s\n", csr->fw_path);
 
-	if (!csr->dmc_payload)
+	if (!intel_csr_has_dmc_payload(dev_priv))
 		goto out;
 
 	seq_printf(m, "version: %d.%d\n", CSR_VERSION_MAJOR(csr->version),
