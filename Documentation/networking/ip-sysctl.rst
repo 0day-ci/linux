@@ -100,6 +100,20 @@ fib_multipath_hash_policy - INTEGER
 	- 1 - Layer 4
 	- 2 - Layer 3 or inner Layer 3 if present
 
+fib_multipath_hash_seed - STRING
+	Controls seed value for multipath route hashes. By default
+	random value is used. Only valid for kernels built with
+	CONFIG_IP_ROUTE_MULTIPATH enabled.
+
+	Valid format: two hex values set off with comma or "random"
+	keyword.
+
+	Example to generate the seed value::
+
+		RAND=$(openssl rand -hex 16) && echo "${RAND:0:16},${RAND:16:16}"
+
+	Default: "random"
+
 fib_sync_mem - UNSIGNED INTEGER
 	Amount of dirty memory from fib entries that can be backlogged before
 	synchronize_rcu is forced.
