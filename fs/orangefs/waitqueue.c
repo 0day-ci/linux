@@ -34,6 +34,8 @@ static void orangefs_clean_up_interrupted_operation(struct orangefs_kernel_op_s 
 void purge_waiting_ops(void)
 {
 	struct orangefs_kernel_op_s *op, *tmp;
+	char *opname;
+	int op_state;
 
 	spin_lock(&orangefs_request_list_lock);
 	list_for_each_entry_safe(op, tmp, &orangefs_request_list, list) {
@@ -41,12 +43,14 @@ void purge_waiting_ops(void)
 			     "pvfs2-client-core: purging op tag %llu %s\n",
 			     llu(op->tag),
 			     get_opname_string(op));
+		opname = get_opname_string(op);
+		op_state = op->op_state;
 		set_op_state_purged(op);
 		gossip_debug(GOSSIP_DEV_DEBUG,
 			     "%s: op:%s: op_state:%d: process:%s:\n",
 			     __func__,
-			     get_opname_string(op),
-			     op->op_state,
+			     opname,
+			     op_state,
 			     current->comm);
 	}
 	spin_unlock(&orangefs_request_list_lock);
