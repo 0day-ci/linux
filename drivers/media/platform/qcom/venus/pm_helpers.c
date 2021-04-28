@@ -486,7 +486,7 @@ static int poweron_coreid(struct venus_core *core, unsigned int coreid_mask)
 	int ret;
 
 	if (coreid_mask & VIDC_CORE_ID_1) {
-		ret = pm_runtime_get_sync(core->pmdomains[1]);
+		ret = pm_runtime_resume_and_get(core->pmdomains[1]);
 		if (ret < 0)
 			return ret;
 
@@ -504,7 +504,7 @@ static int poweron_coreid(struct venus_core *core, unsigned int coreid_mask)
 	}
 
 	if (coreid_mask & VIDC_CORE_ID_2) {
-		ret = pm_runtime_get_sync(core->pmdomains[2]);
+		ret = pm_runtime_resume_and_get(core->pmdomains[2]);
 		if (ret < 0)
 			return ret;
 
@@ -990,11 +990,9 @@ static int core_power_v4(struct venus_core *core, int on)
 
 	if (on == POWER_ON) {
 		if (pmctrl) {
-			ret = pm_runtime_get_sync(pmctrl);
-			if (ret < 0) {
-				pm_runtime_put_noidle(pmctrl);
+			ret = pm_runtime_resume_and_get(pmctrl);
+			if (ret < 0)
 				return ret;
-			}
 		}
 
 		ret = core_resets_reset(core);
