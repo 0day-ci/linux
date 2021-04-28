@@ -675,7 +675,7 @@ static void update_top_cache_domain(int cpu)
 	sd = highest_flag_domain(cpu, SD_ASYM_PACKING);
 	rcu_assign_pointer(per_cpu(sd_asym_packing, cpu), sd);
 
-	sd = lowest_flag_domain(cpu, SD_ASYM_CPUCAPACITY);
+	sd = lowest_flag_domain(cpu, SD_ASYM_CPUCAPACITY_FULL);
 	rcu_assign_pointer(per_cpu(sd_asym_cpucapacity, cpu), sd);
 }
 
@@ -1989,65 +1989,308 @@ static bool topology_span_sane(struct sched_domain_topology_level *tl,
 
 	return true;
 }
+/**
+ * Asym capacity bits
+ */
 
+/**
+ * Cached cpu masks for those sched domains, at a given topology level,
+ * that do represent CPUs with asymmetric capacities.
+ *
+ * Each topology level will get the cached data assigned,
+ * with asym cap sched_flags (SD_ASYM_CPUCAPACITY and SD_ASYM_CPUCAPACITY_FULL
+ * accordingly) and the corresponding cpumask for:
+ * - domains that do span CPUs with different capacities
+ * - domains where all CPU capacities are visible for all CPUs within
+ *   the domain
+ *
+ * Within a single topology level there might be domains
+ * with different scope of asymmetry:
+ *	none     -> .
+ *	partial  -> SD_ASYM_CPUCAPACITY
+ *	full     -> SD_ASYM_CPUCAPACITY|SD_ASYM_CPUCAPACITY_FULL
+ */
+struct asym_cache_data {
+
+	unsigned int			   sched_flags;
+	struct cpumask			   *asym_mask;
+	struct cpumask			   *asym_full_mask;
+};
+
+static inline int asym_cpu_capacity_verify(struct asym_cache_data *data,
+					   int tl_idx, int cpu)
+{
+	struct asym_cache_data *__data = data ? &data[tl_idx] : NULL;
+
+	if (!__data || !__data->sched_flags)
+		goto leave;
+
+	/*
+	 * For topology levels above one, where all CPUs observe
+	 * all available capacities, CPUs mask is not being
+	 * cached for optimization reasons, assuming, that at this
+	 * point, all possible CPUs are being concerned.
+	 * Those levels will have both:
+	 * SD_ASYM_CPUCAPACITY and SD_ASYM_CPUCAPACITY_FULL
+	 * flags set.
+	 */
+	if (__data->sched_flags & SD_ASYM_CPUCAPACITY_FULL &&
+	   !__data->asym_full_mask)
+		return __data->sched_flags;
+
+	if (__data->asym_full_mask &&
+	    cpumask_test_cpu(cpu, __data->asym_full_mask))
+		return __data->sched_flags;
+
+	/*
+	 * A given topology level might be marked with
+	 * SD_ASYM_CPUCAPACITY_FULL mask but only for a certain subset
+	 * of CPUs.
+	 * Consider the following:
+	 * #1
+	 *
+	 * DIE [                                ]
+	 * MC  [                       ][       ]
+	 *      [0] [1] [2] [3] [4] [5]  [6] [7]
+	 *      |.....| |.....| |.....|  |.....|
+	 *         L       M       B        B
+	 *
+	 * where:
+	 * arch_scale_cpu_capacity(L) = 512
+	 * arch_scale_cpu_capacity(M) = 871
+	 * arch_scale_cpu_capacity(B) = 1024
+	 *
+	 * MC topology level will be marked with both
+	 * SD_ASYM_CPUCAPACITY flags, but the relevant masks will be:
+	 *	asym_full_mask = [0-5]
+	 *	asym_mask empty (no other asymmetry apart from
+	 *                       already covered [0-5])
+	 *
+	 * #2
+	 *
+	 * DIE [                                        ]
+	 * MC  [                       ][               ]
+	 *      [0] [1] [2] [3] [4] [5]  [6] [7] [8] [9]
+	 *      |.....| |.....| |.....|  |.....| |.....|
+	 *         L       M       B        L       B
+	 *
+	 * MC topology level will be marked with both
+	 * SD_ASYM_CPUCAPACITY flags, but the relevant masks will be:
+	 *	asym_full_mask = [0-5]
+	 *	asym_mask      = [6-9]
+	 */
+	if (__data->asym_mask && cpumask_test_cpu(cpu, __data->asym_mask))
+		return SD_ASYM_CPUCAPACITY;
+
+leave:
+	return 0;
+}
+
+
+static inline void asym_cpu_capacity_release_data(struct asym_cache_data *data)
+{
+	struct sched_domain_topology_level *tl;
+	struct asym_cache_data *__data = data;
+
+	if (data) {
+
+		for_each_sd_topology(tl) {
+			if (!data->sched_flags)
+				goto next;
+			if (data->sched_flags & SD_ASYM_CPUCAPACITY_FULL)
+				kfree(data->asym_full_mask);
+			kfree(data->asym_mask);
+next:
+			++data;
+		}
+		kfree(__data);
+	}
+}
+
+static inline void asym_cpu_capacity_cache_data(struct asym_cache_data *data,
+			unsigned int flags, const struct cpumask *cpumask)
+{
+	struct cpumask **__mask;
+
+	if (!data)
+		return;
+
+	__mask = flags & SD_ASYM_CPUCAPACITY_FULL ? &data->asym_full_mask
+						  : &data->asym_mask;
+
+	if (!(*__mask))
+		*__mask = kzalloc(cpumask_size(), GFP_KERNEL);
+	if (*__mask)
+		cpumask_or(*__mask, *__mask, cpumask);
+	data->sched_flags |= flags;
+}
 /*
  * Find the sched_domain_topology_level where all CPU capacities are visible
  * for all CPUs.
  */
-static struct sched_domain_topology_level
-*asym_cpu_capacity_level(const struct cpumask *cpu_map)
+static struct asym_cache_data
+*asym_cpu_capacity_scan(const struct cpumask *cpu_map)
 {
-	int i, j, asym_level = 0;
-	bool asym = false;
+	/*
+	 * Simple data structure to record all available CPU capacities.
+	 * Additional scan level allows tracking unique capacities per each
+	 * topology level and each separate topology level CPU mask.
+	 * During each scan phase, the scan level will allow to determine,
+	 * whether given capacity has been already accounted for, by syncing
+	 * it with the scan stage id.
+	 */
+	struct capacity_entry {
+		struct list_head link;
+		unsigned long    capacity;
+		unsigned int     scan_level;
+	};
+
 	struct sched_domain_topology_level *tl, *asym_tl = NULL;
-	unsigned long cap;
-
-	/* Is there any asymmetry? */
-	cap = arch_scale_cpu_capacity(cpumask_first(cpu_map));
-
-	for_each_cpu(i, cpu_map) {
-		if (arch_scale_cpu_capacity(i) != cap) {
-			asym = true;
-			break;
-		}
-	}
-
-	if (!asym)
-		return NULL;
+	struct asym_cache_data *scan_data = NULL;
+	struct capacity_entry *entry = NULL, *tmp;
+	unsigned int level_count = 0;
+	unsigned int cap_count = 0;
+	unsigned int scan_id = 0;
+	LIST_HEAD(capacity_set);
+	unsigned long capacity;
+	cpumask_var_t cpu_mask;
+	int cpu;
 
 	/*
-	 * Examine topology from all CPU's point of views to detect the lowest
-	 * sched_domain_topology_level where a highest capacity CPU is visible
-	 * to everyone.
+	 * Build-up a list of all CPU capacities, verifying on the way
+	 * if there is any asymmetry at all
 	 */
-	for_each_cpu(i, cpu_map) {
-		unsigned long max_capacity = arch_scale_cpu_capacity(i);
-		int tl_id = 0;
+	for_each_cpu(cpu, cpu_map) {
+		unsigned long capacity = arch_scale_cpu_capacity(cpu);
 
-		for_each_sd_topology(tl) {
-			if (tl_id < asym_level)
-				goto next_level;
+		if (entry && capacity == entry->capacity)
+			goto next;
 
-			for_each_cpu_and(j, tl->mask(i), cpu_map) {
-				unsigned long capacity;
-
-				capacity = arch_scale_cpu_capacity(j);
-
-				if (capacity <= max_capacity)
-					continue;
-
-				max_capacity = capacity;
-				asym_level = tl_id;
-				asym_tl = tl;
-			}
-next_level:
-			tl_id++;
+		list_for_each_entry(entry, &capacity_set, link) {
+			if (capacity == entry->capacity)
+				goto next;
 		}
+
+		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+		if (entry) {
+			entry->capacity = capacity;
+			list_add(&entry->link, &capacity_set);
+		}
+		++cap_count;
+next:
+		;
 	}
 
-	return asym_tl;
-}
+	/* No asymmetry detected so skip the rest */
+	if (!(cap_count > 1))
+		goto leave;
 
+	if (!alloc_cpumask_var(&cpu_mask, GFP_KERNEL))
+		goto leave;
+
+	/* Get the number of topology levels */
+	for_each_sd_topology(tl) level_count++;
+	/*
+	 * Allocate an array to store cached data per each topology level
+	 */
+	scan_data = kcalloc(level_count, sizeof(*scan_data), GFP_KERNEL);
+	if (!scan_data) {
+		free_cpumask_var(cpu_mask);
+		goto leave;
+	}
+
+	level_count = 0;
+
+	for_each_sd_topology(tl) {
+		unsigned int local_cap_count;
+		bool full_asym = true;
+		const struct cpumask *mask;
+		struct asym_cache_data *data = &scan_data[level_count++];
+
+#ifdef CONFIG_NUMA
+		/*
+		 * For NUMA we might end-up in a sched domain that spans numa
+		 * nodes with cpus with different capacities which would not be
+		 * caught  by the above scan as those will have separate
+		 * cpumasks - subject to numa level
+		 * @see: sched_domains_curr_level & sd_numa_mask
+		 * Considered to be a no-go
+		 */
+		if (WARN_ON_ONCE(tl->numa_level && !full_asym))
+			goto leave;
+#endif
+
+		if (asym_tl) {
+			data->sched_flags = SD_ASYM_CPUCAPACITY |
+					    SD_ASYM_CPUCAPACITY_FULL;
+			continue;
+		}
+
+		cpumask_copy(cpu_mask, cpu_map);
+		cpu = cpumask_first(cpu_mask);
+
+		while (cpu < nr_cpu_ids) {
+			int i;
+
+			/*
+			 * Tracking each CPU capacity 'scan' id to distinguish
+			 * discovered capacity sets between different CPU masks
+			 * at each topology level: capturing unique capacity
+			 * values at each scan stage
+			 */
+			++scan_id;
+			local_cap_count = 0;
+
+			mask = tl->mask(cpu);
+			for_each_cpu_and(i, mask, cpu_map) {
+
+				capacity = arch_scale_cpu_capacity(i);
+
+				list_for_each_entry(entry, &capacity_set, link) {
+					if (entry->capacity == capacity &&
+					    entry->scan_level < scan_id) {
+						entry->scan_level = scan_id;
+						++local_cap_count;
+					}
+				}
+				__cpumask_clear_cpu(i, cpu_mask);
+			}
+			if (cap_count != local_cap_count)
+				full_asym = false;
+			if (local_cap_count > 1) {
+				int flags = (cap_count != local_cap_count)
+					 ? SD_ASYM_CPUCAPACITY
+					 : SD_ASYM_CPUCAPACITY
+					 | SD_ASYM_CPUCAPACITY_FULL;
+
+				asym_cpu_capacity_cache_data(data, flags, mask);
+			}
+			cpu = cpumask_first(cpu_mask);
+
+		}
+		/*
+		 * Clear the cached masks from CPUs that are not present
+		 * in cpu_map
+		 */
+		if (data->asym_mask)
+			cpumask_and(data->asym_mask, data->asym_mask, cpu_map);
+		if (data->asym_full_mask)
+			cpumask_and(data->asym_full_mask, data->asym_full_mask,
+				    cpu_map);
+
+		if (full_asym)
+			asym_tl = tl;
+	}
+	free_cpumask_var(cpu_mask);
+
+leave:
+	list_for_each_entry_safe(entry, tmp, &capacity_set, link) {
+		list_del(&entry->link);
+		kfree(entry);
+	}
+
+	return scan_data;
+}
 
 /*
  * Build sched domains for a given set of CPUs and attach the sched domains
@@ -2056,12 +2299,12 @@ next_level:
 static int
 build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *attr)
 {
+	struct asym_cache_data *asym_scan_data;
 	enum s_alloc alloc_state = sa_none;
 	struct sched_domain *sd;
 	struct s_data d;
 	struct rq *rq = NULL;
 	int i, ret = -ENOMEM;
-	struct sched_domain_topology_level *tl_asym;
 	bool has_asym = false;
 
 	if (WARN_ON(cpumask_empty(cpu_map)))
@@ -2071,18 +2314,20 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 	if (alloc_state != sa_rootdomain)
 		goto error;
 
-	tl_asym = asym_cpu_capacity_level(cpu_map);
+	asym_scan_data = asym_cpu_capacity_scan(cpu_map);
 
 	/* Set up domains for CPUs specified by the cpu_map: */
 	for_each_cpu(i, cpu_map) {
 		struct sched_domain_topology_level *tl;
 		int dflags = 0;
+		int tlid = 0;
 
 		sd = NULL;
 		for_each_sd_topology(tl) {
-			if (tl == tl_asym) {
-				dflags |= SD_ASYM_CPUCAPACITY;
-				has_asym = true;
+			if (!(dflags & SD_ASYM_CPUCAPACITY_FULL)) {
+				dflags |= asym_cpu_capacity_verify(asym_scan_data,
+						tlid, i);
+				has_asym = dflags & SD_ASYM_CPUCAPACITY;
 			}
 
 			if (WARN_ON(!topology_span_sane(tl, cpu_map, i)))
@@ -2096,9 +2341,11 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 				sd->flags |= SD_OVERLAP;
 			if (cpumask_equal(cpu_map, sched_domain_span(sd)))
 				break;
+			++tlid;
 		}
 	}
 
+	asym_cpu_capacity_release_data(asym_scan_data);
 	/* Build the groups for the domains */
 	for_each_cpu(i, cpu_map) {
 		for (sd = *per_cpu_ptr(d.sd, i); sd; sd = sd->parent) {
