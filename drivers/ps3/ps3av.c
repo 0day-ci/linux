@@ -175,6 +175,7 @@ static int ps3av_vuart_write(struct ps3_system_bus_device *dev,
 			     const void *buf, unsigned long size)
 {
 	int error;
+
 	dev_dbg(&dev->core, " -> %s:%d\n", __func__, __LINE__);
 	error = ps3_vuart_write(dev, buf, size);
 	dev_dbg(&dev->core, " <- %s:%d\n", __func__, __LINE__);
