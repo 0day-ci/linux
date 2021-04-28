@@ -496,11 +496,14 @@ eb_validate_vma(struct i915_execbuffer *eb,
 		struct drm_i915_gem_exec_object2 *entry,
 		struct i915_vma *vma)
 {
-	/* Relocations are disallowed for all platforms after TGL-LP.  This
-	 * also covers all platforms with local memory.
+	/*
+	 * Relocations are disallowed starting from gen12 with some exceptions
+	 * - TGL/RKL/ADL.
 	 */
 	if (entry->relocation_count &&
-	    INTEL_GEN(eb->i915) >= 12 && !IS_TIGERLAKE(eb->i915))
+	    INTEL_GEN(eb->i915) >= 12 && !(IS_TIGERLAKE(eb->i915) ||
+					   IS_ROCKETLAKE(eb->i915) ||
+					   IS_ALDERLAKE_S(eb->i915)))
 		return -EINVAL;
 
 	if (unlikely(entry->flags & eb->invalid_flags))
