@@ -383,12 +383,10 @@ static void memcg_destroy_list_lru_node(struct list_lru_node *nlru)
 	kvfree(memcg_lrus);
 }
 
-static int memcg_update_list_lru_node(struct list_lru_node *nlru,
-				      int old_size, int new_size)
+static int memcg_list_lru_node_inc(struct list_lru_node *nlru,
+				   int old_size, int new_size)
 {
 	struct list_lru_memcg *old, *new;
-
-	BUG_ON(old_size > new_size);
 
 	old = rcu_dereference_protected(nlru->memcg_lrus,
 					lockdep_is_held(&list_lrus_mutex));
@@ -418,10 +416,57 @@ static int memcg_update_list_lru_node(struct list_lru_node *nlru,
 	return 0;
 }
 
+/* This function always returns 0. */
+static int memcg_list_lru_node_dec(struct list_lru_node *nlru,
+				   int old_size, int new_size)
+{
+	struct list_lru_memcg *old, *new;
+
+	old = rcu_dereference_protected(nlru->memcg_lrus,
+					lockdep_is_held(&list_lrus_mutex));
+	__memcg_destroy_list_lru_node(old, new_size, old_size);
+
+	/* Reuse the old array if the allocation failures here. */
+	new = kvmalloc(sizeof(*new) + new_size * sizeof(void *), GFP_KERNEL);
+	if (!new)
+		return 0;
+
+	memcpy(&new->lru, &old->lru, new_size * sizeof(void *));
+
+	/*
+	 * The locking below allows readers that hold nlru->lock avoid taking
+	 * rcu_read_lock (see list_lru_from_memcg_idx).
+	 *
+	 * Since list_lru_{add,del} may be called under an IRQ-safe lock,
+	 * we have to use IRQ-safe primitives here to avoid deadlock.
+	 */
+	spin_lock_irq(&nlru->lock);
+	rcu_assign_pointer(nlru->memcg_lrus, new);
+	spin_unlock_irq(&nlru->lock);
+
+	kvfree_rcu(old, rcu);
+	return 0;
+}
+
+static int memcg_update_list_lru_node(struct list_lru_node *nlru,
+				      int old_size, int new_size)
+{
+	if (new_size > old_size)
+		return memcg_list_lru_node_inc(nlru, old_size, new_size);
+	else if (new_size < old_size)
+		return memcg_list_lru_node_dec(nlru, old_size, new_size);
+
+	return 0;
+}
+
 static void memcg_cancel_update_list_lru_node(struct list_lru_node *nlru,
 					      int old_size, int new_size)
 {
 	struct list_lru_memcg *memcg_lrus;
+
+	/* Nothing to do for the shrinking case. */
+	if (old_size >= new_size)
+		return;
 
 	memcg_lrus = rcu_dereference_protected(nlru->memcg_lrus,
 					       lockdep_is_held(&list_lrus_mutex));
