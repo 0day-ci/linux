@@ -5660,6 +5660,9 @@ dequeue_throttle:
 
 #ifdef CONFIG_SMP
 
+static const bool newidle_balance_in_callback = IS_ENABLED(CONFIG_PREEMPT_RT);
+static DEFINE_PER_CPU(struct callback_head, rebalance_head);
+
 /* Working cpumask for: load_balance, load_balance_newidle. */
 DEFINE_PER_CPU(cpumask_var_t, load_balance_mask);
 DEFINE_PER_CPU(cpumask_var_t, select_idle_mask);
@@ -10549,7 +10552,7 @@ static inline void nohz_newidle_balance(struct rq *this_rq) { }
  *     0 - failed, no new tasks
  *   > 0 - success, new (fair) tasks present
  */
-static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
+static int do_newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 {
 	unsigned long next_balance = jiffies + HZ;
 	int this_cpu = this_rq->cpu;
@@ -10557,7 +10560,9 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	int pulled_task = 0;
 	u64 curr_cost = 0;
 
-	update_misfit_status(NULL, this_rq);
+	if (!newidle_balance_in_callback)
+		update_misfit_status(NULL, this_rq);
+
 	/*
 	 * We must set idle_stamp _before_ calling idle_balance(), such that we
 	 * measure the duration of idle_balance() as idle time.
@@ -10576,7 +10581,8 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	 * further scheduler activity on it and we're being very careful to
 	 * re-start the picking loop.
 	 */
-	rq_unpin_lock(this_rq, rf);
+	if (!newidle_balance_in_callback)
+		rq_unpin_lock(this_rq, rf);
 
 	if (this_rq->avg_idle < sysctl_sched_migration_cost ||
 	    !READ_ONCE(this_rq->rd->overload)) {
@@ -10655,9 +10661,29 @@ out:
 	if (pulled_task)
 		this_rq->idle_stamp = 0;
 
-	rq_repin_lock(this_rq, rf);
+	if (!newidle_balance_in_callback)
+		rq_repin_lock(this_rq, rf);
 
 	return pulled_task;
+}
+
+static void newidle_balance_cb(struct rq *this_rq)
+{
+	update_rq_clock(this_rq);
+	do_newidle_balance(this_rq, NULL);
+}
+
+static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
+{
+	if (newidle_balance_in_callback) {
+		update_misfit_status(NULL, this_rq);
+		queue_balance_callback(this_rq,
+				       &per_cpu(rebalance_head, this_rq->cpu),
+				       newidle_balance_cb);
+		return 0;
+	}
+
+	return do_newidle_balance(this_rq, rf);
 }
 
 /*
