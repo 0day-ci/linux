@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0
+config VIDEO_DWC_HDMI_PHY_E40X
+	tristate "Synopsys DesignWare HDMI RX PHYs e405 and e406 driver"
+	select GENERIC_PHY
+	help
+	  Support for Synopsys DesignWare HDMI RX PHYs versions
+	  e405 and e406.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called phy-dw-hdmi-e40x.
+
+config VIDEO_DWC_HDMI_PHY_E40X_SUPPORT_TESTCHIP
+	bool "Synopsys DesignWare HDMI RX PHYs e405/e406 Test Chip Support"
+	depends on VIDEO_DWC_HDMI_PHY_E40X
+	help
+	  Support for Synopsys DesignWare HDMI RX PHYs e405/e406 with Test Chip.
+
+	  To have support for HDMI RX PHYs e405/e406 Test Chip, choose Y here.
+	  It will enable Test Chip additional requirements, for example enable
+	  the z calibration requirement during the PHY configuration.

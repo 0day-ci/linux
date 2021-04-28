@@ -13,6 +13,7 @@ obj-y					+= allwinner/	\
 					   amlogic/	\
 					   broadcom/	\
 					   cadence/	\
+					   dwc/		\
 					   freescale/	\
 					   hisilicon/	\
 					   ingenic/	\
