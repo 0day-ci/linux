@@ -636,7 +636,8 @@ struct drm_gem_open {
  * DRM_CAP_VBLANK_HIGH_CRTC
  *
  * If set to 1, the kernel supports specifying a CRTC index in the high bits of
- * &drm_wait_vblank_request.type.
+ * &drm_wait_vblank_request.type. To learn how to find out the index of a
+ * certain CRTC, please see :ref:`crtc_index`.
  *
  * Starting kernel version 2.6.39, this capability is always set to 1.
  */

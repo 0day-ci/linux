@@ -457,6 +457,20 @@ Userspace API Structures
 .. kernel-doc:: include/uapi/drm/drm_mode.h
    :doc: overview
 
+.. _crtc_index:
+
+CRTC index
+----------
+
+In some situations, it is important for userspace to find out the index of a
+CRTC. The CRTC index should not be confused with its object id.
+
+In order to do this, userspace should first query the resources object
+from the device that owns the CRTC (using the DRM_IOCTL_MODE_GETRESOURCES
+ioctl). The resources object contains a pointer to an array of CRTC's, and also
+the number of entries of the array. The index of the CRTC is the same as its
+position in this array.
+
 .. kernel-doc:: include/uapi/drm/drm.h
    :internal:
 
