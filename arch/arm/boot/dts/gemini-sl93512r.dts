@@ -138,7 +138,7 @@
 
 
 	soc {
-		flash@30000000 {
+		nand-controller@30000000 {
 			status = "okay";
 			/* 16MB of flash */
 			reg = <0x30000000 0x01000000>;

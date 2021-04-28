@@ -70,7 +70,7 @@
 	};
 
 	soc {
-		flash@30000000 {
+		nand-controller@30000000 {
 			status = "okay";
 			/* 8MB of flash */
 			reg = <0x30000000 0x00800000>;
@@ -136,7 +136,6 @@
 				/* Not used in this platform */
 			};
 		};
-
 		usb@68000000 {
 			status = "okay";
 		};

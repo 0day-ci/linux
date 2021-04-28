@@ -123,7 +123,7 @@
 
 
 	soc {
-		flash@30000000 {
+		nand-controller@30000000 {
 			status = "okay";
 			pinctrl-names = "enabled", "disabled";
 			pinctrl-0 = <&pflash_default_pins>;

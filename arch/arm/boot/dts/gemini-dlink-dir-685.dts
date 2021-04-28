@@ -281,7 +281,7 @@
 	};
 
 	soc {
-		flash@30000000 {
+		nand-controller@30000000 {
 			/*
 			 * Flash access collides with the Chip Enable signal for
 			 * the display panel, that reuse the parallel flash Chip
