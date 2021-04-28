@@ -637,6 +637,12 @@ int br_add_if(struct net_bridge *br, struct net_device *dev,
 	if (err)
 		goto err4;
 
+	/* Make sure dev->rx_handler_data is written in netdev_rx_handler_register
+	 * before the bit IFF_BRIDGE_PORT of dev->priv_flags is set.
+	 * coupled with smp_rmb() in br_get_link_af_size_filtered.
+	 */
+	smp_wmb();
+
 	dev->priv_flags |= IFF_BRIDGE_PORT;
 
 	err = netdev_master_upper_dev_link(dev, br->dev, NULL, NULL, extack);
