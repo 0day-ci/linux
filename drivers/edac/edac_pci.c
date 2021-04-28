@@ -68,7 +68,7 @@ EXPORT_SYMBOL_GPL(edac_pci_free_ctl_info);
 
 /*
  * find_edac_pci_by_dev()
- * 	scans the edac_pci list for a specific 'struct device *'
+ *	scans the edac_pci list for a specific 'struct device *'
  *
  *	return NULL if not found, or return control struct pointer
  */
@@ -91,11 +91,11 @@ static struct edac_pci_ctl_info *find_edac_pci_by_dev(struct device *dev)
 
 /*
  * add_edac_pci_to_global_list
- * 	Before calling this function, caller must assign a unique value to
- * 	edac_dev->pci_idx.
- * 	Return:
- * 		0 on success
- * 		1 on failure
+ *	Before calling this function, caller must assign a unique value to
+ *	edac_dev->pci_idx.
+ *	Return:
+ *		0 on success
+ *		1 on failure
  */
 static int add_edac_pci_to_global_list(struct edac_pci_ctl_info *pci)
 {
@@ -161,7 +161,7 @@ static void del_edac_pci_from_global_list(struct edac_pci_ctl_info *pci)
 /*
  * edac_pci_workq_function()
  *
- * 	periodic function that performs the operation
+ *	periodic function that performs the operation
  *	scheduled by a workq request, for a given PCI control struct
  */
 static void edac_pci_workq_function(struct work_struct *work_req)
