@@ -8,3 +8,13 @@ config VIDEO_DWC_HDMI_RX
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called dw-hdmi-rx.
+
+config VIDEO_DWC_HDMI_RX_CEC
+	bool "Synopsys DesignWare HDMI Receiver CEC support"
+	depends on VIDEO_DWC_HDMI_RX
+	select CEC_CORE
+	help
+	  When selected the Synopsys DesignWare HDMI RX controller
+	  will support the optional HDMI CEC feature.
+
+	  It uses the generic CEC framework interface.
