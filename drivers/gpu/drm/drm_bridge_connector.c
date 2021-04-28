@@ -203,6 +203,11 @@ static void drm_bridge_connector_destroy(struct drm_connector *connector)
 {
 	struct drm_bridge_connector *bridge_connector =
 		to_drm_bridge_connector(connector);
+	struct drm_bridge *bridge;
+
+	drm_for_each_bridge_in_chain(bridge_connector->encoder, bridge)
+		if (bridge->funcs->connector_detach)
+			bridge->funcs->connector_detach(bridge, connector);
 
 	if (bridge_connector->bridge_hpd) {
 		struct drm_bridge *hpd = bridge_connector->bridge_hpd;
@@ -318,6 +323,7 @@ struct drm_connector *drm_bridge_connector_init(struct drm_device *drm,
 	struct i2c_adapter *ddc = NULL;
 	struct drm_bridge *bridge;
 	int connector_type;
+	int ret;
 
 	bridge_connector = kzalloc(sizeof(*bridge_connector), GFP_KERNEL);
 	if (!bridge_connector)
@@ -375,6 +381,23 @@ struct drm_connector *drm_bridge_connector_init(struct drm_device *drm,
 		connector->polled = DRM_CONNECTOR_POLL_CONNECT
 				  | DRM_CONNECTOR_POLL_DISCONNECT;
 
-	return connector;
+	ret = 0;
+	/* call connector_attach for all bridges */
+	drm_for_each_bridge_in_chain(encoder, bridge) {
+		if (!bridge->funcs->connector_attach)
+			continue;
+		ret = bridge->funcs->connector_attach(bridge, connector);
+		if (ret)
+			break;
+	}
+	if (!ret)
+		return connector;
+
+	/* on error, detach any previously successfully attached connectors */
+	list_for_each_entry_continue_reverse(bridge, &(encoder)->bridge_chain,
+					     chain_node)
+		if (bridge->funcs->connector_detach)
+			bridge->funcs->connector_detach(bridge, connector);
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(drm_bridge_connector_init);
