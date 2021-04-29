@@ -464,7 +464,7 @@ static int fill_packet(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 		} else {
 			err = copy_data(qp->pd, 0, &wqe->dma,
 					payload_addr(pkt), paylen,
-					from_mr_obj,
+					RXE_FROM_MR_OBJ,
 					&crc);
 			if (err)
 				return err;
@@ -558,25 +558,25 @@ static void update_state(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 static int rxe_do_local_ops(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 {
 	u8 opcode = wqe->wr.opcode;
-	struct rxe_dev *rxe;
 	struct rxe_mr *mr;
-	u32 rkey;
 	int ret;
+	u32 rkey;
 
 	switch (opcode) {
 	case IB_WR_LOCAL_INV:
-		rxe = to_rdev(qp->ibqp.device);
 		rkey = wqe->wr.ex.invalidate_rkey;
-		mr = rxe_pool_get_index(&rxe->mr_pool, rkey >> 8);
-		if (!mr) {
-			pr_err("No MR for rkey %#x\n", rkey);
+		if (rkey_is_mw(rkey))
+			ret = rxe_invalidate_mw(qp, rkey);
+		else
+			ret = rxe_invalidate_mr(qp, rkey);
+
+		if (ret) {
 			wqe->state = wqe_state_error;
 			wqe->status = IB_WC_LOC_QP_OP_ERR;
-			return -EINVAL;
+			return ret;
 		}
-		mr->state = RXE_MR_STATE_FREE;
-		rxe_drop_ref(mr);
 		break;
+
 	case IB_WR_REG_MR:
 		mr = to_rmr(wqe->wr.wr.reg.mr);
 
@@ -588,14 +588,16 @@ static int rxe_do_local_ops(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 		mr->iova = wqe->wr.wr.reg.mr->iova;
 		rxe_drop_ref(mr);
 		break;
+
 	case IB_WR_BIND_MW:
 		ret = rxe_bind_mw(qp, wqe);
 		if (ret) {
 			wqe->state = wqe_state_error;
 			wqe->status = IB_WC_MW_BIND_ERR;
-			return -EINVAL;
+			return ret;
 		}
 		break;
+
 	default:
 		pr_err("Unexpected send wqe opcode %d\n", opcode);
 		wqe->state = wqe_state_error;
