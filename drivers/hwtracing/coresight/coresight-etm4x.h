@@ -1001,6 +1001,75 @@ void etm4_config_trace_mode(struct etmv4_config *config);
 u64 etm4x_sysreg_read(u32 offset, bool _relaxed, bool _64bit);
 void etm4x_sysreg_write(u64 val, u32 offset, bool _relaxed, bool _64bit);
 
+/*
+ * Register accessors for variable register number, use in a loop
+ * when 'reg' is not a constant that can be passed into an inline
+ * assembly.
+ */
+static inline void etm4x_relaxed_write32_varreg(struct csdev_access *csa, u32 val, u32 offset)
+{
+	if (csa->io_mem)
+		writel_relaxed(val, csa->base + offset);
+	else
+		etm4x_sysreg_write(val, offset, true, false);
+}
+
+static inline void etm4x_relaxed_write64_varreg(struct csdev_access *csa, u64 val, u32 offset)
+{
+	if (csa->io_mem)
+		writeq_relaxed(val, csa->base + offset);
+	else
+		etm4x_sysreg_write(val, offset, true, true);
+}
+
+static inline void etm4x_write32_varreg(struct csdev_access *csa, u32 val, u32 offset)
+{
+	if (csa->io_mem)
+		writel(val, csa->base + offset);
+	else
+		etm4x_sysreg_write(val, offset, false, false);
+}
+
+static inline void etm4x_write64_varreg(struct csdev_access *csa, u64 val, u32 offset)
+{
+	if (csa->io_mem)
+		writeq(val, csa->base + offset);
+	else
+		etm4x_sysreg_write(val, offset, false, true);
+}
+
+static inline u32 etm4x_relaxed_read32_varreg(struct csdev_access *csa, u32 offset)
+{
+	if (csa->io_mem)
+		return readl_relaxed(csa->base + offset);
+	else
+		return etm4x_sysreg_read(offset, true, false);
+}
+
+static inline u64 etm4x_relaxed_read64_varreg(struct csdev_access *csa, u32 offset)
+{
+	if (csa->io_mem)
+		return readq(csa->base + offset);
+	else
+		return etm4x_sysreg_read(offset, true, true);
+}
+
+static inline u32 etm4x_read32_varreg(struct csdev_access *csa, u32 offset)
+{
+	if (csa->io_mem)
+		return readl(csa->base + offset);
+	else
+		return etm4x_sysreg_read(offset, false, false);
+}
+
+static inline u64 etm4x_read64_varreg(struct csdev_access *csa, u32 offset)
+{
+	if (csa->io_mem)
+		return readl(csa->base + offset);
+	else
+		return etm4x_sysreg_read(offset, false, true);
+}
+
 static inline bool etm4x_is_ete(struct etmv4_drvdata *drvdata)
 {
 	return drvdata->arch >= ETM_ARCH_ETE;
