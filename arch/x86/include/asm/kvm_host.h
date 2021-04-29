@@ -1122,6 +1122,8 @@ struct kvm_arch {
 	 */
 	spinlock_t tdp_mmu_pages_lock;
 #endif /* CONFIG_X86_64 */
+
+	bool shadow_mmu_active;
 };
 
 struct kvm_vm_stat {
