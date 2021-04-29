@@ -16,6 +16,7 @@
 
 /* Driver includes */
 #include "../../host/tcp-offload.h"
+#include <linux/nvme-tcp.h>
 
 #define QEDN_MAJOR_VERSION		8
 #define QEDN_MINOR_VERSION		62
@@ -52,6 +53,8 @@
 
 /* Protocol defines */
 #define QEDN_MAX_IO_SIZE QED_NVMETCP_MAX_IO_SIZE
+#define QEDN_MAX_PDU_SIZE 0x80000 /* 512KB */
+#define QEDN_MAX_OUTSTANDING_R2T_PDUS 0 /* 0 Based == 1 max R2T */
 
 #define QEDN_SGE_BUFF_SIZE 4096
 #define QEDN_MAX_SGES_PER_TASK DIV_ROUND_UP(QEDN_MAX_IO_SIZE, QEDN_SGE_BUFF_SIZE)
@@ -64,6 +67,11 @@
 
 #define QEDN_TASK_INSIST_TMO 1000 /* 1 sec */
 #define QEDN_INVALID_ITID 0xFFFF
+
+#define QEDN_ICREQ_FW_PAYLOAD (sizeof(struct nvme_tcp_icreq_pdu) - \
+			       sizeof(struct nvmetcp_init_conn_req_hdr))
+/* The FW will handle the ICReq as CCCID 0 (FW internal design) */
+#define QEDN_ICREQ_CCCID 0
 
 /*
  * TCP offload stack default configurations and defines.
@@ -136,6 +144,16 @@ struct qedn_fp_queue {
 	char irqname[QEDN_IRQ_NAME_LEN];
 };
 
+struct qedn_negotiation_params {
+	u32 maxh2cdata; /* Negotiation */
+	u32 maxr2t; /* Validation */
+	u16 pfv; /* Validation */
+	bool hdr_digest; /* Negotiation */
+	bool data_digest; /* Negotiation */
+	u8 cpda; /* Negotiation */
+	u8 hpda; /* Validation */
+};
+
 struct qedn_ctx {
 	struct pci_dev *pdev;
 	struct qed_dev *cdev;
@@ -194,6 +212,9 @@ struct qedn_endpoint {
 	/* FW Params */
 	struct qed_chain fw_sq_chain;
 	void __iomem *p_doorbell;
+
+	/* Spinlock for accessing FW queue */
+	spinlock_t doorbell_lock;
 
 	/* TCP Params */
 	__be32 dst_addr[4]; /* In network order */
@@ -268,6 +289,12 @@ struct qedn_ctrl {
 	atomic_t host_num_active_conns;
 };
 
+struct qedn_icreq_padding {
+	u32 *buffer;
+	dma_addr_t pa;
+	struct nvmetcp_sge sge;
+};
+
 /* Connection level struct */
 struct qedn_conn_ctx {
 	/* IO path */
@@ -329,6 +356,11 @@ struct qedn_conn_ctx {
 
 	size_t sq_depth;
 
+	struct qedn_negotiation_params required_params;
+	struct qedn_negotiation_params pdu_params;
+	struct nvmetcp_icresp_hdr_psh icresp;
+	struct qedn_icreq_padding *icreq_pad;
+
 	/* "dummy" socket */
 	struct socket *sock;
 };
@@ -337,6 +369,7 @@ enum qedn_conn_resources_state {
 	QEDN_CONN_RESRC_FW_SQ,
 	QEDN_CONN_RESRC_ACQUIRE_CONN,
 	QEDN_CONN_RESRC_TASKS,
+	QEDN_CONN_RESRC_ICREQ_PAD,
 	QEDN_CONN_RESRC_CCCID_ITID_MAP,
 	QEDN_CONN_RESRC_TCP_PORT,
 	QEDN_CONN_RESRC_MAX = 64
@@ -375,5 +408,8 @@ void qedn_common_clear_fw_sgl(struct storage_sgl_task_params *sgl_task_params);
 void qedn_return_active_tasks(struct qedn_conn_ctx *conn_ctx);
 void qedn_destroy_free_tasks(struct qedn_fp_queue *fp_q,
 			     struct qedn_io_resources *io_resrc);
+void qedn_swap_bytes(u32 *p, int size);
+void qedn_prep_icresp(struct qedn_conn_ctx *conn_ctx, struct nvmetcp_fw_cqe *cqe);
+void qedn_ring_doorbell(struct qedn_conn_ctx *conn_ctx);
 
 #endif /* _QEDN_H_ */

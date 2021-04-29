@@ -285,6 +285,19 @@ static void qedn_set_ctrl_io_cpus(struct qedn_conn_ctx *conn_ctx, int qid)
 	conn_ctx->cpu = fp_q->cpu;
 }
 
+static void qedn_set_pdu_params(struct qedn_conn_ctx *conn_ctx)
+{
+	/* Enable digest once supported */
+	conn_ctx->required_params.hdr_digest = 0;
+	conn_ctx->required_params.data_digest = 0;
+
+	conn_ctx->required_params.maxr2t = QEDN_MAX_OUTSTANDING_R2T_PDUS;
+	conn_ctx->required_params.pfv = NVME_TCP_PFV_1_0;
+	conn_ctx->required_params.cpda = 0;
+	conn_ctx->required_params.hpda = 0;
+	conn_ctx->required_params.maxh2cdata = QEDN_MAX_PDU_SIZE;
+}
+
 static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid, size_t q_size)
 {
 	struct nvme_tcp_ofld_ctrl *ctrl = queue->ctrl;
@@ -307,6 +320,7 @@ static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid, size_t 
 	conn_ctx->ctrl = ctrl;
 	conn_ctx->sq_depth = q_size;
 	qedn_set_ctrl_io_cpus(conn_ctx, qid);
+	qedn_set_pdu_params(conn_ctx);
 
 	init_waitqueue_head(&conn_ctx->conn_waitq);
 	atomic_set(&conn_ctx->est_conn_indicator, 0);
@@ -1071,6 +1085,14 @@ exit_probe_and_release_mem:
 static int qedn_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	return __qedn_probe(pdev);
+}
+
+void qedn_swap_bytes(u32 *p, int size)
+{
+	int i;
+
+	for (i = 0; i < size; ++i, ++p)
+		*p = __swab32(*p);
 }
 
 static struct pci_driver qedn_pci_driver = {
