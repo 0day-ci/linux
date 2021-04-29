@@ -1717,19 +1717,6 @@ static int xilinx_dpdma_probe(struct platform_device *pdev)
 	if (IS_ERR(xdev->reg))
 		return PTR_ERR(xdev->reg);
 
-	xdev->irq = platform_get_irq(pdev, 0);
-	if (xdev->irq < 0) {
-		dev_err(xdev->dev, "failed to get platform irq\n");
-		return xdev->irq;
-	}
-
-	ret = request_irq(xdev->irq, xilinx_dpdma_irq_handler, IRQF_SHARED,
-			  dev_name(xdev->dev), xdev);
-	if (ret) {
-		dev_err(xdev->dev, "failed to request IRQ\n");
-		return ret;
-	}
-
 	ddev = &xdev->common;
 	ddev->dev = &pdev->dev;
 
@@ -1785,6 +1772,19 @@ static int xilinx_dpdma_probe(struct platform_device *pdev)
 		goto error_of_dma;
 	}
 
+	xdev->irq = platform_get_irq(pdev, 0);
+	if (xdev->irq < 0) {
+		dev_err(xdev->dev, "failed to get platform irq\n");
+		goto error_irq;
+	}
+
+	ret = request_irq(xdev->irq, xilinx_dpdma_irq_handler, IRQF_SHARED,
+			  dev_name(xdev->dev), xdev);
+	if (ret) {
+		dev_err(xdev->dev, "failed to request IRQ\n");
+		goto error_irq;
+	}
+
 	xilinx_dpdma_enable_irq(xdev);
 
 	xilinx_dpdma_debugfs_init(xdev);
@@ -1793,6 +1793,8 @@ static int xilinx_dpdma_probe(struct platform_device *pdev)
 
 	return 0;
 
+error_irq:
+	of_dma_controller_free(pdev->dev.of_node);
 error_of_dma:
 	dma_async_device_unregister(ddev);
 error_dma_async:
@@ -1800,8 +1802,6 @@ error_dma_async:
 error:
 	for (i = 0; i < ARRAY_SIZE(xdev->chan); i++)
 		xilinx_dpdma_chan_remove(xdev->chan[i]);
-
-	free_irq(xdev->irq, xdev);
 
 	return ret;
 }
