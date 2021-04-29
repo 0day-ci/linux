@@ -1811,7 +1811,8 @@ static int axg_audio_clkc_probe(struct platform_device *pdev)
 
 	ret = device_reset(dev);
 	if (ret) {
-		dev_err(dev, "failed to reset device\n");
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "failed to reset device\n");
 		return ret;
 	}
 
