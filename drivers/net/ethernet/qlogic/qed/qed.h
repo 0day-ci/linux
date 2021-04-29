@@ -240,6 +240,7 @@ enum QED_FEATURE {
 	QED_VF,
 	QED_RDMA_CNQ,
 	QED_ISCSI_CQ,
+	QED_NVMETCP_CQ = QED_ISCSI_CQ,
 	QED_FCOE_CQ,
 	QED_VF_L2_QUE,
 	QED_MAX_FEATURES,
@@ -592,6 +593,7 @@ struct qed_hwfn {
 	struct qed_ooo_info		*p_ooo_info;
 	struct qed_rdma_info		*p_rdma_info;
 	struct qed_iscsi_info		*p_iscsi_info;
+	struct qed_nvmetcp_info		*p_nvmetcp_info;
 	struct qed_fcoe_info		*p_fcoe_info;
 	struct qed_pf_params		pf_params;
 
@@ -828,6 +830,7 @@ struct qed_dev {
 		struct qed_eth_cb_ops		*eth;
 		struct qed_fcoe_cb_ops		*fcoe;
 		struct qed_iscsi_cb_ops		*iscsi;
+		struct qed_nvmetcp_cb_ops	*nvmetcp;
 	} protocol_ops;
 	void				*ops_cookie;
 

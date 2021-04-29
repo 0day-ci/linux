@@ -703,6 +703,7 @@ enum mf_mode {
 /* Per-protocol connection types */
 enum protocol_type {
 	PROTOCOLID_ISCSI,
+	PROTOCOLID_NVMETCP = PROTOCOLID_ISCSI,
 	PROTOCOLID_FCOE,
 	PROTOCOLID_ROCE,
 	PROTOCOLID_CORE,
