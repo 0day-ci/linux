@@ -452,7 +452,7 @@ static int ring_context_init_default_state(struct intel_context *ce,
 	struct drm_i915_gem_object *obj = ce->state->obj;
 	void *vaddr;
 
-	vaddr = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(obj, ww, I915_MAP_WB);
 	if (IS_ERR(vaddr))
 		return PTR_ERR(vaddr);
 

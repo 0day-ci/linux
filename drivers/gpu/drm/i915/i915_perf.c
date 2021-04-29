@@ -1662,7 +1662,7 @@ retry:
 		goto out_ww;
 	}
 
-	batch = cs = i915_gem_object_pin_map(bo, I915_MAP_WB);
+	batch = cs = i915_gem_object_pin_map(bo, &ww, I915_MAP_WB);
 	if (IS_ERR(batch)) {
 		ret = PTR_ERR(batch);
 		goto err_unpin;
@@ -1875,7 +1875,7 @@ retry:
 	if (err)
 		goto out_ww;
 
-	cs = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	cs = i915_gem_object_pin_map(obj, &ww, I915_MAP_WB);
 	if (IS_ERR(cs)) {
 		err = PTR_ERR(cs);
 		goto out_ww;

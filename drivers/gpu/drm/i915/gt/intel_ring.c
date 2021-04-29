@@ -56,7 +56,7 @@ int intel_ring_pin(struct intel_ring *ring, struct i915_gem_ww_ctx *ww)
 	} else {
 		int type = i915_coherent_map_type(vma->vm->i915, vma->obj, false);
 
-		addr = i915_gem_object_pin_map(vma->obj, type);
+		addr = i915_gem_object_pin_map(vma->obj, ww, type);
 	}
 
 	if (IS_ERR(addr)) {

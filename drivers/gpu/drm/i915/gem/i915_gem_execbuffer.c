@@ -1345,7 +1345,7 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 	if (err)
 		goto err_pool;
 
-	cmd = i915_gem_object_pin_map(pool->obj, pool->type);
+	cmd = i915_gem_object_pin_map(pool->obj, &eb->ww, pool->type);
 	if (IS_ERR(cmd)) {
 		err = PTR_ERR(cmd);
 		goto err_pool;
@@ -2494,7 +2494,8 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 			goto err_shadow;
 	}
 
-	pw->shadow_map = i915_gem_object_pin_map(shadow->obj, I915_MAP_WB);
+	pw->shadow_map = i915_gem_object_pin_map(shadow->obj, &eb->ww,
+						 I915_MAP_WB);
 	if (IS_ERR(pw->shadow_map)) {
 		err = PTR_ERR(pw->shadow_map);
 		goto err_trampoline;
@@ -2505,7 +2506,7 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 
 	pw->batch_map = ERR_PTR(-ENODEV);
 	if (needs_clflush && i915_has_memcpy_from_wc())
-		pw->batch_map = i915_gem_object_pin_map(batch, I915_MAP_WC);
+		pw->batch_map = i915_gem_object_pin_map(batch, &eb->ww, I915_MAP_WC);
 
 	if (IS_ERR(pw->batch_map)) {
 		err = i915_gem_object_pin_pages(batch);

@@ -341,6 +341,7 @@ static void *i915_gem_object_map_pfn(struct drm_i915_gem_object *obj,
 
 /* get, pin, and map the pages of the object into kernel space */
 void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
+			      struct i915_gem_ww_ctx *ww,
 			      enum i915_map_type type)
 {
 	enum i915_map_type has_type;
@@ -408,13 +409,26 @@ err_unpin:
 void *i915_gem_object_pin_map_unlocked(struct drm_i915_gem_object *obj,
 				       enum i915_map_type type)
 {
-	void *ret;
+	struct i915_gem_ww_ctx ww;
+	void *ptr;
+	int err;
 
-	i915_gem_object_lock(obj, NULL);
-	ret = i915_gem_object_pin_map(obj, type);
-	i915_gem_object_unlock(obj);
+	i915_gem_ww_ctx_init(&ww, true);
+retry:
+	err = i915_gem_object_lock(obj, &ww);
+	if (!err) {
+		ptr = i915_gem_object_pin_map(obj, &ww, type);
+		if (IS_ERR(ptr))
+			err = PTR_ERR(ptr);
+	}
+	if (err == -EDEADLK) {
+		err = i915_gem_ww_ctx_backoff(&ww);
+		if (!err)
+			goto retry;
+	}
+	i915_gem_ww_ctx_fini(&ww);
 
-	return ret;
+	return err ? ERR_PTR(err) : ptr;
 }
 
 void __i915_gem_object_flush_map(struct drm_i915_gem_object *obj,

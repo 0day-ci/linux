@@ -65,7 +65,7 @@ int map_pt_dma_locked(struct i915_address_space *vm, struct drm_i915_gem_object 
 	void *vaddr;
 
 	type = i915_coherent_map_type(vm->i915, obj, true);
-	vaddr = i915_gem_object_pin_map(obj, type);
+	vaddr = i915_gem_object_pin_map(obj, NULL, type);
 	if (IS_ERR(vaddr))
 		return PTR_ERR(vaddr);
 

@@ -53,7 +53,7 @@ static int render_state_setup(struct intel_renderstate *so,
 	int ret = -EINVAL;
 	u32 *d;
 
-	d = i915_gem_object_pin_map(so->vma->obj, I915_MAP_WB);
+	d = i915_gem_object_pin_map(so->vma->obj, &so->ww, I915_MAP_WB);
 	if (IS_ERR(d))
 		return PTR_ERR(d);
 

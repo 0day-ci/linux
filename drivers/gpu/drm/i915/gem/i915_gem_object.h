@@ -450,6 +450,7 @@ void i915_gem_object_writeback(struct drm_i915_gem_object *obj);
  * ERR_PTR() on error.
  */
 void *__must_check i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
+					   struct i915_gem_ww_ctx *ww,
 					   enum i915_map_type type);
 
 void *__must_check i915_gem_object_pin_map_unlocked(struct drm_i915_gem_object *obj,

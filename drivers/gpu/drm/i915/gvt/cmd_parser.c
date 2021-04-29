@@ -1935,7 +1935,7 @@ static int perform_bb_shadow(struct parser_exec_state *s)
 		goto err_free_bb;
 	}
 
-	bb->va = i915_gem_object_pin_map(bb->obj, I915_MAP_WB);
+	bb->va = i915_gem_object_pin_map_unlocked(bb->obj, I915_MAP_WB);
 	if (IS_ERR(bb->va)) {
 		ret = PTR_ERR(bb->va);
 		goto err_free_obj;
@@ -3008,7 +3008,7 @@ static int shadow_indirect_ctx(struct intel_shadow_wa_ctx *wa_ctx)
 		return PTR_ERR(obj);
 
 	/* get the va of the shadow batch buffer */
-	map = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	map = i915_gem_object_pin_map_unlocked(obj, I915_MAP_WB);
 	if (IS_ERR(map)) {
 		gvt_vgpu_err("failed to vmap shadow indirect ctx\n");
 		ret = PTR_ERR(map);

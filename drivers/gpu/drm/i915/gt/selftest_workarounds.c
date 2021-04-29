@@ -223,7 +223,7 @@ static int check_whitelist(struct intel_context *ce)
 	if (err)
 		goto out_put;
 
-	vaddr = i915_gem_object_pin_map(results, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(results, NULL, I915_MAP_WB);
 	if (IS_ERR(vaddr)) {
 		err = PTR_ERR(vaddr);
 		goto out_put;
@@ -529,13 +529,13 @@ retry:
 		if (err)
 			goto out;
 
-		cs = i915_gem_object_pin_map(batch->obj, I915_MAP_WC);
+		cs = i915_gem_object_pin_map(batch->obj, &ww, I915_MAP_WC);
 		if (IS_ERR(cs)) {
 			err = PTR_ERR(cs);
 			goto out_ctx;
 		}
 
-		results = i915_gem_object_pin_map(scratch->obj, I915_MAP_WB);
+		results = i915_gem_object_pin_map(scratch->obj, &ww, I915_MAP_WB);
 		if (IS_ERR(results)) {
 			err = PTR_ERR(results);
 			goto out_unmap_batch;

@@ -29,7 +29,7 @@ static void dbg_poison_ce(struct intel_context *ce)
 		if (!i915_gem_object_trylock(obj))
 			return;
 
-		map = i915_gem_object_pin_map(obj, type);
+		map = i915_gem_object_pin_map(obj, NULL, type);
 		if (!IS_ERR(map)) {
 			memset(map, CONTEXT_REDZONE, obj->base.size);
 			i915_gem_object_flush_map(obj);

@@ -20,7 +20,7 @@ static int mock_timeline_pin(struct intel_timeline *tl)
 	if (WARN_ON(!i915_gem_object_trylock(tl->hwsp_ggtt->obj)))
 		return -EBUSY;
 
-	err = intel_timeline_pin_map(tl);
+	err = intel_timeline_pin_map(tl, NULL);
 	i915_gem_object_unlock(tl->hwsp_ggtt->obj);
 	if (err)
 		return err;

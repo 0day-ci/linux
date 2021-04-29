@@ -54,7 +54,7 @@ static void *igt_spinner_pin_obj(struct intel_context *ce,
 	if (ret)
 		return ERR_PTR(ret);
 
-	vaddr = i915_gem_object_pin_map(obj, mode);
+	vaddr = i915_gem_object_pin_map(obj, ww, mode);
 
 	if (!ww)
 		i915_gem_object_unlock(obj);

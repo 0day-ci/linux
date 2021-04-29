@@ -902,7 +902,7 @@ lrc_pre_pin(struct intel_context *ce,
 	GEM_BUG_ON(!ce->state);
 	GEM_BUG_ON(!i915_vma_is_pinned(ce->state));
 
-	*vaddr = i915_gem_object_pin_map(ce->state->obj,
+	*vaddr = i915_gem_object_pin_map(ce->state->obj, ww,
 					 i915_coherent_map_type(ce->engine->i915,
 								ce->state->obj,
 								false) |
@@ -1514,7 +1514,7 @@ retry:
 	if (err)
 		goto err;
 
-	batch = i915_gem_object_pin_map(wa_ctx->vma->obj, I915_MAP_WB);
+	batch = i915_gem_object_pin_map(wa_ctx->vma->obj, &ww, I915_MAP_WB);
 	if (IS_ERR(batch)) {
 		err = PTR_ERR(batch);
 		goto err_unpin;

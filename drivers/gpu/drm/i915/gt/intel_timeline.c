@@ -53,13 +53,14 @@ static int __timeline_active(struct i915_active *active)
 }
 
 I915_SELFTEST_EXPORT int
-intel_timeline_pin_map(struct intel_timeline *timeline)
+intel_timeline_pin_map(struct intel_timeline *timeline,
+		       struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_gem_object *obj = timeline->hwsp_ggtt->obj;
 	u32 ofs = offset_in_page(timeline->hwsp_offset);
 	void *vaddr;
 
-	vaddr = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	vaddr = i915_gem_object_pin_map(obj, ww, I915_MAP_WB);
 	if (IS_ERR(vaddr))
 		return PTR_ERR(vaddr);
 
@@ -184,7 +185,7 @@ int intel_timeline_pin(struct intel_timeline *tl, struct i915_gem_ww_ctx *ww)
 		return 0;
 
 	if (!tl->hwsp_map) {
-		err = intel_timeline_pin_map(tl);
+		err = intel_timeline_pin_map(tl, ww);
 		if (err)
 			return err;
 	}

@@ -439,7 +439,7 @@ retry:
 		goto out;
 
 	/* As this is primarily for debugging, let's focus on simplicity */
-	vaddr = i915_gem_object_pin_map(obj, I915_MAP_FORCE_WC);
+	vaddr = i915_gem_object_pin_map(obj, &ww, I915_MAP_FORCE_WC);
 	if (IS_ERR(vaddr)) {
 		err = PTR_ERR(vaddr);
 		goto out;

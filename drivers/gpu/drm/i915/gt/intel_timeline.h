@@ -98,6 +98,7 @@ intel_timeline_is_last(const struct intel_timeline *tl,
 	return list_is_last_rcu(&rq->link, &tl->requests);
 }
 
-I915_SELFTEST_DECLARE(int intel_timeline_pin_map(struct intel_timeline *tl));
+I915_SELFTEST_DECLARE(int intel_timeline_pin_map(struct intel_timeline *tl,
+						 struct i915_gem_ww_ctx *ww));
 
 #endif

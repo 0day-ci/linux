@@ -893,13 +893,15 @@ out_file:
 	return err;
 }
 
-static int rpcs_query_batch(struct drm_i915_gem_object *rpcs, struct i915_vma *vma)
+static int rpcs_query_batch(struct drm_i915_gem_object *rpcs,
+			    struct i915_gem_ww_ctx *ww,
+			    struct i915_vma *vma)
 {
 	u32 *cmd;
 
 	GEM_BUG_ON(INTEL_GEN(vma->vm->i915) < 8);
 
-	cmd = i915_gem_object_pin_map(rpcs, I915_MAP_WB);
+	cmd = i915_gem_object_pin_map(rpcs, ww, I915_MAP_WB);
 	if (IS_ERR(cmd))
 		return PTR_ERR(cmd);
 
@@ -965,7 +967,7 @@ retry:
 	if (err)
 		goto err_vma;
 
-	err = rpcs_query_batch(rpcs, vma);
+	err = rpcs_query_batch(rpcs, &ww, vma);
 	if (err)
 		goto err_batch;
 

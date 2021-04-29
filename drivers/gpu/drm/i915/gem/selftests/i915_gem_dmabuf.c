@@ -120,7 +120,7 @@ static int igt_dmabuf_import(void *arg)
 	}
 
 	if (0) { /* Can not yet map dmabuf */
-		obj_map = i915_gem_object_pin_map(obj, I915_MAP_WB);
+		obj_map = i915_gem_object_pin_map(obj, NULL, I915_MAP_WB);
 		if (IS_ERR(obj_map)) {
 			err = PTR_ERR(obj_map);
 			pr_err("i915_gem_object_pin_map failed with err=%d\n", err);

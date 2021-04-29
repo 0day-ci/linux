@@ -83,16 +83,16 @@ create_spin_counter(struct intel_engine_cs *engine,
 
 	err = i915_vma_pin(vma, 0, 0, PIN_USER);
 	if (err)
-		goto err_unlock;
+		goto err_put;
 
-	i915_vma_lock(vma);
-
-	base = i915_gem_object_pin_map(obj, I915_MAP_WC);
+	base = i915_gem_object_pin_map_unlocked(obj, I915_MAP_WC);
 	if (IS_ERR(base)) {
 		err = PTR_ERR(base);
 		goto err_unpin;
 	}
 	cs = base;
+
+	i915_vma_lock(vma);
 
 	*cs++ = MI_LOAD_REGISTER_IMM(__NGPR__ * 2);
 	for (i = 0; i < __NGPR__; i++) {
@@ -137,8 +137,6 @@ create_spin_counter(struct intel_engine_cs *engine,
 
 err_unpin:
 	i915_vma_unpin(vma);
-err_unlock:
-	i915_vma_unlock(vma);
 err_put:
 	i915_gem_object_put(obj);
 	return ERR_PTR(err);

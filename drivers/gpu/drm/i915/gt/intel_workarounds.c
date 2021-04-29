@@ -2233,7 +2233,7 @@ retry:
 		goto err_rq;
 	}
 
-	results = i915_gem_object_pin_map(vma->obj, I915_MAP_WB);
+	results = i915_gem_object_pin_map(vma->obj, NULL, I915_MAP_WB);
 	if (IS_ERR(results)) {
 		err = PTR_ERR(results);
 		goto err_rq;
