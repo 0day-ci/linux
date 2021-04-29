@@ -52,8 +52,11 @@
  * - Public functions to init or apply the given workaround type.
  */
 
-static void wa_init_start(struct i915_wa_list *wal, const char *name, const char *engine_name)
+static void
+wa_init_start(struct drm_i915_private *i915, struct i915_wa_list *wal,
+	      const char *name, const char *engine_name)
 {
+	wal->i915 = i915;
 	wal->name = name;
 	wal->engine_name = engine_name;
 }
@@ -79,6 +82,59 @@ static void wa_init_finish(struct i915_wa_list *wal)
 
 	DRM_DEBUG_DRIVER("Initialized %u %s workarounds on %s\n",
 			 wal->wa_count, wal->name, wal->engine_name);
+}
+
+static void
+log_bad_wa(const struct i915_wa_list *wal, const struct i915_wa *wa,
+	   const char *msg)
+{
+	drm_err(&wal->i915->drm,
+		"Discarding %s workaround! (reg=%x %s=%x set=%x)\n",
+		msg, i915_mmio_reg_offset(wa->reg), wa->clr ? "clear" : "mask",
+		wa->clr ?: wa->set >> 16, wa->set);
+}
+
+static bool
+check_conflict(const struct i915_wa_list *wal,
+	       const struct i915_wa *old,
+	       const struct i915_wa *new)
+{
+	u32 new_mask, old_mask, common, new_set, old_set;
+
+	if (new->clr && !old->clr) {
+		log_bad_wa(wal, new, "mixed masked and regular");
+		return true;
+	}
+
+	if (new->clr) {
+		new_mask = new->clr;
+		old_mask = old->clr;
+		new_set = new->set;
+		old_set = old->set;
+	} else {
+		new_mask = new->set >> 16;
+		old_mask = old->set >> 16;
+		new_set = new->set & 0xffff;
+		old_set = old->set & 0xffff;
+	}
+
+	if (new_set && (new_set & ~new_mask)) {
+		log_bad_wa(wal, new, "write outside the mask");
+		return true;
+	}
+
+	common = new_mask & old_mask;
+	if (common) {
+		if ((new_set & common) != (old_set & common)) {
+			log_bad_wa(wal, new, "conflicting");
+			return true;
+		} else if (new_mask == old_mask) {
+			log_bad_wa(wal, new, "duplicate");
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
@@ -118,18 +174,13 @@ static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 		} else {
 			wa_ = &wal->list[mid];
 
-			if ((wa->clr | wa_->clr) && !(wa->clr & ~wa_->clr)) {
-				DRM_ERROR("Discarding overwritten w/a for reg %04x (clear: %08x, set: %08x)\n",
-					  i915_mmio_reg_offset(wa_->reg),
-					  wa_->clr, wa_->set);
-
-				wa_->set &= ~wa->clr;
+			if (!check_conflict(wal, wa_, wa)) {
+				wal->wa_count++;
+				wa_->set |= wa->set;
+				wa_->clr |= wa->clr;
+				wa_->read |= wa->read;
 			}
 
-			wal->wa_count++;
-			wa_->set |= wa->set;
-			wa_->clr |= wa->clr;
-			wa_->read |= wa->read;
 			return;
 		}
 	}
@@ -707,7 +758,7 @@ __intel_engine_init_ctx_wa(struct intel_engine_cs *engine,
 	if (engine->class != RENDER_CLASS)
 		return;
 
-	wa_init_start(wal, name, engine->name);
+	wa_init_start(engine->i915, wal, name, engine->name);
 
 	if (IS_DG1(i915))
 		dg1_ctx_workarounds_init(engine, wal);
@@ -1200,7 +1251,7 @@ void intel_gt_init_workarounds(struct drm_i915_private *i915)
 {
 	struct i915_wa_list *wal = &i915->gt_wa_list;
 
-	wa_init_start(wal, "GT", "global");
+	wa_init_start(i915, wal, "GT", "global");
 	gt_init_workarounds(i915, wal);
 	wa_init_finish(wal);
 }
@@ -1543,7 +1594,7 @@ void intel_engine_init_whitelist(struct intel_engine_cs *engine)
 	struct drm_i915_private *i915 = engine->i915;
 	struct i915_wa_list *w = &engine->whitelist;
 
-	wa_init_start(w, "whitelist", engine->name);
+	wa_init_start(engine->i915, w, "whitelist", engine->name);
 
 	if (IS_DG1(i915))
 		dg1_whitelist_build(engine);
@@ -2064,7 +2115,7 @@ void intel_engine_init_workarounds(struct intel_engine_cs *engine)
 	if (INTEL_GEN(engine->i915) < 4)
 		return;
 
-	wa_init_start(wal, "engine", engine->name);
+	wa_init_start(engine->i915, wal, "engine", engine->name);
 	engine_init_workarounds(engine, wal);
 	wa_init_finish(wal);
 }

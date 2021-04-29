@@ -10,6 +10,8 @@
 
 #include "i915_reg.h"
 
+struct drm_i915_private;
+
 struct i915_wa {
 	i915_reg_t	reg;
 	u32		clr;
@@ -18,6 +20,8 @@ struct i915_wa {
 };
 
 struct i915_wa_list {
+	struct drm_i915_private *i915;
+
 	const char	*name;
 	const char	*engine_name;
 	struct i915_wa	*list;
