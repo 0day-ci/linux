@@ -8,6 +8,7 @@
 
 #include "i915_drv.h"
 #include "i915_reg.h"
+#include "i915_trace.h"
 #include "intel_uncore.h"
 
 static inline u32
@@ -26,7 +27,12 @@ intel_de_posting_read(struct drm_i915_private *i915, i915_reg_t reg)
 static inline u32
 intel_de_read_fw(struct drm_i915_private *i915, i915_reg_t reg)
 {
-	return intel_uncore_read_fw(&i915->uncore, reg);
+	u32 val;
+
+	val = intel_uncore_read_fw(&i915->uncore, reg);
+	trace_i915_reg_rw(false, reg, val, sizeof(val), true);
+
+	return val;
 }
 
 static inline void
@@ -39,6 +45,7 @@ intel_de_write(struct drm_i915_private *i915, i915_reg_t reg, u32 val)
 static inline void
 intel_de_write_fw(struct drm_i915_private *i915, i915_reg_t reg, u32 val)
 {
+	trace_i915_reg_rw(true, reg, val, sizeof(val), true);
 	intel_uncore_write_fw(&i915->uncore, reg, val);
 }
 
