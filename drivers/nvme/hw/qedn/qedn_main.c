@@ -328,6 +328,7 @@ static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid, size_t 
 	atomic_set(&conn_ctx->destroy_conn_indicator, 0);
 
 	spin_lock_init(&conn_ctx->conn_state_lock);
+	spin_lock_init(&conn_ctx->async_cccid_bitmap_lock);
 
 	INIT_WORK(&conn_ctx->nvme_req_fp_wq_entry, qedn_nvme_req_fp_wq_handler);
 	conn_ctx->nvme_req_fp_wq = qedn->nvme_req_fp_wq;
