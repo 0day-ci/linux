@@ -105,7 +105,6 @@ struct nvme_tcp_ofld_ctrl {
 	 * Each entry in the array indicates the number of queues of
 	 * corresponding type.
 	 */
-	u32 queue_type_mapping[HCTX_MAX_TYPES];
 	u32 io_queues[HCTX_MAX_TYPES];
 
 	/* Connectivity params */
@@ -205,3 +204,4 @@ struct nvme_tcp_ofld_ops {
 int nvme_tcp_ofld_register_dev(struct nvme_tcp_ofld_dev *dev);
 void nvme_tcp_ofld_unregister_dev(struct nvme_tcp_ofld_dev *dev);
 void nvme_tcp_ofld_error_recovery(struct nvme_ctrl *nctrl);
+inline size_t nvme_tcp_ofld_inline_data_size(struct nvme_tcp_ofld_queue *queue);
