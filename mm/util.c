@@ -1046,8 +1046,10 @@ void page_offline_begin(void)
 {
 	down_write(&page_offline_rwsem);
 }
+EXPORT_SYMBOL(page_offline_begin);
 
 void page_offline_end(void)
 {
 	up_write(&page_offline_rwsem);
 }
+EXPORT_SYMBOL(page_offline_end);
