@@ -441,6 +441,12 @@ static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 
 	if (old_spte == new_spte)
 		return;
+	
+	if (is_large_pte(old_spte))
+		--kvm->stat.lpages;
+	
+	if (is_large_pte(new_spte))
+		++kvm->stat.lpages;
 
 	trace_kvm_tdp_mmu_spte_changed(as_id, gfn, level, old_spte, new_spte);
 
