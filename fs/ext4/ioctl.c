@@ -715,7 +715,6 @@ static int ext4_ioc_getfsmap(struct super_block *sb,
 	info.gi_data = arg;
 	error = ext4_getfsmap(sb, &xhead, ext4_getfsmap_format, &info);
 	if (error == EXT4_QUERY_RANGE_ABORT) {
-		error = 0;
 		aborted = true;
 	} else if (error)
 		return error;
