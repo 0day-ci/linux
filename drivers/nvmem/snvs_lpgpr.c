@@ -21,6 +21,9 @@
 #define IMX_GPR_SL		BIT(5)
 #define IMX_GPR_HL		BIT(5)
 
+#define REGMAP_FIELD_SIZE 16
+#define REGMAP_FIELDS_PER_REG 2
+
 struct snvs_lpgpr_cfg {
 	int offset;
 	int offset_hplr;
@@ -33,6 +36,7 @@ struct snvs_lpgpr_priv {
 	struct regmap			*regmap;
 	struct nvmem_config		cfg;
 	const struct snvs_lpgpr_cfg	*dcfg;
+	struct regmap_field **reg_fields;
 };
 
 static const struct snvs_lpgpr_cfg snvs_lpgpr_cfg_imx6q = {
@@ -56,6 +60,11 @@ static int snvs_lpgpr_write(void *context, unsigned int offset, void *val,
 	const struct snvs_lpgpr_cfg *dcfg = priv->dcfg;
 	unsigned int lock_reg;
 	int ret;
+	u32 regval;
+	unsigned int field_id;
+
+	if (offset + bytes > dcfg->size)
+		return -EINVAL;
 
 	ret = regmap_read(priv->regmap, dcfg->offset_hplr, &lock_reg);
 	if (ret < 0)
@@ -71,8 +80,16 @@ static int snvs_lpgpr_write(void *context, unsigned int offset, void *val,
 	if (lock_reg & IMX_GPR_HL)
 		return -EPERM;
 
-	return regmap_bulk_write(priv->regmap, dcfg->offset + offset, val,
-				 bytes / priv->cfg.stride);
+	if (bytes == (REGMAP_FIELD_SIZE >> 3)) {
+		regval = *(u16 *)(val);
+		field_id = offset / REGMAP_FIELDS_PER_REG;
+		ret = regmap_field_write(priv->reg_fields[field_id], regval);
+	} else {
+		ret = regmap_bulk_write(priv->regmap, dcfg->offset + offset,
+					val, bytes / priv->cfg.stride);
+	}
+
+	return ret;
 }
 
 static int snvs_lpgpr_read(void *context, unsigned int offset, void *val,
@@ -80,9 +97,27 @@ static int snvs_lpgpr_read(void *context, unsigned int offset, void *val,
 {
 	struct snvs_lpgpr_priv *priv = context;
 	const struct snvs_lpgpr_cfg *dcfg = priv->dcfg;
+	int ret;
+	u32 regval;
+	unsigned int field_id;
 
-	return regmap_bulk_read(priv->regmap, dcfg->offset + offset, val,
-				bytes / priv->cfg.stride);
+	if (offset + bytes > dcfg->size)
+		return -EINVAL;
+
+	if (bytes == (REGMAP_FIELD_SIZE >> 3)) {
+		field_id = offset / REGMAP_FIELDS_PER_REG;
+		ret = regmap_field_read(priv->reg_fields[field_id], &regval);
+		if (ret)
+			return ret;
+
+		*(u16 *)(val) = regval;
+	} else {
+		ret = regmap_bulk_read(priv->regmap, dcfg->offset + offset, val,
+				       bytes / priv->cfg.stride);
+		if (ret)
+			return ret;
+	}
+	return 0;
 }
 
 static int snvs_lpgpr_probe(struct platform_device *pdev)
@@ -94,6 +129,8 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
 	struct nvmem_config *cfg;
 	struct nvmem_device *nvmem;
 	const struct snvs_lpgpr_cfg *dcfg;
+	int i;
+	int fields_count;
 
 	if (!node)
 		return -ENOENT;
@@ -121,12 +158,30 @@ static int snvs_lpgpr_probe(struct platform_device *pdev)
 	cfg->priv = priv;
 	cfg->name = dev_name(dev);
 	cfg->dev = dev;
-	cfg->stride = 4;
-	cfg->word_size = 4;
+	cfg->stride = 2;
+	cfg->word_size = 2;
 	cfg->size = dcfg->size;
 	cfg->owner = THIS_MODULE;
 	cfg->reg_read  = snvs_lpgpr_read;
 	cfg->reg_write = snvs_lpgpr_write;
+
+	fields_count = priv->dcfg->size / priv->cfg.stride;
+	priv->reg_fields = devm_kzalloc(
+		dev, sizeof(struct regmap_field *) * fields_count, GFP_KERNEL);
+	if (!priv->reg_fields)
+		return -ENOMEM;
+
+	for (i = 0; i < fields_count; i++) {
+		size_t field_start = i * REGMAP_FIELD_SIZE;
+		size_t field_end = field_start + REGMAP_FIELD_SIZE - 1;
+		const struct reg_field field =
+			REG_FIELD(dcfg->offset, field_start, field_end);
+
+		priv->reg_fields[i] =
+			devm_regmap_field_alloc(dev, priv->regmap, field);
+		if (IS_ERR(priv->reg_fields[i]))
+			return PTR_ERR(priv->reg_fields[i]);
+	}
 
 	nvmem = devm_nvmem_register(dev, cfg);
 
