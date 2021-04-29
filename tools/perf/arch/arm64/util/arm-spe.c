@@ -70,7 +70,6 @@ static int arm_spe_recording_options(struct auxtrace_record *itr,
 	struct evsel *evsel, *arm_spe_evsel = NULL;
 	struct perf_cpu_map *cpus = evlist->core.cpus;
 	bool privileged = perf_event_paranoid_check(-1);
-	struct evsel *tracking_evsel;
 	int err;
 
 	sper->evlist = evlist;
@@ -126,18 +125,23 @@ static int arm_spe_recording_options(struct auxtrace_record *itr,
 		evsel__set_sample_bit(arm_spe_evsel, CPU);
 
 	/* Add dummy event to keep tracking */
-	err = parse_events(evlist, "dummy:u", NULL);
-	if (err)
-		return err;
+	if (opts->full_auxtrace) {
+		struct evsel *tracking_evsel;
 
-	tracking_evsel = evlist__last(evlist);
-	evlist__set_tracking_event(evlist, tracking_evsel);
+		err = parse_events(evlist, "dummy:u", NULL);
+		if (err)
+			return err;
 
-	tracking_evsel->core.attr.freq = 0;
-	tracking_evsel->core.attr.sample_period = 1;
-	evsel__set_sample_bit(tracking_evsel, TIME);
-	evsel__set_sample_bit(tracking_evsel, CPU);
-	evsel__reset_sample_bit(tracking_evsel, BRANCH_STACK);
+		tracking_evsel = evlist__last(evlist);
+		evlist__set_tracking_event(evlist, tracking_evsel);
+
+		tracking_evsel->core.attr.freq = 0;
+		tracking_evsel->core.attr.sample_period = 1;
+
+		/* In per-cpu case, always need the time of mmap events etc */
+		if (!perf_cpu_map__empty(cpus))
+			evsel__set_sample_bit(tracking_evsel, TIME);
+	}
 
 	return 0;
 }
