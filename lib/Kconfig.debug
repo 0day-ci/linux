@@ -1979,6 +1979,15 @@ config KCOV_IRQ_AREA_SIZE
 	  soft interrupts. This specifies the size of those areas in the
 	  number of unsigned long words.
 
+config RTNL_LOCK_DEBUG
+	bool "rtnl_lock debugging, deadlock detection"
+	select STACKTRACE
+	help
+	  If you say Y here then the kernel will detect whether any process
+	  hold rtnl_lock too long and some key information will be printed
+	  to help identify the issue point.
+	  If unsure, say N.
+
 menuconfig RUNTIME_TESTING_MENU
 	bool "Runtime Testing"
 	def_bool y
