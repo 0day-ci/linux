@@ -1718,15 +1718,13 @@ static int wsa_macro_enable_echo(struct snd_soc_dapm_widget *w,
 
 	val = snd_soc_component_read(component, CDC_WSA_RX_INP_MUX_RX_MIX_CFG0);
 
-	switch (w->shift) {
-	case WSA_MACRO_EC0_MUX:
+	if (w->shift == WSA_MACRO_EC0_MUX) {
 		val = val & CDC_WSA_RX_MIX_TX0_SEL_MASK;
 		ec_tx = val - 1;
-		break;
-	case WSA_MACRO_EC1_MUX:
+	} else {
+		/* WSA_MACRO_EC1_MUX */
 		val = val & CDC_WSA_RX_MIX_TX1_SEL_MASK;
 		ec_tx = (val >> CDC_WSA_RX_MIX_TX1_SEL_SHFT) - 1;
-		break;
 	}
 
 	if (wsa->ec_hq[ec_tx]) {
