@@ -1392,8 +1392,7 @@ static int ezusb_init(struct hermes *hw)
 	struct ezusb_priv *upriv = hw->priv;
 	int retval;
 
-	if (!upriv)
-		return -EINVAL;
+	BUG_ON(!upriv);
 
 	upriv->reply_count = 0;
 	/* Write the MAGIC number on the simulated registers to keep
