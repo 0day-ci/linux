@@ -1059,6 +1059,34 @@ err_out:
 	return ERR_PTR(err);
 }
 
+/* offload the tc command after inserted */
+int tcf_action_offload_cmd(struct tc_action *actions[], bool add, struct netlink_ext_ack *extack)
+{
+	int err = 0;
+	struct flow_offload_action *fl_act;
+
+	fl_act = flow_action_alloc(tcf_act_num_actions(actions));
+	if (!fl_act)
+		return -ENOMEM;
+
+	fl_act->extack = extack;
+	err = tc_setup_action(&fl_act->action, actions);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to setup tc actions for offload\n");
+		goto err_out;
+	}
+	fl_act->command = add ? FLOW_ACT_REPLACE : FLOW_ACT_DESTROY;
+
+	flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
+
+	tc_cleanup_flow_action(&fl_act->action);
+
+err_out:
+	kfree(fl_act);
+	return err;
+}
+EXPORT_SYMBOL(tcf_action_offload_cmd);
+
 /* Returns numbers of initialized actions or negative error. */
 
 int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
@@ -1107,6 +1135,7 @@ int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
 	 */
 	tcf_idr_insert_many(actions);
 
+	tcf_action_offload_cmd(actions, true, extack);
 	*attr_size = tcf_action_full_attrs_size(sz);
 	err = i - 1;
 	goto err_mod;
@@ -1465,6 +1494,7 @@ tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 	if (event == RTM_GETACTION)
 		ret = tcf_get_notify(net, portid, n, actions, event, extack);
 	else { /* delete */
+		tcf_action_offload_cmd(actions, false, extack);
 		ret = tcf_del_notify(net, n, actions, portid, attr_size, extack);
 		if (ret)
 			goto err;

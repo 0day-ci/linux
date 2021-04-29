@@ -53,6 +53,11 @@ static inline bool is_tcf_police(const struct tc_action *act)
 	return false;
 }
 
+static inline u32 tcf_police_index(const struct tc_action *act)
+{
+	return act->tcfa_index;
+}
+
 static inline u64 tcf_police_rate_bytes_ps(const struct tc_action *act)
 {
 	struct tcf_police *police = to_police(act);

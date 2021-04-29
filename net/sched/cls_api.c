@@ -3551,8 +3551,8 @@ static enum flow_action_hw_stats tc_act_hw_stats(u8 hw_stats)
 	return hw_stats;
 }
 
-int tc_setup_flow_action(struct flow_action *flow_action,
-			 const struct tcf_exts *exts)
+int tc_setup_action(struct flow_action *flow_action,
+		    struct tc_action *actions[])
 {
 	struct tc_action *act;
 	int i, j, k, err = 0;
@@ -3561,11 +3561,11 @@ int tc_setup_flow_action(struct flow_action *flow_action,
 	BUILD_BUG_ON(TCA_ACT_HW_STATS_IMMEDIATE != FLOW_ACTION_HW_STATS_IMMEDIATE);
 	BUILD_BUG_ON(TCA_ACT_HW_STATS_DELAYED != FLOW_ACTION_HW_STATS_DELAYED);
 
-	if (!exts)
+	if (!actions)
 		return 0;
 
 	j = 0;
-	tcf_exts_for_each_action(i, act, exts) {
+	tcf_act_for_each_action(i, act, actions) {
 		struct flow_action_entry *entry;
 
 		entry = &flow_action->entries[j];
@@ -3732,6 +3732,16 @@ err_out_locked:
 	spin_unlock_bh(&act->tcfa_lock);
 	goto err_out;
 }
+EXPORT_SYMBOL(tc_setup_action);
+
+int tc_setup_flow_action(struct flow_action *flow_action,
+			 const struct tcf_exts *exts)
+{
+	if (!exts)
+		return 0;
+
+	return tc_setup_action(flow_action, exts->actions);
+}
 EXPORT_SYMBOL(tc_setup_flow_action);
 
 unsigned int tcf_exts_num_actions(struct tcf_exts *exts)
@@ -3749,6 +3759,22 @@ unsigned int tcf_exts_num_actions(struct tcf_exts *exts)
 	return num_acts;
 }
 EXPORT_SYMBOL(tcf_exts_num_actions);
+
+unsigned int tcf_act_num_actions(struct tc_action *actions[])
+{
+	unsigned int num_acts = 0;
+	struct tc_action *act;
+	int i;
+
+	tcf_act_for_each_action(i, act, actions) {
+		if (is_tcf_pedit(act))
+			num_acts += tcf_pedit_nkeys(act);
+		else
+			num_acts++;
+	}
+	return num_acts;
+}
+EXPORT_SYMBOL(tcf_act_num_actions);
 
 #ifdef CONFIG_NET_CLS_ACT
 static int tcf_qevent_parse_block_index(struct nlattr *block_index_attr,
