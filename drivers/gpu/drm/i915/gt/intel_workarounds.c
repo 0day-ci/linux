@@ -216,6 +216,12 @@ wa_masked_en(struct i915_wa_list *wal, i915_reg_t reg, u32 val)
 }
 
 static void
+wa_masked_en_no_verify(struct i915_wa_list *wal, i915_reg_t reg, u32 val)
+{
+	wa_masked_add(wal, reg, _MASKED_BIT_ENABLE(val), 0);
+}
+
+static void
 wa_masked_dis(struct i915_wa_list *wal, i915_reg_t reg, u32 val)
 {
 	wa_masked_add(wal, reg, _MASKED_BIT_DISABLE(val), val);
@@ -595,10 +601,9 @@ static void icl_ctx_workarounds_init(struct intel_engine_cs *engine,
 			     GEN11_BLEND_EMB_FIX_DISABLE_IN_RCC);
 
 	/* WaEnableFloatBlendOptimization:icl */
-	wa_write_clr_set(wal,
-			 GEN10_CACHE_MODE_SS,
-			 0, /* write-only, so skip validation */
-			 _MASKED_BIT_ENABLE(FLOAT_BLEND_OPTIMIZATION_ENABLE));
+	wa_masked_en_no_verify(wal,
+			       GEN10_CACHE_MODE_SS,
+			       FLOAT_BLEND_OPTIMIZATION_ENABLE);
 
 	/* WaDisableGPGPUMidThreadPreemption:icl */
 	wa_masked_field_set(wal, GEN8_CS_CHICKEN1,
