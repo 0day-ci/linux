@@ -220,6 +220,23 @@ struct qed_nvmetcp_ops {
 	void (*remove_dst_tcp_port_filter)(struct qed_dev *cdev, u16 dest_port);
 
 	void (*clear_all_filters)(struct qed_dev *cdev);
+
+	void (*init_read_io)(struct nvmetcp_task_params *task_params,
+			     struct nvmetcp_conn_params *conn_params,
+			     struct nvmetcp_cmd_capsule_hdr *cmd_pdu_header,
+			     struct storage_sgl_task_params *sgl_task_params);
+
+	void (*init_write_io)(struct nvmetcp_task_params *task_params,
+			      struct nvmetcp_conn_params *conn_params,
+			      struct nvmetcp_cmd_capsule_hdr *cmd_pdu_header,
+			      struct storage_sgl_task_params *sgl_task_params);
+
+	void (*init_icreq_exchange)(struct nvmetcp_task_params *task_params,
+				    struct nvmetcp_init_conn_req_hdr *init_conn_req_pdu_hdr,
+				    struct storage_sgl_task_params *tx_sgl_task_params,
+				    struct storage_sgl_task_params *rx_sgl_task_params);
+
+	void (*init_task_cleanup)(struct nvmetcp_task_params *task_params);
 };
 
 const struct qed_nvmetcp_ops *qed_get_nvmetcp_ops(void);

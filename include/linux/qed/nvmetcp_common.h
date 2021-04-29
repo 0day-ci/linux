@@ -9,6 +9,9 @@
 #define NVMETCP_SLOW_PATH_LAYER_CODE (6)
 #define NVMETCP_WQE_NUM_SGES_SLOWIO (0xf)
 
+#define QED_NVMETCP_CMD_HDR_SIZE 72
+#define QED_NVMETCP_CMN_HDR_SIZE 24
+
 /* NVMeTCP firmware function init parameters */
 struct nvmetcp_spe_func_init {
 	__le16 half_way_close_timeout;
