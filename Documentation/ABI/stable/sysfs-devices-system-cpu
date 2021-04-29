@@ -1,3 +1,7 @@
+Export CPU topology info via sysfs. Items (attributes) are similar
+to /proc/cpuinfo output of some architectures. They reside in
+/sys/devices/system/cpu/cpuX/topology/:
+
 What: 		/sys/devices/system/cpu/dscr_default
 Date:		13-May-2014
 KernelVersion:	v3.15.0
@@ -23,3 +27,141 @@ Description:	Default value for the Data Stream Control Register (DSCR) on
 		here).
 		If set by a process it will be inherited by child processes.
 Values:		64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/physical_package_id
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    physical package id of cpuX. Typically corresponds to a physical
+                socket number, but the actual value is architecture and platform
+                dependent.
+Values:         64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/die_id
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    the CPU die ID of cpuX. Typically it is the hardware platform's
+                identifier (rather than the kernel's). The actual value is
+                architecture and platform dependent.
+Values:         64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/core_id
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    the CPU core ID of cpuX. Typically it is the hardware platform's
+                identifier (rather than the kernel's). The actual value is
+                architecture and platform dependent.
+Values:         64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/book_id
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    the book ID of cpuX. Typically it is the hardware platform's
+                identifier (rather than the kernel's). The actual value is
+                architecture and platform dependent. it's only used on s390.
+Values:         64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/drawer_id
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    the drawer ID of cpuX. Typically it is the hardware platform's
+                identifier (rather than the kernel's). The actual value is
+                architecture and platform dependent. it's only used on s390.
+Values:         64 bit unsigned integer (bit field)
+
+What:           /sys/devices/system/cpu/cpuX/topology/core_cpus
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    internal kernel map of CPUs within the same core.
+                (deprecated name: "thread_siblings")
+Values:         hexadecimal bitmask.
+
+What:           /sys/devices/system/cpu/cpuX/topology/core_cpus_list
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    human-readable list of CPUs within the same core.
+                The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	        so the tail of the string will be trimmed while its size is larger
+                than PAGE_SIZE.
+                (deprecated name: "thread_siblings_list").
+Values:         decimal list.
+
+What:           /sys/devices/system/cpu/cpuX/topology/package_cpus
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    internal kernel map of the CPUs sharing the same physical_package_id.
+                (deprecated name: "core_siblings").
+Values:         hexadecimal bitmask.
+
+What:           /sys/devices/system/cpu/cpuX/topology/package_cpus_list
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    human-readable list of CPUs sharing the same physical_package_id.
+                The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+                so the tail of the string will be trimmed while its size is larger
+                than PAGE_SIZE.
+                (deprecated name: "core_siblings_list")
+Values:         decimal list.
+
+What:           /sys/devices/system/cpu/cpuX/topology/die_cpus
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    internal kernel map of CPUs within the same die.
+Values:         hexadecimal bitmask.
+
+What:           /sys/devices/system/cpu/cpuX/topology/die_cpus_list
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    human-readable list of CPUs within the same die.
+                The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+                so the tail of the string will be trimmed while its size is larger
+                than PAGE_SIZE.
+Values:         decimal list.
+
+What:           /sys/devices/system/cpu/cpuX/topology/book_siblings
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    internal kernel map of cpuX's hardware threads within the same
+                book_id. it's only used on s390.
+Values:         hexadecimal bitmask.
+
+What:           /sys/devices/system/cpu/cpuX/topology/book_siblings_list
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    human-readable list of cpuX's hardware threads within the same
+                book_id. it's only used on s390.
+                The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+                so the tail of the string will be trimmed while its size is larger
+                than PAGE_SIZE.
+Values:         decimal list.
+
+What:           /sys/devices/system/cpu/cpuX/topology/drawer_siblings
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    internal kernel map of cpuX's hardware threads within the same
+                drawer_id. it's only used on s390.
+Values:         hexadecimal bitmask.
+
+What:           /sys/devices/system/cpu/cpuX/topology/drawer_siblings_list
+Date:           19-Mar-2021
+KernelVersion:  v5.12
+Contact:
+Description:    human-readable list of cpuX's hardware threads within the same
+                drawer_id.
+                The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+                so the tail of the string will be trimmed while its size is larger
+                than PAGE_SIZE. it's only used on s390.
+Values:         decimal list.
