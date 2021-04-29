@@ -578,7 +578,8 @@ i915_pages_create_for_stolen(struct drm_device *dev,
 	return st;
 }
 
-static int i915_gem_object_get_pages_stolen(struct drm_i915_gem_object *obj)
+static int i915_gem_object_get_pages_stolen(struct drm_i915_gem_object *obj,
+					    struct i915_gem_ww_ctx *ww)
 {
 	struct sg_table *pages =
 		i915_pages_create_for_stolen(obj->base.dev,

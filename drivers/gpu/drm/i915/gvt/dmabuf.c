@@ -55,7 +55,8 @@ static void vgpu_unpin_dma_address(struct intel_vgpu *vgpu,
 }
 
 static int vgpu_gem_get_pages(
-		struct drm_i915_gem_object *obj)
+		struct drm_i915_gem_object *obj,
+		struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
 	struct intel_vgpu *vgpu;

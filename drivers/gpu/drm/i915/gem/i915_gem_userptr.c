@@ -126,7 +126,8 @@ static void i915_gem_object_userptr_drop_ref(struct drm_i915_gem_object *obj)
 	}
 }
 
-static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
+static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj,
+				      struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	const unsigned long num_pages = obj->base.size >> PAGE_SHIFT;

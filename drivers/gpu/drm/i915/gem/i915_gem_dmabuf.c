@@ -199,7 +199,8 @@ struct dma_buf *i915_gem_prime_export(struct drm_gem_object *gem_obj, int flags)
 	return drm_gem_dmabuf_export(gem_obj->dev, &exp_info);
 }
 
-static int i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj)
+static int i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj,
+					    struct i915_gem_ww_ctx *ww)
 {
 	struct sg_table *pages;
 	unsigned int sg_page_sizes;

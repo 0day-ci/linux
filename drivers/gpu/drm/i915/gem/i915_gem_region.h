@@ -9,10 +9,12 @@
 #include <linux/types.h>
 
 struct intel_memory_region;
+struct i915_gem_ww_ctx;
 struct drm_i915_gem_object;
 struct sg_table;
 
-int i915_gem_object_get_pages_buddy(struct drm_i915_gem_object *obj);
+int i915_gem_object_get_pages_buddy(struct drm_i915_gem_object *obj,
+				    struct i915_gem_ww_ctx *ww);
 void i915_gem_object_put_pages_buddy(struct drm_i915_gem_object *obj,
 				     struct sg_table *pages);
 

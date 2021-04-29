@@ -100,7 +100,7 @@ int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 		return -EFAULT;
 	}
 
-	err = obj->ops->get_pages(obj);
+	err = obj->ops->get_pages(obj, NULL);
 	GEM_BUG_ON(!err && !i915_gem_object_has_pages(obj));
 
 	return err;

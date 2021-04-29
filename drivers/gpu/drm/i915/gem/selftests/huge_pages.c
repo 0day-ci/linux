@@ -56,7 +56,8 @@ static void huge_pages_free_pages(struct sg_table *st)
 	kfree(st);
 }
 
-static int get_huge_pages(struct drm_i915_gem_object *obj)
+static int get_huge_pages(struct drm_i915_gem_object *obj,
+			  struct i915_gem_ww_ctx *ww)
 {
 #define GFP (GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY)
 	unsigned int page_mask = obj->mm.page_mask;
@@ -181,7 +182,8 @@ huge_pages_object(struct drm_i915_private *i915,
 	return obj;
 }
 
-static int fake_get_huge_pages(struct drm_i915_gem_object *obj)
+static int fake_get_huge_pages(struct drm_i915_gem_object *obj,
+			       struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	const u64 max_len = rounddown_pow_of_two(UINT_MAX);
@@ -236,7 +238,8 @@ static int fake_get_huge_pages(struct drm_i915_gem_object *obj)
 	return 0;
 }
 
-static int fake_get_huge_pages_single(struct drm_i915_gem_object *obj)
+static int fake_get_huge_pages_single(struct drm_i915_gem_object *obj,
+				      struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct sg_table *st;

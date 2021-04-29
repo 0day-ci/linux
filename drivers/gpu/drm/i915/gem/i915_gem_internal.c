@@ -30,7 +30,8 @@ static void internal_free_pages(struct sg_table *st)
 	kfree(st);
 }
 
-static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
+static int i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj,
+					      struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct sg_table *st;

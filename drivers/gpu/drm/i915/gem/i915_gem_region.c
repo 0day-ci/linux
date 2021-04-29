@@ -20,7 +20,8 @@ i915_gem_object_put_pages_buddy(struct drm_i915_gem_object *obj,
 }
 
 int
-i915_gem_object_get_pages_buddy(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_buddy(struct drm_i915_gem_object *obj,
+				struct i915_gem_ww_ctx *ww)
 {
 	const u64 max_segment = i915_sg_segment_size();
 	struct intel_memory_region *mem = obj->mm.region;
