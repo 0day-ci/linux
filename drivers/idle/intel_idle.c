@@ -1445,6 +1445,7 @@ static int __init intel_idle_init(void)
 	retval = cpuidle_register_driver(&intel_idle_driver);
 	if (retval) {
 		struct cpuidle_driver *drv = cpuidle_get_driver();
+
 		printk(KERN_DEBUG pr_fmt("intel_idle yielding to %s\n"),
 		       drv ? drv->name : "none");
 		goto init_driver_fail;
