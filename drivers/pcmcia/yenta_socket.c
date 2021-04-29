@@ -6,10 +6,10 @@
  *
  * Changelog:
  * Aug 2002: Manfred Spraul <manfred@colorfullife.com>
- * 	Dynamically adjust the size of the bridge resource
+ *	Dynamically adjust the size of the bridge resource
  *
  * May 2003: Dominik Brodowski <linux@brodo.de>
- * 	Merge pci_socket.c and yenta.c into one file
+ *	Merge pci_socket.c and yenta.c into one file
  */
 #include <linux/init.h>
 #include <linux/pci.h>
