@@ -1536,7 +1536,11 @@ struct page *get_dump_page(unsigned long addr)
 	if (locked)
 		mmap_read_unlock(mm);
 
-	if (ret == 1 && is_page_poisoned(page))
+	/*
+	 * We might have hwpoisoned pages still mapped into user space. Don't
+	 * read these pages when creating a coredump, access could be fatal.
+	 */
+	if (ret == 1 && is_page_hwpoison(page))
 		return NULL;
 
 	return (ret == 1) ? page : NULL;
