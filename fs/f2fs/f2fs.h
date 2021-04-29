@@ -416,11 +416,15 @@ static inline int update_sits_in_cursum(struct f2fs_journal *journal, int i)
 	return before;
 }
 
-static inline bool __has_cursum_space(struct f2fs_journal *journal,
-							int size, int type)
+static inline bool __has_nats_in_cursum_space(struct f2fs_journal *journal,
+					      int size)
 {
-	if (type == NAT_JOURNAL)
-		return size <= MAX_NAT_JENTRIES(journal);
+	return size <= MAX_NAT_JENTRIES(journal);
+}
+
+static inline bool __has_sits_in_cursum_space(struct f2fs_journal *journal,
+					      int size)
+{
 	return size <= MAX_SIT_JENTRIES(journal);
 }
 
@@ -3420,7 +3424,9 @@ void f2fs_wait_on_block_writeback_range(struct inode *inode, block_t blkaddr,
 								block_t len);
 void f2fs_write_data_summaries(struct f2fs_sb_info *sbi, block_t start_blk);
 void f2fs_write_node_summaries(struct f2fs_sb_info *sbi, block_t start_blk);
-int f2fs_lookup_journal_in_cursum(struct f2fs_journal *journal, int type,
+int f2fs_lookup_journal_sits_in_cursum(struct f2fs_journal *journal,
+			unsigned int val, int alloc);
+int f2fs_lookup_journal_nats_in_cursum(struct f2fs_journal *journal,
 			unsigned int val, int alloc);
 void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc);
 int f2fs_fix_curseg_write_pointer(struct f2fs_sb_info *sbi);

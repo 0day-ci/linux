@@ -4013,25 +4013,33 @@ void f2fs_write_node_summaries(struct f2fs_sb_info *sbi, block_t start_blk)
 	write_normal_summaries(sbi, start_blk, CURSEG_HOT_NODE);
 }
 
-int f2fs_lookup_journal_in_cursum(struct f2fs_journal *journal, int type,
+int f2fs_lookup_journal_nats_in_cursum(struct f2fs_journal *journal,
 					unsigned int val, int alloc)
 {
 	int i;
 
-	if (type == NAT_JOURNAL) {
-		for (i = 0; i < nats_in_cursum(journal); i++) {
-			if (le32_to_cpu(nid_in_journal(journal, i)) == val)
-				return i;
-		}
-		if (alloc && __has_cursum_space(journal, 1, NAT_JOURNAL))
-			return update_nats_in_cursum(journal, 1);
-	} else if (type == SIT_JOURNAL) {
-		for (i = 0; i < sits_in_cursum(journal); i++)
-			if (le32_to_cpu(segno_in_journal(journal, i)) == val)
-				return i;
-		if (alloc && __has_cursum_space(journal, 1, SIT_JOURNAL))
-			return update_sits_in_cursum(journal, 1);
-	}
+	for (i = 0; i < nats_in_cursum(journal); i++)
+		if (le32_to_cpu(nid_in_journal(journal, i)) == val)
+			return i;
+
+	if (alloc && __has_nats_in_cursum_space(journal, 1))
+		return update_nats_in_cursum(journal, 1);
+
+	return -1;
+}
+
+int f2fs_lookup_journal_sits_in_cursum(struct f2fs_journal *journal,
+					unsigned int val, int alloc)
+{
+	int i;
+
+	for (i = 0; i < sits_in_cursum(journal); i++)
+		if (le32_to_cpu(segno_in_journal(journal, i)) == val)
+			return i;
+
+	if (alloc && __has_sits_in_cursum_space(journal, 1))
+		return update_sits_in_cursum(journal, 1);
+
 	return -1;
 }
 
@@ -4174,7 +4182,7 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	 * entries, remove all entries from journal and add and account
 	 * them in sit entry set.
 	 */
-	if (!__has_cursum_space(journal, sit_i->dirty_sentries, SIT_JOURNAL) ||
+	if (!__has_sits_in_cursum_space(journal, sit_i->dirty_sentries) ||
 								!to_journal)
 		remove_sits_in_journal(sbi);
 
@@ -4192,7 +4200,7 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 		unsigned int segno = start_segno;
 
 		if (to_journal &&
-			!__has_cursum_space(journal, ses->entry_cnt, SIT_JOURNAL))
+			!__has_sits_in_cursum_space(journal, ses->entry_cnt))
 			to_journal = false;
 
 		if (to_journal) {
@@ -4220,8 +4228,8 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 			}
 
 			if (to_journal) {
-				offset = f2fs_lookup_journal_in_cursum(journal,
-							SIT_JOURNAL, segno, 1);
+				offset = f2fs_lookup_journal_sits_in_cursum(
+						journal, segno, 1);
 				f2fs_bug_on(sbi, offset < 0);
 				segno_in_journal(journal, offset) =
 							cpu_to_le32(segno);

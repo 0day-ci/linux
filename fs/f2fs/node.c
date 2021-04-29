@@ -554,7 +554,7 @@ int f2fs_get_node_info(struct f2fs_sb_info *sbi, nid_t nid,
 
 	/* Check current segment summary */
 	down_read(&curseg->journal_rwsem);
-	i = f2fs_lookup_journal_in_cursum(journal, NAT_JOURNAL, nid, 0);
+	i = f2fs_lookup_journal_nats_in_cursum(journal, nid, 0);
 	if (i >= 0) {
 		ne = nat_in_journal(journal, i);
 		node_info_from_raw_nat(ni, &ne);
@@ -2891,7 +2891,7 @@ static int __flush_nat_entry_set(struct f2fs_sb_info *sbi,
 	 * #2, flush nat entries to nat page.
 	 */
 	if (enabled_nat_bits(sbi, cpc) ||
-		!__has_cursum_space(journal, set->entry_cnt, NAT_JOURNAL))
+		!__has_nats_in_cursum_space(journal, set->entry_cnt))
 		to_journal = false;
 
 	if (to_journal) {
@@ -2914,8 +2914,8 @@ static int __flush_nat_entry_set(struct f2fs_sb_info *sbi,
 		f2fs_bug_on(sbi, nat_get_blkaddr(ne) == NEW_ADDR);
 
 		if (to_journal) {
-			offset = f2fs_lookup_journal_in_cursum(journal,
-							NAT_JOURNAL, nid, 1);
+			offset = f2fs_lookup_journal_nats_in_cursum(journal,
+							nid, 1);
 			f2fs_bug_on(sbi, offset < 0);
 			raw_ne = &nat_in_journal(journal, offset);
 			nid_in_journal(journal, offset) = cpu_to_le32(nid);
@@ -2985,8 +2985,7 @@ int f2fs_flush_nat_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	 * into nat entry set.
 	 */
 	if (enabled_nat_bits(sbi, cpc) ||
-		!__has_cursum_space(journal,
-			nm_i->nat_cnt[DIRTY_NAT], NAT_JOURNAL))
+		!__has_nats_in_cursum_space(journal, nm_i->nat_cnt[DIRTY_NAT]))
 		remove_nats_in_journal(sbi);
 
 	while ((found = __gang_lookup_nat_set(nm_i,
