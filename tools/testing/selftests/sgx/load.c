@@ -155,10 +155,8 @@ bool encl_load(const char *path, struct encl *encl)
 	 * bits set.  It does not check that the current user is
 	 * the owner or in the owning group.
 	 */
-	if (!(sb.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
-		fprintf(stderr, "no execute permissions on device file %s\n", device_path);
-		goto err;
-	}
+	if (!(sb.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+		fprintf(stderr, "Warning: no execute permissions on device file %s\n", device_path);
 
 	ptr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED, fd, 0);
 	if (ptr == (void *)-1) {
