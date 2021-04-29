@@ -492,6 +492,8 @@ static u32 igb_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr)
  **/
 static void igb_i21x_hw_doublecheck(struct e1000_hw *hw)
 {
+	const unsigned int failed_cnt_max = 3;
+	unsigned int failed_cnt = 0;
 	bool is_failed;
 	int i;
 
@@ -502,10 +504,14 @@ static void igb_i21x_hw_doublecheck(struct e1000_hw *hw)
 				is_failed = true;
 				array_wr32(E1000_MTA, i, hw->mac.mta_shadow[i]);
 				wrfl();
-				break;
 			}
 		}
-	} while (is_failed);
+		if (is_failed)
+			++failed_cnt;
+	} while (is_failed && failed_cnt < failed_cnt_max);
+
+	if (failed_cnt >= failed_cnt_max)
+		hw_dbg("Failed to update MTA_REGISTER, too many retries");
 }
 
 /**
