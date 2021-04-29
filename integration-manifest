@@ -1,0 +1,38 @@
+drm drm-fixes aca38735ae624b93c71c055b68d5802b8f356ea5
+	Merge tag 'drm-intel-fixes-2021-04-22' of git://anongit.freedesktop.org/drm/drm-intel into drm-fixes
+drm-misc drm-misc-fixes ffe8768fb8f391cb478466778c55e2110525c15c
+	drm/vc4: remove unused function
+drm-intel drm-intel-fixes 2d292995bb8f49a2596bef522679c1e1454f3230
+	Merge tag 'gvt-fixes-2021-04-20' of https://github.com/intel/gvt-linux into drm-intel-fixes
+drm-amd drm-amd-fixes 2b702e72e33bbdec0764cfb6e1dd00fe1142ae55
+	Merge tag 'drm-misc-fixes-2017-09-28-1' of git://anongit.freedesktop.org/git/drm-misc into drm-fixes
+drm drm-next a1a1ca70deb3ec600eeabb21de7f3f48aaae5695
+	Merge tag 'drm-misc-next-fixes-2021-04-22' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes 74deef03a44ae77db85dd80e7ef95777a902e0b3
+	efifb: Check efifb_pci_dev before using it
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-amd drm-amd-next-fixes 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e
+	Linux 4.14-rc1
+drm-misc drm-misc-next e590c2b03a6143ba93ddad306bc9eaafa838c020
+	drm/vc4: fix argument ordering in vc4_crtc_get_margins()
+drm-intel drm-intel-next 1a86ac792f67ebd50cdafb20d4aad6b23c8495f7
+	drm/i915: Add frontbuffer tracking tracepoints
+drm-intel drm-intel-gt-next bc6f80cce9ae7c83a4a9082c342fd733a4492928
+	drm/i915: Use trylock in shrinker for ggtt on bsw vt-d and bxt, v2.
+drm-amd drm-amd-next 754270c7c56292e97d0eff924a5d5d83f92add07
+	Merge branch 'drm-next-4.15' of git://people.freedesktop.org/~agd5f/linux into drm-next
+sound-upstream for-linus 2e6a731296be9d356fdccee9fb6ae345dad96438
+	ALSA: hda/conexant: Re-order CX5066 quirk table entries
+sound-upstream for-next 2e6a731296be9d356fdccee9fb6ae345dad96438
+	ALSA: hda/conexant: Re-order CX5066 quirk table entries
+drm-intel topic/core-for-CI 785b066b32b630e4735ca6e51acbb067703e2d3a
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/iomem-mmap-vs-gup ac8b8400620a4b0d9ca903ee9ad440bec736f5fa
+	mm: unexport follow_pfn
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-intel topic/intel-gen-to-ver 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
+drm-intel topic/adl-p-enabling 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
