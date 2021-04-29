@@ -84,6 +84,7 @@ MODULE_PARM_DESC(override_bios, "yenta ignore bios resource allocation");
 static inline u32 cb_readl(struct yenta_socket *socket, unsigned reg)
 {
 	u32 val = readl(socket->base + reg);
+
 	debug("%04x %08x\n", socket, reg, val);
 	return val;
 }
@@ -98,6 +99,7 @@ static inline void cb_writel(struct yenta_socket *socket, unsigned reg, u32 val)
 static inline u8 config_readb(struct yenta_socket *socket, unsigned offset)
 {
 	u8 val;
+
 	pci_read_config_byte(socket->dev, offset, &val);
 	debug("%04x %02x\n", socket, offset, val);
 	return val;
@@ -106,6 +108,7 @@ static inline u8 config_readb(struct yenta_socket *socket, unsigned offset)
 static inline u16 config_readw(struct yenta_socket *socket, unsigned offset)
 {
 	u16 val;
+
 	pci_read_config_word(socket->dev, offset, &val);
 	debug("%04x %04x\n", socket, offset, val);
 	return val;
@@ -114,6 +117,7 @@ static inline u16 config_readw(struct yenta_socket *socket, unsigned offset)
 static inline u32 config_readl(struct yenta_socket *socket, unsigned offset)
 {
 	u32 val;
+
 	pci_read_config_dword(socket->dev, offset, &val);
 	debug("%04x %08x\n", socket, offset, val);
 	return val;
@@ -140,6 +144,7 @@ static inline void config_writel(struct yenta_socket *socket, unsigned offset, u
 static inline u8 exca_readb(struct yenta_socket *socket, unsigned reg)
 {
 	u8 val = readb(socket->base + 0x800 + reg);
+
 	debug("%04x %02x\n", socket, reg, val);
 	return val;
 }
@@ -147,6 +152,7 @@ static inline u8 exca_readb(struct yenta_socket *socket, unsigned reg)
 static inline u8 exca_readw(struct yenta_socket *socket, unsigned reg)
 {
 	u16 val;
+
 	val = readb(socket->base + 0x800 + reg);
 	val |= readb(socket->base + 0x800 + reg + 1) << 8;
 	debug("%04x %04x\n", socket, reg, val);
@@ -179,6 +185,7 @@ static ssize_t show_yenta_registers(struct device *yentadev, struct device_attri
 	offset = snprintf(buf, PAGE_SIZE, "CB registers:");
 	for (i = 0; i < 0x24; i += 4) {
 		unsigned val;
+
 		if (!(i & 15))
 			offset += scnprintf(buf + offset, PAGE_SIZE - offset, "\n%02x:", i);
 		val = cb_readl(socket, i);
@@ -188,6 +195,7 @@ static ssize_t show_yenta_registers(struct device *yentadev, struct device_attri
 	offset += scnprintf(buf + offset, PAGE_SIZE - offset, "\n\nExCA registers:");
 	for (i = 0; i < 0x45; i++) {
 		unsigned char val;
+
 		if (!(i & 7)) {
 			if (i & 8) {
 				memcpy(buf + offset, " -", 2);
@@ -227,6 +235,7 @@ static int yenta_get_status(struct pcmcia_socket *sock, unsigned int *value)
 		val |= (state & CB_PWRCYCLE) ? SS_POWERON | SS_READY : 0;
 	} else if (state & CB_16BITCARD) {
 		u8 status = exca_readb(socket, I365_STATUS);
+
 		val |= ((status & I365_CS_DETECT) == I365_CS_DETECT) ? SS_DETECT : 0;
 		if (exca_readb(socket, I365_INTCTL) & I365_PC_IOCARD) {
 			val |= (status & I365_CS_STSCHG) ? 0 : SS_STSCHG;
@@ -249,6 +258,7 @@ static void yenta_set_power(struct yenta_socket *socket, socket_state_t *state)
 	if (!(cb_readl(socket, CB_SOCKET_STATE) & CB_CBCARD) &&
 	    (socket->flags & YENTA_16BIT_POWER_EXCA)) {
 		u8 reg, old;
+
 		reg = old = exca_readb(socket, I365_POWER);
 		reg &= ~(I365_VCC_MASK | I365_VPP1_MASK | I365_VPP2_MASK);
 
@@ -297,7 +307,9 @@ static void yenta_set_power(struct yenta_socket *socket, socket_state_t *state)
 		if (reg != old)
 			exca_writeb(socket, I365_POWER, reg);
 	} else {
-		u32 reg = 0;	/* CB_SC_STPCLK? */
+		u32 reg = 0;
+
+		/* CB_SC_STPCLK? */
 		switch (state->Vcc) {
 		case 33:
 			reg = CB_SC_VCC_3V;
@@ -338,6 +350,7 @@ static int yenta_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	bridge = config_readw(socket, CB_BRIDGE_CONTROL) & ~(CB_BRIDGE_CRST | CB_BRIDGE_INTR);
 	if (cb_readl(socket, CB_SOCKET_STATE) & CB_CBCARD) {
 		u8 intr;
+
 		bridge |= (state->flags & SS_RESET) ? CB_BRIDGE_CRST : 0;
 
 		/* ISA interrupt control? */
@@ -638,6 +651,7 @@ static int yenta_search_one_res(struct resource *root, struct resource *res,
 	} else {
 		unsigned long avail = root->end - root->start;
 		int i;
+
 		size = BRIDGE_MEM_MAX;
 		if (size > avail/8) {
 			size = (avail+1)/8;
@@ -763,6 +777,7 @@ static void yenta_free_res(struct yenta_socket *socket, int nr)
 static void yenta_allocate_resources(struct yenta_socket *socket)
 {
 	int program = 0;
+
 	program += yenta_allocate_res(socket, PCI_CB_BRIDGE_IO_0_WINDOW,
 			   IORESOURCE_IO,
 			   PCI_CB_IO_BASE_0, PCI_CB_IO_LIMIT_0);
