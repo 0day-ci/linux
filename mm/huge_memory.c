@@ -68,12 +68,18 @@ bool transparent_hugepage_enabled(struct vm_area_struct *vma)
 	/* The addr is used to check if the vma size fits */
 	unsigned long addr = (vma->vm_end & HPAGE_PMD_MASK) - HPAGE_PMD_SIZE;
 
+	if (!transhuge_vma_enabled(vma, vma->vm_flags))
+		return false;
 	if (!transhuge_vma_suitable(vma, addr))
 		return false;
 	if (vma_is_anonymous(vma))
 		return __transparent_hugepage_enabled(vma);
 	if (vma_is_shmem(vma))
 		return shmem_huge_enabled(vma);
+	if (IS_ENABLED(CONFIG_READ_ONLY_THP_FOR_FS) && vma->vm_file &&
+	    !inode_is_open_for_write(vma->vm_file->f_inode) &&
+	    (vma->vm_flags & VM_EXEC))
+		return true;
 
 	return false;
 }
