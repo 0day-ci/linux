@@ -63,6 +63,7 @@ void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
 {
 	struct va_format vaf;
 	va_list args;
+
 	if (pc_debug > lvl) {
 		va_start(args, fmt);
 
@@ -464,6 +465,7 @@ static void soc_common_check_status(struct soc_pcmcia_socket *skt)
 static void soc_common_pcmcia_poll_event(struct timer_list *t)
 {
 	struct soc_pcmcia_socket *skt = from_timer(skt, t, poll_timer);
+
 	debug(skt, 4, "polling for events\n");
 
 	mod_timer(&skt->poll_timer, jiffies + SOC_PCMCIA_POLL_PERIOD);
