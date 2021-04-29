@@ -2669,6 +2669,9 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 	map.m_len = pg_end - pg_start;
 	total = 0;
 
+	if (!file_is_cold(inode))
+		file_set_cold(inode);
+
 	while (map.m_lblk < pg_end) {
 		pgoff_t idx;
 		int cnt = 0;
