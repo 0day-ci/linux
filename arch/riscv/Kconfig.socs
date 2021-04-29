@@ -9,6 +9,7 @@ config SOC_MICROCHIP_POLARFIRE
 
 config SOC_SIFIVE
 	bool "SiFive SoCs"
+	depends on !XIP_KERNEL
 	select SERIAL_SIFIVE if TTY
 	select SERIAL_SIFIVE_CONSOLE if TTY
 	select CLK_SIFIVE

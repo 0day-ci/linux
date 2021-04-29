@@ -2,7 +2,7 @@ menu "CPU errata selection"
 
 config RISCV_ERRATA_ALTERNATIVE
 	bool "RISC-V alternative scheme"
-	default y
+	default y if !XIP_KERNEL
 	help
 	  This Kconfig allows the kernel to automatically patch the
 	  errata required by the execution platform at run time. The
