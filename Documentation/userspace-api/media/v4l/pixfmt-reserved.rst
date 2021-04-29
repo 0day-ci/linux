@@ -260,6 +260,18 @@ please make a proposal on the linux-media mailing list.
 	of tiles, resulting in 32-aligned resolutions for the luminance plane
 	and 16-aligned resolutions for the chrominance plane (with 2x2
 	subsampling).
+    * .. _V4L2-PIX-FMT-QC8C:
+
+      - ``V4L2_PIX_FMT_QC8C``
+      - 'QC8C'
+      - Compressed Macro-tile 8Bit YUV420 format used by Qualcomm platforms.
+	The compression is lossless. It contains four planes.
+    * .. _V4L2-PIX-FMT-QC10C:
+
+      - ``V4L2_PIX_FMT_QC10C``
+      - 'QC10C'
+      - Compressed Macro-tile 10Bit YUV420 format used by Qualcomm platforms.
+	The compression is lossless. It contains four planes.
 
 .. raw:: latex
 
