@@ -44,6 +44,9 @@ core_cpus:
 core_cpus_list:
 
 	human-readable list of CPUs within the same core.
+	The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	so the tail of the string will be trimmed while its size is larger
+	than PAGE_SIZE.
 	(deprecated name: "thread_siblings_list");
 
 package_cpus:
@@ -54,6 +57,9 @@ package_cpus:
 package_cpus_list:
 
 	human-readable list of CPUs sharing the same physical_package_id.
+	The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	so the tail of the string will be trimmed while its size is larger
+	than PAGE_SIZE.
 	(deprecated name: "core_siblings_list")
 
 die_cpus:
@@ -63,6 +69,9 @@ die_cpus:
 die_cpus_list:
 
 	human-readable list of CPUs within the same die.
+	The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	so the tail of the string will be trimmed while its size is larger
+	than PAGE_SIZE.
 
 book_siblings:
 
@@ -73,6 +82,9 @@ book_siblings_list:
 
 	human-readable list of cpuX's hardware threads within the same
 	book_id.
+	The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	so the tail of the string will be trimmed while its size is larger
+	than PAGE_SIZE.
 
 drawer_siblings:
 
@@ -83,6 +95,9 @@ drawer_siblings_list:
 
 	human-readable list of cpuX's hardware threads within the same
 	drawer_id.
+	The format is like 0-3, 8-11, 14,17. The maximum size is PAGE_SIZE,
+	so the tail of the string will be trimmed while its size is larger
+	than PAGE_SIZE.
 
 Architecture-neutral, drivers/base/topology.c, exports these attributes.
 However, the book and drawer related sysfs files will only be created if

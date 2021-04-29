@@ -47,7 +47,10 @@ What:		/sys/devices/system/node/nodeX/cpulist
 Date:		October 2002
 Contact:	Linux Memory Management list <linux-mm@kvack.org>
 Description:
-		The CPUs associated to the node.
+		The CPUs associated to the node. The format is like 0-3,
+		8-11, 14,17. maximum size is PAGE_SIZE, so the tail
+		of the string will be trimmed while its size is larger
+		than PAGE_SIZE.
 
 What:		/sys/devices/system/node/nodeX/meminfo
 Date:		October 2002

@@ -12,6 +12,7 @@
 #include <linux/bitmap.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
+#include <asm/page.h>
 
 /* Don't assign or return these: may not be this big! */
 typedef struct cpumask { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
@@ -924,6 +925,11 @@ static inline const struct cpumask *get_cpu_mask(unsigned int cpu)
 static inline ssize_t
 cpumap_print_to_pagebuf(bool list, char *buf, const struct cpumask *mask)
 {
+	/*
+	 * 32bits requires 9bytes: "ff,ffffffff", thus, too many CPUs will
+	 * cause the overflow of sysfs pagebuf
+	 */
+	BUILD_BUG_ON((NR_CPUS/32 * 9) > (PAGE_SIZE-1));
 	return bitmap_print_to_pagebuf(list, buf, cpumask_bits(mask),
 				      nr_cpu_ids);
 }
