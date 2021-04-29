@@ -1344,12 +1344,18 @@ static int __maybe_unused sysc_noirq_suspend(struct device *dev)
 	    (SYSC_QUIRK_LEGACY_IDLE | SYSC_QUIRK_NO_IDLE))
 		return 0;
 
-	return pm_runtime_force_suspend(dev);
+	if (!ddata->enabled)
+		return 0;
+
+	ddata->needs_resume = 1;
+
+	return sysc_runtime_suspend(dev);
 }
 
 static int __maybe_unused sysc_noirq_resume(struct device *dev)
 {
 	struct sysc *ddata;
+	int error;
 
 	ddata = dev_get_drvdata(dev);
 
@@ -1357,7 +1363,23 @@ static int __maybe_unused sysc_noirq_resume(struct device *dev)
 	    (SYSC_QUIRK_LEGACY_IDLE | SYSC_QUIRK_NO_IDLE))
 		return 0;
 
-	return pm_runtime_force_resume(dev);
+	/* Only enable module if it was on, or needs to be reinitialized */
+	if (ddata->needs_resume ||
+	    ddata->cfg.quirks & SYSC_QUIRK_REINIT_ON_RESUME) {
+		error = sysc_runtime_resume(dev);
+		if (error)
+			dev_warn(dev, "noirq_resume failed: %i\n", error);
+	}
+
+	/* Idle quirky module again if it was not on before suspend */
+	if (ddata->cfg.quirks & SYSC_QUIRK_REINIT_ON_RESUME &&
+	    !ddata->needs_resume) {
+		error = sysc_runtime_suspend(dev);
+	}
+
+	ddata->needs_resume = 0;
+
+	return error;
 }
 
 static const struct dev_pm_ops sysc_pm_ops = {
@@ -1466,7 +1488,8 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
 	SYSC_QUIRK("usb_otg_hs", 0, 0x400, 0x404, 0x408, 0x00000050,
 		   0xffffffff, SYSC_QUIRK_SWSUP_SIDLE | SYSC_QUIRK_SWSUP_MSTANDBY),
 	SYSC_QUIRK("usb_otg_hs", 0, 0, 0x10, -ENODEV, 0x4ea2080d, 0xffffffff,
-		   SYSC_QUIRK_SWSUP_SIDLE | SYSC_QUIRK_SWSUP_MSTANDBY),
+		   SYSC_QUIRK_SWSUP_SIDLE | SYSC_QUIRK_SWSUP_MSTANDBY |
+		   SYSC_QUIRK_REINIT_ON_RESUME),
 	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0500, 0xfffff0f0,
 		   SYSC_MODULE_QUIRK_WDT),
 	/* PRUSS on am3, am4 and am5 */
