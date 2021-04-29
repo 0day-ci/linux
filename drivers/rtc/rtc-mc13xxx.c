@@ -308,10 +308,8 @@ static int __init mc13xxx_rtc_probe(struct platform_device *pdev)
 	mc13xxx_unlock(mc13xxx);
 
 	ret = devm_rtc_register_device(priv->rtc);
-	if (ret) {
-		mc13xxx_lock(mc13xxx);
+	if (ret)
 		goto err_irq_request;
-	}
 
 	return 0;
 
