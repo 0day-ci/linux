@@ -251,14 +251,6 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 		regmap_update_bits(domain->regmap, GPC_PU_PWRHSK,
 				   domain->bits.hskreq, domain->bits.hskreq);
 
-		ret = regmap_read_poll_timeout(domain->regmap, GPC_PU_PWRHSK,
-					       reg_val,
-					       (reg_val & domain->bits.hskack),
-					       0, USEC_PER_MSEC);
-		if (ret) {
-			dev_err(domain->dev, "failed to power up ADB400\n");
-			goto out_clk_disable;
-		}
 	}
 
 	/* Disable reset clocks for all devices in the domain */
