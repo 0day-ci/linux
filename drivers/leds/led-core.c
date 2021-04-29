@@ -262,6 +262,19 @@ void led_set_brightness(struct led_classdev *led_cdev, unsigned int brightness)
 	}
 
 	led_set_brightness_nosleep(led_cdev, brightness);
+
+	/* When the LED is off and the hardware blinking will be disabled,
+	 * but the value of delay_on and delay_off still remains.
+	 */
+	if ((led_cdev->blink_delay_off > 0) &&
+		(led_cdev->blink_delay_on > 0) &&
+		(brightness == LED_OFF)) {
+		if (!test_bit(LED_BLINK_ONESHOT, &led_cdev->work_flags) &&
+			led_cdev->blink_set) {
+			led_cdev->blink_delay_on = 0;
+			led_cdev->blink_delay_off = 0;
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(led_set_brightness);
 
