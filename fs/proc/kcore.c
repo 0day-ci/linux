@@ -311,6 +311,7 @@ static void append_kcore_note(char *notes, size_t *i, const char *name,
 static ssize_t
 read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 {
+	size_t page_offline_frozen = 0;
 	char *buf = file->private_data;
 	size_t phdrs_offset, notes_offset, data_offset;
 	size_t phdrs_len, notes_len;
@@ -510,6 +511,18 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 			page = pfn_to_online_page(pfn);
 
 			/*
+			 * Don't race against drivers that set PageOffline()
+			 * and expect no further page access.
+			 */
+			if (page_offline_frozen == MAX_ORDER_NR_PAGES) {
+				page_offline_unfreeze();
+				page_offline_frozen = 0;
+				cond_resched();
+			}
+			if (!page_offline_frozen++)
+				page_offline_freeze();
+
+			/*
 			 * Don't read offline sections, logically offline pages
 			 * (e.g., inflated in a balloon), hwpoisoned pages,
 			 * and explicitly excluded physical ranges.
@@ -565,6 +578,8 @@ skip:
 	}
 
 out:
+	if (page_offline_frozen)
+		page_offline_unfreeze();
 	up_read(&kclist_lock);
 	if (ret)
 		return ret;
