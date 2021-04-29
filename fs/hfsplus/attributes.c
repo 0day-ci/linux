@@ -55,9 +55,10 @@ int hfsplus_attr_build_key(struct super_block *sb, hfsplus_btree_key *key,
 	memset(key, 0, sizeof(struct hfsplus_attr_key));
 	key->attr.cnid = cpu_to_be32(cnid);
 	if (name) {
-		int res = hfsplus_asc2uni(sb,
-				(struct hfsplus_unistr *)&key->attr.key_name,
-				HFSPLUS_ATTR_MAX_STRLEN, name, strlen(name));
+		int res = hfsplus_asc2uni(sb, (struct hfsplus_unistr *)
+					  &key->attr.key_name,
+					  HFSPLUS_ATTR_MAX_STRLEN,
+					  name, strlen(name), false);
 		if (res)
 			return res;
 		len = be16_to_cpu(key->attr.key_name.length);

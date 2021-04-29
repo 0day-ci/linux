@@ -121,7 +121,7 @@ static u16 *hfsplus_compose_lookup(u16 *p, u16 cc)
 
 int hfsplus_uni2asc(struct super_block *sb,
 		const struct hfsplus_unistr *ustr,
-		char *astr, int *len_p)
+		char *astr, int *len_p, bool name_mangling)
 {
 	const hfsplus_unichr *ip;
 	struct nls_table *nls = HFSPLUS_SB(sb)->nls;
@@ -187,7 +187,8 @@ int hfsplus_uni2asc(struct super_block *sb,
 				c0 = 0x2400;
 				break;
 			case '/':
-				c0 = ':';
+				if (name_mangling)
+					c0 = ':';
 				break;
 			}
 			res = nls->uni2char(c0, op, len);
@@ -253,8 +254,8 @@ out:
  * Convert one or more ASCII characters into a single unicode character.
  * Returns the number of ASCII characters corresponding to the unicode char.
  */
-static inline int asc2unichar(struct super_block *sb, const char *astr, int len,
-			      wchar_t *uc)
+static inline int asc2unichar(struct super_block *sb, const char *astr,
+			      int len, wchar_t *uc, bool name_mangling)
 {
 	int size = HFSPLUS_SB(sb)->nls->char2uni(astr, len, uc);
 	if (size <= 0) {
@@ -266,7 +267,8 @@ static inline int asc2unichar(struct super_block *sb, const char *astr, int len,
 		*uc = 0;
 		break;
 	case ':':
-		*uc = '/';
+		if (name_mangling)
+			*uc = '/';
 		break;
 	}
 	return size;
@@ -343,7 +345,7 @@ static u16 *decompose_unichar(wchar_t uc, int *size, u16 *hangul_buffer)
 
 int hfsplus_asc2uni(struct super_block *sb,
 		    struct hfsplus_unistr *ustr, int max_unistr_len,
-		    const char *astr, int len)
+		    const char *astr, int len, bool name_mangling)
 {
 	int size, dsize, decompose;
 	u16 *dstr, outlen = 0;
@@ -352,7 +354,7 @@ int hfsplus_asc2uni(struct super_block *sb,
 
 	decompose = !test_bit(HFSPLUS_SB_NODECOMPOSE, &HFSPLUS_SB(sb)->flags);
 	while (outlen < max_unistr_len && len > 0) {
-		size = asc2unichar(sb, astr, len, &c);
+		size = asc2unichar(sb, astr, len, &c, name_mangling);
 
 		if (decompose)
 			dstr = decompose_unichar(c, &dsize, dhangul);
@@ -399,7 +401,7 @@ int hfsplus_hash_dentry(const struct dentry *dentry, struct qstr *str)
 	len = str->len;
 	while (len > 0) {
 		int dsize;
-		size = asc2unichar(sb, astr, len, &c);
+		size = asc2unichar(sb, astr, len, &c, true);
 		astr += size;
 		len -= size;
 
@@ -456,7 +458,7 @@ int hfsplus_compare_dentry(const struct dentry *dentry,
 
 	while (len1 > 0 && len2 > 0) {
 		if (!dsize1) {
-			size = asc2unichar(sb, astr1, len1, &c);
+			size = asc2unichar(sb, astr1, len1, &c, true);
 			astr1 += size;
 			len1 -= size;
 
@@ -471,7 +473,7 @@ int hfsplus_compare_dentry(const struct dentry *dentry,
 		}
 
 		if (!dsize2) {
-			size = asc2unichar(sb, astr2, len2, &c);
+			size = asc2unichar(sb, astr2, len2, &c, true);
 			astr2 += size;
 			len2 -= size;
 
