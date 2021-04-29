@@ -2995,6 +2995,9 @@ static void si_apply_state_adjust_rules(struct radeon_device *rdev,
 	    ni_dpm_vblank_too_short(rdev))
 		disable_mclk_switching = true;
 
+	if (rdev->pm.dpm.high_pixelclock_count > 1)
+		disable_sclk_switching = true;
+
 	if (rps->vclk || rps->dclk) {
 		disable_mclk_switching = true;
 		disable_sclk_switching = true;
