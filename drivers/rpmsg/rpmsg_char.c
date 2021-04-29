@@ -10,19 +10,10 @@
  * was based on TI & Google OMX rpmsg driver.
  */
 #include <linux/cdev.h>
-#include <linux/device.h>
-#include <linux/fs.h>
-#include <linux/idr.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/poll.h>
 #include <linux/rpmsg.h>
 #include <linux/skbuff.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <uapi/linux/rpmsg.h>
-
-#include "rpmsg_internal.h"
 
 #define RPMSG_DEV_MAX	(MINORMASK + 1)
 
