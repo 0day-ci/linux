@@ -957,7 +957,7 @@ retry:
 	if (!err)
 		err = i915_gem_object_lock(rpcs, &ww);
 	if (!err)
-		err = i915_gem_object_set_to_gtt_domain(obj, false);
+		err = i915_gem_object_set_to_gtt_domain(obj, &ww, false);
 	if (!err)
 		err = i915_vma_pin_ww(vma, &ww, 0, 0, PIN_USER);
 	if (err)
@@ -1712,7 +1712,7 @@ static int read_from_scratch(struct i915_gem_context *ctx,
 	i915_request_add(rq);
 
 	i915_gem_object_lock(obj, NULL);
-	err = i915_gem_object_set_to_cpu_domain(obj, false);
+	err = i915_gem_object_set_to_cpu_domain(obj, NULL, false);
 	i915_gem_object_unlock(obj);
 	if (err)
 		goto out_vm;

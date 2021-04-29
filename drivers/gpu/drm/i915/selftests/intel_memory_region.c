@@ -743,7 +743,7 @@ static int igt_lmem_write_cpu(void *arg)
 		goto out_unpin;
 
 	i915_gem_object_lock(obj, NULL);
-	err = i915_gem_object_set_to_wc_domain(obj, true);
+	err = i915_gem_object_set_to_wc_domain(obj, NULL, true);
 	i915_gem_object_unlock(obj);
 	if (err)
 		goto out_unpin;

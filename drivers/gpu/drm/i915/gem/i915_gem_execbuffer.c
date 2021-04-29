@@ -1213,7 +1213,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 		if (use_cpu_reloc(cache, obj))
 			return NULL;
 
-		err = i915_gem_object_set_to_gtt_domain(obj, true);
+		err = i915_gem_object_set_to_gtt_domain(obj, &eb->ww, true);
 		if (err)
 			return ERR_PTR(err);
 
@@ -2509,7 +2509,7 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 		pw->batch_map = i915_gem_object_pin_map(batch, &eb->ww, I915_MAP_WC);
 
 	if (IS_ERR(pw->batch_map)) {
-		err = i915_gem_object_pin_pages(batch);
+		err = i915_gem_object_pin_pages(batch, &eb->ww);
 		if (err)
 			goto err_unmap_shadow;
 		pw->batch_map = NULL;

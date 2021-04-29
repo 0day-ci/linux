@@ -87,7 +87,8 @@ void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
 	}
 }
 
-int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
+int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj,
+				  struct i915_gem_ww_ctx *ww)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	int err;
@@ -100,7 +101,7 @@ int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 		return -EFAULT;
 	}
 
-	err = obj->ops->get_pages(obj, NULL);
+	err = obj->ops->get_pages(obj, ww);
 	GEM_BUG_ON(!err && !i915_gem_object_has_pages(obj));
 
 	return err;
@@ -113,7 +114,8 @@ int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
  * either as a result of memory pressure (reaping pages under the shrinker)
  * or as the object is itself released.
  */
-int __i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
+int __i915_gem_object_get_pages(struct drm_i915_gem_object *obj,
+				struct i915_gem_ww_ctx *ww)
 {
 	int err;
 
@@ -124,7 +126,7 @@ int __i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 	if (unlikely(!i915_gem_object_has_pages(obj))) {
 		GEM_BUG_ON(i915_gem_object_has_pinned_pages(obj));
 
-		err = ____i915_gem_object_get_pages(obj);
+		err = ____i915_gem_object_get_pages(obj, ww);
 		if (err)
 			return err;
 
@@ -144,7 +146,7 @@ int i915_gem_object_pin_pages_unlocked(struct drm_i915_gem_object *obj)
 retry:
 	err = i915_gem_object_lock(obj, &ww);
 	if (!err)
-		err = i915_gem_object_pin_pages(obj);
+		err = i915_gem_object_pin_pages(obj, &ww);
 
 	if (err == -EDEADLK) {
 		err = i915_gem_ww_ctx_backoff(&ww);
@@ -362,7 +364,7 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
 		if (unlikely(!i915_gem_object_has_pages(obj))) {
 			GEM_BUG_ON(i915_gem_object_has_pinned_pages(obj));
 
-			err = ____i915_gem_object_get_pages(obj);
+			err = ____i915_gem_object_get_pages(obj, ww);
 			if (err)
 				return ERR_PTR(err);
 

@@ -988,7 +988,7 @@ static int igt_vma_remapped_gtt(void *arg)
 			unsigned int x, y;
 
 			i915_gem_object_lock(obj, NULL);
-			err = i915_gem_object_set_to_gtt_domain(obj, true);
+			err = i915_gem_object_set_to_gtt_domain(obj, NULL, true);
 			i915_gem_object_unlock(obj);
 			if (err)
 				goto out;

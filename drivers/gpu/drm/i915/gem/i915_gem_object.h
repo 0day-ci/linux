@@ -378,18 +378,21 @@ void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
 				 struct sg_table *pages,
 				 unsigned int sg_page_sizes);
 
-int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj);
-int __i915_gem_object_get_pages(struct drm_i915_gem_object *obj);
+int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj,
+				  struct i915_gem_ww_ctx *ww);
+int __i915_gem_object_get_pages(struct drm_i915_gem_object *obj,
+				struct i915_gem_ww_ctx *ww);
 
 static inline int __must_check
-i915_gem_object_pin_pages(struct drm_i915_gem_object *obj)
+i915_gem_object_pin_pages(struct drm_i915_gem_object *obj,
+			  struct i915_gem_ww_ctx *ww)
 {
 	assert_object_held(obj);
 
 	if (atomic_inc_not_zero(&obj->mm.pages_pin_count))
 		return 0;
 
-	return __i915_gem_object_get_pages(obj);
+	return __i915_gem_object_get_pages(obj, ww);
 }
 
 int i915_gem_object_pin_pages_unlocked(struct drm_i915_gem_object *obj);
@@ -519,11 +522,14 @@ void i915_gem_object_flush_if_display(struct drm_i915_gem_object *obj);
 void i915_gem_object_flush_if_display_locked(struct drm_i915_gem_object *obj);
 
 int __must_check
-i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj, bool write);
+i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj,
+				 struct i915_gem_ww_ctx *ww, bool write);
 int __must_check
-i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write);
+i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, 
+				  struct i915_gem_ww_ctx *ww, bool write);
 int __must_check
-i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write);
+i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj,
+				  struct i915_gem_ww_ctx *ww, bool write);
 struct i915_vma * __must_check
 i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 				     struct i915_gem_ww_ctx *ww,

@@ -1090,7 +1090,7 @@ retry:
 	if (!ret && phys_cursor)
 		ret = i915_gem_object_attach_phys(obj, alignment);
 	if (!ret)
-		ret = i915_gem_object_pin_pages(obj);
+		ret = i915_gem_object_pin_pages(obj, &ww);
 	if (ret)
 		goto err;
 

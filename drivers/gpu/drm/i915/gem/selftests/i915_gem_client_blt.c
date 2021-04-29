@@ -74,7 +74,7 @@ static int __igt_client_fill(struct intel_engine_cs *engine)
 			goto err_unpin;
 
 		i915_gem_object_lock(obj, NULL);
-		err = i915_gem_object_set_to_cpu_domain(obj, false);
+		err = i915_gem_object_set_to_cpu_domain(obj, NULL, false);
 		i915_gem_object_unlock(obj);
 		if (err)
 			goto err_unpin;

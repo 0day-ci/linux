@@ -216,7 +216,7 @@ static int check_whitelist(struct intel_context *ce)
 	err = 0;
 	i915_gem_object_lock(results, NULL);
 	intel_wedge_on_timeout(&wedge, engine->gt, HZ / 5) /* safety net! */
-		err = i915_gem_object_set_to_cpu_domain(results, false);
+		err = i915_gem_object_set_to_cpu_domain(results, NULL, false);
 
 	if (intel_gt_is_wedged(engine->gt))
 		err = -EIO;

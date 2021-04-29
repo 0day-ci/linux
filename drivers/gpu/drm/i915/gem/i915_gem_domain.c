@@ -98,7 +98,8 @@ void i915_gem_object_flush_if_display_locked(struct drm_i915_gem_object *obj)
  * flushes to occur.
  */
 int
-i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj, bool write)
+i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj,
+				 struct i915_gem_ww_ctx *ww, bool write)
 {
 	int ret;
 
@@ -122,7 +123,7 @@ i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj, bool write)
 	 * continue to assume that the obj remained out of the CPU cached
 	 * domain.
 	 */
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, ww);
 	if (ret)
 		return ret;
 
@@ -159,7 +160,8 @@ i915_gem_object_set_to_wc_domain(struct drm_i915_gem_object *obj, bool write)
  * flushes to occur.
  */
 int
-i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
+i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj,
+				  struct i915_gem_ww_ctx *ww, bool write)
 {
 	int ret;
 
@@ -183,7 +185,7 @@ i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj, bool write)
 	 * continue to assume that the obj remained out of the CPU cached
 	 * domain.
 	 */
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, ww);
 	if (ret)
 		return ret;
 
@@ -432,7 +434,8 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
  * flushes to occur.
  */
 int
-i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, bool write)
+i915_gem_object_set_to_cpu_domain(struct drm_i915_gem_object *obj, 
+				  struct i915_gem_ww_ctx *ww, bool write)
 {
 	int ret;
 
@@ -482,6 +485,7 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_object *obj;
 	u32 read_domains = args->read_domains;
 	u32 write_domain = args->write_domain;
+	struct i915_gem_ww_ctx ww;
 	int err;
 
 	/* Only handle setting domains to types used by the CPU. */
@@ -541,9 +545,11 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 		goto out;
 	}
 
-	err = i915_gem_object_lock_interruptible(obj, NULL);
+	i915_gem_ww_ctx_init(&ww, true);
+retry:
+	err = i915_gem_object_lock_interruptible(obj, &ww);
 	if (err)
-		goto out;
+		goto out_ww;
 
 	/*
 	 * Flush and acquire obj->pages so that we are coherent through
@@ -554,9 +560,9 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	 * continue to assume that the obj remained out of the CPU cached
 	 * domain.
 	 */
-	err = i915_gem_object_pin_pages(obj);
+	err = i915_gem_object_pin_pages(obj, &ww);
 	if (err)
-		goto out_unlock;
+		goto out_ww;
 
 	/*
 	 * Already in the desired write domain? Nothing for us to do!
@@ -572,21 +578,25 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 		goto out_unpin;
 
 	if (read_domains & I915_GEM_DOMAIN_WC)
-		err = i915_gem_object_set_to_wc_domain(obj, write_domain);
+		err = i915_gem_object_set_to_wc_domain(obj, &ww, write_domain);
 	else if (read_domains & I915_GEM_DOMAIN_GTT)
-		err = i915_gem_object_set_to_gtt_domain(obj, write_domain);
+		err = i915_gem_object_set_to_gtt_domain(obj, &ww, write_domain);
 	else
-		err = i915_gem_object_set_to_cpu_domain(obj, write_domain);
+		err = i915_gem_object_set_to_cpu_domain(obj, &ww, write_domain);
 
 out_unpin:
 	i915_gem_object_unpin_pages(obj);
 
-out_unlock:
-	i915_gem_object_unlock(obj);
-
 	if (!err && write_domain)
 		i915_gem_object_invalidate_frontbuffer(obj, ORIGIN_CPU);
 
+out_ww:
+	if (err == -EDEADLK) {
+		err = i915_gem_ww_ctx_backoff(&ww);
+		if (!err)
+			goto retry;
+	}
+	i915_gem_ww_ctx_fini(&ww);
 out:
 	i915_gem_object_put(obj);
 	return err;
@@ -615,13 +625,13 @@ int i915_gem_object_prepare_read(struct drm_i915_gem_object *obj,
 	if (ret)
 		return ret;
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, ww);
 	if (ret)
 		return ret;
 
 	if (obj->cache_coherent & I915_BO_CACHE_COHERENT_FOR_READ ||
 	    !static_cpu_has(X86_FEATURE_CLFLUSH)) {
-		ret = i915_gem_object_set_to_cpu_domain(obj, false);
+		ret = i915_gem_object_set_to_cpu_domain(obj, ww, false);
 		if (ret)
 			goto err_unpin;
 		else
@@ -667,13 +677,13 @@ int i915_gem_object_prepare_write(struct drm_i915_gem_object *obj,
 	if (ret)
 		return ret;
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, ww);
 	if (ret)
 		return ret;
 
 	if (obj->cache_coherent & I915_BO_CACHE_COHERENT_FOR_WRITE ||
 	    !static_cpu_has(X86_FEATURE_CLFLUSH)) {
-		ret = i915_gem_object_set_to_cpu_domain(obj, true);
+		ret = i915_gem_object_set_to_cpu_domain(obj, ww, true);
 		if (ret)
 			goto err_unpin;
 		else

@@ -798,7 +798,8 @@ unpinned:
 	return pinned;
 }
 
-static int vma_get_pages(struct i915_vma *vma)
+static int vma_get_pages(struct i915_vma *vma,
+			 struct i915_gem_ww_ctx *ww)
 {
 	int err = 0;
 
@@ -811,7 +812,7 @@ static int vma_get_pages(struct i915_vma *vma)
 
 	if (!atomic_read(&vma->pages_count)) {
 		if (vma->obj) {
-			err = i915_gem_object_pin_pages(vma->obj);
+			err = i915_gem_object_pin_pages(vma->obj, ww);
 			if (err)
 				goto unlock;
 		}
@@ -889,7 +890,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 	if (try_qad_pin(vma, flags & I915_VMA_BIND_MASK))
 		return 0;
 
-	err = vma_get_pages(vma);
+	err = vma_get_pages(vma, ww);
 	if (err)
 		return err;
 

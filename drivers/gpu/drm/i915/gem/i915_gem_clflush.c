@@ -57,7 +57,7 @@ static struct clflush *clflush_work_create(struct drm_i915_gem_object *obj)
 	if (!clflush)
 		return NULL;
 
-	if (__i915_gem_object_get_pages(obj) < 0) {
+	if (__i915_gem_object_get_pages(obj, NULL) < 0) {
 		kfree(clflush);
 		return NULL;
 	}

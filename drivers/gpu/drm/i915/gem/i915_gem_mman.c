@@ -239,6 +239,7 @@ static vm_fault_t vm_fault_cpu(struct vm_fault *vmf)
 	struct i915_mmap_offset *mmo = area->vm_private_data;
 	struct drm_i915_gem_object *obj = mmo->obj;
 	resource_size_t iomap;
+	struct i915_gem_ww_ctx ww;
 	int err;
 
 	/* Sanity check that we allow writing into this object */
@@ -246,10 +247,11 @@ static vm_fault_t vm_fault_cpu(struct vm_fault *vmf)
 		     area->vm_flags & VM_WRITE))
 		return VM_FAULT_SIGBUS;
 
-	if (i915_gem_object_lock_interruptible(obj, NULL))
-		return VM_FAULT_NOPAGE;
-
-	err = i915_gem_object_pin_pages(obj);
+	i915_gem_ww_ctx_init(&ww, true);
+retry:
+	err = i915_gem_object_lock(obj, &ww);
+	if (!err)
+		err = i915_gem_object_pin_pages(obj, &ww);
 	if (err)
 		goto out;
 
@@ -272,7 +274,12 @@ static vm_fault_t vm_fault_cpu(struct vm_fault *vmf)
 	i915_gem_object_unpin_pages(obj);
 
 out:
-	i915_gem_object_unlock(obj);
+	if (err == -EDEADLK) {
+		err = i915_gem_ww_ctx_backoff(&ww);
+		if (!err)
+			goto retry;
+	}
+	i915_gem_ww_ctx_fini(&ww);
 	return i915_error_to_vmf_fault(err);
 }
 
@@ -313,7 +320,7 @@ retry:
 		goto err_rpm;
 	}
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, &ww);
 	if (ret)
 		goto err_rpm;
 

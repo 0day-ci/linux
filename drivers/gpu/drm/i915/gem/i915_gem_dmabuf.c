@@ -130,9 +130,9 @@ static int i915_gem_begin_cpu_access(struct dma_buf *dma_buf, enum dma_data_dire
 retry:
 	err = i915_gem_object_lock(obj, &ww);
 	if (!err)
-		err = i915_gem_object_pin_pages(obj);
+		err = i915_gem_object_pin_pages(obj, &ww);
 	if (!err) {
-		err = i915_gem_object_set_to_cpu_domain(obj, write);
+		err = i915_gem_object_set_to_cpu_domain(obj, &ww, write);
 		i915_gem_object_unpin_pages(obj);
 	}
 	if (err == -EDEADLK) {
@@ -154,9 +154,9 @@ static int i915_gem_end_cpu_access(struct dma_buf *dma_buf, enum dma_data_direct
 retry:
 	err = i915_gem_object_lock(obj, &ww);
 	if (!err)
-		err = i915_gem_object_pin_pages(obj);
+		err = i915_gem_object_pin_pages(obj, &ww);
 	if (!err) {
-		err = i915_gem_object_set_to_gtt_domain(obj, false);
+		err = i915_gem_object_set_to_gtt_domain(obj, &ww, false);
 		i915_gem_object_unpin_pages(obj);
 	}
 	if (err == -EDEADLK) {

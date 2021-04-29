@@ -105,7 +105,7 @@ static int check_partial_mapping(struct drm_i915_gem_object *obj,
 	GEM_BUG_ON(i915_gem_object_get_stride(obj) != tile->stride);
 
 	i915_gem_object_lock(obj, NULL);
-	err = i915_gem_object_set_to_gtt_domain(obj, true);
+	err = i915_gem_object_set_to_gtt_domain(obj, NULL, true);
 	i915_gem_object_unlock(obj);
 	if (err) {
 		pr_err("Failed to flush to GTT write domain; err=%d\n", err);
@@ -190,7 +190,7 @@ static int check_partial_mappings(struct drm_i915_gem_object *obj,
 	GEM_BUG_ON(i915_gem_object_get_stride(obj) != tile->stride);
 
 	i915_gem_object_lock(obj, NULL);
-	err = i915_gem_object_set_to_gtt_domain(obj, true);
+	err = i915_gem_object_set_to_gtt_domain(obj, NULL, true);
 	i915_gem_object_unlock(obj);
 	if (err) {
 		pr_err("Failed to flush to GTT write domain; err=%d\n", err);

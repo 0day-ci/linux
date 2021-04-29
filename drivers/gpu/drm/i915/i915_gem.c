@@ -212,7 +212,7 @@ i915_gem_shmem_pread(struct drm_i915_gem_object *obj,
 	if (ret)
 		return ret;
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, NULL);
 	if (ret)
 		goto err_unlock;
 
@@ -291,7 +291,7 @@ retry:
 	if (ret)
 		goto err_ww;
 
-	ret = i915_gem_object_set_to_gtt_domain(obj, write);
+	ret = i915_gem_object_set_to_gtt_domain(obj, &ww, write);
 	if (ret)
 		goto err_ww;
 
@@ -314,7 +314,7 @@ retry:
 		vma = NULL;
 	}
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, &ww);
 	if (ret) {
 		if (drm_mm_node_allocated(node)) {
 			ggtt->vm.clear_range(&ggtt->vm, node->start, node->size);
@@ -643,7 +643,7 @@ i915_gem_shmem_pwrite(struct drm_i915_gem_object *obj,
 	if (ret)
 		return ret;
 
-	ret = i915_gem_object_pin_pages(obj);
+	ret = i915_gem_object_pin_pages(obj, NULL);
 	if (ret)
 		goto err_unlock;
 

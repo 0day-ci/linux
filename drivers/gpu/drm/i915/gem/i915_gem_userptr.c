@@ -261,7 +261,7 @@ static int i915_gem_object_userptr_unbind(struct drm_i915_gem_object *obj, bool 
 		i915_gem_userptr_put_pages(obj, pages);
 
 	if (get_pages)
-		err = ____i915_gem_object_get_pages(obj);
+		err = ____i915_gem_object_get_pages(obj, NULL);
 
 	return err;
 }
@@ -390,7 +390,7 @@ int i915_gem_object_userptr_validate(struct drm_i915_gem_object *obj)
 		 * it doesn't matter if we collide with the mmu notifier,
 		 * and -EAGAIN handling is not required.
 		 */
-		err = i915_gem_object_pin_pages(obj);
+		err = i915_gem_object_pin_pages(obj, NULL);
 		if (!err)
 			i915_gem_object_unpin_pages(obj);
 
