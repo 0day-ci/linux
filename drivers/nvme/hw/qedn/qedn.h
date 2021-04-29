@@ -47,6 +47,9 @@
 #define QEDN_NON_ABORTIVE_TERMINATION 0
 #define QEDN_ABORTIVE_TERMINATION 1
 
+#define QEDN_FW_CQ_FP_WQ_WORKQUEUE "qedn_fw_cq_fp_wq"
+#define QEDN_NVME_REQ_FP_WQ_WORKQUEUE "qedn_nvme_req_fp_wq"
+
 /*
  * TCP offload stack default configurations and defines.
  * Future enhancements will allow controlling the configurable
@@ -100,6 +103,7 @@ struct qedn_fp_queue {
 	struct qedn_ctx	*qedn;
 	struct qed_sb_info *sb_info;
 	unsigned int cpu;
+	struct work_struct fw_cq_fp_wq_entry;
 	u16 sb_id;
 	char irqname[QEDN_IRQ_NAME_LEN];
 };
@@ -131,6 +135,8 @@ struct qedn_ctx {
 	struct qedn_fp_queue *fp_q_arr;
 	struct nvmetcp_glbl_queue_entry *fw_cq_array_virt;
 	dma_addr_t fw_cq_array_phy; /* Physical address of fw_cq_array_virt */
+	struct workqueue_struct *nvme_req_fp_wq;
+	struct workqueue_struct *fw_cq_fp_wq;
 };
 
 struct qedn_endpoint {
@@ -213,6 +219,25 @@ struct qedn_ctrl {
 
 /* Connection level struct */
 struct qedn_conn_ctx {
+	/* IO path */
+	struct workqueue_struct	*nvme_req_fp_wq; /* ptr to qedn->nvme_req_fp_wq */
+	struct nvme_tcp_ofld_req *req; /* currently proccessed request */
+
+	struct list_head host_pend_req_list;
+	/* Spinlock to access pending request list */
+	spinlock_t nvme_req_lock;
+	unsigned int cpu;
+
+	/* Entry for registering to nvme_req_fp_wq */
+	struct work_struct nvme_req_fp_wq_entry;
+	/*
+	 * Spinlock for accessing qedn_process_req as it can be called
+	 * from multiple place like queue_rq, async, self requeued
+	 */
+	struct mutex nvme_req_mutex;
+	struct qedn_fp_queue *fp_q;
+	int qid;
+
 	struct qedn_ctx *qedn;
 	struct nvme_tcp_ofld_queue *queue;
 	struct nvme_tcp_ofld_ctrl *ctrl;
@@ -280,5 +305,9 @@ int qedn_wait_for_conn_est(struct qedn_conn_ctx *conn_ctx);
 int qedn_set_con_state(struct qedn_conn_ctx *conn_ctx, enum qedn_conn_state new_state);
 void qedn_terminate_connection(struct qedn_conn_ctx *conn_ctx, int abrt_flag);
 __be16 qedn_get_in_port(struct sockaddr_storage *sa);
+inline int qedn_validate_cccid_in_range(struct qedn_conn_ctx *conn_ctx, u16 cccid);
+void qedn_queue_request(struct qedn_conn_ctx *qedn_conn, struct nvme_tcp_ofld_req *req);
+void qedn_nvme_req_fp_wq_handler(struct work_struct *work);
+void qedn_io_work_cq(struct qedn_ctx *qedn, struct nvmetcp_fw_cqe *cqe);
 
 #endif /* _QEDN_H_ */

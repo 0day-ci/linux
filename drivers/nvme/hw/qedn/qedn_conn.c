@@ -385,6 +385,9 @@ static int qedn_prep_and_offload_queue(struct qedn_conn_ctx *conn_ctx)
 	}
 
 	set_bit(QEDN_CONN_RESRC_FW_SQ, &conn_ctx->resrc_state);
+	INIT_LIST_HEAD(&conn_ctx->host_pend_req_list);
+	spin_lock_init(&conn_ctx->nvme_req_lock);
+
 	rc = qed_ops->acquire_conn(qedn->cdev,
 				   &conn_ctx->conn_handle,
 				   &conn_ctx->fw_cid,

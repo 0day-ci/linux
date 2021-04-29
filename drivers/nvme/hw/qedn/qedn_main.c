@@ -267,6 +267,18 @@ static int qedn_release_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 	return 0;
 }
 
+static void qedn_set_ctrl_io_cpus(struct qedn_conn_ctx *conn_ctx, int qid)
+{
+	struct qedn_ctx *qedn = conn_ctx->qedn;
+	struct qedn_fp_queue *fp_q = NULL;
+	int index;
+
+	index = qid ? (qid - 1) % qedn->num_fw_cqs : 0;
+	fp_q = &qedn->fp_q_arr[index];
+
+	conn_ctx->cpu = fp_q->cpu;
+}
+
 static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid, size_t q_size)
 {
 	struct nvme_tcp_ofld_ctrl *ctrl = queue->ctrl;
@@ -288,12 +300,17 @@ static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid, size_t 
 	conn_ctx->queue = queue;
 	conn_ctx->ctrl = ctrl;
 	conn_ctx->sq_depth = q_size;
+	qedn_set_ctrl_io_cpus(conn_ctx, qid);
 
 	init_waitqueue_head(&conn_ctx->conn_waitq);
 	atomic_set(&conn_ctx->est_conn_indicator, 0);
 	atomic_set(&conn_ctx->destroy_conn_indicator, 0);
 
 	spin_lock_init(&conn_ctx->conn_state_lock);
+
+	INIT_WORK(&conn_ctx->nvme_req_fp_wq_entry, qedn_nvme_req_fp_wq_handler);
+	conn_ctx->nvme_req_fp_wq = qedn->nvme_req_fp_wq;
+	conn_ctx->qid = qid;
 
 	qedn_initialize_endpoint(&conn_ctx->ep, qedn->local_mac_addr,
 				 &ctrl->conn_params);
@@ -356,6 +373,7 @@ static void qedn_destroy_queue(struct nvme_tcp_ofld_queue *queue)
 	if (!conn_ctx)
 		return;
 
+	cancel_work_sync(&conn_ctx->nvme_req_fp_wq_entry);
 	qedn_terminate_connection(conn_ctx, QEDN_ABORTIVE_TERMINATION);
 
 	qedn_queue_wait_for_terminate_complete(conn_ctx);
@@ -385,12 +403,24 @@ static int qedn_init_req(struct nvme_tcp_ofld_req *req)
 
 static void qedn_commit_rqs(struct nvme_tcp_ofld_queue *queue)
 {
-	/* Placeholder - queue work */
+	struct qedn_conn_ctx *conn_ctx;
+
+	conn_ctx = (struct qedn_conn_ctx *)queue->private_data;
+
+	if (!list_empty(&conn_ctx->host_pend_req_list))
+		queue_work_on(conn_ctx->cpu, conn_ctx->nvme_req_fp_wq,
+			      &conn_ctx->nvme_req_fp_wq_entry);
 }
 
 static int qedn_send_req(struct nvme_tcp_ofld_req *req)
 {
-	/* Placeholder - qedn_send_req */
+	struct qedn_conn_ctx *qedn_conn = (struct qedn_conn_ctx *)req->queue->private_data;
+
+	/* Under the assumption that the cccid/tag will be in the range of 0 to sq_depth-1. */
+	if (!req->async && qedn_validate_cccid_in_range(qedn_conn, req->rq->tag))
+		return BLK_STS_NOTSUPP;
+
+	qedn_queue_request(qedn_conn, req);
 
 	return 0;
 }
@@ -434,9 +464,59 @@ struct qedn_conn_ctx *qedn_get_conn_hash(struct qedn_ctx *qedn, u16 icid)
 }
 
 /* Fastpath IRQ handler */
+void qedn_fw_cq_fp_handler(struct qedn_fp_queue *fp_q)
+{
+	u16 sb_id, cq_prod_idx, cq_cons_idx;
+	struct qedn_ctx *qedn = fp_q->qedn;
+	struct nvmetcp_fw_cqe *cqe = NULL;
+
+	sb_id = fp_q->sb_id;
+	qed_sb_update_sb_idx(fp_q->sb_info);
+
+	/* rmb - to prevent missing new cqes */
+	rmb();
+
+	/* Read the latest cq_prod from the SB */
+	cq_prod_idx = *fp_q->cq_prod;
+	cq_cons_idx = qed_chain_get_cons_idx(&fp_q->cq_chain);
+
+	while (cq_cons_idx != cq_prod_idx) {
+		cqe = qed_chain_consume(&fp_q->cq_chain);
+		if (likely(cqe))
+			qedn_io_work_cq(qedn, cqe);
+		else
+			pr_err("Failed consuming cqe\n");
+
+		cq_cons_idx = qed_chain_get_cons_idx(&fp_q->cq_chain);
+
+		/* Check if new completions were posted */
+		if (unlikely(cq_prod_idx == cq_cons_idx)) {
+			/* rmb - to prevent missing new cqes */
+			rmb();
+
+			/* Update the latest cq_prod from the SB */
+			cq_prod_idx = *fp_q->cq_prod;
+		}
+	}
+}
+
+static void qedn_fw_cq_fq_wq_handler(struct work_struct *work)
+{
+	struct qedn_fp_queue *fp_q = container_of(work, struct qedn_fp_queue, fw_cq_fp_wq_entry);
+
+	qedn_fw_cq_fp_handler(fp_q);
+	qed_sb_ack(fp_q->sb_info, IGU_INT_ENABLE, 1);
+}
+
 static irqreturn_t qedn_irq_handler(int irq, void *dev_id)
 {
-	/* Placeholder */
+	struct qedn_fp_queue *fp_q = dev_id;
+	struct qedn_ctx *qedn = fp_q->qedn;
+
+	fp_q->cpu = smp_processor_id();
+
+	qed_sb_ack(fp_q->sb_info, IGU_INT_DISABLE, 0);
+	queue_work_on(fp_q->cpu, qedn->fw_cq_fp_wq, &fp_q->fw_cq_fp_wq_entry);
 
 	return IRQ_HANDLED;
 }
@@ -584,6 +664,11 @@ static void qedn_free_function_queues(struct qedn_ctx *qedn)
 	int i;
 
 	/* Free workqueues */
+	destroy_workqueue(qedn->fw_cq_fp_wq);
+	qedn->fw_cq_fp_wq = NULL;
+
+	destroy_workqueue(qedn->nvme_req_fp_wq);
+	qedn->nvme_req_fp_wq = NULL;
 
 	/* Free the fast path queues*/
 	for (i = 0; i < qedn->num_fw_cqs; i++) {
@@ -651,7 +736,23 @@ static int qedn_alloc_function_queues(struct qedn_ctx *qedn)
 	u64 cq_phy_addr;
 	int i;
 
-	/* Place holder - IO-path workqueues */
+	qedn->fw_cq_fp_wq = alloc_workqueue(QEDN_FW_CQ_FP_WQ_WORKQUEUE,
+					    WQ_HIGHPRI | WQ_MEM_RECLAIM, 0);
+	if (!qedn->fw_cq_fp_wq) {
+		rc = -ENODEV;
+		pr_err("Unable to create fastpath FW CQ workqueue!\n");
+
+		return rc;
+	}
+
+	qedn->nvme_req_fp_wq = alloc_workqueue(QEDN_NVME_REQ_FP_WQ_WORKQUEUE,
+					       WQ_HIGHPRI | WQ_MEM_RECLAIM, 1);
+	if (!qedn->nvme_req_fp_wq) {
+		rc = -ENODEV;
+		pr_err("Unable to create fastpath qedn nvme workqueue!\n");
+
+		return rc;
+	}
 
 	qedn->fp_q_arr = kcalloc(qedn->num_fw_cqs,
 				 sizeof(struct qedn_fp_queue), GFP_KERNEL);
@@ -679,7 +780,7 @@ static int qedn_alloc_function_queues(struct qedn_ctx *qedn)
 		chain_params.mode = QED_CHAIN_MODE_PBL,
 		chain_params.cnt_type = QED_CHAIN_CNT_TYPE_U16,
 		chain_params.num_elems = QEDN_FW_CQ_SIZE;
-		chain_params.elem_size = 64; /*Placeholder - sizeof(struct nvmetcp_fw_cqe)*/
+		chain_params.elem_size = sizeof(struct nvmetcp_fw_cqe);
 
 		rc = qed_ops->common->chain_alloc(qedn->cdev,
 						  &fp_q->cq_chain,
@@ -708,8 +809,7 @@ static int qedn_alloc_function_queues(struct qedn_ctx *qedn)
 		sb = fp_q->sb_info->sb_virt;
 		fp_q->cq_prod = (u16 *)&sb->pi_array[QEDN_PROTO_CQ_PROD_IDX];
 		fp_q->qedn = qedn;
-
-		/* Placeholder - Init IO-path workqueue */
+		INIT_WORK(&fp_q->fw_cq_fp_wq_entry, qedn_fw_cq_fq_wq_handler);
 
 		/* Placeholder - Init IO-path resources */
 	}
