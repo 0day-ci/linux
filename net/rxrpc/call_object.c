@@ -505,8 +505,7 @@ void rxrpc_release_call(struct rxrpc_sock *rx, struct rxrpc_call *call)
 	ASSERTCMP(call->state, ==, RXRPC_CALL_COMPLETE);
 
 	spin_lock_bh(&call->lock);
-	if (test_and_set_bit(RXRPC_CALL_RELEASED, &call->flags))
-		BUG();
+	BUG_ON(test_and_set_bit(RXRPC_CALL_RELEASED, &call->flags));
 	spin_unlock_bh(&call->lock);
 
 	rxrpc_put_call_slot(call);
@@ -636,8 +635,7 @@ static void rxrpc_rcu_destroy_call(struct rcu_head *rcu)
 
 	if (in_softirq()) {
 		INIT_WORK(&call->processor, rxrpc_destroy_call);
-		if (!rxrpc_queue_work(&call->processor))
-			BUG();
+		BUG_ON(!rxrpc_queue_work(&call->processor));
 	} else {
 		rxrpc_destroy_call(&call->processor);
 	}
