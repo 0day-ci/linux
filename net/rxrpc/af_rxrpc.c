@@ -599,7 +599,6 @@ static int rxrpc_setsockopt(struct socket *sock, int level, int optname,
 	_enter(",%d,%d,,%d", level, optname, optlen);
 
 	lock_sock(&rx->sk);
-	ret = -EOPNOTSUPP;
 
 	if (level == SOL_RXRPC) {
 		switch (optname) {
