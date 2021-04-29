@@ -145,7 +145,11 @@ void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
 		if (!fn(data, frame->pc))
 			break;
 		ret = unwind_frame(tsk, frame);
-		if (ret < 0)
+		/*
+		 * When the frame->pc is zero, it has reached to the initial pc
+		 * and fp values; stop unwinding for this case.
+		 */
+		if (ret < 0 || !frame->pc)
 			break;
 	}
 }
