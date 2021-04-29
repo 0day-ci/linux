@@ -14,6 +14,7 @@
 
 #include <linux/bits.h>
 #include <linux/bitfield.h>
+#include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/of_irq.h>
 #include <linux/pm_runtime.h>
@@ -631,11 +632,28 @@ static int fxls8962af_fifo_transfer(struct fxls8962af_data *data,
 {
 	struct device *dev = regmap_get_device(data->regmap);
 	int sample_length = 3 * sizeof(*buffer);
-	int ret;
+	int ret, i;
 	int total_length = samples * sample_length;
 
-	ret = regmap_raw_read(data->regmap, FXLS8962AF_BUF_X_LSB, buffer,
-			      total_length);
+	if (i2c_verify_client(dev)) {
+		/*
+		 * Due to errata bug:
+		 * E3: FIFO burst read operation error using I2C interface
+		 * We have to avoid burst reads on I2C..
+		 */
+		for (i = 0; i < samples; i++) {
+			ret = regmap_raw_read(data->regmap, FXLS8962AF_BUF_X_LSB,
+					      &buffer[i],
+					      sample_length);
+			if (ret < 0)
+				goto out;
+		}
+	} else {
+		ret = regmap_raw_read(data->regmap, FXLS8962AF_BUF_X_LSB, buffer,
+				      total_length);
+	}
+
+ out:
 	if (ret < 0)
 		dev_err(dev, "Error transferring data from fifo: %d\n", ret);
 
