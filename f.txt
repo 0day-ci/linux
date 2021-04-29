@@ -1,0 +1,6 @@
+drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_mst_types.c
+drivers/gpu/drm/drm_dp_mst_topology.c
+drivers/gpu/drm/i915/display/intel_dp_mst.c
+drivers/gpu/drm/nouveau/dispnv50/disp.c
+drivers/gpu/drm/radeon/radeon_dp_mst.c
+include/drm/drm_dp_mst_helper.h
