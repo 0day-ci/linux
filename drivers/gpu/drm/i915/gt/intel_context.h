@@ -220,6 +220,23 @@ static inline bool intel_context_set_banned(struct intel_context *ce)
 	return test_and_set_bit(CONTEXT_BANNED, &ce->flags);
 }
 
+static inline bool intel_context_is_non_persistent(const struct intel_context *ce)
+{
+	return test_bit(CONTEXT_NON_PERSISTENT, &ce->flags);
+}
+
+static inline bool intel_context_set_non_persistent(struct intel_context *ce)
+{
+	return test_and_set_bit(CONTEXT_NON_PERSISTENT, &ce->flags);
+}
+
+static inline bool intel_context_is_schedulable(const struct intel_context *ce)
+{
+	return !intel_context_is_banned(ce) &&
+	       !(intel_context_is_closed(ce) &&
+	         intel_context_is_non_persistent(ce));
+}
+
 static inline bool
 intel_context_force_single_submission(const struct intel_context *ce)
 {
