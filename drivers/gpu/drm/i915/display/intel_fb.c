@@ -30,14 +30,6 @@ bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int plane)
 	       plane == 2;
 }
 
-bool is_aux_plane(const struct drm_framebuffer *fb, int plane)
-{
-	if (is_ccs_modifier(fb->modifier))
-		return is_ccs_plane(fb, plane);
-
-	return plane == 1;
-}
-
 bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_plane)
 {
 	return intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
@@ -84,7 +76,7 @@ int skl_main_to_aux_plane(const struct drm_framebuffer *fb, int main_plane)
 
 unsigned int intel_tile_size(const struct drm_i915_private *i915)
 {
-	return IS_DISPLAY_VER(i915, 2) ? 2048 : 4096;
+	return DISPLAY_VER(i915) == 2 ? 2048 : 4096;
 }
 
 unsigned int intel_tile_height(const struct drm_framebuffer *fb, int color_plane)
