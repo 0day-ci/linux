@@ -197,7 +197,7 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 	int ret;
 
 	ret = pm_runtime_get_sync(domain->dev);
-	if (ret) {
+	if (ret < 0) {
 		pm_runtime_put_noidle(domain->dev);
 		return ret;
 	}
