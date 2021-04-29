@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/of_dma.h>
 
 #include "dmaengine.h"
 
@@ -784,6 +785,14 @@ static int request_and_map(struct platform_device *pdev, const char *name,
 	return 0;
 }
 
+static struct dma_chan *msgdma_of_xlate(struct of_phandle_args *dma_spec,
+					struct of_dma *ofdma)
+{
+	struct msgdma_device *d = ofdma->of_dma_data;
+
+	return dma_get_any_slave_channel(&d->dmadev);
+}
+
 /**
  * msgdma_probe - Driver probe function
  * @pdev: Pointer to the platform_device structure
@@ -888,6 +897,16 @@ static int msgdma_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail;
 
+	if (IS_ENABLED(CONFIG_OF)) {
+		ret = of_dma_controller_register(pdev->dev.of_node,
+						 msgdma_of_xlate, mdev);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"failed to register dma controller");
+			goto fail;
+		}
+	}
+
 	dev_notice(&pdev->dev, "Altera mSGDMA driver probe success\n");
 
 	return 0;
@@ -916,9 +935,19 @@ static int msgdma_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id msgdma_match[] = {
+	{ .compatible = "altr,msgdma",},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, msgdma_match);
+#endif
+
 static struct platform_driver msgdma_driver = {
 	.driver = {
 		.name = "altera-msgdma",
+		.of_match_table = of_match_ptr(msgdma_match),
 	},
 	.probe = msgdma_probe,
 	.remove = msgdma_remove,
