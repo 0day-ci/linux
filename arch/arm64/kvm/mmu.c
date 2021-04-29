@@ -488,6 +488,16 @@ void kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
 }
 
 /**
+ * is_vma_write_combine - check if VMA is mapped with writecombine or not
+ * Return true if VMA mapped with MT_NORMAL_NC otherwise fasle
+ */
+static bool inline is_vma_write_combine(struct vm_area_struct *vma)
+{
+	pteval_t pteval = pgprot_val(vma->vm_page_prot);
+	return ((pteval & PTE_ATTRINDX_MASK) == PTE_ATTRINDX(MT_NORMAL_NC));
+}
+
+/**
  * kvm_phys_addr_ioremap - map a device range to guest IPA
  *
  * @kvm:	The KVM pointer
@@ -495,9 +505,11 @@ void kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
  * @pa:		The physical address of the device
  * @size:	The size of the mapping
  * @writable:   Whether or not to create a writable mapping
+ * @writecombine: Whether or not to create a writecombine mapping
  */
 int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-			  phys_addr_t pa, unsigned long size, bool writable)
+			  phys_addr_t pa, unsigned long size, bool writable,
+			  bool writecombine)
 {
 	phys_addr_t addr;
 	int ret = 0;
@@ -505,6 +517,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 	struct kvm_pgtable *pgt = kvm->arch.mmu.pgt;
 	enum kvm_pgtable_prot prot = KVM_PGTABLE_PROT_DEVICE |
 				     KVM_PGTABLE_PROT_R |
+				     (writecombine ? KVM_PGTABLE_PROT_WC : 0) |
 				     (writable ? KVM_PGTABLE_PROT_W : 0);
 
 	size += offset_in_page(guest_ipa);
@@ -891,7 +904,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	}
 
 	if (device)
-		prot |= KVM_PGTABLE_PROT_DEVICE;
+		prot |= KVM_PGTABLE_PROT_DEVICE |
+			(is_vma_write_combine(vma) ? KVM_PGTABLE_PROT_WC : 0);
 	else if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC))
 		prot |= KVM_PGTABLE_PROT_X;
 
@@ -1357,7 +1371,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 
 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
 						    vm_end - vm_start,
-						    writable);
+						    writable,
+						    is_vma_write_combine(vma));
 			if (ret)
 				break;
 		}
