@@ -276,8 +276,6 @@ enum surface_update_type {
 /* Forward declaration*/
 struct dc;
 struct dc_plane_state;
-struct dc_state;
-
 
 struct dc_cap_funcs {
 	bool (*get_dcc_compression_cap)(const struct dc *dc,
