@@ -784,9 +784,12 @@ static int imx_pgc_domain_probe(struct platform_device *pdev)
 				     "Failed to get domain's clocks\n");
 
 	domain->reset = devm_reset_control_array_get_optional_exclusive(domain->dev);
-	if (IS_ERR(domain->reset))
+	if (IS_ERR(domain->reset)) {
+		if (PTR_ERR(domain->reset) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
 		return dev_err_probe(domain->dev, PTR_ERR(domain->reset),
 				     "Failed to get domain's resets\n");
+	}
 
 	pm_runtime_enable(domain->dev);
 
