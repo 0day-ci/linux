@@ -698,6 +698,36 @@ static void strip_init(struct perf_inject *inject)
 		evsel->handler = drop_sample;
 }
 
+static int parse_vm_time_correlation(const struct option *opt, const char *str, int unset)
+{
+	struct perf_inject *inject = opt->value;
+	const char *args;
+	char *dry_run;
+
+	if (unset)
+		return 0;
+
+	inject->itrace_synth_opts.set = true;
+	inject->itrace_synth_opts.vm_time_correlation = true;
+	inject->in_place_update = true;
+
+	if (!str)
+		return 0;
+
+	dry_run = strstr(str, "dry-run");
+	if (dry_run) {
+		inject->itrace_synth_opts.vm_tm_corr_dry_run = true;
+		inject->in_place_update_dry_run = true;
+		args = dry_run + strlen("dry-run");
+	} else {
+		args = str;
+	}
+
+	inject->itrace_synth_opts.vm_tm_corr_args = strdup(args);
+
+	return inject->itrace_synth_opts.vm_tm_corr_args ? 0 : -ENOMEM;
+}
+
 static int __cmd_inject(struct perf_inject *inject)
 {
 	int ret = -EINVAL;
@@ -739,6 +769,15 @@ static int __cmd_inject(struct perf_inject *inject)
 			else if (!strncmp(name, "sched:sched_stat_", 17))
 				evsel->handler = perf_inject__sched_stat;
 		}
+	} else if (inject->itrace_synth_opts.vm_time_correlation) {
+		session->itrace_synth_opts = &inject->itrace_synth_opts;
+		memset(&inject->tool, 0, sizeof(inject->tool));
+		inject->tool.id_index	    = perf_event__process_id_index;
+		inject->tool.auxtrace_info  = perf_event__process_auxtrace_info;
+		inject->tool.auxtrace	    = perf_event__process_auxtrace;
+		inject->tool.auxtrace_error = perf_event__process_auxtrace_error;
+		inject->tool.ordered_events = true;
+		inject->tool.ordering_requires_timestamps = true;
 	} else if (inject->itrace_synth_opts.set) {
 		session->itrace_synth_opts = &inject->itrace_synth_opts;
 		inject->itrace_synth_opts.inject = true;
@@ -880,6 +919,9 @@ int cmd_inject(int argc, const char **argv)
 				    itrace_parse_synth_opts),
 		OPT_BOOLEAN(0, "strip", &inject.strip,
 			    "strip non-synthesized events (use with --itrace)"),
+		OPT_CALLBACK_OPTARG(0, "vm-time-correlation", &inject, NULL, "opts",
+				    "correlate time between VM guests and the host",
+				    parse_vm_time_correlation),
 		OPT_END()
 	};
 	const char * const inject_usage[] = {
@@ -972,5 +1014,6 @@ int cmd_inject(int argc, const char **argv)
 out_delete:
 	zstd_fini(&(inject.session->zstd_data));
 	perf_session__delete(inject.session);
+	free(inject.itrace_synth_opts.vm_tm_corr_args);
 	return ret;
 }
