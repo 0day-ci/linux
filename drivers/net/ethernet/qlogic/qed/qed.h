@@ -200,6 +200,7 @@ enum qed_pci_personality {
 	QED_PCI_ETH,
 	QED_PCI_FCOE,
 	QED_PCI_ISCSI,
+	QED_PCI_NVMETCP,
 	QED_PCI_ETH_ROCE,
 	QED_PCI_ETH_IWARP,
 	QED_PCI_ETH_RDMA,
@@ -285,6 +286,8 @@ struct qed_hw_info {
 	((dev)->hw_info.personality == QED_PCI_FCOE)
 #define QED_IS_ISCSI_PERSONALITY(dev)					\
 	((dev)->hw_info.personality == QED_PCI_ISCSI)
+#define QED_IS_NVMETCP_PERSONALITY(dev)					\
+	((dev)->hw_info.personality == QED_PCI_NVMETCP)
 
 	/* Resource Allocation scheme results */
 	u32				resc_start[QED_MAX_RESC];
