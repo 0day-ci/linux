@@ -4753,7 +4753,6 @@ again:
 			mutex_unlock(&fs_info->reclaim_bgs_lock);
 			if (ret < 0)
 				goto done;
-			ret = 0;
 			btrfs_release_path(path);
 			break;
 		}
@@ -7938,7 +7937,7 @@ int btrfs_verify_dev_extents(struct btrfs_fs_info *fs_info)
 	struct btrfs_key key;
 	u64 prev_devid = 0;
 	u64 prev_dev_ext_end = 0;
-	int ret = 0;
+	int ret;
 
 	/*
 	 * We don't have a dev_root because we mounted with ignorebadroots and
@@ -8015,7 +8014,6 @@ int btrfs_verify_dev_extents(struct btrfs_fs_info *fs_info)
 		if (ret < 0)
 			goto out;
 		if (ret > 0) {
-			ret = 0;
 			break;
 		}
 	}
