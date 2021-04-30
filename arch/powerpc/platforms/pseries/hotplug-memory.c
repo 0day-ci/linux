@@ -13,6 +13,7 @@
 #include <linux/memory.h>
 #include <linux/memory_hotplug.h>
 #include <linux/slab.h>
+#include <linux/pgtable.h>
 
 #include <asm/firmware.h>
 #include <asm/machdep.h>
@@ -671,6 +672,10 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 	if (lmbs_available < lmbs_to_add)
 		return -EINVAL;
 
+	if (!radix_enabled())
+		hash_batch_expand_prepare(memblock_phys_mem_size() +
+						 lmbs_to_add * drmem_lmb_size());
+
 	for_each_drmem_lmb(lmb) {
 		if (lmb->flags & DRCONF_MEM_ASSIGNED)
 			continue;
@@ -787,6 +792,10 @@ static int dlpar_memory_add_by_ic(u32 lmbs_to_add, u32 drc_index)
 
 	if (lmbs_available < lmbs_to_add)
 		return -EINVAL;
+
+	if (!radix_enabled())
+		hash_batch_expand_prepare(memblock_phys_mem_size() +
+					  lmbs_to_add * drmem_lmb_size());
 
 	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 		if (lmb->flags & DRCONF_MEM_ASSIGNED)

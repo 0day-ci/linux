@@ -870,6 +870,26 @@ int hash__remove_section_mapping(unsigned long start, unsigned long end)
 
 	return rc;
 }
+
+void hash_batch_expand_prepare(unsigned long newsize)
+{
+	const u64 starting_size = ppc64_pft_size;
+
+	/*
+	 * Resizing-up HPT should never fail, but there are some cases system starts with higher
+	 * SHIFT than required, and we go through the funny case of resizing HPT down while
+	 * adding memory
+	 */
+
+	while (resize_hpt_for_hotplug(newsize, false) == -ENOSPC) {
+		newsize *= 2;
+		pr_warn("Hash collision while resizing HPT\n");
+
+		/* Do not try to resize to the starting size, or bigger value */
+		if (htab_shift_for_mem_size(newsize) >= starting_size)
+			break;
+	}
+}
 #endif /* CONFIG_MEMORY_HOTPLUG */
 
 static void __init hash_init_partition_table(phys_addr_t hash_table,
