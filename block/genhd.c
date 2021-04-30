@@ -1220,6 +1220,7 @@ static void disk_release(struct device *dev)
 struct class block_class = {
 	.name		= "block",
 };
+EXPORT_SYMBOL(block_class);
 
 static char *block_devnode(struct device *dev, umode_t *mode,
 			   kuid_t *uid, kgid_t *gid)
@@ -1237,6 +1238,7 @@ const struct device_type disk_type = {
 	.release	= disk_release,
 	.devnode	= block_devnode,
 };
+EXPORT_SYMBOL(disk_type);
 
 #ifdef CONFIG_PROC_FS
 /*
