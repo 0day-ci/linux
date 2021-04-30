@@ -426,6 +426,9 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 		return -EINVAL;
 	}
 
+	if (!radix_enabled())
+		hash_batch_shrink_begin();
+
 	for_each_drmem_lmb(lmb) {
 		rc = dlpar_remove_lmb(lmb);
 		if (rc)
@@ -470,6 +473,9 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 		}
 		rc = 0;
 	}
+
+	if (!radix_enabled())
+		hash_batch_shrink_end();
 
 	return rc;
 }
@@ -533,6 +539,9 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 	if (lmbs_available < lmbs_to_remove)
 		return -EINVAL;
 
+	if (!radix_enabled())
+		hash_batch_shrink_begin();
+
 	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 		if (!(lmb->flags & DRCONF_MEM_ASSIGNED))
 			continue;
@@ -572,6 +581,9 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 			drmem_remove_lmb_reservation(lmb);
 		}
 	}
+
+	if (!radix_enabled())
+		hash_batch_shrink_end();
 
 	return rc;
 }
@@ -703,6 +715,9 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 	if (lmbs_added != lmbs_to_add) {
 		pr_err("Memory hot-add failed, removing any added LMBs\n");
 
+		if (!radix_enabled())
+			hash_batch_shrink_begin();
+
 		for_each_drmem_lmb(lmb) {
 			if (!drmem_lmb_reserved(lmb))
 				continue;
@@ -716,6 +731,10 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 
 			drmem_remove_lmb_reservation(lmb);
 		}
+
+		if (!radix_enabled())
+			hash_batch_shrink_end();
+
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb(lmb) {
@@ -817,6 +836,9 @@ static int dlpar_memory_add_by_ic(u32 lmbs_to_add, u32 drc_index)
 	if (rc) {
 		pr_err("Memory indexed-count-add failed, removing any added LMBs\n");
 
+		if (!radix_enabled())
+			hash_batch_shrink_begin();
+
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 			if (!drmem_lmb_reserved(lmb))
 				continue;
@@ -830,6 +852,10 @@ static int dlpar_memory_add_by_ic(u32 lmbs_to_add, u32 drc_index)
 
 			drmem_remove_lmb_reservation(lmb);
 		}
+
+		if (!radix_enabled())
+			hash_batch_shrink_end();
+
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {

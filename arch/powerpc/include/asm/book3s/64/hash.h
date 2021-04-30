@@ -256,6 +256,8 @@ int hash__create_section_mapping(unsigned long start, unsigned long end,
 int hash__remove_section_mapping(unsigned long start, unsigned long end);
 
 void hash_batch_expand_prepare(unsigned long newsize);
+void hash_batch_shrink_begin(void);
+void hash_batch_shrink_end(void);
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */

@@ -806,6 +806,9 @@ static unsigned long __init htab_get_table_size(void)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
+
+static DEFINE_MUTEX(hpt_resize_down_lock);
+
 static int resize_hpt_for_hotplug(unsigned long new_mem_size, bool shrinking)
 {
 	unsigned target_hpt_shift;
@@ -816,7 +819,7 @@ static int resize_hpt_for_hotplug(unsigned long new_mem_size, bool shrinking)
 	target_hpt_shift = htab_shift_for_mem_size(new_mem_size);
 
 	if (shrinking) {
-
+		int ret;
 		/*
 		 * To avoid lots of HPT resizes if memory size is fluctuating
 		 * across a boundary, we deliberately have some hysterisis
@@ -829,9 +832,19 @@ static int resize_hpt_for_hotplug(unsigned long new_mem_size, bool shrinking)
 		if (target_hpt_shift >= ppc64_pft_size - 1)
 			return 0;
 
-	} else if (target_hpt_shift <= ppc64_pft_size) {
-		return 0;
+		/* When batch removing entries, only resizes HPT at the end. */
+
+		if (!mutex_trylock(&hpt_resize_down_lock))
+			return 0;
+
+		ret = mmu_hash_ops.resize_hpt(target_hpt_shift);
+
+		mutex_unlock(&hpt_resize_down_lock);
+		return ret;
 	}
+
+	if (target_hpt_shift <= ppc64_pft_size)
+		return 0;
 
 	return mmu_hash_ops.resize_hpt(target_hpt_shift);
 }
@@ -889,6 +902,32 @@ void hash_batch_expand_prepare(unsigned long newsize)
 		if (htab_shift_for_mem_size(newsize) >= starting_size)
 			break;
 	}
+}
+
+void hash_batch_shrink_begin(void)
+{
+	/* Disable HPT resize-down during hot-unplug */
+	mutex_lock(&hpt_resize_down_lock);
+}
+
+void hash_batch_shrink_end(void)
+{
+	const u64 starting_size = ppc64_pft_size;
+	unsigned long newsize;
+
+	newsize = memblock_phys_mem_size();
+	/* Resize to smallest SHIFT possible */
+	while (resize_hpt_for_hotplug(newsize, true) == -ENOSPC) {
+		newsize *= 2;
+		pr_warn("Hash collision while resizing HPT\n");
+
+		/* Do not try to resize to the starting size, or bigger value */
+		if (htab_shift_for_mem_size(newsize) >= starting_size)
+			break;
+	}
+
+	/* Re-enables HPT resize-down after hot-unplug */
+	mutex_unlock(&hpt_resize_down_lock);
 }
 #endif /* CONFIG_MEMORY_HOTPLUG */
 
