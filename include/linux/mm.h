@@ -525,6 +525,10 @@ struct vm_fault {
 	};
 	unsigned int flags;		/* FAULT_FLAG_xxx flags
 					 * XXX: should really be 'const' */
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	unsigned long seq;
+	pmd_t orig_pmd;
+#endif
 	pmd_t *pmd;			/* Pointer to pmd entry matching
 					 * the 'address' */
 	pud_t *pud;			/* Pointer to pud entry matching
