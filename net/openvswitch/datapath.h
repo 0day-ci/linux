@@ -51,6 +51,21 @@ struct dp_stats_percpu {
 };
 
 /**
+ * struct dp_portids - array of netlink portids of for a datapath.
+ *                     This is used when OVS_DP_F_DISPATCH_UPCALL_PER_CPU
+ *                     is enabled and must be protected by rcu.
+ * @rcu: RCU callback head for deferred destruction.
+ * @n_ids: Size of @ids array.
+ * @ids: Array storing the Netlink socket PIDs indexed by CPU ID for packets
+ *       that miss the flow table.
+ */
+struct dp_portids {
+	struct rcu_head rcu;
+	u32 n_ids;
+	u32 ids[];
+};
+
+/**
  * struct datapath - datapath for flow-based packet switching
  * @rcu: RCU callback head for deferred destruction.
  * @list_node: Element in global 'dps' list.
@@ -61,6 +76,7 @@ struct dp_stats_percpu {
  * @net: Reference to net namespace.
  * @max_headroom: the maximum headroom of all vports in this datapath; it will
  * be used by all the internal vports in this dp.
+ * @upcall_portids: RCU protected 'struct dp_portids'.
  *
  * Context: See the comment on locking at the top of datapath.c for additional
  * locking information.
@@ -87,6 +103,8 @@ struct datapath {
 
 	/* Switch meters. */
 	struct dp_meter_table meter_tbl;
+
+	struct dp_portids __rcu *upcall_portids;
 };
 
 /**

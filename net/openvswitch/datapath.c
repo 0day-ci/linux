@@ -121,6 +121,8 @@ int lockdep_ovsl_is_held(void)
 #endif
 
 static struct vport *new_vport(const struct vport_parms *);
+static u32 ovs_dp_get_upcall_portid(const struct datapath *, uint32_t);
+static int ovs_dp_set_upcall_portids(struct datapath *, const struct nlattr *);
 static int queue_gso_packets(struct datapath *dp, struct sk_buff *,
 			     const struct sw_flow_key *,
 			     const struct dp_upcall_info *,
@@ -238,7 +240,12 @@ void ovs_dp_process_packet(struct sk_buff *skb, struct sw_flow_key *key)
 
 		memset(&upcall, 0, sizeof(upcall));
 		upcall.cmd = OVS_PACKET_CMD_MISS;
-		upcall.portid = ovs_vport_find_upcall_portid(p, skb);
+
+		if (dp->user_features & OVS_DP_F_DISPATCH_UPCALL_PER_CPU)
+			upcall.portid = ovs_dp_get_upcall_portid(dp, smp_processor_id());
+		else
+			upcall.portid = ovs_vport_find_upcall_portid(p, skb);
+
 		upcall.mru = OVS_CB(skb)->mru;
 		error = ovs_dp_upcall(dp, skb, key, &upcall, 0);
 		if (unlikely(error))
@@ -1590,16 +1597,67 @@ static void ovs_dp_reset_user_features(struct sk_buff *skb,
 
 DEFINE_STATIC_KEY_FALSE(tc_recirc_sharing_support);
 
+static int ovs_dp_set_upcall_portids(struct datapath *dp,
+				     const struct nlattr *ids)
+{
+	struct dp_portids *old, *dp_portids;
+
+	if (!nla_len(ids) || nla_len(ids) % sizeof(u32))
+		return -EINVAL;
+
+	old = ovsl_dereference(dp->upcall_portids);
+
+	dp_portids = kmalloc(sizeof(*dp_portids) + nla_len(ids),
+			     GFP_KERNEL);
+	if (!dp)
+		return -ENOMEM;
+
+	dp_portids->n_ids = nla_len(ids) / sizeof(u32);
+	nla_memcpy(dp_portids->ids, ids, nla_len(ids));
+
+	rcu_assign_pointer(dp->upcall_portids, dp_portids);
+
+	if (old)
+		kfree_rcu(old, rcu);
+	return 0;
+}
+
+static u32 ovs_dp_get_upcall_portid(const struct datapath *dp, uint32_t cpu_id)
+{
+	struct dp_portids *dp_portids;
+
+	dp_portids = rcu_dereference_ovsl(dp->upcall_portids);
+
+	if (dp->user_features & OVS_DP_F_DISPATCH_UPCALL_PER_CPU && dp_portids) {
+		if (cpu_id < dp_portids->n_ids) {
+			return dp_portids->ids[cpu_id];
+		} else if (dp_portids->n_ids > 0 && cpu_id >= dp_portids->n_ids) {
+			/* If the number of netlink PIDs is mismatched with the number of
+			 * CPUs as seen by the kernel, log this and send the upcall to an
+			 * arbitrary socket (0) in order to not drop packets
+			 */
+			pr_info_ratelimited("cpu_id mismatch with handler threads");
+			return dp_portids->ids[0];
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+}
+
 static int ovs_dp_change(struct datapath *dp, struct nlattr *a[])
 {
 	u32 user_features = 0;
+	int err;
 
 	if (a[OVS_DP_ATTR_USER_FEATURES]) {
 		user_features = nla_get_u32(a[OVS_DP_ATTR_USER_FEATURES]);
 
 		if (user_features & ~(OVS_DP_F_VPORT_PIDS |
 				      OVS_DP_F_UNALIGNED |
-				      OVS_DP_F_TC_RECIRC_SHARING))
+				      OVS_DP_F_TC_RECIRC_SHARING |
+				      OVS_DP_F_DISPATCH_UPCALL_PER_CPU))
 			return -EOPNOTSUPP;
 
 #if !IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
@@ -1619,6 +1677,14 @@ static int ovs_dp_change(struct datapath *dp, struct nlattr *a[])
 	}
 
 	dp->user_features = user_features;
+
+	if (dp->user_features & OVS_DP_F_DISPATCH_UPCALL_PER_CPU &&
+	    a[OVS_DP_ATTR_PER_CPU_PIDS]) {
+		/* Upcall Netlink Port IDs have been updated */
+		err = ovs_dp_set_upcall_portids(dp, a[OVS_DP_ATTR_PER_CPU_PIDS]);
+		if (err)
+			return err;
+	}
 
 	if (dp->user_features & OVS_DP_F_TC_RECIRC_SHARING)
 		static_branch_enable(&tc_recirc_sharing_support);

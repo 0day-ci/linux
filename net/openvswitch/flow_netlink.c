@@ -2928,10 +2928,6 @@ static int validate_userspace(const struct nlattr *attr)
 	if (error)
 		return error;
 
-	if (!a[OVS_USERSPACE_ATTR_PID] ||
-	    !nla_get_u32(a[OVS_USERSPACE_ATTR_PID]))
-		return -EINVAL;
-
 	return 0;
 }
 
