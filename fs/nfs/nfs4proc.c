@@ -2435,9 +2435,15 @@ static void nfs4_open_prepare(struct rpc_task *task, void *calldata)
 	if (data->state != NULL) {
 		struct nfs_delegation *delegation;
 
+		spin_lock(&data->state->owner->so_lock);
 		if (can_open_cached(data->state, data->o_arg.fmode,
-					data->o_arg.open_flags, claim))
+				data->o_arg.open_flags, claim)) {
+			update_open_stateflags(data->state, data->o_arg.fmode);
+			spin_unlock(&data->state->owner->so_lock);
 			goto out_no_action;
+		}
+		spin_unlock(&data->state->owner->so_lock);
+
 		rcu_read_lock();
 		delegation = nfs4_get_valid_delegation(data->state->inode);
 		if (can_open_delegated(delegation, data->o_arg.fmode, claim))
