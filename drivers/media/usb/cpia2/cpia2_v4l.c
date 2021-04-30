@@ -884,12 +884,12 @@ static int cpia2_dqbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 
 	frame = find_earliest_filled_buffer(cam);
 
-	if(frame < 0 && file->f_flags&O_NONBLOCK)
+	if (frame < 0 && file->f_flags&O_NONBLOCK)
 		return -EAGAIN;
 
-	if(frame < 0) {
+	if (frame < 0) {
 		/* Wait for a frame to become available */
-		struct framebuf *cb=cam->curbuff;
+		struct framebuf *cb = cam->curbuff;
 		mutex_unlock(&cam->v4l2_lock);
 		wait_event_interruptible(cam->wq_stream,
 					 !video_is_registered(&cam->vdev) ||
@@ -971,7 +971,7 @@ static int cpia2_mmap(struct file *file, struct vm_area_struct *area)
 		return -ERESTARTSYS;
 	retval = cpia2_remap_buffer(cam, area);
 
-	if(!retval)
+	if (!retval)
 		cam->stream_fh = file->private_data;
 	mutex_unlock(&cam->v4l2_lock);
 	return retval;
@@ -1161,10 +1161,10 @@ void cpia2_unregister_camera(struct camera_data *cam)
  *****************************************************************************/
 static void __init check_parameters(void)
 {
-	if(buffer_size < PAGE_SIZE) {
+	if (buffer_size < PAGE_SIZE) {
 		buffer_size = PAGE_SIZE;
 		LOG("buffer_size too small, setting to %d\n", buffer_size);
-	} else if(buffer_size > 1024*1024) {
+	} else if (buffer_size > 1024*1024) {
 		/* arbitrary upper limiit */
 		buffer_size = 1024*1024;
 		LOG("buffer_size ridiculously large, setting to %d\n",
@@ -1174,15 +1174,15 @@ static void __init check_parameters(void)
 		buffer_size &= ~(PAGE_SIZE-1);
 	}
 
-	if(num_buffers < 1) {
+	if (num_buffers < 1) {
 		num_buffers = 1;
 		LOG("num_buffers too small, setting to %d\n", num_buffers);
-	} else if(num_buffers > VIDEO_MAX_FRAME) {
+	} else if (num_buffers > VIDEO_MAX_FRAME) {
 		num_buffers = VIDEO_MAX_FRAME;
 		LOG("num_buffers too large, setting to %d\n", num_buffers);
 	}
 
-	if(alternate < USBIF_ISO_1 || alternate > USBIF_ISO_6) {
+	if (alternate < USBIF_ISO_1 || alternate > USBIF_ISO_6) {
 		alternate = DEFAULT_ALT;
 		LOG("alternate specified is invalid, using %d\n", alternate);
 	}
