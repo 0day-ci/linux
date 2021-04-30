@@ -98,6 +98,7 @@
  * @pdev: pointer to platform dev
  * @rtc: pointer to rtc struct
  * @ioaddr: IO registers pointer
+ * @norm_irq: irq number of the "normal" irq
  * @clk: input reference clock
  * @dsr: copy of the DSR register
  * @irq_lock: interrupt enable register (DIER) lock
@@ -109,6 +110,7 @@ struct imxdi_dev {
 	struct platform_device *pdev;
 	struct rtc_device *rtc;
 	void __iomem *ioaddr;
+	int norm_irq;
 	struct clk *clk;
 	u32 dsr;
 	spinlock_t irq_lock;
@@ -741,7 +743,7 @@ static void dryice_work(struct work_struct *work)
 static int __init dryice_rtc_probe(struct platform_device *pdev)
 {
 	struct imxdi_dev *imxdi;
-	int norm_irq, sec_irq;
+	int sec_irq;
 	int rc;
 
 	imxdi = devm_kzalloc(&pdev->dev, sizeof(*imxdi), GFP_KERNEL);
@@ -756,9 +758,9 @@ static int __init dryice_rtc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&imxdi->irq_lock);
 
-	norm_irq = platform_get_irq(pdev, 0);
-	if (norm_irq < 0)
-		return norm_irq;
+	imxdi->norm_irq = platform_get_irq(pdev, 0);
+	if (imxdi->norm_irq < 0)
+		return imxdi->norm_irq;
 
 	/* the 2nd irq is the security violation irq
 	 * make this optional, don't break the device tree ABI
@@ -795,7 +797,7 @@ static int __init dryice_rtc_probe(struct platform_device *pdev)
 	if (rc != 0)
 		goto err;
 
-	rc = devm_request_irq(&pdev->dev, norm_irq, dryice_irq,
+	rc = devm_request_irq(&pdev->dev, imxdi->norm_irq, dryice_irq,
 			      IRQF_SHARED, pdev->name, imxdi);
 	if (rc) {
 		dev_warn(&pdev->dev, "interrupt not available.\n");
@@ -810,6 +812,8 @@ static int __init dryice_rtc_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, imxdi);
+
+	device_set_wakeup_capable(&pdev->dev, true);
 
 	imxdi->rtc->ops = &dryice_rtc_ops;
 	imxdi->rtc->range_max = U32_MAX;
@@ -830,6 +834,8 @@ static int __exit dryice_rtc_remove(struct platform_device *pdev)
 {
 	struct imxdi_dev *imxdi = platform_get_drvdata(pdev);
 
+	device_set_wakeup_capable(&pdev->dev, false);
+
 	flush_work(&imxdi->work);
 
 	/* mask all interrupts */
@@ -847,10 +853,33 @@ static const struct of_device_id dryice_dt_ids[] = {
 
 MODULE_DEVICE_TABLE(of, dryice_dt_ids);
 
+#ifdef CONFIG_PM_SLEEP
+static int dryice_suspend(struct device *dev)
+{
+	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		enable_irq_wake(imxdi->norm_irq);
+	return 0;
+}
+
+static int dryice_resume(struct device *dev)
+{
+	struct imxdi_dev *imxdi = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		disable_irq_wake(imxdi->norm_irq);
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(dryice_pm, dryice_suspend, dryice_resume);
+
 static struct platform_driver dryice_rtc_driver = {
 	.driver = {
 		   .name = "imxdi_rtc",
 		   .of_match_table = dryice_dt_ids,
+		   .pm = &dryice_pm,
 		   },
 	.remove = __exit_p(dryice_rtc_remove),
 };
