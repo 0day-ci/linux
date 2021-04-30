@@ -806,7 +806,7 @@ static unsigned long __init htab_get_table_size(void)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
-static int resize_hpt_for_hotplug(unsigned long new_mem_size)
+static int resize_hpt_for_hotplug(unsigned long new_mem_size, bool shrinking)
 {
 	unsigned target_hpt_shift;
 
@@ -815,19 +815,25 @@ static int resize_hpt_for_hotplug(unsigned long new_mem_size)
 
 	target_hpt_shift = htab_shift_for_mem_size(new_mem_size);
 
-	/*
-	 * To avoid lots of HPT resizes if memory size is fluctuating
-	 * across a boundary, we deliberately have some hysterisis
-	 * here: we immediately increase the HPT size if the target
-	 * shift exceeds the current shift, but we won't attempt to
-	 * reduce unless the target shift is at least 2 below the
-	 * current shift
-	 */
-	if (target_hpt_shift > ppc64_pft_size ||
-	    target_hpt_shift < ppc64_pft_size - 1)
-		return mmu_hash_ops.resize_hpt(target_hpt_shift);
+	if (shrinking) {
 
-	return 0;
+		/*
+		 * To avoid lots of HPT resizes if memory size is fluctuating
+		 * across a boundary, we deliberately have some hysterisis
+		 * here: we immediately increase the HPT size if the target
+		 * shift exceeds the current shift, but we won't attempt to
+		 * reduce unless the target shift is at least 2 below the
+		 * current shift
+		 */
+
+		if (target_hpt_shift >= ppc64_pft_size - 1)
+			return 0;
+
+	} else if (target_hpt_shift <= ppc64_pft_size) {
+		return 0;
+	}
+
+	return mmu_hash_ops.resize_hpt(target_hpt_shift);
 }
 
 int hash__create_section_mapping(unsigned long start, unsigned long end,
@@ -840,7 +846,7 @@ int hash__create_section_mapping(unsigned long start, unsigned long end,
 		return -1;
 	}
 
-	resize_hpt_for_hotplug(memblock_phys_mem_size());
+	resize_hpt_for_hotplug(memblock_phys_mem_size(), false);
 
 	rc = htab_bolt_mapping(start, end, __pa(start),
 			       pgprot_val(prot), mmu_linear_psize,
@@ -859,7 +865,7 @@ int hash__remove_section_mapping(unsigned long start, unsigned long end)
 	int rc = htab_remove_mapping(start, end, mmu_linear_psize,
 				     mmu_kernel_ssize);
 
-	if (resize_hpt_for_hotplug(memblock_phys_mem_size()) == -ENOSPC)
+	if (resize_hpt_for_hotplug(memblock_phys_mem_size(), true) == -ENOSPC)
 		pr_warn("Hash collision while resizing HPT\n");
 
 	return rc;
