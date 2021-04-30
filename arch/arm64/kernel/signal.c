@@ -795,6 +795,11 @@ static void setup_restart_syscall(struct pt_regs *regs)
 {
 	if (is_compat_task())
 		compat_setup_restart_syscall(regs);
+#ifdef COMPAT
+	else if (in_compat_syscall())
+		regs->regs[8] = __ARM64_COMPAT_SYSCALL_BIT |
+				__NR_compat_restart_syscall;
+#endif
 	else
 		regs->regs[8] = __NR_restart_syscall;
 }

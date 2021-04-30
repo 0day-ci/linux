@@ -118,6 +118,11 @@ static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
 		 * user-issued syscall(-1). However, requesting a skip and not
 		 * setting the return value is unlikely to do anything sensible
 		 * anyway.
+		 *
+		 * This edge case goes away with CONFIG_COMPAT since a
+		 * user-issued syscall(-1) is interpreted as a
+		 * compat_syscall(0x7fffffff) which still ends up returning
+		 * -ENOSYS in x0.
 		 */
 		if (scno == NO_SYSCALL)
 			regs->regs[0] = -ENOSYS;
@@ -165,7 +170,21 @@ static inline void sve_user_discard(void)
 void do_el0_svc(struct pt_regs *regs)
 {
 	sve_user_discard();
-	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+
+#ifdef CONFIG_COMPAT
+	/*
+	 * Setting bit 31 of x8 allows a 64-bit processe to perform compat
+	 * syscalls.
+	 */
+	if (regs->regs[8] & __ARM64_COMPAT_SYSCALL_BIT) {
+		current_thread_info()->use_compat_syscall = true;
+		el0_svc_common(regs,
+			       regs->regs[8] & ~__ARM64_COMPAT_SYSCALL_BIT,
+			       __NR_compat_syscalls, compat_sys_call_table);
+		current_thread_info()->use_compat_syscall = false;
+	} else
+#endif
+		el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
 }
 
 #ifdef CONFIG_COMPAT
