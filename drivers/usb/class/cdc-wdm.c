@@ -23,6 +23,7 @@
 #include <linux/poll.h>
 #include <linux/usb.h>
 #include <linux/usb/cdc.h>
+#include <linux/wwan.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
 #include <linux/usb/cdc-wdm.h>
@@ -55,6 +56,7 @@ MODULE_DEVICE_TABLE (usb, wdm_ids);
 #define WDM_SUSPENDING		8
 #define WDM_RESETTING		9
 #define WDM_OVERFLOW		10
+#define WDM_WWAN_IN_USE		11
 
 #define WDM_MAX			16
 
@@ -108,6 +110,7 @@ struct wdm_device {
 	int			(*manage_power)(struct usb_interface *, int);
 
 	enum usb_cdc_wdm_type	type;
+	struct wwan_port	*wwanp;
 };
 
 static struct usb_driver wdm_driver;
@@ -203,7 +206,23 @@ static void wdm_in_callback(struct urb *urb)
 	if (desc->rerr == 0 && status != -EPIPE)
 		desc->rerr = status;
 
-	if (length + desc->length > desc->wMaxCommand) {
+	if (test_bit(WDM_WWAN_IN_USE, &desc->flags)) {
+		struct wwan_port *port = desc->wwanp;
+		struct sk_buff *skb;
+
+		/* Forward data to WWAN port */
+		skb = alloc_skb(length, GFP_ATOMIC);
+		if (skb) {
+			memcpy(skb_put(skb, length), desc->inbuf, length);
+			wwan_port_rx(port, skb);
+		} else {
+			dev_err(&desc->intf->dev,
+				"Unable to alloc skb, response discarded\n");
+		}
+
+		/* inbuf has been copied, it is safe to check for outstanding data */
+		schedule_work(&desc->service_outs_intr);
+	} else if (length + desc->length > desc->wMaxCommand) {
 		/* The buffer would overflow */
 		set_bit(WDM_OVERFLOW, &desc->flags);
 	} else {
@@ -699,6 +718,11 @@ static int wdm_open(struct inode *inode, struct file *file)
 		goto out;
 	file->private_data = desc;
 
+	if (test_bit(WDM_WWAN_IN_USE, &desc->flags)) {
+		rv = -EBUSY;
+		goto out;
+	}
+
 	rv = usb_autopm_get_interface(desc->intf);
 	if (rv < 0) {
 		dev_err(&desc->intf->dev, "Error autopm - %d\n", rv);
@@ -793,6 +817,146 @@ static struct usb_class_driver wdm_class = {
 	.fops =		&wdm_fops,
 	.minor_base =	WDM_MINOR_BASE,
 };
+
+/* --- WWAN framework integration --- */
+#ifdef CONFIG_WWAN
+static int wdm_wwan_port_start(struct wwan_port *port)
+{
+	struct wdm_device *desc = wwan_port_get_drvdata(port);
+
+	/* The interface is both exposed via the WWAN framework and as a
+	 * legacy usbmisc chardev. If chardev is already open, just fail
+	 * to prevent concurrent usage. Otherwise, switch to WWAN mode.
+	 */
+	mutex_lock(&wdm_mutex);
+	if (desc->count) {
+		mutex_unlock(&wdm_mutex);
+		return -EBUSY;
+	}
+	set_bit(WDM_WWAN_IN_USE, &desc->flags);
+	mutex_unlock(&wdm_mutex);
+
+	desc->manage_power(desc->intf, 1);
+
+	/* Start getting events */
+	usb_submit_urb(desc->validity, GFP_KERNEL);
+
+	/* tx is allowed */
+	wwan_port_txon(port);
+
+	return 0;
+}
+
+static void wdm_wwan_port_stop(struct wwan_port *port)
+{
+	struct wdm_device *desc = wwan_port_get_drvdata(port);
+
+	/* Stop all transfers and disable WWAN mode */
+	kill_urbs(desc);
+	desc->manage_power(desc->intf, 0);
+	clear_bit(WDM_READ, &desc->flags);
+	clear_bit(WDM_WWAN_IN_USE, &desc->flags);
+}
+
+static void wdm_wwan_port_tx_complete(struct urb *urb)
+{
+	struct sk_buff *skb = urb->context;
+	struct wwan_port *port = skb_shinfo(skb)->destructor_arg;
+
+	/* Allow new command transfer */
+	wwan_port_txon(port);
+	kfree_skb(skb);
+}
+
+static int wdm_wwan_port_tx(struct wwan_port *port, struct sk_buff *skb)
+{
+	struct wdm_device *desc = wwan_port_get_drvdata(port);
+	struct usb_interface *intf = desc->intf;
+	struct usb_ctrlrequest *req = desc->orq;
+	int rv;
+
+	rv = usb_autopm_get_interface(intf);
+	if (rv)
+		return rv;
+
+	usb_fill_control_urb(
+		desc->command,
+		interface_to_usbdev(intf),
+		usb_sndctrlpipe(interface_to_usbdev(intf), 0),
+		(unsigned char *)req,
+		skb->data,
+		skb->len,
+		wdm_wwan_port_tx_complete,
+		skb
+	);
+
+	req->bRequestType = (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE);
+	req->bRequest = USB_CDC_SEND_ENCAPSULATED_COMMAND;
+	req->wValue = 0;
+	req->wIndex = desc->inum;
+	req->wLength = cpu_to_le16(skb->len);
+
+	skb_shinfo(skb)->destructor_arg = port;
+
+	rv = usb_submit_urb(desc->command, GFP_KERNEL);
+	if (!rv) /* One transfer at a time, stop TX until URB completion */
+		wwan_port_txoff(port);
+
+	usb_autopm_put_interface(intf);
+
+	return rv;
+}
+
+static struct wwan_port_ops wdm_wwan_port_ops = {
+	.start = wdm_wwan_port_start,
+	.stop = wdm_wwan_port_stop,
+	.tx = wdm_wwan_port_tx,
+};
+
+static void wdm_wwan_init(struct wdm_device *desc)
+{
+	struct usb_interface *intf = desc->intf;
+	struct wwan_port *port;
+
+	switch (desc->type) {
+	case USB_CDC_WDM_MBIM:
+		port = wwan_create_port(&intf->dev, WWAN_PORT_MBIM,
+					&wdm_wwan_port_ops, desc);
+		break;
+	case USB_CDC_WDM_QMI:
+		port = wwan_create_port(&intf->dev, WWAN_PORT_QMI,
+					&wdm_wwan_port_ops, desc);
+		break;
+	case USB_CDC_WDM_AT:
+		port = wwan_create_port(&intf->dev, WWAN_PORT_AT,
+					&wdm_wwan_port_ops, desc);
+		break;
+	default:
+		dev_info(&intf->dev, "Unknown control protocol\n");
+		return;
+	}
+
+	if (IS_ERR(port)) {
+		dev_err(&intf->dev, "%s: Unable to create WWAN port\n",
+			dev_name(intf->usb_dev));
+		return;
+	}
+
+	desc->wwanp = port;
+}
+
+static void wdm_wwan_deinit(struct wdm_device *desc)
+{
+	if (!desc->wwanp)
+		return;
+
+	wwan_remove_port(desc->wwanp);
+	desc->wwanp = NULL;
+}
+#else /* CONFIG_WWAN */
+static void wdm_wwan_init(struct wdm_device *desc) {}
+static void wdm_wwan_deinit(struct wdm_device *desc) {}
+#endif /* CONFIG_WWAN */
 
 /* --- error handling --- */
 static void wdm_rxwork(struct work_struct *work)
@@ -937,6 +1101,9 @@ static int wdm_create(struct usb_interface *intf, struct usb_endpoint_descriptor
 		goto err;
 	else
 		dev_info(&intf->dev, "%s: USB WDM device\n", dev_name(intf->usb_dev));
+
+	wdm_wwan_init(desc);
+
 out:
 	return rv;
 err:
@@ -1033,6 +1200,8 @@ static void wdm_disconnect(struct usb_interface *intf)
 	usb_deregister_dev(intf, &wdm_class);
 	desc = wdm_find_device(intf);
 	mutex_lock(&wdm_mutex);
+
+	wdm_wwan_deinit(desc);
 
 	/* the spinlock makes sure no new urbs are generated in the callbacks */
 	spin_lock_irqsave(&desc->iuspin, flags);
