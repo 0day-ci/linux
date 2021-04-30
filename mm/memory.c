@@ -3613,8 +3613,12 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 						vma->vm_page_prot));
 	} else {
 		/* Allocate our own private page. */
-		if (unlikely(anon_vma_prepare(vma)))
-			goto oom;
+		if (unlikely(!vma->anon_vma)) {
+			if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+				return VM_FAULT_RETRY;
+			if (__anon_vma_prepare(vma))
+				goto oom;
+		}
 		page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
 		if (!page)
 			goto oom;
@@ -3635,8 +3639,10 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 			entry = pte_mkwrite(pte_mkdirty(entry));
 	}
 
-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
-			&vmf->ptl);
+	if (!pte_map_lock(vmf)) {
+		ret = VM_FAULT_RETRY;
+		goto release;
+	}
 	if (!pte_none(*vmf->pte)) {
 		update_mmu_tlb(vma, vmf->address, vmf->pte);
 		goto unlock;
@@ -3651,6 +3657,8 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
 		if (page)
 			put_page(page);
+		if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+			return VM_FAULT_RETRY;
 		return handle_userfault(vmf, VM_UFFD_MISSING);
 	}
 
@@ -3668,6 +3676,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	return 0;
 unlock:
 	pte_unmap_unlock(vmf->pte, vmf->ptl);
+release:
 	if (page)
 		put_page(page);
 	return ret;
