@@ -49,6 +49,8 @@ void perf_set_singlethreaded(void);
 void perf_set_multithreaded(void);
 
 char *perf_exe(char *buf, int len);
+/* perf_exe_path return malloc'd string on success, caller must free it */
+char *perf_exe_path(void);
 
 #ifndef O_CLOEXEC
 #ifdef __sparc__

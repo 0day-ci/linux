@@ -388,3 +388,24 @@ char *perf_exe(char *buf, int len)
 	}
 	return strcpy(buf, "perf");
 }
+
+char *perf_exe_path(void)
+{
+	int i;
+	char *buf;
+
+	buf = malloc(PATH_MAX);
+	buf = perf_exe(buf, PATH_MAX);
+
+	for (i = strlen(buf) - 1; i != 0 && buf[i] != '/'; i--)
+		;
+
+	if (!i) {
+		free(buf);
+		return NULL;
+	}
+
+	buf[i + 1] = 0;
+
+	return buf;
+}
