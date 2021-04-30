@@ -34,7 +34,7 @@ config SND_SOC_AMD_RV_RT5682_MACH
 	select SND_SOC_CROS_EC_CODEC
 	select I2C_CROS_EC_TUNNEL
 	select SND_SOC_RT1015
-	depends on SND_SOC_AMD_ACP3x && I2C && CROS_EC
+	depends on SND_SOC_AMD_ACP3x && I2C && CROS_EC && GPIOLIB
 	help
 	 This option enables machine driver for RT5682 and MAX9835.
 
@@ -47,6 +47,6 @@ config SND_SOC_AMD_RENOIR
 config SND_SOC_AMD_RENOIR_MACH
 	tristate "AMD Renoir support for DMIC"
 	select SND_SOC_DMIC
-	depends on SND_SOC_AMD_RENOIR
+	depends on SND_SOC_AMD_RENOIR && GPIOLIB
 	help
 	 This option enables machine driver for DMIC
