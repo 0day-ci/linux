@@ -237,6 +237,10 @@ COMPAT_SYSCALL_DEFINE0(sigreturn)
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
 
+	/* Reject attempts to call this from a 64-bit process. */
+	if (!is_compat_task())
+		goto badframe;
+
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
 	 * then 'sp' should be word aligned here.  If it's
@@ -267,6 +271,10 @@ COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
 
 	/* Always make any pending restarted system calls return -EINTR */
 	current->restart_block.fn = do_no_restart_syscall;
+
+	/* Reject attempts to call this from a 64-bit process. */
+	if (!is_compat_task())
+		goto badframe;
 
 	/*
 	 * Since we stacked the signal on a 64-bit boundary,
