@@ -399,25 +399,43 @@ static int dlpar_remove_lmb(struct drmem_lmb *lmb)
 	return 0;
 }
 
-static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
+static int dlpar_memory_remove_lmbs_common(u32 lmbs_to_remove, u32 drc_index)
 {
-	struct drmem_lmb *lmb;
-	int lmbs_removed = 0;
+	struct drmem_lmb *lmb, *start_lmb, *end_lmb;
 	int lmbs_available = 0;
+	int lmbs_removed = 0;
 	int rc;
-
-	pr_info("Attempting to hot-remove %d LMB(s)\n", lmbs_to_remove);
+	/*
+	 * dlpar_memory_remove_by_ic() wants to remove all
+	 * 'lmbs_to_remove' LMBs, starting from drc_index, in a
+	 * contiguous block.
+	 */
+	bool block_removal;
 
 	if (lmbs_to_remove == 0)
 		return -EINVAL;
 
+	block_removal = drc_index != 0;
+
+	if (block_removal) {
+		rc = get_lmb_range(drc_index, lmbs_to_remove, &start_lmb, &end_lmb);
+		if (rc)
+			return -EINVAL;
+	} else {
+		start_lmb = &drmem_info->lmbs[0];
+		end_lmb = &drmem_info->lmbs[drmem_info->n_lmbs];
+	}
+
 	/* Validate that there are enough LMBs to satisfy the request */
-	for_each_drmem_lmb(lmb) {
-		if (lmb_is_removable(lmb))
+	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
+		if (lmb_is_removable(lmb)) {
 			lmbs_available++;
 
-		if (lmbs_available == lmbs_to_remove)
+			if (lmbs_available == lmbs_to_remove)
+				break;
+		} else if (block_removal) {
 			break;
+		}
 	}
 
 	if (lmbs_available < lmbs_to_remove) {
@@ -426,27 +444,39 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 		return -EINVAL;
 	}
 
-	for_each_drmem_lmb(lmb) {
+	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 		rc = dlpar_remove_lmb(lmb);
-		if (rc)
-			continue;
 
-		/* Mark this lmb so we can add it later if all of the
-		 * requested LMBs cannot be removed.
-		 */
-		drmem_mark_lmb_reserved(lmb);
+		if (!rc) {
+			/* Mark this lmb so we can add it later if all of the
+			 * requested LMBs cannot be removed.
+			 */
+			drmem_mark_lmb_reserved(lmb);
 
-		lmbs_removed++;
-		if (lmbs_removed == lmbs_to_remove)
+			lmbs_removed++;
+			if (lmbs_removed == lmbs_to_remove)
+				break;
+		} else if (block_removal) {
 			break;
+		}
 	}
 
 	if (lmbs_removed != lmbs_to_remove) {
-		pr_err("Memory hot-remove failed, adding LMB's back\n");
+		if (block_removal)
+			pr_err("Memory indexed-count-remove failed, adding any removed LMBs\n");
+		else
+			pr_err("Memory hot-remove failed, adding LMB's back\n");
 
-		for_each_drmem_lmb(lmb) {
+		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 			if (!drmem_lmb_reserved(lmb))
 				continue;
+
+			/*
+			 * Setting the isolation state of an UNISOLATED/CONFIGURED
+			 * device to UNISOLATE is a no-op, but the hypervisor can
+			 * use it as a hint that the LMB removal failed.
+			 */
+			dlpar_unisolate_drc(lmb->drc_index);
 
 			rc = dlpar_add_lmb(lmb);
 			if (rc)
@@ -458,13 +488,13 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 
 		rc = -EINVAL;
 	} else {
-		for_each_drmem_lmb(lmb) {
+		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
 			if (!drmem_lmb_reserved(lmb))
 				continue;
 
 			dlpar_release_drc(lmb->drc_index);
-			pr_info("Memory at %llx was hot-removed\n",
-				lmb->base_addr);
+			pr_info("Memory at %llx (drc index %x) was hot-removed\n",
+				lmb->base_addr, lmb->drc_index);
 
 			drmem_remove_lmb_reservation(lmb);
 		}
@@ -472,6 +502,21 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 	}
 
 	return rc;
+}
+
+static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
+{
+	pr_info("Attempting to hot-remove %d LMB(s)\n", lmbs_to_remove);
+
+	return dlpar_memory_remove_lmbs_common(lmbs_to_remove, 0);
+}
+
+static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
+{
+	pr_info("Attempting to hot-remove %u LMB(s) at %x\n",
+		lmbs_to_remove, drc_index);
+
+	return dlpar_memory_remove_lmbs_common(lmbs_to_remove, drc_index);
 }
 
 static int dlpar_memory_remove_by_index(u32 drc_index)
@@ -502,80 +547,6 @@ static int dlpar_memory_remove_by_index(u32 drc_index)
 			 lmb->base_addr);
 	else
 		pr_debug("Memory at %llx was hot-removed\n", lmb->base_addr);
-
-	return rc;
-}
-
-static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
-{
-	struct drmem_lmb *lmb, *start_lmb, *end_lmb;
-	int lmbs_available = 0;
-	int rc;
-
-	pr_info("Attempting to hot-remove %u LMB(s) at %x\n",
-		lmbs_to_remove, drc_index);
-
-	if (lmbs_to_remove == 0)
-		return -EINVAL;
-
-	rc = get_lmb_range(drc_index, lmbs_to_remove, &start_lmb, &end_lmb);
-	if (rc)
-		return -EINVAL;
-
-	/* Validate that there are enough LMBs to satisfy the request */
-	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-		if (!lmb_is_removable(lmb))
-			break;
-
-		lmbs_available++;
-	}
-
-	if (lmbs_available < lmbs_to_remove)
-		return -EINVAL;
-
-	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-		rc = dlpar_remove_lmb(lmb);
-		if (rc)
-			break;
-
-		drmem_mark_lmb_reserved(lmb);
-	}
-
-	if (rc) {
-		pr_err("Memory indexed-count-remove failed, adding any removed LMBs\n");
-
-
-		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
-				continue;
-
-			/*
-			 * Setting the isolation state of an UNISOLATED/CONFIGURED
-			 * device to UNISOLATE is a no-op, but the hypervisor can
-			 * use it as a hint that the LMB removal failed.
-			 */
-			dlpar_unisolate_drc(lmb->drc_index);
-
-			rc = dlpar_add_lmb(lmb);
-			if (rc)
-				pr_err("Failed to add LMB, drc index %x\n",
-				       lmb->drc_index);
-
-			drmem_remove_lmb_reservation(lmb);
-		}
-		rc = -EINVAL;
-	} else {
-		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
-				continue;
-
-			dlpar_release_drc(lmb->drc_index);
-			pr_info("Memory at %llx (drc index %x) was hot-removed\n",
-				lmb->base_addr, lmb->drc_index);
-
-			drmem_remove_lmb_reservation(lmb);
-		}
-	}
 
 	return rc;
 }
