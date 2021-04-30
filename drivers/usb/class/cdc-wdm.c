@@ -106,6 +106,8 @@ struct wdm_device {
 
 	struct list_head	device_list;
 	int			(*manage_power)(struct usb_interface *, int);
+
+	enum usb_cdc_wdm_type	type;
 };
 
 static struct usb_driver wdm_driver;
@@ -836,7 +838,8 @@ static void service_interrupt_work(struct work_struct *work)
 /* --- hotplug --- */
 
 static int wdm_create(struct usb_interface *intf, struct usb_endpoint_descriptor *ep,
-		u16 bufsize, int (*manage_power)(struct usb_interface *, int))
+		      u16 bufsize, enum usb_cdc_wdm_type type,
+		      int (*manage_power)(struct usb_interface *, int))
 {
 	int rv = -ENOMEM;
 	struct wdm_device *desc;
@@ -853,6 +856,7 @@ static int wdm_create(struct usb_interface *intf, struct usb_endpoint_descriptor
 	/* this will be expanded and needed in hardware endianness */
 	desc->inum = cpu_to_le16((u16)intf->cur_altsetting->desc.bInterfaceNumber);
 	desc->intf = intf;
+	desc->type = type;
 	INIT_WORK(&desc->rxwork, wdm_rxwork);
 	INIT_WORK(&desc->service_outs_intr, service_interrupt_work);
 
@@ -977,7 +981,7 @@ static int wdm_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		goto err;
 	ep = &iface->endpoint[0].desc;
 
-	rv = wdm_create(intf, ep, maxcom, &wdm_manage_power);
+	rv = wdm_create(intf, ep, maxcom, USB_CDC_WDM_UNKNOWN, &wdm_manage_power);
 
 err:
 	return rv;
@@ -988,6 +992,7 @@ err:
  * @intf: usb interface the subdriver will associate with
  * @ep: interrupt endpoint to monitor for notifications
  * @bufsize: maximum message size to support for read/write
+ * @type: Type/protocol of the transported data (MBIM, QMI...)
  * @manage_power: call-back invoked during open and release to
  *                manage the device's power
  * Create WDM usb class character device and associate it with intf
@@ -1005,12 +1010,12 @@ err:
  */
 struct usb_driver *usb_cdc_wdm_register(struct usb_interface *intf,
 					struct usb_endpoint_descriptor *ep,
-					int bufsize,
+					int bufsize, enum usb_cdc_wdm_type type,
 					int (*manage_power)(struct usb_interface *, int))
 {
 	int rv;
 
-	rv = wdm_create(intf, ep, bufsize, manage_power);
+	rv = wdm_create(intf, ep, bufsize, type, manage_power);
 	if (rv < 0)
 		goto err;
 
