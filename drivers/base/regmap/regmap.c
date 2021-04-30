@@ -1847,6 +1847,17 @@ size_t regmap_get_raw_write_max(struct regmap *map)
 }
 EXPORT_SYMBOL_GPL(regmap_get_raw_write_max);
 
+/**
+ * regmap_might_sleep - Returns whether a regmap access might sleep.
+ *
+ * @map: Map to check.
+ */
+bool regmap_might_sleep(struct regmap *map)
+{
+	return map->can_sleep;
+}
+EXPORT_SYMBOL_GPL(regmap_might_sleep);
+
 static int _regmap_bus_formatted_write(void *context, unsigned int reg,
 				       unsigned int val)
 {
