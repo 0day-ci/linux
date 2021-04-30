@@ -144,7 +144,7 @@ static ssize_t cpia2_v4l_read(struct file *file, char __user *buf, size_t count,
 	int noblock = file->f_flags&O_NONBLOCK;
 	ssize_t ret;
 
-	if(!cam)
+	if (!cam)
 		return -EINVAL;
 
 	if (mutex_lock_interruptible(&cam->v4l2_lock))
@@ -248,8 +248,8 @@ static int cpia2_querycap(struct file *file, void *fh, struct v4l2_capability *v
 		break;
 	}
 
-	if (usb_make_path(cam->dev, vc->bus_info, sizeof(vc->bus_info)) <0)
-		memset(vc->bus_info,0, sizeof(vc->bus_info));
+	if (usb_make_path(cam->dev, vc->bus_info, sizeof(vc->bus_info)) < 0)
+		memset(vc->bus_info, 0, sizeof(vc->bus_info));
 	return 0;
 }
 
@@ -378,7 +378,7 @@ static int cpia2_s_fmt_vid_cap(struct file *file, void *_fh,
 	int err, frame;
 
 	err = cpia2_try_fmt_vid_cap(file, _fh, f);
-	if(err != 0)
+	if (err != 0)
 		return err;
 
 	cam->pixelformat = f->fmt.pix.pixelformat;
@@ -666,13 +666,13 @@ static int cpia2_g_jpegcomp(struct file *file, void *fh, struct v4l2_jpegcompres
 	parms->quality = 80; // TODO: Can this be made meaningful?
 
 	parms->jpeg_markers = V4L2_JPEG_MARKER_DQT | V4L2_JPEG_MARKER_DRI;
-	if(!cam->params.compression.inhibit_htables) {
+	if (!cam->params.compression.inhibit_htables)
 		parms->jpeg_markers |= V4L2_JPEG_MARKER_DHT;
-	}
+
 
 	parms->APPn = cam->APPn;
 	parms->APP_len = cam->APP_len;
-	if(cam->APP_len > 0) {
+	if (cam->APP_len > 0) {
 		memcpy(parms->APP_data, cam->APP_data, cam->APP_len);
 		parms->jpeg_markers |= V4L2_JPEG_MARKER_APP;
 	}
