@@ -710,7 +710,7 @@ static int xive_irq_set_affinity(struct irq_data *d,
 		return -EINVAL;
 
 	/* Don't do anything if the interrupt isn't started */
-	if (!irqd_is_started(d))
+	if (!irqd_is_started(d) && !irqd_affinity_is_managed(d))
 		return IRQ_SET_MASK_OK;
 
 	/*
