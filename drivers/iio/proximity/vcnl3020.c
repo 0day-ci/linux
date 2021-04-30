@@ -254,6 +254,90 @@ static bool vcnl3020_is_thr_enabled(struct vcnl3020_data *data)
 	return !!(icr & VCNL_ICR_THRES_EN);
 }
 
+static int vcnl3020_read_event(struct iio_dev *indio_dev,
+			       const struct iio_chan_spec *chan,
+			       enum iio_event_type type,
+			       enum iio_event_direction dir,
+			       enum iio_event_info info,
+			       int *val, int *val2)
+{
+	int rc;
+	struct vcnl3020_data *data = iio_priv(indio_dev);
+	__be16 res;
+
+	switch (info) {
+	case IIO_EV_INFO_VALUE:
+		switch (dir) {
+		case IIO_EV_DIR_RISING:
+			rc = regmap_bulk_read(data->regmap, VCNL_PS_HI_THR_HI,
+					      &res, 2);
+			*val = be16_to_cpu(res);
+			if (rc < 0)
+				return rc;
+			return IIO_VAL_INT;
+		case IIO_EV_DIR_FALLING:
+			rc = regmap_bulk_read(data->regmap, VCNL_PS_LO_THR_HI,
+					      &res, 2);
+			*val = be16_to_cpu(res);
+			if (rc < 0)
+				return rc;
+			return IIO_VAL_INT;
+		default:
+			return -EINVAL;
+		}
+	default:
+		return -EINVAL;
+	}
+}
+
+static int vcnl3020_write_event(struct iio_dev *indio_dev,
+				const struct iio_chan_spec *chan,
+				enum iio_event_type type,
+				enum iio_event_direction dir,
+				enum iio_event_info info,
+				int val, int val2)
+{
+	int rc;
+	__be16 buf;
+	struct vcnl3020_data *data = iio_priv(indio_dev);
+
+	rc = iio_device_claim_direct_mode(indio_dev);
+	if (rc)
+		return rc;
+
+	switch (info) {
+	case IIO_EV_INFO_VALUE:
+		switch (dir) {
+		case IIO_EV_DIR_RISING:
+			/* 16 bit word/ low * high */
+			buf = cpu_to_be16(val);
+			rc = regmap_bulk_write(data->regmap, VCNL_PS_HI_THR_HI,
+					       &buf, 2);
+			if (rc < 0)
+				goto end;
+			rc = IIO_VAL_INT;
+			goto end;
+		case IIO_EV_DIR_FALLING:
+			buf = cpu_to_be16(val);
+			rc = regmap_bulk_write(data->regmap, VCNL_PS_LO_THR_HI,
+					       &buf, 2);
+			if (rc < 0)
+				goto end;
+			rc = IIO_VAL_INT;
+			goto end;
+		default:
+			rc = -EINVAL;
+			goto end;
+		}
+	default:
+		rc = -EINVAL;
+		goto end;
+	}
+end:
+	iio_device_release_direct_mode(indio_dev);
+	return rc;
+}
+
 static int vcnl3020_config_threshold(struct iio_dev *indio_dev, bool state)
 {
 	struct vcnl3020_data *data = iio_priv(indio_dev);
@@ -334,6 +418,14 @@ static int vcnl3020_read_event_config(struct iio_dev *indio_dev,
 
 static const struct iio_event_spec vcnl3020_event_spec[] = {
 	{
+		.type = IIO_EV_TYPE_THRESH,
+		.dir = IIO_EV_DIR_RISING,
+		.mask_separate = BIT(IIO_EV_INFO_VALUE),
+	}, {
+		.type = IIO_EV_TYPE_THRESH,
+		.dir = IIO_EV_DIR_FALLING,
+		.mask_separate = BIT(IIO_EV_INFO_VALUE),
+	}, {
 		.type = IIO_EV_TYPE_THRESH,
 		.dir = IIO_EV_DIR_EITHER,
 		.mask_separate = BIT(IIO_EV_INFO_ENABLE),
@@ -423,6 +515,8 @@ static const struct iio_info vcnl3020_info = {
 	.read_raw = vcnl3020_read_raw,
 	.write_raw = vcnl3020_write_raw,
 	.read_avail = vcnl3020_read_avail,
+	.read_event_value = vcnl3020_read_event,
+	.write_event_value = vcnl3020_write_event,
 	.read_event_config = vcnl3020_read_event_config,
 	.write_event_config = vcnl3020_write_event_config,
 };
