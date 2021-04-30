@@ -1924,6 +1924,16 @@ config SENSORS_TMP513
 	  This driver can also be built as a module. If so, the module
 	  will be called tmp513.
 
+config SENSORS_TN48M
+	tristate "Delta Networks TN48M switch CPLD HWMON driver"
+	depends on MFD_TN48M_CPLD
+	help
+	  If you say yes here you get support for Delta Networks TN48M
+	  CPLD.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called tn48m-hwmon.
+
 config SENSORS_VEXPRESS
 	tristate "Versatile Express"
 	depends on VEXPRESS_CONFIG

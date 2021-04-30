@@ -20,6 +20,9 @@
 static const struct mfd_cell tn48m_cell[] = {
 	{
 		.name = "delta,tn48m-gpio",
+	},
+	{
+		.name = "delta,tn48m-hwmon",
 	}
 };
 

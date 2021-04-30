@@ -22,6 +22,7 @@
 #define SFP_TX_DISABLE		0x31
 #define SFP_PRESENT		0x3a
 #define SFP_LOS			0x40
+#define PSU_STATUS		0xa
 
 struct tn48m_data {
 	struct device *dev;
