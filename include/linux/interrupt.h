@@ -721,6 +721,17 @@ static inline void tasklet_enable(struct tasklet_struct *t)
 	atomic_dec(&t->count);
 }
 
+static inline bool tasklet_is_enabled(struct tasklet_struct *t)
+{
+	smp_rmb();
+	return !atomic_read(&t->count);
+}
+
+static inline bool tasklet_is_disabled(struct tasklet_struct *t)
+{
+	return !tasklet_is_enabled(t);
+}
+
 extern void tasklet_kill(struct tasklet_struct *t);
 extern void tasklet_init(struct tasklet_struct *t,
 			 void (*func)(unsigned long), unsigned long data);

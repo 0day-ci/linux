@@ -778,16 +778,16 @@ static void tasklet_action_common(struct softirq_action *a,
 		list = list->next;
 
 		if (tasklet_trylock(t)) {
-			if (!atomic_read(&t->count)) {
-				if (tasklet_clear_sched(t)) {
-					if (t->use_callback)
-						t->callback(t);
-					else
-						t->func(t->data);
-				}
+			if (tasklet_is_disabled(t) || !tasklet_clear_sched(t)) {
 				tasklet_unlock(t);
 				continue;
 			}
+
+			if (t->use_callback)
+				t->callback(t);
+			else
+				t->func(t->data);
+
 			tasklet_unlock(t);
 		}
 
