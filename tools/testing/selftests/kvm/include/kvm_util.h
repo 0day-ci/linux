@@ -388,4 +388,13 @@ uint64_t get_ucall(struct kvm_vm *vm, uint32_t vcpu_id, struct ucall *uc);
 #define GUEST_ASSERT_4(_condition, arg1, arg2, arg3, arg4) \
 	__GUEST_ASSERT((_condition), 4, (arg1), (arg2), (arg3), (arg4))
 
+#define GUEST_ASSERT_EQ(a, b) do {				\
+	__typeof(a) _a = (a);					\
+	__typeof(b) _b = (b);					\
+	if (_a != _b)						\
+		ucall(UCALL_ABORT, 4,				\
+			"Failed guest assert: "			\
+			#a " == " #b, __LINE__, _a, _b);	\
+} while(0)
+
 #endif /* SELFTEST_KVM_UTIL_H */
