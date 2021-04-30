@@ -784,7 +784,7 @@ static int cpia2_querybuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 
 	buf->memory = V4L2_MEMORY_MMAP;
 
-	if(cam->mmapped)
+	if (cam->mmapped)
 		buf->flags = V4L2_BUF_FLAG_MAPPED;
 	else
 		buf->flags = 0;
@@ -825,14 +825,14 @@ static int cpia2_qbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 {
 	struct camera_data *cam = video_drvdata(file);
 
-	if(buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	if (buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
 	   buf->memory != V4L2_MEMORY_MMAP ||
 	   buf->index >= cam->num_frames)
 		return -EINVAL;
 
 	DBG("QBUF #%d\n", buf->index);
 
-	if(cam->buffers[buf->index].status == FRAME_READY)
+	if (cam->buffers[buf->index].status == FRAME_READY)
 		cam->buffers[buf->index].status = FRAME_EMPTY;
 
 	return 0;
@@ -850,9 +850,10 @@ static int find_earliest_filled_buffer(struct camera_data *cam)
 {
 	int i;
 	int found = -1;
-	for (i=0; i<cam->num_frames; i++) {
-		if(cam->buffers[i].status == FRAME_READY) {
-			if(found < 0) {
+
+	for (i = 0; i < cam->num_frames; i++) {
+		if (cam->buffers[i].status == FRAME_READY) {
+			if (found < 0) {
 				found = i;
 			} else {
 				/* find which buffer is earlier */
@@ -877,7 +878,7 @@ static int cpia2_dqbuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 	struct camera_data *cam = video_drvdata(file);
 	int frame;
 
-	if(buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	if (buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
 	   buf->memory != V4L2_MEMORY_MMAP)
 		return -EINVAL;
 
