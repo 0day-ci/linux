@@ -158,10 +158,20 @@ typedef struct user_fpsimd_state elf_fpregset_t;
  */
 #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
 
+#ifdef CONFIG_COMPAT
+#define CLEAR_COMPAT_SYSCALL()						\
+({									\
+	current_thread_info()->use_compat_syscall = false;		\
+})
+#else
+#define CLEAR_COMPAT_SYSCALL()	((void)0)
+#endif
+
 #define SET_PERSONALITY(ex)						\
 ({									\
 	clear_thread_flag(TIF_32BIT);					\
 	current->personality &= ~READ_IMPLIES_EXEC;			\
+	CLEAR_COMPAT_SYSCALL();						\
 })
 
 /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
@@ -228,7 +238,8 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
 #define COMPAT_SET_PERSONALITY(ex)					\
 ({									\
 	set_thread_flag(TIF_32BIT);					\
- })
+	current_thread_info()->use_compat_syscall = true;		\
+})
 #ifdef CONFIG_COMPAT_VDSO
 #define COMPAT_ARCH_DLINFO						\
 do {									\

@@ -42,6 +42,12 @@ struct thread_info {
 	void			*scs_base;
 	void			*scs_sp;
 #endif
+#ifdef CONFIG_COMPAT
+	/*
+	 * compat task or inside a compat syscall from a 64-bit task
+	 */
+	bool			use_compat_syscall;
+#endif
 };
 
 #define thread_saved_pc(tsk)	\
