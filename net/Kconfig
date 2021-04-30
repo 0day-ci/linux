@@ -431,7 +431,12 @@ config SOCK_VALIDATE_XMIT
 
 config NET_SELFTESTS
 	def_tristate PHYLIB
+	prompt "Support for generic selftests"
 	depends on PHYLIB && INET
+	help
+	  These selftests are build automatically if any driver with generic
+	  selftests support is enabled. This option can be used to disable
+	  selftests to reduce kernel size.
 
 config NET_SOCK_MSG
 	bool
