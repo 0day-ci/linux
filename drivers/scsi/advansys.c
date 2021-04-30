@@ -8133,7 +8133,6 @@ static int AscExeScsiQueue(ASC_DVC_VAR *asc_dvc, ASC_SCSI_Q *scsiq)
 	sta = 0;
 	target_ix = scsiq->q2.target_ix;
 	tid_no = ASC_TIX_TO_TID(target_ix);
-	n_q_required = 1;
 	if (scsiq->cdbptr[0] == REQUEST_SENSE) {
 		if ((asc_dvc->init_sdtr & scsiq->q1.target_id) != 0) {
 			asc_dvc->sdtr_done &= ~scsiq->q1.target_id;
@@ -11481,7 +11480,6 @@ static int advansys_vlb_probe(struct device *dev, unsigned int id)
 	if (AscGetChipVersion(iop_base, ASC_IS_VL) > ASC_CHIP_MAX_VER_VL)
 		goto release_region;
 
-	err = -ENOMEM;
 	shost = scsi_host_alloc(&advansys_template, sizeof(*board));
 	if (!shost)
 		goto release_region;
@@ -11706,7 +11704,6 @@ static int advansys_pci_probe(struct pci_dev *pdev,
 
 	ioport = pci_resource_start(pdev, 0);
 
-	err = -ENOMEM;
 	shost = scsi_host_alloc(&advansys_template, sizeof(*board));
 	if (!shost)
 		goto release_region;
