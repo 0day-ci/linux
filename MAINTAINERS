@@ -5099,6 +5099,16 @@ W:	https://linuxtv.org
 T:	git git://linuxtv.org/media_tree.git
 F:	drivers/media/platform/sti/delta
 
+DELTA NETWORKS TN48M CPLD DRIVERS
+M:	Robert Marko <robert.marko@sartura.hr>
+S:	Maintained
+F:	Documentation/devicetree/bindings/mfd/delta,tn48m-cpld.yaml
+F:	drivers/gpio/gpio-tn48m.c
+F:	drivers/hwmon/tn48m-hwmon.c
+F:	drivers/mfd/tn48m-cpld.c
+F:	include/dt-bindings/gpio/tn48m-gpio.h
+F:	include/linux/mfd/tn48m.h
+
 DENALI NAND DRIVER
 L:	linux-mtd@lists.infradead.org
 S:	Orphan
