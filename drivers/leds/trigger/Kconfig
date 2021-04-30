@@ -153,4 +153,14 @@ config LEDS_TRIGGER_TTY
 
 	  When build as a module this driver will be called ledtrig-tty.
 
+config LEDS_TRIGGER_BLOCK
+	tristate "LED Block Device Trigger"
+	depends on BLOCK
+	default m
+	help
+	  This allows LEDs to be controlled by block device activity.
+	  This trigger doesn't require the lower level drivers to have any
+	  instrumentation. The activity is collected by polling the disk stats.
+	  If unsure, say Y.
+
 endif # LEDS_TRIGGERS
