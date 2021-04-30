@@ -678,7 +678,7 @@ static int cpia2_g_jpegcomp(struct file *file, void *fh, struct v4l2_jpegcompres
 	}
 
 	parms->COM_len = cam->COM_len;
-	if(cam->COM_len > 0) {
+	if (cam->COM_len > 0) {
 		memcpy(parms->COM_data, cam->COM_data, cam->COM_len);
 		parms->jpeg_markers |= JPEG_MARKER_COM;
 	}
@@ -709,8 +709,8 @@ static int cpia2_s_jpegcomp(struct file *file, void *fh,
 	cam->params.compression.inhibit_htables =
 		!(parms->jpeg_markers & V4L2_JPEG_MARKER_DHT);
 
-	if(parms->APP_len != 0) {
-		if(parms->APP_len > 0 &&
+	if (parms->APP_len != 0) {
+		if (parms->APP_len > 0 &&
 		   parms->APP_len <= sizeof(cam->APP_data) &&
 		   parms->APPn >= 0 && parms->APPn <= 15) {
 			cam->APPn = parms->APPn;
@@ -725,8 +725,8 @@ static int cpia2_s_jpegcomp(struct file *file, void *fh,
 		cam->APP_len = 0;
 	}
 
-	if(parms->COM_len != 0) {
-		if(parms->COM_len > 0 &&
+	if (parms->COM_len != 0) {
+		if (parms->COM_len > 0 &&
 		   parms->COM_len <= sizeof(cam->COM_data)) {
 			cam->COM_len = parms->COM_len;
 			memcpy(cam->COM_data, parms->COM_data, parms->COM_len);
@@ -752,7 +752,7 @@ static int cpia2_reqbufs(struct file *file, void *fh, struct v4l2_requestbuffers
 {
 	struct camera_data *cam = video_drvdata(file);
 
-	if(req->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	if (req->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
 	   req->memory != V4L2_MEMORY_MMAP)
 		return -EINVAL;
 
@@ -775,7 +775,7 @@ static int cpia2_querybuf(struct file *file, void *fh, struct v4l2_buffer *buf)
 {
 	struct camera_data *cam = video_drvdata(file);
 
-	if(buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	if (buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
 	   buf->index >= cam->num_frames)
 		return -EINVAL;
 
