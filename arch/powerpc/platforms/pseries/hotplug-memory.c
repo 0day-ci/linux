@@ -348,7 +348,8 @@ static int pseries_remove_mem_node(struct device_node *np)
 
 static bool lmb_is_removable(struct drmem_lmb *lmb)
 {
-	if (!(lmb->flags & DRCONF_MEM_ASSIGNED))
+	if ((lmb->flags & DRCONF_MEM_RESERVED) ||
+		!(lmb->flags & DRCONF_MEM_ASSIGNED))
 		return false;
 
 #ifdef CONFIG_FA_DUMP
@@ -523,7 +524,7 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 
 	/* Validate that there are enough LMBs to satisfy the request */
 	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-		if (lmb->flags & DRCONF_MEM_RESERVED)
+		if (!lmb_is_removable(lmb))
 			break;
 
 		lmbs_available++;
@@ -533,9 +534,6 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 		return -EINVAL;
 
 	for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-		if (!(lmb->flags & DRCONF_MEM_ASSIGNED))
-			continue;
-
 		rc = dlpar_remove_lmb(lmb);
 		if (rc)
 			break;
