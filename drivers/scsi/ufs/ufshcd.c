@@ -7277,8 +7277,6 @@ out:
 static void ufshcd_wb_probe(struct ufs_hba *hba, u8 *desc_buf)
 {
 	struct ufs_dev_info *dev_info = &hba->dev_info;
-	u8 lun;
-	u32 d_lu_wb_buf_alloc;
 	u32 ext_ufs_feature;
 
 	if (!ufshcd_is_wb_allowed(hba))
@@ -7318,8 +7316,10 @@ static void ufshcd_wb_probe(struct ufs_hba *hba, u8 *desc_buf)
 				   DEVICE_DESC_PARAM_WB_SHARED_ALLOC_UNITS))
 			goto wb_disabled;
 	} else {
+		u8 lun;
+		u32 d_lu_wb_buf_alloc = 0;
+
 		for (lun = 0; lun < UFS_UPIU_MAX_WB_LUN_ID; lun++) {
-			d_lu_wb_buf_alloc = 0;
 			ufshcd_read_unit_desc_param(hba,
 					lun,
 					UNIT_DESC_PARAM_WB_BUF_ALLOC_UNITS,
