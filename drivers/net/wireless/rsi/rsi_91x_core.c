@@ -492,5 +492,6 @@ void rsi_core_xmit(struct rsi_common *common, struct sk_buff *skb)
 xmit_fail:
 	rsi_dbg(ERR_ZONE, "%s: Failed to queue packet\n", __func__);
 	/* Dropping pkt here */
-	ieee80211_free_txskb(common->priv->hw, skb);
+	if (skb)
+		ieee80211_free_txskb(common->priv->hw, skb);
 }
