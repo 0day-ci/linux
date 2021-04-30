@@ -1131,15 +1131,13 @@ int msm_ispif_subdev_init(struct ispif_device *ispif,
 
 	/* Memory */
 
-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res->reg[0]);
-	ispif->base = devm_ioremap_resource(dev, r);
+	ispif->base = devm_platform_ioremap_resource_byname(pdev, res->reg[0]);
 	if (IS_ERR(ispif->base)) {
 		dev_err(dev, "could not map memory\n");
 		return PTR_ERR(ispif->base);
 	}
 
-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res->reg[1]);
-	ispif->base_clk_mux = devm_ioremap_resource(dev, r);
+	ispif->base_clk_mux = devm_platform_ioremap_resource_byname(pdev, res->reg[1]);
 	if (IS_ERR(ispif->base_clk_mux)) {
 		dev_err(dev, "could not map memory\n");
 		return PTR_ERR(ispif->base_clk_mux);
