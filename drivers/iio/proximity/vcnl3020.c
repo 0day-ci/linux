@@ -71,13 +71,11 @@ static const int vcnl3020_prox_sampling_frequency[][2] = {
  * @regmap:	device register map.
  * @dev:	vcnl3020 device.
  * @rev:	revision id.
- * @lock:	lock for protecting access to device hardware registers.
  */
 struct vcnl3020_data {
 	struct regmap *regmap;
 	struct device *dev;
 	u8 rev;
-	struct mutex lock;
 };
 
 /**
@@ -149,7 +147,6 @@ static int vcnl3020_init(struct vcnl3020_data *data)
 	}
 
 	data->rev = reg;
-	mutex_init(&data->lock);
 
 	return vcnl3020_get_and_apply_property(data,
 					       vcnl3020_led_current_property);
@@ -161,11 +158,9 @@ static int vcnl3020_measure_proximity(struct vcnl3020_data *data, int *val)
 	unsigned int reg;
 	__be16 res;
 
-	mutex_lock(&data->lock);
-
 	rc = regmap_write(data->regmap, VCNL_COMMAND, VCNL_PS_OD);
 	if (rc)
-		goto err_unlock;
+		return rc;
 
 	/* wait for data to become ready */
 	rc = regmap_read_poll_timeout(data->regmap, VCNL_COMMAND, reg,
@@ -174,19 +169,16 @@ static int vcnl3020_measure_proximity(struct vcnl3020_data *data, int *val)
 	if (rc) {
 		dev_err(data->dev,
 			"Error (%d) reading vcnl3020 command register\n", rc);
-		goto err_unlock;
+		return rc;
 	}
 
 	/* high & low result bytes read */
 	rc = regmap_bulk_read(data->regmap, VCNL_PS_RESULT_HI, &res,
 			      sizeof(res));
 	if (rc)
-		goto err_unlock;
+		return rc;
 
 	*val = be16_to_cpu(res);
-
-err_unlock:
-	mutex_unlock(&data->lock);
 
 	return rc;
 }
@@ -450,25 +442,37 @@ static int vcnl3020_read_raw(struct iio_dev *indio_dev,
 	int rc;
 	struct vcnl3020_data *data = iio_priv(indio_dev);
 
+	rc = iio_device_claim_direct_mode(indio_dev);
+	if (rc)
+		return rc;
+
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
 
 		/* Protect against event capture. */
-		if (vcnl3020_is_in_periodic_mode(data))
-			return -EBUSY;
+		if (vcnl3020_is_in_periodic_mode(data)) {
+			rc = -EBUSY;
+			goto end;
+		}
 
 		rc = vcnl3020_measure_proximity(data, val);
 		if (rc)
-			return rc;
-		return IIO_VAL_INT;
+			goto end;
+		rc = IIO_VAL_INT;
+		goto end;
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		rc = vcnl3020_read_proxy_samp_freq(data, val, val2);
 		if (rc < 0)
-			return rc;
-		return IIO_VAL_INT_PLUS_MICRO;
+			goto end;
+		rc = IIO_VAL_INT_PLUS_MICRO;
+		goto end;
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
 	}
+
+end:
+	iio_device_release_direct_mode(indio_dev);
+	return rc;
 }
 
 static int vcnl3020_write_raw(struct iio_dev *indio_dev,
