@@ -17,7 +17,11 @@
 #include <linux/regmap.h>
 #include <linux/slab.h>
 
-static const struct mfd_cell tn48m_cell[] = {};
+static const struct mfd_cell tn48m_cell[] = {
+	{
+		.name = "delta,tn48m-gpio",
+	}
+};
 
 static const struct regmap_config tn48m_regmap_config = {
 	.reg_bits = 8,
