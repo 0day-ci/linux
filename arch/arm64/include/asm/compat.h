@@ -178,21 +178,37 @@ struct compat_shmid64_ds {
 	compat_ulong_t __unused5;
 };
 
-static inline int is_compat_task(void)
+static inline bool is_compat_task(void)
 {
 	return test_thread_flag(TIF_32BIT);
 }
 
-static inline int is_compat_thread(struct thread_info *thread)
+static inline bool is_compat_thread(struct thread_info *thread)
 {
 	return test_ti_thread_flag(thread, TIF_32BIT);
 }
 
+static inline bool in_compat_syscall(void)
+{
+	return is_compat_task();
+}
+#define in_compat_syscall in_compat_syscall	/* override the generic impl */
+
+static inline bool thread_in_compat_syscall(struct thread_info *thread)
+{
+	return is_compat_thread(thread);
+}
+
 #else /* !CONFIG_COMPAT */
 
-static inline int is_compat_thread(struct thread_info *thread)
+static inline bool is_compat_thread(struct thread_info *thread)
 {
-	return 0;
+	return false;
+}
+
+static inline bool thread_in_compat_syscall(struct thread_info *thread)
+{
+	return false;
 }
 
 #endif /* CONFIG_COMPAT */
