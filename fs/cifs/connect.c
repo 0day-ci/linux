@@ -3159,9 +3159,13 @@ out:
 int
 cifs_setup_volume_info(struct smb3_fs_context *ctx, const char *mntopts, const char *devname)
 {
-	int rc = 0;
+	int rc;
 
-	smb3_parse_devname(devname, ctx);
+	rc = smb3_parse_devname(devname, ctx);
+	if (rc) {
+		cifs_dbg(VFS, "%s: failed to parse %s: %d\n", __func__, devname, rc);
+		return rc;
+	}
 
 	if (mntopts) {
 		char *ip;
@@ -3189,7 +3193,7 @@ cifs_setup_volume_info(struct smb3_fs_context *ctx, const char *mntopts, const c
 		return -EINVAL;
 	}
 
-	return rc;
+	return 0;
 }
 
 static int
