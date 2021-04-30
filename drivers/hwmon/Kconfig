@@ -1924,6 +1924,13 @@ config SENSORS_TMP513
 	  This driver can also be built as a module. If so, the module
 	  will be called tmp513.
 
+config SENSORS_VCNL3020
+	tristate "VCNL3020"
+	depends on I2C && VCNL3020
+	help
+	  If you say yes here you get support for the intrusion
+	  sensor via VCNL3020 proximity sensor.
+
 config SENSORS_VEXPRESS
 	tristate "Versatile Express"
 	depends on VEXPRESS_CONFIG

@@ -11,9 +11,11 @@
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/regmap.h>
+#include <linux/platform_device.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
+#include <linux/iio/proximity/vcnl3020.h>
 
 #define VCNL3020_PROD_ID	0x21
 
@@ -64,18 +66,6 @@ static const int vcnl3020_prox_sampling_frequency[][2] = {
 	{62, 500000},
 	{125, 0},
 	{250, 0},
-};
-
-/**
- * struct vcnl3020_data - vcnl3020 specific data.
- * @regmap:	device register map.
- * @dev:	vcnl3020 device.
- * @rev:	revision id.
- */
-struct vcnl3020_data {
-	struct regmap *regmap;
-	struct device *dev;
-	u8 rev;
 };
 
 /**
@@ -330,6 +320,23 @@ end:
 	return rc;
 }
 
+#ifdef CONFIG_SENSORS_VCNL3020
+
+bool vcnl3020_is_thr_triggered(struct vcnl3020_data *data)
+{
+	int rc;
+	unsigned int isr;
+
+	rc = regmap_read(data->regmap, VCNL_ISR, &isr);
+	if (rc)
+		return false;
+
+	return !!((isr & VCNL_INT_TH_LOW) || (isr & VCNL_INT_TH_HI));
+}
+EXPORT_SYMBOL_GPL(vcnl3020_is_thr_triggered);
+
+#endif
+
 static int vcnl3020_config_threshold(struct iio_dev *indio_dev, bool state)
 {
 	struct vcnl3020_data *data = iio_priv(indio_dev);
@@ -536,6 +543,7 @@ static int vcnl3020_probe(struct i2c_client *client)
 	struct vcnl3020_data *data;
 	struct iio_dev *indio_dev;
 	struct regmap *regmap;
+	struct platform_device *pdev;
 	int rc;
 
 	regmap = devm_regmap_init_i2c(client, &vcnl3020_regmap_config);
@@ -560,10 +568,39 @@ static int vcnl3020_probe(struct i2c_client *client)
 	indio_dev->info = &vcnl3020_info;
 	indio_dev->channels = vcnl3020_channels;
 	indio_dev->num_channels = ARRAY_SIZE(vcnl3020_channels);
-	indio_dev->name = "vcnl3020";
+	indio_dev->name = VCNL3020_DRV;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 
-	return devm_iio_device_register(&client->dev, indio_dev);
+	rc = devm_iio_device_register(&client->dev, indio_dev);
+	if (rc != 0)
+		goto err_out;
+
+#ifdef CONFIG_SENSORS_VCNL3020
+
+	pdev = platform_device_alloc(VCNL3020_DRV_HWMON, -1);
+	if (!pdev) {
+		dev_err(&client->dev, "Failed to allocate %s\n",
+			VCNL3020_DRV_HWMON);
+		rc = -ENOMEM;
+		goto err_out;
+	}
+
+	pdev->dev.parent = &indio_dev->dev;
+	platform_set_drvdata(pdev, data);
+	rc = platform_device_add(pdev);
+	if (rc != 0) {
+		dev_err(&client->dev, "Failed to register %s: %d\n",
+			VCNL3020_DRV_HWMON, rc);
+		platform_device_put(pdev);
+		pdev = NULL;
+		goto err_out;
+	}
+
+#endif
+
+err_out:
+
+	return rc;
 }
 
 static const struct of_device_id vcnl3020_of_match[] = {
@@ -576,7 +613,7 @@ MODULE_DEVICE_TABLE(of, vcnl3020_of_match);
 
 static struct i2c_driver vcnl3020_driver = {
 	.driver = {
-		.name   = "vcnl3020",
+		.name   = VCNL3020_DRV,
 		.of_match_table = vcnl3020_of_match,
 	},
 	.probe_new  = vcnl3020_probe,
