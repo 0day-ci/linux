@@ -1777,7 +1777,7 @@ bool try_to_unmap(struct page *page, enum ttu_flags flags)
 	else
 		rmap_walk(page, &rwc);
 
-	return !page_mapcount(page) ? true : false;
+	return !total_mapcount(page) ? true : false;
 }
 
 /**
