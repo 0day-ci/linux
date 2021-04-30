@@ -47,7 +47,6 @@
 #include "util/time-utils.h"
 #include "util/auxtrace.h"
 #include "util/units.h"
-#include "util/util.h" // perf_tip()
 #include "ui/ui.h"
 #include "ui/progress.h"
 #include "util/block-info.h"
@@ -106,6 +105,9 @@ struct report {
 	struct block_report	*block_reports;
 	int			nr_block_reports;
 };
+
+extern char _binary_Documentation_tips_txt_start[];
+extern char _binary_Documentation_tips_txt_end[];
 
 static int report__config(const char *var, const char *value, void *cb)
 {
@@ -604,19 +606,38 @@ static int report__gtk_browse_hists(struct report *rep, const char *help)
 	return hist_browser(rep->session->evlist, help, NULL, rep->min_percent);
 }
 
+#define MAX_TIPS        60
+
+static const char *perf_tip(void)
+{
+	char *str[MAX_TIPS];
+	int i = 0;
+
+	_binary_Documentation_tips_txt_start[_binary_Documentation_tips_txt_end -
+		_binary_Documentation_tips_txt_start - 1] = 0;
+
+	str[i] = strtok(_binary_Documentation_tips_txt_start, "\n");
+	if (!str[i])
+		return "Tips cannot be found!";
+
+	i++;
+
+	while (i < MAX_TIPS) {
+		str[i] = strtok(NULL, "\n");
+		if (!str[i])
+			break;
+		i++;
+	}
+
+	return str[random() % i];
+}
+
 static int report__browse_hists(struct report *rep)
 {
 	int ret;
 	struct perf_session *session = rep->session;
 	struct evlist *evlist = session->evlist;
-	const char *help = perf_tip(system_path(TIPDIR));
-
-	if (help == NULL) {
-		/* fallback for people who don't install perf ;-) */
-		help = perf_tip(DOCDIR);
-		if (help == NULL)
-			help = "Cannot load tips.txt file, please install perf!";
-	}
+	const char *help = perf_tip();
 
 	switch (use_browser) {
 	case 1:
