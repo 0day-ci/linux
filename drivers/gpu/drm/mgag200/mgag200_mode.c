@@ -94,7 +94,6 @@ static inline void mga_wait_vsync(struct mga_device *mdev)
 		status = RREG32(MGAREG_Status);
 	} while ((status & 0x08) && time_before(jiffies, timeout));
 	timeout = jiffies + HZ/10;
-	status = 0;
 	do {
 		status = RREG32(MGAREG_Status);
 	} while (!(status & 0x08) && time_before(jiffies, timeout));
@@ -279,8 +278,6 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 
 		p |= (fvv << 4);
 		m |= 0x80;
-
-		clock = clock / 2;
 	}
 
 	if (delta > permitteddelta) {
