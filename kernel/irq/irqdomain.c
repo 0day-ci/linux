@@ -481,6 +481,7 @@ struct irq_domain *irq_get_default_host(void)
 {
 	return irq_default_domain;
 }
+EXPORT_SYMBOL_GPL(irq_get_default_host);
 
 static void irq_domain_clear_mapping(struct irq_domain *domain,
 				     irq_hw_number_t hwirq)
