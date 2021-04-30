@@ -97,6 +97,8 @@ struct seccomp_knotif {
 
 	/* outstanding addfd requests */
 	struct list_head addfd;
+
+	bool wait_killable;
 };
 
 /**
@@ -1073,6 +1075,12 @@ static void seccomp_handle_addfd(struct seccomp_kaddfd *addfd)
 	complete(&addfd->completion);
 }
 
+/* Must be called with notify_lock held */
+static inline bool notification_wait_killable(struct seccomp_knotif *n)
+{
+	return n->state == SECCOMP_NOTIFY_SENT && n->wait_killable;
+}
+
 static int seccomp_do_user_notification(int this_syscall,
 					struct seccomp_filter *match,
 					const struct seccomp_data *sd)
@@ -1103,11 +1111,33 @@ static int seccomp_do_user_notification(int this_syscall,
 	 * This is where we wait for a reply from userspace.
 	 */
 	do {
+		int wait_killable = notification_wait_killable(&n);
+
 		mutex_unlock(&match->notify_lock);
-		err = wait_for_completion_interruptible(&n.ready);
+		if (wait_killable)
+			err = wait_for_completion_killable(&n.ready);
+		else
+			err = wait_for_completion_interruptible(&n.ready);
 		mutex_lock(&match->notify_lock);
-		if (err != 0)
+		if (err != 0) {
+			/*
+			 * If the SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE was
+			 * used to change the state of the handler to
+			 * wait_killable, but a non-fatal signal arrived
+			 * before we could complete the transition, we could
+			 * erroneously finish waiting early.
+			 *
+			 * If we were previously in not in the wait_killable
+			 * state and we've transitioned to the wait_killable
+			 * state, retry waiting. wait_for_completion_killable
+			 * will check again if there is a fatal signal waiting,
+			 * or another completion (addfd).
+			 */
+			if (!wait_killable && notification_wait_killable(&n))
+				continue;
+
 			goto interrupted;
+		}
 
 		addfd = list_first_entry_or_null(&n.addfd,
 						 struct seccomp_kaddfd, list);
@@ -1477,6 +1507,12 @@ out:
 		if (knotif) {
 			knotif->state = SECCOMP_NOTIFY_INIT;
 			up(&filter->notif->request);
+
+			/* Wake the task to reset its state */
+			if (knotif->wait_killable) {
+				knotif->wait_killable = false;
+				complete(&knotif->ready);
+			}
 		}
 		mutex_unlock(&filter->notify_lock);
 	}
@@ -1648,6 +1684,35 @@ out:
 	return ret;
 }
 
+static long seccomp_notify_set_wait_killable(struct seccomp_filter *filter,
+					     void __user *buf)
+{
+	struct seccomp_knotif *knotif;
+	u64 id;
+	long ret;
+
+	if (copy_from_user(&id, buf, sizeof(id)))
+		return -EFAULT;
+
+	ret = mutex_lock_interruptible(&filter->notify_lock);
+	if (ret < 0)
+		return ret;
+
+	knotif = find_notification(filter, id);
+	if (!knotif || knotif->state != SECCOMP_NOTIFY_SENT) {
+		ret = -ENOENT;
+	} else if (knotif->wait_killable) {
+		ret = -EALREADY;
+	} else {
+		ret = 0;
+		knotif->wait_killable = true;
+		complete(&knotif->ready);
+	}
+
+	mutex_unlock(&filter->notify_lock);
+	return ret;
+}
+
 static long seccomp_notify_ioctl(struct file *file, unsigned int cmd,
 				 unsigned long arg)
 {
@@ -1663,6 +1728,8 @@ static long seccomp_notify_ioctl(struct file *file, unsigned int cmd,
 	case SECCOMP_IOCTL_NOTIF_ID_VALID_WRONG_DIR:
 	case SECCOMP_IOCTL_NOTIF_ID_VALID:
 		return seccomp_notify_id_valid(filter, buf);
+	case SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE:
+		return seccomp_notify_set_wait_killable(filter, buf);
 	}
 
 	/* Extensible Argument ioctls */
