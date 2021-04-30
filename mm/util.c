@@ -353,18 +353,23 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
 	return randomize_page(mm->brk, SZ_1G);
 }
 
-unsigned long arch_mmap_rnd(void)
+static unsigned long mmap_rnd(bool compat)
 {
 	unsigned long rnd;
 
 #ifdef CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS
-	if (is_compat_task())
+	if (compat)
 		rnd = get_random_long() & ((1UL << mmap_rnd_compat_bits) - 1);
 	else
 #endif /* CONFIG_HAVE_ARCH_MMAP_RND_COMPAT_BITS */
 		rnd = get_random_long() & ((1UL << mmap_rnd_bits) - 1);
 
 	return rnd << PAGE_SHIFT;
+}
+
+unsigned long arch_mmap_rnd(void)
+{
+	return mmap_rnd(is_compat_task());
 }
 
 static int mmap_is_legacy(struct rlimit *rlim_stack)
@@ -383,16 +388,17 @@ static int mmap_is_legacy(struct rlimit *rlim_stack)
  * the face of randomisation.
  */
 #define MIN_GAP		(SZ_128M)
-#define MAX_GAP		(STACK_TOP / 6 * 5)
+#define MAX_GAP		(stack_top / 6 * 5)
 
-static unsigned long mmap_base(unsigned long rnd, struct rlimit *rlim_stack)
+static unsigned long mmap_base(unsigned long rnd, struct rlimit *rlim_stack,
+	unsigned long stack_top, unsigned long stack_rnd_mask)
 {
 	unsigned long gap = rlim_stack->rlim_cur;
 	unsigned long pad = stack_guard_gap;
 
 	/* Account for stack randomization if necessary */
 	if (current->flags & PF_RANDOMIZE)
-		pad += (STACK_RND_MASK << PAGE_SHIFT);
+		pad += (stack_rnd_mask << PAGE_SHIFT);
 
 	/* Values close to RLIM_INFINITY can overflow. */
 	if (gap + pad > gap)
@@ -403,21 +409,45 @@ static unsigned long mmap_base(unsigned long rnd, struct rlimit *rlim_stack)
 	else if (gap > MAX_GAP)
 		gap = MAX_GAP;
 
-	return PAGE_ALIGN(STACK_TOP - gap - rnd);
+	return PAGE_ALIGN(stack_top - gap - rnd);
 }
 
 void arch_pick_mmap_layout(struct mm_struct *mm, struct rlimit *rlim_stack)
 {
 	unsigned long random_factor = 0UL;
+#ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
+	unsigned long compat_random_factor = 0UL;
+#endif
 
-	if (current->flags & PF_RANDOMIZE)
+	if (current->flags & PF_RANDOMIZE) {
+#ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
+		random_factor = mmap_rnd(false);
+		compat_random_factor = mmap_rnd(true);
+#else
 		random_factor = arch_mmap_rnd();
+#endif
+	}
 
 	if (mmap_is_legacy(rlim_stack)) {
+#ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
+		mm->mmap_base = TASK_UNMAPPED_BASE_64 + random_factor;
+		mm->mmap_compat_base =
+			TASK_UNMAPPED_BASE_32 + compat_random_factor;
+#else
 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
+#endif
 		mm->get_unmapped_area = arch_get_unmapped_area;
 	} else {
-		mm->mmap_base = mmap_base(random_factor, rlim_stack);
+#ifdef CONFIG_HAVE_ARCH_COMPAT_MMAP_BASES
+		mm->mmap_base = mmap_base(random_factor, rlim_stack,
+					  STACK_TOP_64, STACK_RND_MASK_64);
+		mm->mmap_compat_base = mmap_base(compat_random_factor,
+						 rlim_stack, STACK_TOP_32,
+						 STACK_RND_MASK_32);
+#else
+		mm->mmap_base = mmap_base(random_factor, rlim_stack, STACK_TOP,
+					  STACK_RND_MASK);
+#endif
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
 	}
 }
