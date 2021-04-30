@@ -88,9 +88,10 @@
 #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
 				DEFAULT_MAP_WINDOW)
 
-#define arch_get_mmap_base(addr, base) ((addr > DEFAULT_MAP_WINDOW) ? \
-					base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
-					base)
+#define arch_get_mmap_base_topdown(addr) \
+	((addr > DEFAULT_MAP_WINDOW) ? \
+	current->mm->mmap_base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
+	current->mm->mmap_base)
 #endif /* CONFIG_ARM64_FORCE_52BIT */
 
 extern phys_addr_t arm64_dma_phys_limit;
