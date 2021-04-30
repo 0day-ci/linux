@@ -165,7 +165,8 @@ static int dwc3_imx8mp_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto disable_rpm;
 
-	dwc3_np = of_get_child_by_name(node, "dwc3");
+	dwc3_np = of_get_child_by_name(node, "usb") ? :
+		  of_get_child_by_name(node, "dwc3");
 	if (!dwc3_np) {
 		dev_err(dev, "failed to find dwc3 core child\n");
 		goto disable_rpm;
