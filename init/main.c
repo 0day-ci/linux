@@ -818,7 +818,7 @@ static void __init report_meminit(void)
 /*
  * Set up kernel memory allocators
  */
-static void __init mm_init(void)
+static void __init init_mem(void)
 {
 	/*
 	 * page_ext requires contiguous pages,
@@ -905,7 +905,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	vfs_caches_init_early();
 	sort_main_extable();
 	trap_init();
-	mm_init();
+	init_mem();
 
 	ftrace_init();
 
