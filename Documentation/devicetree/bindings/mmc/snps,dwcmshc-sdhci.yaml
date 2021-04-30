@@ -48,7 +48,10 @@ properties:
 
   rockchip,txclk-tapnum:
     description: Specify the number of delay for tx sampling.
-    $ref: /schemas/types.yaml#/definitions/uint8
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 31
+    default: 8
 
 
 required:
