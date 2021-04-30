@@ -963,6 +963,10 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 
 			ct->proto.tcp.last_flags =
 			ct->proto.tcp.last_wscale = 0;
+			/* Reset the max ack flag so in case the server replies
+			 * with RST/ACK it will not be marked as an invalid rst.
+			 */
+			ct->proto.tcp.seen[dir].flags &= ~IP_CT_TCP_FLAG_MAXACK_SET;
 			tcp_options(skb, dataoff, th, &seen);
 			if (seen.flags & IP_CT_TCP_FLAG_WINDOW_SCALE) {
 				ct->proto.tcp.last_flags |=
@@ -1043,6 +1047,13 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 
 		if (ct->proto.tcp.seen[!dir].flags & IP_CT_TCP_FLAG_MAXACK_SET) {
 			u32 seq = ntohl(th->seq);
+
+			/* If we are not in established state, and an RST is
+			 * observed with SEQ=0, this is most likely an answer
+			 * to a SYN we had let go through above.
+			 */
+			if (seq == 0 && !nf_conntrack_tcp_established(ct))
+				break;
 
 			if (before(seq, ct->proto.tcp.seen[!dir].td_maxack)) {
 				/* Invalid RST  */
