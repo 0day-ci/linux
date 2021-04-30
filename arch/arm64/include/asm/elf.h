@@ -187,12 +187,14 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 				       int uses_interp);
 
 /* 1GB of VA */
+#define STACK_RND_MASK_64		(0x3ffff >> (PAGE_SHIFT - 12))
 #ifdef CONFIG_COMPAT
+#define STACK_RND_MASK_32		(0x7ff >> (PAGE_SHIFT - 12))
 #define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
-						0x7ff >> (PAGE_SHIFT - 12) : \
-						0x3ffff >> (PAGE_SHIFT - 12))
+						STACK_RND_MASK_32 : \
+						STACK_RND_MASK_64)
 #else
-#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
+#define STACK_RND_MASK			STACK_RND_MASK_64
 #endif
 
 #ifdef __AARCH64EB__

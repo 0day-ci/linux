@@ -38,3 +38,36 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 {
 	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
 }
+
+unsigned long arch_get_mmap_end(unsigned long addr)
+{
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall())
+		return TASK_SIZE_32;
+#endif /* CONFIG_COMPAT */
+#ifndef CONFIG_ARM64_FORCE_52BIT
+	if (addr > DEFAULT_MAP_WINDOW_64)
+		return TASK_SIZE_64;
+#endif /* CONFIG_ARM64_FORCE_52BIT */
+	return DEFAULT_MAP_WINDOW_64;
+}
+unsigned long arch_get_mmap_base(unsigned long addr)
+{
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall())
+		return current->mm->mmap_compat_base;
+#endif /* CONFIG_COMPAT */
+	return current->mm->mmap_base;
+}
+unsigned long arch_get_mmap_base_topdown(unsigned long addr)
+{
+#ifdef CONFIG_COMPAT
+	if (in_compat_syscall())
+		return current->mm->mmap_compat_base;
+#endif /* CONFIG_COMPAT */
+#ifndef CONFIG_ARM64_FORCE_52BIT
+	if (addr > DEFAULT_MAP_WINDOW_64)
+		return current->mm->mmap_base + TASK_SIZE - DEFAULT_MAP_WINDOW_64;
+#endif /* CONFIG_ARM64_FORCE_52BIT */
+	return current->mm->mmap_base;
+}

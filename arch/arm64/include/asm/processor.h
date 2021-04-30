@@ -70,29 +70,36 @@
 
 #ifdef CONFIG_ARM64_FORCE_52BIT
 #define STACK_TOP_MAX		TASK_SIZE_64
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+#define TASK_UNMAPPED_BASE_64	(PAGE_ALIGN(TASK_SIZE_64 / 4))
 #else
 #define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+#define TASK_UNMAPPED_BASE_64	(PAGE_ALIGN(DEFAULT_MAP_WINDOW_64 / 4))
 #endif /* CONFIG_ARM64_FORCE_52BIT */
 
 #ifdef CONFIG_COMPAT
-#define AARCH32_VECTORS_BASE	0xffff0000
-#define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
-				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
+#define TASK_UNMAPPED_BASE_32	(PAGE_ALIGN(TASK_SIZE_32 / 4))
+#define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
+				TASK_UNMAPPED_BASE_32 : TASK_UNMAPPED_BASE_64)
 #else
-#define STACK_TOP		STACK_TOP_MAX
+#define TASK_UNMAPPED_BASE	TASK_UNMAPPED_BASE_64
 #endif /* CONFIG_COMPAT */
 
-#ifndef CONFIG_ARM64_FORCE_52BIT
-#define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
-				DEFAULT_MAP_WINDOW)
+#define STACK_TOP_64		STACK_TOP_MAX
+#ifdef CONFIG_COMPAT
+#define AARCH32_VECTORS_BASE	0xffff0000
+#define STACK_TOP_32		AARCH32_VECTORS_BASE
+#define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
+				STACK_TOP_32 : STACK_TOP_64)
+#else
+#define STACK_TOP		STACK_TOP_64
+#endif /* CONFIG_COMPAT */
 
-#define arch_get_mmap_base_topdown(addr) \
-	((addr > DEFAULT_MAP_WINDOW) ? \
-	current->mm->mmap_base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
-	current->mm->mmap_base)
-#endif /* CONFIG_ARM64_FORCE_52BIT */
+#define arch_get_mmap_end arch_get_mmap_end
+#define arch_get_mmap_base arch_get_mmap_base
+#define arch_get_mmap_base_topdown arch_get_mmap_base_topdown
+unsigned long arch_get_mmap_end(unsigned long addr);
+unsigned long arch_get_mmap_base(unsigned long addr);
+unsigned long arch_get_mmap_base_topdown(unsigned long addr);
 
 extern phys_addr_t arm64_dma_phys_limit;
 #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
