@@ -373,6 +373,30 @@ static void intel_mst_disable_dp(struct intel_atomic_state *state,
 					  old_crtc_state, old_conn_state);
 }
 
+static void intel_mst_config_fec(struct intel_encoder *encoder,
+				 const struct intel_crtc_state *crtc_state)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+
+	if (DISPLAY_VER(i915) >= 12 && crtc_state->fec_enable &&
+	    intel_dp->dpcd[DP_DPCD_REV] == DP_DPCD_REV_14)
+		intel_de_rmw(i915, CHICKEN_TRANS(crtc_state->cpu_transcoder),
+			     0, PREVENT_FEC_STALL_SIGNALING);
+}
+
+static void intel_mst_unconfig_fec(struct intel_encoder *encoder,
+				   const struct intel_crtc_state *crtc_state)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+
+	if (DISPLAY_VER(i915) >= 12 && crtc_state->fec_enable &&
+	    intel_dp->dpcd[DP_DPCD_REV] == DP_DPCD_REV_14)
+		intel_de_rmw(i915, CHICKEN_TRANS(crtc_state->cpu_transcoder),
+			     PREVENT_FEC_STALL_SIGNALING, 0);
+}
+
 static void intel_mst_post_disable_dp(struct intel_atomic_state *state,
 				      struct intel_encoder *encoder,
 				      const struct intel_crtc_state *old_crtc_state,
@@ -396,6 +420,8 @@ static void intel_mst_post_disable_dp(struct intel_atomic_state *state,
 	intel_crtc_vblank_off(old_crtc_state);
 
 	intel_disable_pipe(old_crtc_state);
+
+	intel_mst_unconfig_fec(encoder, old_crtc_state);
 
 	drm_dp_update_payload_part2(&intel_dp->mst_mgr);
 
@@ -559,6 +585,8 @@ static void intel_mst_enable_dp(struct intel_atomic_state *state,
 	wait_for_act_sent(encoder, pipe_config);
 
 	drm_dp_update_payload_part2(&intel_dp->mst_mgr);
+
+	intel_mst_config_fec(encoder, pipe_config);
 
 	intel_enable_pipe(pipe_config);
 
