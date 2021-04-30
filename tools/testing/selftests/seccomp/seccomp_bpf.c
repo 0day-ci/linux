@@ -235,6 +235,11 @@ struct seccomp_notif_addfd {
 };
 #endif
 
+#ifndef SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE
+/* Set flag to prevent non-fatal signal preemption */
+#define SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE	SECCOMP_IOW(4, __u64)
+#endif
+
 struct seccomp_notif_addfd_small {
 	__u64 id;
 	char weird[4];
@@ -4134,6 +4139,153 @@ TEST(user_notification_addfd_rlimit)
 
 	close(memfd);
 }
+
+/* Parses /proc/$PID/status, and stores the state and shdpnd */
+static void parse_status(pid_t pid, char *state, long long *shdpnd)
+{
+	char *line = NULL;
+	char proc_path[100] = {0};
+	size_t len = 0;
+	FILE *f;
+
+	snprintf(proc_path, sizeof(proc_path), "/proc/%d/status", pid);
+	f = fopen(proc_path, "r");
+	if (f == NULL)
+		ksft_exit_fail_msg("%s - Could not open %s\n",
+				   strerror(errno), proc_path);
+
+	while (getline(&line, &len, f) != -1) {
+		if (strstr(line, "State")) {
+			if (sscanf(line, "State:\t%c", state) != 1)
+				ksft_exit_fail_msg("Couldn't parse state %s\n",
+						   line);
+		}
+
+		if (strstr(line, "ShdPnd")) {
+			if (sscanf(line, "ShdPnd:\t%llx", shdpnd) != 1)
+				ksft_exit_fail_msg("Couldn't parse shdpnd %s\n",
+						   line);
+		}
+	}
+
+	free(line);
+	fclose(f);
+}
+
+TEST(user_notification_signal_wait_killable)
+{
+	struct seccomp_notif_resp resp = {};
+	struct seccomp_notif req = {};
+	int status, listener;
+	long long sigpnd;
+	char state;
+	pid_t pid;
+	long ret;
+
+	ret = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+	ASSERT_EQ(0, ret) {
+		TH_LOG("Kernel does not support PR_SET_NO_NEW_PRIVS!");
+	}
+
+	listener = user_notif_syscall(__NR_gettid,
+				      SECCOMP_FILTER_FLAG_NEW_LISTENER);
+	ASSERT_GE(listener, 0);
+
+	pid = fork();
+	ASSERT_GE(pid, 0);
+
+	if (pid == 0) {
+		sigset_t mask;
+
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGUSR1);
+
+		EXPECT_EQ(sigprocmask(SIG_BLOCK, &mask, NULL), 0);
+
+		/* Check once for wait_killable */
+		if (syscall(__NR_gettid) != 42)
+			exit(1);
+
+		EXPECT_EQ(SIGUSR1, sigwaitinfo(&mask, NULL));
+
+		exit(42);
+	}
+
+	ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+
+	/* Wait interruptible should be in sleep */
+	parse_status(pid, &state, &sigpnd);
+	ASSERT_EQ(state, 'S');
+
+	ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE, &req.id), 0);
+	EXPECT_EQ(kill(pid, SIGUSR1), 0);
+
+	/* Check for transition to "disk sleep" -- async (or timeout) */
+	do {
+		usleep(100);
+		parse_status(pid, &state, &sigpnd);
+	} while (state != 'D');
+	EXPECT_EQ(sigpnd, (1 << (SIGUSR1 - 1)));
+
+	/* Make sure idempotency is handled correctly */
+	EXPECT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE, &req.id), -1);
+	EXPECT_EQ(errno, EALREADY);
+
+	resp.id = req.id;
+	resp.error = 0;
+	resp.val = 42;
+
+	EXPECT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_SEND, &resp), 0);
+
+	EXPECT_EQ(waitpid(pid, &status, 0), pid);
+	EXPECT_EQ(true, WIFEXITED(status));
+	EXPECT_EQ(42, WEXITSTATUS(status));
+}
+
+
+TEST(user_notification_signal_wait_killable_kill)
+{
+	struct seccomp_notif req = {};
+	int status, listener;
+	long long sigpnd;
+	char state;
+	pid_t pid;
+	long ret;
+
+	ret = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+	ASSERT_EQ(0, ret) {
+		TH_LOG("Kernel does not support PR_SET_NO_NEW_PRIVS!");
+	}
+
+	listener = user_notif_syscall(__NR_gettid,
+				      SECCOMP_FILTER_FLAG_NEW_LISTENER);
+	ASSERT_GE(listener, 0);
+
+	pid = fork();
+	ASSERT_GE(pid, 0);
+
+	if (pid == 0) {
+		syscall(__NR_gettid);
+		exit(1);
+	}
+
+	ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_RECV, &req), 0);
+	ASSERT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_SET_WAIT_KILLABLE, &req.id), 0);
+	do {
+		usleep(100);
+		parse_status(pid, &state, &sigpnd);
+	} while (state != 'D');
+
+	EXPECT_EQ(kill(pid, SIGKILL), 0);
+
+	EXPECT_EQ(waitpid(pid, &status, 0), pid);
+	EXPECT_EQ(true, WIFSIGNALED(status));
+	EXPECT_EQ(9, WTERMSIG(status));
+
+	/* Make sure the notification is invalidated properly */
+	EXPECT_EQ(ioctl(listener, SECCOMP_IOCTL_NOTIF_ID_VALID, &req.id), -1);
+}
+
 
 /*
  * TODO:
