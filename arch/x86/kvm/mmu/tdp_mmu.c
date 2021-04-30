@@ -905,8 +905,11 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu, int write,
 					  kvm_pfn_t pfn, bool prefault)
 {
 	u64 new_spte;
-	int ret = 0;
+	int ret = RET_PF_FIXED;
 	int make_spte_ret = 0;
+
+	if (is_removed_spte(iter->old_spte))
+		return RET_PF_RETRY;
 
 	if (unlikely(is_noslot_pfn(pfn)))
 		new_spte = make_mmio_spte(vcpu, iter->gfn, ACC_ALL);
@@ -916,10 +919,9 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu, int write,
 					 map_writable, !shadow_accessed_mask,
 					 &new_spte);
 
-	if (new_spte == iter->old_spte)
-		ret = RET_PF_SPURIOUS;
-	else if (!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
-		return RET_PF_RETRY;
+	if (new_spte == iter->old_spte ||
+			!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
+		return RET_PF_SPURIOUS;
 
 	/*
 	 * If the page fault was caused by a write but the page is write
