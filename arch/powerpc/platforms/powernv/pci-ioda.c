@@ -2225,29 +2225,6 @@ static int __pnv_pci_ioda_msi_setup(struct pnv_phb *phb, struct pci_dev *dev,
 	return 0;
 }
 
-static int pnv_pci_ioda_msi_setup(struct pnv_phb *phb, struct pci_dev *dev,
-				  unsigned int hwirq, unsigned int virq,
-				  unsigned int is_64, struct msi_msg *msg)
-{
-	struct pnv_ioda_pe *pe = pnv_ioda_get_pe(dev);
-	unsigned int xive_num = hwirq - phb->msi_base;
-	int rc;
-
-	rc = __pnv_pci_ioda_msi_setup(phb, dev, xive_num, is_64, msg);
-	if (rc)
-		return rc;
-
-	/* P8 only */
-	pnv_set_msi_irq_chip(phb, virq);
-
-	pr_devel("%s: %s-bit MSI on hwirq %x (xive #%d),"
-		 " address=%x_%08x data=%x PE# %x\n",
-		 pci_name(dev), is_64 ? "64" : "32", hwirq, xive_num,
-		 msg->address_hi, msg->address_lo, msg->data, pe->pe_number);
-
-	return 0;
-}
-
 /*
  * The msi_free() op is called before irq_domain_free_irqs_top() when
  * the handler data is still available. Use that to clear the XIVE
@@ -2472,8 +2449,6 @@ static void pnv_pci_init_ioda_msis(struct pnv_phb *phb)
 		return;
 	}
 
-	phb->msi_setup = pnv_pci_ioda_msi_setup;
-	phb->msi32_support = 1;
 	pr_info("  Allocated bitmap for %d MSIs (base IRQ 0x%x)\n",
 		count, phb->msi_base);
 
@@ -3091,8 +3066,6 @@ static const struct pci_controller_ops pnv_pci_ioda_controller_ops = {
 	.dma_dev_setup		= pnv_pci_ioda_dma_dev_setup,
 	.dma_bus_setup		= pnv_pci_ioda_dma_bus_setup,
 	.iommu_bypass_supported	= pnv_pci_ioda_iommu_bypass_supported,
-	.setup_msi_irqs		= pnv_setup_msi_irqs,
-	.teardown_msi_irqs	= pnv_teardown_msi_irqs,
 	.enable_device_hook	= pnv_pci_enable_device_hook,
 	.release_device		= pnv_pci_release_device,
 	.window_alignment	= pnv_pci_window_alignment,
@@ -3102,8 +3075,6 @@ static const struct pci_controller_ops pnv_pci_ioda_controller_ops = {
 };
 
 static const struct pci_controller_ops pnv_npu_ioda_controller_ops = {
-	.setup_msi_irqs		= pnv_setup_msi_irqs,
-	.teardown_msi_irqs	= pnv_teardown_msi_irqs,
 	.enable_device_hook	= pnv_pci_enable_device_hook,
 	.window_alignment	= pnv_pci_window_alignment,
 	.reset_secondary_bus	= pnv_pci_reset_secondary_bus,
