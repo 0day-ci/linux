@@ -87,6 +87,11 @@ static const struct fb_ops omap_fb_ops = {
 	.fb_imageblit = drm_fb_helper_sys_imageblit,
 };
 
+static struct fb_deferred_io omap_fb_defio = {
+	.delay		= HZ / 20,
+	.deferred_io	= drm_fb_helper_deferred_io,
+};
+
 static int omap_fbdev_create(struct drm_fb_helper *helper,
 		struct drm_fb_helper_surface_size *sizes)
 {
@@ -175,6 +180,9 @@ static int omap_fbdev_create(struct drm_fb_helper *helper,
 	fbi->fbops = &omap_fb_ops;
 
 	drm_fb_helper_fill_info(fbi, helper, sizes);
+
+	fbi->fbdefio = &omap_fb_defio;
+	fb_deferred_io_init(fbi);
 
 	dev->mode_config.fb_base = dma_addr;
 
