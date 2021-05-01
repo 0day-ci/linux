@@ -450,7 +450,7 @@ static int ltk050h3146w_unprepare(struct drm_panel *panel)
 		return ret;
 	}
 
-	mipi_dsi_dcs_enter_sleep_mode(dsi);
+	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
 	if (ret < 0) {
 		dev_err(ctx->dev, "failed to enter sleep mode: %d\n", ret);
 		return ret;
