@@ -17678,6 +17678,12 @@ T:	git git://github.com/czankel/xtensa-linux.git
 F:	arch/xtensa/
 F:	drivers/irqchip/irq-xtensa-*
 
+TEXAS INSTRUMENTS ADS7142 ADC DRIVER
+M:	Jozsef Horvath <info@ministro.hu>
+S:	Maintained
+F:	Documentation/devicetree/bindings/iio/adc/ti,ads7142.yaml
+F:	drivers/iio/adc/ti-ads7142.c
+
 TEXAS INSTRUMENTS ASoC DRIVERS
 M:	Peter Ujfalusi <peter.ujfalusi@gmail.com>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)

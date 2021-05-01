@@ -1111,6 +1111,16 @@ config TI_ADS1015
 	  This driver can also be built as a module. If so, the module will be
 	  called ti-ads1015.
 
+config TI_ADS7142
+	tristate "Texas Instruments ADS7142 ADC driver"
+	depends on I2C
+	help
+	  This driver is for Texas Instruments ADS7142 Nanopower, Dual-Channel, Programmable Sensor Monitor.
+	  Say 'Y' here if you wish to use it.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ti-ads7142.
+
 config TI_ADS7950
 	tristate "Texas Instruments ADS7950 ADC driver"
 	depends on SPI && GPIOLIB
