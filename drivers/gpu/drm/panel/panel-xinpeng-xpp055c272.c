@@ -151,7 +151,7 @@ static int xpp055c272_unprepare(struct drm_panel *panel)
 	if (ret < 0)
 		dev_err(ctx->dev, "failed to set display off: %d\n", ret);
 
-	mipi_dsi_dcs_enter_sleep_mode(dsi);
+	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
 	if (ret < 0) {
 		dev_err(ctx->dev, "failed to enter sleep mode: %d\n", ret);
 		return ret;
