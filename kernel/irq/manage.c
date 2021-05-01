@@ -456,6 +456,16 @@ int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
 	return ret;
 }
 
+/**
+ * 	irq_set_affinity_hint - set the hint for an irq
+ *	@irq:	Interrupt for which to set the hint
+ *	@m:	Mask to indicate which CPUs to suggest for the interrupt, use
+ *		NULL here to indicate to clear the value.
+ *
+ *	Use this function to recommend which CPU should handle the
+ *	interrupt to any userspace that uses /proc/irq/nn/smp_affinity_hint
+ *	in order to align interrupts. Pass NULL as the mask to clear the hint.
+ */
 int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 {
 	unsigned long flags;
@@ -465,9 +475,6 @@ int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 		return -EINVAL;
 	desc->affinity_hint = m;
 	irq_put_desc_unlock(desc, flags);
-	/* set the initial affinity to prevent every interrupt being on CPU0 */
-	if (m)
-		__irq_set_affinity(irq, m, false);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(irq_set_affinity_hint);
