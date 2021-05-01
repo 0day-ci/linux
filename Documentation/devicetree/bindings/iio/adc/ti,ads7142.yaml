@@ -1,0 +1,198 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/iio/adc/ti,ads7142.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Texas Instruments ADS7142 adc driver device tree bindings
+
+maintainers:
+  - József Horváth <info@ministro.hu>
+
+description: |
+  This document is for describing the required device tree parameters
+   for ads7142 adc driver.
+  The required parameters for proper operation are described below.
+
+  Datasheet: https://www.ti.com/lit/ds/symlink/ads7142.pdf
+
+  Operation modes supportedby the driver:
+    When the 'ti,monitoring-mode' property is not present
+      in the devicetree node definition, the driver initiates a single
+      conversion in the device for each read request
+      (/sys/bus/iio/devices/iio:deviceX/in_voltageY_raw).
+      This is a one-shot conversion, and it is called
+      "Manual Mode" in the datasheet.
+
+    When the 'ti,monitoring-mode' property is present
+      in the devicetree node definition, the driver configures
+      the device's digital window comparator and sets the device's
+      data buffer operation mode to pre alert data mode.
+      The driver reads the conversion result when the BUSY/RDY interrupt
+      fires, and keeps the value until the next BUSY/RDY interrupt
+      or the first read request
+      (/sys/bus/iio/devices/iio:deviceX/in_voltageY_raw).
+      The digital window comparator and hysteresis parameters
+      can be controlled by:
+        - the devicetree definition of channel node
+        - iio sysfs interfaces
+      This is event driven conversion, and is called
+      "Autonomous Mode with Pre Alert Data" in the datasheet.
+      This mode can be used to wake up the system with the ALERT pin,
+      in case when the monitored voltage level is out of the configured range.
+
+properties:
+  compatible:
+    const: ti,ads7142
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    description: |
+      The BUSY/PDY pin is used as interrupt line in autonomous monitoring mode.
+    maxItems: 1
+
+  vref-supply:
+    description: Regulator for the reference voltage
+
+  power-supply: true
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+  "#io-channel-cells":
+    const: 1
+
+  ti,osc-sel:
+    description: |
+      If present, the driver selects the high speed oscillator.
+      See chapter 7.3.5 Oscillator and Timing Control in datasheet.
+    type: boolean
+
+  ti,n-clk:
+    description: |
+      nCLK is number of clocks in one conversion cycle.
+      See chapter 7.3.5 Oscillator and Timing Control in datasheet.
+    $ref: /schemas/types.yaml#/definitions/uint32
+    maximum: 255
+    minimum: 0
+
+  ti,monitoring-mode:
+    description: |
+      If present, the driver selects the autonomous monitoring mode with pre alert data.
+      See chapter 7.4 Device Functional Modes in datasheet.
+    type: boolean
+
+patternProperties:
+  "^channel@[0-1]$":
+    $ref: "adc.yaml"
+    type: object
+    description: |
+      Represents the external channels which are connected to the ADC.
+    properties:
+      reg:
+        description: |
+          The channel number.
+        items:
+          minimum: 0
+          maximum: 1
+      "ti,threshold-falling":
+        description: The low threshold for channel
+        $ref: /schemas/types.yaml#/definitions/uint32
+        maximum: 4095
+        minimum: 0
+      "ti,threshold-rising":
+        description: The high threshold for channel
+        $ref: /schemas/types.yaml#/definitions/uint32
+        maximum: 4095
+        minimum: 0
+      "ti,hysteresis":
+        description: The hysteresis for both comparators for channel
+        $ref: /schemas/types.yaml#/definitions/uint32
+        maximum: 63
+        minimum: 0
+
+    required:
+      - reg
+
+    additionalProperties: false
+
+allOf:
+  - if:
+      required:
+        - ti,monitoring-mode
+    then:
+      required:
+        - interrupts
+
+required:
+  - compatible
+  - "#io-channel-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+      adc@18 {
+        compatible = "ti,ads7142";
+        reg = <0x18>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        #io-channel-cells = <1>;
+
+        vref-supply = <&vdd_3v3_reg>;
+        power-supply = <&vdd_1v8_reg>;
+
+        channel@0 {
+          reg = <0>;
+        };
+
+        channel@1 {
+          reg = <1>;
+        };
+      };
+    };
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+      adc@1f {
+        compatible = "ti,ads7142";
+        reg = <0x1f>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        #io-channel-cells = <1>;
+
+        vref-supply = <&vdd_3v3_reg>;
+        power-supply = <&vdd_1v8_reg>;
+
+        interrupt-parent = <&gpio>;
+        interrupts = <7 2>;
+
+        ti,monitoring-mode;
+
+        channel@0 {
+          reg = <0>;
+          ti,threshold-falling = <1000>;
+          ti,threshold-rising = <2000>;
+          ti,hysteresis = <20>;
+        };
+
+        channel@1 {
+          reg = <1>;
+          ti,threshold-falling = <100>;
+          ti,threshold-rising = <2500>;
+          ti,hysteresis = <0>;
+        };
+      };
+    };
+...
+
