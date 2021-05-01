@@ -145,7 +145,7 @@ static inline u32 sb_zone_number(int shift, int mirror)
 	case 2: zone = 1ULL << (BTRFS_SB_LOG_SECOND_SHIFT - shift); break;
 	default:
 		ASSERT((u32)mirror < 3);
-		break;
+		return 0;
 	}
 
 	ASSERT(zone <= U32_MAX);
