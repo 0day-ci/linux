@@ -167,12 +167,11 @@ static int pci_vpd_wait(struct pci_dev *dev)
 }
 
 static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
-			    void *arg)
+			    void *buf)
 {
 	struct pci_vpd *vpd = dev->vpd;
 	int ret;
 	loff_t end = pos + count;
-	u8 *buf = arg;
 
 	if (pos < 0)
 		return -EINVAL;
@@ -201,8 +200,8 @@ static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
 		goto out;
 
 	while (pos < end) {
+		unsigned int len, skip;
 		u32 val;
-		unsigned int i, skip;
 
 		ret = pci_user_write_config_word(dev, vpd->cap + PCI_VPD_ADDR,
 						 pos & ~3);
@@ -219,14 +218,19 @@ static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
 			break;
 
 		skip = pos & 3;
-		for (i = 0;  i < sizeof(u32); i++) {
-			if (i >= skip) {
-				*buf++ = val;
-				if (++pos == end)
-					break;
-			}
-			val >>= 8;
+		len = min_t(unsigned int, 4 - skip, end - pos);
+
+		if (len == 4)  {
+			put_unaligned_le32(val, buf);
+		} else {
+			u8 tmpbuf[4];
+
+			put_unaligned_le32(val, tmpbuf);
+			memcpy(buf, tmpbuf + skip, len);
 		}
+
+		buf += len;
+		pos += len;
 	}
 out:
 	mutex_unlock(&vpd->lock);
