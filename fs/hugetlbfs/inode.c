@@ -131,9 +131,14 @@ static void huge_pagevec_release(struct pagevec *pvec)
 static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file_inode(file);
+	struct hugetlbfs_inode_info *info = HUGETLBFS_I(inode);
 	loff_t len, vma_len;
 	int ret;
 	struct hstate *h = hstate_file(file);
+
+	ret = seal_check_future_write(info->seals, vma);
+	if (ret)
+		return ret;
 
 	/*
 	 * vma address alignment (but not the pgoff alignment) has
