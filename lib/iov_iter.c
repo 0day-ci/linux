@@ -1921,7 +1921,7 @@ static int copy_compat_iovec_from_user(struct iovec *iov,
 		(const struct compat_iovec __user *)uvec;
 	int ret = -EFAULT, i;
 
-	if (!user_access_begin(uiov, nr_segs * sizeof(*uiov)))
+	if (!user_read_access_begin(uiov, nr_segs * sizeof(*uiov)))
 		return -EFAULT;
 
 	for (i = 0; i < nr_segs; i++) {
@@ -1942,7 +1942,7 @@ static int copy_compat_iovec_from_user(struct iovec *iov,
 
 	ret = 0;
 uaccess_end:
-	user_access_end();
+	user_read_access_end();
 	return ret;
 }
 
