@@ -20,8 +20,8 @@
 #include "ia_css_err.h"
 #include "sh_css_firmware.h"
 
-int
-ia_css_get_version(char *version, int max_size) {
+int ia_css_get_version(char *version, int max_size)
+{
 	char *css_version;
 
 	if (!IS_ISP2401)
