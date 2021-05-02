@@ -12,8 +12,14 @@
 #define ARC4_MAX_KEY_SIZE	256
 #define ARC4_BLOCK_SIZE		1
 
+#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+#define S_type	u8
+#else
+#define S_type	u32
+#endif
+
 struct arc4_ctx {
-	u32 S[256];
+	S_type S[256];
 	u32 x, y;
 };
 

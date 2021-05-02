@@ -21,7 +21,7 @@ int arc4_setkey(struct arc4_ctx *ctx, const u8 *in_key, unsigned int key_len)
 		ctx->S[i] = i;
 
 	for (i = 0; i < 256; i++) {
-		u32 a = ctx->S[i];
+		S_type a = ctx->S[i];
 
 		j = (j + in_key[k] + a) & 0xff;
 		ctx->S[i] = ctx->S[j];
@@ -36,9 +36,9 @@ EXPORT_SYMBOL(arc4_setkey);
 
 void arc4_crypt(struct arc4_ctx *ctx, u8 *out, const u8 *in, unsigned int len)
 {
-	u32 *const S = ctx->S;
-	u32 x, y, a, b;
-	u32 ty, ta, tb;
+	S_type *const S = ctx->S;
+	S_type a, b, ta, tb;
+	u32 x, y, ty;
 
 	if (len == 0)
 		return;
