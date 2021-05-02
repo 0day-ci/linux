@@ -1306,12 +1306,50 @@ struct hci_rp_read_data_block_size {
 } __packed;
 
 #define HCI_OP_READ_LOCAL_CODECS	0x100b
+struct hci_standard_codecs {
+	__u8	num;
+	__u8	codec[];
+} __packed;
+
+struct hci_vendor_codec {
+	__le16	company_id;
+	__le16	codec_id;
+} __packed;
+
+struct hci_vendor_codecs {
+	__u8	num;
+	struct hci_vendor_codec codec[];
+} __packed;
+
+struct hci_rp_read_local_supported_codecs {
+	__u8	status;
+	struct hci_standard_codecs std_codecs;
+	struct hci_vendor_codecs vendor_codecs;
+} __packed;
 
 #define HCI_OP_READ_LOCAL_PAIRING_OPTS	0x100c
 struct hci_rp_read_local_pairing_opts {
 	__u8     status;
 	__u8     pairing_opts;
 	__u8     max_key_size;
+} __packed;
+
+#define HCI_OP_READ_LOCAL_CODEC_CAPS	0x100e
+struct hci_op_read_local_codec_caps {
+	__u8	codec_id[5];
+	__u8	transport;
+	__u8	direction;
+} __packed;
+
+struct hci_codec_caps {
+	__u8	len;
+	__u8	caps[];
+} __packed;
+
+struct hci_rp_read_local_codec_caps {
+	__u8	status;
+	__u8	num_caps;
+	struct hci_codec_caps caps[];
 } __packed;
 
 #define HCI_OP_READ_PAGE_SCAN_ACTIVITY	0x0c1b
