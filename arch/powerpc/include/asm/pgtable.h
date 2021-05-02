@@ -39,6 +39,11 @@ struct mm_struct;
 #define __S110	PAGE_SHARED_X
 #define __S111	PAGE_SHARED_X
 
+#ifndef MODULES_VADDR
+#define MODULES_VADDR	VMALLOC_START
+#define MODULES_END	VMALLOC_END
+#endif
+
 #ifndef __ASSEMBLY__
 
 /* Keep these as a macros to avoid include dependency mess */
