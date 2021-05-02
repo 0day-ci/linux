@@ -1105,6 +1105,13 @@ config HID_WACOM
 	  To compile this driver as a module, choose M here: the
 	  module will be called wacom.
 
+config HID_WIIU_DRC
+	tristate "Nintendo Wii U gamepad over internal DRH"
+	depends on HID
+	help
+	  Support for the Wii U gamepad, when connected with the Wii U’s
+	  internal DRH chip.
+
 config HID_WIIMOTE
 	tristate "Nintendo Wii / Wii U peripherals"
 	depends on HID
