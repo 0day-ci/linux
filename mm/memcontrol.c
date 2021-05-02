@@ -2752,11 +2752,23 @@ int memcg_alloc_page_obj_cgroups(struct page *page, struct kmem_cache *s,
 	 */
 	objects = max(objs_per_slab_page(s, page),
 		      (int)(sizeof(struct rcu_head)/sizeof(void *)));
-
+retry:
 	vec = kcalloc_node(objects, sizeof(struct obj_cgroup *), gfp,
 			   page_to_nid(page));
 	if (!vec)
 		return -ENOMEM;
+
+	/*
+	 * The allocated vector should not come from the same slab.
+	 * Otherwise, this slab will never become empty. Double the size
+	 * in this case to make sure that the vector comes from a different
+	 * kmemcache.
+	 */
+	if (unlikely(virt_to_head_page(vec) == page)) {
+		kfree(vec);
+		objects *= 2;
+		goto retry;
+	}
 
 	memcg_data = (unsigned long) vec | MEMCG_DATA_OBJCGS;
 	if (new_page) {
