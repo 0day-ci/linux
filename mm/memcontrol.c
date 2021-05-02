@@ -2742,9 +2742,16 @@ retry:
 int memcg_alloc_page_obj_cgroups(struct page *page, struct kmem_cache *s,
 				 gfp_t gfp, bool new_page)
 {
-	unsigned int objects = objs_per_slab_page(s, page);
+	unsigned int objects;
 	unsigned long memcg_data;
 	void *vec;
+
+	/*
+	 * Since kfree_rcu() is used for freeing, we have to make
+	 * sure that the allocated buffer is big enough for rcu_head.
+	 */
+	objects = max(objs_per_slab_page(s, page),
+		      (int)(sizeof(struct rcu_head)/sizeof(void *)));
 
 	vec = kcalloc_node(objects, sizeof(struct obj_cgroup *), gfp,
 			   page_to_nid(page));

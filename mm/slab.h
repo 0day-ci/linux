@@ -245,8 +245,17 @@ int memcg_alloc_page_obj_cgroups(struct page *page, struct kmem_cache *s,
 
 static inline void memcg_free_page_obj_cgroups(struct page *page)
 {
-	kfree(page_objcgs(page));
+	struct {
+		struct rcu_head rcu;
+	} *objcgs = (void *)page_objcgs(page);
+
+	/*
+	 * We don't actually need to use rcu to protect objcg pointers.
+	 * kfree_rcu() is used here just to defer the actual freeing to avoid
+	 * a recursive kfree() loop which may lead to kernel stack overflow.
+	 */
 	page->memcg_data = 0;
+	kfree_rcu(objcgs, rcu);
 }
 
 static inline size_t obj_full_size(struct kmem_cache *s)
