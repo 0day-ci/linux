@@ -15,6 +15,8 @@
 #include <linux/device.h>
 #include <linux/hid.h>
 #include <linux/module.h>
+#include <linux/power_supply.h>
+#include <linux/spinlock.h>
 #include "hid-ids.h"
 
 #define DEVICE_NAME	"Nintendo Wii U gamepad"
@@ -69,6 +71,11 @@
 #define MAGNET_MIN	ACCEL_MIN
 #define MAGNET_MAX	ACCEL_MAX
 
+/* Battery constants */
+#define BATTERY_MIN	142
+#define BATTERY_MAX	178
+#define BATTERY_CAPACITY(val) ((val - BATTERY_MIN) * 100 / (BATTERY_MAX - BATTERY_MIN))
+
 /*
  * The device is setup with multiple input devices:
  * - A joypad with the buttons and sticks.
@@ -77,10 +84,17 @@
  */
 
 struct drc {
+	spinlock_t lock;
+
 	struct input_dev *joy_input_dev;
 	struct input_dev *touch_input_dev;
 	struct input_dev *accel_input_dev;
 	struct hid_device *hdev;
+	struct power_supply *battery;
+	struct power_supply_desc battery_desc;
+
+	u8 battery_energy;
+	int battery_status;
 };
 
 static int drc_raw_event(struct hid_device *hdev, struct hid_report *report,
@@ -89,6 +103,7 @@ static int drc_raw_event(struct hid_device *hdev, struct hid_report *report,
 	struct drc *drc = hid_get_drvdata(hdev);
 	int i, x, y, z, pressure, base;
 	u32 buttons;
+	unsigned long flags;
 
 	if (len != 128)
 		return 0;
@@ -206,6 +221,17 @@ static int drc_raw_event(struct hid_device *hdev, struct hid_report *report,
 	input_report_abs(drc->accel_input_dev, ABS_WHEEL, (int16_t)z);
 	input_sync(drc->accel_input_dev);
 
+	/* battery */
+	spin_lock_irqsave(&drc->lock, flags);
+	drc->battery_energy = data[5];
+	if (drc->battery_energy == BATTERY_MAX)
+		drc->battery_status = POWER_SUPPLY_STATUS_FULL;
+	else if ((data[4] & 0x40) != 0)
+		drc->battery_status = POWER_SUPPLY_STATUS_CHARGING;
+	else
+		drc->battery_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	spin_unlock_irqrestore(&drc->lock, flags);
+
 	/* let hidraw and hiddev handle the report */
 	return 0;
 }
@@ -309,10 +335,67 @@ static bool drc_setup_accel(struct drc *drc,
 	return true;
 }
 
+static enum power_supply_property drc_battery_props[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_SCOPE,
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_ENERGY_NOW,
+	POWER_SUPPLY_PROP_ENERGY_EMPTY,
+	POWER_SUPPLY_PROP_ENERGY_FULL,
+};
+
+static int drc_battery_get_property(struct power_supply *psy,
+				    enum power_supply_property psp,
+				    union power_supply_propval *val)
+{
+	struct drc *drc = power_supply_get_drvdata(psy);
+	unsigned long flags;
+	int ret = 0;
+	u8 battery_energy;
+	int battery_status;
+
+	spin_lock_irqsave(&drc->lock, flags);
+	battery_energy = drc->battery_energy;
+	battery_status = drc->battery_status;
+	spin_unlock_irqrestore(&drc->lock, flags);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = 1;
+		break;
+	case POWER_SUPPLY_PROP_SCOPE:
+		val->intval = POWER_SUPPLY_SCOPE_DEVICE;
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		val->intval = BATTERY_CAPACITY(battery_energy);
+		break;
+	case POWER_SUPPLY_PROP_STATUS:
+		val->intval = battery_status;
+		break;
+	case POWER_SUPPLY_PROP_ENERGY_NOW:
+		val->intval = battery_energy;
+		break;
+	case POWER_SUPPLY_PROP_ENERGY_EMPTY:
+		val->intval = BATTERY_MIN;
+		break;
+	case POWER_SUPPLY_PROP_ENERGY_FULL:
+		val->intval = BATTERY_MAX;
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
 static bool drc_setup_joypad(struct drc *drc,
 		struct hid_device *hdev)
 {
 	struct input_dev *input_dev;
+	struct power_supply_config psy_cfg = { .drv_data = drc, };
+	int ret;
+	static uint8_t drc_num = 0;
 
 	input_dev = allocate_and_setup(hdev, DEVICE_NAME " Joypad");
 	if (!input_dev)
@@ -349,6 +432,30 @@ static bool drc_setup_joypad(struct drc *drc,
 	input_set_abs_params(input_dev, ABS_VOLUME, VOLUME_MIN, VOLUME_MAX, 0, 0);
 
 	drc->joy_input_dev = input_dev;
+
+	drc->battery_desc.properties = drc_battery_props;
+	drc->battery_desc.num_properties = ARRAY_SIZE(drc_battery_props);
+	drc->battery_desc.get_property = drc_battery_get_property;
+	drc->battery_desc.type = POWER_SUPPLY_TYPE_BATTERY;
+	drc->battery_desc.use_for_apm = 0;
+
+	/*
+	 * TODO: It might be better to use the interface number as the drc_num,
+	 * but I don’t know how to fetch it from here.  In userland it is
+	 * /sys/devices/platform/latte/d140000.usb/usb3/3-1/3-1:1.?/bInterfaceNumber
+	 */
+	drc->battery_desc.name = devm_kasprintf(&hdev->dev, GFP_KERNEL, "wiiu-drc-%i-battery", drc_num++);
+	if (!drc->battery_desc.name)
+		return -ENOMEM;
+
+	drc->battery = devm_power_supply_register(&hdev->dev, &drc->battery_desc, &psy_cfg);
+	if (IS_ERR(drc->battery)) {
+		ret = PTR_ERR(drc->battery);
+		hid_err(hdev, "Unable to register battery device\n");
+		return ret;
+	}
+
+	power_supply_powers(drc->battery, &hdev->dev);
 
 	return true;
 }
