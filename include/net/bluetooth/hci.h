@@ -1334,6 +1334,34 @@ struct hci_rp_read_local_pairing_opts {
 	__u8     max_key_size;
 } __packed;
 
+#define HCI_OP_READ_LOCAL_CODECS_V2	0x100d
+struct hci_standard_codec_v2 {
+	__u8	codec_id;
+	__u8	transport;
+} __packed;
+
+struct hci_standard_codecs_v2 {
+	__u8	num;
+	struct hci_standard_codec_v2 codec[];
+} __packed;
+
+struct hci_vendor_codec_v2 {
+	__le16	company_id;
+	__le16	vendor_id;
+	__u8	transport;
+} __packed;
+
+struct hci_vendor_codecs_v2 {
+	__u8	num;
+	struct hci_vendor_codec_v2 codec[];
+} __packed;
+
+struct hci_rp_read_local_supported_codecs_v2 {
+	__u8	status;
+	struct hci_standard_codecs_v2 std_codecs;
+	struct hci_vendor_codecs_v2 vendor_codecs;
+} __packed;
+
 #define HCI_OP_READ_LOCAL_CODEC_CAPS	0x100e
 struct hci_op_read_local_codec_caps {
 	__u8	codec_id[5];
