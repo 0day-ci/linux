@@ -61,15 +61,25 @@
 #define TOUCH_BORDER_X	100
 #define TOUCH_BORDER_Y	200
 
+/* Accelerometer, gyroscope and magnetometer constants */
+#define ACCEL_MIN	-(1 << 15)
+#define ACCEL_MAX	((1 << 15) - 1)
+#define GYRO_MIN	-(1 << 23)
+#define GYRO_MAX	((1 << 23) - 1)
+#define MAGNET_MIN	ACCEL_MIN
+#define MAGNET_MAX	ACCEL_MAX
+
 /*
  * The device is setup with multiple input devices:
  * - A joypad with the buttons and sticks.
  * - The touch area which works as a touchscreen.
+ * - An accelerometer + gyroscope + magnetometer device.
  */
 
 struct drc {
 	struct input_dev *joy_input_dev;
 	struct input_dev *touch_input_dev;
+	struct input_dev *accel_input_dev;
 	struct hid_device *hdev;
 };
 
@@ -77,7 +87,7 @@ static int drc_raw_event(struct hid_device *hdev, struct hid_report *report,
 	 u8 *data, int len)
 {
 	struct drc *drc = hid_get_drvdata(hdev);
-	int i, x, y, pressure, base;
+	int i, x, y, z, pressure, base;
 	u32 buttons;
 
 	if (len != 128)
@@ -171,6 +181,31 @@ static int drc_raw_event(struct hid_device *hdev, struct hid_report *report,
 	}
 	input_sync(drc->touch_input_dev);
 
+	/* accelerometer */
+	x = (data[16] << 8) | data[15];
+	y = (data[18] << 8) | data[17];
+	z = (data[20] << 8) | data[19];
+	input_report_abs(drc->accel_input_dev, ABS_X, (int16_t)x);
+	input_report_abs(drc->accel_input_dev, ABS_Y, (int16_t)y);
+	input_report_abs(drc->accel_input_dev, ABS_Z, (int16_t)z);
+
+	/* gyroscope */
+	x = (data[23] << 24) | (data[22] << 16) | (data[21] << 8);
+	y = (data[26] << 24) | (data[25] << 16) | (data[24] << 8);
+	z = (data[29] << 24) | (data[28] << 16) | (data[27] << 8);
+	input_report_abs(drc->accel_input_dev, ABS_RX, x >> 8);
+	input_report_abs(drc->accel_input_dev, ABS_RY, y >> 8);
+	input_report_abs(drc->accel_input_dev, ABS_RZ, z >> 8);
+
+	/* magnetometer */
+	x = (data[31] << 8) | data[30];
+	y = (data[33] << 8) | data[32];
+	z = (data[35] << 8) | data[34];
+	input_report_abs(drc->accel_input_dev, ABS_THROTTLE, (int16_t)x);
+	input_report_abs(drc->accel_input_dev, ABS_RUDDER, (int16_t)y);
+	input_report_abs(drc->accel_input_dev, ABS_WHEEL, (int16_t)z);
+	input_sync(drc->accel_input_dev);
+
 	/* let hidraw and hiddev handle the report */
 	return 0;
 }
@@ -239,6 +274,41 @@ static bool drc_setup_touch(struct drc *drc,
 	return true;
 }
 
+static bool drc_setup_accel(struct drc *drc,
+		struct hid_device *hdev)
+{
+	struct input_dev *input_dev;
+
+	input_dev = allocate_and_setup(hdev, DEVICE_NAME " Accelerometer");
+	if (!input_dev)
+		return false;
+
+	input_dev->evbit[0] = BIT(EV_ABS);
+
+	/* 1G accel is reported as about -7600 */
+	input_set_abs_params(input_dev, ABS_X, ACCEL_MIN, ACCEL_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_Y, ACCEL_MIN, ACCEL_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_Z, ACCEL_MIN, ACCEL_MAX, 0, 0);
+
+	/* gyroscope */
+	input_set_abs_params(input_dev, ABS_RX, GYRO_MIN, GYRO_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_RY, GYRO_MIN, GYRO_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_RZ, GYRO_MIN, GYRO_MAX, 0, 0);
+
+	/* magnetometer */
+	/* TODO: Figure out which ABS_* would make more sense to expose, or
+	 * maybe go for the iio subsystem? */
+	input_set_abs_params(input_dev, ABS_THROTTLE, MAGNET_MIN, MAGNET_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_RUDDER, MAGNET_MIN, MAGNET_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_WHEEL, MAGNET_MIN, MAGNET_MAX, 0, 0);
+
+	set_bit(INPUT_PROP_ACCELEROMETER, input_dev->propbit);
+
+	drc->accel_input_dev = input_dev;
+
+	return true;
+}
+
 static bool drc_setup_joypad(struct drc *drc,
 		struct hid_device *hdev)
 {
@@ -303,13 +373,15 @@ static int drc_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	}
 
 	if (!drc_setup_joypad(drc, hdev) ||
-	    !drc_setup_touch(drc, hdev)) {
+	    !drc_setup_touch(drc, hdev) ||
+	    !drc_setup_accel(drc, hdev)) {
 		hid_err(hdev, "could not allocate interfaces\n");
 		return -ENOMEM;
 	}
 
 	ret = input_register_device(drc->joy_input_dev) ||
-		input_register_device(drc->touch_input_dev);
+		input_register_device(drc->touch_input_dev) ||
+		input_register_device(drc->accel_input_dev);
 	if (ret) {
 		hid_err(hdev, "failed to register interfaces\n");
 		return ret;
