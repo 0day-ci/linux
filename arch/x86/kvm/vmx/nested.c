@@ -6019,6 +6019,7 @@ static int vmx_get_nested_state(struct kvm_vcpu *vcpu,
 		.hdr.vmx.vmxon_pa = -1ull,
 		.hdr.vmx.vmcs12_pa = -1ull,
 		.hdr.vmx.preemption_timer_deadline = 0,
+		.hdr.vmx.evmcs_pa = -1ull,
 	};
 	struct kvm_vmx_nested_state_data __user *user_vmx_nested_state =
 		&user_kvm_nested_state->data.vmx[0];
@@ -6037,8 +6038,10 @@ static int vmx_get_nested_state(struct kvm_vcpu *vcpu,
 		if (vmx_has_valid_vmcs12(vcpu)) {
 			kvm_state.size += sizeof(user_vmx_nested_state->vmcs12);
 
-			if (vmx->nested.hv_evmcs)
+			if (vmx->nested.hv_evmcs) {
 				kvm_state.flags |= KVM_STATE_NESTED_EVMCS;
+				kvm_state.hdr.vmx.evmcs_pa = vmx->nested.hv_evmcs_vmptr;
+			}
 
 			if (is_guest_mode(vcpu) &&
 			    nested_cpu_has_shadow_vmcs(vmcs12) &&
@@ -6230,13 +6233,25 @@ static int vmx_set_nested_state(struct kvm_vcpu *vcpu,
 
 		set_current_vmptr(vmx, kvm_state->hdr.vmx.vmcs12_pa);
 	} else if (kvm_state->flags & KVM_STATE_NESTED_EVMCS) {
+		u64 evmcs_gpa = kvm_state->hdr.vmx.evmcs_pa;
+
 		/*
-		 * nested_vmx_handle_enlightened_vmptrld() cannot be called
-		 * directly from here as HV_X64_MSR_VP_ASSIST_PAGE may not be
-		 * restored yet. EVMCS will be mapped from
-		 * nested_get_vmcs12_pages().
+		 * EVMCS GPA == 0 most likely indicates that the migration data is
+		 * coming from an older KVM which doesn't support 'evmcs_pa' in
+		 * 'struct kvm_vmx_nested_state_hdr'.
 		 */
-		kvm_make_request(KVM_REQ_GET_NESTED_STATE_PAGES, vcpu);
+		if (evmcs_gpa && (evmcs_gpa != -1ull) &&
+		    (__nested_vmx_handle_enlightened_vmptrld(vcpu, evmcs_gpa, false) !=
+		     EVMPTRLD_SUCCEEDED)) {
+			return -EINVAL;
+		} else if (!evmcs_gpa) {
+			/*
+			 * EVMCS GPA can't be acquired from VP assist page here because
+			 * HV_X64_MSR_VP_ASSIST_PAGE may not be restored yet.
+			 * EVMCS will be mapped from nested_get_evmcs_page().
+			 */
+			kvm_make_request(KVM_REQ_GET_NESTED_STATE_PAGES, vcpu);
+		}
 	} else {
 		return -EINVAL;
 	}
