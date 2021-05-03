@@ -3,3 +3,16 @@ Date:		June 2021
 KernelVersion:	5.14
 Contact:	Russ Weight <russell.h.weight@intel.com>
 Description:	Name of low level fpga security manager driver.
+
+What: 		/sys/class/fpga_sec_mgr/fpga_secX/update/filename
+Date:		June 2021
+KernelVersion:	5.14
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Write only. Write the filename of an image
+		file to this sysfs file to initiate a secure
+		update. The file must have an appropriate header
+		which, among other things, identifies the target
+		for the update. This mechanism is used to update
+		BMC images, BMC firmware, Static Region images,
+		and Root Entry Hashes, and to cancel Code Signing
+		Keys (CSK).
