@@ -75,6 +75,10 @@ Optional properties (RDMA function blocks):
   mediatek,rdma-fifo-size of mt8183-rdma0 is 5K
   mediatek,rdma-fifo-size of mt8183-rdma1 is 2K
 
+Optional properties for display mutex:
+- mediatek,gce-events: GCE events used by clients. The event numbers are
+  defined in 'dt-bindings/gce/<chip>-gce.h'.
+
 Examples:
 
 mmsys: clock-controller@14000000 {
@@ -209,6 +213,8 @@ mutex: mutex@14020000 {
 	interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_LOW>;
 	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
 	clocks = <&mmsys CLK_MM_MUTEX_32K>;
+	mediatek,gce-events = <CMDQ_EVENT_MUTEX0_STREAM_EOF>,
+			      <CMDQ_EVENT_MUTEX1_STREAM_EOF>;
 };
 
 od@14023000 {
