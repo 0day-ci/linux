@@ -311,6 +311,7 @@
 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
 	pinctrl-names = "default";
 	hdmi-supply = <&vcc5v>;
+	power-domains = <&pwrc PWRC_GXBB_HDMI_ID>;
 	status = "okay";
 };
 

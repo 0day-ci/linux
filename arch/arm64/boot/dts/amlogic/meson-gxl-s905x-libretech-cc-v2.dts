@@ -224,6 +224,7 @@
 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
 	hdmi-supply = <&vcc5v>;
 	pinctrl-names = "default";
+	power-domains = <&pwrc PWRC_GXBB_HDMI_ID>;
 };
 
 &hdmi_tx_tmds_port {
