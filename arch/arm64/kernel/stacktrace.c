@@ -26,6 +26,9 @@ struct code_range {
 
 struct code_range	sym_code_ranges[] =
 {
+	/* unwindable ranges */
+	{ (unsigned long)return_to_handler, 0 },
+
 	/* non-unwindable ranges */
 	{ (unsigned long)__entry_text_start,
 	  (unsigned long)__entry_text_end },
@@ -47,6 +50,33 @@ struct code_range	sym_code_ranges[] =
 	  (unsigned long)__code_text_end },
 	{ /* sentinel */ }
 };
+
+void init_ranges(void)
+{
+	static char sym[KSYM_NAME_LEN];
+	static bool inited = false;
+	struct code_range *range;
+	unsigned long pc, size, offset;
+
+	if (inited)
+		return;
+
+	for (range = sym_code_ranges; range->start; range++) {
+		if (range->end)
+			continue;
+
+		pc = (unsigned long)range->start;
+		if (kallsyms_lookup(pc, &size, &offset, NULL, sym)) {
+			range->start = pc - offset;
+			range->end = range->start + size;
+		} else {
+			/* Range will only include one instruction */
+			range->start = pc;
+			range->end = pc + 4;
+		}
+	}
+	inited = true;
+}
 
 static struct code_range *lookup_range(unsigned long pc)
 {
@@ -149,19 +179,29 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
-		frame->pc == (unsigned long)return_to_handler) {
+		range->start == (unsigned long)return_to_handler) {
 		struct ftrace_ret_stack *ret_stack;
 		/*
-		 * This is a case where function graph tracer has
-		 * modified a return address (LR) in a stack frame
-		 * to hook a function return.
-		 * So replace it to an original value.
+		 * Either the function graph tracer has modified a return
+		 * address (LR) in a stack frame to the return trampoline.
+		 * Or, the return trampoline itself is executing upon the
+		 * return of a traced function. Lookup the original return
+		 * address and replace frame->pc with it.
+		 *
+		 * However, the return trampoline pops the original return
+		 * address off the return address stack at some point. So,
+		 * there is a small window towards the end of the return
+		 * trampoline where the lookup will fail. In that case,
+		 * mark the stack trace as unreliable and proceed.
 		 */
-		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
-		if (WARN_ON_ONCE(!ret_stack))
-			return -EINVAL;
-		frame->pc = ret_stack->ret;
-		frame->pc = ptrauth_strip_insn_pac(frame->pc);
+		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph);
+		if (!ret_stack || frame->fp != ret_stack->fp) {
+			frame->reliable = false;
+		} else {
+			frame->pc = ret_stack->ret;
+			frame->pc = ptrauth_strip_insn_pac(frame->pc);
+			frame->graph++;
+		}
 		return 0;
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
