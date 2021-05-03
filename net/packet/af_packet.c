@@ -93,20 +93,20 @@
 #include "internal.h"
 
 /*
-   Assumptions:
-   - If the device has no dev->header_ops->create, there is no LL header
-     visible above the device. In this case, its hard_header_len should be 0.
-     The device may prepend its own header internally. In this case, its
-     needed_headroom should be set to the space needed for it to add its
-     internal header.
-     For example, a WiFi driver pretending to be an Ethernet driver should
-     set its hard_header_len to be the Ethernet header length, and set its
-     needed_headroom to be (the real WiFi header length - the fake Ethernet
-     header length).
-   - packet socket receives packets with pulled ll header,
-     so that SOCK_RAW should push it back.
+ * Assumptions:
+ * - If the device has no dev->header_ops->create, there is no LL header
+ *   visible above the device. In this case, its hard_header_len should be 0.
+ *   The device may prepend its own header internally. In this case, its
+ *   needed_headroom should be set to the space needed for it to add its
+ *   internal header.
+ *   For example, a WiFi driver pretending to be an Ethernet driver should
+ *   set its hard_header_len to be the Ethernet header length, and set its
+ *   needed_headroom to be (the real WiFi header length - the fake Ethernet
+ *   header length).
+ * - packet socket receives packets with pulled ll header,
+ *   so that SOCK_RAW should push it back.
 
-On receive:
+ On receive:
 -----------
 
 Incoming, dev_has_header(dev) == true
@@ -781,6 +781,7 @@ static void prb_close_block(struct tpacket_kbdq_core *pkc1,
 		 * blocks. See prb_retire_rx_blk_timer_expired().
 		 */
 		struct timespec64 ts;
+
 		ktime_get_real_ts64(&ts);
 		h1->ts_last_pkt.ts_sec = ts.tv_sec;
 		h1->ts_last_pkt.ts_nsec	= ts.tv_nsec;
@@ -1075,6 +1076,7 @@ static void *packet_current_rx_frame(struct packet_sock *po,
 					    int status, unsigned int len)
 {
 	char *curr = NULL;
+
 	switch (po->tp_version) {
 	case TPACKET_V1:
 	case TPACKET_V2:
@@ -1106,6 +1108,7 @@ static void *prb_lookup_block(const struct packet_sock *po,
 static int prb_previous_blk_num(struct packet_ring_buffer *rb)
 {
 	unsigned int prev;
+
 	if (rb->prb_bdqc.kactive_blk_num)
 		prev = rb->prb_bdqc.kactive_blk_num-1;
 	else
@@ -1119,6 +1122,7 @@ static void *__prb_previous_block(struct packet_sock *po,
 					 int status)
 {
 	unsigned int previous = prb_previous_blk_num(rb);
+
 	return prb_lookup_block(po, rb, previous, status);
 }
 
@@ -1152,6 +1156,7 @@ static void *packet_previous_frame(struct packet_sock *po,
 		int status)
 {
 	unsigned int previous = rb->head ? rb->head - 1 : rb->frame_max;
+
 	return packet_lookup_frame(po, rb, previous, status);
 }
 
@@ -2115,6 +2120,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	if (skb_shared(skb)) {
 		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
+
 		if (nskb == NULL)
 			goto drop_n_acct;
 
@@ -2251,6 +2257,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 				  po->tp_reserve;
 	} else {
 		unsigned int maclen = skb_network_offset(skb);
+
 		netoff = TPACKET_ALIGN(po->tp_hdrlen +
 				       (maclen < 16 ? 16 : maclen)) +
 				       po->tp_reserve;
@@ -2844,9 +2851,9 @@ out:
 }
 
 static struct sk_buff *packet_alloc_skb(struct sock *sk, size_t prepad,
-				        size_t reserve, size_t len,
-				        size_t linear, int noblock,
-				        int *err)
+					size_t reserve, size_t len,
+					size_t linear, int noblock,
+					int *err)
 {
 	struct sk_buff *skb;
 
@@ -3698,6 +3705,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, sockptr_t optval,
 	{
 		struct packet_mreq_max mreq;
 		int len = optlen;
+
 		memset(&mreq, 0, sizeof(mreq));
 		if (len < sizeof(struct packet_mreq))
 			return -EINVAL;
@@ -4586,6 +4594,7 @@ static void *packet_seq_start(struct seq_file *seq, loff_t *pos)
 static void *packet_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct net *net = seq_file_net(seq);
+
 	return seq_hlist_next_rcu(v, &net->packet.sklist, pos);
 }
 
