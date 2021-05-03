@@ -110,6 +110,7 @@ MODULE_PARM_DESC(fan_debounce, "Enable debouncing for fan RPM signal");
 #define NCT6775_LD_ACPI		0x0a
 #define NCT6775_LD_HWM		0x0b
 #define NCT6775_LD_VID		0x0d
+#define NCT6775_LD_GPIO_DATA		0x08
 #define NCT6775_LD_12		0x12
 
 #define SIO_REG_LDSEL		0x07	/* Logical device select */
@@ -229,6 +230,7 @@ static const u16 NCT6775_REG_IN[] = {
 #define NCT6775_REG_FANDIV2		0x507
 
 #define NCT6775_REG_CR_FAN_DEBOUNCE	0xf0
+#define NCT6775_REG_CR_GPIO1_DATA	0xf1
 
 static const u16 NCT6775_REG_ALARM[NUM_REG_ALARM] = { 0x459, 0x45A, 0x45B };
 
@@ -1205,6 +1207,8 @@ struct nct6775_data {
 	u8 vrm;
 
 	bool have_vid;
+	bool have_hddsaver; /* True if hdd saver is supported */
+	bool hddsaver_status; /* True if enabled */
 
 	u16 have_temp;
 	u16 have_temp_fixed;
@@ -1983,6 +1987,48 @@ store_beep(struct device *dev, struct device_attribute *attr, const char *buf,
 		data->beeps &= ~(1ULL << nr);
 	nct6775_write_value(data, data->REG_BEEP[regindex],
 			    (data->beeps >> (regindex << 3)) & 0xff);
+	mutex_unlock(&data->update_lock);
+	return count;
+}
+
+static ssize_t
+show_hddsaver(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct nct6775_data *data = nct6775_update_device(dev);
+
+	return sprintf(buf, "%s\n", (data->hddsaver_status ? "On" : "Off"));
+}
+
+static ssize_t
+store_hddsaver(struct device *dev, struct device_attribute *attr, const char *buf,
+	       size_t count)
+{
+	struct nct6775_data *data = dev_get_drvdata(dev);
+	bool val;
+	int err, ret;
+	u8 tmp;
+
+	err = kstrtobool(buf, &val);
+	if (err == -EINVAL)
+		return -EINVAL;
+
+	mutex_lock(&data->update_lock);
+	ret = superio_enter(data->sioreg);
+	if (ret) {
+		count = ret;
+		goto error;
+	}
+
+	if (val != data->hddsaver_status) {
+		superio_select(data->sioreg, NCT6775_LD_GPIO_DATA); /* Logical Device 8 */
+		tmp = superio_inb(data->sioreg,
+				  NCT6775_REG_CR_GPIO1_DATA); /* GPIO1 date reg */
+		superio_outb(data->sioreg, NCT6775_REG_CR_GPIO1_DATA, tmp ^ (1<<0));
+		data->hddsaver_status = val;
+		pr_info("HDD Saver is %s\n", val ? "On" : "Off");
+	}
+	superio_exit(data->sioreg);
+error:
 	mutex_unlock(&data->update_lock);
 	return count;
 }
@@ -3455,6 +3501,8 @@ static SENSOR_DEVICE_ATTR(intrusion1_beep, S_IWUSR | S_IRUGO, show_beep,
 			  store_beep, INTRUSION_ALARM_BASE + 1);
 static SENSOR_DEVICE_ATTR(beep_enable, S_IWUSR | S_IRUGO, show_beep,
 			  store_beep, BEEP_ENABLE_BASE);
+static SENSOR_DEVICE_ATTR(hddsaver_enable, S_IWUSR | S_IRUGO, show_hddsaver,
+			  store_hddsaver, 0);
 
 static umode_t nct6775_other_is_visible(struct kobject *kobj,
 					struct attribute *attr, int index)
@@ -3475,6 +3523,9 @@ static umode_t nct6775_other_is_visible(struct kobject *kobj,
 			return 0;
 	}
 
+	if (index == 6 && !data->have_hddsaver)
+		return 0;
+
 	return attr->mode;
 }
 
@@ -3490,6 +3541,7 @@ static struct attribute *nct6775_attributes_other[] = {
 	&sensor_dev_attr_intrusion0_beep.dev_attr.attr,		/* 3 */
 	&sensor_dev_attr_intrusion1_beep.dev_attr.attr,		/* 4 */
 	&sensor_dev_attr_beep_enable.dev_attr.attr,		/* 5 */
+	&sensor_dev_attr_hddsaver_enable.dev_attr.attr,		/* 6 */
 
 	NULL
 };
@@ -3804,6 +3856,8 @@ static int nct6775_probe(struct platform_device *pdev)
 	struct attribute_group *group;
 	struct device *hwmon_dev;
 	int num_attr_groups = 0;
+
+	const char *board_vendor, *board_name;
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	if (!devm_request_region(&pdev->dev, res->start, IOREGION_LENGTH,
@@ -4502,6 +4556,9 @@ static int nct6775_probe(struct platform_device *pdev)
 	/* Initialize the chip */
 	nct6775_init_device(data);
 
+	board_vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	board_name = dmi_get_system_info(DMI_BOARD_NAME);
+
 	err = superio_enter(sio_data->sioreg);
 	if (err)
 		return err;
@@ -4518,6 +4575,15 @@ static int nct6775_probe(struct platform_device *pdev)
 	case nct6116:
 	case nct6779:
 	case nct6791:
+		if (board_name && board_vendor &&
+		    !strcmp(board_vendor, "ASRock")) {
+            /* Z97 Extreme6 should also work (the same GPIO10 pin is used) */
+            /* but it needs testing!!! */
+			if (!strcmp(board_name, "Z97 Extreme4") || !strcmp(board_name, "Z97 Extreme6")) {
+                data->have_hddsaver = (cr2a & (1<<6));
+            }
+        }
+        break;
 	case nct6792:
 	case nct6793:
 	case nct6795:
@@ -4525,6 +4591,20 @@ static int nct6775_probe(struct platform_device *pdev)
 	case nct6797:
 	case nct6798:
 		break;
+	}
+
+	if (data->have_hddsaver) {
+		u8 tmp;
+
+		pr_notice("HDD Saver found\n");
+		superio_select(sio_data->sioreg, NCT6775_LD_GPIO_DATA); /* Logical Device 8 */
+		tmp = superio_inb(sio_data->sioreg, NCT6775_REG_CR_GPIO1_DATA); /* GPIO1 date reg */
+		data->hddsaver_status = tmp & (1<<0); /* check bit0 */
+		if (data->hddsaver_status) {
+			pr_warn("HDD Saver is disabled\n");
+		} else {
+			pr_warn("HDD Saver is enabled\n");
+		}
 	}
 
 	/*
