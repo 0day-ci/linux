@@ -611,4 +611,15 @@ config PWM_VT8500
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-vt8500.
 
+config PWM_XILINX
+	tristate "Xilinx AXI Timer PWM support"
+	depends on !MICROBLAZE
+	help
+	  PWM framework driver for Xilinx LogiCORE IP AXI Timers. This
+	  timer is typically a soft core which may be present in Xilinx
+	  FPGAs. If you don't have this IP in your design, choose N.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-xilinx.
+
 endif
