@@ -154,6 +154,10 @@ static struct meson_ee_pwrc_mem_domain gxbb_pwrc_mem_vpu[] = {
 	VPU_HHI_MEMPD(HHI_MEM_PD_REG0),
 };
 
+static struct meson_ee_pwrc_mem_domain meson_pwrc_mem_hdmi[] = {
+	{ HHI_MEM_PD_REG0, GENMASK(15, 8) },
+};
+
 static struct meson_ee_pwrc_mem_domain meson_pwrc_mem_audio[] = {
 	{ HHI_MEM_PD_REG0, GENMASK(5, 4) },
 };
@@ -256,6 +260,7 @@ static struct meson_ee_pwrc_domain_desc axg_pwrc_domains[] = {
 static struct meson_ee_pwrc_domain_desc g12a_pwrc_domains[] = {
 	[PWRC_G12A_VPU_ID]  = VPU_PD("VPU", &gx_pwrc_vpu, g12a_pwrc_mem_vpu,
 				     pwrc_ee_get_power, 11, 2),
+	[PWRC_G12A_HDMI_ID] = MEM_PD("HDMI", meson_pwrc_mem_hdmi),
 	[PWRC_G12A_AUDIO_ID] = MEM_PD("AUDIO", meson_pwrc_mem_audio),
 	[PWRC_G12A_ETH_ID] = MEM_PD("ETH", meson_pwrc_mem_eth),
 };
