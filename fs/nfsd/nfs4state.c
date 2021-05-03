@@ -2335,8 +2335,14 @@ static struct nfs4_client *get_nfsdfs_clp(struct inode *inode)
 
 static void seq_quote_mem(struct seq_file *m, char *data, int len)
 {
+	char *buf;
+	size_t size = seq_get_buf(m, &buf);
+	const char *only = "\"\\";
+	int ret;
+
 	seq_printf(m, "\"");
-	seq_escape_mem_ascii(m, data, len);
+	ret = string_escape_mem(data, len, buf, size, ESCAPE_HEX | ESCAPE_APPEND, only);
+	seq_commit(m, ret < size ? ret : -1);
 	seq_printf(m, "\"");
 }
 
