@@ -156,7 +156,8 @@ static bool match_validate(const struct sw_flow_match *match,
 	u64 mask_allowed = key_attrs;  /* At most allow all key attributes */
 
 	/* The following mask attributes allowed only if they
-	 * pass the validation tests. */
+	 * pass the validation tests.
+	 */
 	mask_allowed &= ~((1 << OVS_KEY_ATTR_IPV4)
 			| (1 << OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV4)
 			| (1 << OVS_KEY_ATTR_IPV6)
@@ -2019,6 +2020,7 @@ static int __ovs_nla_put_key(const struct sw_flow_key *swkey,
 				goto nla_put_failure;
 	} else {
 		u16 upper_u16;
+
 		upper_u16 = !is_mask ? 0 : 0xffff;
 
 		if (nla_put_u32(skb, OVS_KEY_ATTR_IN_PORT,
@@ -2060,11 +2062,11 @@ static int __ovs_nla_put_key(const struct sw_flow_key *swkey,
 
 		if (swkey->eth.type == htons(ETH_P_802_2)) {
 			/*
-			* Ethertype 802.2 is represented in the netlink with omitted
-			* OVS_KEY_ATTR_ETHERTYPE in the flow key attribute, and
-			* 0xffff in the mask attribute.  Ethertype can also
-			* be wildcarded.
-			*/
+			 * Ethertype 802.2 is represented in the netlink with omitted
+			 * OVS_KEY_ATTR_ETHERTYPE in the flow key attribute, and
+			 * 0xffff in the mask attribute.  Ethertype can also
+			 * be wildcarded.
+			 */
 			if (is_mask && output->eth.type)
 				if (nla_put_be16(skb, OVS_KEY_ATTR_ETHERTYPE,
 							output->eth.type))
@@ -2329,7 +2331,8 @@ static void __ovs_nla_free_flow_actions(struct rcu_head *head)
 }
 
 /* Schedules 'sf_acts' to be freed after the next RCU grace period.
- * The caller must hold rcu_read_lock for this to be sensible. */
+ * The caller must hold rcu_read_lock for this to be sensible.
+ */
 void ovs_nla_free_flow_actions_rcu(struct sw_flow_actions *sf_acts)
 {
 	call_rcu(&sf_acts->rcu, __ovs_nla_free_flow_actions);
@@ -2446,6 +2449,7 @@ static int validate_and_copy_sample(struct net *net, const struct nlattr *attr,
 	memset(attrs, 0, sizeof(attrs));
 	nla_for_each_nested(a, attr, rem) {
 		int type = nla_type(a);
+
 		if (!type || type > OVS_SAMPLE_ATTR_MAX || attrs[type])
 			return -EINVAL;
 		attrs[type] = a;
@@ -3184,13 +3188,14 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 
 		case OVS_ACTION_ATTR_POP_MPLS: {
 			__be16  proto;
+
 			if (vlan_tci & htons(VLAN_CFI_MASK) ||
 			    !eth_p_mpls(eth_type))
 				return -EINVAL;
 
 			/* Disallow subsequent L2.5+ set actions and mpls_pop
 			 * actions once the last MPLS label in the packet is
-			 * is popped as there is no check here to ensure that
+			 * popped as there is no check here to ensure that
 			 * the new eth type is valid and thus set actions could
 			 * write off the end of the packet or otherwise corrupt
 			 * it.
@@ -3255,7 +3260,8 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 
 		case OVS_ACTION_ATTR_PUSH_ETH:
 			/* Disallow pushing an Ethernet header if one
-			 * is already present */
+			 * is already present
+			 */
 			if (mac_proto != MAC_PROTO_NONE)
 				return -EINVAL;
 			mac_proto = MAC_PROTO_ETHERNET;
