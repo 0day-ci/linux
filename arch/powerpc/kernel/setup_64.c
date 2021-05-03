@@ -939,15 +939,17 @@ u64 hw_nmi_get_sample_period(int watchdog_thresh)
  * disable it by default. Book3S has a soft-nmi hardlockup detector based
  * on the decrementer interrupt, so it does not suffer from this problem.
  *
- * It is likely to get false positives in VM guests, so disable it there
- * by default too.
+ * It is likely to get false positives in KVM guests, so disable it there
+ * by default too. PowerVM will not stop or arbitrarily oversubscribe
+ * CPUs, but give a minimum regular allotment even with SPLPAR, so enable
+ * the detector for non-KVM guests, assume PowerVM.
  */
 static int __init disable_hardlockup_detector(void)
 {
 #ifdef CONFIG_HARDLOCKUP_DETECTOR_PERF
 	hardlockup_detector_disable();
 #else
-	if (firmware_has_feature(FW_FEATURE_LPAR))
+	if (is_kvm_guest())
 		hardlockup_detector_disable();
 #endif
 
