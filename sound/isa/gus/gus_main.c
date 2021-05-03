@@ -75,10 +75,11 @@ static const struct snd_kcontrol_new snd_gus_joystick_control = {
 	.put = snd_gus_joystick_put
 };
 
-static void snd_gus_init_control(struct snd_gus_card *gus)
+static int snd_gus_init_control(struct snd_gus_card *gus)
 {
 	if (!gus->ace_flag)
-		snd_ctl_add(gus->card, snd_ctl_new1(&snd_gus_joystick_control, gus));
+		return snd_ctl_add(gus->card, snd_ctl_new1(&snd_gus_joystick_control, gus));
+	return 0;
 }
 
 /*
@@ -386,8 +387,7 @@ static int snd_gus_check_version(struct snd_gus_card * gus)
 	}
 	strcpy(card->shortname, card->longname);
 	gus->uart_enable = 1;	/* standard GUSes doesn't have midi uart trouble */
-	snd_gus_init_control(gus);
-	return 0;
+	return snd_gus_init_control(gus);
 }
 
 int snd_gus_initialize(struct snd_gus_card *gus)
