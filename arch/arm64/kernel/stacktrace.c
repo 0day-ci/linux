@@ -15,8 +15,47 @@
 
 #include <asm/irq.h>
 #include <asm/pointer_auth.h>
+#include <asm/sections.h>
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
+
+struct code_range {
+	unsigned long	start;
+	unsigned long	end;
+};
+
+struct code_range	sym_code_ranges[] =
+{
+	/* non-unwindable ranges */
+	{ (unsigned long)__entry_text_start,
+	  (unsigned long)__entry_text_end },
+	{ (unsigned long)__idmap_text_start,
+	  (unsigned long)__idmap_text_end },
+	{ (unsigned long)__hyp_idmap_text_start,
+	  (unsigned long)__hyp_idmap_text_end },
+	{ (unsigned long)__hyp_text_start,
+	  (unsigned long)__hyp_text_end },
+#ifdef CONFIG_HIBERNATION
+	{ (unsigned long)__hibernate_exit_text_start,
+	  (unsigned long)__hibernate_exit_text_end },
+#endif
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	{ (unsigned long)__entry_tramp_text_start,
+	  (unsigned long)__entry_tramp_text_end },
+#endif
+	{ /* sentinel */ }
+};
+
+static struct code_range *lookup_range(unsigned long pc)
+{
+	struct code_range *range;
+
+	for (range = sym_code_ranges; range->start; range++) {
+		if (pc >= range->start && pc < range->end)
+			return range;
+	}
+	return range;
+}
 
 /*
  * AArch64 PCS assigns the frame pointer to x29.
@@ -43,6 +82,7 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 {
 	unsigned long fp = frame->fp;
 	struct stack_info info;
+	struct code_range *range;
 
 	frame->reliable = true;
 
@@ -103,6 +143,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 		return 0;
 	}
 
+	range = lookup_range(frame->pc);
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
 		frame->pc == (unsigned long)return_to_handler) {
@@ -118,8 +160,20 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 			return -EINVAL;
 		frame->pc = ret_stack->ret;
 		frame->pc = ptrauth_strip_insn_pac(frame->pc);
+		return 0;
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+
+	if (!range->start)
+		return 0;
+
+	/*
+	 * The return PC falls in an unreliable function. If the final frame
+	 * has been reached, no more unwinding is needed. Otherwise, mark the
+	 * stack trace not reliable.
+	 */
+	if (frame->fp)
+		frame->reliable = false;
 
 	return 0;
 }
