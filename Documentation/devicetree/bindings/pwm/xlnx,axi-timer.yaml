@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/pwm/xlnx,axi-timer.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Xilinx LogiCORE IP AXI Timer Device Tree Binding
+
+maintainers:
+  - Sean Anderson <sean.anderson@seco.com>
+
+properties:
+  compatible:
+    items:
+      - const: xlnx,axi-timer-2.0
+      - const: xlnx,xps-timer-1.00.a
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    const: s_axi_aclk
+
+  reg:
+    maxItems: 1
+
+  xlnx,count-width:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 8
+    maximum: 32
+    description:
+      The width of the counters, in bits.
+
+  xlnx,gen0-assert:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 0, 1 ]
+    description:
+      The polarity of the generateout0 signal. 0 for active-low, 1 for active-high.
+
+  xlnx,gen1-assert:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 0, 1 ]
+    description:
+      The polarity of the generateout1 signal. 0 for active-low, 1 for active-high.
+
+  xlnx,one-timer-only:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 0, 1 ]
+    description:
+      Whether only one timer is present in this block.
+
+  xlnx,trig0-assert:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 0, 1 ]
+    description:
+      The polarity of the capturetrig0 signal. 0 for active-low, 1 for active-high.
+
+  xlnx,trig1-assert:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [ 0, 1 ]
+    description:
+      The polarity of the capturetrig1 signal. 0 for active-low, 1 for active-high.
+
+required:
+  - compatible
+  - clocks
+  - reg
+  - xlnx,count-width
+  - xlnx,gen0-assert
+  - xlnx,gen1-assert
+  - xlnx,one-timer-only
+  - xlnx,trig0-assert
+  - xlnx,trig1-assert
+
+additionalProperties: true
+
+examples:
+  - |
+    axi_timer_0: timer@800e0000 {
+        clock-frequency = <99999001>;
+        clock-names = "s_axi_aclk";
+        clocks = <&zynqmp_clk 71>;
+        compatible = "xlnx,axi-timer-2.0", "xlnx,xps-timer-1.00.a";
+        reg = <0x0 0x800e0000 0x0 0x10000>;
+        xlnx,count-width = <0x20>;
+        xlnx,gen0-assert = <0x1>;
+        xlnx,gen1-assert = <0x1>;
+        xlnx,one-timer-only = <0x0>;
+        xlnx,trig0-assert = <0x1>;
+        xlnx,trig1-assert = <0x1>;
+    };
