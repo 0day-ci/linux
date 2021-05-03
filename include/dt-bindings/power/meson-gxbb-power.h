@@ -9,5 +9,6 @@
 
 #define PWRC_GXBB_VPU_ID		0
 #define PWRC_GXBB_ETHERNET_MEM_ID	1
+#define PWRC_GXBB_HDMI_ID		2
 
 #endif
