@@ -103,6 +103,12 @@ jiffies = jiffies_64;
 #define TRAMP_TEXT
 #endif
 
+#define CODE_TEXT					\
+	. = ALIGN(SZ_4K);				\
+	__code_text_start = .;				\
+	*(.code.text)					\
+	__code_text_end = .;
+
 /*
  * The size of the PE/COFF section that covers the kernel image, which
  * runs from _stext to _edata, must be a round multiple of the PE/COFF
@@ -145,6 +151,7 @@ SECTIONS
 			SOFTIRQENTRY_TEXT
 			ENTRY_TEXT
 			TEXT_TEXT
+			CODE_TEXT
 			SCHED_TEXT
 			CPUIDLE_TEXT
 			LOCK_TEXT

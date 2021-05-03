@@ -8,6 +8,7 @@
 #include <asm/assembler.h>
 
 	.text
+	.pushsection ".code.text", "ax"
 
 	.macro	save_all_base_regs
 	stp x0, x1, [sp, #S_X0]
@@ -80,3 +81,4 @@ SYM_CODE_START(kretprobe_trampoline)
 	ret
 
 SYM_CODE_END(kretprobe_trampoline)
+	.popsection

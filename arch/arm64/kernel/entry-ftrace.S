@@ -12,7 +12,9 @@
 #include <asm/ftrace.h>
 #include <asm/insn.h>
 
+	.text
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	.pushsection ".code.text", "ax"
 /*
  * Due to -fpatchable-function-entry=2, the compiler has placed two NOPs before
  * the regular function prologue. For an enabled callsite, ftrace_init_nop() and
@@ -135,6 +137,7 @@ SYM_CODE_START(ftrace_graph_caller)
 	b	ftrace_common_return
 SYM_CODE_END(ftrace_graph_caller)
 #endif
+	.popsection
 
 #else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
 
@@ -315,6 +318,7 @@ SYM_FUNC_START(ftrace_stub)
 SYM_FUNC_END(ftrace_stub)
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+	.pushsection ".code.text", "ax"
 /*
  * void return_to_handler(void)
  *
@@ -342,4 +346,5 @@ SYM_CODE_START(return_to_handler)
 
 	ret
 SYM_CODE_END(return_to_handler)
+	.popsection
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */

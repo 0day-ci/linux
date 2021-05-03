@@ -402,6 +402,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 	.endm
 
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+	.pushsection ".code.text", "ax"
 	/*
 	 * Set the TTBR0 PAN bit in SPSR. When the exception is taken from
 	 * EL0, there is no need to check the state of TTBR0_EL1 since
@@ -442,6 +443,7 @@ SYM_CODE_START_LOCAL(__swpan_exit_el0)
 	 */
 	b	post_ttbr_update_workaround
 SYM_CODE_END(__swpan_exit_el0)
+	.popsection
 #endif
 
 	.macro	irq_stack_entry
@@ -950,6 +952,7 @@ SYM_FUNC_START(cpu_switch_to)
 SYM_FUNC_END(cpu_switch_to)
 NOKPROBE(cpu_switch_to)
 
+	.pushsection ".code.text", "ax"
 /*
  * This is how we return from a fork.
  */
@@ -962,6 +965,7 @@ SYM_CODE_START(ret_from_fork)
 	b	ret_to_user
 SYM_CODE_END(ret_from_fork)
 NOKPROBE(ret_from_fork)
+	.popsection
 
 #ifdef CONFIG_ARM_SDE_INTERFACE
 
@@ -1040,6 +1044,7 @@ SYM_DATA_END(__sdei_asm_trampoline_next_handler)
 #endif /* CONFIG_RANDOMIZE_BASE */
 #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
 
+	.pushsection ".code.text", "ax"
 /*
  * Software Delegated Exception entry point.
  *
@@ -1150,4 +1155,5 @@ alternative_else_nop_endif
 #endif
 SYM_CODE_END(__sdei_asm_handler)
 NOKPROBE(__sdei_asm_handler)
+	.popsection
 #endif /* CONFIG_ARM_SDE_INTERFACE */

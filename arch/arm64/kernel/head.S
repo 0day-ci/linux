@@ -75,7 +75,7 @@
 	__EFI_PE_HEADER
 
 	__INIT
-
+	.pushsection ".code.text", "ax"
 	/*
 	 * The following callee saved general purpose registers are used on the
 	 * primary lowlevel boot path:
@@ -120,6 +120,7 @@ SYM_CODE_START_LOCAL(preserve_boot_args)
 	mov	x1, #0x20			// 4 x 8 bytes
 	b	__inval_dcache_area		// tail call
 SYM_CODE_END(preserve_boot_args)
+	.popsection
 
 /*
  * Macro to create a table entry to the next page.

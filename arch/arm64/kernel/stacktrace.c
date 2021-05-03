@@ -43,6 +43,8 @@ struct code_range	sym_code_ranges[] =
 	{ (unsigned long)__entry_tramp_text_start,
 	  (unsigned long)__entry_tramp_text_end },
 #endif
+	{ (unsigned long)__code_text_start,
+	  (unsigned long)__code_text_end },
 	{ /* sentinel */ }
 };
 
