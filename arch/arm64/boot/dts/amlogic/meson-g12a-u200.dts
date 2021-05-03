@@ -208,6 +208,7 @@
 	pinctrl-0 = <&hdmitx_hpd_pins>, <&hdmitx_ddc_pins>;
 	pinctrl-names = "default";
 	hdmi-supply = <&vcc_5v>;
+	power-domains = <&pwrc PWRC_G12A_HDMI_ID>;
 };
 
 &hdmi_tx_tmds_port {
