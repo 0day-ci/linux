@@ -738,6 +738,7 @@ static int vmw_move(struct ttm_buffer_object *bo,
 
 	if (old_man->use_tt && new_man->use_tt) {
 		if (bo->mem.mem_type == TTM_PL_SYSTEM) {
+			ttm_resource_free(bo, &bo->mem);
 			ttm_bo_assign_mem(bo, new_mem);
 			return 0;
 		}
