@@ -1,0 +1,38 @@
+drm drm-fixes aca38735ae624b93c71c055b68d5802b8f356ea5
+	Merge tag 'drm-intel-fixes-2021-04-22' of git://anongit.freedesktop.org/drm/drm-intel into drm-fixes
+drm-misc drm-misc-fixes ffe8768fb8f391cb478466778c55e2110525c15c
+	drm/vc4: remove unused function
+drm-intel drm-intel-fixes 9f4ad9e425a1d3b6a34617b8ea226d56a119a717
+	Linux 5.12
+drm-amd drm-amd-fixes 2b702e72e33bbdec0764cfb6e1dd00fe1142ae55
+	Merge tag 'drm-misc-fixes-2017-09-28-1' of git://anongit.freedesktop.org/git/drm-misc into drm-fixes
+drm drm-next 1cd6b4a04f038eb24fd18c8010e763d1140a9c7a
+	Merge tag 'drm-intel-next-fixes-2021-04-27' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes a712b307cfde6dbe0d4829293afb1566beb30a9a
+	drm/msm/dpu: Delete bonkers code
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-amd drm-amd-next-fixes 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e
+	Linux 4.14-rc1
+drm-misc drm-misc-next 5109d297a3d70a9083a5fb66d487253438f803ea
+	drm/ttm: properly allocate sys resource during swapout
+drm-intel drm-intel-next 20f85ef89d94e12041bc9b0a335a0e7d6c61daf7
+	drm/i915/backlight: use unique backlight device names
+drm-intel drm-intel-gt-next 0333ec8806dfe7b8766ad025821bf58dc49dc970
+	drm/i915: Use might_alloc()
+drm-amd drm-amd-next 754270c7c56292e97d0eff924a5d5d83f92add07
+	Merge branch 'drm-next-4.15' of git://people.freedesktop.org/~agd5f/linux into drm-next
+sound-upstream for-linus 266fd994b2b0ab7ba3e5541868838ce30775964b
+	ALSA: hda/realtek: ALC285 Thinkpad jack pin quirk is unreachable
+sound-upstream for-next 266fd994b2b0ab7ba3e5541868838ce30775964b
+	ALSA: hda/realtek: ALC285 Thinkpad jack pin quirk is unreachable
+drm-intel topic/core-for-CI 785b066b32b630e4735ca6e51acbb067703e2d3a
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/iomem-mmap-vs-gup ac8b8400620a4b0d9ca903ee9ad440bec736f5fa
+	mm: unexport follow_pfn
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-intel topic/intel-gen-to-ver 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
+drm-intel topic/adl-p-enabling 425390c5dce6da76578389629d19517fcd79c959
+	drm/i915: split dgfx features from gen 12
