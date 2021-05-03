@@ -122,15 +122,6 @@ static void pnv_setup_security_mitigations(void)
 			type = L1D_FLUSH_ORI;
 	}
 
-	/*
-	 * If we are non-Power9 bare metal, we don't need to flush on kernel
-	 * entry or after user access: they fix a P9 specific vulnerability.
-	 */
-	if (!pvr_version_is(PVR_POWER9)) {
-		security_ftr_clear(SEC_FTR_L1D_FLUSH_ENTRY);
-		security_ftr_clear(SEC_FTR_L1D_FLUSH_UACCESS);
-	}
-
 	enable = security_ftr_enabled(SEC_FTR_FAVOUR_SECURITY) && \
 		 (security_ftr_enabled(SEC_FTR_L1D_FLUSH_PR)   || \
 		  security_ftr_enabled(SEC_FTR_L1D_FLUSH_HV));
