@@ -1972,18 +1972,11 @@ static int copy_vmcs12_to_enlightened(struct vcpu_vmx *vmx)
  * This is an equivalent of the nested hypervisor executing the vmptrld
  * instruction.
  */
-static enum nested_evmptrld_status nested_vmx_handle_enlightened_vmptrld(
-	struct kvm_vcpu *vcpu, bool from_launch)
+static enum nested_evmptrld_status __nested_vmx_handle_enlightened_vmptrld(
+	struct kvm_vcpu *vcpu, u64 evmcs_gpa, bool from_launch)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	bool evmcs_gpa_changed = false;
-	u64 evmcs_gpa;
-
-	if (likely(!vmx->nested.enlightened_vmcs_enabled))
-		return EVMPTRLD_DISABLED;
-
-	if (!nested_enlightened_vmentry(vcpu, &evmcs_gpa))
-		return EVMPTRLD_DISABLED;
 
 	if (unlikely(!vmx->nested.hv_evmcs ||
 		     evmcs_gpa != vmx->nested.hv_evmcs_vmptr)) {
@@ -2053,6 +2046,21 @@ static enum nested_evmptrld_status nested_vmx_handle_enlightened_vmptrld(
 			~HV_VMX_ENLIGHTENED_CLEAN_FIELD_ALL;
 
 	return EVMPTRLD_SUCCEEDED;
+}
+
+static enum nested_evmptrld_status nested_vmx_handle_enlightened_vmptrld(
+	struct kvm_vcpu *vcpu, bool from_launch)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	u64 evmcs_gpa;
+
+	if (likely(!vmx->nested.enlightened_vmcs_enabled))
+		return EVMPTRLD_DISABLED;
+
+	if (!nested_enlightened_vmentry(vcpu, &evmcs_gpa))
+		return EVMPTRLD_DISABLED;
+
+	return __nested_vmx_handle_enlightened_vmptrld(vcpu, evmcs_gpa, from_launch);
 }
 
 void nested_sync_vmcs12_to_shadow(struct kvm_vcpu *vcpu)
