@@ -1772,12 +1772,6 @@ static int rtrs_rdma_conn_established(struct rtrs_clt_con *con,
 	}
 	if (con->c.cid == 0) {
 		queue_depth = le16_to_cpu(msg->queue_depth);
-
-		if (queue_depth > MAX_SESS_QUEUE_DEPTH) {
-			rtrs_err(clt, "Invalid RTRS message: queue=%d\n",
-				  queue_depth);
-			return -ECONNRESET;
-		}
 		if (!sess->rbufs || sess->queue_depth < queue_depth) {
 			kfree(sess->rbufs);
 			sess->rbufs = kcalloc(queue_depth, sizeof(*sess->rbufs),
