@@ -72,7 +72,7 @@
 static int bss_entries_limit = 1000;
 module_param(bss_entries_limit, int, 0644);
 MODULE_PARM_DESC(bss_entries_limit,
-                 "limit to number of scan BSS entries (per wiphy, default 1000)");
+		"limit to number of scan BSS entries (per wiphy, default 1000)");
 
 #define IEEE80211_SCAN_RESULT_EXPIRE	(30 * HZ)
 
@@ -164,6 +164,7 @@ static inline void bss_ref_put(struct cfg80211_registered_device *rdev,
 
 	if (bss->pub.hidden_beacon_bss) {
 		struct cfg80211_internal_bss *hbss;
+
 		hbss = container_of(bss->pub.hidden_beacon_bss,
 				    struct cfg80211_internal_bss,
 				    pub);
@@ -1154,6 +1155,7 @@ int cfg80211_stop_sched_scan_req(struct cfg80211_registered_device *rdev,
 
 	if (!driver_initiated) {
 		int err = rdev_sched_scan_stop(rdev, req->dev, req->reqid);
+
 		if (err)
 			return err;
 	}
@@ -1181,7 +1183,7 @@ int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 }
 
 void cfg80211_bss_age(struct cfg80211_registered_device *rdev,
-                      unsigned long age_secs)
+		unsigned long age_secs)
 {
 	struct cfg80211_internal_bss *bss;
 	unsigned long age_jiffies = msecs_to_jiffies(age_secs * MSEC_PER_SEC);
@@ -1989,7 +1991,7 @@ static const struct element
 	/*
 	 * If it is not the last subelement in current MBSSID IE or there isn't
 	 * a next MBSSID IE - profile is complete.
-	*/
+	 */
 	if ((sub_elem->data + sub_elem->datalen < mbssid_end - 1) ||
 	    !next_mbssid)
 		return NULL;
@@ -2729,6 +2731,7 @@ int cfg80211_wext_siwscan(struct net_device *dev,
 			if (wreq && wreq->num_channels) {
 				int k;
 				int wiphy_freq = wiphy->bands[band]->channels[j].center_freq;
+
 				for (k = 0; k < wreq->num_channels; k++) {
 					struct iw_freq *freq =
 						&wreq->channel_list[k];
