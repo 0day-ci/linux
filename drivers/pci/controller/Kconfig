@@ -37,6 +37,11 @@ config PCI_FTPCI100
 	depends on OF
 	default ARCH_GEMINI
 
+config PCI_IXP4XX
+	bool "Intel IXP4xx PCI controller"
+	depends on OF
+	default ARCH_IXP4XX
+
 config PCI_TEGRA
 	bool "NVIDIA Tegra PCIe controller"
 	depends on ARCH_TEGRA || COMPILE_TEST
