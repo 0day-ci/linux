@@ -466,18 +466,39 @@ free_bitmap_tags:
 	return -ENOMEM;
 }
 
-int blk_mq_init_shared_sbitmap(struct blk_mq_tag_set *set, unsigned int flags)
+static int __blk_mq_init_bitmaps(struct sbitmap_queue *bitmap_tags,
+				 struct sbitmap_queue *breserved_tags,
+				 struct blk_mq_tag_set *set,
+				 unsigned int queue_depth,
+				 unsigned int reserved)
 {
-	unsigned int depth = set->queue_depth - set->reserved_tags;
+	unsigned int depth = queue_depth - reserved;
 	int alloc_policy = BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags);
 	bool round_robin = alloc_policy == BLK_TAG_ALLOC_RR;
-	int i, node = set->numa_node;
 
-	if (bt_alloc(&set->__bitmap_tags, depth, round_robin, node))
+	if (bt_alloc(bitmap_tags, depth, round_robin, set->numa_node))
 		return -ENOMEM;
-	if (bt_alloc(&set->__breserved_tags, set->reserved_tags,
-		     round_robin, node))
+	if (bt_alloc(breserved_tags, set->reserved_tags,
+		     round_robin, set->numa_node))
 		goto free_bitmap_tags;
+
+	return 0;
+
+free_bitmap_tags:
+	sbitmap_queue_free(bitmap_tags);
+	return -ENOMEM;
+}
+
+int blk_mq_init_shared_sbitmap(struct blk_mq_tag_set *set)
+{
+	int i, ret;
+
+	ret = __blk_mq_init_bitmaps(&set->__bitmap_tags,
+				    &set->__breserved_tags,
+				    set, set->queue_depth,
+				    set->reserved_tags);
+	if (ret)
+		return ret;
 
 	for (i = 0; i < set->nr_hw_queues; i++) {
 		struct blk_mq_tags *tags = set->tags[i];
@@ -487,15 +508,58 @@ int blk_mq_init_shared_sbitmap(struct blk_mq_tag_set *set, unsigned int flags)
 	}
 
 	return 0;
-free_bitmap_tags:
-	sbitmap_queue_free(&set->__bitmap_tags);
-	return -ENOMEM;
 }
 
 void blk_mq_exit_shared_sbitmap(struct blk_mq_tag_set *set)
 {
 	sbitmap_queue_free(&set->__bitmap_tags);
 	sbitmap_queue_free(&set->__breserved_tags);
+}
+
+#define MAX_SCHED_RQ (16 * BLKDEV_MAX_RQ)
+
+int blk_mq_init_sched_shared_sbitmap(struct request_queue *queue)
+{
+	struct blk_mq_tag_set *set = queue->tag_set;
+	int ret;
+
+	queue->sched_bitmap_tags =
+		kmalloc(sizeof(*queue->sched_bitmap_tags), GFP_KERNEL);
+	queue->sched_breserved_tags =
+		kmalloc(sizeof(*queue->sched_breserved_tags), GFP_KERNEL);
+	if (!queue->sched_bitmap_tags || !queue->sched_breserved_tags)
+		goto err;
+
+	/*
+	 * Set initial depth at max so that we don't need to reallocate for
+	 * updating nr_requests.
+	 */
+	ret = __blk_mq_init_bitmaps(queue->sched_bitmap_tags,
+				    queue->sched_breserved_tags,
+				    set, MAX_SCHED_RQ, set->reserved_tags);
+	if (ret)
+		goto err;
+
+	sbitmap_queue_resize(queue->sched_bitmap_tags,
+			     queue->nr_requests - set->reserved_tags);
+
+	return 0;
+
+err:
+	kfree(queue->sched_bitmap_tags);
+	kfree(queue->sched_breserved_tags);
+	return -ENOMEM;
+}
+
+void blk_mq_exit_sched_shared_sbitmap(struct request_queue *queue)
+{
+	sbitmap_queue_free(queue->sched_bitmap_tags);
+	kfree(queue->sched_bitmap_tags);
+	queue->sched_bitmap_tags = NULL;
+
+	sbitmap_queue_free(queue->sched_breserved_tags);
+	kfree(queue->sched_breserved_tags);
+	queue->sched_breserved_tags = NULL;
 }
 
 struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
@@ -551,8 +615,6 @@ int blk_mq_tag_update_depth(struct blk_mq_hw_ctx *hctx,
 	 */
 	if (tdepth > tags->nr_tags) {
 		struct blk_mq_tag_set *set = hctx->queue->tag_set;
-		/* Only sched tags can grow, so clear HCTX_SHARED flag  */
-		unsigned int flags = set->flags & ~BLK_MQ_F_TAG_HCTX_SHARED;
 		struct blk_mq_tags *new;
 		bool ret;
 
@@ -563,21 +625,21 @@ int blk_mq_tag_update_depth(struct blk_mq_hw_ctx *hctx,
 		 * We need some sort of upper limit, set it high enough that
 		 * no valid use cases should require more.
 		 */
-		if (tdepth > 16 * BLKDEV_MAX_RQ)
+		if (tdepth > MAX_SCHED_RQ)
 			return -EINVAL;
 
 		new = blk_mq_alloc_rq_map(set, hctx->queue_num, tdepth,
-				tags->nr_reserved_tags, flags);
+				tags->nr_reserved_tags, set->flags);
 		if (!new)
 			return -ENOMEM;
 		ret = blk_mq_alloc_rqs(set, new, hctx->queue_num, tdepth);
 		if (ret) {
-			blk_mq_free_rq_map(new, flags);
+			blk_mq_free_rq_map(new, set->flags);
 			return -ENOMEM;
 		}
 
 		blk_mq_free_rqs(set, *tagsptr, hctx->queue_num);
-		blk_mq_free_rq_map(*tagsptr, flags);
+		blk_mq_free_rq_map(*tagsptr, set->flags);
 		*tagsptr = new;
 	} else {
 		/*

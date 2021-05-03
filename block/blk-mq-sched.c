@@ -507,11 +507,9 @@ static void blk_mq_sched_free_tags(struct blk_mq_tag_set *set,
 				   struct blk_mq_hw_ctx *hctx,
 				   unsigned int hctx_idx)
 {
-	unsigned int flags = set->flags & ~BLK_MQ_F_TAG_HCTX_SHARED;
-
 	if (hctx->sched_tags) {
 		blk_mq_free_rqs(set, hctx->sched_tags, hctx_idx);
-		blk_mq_free_rq_map(hctx->sched_tags, flags);
+		blk_mq_free_rq_map(hctx->sched_tags, set->flags);
 		hctx->sched_tags = NULL;
 	}
 }
@@ -521,12 +519,10 @@ static int blk_mq_sched_alloc_tags(struct request_queue *q,
 				   unsigned int hctx_idx)
 {
 	struct blk_mq_tag_set *set = q->tag_set;
-	/* Clear HCTX_SHARED so tags are init'ed */
-	unsigned int flags = set->flags & ~BLK_MQ_F_TAG_HCTX_SHARED;
 	int ret;
 
 	hctx->sched_tags = blk_mq_alloc_rq_map(set, hctx_idx, q->nr_requests,
-					       set->reserved_tags, flags);
+					       set->reserved_tags, set->flags);
 	if (!hctx->sched_tags)
 		return -ENOMEM;
 
@@ -544,11 +540,8 @@ static void blk_mq_sched_tags_teardown(struct request_queue *q)
 	int i;
 
 	queue_for_each_hw_ctx(q, hctx, i) {
-		/* Clear HCTX_SHARED so tags are freed */
-		unsigned int flags = hctx->flags & ~BLK_MQ_F_TAG_HCTX_SHARED;
-
 		if (hctx->sched_tags) {
-			blk_mq_free_rq_map(hctx->sched_tags, flags);
+			blk_mq_free_rq_map(hctx->sched_tags, hctx->flags);
 			hctx->sched_tags = NULL;
 		}
 	}
@@ -578,12 +571,25 @@ int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
 	queue_for_each_hw_ctx(q, hctx, i) {
 		ret = blk_mq_sched_alloc_tags(q, hctx, i);
 		if (ret)
-			goto err;
+			goto err_free_tags;
+	}
+
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
+		ret = blk_mq_init_sched_shared_sbitmap(q);
+		if (ret)
+			goto err_free_tags;
+
+		queue_for_each_hw_ctx(q, hctx, i) {
+			hctx->sched_tags->bitmap_tags =
+					q->sched_bitmap_tags;
+			hctx->sched_tags->breserved_tags =
+					q->sched_breserved_tags;
+		}
 	}
 
 	ret = e->ops.init_sched(q, e);
 	if (ret)
-		goto err;
+		goto err_free_sbitmap;
 
 	blk_mq_debugfs_register_sched(q);
 
@@ -594,6 +600,7 @@ int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
 				eq = q->elevator;
 				blk_mq_sched_free_requests(q);
 				blk_mq_exit_sched(q, eq);
+				blk_mq_exit_sched_shared_sbitmap(q);
 				kobject_put(&eq->kobj);
 				return ret;
 			}
@@ -603,7 +610,10 @@ int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
 
 	return 0;
 
-err:
+err_free_sbitmap:
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags))
+		blk_mq_exit_sched_shared_sbitmap(q);
+err_free_tags:
 	blk_mq_sched_free_requests(q);
 	blk_mq_sched_tags_teardown(q);
 	q->elevator = NULL;
@@ -641,5 +651,7 @@ void blk_mq_exit_sched(struct request_queue *q, struct elevator_queue *e)
 	if (e->type->ops.exit_sched)
 		e->type->ops.exit_sched(e);
 	blk_mq_sched_tags_teardown(q);
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags))
+		blk_mq_exit_sched_shared_sbitmap(q);
 	q->elevator = NULL;
 }
