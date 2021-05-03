@@ -504,6 +504,7 @@ xfs_buf_item_unpin(
 
 	freed = atomic_dec_and_test(&bip->bli_refcount);
 
+	xfs_buf_hold(bp);
 	if (atomic_dec_and_test(&bp->b_pin_count))
 		wake_up_all(&bp->b_waiters);
 
@@ -560,6 +561,7 @@ xfs_buf_item_unpin(
 		bp->b_flags |= XBF_ASYNC;
 		xfs_buf_ioend_fail(bp);
 	}
+	xfs_buf_rele(bp);
 }
 
 STATIC uint
