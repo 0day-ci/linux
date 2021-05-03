@@ -6505,10 +6505,10 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
 	return domain;
 }
 
-int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
+int pci_bus_find_domain_nr(void *sysdata, struct device *parent)
 {
 	return acpi_disabled ? of_pci_bus_find_domain_nr(parent) :
-			       acpi_pci_bus_find_domain_nr(bus);
+			       acpi_pci_bus_find_domain_nr(sysdata);
 }
 #endif
 

@@ -208,6 +208,8 @@ static int __init mv78xx0_pcie_scan_bus(int nr, struct pci_host_bridge *bridge)
 	bridge->sysdata = sys;
 	bridge->busnr = sys->busnr;
 	bridge->ops = &pcie_ops;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(sys, NULL);
 
 	return pci_scan_root_bus_bridge(bridge);
 }

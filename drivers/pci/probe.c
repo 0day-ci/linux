@@ -899,7 +899,7 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	bus->ops = bridge->ops;
 	bus->number = bus->busn_res.start = bridge->busnr;
 #ifdef CONFIG_PCI_DOMAINS_GENERIC
-	bus->domain_nr = pci_bus_find_domain_nr(bus, parent);
+	bus->domain_nr = bridge->domain_nr;
 #endif
 
 	b = pci_find_bus(pci_domain_nr(bus), bridge->busnr);
@@ -2974,6 +2974,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 	bridge->sysdata = sysdata;
 	bridge->busnr = bus;
 	bridge->ops = ops;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(sysdata, parent);
 
 	error = pci_register_host_bridge(bridge);
 	if (error < 0)
@@ -2991,6 +2993,9 @@ int pci_host_probe(struct pci_host_bridge *bridge)
 {
 	struct pci_bus *bus, *child;
 	int ret;
+
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(bridge->sysdata, bridge->dev.parent);
 
 	ret = pci_scan_root_bus_bridge(bridge);
 	if (ret < 0) {

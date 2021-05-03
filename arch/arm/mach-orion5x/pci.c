@@ -563,6 +563,8 @@ int __init orion5x_pci_sys_scan_bus(int nr, struct pci_host_bridge *bridge)
 	bridge->dev.parent = NULL;
 	bridge->sysdata = sys;
 	bridge->busnr = sys->busnr;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(sys, NULL);
 
 	if (nr == 0) {
 		bridge->ops = &pcie_ops;

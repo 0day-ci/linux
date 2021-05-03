@@ -97,6 +97,8 @@ static void pcibios_scanbus(struct pci_controller *hose)
 	bridge->ops = hose->pci_ops;
 	bridge->swizzle_irq = pci_common_swizzle;
 	bridge->map_irq = pcibios_map_irq;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(hose, NULL);
 	ret = pci_scan_root_bus_bridge(bridge);
 	if (ret) {
 		pci_free_host_bridge(bridge);

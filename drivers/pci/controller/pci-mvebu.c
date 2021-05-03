@@ -1122,6 +1122,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
 	bridge->sysdata = pcie;
 	bridge->ops = &mvebu_pcie_ops;
 	bridge->align_resource = mvebu_pcie_align_resource;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		bridge->domain_nr = pci_bus_find_domain_nr(pcie, dev);
 
 	return mvebu_pci_host_probe(bridge);
 }

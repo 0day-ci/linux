@@ -712,6 +712,8 @@ static int bridge_probe(struct platform_device *pdev)
 	host->ops = &bridge_pci_ops;
 	host->map_irq = bridge_map_irq;
 	host->swizzle_irq = pci_common_swizzle;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		host->domain_nr = pci_bus_find_domain_nr(bc, dev);
 
 	err = pci_scan_root_bus_bridge(host);
 	if (err < 0)

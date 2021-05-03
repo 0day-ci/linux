@@ -534,6 +534,7 @@ struct pci_host_bridge {
 	struct pci_ops	*child_ops;
 	void		*sysdata;
 	int		busnr;
+	int		domain_nr;
 	struct list_head windows;	/* resource_entry */
 	struct list_head dma_ranges;	/* dma ranges resource list */
 	u8 (*swizzle_irq)(struct pci_dev *, u8 *); /* Platform IRQ swizzler */
@@ -1637,13 +1638,17 @@ static inline int pci_domain_nr(struct pci_bus *bus)
 {
 	return bus->domain_nr;
 }
+struct pci_config_window;
 #ifdef CONFIG_ACPI
-int acpi_pci_bus_find_domain_nr(struct pci_bus *bus);
+int acpi_pci_bus_find_domain_nr(struct pci_config_window *cfg);
 #else
-static inline int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
+static inline int acpi_pci_bus_find_domain_nr(struct pci_config_window *cfg)
 { return 0; }
 #endif
-int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent);
+int pci_bus_find_domain_nr(void *sysdata, struct device *parent);
+#else
+static inline int pci_bus_find_domain_nr(void *sysdata, struct device *parent)
+{ return 0; }
 #endif
 
 /* Some architectures require additional setup to direct VGA traffic */

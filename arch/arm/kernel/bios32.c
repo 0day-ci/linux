@@ -471,6 +471,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 				bridge->sysdata = sys;
 				bridge->busnr = sys->busnr;
 				bridge->ops = hw->ops;
+				if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+					bridge->domain_nr = pci_bus_find_domain_nr(sys, parent);
 
 				ret = pci_scan_root_bus_bridge(bridge);
 			}

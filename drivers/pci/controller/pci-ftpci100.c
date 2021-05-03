@@ -439,6 +439,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
 	host->ops = &faraday_pci_ops;
 	p = pci_host_bridge_priv(host);
 	host->sysdata = p;
+	if (IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
+		host->domain_nr = pci_bus_find_domain_nr(p, dev);
 	p->dev = dev;
 
 	/* Retrieve and enable optional clocks */
