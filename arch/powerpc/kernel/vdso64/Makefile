@@ -25,6 +25,19 @@ KCOV_INSTRUMENT := n
 UBSAN_SANITIZE := n
 KASAN_SANITIZE := n
 
+# Always build vdso64 with ELFv1 ABI for BE kernels
+ifdef CONFIG_PPC64_BUILD_ELF_V2_ABI
+ifdef CONFIG_CPU_BIG_ENDIAN
+KBUILD_CFLAGS := $(filter-out -mabi=elfv2,$(KBUILD_CFLAGS))
+KBUILD_AFLAGS := $(filter-out -mabi=elfv2,$(KBUILD_AFLAGS))
+
+# These are derived from arch/powerpc/Makefile
+KBUILD_CFLAGS += $(call cc-option,-mabi=elfv1)
+KBUILD_CFLAGS += $(call cc-option,-mcall-aixdesc)
+KBUILD_AFLAGS += $(call cc-option,-mabi=elfv1)
+endif
+endif
+
 ccflags-y := -shared -fno-common -fno-builtin -nostdlib \
 	-Wl,-soname=linux-vdso64.so.1 -Wl,--hash-style=both
 asflags-y := -D__VDSO64__ -s
