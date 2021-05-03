@@ -40,7 +40,8 @@
 #define PORT100_FRAME_MAX_PAYLOAD_LEN 1001
 
 #define PORT100_FRAME_ACK_SIZE 6 /* Preamble (1), SoPC (2), ACK Code (2),
-				    Postamble (1) */
+				  * Postamble (1)
+				  */
 static u8 ack_frame[PORT100_FRAME_ACK_SIZE] = {
 	0x00, 0x00, 0xff, 0x00, 0xff, 0x00
 };
