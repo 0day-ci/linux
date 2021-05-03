@@ -196,11 +196,16 @@ Only one of the following properties scanned in the order shown below.
 This means that when multiple properties are present they will be searched
 in the order presented below and the first match is taken as the intended
 configuration.
-- input:      A property specifying to set the GPIO direction as input.
-- output-low  A property specifying to set the GPIO direction as output with
-	      the value low.
-- output-high A property specifying to set the GPIO direction as output with
-	      the value high.
+- input:             A property specifying to set the GPIO direction as input.
+- output-deasserted: A property specifying to set the GPIO direction as output
+		     with the inactive value (depending on the line's polarity,
+		     which is active-high by default)
+- output-asserted:   A property specifying to set the GPIO direction as output
+		     with the active value.
+
+For backwards compatibility "output-low" and "output-high" should be supported
+as aliases for "output-deasserted" and "output-asserted" respectively. Their
+usage is misleading for active-low outputs, so their use is discouraged.
 
 Optional properties:
 - line-name:  The GPIO label name. If not present the node name is used.
