@@ -40,6 +40,7 @@
 		assigned-clock-rates = <294912000>,
 				       <270950400>,
 				       <393216000>;
+		power-domains = <&pwrc PWRC_G12A_AUDIO_ID>;
 		status = "okay";
 
 		dai-link-0 {
