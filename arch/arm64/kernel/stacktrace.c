@@ -44,6 +44,8 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	unsigned long fp = frame->fp;
 	struct stack_info info;
 
+	frame->reliable = true;
+
 	/* Terminal record; nothing to unwind */
 	if (!fp)
 		return -ENOENT;
@@ -86,12 +88,24 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	 */
 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+	frame->pc = ptrauth_strip_insn_pac(frame->pc);
 	frame->prev_fp = fp;
 	frame->prev_type = info.type;
 
+	/*
+	 * First, make sure that the return address is a proper kernel text
+	 * address. A NULL or invalid return address probably means there's
+	 * some generated code which __kernel_text_address() doesn't know
+	 * about. Mark the stack trace as not reliable.
+	 */
+	if (!__kernel_text_address(frame->pc)) {
+		frame->reliable = false;
+		return 0;
+	}
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
-		(ptrauth_strip_insn_pac(frame->pc) == (unsigned long)return_to_handler)) {
+		frame->pc == (unsigned long)return_to_handler) {
 		struct ftrace_ret_stack *ret_stack;
 		/*
 		 * This is a case where function graph tracer has
@@ -103,10 +117,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 		if (WARN_ON_ONCE(!ret_stack))
 			return -EINVAL;
 		frame->pc = ret_stack->ret;
+		frame->pc = ptrauth_strip_insn_pac(frame->pc);
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-
-	frame->pc = ptrauth_strip_insn_pac(frame->pc);
 
 	return 0;
 }
