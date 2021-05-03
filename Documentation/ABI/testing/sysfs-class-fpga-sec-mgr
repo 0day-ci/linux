@@ -1,0 +1,5 @@
+What: 		/sys/class/fpga_sec_mgr/fpga_secX/name
+Date:		June 2021
+KernelVersion:	5.14
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Name of low level fpga security manager driver.

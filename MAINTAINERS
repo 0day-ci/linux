@@ -7119,6 +7119,15 @@ F:	Documentation/fpga/
 F:	drivers/fpga/
 F:	include/linux/fpga/
 
+FPGA SECURITY MANAGER DRIVERS
+M:	Russ Weight <russell.h.weight@intel.com>
+L:	linux-fpga@vger.kernel.org
+S:	Maintained
+F:	Documentation/ABI/testing/sysfs-class-fpga-sec-mgr
+F:	Documentation/fpga/fpga-sec-mgr.rst
+F:	drivers/fpga/fpga-sec-mgr.c
+F:	include/linux/fpga/fpga-sec-mgr.h
+
 FPU EMULATOR
 M:	Bill Metzenthen <billm@melbpc.org.au>
 S:	Maintained

@@ -8,6 +8,7 @@ fpga
     :maxdepth: 1
 
     dfl
+    fpga-sec-mgr
 
 .. only::  subproject and html
 
