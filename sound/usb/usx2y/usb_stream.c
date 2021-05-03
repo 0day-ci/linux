@@ -88,18 +88,35 @@ static int init_urbs(struct usb_stream_kernel *sk, unsigned use_packsize,
 					sizeof(struct usb_stream_packet) *
 					s->inpackets;
 	int			u;
+	int			i;
+	int			err = -ENOMEM;
 
 	for (u = 0; u < USB_STREAM_NURBS; ++u) {
+		sk->outurb[u] = NULL;
 		sk->inurb[u] = usb_alloc_urb(sk->n_o_ps, GFP_KERNEL);
+		if (!sk->inurb[u])
+			goto error;
 		sk->outurb[u] = usb_alloc_urb(sk->n_o_ps, GFP_KERNEL);
+		if (!sk->outurb[u])
+			goto error;
 	}
+	u--;
 
 	if (init_pipe_urbs(sk, use_packsize, sk->inurb, indata, dev, in_pipe) ||
 	    init_pipe_urbs(sk, use_packsize, sk->outurb, sk->write_page, dev,
-			   out_pipe))
-		return -EINVAL;
+			   out_pipe)) {
+		err = -EINVAL;
+		goto error;
+	}
 
 	return 0;
+
+error:
+	for (i = 0; i <= u; ++i) {
+		usb_free_urb(sk->inurb[i]);
+		usb_free_urb(sk->outurb[i]);
+	}
+	return err;
 }
 
 
