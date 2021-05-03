@@ -1027,7 +1027,7 @@ static void mac80211_hwsim_monitor_rx(struct ieee80211_hw *hw,
 		return;
 
 	skb = skb_copy_expand(tx_skb, sizeof(*hdr), 0, GFP_ATOMIC);
-	if (skb == NULL)
+	if (!skb)
 		return;
 
 	hdr = skb_push(skb, sizeof(*hdr));
@@ -1071,7 +1071,7 @@ static void mac80211_hwsim_monitor_ack(struct ieee80211_channel *chan,
 		return;
 
 	skb = dev_alloc_skb(100);
-	if (skb == NULL)
+	if (!skb)
 		return;
 
 	hdr = skb_put(skb, sizeof(*hdr));
@@ -1282,12 +1282,12 @@ static void mac80211_hwsim_tx_frame_nl(struct ieee80211_hw *hw,
 	}
 
 	skb = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_ATOMIC);
-	if (skb == NULL)
+	if (!skb)
 		goto nla_put_failure;
 
 	msg_head = genlmsg_put(skb, 0, 0, &hwsim_genl_family, 0,
 			       HWSIM_CMD_FRAME);
-	if (msg_head == NULL) {
+	if (!msg_head) {
 		pr_debug("mac80211_hwsim: problem with msg_head\n");
 		goto nla_put_failure;
 	}
@@ -1797,7 +1797,7 @@ static void mac80211_hwsim_beacon_tx(void *arg, u8 *mac,
 		return;
 
 	skb = ieee80211_beacon_get(hw, vif);
-	if (skb == NULL)
+	if (!skb)
 		return;
 	info = IEEE80211_SKB_CB(skb);
 	if (ieee80211_hw_check(hw, SUPPORTS_RC_TABLE))
@@ -3646,7 +3646,7 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 
 	/* Allocate new skb here */
 	skb = alloc_skb(frame_data_len, GFP_KERNEL);
-	if (skb == NULL)
+	if (!skb)
 		goto err;
 
 	if (frame_data_len > IEEE80211_MAX_DATA_LEN)
@@ -4550,7 +4550,7 @@ static int __init init_mac80211_hwsim(void)
 
 	hwsim_mon = alloc_netdev(0, "hwsim%d", NET_NAME_UNKNOWN,
 				 hwsim_mon_setup);
-	if (hwsim_mon == NULL) {
+	if (!hwsim_mon) {
 		err = -ENOMEM;
 		goto out_free_radios;
 	}
