@@ -413,6 +413,7 @@
 	status = "okay";
 	pinctrl-0 = <&hdmitx_hpd_pins>, <&hdmitx_ddc_pins>;
 	pinctrl-names = "default";
+	power-domains = <&pwrc PWRC_SM1_HDMI_ID>;
 };
 
 &hdmi_tx_tmds_port {
