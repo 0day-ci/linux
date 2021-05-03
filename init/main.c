@@ -873,6 +873,20 @@ void __init __weak arch_call_rest_init(void)
 	rest_init();
 }
 
+void print_unknown_bootoptions(void)
+{
+	const char *const *p;
+
+	if (panic_later || (!argv_init[1] && !envp_init[2]))
+		return;
+
+	pr_notice("Unknown command line parameters:\n");
+	for (p = &argv_init[1]; *p; p++)
+		pr_notice("    %s\n", *p);
+	for (p = &envp_init[2]; *p; p++)
+		pr_notice("    %s\n", *p);
+}
+
 asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 {
 	char *command_line;
@@ -914,6 +928,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 				  static_command_line, __start___param,
 				  __stop___param - __start___param,
 				  -1, -1, NULL, &unknown_bootoption);
+	print_unknown_bootoptions();
 	if (!IS_ERR_OR_NULL(after_dashes))
 		parse_args("Setting init args", after_dashes, NULL, 0, -1, -1,
 			   NULL, set_init_arg);
