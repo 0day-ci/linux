@@ -3444,6 +3444,7 @@ static struct spi_mem_driver spi_nor_driver = {
 		.driver = {
 			.name = "spi-nor",
 			.of_match_table = spi_nor_of_table,
+			.dev_groups = spi_nor_sysfs_groups,
 		},
 		.id_table = spi_nor_dev_ids,
 	},
