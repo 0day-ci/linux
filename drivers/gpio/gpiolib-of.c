@@ -624,10 +624,16 @@ static struct gpio_desc *of_parse_own_gpio(struct device_node *np,
 
 	if (of_property_read_bool(np, "input"))
 		*dflags |= GPIOD_IN;
+	else if (of_property_read_bool(np, "output-deasserted"))
+		*dflags |= GPIOD_OUT_DEASSERTED;
+	else if (of_property_read_bool(np, "output-asserted"))
+		*dflags |= GPIOD_OUT_ASSERTED;
 	else if (of_property_read_bool(np, "output-low"))
-		*dflags |= GPIOD_OUT_LOW;
+		/* misleading alias for output-deasserted */
+		*dflags |= GPIOD_OUT_DEASSERTED;
 	else if (of_property_read_bool(np, "output-high"))
-		*dflags |= GPIOD_OUT_HIGH;
+		/* misleading alias for output-asserted */
+		*dflags |= GPIOD_OUT_ASSERTED;
 	else {
 		pr_warn("GPIO line %d (%pOFn): no hogging state specified, bailing out\n",
 			desc_to_gpio(desc), np);
