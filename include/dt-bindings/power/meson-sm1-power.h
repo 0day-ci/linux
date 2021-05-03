@@ -14,5 +14,6 @@
 #define PWRC_SM1_GE2D_ID	4
 #define PWRC_SM1_AUDIO_ID	5
 #define PWRC_SM1_ETH_ID		6
+#define PWRC_SM1_HDMI_ID	7
 
 #endif
