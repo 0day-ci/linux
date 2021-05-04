@@ -216,6 +216,18 @@ static void panfrost_attach_object_fences(struct drm_gem_object **bos,
 		dma_resv_add_excl_fence(bos[i]->resv, fence);
 }
 
+static int panfrost_sync_user_fences(struct drm_gem_object **bos, int bo_count)
+{
+	int i, ret;
+
+	for (i = 0; i < bo_count; i++) {
+		ret = dma_resv_sync_user_fence(bos[i]->resv);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 int panfrost_job_push(struct panfrost_job *job)
 {
 	struct panfrost_device *pfdev = job->pfdev;
@@ -223,6 +235,10 @@ int panfrost_job_push(struct panfrost_job *job)
 	struct drm_sched_entity *entity = &job->file_priv->sched_entity[slot];
 	struct ww_acquire_ctx acquire_ctx;
 	int ret = 0;
+
+	ret = panfrost_sync_user_fences(job->bos, job->bo_count);
+	if (ret)
+		return ret;
 
 	mutex_lock(&pfdev->sched_lock);
 
