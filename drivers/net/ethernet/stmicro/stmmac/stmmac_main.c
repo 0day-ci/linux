@@ -1099,7 +1099,7 @@ static int stmmac_init_phy(struct net_device *dev)
 			return -ENODEV;
 		}
 
-		ret = phylink_connect_phy(priv->phylink, phydev);
+		ret = phylink_connect_phy(priv->phylink, phydev, 0);
 	}
 
 	phylink_ethtool_get_wol(priv->phylink, &wol);

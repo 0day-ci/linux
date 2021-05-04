@@ -437,7 +437,7 @@ struct phylink *phylink_create(struct phylink_config *, struct fwnode_handle *,
 void phylink_set_pcs(struct phylink *, struct phylink_pcs *pcs);
 void phylink_destroy(struct phylink *);
 
-int phylink_connect_phy(struct phylink *, struct phy_device *);
+int phylink_connect_phy(struct phylink *, struct phy_device *, u32 flags);
 int phylink_of_phy_connect(struct phylink *, struct device_node *, u32 flags);
 void phylink_disconnect_phy(struct phylink *);
 

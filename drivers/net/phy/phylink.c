@@ -1018,7 +1018,7 @@ static int phylink_bringup_phy(struct phylink *pl, struct phy_device *phy,
 }
 
 static int phylink_attach_phy(struct phylink *pl, struct phy_device *phy,
-			      phy_interface_t interface)
+			      phy_interface_t interface, u32 flags)
 {
 	if (WARN_ON(pl->cfg_link_an_mode == MLO_AN_FIXED ||
 		    (pl->cfg_link_an_mode == MLO_AN_INBAND &&
@@ -1028,13 +1028,14 @@ static int phylink_attach_phy(struct phylink *pl, struct phy_device *phy,
 	if (pl->phydev)
 		return -EBUSY;
 
-	return phy_attach_direct(pl->netdev, phy, 0, interface);
+	return phy_attach_direct(pl->netdev, phy, flags, interface);
 }
 
 /**
  * phylink_connect_phy() - connect a PHY to the phylink instance
  * @pl: a pointer to a &struct phylink returned from phylink_create()
  * @phy: a pointer to a &struct phy_device.
+ * @flags: PHY-specific flags to communicate to the PHY device driver
  *
  * Connect @phy to the phylink instance specified by @pl by calling
  * phy_attach_direct(). Configure the @phy according to the MAC driver's
@@ -1046,7 +1047,8 @@ static int phylink_attach_phy(struct phylink *pl, struct phy_device *phy,
  *
  * Returns 0 on success or a negative errno.
  */
-int phylink_connect_phy(struct phylink *pl, struct phy_device *phy)
+int phylink_connect_phy(struct phylink *pl, struct phy_device *phy,
+			u32 flags)
 {
 	int ret;
 
@@ -1056,7 +1058,7 @@ int phylink_connect_phy(struct phylink *pl, struct phy_device *phy)
 		pl->link_config.interface = pl->link_interface;
 	}
 
-	ret = phylink_attach_phy(pl, phy, pl->link_interface);
+	ret = phylink_attach_phy(pl, phy, pl->link_interface, flags);
 	if (ret < 0)
 		return ret;
 
@@ -2207,7 +2209,7 @@ static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
 		return ret;
 
 	interface = pl->link_config.interface;
-	ret = phylink_attach_phy(pl, phy, interface);
+	ret = phylink_attach_phy(pl, phy, interface, 0);
 	if (ret < 0)
 		return ret;
 

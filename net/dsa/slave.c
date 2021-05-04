@@ -1691,7 +1691,7 @@ static int dsa_slave_phy_connect(struct net_device *slave_dev, int addr)
 		return -ENODEV;
 	}
 
-	return phylink_connect_phy(dp->pl, slave_dev->phydev);
+	return phylink_connect_phy(dp->pl, slave_dev->phydev, 0);
 }
 
 static int dsa_slave_phy_setup(struct net_device *slave_dev)
