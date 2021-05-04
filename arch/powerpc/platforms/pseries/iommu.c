@@ -1016,7 +1016,7 @@ static int create_ddw(struct pci_dev *dev, const u32 *ddw_avail,
 		ret = rtas_call(ddw_avail[DDW_CREATE_PE_DMA_WIN], 5, 4,
 				(u32 *)create, cfg_addr, BUID_HI(buid),
 				BUID_LO(buid), page_shift, window_shift);
-	} while (rtas_busy_delay(ret));
+	} while (rtas_sched_if_busy(ret));
 	dev_info(&dev->dev,
 		"ibm,create-pe-dma-window(%x) %x %x %x %x %x returned %d "
 		"(liobn = 0x%x starting addr = %x %x)\n",
