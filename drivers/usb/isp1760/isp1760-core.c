@@ -2,12 +2,14 @@
 /*
  * Driver for the NXP ISP1760 chip
  *
+ * Copyright 2021 Linaro, Rui Miguel Silva
  * Copyright 2014 Laurent Pinchart
  * Copyright 2007 Sebastian Siewior
  *
  * Contacts:
  *	Sebastian Siewior <bigeasy@linutronix.de>
  *	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+ *	Rui Miguel Silva <rui.silva@linaro.org>
  */
 
 #include <linux/delay.h>
@@ -23,7 +25,7 @@
 #include "isp1760-regs.h"
 #include "isp1760-udc.h"
 
-static void isp1760_init_core(struct isp1760_device *isp)
+static int isp1760_init_core(struct isp1760_device *isp)
 {
 	struct isp1760_hcd *hcd = &isp->hcd;
 	struct isp1760_udc *udc = &isp->udc;
@@ -43,8 +45,15 @@ static void isp1760_init_core(struct isp1760_device *isp)
 	msleep(100);
 
 	/* Setup HW Mode Control: This assumes a level active-low interrupt */
+	if ((isp->devflags & ISP1760_FLAG_ANALOG_OC) && hcd->is_isp1763) {
+		dev_err(isp->dev, "isp1763 analog overcurrent not available\n");
+		return -EINVAL;
+	}
+
 	if (isp->devflags & ISP1760_FLAG_BUS_WIDTH_16)
 		isp1760_field_clear(hcd->fields, HW_DATA_BUS_WIDTH);
+	if (isp->devflags & ISP1760_FLAG_BUS_WIDTH_8)
+		isp1760_field_set(hcd->fields, HW_DATA_BUS_WIDTH);
 	if (isp->devflags & ISP1760_FLAG_ANALOG_OC)
 		isp1760_field_set(hcd->fields, HW_ANA_DIGI_OC);
 	if (isp->devflags & ISP1760_FLAG_DACK_POL_HIGH)
@@ -84,9 +93,14 @@ static void isp1760_init_core(struct isp1760_device *isp)
 		isp1760_field_set(hcd->fields, HW_SEL_CP_EXT);
 	}
 
-	dev_info(isp->dev, "bus width: %u, oc: %s\n",
+	dev_info(isp->dev, "%s bus width: %u, oc: %s\n",
+		 hcd->is_isp1763 ? "isp1763" : "isp1760",
+		 isp->devflags & ISP1760_FLAG_BUS_WIDTH_8 ? 8 :
 		 isp->devflags & ISP1760_FLAG_BUS_WIDTH_16 ? 16 : 32,
+		 hcd->is_isp1763 ? "not available" :
 		 isp->devflags & ISP1760_FLAG_ANALOG_OC ? "analog" : "digital");
+
+	return 0;
 }
 
 void isp1760_set_pullup(struct isp1760_device *isp, bool enable)
@@ -100,6 +114,8 @@ void isp1760_set_pullup(struct isp1760_device *isp, bool enable)
 }
 
 /*
+ * ISP1760/61:
+ *
  * 60kb divided in:
  * - 32 blocks @ 256  bytes
  * - 20 blocks @ 1024 bytes
@@ -113,38 +129,72 @@ static const struct isp1760_memory_layout isp176x_memory_conf = {
 	.blocks[2]		= 4,
 	.blocks_size[2]		= 8192,
 
-	.ptd_num		= 32,
+	.slot_num		= 32,
 	.payload_blocks		= 32 + 20 + 4,
 	.payload_area_size	= 0xf000,
+};
+
+/*
+ * ISP1763:
+ *
+ * 20kb divided in:
+ * - 8 blocks @ 256  bytes
+ * - 2 blocks @ 1024 bytes
+ * - 4 blocks @ 4096 bytes
+ */
+static const struct isp1760_memory_layout isp1763_memory_conf = {
+	.blocks[0]		= 8,
+	.blocks_size[0]		= 256,
+	.blocks[1]		= 2,
+	.blocks_size[1]		= 1024,
+	.blocks[2]		= 4,
+	.blocks_size[2]		= 4096,
+
+	.slot_num		= 16,
+	.payload_blocks		= 8 + 2 + 4,
+	.payload_area_size	= 0x5000,
 };
 
 static struct regmap_config isp1760_hc_regmap_conf = {
 	.name = "isp1760-hc",
 	.reg_bits = 16,
+	.reg_stride = 4,
 	.val_bits = 32,
 	.fast_io = true,
-	.max_register = ISP176x_HC_MEMORY,
+	.max_register = ISP176x_HC_OTG_CTRL_CLEAR,
 	.volatile_table = &isp176x_hc_volatile_table,
+};
+
+static struct regmap_config isp1763_hc_regmap_conf = {
+	.name = "isp1763-hc",
+	.reg_bits = 8,
+	.reg_stride = 2,
+	.val_bits = 16,
+	.fast_io = true,
+	.max_register = ISP1763_HC_OTG_CTRL_CLEAR,
+	.volatile_table = &isp1763_hc_volatile_table,
 };
 
 static struct regmap_config isp1761_dc_regmap_conf = {
 	.name = "isp1761-dc",
 	.reg_bits = 16,
+	.reg_stride = 4,
 	.val_bits = 32,
 	.fast_io = true,
-	.max_register = ISP1761_DC_OTG_CTRL_CLEAR,
+	.max_register = ISP176x_DC_TESTMODE,
 	.volatile_table = &isp176x_dc_volatile_table,
 };
 
 int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 		     struct device *dev, unsigned int devflags)
 {
+	bool udc_disabled = !(devflags & ISP1760_FLAG_ISP1761);
+	const struct regmap_config *hc_regmap;
+	const struct reg_field *hc_reg_fields;
 	struct isp1760_device *isp;
 	struct isp1760_hcd *hcd;
 	struct isp1760_udc *udc;
-	bool udc_disabled = !(devflags & ISP1760_FLAG_ISP1761);
 	struct regmap_field *f;
-	void __iomem *base;
 	int ret;
 	int i;
 
@@ -170,6 +220,24 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 		isp1761_dc_regmap_conf.val_bits = 16;
 	}
 
+	hcd->is_isp1763 = !!(devflags & ISP1760_FLAG_ISP1763);
+
+	if (!hcd->is_isp1763 && (devflags & ISP1760_FLAG_BUS_WIDTH_8)) {
+		dev_err(dev, "isp1760/61 do not support data width 8\n");
+		return -EINVAL;
+	}
+
+	if (devflags & ISP1760_FLAG_BUS_WIDTH_8)
+		isp1763_hc_regmap_conf.val_bits = 8;
+
+	if (hcd->is_isp1763) {
+		hc_regmap = &isp1763_hc_regmap_conf;
+		hc_reg_fields = &isp1763_hc_reg_fields[0];
+	} else {
+		hc_regmap = &isp1760_hc_regmap_conf;
+		hc_reg_fields = &isp1760_hc_reg_fields[0];
+	}
+
 	isp->rst_gpio = devm_gpiod_get_optional(dev, NULL, GPIOD_OUT_HIGH);
 	if (IS_ERR(isp->rst_gpio))
 		return PTR_ERR(isp->rst_gpio);
@@ -178,20 +246,20 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 	if (IS_ERR(hcd->base))
 		return PTR_ERR(hcd->base);
 
-	hcd->regs = devm_regmap_init_mmio(dev, base, &isp1760_hc_regmap_conf);
+	hcd->regs = devm_regmap_init_mmio(dev, hcd->base, hc_regmap);
 	if (IS_ERR(hcd->regs))
 		return PTR_ERR(hcd->regs);
 
 	for (i = 0; i < HC_FIELD_MAX; i++) {
-		f = devm_regmap_field_alloc(dev, hcd->regs,
-					    isp1760_hc_reg_fields[i]);
+		f = devm_regmap_field_alloc(dev, hcd->regs, hc_reg_fields[i]);
 		if (IS_ERR(f))
 			return PTR_ERR(f);
 
 		hcd->fields[i] = f;
 	}
 
-	udc->regs = devm_regmap_init_mmio(dev, base, &isp1761_dc_regmap_conf);
+	udc->regs = devm_regmap_init_mmio(dev, hcd->base,
+					  &isp1761_dc_regmap_conf);
 	if (IS_ERR(udc->regs))
 		return PTR_ERR(udc->regs);
 
@@ -204,9 +272,14 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 		udc->fields[i] = f;
 	}
 
-	hcd->memory_layout = &isp176x_memory_conf;
+	if (hcd->is_isp1763)
+		hcd->memory_layout = &isp1763_memory_conf;
+	else
+		hcd->memory_layout = &isp176x_memory_conf;
 
-	isp1760_init_core(isp);
+	ret = isp1760_init_core(isp);
+	if (ret < 0)
+		return ret;
 
 	if (IS_ENABLED(CONFIG_USB_ISP1760_HCD) && !usb_disabled()) {
 		ret = isp1760_hcd_register(hcd, mem, irq,
