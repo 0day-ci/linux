@@ -607,7 +607,7 @@ xfs_inode_item_release(
  * triggers an assert in xfs_inode_free() complaining about freein an inode
  * still in the AIL.
  *
- * To avoid this, just unpin the inode directly and return a LSN of -1 so the
+ * To avoid this, just unpin the inode directly and return NULLCOMMITLSN so the
  * transaction committed code knows that it does not need to do any further
  * processing on the item.
  */
@@ -621,7 +621,7 @@ xfs_inode_item_committed(
 
 	if (xfs_iflags_test(ip, XFS_ISTALE)) {
 		xfs_inode_item_unpin(lip, 0);
-		return -1;
+		return NULLCOMMITLSN;
 	}
 	return lsn;
 }

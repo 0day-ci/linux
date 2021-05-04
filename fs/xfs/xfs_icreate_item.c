@@ -67,10 +67,10 @@ xfs_icreate_item_release(
 }
 
 static const struct xfs_item_ops xfs_icreate_item_ops = {
-	.flags		= XFS_ITEM_RELEASE_WHEN_COMMITTED,
 	.iop_size	= xfs_icreate_item_size,
 	.iop_format	= xfs_icreate_item_format,
 	.iop_release	= xfs_icreate_item_release,
+	.iop_comitted	= xfs_log_item_committed_done,
 };
 
 

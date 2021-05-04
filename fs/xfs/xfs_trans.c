@@ -759,18 +759,13 @@ xfs_trans_committed_bulk(
 		if (aborted)
 			set_bit(XFS_LI_ABORTED, &lip->li_flags);
 
-		if (lip->li_ops->flags & XFS_ITEM_RELEASE_WHEN_COMMITTED) {
-			lip->li_ops->iop_release(lip);
-			continue;
-		}
-
 		if (lip->li_ops->iop_committed)
 			item_lsn = lip->li_ops->iop_committed(lip, commit_lsn);
 		else
 			item_lsn = commit_lsn;
 
-		/* item_lsn of -1 means the item needs no further processing */
-		if (XFS_LSN_CMP(item_lsn, (xfs_lsn_t)-1) == 0)
+		/* NULLCOMMITLSN means the item needs no further processing */
+		if (XFS_LSN_CMP(item_lsn, NULLCOMMITLSN) == 0)
 			continue;
 
 		/*

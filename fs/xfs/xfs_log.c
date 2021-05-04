@@ -1013,6 +1013,18 @@ xfs_log_item_init(
 }
 
 /*
+ * Log items that have no processing required after they are committed use this
+ * as their ->iop_committed method. xfs_trans_committed_bulk() will skip further
+ * processing for objects that return NULLCOMMITLSN to this method.
+ */
+xfs_lsn_t
+xfs_log_item_committed_done(
+	struct xfs_log_item *item)
+{
+	return NULLCOMMITLSN;
+}
+
+/*
  * Wake up processes waiting for log space after we have moved the log tail.
  */
 void

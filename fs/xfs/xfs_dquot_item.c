@@ -282,7 +282,7 @@ xfs_qm_qoffend_logitem_committed(
 
 	kmem_free(lip->li_lv_shadow);
 	kmem_free(qfe);
-	return (xfs_lsn_t)-1;
+	return NULLCOMMITLSN;
 }
 
 STATIC void

@@ -63,7 +63,6 @@ struct xfs_log_item {
 	{ (1 << XFS_LI_DIRTY),		"DIRTY" }
 
 struct xfs_item_ops {
-	unsigned flags;
 	void (*iop_size)(struct xfs_log_item *, int *, int *);
 	void (*iop_format)(struct xfs_log_item *, struct xfs_log_vec *);
 	void (*iop_pin)(struct xfs_log_item *);
@@ -95,14 +94,14 @@ xlog_item_is_intent_done(struct xfs_log_item *lip)
 	       lip->li_ops->iop_push == NULL;
 }
 
-/*
- * Release the log item as soon as committed.  This is for items just logging
- * intents that never need to be written back in place.
- */
-#define XFS_ITEM_RELEASE_WHEN_COMMITTED	(1 << 0)
-
 void	xfs_log_item_init(struct xfs_mount *mp, struct xfs_log_item *item,
 			  int type, const struct xfs_item_ops *ops);
+
+/*
+ * Generic ->iop_committed callback to indicate that the log item should not be
+ * referenced by the caller once the callback returns.
+ */
+xfs_lsn_t xfs_log_item_committed_done(struct xfs_log_item *item)
 
 /*
  * Return values for the iop_push() routines.
