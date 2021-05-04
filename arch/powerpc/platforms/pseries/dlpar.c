@@ -167,7 +167,7 @@ struct device_node *dlpar_configure_connector(__be32 drc_index,
 
 		spin_unlock(&rtas_data_buf_lock);
 
-		if (rtas_busy_delay(rc))
+		if (rtas_sched_if_busy(rc))
 			continue;
 
 		switch (rc) {
