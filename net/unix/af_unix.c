@@ -1635,7 +1635,7 @@ static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 		return err;
 
 	err = -EOPNOTSUPP;
-	if (msg->msg_flags&MSG_OOB)
+	if (msg->msg_flags & MSG_OOB)
 		goto out;
 
 	if (msg->msg_namelen) {
