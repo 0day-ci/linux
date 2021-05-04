@@ -3231,6 +3231,7 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 	case IGMP_HOST_MEMBERSHIP_REPORT:
 	case IGMPV2_HOST_MEMBERSHIP_REPORT:
 		BR_INPUT_SKB_CB(skb)->mrouters_only = 1;
+		BR_INPUT_SKB_CB(skb)->force_mc_flood = 1;
 		err = br_ip4_multicast_add_group(br, port, ih->group, vid, src,
 						 true);
 		break;
@@ -3294,6 +3295,7 @@ static int br_multicast_ipv6_rcv(struct net_bridge *br,
 	case ICMPV6_MGM_REPORT:
 		src = eth_hdr(skb)->h_source;
 		BR_INPUT_SKB_CB(skb)->mrouters_only = 1;
+		BR_INPUT_SKB_CB(skb)->force_mc_flood = 1;
 		err = br_ip6_multicast_add_group(br, port, &mld->mld_mca, vid,
 						 src, true);
 		break;
@@ -3325,6 +3327,7 @@ int br_multicast_rcv(struct net_bridge *br, struct net_bridge_port *port,
 	BR_INPUT_SKB_CB(skb)->igmp = 0;
 	BR_INPUT_SKB_CB(skb)->mrouters_only = 0;
 	BR_INPUT_SKB_CB(skb)->force_flood = 0;
+	BR_INPUT_SKB_CB(skb)->force_mc_flood = 0;
 
 	if (!br_opt_get(br, BROPT_MULTICAST_ENABLED))
 		return 0;

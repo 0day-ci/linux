@@ -492,6 +492,7 @@ struct br_input_skb_cb {
 	u8 igmp;
 	u8 mrouters_only:1;
 	u8 force_flood:1;
+	u8 force_mc_flood:1;
 #endif
 	u8 proxyarp_replied:1;
 	u8 src_port_isolated:1;
@@ -512,9 +513,11 @@ struct br_input_skb_cb {
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
 # define BR_INPUT_SKB_CB_MROUTERS_ONLY(__skb)	(BR_INPUT_SKB_CB(__skb)->mrouters_only)
 # define BR_INPUT_SKB_CB_FORCE_FLOOD(__skb)		(BR_INPUT_SKB_CB(__skb)->force_flood)
+# define BR_INPUT_SKB_CB_FORCE_MC_FLOOD(__skb)	(BR_INPUT_SKB_CB(__skb)->force_mc_flood)
 #else
 # define BR_INPUT_SKB_CB_MROUTERS_ONLY(__skb)	(0)
 # define BR_INPUT_SKB_CB_FORCE_FLOOD(__skb)		(0)
+# define BR_INPUT_SKB_CB_FORCE_MC_FLOOD(__skb)	(0)
 #endif
 
 #define br_printk(level, br, format, args...)	\
