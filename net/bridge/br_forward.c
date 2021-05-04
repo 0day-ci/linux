@@ -203,7 +203,8 @@ void br_flood(struct net_bridge *br, struct sk_buff *skb,
 				continue;
 			break;
 		case BR_PKT_MULTICAST:
-			if (!(p->flags & BR_MCAST_FLOOD) && skb->dev != br->dev)
+			if (!(p->flags & BR_MCAST_FLOOD) && skb->dev != br->dev &&
+			    !BR_INPUT_SKB_CB_FORCE_FLOOD(skb))
 				continue;
 			break;
 		case BR_PKT_BROADCAST:

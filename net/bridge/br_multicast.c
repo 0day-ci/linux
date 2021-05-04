@@ -3238,6 +3238,7 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 		err = br_ip4_multicast_igmp3_report(br, port, skb, vid);
 		break;
 	case IGMP_HOST_MEMBERSHIP_QUERY:
+		BR_INPUT_SKB_CB(skb)->force_flood = 1;
 		br_ip4_multicast_query(br, port, skb, vid);
 		break;
 	case IGMP_HOST_LEAVE_MESSAGE:
@@ -3300,6 +3301,7 @@ static int br_multicast_ipv6_rcv(struct net_bridge *br,
 		err = br_ip6_multicast_mld2_report(br, port, skb, vid);
 		break;
 	case ICMPV6_MGM_QUERY:
+		BR_INPUT_SKB_CB(skb)->force_flood = 1;
 		err = br_ip6_multicast_query(br, port, skb, vid);
 		break;
 	case ICMPV6_MGM_REDUCTION:
@@ -3322,6 +3324,7 @@ int br_multicast_rcv(struct net_bridge *br, struct net_bridge_port *port,
 
 	BR_INPUT_SKB_CB(skb)->igmp = 0;
 	BR_INPUT_SKB_CB(skb)->mrouters_only = 0;
+	BR_INPUT_SKB_CB(skb)->force_flood = 0;
 
 	if (!br_opt_get(br, BROPT_MULTICAST_ENABLED))
 		return 0;
