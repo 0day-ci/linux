@@ -378,7 +378,7 @@ static void manage_flash(struct rtas_manage_flash_t *args_buf, unsigned int op)
 	do {
 		rc = rtas_call(rtas_token("ibm,manage-flash-image"), 1, 1,
 			       NULL, op);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	args_buf->status = rc;
 }
@@ -456,7 +456,7 @@ static void validate_flash(struct rtas_validate_flash_t *args_buf)
 			       (u32) __pa(rtas_data_buf), args_buf->buf_size);
 		memcpy(args_buf->buf, rtas_data_buf, VALIDATE_BUF_SIZE);
 		spin_unlock(&rtas_data_buf_lock);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	args_buf->status = rc;
 	args_buf->update_results = update_results;
