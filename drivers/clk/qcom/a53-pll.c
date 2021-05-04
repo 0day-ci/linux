@@ -26,6 +26,45 @@ static const struct pll_freq_tbl msm8916_freq[] = {
 	{ }
 };
 
+static const struct pll_freq_tbl msm8939_c0_freq[] = {
+	{  998400000,  52, 0x0, 0x1, 0 },
+	{ 1113600000,  58, 0x0, 0x1, 0 },
+	{ 1209600000,  63, 0x0, 0x1, 0 },
+};
+
+static const struct pll_freq_tbl msm8939_c1_freq[] = {
+	{  652800000, 34, 0x0, 0x1, 0 },
+	{  691200000, 36, 0x0, 0x1, 0 },
+	{  729600000, 38, 0x0, 0x1, 0 },
+	{  806400000, 42, 0x0, 0x1, 0 },
+	{  844800000, 44, 0x0, 0x1, 0 },
+	{  883200000, 46, 0x0, 0x1, 0 },
+	{  960000000, 50, 0x0, 0x1, 0 },
+	{  998400000, 52, 0x0, 0x1, 0 },
+	{ 1036800000, 54, 0x0, 0x1, 0 },
+	{ 1113600000, 58, 0x0, 0x1, 0 },
+	{ 1209600000, 63, 0x0, 0x1, 0 },
+	{ 1190400000, 62, 0x0, 0x1, 0 },
+	{ 1267200000, 66, 0x0, 0x1, 0 },
+	{ 1344000000, 70, 0x0, 0x1, 0 },
+	{ 1363200000, 71, 0x0, 0x1, 0 },
+	{ 1420800000, 74, 0x0, 0x1, 0 },
+	{ 1459200000, 76, 0x0, 0x1, 0 },
+	{ 1497600000, 78, 0x0, 0x1, 0 },
+	{ 1536000000, 80, 0x0, 0x1, 0 },
+	{ 1574400000, 82, 0x0, 0x1, 0 },
+	{ 1612800000, 84, 0x0, 0x1, 0 },
+	{ 1632000000, 85, 0x0, 0x1, 0 },
+	{ 1651200000, 86, 0x0, 0x1, 0 },
+	{ 1689600000, 88, 0x0, 0x1, 0 },
+	{ 1708800000, 89, 0x0, 0x1, 0 },
+};
+
+static const struct pll_freq_tbl msm8939_cci_freq[] = {
+	{ 403200000, 21, 0x0, 0x1, 0 },
+	{ 595200000, 31, 0x0, 0x1, 0 },
+};
+
 static const struct regmap_config a53pll_regmap_config = {
 	.reg_bits		= 32,
 	.reg_stride		= 4,
@@ -98,6 +137,9 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 
 static const struct of_device_id qcom_a53pll_match_table[] = {
 	{ .compatible = "qcom,msm8916-a53pll", .data = msm8916_freq },
+	{ .compatible = "qcom,msm8939-a53pll-c0", .data = &msm8939_c0_freq },
+	{ .compatible = "qcom,msm8939-a53pll-c1", .data = &msm8939_c1_freq },
+	{ .compatible = "qcom,msm8939-a53pll-cci", .data = &msm8939_cci_freq },
 	{ }
 };
 
