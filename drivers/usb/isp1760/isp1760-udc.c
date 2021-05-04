@@ -1503,7 +1503,8 @@ static int isp1760_udc_init(struct isp1760_udc *udc)
 		return -ENODEV;
 	}
 
-	if (chipid != 0x00011582 && chipid != 0x00158210) {
+	if (chipid != 0x00011582 && chipid != 0x00158210 &&
+	    chipid != 0x00006320) {
 		dev_err(udc->isp->dev, "udc: invalid chip ID 0x%08x\n", chipid);
 		return -ENODEV;
 	}
