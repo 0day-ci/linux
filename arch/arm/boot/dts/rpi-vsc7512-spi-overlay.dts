@@ -1,0 +1,124 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2021 Innovative Advantage Inc - https://www.in-advantage.com/
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&spi0_cs_pins>;
+		frag0: __overlay__ {
+		brcm,pins = <8>;
+		};
+	};
+
+	fragment@1 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@2 {
+		target = <&spidev1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@3 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cs-gpios = <&gpio 8 1>;
+			status = "okay";
+
+			vsc7512: vsc7512@0{
+				compatible = "mscc,vsc7512";
+				spi-max-frequency = <250000>;
+				reg = <0>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						ethernet = <&ethernet>;
+						phy-mode = "internal";
+
+						fixed-link {
+							speed = <1000>;
+							full-duplex;
+						};
+					};
+
+					port@1 {
+						reg = <1>;
+						label = "swp1";
+						status = "disabled";
+					};
+
+					port@2 {
+						reg = <2>;
+						label = "swp2";
+						status = "disabled";
+					};
+
+					port@3 {
+						reg = <3>;
+						label = "swp3";
+						status = "disabled";
+					};
+
+					port@4 {
+						reg = <4>;
+						label = "swp4";
+						status = "disabled";
+					};
+
+					port@5 {
+						reg = <5>;
+						label = "swp5";
+						status = "disabled";
+					};
+
+					port@6 {
+						reg = <6>;
+						label = "swp6";
+						status = "disabled";
+					};
+
+					port@7 {
+						reg = <7>;
+						label = "swp7";
+						status = "disabled";
+					};
+
+					port@8 {
+						reg = <8>;
+						label = "swp8";
+						status = "disabled";
+					};
+
+					port@9 {
+						reg = <9>;
+						label = "swp9";
+						status = "disabled";
+					};
+
+					port@10 {
+						reg = <10>;
+						label = "swp10";
+						status = "disabled";
+					};
+				};
+			};
+		};
+	};
+};
