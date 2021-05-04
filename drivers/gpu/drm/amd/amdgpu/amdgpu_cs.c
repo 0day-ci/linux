@@ -534,6 +534,13 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			return r;
 	}
 
+	/* Sync to user fences */
+	amdgpu_bo_list_for_each_entry(e, p->bo_list) {
+		r = dma_resv_sync_user_fence(e->tv.bo->base.resv);
+		if (r)
+			return r;
+	}
+
 	/* One for TTM and one for the CS job */
 	amdgpu_bo_list_for_each_entry(e, p->bo_list)
 		e->tv.num_shared = 2;

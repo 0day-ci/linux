@@ -181,6 +181,12 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	obj = fb->obj[0];
 	new_abo = gem_to_amdgpu_bo(obj);
 
+	r = dma_resv_sync_user_fence(obj->resv);
+	if (unlikely(r)) {
+		DRM_ERROR("failed to wait for user fence before flip\n");
+		goto cleanup;
+	}
+
 	/* pin the new buffer */
 	r = amdgpu_bo_reserve(new_abo, false);
 	if (unlikely(r != 0)) {
