@@ -385,7 +385,7 @@ struct adapter {
 	void *xmitThread;
 	void *recvThread;
 
-	u32 (*intf_init)(struct dvobj_priv *dvobj);
+	int (*intf_init)(struct dvobj_priv *dvobj);
 	void (*intf_deinit)(struct dvobj_priv *dvobj);
 	int (*intf_alloc_irq)(struct dvobj_priv *dvobj);
 	void (*intf_free_irq)(struct dvobj_priv *dvobj);

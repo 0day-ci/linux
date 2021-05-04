@@ -112,7 +112,7 @@ static void sdio_free_irq(struct dvobj_priv *dvobj)
 	}
 }
 
-static u32 sdio_init(struct dvobj_priv *dvobj)
+static int sdio_init(struct dvobj_priv *dvobj)
 {
 	struct sdio_data *psdio_data;
 	struct sdio_func *func;
@@ -139,12 +139,11 @@ static u32 sdio_init(struct dvobj_priv *dvobj)
 	psdio_data->tx_block_mode = 1;
 	psdio_data->rx_block_mode = 1;
 
+	return err;
+
 release:
 	sdio_release_host(func);
-
-	if (err)
-		return _FAIL;
-	return _SUCCESS;
+	return err;
 }
 
 static void sdio_deinit(struct dvobj_priv *dvobj)
@@ -186,7 +185,7 @@ static struct dvobj_priv *sdio_dvobj_init(struct sdio_func *func)
 	psdio = &dvobj->intf_data;
 	psdio->func = func;
 
-	if (sdio_init(dvobj) != _SUCCESS)
+	if (sdio_init(dvobj) < 0)
 		goto free_dvobj;
 
 	rtw_reset_continual_io_error(dvobj);
