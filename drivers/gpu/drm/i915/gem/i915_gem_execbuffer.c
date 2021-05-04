@@ -872,6 +872,12 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 			goto err;
 		}
 
+		err = dma_resv_sync_user_fence(vma->obj->base.resv);
+		if (unlikely(err)) {
+			i915_vma_put(vma);
+			goto err;
+		}
+
 		eb_add_vma(eb, i, batch, vma);
 
 		if (i915_gem_object_is_userptr(vma->obj)) {
