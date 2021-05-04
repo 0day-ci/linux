@@ -4,12 +4,11 @@ Journal (jbd2)
 --------------
 
 Introduced in ext3, the ext4 filesystem employs a journal to protect the
-filesystem against corruption in the case of a system crash. A small
-continuous region of disk (default 128MiB) is reserved inside the
-filesystem as a place to land “important” data writes on-disk as quickly
-as possible. Once the important data transaction is fully written to the
-disk and flushed from the disk write cache, a record of the data being
-committed is also written to the journal. At some later point in time,
+filesystem against corruption in the case of a system crash. Up to 1GB is
+reserved inside the filesystem as a place to land “important” data writes
+on-disk as quickly as possible. Once the important data transaction is fully
+written to the disk and flushed from the disk write cache, a record of the data
+being committed is also written to the journal. At some later point in time,
 the journal code writes the transactions to their final locations on
 disk (this could involve a lot of seeking or a lot of small
 read-write-erases) before erasing the commit record. Should the system
@@ -731,3 +730,18 @@ point, the refcount for inode 11 is not reliable, but that gets fixed by the
 replay of last inode 11 tag. Thus, by converting a non-idempotent procedure
 into a series of idempotent outcomes, fast commits ensured idempotence during
 the replay.
+
+Journal Checkpoint
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Checkpointing the journal ensures all transactions and their associated buffers
+are submitted to the disk. This is used internally during critical updates to
+the filesystem including journal recovery, filesystem resizing, and freeing
+of the journal_t structure.
+
+A journal checkpoint can be triggered from userspace via the ioctl
+EXT4_IOC_CHECKPOINT. This ioctl takes a single, u64 argument for flags.
+Currently, the only flag supported is EXT4_IOC_CHECKPOINT_FLAG_DISCARD. When
+this flag is set, the journal blocks are discarded after the journal checkpoint
+is complete. The ioctl may be useful when snapshotting a system or for complying
+with content deletion SLOs (when discard is supported and the discard flag is set).
