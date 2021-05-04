@@ -15,7 +15,7 @@
 #include "clk-pll.h"
 #include "clk-regmap.h"
 
-static const struct pll_freq_tbl a53pll_freq[] = {
+static const struct pll_freq_tbl msm8916_freq[] = {
 	{  998400000, 52, 0x0, 0x1, 0 },
 	{ 1094400000, 57, 0x0, 0x1, 0 },
 	{ 1152000000, 62, 0x0, 0x1, 0 },
@@ -43,7 +43,12 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 	void __iomem *base;
 	struct clk_init_data init = { };
 	const char *clk_name = NULL;
+	const struct pll_freq_tbl *freq_tbl;
 	int ret;
+
+	freq_tbl = device_get_match_data(&pdev->dev);
+	if (!freq_tbl)
+		return -ENODEV;
 
 	pll = devm_kzalloc(dev, sizeof(*pll), GFP_KERNEL);
 	if (!pll)
@@ -65,7 +70,7 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 	pll->mode_reg = 0x00;
 	pll->status_reg = 0x1c;
 	pll->status_bit = 16;
-	pll->freq_tbl = a53pll_freq;
+	pll->freq_tbl = freq_tbl;
 
 	of_property_read_string(pdev->dev.of_node, "clock-output-names",
 				&clk_name);
@@ -92,7 +97,7 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id qcom_a53pll_match_table[] = {
-	{ .compatible = "qcom,msm8916-a53pll" },
+	{ .compatible = "qcom,msm8916-a53pll", .data = msm8916_freq },
 	{ }
 };
 
