@@ -681,3 +681,21 @@ retry:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dma_resv_test_signaled_rcu);
+
+/**
+ * dma_resv_sync_user_fence - block for user fences to signal
+ *
+ * @obj: The DMA resv object with the user fence attached
+ *
+ * To make sure we have proper synchronization between accesses block for user
+ * fences before starting a dma_fence based operation on the buffer.
+ */
+int dma_resv_sync_user_fence(struct dma_resv *obj)
+{
+	might_fault();
+
+	/* TODO: Actually come up with an implementation for this! */
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dma_resv_sync_user_fence);

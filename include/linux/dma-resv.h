@@ -289,5 +289,6 @@ long dma_resv_wait_timeout_rcu(struct dma_resv *obj, bool wait_all, bool intr,
 			       unsigned long timeout);
 
 bool dma_resv_test_signaled_rcu(struct dma_resv *obj, bool test_all);
+int dma_resv_sync_user_fence(struct dma_resv *obj);
 
 #endif /* _LINUX_RESERVATION_H */
