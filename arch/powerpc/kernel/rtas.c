@@ -743,7 +743,7 @@ int rtas_set_power_level(int powerdomain, int level, int *setlevel)
 
 	do {
 		rc = rtas_call(token, 2, 2, setlevel, powerdomain, level);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc < 0)
 		return rtas_error_rc(rc);
@@ -761,7 +761,7 @@ int rtas_get_sensor(int sensor, int index, int *state)
 
 	do {
 		rc = rtas_call(token, 2, 2, state, sensor, index);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc < 0)
 		return rtas_error_rc(rc);
@@ -822,7 +822,7 @@ int rtas_set_indicator(int indicator, int index, int new_value)
 
 	do {
 		rc = rtas_call(token, 3, 1, NULL, indicator, index, new_value);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc < 0)
 		return rtas_error_rc(rc);
@@ -990,7 +990,7 @@ void rtas_activate_firmware(void)
 
 	do {
 		fwrc = rtas_call(token, 0, 1, NULL);
-	} while (rtas_busy_delay(fwrc));
+	} while (rtas_sched_if_busy(fwrc));
 
 	if (fwrc)
 		pr_err("ibm,activate-firmware failed (%i)\n", fwrc);
