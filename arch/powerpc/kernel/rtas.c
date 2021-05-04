@@ -519,6 +519,174 @@ unsigned int rtas_busy_delay(int status)
 }
 EXPORT_SYMBOL(rtas_busy_delay);
 
+/**
+ * rtas_force_spin_if_busy() - Consume a busy or extended delay status
+ *                             in atomic context.
+ * @status: Return value from rtas_call() or similar function.
+ *
+ * Use this function when you cannot avoid using an RTAS function
+ * which may return an extended delay hint in atomic context. If
+ * possible, use rtas_spin_if_busy() or rtas_sched_if_busy() instead
+ * of this function.
+ *
+ * Return: True if @status is -2 or 990x, in which case
+ *         rtas_spin_if_busy() will have delayed an appropriate amount
+ *         of time, and the caller should call the RTAS function
+ *         again. False otherwise.
+ */
+bool rtas_force_spin_if_busy(int status)
+{
+	bool was_busy = true;
+
+	switch (status) {
+	case RTAS_BUSY:
+		/* OK to call again immediately; do nothing. */
+		break;
+	case RTAS_EXTENDED_DELAY_MIN...RTAS_EXTENDED_DELAY_MAX:
+		mdelay(1);
+		break;
+	default:
+		was_busy = false;
+		break;
+	}
+
+	return was_busy;
+}
+
+/**
+ * rtas_spin_if_busy() - Consume a busy status in atomic context.
+ * @status: Return value from rtas_call() or similar function.
+ *
+ * Prefer rtas_sched_if_busy() over this function. Prefer this
+ * function over rtas_force_spin_if_busy(). Use this function in
+ * atomic contexts with RTAS calls that are specified to return -2 but
+ * not 990x. This function will complain and execute a minimal delay
+ * if passed a 990x status.
+ *
+ * Return: True if @status is -2 or 990x, in which case
+ *         rtas_spin_if_busy() will have delayed an appropriate amount
+ *         of time, and the caller should call the RTAS function
+ *         again. False otherwise.
+ */
+bool rtas_spin_if_busy(int status)
+{
+	bool was_busy = true;
+
+	switch (status) {
+	case RTAS_BUSY:
+		/* OK to call again immediately; do nothing. */
+		break;
+	case RTAS_EXTENDED_DELAY_MIN...RTAS_EXTENDED_DELAY_MAX:
+		/*
+		 * Generally, RTAS functions which can return this
+		 * status should be considered too expensive to use in
+		 * atomic context. Change the calling code to use
+		 * rtas_sched_if_busy(), or if that's not possible,
+		 * use rtas_force_spin_if_busy().
+		 */
+		pr_warn_once("%pS may use RTAS call in atomic context which returns extended delay.\n",
+			     __builtin_return_address(0));
+		mdelay(1);
+		break;
+	default:
+		was_busy = false;
+		break;
+	}
+
+	return was_busy;
+}
+
+static unsigned long extended_delay_ms(unsigned int status)
+{
+	unsigned int extdelay;
+	unsigned int order;
+	unsigned int ms;
+
+	extdelay = clamp((int)status, RTAS_EXTENDED_DELAY_MIN, RTAS_EXTENDED_DELAY_MAX);
+	WARN_ONCE(extdelay != status, "%s passed invalid status %u\n", __func__, status);
+
+	order = status - RTAS_EXTENDED_DELAY_MIN;
+	for (ms = 1; order > 0; order--)
+		ms *= 10;
+
+	return ms;
+}
+
+static void handle_extended_delay(unsigned int status)
+{
+	unsigned long usecs;
+
+	usecs = 1000 * extended_delay_ms(status);
+
+	/*
+	 * If we have no other work pending, there's no reason to
+	 * sleep.
+	 */
+	if (!need_resched())
+		return;
+
+	/*
+	 * The extended delay hint can be as high as 100
+	 * seconds. Surely any function returning such a status is
+	 * either buggy or isn't going to be significantly slowed by
+	 * us polling at 1HZ. Clamp the sleep time to one second.
+	 */
+	usecs = clamp(usecs, 1000UL, 1000000UL);
+
+	/*
+	 * The delay hint is an order-of-magnitude suggestion, not a
+	 * minimum. It is fine, possibly even advantageous, for us to
+	 * pause for less time than suggested. For small values, use
+	 * usleep_range() to ensure we don't sleep much longer than
+	 * actually suggested.
+	 *
+	 * See Documentation/timers/timers-howto.rst for explanation
+	 * of the threshold used here.
+	 */
+	if (usecs <= 20000)
+		usleep_range(usecs / 2, 2 * usecs);
+	else
+		msleep(DIV_ROUND_UP(usecs, 1000));
+}
+
+/**
+ * rtas_sched_if_busy() - Consume a busy or extended delay status.
+ * @status: Return value from rtas_call() or similar function.
+ *
+ * Prefer this function over rtas_spin_if_busy().
+ *
+ * Context: This function may sleep.
+ *
+ * Return: True if @status is -2 or 990x, in which case
+ *         rtas_sched_if_busy() will have slept an appropriate amount
+ *         of time, and the caller should call the RTAS function
+ *         again. False otherwise.
+ */
+bool rtas_sched_if_busy(int status)
+{
+	bool was_busy = true;
+
+	might_sleep();
+
+	switch (status) {
+	case RTAS_BUSY:
+		/*
+		 * OK to call again immediately. Schedule if there's
+		 * other work to do, but no sleep is necessary.
+		 */
+		cond_resched();
+		break;
+	case RTAS_EXTENDED_DELAY_MIN...RTAS_EXTENDED_DELAY_MAX:
+		handle_extended_delay(status);
+		break;
+	default:
+		was_busy = false;
+		break;
+	}
+
+	return was_busy;
+}
+
 static int rtas_error_rc(int rtas_rc)
 {
 	int rc;
