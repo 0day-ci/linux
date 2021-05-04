@@ -25,8 +25,8 @@
 
 static void isp1760_init_core(struct isp1760_device *isp)
 {
-	u32 otgctrl;
-	u32 hwmode;
+	struct isp1760_hcd *hcd = &isp->hcd;
+	struct isp1760_udc *udc = &isp->udc;
 
 	/* Low-level chip reset */
 	if (isp->rst_gpio) {
@@ -39,24 +39,22 @@ static void isp1760_init_core(struct isp1760_device *isp)
 	 * Reset the host controller, including the CPU interface
 	 * configuration.
 	 */
-	isp1760_write32(isp->regs, HC_RESET_REG, SW_RESET_RESET_ALL);
+	isp1760_field_set(hcd->fields, SW_RESET_RESET_ALL);
 	msleep(100);
 
 	/* Setup HW Mode Control: This assumes a level active-low interrupt */
-	hwmode = HW_DATA_BUS_32BIT;
-
 	if (isp->devflags & ISP1760_FLAG_BUS_WIDTH_16)
-		hwmode &= ~HW_DATA_BUS_32BIT;
+		isp1760_field_clear(hcd->fields, HW_DATA_BUS_WIDTH);
 	if (isp->devflags & ISP1760_FLAG_ANALOG_OC)
-		hwmode |= HW_ANA_DIGI_OC;
+		isp1760_field_set(hcd->fields, HW_ANA_DIGI_OC);
 	if (isp->devflags & ISP1760_FLAG_DACK_POL_HIGH)
-		hwmode |= HW_DACK_POL_HIGH;
+		isp1760_field_set(hcd->fields, HW_DACK_POL_HIGH);
 	if (isp->devflags & ISP1760_FLAG_DREQ_POL_HIGH)
-		hwmode |= HW_DREQ_POL_HIGH;
+		isp1760_field_set(hcd->fields, HW_DREQ_POL_HIGH);
 	if (isp->devflags & ISP1760_FLAG_INTR_POL_HIGH)
-		hwmode |= HW_INTR_HIGH_ACT;
+		isp1760_field_set(hcd->fields, HW_INTR_HIGH_ACT);
 	if (isp->devflags & ISP1760_FLAG_INTR_EDGE_TRIG)
-		hwmode |= HW_INTR_EDGE_TRIG;
+		isp1760_field_set(hcd->fields, HW_INTR_EDGE_TRIG);
 
 	/*
 	 * The ISP1761 has a dedicated DC IRQ line but supports sharing the HC
@@ -65,17 +63,9 @@ static void isp1760_init_core(struct isp1760_device *isp)
 	 * spurious interrupts during HCD registration.
 	 */
 	if (isp->devflags & ISP1760_FLAG_ISP1761) {
-		isp1760_write32(isp->regs, DC_MODE, 0);
-		hwmode |= HW_COMN_IRQ;
+		isp1760_reg_write(udc->regs, ISP176x_DC_MODE, 0);
+		isp1760_field_set(hcd->fields, HW_COMN_IRQ);
 	}
-
-	/*
-	 * We have to set this first in case we're in 16-bit mode.
-	 * Write it twice to ensure correct upper bits if switching
-	 * to 16-bit mode.
-	 */
-	isp1760_write32(isp->regs, HC_HW_MODE_CTRL, hwmode);
-	isp1760_write32(isp->regs, HC_HW_MODE_CTRL, hwmode);
 
 	/*
 	 * PORT 1 Control register of the ISP1760 is the OTG control register
@@ -85,14 +75,15 @@ static void isp1760_init_core(struct isp1760_device *isp)
 	 * when OTG is requested.
 	 */
 	if ((isp->devflags & ISP1760_FLAG_ISP1761) &&
-	    (isp->devflags & ISP1760_FLAG_OTG_EN))
-		otgctrl = ((HW_DM_PULLDOWN | HW_DP_PULLDOWN) << 16)
-			| HW_OTG_DISABLE;
-	else
-		otgctrl = (HW_SW_SEL_HC_DC << 16)
-			| (HW_VBUS_DRV | HW_SEL_CP_EXT);
-
-	isp1760_write32(isp->regs, HC_PORT1_CTRL, otgctrl);
+	    (isp->devflags & ISP1760_FLAG_OTG_EN)) {
+		isp1760_field_set(hcd->fields, HW_DM_PULLDOWN);
+		isp1760_field_set(hcd->fields, HW_DP_PULLDOWN);
+		isp1760_field_set(hcd->fields, HW_OTG_DISABLE);
+	} else {
+		isp1760_field_set(hcd->fields, HW_SW_SEL_HC_DC);
+		isp1760_field_set(hcd->fields, HW_VBUS_DRV);
+		isp1760_field_set(hcd->fields, HW_SEL_CP_EXT);
+	}
 
 	dev_info(isp->dev, "bus width: %u, oc: %s\n",
 		 isp->devflags & ISP1760_FLAG_BUS_WIDTH_16 ? 16 : 32,
@@ -101,16 +92,43 @@ static void isp1760_init_core(struct isp1760_device *isp)
 
 void isp1760_set_pullup(struct isp1760_device *isp, bool enable)
 {
-	isp1760_write32(isp->regs, HW_OTG_CTRL_SET,
-			enable ? HW_DP_PULLUP : HW_DP_PULLUP << 16);
+	struct isp1760_udc *udc = &isp->udc;
+
+	if (enable)
+		isp1760_field_set(udc->fields, HW_DP_PULLUP);
+	else
+		isp1760_field_set(udc->fields, HW_DP_PULLUP_CLEAR);
 }
+
+static struct regmap_config isp1760_hc_regmap_conf = {
+	.name = "isp1760-hc",
+	.reg_bits = 16,
+	.val_bits = 32,
+	.fast_io = true,
+	.max_register = ISP176x_HC_MEMORY,
+	.volatile_table = &isp176x_hc_volatile_table,
+};
+
+static struct regmap_config isp1761_dc_regmap_conf = {
+	.name = "isp1761-dc",
+	.reg_bits = 16,
+	.val_bits = 32,
+	.fast_io = true,
+	.max_register = ISP1761_DC_OTG_CTRL_CLEAR,
+	.volatile_table = &isp176x_dc_volatile_table,
+};
 
 int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 		     struct device *dev, unsigned int devflags)
 {
 	struct isp1760_device *isp;
+	struct isp1760_hcd *hcd;
+	struct isp1760_udc *udc;
 	bool udc_disabled = !(devflags & ISP1760_FLAG_ISP1761);
+	struct regmap_field *f;
+	void __iomem *base;
 	int ret;
+	int i;
 
 	/*
 	 * If neither the HCD not the UDC is enabled return an error, as no
@@ -126,19 +144,52 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 
 	isp->dev = dev;
 	isp->devflags = devflags;
+	hcd = &isp->hcd;
+	udc = &isp->udc;
+
+	if (devflags & ISP1760_FLAG_BUS_WIDTH_16) {
+		isp1760_hc_regmap_conf.val_bits = 16;
+		isp1761_dc_regmap_conf.val_bits = 16;
+	}
 
 	isp->rst_gpio = devm_gpiod_get_optional(dev, NULL, GPIOD_OUT_HIGH);
 	if (IS_ERR(isp->rst_gpio))
 		return PTR_ERR(isp->rst_gpio);
 
-	isp->regs = devm_ioremap_resource(dev, mem);
-	if (IS_ERR(isp->regs))
-		return PTR_ERR(isp->regs);
+	hcd->base = devm_ioremap_resource(dev, mem);
+	if (IS_ERR(hcd->base))
+		return PTR_ERR(hcd->base);
+
+	hcd->regs = devm_regmap_init_mmio(dev, base, &isp1760_hc_regmap_conf);
+	if (IS_ERR(hcd->regs))
+		return PTR_ERR(hcd->regs);
+
+	for (i = 0; i < HC_FIELD_MAX; i++) {
+		f = devm_regmap_field_alloc(dev, hcd->regs,
+					    isp1760_hc_reg_fields[i]);
+		if (IS_ERR(f))
+			return PTR_ERR(f);
+
+		hcd->fields[i] = f;
+	}
+
+	udc->regs = devm_regmap_init_mmio(dev, base, &isp1761_dc_regmap_conf);
+	if (IS_ERR(udc->regs))
+		return PTR_ERR(udc->regs);
+
+	for (i = 0; i < DC_FIELD_MAX; i++) {
+		f = devm_regmap_field_alloc(dev, udc->regs,
+					    isp1761_dc_reg_fields[i]);
+		if (IS_ERR(f))
+			return PTR_ERR(f);
+
+		udc->fields[i] = f;
+	}
 
 	isp1760_init_core(isp);
 
 	if (IS_ENABLED(CONFIG_USB_ISP1760_HCD) && !usb_disabled()) {
-		ret = isp1760_hcd_register(&isp->hcd, isp->regs, mem, irq,
+		ret = isp1760_hcd_register(hcd, mem, irq,
 					   irqflags | IRQF_SHARED, dev);
 		if (ret < 0)
 			return ret;
@@ -147,7 +198,7 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 	if (IS_ENABLED(CONFIG_USB_ISP1761_UDC) && !udc_disabled) {
 		ret = isp1760_udc_register(isp, irq, irqflags);
 		if (ret < 0) {
-			isp1760_hcd_unregister(&isp->hcd);
+			isp1760_hcd_unregister(hcd);
 			return ret;
 		}
 	}
