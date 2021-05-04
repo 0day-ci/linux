@@ -142,11 +142,15 @@ int drm_gem_plane_helper_prepare_fb(struct drm_plane *plane, struct drm_plane_st
 {
 	struct drm_gem_object *obj;
 	struct dma_fence *fence;
+	int ret;
 
 	if (!state->fb)
 		return 0;
 
 	obj = drm_gem_fb_get_obj(state->fb, 0);
+	ret = dma_resv_sync_user_fence(obj->resv);
+	if (ret)
+		return ret;
 	fence = dma_resv_get_excl_rcu(obj->resv);
 	drm_atomic_set_fence_for_plane(state, fence);
 
