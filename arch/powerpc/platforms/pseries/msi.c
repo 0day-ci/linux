@@ -49,7 +49,7 @@ static int rtas_change_msi(struct pci_dn *pdn, u32 func, u32 num_irqs)
 					func, num_irqs, seq_num);
 
 		seq_num = rtas_ret[1];
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	/*
 	 * If the RTAS call succeeded, return the number of irqs allocated.
@@ -100,7 +100,7 @@ static int rtas_query_irq_number(struct pci_dn *pdn, int offset)
 	do {
 		rc = rtas_call(query_token, 4, 3, rtas_ret, addr,
 			       BUID_HI(buid), BUID_LO(buid), offset);
-	} while (rtas_busy_delay(rc));
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc) {
 		pr_debug("rtas_msi: error (%d) querying source number\n", rc);
