@@ -189,6 +189,12 @@ static int radeon_cs_parser_relocs(struct radeon_cs_parser *p)
 				      priority);
 	}
 
+	for (i = 0; i < p->nrelocs; i++) {
+		r = dma_resv_sync_user_fence(p->relocs[i].tv.bo->base.resv);
+		if (r)
+			return r;
+	}
+
 	radeon_cs_buckets_get_list(&buckets, &p->validated);
 
 	if (p->cs_flags & RADEON_CS_USE_VM)

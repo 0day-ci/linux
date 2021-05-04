@@ -519,6 +519,10 @@ static int radeon_crtc_page_flip_target(struct drm_crtc *crtc,
 	DRM_DEBUG_DRIVER("flip-ioctl() cur_rbo = %p, new_rbo = %p\n",
 			 work->old_rbo, new_rbo);
 
+	r = dma_resv_sync_user_fence(new_rbo->tbo.base.resv);
+	if (unlikely(r != 0))
+		goto cleanup;
+
 	r = radeon_bo_reserve(new_rbo, false);
 	if (unlikely(r != 0)) {
 		DRM_ERROR("failed to reserve new rbo buffer before flip\n");
