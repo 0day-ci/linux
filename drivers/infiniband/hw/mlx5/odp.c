@@ -804,6 +804,10 @@ static int pagefault_dmabuf_mr(struct mlx5_ib_mr *mr, size_t bcnt,
 	if (flags & MLX5_PF_FLAGS_ENABLE)
 		xlt_flags |= MLX5_IB_UPD_XLT_ENABLE;
 
+	err = dma_resv_sync_user_fence(umem_dmabuf->attach->dmabuf->resv);
+	if (err)
+		return err;
+
 	dma_resv_lock(umem_dmabuf->attach->dmabuf->resv, NULL);
 	err = ib_umem_dmabuf_map_pages(umem_dmabuf);
 	if (err) {
