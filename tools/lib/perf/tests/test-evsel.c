@@ -173,7 +173,7 @@ static int test_stat_user_read(int event)
 
 		__T("invalid counter data", (end - start) > last);
 		last = end - start;
-		__T_VERBOSE("count = %llu\n", end - start);
+		__T_VERBOSE("count = %llu\n", (unsigned long long)(end - start));
 	}
 
 	perf_evsel__munmap(evsel);
