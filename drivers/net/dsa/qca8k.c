@@ -780,6 +780,47 @@ qca8k_setup_mdio_bus(struct qca8k_priv *priv)
 }
 
 static int
+qca8k_setup_of_rgmii_delay(struct qca8k_priv *priv)
+{
+	struct device_node *ports, *port;
+	u32 val;
+
+	ports = of_get_child_by_name(priv->dev->of_node, "ports");
+	if (!ports)
+		return -EINVAL;
+
+	/* Assume only one port with rgmii-id mode */
+	for_each_available_child_of_node(ports, port) {
+		if (!of_property_match_string(port, "phy-mode", "rgmii-id"))
+			continue;
+
+		if (of_property_read_u32(port, "rx-internal-delay-ps", &val))
+			val = 2;
+
+		if (val > QCA8K_MAX_DELAY) {
+			dev_err(priv->dev, "rgmii rx delay is limited to more than 3ps, setting to the max value");
+			priv->rgmii_rx_delay = 3;
+		} else {
+			priv->rgmii_rx_delay = val;
+		}
+
+		if (of_property_read_u32(port, "rx-internal-delay-ps", &val))
+			val = 1;
+
+		if (val > QCA8K_MAX_DELAY) {
+			dev_err(priv->dev, "rgmii tx delay is limited to more than 3ps, setting to the max value");
+			priv->rgmii_tx_delay = 3;
+		} else {
+			priv->rgmii_rx_delay = val;
+		}
+	}
+
+	of_node_put(ports);
+
+	return 0;
+}
+
+static int
 qca8k_setup(struct dsa_switch *ds)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
@@ -805,6 +846,10 @@ qca8k_setup(struct dsa_switch *ds)
 		pr_warn("regmap initialization failed");
 
 	ret = qca8k_setup_mdio_bus(priv);
+	if (ret)
+		return ret;
+
+	ret = qca8k_setup_of_rgmii_delay(priv);
 	if (ret)
 		return ret;
 
@@ -1018,8 +1063,10 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 		 */
 		qca8k_write(priv, reg,
 			    QCA8K_PORT_PAD_RGMII_EN |
-			    QCA8K_PORT_PAD_RGMII_TX_DELAY(QCA8K_MAX_DELAY) |
-			    QCA8K_PORT_PAD_RGMII_RX_DELAY(QCA8K_MAX_DELAY));
+			    QCA8K_PORT_PAD_RGMII_TX_DELAY(priv->rgmii_tx_delay) |
+			    QCA8K_PORT_PAD_RGMII_RX_DELAY(priv->rgmii_rx_delay) |
+			    QCA8K_PORT_PAD_RGMII_TX_DELAY_EN |
+			    QCA8K_PORT_PAD_RGMII_RX_DELAY_EN);
 		/* QCA8337 requires to set rgmii rx delay */
 		if (data->id == QCA8K_ID_QCA8337)
 			qca8k_write(priv, QCA8K_REG_PORT5_PAD_CTRL,
