@@ -100,6 +100,25 @@ void isp1760_set_pullup(struct isp1760_device *isp, bool enable)
 		isp1760_field_set(udc->fields, HW_DP_PULLUP_CLEAR);
 }
 
+/*
+ * 60kb divided in:
+ * - 32 blocks @ 256  bytes
+ * - 20 blocks @ 1024 bytes
+ * -  4 blocks @ 8192 bytes
+ */
+static const struct isp1760_memory_layout isp176x_memory_conf = {
+	.blocks[0]		= 32,
+	.blocks_size[0]		= 256,
+	.blocks[1]		= 20,
+	.blocks_size[1]		= 1024,
+	.blocks[2]		= 4,
+	.blocks_size[2]		= 8192,
+
+	.ptd_num		= 32,
+	.payload_blocks		= 32 + 20 + 4,
+	.payload_area_size	= 0xf000,
+};
+
 static struct regmap_config isp1760_hc_regmap_conf = {
 	.name = "isp1760-hc",
 	.reg_bits = 16,
@@ -185,6 +204,8 @@ int isp1760_register(struct resource *mem, int irq, unsigned long irqflags,
 
 		udc->fields[i] = f;
 	}
+
+	hcd->memory_layout = &isp176x_memory_conf;
 
 	isp1760_init_core(isp);
 
