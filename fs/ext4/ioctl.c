@@ -800,6 +800,40 @@ static int ext4_ioctl_get_es_cache(struct file *filp, unsigned long arg)
 	return error;
 }
 
+static int ext4_ioctl_checkpoint(struct file *filp, unsigned long arg)
+{
+	int err = 0;
+	unsigned long long flags = 0;
+	struct super_block *sb = file_inode(filp)->i_sb;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	/* file argument is not the mount point */
+	if (file_dentry(filp) != sb->s_root)
+		return -EINVAL;
+
+	/* filesystem is not backed by block device */
+	if (sb->s_bdev == NULL)
+		return -EINVAL;
+
+	if (copy_from_user(&flags, (__u64 __user *)arg,
+				sizeof(__u64)))
+		return -EFAULT;
+
+	/* flags can only be 0 or EXT4_IOC_CHECKPOINT_FLAG_DISCARD */
+	if (flags & ~EXT4_IOC_CHECKPOINT_FLAG_DISCARD)
+		return -EINVAL;
+
+	if (EXT4_SB(sb)->s_journal) {
+		jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);
+		err = jbd2_journal_flush(EXT4_SB(sb)->s_journal,
+			flags & EXT4_IOC_CHECKPOINT_FLAG_DISCARD);
+		jbd2_journal_unlock_updates(EXT4_SB(sb)->s_journal);
+	}
+	return err;
+}
+
 static long __ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -1211,6 +1245,9 @@ resizefs_out:
 		return fsverity_ioctl_read_metadata(filp,
 						    (const void __user *)arg);
 
+	case EXT4_IOC_CHECKPOINT:
+		return ext4_ioctl_checkpoint(filp, arg);
+
 	default:
 		return -ENOTTY;
 	}
@@ -1291,6 +1328,7 @@ long ext4_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case EXT4_IOC_CLEAR_ES_CACHE:
 	case EXT4_IOC_GETSTATE:
 	case EXT4_IOC_GET_ES_CACHE:
+	case EXT4_IOC_CHECKPOINT:
 		break;
 	default:
 		return -ENOIOCTLCMD;
