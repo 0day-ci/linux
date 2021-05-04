@@ -195,6 +195,7 @@ static struct fpga_image_info *of_fpga_region_parse_ov(
 {
 	struct device *dev = &region->dev;
 	struct fpga_image_info *info;
+	const char *encrypted_key_name;
 	const char *firmware_name;
 	int ret;
 
@@ -227,6 +228,18 @@ static struct fpga_image_info *of_fpga_region_parse_ov(
 
 	if (of_property_read_bool(overlay, "encrypted-fpga-config"))
 		info->flags |= FPGA_MGR_ENCRYPTED_BITSTREAM;
+
+	if (of_property_read_bool(overlay, "encrypted-user-key-fpga-config")) {
+		if (!of_property_read_string(overlay, "encrypted-key-name",
+					     &encrypted_key_name)) {
+			info->encrypted_key_name =
+			devm_kstrdup(dev, encrypted_key_name, GFP_KERNEL);
+			if (!info->encrypted_key_name)
+				return ERR_PTR(-ENOMEM);
+		}
+
+		info->flags |= FPGA_MGR_ENCRYPTED_USER_KEY_BITSTREAM;
+	}
 
 	if (!of_property_read_string(overlay, "firmware-name",
 				     &firmware_name)) {
