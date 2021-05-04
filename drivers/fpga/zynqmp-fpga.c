@@ -22,6 +22,8 @@
  */
 struct zynqmp_fpga_priv {
 	struct device *dev;
+	const char *key_buf;
+	size_t key_size;
 	u32 flags;
 };
 
@@ -33,6 +35,8 @@ static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
 
 	priv = mgr->priv;
 	priv->flags = info->flags;
+	priv->key_buf = info->enc_key_buf;
+	priv->key_size = info->enc_key_buf_size;
 
 	return 0;
 }
@@ -41,9 +45,9 @@ static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
 				 const char *buf, size_t size)
 {
 	struct zynqmp_fpga_priv *priv;
-	dma_addr_t dma_addr;
+	dma_addr_t dma_addr, key_addr;
 	u32 eemi_flags = 0;
-	char *kbuf;
+	char *kbuf, *key_kbuf;
 	int ret;
 
 	priv = mgr->priv;
@@ -54,12 +58,28 @@ static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
 
 	memcpy(kbuf, buf, size);
 
+	if (priv->flags & FPGA_MGR_ENCRYPTED_USER_KEY_BITSTREAM) {
+		eemi_flags |= XILINX_ZYNQMP_PM_FPGA_ENC_USER_KEY;
+		key_kbuf = dma_alloc_coherent(priv->dev, size, &key_addr,
+					      GFP_KERNEL);
+		if (!key_kbuf)
+			return -ENOMEM;
+		memcpy(key_kbuf, priv->key_buf, priv->key_size);
+	}
+
 	wmb(); /* ensure all writes are done before initiate FW call */
 
 	if (priv->flags & FPGA_MGR_PARTIAL_RECONFIG)
 		eemi_flags |= XILINX_ZYNQMP_PM_FPGA_PARTIAL;
 
+	if (priv->flags & FPGA_MGR_ENCRYPTED_USER_KEY_BITSTREAM)
+		ret = zynqmp_pm_fpga_enc_key_load(key_addr, priv->key_size);
+
 	ret = zynqmp_pm_fpga_load(dma_addr, size, eemi_flags);
+
+	if (priv->flags & FPGA_MGR_ENCRYPTED_USER_KEY_BITSTREAM)
+		dma_free_coherent(priv->dev, priv->key_size,
+				  key_kbuf, key_addr);
 
 	dma_free_coherent(priv->dev, size, kbuf, dma_addr);
 

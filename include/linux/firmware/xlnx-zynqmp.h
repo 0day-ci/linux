@@ -56,9 +56,11 @@
  * Firmware FPGA Manager flags
  * XILINX_ZYNQMP_PM_FPGA_FULL:	FPGA full reconfiguration
  * XILINX_ZYNQMP_PM_FPGA_PARTIAL: FPGA partial reconfiguration
+ * XILINX_ZYNQMP_PM_FPGA_ENC_USER_KEY: User-key Encrypted FPGA reconfiguration
  */
 #define XILINX_ZYNQMP_PM_FPGA_FULL	0x0U
 #define XILINX_ZYNQMP_PM_FPGA_PARTIAL	BIT(0)
+#define XILINX_ZYNQMP_PM_FPGA_ENC_USER_KEY	BIT(3)
 
 enum pm_api_id {
 	PM_GET_API_VERSION = 1,
