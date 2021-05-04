@@ -285,6 +285,20 @@ fail:
 	return ret;
 }
 
+static int submit_sync_user_fence(struct msm_gem_submit *submit)
+{
+	int i, ret;
+
+	for (i = 0; i < submit->nr_bos; i++) {
+		struct msm_gem_object *msm_obj = submit->bos[i].obj;
+
+		ret = dma_resv_sync_user_fence(msm_obj->base.resv);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 static int submit_fence_sync(struct msm_gem_submit *submit, bool no_implicit)
 {
 	int i, ret = 0;
@@ -768,6 +782,10 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	 * have already done all the fence waiting.
 	 */
 	pm_runtime_get_sync(&gpu->pdev->dev);
+
+	ret = submit_sync_user_fence(submit);
+	if (ret)
+		goto out;
 
 	/* copy_*_user while holding a ww ticket upsets lockdep */
 	ww_acquire_init(&submit->ticket, &reservation_ww_class);
