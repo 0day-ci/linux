@@ -669,10 +669,9 @@ static void br_mdb_switchdev_host(struct net_device *dev,
 		br_mdb_switchdev_host_port(dev, lower_dev, mp, type);
 }
 
-void br_mdb_notify(struct net_device *dev,
-		   struct net_bridge_mdb_entry *mp,
-		   struct net_bridge_port_group *pg,
-		   int type)
+void br_mdb_switchdev_port(struct net_bridge_mdb_entry *mp,
+			   struct net_bridge_port *p,
+			   int type)
 {
 	struct br_mdb_complete_info *complete_info;
 	struct switchdev_obj_port_mdb mdb = {
@@ -681,30 +680,42 @@ void br_mdb_notify(struct net_device *dev,
 			.flags = SWITCHDEV_F_DEFER,
 		},
 	};
+
+	if (!p)
+		return;
+
+	br_switchdev_mdb_populate(&mdb, mp);
+
+	mdb.obj.orig_dev = p->dev;
+	switch (type) {
+	case RTM_NEWMDB:
+		complete_info = kmalloc(sizeof(*complete_info), GFP_ATOMIC);
+		if (!complete_info)
+			break;
+		complete_info->port = p;
+		complete_info->ip = mp->addr;
+		mdb.obj.complete_priv = complete_info;
+		mdb.obj.complete = br_mdb_complete;
+		if (switchdev_port_obj_add(p->dev, &mdb.obj, NULL))
+			kfree(complete_info);
+		break;
+	case RTM_DELMDB:
+		switchdev_port_obj_del(p->dev, &mdb.obj);
+		break;
+	}
+}
+
+void br_mdb_notify(struct net_device *dev,
+		   struct net_bridge_mdb_entry *mp,
+		   struct net_bridge_port_group *pg,
+		   int type)
+{
 	struct net *net = dev_net(dev);
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
 
 	if (pg) {
-		br_switchdev_mdb_populate(&mdb, mp);
-
-		mdb.obj.orig_dev = pg->key.port->dev;
-		switch (type) {
-		case RTM_NEWMDB:
-			complete_info = kmalloc(sizeof(*complete_info), GFP_ATOMIC);
-			if (!complete_info)
-				break;
-			complete_info->port = pg->key.port;
-			complete_info->ip = mp->addr;
-			mdb.obj.complete_priv = complete_info;
-			mdb.obj.complete = br_mdb_complete;
-			if (switchdev_port_obj_add(pg->key.port->dev, &mdb.obj, NULL))
-				kfree(complete_info);
-			break;
-		case RTM_DELMDB:
-			switchdev_port_obj_del(pg->key.port->dev, &mdb.obj);
-			break;
-		}
+		br_mdb_switchdev_port(mp, pg->key.port, type);
 	} else {
 		br_mdb_switchdev_host(dev, mp, type);
 	}
