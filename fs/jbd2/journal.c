@@ -2251,8 +2251,7 @@ EXPORT_SYMBOL(jbd2_journal_clear_features);
  * Filesystems can use this when remounting readonly to ensure that
  * recovery does not need to happen on remount.
  */
-
-int jbd2_journal_flush(journal_t *journal)
+int jbd2_journal_flush(journal_t *journal, bool discard)
 {
 	int err = 0;
 	transaction_t *transaction = NULL;
