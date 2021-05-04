@@ -611,6 +611,13 @@ demand:
 Note that reception of a socket's own CAN frames are subject to the same
 filtering as other CAN frames (see :ref:`socketcan-rawfilter`).
 
+RAW socket option CAN_RAW_RECV_OWN_MSGS_ALL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Identical to CAN_RAW_RECV_OWN_MSGS except that all sent messages are
+received. I.e. reception is not subject to filtering.
+
+
 .. _socketcan-rawfd:
 
 RAW Socket Option CAN_RAW_FD_FRAMES
