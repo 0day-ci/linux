@@ -832,7 +832,8 @@ void br_mdb_hash_fini(struct net_bridge *br);
 void br_mdb_switchdev_port(struct net_bridge_mdb_entry *mp,
 			   struct net_bridge_port *p, int type);
 void br_mdb_notify(struct net_device *dev, struct net_bridge_mdb_entry *mp,
-		   struct net_bridge_port_group *pg, int type);
+		   struct net_bridge_port_group *pg, int type,
+		   bool swdev_notify);
 void br_rtr_notify(struct net_device *dev, struct net_bridge_port *port,
 		   int type);
 void br_multicast_del_pg(struct net_bridge_mdb_entry *mp,

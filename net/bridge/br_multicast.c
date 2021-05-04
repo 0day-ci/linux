@@ -506,7 +506,7 @@ static void br_multicast_fwd_src_handle(struct net_bridge_group_src *src)
 		sg_mp = br_mdb_ip_get(src->br, &sg_key.addr);
 		if (!sg_mp)
 			return;
-		br_mdb_notify(src->br->dev, sg_mp, sg, RTM_NEWMDB);
+		br_mdb_notify(src->br->dev, sg_mp, sg, RTM_NEWMDB, true);
 	}
 }
 
@@ -617,7 +617,12 @@ void br_multicast_del_pg(struct net_bridge_mdb_entry *mp,
 	br_multicast_eht_clean_sets(pg);
 	hlist_for_each_entry_safe(ent, tmp, &pg->src_list, node)
 		br_multicast_del_group_src(ent, false);
-	br_mdb_notify(br->dev, mp, pg, RTM_DELMDB);
+	/* don't notify switchdev if mrouter port
+	 * switchdev will be notified when group expires via
+	 * br_multicast_group_change
+	 */
+	br_mdb_notify(br->dev, mp, pg, RTM_DELMDB,
+		      hlist_unhashed(&pg->key.port->rlist));
 	if (!br_multicast_is_star_g(&mp->addr)) {
 		rhashtable_remove_fast(&br->sg_port_tbl, &pg->rhnode,
 				       br_sg_port_rht_params);
@@ -688,7 +693,7 @@ static void br_multicast_port_group_expired(struct timer_list *t)
 
 		if (WARN_ON(!mp))
 			goto out;
-		br_mdb_notify(br->dev, mp, pg, RTM_NEWMDB);
+		br_mdb_notify(br->dev, mp, pg, RTM_NEWMDB, true);
 	}
 out:
 	spin_unlock(&br->multicast_lock);
@@ -1228,7 +1233,7 @@ void br_multicast_host_join(struct net_bridge_mdb_entry *mp, bool notify)
 		if (br_multicast_is_star_g(&mp->addr))
 			br_multicast_star_g_host_state(mp);
 		if (notify)
-			br_mdb_notify(mp->br->dev, mp, NULL, RTM_NEWMDB);
+			br_mdb_notify(mp->br->dev, mp, NULL, RTM_NEWMDB, true);
 	}
 
 	if (br_group_is_l2(&mp->addr))
@@ -1246,7 +1251,7 @@ void br_multicast_host_leave(struct net_bridge_mdb_entry *mp, bool notify)
 	if (br_multicast_is_star_g(&mp->addr))
 		br_multicast_star_g_host_state(mp);
 	if (notify)
-		br_mdb_notify(mp->br->dev, mp, NULL, RTM_DELMDB);
+		br_mdb_notify(mp->br->dev, mp, NULL, RTM_DELMDB, true);
 }
 
 static struct net_bridge_port_group *
@@ -1294,7 +1299,7 @@ __br_multicast_add_group(struct net_bridge *br,
 	rcu_assign_pointer(*pp, p);
 	if (blocked)
 		p->flags |= MDB_PG_FLAGS_BLOCKED;
-	br_mdb_notify(br->dev, mp, p, RTM_NEWMDB);
+	br_mdb_notify(br->dev, mp, p, RTM_NEWMDB, true);
 
 found:
 	if (igmpv2_mldv1)
@@ -2436,7 +2441,7 @@ static int br_ip4_multicast_igmp3_report(struct net_bridge *br,
 			break;
 		}
 		if (changed)
-			br_mdb_notify(br->dev, mdst, pg, RTM_NEWMDB);
+			br_mdb_notify(br->dev, mdst, pg, RTM_NEWMDB, true);
 unlock_continue:
 		spin_unlock_bh(&br->multicast_lock);
 	}
@@ -2575,7 +2580,7 @@ static int br_ip6_multicast_mld2_report(struct net_bridge *br,
 			break;
 		}
 		if (changed)
-			br_mdb_notify(br->dev, mdst, pg, RTM_NEWMDB);
+			br_mdb_notify(br->dev, mdst, pg, RTM_NEWMDB, true);
 unlock_continue:
 		spin_unlock_bh(&br->multicast_lock);
 	}
@@ -2660,26 +2665,71 @@ br_multicast_update_query_timer(struct net_bridge *br,
 	mod_timer(&query->timer, jiffies + br->multicast_querier_interval);
 }
 
-static void br_port_mc_router_state_change(struct net_bridge_port *p,
+static void br_port_mc_router_state_change(struct net_bridge_port *port,
 					   bool is_mc_router)
 {
 	struct switchdev_attr attr = {
-		.orig_dev = p->dev,
+		.orig_dev = port->dev,
 		.id = SWITCHDEV_ATTR_ID_PORT_MROUTER,
 		.flags = SWITCHDEV_F_DEFER,
 		.u.mrouter = is_mc_router,
 	};
 	struct net_bridge_mdb_entry *mp;
+	struct net_bridge *br = port->br;
 	struct hlist_node *n;
 
-	switchdev_port_attr_set(p->dev, &attr, NULL);
+	switchdev_port_attr_set(port->dev, &attr, NULL);
 
 	/* Add/delete the router port to/from all multicast group
 	 * called whle br->multicast_lock is held
 	 */
-	hlist_for_each_entry_safe(mp, n, &p->br->mdb_list, mdb_node) {
-		br_mdb_switchdev_port(mp, p, is_mc_router ?
-				      RTM_NEWMDB : RTM_DELMDB);
+	hlist_for_each_entry_safe(mp, n, &br->mdb_list, mdb_node) {
+		struct net_bridge_port_group __rcu **pp;
+		struct net_bridge_port_group *p;
+		int port_group_exists = 0;
+
+		if (is_mc_router) {
+			for (pp = &mp->ports;
+				(p = mlock_dereference(*pp, br)) != NULL;
+				pp = &p->next) {
+				if (p->key.port == port) {
+					port_group_exists = 1;
+					if (!(p->flags & MDB_PG_FLAGS_PERMANENT))
+						br_multicast_del_pg(mp, p, pp);
+				}
+
+				if ((unsigned long)p->key.port < (unsigned long)port)
+					break;
+			}
+
+			if (port_group_exists)
+				continue;
+
+			br_mdb_switchdev_port(mp, port, RTM_NEWMDB);
+		} else {
+			for (pp = &mp->ports;
+				(p = mlock_dereference(*pp, br)) != NULL;
+				pp = &p->next) {
+				if (p->key.port == port) {
+					port_group_exists = 1;
+					break;
+				}
+
+				if ((unsigned long)p->key.port < (unsigned long)port)
+					break;
+			}
+
+			if (port_group_exists)
+				continue;
+
+			p = br_multicast_new_port_group(port, &mp->addr, *pp, 0,
+							NULL, MCAST_EXCLUDE, RTPROT_KERNEL);
+			if (unlikely(!p))
+				continue;
+			rcu_assign_pointer(*pp, p);
+			br_mdb_notify(br->dev, mp, p, RTM_NEWMDB, false);
+			mod_timer(&p->timer, jiffies + br->multicast_membership_interval);
+		}
 	}
 }
 

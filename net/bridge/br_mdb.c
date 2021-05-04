@@ -708,16 +708,17 @@ void br_mdb_switchdev_port(struct net_bridge_mdb_entry *mp,
 void br_mdb_notify(struct net_device *dev,
 		   struct net_bridge_mdb_entry *mp,
 		   struct net_bridge_port_group *pg,
-		   int type)
+		   int type, bool swdev_notify)
 {
 	struct net *net = dev_net(dev);
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
 
-	if (pg) {
-		br_mdb_switchdev_port(mp, pg->key.port, type);
-	} else {
-		br_mdb_switchdev_host(dev, mp, type);
+	if (swdev_notify) {
+		if (pg)
+			br_mdb_switchdev_port(mp, pg->key.port, type);
+		else
+			br_mdb_switchdev_host(dev, mp, type);
 	}
 
 	skb = nlmsg_new(rtnl_mdb_nlmsg_size(pg), GFP_ATOMIC);
@@ -1011,7 +1012,7 @@ static int br_mdb_add_group(struct net_bridge *br, struct net_bridge_port *port,
 		}
 
 		br_multicast_host_join(mp, false);
-		br_mdb_notify(br->dev, mp, NULL, RTM_NEWMDB);
+		br_mdb_notify(br->dev, mp, NULL, RTM_NEWMDB, true);
 
 		return 0;
 	}
@@ -1042,7 +1043,7 @@ static int br_mdb_add_group(struct net_bridge *br, struct net_bridge_port *port,
 	rcu_assign_pointer(*pp, p);
 	if (entry->state == MDB_TEMPORARY)
 		mod_timer(&p->timer, now + br->multicast_membership_interval);
-	br_mdb_notify(br->dev, mp, p, RTM_NEWMDB);
+	br_mdb_notify(br->dev, mp, p, RTM_NEWMDB, true);
 	/* if we are adding a new EXCLUDE port group (*,G) it needs to be also
 	 * added to all S,G entries for proper replication, if we are adding
 	 * a new INCLUDE port (S,G) then all of *,G EXCLUDE ports need to be
@@ -1176,7 +1177,7 @@ static int __br_mdb_del(struct net_bridge *br, struct br_mdb_entry *entry,
 	if (entry->ifindex == mp->br->dev->ifindex && mp->host_joined) {
 		br_multicast_host_leave(mp, false);
 		err = 0;
-		br_mdb_notify(br->dev, mp, NULL, RTM_DELMDB);
+		br_mdb_notify(br->dev, mp, NULL, RTM_DELMDB, true);
 		if (!mp->ports && netif_running(br->dev))
 			mod_timer(&mp->timer, jiffies);
 		goto unlock;
