@@ -62,7 +62,7 @@ void rtas_get_rtc_time(struct rtc_time *rtc_tm)
 
 int rtas_set_rtc_time(struct rtc_time *tm)
 {
-	int error, wait_time;
+	int error;
 	u64 max_wait_tb;
 
 	max_wait_tb = get_tb() + tb_ticks_per_usec * 1000 * MAX_RTC_WAIT;
@@ -72,13 +72,7 @@ int rtas_set_rtc_time(struct rtc_time *tm)
 				  tm->tm_mday, tm->tm_hour, tm->tm_min,
 				  tm->tm_sec, 0);
 
-		wait_time = rtas_busy_delay_time(error);
-		if (wait_time) {
-			if (in_interrupt())
-				return 1;	/* probably decrementer */
-			msleep(wait_time);
-		}
-	} while (wait_time && (get_tb() < max_wait_tb));
+	} while (rtas_sched_if_busy(error) && (get_tb() < max_wait_tb));
 
 	if (error != 0)
 		printk_ratelimited(KERN_WARNING
