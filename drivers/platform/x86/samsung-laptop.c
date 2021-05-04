@@ -1301,13 +1301,13 @@ static void samsung_debugfs_init(struct samsung_laptop *samsung)
 			   &samsung->debug.data.d2);
 	debugfs_create_u8("d3", S_IRUGO | S_IWUSR, root,
 			  &samsung->debug.data.d3);
-	debugfs_create_blob("data", S_IRUGO | S_IWUSR, root,
+	debugfs_create_blob("data", S_IRUGO, root,
 			    &samsung->debug.data_wrapper);
-	debugfs_create_blob("f0000_segment", S_IRUSR | S_IWUSR, root,
+	debugfs_create_blob("f0000_segment", S_IRUSR, root,
 			    &samsung->debug.f0000_wrapper);
 	debugfs_create_file("call", S_IFREG | S_IRUGO, root, samsung,
 			    &samsung_laptop_call_fops);
-	debugfs_create_blob("sdiag", S_IRUGO | S_IWUSR, root,
+	debugfs_create_blob("sdiag", S_IRUGO, root,
 			    &samsung->debug.sdiag_wrapper);
 }
 
