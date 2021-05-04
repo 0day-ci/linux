@@ -146,12 +146,13 @@ qca8k_set_page(struct mii_bus *bus, u16 page)
 static u32
 qca8k_read(struct qca8k_priv *priv, u32 reg)
 {
+	struct mii_bus *bus = priv->bus;
 	u16 r1, r2, page;
 	u32 val;
 
 	qca8k_split_addr(reg, &r1, &r2, &page);
 
-	mutex_lock_nested(&priv->bus->mdio_lock, MDIO_MUTEX_NESTED);
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
 
 	val = qca8k_set_page(priv->bus, page);
 	if (val < 0)
@@ -160,8 +161,7 @@ qca8k_read(struct qca8k_priv *priv, u32 reg)
 	val = qca8k_mii_read32(priv->bus, 0x10 | r2, r1);
 
 exit:
-	mutex_unlock(&priv->bus->mdio_lock);
-
+	mutex_unlock(&bus->mdio_lock);
 	return val;
 }
 
@@ -226,8 +226,13 @@ static int
 qca8k_regmap_read(void *ctx, uint32_t reg, uint32_t *val)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ctx;
+	int ret;
 
-	*val = qca8k_read(priv, reg);
+	ret = qca8k_read(priv, reg);
+	if (ret < 0)
+		return ret;
+
+	*val = ret;
 
 	return 0;
 }
@@ -280,15 +285,17 @@ static int
 qca8k_busy_wait(struct qca8k_priv *priv, u32 reg, u32 mask)
 {
 	unsigned long timeout;
+	u32 val;
 
 	timeout = jiffies + msecs_to_jiffies(20);
 
 	/* loop until the busy flag has cleared */
 	do {
-		u32 val = qca8k_read(priv, reg);
-		int busy = val & mask;
+		val = qca8k_read(priv, reg);
+		if (val < 0)
+			continue;
 
-		if (!busy)
+		if (!(val & mask))
 			break;
 		cond_resched();
 	} while (!time_after_eq(jiffies, timeout));
@@ -296,15 +303,20 @@ qca8k_busy_wait(struct qca8k_priv *priv, u32 reg, u32 mask)
 	return time_after_eq(jiffies, timeout);
 }
 
-static void
+static int
 qca8k_fdb_read(struct qca8k_priv *priv, struct qca8k_fdb *fdb)
 {
-	u32 reg[4];
+	u32 reg[4], val;
 	int i;
 
 	/* load the ARL table into an array */
-	for (i = 0; i < 4; i++)
-		reg[i] = qca8k_read(priv, QCA8K_REG_ATU_DATA0 + (i * 4));
+	for (i = 0; i < 4; i++) {
+		val = qca8k_read(priv, QCA8K_REG_ATU_DATA0 + (i * 4));
+		if (val < 0)
+			return val;
+
+		reg[i] = val;
+	}
 
 	/* vid - 83:72 */
 	fdb->vid = (reg[2] >> QCA8K_ATU_VID_S) & QCA8K_ATU_VID_M;
@@ -319,6 +331,8 @@ qca8k_fdb_read(struct qca8k_priv *priv, struct qca8k_fdb *fdb)
 	fdb->mac[3] = (reg[0] >> QCA8K_ATU_ADDR3_S) & 0xff;
 	fdb->mac[4] = (reg[0] >> QCA8K_ATU_ADDR4_S) & 0xff;
 	fdb->mac[5] = reg[0] & 0xff;
+
+	return 0;
 }
 
 static void
@@ -370,6 +384,8 @@ qca8k_fdb_access(struct qca8k_priv *priv, enum qca8k_fdb_cmd cmd, int port)
 	/* Check for table full violation when adding an entry */
 	if (cmd == QCA8K_FDB_LOAD) {
 		reg = qca8k_read(priv, QCA8K_REG_ATU_FUNC);
+		if (reg < 0)
+			return reg;
 		if (reg & QCA8K_ATU_FUNC_FULL)
 			return -1;
 	}
@@ -380,12 +396,15 @@ qca8k_fdb_access(struct qca8k_priv *priv, enum qca8k_fdb_cmd cmd, int port)
 static int
 qca8k_fdb_next(struct qca8k_priv *priv, struct qca8k_fdb *fdb, int port)
 {
-	int ret;
+	int ret, ret_read;
 
 	qca8k_fdb_write(priv, fdb->vid, fdb->port_mask, fdb->mac, fdb->aging);
 	ret = qca8k_fdb_access(priv, QCA8K_FDB_NEXT, port);
-	if (ret >= 0)
-		qca8k_fdb_read(priv, fdb);
+	if (ret >= 0) {
+		ret_read = qca8k_fdb_read(priv, fdb);
+		if (ret_read < 0)
+			return ret_read;
+	}
 
 	return ret;
 }
@@ -445,6 +464,8 @@ qca8k_vlan_access(struct qca8k_priv *priv, enum qca8k_vlan_cmd cmd, u16 vid)
 	/* Check for table full violation when adding an entry */
 	if (cmd == QCA8K_VLAN_LOAD) {
 		reg = qca8k_read(priv, QCA8K_REG_VTU_FUNC1);
+		if (reg < 0)
+			return reg;
 		if (reg & QCA8K_VTU_FUNC1_FULL)
 			return -ENOMEM;
 	}
@@ -471,6 +492,8 @@ qca8k_vlan_add(struct qca8k_priv *priv, u8 port, u16 vid, bool untagged)
 		goto out;
 
 	reg = qca8k_read(priv, QCA8K_REG_VTU_FUNC0);
+	if (reg < 0)
+		return reg;
 	reg |= QCA8K_VTU_FUNC0_VALID | QCA8K_VTU_FUNC0_IVL_EN;
 	reg &= ~(QCA8K_VTU_FUNC0_EG_MODE_MASK << QCA8K_VTU_FUNC0_EG_MODE_S(port));
 	if (untagged)
@@ -502,6 +525,8 @@ qca8k_vlan_del(struct qca8k_priv *priv, u8 port, u16 vid)
 		goto out;
 
 	reg = qca8k_read(priv, QCA8K_REG_VTU_FUNC0);
+	if (reg < 0)
+		return reg;
 	reg &= ~(3 << QCA8K_VTU_FUNC0_EG_MODE_S(port));
 	reg |= QCA8K_VTU_FUNC0_EG_MODE_NOT <<
 			QCA8K_VTU_FUNC0_EG_MODE_S(port);
@@ -617,8 +642,11 @@ qca8k_mdio_read(struct qca8k_priv *priv, int port, u32 regnum)
 			    QCA8K_MDIO_MASTER_BUSY))
 		return -ETIMEDOUT;
 
-	val = (qca8k_read(priv, QCA8K_MDIO_MASTER_CTRL) &
-		QCA8K_MDIO_MASTER_DATA_MASK);
+	val = qca8k_read(priv, QCA8K_MDIO_MASTER_CTRL);
+	if (val < 0)
+		return val;
+
+	val &= QCA8K_MDIO_MASTER_DATA_MASK;
 
 	return val;
 }
@@ -974,6 +1002,8 @@ qca8k_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	u32 reg;
 
 	reg = qca8k_read(priv, QCA8K_REG_PORT_STATUS(port));
+	if (reg < 0)
+		return reg;
 
 	state->link = !!(reg & QCA8K_PORT_STATUS_LINK_UP);
 	state->an_complete = state->link;
@@ -1074,18 +1104,26 @@ qca8k_get_ethtool_stats(struct dsa_switch *ds, int port,
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	const struct qca8k_mib_desc *mib;
-	u32 reg, i;
+	u32 reg, i, val;
 	u64 hi;
 
 	for (i = 0; i < ARRAY_SIZE(ar8327_mib); i++) {
 		mib = &ar8327_mib[i];
 		reg = QCA8K_PORT_MIB_COUNTER(port) + mib->offset;
 
-		data[i] = qca8k_read(priv, reg);
+		val = qca8k_read(priv, reg);
+		if (val < 0)
+			continue;
+
 		if (mib->size == 2) {
 			hi = qca8k_read(priv, reg + 4);
-			data[i] |= hi << 32;
+			if (hi < 0)
+				continue;
 		}
+
+		data[i] = val;
+		if (mib->size == 2)
+			data[i] |= hi << 32;
 	}
 }
 
@@ -1103,18 +1141,25 @@ qca8k_set_mac_eee(struct dsa_switch *ds, int port, struct ethtool_eee *eee)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	u32 lpi_en = QCA8K_REG_EEE_CTRL_LPI_EN(port);
+	int ret = 0;
 	u32 reg;
 
 	mutex_lock(&priv->reg_mutex);
 	reg = qca8k_read(priv, QCA8K_REG_EEE_CTRL);
+	if (reg < 0) {
+		ret = reg;
+		goto exit;
+	}
+
 	if (eee->eee_enabled)
 		reg |= lpi_en;
 	else
 		reg &= ~lpi_en;
 	qca8k_write(priv, QCA8K_REG_EEE_CTRL, reg);
-	mutex_unlock(&priv->reg_mutex);
 
-	return 0;
+exit:
+	mutex_unlock(&priv->reg_mutex);
+	return ret;
 }
 
 static int
@@ -1439,6 +1484,9 @@ qca8k_sw_probe(struct mdio_device *mdiodev)
 
 	/* read the switches ID register */
 	id = qca8k_read(priv, QCA8K_REG_MASK_CTRL);
+	if (id < 0)
+		return id;
+
 	id >>= QCA8K_MASK_CTRL_ID_S;
 	id &= QCA8K_MASK_CTRL_ID_M;
 	if (id != QCA8K_ID_QCA8337)
