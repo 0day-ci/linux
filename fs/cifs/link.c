@@ -686,8 +686,10 @@ cifs_symlink(struct user_namespace *mnt_userns, struct inode *inode,
 	void *page = alloc_dentry_path();
 	struct inode *newinode = NULL;
 
-	if (unlikely(cifs_forced_shutdown(cifs_sb)))
+	if (unlikely(cifs_forced_shutdown(cifs_sb))) {
+		free_dentry_path(page);
 		return -EIO;
+	}
 
 	xid = get_xid();
 
