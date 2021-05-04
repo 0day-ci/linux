@@ -44,8 +44,8 @@
  * Locate cache slot in range [offset, index] for specified inode.  If
  * there's more than one return the slot closest to index.
  */
-static struct meta_index *locate_meta_index(struct inode *inode, int offset,
-				int index)
+static struct meta_index *locate_meta_index(struct inode *inode, unsigned int offset,
+				unsigned int index)
 {
 	struct meta_index *meta = NULL;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
@@ -83,8 +83,8 @@ not_allocated:
 /*
  * Find and initialise an empty cache slot for index offset.
  */
-static struct meta_index *empty_meta_index(struct inode *inode, int offset,
-				int skip)
+static struct meta_index *empty_meta_index(struct inode *inode, unsigned int offset,
+				unsigned int skip)
 {
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
 	struct meta_index *meta = NULL;
@@ -211,11 +211,11 @@ failure:
  * If the skip factor is limited in this way then the file will use multiple
  * slots.
  */
-static inline int calculate_skip(int blocks)
+static inline unsigned int calculate_skip(unsigned int blocks)
 {
-	int skip = blocks / ((SQUASHFS_META_ENTRIES + 1)
+	unsigned int skip = blocks / ((SQUASHFS_META_ENTRIES + 1)
 		 * SQUASHFS_META_INDEXES);
-	return min(SQUASHFS_CACHED_BLKS - 1, skip + 1);
+	return min((unsigned int) SQUASHFS_CACHED_BLKS - 1, skip + 1);
 }
 
 
@@ -224,12 +224,12 @@ static inline int calculate_skip(int blocks)
  * on-disk locations of the datablock and block list metadata block
  * <index_block, index_offset> for index (scaled to nearest cache index).
  */
-static int fill_meta_index(struct inode *inode, int index,
+static int fill_meta_index(struct inode *inode, unsigned int index,
 		u64 *index_block, int *index_offset, u64 *data_block)
 {
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
-	int skip = calculate_skip(i_size_read(inode) >> msblk->block_log);
-	int offset = 0;
+	unsigned int skip = calculate_skip(i_size_read(inode) >> msblk->block_log);
+	unsigned int offset = 0;
 	struct meta_index *meta;
 	struct meta_entry *meta_entry;
 	u64 cur_index_block = squashfs_i(inode)->block_list_start;
@@ -323,7 +323,7 @@ failed:
  * Get the on-disk location and compressed size of the datablock
  * specified by index.  Fill_meta_index() does most of the work.
  */
-static int read_blocklist(struct inode *inode, int index, u64 *block)
+static int read_blocklist(struct inode *inode, unsigned int index, u64 *block)
 {
 	u64 start;
 	long long blks;
@@ -448,7 +448,7 @@ static int squashfs_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
 	struct squashfs_sb_info *msblk = inode->i_sb->s_fs_info;
-	int index = page->index >> (msblk->block_log - PAGE_SHIFT);
+	unsigned int index = page->index >> (msblk->block_log - PAGE_SHIFT);
 	int file_end = i_size_read(inode) >> msblk->block_log;
 	int expected = index == file_end ?
 			(i_size_read(inode) & (msblk->block_size - 1)) :
