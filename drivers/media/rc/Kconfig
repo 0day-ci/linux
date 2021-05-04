@@ -532,6 +532,17 @@ config IR_TOY
 	   To compile this driver as a module, choose M here: the module will be
 	   called ir_toy.
 
+config IR_UIRT
+	tristate "USB-UIRT"
+	depends on RC_CORE
+	depends on USB_ARCH_HAS_HCD
+	help
+	   Say Y here if you want to use the USB-UIRT. See
+	   http://www.usbuirt.com/
+
+	   To compile this driver as a module, choose M here: the module will be
+	   called uirt.
+
 endif #RC_DEVICES
 
 endif #RC_CORE
