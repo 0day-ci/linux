@@ -321,6 +321,12 @@ int lima_gem_submit(struct drm_file *file, struct lima_submit *submit)
 			goto err_out0;
 		}
 
+		err = dma_resv_sync_user_fence(obj->resv);
+		if (err) {
+			drm_gem_object_put(obj);
+			goto err_out0;
+		}
+
 		bo = to_lima_bo(obj);
 
 		/* increase refcnt of gpu va map to prevent unmapped when executing,
