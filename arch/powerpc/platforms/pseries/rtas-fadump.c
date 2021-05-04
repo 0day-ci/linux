@@ -129,7 +129,6 @@ static u64 rtas_fadump_get_bootmem_min(void)
 
 static int rtas_fadump_register(struct fw_dump *fadump_conf)
 {
-	unsigned int wait_time;
 	int rc, err = -EIO;
 
 	/* TODO: Add upper time limit for the delay */
@@ -137,12 +136,7 @@ static int rtas_fadump_register(struct fw_dump *fadump_conf)
 		rc =  rtas_call(fadump_conf->ibm_configure_kernel_dump, 3, 1,
 				NULL, FADUMP_REGISTER, &fdm,
 				sizeof(struct rtas_fadump_mem_struct));
-
-		wait_time = rtas_busy_delay_time(rc);
-		if (wait_time)
-			mdelay(wait_time);
-
-	} while (wait_time);
+	} while (rtas_sched_if_busy(rc));
 
 	switch (rc) {
 	case 0:
@@ -177,7 +171,6 @@ static int rtas_fadump_register(struct fw_dump *fadump_conf)
 
 static int rtas_fadump_unregister(struct fw_dump *fadump_conf)
 {
-	unsigned int wait_time;
 	int rc;
 
 	/* TODO: Add upper time limit for the delay */
@@ -185,11 +178,7 @@ static int rtas_fadump_unregister(struct fw_dump *fadump_conf)
 		rc =  rtas_call(fadump_conf->ibm_configure_kernel_dump, 3, 1,
 				NULL, FADUMP_UNREGISTER, &fdm,
 				sizeof(struct rtas_fadump_mem_struct));
-
-		wait_time = rtas_busy_delay_time(rc);
-		if (wait_time)
-			mdelay(wait_time);
-	} while (wait_time);
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc) {
 		pr_err("Failed to un-register - unexpected error(%d).\n", rc);
@@ -202,7 +191,6 @@ static int rtas_fadump_unregister(struct fw_dump *fadump_conf)
 
 static int rtas_fadump_invalidate(struct fw_dump *fadump_conf)
 {
-	unsigned int wait_time;
 	int rc;
 
 	/* TODO: Add upper time limit for the delay */
@@ -210,11 +198,7 @@ static int rtas_fadump_invalidate(struct fw_dump *fadump_conf)
 		rc =  rtas_call(fadump_conf->ibm_configure_kernel_dump, 3, 1,
 				NULL, FADUMP_INVALIDATE, fdm_active,
 				sizeof(struct rtas_fadump_mem_struct));
-
-		wait_time = rtas_busy_delay_time(rc);
-		if (wait_time)
-			mdelay(wait_time);
-	} while (wait_time);
+	} while (rtas_sched_if_busy(rc));
 
 	if (rc) {
 		pr_err("Failed to invalidate - unexpected error (%d).\n", rc);
