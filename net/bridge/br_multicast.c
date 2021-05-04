@@ -522,9 +522,25 @@ static void br_multicast_destroy_mdb_entry(struct net_bridge_mcast_gc *gc)
 	kfree_rcu(mp, rcu);
 }
 
+/* Add/delete all mrouter ports to/from a group
+ * called while br->multicast_lock is held
+ */
+static void br_multicast_group_change(struct net_bridge_mdb_entry *mp,
+				      bool is_group_added)
+{
+	struct net_bridge_port *p;
+	struct hlist_node *n;
+
+	hlist_for_each_entry_safe(p, n, &mp->br->router_list, rlist)
+		br_mdb_switchdev_port(mp, p, is_group_added ?
+				      RTM_NEWMDB : RTM_DELMDB);
+}
+
 static void br_multicast_del_mdb_entry(struct net_bridge_mdb_entry *mp)
 {
 	struct net_bridge *br = mp->br;
+
+	br_multicast_group_change(mp, false);
 
 	rhashtable_remove_fast(&br->mdb_hash_tbl, &mp->rhnode,
 			       br_mdb_rht_params);
@@ -1067,6 +1083,8 @@ struct net_bridge_mdb_entry *br_multicast_new_group(struct net_bridge *br,
 	} else {
 		hlist_add_head_rcu(&mp->mdb_node, &br->mdb_list);
 	}
+
+	br_multicast_group_change(mp, true);
 
 	return mp;
 }
@@ -2651,8 +2669,18 @@ static void br_port_mc_router_state_change(struct net_bridge_port *p,
 		.flags = SWITCHDEV_F_DEFER,
 		.u.mrouter = is_mc_router,
 	};
+	struct net_bridge_mdb_entry *mp;
+	struct hlist_node *n;
 
 	switchdev_port_attr_set(p->dev, &attr, NULL);
+
+	/* Add/delete the router port to/from all multicast group
+	 * called whle br->multicast_lock is held
+	 */
+	hlist_for_each_entry_safe(mp, n, &p->br->mdb_list, mdb_node) {
+		br_mdb_switchdev_port(mp, p, is_mc_router ?
+				      RTM_NEWMDB : RTM_DELMDB);
+	}
 }
 
 /*
