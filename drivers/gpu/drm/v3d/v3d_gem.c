@@ -345,6 +345,12 @@ v3d_lookup_bos(struct drm_device *dev,
 	}
 	spin_unlock(&file_priv->table_lock);
 
+	for (i = 0; i < job->bo_count; i++) {
+		ret = dma_resv_sync_user_fence(job->bo[i]->resv);
+		if (ret)
+			break;
+	}
+
 fail:
 	kvfree(handles);
 	return ret;
