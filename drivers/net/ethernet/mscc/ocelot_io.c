@@ -18,7 +18,8 @@ u32 __ocelot_read_ix(struct ocelot *ocelot, u32 reg, u32 offset)
 	WARN_ON(!target);
 
 	regmap_read(ocelot->targets[target],
-		    ocelot->map[target][reg & REG_MASK] + offset, &val);
+		    ocelot->offsets[target] +
+			    ocelot->map[target][reg & REG_MASK] + offset, &val);
 	return val;
 }
 EXPORT_SYMBOL(__ocelot_read_ix);
@@ -30,7 +31,8 @@ void __ocelot_write_ix(struct ocelot *ocelot, u32 val, u32 reg, u32 offset)
 	WARN_ON(!target);
 
 	regmap_write(ocelot->targets[target],
-		     ocelot->map[target][reg & REG_MASK] + offset, val);
+		     ocelot->offsets[target] +
+			     ocelot->map[target][reg & REG_MASK] + offset, val);
 }
 EXPORT_SYMBOL(__ocelot_write_ix);
 
@@ -42,7 +44,8 @@ void __ocelot_rmw_ix(struct ocelot *ocelot, u32 val, u32 mask, u32 reg,
 	WARN_ON(!target);
 
 	regmap_update_bits(ocelot->targets[target],
-			   ocelot->map[target][reg & REG_MASK] + offset,
+			   ocelot->offsets[target] +
+				   ocelot->map[target][reg & REG_MASK] + offset,
 			   mask, val);
 }
 EXPORT_SYMBOL(__ocelot_rmw_ix);
@@ -55,7 +58,8 @@ u32 ocelot_port_readl(struct ocelot_port *port, u32 reg)
 
 	WARN_ON(!target);
 
-	regmap_read(port->target, ocelot->map[target][reg & REG_MASK], &val);
+	regmap_read(port->target,
+		    port->offset + ocelot->map[target][reg & REG_MASK], &val);
 	return val;
 }
 EXPORT_SYMBOL(ocelot_port_readl);
@@ -67,7 +71,8 @@ void ocelot_port_writel(struct ocelot_port *port, u32 val, u32 reg)
 
 	WARN_ON(!target);
 
-	regmap_write(port->target, ocelot->map[target][reg & REG_MASK], val);
+	regmap_write(port->target,
+		     port->offset + ocelot->map[target][reg & REG_MASK], val);
 }
 EXPORT_SYMBOL(ocelot_port_writel);
 
@@ -85,7 +90,8 @@ u32 __ocelot_target_read_ix(struct ocelot *ocelot, enum ocelot_target target,
 	u32 val;
 
 	regmap_read(ocelot->targets[target],
-		    ocelot->map[target][reg] + offset, &val);
+		    ocelot->offsets[target] + ocelot->map[target][reg] + offset,
+		    &val);
 	return val;
 }
 
@@ -93,7 +99,9 @@ void __ocelot_target_write_ix(struct ocelot *ocelot, enum ocelot_target target,
 			      u32 val, u32 reg, u32 offset)
 {
 	regmap_write(ocelot->targets[target],
-		     ocelot->map[target][reg] + offset, val);
+		     ocelot->offsets[target] + ocelot->map[target][reg] +
+			     offset,
+		     val);
 }
 
 int ocelot_regfields_init(struct ocelot *ocelot,
@@ -136,9 +144,12 @@ static struct regmap_config ocelot_regmap_config = {
 	.reg_stride	= 4,
 };
 
-struct regmap *ocelot_regmap_init(struct ocelot *ocelot, struct resource *res)
+struct regmap *ocelot_regmap_init(struct ocelot *ocelot, struct resource *res,
+				  u32 *offset)
 {
 	void __iomem *regs;
+
+	*offset = 0;
 
 	regs = devm_ioremap_resource(ocelot->dev, res);
 	if (IS_ERR(regs))

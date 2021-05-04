@@ -593,6 +593,7 @@ struct ocelot_port {
 	struct ocelot			*ocelot;
 
 	struct regmap			*target;
+	u32				offset;
 
 	bool				vlan_aware;
 	/* VLAN that untagged frames are classified to, on ingress */
@@ -628,6 +629,7 @@ struct ocelot {
 	const struct ocelot_ops		*ops;
 	struct regmap			*targets[TARGET_MAX];
 	struct regmap_field		*regfields[REGFIELD_MAX];
+	u32				offsets[TARGET_MAX];
 	const u32 *const		*map;
 	const struct ocelot_stat_layout	*stats_layout;
 	unsigned int			num_stats;
@@ -791,7 +793,8 @@ static inline u32 ocelot_ptp_rew_op(struct sk_buff *skb)
 /* Hardware initialization */
 int ocelot_regfields_init(struct ocelot *ocelot,
 			  const struct reg_field *const regfields);
-struct regmap *ocelot_regmap_init(struct ocelot *ocelot, struct resource *res);
+struct regmap *ocelot_regmap_init(struct ocelot *ocelot, struct resource *res,
+				  u32 *offset);
 int ocelot_init(struct ocelot *ocelot);
 void ocelot_deinit(struct ocelot *ocelot);
 void ocelot_init_port(struct ocelot *ocelot, int port);
