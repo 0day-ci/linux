@@ -2680,6 +2680,21 @@ static void br_port_mc_router_state_change(struct net_bridge_port *port,
 
 	switchdev_port_attr_set(port->dev, &attr, NULL);
 
+	/* Force mcast_flood if mrouter port
+	 * this does not prevent netlink from changing it again
+	 */
+	if (is_mc_router && !(port->flags & BR_MCAST_FLOOD)) {
+		attr.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS;
+		attr.u.brport_flags.val = BR_MCAST_FLOOD;
+		attr.u.brport_flags.mask = BR_MCAST_FLOOD;
+		switchdev_port_attr_set(port->dev, &attr, NULL);
+	} else if (!is_mc_router) {
+		attr.id = SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS;
+		attr.u.brport_flags.val = port->flags & BR_MCAST_FLOOD;
+		attr.u.brport_flags.mask = BR_MCAST_FLOOD;
+		switchdev_port_attr_set(port->dev, &attr, NULL);
+	}
+
 	/* Add/delete the router port to/from all multicast group
 	 * called whle br->multicast_lock is held
 	 */
