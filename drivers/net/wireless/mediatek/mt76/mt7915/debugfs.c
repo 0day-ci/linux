@@ -74,6 +74,21 @@ DEFINE_DEBUGFS_ATTRIBUTE(fops_radar_trigger, NULL,
 			 mt7915_radar_trigger, "%lld\n");
 
 static int
+mt7915_efuse_idx_set(void *data, u64 val)
+{
+	struct mt7915_dev *dev = data;
+	u8 *eep = dev->mt76.eeprom.data;
+
+	if (eep[val] == 0xff && !dev->flash_mode)
+		mt7915_mcu_get_eeprom(dev, val);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_efuse_idx, NULL,
+			 mt7915_efuse_idx_set, "0x%llx\n");
+
+static int
 mt7915_fw_debug_set(void *data, u64 val)
 {
 	struct mt7915_dev *dev = data;
@@ -390,6 +405,7 @@ int mt7915_init_debugfs(struct mt7915_dev *dev)
 	debugfs_create_file("radar_trigger", 0200, dir, dev,
 			    &fops_radar_trigger);
 	debugfs_create_file("ser_trigger", 0200, dir, dev, &fops_ser_trigger);
+	debugfs_create_file("efuse_idx", 0200, dir, dev, &fops_efuse_idx);
 	debugfs_create_devm_seqfile(dev->mt76.dev, "temperature", dir,
 				    mt7915_read_temperature);
 	debugfs_create_devm_seqfile(dev->mt76.dev, "txpower_sku", dir,
