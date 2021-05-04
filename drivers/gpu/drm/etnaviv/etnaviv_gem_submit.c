@@ -108,6 +108,21 @@ out_unlock:
 	return ret;
 }
 
+static int submit_sync_user(struct etnaviv_gem_submit *submit)
+{
+	unsigned int i;
+	int ret;
+
+	for (i = 0; i < submit->nr_bos; i++) {
+		struct drm_gem_object *obj = &submit->bos[i].obj->base;
+
+		ret = dma_resv_sync_user_fence(obj->resv);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 static void submit_unlock_object(struct etnaviv_gem_submit *submit, int i)
 {
 	if (submit->bos[i].flags & BO_LOCKED) {
@@ -518,8 +533,6 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		}
 	}
 
-	ww_acquire_init(&ticket, &reservation_ww_class);
-
 	submit = submit_create(dev, gpu, args->nr_bos, args->nr_pmrs);
 	if (!submit) {
 		ret = -ENOMEM;
@@ -540,6 +553,12 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 	ret = submit_lookup_objects(submit, file, bos, args->nr_bos);
 	if (ret)
 		goto err_submit_objects;
+
+	ret = submit_sync_user(submit);
+	if (ret)
+		goto err_submit_objects;
+
+	ww_acquire_init(&ticket, &reservation_ww_class);
 
 	if ((priv->mmu_global->version != ETNAVIV_IOMMU_V2) &&
 	    !etnaviv_cmd_validate_one(gpu, stream, args->stream_size / 4,
