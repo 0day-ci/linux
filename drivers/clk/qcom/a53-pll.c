@@ -42,6 +42,7 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 	struct clk_pll *pll;
 	void __iomem *base;
 	struct clk_init_data init = { };
+	const char *clk_name = NULL;
 	int ret;
 
 	pll = devm_kzalloc(dev, sizeof(*pll), GFP_KERNEL);
@@ -66,7 +67,9 @@ static int qcom_a53pll_probe(struct platform_device *pdev)
 	pll->status_bit = 16;
 	pll->freq_tbl = a53pll_freq;
 
-	init.name = "a53pll";
+	of_property_read_string(pdev->dev.of_node, "clock-output-names",
+				&clk_name);
+	init.name = clk_name ? clk_name : "a53pll";
 	init.parent_names = (const char *[]){ "xo" };
 	init.num_parents = 1;
 	init.ops = &clk_pll_sr2_ops;

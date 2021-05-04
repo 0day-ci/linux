@@ -49,6 +49,7 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
 	struct clk_regmap_mux_div *a53cc;
 	struct regmap *regmap;
 	struct clk_init_data init = { };
+	const char *clk_name = NULL;
 	int ret = -ENODEV;
 
 	regmap = dev_get_regmap(parent, NULL);
@@ -61,7 +62,9 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
 	if (!a53cc)
 		return -ENOMEM;
 
-	init.name = "a53mux";
+	of_property_read_string(parent->of_node, "clock-output-names",
+				&clk_name);
+	init.name = clk_name ? clk_name : "a53mux";
 	init.parent_data = pdata;
 	init.num_parents = ARRAY_SIZE(pdata);
 	init.ops = &clk_regmap_mux_div_ops;
