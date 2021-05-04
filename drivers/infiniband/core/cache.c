@@ -1472,10 +1472,14 @@ err:
 }
 
 static int
-ib_cache_update(struct ib_device *device, u8 port, bool enforce_security)
+ib_cache_update(struct ib_device *device, u8 port, enum ib_event_type event,
+		bool reg_dev, bool enforce_security)
 {
 	struct ib_port_attr       *tprops = NULL;
-	struct ib_pkey_cache      *pkey_cache = NULL, *old_pkey_cache;
+	struct ib_pkey_cache      *pkey_cache = NULL;
+	struct ib_pkey_cache      *old_pkey_cache = NULL;
+	bool			   update_pkey_cache = (reg_dev || event == IB_EVENT_PKEY_CHANGE);
+	bool			   update_gid_cache = (reg_dev || event == IB_EVENT_GID_CHANGE);
 	int                        i;
 	int                        ret;
 
@@ -1492,14 +1496,16 @@ ib_cache_update(struct ib_device *device, u8 port, bool enforce_security)
 		goto err;
 	}
 
-	if (!rdma_protocol_roce(device, port)) {
+	if (!rdma_protocol_roce(device, port) && update_gid_cache) {
 		ret = config_non_roce_gid_cache(device, port,
 						tprops->gid_tbl_len);
 		if (ret)
 			goto err;
 	}
 
-	if (tprops->pkey_tbl_len) {
+	update_pkey_cache &= !!tprops->pkey_tbl_len;
+
+	if (update_pkey_cache) {
 		pkey_cache = kmalloc(struct_size(pkey_cache, table,
 						 tprops->pkey_tbl_len),
 				     GFP_KERNEL);
@@ -1524,9 +1530,10 @@ ib_cache_update(struct ib_device *device, u8 port, bool enforce_security)
 
 	write_lock_irq(&device->cache_lock);
 
-	old_pkey_cache = device->port_data[port].cache.pkey;
-
-	device->port_data[port].cache.pkey = pkey_cache;
+	if (update_pkey_cache) {
+		old_pkey_cache = device->port_data[port].cache.pkey;
+		device->port_data[port].cache.pkey = pkey_cache;
+	}
 	device->port_data[port].cache.lmc = tprops->lmc;
 	device->port_data[port].cache.port_state = tprops->state;
 
@@ -1558,7 +1565,7 @@ static void ib_cache_event_task(struct work_struct *_work)
 	 * the cache.
 	 */
 	ret = ib_cache_update(work->event.device, work->event.element.port_num,
-			      work->enforce_security);
+			      work->event.event, false, work->enforce_security);
 
 	/* GID event is notified already for individual GID entries by
 	 * dispatch_gid_change_event(). Hence, notifiy for rest of the
@@ -1631,7 +1638,7 @@ int ib_cache_setup_one(struct ib_device *device)
 		return err;
 
 	rdma_for_each_port (device, p) {
-		err = ib_cache_update(device, p, true);
+		err = ib_cache_update(device, p, 0, true, true);
 		if (err)
 			return err;
 	}
