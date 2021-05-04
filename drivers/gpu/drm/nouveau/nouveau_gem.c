@@ -552,12 +552,24 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 			     struct validate_op *op, bool *apply_relocs)
 {
 	struct nouveau_cli *cli = nouveau_cli(file_priv);
+	unsigned int i;
 	int ret;
 
 	INIT_LIST_HEAD(&op->list);
 
 	if (nr_buffers == 0)
 		return 0;
+
+	for (i = 0; i < nr_buffers; i++) {
+		struct drm_nouveau_gem_pushbuf_bo *b = &pbbo[i];
+		struct drm_gem_object *gem;
+
+		gem = drm_gem_object_lookup(file_priv, b->handle);
+		if (!gem)
+			return -ENOENT;
+		dma_resv_sync_user_fence(gem->resv);
+		drm_gem_object_put(gem);
+	}
 
 	ret = validate_init(chan, file_priv, pbbo, nr_buffers, op);
 	if (unlikely(ret)) {
