@@ -52,6 +52,7 @@ struct receiver {
 	struct hlist_node list;
 	canid_t can_id;
 	canid_t mask;
+	bool match_sk;
 	unsigned long matches;
 	void (*func)(struct sk_buff *skb, void *data);
 	void *data;
