@@ -15,10 +15,11 @@
 #include "cxl.h"
 
 /**
- * DOC: cxl mem
+ * DOC: cxl pci
  *
- * This implements a CXL memory device ("type-3") as it is defined by the
- * Compute Express Link specification.
+ * This implements the PCI exclusive functionality for a CXL device as it is
+ * defined by the Compute Express Link specification. CXL devices may surface
+ * certain functionality even if it isn't CXL enabled.
  *
  * The driver has several responsibilities, mainly:
  *  - Create the memX device and register on the CXL bus.
@@ -26,8 +27,6 @@
  *  - Probe the device attributes to establish sysfs interface.
  *  - Provide an IOCTL interface to userspace to communicate with the device for
  *    things like firmware update.
- *  - Support management of interleave sets.
- *  - Handle and manage error conditions.
  */
 
 /*
