@@ -204,9 +204,23 @@ static const struct i2c_device_id i2c_slave_eeprom_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, i2c_slave_eeprom_id);
 
+static const struct of_device_id i2c_slave_eeprom_match[] = {
+	{ .compatible = "linux,slave-24c02", },
+	{ .compatible = "linux,slave-24c02ro", },
+	{ .compatible = "linux,slave-24c32", },
+	{ .compatible = "linux,slave-24c32ro", },
+	{ .compatible = "linux,slave-24c64", },
+	{ .compatible = "linux,slave-24c64ro", },
+	{ .compatible = "linux,slave-24c512", },
+	{ .compatible = "linux,slave-24c512ro", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, i2c_slave_eeprom_match);
+
 static struct i2c_driver i2c_slave_eeprom_driver = {
 	.driver = {
 		.name = "i2c-slave-eeprom",
+		.of_match_table = i2c_slave_eeprom_match,
 	},
 	.probe = i2c_slave_eeprom_probe,
 	.remove = i2c_slave_eeprom_remove,
