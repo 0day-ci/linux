@@ -140,6 +140,29 @@ int dwc3_gadget_set_link_state(struct dwc3 *dwc, enum dwc3_link_state state)
 }
 
 /**
+ * dwc3_ep_dec_trb - decrement a trb index.
+ * @index: Pointer to the TRB index to increment.
+ *
+ * The index should never point to the link TRB. After decrementing,
+ * if index is zero, wrap around to the TRB before the link TRB.
+ */
+static void dwc3_ep_dec_trb(u8 *index)
+{
+	(*index)--;
+	if (*index < 0)
+		*index = DWC3_TRB_NUM - 1;
+}
+
+/**
+ * dwc3_ep_dec_enq - decrement endpoint's enqueue pointer
+ * @dep: The endpoint whose enqueue pointer we're decrementing
+ */
+static void dwc3_ep_dec_enq(struct dwc3_ep *dep)
+{
+	dwc3_ep_dec_trb(&dep->trb_enqueue);
+}
+
+/**
  * dwc3_ep_inc_trb - increment a trb index.
  * @index: Pointer to the TRB index to increment.
  *
@@ -1352,7 +1375,26 @@ static int dwc3_prepare_trbs(struct dwc3_ep *dep)
 
 static void dwc3_gadget_ep_cleanup_cancelled_requests(struct dwc3_ep *dep);
 
-static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)
+static void dwc3_gadget_ep_revert_trbs(struct dwc3_ep *dep, struct dwc3_request *req)
+{
+	int i;
+
+	if (!req->trb)
+		return;
+
+	for (i = 0; i < req->num_trbs; i++) {
+		struct dwc3_trb *trb;
+
+		trb = &dep->trb_pool[dep->trb_enqueue];
+		trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
+		dwc3_ep_dec_enq(dep);
+	}
+
+	req->num_trbs = 0;
+}
+
+static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep,
+				       struct dwc3_request *queued_req)
 {
 	struct dwc3_gadget_ep_cmd_params params;
 	struct dwc3_request		*req;
@@ -1410,8 +1452,23 @@ static int __dwc3_gadget_kick_transfer(struct dwc3_ep *dep)
 
 		dwc3_stop_active_transfer(dep, true, true);
 
-		list_for_each_entry_safe(req, tmp, &dep->started_list, list)
-			dwc3_gadget_move_cancelled_request(req, DWC3_REQUEST_STATUS_DEQUEUED);
+		/*
+		 * In order to ensure the logic is applied to a request being
+		 * queued by dwc3_gadget_ep_queue(), it needs to explicitly
+		 * check that req is the same as queued_req (request being
+		 * queued).  If so, then just unmap and decrement the enqueue
+		 * pointer, as the usb_ep_queue() error handler in the function
+		 * driver will handle cleaning up the USB request.
+		 */
+		list_for_each_entry_safe(req, tmp, &dep->started_list, list) {
+			if (req == queued_req) {
+				dwc3_gadget_ep_revert_trbs(dep, req);
+				dwc3_gadget_del_and_unmap_request(dep, req, ret);
+			} else {
+				dwc3_gadget_move_cancelled_request(req,
+								   DWC3_REQUEST_STATUS_DEQUEUED);
+			}
+		}
 
 		/* If ep isn't started, then there's no end transfer pending */
 		if (!(dep->flags & DWC3_EP_END_TRANSFER_PENDING))
@@ -1546,7 +1603,7 @@ static int dwc3_gadget_start_isoc_quirk(struct dwc3_ep *dep)
 	dep->start_cmd_status = 0;
 	dep->combo_num = 0;
 
-	return __dwc3_gadget_kick_transfer(dep);
+	return __dwc3_gadget_kick_transfer(dep, NULL);
 }
 
 static int __dwc3_gadget_start_isoc(struct dwc3_ep *dep)
@@ -1593,7 +1650,7 @@ static int __dwc3_gadget_start_isoc(struct dwc3_ep *dep)
 	for (i = 0; i < DWC3_ISOC_MAX_RETRIES; i++) {
 		dep->frame_number = DWC3_ALIGN_FRAME(dep, i + 1);
 
-		ret = __dwc3_gadget_kick_transfer(dep);
+		ret = __dwc3_gadget_kick_transfer(dep, NULL);
 		if (ret != -EAGAIN)
 			break;
 	}
@@ -1684,7 +1741,7 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 		}
 	}
 
-	return __dwc3_gadget_kick_transfer(dep);
+	return __dwc3_gadget_kick_transfer(dep, req);
 }
 
 static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
@@ -1893,7 +1950,7 @@ int __dwc3_gadget_ep_set_halt(struct dwc3_ep *dep, int value, int protocol)
 
 		if ((dep->flags & DWC3_EP_DELAY_START) &&
 		    !usb_endpoint_xfer_isoc(dep->endpoint.desc))
-			__dwc3_gadget_kick_transfer(dep);
+			__dwc3_gadget_kick_transfer(dep, NULL);
 
 		dep->flags &= ~DWC3_EP_DELAY_START;
 	}
@@ -2992,7 +3049,7 @@ static bool dwc3_gadget_endpoint_trbs_complete(struct dwc3_ep *dep,
 		(list_empty(&dep->pending_list) || status == -EXDEV))
 		dwc3_stop_active_transfer(dep, true, true);
 	else if (dwc3_gadget_ep_should_continue(dep))
-		if (__dwc3_gadget_kick_transfer(dep) == 0)
+		if (__dwc3_gadget_kick_transfer(dep, NULL) == 0)
 			no_started_trb = false;
 
 out:
@@ -3106,7 +3163,7 @@ static void dwc3_gadget_endpoint_command_complete(struct dwc3_ep *dep,
 
 	if ((dep->flags & DWC3_EP_DELAY_START) &&
 	    !usb_endpoint_xfer_isoc(dep->endpoint.desc))
-		__dwc3_gadget_kick_transfer(dep);
+		__dwc3_gadget_kick_transfer(dep, NULL);
 
 	dep->flags &= ~DWC3_EP_DELAY_START;
 }
