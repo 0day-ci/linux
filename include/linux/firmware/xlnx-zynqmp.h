@@ -91,6 +91,7 @@ enum pm_api_id {
 	PM_CLOCK_GETPARENT = 44,
 	PM_SECURE_AES = 47,
 	PM_FEATURE_CHECK = 63,
+	PM_ENC_KEY_LOAD = 64,
 };
 
 /* PMU-FW return status codes */
@@ -411,6 +412,7 @@ int zynqmp_pm_pinctrl_get_config(const u32 pin, const u32 param,
 				 u32 *value);
 int zynqmp_pm_pinctrl_set_config(const u32 pin, const u32 param,
 				 u32 value);
+int zynqmp_pm_fpga_enc_key_load(const u64 address, const u32 size);
 #else
 static inline int zynqmp_pm_get_api_version(u32 *version)
 {
@@ -619,6 +621,11 @@ static inline int zynqmp_pm_pinctrl_get_config(const u32 pin, const u32 param,
 
 static inline int zynqmp_pm_pinctrl_set_config(const u32 pin, const u32 param,
 					       u32 value)
+{
+	return -ENODEV;
+}
+
+static inline int zynqmp_pm_fpga_enc_key_load(const u64 address, const u32 size)
 {
 	return -ENODEV;
 }

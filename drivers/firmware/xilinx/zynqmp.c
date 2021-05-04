@@ -788,6 +788,23 @@ int zynqmp_pm_fpga_load(const u64 address, const u32 size, const u32 flags)
 EXPORT_SYMBOL_GPL(zynqmp_pm_fpga_load);
 
 /**
+ * zynqmp_pm_fpga_key_load - Perform to load the bitstream encrypted key
+ * @address:    Address to write
+ * @size:       encrypted key size
+ *
+ * This function provides access to pmufw. To transfer
+ * the required encrypted key.
+ *
+ * Return: Returns status, either success or error+reason
+ */
+int zynqmp_pm_fpga_enc_key_load(const u64 address, const u32 size)
+{
+	return zynqmp_pm_invoke_fn(PM_ENC_KEY_LOAD, lower_32_bits(address),
+				   upper_32_bits(address), size, 0, NULL);
+}
+EXPORT_SYMBOL_GPL(zynqmp_pm_fpga_enc_key_load);
+
+/**
  * zynqmp_pm_fpga_get_status - Read value from PCAP status register
  * @value: Value to read
  *
