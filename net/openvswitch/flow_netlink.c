@@ -367,7 +367,7 @@ size_t ovs_key_attr_size(void)
 		+ nla_total_size(4)   /* OVS_KEY_ATTR_VLAN */
 		+ nla_total_size(0)   /* OVS_KEY_ATTR_ENCAP */
 		+ nla_total_size(2)   /* OVS_KEY_ATTR_ETHERTYPE */
-		+ nla_total_size(40)  /* OVS_KEY_ATTR_IPV6 */
+		+ nla_total_size(42)  /* OVS_KEY_ATTR_IPV6 */
 		+ nla_total_size(2)   /* OVS_KEY_ATTR_ICMPV6 */
 		+ nla_total_size(28); /* OVS_KEY_ATTR_ND */
 }
@@ -1585,6 +1585,8 @@ static int ovs_key_from_nlattrs(struct net *net, struct sw_flow_match *match,
 				ipv6_key->ipv6_hlimit, is_mask);
 		SW_FLOW_KEY_PUT(match, ip.frag,
 				ipv6_key->ipv6_frag, is_mask);
+		SW_FLOW_KEY_PUT(match, ipv6.exthdrs,
+				ipv6_key->ipv6_exthdr, is_mask);
 		SW_FLOW_KEY_MEMCPY(match, ipv6.addr.src,
 				ipv6_key->ipv6_src,
 				sizeof(match->key->ipv6.addr.src),
@@ -2113,6 +2115,7 @@ static int __ovs_nla_put_key(const struct sw_flow_key *swkey,
 		ipv6_key->ipv6_tclass = output->ip.tos;
 		ipv6_key->ipv6_hlimit = output->ip.ttl;
 		ipv6_key->ipv6_frag = output->ip.frag;
+		ipv6_key->ipv6_exthdr = output->ipv6.exthdrs;
 	} else if (swkey->eth.type == htons(ETH_P_NSH)) {
 		if (nsh_key_to_nlattr(&output->nsh, is_mask, skb))
 			goto nla_put_failure;
