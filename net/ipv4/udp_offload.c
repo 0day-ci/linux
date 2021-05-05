@@ -214,8 +214,10 @@ static void __udpv4_gso_segment_csum(struct sk_buff *seg,
 	*oldip = *newip;
 }
 
-static struct sk_buff *__udpv4_gso_segment_list_csum(struct sk_buff *segs)
+static void __udp_gso_segment_list_csum(struct sk_buff *segs, bool is_ipv6,
+					bool is_tunnel)
 {
+	bool update_csum = !is_ipv6;
 	struct sk_buff *seg;
 	struct udphdr *uh, *uh2;
 	struct iphdr *iph, *iph2;
@@ -224,31 +226,45 @@ static struct sk_buff *__udpv4_gso_segment_list_csum(struct sk_buff *segs)
 	uh = udp_hdr(seg);
 	iph = ip_hdr(seg);
 
-	if ((udp_hdr(seg)->dest == udp_hdr(seg->next)->dest) &&
+	if (update_csum && (udp_hdr(seg)->dest == udp_hdr(seg->next)->dest) &&
 	    (udp_hdr(seg)->source == udp_hdr(seg->next)->source) &&
 	    (ip_hdr(seg)->daddr == ip_hdr(seg->next)->daddr) &&
 	    (ip_hdr(seg)->saddr == ip_hdr(seg->next)->saddr))
-		return segs;
+		update_csum = false;
 
+	if (!update_csum && !is_tunnel)
+		return;
+
+	/* this skb is CHECKSUM_NONE, if it has also a tunnel header
+	 * later __skb_udp_tunnel_segment() will try to make the
+	 * outer header csum and will need valid csum* fields
+	 */
+	SKB_GSO_CB(seg)->csum = ~uh->check;
+	SKB_GSO_CB(seg)->csum_start = seg->transport_header;
 	while ((seg = seg->next)) {
 		uh2 = udp_hdr(seg);
-		iph2 = ip_hdr(seg);
+		if (update_csum) {
+			iph2 = ip_hdr(seg);
 
-		__udpv4_gso_segment_csum(seg,
-					 &iph2->saddr, &iph->saddr,
-					 &uh2->source, &uh->source);
-		__udpv4_gso_segment_csum(seg,
-					 &iph2->daddr, &iph->daddr,
-					 &uh2->dest, &uh->dest);
+			__udpv4_gso_segment_csum(seg,
+						 &iph2->saddr, &iph->saddr,
+						 &uh2->source, &uh->source);
+			__udpv4_gso_segment_csum(seg,
+						 &iph2->daddr, &iph->daddr,
+						 &uh2->dest, &uh->dest);
+		}
+
+		SKB_GSO_CB(seg)->csum = ~uh2->check;
+		SKB_GSO_CB(seg)->csum_start = seg->transport_header;
 	}
-
-	return segs;
 }
 
 static struct sk_buff *__udp_gso_segment_list(struct sk_buff *skb,
 					      netdev_features_t features,
 					      bool is_ipv6)
 {
+	bool is_tunnel = !!(skb_shinfo(skb)->gso_type &
+			    (SKB_GSO_UDP_TUNNEL | SKB_GSO_UDP_TUNNEL_CSUM));
 	unsigned int mss = skb_shinfo(skb)->gso_size;
 
 	skb = skb_segment_list(skb, features, skb_mac_header_len(skb));
@@ -257,7 +273,8 @@ static struct sk_buff *__udp_gso_segment_list(struct sk_buff *skb,
 
 	udp_hdr(skb)->len = htons(sizeof(struct udphdr) + mss);
 
-	return is_ipv6 ? skb : __udpv4_gso_segment_list_csum(skb);
+	__udp_gso_segment_list_csum(skb, is_ipv6, is_tunnel);
+	return skb;
 }
 
 struct sk_buff *__udp_gso_segment(struct sk_buff *gso_skb,
