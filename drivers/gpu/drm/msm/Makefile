@@ -25,12 +25,13 @@ msm-y := \
 	hdmi/hdmi_phy_8960.o \
 	hdmi/hdmi_phy_8x60.o \
 	hdmi/hdmi_phy_8x74.o \
-	edp/edp.o \
-	edp/edp_aux.o \
-	edp/edp_bridge.o \
-	edp/edp_connector.o \
-	edp/edp_ctrl.o \
-	edp/edp_phy.o \
+	edp/edp_common.o \
+	edp/v200/edp_v200.o \
+	edp/v200/edp_v200_aux.o \
+	edp/v200/edp_v200_bridge.o \
+	edp/v200/edp_v200_connector.o \
+	edp/v200/edp_v200_ctrl.o \
+	edp/v200/edp_v200_phy.o \
 	disp/mdp_format.o \
 	disp/mdp_kms.o \
 	disp/mdp4/mdp4_crtc.o \

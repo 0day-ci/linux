@@ -10,7 +10,7 @@
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_edid.h>
 
-#include "edp.h"
+#include "edp_v200.h"
 #include "edp.xml.h"
 
 #define VDDA_UA_ON_LOAD		100000	/* uA units */
@@ -1113,10 +1113,10 @@ void msm_edp_ctrl_power(struct edp_ctrl *ctrl, bool on)
 		queue_work(ctrl->workqueue, &ctrl->off_work);
 }
 
-int msm_edp_ctrl_init(struct msm_edp *edp)
+int msm_edp_ctrl_init(struct msm_edp_v200 *edp)
 {
 	struct edp_ctrl *ctrl = NULL;
-	struct device *dev = &edp->pdev->dev;
+	struct device *dev = &edp->base.pdev->dev;
 	int ret;
 
 	if (!edp) {
@@ -1129,7 +1129,7 @@ int msm_edp_ctrl_init(struct msm_edp *edp)
 		return -ENOMEM;
 
 	edp->ctrl = ctrl;
-	ctrl->pdev = edp->pdev;
+	ctrl->pdev = edp->base.pdev;
 
 	ctrl->base = msm_ioremap(ctrl->pdev, "edp", "eDP");
 	if (IS_ERR(ctrl->base))

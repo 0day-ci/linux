@@ -4,11 +4,11 @@
  */
 
 #include <linux/of_irq.h>
-#include "edp.h"
+#include "edp_v200.h"
 
 static irqreturn_t edp_irq(int irq, void *dev_id)
 {
-	struct msm_edp *edp = dev_id;
+	struct msm_edp_v200 *edp = dev_id;
 
 	/* Process eDP irq */
 	return msm_edp_ctrl_irq(edp->ctrl);
@@ -16,7 +16,7 @@ static irqreturn_t edp_irq(int irq, void *dev_id)
 
 static void edp_destroy(struct platform_device *pdev)
 {
-	struct msm_edp *edp = platform_get_drvdata(pdev);
+	struct msm_edp_v200 *edp = platform_get_drvdata(pdev);
 
 	if (!edp)
 		return;
@@ -32,7 +32,7 @@ static void edp_destroy(struct platform_device *pdev)
 /* construct eDP at bind/probe time, grab all the resources. */
 static struct msm_edp *edp_init(struct platform_device *pdev)
 {
-	struct msm_edp *edp = NULL;
+	struct msm_edp_v200 *edp = NULL;
 	int ret;
 
 	if (!pdev) {
@@ -46,16 +46,17 @@ static struct msm_edp *edp_init(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto fail;
 	}
-	DBG("eDP probed=%p", edp);
+	DBG("eDP v200 probed=%p", edp);
+	edp->base.version = MSM_EDP_VERSION_200;
 
-	edp->pdev = pdev;
+	edp->base.pdev = pdev;
 	platform_set_drvdata(pdev, edp);
 
 	ret = msm_edp_ctrl_init(edp);
 	if (ret)
 		goto fail;
 
-	return edp;
+	return &edp->base;
 
 fail:
 	if (edp)
@@ -123,58 +124,69 @@ static struct platform_driver edp_driver = {
 	},
 };
 
-void __init msm_edp_register(void)
+void __init msm_edp_v200_register(void)
 {
 	DBG("");
 	platform_driver_register(&edp_driver);
 }
 
-void __exit msm_edp_unregister(void)
+void __exit msm_edp_v200_unregister(void)
 {
 	DBG("");
 	platform_driver_unregister(&edp_driver);
 }
 
 /* Second part of initialization, the drm/kms level modeset_init */
-int msm_edp_modeset_init(struct msm_edp *edp, struct drm_device *dev,
+int msm_edp_v200_modeset_init(struct msm_edp *edp, struct drm_device *dev,
 				struct drm_encoder *encoder)
 {
 	struct platform_device *pdev = edp->pdev;
 	struct msm_drm_private *priv = dev->dev_private;
+	struct msm_edp_v200 *edp_ptr = NULL;
 	int ret;
+
+	if (WARN_ON(!encoder) || WARN_ON(!edp) || WARN_ON(!dev))
+		return -EINVAL;
 
 	edp->encoder = encoder;
 	edp->dev = dev;
 
-	edp->bridge = msm_edp_bridge_init(edp);
-	if (IS_ERR(edp->bridge)) {
-		ret = PTR_ERR(edp->bridge);
+	edp_ptr = container_of(edp, struct msm_edp_v200, base);
+	if (IS_ERR(edp_ptr)) {
+		ret = PTR_ERR(edp_ptr);
+		DRM_DEV_ERROR(dev->dev, "failed to retrieve edp_v510 ptr: %d\n", ret);
+		goto fail;
+	}
+
+	edp_ptr->base.bridge = msm_edp_bridge_init(edp_ptr);
+	if (IS_ERR(edp_ptr->base.bridge)) {
+		ret = PTR_ERR(edp_ptr->base.bridge);
 		DRM_DEV_ERROR(dev->dev, "failed to create eDP bridge: %d\n", ret);
-		edp->bridge = NULL;
+		edp_ptr->base.bridge = NULL;
 		goto fail;
 	}
 
-	edp->connector = msm_edp_connector_init(edp);
-	if (IS_ERR(edp->connector)) {
-		ret = PTR_ERR(edp->connector);
+	edp_ptr->base.connector = msm_edp_connector_init(edp_ptr);
+	if (IS_ERR(edp_ptr->base.connector)) {
+		ret = PTR_ERR(edp_ptr->base.connector);
 		DRM_DEV_ERROR(dev->dev, "failed to create eDP connector: %d\n", ret);
-		edp->connector = NULL;
+		edp_ptr->base.connector = NULL;
 		goto fail;
 	}
 
-	edp->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-	if (edp->irq < 0) {
-		ret = edp->irq;
+	edp_ptr->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	if (edp_ptr->irq < 0) {
+		ret = edp_ptr->irq;
 		DRM_DEV_ERROR(dev->dev, "failed to get IRQ: %d\n", ret);
 		goto fail;
 	}
 
-	ret = devm_request_irq(&pdev->dev, edp->irq,
+	ret = devm_request_irq(&pdev->dev, edp_ptr->irq,
 			edp_irq, IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
-			"edp_isr", edp);
+			"edp_isr", edp_ptr);
 	if (ret < 0) {
 		DRM_DEV_ERROR(dev->dev, "failed to request IRQ%u: %d\n",
-				edp->irq, ret);
+				edp_ptr->irq, ret);
 		goto fail;
 	}
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  */
 
-#include "edp.h"
+#include "edp_v200.h"
 #include "edp.xml.h"
 
 #define AUX_CMD_FIFO_LEN	144

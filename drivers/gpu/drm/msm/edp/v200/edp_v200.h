@@ -3,8 +3,8 @@
  * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  */
 
-#ifndef __EDP_CONNECTOR_H__
-#define __EDP_CONNECTOR_H__
+#ifndef __EDP_V200_CONNECTOR_H__
+#define __EDP_V200_CONNECTOR_H__
 
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
@@ -15,6 +15,7 @@
 #include <drm/drm_dp_helper.h>
 
 #include "msm_drv.h"
+#include "../edp_common.h"
 
 #define edp_read(offset) msm_readl((offset))
 #define edp_write(offset, data) msm_writel((data), (offset))
@@ -23,27 +24,18 @@ struct edp_ctrl;
 struct edp_aux;
 struct edp_phy;
 
-struct msm_edp {
-	struct drm_device *dev;
-	struct platform_device *pdev;
-
-	struct drm_connector *connector;
-	struct drm_bridge *bridge;
-
-	/* the encoder we are hooked to (outside of eDP block) */
-	struct drm_encoder *encoder;
-
+struct msm_edp_v200 {
+	struct msm_edp base;
 	struct edp_ctrl *ctrl;
-
 	int irq;
 };
 
 /* eDP bridge */
-struct drm_bridge *msm_edp_bridge_init(struct msm_edp *edp);
+struct drm_bridge *msm_edp_bridge_init(struct msm_edp_v200 *edp);
 void edp_bridge_destroy(struct drm_bridge *bridge);
 
 /* eDP connector */
-struct drm_connector *msm_edp_connector_init(struct msm_edp *edp);
+struct drm_connector *msm_edp_connector_init(struct msm_edp_v200 *edp);
 
 /* AUX */
 void *msm_edp_aux_init(struct device *dev, void __iomem *regbase,
@@ -63,7 +55,7 @@ void *msm_edp_phy_init(struct device *dev, void __iomem *regbase);
 /* Ctrl */
 irqreturn_t msm_edp_ctrl_irq(struct edp_ctrl *ctrl);
 void msm_edp_ctrl_power(struct edp_ctrl *ctrl, bool on);
-int msm_edp_ctrl_init(struct msm_edp *edp);
+int msm_edp_ctrl_init(struct msm_edp_v200 *edp);
 void msm_edp_ctrl_destroy(struct edp_ctrl *ctrl);
 bool msm_edp_ctrl_panel_connected(struct edp_ctrl *ctrl);
 int msm_edp_ctrl_get_panel_info(struct edp_ctrl *ctrl,
@@ -75,4 +67,4 @@ int msm_edp_ctrl_timing_cfg(struct edp_ctrl *ctrl,
 bool msm_edp_ctrl_pixel_clock_valid(struct edp_ctrl *ctrl,
 	u32 pixel_rate, u32 *pm, u32 *pn);
 
-#endif /* __EDP_CONNECTOR_H__ */
+#endif /* __EDP_V200_CONNECTOR_H__ */
