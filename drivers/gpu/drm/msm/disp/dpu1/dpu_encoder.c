@@ -2075,7 +2075,12 @@ static int dpu_encoder_setup_display(struct dpu_encoder_virt *dpu_enc,
 		intf_type = INTF_DSI;
 		break;
 	case DRM_MODE_ENCODER_TMDS:
-		intf_type = INTF_DP;
+		if (disp_info->capabilities & MSM_DISPLAY_CAP_CMD_MODE) {
+			intf_type = INTF_EDP;
+			/* PSR CMD mode not supported */
+			disp_info->capabilities = MSM_DISPLAY_CAP_VID_MODE;
+		} else
+			intf_type = INTF_DP;
 		break;
 	}
 
