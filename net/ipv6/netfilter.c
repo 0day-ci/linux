@@ -83,6 +83,7 @@ static int nf_ip6_reroute(struct sk_buff *skb,
 
 	if (entry->state.hook == NF_INET_LOCAL_OUT) {
 		const struct ipv6hdr *iph = ipv6_hdr(skb);
+
 		if (!ipv6_addr_equal(&iph->daddr, &rt_info->daddr) ||
 		    !ipv6_addr_equal(&iph->saddr, &rt_info->saddr) ||
 		    skb->mark != rt_info->mark)
