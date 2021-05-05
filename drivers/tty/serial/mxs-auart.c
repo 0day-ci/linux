@@ -971,23 +971,7 @@ static void mxs_auart_settermios(struct uart_port *u,
 	ctrl2 = mxs_read(s, REG_CTRL2);
 
 	/* byte size */
-	switch (cflag & CSIZE) {
-	case CS5:
-		bm = 0;
-		break;
-	case CS6:
-		bm = 1;
-		break;
-	case CS7:
-		bm = 2;
-		break;
-	case CS8:
-		bm = 3;
-		break;
-	default:
-		return;
-	}
-
+	bm = tty_get_byte_size(cflag, false) - 5;
 	ctrl |= AUART_LINECTRL_WLEN(bm);
 
 	/* parity */

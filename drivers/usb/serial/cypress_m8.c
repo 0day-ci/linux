@@ -887,23 +887,8 @@ static void cypress_set_termios(struct tty_struct *tty,
 	} else
 		parity_enable = parity_type = 0;
 
-	switch (cflag & CSIZE) {
-	case CS5:
-		data_bits = 0;
-		break;
-	case CS6:
-		data_bits = 1;
-		break;
-	case CS7:
-		data_bits = 2;
-		break;
-	case CS8:
-		data_bits = 3;
-		break;
-	default:
-		dev_err(dev, "%s - CSIZE was set, but not CS5-CS8\n", __func__);
-		data_bits = 3;
-	}
+	data_bits = tty_get_byte_size(cflag, false) - 5;
+
 	spin_lock_irqsave(&priv->lock, flags);
 	oldlines = priv->line_control;
 	if ((cflag & CBAUD) == B0) {
