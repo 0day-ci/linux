@@ -17,4 +17,9 @@ struct work_struct;
 
 void mmc_blk_mq_complete_work(struct work_struct *work);
 
+#define TRAN_TRANSITION_CMD(cmd) !(cmd == MMC_SEND_STATUS \
+				       || cmd == MMC_SEND_CID \
+				       || cmd == MMC_ALL_SEND_CID \
+				       || cmd == MMC_SEND_CSD)
+
 #endif
