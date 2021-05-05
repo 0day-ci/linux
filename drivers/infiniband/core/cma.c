@@ -1368,6 +1368,24 @@ static int cma_save_net_info(struct sockaddr *src_addr,
 	return cma_save_ip_info(src_addr, dst_addr, ib_event, service_id);
 }
 
+/*
+ * If at least one of the pkeys is a full member, none of them are
+ * invalid, and the partitions (lower 15 bits) are equal, we have a
+ * match.
+ *
+ * See IBTA 10.9.1.2 Special P_Keys and 10.9.3 Partition Key Matching
+ */
+
+static bool partition_match(u16 pkey_a, u16 pkey_b)
+{
+	const u16 fmb = 0x8000; /* Full Member Bit */
+	const bool valid_pkeys = (pkey_a & ~fmb) && (pkey_b & ~fmb);
+	const bool one_full = (pkey_a | pkey_b) & fmb;
+	const bool same_partition = (pkey_a | fmb) == (pkey_b | fmb);
+
+	return valid_pkeys && one_full && same_partition;
+}
+
 static int cma_save_req_info(const struct ib_cm_event *ib_event,
 			     struct cma_req_info *req)
 {
@@ -1385,7 +1403,7 @@ static int cma_save_req_info(const struct ib_cm_event *ib_event,
 		req->has_gid	= true;
 		req->service_id = req_param->primary_path->service_id;
 		req->pkey	= be16_to_cpu(req_param->primary_path->pkey);
-		if (req->pkey != req_param->bth_pkey)
+		if (!partition_match(req->pkey, req_param->bth_pkey))
 			pr_warn_ratelimited("RDMA CMA: got different BTH P_Key (0x%x) and primary path P_Key (0x%x)\n"
 					    "RDMA CMA: in the future this may cause the request to be dropped\n",
 					    req_param->bth_pkey, req->pkey);
@@ -1396,7 +1414,7 @@ static int cma_save_req_info(const struct ib_cm_event *ib_event,
 		req->has_gid	= false;
 		req->service_id	= sidr_param->service_id;
 		req->pkey	= sidr_param->pkey;
-		if (req->pkey != sidr_param->bth_pkey)
+		if (!partition_match(req->pkey, sidr_param->bth_pkey))
 			pr_warn_ratelimited("RDMA CMA: got different BTH P_Key (0x%x) and SIDR request payload P_Key (0x%x)\n"
 					    "RDMA CMA: in the future this may cause the request to be dropped\n",
 					    sidr_param->bth_pkey, req->pkey);
