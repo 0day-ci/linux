@@ -2787,7 +2787,7 @@ sub process {
 			$realfile =~ s@^([^/]*)/@@ if (!$file);
 			$in_commit_log = 0;
 			$found_file = 1;
-		} elsif ($line =~ /^\+\+\+\s+(\S+)/) {
+		} elsif ($line =~ /^\+\+\+\s+b(\S+)/) {
 			$realfile = $1;
 			$realfile =~ s@^([^/]*)/@@ if (!$file);
 			$in_commit_log = 0;
