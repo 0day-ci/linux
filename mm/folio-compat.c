@@ -85,3 +85,14 @@ void lru_cache_add(struct page *page)
 	folio_add_lru(page_folio(page));
 }
 EXPORT_SYMBOL(lru_cache_add);
+
+struct page *pagecache_get_page(struct address_space *mapping, pgoff_t index,
+		int fgp_flags, gfp_t gfp)
+{
+	struct folio *folio = filemap_get_folio(mapping, index, fgp_flags, gfp);
+
+	if ((fgp_flags & FGP_HEAD) || !folio || xa_is_value(folio))
+		return &folio->page;
+	return folio_file_page(folio, index);
+}
+EXPORT_SYMBOL(pagecache_get_page);
