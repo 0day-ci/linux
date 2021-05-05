@@ -1414,6 +1414,9 @@ static int kszphy_probe(struct phy_device *phydev)
 
 static int ksz886x_cable_test_start(struct phy_device *phydev)
 {
+	if (phydev->dev_flags & MICREL_KSZ8_P1_ERRATA)
+		return -ENOTSUPP;
+
 	/* If autoneg is enabled, we won't be able to test cross pair
 	 * short. In this case, the PHY will "detect" a link and
 	 * confuse the internal state machine - disable auto neg here.
