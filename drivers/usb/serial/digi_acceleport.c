@@ -1050,12 +1050,11 @@ static unsigned int digi_chars_in_buffer(struct tty_struct *tty)
 			priv->dp_port_num, port->bulk_out_size - 2);
 		/* return(port->bulk_out_size - 2); */
 		return 256;
-	} else {
-		dev_dbg(&port->dev, "digi_chars_in_buffer: port=%d, chars=%d\n",
-			priv->dp_port_num, priv->dp_out_buf_len);
-		return priv->dp_out_buf_len;
 	}
 
+	dev_dbg(&port->dev, "digi_chars_in_buffer: port=%d, chars=%d\n",
+		priv->dp_port_num, priv->dp_out_buf_len);
+	return priv->dp_out_buf_len;
 }
 
 static void digi_dtr_rts(struct usb_serial_port *port, int on)
