@@ -1562,7 +1562,7 @@ struct page *alloc_migration_target(struct page *page, unsigned long private)
 	struct migration_target_control *mtc;
 	gfp_t gfp_mask;
 	unsigned int order = 0;
-	struct page *new_page = NULL;
+	struct folio *new_folio = NULL;
 	int nid;
 	int zidx;
 
@@ -1592,12 +1592,9 @@ struct page *alloc_migration_target(struct page *page, unsigned long private)
 	if (is_highmem_idx(zidx) || zidx == ZONE_MOVABLE)
 		gfp_mask |= __GFP_HIGHMEM;
 
-	new_page = __alloc_pages(gfp_mask, order, nid, mtc->nmask);
+	new_folio = __alloc_folio(gfp_mask, order, nid, mtc->nmask);
 
-	if (new_page && PageTransHuge(new_page))
-		prep_transhuge_page(new_page);
-
-	return new_page;
+	return &new_folio->page;
 }
 
 #ifdef CONFIG_NUMA
@@ -2155,35 +2152,34 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	spinlock_t *ptl;
 	pg_data_t *pgdat = NODE_DATA(node);
 	int isolated = 0;
-	struct page *new_page = NULL;
+	struct folio *new_folio = NULL;
 	int page_lru = page_is_file_lru(page);
 	unsigned long start = address & HPAGE_PMD_MASK;
 
-	new_page = alloc_pages_node(node,
-		(GFP_TRANSHUGE_LIGHT | __GFP_THISNODE),
-		HPAGE_PMD_ORDER);
-	if (!new_page)
+	new_folio = __alloc_folio_node(node,
+			(GFP_TRANSHUGE_LIGHT | __GFP_THISNODE),
+			HPAGE_PMD_ORDER);
+	if (!new_folio)
 		goto out_fail;
-	prep_transhuge_page(new_page);
 
 	isolated = numamigrate_isolate_page(pgdat, page);
 	if (!isolated) {
-		put_page(new_page);
+		folio_put(new_folio);
 		goto out_fail;
 	}
 
 	/* Prepare a page as a migration target */
-	__SetPageLocked(new_page);
+	__folio_set_locked_flag(new_folio);
 	if (PageSwapBacked(page))
-		__SetPageSwapBacked(new_page);
+		__folio_set_swapbacked_flag(new_folio);
 
 	/* anon mapping, we can simply copy page->mapping to the new page: */
-	new_page->mapping = page->mapping;
-	new_page->index = page->index;
+	new_folio->mapping = page->mapping;
+	new_folio->index = page->index;
 	/* flush the cache before copying using the kernel virtual address */
 	flush_cache_range(vma, start, start + HPAGE_PMD_SIZE);
-	migrate_page_copy(new_page, page);
-	WARN_ON(PageLRU(new_page));
+	migrate_page_copy(&new_folio->page, page);
+	WARN_ON(folio_lru(new_folio));
 
 	/* Recheck the target PMD */
 	ptl = pmd_lock(mm, pmd);
@@ -2191,13 +2187,13 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 		spin_unlock(ptl);
 
 		/* Reverse changes made by migrate_page_copy() */
-		if (TestClearPageActive(new_page))
+		if (folio_test_clear_active_flag(new_folio))
 			SetPageActive(page);
-		if (TestClearPageUnevictable(new_page))
+		if (folio_test_clear_unevictable_flag(new_folio))
 			SetPageUnevictable(page);
 
-		unlock_page(new_page);
-		put_page(new_page);		/* Free it */
+		folio_unlock(new_folio);
+		folio_put(new_folio);		/* Free it */
 
 		/* Retake the callers reference and putback on LRU */
 		get_page(page);
@@ -2208,7 +2204,7 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 		goto out_unlock;
 	}
 
-	entry = mk_huge_pmd(new_page, vma->vm_page_prot);
+	entry = mk_huge_pmd(&new_folio->page, vma->vm_page_prot);
 	entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
 
 	/*
@@ -2219,7 +2215,7 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	 * new page and page_add_new_anon_rmap guarantee the copy is
 	 * visible before the pagetable update.
 	 */
-	page_add_anon_rmap(new_page, vma, start, true);
+	page_add_anon_rmap(&new_folio->page, vma, start, true);
 	/*
 	 * At this point the pmd is numa/protnone (i.e. non present) and the TLB
 	 * has already been flushed globally.  So no TLB can be currently
@@ -2235,17 +2231,17 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	update_mmu_cache_pmd(vma, address, &entry);
 
 	page_ref_unfreeze(page, 2);
-	mlock_migrate_page(new_page, page);
+	mlock_migrate_page(&new_folio->page, page);
 	page_remove_rmap(page, true);
-	set_page_owner_migrate_reason(new_page, MR_NUMA_MISPLACED);
+	set_page_owner_migrate_reason(&new_folio->page, MR_NUMA_MISPLACED);
 
 	spin_unlock(ptl);
 
 	/* Take an "isolate" reference and put new page on the LRU. */
-	get_page(new_page);
-	putback_lru_page(new_page);
+	folio_get(new_folio);
+	putback_lru_page(&new_folio->page);
 
-	unlock_page(new_page);
+	folio_unlock(new_folio);
 	unlock_page(page);
 	put_page(page);			/* Drop the rmap reference */
 	put_page(page);			/* Drop the LRU isolation reference */

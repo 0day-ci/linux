@@ -877,18 +877,20 @@ static bool khugepaged_prealloc_page(struct page **hpage, bool *wait)
 static struct page *
 khugepaged_alloc_page(struct page **hpage, gfp_t gfp, int node)
 {
+	struct folio *folio;
+
 	VM_BUG_ON_PAGE(*hpage, *hpage);
 
-	*hpage = __alloc_pages_node(node, gfp, HPAGE_PMD_ORDER);
-	if (unlikely(!*hpage)) {
+	folio = __alloc_folio_node(gfp, HPAGE_PMD_ORDER, node);
+	if (unlikely(!folio)) {
 		count_vm_event(THP_COLLAPSE_ALLOC_FAILED);
 		*hpage = ERR_PTR(-ENOMEM);
 		return NULL;
 	}
 
-	prep_transhuge_page(*hpage);
 	count_vm_event(THP_COLLAPSE_ALLOC);
-	return *hpage;
+	*hpage = &folio->page;
+	return &folio->page;
 }
 #else
 static int khugepaged_find_target_node(void)
@@ -896,24 +898,14 @@ static int khugepaged_find_target_node(void)
 	return 0;
 }
 
-static inline struct page *alloc_khugepaged_hugepage(void)
-{
-	struct page *page;
-
-	page = alloc_pages(alloc_hugepage_khugepaged_gfpmask(),
-			   HPAGE_PMD_ORDER);
-	if (page)
-		prep_transhuge_page(page);
-	return page;
-}
-
 static struct page *khugepaged_alloc_hugepage(bool *wait)
 {
-	struct page *hpage;
+	struct folio *folio;
 
 	do {
-		hpage = alloc_khugepaged_hugepage();
-		if (!hpage) {
+		folio = alloc_folio(alloc_hugepage_khugepaged_gfpmask(),
+					HPAGE_PMD_ORDER);
+		if (!folio) {
 			count_vm_event(THP_COLLAPSE_ALLOC_FAILED);
 			if (!*wait)
 				return NULL;
@@ -922,9 +914,9 @@ static struct page *khugepaged_alloc_hugepage(bool *wait)
 			khugepaged_alloc_sleep();
 		} else
 			count_vm_event(THP_COLLAPSE_ALLOC);
-	} while (unlikely(!hpage) && likely(khugepaged_enabled()));
+	} while (unlikely(!folio) && likely(khugepaged_enabled()));
 
-	return hpage;
+	return &folio->page;
 }
 
 static bool khugepaged_prealloc_page(struct page **hpage, bool *wait)
