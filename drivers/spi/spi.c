@@ -401,6 +401,12 @@ static int spi_probe(struct device *dev)
 	return ret;
 }
 
+static void spi_cleanup(struct spi_device *spi)
+{
+	if (spi->controller->cleanup)
+		spi->controller->cleanup(spi);
+}
+
 static int spi_remove(struct device *dev)
 {
 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
@@ -415,6 +421,7 @@ static int spi_remove(struct device *dev)
 				 ERR_PTR(ret));
 	}
 
+	spi_cleanup(to_spi_device(dev));
 	dev_pm_domain_detach(dev, true);
 
 	return 0;
@@ -552,12 +559,6 @@ static int spi_dev_check(struct device *dev, void *data)
 	    spi->chip_select == new_spi->chip_select)
 		return -EBUSY;
 	return 0;
-}
-
-static void spi_cleanup(struct spi_device *spi)
-{
-	if (spi->controller->cleanup)
-		spi->controller->cleanup(spi);
 }
 
 /**
@@ -713,8 +714,6 @@ void spi_unregister_device(struct spi_device *spi)
 {
 	if (!spi)
 		return;
-
-	spi_cleanup(spi);
 
 	if (spi->dev.of_node) {
 		of_node_clear_flag(spi->dev.of_node, OF_POPULATED);
