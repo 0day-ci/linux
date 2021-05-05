@@ -15,6 +15,7 @@
 #include <linux/virtio_vsock.h>
 #include <linux/vhost.h>
 #include <linux/hashtable.h>
+#include <linux/debugfs.h>
 
 #include <net/af_vsock.h>
 #include "vhost.h"
@@ -900,6 +901,128 @@ static struct miscdevice vhost_vsock_misc = {
 	.fops = &vhost_vsock_fops,
 };
 
+static struct dentry *vsock_file;
+
+struct vsock_file_iter {
+	struct hlist_node	*node;
+	int			index;
+};
+
+
+static void *vsock_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct vsock_file_iter *iter = v;
+	struct vhost_vsock *vsock;
+
+	if (pos)
+		(*pos)++;
+
+	if (iter->index >= (int)HASH_SIZE(vhost_vsock_hash))
+		return NULL;
+
+	if (iter->node)
+		iter->node = rcu_dereference_raw(hlist_next_rcu(iter->node));
+
+	for (;;) {
+		if (iter->node) {
+			vsock = hlist_entry_safe(rcu_dereference_raw(iter->node),
+						 struct vhost_vsock, hash);
+			if (vsock->guest_cid)
+				break;
+			iter->node = rcu_dereference_raw(hlist_next_rcu(iter->node));
+			continue;
+		}
+		iter->index++;
+		if (iter->index >= HASH_SIZE(vhost_vsock_hash))
+			return NULL;
+
+		iter->node = rcu_dereference_raw(hlist_first_rcu(&vhost_vsock_hash[iter->index]));
+	}
+	return iter;
+}
+
+static void *vsock_start(struct seq_file *m, loff_t *pos)
+{
+	struct vsock_file_iter *iter = m->private;
+	loff_t l = 0;
+	void *t;
+
+	rcu_read_lock();
+
+	iter->index = -1;
+	iter->node = NULL;
+	t = vsock_next(m, iter, NULL);
+
+	for (; iter->index < HASH_SIZE(vhost_vsock_hash) && l < *pos;
+	     t = vsock_next(m, iter, &l))
+		;
+
+	return t;
+}
+
+static void vsock_stop(struct seq_file *m, void *p)
+{
+	rcu_read_unlock();
+}
+
+static int vsock_show(struct seq_file *m, void *v)
+{
+	struct vsock_file_iter *iter = v;
+	struct vhost_vsock *vsock;
+	struct task_struct *worker;
+
+	if (!iter || iter->index >= HASH_SIZE(vhost_vsock_hash))
+		return 0;
+
+	vsock = hlist_entry_safe(rcu_dereference_raw(iter->node), struct vhost_vsock, hash);
+	worker = vsock->dev.worker;
+	seq_printf(m, "%d\t", vsock->guest_cid);
+
+	if (worker)
+		seq_printf(m, "%s:%d\n", worker->comm, worker->pid);
+	else
+		seq_puts(m, "(no task)\n");
+
+	return 0;
+}
+
+static const struct seq_operations vsock_file_seq_ops = {
+	.start		= vsock_start,
+	.next		= vsock_next,
+	.stop		= vsock_stop,
+	.show		= vsock_show,
+};
+
+static int vsock_file_open(struct inode *inode, struct file *file)
+{
+	struct vsock_file_iter *iter;
+	struct seq_file *m;
+	int ret;
+
+	iter = kzalloc(sizeof(*iter), GFP_KERNEL);
+	if (!iter)
+		return -ENOMEM;
+
+	ret = seq_open(file, &vsock_file_seq_ops);
+	if (ret) {
+		kfree(iter);
+		return ret;
+	}
+
+	m = file->private_data;
+	m->private = iter;
+
+	return 0;
+}
+
+static const struct file_operations vsock_file_fops = {
+	.owner		= THIS_MODULE,
+	.open		= vsock_file_open,
+	.release	= seq_release_private,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+};
+
 static int __init vhost_vsock_init(void)
 {
 	int ret;
@@ -908,12 +1031,15 @@ static int __init vhost_vsock_init(void)
 				  VSOCK_TRANSPORT_F_H2G);
 	if (ret < 0)
 		return ret;
+	vsock_file = debugfs_create_file("vsock_list", 0400,
+					 NULL, NULL, &vsock_file_fops);
 	return misc_register(&vhost_vsock_misc);
 };
 
 static void __exit vhost_vsock_exit(void)
 {
 	misc_deregister(&vhost_vsock_misc);
+	debugfs_remove(vsock_file);
 	vsock_core_unregister(&vhost_transport.transport);
 };
 
