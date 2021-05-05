@@ -66,3 +66,9 @@ bool set_page_dirty(struct page *page)
 	return folio_mark_dirty(page_folio(page));
 }
 EXPORT_SYMBOL(set_page_dirty);
+
+bool clear_page_dirty_for_io(struct page *page)
+{
+	return folio_clear_dirty_for_io(page_folio(page));
+}
+EXPORT_SYMBOL(clear_page_dirty_for_io);
