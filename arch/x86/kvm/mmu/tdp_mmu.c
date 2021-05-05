@@ -942,7 +942,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu, int write,
 				       rcu_dereference(iter->sptep));
 	}
 
-	if (!prefault)
+	if (!prefault && ret == RET_PF_FIXED)
 		vcpu->stat.pf_fixed++;
 
 	return ret;
