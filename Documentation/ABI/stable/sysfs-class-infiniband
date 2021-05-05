@@ -140,7 +140,7 @@ Description:
 		by LocalPhyErrors
 
 		excessive_buffer_overrun_errors: (RO) This counter, indicates an
-		input buffer overrun. It indicates possible misconfiguration of
+		input buffer overrun. It indicates possible missconfiguration of
 		a port, either by the Subnet Manager (SM) or by user
 		intervention. It can also indicate hardware issues or extremely
 		poor link signal integrity
