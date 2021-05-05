@@ -320,7 +320,7 @@ static int aspeed_vuart_handle_irq(struct uart_port *port)
 {
 	struct uart_8250_port *up = up_to_u8250p(port);
 	unsigned int iir, lsr;
-	int space, count;
+	unsigned int space, count;
 
 	iir = serial_port_in(port, UART_IIR);
 
@@ -346,7 +346,7 @@ static int aspeed_vuart_handle_irq(struct uart_port *port)
 			}
 
 		} else {
-			count = min(space, 256);
+			count = min(space, 256U);
 
 			do {
 				serial8250_read_char(up, lsr);
