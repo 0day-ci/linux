@@ -19,6 +19,7 @@
 #include "dpu_io_util.h"
 
 #define MSM_EDP_VERSION_200 200
+#define MSM_EDP_VERSION_510 510
 
 struct msm_edp {
 	struct drm_device *dev;
@@ -36,6 +37,11 @@ struct msm_edp {
 void __init msm_edp_v200_register(void);
 void __exit msm_edp_v200_unregister(void);
 int msm_edp_v200_modeset_init(struct msm_edp *edp, struct drm_device *dev,
+				struct drm_encoder *encoder);
+
+void __init msm_edp_v510_register(void);
+void __exit msm_edp_v510_unregister(void);
+int msm_edp_v510_modeset_init(struct msm_edp *edp, struct drm_device *dev,
 				struct drm_encoder *encoder);
 
 #endif /* __EDP_COMMON_CONNECTOR_H__ */

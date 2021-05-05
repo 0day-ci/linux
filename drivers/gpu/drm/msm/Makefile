@@ -32,6 +32,12 @@ msm-y := \
 	edp/v200/edp_v200_connector.o \
 	edp/v200/edp_v200_ctrl.o \
 	edp/v200/edp_v200_phy.o \
+	edp/v510/edp_v510.o \
+	edp/v510/edp_v510_aux.o \
+	edp/v510/edp_v510_bridge.o \
+	edp/v510/edp_v510_connector.o \
+	edp/v510/edp_v510_ctrl.o \
+	edp/v510/edp_v510_phy.o \
 	disp/mdp_format.o \
 	disp/mdp_kms.o \
 	disp/mdp4/mdp4_crtc.o \

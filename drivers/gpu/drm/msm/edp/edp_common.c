@@ -8,11 +8,13 @@
 void __init msm_edp_register(void)
 {
 	msm_edp_v200_register();
+	msm_edp_v510_register();
 }
 
 void __exit msm_edp_unregister(void)
 {
 	msm_edp_v200_unregister();
+	msm_edp_v510_unregister();
 }
 
 /* Second part of initialization, the drm/kms level modeset_init */
@@ -29,6 +31,8 @@ int msm_edp_modeset_init(struct msm_edp *edp, struct drm_device *dev,
 
 	if (edp->version == MSM_EDP_VERSION_200)
 		ret = msm_edp_v200_modeset_init(edp, dev, encoder);
+	else if (edp->version == MSM_EDP_VERSION_510)
+		ret = msm_edp_v510_modeset_init(edp, dev, encoder);
 
 	return ret;
 }
