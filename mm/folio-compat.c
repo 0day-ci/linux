@@ -48,3 +48,10 @@ void mark_page_accessed(struct page *page)
 	folio_mark_accessed(page_folio(page));
 }
 EXPORT_SYMBOL(mark_page_accessed);
+
+#ifdef CONFIG_MEMCG
+int mem_cgroup_charge(struct page *page, struct mm_struct *mm, gfp_t gfp)
+{
+	return folio_charge_cgroup(page_folio(page), mm, gfp);
+}
+#endif
