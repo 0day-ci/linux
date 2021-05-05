@@ -645,21 +645,26 @@ static __always_inline void SetPageUptodate(struct page *page)
 
 CLEARPAGEFLAG(Uptodate, uptodate, PF_NO_TAIL)
 
-int __test_set_page_writeback(struct page *page, bool keep_write);
+bool __folio_start_writeback(struct folio *folio, bool keep_write);
 
-#define test_set_page_writeback(page)			\
-	__test_set_page_writeback(page, false)
-#define test_set_page_writeback_keepwrite(page)	\
-	__test_set_page_writeback(page, true)
+#define folio_start_writeback(folio)			\
+	__folio_start_writeback(folio, false)
+#define folio_start_writeback_keepwrite(folio)	\
+	__folio_start_writeback(folio, true)
 
 static inline void set_page_writeback(struct page *page)
 {
-	test_set_page_writeback(page);
+	folio_start_writeback(page_folio(page));
 }
 
 static inline void set_page_writeback_keepwrite(struct page *page)
 {
-	test_set_page_writeback_keepwrite(page);
+	folio_start_writeback_keepwrite(page_folio(page));
+}
+
+static inline bool test_set_page_writeback(struct page *page)
+{
+	return folio_start_writeback(page_folio(page));
 }
 
 __PAGEFLAG(Head, head, PF_ANY) CLEARPAGEFLAG(Head, head, PF_ANY)
