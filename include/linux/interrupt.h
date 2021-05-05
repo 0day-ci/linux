@@ -529,7 +529,7 @@ extern bool force_irqthreads;
  * implement the following hook.
  */
 #ifndef hard_irq_disable
-#define hard_irq_disable()	do { } while(0)
+#define hard_irq_disable()	do { } while (0)
 #endif
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
@@ -538,9 +538,8 @@ extern bool force_irqthreads;
    al. should be converted to tasklets, not to softirqs.
  */
 
-enum
-{
-	HI_SOFTIRQ=0,
+enum {
+	HI_SOFTIRQ = 0,
 	TIMER_SOFTIRQ,
 	NET_TX_SOFTIRQ,
 	NET_RX_SOFTIRQ,
@@ -565,8 +564,7 @@ extern const char * const softirq_to_name[NR_SOFTIRQS];
  * asm/hardirq.h to get better cache usage.  KAO
  */
 
-struct softirq_action
-{
+struct softirq_action {
 	void	(*action)(struct softirq_action *);
 };
 
@@ -610,8 +608,7 @@ static inline struct task_struct *this_cpu_ksoftirqd(void)
      he makes it with spinlocks.
  */
 
-struct tasklet_struct
-{
+struct tasklet_struct {
 	struct tasklet_struct *next;
 	unsigned long state;
 	atomic_t count;
@@ -652,8 +649,7 @@ struct tasklet_struct name = {				\
 	.func = _func,					\
 }
 
-enum
-{
+enum {
 	TASKLET_STATE_SCHED,	/* Tasklet is scheduled for execution */
 	TASKLET_STATE_RUN	/* Tasklet is running (SMP only) */
 };
@@ -755,7 +751,7 @@ extern void tasklet_setup(struct tasklet_struct *t,
  * if more than one irq occurred.
  */
 
-#if !defined(CONFIG_GENERIC_IRQ_PROBE) 
+#if !defined(CONFIG_GENERIC_IRQ_PROBE)
 static inline unsigned long probe_irq_on(void)
 {
 	return 0;
