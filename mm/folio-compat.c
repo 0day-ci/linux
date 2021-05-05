@@ -54,4 +54,9 @@ int mem_cgroup_charge(struct page *page, struct mm_struct *mm, gfp_t gfp)
 {
 	return folio_charge_cgroup(page_folio(page), mm, gfp);
 }
+
+void mem_cgroup_uncharge(struct page *page)
+{
+	folio_uncharge_cgroup(page_folio(page));
+}
 #endif

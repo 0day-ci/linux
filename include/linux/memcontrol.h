@@ -700,6 +700,7 @@ static inline bool mem_cgroup_below_min(struct mem_cgroup *memcg)
 }
 
 int folio_charge_cgroup(struct folio *, struct mm_struct *, gfp_t);
+void folio_uncharge_cgroup(struct folio *);
 
 int mem_cgroup_charge(struct page *page, struct mm_struct *mm, gfp_t gfp_mask);
 int mem_cgroup_swapin_charge_page(struct page *page, struct mm_struct *mm,
@@ -1207,6 +1208,10 @@ static inline int folio_charge_cgroup(struct folio *folio,
 		struct mm_struct *mm, gfp_t gfp)
 {
 	return 0;
+}
+
+static inline void folio_uncharge_cgroup(struct folio *)
+{
 }
 
 static inline int mem_cgroup_charge(struct page *page, struct mm_struct *mm,
