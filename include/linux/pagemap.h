@@ -589,6 +589,8 @@ static inline unsigned find_get_pages_tag(struct address_space *mapping,
 					nr_pages, pages);
 }
 
+struct folio *filemap_get_stable_folio(struct address_space *mapping,
+		pgoff_t index, unsigned flags);
 struct page *grab_cache_page_write_begin(struct address_space *mapping,
 			pgoff_t index, unsigned flags);
 
