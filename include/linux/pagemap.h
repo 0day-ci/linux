@@ -951,9 +951,9 @@ static inline int fault_in_pages_readable(const char __user *uaddr, int size)
 }
 
 int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
-				pgoff_t index, gfp_t gfp_mask);
-int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
-				pgoff_t index, gfp_t gfp_mask);
+				pgoff_t index, gfp_t gfp);
+int folio_add_to_page_cache(struct folio *folio, struct address_space *mapping,
+				pgoff_t index, gfp_t gfp);
 extern void delete_from_page_cache(struct page *page);
 extern void __delete_from_page_cache(struct page *page, void *shadow);
 void replace_page_cache_page(struct page *old, struct page *new);
@@ -977,6 +977,22 @@ static inline int add_to_page_cache(struct page *page,
 		__ClearPageLocked(page);
 	return error;
 }
+
+static inline int add_to_page_cache_lru(struct page *page,
+		struct address_space *mapping, pgoff_t index, gfp_t gfp)
+{
+	return folio_add_to_page_cache((struct folio *)page, mapping,
+			index, gfp);
+}
+
+/*
+ * Making this function static leads to build failure when
+ * CONFIG_DEBUG_INFO_BTF is enabled because __add_to_page_cache_locked()
+ * is referred to by BPF code.  This must be visible for error injection.
+ */
+int __add_to_page_cache_locked(struct folio *folio,
+		struct address_space *mapping,
+		pgoff_t index, gfp_t gfp, void **shadowp);
 
 /**
  * struct readahead_control - Describes a readahead request.
