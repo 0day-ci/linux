@@ -18,6 +18,7 @@
 #include <linux/micrel_phy.h>
 #include <net/dsa.h>
 #include <net/switchdev.h>
+#include <linux/phylink.h>
 
 #include "ksz_common.h"
 #include "ksz8795_reg.h"
@@ -1420,11 +1421,83 @@ static int ksz8_setup(struct dsa_switch *ds)
 	return 0;
 }
 
+static int ksz_get_state(struct dsa_switch *ds, int port,
+					  struct phylink_link_state *state)
+{
+	struct ksz_device *dev = ds->priv;
+	struct ksz8 *ksz8 = dev->priv;
+	const u8 *regs = ksz8->regs;
+	u8 speed, link;
+
+	ksz_pread8(dev, port, regs[P_LINK_STATUS], &link);
+	ksz_pread8(dev, port, regs[P_SPEED_STATUS], &speed);
+
+	state->link = !!(link & PORT_STAT_LINK_GOOD);
+	if (state->link) {
+		state->speed =
+			(speed & PORT_STAT_SPEED_100MBIT) ? SPEED_100 : SPEED_10;
+		state->duplex =
+			(speed & PORT_STAT_FULL_DUPLEX) ? DUPLEX_FULL : DUPLEX_HALF;
+	}
+
+	return 0;
+}
+
+static void ksz_validate(struct dsa_switch *ds, int port,
+			       unsigned long *supported,
+			       struct phylink_link_state *state)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
+	struct ksz_device *dev = ds->priv;
+
+	if (port == dev->cpu_port) {
+		if ((state->interface != PHY_INTERFACE_MODE_RMII) &&
+		   (state->interface != PHY_INTERFACE_MODE_MII))
+			goto unsupported;
+	} else if (port > dev->port_cnt) {
+		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+		dev_err(ds->dev, "Unsupported port: %i\n", port);
+		return;
+	} else {
+		if (state->interface != PHY_INTERFACE_MODE_INTERNAL)
+			goto unsupported;
+	}
+
+	/* Allow all the expected bits */
+	phylink_set_port_modes(mask);
+	phylink_set(mask, Autoneg);
+
+	phylink_set(mask, Pause);
+	/* Silicon Errata Sheet (DS80000830A): Asym_Pause limit to port 2 */
+	if (port || !ksz_is_ksz88x3(dev))
+		phylink_set(mask, Asym_Pause);
+
+	/* 10M and 100M are only supported */
+	phylink_set(mask, 10baseT_Half);
+	phylink_set(mask, 10baseT_Full);
+	phylink_set(mask, 100baseT_Half);
+	phylink_set(mask, 100baseT_Full);
+
+	bitmap_and(supported, supported, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_and(state->advertising, state->advertising, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+	return;
+
+unsupported:
+	bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	dev_err(ds->dev, "Unsupported interface: %d, port: %d\n",
+		state->interface, port);
+}
+
 static const struct dsa_switch_ops ksz8_switch_ops = {
 	.get_tag_protocol	= ksz8_get_tag_protocol,
 	.setup			= ksz8_setup,
 	.phy_read		= ksz_phy_read16,
 	.phy_write		= ksz_phy_write16,
+	.phylink_validate	= ksz_validate,
+	.phylink_mac_link_state	= ksz_get_state,
 	.phylink_mac_link_down	= ksz_mac_link_down,
 	.port_enable		= ksz_enable_port,
 	.get_strings		= ksz8_get_strings,
