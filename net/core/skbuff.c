@@ -3818,6 +3818,12 @@ struct sk_buff *skb_segment_list(struct sk_buff *skb,
 		skb_release_head_state(nskb);
 		 __copy_skb_header(nskb, skb);
 
+		/* __copy_skb_header() does not initialize the sk-related fields,
+		 * and skb_release_head_state() already orphaned nskb
+		 */
+		nskb->sk = NULL;
+		nskb->destructor = NULL;
+
 		skb_headers_offset_update(nskb, skb_headroom(nskb) - skb_headroom(skb));
 		skb_copy_from_linear_data_offset(skb, -tnl_hlen,
 						 nskb->data - tnl_hlen,
