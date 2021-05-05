@@ -39,6 +39,7 @@
 #include <linux/i2c-mux.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/ktime.h>
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/property.h>
@@ -414,6 +415,8 @@ static int pca954x_init(struct i2c_client *client, struct pca954x *data)
 static int pca954x_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
+	enum gpiod_flags flags = GPIOD_OUT_HIGH;
+	const char *reset_gpio_name = "reset";
 	struct i2c_adapter *adap = client->adapter;
 	struct device *dev = &client->dev;
 	struct gpio_desc *gpio;
@@ -435,9 +438,43 @@ static int pca954x_probe(struct i2c_client *client,
 	data->client = client;
 
 	/* Reset the mux if a reset GPIO is specified. */
-	gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(gpio))
-		return PTR_ERR(gpio);
+	gpio = devm_gpiod_get_optional(dev, reset_gpio_name, flags);
+	if (IS_ERR(gpio)) {
+		ret = PTR_ERR(gpio);
+		/*
+		 * In the case that multiple muxes share a single reset line,
+		 * only one should toggle the reset. The other muxes should
+		 * continue probing, waiting for the reset line to drop.
+		 */
+		if (ret == -EBUSY) {
+			ktime_t exp;
+
+			flags |= GPIOD_FLAGS_BIT_NONEXCLUSIVE;
+			gpio = gpiod_get(dev, reset_gpio_name, flags);
+			if (IS_ERR(gpio))
+				return PTR_ERR(gpio);
+
+			exp = ktime_add_us(ktime_get(), 1000);
+			do {
+				ret = gpiod_get_value_cansleep(gpio);
+				if (ret <= 0)
+					break;
+				usleep_range(5, 50);
+			} while (ktime_before(ktime_get(), exp));
+
+			gpiod_put(gpio);
+			if (ret) {
+				if (ret > 0)
+					ret = -ETIMEDOUT;
+
+				return ret;
+			}
+
+			gpio = NULL;
+		} else {
+			return ret;
+		}
+	}
 	if (gpio) {
 		udelay(1);
 		gpiod_set_value_cansleep(gpio, 0);
