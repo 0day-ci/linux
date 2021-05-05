@@ -79,11 +79,50 @@ create_vxlan_pair() {
 	done
 }
 
+move_address() {
+	local -r ns=$1
+	local -r src_dev=$2
+	local -r dst_dev=$3
+	local -r addr=$4
+
+	ip -n $ns addr del dev $src_dev $addr
+	ip -n $ns addr add dev $dst_dev $addr nodad 2>/dev/null
+}
+
 is_ipv6() {
 	if [[ $1 =~ .*:.* ]]; then
 		return 0
 	fi
 	return 1
+}
+
+create_bridge() {
+	local vxdev=vxlan$SRC
+	local src=$1
+	local i
+
+	is_ipv6 $src && vxdev=vxlan6$SRC
+
+	create_vxlan_pair
+	ip -n $NS_SRC link add name br_port type veth peer name br_port_peer
+	ip -n $NS_SRC link add name br0 type bridge
+	ip -n $NS_SRC link set dev br0 up
+	ip -n $NS_SRC link set dev br_port_peer up
+	ip -n $NS_SRC link set dev br_port up master br0
+	ip -n $NS_SRC link set dev $vxdev master br0
+	move_address $NS_SRC $vxdev br_port_peer $src/24
+
+	ip -n $NS_SRC link set br_port xdp object ../bpf/xdp_dummy.o section xdp_dummy 2>/dev/null
+	ip netns exec $NS_SRC ./set_sysfs_attr.sh br_port threaded 1
+
+	# slowing down the input path, we will help the napi thread to
+	# aggregate as much packets as possible via GRO
+	modprobe br_netfilter 2>/dev/null
+	ip netns exec $NS_SRC sysctl -qw net.bridge.bridge-nf-call-iptables=1
+	ip netns exec $NS_SRC sysctl -qw net.bridge.bridge-nf-call-ip6tables=1
+	for i in `seq 1 100`; do
+		ip netns exec $NS_SRC $IPT -A FORWARD
+	done
 }
 
 run_test() {
@@ -226,6 +265,21 @@ for family in 4 6; do
 	create_vxlan_pair
 	ip netns exec $NS_DST ethtool -K veth$DST rx-gro-list on
 	run_test "GRO frag list over UDP tunnel" $OL_NET$DST 1 1
+	cleanup
+
+	create_bridge $OL_NET$SRC
+	ip netns exec $NS_SRC ethtool -K br_port rx-gro-list on
+	ip netns exec $NS_SRC ethtool -K br_port_peer tx-udp-segmentation off
+	ip netns exec $NS_DST ethtool -K veth$DST rx-gro-list on
+	run_test "GRO frag list over UDP tunnel segmentation" $OL_NET$DST 1 1
+	cleanup
+
+	create_bridge $OL_NET$SRC
+	ip netns exec $NS_SRC ethtool -K br_port rx-gro-list on
+	ip netns exec $NS_SRC ethtool -K br_port_peer tx-udp-segmentation off
+	ip netns exec $NS_DST ethtool -K veth$DST rx-gro-list on
+	ip netns exec $NS_SRC ethtool -K veth$SRC tx off
+	run_test "GRO frag list over UDP tunnel segmentation (tx csum off)" $OL_NET$DST 1 1
 	cleanup
 
 	# use NAT to circumvent GRO FWD check
