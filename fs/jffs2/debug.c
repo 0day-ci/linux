@@ -354,7 +354,7 @@ __jffs2_dbg_acct_paranoia_check_nolock(struct jffs2_sb_info *c,
 	}
 
 #if 0
-	/* This should work when we implement ref->__totlen elemination */
+	/* This should work when we implement ref->__totlen elimination */
 	if (my_dirty_size != jeb->dirty_size + jeb->wasted_size) {
 		JFFS2_ERROR("Calculated dirty+wasted size %#08x != stored dirty + wasted size %#08x\n",
 			my_dirty_size, jeb->dirty_size + jeb->wasted_size);
