@@ -289,9 +289,13 @@ PMBus driver platform data
 ==========================
 
 PMBus platform data is defined in include/linux/pmbus.h. Platform data
-currently only provides a flag field with a single bit used::
+currently only provides a flag field with three bits used::
 
-	#define PMBUS_SKIP_STATUS_CHECK (1 << 0)
+	#define PMBUS_SKIP_STATUS_CHECK  BIT(0)
+
+  #define PMBUS_WRITE_PROTECTED BIT(1)
+
+  #define PMBUS_READ_STATUS_AFTER_FAILED_CHECK  BIT(2)
 
 	struct pmbus_platform_data {
 		u32 flags;              /* Device specific flags */
@@ -315,3 +319,19 @@ status register must be disabled.
 Some i2c controllers do not support single-byte commands (write commands with
 no data, i2c_smbus_write_byte()). With such controllers, clearing the status
 register is impossible, and the PMBUS_SKIP_STATUS_CHECK flag must be set.
+
+PMBUS_WRITE_PROTECTED
+
+Set if the chip is write protected and write protection is not determined
+by the standard WRITE_PROTECT command.
+
+PMBUS_READ_STATUS_AFTER_FAILED_CHECK
+  Read the STATUS register after each failed register check.
+
+Some PMBus chips end up in an undefined state when trying to read an
+unsupported register. For such chips, it is necessary to reset the
+chip pmbus controller to a known state after a failed register check.
+This can be done by reading a known register. By setting this flag the
+driver will try to read the STATUS register after each failed
+register check. This read may fail, but it will put the chip into a
+known state.
