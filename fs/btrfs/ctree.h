@@ -279,9 +279,10 @@ struct btrfs_super_block {
 #define BTRFS_FEATURE_COMPAT_SAFE_SET		0ULL
 #define BTRFS_FEATURE_COMPAT_SAFE_CLEAR		0ULL
 
-#define BTRFS_FEATURE_COMPAT_RO_SUPP			\
-	(BTRFS_FEATURE_COMPAT_RO_FREE_SPACE_TREE |	\
-	 BTRFS_FEATURE_COMPAT_RO_FREE_SPACE_TREE_VALID)
+#define BTRFS_FEATURE_COMPAT_RO_SUPP				\
+	(BTRFS_FEATURE_COMPAT_RO_FREE_SPACE_TREE |		\
+	 BTRFS_FEATURE_COMPAT_RO_FREE_SPACE_TREE_VALID |	\
+	 BTRFS_FEATURE_COMPAT_RO_VERITY)
 
 #define BTRFS_FEATURE_COMPAT_RO_SAFE_SET	0ULL
 #define BTRFS_FEATURE_COMPAT_RO_SAFE_CLEAR	0ULL
@@ -1504,6 +1505,11 @@ do {                                                                   \
 	 BTRFS_INODE_DIRSYNC |						\
 	 BTRFS_INODE_COMPRESS |						\
 	 BTRFS_INODE_ROOT_ITEM_INIT)
+
+/*
+ * Inode compat flags
+ */
+#define BTRFS_INODE_VERITY		(1 << 0)
 
 struct btrfs_map_token {
 	struct extent_buffer *eb;
@@ -3765,6 +3771,24 @@ static inline int btrfs_defrag_cancelled(struct btrfs_fs_info *fs_info)
 {
 	return signal_pending(current);
 }
+
+/* verity.c */
+#ifdef CONFIG_FS_VERITY
+extern const struct fsverity_operations btrfs_verityops;
+int btrfs_drop_verity_items(struct btrfs_inode *inode);
+BTRFS_SETGET_FUNCS(verity_descriptor_encryption, struct btrfs_verity_descriptor_item,
+		   encryption, 8);
+BTRFS_SETGET_FUNCS(verity_descriptor_size, struct btrfs_verity_descriptor_item, size, 64);
+BTRFS_SETGET_STACK_FUNCS(stack_verity_descriptor_encryption, struct btrfs_verity_descriptor_item,
+			 encryption, 8);
+BTRFS_SETGET_STACK_FUNCS(stack_verity_descriptor_size, struct btrfs_verity_descriptor_item,
+			 size, 64);
+#else
+static inline int btrfs_drop_verity_items(struct btrfs_inode *inode)
+{
+	return 0;
+}
+#endif
 
 /* Sanity test specific functions */
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS
