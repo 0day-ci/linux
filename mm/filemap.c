@@ -1528,7 +1528,7 @@ void end_page_writeback(struct page *page)
 	 */
 	if (PageReclaim(page)) {
 		ClearPageReclaim(page);
-		rotate_reclaimable_page(page);
+		folio_rotate_reclaimable(page_folio(page));
 	}
 
 	/*
