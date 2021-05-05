@@ -311,10 +311,10 @@ void lru_note_cost(struct lruvec *lruvec, bool file, unsigned int nr_pages)
 	} while ((lruvec = parent_lruvec(lruvec)));
 }
 
-void lru_note_cost_page(struct page *page)
+void lru_note_cost_folio(struct folio *folio)
 {
-	lru_note_cost(mem_cgroup_page_lruvec(page, page_pgdat(page)),
-		      page_is_file_lru(page), thp_nr_pages(page));
+	lru_note_cost(mem_cgroup_folio_lruvec(folio, folio_pgdat(folio)),
+		      folio_is_file_lru(folio), folio_nr_pages(folio));
 }
 
 static void __activate_page(struct page *page, struct lruvec *lruvec)
