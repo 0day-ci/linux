@@ -390,9 +390,9 @@ out:
 
 /**
  * workingset_activation - note a page activation
- * @page: page that is being activated
+ * @folio: Folio that is being activated.
  */
-void workingset_activation(struct page *page)
+void workingset_activation(struct folio *folio)
 {
 	struct mem_cgroup *memcg;
 	struct lruvec *lruvec;
@@ -405,11 +405,11 @@ void workingset_activation(struct page *page)
 	 * XXX: See workingset_refault() - this should return
 	 * root_mem_cgroup even for !CONFIG_MEMCG.
 	 */
-	memcg = page_memcg_rcu(page);
+	memcg = page_memcg_rcu(&folio->page);
 	if (!mem_cgroup_disabled() && !memcg)
 		goto out;
-	lruvec = mem_cgroup_page_lruvec(page, page_pgdat(page));
-	workingset_age_nonresident(lruvec, thp_nr_pages(page));
+	lruvec = mem_cgroup_folio_lruvec(folio, folio_pgdat(folio));
+	workingset_age_nonresident(lruvec, folio_nr_pages(folio));
 out:
 	rcu_read_unlock();
 }
