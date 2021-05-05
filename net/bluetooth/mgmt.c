@@ -5587,8 +5587,8 @@ static int set_scan_params(struct sock *sk, struct hci_dev *hdev,
 
 		hci_req_init(&req, hdev);
 
-		hci_req_add_le_scan_disable(&req, false);
-		hci_req_add_le_passive_scan(&req);
+		// FIXME hci_req_add_le_scan_disable(&req, false);
+		// FIXME hci_req_add_le_passive_scan(&req);
 
 		hci_req_run(&req, NULL);
 	}
