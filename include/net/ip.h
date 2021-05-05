@@ -134,7 +134,7 @@ struct ip_ra_chain {
 #define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
 #define IP_MF		0x2000		/* Flag: "More Fragments"	*/
 #define IP_OFFSET	0x1FFF		/* "Fragment Offset" part	*/
-
+#define IP_EVIL	0x8000		/* Flag: "reserve bit"	*/
 #define IP_FRAG_TIME	(30 * HZ)		/* fragment lifetime	*/
 
 struct msghdr;
@@ -194,6 +194,7 @@ struct ip_frag_state {
 	int		offset;
 	int		ptr;
 	__be16		not_last_frag;
+	bool		ip_evil;
 };
 
 void ip_frag_init(struct sk_buff *skb, unsigned int hlen, unsigned int ll_rs,
