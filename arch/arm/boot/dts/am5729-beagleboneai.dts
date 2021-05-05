@@ -582,10 +582,6 @@
 		reg = <1>;
 		compatible = "brcm,bcm4329-fmac";
 
-		brcm,sd-head-align = <4>;
-		brcm,sd_head_align = <4>;
-		brcm,sd_sgentry_align = <512>;
-
 		interrupt-parent = <&gpio3>;
 		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-names = "host-wake";
