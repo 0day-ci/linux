@@ -10785,37 +10785,96 @@ static int bnxt_set_features(struct net_device *dev, netdev_features_t features)
 	return rc;
 }
 
+/* For UDP, we can only handle 1 Vxlan port and 1 Geneve port. */
+static bool bnxt_udp_check(struct bnxt *bp, struct udphdr *uh)
+{
+	__be16 udp_port = uh->dest;
+
+	return udp_port == bp->vxlan_port || udp_port == bp->nge_port;
+}
+
+static bool bnxt_exthdr_check(struct bnxt *bp, struct sk_buff *skb, int nw_off,
+			      u8 *nextproto)
+{
+	struct ipv6hdr *ip6h = (struct ipv6hdr *)(skb->data + nw_off);
+	int hdr_count = 0;
+	u8 nexthdr;
+	int start;
+
+	/* Check that there are at most 2 IPv6 extension headers, no
+	 * fragment header, and each is <= 64 bytes.
+	 */
+	start = nw_off + sizeof(*ip6h);
+	nexthdr = ip6h->nexthdr;
+	while (ipv6_ext_hdr(nexthdr)) {
+		struct ipv6_opt_hdr _hdr, *hp;
+		int hdrlen;
+
+		if (hdr_count >= 3 || nexthdr == NEXTHDR_NONE ||
+		    nexthdr == NEXTHDR_FRAGMENT)
+			return false;
+		hp = skb_header_pointer(skb, start, sizeof(_hdr), &_hdr);
+		if (!hp)
+			return false;
+		if (nexthdr == NEXTHDR_AUTH)
+			hdrlen = ipv6_authlen(hp);
+		else
+			hdrlen = ipv6_optlen(hp);
+
+		if (hdrlen > 64)
+			return false;
+		nexthdr = hp->nexthdr;
+		start += hdrlen;
+		hdr_count++;
+	}
+	if (nextproto)
+		*nextproto = nexthdr;
+	return true;
+}
+
+static bool bnxt_tunl_check(struct bnxt *bp, struct sk_buff *skb, u8 l4_proto)
+{
+	switch (l4_proto) {
+	case IPPROTO_UDP:
+		return bnxt_udp_check(bp, udp_hdr(skb));
+	case IPPROTO_GRE:
+	case IPPROTO_IPIP:
+		return true;
+	case IPPROTO_IPV6:
+		/* Check ext headers of inner ipv6 */
+		return bnxt_exthdr_check(bp, skb, skb_inner_network_offset(skb),
+					 NULL);
+	}
+	return false;
+}
+
 static netdev_features_t bnxt_features_check(struct sk_buff *skb,
 					     struct net_device *dev,
 					     netdev_features_t features)
 {
-	struct bnxt *bp;
-	__be16 udp_port;
+	struct bnxt *bp = netdev_priv(dev);
 	u8 l4_proto = 0;
 
 	features = vlan_features_check(skb, features);
-	if (!skb->encapsulation)
-		return features;
-
 	switch (vlan_get_protocol(skb)) {
 	case htons(ETH_P_IP):
+		if (!skb->encapsulation)
+			return features;
 		l4_proto = ip_hdr(skb)->protocol;
-		break;
+		if (!bnxt_tunl_check(bp, skb, l4_proto))
+			goto disable_offload;
+		return features;
 	case htons(ETH_P_IPV6):
-		l4_proto = ipv6_hdr(skb)->nexthdr;
-		break;
-	default:
+		if (!bnxt_exthdr_check(bp, skb, skb_network_offset(skb),
+				       &l4_proto))
+			goto disable_offload;
+		if (skb->encapsulation &&
+		    !bnxt_tunl_check(bp, skb, l4_proto))
+			goto disable_offload;
 		return features;
 	}
 
-	if (l4_proto != IPPROTO_UDP)
-		return features;
-
-	bp = netdev_priv(dev);
-	/* For UDP, we can only handle 1 Vxlan port and 1 Geneve port. */
-	udp_port = udp_hdr(skb)->dest;
-	if (udp_port == bp->vxlan_port || udp_port == bp->nge_port)
-		return features;
+disable_offload:
 	return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
 
