@@ -143,7 +143,8 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	spin_lock_bh(&irc_buffer_lock);
 	ib_ptr = skb_header_pointer(skb, dataoff, skb->len - dataoff,
 				    irc_buffer);
-	BUG_ON(ib_ptr == NULL);
+	if (!ib_ptr)
+		return NF_ACCEPT;
 
 	data = ib_ptr;
 	data_limit = ib_ptr + skb->len - dataoff;
