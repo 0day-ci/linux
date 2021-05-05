@@ -46,19 +46,19 @@
 #endif
 
 #define edac_printk(level, prefix, fmt, arg...) \
-	printk(level "EDAC " prefix ": " fmt, ##arg)
+	printk_ratelimited(level "EDAC " prefix ": " fmt, ##arg)
 
 #define edac_mc_printk(mci, level, fmt, arg...) \
-	printk(level "EDAC MC%d: " fmt, mci->mc_idx, ##arg)
+	printk_ratelimited(level "EDAC MC%d: " fmt, mci->mc_idx, ##arg)
 
 #define edac_mc_chipset_printk(mci, level, prefix, fmt, arg...) \
-	printk(level "EDAC " prefix " MC%d: " fmt, mci->mc_idx, ##arg)
+	printk_ratelimited(level "EDAC " prefix " MC%d: " fmt, mci->mc_idx, ##arg)
 
 #define edac_device_printk(ctl, level, fmt, arg...) \
-	printk(level "EDAC DEVICE%d: " fmt, ctl->dev_idx, ##arg)
+	printk_ratelimited(level "EDAC DEVICE%d: " fmt, ctl->dev_idx, ##arg)
 
 #define edac_pci_printk(ctl, level, fmt, arg...) \
-	printk(level "EDAC PCI%d: " fmt, ctl->pci_idx, ##arg)
+	printk_ratelimited(level "EDAC PCI%d: " fmt, ctl->pci_idx, ##arg)
 
 /* prefixes for edac_printk() and edac_mc_printk() */
 #define EDAC_MC "MC"
