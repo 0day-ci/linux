@@ -3854,6 +3854,8 @@ static int __init ingenic_pinctrl_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#define IF_ENABLED(cfg, ptr)	PTR_IF(IS_ENABLED(cfg), (ptr))
+
 static const struct of_device_id ingenic_pinctrl_of_match[] = {
 	{
 		.compatible = "ingenic,jz4730-pinctrl",

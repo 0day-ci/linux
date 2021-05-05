@@ -38,6 +38,8 @@
 #define PTR_ALIGN_DOWN(p, a)	((typeof(p))ALIGN_DOWN((unsigned long)(p), (a)))
 #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
 
+#define PTR_IF(cond, ptr)	((cond) ? (ptr) : NULL)
+
 /* generic data direction definitions */
 #define READ			0
 #define WRITE			1
