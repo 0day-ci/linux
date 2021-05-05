@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright(c) 2017 - 2021 Pensando Systems, Inc */
 
+#if IS_ENABLED(CONFIG_PTP_1588_CLOCK)
+
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 
@@ -613,3 +615,4 @@ void ionic_lif_free_phc(struct ionic_lif *lif)
 	devm_kfree(lif->ionic->dev, lif->phc);
 	lif->phc = NULL;
 }
+#endif /* IS_ENABLED(CONFIG_PTP_1588_CLOCK) */
