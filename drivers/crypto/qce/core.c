@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
@@ -184,11 +185,22 @@ static int qce_check_version(struct qce_device *qce)
 	return 0;
 }
 
+static const struct of_device_id qce_crypto_of_match[] = {
+	{ .compatible = "qcom,ipq6018-qce", },
+	{ .compatible = "qcom,sdm845-qce", },
+	{ .compatible = "qcom,sm8250-qce", },
+	{}
+};
+MODULE_DEVICE_TABLE(of, qce_crypto_of_match);
+
 static int qce_crypto_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct qce_device *qce;
+	const struct of_device_id *of_id =
+			of_match_device(qce_crypto_of_match, &pdev->dev);
 	int ret;
+
 
 	qce = devm_kzalloc(dev, sizeof(*qce), GFP_KERNEL);
 	if (!qce)
@@ -209,39 +221,51 @@ static int qce_crypto_probe(struct platform_device *pdev)
 	if (IS_ERR(qce->mem_path))
 		return PTR_ERR(qce->mem_path);
 
-	qce->core = devm_clk_get(qce->dev, "core");
-	if (IS_ERR(qce->core)) {
-		ret = PTR_ERR(qce->core);
-		goto err_mem_path_put;
-	}
-
-	qce->iface = devm_clk_get(qce->dev, "iface");
-	if (IS_ERR(qce->iface)) {
-		ret = PTR_ERR(qce->iface);
-		goto err_mem_path_put;
-	}
-
-	qce->bus = devm_clk_get(qce->dev, "bus");
-	if (IS_ERR(qce->bus)) {
-		ret = PTR_ERR(qce->bus);
-		goto err_mem_path_put;
-	}
-
 	ret = icc_set_bw(qce->mem_path, QCE_DEFAULT_MEM_BANDWIDTH, QCE_DEFAULT_MEM_BANDWIDTH);
 	if (ret)
 		goto err_mem_path_put;
 
-	ret = clk_prepare_enable(qce->core);
-	if (ret)
-		goto err_mem_path_disable;
+	/* On some qcom parts the crypto clocks are already configured by
+	 * the firmware running before linux. In such cases we don't need to
+	 * enable/configure them again. Check here for the same.
+	 */
+	if (!strcmp(of_id->compatible, "qcom,ipq6018-qce") ||
+	    !strcmp(of_id->compatible, "qcom,sdm845-qce"))
+		qce->clks_configured_by_fw = false;
+	else
+		qce->clks_configured_by_fw = true;
 
-	ret = clk_prepare_enable(qce->iface);
-	if (ret)
-		goto err_clks_core;
+	if (!qce->clks_configured_by_fw) {
+		qce->core = devm_clk_get(qce->dev, "core");
+		if (IS_ERR(qce->core)) {
+			ret = PTR_ERR(qce->core);
+			goto err_mem_path_put;
+		}
 
-	ret = clk_prepare_enable(qce->bus);
-	if (ret)
-		goto err_clks_iface;
+		qce->iface = devm_clk_get(qce->dev, "iface");
+		if (IS_ERR(qce->iface)) {
+			ret = PTR_ERR(qce->iface);
+			goto err_mem_path_put;
+		}
+
+		qce->bus = devm_clk_get(qce->dev, "bus");
+		if (IS_ERR(qce->bus)) {
+			ret = PTR_ERR(qce->bus);
+			goto err_mem_path_put;
+		}
+
+		ret = clk_prepare_enable(qce->core);
+		if (ret)
+			goto err_mem_path_disable;
+
+		ret = clk_prepare_enable(qce->iface);
+		if (ret)
+			goto err_clks_core;
+
+		ret = clk_prepare_enable(qce->bus);
+		if (ret)
+			goto err_clks_iface;
+	}
 
 	ret = qce_dma_request(qce->dev, &qce->dma);
 	if (ret)
@@ -292,13 +316,6 @@ static int qce_crypto_remove(struct platform_device *pdev)
 	clk_disable_unprepare(qce->core);
 	return 0;
 }
-
-static const struct of_device_id qce_crypto_of_match[] = {
-	{ .compatible = "qcom,ipq6018-qce", },
-	{ .compatible = "qcom,sdm845-qce", },
-	{}
-};
-MODULE_DEVICE_TABLE(of, qce_crypto_of_match);
 
 static struct platform_driver qce_crypto_driver = {
 	.probe = qce_crypto_probe,
