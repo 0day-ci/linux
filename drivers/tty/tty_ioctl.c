@@ -301,6 +301,47 @@ int tty_termios_hw_change(const struct ktermios *a, const struct ktermios *b)
 EXPORT_SYMBOL(tty_termios_hw_change);
 
 /**
+ *	tty_get_byte_size	-	get size of a byte
+ *	@cflag: termios cflag value
+ *	@account_flags: account for start and stop bits, second stop bit (if
+ *			set), and parity (if set)
+ *
+ *	Get the size of a byte in bits depending on @cflag. Depending on
+ *	@account_flags parameter, the result also accounts start and stop bits,
+ *	the second stop bit, and parity bit.
+ */
+unsigned char tty_get_byte_size(unsigned int cflag, bool account_flags)
+{
+	unsigned char bits = account_flags ? 2 : 0;
+
+	/* byte size and parity */
+	switch (cflag & CSIZE) {
+	case CS5:
+		bits += 5;
+		break;
+	case CS6:
+		bits += 6;
+		break;
+	case CS7:
+		bits += 7;
+		break;
+	case CS8:
+	default:
+		bits += 8;
+		break;
+	}
+
+	if (account_flags && (cflag & CSTOPB))
+		bits++;
+
+	if (account_flags && (cflag & PARENB))
+		bits++;
+
+	return bits;
+}
+EXPORT_SYMBOL_GPL(tty_get_byte_size);
+
+/**
  *	tty_set_termios		-	update termios values
  *	@tty: tty to update
  *	@new_termios: desired new value
