@@ -60,3 +60,9 @@ void mem_cgroup_uncharge(struct page *page)
 	folio_uncharge_cgroup(page_folio(page));
 }
 #endif
+
+bool set_page_dirty(struct page *page)
+{
+	return folio_mark_dirty(page_folio(page));
+}
+EXPORT_SYMBOL(set_page_dirty);
