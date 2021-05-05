@@ -3944,6 +3944,7 @@ static void fill_inode_item(struct btrfs_trans_handle *trans,
 	btrfs_set_token_inode_transid(&token, item, trans->transid);
 	btrfs_set_token_inode_rdev(&token, item, inode->i_rdev);
 	btrfs_set_token_inode_flags(&token, item, BTRFS_I(inode)->flags);
+	btrfs_set_token_inode_compat_flags(&token, item, BTRFS_I(inode)->compat_flags);
 	btrfs_set_token_inode_block_group(&token, item, 0);
 }
 
