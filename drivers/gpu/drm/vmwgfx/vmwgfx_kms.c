@@ -38,8 +38,10 @@
 
 void vmw_du_cleanup(struct vmw_display_unit *du)
 {
+	struct vmw_private *dev_priv = vmw_priv(du->primary.dev);
 	drm_plane_cleanup(&du->primary);
-	drm_plane_cleanup(&du->cursor);
+	if (vmw_cmd_supported(dev_priv))
+		drm_plane_cleanup(&du->cursor);
 
 	drm_connector_unregister(&du->connector);
 	drm_crtc_cleanup(&du->crtc);
@@ -128,11 +130,17 @@ static void vmw_cursor_update_position(struct vmw_private *dev_priv,
 	uint32_t count;
 
 	spin_lock(&dev_priv->cursor_lock);
-	vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_ON, show ? 1 : 0);
-	vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_X, x);
-	vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_Y, y);
-	count = vmw_fifo_mem_read(dev_priv, SVGA_FIFO_CURSOR_COUNT);
-	vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_COUNT, ++count);
+	if (vmw_is_cursor_bypass3_enabled(dev_priv)) {
+		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_ON, show ? 1 : 0);
+		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_X, x);
+		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_Y, y);
+		count = vmw_fifo_mem_read(dev_priv, SVGA_FIFO_CURSOR_COUNT);
+		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_COUNT, ++count);
+	} else {
+		vmw_write(dev_priv, SVGA_REG_CURSOR_X, x);
+		vmw_write(dev_priv, SVGA_REG_CURSOR_Y, y);
+		vmw_write(dev_priv, SVGA_REG_CURSOR_ON, show ? 1 : 0);
+	}
 	spin_unlock(&dev_priv->cursor_lock);
 }
 
@@ -1045,7 +1053,8 @@ static int vmw_framebuffer_bo_dirty_ext(struct drm_framebuffer *framebuffer,
 {
 	struct vmw_private *dev_priv = vmw_priv(framebuffer->dev);
 
-	if (dev_priv->active_display_unit == vmw_du_legacy)
+	if (dev_priv->active_display_unit == vmw_du_legacy &&
+	    vmw_cmd_supported(dev_priv))
 		return vmw_framebuffer_bo_dirty(framebuffer, file_priv, flags,
 						color, clips, num_clips);
 
