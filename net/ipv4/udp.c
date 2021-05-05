@@ -857,7 +857,7 @@ void udp_set_csum(bool nocheck, struct sk_buff *skb,
 
 	if (nocheck) {
 		uh->check = 0;
-	} else if (skb_is_gso(skb)) {
+	} else if (skb_is_gso(skb) && skb->ip_summed == CHECKSUM_PARTIAL) {
 		uh->check = ~udp_v4_check(len, saddr, daddr, 0);
 	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		uh->check = 0;
