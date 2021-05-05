@@ -548,6 +548,9 @@ ehther||ether
 eigth||eight
 elementry||elementary
 eletronic||electronic
+eleminate||eliminate
+eleminating||eliminating
+elemination||elimination
 embeded||embedded
 enabledi||enabled
 enbale||enable
