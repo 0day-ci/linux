@@ -25,6 +25,7 @@
 #include <linux/pci.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
+#include <linux/security.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/string.h>
@@ -165,7 +166,8 @@ static void *vfio_noiommu_open(unsigned long arg)
 {
 	if (arg != VFIO_NOIOMMU_IOMMU)
 		return ERR_PTR(-EINVAL);
-	if (!capable(CAP_SYS_RAWIO))
+	if (!capable(CAP_SYS_RAWIO) ||
+			security_locked_down(LOCKDOWN_VFIO_NOIOMMU))
 		return ERR_PTR(-EPERM);
 
 	return NULL;
@@ -1280,7 +1282,8 @@ static int vfio_group_set_container(struct vfio_group *group, int container_fd)
 	if (atomic_read(&group->container_users))
 		return -EINVAL;
 
-	if (group->noiommu && !capable(CAP_SYS_RAWIO))
+	if (group->noiommu && (!capable(CAP_SYS_RAWIO) ||
+			security_locked_down(LOCKDOWN_VFIO_NOIOMMU)))
 		return -EPERM;
 
 	f = fdget(container_fd);
@@ -1362,7 +1365,8 @@ static int vfio_group_get_device_fd(struct vfio_group *group, char *buf)
 	    !group->container->iommu_driver || !vfio_group_viable(group))
 		return -EINVAL;
 
-	if (group->noiommu && !capable(CAP_SYS_RAWIO))
+	if (group->noiommu && (!capable(CAP_SYS_RAWIO) ||
+			security_locked_down(LOCKDOWN_VFIO_NOIOMMU)))
 		return -EPERM;
 
 	device = vfio_device_get_from_name(group, buf);
@@ -1490,7 +1494,8 @@ static int vfio_group_fops_open(struct inode *inode, struct file *filep)
 	if (!group)
 		return -ENODEV;
 
-	if (group->noiommu && !capable(CAP_SYS_RAWIO)) {
+	if (group->noiommu && (!capable(CAP_SYS_RAWIO) ||
+			security_locked_down(LOCKDOWN_VFIO_NOIOMMU))) {
 		vfio_group_put(group);
 		return -EPERM;
 	}
