@@ -1797,10 +1797,16 @@ static void setup_msrs(struct vcpu_vmx *vmx)
 		vmx_update_msr_bitmap(&vmx->vcpu);
 }
 
-static u64 vmx_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
+/*
+ * This function receives the requested offset for L1 as an argument but it
+ * actually writes the "current" tsc offset to the VMCS and returns it. The
+ * current offset might be different in case an L2 guest is currently running
+ * and its VMCS02 is loaded.
+ */
+static u64 vmx_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 l1_offset)
 {
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
-	u64 g_tsc_offset = 0;
+	u64 cur_offset = l1_offset;
 
 	/*
 	 * We're here if L1 chose not to trap WRMSR to TSC. According
@@ -1809,11 +1815,19 @@ static u64 vmx_write_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 	 * to the newly set TSC to get L2's TSC.
 	 */
 	if (is_guest_mode(vcpu) &&
-	    (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETTING))
-		g_tsc_offset = vmcs12->tsc_offset;
+	    (vmcs12->cpu_based_vm_exec_control & CPU_BASED_USE_TSC_OFFSETTING)) {
+		if (vmcs12->secondary_vm_exec_control & SECONDARY_EXEC_TSC_SCALING) {
+			cur_offset = kvm_compute_02_tsc_offset(
+					l1_offset,
+					vmcs12->tsc_multiplier,
+					vmcs12->tsc_offset);
+		} else {
+			cur_offset = l1_offset + vmcs12->tsc_offset;
+		}
+	}
 
-	vmcs_write64(TSC_OFFSET, offset + g_tsc_offset);
-	return offset + g_tsc_offset;
+	vmcs_write64(TSC_OFFSET, cur_offset);
+	return cur_offset;
 }
 
 /*
