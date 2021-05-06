@@ -425,11 +425,24 @@ static void check_preempt_curr_idle(struct rq *rq, struct task_struct *p, int fl
 
 static void put_prev_task_idle(struct rq *rq, struct task_struct *prev)
 {
-#ifdef CONFIG_SCHED_SMT
+#ifdef CONFIG_SMP
+	struct sched_domain_shared *sds;
 	int cpu = rq->cpu;
 
+#ifdef CONFIG_SCHED_SMT
 	if (static_branch_likely(&sched_smt_present))
 		set_core_busy(cpu);
+#endif
+
+	rcu_read_lock();
+	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
+	if (sds) {
+		if (per_cpu(is_idle, cpu)) {
+			atomic_inc(&sds->nr_busy_cpus);
+			per_cpu(is_idle, cpu) = 0;
+		}
+	}
+	rcu_read_unlock();
 #endif
 }
 
@@ -442,9 +455,21 @@ static void set_next_task_idle(struct rq *rq, struct task_struct *next, bool fir
 struct task_struct *pick_next_task_idle(struct rq *rq)
 {
 	struct task_struct *next = rq->idle;
+#ifdef CONFIG_SMP
+	struct sched_domain_shared *sds;
+	int cpu = rq->cpu;
+
+	rcu_read_lock();
+	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
+	if (sds) {
+		atomic_add_unless(&sds->nr_busy_cpus, -1, 0);
+		per_cpu(is_idle, cpu) = 1;
+	}
+
+	rcu_read_unlock();
+#endif
 
 	set_next_task_idle(rq, next, true);
-
 	return next;
 }
 

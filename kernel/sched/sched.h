@@ -1483,6 +1483,7 @@ DECLARE_PER_CPU(int, sd_llc_id);
 #ifdef CONFIG_SCHED_SMT
 DECLARE_PER_CPU(int, smt_id);
 #endif
+DECLARE_PER_CPU(int, is_idle);
 DECLARE_PER_CPU(struct sched_domain_shared __rcu *, sd_llc_shared);
 DECLARE_PER_CPU(struct sched_domain __rcu *, sd_numa);
 DECLARE_PER_CPU(struct sched_domain __rcu *, sd_asym_packing);
