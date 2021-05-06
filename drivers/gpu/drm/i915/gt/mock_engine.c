@@ -292,6 +292,11 @@ static void mock_engine_release(struct intel_engine_cs *engine)
 	intel_engine_fini_retire(engine);
 }
 
+static void mock_bump_serial(struct intel_engine_cs *engine)
+{
+	engine->serial++;
+}
+
 struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
 				    const char *name,
 				    int id)
@@ -318,6 +323,7 @@ struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
 
 	engine->base.cops = &mock_context_ops;
 	engine->base.request_alloc = mock_request_alloc;
+	engine->base.bump_serial = mock_bump_serial;
 	engine->base.emit_flush = mock_emit_flush;
 	engine->base.emit_fini_breadcrumb = mock_emit_breadcrumb;
 	engine->base.submit_request = mock_submit_request;
