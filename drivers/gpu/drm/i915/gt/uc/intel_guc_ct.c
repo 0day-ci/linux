@@ -947,6 +947,12 @@ static int ct_process_request(struct intel_guc_ct *ct, struct ct_incoming_msg *r
 			CT_ERROR(ct, "context reset notification failed %x %*ph\n",
 				  action, 4 * len, payload);
 		break;
+	case INTEL_GUC_ACTION_ENGINE_FAILURE_NOTIFICATION:
+		ret = intel_guc_engine_failure_process_msg(guc, payload, len);
+		if (unlikely(ret))
+			CT_ERROR(ct, "engine failure handler failed %x %*ph\n",
+				  action, 4 * len, payload);
+		break;
 	default:
 		ret = -EOPNOTSUPP;
 		break;
