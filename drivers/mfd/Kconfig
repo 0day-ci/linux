@@ -2174,5 +2174,16 @@ config MFD_INTEL_M10_BMC
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_AHC1EC0
+	tristate "Advantech AHC1EC0 Embedded Controller"
+	depends on X86
+	depends on AHC1EC0_CORE
+	select MFD_CORE
+	help
+	  Select this to get support for Advantech Embedded Controller sub-devices.
+	  This driver will instantiate additional drivers such as HWMON, Watchdog,
+	  etc., you also have to select the individual drivers.
+	  The controller is running firmware customized for Advantech hardware.
+
 endmenu
 endif
