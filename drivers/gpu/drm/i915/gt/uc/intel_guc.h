@@ -66,6 +66,7 @@ struct intel_guc {
 	struct list_head destroyed_contexts;
 	struct intel_gt_pm_delayed_work destroy_worker;
 
+	bool submission_supported;
 	bool submission_selected;
 
 	struct i915_vma *ads_vma;
