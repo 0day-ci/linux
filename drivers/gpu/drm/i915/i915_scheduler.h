@@ -116,4 +116,10 @@ sched_engine_active_unlock_bh(struct i915_sched_engine *sched_engine)
 	local_bh_enable(); /* restore softirq, and kick ksoftirqd! */
 }
 
+static inline bool
+i915_sched_engine_disabled(struct i915_sched_engine *sched_engine)
+{
+	return sched_engine->disabled(sched_engine);
+}
+
 #endif /* _I915_SCHEDULER_H_ */

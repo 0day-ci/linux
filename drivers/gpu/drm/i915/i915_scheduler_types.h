@@ -141,6 +141,9 @@ struct i915_sched_engine {
 	/* Back pointer to engine */
 	struct intel_engine_cs *engine;
 
+	/* Schedule engine is disabled by backend */
+	bool	(*disabled)(struct i915_sched_engine *sched_engine);
+
 	/* Kick backend */
 	void	(*kick_backend)(const struct i915_request *rq,
 				int prio);
