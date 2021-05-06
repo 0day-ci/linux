@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/ktime.h>
 
 #include "intel_guc_fwif.h"
 
@@ -42,7 +43,6 @@ struct intel_guc_ct_buffer {
 	bool broken;
 };
 
-
 /** Top-level structure for Command Transport related data
  *
  * Includes a pair of CT buffers for bi-directional communication and tracking
@@ -69,6 +69,9 @@ struct intel_guc_ct {
 		struct list_head incoming; /* incoming requests */
 		struct work_struct worker; /* handler for incoming requests */
 	} requests;
+
+	/** @stall_time: time of first time a CTB submission is stalled */
+	ktime_t stall_time;
 };
 
 void intel_guc_ct_init_early(struct intel_guc_ct *ct);
@@ -88,7 +91,7 @@ static inline bool intel_guc_ct_enabled(struct intel_guc_ct *ct)
 }
 
 int intel_guc_ct_send(struct intel_guc_ct *ct, const u32 *action, u32 len,
-		      u32 *response_buf, u32 response_buf_size);
+		      u32 *response_buf, u32 response_buf_size, u32 flags);
 void intel_guc_ct_event_handler(struct intel_guc_ct *ct);
 
 #endif /* _INTEL_GUC_CT_H_ */
