@@ -27,6 +27,7 @@
 #include <acpi/video.h>
 #include "dell-smbios.h"
 #include "dell-wmi-descriptor.h"
+#include "dell-privacy-wmi.h"
 
 MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
 MODULE_AUTHOR("Pali Rohár <pali@kernel.org>");
@@ -427,7 +428,6 @@ static void dell_wmi_notify(struct wmi_device *wdev,
 
 		switch (buffer_entry[1]) {
 		case 0x0000: /* One key pressed or event occurred */
-		case 0x0012: /* Event with extended data occurred */
 			if (len > 2)
 				dell_wmi_process_key(wdev, buffer_entry[1],
 						     buffer_entry[2]);
@@ -438,6 +438,13 @@ static void dell_wmi_notify(struct wmi_device *wdev,
 			for (i = 2; i < len; ++i)
 				dell_wmi_process_key(wdev, buffer_entry[1],
 						     buffer_entry[i]);
+			break;
+		case 0x0012:
+			if ((len > 4) && dell_privacy_process_event(buffer_entry[1], buffer_entry[3],
+								    buffer_entry[4]))
+				/* dell_privacy_process_event has handled the event */;
+			else if (len > 2)
+				dell_wmi_process_key(wdev, buffer_entry[1], buffer_entry[2]);
 			break;
 		default: /* Unknown event */
 			pr_info("Unknown WMI event type 0x%x\n",

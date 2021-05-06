@@ -204,4 +204,18 @@ config DELL_WMI_SYSMAN
 	  To compile this driver as a module, choose M here: the module will
 	  be called dell-wmi-sysman.
 
+config DELL_PRIVACY
+	tristate "Dell Hardware Privacy Support"
+	depends on ACPI
+	depends on ACPI_WMI
+	depends on INPUT
+	depends on DELL_LAPTOP
+	depends on LEDS_TRIGGER_AUDIO
+	depends on DELL_WMI
+	help
+	  This driver provides integration with the "Dell Hardware Privacy" feature
+	  of Dell laptops.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called dell_privacy.
 endif # X86_PLATFORM_DRIVERS_DELL
