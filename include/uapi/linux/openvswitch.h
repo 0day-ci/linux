@@ -420,6 +420,7 @@ struct ovs_key_ipv6 {
 	__u8   ipv6_tclass;
 	__u8   ipv6_hlimit;
 	__u8   ipv6_frag;	/* One of OVS_FRAG_TYPE_*. */
+	__u16  ipv6_exthdr;
 };
 
 struct ovs_key_tcp {
