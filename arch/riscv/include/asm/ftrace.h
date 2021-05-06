@@ -75,4 +75,8 @@ int ftrace_init_nop(struct module *mod, struct dyn_ftrace *rec);
 
 #endif
 
+#ifndef __ASSEMBLY__
+extern int riscv_ftrace_in_stop_machine;
+#endif
+
 #endif /* _ASM_RISCV_FTRACE_H */
