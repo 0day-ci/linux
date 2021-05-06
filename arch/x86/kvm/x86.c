@@ -10937,9 +10937,44 @@ out_free:
 	return -ENOMEM;
 }
 
+int alloc_all_memslots_rmaps(struct kvm *kvm)
+{
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+	int r = 0;
+	int i;
+
+	if (kvm_memslots_have_rmaps(kvm))
+		return 0;
+
+	mutex_lock(&kvm->slots_arch_lock);
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		kvm_for_each_memslot(slot, slots) {
+			r = alloc_memslot_rmap(slot, slot->npages);
+			if (r) {
+				mutex_unlock(&kvm->slots_arch_lock);
+				return r;
+			}
+		}
+	}
+
+	/*
+	 * memslots_have_rmaps is set and read in different lock contexts,
+	 * so protect it with smp_load/store.
+	 */
+	smp_store_release(&kvm->arch.memslots_have_rmaps, true);
+	mutex_unlock(&kvm->slots_arch_lock);
+	return 0;
+}
+
 bool kvm_memslots_have_rmaps(struct kvm *kvm)
 {
-	return kvm->arch.memslots_have_rmaps;
+	/*
+	 * memslots_have_rmaps is set and read in different lock contexts,
+	 * so protect it with smp_load/store.
+	 */
+	return smp_load_acquire(&kvm->arch.memslots_have_rmaps);
 }
 
 static int kvm_alloc_memslot_metadata(struct kvm *kvm,
