@@ -186,7 +186,7 @@ static int fuse_setup_one_mapping(struct inode *inode, unsigned long start_idx,
 	struct fuse_conn_dax *fcd = fm->fc->dax;
 	struct fuse_inode *fi = get_fuse_inode(inode);
 	struct fuse_setupmapping_in inarg;
-	loff_t offset = start_idx << FUSE_DAX_SHIFT;
+	loff_t offset = (loff_t)start_idx << FUSE_DAX_SHIFT;
 	FUSE_ARGS(args);
 	ssize_t err;
 
@@ -872,7 +872,7 @@ static int dmap_writeback_invalidate(struct inode *inode,
 				     struct fuse_dax_mapping *dmap)
 {
 	int ret;
-	loff_t start_pos = dmap->itn.start << FUSE_DAX_SHIFT;
+	loff_t start_pos = (loff_t)dmap->itn.start << FUSE_DAX_SHIFT;
 	loff_t end_pos = (start_pos + FUSE_DAX_SZ - 1);
 
 	ret = filemap_fdatawrite_range(inode->i_mapping, start_pos, end_pos);
@@ -966,7 +966,7 @@ inode_inline_reclaim_one_dmap(struct fuse_conn_dax *fcd, struct inode *inode,
 	dmap = inode_lookup_first_dmap(inode);
 	if (dmap) {
 		start_idx = dmap->itn.start;
-		dmap_start = start_idx << FUSE_DAX_SHIFT;
+		dmap_start = (u64)start_idx << FUSE_DAX_SHIFT;
 		dmap_end = dmap_start + FUSE_DAX_SZ - 1;
 	}
 	up_read(&fi->dax->sem);
@@ -1118,7 +1118,7 @@ static int lookup_and_reclaim_dmap(struct fuse_conn_dax *fcd,
 {
 	int ret;
 	struct fuse_inode *fi = get_fuse_inode(inode);
-	loff_t dmap_start = start_idx << FUSE_DAX_SHIFT;
+	loff_t dmap_start = (loff_t)start_idx << FUSE_DAX_SHIFT;
 	loff_t dmap_end = (dmap_start + FUSE_DAX_SZ) - 1;
 
 	down_write(&fi->i_mmap_sem);
