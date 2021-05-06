@@ -1226,6 +1226,9 @@ static bool ring_is_idle(struct intel_engine_cs *engine)
 {
 	bool idle = true;
 
+	/* GuC submission shouldn't access HEAD & TAIL via MMIO */
+	GEM_BUG_ON(intel_engine_uses_guc(engine));
+
 	if (I915_SELFTEST_ONLY(!engine->mmio_base))
 		return true;
 
@@ -1290,6 +1293,16 @@ bool intel_engine_is_idle(struct intel_engine_cs *engine)
 
 	/* ELSP is empty, but there are ready requests? E.g. after reset */
 	if (!i915_sched_engine_is_empty(engine->sched_engine))
+		return false;
+
+	/*
+	 * We shouldn't touch engine registers with GuC submission as the GuC
+	 * owns the registers. Let's tie the idle to engine pm, at worst this
+	 * function sometimes will falsely report non-idle when idle during the
+	 * delay to retire requests or with virtual engines and a request
+	 * running on another instance within the same class / submit mask.
+	 */
+	if (intel_engine_uses_guc(engine))
 		return false;
 
 	/* Ring stopped? */
