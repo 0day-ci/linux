@@ -33,6 +33,7 @@ struct intel_guc;
  * @desc: pointer to the buffer descriptor
  * @cmds: pointer to the commands buffer
  * @size: size of the commands buffer in dwords
+ * @resv_space: reserved space in buffer in dwords
  * @head: local shadow copy of head in dwords
  * @tail: local shadow copy of tail in dwords
  * @space: local shadow copy of space in dwords
@@ -43,9 +44,10 @@ struct intel_guc_ct_buffer {
 	struct guc_ct_buffer_desc *desc;
 	u32 *cmds;
 	u32 size;
+	u32 resv_space;
 	u32 tail;
 	u32 head;
-	u32 space;
+	atomic_t space;
 	bool broken;
 };
 
