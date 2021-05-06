@@ -20,6 +20,8 @@
 #include "main.h"
 #include "../kselftest.h"
 
+#define NR_KSELFTESTS 3
+
 static const uint64_t MAGIC = 0x1122334455667788ULL;
 vdso_sgx_enter_enclave_t vdso_sgx_enter_enclave;
 
@@ -107,33 +109,34 @@ static Elf64_Sym *vdso_symtab_get(struct vdso_symtab *symtab, const char *name)
 	return NULL;
 }
 
-bool report_results(struct sgx_enclave_run *run, int ret, uint64_t result,
-		  const char *test)
+bool update_ksft(struct sgx_enclave_run *run, int ret, uint64_t result, const char *test)
 {
 	bool valid = true;
 
 	if (ret) {
-		printf("FAIL: %s() returned: %d\n", test, ret);
+		ksft_print_msg("%s: ret = %d\n", test, ret);
 		valid = false;
 	}
 
 	if (run->function != EEXIT) {
-		printf("FAIL: %s() function, expected: %u, got: %u\n", test, EEXIT,
-		       run->function);
+		ksft_print_msg("%s: function, expected: %u, got: %u\n", test, EEXIT, run->function);
 		valid = false;
 	}
 
 	if (result != MAGIC) {
-		printf("FAIL: %s(), expected: 0x%lx, got: 0x%lx\n", test, MAGIC,
-		       result);
+		ksft_print_msg("%s: expected: 0x%lx, got: 0x%lx\n", test, MAGIC, result);
 		valid = false;
 	}
 
 	if (run->user_data) {
-		printf("FAIL: %s() user data, expected: 0x0, got: 0x%llx\n",
-		       test, run->user_data);
+		ksft_print_msg("%s: user data, expected: 0x0, got: 0x%llx\n", test, run->user_data);
 		valid = false;
 	}
+
+	if (valid)
+		ksft_test_result_pass("%s", test);
+	else
+		ksft_test_result_fail("%s", test);
 
 	return valid;
 }
@@ -155,6 +158,9 @@ int main(int argc, char *argv[])
 	unsigned int i;
 	void *addr;
 	int ret;
+
+	ksft_print_header();
+	ksft_set_plan(NR_KSELFTESTS);
 
 	memset(&run, 0, sizeof(run));
 
@@ -178,8 +184,8 @@ int main(int argc, char *argv[])
 		addr = mmap((void *)encl.encl_base + seg->offset, seg->size,
 			    seg->prot, MAP_SHARED | MAP_FIXED, encl.fd, 0);
 		if (addr == MAP_FAILED) {
-			perror("mmap() segment failed");
-			exit(KSFT_FAIL);
+			ksft_print_msg("mmap() segment: %s", strerror(errno));
+			goto err;
 		}
 	}
 
@@ -200,32 +206,32 @@ int main(int argc, char *argv[])
 
 	vdso_sgx_enter_enclave = addr + sgx_enter_enclave_sym->st_value;
 
+	/* 1: unclobbered vDSO */
 	ret = sgx_enter_enclave((void *)&MAGIC, &result, 0, EENTER,
-					    NULL, NULL, &run);
-	if (!report_results(&run, ret, result, "sgx_enter_enclave_unclobbered"))
+				NULL, NULL, &run);
+	if (!update_ksft(&run, ret, result, "unclobbered"))
 		goto err;
 
-
-	/* Invoke the vDSO directly. */
+	/* 2: clobbered vDSO */
 	result = 0;
 	ret = vdso_sgx_enter_enclave((unsigned long)&MAGIC, (unsigned long)&result,
 				     0, EENTER, 0, 0, &run);
-	if (!report_results(&run, ret, result, "sgx_enter_enclave"))
+	if (!update_ksft(&run, ret, result, "sgx_enter_enclave"))
 		goto err;
 
-	/* And with an exit handler. */
+	/* 3: clobbered vDSO with a callback. */
 	run.user_handler = (__u64)user_handler;
 	run.user_data = 0xdeadbeef;
+
 	ret = vdso_sgx_enter_enclave((unsigned long)&MAGIC, (unsigned long)&result,
 				     0, EENTER, 0, 0, &run);
-	if (!report_results(&run, ret, result, "user_handler"))
+	if (!update_ksft(&run, ret, result, "user_handler"))
 		goto err;
 
-	printf("SUCCESS\n");
 	encl_delete(&encl);
-	exit(KSFT_PASS);
+	ksft_exit_pass();
 
 err:
 	encl_delete(&encl);
-	exit(KSFT_FAIL);
+	ksft_exit_fail();
 }
