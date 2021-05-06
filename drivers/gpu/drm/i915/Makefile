@@ -285,6 +285,7 @@ i915-$(CONFIG_DRM_I915_SELFTEST) += \
 	selftests/igt_mmap.o \
 	selftests/igt_reset.o \
 	selftests/igt_spinner.o \
+	selftests/intel_scheduler_helpers.o \
 	selftests/librapl.o
 
 # virtual gpu code

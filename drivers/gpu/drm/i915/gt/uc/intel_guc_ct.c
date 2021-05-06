@@ -3,7 +3,6 @@
  * Copyright © 2016-2019 Intel Corporation
  */
 
-#include <linux/circ_buf.h>
 #include <linux/ktime.h>
 #include <linux/time64.h>
 #include <linux/timekeeping.h>
@@ -404,11 +403,13 @@ static int ct_write(struct intel_guc_ct *ct,
 	u32 *cmds = ctb->cmds;
 	unsigned int i;
 
-	if (unlikely(ctb->broken))
-		return -EDEADLK;
+	if (!I915_SELFTEST_ONLY(ct_to_guc(ct)->deadlock_expected)) {
+		if (unlikely(ctb->broken))
+			return -EDEADLK;
 
-	if (unlikely(desc->status))
-		goto corrupted;
+		if (unlikely(desc->status))
+			goto corrupted;
+	}
 
 #ifdef CONFIG_DRM_I915_DEBUG_GUC
 	if (unlikely((desc->tail | desc->head) >= size)) {
@@ -426,6 +427,15 @@ static int ct_write(struct intel_guc_ct *ct,
 	header = FIELD_PREP(GUC_CTB_MSG_0_FORMAT, GUC_CTB_FORMAT_HXG) |
 		 FIELD_PREP(GUC_CTB_MSG_0_NUM_DWORDS, len) |
 		 FIELD_PREP(GUC_CTB_MSG_0_FENCE, fence);
+
+#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
+	if (ct_to_guc(ct)->inject_corrupt_h2g) {
+		header = FIELD_PREP(GUC_CTB_MSG_0_FORMAT, 3) |
+			 FIELD_PREP(GUC_CTB_MSG_0_NUM_DWORDS, len + 5) |
+			 FIELD_PREP(GUC_CTB_MSG_0_FENCE, 0xdead);
+		ct_to_guc(ct)->inject_corrupt_h2g = false;
+	}
+#endif
 
 	hxg = (flags & INTEL_GUC_SEND_NB) ?
 		(FIELD_PREP(GUC_HXG_MSG_0_TYPE, GUC_HXG_TYPE_EVENT) |
@@ -464,8 +474,12 @@ static int ct_write(struct intel_guc_ct *ct,
 	return 0;
 
 corrupted:
-	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
-		 desc->head, desc->tail, desc->status);
+	if (I915_SELFTEST_ONLY(ct_to_guc(ct)->bad_desc_expected))
+		CT_DEBUG(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+			 desc->head, desc->tail, desc->status);
+	else
+		CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+			 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
 	return -EDEADLK;
 }
@@ -517,8 +531,16 @@ static inline bool ct_deadlocked(struct intel_guc_ct *ct)
 	bool ret = ktime_us_delta(ktime_get(), ct->stall_time) >
 		MAX_US_STALL_CTB;
 
-	if (unlikely(ret))
-		CT_ERROR(ct, "CT deadlocked\n");
+	if (unlikely(ret)) {
+		/*
+		 * CI doesn't like error messages, demote to debug if deadlock was
+		 * intentionally hit.
+		 */
+		if (I915_SELFTEST_ONLY(ct_to_guc(ct)->deadlock_expected))
+			CT_DEBUG(ct, "CT deadlocked\n");
+		else
+			CT_ERROR(ct, "CT deadlocked\n");
+	}
 
 	return ret;
 }
