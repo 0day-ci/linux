@@ -1859,8 +1859,7 @@ void ieee80211_process_addba_resp(struct ieee80211_local *local,
 				  struct sta_info *sta,
 				  struct ieee80211_mgmt *mgmt,
 				  size_t len);
-void ieee80211_process_addba_request(struct ieee80211_local *local,
-				     struct sta_info *sta,
+void ieee80211_process_addba_request(struct sta_info *sta,
 				     struct ieee80211_mgmt *mgmt,
 				     size_t len);
 

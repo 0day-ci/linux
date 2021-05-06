@@ -471,8 +471,7 @@ static void __ieee80211_start_rx_ba_session(struct sta_info *sta,
 	mutex_unlock(&sta->ampdu_mlme.mtx);
 }
 
-void ieee80211_process_addba_request(struct ieee80211_local *local,
-				     struct sta_info *sta,
+void ieee80211_process_addba_request(struct sta_info *sta,
 				     struct ieee80211_mgmt *mgmt,
 				     size_t len)
 {
