@@ -11,6 +11,7 @@ struct xfs_inode;
 struct xfs_mount;
 struct xfs_trans;
 struct xfs_ifork;
+struct xfs_perag;
 
 extern kmem_zone_t	*xfs_btree_cur_zone;
 
@@ -180,11 +181,12 @@ union xfs_btree_irec {
 
 /* Per-AG btree information. */
 struct xfs_btree_cur_ag {
+	xfs_agnumber_t		agno;
+	struct xfs_perag	*pag;
 	union {
 		struct xfs_buf		*agbp;
 		struct xbtree_afakeroot	*afake;	/* for staging cursor */
 	};
-	xfs_agnumber_t		agno;
 	union {
 		struct {
 			unsigned long nr_ops;	/* # record updates */
