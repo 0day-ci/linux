@@ -64,7 +64,6 @@ struct intel_gt;
 struct intel_ring;
 struct intel_uncore;
 
-typedef u8 intel_engine_mask_t;
 #define ALL_ENGINES ((intel_engine_mask_t)~0ul)
 
 struct intel_hw_status_page {
