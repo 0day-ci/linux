@@ -33,6 +33,7 @@
 #include <linux/highmem.h>
 #include <linux/idr.h>
 #include <linux/platform_data/x86/apple.h>
+#include <../gpio/gpiolib.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/spi.h>
@@ -606,9 +607,26 @@ int spi_add_device(struct spi_device *spi)
 	}
 
 	/* Descriptors take precedence */
-	if (ctlr->cs_gpiods)
+	if (ctlr->cs_gpiods) {
 		spi->cs_gpiod = ctlr->cs_gpiods[spi->chip_select];
-	else if (ctlr->cs_gpios)
+
+		/* We need to handle the active flag conflict between
+		 * the cs-gpio and the SPI slave. The SPI slave active
+		 * flag will determine the active state of cs-gpio.
+		 */
+		if (spi->mode & SPI_CS_HIGH) {
+			if (test_bit(FLAG_ACTIVE_LOW, &spi->cs_gpiod->flags)) {
+				dev_warn(&spi->dev, "GPIO handle specifies "
+					"active low - ignored\n");
+				clear_bit(FLAG_ACTIVE_LOW, &spi->cs_gpiod->flags);
+			}
+		} else {
+			if (!test_bit(FLAG_ACTIVE_LOW, &spi->cs_gpiod->flags))
+				dev_warn(&spi->dev, "enforce active low on "
+					"chipselect handle\n");
+			set_bit(FLAG_ACTIVE_LOW, &spi->cs_gpiod->flags);
+		}
+	} else if (ctlr->cs_gpios)
 		spi->cs_gpio = ctlr->cs_gpios[spi->chip_select];
 
 	/* Drivers may modify this initial i/o setup, but will
