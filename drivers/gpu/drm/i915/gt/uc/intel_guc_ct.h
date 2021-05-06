@@ -32,12 +32,14 @@ struct intel_guc;
  * @desc: pointer to the buffer descriptor
  * @cmds: pointer to the commands buffer
  * @size: size of the commands buffer
+ * @broken: flag to indicate if descriptor data is broken
  */
 struct intel_guc_ct_buffer {
 	spinlock_t lock;
 	struct guc_ct_buffer_desc *desc;
 	u32 *cmds;
 	u32 size;
+	bool broken;
 };
 
 
