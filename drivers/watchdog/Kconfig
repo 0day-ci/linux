@@ -1005,6 +1005,17 @@ config ADVANTECH_WDT
 	  feature. More information can be found at
 	  <https://www.advantech.com.tw/products/>
 
+config AHC1EC0_WDT
+	tristate "Advantech AHC1EC0 Watchdog Function"
+	depends on MFD_AHC1EC0
+	help
+	  This is sub-device for Advantech AHC1EC0 embedded controller.
+
+	  This driver provide watchdog functionality for Advantech related
+	  applications to restart the system.
+	  To compile this driver as a module, choose M here: the module will be
+	  called ahc1ec0-wdt.
+
 config ALIM1535_WDT
 	tristate "ALi M1535 PMU Watchdog Timer"
 	depends on X86 && PCI
