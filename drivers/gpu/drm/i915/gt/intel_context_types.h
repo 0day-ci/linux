@@ -180,6 +180,9 @@ struct intel_context {
 	/* GuC lrc descriptor ID */
 	u16 guc_id;
 
+	/* Number of rq submitted without a guc_id */
+	u16 guc_num_rq_submit_no_id;
+
 	/* GuC lrc descriptor reference count */
 	atomic_t guc_id_ref;
 
