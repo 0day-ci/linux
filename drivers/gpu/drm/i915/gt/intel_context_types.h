@@ -182,6 +182,9 @@ struct intel_context {
 	/* GuC scheduling state that does not require a lock. */
 	atomic_t guc_sched_state_no_lock;
 
+	/* GuC lrc descriptor registration buffer */
+	unsigned int guc_lrcd_reg_idx;
+
 	/* GuC lrc descriptor ID */
 	u16 guc_id;
 
