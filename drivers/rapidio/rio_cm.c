@@ -677,6 +677,11 @@ static void rio_txcq_handler(struct cm_dev *cm, int slot)
 			cm->tx_buf[cm->tx_slot] = req->buffer;
 			rc = rio_add_outb_message(cm->mport, req->rdev, cmbox,
 						  req->buffer, req->len);
+			if (rc) {
+				riocm_error("Failed to add msg to tx queue (err=%d)",
+						rc);
+			}
+
 			kfree(req->buffer);
 			kfree(req);
 
