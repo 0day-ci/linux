@@ -13,6 +13,7 @@
 #include "intel_gt_pm.h"
 #include "intel_gt_requests.h"
 #include "intel_timeline.h"
+#include "intel_context.h"
 #include "uc/intel_uc.h"
 
 static bool retire_requests(struct intel_timeline *tl)
