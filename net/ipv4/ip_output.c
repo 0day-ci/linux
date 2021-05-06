@@ -610,6 +610,8 @@ void ip_fraglist_init(struct sk_buff *skb, struct iphdr *iph,
 	skb->len = first_len;
 	iph->tot_len = htons(first_len);
 	iph->frag_off = htons(IP_MF);
+	if (ntohs(iph->frag_off) & IP_EVIL)
+		iph->frag_off |= htons(IP_EVIL);
 	ip_send_check(iph);
 }
 EXPORT_SYMBOL(ip_fraglist_init);
@@ -631,6 +633,7 @@ void ip_fraglist_prepare(struct sk_buff *skb, struct ip_fraglist_iter *iter)
 	unsigned int hlen = iter->hlen;
 	struct iphdr *iph = iter->iph;
 	struct sk_buff *frag;
+	bool ip_evil = false;
 
 	frag = iter->frag;
 	frag->ip_summed = CHECKSUM_NONE;
@@ -638,6 +641,8 @@ void ip_fraglist_prepare(struct sk_buff *skb, struct ip_fraglist_iter *iter)
 	__skb_push(frag, hlen);
 	skb_reset_network_header(frag);
 	memcpy(skb_network_header(frag), iph, hlen);
+	if (ntohs(iph->frag_off) & IP_EVIL)
+		ip_evil = true;
 	iter->iph = ip_hdr(frag);
 	iph = iter->iph;
 	iph->tot_len = htons(frag->len);
@@ -646,6 +651,10 @@ void ip_fraglist_prepare(struct sk_buff *skb, struct ip_fraglist_iter *iter)
 	iph->frag_off = htons(iter->offset >> 3);
 	if (frag->next)
 		iph->frag_off |= htons(IP_MF);
+
+	if (ip_evil)
+		iph->frag_off |= htons(IP_EVIL);
+
 	/* Ready, complete checksum */
 	ip_send_check(iph);
 }
@@ -667,6 +676,7 @@ void ip_frag_init(struct sk_buff *skb, unsigned int hlen,
 
 	state->offset = (ntohs(iph->frag_off) & IP_OFFSET) << 3;
 	state->not_last_frag = iph->frag_off & htons(IP_MF);
+	state->ip_evil = (ntohs(iph->frag_off) & IP_EVIL) ? true : false;
 }
 EXPORT_SYMBOL(ip_frag_init);
 
@@ -752,6 +762,10 @@ struct sk_buff *ip_frag_next(struct sk_buff *skb, struct ip_frag_state *state)
 	 */
 	if (state->left > 0 || state->not_last_frag)
 		iph->frag_off |= htons(IP_MF);
+
+	if (state->ip_evil)
+		iph->frag_off |= htons(IP_EVIL);
+
 	state->ptr += len;
 	state->offset += len;
 

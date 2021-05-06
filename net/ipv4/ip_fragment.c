@@ -62,6 +62,7 @@ struct ipq {
 	struct inet_frag_queue q;
 
 	u8		ecn; /* RFC3168 support */
+	bool		ip_evil; /*frag with evil bit set */
 	u16		max_df_size; /* largest frag with DF set seen */
 	int             iif;
 	unsigned int    rid;
@@ -88,6 +89,7 @@ static void ip4_frag_init(struct inet_frag_queue *q, const void *a)
 
 	q->key.v4 = *key;
 	qp->ecn = 0;
+	qp->ip_evil = false;
 	qp->peer = q->fqdir->max_dist ?
 		inet_getpeer_v4(net->ipv4.peers, key->saddr, key->vif, 1) :
 		NULL;
@@ -278,6 +280,7 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	unsigned int fragsize;
 	int err = -ENOENT;
 	u8 ecn;
+	bool  ip_evil;
 
 	if (qp->q.flags & INET_FRAG_COMPLETE)
 		goto err;
@@ -295,6 +298,7 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	offset &= IP_OFFSET;
 	offset <<= 3;		/* offset is in 8-byte chunks */
 	ihl = ip_hdrlen(skb);
+	ip_evil = flags & IP_EVIL ?  true : false;
 
 	/* Determine the position of this fragment. */
 	end = offset + skb->len - skb_network_offset(skb) - ihl;
@@ -350,6 +354,7 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	qp->q.stamp = skb->tstamp;
 	qp->q.meat += skb->len;
 	qp->ecn |= ecn;
+	qp->ip_evil = ip_evil;
 	add_frag_mem_limit(qp->q.fqdir, skb->truesize);
 	if (offset == 0)
 		qp->q.flags |= INET_FRAG_FIRST_IN;
@@ -450,6 +455,10 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *skb,
 	} else {
 		iph->frag_off = 0;
 	}
+
+	/*when ip or bridge forward, keep the origin evil bit set*/
+	if (qp->ip_evil)
+		iph->frag_off |= htons(IP_EVIL);
 
 	ip_send_check(iph);
 
