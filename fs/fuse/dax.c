@@ -253,7 +253,10 @@ static int dmap_removemapping_list(struct inode *inode, unsigned int num,
 	struct fuse_removemapping_one *remove_one, *ptr;
 	struct fuse_removemapping_in inarg;
 	struct fuse_dax_mapping *dmap;
-	int ret, i = 0, nr_alloc;
+	int ret = 0, i = 0, nr_alloc;
+
+	if (!num)
+		return ret;
 
 	nr_alloc = min_t(unsigned int, num, FUSE_REMOVEMAPPING_MAX_ENTRY);
 	remove_one = kmalloc_array(nr_alloc, sizeof(*remove_one), GFP_NOFS);
