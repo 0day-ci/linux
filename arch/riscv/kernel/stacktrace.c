@@ -18,6 +18,9 @@ register unsigned long sp_in_global __asm__("sp");
 
 #ifdef CONFIG_FRAME_POINTER
 
+#define READ_FRAME(frame, off)	\
+	(READ_ONCE_NOCHECK(*(unsigned long *)(frame + offsetof(struct stackframe, off))))
+
 void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 			     bool (*fn)(void *, unsigned long), void *arg)
 {
@@ -40,7 +43,7 @@ void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 
 	for (;;) {
 		unsigned long low, high;
-		struct stackframe *frame;
+		unsigned long frame;
 
 		if (unlikely(!__kernel_text_address(pc) || !fn(arg, pc)))
 			break;
@@ -51,14 +54,14 @@ void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 		if (unlikely(fp < low || fp > high || fp & 0x7))
 			break;
 		/* Unwind stack frame */
-		frame = (struct stackframe *)fp - 1;
+		frame = fp - sizeof(struct stackframe);
 		sp = fp;
-		if (regs && (regs->epc == pc) && (frame->fp & 0x7)) {
-			fp = frame->ra;
+		if (regs && (regs->epc == pc) && (READ_FRAME(frame, fp) & 0x7)) {
+			fp = READ_FRAME(frame, ra);
 			pc = regs->ra;
 		} else {
-			fp = frame->fp;
-			pc = ftrace_graph_ret_addr(current, NULL, frame->ra,
+			fp = READ_FRAME(frame, fp);
+			pc = ftrace_graph_ret_addr(current, NULL, READ_FRAME(frame, ra),
 						   (unsigned long *)(fp - 8));
 		}
 
