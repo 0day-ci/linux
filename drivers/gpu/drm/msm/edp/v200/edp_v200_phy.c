@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  */
 
-#include "edp.h"
+#include "edp_v200.h"
 #include "edp.xml.h"
 
 #define EDP_MAX_LANE	4
@@ -76,12 +76,12 @@ void msm_edp_phy_lane_power_ctrl(struct edp_phy *phy, bool up, u32 max_lane)
 		data = 0x7;	/* power down */
 
 	for (i = 0; i < max_lane; i++)
-		edp_write(phy->base + REG_EDP_PHY_LN_PD_CTL(i) , data);
+		edp_write(phy->base + REG_EDP_PHY_LN_PD_CTL(i), data);
 
 	/* power down unused lane */
 	data = 0x7;	/* power down */
 	for (i = max_lane; i < EDP_MAX_LANE; i++)
-		edp_write(phy->base + REG_EDP_PHY_LN_PD_CTL(i) , data);
+		edp_write(phy->base + REG_EDP_PHY_LN_PD_CTL(i), data);
 }
 
 void *msm_edp_phy_init(struct device *dev, void __iomem *regbase)

@@ -5,11 +5,11 @@
 
 #include "drm/drm_edid.h"
 #include "msm_kms.h"
-#include "edp.h"
+#include "edp_v200.h"
 
 struct edp_connector {
 	struct drm_connector base;
-	struct msm_edp *edp;
+	struct msm_edp_v200 *edp;
 };
 #define to_edp_connector(x) container_of(x, struct edp_connector, base)
 
@@ -17,7 +17,7 @@ static enum drm_connector_status edp_connector_detect(
 		struct drm_connector *connector, bool force)
 {
 	struct edp_connector *edp_connector = to_edp_connector(connector);
-	struct msm_edp *edp = edp_connector->edp;
+	struct msm_edp_v200 *edp = edp_connector->edp;
 
 	DBG("");
 	return msm_edp_ctrl_panel_connected(edp->ctrl) ?
@@ -38,7 +38,7 @@ static void edp_connector_destroy(struct drm_connector *connector)
 static int edp_connector_get_modes(struct drm_connector *connector)
 {
 	struct edp_connector *edp_connector = to_edp_connector(connector);
-	struct msm_edp *edp = edp_connector->edp;
+	struct msm_edp_v200 *edp = edp_connector->edp;
 
 	struct edid *drm_edid = NULL;
 	int ret = 0;
@@ -59,14 +59,14 @@ static int edp_connector_mode_valid(struct drm_connector *connector,
 				 struct drm_display_mode *mode)
 {
 	struct edp_connector *edp_connector = to_edp_connector(connector);
-	struct msm_edp *edp = edp_connector->edp;
+	struct msm_edp_v200 *edp = edp_connector->edp;
 	struct msm_drm_private *priv = connector->dev->dev_private;
 	struct msm_kms *kms = priv->kms;
 	long actual, requested;
 
 	requested = 1000 * mode->clock;
 	actual = kms->funcs->round_pixclk(kms,
-			requested, edp_connector->edp->encoder);
+			requested, edp_connector->edp->base.encoder);
 
 	DBG("requested=%ld, actual=%ld", requested, actual);
 	if (actual != requested)
@@ -98,7 +98,7 @@ static const struct drm_connector_helper_funcs edp_connector_helper_funcs = {
 };
 
 /* initialize connector */
-struct drm_connector *msm_edp_connector_init(struct msm_edp *edp)
+struct drm_connector *msm_edp_connector_init(struct msm_edp_v200 *edp)
 {
 	struct drm_connector *connector = NULL;
 	struct edp_connector *edp_connector;
@@ -112,7 +112,7 @@ struct drm_connector *msm_edp_connector_init(struct msm_edp *edp)
 
 	connector = &edp_connector->base;
 
-	ret = drm_connector_init(edp->dev, connector, &edp_connector_funcs,
+	ret = drm_connector_init(edp->base.dev, connector, &edp_connector_funcs,
 			DRM_MODE_CONNECTOR_eDP);
 	if (ret)
 		return ERR_PTR(ret);
@@ -126,7 +126,7 @@ struct drm_connector *msm_edp_connector_init(struct msm_edp *edp)
 	connector->interlace_allowed = false;
 	connector->doublescan_allowed = false;
 
-	drm_connector_attach_encoder(connector, edp->encoder);
+	drm_connector_attach_encoder(connector, edp->base.encoder);
 
 	return connector;
 }
