@@ -141,6 +141,9 @@ struct i915_sched_engine {
 	/* Back pointer to engine */
 	struct intel_engine_cs *engine;
 
+	/* Destroy schedule engine */
+	void	(*destroy)(struct kref *kref);
+
 	/* Schedule engine is disabled by backend */
 	bool	(*disabled)(struct i915_sched_engine *sched_engine);
 

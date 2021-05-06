@@ -53,6 +53,9 @@ void i915_request_show_with_schedule(struct drm_printer *m,
 				     const char *prefix,
 				     int indent);
 
+void i915_sched_engine_init(struct i915_sched_engine *sched_engine,
+			    unsigned int subclass);
+
 struct i915_sched_engine *
 i915_sched_engine_create(unsigned int subclass);
 
@@ -68,7 +71,7 @@ i915_sched_engine_get(struct i915_sched_engine *sched_engine)
 static inline void
 i915_sched_engine_put(struct i915_sched_engine *sched_engine)
 {
-	kref_put(&sched_engine->ref, i915_sched_engine_free);
+	kref_put(&sched_engine->ref, sched_engine->destroy);
 }
 
 static inline bool

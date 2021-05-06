@@ -431,7 +431,7 @@ void i915_request_show_with_schedule(struct drm_printer *m,
 	rcu_read_unlock();
 }
 
-void i915_sched_engine_free(struct kref *kref)
+static void default_destroy(struct kref *kref)
 {
 	struct i915_sched_engine *sched_engine =
 		container_of(kref, typeof(*sched_engine), ref);
@@ -445,20 +445,15 @@ static bool default_disabled(struct i915_sched_engine *sched_engine)
 	return false;
 }
 
-struct i915_sched_engine *
-i915_sched_engine_create(unsigned int subclass)
+void i915_sched_engine_init(struct i915_sched_engine *sched_engine,
+			    unsigned int subclass)
 {
-	struct i915_sched_engine *sched_engine;
-
-	sched_engine = kzalloc(sizeof(*sched_engine), GFP_KERNEL);
-	if (!sched_engine)
-		return NULL;
-
 	kref_init(&sched_engine->ref);
 
 	sched_engine->queue = RB_ROOT_CACHED;
 	sched_engine->queue_priority_hint = INT_MIN;
 	sched_engine->disabled = default_disabled;
+	sched_engine->destroy = default_destroy;
 
 	INIT_LIST_HEAD(&sched_engine->requests);
 	INIT_LIST_HEAD(&sched_engine->hold);
@@ -477,7 +472,19 @@ i915_sched_engine_create(unsigned int subclass)
 	lock_map_release(&sched_engine->lock.dep_map);
 	local_irq_enable();
 #endif
+}
 
+struct i915_sched_engine *
+i915_sched_engine_create(unsigned int subclass)
+{
+	struct i915_sched_engine *sched_engine;
+
+	sched_engine = kzalloc(sizeof(*sched_engine), GFP_KERNEL);
+	if (!sched_engine)
+		return NULL;
+
+	i915_sched_engine_init(sched_engine, subclass);
+ 
 	return sched_engine;
 }
 
