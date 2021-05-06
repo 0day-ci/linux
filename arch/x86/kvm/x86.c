@@ -2241,10 +2241,14 @@ static inline u64 __scale_tsc(u64 ratio, u64 tsc)
 	return mul_u64_u64_shr(tsc, ratio, kvm_tsc_scaling_ratio_frac_bits);
 }
 
-u64 kvm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc)
+/*
+ * If l1 is true the TSC is scaled using L1's scaling ratio, otherwise
+ * the current scaling ratio is used.
+ */
+u64 kvm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc, bool l1)
 {
 	u64 _tsc = tsc;
-	u64 ratio = vcpu->arch.tsc_scaling_ratio;
+	u64 ratio = l1 ? vcpu->arch.l1_tsc_scaling_ratio : vcpu->arch.tsc_scaling_ratio;
 
 	if (ratio != kvm_default_tsc_scaling_ratio)
 		_tsc = __scale_tsc(ratio, tsc);
@@ -2257,14 +2261,14 @@ static u64 kvm_compute_tsc_offset(struct kvm_vcpu *vcpu, u64 target_tsc)
 {
 	u64 tsc;
 
-	tsc = kvm_scale_tsc(vcpu, rdtsc());
+	tsc = kvm_scale_tsc(vcpu, rdtsc(), true);
 
 	return target_tsc - tsc;
 }
 
 u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc)
 {
-	return vcpu->arch.l1_tsc_offset + kvm_scale_tsc(vcpu, host_tsc);
+	return vcpu->arch.l1_tsc_offset + kvm_scale_tsc(vcpu, host_tsc, true);
 }
 EXPORT_SYMBOL_GPL(kvm_read_l1_tsc);
 
@@ -2395,9 +2399,9 @@ static inline void adjust_tsc_offset_guest(struct kvm_vcpu *vcpu,
 
 static inline void adjust_tsc_offset_host(struct kvm_vcpu *vcpu, s64 adjustment)
 {
-	if (vcpu->arch.tsc_scaling_ratio != kvm_default_tsc_scaling_ratio)
+	if (vcpu->arch.l1_tsc_scaling_ratio != kvm_default_tsc_scaling_ratio)
 		WARN_ON(adjustment < 0);
-	adjustment = kvm_scale_tsc(vcpu, (u64) adjustment);
+	adjustment = kvm_scale_tsc(vcpu, (u64) adjustment, true);
 	adjust_tsc_offset_guest(vcpu, adjustment);
 }
 
@@ -2780,7 +2784,7 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
 	/* With all the info we got, fill in the values */
 
 	if (kvm_has_tsc_control)
-		tgt_tsc_khz = kvm_scale_tsc(v, tgt_tsc_khz);
+		tgt_tsc_khz = kvm_scale_tsc(v, tgt_tsc_khz, true);
 
 	if (unlikely(vcpu->hw_tsc_khz != tgt_tsc_khz)) {
 		kvm_get_time_scale(NSEC_PER_SEC, tgt_tsc_khz * 1000LL,
@@ -3482,7 +3486,8 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		u64 tsc_offset = msr_info->host_initiated ? vcpu->arch.l1_tsc_offset :
 							    vcpu->arch.tsc_offset;
 
-		msr_info->data = kvm_scale_tsc(vcpu, rdtsc()) + tsc_offset;
+		msr_info->data = kvm_scale_tsc(vcpu, rdtsc(),
+					       msr_info->host_initiated) + tsc_offset;
 		break;
 	}
 	case MSR_MTRRcap:

@@ -1781,7 +1781,7 @@ int kvm_pv_send_ipi(struct kvm *kvm, unsigned long ipi_bitmap_low,
 void kvm_define_user_return_msr(unsigned index, u32 msr);
 int kvm_set_user_return_msr(unsigned index, u64 val, u64 mask);
 
-u64 kvm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc);
+u64 kvm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc, bool l1);
 u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc);
 
 unsigned long kvm_get_linear_rip(struct kvm_vcpu *vcpu);
