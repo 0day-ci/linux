@@ -7153,6 +7153,12 @@ sub process {
 			     "Where possible, use lockdep_assert_held instead of assertions based on spin_is_locked\n" . $herecurr);
 		}
 
+# check for direct use of send_sig_info(), force_sig_info()
+		if ($line =~ /\b((force|send)_sig_info)\(/) {
+			WARN("USE_SIGINFO_HELPER",
+			     "Where possible, avoid using '$1' directly and use a signal-specific helper setting required siginfo fields (see include/linux/sched/signal.h).\n" . $herecurr);
+		}
+
 # check for deprecated apis
 		if ($line =~ /\b($deprecated_apis_search)\b\s*\(/) {
 			my $deprecated_api = $1;
