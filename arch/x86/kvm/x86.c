@@ -2266,6 +2266,31 @@ static u64 kvm_compute_tsc_offset(struct kvm_vcpu *vcpu, u64 target_tsc)
 	return target_tsc - tsc;
 }
 
+/*
+ * This function computes the TSC offset that is stored in VMCS02 when entering
+ * L2 by combining the offset and multiplier values of VMCS01 and VMCS12.
+ */
+u64 kvm_compute_02_tsc_offset(u64 l1_offset, u64 l2_multiplier, u64 l2_offset)
+{
+	u64 offset;
+
+	/*
+	 * The L1 offset is interpreted as a signed number by the CPU and can
+	 * be negative. So we extract the sign before the multiplication and
+	 * put it back afterwards if needed.
+	 */
+	offset = mul_u64_u64_shr(abs((s64) l1_offset),
+				 l2_multiplier,
+				 kvm_tsc_scaling_ratio_frac_bits);
+
+	if ((s64) l1_offset < 0)
+		offset = -((s64) offset);
+
+	offset += l2_offset;
+	return offset;
+}
+EXPORT_SYMBOL_GPL(kvm_compute_02_tsc_offset);
+
 u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc)
 {
 	return vcpu->arch.l1_tsc_offset + kvm_scale_tsc(vcpu, host_tsc, true);
