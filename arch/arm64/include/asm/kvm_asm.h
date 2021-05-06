@@ -44,7 +44,7 @@
 
 #define __KVM_HOST_SMCCC_FUNC___kvm_hyp_init			0
 #define __KVM_HOST_SMCCC_FUNC___kvm_vcpu_run			1
-#define __KVM_HOST_SMCCC_FUNC___kvm_flush_vm_context		2
+#define __KVM_HOST_SMCCC_FUNC___kvm_tlb_flush_local_all		2
 #define __KVM_HOST_SMCCC_FUNC___kvm_tlb_flush_vmid_ipa		3
 #define __KVM_HOST_SMCCC_FUNC___kvm_tlb_flush_vmid		4
 #define __KVM_HOST_SMCCC_FUNC___kvm_flush_cpu_context		5
@@ -182,7 +182,7 @@ DECLARE_KVM_NVHE_SYM(__per_cpu_end);
 DECLARE_KVM_HYP_SYM(__bp_harden_hyp_vecs);
 #define __bp_harden_hyp_vecs	CHOOSE_HYP_SYM(__bp_harden_hyp_vecs)
 
-extern void __kvm_flush_vm_context(void);
+extern void __kvm_tlb_flush_local_all(void);
 extern void __kvm_flush_cpu_context(struct kvm_s2_mmu *mmu);
 extern void __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa,
 				     int level);
