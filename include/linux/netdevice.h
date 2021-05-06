@@ -318,6 +318,8 @@ struct gro_list {
  */
 #define GRO_HASH_BUCKETS	8
 
+
+#define NAPINAMSIZ		8
 /*
  * Structure for NAPI scheduling similar to tasklet but with weighting
  */
@@ -348,6 +350,7 @@ struct napi_struct {
 	struct hlist_node	napi_hash_node;
 	unsigned int		napi_id;
 	struct task_struct	*thread;
+	char			name[NAPINAMSIZ];
 };
 
 enum {
@@ -2446,6 +2449,21 @@ static inline void *netdev_priv(const struct net_device *dev)
 #define NAPI_POLL_WEIGHT 64
 
 /**
+ *	netif_napi_add_named - initialize a NAPI context
+ *	@dev:  network device
+ *	@napi: NAPI context
+ *	@poll: polling function
+ *	@weight: default weight
+ *	@name: napi instance name
+ *
+ * netif_napi_add_named() must be used to initialize a NAPI context prior to calling
+ * *any* of the other NAPI-related functions.
+ */
+void netif_napi_add_named(struct net_device *dev, struct napi_struct *napi,
+		    int (*poll)(struct napi_struct *, int), int weight,
+		    const char *name);
+
+/**
  *	netif_napi_add - initialize a NAPI context
  *	@dev:  network device
  *	@napi: NAPI context
@@ -2457,6 +2475,27 @@ static inline void *netdev_priv(const struct net_device *dev)
  */
 void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
 		    int (*poll)(struct napi_struct *, int), int weight);
+
+/**
+ *	netif_tx_napi_add_named - initialize a NAPI context
+ *	@dev:  network device
+ *	@napi: NAPI context
+ *	@poll: polling function
+ *	@weight: default weight
+ *	@name: napi instance name
+ *
+ * This variant of netif_napi_add_named() should be used from drivers using NAPI
+ * to exclusively poll a TX queue.
+ * This will avoid we add it into napi_hash[], thus polluting this hash table.
+ */
+static inline void netif_tx_napi_add_named(struct net_device *dev,
+				     struct napi_struct *napi,
+				     int (*poll)(struct napi_struct *, int),
+				     int weight, const char *name)
+{
+	set_bit(NAPI_STATE_NO_BUSY_POLL, &napi->state);
+	netif_napi_add_named(dev, napi, poll, weight, name);
+}
 
 /**
  *	netif_tx_napi_add - initialize a NAPI context
@@ -2474,8 +2513,7 @@ static inline void netif_tx_napi_add(struct net_device *dev,
 				     int (*poll)(struct napi_struct *, int),
 				     int weight)
 {
-	set_bit(NAPI_STATE_NO_BUSY_POLL, &napi->state);
-	netif_napi_add(dev, napi, poll, weight);
+	netif_tx_napi_add_named(dev, napi, poll, weight, NULL);
 }
 
 /**
