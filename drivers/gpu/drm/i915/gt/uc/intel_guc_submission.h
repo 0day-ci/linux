@@ -51,4 +51,6 @@ static inline bool intel_guc_submission_is_used(struct intel_guc *guc)
 	return intel_guc_is_used(guc) && intel_guc_submission_is_wanted(guc);
 }
 
+void intel_guc_decr_num_rq_not_ready(struct intel_context *ce);
+
 #endif
