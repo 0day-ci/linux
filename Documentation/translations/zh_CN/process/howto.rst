@@ -275,14 +275,8 @@ Linux-next 集成测试树
 报告bug
 -------
 
-bugzilla.kernel.org是Linux内核开发者们用来跟踪内核Bug的网站。我们鼓励用
-户在这个工具中报告找到的所有bug。如何使用内核bugzilla的细节请访问：
-
-	http://test.kernel.org/bugzilla/faq.html
-
-内核源码主目录中的:ref:`admin-guide/reporting-bugs.rst <reportingbugs>`
-文件里有一个很好的模板。它指导用户如何报告可能的内核bug以及需要提供哪些信息
-来帮助内核开发者们找到问题的根源。
+内核源码主目录中的 'Documentation/admin-guide/reporting-issues.rst' 文件介绍了
+如何报告可能的内核bug，以及需要提供哪些信息来帮助内核开发者们找到问题的根源。
 
 
 利用bug报告
@@ -293,7 +287,11 @@ bugzilla.kernel.org是Linux内核开发者们用来跟踪内核Bug的网站。�
 者感受到你的存在。修改bug是赢得其他开发者赞誉的最好办法，因为并不是很多
 人都喜欢浪费时间去修改别人报告的bug。
 
-要尝试修改已知的bug，请访问 http://bugzilla.kernel.org 网址。
+要尝试修复已知的bug，请找到你感兴趣的子系统，查看报告该子系统bug的
+MAINTAINERS文件，通常它是一个邮件列表，很少有bug追踪信息。在这个
+文件搜索获取最新的报告，并在你认为合适的地方提供帮助。你可能还需要查看
+https://bugzilla.kernel.org 以获取bug报告，只有少数一些内核子系统积极地
+通过它进行报告或追踪，但是整个内核的bug都被归档在那里。
 
 
 邮件列表
