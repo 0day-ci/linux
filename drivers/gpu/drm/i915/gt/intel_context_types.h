@@ -17,8 +17,9 @@
 #include "intel_engine_types.h"
 #include "intel_sseu.h"
 
-#define CONTEXT_REDZONE POISON_INUSE
+#include "uc/intel_guc_fwif.h"
 
+#define CONTEXT_REDZONE POISON_INUSE
 DECLARE_EWMA(runtime, 3, 8);
 
 struct i915_gem_context;
@@ -193,6 +194,12 @@ struct intel_context {
 	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
 	 */
 	struct list_head guc_id_link;
+
+	/*
+	 * GuC priority management
+	 */
+	u8 guc_prio;
+	u32 guc_prio_count[GUC_CLIENT_PRIORITY_NUM];
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */

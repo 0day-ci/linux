@@ -151,6 +151,11 @@ struct i915_sched_engine {
 	void	(*kick_backend)(const struct i915_request *rq,
 				int prio);
 
+	/* Update priority of inflight requests */
+	void	(*bump_inflight_request_prio)(struct i915_request *rq,
+					      int prio);
+	void	(*retire_inflight_request_prio)(struct i915_request *rq);
+
 	/*
 	 * Call when the priority on a request has changed and it and its
 	 * dependencies may need rescheduling. Note the request itself may

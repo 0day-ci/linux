@@ -299,6 +299,14 @@ struct i915_request {
 	 */
 	struct list_head guc_fence_link;
 
+	/**
+	 * Priority level while the request is inflight. Differs slightly than
+	 * i915 scheduler priority.
+	 */
+#define	GUC_PRIO_INIT	0xff
+#define	GUC_PRIO_FINI	0xfe
+	u8 guc_prio;
+
 	I915_SELFTEST_DECLARE(struct {
 		struct list_head link;
 		unsigned long delay;
