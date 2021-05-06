@@ -336,6 +336,9 @@ struct vcpu_vmx {
 		DECLARE_BITMAP(read, MAX_POSSIBLE_PASSTHROUGH_MSRS);
 		DECLARE_BITMAP(write, MAX_POSSIBLE_PASSTHROUGH_MSRS);
 	} shadow_msr_intercept;
+
+	/* true if vcpu is between pre_block and post_block */
+	bool in_blocked_section;
 };
 
 enum ept_pointers_status {

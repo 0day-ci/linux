@@ -114,7 +114,7 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
 	} while (cmpxchg64(&pi_desc->control, old.control,
 			   new.control) != old.control);
 
-	if (!WARN_ON_ONCE(vcpu->pre_pcpu == -1)) {
+	if (vcpu->pre_pcpu != -1) {
 		spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
 		list_del(&vcpu->blocked_vcpu_list);
 		spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
@@ -135,20 +135,13 @@ static void __pi_post_block(struct kvm_vcpu *vcpu)
  *   this case, return 1, otherwise, return 0.
  *
  */
-int pi_pre_block(struct kvm_vcpu *vcpu)
+static int __pi_pre_block(struct kvm_vcpu *vcpu)
 {
 	unsigned int dest;
 	struct pi_desc old, new;
 	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
 
-	if (!kvm_arch_has_assigned_device(vcpu->kvm) ||
-		!irq_remapping_cap(IRQ_POSTING_CAP)  ||
-		!kvm_vcpu_apicv_active(vcpu))
-		return 0;
-
-	WARN_ON(irqs_disabled());
-	local_irq_disable();
-	if (!WARN_ON_ONCE(vcpu->pre_pcpu != -1)) {
+	if (vcpu->pre_pcpu == -1) {
 		vcpu->pre_pcpu = vcpu->cpu;
 		spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, vcpu->pre_pcpu));
 		list_add_tail(&vcpu->blocked_vcpu_list,
@@ -188,12 +181,33 @@ int pi_pre_block(struct kvm_vcpu *vcpu)
 	if (pi_test_on(pi_desc) == 1)
 		__pi_post_block(vcpu);
 
+	return (vcpu->pre_pcpu == -1);
+}
+
+int pi_pre_block(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	vmx->in_blocked_section = true;
+
+	if (!kvm_arch_has_assigned_device(vcpu->kvm) ||
+		!irq_remapping_cap(IRQ_POSTING_CAP)  ||
+		!kvm_vcpu_apicv_active(vcpu))
+		return 0;
+
+	WARN_ON(irqs_disabled());
+	local_irq_disable();
+	__pi_pre_block(vcpu);
 	local_irq_enable();
+
 	return (vcpu->pre_pcpu == -1);
 }
 
 void pi_post_block(struct kvm_vcpu *vcpu)
 {
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	vmx->in_blocked_section = false;
 	if (vcpu->pre_pcpu == -1)
 		return;
 
@@ -236,6 +250,52 @@ bool pi_has_pending_interrupt(struct kvm_vcpu *vcpu)
 		(pi_test_sn(pi_desc) && !pi_is_pir_empty(pi_desc));
 }
 
+static void pi_update_wakeup_vector(void *data)
+{
+	struct vcpu_vmx *vmx;
+	struct kvm_vcpu *vcpu = data;
+
+	vmx = to_vmx(vcpu);
+
+	/* race with pi_post_block ? */
+	if (vcpu->pre_pcpu != -1)
+		return;
+
+	if (!vmx->in_blocked_section)
+		return;
+
+	__pi_pre_block(vcpu);
+}
+
+void vmx_pi_start_assignment(struct kvm *kvm, int device_count)
+{
+	struct kvm_vcpu *vcpu;
+	int i;
+
+	if (!irq_remapping_cap(IRQ_POSTING_CAP))
+		return;
+
+	/* only care about first device assignment */
+	if (device_count != 1)
+		return;
+
+	/* Update wakeup vector and add vcpu to blocked_vcpu_list */
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		struct vcpu_vmx *vmx = to_vmx(vcpu);
+		int pcpu;
+
+		if (!kvm_vcpu_apicv_active(vcpu))
+			continue;
+
+		preempt_disable();
+		pcpu = vcpu->cpu;
+		if (vmx->in_blocked_section && vcpu->pre_pcpu == -1 &&
+		    pcpu != -1 && pcpu != smp_processor_id())
+			smp_call_function_single(pcpu, pi_update_wakeup_vector,
+						 vcpu, 1);
+		preempt_enable();
+	}
+}
 
 /*
  * pi_update_irte - set IRTE for Posted-Interrupts
