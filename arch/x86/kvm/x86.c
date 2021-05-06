@@ -10923,9 +10923,9 @@ static int alloc_memslot_rmap(struct kvm_memory_slot *slot,
 		lpages = gfn_to_index(slot->base_gfn + npages - 1,
 				      slot->base_gfn, level) + 1;
 
-		slot->arch.rmap[i] =
-			kvcalloc(lpages, sizeof(*slot->arch.rmap[i]),
-				 GFP_KERNEL_ACCOUNT);
+		rcu_assign_pointer(slot->arch.rmap[i],
+				   kvcalloc(lpages, sizeof(*slot->arch.rmap[i]),
+					    GFP_KERNEL_ACCOUNT));
 		if (!slot->arch.rmap[i])
 			goto out_free;
 	}
