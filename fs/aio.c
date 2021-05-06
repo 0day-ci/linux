@@ -653,6 +653,7 @@ static int ioctx_add_table(struct kioctx *ctx, struct mm_struct *mm)
 					ring = kmap_atomic(ctx->ring_pages[0]);
 					ring->id = ctx->id;
 					kunmap_atomic(ring);
+					flush_dcache_page(ctx->ring_pages[0]);
 					return 0;
 				}
 
