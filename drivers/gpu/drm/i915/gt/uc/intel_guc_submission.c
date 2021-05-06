@@ -1395,7 +1395,8 @@ int intel_guc_submission_init(struct intel_guc *guc)
 
 	spin_lock_init(&guc->destroy_lock);
 	INIT_LIST_HEAD(&guc->destroyed_contexts);
-	INIT_WORK(&guc->destroy_worker, destroy_worker_func);
+	INIT_LIST_HEAD(&guc->destroy_worker.link);
+	INIT_WORK(&guc->destroy_worker.worker, destroy_worker_func);
 
 	return 0;
 }
@@ -2374,13 +2375,18 @@ static void deregister_destroyed_contexts(struct intel_guc *guc)
 
 static void destroy_worker_func(struct work_struct *w)
 {
+	struct intel_gt_pm_delayed_work *destroy_worker =
+		container_of(w, struct intel_gt_pm_delayed_work, worker);
 	struct intel_guc *guc =
-		container_of(w, struct intel_guc, destroy_worker);
+		container_of(destroy_worker, struct intel_guc, destroy_worker);
 	struct intel_gt *gt = guc_to_gt(guc);
 	int tmp;
 
-	with_intel_gt_pm(gt, tmp)
+	with_intel_gt_pm_if_awake(gt, tmp)
 		deregister_destroyed_contexts(guc);
+
+	if (!list_empty(&guc->destroyed_contexts))
+		intel_gt_pm_add_delayed_work(gt, destroy_worker);
 }
 
 static void guc_context_destroy(struct kref *kref)
@@ -2441,7 +2447,7 @@ static void guc_context_destroy(struct kref *kref)
 	 * take the GT PM for the first time which isn't allowed from an atomic
 	 * context.
 	 */
-	queue_work(system_unbound_wq, &guc->destroy_worker);
+	intel_gt_pm_add_delayed_work(guc_to_gt(guc), &guc->destroy_worker);
 }
 
 static int guc_context_alloc(struct intel_context *ce)
