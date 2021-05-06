@@ -968,6 +968,9 @@ void i915_active_acquire_barrier(struct i915_active *ref)
 
 	GEM_BUG_ON(i915_active_is_idle(ref));
 
+	if (llist_empty(&ref->preallocated_barriers))
+		return;
+
 	/*
 	 * Transfer the list of preallocated barriers into the
 	 * i915_active rbtree, but only as proto-nodes. They will be
