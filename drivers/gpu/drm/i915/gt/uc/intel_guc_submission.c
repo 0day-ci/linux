@@ -124,6 +124,7 @@ static inline void clr_context_pending_enable(struct intel_context *ce)
 #define SCHED_STATE_WAIT_FOR_DEREGISTER_TO_REGISTER	BIT(0)
 #define SCHED_STATE_DESTROYED				BIT(1)
 #define SCHED_STATE_PENDING_DISABLE			BIT(2)
+#define SCHED_STATE_BANNED				BIT(3)
 static inline void init_sched_state(struct intel_context *ce)
 {
 	/* Only should be called from guc_lrc_desc_pin() */
@@ -184,6 +185,23 @@ static inline void clr_context_pending_disable(struct intel_context *ce)
 	lockdep_assert_held(&ce->guc_state.lock);
 	ce->guc_state.sched_state =
 		(ce->guc_state.sched_state & ~SCHED_STATE_PENDING_DISABLE);
+}
+
+static inline bool context_banned(struct intel_context *ce)
+{
+	return (ce->guc_state.sched_state & SCHED_STATE_BANNED);
+}
+
+static inline void set_context_banned(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+	ce->guc_state.sched_state |= SCHED_STATE_BANNED;
+}
+
+static inline void clr_context_banned(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+	ce->guc_state.sched_state &= ~SCHED_STATE_BANNED;
 }
 
 static inline bool context_guc_id_invalid(struct intel_context *ce)
@@ -359,7 +377,7 @@ static int guc_lrc_desc_pin(struct intel_context *ce, bool loop);
 
 static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 {
-	int err;
+	int err = 0;
 	struct intel_context *ce = rq->context;
 	u32 action[3];
 	int len = 0;
@@ -368,6 +386,16 @@ static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 
 	GEM_BUG_ON(!atomic_read(&ce->guc_id_ref));
 	GEM_BUG_ON(context_guc_id_invalid(ce));
+
+	/*
+	 * Corner case where requests were sitting in the priority list or a
+	 * request resubmitted after the context was banned.
+	 */
+	if (unlikely(intel_context_is_banned(ce))) {
+		i915_request_put(i915_request_mark_eio(rq));
+		intel_engine_signal_breadcrumbs(ce->engine);
+		goto out;
+	}
 
 	/*
 	 * Corner case where the GuC firmware was blown away and reloaded while
@@ -401,6 +429,8 @@ static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 		clr_context_pending_enable(ce);
 		intel_context_put(ce);
 	}
+	if (likely(!err))
+		trace_i915_request_guc_submit(rq);
 
 out:
 	return err;
@@ -465,7 +495,6 @@ resubmit:
 			guc->stalled_request = last;
 			return false;
 		}
-		trace_i915_request_guc_submit(last);
 	}
 
 	guc->stalled_request = NULL;
@@ -504,12 +533,13 @@ static void cs_irq_handler(struct intel_engine_cs *engine, u16 iir)
 static void __guc_context_destroy(struct intel_context *ce);
 static void release_guc_id(struct intel_guc *guc, struct intel_context *ce);
 static void guc_signal_context_fence(struct intel_context *ce);
+static void guc_cancel_context_requests(struct intel_context *ce);
 
 static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 {
 	struct intel_context *ce;
 	unsigned long index, flags;
-	bool pending_disable, pending_enable, deregister, destroyed;
+	bool pending_disable, pending_enable, deregister, destroyed, banned;
 
 	xa_for_each(&guc->context_lookup, index, ce) {
 		/* Flush context */
@@ -527,6 +557,7 @@ static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 		pending_enable = context_pending_enable(ce);
 		pending_disable = context_pending_disable(ce);
 		deregister = context_wait_for_deregister_to_register(ce);
+		banned = context_banned(ce);
 		init_sched_state(ce);
 
 		if (pending_enable || destroyed || deregister) {
@@ -544,6 +575,10 @@ static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 		/* Not mutualy exclusive with above if statement. */
 		if (pending_disable) {
 			guc_signal_context_fence(ce);
+			if (banned) {
+				guc_cancel_context_requests(ce);
+				intel_engine_signal_breadcrumbs(ce->engine);
+			}
 			intel_context_sched_disable_unpin(ce);
 			atomic_dec(&guc->outstanding_submission_g2h);
 			intel_context_put(ce);
@@ -661,6 +696,9 @@ static void guc_reset_state(struct intel_context *ce, u32 head, bool scrub)
 {
 	struct intel_engine_cs *engine = __context_to_physical_engine(ce);
 
+	if (intel_context_is_banned(ce))
+		return;
+
 	GEM_BUG_ON(!intel_context_is_pinned(ce));
 
 	/*
@@ -731,6 +769,8 @@ static void __guc_reset_context(struct intel_context *ce, bool stalled)
 	struct i915_request *rq;
 	u32 head;
 
+	intel_context_get(ce);
+
 	/*
 	 * GuC will implicitly mark the context as non-schedulable
 	 * when it sends the reset notification. Make sure our state
@@ -756,6 +796,7 @@ static void __guc_reset_context(struct intel_context *ce, bool stalled)
 out_replay:
 	guc_reset_state(ce, head, stalled);
 	__unwind_incomplete_requests(ce);
+	intel_context_put(ce);
 }
 
 void intel_guc_submission_reset(struct intel_guc *guc, bool stalled)
@@ -938,8 +979,6 @@ static int guc_bypass_tasklet_submit(struct intel_guc *guc,
 	ret = guc_add_request(guc, rq);
 	if (ret == -EBUSY)
 		guc->stalled_request = rq;
-	else
-		trace_i915_request_guc_submit(rq);
 
 	if (unlikely(ret == -EDEADLK))
 		disable_submission(guc);
@@ -1329,13 +1368,52 @@ static u16 prep_context_pending_disable(struct intel_context *ce)
 	return ce->guc_id;
 }
 
+static void guc_context_ban(struct intel_context *ce, struct i915_request *rq)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	unsigned long flags;
+
+	guc_flush_submissions(guc);
+
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	set_context_banned(ce);
+
+	if (submission_disabled(guc) || (!context_enabled(ce) &&
+	    !context_pending_disable(ce))) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+		guc_cancel_context_requests(ce);
+		intel_engine_signal_breadcrumbs(ce->engine);
+	} else if (!context_pending_disable(ce)) {
+		struct intel_runtime_pm *runtime_pm =
+			&ce->engine->gt->i915->runtime_pm;
+		intel_wakeref_t wakeref;
+		u16 guc_id;
+
+		/*
+		 * We add +2 here as the schedule disable complete CTB handler
+		 * calls intel_context_sched_disable_unpin (-2 to pin_count).
+		 */
+		atomic_add(2, &ce->pin_count);
+
+		guc_id = prep_context_pending_disable(ce);
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+		with_intel_runtime_pm(runtime_pm, wakeref)
+			__guc_context_sched_disable(guc, ce, guc_id);
+	} else {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+	}
+}
+
 static void guc_context_sched_disable(struct intel_context *ce)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
-	struct intel_runtime_pm *runtime_pm = &ce->engine->gt->i915->runtime_pm;
 	unsigned long flags;
-	u16 guc_id;
+	struct intel_runtime_pm *runtime_pm = &ce->engine->gt->i915->runtime_pm;
 	intel_wakeref_t wakeref;
+	u16 guc_id;
+	bool enabled;
 
 	if (submission_disabled(guc) || context_guc_id_invalid(ce) ||
 	    !lrc_desc_registered(guc, ce->guc_id)) {
@@ -1349,12 +1427,21 @@ static void guc_context_sched_disable(struct intel_context *ce)
 	spin_lock_irqsave(&ce->guc_state.lock, flags);
 
 	/*
-	 * We have to check if the context has been pinned again as another pin
-	 * operation is allowed to pass this function. Checking the pin count
-	 * here synchronizes this function with guc_request_alloc ensuring a
-	 * request doesn't slip through the 'context_pending_disable' fence.
+	 * We have to check if the context is disabled by another thread. We
+	 * also have to check if the context has been pinned again as another
+	 * pin operation is allowed to pass this function. Checking the pin
+	 * count here synchronizes this function with guc_request_alloc ensuring
+	 * a request doesn't slip through the 'context_pending_disable' fence.
 	 */
+	enabled = context_enabled(ce);
+	if (unlikely(!enabled || submission_disabled(guc))) {
+		if (!enabled)
+			clr_context_enabled(ce);
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		goto unpin;
+	}
 	if (unlikely(atomic_add_unless(&ce->pin_count, -2, 2))) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 		return;
 	}
 	guc_id = prep_context_pending_disable(ce);
@@ -1508,6 +1595,8 @@ static const struct intel_context_ops guc_context_ops = {
 	.pin = guc_context_pin,
 	.unpin = guc_context_unpin,
 	.post_unpin = guc_context_post_unpin,
+
+	.ban = guc_context_ban,
 
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,
@@ -1712,6 +1801,8 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 	.pin = guc_virtual_context_pin,
 	.unpin = guc_context_unpin,
 	.post_unpin = guc_context_post_unpin,
+
+	.ban = guc_context_ban,
 
 	.enter = guc_virtual_context_enter,
 	.exit = guc_virtual_context_exit,
@@ -2158,6 +2249,8 @@ int intel_guc_sched_done_process_msg(struct intel_guc *guc,
 	if (context_pending_enable(ce)) {
 		clr_context_pending_enable(ce);
 	} else if (context_pending_disable(ce)) {
+		bool banned;
+
 		/*
 		 * Unpin must be done before __guc_signal_context_fence,
 		 * otherwise a race exists between the requests getting
@@ -2168,9 +2261,16 @@ int intel_guc_sched_done_process_msg(struct intel_guc *guc,
 		intel_context_sched_disable_unpin(ce);
 
 		spin_lock_irqsave(&ce->guc_state.lock, flags);
+		banned = context_banned(ce);
+		clr_context_banned(ce);
 		clr_context_pending_disable(ce);
 		__guc_signal_context_fence(ce);
 		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+		if (banned) {
+			guc_cancel_context_requests(ce);
+			intel_engine_signal_breadcrumbs(ce->engine);
+		}
 	}
 
 	decr_outstanding_submission_g2h(guc);
@@ -2205,8 +2305,11 @@ static void guc_handle_context_reset(struct intel_guc *guc,
 				     struct intel_context *ce)
 {
 	trace_intel_context_reset(ce);
-	capture_error_state(guc, ce);
-	guc_context_replay(ce);
+
+	if (likely(!intel_context_is_banned(ce))) {
+		capture_error_state(guc, ce);
+		guc_context_replay(ce);
+	}
 }
 
 int intel_guc_context_reset_process_msg(struct intel_guc *guc,
