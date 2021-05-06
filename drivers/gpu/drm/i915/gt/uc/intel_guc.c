@@ -146,6 +146,9 @@ static void gen11_disable_guc_interrupts(struct intel_guc *guc)
 {
 	struct intel_gt *gt = guc_to_gt(guc);
 
+	if (!guc->interrupts.enabled)
+		return;
+
 	spin_lock_irq(&gt->irq_lock);
 	guc->interrupts.enabled = false;
 
@@ -577,19 +580,6 @@ int intel_guc_suspend(struct intel_guc *guc)
 	}
 
 	return 0;
-}
-
-/**
- * intel_guc_reset_engine() - ask GuC to reset an engine
- * @guc:	intel_guc structure
- * @engine:	engine to be reset
- */
-int intel_guc_reset_engine(struct intel_guc *guc,
-			   struct intel_engine_cs *engine)
-{
-	/* XXX: to be implemented with submission interface rework */
-
-	return -ENODEV;
 }
 
 /**
