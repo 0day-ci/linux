@@ -215,6 +215,15 @@ config ADV_SWBUTTON
 	  To compile this driver as a module, choose M here. The module will
 	  be called adv_swbutton.
 
+config AHC1EC0_CORE
+	tristate "Advantech AHC1EC0 Embedded Controller Core"
+	depends on X86
+	help
+	  This driver provides core functionality for the Advantech AHC1EC0
+	  Embedded Controller (EC) along with registration for HWMON and
+	  Watchdog sub-devices. It also provides lower read and write APIs for
+	  communication with the EC chip.
+
 config APPLE_GMUX
 	tristate "Apple Gmux Driver"
 	depends on ACPI && PCI
