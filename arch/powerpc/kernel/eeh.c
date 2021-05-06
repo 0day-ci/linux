@@ -405,7 +405,8 @@ static int eeh_phb_check_failure(struct eeh_pe *pe)
 	    (ret == EEH_STATE_NOT_SUPPORT) || eeh_state_active(ret)) {
 		ret = 0;
 		goto out;
-	}
+	} else if (ret == EEH_STATE_UNAVAILABLE)
+		eeh_pe_state_mark(phb_pe, EEH_PE_TEMP_UNAVAIL);
 
 	/* Isolate the PHB and send event */
 	eeh_pe_mark_isolated(phb_pe);
@@ -519,14 +520,23 @@ int eeh_dev_check_failure(struct eeh_dev *edev)
 	 * We will punt with the following conditions: Failure to get
 	 * PE's state, EEH not support and Permanently unavailable
 	 * state, PE is in good state.
+	 *
+	 * Certain PHB HW failure causes phyp/hypervisor to recover PHB and
+	 * until that recovery completes, the PE's state is temporarily
+	 * unavailable (EEH_STATE_UNAVAILABLE). In this state the slot
+	 * presence check must be avoided since it may not return valid
+	 * status. Mark this PE status as temporarily unavailable so
+	 * that we can check it later.
 	 */
+
 	if ((ret < 0) ||
 	    (ret == EEH_STATE_NOT_SUPPORT) || eeh_state_active(ret)) {
 		eeh_stats.false_positives++;
 		pe->false_positives++;
 		rc = 0;
 		goto dn_unlock;
-	}
+	} else if (ret == EEH_STATE_UNAVAILABLE)
+		eeh_pe_state_mark(pe, EEH_PE_TEMP_UNAVAIL);
 
 	/*
 	 * It should be corner case that the parent PE has been

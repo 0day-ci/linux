@@ -852,6 +852,17 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 	}
 
 	/*
+	 * When PE's state is temporarily unavailable, the slot
+	 * presence check returns as DR connector empty. This leads
+	 * to assumption that the device is hot-removed and causes EEH
+	 * recovery to stop leaving the device in failed state forever.
+	 * Hence skip the slot presence check if PE's state is
+	 * temporarily unavailable and go down EEH recovery path.
+	 */
+	if (pe->state & EEH_PE_TEMP_UNAVAIL)
+		goto skip_slot_presence_check;
+
+	/*
 	 * When devices are hot-removed we might get an EEH due to
 	 * a driver attempting to touch the MMIO space of a removed
 	 * device. In this case we don't have a device to recover
@@ -871,6 +882,7 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 		goto out; /* nothing to recover */
 	}
 
+skip_slot_presence_check:
 	/* Log the event */
 	if (pe->type & EEH_PE_PHB) {
 		pr_err("EEH: Recovering PHB#%x, location: %s\n",
@@ -952,6 +964,12 @@ void eeh_handle_normal_event(struct eeh_pe *pe)
 			result = PCI_ERS_RESULT_DISCONNECT;
 		}
 	}
+
+	/*
+	 * Now that we finished waiting for PE state as per PAPR,
+	 * clear the PE temporarily unavailable state.
+	 */
+	eeh_pe_state_clear(pe, EEH_PE_TEMP_UNAVAIL, true);
 
 	/* Since rtas may enable MMIO when posting the error log,
 	 * don't post the error log until after all dev drivers
