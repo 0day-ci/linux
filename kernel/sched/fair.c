@@ -5872,9 +5872,7 @@ static inline bool test_reset_idle_core(struct sched_domain_shared *sds, int val
 
 static int wake_affine_idler_llc(struct task_struct *p, int pref_cpu, int try_cpu, int sync)
 {
-#ifdef CONFIG_NO_HZ_COMMON
 	int tnr_busy, tllc_size, pnr_busy, pllc_size;
-#endif
 	struct sched_domain_shared *pref_sds, *try_sds;
 	int diff, idle_core;
 
@@ -5902,7 +5900,6 @@ static int wake_affine_idler_llc(struct task_struct *p, int pref_cpu, int try_cp
 				test_reset_idle_core(try_sds, idle_core))
 		return idle_core;
 
-#ifdef CONFIG_NO_HZ_COMMON
 	pnr_busy = atomic_read(&pref_sds->nr_busy_cpus);
 	tnr_busy = atomic_read(&try_sds->nr_busy_cpus);
 	pllc_size = per_cpu(sd_llc_size, pref_cpu);
@@ -5916,7 +5913,6 @@ static int wake_affine_idler_llc(struct task_struct *p, int pref_cpu, int try_cp
 		return pref_cpu;
 	if (diff < 0)
 		return try_cpu;
-#endif /* CONFIG_NO_HZ_COMMON */
 
 	return nr_cpumask_bits;
 }
