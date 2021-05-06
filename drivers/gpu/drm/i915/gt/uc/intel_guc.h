@@ -61,6 +61,10 @@ struct intel_guc {
 	struct list_head guc_id_list_no_ref;
 	struct list_head guc_id_list_unpinned;
 
+	spinlock_t destroy_lock;
+	struct list_head destroyed_contexts;
+	struct work_struct destroy_worker;
+
 	bool submission_selected;
 
 	struct i915_vma *ads_vma;
