@@ -3202,6 +3202,8 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	 */
 	if (sdkp->media_present) {
 		sd_read_capacity(sdkp, buffer);
+		if (!sdkp->capacity)
+			goto present_block_end;
 
 		/*
 		 * set the default to rotational.  All non-rotational devices
@@ -3227,6 +3229,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 		sd_read_write_same(sdkp, buffer);
 		sd_read_security(sdkp, buffer);
 	}
+present_block_end:
 
 	/*
 	 * We now have all cache related info, determine how we deal
