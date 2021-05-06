@@ -911,7 +911,8 @@ void xprt_connect(struct rpc_task *task)
 
 	if (!xprt_connected(xprt)) {
 		task->tk_rqstp->rq_connect_cookie = xprt->connect_cookie;
-		rpc_sleep_on_timeout(&xprt->pending, task, NULL,
+		if (task->tk_client)
+			rpc_sleep_on_timeout(&xprt->pending, task, NULL,
 				xprt_request_timeout(task->tk_rqstp));
 
 		if (test_bit(XPRT_CLOSING, &xprt->state))
