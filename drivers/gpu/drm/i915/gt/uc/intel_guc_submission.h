@@ -24,6 +24,9 @@ int intel_guc_submission_setup(struct intel_engine_cs *engine);
 void intel_guc_log_submission_info(struct intel_guc *guc,
 				   struct drm_printer *p);
 void intel_guc_log_context_info(struct intel_guc *guc, struct drm_printer *p);
+void intel_guc_dump_active_requests(struct intel_engine_cs *engine,
+				    struct i915_request *hung_rq,
+				    struct drm_printer *m);
 
 bool intel_guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve);
 
