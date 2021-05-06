@@ -31,7 +31,7 @@ struct intel_guc;
  * @lock: protects access to the commands buffer and buffer descriptor
  * @desc: pointer to the buffer descriptor
  * @cmds: pointer to the commands buffer
- * @size: size of the commands buffer
+ * @size: size of the commands buffer in dwords
  * @broken: flag to indicate if descriptor data is broken
  */
 struct intel_guc_ct_buffer {

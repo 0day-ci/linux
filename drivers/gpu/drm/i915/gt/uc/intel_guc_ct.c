@@ -112,32 +112,28 @@ static inline const char *guc_ct_buffer_type_to_str(u32 type)
 	}
 }
 
-static void guc_ct_buffer_desc_init(struct guc_ct_buffer_desc *desc,
-				    u32 cmds_addr, u32 size)
+static void guc_ct_buffer_desc_init(struct guc_ct_buffer_desc *desc)
 {
 	memset(desc, 0, sizeof(*desc));
-	desc->addr = cmds_addr;
-	desc->size = size;
-	desc->owner = CTB_OWNER_HOST;
 }
 
-static void guc_ct_buffer_reset(struct intel_guc_ct_buffer *ctb, u32 cmds_addr)
+static void guc_ct_buffer_reset(struct intel_guc_ct_buffer *ctb)
 {
 	ctb->broken = false;
-	guc_ct_buffer_desc_init(ctb->desc, cmds_addr, ctb->size);
+	guc_ct_buffer_desc_init(ctb->desc);
 }
 
 static void guc_ct_buffer_init(struct intel_guc_ct_buffer *ctb,
 			       struct guc_ct_buffer_desc *desc,
-			       u32 *cmds, u32 size)
+			       u32 *cmds, u32 size_in_bytes)
 {
-	GEM_BUG_ON(size % 4);
+	GEM_BUG_ON(size_in_bytes % 4);
 
 	ctb->desc = desc;
 	ctb->cmds = cmds;
-	ctb->size = size;
+	ctb->size = size_in_bytes / 4;
 
-	guc_ct_buffer_reset(ctb, 0);
+	guc_ct_buffer_reset(ctb);
 }
 
 static int guc_action_register_ct_buffer(struct intel_guc *guc,
@@ -279,10 +275,10 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 
 	/* (re)initialize descriptors */
 	cmds = base + ptrdiff(ct->ctbs.send.cmds, blob);
-	guc_ct_buffer_reset(&ct->ctbs.send, cmds);
+	guc_ct_buffer_reset(&ct->ctbs.send);
 
 	cmds = base + ptrdiff(ct->ctbs.recv.cmds, blob);
-	guc_ct_buffer_reset(&ct->ctbs.recv, cmds);
+	guc_ct_buffer_reset(&ct->ctbs.recv);
 
 	/*
 	 * Register both CT buffers starting with RECV buffer.
@@ -369,17 +365,15 @@ static int ct_write(struct intel_guc_ct *ct,
 	if (unlikely(ctb->broken))
 		return -EPIPE;
 
-	if (unlikely(desc->is_in_error))
+	if (unlikely(desc->status))
 		goto corrupted;
 
-	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
-		     (tail | head) >= size))
+	if (unlikely((tail | head) >= size)) {
+		CT_ERROR(ct, "Invalid offsets head=%u tail=%u (size=%u)\n",
+			 head, tail, size);
+		desc->status |= GUC_CTB_STATUS_OVERFLOW;
 		goto corrupted;
-
-	/* later calculations will be done in dwords */
-	head /= 4;
-	tail /= 4;
-	size /= 4;
+	}
 
 	/*
 	 * tail == head condition indicates empty. GuC FW does not support
@@ -419,14 +413,14 @@ static int ct_write(struct intel_guc_ct *ct,
 	}
 	GEM_BUG_ON(tail > size);
 
-	/* now update desc tail (back in bytes) */
-	desc->tail = tail * 4;
+	/* now update descriptor */
+	WRITE_ONCE(desc->tail, tail);
+
 	return 0;
 
 corrupted:
-	CT_ERROR(ct, "Corrupted descriptor addr=%#x head=%u tail=%u size=%u\n",
-		 desc->addr, desc->head, desc->tail, desc->size);
-	desc->is_in_error = 1;
+	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+		 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
 	return -EPIPE;
 }
@@ -616,17 +610,15 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 	if (unlikely(ctb->broken))
 		return -EPIPE;
 
-	if (unlikely(desc->is_in_error))
+	if (unlikely(desc->status))
 		goto corrupted;
 
-	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
-		     (tail | head) >= size))
+	if (unlikely((tail | head) >= size)) {
+		CT_ERROR(ct, "Invalid offsets head=%u tail=%u (size=%u)\n",
+			 head, tail, size);
+		desc->status |= GUC_CTB_STATUS_OVERFLOW;
 		goto corrupted;
-
-	/* later calculations will be done in dwords */
-	head /= 4;
-	tail /= 4;
-	size /= 4;
+	}
 
 	/* tail == head condition indicates empty */
 	available = tail - head;
@@ -653,6 +645,7 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 			      size - head : available - 1), &cmds[head],
 			 4 * (head + available - 1 > size ?
 			      available - 1 - size + head : 0), &cmds[0]);
+		desc->status |= GUC_CTB_STATUS_UNDERFLOW;
 		goto corrupted;
 	}
 
@@ -675,13 +668,14 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 	}
 	CT_DEBUG(ct, "received %*ph\n", 4 * len, (*msg)->msg);
 
-	desc->head = head * 4;
+	/* now update descriptor */
+	WRITE_ONCE(desc->head, head);
+
 	return available - len;
 
 corrupted:
-	CT_ERROR(ct, "Corrupted descriptor addr=%#x head=%u tail=%u size=%u\n",
-		 desc->addr, desc->head, desc->tail, desc->size);
-	desc->is_in_error = 1;
+	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+		 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
 	return -EPIPE;
 }

@@ -7,6 +7,58 @@
 #define _ABI_GUC_COMMUNICATION_CTB_ABI_H
 
 #include <linux/types.h>
+#include <linux/build_bug.h>
+
+#include "guc_messages_abi.h"
+
+/**
+ * DOC: CT Buffer
+ *
+ * TBD
+ */
+
+/**
+ * DOC: CTB Descriptor
+ *
+ *  +---+-------+--------------------------------------------------------------+
+ *  |   | Bits  | Description                                                  |
+ *  +===+=======+==============================================================+
+ *  | 0 |  31:0 | **HEAD** - offset (in dwords) to the last dword that was     |
+ *  |   |       | read from the `CT Buffer`_.                                  |
+ *  |   |       | It can only be updated by the receiver.                      |
+ *  +---+-------+--------------------------------------------------------------+
+ *  | 1 |  31:0 | **TAIL** - offset (in dwords) to the last dword that was     |
+ *  |   |       | written to the `CT Buffer`_.                                 |
+ *  |   |       | It can only be updated by the sender.                        |
+ *  +---+-------+--------------------------------------------------------------+
+ *  | 2 |  31:0 | **STATUS** - status of the CTB                               |
+ *  |   |       |                                                              |
+ *  |   |       |   - _`GUC_CTB_STATUS_NO_ERROR` = 0 (normal operation)        |
+ *  |   |       |   - _`GUC_CTB_STATUS_OVERFLOW` = 1 (head/tail too large)     |
+ *  |   |       |   - _`GUC_CTB_STATUS_UNDERFLOW` = 2 (truncated message)      |
+ *  |   |       |   - _`GUC_CTB_STATUS_MISMATCH` = 4 (head/tail modified)      |
+ *  |   |       |   - _`GUC_CTB_STATUS_NO_BACKCHANNEL` = 8                     |
+ *  |   |       |   - _`GUC_CTB_STATUS_MALFORMED_MSG` = 16                     |
+ *  +---+-------+--------------------------------------------------------------+
+ *  |...|       | RESERVED = MBZ                                               |
+ *  +---+-------+--------------------------------------------------------------+
+ *  | 15|  31:0 | RESERVED = MBZ                                               |
+ *  +---+-------+--------------------------------------------------------------+
+ */
+
+struct guc_ct_buffer_desc {
+	u32 head;
+	u32 tail;
+	u32 status;
+#define GUC_CTB_STATUS_NO_ERROR				0
+#define GUC_CTB_STATUS_OVERFLOW				(1 << 0)
+#define GUC_CTB_STATUS_UNDERFLOW			(1 << 1)
+#define GUC_CTB_STATUS_MISMATCH				(1 << 2)
+#define GUC_CTB_STATUS_NO_BACKCHANNEL			(1 << 3)
+#define GUC_CTB_STATUS_MALFORMED_MSG			(1 << 4)
+	u32 reserved[13];
+} __packed;
+static_assert(sizeof(struct guc_ct_buffer_desc) == 64);
 
 /**
  * DOC: CTB based communication
@@ -59,24 +111,6 @@
  * - **code**, indicates message code
  * - **flags**, holds various bits to control message handling
  */
-
-/*
- * Describes single command transport buffer.
- * Used by both guc-master and clients.
- */
-struct guc_ct_buffer_desc {
-	u32 addr;		/* gfx address */
-	u64 host_private;	/* host private data */
-	u32 size;		/* size in bytes */
-	u32 head;		/* offset updated by GuC*/
-	u32 tail;		/* offset updated by owner */
-	u32 is_in_error;	/* error indicator */
-	u32 reserved1;
-	u32 reserved2;
-	u32 owner;		/* id of the channel owner */
-	u32 owner_sub_id;	/* owner-defined field for extra tracking */
-	u32 reserved[5];
-} __packed;
 
 /* Type of command transport buffer */
 #define INTEL_GUC_CT_BUFFER_TYPE_SEND	0x0u
