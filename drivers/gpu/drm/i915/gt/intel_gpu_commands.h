@@ -134,6 +134,11 @@
  *   simply ignores the register load under certain conditions.
  * - One can actually load arbitrary many arbitrary registers: Simply issue x
  *   address/value pairs. Don't overdue it, though, x <= 2^4 must hold!
+ * - Newer hardware supports engine relative addressing but older hardware does
+ *   not. This is required for hw engine load balancing. Hence the MI_LRI
+ *   instruction itself is prefixed with '__' and should only be used on
+ *   legacy hardware code paths. Generic code must always use the MI_LRI
+ *   and i915_get_lri_reg() helper functions instead.
  */
 #define MI_LOAD_REGISTER_IMM(x)	MI_INSTR(0x22, 2*(x)-1)
 /* Gen11+. addr = base + (ctx_restore ? offset & GENMASK(12,2) : offset) */

@@ -1211,7 +1211,7 @@ static int emit_ppgtt_update(struct i915_request *rq, void *data)
 {
 	struct i915_address_space *vm = rq->context->vm;
 	struct intel_engine_cs *engine = rq->engine;
-	u32 base = engine->mmio_base;
+	u32 base = engine->lri_mmio_base;
 	u32 *cs;
 	int i;
 
@@ -1223,7 +1223,7 @@ static int emit_ppgtt_update(struct i915_request *rq, void *data)
 		if (IS_ERR(cs))
 			return PTR_ERR(cs);
 
-		*cs++ = MI_LOAD_REGISTER_IMM(2);
+		*cs++ = MI_LOAD_REGISTER_IMM(2) | engine->lri_cmd_mode;
 
 		*cs++ = i915_mmio_reg_offset(GEN8_RING_PDP_UDW(base, 0));
 		*cs++ = upper_32_bits(pd_daddr);
@@ -1245,7 +1245,8 @@ static int emit_ppgtt_update(struct i915_request *rq, void *data)
 		if (IS_ERR(cs))
 			return PTR_ERR(cs);
 
-		*cs++ = MI_LOAD_REGISTER_IMM(2 * GEN8_3LVL_PDPES) | MI_LRI_FORCE_POSTED;
+		*cs++ = MI_LOAD_REGISTER_IMM(2 * GEN8_3LVL_PDPES) |
+			MI_LRI_FORCE_POSTED | engine->lri_cmd_mode;
 		for (i = GEN8_3LVL_PDPES; i--; ) {
 			const dma_addr_t pd_daddr = i915_page_dir_dma_addr(ppgtt, i);
 
