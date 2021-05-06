@@ -287,6 +287,9 @@ EXPORT_SYMBOL(console_set_on_cmdline);
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
 
+/* Flags: console flushing prb when resume */
+static atomic_t console_resume_flush_prb = ATOMIC_INIT(0);
+
 enum con_msg_format_flags {
 	MSG_FORMAT_DEFAULT	= 0,
 	MSG_FORMAT_SYSLOG	= (1 << 0),
@@ -1781,7 +1784,8 @@ static int console_trylock_spinning(void)
 	raw_spin_lock(&console_owner_lock);
 	owner = READ_ONCE(console_owner);
 	waiter = READ_ONCE(console_waiter);
-	if (!waiter && owner && owner != current) {
+	if (!waiter && owner && owner != current &&
+	    !atomic_read(&console_resume_flush_prb)) {
 		WRITE_ONCE(console_waiter, true);
 		spin = true;
 	}
@@ -2355,6 +2359,7 @@ void resume_console(void)
 	if (!console_suspend_enabled)
 		return;
 	down_console_sem();
+	atomic_set(&console_resume_flush_prb, 1);
 	console_suspended = 0;
 	console_unlock();
 }
@@ -2592,6 +2597,8 @@ skip:
 	raw_spin_unlock(&logbuf_lock);
 
 	up_console_sem();
+	if (atomic_read(&console_resume_flush_prb))
+		atomic_set(&console_resume_flush_prb, 0);
 
 	/*
 	 * Someone could have filled up the buffer again, so re-check if there's
