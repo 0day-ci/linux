@@ -572,6 +572,19 @@ S:	Maintained
 F:	Documentation/scsi/advansys.rst
 F:	drivers/scsi/advansys.c
 
+ADVANTECH AHC1EC0 EMBEDDED CONTROLLER DRIVER
+M:	Campion Kang <campion.kang@advantech.com.tw>
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/mfd/ahc1ec0.yaml
+F:	Documentation/hwmon/ahc1ec0-hwmon.rst
+F:	drivers/hwmon/ahc1ec0-hwmon.c
+F:	drivers/mfd/ahc1ec0.c
+F:	drivers/platform/x86/ahc1ec0-core.c
+F:	drivers/watchdog/ahc1ec0-wdt.c
+F:	include/dt-bindings/mfd/ahc1ec0-dt.h
+F:	include/linux/platform_data/ahc1ec0.h
+
 ADVANTECH SWBTN DRIVER
 M:	Andrea Ho <Andrea.Ho@advantech.com.tw>
 L:	platform-driver-x86@vger.kernel.org
