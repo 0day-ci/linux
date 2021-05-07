@@ -38,6 +38,17 @@
 #define reg_list_sve() (false)
 #endif
 
+enum {
+	VREGS,
+	SVE,
+};
+
+static char * const vcpu_config_names[] = {
+	[VREGS] = "vregs",
+	[SVE] = "sve",
+	NULL
+};
+
 static struct kvm_reg_list *reg_list;
 static __u64 *blessed_reg, blessed_n;
 
@@ -502,31 +513,84 @@ static void run_test(struct vcpu_config *c)
 	kvm_vm_free(vm);
 }
 
+static void help(void)
+{
+	char * const *n;
+
+	printf(
+	"\n"
+	"usage: get-reg-list [--config:<selection>[,<selection>...]] [--list] [--list-filtered] [--core-reg-fixup]\n\n"
+	" --config:<selection>[,<selection>...] Used to select a specific vcpu configuration for the test/listing\n"
+	"                                       '<selection>' may be\n");
+
+	for (n = &vcpu_config_names[0]; *n; ++n)
+	printf("                                         '%s'\n", *n);
+
+	printf(
+	"\n"
+	" --list                                Print the register list rather than test it (requires --config)\n"
+	" --list-filtered                       Print registers that would normally be filtered out (requires --config)\n"
+	" --core-reg-fixup                      Needed when running on old kernels with broken core reg listings\n"
+	"\n"
+	);
+}
+
+static struct vcpu_config *parse_config(const char *config)
+{
+	struct vcpu_config *c = NULL;
+	int i;
+
+	if (config[8] != ':')
+		help(), exit(1);
+
+	for (i = 0; i < ARRAY_SIZE(vcpu_config_names) - 1; ++i) {
+		if (strcmp(vcpu_config_names[i], &config[9]) == 0) {
+			c = vcpu_configs[i];
+			break;
+		}
+	}
+
+	if (!c)
+		help(), exit(1);
+
+	return c;
+}
+
 int main(int ac, char **av)
 {
-	struct vcpu_config *c;
+	struct vcpu_config *c = NULL;
 	bool print_list = false, print_filtered = false;
 	int i;
 
 	for (i = 1; i < ac; ++i) {
 		if (strcmp(av[i], "--core-reg-fixup") == 0)
 			fixup_core_regs = true;
+		else if (strncmp(av[i], "--config", 8) == 0)
+			c = parse_config(av[i]);
 		else if (strcmp(av[i], "--list") == 0)
 			print_list = true;
 		else if (strcmp(av[i], "--list-filtered") == 0)
 			print_filtered = true;
+		else if (strcmp(av[i], "--help") == 0 || strcmp(av[1], "-h") == 0)
+			help(), exit(0);
 		else
-			TEST_FAIL("Unknown option: %s\n", av[i]);
+			help(), exit(1);
 	}
 
 	if (print_list || print_filtered) {
 		/*
 		 * We only want to print the register list of a single config.
-		 * TODO: Add command line support to pick which config.
 		 */
-		c = vcpu_configs[0];
+		if (!c)
+			help(), exit(1);
 		check_supported(c);
 		print_reg_list(c, print_list, print_filtered);
+		return 0;
+	}
+
+	if (c) {
+		check_supported(c);
+		run_test(c);
 		return 0;
 	}
 
@@ -917,7 +981,7 @@ static __u64 sve_rejects_set[] = {
 };
 
 static struct vcpu_config vregs_config = {
-	"vregs",
+	vcpu_config_names[VREGS],
 	.sublists = {
 	{ base_regs,	ARRAY_SIZE(base_regs), },
 	{ vregs,	ARRAY_SIZE(vregs), },
@@ -925,7 +989,7 @@ static struct vcpu_config vregs_config = {
 	},
 };
 static struct vcpu_config sve_config = {
-	"sve", .sve = true,
+	vcpu_config_names[SVE], .sve = true,
 	.sublists = {
 	{ base_regs,	ARRAY_SIZE(base_regs), },
 	{ sve_regs,	ARRAY_SIZE(sve_regs),	sve_rejects_set,	ARRAY_SIZE(sve_rejects_set), },
