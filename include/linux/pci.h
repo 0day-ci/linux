@@ -2214,6 +2214,7 @@ static inline struct pci_dev *pcie_find_root_port(struct pci_dev *dev)
 }
 
 void pci_request_acs(void);
+void pci_enable_acs(struct pci_dev *dev);
 bool pci_acs_enabled(struct pci_dev *pdev, u16 acs_flags);
 bool pci_acs_path_enabled(struct pci_dev *start,
 			  struct pci_dev *end, u16 acs_flags);

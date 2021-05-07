@@ -205,7 +205,6 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
 			.np = master_np,
 		};
 
-		pci_request_acs();
 		err = pci_for_each_dma_alias(to_pci_dev(dev),
 					     of_pci_iommu_init, &info);
 	} else {
@@ -227,6 +226,15 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
 		/* The fwspec pointer changed, read it again */
 		fwspec = dev_iommu_fwspec_get(dev);
 		ops    = fwspec->ops;
+
+		/*
+		 * If we found an IOMMU and the device is pci,
+		 * make sure we enable ACS.
+		 */
+		if (dev_is_pci(dev)) {
+			pci_request_acs();
+			pci_enable_acs(to_pci_dev(dev));
+		}
 	}
 	/*
 	 * If we have reason to believe the IOMMU driver missed the initial
