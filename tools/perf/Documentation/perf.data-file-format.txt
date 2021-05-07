@@ -383,6 +383,8 @@ struct {
 		char	name[];
 		char	value[];
 	} [nr_cpu_pmu_caps]
+	char pmu_name[];
+	int nr_rest_pmus;
 };
 
 
@@ -390,6 +392,10 @@ Example:
  cpu pmu capabilities: branches=32, max_precise=3, pmu_name=icelake
 
 	HEADER_CLOCK_DATA = 29,
+
+ On hybrid system:
+ cpu_core pmu capabilities: branches=32, max_precise=3, pmu_name=alderlake_hybrid
+ cpu_atom pmu capabilities: branches=32, max_precise=3, pmu_name=alderlake_hybrid
 
 	Contains clock id and its reference time together with wall clock
 	time taken at the 'same time', both values are in nanoseconds.

@@ -49,6 +49,7 @@
 #include "cputopo.h"
 #include "bpf-event.h"
 #include "clockid.h"
+#include "pmu-hybrid.h"
 
 #include <linux/ctype.h>
 #include <internal/lib.h>
@@ -1459,18 +1460,29 @@ static int write_compressed(struct feat_fd *ff __maybe_unused,
 	return do_write(ff, &(ff->ph->env.comp_mmap_len), sizeof(ff->ph->env.comp_mmap_len));
 }
 
-static int write_cpu_pmu_caps(struct feat_fd *ff,
-			      struct evlist *evlist __maybe_unused)
+static int write_per_cpu_pmu_caps(struct feat_fd *ff, struct perf_pmu *pmu,
+				  int nr)
 {
-	struct perf_pmu *cpu_pmu = perf_pmu__find("cpu");
 	struct perf_pmu_caps *caps = NULL;
 	int nr_caps;
 	int ret;
 
-	if (!cpu_pmu)
-		return -ENOENT;
-
-	nr_caps = perf_pmu__caps_parse(cpu_pmu);
+	/*
+	 * The layout is:
+	 * <pmu1 caps nr>
+	 * <caps string 1>
+	 * <caps string 2>
+	 * <caps string N>
+	 * <pmu1 name>
+	 * <nr of rest pmus to process>
+	 * <pmu2 caps nr>
+	 * <caps string 1>
+	 * <caps string 2>
+	 * <caps string N>
+	 * <pmu2 name>
+	 * <nr of rest pmus to process>
+	 */
+	nr_caps = perf_pmu__caps_parse(pmu);
 	if (nr_caps < 0)
 		return nr_caps;
 
@@ -1478,7 +1490,7 @@ static int write_cpu_pmu_caps(struct feat_fd *ff,
 	if (ret < 0)
 		return ret;
 
-	list_for_each_entry(caps, &cpu_pmu->caps, list) {
+	list_for_each_entry(caps, &pmu->caps, list) {
 		ret = do_write_string(ff, caps->name);
 		if (ret < 0)
 			return ret;
@@ -1488,7 +1500,47 @@ static int write_cpu_pmu_caps(struct feat_fd *ff,
 			return ret;
 	}
 
+	ret = do_write_string(ff, pmu->name);
+	if (ret < 0)
+		return ret;
+
+	ret = do_write(ff, &nr, sizeof(nr));
+	if (ret < 0)
+		return ret;
+
 	return ret;
+}
+
+static int write_cpu_pmu_caps(struct feat_fd *ff,
+			      struct evlist *evlist __maybe_unused)
+{
+	struct perf_pmu *pmu = perf_pmu__find("cpu");
+	u32 nr;
+	int ret;
+
+	if (pmu)
+		nr = 1;
+	else {
+		nr = perf_pmu__hybrid_pmu_num();
+		pmu = NULL;
+	}
+
+	if (nr == 0)
+		return -1;
+
+	if (pmu) {
+		ret = write_per_cpu_pmu_caps(ff, pmu, 0);
+		if (ret < 0)
+			return ret;
+	} else {
+		perf_pmu__for_each_hybrid_pmu(pmu) {
+			ret = write_per_cpu_pmu_caps(ff, pmu, --nr);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
 }
 
 static void print_hostname(struct feat_fd *ff, FILE *fp)
