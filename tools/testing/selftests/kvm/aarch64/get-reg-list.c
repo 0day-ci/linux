@@ -54,8 +54,7 @@ struct vcpu_config {
 	struct reg_sublist sublists[];
 };
 
-static struct vcpu_config vregs_config;
-static struct vcpu_config sve_config;
+static struct vcpu_config *vcpu_configs[];
 
 #define for_each_sublist(c, s)							\
 	for ((s) = &(c)->sublists[0]; (s)->regs; ++(s))
@@ -386,34 +385,17 @@ static void print_reg_list(struct vcpu_config *c, bool print_list, bool print_fi
 			print_reg(c, id);
 	}
 	putchar('\n');
+
+	free(reg_list);
+	kvm_vm_free(vm);
 }
 
-int main(int ac, char **av)
+static void run_test(struct vcpu_config *c)
 {
-	struct vcpu_config *c = reg_list_sve() ? &sve_config : &vregs_config;
 	int new_regs = 0, missing_regs = 0, i, n;
 	int failed_get = 0, failed_set = 0, failed_reject = 0;
-	bool print_list = false, print_filtered = false;
 	struct kvm_vm *vm;
 	struct reg_sublist *s;
-
-	check_supported(c);
-
-	for (i = 1; i < ac; ++i) {
-		if (strcmp(av[i], "--core-reg-fixup") == 0)
-			fixup_core_regs = true;
-		else if (strcmp(av[i], "--list") == 0)
-			print_list = true;
-		else if (strcmp(av[i], "--list-filtered") == 0)
-			print_filtered = true;
-		else
-			TEST_FAIL("Unknown option: %s\n", av[i]);
-	}
-
-	if (print_list || print_filtered) {
-		print_reg_list(c, print_list, print_filtered);
-		return 0;
-	}
 
 	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
 	reg_list_init(vm, c);
@@ -513,6 +495,45 @@ int main(int ac, char **av)
 		    "%s: There are %d missing registers; "
 		    "%d registers failed get; %d registers failed set; %d registers failed reject",
 		    c->name, missing_regs, failed_get, failed_set, failed_reject);
+
+	blessed_n = 0;
+	free(blessed_reg);
+	free(reg_list);
+	kvm_vm_free(vm);
+}
+
+int main(int ac, char **av)
+{
+	struct vcpu_config *c;
+	bool print_list = false, print_filtered = false;
+	int i;
+
+	for (i = 1; i < ac; ++i) {
+		if (strcmp(av[i], "--core-reg-fixup") == 0)
+			fixup_core_regs = true;
+		else if (strcmp(av[i], "--list") == 0)
+			print_list = true;
+		else if (strcmp(av[i], "--list-filtered") == 0)
+			print_filtered = true;
+		else
+			TEST_FAIL("Unknown option: %s\n", av[i]);
+	}
+
+	if (print_list || print_filtered) {
+		/*
+		 * We only want to print the register list of a single config.
+		 * TODO: Add command line support to pick which config.
+		 */
+		c = vcpu_configs[0];
+		check_supported(c);
+		print_reg_list(c, print_list, print_filtered);
+		return 0;
+	}
+
+	for (i = 0, c = vcpu_configs[0]; c; ++i, c = vcpu_configs[i]) {
+		check_supported(c);
+		run_test(c);
+	}
 
 	return 0;
 }
@@ -910,4 +931,9 @@ static struct vcpu_config sve_config = {
 	{ sve_regs,	ARRAY_SIZE(sve_regs),	sve_rejects_set,	ARRAY_SIZE(sve_rejects_set), },
 	{0},
 	},
+};
+
+static struct vcpu_config *vcpu_configs[] = {
+	reg_list_sve() ? &sve_config : &vregs_config,
+	NULL
 };
