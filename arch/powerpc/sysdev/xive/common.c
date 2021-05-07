@@ -65,7 +65,7 @@ static struct irq_domain *xive_irq_domain;
 #ifdef CONFIG_SMP
 /* The IPIs use the same logical irq number when on the same chip */
 static struct xive_ipi_desc {
-	unsigned int irq;
+	int irq;
 	char name[16];
 } *xive_ipis;
 
