@@ -156,6 +156,8 @@ properties:
       - innolux,g070y2-l01
         # Innolux Corporation 10.1" G101ICE-L01 WXGA (1280x800) LVDS panel
       - innolux,g101ice-l01
+        # Innolux Corporation 7" G104AGE-L02 (800x600) LVDS panel
+      - innolux,g104age-l02
         # Innolux Corporation 12.1" WXGA (1280x800) TFT LCD panel
       - innolux,g121i1-l01
         # Innolux Corporation 12.1" G121X1-L03 XGA (1024x768) TFT LCD panel
@@ -291,6 +293,8 @@ properties:
       - winstar,wf35ltiacd
         # Yes Optoelectronics YTC700TLAG-05-201C 7" TFT LCD panel
       - yes-optoelectronics,ytc700tlag-05-201c
+        # Yes Optoelectronics YTS700TLBC-02-100C (1024x600) TFT LCD panel
+      - yes-optoelectronics,yts700tlbc-02-100c
 
   backlight: true
   enable-gpios: true
