@@ -126,11 +126,14 @@ static void qla24xx_abort_iocb_timeout(void *data)
 	}
 	spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
 
-	if (sp->cmd_sp)
+	if (sp->cmd_sp) {
 		sp->cmd_sp->done(sp->cmd_sp, QLA_OS_TIMER_EXPIRED);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
+	}
 
 	abt->u.abt.comp_status = cpu_to_le16(CS_TIMEOUT);
 	sp->done(sp, QLA_OS_TIMER_EXPIRED);
+	kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 }
 
 static void qla24xx_abort_sp_done(srb_t *sp, int res)
@@ -141,11 +144,17 @@ static void qla24xx_abort_sp_done(srb_t *sp, int res)
 	if (orig_sp)
 		qla_wait_nvme_release_cmd_kref(orig_sp);
 
-	del_timer(&sp->u.iocb_cmd.timer);
+	if (sp->cmd_sp) {
+		sp->cmd_sp->done(sp->cmd_sp, QLA_OS_TIMER_EXPIRED);
+		kref_put_lock(&sp->cmd_sp->cmd_kref,
+			      qla2x00_sp_release,
+			      &sp->cmd_sp->lock);
+	}
+
 	if (sp->flags & SRB_WAKEUP_ON_COMP)
 		complete(&abt->u.abt.comp);
 	else
-		sp->free(sp);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 }
 
 int qla24xx_async_abort_cmd(srb_t *cmd_sp, bool wait)
@@ -190,7 +199,7 @@ int qla24xx_async_abort_cmd(srb_t *cmd_sp, bool wait)
 		wait_for_completion(&abt_iocb->u.abt.comp);
 		rval = abt_iocb->u.abt.comp_status == CS_COMPLETE ?
 			QLA_SUCCESS : QLA_FUNCTION_FAILED;
-		sp->free(sp);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 	}
 
 	return rval;
@@ -237,6 +246,7 @@ qla2x00_async_iocb_timeout(void *data)
 			}
 			spin_unlock_irqrestore(sp->qpair->qp_lock_ptr, flags);
 			sp->done(sp, QLA_FUNCTION_TIMEOUT);
+			kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 		}
 		break;
 	case SRB_LOGOUT_CMD:
@@ -261,6 +271,7 @@ qla2x00_async_iocb_timeout(void *data)
 			}
 			spin_unlock_irqrestore(sp->qpair->qp_lock_ptr, flags);
 			sp->done(sp, QLA_FUNCTION_TIMEOUT);
+			kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 		}
 		break;
 	}

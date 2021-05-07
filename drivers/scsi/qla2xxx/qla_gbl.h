@@ -313,6 +313,7 @@ extern int qla24xx_walk_and_build_prot_sglist(struct qla_hw_data *, srb_t *,
 	struct dsd64 *, uint16_t, struct qla_tgt_cmd *);
 extern int qla24xx_get_one_block_sg(uint32_t, struct qla2_sgx *, uint32_t *);
 extern int qla24xx_configure_prot_mode(srb_t *, uint16_t *);
+void qla2x00_sp_release(struct kref *kref);
 
 /*
  * Global Function Prototypes in qla_mbx.c source file.

@@ -2597,12 +2597,36 @@ qla24xx_tm_iocb(srb_t *sp, struct tsk_mgmt_entry *tsk)
 	}
 }
 
+static void
+qla2x00_async_done(struct srb *sp, int res)
+{
+	if (del_timer(&sp->u.iocb_cmd.timer)) {
+		/* Succcesfully cancelled the timeout handler */
+		if (kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock))
+                       return;
+	}
+
+	sp->async_done(sp, res);
+}
+
+void
+qla2x00_sp_release(struct kref *kref)
+{
+	struct srb *sp = container_of(kref, struct srb, cmd_kref);
+
+	sp->free(sp);
+}
+
 void
 qla2x00_init_async_sp(srb_t *sp, unsigned long tmo,
 		      void (*done)(struct srb *sp, int res))
 {
 	timer_setup(&sp->u.iocb_cmd.timer, qla2x00_sp_timeout, 0);
-	sp->done = done;
+	kref_init(&sp->cmd_kref); /* normal control flow */
+	kref_get(&sp->cmd_kref);  /* timeout control flow */
+	spin_lock_init(&sp->lock);
+	sp->done = qla2x00_async_done;
+	sp->async_done = done;
 	sp->free = qla2x00_sp_free;
 	sp->u.iocb_cmd.timeout = qla2x00_async_iocb_timeout;
 	sp->u.iocb_cmd.timer.expires = jiffies + tmo * HZ;
@@ -2889,7 +2913,6 @@ static void qla2x00_els_dcmd2_sp_done(srb_t *sp, int res)
 	    sp->name, res, sp->handle, fcport->d_id.b24, fcport->port_name);
 
 	fcport->flags &= ~(FCF_ASYNC_SENT|FCF_ASYNC_ACTIVE);
-	del_timer(&sp->u.iocb_cmd.timer);
 
 	if (sp->flags & SRB_WAKEUP_ON_COMP)
 		complete(&lio->u.els_plogi.comp);

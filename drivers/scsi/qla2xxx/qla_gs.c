@@ -529,7 +529,6 @@ static void qla2x00_async_sns_sp_done(srb_t *sp, int rc)
 		if (!e)
 			goto err2;
 
-		del_timer(&sp->u.iocb_cmd.timer);
 		e->u.iosb.sp = sp;
 		qla2x00_post_work(vha, e);
 		return;
@@ -556,7 +555,7 @@ err2:
 			sp->u.iocb_cmd.u.ctarg.rsp = NULL;
 		}
 
-		sp->free(sp);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 
 		return;
 	}
@@ -2982,7 +2981,7 @@ void qla24xx_sp_unmap(scsi_qla_host_t *vha, srb_t *sp)
 		break;
 	}
 
-	sp->free(sp);
+	kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 }
 
 void qla24xx_handle_gpnid_event(scsi_qla_host_t *vha, struct event_arg *ea)
@@ -3121,13 +3120,13 @@ static void qla2x00_async_gpnid_sp_done(srb_t *sp, int res)
 	if (res) {
 		if (res == QLA_FUNCTION_TIMEOUT) {
 			qla24xx_post_gpnid_work(sp->vha, &ea.id);
-			sp->free(sp);
+			kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 			return;
 		}
 	} else if (sp->gen1) {
 		/* There was another RSCN for this Nport ID */
 		qla24xx_post_gpnid_work(sp->vha, &ea.id);
-		sp->free(sp);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 		return;
 	}
 
@@ -3148,7 +3147,7 @@ static void qla2x00_async_gpnid_sp_done(srb_t *sp, int res)
 				  sp->u.iocb_cmd.u.ctarg.rsp_dma);
 		sp->u.iocb_cmd.u.ctarg.rsp = NULL;
 
-		sp->free(sp);
+		kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 		return;
 	}
 
@@ -3739,7 +3738,6 @@ static void qla2x00_async_gpnft_gnnft_sp_done(srb_t *sp, int res)
 	    "Async done-%s res %x FC4Type %x\n",
 	    sp->name, res, sp->gen2);
 
-	del_timer(&sp->u.iocb_cmd.timer);
 	sp->rc = res;
 	if (res) {
 		unsigned long flags;
@@ -4133,7 +4131,7 @@ static void qla2x00_async_gnnid_sp_done(srb_t *sp, int res)
 
 	qla24xx_handle_gnnid_event(vha, &ea);
 
-	sp->free(sp);
+	kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 }
 
 int qla24xx_async_gnnid(scsi_qla_host_t *vha, fc_port_t *fcport)
@@ -4260,7 +4258,7 @@ static void qla2x00_async_gfpnid_sp_done(srb_t *sp, int res)
 
 	qla24xx_handle_gfpnid_event(vha, &ea);
 
-	sp->free(sp);
+	kref_put_lock(&sp->cmd_kref, qla2x00_sp_release, &sp->lock);
 }
 
 int qla24xx_async_gfpnid(scsi_qla_host_t *vha, fc_port_t *fcport)

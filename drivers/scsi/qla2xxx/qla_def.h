@@ -676,6 +676,11 @@ typedef struct srb {
 	 * code.
 	 */
 	void (*put_fn)(struct kref *kref);
+	/*
+	 * Report completition for asynchronous commands.
+	 */
+	void (*async_done)(struct srb *sp, int res);
+	spinlock_t lock;
 } srb_t;
 
 #define GET_CMD_SP(sp) (sp->u.scmd.cmd)
