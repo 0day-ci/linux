@@ -6,6 +6,7 @@
  * Author: Boris Brezillon <boris.brezillon@bootlin.com>
  */
 #include <linux/dmaengine.h>
+#include <linux/iopoll.h>
 #include <linux/pm_runtime.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-mem.h>
@@ -743,6 +744,75 @@ static inline struct spi_mem_driver *to_spi_mem_drv(struct device_driver *drv)
 	return container_of(drv, struct spi_mem_driver, spidrv.driver);
 }
 
+/**
+ * spi_mem_finalize_op - report completion of spi_mem_op
+ * @ctlr: the controller reporting completion
+ *
+ * Called by SPI drivers using the spi-mem spi_mem_poll_status()
+ * implementation to notify it that the current spi_mem_op has
+ * finished.
+ */
+void spi_mem_finalize_op(struct spi_controller *ctlr)
+{
+	complete(&ctlr->xfer_completion);
+}
+EXPORT_SYMBOL_GPL(spi_mem_finalize_op);
+
+/**
+ * spi_mem_poll_status() - Poll memory device status
+ * @mem: SPI memory device
+ * @op: the memory operation to execute
+ * @mask: status bitmask to ckeck
+ * @match: (status & mask) expected value
+ * @timeout_ms: timeout in milliseconds
+ *
+ * This function send a polling status request to the controller driver
+ *
+ * Return: 0 in case of success, -ETIMEDOUT in case of error,
+ *         -EOPNOTSUPP if not supported.
+ */
+int spi_mem_poll_status(struct spi_mem *mem,
+			const struct spi_mem_op *op,
+			u16 mask, u16 match, u16 timeout_ms)
+{
+	struct spi_controller *ctlr = mem->spi->controller;
+	unsigned long ms;
+	int ret = -EOPNOTSUPP;
+	int exec_op_ret;
+	u16 *status;
+
+	if (!spi_mem_supports_op(mem, op))
+		return ret;
+
+	if (ctlr->mem_ops && ctlr->mem_ops->poll_status) {
+		ret = spi_mem_access_start(mem);
+		if (ret)
+			return ret;
+
+		reinit_completion(&ctlr->xfer_completion);
+
+		ret = ctlr->mem_ops->poll_status(mem, op, mask, match,
+						 timeout_ms);
+
+		ms = wait_for_completion_timeout(&ctlr->xfer_completion,
+						 msecs_to_jiffies(timeout_ms));
+
+		spi_mem_access_end(mem);
+		if (!ms)
+			return -ETIMEDOUT;
+	} else {
+		status = (u16 *)op->data.buf.in;
+		ret = read_poll_timeout(spi_mem_exec_op, exec_op_ret,
+					((*status) & mask) == match, 20,
+					timeout_ms * 1000, false, mem, op);
+		if (exec_op_ret)
+			return exec_op_ret;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(spi_mem_poll_status);
+
 static int spi_mem_probe(struct spi_device *spi)
 {
 	struct spi_mem_driver *memdrv = to_spi_mem_drv(spi->dev.driver);
@@ -763,6 +833,7 @@ static int spi_mem_probe(struct spi_device *spi)
 	if (IS_ERR_OR_NULL(mem->name))
 		return PTR_ERR_OR_ZERO(mem->name);
 
+	init_completion(&ctlr->xfer_completion);
 	spi_set_drvdata(spi, mem);
 
 	return memdrv->probe(mem);
