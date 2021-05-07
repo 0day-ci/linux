@@ -86,7 +86,16 @@ static int vfio_pci_igd_opregion_init(struct vfio_pci_device *vdev)
 		return -EINVAL;
 	}
 
-	size *= 1024; /* In KB */
+	/*
+	 * The OpRegion size field is specified as size in KB, but there have been
+	 * user reports where this field appears to report size in bytes.  If we
+	 * read 8192, assume this is the case.
+	 */
+	if (size == OPREGION_SIZE)
+		pci_warn(vdev->pdev,
+			 "BIOS Bug, IGD OpRegion reports invalid size, assuming default 8KB\n");
+	else
+		size *= 1024; /* In KB */
 
 	/*
 	 * Support opregion v2.1+
