@@ -847,8 +847,11 @@ static int pci_netmos_init(struct pci_dev *dev)
 
 	switch (dev->device) { /* FALLTHROUGH on all */
 	case PCI_DEVICE_ID_NETMOS_9904:
+		fallthrough;
 	case PCI_DEVICE_ID_NETMOS_9912:
+		fallthrough;
 	case PCI_DEVICE_ID_NETMOS_9922:
+		fallthrough;
 	case PCI_DEVICE_ID_NETMOS_9900:
 		num_serial = pci_netmos_9900_numports(dev);
 		break;
