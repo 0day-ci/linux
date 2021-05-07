@@ -4255,8 +4255,7 @@ int mlx4_ib_modify_wq(struct ib_wq *ibwq, struct ib_wq_attr *wq_attr,
 						     ibwq->state;
 	new_state = wq_attr_mask & IB_WQ_STATE ? wq_attr->wq_state : cur_state;
 
-	if (cur_state  < IB_WQS_RESET || cur_state  > IB_WQS_ERR ||
-	    new_state < IB_WQS_RESET || new_state > IB_WQS_ERR)
+	if (cur_state > IB_WQS_ERR || new_state > IB_WQS_ERR)
 		return -EINVAL;
 
 	if ((new_state == IB_WQS_RDY) && (cur_state == IB_WQS_ERR))
