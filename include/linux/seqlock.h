@@ -268,7 +268,9 @@ static inline bool __seqprop_preemptible(const seqcount_t *s)
 
 static inline void __seqprop_assert(const seqcount_t *s)
 {
+#ifndef CONFIG_PREEMPT_RT
 	lockdep_assert_preemption_disabled();
+#endif
 }
 
 #define __SEQ_RT	IS_ENABLED(CONFIG_PREEMPT_RT)
