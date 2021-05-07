@@ -1041,6 +1041,18 @@ config ARCH_SPARSEMEM_ENABLE
 	select SPARSEMEM_VMEMMAP_ENABLE
 	select SPARSEMEM_VMEMMAP
 
+config PERF_COMPAT_THUMB_FP_R11
+	bool "Assume userspace 32-bit Thumb code uses R11 for Frame pointer"
+	help
+	  Historically R11 was the frame pointer (FP) for 32-bit ARM code
+	  and R7 was the frame pointer for 32-bit Thumb code. This resulted in
+	  the inability to use the FP for stack crawling with mixed code.
+	  The 2019Q4 Issue of AAPCS revised the frame pointer to be R11 for
+	  BOTH ARM and Thumb. If your userspace was built with this new
+	  standard then say "yes" here.
+	depends on PERF_EVENTS
+	depends on COMPAT
+
 config HW_PERF_EVENTS
 	def_bool y
 	depends on ARM_PMU

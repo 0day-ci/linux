@@ -311,12 +311,16 @@ static void compat_perf_callchain_user(struct perf_callchain_entry_ctx *entry,
 
 	/*
 	 * Assuming userspace is compiled with frame pointers then it's in
-	 * R11 for ARM code and R7 for thumb code. If it's thumb mode we'll
-	 * also set the low bit of the PC to match how the PC indicates thumb
-	 * mode when crawling down the stack.
+	 * R11 for ARM code and R7 for thumb code (unless you've got a really
+	 * new compiler). If it's thumb mode we'll also set the low bit of
+	 * the PC to match how the PC indicates thumb mode when crawling
+	 * down the stack.
 	 */
 	if (compat_thumb_mode(regs)) {
-		fp = regs->regs[7];
+		if (IS_ENABLED(CONFIG_PERF_COMPAT_THUMB_FP_R11))
+			fp = regs->regs[11];
+		else
+			fp = regs->regs[7];
 		pc |= BIT(0);
 	} else {
 		fp = regs->compat_fp;
