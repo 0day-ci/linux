@@ -2312,6 +2312,37 @@ static const struct panel_desc innolux_g101ice_l01 = {
 	.connector_type = DRM_MODE_CONNECTOR_LVDS,
 };
 
+static const struct display_timing innolux_g104age_l02_timing = {
+	.pixelclock = { 30000000, 41666666, 50000000 },
+	.hactive = { 800, 800, 800 },
+	.hfront_porch = { 80, 128, 130 },
+	.hback_porch = { 79, 127, 129 },
+	.hsync_len = { 1, 1, 1 },
+	.vactive = { 600, 600, 600 },
+	.vfront_porch = { 4, 29, 212 },
+	.vback_porch = { 3, 28, 211 },
+	.vsync_len = { 1, 1, 1 },
+	.flags = DISPLAY_FLAGS_DE_HIGH |
+		 DISPLAY_FLAGS_HSYNC_HIGH |
+		 DISPLAY_FLAGS_VSYNC_HIGH,
+};
+
+static const struct panel_desc innolux_g104age_l02 = {
+	.timings = &innolux_g104age_l02_timing,
+	.num_timings = 1,
+	.bpc = 8,
+	.size = {
+		.width = 211,  /* 211.2 X 158.4(mm) */
+		.height = 158,
+	},
+	.delay = {
+		.enable = 200,
+		.disable = 200,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+	.connector_type = DRM_MODE_CONNECTOR_LVDS,
+};
+
 static const struct display_timing innolux_g121i1_l01_timing = {
 	.pixelclock = { 67450000, 71000000, 74550000 },
 	.hactive = { 1280, 1280, 1280 },
@@ -4277,6 +4308,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "innolux,g101ice-l01",
 		.data = &innolux_g101ice_l01
+	}, {
+		.compatible = "innolux,g104age-l02",
+		.data = &innolux_g104age_l02
 	}, {
 		.compatible = "innolux,g121i1-l01",
 		.data = &innolux_g121i1_l01
