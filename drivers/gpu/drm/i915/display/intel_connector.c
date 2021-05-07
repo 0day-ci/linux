@@ -270,6 +270,26 @@ intel_attach_broadcast_rgb_property(struct drm_connector *connector)
 }
 
 void
+intel_attach_hdmi_vendor_product_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_property *prop;
+
+	prop = dev_priv->hdmi_vendor_product_property;
+	if (!prop) {
+		prop = drm_property_create(dev, DRM_MODE_PROP_BLOB |
+			DRM_MODE_PROP_ATOMIC, "hdmi_vendor_product", 0);
+		if (!prop)
+			return;
+
+		dev_priv->hdmi_vendor_product_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base, prop, 0);
+}
+
+void
 intel_attach_aspect_ratio_property(struct drm_connector *connector)
 {
 	if (!drm_mode_create_aspect_ratio_property(connector->dev))

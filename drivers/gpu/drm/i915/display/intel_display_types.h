@@ -550,6 +550,11 @@ struct intel_digital_connector_state {
 
 	enum hdmi_force_audio force_audio;
 	int broadcast_rgb;
+	/*
+	 * hdmi_infoframe metadata
+	 * DRM blob with hdmi vendor and product info
+	 */
+	struct drm_property_blob *hdmi_vendor_product_blob;
 };
 
 #define to_intel_digital_connector_state(x) container_of(x, struct intel_digital_connector_state, base)

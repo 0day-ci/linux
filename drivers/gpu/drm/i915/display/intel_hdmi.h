@@ -23,6 +23,11 @@ struct drm_connector_state;
 union hdmi_infoframe;
 enum port;
 
+/*Vendor Id and Product Id for the Hdmi property exported to Userspace*/
+struct hdmi_vendor_product_info {
+	char vendor[30];
+	char product[30];
+};
 void intel_hdmi_init_connector(struct intel_digital_port *dig_port,
 			       struct intel_connector *intel_connector);
 int intel_hdmi_compute_config(struct intel_encoder *encoder,
