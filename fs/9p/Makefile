@@ -15,3 +15,4 @@ obj-$(CONFIG_9P_FS) := 9p.o
 
 9p-$(CONFIG_9P_FSCACHE) += cache.o
 9p-$(CONFIG_9P_FS_POSIX_ACL) += acl.o
+9p-$(CONFIG_9P_FS_ROOT) += v9fsroot.o
