@@ -62,6 +62,11 @@ struct kvm_sdei_vcpu_state {
 #define KVM_SDEI_CMD_GET_KEVENT_COUNT		2
 #define KVM_SDEI_CMD_GET_KEVENT			3
 #define KVM_SDEI_CMD_SET_KEVENT			4
+#define KVM_SDEI_CMD_GET_VEVENT_COUNT		5
+#define KVM_SDEI_CMD_GET_VEVENT			6
+#define KVM_SDEI_CMD_SET_VEVENT			7
+#define KVM_SDEI_CMD_GET_VCPU_STATE		8
+#define KVM_SDEI_CMD_SET_VCPU_STATE		9
 
 struct kvm_sdei_cmd {
 	__u32						cmd;
@@ -71,6 +76,8 @@ struct kvm_sdei_cmd {
 		__u64					num;
 		struct kvm_sdei_event_state		kse_state;
 		struct kvm_sdei_kvm_event_state		kske_state;
+		struct kvm_sdei_vcpu_event_state	ksve_state;
+		struct kvm_sdei_vcpu_state		ksv_state;
 	};
 };
 
