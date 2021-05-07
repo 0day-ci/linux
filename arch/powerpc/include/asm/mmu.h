@@ -413,6 +413,14 @@ static inline void mmu_early_init_devtree(void) { }
 static inline void pkey_early_init_devtree(void) {}
 
 extern void *abatron_pteptrs[2];
+
+/* Context switch the PTE pointer for the Abatron BDI2000. */
+static inline void switch_abatron_pteptrs(pgd_t *pgd)
+{
+	if (IS_ENABLED(CONFIG_BDI_SWITCH))
+		abatron_pteptrs[1] = pgd;
+}
+
 #endif /* __ASSEMBLY__ */
 #endif
 

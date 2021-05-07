@@ -36,6 +36,12 @@ extern char etext[], _stext[], _sinittext[], _einittext[];
 
 static u8 early_fixmap_pagetable[FIXMAP_PTE_SIZE] __page_aligned_data;
 
+/*
+ * Room for two PTE table pointers, usually the kernel and current user
+ * pointer to their respective root page table (pgdir).
+ */
+void *abatron_pteptrs[2];
+
 notrace void __init early_ioremap_init(void)
 {
 	unsigned long addr = ALIGN_DOWN(FIXADDR_START, PGDIR_SIZE);
