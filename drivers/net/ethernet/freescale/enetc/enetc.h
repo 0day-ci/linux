@@ -351,6 +351,7 @@ struct enetc_ndev_priv {
 
 	struct work_struct	tx_onestep_tstamp;
 	struct sk_buff_head	tx_skbs;
+	struct device *ptp_dev;
 };
 
 /* Messaging */

@@ -1201,6 +1201,7 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct enetc_ndev_priv *priv;
+	struct pci_dev *ptp_pdev;
 	struct net_device *ndev;
 	struct enetc_si *si;
 	struct enetc_pf *pf;
@@ -1292,6 +1293,10 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 		dev_err(&pdev->dev, "MSIX alloc failed\n");
 		goto err_alloc_msix;
 	}
+
+	ptp_pdev = pci_get_device(PCI_VENDOR_ID_FREESCALE, ENETC_DEV_ID_PTP, NULL);
+	if (ptp_pdev)
+		priv->ptp_dev = &ptp_pdev->dev;
 
 	if (!of_get_phy_mode(node, &pf->if_mode)) {
 		err = enetc_mdiobus_create(pf, node);

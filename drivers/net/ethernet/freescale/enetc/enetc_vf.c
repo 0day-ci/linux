@@ -138,6 +138,7 @@ static int enetc_vf_probe(struct pci_dev *pdev,
 			  const struct pci_device_id *ent)
 {
 	struct enetc_ndev_priv *priv;
+	struct pci_dev *ptp_pdev;
 	struct net_device *ndev;
 	struct enetc_si *si;
 	int err;
@@ -187,6 +188,10 @@ static int enetc_vf_probe(struct pci_dev *pdev,
 		dev_err(&pdev->dev, "MSIX alloc failed\n");
 		goto err_alloc_msix;
 	}
+
+	ptp_pdev = pci_get_device(PCI_VENDOR_ID_FREESCALE, ENETC_DEV_ID_PTP, NULL);
+	if (ptp_pdev)
+		priv->ptp_dev = &ptp_pdev->dev;
 
 	err = register_netdev(ndev);
 	if (err)
