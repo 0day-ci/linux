@@ -27,16 +27,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include "kvm_util.h"
 #include "test_util.h"
 #include "processor.h"
-
-#ifdef REG_LIST_SVE
-#define reg_list_sve() (true)
-#else
-#define reg_list_sve() (false)
-#endif
 
 enum {
 	VREGS,
@@ -560,7 +557,7 @@ int main(int ac, char **av)
 {
 	struct vcpu_config *c = NULL;
 	bool print_list = false, print_filtered = false;
-	int i;
+	int i, ret = 0;
 
 	for (i = 1; i < ac; ++i) {
 		if (strcmp(av[i], "--core-reg-fixup") == 0)
@@ -595,11 +592,22 @@ int main(int ac, char **av)
 	}
 
 	for (i = 0, c = vcpu_configs[0]; c; ++i, c = vcpu_configs[i]) {
-		check_supported(c);
-		run_test(c);
+		pid_t pid = fork();
+
+		if (!pid) {
+			check_supported(c);
+			run_test(c);
+			exit(0);
+		} else {
+			int wstatus;
+			pid_t wpid = wait(&wstatus);
+			TEST_ASSERT(wpid == pid && WIFEXITED(wstatus), "wait: Unexpected return");
+			if (WEXITSTATUS(wstatus) && WEXITSTATUS(wstatus) != KSFT_SKIP)
+				ret = KSFT_FAIL;
+		}
 	}
 
-	return 0;
+	return ret;
 }
 
 /*
@@ -998,6 +1006,7 @@ static struct vcpu_config sve_config = {
 };
 
 static struct vcpu_config *vcpu_configs[] = {
-	reg_list_sve() ? &sve_config : &vregs_config,
+	&vregs_config,
+	&sve_config,
 	NULL
 };
