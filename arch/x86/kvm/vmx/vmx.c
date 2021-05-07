@@ -7754,6 +7754,7 @@ static struct kvm_x86_ops vmx_x86_ops __initdata = {
 	.nested_ops = &vmx_nested_ops,
 
 	.update_pi_irte = pi_update_irte,
+	.start_assignment = NULL,
 
 #ifdef CONFIG_X86_64
 	.set_hv_timer = vmx_set_hv_timer,
