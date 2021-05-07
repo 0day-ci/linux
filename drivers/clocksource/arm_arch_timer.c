@@ -1408,7 +1408,7 @@ static int __init
 arch_timer_mem_frame_register(struct arch_timer_mem_frame *frame)
 {
 	void __iomem *base;
-	int ret, irq = 0;
+	int ret, irq;
 
 	if (arch_timer_mem_use_virtual)
 		irq = frame->virt_irq;
@@ -1552,7 +1552,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
 {
 	struct arch_timer_mem *timers, *timer;
 	struct arch_timer_mem_frame *frame, *best_frame = NULL;
-	int timer_count, i, ret = 0;
+	int timer_count, i, ret;
 
 	timers = kcalloc(platform_timer_count, sizeof(*timers),
 			    GFP_KERNEL);
