@@ -49,6 +49,32 @@ struct ptp_system_timestamp {
 };
 
 /**
+ * struct ptp_vclock_cc - ptp virtual clock cycle counter info
+ *
+ * @cc:               cyclecounter structure
+ * @refresh_interval: time interval to refresh time counter, to avoid 64-bit
+ *                    overflow during delta conversion. For example, with
+ *                    cc.mult value 2^28,  there are 36 bits left of cycle
+ *                    counter. With 1 ns counter resolution, the overflow time
+ *                    is 2^36 ns which is 68.7 s. The refresh_interval may be
+ *                    (60 * HZ) less than 68.7 s.
+ * @mult_num:         parameter for cc.mult adjustment calculation, see below
+ * @mult_dem:         parameter for cc.mult adjustment calculation, see below
+ *
+ * scaled_ppm to adjustment(mult_adj) of cc.mult
+ *
+ * mult_adj = mult * (ppb / 10^9)
+ *          = mult * (scaled_ppm * 1000 / 2^16) / 10^9
+ *          = scaled_ppm * mult_num / mult_dem
+ */
+struct ptp_vclock_cc {
+	struct cyclecounter cc;
+	unsigned long refresh_interval;
+	u32 mult_num;
+	u32 mult_dem;
+};
+
+/**
  * struct ptp_clock_info - describes a PTP hardware clock
  *
  * @owner:     The clock driver should set to THIS_MODULE.
@@ -157,6 +183,11 @@ struct ptp_clock_info {
 	int (*verify)(struct ptp_clock_info *ptp, unsigned int pin,
 		      enum ptp_pin_function func, unsigned int chan);
 	long (*do_aux_work)(struct ptp_clock_info *ptp);
+
+	/* For virtual clock */
+	struct ptp_vclock_cc *vclock_cc;
+	u8 domain;
+	bool is_vclock;
 };
 
 struct ptp_clock;
@@ -286,6 +317,21 @@ int ptp_schedule_worker(struct ptp_clock *ptp, unsigned long delay);
  */
 void ptp_cancel_worker_sync(struct ptp_clock *ptp);
 
+/**
+ * ptp_get_pclock_info() - get ptp_clock_info pointer of physical clock
+ *
+ * @cc:     cyclecounter pointer of ptp virtual clock.
+ */
+struct ptp_clock_info *ptp_get_pclock_info(const struct cyclecounter *cc);
+
+/**
+ * ptp_clock_domain_tstamp() - convert to domain time stamp
+ *
+ * @dev:     device pointer of current ptp clock.
+ * @tstamp:  time stamp pointer to hardware time stamp
+ * @domain:  domain number to convert
+ */
+void ptp_clock_domain_tstamp(struct device *dev, u64 *tstamp, u8 domain);
 #else
 static inline struct ptp_clock *ptp_clock_register(struct ptp_clock_info *info,
 						   struct device *parent)
@@ -306,6 +352,11 @@ static inline int ptp_schedule_worker(struct ptp_clock *ptp,
 static inline void ptp_cancel_worker_sync(struct ptp_clock *ptp)
 { }
 
+static inline struct ptp_clock_info *ptp_get_pclock_info(const struct cyclecounter *cc);
+{ return NULL; }
+
+void ptp_clock_domain_tstamp(struct device *dev, u64 *tstamp, u8 domain)
+{ }
 #endif
 
 static inline void ptp_read_system_prets(struct ptp_system_timestamp *sts)
