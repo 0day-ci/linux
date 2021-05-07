@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "kvm_util.h"
 #include "test_util.h"
 #include "processor.h"
@@ -336,12 +337,47 @@ static void check_supported(void)
 	}
 }
 
-int main(int ac, char **av)
+static bool fixup_core_regs;
+
+static void reg_list_init(struct kvm_vm *vm)
 {
 	struct kvm_vcpu_init init = { .target = -1, };
+
+	prepare_vcpu_init(&init);
+	aarch64_vcpu_add_default(vm, 0, &init, NULL);
+	finalize_vcpu(vm, 0);
+
+	reg_list = vcpu_get_reg_list(vm, 0);
+
+	if (fixup_core_regs)
+		core_reg_fixup();
+}
+
+static void print_reg_list(bool print_list, bool print_filtered)
+{
+	struct kvm_vm *vm;
+	int i;
+
+	assert(print_list || print_filtered);
+
+	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
+	reg_list_init(vm);
+
+	putchar('\n');
+	for_each_reg(i) {
+		__u64 id = reg_list->reg[i];
+		if ((print_list && !filter_reg(id)) ||
+		    (print_filtered && filter_reg(id)))
+			print_reg(id);
+	}
+	putchar('\n');
+}
+
+int main(int ac, char **av)
+{
 	int new_regs = 0, missing_regs = 0, i;
 	int failed_get = 0, failed_set = 0, failed_reject = 0;
-	bool print_list = false, print_filtered = false, fixup_core_regs = false;
+	bool print_list = false, print_filtered = false;
 	struct kvm_vm *vm;
 	__u64 *vec_regs;
 
@@ -358,27 +394,13 @@ int main(int ac, char **av)
 			TEST_FAIL("Unknown option: %s\n", av[i]);
 	}
 
-	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
-	prepare_vcpu_init(&init);
-	aarch64_vcpu_add_default(vm, 0, &init, NULL);
-	finalize_vcpu(vm, 0);
-
-	reg_list = vcpu_get_reg_list(vm, 0);
-
-	if (fixup_core_regs)
-		core_reg_fixup();
-
 	if (print_list || print_filtered) {
-		putchar('\n');
-		for_each_reg(i) {
-			__u64 id = reg_list->reg[i];
-			if ((print_list && !filter_reg(id)) ||
-			    (print_filtered && filter_reg(id)))
-				print_reg(id);
-		}
-		putchar('\n');
+		print_reg_list(print_list, print_filtered);
 		return 0;
 	}
+
+	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
+	reg_list_init(vm);
 
 	/*
 	 * We only test that we can get the register and then write back the
