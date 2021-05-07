@@ -58,8 +58,25 @@ required:
   - compatible
   - reg
   - '#pwm-cells'
+  - clocks
+  - power-domains
 
-additionalProperties: false
+allOf:
+  - $ref: pwm.yaml#
+
+  - if:
+      not:
+        properties:
+          compatible:
+            contains:
+              enum:
+                - renesas,tpu-r8a73a4
+                - renesas,tpu-r8a7740
+    then:
+      required:
+        - resets
+
+unevaluatedProperties: false
 
 examples:
   - |
