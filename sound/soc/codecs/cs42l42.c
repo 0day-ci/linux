@@ -1025,7 +1025,7 @@ static void cs42l42_process_hs_type_detect(struct cs42l42_private *cs42l42)
 			CS42L42_AUTO_HSBIAS_HIZ_MASK |
 			CS42L42_TIP_SENSE_EN_MASK |
 			CS42L42_HSBIAS_SENSE_TRIP_MASK,
-			(1 << CS42L42_HSBIAS_SENSE_EN_SHIFT) |
+			(cs42l42->hs_bias_sense_en << CS42L42_HSBIAS_SENSE_EN_SHIFT) |
 			(1 << CS42L42_AUTO_HSBIAS_HIZ_SHIFT) |
 			(0 << CS42L42_TIP_SENSE_EN_SHIFT) |
 			(3 << CS42L42_HSBIAS_SENSE_TRIP_SHIFT));
@@ -1808,6 +1808,24 @@ static int cs42l42_handle_device_data(struct i2c_client *i2c_client,
 			CS42L42_HSBIAS_RAMP_MASK,
 			(cs42l42->hs_bias_ramp_rate <<
 			CS42L42_HSBIAS_RAMP_SHIFT));
+
+	ret = device_property_read_u32(dev, "cirrus,hs-bias-sense-en", &val);
+	if (!ret) {
+		switch (val) {
+		case CS42L42_HSBIAS_SENSE_OFF:
+		case CS42L42_HSBIAS_SENSE_ON:
+			cs42l42->hs_bias_sense_en = val;
+			break;
+		default:
+			dev_err(dev,
+				"Wrong cirrus,hs-bias-sense-en DT value %d\n",
+				val);
+			cs42l42->hs_bias_sense_en = CS42L42_HSBIAS_SENSE_ON;
+			break;
+		}
+	} else {
+		cs42l42->hs_bias_sense_en = CS42L42_HSBIAS_SENSE_ON;
+	}
 
 	return 0;
 }
