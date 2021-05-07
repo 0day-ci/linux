@@ -78,11 +78,13 @@ struct posix_msg_tree_node {
  * MQ_BARRIER:
  * To achieve proper release/acquire memory barrier pairing, the state is set to
  * STATE_READY with smp_store_release(), and it is read with READ_ONCE followed
- * by smp_acquire__after_ctrl_dep(). In addition, wake_q_add_safe() is used.
+ * by smp_acquire__after_ctrl_dep(). The state change to STATE_READY must be
+ * the last write operation, after which the blocked task can immediately
+ * return and exit.
  *
  * This prevents the following races:
  *
- * 1) With the simple wake_q_add(), the task could be gone already before
+ * 1) With wake_q_add(), the task could be gone already before
  *    the increase of the reference happens
  * Thread A
  *				Thread B
@@ -97,10 +99,25 @@ struct posix_msg_tree_node {
  * sys_exit()
  *				get_task_struct() // UaF
  *
- * Solution: Use wake_q_add_safe() and perform the get_task_struct() before
- * the smp_store_release() that does ->state = STATE_READY.
+ * 2) With wake_q_add(), the receiver task could have returned from the
+ *    syscall and had its stack-allocated waiter overwritten before the
+ *    waker could add it to the wake_q
+ * Thread A
+ *				Thread B
+ * WRITE_ONCE(wait.state, STATE_NONE);
+ * schedule_hrtimeout()
+ *				->state = STATE_READY
+ * <timeout returns>
+ * if (wait.state == STATE_READY) return;
+ * sysret to user space
+ * overwrite receiver's stack
+ *				wake_q_add(A)
+ *				if (cmpxchg()) // corrupted waiter
  *
- * 2) Without proper _release/_acquire barriers, the woken up task
+ * Solution: Queue the task for wakeup before the smp_store_release() that
+ * does ->state = STATE_READY.
+ *
+ * 3) Without proper _release/_acquire barriers, the woken up task
  *    could read stale data
  *
  * Thread A
@@ -116,7 +133,7 @@ struct posix_msg_tree_node {
  *
  * Solution: use _release and _acquire barriers.
  *
- * 3) There is intentionally no barrier when setting current->state
+ * 4) There is intentionally no barrier when setting current->state
  *    to TASK_INTERRUPTIBLE: spin_unlock(&info->lock) provides the
  *    release memory barrier, and the wakeup is triggered when holding
  *    info->lock, i.e. spin_lock(&info->lock) provided a pairing
@@ -1005,11 +1022,9 @@ static inline void __pipelined_op(struct wake_q_head *wake_q,
 				  struct ext_wait_queue *this)
 {
 	list_del(&this->list);
-	get_task_struct(this->task);
-
+	wake_q_add(wake_q, this->task);
 	/* see MQ_BARRIER for purpose/pairing */
 	smp_store_release(&this->state, STATE_READY);
-	wake_q_add_safe(wake_q, this->task);
 }
 
 /* pipelined_send() - send a message directly to the task waiting in
