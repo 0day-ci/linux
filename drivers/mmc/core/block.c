@@ -446,6 +446,20 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 	return err;
 }
 
+static inline bool is_tran_transition_cmd(struct mmc_command *cmd,
+					  struct mmc_card *card)
+{
+	/* Cards will not be in TRAN after completing identification commands
+	 * or MMC_SEND_STATUS if they are not selected.
+	 */
+	return !(cmd->opcode == MMC_SEND_CID
+			|| cmd->opcode == MMC_ALL_SEND_CID
+			|| cmd->opcode == MMC_SEND_CSD
+			|| (cmd->opcode == MMC_SEND_STATUS &&
+			 MMC_EXTRACT_INDEX_FROM_ARG(cmd->arg) != card->rca));
+
+}
+
 static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 			       struct mmc_blk_ioc_data *idata)
 {
@@ -581,7 +595,8 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 
 	memcpy(&(idata->ic.response), cmd.resp, sizeof(cmd.resp));
 
-	if (idata->rpmb || (cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
+	if ((idata->rpmb || (cmd.flags & MMC_RSP_R1B))
+			&& is_tran_transition_cmd(&cmd, card)) {
 		/*
 		 * Ensure RPMB/R1B command has completed by polling CMD13
 		 * "Send Status".
