@@ -111,3 +111,31 @@ void __init mmu_context_init(void)
 	context_map[0] = (1 << FIRST_CONTEXT) - 1;
 	next_mmu_context = FIRST_CONTEXT;
 }
+
+void switch_mmu_context(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk)
+{
+	long id = next->context.id;
+	unsigned long val;
+
+	if (id < 0)
+		panic("mm_struct %p has no context ID", next);
+
+	isync();
+
+	val = ((id * 897) & 0xfffff) << 4;
+	if (IS_ENABLED(CONFIG_PPC_KUEP))
+		val |= SR_NX;
+	if (IS_ENABLED(CONFIG_PPC_KUAP))
+		val |= SR_KS;
+
+	update_user_segments(val);
+
+	switch_abatron_pteptrs(next->pgd);
+
+	if (!mmu_has_feature(MMU_FTR_HPTE_TABLE))
+		mtspr(SPRN_SDR1, rol32(__pa(next->pgd), 4) & 0xffff01ff);
+
+	mb();	/* sync */
+	isync();
+}
+EXPORT_SYMBOL(switch_mmu_context);
