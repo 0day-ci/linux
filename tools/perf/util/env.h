@@ -42,6 +42,13 @@ struct hybrid_node {
 	char	*cpus;
 };
 
+struct cpu_pmu_caps_node {
+	int		nr_cpu_pmu_caps;
+	unsigned int	max_branches;
+	char		*cpu_pmu_caps;
+	char		*pmu_name;
+};
+
 struct perf_env {
 	char			*hostname;
 	char			*os_release;
@@ -63,15 +70,14 @@ struct perf_env {
 	int			nr_memory_nodes;
 	int			nr_pmu_mappings;
 	int			nr_groups;
-	int			nr_cpu_pmu_caps;
 	int			nr_hybrid_nodes;
+	int			nr_cpu_pmu_caps_nodes;
 	char			*cmdline;
 	const char		**cmdline_argv;
 	char			*sibling_cores;
 	char			*sibling_dies;
 	char			*sibling_threads;
 	char			*pmu_mappings;
-	char			*cpu_pmu_caps;
 	struct cpu_topology_map	*cpu;
 	struct cpu_cache_level	*caches;
 	int			 caches_cnt;
@@ -84,6 +90,7 @@ struct perf_env {
 	struct memory_node	*memory_nodes;
 	unsigned long long	 memory_bsize;
 	struct hybrid_node	*hybrid_nodes;
+	struct cpu_pmu_caps_node	*cpu_pmu_caps_nodes;
 #ifdef HAVE_LIBBPF_SUPPORT
 	/*
 	 * bpf_info_lock protects bpf rbtrees. This is needed because the

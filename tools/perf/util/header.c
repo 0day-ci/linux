@@ -2014,18 +2014,28 @@ static void print_compressed(struct feat_fd *ff, FILE *fp)
 		ff->ph->env.comp_level, ff->ph->env.comp_ratio);
 }
 
-static void print_cpu_pmu_caps(struct feat_fd *ff, FILE *fp)
+static void print_per_cpu_pmu_caps(FILE *fp, struct cpu_pmu_caps_node *n)
 {
-	const char *delimiter = "# cpu pmu capabilities: ";
-	u32 nr_caps = ff->ph->env.nr_cpu_pmu_caps;
-	char *str;
+	const char *delimiter;
+	u32 nr_caps = n->nr_cpu_pmu_caps;
+	char *str, buf[128];
 
 	if (!nr_caps) {
-		fprintf(fp, "# cpu pmu capabilities: not available\n");
+		if (!n->pmu_name)
+			fprintf(fp, "# cpu pmu capabilities: not available\n");
+		else
+			fprintf(fp, "# %s pmu capabilities: not available\n", n->pmu_name);
 		return;
 	}
 
-	str = ff->ph->env.cpu_pmu_caps;
+	if (!n->pmu_name)
+		scnprintf(buf, sizeof(buf), "# cpu pmu capabilities: ");
+	else
+		scnprintf(buf, sizeof(buf), "# %s pmu capabilities: ", n->pmu_name);
+
+	delimiter = buf;
+
+	str = n->cpu_pmu_caps;
 	while (nr_caps--) {
 		fprintf(fp, "%s%s", delimiter, str);
 		delimiter = ", ";
@@ -2033,6 +2043,17 @@ static void print_cpu_pmu_caps(struct feat_fd *ff, FILE *fp)
 	}
 
 	fprintf(fp, "\n");
+}
+
+static void print_cpu_pmu_caps(struct feat_fd *ff, FILE *fp)
+{
+	struct cpu_pmu_caps_node *n;
+	int i;
+
+	for (i = 0; i < ff->ph->env.nr_cpu_pmu_caps_nodes; i++) {
+		n = &ff->ph->env.cpu_pmu_caps_nodes[i];
+		print_per_cpu_pmu_caps(fp, n);
+	}
 }
 
 static void print_pmu_mappings(struct feat_fd *ff, FILE *fp)
@@ -3140,13 +3161,14 @@ static int process_compressed(struct feat_fd *ff,
 	return 0;
 }
 
-static int process_cpu_pmu_caps(struct feat_fd *ff,
-				void *data __maybe_unused)
+static int process_cpu_pmu_caps_node(struct feat_fd *ff,
+				     struct cpu_pmu_caps_node *n, bool *end)
 {
-	char *name, *value;
+	char *name, *value, *pmu_name;
 	struct strbuf sb;
-	u32 nr_caps;
+	u32 nr_caps, nr;
 
+	*end = false;
 	if (do_read_u32(ff, &nr_caps))
 		return -1;
 
@@ -3155,7 +3177,7 @@ static int process_cpu_pmu_caps(struct feat_fd *ff,
 		return 0;
 	}
 
-	ff->ph->env.nr_cpu_pmu_caps = nr_caps;
+	n->nr_cpu_pmu_caps = nr_caps;
 
 	if (strbuf_init(&sb, 128) < 0)
 		return -1;
@@ -3176,13 +3198,33 @@ static int process_cpu_pmu_caps(struct feat_fd *ff,
 		if (strbuf_add(&sb, "", 1) < 0)
 			goto free_value;
 
-		if (!strcmp(name, "branches"))
-			ff->ph->env.max_branches = atoi(value);
+		if (!strcmp(name, "branches")) {
+			n->max_branches = atoi(value);
+			if (n->max_branches > ff->ph->env.max_branches)
+				ff->ph->env.max_branches = n->max_branches;
+		}
 
 		free(value);
 		free(name);
 	}
-	ff->ph->env.cpu_pmu_caps = strbuf_detach(&sb, NULL);
+
+	/*
+	 * Old perf.data may not have pmu_name,
+	 */
+	pmu_name = do_read_string(ff);
+	if (!pmu_name || strncmp(pmu_name, "cpu_", 4)) {
+		*end = true;
+		goto out;
+	}
+
+	if (do_read_u32(ff, &nr))
+		return -1;
+
+	if (nr == 0)
+		*end = true;
+out:
+	n->cpu_pmu_caps = strbuf_detach(&sb, NULL);
+	n->pmu_name = pmu_name;
 	return 0;
 
 free_value:
@@ -3192,6 +3234,50 @@ free_name:
 error:
 	strbuf_release(&sb);
 	return -1;
+}
+
+static int process_cpu_pmu_caps(struct feat_fd *ff,
+				void *data __maybe_unused)
+{
+	struct cpu_pmu_caps_node *nodes = NULL, *tmp;
+	int ret, i, nr_alloc = 1, nr_used = 0;
+	bool end;
+
+	while (1) {
+		if (nr_used == nr_alloc || !nodes) {
+			nr_alloc *= 2;
+			tmp = realloc(nodes, sizeof(*nodes) * nr_alloc);
+			if (!tmp)
+				return -ENOMEM;
+			memset(tmp + nr_used, 0,
+			       sizeof(*nodes) * (nr_alloc - nr_used));
+			nodes = tmp;
+		}
+
+		ret = process_cpu_pmu_caps_node(ff, &nodes[nr_used], &end);
+		if (ret) {
+			if (nr_used)
+				break;
+			goto err;
+		}
+
+		nr_used++;
+		if (end)
+			break;
+	}
+
+	ff->ph->env.nr_cpu_pmu_caps_nodes = (u32)nr_used;
+	ff->ph->env.cpu_pmu_caps_nodes = nodes;
+	return 0;
+
+err:
+	for (i = 0; i < nr_used; i++) {
+		free(nodes[i].cpu_pmu_caps);
+		free(nodes[i].pmu_name);
+	}
+
+	free(nodes);
+	return ret;
 }
 
 #define FEAT_OPR(n, func, __full_only) \
