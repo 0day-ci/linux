@@ -9982,21 +9982,25 @@ static int __set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 	if (kvm_set_apic_base(vcpu, &apic_base_msr))
 		goto out;
 
-	if (vcpu->arch.guest_state_protected)
-		goto skip_protected_regs;
+	if (!vcpu->arch.guest_state_protected) {
+		dt.size = sregs->idt.limit;
+		dt.address = sregs->idt.base;
+		static_call(kvm_x86_set_idt)(vcpu, &dt);
+		dt.size = sregs->gdt.limit;
+		dt.address = sregs->gdt.base;
+		static_call(kvm_x86_set_gdt)(vcpu, &dt);
 
-	dt.size = sregs->idt.limit;
-	dt.address = sregs->idt.base;
-	static_call(kvm_x86_set_idt)(vcpu, &dt);
-	dt.size = sregs->gdt.limit;
-	dt.address = sregs->gdt.base;
-	static_call(kvm_x86_set_gdt)(vcpu, &dt);
+		vcpu->arch.cr2 = sregs->cr2;
+		mmu_reset_needed |= kvm_read_cr3(vcpu) != sregs->cr3;
+		vcpu->arch.cr3 = sregs->cr3;
+		kvm_register_mark_available(vcpu, VCPU_EXREG_CR3);
+	}
 
-	vcpu->arch.cr2 = sregs->cr2;
-	mmu_reset_needed |= kvm_read_cr3(vcpu) != sregs->cr3;
-	vcpu->arch.cr3 = sregs->cr3;
-	kvm_register_mark_available(vcpu, VCPU_EXREG_CR3);
-
+	/*
+	 * Writes to CR0, CR4, CR8, and EFER are trapped (after the instruction
+	 * completes) for SEV-EV guests, thus userspace is allowed to set them
+	 * so that KVM's model can be updated to mirror hardware state.
+	 */
 	kvm_set_cr8(vcpu, sregs->cr8);
 
 	mmu_reset_needed |= vcpu->arch.efer != sregs->efer;
@@ -10009,35 +10013,42 @@ static int __set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 	mmu_reset_needed |= kvm_read_cr4(vcpu) != sregs->cr4;
 	static_call(kvm_x86_set_cr4)(vcpu, sregs->cr4);
 
-	idx = srcu_read_lock(&vcpu->kvm->srcu);
-	if (is_pae_paging(vcpu)) {
+	/*
+	 * PDPTEs, like regular PTEs, are always encrypted, thus reading them
+	 * will return garbage.  Shadow paging, including nested NPT, isn't
+	 * compatible with protected guests, so ignoring the PDPTEs is a-ok.
+	 */
+	if (!vcpu->arch.guest_state_protected && is_pae_paging(vcpu)) {
+		idx = srcu_read_lock(&vcpu->kvm->srcu);
 		load_pdptrs(vcpu, vcpu->arch.walk_mmu, kvm_read_cr3(vcpu));
+		srcu_read_unlock(&vcpu->kvm->srcu, idx);
+
 		mmu_reset_needed = 1;
 	}
-	srcu_read_unlock(&vcpu->kvm->srcu, idx);
 
 	if (mmu_reset_needed)
 		kvm_mmu_reset_context(vcpu);
 
-	kvm_set_segment(vcpu, &sregs->cs, VCPU_SREG_CS);
-	kvm_set_segment(vcpu, &sregs->ds, VCPU_SREG_DS);
-	kvm_set_segment(vcpu, &sregs->es, VCPU_SREG_ES);
-	kvm_set_segment(vcpu, &sregs->fs, VCPU_SREG_FS);
-	kvm_set_segment(vcpu, &sregs->gs, VCPU_SREG_GS);
-	kvm_set_segment(vcpu, &sregs->ss, VCPU_SREG_SS);
+	if (!vcpu->arch.guest_state_protected) {
+		kvm_set_segment(vcpu, &sregs->cs, VCPU_SREG_CS);
+		kvm_set_segment(vcpu, &sregs->ds, VCPU_SREG_DS);
+		kvm_set_segment(vcpu, &sregs->es, VCPU_SREG_ES);
+		kvm_set_segment(vcpu, &sregs->fs, VCPU_SREG_FS);
+		kvm_set_segment(vcpu, &sregs->gs, VCPU_SREG_GS);
+		kvm_set_segment(vcpu, &sregs->ss, VCPU_SREG_SS);
 
-	kvm_set_segment(vcpu, &sregs->tr, VCPU_SREG_TR);
-	kvm_set_segment(vcpu, &sregs->ldt, VCPU_SREG_LDTR);
+		kvm_set_segment(vcpu, &sregs->tr, VCPU_SREG_TR);
+		kvm_set_segment(vcpu, &sregs->ldt, VCPU_SREG_LDTR);
 
-	update_cr8_intercept(vcpu);
+		update_cr8_intercept(vcpu);
 
-	/* Older userspace won't unhalt the vcpu on reset. */
-	if (kvm_vcpu_is_bsp(vcpu) && kvm_rip_read(vcpu) == 0xfff0 &&
-	    sregs->cs.selector == 0xf000 && sregs->cs.base == 0xffff0000 &&
-	    !is_protmode(vcpu))
-		vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
+		/* Older userspace won't unhalt the vcpu on reset. */
+		if (kvm_vcpu_is_bsp(vcpu) && kvm_rip_read(vcpu) == 0xfff0 &&
+		    sregs->cs.selector == 0xf000 &&
+		    sregs->cs.base == 0xffff0000 && !is_protmode(vcpu))
+			vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
+	}
 
-skip_protected_regs:
 	max_bits = KVM_NR_INTERRUPTS;
 	pending_vec = find_first_bit(
 		(const unsigned long *)sregs->interrupt_bitmap, max_bits);
