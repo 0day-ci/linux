@@ -903,7 +903,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	 * MP_JOIN subflows.
 	 */
 	if (!mp_opt->mp_capable) {
-		if (subflow->mp_join)
+		if (subflow->mp_join || mptcp_data_fin_enabled(msk))
 			goto reset;
 		subflow->mp_capable = 0;
 		pr_fallback(msk);
