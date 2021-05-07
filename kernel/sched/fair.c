@@ -3996,7 +3996,7 @@ static inline void util_est_update(struct cfs_rq *cfs_rq,
 	if (ue.enqueued & UTIL_AVG_UNCHANGED)
 		return;
 
-	last_enqueued_diff = ue.enqueued;
+	last_enqueued_diff = (ue.enqueued | UTIL_AVG_UNCHANGED);
 
 	/*
 	 * Reset EWMA on utilization increases, the moving average is used only
