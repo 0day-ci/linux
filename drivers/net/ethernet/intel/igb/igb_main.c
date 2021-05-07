@@ -7988,12 +7988,16 @@ static void igb_ring_irq_enable(struct igb_q_vector *q_vector)
  **/
 static int igb_poll(struct napi_struct *napi, int budget)
 {
-	struct igb_q_vector *q_vector = container_of(napi,
-						     struct igb_q_vector,
-						     napi);
-	bool clean_complete = true;
+	struct igb_q_vector *q_vector;
+	bool clean_complete;
 	int work_done = 0;
 
+	/* if budget is zero, we have a special case for netconsole, so
+	 * make sure to set clean_complete to false in that case.
+	 */
+	clean_complete = !!budget;
+
+	q_vector = container_of(napi, struct igb_q_vector, napi);
 #ifdef CONFIG_IGB_DCA
 	if (q_vector->adapter->flags & IGB_FLAG_DCA_ENABLED)
 		igb_update_dca(q_vector);
