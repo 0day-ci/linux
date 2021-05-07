@@ -56,9 +56,16 @@ void *module_alloc(unsigned long size)
 
 bool module_init_section(const char *name)
 {
+#ifndef CONFIG_MODULE_UNLOAD
+	return strstarts(name, ".init") ||
+		strstarts(name, ".ARM.extab.init") ||
+		strstarts(name, ".ARM.exidx.init") ||
+		module_exit_section(name);
+#else
 	return strstarts(name, ".init") ||
 		strstarts(name, ".ARM.extab.init") ||
 		strstarts(name, ".ARM.exidx.init");
+#endif
 }
 
 bool module_exit_section(const char *name)
