@@ -761,6 +761,9 @@ intel_hdmi_compute_spd_infoframe(struct intel_encoder *encoder,
 {
 	struct hdmi_spd_infoframe *frame = &crtc_state->infoframes.spd.spd;
 	int ret;
+	struct hdmi_vendor_product_info *hdmi_vp_info;
+	struct intel_digital_connector_state *intel_conn_state =
+		to_intel_digital_connector_state(conn_state);
 
 	if (!crtc_state->has_infoframe)
 		return true;
@@ -768,7 +771,15 @@ intel_hdmi_compute_spd_infoframe(struct intel_encoder *encoder,
 	crtc_state->infoframes.enable |=
 		intel_hdmi_infoframe_enable(HDMI_INFOFRAME_TYPE_SPD);
 
-	ret = hdmi_spd_infoframe_init(frame, "Intel", "Integrated gfx");
+	if (!intel_conn_state->hdmi_vendor_product_blob) {
+		ret = hdmi_spd_infoframe_init(frame, "intel", "Integrated gfx");
+	} else {
+		if (intel_conn_state->hdmi_vendor_product_blob->data) {
+			hdmi_vp_info = intel_conn_state->hdmi_vendor_product_blob->data;
+			ret = hdmi_spd_infoframe_init(frame, hdmi_vp_info->vendor,
+					hdmi_vp_info->product);
+		}
+	}
 	if (drm_WARN_ON(encoder->base.dev, ret))
 		return false;
 
@@ -2455,6 +2466,7 @@ intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *c
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
 	intel_attach_aspect_ratio_property(connector);
+	intel_attach_hdmi_vendor_product_property(connector);
 
 	intel_attach_hdmi_colorspace_property(connector);
 	drm_connector_attach_content_type_property(connector);

@@ -65,6 +65,9 @@ int intel_digital_connector_atomic_get_property(struct drm_connector *connector,
 		*val = intel_conn_state->force_audio;
 	else if (property == dev_priv->broadcast_rgb_property)
 		*val = intel_conn_state->broadcast_rgb;
+	else if (property ==  dev_priv->hdmi_vendor_product_property)
+		*val = (intel_conn_state->hdmi_vendor_product_blob)
+			? (intel_conn_state->hdmi_vendor_product_blob->base.id) : 0;
 	else {
 		drm_dbg_atomic(&dev_priv->drm,
 			       "Unknown property [PROP:%d:%s]\n",
@@ -93,6 +96,7 @@ int intel_digital_connector_atomic_set_property(struct drm_connector *connector,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_digital_connector_state *intel_conn_state =
 		to_intel_digital_connector_state(state);
+	struct drm_property_blob *new_blob = NULL;
 
 	if (property == dev_priv->force_audio_property) {
 		intel_conn_state->force_audio = val;
@@ -104,6 +108,16 @@ int intel_digital_connector_atomic_set_property(struct drm_connector *connector,
 		return 0;
 	}
 
+	if (property ==  dev_priv->hdmi_vendor_product_property) {
+		new_blob = drm_property_lookup_blob(dev, val);
+		if (new_blob == NULL)
+			return -EINVAL;
+		if (drm_property_replace_blob
+			(&intel_conn_state->hdmi_vendor_product_blob, new_blob)) {
+			drm_property_blob_put(new_blob);
+			return 0;
+		}
+	}
 	drm_dbg_atomic(&dev_priv->drm, "Unknown property [PROP:%d:%s]\n",
 		       property->base.id, property->name);
 	return -EINVAL;

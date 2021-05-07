@@ -1006,6 +1006,7 @@ struct drm_i915_private {
 
 	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
+	struct drm_property *hdmi_vendor_product_property;
 
 	/* hda/i915 audio component */
 	struct i915_audio_component *audio_component;
