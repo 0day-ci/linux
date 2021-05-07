@@ -33,6 +33,7 @@
 #include <scsi/scsi_transport_fc.h>
 #include <scsi/scsi_bsg_fc.h>
 
+#include <uapi/scsi/fc/fc_fs.h>
 #include <uapi/scsi/fc/fc_els.h>
 
 /* Big endian Fibre Channel S_ID (source ID) or D_ID (destination ID). */
@@ -49,11 +50,45 @@ typedef struct {
 	uint8_t domain;
 } le_id_t;
 
+/*
+ * 24 bit port ID type definition.
+ */
+typedef union {
+	uint32_t b24 : 24;
+	struct {
+#ifdef __BIG_ENDIAN
+		uint8_t domain;
+		uint8_t area;
+		uint8_t al_pa;
+#elif defined(__LITTLE_ENDIAN)
+		uint8_t al_pa;
+		uint8_t area;
+		uint8_t domain;
+#else
+#error "__BIG_ENDIAN or __LITTLE_ENDIAN must be defined!"
+#endif
+		uint8_t rsvd_1;
+	} b;
+} port_id_t;
+#define INVALID_PORT_ID	0xFFFFFF
+
 #include "qla_bsg.h"
 #include "qla_dsd.h"
 #include "qla_nx.h"
 #include "qla_nx2.h"
 #include "qla_nvme.h"
+
+struct auth_els_header {
+	uint8_t         els_code;
+	uint8_t         els_flags;
+	uint8_t         message_code;
+	uint8_t         protocol_version;
+#define AUTH_ELS_PROTOCOL_VERSION   2
+	uint32_t        message_length;
+	uint32_t        transaction_identifier;
+	uint8_t         payload[0];                 /* payload for cmd */
+} __packed;
+
 #define QLA2XXX_DRIVER_NAME	"qla2xxx"
 #define QLA2XXX_APIDEV		"ql2xapidev"
 #define QLA2XXX_MANUFACTURER	"QLogic Corporation"
@@ -319,6 +354,13 @@ struct name_list_extended {
 	u32			size;
 	u8			sent;
 };
+
+struct els_reject {
+	struct fc_els_ls_rjt *c;
+	dma_addr_t  cdma;
+	u16 size;
+};
+
 /*
  * Timeout timer counts in seconds
  */
@@ -345,6 +387,8 @@ struct name_list_extended {
 #define FW_MAX_EXCHANGES_CNT (32 * 1024)
 #define REDUCE_EXCHANGES_CNT  (8 * 1024)
 
+#define SET_DID_STATUS(stat_var, status) (stat_var = status << 16)
+
 struct req_que;
 struct qla_tgt_sess;
 
@@ -370,33 +414,13 @@ struct srb_cmd {
 #define SRB_CRC_CTX_DSD_VALID		BIT_5	/* DIF: dsd_list valid */
 #define SRB_WAKEUP_ON_COMP		BIT_6
 #define SRB_DIF_BUNDL_DMA_VALID		BIT_7   /* DIF: DMA list valid */
+#define SRB_EDIF_CLEANUP_DELETE		BIT_9
 
 /* To identify if a srb is of T10-CRC type. @sp => srb_t pointer */
 #define IS_PROT_IO(sp)	(sp->flags & SRB_CRC_CTX_DSD_VALID)
-
-/*
- * 24 bit port ID type definition.
- */
-typedef union {
-	uint32_t b24 : 24;
-
-	struct {
-#ifdef __BIG_ENDIAN
-		uint8_t domain;
-		uint8_t area;
-		uint8_t al_pa;
-#elif defined(__LITTLE_ENDIAN)
-		uint8_t al_pa;
-		uint8_t area;
-		uint8_t domain;
-#else
-#error "__BIG_ENDIAN or __LITTLE_ENDIAN must be defined!"
-#endif
-		uint8_t rsvd_1;
-	} b;
-} port_id_t;
-#define INVALID_PORT_ID	0xFFFFFF
 #define ISP_REG16_DISCONNECT 0xFFFF
+/* This sp is an internal delete */
+#define IS_EDIF_CLEANUP_DELETE(sp) (sp->flags & SRB_EDIF_CLEANUP_DELETE)
 
 static inline le_id_t be_id_to_le(be_id_t id)
 {
@@ -483,6 +507,7 @@ struct srb_iocb {
 #define SRB_LOGIN_SKIP_PRLI	BIT_2
 #define SRB_LOGIN_NVME_PRLI	BIT_3
 #define SRB_LOGIN_PRLI_ONLY	BIT_4
+#define SRB_LOGIN_FCSP		BIT_5
 			uint16_t data[2];
 			u32 iop[2];
 		} logio;
@@ -587,6 +612,10 @@ struct srb_iocb {
 			u16 cmd;
 			u16 vp_index;
 		} ctrlvp;
+		struct {
+			struct edif_sa_ctl	*sa_ctl;
+			struct qla_sa_update_frame sa_frame;
+		} sa_update;
 	} u;
 
 	struct timer_list timer;
@@ -617,6 +646,21 @@ struct srb_iocb {
 #define SRB_PRLI_CMD	21
 #define SRB_CTRL_VP	22
 #define SRB_PRLO_CMD	23
+#define SRB_SA_UPDATE	25
+#define SRB_ELS_CMD_HST_NOLOGIN 26
+#define SRB_SA_REPLACE	27
+
+struct qla_els_pt_arg {
+	u8 els_opcode;
+	u8 vp_idx;
+	__le16 nport_handle;
+	u16 control_flags;
+	__le32 rx_xchg_address;
+	port_id_t did;
+	u32 tx_len, tx_byte_count, rx_len, rx_byte_count;
+	dma_addr_t tx_addr, rx_addr;
+
+};
 
 enum {
 	TYPE_SRB,
@@ -628,6 +672,13 @@ struct iocb_resource {
 	u8 res_type;
 	u8 pad;
 	u16 iocb_cnt;
+};
+
+struct bsg_cmd {
+	struct bsg_job *bsg_job;
+	union {
+		struct qla_els_pt_arg els_arg;
+	} u;
 };
 
 typedef struct srb {
@@ -662,7 +713,21 @@ typedef struct srb {
 		struct srb_iocb iocb_cmd;
 		struct bsg_job *bsg_job;
 		struct srb_cmd scmd;
+		struct bsg_cmd bsg_cmd;
 	} u;
+	struct {
+		bool remapped;
+		struct {
+			dma_addr_t dma;
+			void *buf;
+			uint len;
+		} req;
+		struct {
+			dma_addr_t dma;
+			void *buf;
+			uint len;
+		} rsp;
+	} remap;
 	/*
 	 * Report completion status @res and call sp_put(@sp). @res is
 	 * an NVMe status code, a SCSI result (e.g. DID_OK << 16) or a
@@ -2294,6 +2359,7 @@ struct imm_ntfy_from_isp {
 			__le16	nport_handle;
 			uint16_t reserved_2;
 			__le16	flags;
+#define NOTIFY24XX_FLAGS_FCSP		BIT_5
 #define NOTIFY24XX_FLAGS_GLOBAL_TPRLO   BIT_1
 #define NOTIFY24XX_FLAGS_PUREX_IOCB     BIT_0
 			__le16	srr_rx_id;
@@ -2424,6 +2490,7 @@ enum discovery_state {
 	DSC_LOGIN_COMPLETE,
 	DSC_ADISC,
 	DSC_DELETE_PEND,
+	DSC_LOGIN_AUTH_PEND,
 };
 
 enum login_state {	/* FW control Target side */
@@ -2467,6 +2534,8 @@ typedef struct fc_port {
 	unsigned int n2n_flag:1;
 	unsigned int explicit_logout:1;
 	unsigned int prli_pend_timer:1;
+	unsigned int explicit_prlo:1;
+
 	uint8_t nvme_flag;
 
 	uint8_t node_name[WWN_SIZE];
@@ -2510,6 +2579,7 @@ typedef struct fc_port {
 	uint16_t tgt_id;
 	uint16_t old_tgt_id;
 	uint16_t sec_since_registration;
+	uint16_t prlo_rc;
 
 	uint8_t fcp_prio;
 
@@ -2563,6 +2633,62 @@ typedef struct fc_port {
 	u64 tgt_short_link_down_cnt;
 	u64 tgt_link_down_time;
 	u64 dev_loss_tmo;
+#define	TTYPE_PRLI	1
+#define	TTYPE_KSHRED	2
+
+// edif timer types
+#define	EDIF_TICK	1	// timer tick incremental value (seconds)
+#define	EDIF_PRLI_TO	120	// default for prli timeout (seconds)
+#define	EDIF_KSHRED_TO	30	// default for old key shred (seconds)
+#define	EDIF_TO_MIN	25
+#define	EDIF_MAX_SA_SLOTS	2	/* Number of SA slots */
+	/*
+	 * EDIF parameters for encryption.
+	 */
+	struct {
+		uint16_t	enable:1;	// device is edif enabled/req'd
+		uint16_t	new_sa:1;	// new/updated sa needed
+		uint16_t	db_sent:1;	// app notified new sa needed
+		uint16_t	rekey_nocnt:1;	// no byte or time limit
+		uint16_t	rekey_mode:1;	// 1-time based, 0-bytes based
+		uint16_t	app_stop:2;
+#define APP_STOPPED  0
+#define APP_STOPPING 1
+		uint16_t	app_started:1;
+		uint16_t	secured_login:1;
+		uint16_t	aes_gmac:1;
+		uint16_t	app_sess_online:1;
+		uint16_t	rekey_cnt;	// num of times rekeyed
+		uint32_t	login_gen;	// saved count
+		uint32_t	rscn_gen;	// saved rscn cnt
+		uint32_t	prli_to;	// timeout for prli to complete
+		int64_t		reload_value;	// time or bytes; 0=unlimited
+		int64_t		rekey;		// amt left before rekey needed
+		struct timer_list timer;	// prli and shred timer
+		uint8_t		auth_state;	/* cureent auth state */
+		uint8_t		tx_sa_set;
+		uint8_t		rx_sa_set;
+		uint8_t		tx_sa_pending;
+		uint8_t		rx_sa_pending;
+		uint8_t		reserved[3];
+		uint32_t	tx_rekey_cnt;
+		uint32_t	rx_rekey_cnt;
+		uint32_t	tx_sa_selold;	/* Select older SA */
+		uint32_t	rx_sa_selold;
+		uint32_t	stall_io;	/* Stall I/O on this port */
+
+		// delayed rx delete data structure list
+		uint64_t	tx_bytes;
+		uint64_t	rx_bytes;
+		uint8_t		non_secured_login;
+		struct list_head edif_indx_list;
+		spinlock_t  indx_list_lock;  // protects the edif index list
+
+		struct list_head tx_sa_list;
+		struct list_head rx_sa_list;
+		spinlock_t	sa_list_lock;       /* protects list */
+	} edif;
+
 } fc_port_t;
 
 enum {
@@ -2604,7 +2730,8 @@ static const char * const port_dstate_str[] = {
 	"UPD_FCPORT",
 	"LOGIN_COMPLETE",
 	"ADISC",
-	"DELETE_PEND"
+	"DELETE_PEND",
+	"LOGIN_AUTH_PEND",
 };
 
 /*
@@ -2616,6 +2743,8 @@ static const char * const port_dstate_str[] = {
 #define FCF_ASYNC_SENT		BIT_3
 #define FCF_CONF_COMP_SUPPORTED BIT_4
 #define FCF_ASYNC_ACTIVE	BIT_5
+#define FCF_FCSP_DEVICE		BIT_6
+#define FCF_EDIF_DELETE		BIT_7
 
 /* No loop ID flag. */
 #define FC_NO_LOOP_ID		0x1000
@@ -3386,6 +3515,7 @@ enum qla_work_type {
 	QLA_EVT_SP_RETRY,
 	QLA_EVT_IIDMA,
 	QLA_EVT_ELS_PLOGI,
+	QLA_EVT_SA_REPLACE,
 };
 
 
@@ -3444,6 +3574,11 @@ struct qla_work_evt {
 			u8 fc4_type;
 			srb_t *sp;
 		} gpnft;
+		struct {
+			struct edif_sa_ctl	*sa_ctl;
+			fc_port_t *fcport;
+			uint16_t nport_handle;
+		} sa_update;
 	 } u;
 };
 
@@ -3563,6 +3698,8 @@ struct rsp_que {
 	srb_t *status_srb; /* status continuation entry */
 	struct qla_qpair *qpair;
 
+	port_id_t pur_sid;
+	int	pur_entcnt;
 	dma_addr_t  dma_fx00;
 	response_t *ring_fx00;
 	uint16_t  length_fx00;
@@ -3843,7 +3980,9 @@ struct qlt_hw_data {
 	int num_act_qpairs;
 #define DEFAULT_NAQP 2
 	spinlock_t atio_lock ____cacheline_aligned;
-	struct btree_head32 host_map;
+	dma_addr_t fast_dig_dma;
+	char       *fast_dig_ptr;
+	char       *fast_sw_sha;
 };
 
 #define MAX_QFULL_CMDS_ALLOC	8192
@@ -3933,6 +4072,7 @@ struct qla_hw_data {
 		uint32_t	scm_supported_f:1;
 				/* Enabled in Driver */
 		uint32_t	scm_enabled:1;
+		uint32_t	edif_enabled:1;
 		uint32_t	max_req_queue_warned:1;
 		uint32_t	plogi_template_valid:1;
 		uint32_t	port_isolated:1;
@@ -4616,7 +4756,22 @@ struct qla_hw_data {
 
 	struct qla_hw_data_stat stat;
 	pci_error_state_t pci_error_state;
+	unsigned short plogi_commfeat;
+	struct dma_pool *purex_dma_pool;
+	struct btree_head32 host_map;
+
+	#define EDIF_NUM_SA_INDEX	512
+	#define EDIF_TX_SA_INDEX_BASE	EDIF_NUM_SA_INDEX
+	void *edif_rx_sa_id_map;
+	void *edif_tx_sa_id_map;
+	spinlock_t sadb_fp_lock;
+
+	struct list_head sadb_tx_index_list;
+	struct list_head sadb_rx_index_list;
+	spinlock_t sadb_lock;	/* protects list */
+	struct els_reject elsrej;
 };
+#define RX_ELS_SIZE (roundup(sizeof(struct enode) + ELS_MAX_PAYLOAD, SMP_CACHE_BYTES))
 
 struct active_regions {
 	uint8_t global;
@@ -4626,6 +4781,7 @@ struct active_regions {
 		uint8_t npiv_config_0_1;
 		uint8_t npiv_config_2_3;
 	} aux;
+	unsigned short plogi_commfeat;
 };
 
 #define FW_ABILITY_MAX_SPEED_MASK	0xFUL
@@ -4655,6 +4811,8 @@ struct purex_item {
 		uint8_t iocb[64];
 	} iocb;
 };
+
+#include "qla_edif.h"
 
 #define SCM_FLAG_RDF_REJECT		0x00
 #define SCM_FLAG_RDF_COMPLETED		0x01
@@ -4743,6 +4901,7 @@ typedef struct scsi_qla_host {
 #define SET_ZIO_THRESHOLD_NEEDED 32
 #define ISP_ABORT_TO_ROM	33
 #define VPORT_DELETE		34
+#define EDIF_TICK_NEEDED	36
 
 #define PROCESS_PUREX_IOCB	63
 
@@ -4776,6 +4935,8 @@ typedef struct scsi_qla_host {
 	uint8_t         loop_down_abort_time;    /* port down timer */
 	atomic_t        loop_down_timer;         /* loop down timer */
 	uint8_t         link_down_timeout;       /* link down timeout */
+	uint16_t	edif_prli_timeout;
+	uint16_t	edif_kshred_timeout;
 
 	uint32_t        timer_active;
 	struct timer_list        timer;
@@ -4884,6 +5045,8 @@ typedef struct scsi_qla_host {
 	u64 reset_cmd_err_cnt;
 	u64 link_down_time;
 	u64 short_link_down_cnt;
+	struct edif_dbell e_dbell;
+	struct pur_core pur_cinfo;
 } scsi_qla_host_t;
 
 struct qla27xx_image_status {
@@ -5082,6 +5245,43 @@ enum nexus_wait_type {
 	WAIT_HOST = 0,
 	WAIT_TARGET,
 	WAIT_LUN,
+};
+
+#define INVALID_EDIF_SA_INDEX	0xffff
+#define RX_DELETE_NO_EDIF_SA_INDEX	0xfffe
+
+#define QLA_SKIP_HANDLE QLA_TGT_SKIP_HANDLE
+
+/* edif hash element */
+struct edif_list_entry {
+	uint16_t handle;			/* nport_handle */
+	uint32_t update_sa_index;
+	uint32_t delete_sa_index;
+	uint32_t count;				/* counter for filtering sa_index */
+#define EDIF_ENTRY_FLAGS_CLEANUP	0x01	/* this index is being cleaned up */
+	uint32_t flags;				/* used by sadb cleanup code */
+	fc_port_t *fcport;			/* needed by rx delay timer function */
+	struct timer_list timer;		/* rx delay timer */
+	struct list_head next;
+};
+
+#define EDIF_TX_INDX_BASE 512
+#define EDIF_RX_INDX_BASE 0
+#define EDIF_RX_DELETE_FILTER_COUNT 3	/* delay queuing rx delete until this many */
+
+/* entry in the sa_index free pool */
+
+struct sa_index_pair {
+	uint16_t sa_index;
+	uint32_t spi;
+};
+
+/* edif sa_index data structure */
+struct edif_sa_index_entry {
+	struct sa_index_pair sa_pair[2];
+	fc_port_t *fcport;
+	uint16_t handle;
+	struct list_head next;
 };
 
 /* Refer to SNIA SFF 8247 */
