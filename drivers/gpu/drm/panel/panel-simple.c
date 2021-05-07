@@ -4069,6 +4069,33 @@ static const struct panel_desc winstar_wf35ltiacd = {
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
+static const struct display_timing yes_optoelectronics_yts700tlbc_02_100c_timing = {
+	.pixelclock = { 40800000, 50000000, 67200000 },
+	.hactive = { 1024, 1024, 1024 },
+	.hfront_porch = { 16, 127, 216 },
+	.hback_porch = { 160, 160, 160 },
+	.hsync_len = { 1, 1, 1 },
+	.vactive = { 600, 600, 600 },
+	.vfront_porch = { 1, 11, 127 },
+	.vback_porch = { 23, 23, 23 },
+	.vsync_len = { 1, 1, 1 },
+	.flags = DISPLAY_FLAGS_DE_HIGH |
+		 DISPLAY_FLAGS_HSYNC_LOW |
+		 DISPLAY_FLAGS_VSYNC_LOW,
+};
+
+static const struct panel_desc yes_optoelectronics_yts700tlbc_02_100c = {
+	.timings = &yes_optoelectronics_yts700tlbc_02_100c_timing,
+	.num_timings = 1,
+	.bpc = 8,
+	.size = {
+		.width = 154,
+		.height = 86,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+	.connector_type = DRM_MODE_CONNECTOR_LVDS,
+};
+
 static const struct drm_display_mode yes_optoelectronics_ytc700tlag_05_201c_mode = {
 	.clock = 51200,
 	.hdisplay = 1024,
@@ -4533,6 +4560,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "yes-optoelectronics,ytc700tlag-05-201c",
 		.data = &yes_optoelectronics_ytc700tlag_05_201c,
+	}, {
+		.compatible = "yes-optoelectronics,yts700tlbc-02-100c",
+		.data = &yes_optoelectronics_yts700tlbc_02_100c,
 	}, {
 		/* Must be the last entry */
 		.compatible = "panel-dpi",
