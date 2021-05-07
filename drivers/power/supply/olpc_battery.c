@@ -238,6 +238,7 @@ static int olpc_bat_get_charge_full_design(union power_supply_propval *val)
 	case POWER_SUPPLY_TECHNOLOGY_LiFe:
 		switch (mfr) {
 		case 1: /* Gold Peak, fall through */
+			fallthrough;
 		case 2: /* BYD */
 			val->intval = 2800000;
 			break;
