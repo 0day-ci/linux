@@ -884,6 +884,7 @@ static inline void audit_free_module(struct audit_context *context)
 		context->module.name = NULL;
 	}
 }
+
 static inline void audit_free_names(struct audit_context *context)
 {
 	struct audit_names *n, *next;
@@ -912,6 +913,16 @@ static inline void audit_free_aux(struct audit_context *context)
 	while ((aux = context->aux_pids)) {
 		context->aux_pids = aux->next;
 		kfree(aux);
+	}
+}
+
+static inline void audit_free_xattr(struct audit_context *context)
+{
+	if (context->type == AUDIT_XATTR) {
+		kfree(context->xattr.name);
+		context->xattr.name = NULL;
+		kfree(context->xattr.value);
+		context->xattr.value = NULL;
 	}
 }
 
@@ -969,6 +980,7 @@ int audit_alloc(struct task_struct *tsk)
 
 static inline void audit_free_context(struct audit_context *context)
 {
+	audit_free_xattr(context);
 	audit_free_module(context);
 	audit_free_names(context);
 	unroll_tree_refs(context, NULL, 0);
@@ -1316,6 +1328,20 @@ static void show_special(struct audit_context *context, int *call_panic)
 			audit_log_untrustedstring(ab, context->module.name);
 		} else
 			audit_log_format(ab, "(null)");
+
+		break;
+	case AUDIT_XATTR:
+		audit_log_format(ab, "xattr=");
+		if (context->xattr.name)
+			audit_log_untrustedstring(ab, context->xattr.name);
+		else
+			audit_log_format(ab, "(null)");
+		audit_log_format(ab, " val=");
+		if (context->xattr.value)
+			audit_log_untrustedstring(ab, context->xattr.value);
+		else
+			audit_log_format(ab, "(null)");
+		audit_log_format(ab, " xflags=0x%x", context->xattr.flags);
 
 		break;
 	}
@@ -1742,6 +1768,7 @@ void __audit_syscall_exit(int success, long return_code)
 	context->in_syscall = 0;
 	context->prio = context->state == AUDIT_RECORD_CONTEXT ? ~0ULL : 0;
 
+	audit_free_xattr(context);
 	audit_free_module(context);
 	audit_free_names(context);
 	unroll_tree_refs(context, NULL, 0);
@@ -2534,6 +2561,24 @@ void __audit_log_kern_module(char *name)
 	if (!context->module.name)
 		audit_log_lost("out of memory in __audit_log_kern_module");
 	context->type = AUDIT_KERN_MODULE;
+}
+
+void __audit_xattr(const char *name, const char *value, int flags)
+{
+	struct audit_context *context = audit_context();
+
+	context->type = AUDIT_XATTR;
+	context->xattr.flags = flags;
+	context->xattr.name = kstrdup(name, GFP_KERNEL);
+	if (!context->xattr.name)
+		goto out;
+	context->xattr.value = kstrdup(value, GFP_KERNEL);
+	if (!context->xattr.value)
+		goto out;
+	return;
+out:
+	kfree(context->xattr.name);
+	audit_log_lost("out of memory in __audit_xattr");
 }
 
 void __audit_fanotify(unsigned int response)

@@ -570,6 +570,7 @@ setxattr(struct user_namespace *mnt_userns, struct dentry *d,
 			posix_acl_fix_xattr_from_user(mnt_userns, kvalue, size);
 	}
 
+	audit_xattr(name, value, flags);
 	error = vfs_setxattr(mnt_userns, d, kname, kvalue, size, flags);
 out:
 	kvfree(kvalue);
@@ -816,6 +817,7 @@ removexattr(struct user_namespace *mnt_userns, struct dentry *d,
 	if (error < 0)
 		return error;
 
+	audit_xattr(name, "(null)", 0);
 	return vfs_removexattr(mnt_userns, d, kname);
 }
 

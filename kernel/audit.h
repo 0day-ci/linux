@@ -191,6 +191,11 @@ struct audit_context {
 		struct {
 			char			*name;
 		} module;
+		struct {
+			char			*name;
+			char			*value;
+			int			flags;
+		} xattr;
 	};
 	int fds[2];
 	struct audit_proctitle proctitle;
