@@ -326,6 +326,20 @@ static void compat_perf_callchain_user(struct perf_callchain_entry_ctx *entry,
 	while ((entry->nr < entry->max_stack) && fp && !(fp & 0x3)) {
 		err = compat_perf_trace_1(&fp, &pc, leaf_lr);
 
+		/*
+		 * If this is the first trace and it didn't find the LR then
+		 * let's throw it in the trace first. This isn't perfect but
+		 * is the best we can do for handling clang leaf functions (or
+		 * the case where we're right at the start of the function
+		 * before the new frame has been pushed). In the worst case
+		 * this can cause us to throw an extra entry that will be some
+		 * location in the same function as the PC. That's not
+		 * amazing but shouldn't really hurt. It seems better than
+		 * throwing away the LR.
+		 */
+		if (leaf_lr && leaf_lr != pc)
+			perf_callchain_store(entry, leaf_lr & ~BIT(0));
+
 		/* Bail out on any type of error */
 		if (err)
 			break;
