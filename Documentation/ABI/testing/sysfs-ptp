@@ -25,6 +25,23 @@ Description:
 		MAC based ones. The string does not necessarily have
 		to be any kind of unique id.
 
+What:		/sys/class/ptp/ptpN/delete_vclock_domain
+Date:		May 2021
+Contact:	Yangbo Lu <yangbo.lu@nxp.com>
+Description:
+		This write-only file removes PTP virtual clock for the
+		specified domain. Write the u8 domain value into this
+		file to remove the PTP virtual clock.
+
+What:		/sys/class/ptp/ptpN/domain
+Date:		May 2021
+Contact:	Yangbo Lu <yangbo.lu@nxp.com>
+Description:
+		This file contains the domain value that the PTP clock
+		serves. Time stamps of PTP messages of this domain are
+		provided by this PTP clock. Write a new u8 value into
+		this file to change the domain.
+
 What:		/sys/class/ptp/ptpN/max_adjustment
 Date:		September 2010
 Contact:	Richard Cochran <richardcochran@gmail.com>
@@ -100,6 +117,14 @@ Description:
 		This file provides timestamps on external events, in
 		the form of three integers: channel index, seconds,
 		and nanoseconds.
+
+What:		/sys/class/ptp/ptpN/new_vclock_domain
+Date:		May 2021
+Contact:	Yangbo Lu <yangbo.lu@nxp.com>
+Description:
+		This write-only file creates PTP virtual clock for a
+		specified domain. Write the u8 domain value into this
+		file to create the PTP virtual clock.
 
 What:		/sys/class/ptp/ptpN/period
 Date:		September 2010

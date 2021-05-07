@@ -121,6 +121,119 @@ out:
 }
 static DEVICE_ATTR(period, 0220, NULL, period_store);
 
+static int check_domain_avail(struct device *dev, void *data)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_clock_info *info = ptp->info;
+	u8 *domain = data;
+
+	if (info->domain == *domain)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int delete_vclock_domain(struct device *dev, void *data)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_clock_info *info = ptp->info;
+	struct ptp_vclock *vclock = info_to_vclock(info);
+	u8 *domain = data;
+
+	if (!info->is_vclock)
+		return 0;
+
+	if (info->domain == *domain) {
+		ptp_vclock_unregister(vclock);
+		/* For break. Not error. */
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static ssize_t domain_show(struct device *dev,
+			   struct device_attribute *attr, char *page)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+
+	return snprintf(page, PAGE_SIZE-1, "%d\n", ptp->info->domain);
+}
+
+static ssize_t domain_store(struct device *dev,
+			    struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_clock_info *info = ptp->info;
+	int err = -EINVAL;
+	u8 domain;
+
+	if (kstrtou8(buf, 0, &domain))
+		goto out;
+
+	if (device_for_each_child(dev->parent, &domain, check_domain_avail)) {
+		dev_err(dev, "the domain value already in used\n");
+		goto out;
+	}
+
+	info->domain = domain;
+
+	return count;
+out:
+	return err;
+}
+static DEVICE_ATTR_RW(domain);
+
+static ssize_t new_vclock_domain_store(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_vclock *vclock;
+	int err = -EINVAL;
+	u8 domain;
+
+	if (kstrtou8(buf, 0, &domain))
+		goto out;
+
+	if (device_for_each_child(dev->parent, &domain, check_domain_avail)) {
+		dev_err(dev, "the domain value already in used\n");
+		goto out;
+	}
+
+	vclock = ptp_vclock_register(ptp, domain);
+	if (!vclock)
+		goto out;
+
+	return count;
+out:
+	return err;
+}
+static DEVICE_ATTR_WO(new_vclock_domain);
+
+static ssize_t delete_vclock_domain_store(struct device *dev,
+					  struct device_attribute *attr,
+					  const char *buf, size_t count)
+{
+	int err = -EINVAL;
+	u8 domain;
+
+	if (kstrtou8(buf, 0, &domain))
+		goto out;
+
+	if (!device_for_each_child(dev->parent, &domain,
+				   delete_vclock_domain)) {
+		dev_err(dev, "no such vclock domain in used\n");
+		goto out;
+	}
+
+	return count;
+out:
+	return err;
+}
+static DEVICE_ATTR_WO(delete_vclock_domain);
+
 static ssize_t pps_enable_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
@@ -161,6 +274,9 @@ static struct attribute *ptp_attrs[] = {
 	&dev_attr_extts_enable.attr,
 	&dev_attr_fifo.attr,
 	&dev_attr_period.attr,
+	&dev_attr_domain.attr,
+	&dev_attr_new_vclock_domain.attr,
+	&dev_attr_delete_vclock_domain.attr,
 	&dev_attr_pps_enable.attr,
 	NULL
 };
@@ -182,6 +298,12 @@ static umode_t ptp_is_attribute_visible(struct kobject *kobj,
 			mode = 0;
 	} else if (attr == &dev_attr_pps_enable.attr) {
 		if (!info->pps)
+			mode = 0;
+	} else if (attr == &dev_attr_new_vclock_domain.attr) {
+		if (info->is_vclock || !info->vclock_cc)
+			mode = 0;
+	} else if (attr == &dev_attr_delete_vclock_domain.attr) {
+		if (info->is_vclock || !info->vclock_cc)
 			mode = 0;
 	}
 
