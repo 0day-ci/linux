@@ -931,6 +931,177 @@ void kvm_sdei_create_vcpu(struct kvm_vcpu *vcpu)
 	vcpu->arch.sdei = vsdei;
 }
 
+static long kvm_sdei_set_event(struct kvm *kvm,
+			       struct kvm_sdei_event_state *kse_state)
+{
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_event *kse = NULL;
+
+	if (!kvm_sdei_is_valid_event_num(kse_state->num))
+		return -EINVAL;
+
+	if (!(kse_state->type == SDEI_EVENT_TYPE_SHARED ||
+	      kse_state->type == SDEI_EVENT_TYPE_PRIVATE))
+		return -EINVAL;
+
+	if (!(kse_state->priority == SDEI_EVENT_PRIORITY_NORMAL ||
+	      kse_state->priority == SDEI_EVENT_PRIORITY_CRITICAL))
+		return -EINVAL;
+
+	kse = kvm_sdei_find_event(kvm, kse_state->num);
+	if (kse)
+		return -EEXIST;
+
+	kse = kzalloc(sizeof(*kse), GFP_KERNEL);
+	if (!kse)
+		return -ENOMEM;
+
+	kse->state = *kse_state;
+	kse->kvm = kvm;
+	list_add_tail(&kse->link, &ksdei->events);
+
+	return 0;
+}
+
+static long kvm_sdei_get_kevent_count(struct kvm *kvm, int *count)
+{
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_kvm_event *kske = NULL;
+	int total = 0;
+
+	list_for_each_entry(kske, &ksdei->kvm_events, link) {
+		total++;
+	}
+
+	*count = total;
+	return 0;
+}
+
+static long kvm_sdei_get_kevent(struct kvm *kvm,
+				struct kvm_sdei_kvm_event_state *kske_state)
+{
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_kvm_event *kske = NULL;
+
+	/*
+	 * The first entry is fetched if the event number is invalid.
+	 * Otherwise, the next entry is fetched.
+	 */
+	if (!kvm_sdei_is_valid_event_num(kske_state->num)) {
+		kske = list_first_entry_or_null(&ksdei->kvm_events,
+				struct kvm_sdei_kvm_event, link);
+	} else {
+		kske = kvm_sdei_find_kvm_event(kvm, kske_state->num);
+		if (kske && !list_is_last(&kske->link, &ksdei->kvm_events))
+			kske = list_next_entry(kske, link);
+		else
+			kske = NULL;
+	}
+
+	if (!kske)
+		return -ENOENT;
+
+	*kske_state = kske->state;
+
+	return 0;
+}
+
+static long kvm_sdei_set_kevent(struct kvm *kvm,
+				struct kvm_sdei_kvm_event_state *kske_state)
+{
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_event *kse = NULL;
+	struct kvm_sdei_kvm_event *kske = NULL;
+
+	/* Sanity check */
+	if (!kvm_sdei_is_valid_event_num(kske_state->num))
+		return -EINVAL;
+
+	if (!(kske_state->route_mode == SDEI_EVENT_REGISTER_RM_ANY ||
+	      kske_state->route_mode == SDEI_EVENT_REGISTER_RM_PE))
+		return -EINVAL;
+
+	/* Check if the event number is valid */
+	kse = kvm_sdei_find_event(kvm, kske_state->num);
+	if (!kse)
+		return -ENOENT;
+
+	/* Check if the event has been populated */
+	kske = kvm_sdei_find_kvm_event(kvm, kske_state->num);
+	if (kske)
+		return -EEXIST;
+
+	kske = kzalloc(sizeof(*kske), GFP_KERNEL);
+	if (!kske)
+		return -ENOMEM;
+
+	kske->state = *kske_state;
+	kske->kse   = kse;
+	kske->kvm   = kvm;
+	list_add_tail(&kske->link, &ksdei->kvm_events);
+
+	return 0;
+}
+
+long kvm_sdei_vm_ioctl(struct kvm *kvm, unsigned long arg)
+{
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_cmd *cmd = NULL;
+	void __user *argp = (void __user *)arg;
+	bool copy = false;
+	long ret = 0;
+
+	/* Sanity check */
+	if (!ksdei) {
+		ret = -EPERM;
+		goto out;
+	}
+
+	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
+	if (!cmd) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (copy_from_user(cmd, argp, sizeof(*cmd))) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	spin_lock(&ksdei->lock);
+
+	switch (cmd->cmd) {
+	case KVM_SDEI_CMD_GET_VERSION:
+		copy = true;
+		cmd->version = (1 << 16);       /* v1.0.0 */
+		break;
+	case KVM_SDEI_CMD_SET_EVENT:
+		ret = kvm_sdei_set_event(kvm, &cmd->kse_state);
+		break;
+	case KVM_SDEI_CMD_GET_KEVENT_COUNT:
+		copy = true;
+		ret = kvm_sdei_get_kevent_count(kvm, &cmd->count);
+		break;
+	case KVM_SDEI_CMD_GET_KEVENT:
+		copy = true;
+		ret = kvm_sdei_get_kevent(kvm, &cmd->kske_state);
+		break;
+	case KVM_SDEI_CMD_SET_KEVENT:
+		ret = kvm_sdei_set_kevent(kvm, &cmd->kske_state);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	spin_unlock(&ksdei->lock);
+out:
+	if (!ret && copy && copy_to_user(argp, cmd, sizeof(*cmd)))
+		ret = -EFAULT;
+
+	kfree(cmd);
+	return ret;
+}
+
 void kvm_sdei_destroy_vcpu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;

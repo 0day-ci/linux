@@ -57,5 +57,22 @@ struct kvm_sdei_vcpu_state {
 	struct kvm_sdei_vcpu_regs	normal_regs;
 };
 
+#define KVM_SDEI_CMD_GET_VERSION		0
+#define KVM_SDEI_CMD_SET_EVENT			1
+#define KVM_SDEI_CMD_GET_KEVENT_COUNT		2
+#define KVM_SDEI_CMD_GET_KEVENT			3
+#define KVM_SDEI_CMD_SET_KEVENT			4
+
+struct kvm_sdei_cmd {
+	__u32						cmd;
+	union {
+		__u32					version;
+		__u32					count;
+		__u64					num;
+		struct kvm_sdei_event_state		kse_state;
+		struct kvm_sdei_kvm_event_state		kske_state;
+	};
+};
+
 #endif /* !__ASSEMBLY__ */
 #endif /* _UAPI__ASM_KVM_SDEI_H */
