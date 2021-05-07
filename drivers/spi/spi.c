@@ -822,7 +822,7 @@ static void spi_set_cs(struct spi_device *spi, bool enable, bool force)
 		if (!(spi->mode & SPI_NO_CS)) {
 			if (spi->cs_gpiod)
 				/* polarity handled by gpiolib */
-				gpiod_set_value_cansleep(spi->cs_gpiod, activate);
+				gpiod_set_value_cansleep(spi->cs_gpiod, !enable);
 			else
 				/*
 				 * invert the enable line, as active low is
