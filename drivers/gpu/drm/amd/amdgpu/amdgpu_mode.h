@@ -337,6 +337,10 @@ struct amdgpu_mode_info {
 	struct drm_property *dither_property;
 	/* Adaptive Backlight Modulation (power feature) */
 	struct drm_property *abm_level_property;
+	/* Color settings */
+	struct drm_property *active_pixel_encoding_property;
+	struct drm_property *active_display_color_depth_property;
+	struct drm_property *active_output_color_space_property;
 	/* hardcoded DFP edid from BIOS */
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;

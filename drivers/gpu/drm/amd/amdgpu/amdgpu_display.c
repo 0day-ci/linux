@@ -1043,6 +1043,40 @@ static const struct drm_prop_enum_list amdgpu_dither_enum_list[] =
 	{ AMDGPU_FMT_DITHER_ENABLE, "on" },
 };
 
+static const struct drm_prop_enum_list amdgpu_active_pixel_encoding_enum_list[] = {
+	{ PIXEL_ENCODING_UNDEFINED, "undefined" },
+	{ PIXEL_ENCODING_RGB, "RGB" },
+	{ PIXEL_ENCODING_YCBCR422, "YCbCr 4:2:2" },
+	{ PIXEL_ENCODING_YCBCR444, "YCbCr 4:4:4" },
+	{ PIXEL_ENCODING_YCBCR420, "YCbCr 4:2:0" },
+};
+
+static const struct drm_prop_enum_list amdgpu_active_display_color_depth_enum_list[] = {
+	{ COLOR_DEPTH_UNDEFINED, "undefined" },
+	{ COLOR_DEPTH_666, "6 bit" },
+	{ COLOR_DEPTH_888, "8 bit" },
+	{ COLOR_DEPTH_101010, "10 bit" },
+	{ COLOR_DEPTH_121212, "12 bit" },
+	{ COLOR_DEPTH_141414, "14 bit" },
+	{ COLOR_DEPTH_161616, "16 bit" },
+	{ COLOR_DEPTH_999, "9 bit" },
+	{ COLOR_DEPTH_111111, "11 bit" },
+};
+
+static const struct drm_prop_enum_list amdgpu_active_output_color_space_enum_list[] = {
+	{ COLOR_SPACE_UNKNOWN, "unknown" },
+	{ COLOR_SPACE_SRGB, "sRGB" },
+	{ COLOR_SPACE_SRGB_LIMITED, "sRGB limited" },
+	{ COLOR_SPACE_YCBCR601, "YCbCr 601" },
+	{ COLOR_SPACE_YCBCR709, "YCbCr 709" },
+	{ COLOR_SPACE_YCBCR601_LIMITED, "YCbCr 601 limited" },
+	{ COLOR_SPACE_YCBCR709_LIMITED, "YCbCr 709 limited" },
+	{ COLOR_SPACE_2020_RGB_FULLRANGE, "RGB 2020" },
+	{ COLOR_SPACE_2020_RGB_LIMITEDRANGE, "RGB 2020 limited" },
+	{ COLOR_SPACE_2020_YCBCR, "YCbCr 2020" },
+	{ COLOR_SPACE_ADOBERGB, "Adobe RGB" },
+};
+
 int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 {
 	int sz;
@@ -1094,6 +1128,30 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 			drm_property_create_range(adev_to_drm(adev), 0,
 						  "abm level", 0, 4);
 		if (!adev->mode_info.abm_level_property)
+			return -ENOMEM;
+
+		sz = ARRAY_SIZE(amdgpu_active_pixel_encoding_enum_list);
+		adev->mode_info.active_pixel_encoding_property =
+			drm_property_create_enum(adev_to_drm(adev), 0,
+				"active pixel encoding",
+				amdgpu_active_pixel_encoding_enum_list, sz);
+		if (!adev->mode_info.active_pixel_encoding_property)
+			return -ENOMEM;
+
+		sz = ARRAY_SIZE(amdgpu_active_display_color_depth_enum_list);
+		adev->mode_info.active_display_color_depth_property =
+			drm_property_create_enum(adev_to_drm(adev), 0,
+				"active display color depth",
+				amdgpu_active_display_color_depth_enum_list, sz);
+		if (!adev->mode_info.active_display_color_depth_property)
+			return -ENOMEM;
+
+		sz = ARRAY_SIZE(amdgpu_active_output_color_space_enum_list);
+		adev->mode_info.active_output_color_space_property =
+			drm_property_create_enum(adev_to_drm(adev), 0,
+				"active output color space",
+				amdgpu_active_output_color_space_enum_list, sz);
+		if (!adev->mode_info.active_output_color_space_property)
 			return -ENOMEM;
 	}
 

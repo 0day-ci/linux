@@ -5909,7 +5909,12 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct dm_connector_state *dm_state =
 		to_dm_connector_state(state);
+	struct dm_crtc_state *dm_crtc_state = NULL;
 	int ret = -EINVAL;
+
+	if (state->crtc != NULL && state->crtc->state != NULL) {
+		dm_crtc_state = to_dm_crtc_state(state->crtc->state);
+	}
 
 	if (property == dev->mode_config.scaling_mode_property) {
 		switch (dm_state->scaling) {
@@ -5939,6 +5944,21 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.abm_level_property) {
 		*val = dm_state->abm_level;
+		ret = 0;
+	} else if (property == adev->mode_info.active_pixel_encoding_property) {
+		*val = PIXEL_ENCODING_UNDEFINED;
+		if (dm_crtc_state != NULL && dm_crtc_state->stream != NULL)
+			*val = dm_crtc_state->stream->timing.pixel_encoding;
+		ret = 0;
+	} else if (property == adev->mode_info.active_display_color_depth_property) {
+		*val = COLOR_DEPTH_UNDEFINED;
+		if (dm_crtc_state != NULL && dm_crtc_state->stream != NULL)
+			*val = dm_crtc_state->stream->timing.display_color_depth;
+		ret = 0;
+	} else if (property == adev->mode_info.active_output_color_space_property) {
+		*val = COLOR_SPACE_UNKNOWN;
+		if (dm_crtc_state != NULL && dm_crtc_state->stream != NULL)
+			*val = dm_crtc_state->stream->output_color_space;
 		ret = 0;
 	}
 
@@ -7525,6 +7545,22 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		if (adev->dm.hdcp_workqueue)
 			drm_connector_attach_content_protection_property(&aconnector->base, true);
 #endif
+	}
+
+	if (adev->mode_info.active_pixel_encoding_property) {
+		drm_object_attach_property(&aconnector->base.base,
+			adev->mode_info.active_pixel_encoding_property, 0);
+		DRM_DEBUG_DRIVER("amdgpu: attached active pixel encoding drm property");
+	}
+	if (adev->mode_info.active_display_color_depth_property) {
+		drm_object_attach_property(&aconnector->base.base,
+			adev->mode_info.active_display_color_depth_property, 0);
+		DRM_DEBUG_DRIVER("amdgpu: attached active color depth drm property");
+	}
+	if (adev->mode_info.active_output_color_space_property) {
+		drm_object_attach_property(&aconnector->base.base,
+			adev->mode_info.active_output_color_space_property, 0);
+		DRM_DEBUG_DRIVER("amdgpu: attached active output color space drm property");
 	}
 }
 
