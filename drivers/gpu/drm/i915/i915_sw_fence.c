@@ -449,7 +449,7 @@ static void dma_i915_sw_fence_wake_timer(struct dma_fence *dma,
 
 	fence = xchg(&cb->base.fence, NULL);
 	if (fence) {
-		i915_sw_fence_set_error_once(fence, dma->error);
+		i915_sw_fence_propagate_dma_fence_error(fence, dma);
 		i915_sw_fence_complete(fence);
 	}
 
@@ -480,7 +480,7 @@ int i915_sw_fence_await_dma_fence(struct i915_sw_fence *fence,
 	might_sleep_if(gfpflags_allow_blocking(gfp));
 
 	if (dma_fence_is_signaled(dma)) {
-		i915_sw_fence_set_error_once(fence, dma->error);
+		i915_sw_fence_propagate_dma_fence_error(fence, dma);
 		return 0;
 	}
 
@@ -496,7 +496,7 @@ int i915_sw_fence_await_dma_fence(struct i915_sw_fence *fence,
 		if (ret)
 			return ret;
 
-		i915_sw_fence_set_error_once(fence, dma->error);
+		i915_sw_fence_propagate_dma_fence_error(fence, dma);
 		return 0;
 	}
 
@@ -548,7 +548,7 @@ int __i915_sw_fence_await_dma_fence(struct i915_sw_fence *fence,
 	debug_fence_assert(fence);
 
 	if (dma_fence_is_signaled(dma)) {
-		i915_sw_fence_set_error_once(fence, dma->error);
+		i915_sw_fence_propagate_dma_fence_error(fence, dma);
 		return 0;
 	}
 

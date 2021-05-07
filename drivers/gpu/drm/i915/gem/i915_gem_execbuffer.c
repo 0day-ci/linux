@@ -2522,6 +2522,8 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 	}
 
 	dma_fence_work_init(&pw->base, &eb_parse_ops);
+	/* Propagate errors for security. */
+	__set_bit(DMA_FENCE_FLAG_PROPAGATE_ERROR, &pw->base.dma.flags);
 
 	pw->engine = eb->engine;
 	pw->batch = eb->batch->vma;

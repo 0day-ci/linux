@@ -116,4 +116,12 @@ i915_sw_fence_set_error_once(struct i915_sw_fence *fence, int error)
 		cmpxchg(&fence->error, 0, error);
 }
 
+static inline void
+i915_sw_fence_propagate_dma_fence_error(struct i915_sw_fence *fence,
+					struct dma_fence *dma)
+{
+	if (unlikely(test_bit(DMA_FENCE_FLAG_PROPAGATE_ERROR, &dma->flags)))
+		i915_sw_fence_set_error_once(fence, dma->error);
+}
+
 #endif /* _I915_SW_FENCE_H_ */
