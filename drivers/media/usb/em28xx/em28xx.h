@@ -549,10 +549,9 @@ struct em28xx_eeprom {
 #define EM28XX_RESOURCE_VBI   0x02
 
 struct em28xx_v4l2 {
-	struct kref ref;
 	struct em28xx *dev;
 
-	struct v4l2_device v4l2_dev;
+	struct v4l2_device *v4l2_dev;
 	struct v4l2_ctrl_handler ctrl_handler;
 
 	struct video_device vdev;

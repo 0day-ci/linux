@@ -4120,7 +4120,6 @@ static void em28xx_usb_disconnect(struct usb_interface *intf)
 	struct em28xx *dev;
 
 	dev = usb_get_intfdata(intf);
-	usb_set_intfdata(intf, NULL);
 
 	if (!dev)
 		return;
@@ -4148,6 +4147,8 @@ static void em28xx_usb_disconnect(struct usb_interface *intf)
 		dev->dev_next = NULL;
 	}
 	kref_put(&dev->ref, em28xx_free_device);
+
+	usb_set_intfdata(intf, NULL);
 }
 
 static int em28xx_usb_suspend(struct usb_interface *intf,
