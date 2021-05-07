@@ -132,6 +132,8 @@ struct kvm_arch {
 
 	u8 pfr0_csv2;
 	u8 pfr0_csv3;
+
+	struct kvm_sdei_kvm *sdei;
 };
 
 struct kvm_vcpu_fault_info {
@@ -371,6 +373,8 @@ struct kvm_vcpu_arch {
 		u64 last_steal;
 		gpa_t base;
 	} steal;
+
+	struct kvm_sdei_vcpu *sdei;
 };
 
 /* Pointer to the vcpu's SVE FFR for sve_{save,load}_state() */
