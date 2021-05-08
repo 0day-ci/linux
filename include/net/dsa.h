@@ -512,6 +512,13 @@ struct dsa_switch_ops {
 	u32	(*get_phy_flags)(struct dsa_switch *ds, int port);
 
 	/*
+	 * Provide a custom phys_mii_mask for the dsa slave mdiobus instead
+	 * of relying on the dsa_user_ports. Not every switch has a 1:1 map
+	 * port to PHY, hence the driver can provide their fixed mask.
+	 */
+	u32	(*get_phys_mii_mask)(struct dsa_switch *ds);
+
+	/*
 	 * Access to the switch's PHY registers.
 	 */
 	int	(*phy_read)(struct dsa_switch *ds, int port, int regnum);

@@ -682,8 +682,13 @@ static int dsa_switch_setup(struct dsa_switch *ds)
 	 * driver and before ops->setup() has run, since the switch drivers and
 	 * the slave MDIO bus driver rely on these values for probing PHY
 	 * devices or not
+	 * Driver can provide his on mask as some switch doesn't have a 1:1 map
+	 * phy to port.
 	 */
-	ds->phys_mii_mask |= dsa_user_ports(ds);
+	if (ds->ops->get_phys_mii_mask)
+		ds->phys_mii_mask = ds->ops->get_phys_mii_mask(ds);
+	else
+		ds->phys_mii_mask |= dsa_user_ports(ds);
 
 	/* Add the switch to devlink before calling setup, so that setup can
 	 * add dpipe tables

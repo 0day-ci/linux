@@ -1685,7 +1685,37 @@ qca8k_get_tag_protocol(struct dsa_switch *ds, int port,
 	return DSA_TAG_PROTO_QCA;
 }
 
+static u32
+qca8k_get_phys_mii_mask(struct dsa_switch *ds)
+{
+	struct device_node *mdio, *phy;
+	u32 reg, phy_mii_mask = 0;
+	int err;
+
+	mdio = of_get_child_by_name(ds->dev->of_node, "mdio");
+	if (mdio) {
+		for_each_available_child_of_node(mdio, phy) {
+			err = of_property_read_u32(phy, "reg", &reg);
+			if (err) {
+				of_node_put(phy);
+				of_node_put(mdio);
+				return 0;
+			}
+
+			phy_mii_mask |= BIT(reg);
+		}
+
+		of_node_put(mdio);
+		return phy_mii_mask;
+	}
+
+	/* Fallback to the lagacy mapping if mdio node is not found */
+	dev_warn(ds->dev, "Using the legacy phys_mii_mapping. Consider updating the dts.");
+	return dsa_user_ports(ds);
+}
+
 static const struct dsa_switch_ops qca8k_switch_ops = {
+	.get_phys_mii_mask	= qca8k_get_phys_mii_mask,
 	.get_tag_protocol	= qca8k_get_tag_protocol,
 	.setup			= qca8k_setup,
 	.get_strings		= qca8k_get_strings,
