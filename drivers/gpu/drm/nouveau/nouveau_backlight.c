@@ -273,6 +273,7 @@ nouveau_backlight_init(struct drm_connector *connector)
 		return -ENOMEM;
 
 	if (!nouveau_get_backlight_name(backlight_name, bl)) {
+		ret = -ENOSPC;
 		NV_ERROR(drm, "Failed to retrieve a unique name for the backlight interface\n");
 		goto fail_alloc;
 	}
