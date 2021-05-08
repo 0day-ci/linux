@@ -764,8 +764,6 @@ static int max77686_rtc_probe(struct platform_device *pdev)
 	if (IS_ERR(info->rtc_dev)) {
 		ret = PTR_ERR(info->rtc_dev);
 		dev_err(&pdev->dev, "Failed to register RTC device: %d\n", ret);
-		if (ret == 0)
-			ret = -EINVAL;
 		goto err_rtc;
 	}
 
