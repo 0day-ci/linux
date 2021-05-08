@@ -487,6 +487,20 @@ struct drm_crtc_helper_funcs {
 				     bool in_vblank_irq, int *vpos, int *hpos,
 				     ktime_t *stime, ktime_t *etime,
 				     const struct drm_display_mode *mode);
+
+	/**
+	 * @needs_dirtyfb
+	 *
+	 * Optional callback used by damage helpers to determine if fb_damage_clips
+	 * update is needed.
+	 *
+	 * Returns:
+	 *
+	 * True if fb_damage_clips update is needed to handle DIRTYFB, False
+	 * otherwise.  If this callback is not implemented, then True is
+	 * assumed.
+	 */
+	bool (*needs_dirtyfb)(struct drm_crtc *crtc);
 };
 
 /**

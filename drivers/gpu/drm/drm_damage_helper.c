@@ -211,12 +211,20 @@ int drm_atomic_helper_dirtyfb(struct drm_framebuffer *fb,
 retry:
 	drm_for_each_plane(plane, fb->dev) {
 		struct drm_plane_state *plane_state;
+		struct drm_crtc *crtc;
 
 		ret = drm_modeset_lock(&plane->mutex, state->acquire_ctx);
 		if (ret)
 			goto out;
 
 		if (plane->state->fb != fb) {
+			drm_modeset_unlock(&plane->mutex);
+			continue;
+		}
+
+		crtc = plane->state->crtc;
+		if (crtc->helper_private->needs_dirtyfb &&
+				!crtc->helper_private->needs_dirtyfb(crtc)) {
 			drm_modeset_unlock(&plane->mutex);
 			continue;
 		}
