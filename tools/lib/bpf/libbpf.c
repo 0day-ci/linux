@@ -291,7 +291,6 @@ struct bpf_program {
 	__u32 line_info_rec_size;
 	__u32 line_info_cnt;
 	__u32 prog_flags;
-	int *fd_array;
 };
 
 struct bpf_struct_ops {
@@ -6451,7 +6450,7 @@ bpf_object__relocate_data(struct bpf_object *obj, struct bpf_program *prog)
 
 		switch (relo->type) {
 		case RELO_LD64:
-			if (kernel_supports(obj, FEAT_FD_IDX)) {
+			if (obj->gen_loader) {
 				insn[0].src_reg = BPF_PSEUDO_MAP_IDX;
 				insn[0].imm = relo->map_idx;
 			} else {
@@ -6461,7 +6460,7 @@ bpf_object__relocate_data(struct bpf_object *obj, struct bpf_program *prog)
 			break;
 		case RELO_DATA:
 			insn[1].imm = insn[0].imm + relo->sym_off;
-			if (kernel_supports(obj, FEAT_FD_IDX)) {
+			if (obj->gen_loader) {
 				insn[0].src_reg = BPF_PSEUDO_MAP_IDX_VALUE;
 				insn[0].imm = relo->map_idx;
 			} else {
@@ -6472,7 +6471,7 @@ bpf_object__relocate_data(struct bpf_object *obj, struct bpf_program *prog)
 		case RELO_EXTERN_VAR:
 			ext = &obj->externs[relo->sym_off];
 			if (ext->type == EXT_KCFG) {
-				if (kernel_supports(obj, FEAT_FD_IDX)) {
+				if (obj->gen_loader) {
 					insn[0].src_reg = BPF_PSEUDO_MAP_IDX_VALUE;
 					insn[0].imm = obj->kconfig_map_idx;
 				} else {
@@ -7275,7 +7274,6 @@ load_program(struct bpf_program *prog, struct bpf_insn *insns, int insns_cnt,
 	load_attr.attach_btf_id = prog->attach_btf_id;
 	load_attr.kern_version = kern_version;
 	load_attr.prog_ifindex = prog->prog_ifindex;
-	load_attr.fd_array = prog->fd_array;
 
 	/* specify func_info/line_info only if kernel supports them */
 	btf_fd = bpf_object__btf_fd(prog->obj);
@@ -7506,7 +7504,6 @@ static int
 bpf_object__load_progs(struct bpf_object *obj, int log_level)
 {
 	struct bpf_program *prog;
-	int *fd_array = NULL;
 	size_t i;
 	int err;
 
@@ -7515,14 +7512,6 @@ bpf_object__load_progs(struct bpf_object *obj, int log_level)
 		err = bpf_object__sanitize_prog(obj, prog);
 		if (err)
 			return err;
-	}
-
-	if (kernel_supports(obj, FEAT_FD_IDX) && obj->nr_maps) {
-		fd_array = malloc(sizeof(int) * obj->nr_maps);
-		if (!fd_array)
-			return -ENOMEM;
-		for (i = 0; i < obj->nr_maps; i++)
-			fd_array[i] = obj->maps[i].fd;
 	}
 
 	for (i = 0; i < obj->nr_programs; i++) {
@@ -7534,17 +7523,12 @@ bpf_object__load_progs(struct bpf_object *obj, int log_level)
 			continue;
 		}
 		prog->log_level |= log_level;
-		prog->fd_array = fd_array;
 		err = bpf_program__load(prog, obj->license, obj->kern_version);
-		prog->fd_array = NULL;
-		if (err) {
-			free(fd_array);
+		if (err)
 			return err;
-		}
 	}
 	if (obj->gen_loader)
 		bpf_object__free_relocs(obj);
-	free(fd_array);
 	return 0;
 }
 
