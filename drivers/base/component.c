@@ -15,6 +15,8 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 
+#include "base.h"
+
 /**
  * DOC: overview
  *
@@ -657,6 +659,14 @@ int component_bind_all(struct device *master_dev, void *data)
 				c = master->match->compare[i - 1].component;
 				component_unbind(c, master, data);
 			}
+	} else {
+		/*
+		 * Move to the tail of the list so that master_dev driver ops
+		 * like 'shutdown' or 'remove' are called before any of the
+		 * dependencies that the components have are shutdown or
+		 * removed.
+		 */
+		device_pm_move_to_tail(master_dev);
 	}
 
 	return ret;
