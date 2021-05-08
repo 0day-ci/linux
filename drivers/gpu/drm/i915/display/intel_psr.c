@@ -1015,40 +1015,51 @@ static bool psr_interrupt_error_check(struct intel_dp *intel_dp)
 	return true;
 }
 
-static void intel_psr_enable_locked(struct intel_dp *intel_dp,
-				    const struct intel_crtc_state *crtc_state,
-				    const struct drm_connector_state *conn_state)
+static void _intel_psr_enable_locked(struct intel_dp *intel_dp,
+				     const struct intel_crtc_state *crtc_state)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct intel_encoder *encoder = &dig_port->base;
-	u32 val;
 
 	drm_WARN_ON(&dev_priv->drm, intel_dp->psr.enabled);
 
-	intel_dp->psr.psr2_enabled = crtc_state->has_psr2;
 	intel_dp->psr.busy_frontbuffer_bits = 0;
-	intel_dp->psr.pipe = to_intel_crtc(crtc_state->uapi.crtc)->pipe;
-	intel_dp->psr.transcoder = crtc_state->cpu_transcoder;
-	/* DC5/DC6 requires at least 6 idle frames */
-	val = usecs_to_jiffies(intel_get_frame_time_us(crtc_state) * 6);
-	intel_dp->psr.dc3co_exit_delay = val;
-	intel_dp->psr.dc3co_exitline = crtc_state->dc3co_exitline;
-	intel_dp->psr.psr2_sel_fetch_enabled = crtc_state->enable_psr2_sel_fetch;
 
 	if (!psr_interrupt_error_check(intel_dp))
 		return;
 
 	drm_dbg_kms(&dev_priv->drm, "Enabling PSR%s\n",
 		    intel_dp->psr.psr2_enabled ? "2" : "1");
-	intel_dp_compute_psr_vsc_sdp(intel_dp, crtc_state, conn_state,
-				     &intel_dp->psr.vsc);
+
 	intel_write_dp_vsc_sdp(encoder, crtc_state, &intel_dp->psr.vsc);
 	intel_psr_enable_sink(intel_dp);
 	intel_psr_enable_source(intel_dp);
 	intel_dp->psr.enabled = true;
 
 	intel_psr_activate(intel_dp);
+}
+
+static void intel_psr_enable_locked(struct intel_dp *intel_dp,
+				    const struct intel_crtc_state *crtc_state,
+				    const struct drm_connector_state *conn_state)
+{
+	u32 val;
+
+	intel_dp->psr.psr2_enabled = crtc_state->has_psr2;
+	intel_dp->psr.pipe = to_intel_crtc(crtc_state->uapi.crtc)->pipe;
+	intel_dp->psr.transcoder = crtc_state->cpu_transcoder;
+	/* DC5/DC6 requires at least 6 idle frames */
+	val = usecs_to_jiffies(intel_get_frame_time_us(crtc_state) * 6);
+	intel_dp->psr.dc3co_exit_delay = val;
+	intel_dp->psr.psr2_sel_fetch_enabled = crtc_state->enable_psr2_sel_fetch;
+	intel_dp->psr.dc3co_exitline = crtc_state->dc3co_exitline;
+	intel_dp->psr.paused = false;
+
+	intel_dp_compute_psr_vsc_sdp(intel_dp, crtc_state, conn_state,
+				     &intel_dp->psr.vsc);
+
+	_intel_psr_enable_locked(intel_dp, crtc_state);
 }
 
 /**
@@ -1186,6 +1197,60 @@ void intel_psr_disable(struct intel_dp *intel_dp,
 	mutex_unlock(&intel_dp->psr.lock);
 	cancel_work_sync(&intel_dp->psr.work);
 	cancel_delayed_work_sync(&intel_dp->psr.dc3co_work);
+}
+
+/**
+ * intel_psr_pause - Pause PSR
+ * @intel_dp: Intel DP
+ *
+ * This function need to be called after enabling psr.
+ */
+void intel_psr_pause(struct intel_dp *intel_dp)
+{
+	struct intel_psr *psr = &intel_dp->psr;
+
+	if (!CAN_PSR(intel_dp))
+		return;
+
+	mutex_lock(&psr->lock);
+
+	if (!psr->active) {
+		mutex_unlock(&psr->lock);
+		return;
+	}
+
+	intel_psr_exit(intel_dp);
+	psr->paused = true;
+
+	mutex_unlock(&psr->lock);
+
+	cancel_work_sync(&psr->work);
+	cancel_delayed_work_sync(&psr->dc3co_work);
+}
+
+/**
+ * intel_psr_resume - Resume PSR
+ * @intel_dp: Intel DP
+ *
+ * This function need to be called after pausing psr.
+ */
+void intel_psr_resume(struct intel_dp *intel_dp)
+{
+	struct intel_psr *psr = &intel_dp->psr;
+
+	if (!CAN_PSR(intel_dp))
+		return;
+
+	mutex_lock(&psr->lock);
+
+	if (!psr->paused)
+		goto unlock;
+
+	psr->paused = false;
+	intel_psr_activate(intel_dp);
+
+unlock:
+	mutex_unlock(&psr->lock);
 }
 
 static void psr_force_hw_tracking_exit(struct intel_dp *intel_dp)
