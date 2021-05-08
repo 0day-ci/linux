@@ -318,7 +318,7 @@ static int idxd_setup_internals(struct idxd_device *idxd)
 
 	rc = idxd_setup_wqs(idxd);
 	if (rc < 0)
-		goto err_wqs;
+		return rc;
 
 	rc = idxd_setup_engines(idxd);
 	if (rc < 0)
@@ -345,8 +345,6 @@ static int idxd_setup_internals(struct idxd_device *idxd)
  err_engine:
 	for (i = 0; i < idxd->max_wqs; i++)
 		put_device(&idxd->wqs[i]->conf_dev);
- err_wqs:
-	kfree(idxd->int_handles);
 	return rc;
 }
 
