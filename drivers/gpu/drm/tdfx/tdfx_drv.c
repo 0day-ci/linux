@@ -44,6 +44,7 @@
 static struct pci_device_id pciidlist[] = {
 	tdfx_PCI_IDS
 };
+MODULE_DEVICE_TABLE(pci, pciidlist);
 
 static const struct file_operations tdfx_driver_fops = {
 	.owner = THIS_MODULE,
