@@ -97,8 +97,36 @@ static void bpf_gen__emit2(struct bpf_gen *gen, struct bpf_insn insn1, struct bp
 
 void bpf_gen__init(struct bpf_gen *gen, int log_level)
 {
+	size_t stack_sz = sizeof(struct loader_stack);
+	int i;
+
 	gen->log_level = log_level;
+	/* save ctx pointer into R6 */
 	bpf_gen__emit(gen, BPF_MOV64_REG(BPF_REG_6, BPF_REG_1));
+
+	/* bzero stack */
+	bpf_gen__emit(gen, BPF_MOV64_REG(BPF_REG_1, BPF_REG_10));
+	bpf_gen__emit(gen, BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -stack_sz));
+	bpf_gen__emit(gen, BPF_MOV64_IMM(BPF_REG_2, stack_sz));
+	bpf_gen__emit(gen, BPF_MOV64_IMM(BPF_REG_3, 0));
+	bpf_gen__emit(gen, BPF_EMIT_CALL(BPF_FUNC_probe_read_kernel));
+
+	/* jump over cleanup code */
+	bpf_gen__emit(gen, BPF_JMP_IMM(BPF_JA, 0, 0,
+				       /* size of cleanup code below */
+				       (stack_sz / 4) * 3 + 2));
+
+	/* remember the label where all error branches will jump to */
+	gen->cleanup_label = gen->insn_cur - gen->insn_start;
+	/* emit cleanup code: close all temp FDs */
+	for (i = 0; i < stack_sz; i+= 4) {
+		bpf_gen__emit(gen, BPF_LDX_MEM(BPF_W, BPF_REG_1, BPF_REG_10, -stack_sz + i));
+		bpf_gen__emit(gen, BPF_JMP_IMM(BPF_JSLE, BPF_REG_1, 0, 1));
+		bpf_gen__emit(gen, BPF_EMIT_CALL(BPF_FUNC_sys_close));
+	}
+	/* R7 contains the error code from sys_bpf. Copy it into R0 and exit. */
+	bpf_gen__emit(gen, BPF_MOV64_REG(BPF_REG_0, BPF_REG_7));
+	bpf_gen__emit(gen, BPF_EXIT_INSN());
 }
 
 static int bpf_gen__add_data(struct bpf_gen *gen, const void *data, __u32 size)
@@ -179,10 +207,12 @@ static void bpf_gen__emit_sys_bpf(struct bpf_gen *gen, int cmd, int attr, int at
 
 static void bpf_gen__emit_check_err(struct bpf_gen *gen)
 {
-	bpf_gen__emit(gen, BPF_JMP_IMM(BPF_JSGE, BPF_REG_7, 0, 2));
-	bpf_gen__emit(gen, BPF_MOV64_REG(BPF_REG_0, BPF_REG_7));
-	/* TODO: close intermediate FDs in case of error */
-	bpf_gen__emit(gen, BPF_EXIT_INSN());
+	/* R7 contains result of last sys_bpf command.
+	 * if (R7 < 0) goto cleanup;
+	 */
+	bpf_gen__emit(gen, BPF_JMP_IMM(BPF_JSGE, BPF_REG_7, 0, 1));
+	bpf_gen__emit(gen, BPF_JMP_IMM(BPF_JA, 0, 0,
+				       -(gen->insn_cur - gen->insn_start - gen->cleanup_label) / 8 - 1));
 }
 
 /* reg1 and reg2 should not be R1 - R5. They can be R0, R6 - R10 */
