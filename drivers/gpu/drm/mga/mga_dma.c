@@ -693,7 +693,7 @@ static int mga_do_pci_dma_bootstrap(struct drm_device *dev,
 	}
 
 	if (bin_count == 0) {
-		DRM_ERROR("Unable to add secondary DMA buffers: %d\n", err);
+		DRM_ERROR("Unable to add secondary DMA buffers: %d\n", err ? : -EINVAL);
 		return err;
 	}
 
