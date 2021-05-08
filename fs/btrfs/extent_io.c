@@ -5368,7 +5368,6 @@ int extent_fiemap(struct btrfs_inode *inode, struct fiemap_extent_info *fieinfo,
 				goto out_free;
 			if (ret)
 				flags |= FIEMAP_EXTENT_SHARED;
-			ret = 0;
 		}
 		if (test_bit(EXTENT_FLAG_COMPRESSED, &em->flags))
 			flags |= FIEMAP_EXTENT_ENCODED;
