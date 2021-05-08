@@ -28,7 +28,7 @@ tc_cold_get_power_domain(struct intel_digital_port *dig_port)
 {
 	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
 
-	if (DISPLAY_VER(i915) == 11)
+	if (IS_ALDERLAKE_P(i915) || DISPLAY_VER(i915) == 11)
 		return intel_legacy_aux_to_power_domain(dig_port->aux_ch);
 	else
 		return POWER_DOMAIN_TC_COLD_OFF;
