@@ -164,9 +164,8 @@ static int vp_vdpa_request_irq(struct vp_vdpa *vp_vdpa)
 	ret = devm_request_irq(&pdev->dev, irq,	vp_vdpa_config_handler, 0,
 			       vp_vdpa->msix_name, vp_vdpa);
 	if (ret) {
-		dev_err(&pdev->dev,
-			"vp_vdpa: fail to request irq for vq %d\n", i);
-			goto err;
+		dev_err(&pdev->dev, "vp_vdpa: fail to request irq for vq %d\n", i);
+		goto err;
 	}
 	vp_modern_config_vector(mdev, queues);
 	vp_vdpa->config_irq = irq;
