@@ -245,6 +245,13 @@ config QSEMI_PHY
 	help
 	  Currently supports the qs6612
 
+config QCA8K_PHY
+	tristate "Qualcomm Atheros AR833x Internal PHYs"
+	help
+	  This PHY is for the internal PHYs present on the QCA833x switch.
+
+	  Currently supports the AR8334, AR8337 model
+
 config REALTEK_PHY
 	tristate "Realtek PHYs"
 	help
