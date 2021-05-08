@@ -14,6 +14,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/of.h>
 #include <linux/of_net.h>
+#include <linux/of_mdio.h>
 #include <net/devlink.h>
 
 #include "dsa_priv.h"
@@ -721,6 +722,8 @@ static int dsa_switch_setup(struct dsa_switch *ds)
 	devlink_params_publish(ds->devlink);
 
 	if (!ds->slave_mii_bus && ds->ops->phy_read) {
+		struct device_node *mdio;
+
 		ds->slave_mii_bus = devm_mdiobus_alloc(ds->dev);
 		if (!ds->slave_mii_bus) {
 			err = -ENOMEM;
@@ -729,7 +732,15 @@ static int dsa_switch_setup(struct dsa_switch *ds)
 
 		dsa_slave_mii_bus_init(ds);
 
-		err = mdiobus_register(ds->slave_mii_bus);
+		mdio = of_get_child_by_name(ds->dev->of_node, "mdio");
+
+		if (mdio) {
+			err = of_mdiobus_register(ds->slave_mii_bus, mdio);
+			of_node_put(mdio);
+		} else {
+			err = mdiobus_register(ds->slave_mii_bus);
+		}
+
 		if (err < 0)
 			goto teardown;
 	}
