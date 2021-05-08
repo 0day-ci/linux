@@ -61,7 +61,7 @@ static int prepend_name(char **buffer, int *buflen, const struct qstr *name)
  * @root: root vfsmnt/dentry
  * @buffer: pointer to the end of the buffer
  * @buflen: pointer to buffer length
- *
+ * @need_lock: not ignoring renames and changes to the mount tree
  * The function will first try to write out the pathname without taking any
  * lock other than the RCU read lock to make sure that dentries won't go away.
  * It only checks the sequence number of the global rename_lock as any change
@@ -74,7 +74,7 @@ static int prepend_name(char **buffer, int *buflen, const struct qstr *name)
  */
 static int prepend_path(const struct path *path,
 			const struct path *root,
-			char **buffer, int *buflen)
+			char **buffer, int *buflen, bool need_lock)
 {
 	struct dentry *dentry;
 	struct vfsmount *vfsmnt;
@@ -86,7 +86,8 @@ static int prepend_path(const struct path *path,
 
 	rcu_read_lock();
 restart_mnt:
-	read_seqbegin_or_lock(&mount_lock, &m_seq);
+	if (need_lock)
+		read_seqbegin_or_lock(&mount_lock, &m_seq);
 	seq = 0;
 	rcu_read_lock();
 restart:
@@ -96,7 +97,8 @@ restart:
 	dentry = path->dentry;
 	vfsmnt = path->mnt;
 	mnt = real_mount(vfsmnt);
-	read_seqbegin_or_lock(&rename_lock, &seq);
+	if (need_lock)
+		read_seqbegin_or_lock(&rename_lock, &seq);
 	while (dentry != root->dentry || vfsmnt != root->mnt) {
 		struct dentry * parent;
 
@@ -136,19 +138,21 @@ restart:
 	}
 	if (!(seq & 1))
 		rcu_read_unlock();
-	if (need_seqretry(&rename_lock, seq)) {
+	if (need_lock && need_seqretry(&rename_lock, seq)) {
 		seq = 1;
 		goto restart;
 	}
-	done_seqretry(&rename_lock, seq);
+	if (need_lock)
+		done_seqretry(&rename_lock, seq);
 
 	if (!(m_seq & 1))
 		rcu_read_unlock();
-	if (need_seqretry(&mount_lock, m_seq)) {
+	if (need_lock && need_seqretry(&mount_lock, m_seq)) {
 		m_seq = 1;
 		goto restart_mnt;
 	}
-	done_seqretry(&mount_lock, m_seq);
+	if (need_lock)
+		done_seqretry(&mount_lock, m_seq);
 
 	if (error >= 0 && bptr == *buffer) {
 		if (--blen < 0)
@@ -185,7 +189,7 @@ char *__d_path(const struct path *path,
 	int error;
 
 	prepend(&res, &buflen, "\0", 1);
-	error = prepend_path(path, root, &res, &buflen);
+	error = prepend_path(path, root, &res, &buflen, true);
 
 	if (error < 0)
 		return ERR_PTR(error);
@@ -202,7 +206,7 @@ char *d_absolute_path(const struct path *path,
 	int error;
 
 	prepend(&res, &buflen, "\0", 1);
-	error = prepend_path(path, &root, &res, &buflen);
+	error = prepend_path(path, &root, &res, &buflen, true);
 
 	if (error > 1)
 		error = -EINVAL;
@@ -225,7 +229,7 @@ static int path_with_deleted(const struct path *path,
 			return error;
 	}
 
-	return prepend_path(path, root, buf, buflen);
+	return prepend_path(path, root, buf, buflen, true);
 }
 
 static int prepend_unreachable(char **buffer, int *buflen)
@@ -290,6 +294,28 @@ char *d_path(const struct path *path, char *buf, int buflen)
 	return res;
 }
 EXPORT_SYMBOL(d_path);
+
+/**
+ * d_path_fast - fast return the path of a dentry
+ * This helper is similar to d_path other than taking seqlock/spinlock.
+ */
+char *d_path_fast(const struct path *path, char *buf, int buflen)
+{
+	char *res = buf + buflen;
+	struct path root;
+	int error;
+
+	rcu_read_lock();
+	get_fs_root_rcu(current->fs, &root);
+	prepend(&res, &buflen, "\0", 1);
+	error = prepend_path(path, &root, &res, &buflen, false);
+	rcu_read_unlock();
+
+	if (error < 0)
+		res = ERR_PTR(error);
+	return res;
+}
+EXPORT_SYMBOL(d_path_fast);
 
 /*
  * Helper function for dentry_operations.d_dname() members
@@ -445,7 +471,7 @@ SYSCALL_DEFINE2(getcwd, char __user *, buf, unsigned long, size)
 		int buflen = PATH_MAX;
 
 		prepend(&cwd, &buflen, "\0", 1);
-		error = prepend_path(&pwd, &root, &cwd, &buflen);
+		error = prepend_path(&pwd, &root, &cwd, &buflen, true);
 		rcu_read_unlock();
 
 		if (error < 0)
