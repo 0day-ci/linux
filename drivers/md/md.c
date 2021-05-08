@@ -489,7 +489,7 @@ static blk_qc_t md_submit_bio(struct bio *bio)
 		return BLK_QC_T_NONE;
 	}
 
-	if (bio->bi_end_io != md_end_io) {
+	if (bio->bi_end_io != md_end_io && bio->bi_end_io != bio_chain_endio) {
 		struct md_io *md_io;
 
 		md_io = mempool_alloc(&mddev->md_io_pool, GFP_NOIO);

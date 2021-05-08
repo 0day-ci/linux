@@ -283,10 +283,11 @@ static struct bio *__bio_chain_endio(struct bio *bio)
 	return parent;
 }
 
-static void bio_chain_endio(struct bio *bio)
+void bio_chain_endio(struct bio *bio)
 {
 	bio_endio(__bio_chain_endio(bio));
 }
+EXPORT_SYMBOL(bio_chain_endio);
 
 /**
  * bio_chain - chain bio completions
