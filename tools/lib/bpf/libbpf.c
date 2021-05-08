@@ -9763,6 +9763,16 @@ int bpf_map__set_initial_value(struct bpf_map *map,
 	return 0;
 }
 
+int bpf_map__get_initial_value(struct bpf_map *map,
+			       const void **pdata, size_t *psize)
+{
+	if (!map->mmaped)
+		return -EINVAL;
+	*psize = map->def.value_size;
+	*pdata = map->mmaped;
+	return 0;
+}
+
 bool bpf_map__is_offload_neutral(const struct bpf_map *map)
 {
 	return map->def.type == BPF_MAP_TYPE_PERF_EVENT_ARRAY;
