@@ -354,14 +354,11 @@ static void __init setup_legacy_serial_console(int console)
 	udbg_uart_setup(info->speed, info->clock);
 }
 
-static int __init ioremap_legacy_serial_console(void)
+static int __init do_ioremap_legacy_serial_console(int console)
 {
-	struct legacy_serial_info *info = &legacy_serial_infos[legacy_serial_console];
-	struct plat_serial8250_port *port = &legacy_serial_ports[legacy_serial_console];
+	struct legacy_serial_info *info = &legacy_serial_infos[console];
+	struct plat_serial8250_port *port = &legacy_serial_ports[console];
 	void __iomem *vaddr;
-
-	if (legacy_serial_console < 0)
-		return 0;
 
 	if (!info->early_addr)
 		return 0;
@@ -375,6 +372,13 @@ static int __init ioremap_legacy_serial_console(void)
 	info->early_addr = NULL;
 
 	return 0;
+}
+
+static int __init ioremap_legacy_serial_console(void)
+{
+	if (legacy_serial_console < 0)
+		return 0;
+	return do_ioremap_legacy_serial_console(legacy_serial_console);
 }
 early_initcall(ioremap_legacy_serial_console);
 
