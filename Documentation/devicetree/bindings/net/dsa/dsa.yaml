@@ -15,6 +15,9 @@ description:
   This binding represents Ethernet Switches which have a dedicated CPU
   port. That port is usually connected to an Ethernet Controller of the
   SoC. Such setups are typical for embedded devices.
+  Switch can also have PHY port connected to an internal mdio bus by
+  declaring a mdio node inside the switch node and declaring the
+  phy-handle for each required port.
 
 select: false
 
@@ -84,6 +87,31 @@ patternProperties:
 
         required:
           - reg
+
+        additionalProperties: false
+
+patternProperties:
+  mdio:
+    description:
+      Describes the internal mdio of the Ethernet switch
+    type: object
+    properties:
+      '#address-cells':
+        const: 1
+      '#size-cells':
+        const: 0
+
+    patternProperties:
+      phy:
+        type: object
+        description: Ethernet switch internal PHY
+
+        properties:
+          reg:
+            description: PHY address
+
+        required:
+            - reg
 
         additionalProperties: false
 
