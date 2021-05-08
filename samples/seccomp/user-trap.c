@@ -164,6 +164,7 @@ static int handle_req(struct seccomp_notif *req,
 	}
 
 	if (lseek(mem, req->data.args[1], SEEK_SET) < 0) {
+		ret = -1;
 		perror("seek");
 		goto out;
 	}
