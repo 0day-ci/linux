@@ -12,12 +12,12 @@
 #include <linux/jump_label.h>
 
 /* old keys */
-struct static_key old_true_key	= STATIC_KEY_INIT_TRUE;
-struct static_key old_false_key	= STATIC_KEY_INIT_FALSE;
+static struct static_key old_true_key	= STATIC_KEY_INIT_TRUE;
+static struct static_key old_false_key	= STATIC_KEY_INIT_FALSE;
 
 /* new api */
-DEFINE_STATIC_KEY_TRUE(true_key);
-DEFINE_STATIC_KEY_FALSE(false_key);
+static DEFINE_STATIC_KEY_TRUE(true_key);
+static DEFINE_STATIC_KEY_FALSE(false_key);
 
 /* external */
 extern struct static_key base_old_true_key;
