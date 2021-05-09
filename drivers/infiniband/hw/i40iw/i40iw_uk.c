@@ -1004,6 +1004,7 @@ enum i40iw_status_code i40iw_qp_uk_init(struct i40iw_qp_uk *qp,
 			i40iw_get_wqe_shift(info->max_rq_frag_cnt, 0, &rqshift);
 			break;
 		case 5: /* fallthrough until next ABI version */
+			fallthrough;
 		default:
 			rqshift = I40IW_MAX_RQ_WQE_SHIFT;
 			break;

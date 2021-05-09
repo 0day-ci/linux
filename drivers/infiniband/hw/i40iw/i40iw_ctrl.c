@@ -2454,6 +2454,7 @@ static enum i40iw_status_code i40iw_sc_qp_init(struct i40iw_sc_qp *qp,
 			return ret_code;
 		break;
 	case 5: /* fallthrough until next ABI version */
+		fallthrough;
 	default:
 		if (qp->qp_uk.max_rq_frag_cnt > I40IW_MAX_WQ_FRAGMENT_COUNT)
 			return I40IW_ERR_INVALID_FRAG_COUNT;
