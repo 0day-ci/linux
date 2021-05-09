@@ -124,6 +124,9 @@
 				 IF_COMM_TXRQST |		 \
 				 IF_COMM_DATAA | IF_COMM_DATAB)
 
+#define IF_COMM_TX_FRAME	(IF_COMM_ARB | IF_COMM_CONTROL | \
+				 IF_COMM_DATAA | IF_COMM_DATAB)
+
 /* For the low buffers we clear the interrupt bit, but keep newdat */
 #define IF_COMM_RCV_LOW		(IF_COMM_MASK | IF_COMM_ARB | \
 				 IF_COMM_CONTROL | IF_COMM_CLR_INT_PND | \
@@ -432,19 +435,36 @@ static netdev_tx_t c_can_start_xmit(struct sk_buff *skb,
 {
 	struct can_frame *frame = (struct can_frame *)skb->data;
 	struct c_can_priv *priv = netdev_priv(dev);
-	u32 idx, obj;
+	u32 idx, obj, tx_active, tx_cached;
 
 	if (can_dropped_invalid_skb(dev, skb))
 		return NETDEV_TX_OK;
-	/* This is not a FIFO. C/D_CAN sends out the buffers
-	 * prioritized. The lowest buffer number wins.
-	 */
-	idx = fls(atomic_read(&priv->tx_active));
+
+	if (atomic_read(&priv->tx_avail) == 0)
+		netif_stop_queue(dev);
+
+	tx_active = atomic_read(&priv->tx_active);
+	tx_cached = atomic_read(&priv->tx_cached);
+	idx = fls(tx_active);
+	if (idx > priv->msg_obj_tx_num - 1) {
+		idx = fls(tx_cached);
+
+		obj = idx + priv->msg_obj_tx_first;
+		spin_lock_bh(&priv->tx_cached_lock);
+		/* prepare message object for transmission */
+		c_can_setup_tx_object(dev, IF_TX, frame, idx);
+		/* Store the message but don't ask for its transmission */
+		c_can_object_put(dev, IF_TX, obj, IF_COMM_TX_FRAME);
+		spin_unlock_bh(&priv->tx_cached_lock);
+		priv->dlc[idx] = frame->len;
+		can_put_echo_skb(skb, dev, idx, 0);
+		atomic_dec(&priv->tx_avail);
+		atomic_add(BIT(idx), &priv->tx_cached);
+		return NETDEV_TX_OK;
+	}
+
 	obj = idx + priv->msg_obj_tx_first;
 
-	/* If this is the last buffer, stop the xmit queue */
-	if (idx == priv->msg_obj_tx_num - 1)
-		netif_stop_queue(dev);
 	/* Store the message in the interface so we can call
 	 * can_put_echo_skb(). We must do this before we enable
 	 * transmit as we might race against do_tx().
@@ -453,6 +473,7 @@ static netdev_tx_t c_can_start_xmit(struct sk_buff *skb,
 	priv->dlc[idx] = frame->len;
 	can_put_echo_skb(skb, dev, idx, 0);
 
+	atomic_dec(&priv->tx_avail);
 	/* Update the active bits */
 	atomic_add(BIT(idx), &priv->tx_active);
 	/* Start transmission */
@@ -599,6 +620,8 @@ static int c_can_chip_config(struct net_device *dev)
 
 	/* Clear all internal status */
 	atomic_set(&priv->tx_active, 0);
+	atomic_set(&priv->tx_cached, 0);
+	atomic_set(&priv->tx_avail, priv->msg_obj_tx_num);
 	priv->tx_dir = 0;
 
 	/* set bittiming params */
@@ -723,13 +746,30 @@ static void c_can_do_tx(struct net_device *dev)
 	/* Clear the bits in the tx_active mask */
 	atomic_sub(clr, &priv->tx_active);
 
-	if (clr & BIT(priv->msg_obj_tx_num - 1))
-		netif_wake_queue(dev);
-
 	if (pkts) {
+		atomic_add(pkts, &priv->tx_avail);
+
+		if (netif_queue_stopped(dev))
+			netif_wake_queue(dev);
+
 		stats->tx_bytes += bytes;
 		stats->tx_packets += pkts;
 		can_led_event(dev, CAN_LED_EVENT_TX);
+	}
+
+	if (atomic_read(&priv->tx_active) == 0) {
+		pend = atomic_read(&priv->tx_cached);
+
+		clr = pend;
+		while ((idx = ffs(pend))) {
+			idx--;
+			pend &= ~(1 << idx);
+
+			obj = idx + priv->msg_obj_tx_first;
+			c_can_object_put(dev, IF_TX, obj, IF_COMM_TXRQST);
+		}
+		atomic_sub(clr, &priv->tx_cached);
+		atomic_add(clr, &priv->tx_active);
 	}
 }
 
@@ -1193,6 +1233,7 @@ struct net_device *alloc_c_can_dev(int msg_obj_num)
 		return NULL;
 
 	priv = netdev_priv(dev);
+	spin_lock_init(&priv->tx_cached_lock);
 	priv->msg_obj_num = msg_obj_num;
 	priv->msg_obj_rx_num = msg_obj_num - msg_obj_tx_num;
 	priv->msg_obj_rx_first = 1;

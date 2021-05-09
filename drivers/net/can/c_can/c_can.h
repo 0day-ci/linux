@@ -191,6 +191,9 @@ struct c_can_priv {
 	unsigned int msg_obj_tx_last;
 	u32 msg_obj_rx_mask;
 	atomic_t tx_active;
+	atomic_t tx_cached;
+	spinlock_t tx_cached_lock;
+	atomic_t tx_avail;
 	atomic_t sie_pending;
 	unsigned long tx_dir;
 	int last_status;
