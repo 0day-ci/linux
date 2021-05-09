@@ -316,7 +316,9 @@ config FORCE_MAX_ZONEORDER
 
 config DRAM_BASE
 	hex "DRAM start addr (the same with memory-section in dts)"
-	default 0x0
+	default 0x10000000	if (CPU_CK610)
+	default 0x0		if (!CPU_CK610)
+
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
