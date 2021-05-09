@@ -310,7 +310,7 @@ static int serial_probe(struct pcmcia_device *link)
 	dev_dbg(&link->dev, "serial_attach()\n");
 
 	/* Create new serial device */
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = devm_kzalloc(&link->dev, sizeof(*info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 	info->p_dev = link;
@@ -325,17 +325,12 @@ static int serial_probe(struct pcmcia_device *link)
 
 static void serial_detach(struct pcmcia_device *link)
 {
-	struct serial_info *info = link->priv;
-
 	dev_dbg(&link->dev, "serial_detach\n");
 
 	/*
 	 * Ensure that the ports have been released.
 	 */
 	serial_remove(link);
-
-	/* free bits */
-	kfree(info);
 }
 
 /*====================================================================*/
