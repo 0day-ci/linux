@@ -1914,6 +1914,9 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		goto out;
 	}
 
+	if (skb->end - skb->tail)
+		memset(skb_tail_pointer(skb), 0, skb->end - skb->tail);
+
 	err = security_netlink_send(sk, skb);
 	if (err) {
 		kfree_skb(skb);
