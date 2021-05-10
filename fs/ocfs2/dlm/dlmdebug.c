@@ -211,7 +211,7 @@ static const char *dlm_errmsgs[] = {
 
 const char *dlm_errmsg(enum dlm_status err)
 {
-	if (err >= DLM_MAXSTATS || err < 0)
+	if (err >= DLM_MAXSTATS)
 		return dlm_errmsgs[DLM_MAXSTATS];
 	return dlm_errmsgs[err];
 }
@@ -219,7 +219,7 @@ EXPORT_SYMBOL_GPL(dlm_errmsg);
 
 const char *dlm_errname(enum dlm_status err)
 {
-	if (err >= DLM_MAXSTATS || err < 0)
+	if (err >= DLM_MAXSTATS)
 		return dlm_errnames[DLM_MAXSTATS];
 	return dlm_errnames[err];
 }
