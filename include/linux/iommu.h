@@ -482,6 +482,7 @@ bool iommu_get_dma_strict(struct iommu_domain *domain);
 
 extern int report_iommu_fault(struct iommu_domain *domain, struct device *dev,
 			      unsigned long iova, int flags);
+extern int iommu_realloc_dev_group(struct device *dev);
 
 static inline void iommu_flush_iotlb_all(struct iommu_domain *domain)
 {
@@ -697,6 +698,11 @@ static inline size_t iommu_map_sg_atomic(struct iommu_domain *domain,
 				  unsigned int nents, int prot)
 {
 	return 0;
+}
+
+static inline int iommu_realloc_dev_group(struct device *dev)
+{
+	return -ENODEV;
 }
 
 static inline void iommu_flush_iotlb_all(struct iommu_domain *domain)

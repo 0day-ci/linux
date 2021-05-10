@@ -3191,6 +3191,18 @@ out:
 	return ret;
 }
 
+int iommu_realloc_dev_group(struct device *dev)
+{
+	struct iommu_group *group;
+	int ret;
+
+	group = iommu_group_get(dev);
+	ret = iommu_change_dev_def_domain(group, dev, 0, true);
+	iommu_group_put(group);
+
+	return ret;
+}
+
 /*
  * Changing the default domain or any other IOMMU group attribute through sysfs
  * requires the users to unbind the drivers from the devices in the IOMMU group.
