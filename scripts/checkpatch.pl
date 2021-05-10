@@ -889,6 +889,13 @@ if (open(my $spelling, '<', $spelling_file)) {
 }
 
 if ($codespell) {
+	if (! -e "$codespellfile" && which("python3") ne "") {
+		my $output = `python3 -c "import codespell_lib; print(codespell_lib.__file__, end='');" 2>/dev/null`;
+		my $dictionary_path = dirname($output) . "/data/dictionary.txt";
+		if (-e "$dictionary_path") {
+			$codespellfile = $dictionary_path;
+		}
+	}
 	if (open(my $spelling, '<', $codespellfile)) {
 		while (<$spelling>) {
 			my $line = $_;
