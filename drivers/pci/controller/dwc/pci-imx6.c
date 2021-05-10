@@ -1063,6 +1063,8 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		if (dbi_base->start == IMX8MQ_PCIE2_BASE_ADDR)
 			imx6_pcie->controller_id = 1;
 
+		pci->atu_base =  pci->dbi_base + DEFAULT_DBI_ATU_OFFSET;
+
 		fallthrough;
 	case IMX7D:
 		imx6_pcie->pciephy_reset = devm_reset_control_get_exclusive(dev,
