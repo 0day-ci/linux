@@ -879,7 +879,7 @@ config LEDS_TI_LMU_COMMON
 config LEDS_LM3697
 	tristate "LED driver for LM3697"
 	depends on LEDS_TI_LMU_COMMON
-	depends on I2C && OF
+	depends on I2C
 	help
 	  Say Y to enable the LM3697 LED driver for TI LMU devices.
 	  This supports the LED device LM3697.
