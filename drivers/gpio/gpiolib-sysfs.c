@@ -793,8 +793,7 @@ void gpiochip_sysfs_unregister(struct gpio_device *gdev)
 	mutex_unlock(&sysfs_lock);
 
 	/* unregister gpiod class devices owned by sysfs */
-	for (i = 0; i < chip->ngpio; i++) {
-		desc = &gdev->descs[i];
+	for_each_gpio_desc(i, chip, desc) {
 		if (test_and_clear_bit(FLAG_SYSFS, &desc->flags))
 			gpiod_free(desc);
 	}

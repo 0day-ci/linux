@@ -711,13 +711,12 @@ static int of_gpiochip_scan_gpios(struct gpio_chip *chip)
 static void of_gpiochip_remove_hog(struct gpio_chip *chip,
 				   struct device_node *hog)
 {
-	struct gpio_desc *descs = chip->gpiodev->descs;
+	struct gpio_desc *desc;
 	unsigned int i;
 
-	for (i = 0; i < chip->ngpio; i++) {
-		if (test_bit(FLAG_IS_HOGGED, &descs[i].flags) &&
-		    descs[i].hog == hog)
-			gpiochip_free_own_desc(&descs[i]);
+	for_each_gpio_desc(i, chip, desc) {
+		if (test_bit(FLAG_IS_HOGGED, desc->flags) && desc->hog == hog)
+			gpiochip_free_own_desc(desc);
 	}
 }
 
