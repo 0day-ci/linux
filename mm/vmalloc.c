@@ -2775,13 +2775,8 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		gfp_mask |= __GFP_HIGHMEM;
 
 	/* Please note that the recursion is strictly bounded. */
-	if (array_size > PAGE_SIZE) {
-		pages = __vmalloc_node(array_size, 1, nested_gfp, node,
-					area->caller);
-	} else {
-		pages = kmalloc_node(array_size, nested_gfp, node);
-	}
-
+	pages = kvmalloc_node_caller(array_size, nested_gfp, node,
+					(unsigned long)area->caller);
 	if (!pages) {
 		free_vm_area(area);
 		warn_alloc(gfp_mask, NULL,
