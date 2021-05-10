@@ -571,9 +571,6 @@ static int navi10_ih_sw_fini(void *handle)
 
 	amdgpu_irq_fini_sw(adev);
 	amdgpu_ih_ring_fini(adev, &adev->irq.ih_soft);
-	amdgpu_ih_ring_fini(adev, &adev->irq.ih2);
-	amdgpu_ih_ring_fini(adev, &adev->irq.ih1);
-	amdgpu_ih_ring_fini(adev, &adev->irq.ih);
 
 	return 0;
 }

@@ -92,7 +92,7 @@ static int amdgpu_gart_dummy_page_init(struct amdgpu_device *adev)
  *
  * Frees the dummy page used by the driver (all asics).
  */
-static void amdgpu_gart_dummy_page_fini(struct amdgpu_device *adev)
+void amdgpu_gart_dummy_page_fini(struct amdgpu_device *adev)
 {
 	if (!adev->dummy_page_addr)
 		return;
@@ -375,5 +375,4 @@ int amdgpu_gart_init(struct amdgpu_device *adev)
  */
 void amdgpu_gart_fini(struct amdgpu_device *adev)
 {
-	amdgpu_gart_dummy_page_fini(adev);
 }
