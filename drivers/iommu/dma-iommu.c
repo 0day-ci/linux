@@ -315,6 +315,31 @@ static bool dev_is_untrusted(struct device *dev)
 	return dev_is_pci(dev) && to_pci_dev(dev)->untrusted;
 }
 
+void iommu_reconfig_dev_group_dma(struct device *dev)
+{
+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	unsigned long shift, iova_len;
+	struct iova_domain *iovad;
+	size_t max_opt_dma_size;
+
+	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
+		return;
+
+	max_opt_dma_size = iommu_group_get_max_opt_dma_size(dev->iommu_group);
+	if (!max_opt_dma_size)
+		return;
+
+	iovad = &cookie->iovad;
+	shift = iova_shift(iovad);
+	iova_len = max_opt_dma_size >> shift;
+
+	if (iova_domain_len_is_cached(iovad, iova_len))
+		return;
+
+	iommu_realloc_dev_group(dev);
+}
+
 /**
  * iommu_dma_init_domain - Initialise a DMA mapping domain
  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
