@@ -6,6 +6,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/qcom,gcc-sm8350.h>
 #include <dt-bindings/clock/qcom,rpmh.h>
+#include <dt-bindings/interconnect/qcom,sm8350.h>
 #include <dt-bindings/mailbox/qcom-ipcc.h>
 #include <dt-bindings/power/qcom-aoss-qmp.h>
 #include <dt-bindings/power/qcom-rpmpd.h>
@@ -689,7 +690,7 @@
 			interrupt-controller;
 		};
 
-		tsens0: thermal-sensor@c222000 {
+		tsens0: thermal-sensor@c263000 {
 			compatible = "qcom,sm8350-tsens", "qcom,tsens-v2";
 			reg = <0 0x0c263000 0 0x1ff>, /* TM */
 			      <0 0x0c222000 0 0x8>; /* SROT */
@@ -700,7 +701,7 @@
 			#thermal-sensor-cells = <1>;
 		};
 
-		tsens1: thermal-sensor@c223000 {
+		tsens1: thermal-sensor@c265000 {
 			compatible = "qcom,sm8350-tsens", "qcom,tsens-v2";
 			reg = <0 0x0c265000 0 0x1ff>, /* TM */
 			      <0 0x0c223000 0 0x8>; /* SROT */
@@ -1176,7 +1177,7 @@
 			};
 		};
 
-		dc_noc: interconnect@90e0000 {
+		dc_noc: interconnect@90c0000 {
 			compatible = "qcom,sm8350-dc-noc";
 			reg = <0 0x090c0000 0 0x4200>;
 			#interconnect-cells = <1>;
