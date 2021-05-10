@@ -43,9 +43,10 @@ static void __activate_traps(struct kvm_vcpu *vcpu)
 		if (!vcpu_el2_e2h_is_set(vcpu)) {
 			/*
 			 * For a guest hypervisor on v8.0, trap and emulate
-			 * the EL1 virtual memory control register accesses.
+			 * the EL1 virtual memory control register accesses
+			 * as well as the AT S1 operations.
 			 */
-			hcr |= HCR_TVM | HCR_TRVM | HCR_NV1;
+			hcr |= HCR_TVM | HCR_TRVM | HCR_AT | HCR_NV1;
 		} else {
 			/*
 			 * For a guest hypervisor on v8.1 (VHE), allow to
@@ -68,6 +69,14 @@ static void __activate_traps(struct kvm_vcpu *vcpu)
 			hcr &= ~HCR_TVM;
 
 			hcr |= vhcr_el2 & (HCR_TVM | HCR_TRVM);
+
+			/*
+			 * If we're using the EL1 translation regime
+			 * (TGE clear), then ensure that AT S1 ops are
+			 * trapped too.
+			 */
+			if (!vcpu_el2_tge_is_set(vcpu))
+				hcr |= HCR_AT;
 		}
 	}
 
