@@ -65,6 +65,13 @@ static int handle_smc(struct kvm_vcpu *vcpu)
 	int ret;
 
 	/*
+	 * Forward this trapped smc instruction to the virtual EL2 if
+	 * the guest has asked for it.
+	 */
+	if (forward_traps(vcpu, HCR_TSC))
+		return 1;
+
+	/*
 	 * "If an SMC instruction executed at Non-secure EL1 is
 	 * trapped to EL2 because HCR_EL2.TSC is 1, the exception is a
 	 * Trap exception, not a Secure Monitor Call exception [...]"
