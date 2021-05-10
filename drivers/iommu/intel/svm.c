@@ -347,10 +347,6 @@ int intel_svm_bind_gpasid(struct iommu_domain *domain, struct device *dev,
 	sdev->sid = PCI_DEVID(info->bus, info->devfn);
 	sdev->iommu = iommu;
 
-	/* Only count users if device has aux domains */
-	if (iommu_dev_feature_enabled(dev, IOMMU_DEV_FEAT_AUX))
-		sdev->users = 1;
-
 	/* Set up device context entry for PASID if not enabled already */
 	ret = intel_iommu_enable_pasid(iommu, sdev->dev);
 	if (ret) {
@@ -412,8 +408,6 @@ int intel_svm_unbind_gpasid(struct device *dev, u32 pasid)
 		goto out;
 
 	if (sdev) {
-		if (iommu_dev_feature_enabled(dev, IOMMU_DEV_FEAT_AUX))
-			sdev->users--;
 		if (!sdev->users) {
 			list_del_rcu(&sdev->list);
 			intel_pasid_tear_down_entry(iommu, dev,
