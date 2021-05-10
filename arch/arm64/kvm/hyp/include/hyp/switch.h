@@ -242,8 +242,12 @@ static inline bool __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
 	    esr_ec != ESR_ELx_EC_SVE)
 		return false;
 
-	/* Don't handle SVE traps for non-SVE vcpus here: */
-	if (!sve_guest && esr_ec != ESR_ELx_EC_FP_ASIMD)
+	/*
+	 * Don't handle SVE traps for non-SVE vcpus here. This
+	 * includes NV guests for the time being.
+	 */
+	if (!sve_guest && (esr_ec != ESR_ELx_EC_FP_ASIMD ||
+			   guest_hyp_fpsimd_traps_enabled(vcpu)))
 		return false;
 
 	/* Valid trap.  Switch the context: */
