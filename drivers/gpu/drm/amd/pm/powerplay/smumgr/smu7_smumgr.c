@@ -405,6 +405,8 @@ int smu7_request_smu_load_fw(struct pp_hwmgr *hwmgr)
 				UCODE_ID_MEC_STORAGE, &toc->entry[toc->num_entries++]),
 				"Failed to Get Firmware Entry.", r = -EINVAL; goto failed);
 	}
+
+	/* AG TODO Can't call drm_dev_enter/exit because access adev->ddev here ... */
 	memcpy_toio(smu_data->header_buffer.kaddr, smu_data->toc,
 		    sizeof(struct SMU_DRAMData_TOC));
 	smum_send_msg_to_smc_with_parameter(hwmgr,

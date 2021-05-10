@@ -35,6 +35,8 @@
 #include "amdgpu.h"
 #include "atom.h"
 
+#include <drm/drm_drv.h>
+
 /*
  * Rings
  * Most engines on the GPU are fed via ring buffers.  Ring
@@ -460,4 +462,72 @@ int amdgpu_ring_test_helper(struct amdgpu_ring *ring)
 
 	ring->sched.ready = !r;
 	return r;
+}
+
+void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
+{
+	int idx;
+	int i = 0;
+
+	if (!drm_dev_enter(&ring->adev->ddev, &idx))
+		return;
+
+	while (i <= ring->buf_mask)
+		ring->ring[i++] = ring->funcs->nop;
+
+	drm_dev_exit(idx);
+
+}
+
+void amdgpu_ring_write(struct amdgpu_ring *ring, uint32_t v)
+{
+	int idx;
+
+	if (!drm_dev_enter(&ring->adev->ddev, &idx))
+		return;
+
+	if (ring->count_dw <= 0)
+		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
+	ring->ring[ring->wptr++ & ring->buf_mask] = v;
+	ring->wptr &= ring->ptr_mask;
+	ring->count_dw--;
+
+	drm_dev_exit(idx);
+}
+
+void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
+					      void *src, int count_dw)
+{
+	unsigned occupied, chunk1, chunk2;
+	void *dst;
+	int idx;
+
+	if (!drm_dev_enter(&ring->adev->ddev, &idx))
+		return;
+
+	if (unlikely(ring->count_dw < count_dw))
+		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
+
+	occupied = ring->wptr & ring->buf_mask;
+	dst = (void *)&ring->ring[occupied];
+	chunk1 = ring->buf_mask + 1 - occupied;
+	chunk1 = (chunk1 >= count_dw) ? count_dw: chunk1;
+	chunk2 = count_dw - chunk1;
+	chunk1 <<= 2;
+	chunk2 <<= 2;
+
+	if (chunk1)
+		memcpy(dst, src, chunk1);
+
+	if (chunk2) {
+		src += chunk1;
+		dst = (void *)ring->ring;
+		memcpy(dst, src, chunk2);
+	}
+
+	ring->wptr += count_dw;
+	ring->wptr &= ring->ptr_mask;
+	ring->count_dw -= count_dw;
+
+	drm_dev_exit(idx);
 }

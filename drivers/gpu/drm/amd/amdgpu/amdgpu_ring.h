@@ -299,53 +299,12 @@ static inline void amdgpu_ring_set_preempt_cond_exec(struct amdgpu_ring *ring,
 	*ring->cond_exe_cpu_addr = cond_exec;
 }
 
-static inline void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
-{
-	int i = 0;
-	while (i <= ring->buf_mask)
-		ring->ring[i++] = ring->funcs->nop;
+void amdgpu_ring_clear_ring(struct amdgpu_ring *ring);
 
-}
+void amdgpu_ring_write(struct amdgpu_ring *ring, uint32_t v);
 
-static inline void amdgpu_ring_write(struct amdgpu_ring *ring, uint32_t v)
-{
-	if (ring->count_dw <= 0)
-		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
-	ring->ring[ring->wptr++ & ring->buf_mask] = v;
-	ring->wptr &= ring->ptr_mask;
-	ring->count_dw--;
-}
-
-static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
-					      void *src, int count_dw)
-{
-	unsigned occupied, chunk1, chunk2;
-	void *dst;
-
-	if (unlikely(ring->count_dw < count_dw))
-		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
-
-	occupied = ring->wptr & ring->buf_mask;
-	dst = (void *)&ring->ring[occupied];
-	chunk1 = ring->buf_mask + 1 - occupied;
-	chunk1 = (chunk1 >= count_dw) ? count_dw: chunk1;
-	chunk2 = count_dw - chunk1;
-	chunk1 <<= 2;
-	chunk2 <<= 2;
-
-	if (chunk1)
-		memcpy(dst, src, chunk1);
-
-	if (chunk2) {
-		src += chunk1;
-		dst = (void *)ring->ring;
-		memcpy(dst, src, chunk2);
-	}
-
-	ring->wptr += count_dw;
-	ring->wptr &= ring->ptr_mask;
-	ring->count_dw -= count_dw;
-}
+void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
+					      void *src, int count_dw);
 
 int amdgpu_ring_test_helper(struct amdgpu_ring *ring);
 

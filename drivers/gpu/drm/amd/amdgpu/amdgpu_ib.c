@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 
 #include <drm/amdgpu_drm.h>
+#include <drm/drm_drv.h>
 
 #include "amdgpu.h"
 #include "atom.h"
@@ -137,7 +138,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	bool secure;
 
 	unsigned i;
-	int r = 0;
+	int idx, r = 0;
 	bool need_pipe_sync = false;
 
 	if (num_ibs == 0)
@@ -169,13 +170,16 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		return -EINVAL;
 	}
 
+	if (!drm_dev_enter(&adev->ddev, &idx))
+		return -ENODEV;
+
 	alloc_size = ring->funcs->emit_frame_size + num_ibs *
 		ring->funcs->emit_ib_size;
 
 	r = amdgpu_ring_alloc(ring, alloc_size);
 	if (r) {
 		dev_err(adev->dev, "scheduling IB failed (%d).\n", r);
-		return r;
+		goto exit;
 	}
 
 	need_ctx_switch = ring->current_ctx != fence_ctx;
@@ -205,7 +209,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		r = amdgpu_vm_flush(ring, job, need_pipe_sync);
 		if (r) {
 			amdgpu_ring_undo(ring);
-			return r;
+			goto exit;
 		}
 	}
 
@@ -286,7 +290,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		if (job && job->vmid)
 			amdgpu_vmid_reset(adev, ring->funcs->vmhub, job->vmid);
 		amdgpu_ring_undo(ring);
-		return r;
+		goto exit;
 	}
 
 	if (ring->funcs->insert_end)
@@ -304,7 +308,10 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		ring->funcs->emit_wave_limit(ring, false);
 
 	amdgpu_ring_commit(ring);
-	return 0;
+
+exit:
+	drm_dev_exit(idx);
+	return r;
 }
 
 /**
