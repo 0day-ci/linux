@@ -3385,6 +3385,21 @@ int usb_port_suspend(struct usb_device *udev, pm_message_t msg)
 		status = 0;
 	}
 	if (status) {
+		if (status == -ETIMEDOUT) {
+			u16 portstatus, portchange;
+
+			int ret = hub_port_status(hub, port1, &portstatus,
+					&portchange);
+
+			dev_dbg(&port_dev->dev,
+				"suspend timeout, status %04x\n", portstatus);
+
+			if (ret == 0 && port_is_suspended(hub, portstatus)) {
+				udev->reset_resume = 1;
+				goto err_wakeup;
+			}
+		}
+
 		dev_dbg(&port_dev->dev, "can't suspend, status %d\n", status);
 
 		/* Try to enable USB3 LTM again */
