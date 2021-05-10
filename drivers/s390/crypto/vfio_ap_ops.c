@@ -26,6 +26,7 @@
 
 static int vfio_ap_mdev_reset_queues(struct mdev_device *mdev);
 static struct vfio_ap_queue *vfio_ap_find_queue(int apqn);
+static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev);
 
 static int match_apqn(struct device *dev, const void *data)
 {
@@ -366,17 +367,7 @@ static int vfio_ap_mdev_remove(struct mdev_device *mdev)
 	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 
 	mutex_lock(&matrix_dev->lock);
-
-	/*
-	 * If the KVM pointer is in flux or the guest is running, disallow
-	 * un-assignment of control domain.
-	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
-		mutex_unlock(&matrix_dev->lock);
-		return -EBUSY;
-	}
-
-	vfio_ap_mdev_reset_queues(mdev);
+	vfio_ap_mdev_unset_kvm(matrix_mdev);
 	list_del(&matrix_mdev->node);
 	kfree(matrix_mdev);
 	mdev_set_drvdata(mdev, NULL);
