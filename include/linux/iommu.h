@@ -202,7 +202,6 @@ struct iommu_iotlb_gather {
  *                               iommu specific features.
  * @dev_feat_enabled: check enabled feature
  * @aux_attach/detach_dev: aux-domain specific attach/detach entries.
- * @aux_get_pasid: get the pasid given an aux-domain
  * @sva_bind: Bind process address space to device
  * @sva_unbind: Unbind process address space from device
  * @sva_get_pasid: Get PASID associated to a SVA handle
@@ -262,7 +261,6 @@ struct iommu_ops {
 	/* Aux-domain specific attach/detach entries */
 	int (*aux_attach_dev)(struct iommu_domain *domain, struct device *dev);
 	void (*aux_detach_dev)(struct iommu_domain *domain, struct device *dev);
-	int (*aux_get_pasid)(struct iommu_domain *domain, struct device *dev);
 
 	struct iommu_sva *(*sva_bind)(struct device *dev, struct mm_struct *mm,
 				      void *drvdata);
@@ -594,7 +592,6 @@ int iommu_dev_disable_feature(struct device *dev, enum iommu_dev_features f);
 bool iommu_dev_feature_enabled(struct device *dev, enum iommu_dev_features f);
 int iommu_aux_attach_device(struct iommu_domain *domain, struct device *dev);
 void iommu_aux_detach_device(struct iommu_domain *domain, struct device *dev);
-int iommu_aux_get_pasid(struct iommu_domain *domain, struct device *dev);
 
 struct iommu_sva *iommu_sva_bind_device(struct device *dev,
 					struct mm_struct *mm,
@@ -943,12 +940,6 @@ iommu_aux_attach_device(struct iommu_domain *domain, struct device *dev)
 static inline void
 iommu_aux_detach_device(struct iommu_domain *domain, struct device *dev)
 {
-}
-
-static inline int
-iommu_aux_get_pasid(struct iommu_domain *domain, struct device *dev)
-{
-	return -ENODEV;
 }
 
 static inline struct iommu_sva *

@@ -5375,15 +5375,6 @@ intel_iommu_dev_feat_enabled(struct device *dev, enum iommu_dev_features feat)
 	return false;
 }
 
-static int
-intel_iommu_aux_get_pasid(struct iommu_domain *domain, struct device *dev)
-{
-	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
-
-	return dmar_domain->default_pasid > 0 ?
-			dmar_domain->default_pasid : -EINVAL;
-}
-
 static bool intel_iommu_is_attach_deferred(struct iommu_domain *domain,
 					   struct device *dev)
 {
@@ -5485,7 +5476,6 @@ const struct iommu_ops intel_iommu_ops = {
 	.detach_dev		= intel_iommu_detach_device,
 	.aux_attach_dev		= intel_iommu_aux_attach_device,
 	.aux_detach_dev		= intel_iommu_aux_detach_device,
-	.aux_get_pasid		= intel_iommu_aux_get_pasid,
 	.map			= intel_iommu_map,
 	.iotlb_sync_map		= intel_iommu_iotlb_sync_map,
 	.unmap			= intel_iommu_unmap,
