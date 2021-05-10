@@ -555,7 +555,7 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
 			writel(PCIE_PHY_CMN_REG26_ATT_MODE,
 			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG26);
 		} else {
-			dev_warn(dev, "Unable to apply ERR010728 workaround. DT missing fsl,imx7d-pcie-phy phandle ?\n");
+			dev_warn(dev, "Unable to apply ERR010728 workaround. DT missing fsl,imx7d-pcie-phy node?\n");
 		}
 
 		imx7d_pcie_wait_for_phy_pll_lock(imx6_pcie);
@@ -970,7 +970,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct dw_pcie *pci;
 	struct imx6_pcie *imx6_pcie;
-	struct device_node *np;
+	struct device_node *np = NULL;
 	struct resource *dbi_base;
 	struct device_node *node = dev->of_node;
 	int ret;
@@ -991,17 +991,10 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	imx6_pcie->pci = pci;
 	imx6_pcie->drvdata = of_device_get_match_data(dev);
 
-	/* Find the PHY if one is defined, only imx7d uses it */
-	np = of_parse_phandle(node, "fsl,imx7d-pcie-phy", 0);
+	/* Find the PHY if one is present in DT, only imx7d uses it */
+	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-pcie-phy");
 	if (np) {
-		struct resource res;
-
-		ret = of_address_to_resource(np, 0, &res);
-		if (ret) {
-			dev_err(dev, "Unable to map PCIe PHY\n");
-			return ret;
-		}
-		imx6_pcie->phy_base = devm_ioremap_resource(dev, &res);
+		imx6_pcie->phy_base = devm_of_iomap(dev, np, 0, NULL);
 		if (IS_ERR(imx6_pcie->phy_base)) {
 			dev_err(dev, "Unable to map PCIe PHY\n");
 			return PTR_ERR(imx6_pcie->phy_base);
