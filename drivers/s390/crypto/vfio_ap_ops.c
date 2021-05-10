@@ -24,7 +24,7 @@
 #define VFIO_AP_MDEV_TYPE_HWVIRT "passthrough"
 #define VFIO_AP_MDEV_NAME_HWVIRT "VFIO AP Passthrough Device"
 
-static int vfio_ap_mdev_reset_queues(struct mdev_device *mdev);
+static int vfio_ap_mdev_reset_queues(struct ap_matrix *matrix);
 static struct vfio_ap_queue *vfio_ap_find_queue(int apqn);
 
 static struct vfio_ap_queue *
@@ -262,8 +262,8 @@ static int handle_pqap(struct kvm_vcpu *vcpu)
 	if (!(vcpu->arch.sie_block->eca & ECA_AIV))
 		return -EOPNOTSUPP;
 
-	apqn = vcpu->run->s.regs.gprs[0] & 0xffff;
 	mutex_lock(&matrix_dev->lock);
+	apqn = vcpu->run->s.regs.gprs[0] & 0xffff;
 
 	if (!vcpu->kvm->arch.crypto.pqap_hook)
 		goto out_unlock;
@@ -336,6 +336,31 @@ static void vfio_ap_mdev_clear_apcb(struct ap_matrix_mdev *matrix_mdev)
 		wake_up_all(&matrix_mdev->wait_for_kvm);
 	}
 }
+
+static void vfio_ap_mdev_commit_apcb(struct ap_matrix_mdev *matrix_mdev)
+{
+	/*
+	 * If the KVM pointer is in the process of being set, wait until the
+	 * process has completed.
+	 */
+	wait_event_cmd(matrix_mdev->wait_for_kvm,
+		       !matrix_mdev->kvm_busy,
+		       mutex_unlock(&matrix_dev->lock),
+		       mutex_lock(&matrix_dev->lock));
+
+	if (vfio_ap_mdev_has_crycb(matrix_mdev)) {
+		matrix_mdev->kvm_busy = true;
+		mutex_unlock(&matrix_dev->lock);
+		kvm_arch_crypto_set_masks(matrix_mdev->kvm,
+					  matrix_mdev->shadow_apcb.apm,
+					  matrix_mdev->shadow_apcb.aqm,
+					  matrix_mdev->shadow_apcb.adm);
+		mutex_lock(&matrix_dev->lock);
+		matrix_mdev->kvm_busy = false;
+		wake_up_all(&matrix_mdev->wait_for_kvm);
+	}
+}
+
 /*
  * vfio_ap_mdev_filter_apcb
  *
@@ -403,6 +428,7 @@ static void vfio_ap_mdev_refresh_apcb(struct ap_matrix_mdev *matrix_mdev)
 		   sizeof(struct ap_matrix)) != 0) {
 		memcpy(&matrix_mdev->shadow_apcb, &shadow_apcb,
 		       sizeof(struct ap_matrix));
+		vfio_ap_mdev_commit_apcb(matrix_mdev);
 	}
 }
 
@@ -492,7 +518,7 @@ static int vfio_ap_mdev_remove(struct mdev_device *mdev)
 	WARN(vfio_ap_mdev_has_crycb(matrix_mdev),
 	     "Removing mdev leaves KVM guest without any crypto devices");
 	vfio_ap_mdev_clear_apcb(matrix_mdev);
-	vfio_ap_mdev_reset_queues(mdev);
+	vfio_ap_mdev_reset_queues(&matrix_mdev->matrix);
 	vfio_ap_mdev_unlink_fr_queues(matrix_mdev);
 	list_del(&matrix_mdev->node);
 	kfree(matrix_mdev);
@@ -682,7 +708,7 @@ static ssize_t assign_adapter_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of adapter
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -760,7 +786,7 @@ static ssize_t unassign_adapter_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of adapter
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -841,7 +867,7 @@ static ssize_t assign_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * assignment of domain
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -918,7 +944,7 @@ static ssize_t unassign_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of domain
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -942,6 +968,16 @@ done:
 	return ret;
 }
 static DEVICE_ATTR_WO(unassign_domain);
+
+static void vfio_ap_mdev_hot_plug_cdom(struct ap_matrix_mdev *matrix_mdev,
+				       unsigned long domid)
+{
+	if (!test_bit_inv(domid, matrix_mdev->shadow_apcb.adm) &&
+	    test_bit_inv(domid, (unsigned long *)matrix_dev->info.adm)) {
+		set_bit_inv(domid, matrix_mdev->shadow_apcb.adm);
+		vfio_ap_mdev_commit_apcb(matrix_mdev);
+	}
+}
 
 /**
  * assign_control_domain_store
@@ -974,7 +1010,7 @@ static ssize_t assign_control_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * assignment of control domain.
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -994,13 +1030,22 @@ static ssize_t assign_control_domain_store(struct device *dev,
 	 * number of control domains that can be assigned.
 	 */
 	set_bit_inv(id, matrix_mdev->matrix.adm);
-	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_mdev_hot_plug_cdom(matrix_mdev, id);
 	ret = count;
 done:
 	mutex_unlock(&matrix_dev->lock);
 	return ret;
 }
 static DEVICE_ATTR_WO(assign_control_domain);
+
+static void vfio_ap_mdev_hot_unplug_cdom(struct ap_matrix_mdev *matrix_mdev,
+					 unsigned long domid)
+{
+	if (test_bit_inv(domid, matrix_mdev->shadow_apcb.adm)) {
+		clear_bit_inv(domid, matrix_mdev->shadow_apcb.adm);
+		vfio_ap_mdev_commit_apcb(matrix_mdev);
+	}
+}
 
 /**
  * unassign_control_domain_store
@@ -1034,7 +1079,7 @@ static ssize_t unassign_control_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of control domain.
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm_busy) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -1048,7 +1093,7 @@ static ssize_t unassign_control_domain_store(struct device *dev,
 	}
 
 	clear_bit_inv(domid, matrix_mdev->matrix.adm);
-	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_mdev_hot_unplug_cdom(matrix_mdev, domid);
 	ret = count;
 done:
 	mutex_unlock(&matrix_dev->lock);
@@ -1257,7 +1302,7 @@ static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev)
 		mutex_unlock(&matrix_dev->lock);
 		kvm_arch_crypto_clear_masks(matrix_mdev->kvm);
 		mutex_lock(&matrix_dev->lock);
-		vfio_ap_mdev_reset_queues(matrix_mdev->mdev);
+		vfio_ap_mdev_reset_queues(&matrix_mdev->matrix);
 		matrix_mdev->kvm->arch.crypto.pqap_hook = NULL;
 		kvm_put_kvm(matrix_mdev->kvm);
 		matrix_mdev->kvm = NULL;
@@ -1356,18 +1401,15 @@ free_resources:
 	return ret;
 }
 
-static int vfio_ap_mdev_reset_queues(struct mdev_device *mdev)
+static int vfio_ap_mdev_reset_queues(struct ap_matrix *matrix)
 {
 	int ret;
 	int rc = 0;
 	unsigned long apid, apqi;
 	struct vfio_ap_queue *q;
-	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 
-	for_each_set_bit_inv(apid, matrix_mdev->matrix.apm,
-			     matrix_mdev->matrix.apm_max + 1) {
-		for_each_set_bit_inv(apqi, matrix_mdev->matrix.aqm,
-				     matrix_mdev->matrix.aqm_max + 1) {
+	for_each_set_bit_inv(apid, matrix->apm, AP_DEVICES) {
+		for_each_set_bit_inv(apqi, matrix->aqm, AP_DOMAINS) {
 			q = vfio_ap_find_queue(AP_MKQID(apid, apqi));
 			ret = vfio_ap_mdev_reset_queue(q, 1);
 			/*
@@ -1478,7 +1520,7 @@ static ssize_t vfio_ap_mdev_ioctl(struct mdev_device *mdev,
 			       mutex_unlock(&matrix_dev->lock),
 			       mutex_lock(&matrix_dev->lock));
 
-		ret = vfio_ap_mdev_reset_queues(mdev);
+		ret = vfio_ap_mdev_reset_queues(&matrix_mdev->matrix);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
@@ -1545,8 +1587,17 @@ int vfio_ap_mdev_probe_queue(struct ap_device *apdev)
 	q->apqn = to_ap_queue(&apdev->device)->qid;
 	q->saved_isc = VFIO_AP_ISC_INVALID;
 	vfio_ap_queue_link_mdev(q);
-	if (q->matrix_mdev)
+	if (q->matrix_mdev) {
+		/*
+		 * If the KVM pointer is in the process of being set, wait
+		 * until the process has completed.
+		 */
+		wait_event_cmd(q->matrix_mdev->wait_for_kvm,
+			       !q->matrix_mdev->kvm_busy,
+			       mutex_unlock(&matrix_dev->lock),
+			       mutex_lock(&matrix_dev->lock));
 		vfio_ap_mdev_refresh_apcb(q->matrix_mdev);
+	}
 	dev_set_drvdata(&apdev->device, q);
 	mutex_unlock(&matrix_dev->lock);
 
