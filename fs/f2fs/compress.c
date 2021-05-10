@@ -1082,6 +1082,7 @@ retry:
 
 		for (i = cc->cluster_size - 1; i > 0; i--) {
 			ret = f2fs_get_block(&dn, start_idx + i);
+			f2fs_put_dnode(&dn);
 			if (ret) {
 				i = cc->cluster_size;
 				break;
