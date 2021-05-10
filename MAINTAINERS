@@ -19486,6 +19486,13 @@ S:	Maintained
 F:	drivers/vlynq/vlynq.c
 F:	include/linux/vlynq.h
 
+VMALLOC
+M:	Uladzislau Rezki <urezki@gmail.com>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	mm/vmalloc.c
+F:	include/linux/vmalloc.h
+
 VME SUBSYSTEM
 M:	Martyn Welch <martyn@welchs.me.uk>
 M:	Manohar Vanga <manohar.vanga@gmail.com>
