@@ -3058,6 +3058,53 @@ u32 iommu_sva_get_pasid(struct iommu_sva *handle)
 }
 EXPORT_SYMBOL_GPL(iommu_sva_get_pasid);
 
+int iommu_set_dev_dma_opt_size(struct device *dev, size_t size)
+{
+	struct iommu_group *group = iommu_group_get(dev);
+	struct group_device *grp_dev;
+	struct device *_dev;
+	int ret, group_count;
+
+	if (!group)
+		return 0;
+
+	mutex_lock(&group->mutex);
+
+	/*
+	 * If already set, then ignore. We may have been set via sysfs, so
+	 * honour that.
+	 */
+	if (group->max_opt_dma_size) {
+		ret = 0;
+		goto out;
+	}
+
+	group_count = iommu_group_device_count(group);
+	if (group_count != 1) {
+		dev_err_ratelimited(dev, "Cannot change DMA opt size: Group has more than one device group_count=%d\n",
+				    group_count);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* Since group has only one device */
+	grp_dev = list_first_entry(&group->devices, struct group_device, list);
+	_dev = grp_dev->dev;
+
+	if (_dev != dev) {
+		dev_err_ratelimited(dev, "Cannot set DMA max opt size - device has changed\n");
+		ret = -EBUSY;
+		goto out;
+	}
+
+	group->max_opt_dma_size = size;
+	ret = -EPROBE_DEFER;
+out:
+	mutex_unlock(&group->mutex);
+	iommu_group_put(group);
+	return ret;
+}
+
 /*
  * Changes the default domain of an iommu group that has *only* one device
  *

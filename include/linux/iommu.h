@@ -428,6 +428,7 @@ extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
 extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
 extern void generic_iommu_put_resv_regions(struct device *dev,
 					   struct list_head *list);
+extern int iommu_set_dev_dma_opt_size(struct device *dev, size_t size);
 extern void iommu_set_default_passthrough(bool cmd_line);
 extern void iommu_set_default_translated(bool cmd_line);
 extern bool iommu_default_passthrough(void);
@@ -736,6 +737,12 @@ static inline void iommu_put_resv_regions(struct device *dev,
 
 static inline int iommu_get_group_resv_regions(struct iommu_group *group,
 					       struct list_head *head)
+{
+	return -ENODEV;
+}
+
+static inline int iommu_set_dev_dma_opt_size(struct device *dev,
+						 size_t size)
 {
 	return -ENODEV;
 }
