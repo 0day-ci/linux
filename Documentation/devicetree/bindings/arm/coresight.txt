@@ -137,6 +137,11 @@ its hardware characteristcs.
 	  will lose register context when AMBA clock is removed which is observed
 	  in some replicator designs.
 
+* Optional properties for funnels:
+
+	* source: specifies the source that binds to this output port. Only
+	  trace from that source routes to this output port.
+
 Graph bindings for Coresight
 -------------------------------
 
