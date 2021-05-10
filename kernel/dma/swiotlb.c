@@ -334,6 +334,7 @@ void __init swiotlb_exit(void)
 	io_tlb_default_mem = NULL;
 }
 
+static unsigned int swiotlb_align_offset(struct device *dev, u64 addr);
 /*
  * Bounce: copy the swiotlb buffer from or back to the original dma location
  */
@@ -346,9 +347,16 @@ static void swiotlb_bounce(struct device *dev, phys_addr_t tlb_addr, size_t size
 	size_t alloc_size = mem->slots[index].alloc_size;
 	unsigned long pfn = PFN_DOWN(orig_addr);
 	unsigned char *vaddr = phys_to_virt(tlb_addr);
+	unsigned int tlb_offset;
 
 	if (orig_addr == INVALID_PHYS_ADDR)
 		return;
+
+	tlb_offset = (unsigned int)tlb_addr & (IO_TLB_SIZE - 1);
+	tlb_offset -= swiotlb_align_offset(dev, orig_addr);
+
+	orig_addr += tlb_offset;
+	alloc_size -= tlb_offset;
 
 	if (size > alloc_size) {
 		dev_WARN_ONCE(dev, 1,
