@@ -402,3 +402,4 @@ void ttm_tt_mgr_init(unsigned long num_pages, unsigned long num_dma32_pages)
 	if (!ttm_dma32_pages_limit)
 		ttm_dma32_pages_limit = num_dma32_pages;
 }
+EXPORT_SYMBOL(ttm_tt_unpopulate);
