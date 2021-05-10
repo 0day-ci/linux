@@ -350,6 +350,11 @@ static int set_rwqe_data_seg(struct ib_qp *ibqp, const struct ib_send_wr *wr,
 	return 0;
 }
 
+static inline bool check_qp_dca_enable(struct hns_roce_qp *hr_qp)
+{
+	return !!(hr_qp->en_flags & HNS_ROCE_QP_CAP_DCA);
+}
+
 static int check_send_valid(struct hns_roce_dev *hr_dev,
 			    struct hns_roce_qp *hr_qp)
 {
@@ -4531,6 +4536,21 @@ static int modify_qp_init_to_rtr(struct ib_qp *ibqp,
 	roce_set_field(qpc_mask->byte_140_raq, V2_QPC_BYTE_140_TRRL_BA_M,
 		       V2_QPC_BYTE_140_TRRL_BA_S, 0);
 
+	/* hip09 reused the IRRL_HEAD fileds in hip08 */
+	if (hr_dev->pci_dev->revision >= PCI_REVISION_ID_HIP09) {
+		if (check_qp_dca_enable(hr_qp)) {
+			roce_set_bit(context->byte_196_sq_psn,
+				     V2_QPC_BYTE_196_DCA_MODE_S, 1);
+			roce_set_bit(qpc_mask->byte_196_sq_psn,
+				     V2_QPC_BYTE_196_DCA_MODE_S, 0);
+		}
+	} else {
+		/* reset IRRL_HEAD */
+		roce_set_field(qpc_mask->byte_196_sq_psn,
+			       V2_QPC_BYTE_196_IRRL_HEAD_M,
+			       V2_QPC_BYTE_196_IRRL_HEAD_S, 0);
+	}
+
 	context->irrl_ba = cpu_to_le32(irrl_ba >> 6);
 	qpc_mask->irrl_ba = 0;
 	roce_set_field(context->byte_208_irrl, V2_QPC_BYTE_208_IRRL_BA_M,
@@ -4687,9 +4707,6 @@ static int modify_qp_rtr_to_rts(struct ib_qp *ibqp,
 		       V2_QPC_BYTE_212_LSN_S, 0x100);
 	roce_set_field(qpc_mask->byte_212_lsn, V2_QPC_BYTE_212_LSN_M,
 		       V2_QPC_BYTE_212_LSN_S, 0);
-
-	roce_set_field(qpc_mask->byte_196_sq_psn, V2_QPC_BYTE_196_IRRL_HEAD_M,
-		       V2_QPC_BYTE_196_IRRL_HEAD_S, 0);
 
 	return 0;
 }

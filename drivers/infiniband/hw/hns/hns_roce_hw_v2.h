@@ -853,6 +853,8 @@ struct hns_roce_v2_qp_context {
 #define	V2_QPC_BYTE_196_IRRL_HEAD_S 0
 #define V2_QPC_BYTE_196_IRRL_HEAD_M GENMASK(7, 0)
 
+#define V2_QPC_BYTE_196_DCA_MODE_S 6
+
 #define	V2_QPC_BYTE_196_SQ_MAX_PSN_S 8
 #define V2_QPC_BYTE_196_SQ_MAX_PSN_M GENMASK(31, 8)
 
