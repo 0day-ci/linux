@@ -2892,8 +2892,15 @@ brcmf_cfg80211_dump_station(struct wiphy *wiphy, struct net_device *ndev,
 					     &cfg->assoclist,
 					     sizeof(cfg->assoclist));
 		if (err) {
-			bphy_err(drvr, "BRCMF_C_GET_ASSOCLIST unsupported, err=%d\n",
-				 err);
+			static bool error_printed = false;
+
+			/* GET_ASSOCLIST unsupported by firmware of older chips */
+			if (!error_printed || err != -EBADE) {
+				bphy_err(drvr, "BRCMF_C_GET_ASSOCLIST unsupported, err=%d\n",
+					 err);
+				error_printed = true;
+			}
+
 			cfg->assoclist.count = 0;
 			return -EOPNOTSUPP;
 		}
