@@ -4675,6 +4675,11 @@ hisi_sas_v3_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct sas_ha_struct *sha;
 	int rc, phy_nr, port_nr, i;
 
+	rc = dma_set_max_opt_size(dev, PAGE_SIZE * HISI_SAS_SGE_PAGE_CNT);
+	/* We can live with other errors */
+	if (rc == -EPROBE_DEFER)
+		return rc;
+
 	rc = pci_enable_device(pdev);
 	if (rc)
 		goto err_out;
