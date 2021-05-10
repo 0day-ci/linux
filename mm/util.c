@@ -539,26 +539,8 @@ unsigned long vm_mmap(struct file *file, unsigned long addr,
 }
 EXPORT_SYMBOL(vm_mmap);
 
-/**
- * kvmalloc_node - attempt to allocate physically contiguous memory, but upon
- * failure, fall back to non-contiguous (vmalloc) allocation.
- * @size: size of the request.
- * @flags: gfp mask for the allocation - must be compatible (superset) with GFP_KERNEL.
- * @node: numa node to allocate from
- *
- * Uses kmalloc to get the memory but if the allocation fails then falls back
- * to the vmalloc allocator. Use kvfree for freeing the memory.
- *
- * Reclaim modifiers - __GFP_NORETRY and __GFP_NOFAIL are not supported.
- * __GFP_RETRY_MAYFAIL is supported, and it should be used only if kmalloc is
- * preferable to the vmalloc fallback, due to visible performance drawbacks.
- *
- * Please note that any use of gfp flags outside of GFP_KERNEL is careful to not
- * fall back to vmalloc.
- *
- * Return: pointer to the allocated memory of %NULL in case of failure
- */
-void *kvmalloc_node(size_t size, gfp_t flags, int node)
+void *kvmalloc_node_caller(size_t size, gfp_t flags, int node,
+		unsigned long caller)
 {
 	gfp_t kmalloc_flags = flags;
 	void *ret;
@@ -584,7 +566,7 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
 			kmalloc_flags |= __GFP_NORETRY;
 	}
 
-	ret = kmalloc_node(size, kmalloc_flags, node);
+	ret = __kmalloc_node_track_caller(size, kmalloc_flags, node, caller);
 
 	/*
 	 * It doesn't really make sense to fallback to vmalloc for sub page
@@ -593,8 +575,31 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
 	if (ret || size <= PAGE_SIZE)
 		return ret;
 
-	return __vmalloc_node(size, 1, flags, node,
-			__builtin_return_address(0));
+	return __vmalloc_node(size, 1, flags, node, (void *)caller);
+}
+
+/**
+ * kvmalloc_node - Allocate memory from a particular NUMA node.
+ * @size: Number of bytes to allocate.
+ * @flags: Memory allocation (GFP) flags.
+ * @node: NUMA node to allocate from.
+ *
+ * The allocated memory may or may not be physically contiguous, and so
+ * is not suitable for DMA.  Use kvfree() to free the memory.
+ *
+ * Reclaim modifiers - __GFP_NORETRY and __GFP_NOFAIL are not supported.
+ * __GFP_RETRY_MAYFAIL is supported, and it should be used only if kmalloc is
+ * preferable to the vmalloc fallback, due to visible performance drawbacks.
+ *
+ * Any use of gfp flags outside of GFP_KERNEL is careful to not
+ * fall back to vmalloc.
+ *
+ * Return: pointer to the allocated memory or %NULL in case of failure.
+ * %ZERO_SIZE_PTR if @size is zero.
+ */
+void *kvmalloc_node(size_t size, gfp_t flags, int node)
+{
+	return kvmalloc_node_caller(size, flags, node, _RET_IP_);
 }
 EXPORT_SYMBOL(kvmalloc_node);
 

@@ -665,6 +665,8 @@ extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, unsigned long);
 
 #else /* CONFIG_NUMA */
 
+#define __kmalloc_node_track_caller(size, flags, node, caller) \
+	__kmalloc_track_caller(size, flags, caller)
 #define kmalloc_node_track_caller(size, flags, node) \
 	kmalloc_track_caller(size, flags)
 
