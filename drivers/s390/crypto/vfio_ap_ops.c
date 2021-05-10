@@ -25,6 +25,8 @@
 #define VFIO_AP_MDEV_NAME_HWVIRT "VFIO AP Passthrough Device"
 
 static int vfio_ap_mdev_reset_queues(struct ap_matrix *matrix);
+static int vfio_ap_mdev_reset_queue(struct vfio_ap_queue *q,
+				    unsigned int retry);
 static struct vfio_ap_queue *vfio_ap_find_queue(int apqn);
 
 static struct vfio_ap_queue *
@@ -488,12 +490,6 @@ static void vfio_ap_mdev_unlink_fr_queue(struct vfio_ap_queue *q)
 	q->matrix_mdev = NULL;
 }
 
-static void vfio_ap_mdev_unlink_queue(struct vfio_ap_queue *q)
-{
-	vfio_ap_mdev_unlink_queue_fr_mdev(q);
-	vfio_ap_mdev_unlink_fr_queue(q);
-}
-
 static void vfio_ap_mdev_unlink_fr_queues(struct ap_matrix_mdev *matrix_mdev)
 {
 	struct vfio_ap_queue *q;
@@ -740,8 +736,20 @@ done:
 }
 static DEVICE_ATTR_WO(assign_adapter);
 
-static void vfio_ap_mdev_unlink_adapter(struct ap_matrix_mdev *matrix_mdev,
-					unsigned long apid)
+/*
+ * vfio_ap_unlink_adapter_fr_mdev
+ *
+ * @matrix_mdev: a pointer to the mdev currently in use by the KVM guest
+ * @apqi: the APID of the adapter that was unassigned from the mdev
+ * @qlist: a pointer to a list to which the queues unlinked from the mdev
+ *         will be stored.
+ *
+ * Unlinks the queues associated with the adapter from the mdev. Each queue that
+ * is unlinked will be added to @qlist.
+ */
+static void vfio_ap_unlink_adapter_fr_mdev(struct ap_matrix_mdev *matrix_mdev,
+					   unsigned long apid,
+					   struct list_head *qlist)
 {
 	unsigned long apqi;
 	struct vfio_ap_queue *q;
@@ -749,9 +757,77 @@ static void vfio_ap_mdev_unlink_adapter(struct ap_matrix_mdev *matrix_mdev,
 	for_each_set_bit_inv(apqi, matrix_mdev->matrix.aqm, AP_DOMAINS) {
 		q = vfio_ap_mdev_get_queue(matrix_mdev, AP_MKQID(apid, apqi));
 
-		if (q)
-			vfio_ap_mdev_unlink_queue(q);
+		if (q) {
+			vfio_ap_mdev_unlink_queue_fr_mdev(q);
+			list_add(&q->qlist_node, qlist);
+		}
 	}
+}
+
+/*
+ * vfio_ap_reset_queues_removed
+ *
+ * @guest_apcb: a pointer to a matrix object containing the values from the
+ *		  guest's APCB prior to refreshing the guest's AP configuration
+ *		  as a result of unassigning an adapter or domain from an mdev.
+ * @qlist: the list of queues unlinked from the mdev as a result of unassigning
+ *	   an adapter or domain from an mdev.
+ *
+ * Resets the queues that were removed from the guest's AP configuration.
+ */
+static void vfio_ap_reset_queues_removed(struct ap_matrix *guest_apcb,
+					 struct list_head *qlist)
+{
+	struct vfio_ap_queue *q;
+	unsigned long apid, apqi;
+
+	list_for_each_entry(q, qlist, qlist_node) {
+		apid = AP_QID_CARD(q->apqn);
+		apqi = AP_QID_QUEUE(q->apqn);
+
+		if (test_bit_inv(apid, guest_apcb->apm) &&
+		    test_bit_inv(apqi, guest_apcb->aqm))
+			vfio_ap_mdev_reset_queue(q, 1);
+	}
+}
+
+/*
+ * vfio_ap_unlink_mdev_fr_queues
+ *
+ * @qlist: the list of queues unlinked from the mdev to which they were
+ *	   previously assigned.
+ *
+ * Unlink the mdev from each queue.
+ */
+static void vfio_ap_unlink_mdev_fr_queues(struct list_head *qlist)
+{
+	struct vfio_ap_queue *q;
+
+	list_for_each_entry(q, qlist, qlist_node)
+		vfio_ap_mdev_unlink_fr_queue(q);
+}
+
+/*
+ * vfio_ap_mdev_rem_adapter_refresh
+ *
+ * @matrix_mdev: the mdev currently in use by the KVM guest
+ * @apqi: the APID of the adapter unassigned from the mdev
+ *
+ * Refreshes the KVM guest's APCB and resets any queues that may have been
+ * dynamically removed from the guest's AP configuration.
+ */
+static void vfio_ap_mdev_rem_adapter_refresh(struct ap_matrix_mdev *matrix_mdev,
+					     unsigned long apid)
+{
+	LIST_HEAD(qlist);
+	struct ap_matrix shadow_matrix;
+
+	memcpy(&shadow_matrix, &matrix_mdev->shadow_apcb,
+	       sizeof(shadow_matrix));
+	vfio_ap_unlink_adapter_fr_mdev(matrix_mdev, apid, &qlist);
+	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_reset_queues_removed(&shadow_matrix, &qlist);
+	vfio_ap_unlink_mdev_fr_queues(&qlist);
 }
 
 /**
@@ -801,8 +877,7 @@ static ssize_t unassign_adapter_store(struct device *dev,
 	}
 
 	clear_bit_inv((unsigned long)apid, matrix_mdev->matrix.apm);
-	vfio_ap_mdev_unlink_adapter(matrix_mdev, apid);
-	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_mdev_rem_adapter_refresh(matrix_mdev, apid);
 	ret = count;
 done:
 	mutex_unlock(&matrix_dev->lock);
@@ -898,8 +973,20 @@ done:
 }
 static DEVICE_ATTR_WO(assign_domain);
 
-static void vfio_ap_mdev_unlink_domain(struct ap_matrix_mdev *matrix_mdev,
-				       unsigned long apqi)
+/*
+ * vfio_ap_unlink_domain_fr_mdev
+ *
+ * @matrix_mdev: a pointer to the mdev currently in use by the KVM guest
+ * @apqi: the APQI of the domain that was unassigned from the mdev
+ * @qlist: a pointer to a list to which the queues unlinked from the mdev
+ *         will be stored.
+ *
+ * Unlinks the queues associated with the domain from the mdev. Each queue that
+ * is unlinked will be added to @qlist.
+ */
+static void vfio_ap_unlink_domain_fr_mdev(struct ap_matrix_mdev *matrix_mdev,
+					  unsigned long apqi,
+					  struct list_head *qlist)
 {
 	unsigned long apid;
 	struct vfio_ap_queue *q;
@@ -907,9 +994,42 @@ static void vfio_ap_mdev_unlink_domain(struct ap_matrix_mdev *matrix_mdev,
 	for_each_set_bit_inv(apid, matrix_mdev->matrix.apm, AP_DEVICES) {
 		q = vfio_ap_mdev_get_queue(matrix_mdev, AP_MKQID(apid, apqi));
 
-		if (q)
-			vfio_ap_mdev_unlink_queue(q);
+		if (q) {
+			vfio_ap_mdev_unlink_queue_fr_mdev(q);
+			list_add(&q->qlist_node, qlist);
+		}
 	}
+}
+
+/*
+ * vfio_ap_mdev_rem_domain_refresh
+ *
+ * @matrix_mdev: the mdev currently in use by the KVM guest
+ * @apqi: the APQI of the domain unassigned from the mdev
+ *
+ * Refreshes the KVM guest's APCB and resets any queues that may have been
+ * dynamically removed from the guest's AP configuration.
+ */
+static void vfio_ap_mdev_rem_domain_refresh(struct ap_matrix_mdev *matrix_mdev,
+					    unsigned long apqi)
+{
+	LIST_HEAD(qlist);
+	struct ap_matrix shadow_matrix;
+
+	memcpy(&shadow_matrix, &matrix_mdev->shadow_apcb,
+	       sizeof(shadow_matrix));
+	/*
+	 * Unlink the queues associated with the domain from the mdev
+	 * so the refresh can determine what adapter to unplug from the guest.
+	 */
+	vfio_ap_unlink_domain_fr_mdev(matrix_mdev, apqi, &qlist);
+	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_reset_queues_removed(&shadow_matrix, &qlist);
+	/*
+	 * Complete the unlinking of the queues associated with the domain
+	 * by unlinking the mdev from each queue.
+	 */
+	vfio_ap_unlink_mdev_fr_queues(&qlist);
 }
 
 /**
@@ -959,8 +1079,7 @@ static ssize_t unassign_domain_store(struct device *dev,
 	}
 
 	clear_bit_inv((unsigned long)apqi, matrix_mdev->matrix.aqm);
-	vfio_ap_mdev_unlink_domain(matrix_mdev, apqi);
-	vfio_ap_mdev_refresh_apcb(matrix_mdev);
+	vfio_ap_mdev_rem_domain_refresh(matrix_mdev, apqi);
 	ret = count;
 
 done:

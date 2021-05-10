@@ -101,6 +101,7 @@ struct vfio_ap_queue {
 #define VFIO_AP_ISC_INVALID 0xff
 	unsigned char saved_isc;
 	struct hlist_node mdev_qnode;
+	struct list_head qlist_node;
 };
 
 int vfio_ap_mdev_register(void);
