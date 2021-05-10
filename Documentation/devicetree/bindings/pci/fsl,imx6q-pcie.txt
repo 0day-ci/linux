@@ -38,6 +38,11 @@ Optional properties:
   The regulator will be enabled when initializing the PCIe host and
   disabled either as part of the init process or when shutting down the
   host.
+- fsl,refclk-pad-mode: Usage mode of the refclk pad. Valid values:
+  - 0: pad not used. PHY refclock is derived from SoC internal source.
+  - 1: pad input. PHY refclock is provided externally via the refclk pad.
+  - 2: pad output. PHY refclock is derived from SoC internal source and
+       provided on the refclk pad.
 
 Additional required properties for imx6sx-pcie:
 - clock names: Must include the following additional entries:
