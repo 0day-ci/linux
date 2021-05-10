@@ -2558,8 +2558,19 @@ static pci_power_t pci_target_state(struct pci_dev *dev, bool wakeup)
 		return target_state;
 	}
 
-	if (!dev->pm_cap)
+	if (!dev->pm_cap) {
 		target_state = PCI_D0;
+	} else {
+		struct pci_dev *bridge;
+
+		/*
+		 * If the upstream bridge can be put to D3 then it means
+		 * that our target state is D3cold instead of D3hot.
+		 */
+		bridge = pci_upstream_bridge(dev);
+		if (bridge && pci_bridge_d3_possible(bridge))
+			target_state = PCI_D3cold;
+	}
 
 	/*
 	 * If the device is in D3cold even though it's not power-manageable by
