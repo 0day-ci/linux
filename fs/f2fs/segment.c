@@ -3577,9 +3577,11 @@ drop_bio:
 	if (fio->bio) {
 		struct bio *bio = *(fio->bio);
 
-		bio->bi_status = BLK_STS_IOERR;
-		bio_endio(bio);
-		fio->bio = NULL;
+		if (bio) {
+			bio->bi_status = BLK_STS_IOERR;
+			bio_endio(bio);
+			fio->bio = NULL;
+		}
 	}
 	return err;
 }
