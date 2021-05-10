@@ -462,11 +462,12 @@ static void load_pasid(struct mm_struct *mm, u32 pasid)
 /* Caller must hold pasid_mutex, mm reference */
 static int
 intel_svm_bind_mm(struct device *dev, unsigned int flags,
-		  struct mm_struct *mm, struct intel_svm_dev **sd)
+		  struct intel_svm_dev **sd)
 {
 	struct intel_iommu *iommu = device_to_iommu(dev, NULL, NULL);
 	struct intel_svm *svm = NULL, *t;
 	struct device_domain_info *info;
+	struct mm_struct *mm = NULL;
 	struct intel_svm_dev *sdev;
 	unsigned long iflags;
 	int pasid_max;
@@ -485,9 +486,13 @@ intel_svm_bind_mm(struct device *dev, unsigned int flags,
 	} else
 		pasid_max = 1 << 20;
 
-	if ((flags & IOMMU_SVA_BIND_SUPERVISOR) && !ecap_srs(iommu->ecap)) {
-		pr_err("Supervisor PASID not supported.\n");
-		return -EINVAL;
+	if (flags & IOMMU_SVA_BIND_SUPERVISOR) {
+		if (!ecap_srs(iommu->ecap)) {
+			pr_err("Supervisor PASID not supported.\n");
+			return -EINVAL;
+		}
+	} else {
+		mm = current->mm;
 	}
 
 	list_for_each_entry(t, &global_svm_list, list) {
@@ -1052,7 +1057,7 @@ prq_advance:
 
 #define to_intel_svm_dev(handle) container_of(handle, struct intel_svm_dev, sva)
 struct iommu_sva *
-intel_svm_bind(struct device *dev, struct mm_struct *mm, unsigned int flags)
+intel_svm_bind(struct device *dev, unsigned int flags)
 {
 	struct iommu_sva *sva = ERR_PTR(-EINVAL);
 	struct intel_svm_dev *sdev = NULL;
@@ -1064,7 +1069,7 @@ intel_svm_bind(struct device *dev, struct mm_struct *mm, unsigned int flags)
 	 * and intel_svm etc.
 	 */
 	mutex_lock(&pasid_mutex);
-	ret = intel_svm_bind_mm(dev, flags, mm, &sdev);
+	ret = intel_svm_bind_mm(dev, flags, &sdev);
 	if (ret)
 		sva = ERR_PTR(ret);
 	else if (sdev)

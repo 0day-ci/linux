@@ -302,7 +302,7 @@ static int idxd_enable_system_pasid(struct idxd_device *idxd)
 	unsigned int pasid;
 	struct iommu_sva *sva;
 
-	sva = iommu_sva_bind_device(&idxd->pdev->dev, NULL,
+	sva = iommu_sva_bind_device(&idxd->pdev->dev,
 				    IOMMU_SVA_BIND_SUPERVISOR);
 	if (IS_ERR(sva)) {
 		dev_warn(&idxd->pdev->dev,
