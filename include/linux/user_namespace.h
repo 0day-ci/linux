@@ -32,6 +32,7 @@ struct uid_gid_map { /* 64 bytes -- 1 cache line */
 };
 
 #define USERNS_SETGROUPS_ALLOWED 1UL
+#define USERNS_SETGROUPS_SHADOW  2UL
 
 #define USERNS_INIT_FLAGS USERNS_SETGROUPS_ALLOWED
 
@@ -93,6 +94,9 @@ struct user_namespace {
 #endif
 	struct ucounts		*ucounts;
 	int ucount_max[UCOUNT_COUNTS];
+
+	/* Supplementary groups when setgroups "shadow" mode is enabled.   */
+	struct group_info *shadow_group_info;
 } __randomize_layout;
 
 struct ucounts {
@@ -138,7 +142,8 @@ extern ssize_t proc_gid_map_write(struct file *, const char __user *, size_t, lo
 extern ssize_t proc_projid_map_write(struct file *, const char __user *, size_t, loff_t *);
 extern ssize_t proc_setgroups_write(struct file *, const char __user *, size_t, loff_t *);
 extern int proc_setgroups_show(struct seq_file *m, void *v);
-extern bool userns_may_setgroups(const struct user_namespace *ns);
+extern bool userns_may_setgroups(const struct user_namespace *ns,
+				 struct group_info **shadowed_groups);
 extern bool in_userns(const struct user_namespace *ancestor,
 		       const struct user_namespace *child);
 extern bool current_in_userns(const struct user_namespace *target_ns);
@@ -167,8 +172,10 @@ static inline void put_user_ns(struct user_namespace *ns)
 {
 }
 
-static inline bool userns_may_setgroups(const struct user_namespace *ns)
+static inline bool userns_may_setgroups(const struct user_namespace *ns,
+					struct group_info **shadowed_groups)
 {
+	*shadowed_groups = NULL;
 	return true;
 }
 

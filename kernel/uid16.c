@@ -130,14 +130,14 @@ static int groups16_to_user(old_gid_t __user *grouplist,
 }
 
 static int groups16_from_user(struct group_info *group_info,
-    old_gid_t __user *grouplist)
+			      old_gid_t __user *grouplist, int count)
 {
 	struct user_namespace *user_ns = current_user_ns();
 	int i;
 	old_gid_t group;
 	kgid_t kgid;
 
-	for (i = 0; i < group_info->ngroups; i++) {
+	for (i = 0; i < count; i++) {
 		if (get_user(group, grouplist+i))
 			return  -EFAULT;
 
@@ -177,25 +177,47 @@ out:
 SYSCALL_DEFINE2(setgroups16, int, gidsetsize, old_gid_t __user *, grouplist)
 {
 	struct group_info *group_info;
+	struct group_info *shadowed_groups = NULL;
 	int retval;
+	unsigned int arraysize = gidsetsize;
 
-	if (!may_setgroups())
-		return -EPERM;
-	if ((unsigned)gidsetsize > NGROUPS_MAX)
+	if (arraysize > NGROUPS_MAX)
 		return -EINVAL;
 
-	group_info = groups_alloc(gidsetsize);
-	if (!group_info)
+	if (!may_setgroups(&shadowed_groups))
+		return -EPERM;
+
+	if (shadowed_groups) {
+		if (shadowed_groups->ngroups + gidsetsize > NGROUPS_MAX) {
+			put_group_info(shadowed_groups);
+			return -EINVAL;
+		}
+		arraysize += shadowed_groups->ngroups;
+	}
+
+	group_info = groups_alloc(arraysize);
+	if (!group_info) {
+		if (shadowed_groups)
+			put_group_info(shadowed_groups);
 		return -ENOMEM;
-	retval = groups16_from_user(group_info, grouplist);
+	}
+
+	retval = groups16_from_user(group_info, grouplist, gidsetsize);
 	if (retval) {
+		if (shadowed_groups)
+			put_group_info(shadowed_groups);
 		put_group_info(group_info);
 		return retval;
 	}
 
+	if (shadowed_groups)
+		add_shadowed_groups(group_info, shadowed_groups);
+
 	groups_sort(group_info);
 	retval = set_current_groups(group_info);
 	put_group_info(group_info);
+	if (shadowed_groups)
+		put_group_info(shadowed_groups);
 
 	return retval;
 }

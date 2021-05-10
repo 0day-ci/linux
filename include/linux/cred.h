@@ -63,7 +63,9 @@ extern int groups_search(const struct group_info *, kgid_t);
 
 extern int set_current_groups(struct group_info *);
 extern void set_groups(struct cred *, struct group_info *);
-extern bool may_setgroups(void);
+extern bool may_setgroups(struct group_info **shadowed_groups);
+extern void add_shadowed_groups(struct group_info *group_info,
+				struct group_info *shadowed);
 extern void groups_sort(struct group_info *);
 #else
 static inline void groups_free(struct group_info *group_info)
