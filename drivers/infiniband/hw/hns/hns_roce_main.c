@@ -37,10 +37,12 @@
 #include <rdma/ib_addr.h>
 #include <rdma/ib_smi.h>
 #include <rdma/ib_user_verbs.h>
+#include <rdma/uverbs_ioctl.h>
 #include <rdma/ib_cache.h>
 #include "hns_roce_common.h"
 #include "hns_roce_device.h"
 #include "hns_roce_hem.h"
+#include "hns_roce_dca.h"
 
 static int hns_roce_set_mac(struct hns_roce_dev *hr_dev, u32 port, u8 *addr)
 {
@@ -294,16 +296,17 @@ static int hns_roce_modify_device(struct ib_device *ib_dev, int mask,
 static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 				   struct ib_udata *udata)
 {
-	int ret;
 	struct hns_roce_ucontext *context = to_hr_ucontext(uctx);
-	struct hns_roce_ib_alloc_ucontext_resp resp = {};
 	struct hns_roce_dev *hr_dev = to_hr_dev(uctx->device);
+	struct hns_roce_ib_alloc_ucontext_resp resp = {};
+	int ret;
 
 	if (!hr_dev->active)
 		return -EAGAIN;
 
 	resp.qp_tab_size = hr_dev->caps.num_qps;
 	resp.srq_tab_size = hr_dev->caps.num_srqs;
+	resp.cap_flags = hr_dev->caps.flags;
 
 	ret = hns_roce_uar_alloc(hr_dev, &context->uar);
 	if (ret)
@@ -315,6 +318,9 @@ static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 		mutex_init(&context->page_mutex);
 	}
 
+	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_DCA_MODE)
+		hns_roce_register_udca(hr_dev, context);
+
 	resp.cqe_size = hr_dev->caps.cqe_sz;
 
 	ret = ib_copy_to_udata(udata, &resp,
@@ -325,6 +331,9 @@ static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 	return 0;
 
 error_fail_copy_to_udata:
+	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_DCA_MODE)
+		hns_roce_unregister_udca(hr_dev, context);
+
 	hns_roce_uar_free(hr_dev, &context->uar);
 
 error_fail_uar_alloc:
@@ -334,8 +343,12 @@ error_fail_uar_alloc:
 static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
 {
 	struct hns_roce_ucontext *context = to_hr_ucontext(ibcontext);
+	struct hns_roce_dev *hr_dev = to_hr_dev(ibcontext->device);
 
 	hns_roce_uar_free(to_hr_dev(ibcontext->device), &context->uar);
+
+	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_DCA_MODE)
+		hns_roce_unregister_udca(hr_dev, context);
 }
 
 static int hns_roce_mmap(struct ib_ucontext *context,
@@ -416,6 +429,12 @@ static void hns_roce_unregister_device(struct hns_roce_dev *hr_dev)
 	unregister_netdevice_notifier(&iboe->nb);
 	ib_unregister_device(&hr_dev->ib_dev);
 }
+
+extern const struct uapi_definition hns_roce_dca_uapi_defs[];
+static const struct uapi_definition hns_roce_uapi_defs[] = {
+	UAPI_DEF_CHAIN(hns_roce_dca_uapi_defs),
+	{}
+};
 
 static const struct ib_device_ops hns_roce_dev_ops = {
 	.owner = THIS_MODULE,
@@ -526,6 +545,10 @@ static int hns_roce_register_device(struct hns_roce_dev *hr_dev)
 
 	ib_set_device_ops(ib_dev, hr_dev->hw->hns_roce_dev_ops);
 	ib_set_device_ops(ib_dev, &hns_roce_dev_ops);
+
+	if (IS_ENABLED(CONFIG_INFINIBAND_USER_ACCESS))
+		ib_dev->driver_def = hns_roce_uapi_defs;
+
 	for (i = 0; i < hr_dev->caps.num_ports; i++) {
 		if (!hr_dev->iboe.netdevs[i])
 			continue;
