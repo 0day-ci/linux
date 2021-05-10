@@ -1358,6 +1358,9 @@ void iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size)
 	 * underlying IOMMU driver needs to support via the dma-iommu layer.
 	 */
 	if (domain->type == IOMMU_DOMAIN_DMA) {
+		iommu_reconfig_dev_group_dma(dev);
+		/* domain may be stale ... */
+		domain = iommu_get_domain_for_dev(dev);
 		if (iommu_dma_init_domain(domain, dma_base, size, dev))
 			goto out_err;
 		dev->dma_ops = &iommu_dma_ops;
