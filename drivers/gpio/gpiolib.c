@@ -2002,9 +2002,6 @@ const char *gpiochip_is_requested(struct gpio_chip *gc, unsigned int offset)
 {
 	struct gpio_desc *desc;
 
-	if (offset >= gc->ngpio)
-		return NULL;
-
 	desc = gpiochip_get_desc(gc, offset);
 	if (IS_ERR(desc))
 		return NULL;
