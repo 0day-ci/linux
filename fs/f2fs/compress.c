@@ -1060,6 +1060,8 @@ release_and_retry:
 			f2fs_put_rpages(cc);
 			f2fs_unlock_rpages(cc, i + 1);
 			f2fs_destroy_compress_ctx(cc);
+			cc->cluster_idx = index >>
+					F2FS_I(cc->inode)->i_log_cluster_size;
 			goto retry;
 		}
 	}
