@@ -626,6 +626,43 @@ TRACE_EVENT(nfsd_clid_verf_mismatch,
 	)
 );
 
+DECLARE_EVENT_CLASS(nfsd_clid_class,
+	TP_PROTO(const struct nfs4_client *clp),
+	TP_ARGS(clp),
+	TP_STRUCT__entry(
+		__field(u32, cl_boot)
+		__field(u32, cl_id)
+		__array(unsigned char, addr, sizeof(struct sockaddr_in6))
+		__field(unsigned long, flavor)
+		__array(unsigned char, verifier, NFS4_VERIFIER_SIZE)
+		__field(unsigned int, namelen)
+		__dynamic_array(unsigned char, name, clp->cl_name.len)
+	),
+	TP_fast_assign(
+		memcpy(__entry->addr, &clp->cl_addr,
+			sizeof(struct sockaddr_in6));
+		__entry->flavor = clp->cl_cred.cr_flavor;
+		memcpy(__entry->verifier, (void *)&clp->cl_verifier,
+		       NFS4_VERIFIER_SIZE);
+		__entry->namelen = clp->cl_name.len;
+		memcpy(__get_dynamic_array(name), clp->cl_name.data,
+			clp->cl_name.len);
+	),
+	TP_printk("addr=%pISpc name='%.*s' verifier=0x%s flavor=%s client=%08x:%08x\n",
+		__entry->addr, __entry->namelen, __get_str(name),
+		__print_hex_str(__entry->verifier, NFS4_VERIFIER_SIZE),
+		show_nfsd_authflavor(__entry->flavor),
+		__entry->cl_boot, __entry->cl_id)
+);
+
+#define DEFINE_CLID_EVENT(name) \
+DEFINE_EVENT(nfsd_clid_class, nfsd_clid_##name, \
+	TP_PROTO(const struct nfs4_client *clp), \
+	TP_ARGS(clp))
+
+DEFINE_CLID_EVENT(new);
+DEFINE_CLID_EVENT(existing);
+
 /*
  * from fs/nfsd/filecache.h
  */

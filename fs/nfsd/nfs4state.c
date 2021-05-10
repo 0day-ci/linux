@@ -3180,6 +3180,7 @@ nfsd4_exchange_id(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 			}
 			/* case 6 */
 			exid->flags |= EXCHGID4_FLAG_CONFIRMED_R;
+			trace_nfsd_clid_existing(conf);
 			goto out_copy;
 		}
 		if (!creds_match) { /* case 3 */
@@ -3188,15 +3189,18 @@ nfsd4_exchange_id(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 				trace_nfsd_clid_cred_mismatch(conf, rqstp);
 				goto out;
 			}
+			trace_nfsd_clid_new(new);
 			goto out_new;
 		}
 		if (verfs_match) { /* case 2 */
 			conf->cl_exchange_flags |= EXCHGID4_FLAG_CONFIRMED_R;
+			trace_nfsd_clid_existing(conf);
 			goto out_copy;
 		}
 		/* case 5, client reboot */
 		trace_nfsd_clid_verf_mismatch(conf, rqstp, &verf);
 		conf = NULL;
+		trace_nfsd_clid_new(new);
 		goto out_new;
 	}
 
@@ -3996,10 +4000,12 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		if (same_verf(&conf->cl_verifier, &clverifier)) {
 			copy_clid(new, conf);
 			gen_confirm(new, nn);
+			trace_nfsd_clid_existing(new);
 		} else
 			trace_nfsd_clid_verf_mismatch(conf, rqstp,
 						      &clverifier);
-	}
+	} else
+		trace_nfsd_clid_new(new);
 	new->cl_minorversion = 0;
 	gen_callback(new, setclid, rqstp);
 	add_to_unconfirmed(new);
@@ -4016,7 +4022,6 @@ out:
 		expire_client(unconf);
 	return status;
 }
-
 
 __be32
 nfsd4_setclientid_confirm(struct svc_rqst *rqstp,
