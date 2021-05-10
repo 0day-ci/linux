@@ -392,7 +392,7 @@ struct kvm_vcpu_arch {
 	/*
 	 * Guest registers we preserve during guest debugging.
 	 *
-	 * These shadow registers are updated by the kvm_handle_sys_reg
+	 * These shadow registers are updated by the kvm_handle_sys
 	 * trap handler if the guest accesses or updates them while we
 	 * are using guest debug.
 	 */
@@ -712,7 +712,7 @@ int kvm_handle_cp14_32(struct kvm_vcpu *vcpu);
 int kvm_handle_cp14_64(struct kvm_vcpu *vcpu);
 int kvm_handle_cp15_32(struct kvm_vcpu *vcpu);
 int kvm_handle_cp15_64(struct kvm_vcpu *vcpu);
-int kvm_handle_sys_reg(struct kvm_vcpu *vcpu);
+int kvm_handle_sys(struct kvm_vcpu *vcpu);
 
 void kvm_reset_sys_regs(struct kvm_vcpu *vcpu);
 
