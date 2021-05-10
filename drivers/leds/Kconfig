@@ -232,7 +232,7 @@ config LEDS_LM3642
 
 config LEDS_LM3692X
 	tristate "LED support for LM3692x Chips"
-	depends on LEDS_CLASS && I2C && OF
+	depends on LEDS_CLASS && I2C
 	select REGMAP_I2C
 	help
 	  This option enables support for the TI LM3692x family
