@@ -69,8 +69,8 @@ enum el15203000_command {
 };
 
 struct el15203000_led {
-	struct el15203000	*priv;
 	struct led_classdev	ldev;
+	struct el15203000	*priv;
 	u32			reg;
 };
 
@@ -82,6 +82,8 @@ struct el15203000 {
 	size_t			count;
 	struct el15203000_led	leds[];
 };
+
+#define to_el15203000_led(d)	container_of(d, struct el15203000_led, ldev)
 
 static int el15203000_cmd(struct el15203000_led *led, u8 brightness)
 {
@@ -124,9 +126,7 @@ static int el15203000_cmd(struct el15203000_led *led, u8 brightness)
 static int el15203000_set_blocking(struct led_classdev *ldev,
 				   enum led_brightness brightness)
 {
-	struct el15203000_led *led = container_of(ldev,
-						  struct el15203000_led,
-						  ldev);
+	struct el15203000_led *led = to_el15203000_led(ldev);
 
 	return el15203000_cmd(led, brightness == LED_OFF ? EL_OFF : EL_ON);
 }
@@ -135,9 +135,7 @@ static int el15203000_pattern_set_S(struct led_classdev *ldev,
 				    struct led_pattern *pattern,
 				    u32 len, int repeat)
 {
-	struct el15203000_led *led = container_of(ldev,
-						  struct el15203000_led,
-						  ldev);
+	struct el15203000_led *led = to_el15203000_led(ldev);
 
 	if (repeat > 0 || len != 2 ||
 	    pattern[0].delta_t != 4000 || pattern[0].brightness != 0 ||
@@ -188,10 +186,8 @@ static int el15203000_pattern_set_P(struct led_classdev *ldev,
 				    struct led_pattern *pattern,
 				    u32 len, int repeat)
 {
+	struct el15203000_led	*led = to_el15203000_led(ldev);
 	u8			cmd;
-	struct el15203000_led	*led = container_of(ldev,
-						    struct el15203000_led,
-						    ldev);
 
 	if (repeat > 0)
 		return -EINVAL;
@@ -228,9 +224,7 @@ static int el15203000_pattern_set_P(struct led_classdev *ldev,
 
 static int el15203000_pattern_clear(struct led_classdev *ldev)
 {
-	struct el15203000_led	*led = container_of(ldev,
-						    struct el15203000_led,
-						    ldev);
+	struct el15203000_led *led = to_el15203000_led(ldev);
 
 	return el15203000_cmd(led, EL_OFF);
 }
