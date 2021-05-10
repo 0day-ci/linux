@@ -202,9 +202,17 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 
 	seq_puts(m, "\nGroups:\t");
 	group_info = cred->group_info;
-	for (g = 0; g < group_info->ngroups; g++)
+	for (g = 0; g < group_info->ngroups; g++) {
+		gid_t gid = from_kgid(user_ns, group_info->gid[g]);
+
+		if (gid == (gid_t)-1) {
+			if (user_ns->flags & USERNS_SETGROUPS_SHADOW)
+				continue;
+			gid = overflowgid;
+		}
 		seq_put_decimal_ull(m, g ? " " : "",
-				from_kgid_munged(user_ns, group_info->gid[g]));
+				gid);
+	}
 	put_cred(cred);
 	/* Trailing space shouldn't have been added in the first place. */
 	seq_putc(m, ' ');
