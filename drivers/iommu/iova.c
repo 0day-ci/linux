@@ -872,6 +872,17 @@ static void iova_magazine_push(struct iova_magazine *mag, unsigned long pfn)
 	mag->pfns[mag->size++] = pfn;
 }
 
+static unsigned long iova_len_to_rcache_max(unsigned long iova_len)
+{
+	return order_base_2(iova_len) + 1;
+}
+
+/* Test if iova_len range cached upper limit matches that of IOVA domain */
+bool iova_domain_len_is_cached(struct iova_domain *iovad, unsigned long iova_len)
+{
+	return iova_len_to_rcache_max(iova_len) == iovad->rcache_max_size;
+}
+
 static void init_iova_rcaches(struct iova_domain *iovad)
 {
 	struct iova_cpu_rcache *cpu_rcache;

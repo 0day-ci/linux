@@ -136,7 +136,8 @@ static inline unsigned long iova_pfn(struct iova_domain *iovad, dma_addr_t iova)
 #if IS_ENABLED(CONFIG_IOMMU_IOVA)
 int iova_cache_get(void);
 void iova_cache_put(void);
-
+bool iova_domain_len_is_cached(struct iova_domain *iovad,
+			       unsigned long iova_len);
 void free_iova(struct iova_domain *iovad, unsigned long pfn);
 void __free_iova(struct iova_domain *iovad, struct iova *iova);
 struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
@@ -158,6 +159,11 @@ int init_iova_flush_queue(struct iova_domain *iovad,
 struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
 void put_iova_domain(struct iova_domain *iovad);
 #else
+static inline bool iova_domain_len_is_cached(struct iova_domain *iovad,
+					     unsigned long iova_len)
+{
+	return false;
+}
 static inline int iova_cache_get(void)
 {
 	return -ENOTSUPP;
