@@ -10,6 +10,7 @@ Required properties:
 	- "fsl,imx6qp-pcie"
 	- "fsl,imx7d-pcie"
 	- "fsl,imx8mq-pcie"
+	- "fsl,imx8mm-pcie"
 - reg: base address and length of the PCIe controller
 - interrupts: A list of interrupt outputs of the controller. Must contain an
   entry for each entry in the interrupt-names property.
@@ -90,12 +91,13 @@ Example:
 		clock-names = "pcie", "pcie_bus", "pcie_phy";
 	};
 
-* Freescale i.MX7d PCIe PHY
+* Freescale i.MX PCIe PHY
 
-This is the PHY associated with the IMX7d PCIe controller.  It's looked up by
-the PCI-e controller via the fsl,imx7d-pcie-phy compatible.
+This is the PHY associated with the IMX PCIe controller.  It's looked up by
+the PCI-e controller via the compatible.
 
 Required properties:
 - compatible:
 	- "fsl,imx7d-pcie-phy"
+	- "fsl,imx8mm-pcie-phy"
 - reg: base address and length of the PCIe PHY controller
