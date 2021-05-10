@@ -668,6 +668,42 @@
 #define OP_AT_S12E0R	sys_insn(AT_Op0, 4, AT_CRn, 8, 6)
 #define OP_AT_S12E0W	sys_insn(AT_Op0, 4, AT_CRn, 8, 7)
 
+/* TLBI instructions */
+#define TLBI_Op0	1
+#define TLBI_Op1_EL1	0	/* Accessible from EL1 or higher */
+#define TLBI_Op1_EL2	4	/* Accessible from EL2 or higher */
+#define TLBI_CRn	8
+#define tlbi_insn_el1(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL1, TLBI_CRn, (CRm), (Op2))
+#define tlbi_insn_el2(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL2, TLBI_CRn, (CRm), (Op2))
+
+#define OP_TLBI_VMALLE1IS	tlbi_insn_el1(3, 0)
+#define OP_TLBI_VAE1IS		tlbi_insn_el1(3, 1)
+#define OP_TLBI_ASIDE1IS	tlbi_insn_el1(3, 2)
+#define OP_TLBI_VAAE1IS		tlbi_insn_el1(3, 3)
+#define OP_TLBI_VALE1IS		tlbi_insn_el1(3, 5)
+#define OP_TLBI_VAALE1IS	tlbi_insn_el1(3, 7)
+#define OP_TLBI_VMALLE1		tlbi_insn_el1(7, 0)
+#define OP_TLBI_VAE1		tlbi_insn_el1(7, 1)
+#define OP_TLBI_ASIDE1		tlbi_insn_el1(7, 2)
+#define OP_TLBI_VAAE1		tlbi_insn_el1(7, 3)
+#define OP_TLBI_VALE1		tlbi_insn_el1(7, 5)
+#define OP_TLBI_VAALE1		tlbi_insn_el1(7, 7)
+
+#define OP_TLBI_IPAS2E1IS	tlbi_insn_el2(0, 1)
+#define OP_TLBI_IPAS2LE1IS	tlbi_insn_el2(0, 5)
+#define OP_TLBI_ALLE2IS		tlbi_insn_el2(3, 0)
+#define OP_TLBI_VAE2IS		tlbi_insn_el2(3, 1)
+#define OP_TLBI_ALLE1IS		tlbi_insn_el2(3, 4)
+#define OP_TLBI_VALE2IS		tlbi_insn_el2(3, 5)
+#define OP_TLBI_VMALLS12E1IS	tlbi_insn_el2(3, 6)
+#define OP_TLBI_IPAS2E1		tlbi_insn_el2(4, 1)
+#define OP_TLBI_IPAS2LE1	tlbi_insn_el2(4, 5)
+#define OP_TLBI_ALLE2		tlbi_insn_el2(7, 0)
+#define OP_TLBI_VAE2		tlbi_insn_el2(7, 1)
+#define OP_TLBI_ALLE1		tlbi_insn_el2(7, 4)
+#define OP_TLBI_VALE2		tlbi_insn_el2(7, 5)
+#define OP_TLBI_VMALLS12E1	tlbi_insn_el2(7, 6)
+
 /* Common SCTLR_ELx flags. */
 #define SCTLR_ELx_DSSBS	(BIT(44))
 #define SCTLR_ELx_ATA	(BIT(43))
