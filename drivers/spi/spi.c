@@ -820,12 +820,23 @@ static void spi_set_cs(struct spi_device *spi, bool enable, bool force)
 
 	if (spi->cs_gpiod || gpio_is_valid(spi->cs_gpio)) {
 		if (!(spi->mode & SPI_NO_CS)) {
+			/*
+			 * Historically ACPI has no means of the GPIO polarity and thus
+			 * the SPISerialBus() resource defines it on the per-chip basis.
+			 * In order to avoid a chain of negations, the GPIO polarity is
+			 * considered being Active High. Even for the cases when _DSD()
+			 * is involved (in the updated versions of ACPI) the GPIO CS
+			 * polarity must be defined Active High to avoid ambiguity.
+			 * That's why we use enable, that takes SPI_CS_HIGH into account.
+			 */
+			bool value = has_acpi_companion(&spi->dev) ? !enable : activate;
+
 			if (spi->cs_gpiod)
-				/* polarity handled by gpiolib */
-				gpiod_set_value_cansleep(spi->cs_gpiod, activate);
+				/* Polarity handled by GPIO library */
+				gpiod_set_value_cansleep(spi->cs_gpiod, value);
 			else
 				/*
-				 * invert the enable line, as active low is
+				 * Invert the enable line, as active low is
 				 * default for SPI.
 				 */
 				gpio_set_value_cansleep(spi->cs_gpio, !enable);
