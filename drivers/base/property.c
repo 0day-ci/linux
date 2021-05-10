@@ -632,9 +632,10 @@ struct device *fwnode_get_next_parent_dev(struct fwnode_handle *fwnode)
 	fwnode_handle_get(fwnode);
 	do {
 		fwnode = fwnode_get_next_parent(fwnode);
-		if (fwnode)
-			dev = get_dev_from_fwnode(fwnode);
-	} while (fwnode && !dev);
+		if (!fwnode)
+			break;
+		dev = get_dev_from_fwnode(fwnode);
+	} while (!dev);
 	fwnode_handle_put(fwnode);
 	return dev;
 }
@@ -742,10 +743,9 @@ fwnode_get_next_available_child_node(const struct fwnode_handle *fwnode,
 
 	do {
 		next_child = fwnode_get_next_child_node(fwnode, next_child);
-
-		if (!next_child || fwnode_device_is_available(next_child))
+		if (!next_child)
 			break;
-	} while (next_child);
+	} while (!fwnode_device_is_available(next_child));
 
 	return next_child;
 }
