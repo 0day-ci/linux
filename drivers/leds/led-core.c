@@ -290,6 +290,8 @@ EXPORT_SYMBOL_GPL(led_set_brightness_nosleep);
 
 int led_set_brightness_sync(struct led_classdev *led_cdev, unsigned int value)
 {
+	int ret;
+
 	if (led_cdev->blink_delay_on || led_cdev->blink_delay_off)
 		return -EBUSY;
 
@@ -298,7 +300,10 @@ int led_set_brightness_sync(struct led_classdev *led_cdev, unsigned int value)
 	if (led_cdev->flags & LED_SUSPENDED)
 		return 0;
 
-	return __led_set_brightness_blocking(led_cdev, led_cdev->brightness);
+	ret = __led_set_brightness_blocking(led_cdev, led_cdev->brightness);
+	if (ret == -ENOTSUPP)
+		return -EOPNOTSUPP;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(led_set_brightness_sync);
 
