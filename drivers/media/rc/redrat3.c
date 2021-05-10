@@ -952,7 +952,7 @@ static struct rc_dev *redrat3_init_rc_dev(struct redrat3_dev *rr3)
 	rc->s_timeout = redrat3_set_timeout;
 	rc->tx_ir = redrat3_transmit_ir;
 	rc->s_tx_carrier = redrat3_set_tx_carrier;
-	rc->s_carrier_report = redrat3_wideband_receiver;
+	rc->s_learning_mode = redrat3_wideband_receiver;
 	rc->driver_name = DRIVER_NAME;
 	rc->rx_resolution = 2;
 	rc->map_name = RC_MAP_HAUPPAUGE;
