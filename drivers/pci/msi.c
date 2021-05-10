@@ -465,8 +465,8 @@ static ssize_t msi_mode_show(struct device *dev, struct device_attribute *attr,
 
 	entry = irq_get_msi_desc(irq);
 	if (entry)
-		return sprintf(buf, "%s\n",
-				entry->msi_attrib.is_msix ? "msix" : "msi");
+		return sysfs_emit(buf, "%s\n",
+				  entry->msi_attrib.is_msix ? "msix" : "msi");
 
 	return -ENODEV;
 }
