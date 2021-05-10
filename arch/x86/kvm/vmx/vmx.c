@@ -7749,6 +7749,7 @@ static struct kvm_x86_ops vmx_x86_ops __initdata = {
 
 	.pre_block = vmx_pre_block,
 	.post_block = vmx_post_block,
+	.vcpu_check_block = NULL,
 
 	.pmu_ops = &intel_pmu_ops,
 	.nested_ops = &vmx_nested_ops,
