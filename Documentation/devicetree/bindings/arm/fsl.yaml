@@ -747,6 +747,7 @@ properties:
               - purism,librem5-devkit     # Purism Librem5 devkit
               - solidrun,hummingboard-pulse # SolidRun Hummingboard Pulse
               - technexion,pico-pi-imx8m  # TechNexion PICO-PI-8M evk
+              - mntre,reform2             # MNT Reform2 Laptop
           - const: fsl,imx8mq
 
       - description: Purism Librem5 phones
