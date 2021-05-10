@@ -45,6 +45,7 @@ struct iommu_group {
 	struct iommu_domain *default_domain;
 	struct iommu_domain *domain;
 	struct list_head entry;
+	size_t max_opt_dma_size;
 };
 
 struct group_device {
@@ -86,6 +87,9 @@ static int iommu_create_device_direct_mappings(struct iommu_group *group,
 static struct iommu_group *iommu_group_get_for_dev(struct device *dev);
 static ssize_t iommu_group_store_type(struct iommu_group *group,
 				      const char *buf, size_t count);
+static ssize_t iommu_group_store_max_opt_dma_size(struct iommu_group *group,
+						  const char *buf,
+						  size_t count);
 
 #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
 struct iommu_group_attribute iommu_group_attr_##_name =		\
@@ -554,6 +558,12 @@ static ssize_t iommu_group_show_type(struct iommu_group *group,
 	return strlen(type);
 }
 
+static ssize_t iommu_group_show_max_opt_dma_size(struct iommu_group *group,
+				     char *buf)
+{
+	return sprintf(buf, "%zu\n", group->max_opt_dma_size);
+}
+
 static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
 
 static IOMMU_GROUP_ATTR(reserved_regions, 0444,
@@ -561,6 +571,9 @@ static IOMMU_GROUP_ATTR(reserved_regions, 0444,
 
 static IOMMU_GROUP_ATTR(type, 0644, iommu_group_show_type,
 			iommu_group_store_type);
+
+static IOMMU_GROUP_ATTR(max_opt_dma_size, 0644, iommu_group_show_max_opt_dma_size,
+			iommu_group_store_max_opt_dma_size);
 
 static void iommu_group_release(struct kobject *kobj)
 {
@@ -645,6 +658,10 @@ struct iommu_group *iommu_group_alloc(void)
 		return ERR_PTR(ret);
 
 	ret = iommu_group_create_file(group, &iommu_group_attr_type);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = iommu_group_create_file(group, &iommu_group_attr_max_opt_dma_size);
 	if (ret)
 		return ERR_PTR(ret);
 
@@ -3278,4 +3295,30 @@ static ssize_t iommu_group_store_type(struct iommu_group *group,
 {
 	return iommu_group_store_common(group, buf, count,
 					iommu_group_store_type_cb);
+}
+
+static int iommu_group_store_max_opt_dma_size_cb(const char *buf,
+						 struct iommu_group *group,
+						 struct device *dev)
+{
+	unsigned long val;
+	char *endp;
+
+	val = simple_strtoul(buf, &endp, 0);
+	if (endp == buf)
+		return -EINVAL;
+
+	mutex_lock(&group->mutex);
+	group->max_opt_dma_size = val;
+	mutex_unlock(&group->mutex);
+
+	return 0;
+}
+
+static ssize_t iommu_group_store_max_opt_dma_size(struct iommu_group *group,
+						  const char *buf,
+						  size_t count)
+{
+	return iommu_group_store_common(group, buf, count,
+					iommu_group_store_max_opt_dma_size_cb);
 }
