@@ -79,6 +79,7 @@ struct imx6_pcie {
 	u32			tx_deemph_gen2_6db;
 	u32			tx_swing_full;
 	u32			tx_swing_low;
+	u32			refclk_pad_mode;
 	struct regulator	*vpcie;
 	void __iomem		*phy_base;
 
@@ -613,18 +614,17 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
 {
 	switch (imx6_pcie->drvdata->variant) {
 	case IMX8MQ:
-		/*
-		 * TODO: Currently this code assumes external
-		 * oscillator is being used
-		 */
 		regmap_update_bits(imx6_pcie->iomuxc_gpr,
 				   imx6_pcie_grp_offset(imx6_pcie),
 				   IMX8MQ_GPR_PCIE_REF_USE_PAD,
-				   IMX8MQ_GPR_PCIE_REF_USE_PAD);
+				   imx6_pcie->refclk_pad_mode == 1 ?
+				   IMX8MQ_GPR_PCIE_REF_USE_PAD : 0);
 		break;
 	case IMX7D:
 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+				   imx6_pcie->refclk_pad_mode == 1 ?
+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL : 0);
 		break;
 	case IMX6SX:
 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
@@ -1049,6 +1049,12 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 					     "pcie_inbound_axi clock missing or invalid\n");
 		break;
 	case IMX8MQ:
+		/*
+		 * i.MX8MQ is special, as the default refclk pad mode is set to
+		 * input in order to keep compatibility with old devicetrees.
+		 */
+		imx6_pcie->refclk_pad_mode = 1;
+
 		imx6_pcie->pcie_aux = devm_clk_get(dev, "pcie_aux");
 		if (IS_ERR(imx6_pcie->pcie_aux))
 			return dev_err_probe(dev, PTR_ERR(imx6_pcie->pcie_aux),
@@ -1113,6 +1119,10 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	if (of_property_read_u32(node, "fsl,tx-swing-low",
 				 &imx6_pcie->tx_swing_low))
 		imx6_pcie->tx_swing_low = 127;
+
+	/* get PHY refclk pad mode */
+	of_property_read_u32(node, "fsl,refclk-pad-mode",
+			     &imx6_pcie->refclk_pad_mode);
 
 	/* Limit link speed */
 	pci->link_gen = 1;
