@@ -154,12 +154,60 @@ void deactivate_traps_vhe_put(void)
 	__deactivate_traps_common();
 }
 
+static bool fixup_guest_exit_vhe(struct kvm_vcpu *vcpu, u64 *exit_code,
+				 bool hyp_ctxt)
+{
+	u64 pstate = read_sysreg_el2(SYS_SPSR);
+
+	/*
+	 * Sync pstate back as early as possible, so that is_hyp_ctxt()
+	 * reflects the exact context. It is otherwise possible to get
+	 * confused with a VHE guest and ARMv8.4-NV, such as:
+	 *
+	 * (1) enter guest in host EL0
+	 * (2) guest traps to guest vEL2 (no hypervisor intervention)
+	 * (3) guest clears virtual HCR_EL2.TGE (no trap either)
+	 * (4) host interrupt fires, exit
+	 * (5) is_hyp_ctxt() now says "guest" (pstate.M==EL1 and TGE==0)
+	 *
+	 * If host preemption occurs, vcpu_load/put() will be very confused.
+	 *
+	 * Consider this as the prologue before the fixup prologue...
+	 */
+
+	if (unlikely(hyp_ctxt)) {
+		u64 mode = pstate & PSR_MODE_MASK;
+
+		switch (mode) {
+		case PSR_MODE_EL1t:
+			mode = PSR_MODE_EL2t;
+			break;
+		case PSR_MODE_EL1h:
+			mode = PSR_MODE_EL2h;
+			break;
+		}
+
+		pstate = (pstate & ~PSR_MODE_MASK) | mode;
+	}
+
+	*vcpu_cpsr(vcpu) = pstate;
+
+	fixup_guest_exit_prologue(vcpu, exit_code);
+
+	if (*exit_code == ARM_EXCEPTION_TRAP) {
+		/* more to come here */
+	}
+
+	return fixup_guest_exit(vcpu, exit_code);
+}
+
 /* Switch to the guest for VHE systems running in EL2 */
 static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *host_ctxt;
 	struct kvm_cpu_context *guest_ctxt;
 	u64 exit_code;
+	bool hyp_ctxt;
 
 	host_ctxt = &this_cpu_ptr(&kvm_host_data)->host_ctxt;
 	host_ctxt->__hyp_running_vcpu = vcpu;
@@ -186,12 +234,19 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 	sysreg_restore_guest_state_vhe(guest_ctxt);
 	__debug_switch_to_guest(vcpu);
 
+	/*
+	 * Being in HYP context or not is an invariant here. If we enter in
+	 * a given context, we exit in the same context. We can thus only
+	 * sample the context once.
+	 */
+	WRITE_ONCE(hyp_ctxt, is_hyp_ctxt(vcpu));
+
 	do {
 		/* Jump in the fire! */
 		exit_code = __guest_enter(vcpu);
 
 		/* And we're baaack! */
-	} while (fixup_guest_exit(vcpu, &exit_code));
+	} while (fixup_guest_exit_vhe(vcpu, &exit_code, READ_ONCE(hyp_ctxt)));
 
 	sysreg_save_guest_state_vhe(guest_ctxt);
 
