@@ -78,6 +78,8 @@ static void __activate_traps(struct kvm_vcpu *vcpu)
 			if (!vcpu_el2_tge_is_set(vcpu))
 				hcr |= HCR_AT | HCR_TTLB;
 		}
+	} else if (nested_virt_in_use(vcpu)) {
+		hcr |= __vcpu_sys_reg(vcpu, HCR_EL2);
 	}
 
 	___activate_traps(vcpu, hcr);
