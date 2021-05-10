@@ -603,15 +603,9 @@ static void sso_led_shutdown(struct sso_led *led)
 {
 	struct sso_led_priv *priv = led->priv;
 
-	/* unregister led */
-	devm_led_classdev_unregister(priv->dev, &led->cdev);
-
 	/* clear HW control bit */
 	if (led->desc.hw_trig)
 		regmap_update_bits(priv->mmap, SSO_CON3, BIT(led->desc.pin), 0);
-
-	if (led->gpiod)
-		devm_gpiod_put(priv->dev, led->gpiod);
 
 	led->priv = NULL;
 }
