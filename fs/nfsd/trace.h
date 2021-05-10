@@ -537,7 +537,7 @@ DEFINE_EVENT(nfsd_net_class, nfsd_##name, \
 DEFINE_NET_EVENT(grace_start);
 DEFINE_NET_EVENT(grace_complete);
 
-DECLARE_EVENT_CLASS(nfsd_clid_class,
+DECLARE_EVENT_CLASS(nfsd_reclaim_class,
 	TP_PROTO(const struct nfsd_net *nn,
 		 unsigned int namelen,
 		 const unsigned char *namedata),
@@ -556,15 +556,15 @@ DECLARE_EVENT_CLASS(nfsd_clid_class,
 		__entry->boot_time, __entry->namelen, __get_str(name))
 )
 
-#define DEFINE_CLID_EVENT(name) \
-DEFINE_EVENT(nfsd_clid_class, nfsd_clid_##name, \
+#define DEFINE_RECLAIM_EVENT(name) \
+DEFINE_EVENT(nfsd_reclaim_class, nfsd_clid_##name, \
 	TP_PROTO(const struct nfsd_net *nn, \
 		 unsigned int namelen, \
 		 const unsigned char *namedata), \
 	TP_ARGS(nn, namelen, namedata))
 
-DEFINE_CLID_EVENT(find);
-DEFINE_CLID_EVENT(reclaim);
+DEFINE_RECLAIM_EVENT(find);
+DEFINE_RECLAIM_EVENT(reclaim);
 
 TRACE_EVENT(nfsd_clid_cred_mismatch,
 	TP_PROTO(
