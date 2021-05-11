@@ -1686,6 +1686,106 @@ static void jbd2_mark_journal_empty(journal_t *journal, int write_op)
 	write_unlock(&journal->j_state_lock);
 }
 
+#define JBD2_ERASE_FLAG_DISCARD	1
+#define JBD2_ERASE_FLAG_ZEROOUT	2
+
+/**
+ * __jbd2_journal_erase() - Discard or zeroout journal blocks (excluding superblock)
+ * @journal: The journal to erase.
+ * @flags: A discard/zeroout request is sent for each physically contigous region
+ *	of the journal. Either JBD2_ERASE_FLAG_DISCARD or JBD2_ERASE_FLAG_ZEROOUT
+ *	must be set to decide which operation to perform.
+ *
+ * Note: JBD2_ERASE_FLAG_ZEROOUT attempts to use hardware offload. Zeroes will
+ * be explicitly written if no hardware offload is available, see
+ * blkdev_issue_zeroout for more details.
+ */
+static int __jbd2_journal_erase(journal_t *journal, unsigned long long flags)
+{
+	int err = 0;
+	unsigned long block, log_offset; /* logical */
+	unsigned long long phys_block, block_start, block_stop; /* physical */
+	loff_t byte_start, byte_stop, byte_count;
+	struct request_queue *q = bdev_get_queue(journal->j_dev);
+
+	/* flags must be set to either discard or zeroout */
+	if ((flags & JBD2_ERASE_FLAG_DISCARD & JBD2_ERASE_FLAG_ZEROOUT) || !flags)
+		return -EINVAL;
+
+	if (!q)
+		return -ENXIO;
+
+	if (JBD2_ERASE_FLAG_DISCARD & !blk_queue_discard(q))
+		return -EOPNOTSUPP;
+
+	/*
+	 * lookup block mapping and issue discard/zeroout for each
+	 * contiguous region
+	 */
+	log_offset = be32_to_cpu(journal->j_superblock->s_first);
+
+	err = jbd2_journal_bmap(journal, log_offset, &block_start);
+	if (err) {
+		printk(KERN_ERR "JBD2: bad block at offset %lu", log_offset);
+		return err;
+	}
+
+	/*
+	 * use block_start - 1 to meet check for contiguous with previous region:
+	 * phys_block == block_stop + 1
+	 */
+	block_stop = block_start - 1;
+
+	for (block = log_offset; block < journal->j_total_len; block++) {
+		err = jbd2_journal_bmap(journal, block, &phys_block);
+		if (err) {
+			printk(KERN_ERR "JBD2: bad block at offset %lu", block);
+			return err;
+		}
+
+		if (block == journal->j_total_len - 1) {
+			block_stop = phys_block;
+		} else if (phys_block == block_stop + 1) {
+			block_stop++;
+			continue;
+		}
+
+		/*
+		 * not contiguous with prior physical block or this is last
+		 * block of journal, take care of the region
+		 */
+		byte_start = block_start * journal->j_blocksize;
+		byte_stop = block_stop * journal->j_blocksize;
+		byte_count = (block_stop - block_start + 1) *
+				journal->j_blocksize;
+
+		truncate_inode_pages_range(journal->j_dev->bd_inode->i_mapping,
+				byte_start, byte_stop);
+
+		if (flags & JBD2_ERASE_FLAG_DISCARD) {
+			err = blkdev_issue_discard(journal->j_dev,
+					byte_start >> SECTOR_SHIFT,
+					byte_count >> SECTOR_SHIFT,
+					GFP_NOFS, 0);
+		} else if (flags & JBD2_ERASE_FLAG_ZEROOUT) {
+			err = blkdev_issue_zeroout(journal->j_dev,
+					byte_start >> SECTOR_SHIFT,
+					byte_count >> SECTOR_SHIFT,
+					GFP_NOFS, 0);
+		}
+
+		if (unlikely(err != 0)) {
+			printk(KERN_ERR "JBD2: (error %d) unable to wipe journal at physical blocks %llu - %llu",
+					err, block_start, block_stop);
+			return err;
+		}
+
+		block_start = phys_block;
+		block_stop = phys_block;
+	}
+
+	return blkdev_issue_flush(journal->j_dev);
+}
 
 /**
  * jbd2_journal_update_sb_errno() - Update error in the journal.
@@ -2246,13 +2346,17 @@ EXPORT_SYMBOL(jbd2_journal_clear_features);
 /**
  * jbd2_journal_flush() - Flush journal
  * @journal: Journal to act on.
+ * @flags: optional operations on the journal blocks after the flush (see below)
  *
  * Flush all data for a given journal to disk and empty the journal.
  * Filesystems can use this when remounting readonly to ensure that
  * recovery does not need to happen on remount.
+ *
+ * flags:
+ *	EXT4_IOC_CHECKPOINT_FLAG_DISCARD: issues discards for the journal blocks
+ *	EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT: issues zeroouts for the journal blocks
  */
-
-int jbd2_journal_flush(journal_t *journal)
+int jbd2_journal_flush(journal_t *journal, unsigned long long flags)
 {
 	int err = 0;
 	transaction_t *transaction = NULL;
@@ -2306,6 +2410,10 @@ int jbd2_journal_flush(journal_t *journal)
 	 * commits of data to the journal will restore the current
 	 * s_start value. */
 	jbd2_mark_journal_empty(journal, REQ_SYNC | REQ_FUA);
+
+	if (flags)
+		err = __jbd2_journal_erase(journal, flags);
+
 	mutex_unlock(&journal->j_checkpoint_mutex);
 	write_lock(&journal->j_state_lock);
 	J_ASSERT(!journal->j_running_transaction);
