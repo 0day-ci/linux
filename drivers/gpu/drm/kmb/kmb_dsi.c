@@ -1468,10 +1468,8 @@ int kmb_dsi_map_mmio(struct kmb_dsi *kmb_dsi)
 		return -ENOMEM;
 	}
 	kmb_dsi->mipi_mmio = devm_ioremap_resource(dev, res);
-	if (IS_ERR(kmb_dsi->mipi_mmio)) {
-		dev_err(dev, "failed to ioremap mipi registers");
+	if (IS_ERR(kmb_dsi->mipi_mmio))
 		return PTR_ERR(kmb_dsi->mipi_mmio);
-	}
 	return 0;
 }
 
