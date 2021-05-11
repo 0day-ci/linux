@@ -13,6 +13,9 @@ the device tree.
 Required properties:
 
 The scmi node with the following properties shall be under the /firmware/ node.
+Some properties are specific to a transport type.
+
+shmem-based transports (mailbox, smc/hvc):
 
 - compatible : shall be "arm,scmi" or "arm,scmi-smc" for smc/hvc transports
 - mboxes: List of phandle and mailbox channel specifiers. It should contain
@@ -21,6 +24,15 @@ The scmi node with the following properties shall be under the /firmware/ node.
 	  supported.
 - shmem : List of phandle pointing to the shared memory(SHM) area as per
 	  generic mailbox client binding.
+
+Virtio transport:
+
+- compatible : shall be "arm,scmi-virtio".
+
+The virtio transport only supports a single device.
+
+Additional required properties:
+
 - #address-cells : should be '1' if the device has sub-nodes, maps to
 	  protocol identifier for a given sub-node.
 - #size-cells : should be '0' as 'reg' property doesn't have any size
@@ -50,7 +62,8 @@ Each protocol supported shall have a sub-node with corresponding compatible
 as described in the following sections. If the platform supports dedicated
 communication channel for a particular protocol, the 3 properties namely:
 mboxes, mbox-names and shmem shall be present in the sub-node corresponding
-to that protocol.
+to that protocol. The virtio transport does not support dedicated communication
+channels.
 
 Clock/Performance bindings for the clocks/OPPs based on SCMI Message Protocol
 ------------------------------------------------------------
@@ -129,7 +142,8 @@ Required sub-node properties:
 [5] Documentation/devicetree/bindings/reset/reset.txt
 [6] Documentation/devicetree/bindings/regulator/regulator.yaml
 
-Example:
+Example (mailbox transport):
+----------------------------
 
 sram@50000000 {
 	compatible = "mmio-sram";
@@ -237,3 +251,20 @@ thermal-zones {
 		...
 	};
 };
+
+Example (virtio transport):
+---------------------------
+
+virtio_mmio@4b001000 {
+	compatible = "virtio,mmio";
+	...
+};
+
+firmware {
+	...
+	scmi {
+		compatible = "arm,scmi-virtio";
+		...
+
+The rest is similar to the mailbox transport example, when omitting the
+mailbox/shmem-specific properties.
