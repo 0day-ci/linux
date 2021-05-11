@@ -591,6 +591,7 @@ static int smb3_fs_context_parse_monolithic(struct fs_context *fc,
 static int smb3_fs_context_validate(struct fs_context *fc)
 {
 	struct smb3_fs_context *ctx = smb3_fc2context(fc);
+	unsigned int i;
 
 	if (ctx->rdma && ctx->vals->protocol_id < SMB30_PROT_ID) {
 		cifs_errorf(fc, "SMB Direct requires Version >=3.0\n");
@@ -633,9 +634,12 @@ static int smb3_fs_context_validate(struct fs_context *fc)
 			pr_err("Unable to determine destination address\n");
 			return -EHOSTUNREACH;
 		}
+		ctx->dst_addr_list[ctx->dst_addr_count++] = ctx->dstaddr;
 	}
 
 	/* set the port that we got earlier */
+	for (i = 0; i < ctx->dst_addr_count; i++)
+		cifs_set_port((struct sockaddr *)&ctx->dst_addr_list[i], ctx->port);
 	cifs_set_port((struct sockaddr *)&ctx->dstaddr, ctx->port);
 
 	if (ctx->override_uid && !ctx->uid_specified) {
@@ -792,6 +796,7 @@ static int smb3_fs_context_parse_param(struct fs_context *fc,
 	int i, opt;
 	bool is_smb3 = !strcmp(fc->fs_type->name, "smb3");
 	bool skip_parsing = false;
+	struct sockaddr_storage dstaddr;
 
 	cifs_dbg(FYI, "CIFS: parsing cifs mount option '%s'\n", param->key);
 
@@ -1096,12 +1101,25 @@ static int smb3_fs_context_parse_param(struct fs_context *fc,
 			ctx->got_ip = false;
 			break;
 		}
-		if (!cifs_convert_address((struct sockaddr *)&ctx->dstaddr,
-					  param->string,
+
+		if (ctx->dst_addr_count >= CIFS_MAX_ADDR_COUNT) {
+			cifs_errorf(fc, "reached max number (%u) of ip addresses.  ignoring ip=%s option.\n",
+				    CIFS_MAX_ADDR_COUNT, param->string);
+			break;
+		}
+
+		if (!cifs_convert_address((struct sockaddr *)&dstaddr, param->string,
 					  strlen(param->string))) {
 			pr_err("bad ip= option (%s)\n", param->string);
 			goto cifs_parse_mount_err;
 		}
+
+		if (ctx->dst_addr_count == 0)
+			ctx->dstaddr = dstaddr;
+
+		cifs_dbg(FYI, "%s: add \'%s\' to the list of destination addresses\n", __func__,
+			 param->string);
+		ctx->dst_addr_list[ctx->dst_addr_count++] = dstaddr;
 		ctx->got_ip = true;
 		break;
 	case Opt_domain:

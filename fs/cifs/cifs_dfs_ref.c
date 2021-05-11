@@ -143,8 +143,10 @@ char *cifs_compose_mount_options(const char *sb_mountdata,
 	const char *prepath = NULL;
 	int md_len;
 	char *tkn_e;
-	char *srvIP = NULL;
 	char sep = ',';
+	struct sockaddr_storage *addrs = NULL;
+	char ip[INET6_ADDRSTRLEN + 1];
+	int numaddrs, i;
 	int off, noff;
 
 	if (sb_mountdata == NULL)
@@ -173,21 +175,28 @@ char *cifs_compose_mount_options(const char *sb_mountdata,
 		}
 	}
 
-	rc = dns_resolve_server_name_to_ip(name, &srvIP);
-	if (rc < 0) {
+	addrs = kmalloc(CIFS_MAX_ADDR_COUNT * sizeof(*addrs), GFP_KERNEL);
+	if (!addrs) {
+		rc = -ENOMEM;
+		goto compose_mount_options_err;
+	}
+
+	rc = numaddrs = dns_resolve_server_name_to_addrs(name, addrs, CIFS_MAX_ADDR_COUNT);
+	if (rc <= 0) {
 		cifs_dbg(FYI, "%s: Failed to resolve server part of %s to IP: %d\n",
 			 __func__, name, rc);
+		rc = rc == 0 ? -EINVAL : rc;
 		goto compose_mount_options_err;
 	}
 
 	/*
-	 * In most cases, we'll be building a shorter string than the original,
-	 * but we do have to assume that the address in the ip= option may be
-	 * much longer than the original. Add the max length of an address
-	 * string to the length of the original string to allow for worst case.
+	 * In most cases, we'll be building a shorter string than the original, but we do have to
+	 * assume that the address in the ip= option may be much longer than the original.
+	 * Add the max length of CIFS_MAX_ADDR_COUNT * an address string to the length of the
+	 * original string to allow for worst case.
 	 */
-	md_len = strlen(sb_mountdata) + INET6_ADDRSTRLEN;
-	mountdata = kzalloc(md_len + sizeof("ip=") + 1, GFP_KERNEL);
+	md_len = strlen(sb_mountdata) + CIFS_MAX_ADDR_COUNT * (INET6_ADDRSTRLEN + sizeof(",ip="));
+	mountdata = kzalloc(md_len + 1, GFP_KERNEL);
 	if (mountdata == NULL) {
 		rc = -ENOMEM;
 		goto compose_mount_options_err;
@@ -227,10 +236,23 @@ char *cifs_compose_mount_options(const char *sb_mountdata,
 	mountdata[md_len] = '\0';
 
 	/* copy new IP and ref share name */
-	if (mountdata[strlen(mountdata) - 1] != sep)
+	if (mountdata[strlen(mountdata) - 1] == sep)
+		mountdata[strlen(mountdata) - 1] = '\0';
+
+	for (i = 0; i < numaddrs; i++) {
+		struct sockaddr_storage *addr = &addrs[i];
+
+		if (addr->ss_family == AF_INET6) {
+			scnprintf(ip, sizeof(ip), "%pI6",
+				  &((struct sockaddr_in6 *)addr)->sin6_addr);
+		} else
+			scnprintf(ip, sizeof(ip), "%pI4", &((struct sockaddr_in *)addr)->sin_addr);
 		strncat(mountdata, &sep, 1);
-	strcat(mountdata, "ip=");
-	strcat(mountdata, srvIP);
+		strcat(mountdata, "ip=");
+		strcat(mountdata, ip);
+	}
+
+	kfree(addrs);
 
 	if (devname)
 		*devname = name;
@@ -241,13 +263,13 @@ char *cifs_compose_mount_options(const char *sb_mountdata,
 	/*cifs_dbg(FYI, "%s: submount mountdata: %s\n", __func__, mountdata );*/
 
 compose_mount_options_out:
-	kfree(srvIP);
 	return mountdata;
 
 compose_mount_options_err:
 	kfree(mountdata);
 	mountdata = ERR_PTR(rc);
 	kfree(name);
+	kfree(addrs);
 	goto compose_mount_options_out;
 }
 

@@ -23,8 +23,11 @@
 #ifndef _DNS_RESOLVE_H
 #define _DNS_RESOLVE_H
 
+#include <linux/net.h>
+
 #ifdef __KERNEL__
-extern int dns_resolve_server_name_to_ip(const char *unc, char **ip_addr);
+extern int dns_resolve_server_name_to_addrs(const char *unc, struct sockaddr_storage *addrs,
+					    int maxaddrs);
 #endif /* KERNEL */
 
 #endif /* _DNS_RESOLVE_H */

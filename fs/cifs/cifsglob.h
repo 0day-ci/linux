@@ -87,6 +87,9 @@
 /* maximum number of PDUs in one compound */
 #define MAX_COMPOUND 5
 
+/* maximum number of addresses we can handle from a resolved hostname */
+#define CIFS_MAX_ADDR_COUNT 16
+
 /*
  * Default number of credits to keep available for SMB3.
  * This value is chosen somewhat arbitrarily. The Windows client
@@ -589,8 +592,11 @@ struct TCP_Server_Info {
 	enum statusEnum tcpStatus; /* what we think the status is */
 	char *hostname; /* hostname portion of UNC string */
 	struct socket *ssocket;
-	struct sockaddr_storage dstaddr;
+	struct sockaddr_storage dst_addr_list[CIFS_MAX_ADDR_COUNT];
+	unsigned int dst_addr_count;
+	struct sockaddr_storage dstaddr; /* current destination address */
 	struct sockaddr_storage srcaddr; /* locally bind to this IP */
+	unsigned short port_num;
 #ifdef CONFIG_NET_NS
 	struct net *net;
 #endif

@@ -1235,8 +1235,10 @@ int dfs_cache_update_vol(const char *fullpath, struct TCP_Server_Info *server)
 
 	cifs_dbg(FYI, "%s: updating volume info\n", __func__);
 	spin_lock(&vi->ctx_lock);
-	memcpy(&vi->ctx.dstaddr, &server->dstaddr,
-	       sizeof(vi->ctx.dstaddr));
+	memcpy(vi->ctx.dst_addr_list, server->dst_addr_list,
+	       server->dst_addr_count * sizeof(server->dst_addr_list[0]));
+	vi->ctx.dst_addr_count = server->dst_addr_count;
+	memcpy(&vi->ctx.dstaddr, &server->dstaddr, sizeof(vi->ctx.dstaddr));
 	spin_unlock(&vi->ctx_lock);
 
 	kref_put(&vi->refcnt, vol_release);

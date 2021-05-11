@@ -1178,43 +1178,52 @@ int match_target_ip(struct TCP_Server_Info *server,
 		    bool *result)
 {
 	int rc;
-	char *target, *tip = NULL;
-	struct sockaddr tipaddr;
+	struct sockaddr_storage *addrs = NULL;
+	unsigned int numaddrs, i, j;
+	char *target = NULL;
 
 	*result = false;
 
 	target = kzalloc(share_len + 3, GFP_KERNEL);
-	if (!target) {
-		rc = -ENOMEM;
-		goto out;
-	}
+	if (!target)
+		return -ENOMEM;
 
 	scnprintf(target, share_len + 3, "\\\\%.*s", (int)share_len, share);
 
 	cifs_dbg(FYI, "%s: target name: %s\n", __func__, target + 2);
 
-	rc = dns_resolve_server_name_to_ip(target, &tip);
-	if (rc < 0)
-		goto out;
-
-	cifs_dbg(FYI, "%s: target ip: %s\n", __func__, tip);
-
-	if (!cifs_convert_address(&tipaddr, tip, strlen(tip))) {
-		cifs_dbg(VFS, "%s: failed to convert target ip address\n",
-			 __func__);
-		rc = -EINVAL;
+	addrs = kcalloc(CIFS_MAX_ADDR_COUNT, sizeof(*addrs), GFP_KERNEL);
+	if (!addrs) {
+		rc = -ENOMEM;
 		goto out;
 	}
 
-	*result = cifs_match_ipaddr((struct sockaddr *)&server->dstaddr,
-				    &tipaddr);
-	cifs_dbg(FYI, "%s: ip addresses match: %u\n", __func__, *result);
+	rc = numaddrs = dns_resolve_server_name_to_addrs(target, addrs, CIFS_MAX_ADDR_COUNT);
+	if (rc <= 0) {
+		cifs_dbg(FYI, "%s: failed to resolve server name: %d\n", __func__, rc);
+		rc = rc == 0 ? -EINVAL : rc;
+		goto out;
+	}
+
 	rc = 0;
 
-out:
-	kfree(target);
-	kfree(tip);
+	if (server->dst_addr_count != numaddrs)
+		goto out;
+	for (i = 0; i < numaddrs; i++) {
+		bool match = false;
 
+		for (j = 0; j < server->dst_addr_count && !match; j++)
+			match |= cifs_match_ipaddr((struct sockaddr *)&server->dst_addr_list[j],
+						   (struct sockaddr *)&addrs[i]);
+		if (!match)
+			break;
+	}
+	*result = i == numaddrs;
+
+out:
+	cifs_dbg(FYI, "%s: ip addresses match: %u\n", __func__, *result);
+	kfree(target);
+	kfree(addrs);
 	return rc;
 }
 

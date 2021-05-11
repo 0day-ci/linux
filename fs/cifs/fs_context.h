@@ -247,7 +247,9 @@ struct smb3_fs_context {
 	struct smb_version_operations *ops;
 	struct smb_version_values *vals;
 	char *prepath;
-	struct sockaddr_storage dstaddr; /* destination address */
+	struct sockaddr_storage dst_addr_list[CIFS_MAX_ADDR_COUNT]; /* list of dest addresses */
+	unsigned int dst_addr_count; /* number of dest addresses */
+	struct sockaddr_storage dstaddr; /* current destination address */
 	struct sockaddr_storage srcaddr; /* allow binding to a local IP */
 	struct nls_table *local_nls; /* This is a copy of the pointer in cifs_sb */
 	unsigned int echo_interval; /* echo interval in secs */

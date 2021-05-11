@@ -32,25 +32,40 @@
 #include "cifsproto.h"
 #include "cifs_debug.h"
 
+static int iplist_to_addrs(char *ips, struct sockaddr_storage *addrs, int maxaddrs)
+{
+	char *ip;
+	int count = 0;
+
+	while ((ip = strsep(&ips, ",")) && count < maxaddrs) {
+		struct sockaddr_storage addr;
+
+		if (!*ip)
+			break;
+
+		cifs_dbg(FYI, "%s: add \'%s\' to the list of ip addresses\n", __func__, ip);
+		if (cifs_convert_address((struct sockaddr *)&addr, ip, strlen(ip)) > 0)
+			addrs[count++] = addr;
+	}
+	return count;
+}
+
 /**
- * dns_resolve_server_name_to_ip - Resolve UNC server name to ip address.
+ * dns_resolve_server_name_to_addrs - Resolve UNC server name to a list of addresses.
  * @unc: UNC path specifying the server (with '/' as delimiter)
- * @ip_addr: Where to return the IP address.
+ * @addrs: Where to return the list of addresses.
+ * @maxaddrs: Maximum number of addresses.
  *
- * The IP address will be returned in string form, and the caller is
- * responsible for freeing it.
- *
- * Returns length of result on success, -ve on error.
+ * Returns the number of resolved addresses, otherwise a negative error number.
  */
-int
-dns_resolve_server_name_to_ip(const char *unc, char **ip_addr)
+int dns_resolve_server_name_to_addrs(const char *unc, struct sockaddr_storage *addrs, int maxaddrs)
 {
 	struct sockaddr_storage ss;
 	const char *hostname, *sep;
-	char *name;
+	char *ips;
 	int len, rc;
 
-	if (!ip_addr || !unc)
+	if (!addrs || !maxaddrs || !unc)
 		return -EINVAL;
 
 	len = strlen(unc);
@@ -73,28 +88,23 @@ dns_resolve_server_name_to_ip(const char *unc, char **ip_addr)
 
 	/* Try to interpret hostname as an IPv4 or IPv6 address */
 	rc = cifs_convert_address((struct sockaddr *)&ss, hostname, len);
-	if (rc > 0)
-		goto name_is_IP_address;
+	if (rc > 0) {
+		cifs_dbg(FYI, "%s: unc is IP, skipping dns upcall: %s\n", __func__, hostname);
+		addrs[0] = ss;
+		return 1;
+	}
 
 	/* Perform the upcall */
-	rc = dns_query(current->nsproxy->net_ns, NULL, hostname, len,
-		       NULL, ip_addr, NULL, false);
-	if (rc < 0)
-		cifs_dbg(FYI, "%s: unable to resolve: %*.*s\n",
-			 __func__, len, len, hostname);
-	else
-		cifs_dbg(FYI, "%s: resolved: %*.*s to %s\n",
-			 __func__, len, len, hostname, *ip_addr);
-	return rc;
+	rc = dns_query(current->nsproxy->net_ns, NULL, hostname, len, "list", &ips, NULL, false);
+	if (rc < 0) {
+		cifs_dbg(FYI, "%s: unable to resolve: %*.*s\n", __func__, len, len, hostname);
+		return rc;
+	}
+	cifs_dbg(FYI, "%s: resolved: %*.*s to %s\n", __func__, len, len, hostname, ips);
 
-name_is_IP_address:
-	name = kmalloc(len + 1, GFP_KERNEL);
-	if (!name)
-		return -ENOMEM;
-	memcpy(name, hostname, len);
-	name[len] = 0;
-	cifs_dbg(FYI, "%s: unc is IP, skipping dns upcall: %s\n",
-		 __func__, name);
-	*ip_addr = name;
-	return 0;
+	rc = iplist_to_addrs(ips, addrs, maxaddrs);
+	cifs_dbg(FYI, "%s: num of resolved ips: %d\n", __func__, rc);
+	kfree(ips);
+
+	return rc;
 }
