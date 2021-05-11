@@ -221,7 +221,8 @@ skip_error:
 		 * We should respond to further attempts from the device to send
 		 * data, so that we can get unstuck.
 		 */
-		schedule_work(&desc->service_outs_intr);
+		if (!test_bit(WDM_DISCONNECTING, &desc->flags))
+			schedule_work(&desc->service_outs_intr);
 	} else {
 		set_bit(WDM_READ, &desc->flags);
 		wake_up(&desc->wait);
@@ -306,10 +307,12 @@ static void wdm_int_callback(struct urb *urb)
 			return;
 		if (rv == -ENOMEM) {
 sw:
-			rv = schedule_work(&desc->rxwork);
-			if (rv)
-				dev_err(&desc->intf->dev,
-					"Cannot schedule work\n");
+			if (!test_bit(WDM_DISCONNECTING, &desc->flags)) {
+				rv = schedule_work(&desc->rxwork);
+				if (rv)
+					dev_err(&desc->intf->dev,
+						"Cannot schedule work\n");
+			}
 		}
 	}
 exit:
