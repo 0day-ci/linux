@@ -1245,9 +1245,17 @@ int bdev_disk_changed(struct block_device *bdev, bool invalidate)
 	lockdep_assert_held(&bdev->bd_mutex);
 
 rescan:
+	down_read(&bdev_lookup_sem);
+	if (!(disk->flags & GENHD_FL_UP)) {
+		up_read(&bdev_lookup_sem);
+		return -ENXIO;
+	}
+
 	ret = blk_drop_partitions(bdev);
-	if (ret)
+	if (ret) {
+		up_read(&bdev_lookup_sem);
 		return ret;
+	}
 
 	clear_bit(GD_NEED_PART_SCAN, &disk->state);
 
@@ -1270,8 +1278,10 @@ rescan:
 
 	if (get_capacity(disk)) {
 		ret = blk_add_partitions(disk, bdev);
-		if (ret == -EAGAIN)
+		if (ret == -EAGAIN) {
+			up_read(&bdev_lookup_sem);
 			goto rescan;
+		}
 	} else if (invalidate) {
 		/*
 		 * Tell userspace that the media / partition table may have
@@ -1280,6 +1290,7 @@ rescan:
 		kobject_uevent(&disk_to_dev(disk)->kobj, KOBJ_CHANGE);
 	}
 
+	up_read(&bdev_lookup_sem);
 	return ret;
 }
 /*
