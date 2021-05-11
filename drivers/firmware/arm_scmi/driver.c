@@ -371,6 +371,7 @@ void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr,
 {
 	u16 xfer_id = MSG_XTRACT_TOKEN(msg_hdr);
 	u8 msg_type = MSG_XTRACT_TYPE(msg_hdr);
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
 
 	switch (msg_type) {
 	case MSG_TYPE_NOTIFICATION:
@@ -384,6 +385,9 @@ void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr,
 		WARN_ONCE(1, "received unknown msg_type:%d\n", msg_type);
 		break;
 	}
+
+	if (info->desc->ops->drop_message)
+		info->desc->ops->drop_message(cinfo, msg_handle);
 }
 
 /**

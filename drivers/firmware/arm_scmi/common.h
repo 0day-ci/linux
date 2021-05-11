@@ -298,6 +298,7 @@ struct scmi_chan_info {
  * @fetch_notification: Callback to fetch notification
  * @clear_channel: Callback to clear a channel
  * @poll_done: Callback to poll transfer status
+ * @drop_message: Optional callback when finished using msg_handle
  */
 struct scmi_transport_ops {
 	int (*link_supplier)(struct device *dev);
@@ -315,6 +316,7 @@ struct scmi_transport_ops {
 				   struct scmi_xfer *xfer, void *msg_handle);
 	void (*clear_channel)(struct scmi_chan_info *cinfo);
 	bool (*poll_done)(struct scmi_chan_info *cinfo, struct scmi_xfer *xfer);
+	void (*drop_message)(struct scmi_chan_info *cinfo, void *msg_handle);
 };
 
 int scmi_protocol_device_request(const struct scmi_device_id *id_table);
