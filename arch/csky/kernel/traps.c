@@ -187,7 +187,6 @@ asmlinkage void do_trap_bkpt(struct pt_regs *regs)
 asmlinkage void do_trap_illinsn(struct pt_regs *regs)
 {
 	current->thread.trap_no = trap_no(regs);
-
 #ifdef CONFIG_KPROBES
 	if (kprobe_breakpoint_handler(regs))
 		return;
@@ -209,7 +208,7 @@ asmlinkage void do_trap_illinsn(struct pt_regs *regs)
 
 asmlinkage void do_trap_fpe(struct pt_regs *regs)
 {
-#ifdef CONFIG_CPU_HAS_FP
+#ifdef CONFIG_CPU_HAS_FPU
 	return fpu_fpe(regs);
 #else
 	do_trap_error(regs, SIGILL, ILL_ILLOPC, regs->pc,
@@ -219,7 +218,7 @@ asmlinkage void do_trap_fpe(struct pt_regs *regs)
 
 asmlinkage void do_trap_priv(struct pt_regs *regs)
 {
-#ifdef CONFIG_CPU_HAS_FP
+#ifdef CONFIG_CPU_HAS_FPU
 	if (user_mode(regs) && fpu_libc_helper(regs))
 		return;
 #endif

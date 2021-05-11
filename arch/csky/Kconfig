@@ -285,6 +285,13 @@ config CPU_HAS_FPU
 	bool "CPU has FPU coprocessor"
 	depends on CPU_CK807 || CPU_CK810 || CPU_CK860
 
+config CPU_HAS_MATHEMU
+	bool "CPU has FPU Mathemu Instructions"
+	depends on (CPU_CK810 || CPU_CK860) && CPU_HAS_FPU
+	default y
+	help
+	  Say Y/N here to allow turning FPU Instructions simulation on/off.
+
 config CPU_HAS_ICACHE_INS
 	bool "CPU has Icache invalidate instructions"
 	depends on CPU_HAS_CACHEV2

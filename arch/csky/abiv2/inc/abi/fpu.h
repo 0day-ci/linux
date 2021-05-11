@@ -6,14 +6,44 @@
 #include <asm/sigcontext.h>
 #include <asm/ptrace.h>
 
+
+#ifdef CONFIG_CPU_HAS_MATHEMU
+#define FPU_INIT		mtcr("cr<1, 2>", 0x3f)
+#define MFCR_FCR        current->thread.emul_fp.user_fcr
+#define MFCR_FESR       current->thread.emul_fp.user_fesr
+#define MTCR_FCR(regx)		\
+		{	\
+			mtcr("cr<1, 2>", regx | 0x3f);	\
+			current->thread.emul_fp.user_fcr = regx;	\
+		}
+#define MTCR_FESR(regx)		\
+		{	\
+			mtcr("cr<2, 2>", regx); \
+			current->thread.emul_fp.user_fesr = regx;	\
+		}
+#define CR_NUM          15
+
+inline unsigned int get_fpu_insn(struct pt_regs *regs);
+inline int do_fpu_insn(unsigned int inst, struct pt_regs *regs);
+#else
+#define FPU_INIT		mtcr("cr<1, 2>", 0)
+#define MFCR_FCR mfcr("cr<1, 2>")
+#define MFCR_FESR mfcr("cr<2, 2>")
+#define MTCR_FCR(regx)		{ mtcr("cr<1, 2>", regx); }
+#define MTCR_FESR(regx)		{ mtcr("cr<2, 2>", regx); }
+#define CR_NUM    2
+#endif
+
 int fpu_libc_helper(struct pt_regs *regs);
 void fpu_fpe(struct pt_regs *regs);
 
-static inline void init_fpu(void) { mtcr("cr<1, 2>", 0); }
+static inline void init_fpu(void)
+{
+	FPU_INIT;
+}
 
 void save_to_user_fp(struct user_fp *user_fp);
 void restore_from_user_fp(struct user_fp *user_fp);
-
 /*
  * Define the fesr bit for fpe handle.
  */

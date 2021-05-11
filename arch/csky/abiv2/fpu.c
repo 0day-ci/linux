@@ -38,8 +38,7 @@ int fpu_libc_helper(struct pt_regs *regs)
 		return 0;
 
 	tinstr = instr_hi | ((unsigned long)instr_low << 16);
-
-	if (((tinstr >> 21) & 0x1F) != 2)
+	if (((tinstr >> 21) & 0x1F) != CR_NUM)
 		return 0;
 
 	if ((tinstr & MTCR_MASK) == MTCR_DIST) {
@@ -54,9 +53,9 @@ int fpu_libc_helper(struct pt_regs *regs)
 		regx =  *(&regs->a0 + index);
 
 		if (tmp == 1)
-			mtcr("cr<1, 2>", regx);
+			MTCR_FCR(regx)
 		else if (tmp == 2)
-			mtcr("cr<2, 2>", regx);
+			MTCR_FESR(regx)
 		else
 			return 0;
 
@@ -74,9 +73,9 @@ int fpu_libc_helper(struct pt_regs *regs)
 			return 0;
 
 		if (tmp == 1)
-			regx = mfcr("cr<1, 2>");
+			regx = MFCR_FCR;
 		else if (tmp == 2)
-			regx = mfcr("cr<2, 2>");
+			regx = MFCR_FESR;
 		else
 			return 0;
 
@@ -93,6 +92,16 @@ void fpu_fpe(struct pt_regs *regs)
 {
 	int sig, code;
 	unsigned int fesr;
+
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	unsigned int inst;
+
+	inst = get_fpu_insn(regs);
+	if (inst && !do_fpu_insn(inst, regs)) {
+		regs->pc += 4;
+		return;
+	}
+#endif
 
 	fesr = mfcr("cr<2, 2>");
 

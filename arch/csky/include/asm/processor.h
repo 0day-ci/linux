@@ -21,6 +21,14 @@ struct cpuinfo_csky {
 
 extern struct cpuinfo_csky cpu_data[];
 
+#ifdef CONFIG_CPU_HAS_MATHEMU
+struct emul_fp {
+	unsigned long	user_fcr;
+	unsigned long	user_fesr;
+	unsigned long	reserved1;
+	unsigned long	reserved2;
+};
+#endif
 /*
  * User space process size: 2GB. This is hardcoded into a few places,
  * so don't change it unless you know what you are doing.  TASK_SIZE
@@ -45,6 +53,9 @@ struct thread_struct {
 
 	/* FPU regs */
 	struct user_fp __aligned(16) user_fp;
+#ifdef CONFIG_CPU_HAS_MATHEMU
+	struct emul_fp __aligned(16) emul_fp;
+#endif
 };
 
 #define INIT_THREAD  { \
