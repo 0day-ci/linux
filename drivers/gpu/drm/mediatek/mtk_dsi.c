@@ -1062,7 +1062,6 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 	dsi->regs = devm_ioremap_resource(dev, regs);
 	if (IS_ERR(dsi->regs)) {
 		ret = PTR_ERR(dsi->regs);
-		dev_err(dev, "Failed to ioremap memory: %d\n", ret);
 		goto err_unregister_host;
 	}
 
