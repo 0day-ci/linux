@@ -125,7 +125,9 @@ struct inet_connection_sock {
 		int		  search_low;
 
 		/* Information on the current probe. */
-		u32		  probe_size:31,
+		u32		  probe_size:30,
+		/* Are we actively accumulating data for an mtu probe? */
+				  wait_data:1,
 		/* Is the MTUP feature enabled for this connection? */
 				  enabled:1;
 

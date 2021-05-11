@@ -322,6 +322,11 @@ tcp_mtu_probe_floor - INTEGER
 
 	Default : 48
 
+tcp_mtu_probe_autocork - BOOLEAN
+	Take into account mtu probe size when accumulating data via autocorking.
+
+	Default: 1
+
 tcp_min_snd_mss - INTEGER
 	TCP SYN and SYNACK messages usually advertise an ADVMSS option,
 	as described in RFC 1122 and RFC 6691.

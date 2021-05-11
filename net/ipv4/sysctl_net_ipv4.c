@@ -830,6 +830,13 @@ static struct ctl_table ipv4_net_table[] = {
 		.extra2		= &tcp_min_snd_mss_max,
 	},
 	{
+		.procname	= "tcp_mtu_probe_autocork",
+		.data		= &init_net.ipv4.sysctl_tcp_mtu_probe_autocork,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
 		.procname	= "tcp_probe_threshold",
 		.data		= &init_net.ipv4.sysctl_tcp_probe_threshold,
 		.maxlen		= sizeof(int),
