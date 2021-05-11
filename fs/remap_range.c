@@ -158,11 +158,11 @@ static int generic_remap_check_len(struct inode *inode_in,
 }
 
 /* Read a page's worth of file data into the page cache. */
-static struct page *vfs_dedupe_get_page(struct inode *inode, loff_t offset)
+static struct page *vfs_dedupe_get_page(struct file *file, loff_t offset)
 {
 	struct page *page;
 
-	page = read_mapping_page(inode->i_mapping, offset >> PAGE_SHIFT, NULL);
+	page = read_mapping_page(file->f_mapping, offset >> PAGE_SHIFT, file);
 	if (IS_ERR(page))
 		return page;
 	if (!PageUptodate(page)) {
@@ -199,8 +199,8 @@ static void vfs_unlock_two_pages(struct page *page1, struct page *page2)
  * Compare extents of two files to see if they are the same.
  * Caller must have locked both inodes to prevent write races.
  */
-static int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
-					 struct inode *dest, loff_t destoff,
+static int vfs_dedupe_file_range_compare(struct file *src, loff_t srcoff,
+					 struct file *dst, loff_t destoff,
 					 loff_t len, bool *is_same)
 {
 	loff_t src_poff;
@@ -229,7 +229,7 @@ static int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
 			error = PTR_ERR(src_page);
 			goto out_error;
 		}
-		dest_page = vfs_dedupe_get_page(dest, destoff);
+		dest_page = vfs_dedupe_get_page(dst, destoff);
 		if (IS_ERR(dest_page)) {
 			error = PTR_ERR(dest_page);
 			put_page(src_page);
@@ -244,8 +244,8 @@ static int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
 		 * someone is invalidating pages on us and we lose.
 		 */
 		if (!PageUptodate(src_page) || !PageUptodate(dest_page) ||
-		    src_page->mapping != src->i_mapping ||
-		    dest_page->mapping != dest->i_mapping) {
+		    src_page->mapping != src->f_mapping ||
+		    dest_page->mapping != dst->f_mapping) {
 			same = false;
 			goto unlock;
 		}
@@ -351,8 +351,8 @@ int generic_remap_file_range_prep(struct file *file_in, loff_t pos_in,
 	if (remap_flags & REMAP_FILE_DEDUP) {
 		bool		is_same = false;
 
-		ret = vfs_dedupe_file_range_compare(inode_in, pos_in,
-				inode_out, pos_out, *len, &is_same);
+		ret = vfs_dedupe_file_range_compare(file_in, pos_in,
+				file_out, pos_out, *len, &is_same);
 		if (ret)
 			return ret;
 		if (!is_same)
