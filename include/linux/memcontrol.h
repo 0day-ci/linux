@@ -1649,8 +1649,6 @@ void obj_cgroup_uncharge(struct obj_cgroup *objcg, size_t size);
 extern struct static_key_false memcg_kmem_enabled_key;
 
 extern int memcg_nr_cache_ids;
-void memcg_get_cache_ids(void);
-void memcg_put_cache_ids(void);
 
 /*
  * Helper macro to loop through all memcg-specific caches. Callers must still
@@ -1723,14 +1721,6 @@ static inline bool memcg_kmem_enabled(void)
 static inline int memcg_cache_id(struct mem_cgroup *memcg)
 {
 	return -1;
-}
-
-static inline void memcg_get_cache_ids(void)
-{
-}
-
-static inline void memcg_put_cache_ids(void)
-{
 }
 
 static inline struct mem_cgroup *mem_cgroup_from_obj(void *p)
