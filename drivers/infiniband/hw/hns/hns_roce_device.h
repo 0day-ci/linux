@@ -230,11 +230,20 @@ struct hns_roce_uar {
 	unsigned long	logic_idx;
 };
 
+struct hns_roce_dca_ctx {
+	struct list_head pool; /* all DCA mems link to @pool */
+	spinlock_t pool_lock; /* protect @pool */
+	unsigned int free_mems; /* free mem num in pool */
+	size_t free_size; /* free mem size in pool */
+	size_t total_size; /* total size in pool */
+};
+
 struct hns_roce_ucontext {
 	struct ib_ucontext	ibucontext;
 	struct hns_roce_uar	uar;
 	struct list_head	page_list;
 	struct mutex		page_mutex;
+	struct hns_roce_dca_ctx	dca_ctx;
 };
 
 struct hns_roce_pd {
