@@ -53,7 +53,7 @@ ffc00000	ffc7ffff	Guard region
 ff800000	ffbfffff	Permanent, fixed read-only mapping of the
 				firmware provided DT blob
 
-fee00000	feffffff	Mapping of PCI I/O space. This is a static
+fee00000	ff0fffff	Mapping of PCI I/O space. This is a static
 				mapping within the vmalloc space.
 
 VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
