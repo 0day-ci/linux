@@ -188,20 +188,6 @@ static void vfe_hw_version_read(struct vfe_device *vfe, struct device *dev)
 	dev_err(dev, "VFE HW Version = %u.%u.%u\n", gen, rev, step);
 }
 
-static inline void vfe_reg_clr(struct vfe_device *vfe, u32 reg, u32 clr_bits)
-{
-	u32 bits = readl_relaxed(vfe->base + reg);
-
-	writel_relaxed(bits & ~clr_bits, vfe->base + reg);
-}
-
-static inline void vfe_reg_set(struct vfe_device *vfe, u32 reg, u32 set_bits)
-{
-	u32 bits = readl_relaxed(vfe->base + reg);
-
-	writel_relaxed(bits | set_bits, vfe->base + reg);
-}
-
 static void vfe_global_reset(struct vfe_device *vfe)
 {
 	u32 reset_bits = GLOBAL_RESET_CMD_CORE		|
@@ -305,30 +291,12 @@ static inline void vfe_reg_update_clear(struct vfe_device *vfe,
 
 static void vfe_enable_irq_common(struct vfe_device *vfe)
 {
-	vfe_reg_set(vfe, VFE_IRQ_MASK_0, ~0u);
-	vfe_reg_set(vfe, VFE_IRQ_MASK_1, ~0u);
+	writel_relaxed(~0u, vfe->base + VFE_IRQ_MASK_0);
+	writel_relaxed(~0u, vfe->base + VFE_IRQ_MASK_1);
 
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(0));
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(1));
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(2));
-}
-
-static void vfe_isr_halt_ack(struct vfe_device *vfe)
-{
-	complete(&vfe->halt_complete);
-}
-
-static void vfe_isr_read(struct vfe_device *vfe, u32 *status0, u32 *status1)
-{
-	*status0 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_0);
-	*status1 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_1);
-
-	writel_relaxed(*status0, vfe->base + VFE_IRQ_CLEAR_0);
-	writel_relaxed(*status1, vfe->base + VFE_IRQ_CLEAR_1);
-
-	/* Enforce ordering between IRQ Clear and Global IRQ Clear */
-	wmb();
-	writel_relaxed(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD);
 }
 
 static void vfe_violation_read(struct vfe_device *vfe)
@@ -374,10 +342,6 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
 		if (status0 & STATUS_0_RDI_REG_UPDATE(i))
 			vfe->isr_ops.reg_update(vfe, i);
-
-	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
-		if (status0 & STATUS_1_RDI_SOF(i))
-			vfe->isr_ops.sof(vfe, i);
 
 	for (i = 0; i < MSM_VFE_COMPOSITE_IRQ_NUM; i++)
 		if (vfe_bus_status[0] & STATUS0_COMP_BUF_DONE(i))
@@ -608,16 +572,6 @@ static int vfe_disable(struct vfe_line *line)
 }
 
 /*
- * vfe_isr_sof - Process start of frame interrupt
- * @vfe: VFE Device
- * @line_id: VFE line
- */
-static void vfe_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id)
-{
-	/* nop */
-}
-
-/*
  * vfe_isr_reg_update - Process reg update interrupt
  * @vfe: VFE Device
  * @line_id: VFE line
@@ -749,9 +703,7 @@ static int vfe_queue_buffer(struct camss_video *vid,
 
 static const struct vfe_isr_ops vfe_isr_ops_170 = {
 	.reset_ack = vfe_isr_reset_ack,
-	.halt_ack = vfe_isr_halt_ack,
 	.reg_update = vfe_isr_reg_update,
-	.sof = vfe_isr_sof,
 	.comp_done = vfe_isr_comp_done,
 	.wm_done = vfe_isr_wm_done,
 };
@@ -772,7 +724,6 @@ static void vfe_subdev_init(struct device *dev, struct vfe_device *vfe)
 const struct vfe_hw_ops vfe_ops_170 = {
 	.global_reset = vfe_global_reset,
 	.hw_version_read = vfe_hw_version_read,
-	.isr_read = vfe_isr_read,
 	.isr = vfe_isr,
 	.pm_domain_off = vfe_pm_domain_off,
 	.pm_domain_on = vfe_pm_domain_on,
