@@ -21,7 +21,6 @@
 #include "dpu_hw_lm.h"
 #include "dpu_hw_interrupts.h"
 #include "dpu_hw_top.h"
-#include "dpu_io_util.h"
 #include "dpu_rm.h"
 #include "dpu_core_perf.h"
 
@@ -132,7 +131,8 @@ struct dpu_kms {
 
 	struct opp_table *opp_table;
 
-	struct dss_module_power mp;
+	struct clk_bulk_data *clocks;
+	int num_clocks;
 
 	/* reference count bandwidth requests, so we know when we can
 	 * release bandwidth.  Each atomic update increments, and frame-

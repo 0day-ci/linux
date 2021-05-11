@@ -5,6 +5,7 @@
  * Author: Rob Clark <robdclark@gmail.com>
  */
 
+#include <linux/clk/clk-conf.h>
 #include <linux/dma-mapping.h>
 #include <linux/kthread.h>
 #include <linux/sched/mm.h>
@@ -120,6 +121,54 @@ struct clk *msm_clk_get(struct platform_device *pdev, const char *name)
 				"\"%s\" instead of \"%s\"\n", name, name2);
 
 	return clk;
+}
+
+int msm_parse_clock(struct platform_device *pdev, struct clk_bulk_data **clocks)
+{
+	u32 i, rc = 0;
+	const char *clock_name;
+	struct clk_bulk_data *bulk;
+	int num_clk = 0;
+
+	if (!pdev)
+		return -EINVAL;
+
+	num_clk = of_property_count_strings(pdev->dev.of_node, "clock-names");
+	if (num_clk <= 0) {
+		pr_debug("clocks are not defined\n");
+		return 0;
+	}
+
+	bulk = devm_kcalloc(&pdev->dev, num_clk, sizeof(struct clk_bulk_data), GFP_KERNEL);
+	if (!bulk)
+		return -ENOMEM;
+
+	for (i = 0; i < num_clk; i++) {
+		rc = of_property_read_string_index(pdev->dev.of_node,
+						   "clock-names", i,
+						   &clock_name);
+		if (rc) {
+			DRM_DEV_ERROR(&pdev->dev, "Failed to get clock name for %d\n", i);
+			return rc;
+		}
+		bulk[i].id = devm_kstrdup(&pdev->dev, clock_name, GFP_KERNEL);
+	}
+
+	rc = devm_clk_bulk_get(&pdev->dev, num_clk, bulk);
+	if (rc) {
+		DRM_DEV_ERROR(&pdev->dev, "Failed to get clock refs %d\n", rc);
+		return rc;
+	}
+
+	rc = of_clk_set_defaults(pdev->dev.of_node, false);
+	if (rc) {
+		DRM_DEV_ERROR(&pdev->dev, "Failed to set clock defaults %d\n", rc);
+		return rc;
+	}
+
+	*clocks = bulk;
+
+	return num_clk;
 }
 
 static void __iomem *_msm_ioremap(struct platform_device *pdev, const char *name,
