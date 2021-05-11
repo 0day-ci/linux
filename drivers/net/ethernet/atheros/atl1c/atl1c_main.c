@@ -478,6 +478,8 @@ static void atl1c_set_rxbufsize(struct atl1c_adapter *adapter,
 static netdev_features_t atl1c_fix_features(struct net_device *netdev,
 	netdev_features_t features)
 {
+	struct atl1c_adapter *adapter = netdev_priv(netdev);
+	struct atl1c_hw *hw = &adapter->hw;
 	/*
 	 * Since there is no support for separate rx/tx vlan accel
 	 * enable/disable make sure tx flag is always in same state as rx.
@@ -487,8 +489,10 @@ static netdev_features_t atl1c_fix_features(struct net_device *netdev,
 	else
 		features &= ~NETIF_F_HW_VLAN_CTAG_TX;
 
-	if (netdev->mtu > MAX_TSO_FRAME_SIZE)
-		features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
+	if (hw->nic_type != athr_mt) {
+		if (netdev->mtu > MAX_TSO_FRAME_SIZE)
+			features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
+	}
 
 	return features;
 }
@@ -516,6 +520,9 @@ static void atl1c_set_max_mtu(struct net_device *netdev)
 	case athr_l1d_2:
 		netdev->max_mtu = MAX_JUMBO_FRAME_SIZE -
 				  (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
+		break;
+	case athr_mt:
+		netdev->max_mtu = 9500;
 		break;
 	/* The 10/100 devices don't support jumbo packets, max_mtu 1500 */
 	default:
