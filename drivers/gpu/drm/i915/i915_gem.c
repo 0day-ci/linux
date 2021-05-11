@@ -1109,6 +1109,7 @@ err_unlock:
 	}
 
 	i915_gem_drain_freed_objects(dev_priv);
+
 	return ret;
 }
 

@@ -13,6 +13,8 @@
 
 #include "i915_gem.h"
 
+struct drm_mm_node;
+
 /*
  * Optimised SGL iterator for GEM objects
  */
@@ -133,4 +135,37 @@ static inline unsigned int i915_sg_segment_size(void)
 
 bool i915_sg_trim(struct sg_table *orig_st);
 
+/**
+ * i915_sg_dma_page_sizes - Calculate page sizes from a scatterlist
+ * @sg: The scatterlist from which to calculate page sizes
+ *
+ * Return: a value with bits sets for relevant page sizes.
+ */
+static inline unsigned int i915_sg_dma_page_sizes(struct scatterlist *sg)
+{
+	unsigned int page_sizes;
+
+	page_sizes = 0;
+	while (sg) {
+		GEM_BUG_ON(sg->offset);
+		GEM_BUG_ON(!IS_ALIGNED(sg->dma_length, PAGE_SIZE));
+		page_sizes |= sg->dma_length;
+		sg = __sg_next(sg);
+	}
+
+	/*
+	 * Is this necessary to support building large GPU pages from
+	 * even larger segments?
+	 */
+
+	if (page_sizes > SZ_64K)
+		page_sizes |= SZ_64K;
+	if (page_sizes > SZ_2M)
+		page_sizes |= SZ_2M;
+
+	return page_sizes;
+}
+
+struct sg_table *i915_sg_from_mm_node(const struct drm_mm_node *node,
+				      u64 region_start);
 #endif

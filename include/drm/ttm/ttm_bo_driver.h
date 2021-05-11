@@ -322,6 +322,20 @@ int ttm_range_man_init(struct ttm_device *bdev,
 		       unsigned long p_size);
 
 /**
+ * ttm_range_man_init_standalone - Initialize a ttm range manager without
+ * device interaction.
+ * @size: Size of the area to be managed in pages.
+ * @use_tt: The memory type requires tt backing.
+ *
+ * This function is intended for selftests. It initializes a range manager
+ * without any device interaction.
+ *
+ * Return: pointer to a range manager on success. Error pointer on failure.
+ */
+struct ttm_resource_manager *
+ttm_range_man_init_standalone(unsigned long size, bool use_tt);
+
+/**
  * ttm_range_man_fini
  *
  * @bdev: ttm device
@@ -331,5 +345,14 @@ int ttm_range_man_init(struct ttm_device *bdev,
  */
 int ttm_range_man_fini(struct ttm_device *bdev,
 		       unsigned type);
+
+/**
+ * ttm_range_man_fini_standalone
+ * @man: The range manager
+ *
+ * Tear down a range manager initialized with
+ * ttm_range_manager_init_standalone().
+ */
+void ttm_range_man_fini_standalone(struct ttm_resource_manager *man);
 
 #endif

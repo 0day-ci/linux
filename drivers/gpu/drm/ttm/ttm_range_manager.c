@@ -125,46 +125,51 @@ static const struct ttm_resource_manager_func ttm_range_manager_func = {
 	.debug = ttm_range_man_debug
 };
 
-int ttm_range_man_init(struct ttm_device *bdev,
-		       unsigned type, bool use_tt,
-		       unsigned long p_size)
+struct ttm_resource_manager *
+ttm_range_man_init_standalone(unsigned long size, bool use_tt)
 {
 	struct ttm_resource_manager *man;
 	struct ttm_range_manager *rman;
 
 	rman = kzalloc(sizeof(*rman), GFP_KERNEL);
 	if (!rman)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	man = &rman->manager;
 	man->use_tt = use_tt;
 
 	man->func = &ttm_range_manager_func;
 
-	ttm_resource_manager_init(man, p_size);
+	ttm_resource_manager_init(man, size);
 
-	drm_mm_init(&rman->mm, 0, p_size);
+	drm_mm_init(&rman->mm, 0, size);
 	spin_lock_init(&rman->lock);
 
-	ttm_set_driver_manager(bdev, type, &rman->manager);
+	return man;
+}
+EXPORT_SYMBOL(ttm_range_man_init_standalone);
+
+int ttm_range_man_init(struct ttm_device *bdev,
+		       unsigned int type, bool use_tt,
+		       unsigned long p_size)
+{
+	struct ttm_resource_manager *man;
+
+	man = ttm_range_man_init_standalone(p_size, use_tt);
+	if (IS_ERR(man))
+		return PTR_ERR(man);
+
 	ttm_resource_manager_set_used(man, true);
+	ttm_set_driver_manager(bdev, type, man);
+
 	return 0;
 }
 EXPORT_SYMBOL(ttm_range_man_init);
 
-int ttm_range_man_fini(struct ttm_device *bdev,
-		       unsigned type)
+void ttm_range_man_fini_standalone(struct ttm_resource_manager *man)
 {
-	struct ttm_resource_manager *man = ttm_manager_type(bdev, type);
 	struct ttm_range_manager *rman = to_range_manager(man);
 	struct drm_mm *mm = &rman->mm;
-	int ret;
-
-	ttm_resource_manager_set_used(man, false);
-
-	ret = ttm_resource_manager_evict_all(bdev, man);
-	if (ret)
-		return ret;
 
 	spin_lock(&rman->lock);
 	drm_mm_clean(mm);
@@ -172,8 +177,24 @@ int ttm_range_man_fini(struct ttm_device *bdev,
 	spin_unlock(&rman->lock);
 
 	ttm_resource_manager_cleanup(man);
-	ttm_set_driver_manager(bdev, type, NULL);
 	kfree(rman);
+}
+EXPORT_SYMBOL(ttm_range_man_fini_standalone);
+
+int ttm_range_man_fini(struct ttm_device *bdev,
+		       unsigned type)
+{
+	struct ttm_resource_manager *man = ttm_manager_type(bdev, type);
+	int ret;
+
+	ttm_resource_manager_set_used(man, false);
+	ret = ttm_resource_manager_evict_all(bdev, man);
+	if (ret)
+		return ret;
+
+	ttm_set_driver_manager(bdev, type, NULL);
+	ttm_range_man_fini_standalone(man);
+
 	return 0;
 }
 EXPORT_SYMBOL(ttm_range_man_fini);
