@@ -31,8 +31,8 @@
 #include <linux/pci.h>
 #include <linux/mem_encrypt.h>
 
+#include <drm/drm_aperture.h>
 #include <drm/drm_drv.h>
-#include <drm/drm_fb_helper.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_sysfs.h>
 #include <drm/ttm/ttm_bo_driver.h>
@@ -724,7 +724,7 @@ static int vmw_driver_load(struct vmw_private *dev_priv, u32 pci_id)
 
 
 	for (i = vmw_res_context; i < vmw_res_max; ++i) {
-		idr_init(&dev_priv->res_idr[i]);
+		idr_init_base(&dev_priv->res_idr[i], 1);
 		INIT_LIST_HEAD(&dev_priv->res_lru[i]);
 	}
 
@@ -1490,7 +1490,7 @@ static int vmw_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct vmw_private *vmw;
 	int ret;
 
-	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, "svgadrmfb");
+	ret = drm_aperture_remove_conflicting_pci_framebuffers(pdev, "svgadrmfb");
 	if (ret)
 		return ret;
 
