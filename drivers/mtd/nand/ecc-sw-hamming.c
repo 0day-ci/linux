@@ -625,11 +625,12 @@ static int nand_ecc_sw_hamming_finish_io_req(struct nand_device *nand,
 							&ecccode[i],
 							&ecccalc[i]);
 		if (stat < 0) {
-			mtd->ecc_stats.failed++;
-		} else {
-			mtd->ecc_stats.corrected += stat;
-			max_bitflips = max_t(unsigned int, max_bitflips, stat);
+			nand_ecc_restore_req(&engine_conf->req_ctx, req);
+
+			return -EBADMSG;
 		}
+
+		max_bitflips = max_t(unsigned int, max_bitflips, stat);
 	}
 
 	nand_ecc_restore_req(&engine_conf->req_ctx, req);
