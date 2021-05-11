@@ -212,7 +212,6 @@ nouveau_gem_new(struct nouveau_cli *cli, u64 size, int align, uint32_t domain,
 
 	ret = nouveau_bo_init(nvbo, size, align, domain, NULL, NULL);
 	if (ret) {
-		nouveau_bo_ref(NULL, &nvbo);
 		return ret;
 	}
 
