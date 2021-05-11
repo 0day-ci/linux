@@ -2313,6 +2313,14 @@ static bool tcp_can_coalesce_send_queue_head(struct sock *sk, int len)
 	return true;
 }
 
+static int tcp_mtu_probe_is_rack(const struct sock *sk)
+{
+	struct net *net = sock_net(sk);
+
+	return (net->ipv4.sysctl_tcp_recovery & TCP_RACK_LOSS_DETECTION &&
+			net->ipv4.sysctl_tcp_mtu_probe_rack);
+}
+
 /* Calculate the size of an MTU probe
  * Probing the MTU requires one packets which is larger that current MSS as well
  * as enough following mtu-sized packets to ensure that a probe loss can be
@@ -2322,6 +2330,7 @@ int tcp_mtu_probe_size_needed(struct sock *sk, int *probe_size)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct net *net = sock_net(sk);
 	int probe_size_val;
 	int size_needed;
 
@@ -2329,7 +2338,18 @@ int tcp_mtu_probe_size_needed(struct sock *sk, int *probe_size)
 	probe_size_val = tcp_mtu_to_mss(sk, (icsk->icsk_mtup.search_high + icsk->icsk_mtup.search_low) >> 1);
 	if (probe_size)
 		*probe_size = probe_size_val;
-	size_needed = probe_size_val + (tp->reordering + 1) * tp->mss_cache;
+
+	if (tcp_mtu_probe_is_rack(sk)) {
+		/* RACK allows recovering in min_rtt / 4 based on just one extra packet
+		 * Use two to account for unrelated losses
+		 */
+		size_needed = probe_size_val + 2 * tp->mss_cache;
+	} else {
+		/* Without RACK send enough extra packets to trigger fast retransmit
+		 * This is dynamic DupThresh + 1
+		 */
+		size_needed = probe_size_val + (tp->reordering + 1) * tp->mss_cache;
+	}
 
 	return size_needed;
 }
