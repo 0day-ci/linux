@@ -310,9 +310,9 @@ struct scmi_transport_ops {
 			    struct scmi_xfer *xfer);
 	void (*mark_txdone)(struct scmi_chan_info *cinfo, int ret);
 	void (*fetch_response)(struct scmi_chan_info *cinfo,
-			       struct scmi_xfer *xfer);
-	void (*fetch_notification)(struct scmi_chan_info *cinfo,
-				   size_t max_len, struct scmi_xfer *xfer);
+			       struct scmi_xfer *xfer, void *msg_handle);
+	void (*fetch_notification)(struct scmi_chan_info *cinfo, size_t max_len,
+				   struct scmi_xfer *xfer, void *msg_handle);
 	void (*clear_channel)(struct scmi_chan_info *cinfo);
 	bool (*poll_done)(struct scmi_chan_info *cinfo, struct scmi_xfer *xfer);
 };
@@ -350,7 +350,7 @@ extern const struct scmi_desc scmi_smc_desc;
 
 int scmi_set_transport_info(struct device *dev, void *transport_info);
 void *scmi_get_transport_info(struct device *dev);
-void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr);
+void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr, void *msg_handle);
 void scmi_free_channel(struct scmi_chan_info *cinfo, struct idr *idr, int id);
 
 /* shmem related declarations */

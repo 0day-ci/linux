@@ -151,7 +151,8 @@ static int smc_send_message(struct scmi_chan_info *cinfo,
 	if (scmi_info->irq)
 		wait_for_completion(&scmi_info->tx_complete);
 
-	scmi_rx_callback(scmi_info->cinfo, shmem_read_header(scmi_info->shmem));
+	scmi_rx_callback(scmi_info->cinfo, shmem_read_header(scmi_info->shmem),
+			 NULL);
 
 	mutex_unlock(&scmi_info->shmem_lock);
 
@@ -162,7 +163,7 @@ static int smc_send_message(struct scmi_chan_info *cinfo,
 }
 
 static void smc_fetch_response(struct scmi_chan_info *cinfo,
-			       struct scmi_xfer *xfer)
+			       struct scmi_xfer *xfer, void *msg_handle)
 {
 	struct scmi_smc *scmi_info = cinfo->transport_info;
 

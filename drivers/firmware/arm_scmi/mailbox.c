@@ -43,7 +43,7 @@ static void rx_callback(struct mbox_client *cl, void *m)
 {
 	struct scmi_mailbox *smbox = client_to_scmi_mailbox(cl);
 
-	scmi_rx_callback(smbox->cinfo, shmem_read_header(smbox->shmem));
+	scmi_rx_callback(smbox->cinfo, shmem_read_header(smbox->shmem), NULL);
 }
 
 static bool mailbox_chan_available(struct device *dev, int idx)
@@ -151,7 +151,7 @@ static void mailbox_mark_txdone(struct scmi_chan_info *cinfo, int ret)
 }
 
 static void mailbox_fetch_response(struct scmi_chan_info *cinfo,
-				   struct scmi_xfer *xfer)
+				   struct scmi_xfer *xfer, void *msg_handle)
 {
 	struct scmi_mailbox *smbox = cinfo->transport_info;
 
@@ -159,7 +159,8 @@ static void mailbox_fetch_response(struct scmi_chan_info *cinfo,
 }
 
 static void mailbox_fetch_notification(struct scmi_chan_info *cinfo,
-				       size_t max_len, struct scmi_xfer *xfer)
+				       size_t max_len, struct scmi_xfer *xfer,
+				       void *msg_handle)
 {
 	struct scmi_mailbox *smbox = cinfo->transport_info;
 
