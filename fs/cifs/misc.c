@@ -1284,3 +1284,51 @@ out:
 	cifs_put_tcon_super(sb);
 	return rc;
 }
+
+/**
+ * Parse a string that is in key[=val][,key[=val]]* form.
+ *
+ * @options: The options to parse
+ * @sep: The options separator
+ * @nkey: The next key pointer
+ * @nval: The next value pointer
+ *
+ * Returns next key-value pair to be parsed, otherwise NULL.
+ */
+char *smb3_parse_option(char *options, char sep, char **nkey, char **nval)
+{
+	char *key, *value;
+	char sepstr[2] = {sep, '\0'};
+
+	*nkey = NULL;
+	*nval = NULL;
+
+	if (!options || !options[0])
+		return NULL;
+
+	while ((key = strsep(&options, sepstr)) != NULL) {
+		size_t len;
+
+		if (*key == 0)
+			return NULL;
+
+		while (options && options[0] == sep) {
+			len = strlen(key);
+			strcpy(key + len, options);
+			options = strchr(options, sep);
+			if (options)
+				*options++ = 0;
+		}
+
+		value = strchr(key, '=');
+		if (value) {
+			if (value == key)
+				continue;
+			*value++ = 0;
+		}
+		break;
+	}
+	*nkey = key;
+	*nval = value;
+	return options;
+}

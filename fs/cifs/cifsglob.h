@@ -1960,4 +1960,20 @@ static inline bool is_tcon_dfs(struct cifs_tcon *tcon)
 		tcon->share_flags & (SHI1005_FLAGS_DFS | SHI1005_FLAGS_DFS_ROOT);
 }
 
+char *smb3_parse_option(char *options, char sep, char **nkey, char **nval);
+
+static inline char *smb3_parse_options_sep(char *options, char *sep, char **nkey, char **nval)
+{
+	*sep = ',';
+	if (!strncmp(options, "sep=", 4)) {
+		*sep = options[4];
+		options += 5;
+	}
+	return smb3_parse_option(options, *sep, nkey, nval);
+}
+
+#define smb3_options_for_each(opts, nopts, sep, key, val) \
+	for (nopts = (opts), nopts = smb3_parse_options_sep(nopts, &sep, &(key), &(val)); \
+	     (key); nopts = smb3_parse_option(nopts, sep, &(key), &(val)))
+
 #endif	/* _CIFS_GLOB_H */
