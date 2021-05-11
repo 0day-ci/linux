@@ -155,6 +155,7 @@ static enum power_supply_property magicmouse_ps_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_STATUS,
 };
 
 static bool magicmouse_can_report_battery(struct magicmouse_sc *msc)
@@ -228,6 +229,15 @@ static int magicmouse_battery_get_property(struct power_supply *psy,
 			magicmouse_battery_bt_get_capacity(msc);
 
 		val->intval = msc->battery.capacity;
+		break;
+	case POWER_SUPPLY_PROP_STATUS:
+		if (msc->input->id.vendor == BT_VENDOR_ID_APPLE) {
+			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+		} else { /* USB_VENDOR_ID_APPLE */
+			val->intval = (msc->battery.capacity == 100) ?
+				      POWER_SUPPLY_STATUS_FULL :
+				      POWER_SUPPLY_STATUS_CHARGING;
+		}
 		break;
 	default:
 		ret = -EINVAL;
