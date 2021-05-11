@@ -56,5 +56,6 @@
 #define VIRTIO_ID_PMEM			27 /* virtio pmem */
 #define VIRTIO_ID_BT			28 /* virtio bluetooth */
 #define VIRTIO_ID_MAC80211_HWSIM	29 /* virtio mac80211-hwsim */
+#define VIRTIO_ID_SCMI			32 /* virtio SCMI */
 
 #endif /* _LINUX_VIRTIO_IDS_H */
