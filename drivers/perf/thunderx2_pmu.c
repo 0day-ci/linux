@@ -818,7 +818,6 @@ static struct tx2_uncore_pmu *tx2_uncore_pmu_init_dev(struct device *dev,
 
 	base = devm_ioremap_resource(dev, &res);
 	if (IS_ERR(base)) {
-		dev_err(dev, "PMU type %d: Fail to map resource\n", type);
 		return NULL;
 	}
 
