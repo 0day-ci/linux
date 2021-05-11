@@ -124,6 +124,29 @@ struct scmi_msg {
 };
 
 /**
+ * struct scmi_xfer_state - Message flow state
+ *
+ * @done: command message transmit completion event
+ * @async_done: pointer to delayed response message received event completion
+ * @wait_response: Waiting for the (not delayed) response.
+ * @wait_delayed: Waiting for the delayed response.
+ * @wait_after_timeout: Message timed out for core, but transport will
+ * 			eventually submit the response. Cannot reuse the
+ * 			scmi_xfer as long as this is set.
+ * @put_wait: wait_after_timeout was set when we were trying to put the
+ * 	      message, so we wait for the transport to present the response
+ * 	      before actually releasing the message.
+ */
+struct scmi_xfer_state {
+	struct completion done;
+	struct completion *async_done;
+	u8 wait_response;
+	u8 wait_delayed;
+	u8 wait_after_timeout;
+	u8 put_wait;
+};
+
+/**
  * struct scmi_xfer - Structure representing a message flow
  *
  * @transfer_id: Unique ID for debug & profiling purpose
@@ -132,16 +155,16 @@ struct scmi_msg {
  * @rx: Receive message, the buffer should be pre-allocated to store
  *	message. If request-ACK protocol is used, we can reuse the same
  *	buffer for the rx path as we use for the tx path.
- * @done: command message transmit completion event
- * @async_done: pointer to delayed response message received event completion
+ * @state: Message flow state
+ * @lock: Protects access to message while transport may access it
  */
 struct scmi_xfer {
 	int transfer_id;
 	struct scmi_msg_hdr hdr;
 	struct scmi_msg tx;
 	struct scmi_msg rx;
-	struct completion done;
-	struct completion *async_done;
+	struct scmi_xfer_state state;
+	spinlock_t lock;
 };
 
 struct scmi_xfer_ops;
@@ -333,6 +356,8 @@ struct scmi_device *scmi_child_dev_find(struct device *parent,
  *	be pending simultaneously in the system. May be overridden by the
  *	get_max_msg op.
  * @max_msg_size: Maximum size of data per message that can be handled.
+ * @wait_after_timeout: On response timeout, don't reuse scmi_xfer until
+ * 			transport eventually returns response.
  */
 struct scmi_desc {
 	int (*init)(void);
@@ -341,6 +366,7 @@ struct scmi_desc {
 	int max_rx_timeout_ms;
 	int max_msg;
 	int max_msg_size;
+	u8 wait_after_timeout;
 };
 
 #ifdef CONFIG_MAILBOX
