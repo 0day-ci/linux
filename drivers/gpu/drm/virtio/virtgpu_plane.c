@@ -129,6 +129,30 @@ static void virtio_gpu_update_dumb_bo(struct virtio_gpu_device *vgdev,
 					   objs, NULL);
 }
 
+static void virtio_gpu_fb_wait_flush(struct drm_plane *plane)
+{
+	struct drm_device *dev = plane->dev;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct virtio_gpu_framebuffer *vgfb;
+
+	vgfb = to_virtio_gpu_framebuffer(plane->state->fb);
+	if (vgfb && vgfb->fence) {
+		struct virtio_gpu_object_array *objs;
+
+		objs = virtio_gpu_array_alloc(1);
+		if (!objs)
+			return;
+		virtio_gpu_array_add_obj(objs, vgfb->base.obj[0]);
+		virtio_gpu_array_lock_resv(objs);
+		virtio_gpu_cmd_wait_flush(vgdev, objs, vgfb->fence);
+		virtio_gpu_notify(vgdev);
+
+		dma_fence_wait(&vgfb->fence->f, true);
+		dma_fence_put(&vgfb->fence->f);
+		vgfb->fence = NULL;
+	}
+}
+
 static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 					    struct drm_atomic_state *state)
 {
@@ -204,17 +228,22 @@ static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 				      rect.x2 - rect.x1,
 				      rect.y2 - rect.y1);
 	virtio_gpu_notify(vgdev);
+
+	if (vgdev->has_explicit_flush && bo->guest_blob)
+		virtio_gpu_fb_wait_flush(plane);
 }
 
-static int virtio_gpu_cursor_prepare_fb(struct drm_plane *plane,
-					struct drm_plane_state *new_state)
+static int virtio_gpu_plane_prepare_fb(struct drm_plane *plane,
+				       struct drm_plane_state *new_state)
 {
 	struct drm_device *dev = plane->dev;
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct virtio_gpu_framebuffer *vgfb;
 	struct virtio_gpu_object *bo;
 
-	if (!new_state->fb)
+	if (!new_state->fb ||
+	    (plane->type == DRM_PLANE_TYPE_PRIMARY &&
+	    !vgdev->has_explicit_flush))
 		return 0;
 
 	vgfb = to_virtio_gpu_framebuffer(new_state->fb);
@@ -228,12 +257,16 @@ static int virtio_gpu_cursor_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
-static void virtio_gpu_cursor_cleanup_fb(struct drm_plane *plane,
-					 struct drm_plane_state *old_state)
+static void virtio_gpu_plane_cleanup_fb(struct drm_plane *plane,
+					struct drm_plane_state *old_state)
 {
+	struct drm_device *dev = plane->dev;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct virtio_gpu_framebuffer *vgfb;
 
-	if (!plane->state->fb)
+	if (!plane->state->fb ||
+	    (plane->type == DRM_PLANE_TYPE_PRIMARY &&
+	    !vgdev->has_explicit_flush))
 		return;
 
 	vgfb = to_virtio_gpu_framebuffer(plane->state->fb);
@@ -321,13 +354,15 @@ static void virtio_gpu_cursor_plane_update(struct drm_plane *plane,
 }
 
 static const struct drm_plane_helper_funcs virtio_gpu_primary_helper_funcs = {
+	.prepare_fb		= virtio_gpu_plane_prepare_fb,
+	.cleanup_fb		= virtio_gpu_plane_cleanup_fb,
 	.atomic_check		= virtio_gpu_plane_atomic_check,
 	.atomic_update		= virtio_gpu_primary_plane_update,
 };
 
 static const struct drm_plane_helper_funcs virtio_gpu_cursor_helper_funcs = {
-	.prepare_fb		= virtio_gpu_cursor_prepare_fb,
-	.cleanup_fb		= virtio_gpu_cursor_cleanup_fb,
+	.prepare_fb		= virtio_gpu_plane_prepare_fb,
+	.cleanup_fb		= virtio_gpu_plane_cleanup_fb,
 	.atomic_check		= virtio_gpu_plane_atomic_check,
 	.atomic_update		= virtio_gpu_cursor_plane_update,
 };
