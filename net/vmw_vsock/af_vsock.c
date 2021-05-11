@@ -1368,6 +1368,7 @@ static int vsock_stream_connect(struct socket *sock, struct sockaddr *addr,
 		lock_sock(sk);
 
 		if (signal_pending(current)) {
+			vsock_send_shutdown(sk, SHUTDOWN_MASK);
 			err = sock_intr_errno(timeout);
 			sk->sk_state = TCP_CLOSE;
 			sock->state = SS_UNCONNECTED;
