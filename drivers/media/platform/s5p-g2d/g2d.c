@@ -279,6 +279,9 @@ static int g2d_release(struct file *file)
 	v4l2_ctrl_handler_free(&ctx->ctrl_handler);
 	v4l2_fh_del(&ctx->fh);
 	v4l2_fh_exit(&ctx->fh);
+	mutex_lock(&dev->mutex);
+	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
+	mutex_unlock(&dev->mutex);
 	kfree(ctx);
 	v4l2_info(&dev->v4l2_dev, "instance closed\n");
 	return 0;
