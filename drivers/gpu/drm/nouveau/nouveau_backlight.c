@@ -47,20 +47,20 @@ struct nouveau_backlight {
 	int id;
 };
 
-static bool
+static int
 nouveau_get_backlight_name(char backlight_name[BL_NAME_SIZE],
 			   struct nouveau_backlight *bl)
 {
 	int nb = ida_simple_get(&bl_ida, 0, 100, GFP_KERNEL);
 
 	if (nb < 0)
-		return false;
+		return nb;
 	if (nb > 0)
 		snprintf(backlight_name, BL_NAME_SIZE, "nv_backlight%d", nb);
 	else
 		snprintf(backlight_name, BL_NAME_SIZE, "nv_backlight");
 	bl->id = nb;
-	return true;
+	return 0;
 }
 
 static int
@@ -273,7 +273,8 @@ nouveau_backlight_init(struct drm_connector *connector)
 	if (!bl)
 		return -ENOMEM;
 
-	if (!nouveau_get_backlight_name(backlight_name, bl)) {
+	ret = nouveau_get_backlight_name(backlight_name, bl);
+	if (ret) {
 		NV_ERROR(drm, "Failed to retrieve a unique name for the backlight interface\n");
 		goto fail_alloc;
 	}
