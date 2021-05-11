@@ -18,8 +18,16 @@
 static LIST_HEAD(list_lrus);
 static DEFINE_MUTEX(list_lrus_mutex);
 
+static inline bool list_lru_memcg_aware(struct list_lru *lru)
+{
+	return lru->memcg_aware;
+}
+
 static void list_lru_register(struct list_lru *lru)
 {
+	if (!list_lru_memcg_aware(lru))
+		return;
+
 	mutex_lock(&list_lrus_mutex);
 	list_add(&lru->list, &list_lrus);
 	mutex_unlock(&list_lrus_mutex);
@@ -27,6 +35,9 @@ static void list_lru_register(struct list_lru *lru)
 
 static void list_lru_unregister(struct list_lru *lru)
 {
+	if (!list_lru_memcg_aware(lru))
+		return;
+
 	mutex_lock(&list_lrus_mutex);
 	list_del(&lru->list);
 	mutex_unlock(&list_lrus_mutex);
@@ -35,11 +46,6 @@ static void list_lru_unregister(struct list_lru *lru)
 static int lru_shrinker_id(struct list_lru *lru)
 {
 	return lru->shrinker_id;
-}
-
-static inline bool list_lru_memcg_aware(struct list_lru *lru)
-{
-	return lru->memcg_aware;
 }
 
 static inline struct list_lru_one *
@@ -460,9 +466,6 @@ static int memcg_update_list_lru(struct list_lru *lru,
 {
 	int i;
 
-	if (!list_lru_memcg_aware(lru))
-		return 0;
-
 	for_each_node(i) {
 		if (memcg_update_list_lru_node(&lru->node[i],
 					       old_size, new_size))
@@ -484,9 +487,6 @@ static void memcg_cancel_update_list_lru(struct list_lru *lru,
 					 int old_size, int new_size)
 {
 	int i;
-
-	if (!list_lru_memcg_aware(lru))
-		return;
 
 	for_each_node(i)
 		memcg_cancel_update_list_lru_node(&lru->node[i],
@@ -545,9 +545,6 @@ static void memcg_drain_list_lru(struct list_lru *lru,
 				 int src_idx, struct mem_cgroup *dst_memcg)
 {
 	int i;
-
-	if (!list_lru_memcg_aware(lru))
-		return;
 
 	for_each_node(i)
 		memcg_drain_list_lru_node(lru, i, src_idx, dst_memcg);
