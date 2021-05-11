@@ -1190,7 +1190,8 @@ static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
 		kvm_tdp_mmu_clear_dirty_pt_masked(kvm, slot,
 				slot->base_gfn + gfn_offset, mask, true);
 
-	if (!kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (!smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		return;
 
 	while (mask) {
@@ -1223,7 +1224,8 @@ static void kvm_mmu_clear_dirty_pt_masked(struct kvm *kvm,
 		kvm_tdp_mmu_clear_dirty_pt_masked(kvm, slot,
 				slot->base_gfn + gfn_offset, mask, false);
 
-	if (!kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (!smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		return;
 
 	while (mask) {
@@ -1268,7 +1270,8 @@ bool kvm_mmu_slot_gfn_write_protect(struct kvm *kvm,
 	int i;
 	bool write_protected = false;
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		for (i = PG_LEVEL_4K; i <= KVM_MAX_HUGEPAGE_LEVEL; ++i) {
 			rmap_head = __gfn_to_rmap(gfn, i, slot);
 			write_protected |= __rmap_write_protect(kvm, rmap_head,
@@ -1446,7 +1449,8 @@ bool kvm_unmap_gfn_range(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	bool flush = false;
 
-	if (kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		flush = kvm_handle_gfn_range(kvm, range, kvm_unmap_rmapp);
 
 	if (is_tdp_mmu_enabled(kvm))
@@ -1459,7 +1463,8 @@ bool kvm_set_spte_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	bool flush = false;
 
-	if (kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		flush = kvm_handle_gfn_range(kvm, range, kvm_set_pte_rmapp);
 
 	if (is_tdp_mmu_enabled(kvm))
@@ -1515,7 +1520,8 @@ bool kvm_age_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	bool young = false;
 
-	if (kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		young = kvm_handle_gfn_range(kvm, range, kvm_age_rmapp);
 
 	if (is_tdp_mmu_enabled(kvm))
@@ -1528,7 +1534,8 @@ bool kvm_test_age_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	bool young = false;
 
-	if (kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		young = kvm_handle_gfn_range(kvm, range, kvm_test_age_rmapp);
 
 	if (is_tdp_mmu_enabled(kvm))
@@ -3294,6 +3301,10 @@ static int mmu_alloc_shadow_roots(struct kvm_vcpu *vcpu)
 				return 1;
 		}
 	}
+
+	r = alloc_all_memslots_rmaps(vcpu->kvm);
+	if (r)
+		return r;
 
 	write_lock(&vcpu->kvm->mmu_lock);
 	r = make_mmu_pages_available(vcpu);
@@ -5455,7 +5466,8 @@ static void kvm_mmu_zap_all_fast(struct kvm *kvm)
 	 */
 	kvm_reload_remote_mmus(kvm);
 
-	if (kvm->arch.memslots_have_rmaps)
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
 		kvm_zap_obsolete_pages(kvm);
 
 	write_unlock(&kvm->mmu_lock);
@@ -5483,9 +5495,13 @@ void kvm_mmu_init_vm(struct kvm *kvm)
 {
 	struct kvm_page_track_notifier_node *node = &kvm->arch.mmu_sp_tracker;
 
-	kvm_mmu_init_tdp_mmu(kvm);
-
-	kvm->arch.memslots_have_rmaps = true;
+	if (!kvm_mmu_init_tdp_mmu(kvm))
+		/*
+		 * No smp_load/store wrappers needed here as we are in
+		 * VM init and there cannot be any memslots / other threads
+		 * accessing this struct kvm yet.
+		 */
+		kvm->arch.memslots_have_rmaps = true;
 
 	node->track_write = kvm_mmu_pte_write;
 	node->track_flush_slot = kvm_mmu_invalidate_zap_pages_in_memslot;
@@ -5508,7 +5524,8 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 	int i;
 	bool flush = false;
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		write_lock(&kvm->mmu_lock);
 		for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 			slots = __kvm_memslots(kvm, i);
@@ -5559,7 +5576,8 @@ void kvm_mmu_slot_remove_write_access(struct kvm *kvm,
 {
 	bool flush = false;
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		write_lock(&kvm->mmu_lock);
 		flush = slot_handle_level(kvm, memslot, slot_rmap_write_protect,
 					  start_level, KVM_MAX_HUGEPAGE_LEVEL,
@@ -5635,7 +5653,8 @@ void kvm_mmu_zap_collapsible_sptes(struct kvm *kvm,
 	struct kvm_memory_slot *slot = (struct kvm_memory_slot *)memslot;
 	bool flush;
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		write_lock(&kvm->mmu_lock);
 		flush = slot_handle_leaf(kvm, slot, kvm_mmu_zap_collapsible_spte, true);
 		if (flush)
@@ -5672,7 +5691,8 @@ void kvm_mmu_slot_leaf_clear_dirty(struct kvm *kvm,
 {
 	bool flush = false;
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		write_lock(&kvm->mmu_lock);
 		flush = slot_handle_leaf(kvm, memslot, __rmap_clear_dirty,
 					 false);
@@ -5705,7 +5725,8 @@ void kvm_mmu_zap_all(struct kvm *kvm)
 	if (is_tdp_mmu_enabled(kvm))
 		kvm_tdp_mmu_zap_all(kvm);
 
-	if (!kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before the rmaps themselves */
+	if (!smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		write_unlock(&kvm->mmu_lock);
 		return;
 	}

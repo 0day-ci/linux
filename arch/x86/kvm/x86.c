@@ -10920,6 +10920,8 @@ static int memslot_rmap_alloc(struct kvm_memory_slot *slot,
 		int lpages;
 		int level = i + 1;
 
+		WARN_ON(slot->arch.rmap[i]);
+
 		lpages = gfn_to_index(slot->base_gfn + npages - 1,
 				      slot->base_gfn, level) + 1;
 
@@ -10932,6 +10934,46 @@ static int memslot_rmap_alloc(struct kvm_memory_slot *slot,
 		}
 	}
 
+	return 0;
+}
+
+int alloc_all_memslots_rmaps(struct kvm *kvm)
+{
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *slot;
+	int r = 0;
+	int i;
+
+	/*
+	 * Check memslots_have_rmaps early before acquiring the
+	 * slots_arch_lock below.
+	 */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
+		return 0;
+
+	mutex_lock(&kvm->slots_arch_lock);
+
+	/*
+	 * Read memslots_have_rmaps again, under the slots arch lock,
+	 * before allocating the rmaps
+	 */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps))
+		return 0;
+
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		slots = __kvm_memslots(kvm, i);
+		kvm_for_each_memslot(slot, slots) {
+			r = memslot_rmap_alloc(slot, slot->npages);
+			if (r) {
+				mutex_unlock(&kvm->slots_arch_lock);
+				return r;
+			}
+		}
+	}
+
+	/* Write rmap pointers before memslots_have_rmaps */
+	smp_store_release(&kvm->arch.memslots_have_rmaps, true);
+	mutex_unlock(&kvm->slots_arch_lock);
 	return 0;
 }
 
@@ -10949,7 +10991,8 @@ static int kvm_alloc_memslot_metadata(struct kvm *kvm,
 	 */
 	memset(&slot->arch, 0, sizeof(slot->arch));
 
-	if (kvm->arch.memslots_have_rmaps) {
+	/* Read memslots_have_rmaps before allocating the rmaps */
+	if (smp_load_acquire(&kvm->arch.memslots_have_rmaps)) {
 		r = memslot_rmap_alloc(slot, npages);
 		if (r)
 			return r;
