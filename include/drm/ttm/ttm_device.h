@@ -182,6 +182,15 @@ struct ttm_device_funcs {
 	void (*delete_mem_notify)(struct ttm_buffer_object *bo);
 
 	/**
+	 * struct ttm_bo_driver member swap_possible
+	 *
+	 * @bo: the buffer object to be evicted
+	 *
+	 * Check with the driver if it is possible to swap out a BO.
+	 */
+	bool (*swap_possible)(struct ttm_buffer_object *bo);
+
+	/**
 	 * notify the driver that we're about to swap out this bo
 	 */
 	void (*swap_notify)(struct ttm_buffer_object *bo);

@@ -63,6 +63,20 @@ struct drm_i915_gem_object_ops {
 		      const struct drm_i915_gem_pwrite *arg);
 
 	int (*dmabuf_export)(struct drm_i915_gem_object *obj);
+
+	/**
+	 * adjust_lru - notify that the madvise value was updated
+	 * @obj: The gem object
+	 *
+	 * The madvise value may have been updated, or object was recently
+	 * referenced so act accordingly (Perhaps changing an LRU list etc).
+	 */
+	void (*adjust_lru)(struct drm_i915_gem_object *obj);
+
+	/**
+	 * delayed_free - Override the default delayed free implementation
+	 */
+	void (*delayed_free)(struct drm_i915_gem_object *obj);
 	void (*release)(struct drm_i915_gem_object *obj);
 
 	const char *name; /* friendly name for debug, e.g. lockdep classes */
@@ -306,6 +320,10 @@ struct drm_i915_gem_object {
 		 */
 		bool dirty:1;
 	} mm;
+
+	struct {
+		struct sg_table *cached_io_st;
+	} ttm;
 
 	/** Record of address bit 17 of each page at last unbind. */
 	unsigned long *bit_17;

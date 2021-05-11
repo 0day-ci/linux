@@ -10,8 +10,7 @@
 
 #include "intel_region_ttm.h"
 
-/* A Zero-initialized driver for now. We don't have a TTM backend yet. */
-static struct ttm_device_funcs i915_ttm_bo_driver;
+extern struct ttm_device_funcs i915_ttm_bo_driver;
 
 /**
  * DOC: TTM support structure
@@ -198,6 +197,7 @@ struct sg_table *intel_region_ttm_node_to_st(struct intel_memory_region *mem,
 	return i915_sg_from_mm_node(node, mem->region.start);
 }
 
+#ifdef CONFIG_DRM_I915_SELFTEST
 /**
  * intel_region_ttm_node_alloc - Allocate memory resources from a region
  * @mem: The memory region,
@@ -244,3 +244,4 @@ void *intel_region_ttm_node_alloc(struct intel_memory_region *mem,
 		ret = -ENXIO;
 	return ret ? ERR_PTR(ret) : res.mm_node;
 }
+#endif

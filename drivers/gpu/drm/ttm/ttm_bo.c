@@ -1150,6 +1150,14 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 		return -EBUSY;
 	}
 
+	if (bo->bdev->funcs->swap_possible) {
+		if (!bo->bdev->funcs->swap_possible(bo)) {
+			if (locked)
+				dma_resv_unlock(bo->base.resv);
+			return -EBUSY;
+		}
+	}
+
 	if (bo->deleted) {
 		ttm_bo_cleanup_refs(bo, false, false, locked);
 		ttm_bo_put(bo);
@@ -1199,6 +1207,10 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 	 */
 	if (bo->bdev->funcs->swap_notify)
 		bo->bdev->funcs->swap_notify(bo);
+
+	/* The call to swap_notify may have purged the bo */
+	if (!bo->ttm)
+		goto out;
 
 	ret = ttm_tt_swapout(bo->bdev, bo->ttm, gfp_flags);
 out:
