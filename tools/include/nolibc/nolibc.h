@@ -2244,6 +2244,14 @@ unsigned int sleep(unsigned int seconds)
 }
 
 static __attribute__((unused))
+void msleep(unsigned int msecs)
+{
+	struct timeval my_timeval = { 0, msecs * 1000 };
+
+	sys_select(0, 0, 0, 0, &my_timeval);
+}
+
+static __attribute__((unused))
 int stat(const char *path, struct stat *buf)
 {
 	int ret = sys_stat(path, buf);
