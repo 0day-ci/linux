@@ -2090,9 +2090,6 @@ void nested_sync_vmcs12_to_shadow(struct kvm_vcpu *vcpu)
 
 	if (vmx->nested.hv_evmcs) {
 		copy_vmcs12_to_enlightened(vmx);
-		/* All fields are clean */
-		vmx->nested.hv_evmcs->hv_clean_fields |=
-			HV_VMX_ENLIGHTENED_CLEAN_FIELD_ALL;
 	} else {
 		copy_vmcs12_to_shadow(vmx);
 	}
@@ -2636,6 +2633,12 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 
 	kvm_rsp_write(vcpu, vmcs12->guest_rsp);
 	kvm_rip_write(vcpu, vmcs12->guest_rip);
+
+	/* Mark all fields as clean so L1 hypervisor can set what's dirty */
+	if (hv_evmcs)
+		vmx->nested.hv_evmcs->hv_clean_fields |=
+			HV_VMX_ENLIGHTENED_CLEAN_FIELD_ALL;
+
 	return 0;
 }
 
