@@ -743,7 +743,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 	dpi->regs = devm_ioremap_resource(dev, mem);
 	if (IS_ERR(dpi->regs)) {
 		ret = PTR_ERR(dpi->regs);
-		dev_err(dev, "Failed to ioremap mem resource: %d\n", ret);
 		return ret;
 	}
 
