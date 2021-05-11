@@ -723,8 +723,6 @@ static int __init cppc_cpufreq_init(void)
 	if ((acpi_disabled) || !acpi_cpc_valid())
 		return -ENODEV;
 
-	INIT_LIST_HEAD(&cpu_data_list);
-
 	cppc_check_hisi_workaround();
 
 	ret = cpufreq_register_driver(&cppc_cpufreq_driver);
