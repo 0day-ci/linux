@@ -5657,7 +5657,8 @@ static void tcpm_init(struct tcpm_port *port)
 {
 	enum typec_cc_status cc1, cc2;
 
-	port->tcpc->init(port->tcpc);
+	if (port->tcpc->init)
+		port->tcpc->init(port->tcpc);
 
 	tcpm_reset_port(port);
 
