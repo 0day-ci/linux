@@ -1246,7 +1246,7 @@ void __init adjust_lowmem_bounds(void)
 	memblock_set_current_limit(memblock_limit);
 }
 
-static inline void prepare_page_table(void)
+static inline __init void prepare_page_table(void)
 {
 	unsigned long addr;
 	phys_addr_t end;
