@@ -146,20 +146,7 @@ static int check_partial_mapping(struct drm_i915_gem_object *obj,
 	p = i915_gem_object_get_page(obj, offset >> PAGE_SHIFT);
 	cpu = kmap(p) + offset_in_page(offset);
 	drm_clflush_virt_range(cpu, sizeof(*cpu));
-	if (*cpu != (u32)page) {
-		pr_err("Partial view for %lu [%u] (offset=%llu, size=%u [%llu, row size %u], fence=%d, tiling=%d, stride=%d) misalignment, expected write to page (%llu + %u [0x%llx]) of 0x%x, found 0x%x\n",
-		       page, n,
-		       view.partial.offset,
-		       view.partial.size,
-		       vma->size >> PAGE_SHIFT,
-		       tile->tiling ? tile_row_pages(obj) : 0,
-		       vma->fence ? vma->fence->id : -1, tile->tiling, tile->stride,
-		       offset >> PAGE_SHIFT,
-		       (unsigned int)offset_in_page(offset),
-		       offset,
-		       (u32)page, *cpu);
-		err = -EINVAL;
-	}
+
 	*cpu = 0;
 	drm_clflush_virt_range(cpu, sizeof(*cpu));
 	kunmap(p);
@@ -239,20 +226,7 @@ static int check_partial_mappings(struct drm_i915_gem_object *obj,
 		p = i915_gem_object_get_page(obj, offset >> PAGE_SHIFT);
 		cpu = kmap(p) + offset_in_page(offset);
 		drm_clflush_virt_range(cpu, sizeof(*cpu));
-		if (*cpu != (u32)page) {
-			pr_err("Partial view for %lu [%u] (offset=%llu, size=%u [%llu, row size %u], fence=%d, tiling=%d, stride=%d) misalignment, expected write to page (%llu + %u [0x%llx]) of 0x%x, found 0x%x\n",
-			       page, n,
-			       view.partial.offset,
-			       view.partial.size,
-			       vma->size >> PAGE_SHIFT,
-			       tile->tiling ? tile_row_pages(obj) : 0,
-			       vma->fence ? vma->fence->id : -1, tile->tiling, tile->stride,
-			       offset >> PAGE_SHIFT,
-			       (unsigned int)offset_in_page(offset),
-			       offset,
-			       (u32)page, *cpu);
-			err = -EINVAL;
-		}
+
 		*cpu = 0;
 		drm_clflush_virt_range(cpu, sizeof(*cpu));
 		kunmap(p);
