@@ -281,10 +281,9 @@ static inline void set_mm(struct mm_struct *mm, unsigned int cpu)
  * actually performs that local instruction cache flush, which implicitly only
  * refers to the current hart.
  */
-static inline void flush_icache_deferred(struct mm_struct *mm)
+static inline void flush_icache_deferred(struct mm_struct *mm, unsigned int cpu)
 {
 #ifdef CONFIG_SMP
-	unsigned int cpu = smp_processor_id();
 	cpumask_t *mask = &mm->context.icache_stale_mask;
 
 	if (cpumask_test_cpu(cpu, mask)) {
@@ -320,5 +319,5 @@ void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 	set_mm(next, cpu);
 
-	flush_icache_deferred(next);
+	flush_icache_deferred(next, cpu);
 }
