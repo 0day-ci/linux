@@ -839,9 +839,6 @@ static int __init maple_bus_init(void)
 		goto cleanup_bothirqs;
 	}
 
-	INIT_LIST_HEAD(&maple_waitq);
-	INIT_LIST_HEAD(&maple_sentq);
-
 	/* setup maple ports */
 	for (i = 0; i < MAPLE_PORTS; i++) {
 		checked[i] = false;
