@@ -1430,6 +1430,12 @@ static struct cifs_ses *find_root_ses(struct vol_info *vi,
 	if (IS_ERR(rpath))
 		return ERR_CAST(rpath);
 
+	rc = smb3_fs_context_dup(&ctx, &vi->ctx);
+	if (rc) {
+		ses = ERR_PTR(rc);
+		goto out;
+	}
+
 	down_read(&htable_rw_lock);
 
 	ce = lookup_cache_entry(rpath, NULL);
