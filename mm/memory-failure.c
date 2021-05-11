@@ -1527,14 +1527,14 @@ try_again:
 		return 0;
 	}
 
-	if (!PageTransTail(p) && !PageLRU(p))
-		goto identify_page_state;
-
 	/*
 	 * It's very difficult to mess with pages currently under IO
 	 * and in many cases impossible, so we just avoid it here.
 	 */
 	wait_on_page_writeback(p);
+
+	if (!PageTransTail(p) && !PageLRU(p))
+		goto identify_page_state;
 
 	/*
 	 * Now take care of user space mappings.
