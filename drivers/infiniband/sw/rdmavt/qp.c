@@ -1077,7 +1077,7 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 	int err;
 	struct rvt_swqe *swq = NULL;
 	size_t sz;
-	size_t sg_list_sz;
+	size_t sg_list_sz = 0;
 	struct ib_qp *ret = ERR_PTR(-ENOMEM);
 	struct rvt_dev_info *rdi = ib_to_rvt(ibpd->device);
 	void *priv = NULL;
@@ -1125,8 +1125,6 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 		if (!swq)
 			return ERR_PTR(-ENOMEM);
 
-		sz = sizeof(*qp);
-		sg_list_sz = 0;
 		if (init_attr->srq) {
 			struct rvt_srq *srq = ibsrq_to_rvtsrq(init_attr->srq);
 
@@ -1136,10 +1134,13 @@ struct ib_qp *rvt_create_qp(struct ib_pd *ibpd,
 		} else if (init_attr->cap.max_recv_sge > 1)
 			sg_list_sz = sizeof(*qp->r_sg_list) *
 				(init_attr->cap.max_recv_sge - 1);
-		qp = kzalloc_node(sz + sg_list_sz, GFP_KERNEL,
-				  rdi->dparms.node);
+		qp = kzalloc(sizeof(*qp), GFP_KERNEL);
 		if (!qp)
 			goto bail_swq;
+		qp->r_sg_list =
+			kzalloc_node(sg_list_sz, GFP_KERNEL, rdi->dparms.node);
+		if (!qp->r_sg_list)
+			goto bail_qp;
 		qp->allowed_ops = get_allowed_ops(init_attr->qp_type);
 
 		RCU_INIT_POINTER(qp->next, NULL);
@@ -1327,6 +1328,7 @@ bail_driver_priv:
 
 bail_qp:
 	kfree(qp->s_ack_queue);
+	kfree(qp->r_sg_list);
 	kfree(qp);
 
 bail_swq:
@@ -1761,6 +1763,7 @@ int rvt_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 	kvfree(qp->r_rq.kwq);
 	rdi->driver_f.qp_priv_free(rdi, qp);
 	kfree(qp->s_ack_queue);
+	kfree(qp->r_sg_list);
 	rdma_destroy_ah_attr(&qp->remote_ah_attr);
 	rdma_destroy_ah_attr(&qp->alt_ah_attr);
 	free_ud_wq_attr(qp);
