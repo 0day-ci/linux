@@ -249,6 +249,7 @@ static const struct of_device_id da8xx_mstpri_of_match[] = {
 	{ .compatible = "ti,da850-mstpri", },
 	{ },
 };
+MODULE_DEVICE_TABLE(of, da8xx_mstpri_of_match);
 
 static struct platform_driver da8xx_mstpri_driver = {
 	.probe = da8xx_mstpri_probe,
