@@ -911,8 +911,17 @@ static int magicmouse_enable_multitouch(struct hid_device *hdev)
 			feature = feature_mt_trackpad2_usb;
 		}
 	} else if (hdev->product == USB_DEVICE_ID_APPLE_MAGICMOUSE2) {
-		feature_size = sizeof(feature_mt_mouse2);
-		feature = feature_mt_mouse2;
+		if (hdev->vendor == BT_VENDOR_ID_APPLE) {
+			feature_size = sizeof(feature_mt_mouse2);
+			feature = feature_mt_mouse2;
+		} else { /* USB_VENDOR_ID_APPLE */
+			/*
+			 * The Magic Mouse 2 has the lightning connector on the
+			 * bottom, making impossible to use it when it is
+			 * charging.
+			 */
+			return 0;
+		}
 	} else {
 		feature_size = sizeof(feature_mt);
 		feature = feature_mt;
@@ -947,7 +956,8 @@ static int magicmouse_probe(struct hid_device *hdev,
 	int ret;
 
 	if (id->vendor == USB_VENDOR_ID_APPLE &&
-	    id->product == USB_DEVICE_ID_APPLE_MAGICTRACKPAD2 &&
+	    (id->product == USB_DEVICE_ID_APPLE_MAGICTRACKPAD2 ||
+	     id->product == USB_DEVICE_ID_APPLE_MAGICMOUSE2) &&
 	    hdev->type != HID_TYPE_USBMOUSE)
 		return 0;
 
@@ -1067,6 +1077,8 @@ static const struct hid_device_id magic_mice[] = {
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_APPLE,
 		USB_DEVICE_ID_APPLE_MAGICMOUSE), .driver_data = 0 },
 	{ HID_BLUETOOTH_DEVICE(BT_VENDOR_ID_APPLE,
+		USB_DEVICE_ID_APPLE_MAGICMOUSE2), .driver_data = 0 },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE,
 		USB_DEVICE_ID_APPLE_MAGICMOUSE2), .driver_data = 0 },
 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_APPLE,
 		USB_DEVICE_ID_APPLE_MAGICTRACKPAD), .driver_data = 0 },
