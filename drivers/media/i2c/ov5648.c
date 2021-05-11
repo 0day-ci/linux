@@ -2143,8 +2143,12 @@ static int ov5648_s_stream(struct v4l2_subdev *subdev, int enable)
 	ret = ov5648_sw_standby(sensor, !enable);
 	mutex_unlock(&sensor->mutex);
 
-	if (ret)
+	if (ret) {
+		if (enable)
+			pm_runtime_put(sensor->dev);
+
 		return ret;
+	}
 
 	state->streaming = !!enable;
 
