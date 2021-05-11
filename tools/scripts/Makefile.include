@@ -80,6 +80,10 @@ ifeq ($(CC_NO_CLANG), 1)
 EXTRA_WARNINGS += -Wstrict-aliasing=3
 endif
 
+ifneq ($(CC_NO_CLANG), 1)
+EXTRA_WARNINGS += -Wno-missing-field-initializers
+endif
+
 # Hack to avoid type-punned warnings on old systems such as RHEL5:
 # We should be changing CFLAGS and checking gcc version, but this
 # will do for now and keep the above -Wstrict-aliasing=3 in place
