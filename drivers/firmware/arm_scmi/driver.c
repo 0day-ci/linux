@@ -1588,9 +1588,52 @@ static struct platform_driver scmi_driver = {
 	.remove = scmi_remove,
 };
 
+static inline int __scmi_transports_setup(bool init)
+{
+	int ret = 0;
+	const struct of_device_id *trans;
+
+	for (trans = scmi_of_match; trans->data; trans++) {
+		const struct scmi_desc *tdesc = trans->data;
+
+		if ((init && !tdesc->init) || !tdesc->exit)
+			continue;
+		pr_info("SCMI %sInitializing %s transport\n", init ? "" : "De-",
+			trans->compatible);
+		if (init)
+			ret = tdesc->init();
+		else
+			tdesc->exit();
+
+		if (ret) {
+			pr_err("SCMI transport %s FAILED initialization!\n",
+			       trans->compatible);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int __init scmi_transports_init(void)
+{
+	return __scmi_transports_setup(true);
+}
+
+static void __exit scmi_transports_exit(void)
+{
+	__scmi_transports_setup(false);
+}
+
 static int __init scmi_driver_init(void)
 {
+	int ret;
+
 	scmi_bus_init();
+
+	ret = scmi_transports_init();
+	if (ret)
+		return ret;
 
 	scmi_base_register();
 
@@ -1617,6 +1660,8 @@ static void __exit scmi_driver_exit(void)
 	scmi_sensors_unregister();
 	scmi_voltage_unregister();
 	scmi_system_unregister();
+
+	scmi_transports_exit();
 
 	scmi_bus_exit();
 
