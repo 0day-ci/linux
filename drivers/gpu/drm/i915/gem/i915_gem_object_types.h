@@ -149,6 +149,7 @@ struct drm_i915_gem_object {
 	 * when i915_gem_ww_ctx_backoff() or i915_gem_ww_ctx_fini() are called.
 	 */
 	struct list_head obj_link;
+	struct dma_resv *resv_shared_from;
 
 	union {
 		struct rcu_head rcu;
