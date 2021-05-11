@@ -337,6 +337,8 @@ struct hns_roce_dca_cfg {
 	u32 buf_id;
 	u16 attach_count;
 	u32 npages;
+	u32 sq_idx;
+	struct delayed_work dwork;
 };
 
 /* DCA attr for setting WQE buffer */
@@ -939,6 +941,8 @@ struct hns_roce_hw {
 	int (*set_dca_buf)(struct hns_roce_dev *hr_dev,
 			   struct hns_roce_qp *hr_qp,
 			   struct hns_roce_dca_attr *attr);
+	bool (*chk_dca_buf_inactive)(struct hns_roce_dev *hr_dev,
+				     struct hns_roce_qp *hr_qp);
 	int (*query_qp)(struct ib_qp *ibqp, struct ib_qp_attr *qp_attr,
 			int qp_attr_mask, struct ib_qp_init_attr *qp_init_attr);
 	int (*modify_qp)(struct ib_qp *ibqp, const struct ib_qp_attr *attr,
