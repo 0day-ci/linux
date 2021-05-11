@@ -386,6 +386,21 @@ static void free_dca_mem(struct dca_mem *mem)
 	spin_unlock(&mem->lock);
 }
 
+void hns_roce_enable_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp)
+{
+	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
+
+	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
+}
+
+void hns_roce_disable_dca(struct hns_roce_dev *hr_dev,
+			  struct hns_roce_qp *hr_qp)
+{
+	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
+
+	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
+}
+
 static inline struct hns_roce_ucontext *
 uverbs_attr_to_hr_uctx(struct uverbs_attr_bundle *attrs)
 {
