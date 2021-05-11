@@ -58,6 +58,8 @@ enum tcpm_transmit_type {
 /**
  * struct tcpc_dev - Port configuration and callback functions
  * @fwnode:	Pointer to port fwnode
+ * @init:	Optional; Called by tcpm_port_register() and tcpm_tcpc_reset()
+ *		to set the TCPM driver into a known initial state.
  * @get_vbus:	Called to read current VBUS state
  * @get_current_limit:
  *		Optional; called by the tcpm core when configured as a snk
