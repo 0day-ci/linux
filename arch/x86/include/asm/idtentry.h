@@ -220,6 +220,23 @@ static noinline void __##func(struct pt_regs *regs, u32 vector)
 	DECLARE_IDTENTRY(vector, func)
 
 /**
+ * IDTENTRY_INVOKE_SYSVEC - Common code for system vector IDT entry points
+ * @what:	What should be called
+ *
+ * Common code for DEFINE_IDTENTRY_SYSVEC and _SYSVEC_SIMPLE
+ */
+#define IDTENTRY_INVOKE_SYSVEC(what)					\
+do {									\
+	irqentry_state_t state = irqentry_enter(regs);			\
+									\
+	instrumentation_begin();					\
+	kvm_set_cpu_l1tf_flush_l1d();					\
+	what;								\
+	instrumentation_end();						\
+	irqentry_exit(regs, state);					\
+} while (0)								\
+
+/**
  * DEFINE_IDTENTRY_SYSVEC - Emit code for system vector IDT entry points
  * @func:	Function name of the entry point
  *
@@ -233,13 +250,7 @@ static void __##func(struct pt_regs *regs);				\
 									\
 __visible noinstr void func(struct pt_regs *regs)			\
 {									\
-	irqentry_state_t state = irqentry_enter(regs);			\
-									\
-	instrumentation_begin();					\
-	kvm_set_cpu_l1tf_flush_l1d();					\
-	run_sysvec_on_irqstack_cond(__##func, regs);			\
-	instrumentation_end();						\
-	irqentry_exit(regs, state);					\
+	IDTENTRY_INVOKE_SYSVEC(run_sysvec_on_irqstack_cond(__##func, regs)); \
 }									\
 									\
 static noinline void __##func(struct pt_regs *regs)
@@ -260,15 +271,7 @@ static __always_inline void __##func(struct pt_regs *regs);		\
 									\
 __visible noinstr void func(struct pt_regs *regs)			\
 {									\
-	irqentry_state_t state = irqentry_enter(regs);			\
-									\
-	instrumentation_begin();					\
-	__irq_enter_raw();						\
-	kvm_set_cpu_l1tf_flush_l1d();					\
-	__##func (regs);						\
-	__irq_exit_raw();						\
-	instrumentation_end();						\
-	irqentry_exit(regs, state);					\
+	IDTENTRY_INVOKE_SYSVEC(__irq_enter_raw(); __##func(regs); __irq_exit_raw()); \
 }									\
 									\
 static __always_inline void __##func(struct pt_regs *regs)
