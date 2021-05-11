@@ -693,4 +693,19 @@ config MICROCHIP_PIT64B
 	  modes and high resolution. It is used as a clocksource
 	  and a clockevent.
 
+config XILINX_TIMER
+	tristate "Xilinx AXI Timer support"
+	depends on HAS_IOMEM && COMMON_CLK
+	default y if MICROBLAZE
+	help
+	  Clocksource, clockevent, and PWM drivers for Xilinx LogiCORE
+	  IP AXI Timers. This timer is typically a soft core which may
+	  be present in Xilinx FPGAs. This device may also be present in
+	  Microblaze soft processors. If you don't have this IP in your
+	  design, choose N.
+
+	  To use this device as the primary clocksource for your system,
+	  choose Y here. Otherwise, this driver will not be available
+	  early enough during boot. To compile this driver as a module,
+	  choose M here: the module will be called timer-xilinx.
 endmenu
