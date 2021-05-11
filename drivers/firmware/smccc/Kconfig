@@ -9,6 +9,7 @@ config HAVE_ARM_SMCCC_DISCOVERY
 	bool
 	depends on ARM_PSCI_FW
 	default y
+	select ARM_SCMI_HAVE_SHMEM
 	help
 	 SMCCC v1.0 lacked discoverability and hence PSCI v1.0 was updated
 	 to add SMCCC discovery mechanism though the PSCI firmware
