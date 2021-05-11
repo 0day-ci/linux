@@ -283,7 +283,6 @@ static int bluefield_edac_mc_probe(struct platform_device *pdev)
 	priv->dimm_per_mc = dimm_count;
 	priv->emi_base = devm_ioremap_resource(dev, emi_res);
 	if (IS_ERR(priv->emi_base)) {
-		dev_err(dev, "failed to map EMI IO resource\n");
 		ret = PTR_ERR(priv->emi_base);
 		goto err;
 	}
