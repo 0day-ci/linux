@@ -926,9 +926,14 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_irq_move_cleanup)
 		 * to this CPU. IRQ_MOVE_CLEANUP_VECTOR is the lowest
 		 * priority external vector, so on return from this
 		 * interrupt the device interrupt will happen first.
+		 *
+		 * *** This should never happen with the current IRQ
+		 * cleanup code, so WARN_ONCE() for now, and
+		 * eventually get rid of this hack.
 		 */
 		irr = apic_read(APIC_IRR + (vector / 32 * 0x10));
 		if (irr & (1U << (vector % 32))) {
+			WARN_ONCE(1, "irq_move_cleanup called on still pending interrupt\n");
 			apic->send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
 			continue;
 		}
