@@ -2371,6 +2371,7 @@ static int tcp_mtu_probe(struct sock *sk)
 	struct net *net = sock_net(sk);
 	int probe_size;
 	int size_needed;
+	int packets_needed;
 	int copy, len;
 	int mss_now;
 	int interval;
@@ -2383,7 +2384,6 @@ static int tcp_mtu_probe(struct sock *sk)
 	if (likely(!icsk->icsk_mtup.enabled ||
 		   icsk->icsk_mtup.probe_size ||
 		   inet_csk(sk)->icsk_ca_state != TCP_CA_Open ||
-		   tp->snd_cwnd < 11 ||
 		   tp->rx_opt.num_sacks || tp->rx_opt.dsack))
 		return -1;
 
@@ -2393,6 +2393,7 @@ static int tcp_mtu_probe(struct sock *sk)
 	 */
 	mss_now = tcp_current_mss(sk);
 	size_needed = tcp_mtu_probe_size_needed(sk, &probe_size);
+	packets_needed = DIV_ROUND_UP(size_needed, tp->mss_cache);
 
 	interval = icsk->icsk_mtup.search_high - icsk->icsk_mtup.search_low;
 	/* When misfortune happens, we are reprobing actively,
@@ -2408,6 +2409,10 @@ static int tcp_mtu_probe(struct sock *sk)
 		return -1;
 	}
 
+	/* Can probe fit inside snd_cwnd */
+	if (packets_needed > tp->snd_cwnd)
+		return -1;
+
 	/* Have enough data in the send queue to probe? */
 	if (tp->write_seq - tp->snd_nxt < size_needed)
 		return net->ipv4.sysctl_tcp_mtu_probe_autocork ? 0 : -1;
@@ -2417,13 +2422,9 @@ static int tcp_mtu_probe(struct sock *sk)
 	if (after(tp->snd_nxt + size_needed, tcp_wnd_end(tp)))
 		return 0;
 
-	/* Do we need to wait to drain cwnd? With none in flight, don't stall */
-	if (tcp_packets_in_flight(tp) + 2 > tp->snd_cwnd) {
-		if (!tcp_packets_in_flight(tp))
-			return -1;
-		else
-			return 0;
-	}
+	/* Wait for snd_cwnd to drain */
+	if (tcp_packets_in_flight(tp) + packets_needed > tp->snd_cwnd)
+		return 0;
 
 	if (!tcp_can_coalesce_send_queue_head(sk, probe_size))
 		return -1;
