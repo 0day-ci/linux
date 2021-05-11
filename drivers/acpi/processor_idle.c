@@ -30,6 +30,7 @@
 #ifdef CONFIG_X86
 #include <asm/apic.h>
 #include <asm/cpu.h>
+#include <asm/cpu_device_id.h>
 #endif
 
 #define _COMPONENT              ACPI_PROCESSOR_COMPONENT
@@ -203,8 +204,73 @@ static void tsc_check_state(int state)
 			mark_tsc_unstable("TSC halts in idle");
 	}
 }
+
+struct cpu_cstate_quirks {
+	int latency2;
+	int latency3;
+};
+
+static struct cpu_cstate_quirks amd_cst_bug = {
+	.latency2 = 18,
+	.latency3 = 350,
+};
+
+static const struct x86_cpu_id cpu_match[] = {
+	/* AMD Picasso */
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x18, &amd_cst_bug),
+	/* AMD Renoir */
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x60, &amd_cst_bug),
+	/* AMD Van Gogh */
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x90, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x91, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x92, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x93, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x94, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x95, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x96, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x97, &amd_cst_bug),
+	/* AMD Cezanne */
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x50, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x51, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x52, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x53, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x54, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x55, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x56, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x57, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x58, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x59, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5A, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5B, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5C, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5D, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5E, &amd_cst_bug),
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x19, 0x5F, &amd_cst_bug),
+	{},
+};
+
+static void acpi_processor_check_quirks(struct acpi_processor *pr)
+{
+	const struct x86_cpu_id *id = x86_match_cpu(cpu_match);
+	struct cpu_cstate_quirks *quirks;
+
+	if (!id)
+		return;
+	quirks = (struct cpu_cstate_quirks *)id->driver_data;
+	/* correct some OEM BIOS that mistakingly set C2 latency higher
+	 * than C3 making C2 seem like an invalid state
+	 */
+	if (max_cstate >= 3 &&
+	    pr->power.states[2].latency >= pr->power.states[3].latency &&
+	    quirks->latency2 && quirks->latency3) {
+		pr->power.states[2].latency = quirks->latency2;
+		pr->power.states[3].latency = quirks->latency3;
+		pr_notice("overriding known buggy C2 latency\n");
+	}
+}
 #else
 static void tsc_check_state(int state) { return; }
+static void acpi_processor_check_quirks(struct acpi_processor *pr) { return; }
 #endif
 
 static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
@@ -446,6 +512,8 @@ static int acpi_processor_get_cstate_info(struct acpi_processor *pr)
 		return result;
 
 	acpi_processor_get_power_info_default(pr);
+
+	acpi_processor_check_quirks(pr);
 
 	pr->power.count = acpi_processor_power_verify(pr);
 
