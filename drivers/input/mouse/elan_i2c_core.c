@@ -1338,6 +1338,12 @@ static int elan_probe(struct i2c_client *client,
 	return 0;
 }
 
+static void elan_shutdown(struct i2c_client *client)
+{
+	/* Make sure we don't access i2c bus after it is shutdown. */
+	disable_irq(client->irq);
+}
+
 static int __maybe_unused elan_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -1423,6 +1429,7 @@ static struct i2c_driver elan_driver = {
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe		= elan_probe,
+	.shutdown	= elan_shutdown,
 	.id_table	= elan_id,
 };
 
