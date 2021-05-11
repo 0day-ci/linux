@@ -57,7 +57,7 @@ static int qcom_apcs_sdx55_clk_probe(struct platform_device *pdev)
 
 	regmap = dev_get_regmap(parent, NULL);
 	if (!regmap) {
-		dev_err_probe(dev, -ENODEV, "Failed to get parent regmap\n");
+		dev_err(dev, "Failed to get parent regmap\n");
 		return -ENODEV;
 	}
 
@@ -82,9 +82,7 @@ static int qcom_apcs_sdx55_clk_probe(struct platform_device *pdev)
 	a7cc->pclk = devm_clk_get(parent, "pll");
 	if (IS_ERR(a7cc->pclk)) {
 		ret = PTR_ERR(a7cc->pclk);
-		if (ret != -EPROBE_DEFER)
-			dev_err_probe(dev, ret, "Failed to get PLL clk\n");
-		return ret;
+		return dev_err_probe(dev, ret, "Failed to get PLL clk\n");
 	}
 
 	a7cc->clk_nb.notifier_call = a7cc_notifier_cb;
