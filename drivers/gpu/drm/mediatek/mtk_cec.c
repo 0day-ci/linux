@@ -195,11 +195,8 @@ static int mtk_cec_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	cec->regs = devm_ioremap_resource(dev, res);
-	if (IS_ERR(cec->regs)) {
-		ret = PTR_ERR(cec->regs);
-		dev_err(dev, "Failed to ioremap cec: %d\n", ret);
-		return ret;
-	}
+	if (IS_ERR(cec->regs))
+		return PTR_ERR(cec->regs);
 
 	cec->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(cec->clk)) {
