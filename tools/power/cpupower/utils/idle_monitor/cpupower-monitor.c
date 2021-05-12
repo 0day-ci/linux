@@ -278,7 +278,7 @@ void list_monitors(void)
 	}
 }
 
-int fork_it(char **argv)
+int fork_it(int cpu, char **argv)
 {
 	int status;
 	unsigned int num;
@@ -315,9 +315,9 @@ int fork_it(char **argv)
 
 	timediff = timespec_diff_us(start, end);
 	if (WIFEXITED(status))
-		printf(_("%s took %.5f seconds and exited with status %d\n"),
-			argv[0], timediff / (1000.0 * 1000),
-			WEXITSTATUS(status));
+		printf(_("cpu %d: %s took %.5f seconds and exited with status %d\n"),
+			cpu, argv[0],
+			timediff / (1000.0 * 1000), WEXITSTATUS(status));
 	return 0;
 }
 
@@ -388,7 +388,8 @@ int cmd_monitor(int argc, char **argv)
 {
 	unsigned int num;
 	struct cpuidle_monitor *test_mon;
-	int cpu;
+	int cpu, status;
+	pid_t child_pid;
 
 	cmdline(argc, argv);
 	cpu_count = get_cpu_topology(&cpu_top);
@@ -440,10 +441,21 @@ int cmd_monitor(int argc, char **argv)
 	/*
 	 * if any params left, it must be a command to fork
 	 */
-	if (argc - optind)
-		fork_it(argv + optind);
-	else
+	if (argc - optind) {
+		for (cpu = 0; cpu < cpu_count; cpu++) {
+			child_pid = fork();
+			if (!child_pid) {
+				bind_cpu(cpu);
+				fork_it(cpu, argv + optind);
+				exit(EXIT_SUCCESS);
+			} else if (waitpid(child_pid, &status, 0) == -1) {
+				perror("waitpid");
+				exit(EXIT_FAILURE);
+			}
+		}
+	} else {
 		do_interval_measure(interval);
+	}
 
 	/* ToDo: Topology parsing needs fixing first to do
 	   this more generically */
