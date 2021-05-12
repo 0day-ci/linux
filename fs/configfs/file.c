@@ -143,10 +143,10 @@ static ssize_t
 configfs_read_bin_file(struct file *file, char __user *buf,
 		       size_t count, loff_t *ppos)
 {
-	struct configfs_fragment *frag = to_frag(file);
 	struct configfs_buffer *buffer = file->private_data;
+	struct configfs_fragment *frag = to_frag(file);
 	ssize_t retval = 0;
-	ssize_t len = min_t(size_t, count, PAGE_SIZE);
+	ssize_t len;
 
 	mutex_lock(&buffer->mutex);
 
