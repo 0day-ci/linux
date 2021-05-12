@@ -51,7 +51,9 @@ int nvmet_file_ns_enable(struct nvmet_ns *ns)
 	if (IS_ERR(ns->file)) {
 		pr_err("failed to open file %s: (%ld)\n",
 				ns->device_path, PTR_ERR(ns->file));
-		return PTR_ERR(ns->file);
+		ret = ns->file;
+		ns->file = NULL;
+		return PTR_ERR(ret);
 	}
 
 	ret = nvmet_file_ns_revalidate(ns);
