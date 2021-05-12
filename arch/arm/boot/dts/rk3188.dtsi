@@ -214,30 +214,6 @@
 		};
 	};
 
-	usbphy: phy {
-		compatible = "rockchip,rk3188-usb-phy", "rockchip,rk3288-usb-phy";
-		rockchip,grf = <&grf>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		status = "disabled";
-
-		usbphy0: usb-phy@10c {
-			#phy-cells = <0>;
-			reg = <0x10c>;
-			clocks = <&cru SCLK_OTGPHY0>;
-			clock-names = "phyclk";
-			#clock-cells = <0>;
-		};
-
-		usbphy1: usb-phy@11c {
-			#phy-cells = <0>;
-			reg = <0x11c>;
-			clocks = <&cru SCLK_OTGPHY1>;
-			clock-names = "phyclk";
-			#clock-cells = <0>;
-		};
-	};
-
 	pinctrl: pinctrl {
 		compatible = "rockchip,rk3188-pinctrl";
 		rockchip,grf = <&grf>;
@@ -635,6 +611,35 @@
 
 &local_timer {
 	interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
+};
+
+&grf{
+	compatible = "rockchip,rk3188-grf", "syscon", "simple-mfd";
+
+	usbphy: usbphy {
+		compatible = "rockchip,rk3188-usb-phy",
+			     "rockchip,rk3288-usb-phy";
+		#phy-cells = <0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
+
+		usbphy0: usb-phy@10c {
+			reg = <0x10c>;
+			clocks = <&cru SCLK_OTGPHY0>;
+			clock-names = "phyclk";
+			#clock-cells = <0>;
+			#phy-cells = <0>;
+		};
+
+		usbphy1: usb-phy@11c {
+			reg = <0x11c>;
+			clocks = <&cru SCLK_OTGPHY1>;
+			clock-names = "phyclk";
+			#clock-cells = <0>;
+			#phy-cells = <0>;
+		};
+	};
 };
 
 &gpu {
