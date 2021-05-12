@@ -375,9 +375,25 @@ static int nnp_cmdq_flush(struct nnp_device *nnpdev)
 	return 0;
 }
 
+static int nnp_set_host_doorbell_value(struct nnp_device *nnpdev, u32 value)
+{
+	struct nnp_pci *nnp_pci = container_of(nnpdev, struct nnp_pci, nnpdev);
+
+	/*
+	 * The SELF_RESET bit is set only by the h/w layer,
+	 * do not allow higher layer to set it
+	 */
+	value &= ~NNP_HOST_DRV_REQUEST_SELF_RESET_MASK;
+
+	nnp_mmio_write(nnp_pci, ELBI_PCI_HOST_DOORBELL_VALUE, value);
+
+	return 0;
+}
+
 static struct nnp_device_ops nnp_device_ops = {
 	.cmdq_flush = nnp_cmdq_flush,
 	.cmdq_write_mesg = nnp_cmdq_write_mesg,
+	.set_host_doorbell_value = nnp_set_host_doorbell_value,
 };
 
 static void set_host_boot_state(struct nnp_pci *nnp_pci, int boot_state)
