@@ -238,9 +238,19 @@ struct kasan_track *kasan_get_free_track(struct kmem_cache *cache,
 	return &alloc_meta->free_track[0];
 }
 
+static bool skip_user_poison_on_free;
+static int __init skip_user_poison_on_free_param(char *buf)
+{
+	return kstrtobool(buf, &skip_user_poison_on_free);
+}
+early_param("kasan.skip_user_poison_on_free", skip_user_poison_on_free_param);
+
 void kasan_alloc_pages(struct page *page, unsigned int order, gfp_t flags)
 {
 	bool init = !want_init_on_free() && want_init_on_alloc(flags);
+
+	if (skip_user_poison_on_free && (flags & __GFP_SKIP_KASAN_POISON))
+		SetPageSkipKASanPoison(page);
 
 	if (flags & __GFP_ZEROTAGS) {
 		int i;
