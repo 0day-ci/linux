@@ -2665,6 +2665,8 @@ static void force_expire_client(struct nfs4_client *clp)
 	struct nfsd_net *nn = net_generic(clp->net, nfsd_net_id);
 	bool already_expired;
 
+	trace_nfsd_clid_expired(&clp->cl_clientid);
+
 	spin_lock(&clp->cl_lock);
 	clp->cl_time = 0;
 	spin_unlock(&clp->cl_lock);
@@ -4075,6 +4077,7 @@ nfsd4_setclientid_confirm(struct svc_rqst *rqstp,
 				goto out;
 			status = mark_client_expired_locked(old);
 			if (status) {
+				trace_nfsd_clid_expired(&old->cl_clientid);
 				old = NULL;
 				goto out;
 			}
