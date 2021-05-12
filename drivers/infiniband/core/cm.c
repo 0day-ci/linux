@@ -643,29 +643,14 @@ static struct cm_id_private *cm_insert_listen(struct cm_id_private *cm_id_priv,
 		parent = *link;
 		cur_cm_id_priv = rb_entry(parent, struct cm_id_private,
 					  service_node);
-		if ((cur_cm_id_priv->id.service_mask & service_id) ==
-		    (service_mask & cur_cm_id_priv->id.service_id) &&
-		    (cm_id_priv->id.device == cur_cm_id_priv->id.device)) {
-			/*
-			 * Sharing an ib_cm_id with different handlers is not
-			 * supported
-			 */
-			if (cur_cm_id_priv->id.cm_handler != shared_handler ||
-			    cur_cm_id_priv->id.context ||
-			    WARN_ON(!cur_cm_id_priv->id.cm_handler)) {
-				spin_unlock_irqrestore(&cm.lock, flags);
-				return NULL;
-			}
-			refcount_inc(&cur_cm_id_priv->refcount);
-			cur_cm_id_priv->listen_sharecount++;
-			spin_unlock_irqrestore(&cm.lock, flags);
-			return cur_cm_id_priv;
-		}
 
 		if (cm_id_priv->id.device < cur_cm_id_priv->id.device)
 			link = &(*link)->rb_left;
 		else if (cm_id_priv->id.device > cur_cm_id_priv->id.device)
 			link = &(*link)->rb_right;
+		else if ((cur_cm_id_priv->id.service_mask & service_id) ==
+			 (service_mask & cur_cm_id_priv->id.service_id))
+			goto found;
 		else if (be64_lt(service_id, cur_cm_id_priv->id.service_id))
 			link = &(*link)->rb_left;
 		else
@@ -676,6 +661,22 @@ static struct cm_id_private *cm_insert_listen(struct cm_id_private *cm_id_priv,
 	rb_insert_color(&cm_id_priv->service_node, &cm.listen_service_table);
 	spin_unlock_irqrestore(&cm.lock, flags);
 	return cm_id_priv;
+
+found:
+	/*
+	 * Sharing an ib_cm_id with different handlers is not
+	 * supported
+	 */
+	if (cur_cm_id_priv->id.cm_handler != shared_handler ||
+	    cur_cm_id_priv->id.context ||
+	    WARN_ON(!cur_cm_id_priv->id.cm_handler)) {
+		spin_unlock_irqrestore(&cm.lock, flags);
+		return NULL;
+	}
+	refcount_inc(&cur_cm_id_priv->refcount);
+	cur_cm_id_priv->listen_sharecount++;
+	spin_unlock_irqrestore(&cm.lock, flags);
+	return cur_cm_id_priv;
 }
 
 static struct cm_id_private *cm_find_listen(struct ib_device *device,
@@ -686,22 +687,23 @@ static struct cm_id_private *cm_find_listen(struct ib_device *device,
 
 	while (node) {
 		cm_id_priv = rb_entry(node, struct cm_id_private, service_node);
-		if ((cm_id_priv->id.service_mask & service_id) ==
-		     cm_id_priv->id.service_id &&
-		    (cm_id_priv->id.device == device)) {
-			refcount_inc(&cm_id_priv->refcount);
-			return cm_id_priv;
-		}
+
 		if (device < cm_id_priv->id.device)
 			node = node->rb_left;
 		else if (device > cm_id_priv->id.device)
 			node = node->rb_right;
+		else if ((cm_id_priv->id.service_mask & service_id) == cm_id_priv->id.service_id)
+			goto found;
 		else if (be64_lt(service_id, cm_id_priv->id.service_id))
 			node = node->rb_left;
 		else
 			node = node->rb_right;
 	}
 	return NULL;
+
+found:
+	refcount_inc(&cm_id_priv->refcount);
+	return cm_id_priv;
 }
 
 static struct cm_timewait_info *
