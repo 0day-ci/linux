@@ -260,7 +260,7 @@ static int __maybe_unused keembay_wdt_resume(struct device *dev)
 {
 	struct keembay_wdt *wdt = dev_get_drvdata(dev);
 
-	if (watchdog_active(&wdt->wdd))
+	if (!watchdog_active(&wdt->wdd))
 		return keembay_wdt_start(&wdt->wdd);
 
 	return 0;
