@@ -4563,8 +4563,7 @@ enum {
 #define   EDP_SU_TRACK_ENABLE			(1 << 30)
 #define   TGL_EDP_PSR2_BLOCK_COUNT_NUM_2	(0 << 28)
 #define   TGL_EDP_PSR2_BLOCK_COUNT_NUM_3	(1 << 28)
-#define   EDP_Y_COORDINATE_VALID		(1 << 26) /* GLK and CNL+ */
-#define   EDP_Y_COORDINATE_ENABLE		(1 << 25) /* GLK and CNL+ */
+#define   EDP_Y_COORDINATE_ENABLE		REG_BIT(25) /* display 10, 11 and 12 */
 #define   EDP_MAX_SU_DISABLE_TIME(t)		((t) << 20)
 #define   EDP_MAX_SU_DISABLE_TIME_MASK		(0x1f << 20)
 #define   EDP_PSR2_IO_BUFFER_WAKE_MAX_LINES	8
@@ -7207,6 +7206,8 @@ enum {
 	_PIPE(pipe, _PLANE_STRIDE_3_A, _PLANE_STRIDE_3_B)
 #define PLANE_STRIDE(pipe, plane)	\
 	_MMIO_PLANE(plane, _PLANE_STRIDE_1(pipe), _PLANE_STRIDE_2(pipe))
+#define PLANE_STRIDE_MASK		REG_GENMASK(10, 0)
+#define PLANE_STRIDE_MASK_XELPD		REG_GENMASK(11, 0)
 
 #define _PLANE_POS_1_B				0x7118c
 #define _PLANE_POS_2_B				0x7128c
@@ -12548,5 +12549,8 @@ enum skl_power_gate {
 #define TGL_ROOT_DEVICE_SKU_MASK	0xF
 #define TGL_ROOT_DEVICE_SKU_ULX		0x2
 #define TGL_ROOT_DEVICE_SKU_ULT		0x4
+
+#define CLKREQ_POLICY			_MMIO(0x101038)
+#define  CLKREQ_POLICY_MEM_UP_OVRD	REG_BIT(1)
 
 #endif /* _I915_REG_H_ */
