@@ -194,6 +194,7 @@ static const struct i2c_device_id eeprom_id[] = {
 	{ "eeprom", 0 },
 	{ }
 };
+MODULE_DEVICE_TABLE(i2c, eeprom_id);
 
 static struct i2c_driver eeprom_driver = {
 	.driver = {
