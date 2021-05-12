@@ -2536,11 +2536,23 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 	unsigned int total = 0, sec_num;
 	block_t blk_end = 0;
 	bool fragmented = false;
+	bool is_cold = file_is_cold(inode);
 	int err;
 
+	/*
+	 * Cold file can be fragmented by write order. So we clear cold bit from
+	 * the file temporarily.
+	 */
+	if (is_cold)
+		file_clear_cold(inode);
+
 	/* if in-place-update policy is enabled, don't waste time here */
-	if (f2fs_should_update_inplace(inode, NULL))
+	if (f2fs_should_update_inplace(inode, NULL)) {
+		/* restore file temperature */
+		if (is_cold)
+			file_set_cold(inode);
 		return -EINVAL;
+	}
 
 	pg_start = range->start >> PAGE_SHIFT;
 	pg_end = (range->start + range->len) >> PAGE_SHIFT;
@@ -2668,6 +2680,9 @@ clear_out:
 	clear_inode_flag(inode, FI_DO_DEFRAG);
 out:
 	inode_unlock(inode);
+	/* restore file temperature */
+	if (is_cold)
+		file_set_cold(inode);
 	if (!err)
 		range->len = (u64)total << PAGE_SHIFT;
 	return err;
