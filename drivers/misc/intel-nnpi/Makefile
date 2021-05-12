@@ -6,7 +6,7 @@
 obj-$(CONFIG_INTEL_NNPI) := intel_nnpi.o intel_nnpi_pcie.o
 
 intel_nnpi-y := device.o msg_scheduler.o hostres.o host_chardev.o nnp_user.o \
-                bootimage.o
+                bootimage.o cmd_chan.o
 
 intel_nnpi_pcie-y := nnp_pcie.o
 

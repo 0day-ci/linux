@@ -11,6 +11,7 @@
 #include <linux/printk.h>
 
 #include "bootimage.h"
+#include "cmd_chan.h"
 #include "device.h"
 #include "host_chardev.h"
 #include "msg_scheduler.h"
@@ -61,6 +62,9 @@ static void process_query_version_reply(struct work_struct *work)
 	u32 protocol_version;
 	u32 card_boot_state;
 	u32 val;
+	u64 chan_resp_op_size;
+	u64 chan_cmd_op_size;
+	int i;
 
 	query_version_work =
 		container_of(work, struct query_version_work, work);
@@ -69,6 +73,15 @@ static void process_query_version_reply(struct work_struct *work)
 	protocol_version = NNP_IPC_PROTOCOL_VERSION;
 	card_boot_state = FIELD_GET(NNP_CARD_BOOT_STATE_MASK,
 				    nnpdev->card_doorbell_val);
+
+	chan_resp_op_size = query_version_work->chan_resp_op_size;
+	chan_cmd_op_size = query_version_work->chan_cmd_op_size;
+	for (i = 0; i < NNP_IPC_NUM_USER_OPS; i++) {
+		nnpdev->ipc_chan_resp_op_size[i] = chan_resp_op_size & 0x3;
+		chan_resp_op_size >>= 2;
+		nnpdev->ipc_chan_cmd_op_size[i] = chan_cmd_op_size & 0x3;
+		chan_cmd_op_size >>= 2;
+	}
 
 	nnpdev->protocol_version =
 		query_version_work->protocol_version;
@@ -167,6 +180,38 @@ static int handle_bios_protocol(struct nnp_device *nnpdev, const u64 *msgbuf,
 	return msg_qwords;
 }
 
+struct nnp_chan *nnpdev_find_channel(struct nnp_device *nnpdev, u16 chan_id)
+{
+	struct nnp_chan *cmd_chan;
+
+	spin_lock(&nnpdev->lock);
+	hash_for_each_possible(nnpdev->cmd_chan_hash, cmd_chan, hash_node, chan_id)
+		if (cmd_chan->chan_id == chan_id) {
+			nnp_chan_get(cmd_chan);
+			spin_unlock(&nnpdev->lock);
+			return cmd_chan;
+		}
+	spin_unlock(&nnpdev->lock);
+
+	return NULL;
+}
+
+static void disconnect_all_channels(struct nnp_device *nnpdev)
+{
+	struct nnp_chan *cmd_chan;
+	int i;
+
+restart:
+	spin_lock(&nnpdev->lock);
+	hash_for_each(nnpdev->cmd_chan_hash, i, cmd_chan, hash_node) {
+		spin_unlock(&nnpdev->lock);
+		nnp_chan_disconnect(cmd_chan);
+		nnp_chan_put(cmd_chan);
+		goto restart;
+	}
+	spin_unlock(&nnpdev->lock);
+}
+
 typedef int (*response_handler)(struct nnp_device *nnpdev, const u64 *msgbuf,
 				int avail_qwords);
 
@@ -174,6 +219,50 @@ static response_handler resp_handlers[NNP_IPC_C2H_OPCODE_LAST + 1] = {
 	[NNP_IPC_C2H_OP_QUERY_VERSION_REPLY3] = handle_query_version_reply3,
 	[NNP_IPC_C2H_OP_BIOS_PROTOCOL] = handle_bios_protocol
 };
+
+static int dispatch_chan_message(struct nnp_device *nnpdev, u64 *hw_msg,
+				 unsigned int size)
+{
+	int op_code = FIELD_GET(NNP_C2H_CHAN_MSG_OP_MASK, hw_msg[0]);
+	int chan_id = FIELD_GET(NNP_C2H_CHAN_MSG_CHAN_ID_MASK, hw_msg[0]);
+	struct nnp_chan *chan;
+	int msg_size;
+
+	if (op_code < NNP_IPC_MIN_USER_OP ||
+	    op_code > NNP_IPC_MAX_USER_OP) {
+		/* Should not happen! */
+		dev_err(nnpdev->dev,
+			"chan response opcode out-of-range received %d (0x%llx)\n",
+			op_code, *hw_msg);
+		return -EINVAL;
+	}
+
+	msg_size = nnpdev->ipc_chan_resp_op_size[op_code - NNP_IPC_MIN_USER_OP];
+	if (msg_size == 0) {
+		/* Should not happen! */
+		dev_err(nnpdev->dev,
+			"Unknown response chan opcode received %d (0x%llx)\n",
+			op_code, *hw_msg);
+		return -EINVAL;
+	}
+
+	/* Check for partial message */
+	if (size < msg_size)
+		return -ENOSPC;
+
+	chan = nnpdev_find_channel(nnpdev, chan_id);
+	if (!chan) {
+		dev_err(nnpdev->dev,
+			"Got response for invalid channel chan_id=%d 0x%llx\n",
+			chan_id, *hw_msg);
+		return msg_size;
+	}
+
+	nnp_chan_add_response(chan, hw_msg, msg_size * 8);
+	nnp_chan_put(chan);
+
+	return msg_size;
+}
 
 /**
  * nnpdev_process_messages() - process response messages from nnpi device
@@ -234,10 +323,18 @@ void nnpdev_process_messages(struct nnp_device *nnpdev, u64 *hw_msg,
 		int op_code = FIELD_GET(NNP_C2H_OP_MASK, msg[j]);
 		response_handler handler;
 
-		/* opcodes above OP_BIOS_PROTOCOL are not yet supported */
+		/* opcodes above OP_BIOS_PROTOCOL are routed to a channel */
 		if (op_code > NNP_IPC_C2H_OP_BIOS_PROTOCOL) {
-			fatal_protocol_error = true;
-			break;
+			msg_size = dispatch_chan_message(nnpdev, &msg[j],
+							 nof_msg - j);
+			if (msg_size < 0) {
+				if (msg_size != -ENOSPC)
+					fatal_protocol_error = true;
+				break;
+			}
+
+			j += msg_size;
+			continue;
 		}
 
 		/* dispatch the message request */
@@ -492,6 +589,11 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 	nnpdev->ops = ops;
 	nnpdev->protocol_version = 0;
 
+	nnpdev->protocol_version = 0;
+
+	ida_init(&nnpdev->cmd_chan_ida);
+	hash_init(nnpdev->cmd_chan_hash);
+
 	nnpdev->cmdq_sched = nnp_msched_create(nnpdev);
 	if (!nnpdev->cmdq_sched) {
 		ret = -ENOMEM;
@@ -668,10 +770,15 @@ void nnpdev_destroy(struct nnp_device *nnpdev)
 
 	destroy_workqueue(nnpdev->wq);
 
+	disconnect_all_channels(nnpdev);
 	dma_free_coherent(nnpdev->dev, NNP_PAGE_SIZE, nnpdev->bios_system_info,
 			  nnpdev->bios_system_info_dma_addr);
 
 	nnp_msched_destroy(nnpdev->cmdq_sched);
+	/*
+	 * nnpdev->cmd_chan_ida is empty after disconnect_all_channels,
+	 * ida_destroy is not needed
+	 */
 	ida_simple_remove(&dev_ida, nnpdev->id);
 }
 EXPORT_SYMBOL(nnpdev_destroy);

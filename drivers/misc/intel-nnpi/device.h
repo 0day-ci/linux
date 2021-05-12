@@ -4,6 +4,8 @@
 #ifndef _NNPDRV_DEVICE_H
 #define _NNPDRV_DEVICE_H
 
+#include <linux/hashtable.h>
+#include <linux/idr.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
@@ -70,11 +72,13 @@ struct query_version_work {
  * @cmdq: input queue to @cmdq_sched used to schedule driver internal commands
  *        to be sent to the device.
  * @wq: singlethread workqueue for processing device's response messages.
- * @lock: protects accesses to @state
+ * @lock: protects accesses to @state and @cmd_chan_hash
  * @is_recovery_bios: true if device has booted from the recovery bios flash
  * @boot_image_loaded: true if boot image load has started
  * @response_buf: buffer of device response messages arrived from "pci" layer.
  * @response_num_msgs: number of qwords available in @response_buf
+ * @cmd_chan_ida: allocate channel ids to be used in ipc protocol.
+ * @cmd_chan_hash: maps command channel id to its struct pointer.
  * @bios_system_info_dma_addr: dma page allocated for bios system info.
  * @bios_system_info: virtual pointer to bios system info page
  * @bios_version_str: the device's started bios version string
@@ -87,6 +91,9 @@ struct query_version_work {
  * @boot_image: boot image object used to boot the card
  * @query_version_work: work struct used to schedule processing of version
  *                      reply response message arrived from card.
+ * @ipc_chan_resp_op_size: holds response size for each possible channel
+ *                         response.
+ * @ipc_chan_cmd_op_size: holds command size for each possible channel command.
  */
 struct nnp_device {
 	const struct nnp_device_ops *ops;
@@ -104,6 +111,9 @@ struct nnp_device {
 	u64            response_buf[NNP_DEVICE_RESPONSE_BUFFER_LEN];
 	unsigned int   response_num_msgs;
 
+	struct ida cmd_chan_ida;
+	DECLARE_HASHTABLE(cmd_chan_hash, 6);
+
 	dma_addr_t                  bios_system_info_dma_addr;
 	struct nnp_c2h_system_info  *bios_system_info;
 	char                        bios_version_str[NNP_BIOS_VERSION_LEN];
@@ -117,6 +127,9 @@ struct nnp_device {
 	struct image_info boot_image;
 
 	struct query_version_work query_version_work;
+
+	u8   ipc_chan_resp_op_size[NNP_IPC_NUM_USER_OPS];
+	u8   ipc_chan_cmd_op_size[NNP_IPC_NUM_USER_OPS];
 };
 
 /**
@@ -150,5 +163,7 @@ void nnpdev_process_messages(struct nnp_device *nnpdev, u64 *hw_msg,
  * Framework internal functions (not exported)
  */
 void nnpdev_set_boot_state(struct nnp_device *nnpdev, u32 mask);
+
+struct nnp_chan *nnpdev_find_channel(struct nnp_device *nnpdev, u16 chan_id);
 
 #endif

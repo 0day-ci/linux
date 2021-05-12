@@ -11,6 +11,9 @@
 
 #define IPC_OP_MAX          BIT(6)
 #define NNP_IPC_OPCODE_MASK GENMASK(5, 0)
+#define NNP_IPC_MIN_USER_OP  32
+#define NNP_IPC_MAX_USER_OP  63
+#define NNP_IPC_NUM_USER_OPS (NNP_IPC_MAX_USER_OP - NNP_IPC_MIN_USER_OP + 1)
 
 #define NNP_MSG_SIZE(msg) (sizeof(msg) / sizeof(__le64))
 
