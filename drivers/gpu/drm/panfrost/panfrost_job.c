@@ -148,21 +148,22 @@ static void panfrost_job_write_affinity(struct panfrost_device *pfdev,
 	job_write(pfdev, JS_AFFINITY_NEXT_HI(js), affinity >> 32);
 }
 
-static void panfrost_job_hw_submit(struct panfrost_job *job, int js)
+static int panfrost_job_hw_submit(struct panfrost_job *job, int js)
 {
 	struct panfrost_device *pfdev = job->pfdev;
 	u32 cfg;
 	u64 jc_head = job->jc;
 	int ret;
 
+	ret = pm_runtime_resume_and_get(pfdev->dev);
+	if (ret < 0)
+		return ret;
+
 	panfrost_devfreq_record_busy(&pfdev->pfdevfreq);
 
-	ret = pm_runtime_get_sync(pfdev->dev);
-	if (ret < 0)
-		return;
-
 	if (WARN_ON(job_read(pfdev, JS_COMMAND_NEXT(js)))) {
-		return;
+		pm_runtime_put_autosuspend(pfdev->dev);
+		return -EBUSY;
 	}
 
 	cfg = panfrost_mmu_as_get(pfdev, &job->file_priv->mmu);
@@ -194,6 +195,8 @@ static void panfrost_job_hw_submit(struct panfrost_job *job, int js)
 				job, js, jc_head);
 
 	job_write(pfdev, JS_COMMAND_NEXT(js), JS_COMMAND_START);
+
+	return 0;
 }
 
 static void panfrost_acquire_object_fences(struct drm_gem_object **bos,
@@ -347,11 +350,10 @@ static struct dma_fence *panfrost_job_run(struct drm_sched_job *sched_job)
 	struct panfrost_device *pfdev = job->pfdev;
 	int slot = panfrost_job_get_slot(job);
 	struct dma_fence *fence = NULL;
+	int err;
 
 	if (unlikely(job->base.s_fence->finished.error))
 		return NULL;
-
-	pfdev->jobs[slot] = job;
 
 	fence = panfrost_fence_create(pfdev, slot);
 	if (IS_ERR(fence))
@@ -361,7 +363,14 @@ static struct dma_fence *panfrost_job_run(struct drm_sched_job *sched_job)
 		dma_fence_put(job->done_fence);
 	job->done_fence = dma_fence_get(fence);
 
-	panfrost_job_hw_submit(job, slot);
+	err = panfrost_job_hw_submit(job, slot);
+
+	if (err) {
+		dma_fence_put(fence);
+		return NULL;
+	}
+
+	pfdev->jobs[slot] = job;
 
 	return fence;
 }
