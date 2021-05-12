@@ -363,13 +363,13 @@ static int dlfb_ops_mmap(struct fb_info *info, struct vm_area_struct *vma)
  */
 static int dlfb_trim_hline(const u8 *bback, const u8 **bfront, int *width_bytes)
 {
-	int j, k;
-	const unsigned long *back = (const unsigned long *) bback;
 	const unsigned long *front = (const unsigned long *) *bfront;
+	const unsigned long *back = (const unsigned long *) bback;
 	const int width = *width_bytes / sizeof(unsigned long);
-	int identical = width;
 	int start = width;
 	int end = width;
+	int identical;
+	int j, k;
 
 	for (j = 0; j < width; j++) {
 		if (back[j] != front[j]) {
