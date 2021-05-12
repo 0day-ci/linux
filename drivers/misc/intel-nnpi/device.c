@@ -23,6 +23,142 @@ bool nnpdev_no_devices(void)
 	return ida_is_empty(&dev_ida);
 }
 
+/**
+ * handle_bios_protocol() - process response coming from card's BIOS.
+ * @nnpdev: The nnp device
+ * @msgbuf: pointer to response message content
+ * @avail_qwords: number of 64-bit units available in @msgbuf
+ *
+ * IPC protocol with card's BIOS may have different response sizes.
+ * @avail_qwords is the number of 64-bit units available in @msgbuf buffer.
+ * If the actual response size is larger then available data in the buffer,
+ * the function returns 0 to indicate that this is a partial response. Otherwise
+ * the actual response size is returned (in units of qwords).
+ *
+ * Return: 0 if @msgbuf contains a partial response otherwise the number of
+ * qwords of the response in @msgbuf.
+ */
+static int handle_bios_protocol(struct nnp_device *nnpdev, const u64 *msgbuf,
+				int avail_qwords)
+{
+	int msg_size, msg_qwords;
+
+	msg_size = FIELD_GET(NNP_C2H_BIOS_PROTOCOL_TYPE_MASK, msgbuf[0]);
+
+	/* The +1 is because size field does not include header */
+	msg_qwords = DIV_ROUND_UP(msg_size, 8) + 1;
+
+	if (msg_qwords > avail_qwords)
+		return 0;
+
+	return msg_qwords;
+}
+
+typedef int (*response_handler)(struct nnp_device *nnpdev, const u64 *msgbuf,
+				int avail_qwords);
+
+static response_handler resp_handlers[NNP_IPC_C2H_OPCODE_LAST + 1] = {
+	[NNP_IPC_C2H_OP_BIOS_PROTOCOL] = handle_bios_protocol
+};
+
+/**
+ * nnpdev_process_messages() - process response messages from nnpi device
+ * @nnpdev: The nnp device
+ * @hw_msg: pointer to response message content
+ * @hw_nof_msg: number of 64-bit units available in hw_msg buffer.
+ *
+ * This function is called from the PCIe device driver when response messages
+ * are arrived in the HWQ. It is called in sequence, should not be re-entrant.
+ * The function may not block !
+ */
+void nnpdev_process_messages(struct nnp_device *nnpdev, u64 *hw_msg,
+			     unsigned int hw_nof_msg)
+{
+	int j = 0;
+	int msg_size;
+	u64 *msg;
+	unsigned int nof_msg;
+	bool fatal_protocol_error = false;
+
+	/* ignore any response if protocol error detected */
+	if ((nnpdev->state & NNP_DEVICE_PROTOCOL_ERROR) != 0)
+		return;
+
+	/*
+	 * If we have pending messages from previous round
+	 * copy the new messages to the pending list and process
+	 * the pending list.
+	 * otherwise process the messages received from HW directly
+	 */
+	msg = hw_msg;
+	nof_msg = hw_nof_msg;
+	if (nnpdev->response_num_msgs > 0) {
+		/*
+		 * Check to prevent response buffer overrun.
+		 * This should never happen since the buffer is twice
+		 * the size of the HW response queue. This check is
+		 * for safety and debug purposes.
+		 */
+		if (hw_nof_msg + nnpdev->response_num_msgs >=
+		    NNP_DEVICE_RESPONSE_BUFFER_LEN) {
+			dev_dbg(nnpdev->dev,
+				"device response buffer would overrun: %d + %d !!\n",
+				nnpdev->response_num_msgs, hw_nof_msg);
+			return;
+		}
+
+		memcpy(&nnpdev->response_buf[nnpdev->response_num_msgs], hw_msg,
+		       hw_nof_msg * sizeof(u64));
+		msg = nnpdev->response_buf;
+		nof_msg = nnpdev->response_num_msgs + hw_nof_msg;
+	}
+
+	/*
+	 * loop for each message
+	 */
+	do {
+		int op_code = FIELD_GET(NNP_C2H_OP_MASK, msg[j]);
+		response_handler handler;
+
+		/* opcodes above OP_BIOS_PROTOCOL are not yet supported */
+		if (op_code > NNP_IPC_C2H_OP_BIOS_PROTOCOL) {
+			fatal_protocol_error = true;
+			break;
+		}
+
+		/* dispatch the message request */
+		handler = resp_handlers[op_code];
+		if (!handler) {
+			/* Should not happen! */
+			dev_dbg(nnpdev->dev,
+				"Unknown response opcode received %d (0x%llx)\n",
+				op_code, msg[j]);
+			fatal_protocol_error = true;
+			break;
+		}
+
+		msg_size = (*handler)(nnpdev, &msg[j], (nof_msg - j));
+
+		j += msg_size;
+	} while (j < nof_msg || !msg_size);
+
+	if (fatal_protocol_error)
+		nnpdev->state |= NNP_DEVICE_PROTOCOL_ERROR;
+
+	/*
+	 * If unprocessed messages left, copy it to the pending messages buffer
+	 * for the next time this function will be called.
+	 */
+	if (j < nof_msg) {
+		memcpy(&nnpdev->response_buf[0], &msg[j],
+		       (nof_msg - j) * sizeof(u64));
+		nnpdev->response_num_msgs = nof_msg - j;
+	} else {
+		nnpdev->response_num_msgs = 0;
+	}
+}
+EXPORT_SYMBOL(nnpdev_process_messages);
+
 static void send_sysinfo_request_to_bios(struct nnp_device *nnpdev)
 {
 	u64 cmd[3];

@@ -48,6 +48,9 @@
 #define NNP_DEVICE_CORRUPTED_BOOT_IMAGE BIT(30)
 #define NNP_DEVICE_ERROR_MASK        GENMASK(31, 16)
 
+#define NNP_DEVICE_RESPONSE_FIFO_LEN    16
+#define NNP_DEVICE_RESPONSE_BUFFER_LEN  (NNP_DEVICE_RESPONSE_FIFO_LEN * 2)
+
 /**
  * struct nnp_device - structure for NNP-I device info
  * @ops: device operations implemented by the underlying device driver
@@ -61,6 +64,8 @@
  * @lock: protects accesses to @state
  * @is_recovery_bios: true if device has booted from the recovery bios flash
  * @boot_image_loaded: true if boot image load has started
+ * @response_buf: buffer of device response messages arrived from "pci" layer.
+ * @response_num_msgs: number of qwords available in @response_buf
  * @bios_system_info_dma_addr: dma page allocated for bios system info.
  * @bios_system_info: virtual pointer to bios system info page
  * @bios_version_str: the device's started bios version string
@@ -82,6 +87,9 @@ struct nnp_device {
 	spinlock_t     lock;
 	bool           is_recovery_bios;
 	bool           boot_image_loaded;
+
+	u64            response_buf[NNP_DEVICE_RESPONSE_BUFFER_LEN];
+	unsigned int   response_num_msgs;
 
 	dma_addr_t                  bios_system_info_dma_addr;
 	struct nnp_c2h_system_info  *bios_system_info;
@@ -118,6 +126,8 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 void nnpdev_destroy(struct nnp_device *nnpdev);
 void nnpdev_card_doorbell_value_changed(struct nnp_device *nnpdev,
 					u32 doorbell_val);
+void nnpdev_process_messages(struct nnp_device *nnpdev, u64 *hw_msg,
+			     unsigned int hw_nof_msg);
 
 /*
  * Framework internal functions (not exported)

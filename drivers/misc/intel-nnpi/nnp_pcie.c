@@ -150,6 +150,9 @@ static void nnp_process_commands(struct nnp_pci *nnp_pci)
 	response_pci_control |= FIELD_PREP(RESPQ_READ_PTR_MASK, read_pointer);
 	nnp_mmio_write(nnp_pci, ELBI_RESPONSE_PCI_CONTROL,
 		       response_pci_control);
+
+	nnpdev_process_messages(&nnp_pci->nnpdev, nnp_pci->response_buf,
+				avail_slots);
 }
 
 static void mask_all_interrupts(struct nnp_pci *nnp_pci)
