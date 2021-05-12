@@ -1815,7 +1815,7 @@ static struct resource *__request_free_mem_region(struct device *dev,
 				REGION_DISJOINT)
 			continue;
 
-		if (!__request_region_locked(res, &iomem_resource, addr, size,
+		if (__request_region_locked(res, &iomem_resource, addr, size,
 						name, 0))
 			break;
 
