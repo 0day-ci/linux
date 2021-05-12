@@ -76,6 +76,12 @@ Description:	(RO) Attribute group to describe the magic bits
 		For example::
 		    noopstat = "event=0x1"
 
+What:		/sys/devices/nmemX/cpumask
+Date:		May 2021
+Contact:	linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, linux-nvdimm@lists.01.org,
+Description:	(RO) This sysfs file exposes the cpumask which is designated to make
+                HCALLs to retrieve nvdimm pmu event counter data.
+
 What:		/sys/devices/nmemX/events
 Date:		May 2021
 Contact:	linuxppc-dev <linuxppc-dev@lists.ozlabs.org>, linux-nvdimm@lists.01.org,
