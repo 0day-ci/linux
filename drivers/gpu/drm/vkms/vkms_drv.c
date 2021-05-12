@@ -227,6 +227,7 @@ static void __exit vkms_exit(void)
 		vkms_destroy(default_config);
 
 	kfree(default_config);
+	default_config = NULL;
 }
 
 module_init(vkms_init);
