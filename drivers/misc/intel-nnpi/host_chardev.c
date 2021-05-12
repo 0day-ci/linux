@@ -217,6 +217,13 @@ static int host_open(struct inode *inode, struct file *f)
 	if (!is_host_file(f))
 		return -EINVAL;
 
+	/*
+	 * No point to serve host resource creation while no
+	 * NNP-I devices exist in the system.
+	 */
+	if (nnpdev_no_devices())
+		return -ENODEV;
+
 	user_info = kzalloc(sizeof(*user_info), GFP_KERNEL);
 	if (!user_info)
 		return -ENOMEM;

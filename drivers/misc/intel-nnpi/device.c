@@ -13,6 +13,11 @@
 
 static DEFINE_IDA(dev_ida);
 
+bool nnpdev_no_devices(void)
+{
+	return ida_is_empty(&dev_ida);
+}
+
 /**
  * nnpdev_init() - initialize NNP-I device structure.
  * @nnpdev: device to be initialized

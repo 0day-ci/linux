@@ -36,6 +36,8 @@ struct nnp_device_ops {
 	int (*cmdq_write_mesg)(struct nnp_device *nnpdev, u64 *msg, u32 size);
 };
 
+bool nnpdev_no_devices(void);
+
 /*
  * Functions exported by the device framework module which are
  * called by the lower layer NNP-I device driver module
