@@ -2430,6 +2430,9 @@ static void layout_sections(struct module *mod, struct load_info *info)
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
 			    || s->sh_entsize != ~0UL
+#ifndef CONFIG_MODULE_UNLOAD
+			    || module_exit_section(sname)
+#endif
 			    || module_init_section(sname))
 				continue;
 			s->sh_entsize = get_offset(mod, &mod->core_layout.size, s, i);
@@ -2463,7 +2466,11 @@ static void layout_sections(struct module *mod, struct load_info *info)
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
 			    || s->sh_entsize != ~0UL
+#ifndef CONFIG_MODULE_UNLOAD
+			    || (!module_init_section(sname) && !module_exit_section(sname)))
+#else
 			    || !module_init_section(sname))
+#endif
 				continue;
 			s->sh_entsize = (get_offset(mod, &mod->init_layout.size, s, i)
 					 | INIT_OFFSET_MASK);
@@ -2802,11 +2809,7 @@ void * __weak module_alloc(unsigned long size)
 
 bool __weak module_init_section(const char *name)
 {
-#ifndef CONFIG_MODULE_UNLOAD
-	return strstarts(name, ".init") || module_exit_section(name);
-#else
 	return strstarts(name, ".init");
-#endif
 }
 
 bool __weak module_exit_section(const char *name)
