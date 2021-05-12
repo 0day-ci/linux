@@ -8,6 +8,8 @@
 #include <linux/ndctl.h>
 #include <linux/device.h>
 #include <linux/badblocks.h>
+#include <linux/platform_device.h>
+#include <linux/perf_event.h>
 
 enum nvdimm_event {
 	NVDIMM_REVALIDATE_POISON,
@@ -22,6 +24,35 @@ enum nvdimm_claim_class {
 	NVDIMM_CCLASS_DAX,
 	NVDIMM_CCLASS_UNKNOWN,
 };
+
+/**
+ * struct nvdimm_pmu - data structure for nvdimm perf driver
+ *
+ * @name: name of the nvdimm pmu device.
+ * @pmu: pmu data structure for nvdimm performance stats.
+ * @cpu: designated cpu for counter access.
+ * @dev: nvdimm device pointer.
+ * @functions(event_init/add/del/read): platform specific callbacks.
+ * @attr_groups: data structure for events/formats/cpumask.
+ * @node: node for cpu hotplug notifier link.
+ * @cpuhp_state: state for cpu hotplug notification.
+ */
+struct nvdimm_pmu {
+	const char *name;
+	struct pmu pmu;
+	int cpu;
+	struct device *dev;
+	int (*event_init)(struct perf_event *event,  struct device *dev);
+	int  (*add)(struct perf_event *event, int flags, struct device *dev);
+	void (*del)(struct perf_event *event, int flags, struct device *dev);
+	void (*read)(struct perf_event *event,  struct device *dev);
+	const struct attribute_group **attr_groups;
+	struct hlist_node node;
+	enum cpuhp_state cpuhp_state;
+};
+
+int register_nvdimm_pmu(struct nvdimm_pmu *nvdimm, struct platform_device *pdev);
+void unregister_nvdimm_pmu(struct pmu *pmu);
 
 struct nd_device_driver {
 	struct device_driver drv;
