@@ -38,10 +38,14 @@
  *                    queue.
  * @card_doorbell_val: card's doorbell register value, updated when doorbell
  *                     interrupt is received.
+ * @cmdq_free_slots: number of slots in the device's command queue which is known
+ *                   to be available.
+ * @cmdq_lock: protects @cmdq_free_slots calculation.
  * @card_status: Last device interrupt status register, updated in interrupt
  *               handler.
  * @cmd_read_update_count: number of times the device has updated its read
  *                         pointer to the device command queue.
+ * @removing: true if device remove is in progress.
  */
 struct nnp_pci {
 	struct nnp_device nnpdev;
@@ -55,8 +59,12 @@ struct nnp_pci {
 	wait_queue_head_t card_status_wait;
 	u32             card_doorbell_val;
 
+	u32             cmdq_free_slots;
+	spinlock_t      cmdq_lock;
+
 	u32             card_status;
 	u32             cmd_read_update_count;
+	bool            removing;
 };
 
 #define NNP_DRIVER_NAME  "nnp_pcie"
@@ -228,6 +236,135 @@ static void nnp_free_interrupts(struct nnp_pci *nnp_pci, struct pci_dev *pdev)
 	pci_free_irq_vectors(pdev);
 }
 
+/**
+ * nnp_cmdq_write_mesg_nowait() - tries to write full message to command queue
+ * @nnp_pci: the device
+ * @msg: pointer to the command message
+ * @size: size of the command message in qwords
+ * @read_update_count: returns current cmd_read_update_count value,
+ *                     valid only if function returns -EAGAIN.
+ *
+ * Return:
+ * * 0: Success, command has been written
+ * * -EAGAIN: command queue does not have room for the entire command
+ *            message.
+ *            read_update_count returns the current value of
+ *            cmd_read_update_count counter which increments when the device
+ *            advance its command queue read pointer. The caller may wait
+ *            for this counter to be advanced past this point before calling
+ *            this function again to re-try the write.
+ * * -ENODEV: device remove is in progress.
+ */
+static int nnp_cmdq_write_mesg_nowait(struct nnp_pci *nnp_pci, u64 *msg,
+				      u32 size, u32 *read_update_count)
+{
+	u32 cmd_iosf_control;
+	u32 read_pointer, write_pointer;
+	int i;
+
+	if (nnp_pci->removing)
+		return -ENODEV;
+
+	if (!size)
+		return 0;
+
+	spin_lock(&nnp_pci->cmdq_lock);
+
+	if (nnp_pci->cmdq_free_slots < size) {
+		/* read command fifo pointers and compute free slots in fifo */
+		spin_lock(&nnp_pci->lock);
+		cmd_iosf_control = nnp_mmio_read(nnp_pci, ELBI_COMMAND_IOSF_CONTROL);
+		read_pointer = FIELD_GET(CMDQ_READ_PTR_MASK, cmd_iosf_control);
+		write_pointer =
+			FIELD_GET(CMDQ_WRITE_PTR_MASK, cmd_iosf_control);
+
+		nnp_pci->cmdq_free_slots = ELBI_COMMAND_FIFO_DEPTH -
+					   (write_pointer - read_pointer);
+
+		if (nnp_pci->cmdq_free_slots < size) {
+			*read_update_count = nnp_pci->cmd_read_update_count;
+			spin_unlock(&nnp_pci->lock);
+			spin_unlock(&nnp_pci->cmdq_lock);
+			return -EAGAIN;
+		}
+		spin_unlock(&nnp_pci->lock);
+	}
+
+	/* Write all but the last qword without generating msi on card */
+	for (i = 0; i < size - 1; i++)
+		nnp_mmio_write_8b(nnp_pci, ELBI_COMMAND_WRITE_WO_MSI_LOW, msg[i]);
+
+	/* Write last qword with generating interrupt on card */
+	nnp_mmio_write_8b(nnp_pci, ELBI_COMMAND_WRITE_W_MSI_LOW, msg[i]);
+
+	nnp_pci->cmdq_free_slots -= size;
+
+	spin_unlock(&nnp_pci->cmdq_lock);
+
+	return 0;
+}
+
+/**
+ * check_read_count() - check if device has read commands from command FIFO
+ * @nnp_pci: the device
+ * @count: last known 'cmd_read_update_count' value
+ *
+ * cmd_read_update_count is advanced on each interrupt received because the
+ * device has advanced its read pointer into the command FIFO.
+ * This function checks the current cmd_read_update_count against @count and
+ * returns true if it is different. This is used to check if the device has
+ * freed some entries in the command FIFO after it became full.
+ *
+ * Return: true if current device read update count has been advanced
+ */
+static bool check_read_count(struct nnp_pci *nnp_pci, u32 count)
+{
+	bool ret;
+
+	spin_lock(&nnp_pci->lock);
+	ret = (count != nnp_pci->cmd_read_update_count);
+	spin_unlock(&nnp_pci->lock);
+
+	return ret;
+}
+
+/**
+ * nnp_cmdq_write_mesg() - writes a command message to device's command queue
+ * @nnpdev: the device handle
+ * @msg: The command message to write
+ * @size: size of the command message in qwords
+ *
+ * Return:
+ * * 0: Success, command has been written
+ * * -ENODEV: device remove is in progress.
+ */
+static int nnp_cmdq_write_mesg(struct nnp_device *nnpdev, u64 *msg, u32 size)
+{
+	int rc;
+	u32 rcnt = 0;
+	struct nnp_pci *nnp_pci = container_of(nnpdev, struct nnp_pci, nnpdev);
+
+	do {
+		rc = nnp_cmdq_write_mesg_nowait(nnp_pci, msg, size, &rcnt);
+		if (rc != -EAGAIN)
+			break;
+
+		rc = wait_event_interruptible(nnp_pci->card_status_wait,
+					      check_read_count(nnp_pci, rcnt) ||
+					      nnp_pci->removing);
+		if (!rc && nnp_pci->removing) {
+			rc = -ENODEV;
+			break;
+		}
+	} while (!rc);
+
+	if (rc)
+		dev_dbg(&nnp_pci->pdev->dev,
+			"Failed to write message size %u rc=%d!\n", size, rc);
+
+	return rc;
+}
+
 static int nnp_cmdq_flush(struct nnp_device *nnpdev)
 {
 	struct nnp_pci *nnp_pci = container_of(nnpdev, struct nnp_pci, nnpdev);
@@ -240,6 +377,7 @@ static int nnp_cmdq_flush(struct nnp_device *nnpdev)
 
 static struct nnp_device_ops nnp_device_ops = {
 	.cmdq_flush = nnp_cmdq_flush,
+	.cmdq_write_mesg = nnp_cmdq_write_mesg,
 };
 
 static void set_host_boot_state(struct nnp_pci *nnp_pci, int boot_state)
@@ -271,6 +409,7 @@ static int nnp_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	init_waitqueue_head(&nnp_pci->card_status_wait);
 	spin_lock_init(&nnp_pci->lock);
+	spin_lock_init(&nnp_pci->cmdq_lock);
 
 	rc = pcim_enable_device(pdev);
 	if (rc)
@@ -326,6 +465,20 @@ static void nnp_remove(struct pci_dev *pdev)
 
 	/* stop service new interrupts */
 	nnp_free_interrupts(nnp_pci, nnp_pci->pdev);
+
+	/*
+	 * Flag that the device is being removed and wake any possible
+	 * thread waiting on the card's command queue.
+	 * During the remove flow, we want to immediately fail any thread
+	 * that is using the device without waiting for pending device
+	 * requests to complete. We rather give precedance to device
+	 * removal over waiting for all pending requests to finish.
+	 * When we set the host boot state to "NOT_READY" in the doorbell
+	 * register, the card will cleanup any state, so this "hard remove"
+	 * is not an issue for next time the device will get inserted.
+	 */
+	nnp_pci->removing = true;
+	wake_up_all(&nnp_pci->card_status_wait);
 
 	/*
 	 * Inform card that host driver is down.

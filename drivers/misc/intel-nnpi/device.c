@@ -8,6 +8,7 @@
 #include <linux/module.h>
 
 #include "device.h"
+#include "msg_scheduler.h"
 
 static DEFINE_IDA(dev_ida);
 
@@ -45,7 +46,25 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 	nnpdev->dev = dev;
 	nnpdev->ops = ops;
 
+	nnpdev->cmdq_sched = nnp_msched_create(nnpdev);
+	if (!nnpdev->cmdq_sched) {
+		ret = -ENOMEM;
+		goto err_ida;
+	}
+
+	nnpdev->cmdq = nnp_msched_queue_create(nnpdev->cmdq_sched);
+	if (!nnpdev->cmdq) {
+		ret = -ENOMEM;
+		goto err_msg_sched;
+	}
+
 	return 0;
+
+err_msg_sched:
+	nnp_msched_destroy(nnpdev->cmdq_sched);
+err_ida:
+	ida_simple_remove(&dev_ida, nnpdev->id);
+	return ret;
 }
 EXPORT_SYMBOL(nnpdev_init);
 
@@ -75,6 +94,7 @@ void nnpdev_destroy(struct nnp_device *nnpdev)
 {
 	dev_dbg(nnpdev->dev, "Destroying NNP-I device\n");
 
+	nnp_msched_destroy(nnpdev->cmdq_sched);
 	ida_simple_remove(&dev_ida, nnpdev->id);
 }
 EXPORT_SYMBOL(nnpdev_destroy);
