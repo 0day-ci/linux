@@ -383,6 +383,9 @@ struct nnp_chan *nnpdev_chan_create(struct nnp_device *nnpdev, int host_fd,
 	init_waitqueue_head(&cmd_chan->resp_waitq);
 	mutex_init(&cmd_chan->dev_mutex);
 
+	ida_init(&cmd_chan->hostres_map_ida);
+	hash_init(cmd_chan->hostres_hash);
+
 	/*
 	 * Add channel to the channel hash
 	 */
@@ -409,6 +412,11 @@ static void nnp_chan_release(struct kref *kref)
 	struct nnp_chan *cmd_chan = container_of(kref, struct nnp_chan, ref);
 
 	nnp_chan_disconnect(cmd_chan);
+
+	/*
+	 * cmd_chan->hostres_map_ida is empty at this point,
+	 * calling ida_destroy is not needed
+	 */
 
 	/*
 	 * If a chan file was created (through nnp_chan_create_file),
@@ -542,6 +550,9 @@ done:
 void nnp_chan_disconnect(struct nnp_chan *cmd_chan)
 {
 	struct nnp_device *nnpdev;
+	struct chan_hostres_map *hostres_map;
+	struct hlist_node *tmp;
+	int i;
 
 	mutex_lock(&cmd_chan->dev_mutex);
 	if (!cmd_chan->nnpdev) {
@@ -573,6 +584,32 @@ void nnp_chan_disconnect(struct nnp_chan *cmd_chan)
 	nnp_msched_queue_destroy(cmd_chan->cmdq);
 
 	ida_simple_remove(&nnpdev->cmd_chan_ida, cmd_chan->chan_id);
+
+	/*
+	 * Unmap ring buffers
+	 */
+	for (i = 0; i < NNP_IPC_MAX_CHANNEL_RB; i++) {
+		if (cmd_chan->h2c_rb_hostres_map[i]) {
+			nnp_hostres_unmap_device(cmd_chan->h2c_rb_hostres_map[i]);
+			cmd_chan->h2c_rb_hostres_map[i] = NULL;
+		}
+		if (cmd_chan->c2h_rb_hostres_map[i]) {
+			nnp_hostres_unmap_device(cmd_chan->c2h_rb_hostres_map[i]);
+			cmd_chan->c2h_rb_hostres_map[i] = NULL;
+		}
+	}
+
+	/*
+	 * Destroy all host resource maps
+	 */
+	mutex_lock(&cmd_chan->dev_mutex);
+	hash_for_each_safe(cmd_chan->hostres_hash, i, tmp, hostres_map, hash_node) {
+		hash_del(&hostres_map->hash_node);
+		ida_simple_remove(&cmd_chan->hostres_map_ida, hostres_map->id);
+		nnp_hostres_unmap_device(hostres_map->hostres_map);
+		kfree(hostres_map);
+	}
+	mutex_unlock(&cmd_chan->dev_mutex);
 }
 
 static int resize_respq(struct nnp_chan *cmd_chan)
@@ -684,4 +721,70 @@ retry:
 	}
 
 	return ret;
+}
+
+int nnp_chan_set_ringbuf(struct nnp_chan *chan, bool h2c, unsigned int id,
+			 struct nnpdev_mapping *hostres_map)
+{
+	if (id >= NNP_IPC_MAX_CHANNEL_RB)
+		return -EINVAL;
+
+	mutex_lock(&chan->dev_mutex);
+	if (h2c) {
+		if (chan->h2c_rb_hostres_map[id])
+			nnp_hostres_unmap_device(chan->h2c_rb_hostres_map[id]);
+		chan->h2c_rb_hostres_map[id] = hostres_map;
+	} else {
+		if (chan->c2h_rb_hostres_map[id])
+			nnp_hostres_unmap_device(chan->c2h_rb_hostres_map[id]);
+		chan->c2h_rb_hostres_map[id] = hostres_map;
+	}
+	mutex_unlock(&chan->dev_mutex);
+
+	return 0;
+}
+
+static struct chan_hostres_map *find_map(struct nnp_chan *chan, unsigned int map_id)
+{
+	struct chan_hostres_map *hostres_map;
+
+	lockdep_assert_held(&chan->dev_mutex);
+
+	hash_for_each_possible(chan->hostres_hash, hostres_map, hash_node,
+			       map_id)
+		if (hostres_map->id == map_id)
+			return hostres_map;
+
+	return NULL;
+}
+
+struct chan_hostres_map *nnp_chan_find_map(struct nnp_chan *chan, unsigned int map_id)
+{
+	struct chan_hostres_map *map;
+
+	mutex_lock(&chan->dev_mutex);
+	map = find_map(chan, map_id);
+	mutex_unlock(&chan->dev_mutex);
+
+	return map;
+}
+
+int nnp_chan_unmap_hostres(struct nnp_chan *chan, unsigned int map_id)
+{
+	struct chan_hostres_map *hostres_map;
+
+	mutex_lock(&chan->dev_mutex);
+	hostres_map = find_map(chan, map_id);
+	if (!hostres_map) {
+		mutex_unlock(&chan->dev_mutex);
+		return -ENXIO;
+	}
+	hash_del(&hostres_map->hash_node);
+	ida_simple_remove(&chan->hostres_map_ida, hostres_map->id);
+	nnp_hostres_unmap_device(hostres_map->hostres_map);
+	mutex_unlock(&chan->dev_mutex);
+
+	kfree(hostres_map);
+
+	return 0;
 }

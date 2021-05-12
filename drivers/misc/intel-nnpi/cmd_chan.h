@@ -19,10 +19,13 @@
  * enum nnp_chan_state - indicate special state of a command channel
  * @NNP_CHAN_NORMAL: channel is in normal state.
  * @NNP_CHAN_DESTROYED: channel should be treated as no-longer-exist on card.
+ * @NNP_CHAN_RB_OP_IN_FLIGHT: a ring-buffer create or destroy command has been
+ *                            sent to device and response did not yet arrived.
  */
 enum nnp_chan_state {
 	NNP_CHAN_NORMAL = 0,
 	NNP_CHAN_DESTROYED,
+	NNP_CHAN_RB_OP_IN_FLIGHT,
 };
 
 /**
@@ -45,14 +48,20 @@ enum nnp_chan_state {
  * @nnp_user: the nnp_user this channel belongs to.
  *             the channel can reference host resources created by this
  *             nnp_user object.
- * @dev_mutex: protects @nnpdev and @state
+ * @dev_mutex: protects @nnpdev, @state, @hostres_hash and @hostres_map_ida
  * @state: the current state of this channel.
+ * @hostres_map_ida: generate ipc ids for hostres mapping
+ * @hostres_hash: hash table to store all host resource mapping, key is ipc id
  * @resp_waitq: waitqueue used for waiting for response messages be available.
  * @respq: circular buffer object that receive response messages from device.
  * @respq_lock: protects @respq
  * @respq_buf: buffer space allocated for circular response buffer.
  * @respq_size: current allocated size of circular response buffer.
  * @resp_lost: number of response messages lost due to response buffer full.
+ * @h2c_rb_hostres_map: host resource mapping used for each host-to-card ring buffer
+ *                  There may be up to 2 such ring buffers, both can be NULL.
+ * @c2h_rb_hostres_map: host resource mapping used for each card-to-host ring buffer
+ *                  There may be up to 2 such ring buffers, both can be NULL.
  */
 struct nnp_chan {
 	struct kref            ref;
@@ -72,11 +81,32 @@ struct nnp_chan {
 	wait_queue_head_t resp_waitq;
 	enum nnp_chan_state state;
 
+	struct ida        hostres_map_ida;
+	DECLARE_HASHTABLE(hostres_hash, 6);
+
 	struct circ_buf   respq;
 	spinlock_t        respq_lock;
 	char              *respq_buf;
 	unsigned int      respq_size;
 	unsigned int      resp_lost;
+
+	struct nnpdev_mapping *h2c_rb_hostres_map[NNP_IPC_MAX_CHANNEL_RB];
+	struct nnpdev_mapping *c2h_rb_hostres_map[NNP_IPC_MAX_CHANNEL_RB];
+};
+
+/**
+ * struct chan_hostres_map - holds host resource mapping to channel
+ *
+ * @id: ipc map id of the mapping
+ * @hash_node: node to include this mapping in @hostres_hash of nnpdrv_cmd_chan
+ * @hostres_map: the host resource mapping object
+ * @event_msg: device response to the map create request
+ */
+struct chan_hostres_map {
+	unsigned int           id;
+	struct hlist_node      hash_node;
+	struct nnpdev_mapping  *hostres_map;
+	u64                    event_msg;
 };
 
 #define chan_broken(chan) FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, (chan)->card_critical_error_msg)
@@ -96,4 +126,9 @@ bool nnp_chan_set_destroyed(struct nnp_chan *chan);
 
 int nnp_chan_add_response(struct nnp_chan *cmd_chan, u64 *hw_msg, u32 size);
 
+int nnp_chan_set_ringbuf(struct nnp_chan *chan, bool h2c, unsigned int id,
+			 struct nnpdev_mapping *hostres_map);
+
+struct chan_hostres_map *nnp_chan_find_map(struct nnp_chan *chan, unsigned int map_id);
+int nnp_chan_unmap_hostres(struct nnp_chan *chan, unsigned int map_id);
 #endif

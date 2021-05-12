@@ -276,6 +276,45 @@ static void handle_channel_create_response(struct nnp_device *nnpdev, u64 event_
 	wake_up_all(&nnpdev->waitq);
 }
 
+static void handle_channel_map_hostres(struct nnp_device *nnpdev, u64 event_msg)
+{
+	struct chan_hostres_map *hostres_map;
+	unsigned int chan_id, map_id;
+	struct nnp_chan *cmd_chan;
+
+	chan_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+	cmd_chan = nnpdev_find_channel(nnpdev, chan_id);
+	if (!cmd_chan)
+		return;
+
+	map_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID2_MASK, event_msg);
+	hostres_map = nnp_chan_find_map(cmd_chan, map_id);
+	if (!hostres_map)
+		goto put_chan;
+
+	hostres_map->event_msg = event_msg;
+	wake_up_all(&nnpdev->waitq);
+
+put_chan:
+	nnp_chan_put(cmd_chan);
+}
+
+static void handle_channel_unmap_hostres(struct nnp_device *nnpdev, u64 event_msg)
+{
+	unsigned int chan_id, map_id;
+	struct nnp_chan *cmd_chan;
+
+	chan_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+	cmd_chan = nnpdev_find_channel(nnpdev, chan_id);
+	if (!cmd_chan)
+		return;
+
+	map_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID2_MASK, event_msg);
+	nnp_chan_unmap_hostres(cmd_chan, map_id);
+
+	nnp_chan_put(cmd_chan);
+}
+
 static void handle_channel_destroy(struct nnp_device *nnpdev, u64 event_msg)
 {
 	struct nnp_chan *cmd_chan;
@@ -313,13 +352,19 @@ static void handle_channel_destroy(struct nnp_device *nnpdev, u64 event_msg)
 static void process_device_event(struct nnp_device *nnpdev, u64 event_msg)
 {
 	unsigned int event_code = FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, event_msg);
-	unsigned int obj_id, event_val;
+	unsigned int obj_id, event_val, obj_id_2;
 
 	if (!is_card_fatal_event(event_code)) {
 		switch (event_code) {
 		case NNP_IPC_CREATE_CHANNEL_SUCCESS:
 		case NNP_IPC_CREATE_CHANNEL_FAILED:
+		case NNP_IPC_CHANNEL_SET_RB_SUCCESS:
+		case NNP_IPC_CHANNEL_SET_RB_FAILED:
 			handle_channel_create_response(nnpdev, event_msg);
+			break;
+		case NNP_IPC_CHANNEL_MAP_HOSTRES_SUCCESS:
+		case NNP_IPC_CHANNEL_MAP_HOSTRES_FAILED:
+			handle_channel_map_hostres(nnpdev, event_msg);
 			break;
 		case NNP_IPC_DESTROY_CHANNEL_FAILED:
 			obj_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
@@ -338,6 +383,17 @@ static void process_device_event(struct nnp_device *nnpdev, u64 event_msg)
 			fallthrough;
 		case NNP_IPC_CHANNEL_DESTROYED:
 			handle_channel_destroy(nnpdev, event_msg);
+			break;
+		case NNP_IPC_CHANNEL_UNMAP_HOSTRES_FAILED:
+			obj_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+			obj_id_2 = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID2_MASK, event_msg);
+			event_val = FIELD_GET(NNP_C2H_EVENT_REPORT_VAL_MASK, event_msg);
+			dev_dbg(nnpdev->dev,
+				"Channel hostres unmap failed on device channel %d map %d val %d\n",
+				obj_id, obj_id_2, event_val);
+			fallthrough;
+		case NNP_IPC_CHANNEL_UNMAP_HOSTRES_SUCCESS:
+			handle_channel_unmap_hostres(nnpdev, event_msg);
 			break;
 		default:
 			dev_err(nnpdev->dev,

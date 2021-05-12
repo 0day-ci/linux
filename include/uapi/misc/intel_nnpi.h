@@ -150,6 +150,43 @@ struct nnpdrv_ioctl_destroy_hostres {
 	_IOWR('D', 0, struct ioctl_nnpi_create_channel)
 
 /**
+ * IOCTL_NNPI_DEVICE_CREATE_CHANNEL_RB:
+ *
+ * A request to create a data ring buffer for a command channel object.
+ * This is used to transfer data together with command to the device.
+ * A device command may include a data size fields which indicate how much data
+ * has pushed into that ring-buffer object.
+ */
+#define IOCTL_NNPI_DEVICE_CREATE_CHANNEL_RB   \
+	_IOWR('D', 1, struct ioctl_nnpi_create_channel_data_ringbuf)
+
+/**
+ * IOCTL_NNPI_DEVICE_DESTROY_CHANNEL_RB:
+ *
+ * A request to destoy a data ring buffer allocated for a command channel.
+ */
+#define IOCTL_NNPI_DEVICE_DESTROY_CHANNEL_RB  \
+	_IOWR('D', 2, struct ioctl_nnpi_destroy_channel_data_ringbuf)
+
+/**
+ * IOCTL_NNPI_DEVICE_CHANNEL_MAP_HOSTRES:
+ *
+ * A request to map a host resource to a command channel object.
+ * Device commands can include "map id" of this mapping for referencing
+ * a host resource.
+ */
+#define IOCTL_NNPI_DEVICE_CHANNEL_MAP_HOSTRES \
+	_IOWR('D', 3, struct ioctl_nnpi_channel_map_hostres)
+
+/**
+ * IOCTL_NNPI_DEVICE_CHANNEL_UNMAP_HOSTRES:
+ *
+ * A request to unmap a host resource previously mapped to a command channel.
+ */
+#define IOCTL_NNPI_DEVICE_CHANNEL_UNMAP_HOSTRES \
+	_IOWR('D', 4, struct ioctl_nnpi_channel_unmap_hostres)
+
+/**
  * struct ioctl_nnpi_create_channel - IOCTL_NNPI_DEVICE_CREATE_CHANNEL payload
  * @i_host_fd: opened file descriptor to /dev/nnpi_host
  * @i_min_id: minimum range for channel id allocation
@@ -175,6 +212,80 @@ struct ioctl_nnpi_create_channel {
 	__s32    o_fd;
 	__u32    o_errno;
 	__u16    o_channel_id;
+};
+
+/**
+ * struct ioctl_nnpi_create_channel_data_ringbuf
+ * @i_hostres_handle: handle of a host resource which will be used to hold
+ *         the ring-buffer content.
+ * @i_channel_id: command channel id.
+ * @i_id: id of the ring buffer object (can be 0 or 1).
+ * @i_h2c: non-zero if this ring-buffer is for command submission use,
+ *         otherwise it is for responses.
+ * @o_errno: On input, must be set to 0.
+ *           On output, 0 on success, one of the NNPERR_* error codes on error.
+ *
+ * this is the payload for IOCTL_NNPI_DEVICE_CREATE_CHANNEL_RB ioctl
+ */
+struct ioctl_nnpi_create_channel_data_ringbuf {
+	__s32 i_hostres_handle;
+	__u32 i_channel_id;
+	__u32 i_id;
+	__u32 i_h2c;
+	__u32 o_errno;
+};
+
+/**
+ * struct ioctl_nnpi_destroy_channel_data_ringbuf
+ * @i_channel_id: command channel id.
+ * @i_id: id of the ring buffer object (can be 0 or 1).
+ * @i_h2c: true if this ring-buffer is for command submission use,
+ *         otherwise it is for responses.
+ * @o_errno: On input, must be set to 0.
+ *           On output, 0 on success, one of the NNPERR_* error codes on error.
+ *
+ * this is the payload for IOCTL_NNPI_DEVICE_DESTROY_CHANNEL_RB ioctl
+ */
+struct ioctl_nnpi_destroy_channel_data_ringbuf {
+	__u32 i_channel_id;
+	__u32 i_id;
+	__u32 i_h2c;
+	__u32 o_errno;
+};
+
+/**
+ * struct ioctl_nnpi_channel_map_hostres
+ * @i_hostres_handle: handle of a host resource to be mapped
+ * @i_channel_id: command channel id.
+ * @o_map_id: returns unique id of the mapping
+ * @o_sync_needed: returns non-zero if LOCK/UNLOCK_HOST_RESOURCE ioctls
+ *            needs to be used before/after accessing the resource from cpu.
+ * @o_errno: On input, must be set to 0.
+ *           On output, 0 on success, one of the NNPERR_* error codes on error.
+ *
+ * this is the payload for IOCTL_NNPI_DEVICE_CHANNEL_MAP_HOSTRES ioctl
+ */
+struct ioctl_nnpi_channel_map_hostres {
+	__s32 i_hostres_handle;
+	__u32 i_channel_id;
+	__u32 o_map_id;
+	__u32 o_sync_needed;
+	__u32 o_errno;
+};
+
+/**
+ * ioctl_nnpi_channel_unmap_hostres
+ * @i_channel_id: command channel id.
+ * @i_map_id: mapping id
+ * @o_errno: On input, must be set to 0.
+ *           On output, 0 on success, one of the NNPERR_* error codes on error.
+ *
+ * This is the payload for IOCTL_NNPI_DEVICE_CHANNEL_UNMAP_HOSTRES ioctl
+ */
+struct ioctl_nnpi_channel_unmap_hostres {
+	__u32 i_channel_id;
+	__u32 i_map_id;
+	__u32 o_errno;
 };
 
 /****************************************************************
