@@ -79,6 +79,7 @@ struct query_version_work {
  * @response_num_msgs: number of qwords available in @response_buf
  * @cmd_chan_ida: allocate channel ids to be used in ipc protocol.
  * @cmd_chan_hash: maps command channel id to its struct pointer.
+ * @waitq: used to wait for device response messages
  * @bios_system_info_dma_addr: dma page allocated for bios system info.
  * @bios_system_info: virtual pointer to bios system info page
  * @bios_version_str: the device's started bios version string
@@ -113,6 +114,7 @@ struct nnp_device {
 
 	struct ida cmd_chan_ida;
 	DECLARE_HASHTABLE(cmd_chan_hash, 6);
+	wait_queue_head_t waitq;
 
 	dma_addr_t                  bios_system_info_dma_addr;
 	struct nnp_c2h_system_info  *bios_system_info;

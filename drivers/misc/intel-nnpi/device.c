@@ -14,6 +14,7 @@
 #include "cmd_chan.h"
 #include "device.h"
 #include "host_chardev.h"
+#include "ipc_c2h_events.h"
 #include "msg_scheduler.h"
 #include "nnp_boot_defs.h"
 
@@ -212,11 +213,113 @@ restart:
 	spin_unlock(&nnpdev->lock);
 }
 
+static void nnpdev_submit_device_event_to_channels(struct nnp_device *nnpdev,
+						   u64 event_msg)
+{
+	struct nnp_chan *cmd_chan;
+	int i;
+	unsigned int event_code;
+	bool should_wake = false;
+	bool is_card_fatal;
+
+	event_code = FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, event_msg);
+	is_card_fatal = is_card_fatal_event(event_code);
+
+	spin_lock(&nnpdev->lock);
+	hash_for_each(nnpdev->cmd_chan_hash, i, cmd_chan, hash_node) {
+		/*
+		 * Update channel's card critical error,
+		 * but do not override it if a more sever "fatal_drv" error
+		 * event is already set.
+		 */
+		if (is_card_fatal &&
+		    !is_card_fatal_drv_event(chan_broken(cmd_chan))) {
+			cmd_chan->card_critical_error_msg = event_msg;
+			should_wake = true;
+		}
+
+		/* Send the event message to the channel (if needed) */
+		if (is_card_fatal || cmd_chan->get_device_events)
+			nnp_chan_add_response(cmd_chan, &event_msg, sizeof(event_msg));
+	}
+	spin_unlock(&nnpdev->lock);
+
+	if (should_wake)
+		wake_up_all(&nnpdev->waitq);
+}
+
+/*
+ * this function handle device-level event report message.
+ * which is usually affect the entire device and not a single channel
+ */
+static void process_device_event(struct nnp_device *nnpdev, u64 event_msg)
+{
+	/* submit the event to all channels requested to get device events */
+	nnpdev_submit_device_event_to_channels(nnpdev, event_msg);
+}
+
+struct event_report_work {
+	struct work_struct work;
+	struct nnp_device  *nnpdev;
+	u64                event_msg;
+};
+
+static void device_event_report_handler(struct work_struct *work)
+{
+	struct event_report_work *req =
+		container_of(work, struct event_report_work, work);
+
+	process_device_event(req->nnpdev, req->event_msg);
+
+	kfree(req);
+}
+
+static int handle_event_report(struct nnp_device *nnpdev, const u64 *msgbuf,
+			       int avail_qwords)
+{
+	int msg_qwords = 1; /* EVENT_REPORT response len is 1 qword */
+	struct event_report_work *req;
+	u64 event_msg;
+
+	if (avail_qwords < msg_qwords)
+		return 0;
+
+	event_msg = msgbuf[0];
+	if (FIELD_GET(NNP_C2H_EVENT_REPORT_CHAN_VALID_MASK, event_msg)) {
+		struct nnp_chan *cmd_chan;
+		unsigned int chan_id;
+
+		chan_id = FIELD_GET(NNP_C2H_EVENT_REPORT_CHAN_ID_MASK, event_msg);
+		cmd_chan = nnpdev_find_channel(nnpdev, chan_id);
+		if (cmd_chan) {
+			nnp_chan_add_response(cmd_chan, &event_msg, sizeof(event_msg));
+			nnp_chan_put(cmd_chan);
+		} else {
+			dev_dbg(nnpdev->dev,
+				"Got Event Report for non existing channel id %d\n",
+				chan_id);
+		}
+		return msg_qwords;
+	}
+
+	req = kzalloc(sizeof(*req), GFP_NOWAIT);
+	if (!req)
+		return msg_qwords;
+
+	req->event_msg = event_msg;
+	req->nnpdev = nnpdev;
+	INIT_WORK(&req->work, device_event_report_handler);
+	queue_work(nnpdev->wq, &req->work);
+
+	return msg_qwords;
+}
+
 typedef int (*response_handler)(struct nnp_device *nnpdev, const u64 *msgbuf,
 				int avail_qwords);
 
 static response_handler resp_handlers[NNP_IPC_C2H_OPCODE_LAST + 1] = {
 	[NNP_IPC_C2H_OP_QUERY_VERSION_REPLY3] = handle_query_version_reply3,
+	[NNP_IPC_C2H_OP_EVENT_REPORT] = handle_event_report,
 	[NNP_IPC_C2H_OP_BIOS_PROTOCOL] = handle_bios_protocol
 };
 
@@ -593,6 +696,7 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 
 	ida_init(&nnpdev->cmd_chan_ida);
 	hash_init(nnpdev->cmd_chan_hash);
+	init_waitqueue_head(&nnpdev->waitq);
 
 	nnpdev->cmdq_sched = nnp_msched_create(nnpdev);
 	if (!nnpdev->cmdq_sched) {

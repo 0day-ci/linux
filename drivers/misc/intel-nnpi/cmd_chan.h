@@ -4,6 +4,7 @@
 #ifndef NNPDRV_CMD_CHAN_H
 #define NNPDRV_CMD_CHAN_H
 
+#include <linux/bitfield.h>
 #include <linux/circ_buf.h>
 #include <linux/hashtable.h>
 #include <linux/kref.h>
@@ -12,6 +13,7 @@
 #include <linux/spinlock.h>
 
 #include "device.h"
+#include "ipc_c2h_events.h"
 
 /**
  * struct nnp_chan - structure object for user<->device communication
@@ -21,6 +23,7 @@
  * @chan_id: the ipc channel id for this channel
  * @hash_node: node to include this object in list of channels
  *             hash is in (cmd_chan_hash in nnp_device).
+ * @card_critical_error_msg: last critical event report received from device
  * @get_device_events: true if device-level events received from card should
  *                     be sent over this channel to user.
  * @cmdq: message queue added to msg_scheduler, for user commands to be sent
@@ -43,6 +46,7 @@ struct nnp_chan {
 	struct nnp_device      *nnpdev;
 	u16                    chan_id;
 	struct hlist_node      hash_node;
+	u64                    card_critical_error_msg;
 	bool                   get_device_events;
 
 	struct nnp_msched_queue    *cmdq;
@@ -58,6 +62,8 @@ struct nnp_chan {
 	unsigned int      respq_size;
 	unsigned int      resp_lost;
 };
+
+#define chan_broken(chan) FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, (chan)->card_critical_error_msg)
 
 struct nnp_chan *nnpdev_chan_create(struct nnp_device *nnpdev, int host_fd,
 				    unsigned int min_id, unsigned int max_id,
