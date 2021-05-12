@@ -4,13 +4,16 @@
 #define pr_fmt(fmt)   KBUILD_MODNAME ": " fmt
 
 #include <linux/anon_inodes.h>
+#include <linux/bitfield.h>
 #include <linux/dev_printk.h>
 #include <linux/file.h>
 #include <linux/minmax.h>
+#include <linux/poll.h>
 #include <linux/slab.h>
 
 #include "cmd_chan.h"
 #include "host_chardev.h"
+#include "ipc_c2h_events.h"
 #include "ipc_protocol.h"
 #include "nnp_user.h"
 
@@ -50,6 +53,258 @@ static inline void respq_pop(struct nnp_chan *chan, void *buf, int count)
 		memcpy((u8 *)buf + t, chan->respq.buf, count - t);
 	}
 	chan->respq.tail = (chan->respq.tail + count) & (chan->respq_size - 1);
+}
+
+static inline void respq_unpop(struct nnp_chan *chan, int count)
+{
+	chan->respq.tail = (chan->respq.tail - count) & (chan->respq_size - 1);
+}
+
+enum respq_state {
+	RESPQ_EMPTY = 0,
+	RESPQ_MSG_AVAIL,
+	RESPQ_DISCONNECTED
+};
+
+/**
+ * respq_state() - check if a response message is available to be popped
+ * @chan: the cmd_chan object
+ *
+ * Checks if new response message is available or channel has been destroyed.
+ *
+ * Return:
+ *  * RESPQ_EMPTY        - response queue is empty
+ *  * RESPQ_MSG_AVAIL    - a response message is available in the queue
+ *  * RESPQ_DISCONNECTED - the channel in a destroyed state
+ */
+static enum respq_state respq_state(struct nnp_chan *chan)
+{
+	bool ret;
+
+	mutex_lock(&chan->dev_mutex);
+	if (chan->state == NNP_CHAN_DESTROYED) {
+		mutex_unlock(&chan->dev_mutex);
+		return RESPQ_DISCONNECTED;
+	}
+
+	spin_lock(&chan->respq_lock);
+	/*
+	 * response messages are pushed into the respq ring-buffer by pushing
+	 * the size of the message (as u32) followed by message content.
+	 * So an entire message is available only if more than sizeof(u32)
+	 * bytes are available (there is no message with zero size).
+	 */
+	if (CIRC_CNT(chan->respq.head, chan->respq.tail, chan->respq_size) >
+	    sizeof(u32))
+		ret = RESPQ_MSG_AVAIL;
+	else
+		ret = RESPQ_EMPTY;
+	spin_unlock(&chan->respq_lock);
+
+	mutex_unlock(&chan->dev_mutex);
+
+	return ret;
+}
+
+static inline int is_cmd_chan_file(struct file *f);
+
+static int cmd_chan_file_release(struct inode *inode, struct file *f)
+{
+	struct nnp_chan *chan = f->private_data;
+	struct file *host_file;
+
+	if (!is_cmd_chan_file(f))
+		return -EINVAL;
+
+	nnp_chan_send_destroy(chan);
+
+	host_file = chan->host_file;
+	nnp_chan_put(chan);
+	fput(host_file);
+
+	return 0;
+}
+
+/**
+ * cmd_chan_file_read() - reads a single response message arrived from device
+ * @f: cmd_chan file descriptor
+ * @buf: buffer to receive the message
+ * @size: size of buf, must be at least 16 qwords (16 * sizeof(u64))
+ * @off: ignored.
+ *
+ * This function will block and wait until interrupted or a response
+ * message from device is available.
+ * When message(s) are available, it reads a single message, copy it to
+ * @buf and returns the message size.
+ * The given @buf and @size must be large enough to receive the largest
+ * possible response which is 16 qwords, otherwise -EINVAL is returned.
+ * The function returns the size of the received message, a return value
+ * of zero means that corrupted message has been detected and no more reads
+ * can be made from this channel.
+ *
+ * Return: if positive, the size in bytes of the read message.
+ *         zero, if a corrupted message has been detected.
+ *         error code otherwise
+ */
+static ssize_t cmd_chan_file_read(struct file *f, char __user *buf, size_t size,
+				  loff_t *off)
+{
+	struct nnp_chan *chan = f->private_data;
+	u64 msg[NNP_DEVICE_RESPONSE_FIFO_LEN];
+	enum respq_state state;
+	u32 msg_size;
+	int ret;
+
+	if (!is_cmd_chan_file(f))
+		return -EINVAL;
+
+	if (size < sizeof(msg))
+		return -EINVAL;
+
+	/*
+	 * wait for response message to be available, interrupted or channel
+	 * has been destroyed on us.
+	 */
+	ret = wait_event_interruptible(chan->resp_waitq,
+				       (state = respq_state(chan)) != RESPQ_EMPTY);
+	if (ret < 0)
+		return ret;
+
+	if (state == RESPQ_DISCONNECTED)
+		return -EPIPE;
+
+	spin_lock(&chan->respq_lock);
+	respq_pop(chan, &msg_size, sizeof(msg_size));
+	/*
+	 * Check msg_size does not overrun msg size.
+	 * This will never happen unless the response ring buffer got
+	 * corrupted in some way.
+	 * We detect it here for safety and return zero
+	 */
+	if (msg_size > sizeof(msg)) {
+		/*
+		 * unpop the bad size to let subsequent read attempts
+		 * to fail as well.
+		 */
+		respq_unpop(chan, sizeof(msg_size));
+		spin_unlock(&chan->respq_lock);
+		return 0;
+	}
+	respq_pop(chan, msg, msg_size);
+	spin_unlock(&chan->respq_lock);
+
+	if (copy_to_user(buf, msg, msg_size))
+		return -EFAULT;
+
+	return (ssize_t)msg_size;
+}
+
+/**
+ * cmd_chan_file_write() - schedule a command message to be sent to the device.
+ * @f: a cmd_chan file descriptor
+ * @buf: the command message content
+ * @size: size in bytes of the message, must be multiple of 8 and not larger
+ *        than 3 qwords.
+ * @off: ignored
+ *
+ * This function reads a command message from buffer and puts it in the
+ * channel's message queue to schedule it to be delivered to the device.
+ * The function returns when the message is copied to the message scheduler
+ * queue without waiting for it to be sent out.
+ * A valid command message size must be qword aligned and not larger than
+ * the maximum size the message scheduler support, which is 3 qwords.
+ *
+ * The function also validate the command content and fail if the chan_id
+ * field of the command header does not belong to the same channel of this
+ * file descriptor, or the command opcode is out of range, or the command
+ * size does not fit the size of this opcode.
+ *
+ * Return: the size of the message written or error code.
+ */
+static ssize_t cmd_chan_file_write(struct file *f, const char __user *buf,
+				   size_t size, loff_t *off)
+{
+	struct nnp_chan *chan = f->private_data;
+	u64 msg[MSG_SCHED_MAX_MSG_SIZE];
+	unsigned int chan_id, opcode;
+	unsigned int op;
+	int rc = 0;
+
+	if (!is_cmd_chan_file(f))
+		return -EINVAL;
+
+	/*
+	 * size must be positive, multiple of 8 bytes and
+	 * cannot exceed maximum message size
+	 */
+	if (!size || size > sizeof(msg) || (size &  0x7) != 0)
+		return -EINVAL;
+
+	if (copy_from_user(msg, buf, size))
+		return -EFAULT;
+
+	/*
+	 * Check chan_id, opcode and message size are valid
+	 */
+	opcode = FIELD_GET(NNP_H2C_CHAN_MSG_OP_MASK, msg[0]);
+	chan_id = FIELD_GET(NNP_H2C_CHAN_MSG_CHAN_ID_MASK, msg[0]);
+	if (chan_id != chan->chan_id)
+		return -EINVAL;
+	if (opcode < NNP_IPC_MIN_USER_OP)
+		return -EINVAL;
+	op = opcode - NNP_IPC_MIN_USER_OP;
+
+	mutex_lock(&chan->dev_mutex);
+	if (!chan->nnpdev) {
+		/* The device was removed */
+		mutex_unlock(&chan->dev_mutex);
+		return -EPIPE;
+	}
+	if (size != chan->nnpdev->ipc_chan_cmd_op_size[op] * 8) {
+		mutex_unlock(&chan->dev_mutex);
+		return -EINVAL;
+	}
+
+	if (!is_card_fatal_drv_event(chan_broken(chan)))
+		rc  = nnp_msched_queue_add_msg(chan->cmdq, msg, size / 8);
+	mutex_unlock(&chan->dev_mutex);
+
+	if (rc < 0)
+		return rc;
+
+	return size;
+}
+
+static unsigned int cmd_chan_file_poll(struct file *f, struct poll_table_struct *pt)
+{
+	struct nnp_chan *chan = f->private_data;
+	unsigned int mask = POLLOUT | POLLWRNORM;
+	enum respq_state state;
+
+	if (!is_cmd_chan_file(f))
+		return 0;
+
+	poll_wait(f, &chan->resp_waitq, pt);
+	state = respq_state(chan);
+	if (state != RESPQ_EMPTY)
+		mask |= POLLIN | POLLRDNORM;
+	if (state == RESPQ_DISCONNECTED)
+		mask |= POLLHUP;
+
+	return mask;
+}
+
+static const struct file_operations nnp_chan_fops = {
+	.owner = THIS_MODULE,
+	.release = cmd_chan_file_release,
+	.read = cmd_chan_file_read,
+	.write = cmd_chan_file_write,
+	.poll = cmd_chan_file_poll,
+};
+
+static inline int is_cmd_chan_file(struct file *f)
+{
+	return f->f_op == &nnp_chan_fops;
 }
 
 /**
@@ -119,6 +374,7 @@ struct nnp_chan *nnpdev_chan_create(struct nnp_device *nnpdev, int host_fd,
 	kref_init(&cmd_chan->ref);
 	cmd_chan->chan_id = chan_id;
 	cmd_chan->nnpdev = nnpdev;
+	cmd_chan->fd = -1;
 	cmd_chan->get_device_events = get_device_events;
 
 	cmd_chan->nnp_user = cmd_chan->host_file->private_data;
@@ -154,6 +410,17 @@ static void nnp_chan_release(struct kref *kref)
 
 	nnp_chan_disconnect(cmd_chan);
 
+	/*
+	 * If a chan file was created (through nnp_chan_create_file),
+	 * the host_file was already put when the file has released, otherwise
+	 * we put it here.
+	 * This is because we want to release host_file once the channel file
+	 * has been closed even though the channel object may continue to exist
+	 * until the card will send a respond that it was destroyed.
+	 */
+	if (cmd_chan->fd < 0)
+		fput(cmd_chan->host_file);
+
 	nnp_user_put(cmd_chan->nnp_user);
 
 	kfree(cmd_chan->respq_buf);
@@ -168,6 +435,99 @@ void nnp_chan_get(struct nnp_chan *cmd_chan)
 void nnp_chan_put(struct nnp_chan *cmd_chan)
 {
 	kref_put(&cmd_chan->ref, nnp_chan_release);
+}
+
+int nnp_chan_create_file(struct nnp_chan *cmd_chan)
+{
+	/*
+	 * get refcount to the channel that will drop when
+	 * the file is released.
+	 */
+	nnp_chan_get(cmd_chan);
+
+	cmd_chan->fd = anon_inode_getfd("nnpi_chan", &nnp_chan_fops, cmd_chan,
+					O_RDWR | O_CLOEXEC);
+	if (cmd_chan->fd < 0)
+		nnp_chan_put(cmd_chan);
+
+	return cmd_chan->fd;
+}
+
+/**
+ * nnp_chan_set_destroyed() - atomically mark the channel "destroyed"
+ * @chan: the cmd_chan
+ *
+ * This function sets the command channel state to "destroyed" and returns
+ * the previous destroyed state.
+ * This function should be called once the channel has been destructed on the
+ * device and a "channel destroyed" response message arrived.
+ *
+ * Return: true if the channel was already marked destroyed.
+ */
+bool nnp_chan_set_destroyed(struct nnp_chan *chan)
+{
+	bool ret;
+
+	mutex_lock(&chan->dev_mutex);
+	ret = (chan->state == NNP_CHAN_DESTROYED);
+	chan->state = NNP_CHAN_DESTROYED;
+	mutex_unlock(&chan->dev_mutex);
+
+	wake_up_all(&chan->resp_waitq);
+
+	return ret;
+}
+
+/**
+ * nnp_chan_send_destroy() - sends a "destroy channel" command to device
+ * @chan: the cmd_chan to destroy.
+ *
+ * This function sends a command to the device to destroy a command channel,
+ * The channel object remains to exist, it will be dropped only when the device
+ * send back a "channel destroyed" response message.
+ * In case the device is in critical error state, we treat it as not
+ * functional, and the function will immediately drop the channel object without
+ * sending any command and will return with success.
+ *
+ * Return: 0 on success, error value otherwise.
+ */
+int nnp_chan_send_destroy(struct nnp_chan *chan)
+{
+	u64 cmd;
+	int ret = 0;
+	bool do_put = false;
+
+	mutex_lock(&chan->dev_mutex);
+	if (chan->state == NNP_CHAN_DESTROYED || !chan->nnpdev)
+		goto done;
+
+	cmd = FIELD_PREP(NNP_H2C_OP_MASK, NNP_IPC_H2C_OP_CHANNEL_OP);
+	cmd |= FIELD_PREP(NNP_H2C_CHANNEL_OP_CHAN_ID_MASK, chan->chan_id);
+	cmd |= FIELD_PREP(NNP_H2C_CHANNEL_OP_DESTROY_MASK, 1);
+
+	chan->event_msg = 0;
+
+	/*
+	 * If card is in critical state (or was during the channel lifetime)
+	 * we destroy the channel.
+	 * otherwise, we send a destroy command to card and will destroy when
+	 * the destroy reply arrives.
+	 */
+	if (is_card_fatal_drv_event(chan_broken(chan))) {
+		chan->state = NNP_CHAN_DESTROYED;
+		do_put = true;
+		goto done;
+	}
+
+	ret = nnp_msched_queue_msg(chan->cmdq, cmd);
+
+done:
+	mutex_unlock(&chan->dev_mutex);
+	if (do_put) {
+		wake_up_all(&chan->resp_waitq);
+		nnp_chan_put(chan);
+	}
+	return ret;
 }
 
 /**
@@ -194,8 +554,10 @@ void nnp_chan_disconnect(struct nnp_chan *cmd_chan)
 	spin_lock(&nnpdev->lock);
 	hash_del(&cmd_chan->hash_node);
 	spin_unlock(&nnpdev->lock);
+	cmd_chan->state = NNP_CHAN_DESTROYED;
 	mutex_unlock(&cmd_chan->dev_mutex);
 
+	wake_up_all(&cmd_chan->resp_waitq);
 	nnp_msched_queue_sync(cmd_chan->cmdq);
 	nnp_msched_queue_destroy(cmd_chan->cmdq);
 

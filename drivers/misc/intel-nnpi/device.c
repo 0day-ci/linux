@@ -246,6 +246,47 @@ static void nnpdev_submit_device_event_to_channels(struct nnp_device *nnpdev,
 
 	if (should_wake)
 		wake_up_all(&nnpdev->waitq);
+
+	/*
+	 * On card fatal event, we consider the device dead and there is
+	 * no point communicating with it. The user will destroy the channel
+	 * and initiate a device reset to fix this.
+	 * We disconnect all channels and set each as "destroyed" since the
+	 * NNP_IPC_CHANNEL_DESTROYED response, which normally do that, will
+	 * never arrive.
+	 */
+	if (is_card_fatal_drv_event(event_code))
+		disconnect_all_channels(nnpdev);
+}
+
+static void handle_channel_destroy(struct nnp_device *nnpdev, u64 event_msg)
+{
+	struct nnp_chan *cmd_chan;
+	unsigned int chan_id;
+
+	chan_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+	cmd_chan = nnpdev_find_channel(nnpdev, chan_id);
+	if (!cmd_chan) {
+		dev_err(nnpdev->dev,
+			"Got channel destroyed reply for not existing channel %d\n",
+			chan_id);
+		return;
+	}
+
+	/*
+	 * Channel is destroyed on device. Put the main ref of cmd_chan if it
+	 * did not already done.
+	 * There is one possible case that the channel will be already marked
+	 * as destroyed when we get here. This is when we got some card fatal
+	 * event, which caused us to flag the channel as destroyed, but later
+	 * the "destroy channel" response has arrived from the device
+	 * (unexpected).
+	 */
+	if (!nnp_chan_set_destroyed(cmd_chan))
+		nnp_chan_put(cmd_chan);
+
+	/* put against the get from find_channel */
+	nnp_chan_put(cmd_chan);
 }
 
 /*
@@ -254,6 +295,36 @@ static void nnpdev_submit_device_event_to_channels(struct nnp_device *nnpdev,
  */
 static void process_device_event(struct nnp_device *nnpdev, u64 event_msg)
 {
+	unsigned int event_code = FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, event_msg);
+	unsigned int obj_id, event_val;
+
+	if (!is_card_fatal_event(event_code)) {
+		switch (event_code) {
+		case NNP_IPC_DESTROY_CHANNEL_FAILED:
+			obj_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+			event_val = FIELD_GET(NNP_C2H_EVENT_REPORT_VAL_MASK, event_msg);
+			dev_err(nnpdev->dev,
+				"Channel destroyed failed channel %d val %d\n",
+				obj_id, event_val);
+			/*
+			 * We should not enter this case never as the card will
+			 * send this response only when the driver requested to
+			 * destroy a not-exist channel, which means a driver
+			 * bug.
+			 * To handle the case we continue and destroy the channel
+			 * on the host side.
+			 */
+			fallthrough;
+		case NNP_IPC_CHANNEL_DESTROYED:
+			handle_channel_destroy(nnpdev, event_msg);
+			break;
+		default:
+			dev_err(nnpdev->dev,
+				"Unknown event received - %u\n", event_code);
+			return;
+		}
+	}
+
 	/* submit the event to all channels requested to get device events */
 	nnpdev_submit_device_event_to_channels(nnpdev, event_msg);
 }
