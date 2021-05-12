@@ -90,6 +90,9 @@ static int snd_pcm_ioctl_sw_params_compat(struct snd_pcm_substream *substream,
 	snd_pcm_uframes_t boundary;
 	int err;
 
+	if (!substream->runtime)
+		return -ENOTTY;
+
 	memset(&params, 0, sizeof(params));
 	if (get_user(params.tstamp_mode, &src->tstamp_mode) ||
 	    get_user(params.period_step, &src->period_step) ||
