@@ -9320,6 +9320,7 @@ INTEL NNP-I PCI DRIVER
 M:	Guy Zadicario <guy.zadicario@intel.com>
 S:	Supported
 F:	drivers/misc/intel-nnpi/
+F:	include/uapi/misc/intel_nnpi.h
 
 INTEL P-Unit IPC DRIVER
 M:	Zha Qipeng <qipeng.zha@intel.com>

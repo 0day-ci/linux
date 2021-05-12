@@ -8,6 +8,7 @@
 #include <linux/module.h>
 
 #include "device.h"
+#include "host_chardev.h"
 #include "msg_scheduler.h"
 
 static DEFINE_IDA(dev_ida);
@@ -98,6 +99,19 @@ void nnpdev_destroy(struct nnp_device *nnpdev)
 	ida_simple_remove(&dev_ida, nnpdev->id);
 }
 EXPORT_SYMBOL(nnpdev_destroy);
+
+static int __init nnp_init(void)
+{
+	return nnp_init_host_interface();
+}
+subsys_initcall(nnp_init);
+
+static void __exit nnp_cleanup(void)
+{
+	nnp_release_host_interface();
+	/* dev_ida is already empty here - no point calling ida_destroy */
+}
+module_exit(nnp_cleanup);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Intel(R) NNPI Framework");
