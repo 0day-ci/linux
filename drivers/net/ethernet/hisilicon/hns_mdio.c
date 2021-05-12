@@ -422,11 +422,6 @@ static int hns_mdio_probe(struct platform_device *pdev)
 	struct mii_bus *new_bus;
 	int ret = -ENODEV;
 
-	if (!pdev) {
-		dev_err(NULL, "pdev is NULL!\r\n");
-		return -ENODEV;
-	}
-
 	mdio_dev = devm_kzalloc(&pdev->dev, sizeof(*mdio_dev), GFP_KERNEL);
 	if (!mdio_dev)
 		return -ENOMEM;
