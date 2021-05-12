@@ -51,6 +51,15 @@
 #define NNP_DEVICE_RESPONSE_FIFO_LEN    16
 #define NNP_DEVICE_RESPONSE_BUFFER_LEN  (NNP_DEVICE_RESPONSE_FIFO_LEN * 2)
 
+struct query_version_work {
+	struct work_struct work;
+	u64 chan_resp_op_size;
+	u64 chan_cmd_op_size;
+	u16 protocol_version;
+	u16 chan_protocol_version;
+	bool running;
+};
+
 /**
  * struct nnp_device - structure for NNP-I device info
  * @ops: device operations implemented by the underlying device driver
@@ -71,9 +80,13 @@
  * @bios_version_str: the device's started bios version string
  * @bios_system_info_valid: true if @bios_system_info has been filled and valid
  * @state: current device boot state mask (see device state bits above)
+ * @protocol_version: version of host->card IPC protocol
+ * @chan_protocol_version: version of user-space->card IPC protocol
  * @curr_boot_state: last boot state field received from device doorbell reg
  * @card_doorbell_val: last received device doorbell register value.
  * @boot_image: boot image object used to boot the card
+ * @query_version_work: work struct used to schedule processing of version
+ *                      reply response message arrived from card.
  */
 struct nnp_device {
 	const struct nnp_device_ops *ops;
@@ -98,8 +111,12 @@ struct nnp_device {
 
 	u32            state;
 	u32            curr_boot_state;
+	unsigned short protocol_version;
+	unsigned short chan_protocol_version;
 	u32            card_doorbell_val;
 	struct image_info boot_image;
+
+	struct query_version_work query_version_work;
 };
 
 /**
