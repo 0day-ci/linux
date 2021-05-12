@@ -203,6 +203,8 @@ struct nsim_dev_port {
 	unsigned int port_index;
 	struct dentry *ddir;
 	struct netdevsim *ns;
+	char devlink_test_param_str[__DEVLINK_PARAM_MAX_STRING_VALUE];
+	bool devlink_test_param_bool;
 };
 
 struct nsim_dev {
