@@ -1175,6 +1175,7 @@ static const struct platform_device_id s3c24xx_dma_driver_ids[] = {
 	},
 	{ },
 };
+MODULE_DEVICE_TABLE(platform, s3c24xx_dma_driver_ids);
 
 static struct soc_data *s3c24xx_dma_get_soc_data(struct platform_device *pdev)
 {
