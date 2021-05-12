@@ -93,8 +93,7 @@
 #define HNS_ROCE_V3_SCCC_SZ			64
 #define HNS_ROCE_V3_GMV_ENTRY_SZ		32
 
-#define HNS_ROCE_V2_TSQ_EXT_LLM_ENTRY_SZ	8
-#define HNS_ROCE_V2_TPQ_EXT_LLM_ENTRY_SZ	4
+#define HNS_ROCE_V2_EXT_LLM_ENTRY_SZ		8
 #define HNS_ROCE_V2_EXT_LLM_MAX_DEPTH		4096
 
 #define HNS_ROCE_V2_QPC_TIMER_ENTRY_SZ		PAGE_SIZE
@@ -238,7 +237,6 @@ enum hns_roce_opcode_type {
 	HNS_ROCE_OPC_QUERY_PF_RES			= 0x8400,
 	HNS_ROCE_OPC_ALLOC_VF_RES			= 0x8401,
 	HNS_ROCE_OPC_CFG_EXT_LLM			= 0x8403,
-	HNS_ROCE_OPC_CFG_TMOUT_LLM			= 0x8404,
 	HNS_ROCE_OPC_QUERY_PF_TIMER_RES			= 0x8406,
 	HNS_ROCE_OPC_QUERY_FUNC_INFO			= 0x8407,
 	HNS_ROCE_OPC_QUERY_PF_CAPS_NUM                  = 0x8408,
@@ -1718,26 +1716,18 @@ struct hns_roce_v2_cmq {
 	u16 tx_timeout;
 };
 
-enum hns_roce_link_table_type {
-	TSQ_LINK_TABLE,
-	TPQ_LINK_TABLE,
-};
-
 struct hns_roce_link_table {
 	struct hns_roce_buf_list table;
 	struct hns_roce_buf *buf;
 };
 
 #define HNS_ROCE_EXT_LLM_ENTRY(addr, id) (((id) << (64 - 12)) | ((addr) >> 12))
-
-#define HNS_ROCE_TSQ_EXT_LLM_MIN_PAGES(que_num) ((que_num) * 4 + 2)
-#define HNS_ROCE_TPQ_EXT_LLM_MIN_PAGES(que_num) ((que_num) * 8 + 2)
+#define HNS_ROCE_EXT_LLM_MIN_PAGES(que_num) ((que_num) * 4 + 2)
 
 struct hns_roce_v2_priv {
 	struct hnae3_handle *handle;
 	struct hns_roce_v2_cmq cmq;
-	struct hns_roce_link_table tsq;
-	struct hns_roce_link_table tpq;
+	struct hns_roce_link_table ext_llm;
 };
 
 struct hns_roce_eq_context {
