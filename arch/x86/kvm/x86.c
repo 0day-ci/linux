@@ -2377,8 +2377,23 @@ EXPORT_SYMBOL_GPL(kvm_set_02_tsc_multiplier);
 
 static void kvm_vcpu_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 {
+	trace_kvm_write_tsc_offset(vcpu->vcpu_id,
+				   vcpu->arch.l1_tsc_offset,
+				   offset);
+
 	vcpu->arch.l1_tsc_offset = offset;
-	vcpu->arch.tsc_offset = static_call(kvm_x86_write_l1_tsc_offset)(vcpu, offset);
+	vcpu->arch.tsc_offset = offset;
+
+	if (is_guest_mode(vcpu)) {
+		/*
+		 * We're here if L1 chose not to trap WRMSR to TSC and
+		 * according to the spec this should set L1's TSC (as opposed
+		 * to setting L1's offset for L2).
+		 */
+		kvm_set_02_tsc_offset(vcpu);
+	}
+
+	static_call(kvm_x86_write_tsc_offset)(vcpu, vcpu->arch.tsc_offset);
 }
 
 static inline bool kvm_check_tsc_unstable(void)
