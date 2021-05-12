@@ -1793,6 +1793,8 @@ static inline bool kvm_is_supported_user_return_msr(u32 msr)
 u64 kvm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc);
 u64 kvm_scale_tsc_l1(struct kvm_vcpu *vcpu, u64 tsc);
 u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc);
+void kvm_set_02_tsc_offset(struct kvm_vcpu *vcpu);
+void kvm_set_02_tsc_multiplier(struct kvm_vcpu *vcpu);
 
 unsigned long kvm_get_linear_rip(struct kvm_vcpu *vcpu);
 bool kvm_is_linear_rip(struct kvm_vcpu *vcpu, unsigned long linear_rip);
