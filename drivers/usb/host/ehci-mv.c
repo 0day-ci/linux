@@ -266,6 +266,7 @@ static const struct platform_device_id ehci_id_table[] = {
 	{"pxa-sph", 0},
 	{},
 };
+MODULE_DEVICE_TABLE(platform, ehci_id_table);
 
 static void mv_ehci_shutdown(struct platform_device *pdev)
 {
