@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+#
+# Copyright (C) 2019-2021 Intel Corporation
+#
+#
+
+config INTEL_NNPI
+	tristate "Intel(R) PCIe NNP-I (AI accelerator for inference) device driver"
+	depends on PCI
+	select DMA_SHARED_BUFFER
+	help
+	  Device driver for Intel NNP-I PCIe accelerator card for AI inference.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here. Two modules will
+          get generated intel_nnpi and intel_nnpi_pcie.
