@@ -258,6 +258,9 @@ int x509_note_pkey_algo(void *context, size_t hdrlen,
 	case OID_SM2_with_SM3:
 		ctx->cert->sig->hash_algo = "sm3";
 		goto sm2;
+	case OID_ed25519:
+		ctx->cert->sig->hash_algo = "sha512";
+		goto eddsa;
 	}
 
 rsa_pkcs1:
@@ -278,6 +281,11 @@ sm2:
 ecdsa:
 	ctx->cert->sig->pkey_algo = "ecdsa";
 	ctx->cert->sig->encoding = "x962";
+	ctx->algo_oid = ctx->last_oid;
+	return 0;
+eddsa:
+	ctx->cert->sig->pkey_algo = "eddsa";
+	ctx->cert->sig->encoding = "raw";
 	ctx->algo_oid = ctx->last_oid;
 	return 0;
 }
@@ -302,7 +310,8 @@ int x509_note_signature(void *context, size_t hdrlen,
 	if (strcmp(ctx->cert->sig->pkey_algo, "rsa") == 0 ||
 	    strcmp(ctx->cert->sig->pkey_algo, "ecrdsa") == 0 ||
 	    strcmp(ctx->cert->sig->pkey_algo, "sm2") == 0 ||
-	    strcmp(ctx->cert->sig->pkey_algo, "ecdsa") == 0) {
+	    strcmp(ctx->cert->sig->pkey_algo, "ecdsa") == 0 ||
+	    strcmp(ctx->cert->sig->pkey_algo, "eddsa") == 0) {
 		/* Discard the BIT STRING metadata */
 		if (vlen < 1 || *(const u8 *)value != 0)
 			return -EBADMSG;
@@ -516,6 +525,9 @@ int x509_extract_key_data(void *context, size_t hdrlen,
 		default:
 			return -ENOPKG;
 		}
+		break;
+	case OID_ed25519:
+		ctx->cert->pub->pkey_algo = "eddsa-25519";
 		break;
 	default:
 		return -ENOPKG;
