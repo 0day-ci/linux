@@ -1,0 +1,5 @@
+What:           /sys/class/nnpi_host/nnpi_host/total_hostres_size
+Date:           Mar 2021
+Kernelversion:  5.13
+Contact:        guy.zadicario@intel.com
+Description:    Total size in bytes of all allocated NNP-I host resources.
