@@ -557,6 +557,17 @@ void nnp_chan_disconnect(struct nnp_chan *cmd_chan)
 	cmd_chan->state = NNP_CHAN_DESTROYED;
 	mutex_unlock(&cmd_chan->dev_mutex);
 
+	/*
+	 * If the channel is not in critical state,
+	 * put it in critical state and wake any user
+	 * which might wait for the device.
+	 */
+	if (!chan_drv_fatal(cmd_chan)) {
+		cmd_chan->card_critical_error_msg = FIELD_PREP(NNP_C2H_EVENT_REPORT_CODE_MASK,
+							       NNP_IPC_ERROR_CHANNEL_KILLED);
+		wake_up_all(&nnpdev->waitq);
+	}
+
 	wake_up_all(&cmd_chan->resp_waitq);
 	nnp_msched_queue_sync(cmd_chan->cmdq);
 	nnp_msched_queue_destroy(cmd_chan->cmdq);

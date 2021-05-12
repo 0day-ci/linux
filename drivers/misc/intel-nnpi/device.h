@@ -4,8 +4,10 @@
 #ifndef _NNPDRV_DEVICE_H
 #define _NNPDRV_DEVICE_H
 
+#include <linux/cdev.h>
 #include <linux/hashtable.h>
 #include <linux/idr.h>
+#include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
@@ -53,6 +55,9 @@
 #define NNP_DEVICE_RESPONSE_FIFO_LEN    16
 #define NNP_DEVICE_RESPONSE_BUFFER_LEN  (NNP_DEVICE_RESPONSE_FIFO_LEN * 2)
 
+#define NNP_MAX_CHANNEL_ID             1023  /* has 10 bits in ipc protocol */
+#define NNP_MAX_INF_CONTEXT_CHANNEL_ID 255   /* [0, 255] are reserved for inference contexts */
+
 struct query_version_work {
 	struct work_struct work;
 	u64 chan_resp_op_size;
@@ -92,6 +97,9 @@ struct query_version_work {
  * @boot_image: boot image object used to boot the card
  * @query_version_work: work struct used to schedule processing of version
  *                      reply response message arrived from card.
+ * @cdev: cdev object of NNP-I device char dev.
+ * @chardev: character device for this device
+ * @cdev_clients: list of opened struct file to the chardev of this device.
  * @ipc_chan_resp_op_size: holds response size for each possible channel
  *                         response.
  * @ipc_chan_cmd_op_size: holds command size for each possible channel command.
@@ -130,6 +138,9 @@ struct nnp_device {
 
 	struct query_version_work query_version_work;
 
+	struct cdev      cdev;
+	struct device    *chardev;
+	struct list_head cdev_clients;
 	u8   ipc_chan_resp_op_size[NNP_IPC_NUM_USER_OPS];
 	u8   ipc_chan_cmd_op_size[NNP_IPC_NUM_USER_OPS];
 };

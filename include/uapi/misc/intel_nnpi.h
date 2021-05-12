@@ -134,6 +134,49 @@ struct nnpdrv_ioctl_destroy_hostres {
 	__u32 o_errno;
 };
 
+/*
+ * ioctls for /dev/nnpi%d device
+ */
+#define NNPI_DEVICE_DEV_FMT "nnpi%u"
+
+/**
+ * IOCTL_NNPI_DEVICE_CREATE_CHANNEL:
+ *
+ * A request to create a new communication "channel" with an NNP-I device.
+ * This channel can be used to send command and receive responses from the
+ * device.
+ */
+#define IOCTL_NNPI_DEVICE_CREATE_CHANNEL      \
+	_IOWR('D', 0, struct ioctl_nnpi_create_channel)
+
+/**
+ * struct ioctl_nnpi_create_channel - IOCTL_NNPI_DEVICE_CREATE_CHANNEL payload
+ * @i_host_fd: opened file descriptor to /dev/nnpi_host
+ * @i_min_id: minimum range for channel id allocation
+ * @i_max_id: maximum range for channel id allocation
+ * @i_get_device_events: if true, device-level event responses will be
+ *            delivered to be read from the channel.
+ * @i_protocol_version: The NNP_IPC_CHAN_PROTOCOL_VERSION the user-space has
+ *                      compiled with.
+ * @o_fd: returns file-descriptor through which commands/responses can be
+ *        write/read.
+ * @o_errno: On input, must be set to 0.
+ *           On output, 0 on success, one of the NNPERR_* error codes on error.
+ * @o_channel_id: returns the unique id of the channel
+ *
+ * Argument structure for IOCTL_NNPI_DEVICE_CREATE_CHANNEL ioctl.
+ */
+struct ioctl_nnpi_create_channel {
+	__s32    i_host_fd;
+	__u32    i_min_id;
+	__u32    i_max_id;
+	__s32    i_get_device_events;
+	__u32    i_protocol_version;
+	__s32    o_fd;
+	__u32    o_errno;
+	__u16    o_channel_id;
+};
+
 /****************************************************************
  * Error code values - errors returned in o_errno fields of
  * above structures.

@@ -80,6 +80,7 @@ struct nnp_chan {
 };
 
 #define chan_broken(chan) FIELD_GET(NNP_C2H_EVENT_REPORT_CODE_MASK, (chan)->card_critical_error_msg)
+#define chan_drv_fatal(chan) (is_card_fatal_drv_event(chan_broken(chan)))
 
 struct nnp_chan *nnpdev_chan_create(struct nnp_device *nnpdev, int host_fd,
 				    unsigned int min_id, unsigned int max_id,

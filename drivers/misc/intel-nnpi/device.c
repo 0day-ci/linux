@@ -13,6 +13,7 @@
 #include "bootimage.h"
 #include "cmd_chan.h"
 #include "device.h"
+#include "device_chardev.h"
 #include "host_chardev.h"
 #include "ipc_c2h_events.h"
 #include "msg_scheduler.h"
@@ -259,6 +260,22 @@ static void nnpdev_submit_device_event_to_channels(struct nnp_device *nnpdev,
 		disconnect_all_channels(nnpdev);
 }
 
+static void handle_channel_create_response(struct nnp_device *nnpdev, u64 event_msg)
+{
+	struct nnp_chan *cmd_chan;
+	unsigned int chan_id;
+
+	chan_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
+
+	cmd_chan = nnpdev_find_channel(nnpdev, chan_id);
+	if (!cmd_chan)
+		return;
+
+	cmd_chan->event_msg = event_msg;
+	nnp_chan_put(cmd_chan);
+	wake_up_all(&nnpdev->waitq);
+}
+
 static void handle_channel_destroy(struct nnp_device *nnpdev, u64 event_msg)
 {
 	struct nnp_chan *cmd_chan;
@@ -300,6 +317,10 @@ static void process_device_event(struct nnp_device *nnpdev, u64 event_msg)
 
 	if (!is_card_fatal_event(event_code)) {
 		switch (event_code) {
+		case NNP_IPC_CREATE_CHANNEL_SUCCESS:
+		case NNP_IPC_CREATE_CHANNEL_FAILED:
+			handle_channel_create_response(nnpdev, event_msg);
+			break;
 		case NNP_IPC_DESTROY_CHANNEL_FAILED:
 			obj_id = FIELD_GET(NNP_C2H_EVENT_REPORT_OBJ_ID_MASK, event_msg);
 			event_val = FIELD_GET(NNP_C2H_EVENT_REPORT_VAL_MASK, event_msg);
@@ -796,6 +817,11 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 		goto err_wq;
 	}
 
+	/* Create the character device interface to this device */
+	ret = nnpdev_cdev_create(nnpdev);
+	if (ret)
+		goto err_sys_info;
+
 	/* set host driver state to "Not ready" */
 	nnpdev->ops->set_host_doorbell_value(nnpdev, 0);
 
@@ -805,6 +831,9 @@ int nnpdev_init(struct nnp_device *nnpdev, struct device *dev,
 
 	return 0;
 
+err_sys_info:
+	dma_free_coherent(nnpdev->dev, NNP_PAGE_SIZE, nnpdev->bios_system_info,
+			  nnpdev->bios_system_info_dma_addr);
 err_wq:
 	destroy_workqueue(nnpdev->wq);
 err_cmdq:
@@ -946,6 +975,10 @@ void nnpdev_destroy(struct nnp_device *nnpdev)
 	destroy_workqueue(nnpdev->wq);
 
 	disconnect_all_channels(nnpdev);
+
+	/* destroy character device */
+	nnpdev_cdev_destroy(nnpdev);
+
 	dma_free_coherent(nnpdev->dev, NNP_PAGE_SIZE, nnpdev->bios_system_info,
 			  nnpdev->bios_system_info_dma_addr);
 
@@ -960,13 +993,28 @@ EXPORT_SYMBOL(nnpdev_destroy);
 
 static int __init nnp_init(void)
 {
-	return nnp_init_host_interface();
+	int ret;
+
+	ret = nnp_init_host_interface();
+	if (ret)
+		return ret;
+
+	ret = nnpdev_cdev_class_init();
+	if (ret)
+		goto err_class;
+
+	return 0;
+
+err_class:
+	nnp_release_host_interface();
+	return ret;
 }
 subsys_initcall(nnp_init);
 
 static void __exit nnp_cleanup(void)
 {
 	nnp_release_host_interface();
+	nnpdev_cdev_class_cleanup();
 	/* dev_ida is already empty here - no point calling ida_destroy */
 }
 module_exit(nnp_cleanup);
