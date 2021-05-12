@@ -1097,8 +1097,13 @@ vm_vaddr_t vm_vaddr_alloc(struct kvm_vm *vm, size_t sz, vm_vaddr_t vaddr_min,
 			  uint32_t data_memslot, uint32_t pgd_memslot)
 {
 	uint64_t pages = (sz >> vm->page_shift) + ((sz % vm->page_size) != 0);
+	vm_paddr_t paddr_start = 0;
 
 	virt_pgd_alloc(vm, pgd_memslot);
+
+	if (data_memslot == pgd_memslot)
+		paddr_start = vm_phy_pages_alloc(vm, pages,
+				KVM_UTIL_MIN_PFN * vm->page_size, data_memslot);
 
 	/*
 	 * Find an unused range of virtual page addresses of at least
@@ -1111,8 +1116,12 @@ vm_vaddr_t vm_vaddr_alloc(struct kvm_vm *vm, size_t sz, vm_vaddr_t vaddr_min,
 		pages--, vaddr += vm->page_size) {
 		vm_paddr_t paddr;
 
-		paddr = vm_phy_page_alloc(vm,
-				KVM_UTIL_MIN_PFN * vm->page_size, data_memslot);
+		if (paddr_start) {
+			paddr = paddr_start;
+			paddr_start += vm->page_size;
+		} else
+			paddr = vm_phy_page_alloc(vm,
+					KVM_UTIL_MIN_PFN * vm->page_size, data_memslot);
 
 		virt_pg_map(vm, vaddr, paddr, pgd_memslot);
 
