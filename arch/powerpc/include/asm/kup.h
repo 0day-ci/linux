@@ -47,8 +47,15 @@ static inline void setup_kuep(bool disabled) { }
 #endif /* CONFIG_PPC_KUEP */
 
 #if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
-void kuep_lock(void);
-void kuep_unlock(void);
+static inline void kuep_lock(void)
+{
+	update_user_segments(mfsr(0) | SR_NX);
+}
+
+static inline void kuep_unlock(void)
+{
+	update_user_segments(mfsr(0) & ~SR_NX);
+}
 #else
 static inline void kuep_lock(void) { }
 static inline void kuep_unlock(void) { }
