@@ -50,7 +50,17 @@ static int no_handler_test(void)
 
 	event_close(&event);
 
-	dump_ebb_state();
+	/*
+	 * For ISA v3.1, verify the test takes a SIGILL when reading
+	 * PMU regs after the event is closed. With the control bit
+	 * in MMCR0 (PMCCEXT) restricting access to group B PMU regs,
+	 * sigill is expected.
+	 */
+
+	if (have_hwcap2(PPC_FEATURE2_ARCH_3_1))
+		FAIL_IF(catch_sigill(dump_ebb_state));
+	else
+		dump_ebb_state();
 
 	/* The real test is that we never took an EBB at 0x0 */
 
