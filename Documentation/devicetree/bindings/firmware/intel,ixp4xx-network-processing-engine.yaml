@@ -30,6 +30,10 @@ properties:
       - description: NPE1 register range
       - description: NPE2 register range
 
+  crypto:
+    type: object
+    description: optional node for the embedded crypto engine
+
 required:
   - compatible
   - reg
@@ -38,8 +42,15 @@ additionalProperties: false
 
 examples:
   - |
-    npe@c8006000 {
+    npe: npe@c8006000 {
          compatible = "intel,ixp4xx-network-processing-engine";
          reg = <0xc8006000 0x1000>, <0xc8007000 0x1000>, <0xc8008000 0x1000>;
+
+         crypto {
+             compatible = "intel,ixp4xx-crypto";
+             intel,npe = <2>;
+             queue-rx = <&qmgr 30>;
+             queue-txready = <&qmgr 29>;
+         };
     };
 ...
