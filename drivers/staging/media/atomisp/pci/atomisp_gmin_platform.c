@@ -1041,9 +1041,9 @@ static struct camera_sensor_platform_data acpi_gmin_plat = {
 };
 
 struct camera_sensor_platform_data *gmin_camera_platform_data(
-    struct v4l2_subdev *subdev,
-    enum atomisp_input_format csi_format,
-    enum atomisp_bayer_order csi_bayer)
+	struct v4l2_subdev *subdev,
+	enum atomisp_input_format csi_format,
+	enum atomisp_bayer_order csi_bayer)
 {
 	u8 pmic_i2c_addr = gmin_detect_pmic(subdev);
 	struct gmin_subdev *gs;
