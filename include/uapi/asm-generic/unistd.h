@@ -873,8 +873,31 @@ __SYSCALL(__NR_landlock_add_rule, sys_landlock_add_rule)
 #define __NR_landlock_restrict_self 446
 __SYSCALL(__NR_landlock_restrict_self, sys_landlock_restrict_self)
 
+#define __NR_umcg_api_version 447
+__SYSCALL(__NR_umcg_api_version, sys_umcg_api_version)
+#define __NR_umcg_register_task 448
+__SYSCALL(__NR_umcg_register_task, sys_umcg_register_task)
+#define __NR_umcg_unregister_task 449
+__SYSCALL(__NR_umcg_unregister_task, sys_umcg_unregister_task)
+#define __NR_umcg_wait 450
+__SYSCALL(__NR_umcg_wait, sys_umcg_wait)
+#define __NR_umcg_wake 451
+__SYSCALL(__NR_umcg_wake, sys_umcg_wake)
+#define __NR_umcg_swap 452
+__SYSCALL(__NR_umcg_swap, sys_umcg_swap)
+#define __NR_umcg_create_group 453
+__SYSCALL(__NR_umcg_create_group, sys_umcg_create_group)
+#define __NR_umcg_destroy_group 454
+__SYSCALL(__NR_umcg_destroy_group, sys_umcg_destroy_group)
+#define __NR_umcg_poll_worker 455
+__SYSCALL(__NR_umcg_poll_worker, sys_umcg_poll_worker)
+#define __NR_umcg_run_worker 456
+__SYSCALL(__NR_umcg_run_worker, sys_umcg_run_worker)
+#define __NR_umcg_preempt_worker 457
+__SYSCALL(__NR_umcg_preempt_worker, sys_umcg_preempt_worker)
+
 #undef __NR_syscalls
-#define __NR_syscalls 447
+#define __NR_syscalls 458
 
 /*
  * 32 bit systems traditionally used different

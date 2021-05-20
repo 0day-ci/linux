@@ -272,6 +272,19 @@ COND_SYSCALL(landlock_create_ruleset);
 COND_SYSCALL(landlock_add_rule);
 COND_SYSCALL(landlock_restrict_self);
 
+/* kernel/sched/umcg.c */
+COND_SYSCALL(umcg_api_version);
+COND_SYSCALL(umcg_register_task);
+COND_SYSCALL(umcg_unregister_task);
+COND_SYSCALL(umcg_wait);
+COND_SYSCALL(umcg_wake);
+COND_SYSCALL(umcg_swap);
+COND_SYSCALL(umcg_create_group);
+COND_SYSCALL(umcg_destroy_group);
+COND_SYSCALL(umcg_poll_worker);
+COND_SYSCALL(umcg_run_worker);
+COND_SYSCALL(umcg_preempt_worker);
+
 /* arch/example/kernel/sys_example.c */
 
 /* mm/fadvise.c */

@@ -368,6 +368,17 @@
 444	common	landlock_create_ruleset	sys_landlock_create_ruleset
 445	common	landlock_add_rule	sys_landlock_add_rule
 446	common	landlock_restrict_self	sys_landlock_restrict_self
+447	common	umcg_api_version	sys_umcg_api_version
+448	common	umcg_register_task	sys_umcg_register_task
+449	common	umcg_unregister_task	sys_umcg_unregister_task
+450	common	umcg_wait		sys_umcg_wait
+451	common	umcg_wake		sys_umcg_wake
+452	common	umcg_swap		sys_umcg_swap
+453	common	umcg_create_group	sys_umcg_create_group
+454	common	umcg_destroy_group	sys_umcg_destroy_group
+455	common	umcg_poll_worker	sys_umcg_poll_worker
+456	common	umcg_run_worker		sys_umcg_run_worker
+457	common	umcg_preempt_worker	sys_umcg_preempt_worker
 
 #
 # Due to a historical design error, certain syscalls are numbered differently

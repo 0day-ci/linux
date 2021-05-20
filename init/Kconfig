@@ -1661,6 +1661,16 @@ config MEMBARRIER
 
 	  If unsure, say Y.
 
+config UMCG
+	bool "Enable User Managed Concurrency Groups API"
+	default n
+	help
+	  Enable UMCG core wait/wake/swap operations as well as UMCG
+	  group/server/worker API. The core API is useful for fast IPC
+	  and context switching, while the group/server/worker API, together
+	  with the core API, form the basis for an in-process M:N userspace
+	  scheduling framework implemented in lib/umcg.
+
 config KALLSYMS
 	bool "Load all symbols for debugging/ksymoops" if EXPERT
 	default y
