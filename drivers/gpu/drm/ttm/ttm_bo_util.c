@@ -31,6 +31,7 @@
 
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
+#include <drm/drm_memcpy.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/dma-buf-map.h>
 #include <linux/io.h>
@@ -185,6 +186,7 @@ void ttm_move_memcpy(struct ttm_buffer_object *bo,
 	struct ttm_resource *old_mem = &bo->mem;
 	struct ttm_resource_manager *old_man = ttm_manager_type(bdev, old_mem->mem_type);
 	struct dma_buf_map old_map, new_map;
+	bool wc_memcpy;
 	pgoff_t i;
 
 	/* Single TTM move. NOP */
@@ -208,11 +210,25 @@ void ttm_move_memcpy(struct ttm_buffer_object *bo,
 		return;
 	}
 
+	wc_memcpy = ((!old_man->use_tt || bo->ttm->caching != ttm_cached) &&
+		     drm_has_memcpy_from_wc());
+
+	/*
+	 * We use some nasty aliasing for drm_memcpy_from_wc, but assuming
+	 * that we can move to memremapping in the not too distant future,
+	 * reduce the fragility for now with a build assert.
+	 */
+	BUILD_BUG_ON(offsetof(typeof(old_map), vaddr) !=
+		     offsetof(typeof(old_map), vaddr_iomem));
+
 	for (i = 0; i < new_mem->num_pages; ++i) {
 		new_iter->ops->kmap_local(new_iter, &new_map, i);
 		old_iter->ops->kmap_local(old_iter, &old_map, i);
 
-		if (!old_map.is_iomem && !new_map.is_iomem) {
+		if (wc_memcpy) {
+			drm_memcpy_from_wc(new_map.vaddr, old_map.vaddr,
+					   PAGE_SIZE);
+		} else if (!old_map.is_iomem && !new_map.is_iomem) {
 			memcpy(new_map.vaddr, old_map.vaddr, PAGE_SIZE);
 		} else if (!old_map.is_iomem) {
 			dma_buf_map_memcpy_to(&new_map, old_map.vaddr,
