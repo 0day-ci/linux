@@ -2032,6 +2032,23 @@ static inline bool more_used(const struct vring_virtqueue *vq)
 	return vq->packed_ring ? more_used_packed(vq) : more_used_split(vq);
 }
 
+/**
+ * virtqueue_more_used - check if there are used buffers pending
+ * @_vq: the struct virtqueue we're talking about.
+ *
+ * Returns true if there are used buffers, false otherwise. May be called at
+ * the same time as other virtqueue operations, but actually calling
+ * virtqueue_get_buf() requires serialization so be mindful of the race between
+ * calling virtqueue_more_used() and virtqueue_get_buf().
+ */
+bool virtqueue_more_used(const struct virtqueue *_vq)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+
+	return more_used(vq);
+}
+EXPORT_SYMBOL_GPL(virtqueue_more_used);
+
 irqreturn_t vring_interrupt(int irq, void *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);

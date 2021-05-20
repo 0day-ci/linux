@@ -63,6 +63,8 @@ bool virtqueue_kick_prepare(struct virtqueue *vq);
 
 bool virtqueue_notify(struct virtqueue *vq);
 
+bool virtqueue_more_used(const struct virtqueue *vq);
+
 void *virtqueue_get_buf(struct virtqueue *vq, unsigned int *len);
 
 void *virtqueue_get_buf_ctx(struct virtqueue *vq, unsigned int *len,
