@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-/**
+/*
  * file phonet.h
  *
  * Phonet sockets kernel interface
