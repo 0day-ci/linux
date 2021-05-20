@@ -305,15 +305,15 @@ static irqreturn_t fsl_msi_cascade(int irq, void *data)
 	}
 
 	while (msir_value) {
+		int err;
 		intr_index = ffs(msir_value) - 1;
 
-		cascade_irq = irq_linear_revmap(msi_data->irqhost,
+		err = generic_handle_domain_irq(msi_data->irqhost,
 				msi_hwirq(msi_data, msir_index,
 					  intr_index + have_shift));
-		if (cascade_irq) {
-			generic_handle_irq(cascade_irq);
+		if (!err)
 			ret = IRQ_HANDLED;
-		}
+
 		have_shift += intr_index + 1;
 		msir_value = msir_value >> (intr_index + 1);
 	}
