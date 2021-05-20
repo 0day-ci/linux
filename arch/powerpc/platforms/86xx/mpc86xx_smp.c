@@ -83,7 +83,7 @@ smp_86xx_kick_cpu(int nr)
 		mdelay(1);
 
 	/* Restore the exception vector */
-	patch_instruction((struct ppc_inst *)vector, ppc_inst(save_vector));
+	patch_instruction(vector, ppc_inst(save_vector));
 
 	local_irq_restore(flags);
 
