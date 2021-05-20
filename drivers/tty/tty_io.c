@@ -765,7 +765,7 @@ int tty_hung_up_p(struct file *filp)
 EXPORT_SYMBOL(tty_hung_up_p);
 
 /**
- *	stop_tty	-	propagate flow control
+ *	__stop_tty	-	propagate flow control
  *	@tty: tty to stop
  *
  *	Perform flow control to the driver. May be called
@@ -801,7 +801,7 @@ void stop_tty(struct tty_struct *tty)
 EXPORT_SYMBOL(stop_tty);
 
 /**
- *	start_tty	-	propagate flow control
+ *	__start_tty	-	propagate flow control
  *	@tty: tty to start
  *
  *	Start a tty that has been stopped if at all possible. If this
@@ -912,12 +912,8 @@ static int iterate_tty_read(struct tty_ldisc *ld, struct tty_struct *tty,
 }
 
 
-/**
+/*
  *	tty_read	-	read method for tty device files
- *	@file: pointer to tty file
- *	@buf: user buffer
- *	@count: size of user buffer
- *	@ppos: unused
  *
  *	Perform the read system call function on this terminal device. Checks
  *	for hung up devices before calling the line discipline method.
@@ -1095,12 +1091,9 @@ void tty_write_message(struct tty_struct *tty, char *msg)
 }
 
 
-/**
+/*
  *	tty_write		-	write method for tty device file
  *	@file: tty file pointer
- *	@buf: user data to write
- *	@count: bytes to write
- *	@ppos: unused
  *
  *	Write data to a tty device via the line discipline.
  *
