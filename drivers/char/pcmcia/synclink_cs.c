@@ -4054,11 +4054,12 @@ static int hdlcdev_close(struct net_device *dev)
 }
 
 /**
- * called by network layer to process IOCTL call to network device
+ * hdlcdev_ioctl() - called by network layer to process IOCTL call
+ *                   to network device
  *
- * dev  pointer to network device structure
- * ifr  pointer to network interface request structure
- * cmd  IOCTL command code
+ * @dev:  pointer to network device structure
+ * @ifr:  pointer to network interface request structure
+ * @cmd:  IOCTL command code
  *
  * returns 0 if success, otherwise error code
  */
@@ -4165,7 +4166,8 @@ static int hdlcdev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  * hdlcdev_tx_timeout() - called by network layer when transmit timeout
  *                        is detected
  *
- * @dev:  pointer to network device structure
+ * @dev:      pointer to network device structure
+ * @txqueue:  unused
  */
 static void hdlcdev_tx_timeout(struct net_device *dev, unsigned int txqueue)
 {
