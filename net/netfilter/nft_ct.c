@@ -1217,17 +1217,22 @@ static void nft_ct_expect_obj_eval(struct nft_object *obj,
 	struct nf_conn *ct;
 
 	ct = nf_ct_get(pkt->skb, &ctinfo);
-	if (!ct || ctinfo == IP_CT_UNTRACKED) {
+	if (!ct || nf_ct_is_template(ct)) {
 		regs->verdict.code = NFT_BREAK;
 		return;
 	}
 	dir = CTINFO2DIR(ctinfo);
 
 	help = nfct_help(ct);
-	if (!help)
+	if (!help && !nf_ct_is_confirmed(ct)) {
 		help = nf_ct_helper_ext_add(ct, GFP_ATOMIC);
+		if (!help) {
+			regs->verdict.code = NF_DROP;
+			return;
+		}
+	}
 	if (!help) {
-		regs->verdict.code = NF_DROP;
+		regs->verdict.code = NFT_BREAK;
 		return;
 	}
 
