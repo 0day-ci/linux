@@ -313,6 +313,18 @@ static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
 	seq_printf(s, "%zx %08x %s ", pa, val, DRIVER_NAME);
 }
 
+static int pcs_pin_dbg_set(struct pinctrl_dev *pctldev, unsigned int pin,
+			   unsigned int val)
+{
+	struct pcs_device *pcs;
+	unsigned int mux_bytes;
+
+	pcs = pinctrl_dev_get_drvdata(pctldev);
+	mux_bytes = pcs->width / BITS_PER_BYTE;
+	pcs->write(val, pcs->base + pin * mux_bytes);
+	return 0;
+}
+
 static void pcs_dt_free_map(struct pinctrl_dev *pctldev,
 				struct pinctrl_map *map, unsigned num_maps)
 {
@@ -331,6 +343,7 @@ static const struct pinctrl_ops pcs_pinctrl_ops = {
 	.get_group_name = pinctrl_generic_get_group_name,
 	.get_group_pins = pinctrl_generic_get_group_pins,
 	.pin_dbg_show = pcs_pin_dbg_show,
+	.pin_dbg_set = pcs_pin_dbg_set,
 	.dt_node_to_map = pcs_dt_node_to_map,
 	.dt_free_map = pcs_dt_free_map,
 };
