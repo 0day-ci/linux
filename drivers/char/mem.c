@@ -39,6 +39,8 @@
 #define DEVMEM_MINOR	1
 #define DEVPORT_MINOR	4
 
+void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
+
 static inline unsigned long size_inside_page(unsigned long start,
 					     unsigned long size)
 {
