@@ -69,10 +69,13 @@ static inline void ptrauth_keys_init_user(struct ptrauth_keys_user *keys)
 	ptrauth_keys_install_user(keys);
 }
 
-static __always_inline void ptrauth_keys_init_kernel(struct ptrauth_keys_kernel *keys)
+static __always_inline void
+ptrauth_keys_init_kernel(struct ptrauth_keys_kernel *keys)
 {
-	if (system_supports_address_auth())
-		get_random_bytes(&keys->apia, sizeof(keys->apia));
+	if (keys->apia.lo == 0 && keys->apia.hi == 0) {
+		if (system_supports_address_auth())
+			get_random_bytes(&keys->apia, sizeof(keys->apia));
+	}
 }
 
 static __always_inline void ptrauth_keys_switch_kernel(struct ptrauth_keys_kernel *keys)
