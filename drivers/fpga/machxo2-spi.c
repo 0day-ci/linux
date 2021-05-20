@@ -350,10 +350,10 @@ fail:
 }
 
 static const struct fpga_manager_ops machxo2_ops = {
-	.state = machxo2_spi_state,
-	.write_init = machxo2_write_init,
-	.write = machxo2_write,
-	.write_complete = machxo2_write_complete,
+	.state                   = machxo2_spi_state,
+	.reconfig.write_init     = machxo2_write_init,
+	.reconfig.write          = machxo2_write,
+	.reconfig.write_complete = machxo2_write_complete,
 };
 
 static int machxo2_spi_probe(struct spi_device *spi)

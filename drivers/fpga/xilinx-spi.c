@@ -214,10 +214,10 @@ static int xilinx_spi_write_complete(struct fpga_manager *mgr,
 }
 
 static const struct fpga_manager_ops xilinx_spi_ops = {
-	.state = xilinx_spi_state,
-	.write_init = xilinx_spi_write_init,
-	.write = xilinx_spi_write,
-	.write_complete = xilinx_spi_write_complete,
+	.state                   = xilinx_spi_state,
+	.reconfig.write_init     = xilinx_spi_write_init,
+	.reconfig.write          = xilinx_spi_write,
+	.reconfig.write_complete = xilinx_spi_write_complete,
 };
 
 static int xilinx_spi_probe(struct spi_device *spi)

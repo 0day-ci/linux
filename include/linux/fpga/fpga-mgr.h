@@ -106,14 +106,29 @@ struct fpga_image_info {
 };
 
 /**
- * struct fpga_manager_ops - ops for low level fpga manager drivers
- * @initial_header_size: Maximum number of bytes that should be passed into write_init
- * @state: returns an enum value of the FPGA's state
- * @status: returns status of the FPGA, including reconfiguration error code
+ * struct fpga_manager_update_ops - ops updating fpga
  * @write_init: prepare the FPGA to receive confuration data
  * @write: write count bytes of configuration data to the FPGA
  * @write_sg: write the scatter list of configuration data to the FPGA
  * @write_complete: set FPGA to operating state after writing is done
+ */
+struct fpga_manager_update_ops {
+	int (*write_init)(struct fpga_manager *mgr,
+			  struct fpga_image_info *info,
+			  const char *buf, size_t count);
+	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
+	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+	int (*write_complete)(struct fpga_manager *mgr,
+			      struct fpga_image_info *info);
+};
+
+/**
+ * struct fpga_manager_ops - ops for low level fpga manager drivers
+ * @initial_header_size: Maximum number of bytes that should be passed into write_init
+ * @state: returns an enum value of the FPGA's state
+ * @status: returns status of the FPGA, including reconfiguration error code
+ * @partial_update: ops for doing partial reconfiguration
+ * @full_update: ops for doing a full card update, user,shell,fw ie. the works
  * @fpga_remove: optional: Set FPGA into a specific state during driver remove
  * @groups: optional attribute groups.
  *
@@ -125,13 +140,8 @@ struct fpga_manager_ops {
 	size_t initial_header_size;
 	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
 	u64 (*status)(struct fpga_manager *mgr);
-	int (*write_init)(struct fpga_manager *mgr,
-			  struct fpga_image_info *info,
-			  const char *buf, size_t count);
-	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
-	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
-	int (*write_complete)(struct fpga_manager *mgr,
-			      struct fpga_image_info *info);
+	struct fpga_manager_update_ops reconfig;
+	struct fpga_manager_update_ops reimage;
 	void (*fpga_remove)(struct fpga_manager *mgr);
 	const struct attribute_group **groups;
 };

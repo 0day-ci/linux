@@ -394,10 +394,10 @@ static enum fpga_mgr_states s10_ops_state(struct fpga_manager *mgr)
 }
 
 static const struct fpga_manager_ops s10_ops = {
-	.state = s10_ops_state,
-	.write_init = s10_ops_write_init,
-	.write = s10_ops_write,
-	.write_complete = s10_ops_write_complete,
+	.state                           = s10_ops_state,
+	.partial_reconfig.write_init     = s10_ops_write_init,
+	.partial_reconfig.write          = s10_ops_write,
+	.partial_reconfig.write_complete = s10_ops_write_complete,
 };
 
 static int s10_probe(struct platform_device *pdev)

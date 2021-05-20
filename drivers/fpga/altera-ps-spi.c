@@ -231,10 +231,10 @@ static int altera_ps_write_complete(struct fpga_manager *mgr,
 }
 
 static const struct fpga_manager_ops altera_ps_ops = {
-	.state = altera_ps_state,
-	.write_init = altera_ps_write_init,
-	.write = altera_ps_write,
-	.write_complete = altera_ps_write_complete,
+	.state                   = altera_ps_state,
+	.reconfig.write_init     = altera_ps_write_init,
+	.reconfig.write          = altera_ps_write,
+	.reconfig.write_complete = altera_ps_write_complete,
 };
 
 static const struct altera_ps_data *id_to_data(const struct spi_device_id *id)
