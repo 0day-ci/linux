@@ -101,6 +101,86 @@ umcg_tid umcg_register_core_task(intptr_t tag)
 	return umcg_task_tls->self;
 }
 
+umcg_tid umcg_register_worker(umcg_t group_id, intptr_t tag)
+{
+	int ret;
+	struct umcg_group *group;
+
+	if (group_id == UMCG_NONE) {
+		errno = EINVAL;
+		return UMCG_NONE;
+	}
+
+	if (umcg_task_tls != NULL) {
+		errno = EINVAL;
+		return UMCG_NONE;
+	}
+
+	group = (struct umcg_group *)group_id;
+
+	umcg_task_tls = malloc(sizeof(struct umcg_task_tls));
+	if (!umcg_task_tls) {
+		errno = ENOMEM;
+		return UMCG_NONE;
+	}
+
+	umcg_task_tls->umcg_task.state = UMCG_TASK_NONE;
+	umcg_task_tls->self = (umcg_tid)&umcg_task_tls;
+	umcg_task_tls->tag = tag;
+	umcg_task_tls->tid = gettid();
+
+	ret = sys_umcg_register_task(umcg_api_version, UMCG_REGISTER_WORKER,
+			group->group_id, &umcg_task_tls->umcg_task);
+	if (ret) {
+		free(umcg_task_tls);
+		umcg_task_tls = NULL;
+		errno = ret;
+		return UMCG_NONE;
+	}
+
+	return umcg_task_tls->self;
+}
+
+umcg_tid umcg_register_server(umcg_t group_id, intptr_t tag)
+{
+	int ret;
+	struct umcg_group *group;
+
+	if (group_id == UMCG_NONE) {
+		errno = EINVAL;
+		return UMCG_NONE;
+	}
+
+	if (umcg_task_tls != NULL) {
+		errno = EINVAL;
+		return UMCG_NONE;
+	}
+
+	group = (struct umcg_group *)group_id;
+
+	umcg_task_tls = malloc(sizeof(struct umcg_task_tls));
+	if (!umcg_task_tls) {
+		errno = ENOMEM;
+		return UMCG_NONE;
+	}
+
+	umcg_task_tls->umcg_task.state = UMCG_TASK_NONE;
+	umcg_task_tls->self = (umcg_tid)&umcg_task_tls;
+	umcg_task_tls->tag = tag;
+	umcg_task_tls->tid = gettid();
+
+	ret = sys_umcg_register_task(umcg_api_version, UMCG_REGISTER_SERVER,
+			group->group_id, &umcg_task_tls->umcg_task);
+	if (ret) {
+		free(umcg_task_tls);
+		umcg_task_tls = NULL;
+		errno = ret;
+		return UMCG_NONE;
+	}
+
+	return umcg_task_tls->self;
+}
+
 int umcg_unregister_task(void)
 {
 	int ret;
@@ -347,4 +427,146 @@ again:
 		return umcg_do_wait(timeout);
 
 	return 0;
+}
+
+umcg_t umcg_create_group(uint32_t flags)
+{
+	int res = sys_umcg_create_group(umcg_api_version, flags);
+	struct umcg_group *group;
+
+	if (res < 0) {
+		errno = -res;
+		return -1;
+	}
+
+	group = malloc(sizeof(struct umcg_group));
+	if (!group) {
+		errno = ENOMEM;
+		return UMCG_NONE;
+	}
+
+	group->group_id = res;
+	return (intptr_t)group;
+}
+
+int umcg_destroy_group(umcg_t umcg)
+{
+	int res;
+	struct umcg_group *group = (struct umcg_group *)umcg;
+
+	res = sys_umcg_destroy_group(group->group_id);
+	if (res) {
+		errno = -res;
+		return -1;
+	}
+
+	free(group);
+	return 0;
+}
+
+umcg_tid umcg_poll_worker(void)
+{
+	struct umcg_task *server_ut = &umcg_task_tls->umcg_task;
+	struct umcg_task *worker_ut;
+	uint32_t expected_state;
+	int ret;
+
+	expected_state = UMCG_TASK_PROCESSING;
+	if (!atomic_compare_exchange_strong_explicit(&server_ut->state,
+			&expected_state, UMCG_TASK_POLLING,
+			memory_order_seq_cst, memory_order_seq_cst)) {
+		fprintf(stderr, "umcg_poll_worker: wrong server state before: %u\n",
+				expected_state);
+		exit(1);
+		return UMCG_NONE;
+	}
+	ret = sys_umcg_poll_worker(0, &worker_ut);
+
+	expected_state = UMCG_TASK_POLLING;
+	if (!atomic_compare_exchange_strong_explicit(&server_ut->state,
+			&expected_state, UMCG_TASK_PROCESSING,
+			memory_order_seq_cst, memory_order_seq_cst)) {
+		fprintf(stderr, "umcg_poll_worker: wrong server state after: %u\n",
+				expected_state);
+		exit(1);
+		return UMCG_NONE;
+	}
+
+	if (ret) {
+		fprintf(stderr, "sys_umcg_poll_worker: unexpected result %d\n",
+				errno);
+		exit(1);
+		return UMCG_NONE;
+	}
+
+	return umcg_task_to_utid(worker_ut);
+}
+
+umcg_tid umcg_run_worker(umcg_tid worker)
+{
+	struct umcg_task_tls *worker_utls;
+	struct umcg_task *server_ut = &umcg_task_tls->umcg_task;
+	struct umcg_task *worker_ut;
+	uint32_t expected_state;
+	int ret;
+
+	worker_utls = atomic_load_explicit((struct umcg_task_tls **)worker,
+			memory_order_seq_cst);
+	if (!worker_utls)
+		return UMCG_NONE;
+
+	worker_ut = &worker_utls->umcg_task;
+
+	expected_state = UMCG_TASK_RUNNABLE;
+	if (!atomic_compare_exchange_strong_explicit(&worker_ut->state,
+			&expected_state, UMCG_TASK_RUNNING,
+			memory_order_seq_cst, memory_order_seq_cst)) {
+		fprintf(stderr, "umcg_run_worker: wrong worker state: %u\n",
+				expected_state);
+		exit(1);
+		return UMCG_NONE;
+	}
+
+	expected_state = UMCG_TASK_PROCESSING;
+	if (!atomic_compare_exchange_strong_explicit(&server_ut->state,
+			&expected_state, UMCG_TASK_SERVING,
+			memory_order_seq_cst, memory_order_seq_cst)) {
+		fprintf(stderr, "umcg_run_worker: wrong server state: %u\n",
+				expected_state);
+		exit(1);
+		return UMCG_NONE;
+	}
+
+again:
+	ret = sys_umcg_run_worker(0, worker_utls->tid, &worker_ut);
+	if (ret && errno == EAGAIN)
+		goto again;
+
+	if (ret) {
+		fprintf(stderr, "umcg_run_worker failed: %d %d\n", ret, errno);
+		return UMCG_NONE;
+	}
+
+	expected_state = UMCG_TASK_SERVING;
+	if (!atomic_compare_exchange_strong_explicit(&server_ut->state,
+			&expected_state, UMCG_TASK_PROCESSING,
+			memory_order_seq_cst, memory_order_seq_cst)) {
+		fprintf(stderr, "umcg_run_worker: wrong server state: %u\n",
+				expected_state);
+		exit(1);
+		return UMCG_NONE;
+	}
+
+	return umcg_task_to_utid(worker_ut);
+}
+
+uint32_t umcg_get_task_state(umcg_tid task)
+{
+	struct umcg_task_tls *utls = atomic_load_explicit(
+			(struct umcg_task_tls **)task, memory_order_seq_cst);
+
+	if (!utls)
+		return UMCG_TASK_NONE;
+
+	return atomic_load_explicit(&utls->umcg_task.state, memory_order_relaxed);
 }

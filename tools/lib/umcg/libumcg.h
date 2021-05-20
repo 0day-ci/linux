@@ -49,6 +49,28 @@ static int sys_umcg_swap(uint32_t wake_flags, uint32_t next_tid,
 			wait_flags, timeout);
 }
 
+static int32_t sys_umcg_create_group(uint32_t api_version, uint32_t flags)
+{
+	return syscall(__NR_umcg_create_group, api_version, flags);
+}
+
+static int sys_umcg_destroy_group(int32_t group_id)
+{
+	return syscall(__NR_umcg_destroy_group, group_id);
+}
+
+static int sys_umcg_poll_worker(uint32_t flags, struct umcg_task **ut)
+{
+	return syscall(__NR_umcg_poll_worker, flags, ut);
+}
+
+static int sys_umcg_run_worker(uint32_t flags, uint32_t worker_tid,
+		struct umcg_task **ut)
+{
+	return syscall(__NR_umcg_run_worker, flags, worker_tid, ut);
+}
+
+typedef intptr_t umcg_t;   /* UMCG group ID. */
 typedef intptr_t umcg_tid; /* UMCG thread ID. */
 
 #define UMCG_NONE	(0)
@@ -87,6 +109,28 @@ intptr_t umcg_get_task_tag(umcg_tid utid);
  *                 to match the value returned by umcg_get_utid).
  */
 umcg_tid umcg_register_core_task(intptr_t tag);
+
+/**
+ * umcg_register_worker - register the current thread as a UMCG worker
+ * @group_id:      The ID of the UMCG group the thread should join.
+ *
+ * Return:
+ * UMCG_NONE     - an error occurred. Check errno.
+ * != UMCG_NONE  - the ID of the thread to be used with UMCG API (guaranteed
+ *                 to match the value returned by umcg_get_utid).
+ */
+umcg_tid umcg_register_worker(umcg_t group_id, intptr_t tag);
+
+/**
+ * umcg_register_server - register the current thread as a UMCG server
+ * @group_id:      The ID of the UMCG group the thread should join.
+ *
+ * Return:
+ * UMCG_NONE     - an error occurred. Check errno.
+ * != UMCG_NONE  - the ID of the thread to be used with UMCG API (guaranteed
+ *                 to match the value returned by umcg_get_utid).
+ */
+umcg_tid umcg_register_server(umcg_t group_id, intptr_t tag);
 
 /**
  * umcg_unregister_task - unregister the current thread
@@ -150,5 +194,69 @@ int umcg_wake(umcg_tid next);
  * but may do a synchronous context switch into @next on the current CPU.
  */
 int umcg_swap(umcg_tid next, const struct timespec *timeout);
+
+/**
+ * umcg_create_group - create a UMCG group
+ * @flags:             Reserved.
+ *
+ * UMCG groups have worker and server threads.
+ *
+ * Worker threads are either RUNNABLE/RUNNING "on behalf" of server threads
+ * (see umcg_run_worker), or are BLOCKED/UNBLOCKED. A worker thread can be
+ * running only if it is attached to a server thread (interrupts can
+ * complicate the matter - TBD).
+ *
+ * Server threads are either blocked while running worker threads or are
+ * blocked waiting for available (=UNBLOCKED) workers. A server thread
+ * can "run" only one worker thread.
+ *
+ * Return:
+ * UMCG_NONE     - an error occurred. Check errno.
+ * != UMCG_NONE  - the ID of the group, to be used in e.g. umcg_register.
+ */
+umcg_t umcg_create_group(uint32_t flags);
+
+/**
+ * umcg_destroy_group - destroy a UMCG group
+ * @umcg:               ID of the group to destroy
+ *
+ * The group must be empty (no server or worker threads).
+ *
+ * Return:
+ * 0            - Ok
+ * -1           - an error occurred. Check errno.
+ *                errno == EAGAIN: the group has server or worker threads
+ */
+int umcg_destroy_group(umcg_t umcg);
+
+/**
+ * umcg_poll_worker - wait for the first available UNBLOCKED worker
+ *
+ * The current thread must be a UMCG server. If there is a list/queue of
+ * waiting UNBLOCKED workers in the server's group, umcg_poll_worker
+ * picks the longest waiting one; if there are no UNBLOCKED workers, the
+ * current thread sleeps in the polling queue.
+ *
+ * Return:
+ * UMCG_NONE         - an error occurred; check errno;
+ * != UMCG_NONE      - a RUNNABLE worker.
+ */
+umcg_tid umcg_poll_worker(void);
+
+/**
+ * umcg_run_worker - run @worker as a UMCG server
+ * @worker:          the ID of a RUNNABLE worker to run
+ *
+ * The current thread must be a UMCG "server".
+ *
+ * Return:
+ * UMCG_NONE    - if errno == 0, the last worker the server was running
+ *                unregistered itself; if errno != 0, an error occurred
+ * != UMCG_NONE - the ID of the last worker the server was running before
+ *                the worker was blocked or preempted.
+ */
+umcg_tid umcg_run_worker(umcg_tid worker);
+
+uint32_t umcg_get_task_state(umcg_tid task);
 
 #endif  /* __LIBUMCG_H */
