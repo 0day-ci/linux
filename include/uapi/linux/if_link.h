@@ -1251,4 +1251,14 @@ struct ifla_rmnet_flags {
 	__u32	mask;
 };
 
+/* IOSM Section */
+
+enum {
+	IFLA_IOSM_UNSPEC,
+	IFLA_IOSM_IF_ID,
+	__IFLA_IOSM_MAX,
+};
+
+#define IFLA_IOSM_MAX  (__IFLA_IOSM_MAX - 1)
+
 #endif /* _UAPI_LINUX_IF_LINK_H */
