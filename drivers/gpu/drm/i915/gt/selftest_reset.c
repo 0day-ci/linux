@@ -5,9 +5,10 @@
 
 #include <linux/crc32.h>
 
+#include <drm/drm_memcpy.h>
+
 #include "gem/i915_gem_stolen.h"
 
-#include "i915_memcpy.h"
 #include "i915_selftest.h"
 #include "intel_gpu_commands.h"
 #include "selftests/igt_reset.h"
@@ -99,7 +100,7 @@ __igt_reset_stolen(struct intel_gt *gt,
 			memset_io(s, STACK_MAGIC, PAGE_SIZE);
 
 		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
+		if (drm_memcpy_from_wc(tmp, in, PAGE_SIZE))
 			in = tmp;
 		crc[page] = crc32_le(0, in, PAGE_SIZE);
 
@@ -135,7 +136,7 @@ __igt_reset_stolen(struct intel_gt *gt,
 				      PAGE_SIZE);
 
 		in = (void __force *)s;
-		if (i915_memcpy_from_wc(tmp, in, PAGE_SIZE))
+		if (drm_memcpy_from_wc(tmp, in, PAGE_SIZE))
 			in = tmp;
 		x = crc32_le(0, in, PAGE_SIZE);
 

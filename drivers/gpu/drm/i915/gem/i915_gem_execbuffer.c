@@ -10,6 +10,7 @@
 #include <linux/uaccess.h>
 
 #include <drm/drm_syncobj.h>
+#include <drm/drm_memcpy.h>
 
 #include "display/intel_frontbuffer.h"
 
@@ -28,7 +29,6 @@
 #include "i915_sw_fence_work.h"
 #include "i915_trace.h"
 #include "i915_user_extensions.h"
-#include "i915_memcpy.h"
 
 struct eb_vma {
 	struct i915_vma *vma;
@@ -2503,7 +2503,7 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 		!(batch->cache_coherent & I915_BO_CACHE_COHERENT_FOR_READ);
 
 	pw->batch_map = ERR_PTR(-ENODEV);
-	if (needs_clflush && i915_has_memcpy_from_wc())
+	if (needs_clflush && drm_has_memcpy_from_wc())
 		pw->batch_map = i915_gem_object_pin_map(batch, I915_MAP_WC);
 
 	if (IS_ERR(pw->batch_map)) {

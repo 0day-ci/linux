@@ -24,12 +24,12 @@
  *    Brad Volkin <bradley.d.volkin@intel.com>
  *
  */
+#include <drm/drm_memcpy.h>
 
 #include "gt/intel_engine.h"
 #include "gt/intel_gpu_commands.h"
 
 #include "i915_drv.h"
-#include "i915_memcpy.h"
 
 /**
  * DOC: batch buffer command parser
@@ -1152,7 +1152,7 @@ static u32 *copy_batch(struct drm_i915_gem_object *dst_obj,
 
 	if (src) {
 		GEM_BUG_ON(!needs_clflush);
-		i915_unaligned_memcpy_from_wc(dst, src + offset, length);
+		drm_unaligned_memcpy_from_wc(dst, src + offset, length);
 	} else {
 		struct scatterlist *sg;
 		void *ptr;
