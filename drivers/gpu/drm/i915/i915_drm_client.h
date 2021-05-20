@@ -98,6 +98,10 @@ i915_drm_client_pid(const struct i915_drm_client *client)
 	return __i915_drm_client_name(client)->pid;
 }
 
+#ifdef CONFIG_PROC_FS
+void i915_drm_client_fdinfo(struct seq_file *m, struct file *f);
+#endif
+
 void i915_drm_clients_fini(struct i915_drm_clients *clients);
 
 #endif /* !__I915_DRM_CLIENT_H__ */
