@@ -1620,6 +1620,53 @@ EXPORT_SYMBOL_GPL(pinctrl_pm_select_idle_state);
 
 #ifdef CONFIG_DEBUG_FS
 
+static ssize_t pinctrl_pins_write(struct file *file,
+				  const char __user *user_buf, size_t count,
+				  loff_t *ppos)
+{
+	struct seq_file	*s = file->private_data;
+	struct pinctrl_dev *pctldev = s->private;
+	const struct pinctrl_ops *ops = pctldev->desc->pctlops;
+	char buf[32];
+	char *c = &buf[0];
+	char *token;
+	int ret;
+	unsigned int i, pin, val;
+
+	if (!ops->pin_dbg_set)
+		return -EFAULT;
+
+	ret = strncpy_from_user(buf, user_buf, sizeof(buf));
+	if (ret == 0 || ret == sizeof(buf))
+		ret = -ERANGE;
+
+	if (ret < 0)
+		return ret;
+
+	token = strsep(&c, " ");
+	ret = kstrtouint(token, 0, &pin);
+	if (ret)
+		return ret;
+
+	token = strsep(&c, " ");
+	ret = kstrtouint(token, 0, &val);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < pctldev->desc->npins; i++) {
+		if (pin != pctldev->desc->pins[i].number)
+			continue;
+
+		ret = ops->pin_dbg_set(pctldev, pin, val);
+		if (ret)
+			return ret;
+
+		return count;
+	}
+
+	return -EINVAL;
+}
+
 static int pinctrl_pins_show(struct seq_file *s, void *what)
 {
 	struct pinctrl_dev *pctldev = s->private;
@@ -1677,7 +1724,11 @@ static int pinctrl_pins_show(struct seq_file *s, void *what)
 
 	return 0;
 }
-DEFINE_SHOW_ATTRIBUTE(pinctrl_pins);
+
+static int pinctrl_pins_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pinctrl_pins_show, inode->i_private);
+}
 
 static int pinctrl_groups_show(struct seq_file *s, void *what)
 {
@@ -1886,6 +1937,14 @@ static int pinctrl_show(struct seq_file *s, void *what)
 }
 DEFINE_SHOW_ATTRIBUTE(pinctrl);
 
+static const struct file_operations pinctrl_pins_fops = {
+	.open		= pinctrl_pins_open,
+	.read		= seq_read,
+	.write		= pinctrl_pins_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static struct dentry *debugfs_root;
 
 static void pinctrl_init_device_debugfs(struct pinctrl_dev *pctldev)
@@ -1915,7 +1974,7 @@ static void pinctrl_init_device_debugfs(struct pinctrl_dev *pctldev)
 			dev_name(pctldev->dev));
 		return;
 	}
-	debugfs_create_file("pins", 0444,
+	debugfs_create_file("pins", 0644,
 			    device_root, pctldev, &pinctrl_pins_fops);
 	debugfs_create_file("pingroups", 0444,
 			    device_root, pctldev, &pinctrl_groups_fops);

@@ -75,6 +75,8 @@ struct pinctrl_gpio_range {
  *	group selector @pins, and the size of the array in @num_pins
  * @pin_dbg_show: optional debugfs display hook that will provide per-device
  *	info for a certain pin in debugfs
+ * @pin_dbg_set: optional debugfs set hook that will write per-device pinmux
+ *	register for a certain pin in debugfs
  * @dt_node_to_map: parse a device tree "pin configuration node", and create
  *	mapping table entries for it. These are returned through the @map and
  *	@num_maps output parameters. This function is optional, and may be
@@ -95,6 +97,8 @@ struct pinctrl_ops {
 			       unsigned *num_pins);
 	void (*pin_dbg_show) (struct pinctrl_dev *pctldev, struct seq_file *s,
 			  unsigned offset);
+	int (*pin_dbg_set) (struct pinctrl_dev *pctldev, unsigned int offset,
+			    unsigned int val);
 	int (*dt_node_to_map) (struct pinctrl_dev *pctldev,
 			       struct device_node *np_config,
 			       struct pinctrl_map **map, unsigned *num_maps);
