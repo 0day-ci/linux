@@ -65,7 +65,9 @@ bool ntfs_are_names_equal(const ntfschar *s1, size_t s1_len,
 /**
  * ntfs_collate_names - collate two Unicode names
  * @name1:	first Unicode name to compare
+ * @name1_len:	length of @name1
  * @name2:	second Unicode name to compare
+ * @name2_len:	length of @name2
  * @err_val:	if @name1 contains an invalid character return this value
  * @ic:		either CASE_SENSITIVE or IGNORE_CASE
  * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
