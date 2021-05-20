@@ -134,6 +134,13 @@ int __weak arch_asym_cpu_priority(int cpu)
  * (default: 5 msec, units: microseconds)
  */
 unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
+
+/*
+ * A switch for cfs bandwidth burst.
+ *
+ * (default: 1, enabled)
+ */
+unsigned int sysctl_sched_cfs_bw_burst_enabled = 1;
 #endif
 
 static inline void update_load_add(struct load_weight *lw, unsigned long inc)
@@ -4582,8 +4589,16 @@ static inline u64 sched_cfs_bandwidth_slice(void)
  */
 void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 {
-	if (cfs_b->quota != RUNTIME_INF)
+	if (unlikely(cfs_b->quota == RUNTIME_INF))
+		return;
+
+	if (!sysctl_sched_cfs_bw_burst_enabled) {
 		cfs_b->runtime = cfs_b->quota;
+		return;
+	}
+
+	cfs_b->runtime += cfs_b->quota;
+	cfs_b->runtime = min(cfs_b->runtime, cfs_b->quota + cfs_b->burst);
 }
 
 static inline struct cfs_bandwidth *tg_cfs_bandwidth(struct task_group *tg)
@@ -4605,6 +4620,9 @@ static int __assign_cfs_rq_runtime(struct cfs_bandwidth *cfs_b,
 	if (cfs_b->quota == RUNTIME_INF)
 		amount = min_amount;
 	else {
+		if (!cfs_b->period_active)
+			__refill_cfs_bandwidth_runtime(cfs_b);
+
 		start_cfs_bandwidth(cfs_b);
 
 		if (cfs_b->runtime > 0) {
@@ -5233,6 +5251,7 @@ void init_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 	cfs_b->runtime = 0;
 	cfs_b->quota = RUNTIME_INF;
 	cfs_b->period = ns_to_ktime(default_cfs_period());
+	cfs_b->burst = 0;
 
 	INIT_LIST_HEAD(&cfs_b->throttled_cfs_rq);
 	hrtimer_init(&cfs_b->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_PINNED);
