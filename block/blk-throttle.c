@@ -2170,8 +2170,17 @@ static void throtl_update_latency_buckets(struct throtl_data *td)
 			td->avg_buckets[WRITE][i].latency,
 			td->avg_buckets[WRITE][i].valid);
 }
+
+static inline void throtl_bio_skip_latency(struct bio *bio)
+{
+	bio->bi_issue.value |= BIO_ISSUE_THROTL_SKIP_LATENCY;
+}
 #else
 static inline void throtl_update_latency_buckets(struct throtl_data *td)
+{
+}
+
+static inline void throtl_bio_skip_latency(struct bio *bio)
 {
 }
 #endif
@@ -2187,20 +2196,26 @@ bool blk_throtl_bio(struct bio *bio)
 	bool throttled = false;
 	struct throtl_data *td = tg->td;
 
-	rcu_read_lock();
+	if (!td->track_bio_latency)
+		throtl_bio_skip_latency(bio);
 
 	/* see throtl_charge_bio() */
 	if (bio_flagged(bio, BIO_THROTTLED))
-		goto out;
+		return false;
 
+	rcu_read_lock();
 	if (!cgroup_subsys_on_dfl(io_cgrp_subsys)) {
 		blkg_rwstat_add(&tg->stat_bytes, bio->bi_opf,
 				bio->bi_iter.bi_size);
 		blkg_rwstat_add(&tg->stat_ios, bio->bi_opf, 1);
 	}
 
-	if (!tg->has_rules[rw])
-		goto out;
+
+	if (!tg->has_rules[rw]) {
+		bio_set_flag(bio, BIO_THROTTLED);
+		rcu_read_unlock();
+		return false;
+	}
 
 	spin_lock_irq(&q->queue_lock);
 
@@ -2268,8 +2283,15 @@ again:
 
 	tg->last_low_overflow_time[rw] = jiffies;
 
+	/*
+	 * Once bio was added to throttler's list, we may assess this bio only
+	 * while we hold ->queue_lock, otherwise throttler's thread may modify
+	 * it under our feet.
+	 */
 	td->nr_queued[rw]++;
 	throtl_add_bio_tg(bio, qn, tg);
+	blkcg_bio_issue_init(bio);
+	throtl_bio_skip_latency(bio);
 	throttled = true;
 
 	/*
@@ -2284,15 +2306,12 @@ again:
 	}
 
 out_unlock:
-	spin_unlock_irq(&q->queue_lock);
-out:
-	bio_set_flag(bio, BIO_THROTTLED);
+	if (!bio_flagged(bio, BIO_THROTTLED))
+		bio_set_flag(bio, BIO_THROTTLED);
 
-#ifdef CONFIG_BLK_DEV_THROTTLING_LOW
-	if (throttled || !td->track_bio_latency)
-		bio->bi_issue.value |= BIO_ISSUE_THROTL_SKIP_LATENCY;
-#endif
+	spin_unlock_irq(&q->queue_lock);
 	rcu_read_unlock();
+
 	return throttled;
 }
 

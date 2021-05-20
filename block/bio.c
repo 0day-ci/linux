@@ -273,9 +273,17 @@ void bio_reset(struct bio *bio)
 }
 EXPORT_SYMBOL(bio_reset);
 
+/*
+ * Chained bios must have BIO_CHAIN flag set, see bio_chain().
+ * If this is not true when we break bio_endio() logic,
+ * and ->bi_end_io() will be called multiple times for parent bio
+ * which likely result in use-after-fee and silent data corruption.
+ */
 static struct bio *__bio_chain_endio(struct bio *bio)
 {
 	struct bio *parent = bio->bi_private;
+
+	BUG_ON(!bio_flagged(parent, BIO_CHAIN));
 
 	if (bio->bi_status && !parent->bi_status)
 		parent->bi_status = bio->bi_status;
