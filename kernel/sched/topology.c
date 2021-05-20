@@ -1630,6 +1630,26 @@ static void init_numa_topology_type(void)
 
 #define NR_DISTANCE_VALUES (1 << DISTANCE_BITS)
 
+#ifndef arch_populate_distance_map
+static int arch_populate_distance_map(unsigned long *distance_map)
+{
+	int i, j;
+
+	for (i = 0; i < nr_node_ids; i++) {
+		for (j = 0; j < nr_node_ids; j++) {
+			int distance = node_distance(i, j);
+
+			if (distance < LOCAL_DISTANCE || distance >= NR_DISTANCE_VALUES) {
+				sched_numa_warn("Invalid distance value range");
+				return -1;
+			}
+			bitmap_set(distance_map, distance, 1);
+		}
+	}
+	return 0;
+}
+#endif
+
 void sched_init_numa(void)
 {
 	struct sched_domain_topology_level *tl;
@@ -1646,18 +1666,10 @@ void sched_init_numa(void)
 		return;
 
 	bitmap_zero(distance_map, NR_DISTANCE_VALUES);
-	for (i = 0; i < nr_node_ids; i++) {
-		for (j = 0; j < nr_node_ids; j++) {
-			int distance = node_distance(i, j);
 
-			if (distance < LOCAL_DISTANCE || distance >= NR_DISTANCE_VALUES) {
-				sched_numa_warn("Invalid distance value range");
-				return;
-			}
+	if (arch_populate_distance_map(distance_map))
+		return;
 
-			bitmap_set(distance_map, distance, 1);
-		}
-	}
 	/*
 	 * We can now figure out how many unique distance values there are and
 	 * allocate memory accordingly.
