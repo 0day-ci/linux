@@ -325,6 +325,25 @@
 
 #define DW_HDMI_HDCP22_STATUS			0x08fc
 
+/* id_audio_and_cec_interrupt Registers */
+#define DW_HDMI_AUD_CEC_IEN_CLR			0x0f90
+#define DW_HDMI_AUD_CEC_IEN_SET			0x0f94
+
+#define DW_HDMI_AUD_CEC_ISTS			0x0f98
+#define DW_HDMI_WAKEUPCTRL_ISTS			BIT(22)
+#define DW_HDMI_ERROR_FOLL_ISTS			BIT(21)
+#define DW_HDMI_ERROR_INIT_ISTS			BIT(20)
+#define DW_HDMI_ARBLST_ISTS			BIT(19)
+#define DW_HDMI_NACK_ISTS			BIT(18)
+#define DW_HDMI_EOM_ISTS			BIT(17)
+#define DW_HDMI_DONE_ISTS			BIT(16)
+#define DW_HDMI_SCK_STABLE_ISTS			BIT(1)
+#define DW_HDMI_CTSN_CNT_ISTS			BIT(0)
+
+#define DW_HDMI_AUD_CEC_IEN			0x0f9c
+#define DW_HDMI_AUD_CEC_ICLR			0x0fa0
+#define DW_HDMI_AUD_CEC_ISET			0x0fa4
+
 /* id_mode_detection_interrupt Registers */
 #define DW_HDMI_MD_IEN_CLR			0x0fc0
 #define DW_HDMI_MD_IEN_SET			0x0fc4
@@ -425,6 +444,44 @@
 #define DW_HDMI_DMI_DISABLE_IF			0x0ff4
 #define DW_HDMI_HDMI_ENABLE_MASK		BIT(2)
 #define DW_HDMI_HDMI_ENABLE_OFFSET		2
+
+/* id_cec Registers */
+#define DW_HDMI_CEC_CTRL			0x1f00
+#define DW_HDMI_STANDBY_MASK			BIT(4)
+#define DW_HDMI_STANDBY_OFFSET			4
+#define DW_HDMI_BC_NACK_MASK			BIT(3)
+#define DW_HDMI_BC_NACK_OFFSET			3
+#define DW_HDMI_FRAME_TYP_MASK			GENMASK(2, 1)
+#define DW_HDMI_FRAME_TYP_OFFSET		1
+#define DW_HDMI_SEND_MASK			BIT(0)
+#define DW_HDMI_SEND_OFFSET			0
+
+#define DW_HDMI_CEC_MASK			0x1f08
+#define DW_HDMI_WAKEUP_MASK			BIT(6)
+#define DW_HDMI_WAKEUP_OFFSET			6
+#define DW_HDMI_ERROR_FLOW_MASK			BIT(5)
+#define DW_HDMI_ERROR_FLOW_OFFSET		5
+#define DW_HDMI_ERROR_INITITATOR_MASK		BIT(4)
+#define DW_HDMI_ERROR_INITITATOR_OFFSET		4
+#define DW_HDMI_ARB_LOST_MASK			BIT(3)
+#define DW_HDMI_ARB_LOST_OFFSET			3
+#define DW_HDMI_NACK_MASK			BIT(2)
+#define DW_HDMI_NACK_OFFSET			2
+#define DW_HDMI_EOM_MASK			BIT(1)
+#define DW_HDMI_EOM_OFFSET			1
+#define DW_HDMI_DONE_MASK			BIT(0)
+#define DW_HDMI_DONE_OFFSET			0
+
+#define DW_HDMI_CEC_ADDR_L			0x1f14
+#define DW_HDMI_CEC_ADDR_H			0x1f18
+#define DW_HDMI_CEC_TX_CNT			0x1f1c
+#define DW_HDMI_CEC_RX_CNT			0x1f20
+#define DW_HDMI_CEC_TX_DATA(i)			(0x1f40 + ((i) * 4))
+#define DW_HDMI_CEC_TX_DATA_MAX			16
+#define DW_HDMI_CEC_RX_DATA(i)			(0x1f80 + ((i) * 4))
+#define DW_HDMI_CEC_RX_DATA_MAX			16
+#define DW_HDMI_CEC_LOCK			0x1fc0
+#define DW_HDMI_CEC_WAKEUPCTRL			0x1fc4
 
 /* id_cbus Registers */
 #define DW_HDMI_CBUSIOCTRL			0x3020
