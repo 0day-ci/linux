@@ -1408,6 +1408,11 @@ static int virtio_fs_test_super(struct super_block *sb,
 	struct fuse_mount *fsc_fm = fsc->s_fs_info;
 	struct fuse_mount *sb_fm = get_fuse_mount_super(sb);
 
+
+	/* Skip submounts */
+	if (!list_is_first(&sb_fm->fc_entry, &sb_fm->fc->mounts))
+		return 0;
+
 	return fsc_fm->fc->iq.priv == sb_fm->fc->iq.priv;
 }
 
