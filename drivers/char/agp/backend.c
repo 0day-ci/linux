@@ -60,7 +60,7 @@ EXPORT_SYMBOL(agp_bridge);
 EXPORT_SYMBOL(agp_bridges);
 EXPORT_SYMBOL(agp_find_bridge);
 
-/**
+/*
  *	agp_backend_acquire  -  attempt to acquire an agp backend.
  *
  */
@@ -81,7 +81,7 @@ struct agp_bridge_data *agp_backend_acquire(struct pci_dev *pdev)
 EXPORT_SYMBOL(agp_backend_acquire);
 
 
-/**
+/*
  *	agp_backend_release  -  release the lock on the agp backend.
  *
  *	The caller must insure that the graphics aperture translation table
