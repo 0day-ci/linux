@@ -96,6 +96,15 @@ static struct clock_event_device *tick_get_oneshot_wakeup_device(int cpu)
 	return per_cpu(tick_oneshot_wakeup_device, cpu);
 }
 
+static void tick_oneshot_wakeup_handler(struct clock_event_device *wd)
+{
+	/*
+	 * If we woke up early and the tick was reprogrammed in the
+	 * meantime then this may be spurious but harmless.
+	 */
+	tick_receive_broadcast();
+}
+
 static bool tick_set_oneshot_wakeup_device(struct clock_event_device *newdev,
 					   int cpu)
 {
@@ -116,6 +125,7 @@ static bool tick_set_oneshot_wakeup_device(struct clock_event_device *newdev,
 	if (curdev && newdev->rating <= curdev->rating)
 		return false;
 
+	newdev->event_handler = tick_oneshot_wakeup_handler;
 set_device:
 	per_cpu(tick_oneshot_wakeup_device, cpu) = newdev;
 	return true;
@@ -903,16 +913,42 @@ out:
 	return ret;
 }
 
+static int tick_oneshot_wakeup_control(enum tick_broadcast_state state,
+				       struct tick_device *td,
+				       int cpu)
+{
+	struct clock_event_device *dev, *wd;
+
+	dev = td->evtdev;
+	if (td->mode != TICKDEV_MODE_ONESHOT)
+		return -EINVAL;
+
+	wd = tick_get_oneshot_wakeup_device(cpu);
+	if (!wd)
+		return -ENODEV;
+
+	if (state == TICK_BROADCAST_ENTER) {
+		clockevents_switch_state(dev, CLOCK_EVT_STATE_ONESHOT_STOPPED);
+		clockevents_switch_state(wd, CLOCK_EVT_STATE_ONESHOT);
+		clockevents_program_event(wd, dev->next_event, 1);
+	}
+
+	return 0;
+}
+
 int __tick_broadcast_oneshot_control(enum tick_broadcast_state state)
 {
 	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
 	int cpu = smp_processor_id();
 
+	if (!tick_oneshot_wakeup_control(state, td, cpu))
+		return 0;
+
 	if (tick_broadcast_device.evtdev)
 		return ___tick_broadcast_oneshot_control(state, td, cpu);
 
 	/*
-	 * If there is no broadcast device, tell the caller not
+	 * If there is no broadcast or wakeup device, tell the caller not
 	 * to go into deep idle.
 	 */
 	return -EBUSY;
