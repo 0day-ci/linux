@@ -263,6 +263,9 @@ int ttm_tt_swapout(struct ttm_device *bdev, struct ttm_tt *ttm,
 	struct page *to_page;
 	int i, ret;
 
+	if (!ttm_tt_is_populated(ttm))
+		return 0;
+
 	swap_storage = shmem_file_setup("ttm swap", size, 0);
 	if (IS_ERR(swap_storage)) {
 		pr_err("Failed allocating swap storage\n");
@@ -404,6 +407,7 @@ void ttm_tt_unpopulate(struct ttm_device *bdev, struct ttm_tt *ttm)
 
 	ttm->page_flags &= ~TTM_PAGE_FLAG_PRIV_POPULATED;
 }
+EXPORT_SYMBOL(ttm_tt_unpopulate);
 
 #ifdef CONFIG_DEBUG_FS
 
