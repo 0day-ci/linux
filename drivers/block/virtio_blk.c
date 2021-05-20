@@ -29,6 +29,16 @@ static struct workqueue_struct *virtblk_wq;
 struct virtio_blk_vq {
 	struct virtqueue *vq;
 	spinlock_t lock;
+
+	/* Number of non-REQ_HIPRI requests in flight. Protected by lock. */
+	unsigned int num_lopri;
+
+	/* Number of REQ_HIPRI requests in flight. Protected by lock. */
+	unsigned int num_hipri;
+
+	/* Are vq notifications enabled? Protected by lock. */
+	bool cb_enabled;
+
 	char name[VQ_NAME_LEN];
 } ____cacheline_aligned_in_smp;
 
@@ -171,20 +181,30 @@ static inline void virtblk_request_done(struct request *req)
 	blk_mq_end_request(req, virtblk_result(vbr));
 }
 
-static void virtblk_done(struct virtqueue *vq)
+/* Returns true if one or more requests completed */
+static bool virtblk_complete_requests(struct virtqueue *vq)
 {
 	struct virtio_blk *vblk = vq->vdev->priv;
 	struct virtio_blk_vq *vbq = &vblk->vqs[vq->index];
 	bool req_done = false;
+	bool last_hipri_done = false;
 	struct virtblk_req *vbr;
 	unsigned long flags;
 	unsigned int len;
 
 	spin_lock_irqsave(&vbq->lock, flags);
+
 	do {
-		virtqueue_disable_cb(vq);
+		if (vbq->cb_enabled)
+			virtqueue_disable_cb(vq);
 		while ((vbr = virtqueue_get_buf(vq, &len)) != NULL) {
 			struct request *req = blk_mq_rq_from_pdu(vbr);
+
+			if (req->cmd_flags & REQ_HIPRI) {
+				if (--vbq->num_hipri == 0)
+					last_hipri_done = true;
+			} else
+				vbq->num_lopri--;
 
 			if (likely(!blk_should_fake_timeout(req->q)))
 				blk_mq_complete_request(req);
@@ -192,12 +212,36 @@ static void virtblk_done(struct virtqueue *vq)
 		}
 		if (unlikely(virtqueue_is_broken(vq)))
 			break;
-	} while (!virtqueue_enable_cb(vq));
+
+		/* Enable vq notifications if non-polled requests remain */
+		if (last_hipri_done && vbq->num_lopri > 0) {
+			last_hipri_done = false;
+			vbq->cb_enabled = true;
+		}
+	} while (vbq->cb_enabled && !virtqueue_enable_cb(vq));
 
 	/* In case queue is stopped waiting for more buffers. */
 	if (req_done)
 		blk_mq_start_stopped_hw_queues(vblk->disk->queue, true);
 	spin_unlock_irqrestore(&vbq->lock, flags);
+
+	return req_done;
+}
+
+static int virtblk_poll(struct blk_mq_hw_ctx *hctx)
+{
+	struct virtio_blk *vblk = hctx->queue->queuedata;
+	struct virtqueue *vq = vblk->vqs[hctx->queue_num].vq;
+
+	if (!virtqueue_more_used(vq))
+		return 0;
+
+	return virtblk_complete_requests(vq);
+}
+
+static void virtblk_done(struct virtqueue *vq)
+{
+	virtblk_complete_requests(vq);
 }
 
 static void virtio_commit_rqs(struct blk_mq_hw_ctx *hctx)
@@ -275,6 +319,16 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 	}
 
 	spin_lock_irqsave(&vbq->lock, flags);
+
+	/* Re-enable vq notifications if first req is non-polling */
+	if (!(req->cmd_flags & REQ_HIPRI) &&
+	    vbq->num_lopri == 0 && vbq->num_hipri == 0 &&
+	    !vbq->cb_enabled) {
+		/* Can't return false since there are no in-flight reqs */
+		virtqueue_enable_cb(vbq->vq);
+		vbq->cb_enabled = true;
+	}
+
 	err = virtblk_add_req(vbq->vq, vbr, vbr->sg, num);
 	if (err) {
 		virtqueue_kick(vbq->vq);
@@ -293,6 +347,21 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 			return BLK_STS_IOERR;
 		}
 	}
+
+	/*
+	 * Disable vq notifications when polled reqs are submitted.
+	 *
+	 * The virtqueue lock is held so req is still valid here even if the
+	 * device polls the virtqueue and completes the request before we call
+	 * virtqueue_notify().
+	 */
+	if (req->cmd_flags & REQ_HIPRI) {
+		if (vbq->num_hipri++ == 0 && vbq->cb_enabled) {
+			virtqueue_disable_cb(vbq->vq);
+			vbq->cb_enabled = false;
+		}
+	} else
+		vbq->num_lopri++;
 
 	if (bd->last && virtqueue_kick_prepare(vbq->vq))
 		notify = true;
@@ -533,6 +602,9 @@ static int init_vq(struct virtio_blk *vblk)
 	for (i = 0; i < num_vqs; i++) {
 		spin_lock_init(&vblk->vqs[i].lock);
 		vblk->vqs[i].vq = vqs[i];
+		vblk->vqs[i].num_lopri = 0;
+		vblk->vqs[i].num_hipri = 0;
+		vblk->vqs[i].cb_enabled = true;
 	}
 	vblk->num_vqs = num_vqs;
 
@@ -681,8 +753,16 @@ static int virtblk_map_queues(struct blk_mq_tag_set *set)
 {
 	struct virtio_blk *vblk = set->driver_data;
 
-	return blk_mq_virtio_map_queues(&set->map[HCTX_TYPE_DEFAULT],
-					vblk->vdev, 0);
+	set->map[HCTX_TYPE_DEFAULT].nr_queues = vblk->num_vqs;
+	blk_mq_virtio_map_queues(&set->map[HCTX_TYPE_DEFAULT], vblk->vdev, 0);
+
+	set->map[HCTX_TYPE_READ].nr_queues = 0;
+
+	/* HCTX_TYPE_DEFAULT queues are shared with HCTX_TYPE_POLL */
+	set->map[HCTX_TYPE_POLL].nr_queues = vblk->num_vqs;
+	blk_mq_virtio_map_queues(&set->map[HCTX_TYPE_POLL], vblk->vdev, 0);
+
+	return 0;
 }
 
 static const struct blk_mq_ops virtio_mq_ops = {
@@ -691,6 +771,7 @@ static const struct blk_mq_ops virtio_mq_ops = {
 	.complete	= virtblk_request_done,
 	.init_request	= virtblk_init_request,
 	.map_queues	= virtblk_map_queues,
+	.poll		= virtblk_poll,
 };
 
 static unsigned int virtblk_queue_depth;
@@ -768,6 +849,7 @@ static int virtblk_probe(struct virtio_device *vdev)
 
 	memset(&vblk->tag_set, 0, sizeof(vblk->tag_set));
 	vblk->tag_set.ops = &virtio_mq_ops;
+	vblk->tag_set.nr_maps = 3; /* default, read, and poll */
 	vblk->tag_set.queue_depth = queue_depth;
 	vblk->tag_set.numa_node = NUMA_NO_NODE;
 	vblk->tag_set.flags = BLK_MQ_F_SHOULD_MERGE;
