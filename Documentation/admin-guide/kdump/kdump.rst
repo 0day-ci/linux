@@ -2,7 +2,7 @@
 Documentation for Kdump - The kexec-based Crash Dumping Solution
 ================================================================
 
-This document includes overview, setup and installation, and analysis
+This document includes overview, setup, installation, and analysis
 information.
 
 Overview
@@ -13,12 +13,12 @@ dump of the system kernel's memory needs to be taken (for example, when
 the system panics). The system kernel's memory image is preserved across
 the reboot and is accessible to the dump-capture kernel.
 
-You can use common commands, such as cp and scp, to copy the
-memory image to a dump file on the local disk, or across the network to
-a remote system.
+You can use common commands, such as cp, scp or makedumpfile to copy
+the memory image to a dump file on the local disk, or across the network
+to a remote system.
 
-Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-s390x, arm and arm64 architectures.
+Kdump and kexec are currently supported on the x86/64, ppc64, ia64,
+s390x, arm/64 architectures.
 
 When the system kernel boots, it reserves a small section of memory for
 the dump-capture kernel. This ensures that ongoing Direct Memory Access
@@ -27,12 +27,14 @@ The kexec -p command loads the dump-capture kernel into this reserved
 memory.
 
 On x86 machines, the first 640 KB of physical memory is needed to boot,
-regardless of where the kernel loads. Therefore, kexec backs up this
-region just before rebooting into the dump-capture kernel.
+regardless of where the kernel loads. For simpler handling, the whole
+low 1M is reserved to avoid any later kernel or device driver writing
+data into this area. Like this, the low 1M can be reused as system RAM
+by kdump kernel without extra handling.
 
-Similarly on PPC64 machines first 32KB of physical memory is needed for
-booting regardless of where the kernel is loaded and to support 64K page
-size kexec backs up the first 64KB memory.
+On PPC64 machines first 32KB of physical memory is needed for booting
+regardless of where the kernel is loaded and to support 64K page size
+kexec backs up the first 64KB memory.
 
 For s390x, when kdump is triggered, the crashkernel region is exchanged
 with the region [0, crashkernel region size] and then the kdump kernel
@@ -46,14 +48,14 @@ passed to the dump-capture kernel through the elfcorehdr= boot
 parameter. Optionally the size of the ELF header can also be passed
 when using the elfcorehdr=[size[KMG]@]offset[KMG] syntax.
 
-
 With the dump-capture kernel, you can access the memory image through
 /proc/vmcore. This exports the dump as an ELF-format file that you can
-write out using file copy commands such as cp or scp. Further, you can
-use analysis tools such as the GNU Debugger (GDB) and the Crash tool to
-debug the dump file. This method ensures that the dump pages are correctly
-ordered.
-
+write out using file copy commands such as cp or scp. You can also use
+makedumpfile utility to analyze and write out filtered contents with
+options, e.g with '-d 31' it will only write out kernel data. Further,
+you can use analysis tools such as the GNU Debugger (GDB) and the Crash
+tool to debug the dump file. This method ensures that the dump pages are
+correctly ordered.
 
 Setup and Installation
 ======================
@@ -111,7 +113,7 @@ There are two possible methods of using Kdump.
 2) Or use the system kernel binary itself as dump-capture kernel and there is
    no need to build a separate dump-capture kernel. This is possible
    only with the architectures which support a relocatable kernel. As
-   of today, i386, x86_64, ppc64, ia64, arm and arm64 architectures support
+   of today, x86/64, ppc64, ia64, arm/64 architectures support
    relocatable kernel.
 
 Building a relocatable kernel is advantageous from the point of view that
@@ -125,9 +127,18 @@ dump-capture kernels for enabling kdump support.
 System kernel config options
 ----------------------------
 
-1) Enable "kexec system call" in "Processor type and features."::
+1) Enable "kexec system call" or "kexec file based system call" in
+   "Processor type and features."::
 
-	CONFIG_KEXEC=y
+	CONFIG_KEXEC=y or CONFIG_KEXEC_FILE=y
+
+   And both of them will select KEXEC_CORE::
+
+	CONFIG_KEXEC_CORE=y
+
+   Subsequently, CRASH_CORE is selected by KEXEC_CORE::
+
+	CONFIG_CRASH_CORE=y
 
 2) Enable "sysfs file system support" in "Filesystem" -> "Pseudo
    filesystems." This is usually enabled by default::
@@ -180,7 +191,7 @@ Dump-capture kernel config options (Arch Dependent, i386 and x86_64)
 
 	CONFIG_SMP=n
 
-   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
+   (If CONFIG_SMP=y, then specify nr_cpus=1 on the kernel command line
    when loading the dump-capture kernel, see section "Load the Dump-capture
    Kernel".)
 
@@ -241,10 +252,6 @@ Dump-capture kernel config options (Arch Dependent, ia64)
 
 	crashkernel=256M
 
-  If the start address is specified, note that the start address of the
-  kernel will be aligned to 64Mb, so if the start address is not then
-  any space below the alignment point will be wasted.
-
 Dump-capture kernel config options (Arch Dependent, arm)
 ----------------------------------------------------------
 
@@ -260,44 +267,77 @@ Dump-capture kernel config options (Arch Dependent, arm64)
   on non-VHE systems even if it is configured. This is because the CPU
   will not be reset to EL2 on panic.
 
-Extended crashkernel syntax
+crashkernel syntax
 ===========================
+1) crashkernel=size@offset
 
-While the "crashkernel=size[@offset]" syntax is sufficient for most
-configurations, sometimes it's handy to have the reserved memory dependent
-on the value of System RAM -- that's mostly for distributors that pre-setup
-the kernel command line to avoid a unbootable system after some memory has
-been removed from the machine.
+   Here 'size' specifies how much memory to reserve for the dump-capture kernel
+   and 'offset' specifies the beginning of this reserved memory. For example,
+   "crashkernel=64M@16M" tells the system kernel to reserve 64 MB of memory
+   starting at physical address 0x01000000 (16MB) for the dump-capture kernel.
 
-The syntax is::
+   The crashkernel region can be automatically placed by the system
+   kernel at run time. This is done by specifying the base address as 0,
+   or omitting it all together::
 
-    crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
-    range=start-[end]
+         crashkernel=256M@0
+   or::
 
-For example::
+         crashkernel=256M
 
-    crashkernel=512M-2G:64M,2G-:128M
+   If the start address is specified, note that the start address of the
+   kernel will be aligned to a value (which is Arch dependent), so if the
+   start address is not then any space below the alignment point will be
+   wasted.
 
-This would mean:
+2) range1:size1[,range2:size2,...][@offset]
 
-    1) if the RAM is smaller than 512M, then don't reserve anything
-       (this is the "rescue" case)
-    2) if the RAM size is between 512M and 2G (exclusive), then reserve 64M
-    3) if the RAM size is larger than 2G, then reserve 128M
+   While the "crashkernel=size[@offset]" syntax is sufficient for most
+   configurations, sometimes it's handy to have the reserved memory dependent
+   on the value of System RAM -- that's mostly for distributors that pre-setup
+   the kernel command line to avoid a unbootable system after some memory has
+   been removed from the machine.
 
+   The syntax is::
 
+       crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+       range=start-[end]
+
+   For example::
+
+       crashkernel=512M-2G:64M,2G-:128M
+
+   This would mean:
+
+       1) if the RAM is smaller than 512M, then don't reserve anything
+          (this is the "rescue" case)
+       2) if the RAM size is between 512M and 2G (exclusive), then reserve 64M
+       3) if the RAM size is larger than 2G, then reserve 128M
+
+3) crashkernel=size,high and crashkernel=size,low
+
+   If memory above 4G is preferred, crashkernel=size,high can be used to
+   fulfill that. With it, physical memory is allowed to allocate from top,
+   so could be above 4G if system has more than 4G RAM installed. Otherwise,
+   memory region will be allocated below 4G if available.
+
+   When crashkernel=X,high is passed, kernel could allocate physical memory
+   region above 4G, low memory under 4G is needed in this case. There are
+   three ways to get low memory:
+
+      1) Kernel will allocate at least 256M memory below 4G automatically
+         if crashkernel=Y,low is not specified.
+      2) Let user specify low memory size instread.
+      3) Specified value 0 will disable low memory allocation::
+
+            crashkernel=0,low
 
 Boot into System Kernel
-=======================
-
+-----------------------
 1) Update the boot loader (such as grub, yaboot, or lilo) configuration
    files as necessary.
 
-2) Boot the system kernel with the boot parameter "crashkernel=Y@X",
-   where Y specifies how much memory to reserve for the dump-capture kernel
-   and X specifies the beginning of this reserved memory. For example,
-   "crashkernel=64M@16M" tells the system kernel to reserve 64 MB of memory
-   starting at physical address 0x01000000 (16MB) for the dump-capture kernel.
+2) Boot the system kernel with the boot parameter "crashkernel=Y@X".
 
    On x86 and x86_64, use "crashkernel=64M@16M".
 
@@ -392,7 +432,7 @@ loading dump-capture kernel.
 
 For i386, x86_64 and ia64:
 
-	"1 irqpoll maxcpus=1 reset_devices"
+	"1 irqpoll nr_cpus=1 reset_devices"
 
 For ppc64:
 
@@ -400,7 +440,7 @@ For ppc64:
 
 For s390x:
 
-	"1 maxcpus=1 cgroup_disable=memory"
+	"1 nr_cpus=1 cgroup_disable=memory"
 
 For arm:
 
@@ -408,7 +448,7 @@ For arm:
 
 For arm64:
 
-	"1 maxcpus=1 reset_devices"
+	"1 nr_cpus=1 reset_devices"
 
 Notes on loading the dump-capture kernel:
 
@@ -487,7 +527,12 @@ After the dump-capture kernel is booted, write out the dump file with
 the following command::
 
    cp /proc/vmcore <dump-file>
+   scp /proc/vmcore to <user@server>:<path>/%HOST-%DATE/
 
+You can also use makedumpfile utility to write out the dump file
+with specified options to filter out unwanted contents, e.g::
+
+   core_collector makedumpfile -l --message-level 1 -d 31
 
 Analysis
 ========
@@ -535,8 +580,7 @@ This will cause a kdump to occur at the add_taint()->panic() call.
 Contact
 =======
 
-- Vivek Goyal (vgoyal@redhat.com)
-- Maneesh Soni (maneesh@in.ibm.com)
+- kexec@lists.infradead.org
 
 GDB macros
 ==========
