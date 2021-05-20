@@ -134,6 +134,11 @@ void ttm_tt_destroy_common(struct ttm_device *bdev, struct ttm_tt *ttm)
 }
 EXPORT_SYMBOL(ttm_tt_destroy_common);
 
+void ttm_tt_mark_for_clear(struct ttm_tt *ttm)
+{
+	ttm->page_flags |= TTM_PAGE_FLAG_ZERO_ALLOC;
+}
+
 void ttm_tt_destroy(struct ttm_device *bdev, struct ttm_tt *ttm)
 {
 	bdev->funcs->ttm_tt_destroy(bdev, ttm);
