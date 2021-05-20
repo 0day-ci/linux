@@ -1447,6 +1447,9 @@ controller device containing these files:
 
 - ``pins``: prints a line for each pin registered on the pin controller. The
   pinctrl driver may add additional information such as register contents.
+  Optionally writes the mux register for the selected pin.
+  e.g. to write the value 0x73 in the mux register of pin 19:
+  echo 19 0x73 >/sys/kernel/debug/pinctrl/pins
 
 - ``gpio-ranges``: print ranges that map gpio lines to pins on the controller
 
