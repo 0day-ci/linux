@@ -2801,6 +2801,11 @@ static irqreturn_t ice_misc_intr(int __always_unused irq, void *data)
 		}
 	}
 
+	if (oicr & PFINT_OICR_TSYN_TX_M) {
+		ena_mask &= ~PFINT_OICR_TSYN_TX_M;
+		ice_ptp_process_ts(pf);
+	}
+
 	if (oicr & PFINT_OICR_HMC_ERR_M) {
 		ena_mask &= ~PFINT_OICR_HMC_ERR_M;
 		dev_dbg(dev, "HMC Error interrupt - info 0x%x, data 0x%x\n",
