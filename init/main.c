@@ -607,6 +607,21 @@ static inline void setup_nr_cpu_ids(void) { }
 static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 #endif
 
+bool __init ramdisk_exec_exist(bool abs)
+{
+	char *tmp_command = ramdisk_execute_command;
+
+	if (!tmp_command)
+		return false;
+
+	if (!abs) {
+		while (*tmp_command == '/' || *tmp_command == '.')
+			tmp_command++;
+	}
+
+	return init_eaccess(tmp_command) == 0;
+}
+
 /*
  * We need to store the untouched command line for future reference.
  * We also need to store the touched command line since the parameter
@@ -1568,7 +1583,7 @@ static noinline void __init kernel_init_freeable(void)
 	 * check if there is an early userspace init.  If yes, let it do all
 	 * the work
 	 */
-	if (init_eaccess(ramdisk_execute_command) != 0) {
+	if (!ramdisk_exec_exist(true)) {
 		ramdisk_execute_command = NULL;
 		prepare_namespace();
 	}

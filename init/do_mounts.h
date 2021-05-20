@@ -13,6 +13,7 @@
 void  mount_block_root(char *name, int flags);
 void  mount_root(void);
 extern int root_mountflags;
+int   mount_user_root(void);
 
 static inline __init int create_dev(char *name, dev_t dev)
 {

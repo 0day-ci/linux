@@ -459,7 +459,7 @@ retry:
 out:
 	put_page(page);
 }
- 
+
 #ifdef CONFIG_ROOT_NFS
 
 #define NFSROOT_TIMEOUT_MIN	5
@@ -617,24 +617,57 @@ out:
 	init_chroot(".");
 }
 
-static bool is_tmpfs;
-static int rootfs_init_fs_context(struct fs_context *fc)
+#ifdef CONFIG_TMPFS
+static __init bool is_tmpfs_enabled(void)
 {
-	if (IS_ENABLED(CONFIG_TMPFS) && is_tmpfs)
-		return shmem_init_fs_context(fc);
+	return (!root_fs_names || strstr(root_fs_names, "tmpfs")) &&
+	       !saved_root_name[0];
+}
+#endif
 
-	return ramfs_init_fs_context(fc);
+static __init bool is_ramfs_enabled(void)
+{
+	return true;
+}
+
+struct fs_user_root {
+	bool (*enabled)(void);
+	char *dev_name;
+	char *fs_name;
+};
+
+static struct fs_user_root user_roots[] __initdata = {
+#ifdef CONFIG_TMPFS
+	{.fs_name = "tmpfs", .enabled = is_tmpfs_enabled },
+#endif
+	{.fs_name = "ramfs", .enabled = is_ramfs_enabled }
+};
+static struct fs_user_root * __initdata user_root;
+
+int __init mount_user_root(void)
+{
+	return do_mount_root(user_root->dev_name,
+			     user_root->fs_name,
+			     root_mountflags,
+			     root_mount_data);
 }
 
 struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
-	.init_fs_context = rootfs_init_fs_context,
+	.init_fs_context = ramfs_init_fs_context,
 	.kill_sb	= kill_litter_super,
 };
 
 void __init init_rootfs(void)
 {
-	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
-		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
-		is_tmpfs = true;
+	struct fs_user_root *root;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(user_roots); i++) {
+		root = &user_roots[i];
+		if (root->enabled()) {
+			user_root = root;
+			break;
+		}
+	}
 }
