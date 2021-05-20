@@ -1092,7 +1092,7 @@ void tty_write_message(struct tty_struct *tty, char *msg)
 
 
 /*
- *	tty_write		-	write method for tty device file
+ *	file_tty_write		-	write method for tty device file
  *	@file: tty file pointer
  *
  *	Write data to a tty device via the line discipline.
