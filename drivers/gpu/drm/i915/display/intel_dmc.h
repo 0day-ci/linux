@@ -6,6 +6,10 @@
 #ifndef __INTEL_DMC_H__
 #define __INTEL_DMC_H__
 
+#include <drm/drm_util.h>
+#include "intel_wakeref.h"
+#include "i915_reg.h"
+
 struct drm_i915_private;
 
 #define DMC_VERSION(major, minor)	((major) << 16 | (minor))
@@ -17,5 +21,6 @@ void intel_dmc_load_program(struct drm_i915_private *i915);
 void intel_dmc_ucode_fini(struct drm_i915_private *i915);
 void intel_dmc_ucode_suspend(struct drm_i915_private *i915);
 void intel_dmc_ucode_resume(struct drm_i915_private *i915);
+bool intel_dmc_has_payload(struct drm_i915_private *i915);
 
 #endif /* __INTEL_DMC_H__ */
