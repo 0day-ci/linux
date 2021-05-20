@@ -446,10 +446,9 @@ static void cqhci_prep_task_desc(struct mmc_request *mrq,
 	}
 }
 
-static int cqhci_dma_map(struct mmc_host *host, struct mmc_request *mrq)
+static int cqhci_dma_map(struct mmc_host *host, struct mmc_data *data)
 {
 	int sg_count;
-	struct mmc_data *data = mrq->data;
 
 	if (!data)
 		return -EINVAL;
@@ -499,7 +498,7 @@ static int cqhci_prep_tran_desc(struct mmc_request *mrq,
 	u8 *desc;
 	struct scatterlist *sg;
 
-	sg_count = cqhci_dma_map(mrq->host, mrq);
+	sg_count = cqhci_dma_map(mrq->host, data);
 	if (sg_count < 0) {
 		pr_err("%s: %s: unable to map sg lists, %d\n",
 				mmc_hostname(mrq->host), __func__, sg_count);
