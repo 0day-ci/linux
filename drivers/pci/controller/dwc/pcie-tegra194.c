@@ -240,6 +240,7 @@
 #define EP_STATE_DISABLED	0
 #define EP_STATE_ENABLED	1
 
+#if defined(CONFIG_PCIEASPM)
 static const unsigned int pcie_gen_freq[] = {
 	GEN1_CORE_CLK_FREQ,
 	GEN2_CORE_CLK_FREQ,
@@ -264,6 +265,7 @@ static const u32 event_cntr_data_offset[] = {
 	0x1c8,
 	0x1dc
 };
+#endif
 
 struct tegra_pcie_dw {
 	struct device *dev;
