@@ -40,19 +40,35 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 			size_t len, struct ptp_system_timestamp *ptp_sts)
 {
 	u8 hdr_buf[SJA1105_SIZE_SPI_MSG_HEADER] = {0};
-	struct sja1105_chunk chunk = {
-		.len = min_t(size_t, len, SJA1105_SIZE_SPI_MSG_MAXLEN),
-		.reg_addr = reg_addr,
-		.buf = buf,
-	};
 	struct spi_device *spi = priv->spidev;
 	struct spi_transfer xfers[2] = {0};
 	struct spi_transfer *chunk_xfer;
 	struct spi_transfer *hdr_xfer;
+	struct sja1105_chunk chunk;
+	ssize_t xfer_len;
 	int num_chunks;
 	int rc, i = 0;
 
-	num_chunks = DIV_ROUND_UP(len, SJA1105_SIZE_SPI_MSG_MAXLEN);
+	/* One spi_message is composed of two spi_transfers: a small one for
+	 * the message header and another one for the current chunk of the
+	 * packed buffer.
+	 * Check that the restrictions imposed by the SPI controller are
+	 * respected: the chunk buffer is smaller than the max transfer size,
+	 * and the total length of the chunk plus its message header is smaller
+	 * than the max message size.
+	 */
+	xfer_len = min_t(ssize_t, SJA1105_SIZE_SPI_MSG_MAXLEN,
+			 spi_max_transfer_size(spi));
+	xfer_len = min_t(ssize_t, SJA1105_SIZE_SPI_MSG_MAXLEN,
+			 spi_max_message_size(spi) - SJA1105_SIZE_SPI_MSG_HEADER);
+	if (xfer_len < 0)
+		return -ERANGE;
+
+	num_chunks = DIV_ROUND_UP(len, xfer_len);
+
+	chunk.reg_addr = reg_addr;
+	chunk.buf = buf;
+	chunk.len = min_t(size_t, len, xfer_len);
 
 	hdr_xfer = &xfers[0];
 	chunk_xfer = &xfers[1];
@@ -104,7 +120,7 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 		chunk.buf += chunk.len;
 		chunk.reg_addr += chunk.len / 4;
 		chunk.len = min_t(size_t, (ptrdiff_t)(buf + len - chunk.buf),
-				  SJA1105_SIZE_SPI_MSG_MAXLEN);
+				  xfer_len);
 
 		rc = spi_sync_transfer(spi, xfers, 2);
 		if (rc < 0) {
