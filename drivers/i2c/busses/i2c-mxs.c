@@ -100,7 +100,7 @@ enum mxs_i2c_devtype {
 	MXS_I2C_V2,
 };
 
-/**
+/*
  * struct mxs_i2c_dev - per device, private MXS-I2C data
  *
  * @dev: driver model device node
