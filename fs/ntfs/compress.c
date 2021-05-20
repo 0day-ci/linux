@@ -18,7 +18,7 @@
 #include "debug.h"
 #include "ntfs.h"
 
-/**
+/*
  * ntfs_compression_constants - enum of constants used in the compression code
  */
 typedef enum {
@@ -41,12 +41,12 @@ typedef enum {
 	NTFS_MAX_CB_SIZE	= 64 * 1024,
 } ntfs_compression_constants;
 
-/**
+/*
  * ntfs_compression_buffer - one buffer for the decompression engine
  */
 static u8 *ntfs_compression_buffer;
 
-/**
+/*
  * ntfs_cb_lock - spinlock which protects ntfs_compression_buffer
  */
 static DEFINE_SPINLOCK(ntfs_cb_lock);
@@ -80,7 +80,7 @@ void free_compression_buffers(void)
 	ntfs_compression_buffer = NULL;
 }
 
-/**
+/*
  * zero_partial_compressed_page - zero out of bounds compressed page region
  */
 static void zero_partial_compressed_page(struct page *page,
@@ -99,7 +99,7 @@ static void zero_partial_compressed_page(struct page *page,
 	return;
 }
 
-/**
+/*
  * handle_bounds_compressed_page - test for&handle out of bounds compressed page
  */
 static inline void handle_bounds_compressed_page(struct page *page,
