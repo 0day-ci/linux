@@ -317,6 +317,7 @@
 #include <linux/fcntl.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/hw_random.h>
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/fs.h>
