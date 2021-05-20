@@ -46,18 +46,22 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 			sja1105_spi_rw_mode_t rw, u64 reg_addr, u8 *buf,
 			size_t len, struct ptp_system_timestamp *ptp_sts)
 {
+	struct spi_device *spi = priv->spidev;
 	struct sja1105_chunk chunk = {
-		.len = min_t(size_t, len, SJA1105_SIZE_SPI_MSG_MAXLEN),
 		.reg_addr = reg_addr,
 		.buf = buf,
 	};
-	struct spi_device *spi = priv->spidev;
 	struct spi_transfer *xfers;
+	size_t xfer_len;
 	int num_chunks;
 	int rc, i = 0;
 	u8 *hdr_bufs;
 
-	num_chunks = DIV_ROUND_UP(len, SJA1105_SIZE_SPI_MSG_MAXLEN);
+	xfer_len = min_t(size_t, SJA1105_SIZE_SPI_MSG_MAXLEN,
+			 spi_max_transfer_size(spi) - SJA1105_SIZE_SPI_MSG_HEADER);
+
+	num_chunks = DIV_ROUND_UP(len, xfer_len);
+	chunk.len = min(len, xfer_len);
 
 	/* One transfer for each message header, one for each message
 	 * payload (chunk).
@@ -127,7 +131,7 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 		chunk.buf += chunk.len;
 		chunk.reg_addr += chunk.len / 4;
 		chunk.len = min_t(size_t, (ptrdiff_t)(buf + len - chunk.buf),
-				  SJA1105_SIZE_SPI_MSG_MAXLEN);
+				  xfer_len);
 
 		/* De-assert the chip select after each chunk. */
 		if (chunk.len)
