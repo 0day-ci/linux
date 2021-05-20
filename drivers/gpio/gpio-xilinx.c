@@ -509,7 +509,6 @@ static void xgpio_irqhandler(struct irq_desc *desc)
 			unsigned long rising_events, falling_events, all_events;
 			unsigned long flags;
 			u32 data, bit;
-			unsigned int irq;
 
 			spin_lock_irqsave(&chip->gpio_lock, flags);
 			data = xgpio_readreg(chip->regs + XGPIO_DATA_OFFSET +
@@ -529,11 +528,9 @@ static void xgpio_irqhandler(struct irq_desc *desc)
 			chip->gpio_last_irq_read[index] = data;
 			spin_unlock_irqrestore(&chip->gpio_lock, flags);
 
-			for_each_set_bit(bit, &all_events, 32) {
-				irq = irq_find_mapping(chip->gc.irq.domain,
-						       offset + bit);
-				generic_handle_irq(irq);
-			}
+			for_each_set_bit(bit, &all_events, 32)
+				generic_handle_domain_irq(chip->gc.irq.domain,
+							  offset + bit);
 		}
 		offset += chip->gpio_width[index];
 	}
