@@ -67,7 +67,13 @@ def main():
     # Read JSON data into the datastore variable
     with open(args.path, "r") as f:
         datastore = json.load(f)
-        pool.map(run_analysis, datastore)
+        try:
+            pool.map(run_analysis, datastore)
+        except FileNotFoundError as not_found:
+            if not_found.filename == 'clang-tidy':
+                print('Command `clang-tidy` is missing in the system.')
+            else:
+                raise not_found
 
 
 if __name__ == "__main__":
