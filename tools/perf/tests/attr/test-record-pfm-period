@@ -7,3 +7,4 @@ ret     = 1
 sample_period=77777
 sample_type=7
 freq=0
+exclude_hv=0|1
