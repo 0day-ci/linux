@@ -57,7 +57,7 @@ const option_t on_errors_arr[] = {
 	{ 0,			NULL }
 };
 
-/**
+/*
  * simple_getbool -
  *
  * Copied from old ntfs driver (which copied from vfat driver).
@@ -1196,6 +1196,7 @@ mft_unmap_out:
 /**
  * load_and_check_logfile - load and check the logfile inode for a volume
  * @vol:	ntfs super block describing device whose logfile to load
+ * @rp: 	restart page header to check
  *
  * Return 'true' on success or 'false' on error.
  */
@@ -2656,7 +2657,7 @@ static int ntfs_write_inode(struct inode *vi, struct writeback_control *wbc)
 }
 #endif
 
-/**
+/*
  * The complete super operations.
  */
 static const struct super_operations ntfs_sops = {
