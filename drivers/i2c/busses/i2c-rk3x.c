@@ -238,7 +238,7 @@ static inline void rk3x_i2c_clean_ipd(struct rk3x_i2c *i2c)
 	i2c_writel(i2c, REG_INT_ALL, REG_IPD);
 }
 
-/**
+/*
  * Generate a START condition, which triggers a REG_INT_START interrupt.
  */
 static void rk3x_i2c_start(struct rk3x_i2c *i2c)
@@ -257,7 +257,7 @@ static void rk3x_i2c_start(struct rk3x_i2c *i2c)
 	i2c_writel(i2c, val, REG_CON);
 }
 
-/**
+/*
  * Generate a STOP condition, which triggers a REG_INT_STOP interrupt.
  *
  * @error: Error code to return in rk3x_i2c_xfer
@@ -297,7 +297,7 @@ static void rk3x_i2c_stop(struct rk3x_i2c *i2c, int error)
 	}
 }
 
-/**
+/*
  * Setup a read according to i2c->msg
  */
 static void rk3x_i2c_prepare_read(struct rk3x_i2c *i2c)
@@ -328,7 +328,7 @@ static void rk3x_i2c_prepare_read(struct rk3x_i2c *i2c)
 	i2c_writel(i2c, len, REG_MRXCNT);
 }
 
-/**
+/*
  * Fill the transmit buffer with data from i2c->msg
  */
 static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c *i2c)
@@ -532,7 +532,7 @@ out:
 }
 
 /**
- * Get timing values of I2C specification
+ * rk3x_i2c_get_spec() - Get timing values of I2C specification
  *
  * @speed: Desired SCL frequency
  *
@@ -549,7 +549,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
 }
 
 /**
- * Calculate divider values for desired SCL frequency
+ * rk3x_i2c_v0_calc_timings() - Calculate divider values for desired SCL frequency
  *
  * @clk_rate: I2C input clock rate
  * @t: Known I2C timing information
@@ -710,7 +710,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
 }
 
 /**
- * Calculate timing values for desired SCL frequency
+ * rk3x_i2c_v1_calc_timings() - Calculate timing values for desired SCL frequency
  *
  * @clk_rate: I2C input clock rate
  * @t: Known I2C timing information
@@ -959,8 +959,8 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
 	}
 }
 
-/**
- * Setup I2C registers for an I2C operation specified by msgs, num.
+/*
+ * rk3x_i2c_setup() - Setup I2C registers for an I2C operation specified by msgs, num.
  *
  * Must be called with i2c->lock held.
  *
