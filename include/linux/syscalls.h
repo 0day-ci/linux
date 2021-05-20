@@ -71,6 +71,7 @@ struct open_how;
 struct mount_attr;
 struct landlock_ruleset_attr;
 enum landlock_rule_type;
+struct umcg_task;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -1050,6 +1051,14 @@ asmlinkage long sys_landlock_create_ruleset(const struct landlock_ruleset_attr _
 asmlinkage long sys_landlock_add_rule(int ruleset_fd, enum landlock_rule_type rule_type,
 		const void __user *rule_attr, __u32 flags);
 asmlinkage long sys_landlock_restrict_self(int ruleset_fd, __u32 flags);
+asmlinkage long umcg_api_version(u32 api_version, u32 flags);
+asmlinkage long umcg_register_task(u32 api_version, u32 flags, u32 group_id,
+					struct umcg_task __user *umcg_task);
+asmlinkage long umcg_unregister_task(u32 flags);
+asmlinkage long umcg_wait(u32 flags, const struct __kernel_timespec __user *timeout);
+asmlinkage long umcg_wake(u32 flags, u32 next_tid);
+asmlinkage long umcg_swap(u32 wake_flags, u32 next_tid, u32 wait_flags,
+				const struct __kernel_timespec __user *timeout);
 
 /*
  * Architecture-specific system calls
