@@ -300,7 +300,7 @@ static bool find_next_esco_param(struct hci_conn *conn,
 		if (lmp_esco_2m_capable(conn->link) ||
 		    (esco_param[conn->attempt - 1].pkt_type & ESCO_2EV3))
 			break;
-		BT_DBG("hcon %p skipped attempt %d, eSCO 2M not supported",
+		BT_DBG("hcon %p skipped attempt %u, eSCO 2M not supported",
 		       conn, conn->attempt);
 	}
 
@@ -471,7 +471,7 @@ static void hci_conn_idle(struct work_struct *work)
 					     idle_work.work);
 	struct hci_dev *hdev = conn->hdev;
 
-	BT_DBG("hcon %p mode %d", conn, conn->mode);
+	BT_DBG("hcon %p mode %u", conn, conn->mode);
 
 	if (!lmp_sniff_capable(hdev) || !lmp_sniff_capable(conn))
 		return;
@@ -637,7 +637,7 @@ int hci_conn_del(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 
-	BT_DBG("%s hcon %p handle %d", hdev->name, conn, conn->handle);
+	BT_DBG("%s hcon %p handle %u", hdev->name, conn, conn->handle);
 
 	cancel_delayed_work_sync(&conn->disc_work);
 	cancel_delayed_work_sync(&conn->auto_accept_work);
@@ -1574,7 +1574,7 @@ void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active)
 {
 	struct hci_dev *hdev = conn->hdev;
 
-	BT_DBG("hcon %p mode %d", conn, conn->mode);
+	BT_DBG("hcon %p mode %u", conn, conn->mode);
 
 	if (conn->mode != HCI_CM_SNIFF)
 		goto timer;
