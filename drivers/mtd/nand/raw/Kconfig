@@ -453,6 +453,14 @@ config MTD_NAND_ROCKCHIP
 	    NFC v800: RK3308, RV1108
 	    NFC v900: PX30, RK3326
 
+config MTD_NAND_LOONGSON1
+	tristate "Support for Loongson1 SoC NAND controller"
+	depends on MACH_LOONGSON32
+	select MTD_NAND_ECC_SW_HAMMING
+	select LOONGSON1_DMA
+	help
+	  Enables support for NAND controller on Loongson1 SoCs.
+
 comment "Misc"
 
 config MTD_SM_COMMON
