@@ -799,6 +799,10 @@ static int virtblk_probe(struct virtio_device *vdev)
 	vblk->disk->flags |= GENHD_FL_EXT_DEVT;
 	vblk->index = index;
 
+	/*Disable partitions scanning for no-partitions block*/
+	if (virtio_has_feature(vdev, VIRTIO_BLK_F_NO_PS))
+		vblk->disk->flags |= GENHD_FL_NO_PART_SCAN;
+
 	/* configure queue flush support */
 	virtblk_update_cache_mode(vdev);
 
@@ -977,6 +981,7 @@ static unsigned int features_legacy[] = {
 	VIRTIO_BLK_F_RO, VIRTIO_BLK_F_BLK_SIZE,
 	VIRTIO_BLK_F_FLUSH, VIRTIO_BLK_F_TOPOLOGY, VIRTIO_BLK_F_CONFIG_WCE,
 	VIRTIO_BLK_F_MQ, VIRTIO_BLK_F_DISCARD, VIRTIO_BLK_F_WRITE_ZEROES,
+	VIRTIO_BLK_F_NO_PS,
 }
 ;
 static unsigned int features[] = {
@@ -984,6 +989,7 @@ static unsigned int features[] = {
 	VIRTIO_BLK_F_RO, VIRTIO_BLK_F_BLK_SIZE,
 	VIRTIO_BLK_F_FLUSH, VIRTIO_BLK_F_TOPOLOGY, VIRTIO_BLK_F_CONFIG_WCE,
 	VIRTIO_BLK_F_MQ, VIRTIO_BLK_F_DISCARD, VIRTIO_BLK_F_WRITE_ZEROES,
+	VIRTIO_BLK_F_NO_PS,
 };
 
 static struct virtio_driver virtio_blk = {
