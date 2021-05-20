@@ -701,6 +701,7 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 	struct ib_mr                *mr;
 	int                          ret;
 	struct ib_device *ib_dev;
+	u32 access_flags;
 
 	ret = uverbs_request(attrs, &cmd, sizeof(cmd));
 	if (ret)
@@ -713,7 +714,11 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 	if (IS_ERR(uobj))
 		return PTR_ERR(uobj);
 
-	ret = ib_check_mr_access(ib_dev, cmd.access_flags);
+	ret = copy_mr_access_flags(&access_flags, cmd.access_flags);
+	if (ret)
+		goto err_free;
+
+	ret = ib_check_mr_access(ib_dev, access_flags);
 	if (ret)
 		goto err_free;
 
@@ -724,8 +729,7 @@ static int ib_uverbs_reg_mr(struct uverbs_attr_bundle *attrs)
 	}
 
 	mr = pd->device->ops.reg_user_mr(pd, cmd.start, cmd.length, cmd.hca_va,
-					 cmd.access_flags,
-					 &attrs->driver_udata);
+					 access_flags, &attrs->driver_udata);
 	if (IS_ERR(mr)) {
 		ret = PTR_ERR(mr);
 		goto err_put;
@@ -772,6 +776,7 @@ static int ib_uverbs_rereg_mr(struct uverbs_attr_bundle *attrs)
 	struct ib_pd *orig_pd;
 	struct ib_pd *new_pd;
 	struct ib_mr *new_mr;
+	u32 access_flags;
 
 	ret = uverbs_request(attrs, &cmd, sizeof(cmd));
 	if (ret)
@@ -799,7 +804,11 @@ static int ib_uverbs_rereg_mr(struct uverbs_attr_bundle *attrs)
 	}
 
 	if (cmd.flags & IB_MR_REREG_ACCESS) {
-		ret = ib_check_mr_access(mr->device, cmd.access_flags);
+		ret = copy_mr_access_flags(&access_flags, cmd.access_flags);
+		if (ret)
+			goto put_uobjs;
+
+		ret = ib_check_mr_access(mr->device, access_flags);
 		if (ret)
 			goto put_uobjs;
 	}
@@ -827,7 +836,7 @@ static int ib_uverbs_rereg_mr(struct uverbs_attr_bundle *attrs)
 	}
 
 	new_mr = ib_dev->ops.rereg_user_mr(mr, cmd.flags, cmd.start, cmd.length,
-					   cmd.hca_va, cmd.access_flags, new_pd,
+					   cmd.hca_va, access_flags, new_pd,
 					   &attrs->driver_udata);
 	if (IS_ERR(new_mr)) {
 		ret = PTR_ERR(new_mr);
@@ -1660,6 +1669,27 @@ static void copy_ah_attr_to_uverbs(struct ib_uverbs_qp_dest *uverb_attr,
 	uverb_attr->port_num          = rdma_ah_get_port_num(rdma_attr);
 }
 
+static void copy_qp_access_flags(unsigned int *dest_flags,
+				 unsigned int src_flags)
+{
+	*dest_flags = 0;
+
+	process_access_flag(dest_flags, IB_UVERBS_ACCESS_LOCAL_WRITE,
+			    &src_flags, IB_ACCESS_LOCAL_WRITE);
+
+	process_access_flag(dest_flags, IB_UVERBS_ACCESS_REMOTE_WRITE,
+			    &src_flags, IB_ACCESS_REMOTE_WRITE);
+
+	process_access_flag(dest_flags, IB_UVERBS_ACCESS_REMOTE_READ,
+			    &src_flags, IB_ACCESS_REMOTE_READ);
+
+	process_access_flag(dest_flags, IB_UVERBS_ACCESS_REMOTE_ATOMIC,
+			    &src_flags, IB_ACCESS_REMOTE_ATOMIC);
+
+	process_access_flag(dest_flags, IB_UVERBS_ACCESS_MW_BIND, &src_flags,
+			    IB_ACCESS_MW_BIND);
+}
+
 static int ib_uverbs_query_qp(struct uverbs_attr_bundle *attrs)
 {
 	struct ib_uverbs_query_qp      cmd;
@@ -1704,7 +1734,9 @@ static int ib_uverbs_query_qp(struct uverbs_attr_bundle *attrs)
 	resp.rq_psn                 = attr->rq_psn;
 	resp.sq_psn                 = attr->sq_psn;
 	resp.dest_qp_num            = attr->dest_qp_num;
-	resp.qp_access_flags        = attr->qp_access_flags;
+
+	copy_qp_access_flags(&resp.qp_access_flags, attr->qp_access_flags);
+
 	resp.pkey_index             = attr->pkey_index;
 	resp.alt_pkey_index         = attr->alt_pkey_index;
 	resp.sq_draining            = attr->sq_draining;
@@ -1772,6 +1804,17 @@ static void copy_ah_attr_from_uverbs(struct ib_device *dev,
 	rdma_ah_set_static_rate(rdma_attr, uverb_attr->static_rate);
 	rdma_ah_set_port_num(rdma_attr, uverb_attr->port_num);
 	rdma_ah_set_make_grd(rdma_attr, false);
+}
+
+static int check_qp_access_flags(unsigned int qp_access_flags)
+{
+	if (qp_access_flags &
+	    ~(IB_UVERBS_ACCESS_LOCAL_WRITE | IB_UVERBS_ACCESS_REMOTE_WRITE |
+	      IB_UVERBS_ACCESS_REMOTE_READ | IB_UVERBS_ACCESS_REMOTE_ATOMIC |
+	      IB_UVERBS_ACCESS_MW_BIND))
+		return -EINVAL;
+
+	return 0;
 }
 
 static int modify_qp(struct uverbs_attr_bundle *attrs,
@@ -1868,6 +1911,12 @@ static int modify_qp(struct uverbs_attr_bundle *attrs,
 		goto release_qp;
 	}
 
+	if (cmd->base.attr_mask & IB_QP_ACCESS_FLAGS &&
+	    check_qp_access_flags(cmd->base.qp_access_flags)) {
+		ret = -EINVAL;
+		goto release_qp;
+	}
+
 	if (cmd->base.attr_mask & IB_QP_STATE)
 		attr->qp_state = cmd->base.qp_state;
 	if (cmd->base.attr_mask & IB_QP_CUR_STATE)
@@ -1885,7 +1934,8 @@ static int modify_qp(struct uverbs_attr_bundle *attrs,
 	if (cmd->base.attr_mask & IB_QP_DEST_QPN)
 		attr->dest_qp_num = cmd->base.dest_qp_num;
 	if (cmd->base.attr_mask & IB_QP_ACCESS_FLAGS)
-		attr->qp_access_flags = cmd->base.qp_access_flags;
+		copy_qp_access_flags(&attr->qp_access_flags,
+				     cmd->base.qp_access_flags);
 	if (cmd->base.attr_mask & IB_QP_PKEY_INDEX)
 		attr->pkey_index = cmd->base.pkey_index;
 	if (cmd->base.attr_mask & IB_QP_EN_SQD_ASYNC_NOTIFY)

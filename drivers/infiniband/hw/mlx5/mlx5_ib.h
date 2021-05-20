@@ -625,12 +625,14 @@ struct mlx5_user_mmap_entry {
 					 IB_ACCESS_REMOTE_WRITE  |\
 					 IB_ACCESS_REMOTE_READ   |\
 					 IB_ACCESS_REMOTE_ATOMIC |\
-					 IB_ZERO_BASED)
+					 IB_ZERO_BASED		 |\
+					 IB_ACCESS_DISABLE_RELAXED_ORDERING)
 
 #define MLX5_IB_DM_SW_ICM_ALLOWED_ACCESS (IB_ACCESS_LOCAL_WRITE   |\
 					  IB_ACCESS_REMOTE_WRITE  |\
 					  IB_ACCESS_REMOTE_READ   |\
-					  IB_ZERO_BASED)
+					  IB_ZERO_BASED		  |\
+					  IB_ACCESS_DISABLE_RELAXED_ORDERING)
 
 #define mlx5_update_odp_stats(mr, counter_name, value)		\
 	atomic64_add(value, &((mr)->odp_stats.counter_name))
@@ -1568,12 +1570,12 @@ static inline bool mlx5_ib_can_reconfig_with_umr(struct mlx5_ib_dev *dev,
 	    MLX5_CAP_GEN(dev->mdev, umr_modify_atomic_disabled))
 		return false;
 
-	if ((diffs & IB_ACCESS_RELAXED_ORDERING) &&
+	if ((diffs & IB_ACCESS_DISABLE_RELAXED_ORDERING) &&
 	    MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write) &&
 	    !MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write_umr))
 		return false;
 
-	if ((diffs & IB_ACCESS_RELAXED_ORDERING) &&
+	if ((diffs & IB_ACCESS_DISABLE_RELAXED_ORDERING) &&
 	    MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read) &&
 	    !MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read_umr))
 		return false;

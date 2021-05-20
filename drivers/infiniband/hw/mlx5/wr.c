@@ -415,12 +415,12 @@ static void set_reg_mkey_segment(struct mlx5_ib_dev *dev,
 	MLX5_SET(mkc, seg, rr, !!(umrwr->access_flags & IB_ACCESS_REMOTE_READ));
 	MLX5_SET(mkc, seg, lw, !!(umrwr->access_flags & IB_ACCESS_LOCAL_WRITE));
 	MLX5_SET(mkc, seg, lr, 1);
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write_umr))
+	if (!(umrwr->access_flags & IB_ACCESS_DISABLE_RELAXED_ORDERING)) {
 		MLX5_SET(mkc, seg, relaxed_ordering_write,
-			 !!(umrwr->access_flags & IB_ACCESS_RELAXED_ORDERING));
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read_umr))
+			 MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write_umr));
 		MLX5_SET(mkc, seg, relaxed_ordering_read,
-			 !!(umrwr->access_flags & IB_ACCESS_RELAXED_ORDERING));
+			 MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read_umr));
+	}
 
 	if (umrwr->pd)
 		MLX5_SET(mkc, seg, pd, to_mpd(umrwr->pd)->pdn);

@@ -75,12 +75,12 @@ static void set_mkc_access_pd_addr_fields(void *mkc, int acc, u64 start_addr,
 	MLX5_SET(mkc, mkc, lw, !!(acc & IB_ACCESS_LOCAL_WRITE));
 	MLX5_SET(mkc, mkc, lr, 1);
 
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write))
+	if (!(acc & IB_ACCESS_DISABLE_RELAXED_ORDERING)) {
 		MLX5_SET(mkc, mkc, relaxed_ordering_write,
-			 !!(acc & IB_ACCESS_RELAXED_ORDERING));
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read))
+			 MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write));
 		MLX5_SET(mkc, mkc, relaxed_ordering_read,
-			 !!(acc & IB_ACCESS_RELAXED_ORDERING));
+			 MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read));
+	}
 
 	MLX5_SET(mkc, mkc, pd, to_mpd(pd)->pdn);
 	MLX5_SET(mkc, mkc, qpn, 0xffffff);
@@ -180,7 +180,8 @@ static struct mlx5_ib_mr *alloc_cache_mr(struct mlx5_cache_ent *ent, void *mkc)
 		return NULL;
 	mr->cache_ent = ent;
 
-	set_mkc_access_pd_addr_fields(mkc, 0, 0, ent->dev->umrc.pd);
+	set_mkc_access_pd_addr_fields(mkc, IB_ACCESS_DISABLE_RELAXED_ORDERING,
+				      0, ent->dev->umrc.pd);
 	MLX5_SET(mkc, mkc, free, 1);
 	MLX5_SET(mkc, mkc, umr_en, 1);
 	MLX5_SET(mkc, mkc, access_mode_1_0, ent->access_mode & 0x3);
@@ -573,7 +574,8 @@ struct mlx5_ib_mr *mlx5_mr_cache_alloc(struct mlx5_ib_dev *dev,
 		return ERR_PTR(-EINVAL);
 
 	/* Matches access in alloc_cache_mr() */
-	if (!mlx5_ib_can_reconfig_with_umr(dev, 0, access_flags))
+	if (!mlx5_ib_can_reconfig_with_umr(
+		    dev, IB_ACCESS_DISABLE_RELAXED_ORDERING, access_flags))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	ent = &cache->ent[entry];
@@ -952,7 +954,8 @@ static struct mlx5_ib_mr *alloc_cacheable_mr(struct ib_pd *pd,
 	 * cache then synchronously create an uncached one.
 	 */
 	if (!ent || ent->limit == 0 ||
-	    !mlx5_ib_can_reconfig_with_umr(dev, 0, access_flags)) {
+	    !mlx5_ib_can_reconfig_with_umr(
+		    dev, IB_ACCESS_DISABLE_RELAXED_ORDERING, access_flags)) {
 		mutex_lock(&dev->slow_path_mutex);
 		mr = reg_create(pd, umem, iova, access_flags, page_size, false);
 		mutex_unlock(&dev->slow_path_mutex);
@@ -1678,8 +1681,9 @@ static bool can_use_umr_rereg_access(struct mlx5_ib_dev *dev,
 {
 	unsigned int diffs = current_access_flags ^ target_access_flags;
 
-	if (diffs & ~(IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
-		      IB_ACCESS_REMOTE_READ | IB_ACCESS_RELAXED_ORDERING))
+	if (diffs &
+	    ~(IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE |
+	      IB_ACCESS_REMOTE_READ | IB_ACCESS_DISABLE_RELAXED_ORDERING))
 		return false;
 	return mlx5_ib_can_reconfig_with_umr(dev, current_access_flags,
 					     target_access_flags);
