@@ -1059,6 +1059,11 @@ asmlinkage long umcg_wait(u32 flags, const struct __kernel_timespec __user *time
 asmlinkage long umcg_wake(u32 flags, u32 next_tid);
 asmlinkage long umcg_swap(u32 wake_flags, u32 next_tid, u32 wait_flags,
 				const struct __kernel_timespec __user *timeout);
+asmlinkage long umcg_create_group(u32 api_version, u64, flags);
+asmlinkage long umcg_destroy_group(u32 group_id);
+asmlinkage long umcg_poll_worker(u32 flags, struct umcg_task __user **ut);
+asmlinkage long umcg_run_worker(u32 flags, u32 worker_tid,
+		struct umcg_task __user **ut);
 
 /*
  * Architecture-specific system calls

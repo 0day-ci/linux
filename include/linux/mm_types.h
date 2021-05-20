@@ -562,6 +562,11 @@ struct mm_struct {
 #ifdef CONFIG_IOMMU_SUPPORT
 		u32 pasid;
 #endif
+
+#ifdef CONFIG_UMCG
+	spinlock_t umcg_lock;
+	struct list_head umcg_groups;
+#endif
 	} __randomize_layout;
 
 	/*

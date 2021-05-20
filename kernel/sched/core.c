@@ -26,6 +26,7 @@
 
 #include "pelt.h"
 #include "smp.h"
+#include "umcg.h"
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -6012,10 +6013,20 @@ static inline void sched_submit_work(struct task_struct *tsk)
 	 */
 	if (blk_needs_flush_plug(tsk))
 		blk_schedule_flush_plug(tsk);
+
+#ifdef CONFIG_UMCG
+	if (rcu_access_pointer(tsk->umcg_task_data))
+		umcg_on_block();
+#endif
 }
 
 static void sched_update_worker(struct task_struct *tsk)
 {
+#ifdef CONFIG_UMCG
+	if (rcu_access_pointer(tsk->umcg_task_data))
+		umcg_on_wake();
+#endif
+
 	if (tsk->flags & (PF_WQ_WORKER | PF_IO_WORKER)) {
 		if (tsk->flags & PF_WQ_WORKER)
 			wq_worker_running(tsk);

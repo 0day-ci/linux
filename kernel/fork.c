@@ -1026,6 +1026,10 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	seqcount_init(&mm->write_protect_seq);
 	mmap_init_lock(mm);
 	INIT_LIST_HEAD(&mm->mmlist);
+#ifdef CONFIG_UMCG
+	spin_lock_init(&mm->umcg_lock);
+	INIT_LIST_HEAD(&mm->umcg_groups);
+#endif
 	mm->core_state = NULL;
 	mm_pgtables_bytes_init(mm);
 	mm->map_count = 0;
@@ -1102,6 +1106,13 @@ static inline void __mmput(struct mm_struct *mm)
 		list_del(&mm->mmlist);
 		spin_unlock(&mmlist_lock);
 	}
+#ifdef CONFIG_UMCG
+	if (!list_empty(&mm->umcg_groups)) {
+		spin_lock(&mm->umcg_lock);
+		list_del(&mm->umcg_groups);
+		spin_unlock(&mm->umcg_lock);
+	}
+#endif
 	if (mm->binfmt)
 		module_put(mm->binfmt->module);
 	mmdrop(mm);
