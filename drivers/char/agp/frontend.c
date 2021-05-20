@@ -40,6 +40,7 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include "agp.h"
+#include "compat_ioctl.h"
 
 struct agp_front_data agp_fe;
 
