@@ -117,8 +117,8 @@
 #define SDA_SETUP_TIME		0x8c
 #define SDA_HOLD_TIME		0x90
 
-/**
- * axxia_i2c_dev - I2C device context
+/*
+ * struct axxia_i2c_dev - I2C device context
  * @base: pointer to register struct
  * @msg: pointer to current message
  * @msg_r: pointer to current read message (sequence transfer)
@@ -165,7 +165,7 @@ static void i2c_int_enable(struct axxia_i2c_dev *idev, u32 mask)
 	writel(int_en | mask, idev->base + MST_INT_ENABLE);
 }
 
-/**
+/*
  * ns_to_clk - Convert time (ns) to clock cycles for the given clock frequency.
  */
 static u32 ns_to_clk(u64 ns, u32 clk_mhz)
@@ -263,7 +263,7 @@ static int i2c_m_recv_len(const struct i2c_msg *msg)
 	return (msg->flags & I2C_M_RECV_LEN) != 0;
 }
 
-/**
+/*
  * axxia_i2c_empty_rx_fifo - Fetch data from RX FIFO and update SMBus block
  * transfer length if this is the first byte of such a transfer.
  */
@@ -295,9 +295,8 @@ static int axxia_i2c_empty_rx_fifo(struct axxia_i2c_dev *idev)
 	return 0;
 }
 
-/**
+/*
  * axxia_i2c_fill_tx_fifo - Fill TX FIFO from current message buffer.
- * @return: Number of bytes left to transfer.
  */
 static int axxia_i2c_fill_tx_fifo(struct axxia_i2c_dev *idev)
 {
