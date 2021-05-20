@@ -12,7 +12,7 @@
 #include "malloc.h"
 #include "ntfs.h"
 
-/**
+/*
  * ntfs_rl_mm - runlist memmove
  *
  * It is up to the caller to serialize access to the runlist @base.
@@ -24,7 +24,7 @@ static inline void ntfs_rl_mm(runlist_element *base, int dst, int src,
 		memmove(base + dst, base + src, size * sizeof(*base));
 }
 
-/**
+/*
  * ntfs_rl_mc - runlist memory copy
  *
  * It is up to the caller to serialize access to the runlists @dstbase and
