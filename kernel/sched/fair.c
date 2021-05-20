@@ -4589,6 +4589,8 @@ static inline u64 sched_cfs_bandwidth_slice(void)
  */
 void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 {
+	u64 runtime;
+
 	if (unlikely(cfs_b->quota == RUNTIME_INF))
 		return;
 
@@ -4597,8 +4599,17 @@ void __refill_cfs_bandwidth_runtime(struct cfs_bandwidth *cfs_b)
 		return;
 	}
 
+	if (cfs_b->runtime_at_period_start > cfs_b->runtime) {
+		runtime = cfs_b->runtime_at_period_start - cfs_b->runtime;
+		if (runtime > cfs_b->quota) {
+			cfs_b->burst_time += runtime - cfs_b->quota;
+			cfs_b->nr_burst++;
+		}
+	}
+
 	cfs_b->runtime += cfs_b->quota;
 	cfs_b->runtime = min(cfs_b->runtime, cfs_b->quota + cfs_b->burst);
+	cfs_b->runtime_at_period_start = cfs_b->runtime;
 }
 
 static inline struct cfs_bandwidth *tg_cfs_bandwidth(struct task_group *tg)
