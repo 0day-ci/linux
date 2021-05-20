@@ -221,6 +221,25 @@ static void initialize_distance_lookup_table(int nid,
 	}
 }
 
+int arch_populate_distance_map(unsigned long *distance_map)
+{
+	int i;
+	int distance = LOCAL_DISTANCE;
+
+	bitmap_set(distance_map, distance, 1);
+
+	if (!form1_affinity) {
+		bitmap_set(distance_map, REMOTE_DISTANCE, 1);
+		return 0;
+	}
+
+	for (i = 0; i < distance_ref_points_depth; i++) {
+		distance *= 2;
+		bitmap_set(distance_map, distance, 1);
+	}
+	return 0;
+}
+
 /*
  * Returns nid in the range [0..nr_node_ids], or -1 if no useful NUMA
  * info is found.

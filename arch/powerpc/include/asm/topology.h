@@ -22,6 +22,9 @@ struct drmem_lmb;
 			       cpu_all_mask :				\
 			       node_to_cpumask_map[node])
 
+#define arch_populate_distance_map arch_populate_distance_map
+extern int arch_populate_distance_map(unsigned long *distance_map);
+
 struct pci_bus;
 #ifdef CONFIG_PCI
 extern int pcibus_to_node(struct pci_bus *bus);
