@@ -16,9 +16,9 @@ allOf:
 select:
   properties:
     compatible:
-      contains:
-        enum:
-          - arm,pl011
+      items:
+        - const: arm,pl011
+        - const: arm,primecell
   required:
     - compatible
 
