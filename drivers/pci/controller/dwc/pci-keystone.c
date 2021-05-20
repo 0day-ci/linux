@@ -264,9 +264,8 @@ static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
 	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
 
 	if (BIT(0) & pending) {
-		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
-		dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
-		generic_handle_irq(virq);
+		dev_dbg(dev, ": irq: irq_offset %d", offset);
+		generic_handle_domain_irq(ks_pcie->legacy_irq_domain, offset);
 	}
 
 	/* EOI the INTx interrupt */
