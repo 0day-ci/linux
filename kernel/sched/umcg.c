@@ -4,10 +4,22 @@
  * User Managed Concurrency Groups (UMCG).
  */
 
+#include <linux/freezer.h>
 #include <linux/syscalls.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/umcg.h>
+
+#include "sched.h"
+#include "umcg.h"
+
+static int __api_version(u32 requested)
+{
+	if (requested == 1)
+		return 0;
+
+	return 1;
+}
 
 /**
  * sys_umcg_api_version - query UMCG API versions that are supported.
@@ -26,7 +38,52 @@
  */
 SYSCALL_DEFINE2(umcg_api_version, u32, api_version, u32, flags)
 {
-	return -ENOSYS;
+	if (flags)
+		return -EINVAL;
+
+	return __api_version(api_version);
+}
+
+static int get_state(struct umcg_task __user *ut, u32 *state)
+{
+	return get_user(*state, (u32 __user *)ut);
+}
+
+static int put_state(struct umcg_task __user *ut, u32 state)
+{
+	return put_user(state, (u32 __user *)ut);
+}
+
+static int register_core_task(u32 api_version, struct umcg_task __user *umcg_task)
+{
+	struct umcg_task_data *utd;
+	u32 state;
+
+	if (get_state(umcg_task, &state))
+		return -EFAULT;
+
+	if (state != UMCG_TASK_NONE)
+		return -EINVAL;
+
+	utd = kzalloc(sizeof(struct umcg_task_data), GFP_KERNEL);
+	if (!utd)
+		return -EINVAL;
+
+	utd->self = current;
+	utd->umcg_task = umcg_task;
+	utd->task_type = UMCG_TT_CORE;
+	utd->api_version = api_version;
+
+	if (put_state(umcg_task, UMCG_TASK_RUNNING)) {
+		kfree(utd);
+		return -EFAULT;
+	}
+
+	task_lock(current);
+	rcu_assign_pointer(current->umcg_task_data, utd);
+	task_unlock(current);
+
+	return 0;
 }
 
 /**
@@ -54,7 +111,20 @@ SYSCALL_DEFINE2(umcg_api_version, u32, api_version, u32, flags)
 SYSCALL_DEFINE4(umcg_register_task, u32, api_version, u32, flags, u32, group_id,
 		struct umcg_task __user *, umcg_task)
 {
-	return -ENOSYS;
+	if (__api_version(api_version))
+		return -EOPNOTSUPP;
+
+	if (rcu_access_pointer(current->umcg_task_data) || !umcg_task)
+		return -EINVAL;
+
+	switch (flags) {
+	case UMCG_REGISTER_CORE_TASK:
+		if (group_id != UMCG_NOID)
+			return -EINVAL;
+		return register_core_task(api_version, umcg_task);
+	default:
+		return -EINVAL;
+	}
 }
 
 /**
@@ -67,7 +137,75 @@ SYSCALL_DEFINE4(umcg_register_task, u32, api_version, u32, flags, u32, group_id,
  */
 SYSCALL_DEFINE1(umcg_unregister_task, u32, flags)
 {
-	return -ENOSYS;
+	struct umcg_task_data *utd;
+	int ret = -EINVAL;
+
+	rcu_read_lock();
+	utd = rcu_dereference(current->umcg_task_data);
+
+	if (!utd || flags)
+		goto out;
+
+	task_lock(current);
+	rcu_assign_pointer(current->umcg_task_data, NULL);
+	task_unlock(current);
+
+	ret = 0;
+
+out:
+	rcu_read_unlock();
+	if (!ret && utd) {
+		synchronize_rcu();
+		kfree(utd);
+	}
+	return ret;
+}
+
+static int do_context_switch(struct task_struct *next)
+{
+	struct umcg_task_data *utd = rcu_access_pointer(current->umcg_task_data);
+
+	/*
+	 * It is important to set_current_state(TASK_INTERRUPTIBLE) before
+	 * waking @next, as @next may immediately try to wake current back
+	 * (e.g. current is a server, @next is a worker that immediately
+	 * blocks or waits), and this next wakeup must not be lost.
+	 */
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	WRITE_ONCE(utd->in_wait, true);
+
+	if (!try_to_wake_up(next, TASK_NORMAL, WF_CURRENT_CPU))
+		return -EAGAIN;
+
+	freezable_schedule();
+
+	WRITE_ONCE(utd->in_wait, false);
+
+	if (signal_pending(current))
+		return -EINTR;
+
+	return 0;
+}
+
+static int do_wait(void)
+{
+	struct umcg_task_data *utd = rcu_access_pointer(current->umcg_task_data);
+
+	if (!utd)
+		return -EINVAL;
+
+	WRITE_ONCE(utd->in_wait, true);
+
+	set_current_state(TASK_INTERRUPTIBLE);
+	freezable_schedule();
+
+	WRITE_ONCE(utd->in_wait, false);
+
+	if (signal_pending(current))
+		return -EINTR;
+
+	return 0;
 }
 
 /**
@@ -90,7 +228,23 @@ SYSCALL_DEFINE1(umcg_unregister_task, u32, flags)
 SYSCALL_DEFINE2(umcg_wait, u32, flags,
 		const struct __kernel_timespec __user *, timeout)
 {
-	return -ENOSYS;
+	struct umcg_task_data *utd;
+
+	if (flags)
+		return -EINVAL;
+	if (timeout)
+		return -EOPNOTSUPP;
+
+	rcu_read_lock();
+	utd = rcu_dereference(current->umcg_task_data);
+	if (!utd) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+
+	rcu_read_unlock();
+
+	return do_wait();
 }
 
 /**
@@ -110,7 +264,39 @@ SYSCALL_DEFINE2(umcg_wait, u32, flags,
  */
 SYSCALL_DEFINE2(umcg_wake, u32, flags, u32, next_tid)
 {
-	return -ENOSYS;
+	struct umcg_task_data *next_utd;
+	struct task_struct *next;
+	int ret = -EINVAL;
+
+	if (!next_tid)
+		return -EINVAL;
+	if (flags)
+		return -EINVAL;
+
+	next = find_get_task_by_vpid(next_tid);
+	if (!next)
+		return -ESRCH;
+
+	rcu_read_lock();
+	next_utd = rcu_dereference(next->umcg_task_data);
+	if (!next_utd)
+		goto out;
+
+	if (!READ_ONCE(next_utd->in_wait)) {
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	ret = wake_up_process(next);
+	put_task_struct(next);
+	if (ret)
+		ret = 0;
+	else
+		ret = -EAGAIN;
+
+out:
+	rcu_read_unlock();
+	return ret;
 }
 
 /**
@@ -139,5 +325,44 @@ SYSCALL_DEFINE2(umcg_wake, u32, flags, u32, next_tid)
 SYSCALL_DEFINE4(umcg_swap, u32, wake_flags, u32, next_tid, u32, wait_flags,
 		const struct __kernel_timespec __user *, timeout)
 {
-	return -ENOSYS;
+	struct umcg_task_data *curr_utd;
+	struct umcg_task_data *next_utd;
+	struct task_struct *next;
+	int ret = -EINVAL;
+
+	rcu_read_lock();
+	curr_utd = rcu_dereference(current->umcg_task_data);
+
+	if (!next_tid || wake_flags || wait_flags || !curr_utd)
+		goto out;
+
+	if (timeout) {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	next = find_get_task_by_vpid(next_tid);
+	if (!next) {
+		ret = -ESRCH;
+		goto out;
+	}
+
+	next_utd = rcu_dereference(next->umcg_task_data);
+	if (!next_utd) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!READ_ONCE(next_utd->in_wait)) {
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	rcu_read_unlock();
+
+	return do_context_switch(next);
+
+out:
+	rcu_read_unlock();
+	return ret;
 }

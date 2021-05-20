@@ -3964,6 +3964,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->wake_entry.u_flags = CSD_TYPE_TTWU;
 	p->migration_pending = NULL;
 #endif
+#ifdef CONFIG_UMCG
+	rcu_assign_pointer(p->umcg_task_data, NULL);
+#endif
 }
 
 DEFINE_STATIC_KEY_FALSE(sched_numa_balancing);

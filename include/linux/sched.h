@@ -66,6 +66,7 @@ struct sighand_struct;
 struct signal_struct;
 struct task_delay_info;
 struct task_group;
+struct umcg_task_data;
 
 /*
  * Task state bitmask. NOTE! These bits are also
@@ -778,6 +779,10 @@ struct task_struct {
 	struct mm_struct		*mm;
 	struct mm_struct		*active_mm;
 
+#ifdef CONFIG_UMCG
+	struct umcg_task_data __rcu	*umcg_task_data;
+#endif
+
 	/* Per-thread vma caching: */
 	struct vmacache			vmacache;
 
@@ -1022,7 +1027,7 @@ struct task_struct {
 	u64				parent_exec_id;
 	u64				self_exec_id;
 
-	/* Protection against (de-)allocation: mm, files, fs, tty, keyrings, mems_allowed, mempolicy: */
+	/* Protection against (de-)allocation: mm, files, fs, tty, keyrings, mems_allowed, mempolicy, umcg: */
 	spinlock_t			alloc_lock;
 
 	/* Protection of the PI data structures: */
