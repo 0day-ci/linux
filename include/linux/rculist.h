@@ -11,15 +11,6 @@
 #include <linux/rcupdate.h>
 
 /*
- * Why is there no list_empty_rcu()?  Because list_empty() serves this
- * purpose.  The list_empty() function fetches the RCU-protected pointer
- * and compares it to the address of the list head, but neither dereferences
- * this pointer itself nor provides this pointer to the caller.  Therefore,
- * it is not necessary to use rcu_dereference(), so that list_empty() can
- * be used anywhere you would want to use a list_empty_rcu().
- */
-
-/*
  * INIT_LIST_HEAD_RCU - Initialize a list_head visible to RCU readers
  * @list: list to be initialized
  *
@@ -333,6 +324,12 @@ static inline void list_splice_tail_init_rcu(struct list_head *list,
  * Rereading the ->next pointer is not a problem for list_empty() and
  * list_first_entry() because they would be protected by a lock that blocks
  * writers.
+ *
+ * list_empty() fetches the RCU-protected pointer and compares it to the address
+ * of the list head. But it neither dereferences this pointer itself, nor
+ * provides this pointer to the caller. Therefore it is not necessary to use
+ * rcu_dereference(), and list_empty() can be used anywhere you would want to
+ * use a list_empty_rcu().
  *
  * See list_first_or_null_rcu for an alternative.
  */
