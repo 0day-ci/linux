@@ -5,6 +5,9 @@
 
 #ifndef _ASM_POWERPC_VAS_H
 #define _ASM_POWERPC_VAS_H
+#include <linux/sched/mm.h>
+#include <linux/mmu_context.h>
+#include <asm/icswx.h>
 #include <uapi/asm/vas-api.h>
 
 struct vas_window;
@@ -50,6 +53,17 @@ enum vas_cop_type {
 };
 
 /*
+ * User space VAS windows are opened by tasks and take references
+ * to pid and mm until windows are closed.
+ * Stores pid, mm, and tgid for each window.
+ */
+struct vas_user_win_ref {
+	struct pid *pid;	/* PID of owner */
+	struct pid *tgid;	/* Thread group ID of owner */
+	struct mm_struct *mm;	/* Linux process mm_struct */
+};
+
+/*
  * User space window operations used for powernv and powerVM
  */
 struct vas_user_win_ops {
@@ -58,6 +72,16 @@ struct vas_user_win_ops {
 	u64 (*paste_addr)(void *);
 	int (*close_win)(void *);
 };
+
+static inline void vas_drop_reference_pid_mm(struct vas_user_win_ref *ref)
+{
+	/* Drop references to pid and mm */
+	put_pid(ref->pid);
+	if (ref->mm) {
+		mm_context_remove_vas_window(ref->mm);
+		mmdrop(ref->mm);
+	}
+}
 
 /*
  * Receive window attributes specified by the (in-kernel) owner of window.
@@ -192,4 +216,5 @@ int vas_register_coproc_api(struct module *mod, enum vas_cop_type cop_type,
 			    struct vas_user_win_ops *vops);
 void vas_unregister_coproc_api(void);
 
+int vas_reference_pid_mm(struct vas_user_win_ref *task_ref);
 #endif /* __ASM_POWERPC_VAS_H */
