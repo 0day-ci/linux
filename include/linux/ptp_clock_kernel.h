@@ -3,6 +3,7 @@
  * PTP 1588 clock support
  *
  * Copyright (C) 2010 OMICRON electronics GmbH
+ * Copyright 2021 NXP
  */
 
 #ifndef _PTP_CLOCK_KERNEL_H_
@@ -11,7 +12,9 @@
 #include <linux/device.h>
 #include <linux/pps_kernel.h>
 #include <linux/ptp_clock.h>
+#include <linux/timecounter.h>
 
+#define PTP_CLOCK_NAME_LEN	32
 /**
  * struct ptp_clock_request - request PTP clock event
  *
@@ -49,6 +52,32 @@ struct ptp_system_timestamp {
 };
 
 /**
+ * struct ptp_vclock_cc - ptp virtual clock cycle counter info
+ *
+ * @cc:               cyclecounter structure
+ * @refresh_interval: time interval to refresh time counter, to avoid 64-bit
+ *                    overflow during delta conversion. For example, with
+ *                    cc.mult value 2^28,  there are 36 bits left of cycle
+ *                    counter. With 1 ns counter resolution, the overflow time
+ *                    is 2^36 ns which is 68.7 s. The refresh_interval may be
+ *                    (60 * HZ) less than 68.7 s.
+ * @mult_factor:      parameter for cc.mult adjustment calculation, see below
+ * @div_factor:       parameter for cc.mult adjustment calculation, see below
+ *
+ * scaled_ppm to adjustment of cc.mult
+ *
+ * adj = mult * (ppb / 10^9)
+ *     = mult * (scaled_ppm * 1000 / 2^16) / 10^9
+ *     = scaled_ppm * mult_factor / div_factor
+ */
+struct ptp_vclock_cc {
+	struct cyclecounter cc;
+	unsigned long refresh_interval;
+	u32 mult_factor;
+	u32 div_factor;
+};
+
+/**
  * struct ptp_clock_info - describes a PTP hardware clock
  *
  * @owner:     The clock driver should set to THIS_MODULE.
@@ -64,6 +93,8 @@ struct ptp_system_timestamp {
  * @pin_config: Array of length 'n_pins'. If the number of
  *              programmable pins is nonzero, then drivers must
  *              allocate and initialize this array.
+ * @vclock_cc: ptp_vclock_cc structure pointer. Provide initial cyclecounter
+ *             info for ptp virtual clock. This is optional.
  *
  * clock operations
  *
@@ -134,7 +165,7 @@ struct ptp_system_timestamp {
 
 struct ptp_clock_info {
 	struct module *owner;
-	char name[16];
+	char name[PTP_CLOCK_NAME_LEN];
 	s32 max_adj;
 	int n_alarm;
 	int n_ext_ts;
@@ -142,6 +173,7 @@ struct ptp_clock_info {
 	int n_pins;
 	int pps;
 	struct ptp_pin_desc *pin_config;
+	struct ptp_vclock_cc *vclock_cc;
 	int (*adjfine)(struct ptp_clock_info *ptp, long scaled_ppm);
 	int (*adjfreq)(struct ptp_clock_info *ptp, s32 delta);
 	int (*adjphase)(struct ptp_clock_info *ptp, s32 phase);
@@ -304,6 +336,12 @@ int ptp_schedule_worker(struct ptp_clock *ptp, unsigned long delay);
  */
 void ptp_cancel_worker_sync(struct ptp_clock *ptp);
 
+/**
+ * ptp_get_pclock_info() - get ptp_clock_info pointer of physical clock
+ *
+ * @cc:     cyclecounter pointer of ptp virtual clock.
+ */
+struct ptp_clock_info *ptp_get_pclock_info(const struct cyclecounter *cc);
 #else
 static inline struct ptp_clock *ptp_clock_register(struct ptp_clock_info *info,
 						   struct device *parent)
@@ -324,6 +362,9 @@ static inline int ptp_schedule_worker(struct ptp_clock *ptp,
 static inline void ptp_cancel_worker_sync(struct ptp_clock *ptp)
 { }
 
+static inline struct ptp_clock_info *ptp_get_pclock_info(
+	const struct cyclecounter *cc)
+{ return NULL; }
 #endif
 
 static inline void ptp_read_system_prets(struct ptp_system_timestamp *sts)
