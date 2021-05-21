@@ -218,26 +218,19 @@ static void panfrost_attach_object_fences(struct drm_gem_object **bos,
 
 int panfrost_job_push(struct panfrost_job *job)
 {
-	struct panfrost_device *pfdev = job->pfdev;
 	int slot = panfrost_job_get_slot(job);
 	struct drm_sched_entity *entity = &job->file_priv->sched_entity[slot];
 	struct ww_acquire_ctx acquire_ctx;
 	int ret = 0;
 
-	mutex_lock(&pfdev->sched_lock);
-
 	ret = drm_gem_lock_reservations(job->bos, job->bo_count,
 					    &acquire_ctx);
-	if (ret) {
-		mutex_unlock(&pfdev->sched_lock);
+	if (ret)
 		return ret;
-	}
 
 	ret = drm_sched_job_init(&job->base, entity, NULL);
-	if (ret) {
-		mutex_unlock(&pfdev->sched_lock);
+	if (ret)
 		goto unlock;
-	}
 
 	job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
 
@@ -247,8 +240,6 @@ int panfrost_job_push(struct panfrost_job *job)
 				       job->implicit_fences);
 
 	drm_sched_entity_push_job(&job->base, entity);
-
-	mutex_unlock(&pfdev->sched_lock);
 
 	panfrost_attach_object_fences(job->bos, job->bo_count,
 				      job->render_done_fence);

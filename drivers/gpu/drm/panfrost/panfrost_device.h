@@ -105,8 +105,6 @@ struct panfrost_device {
 
 	struct panfrost_perfcnt *perfcnt;
 
-	struct mutex sched_lock;
-
 	struct {
 		struct work_struct work;
 		atomic_t pending;
