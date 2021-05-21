@@ -394,6 +394,17 @@ static bool bmc150_apply_acpi_orientation(struct device *dev,
 	acpi_status status;
 	int i, j, val[3];
 
+	/* Special case for devices with a "DUAL250E" HID */
+	if (adev && acpi_dev_hid_uid_match(adev, "DUAL250E", NULL)) {
+		if (strcmp(dev_name(dev), "i2c-DUAL250E:base") == 0)
+			label = "accel-base";
+		else
+			label = "accel-display";
+
+		indio_dev->label = label;
+		return false; /* DUAL250E fwnodes have no mount matrix info */
+	}
+
 	if (!adev || !acpi_dev_hid_uid_match(adev, "BOSC0200", NULL))
 		return false;
 
