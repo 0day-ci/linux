@@ -16,6 +16,7 @@
 #include <linux/mmu_context.h>
 #include <asm/switch_to.h>
 #include <asm/ppc-opcode.h>
+#include <asm/vas.h>
 #include "vas.h"
 #include "copy-paste.h"
 
@@ -1442,6 +1443,49 @@ struct vas_window *vas_pswid_to_window(struct vas_instance *vinst,
 	return window;
 }
 
+static struct vas_window *vas_user_win_open(struct vas_tx_win_open_attr *uattr,
+				enum vas_cop_type cop_type)
+{
+	struct vas_tx_win_attr txattr = {};
+
+	vas_init_tx_win_attr(&txattr, cop_type);
+
+	txattr.lpid = mfspr(SPRN_LPID);
+	txattr.pidr = mfspr(SPRN_PID);
+	txattr.user_win = true;
+	txattr.rsvd_txbuf_count = false;
+	txattr.pswid = false;
+
+	pr_devel("Pid %d: Opening txwin, PIDR %ld\n", txattr.pidr,
+				mfspr(SPRN_PID));
+
+	return vas_tx_win_open(uattr->vas_id, cop_type, &txattr);
+}
+
+static u64 vas_user_win_paste_addr(void *addr)
+{
+	u64 paste_addr;
+
+	vas_win_paste_addr((struct vas_window *)addr, &paste_addr, NULL);
+
+	return paste_addr;
+}
+
+static int vas_user_win_close(void *addr)
+{
+	struct vas_window *txwin = addr;
+
+	vas_win_close(txwin);
+
+	return 0;
+}
+
+static struct vas_user_win_ops vops =  {
+	.open_win	=	vas_user_win_open,
+	.paste_addr	=	vas_user_win_paste_addr,
+	.close_win	=	vas_user_win_close,
+};
+
 /*
  * Supporting only nx-gzip coprocessor type now, but this API code
  * extended to other coprocessor types later.
@@ -1450,7 +1494,7 @@ int vas_register_api_powernv(struct module *mod, enum vas_cop_type cop_type,
 			     const char *name)
 {
 
-	return vas_register_coproc_api(mod, cop_type, name);
+	return vas_register_coproc_api(mod, cop_type, name, &vops);
 }
 EXPORT_SYMBOL_GPL(vas_register_api_powernv);
 

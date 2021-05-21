@@ -5,6 +5,7 @@
 
 #ifndef _ASM_POWERPC_VAS_H
 #define _ASM_POWERPC_VAS_H
+#include <uapi/asm/vas-api.h>
 
 struct vas_window;
 
@@ -46,6 +47,16 @@ enum vas_cop_type {
 	VAS_COP_TYPE_GZIP_HIPRI,
 	VAS_COP_TYPE_FTW,
 	VAS_COP_TYPE_MAX,
+};
+
+/*
+ * User space window operations used for powernv and powerVM
+ */
+struct vas_user_win_ops {
+	struct vas_window * (*open_win)(struct vas_tx_win_open_attr *,
+				enum vas_cop_type);
+	u64 (*paste_addr)(void *);
+	int (*close_win)(void *);
 };
 
 /*
@@ -177,7 +188,8 @@ void vas_unregister_api_powernv(void);
  * used for others in future.
  */
 int vas_register_coproc_api(struct module *mod, enum vas_cop_type cop_type,
-				const char *name);
+			    const char *name,
+			    struct vas_user_win_ops *vops);
 void vas_unregister_coproc_api(void);
 
 #endif /* __ASM_POWERPC_VAS_H */
