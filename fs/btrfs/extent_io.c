@@ -1863,6 +1863,7 @@ noinline_for_stack bool find_lock_delalloc_range(struct inode *inode,
 				    u64 *end)
 {
 	struct extent_io_tree *tree = &BTRFS_I(inode)->io_tree;
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	u64 max_bytes = BTRFS_MAX_EXTENT_SIZE;
 	u64 delalloc_start;
 	u64 delalloc_end;
@@ -1871,6 +1872,9 @@ noinline_for_stack bool find_lock_delalloc_range(struct inode *inode,
 	int ret;
 	int loops = 0;
 
+	if (fs_info && fs_info->max_zone_append_size)
+		max_bytes = ALIGN_DOWN(fs_info->max_zone_append_size,
+				       PAGE_SIZE);
 again:
 	/* step one, find a bunch of delalloc bytes starting at start */
 	delalloc_start = *start;
