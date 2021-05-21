@@ -103,12 +103,14 @@ nf_conntrack_max - INTEGER
 	Size of connection tracking table.  Default value is
 	nf_conntrack_buckets value * 4.
 
-nf_conntrack_tcp_be_liberal - BOOLEAN
+nf_conntrack_tcp_be_liberal - INTEGER
 	- 0 - disabled (default)
-	- not 0 - enabled
+        - 1 - RST sequence number check only
+	- greater than 1 - turns off all sequence number/window checks
 
-	Be conservative in what you do, be liberal in what you accept from others.
-	If it's non-zero, we mark only out of window RST segments as INVALID.
+	Be conservative in what you do, be liberal in what you accept from
+	others. If it is set to 1, we mark only out of window RST segments as
+	INVALID. Values greater than 1 disables also RST sequence numbers check.
 
 nf_conntrack_tcp_loose - BOOLEAN
 	- 0 - disabled
