@@ -193,7 +193,7 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 	struct sock *sk;
 	struct sk_buff *skb_copy = NULL;
 
-	BT_DBG("hdev %p len %d", hdev, skb->len);
+	BT_DBG("hdev %p len %u", hdev, skb->len);
 
 	read_lock(&hci_sk_list.lock);
 
@@ -258,7 +258,7 @@ static void __hci_send_to_channel(unsigned short channel, struct sk_buff *skb,
 {
 	struct sock *sk;
 
-	BT_DBG("channel %u len %d", channel, skb->len);
+	BT_DBG("channel %u len %u", channel, skb->len);
 
 	sk_for_each(sk, &hci_sk_list.head) {
 		struct sk_buff *nskb;
@@ -305,7 +305,7 @@ void hci_send_to_monitor(struct hci_dev *hdev, struct sk_buff *skb)
 	if (!atomic_read(&monitor_promisc))
 		return;
 
-	BT_DBG("hdev %p len %d", hdev, skb->len);
+	BT_DBG("hdev %p len %u", hdev, skb->len);
 
 	switch (hci_skb_pkt_type(skb)) {
 	case HCI_COMMAND_PKT:

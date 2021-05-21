@@ -519,7 +519,7 @@ static void hci_cc_read_num_supported_iac(struct hci_dev *hdev,
 
 	hdev->num_iac = rp->num_iac;
 
-	BT_DBG("%s num iac %d", hdev->name, hdev->num_iac);
+	BT_DBG("%s num iac %u", hdev->name, hdev->num_iac);
 }
 
 static void hci_cc_write_ssp_mode(struct hci_dev *hdev, struct sk_buff *skb)
@@ -765,7 +765,7 @@ static void hci_cc_read_buffer_size(struct hci_dev *hdev, struct sk_buff *skb)
 	hdev->acl_cnt = hdev->acl_pkts;
 	hdev->sco_cnt = hdev->sco_pkts;
 
-	BT_DBG("%s acl mtu %d:%d sco mtu %d:%d", hdev->name, hdev->acl_mtu,
+	BT_DBG("%s acl mtu %u:%u sco mtu %u:%u", hdev->name, hdev->acl_mtu,
 	       hdev->acl_pkts, hdev->sco_mtu, hdev->sco_pkts);
 }
 
@@ -883,7 +883,7 @@ static void hci_cc_read_data_block_size(struct hci_dev *hdev,
 
 	hdev->block_cnt = hdev->num_blocks;
 
-	BT_DBG("%s blk mtu %d cnt %d len %d", hdev->name, hdev->block_mtu,
+	BT_DBG("%s blk mtu %u cnt %u len %u", hdev->name, hdev->block_mtu,
 	       hdev->block_cnt, hdev->block_len);
 }
 
@@ -1046,7 +1046,7 @@ static void hci_cc_le_read_buffer_size(struct hci_dev *hdev,
 
 	hdev->le_cnt = hdev->le_pkts;
 
-	BT_DBG("%s le mtu %d:%d", hdev->name, hdev->le_mtu, hdev->le_pkts);
+	BT_DBG("%s le mtu %u:%u", hdev->name, hdev->le_mtu, hdev->le_pkts);
 }
 
 static void hci_cc_le_read_local_features(struct hci_dev *hdev,
@@ -1434,7 +1434,7 @@ static void le_set_scan_enable_complete(struct hci_dev *hdev, u8 enable)
 		break;
 
 	default:
-		bt_dev_err(hdev, "use of reserved LE_Scan_Enable param %d",
+		bt_dev_err(hdev, "use of reserved LE_Scan_Enable param %u",
 			   enable);
 		break;
 	}
@@ -3799,7 +3799,7 @@ static void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	int i;
 
 	if (hdev->flow_ctl_mode != HCI_FLOW_CTL_MODE_PACKET_BASED) {
-		bt_dev_err(hdev, "wrong event for mode %d", hdev->flow_ctl_mode);
+		bt_dev_err(hdev, "wrong event for mode %u", hdev->flow_ctl_mode);
 		return;
 	}
 
@@ -3809,7 +3809,7 @@ static void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		return;
 	}
 
-	BT_DBG("%s num_hndl %d", hdev->name, ev->num_hndl);
+	BT_DBG("%s num_hndl %u", hdev->name, ev->num_hndl);
 
 	for (i = 0; i < ev->num_hndl; i++) {
 		struct hci_comp_pkts_info *info = &ev->handles[i];
@@ -3851,7 +3851,7 @@ static void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *skb)
 			break;
 
 		default:
-			bt_dev_err(hdev, "unknown type %d conn %p",
+			bt_dev_err(hdev, "unknown type %u conn %p",
 				   conn->type, conn);
 			break;
 		}
@@ -3874,7 +3874,7 @@ static struct hci_conn *__hci_conn_lookup_handle(struct hci_dev *hdev,
 			return chan->conn;
 		break;
 	default:
-		bt_dev_err(hdev, "unknown dev_type %d", hdev->dev_type);
+		bt_dev_err(hdev, "unknown dev_type %u", hdev->dev_type);
 		break;
 	}
 
@@ -3887,7 +3887,7 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	int i;
 
 	if (hdev->flow_ctl_mode != HCI_FLOW_CTL_MODE_BLOCK_BASED) {
-		bt_dev_err(hdev, "wrong event for mode %d", hdev->flow_ctl_mode);
+		bt_dev_err(hdev, "wrong event for mode %u", hdev->flow_ctl_mode);
 		return;
 	}
 
@@ -3897,7 +3897,7 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		return;
 	}
 
-	BT_DBG("%s num_blocks %d num_hndl %d", hdev->name, ev->num_blocks,
+	BT_DBG("%s num_blocks %d num_hndl %u", hdev->name, ev->num_blocks,
 	       ev->num_hndl);
 
 	for (i = 0; i < ev->num_hndl; i++) {
@@ -3923,7 +3923,7 @@ static void hci_num_comp_blocks_evt(struct hci_dev *hdev, struct sk_buff *skb)
 			break;
 
 		default:
-			bt_dev_err(hdev, "unknown type %d conn %p",
+			bt_dev_err(hdev, "unknown type %u conn %p",
 				   conn->type, conn);
 			break;
 		}
