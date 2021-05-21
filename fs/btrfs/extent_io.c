@@ -2650,7 +2650,7 @@ static void end_page_read(struct page *page, bool uptodate, u64 start, u32 len)
 	 * For subapge metadata case, all btrfs_page_* helpers need page to
 	 * have page::private populated.
 	 * But we can have rare case where the last eb in the page is only
-	 * referred by the IO, and it gets released immedately after it's
+	 * referred by the IO, and it gets released immediately after it's
 	 * read and verified.
 	 *
 	 * This can detach the page private completely.
