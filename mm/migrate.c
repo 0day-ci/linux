@@ -530,28 +530,6 @@ int migrate_huge_page_move_mapping(struct address_space *mapping,
 	return MIGRATEPAGE_SUCCESS;
 }
 
-/*
- * Gigantic pages are so large that we do not guarantee that page++ pointer
- * arithmetic will work across the entire page.  We need something more
- * specialized.
- */
-static void __copy_gigantic_page(struct page *dst, struct page *src,
-				int nr_pages)
-{
-	int i;
-	struct page *dst_base = dst;
-	struct page *src_base = src;
-
-	for (i = 0; i < nr_pages; ) {
-		cond_resched();
-		copy_highpage(dst, src);
-
-		i++;
-		dst = mem_map_next(dst, dst_base, i);
-		src = mem_map_next(src, src_base, i);
-	}
-}
-
 static void copy_huge_page(struct page *dst, struct page *src)
 {
 	int i;
@@ -559,18 +537,13 @@ static void copy_huge_page(struct page *dst, struct page *src)
 
 	if (PageHuge(src)) {
 		/* hugetlbfs page */
-		struct hstate *h = page_hstate(src);
-		nr_pages = pages_per_huge_page(h);
-
-		if (unlikely(nr_pages > MAX_ORDER_NR_PAGES)) {
-			__copy_gigantic_page(dst, src, nr_pages);
-			return;
-		}
-	} else {
-		/* thp page */
-		BUG_ON(!PageTransHuge(src));
-		nr_pages = thp_nr_pages(src);
+		hugetlb_copy_page(dst, src);
+		return;
 	}
+
+	/* thp page */
+	BUG_ON(!PageTransHuge(src));
+	nr_pages = thp_nr_pages(src);
 
 	for (i = 0; i < nr_pages; i++) {
 		cond_resched();
