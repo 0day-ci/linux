@@ -39,10 +39,6 @@ properties:
           - adi,adp5585-02
             # Analog Devices ADP5589 Keypad Decoder and I/O Expansion
           - adi,adp5589
-            # +/-1C TDM Extended Temp Range I.C
-          - adi,adt7461
-            # +/-1C TDM Extended Temp Range I.C
-          - adt7461
             # AMS iAQ-Core VOC Sensor
           - ams,iaq-core
             # i2c serial eeprom  (24cxx)
@@ -65,14 +61,10 @@ properties:
           - dallas,ds1631
             # Total-Elapsed-Time Recorder with Alarm
           - dallas,ds1682
-            # Tiny Digital Thermometer and Thermostat
-          - dallas,ds1775
             # CPU Peripheral Monitor
           - dallas,ds1780
             # CPU Supervisor with Nonvolatile Memory and Programmable I/O
           - dallas,ds4510
-            # Digital Thermometer and Thermostat
-          - dallas,ds75
             # 1/4 Brick DC/DC Regulated Power Module
           - delta,q54sj108a2
             # Devantech SRF02 ultrasonic ranger in I2C mode
@@ -83,8 +75,6 @@ properties:
           - devantech,srf10
             # DA9053: flexible system level PMIC with multicore support
           - dlg,da9053
-            # DA9063: system PMIC for quad-core application processors
-          - dlg,da9063
             # DMARD05: 3-axis I2C Accelerometer
           - domintech,dmard05
             # DMARD06: 3-axis I2C Accelerometer
@@ -107,8 +97,6 @@ properties:
           - mps,mp2888
             # Monolithic Power Systems Inc. multi-phase controller mp2975
           - mps,mp2975
-            # G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire Interface
-          - gmt,g751
             # Infineon IR36021 digital POL buck controller
           - infineon,ir36021
             # Infineon IR38064 Voltage Regulator
@@ -139,8 +127,6 @@ properties:
           - maxim,ds1803-050
             # 100 kOhm digital potentiometer with I2C interface
           - maxim,ds1803-100
-            # Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
-          - maxim,max1237
             # 10-bit 10 kOhm linear programable voltage divider
           - maxim,max5481
             # 10-bit 50 kOhm linear programable voltage divider
@@ -151,8 +137,6 @@ properties:
           - maxim,max5484
             # PECI-to-I2C translator for PECI-to-SMBus/I2C protocol conversion
           - maxim,max6621
-            # 9-Bit/12-Bit Temperature Sensors with I²C-Compatible Serial Interface
-          - maxim,max6625
             # 3-Channel Remote Temperature Sensor
           - maxim,max31730
             # mCube 3-axis 8-bit digital accelerometer
@@ -235,8 +219,6 @@ properties:
           - miramems,da311
             # Temperature sensor with integrated fan control
           - national,lm63
-            # I2C TEMP SENSOR
-          - national,lm75
             # Serial Interface ACPI-Compatible Microprocessor System Hardware Monitor
           - national,lm80
             # Serial Interface ACPI-Compatible Microprocessor System Hardware Monitor
@@ -247,8 +229,6 @@ properties:
           - national,lm92
             # i2c trusted platform module (TPM)
           - nuvoton,npct501
-            # i2c trusted platform module (TPM2)
-          - nuvoton,npct601
             # Nuvoton Temperature Sensor
           - nuvoton,w83773g
             # OKI ML86V7667 video decoder
@@ -275,8 +255,6 @@ properties:
           - sgx,vz89x
             # Relative Humidity and Temperature Sensors
           - silabs,si7020
-            # Skyworks SKY81452: Six-Channel White LED Driver with Touch Panel Bias Supply
-          - skyworks,sky81452
             # Socionext SynQuacer TPM MMIO module
           - socionext,synquacer-tpm-mmio
             # i2c serial eeprom  (24cxx)
@@ -305,8 +283,6 @@ properties:
           - ti,tmp102
             # Low Power Digital Temperature Sensor with SMBUS/Two Wire Serial Interface
           - ti,tmp103
-            # Digital Temperature Sensor
-          - ti,tmp275
             # TI Dual channel DCAP+ multiphase controller TPS53676 with AVSBus
           - ti,tps53676
             # TI Dual channel DCAP+ multiphase controller TPS53679
