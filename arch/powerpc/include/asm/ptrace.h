@@ -52,6 +52,7 @@ struct pt_regs
 		struct {
 #ifdef CONFIG_PPC64
 			unsigned long ppr;
+			unsigned long exit_result;
 #endif
 			union {
 #ifdef CONFIG_PPC_KUAP

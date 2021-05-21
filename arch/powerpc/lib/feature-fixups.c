@@ -17,6 +17,7 @@
 #include <linux/stop_machine.h>
 #include <asm/cputable.h>
 #include <asm/code-patching.h>
+#include <asm/interrupt.h>
 #include <asm/page.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
@@ -228,9 +229,26 @@ static void do_stf_exit_barrier_fixups(enum stf_barrier_type types)
 		                                           : "unknown");
 }
 
+static bool stf_exit_not_reentrant = false;
+static bool rfi_exit_not_reentrant = false;
+
+static void update_interrupt_exit(void)
+{
+	if (stf_exit_not_reentrant || rfi_exit_not_reentrant)
+		static_branch_enable(&interrupt_exit_not_reentrant);
+	else
+		static_branch_disable(&interrupt_exit_not_reentrant);
+}
+
 static int __do_stf_barrier_fixups(void *data)
 {
 	enum stf_barrier_type *types = data;
+
+	if (*types & STF_BARRIER_FALLBACK || *types & STF_BARRIER_SYNC_ORI)
+		stf_exit_not_reentrant = true;
+	else
+		stf_exit_not_reentrant = false;
+	update_interrupt_exit();
 
 	do_stf_entry_barrier_fixups(*types);
 	do_stf_exit_barrier_fixups(*types);
@@ -412,11 +430,18 @@ void do_entry_flush_fixups(enum l1d_flush_type types)
 	stop_machine(__do_entry_flush_fixups, &types, NULL);
 }
 
-void do_rfi_flush_fixups(enum l1d_flush_type types)
+static int __do_rfi_flush_fixups(void *data)
 {
+	enum l1d_flush_type types = *(enum l1d_flush_type *)data;
 	unsigned int instrs[3], *dest;
 	long *start, *end;
 	int i;
+
+	if (types & L1D_FLUSH_FALLBACK)
+		rfi_exit_not_reentrant = true;
+	else
+		rfi_exit_not_reentrant = false;
+	update_interrupt_exit();
 
 	start = PTRRELOC(&__start___rfi_flush_fixup);
 	end = PTRRELOC(&__stop___rfi_flush_fixup);
@@ -456,6 +481,17 @@ void do_rfi_flush_fixups(enum l1d_flush_type types)
 							: "ori type" :
 		(types &  L1D_FLUSH_MTTRIG)     ? "mttrig type"
 						: "unknown");
+
+	return 0;
+}
+
+void do_rfi_flush_fixups(enum l1d_flush_type types)
+{
+	/*
+	 * The interrupt_exit_not_reentrant static branch together with the
+	 * patching is not safe to perform while other CPUs are executing.
+	 */
+	stop_machine(__do_rfi_flush_fixups, &types, NULL);
 }
 
 void do_barrier_nospec_fixups_range(bool enable, void *fixup_start, void *fixup_end)
