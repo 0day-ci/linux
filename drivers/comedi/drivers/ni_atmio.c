@@ -44,8 +44,7 @@
  */
 
 /*
- * The real guts of the driver is in ni_mio_common.c, which is included
- * both here and in ni_pcimio.c
+ * The real guts of the driver is in ni_mio_common.c.
  *
  * Interrupt support added by Truxton Fulton <trux@truxton.com>
  *
@@ -78,6 +77,7 @@
 #include <linux/isapnp.h>
 
 #include "ni_stc.h"
+#include "ni_mio.h"
 #include "8255.h"
 
 /* AT specific setup */
@@ -204,8 +204,6 @@ static const struct ni_board_struct ni_boards[] = {
 static const int ni_irqpin[] = {
 	-1, -1, -1, 0, 1, 2, -1, 3, -1, -1, 4, 5, 6, -1, -1, 7
 };
-
-#include "ni_mio_common.c"
 
 static const struct pnp_device_id device_ids[] = {
 	{.id = "NIC1900", .driver_data = 0},

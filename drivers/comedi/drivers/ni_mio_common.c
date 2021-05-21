@@ -41,10 +41,15 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include "8255.h"
 #include "mite.h"
+
+#include "ni_stc.h"
+#include "ni_mio.h"
+#include "../comedidev.h"
 
 /* A timeout count */
 #define NI_TIMEOUT 1000
@@ -160,7 +165,7 @@ static const struct comedi_lrange range_ni_M_ai_628x = {
 	}
 };
 
-static const struct comedi_lrange range_ni_E_ao_ext = {
+const struct comedi_lrange range_ni_E_ao_ext = {
 	4, {
 		BIP_RANGE(10),
 		UNI_RANGE(10),
@@ -168,6 +173,7 @@ static const struct comedi_lrange range_ni_E_ao_ext = {
 		RANGE_ext(0, 1)
 	}
 };
+EXPORT_SYMBOL_GPL(range_ni_E_ao_ext);
 
 static const struct comedi_lrange *const ni_range_lkup[] = {
 	[ai_gain_16] = &range_ni_E_ai,
@@ -187,26 +193,6 @@ enum aimodes {
 	AIMODE_SAMPLE = 3,
 };
 
-enum ni_common_subdevices {
-	NI_AI_SUBDEV,
-	NI_AO_SUBDEV,
-	NI_DIO_SUBDEV,
-	NI_8255_DIO_SUBDEV,
-	NI_UNUSED_SUBDEV,
-	NI_CALIBRATION_SUBDEV,
-	NI_EEPROM_SUBDEV,
-	NI_PFI_DIO_SUBDEV,
-	NI_CS5529_CALIBRATION_SUBDEV,
-	NI_SERIAL_SUBDEV,
-	NI_RTSI_SUBDEV,
-	NI_GPCT0_SUBDEV,
-	NI_GPCT1_SUBDEV,
-	NI_FREQ_OUT_SUBDEV,
-	NI_NUM_SUBDEVICES
-};
-
-#define NI_GPCT_SUBDEV(x)	(NI_GPCT0_SUBDEV + (x))
-
 enum timebase_nanoseconds {
 	TIMEBASE_1_NS = 50,
 	TIMEBASE_2_NS = 10000
@@ -219,29 +205,32 @@ enum timebase_nanoseconds {
 
 static const int num_adc_stages_611x = 3;
 
-static void ni_writel(struct comedi_device *dev, unsigned int data, int reg)
+void ni_writel(struct comedi_device *dev, unsigned int data, int reg)
 {
 	if (dev->mmio)
 		writel(data, dev->mmio + reg);
 	else
 		outl(data, dev->iobase + reg);
 }
+EXPORT_SYMBOL_GPL(ni_writel);
 
-static void ni_writew(struct comedi_device *dev, unsigned int data, int reg)
+void ni_writew(struct comedi_device *dev, unsigned int data, int reg)
 {
 	if (dev->mmio)
 		writew(data, dev->mmio + reg);
 	else
 		outw(data, dev->iobase + reg);
 }
+EXPORT_SYMBOL_GPL(ni_writew);
 
-static void ni_writeb(struct comedi_device *dev, unsigned int data, int reg)
+void ni_writeb(struct comedi_device *dev, unsigned int data, int reg)
 {
 	if (dev->mmio)
 		writeb(data, dev->mmio + reg);
 	else
 		outb(data, dev->iobase + reg);
 }
+EXPORT_SYMBOL_GPL(ni_writeb);
 
 static unsigned int ni_readl(struct comedi_device *dev, int reg)
 {
@@ -259,13 +248,14 @@ static unsigned int ni_readw(struct comedi_device *dev, int reg)
 	return inw(dev->iobase + reg);
 }
 
-static unsigned int ni_readb(struct comedi_device *dev, int reg)
+unsigned int ni_readb(struct comedi_device *dev, int reg)
 {
 	if (dev->mmio)
 		return readb(dev->mmio + reg);
 
 	return inb(dev->iobase + reg);
 }
+EXPORT_SYMBOL_GPL(ni_readb);
 
 /*
  * We automatically take advantage of STC registers that can be
@@ -435,8 +425,7 @@ static unsigned int m_series_stc_read(struct comedi_device *dev,
 	}
 }
 
-static void ni_stc_writew(struct comedi_device *dev,
-			  unsigned int data, int reg)
+void ni_stc_writew(struct comedi_device *dev, unsigned int data, int reg)
 {
 	struct ni_private *devpriv = dev->private;
 	unsigned long flags;
@@ -454,6 +443,7 @@ static void ni_stc_writew(struct comedi_device *dev,
 		spin_unlock_irqrestore(&devpriv->window_lock, flags);
 	}
 }
+EXPORT_SYMBOL_GPL(ni_stc_writew);
 
 static void ni_stc_writel(struct comedi_device *dev,
 			  unsigned int data, int reg)
@@ -4482,7 +4472,7 @@ static void caldac_setup(struct comedi_device *dev, struct comedi_subdevice *s)
 	}
 }
 
-static int ni_read_eeprom(struct comedi_device *dev, int addr)
+int ni_read_eeprom(struct comedi_device *dev, int addr)
 {
 	unsigned int cmd = NI_E_SERIAL_CMD_EEPROM_CS;
 	int bit;
@@ -4511,6 +4501,7 @@ static int ni_read_eeprom(struct comedi_device *dev, int addr)
 
 	return bitstring;
 }
+EXPORT_SYMBOL_GPL(ni_read_eeprom);
 
 static int ni_eeprom_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
@@ -5885,7 +5876,7 @@ static int ni_gpct_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
 }
 #endif
 
-static irqreturn_t ni_E_interrupt(int irq, void *d)
+irqreturn_t ni_E_interrupt(int irq, void *d)
 {
 	struct comedi_device *dev = d;
 	struct comedi_subdevice *s_ai = dev->read_subdev;
@@ -5941,8 +5932,9 @@ static irqreturn_t ni_E_interrupt(int irq, void *d)
 	spin_unlock_irqrestore(&dev->spinlock, flags);
 	return IRQ_HANDLED;
 }
+EXPORT_SYMBOL_GPL(ni_E_interrupt);
 
-static int ni_alloc_private(struct comedi_device *dev)
+int ni_alloc_private(struct comedi_device *dev)
 {
 	struct ni_private *devpriv;
 
@@ -5956,6 +5948,7 @@ static int ni_alloc_private(struct comedi_device *dev)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(ni_alloc_private);
 
 static unsigned int _ni_get_valid_routes(struct comedi_device *dev,
 					 unsigned int n_pairs,
@@ -5967,8 +5960,8 @@ static unsigned int _ni_get_valid_routes(struct comedi_device *dev,
 				   pair_data);
 }
 
-static int ni_E_init(struct comedi_device *dev,
-		     unsigned int interrupt_pin, unsigned int irq_polarity)
+int ni_E_init(struct comedi_device *dev,
+	      unsigned int interrupt_pin, unsigned int irq_polarity)
 {
 	const struct ni_board_struct *board = dev->board_ptr;
 	struct ni_private *devpriv = dev->private;
@@ -6331,11 +6324,15 @@ static int ni_E_init(struct comedi_device *dev,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(ni_E_init);
 
-static void mio_common_detach(struct comedi_device *dev)
+void mio_common_detach(struct comedi_device *dev)
 {
 	struct ni_private *devpriv = dev->private;
 
 	if (devpriv)
 		ni_gpct_device_destroy(devpriv->counter_dev);
 }
+EXPORT_SYMBOL_GPL(mio_common_detach);
+
+MODULE_LICENSE("GPL");
