@@ -276,7 +276,7 @@ static u32 fanotify_group_event_mask(struct fsnotify_group *group,
 		/* Path type events are only relevant for files and dirs */
 		if (!d_is_reg(path->dentry) && !d_can_lookup(path->dentry))
 			return 0;
-	} else if (!(fid_mode & FAN_REPORT_FID)) {
+	} else if (fid_mode & FAN_REPORT_DFID_NAME) {
 		/* Do we have a directory inode to report? */
 		if (!dir && !(event_mask & FS_ISDIR))
 			return 0;
