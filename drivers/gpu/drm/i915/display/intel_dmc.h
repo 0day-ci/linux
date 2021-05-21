@@ -18,6 +18,7 @@ struct drm_i915_private;
 
 enum {
 	DMC_FW_MAIN = 0,
+	DMC_FW_PIPEA,
 	DMC_FW_MAX
 };
 
@@ -35,6 +36,7 @@ struct intel_dmc {
 		u32 start_mmioaddr;
 		u32 dmc_fw_size; /*dwords */
 		u32 *payload;
+		bool present;
 	} dmc_info[DMC_FW_MAX];
 
 	u32 dc_state;
