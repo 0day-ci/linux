@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2010 OMICRON electronics GmbH
- * Copyright 2018 NXP
+ * Copyright 2018-2021 NXP
  */
 #ifndef __PTP_QORIQ_H__
 #define __PTP_QORIQ_H__
@@ -193,6 +193,7 @@ int ptp_qoriq_settime(struct ptp_clock_info *ptp,
 		      const struct timespec64 *ts);
 int ptp_qoriq_enable(struct ptp_clock_info *ptp,
 		     struct ptp_clock_request *rq, int on);
+u64 ptp_qoriq_clock_read(const struct cyclecounter *cc);
 int extts_clean_up(struct ptp_qoriq *ptp_qoriq, int index, bool update_event);
 #ifdef CONFIG_DEBUG_FS
 void ptp_qoriq_create_debugfs(struct ptp_qoriq *ptp_qoriq);

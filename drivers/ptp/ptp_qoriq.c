@@ -3,6 +3,7 @@
  * PTP 1588 clock for Freescale QorIQ 1588 timer
  *
  * Copyright (C) 2010 OMICRON electronics GmbH
+ * Copyright 2021 NXP
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -310,6 +311,21 @@ int ptp_qoriq_enable(struct ptp_clock_info *ptp,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ptp_qoriq_enable);
+
+u64 ptp_qoriq_clock_read(const struct cyclecounter *cc)
+{
+	struct ptp_clock_info *ptp = ptp_get_pclock_info(cc);
+	struct ptp_qoriq *ptp_qoriq = container_of(ptp, struct ptp_qoriq, caps);
+	unsigned long flags;
+	u64 ns;
+
+	spin_lock_irqsave(&ptp_qoriq->lock, flags);
+	ns = tmr_cnt_read(ptp_qoriq);
+	spin_unlock_irqrestore(&ptp_qoriq->lock, flags);
+
+	return ns;
+}
+EXPORT_SYMBOL_GPL(ptp_qoriq_clock_read);
 
 static const struct ptp_clock_info ptp_qoriq_caps = {
 	.owner		= THIS_MODULE,
