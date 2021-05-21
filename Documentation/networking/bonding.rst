@@ -707,6 +707,13 @@ mode
 		swapped with the new curr_active_slave that was
 		chosen.
 
+novlan_srcmac
+
+	When using the vlan+srcmac xmit_hash_policy, there may be cases where
+	omitting the vlan from the hash is beneficial. This can be done with
+	an extra module parameter here. The default value is 0 to include
+	vlan ID in the transmit hash.
+
 num_grat_arp,
 num_unsol_na
 
@@ -963,6 +970,12 @@ xmit_hash_policy
 		The formula for the hash is simply
 
 		hash = (vlan ID) XOR (source MAC vendor) XOR (source MAC dev)
+
+		Optionally, if the module parameter novlan_srcmac=1 is set,
+		the vlan ID is omitted from the hash and only the source MAC
+		address is used, reducing the hash to
+
+		hash = (source MAC vendor) XOR (source MAC dev)
 
 	The default value is layer2.  This option was added in bonding
 	version 2.6.3.  In earlier versions of bonding, this parameter
