@@ -39,19 +39,15 @@ static int fme_region_probe(struct platform_device *pdev)
 	if (IS_ERR(mgr))
 		return -EPROBE_DEFER;
 
-	region = devm_fpga_region_create(dev, mgr, fme_region_get_bridges);
-	if (!region) {
-		ret = -ENOMEM;
+	region = fpga_region_register(dev, mgr, fme_region_get_bridges);
+	if (IS_ERR(region)) {
+		ret = PTR_ERR(region);
 		goto eprobe_mgr_put;
 	}
 
 	region->priv = pdata;
 	region->compat_id = mgr->compat_id;
 	platform_set_drvdata(pdev, region);
-
-	ret = fpga_region_register(region);
-	if (ret)
-		goto eprobe_mgr_put;
 
 	dev_dbg(dev, "DFL FME FPGA Region probed\n");
 
