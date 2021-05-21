@@ -346,34 +346,6 @@ struct vas_instance {
 };
 
 /*
- * In-kernel state a VAS window. One per window.
- */
-struct vas_window {
-	/* Fields common to send and receive windows */
-	struct vas_instance *vinst;
-	int winid;
-	bool tx_win;		/* True if send window */
-	bool nx_win;		/* True if NX window */
-	bool user_win;		/* True if user space window */
-	void *hvwc_map;		/* HV window context */
-	void *uwc_map;		/* OS/User window context */
-	int wcreds_max;		/* Window credits */
-
-	struct vas_user_win_ref task_ref;
-	char *dbgname;
-	struct dentry *dbgdir;
-
-	/* Fields applicable only to send windows */
-	void *paste_kaddr;
-	char *paste_addr_name;
-	struct vas_window *rxwin;
-
-	/* Feilds applicable only to receive windows */
-	enum vas_cop_type cop;
-	atomic_t num_txwins;
-};
-
-/*
  * Container for the hardware state of a window. One per-window.
  *
  * A VAS Window context is a 512-byte area in the hardware that contains
@@ -449,8 +421,8 @@ static inline void vas_log_write(struct vas_window *win, char *name,
 {
 	if (val)
 		pr_debug("%swin #%d: %s reg %p, val 0x%016llx\n",
-				win->tx_win ? "Tx" : "Rx", win->winid, name,
-				regptr, val);
+				win->pnv.tx_win ? "Tx" : "Rx", win->winid,
+				name, regptr, val);
 }
 
 static inline void write_uwc_reg(struct vas_window *win, char *name,
@@ -458,7 +430,7 @@ static inline void write_uwc_reg(struct vas_window *win, char *name,
 {
 	void *regptr;
 
-	regptr = win->uwc_map + reg;
+	regptr = win->pnv.uwc_map + reg;
 	vas_log_write(win, name, regptr, val);
 
 	out_be64(regptr, val);
@@ -469,7 +441,7 @@ static inline void write_hvwc_reg(struct vas_window *win, char *name,
 {
 	void *regptr;
 
-	regptr = win->hvwc_map + reg;
+	regptr = win->pnv.hvwc_map + reg;
 	vas_log_write(win, name, regptr, val);
 
 	out_be64(regptr, val);
@@ -478,7 +450,7 @@ static inline void write_hvwc_reg(struct vas_window *win, char *name,
 static inline u64 read_hvwc_reg(struct vas_window *win,
 			char *name __maybe_unused, s32 reg)
 {
-	return in_be64(win->hvwc_map+reg);
+	return in_be64(win->pnv.hvwc_map + reg);
 }
 
 /*

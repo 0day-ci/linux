@@ -152,10 +152,10 @@ irqreturn_t vas_fault_thread_fn(int irq, void *data)
 			/*
 			 * NX sees faults only with user space windows.
 			 */
-			if (window->user_win)
+			if (window->pnv.user_win)
 				vas_update_csb(crb, &window->task_ref);
 			else
-				WARN_ON_ONCE(!window->user_win);
+				WARN_ON_ONCE(!window->pnv.user_win);
 
 			/*
 			 * Return credit for send window after processing

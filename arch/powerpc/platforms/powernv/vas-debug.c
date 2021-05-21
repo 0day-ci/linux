@@ -9,6 +9,7 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <asm/vas.h>
 #include "vas.h"
 
 static struct dentry *vas_debugfs;
@@ -33,11 +34,11 @@ static int info_show(struct seq_file *s, void *private)
 	mutex_lock(&vas_mutex);
 
 	/* ensure window is not unmapped */
-	if (!window->hvwc_map)
+	if (!window->pnv.hvwc_map)
 		goto unlock;
 
 	seq_printf(s, "Type: %s, %s\n", cop_to_str(window->cop),
-					window->tx_win ? "Send" : "Receive");
+				window->pnv.tx_win ? "Send" : "Receive");
 	seq_printf(s, "Pid : %d\n", vas_window_pid(window));
 
 unlock:
@@ -60,7 +61,7 @@ static int hvwc_show(struct seq_file *s, void *private)
 	mutex_lock(&vas_mutex);
 
 	/* ensure window is not unmapped */
-	if (!window->hvwc_map)
+	if (!window->pnv.hvwc_map)
 		goto unlock;
 
 	print_reg(s, window, VREG(LPID));
@@ -115,9 +116,10 @@ void vas_window_free_dbgdir(struct vas_window *window)
 
 void vas_window_init_dbgdir(struct vas_window *window)
 {
+	struct vas_instance *vinst = window->pnv.vinst;
 	struct dentry *d;
 
-	if (!window->vinst->dbgdir)
+	if (!vinst->dbgdir)
 		return;
 
 	window->dbgname = kzalloc(16, GFP_KERNEL);
@@ -126,7 +128,7 @@ void vas_window_init_dbgdir(struct vas_window *window)
 
 	snprintf(window->dbgname, 16, "w%d", window->winid);
 
-	d = debugfs_create_dir(window->dbgname, window->vinst->dbgdir);
+	d = debugfs_create_dir(window->dbgname, vinst->dbgdir);
 	window->dbgdir = d;
 
 	debugfs_create_file("info", 0444, d, window, &info_fops);
