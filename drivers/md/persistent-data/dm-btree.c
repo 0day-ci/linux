@@ -693,8 +693,10 @@ static int split_one_into_two(struct shadow_spine *s, unsigned parent_index,
  * child of the given parent node.  Making sure to update the parent to point
  * to the new shadow.
  */
-int shadow_child(struct dm_btree_info *info, struct dm_btree_value_type *vt,
-		 struct btree_node *parent, unsigned index, struct dm_block **result)
+static int shadow_child(struct dm_btree_info *info,
+			struct dm_btree_value_type *vt,
+			struct btree_node *parent,
+			unsigned index, struct dm_block **result)
 {
 	int r, inc;
 	dm_block_t root;
