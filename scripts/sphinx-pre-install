@@ -101,7 +101,12 @@ sub check_missing(%)
 		}
 
 		if ($is_optional) {
-			print "Warning: better to also install \"$prog\".\n";
+			if ($prog =~ /cjk/ ) {
+				print "Warning: For translations PDF, better to install \"$prog\".\n";
+				print "However, doing so will *degrade* English PDF typesetting.\n";
+			} else {
+				print "Warning: better to also install \"$prog\".\n";
+			}
 		} else {
 			print "ERROR: please install \"$prog\", otherwise, build won't work.\n";
 		}
