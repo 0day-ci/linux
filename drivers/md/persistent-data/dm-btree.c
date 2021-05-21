@@ -1048,7 +1048,7 @@ static bool contains_key(struct btree_node *node, uint64_t key)
 {
 	int i = lower_bound(node, key);
 
-	if (le64_to_cpu(node->keys[i]) == key)
+	if (i >= 0 && le64_to_cpu(node->keys[i]) == key)
 		return true;
 
 	return false;
