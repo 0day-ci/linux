@@ -191,10 +191,11 @@ static ssize_t kernfs_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	buf = of->prealloc_buf;
 	if (buf)
 		mutex_lock(&of->prealloc_mutex);
-	else
+	else {
 		buf = kmalloc(len, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
+		if (!buf)
+			return -ENOMEM;
+	}
 
 	/*
 	 * @of->mutex nests outside active ref and is used both to ensure that
