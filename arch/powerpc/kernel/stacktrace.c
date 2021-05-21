@@ -51,6 +51,10 @@ void arch_stack_walk(stack_trace_consume_fn consume_entry, void *cookie,
 		if (!consume_entry(cookie, ip))
 			return;
 
+		ip = ftrace_get_traced_func_if_no_stackframe(ip, stack);
+		if (ip && !consume_entry(cookie, ip))
+			return;
+
 		sp = newsp;
 	}
 }
