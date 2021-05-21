@@ -3,6 +3,7 @@
  * PTP 1588 clock support
  *
  * Copyright (C) 2010 OMICRON electronics GmbH
+ * Copyright 2021 NXP
  */
 #include <linux/idr.h>
 #include <linux/device.h>
@@ -76,6 +77,11 @@ static int ptp_clock_settime(struct posix_clock *pc, const struct timespec64 *tp
 {
 	struct ptp_clock *ptp = container_of(pc, struct ptp_clock, clock);
 
+	if (ptp_guarantee_pclock(ptp)) {
+		pr_err("ptp: virtual clock in use, guarantee physical clock free running\n");
+		return -EBUSY;
+	}
+
 	return  ptp->info->settime64(ptp->info, tp);
 }
 
@@ -96,6 +102,11 @@ static int ptp_clock_adjtime(struct posix_clock *pc, struct __kernel_timex *tx)
 	struct ptp_clock *ptp = container_of(pc, struct ptp_clock, clock);
 	struct ptp_clock_info *ops;
 	int err = -EOPNOTSUPP;
+
+	if (ptp_guarantee_pclock(ptp)) {
+		pr_err("ptp: virtual clock in use, guarantee physical clock free running\n");
+		return -EBUSY;
+	}
 
 	ops = ptp->info;
 

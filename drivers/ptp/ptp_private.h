@@ -47,6 +47,7 @@ struct ptp_clock {
 	const struct attribute_group *pin_attr_groups[2];
 	struct kthread_worker *kworker;
 	struct kthread_delayed_work aux_work;
+	u8 num_vclocks;
 };
 
 #define info_to_vclock(d) container_of((d), struct ptp_vclock, info)
@@ -80,6 +81,18 @@ static inline int queue_cnt(struct timestamp_event_queue *q)
 {
 	int cnt = q->tail - q->head;
 	return cnt < 0 ? PTP_MAX_TIMESTAMPS + cnt : cnt;
+}
+
+/*
+ * Guarantee physical clock to stay free running, if ptp virtual clocks
+ * on it are in use.
+ */
+static inline bool ptp_guarantee_pclock(struct ptp_clock *ptp)
+{
+	if (!ptp->info->vclock_flag && ptp->num_vclocks)
+		return true;
+
+	return false;
 }
 
 /*

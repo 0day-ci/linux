@@ -174,6 +174,7 @@ struct ptp_clock_info {
 	int pps;
 	struct ptp_pin_desc *pin_config;
 	struct ptp_vclock_cc *vclock_cc;
+	bool vclock_flag;
 	int (*adjfine)(struct ptp_clock_info *ptp, long scaled_ppm);
 	int (*adjfreq)(struct ptp_clock_info *ptp, s32 delta);
 	int (*adjphase)(struct ptp_clock_info *ptp, s32 phase);

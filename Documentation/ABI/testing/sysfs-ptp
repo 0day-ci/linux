@@ -61,6 +61,19 @@ Description:
 		This file contains the number of programmable pins
 		offered by the PTP hardware clock.
 
+What:		/sys/class/ptp/ptpN/num_vclocks
+Date:		May 2021
+Contact:	Yangbo Lu <yangbo.lu@nxp.com>
+Description:
+		This file contains the ptp virtual clocks number in use,
+		based on current ptp physical clock. In default, the
+		value is 0 meaning only ptp physical clock is in use.
+		Setting the value can create corresponding number of ptp
+		virtual clocks to use. But current ptp physical clock is
+		guaranteed to stay free running. Setting the value back
+		to 0 can delete ptp virtual clocks and back use ptp
+		physical clock again.
+
 What:		/sys/class/ptp/ptpN/pins
 Date:		March 2014
 Contact:	Richard Cochran <richardcochran@gmail.com>
