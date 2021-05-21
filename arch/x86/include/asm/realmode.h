@@ -25,6 +25,7 @@ struct real_mode_header {
 	u32	sev_es_trampoline_start;
 #endif
 #ifdef CONFIG_X86_64
+	u32	trampoline_start64;
 	u32	trampoline_pgd;
 #endif
 	/* ACPI S3 wakeup */
@@ -86,6 +87,16 @@ static inline size_t real_mode_size_needed(void)
 static inline void set_real_mode_mem(phys_addr_t mem)
 {
 	real_mode_header = (struct real_mode_header *) __va(mem);
+}
+
+/* Common helper function to get start IP address */
+static inline unsigned long get_trampoline_start_ip(struct real_mode_header *rmh)
+{
+#ifdef CONFIG_X86_64
+	if (is_tdx_guest())
+		return rmh->trampoline_start64;
+#endif
+	return rmh->trampoline_start;
 }
 
 void reserve_real_mode(void);
