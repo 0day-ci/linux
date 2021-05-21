@@ -120,6 +120,7 @@ typedef int __bitwise fpi_t;
 
 /* prevent >1 _updater_ of zone percpu pageset ->high and ->batch fields */
 static DEFINE_MUTEX(pcp_batch_high_lock);
+#define MIN_PERCPU_PAGELIST_HIGH_FRACTION (8)
 
 struct pagesets {
 	local_lock_t lock;
@@ -181,6 +182,7 @@ EXPORT_SYMBOL(_totalram_pages);
 unsigned long totalreserve_pages __read_mostly;
 unsigned long totalcma_pages __read_mostly;
 
+int percpu_pagelist_high_fraction;
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 DEFINE_STATIC_KEY_MAYBE(CONFIG_INIT_ON_ALLOC_DEFAULT_ON, init_on_alloc);
 EXPORT_SYMBOL(init_on_alloc);
@@ -6673,7 +6675,8 @@ static int zone_batchsize(struct zone *zone)
 #endif
 }
 
-static int zone_highsize(struct zone *zone, int cpu_online)
+static int
+zone_highsize(struct zone *zone, unsigned long total_pages, int cpu_online)
 {
 #ifdef CONFIG_MMU
 	int high;
@@ -6686,7 +6689,7 @@ static int zone_highsize(struct zone *zone, int cpu_online)
 	 * not be online yet.
 	 */
 	nr_local_cpus = max(1U, cpumask_weight(cpumask_of_node(zone_to_nid(zone)))) + cpu_online;
-	high = low_wmark_pages(zone) / nr_local_cpus;
+	high = total_pages / nr_local_cpus;
 
 	return high;
 #else
@@ -6752,14 +6755,21 @@ static void __zone_set_pageset_high_and_batch(struct zone *zone, unsigned long h
 
 /*
  * Calculate and set new high and batch values for all per-cpu pagesets of a
- * zone based on the zone's size.
+ * zone based on the zone's size and the percpu_pagelist_high_fraction sysctl.
  */
 static void zone_set_pageset_high_and_batch(struct zone *zone, int cpu_online)
 {
 	int new_high, new_batch;
 
+	if (!percpu_pagelist_high_fraction) {
+		new_high = zone_highsize(zone, low_wmark_pages(zone), cpu_online);
+	} else {
+		new_high = zone_highsize(zone,
+			zone_managed_pages(zone) / percpu_pagelist_high_fraction,
+			cpu_online);
+	}
+
 	new_batch = max(1, zone_batchsize(zone));
-	new_high = zone_highsize(zone, cpu_online);
 
 	if (zone->pageset_high == new_high &&
 	    zone->pageset_batch == new_batch)
@@ -8440,6 +8450,44 @@ int lowmem_reserve_ratio_sysctl_handler(struct ctl_table *table, int write,
 
 	setup_per_zone_lowmem_reserve();
 	return 0;
+}
+
+/*
+ * percpu_pagelist_high_fraction - changes the pcp->high for each zone on each
+ * cpu. It is the fraction of total pages in each zone that a hot per cpu
+ * pagelist can have before it gets flushed back to buddy allocator.
+ */
+int percpu_pagelist_high_fraction_sysctl_handler(struct ctl_table *table,
+		int write, void *buffer, size_t *length, loff_t *ppos)
+{
+	struct zone *zone;
+	int old_percpu_pagelist_high_fraction;
+	int ret;
+
+	mutex_lock(&pcp_batch_high_lock);
+	old_percpu_pagelist_high_fraction = percpu_pagelist_high_fraction;
+
+	ret = proc_dointvec_minmax(table, write, buffer, length, ppos);
+	if (!write || ret < 0)
+		goto out;
+
+	/* Sanity checking to avoid pcp imbalance */
+	if (percpu_pagelist_high_fraction &&
+	    percpu_pagelist_high_fraction < MIN_PERCPU_PAGELIST_HIGH_FRACTION) {
+		percpu_pagelist_high_fraction = old_percpu_pagelist_high_fraction;
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* No change? */
+	if (percpu_pagelist_high_fraction == old_percpu_pagelist_high_fraction)
+		goto out;
+
+	for_each_populated_zone(zone)
+		zone_set_pageset_high_and_batch(zone, 0);
+out:
+	mutex_unlock(&pcp_batch_high_lock);
+	return ret;
 }
 
 #ifndef __HAVE_ARCH_RESERVED_KERNEL_PAGES
