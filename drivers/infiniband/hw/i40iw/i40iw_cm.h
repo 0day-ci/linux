@@ -291,7 +291,7 @@ struct i40iw_cm_listener {
 	u32 loc_addr[4];
 	u16 loc_port;
 	struct iw_cm_id *cm_id;
-	atomic_t ref_count;
+	refcount_t ref_count;
 	struct i40iw_device *iwdev;
 	atomic_t pend_accepts_cnt;
 	int backlog;

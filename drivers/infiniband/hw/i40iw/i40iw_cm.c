@@ -1491,7 +1491,7 @@ static struct i40iw_cm_listener *i40iw_find_listener(
 		     !memcmp(listen_addr, ip_zero, sizeof(listen_addr))) &&
 		     (listen_port == dst_port) &&
 		     (listener_state & listen_node->listener_state)) {
-			atomic_inc(&listen_node->ref_count);
+			refcount_inc(&listen_node->ref_count);
 			spin_unlock_irqrestore(&cm_core->listen_list_lock, flags);
 			return listen_node;
 		}
@@ -1910,7 +1910,7 @@ static int i40iw_dec_refcnt_listen(struct i40iw_cm_core *cm_core,
 		}
 	}
 
-	if (!atomic_dec_return(&listener->ref_count)) {
+	if (refcount_dec_and_test(&listener->ref_count)) {
 		spin_lock_irqsave(&cm_core->listen_list_lock, flags);
 		list_del(&listener->list);
 		spin_unlock_irqrestore(&cm_core->listen_list_lock, flags);
@@ -2870,7 +2870,7 @@ static struct i40iw_cm_listener *i40iw_make_listen_node(
 				       I40IW_CM_LISTENER_EITHER_STATE);
 	if (listener &&
 	    (listener->listener_state == I40IW_CM_LISTENER_ACTIVE_STATE)) {
-		atomic_dec(&listener->ref_count);
+		refcount_dec(&listener->ref_count);
 		i40iw_debug(cm_core->dev,
 			    I40IW_DEBUG_CM,
 			    "Not creating listener since it already exists\n");
@@ -2888,7 +2888,7 @@ static struct i40iw_cm_listener *i40iw_make_listen_node(
 
 		INIT_LIST_HEAD(&listener->child_listen_list);
 
-		atomic_set(&listener->ref_count, 1);
+		refcount_set(&listener->ref_count, 1);
 	} else {
 		listener->reused_node = 1;
 	}
@@ -3213,7 +3213,7 @@ void i40iw_receive_ilq(struct i40iw_sc_vsi *vsi, struct i40iw_puda_buf *rbuf)
 				    I40IW_DEBUG_CM,
 				    "%s allocate node failed\n",
 				    __func__);
-			atomic_dec(&listener->ref_count);
+			refcount_dec(&listener->ref_count);
 			return;
 		}
 		if (!tcph->rst && !tcph->fin) {
