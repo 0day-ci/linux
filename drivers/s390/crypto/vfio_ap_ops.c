@@ -64,6 +64,21 @@ static struct vfio_ap_queue *vfio_ap_get_queue(
 	return q;
 }
 
+static struct ap_matrix_mdev *vfio_ap_find_mdev_for_apqn(int apqn)
+{
+	struct ap_matrix_mdev *matrix_mdev;
+	unsigned long apid = AP_QID_CARD(apqn);
+	unsigned long apqi = AP_QID_QUEUE(apqn);
+
+	list_for_each_entry(matrix_mdev, &matrix_dev->mdev_list, node) {
+		if (test_bit_inv(apid, matrix_mdev->matrix.apm) &&
+		    test_bit_inv(apqi, matrix_mdev->matrix.aqm))
+			return matrix_mdev;
+	}
+
+	return NULL;
+}
+
 /**
  * vfio_ap_wait_for_irqclear
  * @apqn: The AP Queue number
@@ -287,13 +302,13 @@ static int handle_pqap(struct kvm_vcpu *vcpu)
 	if (!(vcpu->arch.sie_block->eca & ECA_AIV))
 		return -EOPNOTSUPP;
 
+
 	apqn = vcpu->run->s.regs.gprs[0] & 0xffff;
 	mutex_lock(&matrix_dev->lock);
 
-	if (!vcpu->kvm->arch.crypto.pqap_hook)
+	matrix_mdev = vfio_ap_find_mdev_for_apqn(apqn);
+	if (!matrix_mdev)
 		goto out_unlock;
-	matrix_mdev = container_of(vcpu->kvm->arch.crypto.pqap_hook,
-				   struct ap_matrix_mdev, pqap_hook);
 
 	/*
 	 * If the KVM pointer is in the process of being set, wait until the
@@ -353,8 +368,6 @@ static int vfio_ap_mdev_create(struct kobject *kobj, struct mdev_device *mdev)
 	vfio_ap_matrix_init(&matrix_dev->info, &matrix_mdev->matrix);
 	init_waitqueue_head(&matrix_mdev->wait_for_kvm);
 	mdev_set_drvdata(mdev, matrix_mdev);
-	matrix_mdev->pqap_hook.hook = handle_pqap;
-	matrix_mdev->pqap_hook.owner = THIS_MODULE;
 	mutex_lock(&matrix_dev->lock);
 	list_add(&matrix_mdev->node, &matrix_dev->mdev_list);
 	mutex_unlock(&matrix_dev->lock);
@@ -1121,7 +1134,6 @@ static int vfio_ap_mdev_set_kvm(struct ap_matrix_mdev *matrix_mdev,
 					  matrix_mdev->matrix.aqm,
 					  matrix_mdev->matrix.adm);
 		mutex_lock(&matrix_dev->lock);
-		kvm->arch.crypto.pqap_hook = &matrix_mdev->pqap_hook;
 		matrix_mdev->kvm = kvm;
 		matrix_mdev->kvm_busy = false;
 		wake_up_all(&matrix_mdev->wait_for_kvm);
@@ -1191,7 +1203,6 @@ static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev)
 		kvm_arch_crypto_clear_masks(matrix_mdev->kvm);
 		mutex_lock(&matrix_dev->lock);
 		vfio_ap_mdev_reset_queues(matrix_mdev->mdev);
-		matrix_mdev->kvm->arch.crypto.pqap_hook = NULL;
 		kvm_put_kvm(matrix_mdev->kvm);
 		matrix_mdev->kvm = NULL;
 		matrix_mdev->kvm_busy = false;
@@ -1431,14 +1442,26 @@ static const struct mdev_parent_ops vfio_ap_matrix_ops = {
 	.ioctl			= vfio_ap_mdev_ioctl,
 };
 
+static struct kvm_s390_crypto_hook pqap_hook = {
+	.type = PQAP_HOOK,
+	.owner = THIS_MODULE,
+	.hook_fcn = handle_pqap
+};
+
 int vfio_ap_mdev_register(void)
 {
+	int ret;
 	atomic_set(&matrix_dev->available_instances, MAX_ZDEV_ENTRIES_EXT);
+
+	ret = kvm_arch_crypto_register_hook(&pqap_hook);
+	if (ret)
+		return ret;
 
 	return mdev_register_device(&matrix_dev->device, &vfio_ap_matrix_ops);
 }
 
 void vfio_ap_mdev_unregister(void)
 {
+	WARN_ON(kvm_arch_crypto_unregister_hook(&pqap_hook));
 	mdev_unregister_device(&matrix_dev->device);
 }

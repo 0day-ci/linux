@@ -798,14 +798,19 @@ struct kvm_s390_cpu_model {
 	unsigned short ibc;
 };
 
-struct kvm_s390_module_hook {
-	int (*hook)(struct kvm_vcpu *vcpu);
+enum kvm_s390_crypto_hook_type {
+	PQAP_HOOK
+};
+
+struct kvm_s390_crypto_hook {
+	enum kvm_s390_crypto_hook_type type;
 	struct module *owner;
+	int (*hook_fcn)(struct kvm_vcpu *vcpu);
+	struct list_head node;
 };
 
 struct kvm_s390_crypto {
 	struct kvm_s390_crypto_cb *crycb;
-	struct kvm_s390_module_hook *pqap_hook;
 	__u32 crycbd;
 	__u8 aes_kw;
 	__u8 dea_kw;
@@ -991,6 +996,8 @@ static inline void kvm_arch_async_page_present_queued(struct kvm_vcpu *vcpu) {}
 void kvm_arch_crypto_clear_masks(struct kvm *kvm);
 void kvm_arch_crypto_set_masks(struct kvm *kvm, unsigned long *apm,
 			       unsigned long *aqm, unsigned long *adm);
+extern int kvm_arch_crypto_register_hook(struct kvm_s390_crypto_hook *hook);
+extern int kvm_arch_crypto_unregister_hook(struct kvm_s390_crypto_hook *hook);
 
 extern int sie64a(struct kvm_s390_sie_block *, u64 *);
 extern char sie_exit;

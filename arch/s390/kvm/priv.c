@@ -12,6 +12,7 @@
 #include <linux/gfp.h>
 #include <linux/errno.h>
 #include <linux/compat.h>
+#include <linux/list.h>
 #include <linux/mm_types.h>
 #include <linux/pgtable.h>
 
@@ -30,6 +31,63 @@
 #include "gaccess.h"
 #include "kvm-s390.h"
 #include "trace.h"
+
+DEFINE_MUTEX(crypto_hooks_lock);
+static struct list_head crypto_hooks = { &(crypto_hooks), &(crypto_hooks) };
+
+static struct kvm_s390_crypto_hook
+*kvm_arch_crypto_find_hook(enum kvm_s390_crypto_hook_type type)
+{
+	struct kvm_s390_crypto_hook *crypto_hook;
+
+	list_for_each_entry(crypto_hook, &crypto_hooks, node) {
+		if (crypto_hook->type == type)
+			return crypto_hook;
+	}
+
+	return NULL;
+}
+
+int kvm_arch_crypto_register_hook(struct kvm_s390_crypto_hook *hook)
+{
+	struct kvm_s390_crypto_hook *crypto_hook;
+
+	mutex_lock(&crypto_hooks_lock);
+	crypto_hook = kvm_arch_crypto_find_hook(hook->type);
+	if (crypto_hook) {
+		if (crypto_hook->owner != hook->owner)
+			return -EACCES;
+		list_replace(&crypto_hook->node, &hook->node);
+	} else {
+		list_add(&hook->node, &crypto_hooks);
+	}
+	mutex_unlock(&crypto_hooks_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_arch_crypto_register_hook);
+
+int kvm_arch_crypto_unregister_hook(struct kvm_s390_crypto_hook *hook)
+{
+	struct kvm_s390_crypto_hook *crypto_hook;
+
+	mutex_lock(&crypto_hooks_lock);
+	crypto_hook = kvm_arch_crypto_find_hook(hook->type);
+
+	if (crypto_hook) {
+		if (crypto_hook->owner != hook->owner)
+			return -EACCES;
+		if (crypto_hook->hook_fcn != hook->hook_fcn)
+			return -EFAULT;
+		list_del(&crypto_hook->node);
+	} else {
+		return -ENODEV;
+	}
+	mutex_unlock(&crypto_hooks_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_arch_crypto_unregister_hook);
 
 static int handle_ri(struct kvm_vcpu *vcpu)
 {
@@ -610,6 +668,7 @@ static int handle_io_inst(struct kvm_vcpu *vcpu)
 static int handle_pqap(struct kvm_vcpu *vcpu)
 {
 	struct ap_queue_status status = {};
+	struct kvm_s390_crypto_hook *pqap_hook;
 	unsigned long reg0;
 	int ret;
 	uint8_t fc;
@@ -657,15 +716,16 @@ static int handle_pqap(struct kvm_vcpu *vcpu)
 	 * Verify that the hook callback is registered, lock the owner
 	 * and call the hook.
 	 */
-	if (vcpu->kvm->arch.crypto.pqap_hook) {
-		if (!try_module_get(vcpu->kvm->arch.crypto.pqap_hook->owner))
-			return -EOPNOTSUPP;
-		ret = vcpu->kvm->arch.crypto.pqap_hook->hook(vcpu);
-		module_put(vcpu->kvm->arch.crypto.pqap_hook->owner);
+	mutex_lock(&crypto_hooks_lock);
+	pqap_hook = kvm_arch_crypto_find_hook(PQAP_HOOK);
+	if (pqap_hook) {
+		ret = pqap_hook->hook_fcn(vcpu);
 		if (!ret && vcpu->run->s.regs.gprs[1] & 0x00ff0000)
 			kvm_s390_set_psw_cc(vcpu, 3);
+		mutex_unlock(&crypto_hooks_lock);
 		return ret;
 	}
+	mutex_unlock(&crypto_hooks_lock);
 	/*
 	 * A vfio_driver must register a hook.
 	 * No hook means no driver to enable the SIE CRYCB and no queues.
