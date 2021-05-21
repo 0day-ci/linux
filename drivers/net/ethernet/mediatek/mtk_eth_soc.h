@@ -502,6 +502,13 @@
 #define MT7628_SDM_MAC_ADRL	(MT7628_SDM_OFFSET + 0x0c)
 #define MT7628_SDM_MAC_ADRH	(MT7628_SDM_OFFSET + 0x10)
 
+/* Counter / stat register */
+#define MT7628_SDM_TPCNT	(MT7628_SDM_OFFSET + 0x100)
+#define MT7628_SDM_TBCNT	(MT7628_SDM_OFFSET + 0x104)
+#define MT7628_SDM_RPCNT	(MT7628_SDM_OFFSET + 0x108)
+#define MT7628_SDM_RBCNT	(MT7628_SDM_OFFSET + 0x10c)
+#define MT7628_SDM_CS_ERR	(MT7628_SDM_OFFSET + 0x110)
+
 struct mtk_rx_dma {
 	unsigned int rxd1;
 	unsigned int rxd2;
