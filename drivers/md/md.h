@@ -487,6 +487,7 @@ struct mddev {
 	struct bio_set			sync_set; /* for sync operations like
 						   * metadata and bitmap writes
 						   */
+	struct bio_set			md_io_bs; /* for io accounting */
 
 	/* Generic flush handling.
 	 * The last to finish preflush schedules a worker to submit

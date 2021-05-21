@@ -441,6 +441,25 @@ check_suspended:
 }
 EXPORT_SYMBOL(md_handle_request);
 
+struct md_io {
+	struct mddev *mddev;
+	struct bio *orig_bio;
+	unsigned long start_time;
+	struct bio bio_clone;
+};
+
+static void md_end_io(struct bio *bio)
+{
+	struct md_io *md_io = bio->bi_private;
+	struct bio *orig_bio = md_io->orig_bio;
+
+	orig_bio->bi_status = bio->bi_status;
+
+	bio_end_io_acct(orig_bio, md_io->start_time);
+	bio_put(bio);
+	bio_endio(orig_bio);
+}
+
 static blk_qc_t md_submit_bio(struct bio *bio)
 {
 	const int rw = bio_data_dir(bio);
@@ -463,6 +482,30 @@ static blk_qc_t md_submit_bio(struct bio *bio)
 			bio->bi_status = BLK_STS_IOERR;
 		bio_endio(bio);
 		return BLK_QC_T_NONE;
+	}
+
+	/*
+	 * clone bio under conditions:
+	 * 1. QUEUE_FLAG_IO_STAT flag is set.
+	 * 2. bio just enters md and it is not split from personality.
+	 */
+	if (blk_queue_io_stat(bio->bi_bdev->bd_disk->queue) &&
+	    (bio->bi_pool != &mddev->md_io_bs) &&
+	    (mddev->pers->accounting_bio &&
+	     mddev->pers->accounting_bio(mddev, bio))) {
+		struct md_io *md_io;
+		struct bio *clone;
+
+		clone = bio_clone_fast(bio, GFP_NOIO, &mddev->md_io_bs);
+
+		md_io = container_of(clone, struct md_io, bio_clone);
+		md_io->mddev = mddev;
+		md_io->orig_bio = bio;
+		md_io->start_time = bio_start_io_acct(bio);
+
+		clone->bi_end_io = md_end_io;
+		clone->bi_private = md_io;
+		bio = clone;
 	}
 
 	/* bio could be mergeable after passing to underlayer */
@@ -2340,9 +2383,12 @@ int md_integrity_register(struct mddev *mddev)
 			       bdev_get_integrity(reference->bdev));
 
 	pr_debug("md: data integrity enabled on %s\n", mdname(mddev));
-	if (bioset_integrity_create(&mddev->bio_set, BIO_POOL_SIZE)) {
+	if (bioset_integrity_create(&mddev->bio_set, BIO_POOL_SIZE) ||
+	    bioset_integrity_create(&mddev->md_io_bs, BIO_POOL_SIZE)) {
 		pr_err("md: failed to create integrity pool for %s\n",
 		       mdname(mddev));
+		bioset_exit(&mddev->bio_set);
+		bioset_exit(&mddev->md_io_bs);
 		return -EINVAL;
 	}
 	return 0;
@@ -5569,6 +5615,7 @@ static void md_free(struct kobject *ko)
 
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->md_io_bs);
 	kfree(mddev);
 }
 
@@ -5864,6 +5911,12 @@ int md_run(struct mddev *mddev)
 		if (err)
 			return err;
 	}
+	if (!bioset_initialized(&mddev->md_io_bs)) {
+		err = bioset_init(&mddev->md_io_bs, BIO_POOL_SIZE,
+				  offsetof(struct md_io, bio_clone), 0);
+		if (err)
+			return err;
+	}
 
 	spin_lock(&pers_lock);
 	pers = find_pers(mddev->level, mddev->clevel);
@@ -6041,6 +6094,7 @@ bitmap_abort:
 abort:
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->md_io_bs);
 	return err;
 }
 EXPORT_SYMBOL_GPL(md_run);
@@ -6264,6 +6318,7 @@ void md_stop(struct mddev *mddev)
 	__md_stop(mddev);
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->md_io_bs);
 }
 
 EXPORT_SYMBOL_GPL(md_stop);
