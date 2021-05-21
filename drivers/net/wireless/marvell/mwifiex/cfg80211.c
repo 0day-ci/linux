@@ -2450,7 +2450,7 @@ static int mwifiex_set_ibss_params(struct mwifiex_private *priv,
 				config_bands = BAND_B;
 			} else {
 				config_bands = BAND_G;
-				if (params->basic_rates % index)
+				if (index && (params->basic_rates % index))
 					config_bands |= BAND_B;
 			}
 		}
