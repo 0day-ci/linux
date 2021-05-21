@@ -93,6 +93,11 @@ perf_callchain_kernel(struct perf_callchain_entry_ctx *entry, struct pt_regs *re
 		}
 
 		perf_callchain_store(entry, next_ip);
+		if (level && next_ip) {
+			next_ip = ftrace_get_traced_func_if_no_stackframe(next_ip, fp);
+			if (next_ip)
+				perf_callchain_store(entry, next_ip);
+		}
 		if (!valid_next_sp(next_sp, sp))
 			return;
 		sp = next_sp;
