@@ -207,7 +207,7 @@ static ssize_t show_address(struct device *tty_dev, struct device_attribute *att
 static ssize_t show_channel(struct device *tty_dev, struct device_attribute *attr, char *buf)
 {
 	struct rfcomm_dev *dev = dev_get_drvdata(tty_dev);
-	return sprintf(buf, "%d\n", dev->channel);
+	return sprintf(buf, "%u\n", dev->channel);
 }
 
 static DEVICE_ATTR(address, 0444, show_address, NULL);
@@ -319,7 +319,7 @@ static int rfcomm_dev_add(struct rfcomm_dev_req *req, struct rfcomm_dlc *dlc)
 	struct rfcomm_dev *dev;
 	struct device *tty;
 
-	BT_DBG("id %d channel %d", req->dev_id, req->channel);
+	BT_DBG("id %d channel %u", req->dev_id, req->channel);
 
 	dev = __rfcomm_dev_add(req, dlc);
 	if (IS_ERR(dev)) {
@@ -579,7 +579,7 @@ static int rfcomm_get_dev_info(void __user *arg)
 
 int rfcomm_dev_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
 {
-	BT_DBG("cmd %d arg %p", cmd, arg);
+	BT_DBG("cmd %u arg %p", cmd, arg);
 
 	switch (cmd) {
 	case RFCOMMCREATEDEV:
@@ -613,7 +613,7 @@ static void rfcomm_dev_data_ready(struct rfcomm_dlc *dlc, struct sk_buff *skb)
 		return;
 	}
 
-	BT_DBG("dlc %p len %d", dlc, skb->len);
+	BT_DBG("dlc %p len %u", dlc, skb->len);
 
 	tty_insert_flip_string(&dev->port, skb->data, skb->len);
 	tty_flip_buffer_push(&dev->port);
@@ -749,7 +749,7 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 	BT_DBG("tty %p id %d", tty, tty->index);
 
-	BT_DBG("dev %p dst %pMR channel %d opened %d", dev, &dev->dst,
+	BT_DBG("dev %p dst %pMR channel %u opened %d", dev, &dev->dst,
 	       dev->channel, dev->port.count);
 
 	err = tty_port_open(&dev->port, tty, filp);
