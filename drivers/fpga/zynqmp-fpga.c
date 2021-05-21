@@ -102,12 +102,10 @@ static int zynqmp_fpga_probe(struct platform_device *pdev)
 
 	priv->dev = dev;
 
-	mgr = devm_fpga_mgr_create(dev, "Xilinx ZynqMP FPGA Manager",
-				   &zynqmp_fpga_ops, priv);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(dev, "Xilinx ZynqMP FPGA Manager",
+				&zynqmp_fpga_ops, priv);
 
-	return devm_fpga_mgr_register(dev, mgr);
+	return (IS_ERR(mgr)) ? PTR_ERR(mgr) : 0;
 }
 
 static const struct of_device_id zynqmp_fpga_of_match[] = {

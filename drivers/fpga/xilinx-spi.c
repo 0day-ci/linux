@@ -247,13 +247,11 @@ static int xilinx_spi_probe(struct spi_device *spi)
 		return dev_err_probe(&spi->dev, PTR_ERR(conf->done),
 				     "Failed to get DONE gpio\n");
 
-	mgr = devm_fpga_mgr_create(&spi->dev,
-				   "Xilinx Slave Serial FPGA Manager",
-				   &xilinx_spi_ops, conf);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(&spi->dev,
+				"Xilinx Slave Serial FPGA Manager",
+				&xilinx_spi_ops, conf);
 
-	return devm_fpga_mgr_register(&spi->dev, mgr);
+	return (IS_ERR(mgr)) ? PTR_ERR(mgr) : 0;
 }
 
 static const struct of_device_id xlnx_spi_of_match[] = {

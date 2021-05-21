@@ -302,12 +302,10 @@ static int altera_ps_probe(struct spi_device *spi)
 	snprintf(conf->mgr_name, sizeof(conf->mgr_name), "%s %s",
 		 dev_driver_string(&spi->dev), dev_name(&spi->dev));
 
-	mgr = devm_fpga_mgr_create(&spi->dev, conf->mgr_name,
-				   &altera_ps_ops, conf);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(&spi->dev, conf->mgr_name,
+				&altera_ps_ops, conf);
 
-	return devm_fpga_mgr_register(&spi->dev, mgr);
+	return (IS_ERR(mgr)) ? PTR_ERR(mgr) : 0;
 }
 
 static const struct spi_device_id altera_ps_spi_ids[] = {

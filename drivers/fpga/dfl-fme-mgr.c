@@ -308,14 +308,14 @@ static int fme_mgr_probe(struct platform_device *pdev)
 
 	fme_mgr_get_compat_id(priv->ioaddr, compat_id);
 
-	mgr = devm_fpga_mgr_create(dev, "DFL FME FPGA Manager",
-				   &fme_mgr_ops, priv);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(dev, "DFL FME FPGA Manager",
+				&fme_mgr_ops, priv);
+	if (IS_ERR(mgr))
+		return PTR_ERR(mgr);
 
 	mgr->compat_id = compat_id;
 
-	return devm_fpga_mgr_register(dev, mgr);
+	return 0;
 }
 
 static struct platform_driver fme_mgr_driver = {

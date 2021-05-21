@@ -571,12 +571,10 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	mgr = devm_fpga_mgr_create(dev, "Altera SOCFPGA FPGA Manager",
-				   &socfpga_fpga_ops, priv);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
+				&socfpga_fpga_ops, priv);
 
-	return devm_fpga_mgr_register(dev, mgr);
+	return (IS_ERR(mgr)) ? PTR_ERR(mgr) : 0;
 }
 
 #ifdef CONFIG_OF

@@ -366,12 +366,10 @@ static int machxo2_spi_probe(struct spi_device *spi)
 		return -EINVAL;
 	}
 
-	mgr = devm_fpga_mgr_create(dev, "Lattice MachXO2 SPI FPGA Manager",
-				   &machxo2_ops, spi);
-	if (!mgr)
-		return -ENOMEM;
+	mgr = fpga_mgr_register(dev, "Lattice MachXO2 SPI FPGA Manager",
+				&machxo2_ops, spi);
 
-	return devm_fpga_mgr_register(dev, mgr);
+	return (IS_ERR(mgr)) ? PTR_ERR(mgr) : 0;
 }
 
 static const struct of_device_id of_match[] = {
