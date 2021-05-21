@@ -259,7 +259,7 @@ repeat:
 	return NF_ACCEPT;
 }
 
-static struct nf_hook_entries *nf_hook_entries_head(const struct net *net, u8 pf, u8 hooknum)
+static struct nf_hook_entries *nf_queue_hook_entries_head(const struct net *net, u8 pf, u8 hooknum)
 {
 	switch (pf) {
 #ifdef CONFIG_NETFILTER_FAMILY_BRIDGE
@@ -292,7 +292,7 @@ void nf_reinject(struct nf_queue_entry *entry, unsigned int verdict)
 	net = entry->state.net;
 	pf = entry->state.pf;
 
-	hooks = nf_hook_entries_head(net, pf, entry->state.hook);
+	hooks = nf_queue_hook_entries_head(net, pf, entry->state.hook);
 
 	i = entry->hook_index;
 	if (WARN_ON_ONCE(!hooks || i >= hooks->num_hook_entries)) {
