@@ -869,7 +869,9 @@ static void fanotify_freeing_mark(struct fsnotify_mark *mark,
 
 static void fanotify_free_mark(struct fsnotify_mark *fsn_mark)
 {
-	kmem_cache_free(fanotify_mark_cache, fsn_mark);
+	struct fanotify_mark *mark = FANOTIFY_MARK(fsn_mark);
+
+	kmem_cache_free(fanotify_mark_cache, mark);
 }
 
 const struct fsnotify_ops fanotify_fsnotify_ops = {
