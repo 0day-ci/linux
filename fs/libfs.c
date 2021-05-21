@@ -138,15 +138,15 @@ loff_t dcache_dir_lseek(struct file *file, loff_t offset, int whence)
 {
 	struct dentry *dentry = file->f_path.dentry;
 	switch (whence) {
-		case 1:
-			offset += file->f_pos;
-			fallthrough;
-		case 0:
-			if (offset >= 0)
-				break;
-			fallthrough;
-		default:
-			return -EINVAL;
+	case 1:
+		offset += file->f_pos;
+		fallthrough;
+	case 0:
+		if (offset >= 0)
+			break;
+		fallthrough;
+	default:
+		return -EINVAL;
 	}
 	if (offset != file->f_pos) {
 		struct dentry *cursor = file->private_data;
@@ -266,7 +266,7 @@ static struct dentry *find_next_child(struct dentry *parent, struct dentry *prev
 }
 
 void simple_recursive_removal(struct dentry *dentry,
-                              void (*callback)(struct dentry *))
+				void (*callback)(struct dentry *))
 {
 	struct dentry *this = dget(dentry);
 	while (true) {
