@@ -8107,6 +8107,69 @@ static void r8156b_init(struct r8152 *tp)
 	tp->coalesce = 15000;	/* 15 us */
 }
 
+static bool rtl_check_vendor_ok(struct usb_interface *intf)
+{
+	struct usb_host_interface *alt = intf->cur_altsetting;
+	struct usb_host_endpoint *in = NULL, *out = NULL, *intr = NULL;
+	unsigned int ep;
+
+	if (alt->desc.bNumEndpoints < 3) {
+		dev_err(&intf->dev, "Unexpected bNumEndpoints %d\n", alt->desc.bNumEndpoints);
+		return false;
+	}
+
+	for (ep = 0; ep < alt->desc.bNumEndpoints; ep++) {
+		struct usb_host_endpoint *e;
+
+		e = alt->endpoint + ep;
+
+		/* ignore endpoints which cannot transfer data */
+		if (!usb_endpoint_maxp(&e->desc))
+			continue;
+
+		switch (e->desc.bmAttributes) {
+		case USB_ENDPOINT_XFER_INT:
+			if (!usb_endpoint_dir_in(&e->desc))
+				continue;
+			if (!intr)
+				intr = e;
+			break;
+		case USB_ENDPOINT_XFER_BULK:
+			if (usb_endpoint_dir_in(&e->desc)) {
+				if (!in)
+					in = e;
+			} else if (!out) {
+				out = e;
+			}
+			break;
+		default:
+			continue;
+		}
+	}
+
+	if (!in || !out || !intr) {
+		dev_err(&intf->dev, "Miss Endpoints\n");
+		return false;
+	}
+
+	if ((in->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != 1) {
+		dev_err(&intf->dev, "Invalid Rx Endpoints\n");
+		return false;
+	}
+
+	if ((out->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != 2) {
+		dev_err(&intf->dev, "Invalid Tx Endpoints\n");
+		return false;
+	}
+
+	if ((intr->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != 3) {
+		dev_err(&intf->dev, "Invalid interrupt Endpoints\n");
+		return false;
+	}
+
+	return true;
+}
+
 static bool rtl_vendor_mode(struct usb_interface *intf)
 {
 	struct usb_host_interface *alt = intf->cur_altsetting;
@@ -8115,12 +8178,15 @@ static bool rtl_vendor_mode(struct usb_interface *intf)
 	int i, num_configs;
 
 	if (alt->desc.bInterfaceClass == USB_CLASS_VENDOR_SPEC)
-		return true;
+		return rtl_check_vendor_ok(intf);
 
 	/* The vendor mode is not always config #1, so to find it out. */
 	udev = interface_to_usbdev(intf);
 	c = udev->config;
 	num_configs = udev->descriptor.bNumConfigurations;
+	if (num_configs < 2)
+		return false;
+
 	for (i = 0; i < num_configs; (i++, c++)) {
 		struct usb_interface_descriptor	*desc = NULL;
 
@@ -8135,7 +8201,8 @@ static bool rtl_vendor_mode(struct usb_interface *intf)
 		}
 	}
 
-	WARN_ON_ONCE(i == num_configs);
+	if (i == num_configs)
+		dev_err(&intf->dev, "Unexpected Device\n");
 
 	return false;
 }
