@@ -1234,7 +1234,7 @@ EXC_COMMON_BEGIN(machine_check_common)
 	mtmsrd 	r10,1
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	machine_check_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM machine_check
 
@@ -1363,7 +1363,7 @@ BEGIN_MMU_FTR_SECTION
 MMU_FTR_SECTION_ELSE
 	bl	do_page_fault
 ALT_MMU_FTR_SECTION_END_IFCLR(MMU_FTR_TYPE_RADIX)
-	b	interrupt_return
+	b	interrupt_return_srr
 
 1:	bl	do_break
 	/*
@@ -1371,7 +1371,7 @@ ALT_MMU_FTR_SECTION_END_IFCLR(MMU_FTR_TYPE_RADIX)
 	 * If so, we need to restore them with their updated values.
 	 */
 	REST_NVGPRS(r1)
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM data_access
 
@@ -1414,7 +1414,7 @@ BEGIN_MMU_FTR_SECTION
 	bl	do_slb_fault
 	cmpdi	r3,0
 	bne-	1f
-	b	fast_interrupt_return
+	b	fast_interrupt_return_srr
 1:	/* Error case */
 MMU_FTR_SECTION_ELSE
 	/* Radix case, access is outside page table range */
@@ -1423,7 +1423,7 @@ ALT_MMU_FTR_SECTION_END_IFCLR(MMU_FTR_TYPE_RADIX)
 	std	r3,RESULT(r1)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_bad_slb_fault
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM data_access_slb
 
@@ -1461,7 +1461,7 @@ BEGIN_MMU_FTR_SECTION
 MMU_FTR_SECTION_ELSE
 	bl	do_page_fault
 ALT_MMU_FTR_SECTION_END_IFCLR(MMU_FTR_TYPE_RADIX)
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM instruction_access
 
@@ -1498,7 +1498,7 @@ BEGIN_MMU_FTR_SECTION
 	bl	do_slb_fault
 	cmpdi	r3,0
 	bne-	1f
-	b	fast_interrupt_return
+	b	fast_interrupt_return_srr
 1:	/* Error case */
 MMU_FTR_SECTION_ELSE
 	/* Radix case, access is outside page table range */
@@ -1507,7 +1507,7 @@ ALT_MMU_FTR_SECTION_END_IFCLR(MMU_FTR_TYPE_RADIX)
 	std	r3,RESULT(r1)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_bad_slb_fault
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM instruction_access_slb
 
@@ -1553,7 +1553,11 @@ EXC_COMMON_BEGIN(hardware_interrupt_common)
 	GEN_COMMON hardware_interrupt
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_IRQ
-	b	interrupt_return
+	BEGIN_FTR_SECTION
+	b	interrupt_return_hsrr
+	FTR_SECTION_ELSE
+	b	interrupt_return_srr
+	ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE | CPU_FTR_ARCH_206)
 
 	GEN_KVM hardware_interrupt
 
@@ -1582,7 +1586,7 @@ EXC_COMMON_BEGIN(alignment_common)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	alignment_exception
 	REST_NVGPRS(r1) /* instruction emulation may change GPRs */
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM alignment
 
@@ -1691,7 +1695,7 @@ EXC_COMMON_BEGIN(program_check_common)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	program_check_exception
 	REST_NVGPRS(r1) /* instruction emulation may change GPRs */
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM program_check
 
@@ -1736,12 +1740,12 @@ BEGIN_FTR_SECTION
 END_FTR_SECTION_IFSET(CPU_FTR_TM)
 #endif
 	bl	load_up_fpu
-	b	fast_interrupt_return
+	b	fast_interrupt_return_srr
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 2:	/* User process was in a transaction */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	fp_unavailable_tm
-	b	interrupt_return
+	b	interrupt_return_srr
 #endif
 
 	GEN_KVM fp_unavailable
@@ -1782,7 +1786,7 @@ EXC_COMMON_BEGIN(decrementer_common)
 	GEN_COMMON decrementer
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	timer_interrupt
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM decrementer
 
@@ -1870,7 +1874,7 @@ EXC_COMMON_BEGIN(doorbell_super_common)
 #else
 	bl	unknown_async_exception
 #endif
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM doorbell_super
 
@@ -2041,7 +2045,7 @@ EXC_COMMON_BEGIN(single_step_common)
 	GEN_COMMON single_step
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	single_step_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM single_step
 
@@ -2082,7 +2086,7 @@ BEGIN_MMU_FTR_SECTION
 MMU_FTR_SECTION_ELSE
 	bl      unknown_exception
 ALT_MMU_FTR_SECTION_END_IFSET(MMU_FTR_TYPE_RADIX)
-	b       interrupt_return
+	b       interrupt_return_hsrr
 
 	GEN_KVM h_data_storage
 
@@ -2109,7 +2113,7 @@ EXC_COMMON_BEGIN(h_instr_storage_common)
 	GEN_COMMON h_instr_storage
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	unknown_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM h_instr_storage
 
@@ -2135,7 +2139,7 @@ EXC_COMMON_BEGIN(emulation_assist_common)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	emulation_assist_interrupt
 	REST_NVGPRS(r1) /* instruction emulation may change GPRs */
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM emulation_assist
 
@@ -2216,7 +2220,7 @@ EXC_COMMON_BEGIN(hmi_exception_common)
 	GEN_COMMON hmi_exception
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	handle_hmi_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM hmi_exception
 
@@ -2248,7 +2252,7 @@ EXC_COMMON_BEGIN(h_doorbell_common)
 #else
 	bl	unknown_async_exception
 #endif
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM h_doorbell
 
@@ -2276,7 +2280,7 @@ EXC_COMMON_BEGIN(h_virt_irq_common)
 	GEN_COMMON h_virt_irq
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	do_IRQ
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM h_virt_irq
 
@@ -2321,7 +2325,7 @@ EXC_COMMON_BEGIN(performance_monitor_common)
 	GEN_COMMON performance_monitor
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	performance_monitor_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM performance_monitor
 
@@ -2360,19 +2364,19 @@ BEGIN_FTR_SECTION
   END_FTR_SECTION_NESTED(CPU_FTR_TM, CPU_FTR_TM, 69)
 #endif
 	bl	load_up_altivec
-	b	fast_interrupt_return
+	b	fast_interrupt_return_srr
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 2:	/* User process was in a transaction */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	altivec_unavailable_tm
-	b	interrupt_return
+	b	interrupt_return_srr
 #endif
 1:
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	altivec_unavailable_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM altivec_unavailable
 
@@ -2415,14 +2419,14 @@ BEGIN_FTR_SECTION
 2:	/* User process was in a transaction */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	vsx_unavailable_tm
-	b	interrupt_return
+	b	interrupt_return_srr
 #endif
 1:
 END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 #endif
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	vsx_unavailable_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM vsx_unavailable
 
@@ -2452,7 +2456,7 @@ EXC_COMMON_BEGIN(facility_unavailable_common)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	facility_unavailable_exception
 	REST_NVGPRS(r1) /* instruction emulation may change GPRs */
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM facility_unavailable
 
@@ -2482,7 +2486,7 @@ EXC_COMMON_BEGIN(h_facility_unavailable_common)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	facility_unavailable_exception
 	REST_NVGPRS(r1) /* XXX Shouldn't be necessary in practice */
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM h_facility_unavailable
 
@@ -2513,7 +2517,7 @@ EXC_COMMON_BEGIN(cbe_system_error_common)
 	GEN_COMMON cbe_system_error
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	cbe_system_error_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM cbe_system_error
 
@@ -2546,7 +2550,7 @@ EXC_COMMON_BEGIN(instruction_breakpoint_common)
 	GEN_COMMON instruction_breakpoint
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	instruction_breakpoint_exception
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM instruction_breakpoint
 
@@ -2668,7 +2672,7 @@ EXC_COMMON_BEGIN(denorm_exception_common)
 	GEN_COMMON denorm_exception
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	unknown_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM denorm_exception
 
@@ -2687,7 +2691,7 @@ EXC_COMMON_BEGIN(cbe_maintenance_common)
 	GEN_COMMON cbe_maintenance
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	cbe_maintenance_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM cbe_maintenance
 
@@ -2719,7 +2723,7 @@ EXC_COMMON_BEGIN(altivec_assist_common)
 #else
 	bl	unknown_exception
 #endif
-	b	interrupt_return
+	b	interrupt_return_srr
 
 	GEN_KVM altivec_assist
 
@@ -2738,7 +2742,7 @@ EXC_COMMON_BEGIN(cbe_thermal_common)
 	GEN_COMMON cbe_thermal
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	cbe_thermal_exception
-	b	interrupt_return
+	b	interrupt_return_hsrr
 
 	GEN_KVM cbe_thermal
 
