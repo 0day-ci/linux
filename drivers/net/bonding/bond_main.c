@@ -647,9 +647,10 @@ static int bond_check_dev_link(struct bonding *bond,
 static int bond_set_promiscuity(struct bonding *bond, int inc)
 {
 	struct list_head *iter;
-	int err = 0;
+	int mode, err = 0;
 
-	if (bond_uses_primary(bond)) {
+	mode = BOND_MODE(bond);
+	if (mode == BOND_MODE_ACTIVEBACKUP || mode == BOND_MODE_TLB) {
 		struct slave *curr_active = rtnl_dereference(bond->curr_active_slave);
 
 		if (curr_active)
