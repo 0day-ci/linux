@@ -1309,6 +1309,8 @@ struct macb {
 
 	u32	rx_intr_mask;
 
+	unsigned int is_opened;
+
 	struct macb_pm_data pm_data;
 	const struct macb_usrio_config *usrio;
 };

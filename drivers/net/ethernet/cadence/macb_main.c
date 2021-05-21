@@ -2781,6 +2781,8 @@ static int macb_open(struct net_device *dev)
 	if (bp->ptp_info)
 		bp->ptp_info->ptp_init(dev);
 
+	bp->is_opened = 1;
+
 	return 0;
 
 reset_hw:
@@ -2817,6 +2819,8 @@ static int macb_close(struct net_device *dev)
 
 	if (bp->ptp_info)
 		bp->ptp_info->ptp_remove(dev);
+
+	bp->is_opened = 0;
 
 	pm_runtime_put(&bp->pdev->dev);
 
@@ -2866,6 +2870,9 @@ static struct net_device_stats *gem_get_stats(struct macb *bp)
 {
 	struct gem_stats *hwstat = &bp->hw_stats.gem;
 	struct net_device_stats *nstat = &bp->dev->stats;
+
+	if (!bp->is_opened)
+		return nstat;
 
 	gem_update_stats(bp);
 
