@@ -8,14 +8,15 @@
 #ifndef __ASM_MACH_LOONGSON32_DMA_H
 #define __ASM_MACH_LOONGSON32_DMA_H
 
+#include <linux/dmaengine.h>
+
 #define LS1X_DMA_CHANNEL0	0
 #define LS1X_DMA_CHANNEL1	1
 #define LS1X_DMA_CHANNEL2	2
 
 struct plat_ls1x_dma {
-	int nr_channels;
+	const struct dma_slave_map *slave_map;
+	int slavecnt;
 };
-
-extern struct plat_ls1x_dma ls1b_dma_pdata;
 
 #endif /* __ASM_MACH_LOONGSON32_DMA_H */
