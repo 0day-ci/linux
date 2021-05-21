@@ -212,6 +212,7 @@ static int rs5c372_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct rs5c372	*rs5c = i2c_get_clientdata(client);
 	int		status = rs5c_get_regs(rs5c);
 	unsigned char ctrl2 = rs5c->regs[RS5C_REG_CTRL2];
+	int flags_utime = 0;
 
 	if (status < 0)
 		return status;
@@ -239,11 +240,26 @@ static int rs5c372_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	tm->tm_wday = bcd2bin(rs5c->regs[RS5C372_REG_WDAY] & 0x07);
 	tm->tm_mday = bcd2bin(rs5c->regs[RS5C372_REG_DAY] & 0x3f);
 
+	if (tm->tm_mday < 1) {
+		// The value read from the register may be zero, which is an illegal value
+		flags_utime = flags_utime + 1;
+		tm->tm_mday = 1;
+	}
+
 	/* tm->tm_mon is zero-based */
 	tm->tm_mon = bcd2bin(rs5c->regs[RS5C372_REG_MONTH] & 0x1f) - 1;
 
+	if (tm->tm_mon < 0) {
+		flags_utime = flags_utime + 1;
+		tm->tm_mon = 0;
+	}
+
 	/* year is 1900 + tm->tm_year */
 	tm->tm_year = bcd2bin(rs5c->regs[RS5C372_REG_YEAR]) + 100;
+
+	if (flags_utime > 0) {
+		rs5c372_rtc_set_time(dev, tm);
+	}
 
 	dev_dbg(&client->dev, "%s: tm is secs=%d, mins=%d, hours=%d, "
 		"mday=%d, mon=%d, year=%d, wday=%d\n",
