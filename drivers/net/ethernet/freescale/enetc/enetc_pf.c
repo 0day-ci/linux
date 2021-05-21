@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-/* Copyright 2017-2019 NXP */
+/* Copyright 2017-2021 NXP */
 
 #include <linux/mdio.h>
 #include <linux/module.h>
@@ -1201,6 +1201,7 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct enetc_ndev_priv *priv;
+	struct pci_dev *ptp_pdev;
 	struct net_device *ndev;
 	struct enetc_si *si;
 	struct enetc_pf *pf;
@@ -1293,6 +1294,16 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 		goto err_alloc_msix;
 	}
 
+	ptp_pdev = pci_get_device(PCI_VENDOR_ID_FREESCALE, ENETC_DEV_ID_PTP,
+				  NULL);
+	if (!ptp_pdev) {
+		dev_err(&pdev->dev, "no PTP device found\n");
+		err = -ENODEV;
+		goto err_get_ptp;
+	}
+
+	priv->ptp_dev = &ptp_pdev->dev;
+
 	if (!of_get_phy_mode(node, &pf->if_mode)) {
 		err = enetc_mdiobus_create(pf, node);
 		if (err)
@@ -1310,6 +1321,7 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 	return 0;
 
 err_reg_netdev:
+err_get_ptp:
 	enetc_phylink_destroy(priv);
 err_phylink_create:
 	enetc_mdiobus_destroy(pf);

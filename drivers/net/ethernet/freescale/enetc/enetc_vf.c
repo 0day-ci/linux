@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-/* Copyright 2017-2019 NXP */
+/* Copyright 2017-2021 NXP */
 
 #include <linux/module.h>
 #include "enetc.h"
@@ -138,6 +138,7 @@ static int enetc_vf_probe(struct pci_dev *pdev,
 			  const struct pci_device_id *ent)
 {
 	struct enetc_ndev_priv *priv;
+	struct pci_dev *ptp_pdev;
 	struct net_device *ndev;
 	struct enetc_si *si;
 	int err;
@@ -188,6 +189,16 @@ static int enetc_vf_probe(struct pci_dev *pdev,
 		goto err_alloc_msix;
 	}
 
+	ptp_pdev = pci_get_device(PCI_VENDOR_ID_FREESCALE, ENETC_DEV_ID_PTP,
+				  NULL);
+	if (!ptp_pdev) {
+		dev_err(&pdev->dev, "no PTP device found\n");
+		err = -ENODEV;
+		goto err_get_ptp;
+	}
+
+	priv->ptp_dev = &ptp_pdev->dev;
+
 	err = register_netdev(ndev);
 	if (err)
 		goto err_reg_netdev;
@@ -197,6 +208,7 @@ static int enetc_vf_probe(struct pci_dev *pdev,
 	return 0;
 
 err_reg_netdev:
+err_get_ptp:
 	enetc_free_msix(priv);
 err_config_si:
 err_alloc_msix:
