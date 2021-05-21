@@ -1068,6 +1068,9 @@ static int fwtty_install(struct tty_driver *driver, struct tty_struct *tty)
 	struct fwtty_port *port = fwtty_port_get(tty->index);
 	int err;
 
+	if (!port)
+		return -ENODEV;
+
 	err = tty_standard_install(driver, tty);
 	if (!err)
 		tty->driver_data = port;
@@ -1080,6 +1083,9 @@ static int fwloop_install(struct tty_driver *driver, struct tty_struct *tty)
 {
 	struct fwtty_port *port = fwtty_port_get(table_idx(tty->index));
 	int err;
+
+	if (!port)
+		return -ENODEV;
 
 	err = tty_standard_install(driver, tty);
 	if (!err)
