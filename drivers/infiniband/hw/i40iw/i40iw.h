@@ -137,7 +137,7 @@ struct i40iw_cqp_request {
 	struct cqp_commands_info info;
 	wait_queue_head_t waitq;
 	struct list_head list;
-	atomic_t refcount;
+	refcount_t refcount;
 	void (*callback_fcn)(struct i40iw_cqp_request*, u32);
 	void *param;
 	struct i40iw_cqp_compl_info compl_info;

@@ -384,10 +384,10 @@ struct i40iw_cqp_request *i40iw_get_cqp_request(struct i40iw_cqp *cqp, bool wait
 	}
 
 	if (wait) {
-		atomic_set(&cqp_request->refcount, 2);
+		refcount_set(&cqp_request->refcount, 2);
 		cqp_request->waiting = true;
 	} else {
-		atomic_set(&cqp_request->refcount, 1);
+		refcount_set(&cqp_request->refcount, 1);
 	}
 	return cqp_request;
 }
@@ -424,7 +424,7 @@ void i40iw_free_cqp_request(struct i40iw_cqp *cqp, struct i40iw_cqp_request *cqp
 void i40iw_put_cqp_request(struct i40iw_cqp *cqp,
 			   struct i40iw_cqp_request *cqp_request)
 {
-	if (atomic_dec_and_test(&cqp_request->refcount))
+	if (refcount_dec_and_test(&cqp_request->refcount))
 		i40iw_free_cqp_request(cqp, cqp_request);
 }
 
@@ -445,7 +445,7 @@ static void i40iw_free_pending_cqp_request(struct i40iw_cqp *cqp,
 	}
 	i40iw_put_cqp_request(cqp, cqp_request);
 	wait_event_timeout(iwdev->close_wq,
-			   !atomic_read(&cqp_request->refcount),
+			   !refcount_read(&cqp_request->refcount),
 			   1000);
 }
 
@@ -1005,7 +1005,7 @@ static void i40iw_cqp_manage_hmc_fcn_callback(struct i40iw_cqp_request *cqp_requ
 
 	if (hmcfcninfo && hmcfcninfo->callback_fcn) {
 		i40iw_debug(&iwdev->sc_dev, I40IW_DEBUG_HMC, "%s1\n", __func__);
-		atomic_inc(&cqp_request->refcount);
+		refcount_inc(&cqp_request->refcount);
 		work = &iwdev->virtchnl_w[hmcfcninfo->iw_vf_idx];
 		work->cqp_request = cqp_request;
 		INIT_WORK(&work->work, i40iw_cqp_manage_hmc_fcn_worker);

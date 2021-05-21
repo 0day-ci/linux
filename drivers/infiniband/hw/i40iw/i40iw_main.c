@@ -1125,7 +1125,7 @@ static enum i40iw_status_code i40iw_alloc_local_mac_ipaddr_entry(struct i40iw_de
 	}
 
 	/* increment refcount, because we need the cqp request ret value */
-	atomic_inc(&cqp_request->refcount);
+	refcount_inc(&cqp_request->refcount);
 
 	cqp_info = &cqp_request->info;
 	cqp_info->cqp_cmd = OP_ALLOC_LOCAL_MAC_IPADDR_ENTRY;
