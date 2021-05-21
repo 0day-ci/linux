@@ -1319,3 +1319,16 @@ void idxd_device_drv_remove(struct idxd_dev *idxd_dev)
 	if (rc < 0)
 		dev_dbg(dev, "Device disable failed\n");
 }
+
+static enum idxd_dev_type dev_types[] = {
+	IDXD_DEV_DSA,
+	IDXD_DEV_IAX,
+	IDXD_DEV_NONE,
+};
+
+struct idxd_device_driver idxd_drv = {
+	.type = dev_types,
+	.probe = idxd_device_drv_probe,
+	.remove = idxd_device_drv_remove,
+	.name = "idxd",
+};
