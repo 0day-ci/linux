@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-/* Copyright 2019 NXP */
+/* Copyright 2019-2021 NXP */
 
 #include <linux/module.h>
 #include <linux/of.h>
@@ -9,6 +9,16 @@
 
 int enetc_phc_index = -1;
 EXPORT_SYMBOL(enetc_phc_index);
+
+static struct ptp_vclock_cc ptp_qoriq_vclock_cc = {
+	.cc.read		= ptp_qoriq_clock_read,
+	.cc.mask		= CYCLECOUNTER_MASK(64),
+	.cc.shift		= 28,
+	.cc.mult		= (1 << 28),
+	.refresh_interval	= (HZ * 60),
+	.mult_factor		= (1 << 6),
+	.div_factor		= 15625,
+};
 
 static struct ptp_clock_info enetc_ptp_caps = {
 	.owner		= THIS_MODULE,
@@ -24,6 +34,7 @@ static struct ptp_clock_info enetc_ptp_caps = {
 	.gettime64	= ptp_qoriq_gettime,
 	.settime64	= ptp_qoriq_settime,
 	.enable		= ptp_qoriq_enable,
+	.vclock_cc	= &ptp_qoriq_vclock_cc,
 };
 
 static int enetc_ptp_probe(struct pci_dev *pdev,
