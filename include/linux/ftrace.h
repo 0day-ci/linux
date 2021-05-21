@@ -368,10 +368,18 @@ static inline void arch_ftrace_set_direct_caller(struct pt_regs *regs,
 
 #ifdef CONFIG_STACK_TRACER
 
+#define STACK_TRACE_ENTRIES 500
+
+extern unsigned long stack_dump_trace[STACK_TRACE_ENTRIES];
+extern unsigned stack_trace_index[STACK_TRACE_ENTRIES];
+extern unsigned int stack_trace_nr_entries;
+extern unsigned long stack_trace_max_size;
 extern int stack_tracer_enabled;
 
 int stack_trace_sysctl(struct ctl_table *table, int write, void *buffer,
 		       size_t *lenp, loff_t *ppos);
+void stack_get_trace(unsigned long traced_ip, unsigned long *stack_ref,
+					unsigned long stack_size, int *tracer_frame);
 
 /* DO NOT MODIFY THIS VARIABLE DIRECTLY! */
 DECLARE_PER_CPU(int, disable_stack_tracer);

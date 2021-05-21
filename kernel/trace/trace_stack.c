@@ -19,13 +19,11 @@
 
 #include "trace.h"
 
-#define STACK_TRACE_ENTRIES 500
+unsigned long stack_dump_trace[STACK_TRACE_ENTRIES];
+unsigned stack_trace_index[STACK_TRACE_ENTRIES];
 
-static unsigned long stack_dump_trace[STACK_TRACE_ENTRIES];
-static unsigned stack_trace_index[STACK_TRACE_ENTRIES];
-
-static unsigned int stack_trace_nr_entries;
-static unsigned long stack_trace_max_size;
+unsigned int stack_trace_nr_entries;
+unsigned long stack_trace_max_size;
 static arch_spinlock_t stack_trace_max_lock =
 	(arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
 
@@ -152,12 +150,103 @@ static void print_max_stack(void)
  * Although the entry function is not displayed, the first function (sys_foo)
  * will still include the stack size of it.
  */
+void __weak stack_get_trace(unsigned long traced_ip, unsigned long *stack_ref,
+					unsigned long stack_size, int *tracer_frame)
+{
+	unsigned long *p, *top, *start;
+	int i, x;
+
+	stack_trace_nr_entries = stack_trace_save(stack_dump_trace,
+					       ARRAY_SIZE(stack_dump_trace) - 1,
+					       0);
+
+	/* Skip over the overhead of the stack tracer itself */
+	for (i = 0; i < stack_trace_nr_entries; i++) {
+		if (stack_dump_trace[i] == traced_ip)
+			break;
+	}
+
+	/*
+	 * Some archs may not have the passed in ip in the dump.
+	 * If that happens, we need to show everything.
+	 */
+	if (i == stack_trace_nr_entries)
+		i = 0;
+
+	/*
+	 * Now find where in the stack these are.
+	 */
+	x = 0;
+	start = stack_ref;
+	top = (unsigned long *)
+		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
+
+	/*
+	 * Loop through all the entries. One of the entries may
+	 * for some reason be missed on the stack, so we may
+	 * have to account for them. If they are all there, this
+	 * loop will only happen once. This code only takes place
+	 * on a new max, so it is far from a fast path.
+	 */
+	while (i < stack_trace_nr_entries) {
+		int found = 0;
+
+		stack_trace_index[x] = stack_size;
+		p = start;
+
+		for (; p < top && i < stack_trace_nr_entries; p++) {
+			/*
+			 * The READ_ONCE_NOCHECK is used to let KASAN know that
+			 * this is not a stack-out-of-bounds error.
+			 */
+			if ((READ_ONCE_NOCHECK(*p)) == stack_dump_trace[i]) {
+				stack_dump_trace[x] = stack_dump_trace[i++];
+				stack_size = stack_trace_index[x++] =
+					(top - p) * sizeof(unsigned long);
+				found = 1;
+				/* Start the search from here */
+				start = p + 1;
+				/*
+				 * We do not want to show the overhead
+				 * of the stack tracer stack in the
+				 * max stack. If we haven't figured
+				 * out what that is, then figure it out
+				 * now.
+				 */
+				if (unlikely(!*tracer_frame)) {
+					*tracer_frame = (p - stack_ref) *
+						sizeof(unsigned long);
+					stack_trace_max_size -= *tracer_frame;
+				}
+			}
+		}
+
+		if (!found)
+			i++;
+	}
+
+#ifdef ARCH_FTRACE_SHIFT_STACK_TRACER
+	/*
+	 * Some archs will store the link register before calling
+	 * nested functions. This means the saved return address
+	 * comes after the local storage, and we need to shift
+	 * for that.
+	 */
+	if (x > 1) {
+		memmove(&stack_trace_index[0], &stack_trace_index[1],
+			sizeof(stack_trace_index[0]) * (x - 1));
+		x--;
+	}
+#endif
+
+	stack_trace_nr_entries = x;
+}
+
 static void check_stack(unsigned long ip, unsigned long *stack)
 {
-	unsigned long this_size, flags; unsigned long *p, *top, *start;
+	unsigned long this_size, flags;
 	static int tracer_frame;
 	int frame_size = READ_ONCE(tracer_frame);
-	int i, x;
 
 	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
 	this_size = THREAD_SIZE - this_size;
@@ -188,90 +277,7 @@ static void check_stack(unsigned long ip, unsigned long *stack)
 
 	stack_trace_max_size = this_size;
 
-	stack_trace_nr_entries = stack_trace_save(stack_dump_trace,
-					       ARRAY_SIZE(stack_dump_trace) - 1,
-					       0);
-
-	/* Skip over the overhead of the stack tracer itself */
-	for (i = 0; i < stack_trace_nr_entries; i++) {
-		if (stack_dump_trace[i] == ip)
-			break;
-	}
-
-	/*
-	 * Some archs may not have the passed in ip in the dump.
-	 * If that happens, we need to show everything.
-	 */
-	if (i == stack_trace_nr_entries)
-		i = 0;
-
-	/*
-	 * Now find where in the stack these are.
-	 */
-	x = 0;
-	start = stack;
-	top = (unsigned long *)
-		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
-
-	/*
-	 * Loop through all the entries. One of the entries may
-	 * for some reason be missed on the stack, so we may
-	 * have to account for them. If they are all there, this
-	 * loop will only happen once. This code only takes place
-	 * on a new max, so it is far from a fast path.
-	 */
-	while (i < stack_trace_nr_entries) {
-		int found = 0;
-
-		stack_trace_index[x] = this_size;
-		p = start;
-
-		for (; p < top && i < stack_trace_nr_entries; p++) {
-			/*
-			 * The READ_ONCE_NOCHECK is used to let KASAN know that
-			 * this is not a stack-out-of-bounds error.
-			 */
-			if ((READ_ONCE_NOCHECK(*p)) == stack_dump_trace[i]) {
-				stack_dump_trace[x] = stack_dump_trace[i++];
-				this_size = stack_trace_index[x++] =
-					(top - p) * sizeof(unsigned long);
-				found = 1;
-				/* Start the search from here */
-				start = p + 1;
-				/*
-				 * We do not want to show the overhead
-				 * of the stack tracer stack in the
-				 * max stack. If we haven't figured
-				 * out what that is, then figure it out
-				 * now.
-				 */
-				if (unlikely(!tracer_frame)) {
-					tracer_frame = (p - stack) *
-						sizeof(unsigned long);
-					stack_trace_max_size -= tracer_frame;
-				}
-			}
-		}
-
-		if (!found)
-			i++;
-	}
-
-#ifdef ARCH_FTRACE_SHIFT_STACK_TRACER
-	/*
-	 * Some archs will store the link register before calling
-	 * nested functions. This means the saved return address
-	 * comes after the local storage, and we need to shift
-	 * for that.
-	 */
-	if (x > 1) {
-		memmove(&stack_trace_index[0], &stack_trace_index[1],
-			sizeof(stack_trace_index[0]) * (x - 1));
-		x--;
-	}
-#endif
-
-	stack_trace_nr_entries = x;
+	stack_get_trace(ip, stack, this_size, &tracer_frame);
 
 	if (task_stack_end_corrupted(current)) {
 		print_max_stack();
