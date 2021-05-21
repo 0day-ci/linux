@@ -160,6 +160,10 @@ int arch_stack_walk_reliable(stack_trace_consume_fn consume_entry,
 
 		if (!consume_entry(cookie, ip))
 			return -EINVAL;
+
+		ip = ftrace_get_traced_func_if_no_stackframe(ip, stack);
+		if (ip && !consume_entry(cookie, ip))
+			return -EINVAL;
 	}
 	return 0;
 }
