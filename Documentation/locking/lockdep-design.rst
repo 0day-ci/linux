@@ -462,7 +462,7 @@ Block condition matrix, Y means the row blocks the column, and N means otherwise
 	| R | Y | Y | N |
 	+---+---+---+---+
 
-	(W: writers, r: non-recursive readers, R: recursive readers)
+	(E: writers, r: non-recursive readers, R: recursive readers)
 
 
 acquired recursively. Unlike non-recursive read locks, recursive read locks
