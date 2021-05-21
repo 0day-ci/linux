@@ -344,7 +344,7 @@ static void i40iw_free_retrans_entry(struct i40iw_cm_node *cm_node)
 		cm_node->send_entry = NULL;
 		i40iw_free_sqbuf(&iwdev->vsi, (void *)send_entry->sqbuf);
 		kfree(send_entry);
-		atomic_dec(&cm_node->ref_count);
+		refcount_dec(&cm_node->ref_count);
 	}
 }
 
@@ -570,7 +570,7 @@ static void i40iw_active_open_err(struct i40iw_cm_node *cm_node, bool reset)
 			    __func__,
 			    cm_node,
 			    cm_node->state);
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 	}
 
@@ -1092,7 +1092,7 @@ int i40iw_schedule_cm_timer(struct i40iw_cm_node *cm_node,
 	if (type == I40IW_TIMER_TYPE_SEND) {
 		spin_lock_irqsave(&cm_node->retrans_list_lock, flags);
 		cm_node->send_entry = new_send;
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		spin_unlock_irqrestore(&cm_node->retrans_list_lock, flags);
 		new_send->timetosend = jiffies + I40IW_RETRY_TIMEOUT;
 
@@ -1140,7 +1140,7 @@ static void i40iw_retrans_expired(struct i40iw_cm_node *cm_node)
 		i40iw_send_reset(cm_node);
 		break;
 	default:
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 		i40iw_create_event(cm_node, I40IW_CM_EVENT_ABORTED);
 		break;
@@ -1198,7 +1198,7 @@ static void i40iw_build_timer_list(struct list_head *timer_list,
 	list_for_each_safe(list_node, list_core_temp, hte) {
 		cm_node = container_of(list_node, struct i40iw_cm_node, list);
 		if (cm_node->close_entry || cm_node->send_entry) {
-			atomic_inc(&cm_node->ref_count);
+			refcount_inc(&cm_node->ref_count);
 			list_add(&cm_node->timer_entry, timer_list);
 		}
 	}
@@ -1448,7 +1448,7 @@ struct i40iw_cm_node *i40iw_find_node(struct i40iw_cm_core *cm_core,
 		    !memcmp(cm_node->rem_addr, rem_addr, sizeof(cm_node->rem_addr)) &&
 		    (cm_node->rem_port == rem_port)) {
 			if (add_refcnt)
-				atomic_inc(&cm_node->ref_count);
+				refcount_inc(&cm_node->ref_count);
 			spin_unlock_irqrestore(&cm_core->ht_lock, flags);
 			return cm_node;
 		}
@@ -1864,7 +1864,7 @@ static int i40iw_dec_refcnt_listen(struct i40iw_cm_core *cm_core,
 			cm_node = container_of(list_pos, struct i40iw_cm_node, list);
 			if ((cm_node->listener == listener) &&
 			    !cm_node->accelerated) {
-				atomic_inc(&cm_node->ref_count);
+				refcount_inc(&cm_node->ref_count);
 				list_add(&cm_node->reset_entry, &reset_list);
 			}
 		}
@@ -1901,7 +1901,7 @@ static int i40iw_dec_refcnt_listen(struct i40iw_cm_core *cm_core,
 				event.cm_info.loc_port = loopback->loc_port;
 				event.cm_info.cm_id = loopback->cm_id;
 				event.cm_info.ipv4 = loopback->ipv4;
-				atomic_inc(&loopback->ref_count);
+				refcount_inc(&loopback->ref_count);
 				loopback->state = I40IW_CM_STATE_CLOSED;
 				i40iw_event_connect_error(&event);
 				cm_node->state = I40IW_CM_STATE_LISTENER_DESTROYED;
@@ -2206,7 +2206,7 @@ static struct i40iw_cm_node *i40iw_make_cm_node(
 	spin_lock_init(&cm_node->retrans_list_lock);
 	cm_node->ack_rcvd = false;
 
-	atomic_set(&cm_node->ref_count, 1);
+	refcount_set(&cm_node->ref_count, 1);
 	/* associate our parent CM core */
 	cm_node->cm_core = cm_core;
 	cm_node->tcp_cntxt.loc_id = I40IW_CM_DEF_LOCAL_ID;
@@ -2288,7 +2288,7 @@ static void i40iw_rem_ref_cm_node(struct i40iw_cm_node *cm_node)
 	unsigned long flags;
 
 	spin_lock_irqsave(&cm_node->cm_core->ht_lock, flags);
-	if (atomic_dec_return(&cm_node->ref_count)) {
+	if (!refcount_dec_and_test(&cm_node->ref_count)) {
 		spin_unlock_irqrestore(&cm_node->cm_core->ht_lock, flags);
 		return;
 	}
@@ -2366,7 +2366,7 @@ static void i40iw_handle_fin_pkt(struct i40iw_cm_node *cm_node)
 		cm_node->tcp_cntxt.rcv_nxt++;
 		i40iw_cleanup_retrans_entry(cm_node);
 		cm_node->state = I40IW_CM_STATE_CLOSED;
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 		break;
 	case I40IW_CM_STATE_FIN_WAIT1:
@@ -2627,7 +2627,7 @@ static void i40iw_handle_syn_pkt(struct i40iw_cm_node *cm_node,
 		break;
 	case I40IW_CM_STATE_CLOSED:
 		i40iw_cleanup_retrans_entry(cm_node);
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 		break;
 	case I40IW_CM_STATE_OFFLOADED:
@@ -2701,7 +2701,7 @@ static void i40iw_handle_synack_pkt(struct i40iw_cm_node *cm_node,
 	case I40IW_CM_STATE_CLOSED:
 		cm_node->tcp_cntxt.loc_seq_num = ntohl(tcph->ack_seq);
 		i40iw_cleanup_retrans_entry(cm_node);
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 		break;
 	case I40IW_CM_STATE_ESTABLISHED:
@@ -2774,7 +2774,7 @@ static int i40iw_handle_ack_pkt(struct i40iw_cm_node *cm_node,
 		break;
 	case I40IW_CM_STATE_CLOSED:
 		i40iw_cleanup_retrans_entry(cm_node);
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 		i40iw_send_reset(cm_node);
 		break;
 	case I40IW_CM_STATE_LAST_ACK:
@@ -3222,7 +3222,7 @@ void i40iw_receive_ilq(struct i40iw_sc_vsi *vsi, struct i40iw_puda_buf *rbuf)
 			i40iw_rem_ref_cm_node(cm_node);
 			return;
 		}
-		atomic_inc(&cm_node->ref_count);
+		refcount_inc(&cm_node->ref_count);
 	} else if (cm_node->state == I40IW_CM_STATE_OFFLOADED) {
 		i40iw_rem_ref_cm_node(cm_node);
 		return;
@@ -4228,7 +4228,7 @@ static void i40iw_cm_event_handler(struct work_struct *work)
  */
 static void i40iw_cm_post_event(struct i40iw_cm_event *event)
 {
-	atomic_inc(&event->cm_node->ref_count);
+	refcount_inc(&event->cm_node->ref_count);
 	event->cm_info.cm_id->add_ref(event->cm_info.cm_id);
 	INIT_WORK(&event->event_work, i40iw_cm_event_handler);
 
@@ -4331,7 +4331,7 @@ void i40iw_cm_teardown_connections(struct i40iw_device *iwdev, u32 *ipaddr,
 		    (nfo->vlan_id == cm_node->vlan_id &&
 		    (!memcmp(cm_node->loc_addr, ipaddr, nfo->ipv4 ? 4 : 16) ||
 		     !memcmp(cm_node->rem_addr, ipaddr, nfo->ipv4 ? 4 : 16)))) {
-			atomic_inc(&cm_node->ref_count);
+			refcount_inc(&cm_node->ref_count);
 			list_add(&cm_node->teardown_entry, &teardown_list);
 		}
 	}
@@ -4342,7 +4342,7 @@ void i40iw_cm_teardown_connections(struct i40iw_device *iwdev, u32 *ipaddr,
 		    (nfo->vlan_id == cm_node->vlan_id &&
 		    (!memcmp(cm_node->loc_addr, ipaddr, nfo->ipv4 ? 4 : 16) ||
 		     !memcmp(cm_node->rem_addr, ipaddr, nfo->ipv4 ? 4 : 16)))) {
-			atomic_inc(&cm_node->ref_count);
+			refcount_inc(&cm_node->ref_count);
 			list_add(&cm_node->teardown_entry, &teardown_list);
 		}
 	}

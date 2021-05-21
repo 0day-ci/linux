@@ -319,7 +319,7 @@ struct i40iw_cm_node {
 	enum i40iw_cm_node_state state;
 	u8 loc_mac[ETH_ALEN];
 	u8 rem_mac[ETH_ALEN];
-	atomic_t ref_count;
+	refcount_t ref_count;
 	struct i40iw_qp *iwqp;
 	struct i40iw_device *iwdev;
 	struct i40iw_sc_dev *dev;
