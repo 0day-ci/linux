@@ -77,7 +77,7 @@ void i40iw_free_sqbuf(struct i40iw_sc_vsi *vsi, void *bufp)
 	struct i40iw_puda_buf *buf = (struct i40iw_puda_buf *)bufp;
 	struct i40iw_puda_rsrc *ilq = vsi->ilq;
 
-	if (!atomic_dec_return(&buf->refcount))
+	if (refcount_dec_and_test(&buf->refcount))
 		i40iw_puda_ret_bufpool(ilq, buf);
 }
 
@@ -531,7 +531,7 @@ static struct i40iw_puda_buf *i40iw_form_cm_frame(struct i40iw_cm_node *cm_node,
 	if (pdata && pdata->addr)
 		memcpy(buf, pdata->addr, pdata->size);
 
-	atomic_set(&sqbuf->refcount, 1);
+	refcount_set(&sqbuf->refcount, 1);
 
 	return sqbuf;
 }
@@ -1096,7 +1096,7 @@ int i40iw_schedule_cm_timer(struct i40iw_cm_node *cm_node,
 		spin_unlock_irqrestore(&cm_node->retrans_list_lock, flags);
 		new_send->timetosend = jiffies + I40IW_RETRY_TIMEOUT;
 
-		atomic_inc(&sqbuf->refcount);
+		refcount_inc(&sqbuf->refcount);
 		i40iw_puda_send_buf(vsi->ilq, sqbuf);
 		if (!send_retrans) {
 			i40iw_cleanup_retrans_entry(cm_node);
@@ -1286,7 +1286,7 @@ static void i40iw_cm_timer_tick(struct timer_list *t)
 		vsi = &cm_node->iwdev->vsi;
 
 		if (!cm_node->ack_rcvd) {
-			atomic_inc(&send_entry->sqbuf->refcount);
+			refcount_inc(&send_entry->sqbuf->refcount);
 			i40iw_puda_send_buf(vsi->ilq, send_entry->sqbuf);
 			cm_node->cm_core->stats_pkt_retrans++;
 		}

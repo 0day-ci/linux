@@ -90,7 +90,7 @@ struct i40iw_puda_buf {
 	u8 tcphlen;		/* tcp length in bytes */
 	u8 maclen;		/* mac length in bytes */
 	u32 totallen;		/* machlen+iphlen+tcphlen+datalen */
-	atomic_t refcount;
+	refcount_t refcount;
 	u8 hdrlen;
 	bool ipv4;
 	u32 seqnum;
