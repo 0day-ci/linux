@@ -196,10 +196,9 @@ static int __maybe_unused exynos_trng_resume(struct device *dev)
 {
 	int ret;
 
-	ret = pm_runtime_get_sync(dev);
-	if (ret < 0) {
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret) {
 		dev_err(dev, "Could not get runtime PM.\n");
-		pm_runtime_put_noidle(dev);
 		return ret;
 	}
 
