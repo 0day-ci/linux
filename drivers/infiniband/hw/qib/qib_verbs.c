@@ -336,7 +336,8 @@ void qib_ib_rcv(struct qib_ctxtdata *rcd, void *rhdr, void *data, u32 tlen)
 		 * Notify rvt_multicast_detach() if it is waiting for us
 		 * to finish.
 		 */
-		if (atomic_dec_return(&mcast->refcount) <= 1)
+		refcount_dec(&mcast->refcount);
+		if (refcount_read(&mcast->refcount) <= 1)
 			wake_up(&mcast->wait);
 	} else {
 		rcu_read_lock();

@@ -117,7 +117,6 @@ static struct rvt_mcast *rvt_mcast_alloc(union ib_gid *mgid, u16 lid)
 
 	INIT_LIST_HEAD(&mcast->qp_list);
 	init_waitqueue_head(&mcast->wait);
-	atomic_set(&mcast->refcount, 0);
 
 bail:
 	return mcast;
@@ -169,7 +168,7 @@ struct rvt_mcast *rvt_mcast_find(struct rvt_ibport *ibp, union ib_gid *mgid,
 		} else {
 			/* MGID/MLID must match */
 			if (mcast->mcast_addr.lid == lid) {
-				atomic_inc(&mcast->refcount);
+				refcount_inc(&mcast->refcount);
 				found = mcast;
 			}
 			break;
@@ -257,7 +256,7 @@ static int rvt_mcast_add(struct rvt_dev_info *rdi, struct rvt_ibport *ibp,
 
 	list_add_tail_rcu(&mqp->list, &mcast->qp_list);
 
-	atomic_inc(&mcast->refcount);
+	refcount_set(&mcast->refcount, 1);
 	rb_link_node(&mcast->rb_node, pn, n);
 	rb_insert_color(&mcast->rb_node, &ibp->mcast_tree);
 
@@ -410,12 +409,12 @@ int rvt_detach_mcast(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 	 * Wait for any list walkers to finish before freeing the
 	 * list element.
 	 */
-	wait_event(mcast->wait, atomic_read(&mcast->refcount) <= 1);
+	wait_event(mcast->wait, refcount_read(&mcast->refcount) <= 1);
 	rvt_mcast_qp_free(delp);
 
 	if (last) {
-		atomic_dec(&mcast->refcount);
-		wait_event(mcast->wait, !atomic_read(&mcast->refcount));
+		refcount_dec(&mcast->refcount);
+		wait_event(mcast->wait, !refcount_read(&mcast->refcount));
 		rvt_mcast_free(mcast);
 		spin_lock_irq(&rdi->n_mcast_grps_lock);
 		rdi->n_mcast_grps_allocated--;
