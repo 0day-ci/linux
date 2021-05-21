@@ -6,7 +6,7 @@ CPU topology binding description
 1 - Introduction
 ===========================================
 
-In a SMP system, the hierarchy of CPUs is defined through three entities that
+In a SMP system, the hierarchy of CPUs is defined through four entities that
 are used to describe the layout of physical CPUs in the system:
 
 - socket
@@ -75,7 +75,7 @@ whose bindings are described in paragraph 3.
 
 The nodes describing the CPU topology (socket/cluster/core/thread) can
 only be defined within the cpu-map node and every core/thread in the
-system must be defined within the topology.  Any other configuration is
+system must be defined within the topology. Any other configuration is
 invalid and therefore must be ignored.
 
 ===========================================
@@ -91,9 +91,9 @@ cpu-map child nodes which do not share a common parent node can have the same
 name (ie same number N as other cpu-map child nodes at different device tree
 levels) since name uniqueness will be guaranteed by the device tree hierarchy.
 
-===========================================
+============================================
 3 - socket/cluster/core/thread node bindings
-===========================================
+============================================
 
 Bindings for socket/cluster/cpu/thread nodes are defined as follows:
 
