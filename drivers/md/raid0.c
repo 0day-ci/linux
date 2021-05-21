@@ -748,6 +748,19 @@ static void raid0_quiesce(struct mddev *mddev, int quiesce)
 {
 }
 
+/*
+ * Don't account the bio if it was split from mddev->bio_set.
+ */
+static bool raid0_accounting_bio(struct mddev *mddev, struct bio *bio)
+{
+	bool ret = true;
+
+	if (bio->bi_pool == &mddev->bio_set)
+		ret = false;
+
+	return ret;
+}
+
 static struct md_personality raid0_personality=
 {
 	.name		= "raid0",
@@ -760,6 +773,7 @@ static struct md_personality raid0_personality=
 	.size		= raid0_size,
 	.takeover	= raid0_takeover,
 	.quiesce	= raid0_quiesce,
+	.accounting_bio = raid0_accounting_bio,
 };
 
 static int __init raid0_init (void)

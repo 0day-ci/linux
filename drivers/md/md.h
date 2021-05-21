@@ -605,6 +605,8 @@ struct md_personality
 	void *(*takeover) (struct mddev *mddev);
 	/* Changes the consistency policy of an active array. */
 	int (*change_consistency_policy)(struct mddev *mddev, const char *buf);
+	/* check if need to clone bio for accounting in md layer */
+	bool (*accounting_bio)(struct mddev *mddev, struct bio *bio);
 };
 
 struct md_sysfs_entry {

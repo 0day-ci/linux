@@ -8595,6 +8595,20 @@ static void *raid6_takeover(struct mddev *mddev)
 	return setup_conf(mddev);
 }
 
+/*
+ * Don't account the bio if it was split from r5conf->bio_split.
+ */
+static bool raid5_accounting_bio(struct mddev *mddev, struct bio *bio)
+{
+	bool ret = true;
+	struct r5conf *conf = mddev->private;
+
+	if (bio->bi_pool == &conf->bio_split)
+		ret = false;
+
+	return ret;
+}
+
 static int raid5_change_consistency_policy(struct mddev *mddev, const char *buf)
 {
 	struct r5conf *conf;
@@ -8687,6 +8701,7 @@ static struct md_personality raid6_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid6_takeover,
 	.change_consistency_policy = raid5_change_consistency_policy,
+	.accounting_bio	= raid5_accounting_bio,
 };
 static struct md_personality raid5_personality =
 {
@@ -8711,6 +8726,7 @@ static struct md_personality raid5_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid5_takeover,
 	.change_consistency_policy = raid5_change_consistency_policy,
+	.accounting_bio	= raid5_accounting_bio,
 };
 
 static struct md_personality raid4_personality =
@@ -8736,6 +8752,7 @@ static struct md_personality raid4_personality =
 	.quiesce	= raid5_quiesce,
 	.takeover	= raid4_takeover,
 	.change_consistency_policy = raid5_change_consistency_policy,
+	.accounting_bio	= raid5_accounting_bio,
 };
 
 static int __init raid5_init(void)
