@@ -577,7 +577,7 @@ static int __sm_ll_inc_overflow(struct ll_disk *ll, dm_block_t b, struct inc_con
 
 static int sm_ll_inc_overflow(struct ll_disk *ll, dm_block_t b, struct inc_context *ic)
 {
-	int index = -1;
+	int index;
 	struct btree_node *n;
 	__le32 *v_ptr;
 	uint32_t rc;
