@@ -1704,6 +1704,22 @@ out:
 	return ret;
 }
 
+static long do_quota_rescan(struct file *file)
+{
+	struct inode *inode = file_inode(file);
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	int ret;
+
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+
+	ret = btrfs_qgroup_rescan(fs_info);
+
+	mnt_drop_write_file(file);
+	return ret;
+}
+
 static noinline int __btrfs_ioctl_snap_create(struct file *file,
 				const char *name, unsigned long fd, int subvol,
 				bool readonly,
@@ -1793,6 +1809,7 @@ static noinline int btrfs_ioctl_snap_create_v2(struct file *file,
 	struct btrfs_ioctl_vol_args_v2 *vol_args;
 	int ret;
 	bool readonly = false;
+	bool quota_rescan = false;
 	struct btrfs_qgroup_inherit *inherit = NULL;
 
 	if (!S_ISDIR(file_inode(file)->i_mode))
@@ -1806,6 +1823,15 @@ static noinline int btrfs_ioctl_snap_create_v2(struct file *file,
 	if (vol_args->flags & ~BTRFS_SUBVOL_CREATE_ARGS_MASK) {
 		ret = -EOPNOTSUPP;
 		goto free_args;
+	}
+
+	if (vol_args->flags & BTRFS_SUBVOL_QGROUP_RESCAN) {
+		if (!capable(CAP_SYS_ADMIN)) {
+			ret = -EPERM;
+			goto free_args;
+		}
+
+		quota_rescan = true;
 	}
 
 	if (vol_args->flags & BTRFS_SUBVOL_RDONLY)
@@ -1843,6 +1869,22 @@ static noinline int btrfs_ioctl_snap_create_v2(struct file *file,
 					subvol, readonly, inherit);
 	if (ret)
 		goto free_inherit;
+
+	if (quota_rescan) {
+		ret = do_quota_rescan(file);
+		/*
+		 * EINVAL is returned if quota is not enabled. There is already
+		 * a warning issued if quota rescan is started when quota is not
+		 * enabled, so skip a warning here if it is the case.
+		 */
+		if (ret < 0 && ret != -EINVAL)
+			btrfs_warn(btrfs_sb(file_inode(file)->i_sb),
+		"Couldn't execute quota rescan after snapshot creation: %d",
+					ret);
+		else
+			ret = 0;
+	}
+
 free_inherit:
 	kfree(inherit);
 free_args:
@@ -4277,35 +4319,25 @@ drop_write:
 
 static long btrfs_ioctl_quota_rescan(struct file *file, void __user *arg)
 {
-	struct inode *inode = file_inode(file);
-	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_ioctl_quota_rescan_args *qsa;
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	ret = mnt_want_write_file(file);
-	if (ret)
-		return ret;
-
 	qsa = memdup_user(arg, sizeof(*qsa));
-	if (IS_ERR(qsa)) {
-		ret = PTR_ERR(qsa);
-		goto drop_write;
-	}
+	if (IS_ERR(qsa))
+		return PTR_ERR(qsa);
 
 	if (qsa->flags) {
 		ret = -EINVAL;
 		goto out;
 	}
 
-	ret = btrfs_qgroup_rescan(fs_info);
+	ret = do_quota_rescan(file);
 
 out:
 	kfree(qsa);
-drop_write:
-	mnt_drop_write_file(file);
 	return ret;
 }
 
