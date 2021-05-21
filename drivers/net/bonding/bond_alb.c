@@ -1305,6 +1305,23 @@ void bond_alb_deinitialize(struct bonding *bond)
 		rlb_deinitialize(bond);
 }
 
+static bool bond_alb_bridged_mac(struct bonding *bond, struct ethhdr *eth_data)
+{
+	if (BOND_MODE(bond) != BOND_MODE_ALB)
+		return false;
+
+	/* Don't modify source MACs that do not originate locally
+	 * (e.g.,arrive via a bridge).
+	 */
+	if (!netif_is_bridge_port(bond->dev))
+		return false;
+
+	if (bond_slave_has_mac_rx(bond, eth_data->h_source))
+		return false;
+
+	return true;
+}
+
 static netdev_tx_t bond_do_alb_xmit(struct sk_buff *skb, struct bonding *bond,
 				    struct slave *tx_slave)
 {
@@ -1319,7 +1336,8 @@ static netdev_tx_t bond_do_alb_xmit(struct sk_buff *skb, struct bonding *bond,
 	}
 
 	if (tx_slave && bond_slave_can_tx(tx_slave)) {
-		if (tx_slave != rcu_access_pointer(bond->curr_active_slave)) {
+		if (tx_slave != rcu_access_pointer(bond->curr_active_slave) &&
+		    !bond_alb_bridged_mac(bond, eth_data)) {
 			ether_addr_copy(eth_data->h_source,
 					tx_slave->dev->dev_addr);
 		}
