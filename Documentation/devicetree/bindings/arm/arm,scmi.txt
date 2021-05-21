@@ -14,7 +14,8 @@ Required properties:
 
 The scmi node with the following properties shall be under the /firmware/ node.
 
-- compatible : shall be "arm,scmi" or "arm,scmi-smc" for smc/hvc transports
+- compatible : shall be "arm,scmi" or "arm,scmi-smc" for smc/hvc transports,
+	  or "linaro,scmi-optee" for OP-TEE transport.
 - mboxes: List of phandle and mailbox channel specifiers. When used, it should
 	  contain exactly one or two mailboxes, one for transmitting messages
 	  ("tx") and another optional for receiving the notifications("rx") if
