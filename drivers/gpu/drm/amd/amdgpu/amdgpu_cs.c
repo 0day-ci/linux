@@ -617,8 +617,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	amdgpu_bo_list_for_each_entry(e, p->bo_list) {
 		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 
-		/* Make sure we use the exclusive slot for shared BOs */
-		if (bo->prime_shared_count)
+		/* Make sure we use the exclusive slot for all potentially shared BOs */
+		if (!(bo->flags & AMDGPU_GEM_CREATE_VM_ALWAYS_VALID))
 			e->tv.num_shared = 0;
 		e->bo_va = amdgpu_vm_bo_find(vm, bo);
 	}
