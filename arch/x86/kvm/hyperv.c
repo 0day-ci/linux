@@ -2022,6 +2022,11 @@ static u16 kvm_hvcall_signal_event(struct kvm_vcpu *vcpu, bool fast, u64 param)
 	return HV_STATUS_SUCCESS;
 }
 
+static bool hv_check_hypercall_access(struct kvm_vcpu_hv *hv_vcpu, u16 code)
+{
+	return true;
+}
+
 int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 {
 	u64 param, ingpa, outgpa, ret = HV_STATUS_SUCCESS;
@@ -2060,6 +2065,11 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 	rep = !!(rep_cnt || rep_idx);
 
 	trace_kvm_hv_hypercall(code, fast, rep_cnt, rep_idx, ingpa, outgpa);
+
+	if (unlikely(!hv_check_hypercall_access(to_hv_vcpu(vcpu), code))) {
+		ret = HV_STATUS_ACCESS_DENIED;
+		goto hypercall_complete;
+	}
 
 	switch (code) {
 	case HVCALL_NOTIFY_LONG_SPIN_WAIT:
@@ -2167,6 +2177,7 @@ int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
 		break;
 	}
 
+hypercall_complete:
 	return kvm_hv_hypercall_complete(vcpu, ret);
 }
 
