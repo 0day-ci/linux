@@ -593,13 +593,14 @@ static void r871xu_dev_remove(struct usb_interface *pusb_intf)
 	struct usb_device *udev = interface_to_usbdev(pusb_intf);
 
 	if (pnetdev) {
+		struct net_device *newpnetdev = NULL;
 		struct _adapter *padapter = netdev_priv(pnetdev);
 
 		/* never exit with a firmware callback pending */
 		wait_for_completion(&padapter->rtl8712_fw_ready);
-		pnetdev = usb_get_intfdata(pusb_intf);
+		newpnetdev = usb_get_intfdata(pusb_intf);
 		usb_set_intfdata(pusb_intf, NULL);
-		if (!pnetdev)
+		if (!newpnetdev)
 			goto firmware_load_fail;
 		release_firmware(padapter->fw);
 		if (drvpriv.drv_registered)
@@ -625,6 +626,10 @@ firmware_load_fail:
 	 */
 	if (udev->state != USB_STATE_NOTATTACHED)
 		usb_reset_device(udev);
+	if (pnetdev) {
+		struct _adapter *padapter = netdev_priv(pnetdev);
+		r8712_free_drv_sw(padapter);
+	}
 }
 
 static int __init r8712u_drv_entry(void)
