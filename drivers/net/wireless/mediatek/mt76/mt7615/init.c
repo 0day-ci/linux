@@ -360,6 +360,16 @@ mt7615_init_wiphy(struct ieee80211_hw *hw)
 		wiphy->n_iface_combinations = ARRAY_SIZE(if_comb_radar);
 	}
 	wiphy->reg_notifier = mt7615_regd_notifier;
+	wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
+	wiphy->interface_modes =
+		BIT(NL80211_IFTYPE_STATION) |
+		BIT(NL80211_IFTYPE_AP) |
+#ifdef CONFIG_MAC80211_MESH
+		BIT(NL80211_IFTYPE_MESH_POINT) |
+#endif
+		BIT(NL80211_IFTYPE_P2P_CLIENT) |
+		BIT(NL80211_IFTYPE_P2P_GO) |
+		BIT(NL80211_IFTYPE_ADHOC);
 
 	wiphy->max_sched_scan_plan_interval =
 		MT76_CONNAC_MAX_SCHED_SCAN_INTERVAL;
