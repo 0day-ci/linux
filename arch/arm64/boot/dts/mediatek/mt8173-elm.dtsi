@@ -1112,7 +1112,7 @@
 		syscfg_pctl_pmic: syscfg_pctl_pmic@c000 {
 			compatible = "mediatek,mt6397-pctl-pmic-syscfg",
 				     "syscon";
-			reg = <0 0x0000c000 0 0x0108>;
+			reg = <0x0000c000 0x0108>;
 		};
 	};
 };
