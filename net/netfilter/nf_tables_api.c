@@ -7979,6 +7979,44 @@ struct nft_dump_hooks_data {
 	u8 hook;
 };
 
+static int nla_put_chain_hook_info(struct sk_buff *nlskb, const struct nft_dump_hooks_data *ctx,
+				   const struct nf_hook_ops *ops)
+{
+	struct net *net = sock_net(nlskb->sk);
+	struct nft_chain *chain;
+	struct nlattr *nest;
+	int ret = 0;
+
+	if (ops->hook_ops_type != NF_HOOK_OP_NF_TABLES)
+		return 0;
+
+	chain = ops->priv;
+
+	if (WARN_ON_ONCE(!chain))
+		return 0;
+
+	if (!nft_is_active(net, chain))
+		return 0;
+
+	nest = nla_nest_start(nlskb, NFTA_HOOK_NFT_CHAIN_INFO);
+	if (!nest)
+		return -EMSGSIZE;
+
+	ret = nla_put_string(nlskb, NFTA_CHAIN_TABLE, chain->table->name);
+	if (ret) {
+		nla_nest_cancel(nlskb, nest);
+		return -EMSGSIZE;
+	}
+
+	ret = nla_put_string(nlskb, NFTA_CHAIN_NAME, chain->name);
+	if (ret)
+		nla_nest_cancel(nlskb, nest);
+	else
+		nla_nest_end(nlskb, nest);
+
+	return ret;
+}
+
 static int nf_tables_dump_one_hook(struct sk_buff *nlskb,
 				   const struct nft_dump_hooks_data *ctx,
 				   const struct nf_hook_ops *ops)
@@ -8011,6 +8049,10 @@ static int nf_tables_dump_one_hook(struct sk_buff *nlskb,
 		goto nla_put_failure;
 
 	ret = nla_put_be32(nlskb, NFTA_HOOK_PRIORITY, htonl(ops->priority));
+	if (ret)
+		goto nla_put_failure;
+
+	ret = nla_put_chain_hook_info(nlskb, ctx, ops);
 	if (ret)
 		goto nla_put_failure;
 

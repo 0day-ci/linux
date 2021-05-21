@@ -149,6 +149,7 @@ enum nft_list_attributes {
  * @NFTA_HOOK_DEVS: list of netdevices (NLA_NESTED)
  * @NFTA_HOOK_FUNCTION_NAME: hook function name (NLA_STRING)
  * @NFTA_HOOK_MODULE_NAME: kernel module that registered this hook (NLA_STRING)
+ * @NFTA_HOOK_NFT_CHAIN_INFO: nft chain and table name (NLA_NESTED)
  */
 enum nft_hook_attributes {
 	NFTA_HOOK_UNSPEC,
@@ -158,6 +159,7 @@ enum nft_hook_attributes {
 	NFTA_HOOK_DEVS,
 	NFTA_HOOK_FUNCTION_NAME,
 	NFTA_HOOK_MODULE_NAME,
+	NFTA_HOOK_NFT_CHAIN_INFO,
 	__NFTA_HOOK_MAX
 };
 #define NFTA_HOOK_MAX		(__NFTA_HOOK_MAX - 1)
