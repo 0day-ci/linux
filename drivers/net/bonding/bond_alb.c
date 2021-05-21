@@ -1421,7 +1421,7 @@ struct slave *bond_xmit_alb_slave_get(struct bonding *bond,
 	case ETH_P_IP: {
 		const struct iphdr *iph;
 
-		if (is_broadcast_ether_addr(eth_data->h_dest) ||
+		if (is_multicast_ether_addr(eth_data->h_dest) ||
 		    !pskb_network_may_pull(skb, sizeof(*iph))) {
 			do_tx_balance = false;
 			break;
@@ -1441,7 +1441,7 @@ struct slave *bond_xmit_alb_slave_get(struct bonding *bond,
 		/* IPv6 doesn't really use broadcast mac address, but leave
 		 * that here just in case.
 		 */
-		if (is_broadcast_ether_addr(eth_data->h_dest)) {
+		if (is_multicast_ether_addr(eth_data->h_dest)) {
 			do_tx_balance = false;
 			break;
 		}
