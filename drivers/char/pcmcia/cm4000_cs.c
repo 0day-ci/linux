@@ -564,16 +564,15 @@ static int set_protocol(struct cm4000_dev *dev, struct ptsreq *ptsreq)
 
 	/* Read PPS reply */
 	DEBUGP(5, dev, "Read PPS reply\n");
-	for (i = 0; i < num_bytes_read; i++) {
+	for (i = 0; i < 4; i++) {
 		xoutb(i, REG_BUF_ADDR(iobase));
 		pts_reply[i] = inb(REG_BUF_DATA(iobase));
 	}
 
 #ifdef CM4000_DEBUG
 	DEBUGP(2, dev, "PTSreply: ");
-	for (i = 0; i < num_bytes_read; i++) {
+	for (i = 0; i < 4; i++)
 		pr_debug("0x%.2x ", pts_reply[i]);
-	}
 	pr_debug("\n");
 #endif	/* CM4000_DEBUG */
 
