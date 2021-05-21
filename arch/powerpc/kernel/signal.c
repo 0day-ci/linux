@@ -214,7 +214,7 @@ static void check_syscall_restart(struct pt_regs *regs, struct k_sigaction *ka,
 			regs->gpr[0] = __NR_restart_syscall;
 		else
 			regs->gpr[3] = regs->orig_gpr3;
-		regs->nip -= 4;
+		regs_add_return_ip(regs, -4);
 		regs->result = 0;
 	} else {
 		if (trap_is_scv(regs)) {

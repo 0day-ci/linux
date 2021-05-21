@@ -1848,6 +1848,7 @@ static int kvmppc_vcpu_run_pr(struct kvm_vcpu *vcpu)
 	/* Make sure we save the guest TAR/EBB/DSCR state */
 	kvmppc_giveup_fac(vcpu, FSCR_TAR_LG);
 
+	srr_regs_clobbered();
 out:
 	vcpu->mode = OUTSIDE_GUEST_MODE;
 	return ret;

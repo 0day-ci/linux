@@ -1031,7 +1031,7 @@ static void p9_hmi_special_emu(struct pt_regs *regs)
 #endif /* !__LITTLE_ENDIAN__ */
 
 	/* Go to next instruction */
-	regs->nip += 4;
+	regs_add_return_ip(regs, 4);
 }
 #endif /* CONFIG_VSX */
 
@@ -1476,7 +1476,7 @@ static void do_program_check(struct pt_regs *regs)
 
 		if (!(regs->msr & MSR_PR) &&  /* not user-mode */
 		    report_bug(bugaddr, regs) == BUG_TRAP_TYPE_WARN) {
-			regs->nip += 4;
+			regs_add_return_ip(regs, 4);
 			return;
 		}
 		_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
@@ -1538,7 +1538,7 @@ static void do_program_check(struct pt_regs *regs)
 	if (reason & (REASON_ILLEGAL | REASON_PRIVILEGED)) {
 		switch (emulate_instruction(regs)) {
 		case 0:
-			regs->nip += 4;
+			regs_add_return_ip(regs, 4);
 			emulate_single_step(regs);
 			return;
 		case -EFAULT:
@@ -1593,7 +1593,7 @@ DEFINE_INTERRUPT_HANDLER(alignment_exception)
 
 	if (fixed == 1) {
 		/* skip over emulated instruction */
-		regs->nip += inst_length(reason);
+		regs_add_return_ip(regs, inst_length(reason));
 		emulate_single_step(regs);
 		return;
 	}
@@ -1751,7 +1751,7 @@ DEFINE_INTERRUPT_HANDLER(facility_unavailable_exception)
 				pr_err("DSCR based mfspr emulation failed\n");
 				return;
 			}
-			regs->nip += 4;
+			regs_add_return_ip(regs, 4);
 			emulate_single_step(regs);
 		}
 		return;
@@ -2044,7 +2044,7 @@ DEFINE_INTERRUPT_HANDLER(altivec_assist_exception)
 	PPC_WARN_EMULATED(altivec, regs);
 	err = emulate_altivec(regs);
 	if (err == 0) {
-		regs->nip += 4;		/* skip emulated instruction */
+		regs_add_return_ip(regs, 4); /* skip emulated instruction */
 		emulate_single_step(regs);
 		return;
 	}
@@ -2109,7 +2109,7 @@ DEFINE_INTERRUPT_HANDLER(SPEFloatingPointException)
 
 	err = do_spe_mathemu(regs);
 	if (err == 0) {
-		regs->nip += 4;		/* skip emulated instruction */
+		regs_add_return_ip(regs, 4); /* skip emulated instruction */
 		emulate_single_step(regs);
 		return;
 	}
@@ -2140,10 +2140,10 @@ DEFINE_INTERRUPT_HANDLER(SPEFloatingPointRoundException)
 		giveup_spe(current);
 	preempt_enable();
 
-	regs->nip -= 4;
+	regs_add_return_ip(regs, -4);
 	err = speround_handler(regs);
 	if (err == 0) {
-		regs->nip += 4;		/* skip emulated instruction */
+		regs_add_return_ip(regs, 4); /* skip emulated instruction */
 		emulate_single_step(regs);
 		return;
 	}

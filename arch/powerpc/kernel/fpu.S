@@ -103,6 +103,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 	ori	r12,r12,MSR_FP
 	or	r12,r12,r4
 	std	r12,_MSR(r1)
+	li	r4,0
+	stb	r4,PACASRR_VALID(r13)
 #endif
 	li	r4,1
 	stb	r4,THREAD_LOAD_FP(r5)

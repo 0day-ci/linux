@@ -720,6 +720,9 @@ SYSCALL_DEFINE3(swapcontext, struct ucontext __user *, old_ctx,
 
 	/* This returns like rt_sigreturn */
 	set_thread_flag(TIF_RESTOREALL);
+
+	return_ip_or_msr_changed();
+
 	return 0;
 
 efault_out:
@@ -832,6 +835,9 @@ SYSCALL_DEFINE0(rt_sigreturn)
 		goto badframe;
 
 	set_thread_flag(TIF_RESTOREALL);
+
+	return_ip_or_msr_changed();
+
 	return 0;
 
 badframe_block:
@@ -957,12 +963,15 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set,
 	if (err)
 		goto badframe;
 
+	return_ip_or_msr_changed();
+
 	return 0;
 
 badframe_block:
 	user_write_access_end();
 badframe:
 	signal_fault(current, regs, "handle_rt_signal64", frame);
+	return_ip_or_msr_changed();
 
 	return 1;
 }

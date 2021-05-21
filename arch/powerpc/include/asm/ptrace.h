@@ -121,27 +121,7 @@ struct pt_regs
 #endif /* __powerpc64__ */
 
 #ifndef __ASSEMBLY__
-
-static inline unsigned long instruction_pointer(struct pt_regs *regs)
-{
-	return regs->nip;
-}
-
-static inline void instruction_pointer_set(struct pt_regs *regs,
-		unsigned long val)
-{
-	regs->nip = val;
-}
-
-static inline unsigned long user_stack_pointer(struct pt_regs *regs)
-{
-	return regs->gpr[1];
-}
-
-static inline unsigned long frame_pointer(struct pt_regs *regs)
-{
-	return 0;
-}
+#include <asm/paca.h>
 
 #ifdef CONFIG_SMP
 extern unsigned long profile_pc(struct pt_regs *regs);
@@ -169,6 +149,58 @@ static inline long regs_return_value(struct pt_regs *regs)
 static inline void regs_set_return_value(struct pt_regs *regs, unsigned long rc)
 {
 	regs->gpr[3] = rc;
+}
+
+static inline void regs_set_return_ip(struct pt_regs *regs, unsigned long ip)
+{
+	regs->nip = ip;
+#ifdef CONFIG_PPC_BOOK3S_64
+	local_paca->hsrr_valid = 0;
+	local_paca->srr_valid = 0;
+#endif
+}
+
+static inline void regs_set_return_msr(struct pt_regs *regs, unsigned long msr)
+{
+	regs->msr = msr;
+#ifdef CONFIG_PPC_BOOK3S_64
+	local_paca->hsrr_valid = 0;
+	local_paca->srr_valid = 0;
+#endif
+}
+
+static inline void return_ip_or_msr_changed(void)
+{
+#ifdef CONFIG_PPC_BOOK3S_64
+	local_paca->hsrr_valid = 0;
+	local_paca->srr_valid = 0;
+#endif
+}
+
+static inline void regs_add_return_ip(struct pt_regs *regs, long offset)
+{
+	regs_set_return_ip(regs, regs->nip + offset);
+}
+
+static inline unsigned long instruction_pointer(struct pt_regs *regs)
+{
+	return regs->nip;
+}
+
+static inline void instruction_pointer_set(struct pt_regs *regs,
+		unsigned long val)
+{
+	regs_set_return_ip(regs, val);
+}
+
+static inline unsigned long user_stack_pointer(struct pt_regs *regs)
+{
+	return regs->gpr[1];
+}
+
+static inline unsigned long frame_pointer(struct pt_regs *regs)
+{
+	return 0;
 }
 
 #ifdef __powerpc64__

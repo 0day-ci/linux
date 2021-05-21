@@ -3203,7 +3203,7 @@ void emulate_update_regs(struct pt_regs *regs, struct instruction_op *op)
 	default:
 		WARN_ON_ONCE(1);
 	}
-	regs->nip = next_pc;
+	regs_set_return_ip(regs, next_pc);
 }
 NOKPROBE_SYMBOL(emulate_update_regs);
 
@@ -3479,6 +3479,8 @@ int emulate_step(struct pt_regs *regs, struct ppc_inst instr)
 	int r, err, type;
 	unsigned long val;
 	unsigned long ea;
+
+	return_ip_or_msr_changed();
 
 	r = analyse_instr(&op, regs, instr);
 	if (r < 0)
