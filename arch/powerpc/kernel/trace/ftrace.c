@@ -21,6 +21,7 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/sched/task_stack.h>
 
 #include <asm/asm-prototypes.h>
 #include <asm/cacheflush.h>
@@ -987,3 +988,72 @@ char *arch_ftrace_match_adjust(char *str, const char *search)
 		return str;
 }
 #endif /* PPC64_ELF_ABI_v1 */
+
+static int is_ftrace_entry(unsigned long ip)
+{
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+	if (ip == (unsigned long)&ftrace_call + 4 || ip == (unsigned long)&ftrace_regs_call + 4)
+#else
+	if (ip == (unsigned long)&ftrace_call + 4)
+#endif
+		return 1;
+
+	return 0;
+}
+
+unsigned long ftrace_get_traced_func_if_no_stackframe(unsigned long ip, unsigned long *stack)
+{
+	if (!is_ftrace_entry(ip))
+		return 0;
+
+	if (IS_ENABLED(CONFIG_PPC32))
+		return stack[11]; /* see MCOUNT_SAVE_FRAME */
+
+	if (!IS_ENABLED(CONFIG_MPROFILE_KERNEL))
+		return 0;
+
+	return stack[(STACK_FRAME_OVERHEAD + offsetof(struct pt_regs, nip)) / sizeof(unsigned long)];
+}
+
+#ifdef CONFIG_STACK_TRACER
+void stack_get_trace(unsigned long traced_ip,
+		     unsigned long *stack_ref __maybe_unused,
+		     unsigned long stack_size __maybe_unused,
+		     int *tracer_frame)
+{
+	unsigned long sp, newsp, top, ip;
+	int ftrace_call_found = 0;
+	unsigned long *stack;
+	int i = 0;
+
+	sp = current_stack_frame();
+	top = (unsigned long)task_stack_page(current) + THREAD_SIZE;
+
+	while (validate_sp(sp, current, STACK_FRAME_OVERHEAD) && i < STACK_TRACE_ENTRIES) {
+		stack = (unsigned long *) sp;
+		newsp = stack[0];
+		ip = stack[STACK_FRAME_LR_SAVE];
+
+		if (ftrace_call_found) {
+			stack_dump_trace[i] = ip;
+			stack_trace_index[i++] = top - sp;
+		}
+
+		if (is_ftrace_entry(ip)) {
+			if (IS_ENABLED(CONFIG_MPROFILE_KERNEL) || IS_ENABLED(CONFIG_PPC32)) {
+				stack_dump_trace[i] = ftrace_get_traced_func_if_no_stackframe(ip, stack);
+				stack_trace_index[i++] = top - newsp;
+			}
+			if (unlikely(!*tracer_frame)) {
+				*tracer_frame = newsp - (unsigned long)stack_ref;
+				stack_trace_max_size -= *tracer_frame;
+			}
+			ftrace_call_found = 1;
+		}
+
+		sp = newsp;
+	}
+
+	stack_trace_nr_entries = i;
+}
+#endif

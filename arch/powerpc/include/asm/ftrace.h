@@ -126,6 +126,24 @@ static inline void this_cpu_enable_ftrace(void) { }
 static inline void this_cpu_set_ftrace_enabled(u8 ftrace_enabled) { }
 static inline u8 this_cpu_get_ftrace_enabled(void) { return 1; }
 #endif /* CONFIG_PPC64 */
+
+#ifdef CONFIG_FUNCTION_TRACER
+/*
+ * With ppc64 -mprofile-kernel and ppc32, mcount call is made before a function
+ * establishes its own stack frame. While unwinding the stack, such functions
+ * do not appear in the trace. This helper returns the traced function if ip in
+ * the stack frame points to ftrace_[regs_]call.
+ *
+ * In ppc64 ELFv1, mcount call is after a function establishes its own
+ * stackframe. So, this always returns 0.
+ */
+unsigned long ftrace_get_traced_func_if_no_stackframe(unsigned long ip, unsigned long *stack);
+#else
+static inline unsigned long ftrace_get_traced_func_if_no_stackframe(unsigned long ip, unsigned long *stack)
+{
+	return 0;
+}
+#endif /* FUNCTION_TRACER */
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_POWERPC_FTRACE */
