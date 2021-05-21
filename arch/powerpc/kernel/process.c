@@ -2160,6 +2160,9 @@ void show_stack(struct task_struct *tsk, unsigned long *stack,
 						&ftrace_idx, ip, stack);
 			if (ret_addr != ip)
 				pr_cont(" (%pS)", (void *)ret_addr);
+			ip = ftrace_get_traced_func_if_no_stackframe(ip, stack);
+			if (ip)
+				pr_cont(" (%pS)", (void *)ip);
 			if (firstframe)
 				pr_cont(" (unreliable)");
 			pr_cont("\n");
