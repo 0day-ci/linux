@@ -48,6 +48,7 @@ struct ptp_clock {
 	struct kthread_worker *kworker;
 	struct kthread_delayed_work aux_work;
 	u8 num_vclocks;
+	int16_t domain;
 };
 
 #define info_to_vclock(d) container_of((d), struct ptp_vclock, info)
@@ -68,6 +69,11 @@ struct ptp_vclock {
 	u32 mult;
 	u32 mult_factor;
 	u32 div_factor;
+};
+
+struct domain_tstamp {
+	u64 tstamp;
+	u8 domain;
 };
 
 /*

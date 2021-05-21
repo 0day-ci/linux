@@ -343,6 +343,15 @@ void ptp_cancel_worker_sync(struct ptp_clock *ptp);
  * @cc:     cyclecounter pointer of ptp virtual clock.
  */
 struct ptp_clock_info *ptp_get_pclock_info(const struct cyclecounter *cc);
+
+/**
+ * ptp_clock_domain_tstamp() - convert to domain timestamp
+ *
+ * @ptp_dev: device pointer of current ptp clock.
+ * @tstamp:  time stamp pointer to hardware time stamp
+ * @domain:  domain number to convert
+ */
+void ptp_clock_domain_tstamp(struct device *ptp_dev, u64 *tstamp, u8 domain);
 #else
 static inline struct ptp_clock *ptp_clock_register(struct ptp_clock_info *info,
 						   struct device *parent)
@@ -366,6 +375,10 @@ static inline void ptp_cancel_worker_sync(struct ptp_clock *ptp)
 static inline struct ptp_clock_info *ptp_get_pclock_info(
 	const struct cyclecounter *cc)
 { return NULL; }
+
+static inline void ptp_clock_domain_tstamp(struct device *dev, u64 *tstamp,
+					   u8 domain)
+{ }
 #endif
 
 static inline void ptp_read_system_prets(struct ptp_system_timestamp *sts)

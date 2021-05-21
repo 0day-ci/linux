@@ -87,6 +87,39 @@ static void ptp_vclock_refresh(struct work_struct *work)
 	schedule_delayed_work(&vclock->refresh_work, vclock->refresh_interval);
 }
 
+static int ptp_convert_domain_tstamp(struct device *dev, void *data)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_clock_info *info = ptp->info;
+	struct domain_tstamp *domain_ts = data;
+	struct ptp_vclock *vclock;
+	unsigned long flags;
+
+	/* Convert to domain tstamp if there is a domain matched */
+	if (ptp->domain == domain_ts->domain) {
+		vclock = info_to_vclock(info);
+		spin_lock_irqsave(&vclock->lock, flags);
+		domain_ts->tstamp = timecounter_cyc2time(&vclock->tc,
+							 domain_ts->tstamp);
+		spin_unlock_irqrestore(&vclock->lock, flags);
+		return -EINVAL;	/* For break. Not error. */
+	}
+
+	return 0;
+}
+
+void ptp_clock_domain_tstamp(struct device *ptp_dev, u64 *tstamp, u8 domain)
+{
+	struct domain_tstamp domain_ts;
+
+	domain_ts.tstamp = *tstamp;
+	domain_ts.domain = domain;
+
+	device_for_each_child(ptp_dev, &domain_ts, ptp_convert_domain_tstamp);
+	*tstamp = domain_ts.tstamp;
+}
+EXPORT_SYMBOL(ptp_clock_domain_tstamp);
+
 struct ptp_clock_info *ptp_get_pclock_info(const struct cyclecounter *cc)
 {
 	struct ptp_vclock *vclock = cc_to_vclock(cc);

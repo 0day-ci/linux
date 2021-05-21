@@ -223,6 +223,57 @@ out:
 }
 static DEVICE_ATTR_RW(num_vclocks);
 
+static int check_domain_avail(struct device *dev, void *data)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	int16_t *domain = data;
+
+	if (ptp->domain == *domain)
+		return -EINVAL;
+
+	return 0;
+}
+
+static ssize_t domain_show(struct device *dev,
+			   struct device_attribute *attr, char *page)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+
+	return snprintf(page, PAGE_SIZE-1, "%d\n", ptp->domain);
+}
+
+static ssize_t domain_store(struct device *dev,
+			    struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	int err = -EINVAL;
+	int16_t domain;
+
+	if (kstrtos16(buf, 0, &domain))
+		goto out;
+
+	if (domain > 255 || domain < -1)
+		goto out;
+
+	if (domain == -1) {
+		ptp->domain = -1;
+		return count;
+	}
+
+	if (device_for_each_child(dev->parent, &domain, check_domain_avail)) {
+		dev_err(dev, "the domain value already in used\n");
+		goto out;
+	}
+
+	ptp->domain = domain;
+
+	return count;
+out:
+	return err;
+}
+static DEVICE_ATTR_RW(domain);
+
 static struct attribute *ptp_attrs[] = {
 	&dev_attr_clock_name.attr,
 
@@ -238,6 +289,7 @@ static struct attribute *ptp_attrs[] = {
 	&dev_attr_period.attr,
 	&dev_attr_pps_enable.attr,
 	&dev_attr_num_vclocks.attr,
+	&dev_attr_domain.attr,
 	NULL
 };
 
@@ -261,6 +313,9 @@ static umode_t ptp_is_attribute_visible(struct kobject *kobj,
 			mode = 0;
 	} else if (attr == &dev_attr_num_vclocks.attr) {
 		if (info->vclock_flag || !info->vclock_cc)
+			mode = 0;
+	} else if (attr == &dev_attr_domain.attr) {
+		if (!info->vclock_flag)
 			mode = 0;
 	}
 

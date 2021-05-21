@@ -25,6 +25,18 @@ Description:
 		MAC based ones. The string does not necessarily have
 		to be any kind of unique id.
 
+What:		/sys/class/ptp/ptpN/domain
+Date:		May 2021
+Contact:	Yangbo Lu <yangbo.lu@nxp.com>
+Description:
+		This file contains the domain value that the PTP virtual
+		clock serves. PTP virtual clock will provide timestamp
+		to PTP messages which have same domain matched.
+		Write value 0 ~ 255 into this file to change the domain.
+		Writing -1 means serving no domain. If PTP message domain
+		value does not have a PTP virtual clock matched, the
+		original hardware time stamp will be used.
+
 What:		/sys/class/ptp/ptpN/max_adjustment
 Date:		September 2010
 Contact:	Richard Cochran <richardcochran@gmail.com>
