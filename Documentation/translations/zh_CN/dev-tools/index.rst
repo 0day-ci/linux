@@ -22,6 +22,7 @@ Documentation/dev-tools/testing-overview.rst
    :maxdepth: 2
 
    gcov
+   testing-overview
 
 Todolist:
 
@@ -32,6 +33,7 @@ Todolist:
  - ubsan
  - kmemleak
  - kcsan
+ - kfence
  - gdb-kernel-debugging
  - kgdb
  - kselftest
