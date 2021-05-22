@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- * Copyright (c) 2012-2013 Hisilicon Limited.
+ * Copyright (c) 2012-2013 HiSilicon Limited.
  * Copyright (c) 2012-2013 Linaro Limited.
  *
  * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
