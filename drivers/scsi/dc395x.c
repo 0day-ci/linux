@@ -724,10 +724,10 @@ static struct DeviceCtlBlk *dcb_get_next(struct list_head *head,
 		}
 	/* if no next one take the head one (ie, wraparound) */
 	if (!next)
-        	list_for_each_entry(i, head, list) {
-        		next = i;
-        		break;
-        	}
+		list_for_each_entry(i, head, list) {
+			next = i;
+			break;
+		}
 
 	return next;
 }
@@ -4370,13 +4370,13 @@ static int adapter_init(struct AdapterCtlBlk *acb, unsigned long io_port,
 
 	/* get eeprom configuration information and command line settings etc */
 	check_eeprom(&acb->eeprom, io_port);
- 	print_eeprom_settings(&acb->eeprom);
+	print_eeprom_settings(&acb->eeprom);
 
 	/* setup adapter control block */	
 	adapter_init_params(acb);
 	
 	/* display card connectors/termination settings */
- 	adapter_print_config(acb);
+	adapter_print_config(acb);
 
 	if (adapter_sg_tables_alloc(acb)) {
 		dprintkl(KERN_DEBUG, "Memory allocation for SG tables failed\n");
@@ -4641,12 +4641,12 @@ static int dc395x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 		dprintkl(KERN_INFO, "scsi_host_alloc failed\n");
 		goto fail;
 	}
- 	acb = (struct AdapterCtlBlk*)scsi_host->hostdata;
- 	acb->scsi_host = scsi_host;
- 	acb->dev = dev;
+	acb = (struct AdapterCtlBlk*)scsi_host->hostdata;
+	acb->scsi_host = scsi_host;
+	acb->dev = dev;
 
 	/* initialise the adapter and everything we need */
- 	if (adapter_init(acb, io_port_base, io_port_len, irq)) {
+	if (adapter_init(acb, io_port_base, io_port_len, irq)) {
 		dprintkl(KERN_INFO, "adapter init failed\n");
 		goto fail;
 	}
@@ -4660,7 +4660,7 @@ static int dc395x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	}
 	pci_set_drvdata(dev, scsi_host);
 	scsi_scan_host(scsi_host);
-        	
+
 	return 0;
 
 fail:
