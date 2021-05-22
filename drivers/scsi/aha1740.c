@@ -614,7 +614,7 @@ static int aha1740_probe (struct device *dev)
 	return 0;
 
  err_irq:
- 	free_irq(irq_level, shpnt);
+	free_irq(irq_level, shpnt);
  err_unmap:
 	dma_unmap_single (&edev->dev, host->ecb_dma_addr,
 			  sizeof (host->ecb), DMA_BIDIRECTIONAL);
