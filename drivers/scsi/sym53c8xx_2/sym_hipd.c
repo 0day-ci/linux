@@ -332,16 +332,16 @@ static unsigned getfreq (struct sym_hcb *np, int gen)
 		OUTW(np, nc_sien, 0);
 		OUTB(np, nc_istat1, 0);
 	}
- 	/*
- 	 * set prescaler to divide by whatever 0 means
- 	 * 0 ought to choose divide by 2, but appears
- 	 * to set divide by 3.5 mode in my 53c810 ...
- 	 */
- 	OUTB(np, nc_scntl3, 0);
+	/*
+	 * set prescaler to divide by whatever 0 means
+	 * 0 ought to choose divide by 2, but appears
+	 * to set divide by 3.5 mode in my 53c810 ...
+	 */
+	OUTB(np, nc_scntl3, 0);
 
-  	/*
- 	 * adjust for prescaler, and convert into KHz 
-  	 */
+	/*
+	 * adjust for prescaler, and convert into KHz
+	 */
 	f = ms ? ((1 << gen) * (4340*4)) / ms : 0;
 
 	/*
@@ -688,7 +688,7 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
 
 	/*
 	 *  Get the clock multiplier factor.
- 	 */
+	 */
 	if	(np->features & FE_QUAD)
 		np->multiplier	= 4;
 	else if	(np->features & FE_DBLR)
@@ -774,11 +774,11 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
 
 	/*
 	 *  Phase mismatch handled by SCRIPTS (895A/896/1010) ?
-  	 */
+	 */
 	if (np->features & FE_NOPM)
 		np->rv_ccntl0	|= (ENPMJ);
 
- 	/*
+	/*
 	 *  C1010-33 Errata: Part Number:609-039638 (rev. 1) is fixed.
 	 *  In dual channel mode, contention occurs if internal cycles
 	 *  are used. Disable internal cycles.
@@ -1692,12 +1692,12 @@ void sym_start_up(struct Scsi_Host *shost, int reason)
 	struct sym_data *sym_data = shost_priv(shost);
 	struct pci_dev *pdev = sym_data->pdev;
 	struct sym_hcb *np = sym_data->ncb;
- 	int	i;
+	int	i;
 	u32	phys;
 
- 	/*
+	/*
 	 *  Reset chip if asked, otherwise just clear fifos.
- 	 */
+	 */
 	if (reason == 1)
 		sym_soft_reset(np);
 	else {
@@ -3080,7 +3080,7 @@ static void sym_sir_bad_scsi_status(struct sym_hcb *np, int num, struct sym_ccb 
 		sym_dequeue_from_squeue(np, i, cp->target, cp->lun, -1);
 		OUTL_DSP(np, SCRIPTA_BA(np, start));
 
- 		/*
+		/*
 		 *  Save some info of the actual IO.
 		 *  Compute the data residual.
 		 */
@@ -3573,9 +3573,9 @@ static void sym_sir_task_recovery(struct sym_hcb *np, int num)
 		sym_clear_tasks(np, DID_ABORT, target, lun, task);
 		sym_flush_comp_queue(np, 0);
 
- 		/*
+		/*
 		 *  If we sent a BDR, make upper layer aware of that.
- 		 */
+		 */
 		if (np->abrt_msg[0] == M_RESET)
 			starget_printk(KERN_NOTICE, starget,
 							"has been reset\n");
@@ -4902,7 +4902,7 @@ static struct sym_ccb *sym_alloc_ccb(struct sym_hcb *np)
 	cp->phys.head.go.start   = cpu_to_scr(SCRIPTA_BA(np, idle));
 	cp->phys.head.go.restart = cpu_to_scr(SCRIPTB_BA(np, bad_i_t_l));
 
- 	/*
+	/*
 	 *  Initilialyze some other fields.
 	 */
 	cp->phys.smsg_ext.addr = cpu_to_scr(HCB_BA(np, msgin[2]));
