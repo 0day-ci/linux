@@ -640,7 +640,7 @@ config LOGIWHEELS_FF
 
 config HID_MAGICMOUSE
 	tristate "Apple Magic Mouse/Trackpad multi-touch support"
-	depends on HID
+	depends on USB_HID
 	help
 	Support for the Apple Magic Mouse/Trackpad multi-touch.
 
