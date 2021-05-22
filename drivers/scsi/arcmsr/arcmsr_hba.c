@@ -1026,7 +1026,7 @@ static int arcmsr_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	host = scsi_host_alloc(&arcmsr_scsi_host_template, sizeof(struct AdapterControlBlock));
 	if(!host){
-    		goto pci_disable_dev;
+		goto pci_disable_dev;
 	}
 	init_waitqueue_head(&wait_q);
 	bus = pdev->bus->number;
