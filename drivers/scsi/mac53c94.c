@@ -424,11 +424,11 @@ static int mac53c94_probe(struct macio_dev *mdev, const struct of_device_id *mat
 	}
 
 	if (macio_request_resources(mdev, "mac53c94") != 0) {
-       		printk(KERN_ERR "mac53c94: unable to request memory resources");
+		printk(KERN_ERR "mac53c94: unable to request memory resources");
 		return -EBUSY;
 	}
 
-       	host = scsi_host_alloc(&mac53c94_template, sizeof(struct fsc_state));
+	host = scsi_host_alloc(&mac53c94_template, sizeof(struct fsc_state));
 	if (host == NULL) {
 		printk(KERN_ERR "mac53c94: couldn't register host");
 		rc = -ENOMEM;
@@ -453,18 +453,18 @@ static int mac53c94_probe(struct macio_dev *mdev, const struct of_device_id *mat
 	}
 
 	clkprop = of_get_property(node, "clock-frequency", &proplen);
-       	if (clkprop == NULL || proplen != sizeof(int)) {
-       		printk(KERN_ERR "%pOF: can't get clock frequency, "
-       		       "assuming 25MHz\n", node);
-       		state->clk_freq = 25000000;
-       	} else
-       		state->clk_freq = *(int *)clkprop;
+	if (clkprop == NULL || proplen != sizeof(int)) {
+		printk(KERN_ERR "%pOF: can't get clock frequency, "
+		       "assuming 25MHz\n", node);
+		state->clk_freq = 25000000;
+	} else
+		state->clk_freq = *(int *)clkprop;
 
-       	/* Space for dma command list: +1 for stop command,
-       	 * +1 to allow for aligning.
+	/* Space for dma command list: +1 for stop command,
+	 * +1 to allow for aligning.
 	 * XXX FIXME: Use DMA consistent routines
 	 */
-       	dma_cmd_space = kmalloc_array(host->sg_tablesize + 2,
+	dma_cmd_space = kmalloc_array(host->sg_tablesize + 2,
 					     sizeof(struct dbdma_cmd),
 					     GFP_KERNEL);
 	if (!dma_cmd_space) {
