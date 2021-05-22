@@ -2,7 +2,7 @@
 /*
  * Hisilicon Hi3620 clock driver
  *
- * Copyright (c) 2012-2013 Hisilicon Limited.
+ * Copyright (c) 2012-2013 HiSilicon Limited.
  * Copyright (c) 2012-2013 Linaro Limited.
  *
  * Author: Haojian Zhuang <haojian.zhuang@linaro.org>

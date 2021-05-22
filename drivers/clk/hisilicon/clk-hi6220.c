@@ -2,7 +2,7 @@
 /*
  * Hisilicon Hi6220 clock driver
  *
- * Copyright (c) 2015 Hisilicon Limited.
+ * Copyright (c) 2015 HiSilicon Limited.
  *
  * Author: Bintian Wang <bintian.wang@huawei.com>
  */

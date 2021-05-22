@@ -2,7 +2,7 @@
 /*
  * Hisilicon clock driver
  *
- * Copyright (c) 2013-2017 Hisilicon Limited.
+ * Copyright (c) 2013-2017 HiSilicon Limited.
  * Copyright (c) 2017 Linaro Limited.
  *
  * Author: Kai Zhao <zhaokai1@hisilicon.com>

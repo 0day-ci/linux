@@ -2,7 +2,7 @@
 /*
  * Hisilicon hi6220 SoC divider clock driver
  *
- * Copyright (c) 2015 Hisilicon Limited.
+ * Copyright (c) 2015 HiSilicon Limited.
  *
  * Author: Bintian Wang <bintian.wang@huawei.com>
  */
