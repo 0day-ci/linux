@@ -1032,12 +1032,12 @@ qla2100_fw_dump(scsi_qla_host_t *vha)
 	if (rval == QLA_SUCCESS) {
 		/* Get RISC SRAM. */
 		risc_address = 0x1000;
- 		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_WORD);
+		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_WORD);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
 	for (cnt = 0; cnt < ARRAY_SIZE(fw->risc_ram) && rval == QLA_SUCCESS;
 	    cnt++, risc_address++) {
- 		WRT_MAILBOX_REG(ha, reg, 1, risc_address);
+		WRT_MAILBOX_REG(ha, reg, 1, risc_address);
 		wrt_reg_word(&reg->hccr, HCCR_SET_HOST_INT);
 
 		for (timer = 6000000; timer != 0; timer--) {
