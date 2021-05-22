@@ -2177,6 +2177,38 @@ static int pmbus_find_attributes(struct i2c_client *client,
 	return ret;
 }
 
+static int pmbus_init_coefficients(struct i2c_client *client,
+				   struct pmbus_data *data, int page,
+				   enum pmbus_sensor_classes sensor_class,
+				   const struct pmbus_sensor_attr *attrs,
+				   int nattrs)
+{
+	int i, status;
+
+	for (i = 0; i < nattrs; i++) {
+		if (attrs->class == sensor_class &&
+		    (attrs->func & data->info->func[page])) {
+			status = pmbus_read_coefficients(client,
+							 (struct pmbus_driver_info *)data->info,
+							 sensor_class,
+							 attrs->reg);
+			if (status < 0) {
+				dev_err(&client->dev,
+					"Failed to read coefficients for register: %x\n",
+					attrs->reg);
+				return status;
+			}
+			return 0;
+		}
+		attrs++;
+	}
+
+	dev_err(&client->dev, "No coefficients found for register: %x\n",
+		attrs->reg);
+
+	return -ENODEV;
+}
+
 /*
  * Identify chip parameters.
  * This function is called for all chips.
@@ -2185,6 +2217,7 @@ static int pmbus_identify_common(struct i2c_client *client,
 				 struct pmbus_data *data, int page)
 {
 	int vout_mode = -1;
+	int ret;
 
 	if (pmbus_check_byte_register(client, page, PMBUS_VOUT_MODE))
 		vout_mode = _pmbus_read_byte_data(client, page,
@@ -2211,6 +2244,66 @@ static int pmbus_identify_common(struct i2c_client *client,
 			break;
 		default:
 			return -ENODEV;
+		}
+	}
+
+	if (data->flags & PMBUS_USE_COEFFICIENTS_CMD) {
+		if (!i2c_check_functionality(client->adapter,
+					     I2C_FUNC_SMBUS_BLOCK_PROC_CALL))
+			return -ENODEV;
+
+		if (data->info->format[PSC_VOLTAGE_IN] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_VOLTAGE_IN,
+						      voltage_attributes,
+						      ARRAY_SIZE(voltage_attributes));
+			if (ret)
+				return ret;
+		}
+
+		if (data->info->format[PSC_VOLTAGE_OUT] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_VOLTAGE_OUT,
+						      voltage_attributes,
+						      ARRAY_SIZE(voltage_attributes));
+			if (ret)
+				return ret;
+		}
+
+		if (data->info->format[PSC_CURRENT_IN] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_CURRENT_IN,
+						      current_attributes,
+						      ARRAY_SIZE(current_attributes));
+			if (ret)
+				return ret;
+		}
+
+		if (data->info->format[PSC_CURRENT_OUT] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_CURRENT_OUT,
+						      current_attributes,
+						      ARRAY_SIZE(current_attributes));
+			if (ret)
+				return ret;
+		}
+
+		if (data->info->format[PSC_POWER] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_POWER,
+						      power_attributes,
+						      ARRAY_SIZE(power_attributes));
+			if (ret)
+				return ret;
+		}
+
+		if (data->info->format[PSC_TEMPERATURE] == direct) {
+			ret = pmbus_init_coefficients(client, data, page,
+						      PSC_TEMPERATURE,
+						      temp_attributes,
+						      ARRAY_SIZE(temp_attributes));
+			if (ret)
+				return ret;
 		}
 	}
 
