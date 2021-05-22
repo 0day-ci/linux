@@ -100,7 +100,7 @@ aic7770_probe(struct device *dev)
 		return (error);
 	}
 
- 	dev_set_drvdata(dev, ahc);
+	dev_set_drvdata(dev, ahc);
 
 	error = ahc_linux_register_host(ahc, &aic7xxx_driver_template);
 	return (error);

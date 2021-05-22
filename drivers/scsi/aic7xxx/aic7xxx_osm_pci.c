@@ -109,8 +109,8 @@ static const struct pci_device_id ahc_linux_pci_id_table[] = {
 	ID(ID_AIC7860 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7870 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7880 & ID_DEV_VENDOR_MASK),
- 	ID16(ID_AIC7890 & ID_9005_GENERIC_MASK),
- 	ID16(ID_AIC7892 & ID_9005_GENERIC_MASK),
+	ID16(ID_AIC7890 & ID_9005_GENERIC_MASK),
+	ID16(ID_AIC7892 & ID_9005_GENERIC_MASK),
 	ID(ID_AIC7895 & ID_DEV_VENDOR_MASK),
 	ID16(ID_AIC7896 & ID_9005_GENERIC_MASK),
 	ID16(ID_AIC7899 & ID_9005_GENERIC_MASK),
@@ -164,15 +164,15 @@ ahc_linux_pci_inherit_flags(struct ahc_softc *ahc)
 	if (master_pdev) {
 		struct ahc_softc *master = pci_get_drvdata(master_pdev);
 		if (master) {
-			ahc->flags &= ~AHC_BIOS_ENABLED; 
+			ahc->flags &= ~AHC_BIOS_ENABLED;
 			ahc->flags |= master->flags & AHC_BIOS_ENABLED;
 
-			ahc->flags &= ~AHC_PRIMARY_CHANNEL; 
+			ahc->flags &= ~AHC_PRIMARY_CHANNEL;
 			ahc->flags |= master->flags & AHC_PRIMARY_CHANNEL;
 		} else
 			printk(KERN_ERR "aic7xxx: no multichannel peer found!\n");
 		pci_dev_put(master_pdev);
-	} 
+	}
 }
 
 static int
@@ -222,7 +222,7 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		if (dma_set_mask(dev, DMA_BIT_MASK(32))) {
 			ahc_free(ahc);
 			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
-                	return (-ENODEV);
+			return (-ENODEV);
 		}
 	}
 	ahc->dev_softc = pci;
@@ -441,7 +441,7 @@ ahc_pci_map_int(struct ahc_softc *ahc)
 			    IRQF_SHARED, "aic7xxx", ahc);
 	if (error == 0)
 		ahc->platform_data->irq = ahc->dev_softc->irq;
-	
+
 	return (-error);
 }
 
