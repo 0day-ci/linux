@@ -3348,7 +3348,7 @@ static int adpt_i2o_issue_params(int cmd, adpt_hba* pHba, int tid,
 
 	if ((wait_status = adpt_i2o_post_wait(pHba, msg, sizeof(msg), 20))) {
 		printk("adpt_i2o_issue_params: post_wait failed (%p)\n", resblk_va);
-   		return wait_status; 	/* -DetailedStatus */
+		return wait_status; 	/* -DetailedStatus */
 	}
 
 	if (res[1]&0x00FF0000) { 	/* BlockStatus != SUCCESS */
@@ -3375,7 +3375,7 @@ static s32 adpt_i2o_quiesce_hba(adpt_hba* pHba)
 	/* SysQuiesce discarded if IOP not in READY or OPERATIONAL state */
 
 	if((pHba->status_block->iop_state != ADAPTER_STATE_READY) &&
-   	   (pHba->status_block->iop_state != ADAPTER_STATE_OPERATIONAL)){
+	   (pHba->status_block->iop_state != ADAPTER_STATE_OPERATIONAL)){
 		return 0;
 	}
 
