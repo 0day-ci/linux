@@ -74,7 +74,7 @@ lasi_scsi_clock(void * hpa, int defaultclock)
 	}
 
 	printk(KERN_DEBUG "%s: SCSI clock %d\n", __func__, clock);
- 	return clock;
+	return clock;
 }
 #endif
 
