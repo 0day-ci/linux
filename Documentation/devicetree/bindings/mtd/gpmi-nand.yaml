@@ -62,12 +62,21 @@ properties:
 
   fsl,use-minimum-ecc:
     type: boolean
+    deprecated: true
     description: |
       Protect this NAND flash with the minimum ECC strength required.
       The required ECC strength is automatically discoverable for some
       flash (e.g., according to the ONFI standard). However, note that
       if this strength is not discoverable or this property is not enabled,
       the software may chooses an implementation-defined ECC scheme.
+
+  fsl,legacy-bch-geometry:
+    type: boolean
+    description: |
+      Enable the legacy bch geometry setting, which will set the data chunk
+      size larger than oob size and chose the maximum ecc strength oob can
+      hold. This flag was designed for backward compatible or old NAND chip
+      support, should be en/disabled in u-boot and kernel at the same time.
 
   fsl,no-blockmark-swap:
     type: boolean
