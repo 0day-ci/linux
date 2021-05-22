@@ -937,7 +937,7 @@ static int nsp_nexus(struct scsi_cmnd *SCpnt)
 	nsp_setup_fifo(data, TRUE);
 
 	/* clear ack counter */
- 	data->FifoCount = 0;
+	data->FifoCount = 0;
 	nsp_index_write(base, POINTERCLR, POINTER_CLEAR	    |
 					  ACK_COUNTER_CLEAR |
 					  REQ_COUNTER_CLEAR |
