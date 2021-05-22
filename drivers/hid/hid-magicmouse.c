@@ -57,6 +57,8 @@ MODULE_PARM_DESC(report_undeciphered, "Report undeciphered multi-touch state fie
 #define MOUSE_REPORT_ID    0x29
 #define MOUSE2_REPORT_ID   0x12
 #define DOUBLE_REPORT_ID   0xf7
+#define BT_BATTERY_REPORT_ID 0x90
+
 /* These definitions are not precise, but they're close enough.  (Bits
  * 0x03 seem to indicate the aspect ratio of the touch, bits 0x70 seem
  * to be some kind of bit mask -- 0x20 may be a near-field reading,
@@ -139,18 +141,63 @@ struct magicmouse_sc {
 	struct {
 		struct power_supply *ps;
 		struct power_supply_desc ps_desc;
+		int capacity;
 	} battery;
 };
 
 static enum power_supply_property magicmouse_ps_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_SCOPE,
+	POWER_SUPPLY_PROP_CAPACITY,
 };
 
 static bool magicmouse_can_report_battery(struct magicmouse_sc *msc)
 {
 	return (msc->input->id.product == USB_DEVICE_ID_APPLE_MAGICTRACKPAD2) ||
 	       (msc->input->id.product == USB_DEVICE_ID_APPLE_MAGICMOUSE2);
+}
+
+static bool magicmouse_can_report_battery_vendor(struct magicmouse_sc *msc,
+						 unsigned short vendor)
+{
+	return magicmouse_can_report_battery(msc) &&
+	       (msc->input->id.vendor == vendor);
+}
+
+static int magicmouse_battery_bt_get_capacity(struct magicmouse_sc *msc)
+{
+	struct hid_report_enum report_enum;
+	struct hid_report *report;
+	int ret;
+
+	if (!magicmouse_can_report_battery_vendor(msc, BT_VENDOR_ID_APPLE))
+		return -EINVAL;
+
+	report_enum = msc->hdev->report_enum[HID_INPUT_REPORT];
+	report = report_enum.report_id_hash[BT_BATTERY_REPORT_ID];
+
+	if (!report || report->maxfield < 1) {
+		hid_err(msc->hdev, "failed to retrieve report with ID %d\n",
+			BT_BATTERY_REPORT_ID);
+		return -EINVAL;
+	}
+
+	hid_hw_request(msc->hdev, report, HID_REQ_GET_REPORT);
+
+	if (!report || report->maxfield < 2) {
+		hid_err(msc->hdev, "invalid report->maxfield: %d\n",
+			report->maxfield);
+		return -EINVAL;
+	}
+
+	ret = report->field[0]->value[0];
+	if (ret < 0) {
+		hid_err(msc->hdev, "invalid report status %d\n", ret);
+		return ret;
+	}
+
+	msc->battery.capacity = report->field[1]->value[0];
+	return 0;
 }
 
 static int magicmouse_battery_get_property(struct power_supply *psy,
@@ -170,6 +217,12 @@ static int magicmouse_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_SCOPE:
 		val->intval = POWER_SUPPLY_SCOPE_DEVICE;
 		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		if (msc->input->id.vendor == BT_VENDOR_ID_APPLE)
+			magicmouse_battery_bt_get_capacity(msc);
+
+		val->intval = msc->battery.capacity;
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -188,6 +241,7 @@ static int magicmouse_battery_probe(struct hid_device *hdev)
 	if (!magicmouse_can_report_battery(msc))
 		return 0;
 
+	msc->battery.capacity = 100;
 	msc->battery.ps_desc.type = POWER_SUPPLY_TYPE_BATTERY;
 	msc->battery.ps_desc.properties = magicmouse_ps_props;
 	msc->battery.ps_desc.num_properties = ARRAY_SIZE(magicmouse_ps_props);
