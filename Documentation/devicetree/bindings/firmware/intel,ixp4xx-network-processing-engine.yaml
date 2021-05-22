@@ -30,6 +30,18 @@ properties:
       - description: NPE1 register range
       - description: NPE2 register range
 
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+patternProperties:
+  "^crypto@[0-7]+$":
+    $ref: /schemas/crypto/intel,ixp4xx-crypto.yaml#
+    type: object
+    description: Optional node for the embedded crypto engine
+
 required:
   - compatible
   - reg
@@ -41,5 +53,14 @@ examples:
     npe@c8006000 {
          compatible = "intel,ixp4xx-network-processing-engine";
          reg = <0xc8006000 0x1000>, <0xc8007000 0x1000>, <0xc8008000 0x1000>;
+         #address-cells = <1>;
+         #size-cells = <0>;
+
+         crypto@2 {
+             compatible = "intel,ixp4xx-crypto";
+             reg = <2>;
+             queue-rx = <&qmgr 30>;
+             queue-txready = <&qmgr 29>;
+         };
     };
 ...
