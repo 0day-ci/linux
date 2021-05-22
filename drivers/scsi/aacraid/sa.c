@@ -154,7 +154,7 @@ static int sa_sync_cmd(struct aac_dev *dev, u32 command,
 		u32 *ret, u32 *r1, u32 *r2, u32 *r3, u32 *r4)
 {
 	unsigned long start;
- 	int ok;
+	int ok;
 	/*
 	 *	Write the Command into Mailbox 0
 	 */
