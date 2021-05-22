@@ -663,7 +663,7 @@ static int map_sg_list(struct scsi_cmnd *cmd, int nseg,
 		descr->len = cpu_to_be32(sg_dma_len(sg));
 		descr->key = 0;
 		total_length += sg_dma_len(sg);
- 	}
+	}
 	return total_length;
 }
 
@@ -738,7 +738,7 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 					       sizeof(indirect->desc_list[0]));
 	memcpy(indirect->desc_list, evt_struct->ext_list,
 	       MAX_INDIRECT_BUFS * sizeof(struct srp_direct_buf));
- 	return 1;
+	return 1;
 }
 
 /**
