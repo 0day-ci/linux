@@ -617,6 +617,78 @@ out:
 	init_chroot(".");
 }
 
+#ifdef CONFIG_TMPFS
+static __init bool is_tmpfs_enabled(void)
+{
+	return (!root_fs_names || strstr(root_fs_names, "tmpfs")) &&
+	       !saved_root_name[0];
+}
+#endif
+
+static __init bool is_ramfs_enabled(void)
+{
+	return true;
+}
+
+struct fs_user_root {
+	bool (*enabled)(void);
+	char *dev_name;
+	char *fs_name;
+};
+
+static struct fs_user_root user_roots[] __initdata = {
+#ifdef CONFIG_TMPFS
+	{.fs_name = "tmpfs", .enabled = is_tmpfs_enabled },
+#endif
+	{.fs_name = "ramfs", .enabled = is_ramfs_enabled }
+};
+static struct fs_user_root * __initdata user_root;
+
+/* Mount the user_root on '/'. */
+int __init mount_user_root(void)
+{
+	return do_mount_root(user_root->dev_name,
+			     user_root->fs_name,
+			     root_mountflags & ~MS_RDONLY,
+			     root_mount_data);
+}
+
+/*
+ * This function is used to chroot to new initramfs root that
+ * we unpacked on success. It will chdir to '/' and umount
+ * the secound mount on failure.
+ */
+void __init end_mount_user_root(bool succeed)
+{
+	if (!succeed)
+		goto on_failed;
+
+	if (!ramdisk_exec_exist(false))
+		goto on_failed;
+
+	init_mount(".", "/", NULL, MS_MOVE, NULL);
+	init_chroot(".");
+	return;
+
+on_failed:
+	init_chdir("/");
+	init_umount("/..", 0);
+}
+
+void __init init_user_rootfs(void)
+{
+	struct fs_user_root *root;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(user_roots); i++) {
+		root = &user_roots[i];
+		if (root->enabled()) {
+			user_root = root;
+			break;
+		}
+	}
+}
+
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
 {
