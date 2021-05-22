@@ -94,3 +94,8 @@
 		voltage = <800000>;
 	};
 };
+
+&emac {
+	allwinner,leds-active-low;
+	status = "okay";
+};
