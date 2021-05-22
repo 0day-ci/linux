@@ -26,8 +26,8 @@
    Cleaned up 26/10/2002 by Alan Cox <alan@lxorguk.ukuu.org.uk> as part of the 2.5
    SCSI driver cleanup and audit. This driver still needs work on the
    following
-   	-	Non terminating hardware waits
-   	-	Some layering violations with its pcmcia stub
+	-	Non terminating hardware waits
+	-	Some layering violations with its pcmcia stub
 
    Redistributable under terms of the GNU General Public License
 
