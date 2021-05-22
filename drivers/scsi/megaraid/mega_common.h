@@ -249,7 +249,7 @@ typedef struct {
  * ### Helper routines ###
  */
 #define LSI_DBGLVL mraid_debug_level	// each LLD must define a global
- 					// mraid_debug_level
+					// mraid_debug_level
 
 #ifdef DEBUG
 #if defined (_ASSERT_PANIC)
