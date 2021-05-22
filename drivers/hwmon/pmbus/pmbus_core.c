@@ -301,6 +301,44 @@ int pmbus_update_fan(struct i2c_client *client, int page, int id,
 }
 EXPORT_SYMBOL_NS_GPL(pmbus_update_fan, PMBUS);
 
+/*
+ * Read the coefficients for direct mode.
+ */
+int pmbus_read_coefficients(struct i2c_client *client,
+			    struct pmbus_driver_info *info,
+			    enum pmbus_sensor_classes sensor_class,
+			    u8 command)
+{
+	int rv;
+	union i2c_smbus_data data;
+	s8 R;
+	s16 m, b;
+
+	data.block[0] = 2;
+	data.block[1] = command;
+	data.block[2] = 0x01;
+
+	rv = i2c_smbus_xfer(client->adapter, client->addr, client->flags,
+			    I2C_SMBUS_WRITE, PMBUS_COEFFICIENTS,
+			    I2C_SMBUS_BLOCK_PROC_CALL, &data);
+
+	if (rv < 0)
+		return rv;
+
+	if (data.block[0] != 5)
+		return -EIO;
+
+	m = data.block[1] | (data.block[2] << 8);
+	b = data.block[3] | (data.block[4] << 8);
+	R = data.block[5];
+	info->m[sensor_class] = m;
+	info->b[sensor_class] = b;
+	info->R[sensor_class] = R;
+
+	return rv;
+}
+EXPORT_SYMBOL_NS_GPL(pmbus_read_coefficients, PMBUS);
+
 int pmbus_read_word_data(struct i2c_client *client, int page, int phase, u8 reg)
 {
 	int rv;
