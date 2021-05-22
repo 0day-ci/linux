@@ -371,6 +371,17 @@ if cjk_cmd.find("Noto Sans CJK SC") >= 0:
 	% This is needed for translations
         \\usepackage{xeCJK}
         \\setCJKmainfont{Noto Sans CJK SC}
+	% Define custom macro to on/off CJK
+	\\newcommand{\\kerneldocCJKon}{\\makexeCJKactive}
+	\\newcommand{\\kerneldocCJKoff}{\\makexeCJKinactive}
+	% CJK off by default
+	\\kerneldocCJKoff
+     '''
+else:
+    latex_elements['preamble']  += '''
+	% Dummy custom macro to on/off CJK
+	\\newcommand{\\kerneldocCJKon}{}
+	\\newcommand{\\kerneldocCJKoff}{}
      '''
 
 # Fix reference escape troubles with Sphinx 1.4.x

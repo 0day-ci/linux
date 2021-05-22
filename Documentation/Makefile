@@ -96,6 +96,8 @@ linkcheckdocs:
 latexdocs:
 	@$(srctree)/scripts/sphinx-pre-install --version-check
 	@+$(foreach var,$(SPHINXDIRS),$(call loop_cmd,sphinx,latex,$(var),latex,$(var)))
+	@find $(BUILDDIR) -name translations.tex -exec \
+	sh $(srctree)/Documentation/sphinx/retouch-translations.sh \{\} \;
 
 ifeq ($(HAVE_PDFLATEX),0)
 
