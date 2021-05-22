@@ -1522,6 +1522,21 @@ void __init console_on_rootfs(void)
 	fput(file);
 }
 
+bool __init ramdisk_exec_exist(bool absolute)
+{
+	char *tmp_command = ramdisk_execute_command;
+
+	if (!tmp_command)
+		return false;
+
+	if (!absolute) {
+		while (*tmp_command == '/' || *tmp_command == '.')
+			tmp_command++;
+	}
+
+	return init_eaccess(tmp_command) == 0;
+}
+
 static noinline void __init kernel_init_freeable(void)
 {
 	/*
@@ -1568,7 +1583,7 @@ static noinline void __init kernel_init_freeable(void)
 	 * check if there is an early userspace init.  If yes, let it do all
 	 * the work
 	 */
-	if (init_eaccess(ramdisk_execute_command) != 0) {
+	if (!ramdisk_exec_exist(true)) {
 		ramdisk_execute_command = NULL;
 		prepare_namespace();
 	}
