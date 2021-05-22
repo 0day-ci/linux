@@ -122,6 +122,15 @@ seq_printf()，而不是printk()）由用户空间进程读取，使用下面描
 ``B`` 占位符的结果是带有偏移量的符号名，在打印堆栈回溯时应该使用。占位符将考虑编译器优化
 的影响，当使用尾部调用并使用noreturn GCC属性标记时，可能会发生这种优化。
 
+如果占位符是在一个模块之中，可在占位符末尾添加 ``b`` 以在符号名后打印模块名称和可选构建ID。
+
+::
+        %pS     versatile_init+0x0/0x110 [module_name]
+        %pSb    versatile_init+0x0/0x110 [module_name ed5019fdf5e53be37cb1ba7899292d7e143b259e]
+        %pSRb   versatile_init+0x9/0x110 [module_name ed5019fdf5e53be37cb1ba7899292d7e143b259e]
+                (with __builtin_extract_return_addr() translation)
+        %pBb    prev_fn_of_versatile_init+0x88/0x88 [module_name ed5019fdf5e53be37cb1ba7899292d7e143b259e]
+
 来自BPF / tracing追踪的探查指针
 ----------------------------------
 
