@@ -473,9 +473,13 @@ config COMEDI_NI_AT_AO
 	  To compile this driver as a module, choose M here: the module will be
 	  called ni_at_ao.
 
+config COMEDI_NI_MIO
+	tristate
+
 config COMEDI_NI_ATMIO
 	tristate "NI AT-MIO E series ISA-PNP card support"
 	select COMEDI_8255
+	select COMEDI_NI_MIO
 	select COMEDI_NI_TIO
 	help
 	  Enable support for National Instruments AT-MIO E series cards
@@ -1053,6 +1057,7 @@ config COMEDI_NI_PCIDIO
 config COMEDI_NI_PCIMIO
 	tristate "NI PCI-MIO-E series and M series support"
 	depends on HAS_DMA
+	select COMEDI_NI_MIO
 	select COMEDI_NI_TIOCMD
 	select COMEDI_8255
 	help
@@ -1160,6 +1165,7 @@ config COMEDI_NI_LABPC_CS
 
 config COMEDI_NI_MIO_CS
 	tristate "NI DAQCard E series PCMCIA support"
+	select COMEDI_NI_MIO
 	select COMEDI_NI_TIO
 	select COMEDI_8255
 	help

@@ -49,6 +49,7 @@ obj-$(CONFIG_COMEDI_MPC624)		+= mpc624.o
 obj-$(CONFIG_COMEDI_ADQ12B)		+= adq12b.o
 obj-$(CONFIG_COMEDI_NI_AT_A2150)	+= ni_at_a2150.o
 obj-$(CONFIG_COMEDI_NI_AT_AO)		+= ni_at_ao.o
+obj-$(CONFIG_COMEDI_NI_MIO)		+= ni_mio_common.o
 obj-$(CONFIG_COMEDI_NI_ATMIO)		+= ni_atmio.o
 obj-$(CONFIG_COMEDI_NI_ATMIO16D)	+= ni_atmio16d.o
 obj-$(CONFIG_COMEDI_NI_LABPC_ISA)	+= ni_labpc.o

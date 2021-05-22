@@ -100,6 +100,7 @@
 #include <asm/byteorder.h>
 
 #include "ni_stc.h"
+#include "ni_mio.h"
 #include "mite.h"
 
 #define PCIDMA
@@ -1141,8 +1142,6 @@ static const struct ni_board_struct ni_boards[] = {
 		.caldac		= { ad8804_debug, ad8804_debug },
 	},
 };
-
-#include "ni_mio_common.c"
 
 static int pcimio_ai_change(struct comedi_device *dev,
 			    struct comedi_subdevice *s)

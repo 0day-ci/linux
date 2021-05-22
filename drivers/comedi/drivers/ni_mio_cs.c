@@ -19,8 +19,7 @@
  */
 
 /*
- * The real guts of the driver is in ni_mio_common.c, which is
- * included by all the E series drivers.
+ * The real guts of the driver is in ni_mio_common.c
  *
  * References for specifications:
  *	341080a.pdf  DAQCard E Series Register Level Programmer Manual
@@ -31,6 +30,7 @@
 
 #include "../comedi_pcmcia.h"
 #include "ni_stc.h"
+#include "ni_mio.h"
 #include "8255.h"
 
 /*
@@ -111,8 +111,6 @@ static const struct ni_board_struct ni_boards[] = {
 	},
 #endif
 };
-
-#include "ni_mio_common.c"
 
 static const void *ni_getboardtype(struct comedi_device *dev,
 				   struct pcmcia_device *link)
