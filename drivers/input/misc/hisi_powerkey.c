@@ -1,7 +1,7 @@
 /*
  * Hisilicon PMIC powerkey driver
  *
- * Copyright (C) 2013 Hisilicon Ltd.
+ * Copyright (C) 2013 HiSilicon Ltd.
  * Copyright (C) 2015, 2016 Linaro Ltd.
  *
  * This file is subject to the terms and conditions of the GNU General
