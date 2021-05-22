@@ -960,7 +960,10 @@ static int vchiq_irq_queue_bulk_tx_rx(struct vchiq_instance *instance,
 			current->pid);
 		userdata = &waiter->bulk_waiter;
 	} else {
-		userdata = args->userdata;
+		if (copy_from_user(userdata, args->userdata, sizeof(args->userdata))) {
+			ret = -EFAULT;
+			goto out;
+		}
 	}
 
 	status = vchiq_bulk_transfer(args->handle, NULL, args->data, args->size,
