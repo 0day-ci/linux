@@ -757,7 +757,7 @@ struct ncr_reg {
 	#define   IRQM    0x08  /* mod: irq mode (1 = totem pole !) */
 	#define   STD     0x04  /* cmd: start dma mode              */
 	#define   IRQD    0x02  /* mod: irq disable                 */
- 	#define	  NOCOM   0x01	/* cmd: protect sfbr while reselect */
+	#define	  NOCOM   0x01	/* cmd: protect sfbr while reselect */
 				/* bits 0-1 rsvd for C1010          */
 
 /*3c*/  u32	nc_adder;

@@ -2214,7 +2214,7 @@ static	struct script script0 __initdata = {
 		RADDR (scratcha),
 		RADDR (scratcha),
 	SCR_RETURN,
- 		0,
+		0,
 	SCR_JUMP ^ IFTRUE (IF (SCR_STATUS)),
 		PADDR (status),
 	SCR_JUMP ^ IFTRUE (IF (SCR_COMMAND)),
@@ -3760,7 +3760,7 @@ static void __init ncr_prepare_setting(struct ncb *np)
 
 	np->maxwide	= (np->features & FE_WIDE)? 1 : 0;
 
- 	/*
+	/*
 	 *  Guess the frequency of the chip's clock.
 	 */
 	if (np->features & FE_ULTRA)
@@ -3770,7 +3770,7 @@ static void __init ncr_prepare_setting(struct ncb *np)
 
 	/*
 	 *  Get the clock multiplier factor.
- 	 */
+	 */
 	if	(np->features & FE_QUAD)
 		np->multiplier	= 4;
 	else if	(np->features & FE_DBLR)
@@ -4541,7 +4541,7 @@ static void ncr_start_reset(struct ncb *np)
 {
 	if (!np->settle_time) {
 		ncr_reset_scsi_bus(np, 1, driver_setup.settle_delay);
- 	}
+	}
 }
  
 /*==========================================================
@@ -5204,11 +5204,11 @@ static void ncr_chip_reset(struct ncb *np, int delay)
 
 void ncr_init (struct ncb *np, int reset, char * msg, u_long code)
 {
- 	int	i;
+	int	i;
 
- 	/*
+	/*
 	**	Reset chip if asked, otherwise just clear fifos.
- 	*/
+	*/
 
 	if (reset) {
 		OUTB (nc_istat,  SRST);
@@ -7880,18 +7880,18 @@ static unsigned __init ncrgetfreq (struct ncb *np, int gen)
 			udelay(100);	/* count ms */
 	}
 	OUTB (nc_stime1, 0);	/* disable general purpose timer */
- 	/*
- 	 * set prescaler to divide by whatever 0 means
- 	 * 0 ought to choose divide by 2, but appears
- 	 * to set divide by 3.5 mode in my 53c810 ...
- 	 */
- 	OUTB (nc_scntl3, 0);
+	/*
+	 * set prescaler to divide by whatever 0 means
+	 * 0 ought to choose divide by 2, but appears
+	 * to set divide by 3.5 mode in my 53c810 ...
+	 */
+	OUTB (nc_scntl3, 0);
 
 	if (bootverbose >= 2)
 		printk ("%s: Delay (GEN=%d): %u msec\n", ncr_name(np), gen, ms);
-  	/*
- 	 * adjust for prescaler, and convert into KHz 
-  	 */
+	/*
+	 * adjust for prescaler, and convert into KHz
+	 */
 	return ms ? ((1 << gen) * 4340) / ms : 0;
 }
 
