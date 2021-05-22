@@ -2011,7 +2011,7 @@ store_fc_private_host_tgtid_bind_type(struct device *dev,
 {
 	struct Scsi_Host *shost = transport_class_to_shost(dev);
 	struct fc_rport *rport;
- 	enum fc_tgtid_binding_type val;
+	enum fc_tgtid_binding_type val;
 	unsigned long flags;
 
 	if (get_fc_tgtid_bind_type_match(buf, &val))
