@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-/**
- * file phonet.h
- *
+/*
  * Phonet sockets kernel interface
  *
  * Copyright (C) 2008 Nokia Corporation. All rights reserved.
