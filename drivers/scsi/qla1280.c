@@ -38,7 +38,7 @@
 	- Initialize completion queue to avoid OOPS on probe
 	- Handle interrupts during mailbox testing
     Rev  3.24 November 17, 2003, Christoph Hellwig
-    	- use struct list_head for completion queue
+	- use struct list_head for completion queue
 	- avoid old Scsi_FOO typedefs
 	- cleanup 2.4 compat glue a bit
 	- use <scsi/scsi_*.h> headers on 2.6 instead of "scsi.h"
@@ -4058,7 +4058,7 @@ qla1280_setup(char *s)
 			val = 0x10000;
 			ptr += 3;
 		} else if (!strcmp(ptr, "no")) {
- 			val = 0;
+			val = 0;
 			ptr += 2;
 		} else
 			val = simple_strtoul(ptr, &ptr, 0);
