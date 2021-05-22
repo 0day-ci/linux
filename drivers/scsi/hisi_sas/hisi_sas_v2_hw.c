@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2016 Linaro Ltd.
- * Copyright (c) 2016 Hisilicon Limited.
+ * Copyright (c) 2016 HiSilicon Limited.
  */
 
 #include "hisi_sas.h"
