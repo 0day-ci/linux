@@ -1511,10 +1511,10 @@ reset_wd33c93(struct Scsi_Host *instance)
 		while ((read_aux_stat(regs) & ASR_BSY) && busycount++ < 100)
 			udelay (10);
 	/*
- 	 * there are scsi devices out there, which manage to lock up
+	 * there are scsi devices out there, which manage to lock up
 	 * the wd33c93 in a busy condition. In this state it won't
 	 * accept the reset command. The only way to solve this is to
- 	 * give the chip a hardware reset (if possible). The code below
+	 * give the chip a hardware reset (if possible). The code below
 	 * does this for the SGI Indy, where this is possible
 	 */
 	/* still busy ? */
