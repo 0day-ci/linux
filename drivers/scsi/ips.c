@@ -3314,7 +3314,7 @@ ips_map_status(ips_ha_t * ha, ips_scb_t * scb, ips_stat_t * sp)
 				if (scb->scsi_cmd->cmnd[0] == INQUIRY) {
 				    ips_scmd_buf_read(scb->scsi_cmd,
                                       &inquiryData, sizeof (inquiryData));
- 				    if ((inquiryData.DeviceType & 0x1f) == TYPE_DISK) {
+				    if ((inquiryData.DeviceType & 0x1f) == TYPE_DISK) {
 				        errcode = DID_TIME_OUT;
 				        break;
 				    }
@@ -4558,7 +4558,7 @@ ips_flush_and_reset(ips_ha_t *ha)
 {
 	ips_scb_t *scb;
 	int  ret;
- 	int  time;
+	int  time;
 	int  done;
 	dma_addr_t command_dma;
 
