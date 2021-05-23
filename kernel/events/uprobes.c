@@ -1123,6 +1123,7 @@ EXPORT_SYMBOL_GPL(uprobe_unregister);
  * __uprobe_register - register a probe
  * @inode: the file in which the probe has to be placed.
  * @offset: offset from the start of the file.
+ * @ref_ctr_offset: reference counter offset from the start of the file.
  * @uc: information on howto handle the probe..
  *
  * Apart from the access refcount, __uprobe_register() takes a creation
