@@ -304,9 +304,7 @@ skip_stat:
 
 static struct fc_seq *qedf_elsct_send(struct fc_lport *lport, u32 did,
 	struct fc_frame *fp, unsigned int op,
-	void (*resp)(struct fc_seq *,
-	struct fc_frame *,
-	void *),
+	void (*resp)(struct fc_seq *, struct fc_frame *, void *),
 	void *arg, u32 timeout)
 {
 	struct qedf_ctx *qedf = lport_priv(lport);
@@ -628,7 +626,6 @@ static void qedf_link_update(void *dev, struct qed_link_output *link)
 	}
 }
 
-
 static void qedf_dcbx_handler(void *dev, struct qed_dcbx_get *get, u32 mib_type)
 {
 	struct qedf_ctx *qedf = (struct qedf_ctx *)dev;
@@ -736,7 +733,6 @@ static int qedf_eh_abort(struct scsi_cmnd *sc_cmd)
 		rc = SUCCESS;
 		goto out;
 	}
-
 
 	io_req = (struct qedf_ioreq *)sc_cmd->SCp.ptr;
 	if (!io_req) {
@@ -970,9 +966,8 @@ static int qedf_eh_host_reset(struct scsi_cmnd *sc_cmd)
 
 static int qedf_slave_configure(struct scsi_device *sdev)
 {
-	if (qedf_queue_depth) {
+	if (qedf_queue_depth)
 		scsi_change_queue_depth(sdev, qedf_queue_depth);
-	}
 
 	return 0;
 }
@@ -1178,7 +1173,6 @@ static int qedf_xmit(struct fc_lport *lport, struct fc_frame *fp)
 		kunmap_atomic(cp);
 		cp = NULL;
 	}
-
 
 	/* adjust skb network/transport offsets to match mac/fcoe/port */
 	skb_push(skb, elen + hlen);
@@ -1897,7 +1891,6 @@ static int qedf_vport_create(struct fc_vport *vport, bool disabled)
 	fc_disc_init(vn_port);
 	fc_disc_config(vn_port, vn_port);
 
-
 	/* Allocate the exchange manager */
 	shost = vport_to_shost(vport);
 	n_port = shost_priv(shost);
@@ -1998,8 +1991,7 @@ static void qedf_wait_for_vport_destroy(struct qedf_ctx *qedf)
 {
 	struct fc_host_attrs *fc_host = shost_to_fc_host(qedf->lport->host);
 
-	QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_NPIV,
-	    "Entered.\n");
+	QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_NPIV, "Entered.\n");
 	while (fc_host->npiv_vports_inuse > 0) {
 		QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_NPIV,
 		    "Waiting for all vports to be reaped.\n");
@@ -2286,7 +2278,6 @@ inc_idx:
 
 	return true;
 }
-
 
 /* MSI-X fastpath handler code */
 static irqreturn_t qedf_msix_handler(int irq, void *dev_id)
@@ -2621,7 +2612,6 @@ err_out:
 	kfree_skb(skb);
 out:
 	kfree(skb_work);
-	return;
 }
 
 static int qedf_ll2_rx(void *cookie, struct sk_buff *skb,
@@ -2744,8 +2734,7 @@ static int qedf_prepare_sb(struct qedf_ctx *qedf)
 		GFP_KERNEL);
 
 	if (!qedf->fp_array) {
-		QEDF_ERR(&(qedf->dbg_ctx), "fastpath array allocation "
-			  "failed.\n");
+		QEDF_ERR(&qedf->dbg_ctx, "fastpath array allocation failed.\n");
 		return -ENOMEM;
 	}
 
@@ -2766,9 +2755,8 @@ static int qedf_prepare_sb(struct qedf_ctx *qedf)
 		}
 		fp->sb_id = id;
 		fp->qedf = qedf;
-		fp->cq_num_entries =
-		    qedf->global_queues[id]->cq_mem_size /
-		    sizeof(struct fcoe_cqe);
+		fp->cq_num_entries = qedf->global_queues[id]->cq_mem_size /
+				     sizeof(struct fcoe_cqe);
 	}
 err:
 	return 0;
@@ -2812,7 +2800,6 @@ void qedf_process_cqe(struct qedf_ctx *qedf, struct fcoe_cqe *cqe)
 			 "Session not offloaded yet, fcport = %p.\n", fcport);
 		return;
 	}
-
 
 	switch (comp_type) {
 	case FCOE_GOOD_COMPLETION_CQE_TYPE:
@@ -3152,8 +3139,7 @@ static int qedf_set_fcoe_pf_param(struct qedf_ctx *qedf)
 
 	rval = qedf_alloc_global_queues(qedf);
 	if (rval) {
-		QEDF_ERR(&(qedf->dbg_ctx), "Global queue allocation "
-			  "failed.\n");
+		QEDF_ERR(&qedf->dbg_ctx, "Global queue allocation failed.\n");
 		return 1;
 	}
 
@@ -3324,8 +3310,7 @@ retry_probe:
 	QEDF_INFO(&(qedf->dbg_ctx), QEDF_LOG_INFO, "qedf->io_mempool=%p.\n",
 	    qedf->io_mempool);
 
-	sprintf(host_buf, "qedf_%u_link",
-	    qedf->lport->host->host_no);
+	sprintf(host_buf, "qedf_%u_link", qedf->lport->host->host_no);
 	qedf->link_update_wq = create_workqueue(host_buf);
 	INIT_DELAYED_WORK(&qedf->link_update, qedf_handle_link_update);
 	INIT_DELAYED_WORK(&qedf->link_recovery, qedf_link_recovery);
@@ -3579,8 +3564,7 @@ retry_probe:
 	qedf->timer_work_queue =
 		create_workqueue(host_buf);
 	if (!qedf->timer_work_queue) {
-		QEDF_ERR(&(qedf->dbg_ctx), "Failed to start timer "
-			  "workqueue.\n");
+		QEDF_ERR(&qedf->dbg_ctx, "Failed to start timer workqueue.\n");
 		rc = -ENOMEM;
 		goto err7;
 	}
@@ -3824,13 +3808,13 @@ void qedf_schedule_hw_err_handler(void *dev, enum qed_hw_err_type err_type)
 {
 	struct qedf_ctx *qedf = dev;
 
-	QEDF_ERR(&(qedf->dbg_ctx),
-			"Hardware error handler scheduled, event=%d.\n",
-			err_type);
+	QEDF_ERR(&qedf->dbg_ctx,
+		 "Hardware error handler scheduled, event=%d.\n",
+		 err_type);
 
 	if (test_bit(QEDF_IN_RECOVERY, &qedf->flags)) {
-		QEDF_ERR(&(qedf->dbg_ctx),
-				"Already in recovery, not scheduling board disable work.\n");
+		QEDF_ERR(&qedf->dbg_ctx,
+			 "Already in recovery, not scheduling board disable work.\n");
 		return;
 	}
 
