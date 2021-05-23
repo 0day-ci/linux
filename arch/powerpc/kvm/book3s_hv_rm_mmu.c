@@ -26,16 +26,23 @@
 static void *real_vmalloc_addr(void *x)
 {
 	unsigned long addr = (unsigned long) x;
+	unsigned long mask;
+	int shift;
 	pte_t *p;
+
 	/*
-	 * assume we don't have huge pages in vmalloc space...
-	 * So don't worry about THP collapse/split. Called
-	 * Only in realmode with MSR_EE = 0, hence won't need irq_save/restore.
+	 * This is called only in realmode with MSR_EE = 0, hence won't need
+	 * irq_save/restore around find_init_mm_pte.
 	 */
-	p = find_init_mm_pte(addr, NULL);
+	p = find_init_mm_pte(addr, &shift);
 	if (!p || !pte_present(*p))
 		return NULL;
-	addr = (pte_pfn(*p) << PAGE_SHIFT) | (addr & ~PAGE_MASK);
+	if (!shift)
+		shift = PAGE_SHIFT;
+
+	mask = (1UL << shift) - 1;
+	addr = (pte_pfn(*p) << PAGE_SHIFT) | (addr & mask);
+
 	return __va(addr);
 }
 
