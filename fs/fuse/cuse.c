@@ -574,25 +574,25 @@ static struct file_operations cuse_channel_fops; /* initialized during init */
  * CUSE exports the same set of attributes to sysfs as fusectl.
  */
 
-static ssize_t cuse_class_waiting_show(struct device *dev,
-				       struct device_attribute *attr, char *buf)
+static ssize_t waiting_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
 {
 	struct cuse_conn *cc = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%d\n", atomic_read(&cc->fc.num_waiting));
 }
-static DEVICE_ATTR(waiting, 0400, cuse_class_waiting_show, NULL);
+static DEVICE_ATTR_ADMIN_RO(waiting);
 
-static ssize_t cuse_class_abort_store(struct device *dev,
-				      struct device_attribute *attr,
-				      const char *buf, size_t count)
+static ssize_t abort_store(struct device *dev,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
 	struct cuse_conn *cc = dev_get_drvdata(dev);
 
 	fuse_abort_conn(&cc->fc);
 	return count;
 }
-static DEVICE_ATTR(abort, 0200, NULL, cuse_class_abort_store);
+static DEVICE_ATTR_WO(abort);
 
 static struct attribute *cuse_class_dev_attrs[] = {
 	&dev_attr_waiting.attr,
