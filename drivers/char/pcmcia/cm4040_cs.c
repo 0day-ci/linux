@@ -557,6 +557,7 @@ static void reader_release(struct pcmcia_device *link)
 static int reader_probe(struct pcmcia_device *link)
 {
 	struct reader_dev *dev;
+	struct device *dev_ret;
 	int i, ret;
 
 	for (i = 0; i < CM_MAX_DEV; i++) {
@@ -592,8 +593,15 @@ static int reader_probe(struct pcmcia_device *link)
 		return ret;
 	}
 
-	device_create(cmx_class, NULL, MKDEV(major, i), NULL, "cmx%d", i);
-
+	dev_ret = device_create(cmx_class, NULL, MKDEV(major, i), NULL, "cmx%d", i);
+        if (IS_ERR(dev_ret)) {
+                printk(KERN_ERR "device_create failed for %d\n",
+                               i);
+                reader_release(link);
+                dev_table[i] = NULL;
+                kfree(dev);
+                return -ENODEV;
+        }
 	return 0;
 }
 
