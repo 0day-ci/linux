@@ -1782,6 +1782,7 @@ static int cm4000_probe(struct pcmcia_device *link)
 {
 	struct cm4000_dev *dev;
 	int i, ret;
+	struct device *dev_ret;
 
 	for (i = 0; i < CM4000_MAX_DEV; i++)
 		if (dev_table[i] == NULL)
@@ -1813,8 +1814,15 @@ static int cm4000_probe(struct pcmcia_device *link)
 		return ret;
 	}
 
-	device_create(cmm_class, NULL, MKDEV(major, i), NULL, "cmm%d", i);
-
+	dev_ret = device_create(cmm_class, NULL, MKDEV(major, i), NULL, "cmm%d", i);
+        if (IS_ERR(dev_ret)) {
+               	printk(KERN_ERR "device_create failed for %d\n",
+                       	       i);
+		cm4000_release(link);
+                dev_table[i] = NULL;
+		kfree(dev);
+		return -ENODEV;
+	}
 	return 0;
 }
 
