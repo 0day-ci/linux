@@ -671,6 +671,24 @@ static const struct tegra_asoc_data tegra_rt5640_data = {
 	.add_hp_jack = true,
 };
 
+/*
+ * Speaker: Connected to SPO L/R P/N pins, stereo.
+ * Internal Microphone: Digital, connected to DMIC1_DAT IN2P/N pins.
+ * Headphones: Connected to HPOL/R pins.
+ * Headset Microphone: Unconnected.
+ *
+ * IF2_DAC/ADC are unpopulated.
+ */
+static const struct tegra_asoc_data tegra_rt5640_grouper_data = {
+	.components = "codec:rt5640 cfg-spk:2 cfg-mic:dmic1 aif:1",
+	.mclk_rate = tegra_machine_mclk_rate_256,
+	.card = &snd_soc_tegra_rt5640,
+	.add_common_dapm_widgets = true,
+	.add_common_controls = true,
+	.add_common_snd_ops = true,
+	.add_hp_jack = true,
+};
+
 /* RT5632 machine */
 
 SND_SOC_DAILINK_DEFS(rt5632_hifi,
@@ -712,6 +730,7 @@ static const struct of_device_id tegra_machine_of_match[] = {
 	{ .compatible = "nvidia,tegra-audio-wm8753", .data = &tegra_wm8753_data },
 	{ .compatible = "nvidia,tegra-audio-rt5677", .data = &tegra_rt5677_data },
 	{ .compatible = "nvidia,tegra-audio-rt5640", .data = &tegra_rt5640_data },
+	{ .compatible = "nvidia,tegra-audio-rt5640-grouper", .data = &tegra_rt5640_grouper_data },
 	{ .compatible = "nvidia,tegra-audio-alc5632", .data = &tegra_rt5632_data },
 	{},
 };
