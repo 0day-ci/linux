@@ -106,11 +106,7 @@ static inline bool of_dma_is_coherent(struct device_node *np)
 }
 #endif /* CONFIG_OF_ADDRESS */
 
-#ifdef CONFIG_OF
-extern int of_address_to_resource(struct device_node *dev, int index,
-				  struct resource *r);
-void __iomem *of_iomap(struct device_node *node, int index);
-#else
+#if defined(CONFIG_OF) && !defined(CONFIG_OF_ADDRESS) || !defined(CONFIG_OF)
 static inline int of_address_to_resource(struct device_node *dev, int index,
 					 struct resource *r)
 {
