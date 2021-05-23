@@ -376,33 +376,31 @@ static void ufshcd_add_command_trace(struct ufs_hba *hba, unsigned int tag,
 	struct scsi_cmnd *cmd = lrbp->cmd;
 	int transfer_len = -1;
 
-	if (!trace_ufshcd_command_enabled()) {
-		/* trace UPIU W/O tracing command */
-		if (cmd)
-			ufshcd_add_cmd_upiu_trace(hba, tag, str_t);
+	if (!cmd)
 		return;
-	}
 
-	if (cmd) { /* data phase exists */
-		/* trace UPIU also */
-		ufshcd_add_cmd_upiu_trace(hba, tag, str_t);
-		opcode = cmd->cmnd[0];
-		if ((opcode == READ_10) || (opcode == WRITE_10)) {
-			/*
-			 * Currently we only fully trace read(10) and write(10)
-			 * commands
-			 */
-			if (cmd->request && cmd->request->bio)
-				lba = cmd->request->bio->bi_iter.bi_sector;
-			transfer_len = be32_to_cpu(
+	/* trace UPIU W/O tracing command */
+	ufshcd_add_cmd_upiu_trace(hba, tag, str_t);
+
+	if (!trace_ufshcd_command_enabled())
+		return;
+
+	opcode = cmd->cmnd[0];
+	if ((opcode == READ_10) || (opcode == WRITE_10)) {
+		/*
+		 * Currently we only fully trace read(10) and write(10)
+		 * commands
+		 */
+		if (cmd->request && cmd->request->bio)
+			lba = cmd->request->bio->bi_iter.bi_sector;
+		transfer_len = be32_to_cpu(
 				lrbp->ucd_req_ptr->sc.exp_data_transfer_len);
-			if (opcode == WRITE_10)
-				group_id = lrbp->cmd->cmnd[6];
-		} else if (opcode == UNMAP) {
-			if (cmd->request) {
-				lba = scsi_get_lba(cmd);
-				transfer_len = blk_rq_bytes(cmd->request);
-			}
+		if (opcode == WRITE_10)
+			group_id = lrbp->cmd->cmnd[6];
+	} else if (opcode == UNMAP) {
+		if (cmd->request) {
+			lba = scsi_get_lba(cmd);
+			transfer_len = blk_rq_bytes(cmd->request);
 		}
 	}
 
@@ -9774,8 +9772,7 @@ static const struct dev_pm_ops ufs_rpmb_pm_ops = {
 };
 
 /**
- * Describes the ufs rpmb wlun.
- * Used only to send uac.
+ * Describes the ufs rpmb wlun. Used only to send uac.
  */
 static struct scsi_driver ufs_rpmb_wlun_template = {
 	.gendrv = {
