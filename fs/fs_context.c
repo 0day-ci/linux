@@ -359,33 +359,40 @@ EXPORT_SYMBOL(vfs_dup_fs_context);
  * @fc: The filesystem context to log to.
  * @fmt: The format of the buffer.
  */
-void logfc(struct fc_log *log, const char *prefix, char level, const char *fmt, ...)
+void logfc(struct fc_log *log, const char *prefix, char level,
+	   const char *fmt, ...)
 {
 	va_list va;
 	struct va_format vaf = {.fmt = fmt, .va = &va};
 
 	va_start(va, fmt);
 	if (!log) {
+		const char *kern_level;
+
 		switch (level) {
 		case 'w':
-			printk(KERN_WARNING "%s%s%pV\n", prefix ? prefix : "",
-						prefix ? ": " : "", &vaf);
+			kern_level = KERN_WARNING;
 			break;
 		case 'e':
-			printk(KERN_ERR "%s%s%pV\n", prefix ? prefix : "",
-						prefix ? ": " : "", &vaf);
+			kern_level = KERN_ERR;
 			break;
 		default:
-			printk(KERN_NOTICE "%s%s%pV\n", prefix ? prefix : "",
-						prefix ? ": " : "", &vaf);
+			kern_level = KERN_NOTICE;
 			break;
 		}
+		printk("%s%s%s%pV\n",
+		       kern_level,
+		       prefix ? prefix : "",
+		       prefix ? ": " : "",
+		       &vaf);
 	} else {
 		unsigned int logsize = ARRAY_SIZE(log->buffer);
 		u8 index;
-		char *q = kasprintf(GFP_KERNEL, "%c %s%s%pV\n", level,
-						prefix ? prefix : "",
-						prefix ? ": " : "", &vaf);
+		char *q = kasprintf(GFP_KERNEL, "%c %s%s%pV\n",
+				    level,
+				    prefix ? prefix : "",
+				    prefix ? ": " : "",
+				    &vaf);
 
 		index = log->head & (logsize - 1);
 		BUILD_BUG_ON(sizeof(log->head) != sizeof(u8) ||
