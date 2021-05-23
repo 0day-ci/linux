@@ -36,6 +36,9 @@
 #define VIRTIO_SCSI_EVENT_LEN 8
 #define VIRTIO_SCSI_VQ_BASE 2
 
+static bool __read_mostly timed_out_enabled;
+module_param(timed_out_enabled, bool, 0644);
+
 /* Command queue element */
 struct virtio_scsi_cmd {
 	struct scsi_cmnd *sc;
@@ -732,9 +735,38 @@ static void virtscsi_commit_rqs(struct Scsi_Host *shost, u16 hwq)
  * The host guarantees to respond to each command, although I/O
  * latencies might be higher than on bare metal.  Reset the timer
  * unconditionally to give the host a chance to perform EH.
+ *
+ * If 'timed_out_enabled' is set, the timeout handler polls or kicks the
+ * virtqueue on purpose, in order to recover the IO, in case there is loss
+ * of interrupt or kick issue with virtio.
  */
 static enum blk_eh_timer_return virtscsi_eh_timed_out(struct scsi_cmnd *scmnd)
 {
+	struct Scsi_Host *shost;
+	struct virtio_scsi *vscsi;
+	struct virtio_scsi_vq *req_vq;
+
+	if (!timed_out_enabled)
+		return BLK_EH_RESET_TIMER;
+
+	shost = scmnd->device->host;
+	vscsi = shost_priv(shost);
+	req_vq = virtscsi_pick_vq_mq(vscsi, scmnd);
+
+	virtscsi_vq_done(vscsi, req_vq, virtscsi_complete_cmd);
+
+	if (test_bit(SCMD_STATE_COMPLETE, &scmnd->state)) {
+		pr_warn("Virtio SCSI HBA %u: I/O %u QID %d timeout, completion polled\n",
+			shost->host_no, scmnd->tag, req_vq->vq->index);
+		return BLK_EH_DONE;
+	}
+
+	/*
+	 * To kick the virtqueue in case the timeout is due to the loss of
+	 * one prior notification.
+	 */
+	virtqueue_notify(req_vq->vq);
+
 	return BLK_EH_RESET_TIMER;
 }
 
