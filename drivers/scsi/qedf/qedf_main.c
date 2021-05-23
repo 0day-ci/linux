@@ -3020,9 +3020,8 @@ static int qedf_alloc_global_queues(struct qedf_ctx *qedf)
 	 * addresses of our queues
 	 */
 	if (!qedf->p_cpuq) {
-		status = 1;
 		QEDF_ERR(&qedf->dbg_ctx, "p_cpuq is NULL.\n");
-		goto mem_alloc_failure;
+		return 1;
 	}
 
 	qedf->global_queues = kzalloc((sizeof(struct global_queue *)
@@ -3039,7 +3038,7 @@ static int qedf_alloc_global_queues(struct qedf_ctx *qedf)
 	rc = qedf_alloc_bdq(qedf);
 	if (rc) {
 		QEDF_ERR(&qedf->dbg_ctx, "Unable to allocate bdq.\n");
-		goto mem_alloc_failure;
+		return -ENOMEM;
 	}
 
 	/* Allocate a CQ and an associated PBL for each MSI-X vector */
