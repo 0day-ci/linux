@@ -3043,55 +3043,46 @@ static int qedf_alloc_global_queues(struct qedf_ctx *qedf)
 
 	/* Allocate a CQ and an associated PBL for each MSI-X vector */
 	for (i = 0; i < qedf->num_queues; i++) {
-		qedf->global_queues[i] = kzalloc(sizeof(struct global_queue),
-		    GFP_KERNEL);
-		if (!qedf->global_queues[i]) {
+		struct global_queue *q;
+
+		q = kzalloc(sizeof(*q), GFP_KERNEL);
+		if (!q) {
 			QEDF_WARN(&(qedf->dbg_ctx), "Unable to allocate "
 				   "global queue %d.\n", i);
 			status = -ENOMEM;
 			goto mem_alloc_failure;
 		}
+		qedf->global_queues[i] = q;
 
-		qedf->global_queues[i]->cq_mem_size =
+		q->cq_mem_size =
 		    FCOE_PARAMS_CQ_NUM_ENTRIES * sizeof(struct fcoe_cqe);
-		qedf->global_queues[i]->cq_mem_size =
-		    ALIGN(qedf->global_queues[i]->cq_mem_size, QEDF_PAGE_SIZE);
+		q->cq_mem_size = ALIGN(q->cq_mem_size, QEDF_PAGE_SIZE);
 
-		qedf->global_queues[i]->cq_pbl_size =
-		    (qedf->global_queues[i]->cq_mem_size /
-		    PAGE_SIZE) * sizeof(void *);
-		qedf->global_queues[i]->cq_pbl_size =
-		    ALIGN(qedf->global_queues[i]->cq_pbl_size, QEDF_PAGE_SIZE);
+		q->cq_pbl_size = (q->cq_mem_size / PAGE_SIZE) * sizeof(void *);
+		q->cq_pbl_size = ALIGN(q->cq_pbl_size, QEDF_PAGE_SIZE);
 
-		qedf->global_queues[i]->cq =
-		    dma_alloc_coherent(&qedf->pdev->dev,
-				       qedf->global_queues[i]->cq_mem_size,
-				       &qedf->global_queues[i]->cq_dma,
-				       GFP_KERNEL);
+		q->cq = dma_alloc_coherent(&qedf->pdev->dev, q->cq_mem_size,
+					   &q->cq_dma, GFP_KERNEL);
 
-		if (!qedf->global_queues[i]->cq) {
+		if (!q->cq) {
 			QEDF_WARN(&(qedf->dbg_ctx), "Could not allocate cq.\n");
 			status = -ENOMEM;
 			goto mem_alloc_failure;
 		}
 
-		qedf->global_queues[i]->cq_pbl =
-		    dma_alloc_coherent(&qedf->pdev->dev,
-				       qedf->global_queues[i]->cq_pbl_size,
-				       &qedf->global_queues[i]->cq_pbl_dma,
-				       GFP_KERNEL);
+		q->cq_pbl = dma_alloc_coherent(&qedf->pdev->dev, q->cq_pbl_size,
+					       &q->cq_pbl_dma, GFP_KERNEL);
 
-		if (!qedf->global_queues[i]->cq_pbl) {
+		if (!q->cq_pbl) {
 			QEDF_WARN(&(qedf->dbg_ctx), "Could not allocate cq PBL.\n");
 			status = -ENOMEM;
 			goto mem_alloc_failure;
 		}
 
 		/* Create PBL */
-		num_pages = qedf->global_queues[i]->cq_mem_size /
-		    QEDF_PAGE_SIZE;
-		page = qedf->global_queues[i]->cq_dma;
-		pbl = (u32 *)qedf->global_queues[i]->cq_pbl;
+		num_pages = q->cq_mem_size / QEDF_PAGE_SIZE;
+		page = q->cq_dma;
+		pbl = (u32 *)q->cq_pbl;
 
 		while (num_pages--) {
 			*pbl = U64_LO(page);
@@ -3101,7 +3092,7 @@ static int qedf_alloc_global_queues(struct qedf_ctx *qedf)
 			page += QEDF_PAGE_SIZE;
 		}
 		/* Set the initial consumer index for cq */
-		qedf->global_queues[i]->cq_cons_idx = 0;
+		q->cq_cons_idx = 0;
 	}
 
 	list = (u32 *)qedf->p_cpuq;
