@@ -5084,6 +5084,13 @@ static void regulator_remove_coupling(struct regulator_dev *rdev)
 
 	n_coupled = c_desc->n_coupled;
 
+	if (coupler && coupler->detach_regulator) {
+		err = coupler->detach_regulator(coupler, rdev);
+		if (err)
+			rdev_err(rdev, "failed to detach from coupler: %pe\n",
+				 ERR_PTR(err));
+	}
+
 	for (i = 1; i < n_coupled; i++) {
 		c_rdev = c_desc->coupled_rdevs[i];
 
@@ -5109,13 +5116,6 @@ static void regulator_remove_coupling(struct regulator_dev *rdev)
 
 		c_desc->coupled_rdevs[i] = NULL;
 		c_desc->n_resolved--;
-	}
-
-	if (coupler && coupler->detach_regulator) {
-		err = coupler->detach_regulator(coupler, rdev);
-		if (err)
-			rdev_err(rdev, "failed to detach from coupler: %pe\n",
-				 ERR_PTR(err));
 	}
 
 	kfree(rdev->coupling_desc.coupled_rdevs);
