@@ -114,6 +114,12 @@ enum iommu_resv_type {
 	IOMMU_RESV_SW_MSI,
 };
 
+struct iommu_iort_rmr_data {
+#define IOMMU_RMR_REMAP_PERMITTED	(1 << 0)
+	u32 flags;
+	u32 sid;	/* Stream Id associated with RMR entry */
+};
+
 /**
  * struct iommu_resv_region - descriptor for a reserved memory region
  * @list: Linked list pointers
@@ -121,6 +127,7 @@ enum iommu_resv_type {
  * @length: Length of the region in bytes
  * @prot: IOMMU Protection flags (READ/WRITE/...)
  * @type: Type of the reserved region
+ * @rmr: ACPI IORT RMR specific data
  */
 struct iommu_resv_region {
 	struct list_head	list;
@@ -128,6 +135,9 @@ struct iommu_resv_region {
 	size_t			length;
 	int			prot;
 	enum iommu_resv_type	type;
+	union {
+		struct iommu_iort_rmr_data rmr;
+	} fw_data;
 };
 
 /**
