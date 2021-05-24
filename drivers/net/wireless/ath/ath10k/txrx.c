@@ -51,6 +51,7 @@ int ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	struct ath10k_txq *artxq;
 	struct sk_buff *msdu;
 	u8 flags;
+	struct ieee80211_vif *vif;
 
 	ath10k_dbg(ar, ATH10K_DBG_HTT,
 		   "htt tx completion msdu_id %u status %d\n",
@@ -80,6 +81,8 @@ int ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 	}
 
 	flags = skb_cb->flags;
+	vif = skb_cb->vif;
+
 	ath10k_htt_tx_free_msdu_id(htt, tx_done->msdu_id);
 	ath10k_htt_tx_dec_pending(htt);
 	if (htt->num_pending_tx == 0)
@@ -130,7 +133,10 @@ int ath10k_txrx_tx_unref(struct ath10k_htt *htt,
 		info->status.is_valid_ack_signal = true;
 	}
 
-	ieee80211_tx_status(htt->ar->hw, msdu);
+	if (info->flags & IEEE80211_TX_CTL_HW_80211_ENCAP)
+		ieee80211_tx_status_8023(htt->ar->hw, vif, msdu);
+	else
+		ieee80211_tx_status(htt->ar->hw, msdu);
 	/* we do not own the msdu anymore */
 
 	return 0;

@@ -1298,6 +1298,8 @@ struct ath10k {
 	s32 tx_power_2g_limit;
 	s32 tx_power_5g_limit;
 
+	bool ethernetmode;
+
 	/* must be last */
 	u8 drv_priv[] __aligned(sizeof(void *));
 };
