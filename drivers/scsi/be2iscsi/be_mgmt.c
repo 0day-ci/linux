@@ -509,6 +509,7 @@ beiscsi_if_clr_ip(struct beiscsi_hba *phba,
 {
 	struct be_cmd_set_ip_addr_req *req;
 	struct be_dma_mem nonemb_cmd;
+	u32 status;
 	int rc;
 
 	rc = beiscsi_prep_nemb_cmd(phba, &nonemb_cmd, CMD_SUBSYSTEM_ISCSI,
@@ -531,11 +532,12 @@ beiscsi_if_clr_ip(struct beiscsi_hba *phba,
 	memcpy(req->ip_params.ip_record.ip_addr.subnet_mask,
 	       if_info->ip_addr.subnet_mask,
 	       sizeof(if_info->ip_addr.subnet_mask));
+	status = req->ip_params.ip_record.status;
 	rc = beiscsi_exec_nemb_cmd(phba, &nonemb_cmd, NULL, NULL, 0);
-	if (rc < 0 || req->ip_params.ip_record.status) {
+	if (rc < 0 || status) {
 		beiscsi_log(phba, KERN_INFO, BEISCSI_LOG_CONFIG,
 			    "BG_%d : failed to clear IP: rc %d status %d\n",
-			    rc, req->ip_params.ip_record.status);
+			    rc, status);
 	}
 	return rc;
 }
