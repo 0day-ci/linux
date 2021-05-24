@@ -189,12 +189,6 @@ extern void warn_bogus_irq_restore(void);
 #define raw_irqs_disabled()		(arch_irqs_disabled())
 #define raw_safe_halt()			arch_safe_halt()
 
-/*
- * The local_irq_*() APIs are equal to the raw_local_irq*()
- * if !TRACE_IRQFLAGS.
- */
-#ifdef CONFIG_TRACE_IRQFLAGS
-
 #define local_irq_enable()				\
 	do {						\
 		trace_hardirqs_on();			\
@@ -229,16 +223,6 @@ extern void warn_bogus_irq_restore(void);
 		raw_safe_halt();		\
 	} while (0)
 
-
-#else /* !CONFIG_TRACE_IRQFLAGS */
-
-#define local_irq_enable()	do { raw_local_irq_enable(); } while (0)
-#define local_irq_disable()	do { raw_local_irq_disable(); } while (0)
-#define local_irq_save(flags)	do { raw_local_irq_save(flags); } while (0)
-#define local_irq_restore(flags) do { raw_local_irq_restore(flags); } while (0)
-#define safe_halt()		do { raw_safe_halt(); } while (0)
-
-#endif /* CONFIG_TRACE_IRQFLAGS */
 
 #define local_save_flags(flags)	raw_local_save_flags(flags)
 
