@@ -458,11 +458,11 @@ static enum fpga_mgr_states socfpga_a10_fpga_state(struct fpga_manager *mgr)
 }
 
 static const struct fpga_manager_ops socfpga_a10_fpga_mgr_ops = {
-	.initial_header_size = (RBF_DECOMPRESS_OFFSET + 1) * 4,
-	.state = socfpga_a10_fpga_state,
-	.write_init = socfpga_a10_fpga_write_init,
-	.write = socfpga_a10_fpga_write,
-	.write_complete = socfpga_a10_fpga_write_complete,
+	.initial_header_size     = (RBF_DECOMPRESS_OFFSET + 1) * 4,
+	.state                   = socfpga_a10_fpga_state,
+	.reconfig.write_init     = socfpga_a10_fpga_write_init,
+	.reconfig.write          = socfpga_a10_fpga_write,
+	.reconfig.write_complete = socfpga_a10_fpga_write_complete,
 };
 
 static int socfpga_a10_fpga_probe(struct platform_device *pdev)

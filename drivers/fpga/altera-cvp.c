@@ -516,10 +516,10 @@ static int altera_cvp_write_complete(struct fpga_manager *mgr,
 }
 
 static const struct fpga_manager_ops altera_cvp_ops = {
-	.state		= altera_cvp_state,
-	.write_init	= altera_cvp_write_init,
-	.write		= altera_cvp_write,
-	.write_complete	= altera_cvp_write_complete,
+	.state                   = altera_cvp_state,
+	.reconfig.write_init     = altera_cvp_write_init,
+	.reconfig.write          = altera_cvp_write,
+	.reconfig.write_complete = altera_cvp_write_complete,
 };
 
 static const struct cvp_priv cvp_priv_v1 = {

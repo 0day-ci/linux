@@ -167,10 +167,10 @@ static int alt_pr_fpga_write_complete(struct fpga_manager *mgr,
 }
 
 static const struct fpga_manager_ops alt_pr_ops = {
-	.state = alt_pr_fpga_state,
-	.write_init = alt_pr_fpga_write_init,
-	.write = alt_pr_fpga_write,
-	.write_complete = alt_pr_fpga_write_complete,
+	.state                   = alt_pr_fpga_state,
+	.reconfig.write_init     = alt_pr_fpga_write_init,
+	.reconfig.write          = alt_pr_fpga_write,
+	.reconfig.write_complete = alt_pr_fpga_write_complete,
 };
 
 int alt_pr_register(struct device *dev, void __iomem *reg_base)

@@ -534,10 +534,10 @@ static enum fpga_mgr_states socfpga_fpga_ops_state(struct fpga_manager *mgr)
 }
 
 static const struct fpga_manager_ops socfpga_fpga_ops = {
-	.state = socfpga_fpga_ops_state,
-	.write_init = socfpga_fpga_ops_configure_init,
-	.write = socfpga_fpga_ops_configure_write,
-	.write_complete = socfpga_fpga_ops_configure_complete,
+	.state                   = socfpga_fpga_ops_state,
+	.reconfig.write_init     = socfpga_fpga_ops_configure_init,
+	.reconfig.write          = socfpga_fpga_ops_configure_write,
+	.reconfig.write_complete = socfpga_fpga_ops_configure_complete,
 };
 
 static int socfpga_fpga_probe(struct platform_device *pdev)

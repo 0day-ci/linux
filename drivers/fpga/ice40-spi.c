@@ -126,10 +126,10 @@ static int ice40_fpga_ops_write_complete(struct fpga_manager *mgr,
 }
 
 static const struct fpga_manager_ops ice40_fpga_ops = {
-	.state = ice40_fpga_ops_state,
-	.write_init = ice40_fpga_ops_write_init,
-	.write = ice40_fpga_ops_write,
-	.write_complete = ice40_fpga_ops_write_complete,
+	.state                   = ice40_fpga_ops_state,
+	.reconfig.write_init     = ice40_fpga_ops_write_init,
+	.reconfig.write          = ice40_fpga_ops_write,
+	.reconfig.write_complete = ice40_fpga_ops_write_complete,
 };
 
 static int ice40_fpga_probe(struct spi_device *spi)

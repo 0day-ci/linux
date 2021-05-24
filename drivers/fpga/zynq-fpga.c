@@ -543,11 +543,11 @@ static enum fpga_mgr_states zynq_fpga_ops_state(struct fpga_manager *mgr)
 }
 
 static const struct fpga_manager_ops zynq_fpga_ops = {
-	.initial_header_size = 128,
-	.state = zynq_fpga_ops_state,
-	.write_init = zynq_fpga_ops_write_init,
-	.write_sg = zynq_fpga_ops_write,
-	.write_complete = zynq_fpga_ops_write_complete,
+	.initial_header_size     = 128,
+	.state                   = zynq_fpga_ops_state,
+	.reconfig.write_init     = zynq_fpga_ops_write_init,
+	.reconfig.write_sg       = zynq_fpga_ops_write,
+	.reconfig.write_complete = zynq_fpga_ops_write_complete,
 };
 
 static int zynq_fpga_probe(struct platform_device *pdev)
