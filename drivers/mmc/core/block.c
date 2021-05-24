@@ -2692,7 +2692,7 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 	md->force_ro.store = force_ro_store;
 	sysfs_attr_init(&md->force_ro.attr);
 	md->force_ro.attr.name = "force_ro";
-	md->force_ro.attr.mode = S_IRUGO | S_IWUSR;
+	md->force_ro.attr.mode = 0644;
 	ret = device_create_file(disk_to_dev(md->disk), &md->force_ro);
 	if (ret)
 		goto force_ro_fail;
@@ -2702,9 +2702,9 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 		umode_t mode;
 
 		if (card->ext_csd.boot_ro_lock & EXT_CSD_BOOT_WP_B_PWR_WP_DIS)
-			mode = S_IRUGO;
+			mode = 0444;
 		else
-			mode = S_IRUGO | S_IWUSR;
+			mode = 0644;
 
 		md->power_ro_lock.show = power_ro_lock_show;
 		md->power_ro_lock.store = power_ro_lock_store;
@@ -2850,7 +2850,7 @@ static int mmc_blk_add_debugfs(struct mmc_card *card, struct mmc_blk_data *md)
 
 	if (mmc_card_mmc(card)) {
 		md->ext_csd_dentry =
-			debugfs_create_file("ext_csd", S_IRUSR, root, card,
+			debugfs_create_file("ext_csd", 0400, root, card,
 					    &mmc_dbg_ext_csd_fops);
 		if (!md->ext_csd_dentry)
 			return -EIO;
