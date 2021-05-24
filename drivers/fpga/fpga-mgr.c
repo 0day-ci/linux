@@ -369,6 +369,14 @@ int fpga_mgr_load(struct fpga_manager *mgr, struct fpga_image_info *info)
 {
 	const struct fpga_manager_update_ops *uops = &mgr->mops->reconfig;
 
+	if (!uops->write_complete ||
+	    !uops->write_init ||
+	    (!uops->write && !uops->write_sg) ||
+	    (uops->write && uops->write_sg)) {
+		dev_err(&mgr->dev, "Attempt to load an image without fpga_manager_update_ops\n");
+		return -EOPNOTSUPP;
+	}
+
 	if (info->sgt)
 		return fpga_mgr_buf_load_sg(mgr, info, uops, info->sgt);
 	if (info->buf && info->count)
@@ -579,10 +587,7 @@ struct fpga_manager *fpga_mgr_create(struct device *dev, const char *name,
 	struct fpga_manager *mgr;
 	int id, ret;
 
-	if (!mops || !mops->reconfig.write_complete || !mops->state ||
-	    !mops->reconfig.write_init || (!mops->reconfig.write &&
-						 !mops->reconfig.write_sg) ||
-	    (mops->reconfig.write && mops->reconfig.write_sg)) {
+	if (!mops || !mops->state) {
 		dev_err(dev, "Attempt to register without fpga_manager_ops\n");
 		return NULL;
 	}
