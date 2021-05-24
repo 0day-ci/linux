@@ -895,12 +895,15 @@ int amdgpu_acpi_init(struct amdgpu_device *adev)
 atcs:
 	/* Probe for ATCS, and initialize it if found */
 	atcs_handle = amdgpu_atcs_probe_handle(handle);
-	if (!atcs_handle)
+	if (!atcs_handle) {
+		ret = -ENODEV;
 		goto out;
+	}
 
 	atcs = kzalloc(sizeof(*atcs), GFP_KERNEL);
 	if (!atcs) {
 		DRM_WARN("Not enough memory to initialize ATCS\n");
+		ret = -ENOMEM;
 		goto out;
 	}
 	atcs->handle = atcs_handle;
