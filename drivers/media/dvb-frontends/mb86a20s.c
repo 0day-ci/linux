@@ -1346,7 +1346,7 @@ static u32 interpolate_value(u32 value, const struct linear_segments *segments,
 {
 	u64 tmp64;
 	u32 dx, dy;
-	int i, ret;
+	int i;
 
 	if (value >= segments[0].x)
 		return segments[0].y;
@@ -1367,9 +1367,7 @@ static u32 interpolate_value(u32 value, const struct linear_segments *segments,
 	tmp64 = value - segments[i].x;
 	tmp64 *= dy;
 	do_div(tmp64, dx);
-	ret = segments[i].y - tmp64;
-
-	return ret;
+	return segments[i].y - tmp64;
 }
 
 static int mb86a20s_get_main_CNR(struct dvb_frontend *fe)
