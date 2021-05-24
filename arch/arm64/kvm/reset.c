@@ -220,7 +220,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
 	switch (vcpu->arch.target) {
 	default:
 		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
-			if (!cpus_have_const_cap(ARM64_HAS_32BIT_EL1)) {
+			if (!cpus_have_const_cap(ARM64_HAS_32BIT_EL1) ||
+			    vcpu->kvm->arch.mte_enabled) {
 				ret = -EINVAL;
 				goto out;
 			}
