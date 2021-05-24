@@ -106,11 +106,12 @@ static inline bool of_dma_is_coherent(struct device_node *np)
 }
 #endif /* CONFIG_OF_ADDRESS */
 
-#ifdef CONFIG_OF
+#ifdef CONFIG_SPARC /* SPARC has its own versions of these */
 extern int of_address_to_resource(struct device_node *dev, int index,
 				  struct resource *r);
-void __iomem *of_iomap(struct device_node *node, int index);
-#else
+extern void __iomem *of_iomap(struct device_node *device, int index);
+#else /* !CONFIG_SPARC */
+#if (defined(CONFIG_OF) && !defined(CONFIG_OF_ADDRESS)) || !defined(CONFIG_OF)
 static inline int of_address_to_resource(struct device_node *dev, int index,
 					 struct resource *r)
 {
@@ -121,7 +122,9 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
 {
 	return NULL;
 }
-#endif
+#endif /* (defined(CONFIG_OF) && !defined(CONFIG_OF_ADDRESS)) || !defined(CONFIG_OF) */
+#endif /* CONFIG_SPARC */
+
 #define of_range_parser_init of_pci_range_parser_init
 
 #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
