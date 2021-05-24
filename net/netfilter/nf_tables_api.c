@@ -986,15 +986,21 @@ static int nf_tables_updtable(struct nft_ctx *ctx)
 	if (trans == NULL)
 		return -ENOMEM;
 
+	pr_info("__NFT_TABLE_F_WAS_DORMANT %x __NFT_TABLE_F_WAS_AWAKEN %x\n",
+		__NFT_TABLE_F_WAS_DORMANT, __NFT_TABLE_F_WAS_AWAKEN);
+
 	if ((flags & NFT_TABLE_F_DORMANT) &&
 	    !(ctx->table->flags & NFT_TABLE_F_DORMANT)) {
+		pr_info("awaken -> dormant\n");
 		ctx->table->flags |= NFT_TABLE_F_DORMANT;
 		if (!(ctx->table->flags & __NFT_TABLE_F_UPDATE))
 			ctx->table->flags |= __NFT_TABLE_F_WAS_AWAKEN;
 	} else if (!(flags & NFT_TABLE_F_DORMANT) &&
 		   ctx->table->flags & NFT_TABLE_F_DORMANT) {
+		pr_info("dormant -> awaken\n");
 		ctx->table->flags &= ~NFT_TABLE_F_DORMANT;
 		if (!(ctx->table->flags & __NFT_TABLE_F_UPDATE)) {
+			pr_info("register hooks\n");
 			ret = nf_tables_table_enable(ctx->net, ctx->table);
 			if (ret < 0)
 				goto err_register_hooks;
@@ -8559,18 +8565,24 @@ static int nf_tables_commit(struct net *net, struct sk_buff *skb)
 	/* step 3. Start new generation, rules_gen_X now in use. */
 	net->nft.gencursor = nft_gencursor_next(net);
 
+	pr_info("commit\n");
+
 	list_for_each_entry_safe(trans, next, &nft_net->commit_list, list) {
 		nf_tables_commit_audit_collect(&adl, trans->ctx.table,
 					       trans->msg_type);
 		switch (trans->msg_type) {
 		case NFT_MSG_NEWTABLE:
 			if (nft_trans_table_update(trans)) {
+				pr_info("	> update\n");
 				if (!(trans->ctx.table->flags & __NFT_TABLE_F_UPDATE)) {
+					pr_info("	skip\n");
 					nft_trans_destroy(trans);
 					break;
 				}
-				if (trans->ctx.table->flags & NFT_TABLE_F_DORMANT)
+				if (trans->ctx.table->flags & NFT_TABLE_F_DORMANT) {
+					pr_info("	disable!\n");
 					nf_tables_table_disable(net, trans->ctx.table);
+				}
 
 				trans->ctx.table->flags &= ~__NFT_TABLE_F_UPDATE;
 			} else {
