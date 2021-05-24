@@ -688,34 +688,52 @@ static int line6_init_cap_control(struct usb_line6 *line6)
 
 	/* initialize USB buffers: */
 	line6->buffer_listen = kmalloc(LINE6_BUFSIZE_LISTEN, GFP_KERNEL);
-	if (!line6->buffer_listen)
-		return -ENOMEM;
+	if (!line6->buffer_listen) {
+		ret = -ENOMEM;
+		goto fail_ret;
+	}
 
 	line6->urb_listen = usb_alloc_urb(0, GFP_KERNEL);
-	if (!line6->urb_listen)
-		return -ENOMEM;
+	if (!line6->urb_listen) {
+		ret = -ENOMEM;
+		goto fail1;
+	}
 
 	if (line6->properties->capabilities & LINE6_CAP_CONTROL_MIDI) {
 		line6->buffer_message = kmalloc(LINE6_MIDI_MESSAGE_MAXLEN, GFP_KERNEL);
-		if (!line6->buffer_message)
-			return -ENOMEM;
+		if (!line6->buffer_message) {
+			ret = -ENOMEM;
+			goto fail2;
+		}
 
 		ret = line6_init_midi(line6);
 		if (ret < 0)
-			return ret;
+			goto fail3;
 	} else {
 		ret = line6_hwdep_init(line6);
 		if (ret < 0)
-			return ret;
+			goto fail2;
 	}
 
 	ret = line6_start_listen(line6);
 	if (ret < 0) {
 		dev_err(line6->ifcdev, "cannot start listening: %d\n", ret);
-		return ret;
+		if (line6->properties->capabilities & LINE6_CAP_CONTROL_MIDI)
+			goto fail3;
+		else
+			goto fail2;
 	}
 
 	return 0;
+
+fail3:
+	kfree(line6->buffer_message);
+fail2:
+	usb_free_urb(line6->urb_listen);
+fail1:
+	kfree(line6->buffer_listen);
+fail_ret:
+	return ret;
 }
 
 static void line6_startup_work(struct work_struct *work)
