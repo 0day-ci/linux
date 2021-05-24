@@ -2329,16 +2329,18 @@ static int xhci_check_tt_bw_table(struct xhci_hcd *xhci,
 	struct xhci_interval_bw_table *bw_table;
 	struct xhci_tt_bw_info *tt_info;
 
-	/* Find the bandwidth table for the root port this TT is attached to. */
-	bw_table = &xhci->rh_bw[virt_dev->real_port - 1].bw_table;
-	tt_info = virt_dev->tt_info;
 	/* If this TT already had active endpoints, the bandwidth for this TT
 	 * has already been added.  Removing all periodic endpoints (and thus
 	 * making the TT enactive) will only decrease the bandwidth used.
 	 */
 	if (old_active_eps)
 		return 0;
-	if (old_active_eps == 0 && tt_info->active_eps != 0) {
+
+	/* Find the bandwidth table for the root port this TT is attached to. */
+	bw_table = &xhci->rh_bw[virt_dev->real_port - 1].bw_table;
+	tt_info = virt_dev->tt_info;
+
+	if (tt_info->active_eps != 0) {
 		if (bw_table->bw_used + TT_HS_OVERHEAD > HS_BW_LIMIT)
 			return -ENOMEM;
 		return 0;
