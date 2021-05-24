@@ -190,8 +190,8 @@ static const struct dmi_system_id rotated_screen[] = {
 			/* tPAD is too generic, also match on bios date */
 			DMI_MATCH(DMI_BOARD_VENDOR, "TECLAST"),
 			DMI_MATCH(DMI_BOARD_NAME, "tPAD"),
-			DMI_MATCH(DMI_BIOS_DATE, "12/19/2014"),
-		},
+			DMI_MATCH(DMI_BIOS_DATE, "12/19/2014")
+		}
 	},
 	{
 		.ident = "Teclast X98 Pro",
@@ -202,8 +202,8 @@ static const struct dmi_system_id rotated_screen[] = {
 			 * (sometimes)...
 			 */
 			DMI_MATCH(DMI_BOARD_VENDOR, "TECLAST"),
-			DMI_MATCH(DMI_BIOS_DATE, "10/28/2015"),
-		},
+			DMI_MATCH(DMI_BIOS_DATE, "10/28/2015")
+		}
 	},
 	{
 		.ident = "WinBook TW100",
@@ -217,7 +217,7 @@ static const struct dmi_system_id rotated_screen[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "WinBook"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "TW700")
-		},
+		}
 	},
 #endif
 	{}
@@ -246,7 +246,7 @@ static const struct dmi_system_id inverted_x_screen[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Cube"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "I15-TC")
-		},
+		}
 	},
 #endif
 	{}
