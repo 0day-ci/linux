@@ -2042,6 +2042,67 @@ err_reset_platform_ops: __maybe_unused;
 	return err;
 }
 
+static void arm_smmu_rmr_install_bypass_smr(struct arm_smmu_device *smmu)
+{
+	struct list_head rmr_list;
+	struct iommu_resv_region *e;
+	int i, cnt = 0;
+	u32 smr;
+	u32 reg;
+
+	INIT_LIST_HEAD(&rmr_list);
+	if (iommu_dma_get_rmrs(dev_fwnode(smmu->dev), &rmr_list))
+		return;
+
+	reg = arm_smmu_gr0_read(smmu, ARM_SMMU_GR0_sCR0);
+
+	if ((reg & ARM_SMMU_sCR0_USFCFG) && !(reg & ARM_SMMU_sCR0_CLIENTPD)) {
+		/*
+		 * SMMU is already enabled and disallowing bypass, so preserve
+		 * the existing SMRs
+		 */
+		for (i = 0; i < smmu->num_mapping_groups; i++) {
+			smr = arm_smmu_gr0_read(smmu, ARM_SMMU_GR0_SMR(i));
+			if (!FIELD_GET(ARM_SMMU_SMR_VALID, smr))
+				continue;
+			smmu->smrs[i].id = FIELD_GET(ARM_SMMU_SMR_ID, smr);
+			smmu->smrs[i].mask = FIELD_GET(ARM_SMMU_SMR_MASK, smr);
+			smmu->smrs[i].valid = true;
+		}
+	}
+
+	list_for_each_entry(e, &rmr_list, list) {
+		u32 sid = e->fw_data.rmr.sid;
+
+		i = arm_smmu_find_sme(smmu, sid, ~0);
+		if (i < 0)
+			continue;
+		if (smmu->s2crs[i].count == 0) {
+			smmu->smrs[i].id = sid;
+			smmu->smrs[i].mask = ~0;
+			smmu->smrs[i].valid = true;
+		}
+		smmu->s2crs[i].count++;
+		smmu->s2crs[i].type = S2CR_TYPE_BYPASS;
+		smmu->s2crs[i].privcfg = S2CR_PRIVCFG_DEFAULT;
+		smmu->s2crs[i].cbndx = 0xff;
+
+		cnt++;
+	}
+
+	if ((reg & ARM_SMMU_sCR0_USFCFG) && !(reg & ARM_SMMU_sCR0_CLIENTPD)) {
+		/* Remove the valid bit for unused SMRs */
+		for (i = 0; i < smmu->num_mapping_groups; i++) {
+			if (smmu->s2crs[i].count == 0)
+				smmu->smrs[i].valid = false;
+		}
+	}
+
+	dev_notice(smmu->dev, "\tpreserved %d boot mapping%s\n", cnt,
+		   cnt == 1 ? "" : "s");
+	iommu_dma_put_rmrs(dev_fwnode(smmu->dev), &rmr_list);
+}
+
 static int arm_smmu_device_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -2168,6 +2229,10 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, smmu);
+
+	/* Check for RMRs and install bypass SMRs if any */
+	arm_smmu_rmr_install_bypass_smr(smmu);
+
 	arm_smmu_device_reset(smmu);
 	arm_smmu_test_smr_masks(smmu);
 
