@@ -730,6 +730,15 @@ struct aspeed_pin_desc {
 			SIG_EXPR_LIST_PTR(pin, low), \
 			SIG_EXPR_LIST_PTR(pin, other))
 
+#define PIN_DECL_4(pin, other, high, medium, low1, low2) \
+	SIG_EXPR_LIST_DECL_SESG(pin, other, other); \
+	PIN_DECL_(pin, \
+			SIG_EXPR_LIST_PTR(pin, high), \
+			SIG_EXPR_LIST_PTR(pin, medium), \
+			SIG_EXPR_LIST_PTR(pin, low1), \
+			SIG_EXPR_LIST_PTR(pin, low2), \
+			SIG_EXPR_LIST_PTR(pin, other))
+
 #define GROUP_SYM(group) group_pins_ ## group
 #define GROUP_DECL(group, ...) \
 	static const int GROUP_SYM(group)[] = { __VA_ARGS__ }
