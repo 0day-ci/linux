@@ -451,9 +451,9 @@ static int virtio_gpu_wait_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 
 	if (args->flags & VIRTGPU_WAIT_NOWAIT) {
-		ret = dma_resv_test_signaled_rcu(obj->resv, true);
+		ret = dma_resv_test_signaled_unlocked(obj->resv, true);
 	} else {
-		ret = dma_resv_wait_timeout_rcu(obj->resv, true, true,
+		ret = dma_resv_wait_timeout_unlocked(obj->resv, true, true,
 						timeout);
 	}
 	if (ret == 0)

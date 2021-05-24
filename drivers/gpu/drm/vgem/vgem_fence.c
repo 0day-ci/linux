@@ -151,7 +151,7 @@ int vgem_fence_attach_ioctl(struct drm_device *dev,
 
 	/* Check for a conflicting fence */
 	resv = obj->resv;
-	if (!dma_resv_test_signaled_rcu(resv,
+	if (!dma_resv_test_signaled_unlocked(resv,
 						  arg->flags & VGEM_FENCE_WRITE)) {
 		ret = -EBUSY;
 		goto err_fence;

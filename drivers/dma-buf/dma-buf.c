@@ -1147,7 +1147,7 @@ static int __dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	long ret;
 
 	/* Wait on any implicit rendering fences */
-	ret = dma_resv_wait_timeout_rcu(resv, write, true,
+	ret = dma_resv_wait_timeout_unlocked(resv, write, true,
 						  MAX_SCHEDULE_TIMEOUT);
 	if (ret < 0)
 		return ret;
