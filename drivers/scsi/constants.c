@@ -412,8 +412,8 @@ static const char * const driverbyte_table[]={
 
 const char *scsi_hostbyte_string(int result)
 {
+	enum scsi_host_status hb = host_byte(result);
 	const char *hb_string = NULL;
-	int hb = host_byte(result);
 
 	if (hb < ARRAY_SIZE(hostbyte_table))
 		hb_string = hostbyte_table[hb];
@@ -423,8 +423,8 @@ EXPORT_SYMBOL(scsi_hostbyte_string);
 
 const char *scsi_driverbyte_string(int result)
 {
+	enum scsi_driver_status db = driver_byte(result);
 	const char *db_string = NULL;
-	int db = driver_byte(result);
 
 	if (db < ARRAY_SIZE(driverbyte_table))
 		db_string = driverbyte_table[db];
