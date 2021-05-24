@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/apple,gate-clock.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Binding for Apple clock gates
+
+maintainers:
+  - Sven Peter <sven@svenpeter.dev>
+
+description: |
+  Apple SoC's such as the M1 contain various clock gates.
+  These clock gates do not have a frequency associated with them and are only
+  used to power on/off various peripherals. Generally, a clock gate needs to
+  be enabled before the respective MMIO region can be accessed.
+
+  Each clock gate is configured by a single 32bit MMIO register which contains
+  the actual and the target state. The state is encoded as four bits but
+  right now only "powered on" / 0b1111 and "powered off" / 0b0000 are used.
+
+
+properties:
+  compatible:
+    enum:
+      - apple,t8103-gate-clock
+      - apple,gate-clock
+
+  "#clock-cells":
+    const: 0
+
+  reg:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    maxItems: 1
+
+  clock-output-names:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - clock-output-names
+  - "#clock-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    clock@3b7001c0 {
+      compatible = "apple,t8103-gate-clock";
+      reg = <0x3b7001c0 0x4>;
+      #clock-cells = <0>;
+      clock-output-names = "sio_busif_clk";
+    };
+...
