@@ -343,6 +343,15 @@
 			status = "disabled";
 		};
 
+		pwm: pwm@1941010 {
+			#pwm-cells = <2>;
+			compatible = "qcom,pwm-ipq6018";
+			reg = <0x0 0x1941010 0x0 0x20>;
+			clocks = <&gcc GCC_ADSS_PWM_CLK>;
+			clock-names = "core";
+			status = "disabled";
+		};
+
 		qpic_bam: dma-controller@7984000 {
 			compatible = "qcom,bam-v1.7.0";
 			reg = <0x0 0x07984000 0x0 0x1a000>;
