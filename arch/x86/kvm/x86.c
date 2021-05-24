@@ -7552,6 +7552,13 @@ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
 
 	init_emulate_ctxt(vcpu);
 
+	ctxt->interruptibility = 0;
+	ctxt->have_exception = false;
+	ctxt->exception.vector = -1;
+	ctxt->perm_ok = false;
+
+	ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
+
 	/*
 	 * We will reenter on the same instruction since we do not set
 	 * complete_userspace_io. This does not handle watchpoints yet,
@@ -7560,13 +7567,6 @@ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
 	if (!(emulation_type & EMULTYPE_SKIP) &&
 	    kvm_vcpu_check_breakpoint(vcpu, &r))
 		return r;
-
-	ctxt->interruptibility = 0;
-	ctxt->have_exception = false;
-	ctxt->exception.vector = -1;
-	ctxt->perm_ok = false;
-
-	ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
 
 	r = x86_decode_insn(ctxt, insn, insn_len);
 
