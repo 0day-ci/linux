@@ -245,6 +245,18 @@ config CLK_TWL6040
 	  McPDM. McPDM module is using the external bit clock on the McPDM bus
 	  as functional clock.
 
+config COMMON_CLK_APPLE
+	tristate "Clock driver for Apple platforms"
+	depends on ARCH_APPLE && COMMON_CLK
+	default ARCH_APPLE
+	help
+	  Support for clock gates on Apple SoCs such as the M1.
+
+	  These clock gates do not have a frequency associated with them and
+	  are only used to power on/off various peripherals. Generally, a clock
+	  gate needs to be enabled before the respective MMIO region can be
+	  accessed.
+
 config COMMON_CLK_AXI_CLKGEN
 	tristate "AXI clkgen driver"
 	depends on HAS_IOMEM || COMPILE_TEST
