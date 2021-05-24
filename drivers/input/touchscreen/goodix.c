@@ -210,7 +210,7 @@ static const struct dmi_system_id rotated_screen[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "WinBook"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "TW100")
-		}
+		},
 	},
 	{
 		.ident = "WinBook TW700",
@@ -230,7 +230,7 @@ static const struct dmi_system_id nine_bytes_report[] = {
 		/* YB1-X91L/F and YB1-X90L/F */
 		.matches = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "Lenovo YB1-X9")
-		}
+		},
 	},
 #endif
 	{}
