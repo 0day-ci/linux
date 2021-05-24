@@ -67,14 +67,26 @@ static bool dsa_switch_mtu_match(struct dsa_switch *ds, int port,
 static int dsa_switch_mtu(struct dsa_switch *ds,
 			  struct dsa_notifier_mtu_info *info)
 {
-	int port, ret;
+	struct dsa_port *cpu_dp;
+	int port, ret, overhead;
 
 	if (!ds->ops->port_change_mtu)
 		return -EOPNOTSUPP;
 
 	for (port = 0; port < ds->num_ports; port++) {
 		if (dsa_switch_mtu_match(ds, port, info)) {
-			ret = ds->ops->port_change_mtu(ds, port, info->mtu);
+			overhead = 0;
+			if (dsa_is_cpu_port(ds, port)) {
+				cpu_dp = dsa_to_port(ds, port);
+				overhead = cpu_dp->tag_ops->overhead;
+			}
+			if (dsa_is_dsa_port(ds, port)) {
+					cpu_dp = dsa_to_port(ds, port)->cpu_dp;
+					overhead = cpu_dp->tag_ops->overhead;
+			}
+
+			ret = ds->ops->port_change_mtu(ds, port,
+						       info->mtu + overhead);
 			if (ret)
 				return ret;
 		}
