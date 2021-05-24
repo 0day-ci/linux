@@ -352,7 +352,8 @@ static ssize_t store_##name(struct device *dev, struct device_attribute *attr, c
 	struct thermostat *th = dev_get_drvdata(dev);		\
 	int val;						\
 	int i;							\
-	val = simple_strtol(buf, NULL, 10);			\
+	if (unlikely(kstrtoint(buf, 10, &val))			\
+		return -EINVAL;					\
 	printk(KERN_INFO "Adjusting limits by %d degrees\n", val);	\
 	limit_adjust = val;					\
 	for (i=0; i < 3; i++)					\
@@ -364,7 +365,8 @@ static ssize_t store_##name(struct device *dev, struct device_attribute *attr, c
 static ssize_t store_##name(struct device *dev, struct device_attribute *attr, const char *buf, size_t n) \
 {								\
 	int val;						\
-	val = simple_strtol(buf, NULL, 10);			\
+	if (unlikely(kstrtoint(buf, 10, &val))			\
+		return -EINVAL;					\
 	if (val < 0 || val > 255)				\
 		return -EINVAL;					\
 	printk(KERN_INFO "Setting specified fan speed to %d\n", val);	\
