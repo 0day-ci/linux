@@ -1,1 +1,2 @@
 pcitest-y += pcitest.o
+doetest-y += doetest.o

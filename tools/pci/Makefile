@@ -14,7 +14,7 @@ MAKEFLAGS += -r
 
 CFLAGS += -O2 -Wall -g -D_GNU_SOURCE -I$(OUTPUT)include
 
-ALL_TARGETS := pcitest
+ALL_TARGETS := pcitest doetest
 ALL_PROGRAMS := $(patsubst %,$(OUTPUT)%,$(ALL_TARGETS))
 
 SCRIPTS := pcitest.sh
@@ -30,6 +30,7 @@ include $(srctree)/tools/build/Makefile.include
 $(OUTPUT)include/linux/: ../../include/uapi/linux/
 	mkdir -p $(OUTPUT)include/linux/ 2>&1 || true
 	ln -sf $(CURDIR)/../../include/uapi/linux/pcitest.h $@
+	ln -sf $(CURDIR)/../../include/uapi/linux/pci_doe.h $@
 
 prepare: $(OUTPUT)include/linux/
 
@@ -37,6 +38,12 @@ PCITEST_IN := $(OUTPUT)pcitest-in.o
 $(PCITEST_IN): prepare FORCE
 	$(Q)$(MAKE) $(build)=pcitest
 $(OUTPUT)pcitest: $(PCITEST_IN)
+	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
+
+DOETEST_IN := $(OUTPUT)doetest-in.o
+$(DOETEST_IN): prepare FORCE
+	$(Q)$(MAKE) $(build)=doetest
+$(OUTPUT)doetest: $(DOETEST_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
 
 clean:
