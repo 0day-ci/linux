@@ -77,6 +77,8 @@ static const struct of_device_id imx_mmdc_dt_ids[] = {
 	{ /* sentinel */ }
 };
 
+static void __iomem *mmdc_base;
+
 #ifdef CONFIG_PERF_EVENTS
 
 static enum cpuhp_state cpuhp_mmdc_state;
@@ -456,16 +458,6 @@ static int mmdc_pmu_init(struct mmdc_pmu *pmu_mmdc,
 	return mmdc_num;
 }
 
-static int imx_mmdc_remove(struct platform_device *pdev)
-{
-	struct mmdc_pmu *pmu_mmdc = platform_get_drvdata(pdev);
-
-	cpuhp_state_remove_instance_nocalls(cpuhp_mmdc_state, &pmu_mmdc->node);
-	perf_pmu_unregister(&pmu_mmdc->pmu);
-	kfree(pmu_mmdc);
-	return 0;
-}
-
 static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_base)
 {
 	struct mmdc_pmu *pmu_mmdc;
@@ -528,14 +520,26 @@ pmu_free:
 }
 
 #else
-#define imx_mmdc_remove NULL
 #define imx_mmdc_perf_init(pdev, mmdc_base) 0
 #endif
+
+static int imx_mmdc_remove(struct platform_device *pdev)
+{
+#ifdef CONFIG_PERF_EVENTS
+	struct mmdc_pmu *pmu_mmdc = platform_get_drvdata(pdev);
+
+	cpuhp_state_remove_instance_nocalls(cpuhp_mmdc_state, &pmu_mmdc->node);
+	perf_pmu_unregister(&pmu_mmdc->pmu);
+	kfree(pmu_mmdc);
+#endif
+	iounmap(mmdc_base);
+	return 0;
+}
 
 static int imx_mmdc_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
-	void __iomem *mmdc_base, *reg;
+	void *reg;
 	struct clk *mmdc_ipg_clk;
 	u32 val;
 	int err;
