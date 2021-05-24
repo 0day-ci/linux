@@ -599,8 +599,10 @@ static void r871xu_dev_remove(struct usb_interface *pusb_intf)
 		wait_for_completion(&padapter->rtl8712_fw_ready);
 		pnetdev = usb_get_intfdata(pusb_intf);
 		usb_set_intfdata(pusb_intf, NULL);
-		if (!pnetdev)
+		if (!pnetdev) {
+			r8712_free_drv_sw(padapter);
 			goto firmware_load_fail;
+		}
 		release_firmware(padapter->fw);
 		if (drvpriv.drv_registered)
 			padapter->surprise_removed = true;
