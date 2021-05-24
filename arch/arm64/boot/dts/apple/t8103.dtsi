@@ -120,7 +120,7 @@
 			 * TODO: figure out the clocking properly, there may
 			 * be a third selectable clock.
 			 */
-			clocks = <&clk24>, <&clk24>;
+			clocks = <&clock_uart0>, <&clk24>;
 			clock-names = "uart", "clk_uart_baud0";
 			status = "disabled";
 		};
@@ -130,6 +130,40 @@
 			#interrupt-cells = <3>;
 			interrupt-controller;
 			reg = <0x2 0x3b100000 0x0 0x8000>;
+		};
+
+		clock_sio_busif: clock-sio-busif@23b7001c0 {
+			compatible = "apple,t8103-gate-clock";
+			#clock-cells = <0>;
+			reg = <0x2 0x3b7001c0 0x0 0x4>;
+			clock-output-names = "clock_sio_busif";
+		};
+
+		clock_sio: clock-sio@23b7001c8 {
+			compatible = "apple,t8103-gate-clock";
+			#clock-cells = <0>;
+			reg = <0x2 0x3b7001c8 0x0 0x4>;
+			clocks = <&clock_sio_busif>;
+			clock-names = "clock_sio_busif";
+			clock-output-names = "clock_sio";
+		};
+
+		clock_uart_p: clock-uart-p@23b700220 {
+			reg = <0x2 0x3b700220 0 4>;
+			compatible = "apple,t8103-gate-clock";
+			#clock-cells = <0>;
+			clock-output-names = "clock_uart_p";
+			clocks = <&clock_sio>;
+			clock-names = "clock_sio";
+		};
+
+		clock_uart0: clock-uart0@23b700270 {
+			reg = <0x2 0x3b700270 0 4>;
+			compatible = "apple,t8103-gate-clock";
+			#clock-cells = <0>;
+			clock-output-names = "clock_uart0";
+			clocks = <&clock_uart_p>;
+			clock-names = "clock_uart_p";
 		};
 	};
 };
