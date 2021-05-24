@@ -4234,14 +4234,11 @@ int drxj_dap_scu_atomic_write_reg16(struct i2c_device_addr *dev_addr,
 					  u16 data, u32 flags)
 {
 	u8 buf[2];
-	int rc;
 
 	buf[0] = (u8) (data & 0xff);
 	buf[1] = (u8) ((data >> 8) & 0xff);
 
-	rc = drxj_dap_scu_atomic_read_write_block(dev_addr, addr, 2, buf, false);
-
-	return rc;
+	return drxj_dap_scu_atomic_read_write_block(dev_addr, addr, 2, buf, false);
 }
 
 /* -------------------------------------------------------------------------- */
