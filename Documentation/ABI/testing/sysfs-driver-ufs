@@ -1253,14 +1253,14 @@ Description:	This entry shows the number of HPB pinned regions assigned to
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/hit_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/hit_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of reads that changed to HPB read.
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/miss_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/miss_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of reads that cannot be changed to
@@ -1268,7 +1268,7 @@ Description:	This entry shows the number of reads that cannot be changed to
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/rb_noti_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/rb_noti_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of response UPIUs that has
@@ -1276,7 +1276,7 @@ Description:	This entry shows the number of response UPIUs that has
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/rb_active_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/rb_active_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of active sub-regions recommended by
@@ -1284,7 +1284,7 @@ Description:	This entry shows the number of active sub-regions recommended by
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/rb_inactive_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/rb_inactive_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of inactive regions recommended by
@@ -1292,10 +1292,45 @@ Description:	This entry shows the number of inactive regions recommended by
 
 		The file is read only.
 
-What:		/sys/class/scsi_device/*/device/hpb_sysfs/map_req_cnt
+What:		/sys/class/scsi_device/*/device/hpb_stat_sysfs/map_req_cnt
 Date:		March 2021
 Contact:	Daejun Park <daejun7.park@samsung.com>
 Description:	This entry shows the number of read buffer commands for
 		activating sub-regions recommended by response UPIUs.
+
+		The file is read only.
+
+What:		/sys/class/scsi_device/*/device/hpb_param_sysfs/requeue_timeout_ms
+Date:		March 2021
+Contact:	Daejun Park <daejun7.park@samsung.com>
+Description:	This entry shows the requeue timeout threshold for write buffer
+		command in ms. This value can be changed by writing proper integer to
+		this entry.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/attributes/max_data_size_hpb_single_cmd
+Date:		March 2021
+Contact:	Daejun Park <daejun7.park@samsung.com>
+Description:	This entry shows the maximum HPB data size for using single HPB
+		command.
+
+		===  ========
+		00h  4KB
+		01h  8KB
+		02h  12KB
+		...
+		FFh  1024KB
+		===  ========
+
+		The file is read only.
+
+What:		/sys/bus/platform/drivers/ufshcd/*/flags/wb_enable
+Date:		March 2021
+Contact:	Daejun Park <daejun7.park@samsung.com>
+Description:	This entry shows the status of HPB.
+
+		== ============================
+		0  HPB is not enabled.
+		1  HPB is enabled
+		== ============================
 
 		The file is read only.
