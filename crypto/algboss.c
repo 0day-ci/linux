@@ -140,8 +140,8 @@ static int cryptomgr_schedule_probe(struct crypto_larval *larval)
 			param->attrs[i].nu32.attr.rta_len =
 				sizeof(param->attrs[i].nu32);
 			param->attrs[i].nu32.attr.rta_type = CRYPTOA_U32;
-			param->attrs[i].nu32.data.num =
-				simple_strtol(name, NULL, 0);
+			if (unlikely(kstrtouint(name, 0, &param->attrs[i].nu32.data.num)))
+				goto err_free_param;
 		}
 
 		param->tb[i + 1] = &param->attrs[i].attr;
