@@ -63,11 +63,11 @@ static struct fpga_region *dfl_fme_region_find(struct dfl_fme *fme, int port_id)
 	return region;
 }
 
-static int fme_pr(struct platform_device *pdev, unsigned long arg)
+static int fme_image(struct platform_device *pdev, unsigned long arg, bool pr)
 {
 	struct dfl_feature_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	void __user *argp = (void __user *)arg;
-	struct dfl_fpga_fme_port_pr port_pr;
+	struct dfl_fpga_fme_image image;
 	struct fpga_image_info *info;
 	struct fpga_region *region;
 	void __iomem *fme_hdr;
@@ -78,12 +78,12 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	int ret = 0;
 	u64 v;
 
-	minsz = offsetofend(struct dfl_fpga_fme_port_pr, buffer_address);
+	minsz = offsetofend(struct dfl_fpga_fme_image, buffer_address);
 
-	if (copy_from_user(&port_pr, argp, minsz))
+	if (copy_from_user(&image, argp, minsz))
 		return -EFAULT;
 
-	if (port_pr.argsz < minsz || port_pr.flags)
+	if (image.argsz < minsz || image.flags)
 		return -EINVAL;
 
 	/* get fme header region */
@@ -91,25 +91,27 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 					       FME_FEATURE_ID_HEADER);
 
 	/* check port id */
-	v = readq(fme_hdr + FME_HDR_CAP);
-	if (port_pr.port_id >= FIELD_GET(FME_CAP_NUM_PORTS, v)) {
-		dev_dbg(&pdev->dev, "port number more than maximum\n");
-		return -EINVAL;
+	if (pr) {
+		v = readq(fme_hdr + FME_HDR_CAP);
+		if (image.port_id >= FIELD_GET(FME_CAP_NUM_PORTS, v)) {
+			dev_dbg(&pdev->dev, "port number more than maximum\n");
+			return -EINVAL;
+		}
 	}
 
 	/*
 	 * align PR buffer per PR bandwidth, as HW ignores the extra padding
 	 * data automatically.
 	 */
-	length = ALIGN(port_pr.buffer_size, 4);
+	length = ALIGN(image.buffer_size, 4);
 
 	buf = vmalloc(length);
 	if (!buf)
 		return -ENOMEM;
 
 	if (copy_from_user(buf,
-			   (void __user *)(unsigned long)port_pr.buffer_address,
-			   port_pr.buffer_size)) {
+			   (void __user *)(unsigned long)image.buffer_address,
+			   image.buffer_size)) {
 		ret = -EFAULT;
 		goto free_exit;
 	}
@@ -121,7 +123,10 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		goto free_exit;
 	}
 
-	info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
+	if (pr)
+		info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
+	else
+		info->flags |= FPGA_MGR_REIMAGE;
 
 	mutex_lock(&pdata->lock);
 	fme = dfl_fpga_pdata_get_private(pdata);
@@ -131,7 +136,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 		goto unlock_exit;
 	}
 
-	region = dfl_fme_region_find(fme, port_pr.port_id);
+	region = dfl_fme_region_find(fme, pr ? image.port_id : 0);
 	if (!region) {
 		ret = -EINVAL;
 		goto unlock_exit;
@@ -141,7 +146,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 
 	info->buf = buf;
 	info->count = length;
-	info->region_id = port_pr.port_id;
+	info->region_id = image.port_id;
 	region->info = info;
 
 	ret = fpga_region_program_fpga(region);
@@ -457,7 +462,10 @@ static long fme_pr_ioctl(struct platform_device *pdev,
 
 	switch (cmd) {
 	case DFL_FPGA_FME_PORT_PR:
-		ret = fme_pr(pdev, arg);
+		ret = fme_image(pdev, arg, true);
+		break;
+	case DFL_FPGA_FME_REIMAGE:
+		ret = fme_image(pdev, arg, false);
 		break;
 	default:
 		ret = -ENODEV;

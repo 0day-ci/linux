@@ -214,7 +214,7 @@ struct dfl_fpga_irq_set {
 
 /**
  * DFL_FPGA_FME_PORT_PR - _IOW(DFL_FPGA_MAGIC, DFL_FME_BASE + 0,
- *						struct dfl_fpga_fme_port_pr)
+ *						struct dfl_fpga_fme_image)
  *
  * Driver does Partial Reconfiguration based on Port ID and Buffer (Image)
  * provided by caller.
@@ -224,13 +224,13 @@ struct dfl_fpga_irq_set {
  * from the status of FME's fpga manager.
  */
 
-struct dfl_fpga_fme_port_pr {
+struct dfl_fpga_fme_image {
 	/* Input */
 	__u32 argsz;		/* Structure length */
 	__u32 flags;		/* Zero for now */
 	__u32 port_id;
 	__u32 buffer_size;
-	__u64 buffer_address;	/* Userspace address to the buffer for PR */
+	__u64 buffer_address;	/* Userspace address to the buffer for image */
 };
 
 #define DFL_FPGA_FME_PORT_PR	_IO(DFL_FPGA_MAGIC, DFL_FME_BASE + 0)
@@ -275,5 +275,17 @@ struct dfl_fpga_fme_port_pr {
 #define DFL_FPGA_FME_ERR_SET_IRQ	_IOW(DFL_FPGA_MAGIC,	\
 					     DFL_FME_BASE + 4,	\
 					     struct dfl_fpga_irq_set)
+
+/**
+ * DFL_FPGA_FME_REIMAGE - _IOW(DFL_FPGA_MAGIC, DFL_FME_BASE + 5,
+ *						struct dfl_fpga_fme_image)
+ *
+ * Driver reimages the whole board with the Buffer (Image) provided by caller.
+ * Return: 0 on success, -errno on failure.
+ * If DFL_FPGA_FME_REIMAGE returns -EIO, that indicates the HW has detected
+ * some errors during PR, under this case, the user can fetch HW error info
+ * from the status of FME's fpga manager.
+ */
+#define DFL_FPGA_FME_REIMAGE	_IO(DFL_FPGA_MAGIC, DFL_FME_BASE + 5)
 
 #endif /* _UAPI_LINUX_FPGA_DFL_H */

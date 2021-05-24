@@ -252,6 +252,31 @@ static int fme_mgr_write_complete(struct fpga_manager *mgr,
 	return 0;
 }
 
+static int fme_mgr_reimage_write_init(struct fpga_manager *mgr,
+				      struct fpga_image_info *info,
+				      const char *buf, size_t count)
+{
+	struct device *dev = &mgr->dev;
+
+	if (!(info->flags & FPGA_MGR_REIMAGE)) {
+		dev_err(dev, "only supports reimaging.\n");
+		return -EINVAL;
+	}
+	return -EOPNOTSUPP;
+}
+
+static int fme_mgr_reimage_write(struct fpga_manager *mgr,
+				 const char *buf, size_t count)
+{
+	return -EOPNOTSUPP;
+}
+
+static int fme_mgr_reimage_write_complete(struct fpga_manager *mgr,
+					  struct fpga_image_info *info)
+{
+	return -EOPNOTSUPP;
+}
+
 static enum fpga_mgr_states fme_mgr_state(struct fpga_manager *mgr)
 {
 	return FPGA_MGR_STATE_UNKNOWN;
@@ -270,6 +295,9 @@ static const struct fpga_manager_ops fme_mgr_ops = {
 	.reconfig.write_init     = fme_mgr_write_init,
 	.reconfig.write          = fme_mgr_write,
 	.reconfig.write_complete = fme_mgr_write_complete,
+	.reimage.write_init      = fme_mgr_reimage_write_init,
+	.reimage.write           = fme_mgr_reimage_write,
+	.reimage.write_complete  = fme_mgr_reimage_write_complete,
 };
 
 static void fme_mgr_get_compat_id(void __iomem *fme_pr,
