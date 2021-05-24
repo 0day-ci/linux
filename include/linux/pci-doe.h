@@ -6,6 +6,7 @@
  *     Jonathan Cameron <Jonathan.Cameron@huawei.com>
  */
 
+#include <linux/cdev.h>
 #include <linux/completion.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
@@ -56,8 +57,11 @@ struct pci_doe_exchange {
  * @abort: Request a manual abort (e.g. on init)
  * @dead: Used to mark a DOE for which an ABORT has timed out. Further messages
  *        will immediately be aborted with error
+ * @going_down: Mark DOE as removed
  */
 struct pci_doe {
+	struct device dev;
+	struct cdev cdev;
 	int cap;
 	struct pci_dev *pdev;
 	struct completion abort_c;
@@ -76,6 +80,7 @@ struct pci_doe {
 	unsigned int busy_retries;
 	unsigned int abort:1;
 	unsigned int dead:1;
+	unsigned int going_down:1;
 };
 
 int pci_doe_register_all(struct pci_dev *pdev);
@@ -84,4 +89,12 @@ struct pci_doe *pci_doe_find(struct pci_dev *pdev, u16 vid, u8 type);
 
 int pci_doe_exchange_sync(struct pci_doe *doe, struct pci_doe_exchange *ex);
 
+#ifdef CONFIG_PCI_DOE
+int pci_doe_sys_init(void);
+#else
+static inline int pci_doe_sys_init(void)
+{
+	return 0;
+}
+#endif /* CONFIG_PCI_DOE */
 #endif

@@ -20,6 +20,7 @@
 #include <linux/of_device.h>
 #include <linux/acpi.h>
 #include <linux/dma-map-ops.h>
+#include <linux/pci-doe.h>
 #include "pci.h"
 #include "pcie/portdrv.h"
 
@@ -1655,6 +1656,6 @@ static int __init pci_driver_init(void)
 		return ret;
 #endif
 	dma_debug_add_bus(&pci_bus_type);
-	return 0;
+	return pci_doe_sys_init();
 }
 postcore_initcall(pci_driver_init);

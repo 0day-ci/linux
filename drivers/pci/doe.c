@@ -15,6 +15,10 @@
 #include <linux/pci.h>
 #include <linux/pci-doe.h>
 #include <linux/workqueue.h>
+#include <uapi/linux/pci_doe.h>
+
+/* Maximum number of DOE instances in the system */
+#define PCI_DOE_MAX_CNT 65536
 
 #define PCI_DOE_PROTOCOL_DISCOVERY 0
 
@@ -23,6 +27,10 @@
 
 /* Timeout of 1 second from 6.xx.1 (Operation), ECN - Data Object Exchange */
 #define PCI_DOE_TIMEOUT HZ
+
+static int pci_doe_major;
+static DEFINE_IDA(pci_doe_ida);
+static DECLARE_RWSEM(pci_doe_rwsem);
 
 static irqreturn_t pci_doe_irq(int irq, void *data)
 {
@@ -479,6 +487,126 @@ static int pci_doe_abort(struct pci_doe *doe)
 	return 0;
 }
 
+static void pci_doe_release(struct device *dev)
+{
+	struct pci_doe *doe = container_of(dev, struct pci_doe, dev);
+
+	ida_free(&pci_doe_ida, MINOR(doe->dev.devt));
+	kfree(doe);
+}
+
+static char *pci_doe_devnode(struct device *dev, umode_t *mode, kuid_t *uid,
+			     kgid_t *gid)
+{
+	return kasprintf(GFP_KERNEL, "pcidoe/%s", dev_name(dev));
+}
+
+static const struct device_type pci_doe_type = {
+	.name = "pci_doe",
+	.release = pci_doe_release,
+	.devnode = pci_doe_devnode,
+};
+
+static long __pci_doe_ioctl(struct pci_doe *doe, unsigned int cmd,
+			    unsigned long arg)
+{
+	struct pci_doe_uexchange __user *uex;
+	struct pci_doe_uexchange ex;
+	struct pci_doe_exchange exchange;
+	u32 *request_pl;
+	u32 *response_pl;
+	int ret;
+
+	if (cmd != PCI_DOE_EXCHANGE)
+		return -ENOTTY;
+
+	uex = (void __user *)arg;
+	if (copy_from_user(&ex, uex, sizeof(ex)))
+		return -EFAULT;
+
+	/* Cap size at something sensible */
+	request_pl = vmemdup_user(u64_to_user_ptr(ex.in.payload), ex.in.size);
+	if (!request_pl)
+		return -ENOMEM;
+
+	response_pl = kvzalloc(ex.out.size, GFP_KERNEL);
+	if (!response_pl) {
+		ret = -ENOMEM;
+		goto free_request;
+	}
+
+	exchange.vid = ex.vid;
+	exchange.protocol = ex.protocol;
+	exchange.request_pl = request_pl;
+	exchange.request_pl_sz = ex.in.size;
+	exchange.response_pl = response_pl;
+	exchange.response_pl_sz = ex.out.size;
+	ret = pci_doe_exchange_sync(doe, &exchange);
+	if (ret < 0)
+		goto free_response;
+	ret = 0;
+
+	if (copy_to_user(u64_to_user_ptr(ex.out.payload), response_pl, ex.out.size)) {
+		ret = -EFAULT;
+		goto free_response;
+	}
+
+	/* No useful value to return currently */
+	ex.retval = 0;
+	if (copy_to_user(uex, &ex, sizeof(ex))) {
+		ret = -EFAULT;
+		goto free_response;
+	}
+
+free_response:
+	kvfree(response_pl);
+free_request:
+	kvfree(request_pl);
+
+	return ret;
+}
+
+static long pci_doe_ioctl(struct file *file, unsigned int cmd,
+			    unsigned long arg)
+{
+	struct pci_doe *doe = file->private_data;
+	int rc = -ENXIO;
+
+	down_read(&pci_doe_rwsem);
+	if (!doe->going_down)
+		rc = __pci_doe_ioctl(doe, cmd, arg);
+	up_read(&pci_doe_rwsem);
+
+	return rc;
+}
+
+static int pci_doe_open(struct inode *inode, struct file *file)
+{
+	struct pci_doe *doe = container_of(inode->i_cdev, typeof(*doe), cdev);
+
+	get_device(&doe->dev);
+	file->private_data = doe;
+
+	return 0;
+}
+
+static int pci_doe_file_release(struct inode *inode, struct file *file)
+{
+	struct pci_doe *doe = container_of(inode->i_cdev, typeof(*doe), cdev);
+
+	put_device(&doe->dev);
+
+	return 0;
+}
+static const struct file_operations pci_doe_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = pci_doe_ioctl,
+	.open = pci_doe_open,
+	.release = pci_doe_file_release,
+	.compat_ioctl = compat_ptr_ioctl,
+	.llseek = noop_llseek,
+};
+
 static int pci_doe_register(struct pci_doe *doe)
 {
 	struct pci_dev *pdev = doe->pdev;
@@ -486,17 +614,35 @@ static int pci_doe_register(struct pci_doe *doe)
 	int rc, irq;
 	u32 val;
 
+	rc = ida_alloc_range(&pci_doe_ida, 0, PCI_DOE_MAX_CNT - 1, GFP_KERNEL);
+	if (rc < 0)
+		return rc;
+
+	device_initialize(&doe->dev);
+	doe->dev.parent = &pdev->dev;
+	doe->dev.devt = MKDEV(pci_doe_major, rc);
+	doe->dev.type = &pci_doe_type;
+	device_set_pm_not_required(&doe->dev);
+	rc = dev_set_name(&doe->dev, "doe[%s]_%x", dev_name(&pdev->dev), doe->cap);
+	if (rc)
+		goto err_put_device;
+
+	cdev_init(&doe->cdev, &pci_doe_fops);
+
 	pci_read_config_dword(pdev, doe->cap + PCI_DOE_CAP, &val);
 
 	if (!poll && FIELD_GET(PCI_DOE_CAP_INT, val)) {
-		irq = pci_irq_vector(pdev, FIELD_GET(PCI_DOE_CAP_IRQ, val));
-		if (irq < 0)
-			return irq;
+		rc = pci_irq_vector(pdev, FIELD_GET(PCI_DOE_CAP_IRQ, val));
+		if (rc < 0)
+			goto err_put_device;
+		irq = rc;
 
 		doe->irq_name = kasprintf(GFP_KERNEL, "DOE[%s]_%x",
 					  dev_name(&pdev->dev), doe->cap);
-		if (!doe->irq_name)
-			return -ENOMEM;
+		if (!doe->irq_name) {
+			rc = -ENOMEM;
+			goto err_put_device;
+		}
 
 		rc = request_irq(irq, pci_doe_irq, 0, doe->irq_name, doe);
 		if (rc)
@@ -512,6 +658,10 @@ static int pci_doe_register(struct pci_doe *doe)
 	if (rc)
 		goto err_free_irqs;
 
+	rc = cdev_device_add(&doe->cdev, &doe->dev);
+	if (rc)
+		goto err_free_irqs;
+
 	return 0;
 
 err_free_irqs:
@@ -519,15 +669,22 @@ err_free_irqs:
 		free_irq(doe->irq, doe);
 err_free_name:
 	kfree(doe->irq_name);
+err_put_device:
+	put_device(&doe->dev);
 
 	return rc;
 }
 
 static void pci_doe_unregister(struct pci_doe *doe)
 {
+	cdev_device_del(&doe->cdev, &doe->dev);
+	down_write(&pci_doe_rwsem);
+	doe->going_down = 1;
+	up_write(&pci_doe_rwsem);
 	if (doe->irq > 0)
 		free_irq(doe->irq, doe);
 	kfree(doe->irq_name);
+	put_device(&doe->dev);
 }
 
 void pci_doe_unregister_all(struct pci_dev *pdev)
@@ -539,7 +696,6 @@ void pci_doe_unregister_all(struct pci_dev *pdev)
 		cancel_delayed_work_sync(&doe->statemachine);
 		kfree(doe->prots);
 		pci_doe_unregister(doe);
-		kfree(doe);
 	}
 }
 EXPORT_SYMBOL_GPL(pci_doe_unregister_all);
@@ -559,6 +715,7 @@ int pci_doe_register_all(struct pci_dev *pdev)
 {
 	struct pci_doe *doe;
 	int pos = 0;
+
 	int rc;
 
 	INIT_LIST_HEAD(&pdev->doe_list);
@@ -578,15 +735,12 @@ int pci_doe_register_all(struct pci_dev *pdev)
 
 		pci_doe_init(doe, pdev, pos);
 		rc = pci_doe_register(doe);
-		if (rc) {
-			kfree(doe);
+		if (rc)
 			goto err_free_does;
-		}
 
 		rc = pci_doe_cache_protocols(doe);
 		if (rc) {
 			pci_doe_unregister(doe);
-			kfree(doe);
 			goto err_free_does;
 		}
 
@@ -624,3 +778,17 @@ struct pci_doe *pci_doe_find(struct pci_dev *pdev, u16 vid, u8 type)
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(pci_doe_find);
+
+int pci_doe_sys_init(void)
+{
+	dev_t devt;
+	int rc;
+
+	rc = alloc_chrdev_region(&devt, 0, PCI_DOE_MAX_CNT, "pcidoe");
+	if (rc)
+		return rc;
+	pci_doe_major = MAJOR(devt);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pci_doe_sys_init);
