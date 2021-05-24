@@ -10,6 +10,7 @@ Required Properties:
 	- "mediatek,mt6779-mfgcfg", "syscon"
 	- "mediatek,mt8167-mfgcfg", "syscon"
 	- "mediatek,mt8183-mfgcfg", "syscon"
+	- "mediatek,mt8192-mfgcfg", "syscon"
 - #clock-cells: Must be 1
 
 The mfgcfg controller uses the common clk binding from
