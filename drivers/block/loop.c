@@ -2415,8 +2415,7 @@ module_exit(loop_exit);
 #ifndef MODULE
 static int __init max_loop_setup(char *str)
 {
-	max_loop = simple_strtol(str, NULL, 0);
-	return 1;
+	return !kstrtoint(str, 0, &max_loop);
 }
 
 __setup("max_loop=", max_loop_setup);
