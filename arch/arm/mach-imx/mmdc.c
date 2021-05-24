@@ -78,6 +78,7 @@ static const struct of_device_id imx_mmdc_dt_ids[] = {
 };
 
 static void __iomem *mmdc_base;
+static struct clk *mmdc_ipg_clk;
 
 #ifdef CONFIG_PERF_EVENTS
 
@@ -533,6 +534,7 @@ static int imx_mmdc_remove(struct platform_device *pdev)
 	kfree(pmu_mmdc);
 #endif
 	iounmap(mmdc_base);
+	clk_disable_unprepare(mmdc_ipg_clk);
 	return 0;
 }
 
@@ -540,7 +542,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	void *reg;
-	struct clk *mmdc_ipg_clk;
 	u32 val;
 	int err;
 
