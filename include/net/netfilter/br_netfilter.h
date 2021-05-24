@@ -9,12 +9,7 @@
 static inline struct nf_bridge_info *nf_bridge_alloc(struct sk_buff *skb)
 {
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
-	struct nf_bridge_info *b = skb_ext_add(skb, SKB_EXT_BRIDGE_NF);
-
-	if (b)
-		memset(b, 0, sizeof(*b));
-
-	return b;
+	return skb_ext_add(skb, SKB_EXT_BRIDGE_NF);
 #else
 	return NULL;
 #endif

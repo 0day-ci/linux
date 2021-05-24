@@ -6316,12 +6316,10 @@ static void *skb_ext_get_ptr(struct skb_ext *ext, enum skb_ext_id id)
  */
 struct skb_ext *__skb_ext_alloc(gfp_t flags)
 {
-	struct skb_ext *new = kmem_cache_alloc(skbuff_ext_cache, flags);
+	struct skb_ext *new = kmem_cache_zalloc(skbuff_ext_cache, flags);
 
-	if (new) {
-		memset(new->offset, 0, sizeof(new->offset));
+	if (new)
 		refcount_set(&new->refcnt, 1);
-	}
 
 	return new;
 }

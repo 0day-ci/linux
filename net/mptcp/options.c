@@ -1078,8 +1078,6 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	if (!mpext)
 		return;
 
-	memset(mpext, 0, sizeof(*mpext));
-
 	if (mp_opt.use_map) {
 		if (mp_opt.mpc_map) {
 			/* this is an MP_CAPABLE carrying MPTCP data
