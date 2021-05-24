@@ -7,6 +7,7 @@
 #include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/io.h>
+#include <linux/pci-doe.h>
 
 /* CXL 2.0 8.2.8.1 Device Capabilities Array Register */
 #define CXLDEV_CAP_ARRAY_OFFSET 0x0
@@ -68,6 +69,26 @@ struct cxl_regs {
 
 void cxl_setup_device_regs(struct device *dev, void __iomem *base,
 			   struct cxl_device_regs *regs);
+
+/*
+ * Address space properties derived from:
+ * CXL 2.0 8.2.5.12.7 CXL HDM Decoder 0 Control Register
+ */
+#define CXL_ADDRSPACE_RAM   BIT(0)
+#define CXL_ADDRSPACE_PMEM  BIT(1)
+#define CXL_ADDRSPACE_TYPE2 BIT(2)
+#define CXL_ADDRSPACE_TYPE3 BIT(3)
+#define CXL_ADDRSPACE_MASK  GENMASK(3, 0)
+
+#define CXL_DOE_PROTOCOL_COMPLIANCE 0
+#define CXL_DOE_PROTOCOL_TABLE_ACCESS 2
+
+/* Common to request and response */
+#define CXL_DOE_TABLE_ACCESS_3_CODE GENMASK(7, 0)
+#define   CXL_DOE_TABLE_ACCESS_3_CODE_READ 0
+#define CXL_DOE_TABLE_ACCESS_3_TYPE GENMASK(15, 8)
+#define   CXL_DOE_TABLE_ACCESS_3_TYPE_CDAT 0
+#define CXL_DOE_TABLE_ACCESS_3_ENTRY_HANDLE GENMASK(31, 16)
 
 extern struct bus_type cxl_bus_type;
 #endif /* __CXL_H__ */
