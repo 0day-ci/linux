@@ -674,7 +674,7 @@ static int rfcomm_sock_setsockopt_old(struct socket *sock, int optname,
 		if (opt & RFCOMM_LM_SECURE)
 			rfcomm_pi(sk)->sec_level = BT_SECURITY_HIGH;
 
-		rfcomm_pi(sk)->role_switch = (opt & RFCOMM_LM_MASTER);
+		rfcomm_pi(sk)->role_switch = (opt & RFCOMM_LM_CENTRAL);
 		break;
 
 	default:
@@ -794,7 +794,7 @@ static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __u
 		}
 
 		if (rfcomm_pi(sk)->role_switch)
-			opt |= RFCOMM_LM_MASTER;
+			opt |= RFCOMM_LM_CENTRAL;
 
 		if (put_user(opt, (u32 __user *) optval))
 			err = -EFAULT;
