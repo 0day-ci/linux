@@ -573,15 +573,13 @@ void iavf_add_vlans(struct iavf_adapter *adapter)
 	}
 	adapter->current_op = VIRTCHNL_OP_ADD_VLAN;
 
-	len = sizeof(struct virtchnl_vlan_filter_list) +
-	      (count * sizeof(u16));
+	len = struct_size(vvfl, vlan_id, count);
 	if (len > IAVF_MAX_AQ_BUF_SIZE) {
 		dev_warn(&adapter->pdev->dev, "Too many add VLAN changes in one request\n");
 		count = (IAVF_MAX_AQ_BUF_SIZE -
 			 sizeof(struct virtchnl_vlan_filter_list)) /
 			sizeof(u16);
-		len = sizeof(struct virtchnl_vlan_filter_list) +
-		      (count * sizeof(u16));
+		len = struct_size(vvfl, vlan_id, count);
 		more = true;
 	}
 	vvfl = kzalloc(len, GFP_ATOMIC);
@@ -643,15 +641,13 @@ void iavf_del_vlans(struct iavf_adapter *adapter)
 	}
 	adapter->current_op = VIRTCHNL_OP_DEL_VLAN;
 
-	len = sizeof(struct virtchnl_vlan_filter_list) +
-	      (count * sizeof(u16));
+	len = struct_size(vvfl, vlan_id, count);
 	if (len > IAVF_MAX_AQ_BUF_SIZE) {
 		dev_warn(&adapter->pdev->dev, "Too many delete VLAN changes in one request\n");
 		count = (IAVF_MAX_AQ_BUF_SIZE -
 			 sizeof(struct virtchnl_vlan_filter_list)) /
 			sizeof(u16);
-		len = sizeof(struct virtchnl_vlan_filter_list) +
-		      (count * sizeof(u16));
+		len = struct_size(vvfl, vlan_id, count);
 		more = true;
 	}
 	vvfl = kzalloc(len, GFP_ATOMIC);
