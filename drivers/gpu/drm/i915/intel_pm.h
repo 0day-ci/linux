@@ -83,8 +83,6 @@ struct intel_dbuf_state {
 	u8 active_pipes;
 };
 
-int intel_dbuf_init(struct drm_i915_private *dev_priv);
-
 struct intel_dbuf_state *
 intel_atomic_get_dbuf_state(struct intel_atomic_state *state);
 
