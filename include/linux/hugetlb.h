@@ -517,6 +517,13 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
  *	Synchronization:  Examined or modified by code that knows it has
  *	the only reference to page.  i.e. After allocation but before use
  *	or when the page is being freed.
+ * HPG_restore_rsv_map - Set when a hugetlb page allocation results in adding
+ *	an entry to the reserve map.  This can happen without adjustment of
+ *	the global reserve count.  Cleared when page is fully instantiated.
+ *	Error paths (restore_reserve_on_error) check this flag to make
+ *	adjustments to the reserve map.
+ *	Synchronization:  Examined or modified by code that knows it has
+ *	the only reference to page.  i.e. After allocation but before use.
  * HPG_migratable  - Set after a newly allocated page is added to the page
  *	cache and/or page tables.  Indicates the page is a candidate for
  *	migration.
@@ -536,6 +543,7 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
  */
 enum hugetlb_page_flags {
 	HPG_restore_rsv_cnt = 0,
+	HPG_restore_rsv_map,
 	HPG_migratable,
 	HPG_temporary,
 	HPG_freed,
@@ -582,6 +590,7 @@ static inline void ClearHPage##uname(struct page *page)		\
  * Create functions associated with hugetlb page flags
  */
 HPAGEFLAG(RestoreRsvCnt, restore_rsv_cnt)
+HPAGEFLAG(RestoreRsvMap, restore_rsv_map)
 HPAGEFLAG(Migratable, migratable)
 HPAGEFLAG(Temporary, temporary)
 HPAGEFLAG(Freed, freed)
@@ -633,6 +642,8 @@ struct page *alloc_huge_page_vma(struct hstate *h, struct vm_area_struct *vma,
 				unsigned long address);
 int huge_add_to_page_cache(struct page *page, struct address_space *mapping,
 			pgoff_t idx);
+void restore_reserve_on_error(struct hstate *h, struct vm_area_struct *vma,
+		unsigned long address, struct page *page);
 
 /* arch callback */
 int __init __alloc_bootmem_huge_page(struct hstate *h);

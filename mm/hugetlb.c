@@ -1551,6 +1551,7 @@ void free_huge_page(struct page *page)
 	page->mapping = NULL;
 	restore_reserve = HPageRestoreRsvCnt(page);
 	ClearHPageRestoreRsvCnt(page);
+	ClearHPageRestoreRsvMap(page);
 
 	/*
 	 * If HPageRestoreRsvCnt was set on page, page allocation consumed a
@@ -2360,24 +2361,26 @@ static long vma_add_reservation(struct hstate *h,
 }
 
 /*
- * This routine is called to restore a reservation on error paths.  In the
- * specific error paths, a huge page was allocated (via alloc_huge_page)
- * and is about to be freed.  If a reservation for the page existed,
- * alloc_huge_page would have consumed the reservation and set
- * HPageRestoreRsvCnt in the newly allocated page.  When the page is freed
- * via free_huge_page, the global reservation count will be incremented if
- * HPageRestoreRsvCnt is set.  However, free_huge_page can not adjust the
- * reserve map.  Adjust the reserve map here to be consistent with global
- * reserve count adjustments to be made by free_huge_page.
+ * This routine is called to restore a reservation data on error paths.
+ * It handles two specific cases for pages allocated via alloc_huge_page:
+ * 1) A reservation was in place and page consumed the reservation.
+ *    HPageRestoreRsvCnt is set in the page.
+ * 2) No reservation was in place for the page, so HPageRestoreRsvCnt is
+ *    not set.  However, the reserve map was updated.
+ * In case 1, free_huge_page will increment the global reserve count.  But,
+ * free_huge_page does not have enough context to adjust the reservation map.
+ * This case deals primarily with private mappings.  Adjust the reserve map
+ * here to be consistent with global reserve count adjustments to be made
+ * by free_huge_page.
+ * In case 2, simply undo an reserve map modifications done by alloc_huge_page.
  */
-static void restore_reserve_on_error(struct hstate *h,
-			struct vm_area_struct *vma, unsigned long address,
-			struct page *page)
+void restore_reserve_on_error(struct hstate *h, struct vm_area_struct *vma,
+				unsigned long address, struct page *page)
 {
 	if (unlikely(HPageRestoreRsvCnt(page))) {
 		long rc = vma_needs_reservation(h, vma, address);
 
-		if (unlikely(rc < 0)) {
+		if (unlikely(rc < 0))
 			/*
 			 * Rare out of memory condition in reserve map
 			 * manipulation.  Clear HPageRestoreRsvCnt so that
@@ -2390,16 +2393,47 @@ static void restore_reserve_on_error(struct hstate *h,
 			 * accounting of reserve counts.
 			 */
 			ClearHPageRestoreRsvCnt(page);
-		} else if (rc) {
-			rc = vma_add_reservation(h, vma, address);
-			if (unlikely(rc < 0))
+		else if (rc)
+			vma_add_reservation(h, vma, address);
+		else
+			vma_end_reservation(h, vma, address);
+	} else if (unlikely(HPageRestoreRsvMap(page))) {
+		struct resv_map *resv = vma_resv_map(vma);
+		pgoff_t idx = vma_hugecache_offset(h, vma, address);
+		long rc;
+
+		/*
+		 * This handles the specific case where the reserve count
+		 * was not updated during the page allocation process, but
+		 * the reserve map was updated.  We need to undo the reserve
+		 * map update.
+		 *
+		 * The presence of an entry in the reserve map has opposite
+		 * meanings for shared and private mappings.
+		 */
+		if (vma->vm_flags & VM_MAYSHARE) {
+			rc = region_del(resv, idx, idx + 1);
+			if (rc < 0)
+				/*
+				 * Rare out of memory condition.  Since we can
+				 * not delete the reserve entry, set
+				 * HPageRestoreRsvCnt so that the global count
+				 * will be consistent with the reserve map.
+				 */
+				SetHPageRestoreRsvCnt(page);
+		} else {
+			rc = vma_needs_reservation(h, vma, address);
+			if (rc < 0)
 				/*
 				 * See above comment about rare out of
 				 * memory condition.
 				 */
-				ClearHPageRestoreRsvCnt(page);
-		} else
-			vma_end_reservation(h, vma, address);
+				SetHPageRestoreRsvCnt(page);
+			else if (rc)
+				vma_add_reservation(h, vma, address);
+			else
+				vma_end_reservation(h, vma, address);
+		}
 	}
 }
 
@@ -2641,6 +2675,8 @@ struct page *alloc_huge_page(struct vm_area_struct *vma,
 			hugetlb_cgroup_uncharge_page_rsvd(hstate_index(h),
 					pages_per_huge_page(h), page);
 	}
+	if (map_commit)
+		SetHPageRestoreRsvMap(page);
 	return page;
 
 out_uncharge_cgroup:
@@ -4053,6 +4089,7 @@ hugetlb_install_page(struct vm_area_struct *vma, pte_t *ptep, unsigned long addr
 	hugepage_add_new_anon_rmap(new_page, vma, addr);
 	hugetlb_count_add(pages_per_huge_page(hstate_vma(vma)), vma->vm_mm);
 	ClearHPageRestoreRsvCnt(new_page);
+	ClearHPageRestoreRsvMap(new_page);
 	SetHPageMigratable(new_page);
 }
 
@@ -4174,6 +4211,8 @@ again:
 				spin_lock_nested(src_ptl, SINGLE_DEPTH_NESTING);
 				entry = huge_ptep_get(src_pte);
 				if (!pte_same(src_pte_old, entry)) {
+					restore_reserve_on_error(h, vma, addr,
+								new);
 					put_page(new);
 					/* dst_entry won't change as in child */
 					goto again;
@@ -4526,6 +4565,7 @@ retry_avoidcopy:
 	ptep = huge_pte_offset(mm, haddr, huge_page_size(h));
 	if (likely(ptep && pte_same(huge_ptep_get(ptep), pte))) {
 		ClearHPageRestoreRsvCnt(new_page);
+		ClearHPageRestoreRsvMap(new_page);
 
 		/* Break COW */
 		huge_ptep_clear_flush(vma, haddr, ptep);
@@ -4593,6 +4633,7 @@ int huge_add_to_page_cache(struct page *page, struct address_space *mapping,
 	if (err)
 		return err;
 	ClearHPageRestoreRsvCnt(page);
+	ClearHPageRestoreRsvMap(page);
 
 	/*
 	 * set page dirty so that it will not be removed from cache/file
@@ -4776,6 +4817,7 @@ retry:
 
 	if (anon_rmap) {
 		ClearHPageRestoreRsvCnt(page);
+		ClearHPageRestoreRsvMap(page);
 		hugepage_add_new_anon_rmap(page, vma, haddr);
 	} else
 		page_dup_rmap(page, true);
@@ -5097,6 +5139,7 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm,
 		page_dup_rmap(page, true);
 	} else {
 		ClearHPageRestoreRsvCnt(page);
+		ClearHPageRestoreRsvMap(page);
 		hugepage_add_new_anon_rmap(page, dst_vma, dst_addr);
 	}
 
@@ -5133,6 +5176,7 @@ out_release_unlock:
 	if (vm_shared || is_continue)
 		unlock_page(page);
 out_release_nounlock:
+	restore_reserve_on_error(h, dst_vma, dst_addr, page);
 	put_page(page);
 	goto out;
 }
