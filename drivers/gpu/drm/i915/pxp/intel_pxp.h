@@ -19,6 +19,11 @@ static inline bool intel_pxp_is_enabled(const struct intel_pxp *pxp)
 	return pxp->ce;
 }
 
+static inline bool intel_pxp_is_active(const struct intel_pxp *pxp)
+{
+	return pxp->arb_is_valid;
+}
+
 #ifdef CONFIG_DRM_I915_PXP
 void intel_pxp_init(struct intel_pxp *pxp);
 void intel_pxp_fini(struct intel_pxp *pxp);
