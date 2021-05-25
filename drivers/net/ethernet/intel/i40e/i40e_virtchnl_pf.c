@@ -521,7 +521,7 @@ static int i40e_config_iwarp_qvlist(struct i40e_vf *vf,
 
 	kfree(vf->qvlist_info);
 	vf->qvlist_info = kzalloc(struct_size(vf->qvlist_info, qv_info,
-					      qvlist_info->num_vectors - 1),
+					      qvlist_info->num_vectors),
 				  GFP_KERNEL);
 	if (!vf->qvlist_info) {
 		ret = -ENOMEM;
