@@ -131,6 +131,8 @@ static int ast_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	drm_fbdev_generic_setup(dev, 32);
 
+	drm_kms_helper_poll_init(dev);
+
 	return 0;
 }
 
