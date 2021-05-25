@@ -115,7 +115,7 @@ int __init init_eaccess(const char *filename)
 	struct path path;
 	int error;
 
-	error = kern_path(filename, LOOKUP_FOLLOW, &path);
+	error = kern_path(filename, LOOKUP_FOLLOW | LOOKUP_DOWN, &path);
 	if (error)
 		return error;
 	error = path_permission(&path, MAY_ACCESS);
