@@ -1884,6 +1884,10 @@ struct drm_dp_aux_cec {
  * Note that the aux helper code assumes that the @transfer() function only
  * modifies the reply field of the &drm_dp_aux_msg structure. The retry logic
  * and i2c helpers assume this is the case.
+ *
+ * Also note that @transfer() can be called no matter the state @dev is
+ * in. Drivers that need that device to be powered to perform this
+ * operation will first need to make sure it's been properly enabled.
  */
 struct drm_dp_aux {
 	const char *name;
