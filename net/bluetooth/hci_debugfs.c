@@ -138,7 +138,7 @@ static int device_list_show(struct seq_file *f, void *ptr)
 
 DEFINE_SHOW_ATTRIBUTE(device_list);
 
-static int blacklist_show(struct seq_file *f, void *p)
+static int reject_list_show(struct seq_file *f, void *p)
 {
 	struct hci_dev *hdev = f->private;
 	struct bdaddr_list *b;
@@ -151,7 +151,7 @@ static int blacklist_show(struct seq_file *f, void *p)
 	return 0;
 }
 
-DEFINE_SHOW_ATTRIBUTE(blacklist);
+DEFINE_SHOW_ATTRIBUTE(reject_list);
 
 static int blocked_keys_show(struct seq_file *f, void *p)
 {
@@ -323,7 +323,7 @@ void hci_debugfs_create_common(struct hci_dev *hdev)
 	debugfs_create_file("device_list", 0444, hdev->debugfs, hdev,
 			    &device_list_fops);
 	debugfs_create_file("blacklist", 0444, hdev->debugfs, hdev,
-			    &blacklist_fops);
+			    &reject_list_fops);
 	debugfs_create_file("blocked_keys", 0444, hdev->debugfs, hdev,
 			    &blocked_keys_fops);
 	debugfs_create_file("uuids", 0444, hdev->debugfs, hdev, &uuids_fops);
@@ -778,7 +778,7 @@ static const struct file_operations force_static_address_fops = {
 	.llseek		= default_llseek,
 };
 
-static int white_list_show(struct seq_file *f, void *ptr)
+static int accept_list_show(struct seq_file *f, void *ptr)
 {
 	struct hci_dev *hdev = f->private;
 	struct bdaddr_list *b;
@@ -791,7 +791,7 @@ static int white_list_show(struct seq_file *f, void *ptr)
 	return 0;
 }
 
-DEFINE_SHOW_ATTRIBUTE(white_list);
+DEFINE_SHOW_ATTRIBUTE(accept_list);
 
 static int resolv_list_show(struct seq_file *f, void *ptr)
 {
@@ -1197,7 +1197,7 @@ void hci_debugfs_create_le(struct hci_dev *hdev)
 	debugfs_create_u8("white_list_size", 0444, hdev->debugfs,
 			  &hdev->le_white_list_size);
 	debugfs_create_file("white_list", 0444, hdev->debugfs, hdev,
-			    &white_list_fops);
+			    &accept_list_fops);
 	debugfs_create_u8("resolv_list_size", 0444, hdev->debugfs,
 			  &hdev->le_resolv_list_size);
 	debugfs_create_file("resolv_list", 0444, hdev->debugfs, hdev,
