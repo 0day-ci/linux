@@ -1068,6 +1068,12 @@ int fuse_fill_super_submount(struct super_block *sb,
 			     struct fuse_inode *parent_fi);
 
 /*
+ * Get the mountable root for the submount
+ * @fsc: superblock configuration context
+ */
+int fuse_get_tree_submount(struct fs_context *fsc);
+
+/*
  * Remove the mount from the connection
  *
  * Returns whether this was the last mount
