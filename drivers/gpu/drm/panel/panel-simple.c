@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/backlight.h>
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/iopoll.h>
@@ -169,6 +170,19 @@ struct panel_desc {
 
 	/** @connector_type: LVDS, eDP, DSI, DPI, etc. */
 	int connector_type;
+
+	/**
+	 * @uses_dpcd_backlight: Panel supports eDP dpcd backlight control.
+	 *
+	 * Set true, if the panel supports backlight control over eDP AUX channel
+	 * using DPCD registers as per VESA's standard.
+	 */
+	bool uses_dpcd_backlight;
+};
+
+struct edp_backlight {
+	struct backlight_device *dev;
+	struct drm_edp_backlight_info info;
 };
 
 struct panel_simple {
@@ -190,6 +204,8 @@ struct panel_simple {
 	struct gpio_desc *hpd_gpio;
 
 	struct edid *edid;
+
+	struct edp_backlight *edp_bl;
 
 	struct drm_display_mode override_mode;
 
@@ -327,9 +343,13 @@ static void panel_simple_wait(ktime_t start_ktime, unsigned int min_ms)
 static int panel_simple_disable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
+	struct edp_backlight *bl = p->edp_bl;
 
 	if (!p->enabled)
 		return 0;
+
+	if (p->desc->uses_dpcd_backlight && bl)
+		drm_edp_backlight_disable(p->aux, &bl->info);
 
 	if (p->desc->delay.disable)
 		msleep(p->desc->delay.disable);
@@ -493,6 +513,7 @@ static int panel_simple_prepare(struct drm_panel *panel)
 static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
+	struct edp_backlight *bl = p->edp_bl;
 
 	if (p->enabled)
 		return 0;
@@ -501,6 +522,10 @@ static int panel_simple_enable(struct drm_panel *panel)
 		msleep(p->desc->delay.enable);
 
 	panel_simple_wait(p->prepared_time, p->desc->delay.prepare_to_enable);
+
+	if (p->desc->uses_dpcd_backlight && bl)
+		drm_edp_backlight_enable(p->aux, &bl->info,
+					 bl->dev->props.brightness);
 
 	p->enabled = true;
 
@@ -561,6 +586,59 @@ static const struct drm_panel_funcs panel_simple_funcs = {
 	.get_modes = panel_simple_get_modes,
 	.get_timings = panel_simple_get_timings,
 };
+
+static int edp_backlight_update_status(struct backlight_device *bd)
+{
+	struct panel_simple *p = bl_get_data(bd);
+	struct edp_backlight *bl = p->edp_bl;
+
+	if (!p->enabled)
+		return 0;
+
+	return drm_edp_backlight_set_level(p->aux, &bl->info, bd->props.brightness);
+}
+
+static const struct backlight_ops edp_backlight_ops = {
+	.update_status = edp_backlight_update_status,
+};
+
+static int edp_backlight_register(struct device *dev, struct panel_simple *panel)
+{
+	struct edp_backlight *bl;
+	struct backlight_properties props = { 0 };
+	u16 current_level;
+	u8 current_mode;
+	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
+	int ret;
+
+	bl = devm_kzalloc(dev, sizeof(*bl), GFP_KERNEL);
+	if (!bl)
+		return -ENOMEM;
+
+	ret = drm_dp_dpcd_read(panel->aux, DP_EDP_DPCD_REV, edp_dpcd,
+			       EDP_DISPLAY_CTL_CAP_SIZE);
+	if (ret < 0)
+		return ret;
+
+	ret = drm_edp_backlight_init(panel->aux, &bl->info, 0, edp_dpcd,
+				     &current_level, &current_mode);
+	if (ret < 0)
+		return ret;
+
+	props.type = BACKLIGHT_RAW;
+	props.brightness = current_level;
+	props.max_brightness = bl->info.max;
+
+	bl->dev = devm_backlight_device_register(dev, "edp_backlight",
+						dev, panel,
+						&edp_backlight_ops, &props);
+	if (IS_ERR(bl->dev))
+		return PTR_ERR(bl->dev);
+
+	panel->edp_bl = bl;
+
+	return 0;
+}
 
 static struct panel_desc panel_dpi;
 
@@ -789,9 +867,24 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 
 	drm_panel_init(&panel->base, dev, &panel_simple_funcs, connector_type);
 
-	err = drm_panel_of_backlight(&panel->base);
-	if (err)
-		goto disable_pm_runtime;
+	if (panel->desc->uses_dpcd_backlight) {
+		if (!panel->aux) {
+			dev_err(dev, "edp backlight needs DP aux\n");
+			err = -EINVAL;
+			goto disable_pm_runtime;
+		}
+
+		err = edp_backlight_register(dev, panel);
+		if (err) {
+			dev_err(dev, "failed to register edp backlight %d\n", err);
+			goto disable_pm_runtime;
+		}
+
+	} else {
+		err = drm_panel_of_backlight(&panel->base);
+		if (err)
+			goto disable_pm_runtime;
+	}
 
 	drm_panel_add(&panel->base);
 
