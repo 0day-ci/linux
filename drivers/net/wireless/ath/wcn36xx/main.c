@@ -427,8 +427,11 @@ static int wcn36xx_config(struct ieee80211_hw *hw, u32 changed)
 			/* A scan is ongoing, do not change the operating
 			 * channel, but start a scan session on the channel.
 			 */
-			wcn36xx_smd_init_scan(wcn, HAL_SYS_MODE_SCAN,
-					      wcn->sw_scan_vif);
+			if (wcn36xx_smd_init_scan(wcn, HAL_SYS_MODE_SCAN,
+						  wcn->sw_scan_vif)) {
+				mutex_unlock(&wcn->conf_mutex);
+				return -EIO;
+			}
 			wcn36xx_smd_start_scan(wcn, ch);
 		} else {
 			wcn36xx_change_opchannel(wcn, ch);
