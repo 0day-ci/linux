@@ -149,6 +149,7 @@ enum nft_list_attributes {
  * @NFTA_HOOK_DEVS: list of netdevices (NLA_NESTED)
  * @NFTA_HOOK_FUNCTION_NAME: hook function name (NLA_STRING)
  * @NFTA_HOOK_MODULE_NAME: kernel module that registered this hook (NLA_STRING)
+ * @NFTA_HOOK_CHAIN_INFO: basechain hook metadata (NLA_NESTED)
  */
 enum nft_hook_attributes {
 	NFTA_HOOK_UNSPEC,
@@ -158,9 +159,33 @@ enum nft_hook_attributes {
 	NFTA_HOOK_DEVS,
 	NFTA_HOOK_FUNCTION_NAME,
 	NFTA_HOOK_MODULE_NAME,
+	NFTA_HOOK_CHAIN_INFO,
 	__NFTA_HOOK_MAX
 };
 #define NFTA_HOOK_MAX		(__NFTA_HOOK_MAX - 1)
+
+/**
+ * enum nft_chain_info_attributes - chain description
+ *
+ * NFTA_CHAIN_INFO_DESC: chain and table name (enum nft_table_attributes) (NLA_NESTED)
+ * NFTA_CHAIN_INFO_TYPE: chain type (enum nf_chain_type) (NLA_U32)
+ */
+enum nft_chain_info_attributes {
+	NFTA_CHAIN_INFO_UNSPEC,
+	NFTA_CHAIN_INFO_DESC,
+	NFTA_CHAIN_INFO_TYPE,
+	__NFTA_CHAIN_INFO_MAX,
+};
+#define NFTA_CHAIN_INFO_MAX (__NFTA_CHAIN_INFO_MAX - 1)
+
+/**
+ * enum nft_chain_info_attributes - chain description
+ *
+ * @NF_CHAININFO_TYPE_NF_TABLES nf_tables base chain
+ */
+enum nf_chaininfo_type {
+	NF_CHAININFO_TYPE_NF_TABLES = 0x1,
+};
 
 /**
  * enum nft_table_flags - nf_tables table flags
