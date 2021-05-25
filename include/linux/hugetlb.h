@@ -511,7 +511,7 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
  * of the hugetlb head page.  Functions created via the below macros should be
  * used to manipulate these flags.
  *
- * HPG_restore_reserve - Set when a hugetlb page consumes a reservation at
+ * HPG_restore_rsv_cnt - Set when a hugetlb page consumes a reservation at
  *	allocation time.  Cleared when page is fully instantiated.  Free
  *	routine checks flag to restore a reservation on error paths.
  *	Synchronization:  Examined or modified by code that knows it has
@@ -535,7 +535,7 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
  * HPG_vmemmap_optimized - Set when the vmemmap pages of the page are freed.
  */
 enum hugetlb_page_flags {
-	HPG_restore_reserve = 0,
+	HPG_restore_rsv_cnt = 0,
 	HPG_migratable,
 	HPG_temporary,
 	HPG_freed,
@@ -581,7 +581,7 @@ static inline void ClearHPage##uname(struct page *page)		\
 /*
  * Create functions associated with hugetlb page flags
  */
-HPAGEFLAG(RestoreReserve, restore_reserve)
+HPAGEFLAG(RestoreRsvCnt, restore_rsv_cnt)
 HPAGEFLAG(Migratable, migratable)
 HPAGEFLAG(Temporary, temporary)
 HPAGEFLAG(Freed, freed)
