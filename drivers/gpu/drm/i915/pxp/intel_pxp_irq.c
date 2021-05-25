@@ -9,6 +9,7 @@
 #include "gt/intel_gt_irq.h"
 #include "i915_irq.h"
 #include "i915_reg.h"
+#include "intel_runtime_pm.h"
 
 /**
  * intel_pxp_irq_handler - Handles PXP interrupts.
@@ -62,11 +63,13 @@ void intel_pxp_irq_enable(struct intel_pxp *pxp)
 	struct intel_gt *gt = pxp_to_gt(pxp);
 
 	spin_lock_irq(&gt->irq_lock);
-	if (!pxp->irq_enabled) {
+
+	if (!pxp->irq_enabled)
 		WARN_ON_ONCE(gen11_gt_reset_one_iir(gt, 0, GEN11_KCR));
-		__pxp_set_interrupts(gt, GEN12_PXP_INTERRUPTS);
-		pxp->irq_enabled = true;
-	}
+
+	__pxp_set_interrupts(gt, GEN12_PXP_INTERRUPTS);
+	pxp->irq_enabled = true;
+
 	spin_unlock_irq(&gt->irq_lock);
 }
 
