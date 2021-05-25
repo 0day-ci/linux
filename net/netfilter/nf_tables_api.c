@@ -7983,6 +7983,7 @@ static int nf_tables_dump_one_hook(struct sk_buff *nlskb,
 {
 	unsigned int portid = NETLINK_CB(nlskb).portid;
 	struct net *net = sock_net(nlskb->sk);
+	char *module_name, fn[KSYM_NAME_LEN];
 	struct nlmsghdr *nlh;
 	int ret = -EMSGSIZE;
 
@@ -7990,6 +7991,18 @@ static int nf_tables_dump_one_hook(struct sk_buff *nlskb,
 			   NLM_F_MULTI, ops->pf, NFNETLINK_V0, nft_base_seq(net));
 	if (!nlh)
 		goto nla_put_failure;
+
+	if (nf_get_hook_info(ops, fn, &module_name)) {
+		ret = nla_put_string(nlskb, NFTA_HOOK_FUNCTION_NAME, fn);
+		if (ret)
+			goto nla_put_failure;
+
+		if (module_name) {
+			ret = nla_put_string(nlskb, NFTA_HOOK_MODULE_NAME, module_name);
+			if (ret)
+				goto nla_put_failure;
+		}
+	}
 
 	ret = nla_put_be32(nlskb, NFTA_HOOK_HOOKNUM, htonl(ops->hooknum));
 	if (ret)

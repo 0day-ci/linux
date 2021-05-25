@@ -749,6 +749,12 @@ static struct pernet_operations netfilter_net_ops = {
 	.exit = netfilter_net_exit,
 };
 
+bool nf_get_hook_info(const struct nf_hook_ops *ops, char fn[KSYM_NAME_LEN], char **modname)
+{
+	return kallsyms_lookup((unsigned long)ops->hook, NULL, NULL, modname, fn);
+}
+EXPORT_SYMBOL_GPL(nf_get_hook_info);
+
 int __init netfilter_init(void)
 {
 	int ret;
