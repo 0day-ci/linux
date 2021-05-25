@@ -515,7 +515,7 @@ enum {
 
 /* Link modes */
 #define HCI_LM_ACCEPT	0x8000
-#define HCI_LM_MASTER	0x0001
+#define HCI_LM_CENTRAL	0x0001
 #define HCI_LM_AUTH	0x0002
 #define HCI_LM_ENCRYPT	0x0004
 #define HCI_LM_TRUSTED	0x0008
@@ -573,8 +573,8 @@ enum {
 #define HCI_TX_POWER_INVALID	127
 #define HCI_RSSI_INVALID	127
 
-#define HCI_ROLE_MASTER		0x00
-#define HCI_ROLE_SLAVE		0x01
+#define HCI_ROLE_CENTRAL	0x00
+#define HCI_ROLE_PERIPHERAL	0x01
 
 /* Extended Inquiry Response field types */
 #define EIR_FLAGS		0x01 /* flags */

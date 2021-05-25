@@ -222,7 +222,7 @@ static void hci_acl_create_connection(struct hci_conn *conn)
 
 	conn->state = BT_CONNECT;
 	conn->out = true;
-	conn->role = HCI_ROLE_MASTER;
+	conn->role = HCI_ROLE_CENTRAL;
 
 	conn->attempt++;
 
@@ -245,7 +245,7 @@ static void hci_acl_create_connection(struct hci_conn *conn)
 	}
 
 	cp.pkt_type = cpu_to_le16(conn->pkt_type);
-	if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_MASTER))
+	if (lmp_rswitch_capable(hdev) && !(hdev->link_mode & HCI_LM_CENTRAL))
 		cp.role_switch = 0x01;
 	else
 		cp.role_switch = 0x00;
@@ -257,12 +257,12 @@ int hci_disconnect(struct hci_conn *conn, __u8 reason)
 {
 	BT_DBG("hcon %p", conn);
 
-	/* When we are master of an established connection and it enters
+	/* When we are central of an established connection and it enters
 	 * the disconnect timeout, then go ahead and try to read the
 	 * current clock offset.  Processing of the result is done
 	 * within the event handling and hci_clock_offset_evt function.
 	 */
-	if (conn->type == ACL_LINK && conn->role == HCI_ROLE_MASTER &&
+	if (conn->type == ACL_LINK && conn->role == HCI_ROLE_CENTRAL &&
 	    (conn->state == BT_CONNECTED || conn->state == BT_CONFIG)) {
 		struct hci_dev *hdev = conn->hdev;
 		struct hci_cp_read_clock_offset clkoff_cp;
@@ -538,7 +538,7 @@ static void le_conn_timeout(struct work_struct *work)
 	 * happen with broken hardware or if low duty cycle was used
 	 * (which doesn't have a timeout of its own).
 	 */
-	if (conn->role == HCI_ROLE_SLAVE) {
+	if (conn->role == HCI_ROLE_PERIPHERAL) {
 		/* Disable LE Advertising */
 		le_disable_advertising(hdev);
 		hci_le_conn_failed(conn, HCI_ERROR_ADVERTISING_TIMEOUT);
@@ -580,7 +580,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst,
 	/* Set Default Authenticated payload timeout to 30s */
 	conn->auth_payload_timeout = DEFAULT_AUTH_PAYLOAD_TIMEOUT;
 
-	if (conn->role == HCI_ROLE_MASTER)
+	if (conn->role == HCI_ROLE_CENTRAL)
 		conn->out = true;
 
 	switch (type) {
@@ -1109,9 +1109,9 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 
 	hci_req_init(&req, hdev);
 
-	/* Disable advertising if we're active. For master role
+	/* Disable advertising if we're active. For central role
 	 * connections most controllers will refuse to connect if
-	 * advertising is enabled, and for slave role connections we
+	 * advertising is enabled, and for peripheral role connections we
 	 * anyway have to disable it in order to start directed
 	 * advertising. Any registered advertisements will be
 	 * re-enabled after the connection attempt is finished.
@@ -1119,8 +1119,8 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 	if (hci_dev_test_flag(hdev, HCI_LE_ADV))
 		__hci_req_pause_adv_instances(&req);
 
-	/* If requested to connect as slave use directed advertising */
-	if (conn->role == HCI_ROLE_SLAVE) {
+	/* If requested to connect as peripheral use directed advertising */
+	if (conn->role == HCI_ROLE_PERIPHERAL) {
 		/* If we're active scanning most controllers are unable
 		 * to initiate advertising. Simply reject the attempt.
 		 */
@@ -1261,7 +1261,7 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 
 	BT_DBG("requesting refresh of dst_addr");
 
-	conn = hci_conn_add(hdev, LE_LINK, dst, HCI_ROLE_MASTER);
+	conn = hci_conn_add(hdev, LE_LINK, dst, HCI_ROLE_CENTRAL);
 	if (!conn)
 		return ERR_PTR(-ENOMEM);
 
@@ -1300,7 +1300,7 @@ struct hci_conn *hci_connect_acl(struct hci_dev *hdev, bdaddr_t *dst,
 
 	acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst);
 	if (!acl) {
-		acl = hci_conn_add(hdev, ACL_LINK, dst, HCI_ROLE_MASTER);
+		acl = hci_conn_add(hdev, ACL_LINK, dst, HCI_ROLE_CENTRAL);
 		if (!acl)
 			return ERR_PTR(-ENOMEM);
 	}
@@ -1331,7 +1331,7 @@ struct hci_conn *hci_connect_sco(struct hci_dev *hdev, int type, bdaddr_t *dst,
 
 	sco = hci_conn_hash_lookup_ba(hdev, type, dst);
 	if (!sco) {
-		sco = hci_conn_add(hdev, type, dst, HCI_ROLE_MASTER);
+		sco = hci_conn_add(hdev, type, dst, HCI_ROLE_CENTRAL);
 		if (!sco) {
 			hci_conn_drop(acl);
 			return ERR_PTR(-ENOMEM);
@@ -1630,8 +1630,8 @@ static u32 get_link_mode(struct hci_conn *conn)
 {
 	u32 link_mode = 0;
 
-	if (conn->role == HCI_ROLE_MASTER)
-		link_mode |= HCI_LM_MASTER;
+	if (conn->role == HCI_ROLE_CENTRAL)
+		link_mode |= HCI_LM_CENTRAL;
 
 	if (test_bit(HCI_CONN_ENCRYPT, &conn->flags))
 		link_mode |= HCI_LM_ENCRYPT;

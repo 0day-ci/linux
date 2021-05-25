@@ -1900,7 +1900,7 @@ static void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 	} else {
 		if (!conn) {
 			conn = hci_conn_add(hdev, ACL_LINK, &cp->bdaddr,
-					    HCI_ROLE_MASTER);
+					    HCI_ROLE_CENTRAL);
 			if (!conn)
 				bt_dev_err(hdev, "no memory for new connection");
 		}
@@ -2627,7 +2627,7 @@ static void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 						      &ev->bdaddr,
 						      BDADDR_BREDR)) {
 			conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr,
-					    HCI_ROLE_SLAVE);
+					    HCI_ROLE_PERIPHERAL);
 			if (!conn) {
 				bt_dev_err(hdev, "no memory for new conn");
 				goto unlock;
@@ -2775,7 +2775,7 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 			&ev->bdaddr);
 	if (!conn) {
 		conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr,
-				    HCI_ROLE_SLAVE);
+				    HCI_ROLE_PERIPHERAL);
 		if (!conn) {
 			bt_dev_err(hdev, "no memory for new connection");
 			hci_dev_unlock(hdev);
@@ -2794,10 +2794,10 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 
 		bacpy(&cp.bdaddr, &ev->bdaddr);
 
-		if (lmp_rswitch_capable(hdev) && (mask & HCI_LM_MASTER))
-			cp.role = 0x00; /* Become master */
+		if (lmp_rswitch_capable(hdev) && (mask & HCI_LM_CENTRAL))
+			cp.role = 0x00; /* Become central */
 		else
-			cp.role = 0x01; /* Remain slave */
+			cp.role = 0x01; /* Remain peripheral */
 
 		hci_send_cmd(hdev, HCI_OP_ACCEPT_CONN_REQ, sizeof(cp), &cp);
 	} else if (!(flags & HCI_PROTO_DEFER)) {
@@ -5131,7 +5131,7 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 		conn->dst_type = bdaddr_type;
 
 		/* If we didn't have a hci_conn object previously
-		 * but we're in master role this must be something
+		 * but we're in central role this must be something
 		 * initiated using a white list. Since white list based
 		 * connections are not "first class citizens" we don't
 		 * have full tracking of them. Therefore, we go ahead
@@ -5423,8 +5423,8 @@ static struct hci_conn *check_pending_le_conn(struct hci_dev *hdev,
 	}
 
 	conn = hci_connect_le(hdev, addr, addr_type, BT_SECURITY_LOW,
-			      hdev->def_le_autoconnect_timeout, HCI_ROLE_MASTER,
-			      direct_rpa);
+			      hdev->def_le_autoconnect_timeout,
+			      HCI_ROLE_CENTRAL, direct_rpa);
 	if (!IS_ERR(conn)) {
 		/* If HCI_AUTO_CONN_EXPLICIT is set, conn is already owned
 		 * by higher layer that tried to connect, if no then
@@ -5897,7 +5897,7 @@ static void hci_le_remote_conn_param_req_evt(struct hci_dev *hdev,
 		return send_conn_param_neg_reply(hdev, handle,
 						 HCI_ERROR_INVALID_LL_PARAMS);
 
-	if (hcon->role == HCI_ROLE_MASTER) {
+	if (hcon->role == HCI_ROLE_CENTRAL) {
 		struct hci_conn_params *params;
 		u8 store_hint;
 

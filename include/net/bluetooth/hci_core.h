@@ -893,7 +893,7 @@ static inline void hci_conn_hash_add(struct hci_dev *hdev, struct hci_conn *c)
 		break;
 	case LE_LINK:
 		h->le_num++;
-		if (c->role == HCI_ROLE_SLAVE)
+		if (c->role == HCI_ROLE_PERIPHERAL)
 			h->le_num_slave++;
 		break;
 	case SCO_LINK:
@@ -919,7 +919,7 @@ static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 		break;
 	case LE_LINK:
 		h->le_num--;
-		if (c->role == HCI_ROLE_SLAVE)
+		if (c->role == HCI_ROLE_PERIPHERAL)
 			h->le_num_slave--;
 		break;
 	case SCO_LINK:
