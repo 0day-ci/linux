@@ -339,6 +339,28 @@ static ssize_t drc_pmem_query_stats(struct papr_scm_priv *p,
 	return 0;
 }
 
+static ssize_t cpumask_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	struct pmu *pmu = dev_get_drvdata(dev);
+	struct nvdimm_pmu *nd_pmu;
+
+	nd_pmu = container_of(pmu, struct nvdimm_pmu, pmu);
+
+	return cpumap_print_to_pagebuf(true, buf, cpumask_of(nd_pmu->cpu));
+}
+
+static DEVICE_ATTR_RO(cpumask);
+
+static struct attribute *nvdimm_cpumask_attrs[] = {
+	&dev_attr_cpumask.attr,
+	NULL,
+};
+
+static const struct attribute_group nvdimm_pmu_cpumask_group = {
+	.attrs = nvdimm_cpumask_attrs,
+};
+
 PMU_FORMAT_ATTR(event, "config:0-4");
 
 static struct attribute *nvdimm_pmu_format_attr[] = {
@@ -457,6 +479,24 @@ static void papr_scm_pmu_read(struct perf_event *event)
 static void papr_scm_pmu_del(struct perf_event *event, int flags)
 {
 	papr_scm_pmu_read(event);
+}
+
+static int nvdimm_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
+{
+	struct nvdimm_pmu *nd_pmu;
+	int target;
+
+	nd_pmu = hlist_entry_safe(node, struct nvdimm_pmu, node);
+
+	if (cpu != nd_pmu->cpu)
+		return 0;
+
+	target = cpumask_last(cpu_active_mask);
+	if (target < 0 || target >= nr_cpu_ids)
+		return -1;
+
+	nd_pmu->cpu = target;
+	return 0;
 }
 
 static ssize_t device_show_string(struct device *dev, struct device_attribute *attr,
@@ -603,6 +643,7 @@ out:
 	/* Fill attribute groups for the nvdimm pmu device */
 	nd_pmu->attr_groups[NVDIMM_PMU_FORMAT_ATTR] = &nvdimm_pmu_format_group;
 	nd_pmu->attr_groups[NVDIMM_PMU_EVENT_ATTR] = nvdimm_pmu_events_group;
+	nd_pmu->attr_groups[NVDIMM_PMU_CPUMASK_ATTR] = &nvdimm_pmu_cpumask_group;
 	nd_pmu->attr_groups[NVDIMM_PMU_NULL_ATTR] = NULL;
 
 	kfree(single_stats);
@@ -652,6 +693,20 @@ static void papr_scm_pmu_register(struct papr_scm_priv *p)
 	nd_pmu->read = papr_scm_pmu_read;
 	nd_pmu->add = papr_scm_pmu_add;
 	nd_pmu->del = papr_scm_pmu_del;
+	nd_pmu->cpu = raw_smp_processor_id();
+
+	rc = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
+				     "perf/nvdimm:online",
+			      NULL, nvdimm_pmu_offline_cpu);
+	if (rc < 0)
+		goto pmu_cpuhp_setup_err;
+
+	nd_pmu->cpuhp_state = rc;
+
+	/* Register the pmu instance for cpu hotplug */
+	rc = cpuhp_state_add_instance_nocalls(nd_pmu->cpuhp_state, &nd_pmu->node);
+	if (rc)
+		goto cpuhp_instance_err;
 
 	rc = register_nvdimm_pmu(nd_pmu, p->pdev);
 	if (rc)
@@ -665,6 +720,10 @@ static void papr_scm_pmu_register(struct papr_scm_priv *p)
 	return;
 
 pmu_register_err:
+	cpuhp_state_remove_instance_nocalls(nd_pmu->cpuhp_state, &nd_pmu->node);
+cpuhp_instance_err:
+	cpuhp_remove_multi_state(nd_pmu->cpuhp_state);
+pmu_cpuhp_setup_err:
 	nvdimm_pmu_mem_free(nd_pmu);
 	kfree(p->nvdimm_events_map);
 pmu_check_events_err:
@@ -675,6 +734,8 @@ pmu_err_print:
 
 static void nvdimm_pmu_uinit(struct nvdimm_pmu *nd_pmu)
 {
+	cpuhp_state_remove_instance_nocalls(nd_pmu->cpuhp_state, &nd_pmu->node);
+	cpuhp_remove_multi_state(nd_pmu->cpuhp_state);
 	unregister_nvdimm_pmu(&nd_pmu->pmu);
 	nvdimm_pmu_mem_free(nd_pmu);
 	kfree(nd_pmu);

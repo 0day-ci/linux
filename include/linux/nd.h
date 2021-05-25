@@ -28,7 +28,8 @@ enum nvdimm_claim_class {
 /* Event attribute array index */
 #define NVDIMM_PMU_FORMAT_ATTR		0
 #define NVDIMM_PMU_EVENT_ATTR		1
-#define NVDIMM_PMU_NULL_ATTR		2
+#define NVDIMM_PMU_CPUMASK_ATTR		2
+#define NVDIMM_PMU_NULL_ATTR		3
 
 /**
  * struct nvdimm_pmu - data structure for nvdimm perf driver
@@ -37,7 +38,10 @@ enum nvdimm_claim_class {
  * @pmu: pmu data structure for nvdimm performance stats.
  * @dev: nvdimm device pointer.
  * @functions(event_init/add/del/read): platform specific pmu functions.
- * @attr_groups: data structure for events and formats.
+ * @attr_groups: data structure for events, formats and cpumask
+ * @cpu: designated cpu for counter access.
+ * @node: node for cpu hotplug notifier link.
+ * @cpuhp_state: state for cpu hotplug notification.
  */
 struct nvdimm_pmu {
 	const char *name;
@@ -49,10 +53,13 @@ struct nvdimm_pmu {
 	void (*read)(struct perf_event *event);
 	/*
 	 * Attribute groups for the nvdimm pmu. Index 0 used for
-	 * format attribute, index 1 used for event attribute and
-	 * index 2 kept as NULL.
+	 * format attribute, index 1 used for event attribute,
+	 * index 2 used for cpusmask attribute and index 3 kept as NULL.
 	 */
-	const struct attribute_group *attr_groups[3];
+	const struct attribute_group *attr_groups[4];
+	int cpu;
+	struct hlist_node node;
+	enum cpuhp_state cpuhp_state;
 };
 
 int register_nvdimm_pmu(struct nvdimm_pmu *nvdimm, struct platform_device *pdev);
