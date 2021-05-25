@@ -2340,7 +2340,8 @@ int md_integrity_register(struct mddev *mddev)
 			       bdev_get_integrity(reference->bdev));
 
 	pr_debug("md: data integrity enabled on %s\n", mdname(mddev));
-	if (bioset_integrity_create(&mddev->bio_set, BIO_POOL_SIZE)) {
+	if (bioset_integrity_create(&mddev->bio_set, BIO_POOL_SIZE) ||
+	    bioset_integrity_create(&mddev->io_acct_set, BIO_POOL_SIZE)) {
 		pr_err("md: failed to create integrity pool for %s\n",
 		       mdname(mddev));
 		return -EINVAL;
@@ -5569,6 +5570,7 @@ static void md_free(struct kobject *ko)
 
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->io_acct_set);
 	kfree(mddev);
 }
 
@@ -5864,6 +5866,12 @@ int md_run(struct mddev *mddev)
 		if (err)
 			return err;
 	}
+	if (!bioset_initialized(&mddev->io_acct_set)) {
+		err = bioset_init(&mddev->io_acct_set, BIO_POOL_SIZE,
+				  offsetof(struct md_io_acct, bio_clone), 0);
+		if (err)
+			return err;
+	}
 
 	spin_lock(&pers_lock);
 	pers = find_pers(mddev->level, mddev->clevel);
@@ -6041,6 +6049,7 @@ bitmap_abort:
 abort:
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->io_acct_set);
 	return err;
 }
 EXPORT_SYMBOL_GPL(md_run);
@@ -6264,6 +6273,7 @@ void md_stop(struct mddev *mddev)
 	__md_stop(mddev);
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
+	bioset_exit(&mddev->io_acct_set);
 }
 
 EXPORT_SYMBOL_GPL(md_stop);
@@ -8567,6 +8577,38 @@ void md_submit_discard_bio(struct mddev *mddev, struct md_rdev *rdev,
 	submit_bio_noacct(discard_bio);
 }
 EXPORT_SYMBOL_GPL(md_submit_discard_bio);
+
+static void md_end_io_acct(struct bio *bio)
+{
+	struct md_io_acct *md_io_acct = bio->bi_private;
+	struct bio *orig_bio = md_io_acct->orig_bio;
+
+	orig_bio->bi_status = bio->bi_status;
+
+	bio_end_io_acct(orig_bio, md_io_acct->start_time);
+	bio_put(bio);
+	bio_endio(orig_bio);
+}
+
+/* used by personalities (raid0 and raid5) to account io stats */
+void md_account_bio(struct mddev *mddev, struct bio **bio)
+{
+	struct md_io_acct *md_io_acct;
+	struct bio *clone;
+
+	if (!blk_queue_io_stat((*bio)->bi_bdev->bd_disk->queue))
+		return;
+
+	clone = bio_clone_fast(*bio, GFP_NOIO, &mddev->io_acct_set);
+	md_io_acct = container_of(clone, struct md_io_acct, bio_clone);
+	md_io_acct->orig_bio = *bio;
+	md_io_acct->start_time = bio_start_io_acct(*bio);
+
+	clone->bi_end_io = md_end_io_acct;
+	clone->bi_private = md_io_acct;
+	*bio = clone;
+}
+EXPORT_SYMBOL_GPL(md_account_bio);
 
 /* md_allow_write(mddev)
  * Calling this ensures that the array is marked 'active' so that writes
