@@ -41,6 +41,7 @@
 #include "intel_display_types.h"
 #include "intel_pm.h"
 #include "intel_sprite.h"
+#include "pxp/intel_pxp.h"
 
 static void intel_plane_state_reset(struct intel_plane_state *plane_state,
 				    struct intel_plane *plane)
@@ -383,6 +384,14 @@ intel_crtc_get_plane(struct intel_crtc *crtc, enum plane_id plane_id)
 	return NULL;
 }
 
+static int bo_has_valid_encryption(const struct drm_i915_gem_object *obj)
+{
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
+
+	return i915_gem_object_has_valid_protection(obj) &&
+	       intel_pxp_is_active(&i915->gt.pxp);
+}
+
 int intel_plane_atomic_check(struct intel_atomic_state *state,
 			     struct intel_plane *plane)
 {
@@ -397,6 +406,7 @@ int intel_plane_atomic_check(struct intel_atomic_state *state,
 		intel_atomic_get_old_crtc_state(state, crtc);
 	struct intel_crtc_state *new_crtc_state =
 		intel_atomic_get_new_crtc_state(state, crtc);
+	const struct drm_framebuffer *fb;
 
 	if (new_crtc_state && new_crtc_state->bigjoiner_slave) {
 		struct intel_plane *master_plane =
@@ -412,6 +422,12 @@ int intel_plane_atomic_check(struct intel_atomic_state *state,
 	intel_plane_copy_uapi_to_hw_state(new_plane_state,
 					  new_master_plane_state,
 					  crtc);
+
+	fb = new_plane_state->hw.fb;
+	if (fb)
+		new_plane_state->decrypt = bo_has_valid_encryption(intel_fb_obj(fb));
+	else
+		new_plane_state->decrypt = old_plane_state->decrypt;
 
 	new_plane_state->uapi.visible = false;
 	if (!new_crtc_state)
