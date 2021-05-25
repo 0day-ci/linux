@@ -236,6 +236,13 @@ bool pi_has_pending_interrupt(struct kvm_vcpu *vcpu)
 		(pi_test_sn(pi_desc) && !pi_is_pir_empty(pi_desc));
 }
 
+void vmx_pi_start_assignment(struct kvm *kvm)
+{
+	if (!irq_remapping_cap(IRQ_POSTING_CAP))
+		return;
+
+	kvm_make_all_cpus_request(kvm, KVM_REQ_UNBLOCK);
+}
 
 /*
  * pi_update_irte - set IRTE for Posted-Interrupts
