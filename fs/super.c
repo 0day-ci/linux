@@ -156,8 +156,8 @@ static unsigned long super_cache_count(struct shrinker *shrink,
 
 static void destroy_super_work(struct work_struct *work)
 {
-	struct super_block *s = container_of(work, struct super_block,
-							destroy_work);
+	struct super_block *s = container_of(to_rcu_work(work), struct super_block,
+							rcu_work);
 	int i;
 
 	for (i = 0; i < SB_FREEZE_LEVELS; i++)
@@ -165,12 +165,6 @@ static void destroy_super_work(struct work_struct *work)
 	kfree(s);
 }
 
-static void destroy_super_rcu(struct rcu_head *head)
-{
-	struct super_block *s = container_of(head, struct super_block, rcu);
-	INIT_WORK(&s->destroy_work, destroy_super_work);
-	schedule_work(&s->destroy_work);
-}
 
 /* Free a superblock that has never been seen by anyone */
 static void destroy_unused_super(struct super_block *s)
@@ -185,7 +179,7 @@ static void destroy_unused_super(struct super_block *s)
 	kfree(s->s_subtype);
 	free_prealloced_shrinker(&s->s_shrink);
 	/* no delays needed */
-	destroy_super_work(&s->destroy_work);
+	destroy_super_work(&s->rcu_work.work);
 }
 
 /**
@@ -249,6 +243,7 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags,
 	spin_lock_init(&s->s_inode_list_lock);
 	INIT_LIST_HEAD(&s->s_inodes_wb);
 	spin_lock_init(&s->s_inode_wblist_lock);
+	INIT_RCU_WORK(&s->rcu_work, destroy_super_work);
 
 	s->s_count = 1;
 	atomic_set(&s->s_active, 1);
@@ -296,7 +291,7 @@ static void __put_super(struct super_block *s)
 		fscrypt_sb_free(s);
 		put_user_ns(s->s_user_ns);
 		kfree(s->s_subtype);
-		call_rcu(&s->rcu, destroy_super_rcu);
+		queue_rcu_work(system_wq, &s->rcu_work);
 	}
 }
 

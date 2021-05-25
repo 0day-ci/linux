@@ -1534,8 +1534,7 @@ struct super_block {
 	 */
 	struct list_lru		s_dentry_lru;
 	struct list_lru		s_inode_lru;
-	struct rcu_head		rcu;
-	struct work_struct	destroy_work;
+	struct rcu_work         rcu_work;
 
 	struct mutex		s_sync_lock;	/* sync serialisation lock */
 
