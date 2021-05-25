@@ -735,6 +735,13 @@ static struct sk_buff *receive_small(struct net_device *dev,
 		void *orig_data;
 		u32 act;
 
+		if (unlikely(len > GOOD_PACKET_LEN)) {
+			pr_debug("%s: rx error: len %u exceeds max size %lu\n",
+				 dev->name, len, GOOD_PACKET_LEN);
+			dev->stats.rx_length_errors++;
+			goto err_xdp;
+		}
+
 		if (unlikely(hdr->hdr.gso_type))
 			goto err_xdp;
 
@@ -807,6 +814,14 @@ static struct sk_buff *receive_small(struct net_device *dev,
 		}
 	}
 	rcu_read_unlock();
+
+	if (unlikely(len > GOOD_PACKET_LEN)) {
+		pr_debug("%s: rx error: len %u exceeds max size %lu\n",
+			 dev->name, len, GOOD_PACKET_LEN);
+		dev->stats.rx_length_errors++;
+		put_page(page);
+		return NULL;
+	}
 
 	skb = build_skb(buf, buflen);
 	if (!skb) {
@@ -890,6 +905,13 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		struct xdp_buff xdp;
 		void *data;
 		u32 act;
+
+		if (unlikely(len > truesize)) {
+			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
+				 dev->name, len, (unsigned long)ctx);
+			dev->stats.rx_length_errors++;
+			goto err_xdp;
+		}
 
 		/* Transient failure which in theory could occur if
 		 * in-flight packets from before XDP was enabled reach
