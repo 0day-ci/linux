@@ -534,7 +534,8 @@ static inline void hfi1_handle_packet(struct hfi1_packet *packet,
 		 * Notify rvt_multicast_detach() if it is waiting for us
 		 * to finish.
 		 */
-		if (atomic_dec_return(&mcast->refcount) <= 1)
+		refcount_dec(&mcast->refcount);
+		if (refcount_read(&mcast->refcount) <= 1)
 			wake_up(&mcast->wait);
 	} else {
 		/* Get the destination QP number. */

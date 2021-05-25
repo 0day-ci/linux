@@ -520,7 +520,7 @@ struct rvt_mcast {
 	struct rvt_mcast_addr mcast_addr;
 	struct list_head qp_list;
 	wait_queue_head_t wait;
-	atomic_t refcount;
+	refcount_t refcount;
 	int n_attached;
 };
 
