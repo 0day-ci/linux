@@ -1382,7 +1382,7 @@ static void mmc_blk_cqe_complete_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_request *mrq = &mqrq->brq.mrq;
 	struct request_queue *q = req->q;
 	struct mmc_host *host = mq->card->host;
-	enum mmc_issue_type issue_type = mmc_issue_type(mq, req);
+	enum mmc_issue_type issue_type = mmc_issue_type(host, req);
 	unsigned long flags;
 	bool put_card;
 	int err;
@@ -1977,7 +1977,7 @@ static void mmc_blk_mq_dec_in_flight(struct mmc_queue *mq, struct request *req)
 
 	spin_lock_irqsave(&mq->lock, flags);
 
-	mq->in_flight[mmc_issue_type(mq, req)] -= 1;
+	mq->in_flight[mmc_issue_type(mq->card->host, req)] -= 1;
 
 	put_card = (mmc_tot_in_flight(mq) == 0);
 
@@ -2209,7 +2209,7 @@ enum mmc_issued mmc_blk_mq_issue_rq(struct mmc_queue *mq, struct request *req)
 	if (ret)
 		return MMC_REQ_FAILED_TO_START;
 
-	switch (mmc_issue_type(mq, req)) {
+	switch (mmc_issue_type(host, req)) {
 	case MMC_ISSUE_SYNC:
 		ret = mmc_blk_wait_for_idle(mq, host);
 		if (ret)

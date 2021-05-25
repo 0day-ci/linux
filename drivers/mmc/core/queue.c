@@ -56,10 +56,8 @@ static enum mmc_issue_type mmc_cqe_issue_type(struct mmc_host *host,
 	}
 }
 
-enum mmc_issue_type mmc_issue_type(struct mmc_queue *mq, struct request *req)
+enum mmc_issue_type mmc_issue_type(struct mmc_host *host, struct request *req)
 {
-	struct mmc_host *host = mq->card->host;
-
 	if (host->cqe_enabled && !host->hsq_enabled)
 		return mmc_cqe_issue_type(host, req);
 
@@ -97,7 +95,7 @@ static enum blk_eh_timer_return mmc_cqe_timed_out(struct request *req)
 	struct mmc_request *mrq = &mqrq->brq.mrq;
 	struct mmc_queue *mq = req->q->queuedata;
 	struct mmc_host *host = mq->card->host;
-	enum mmc_issue_type issue_type = mmc_issue_type(mq, req);
+	enum mmc_issue_type issue_type = mmc_issue_type(host, req);
 	bool recovery_needed = false;
 
 	switch (issue_type) {
@@ -259,7 +257,7 @@ static blk_status_t mmc_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
 		return BLK_STS_IOERR;
 	}
 
-	issue_type = mmc_issue_type(mq, req);
+	issue_type = mmc_issue_type(host, req);
 
 	spin_lock_irq(&mq->lock);
 

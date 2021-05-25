@@ -104,7 +104,7 @@ extern unsigned int mmc_queue_map_sg(struct mmc_queue *,
 void mmc_cqe_check_busy(struct mmc_queue *mq);
 void mmc_cqe_recovery_notifier(struct mmc_request *mrq);
 
-enum mmc_issue_type mmc_issue_type(struct mmc_queue *mq, struct request *req);
+enum mmc_issue_type mmc_issue_type(struct mmc_host *host, struct request *req);
 
 static inline int mmc_tot_in_flight(struct mmc_queue *mq)
 {
