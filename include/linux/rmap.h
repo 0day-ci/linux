@@ -209,6 +209,7 @@ struct page_vma_mapped_walk {
 	pte_t *pte;
 	spinlock_t *pte_ptl;
 	spinlock_t *pmd_ptl;
+	spinlock_t *pud_ptl;
 	unsigned int flags;
 };
 
@@ -221,6 +222,9 @@ static inline void page_vma_mapped_walk_done(struct page_vma_mapped_walk *pvmw)
 		spin_unlock(pvmw->pte_ptl);
 	if (pvmw->pmd_ptl)
 		spin_unlock(pvmw->pmd_ptl);
+	if (pvmw->pud_ptl)
+		spin_unlock(pvmw->pud_ptl);
+
 }
 
 bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw);

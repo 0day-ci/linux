@@ -180,8 +180,11 @@ restart:
 	pud = pud_offset(p4d, pvmw->address);
 	if (!pud_present(*pud))
 		return false;
+
+	pvmw->pud_ptl = pud_lock(mm, pud);
 	pvmw->pmd = pmd_offset(pud, pvmw->address);
-	pvmw->pmd_ptl = pmd_lock(mm, pvmw->pmd);
+	if (USE_SPLIT_PMD_PTLOCKS)
+		pvmw->pmd_ptl = pmd_lock(mm, pvmw->pmd);
 	/*
 	 * Make sure the pmd value isn't cached in a register by the
 	 * compiler and used as a stale value after we've observed a
@@ -235,8 +238,12 @@ next_pte:
 					spin_unlock(pvmw->pte_ptl);
 					pvmw->pte_ptl = NULL;
 				}
-				spin_unlock(pvmw->pmd_ptl);
-				pvmw->pmd_ptl = NULL;
+				if (pvmw->pmd_ptl) {
+					spin_unlock(pvmw->pmd_ptl);
+					pvmw->pmd_ptl = NULL;
+				}
+				spin_unlock(pvmw->pud_ptl);
+				pvmw->pud_ptl = NULL;
 				goto restart;
 			} else {
 				pvmw->pte++;
