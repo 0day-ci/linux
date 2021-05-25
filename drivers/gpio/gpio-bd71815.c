@@ -9,6 +9,7 @@
  */
 
 #include <linux/gpio/driver.h>
+#include <linux/gpio/regmap.h>
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/module.h>
@@ -17,81 +18,29 @@
 /* For the BD71815 register definitions */
 #include <linux/mfd/rohm-bd71815.h>
 
-struct bd71815_gpio {
-	/* chip.parent points the MFD which provides DT node and regmap */
-	struct gpio_chip chip;
-	/* dev points to the platform device for devm and prints */
-	struct device *dev;
-	struct regmap *regmap;
-};
-
-static int bd71815gpo_get(struct gpio_chip *chip, unsigned int offset)
+static int bd71815_gpio_set_config(const struct gpio_regmap_config *gr_config,
+				   unsigned int offset, unsigned long config)
 {
-	struct bd71815_gpio *bd71815 = gpiochip_get_data(chip);
-	int ret, val;
-
-	ret = regmap_read(bd71815->regmap, BD71815_REG_GPO, &val);
-	if (ret)
-		return ret;
-
-	return (val >> offset) & 1;
-}
-
-static void bd71815gpo_set(struct gpio_chip *chip, unsigned int offset,
-			   int value)
-{
-	struct bd71815_gpio *bd71815 = gpiochip_get_data(chip);
-	int ret, bit;
-
-	bit = BIT(offset);
-
-	if (value)
-		ret = regmap_set_bits(bd71815->regmap, BD71815_REG_GPO, bit);
-	else
-		ret = regmap_clear_bits(bd71815->regmap, BD71815_REG_GPO, bit);
-
-	if (ret)
-		dev_warn(bd71815->dev, "failed to toggle GPO\n");
-}
-
-static int bd71815_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
-				   unsigned long config)
-{
-	struct bd71815_gpio *bdgpio = gpiochip_get_data(chip);
+	struct regmap *regmap = gr_config->regmap;
 
 	switch (pinconf_to_config_param(config)) {
 	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		return regmap_update_bits(bdgpio->regmap,
+		return regmap_update_bits(regmap,
 					  BD71815_REG_GPO,
 					  BD71815_GPIO_DRIVE_MASK << offset,
 					  BD71815_GPIO_OPEN_DRAIN << offset);
 	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		return regmap_update_bits(bdgpio->regmap,
+		return regmap_update_bits(regmap,
 					  BD71815_REG_GPO,
 					  BD71815_GPIO_DRIVE_MASK << offset,
 					  BD71815_GPIO_CMOS << offset);
 	default:
+		dev_err(gr_config->parent, "Unsupported config (0x%lx)\n",
+			config);
 		break;
 	}
 	return -ENOTSUPP;
 }
-
-/* BD71815 GPIO is actually GPO */
-static int bd71815gpo_direction_get(struct gpio_chip *gc, unsigned int offset)
-{
-	return GPIO_LINE_DIRECTION_OUT;
-}
-
-/* Template for GPIO chip */
-static const struct gpio_chip bd71815gpo_chip = {
-	.label			= "bd71815",
-	.owner			= THIS_MODULE,
-	.get			= bd71815gpo_get,
-	.get_direction		= bd71815gpo_direction_get,
-	.set			= bd71815gpo_set,
-	.set_config		= bd71815_gpio_set_config,
-	.can_sleep		= true,
-};
 
 #define BD71815_TWO_GPIOS	GENMASK(1, 0)
 #define BD71815_ONE_GPIO	BIT(0)
@@ -111,15 +60,17 @@ static const struct gpio_chip bd71815gpo_chip = {
  * but allows using it by providing the DT property
  * "rohm,enable-hidden-gpo".
  */
-static int bd71815_init_valid_mask(struct gpio_chip *gc,
+static int bd71815_init_valid_mask(const struct gpio_regmap_config *c,
 				   unsigned long *valid_mask,
 				   unsigned int ngpios)
 {
+
 	if (ngpios != 2)
 		return 0;
 
-	if (gc->parent && device_property_present(gc->parent,
-						  "rohm,enable-hidden-gpo"))
+	/* The property should be in MFD DT node */
+	if (c->parent && fwnode_property_present(c->fwnode,
+						 "rohm,enable-hidden-gpo"))
 		*valid_mask = BD71815_TWO_GPIOS;
 	else
 		*valid_mask = BD71815_ONE_GPIO;
@@ -127,9 +78,21 @@ static int bd71815_init_valid_mask(struct gpio_chip *gc,
 	return 0;
 }
 
+/* Template for regmap gpio config */
+static const struct gpio_regmap_config gpio_cfg_template = {
+	.label			= "bd71815",
+	.reg_set_base		= BD71815_REG_GPO,
+	.ngpio			= 2,
+};
+
+static const struct gpio_regmap_ops ops = {
+	.set_config		= bd71815_gpio_set_config,
+	.init_valid_mask	= bd71815_init_valid_mask,
+};
+
 static int gpo_bd71815_probe(struct platform_device *pdev)
 {
-	struct bd71815_gpio *g;
+	struct gpio_regmap_config cfg;
 	struct device *parent, *dev;
 
 	/*
@@ -140,34 +103,12 @@ static int gpo_bd71815_probe(struct platform_device *pdev)
 	/* The device-tree and regmap come from MFD => use parent for that */
 	parent = dev->parent;
 
-	g = devm_kzalloc(dev, sizeof(*g), GFP_KERNEL);
-	if (!g)
-		return -ENOMEM;
+	cfg = gpio_cfg_template;
+	cfg.parent = parent;
+	cfg.regmap = dev_get_regmap(parent, NULL);
+	cfg.fwnode = dev_fwnode(dev);
 
-	g->chip = bd71815gpo_chip;
-
-	/*
-	 * FIXME: As writing of this the sysfs interface for GPIO control does
-	 * not respect the valid_mask. Do not trust it but rather set the ngpios
-	 * to 1 if "rohm,enable-hidden-gpo" is not given.
-	 *
-	 * This check can be removed later if the sysfs export is fixed and
-	 * if the fix is backported.
-	 *
-	 * For now it is safest to just set the ngpios though.
-	 */
-	if (device_property_present(parent, "rohm,enable-hidden-gpo"))
-		g->chip.ngpio = 2;
-	else
-		g->chip.ngpio = 1;
-
-	g->chip.init_valid_mask = bd71815_init_valid_mask;
-	g->chip.base = -1;
-	g->chip.parent = parent;
-	g->regmap = dev_get_regmap(parent, NULL);
-	g->dev = dev;
-
-	return devm_gpiochip_add_data(dev, &g->chip, g);
+	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &cfg, &ops));
 }
 
 static struct platform_driver gpo_bd71815_driver = {
