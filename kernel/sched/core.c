@@ -1869,6 +1869,7 @@ static struct rq *move_queued_task(struct rq *rq, struct rq_flags *rf,
 struct migration_arg {
 	struct task_struct		*task;
 	int				dest_cpu;
+	const struct cpumask		*dest_mask;
 	struct set_affinity_pending	*pending;
 };
 
@@ -1917,6 +1918,7 @@ static int migration_cpu_stop(void *data)
 	struct set_affinity_pending *pending = arg->pending;
 	struct task_struct *p = arg->task;
 	int dest_cpu = arg->dest_cpu;
+	const struct cpumask *dest_mask = arg->dest_mask;
 	struct rq *rq = this_rq();
 	bool complete = false;
 	struct rq_flags rf;
@@ -1956,12 +1958,8 @@ static int migration_cpu_stop(void *data)
 			complete = true;
 		}
 
-		if (dest_cpu < 0) {
-			if (cpumask_test_cpu(task_cpu(p), &p->cpus_mask))
-				goto out;
-
-			dest_cpu = cpumask_any_distribute(&p->cpus_mask);
-		}
+		if (dest_mask && (cpumask_test_cpu(task_cpu(p), dest_mask)))
+			goto out;
 
 		if (task_on_rq_queued(p))
 			rq = __migrate_task(rq, &rf, p, dest_cpu);
@@ -2249,7 +2247,8 @@ static int affine_move_task(struct rq *rq, struct task_struct *p, struct rq_flag
 			init_completion(&my_pending.done);
 			my_pending.arg = (struct migration_arg) {
 				.task = p,
-				.dest_cpu = -1,		/* any */
+				.dest_cpu = dest_cpu,
+				.dest_mask = &p->cpus_mask,
 				.pending = &my_pending,
 			};
 
