@@ -7911,6 +7911,216 @@ err_fill_gen_info:
 	return err;
 }
 
+static const struct nf_hook_entries *
+nf_hook_entries_head(u8 pf, unsigned int hook, struct net *net, const char *dev)
+{
+	const struct nf_hook_entries *hook_head = NULL;
+	struct net_device *netdev;
+
+	switch (pf) {
+	case NFPROTO_IPV4:
+		if (hook >= ARRAY_SIZE(net->nf.hooks_ipv4))
+			return ERR_PTR(-EINVAL);
+		hook_head = rcu_dereference(net->nf.hooks_ipv4[hook]);
+		break;
+	case NFPROTO_IPV6:
+		hook_head = rcu_dereference(net->nf.hooks_ipv6[hook]);
+		if (hook >= ARRAY_SIZE(net->nf.hooks_ipv6))
+			return ERR_PTR(-EINVAL);
+		break;
+	case NFPROTO_ARP:
+#ifdef CONFIG_NETFILTER_FAMILY_ARP
+		if (hook >= ARRAY_SIZE(net->nf.hooks_arp))
+			return ERR_PTR(-EINVAL);
+		hook_head = rcu_dereference(net->nf.hooks_arp[hook]);
+#endif
+		break;
+	case NFPROTO_BRIDGE:
+#ifdef CONFIG_NETFILTER_FAMILY_BRIDGE
+		if (hook >= ARRAY_SIZE(net->nf.hooks_bridge))
+			return ERR_PTR(-EINVAL);
+		hook_head = rcu_dereference(net->nf.hooks_bridge[hook]);
+#endif
+		break;
+#if IS_ENABLED(CONFIG_DECNET)
+	case NFPROTO_DECNET:
+		if (hook >= ARRAY_SIZE(net->nf.hooks_decnet))
+			return ERR_PTR(-EINVAL);
+		hook_head = rcu_dereference(net->nf.hooks_decnet[hook]);
+		break;
+#endif
+#ifdef CONFIG_NETFILTER_INGRESS
+	case NFPROTO_NETDEV:
+		if (hook != NF_NETDEV_INGRESS)
+			return ERR_PTR(-EOPNOTSUPP);
+
+		if (!dev)
+			return ERR_PTR(-ENODEV);
+
+		netdev = dev_get_by_name_rcu(net, dev);
+		if (!netdev)
+			return ERR_PTR(-ENODEV);
+
+		return rcu_dereference(netdev->nf_hooks_ingress);
+#endif
+	default:
+		return ERR_PTR(-EPROTONOSUPPORT);
+	}
+
+	return hook_head;
+}
+
+struct nft_dump_hooks_data {
+	char devname[IFNAMSIZ];
+	unsigned long headv;
+	unsigned int seq;
+	u8 hook;
+};
+
+static int nf_tables_dump_one_hook(struct sk_buff *nlskb,
+				   const struct nft_dump_hooks_data *ctx,
+				   const struct nf_hook_ops *ops)
+{
+	unsigned int portid = NETLINK_CB(nlskb).portid;
+	struct net *net = sock_net(nlskb->sk);
+	struct nlmsghdr *nlh;
+	int ret = -EMSGSIZE;
+
+	nlh = nfnl_msg_put(nlskb, portid, ctx->seq, NFT_MSG_GETNFHOOKS,
+			   NLM_F_MULTI, ops->pf, NFNETLINK_V0, nft_base_seq(net));
+	if (!nlh)
+		goto nla_put_failure;
+
+	ret = nla_put_be32(nlskb, NFTA_HOOK_HOOKNUM, htonl(ops->hooknum));
+	if (ret)
+		goto nla_put_failure;
+
+	ret = nla_put_be32(nlskb, NFTA_HOOK_PRIORITY, htonl(ops->priority));
+	if (ret)
+		goto nla_put_failure;
+
+	nlmsg_end(nlskb, nlh);
+	return 0;
+nla_put_failure:
+	nlmsg_trim(nlskb, nlh);
+	return ret;
+}
+
+static int nf_tables_dump_basehooks(struct sk_buff *nlskb,
+				    struct netlink_callback *cb)
+{
+	struct nfgenmsg *nfmsg = nlmsg_data(cb->nlh);
+	struct nft_dump_hooks_data *ctx = cb->data;
+	int err, family = nfmsg->nfgen_family;
+	struct net *net = sock_net(nlskb->sk);
+	struct nf_hook_ops * const *ops;
+	const struct nf_hook_entries *e;
+	unsigned int i = cb->args[0];
+
+	rcu_read_lock();
+	cb->seq = ctx->seq;
+
+	e = nf_hook_entries_head(family, ctx->hook, net, ctx->devname);
+	if (!e)
+		goto done;
+
+	if (IS_ERR(e)) {
+		ctx->seq++;
+		goto done;
+	}
+
+	if ((unsigned long)e != ctx->headv || i >= e->num_hook_entries)
+		ctx->seq++;
+
+	ops = nf_hook_entries_get_hook_ops(e);
+
+	for (; i < e->num_hook_entries; i++) {
+		err = nf_tables_dump_one_hook(nlskb, ctx, ops[i]);
+		if (err)
+			break;
+	}
+
+done:
+	nl_dump_check_consistent(cb, nlmsg_hdr(nlskb));
+	rcu_read_unlock();
+	cb->args[0] = i;
+	return nlskb->len;
+}
+
+static int nf_tables_dump_basehooks_start(struct netlink_callback *cb)
+{
+	const struct nfgenmsg *nfmsg = nlmsg_data(cb->nlh);
+	const struct nlattr * const *nla = cb->data;
+	struct nft_dump_hooks_data *ctx = NULL;
+	struct net *net = sock_net(cb->skb->sk);
+	u8 family = nfmsg->nfgen_family;
+	char name[IFNAMSIZ] = "";
+	const void *head;
+	u32 hooknum;
+
+	hooknum = ntohl(nla_get_be32(nla[NFTA_HOOK_HOOKNUM]));
+	if (hooknum > 255)
+		return -EINVAL;
+
+	if (family == NFPROTO_NETDEV) {
+		if (!nla[NFTA_HOOK_DEV])
+			return -EINVAL;
+
+		nla_strscpy(name, nla[NFTA_HOOK_DEV], sizeof(name));
+	}
+
+	rcu_read_lock();
+	/* Not dereferenced; for consistency check only */
+	head = nf_hook_entries_head(family, hooknum, net, name);
+	rcu_read_unlock();
+
+	if (head && IS_ERR(head))
+		return PTR_ERR(head);
+
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx)
+		return -ENOMEM;
+
+	ctx->headv = (unsigned long)head;
+
+	ctx->hook = hooknum;
+	strscpy(ctx->devname, name, sizeof(ctx->devname));
+	cb->data = ctx;
+	cb->seq = 1;
+	return 0;
+}
+
+static int nf_tables_dump_basehooks_stop(struct netlink_callback *cb)
+{
+	kfree(cb->data);
+	return 0;
+}
+
+static int nft_get_basehooks(struct sk_buff *skb,
+			     const struct nfnl_info *info,
+			     const struct nlattr * const nla[])
+{
+	if (!nla[NFTA_HOOK_HOOKNUM])
+		return -EINVAL;
+
+	if (ntohl(nla_get_be32(nla[NFTA_HOOK_HOOKNUM])) > 255)
+		return -EINVAL;
+
+	if (info->nlh->nlmsg_flags & NLM_F_DUMP) {
+		struct netlink_dump_control c = {
+			.start = nf_tables_dump_basehooks_start,
+			.done = nf_tables_dump_basehooks_stop,
+			.dump = nf_tables_dump_basehooks,
+			.module = THIS_MODULE,
+			.data = (void *)nla,
+		};
+
+		return nft_netlink_dump_start_rcu(info->sk, skb, info->nlh, &c);
+	}
+
+	return -EOPNOTSUPP;
+}
+
 static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 	[NFT_MSG_NEWTABLE] = {
 		.call		= nf_tables_newtable,
@@ -8047,6 +8257,12 @@ static const struct nfnl_callback nf_tables_cb[NFT_MSG_MAX] = {
 		.type		= NFNL_CB_BATCH,
 		.attr_count	= NFTA_FLOWTABLE_MAX,
 		.policy		= nft_flowtable_policy,
+	},
+	[NFT_MSG_GETNFHOOKS] = {
+		.call		= nft_get_basehooks,
+		.type		= NFNL_CB_RCU,
+		.attr_count	= NFTA_HOOK_MAX,
+		.policy		= nft_hook_policy,
 	},
 };
 
