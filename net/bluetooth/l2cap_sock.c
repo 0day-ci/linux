@@ -503,7 +503,7 @@ static int l2cap_sock_getsockopt_old(struct socket *sock, int optname,
 		}
 
 		if (test_bit(FLAG_ROLE_SWITCH, &chan->flags))
-			opt |= L2CAP_LM_MASTER;
+			opt |= L2CAP_LM_CENTRAL;
 
 		if (test_bit(FLAG_FORCE_RELIABLE, &chan->flags))
 			opt |= L2CAP_LM_RELIABLE;
@@ -807,7 +807,7 @@ static int l2cap_sock_setsockopt_old(struct socket *sock, int optname,
 		if (opt & L2CAP_LM_SECURE)
 			chan->sec_level = BT_SECURITY_HIGH;
 
-		if (opt & L2CAP_LM_MASTER)
+		if (opt & L2CAP_LM_CENTRAL)
 			set_bit(FLAG_ROLE_SWITCH, &chan->flags);
 		else
 			clear_bit(FLAG_ROLE_SWITCH, &chan->flags);
