@@ -132,6 +132,22 @@ struct panel_desc {
 		unsigned int prepare_to_enable;
 
 		/**
+		 * @delay.power_to_enable: Time for the power to enable the display on.
+		 *
+		 * The time (in milliseconds) that it takes for the panel to
+		 * turn the display on.
+		 */
+		unsigned int power_to_enable;
+
+		/**
+		 * @delay.disable_to_power_off: Time for the disable to power the display off.
+		 *
+		 * The time (in milliseconds) that it takes for the panel to
+		 * turn the display off.
+		 */
+		unsigned int disable_to_power_off;
+
+		/**
 		 * @delay.enable: Time for the panel to display a valid frame.
 		 *
 		 * The time (in milliseconds) that it takes for the panel to
@@ -364,6 +380,10 @@ static int panel_simple_suspend(struct device *dev)
 	struct panel_simple *p = dev_get_drvdata(dev);
 
 	gpiod_set_value_cansleep(p->enable_gpio, 0);
+
+	if (p->desc->delay.disable_to_power_off)
+		msleep(p->desc->delay.disable_to_power_off);
+
 	regulator_disable(p->supply);
 	p->unprepared_time = ktime_get();
 
@@ -423,6 +443,9 @@ static int panel_simple_prepare_once(struct panel_simple *p)
 		dev_err(dev, "failed to enable supply: %d\n", err);
 		return err;
 	}
+
+	if (p->desc->delay.power_to_enable)
+		msleep(p->desc->delay.power_to_enable);
 
 	gpiod_set_value_cansleep(p->enable_gpio, 1);
 
