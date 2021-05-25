@@ -174,7 +174,7 @@ static int reset_channel(struct device *dev, int ch)
 	/* and ICCR writeback, if available */
 	if (priv->features & TALITOS_FTR_HW_AUTH_CHECK)
 		setbits32(priv->chan[ch].reg + TALITOS_CCCR_LO,
-		          TALITOS_CCCR_LO_IWSE);
+				TALITOS_CCCR_LO_IWSE);
 
 	return 0;
 }
@@ -249,7 +249,7 @@ static int init_device(struct device *dev)
 	/* disable integrity check error interrupts (use writeback instead) */
 	if (priv->features & TALITOS_FTR_HW_AUTH_CHECK)
 		setbits32(priv->reg_mdeu + TALITOS_EUICR_LO,
-		          TALITOS_MDEUICR_LO_ICE);
+				TALITOS_MDEUICR_LO_ICE);
 
 	return 0;
 }
@@ -2276,12 +2276,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = SHA1_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_AESU |
-		                     DESC_HDR_MODE0_AESU_CBC |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_SHA1_HMAC,
+			DESC_HDR_SEL0_AESU |
+			DESC_HDR_MODE0_AESU_CBC |
+			DESC_HDR_SEL1_MDEUA |
+			DESC_HDR_MODE1_MDEU_INIT |
+			DESC_HDR_MODE1_MDEU_PAD |
+			DESC_HDR_MODE1_MDEU_SHA1_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2321,13 +2321,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_SHA1_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA1_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2413,13 +2413,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_SHA224_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA224_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2438,13 +2438,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_HMAC_SNOOP_NO_AFEU |
-				     DESC_HDR_SEL0_DEU |
-				     DESC_HDR_MODE0_DEU_CBC |
-				     DESC_HDR_MODE0_DEU_3DES |
-				     DESC_HDR_SEL1_MDEUA |
-				     DESC_HDR_MODE1_MDEU_INIT |
-				     DESC_HDR_MODE1_MDEU_PAD |
-				     DESC_HDR_MODE1_MDEU_SHA224_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA224_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2460,12 +2460,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = SHA256_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_AESU |
-		                     DESC_HDR_MODE0_AESU_CBC |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_SHA256_HMAC,
+					DESC_HDR_SEL0_AESU |
+					DESC_HDR_MODE0_AESU_CBC |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA256_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2505,13 +2505,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_SHA256_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA256_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2530,13 +2530,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_HMAC_SNOOP_NO_AFEU |
-				     DESC_HDR_SEL0_DEU |
-				     DESC_HDR_MODE0_DEU_CBC |
-				     DESC_HDR_MODE0_DEU_3DES |
-				     DESC_HDR_SEL1_MDEUA |
-				     DESC_HDR_MODE1_MDEU_INIT |
-				     DESC_HDR_MODE1_MDEU_PAD |
-				     DESC_HDR_MODE1_MDEU_SHA256_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_SHA256_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2552,12 +2552,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = SHA384_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_AESU |
-		                     DESC_HDR_MODE0_AESU_CBC |
-		                     DESC_HDR_SEL1_MDEUB |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEUB_SHA384_HMAC,
+					DESC_HDR_SEL0_AESU |
+					DESC_HDR_MODE0_AESU_CBC |
+					DESC_HDR_SEL1_MDEUB |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEUB_SHA384_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2575,13 +2575,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUB |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEUB_SHA384_HMAC,
+				DESC_HDR_SEL0_DEU |
+				DESC_HDR_MODE0_DEU_CBC |
+				DESC_HDR_MODE0_DEU_3DES |
+				DESC_HDR_SEL1_MDEUB |
+				DESC_HDR_MODE1_MDEU_INIT |
+				DESC_HDR_MODE1_MDEU_PAD |
+				DESC_HDR_MODE1_MDEUB_SHA384_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2597,12 +2597,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = SHA512_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_AESU |
-		                     DESC_HDR_MODE0_AESU_CBC |
-		                     DESC_HDR_SEL1_MDEUB |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEUB_SHA512_HMAC,
+					DESC_HDR_SEL0_AESU |
+					DESC_HDR_MODE0_AESU_CBC |
+					DESC_HDR_SEL1_MDEUB |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEUB_SHA512_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2620,13 +2620,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUB |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEUB_SHA512_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUB |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEUB_SHA512_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2642,12 +2642,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = MD5_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_AESU |
-		                     DESC_HDR_MODE0_AESU_CBC |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_MD5_HMAC,
+					DESC_HDR_SEL0_AESU |
+					DESC_HDR_MODE0_AESU_CBC |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_MD5_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2664,12 +2664,12 @@ static struct talitos_alg_template driver_algs[] = {
 			.maxauthsize = MD5_DIGEST_SIZE,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_HMAC_SNOOP_NO_AFEU |
-				     DESC_HDR_SEL0_AESU |
-				     DESC_HDR_MODE0_AESU_CBC |
-				     DESC_HDR_SEL1_MDEUA |
-				     DESC_HDR_MODE1_MDEU_INIT |
-				     DESC_HDR_MODE1_MDEU_PAD |
-				     DESC_HDR_MODE1_MDEU_MD5_HMAC,
+					DESC_HDR_SEL0_AESU |
+					DESC_HDR_MODE0_AESU_CBC |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_MD5_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.alg.aead = {
@@ -2686,13 +2686,13 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = aead_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_IPSEC_ESP |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES |
-		                     DESC_HDR_SEL1_MDEUA |
-		                     DESC_HDR_MODE1_MDEU_INIT |
-		                     DESC_HDR_MODE1_MDEU_PAD |
-		                     DESC_HDR_MODE1_MDEU_MD5_HMAC,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES |
+					DESC_HDR_SEL1_MDEUA |
+					DESC_HDR_MODE1_MDEU_INIT |
+					DESC_HDR_MODE1_MDEU_PAD |
+					DESC_HDR_MODE1_MDEU_MD5_HMAC,
 	},
 	{	.type = CRYPTO_ALG_TYPE_AEAD,
 		.priority = TALITOS_CRA_PRIORITY_AEAD_HSNA,
@@ -2839,9 +2839,9 @@ static struct talitos_alg_template driver_algs[] = {
 			.setkey = skcipher_des3_setkey,
 		},
 		.desc_hdr_template = DESC_HDR_TYPE_COMMON_NONSNOOP_NO_AFEU |
-			             DESC_HDR_SEL0_DEU |
-		                     DESC_HDR_MODE0_DEU_CBC |
-		                     DESC_HDR_MODE0_DEU_3DES,
+					DESC_HDR_SEL0_DEU |
+					DESC_HDR_MODE0_DEU_CBC |
+					DESC_HDR_MODE0_DEU_3DES,
 	},
 	/* AHASH algorithms. */
 	{	.type = CRYPTO_ALG_TYPE_AHASH,
@@ -3131,7 +3131,7 @@ static int hw_supports(struct device *dev, __be32 desc_hdr_template)
 
 	if (SECONDARY_EU(desc_hdr_template))
 		ret = ret && (1 << SECONDARY_EU(desc_hdr_template)
-		              & priv->exec_units);
+				& priv->exec_units);
 
 	return ret;
 }
@@ -3176,7 +3176,7 @@ static int talitos_remove(struct platform_device *ofdev)
 
 static struct talitos_crypto_alg *talitos_alg_alloc(struct device *dev,
 						    struct talitos_alg_template
-						           *template)
+							*template)
 {
 	struct talitos_private *priv = dev_get_drvdata(dev);
 	struct talitos_crypto_alg *t_alg;
