@@ -62,8 +62,8 @@ static int parse_qcomsmem_part(struct mtd_info *mtd,
 	struct smem_flash_ptable *ptable;
 	size_t len = SMEM_FLASH_PTABLE_HDR_LEN;
 	struct mtd_partition *parts;
-	int ret, i, numparts;
-	char *name, *c;
+	int i, numparts;
+	char *c;
 
 	if (IS_ENABLED(CONFIG_MTD_SPI_NOR_USE_4K_SECTORS)
 			&& mtd->type == MTD_NORFLASH) {
@@ -125,17 +125,11 @@ static int parse_qcomsmem_part(struct mtd_info *mtd,
 		if (pentry->name[0] == '\0')
 			continue;
 
-		name = kstrdup(pentry->name, GFP_KERNEL);
-		if (!name) {
-			ret = -ENOMEM;
-			goto out_free_parts;
-		}
-
 		/* Convert name to lower case */
-		for (c = name; *c != '\0'; c++)
+		for (c = pentry->name; *c != '\0'; c++)
 			*c = tolower(*c);
 
-		parts[i].name = name;
+		parts[i].name = pentry->name;
 		parts[i].offset = le32_to_cpu(pentry->offset) * mtd->erasesize;
 		parts[i].mask_flags = pentry->attr;
 		parts[i].size = le32_to_cpu(pentry->length) * mtd->erasesize;
@@ -149,14 +143,6 @@ static int parse_qcomsmem_part(struct mtd_info *mtd,
 	*pparts = parts;
 
 	return numparts;
-
-out_free_parts:
-	while (--i >= 0)
-		kfree(parts[i].name);
-	kfree(parts);
-	*pparts = NULL;
-
-	return ret;
 }
 
 static const struct of_device_id qcomsmem_of_match_table[] = {
