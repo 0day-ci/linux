@@ -3878,6 +3878,7 @@ static bool cached_root_available(struct kvm_vcpu *vcpu, gpa_t new_pgd,
 
 	root.pgd = mmu->root_pgd;
 	root.hpa = mmu->root_hpa;
+	root.need_sync = false;
 
 	if (is_root_usable(&root, new_pgd, new_role))
 		return true;
@@ -3891,6 +3892,11 @@ static bool cached_root_available(struct kvm_vcpu *vcpu, gpa_t new_pgd,
 
 	mmu->root_hpa = root.hpa;
 	mmu->root_pgd = root.pgd;
+
+	if (i < KVM_MMU_NUM_PREV_ROOTS && root.need_sync) {
+		kvm_make_request(KVM_REQ_MMU_SYNC, vcpu);
+		kvm_make_request(KVM_REQ_TLB_FLUSH_CURRENT, vcpu);
+	}
 
 	return i < KVM_MMU_NUM_PREV_ROOTS;
 }

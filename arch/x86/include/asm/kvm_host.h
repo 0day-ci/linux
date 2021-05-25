@@ -354,10 +354,11 @@ struct rsvd_bits_validate {
 struct kvm_mmu_root_info {
 	gpa_t pgd;
 	hpa_t hpa;
+	bool need_sync;
 };
 
 #define KVM_MMU_ROOT_INFO_INVALID \
-	((struct kvm_mmu_root_info) { .pgd = INVALID_PAGE, .hpa = INVALID_PAGE })
+	((struct kvm_mmu_root_info) { .pgd = INVALID_PAGE, .hpa = INVALID_PAGE, .need_sync = true})
 
 #define KVM_MMU_NUM_PREV_ROOTS 3
 

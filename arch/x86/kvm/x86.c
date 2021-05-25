@@ -11680,7 +11680,6 @@ int kvm_handle_invpcid(struct kvm_vcpu *vcpu, unsigned long type, gva_t gva)
 	bool pcid_enabled;
 	struct x86_exception e;
 	unsigned i;
-	unsigned long roots_to_free = 0;
 	struct {
 		u64 pcid;
 		u64 gla;
@@ -11722,9 +11721,8 @@ int kvm_handle_invpcid(struct kvm_vcpu *vcpu, unsigned long type, gva_t gva)
 		for (i = 0; i < KVM_MMU_NUM_PREV_ROOTS; i++)
 			if (kvm_get_pcid(vcpu, vcpu->arch.mmu->prev_roots[i].pgd)
 			    == operand.pcid)
-				roots_to_free |= KVM_MMU_ROOT_PREVIOUS(i);
+				vcpu->arch.mmu->prev_roots[i].need_sync = true;
 
-		kvm_mmu_free_roots(vcpu, vcpu->arch.mmu, roots_to_free);
 		/*
 		 * If neither the current cr3 nor any of the prev_roots use the
 		 * given PCID, then nothing needs to be done here because a
@@ -11743,7 +11741,10 @@ int kvm_handle_invpcid(struct kvm_vcpu *vcpu, unsigned long type, gva_t gva)
 
 		fallthrough;
 	case INVPCID_TYPE_ALL_INCL_GLOBAL:
-		kvm_make_request(KVM_REQ_MMU_RELOAD, vcpu);
+		kvm_mmu_sync_roots(vcpu);
+		kvm_make_request(KVM_REQ_TLB_FLUSH_CURRENT, vcpu);
+		for (i = 0; i < KVM_MMU_NUM_PREV_ROOTS; i++)
+			vcpu->arch.mmu->prev_roots[i].need_sync = true;
 		return kvm_skip_emulated_instruction(vcpu);
 
 	default:

@@ -5312,7 +5312,7 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 vmx_instruction_info, types;
-	unsigned long type, roots_to_free;
+	unsigned long type;
 	struct kvm_mmu *mmu;
 	gva_t gva;
 	struct x86_exception e;
@@ -5361,28 +5361,24 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 			return nested_vmx_fail(vcpu,
 				VMXERR_INVALID_OPERAND_TO_INVEPT_INVVPID);
 
-		roots_to_free = 0;
 		if (nested_ept_root_matches(mmu->root_hpa, mmu->root_pgd,
 					    operand.eptp))
-			roots_to_free |= KVM_MMU_ROOT_CURRENT;
+			kvm_mmu_free_roots(vcpu, mmu, KVM_MMU_ROOT_CURRENT);
 
 		for (i = 0; i < KVM_MMU_NUM_PREV_ROOTS; i++) {
 			if (nested_ept_root_matches(mmu->prev_roots[i].hpa,
 						    mmu->prev_roots[i].pgd,
 						    operand.eptp))
-				roots_to_free |= KVM_MMU_ROOT_PREVIOUS(i);
+				mmu->prev_roots[i].need_sync = true;
 		}
 		break;
 	case VMX_EPT_EXTENT_GLOBAL:
-		roots_to_free = KVM_MMU_ROOTS_ALL;
+		kvm_mmu_free_roots(vcpu, mmu, KVM_MMU_ROOTS_ALL);
 		break;
 	default:
 		BUG();
 		break;
 	}
-
-	if (roots_to_free)
-		kvm_mmu_free_roots(vcpu, mmu, roots_to_free);
 
 	return nested_vmx_succeed(vcpu);
 }
