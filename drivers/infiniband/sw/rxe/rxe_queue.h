@@ -161,8 +161,22 @@ static inline unsigned int index_from_addr(const struct rxe_queue *q,
 
 static inline unsigned int queue_count(const struct rxe_queue *q)
 {
-	return (q->buf->producer_index - q->buf->consumer_index)
-		& q->index_mask;
+	u32 prod;
+	u32 cons;
+	u32 count;
+
+	/* make sure all changes to queue complete before
+	 * changing producer index
+	 */
+	prod = smp_load_acquire(&q->buf->producer_index);
+
+	/* make sure all changes to queue complete before
+	 * changing consumer index
+	 */
+	cons = smp_load_acquire(&q->buf->consumer_index);
+	count = (prod - cons) % q->index_mask;
+
+	return count;
 }
 
 static inline void *queue_head(struct rxe_queue *q)
