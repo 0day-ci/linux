@@ -522,7 +522,7 @@ struct hci_dev {
 	struct hci_conn_hash	conn_hash;
 
 	struct list_head	mgmt_pending;
-	struct list_head	blacklist;
+	struct list_head	reject_list;
 	struct list_head	whitelist;
 	struct list_head	uuids;
 	struct list_head	link_keys;

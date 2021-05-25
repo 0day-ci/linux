@@ -5207,7 +5207,7 @@ static int block_device(struct sock *sk, struct hci_dev *hdev, void *data,
 
 	hci_dev_lock(hdev);
 
-	err = hci_bdaddr_list_add(&hdev->blacklist, &cp->addr.bdaddr,
+	err = hci_bdaddr_list_add(&hdev->reject_list, &cp->addr.bdaddr,
 				  cp->addr.type);
 	if (err < 0) {
 		status = MGMT_STATUS_FAILED;
@@ -5243,7 +5243,7 @@ static int unblock_device(struct sock *sk, struct hci_dev *hdev, void *data,
 
 	hci_dev_lock(hdev);
 
-	err = hci_bdaddr_list_del(&hdev->blacklist, &cp->addr.bdaddr,
+	err = hci_bdaddr_list_del(&hdev->reject_list, &cp->addr.bdaddr,
 				  cp->addr.type);
 	if (err < 0) {
 		status = MGMT_STATUS_INVALID_PARAMS;

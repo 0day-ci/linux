@@ -2745,7 +2745,7 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		return;
 	}
 
-	if (hci_bdaddr_list_lookup(&hdev->blacklist, &ev->bdaddr,
+	if (hci_bdaddr_list_lookup(&hdev->reject_list, &ev->bdaddr,
 				   BDADDR_BREDR)) {
 		hci_reject_conn(hdev, &ev->bdaddr);
 		return;
@@ -5224,7 +5224,7 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 		addr_type = BDADDR_LE_RANDOM;
 
 	/* Drop the connection if the device is blocked */
-	if (hci_bdaddr_list_lookup(&hdev->blacklist, &conn->dst, addr_type)) {
+	if (hci_bdaddr_list_lookup(&hdev->reject_list, &conn->dst, addr_type)) {
 		hci_conn_drop(conn);
 		goto unlock;
 	}
@@ -5380,7 +5380,7 @@ static struct hci_conn *check_pending_le_conn(struct hci_dev *hdev,
 		return NULL;
 
 	/* Ignore if the device is blocked */
-	if (hci_bdaddr_list_lookup(&hdev->blacklist, addr, addr_type))
+	if (hci_bdaddr_list_lookup(&hdev->reject_list, addr, addr_type))
 		return NULL;
 
 	/* Most controller will fail if we try to create new connections

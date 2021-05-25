@@ -3822,7 +3822,7 @@ struct hci_dev *hci_alloc_dev(void)
 	mutex_init(&hdev->req_lock);
 
 	INIT_LIST_HEAD(&hdev->mgmt_pending);
-	INIT_LIST_HEAD(&hdev->blacklist);
+	INIT_LIST_HEAD(&hdev->reject_list);
 	INIT_LIST_HEAD(&hdev->whitelist);
 	INIT_LIST_HEAD(&hdev->uuids);
 	INIT_LIST_HEAD(&hdev->link_keys);
@@ -4042,7 +4042,7 @@ void hci_unregister_dev(struct hci_dev *hdev)
 	destroy_workqueue(hdev->req_workqueue);
 
 	hci_dev_lock(hdev);
-	hci_bdaddr_list_clear(&hdev->blacklist);
+	hci_bdaddr_list_clear(&hdev->reject_list);
 	hci_bdaddr_list_clear(&hdev->whitelist);
 	hci_uuids_clear(hdev);
 	hci_link_keys_clear(hdev);
