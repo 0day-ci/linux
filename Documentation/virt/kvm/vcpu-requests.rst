@@ -118,10 +118,11 @@ KVM_REQ_MMU_RELOAD
   necessary to inform each VCPU to completely refresh the tables.  This
   request is used for that.
 
-KVM_REQ_PENDING_TIMER
+KVM_REQ_UNBLOCK
 
   This request may be made from a timer handler run on the host on behalf
-  of a VCPU.  It informs the VCPU thread to inject a timer interrupt.
+  of a VCPU, or when device assignment is performed. It informs the VCPU to
+  exit the vcpu halt inner loop.
 
 KVM_REQ_UNHALT
 
