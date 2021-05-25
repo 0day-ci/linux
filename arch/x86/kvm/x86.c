@@ -7557,8 +7557,6 @@ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
 
 	init_emulate_ctxt(vcpu);
 
-	ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
-
 	/*
 	 * We will reenter on the same instruction since we do not set
 	 * complete_userspace_io. This does not handle watchpoints yet,
@@ -7568,7 +7566,7 @@ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
 	    kvm_vcpu_check_breakpoint(vcpu, &r))
 		return r;
 
-	r = x86_decode_insn(ctxt, insn, insn_len);
+	r = x86_decode_insn(ctxt, insn, insn_len, emulation_type);
 
 	trace_kvm_emulate_insn_start(vcpu);
 	++vcpu->stat.insn_emulation;
