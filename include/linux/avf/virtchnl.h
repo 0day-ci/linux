@@ -272,10 +272,10 @@ struct virtchnl_vf_resource {
 	u32 rss_key_size;
 	u32 rss_lut_size;
 
-	struct virtchnl_vsi_resource vsi_res[1];
+	struct virtchnl_vsi_resource vsi_res[];
 };
 
-VIRTCHNL_CHECK_STRUCT_LEN(36, virtchnl_vf_resource);
+VIRTCHNL_CHECK_STRUCT_LEN(20, virtchnl_vf_resource);
 
 /* VIRTCHNL_OP_CONFIG_TX_QUEUE
  * VF sends this message to set up parameters for one TX queue.

@@ -198,8 +198,8 @@ int iavf_get_vf_config(struct iavf_adapter *adapter)
 	enum iavf_status err;
 	u16 len;
 
-	len =  sizeof(struct virtchnl_vf_resource) +
-		IAVF_MAX_VF_VSI * sizeof(struct virtchnl_vsi_resource);
+	len = struct_size((struct virtchnl_vf_resource *)0, vsi_res,
+			  IAVF_MAX_VF_VSI);
 	event.buf_len = len;
 	event.msg_buf = kzalloc(event.buf_len, GFP_KERNEL);
 	if (!event.msg_buf) {
@@ -1662,9 +1662,8 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		}
 		break;
 	case VIRTCHNL_OP_GET_VF_RESOURCES: {
-		u16 len = sizeof(struct virtchnl_vf_resource) +
-			  IAVF_MAX_VF_VSI *
-			  sizeof(struct virtchnl_vsi_resource);
+		u16 len = struct_size((struct virtchnl_vf_resource *)0,
+				      vsi_res, IAVF_MAX_VF_VSI);
 		memcpy(adapter->vf_res, msg, min(msglen, len));
 		iavf_validate_num_queues(adapter);
 		iavf_vf_parse_hw_config(&adapter->hw, adapter->vf_res);

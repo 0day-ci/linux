@@ -2281,7 +2281,7 @@ static int ice_vc_get_vf_res_msg(struct ice_vf *vf, u8 *msg)
 	struct virtchnl_vf_resource *vfres = NULL;
 	struct ice_pf *pf = vf->pf;
 	struct ice_vsi *vsi;
-	int len = 0;
+	size_t len = 0;
 	int ret;
 
 	if (ice_check_vf_init(pf, vf)) {
@@ -2289,7 +2289,7 @@ static int ice_vc_get_vf_res_msg(struct ice_vf *vf, u8 *msg)
 		goto err;
 	}
 
-	len = sizeof(struct virtchnl_vf_resource);
+	len = struct_size(vfres, vsi_res, 1);
 
 	vfres = kzalloc(len, GFP_KERNEL);
 	if (!vfres) {

@@ -89,9 +89,8 @@ struct iavf_vsi {
 #define IAVF_HLUT_ARRAY_SIZE ((IAVF_VFQF_HLUT_MAX_INDEX + 1) * 4)
 #define IAVF_MBPS_DIVISOR	125000 /* divisor to convert to Mbps */
 
-#define IAVF_VIRTCHNL_VF_RESOURCE_SIZE (sizeof(struct virtchnl_vf_resource) + \
-					(IAVF_MAX_VF_VSI * \
-					 sizeof(struct virtchnl_vsi_resource)))
+#define IAVF_VIRTCHNL_VF_RESOURCE_SIZE (struct_size((struct virtchnl_vf_resource *)0, \
+					vsi_res, IAVF_MAX_VF_VSI))
 
 /* MAX_MSIX_Q_VECTORS of these are allocated,
  * but we only use one per queue-specific vector.

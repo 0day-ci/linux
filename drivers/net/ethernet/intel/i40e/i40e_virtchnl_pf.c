@@ -2048,7 +2048,6 @@ static int i40e_vc_get_vf_resources_msg(struct i40e_vf *vf, u8 *msg)
 	struct i40e_pf *pf = vf->pf;
 	i40e_status aq_ret = 0;
 	struct i40e_vsi *vsi;
-	int num_vsis = 1;
 	size_t len = 0;
 	int ret;
 
@@ -2057,7 +2056,7 @@ static int i40e_vc_get_vf_resources_msg(struct i40e_vf *vf, u8 *msg)
 		goto err;
 	}
 
-	len = struct_size(vfres, vsi_res, num_vsis);
+	len = struct_size(vfres, vsi_res, 1);
 	vfres = kzalloc(len, GFP_KERNEL);
 	if (!vfres) {
 		aq_ret = I40E_ERR_NO_MEMORY;
@@ -2131,7 +2130,7 @@ static int i40e_vc_get_vf_resources_msg(struct i40e_vf *vf, u8 *msg)
 	if (vf->driver_caps & VIRTCHNL_VF_OFFLOAD_ADQ)
 		vfres->vf_cap_flags |= VIRTCHNL_VF_OFFLOAD_ADQ;
 
-	vfres->num_vsis = num_vsis;
+	vfres->num_vsis = 1;
 	vfres->num_queue_pairs = vf->num_queue_pairs;
 	vfres->max_vectors = pf->hw.func_caps.num_msix_vectors_vf;
 	vfres->rss_key_size = I40E_HKEY_ARRAY_SIZE;
