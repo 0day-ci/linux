@@ -835,7 +835,7 @@ void iavf_set_rss_key(struct iavf_adapter *adapter)
 void iavf_set_rss_lut(struct iavf_adapter *adapter)
 {
 	struct virtchnl_rss_lut *vrl;
-	int len;
+	size_t len;
 
 	if (adapter->current_op != VIRTCHNL_OP_UNKNOWN) {
 		/* bail because we already have a command pending */
@@ -843,8 +843,7 @@ void iavf_set_rss_lut(struct iavf_adapter *adapter)
 			adapter->current_op);
 		return;
 	}
-	len = sizeof(struct virtchnl_rss_lut) +
-	      (adapter->rss_lut_size * sizeof(u8)) - 1;
+	len = struct_size(vrl, lut, adapter->rss_lut_size);
 	vrl = kzalloc(len, GFP_KERNEL);
 	if (!vrl)
 		return;
