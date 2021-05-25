@@ -638,7 +638,7 @@ unlock:
 
 static void tgl_disallow_dc3co_on_psr2_exit(struct intel_dp *intel_dp)
 {
-	if (!intel_dp->psr.dc3co_enabled)
+	if (!intel_dp->psr.dc3co_exitline)
 		return;
 
 	cancel_delayed_work(&intel_dp->psr.dc3co_work);
@@ -669,7 +669,7 @@ tgl_dc3co_exitline_compute_config(struct intel_dp *intel_dp,
 	if (crtc_state->enable_psr2_sel_fetch)
 		return;
 
-	if (!(dev_priv->csr.allowed_dc_mask & DC_STATE_EN_DC3CO))
+	if (!(dev_priv->dmc.allowed_dc_mask & DC_STATE_EN_DC3CO))
 		return;
 
 	/* B.Specs:49196 DC3CO only works with pipeA and DDIA.*/
@@ -1010,7 +1010,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 
 	psr_irq_control(intel_dp);
 
-	if (crtc_state->dc3co_exitline) {
+	if (intel_dp->psr.dc3co_exitline) {
 		u32 val;
 
 		/*
@@ -1019,7 +1019,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 		 */
 		val = intel_de_read(dev_priv, EXITLINE(cpu_transcoder));
 		val &= ~EXITLINE_MASK;
-		val |= crtc_state->dc3co_exitline << EXITLINE_SHIFT;
+		val |= intel_dp->psr.dc3co_exitline << EXITLINE_SHIFT;
 		val |= EXITLINE_ENABLE;
 		intel_de_write(dev_priv, EXITLINE(cpu_transcoder), val);
 	}
@@ -1030,26 +1030,10 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 			     IGNORE_PSR2_HW_TRACKING : 0);
 }
 
-static void intel_psr_enable_locked(struct intel_dp *intel_dp,
-				    const struct intel_crtc_state *crtc_state,
-				    const struct drm_connector_state *conn_state)
+static bool psr_interrupt_error_check(struct intel_dp *intel_dp)
 {
-	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
-	struct intel_encoder *encoder = &dig_port->base;
 	u32 val;
-
-	drm_WARN_ON(&dev_priv->drm, intel_dp->psr.enabled);
-
-	intel_dp->psr.psr2_enabled = crtc_state->has_psr2;
-	intel_dp->psr.busy_frontbuffer_bits = 0;
-	intel_dp->psr.pipe = to_intel_crtc(crtc_state->uapi.crtc)->pipe;
-	intel_dp->psr.dc3co_enabled = !!crtc_state->dc3co_exitline;
-	intel_dp->psr.transcoder = crtc_state->cpu_transcoder;
-	/* DC5/DC6 requires at least 6 idle frames */
-	val = usecs_to_jiffies(intel_get_frame_time_us(crtc_state) * 6);
-	intel_dp->psr.dc3co_exit_delay = val;
-	intel_dp->psr.psr2_sel_fetch_enabled = crtc_state->enable_psr2_sel_fetch;
 
 	/*
 	 * If a PSR error happened and the driver is reloaded, the EDP_PSR_IIR
@@ -1071,8 +1055,35 @@ static void intel_psr_enable_locked(struct intel_dp *intel_dp,
 		intel_dp->psr.sink_not_reliable = true;
 		drm_dbg_kms(&dev_priv->drm,
 			    "PSR interruption error set, not enabling PSR\n");
-		return;
+		return false;
 	}
+
+	return true;
+}
+
+static void intel_psr_enable_locked(struct intel_dp *intel_dp,
+				    const struct intel_crtc_state *crtc_state,
+				    const struct drm_connector_state *conn_state)
+{
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	struct intel_encoder *encoder = &dig_port->base;
+	u32 val;
+
+	drm_WARN_ON(&dev_priv->drm, intel_dp->psr.enabled);
+
+	intel_dp->psr.psr2_enabled = crtc_state->has_psr2;
+	intel_dp->psr.busy_frontbuffer_bits = 0;
+	intel_dp->psr.pipe = to_intel_crtc(crtc_state->uapi.crtc)->pipe;
+	intel_dp->psr.transcoder = crtc_state->cpu_transcoder;
+	/* DC5/DC6 requires at least 6 idle frames */
+	val = usecs_to_jiffies(intel_get_frame_time_us(crtc_state) * 6);
+	intel_dp->psr.dc3co_exit_delay = val;
+	intel_dp->psr.dc3co_exitline = crtc_state->dc3co_exitline;
+	intel_dp->psr.psr2_sel_fetch_enabled = crtc_state->enable_psr2_sel_fetch;
+
+	if (!psr_interrupt_error_check(intel_dp))
+		return;
 
 	drm_dbg_kms(&dev_priv->drm, "Enabling PSR%s\n",
 		    intel_dp->psr.psr2_enabled ? "2" : "1");
@@ -1818,7 +1829,7 @@ tgl_dc3co_flush(struct intel_dp *intel_dp, unsigned int frontbuffer_bits,
 {
 	mutex_lock(&intel_dp->psr.lock);
 
-	if (!intel_dp->psr.dc3co_enabled)
+	if (!intel_dp->psr.dc3co_exitline)
 		goto unlock;
 
 	if (!intel_dp->psr.psr2_enabled || !intel_dp->psr.active)
