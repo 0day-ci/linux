@@ -417,7 +417,7 @@ retry:
 EXPORT_SYMBOL(dma_resv_copy_fences);
 
 /**
- * dma_resv_get_fences_rcu - Get an object's shared and exclusive
+ * dma_resv_get_fences_unlocked - Get an object's shared and exclusive
  * fences without update side lock held
  * @obj: the reservation object
  * @pfence_excl: the returned exclusive fence (or NULL)
@@ -429,10 +429,10 @@ EXPORT_SYMBOL(dma_resv_copy_fences);
  * exclusive fence is not specified the fence is put into the array of the
  * shared fences as well. Returns either zero or -ENOMEM.
  */
-int dma_resv_get_fences_rcu(struct dma_resv *obj,
-			    struct dma_fence **pfence_excl,
-			    unsigned *pshared_count,
-			    struct dma_fence ***pshared)
+int dma_resv_get_fences_unlocked(struct dma_resv *obj,
+				 struct dma_fence **pfence_excl,
+				 unsigned *pshared_count,
+				 struct dma_fence ***pshared)
 {
 	struct dma_fence **shared = NULL;
 	struct dma_fence *fence_excl;
@@ -515,10 +515,10 @@ unlock:
 	*pshared = shared;
 	return ret;
 }
-EXPORT_SYMBOL_GPL(dma_resv_get_fences_rcu);
+EXPORT_SYMBOL_GPL(dma_resv_get_fences_unlocked);
 
 /**
- * dma_resv_wait_timeout_rcu - Wait on reservation's objects
+ * dma_resv_wait_timeout_unlocked - Wait on reservation's objects
  * shared and/or exclusive fences.
  * @obj: the reservation object
  * @wait_all: if true, wait on all fences, else wait on just exclusive fence
@@ -529,9 +529,9 @@ EXPORT_SYMBOL_GPL(dma_resv_get_fences_rcu);
  * Returns -ERESTARTSYS if interrupted, 0 if the wait timed out, or
  * greater than zer on success.
  */
-long dma_resv_wait_timeout_rcu(struct dma_resv *obj,
-			       bool wait_all, bool intr,
-			       unsigned long timeout)
+long dma_resv_wait_timeout_unlocked(struct dma_resv *obj,
+				    bool wait_all, bool intr,
+				    unsigned long timeout)
 {
 	struct dma_fence *fence;
 	unsigned seq, shared_count;
@@ -602,7 +602,7 @@ unlock_retry:
 	rcu_read_unlock();
 	goto retry;
 }
-EXPORT_SYMBOL_GPL(dma_resv_wait_timeout_rcu);
+EXPORT_SYMBOL_GPL(dma_resv_wait_timeout_unlocked);
 
 
 static inline int dma_resv_test_signaled_single(struct dma_fence *passed_fence)
@@ -622,7 +622,7 @@ static inline int dma_resv_test_signaled_single(struct dma_fence *passed_fence)
 }
 
 /**
- * dma_resv_test_signaled_rcu - Test if a reservation object's
+ * dma_resv_test_signaled_unlocked - Test if a reservation object's
  * fences have been signaled.
  * @obj: the reservation object
  * @test_all: if true, test all fences, otherwise only test the exclusive
@@ -631,7 +631,7 @@ static inline int dma_resv_test_signaled_single(struct dma_fence *passed_fence)
  * RETURNS
  * true if all fences signaled, else false
  */
-bool dma_resv_test_signaled_rcu(struct dma_resv *obj, bool test_all)
+bool dma_resv_test_signaled_unlocked(struct dma_resv *obj, bool test_all)
 {
 	unsigned seq, shared_count;
 	int ret;
@@ -680,4 +680,4 @@ retry:
 	rcu_read_unlock();
 	return ret;
 }
-EXPORT_SYMBOL_GPL(dma_resv_test_signaled_rcu);
+EXPORT_SYMBOL_GPL(dma_resv_test_signaled_unlocked);

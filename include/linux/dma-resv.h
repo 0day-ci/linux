@@ -246,7 +246,7 @@ dma_resv_get_excl(struct dma_resv *obj)
 }
 
 /**
- * dma_resv_get_excl_rcu - get the reservation object's
+ * dma_resv_get_excl_unlocked - get the reservation object's
  * exclusive fence, without lock held.
  * @obj: the reservation object
  *
@@ -257,7 +257,7 @@ dma_resv_get_excl(struct dma_resv *obj)
  * The exclusive fence or NULL if none
  */
 static inline struct dma_fence *
-dma_resv_get_excl_rcu(struct dma_resv *obj)
+dma_resv_get_excl_unlocked(struct dma_resv *obj)
 {
 	struct dma_fence *fence;
 
@@ -278,16 +278,16 @@ void dma_resv_add_shared_fence(struct dma_resv *obj, struct dma_fence *fence);
 
 void dma_resv_add_excl_fence(struct dma_resv *obj, struct dma_fence *fence);
 
-int dma_resv_get_fences_rcu(struct dma_resv *obj,
-			    struct dma_fence **pfence_excl,
-			    unsigned *pshared_count,
-			    struct dma_fence ***pshared);
+int dma_resv_get_fences_unlocked(struct dma_resv *obj,
+				 struct dma_fence **pfence_excl,
+				 unsigned *pshared_count,
+				 struct dma_fence ***pshared);
 
 int dma_resv_copy_fences(struct dma_resv *dst, struct dma_resv *src);
 
-long dma_resv_wait_timeout_rcu(struct dma_resv *obj, bool wait_all, bool intr,
-			       unsigned long timeout);
+long dma_resv_wait_timeout_unlocked(struct dma_resv *obj, bool wait_all, bool intr,
+				    unsigned long timeout);
 
-bool dma_resv_test_signaled_rcu(struct dma_resv *obj, bool test_all);
+bool dma_resv_test_signaled_unlocked(struct dma_resv *obj, bool test_all);
 
 #endif /* _LINUX_RESERVATION_H */

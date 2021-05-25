@@ -815,8 +815,8 @@ int amdgpu_bo_kmap(struct amdgpu_bo *bo, void **ptr)
 		return 0;
 	}
 
-	r = dma_resv_wait_timeout_rcu(bo->tbo.base.resv, false, false,
-						MAX_SCHEDULE_TIMEOUT);
+	r = dma_resv_wait_timeout_unlocked(bo->tbo.base.resv, false, false,
+					   MAX_SCHEDULE_TIMEOUT);
 	if (r < 0)
 		return r;
 
