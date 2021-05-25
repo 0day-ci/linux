@@ -4659,6 +4659,29 @@ int pcie_flr(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pcie_flr);
 
+/**
+ * pci_dev_is_alive - check the pci device is alive or not
+ * @pdev: the PCI device
+ *
+ * Device drivers use this API to proactively check if the device
+ * is alive or not. It is helpful for some PCI devices to detect
+ * surprise removal and do recovery when Hotplug function is disabled.
+ *
+ * Note: Device in power state larger than D0 is also treated not alive
+ * by this function.
+ *
+ * Returns true if the device is alive.
+ */
+bool pci_dev_is_alive(struct pci_dev *pdev)
+{
+	u16 vendor;
+
+	pci_read_config_word(pdev, PCI_VENDOR_ID, &vendor);
+
+	return vendor == pdev->vendor;
+}
+EXPORT_SYMBOL(pci_dev_is_alive);
+
 static int pci_af_flr(struct pci_dev *dev, int probe)
 {
 	int pos;
