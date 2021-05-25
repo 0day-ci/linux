@@ -2552,13 +2552,17 @@ int gpiod_get_array_value_complex(bool raw, bool can_sleep,
 			mask = fastpath_mask;
 			bits = fastpath_bits;
 		} else {
-			mask = kmalloc_array(2 * BITS_TO_LONGS(gc->ngpio),
-					   sizeof(*mask),
-					   can_sleep ? GFP_KERNEL : GFP_ATOMIC);
+			gfp_t flags = can_sleep ? GFP_KERNEL : GFP_ATOMIC;
+
+			mask = bitmap_alloc(gc->ngpio, flags);
 			if (!mask)
 				return -ENOMEM;
 
-			bits = mask + BITS_TO_LONGS(gc->ngpio);
+			bits = bitmap_alloc(gc->ngpio, flags);
+			if (!bits) {
+				bitmap_free(mask);
+				return -ENOMEM;
+			}
 		}
 
 		bitmap_zero(mask, gc->ngpio);
@@ -2584,7 +2588,9 @@ int gpiod_get_array_value_complex(bool raw, bool can_sleep,
 		ret = gpio_chip_get_multiple(gc, mask, bits);
 		if (ret) {
 			if (mask != fastpath_mask)
-				kfree(mask);
+				bitmap_free(mask);
+			if (bits != fastpath_bits)
+				bitmap_free(bits);
 			return ret;
 		}
 
@@ -2605,7 +2611,9 @@ int gpiod_get_array_value_complex(bool raw, bool can_sleep,
 		}
 
 		if (mask != fastpath_mask)
-			kfree(mask);
+			bitmap_free(mask);
+		if (bits != fastpath_bits)
+			bitmap_free(bits);
 	}
 	return 0;
 }
@@ -2838,13 +2846,17 @@ int gpiod_set_array_value_complex(bool raw, bool can_sleep,
 			mask = fastpath_mask;
 			bits = fastpath_bits;
 		} else {
-			mask = kmalloc_array(2 * BITS_TO_LONGS(gc->ngpio),
-					   sizeof(*mask),
-					   can_sleep ? GFP_KERNEL : GFP_ATOMIC);
+			gfp_t flags = can_sleep ? GFP_KERNEL : GFP_ATOMIC;
+
+			mask = bitmap_alloc(gc->ngpio, flags);
 			if (!mask)
 				return -ENOMEM;
 
-			bits = mask + BITS_TO_LONGS(gc->ngpio);
+			bits = bitmap_alloc(gc->ngpio, flags);
+			if (!bits) {
+				bitmap_free(mask);
+				return -ENOMEM;
+			}
 		}
 
 		bitmap_zero(mask, gc->ngpio);
@@ -2892,7 +2904,9 @@ int gpiod_set_array_value_complex(bool raw, bool can_sleep,
 			gpio_chip_set_multiple(gc, mask, bits);
 
 		if (mask != fastpath_mask)
-			kfree(mask);
+			bitmap_free(mask);
+		if (bits != fastpath_bits)
+			bitmap_free(bits);
 	}
 	return 0;
 }
