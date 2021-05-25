@@ -389,7 +389,7 @@ static long dma_buf_export_sync_file(struct dma_buf *dmabuf,
 		return fd;
 
 	if (arg.flags & DMA_BUF_SYNC_WRITE) {
-		fence = dma_resv_get_singleton_unlocked(dmabuf->resv);
+		fence = dma_resv_get_singleton_unlocked(dmabuf->resv, NULL);
 		if (IS_ERR(fence)) {
 			ret = PTR_ERR(fence);
 			goto err_put_fd;

@@ -527,6 +527,7 @@ EXPORT_SYMBOL_GPL(dma_resv_get_fences_unlocked);
 /**
  * dma_resv_get_singleton_unlocked - get a single fence for the dma_resv object
  * @obj: the reservation object
+ * @extra: extra fence to add to the resulting array
  *
  * Get a single fence representing all unsignaled fences in the dma_resv object
  * plus the given extra fence. If we got only one fence return a new
@@ -535,7 +536,8 @@ EXPORT_SYMBOL_GPL(dma_resv_get_fences_unlocked);
  * RETURNS
  * The singleton dma_fence on success or an ERR_PTR on failure
  */
-struct dma_fence *dma_resv_get_singleton_unlocked(struct dma_resv *obj)
+struct dma_fence *dma_resv_get_singleton_unlocked(struct dma_resv *obj,
+						  struct dma_fence *extra)
 {
 	struct dma_fence *result, **resv_fences, *fence, *chain, **fences;
 	struct dma_fence_array *array;
@@ -546,7 +548,7 @@ struct dma_fence *dma_resv_get_singleton_unlocked(struct dma_resv *obj)
 	if (err)
 		return ERR_PTR(err);
 
-	if (num_resv_fences == 0)
+	if (num_resv_fences == 0 && !extra)
 		return NULL;
 
 	num_fences = 0;
@@ -554,6 +556,16 @@ struct dma_fence *dma_resv_get_singleton_unlocked(struct dma_resv *obj)
 
 	for (i = 0; i < num_resv_fences; ++i) {
 		dma_fence_deep_dive_for_each(fence, chain, j, resv_fences[i]) {
+			if (dma_fence_is_signaled(fence))
+				continue;
+
+			result = fence;
+			++num_fences;
+		}
+	}
+
+	if (extra) {
+		dma_fence_deep_dive_for_each(fence, chain, j, extra) {
 			if (dma_fence_is_signaled(fence))
 				continue;
 
@@ -578,6 +590,13 @@ struct dma_fence *dma_resv_get_singleton_unlocked(struct dma_resv *obj)
 	for (i = 0; i < num_resv_fences; ++i) {
 		dma_fence_deep_dive_for_each(fence, chain, j, resv_fences[i]) {
 			if (!dma_fence_is_signaled(fence))
+				fences[num_fences++] = dma_fence_get(fence);
+		}
+	}
+
+	if (extra) {
+		dma_fence_deep_dive_for_each(fence, chain, j, extra) {
+			if (dma_fence_is_signaled(fence))
 				fences[num_fences++] = dma_fence_get(fence);
 		}
 	}
