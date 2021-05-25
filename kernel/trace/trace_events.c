@@ -594,7 +594,7 @@ static int __ftrace_event_enable_disable(struct trace_event_file *file,
 		 *
 		 * When soft_disable is not set but the SOFT_MODE flag is,
 		 * we do nothing. Do not disable the tracepoint, otherwise
-		 * "soft enable"s (clearing the SOFT_DISABLED bit) wont work.
+		 * "soft enable"s (clearing the SOFT_DISABLED bit) won't work.
 		 */
 		if (soft_disable) {
 			if (atomic_dec_return(&file->sm_ref) > 0)

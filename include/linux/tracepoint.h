@@ -507,7 +507,7 @@ static inline struct tracepoint *tracepoint_ptr_deref(tracepoint_ptr_t *p)
  *	* This is how the tracepoint will appear under ftrace
  *	* plugins that make use of this tracepoint.
  *	*
- *	* (raw-binary tracing wont actually perform this step.)
+ *	* (raw-binary tracing won't actually perform this step.)
  *	*
  *
  *	TP_printk("task %s:%d [%d] ==> %s:%d [%d]",

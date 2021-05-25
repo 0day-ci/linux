@@ -274,7 +274,7 @@ static void branch_stat_show(struct seq_file *m,
 	long percent;
 
 	/*
-	 * The miss is overlayed on correct, and hit on incorrect.
+	 * The miss is overlaid on correct, and hit on incorrect.
 	 */
 	percent = get_incorrect_percent(p);
 
