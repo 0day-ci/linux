@@ -10,9 +10,25 @@
 #include <linux/root_dev.h>
 #include <linux/init_syscalls.h>
 
+extern int root_mountflags;
+
 void  mount_block_root(char *name, int flags);
 void  mount_root(void);
-extern int root_mountflags;
+bool  ramdisk_exec_exist(void);
+
+#ifdef CONFIG_INITRAMFS_USER_ROOT
+
+int   mount_user_root(void);
+void  end_mount_user_root(bool succeed);
+void  init_user_rootfs(void);
+
+#else
+
+static inline int   mount_user_root(void) { return 0; }
+static inline void  end_mount_user_root(bool succeed) { }
+static inline void  init_user_rootfs(void) { }
+
+#endif
 
 static inline __init int create_dev(char *name, dev_t dev)
 {
