@@ -22,8 +22,38 @@
 
 #include <linux/types.h>
 
-/* begin/end dma-buf functions used for userspace mmap. */
+/**
+ * struct dma_buf_sync - Synchronize with CPU access.
+ *
+ * When a DMA buffer is accessed from the CPU via mmap, it is not always
+ * possible to guarantee coherency between the CPU-visible map and underlying
+ * memory.  To manage coherency, DMA_BUF_IOCTL_SYNC must be used to bracket
+ * any CPU access to give the kernel the chance to shuffle memory around if
+ * needed.
+ *
+ * Prior to accessing the map, the client should call DMA_BUF_IOCTL_SYNC
+ * with DMA_BUF_SYNC_START and the appropriate read/write flags.  Once the
+ * access is complete, the client should call DMA_BUF_IOCTL_SYNC with
+ * DMA_BUF_SYNC_END and the same read/write flags.
+ */
 struct dma_buf_sync {
+	/**
+	 * @flags: Set of access flags
+	 *
+	 * - DMA_BUF_SYNC_START: Indicates the start of a map access
+	 *   session.
+	 *
+	 * - DMA_BUF_SYNC_END: Indicates the end of a map access session.
+	 *
+	 * - DMA_BUF_SYNC_READ: Indicates that the mapped DMA buffer will
+	 *   be read by the client via the CPU map.
+	 *
+	 * - DMA_BUF_SYNC_READ: Indicates that the mapped DMA buffer will
+	 *   be written by the client via the CPU map.
+	 *
+	 * - DMA_BUF_SYNC_RW: An alias for DMA_BUF_SYNC_READ |
+	 *   DMA_BUF_SYNC_WRITE.
+	 */
 	__u64 flags;
 };
 
