@@ -2263,6 +2263,8 @@ static struct rq *__migrate_task(struct rq *rq, struct rq_flags *rf,
 	return rq;
 }
 
+static int select_fallback_rq(int cpu, struct task_struct *p);
+
 /*
  * migration_cpu_stop - this will be executed by a highprio stopper thread
  * and performs thread migration by bumping thread off CPU then
@@ -2276,6 +2278,7 @@ static int migration_cpu_stop(void *data)
 	struct rq *rq = this_rq();
 	bool complete = false;
 	struct rq_flags rf;
+	int dest_cpu;
 
 	/*
 	 * The original target CPU might have gone down and we might
@@ -2315,18 +2318,27 @@ static int migration_cpu_stop(void *data)
 				goto out;
 		}
 
-		if (task_on_rq_queued(p))
-			rq = __migrate_task(rq, &rf, p, arg->dest_cpu);
-		else
-			p->wake_cpu = arg->dest_cpu;
-
-		/*
-		 * XXX __migrate_task() can fail, at which point we might end
-		 * up running on a dodgy CPU, AFAICT this can only happen
-		 * during CPU hotplug, at which point we'll get pushed out
-		 * anyway, so it's probably not a big deal.
-		 */
-
+		dest_cpu = arg->dest_cpu;
+		if (task_on_rq_queued(p)) {
+			/*
+			 * A hotplug operation could have happened between
+			 * set_cpus_allowed_ptr() and here, making dest_cpu no
+			 * longer allowed.
+			 */
+			if (!is_cpu_allowed(p, dest_cpu))
+				dest_cpu = select_fallback_rq(cpu_of(rq), p);
+			/*
+			 * dest_cpu can be victim of hotplug between is_cpu_allowed()
+			 * and here. However, per the synchronize_rcu() in
+			 * sched_cpu_deactivate(), it can't have gone lower than
+			 * CPUHP_AP_ACTIVE, so it's safe to punt it over and let
+			 * balance_push() route it elsewhere.
+			 */
+			update_rq_clock(rq);
+			rq = move_queued_task(rq, &rf, p, dest_cpu);
+		} else {
+			p->wake_cpu = dest_cpu;
+		}
 	} else if (pending) {
 		/*
 		 * This happens when we get migrated between migrate_enable()'s
