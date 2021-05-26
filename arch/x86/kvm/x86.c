@@ -2179,14 +2179,15 @@ static u32 adjust_tsc_khz(u32 khz, s32 ppm)
 	return v;
 }
 
+static void kvm_vcpu_write_tsc_multiplier(struct kvm_vcpu *vcpu, u64 l1_multiplier);
+
 static int set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
 {
 	u64 ratio;
 
 	/* Guest TSC same frequency as host TSC? */
 	if (!scale) {
-		vcpu->arch.l1_tsc_scaling_ratio = kvm_default_tsc_scaling_ratio;
-		vcpu->arch.tsc_scaling_ratio = kvm_default_tsc_scaling_ratio;
+		kvm_vcpu_write_tsc_multiplier(vcpu, kvm_default_tsc_scaling_ratio);
 		return 0;
 	}
 
@@ -2212,7 +2213,7 @@ static int set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
 		return -1;
 	}
 
-	vcpu->arch.l1_tsc_scaling_ratio = vcpu->arch.tsc_scaling_ratio = ratio;
+	kvm_vcpu_write_tsc_multiplier(vcpu, ratio);
 	return 0;
 }
 
@@ -2224,8 +2225,7 @@ static int kvm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz)
 	/* tsc_khz can be zero if TSC calibration fails */
 	if (user_tsc_khz == 0) {
 		/* set tsc_scaling_ratio to a safe value */
-		vcpu->arch.l1_tsc_scaling_ratio = kvm_default_tsc_scaling_ratio;
-		vcpu->arch.tsc_scaling_ratio = kvm_default_tsc_scaling_ratio;
+		kvm_vcpu_write_tsc_multiplier(vcpu, kvm_default_tsc_scaling_ratio);
 		return -1;
 	}
 
@@ -2381,6 +2381,23 @@ static void kvm_vcpu_write_tsc_offset(struct kvm_vcpu *vcpu, u64 l1_offset)
 		vcpu->arch.tsc_offset = l1_offset;
 
 	static_call(kvm_x86_write_tsc_offset)(vcpu, vcpu->arch.tsc_offset);
+}
+
+static void kvm_vcpu_write_tsc_multiplier(struct kvm_vcpu *vcpu, u64 l1_multiplier)
+{
+	vcpu->arch.l1_tsc_scaling_ratio = l1_multiplier;
+
+	/* Userspace is changing the multiplier while L2 is active */
+	if (is_guest_mode(vcpu))
+		vcpu->arch.tsc_scaling_ratio = kvm_calc_nested_tsc_multiplier(
+			l1_multiplier,
+			static_call(kvm_x86_get_l2_tsc_multiplier)(vcpu));
+	else
+		vcpu->arch.tsc_scaling_ratio = l1_multiplier;
+
+	if (kvm_has_tsc_control)
+		static_call(kvm_x86_write_tsc_multiplier)(
+			vcpu, vcpu->arch.tsc_scaling_ratio);
 }
 
 static inline bool kvm_check_tsc_unstable(void)
@@ -10444,6 +10461,7 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
 		return;
 	vcpu_load(vcpu);
 	kvm_synchronize_tsc(vcpu, 0);
+	kvm_vcpu_write_tsc_multiplier(vcpu, kvm_default_tsc_scaling_ratio);
 	vcpu_put(vcpu);
 
 	/* poll control enabled by default */
