@@ -38,6 +38,15 @@ config DRM_I915_USERFAULT_AUTOSUSPEND
 	  May be 0 to disable the extra delay and solely use the device level
 	  runtime pm autosuspend delay tunable.
 
+config DRM_I915_GUC_CTB_TIMEOUT
+	int "How long to wait for the GuC to make forward progress on CTBs (ms)"
+	default 1500 # milliseconds
+	help
+	  Configures the default timeout waiting for GuC the to make forward
+	  progress on CTBs. e.g. Waiting for a response to requeset.
+
+	  A minimum value of 10 ms is allowed.
+
 config DRM_I915_HEARTBEAT_INTERVAL
 	int "Interval between heartbeat pulses (ms)"
 	default 2500 # milliseconds
