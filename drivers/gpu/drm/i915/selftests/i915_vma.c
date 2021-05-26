@@ -987,12 +987,6 @@ static int igt_vma_remapped_gtt(void *arg)
 			u32 __iomem *map;
 			unsigned int x, y;
 
-			i915_gem_object_lock(obj, NULL);
-			err = i915_gem_object_set_to_gtt_domain(obj, true);
-			i915_gem_object_unlock(obj);
-			if (err)
-				goto out;
-
 			if (!plane_info[0].dst_stride)
 				plane_info[0].dst_stride = *t == I915_GGTT_VIEW_ROTATED ?
 								 p->height : p->width;
