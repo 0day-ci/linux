@@ -395,10 +395,11 @@ static int push_tx_frames(struct cxgbi_sock *csk, int req_completion)
 	struct sk_buff *skb;
 
 	if (unlikely(csk->state < CTP_ESTABLISHED ||
-		csk->state == CTP_CLOSE_WAIT_1 || csk->state >= CTP_ABORTING)) {
-			log_debug(1 << CXGBI_DBG_TOE | 1 << CXGBI_DBG_PDU_TX,
-				"csk 0x%p,%u,0x%lx,%u, in closing state.\n",
-				csk, csk->state, csk->flags, csk->tid);
+		     csk->state == CTP_CLOSE_WAIT_1 ||
+		     csk->state >= CTP_ABORTING)) {
+		log_debug(1 << CXGBI_DBG_TOE | 1 << CXGBI_DBG_PDU_TX,
+			  "csk 0x%p,%u,0x%lx,%u, in closing state.\n",
+			  csk, csk->state, csk->flags, csk->tid);
 		return 0;
 	}
 
