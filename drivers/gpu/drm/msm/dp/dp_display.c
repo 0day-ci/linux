@@ -104,6 +104,8 @@ struct dp_display_private {
 
 	bool encoder_mode_set;
 
+	bool mainlink_on;
+
 	/* wait for audio signaling */
 	struct completion audio_comp;
 
@@ -353,11 +355,14 @@ static int dp_display_process_hpd_high(struct dp_display_private *dp)
 	dp_link_psm_config(dp->link, &dp->panel->link_info, false);
 
 	dp_link_reset_phy_params_vx_px(dp->link);
+
+	dp->mainlink_on = false;
 	rc = dp_ctrl_on_link(dp->ctrl);
 	if (rc) {
 		DRM_ERROR("failed to complete DP link training\n");
 		goto end;
 	}
+	dp->mainlink_on = true;
 
 	dp_add_event(dp, EV_USER_NOTIFICATION, true, 0);
 
@@ -392,7 +397,7 @@ static void dp_display_host_deinit(struct dp_display_private *dp)
 		return;
 	}
 
-	dp_ctrl_host_deinit(dp->ctrl);
+	dp_ctrl_host_deinit(dp->ctrl, dp->mainlink_on);
 	dp_aux_deinit(dp->aux);
 	dp_power_deinit(dp->power);
 
@@ -940,6 +945,8 @@ static int dp_display_disable(struct dp_display_private *dp, u32 data)
 		dp_ctrl_off(dp->ctrl);
 		dp->core_initialized = false;
 	}
+
+	dp->mainlink_on = false;
 
 	dp_display->power_on = false;
 
