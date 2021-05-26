@@ -387,7 +387,7 @@ struct i2c_adapter *i2c_acpi_find_adapter_by_handle(acpi_handle handle)
 }
 EXPORT_SYMBOL_GPL(i2c_acpi_find_adapter_by_handle);
 
-static struct i2c_client *i2c_acpi_find_client_by_adev(struct acpi_device *adev)
+struct i2c_client *i2c_acpi_find_client_by_adev(struct acpi_device *adev)
 {
 	struct device *dev;
 	struct i2c_client *client;
@@ -402,6 +402,7 @@ static struct i2c_client *i2c_acpi_find_client_by_adev(struct acpi_device *adev)
 
 	return client;
 }
+EXPORT_SYMBOL_GPL(i2c_acpi_find_client_by_adev);
 
 static int i2c_acpi_notify(struct notifier_block *nb, unsigned long value,
 			   void *arg)
