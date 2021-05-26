@@ -27,6 +27,14 @@ struct page_counter {
 	unsigned long watermark;
 	unsigned long failcnt;
 
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+	/* allocation speed throttle */
+	atomic_long_t total_chg;
+	atomic_long_t mem_spd_max;
+	atomic_long_t prev_spd_jifs;
+	atomic_long_t prev_total_chg;
+#endif
+
 	/*
 	 * 'parent' is placed here to be far from 'usage' to reduce
 	 * cache false sharing, as 'usage' is written mostly while

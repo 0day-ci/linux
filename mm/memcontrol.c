@@ -1392,6 +1392,37 @@ static int memcg_page_state_unit(int item)
 	}
 }
 
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+static unsigned long mem_cgroup_mst_get_mem_spd_max(struct mem_cgroup *memcg)
+{
+	struct page_counter *c = &memcg->memory;
+	unsigned long deadline;
+
+	/* Reset speed if it is too old */
+	deadline = atomic_long_read(&c->prev_spd_jifs) + 5 * HZ;
+	if (time_after(jiffies, deadline))
+		atomic_long_set(&c->mem_spd_max, 0);
+
+	/* Clear after read */
+	return atomic_long_xchg(&c->mem_spd_max, 0) << PAGE_SHIFT;
+}
+
+static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
+					    struct seq_file *m)
+{
+	if (mem_cgroup_is_root(memcg))
+		return;
+
+	seq_printf(m, "mst_mem_spd_max %lu\n",
+		   mem_cgroup_mst_get_mem_spd_max(memcg));
+}
+#else /* CONFIG_MEM_SPEED_THROTTLE */
+static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
+					    struct seq_file *m)
+{
+}
+#endif
+
 static inline unsigned long memcg_page_state_output(struct mem_cgroup *memcg,
 						    int item)
 {
@@ -1461,6 +1492,11 @@ static char *memory_stat_format(struct mem_cgroup *memcg)
 	seq_buf_printf(&s, "%s %lu\n", vm_event_name(THP_COLLAPSE_ALLOC),
 		       memcg_events(memcg, THP_COLLAPSE_ALLOC));
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+	seq_buf_printf(&s, "mst_mem_spd_max %lu\n",
+		mem_cgroup_mst_get_mem_spd_max(memcg));
+#endif
 
 	/* The above should easily fit into one page */
 	WARN_ON_ONCE(seq_buf_has_overflowed(&s));
@@ -3908,6 +3944,8 @@ static int memcg_stat_show(struct seq_file *m, void *v)
 		seq_printf(m, "file_cost %lu\n", file_cost);
 	}
 #endif
+
+	mem_cgroup_mst_show_mem_spd_max(memcg, m);
 
 	return 0;
 }

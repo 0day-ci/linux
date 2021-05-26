@@ -61,6 +61,39 @@ void page_counter_cancel(struct page_counter *counter, unsigned long nr_pages)
 	propagate_protected_usage(counter, new);
 }
 
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+static void mem_speed_update(struct page_counter *c, unsigned long nr_pages)
+{
+	unsigned long prev_jifs, chg, spd_max;
+	long delta_jifs, delta_chg;
+
+	chg = atomic_long_add_return(nr_pages, &c->total_chg);
+	prev_jifs = atomic_long_read(&c->prev_spd_jifs);
+
+	/* First time we get here? */
+	if (!prev_jifs)
+		goto done;
+
+	delta_jifs = jiffies - prev_jifs;
+	delta_chg = chg - atomic_long_read(&c->prev_total_chg);
+
+	if (delta_jifs <= HZ || delta_chg <= 0)
+		return;
+
+	spd_max = max(delta_chg * HZ / delta_jifs,
+			atomic_long_read(&c->mem_spd_max));
+	atomic_long_set(&c->mem_spd_max, spd_max);
+
+done:
+	atomic_long_set(&c->prev_spd_jifs, jiffies);
+	atomic_long_set(&c->prev_total_chg, chg);
+}
+#else
+static void mem_speed_update(struct page_counter *c, unsigned long nr_pages)
+{
+}
+#endif
+
 /**
  * page_counter_charge - hierarchically charge pages
  * @counter: counter
@@ -83,6 +116,9 @@ void page_counter_charge(struct page_counter *counter, unsigned long nr_pages)
 		 */
 		if (new > READ_ONCE(c->watermark))
 			WRITE_ONCE(c->watermark, new);
+
+		/* Update mem speed max, maybe inaccurate due to races */
+		mem_speed_update(c, nr_pages);
 	}
 }
 
@@ -137,6 +173,9 @@ bool page_counter_try_charge(struct page_counter *counter,
 		 */
 		if (new > READ_ONCE(c->watermark))
 			WRITE_ONCE(c->watermark, new);
+
+		/* Update mem speed max, maybe inaccurate due to races */
+		mem_speed_update(c, nr_pages);
 	}
 	return true;
 

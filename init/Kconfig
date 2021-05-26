@@ -921,6 +921,14 @@ config MEMCG_KMEM
 	depends on MEMCG && !SLOB
 	default y
 
+config MEM_SPEED_THROTTLE
+	bool "Memory allocation speed throttle for memcg"
+	depends on MEMCG
+	help
+	  This enables memory allocation speed throttle feature for memcg.
+	  It can be used to limit the memory allocation speed(bps) for memcg,
+	  and only works under memory pressure.
+
 config BLK_CGROUP
 	bool "IO controller"
 	depends on BLOCK
