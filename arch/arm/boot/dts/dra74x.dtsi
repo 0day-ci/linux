@@ -49,7 +49,7 @@
 			reg = <0x41500000 0x100>;
 		};
 
-		target-module@48940000 {
+		usb4_tm: target-module@48940000 {
 			compatible = "ti,sysc-omap4", "ti,sysc";
 			reg = <0x48940000 0x4>,
 			      <0x48940010 0x4>;
