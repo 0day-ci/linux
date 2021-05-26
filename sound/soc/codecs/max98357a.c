@@ -117,7 +117,7 @@ static struct snd_soc_dai_driver max98357a_dai_driver = {
 		.rate_min	= 8000,
 		.rate_max	= 96000,
 		.channels_min	= 1,
-		.channels_max	= 2,
+		.channels_max	= 4,
 	},
 	.ops    = &max98357a_dai_ops,
 };
