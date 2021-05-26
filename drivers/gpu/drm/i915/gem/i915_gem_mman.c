@@ -414,58 +414,6 @@ err_rpm:
 	return i915_error_to_vmf_fault(ret);
 }
 
-static int
-vm_access(struct vm_area_struct *area, unsigned long addr,
-	  void *buf, int len, int write)
-{
-	struct i915_mmap_offset *mmo = area->vm_private_data;
-	struct drm_i915_gem_object *obj = mmo->obj;
-	struct i915_gem_ww_ctx ww;
-	void *vaddr;
-	int err = 0;
-
-	if (i915_gem_object_is_readonly(obj) && write)
-		return -EACCES;
-
-	addr -= area->vm_start;
-	if (addr >= obj->base.size)
-		return -EINVAL;
-
-	i915_gem_ww_ctx_init(&ww, true);
-retry:
-	err = i915_gem_object_lock(obj, &ww);
-	if (err)
-		goto out;
-
-	/* As this is primarily for debugging, let's focus on simplicity */
-	vaddr = i915_gem_object_pin_map(obj, I915_MAP_FORCE_WC);
-	if (IS_ERR(vaddr)) {
-		err = PTR_ERR(vaddr);
-		goto out;
-	}
-
-	if (write) {
-		memcpy(vaddr + addr, buf, len);
-		__i915_gem_object_flush_map(obj, addr, len);
-	} else {
-		memcpy(buf, vaddr + addr, len);
-	}
-
-	i915_gem_object_unpin_map(obj);
-out:
-	if (err == -EDEADLK) {
-		err = i915_gem_ww_ctx_backoff(&ww);
-		if (!err)
-			goto retry;
-	}
-	i915_gem_ww_ctx_fini(&ww);
-
-	if (err)
-		return err;
-
-	return len;
-}
-
 void __i915_gem_object_release_mmap_gtt(struct drm_i915_gem_object *obj)
 {
 	struct i915_vma *vma;
@@ -801,14 +749,18 @@ static void vm_close(struct vm_area_struct *vma)
 
 static const struct vm_operations_struct vm_ops_gtt = {
 	.fault = vm_fault_gtt,
-	.access = vm_access,
+#ifdef CONFIG_HAVE_IOREMAP_PROT
+	.access = generic_access_phys
+#endif
 	.open = vm_open,
 	.close = vm_close,
 };
 
 static const struct vm_operations_struct vm_ops_cpu = {
 	.fault = vm_fault_cpu,
-	.access = vm_access,
+#ifdef CONFIG_HAVE_IOREMAP_PROT
+	.access = generic_access_phys
+#endif
 	.open = vm_open,
 	.close = vm_close,
 };
