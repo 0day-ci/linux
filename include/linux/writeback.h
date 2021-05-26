@@ -212,6 +212,7 @@ static inline void wait_on_inode(struct inode *inode)
 #include <linux/bio.h>
 
 void __inode_attach_wb(struct inode *inode, struct page *page);
+void inode_cgwb_move_to_attached(struct inode *inode, struct bdi_writeback *wb);
 void wbc_attach_and_unlock_inode(struct writeback_control *wbc,
 				 struct inode *inode)
 	__releases(&inode->i_lock);

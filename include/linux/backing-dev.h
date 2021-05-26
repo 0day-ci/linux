@@ -177,6 +177,7 @@ struct bdi_writeback *wb_get_create(struct backing_dev_info *bdi,
 void wb_memcg_offline(struct mem_cgroup *memcg);
 void wb_blkcg_offline(struct blkcg *blkcg);
 int inode_congested(struct inode *inode, int cong_bits);
+void inode_cgwb_move_to_attached(struct inode *inode, struct bdi_writeback *wb);
 
 /**
  * inode_cgwb_enabled - test whether cgroup writeback is enabled on an inode
@@ -343,6 +344,12 @@ static inline void unlocked_inode_to_wb_end(struct inode *inode,
 static inline bool inode_cgwb_enabled(struct inode *inode)
 {
 	return false;
+}
+
+static inline void inode_cgwb_move_to_attached(struct inode *inode,
+					       struct bdi_writeback *wb)
+{
+	list_del_init(&inode->i_io_list);
 }
 
 static inline struct bdi_writeback *wb_find_current(struct backing_dev_info *bdi)
