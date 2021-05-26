@@ -2158,10 +2158,42 @@ static const struct {
 	{"i915_edp_psr_debug", &i915_edp_psr_debug_fops},
 };
 
+static int dither_state_show(struct seq_file *m, void *data)
+{
+	struct intel_crtc *crtc = to_intel_crtc(m->private);
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	struct intel_crtc_state *crtc_state;
+	int ret;
+
+	if (!HAS_DISPLAY(dev_priv))
+		return -ENODEV;
+
+	ret = drm_modeset_lock_single_interruptible(&crtc->base.mutex);
+	if (ret)
+		return ret;
+
+	crtc_state = to_intel_crtc_state(crtc->base.state);
+	seq_printf(m, "bpc: %u\n", crtc_state->pipe_bpp / 3);
+	seq_printf(m, "Dither: %u\n", (crtc_state->dither) ? 1 : 0);
+	seq_printf(m, "Dither_CC1: %u\n",
+		(crtc_state->gamma_mode & GAMMA_MODE_DITHER_AFTER_CC1) ? 1 : 0);
+
+	drm_modeset_unlock(&crtc->base.mutex);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(dither_state);
+
 void intel_display_debugfs_register(struct drm_i915_private *i915)
 {
 	struct drm_minor *minor = i915->drm.primary;
+	struct drm_device *dev = &i915->drm;
+	struct drm_crtc *crtc;
 	int i;
+
+	drm_for_each_crtc(crtc, dev)
+		debugfs_create_file("dither", 0444, crtc->debugfs_entry, crtc,
+				    &dither_state_fops);
 
 	for (i = 0; i < ARRAY_SIZE(intel_display_debugfs_files); i++) {
 		debugfs_create_file(intel_display_debugfs_files[i].name,
