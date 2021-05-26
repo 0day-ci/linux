@@ -79,9 +79,9 @@
 #include "intel_cdclk.h"
 #include "intel_color.h"
 #include "intel_crtc.h"
-#include "intel_csr.h"
 #include "intel_de.h"
 #include "intel_display_types.h"
+#include "intel_dmc.h"
 #include "intel_dp_link_training.h"
 #include "intel_fbc.h"
 #include "intel_fdi.h"
@@ -3675,7 +3675,9 @@ bool intel_phy_is_combo(struct drm_i915_private *dev_priv, enum phy phy)
 
 bool intel_phy_is_tc(struct drm_i915_private *dev_priv, enum phy phy)
 {
-	if (IS_TIGERLAKE(dev_priv))
+	if (IS_ALDERLAKE_P(dev_priv))
+		return phy >= PHY_F && phy <= PHY_I;
+	else if (IS_TIGERLAKE(dev_priv))
 		return phy >= PHY_D && phy <= PHY_I;
 	else if (IS_ICELAKE(dev_priv))
 		return phy >= PHY_C && phy <= PHY_F;
@@ -5714,8 +5716,12 @@ static void hsw_set_pipeconf(const struct intel_crtc_state *crtc_state)
 static void bdw_set_pipemisc(const struct intel_crtc_state *crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
+	const struct intel_crtc_scaler_state *scaler_state =
+		&crtc_state->scaler_state;
+
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	u32 val = 0;
+	int i;
 
 	switch (crtc_state->pipe_bpp) {
 	case 18:
@@ -5753,6 +5759,23 @@ static void bdw_set_pipemisc(const struct intel_crtc_state *crtc_state)
 
 	if (DISPLAY_VER(dev_priv) >= 12)
 		val |= PIPEMISC_PIXEL_ROUNDING_TRUNC;
+
+	if (IS_ALDERLAKE_P(dev_priv)) {
+		bool scaler_in_use = false;
+
+		for (i = 0; i < crtc->num_scalers; i++) {
+			if (!scaler_state->scalers[i].in_use)
+				continue;
+
+			scaler_in_use = true;
+			break;
+		}
+
+		intel_de_rmw(dev_priv, PIPE_MISC2(crtc->pipe),
+			     PIPE_MISC2_UNDERRUN_BUBBLE_COUNTER_MASK,
+			     scaler_in_use ? PIPE_MISC2_BUBBLE_COUNTER_SCALER_EN :
+			     PIPE_MISC2_BUBBLE_COUNTER_SCALER_DIS);
+	}
 
 	intel_de_write(dev_priv, PIPEMISC(crtc->pipe), val);
 }
@@ -8750,6 +8773,38 @@ static void verify_wm_state(struct intel_crtc *crtc,
 				hw_wm_level->lines);
 		}
 
+		hw_wm_level = &hw->wm.planes[plane->id].sagv.wm0;
+		sw_wm_level = &sw_wm->planes[plane->id].sagv.wm0;
+
+		if (HAS_HW_SAGV_WM(dev_priv) &&
+		    !skl_wm_level_equals(hw_wm_level, sw_wm_level)) {
+			drm_err(&dev_priv->drm,
+				"[PLANE:%d:%s] mismatch in SAGV WM (expected e=%d b=%u l=%u, got e=%d b=%u l=%u)\n",
+				plane->base.base.id, plane->base.name,
+				sw_wm_level->enable,
+				sw_wm_level->blocks,
+				sw_wm_level->lines,
+				hw_wm_level->enable,
+				hw_wm_level->blocks,
+				hw_wm_level->lines);
+		}
+
+		hw_wm_level = &hw->wm.planes[plane->id].sagv.trans_wm;
+		sw_wm_level = &sw_wm->planes[plane->id].sagv.trans_wm;
+
+		if (HAS_HW_SAGV_WM(dev_priv) &&
+		    !skl_wm_level_equals(hw_wm_level, sw_wm_level)) {
+			drm_err(&dev_priv->drm,
+				"[PLANE:%d:%s] mismatch in SAGV trans WM (expected e=%d b=%u l=%u, got e=%d b=%u l=%u)\n",
+				plane->base.base.id, plane->base.name,
+				sw_wm_level->enable,
+				sw_wm_level->blocks,
+				sw_wm_level->lines,
+				hw_wm_level->enable,
+				hw_wm_level->blocks,
+				hw_wm_level->lines);
+		}
+
 		/* DDB */
 		hw_ddb_entry = &hw->ddb_y[plane->id];
 		sw_ddb_entry = &new_crtc_state->wm.skl.plane_ddb_y[plane->id];
@@ -9922,6 +9977,9 @@ static int intel_atomic_check(struct drm_device *dev,
 	ret = intel_atomic_check_cdclk(state, &any_ms);
 	if (ret)
 		goto fail;
+
+	if (intel_any_crtc_needs_modeset(state))
+		any_ms = true;
 
 	if (any_ms) {
 		ret = intel_modeset_checks(state);
@@ -11219,7 +11277,14 @@ static void intel_setup_outputs(struct drm_i915_private *dev_priv)
 	if (!HAS_DISPLAY(dev_priv))
 		return;
 
-	if (IS_ALDERLAKE_S(dev_priv)) {
+	if (IS_ALDERLAKE_P(dev_priv)) {
+		intel_ddi_init(dev_priv, PORT_A);
+		intel_ddi_init(dev_priv, PORT_B);
+		intel_ddi_init(dev_priv, PORT_TC1);
+		intel_ddi_init(dev_priv, PORT_TC2);
+		intel_ddi_init(dev_priv, PORT_TC3);
+		intel_ddi_init(dev_priv, PORT_TC4);
+	} else if (IS_ALDERLAKE_S(dev_priv)) {
 		intel_ddi_init(dev_priv, PORT_A);
 		intel_ddi_init(dev_priv, PORT_TC1);
 		intel_ddi_init(dev_priv, PORT_TC2);
@@ -12183,7 +12248,7 @@ int intel_modeset_init_noirq(struct drm_i915_private *i915)
 	if (!HAS_DISPLAY(i915))
 		return 0;
 
-	intel_csr_ucode_init(i915);
+	intel_dmc_ucode_init(i915);
 
 	i915->modeset_wq = alloc_ordered_workqueue("i915_modeset", 0);
 	i915->flip_wq = alloc_workqueue("i915_flip", WQ_HIGHPRI |
@@ -12195,15 +12260,15 @@ int intel_modeset_init_noirq(struct drm_i915_private *i915)
 
 	ret = intel_cdclk_init(i915);
 	if (ret)
-		goto cleanup_vga_client_pw_domain_csr;
+		goto cleanup_vga_client_pw_domain_dmc;
 
 	ret = intel_dbuf_init(i915);
 	if (ret)
-		goto cleanup_vga_client_pw_domain_csr;
+		goto cleanup_vga_client_pw_domain_dmc;
 
 	ret = intel_bw_init(i915);
 	if (ret)
-		goto cleanup_vga_client_pw_domain_csr;
+		goto cleanup_vga_client_pw_domain_dmc;
 
 	init_llist_head(&i915->atomic_helper.free_list);
 	INIT_WORK(&i915->atomic_helper.free_work,
@@ -12215,8 +12280,8 @@ int intel_modeset_init_noirq(struct drm_i915_private *i915)
 
 	return 0;
 
-cleanup_vga_client_pw_domain_csr:
-	intel_csr_ucode_fini(i915);
+cleanup_vga_client_pw_domain_dmc:
+	intel_dmc_ucode_fini(i915);
 	intel_power_domains_driver_remove(i915);
 	intel_vga_unregister(i915);
 cleanup_bios:
@@ -13295,7 +13360,7 @@ void intel_modeset_driver_remove_noirq(struct drm_i915_private *i915)
 /* part #3: call after gem init */
 void intel_modeset_driver_remove_nogem(struct drm_i915_private *i915)
 {
-	intel_csr_ucode_fini(i915);
+	intel_dmc_ucode_fini(i915);
 
 	intel_power_domains_driver_remove(i915);
 
