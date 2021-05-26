@@ -156,7 +156,7 @@ void i915_address_space_init(struct i915_address_space *vm, int subclass)
 	lockdep_set_subclass(&vm->mutex, subclass);
 
 	if (!intel_vm_no_concurrent_access_wa(vm->i915)) {
-		i915_gem_shrinker_taints_mutex(vm->i915, &vm->mutex);
+		fs_reclaim_taints_mutex(&vm->mutex);
 	} else {
 		/*
 		 * CHV + BXT VTD workaround use stop_machine(),
