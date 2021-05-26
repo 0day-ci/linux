@@ -377,7 +377,7 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 
 	/*
 	 * Read the current timestamp first. It might become invalid anytime
-	 * when a virtual machine is stopped by the host or when the watchog
+	 * when a virtual machine is stopped by the host or when the watchdog
 	 * is touched from NMI.
 	 */
 	now = get_timestamp();

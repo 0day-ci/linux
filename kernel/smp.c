@@ -769,7 +769,7 @@ EXPORT_SYMBOL(smp_call_function_single);
  * @cpu: The CPU to run on.
  * @csd: Pre-allocated and setup data structure
  *
- * Like smp_call_function_single(), but the call is asynchonous and
+ * Like smp_call_function_single(), but the call is asynchronous and
  * can thus be done from contexts with disabled interrupts.
  *
  * The caller passes his own pre-allocated data structure

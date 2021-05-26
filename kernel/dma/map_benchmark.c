@@ -76,7 +76,7 @@ static int map_benchmark_thread(void *data)
 		 * for a non-coherent device, if we don't stain them in the
 		 * cache, this will give an underestimate of the real-world
 		 * overhead of BIDIRECTIONAL or TO_DEVICE mappings;
-		 * 66 means evertything goes well! 66 is lucky.
+		 * 66 means everything goes well! 66 is lucky.
 		 */
 		if (map->dir != DMA_FROM_DEVICE)
 			memset(buf, 0x66, size);

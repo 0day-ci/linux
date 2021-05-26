@@ -127,7 +127,7 @@ account_global_scheduler_latency(struct task_struct *tsk,
 	if (i >= MAXLR - 1)
 		return;
 
-	/* Allocted a new one: */
+	/* Allocated a new one: */
 	memcpy(&latency_record[i], lat, sizeof(struct latency_record));
 }
 

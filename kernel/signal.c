@@ -1541,7 +1541,7 @@ static inline bool kill_as_cred_perm(const struct cred *cred,
  * There is nothing in the encoding that can allow
  * copy_siginfo_to_user32 to detect this confusion of formats, so
  * handle this by requiring the caller of kill_pid_usb_asyncio to
- * notice when this situration takes place and to store the 32bit
+ * notice when this situation takes place and to store the 32bit
  * pointer in sival_int, instead of sival_addr of the sigval_t addr
  * parameter.
  */
@@ -3350,7 +3350,7 @@ int copy_siginfo_from_user(kernel_siginfo_t *to, const siginfo_t __user *from)
  *
  * Note: This function does not work properly for the SIGCHLD on x32, but
  * fortunately it doesn't have to.  The only valid callers for this function are
- * copy_siginfo_to_user32, which is overriden for x32 and the coredump code.
+ * copy_siginfo_to_user32, which is overridden for x32 and the coredump code.
  * The latter does not care because SIGCHLD will never cause a coredump.
  */
 void copy_siginfo_to_external32(struct compat_siginfo *to,

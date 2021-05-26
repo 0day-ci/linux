@@ -261,7 +261,7 @@ static void fill_tgid_exit(struct task_struct *tsk)
 
 	/*
 	 * Each accounting subsystem calls its functions here to
-	 * accumalate its per-task stats for tsk, into the per-tgid structure
+	 * accumulate its per-task stats for tsk, into the per-tgid structure
 	 *
 	 *	per-task-foo(tsk->signal->stats, tsk);
 	 */

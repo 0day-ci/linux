@@ -505,7 +505,7 @@ static int ptrace_traceme(void)
 }
 
 /*
- * Called with irqs disabled, returns true if childs should reap themselves.
+ * Called with irqs disabled, returns true if children should reap themselves.
  */
 static int ignoring_children(struct sighand_struct *sigh)
 {

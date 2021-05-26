@@ -54,7 +54,7 @@ static struct vfsmount *blob_to_mnt(const void *data, size_t len, const char *na
  * umd_load_blob - Remember a blob of bytes for fork_usermode_driver
  * @info: information about usermode driver
  * @data: a blob of bytes that can be executed as a file
- * @len:  The lentgh of the blob
+ * @len:  The length of the blob
  *
  */
 int umd_load_blob(struct umd_info *info, const void *data, size_t len)

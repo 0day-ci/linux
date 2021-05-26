@@ -66,7 +66,7 @@ enum swiotlb_force swiotlb_force;
 struct io_tlb_mem *io_tlb_default_mem;
 
 /*
- * Max segment that we can provide which (if pages are contingous) will
+ * Max segment that we can provide which (if pages are contiguous) will
  * not be bounced (unless SWIOTLB_FORCE is set).
  */
 static unsigned int max_segment;

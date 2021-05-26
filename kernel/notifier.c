@@ -179,7 +179,7 @@ int atomic_notifier_call_chain_robust(struct atomic_notifier_head *nh,
 	int ret;
 
 	/*
-	 * Musn't use RCU; because then the notifier list can
+	 * Mustn't use RCU; because then the notifier list can
 	 * change between the up and down traversal.
 	 */
 	spin_lock_irqsave(&nh->lock, flags);

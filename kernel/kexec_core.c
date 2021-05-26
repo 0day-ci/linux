@@ -180,7 +180,7 @@ int sanity_check_segment_list(struct kimage *image)
 	}
 
 	/* Verify our destination addresses do not overlap.
-	 * If we alloed overlapping destination addresses
+	 * If we allowed overlapping destination addresses
 	 * through very weird things can happen with no
 	 * easy explanation as one segment stops on another.
 	 */

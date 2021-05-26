@@ -832,7 +832,7 @@ cpuhp_invoke_ap_callback(int cpu, enum cpuhp_state state, bool bringup,
 	}
 
 	/*
-	 * Clean up the leftovers so the next hotplug operation wont use stale
+	 * Clean up the leftovers so the next hotplug operation won't use stale
 	 * data.
 	 */
 	st->node = st->last = NULL;

@@ -2157,7 +2157,7 @@ static void free_module(struct module *mod)
 
 	/*
 	 * We leave it in list to prevent duplicate loads, but make sure
-	 * that noone uses it while it's being deconstructed.
+	 * that no one uses it while it's being deconstructed.
 	 */
 	mutex_lock(&module_mutex);
 	mod->state = MODULE_STATE_UNFORMED;
@@ -2914,7 +2914,7 @@ static int module_sig_check(struct load_info *info, int flags)
 	default:
 		/*
 		 * All other errors are fatal, including lack of memory,
-		 * unparseable signatures, and signature check failures --
+		 * unparsable signatures, and signature check failures --
 		 * even if signatures aren't required.
 		 */
 		return err;

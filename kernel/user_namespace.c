@@ -878,7 +878,7 @@ static bool verify_root_map(const struct file *file,
 
 	if (map_ns == file_ns) {
 		/* The process unshared its ns and is writing to its own
-		 * /proc/self/uid_map.  User already has full capabilites in
+		 * /proc/self/uid_map.  User already has full capabilities in
 		 * the new namespace.  Verify that the parent had CAP_SETFCAP
 		 * when it unshared.
 		 * */
