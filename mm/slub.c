@@ -4451,6 +4451,8 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	return s;
 }
 
+extern int no_hash_pointers_enable(char *str);
+
 void __init kmem_cache_init(void)
 {
 	static __initdata struct kmem_cache boot_kmem_cache,
@@ -4469,6 +4471,10 @@ void __init kmem_cache_init(void)
 	 */
 	for_each_node_state(node, N_NORMAL_MEMORY)
 		node_set(node, slab_nodes);
+
+	/* Print slub debugging pointers without hashing */
+	if (static_branch_unlikely(&slub_debug_enabled))
+		no_hash_pointers_enable(NULL);
 
 	create_boot_cache(kmem_cache_node, "kmem_cache_node",
 		sizeof(struct kmem_cache_node), SLAB_HWCACHE_ALIGN, 0, 0);
