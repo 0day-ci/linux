@@ -18,3 +18,5 @@ obj-$(CONFIG_KUNIT_TEST) +=		string-stream-test.o
 endif
 
 obj-$(CONFIG_KUNIT_EXAMPLE_TEST) +=	kunit-example-test.o
+
+obj-$(CONFIG_KUNIT_EXAMPLE_SKIP_TEST) +=	kunit-example-skip-test.o
