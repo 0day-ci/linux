@@ -149,10 +149,27 @@ static const struct ti_syscon_gate_clk_data am654_clk_data[] = {
 	{ /* Sentinel */ },
 };
 
+static const struct ti_syscon_gate_clk_data am64_clk_data[] = {
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk0", 0x0, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk1", 0x4, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk2", 0x8, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk3", 0xc, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk4", 0x10, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk5", 0x14, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk6", 0x18, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk7", 0x1c, 0),
+	TI_SYSCON_CLK_GATE("ehrpwm_tbclk8", 0x20, 0),
+	{ /* Sentinel */ },
+};
+
 static const struct of_device_id ti_syscon_gate_clk_ids[] = {
 	{
 		.compatible = "ti,am654-ehrpwm-tbclk",
 		.data = &am654_clk_data,
+	},
+	{
+		.compatible = "ti,am64-ehrpwm-tbclk",
+		.data = &am64_clk_data,
 	},
 	{ }
 };
