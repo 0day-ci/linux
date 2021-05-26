@@ -1403,6 +1403,9 @@ static void mem_cgroup_mst_msc_reset(struct mem_cgroup *memcg)
 	msc = &memcg->msc;
 	msc->has_lmt = 0;
 	msc->mem_spd_lmt = 0;
+	msc->slice_lmt = 0;
+	msc->prev_chg = 0;
+	msc->prev_thl_jifs = 0;
 }
 
 static void mem_cgroup_mst_has_lmt_init(struct mem_cgroup *memcg)
@@ -1440,6 +1443,7 @@ static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
 	lmt = val >> PAGE_SHIFT;
 
 	memcg->msc.mem_spd_lmt = lmt;
+	memcg->msc.slice_lmt = lmt * MST_SLICE / HZ;
 
 	/* Sync with mst_has_lmt_init*/
 	synchronize_rcu();
@@ -1450,6 +1454,27 @@ static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
 	}
 
 	return 0;
+}
+
+/*
+ * Update the memory speed throttle slice window.
+ * Return 0 when we still in the previous slice window
+ * Return 1 when we start a new slice window
+ */
+static int mem_cgroup_update_mst_slice(struct mem_cgroup *memcg)
+{
+	unsigned long total_charge;
+	struct mem_spd_ctl *msc = &memcg->msc;
+
+	if (msc->prev_thl_jifs &&
+	    time_before(jiffies, (msc->prev_thl_jifs + MST_SLICE)))
+		return 0;
+
+	total_charge = atomic_long_read(&memcg->memory.total_chg);
+	msc->prev_chg = total_charge;
+	msc->prev_thl_jifs = jiffies;
+
+	return 1;
 }
 
 static unsigned long mem_cgroup_mst_get_mem_spd_max(struct mem_cgroup *memcg)

@@ -231,8 +231,12 @@ struct obj_cgroup {
 };
 
 #ifdef CONFIG_MEM_SPEED_THROTTLE
+#define MST_SLICE		(HZ/10)
 struct mem_spd_ctl {
 	unsigned long mem_spd_lmt;
+	unsigned long slice_lmt;
+	unsigned long prev_thl_jifs;
+	unsigned long prev_chg;
 	int has_lmt;
 };
 #endif
