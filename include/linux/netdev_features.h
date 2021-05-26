@@ -239,7 +239,7 @@ static inline int find_next_netdev_feature(u64 feature, unsigned long start)
  * If upper/master device has these features disabled, they must be disabled
  * on all lower/slave devices as well.
  */
-#define NETIF_F_UPPER_DISABLES	(NETIF_F_LRO | NETIF_F_HW_TLS_TX)
+#define NETIF_F_UPPER_DISABLES	(NETIF_F_LRO | NETIF_F_HW_TLS_TX | NETIF_F_HW_TLS_RX)
 
 /* changeable features with no special hardware requirements */
 #define NETIF_F_SOFT_FEATURES	(NETIF_F_GSO | NETIF_F_GRO)
