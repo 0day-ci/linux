@@ -169,6 +169,28 @@ Setting the brightness to zero with brightness_set() callback function
 should completely turn off the LED and cancel the previously programmed
 hardware blinking function, if any.
 
+Hardware offloading of LED triggers
+===================================
+
+Some LEDs can offload SW triggers to hardware (for example a LED connected to
+an ethernet PHY or an ethernet switch can be configured to blink on activity on
+the network, which in software is done by the netdev trigger).
+
+To do such offloading, both the trigger code and LED driver must support this.
+The LED must implement the trigger_offload() method and the trigger code must
+try to call this method (via led_trigger_offload() function) when configuration
+of the trigger (trigger_data) changes.
+
+The implementation of the trigger_offload() method by the LED driver must return
+0 if the offload is successful and -EOPNOTSUPP if the requested trigger
+configuration is not supported and the trigger should be executed in software.
+If trigger_offload() returns negative value, the trigger will be done in
+software, so any active offloading must also be disabled.
+
+If the second argument (enable) to the trigger_offload() method is false, any
+active HW offloading must be deactivated. In this case errors are not permitted
+in the trigger_offload() method.
+
 
 Known Issues
 ============
