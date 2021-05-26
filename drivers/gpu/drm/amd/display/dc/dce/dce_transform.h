@@ -166,8 +166,7 @@
 	SRI(SCL_F_SHARP_CONTROL, SCL, id)
 
 #define XFM_COMMON_REG_LIST_DCE60(id) \
-	XFM_COMMON_REG_LIST_DCE60_BASE(id), \
-	SRI(DCFE_MEM_LIGHT_SLEEP_CNTL, CRTC, id)
+	XFM_COMMON_REG_LIST_DCE60_BASE(id)
 #endif
 
 #define XFM_SF(reg_name, field_name, post_fix)\
