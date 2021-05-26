@@ -207,6 +207,14 @@ static inline int encl_call(const void *in, void *out, struct sgx_enclave_run *r
 	return ret;
 }
 
+#define EXPECT_EEXIT(run) \
+	do { \
+		EXPECT_EQ((run)->function, EEXIT); \
+		if ((run)->function != EEXIT) \
+			TH_LOG("0x%02x 0x%02x 0x%16llx", (run)->exception_vector, \
+			       (run)->exception_error_code, (run)->exception_addr); \
+	} while (0)
+
 TEST_F(enclave, unclobbered_vdso)
 {
 	uint64_t result = 0;
@@ -214,7 +222,7 @@ TEST_F(enclave, unclobbered_vdso)
 	EXPECT_EQ(encl_call(&MAGIC, &result, &self->run, false), 0);
 
 	EXPECT_EQ(result, MAGIC);
-	EXPECT_EQ(self->run.function, EEXIT);
+	EXPECT_EEXIT(&self->run);
 	EXPECT_EQ(self->run.user_data, 0);
 }
 
@@ -225,7 +233,7 @@ TEST_F(enclave, clobbered_vdso)
 	EXPECT_EQ(encl_call(&MAGIC, &result, &self->run, true), 0);
 
 	EXPECT_EQ(result, MAGIC);
-	EXPECT_EQ(self->run.function, EEXIT);
+	EXPECT_EEXIT(&self->run);
 	EXPECT_EQ(self->run.user_data, 0);
 }
 
@@ -247,7 +255,7 @@ TEST_F(enclave, clobbered_vdso_and_user_function)
 	EXPECT_EQ(encl_call(&MAGIC, &result, &self->run, true), 0);
 
 	EXPECT_EQ(result, MAGIC);
-	EXPECT_EQ(self->run.function, EEXIT);
+	EXPECT_EEXIT(&self->run);
 	EXPECT_EQ(self->run.user_data, 0);
 }
 
