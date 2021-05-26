@@ -377,6 +377,7 @@ static int find_next_iomem_res(resource_size_t start, resource_size_t end,
 			.flags = p->flags,
 			.desc = p->desc,
 			.parent = p->parent,
+			.child = p->child,
 		};
 	}
 
