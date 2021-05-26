@@ -132,6 +132,9 @@ struct sja1105_info {
 	int (*clocking_setup)(struct sja1105_private *priv);
 	int (*pcs_mdio_read)(struct mii_bus *bus, int phy, int reg);
 	int (*pcs_mdio_write)(struct mii_bus *bus, int phy, int reg, u16 val);
+	void (*pcs_config)(struct sja1105_private *priv, int port,
+			   bool an_enabled, bool an_master,
+			   phy_interface_t interface);
 	const char *name;
 	bool supports_mii[SJA1105_MAX_NUM_PORTS];
 	bool supports_rmii[SJA1105_MAX_NUM_PORTS];
@@ -304,6 +307,12 @@ int sja1110_pcs_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val);
 int sja1105_pcs_read(struct sja1105_private *priv, int port, int mmd, int reg);
 int sja1105_pcs_write(struct sja1105_private *priv, int port, int mmd, int reg,
 		      u16 val);
+void sja1105_pcs_config(struct sja1105_private *priv, int port,
+			bool an_enabled, bool an_master,
+			phy_interface_t interface);
+void sja1110_pcs_config(struct sja1105_private *priv, int port,
+			bool an_enabled, bool an_master,
+			phy_interface_t interface);
 
 /* From sja1105_devlink.c */
 int sja1105_devlink_setup(struct dsa_switch *ds);

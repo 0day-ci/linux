@@ -210,12 +210,14 @@ static int sja1105_init_mii_settings(struct sja1105_private *priv,
 				goto unsupported;
 
 			mii->xmii_mode[i] = XMII_MODE_SGMII;
+			mii->special[i] = true;
 			break;
 		case PHY_INTERFACE_MODE_2500BASEX:
 			if (!priv->info->supports_2500basex[i])
 				goto unsupported;
 
 			mii->xmii_mode[i] = XMII_MODE_SGMII;
+			mii->special[i] = true;
 			break;
 unsupported:
 		default:
@@ -234,6 +236,7 @@ unsupported:
 		 * but unconditionally put the port in the MAC role.
 		 */
 		if (ports[i].phy_mode == PHY_INTERFACE_MODE_SGMII ||
+		    ports[i].phy_mode == PHY_INTERFACE_MODE_2500BASEX ||
 		    phy_interface_mode_is_rgmii(ports[i].phy_mode))
 			mii->phy_mac[i] = XMII_MAC;
 		else
@@ -962,8 +965,9 @@ static int sja1105_parse_dt(struct sja1105_private *priv,
 	return rc;
 }
 
-static void sja1105_sgmii_pcs_config(struct sja1105_private *priv, int port,
-				     bool an_enabled, bool an_master)
+void sja1105_pcs_config(struct sja1105_private *priv, int port,
+			bool an_enabled, bool an_master,
+			phy_interface_t interface)
 {
 	u16 ac = SJA1105_AC_AUTONEG_MODE_SGMII;
 	int rc;
@@ -1012,6 +1016,188 @@ out_write_failed:
 		ERR_PTR(rc));
 }
 
+void sja1110_pcs_config(struct sja1105_private *priv, int port,
+			bool an_enabled, bool an_master,
+			phy_interface_t interface)
+{
+	const int timeout_us = 1000;
+	u16 val;
+	int rc;
+
+	/* Soft-reset the PCS */
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
+			       MDIO_CTRL1_RESET);
+	if (rc < 0)
+		goto out_write_failed;
+
+	rc = read_poll_timeout(sja1105_pcs_read, val,
+			       !(val & MDIO_CTRL1_RESET),
+			       0, timeout_us, false,
+			       priv, port, MDIO_MMD_VEND2, MDIO_CTRL1);
+	if (rc || val < 0) {
+		dev_err(priv->ds->dev, "port %d PCS reset failed: %pe\n",
+			port, ERR_PTR(rc));
+		return;
+	}
+
+	val = SJA1105_DC1_EN_VSMMD1;
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val |= SJA1105_DC1_ENA_2500_MODE;
+	if (an_master)
+		val |= SJA1105_DC1_MAC_AUTO_SW;
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_DC1, val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Program TX PLL feedback divider and reference divider settings for
+	 * correct oscillation frequency.
+	 */
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val = SJA1105_TXPLL_FBDIV(0x7d);
+	else
+		val = SJA1105_TXPLL_FBDIV(0x19);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_TXPLL_CTRL0,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val = SJA1105_TXPLL_REFDIV(0x2);
+	else
+		val = SJA1105_TXPLL_REFDIV(0x1);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_TXPLL_CTRL1,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Program transmitter amplitude and disable amplitude trimming */
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_LANE_DRIVER1_0,
+			       SJA1105_TXDRV(0x5));
+	if (rc < 0)
+		goto out_write_failed;
+
+	val = SJA1105_TXDRVTRIM_LSB(0xffffffull);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_LANE_DRIVER2_0, val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	val = SJA1105_TXDRVTRIM_MSB(0xffffffull) | SJA1105_LANE_DRIVER2_1_RSV;
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_LANE_DRIVER2_1, val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Enable input and output resistor terminations for low BER. */
+	val = SJA1105_ACCOUPLE_RXVCM_EN | SJA1105_CDR_GAIN |
+	      SJA1105_RXRTRIM(4) | SJA1105_RXTEN | SJA1105_TXPLL_BWSEL |
+	      SJA1105_TXRTRIM(3) | SJA1105_TXTEN;
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_LANE_TRIM,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Select PCS as transmitter data source. */
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_LANE_DATAPATH_1, 0);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Program RX PLL feedback divider and reference divider for correct
+	 * oscillation frequency.
+	 */
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val = SJA1105_RXPLL_FBDIV(0x7d);
+	else
+		val = SJA1105_RXPLL_FBDIV(0x19);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_RXPLL_CTRL0,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val = SJA1105_RXPLL_REFDIV(0x2);
+	else
+		val = SJA1105_RXPLL_REFDIV(0x1);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_RXPLL_CTRL1,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Program threshold for receiver signal detector.
+	 * Enable control of RXPLL by receiver signal detector to disable RXPLL
+	 * when an input signal is not present.
+	 */
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_RX_DATA_DETECT, 0x0005);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Enable TX and RX PLLs and circuits.
+	 * Release reset of PMA to enable data flow to/from PCS.
+	 */
+	val = sja1105_pcs_read(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_POWERDOWN_ENABLE);
+	if (val < 0) {
+		dev_err(priv->ds->dev, "failed to read PCS: %pe\n",
+			ERR_PTR(val));
+		return;
+	}
+
+	val &= ~(SJA1105_TXPLL_PD | SJA1105_TXPD | SJA1105_RXCH_PD |
+		 SJA1105_RXBIAS_PD | SJA1105_RESET_SER_EN |
+		 SJA1105_RESET_SER | SJA1105_RESET_DES);
+	val |= SJA1105_RXPKDETEN | SJA1105_RCVEN;
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2,
+			       SJA1105_POWERDOWN_ENABLE, val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* Program continuous-time linear equalizer (CTLE) settings. */
+	if (interface == PHY_INTERFACE_MODE_2500BASEX)
+		val = 0x732a;
+	else
+		val = 0x212a;
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_RX_CDR_CTLE,
+			       val);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* AUTONEG_CONTROL: Use SGMII autoneg in MAC mode */
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_AC,
+			       SJA1105_AC_AUTONEG_MODE_SGMII);
+	if (rc < 0)
+		goto out_write_failed;
+
+	/* BASIC_CONTROL: enable in-band AN now, if requested. Otherwise,
+	 * sja1105_sgmii_pcs_force_speed must be called later for the link
+	 * to become operational.
+	 */
+	if (an_enabled) {
+		rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
+				       BMCR_ANENABLE | BMCR_ANRESTART);
+		if (rc < 0)
+			goto out_write_failed;
+	}
+
+	return;
+
+out_write_failed:
+	dev_err(priv->ds->dev, "Failed to write to PCS: %pe\n",
+		ERR_PTR(rc));
+}
+
 static void sja1105_sgmii_pcs_force_speed(struct sja1105_private *priv,
 					  int port, int speed)
 {
@@ -1019,6 +1205,7 @@ static void sja1105_sgmii_pcs_force_speed(struct sja1105_private *priv,
 	int rc;
 
 	switch (speed) {
+	case SPEED_2500:
 	case SPEED_1000:
 		pcs_speed = BMCR_SPEED1000;
 		break;
@@ -1092,6 +1279,9 @@ static int sja1105_adjust_port_config(struct sja1105_private *priv, int port,
 	case SPEED_1000:
 		speed = priv->info->port_speed[SJA1105_SPEED_1000MBPS];
 		break;
+	case SPEED_2500:
+		speed = priv->info->port_speed[SJA1105_SPEED_2500MBPS];
+		break;
 	default:
 		dev_err(dev, "Invalid speed %iMbps\n", speed_mbps);
 		return -EINVAL;
@@ -1106,6 +1296,8 @@ static int sja1105_adjust_port_config(struct sja1105_private *priv, int port,
 	 */
 	if (priv->phy_mode[port] == PHY_INTERFACE_MODE_SGMII)
 		mac[port].speed = priv->info->port_speed[SJA1105_SPEED_1000MBPS];
+	else if (priv->phy_mode[port] == PHY_INTERFACE_MODE_2500BASEX)
+		mac[port].speed = priv->info->port_speed[SJA1105_SPEED_2500MBPS];
 	else
 		mac[port].speed = speed;
 
@@ -1162,10 +1354,10 @@ static void sja1105_mac_config(struct dsa_switch *ds, int port,
 		return;
 	}
 
-	if (is_sgmii)
-		sja1105_sgmii_pcs_config(priv, port,
-					 phylink_autoneg_inband(mode),
-					 false);
+	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
+	    state->interface == PHY_INTERFACE_MODE_2500BASEX)
+		priv->info->pcs_config(priv, port, phylink_autoneg_inband(mode),
+				       false, state->interface);
 }
 
 static void sja1105_mac_link_down(struct dsa_switch *ds, int port,
@@ -1186,7 +1378,8 @@ static void sja1105_mac_link_up(struct dsa_switch *ds, int port,
 
 	sja1105_adjust_port_config(priv, port, speed);
 
-	if (priv->phy_mode[port] == PHY_INTERFACE_MODE_SGMII &&
+	if ((priv->phy_mode[port] == PHY_INTERFACE_MODE_SGMII ||
+	     priv->phy_mode[port] == PHY_INTERFACE_MODE_2500BASEX) &&
 	    !phylink_autoneg_inband(mode))
 		sja1105_sgmii_pcs_force_speed(priv, port, speed);
 
@@ -1228,6 +1421,10 @@ static void sja1105_phylink_validate(struct dsa_switch *ds, int port,
 	if (mii->xmii_mode[port] == XMII_MODE_RGMII ||
 	    mii->xmii_mode[port] == XMII_MODE_SGMII)
 		phylink_set(mask, 1000baseT_Full);
+	if (priv->info->supports_2500basex[port]) {
+		phylink_set(mask, 2500baseT_Full);
+		phylink_set(mask, 2500baseX_Full);
+	}
 
 	bitmap_and(supported, supported, mask, __ETHTOOL_LINK_MODE_MASK_NBITS);
 	bitmap_and(state->advertising, state->advertising, mask,
@@ -1945,7 +2142,8 @@ int sja1105_static_config_reload(struct sja1105_private *priv,
 							      mac[i].speed);
 		mac[i].speed = priv->info->port_speed[SJA1105_SPEED_AUTO];
 
-		if (priv->phy_mode[i] == PHY_INTERFACE_MODE_SGMII)
+		if (priv->phy_mode[i] == PHY_INTERFACE_MODE_SGMII ||
+		    priv->phy_mode[i] == PHY_INTERFACE_MODE_2500BASEX)
 			bmcr[i] = sja1105_pcs_read(priv, i,
 						   MDIO_MMD_VEND2,
 						   MDIO_CTRL1);
@@ -2002,17 +2200,21 @@ out_unlock_ptp:
 		if (rc < 0)
 			goto out;
 
-		if (priv->phy_mode[i] != PHY_INTERFACE_MODE_SGMII)
+		if (priv->phy_mode[i] != PHY_INTERFACE_MODE_SGMII &&
+		    priv->phy_mode[i] != PHY_INTERFACE_MODE_2500BASEX)
 			continue;
 
 		an_enabled = !!(bmcr[i] & BMCR_ANENABLE);
 
-		sja1105_sgmii_pcs_config(priv, i, an_enabled, false);
+		priv->info->pcs_config(priv, i, an_enabled, false,
+				       priv->phy_mode[i]);
 
 		if (!an_enabled) {
 			int speed = SPEED_UNKNOWN;
 
-			if (bmcr[i] & BMCR_SPEED1000)
+			if (priv->phy_mode[i] == PHY_INTERFACE_MODE_2500BASEX)
+				speed = SPEED_2500;
+			else if (bmcr[i] & BMCR_SPEED1000)
 				speed = SPEED_1000;
 			else if (bmcr[i] & BMCR_SPEED100)
 				speed = SPEED_100;
