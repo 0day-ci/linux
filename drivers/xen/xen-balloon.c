@@ -163,13 +163,16 @@ static ssize_t store_target_kb(struct device *dev,
 			       const char *buf,
 			       size_t count)
 {
-	char *endchar;
+	ssize_t ret;
 	unsigned long long target_bytes;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	target_bytes = simple_strtoull(buf, &endchar, 0) * 1024;
+	ret = kstrtoull(buf, 0, &target_bytes);
+	if (ret)
+		return ret;
+	target_bytes *= 1024;
 
 	balloon_set_new_target(target_bytes >> PAGE_SHIFT);
 
