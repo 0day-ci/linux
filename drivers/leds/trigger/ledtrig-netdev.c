@@ -406,12 +406,8 @@ static int netdev_trig_activate(struct led_classdev *led_cdev)
 	INIT_DELAYED_WORK(&trigger_data->work, netdev_trig_work);
 
 	trigger_data->led_cdev = led_cdev;
-	trigger_data->net_dev = NULL;
-	trigger_data->device_name[0] = 0;
 
-	trigger_data->mode = 0;
 	atomic_set(&trigger_data->interval, msecs_to_jiffies(50));
-	trigger_data->last_activity = 0;
 
 	led_set_trigger_data(led_cdev, trigger_data);
 
