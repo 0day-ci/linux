@@ -1393,6 +1393,28 @@ static int memcg_page_state_unit(int item)
 }
 
 #ifdef CONFIG_MEM_SPEED_THROTTLE
+static u64 mem_cgroup_mem_spd_lmt_read(struct cgroup_subsys_state *css,
+				       struct cftype *cft)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	return (u64)(memcg->msc.mem_spd_lmt << PAGE_SHIFT);
+}
+
+static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
+					struct cftype *cft, u64 val)
+{
+	struct mem_cgroup *memcg;
+	unsigned long lmt;
+
+	memcg = mem_cgroup_from_css(css);
+	lmt = val >> PAGE_SHIFT;
+
+	memcg->msc.mem_spd_lmt = lmt;
+
+	return 0;
+}
+
 static unsigned long mem_cgroup_mst_get_mem_spd_max(struct mem_cgroup *memcg)
 {
 	struct page_counter *c = &memcg->memory;
@@ -4805,6 +4827,14 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.write_u64 = mem_cgroup_hierarchy_write,
 		.read_u64 = mem_cgroup_hierarchy_read,
 	},
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+	{
+		.name = "alloc_bps",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = mem_cgroup_mem_spd_lmt_read,
+		.write_u64 = mem_cgroup_mem_spd_lmt_write,
+	},
+#endif
 	{
 		.name = "cgroup.event_control",		/* XXX: for compat */
 		.write = memcg_write_event_control,
@@ -6358,6 +6388,14 @@ static struct cftype memory_files[] = {
 		.seq_show = memory_oom_group_show,
 		.write = memory_oom_group_write,
 	},
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+	{
+		.name = "alloc_bps",
+		.write_u64 = mem_cgroup_mem_spd_lmt_write,
+		.read_u64 = mem_cgroup_mem_spd_lmt_read,
+		.flags = CFTYPE_NOT_ON_ROOT,
+	},
+#endif
 	{ }	/* terminate */
 };
 

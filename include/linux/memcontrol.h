@@ -230,6 +230,12 @@ struct obj_cgroup {
 	};
 };
 
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+struct mem_spd_ctl {
+	unsigned long mem_spd_lmt;
+};
+#endif
+
 /*
  * The memory controller data structure. The memory controller controls both
  * page cache and RSS per cgroup. We would eventually like to provide
@@ -347,6 +353,10 @@ struct mem_cgroup {
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	struct deferred_split deferred_split_queue;
+#endif
+
+#ifdef CONFIG_MEM_SPEED_THROTTLE
+	struct mem_spd_ctl msc;
 #endif
 
 	struct mem_cgroup_per_node *nodeinfo[0];
