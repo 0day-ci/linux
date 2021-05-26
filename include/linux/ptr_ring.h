@@ -261,8 +261,7 @@ static inline void __ptr_ring_discard_one(struct ptr_ring *r)
 	/* Note: we must keep consumer_head valid at all times for __ptr_ring_empty
 	 * to work correctly.
 	 */
-	int consumer_head = r->consumer_head;
-	int head = consumer_head++;
+	int consumer_head = r->consumer_head + 1;
 
 	/* Once we have processed enough entries invalidate them in
 	 * the ring all at once so producer can reuse their space in the ring.
@@ -271,19 +270,28 @@ static inline void __ptr_ring_discard_one(struct ptr_ring *r)
 	 */
 	if (unlikely(consumer_head - r->consumer_tail >= r->batch ||
 		     consumer_head >= r->size)) {
+		int tail = r->consumer_tail;
+		int head = consumer_head;
+
+		if (unlikely(consumer_head >= r->size)) {
+			r->consumer_tail = 0;
+			WRITE_ONCE(r->consumer_head, 0);
+		} else {
+			r->consumer_tail = consumer_head;
+			WRITE_ONCE(r->consumer_head, consumer_head);
+		}
+
 		/* Zero out entries in the reverse order: this way we touch the
 		 * cache line that producer might currently be reading the last;
 		 * producer won't make progress and touch other cache lines
 		 * besides the first one until we write out all entries.
 		 */
-		while (likely(head >= r->consumer_tail))
-			r->queue[head--] = NULL;
-		r->consumer_tail = consumer_head;
+		while (likely(--head >= tail))
+			r->queue[head] = NULL;
+
+		return;
 	}
-	if (unlikely(consumer_head >= r->size)) {
-		consumer_head = 0;
-		r->consumer_tail = 0;
-	}
+
 	/* matching READ_ONCE in __ptr_ring_empty for lockless tests */
 	WRITE_ONCE(r->consumer_head, consumer_head);
 }
