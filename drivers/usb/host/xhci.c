@@ -2773,7 +2773,7 @@ static int xhci_reserve_bandwidth(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct xhci_container_ctx *in_ctx)
 {
-	struct xhci_bw_info ep_bw_info[31];
+	struct xhci_bw_info *ep_bw_info;
 	int i;
 	struct xhci_input_control_ctx *ctrl_ctx;
 	int old_active_eps = 0;
@@ -2787,6 +2787,10 @@ static int xhci_reserve_bandwidth(struct xhci_hcd *xhci,
 				__func__);
 		return -ENOMEM;
 	}
+
+	ep_bw_info = kzalloc(sizeof(*ep_bw_info) * 31, GFP_KERNEL);
+	if (!ep_bw_info)
+		return -ENOMEM;
 
 	for (i = 0; i < 31; i++) {
 		if (!EP_IS_ADDED(ctrl_ctx, i) && !EP_IS_DROPPED(ctrl_ctx, i))
@@ -2824,6 +2828,7 @@ static int xhci_reserve_bandwidth(struct xhci_hcd *xhci,
 		 * Update the number of active TTs.
 		 */
 		xhci_update_tt_active_eps(xhci, virt_dev, old_active_eps);
+		kfree(ep_bw_info);
 		return 0;
 	}
 
@@ -2855,6 +2860,7 @@ static int xhci_reserve_bandwidth(struct xhci_hcd *xhci,
 					&virt_dev->eps[i],
 					virt_dev->tt_info);
 	}
+	kfree(ep_bw_info);
 	return -ENOMEM;
 }
 
