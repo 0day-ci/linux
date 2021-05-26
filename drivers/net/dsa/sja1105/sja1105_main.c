@@ -962,74 +962,61 @@ static int sja1105_parse_dt(struct sja1105_private *priv,
 	return rc;
 }
 
-static int sja1105_sgmii_read(struct sja1105_private *priv, int port, int mmd,
-			      int pcs_reg)
-{
-	u64 addr = (mmd << 16) | pcs_reg;
-	u32 val;
-	int rc;
-
-	if (port != SJA1105_SGMII_PORT)
-		return -ENODEV;
-
-	rc = sja1105_xfer_u32(priv, SPI_READ, addr, &val, NULL);
-	if (rc < 0)
-		return rc;
-
-	return val;
-}
-
-static int sja1105_sgmii_write(struct sja1105_private *priv, int port, int mmd,
-			       int pcs_reg, u16 pcs_val)
-{
-	u64 addr = (mmd << 16) | pcs_reg;
-	u32 val = pcs_val;
-	int rc;
-
-	if (port != SJA1105_SGMII_PORT)
-		return -ENODEV;
-
-	rc = sja1105_xfer_u32(priv, SPI_WRITE, addr, &val, NULL);
-	if (rc < 0)
-		return rc;
-
-	return val;
-}
-
 static void sja1105_sgmii_pcs_config(struct sja1105_private *priv, int port,
 				     bool an_enabled, bool an_master)
 {
 	u16 ac = SJA1105_AC_AUTONEG_MODE_SGMII;
+	int rc;
 
 	/* DIGITAL_CONTROL_1: Enable vendor-specific MMD1, allow the PHY to
 	 * stop the clock during LPI mode, make the MAC reconfigure
 	 * autonomously after PCS autoneg is done, flush the internal FIFOs.
 	 */
-	sja1105_sgmii_write(priv, port, MDIO_MMD_VEND2, SJA1105_DC1,
-			    SJA1105_DC1_EN_VSMMD1 |
-			    SJA1105_DC1_CLOCK_STOP_EN |
-			    SJA1105_DC1_MAC_AUTO_SW |
-			    SJA1105_DC1_INIT);
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_DC1,
+			       SJA1105_DC1_EN_VSMMD1 |
+			       SJA1105_DC1_CLOCK_STOP_EN |
+			       SJA1105_DC1_MAC_AUTO_SW |
+			       SJA1105_DC1_INIT);
+	if (rc < 0)
+		goto out_write_failed;
+
 	/* DIGITAL_CONTROL_2: No polarity inversion for TX and RX lanes */
-	sja1105_sgmii_write(priv, port, MDIO_MMD_VEND2, SJA1105_DC2,
-			    SJA1105_DC2_TX_POL_INV_DISABLE);
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_DC2,
+			       SJA1105_DC2_TX_POL_INV_DISABLE);
+	if (rc < 0)
+		goto out_write_failed;
+
 	/* AUTONEG_CONTROL: Use SGMII autoneg */
 	if (an_master)
 		ac |= SJA1105_AC_PHY_MODE | SJA1105_AC_SGMII_LINK;
-	sja1105_sgmii_write(priv, port, MDIO_MMD_VEND2, SJA1105_AC, ac);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, SJA1105_AC, ac);
+	if (rc < 0)
+		goto out_write_failed;
+
 	/* BASIC_CONTROL: enable in-band AN now, if requested. Otherwise,
 	 * sja1105_sgmii_pcs_force_speed must be called later for the link
 	 * to become operational.
 	 */
-	if (an_enabled)
-		sja1105_sgmii_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
-				    BMCR_ANENABLE | BMCR_ANRESTART);
+	if (an_enabled) {
+		rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
+				       BMCR_ANENABLE | BMCR_ANRESTART);
+		if (rc < 0)
+			goto out_write_failed;
+	}
+
+	return;
+
+out_write_failed:
+	dev_err(priv->ds->dev, "Failed to write to PCS: %pe\n",
+		ERR_PTR(rc));
 }
 
 static void sja1105_sgmii_pcs_force_speed(struct sja1105_private *priv,
 					  int port, int speed)
 {
 	int pcs_speed;
+	int rc;
 
 	switch (speed) {
 	case SPEED_1000:
@@ -1045,8 +1032,12 @@ static void sja1105_sgmii_pcs_force_speed(struct sja1105_private *priv,
 		dev_err(priv->ds->dev, "Invalid speed %d\n", speed);
 		return;
 	}
-	sja1105_sgmii_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
-			    pcs_speed | BMCR_FULLDPLX);
+
+	rc = sja1105_pcs_write(priv, port, MDIO_MMD_VEND2, MDIO_CTRL1,
+			       pcs_speed | BMCR_FULLDPLX);
+	if (rc < 0)
+		dev_err(priv->ds->dev, "Failed to write to PCS: %pe\n",
+			ERR_PTR(rc));
 }
 
 /* Convert link speed from SJA1105 to ethtool encoding */
@@ -1250,7 +1241,7 @@ static int sja1105_mac_pcs_get_state(struct dsa_switch *ds, int port,
 	int ais;
 
 	/* Read the vendor-specific AUTONEG_INTR_STATUS register */
-	ais = sja1105_sgmii_read(priv, port, MDIO_MMD_VEND2, SJA1105_AIS);
+	ais = sja1105_pcs_read(priv, port, MDIO_MMD_VEND2, SJA1105_AIS);
 	if (ais < 0)
 		return ais;
 
@@ -1955,9 +1946,9 @@ int sja1105_static_config_reload(struct sja1105_private *priv,
 		mac[i].speed = priv->info->port_speed[SJA1105_SPEED_AUTO];
 
 		if (priv->phy_mode[i] == PHY_INTERFACE_MODE_SGMII)
-			bmcr[i] = sja1105_sgmii_read(priv, i,
-						     MDIO_MMD_VEND2,
-						     MDIO_CTRL1);
+			bmcr[i] = sja1105_pcs_read(priv, i,
+						   MDIO_MMD_VEND2,
+						   MDIO_CTRL1);
 	}
 
 	/* No PTP operations can run right now */

@@ -4,8 +4,6 @@
 #ifndef _SJA1105_SGMII_H
 #define _SJA1105_SGMII_H
 
-#define SJA1105_SGMII_PORT		4
-
 /* DIGITAL_CONTROL_1 (address 1f8000h) */
 #define SJA1105_DC1			0x8000
 #define SJA1105_DC1_VS_RESET		BIT(15)

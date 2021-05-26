@@ -69,6 +69,7 @@ struct sja1105_regs {
 	u64 stats[__MAX_SJA1105_STATS_AREA][SJA1105_MAX_NUM_PORTS];
 	u64 mdio_100base_tx;
 	u64 mdio_100base_t1;
+	u64 pcs_base[SJA1105_MAX_NUM_PORTS];
 };
 
 struct sja1105_mdio_private {
@@ -129,6 +130,8 @@ struct sja1105_info {
 	void (*ptp_cmd_packing)(u8 *buf, struct sja1105_ptp_cmd *cmd,
 				enum packing_op op);
 	int (*clocking_setup)(struct sja1105_private *priv);
+	int (*pcs_mdio_read)(struct mii_bus *bus, int phy, int reg);
+	int (*pcs_mdio_write)(struct mii_bus *bus, int phy, int reg, u16 val);
 	const char *name;
 	bool supports_mii[SJA1105_MAX_NUM_PORTS];
 	bool supports_rmii[SJA1105_MAX_NUM_PORTS];
@@ -260,6 +263,8 @@ struct sja1105_private {
 	struct sja1105_cbs_entry *cbs;
 	struct mii_bus *mdio_base_t1;
 	struct mii_bus *mdio_base_tx;
+	struct mii_bus *mdio_pcs;
+	struct mdio_device *pcs[SJA1105_MAX_NUM_PORTS];
 	struct sja1105_tagger_data tagger_data;
 	struct sja1105_ptp_data ptp_data;
 	struct sja1105_tas_data tas_data;
@@ -292,6 +297,13 @@ void sja1105_frame_memory_partitioning(struct sja1105_private *priv);
 /* From sja1105_mdio.c */
 int sja1105_mdiobus_register(struct dsa_switch *ds);
 void sja1105_mdiobus_unregister(struct dsa_switch *ds);
+int sja1105_pcs_mdio_read(struct mii_bus *bus, int phy, int reg);
+int sja1105_pcs_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val);
+int sja1110_pcs_mdio_read(struct mii_bus *bus, int phy, int reg);
+int sja1110_pcs_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val);
+int sja1105_pcs_read(struct sja1105_private *priv, int port, int mmd, int reg);
+int sja1105_pcs_write(struct sja1105_private *priv, int port, int mmd, int reg,
+		      u16 val);
 
 /* From sja1105_devlink.c */
 int sja1105_devlink_setup(struct dsa_switch *ds);
