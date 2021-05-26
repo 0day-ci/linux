@@ -34,6 +34,7 @@
 #include <linux/utsname.h>
 #include <linux/zlib.h>
 
+#include <drm/drm_memcpy.h>
 #include <drm/drm_print.h>
 
 #include "display/intel_dmc.h"
@@ -46,7 +47,6 @@
 
 #include "i915_drv.h"
 #include "i915_gpu_error.h"
-#include "i915_memcpy.h"
 #include "i915_scatterlist.h"
 
 #define ALLOW_FAIL (GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_NOWARN)
@@ -255,7 +255,7 @@ static bool compress_init(struct i915_vma_compress *c)
 	}
 
 	c->tmp = NULL;
-	if (i915_has_memcpy_from_wc())
+	if (drm_has_memcpy_from_wc())
 		c->tmp = pool_alloc(&c->pool, ALLOW_FAIL);
 
 	return true;
@@ -295,7 +295,7 @@ static int compress_page(struct i915_vma_compress *c,
 	struct z_stream_s *zstream = &c->zstream;
 
 	zstream->next_in = src;
-	if (wc && c->tmp && i915_memcpy_from_wc(c->tmp, src, PAGE_SIZE))
+	if (wc && c->tmp && drm_memcpy_from_wc(c->tmp, src, PAGE_SIZE))
 		zstream->next_in = c->tmp;
 	zstream->avail_in = PAGE_SIZE;
 
@@ -395,7 +395,7 @@ static int compress_page(struct i915_vma_compress *c,
 	if (!ptr)
 		return -ENOMEM;
 
-	if (!(wc && i915_memcpy_from_wc(ptr, src, PAGE_SIZE)))
+	if (!(wc && drm_memcpy_from_wc(ptr, src, PAGE_SIZE)))
 		memcpy(ptr, src, PAGE_SIZE);
 	dst->pages[dst->page_count++] = ptr;
 	cond_resched();

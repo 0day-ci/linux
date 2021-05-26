@@ -40,6 +40,7 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
 #include <drm/drm_managed.h>
+#include <drm/drm_memcpy.h>
 #include <drm/drm_mode_object.h>
 #include <drm/drm_print.h>
 
@@ -1041,6 +1042,7 @@ static int __init drm_core_init(void)
 
 	drm_connector_ida_init();
 	idr_init(&drm_minors_idr);
+	drm_memcpy_init_early();
 
 	ret = drm_sysfs_init();
 	if (ret < 0) {

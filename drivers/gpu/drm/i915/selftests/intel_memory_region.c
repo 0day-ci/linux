@@ -6,6 +6,8 @@
 #include <linux/prime_numbers.h>
 #include <linux/sort.h>
 
+#include <drm/drm_memcpy.h>
+
 #include "../i915_selftest.h"
 
 #include "mock_drm.h"
@@ -20,7 +22,6 @@
 #include "gem/selftests/mock_context.h"
 #include "gt/intel_engine_user.h"
 #include "gt/intel_gt.h"
-#include "i915_memcpy.h"
 #include "selftests/igt_flush_test.h"
 #include "selftests/i915_random.h"
 
@@ -901,7 +902,7 @@ static inline void igt_memcpy(void *dst, const void *src, size_t size)
 
 static inline void igt_memcpy_from_wc(void *dst, const void *src, size_t size)
 {
-	i915_memcpy_from_wc(dst, src, size);
+	drm_memcpy_from_wc(dst, src, size);
 }
 
 static int _perf_memcpy(struct intel_memory_region *src_mr,
@@ -925,7 +926,7 @@ static int _perf_memcpy(struct intel_memory_region *src_mr,
 		{
 			"memcpy_from_wc",
 			igt_memcpy_from_wc,
-			!i915_has_memcpy_from_wc(),
+			!drm_has_memcpy_from_wc(),
 		},
 	};
 	struct drm_i915_gem_object *src, *dst;

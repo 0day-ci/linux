@@ -24,6 +24,8 @@
 
 #include <linux/sched/mm.h>
 
+#include <drm/drm_memcpy.h>
+
 #include "display/intel_frontbuffer.h"
 #include "i915_drv.h"
 #include "i915_gem_clflush.h"
@@ -31,7 +33,6 @@
 #include "i915_gem_mman.h"
 #include "i915_gem_object.h"
 #include "i915_globals.h"
-#include "i915_memcpy.h"
 #include "i915_trace.h"
 
 static struct i915_global_object {
@@ -374,7 +375,7 @@ i915_gem_object_read_from_page_iomap(struct drm_i915_gem_object *obj, u64 offset
 				    PAGE_SIZE);
 
 	src_ptr = src_map + offset_in_page(offset);
-	if (!i915_memcpy_from_wc(dst, (void __force *)src_ptr, size))
+	if (!drm_memcpy_from_wc(dst, (void __force *)src_ptr, size))
 		memcpy_fromio(dst, src_ptr, size);
 
 	io_mapping_unmap(src_map);

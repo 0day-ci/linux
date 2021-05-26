@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * Copyright © 2016 Intel Corporation
  *
@@ -22,16 +23,12 @@
  *
  */
 
+#ifdef CONFIG_X86
+#include <linux/dma-buf-map.h>
 #include <linux/kernel.h>
 #include <asm/fpu/api.h>
 
-#include "i915_memcpy.h"
-
-#if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-#define CI_BUG_ON(expr) BUG_ON(expr)
-#else
-#define CI_BUG_ON(expr) BUILD_BUG_ON_INVALID(expr)
-#endif
+#include "drm/drm_memcpy.h"
 
 static DEFINE_STATIC_KEY_FALSE(has_movntdqa);
 
@@ -94,23 +91,24 @@ static void __memcpy_ntdqu(void *dst, const void *src, unsigned long len)
 }
 
 /**
- * i915_memcpy_from_wc: perform an accelerated *aligned* read from WC
+ * drm_memcpy_from_wc: perform an accelerated *aligned* read from WC
  * @dst: destination pointer
  * @src: source pointer
  * @len: how many bytes to copy
  *
- * i915_memcpy_from_wc copies @len bytes from @src to @dst using
+ * drm_memcpy_from_wc copies @len bytes from @src to @dst using
  * non-temporal instructions where available. Note that all arguments
  * (@src, @dst) must be aligned to 16 bytes and @len must be a multiple
  * of 16.
  *
  * To test whether accelerated reads from WC are supported, use
- * i915_memcpy_from_wc(NULL, NULL, 0);
+ * drm_memcpy_from_wc(NULL, NULL, 0);
+ * This interface is intended for memremapped memory without the __iomem tag.
  *
  * Returns true if the copy was successful, false if the preconditions
  * are not met.
  */
-bool i915_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+bool drm_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 {
 	if (unlikely(((unsigned long)dst | (unsigned long)src | len) & 15))
 		return false;
@@ -123,23 +121,52 @@ bool i915_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 
 	return false;
 }
+EXPORT_SYMBOL(drm_memcpy_from_wc);
 
 /**
- * i915_unaligned_memcpy_from_wc: perform a mostly accelerated read from WC
+ * drm_memcpy_from_wc_dbm: perform an accelerated *aligned* read from WC with
+ * struct dma_buf_map arguments.
+ * @dst: destination map
+ * @src: source map
+ * @len: how many bytes to copy
+ *
+ * This is identical to drm_memcpy_from_wc, except it's intended for
+ * potentially ioremapped memory rather than memremapped memory.
+ *
+ * Returns true if the copy was successful, false if the preconditions
+ * are not met.
+ */
+bool drm_memcpy_from_wc_dbm(struct dma_buf_map *dst,
+			    const struct dma_buf_map *src,
+			    unsigned long len)
+{
+	/* For X86 we can safely drop __iomem */
+	return drm_memcpy_from_wc(dst->is_iomem ?
+				  (void __force *)dst->vaddr_iomem :
+				  dst->vaddr,
+				  src->is_iomem ?
+				  (void const __force *)src->vaddr_iomem :
+				  src->vaddr,
+				  len);
+}
+EXPORT_SYMBOL(drm_memcpy_from_wc_dbm);
+
+/**
+ * drm_unaligned_memcpy_from_wc: perform a mostly accelerated read from WC
  * @dst: destination pointer
  * @src: source pointer
  * @len: how many bytes to copy
  *
- * Like i915_memcpy_from_wc(), the unaligned variant copies @len bytes from
+ * Like drm_memcpy_from_wc(), the unaligned variant copies @len bytes from
  * @src to @dst using * non-temporal instructions where available, but
  * accepts that its arguments may not be aligned, but are valid for the
  * potential 16-byte read past the end.
+ *
+ * This interface is intended for mremapped memory without the __iomem tag.
  */
-void i915_unaligned_memcpy_from_wc(void *dst, const void *src, unsigned long len)
+void drm_unaligned_memcpy_from_wc(void *dst, const void *src, unsigned long len)
 {
 	unsigned long addr;
-
-	CI_BUG_ON(!i915_has_memcpy_from_wc());
 
 	addr = (unsigned long)src;
 	if (!IS_ALIGNED(addr, 16)) {
@@ -155,8 +182,9 @@ void i915_unaligned_memcpy_from_wc(void *dst, const void *src, unsigned long len
 	if (likely(len))
 		__memcpy_ntdqu(dst, src, DIV_ROUND_UP(len, 16));
 }
+EXPORT_SYMBOL(drm_unaligned_memcpy_from_wc);
 
-void i915_memcpy_init_early(struct drm_i915_private *dev_priv)
+void drm_memcpy_init_early(void)
 {
 	/*
 	 * Some hypervisors (e.g. KVM) don't support VEX-prefix instructions
@@ -166,3 +194,4 @@ void i915_memcpy_init_early(struct drm_i915_private *dev_priv)
 	    !boot_cpu_has(X86_FEATURE_HYPERVISOR))
 		static_branch_enable(&has_movntdqa);
 }
+#endif

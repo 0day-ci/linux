@@ -5,9 +5,10 @@
 
 #include <linux/debugfs.h>
 
+#include <drm/drm_memcpy.h>
+
 #include "gt/intel_gt.h"
 #include "i915_drv.h"
-#include "i915_memcpy.h"
 #include "intel_guc_log.h"
 
 static void guc_log_capture_logs(struct intel_guc_log *log);
@@ -295,13 +296,13 @@ static void guc_read_update_log_buffer(struct intel_guc_log *log)
 
 		/* Just copy the newly written data */
 		if (read_offset > write_offset) {
-			i915_memcpy_from_wc(dst_data, src_data, write_offset);
+			drm_memcpy_from_wc(dst_data, src_data, write_offset);
 			bytes_to_copy = buffer_size - read_offset;
 		} else {
 			bytes_to_copy = write_offset - read_offset;
 		}
-		i915_memcpy_from_wc(dst_data + read_offset,
-				    src_data + read_offset, bytes_to_copy);
+		drm_memcpy_from_wc(dst_data + read_offset,
+				   src_data + read_offset, bytes_to_copy);
 
 		src_data += buffer_size;
 		dst_data += buffer_size;
@@ -569,7 +570,7 @@ int intel_guc_log_relay_open(struct intel_guc_log *log)
 	 * it should be present on the chipsets supporting GuC based
 	 * submisssions.
 	 */
-	if (!i915_has_memcpy_from_wc()) {
+	if (!drm_has_memcpy_from_wc()) {
 		ret = -ENXIO;
 		goto out_unlock;
 	}
