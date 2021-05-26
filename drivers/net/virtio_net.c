@@ -237,6 +237,10 @@ struct virtnet_info {
 
 	/* failover when STANDBY feature enabled */
 	struct failover *failover;
+
+	/* Work struct for checking vq status, stop NIC if vq is broken. */
+	struct delayed_work vq_check_work;
+	bool broken;
 };
 
 struct padded_vnet_hdr {
@@ -1407,6 +1411,27 @@ static void refill_work(struct work_struct *work)
 	}
 }
 
+static void virnet_vq_check_work(struct work_struct *work)
+{
+	struct virtnet_info *vi =
+		container_of(work, struct virtnet_info, vq_check_work.work);
+	struct net_device *netdev = vi->dev;
+	int i;
+
+	if (vi->broken)
+		return;
+
+	/* If virtqueue is broken, set link down and stop all queues */
+	for (i = 0; i < vi->max_queue_pairs; i++) {
+		if (virtqueue_is_broken(vi->rq[i].vq) || virtqueue_is_broken(vi->sq[i].vq)) {
+			netif_carrier_off(netdev);
+			netif_tx_stop_all_queues(netdev);
+			vi->broken = true;
+			break;
+		}
+	}
+}
+
 static int virtnet_receive(struct receive_queue *rq, int budget,
 			   unsigned int *xdp_xmit)
 {
@@ -1431,6 +1456,9 @@ static int virtnet_receive(struct receive_queue *rq, int budget,
 			stats.packets++;
 		}
 	}
+
+	if (unlikely(!virtqueue_is_broken(rq->vq)))
+		schedule_delayed_work(&vi->vq_check_work, HZ);
 
 	if (rq->vq->num_free > min((unsigned int)budget, virtqueue_get_vring_size(rq->vq)) / 2) {
 		if (!try_fill_recv(vi, rq, GFP_ATOMIC))
@@ -1681,6 +1709,7 @@ static netdev_tx_t start_xmit(struct sk_buff *skb, struct net_device *dev)
 				 qnum, err);
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
+		schedule_delayed_work(&vi->vq_check_work, HZ);
 		return NETDEV_TX_OK;
 	}
 
@@ -1905,6 +1934,7 @@ static int virtnet_close(struct net_device *dev)
 
 	/* Make sure refill_work doesn't re-enable napi! */
 	cancel_delayed_work_sync(&vi->refill);
+	cancel_delayed_work_sync(&vi->vq_check_work);
 
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		xdp_rxq_info_unreg(&vi->rq[i].xdp_rxq);
@@ -2381,6 +2411,7 @@ static void virtnet_freeze_down(struct virtio_device *vdev)
 	netif_device_detach(vi->dev);
 	netif_tx_unlock_bh(vi->dev);
 	cancel_delayed_work_sync(&vi->refill);
+	cancel_delayed_work_sync(&vi->vq_check_work);
 
 	if (netif_running(vi->dev)) {
 		for (i = 0; i < vi->max_queue_pairs; i++) {
@@ -2662,7 +2693,7 @@ static void virtnet_config_changed_work(struct work_struct *work)
 
 	vi->status = v;
 
-	if (vi->status & VIRTIO_NET_S_LINK_UP) {
+	if ((vi->status & VIRTIO_NET_S_LINK_UP) && !vi->broken) {
 		virtnet_update_settings(vi);
 		netif_carrier_on(vi->dev);
 		netif_tx_wake_all_queues(vi->dev);
@@ -2889,6 +2920,8 @@ static int virtnet_alloc_queues(struct virtnet_info *vi)
 		goto err_rq;
 
 	INIT_DELAYED_WORK(&vi->refill, refill_work);
+	INIT_DELAYED_WORK(&vi->vq_check_work, virnet_vq_check_work);
+
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		vi->rq[i].pages = NULL;
 		netif_napi_add(vi->dev, &vi->rq[i].napi, virtnet_poll,
@@ -3240,6 +3273,7 @@ free_failover:
 	net_failover_destroy(vi->failover);
 free_vqs:
 	cancel_delayed_work_sync(&vi->refill);
+	cancel_delayed_work_sync(&vi->vq_check_work);
 	free_receive_page_frags(vi);
 	virtnet_del_vqs(vi);
 free:
