@@ -2108,6 +2108,7 @@ static inline struct obj_stock *get_obj_stock(unsigned long *pflags)
 	struct memcg_stock_pcp *stock;
 
 	if (likely(in_task())) {
+		*pflags = 0UL;
 		preempt_disable();
 		stock = this_cpu_ptr(&memcg_stock);
 		return &stock->task_obj;
@@ -6840,6 +6841,7 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
 	unsigned long nr_pages;
 	struct mem_cgroup *memcg;
 	struct obj_cgroup *objcg;
+	bool use_objcg = PageMemcgKmem(page);
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
@@ -6848,7 +6850,7 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
 	 * page memcg or objcg at this point, we have fully
 	 * exclusive access to the page.
 	 */
-	if (PageMemcgKmem(page)) {
+	if (use_objcg) {
 		objcg = __page_objcg(page);
 		/*
 		 * This get matches the put at the end of the function and
@@ -6876,7 +6878,7 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
 
 	nr_pages = compound_nr(page);
 
-	if (PageMemcgKmem(page)) {
+	if (use_objcg) {
 		ug->nr_memory += nr_pages;
 		ug->nr_kmem += nr_pages;
 
