@@ -163,8 +163,10 @@ int ufshcd_hba_init_crypto_capabilities(struct ufs_hba *hba)
 	 * hasn't advertised that crypto is supported.
 	 */
 	if (!(hba->capabilities & MASK_CRYPTO_SUPPORT) ||
-	    !(hba->caps & UFSHCD_CAP_CRYPTO))
+	    !(hba->caps & UFSHCD_CAP_CRYPTO)) {
+		err = -EINVAL;
 		goto out;
+	}
 
 	hba->crypto_capabilities.reg_val =
 			cpu_to_le32(ufshcd_readl(hba, REG_UFS_CCAP));
