@@ -23,6 +23,26 @@ struct plat_ls1x_dma ls1x_dma_pdata = {
 	.slavecnt = ARRAY_SIZE(ls1x_dma_slave_map),
 };
 
+static struct mtd_partition ls1x_nand_parts[] = {
+	{
+		.name        = "kernel",
+		.offset      = 0,
+		.size        = SZ_16M,
+	},
+	{
+		.name        = "rootfs",
+		.offset      = MTDPART_OFS_APPEND,
+		.size        = MTDPART_SIZ_FULL,
+	},
+};
+
+struct plat_ls1x_nand ls1x_nand_pdata = {
+	.parts		= ls1x_nand_parts,
+	.nr_parts	= ARRAY_SIZE(ls1x_nand_parts),
+	.hold_cycle	= 0x2,
+	.wait_cycle	= 0xc,
+};
+
 static const struct gpio_led ls1x_gpio_leds[] __initconst = {
 	{
 		.name			= "LED9",
@@ -53,6 +73,7 @@ static struct platform_device *ls1b_platform_devices[] __initdata = {
 	&ls1x_ehci_pdev,
 	&ls1x_gpio0_pdev,
 	&ls1x_gpio1_pdev,
+	&ls1x_nand_pdev,
 	&ls1x_rtc_pdev,
 	&ls1x_wdt_pdev,
 };
@@ -61,6 +82,7 @@ static int __init ls1b_platform_init(void)
 {
 	ls1x_serial_set_uartclk(&ls1x_uart_pdev);
 	ls1x_dma_set_platdata(&ls1x_dma_pdata);
+	ls1x_nand_set_platdata(&ls1x_nand_pdata);
 
 	gpio_led_register_device(-1, &ls1x_led_pdata);
 
