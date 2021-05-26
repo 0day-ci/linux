@@ -1820,6 +1820,7 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 
 	if (TCP_SKB_CB(tail)->end_seq != TCP_SKB_CB(skb)->seq ||
 	    TCP_SKB_CB(tail)->ip_dsfield != TCP_SKB_CB(skb)->ip_dsfield ||
+	    !mptcp_skb_can_collapse(tail, skb) ||
 	    ((TCP_SKB_CB(tail)->tcp_flags |
 	      TCP_SKB_CB(skb)->tcp_flags) & (TCPHDR_SYN | TCPHDR_RST | TCPHDR_URG)) ||
 	    !((TCP_SKB_CB(tail)->tcp_flags &
