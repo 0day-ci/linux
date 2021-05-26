@@ -351,6 +351,11 @@ tcp_mtu_probe_floor - INTEGER
 
 	Default : 48
 
+tcp_mtu_probe_rack - BOOLEAN
+	Try to use shorter probes if RACK is also enabled
+
+	Default: 1
+
 tcp_min_snd_mss - INTEGER
 	TCP SYN and SYNACK messages usually advertise an ADVMSS option,
 	as described in RFC 1122 and RFC 6691.

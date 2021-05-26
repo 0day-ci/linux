@@ -2313,6 +2313,15 @@ static bool tcp_can_coalesce_send_queue_head(struct sock *sk, int len)
 	return true;
 }
 
+/* Check if rack is supported for current connection */
+static int tcp_mtu_probe_is_rack(const struct sock *sk)
+{
+	struct net *net = sock_net(sk);
+
+	return (net->ipv4.sysctl_tcp_recovery & TCP_RACK_LOSS_DETECTION &&
+			net->ipv4.sysctl_tcp_mtu_probe_rack);
+}
+
 /* Create a new MTU probe if we are ready.
  * MTU probe is regularly attempting to increase the path MTU by
  * deliberately sending larger packets.  This discovers routing
@@ -2353,7 +2362,22 @@ static int tcp_mtu_probe(struct sock *sk)
 	mss_now = tcp_current_mss(sk);
 	probe_size = tcp_mtu_to_mss(sk, (icsk->icsk_mtup.search_high +
 				    icsk->icsk_mtup.search_low) >> 1);
-	size_needed = probe_size + (tp->reordering + 1) * tp->mss_cache;
+	/* Probing the MTU requires one packet which is larger that current MSS as well
+	 * as enough following mtu-sized packets to ensure that a probe loss can be
+	 * detected without a full Retransmit Time Out.
+	 */
+	if (tcp_mtu_probe_is_rack(sk)) {
+		/* RACK allows recovering in min_rtt / 4 based on just one extra packet
+		 * Use two to account for unrelated losses
+		 */
+		size_needed = probe_size + 2 * tp->mss_cache;
+	} else {
+		/* Without RACK send enough extra packets to trigger fast retransmit
+		 * This is dynamic DupThresh + 1
+		 */
+		size_needed = probe_size + (tp->reordering + 1) * tp->mss_cache;
+	}
+
 	interval = icsk->icsk_mtup.search_high - icsk->icsk_mtup.search_low;
 	/* When misfortune happens, we are reprobing actively,
 	 * and then reprobe timer has expired. We stick with current
