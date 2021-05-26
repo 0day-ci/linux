@@ -1048,6 +1048,26 @@ static int ksz8873mll_config_aneg(struct phy_device *phydev)
 	return 0;
 }
 
+static int ksz886x_resume(struct phy_device *phydev)
+{
+	int ret;
+
+	/* Apply errata workaround for KSZ8863 and KSZ8873:
+	 * Receiver error in 100BASE-TX mode following Soft Power Down
+	 *
+	 * When exiting Soft Power Down mode, the receiver blocks may not start
+	 * up properly, causing the PHY to miss data and exhibit erratic
+	 * behavior.
+	 */
+	usleep_range(1000, 2000);
+
+	ret = phy_set_bits(phydev, MII_BMCR, BMCR_PDOWN);
+	if (ret)
+		return ret;
+
+	return phy_clear_bits(phydev, MII_BMCR, BMCR_PDOWN);
+}
+
 static int kszphy_get_sset_count(struct phy_device *phydev)
 {
 	return ARRAY_SIZE(kszphy_hw_stats);
@@ -1401,7 +1421,7 @@ static struct phy_driver ksphy_driver[] = {
 	/* PHY_BASIC_FEATURES */
 	.config_init	= kszphy_config_init,
 	.suspend	= genphy_suspend,
-	.resume		= genphy_resume,
+	.resume		= ksz886x_resume,
 }, {
 	.name		= "Micrel KSZ87XX Switch",
 	/* PHY_BASIC_FEATURES */
