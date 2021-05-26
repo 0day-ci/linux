@@ -59,4 +59,7 @@ extern void ioam6_fill_trace_data(struct sk_buff *skb,
 extern int ioam6_init(void);
 extern void ioam6_exit(void);
 
+extern int ioam6_iptunnel_init(void);
+extern void ioam6_iptunnel_exit(void);
+
 #endif /* _NET_IOAM6_H */
