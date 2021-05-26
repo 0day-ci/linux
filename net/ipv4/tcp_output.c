@@ -2330,6 +2330,10 @@ static int tcp_mtu_probe_is_rack(const struct sock *sk)
  * Returns 0 if we should wait to probe (no cwnd available),
  *         1 if a probe was sent,
  *         -1 otherwise
+ *
+ * Caller won't queue future write attempts if this returns 0. Zero is only
+ * returned if acks are pending from packets in flight which will trigger
+ * tcp_write_xmit again later.
  */
 static int tcp_mtu_probe(struct sock *sk)
 {
@@ -2339,19 +2343,18 @@ static int tcp_mtu_probe(struct sock *sk)
 	struct net *net = sock_net(sk);
 	int probe_size;
 	int size_needed;
+	int packets_needed;
 	int copy, len;
 	int mss_now;
 	int interval;
 
 	/* Not currently probing/verifying,
 	 * not in recovery,
-	 * have enough cwnd, and
 	 * not SACKing (the variable headers throw things off)
 	 */
 	if (likely(!icsk->icsk_mtup.enabled ||
 		   icsk->icsk_mtup.probe_size ||
 		   inet_csk(sk)->icsk_ca_state != TCP_CA_Open ||
-		   tp->snd_cwnd < 11 ||
 		   tp->rx_opt.num_sacks || tp->rx_opt.dsack))
 		return -1;
 
@@ -2377,6 +2380,7 @@ static int tcp_mtu_probe(struct sock *sk)
 		 */
 		size_needed = probe_size + (tp->reordering + 1) * tp->mss_cache;
 	}
+	packets_needed = DIV_ROUND_UP(size_needed, tp->mss_cache);
 
 	interval = icsk->icsk_mtup.search_high - icsk->icsk_mtup.search_low;
 	/* When misfortune happens, we are reprobing actively,
@@ -2396,18 +2400,26 @@ static int tcp_mtu_probe(struct sock *sk)
 	if (tp->write_seq - tp->snd_nxt < size_needed)
 		return -1;
 
+	/* Can probe fit inside congestion window? */
+	if (packets_needed > tp->snd_cwnd)
+		return -1;
+
+	/* Can probe fit inside receiver window? If not then skip probing.
+	 * The receiver might increase the window as data is processed but
+	 * don't assume that.
+	 * If some data is inflight (between snd_una and snd_nxt) we wait for it to
+	 * clear below.
+	 */
 	if (tp->snd_wnd < size_needed)
 		return -1;
+
+	/* Do we need for more acks to clear the receive window? */
 	if (after(tp->snd_nxt + size_needed, tcp_wnd_end(tp)))
 		return 0;
 
-	/* Do we need to wait to drain cwnd? With none in flight, don't stall */
-	if (tcp_packets_in_flight(tp) + 2 > tp->snd_cwnd) {
-		if (!tcp_packets_in_flight(tp))
-			return -1;
-		else
-			return 0;
-	}
+	/* Do we need the congestion window to clear? */
+	if (tcp_packets_in_flight(tp) + packets_needed > tp->snd_cwnd)
+		return 0;
 
 	if (!tcp_can_coalesce_send_queue_head(sk, probe_size))
 		return -1;
