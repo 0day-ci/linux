@@ -64,7 +64,7 @@ static int vnt_set_keymode(struct ieee80211_hw *hw, u8 *mac_addr,
 		key_mode |= (mode << 4);
 		key_mode |= VNT_KEY_GROUP;
 		break;
-	case  VNT_KEY_PAIRWISE:
+	case VNT_KEY_PAIRWISE:
 		key_mode |= mode;
 		key_inx = 4;
 		break;
@@ -82,8 +82,8 @@ static int vnt_set_keymode(struct ieee80211_hw *hw, u8 *mac_addr,
 			key->key[15] |= 0x80;
 	}
 
-	MACvSetKeyEntry(priv, key_mode, entry, key_inx,
-			bssid, (u32 *)key->key, priv->byLocalID);
+	MACvSetKeyEntry(priv, key_mode, entry, key_inx, bssid, (u32 *)key->key,
+			priv->byLocalID);
 
 	return 0;
 }
@@ -103,7 +103,7 @@ int vnt_set_keys(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 
 	switch (key->cipher) {
 	case 0:
-		for (u = 0 ; u < MAX_KEY_TABLE; u++)
+		for (u = 0; u < MAX_KEY_TABLE; u++)
 			MACvDisableKeyEntry(priv, u);
 		return ret;
 
@@ -112,8 +112,8 @@ int vnt_set_keys(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 		for (u = 0; u < MAX_KEY_TABLE; u++)
 			MACvDisableKeyEntry(priv, u);
 
-		vnt_set_keymode(hw, mac_addr,
-				key, VNT_KEY_DEFAULTKEY, KEY_CTL_WEP, true);
+		vnt_set_keymode(hw, mac_addr, key, VNT_KEY_DEFAULTKEY,
+				KEY_CTL_WEP, true);
 
 		key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 
@@ -132,14 +132,14 @@ int vnt_set_keys(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 	}
 
 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE) {
-		vnt_set_keymode(hw, mac_addr,
-				key, VNT_KEY_PAIRWISE, key_dec_mode, true);
+		vnt_set_keymode(hw, mac_addr, key, VNT_KEY_PAIRWISE,
+				key_dec_mode, true);
 	} else {
-		vnt_set_keymode(hw, mac_addr,
-				key, VNT_KEY_DEFAULTKEY, key_dec_mode, true);
+		vnt_set_keymode(hw, mac_addr, key, VNT_KEY_DEFAULTKEY,
+				key_dec_mode, true);
 
-		vnt_set_keymode(hw, (u8 *)conf->bssid,
-				key, VNT_KEY_GROUP_ADDRESS, key_dec_mode, true);
+		vnt_set_keymode(hw, (u8 *)conf->bssid, key,
+				VNT_KEY_GROUP_ADDRESS, key_dec_mode, true);
 	}
 
 	return 0;
