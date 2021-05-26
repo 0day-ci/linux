@@ -238,6 +238,7 @@ struct mem_spd_ctl {
 	unsigned long prev_thl_jifs;
 	unsigned long prev_chg;
 	int has_lmt;
+	atomic_t updating;
 };
 #endif
 

@@ -1445,7 +1445,7 @@ static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
 	memcg->msc.mem_spd_lmt = lmt;
 	memcg->msc.slice_lmt = lmt * MST_SLICE / HZ;
 
-	/* Sync with mst_has_lmt_init*/
+	/* Sync with mst_has_lmt_init and mem_cgroup_mst_overlmt_tree */
 	synchronize_rcu();
 
 	if (lmt) {
@@ -1458,23 +1458,109 @@ static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
 
 /*
  * Update the memory speed throttle slice window.
- * Return 0 when we still in the previous slice window
- * Return 1 when we start a new slice window
+ * Return the prev charged page number before next slice
+ * refresh the total charge so that the overspeed exam logic
+ * can check if the quota is exceeded.
  */
 static int mem_cgroup_update_mst_slice(struct mem_cgroup *memcg)
 {
 	unsigned long total_charge;
 	struct mem_spd_ctl *msc = &memcg->msc;
+	unsigned long prev_chg = msc->prev_chg;
 
 	if (msc->prev_thl_jifs &&
 	    time_before(jiffies, (msc->prev_thl_jifs + MST_SLICE)))
-		return 0;
+		goto exit;
+
+	/* Bail out if other's updating */
+	if (atomic_cmpxchg(&msc->updating, 0, 1) != 0)
+		goto exit;
 
 	total_charge = atomic_long_read(&memcg->memory.total_chg);
 	msc->prev_chg = total_charge;
 	msc->prev_thl_jifs = jiffies;
+	atomic_set(&msc->updating, 0);
 
-	return 1;
+exit:
+	return prev_chg;
+}
+
+/*
+ * Check if the memory allocate speed is exceed the limits.
+ * Return 0 when it is within the limits.
+ * Return the value of actual time frame should be used for the
+ * allocation when it exceeds the limits.
+ */
+static int mem_cgroup_mst_overspd(struct mem_cgroup *memcg)
+{
+	struct mem_spd_ctl *msc = &memcg->msc;
+	unsigned long total_charge;
+	unsigned long usage, prev_chg;
+
+	prev_chg = mem_cgroup_update_mst_slice(memcg);
+
+	total_charge = atomic_long_read(&memcg->memory.total_chg);
+	usage = total_charge <= prev_chg ?
+		      0 : total_charge - prev_chg;
+
+	if (usage < msc->slice_lmt)
+		return 0;
+	else
+		return (usage * MST_SLICE) / msc->slice_lmt;
+}
+
+static int mem_cgroup_mst_overspd_tree(struct mem_cgroup *memcg)
+{
+	struct cgroup_subsys_state *css = &memcg->css;
+	struct mem_cgroup *iter = memcg;
+	int no_lmt = 1;
+	int ret = 0;
+
+	rcu_read_lock();
+	while (!mem_cgroup_is_root(iter)) {
+		if (iter->msc.mem_spd_lmt) {
+			no_lmt = 0;
+			ret = mem_cgroup_mst_overspd(iter);
+			if (ret) {
+				rcu_read_unlock();
+				return ret;
+			}
+		}
+		css = css->parent;
+		iter = mem_cgroup_from_css(css);
+	}
+
+	/* Mst has been disabled */
+	if (no_lmt)
+		mem_cgroup_mst_msc_reset(memcg);
+
+	rcu_read_unlock();
+	return ret;
+}
+
+static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
+{
+	struct mem_spd_ctl *msc = &memcg->msc;
+	long timeout;
+	int ret = 0;
+
+	if (!memcg->msc.has_lmt || in_interrupt() || in_atomic() ||
+		irqs_disabled() || oops_in_progress)
+		return;
+
+	ret = mem_cgroup_mst_overspd_tree(memcg);
+	if (!ret)
+		return;
+
+	/*
+	 * Throttle the allocation for amount of jiffies according to
+	 * the fraction between the actual memory usage and allowed
+	 * allocation speed
+	 */
+	timeout = ret - (jiffies - msc->prev_thl_jifs);
+
+	if (timeout > 0)
+		schedule_timeout_interruptible(timeout);
 }
 
 static unsigned long mem_cgroup_mst_get_mem_spd_max(struct mem_cgroup *memcg)
@@ -1501,6 +1587,10 @@ static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
 		   mem_cgroup_mst_get_mem_spd_max(memcg));
 }
 #else /* CONFIG_MEM_SPEED_THROTTLE */
+static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
+{
+}
+
 static void mem_cgroup_mst_has_lmt_init(struct mem_cgroup *memcg)
 {
 }
@@ -2778,6 +2868,9 @@ force:
 	return 0;
 
 done_restock:
+	/* Try to throttle allocation speed if needed */
+	mem_cgroup_mst_spd_throttle(memcg);
+
 	if (batch > nr_pages)
 		refill_stock(memcg, batch - nr_pages);
 
