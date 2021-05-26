@@ -385,8 +385,13 @@ static int intel_pstate_get_cppc_guranteed(int cpu)
 }
 
 #else /* CONFIG_ACPI_CPPC_LIB */
-static void intel_pstate_set_itmt_prio(int cpu)
+static inline void intel_pstate_set_itmt_prio(int cpu)
 {
+}
+
+static inline int intel_pstate_get_cppc_guranteed(int cpu)
+{
+	return -ENOTSUPP;
 }
 #endif /* CONFIG_ACPI_CPPC_LIB */
 
@@ -470,27 +475,6 @@ static void intel_pstate_exit_perf_limits(struct cpufreq_policy *policy)
 
 	acpi_processor_unregister_performance(policy->cpu);
 }
-#else /* CONFIG_ACPI */
-static inline void intel_pstate_init_acpi_perf_limits(struct cpufreq_policy *policy)
-{
-}
-
-static inline void intel_pstate_exit_perf_limits(struct cpufreq_policy *policy)
-{
-}
-
-static inline bool intel_pstate_acpi_pm_profile_server(void)
-{
-	return false;
-}
-#endif /* CONFIG_ACPI */
-
-#ifndef CONFIG_ACPI_CPPC_LIB
-static int intel_pstate_get_cppc_guranteed(int cpu)
-{
-	return -ENOTSUPP;
-}
-#endif /* CONFIG_ACPI_CPPC_LIB */
 
 static bool intel_pstate_cppc_perf_valid(u32 perf, struct cppc_perf_caps *caps)
 {
@@ -505,6 +489,20 @@ static bool intel_pstate_cppc_perf_caps(struct cpudata *cpu,
 
 	return caps->highest_perf && caps->lowest_perf <= caps->highest_perf;
 }
+#else /* CONFIG_ACPI */
+static inline void intel_pstate_init_acpi_perf_limits(struct cpufreq_policy *policy)
+{
+}
+
+static inline void intel_pstate_exit_perf_limits(struct cpufreq_policy *policy)
+{
+}
+
+static inline bool intel_pstate_acpi_pm_profile_server(void)
+{
+	return false;
+}
+#endif /* CONFIG_ACPI */
 
 static void intel_pstate_hybrid_hwp_perf_ctl_parity(struct cpudata *cpu)
 {
@@ -530,7 +528,6 @@ static void intel_pstate_hybrid_hwp_perf_ctl_parity(struct cpudata *cpu)
  */
 static void intel_pstate_hybrid_hwp_calibrate(struct cpudata *cpu)
 {
-	struct cppc_perf_caps caps;
 	int perf_ctl_max_phys = cpu->pstate.max_pstate_physical;
 	int perf_ctl_scaling = cpu->pstate.perf_ctl_scaling;
 	int perf_ctl_turbo = pstate_funcs.get_turbo();
@@ -548,33 +545,39 @@ static void intel_pstate_hybrid_hwp_calibrate(struct cpudata *cpu)
 	pr_debug("CPU%d: HWP_CAP guaranteed = %d\n", cpu->cpu, cpu->pstate.max_pstate);
 	pr_debug("CPU%d: HWP_CAP highest = %d\n", cpu->cpu, cpu->pstate.turbo_pstate);
 
-	if (intel_pstate_cppc_perf_caps(cpu, &caps)) {
-		if (intel_pstate_cppc_perf_valid(caps.nominal_perf, &caps)) {
-			pr_debug("CPU%d: Using CPPC nominal\n", cpu->cpu);
+#ifdef CONFIG_ACPI
+	if (IS_ENABLED(CONFIG_ACPI_CPPC_LIB)) {
+		struct cppc_perf_caps caps;
 
-			/*
-			 * If the CPPC nominal performance is valid, it can be
-			 * assumed to correspond to cpu_khz.
-			 */
-			if (caps.nominal_perf == perf_ctl_max_phys) {
-				intel_pstate_hybrid_hwp_perf_ctl_parity(cpu);
-				return;
-			}
-			scaling = DIV_ROUND_UP(cpu_khz, caps.nominal_perf);
-		} else if (intel_pstate_cppc_perf_valid(caps.guaranteed_perf, &caps)) {
-			pr_debug("CPU%d: Using CPPC guaranteed\n", cpu->cpu);
+		if (intel_pstate_cppc_perf_caps(cpu, &caps)) {
+			if (intel_pstate_cppc_perf_valid(caps.nominal_perf, &caps)) {
+				pr_debug("CPU%d: Using CPPC nominal\n", cpu->cpu);
 
-			/*
-			 * If the CPPC guaranteed performance is valid, it can
-			 * be assumed to correspond to max_freq.
-			 */
-			if (caps.guaranteed_perf == perf_ctl_max) {
-				intel_pstate_hybrid_hwp_perf_ctl_parity(cpu);
-				return;
+				/*
+				 * If the CPPC nominal performance is valid, it
+				 * can be assumed to correspond to cpu_khz.
+				 */
+				if (caps.nominal_perf == perf_ctl_max_phys) {
+					intel_pstate_hybrid_hwp_perf_ctl_parity(cpu);
+					return;
+				}
+				scaling = DIV_ROUND_UP(cpu_khz, caps.nominal_perf);
+			} else if (intel_pstate_cppc_perf_valid(caps.guaranteed_perf, &caps)) {
+				pr_debug("CPU%d: Using CPPC guaranteed\n", cpu->cpu);
+
+				/*
+				 * If the CPPC guaranteed performance is valid,
+				 * it can be assumed to correspond to max_freq.
+				 */
+				if (caps.guaranteed_perf == perf_ctl_max) {
+					intel_pstate_hybrid_hwp_perf_ctl_parity(cpu);
+					return;
+				}
+				scaling = DIV_ROUND_UP(max_freq, caps.guaranteed_perf);
 			}
-			scaling = DIV_ROUND_UP(max_freq, caps.guaranteed_perf);
 		}
 	}
+#endif
 	/*
 	 * If using the CPPC data to compute the HWP-to-frequency scaling factor
 	 * doesn't work, use the HWP_CAP gauranteed perf for this purpose with
