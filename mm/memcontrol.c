@@ -1393,6 +1393,35 @@ static int memcg_page_state_unit(int item)
 }
 
 #ifdef CONFIG_MEM_SPEED_THROTTLE
+static void mem_cgroup_mst_msc_reset(struct mem_cgroup *memcg)
+{
+	struct mem_spd_ctl *msc;
+
+	if (mem_cgroup_is_root(memcg))
+		return;
+
+	msc = &memcg->msc;
+	msc->has_lmt = 0;
+	msc->mem_spd_lmt = 0;
+}
+
+static void mem_cgroup_mst_has_lmt_init(struct mem_cgroup *memcg)
+{
+	struct mem_cgroup *iter = memcg;
+	struct cgroup_subsys_state *css = &memcg->css;
+
+	rcu_read_lock();
+	while (!mem_cgroup_is_root(iter)) {
+		if (iter->msc.mem_spd_lmt != 0) {
+			memcg->msc.has_lmt = 1;
+			return;
+		}
+		css = css->parent;
+		iter = mem_cgroup_from_css(css);
+	}
+	rcu_read_unlock();
+}
+
 static u64 mem_cgroup_mem_spd_lmt_read(struct cgroup_subsys_state *css,
 				       struct cftype *cft)
 {
@@ -1404,13 +1433,21 @@ static u64 mem_cgroup_mem_spd_lmt_read(struct cgroup_subsys_state *css,
 static int mem_cgroup_mem_spd_lmt_write(struct cgroup_subsys_state *css,
 					struct cftype *cft, u64 val)
 {
-	struct mem_cgroup *memcg;
+	struct mem_cgroup *memcg, *iter;
 	unsigned long lmt;
 
 	memcg = mem_cgroup_from_css(css);
 	lmt = val >> PAGE_SHIFT;
 
 	memcg->msc.mem_spd_lmt = lmt;
+
+	/* Sync with mst_has_lmt_init*/
+	synchronize_rcu();
+
+	if (lmt) {
+		for_each_mem_cgroup_tree(iter, memcg)
+			iter->msc.has_lmt = 1;
+	}
 
 	return 0;
 }
@@ -1439,6 +1476,14 @@ static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
 		   mem_cgroup_mst_get_mem_spd_max(memcg));
 }
 #else /* CONFIG_MEM_SPEED_THROTTLE */
+static void mem_cgroup_mst_has_lmt_init(struct mem_cgroup *memcg)
+{
+}
+
+static void mem_cgroup_mst_msc_reset(struct mem_cgroup *memcg)
+{
+}
+
 static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
 					    struct seq_file *m)
 {
@@ -5198,6 +5243,8 @@ static int mem_cgroup_css_online(struct cgroup_subsys_state *css)
 	/* Online state pins memcg ID, memcg ID pins CSS */
 	refcount_set(&memcg->id.ref, 1);
 	css_get(css);
+	mem_cgroup_mst_has_lmt_init(memcg);
+
 	return 0;
 }
 
@@ -5287,6 +5334,7 @@ static void mem_cgroup_css_reset(struct cgroup_subsys_state *css)
 	memcg->soft_limit = PAGE_COUNTER_MAX;
 	page_counter_set_high(&memcg->swap, PAGE_COUNTER_MAX);
 	memcg_wb_domain_size_changed(memcg);
+	mem_cgroup_mst_msc_reset(memcg);
 }
 
 static void mem_cgroup_css_rstat_flush(struct cgroup_subsys_state *css, int cpu)

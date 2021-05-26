@@ -233,6 +233,7 @@ struct obj_cgroup {
 #ifdef CONFIG_MEM_SPEED_THROTTLE
 struct mem_spd_ctl {
 	unsigned long mem_spd_lmt;
+	int has_lmt;
 };
 #endif
 
