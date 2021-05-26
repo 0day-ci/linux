@@ -140,7 +140,10 @@ static int kvm_s390_pv_alloc_vm(struct kvm *kvm)
 	/* Allocate variable storage */
 	vlen = ALIGN(virt * ((npages * PAGE_SIZE) / HPAGE_SIZE), PAGE_SIZE);
 	vlen += uv_info.guest_virt_base_stor_len;
-	kvm->arch.pv.stor_var = vzalloc(vlen);
+	kvm->arch.pv.stor_var = __vmalloc_node_range(vlen, PAGE_SIZE, VMALLOC_START, VMALLOC_END,
+						GFP_KERNEL | __GFP_ZERO, PAGE_KERNEL,
+						VM_NO_HUGE_VMAP, NUMA_NO_NODE,
+						__builtin_return_address(0));
 	if (!kvm->arch.pv.stor_var)
 		goto out_err;
 	return 0;
