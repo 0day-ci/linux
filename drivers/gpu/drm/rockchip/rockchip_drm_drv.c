@@ -158,6 +158,9 @@ static int rockchip_drm_bind(struct device *dev)
 	 */
 	drm_dev->irq_enabled = true;
 
+	/* Remove early framebuffers (ie. efifb) */
+	drm_fb_helper_remove_conflicting_framebuffers(NULL, "rockchipdrmfb", false);
+
 	ret = rockchip_drm_fbdev_init(drm_dev);
 	if (ret)
 		goto err_unbind_all;
