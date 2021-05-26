@@ -19,7 +19,7 @@
 #define BCM63XX_DIROUT_REG	0x04
 #define BCM63XX_DATA_REG	0x0c
 
-static int bcm63xx_reg_mask_xlate(struct gpio_regmap *gpio,
+static int bcm63xx_reg_mask_xlate(const struct gpio_regmap_config *cfg,
 				  unsigned int base, unsigned int offset,
 				  unsigned int *reg, unsigned int *mask)
 {
@@ -47,6 +47,9 @@ static int bcm63xx_gpio_probe(struct device *dev, struct device_node *node,
 			      struct bcm63xx_pinctrl *pc)
 {
 	struct gpio_regmap_config grc = {0};
+	struct gpio_regmap_ops ops = {
+		.reg_mask_xlate = bcm63xx_reg_mask_xlate,
+	};
 
 	grc.parent = dev;
 	grc.fwnode = &node->fwnode;
@@ -56,9 +59,8 @@ static int bcm63xx_gpio_probe(struct device *dev, struct device_node *node,
 	grc.reg_dat_base = BCM63XX_DATA_REG;
 	grc.reg_dir_out_base = BCM63XX_DIROUT_REG;
 	grc.reg_set_base = BCM63XX_DATA_REG;
-	grc.reg_mask_xlate = bcm63xx_reg_mask_xlate;
 
-	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &grc));
+	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(dev, &grc, &ops));
 }
 
 int bcm63xx_pinctrl_probe(struct platform_device *pdev,

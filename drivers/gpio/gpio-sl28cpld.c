@@ -136,7 +136,8 @@ static int sl28cpld_gpio_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(&pdev->dev, &config));
+	return PTR_ERR_OR_ZERO(devm_gpio_regmap_register(&pdev->dev, &config,
+							 NULL));
 }
 
 static const struct of_device_id sl28cpld_gpio_of_match[] = {

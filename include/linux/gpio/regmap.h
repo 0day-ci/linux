@@ -6,11 +6,38 @@
 struct device;
 struct fwnode_handle;
 struct gpio_regmap;
+struct gpio_regmap_config;
 struct irq_domain;
 struct regmap;
 
 #define GPIO_REGMAP_ADDR_ZERO ((unsigned int)(-1))
 #define GPIO_REGMAP_ADDR(addr) ((addr) ? : GPIO_REGMAP_ADDR_ZERO)
+
+/**
+ * struct gpio_regmap_ops - Custom operations for regmap_gpio.
+ * @reg_mask_xlate:     Translates base address and GPIO
+ *			offset to a register/bitmask pair. If not given the
+ *			default gpio_regmap_simple_xlate() is used.
+ * @set_config:		Hook for all kinds of settings. Uses the same packed
+ *			config format as generic pinconf.
+ * @init_valid_mask:	Routine to initialize @valid_mask, to be used if not
+ *			all GPIOs are valid.
+ *
+ * Provide ustom operations for the regmap_gpio controller where the
+ * standard regmap_gpio operations are insufficient.
+ * The ->reg_mask_xlate translates a given base address and GPIO offset to
+ * register and mask pair. The base address is one of the given register
+ * base addresses in the gpio_regmap_config structure.
+ */
+struct gpio_regmap_ops {
+	int (*reg_mask_xlate)(const struct gpio_regmap_config *config,
+			      unsigned int base, unsigned int offset,
+			      unsigned int *reg, unsigned int *mask);
+	int (*set_config)(const struct gpio_regmap_config *regmap_config,
+			  unsigned int offset, unsigned long config);
+	int (*init_valid_mask)(const struct gpio_regmap_config *config,
+			       unsigned long *valid_mask, unsigned int ngpios);
+};
 
 /**
  * struct gpio_regmap_config - Description of a generic regmap gpio_chip.
@@ -33,14 +60,9 @@ struct regmap;
  * @ngpio_per_reg:	Number of GPIOs per register
  * @irq_domain:		(Optional) IRQ domain if the controller is
  *			interrupt-capable
- * @reg_mask_xlate:     (Optional) Translates base address and GPIO
- *			offset to a register/bitmask pair. If not
- *			given the default gpio_regmap_simple_xlate()
- *			is used.
- *
- * The ->reg_mask_xlate translates a given base address and GPIO offset to
- * register and mask pair. The base address is one of the given register
- * base addresses in this structure.
+ * @drvdata:		(Optional) Pointer to IC specific data which is
+ *			not used by gpio-remap but is provided "as is" to
+ *			the driver callback(s).
  *
  * Although all register base addresses are marked as optional, there are
  * several rules:
@@ -74,17 +96,14 @@ struct gpio_regmap_config {
 	int reg_stride;
 	int ngpio_per_reg;
 	struct irq_domain *irq_domain;
-
-	int (*reg_mask_xlate)(struct gpio_regmap *gpio, unsigned int base,
-			      unsigned int offset, unsigned int *reg,
-			      unsigned int *mask);
+	void *drvdata;
 };
 
-struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config);
+struct gpio_regmap *gpio_regmap_register(const struct gpio_regmap_config *config,
+					 const struct gpio_regmap_ops *ops);
 void gpio_regmap_unregister(struct gpio_regmap *gpio);
 struct gpio_regmap *devm_gpio_regmap_register(struct device *dev,
-					      const struct gpio_regmap_config *config);
-void gpio_regmap_set_drvdata(struct gpio_regmap *gpio, void *data);
-void *gpio_regmap_get_drvdata(struct gpio_regmap *gpio);
+					      const struct gpio_regmap_config *config,
+					      const struct gpio_regmap_ops *ops);
 
 #endif /* _LINUX_GPIO_REGMAP_H */
