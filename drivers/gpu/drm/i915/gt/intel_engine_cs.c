@@ -15,6 +15,7 @@
 #include "intel_engine_pm.h"
 #include "intel_engine_user.h"
 #include "intel_execlists_submission.h"
+#include "intel_gpu_commands.h"
 #include "intel_gt.h"
 #include "intel_gt_requests.h"
 #include "intel_gt_pm.h"
@@ -222,6 +223,25 @@ static u32 __engine_mmio_base(struct drm_i915_private *i915,
 	return bases[i].base;
 }
 
+static bool i915_engine_has_relative_lri(const struct intel_engine_cs *engine)
+{
+	if (INTEL_GEN(engine->i915) < 11)
+		return false;
+
+	return true;
+}
+
+static void lri_init(struct intel_engine_cs *engine)
+{
+	if (i915_engine_has_relative_lri(engine)) {
+		engine->lri_cmd_mode = MI_LRI_LRM_CS_MMIO;
+		engine->lri_mmio_base = 0;
+	} else {
+		engine->lri_cmd_mode = 0;
+		engine->lri_mmio_base = engine->mmio_base;
+	}
+}
+
 static void __sprint_engine_name(struct intel_engine_cs *engine)
 {
 	/*
@@ -321,6 +341,8 @@ static int intel_engine_setup(struct intel_gt *gt, enum intel_engine_id id)
 
 	/* Nothing to do here, execute in order of dependencies */
 	engine->schedule = NULL;
+
+	lri_init(engine);
 
 	ewma__engine_latency_init(&engine->latency);
 	seqcount_init(&engine->stats.lock);

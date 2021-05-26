@@ -310,6 +310,9 @@ struct intel_engine_cs {
 	u32 context_size;
 	u32 mmio_base;
 
+	u32 lri_mmio_base;
+	u32 lri_cmd_mode;
+
 	/*
 	 * Some w/a require forcewake to be held (which prevents RC6) while
 	 * a particular engine is active. If so, we set fw_domain to which

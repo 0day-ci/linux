@@ -44,11 +44,9 @@ static void set_offsets(u32 *regs,
 		flags = *data >> 6;
 		data++;
 
-		*regs = MI_LOAD_REGISTER_IMM(count);
+		*regs = MI_LOAD_REGISTER_IMM_REL(engine, count);
 		if (flags & POSTED)
 			*regs |= MI_LRI_FORCE_POSTED;
-		if (INTEL_GEN(engine->i915) >= 11)
-			*regs |= MI_LRI_LRM_CS_MMIO;
 		regs++;
 
 		GEM_BUG_ON(!count);

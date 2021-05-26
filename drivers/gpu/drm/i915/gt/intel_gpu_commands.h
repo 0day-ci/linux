@@ -134,8 +134,14 @@
  *   simply ignores the register load under certain conditions.
  * - One can actually load arbitrary many arbitrary registers: Simply issue x
  *   address/value pairs. Don't overdue it, though, x <= 2^4 must hold!
+ * - Newer hardware supports engine relative addressing but older hardware does
+ *   not. This is required for hw engine load balancing. The
+ *   MI_LOAD_REGISTER_IMM_REL macro can be used on both newer and older
+ *   hardware.
  */
 #define MI_LOAD_REGISTER_IMM(x)	MI_INSTR(0x22, 2*(x)-1)
+#define MI_LOAD_REGISTER_IMM_REL(egine, x)	\
+	(MI_LOAD_REGISTER_IMM(x) | engine->lri_cmd_mode)
 /* Gen11+. addr = base + (ctx_restore ? offset & GENMASK(12,2) : offset) */
 #define   MI_LRI_LRM_CS_MMIO		REG_BIT(19)
 #define   MI_LRI_FORCE_POSTED		(1<<12)
