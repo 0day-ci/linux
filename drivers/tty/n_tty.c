@@ -596,7 +596,7 @@ break_out:
 }
 
 /**
- *	process_echoes	-	write pending echo characters
+ *	__process_echoes	-	write pending echo characters
  *	@tty: terminal device
  *
  *	Write previously buffered echo (and other ldisc-generated)
@@ -1092,7 +1092,7 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 }
 
 /**
- *	isig		-	handle the ISIG optio
+ *	__isig		-	handle the ISIG optio
  *	@sig: signal
  *	@tty: terminal
  *
@@ -1248,7 +1248,7 @@ n_tty_receive_signal_char(struct tty_struct *tty, int signal, unsigned char c)
 }
 
 /**
- *	n_tty_receive_char	-	perform processing
+ *	n_tty_receive_char_special	-	perform processing
  *	@tty: terminal device
  *	@c: character
  *
@@ -2042,11 +2042,11 @@ static int job_control(struct tty_struct *tty, struct file *file)
 }
 
 
-/**
+/*
  *	n_tty_read		-	read function for tty
  *	@tty: tty device
  *	@file: file object
- *	@buf: userspace buffer pointer
+ *	@kbuf: userspace buffer pointer
  *	@nr: size of I/O
  *
  *	Perform reads for the line discipline. We are guaranteed that the
