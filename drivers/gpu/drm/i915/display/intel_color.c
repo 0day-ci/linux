@@ -1605,6 +1605,20 @@ static u32 icl_csc_mode(const struct intel_crtc_state *crtc_state)
 	return csc_mode;
 }
 
+static u32 dither_after_cc1_12bpc(const struct intel_crtc_state *crtc_state)
+{
+	u32 gamma_mode = crtc_state->gamma_mode;
+	struct drm_i915_private *i915 = to_i915(crtc_state->uapi.crtc->dev);
+
+	if (DISPLAY_VER(i915) >= 13) {
+		if (!crtc_state->dither_force_disable &&
+		    (crtc_state->pipe_bpp == 36))
+			gamma_mode |= GAMMA_MODE_DITHER_AFTER_CC1;
+	}
+
+	return gamma_mode;
+}
+
 static int icl_color_check(struct intel_crtc_state *crtc_state)
 {
 	int ret;
@@ -1615,6 +1629,7 @@ static int icl_color_check(struct intel_crtc_state *crtc_state)
 
 	crtc_state->gamma_mode = icl_gamma_mode(crtc_state);
 
+	crtc_state->gamma_mode = dither_after_cc1_12bpc(crtc_state);
 	crtc_state->csc_mode = icl_csc_mode(crtc_state);
 
 	crtc_state->preload_luts = intel_can_preload_luts(crtc_state);
