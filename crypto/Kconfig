@@ -669,6 +669,18 @@ config CRYPTO_AES_GCM_AVX512
        depends on CRYPTO_AES_NI_INTEL
        depends on AS_VPCLMULQDQ
 
+# We default CRYPTO_AES_XTS_AVX512 to Y but depend on CRYPTO_AVX512 in
+# order to have a singular option (CRYPTO_AVX512) select multiple algorithms
+# when supported. Specifically, if the platform and/or toolset does not
+# support VPLMULQDQ. Then this algorithm should not be supported as part of
+# the set that CRYPTO_AVX512 selects.
+config CRYPTO_AES_XTS_AVX512
+       bool
+       default y
+       depends on CRYPTO_AVX512
+       depends on CRYPTO_AES_NI_INTEL
+       depends on AS_VPCLMULQDQ
+
 config CRYPTO_CRC32C_SPARC64
 	tristate "CRC32c CRC algorithm (SPARC64)"
 	depends on SPARC64

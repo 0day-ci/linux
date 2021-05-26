@@ -115,8 +115,12 @@ asmlinkage void aesni_xts_encrypt(const struct crypto_aes_ctx *ctx, u8 *out,
 
 asmlinkage void aesni_xts_decrypt(const struct crypto_aes_ctx *ctx, u8 *out,
 				  const u8 *in, unsigned int len, u8 *iv);
-
 #ifdef CONFIG_X86_64
+asmlinkage void aesni_xts_encrypt_avx512(const struct crypto_aes_ctx *ctx, u8 *out,
+				  const u8 *in, unsigned int len, u8 *iv);
+
+asmlinkage void aesni_xts_decrypt_avx512(const struct crypto_aes_ctx *ctx, u8 *out,
+				  const u8 *in, unsigned int len, u8 *iv);
 
 asmlinkage void aesni_ctr_enc(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len, u8 *iv);
@@ -236,6 +240,7 @@ asmlinkage void aes_gcm_precomp_avx_512(struct crypto_aes_ctx *ctx,
 static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx);
 static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx2);
 static __ro_after_init DEFINE_STATIC_KEY_FALSE(gcm_use_avx512);
+static __ro_after_init DEFINE_STATIC_KEY_FALSE(xts_use_avx512);
 
 static inline struct
 aesni_rfc4106_gcm_ctx *aesni_rfc4106_gcm_ctx_get(struct crypto_aead *tfm)
@@ -924,6 +929,25 @@ static int helper_rfc4106_decrypt(struct aead_request *req)
 }
 #endif
 
+#if defined(CONFIG_X86_64) && IS_ENABLED(CONFIG_CRYPTO_AES_XTS_AVX512)
+#define _aesni_xts_encrypt(raw, dst, src, nbytes, iv) \
+({ \
+	static_branch_likely(&xts_use_avx512) ? \
+	aesni_xts_encrypt_avx512(raw, dst, src, nbytes, iv) :\
+	aesni_xts_encrypt(raw, dst, src, nbytes, iv); \
+})
+#define _aesni_xts_decrypt(raw, dst, src, nbytes, iv) \
+({ \
+	static_branch_likely(&xts_use_avx512) ? \
+	aesni_xts_decrypt_avx512(raw, dst, src, nbytes, iv) :\
+	aesni_xts_decrypt(raw, dst, src, nbytes, iv); \
+})
+#else
+#define _aesni_xts_encrypt aesni_xts_encrypt
+#define _aesni_xts_decrypt aesni_xts_decrypt
+#endif
+
+
 static int xts_aesni_setkey(struct crypto_skcipher *tfm, const u8 *key,
 			    unsigned int keylen)
 {
@@ -990,13 +1014,15 @@ static int xts_crypt(struct skcipher_request *req, bool encrypt)
 			nbytes &= ~(AES_BLOCK_SIZE - 1);
 
 		if (encrypt)
-			aesni_xts_encrypt(aes_ctx(ctx->raw_crypt_ctx),
-					  walk.dst.virt.addr, walk.src.virt.addr,
-					  nbytes, walk.iv);
+			_aesni_xts_encrypt(aes_ctx(ctx->raw_crypt_ctx),
+					   walk.dst.virt.addr,
+					   walk.src.virt.addr,
+					   nbytes, walk.iv);
 		else
-			aesni_xts_decrypt(aes_ctx(ctx->raw_crypt_ctx),
-					  walk.dst.virt.addr, walk.src.virt.addr,
-					  nbytes, walk.iv);
+			_aesni_xts_decrypt(aes_ctx(ctx->raw_crypt_ctx),
+					   walk.dst.virt.addr,
+					   walk.src.virt.addr,
+					   nbytes, walk.iv);
 		kernel_fpu_end();
 
 		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
@@ -1022,13 +1048,15 @@ static int xts_crypt(struct skcipher_request *req, bool encrypt)
 
 		kernel_fpu_begin();
 		if (encrypt)
-			aesni_xts_encrypt(aes_ctx(ctx->raw_crypt_ctx),
-					  walk.dst.virt.addr, walk.src.virt.addr,
-					  walk.nbytes, walk.iv);
+			_aesni_xts_encrypt(aes_ctx(ctx->raw_crypt_ctx),
+					   walk.dst.virt.addr,
+					   walk.src.virt.addr,
+					   walk.nbytes, walk.iv);
 		else
-			aesni_xts_decrypt(aes_ctx(ctx->raw_crypt_ctx),
-					  walk.dst.virt.addr, walk.src.virt.addr,
-					  walk.nbytes, walk.iv);
+			_aesni_xts_decrypt(aes_ctx(ctx->raw_crypt_ctx),
+					   walk.dst.virt.addr,
+					   walk.src.virt.addr,
+					   walk.nbytes, walk.iv);
 		kernel_fpu_end();
 
 		err = skcipher_walk_done(&walk, 0);
@@ -1276,6 +1304,11 @@ static int __init aesni_init(void)
 		/* optimize performance of ctr mode encryption transform */
 		static_call_update(aesni_ctr_enc_tfm, aesni_ctr_enc_avx_tfm);
 		pr_info("AES CTR mode by8 optimization enabled\n");
+	}
+	if (use_avx512 && IS_ENABLED(CONFIG_CRYPTO_AES_XTS_AVX512) &&
+	    cpu_feature_enabled(X86_FEATURE_VPCLMULQDQ)) {
+		pr_info("AES XTS AVX512 optimization enabled.\n");
+		static_branch_enable(&xts_use_avx512);
 	}
 #endif
 

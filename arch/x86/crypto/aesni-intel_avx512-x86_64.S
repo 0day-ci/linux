@@ -9,6 +9,7 @@
  */
 
 #include "aes_avx512_common.S"
+#include <asm/frame.h>
 
 #define zmm31y ymm31
 #define zmm30y ymm30
@@ -209,6 +210,31 @@
 #define AadLen          (16*1)
 #define AadHash         (16*0)
 #define big_loop_nblocks        48
+
+#if defined(CONFIG_CRYPTO_AES_XTS_AVX512)
+#define IV	%xmm3
+#define KEYP	%rdi
+#define OUTP	%rsi
+#define INP	%rdx
+#define LEN	%rcx
+#define IVP	%r8
+#define KLEN	%r9d
+#define T1	%r10
+#define TKEYP	T1
+#define TTMP1	%r11
+#define zpoly	%zmm25
+#define ghash_poly_8b	%r10
+#define ST1	%zmm1
+#define ST2	%zmm2
+#define ST3	%zmm3
+#define ST4	%zmm4
+#define TW1	%zmm9
+#define TW2	%zmm10
+#define TW3	%zmm11
+#define TW4	%zmm12
+#define T0	%zmm0
+#define STATE4	%xmm6
+#endif
 
 .data
 
@@ -449,6 +475,36 @@ ddq_add_16:
 
 mask_16_bytes:
 .octa  0x000000000000ffff
+
+#if defined(CONFIG_CRYPTO_AES_XTS_AVX512)
+.section	.rodata.cst16.shufb_15_7, "aM", @progbits, 16
+.align 16
+shufb_15_7:
+	.byte 	15, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+	.byte	 7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+
+.section	.rodata.cst16.const_dq3210, "aM", @progbits, 64
+.align 16
+const_dq3210: .quad 0, 0, 1, 1, 2, 2, 3, 3
+
+.section	.rodata.cst16.const_dq5678, "aM", @progbits, 64
+.align 16
+const_dq5678: .quad 8, 8, 7, 7, 6, 6, 5, 5
+
+.section	.rodata.cst16.const_dq7654, "aM", @progbits, 64
+.align 16
+const_dq7654: .quad 4, 4, 5, 5, 6, 6, 7, 7
+
+.section	.rodata.cst16.const_dq1234, "aM", @progbits, 64
+.align 16
+const_dq1234: .quad 4, 4, 3, 3, 2, 2, 1, 1
+
+.section	.rodata.cst16.vpshufb_shf_table, "aM", @progbits, 32
+.align 16
+vpshufb_shf_table:
+	.quad 0x8786858483828100, 0x8f8e8d8c8b8a8988
+	.quad 0x0706050403020100, 0x000e0d0c0b0a0908
+#endif
 
 .text
 
@@ -3076,3 +3132,606 @@ key_precomp:
 	ret
 
 SYM_FUNC_END(aes_gcm_precomp_avx_512)
+
+#if defined(CONFIG_CRYPTO_AES_XTS_AVX512)
+/*
+ * _aesni_enc16:	internal ABI
+ *			Encrypt 16 blocks at once using zmm registers
+ * input:
+ *	KEYP:		key struct pointer
+ *	KLEN:		round count
+ *	ST1:		initial state (input)
+ *	ST2
+ *	ST3
+ *	ST4
+ *	TW1		Tweak
+ *	TW2
+ *	TW3
+ *	TW4
+ *	T0		zmm register for temporary state
+ * output:
+ *	ST1:		final state (output)
+ *	ST2
+ *	ST3
+ *	ST4
+ * changed:
+ *	T0
+ */
+SYM_FUNC_START_LOCAL(_aesni_enc16)
+	vbroadcasti32x4 (KEYP), T0
+	mov KEYP, TKEYP
+
+	/* round zero */
+	vpxorq	T0, ST1, ST1
+	vpxorq	T0, ST2, ST2
+	vpxorq	T0, ST3, ST3
+	vpxorq	T0, ST4, ST4
+
+	add $0x30, TKEYP
+	cmp $24, KLEN
+	jb .L16enc128
+	lea 0x20(TKEYP), TKEYP
+	je .L16enc192
+	add $0x20, TKEYP
+
+	/* round 1 */
+	vbroadcasti32x4 -0x60(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 2 */
+	vbroadcasti32x4 -0x50(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+#.align 4
+.L16enc192:
+	/* round 3 */
+	vbroadcasti32x4 -0x40(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 4 */
+	vbroadcasti32x4 -0x30(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+#.align 4
+.L16enc128:
+	/* round 5 */
+	vbroadcasti32x4 -0x20(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, TW3, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, TW3, %zmm15
+	vpxord	%zmm14, %zmm15, %zmm15
+
+	/* round 6 */
+	vbroadcasti32x4 -0x10(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 7 */
+	vbroadcasti32x4 (TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 8 */
+	vbroadcasti32x4 0x10(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, TW4, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, TW4, %zmm16
+	vpxord	%zmm14, %zmm16, %zmm16
+
+	/* round 9 */
+	vbroadcasti32x4 0x20(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 10 */
+	vbroadcasti32x4 0x30(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 11 */
+	vbroadcasti32x4 0x40(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, %zmm15, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm15, %zmm17
+	vpxord	%zmm14, %zmm17, %zmm17
+
+	/* round 12 */
+	vbroadcasti32x4 0x50(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 13 */
+	vbroadcasti32x4 0x60(TKEYP), T0
+	vaesenc	T0, ST1, ST1
+	vaesenc	T0, ST2, ST2
+	vaesenc	T0, ST3, ST3
+	vaesenc	T0, ST4, ST4
+
+	/* round 14 */
+	vbroadcasti32x4 0x70(TKEYP), T0
+	vaesenclast	T0, ST1, ST1
+	vaesenclast	T0, ST2, ST2
+	vaesenclast	T0, ST3, ST3
+	vaesenclast	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, %zmm16, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm16, %zmm18
+	vpxord	%zmm14, %zmm18, %zmm18
+
+	ret
+SYM_FUNC_END(_aesni_enc16)
+
+/*
+ * _aesni_dec16:	internal ABI
+ *			Decrypt 16 blocks at once using zmm registers
+ * input:
+ *	KEYP:		key struct pointer
+ *	KLEN:		round count
+ *	ST1:		initial state (input)
+ *	ST2
+ *	ST3
+ *	ST4
+ *	TW1		Tweak
+ *	TW2
+ *	TW3
+ *	TW4
+ *	T0		zmm register for temporary state
+ * output:
+ *	ST1:		final state (output)
+ *	ST2
+ *	ST3
+ *	ST4
+ * changed:
+ *	T0
+ */
+SYM_FUNC_START_LOCAL(_aesni_dec16)
+	vbroadcasti32x4 (KEYP), T0
+	mov KEYP, TKEYP
+
+	/* round 0 */
+	vpxorq	T0, ST1, ST1
+	vpxorq	T0, ST2, ST2
+	vpxorq	T0, ST3, ST3
+	vpxorq	T0, ST4, ST4
+
+	add $0x30, TKEYP
+	cmp $24, KLEN
+	jb .L16dec128
+	lea 0x20(TKEYP), TKEYP
+	je .L16dec192
+	add $0x20, TKEYP
+
+	/* round 1 */
+	vbroadcasti32x4 -0x60(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 2 */
+	vbroadcasti32x4 -0x50(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+#.align 4
+.L16dec192:
+	/* round 3 */
+	vbroadcasti32x4 -0x40(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 4 */
+	vbroadcasti32x4 -0x30(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+#.align 4
+.L16dec128:
+	/* round 5 */
+	vbroadcasti32x4 -0x20(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, TW3, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, TW3, %zmm15
+	vpxord	%zmm14, %zmm15, %zmm15
+
+	/* round 6 */
+	vbroadcasti32x4 -0x10(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 7 */
+	vbroadcasti32x4 (TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 8 */
+	vbroadcasti32x4 0x10(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, TW4, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, TW4, %zmm16
+	vpxord	%zmm14, %zmm16, %zmm16
+
+	/* round 9 */
+	vbroadcasti32x4 0x20(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 10 */
+	vbroadcasti32x4 0x30(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 11 */
+	vbroadcasti32x4 0x40(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, %zmm15, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm15, %zmm17
+	vpxord	%zmm14, %zmm17, %zmm17
+
+	/* round 12 */
+	vbroadcasti32x4 0x50(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 13 */
+	vbroadcasti32x4 0x60(TKEYP), T0
+	vaesdec	T0, ST1, ST1
+	vaesdec	T0, ST2, ST2
+	vaesdec	T0, ST3, ST3
+	vaesdec	T0, ST4, ST4
+
+	/* round 14 */
+	vbroadcasti32x4 0x70(TKEYP), T0
+	vaesdeclast	T0, ST1, ST1
+	vaesdeclast	T0, ST2, ST2
+	vaesdeclast	T0, ST3, ST3
+	vaesdeclast	T0, ST4, ST4
+
+	/* interleave making next 8 tweak values */
+	vpsrldq $15, %zmm16, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm16, %zmm18
+	vpxord	%zmm14, %zmm18, %zmm18
+
+	ret
+SYM_FUNC_END(_aesni_dec16)
+
+/*
+ * void aesni_xts_decrypt_avx512(const struct crypto_aes_ctx *ctx, u8 *dst,
+ *			  const u8 *src, unsigned int len, le128 *iv)
+ */
+SYM_FUNC_START(aesni_xts_decrypt_avx512)
+	FRAME_BEGIN
+
+	/* for 8 blocks and below, use xmm registers. */
+	cmp $256, LEN
+	jl .Lxts_dec_less_than_16
+
+	movups (IVP), IV
+	mov 480(KEYP), KLEN
+	add $240, KEYP
+
+	test $15, LEN
+	jz .Lxts_start_dec16
+
+	/*
+	 * the cts algorithm requires that the last block be
+	 * recomputed, so only take this path if there is
+	 * 256+16 bytes since cts will need to be applied.
+	 */
+	sub $16, LEN
+	cmp $256, LEN
+	jl .Lxts_dec_restore_len
+
+.Lxts_start_dec16:
+	/* Generate the first 7 tweak values */
+	mov		$0x87, ghash_poly_8b
+	vpbroadcastq	ghash_poly_8b, zpoly
+
+	vbroadcasti32x4 (IVP), %zmm0		# first tweak value already there
+	vbroadcasti32x4 shufb_15_7, %zmm8	# immediate values to control shuffle
+
+	mov $0xaa, TTMP1
+	kmovq TTMP1, %k2			# mask value for zmm registers
+
+	/* multiply tweak by 2^{3,2,1,0} */
+	vpshufb %zmm8, %zmm0, %zmm1 		# move 15-> 9, 7->8
+	vpsllvq const_dq3210, %zmm0, %zmm4	# shift l 3, 2, 1, 0
+	vpsrlvq const_dq5678, %zmm1, %zmm2	# shift r 5, 6, 7, 8
+	vpclmulqdq $0x00, zpoly, %zmm2, %zmm3
+	vpxorq %zmm2, %zmm4, %zmm4 {%k2}	# tweaks shifted by 3-0
+	vpxord %zmm4, %zmm3, TW1
+
+	/* multiply tweak by 2^{7, 6, 5, 4} */
+	vpsllvq const_dq7654, %zmm0, %zmm5	# shift l 7, 6, 5, 4
+	vpsrlvq const_dq1234, %zmm1, %zmm6	# shift r 1, 2, 3, 4
+	vpclmulqdq $0x00, zpoly, %zmm6, %zmm7
+	vpxorq %zmm6, %zmm5, %zmm5 {%k2}	# tweaks shifted by 7-4
+	vpxord %zmm5, %zmm7, TW2
+
+	/* make next 8 tweak values by all x 2^8 */
+	vpsrldq $15, %zmm9, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm9, %zmm11
+	vpxord	%zmm14, %zmm11, TW3
+
+	vpsrldq $15, %zmm10, %zmm15
+	vpclmulqdq $0, zpoly, %zmm15, %zmm16
+	vpslldq	$1, %zmm10, %zmm12
+	vpxord %zmm16, %zmm12, TW4
+
+.Lxts_dec_loop16:
+
+	/*
+	 * Put 16 plain text blocks (P) into registers.
+	 * STn are 512 bit registers, so we grab 4 at a time.
+	 */
+	vmovdqu8 0x00(INP), ST1
+	vmovdqu8 0x40(INP), ST2
+	vmovdqu8 0x80(INP), ST3
+	vmovdqu8 0xc0(INP), ST4
+
+	/*
+	 * encrypt: PP <- T xor P
+	 * decrypt: CC <- T xor C
+	 */
+	vpxorq TW1, ST1, ST1
+	vpxorq TW2, ST2, ST2
+	vpxorq TW3, ST3, ST3
+	vpxorq TW4, ST4, ST4
+
+	/*
+	 * encrypt: CC <- AES-enc(Key1, PP)
+	 * decrypt: PP <- AES-dec(Key1, CC)
+	 */
+	call _aesni_dec16
+
+	/*
+	 * encrypt: C <- CC xor T
+	 * decrypt: P <- PP xor T
+	 */
+	vpxorq TW1, ST1, ST1
+	vpxorq TW2, ST2, ST2
+	vpxorq TW3, ST3, ST3
+	vpxorq TW4, ST4, ST4
+
+	/* load next tweak values */
+	vmovdqa32 %zmm15, TW1
+	vmovdqa32 %zmm16, TW2
+	vmovdqa32 %zmm17, TW3
+	vmovdqa32 %zmm18, TW4
+
+	/* save result of en/decryption to output */
+	vmovdqu8 ST1, 0x00(OUTP)
+	vmovdqu8 ST2, 0x40(OUTP)
+	vmovdqu8 ST3, 0x80(OUTP)
+	vmovdqu8 ST4, 0xc0(OUTP)
+
+	add $256, INP
+	add $256, OUTP
+	sub $256, LEN
+
+	cmp $256, LEN
+	jge .Lxts_dec_loop16
+
+	/* save last generated tweak value */
+	vextracti32x4 $0, TW1, IV
+	movups IV, (IVP)
+
+	test LEN, LEN
+	jz .Lxts_dec_end16
+
+	test $15, LEN
+	jz .Lxts_dec_restore_keyp
+
+.Lxts_dec_restore_len:
+	add $16, LEN
+
+.Lxts_dec_restore_keyp:
+	sub $240, KEYP
+
+.Lxts_dec_less_than_16:
+	call aesni_xts_decrypt
+
+.Lxts_dec_end16:
+	FRAME_END
+	ret
+SYM_FUNC_END(aesni_xts_decrypt_avx512)
+
+/*
+ * void aesni_xts_encrypt_avx512(const struct crypto_aes_ctx *ctx, u8 *dst,
+ *			  const u8 *src, unsigned int len, le128 *iv)
+ */
+SYM_FUNC_START(aesni_xts_encrypt_avx512)
+	FRAME_BEGIN
+
+	/* for 8 blocks and below, use xmm registers. */
+	cmp $256, LEN
+	jl .Lxts_enc_less_than_16
+
+	movups (IVP), IV
+	mov 480(KEYP), KLEN
+
+	/* Generate the first 7 tweak values */
+	mov		$0x87, ghash_poly_8b
+	vpbroadcastq	ghash_poly_8b, zpoly
+
+	vbroadcasti32x4 (IVP), %zmm0		# first tweak value already there
+	vbroadcasti32x4 shufb_15_7, %zmm8	# immediate values to control shuffle
+
+	mov $0xaa, TTMP1
+	kmovq TTMP1, %k2			# mask value for zmm registers
+
+	/* multiply tweak by 2^{3,2,1,0} */
+	vpshufb %zmm8, %zmm0, %zmm1 		# move 15-> 9, 7->8
+	vpsllvq const_dq3210, %zmm0, %zmm4	# shift l 3, 2, 1, 0
+	vpsrlvq const_dq5678, %zmm1, %zmm2	# shift r 5, 6, 7, 8
+	vpclmulqdq $0x00, zpoly, %zmm2, %zmm3
+	vpxorq %zmm2, %zmm4, %zmm4 {%k2}	# tweaks shifted by 3-0
+	vpxord %zmm4, %zmm3, TW1
+
+	/* multiply tweak by 2^{7, 6, 5, 4} */
+	vpsllvq const_dq7654, %zmm0, %zmm5	# shift l 7, 6, 5, 4
+	vpsrlvq const_dq1234, %zmm1, %zmm6	# shift r 1, 2, 3, 4
+	vpclmulqdq $0x00, zpoly, %zmm6, %zmm7
+	vpxorq %zmm6, %zmm5, %zmm5 {%k2}	# tweaks shifted by 7-4
+	vpxord %zmm5, %zmm7, TW2
+
+	vpsrldq $15, %zmm9, %zmm13
+	vpclmulqdq $0, zpoly, %zmm13, %zmm14
+	vpslldq $1, %zmm9, %zmm11
+	vpxord	%zmm14, %zmm11, TW3
+
+	vpsrldq $15, %zmm10, %zmm15
+	vpclmulqdq $0, zpoly, %zmm15, %zmm16
+	vpslldq	$1, %zmm10, %zmm12
+	vpxord %zmm16, %zmm12, TW4
+
+.Lxts_enc_loop16:
+
+	/*
+	 * Put 16 plain text blocks (P) into registers.
+	 * STn are 512 bit registers, so we grab 4 at a time.
+	 */
+	vmovdqu8 0x00(INP), ST1
+	vmovdqu8 0x40(INP), ST2
+	vmovdqu8 0x80(INP), ST3
+	vmovdqu8 0xc0(INP), ST4
+
+	/*
+	 * encrypt: PP <- T xor P
+	 * decrypt: CC <- T xor C
+	 */
+	vpxorq TW1, ST1, ST1
+	vpxorq TW2, ST2, ST2
+	vpxorq TW3, ST3, ST3
+	vpxorq TW4, ST4, ST4
+
+	/*
+	 * encrypt: CC <- AES-enc(Key1, PP)
+	 * decrypt: PP <- AES-dec(Key1, CC)
+	 */
+	call _aesni_enc16
+
+	/*
+	 * encrypt: C <- CC xor T
+	 * decrypt: P <- PP xor T
+	 */
+	vpxorq TW1, ST1, ST1
+	vpxorq TW2, ST2, ST2
+	vpxorq TW3, ST3, ST3
+	vpxorq TW4, ST4, ST4
+
+	/* load next tweak values */
+	vmovdqa32 %zmm15, TW1
+	vmovdqa32 %zmm16, TW2
+	vmovdqa32 %zmm17, TW3
+	vmovdqa32 %zmm18, TW4
+
+	/* save result of en/decryption to output */
+	vmovdqu8 ST1, 0x00(OUTP)
+	vmovdqu8 ST2, 0x40(OUTP)
+	vmovdqu8 ST3, 0x80(OUTP)
+	vmovdqu8 ST4, 0xc0(OUTP)
+
+	add $256, INP
+	add $256, OUTP
+	sub $256, LEN
+
+	cmp $256, LEN
+	jge .Lxts_enc_loop16
+
+	/* save last generated tweak value */
+	vextracti32x4 $0, TW1, IV
+
+	movups IV, (IVP)
+	test LEN, LEN
+	jz .Lxts_enc_end16
+
+	/* save last encrypted block */
+	vextracti32x4 $3, ST4, STATE4
+
+.Lxts_enc_less_than_16:
+	call aesni_xts_encrypt
+
+.Lxts_enc_end16:
+	FRAME_END
+	ret
+SYM_FUNC_END(aesni_xts_encrypt_avx512)
+#endif
