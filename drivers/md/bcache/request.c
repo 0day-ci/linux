@@ -883,6 +883,7 @@ static int cached_dev_cache_miss(struct btree *b, struct search *s,
 	unsigned int reada = 0;
 	struct cached_dev *dc = container_of(s->d, struct cached_dev, disk);
 	struct bio *miss, *cache_bio;
+	unsigned int nr_bvecs, max_segs;
 
 	s->cache_missed = 1;
 
@@ -899,6 +900,24 @@ static int cached_dev_cache_miss(struct btree *b, struct search *s,
 			      get_capacity(bio->bi_bdev->bd_disk) -
 			      bio_end_sector(bio));
 
+	/*
+	 * If "bio_sectors(bio) + reada" may causes an oversized bio bvecs
+	 * number, reada size must be deducted to make sure the following
+	 * calculated s->insert_bio_sectors won't cause oversized bvecs number
+	 * to cache_bio.
+	 */
+	nr_bvecs = DIV_ROUND_UP(bio_sectors(bio) + reada, PAGE_SECTORS);
+	max_segs = bio_max_segs(nr_bvecs);
+	if (nr_bvecs > max_segs)
+		reada = max_segs * PAGE_SECTORS - bio_sectors(bio);
+
+	/*
+	 * Make sure sectors won't exceed (1 << KEY_SIZE_BITS) - 1, which is
+	 * the maximum bkey size in unit of sector. Then s->insert_bio_sectors
+	 * will always be a valid bio in valid bkey size range.
+	 */
+	if (sectors > ((1 << KEY_SIZE_BITS) - 1))
+		sectors = (1 << KEY_SIZE_BITS) - 1;
 	s->insert_bio_sectors = min(sectors, bio_sectors(bio) + reada);
 
 	s->iop.replace_key = KEY(s->iop.inode,
