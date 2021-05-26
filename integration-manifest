@@ -1,0 +1,26 @@
+drm drm-fixes dd6ad0516ee38112321e99ce368fddd49ee3b9db
+	Merge tag 'amd-drm-fixes-5.13-2021-05-19' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes 35f819d218035ddfbc71e7cf62a4849231701e58
+	drm/ttm: Skip swapout if ttm object is not populated
+drm-intel drm-intel-fixes e11851429fdc23524aa244f76508c3c7aeaefdf6
+	drm/i915: Reenable LTTPR non-transparent LT mode for DPCD_REV<1.4
+drm drm-next 9a91e5e0af5e03940d0eec72c36364a1701de240
+	Merge tag 'amd-drm-next-5.14-2021-05-21' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes b9d79e4ca4ff23543d6b33c736ba07c1f0a9dcb1
+	fbmem: Mark proc_fb_seq_ops as __maybe_unused
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-misc drm-misc-next 39aa91e2af57561716338d6488977d50b9735cfb
+	fbdev: matrox: use modern module_init()
+drm-intel drm-intel-next 994a4c3e226a40fb6404ca9999e20d1e43096470
+	drm/i915: Drop redundant has_hdmi_sink check
+drm-intel drm-intel-gt-next 0669a6e1f11500ba9e6ddebe67c449c0444daa3a
+	drm/i915/gt: Move CS interrupt handler to the backend
+sound-upstream for-linus 29c8f40b54a45dd23971e2bc395697731bcffbe1
+	ALSA: hda/realtek: Chain in pop reduction fixup for ThinkStation P340
+sound-upstream for-next 08e767cd9e8b6682cfc4fba630ec2e46f13e99e0
+	ALSA: control_led - use DEVICE_ATTR_*() macro
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
