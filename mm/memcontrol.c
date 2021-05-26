@@ -1401,11 +1401,19 @@ static void mem_cgroup_mst_msc_reset(struct mem_cgroup *memcg)
 		return;
 
 	msc = &memcg->msc;
-	msc->has_lmt = 0;
-	msc->mem_spd_lmt = 0;
-	msc->slice_lmt = 0;
-	msc->prev_chg = 0;
-	msc->prev_thl_jifs = 0;
+	while (msc->prev_thl_jifs ||
+	    msc->prev_chg ||
+	    msc->slice_lmt ||
+	    msc->mem_spd_lmt ||
+	    msc->has_lmt ||
+	    atomic_long_read(&msc->nr_throttled)) {
+		atomic_long_set(&msc->nr_throttled, 0);
+		msc->has_lmt = 0;
+		msc->mem_spd_lmt = 0;
+		msc->slice_lmt = 0;
+		msc->prev_chg = 0;
+		msc->prev_thl_jifs = 0;
+	}
 }
 
 static void mem_cgroup_mst_has_lmt_init(struct mem_cgroup *memcg)
@@ -1552,6 +1560,8 @@ static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
 	if (!ret)
 		return;
 
+	atomic_long_inc(&msc->nr_throttled);
+
 	/*
 	 * Throttle the allocation for amount of jiffies according to
 	 * the fraction between the actual memory usage and allowed
@@ -1586,7 +1596,18 @@ static void mem_cgroup_mst_show_mem_spd_max(struct mem_cgroup *memcg,
 	seq_printf(m, "mst_mem_spd_max %lu\n",
 		   mem_cgroup_mst_get_mem_spd_max(memcg));
 }
+
+static void mem_cgroup_mst_show_nr_throttled(struct mem_cgroup *memcg,
+					     struct seq_file *m)
+{
+	seq_printf(m, "mst_nr_throttled %lu\n",
+		   atomic_long_read(&memcg->msc.nr_throttled));
+}
 #else /* CONFIG_MEM_SPEED_THROTTLE */
+static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
+{
+}
+
 static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
 {
 }
@@ -1678,6 +1699,8 @@ static char *memory_stat_format(struct mem_cgroup *memcg)
 #ifdef CONFIG_MEM_SPEED_THROTTLE
 	seq_buf_printf(&s, "mst_mem_spd_max %lu\n",
 		mem_cgroup_mst_get_mem_spd_max(memcg));
+	seq_buf_printf(&s, "mst_nr_throttled %lu\n",
+		atomic_long_read(&memcg->msc.nr_throttled));
 #endif
 
 	/* The above should easily fit into one page */
@@ -4131,6 +4154,7 @@ static int memcg_stat_show(struct seq_file *m, void *v)
 #endif
 
 	mem_cgroup_mst_show_mem_spd_max(memcg, m);
+	mem_cgroup_mst_show_nr_throttled(memcg, m);
 
 	return 0;
 }

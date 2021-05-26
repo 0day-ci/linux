@@ -239,6 +239,7 @@ struct mem_spd_ctl {
 	unsigned long prev_chg;
 	int has_lmt;
 	atomic_t updating;
+	atomic_long_t nr_throttled;
 };
 #endif
 
