@@ -319,6 +319,86 @@ int release_resource(struct resource *old)
 EXPORT_SYMBOL(release_resource);
 
 /**
+ * walk_excluding_child_res - call a callback function on each fragment of
+ *			      a resource that do not have a child resource
+ *
+ * @res: the root resource containing the initial range
+ * @arg: function argument for the callback @func
+ * @func: callback function that is called for each qualifying resource area
+ *
+ * For a given resource, remove all the child resources and feed the
+ * resulting fragments to kexec_locate_mem_hole_callback().
+ */
+int walk_excluding_child_res(struct resource *res, void *arg,
+			     int (*func)(struct resource *, void *))
+{
+	struct resource *tmp, cursor;
+	int ret = 0;
+
+	cursor = *res;
+
+	/* Use .child for the head of the list, .sibling for the tail */
+	cursor.child = cursor.sibling = NULL;
+
+	read_lock(&resource_lock);
+
+	for (tmp = res->child; tmp; tmp = tmp->sibling) {
+		struct resource *new;
+
+		if (cursor.start < tmp->start) {
+			new = kmalloc(sizeof(*new), GFP_KERNEL);
+			if (!new)
+				goto cleanup;
+
+			*new = (struct resource) {
+				.start	= cursor.start,
+				.end	= tmp->start - 1,
+				.flags	= res->flags,
+				.desc	= res->desc,
+				.parent	= res->parent,
+			};
+
+			if (!cursor.child)
+				cursor.child = new;
+			if (cursor.sibling)
+				cursor.sibling->sibling = new;
+			cursor.sibling = new;
+		}
+
+		/*
+		 * This may result in a resource with a negative size
+		 * at the very end of the loop.
+		 */
+		cursor.start = tmp->end + 1;
+	}
+
+	read_unlock(&resource_lock);
+
+	/*
+	 * At this stage, the list pointed to by cursor.child contains
+	 * every non-reserved blocks, completed by 'cursor' which
+	 * contains the potential last block (may be empty).
+	 */
+	for (tmp = cursor.child; tmp; tmp = tmp->sibling) {
+		ret = func(tmp, arg);
+		if (ret)
+			break;
+	}
+
+	if (!ret && cursor.start <= cursor.end)
+		ret = func(&cursor, tmp);
+
+cleanup:
+	while (cursor.child) {
+		tmp = cursor.child;
+		cursor.child = cursor.child->sibling;
+		kfree(tmp);
+	}
+
+	return ret;
+}
+
+/**
  * find_next_iomem_res - Finds the lowest iomem resource that covers part of
  *			 [@start..@end].
  *

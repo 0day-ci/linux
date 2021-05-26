@@ -323,6 +323,10 @@ extern int
 walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
 		    void *arg, int (*func)(struct resource *, void *));
 
+extern int
+walk_excluding_child_res(struct resource *res, void *arg,
+			 int (*func)(struct resource *, void *));
+
 struct resource *devm_request_free_mem_region(struct device *dev,
 		struct resource *base, unsigned long size);
 struct resource *request_free_mem_region(struct resource *base,
