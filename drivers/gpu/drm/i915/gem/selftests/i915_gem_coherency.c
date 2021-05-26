@@ -90,8 +90,13 @@ static int gtt_set(struct context *ctx, unsigned long offset, u32 v)
 	int err = 0;
 
 	i915_gem_object_lock(ctx->obj, NULL);
-	err = i915_gem_object_set_to_gtt_domain(ctx->obj, true);
+	i915_gem_object_set_to_gtt_domain(ctx->obj, true);
 	i915_gem_object_unlock(ctx->obj);
+
+	err = i915_gem_object_wait(ctx->obj,
+				   I915_WAIT_ALL |
+				   I915_WAIT_INTERRUPTIBLE,
+				   HZ / 2);
 	if (err)
 		return err;
 
@@ -123,8 +128,12 @@ static int gtt_get(struct context *ctx, unsigned long offset, u32 *v)
 	int err = 0;
 
 	i915_gem_object_lock(ctx->obj, NULL);
-	err = i915_gem_object_set_to_gtt_domain(ctx->obj, false);
+	i915_gem_object_set_to_gtt_domain(ctx->obj, false);
 	i915_gem_object_unlock(ctx->obj);
+
+	err = i915_gem_object_wait(ctx->obj,
+				   I915_WAIT_INTERRUPTIBLE,
+				   HZ / 2);
 	if (err)
 		return err;
 
@@ -155,8 +164,13 @@ static int wc_set(struct context *ctx, unsigned long offset, u32 v)
 	int err;
 
 	i915_gem_object_lock(ctx->obj, NULL);
-	err = i915_gem_object_set_to_wc_domain(ctx->obj, true);
+	i915_gem_object_set_to_wc_domain(ctx->obj, true);
 	i915_gem_object_unlock(ctx->obj);
+
+	err = i915_gem_object_wait(ctx->obj,
+				   I915_WAIT_ALL |
+				   I915_WAIT_INTERRUPTIBLE,
+				   HZ / 2);
 	if (err)
 		return err;
 
@@ -178,8 +192,12 @@ static int wc_get(struct context *ctx, unsigned long offset, u32 *v)
 	int err;
 
 	i915_gem_object_lock(ctx->obj, NULL);
-	err = i915_gem_object_set_to_wc_domain(ctx->obj, false);
+	i915_gem_object_set_to_wc_domain(ctx->obj, false);
 	i915_gem_object_unlock(ctx->obj);
+
+	err = i915_gem_object_wait(ctx->obj,
+				   I915_WAIT_INTERRUPTIBLE,
+				   HZ / 2);
 	if (err)
 		return err;
 
@@ -205,9 +223,7 @@ static int gpu_set(struct context *ctx, unsigned long offset, u32 v)
 		return PTR_ERR(vma);
 
 	i915_gem_object_lock(ctx->obj, NULL);
-	err = i915_gem_object_set_to_gtt_domain(ctx->obj, true);
-	if (err)
-		goto out_unlock;
+	i915_gem_object_set_to_gtt_domain(ctx->obj, false);
 
 	rq = intel_engine_create_kernel_request(ctx->engine);
 	if (IS_ERR(rq)) {
@@ -247,7 +263,6 @@ out_rq:
 	i915_request_add(rq);
 out_unpin:
 	i915_vma_unpin(vma);
-out_unlock:
 	i915_gem_object_unlock(ctx->obj);
 
 	return err;

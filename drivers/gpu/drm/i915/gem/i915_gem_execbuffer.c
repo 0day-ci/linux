@@ -1212,9 +1212,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 		if (use_cpu_reloc(cache, obj))
 			return NULL;
 
-		err = i915_gem_object_set_to_gtt_domain(obj, true);
-		if (err)
-			return ERR_PTR(err);
+		i915_gem_object_set_to_gtt_domain(obj, true);
 
 		vma = i915_gem_object_ggtt_pin_ww(obj, &eb->ww, NULL, 0, 0,
 						  PIN_MAPPABLE |

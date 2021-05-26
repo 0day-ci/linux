@@ -301,9 +301,7 @@ retry:
 	if (ret)
 		goto err_ww;
 
-	ret = i915_gem_object_set_to_gtt_domain(obj, write);
-	if (ret)
-		goto err_ww;
+	i915_gem_object_set_to_gtt_domain(obj, write);
 
 	if (!i915_gem_object_is_tiled(obj))
 		vma = i915_gem_object_ggtt_pin_ww(obj, &ww, NULL, 0, 0,

@@ -132,7 +132,7 @@ retry:
 	if (!err)
 		err = i915_gem_object_pin_pages(obj);
 	if (!err) {
-		err = i915_gem_object_set_to_cpu_domain(obj, write);
+		i915_gem_object_set_to_cpu_domain(obj, write);
 		i915_gem_object_unpin_pages(obj);
 	}
 	if (err == -EDEADLK) {
@@ -156,7 +156,7 @@ retry:
 	if (!err)
 		err = i915_gem_object_pin_pages(obj);
 	if (!err) {
-		err = i915_gem_object_set_to_gtt_domain(obj, false);
+		i915_gem_object_set_to_gtt_domain(obj, false);
 		i915_gem_object_unpin_pages(obj);
 	}
 	if (err == -EDEADLK) {
