@@ -1242,7 +1242,8 @@ static void record_request(const struct i915_request *request,
 
 static void engine_record_execlists(struct intel_engine_coredump *ee)
 {
-	const struct intel_engine_execlists * const el = &ee->engine->execlists;
+	const struct intel_engine_execlists * const el =
+		&ee->engine->execlists;
 	struct i915_request * const *port = el->active;
 	unsigned int n = 0;
 
@@ -1436,12 +1437,12 @@ capture_engine(struct intel_engine_cs *engine,
 	if (!ee)
 		return NULL;
 
-	spin_lock_irqsave(&engine->active.lock, flags);
+	spin_lock_irqsave(&engine->sched_engine->lock, flags);
 	rq = intel_engine_find_active_request(engine);
 	if (rq)
 		capture = intel_engine_coredump_add_request(ee, rq,
 							    ATOMIC_MAYFAIL);
-	spin_unlock_irqrestore(&engine->active.lock, flags);
+	spin_unlock_irqrestore(&engine->sched_engine->lock, flags);
 	if (!capture) {
 		kfree(ee);
 		return NULL;

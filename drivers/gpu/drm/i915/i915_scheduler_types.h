@@ -91,4 +91,67 @@ struct i915_dependency {
 				&(rq__)->sched.signalers_list, \
 				signal_link)
 
+struct i915_sched_engine {
+	struct kref ref;
+
+	/*
+	 * @lock: Protects requests in priority lists, requests, hold, and
+	 * tasklet while running.
+	 */
+	spinlock_t lock;
+
+	/* Execlist specific lists, needed here as protected by lock */
+	struct list_head requests;
+	struct list_head hold; /* ready requests, but on hold */
+
+	/**
+	 * @tasklet: softirq tasklet for bottom handler
+	 */
+	struct tasklet_struct tasklet;
+
+	/**
+	 * @default_priolist: priority list for I915_PRIORITY_NORMAL
+	 */
+	struct i915_priolist default_priolist;
+
+	/**
+	 * @queue_priority_hint: Highest pending priority.
+	 *
+	 * When we add requests into the queue, or adjust the priority of
+	 * executing requests, we compute the maximum priority of those
+	 * pending requests. We can then use this value to determine if
+	 * we need to preempt the executing requests to service the queue.
+	 * However, since the we may have recorded the priority of an inflight
+	 * request we wanted to preempt but since completed, at the time of
+	 * dequeuing the priority hint may no longer may match the highest
+	 * available request priority.
+	 */
+	int queue_priority_hint;
+
+	/**
+	 * @queue: queue of requests, in priority lists
+	 */
+	struct rb_root_cached queue;
+
+	/**
+	 * @no_priolist: priority lists disabled
+	 */
+	bool no_priolist;
+
+	/* Back pointer to engine */
+	struct intel_engine_cs *engine;
+
+	/* Kick backend */
+	void	(*kick_backend)(const struct i915_request *rq,
+				int prio);
+
+	/*
+	 * Call when the priority on a request has changed and it and its
+	 * dependencies may need rescheduling. Note the request itself may
+	 * not be ready to run!
+	 */
+	void	(*schedule)(struct i915_request *request,
+			    const struct i915_sched_attr *attr);
+};
+
 #endif /* _I915_SCHEDULER_TYPES_H_ */
