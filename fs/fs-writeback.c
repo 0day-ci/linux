@@ -578,6 +578,41 @@ out_free:
 }
 
 /**
+ * cleanup_offline_wb - detach associated clean inodes
+ * @wb: target wb
+ *
+ * Switch the inode->i_wb pointer of the attached inodes to the bdi's wb and
+ * drop the corresponding per-cgroup wb's reference. Skip inodes which are
+ * dirty, freeing, in the active writeback process or are in any way busy.
+ */
+void cleanup_offline_wb(struct bdi_writeback *wb)
+{
+	struct inode *inode, *tmp;
+
+	spin_lock(&wb->list_lock);
+restart:
+	list_for_each_entry_safe(inode, tmp, &wb->b_attached, i_io_list) {
+		if (!spin_trylock(&inode->i_lock))
+			continue;
+		xa_lock_irq(&inode->i_mapping->i_pages);
+		if ((inode->i_state & I_REFERENCED) != I_REFERENCED) {
+			struct bdi_writeback *bdi_wb = &inode_to_bdi(inode)->wb;
+
+			WARN_ON_ONCE(inode->i_wb != wb);
+
+			inode->i_wb = bdi_wb;
+			list_del_init(&inode->i_io_list);
+			wb_put(wb);
+		}
+		xa_unlock_irq(&inode->i_mapping->i_pages);
+		spin_unlock(&inode->i_lock);
+		if (cond_resched_lock(&wb->list_lock))
+			goto restart;
+	}
+	spin_unlock(&wb->list_lock);
+}
+
+/**
  * wbc_attach_and_unlock_inode - associate wbc with target inode and unlock it
  * @wbc: writeback_control of interest
  * @inode: target inode
