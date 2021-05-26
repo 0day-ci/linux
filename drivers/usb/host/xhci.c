@@ -1415,6 +1415,8 @@ static void xhci_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
  * HCDs.  Find the index for an endpoint given its descriptor.  Use the return
  * value to right shift 1 for the bitmask.
  *
+ * @desc: USB endpoint descriptor
+ *
  * Index  = (epnum * 2) + direction - 1,
  * where direction = 0 for OUT, 1 for IN.
  * For control endpoints, the IN index is used (OUT index is unused), so
