@@ -63,6 +63,7 @@ enum {
 #define MPOL_F_LOCAL   (1 << 1)	/* preferred local allocation */
 #define MPOL_F_MOF	(1 << 3) /* this policy wants migrate on fault */
 #define MPOL_F_MORON	(1 << 4) /* Migrate On protnone Reference On Node */
+#define MPOL_F_LOCAL_TEMP  (1 << 5) /* a policy temporarily changed from 'prefer' to 'local' */
 
 /*
  * These bit locations are exposed in the vm.zone_reclaim_mode sysctl
