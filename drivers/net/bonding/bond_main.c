@@ -4914,6 +4914,7 @@ void bond_setup(struct net_device *bond_dev)
 		bond_dev->features |= BOND_XFRM_FEATURES;
 #endif /* CONFIG_XFRM_OFFLOAD */
 #if IS_ENABLED(CONFIG_TLS_DEVICE)
+	bond_dev->hw_features |= BOND_TLS_FEATURES;
 	if (bond_sk_check(bond))
 		bond_dev->features |= BOND_TLS_FEATURES;
 #endif
