@@ -348,6 +348,7 @@ config MOUSE_AMIGA
 
 config MOUSE_ATARI
 	tristate "Atari mouse"
+	depends on INPUT_KEYBOARD
 	depends on ATARI
 	select ATARI_KBD_CORE
 	help
