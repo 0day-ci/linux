@@ -6771,7 +6771,15 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 			new_cpu = prev_cpu;
 		}
 
-		want_affine = !wake_wide(p) && cpumask_test_cpu(cpu, p->cpus_ptr);
+		/*
+		 * we use wake_wide to make smarter pull and avoid cruel
+		 * competition because of jam-packed tasks in waker's LLC
+		 * domain. But if waker and wakee have been already in
+		 * same LLC domain, it seems it is pointless to depend
+		 * on wake_wide
+		 */
+		want_affine = (cpus_share_cache(cpu, prev_cpu) || !wake_wide(p)) &&
+				cpumask_test_cpu(cpu, p->cpus_ptr);
 	}
 
 	rcu_read_lock();
