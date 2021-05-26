@@ -241,6 +241,12 @@ struct mem_spd_ctl {
 	atomic_t updating;
 	atomic_long_t nr_throttled;
 };
+
+enum mst_wmark_stat {
+	WMARK_OK = 0,
+	WMARK_REACH_LOW,
+	WMARK_REACH_MIN,
+};
 #endif
 
 /*

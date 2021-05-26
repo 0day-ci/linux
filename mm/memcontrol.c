@@ -1546,18 +1546,47 @@ static int mem_cgroup_mst_overspd_tree(struct mem_cgroup *memcg)
 	return ret;
 }
 
+static enum mst_wmark_stat mem_cgroup_mst_wmark_ok(struct mem_cgroup *memcg)
+{
+	int nid;
+
+	for_each_online_node(nid) {
+		unsigned long free, low, min;
+		struct zone *zone;
+
+		zone = &NODE_DATA(nid)->node_zones[ZONE_NORMAL];
+		free = zone_page_state(zone, NR_FREE_PAGES);
+		low = low_wmark_pages(zone);
+		min = min_wmark_pages(zone);
+		min += (low - min) >> 2;
+
+		if (free <= min)
+			return WMARK_REACH_MIN;
+
+		if (free <= low)
+			return WMARK_REACH_LOW;
+
+	}
+	return WMARK_OK;
+}
+
 static void mem_cgroup_mst_spd_throttle(struct mem_cgroup *memcg)
 {
 	struct mem_spd_ctl *msc = &memcg->msc;
 	long timeout;
 	int ret = 0;
+	enum mst_wmark_stat stat;
 
 	if (!memcg->msc.has_lmt || in_interrupt() || in_atomic() ||
 		irqs_disabled() || oops_in_progress)
 		return;
 
+	stat = mem_cgroup_mst_wmark_ok(memcg);
+	if (stat == WMARK_OK)
+		return;
+
 	ret = mem_cgroup_mst_overspd_tree(memcg);
-	if (!ret)
+	if (stat == WMARK_REACH_LOW && !ret)
 		return;
 
 	atomic_long_inc(&msc->nr_throttled);
