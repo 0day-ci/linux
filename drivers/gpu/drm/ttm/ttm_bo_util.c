@@ -31,6 +31,7 @@
 
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
+#include <drm/drm_memcpy.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/dma-buf-map.h>
 #include <linux/io.h>
@@ -91,6 +92,7 @@ void ttm_move_memcpy(struct ttm_buffer_object *bo,
 	const struct ttm_kmap_iter_ops *src_ops = src_iter->ops;
 	struct ttm_tt *ttm = bo->ttm;
 	struct dma_buf_map src_map, dst_map;
+	bool wc_memcpy;
 	pgoff_t i;
 
 	/* Single TTM move. NOP */
@@ -114,11 +116,21 @@ void ttm_move_memcpy(struct ttm_buffer_object *bo,
 		return;
 	}
 
+	/*
+	 * Condition this on src being WC if needed. However i915 perf
+	 * selftest indicates that for PAGE_SIZE chunks, wc_memcpy
+	 * outperforms memcpy() on all cases except WB->WB where results
+	 * are similar.
+	 */
+	wc_memcpy = drm_has_memcpy_from_wc();
+
 	for (i = 0; i < num_pages; ++i) {
 		dst_ops->map_local(dst_iter, &dst_map, i);
 		src_ops->map_local(src_iter, &src_map, i);
 
-		if (!src_map.is_iomem && !dst_map.is_iomem) {
+		if (wc_memcpy && drm_memcpy_from_wc_dbm(&dst_map, &src_map, PAGE_SIZE)) {
+			;
+		} else if (!src_map.is_iomem && !dst_map.is_iomem) {
 			memcpy(dst_map.vaddr, src_map.vaddr, PAGE_SIZE);
 		} else if (!src_map.is_iomem) {
 			dma_buf_map_memcpy_to(&dst_map, src_map.vaddr,
