@@ -1026,12 +1026,15 @@ EXPORT_SYMBOL_GPL(ata_scsi_dma_need_drain);
 int ata_scsi_dev_config(struct scsi_device *sdev, struct ata_device *dev)
 {
 	struct request_queue *q = sdev->request_queue;
+	unsigned int max_sectors;
 
 	if (!ata_id_has_unload(dev->id))
 		dev->flags |= ATA_DFLAG_NO_UNLOAD;
 
 	/* configure max sectors */
-	blk_queue_max_hw_sectors(q, dev->max_sectors);
+	max_sectors = min_t(unsigned int, dev->max_sectors,
+			q->limits.max_sectors);
+	blk_queue_max_hw_sectors(q, max_sectors);
 
 	if (dev->class == ATA_DEV_ATAPI) {
 		sdev->sector_size = ATA_SECT_SIZE;
