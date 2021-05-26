@@ -34,6 +34,7 @@ properties:
           to SCPI v1.0
         items:
           - const: arm,scpi-pre-1.0
+          - const: amlogic,meson-gxbb-scpi
 
   mboxes:
     description: |
@@ -64,6 +65,9 @@ patternProperties:
         oneOf:
           - const: arm,scpi-sensors
           - const: arm,scpi-power-domains
+          - items:
+              - const: amlogic,meson-gxbb-scpi-sensors
+              - const: arm,scpi-sensors
 
   "^clocks(-[0-9a-f]+)?$":
     type: object
