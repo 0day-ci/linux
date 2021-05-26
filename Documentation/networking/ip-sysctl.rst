@@ -351,6 +351,11 @@ tcp_mtu_probe_floor - INTEGER
 
 	Default : 48
 
+tcp_mtu_probe_waitdata - BOOLEAN
+	Wait for enough data for an mtu probe to accumulate on the sender.
+
+	Default: 1
+
 tcp_mtu_probe_rack - BOOLEAN
 	Try to use shorter probes if RACK is also enabled
 

@@ -2396,10 +2396,6 @@ static int tcp_mtu_probe(struct sock *sk)
 		return -1;
 	}
 
-	/* Have enough data in the send queue to probe? */
-	if (tp->write_seq - tp->snd_nxt < size_needed)
-		return -1;
-
 	/* Can probe fit inside congestion window? */
 	if (packets_needed > tp->snd_cwnd)
 		return -1;
@@ -2412,6 +2408,20 @@ static int tcp_mtu_probe(struct sock *sk)
 	 */
 	if (tp->snd_wnd < size_needed)
 		return -1;
+
+	/* Have enough data in the send queue to probe? */
+	if (tp->write_seq - tp->snd_nxt < size_needed) {
+		/* If packets are already in flight it's safe to wait for more data to
+		 * accumulate on the sender because writing will be triggered as ACKs
+		 * arrive.
+		 * If no packets are in flight returning zero can stall.
+		 */
+		if (net->ipv4.sysctl_tcp_mtu_probe_waitdata &&
+		    tcp_packets_in_flight(tp))
+			return 0;
+		else
+			return -1;
+	}
 
 	/* Do we need for more acks to clear the receive window? */
 	if (after(tp->snd_nxt + size_needed, tcp_wnd_end(tp)))
