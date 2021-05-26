@@ -33,6 +33,8 @@ struct led_netdev_data {
 #define NETDEV_LED_MODE_LINKUP	3
 };
 
+extern struct led_trigger netdev_led_trigger;
+
 #endif /* IS_ENABLED(CONFIG_LEDS_TRIGGER_NETDEV) */
 
 #endif /* __LINUX_LEDTRIG_H__ */

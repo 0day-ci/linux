@@ -52,6 +52,9 @@ static void set_baseline_state(struct led_netdev_data *trigger_data)
 	if (!led_cdev->blink_brightness)
 		led_cdev->blink_brightness = led_cdev->max_brightness;
 
+	if (!led_trigger_offload(led_cdev))
+		return;
+
 	if (!test_bit(NETDEV_LED_MODE_LINKUP, &trigger_data->mode))
 		led_set_brightness(led_cdev, LED_OFF);
 	else {
@@ -411,12 +414,13 @@ static void netdev_trig_deactivate(struct led_classdev *led_cdev)
 	kfree(trigger_data);
 }
 
-static struct led_trigger netdev_led_trigger = {
+struct led_trigger netdev_led_trigger = {
 	.name = "netdev",
 	.activate = netdev_trig_activate,
 	.deactivate = netdev_trig_deactivate,
 	.groups = netdev_trig_groups,
 };
+EXPORT_SYMBOL_GPL(netdev_led_trigger);
 
 static int __init netdev_trig_init(void)
 {
