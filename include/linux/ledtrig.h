@@ -8,13 +8,13 @@
 
 #include <linux/atomic.h>
 #include <linux/leds.h>
+#include <linux/mutex.h>
 #include <linux/netdevice.h>
-#include <linux/spinlock.h>
 
 #if IS_ENABLED(CONFIG_LEDS_TRIGGER_NETDEV)
 
 struct led_netdev_data {
-	spinlock_t lock;
+	struct mutex lock;
 
 	struct delayed_work work;
 	struct notifier_block notifier;
