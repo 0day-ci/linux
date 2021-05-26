@@ -749,7 +749,7 @@ static int dmirror_exclusive(struct dmirror *dmirror,
 			}
 		}
 
-		if (addr + (mapped << PAGE_SHIFT) < next) {
+		if (addr + ((unsigned int)mapped << PAGE_SHIFT) < next) {
 			mmap_read_unlock(mm);
 			mmput(mm);
 			return -EBUSY;
