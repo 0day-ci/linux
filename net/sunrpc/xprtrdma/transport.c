@@ -520,9 +520,8 @@ xprt_rdma_alloc_slot(struct rpc_xprt *xprt, struct rpc_task *task)
 	return;
 
 out_sleep:
-	set_bit(XPRT_CONGESTED, &xprt->state);
-	rpc_sleep_on(&xprt->backlog, task, NULL);
 	task->tk_status = -EAGAIN;
+	xprt_add_backlog(xprt, task);
 }
 
 /**
@@ -539,8 +538,7 @@ xprt_rdma_free_slot(struct rpc_xprt *xprt, struct rpc_rqst *rqst)
 
 	memset(rqst, 0, sizeof(*rqst));
 	rpcrdma_buffer_put(&r_xprt->rx_buf, rpcr_to_rdmar(rqst));
-	if (unlikely(!rpc_wake_up_next(&xprt->backlog)))
-		clear_bit(XPRT_CONGESTED, &xprt->state);
+	xprt_wake_up_backlog(xprt, rqst);
 }
 
 static bool rpcrdma_check_regbuf(struct rpcrdma_xprt *r_xprt,
