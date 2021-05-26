@@ -240,31 +240,6 @@
 #define EP_STATE_DISABLED	0
 #define EP_STATE_ENABLED	1
 
-static const unsigned int pcie_gen_freq[] = {
-	GEN1_CORE_CLK_FREQ,
-	GEN2_CORE_CLK_FREQ,
-	GEN3_CORE_CLK_FREQ,
-	GEN4_CORE_CLK_FREQ
-};
-
-static const u32 event_cntr_ctrl_offset[] = {
-	0x1d8,
-	0x1a8,
-	0x1a8,
-	0x1a8,
-	0x1c4,
-	0x1d8
-};
-
-static const u32 event_cntr_data_offset[] = {
-	0x1dc,
-	0x1ac,
-	0x1ac,
-	0x1ac,
-	0x1c8,
-	0x1dc
-};
-
 struct tegra_pcie_dw {
 	struct device *dev;
 	struct resource *appl_res;
@@ -409,7 +384,13 @@ const struct pci_ecam_ops tegra194_pcie_ops = {
 };
 #endif /* defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS) */
 
-#ifdef CONFIG_PCIE_TEGRA194
+#if IS_ENABLED(CONFIG_PCIE_TEGRA194)
+static const unsigned int pcie_gen_freq[] = {
+	GEN1_CORE_CLK_FREQ,
+	GEN2_CORE_CLK_FREQ,
+	GEN3_CORE_CLK_FREQ,
+	GEN4_CORE_CLK_FREQ
+};
 
 static inline struct tegra_pcie_dw *to_tegra_pcie(struct dw_pcie *pci)
 {
@@ -694,6 +675,24 @@ static struct pci_ops tegra_pci_ops = {
 };
 
 #if defined(CONFIG_PCIEASPM)
+static const u32 event_cntr_ctrl_offset[] = {
+	0x1d8,
+	0x1a8,
+	0x1a8,
+	0x1a8,
+	0x1c4,
+	0x1d8
+};
+
+static const u32 event_cntr_data_offset[] = {
+	0x1dc,
+	0x1ac,
+	0x1ac,
+	0x1ac,
+	0x1c8,
+	0x1dc
+};
+
 static void disable_aspm_l11(struct tegra_pcie_dw *pcie)
 {
 	u32 val;
