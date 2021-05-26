@@ -1228,9 +1228,7 @@ static netdev_features_t bond_fix_features(struct net_device *dev,
 	struct slave *slave;
 
 #if IS_ENABLED(CONFIG_TLS_DEVICE)
-	if (bond_sk_check(bond))
-		features |= BOND_TLS_FEATURES;
-	else
+	if (!bond_sk_check(bond) && (features & BOND_TLS_FEATURES))
 		features &= ~BOND_TLS_FEATURES;
 #endif
 
