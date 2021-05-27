@@ -888,6 +888,10 @@ static int genpd_runtime_suspend(struct device *dev)
 	if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
 		return 0;
 
+	/* Drop the assigned performance state */
+	if (dev_gpd_data(dev)->assigned_pstate)
+		dev_pm_genpd_set_performance_state(dev, 0);
+
 	genpd_lock(genpd);
 	genpd_power_off(genpd, true, 0);
 	genpd_unlock(genpd);
@@ -907,6 +911,7 @@ static int genpd_runtime_resume(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
 	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
+	unsigned int assigned_pstate = dev_gpd_data(dev)->assigned_pstate;
 	bool runtime_pm = pm_runtime_enabled(dev);
 	ktime_t time_start;
 	s64 elapsed_ns;
@@ -935,6 +940,9 @@ static int genpd_runtime_resume(struct device *dev)
 	if (ret)
 		return ret;
 
+	/* Set the assigned performance state */
+	if (assigned_pstate)
+		dev_pm_genpd_set_performance_state(dev, assigned_pstate);
  out:
 	/* Measure resume latency. */
 	time_start = 0;
@@ -967,6 +975,8 @@ err_stop:
 	genpd_stop_dev(genpd, dev);
 err_poweroff:
 	if (!pm_runtime_is_irq_safe(dev) || genpd_is_irq_safe(genpd)) {
+		if (assigned_pstate)
+			dev_pm_genpd_set_performance_state(dev, 0);
 		genpd_lock(genpd);
 		genpd_power_off(genpd, true, 0);
 		genpd_unlock(genpd);
@@ -2568,6 +2578,12 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
 
 	dev_dbg(dev, "removing from PM domain %s\n", pd->name);
 
+	/* Drop the assigned performance state */
+	if (dev_gpd_data(dev)->assigned_pstate) {
+		dev_pm_genpd_set_performance_state(dev, 0);
+		dev_gpd_data(dev)->assigned_pstate = 0;
+	}
+
 	for (i = 1; i < GENPD_RETRY_MAX_MS; i <<= 1) {
 		ret = genpd_remove_device(pd, dev);
 		if (ret != -EAGAIN)
@@ -2605,6 +2621,7 @@ static void genpd_dev_pm_sync(struct device *dev)
 static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 				 unsigned int index, bool power_on)
 {
+	unsigned int assigned_pstate;
 	struct of_phandle_args pd_args;
 	struct generic_pm_domain *pd;
 	int ret;
@@ -2647,6 +2664,16 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 
 	if (ret)
 		genpd_remove_device(pd, dev);
+
+	/* Set the assigned performance state */
+	if (!of_property_read_u32_index(base_dev->of_node,
+					"assigned-performance-states",
+					index, &assigned_pstate)) {
+		if (assigned_pstate) {
+			dev_pm_genpd_set_performance_state(dev, assigned_pstate);
+			dev_gpd_data(dev)->assigned_pstate = assigned_pstate;
+		}
+	}
 
 	return ret ? -EPROBE_DEFER : 1;
 }
