@@ -28,6 +28,19 @@
 #define LPASS_CPU_I2S_SD2_3_MASK	GENMASK(3, 2)
 #define LPASS_CPU_I2S_SD0_1_2_MASK	GENMASK(2, 0)
 #define LPASS_CPU_I2S_SD0_1_2_3_MASK	GENMASK(3, 0)
+#define LPASS_CHMAP_IDX_UNKNOWN		-1
+
+/*
+ * Channel maps for multi-channel playbacks on MI2S Secondary, up to 4 n_ch
+ */
+static struct snd_pcm_chmap_elem lpass_chmaps[] = {
+	{ .channels = 2,
+	  .map = { SNDRV_CHMAP_FL, SNDRV_CHMAP_FR } },
+	{ .channels = 4,
+	  .map = { SNDRV_CHMAP_FL, SNDRV_CHMAP_FR,
+				SNDRV_CHMAP_RL, SNDRV_CHMAP_RR } },
+	{ }
+};
 
 static int lpass_cpu_init_i2sctl_bitfields(struct device *dev,
 			struct lpaif_i2sctl *i2sctl, struct regmap *map)
@@ -86,6 +99,9 @@ static int lpass_cpu_daiops_startup(struct snd_pcm_substream *substream,
 		clk_disable_unprepare(drvdata->mi2s_osr_clk[dai->driver->id]);
 		return ret;
 	}
+	if (drvdata->chmap_info && drvdata->chmap_info->max_channels == 4)
+		drvdata->chmap_info->chmap = lpass_chmaps;
+
 	return 0;
 }
 
@@ -96,6 +112,7 @@ static void lpass_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
 
 	clk_disable_unprepare(drvdata->mi2s_osr_clk[dai->driver->id]);
 	clk_unprepare(drvdata->mi2s_bit_clk[dai->driver->id]);
+	drvdata->chmap_idx = LPASS_CHMAP_IDX_UNKNOWN;
 }
 
 static int lpass_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
@@ -224,9 +241,14 @@ static int lpass_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 				ret);
 			return ret;
 		}
-		if (channels >= 2)
+		if (channels >= 2) {
 			ret = regmap_fields_write(i2sctl->spkmono, id,
 						 LPAIF_I2SCTL_SPKMONO_STEREO);
+			if (channels == 4)
+				drvdata->chmap_idx = 1;
+			else
+				drvdata->chmap_idx = 0;
+		}
 		else
 			ret = regmap_fields_write(i2sctl->spkmono, id,
 						 LPAIF_I2SCTL_SPKMONO_MONO);
@@ -323,6 +345,84 @@ const struct snd_soc_dai_ops asoc_qcom_lpass_cpu_dai_ops = {
 	.trigger	= lpass_cpu_daiops_trigger,
 };
 EXPORT_SYMBOL_GPL(asoc_qcom_lpass_cpu_dai_ops);
+
+static int lpass_cpu_chmap_ctl_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	unsigned const char *map;
+	unsigned int i;
+	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
+	struct lpass_data *drvdata = info->private_data;
+
+	if (info->max_channels == 2)
+		map = &lpass_chmaps[0].map[0];
+	else if (info->max_channels == 4)
+		map = &lpass_chmaps[1].map[0];
+
+	for (i = 0; i < info->max_channels; i++) {
+		if (drvdata->chmap_idx == LPASS_CHMAP_IDX_UNKNOWN)
+			ucontrol->value.integer.value[i] = 0;
+		else
+			ucontrol->value.integer.value[i] = map[i];
+	}
+
+	return 0;
+}
+
+static int lpass_cpu_chmap_ctl_set(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	unsigned int i;
+	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
+	struct lpass_data *drvdata = info->private_data;
+	unsigned char *map;
+
+	if (info->max_channels == 2)
+		map = &lpass_chmaps[0].map[0];
+	else if (info->max_channels == 4)
+		map = &lpass_chmaps[1].map[0];
+
+	for (i = 0; i < info->max_channels; i++) {
+		if (drvdata->chmap_idx == LPASS_CHMAP_IDX_UNKNOWN)
+			map[i] = 0;
+		else
+			map[i] = ucontrol->value.integer.value[i];
+	}
+
+	return 0;
+}
+
+int lpass_cpu_pcm_new(struct snd_soc_pcm_runtime *rtd,
+			      struct snd_soc_dai *dai)
+{
+	int ret;
+
+	struct snd_soc_dai_driver *drv = dai->driver;
+	struct lpass_data *drvdata = snd_soc_dai_get_drvdata(dai);
+
+	ret =  snd_pcm_add_chmap_ctls(rtd->pcm, SNDRV_PCM_STREAM_PLAYBACK,
+			snd_pcm_alt_chmaps, drv->playback.channels_max, 0,
+			&drvdata->chmap_info);
+	if (ret < 0)
+		return ret;
+
+
+	/*
+	 * override handlers
+	 */
+	drvdata->chmap_info->private_data = drvdata;
+	drvdata->chmap_info->kctl->get = lpass_cpu_chmap_ctl_get;
+	drvdata->chmap_info->kctl->put = lpass_cpu_chmap_ctl_set;
+
+	/*
+	 * default chmap supported is stereo
+	 */
+	drvdata->chmap_info->chmap = lpass_chmaps;
+	drvdata->chmap_idx = LPASS_CHMAP_IDX_UNKNOWN;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(lpass_cpu_pcm_new);
 
 int asoc_qcom_lpass_cpu_dai_probe(struct snd_soc_dai *dai)
 {
@@ -845,6 +945,10 @@ int asoc_qcom_lpass_cpu_platform_probe(struct platform_device *pdev)
 				variant->dai_bit_clk_names[i],
 				PTR_ERR(drvdata->mi2s_bit_clk[dai_id]));
 			return PTR_ERR(drvdata->mi2s_bit_clk[dai_id]);
+		}
+		if (drvdata->mi2s_playback_sd_mode[dai_id] == LPAIF_I2SCTL_MODE_QUAD01) {
+			variant->dai_driver[dai_id].playback.channels_min = 4;
+			variant->dai_driver[dai_id].playback.channels_max = 4;
 		}
 	}
 
