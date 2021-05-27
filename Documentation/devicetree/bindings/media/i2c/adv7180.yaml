@@ -35,6 +35,11 @@ properties:
   powerdown-gpios:
     maxItems: 1
 
+  adv,adv7182-force-bt656-4:
+    description:
+      Indicates that ADV7182 should output a BT.656-4 compatible stream.
+    type: boolean
+
   port:
     $ref: /schemas/graph.yaml#/properties/port
 
