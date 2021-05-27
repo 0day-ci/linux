@@ -615,10 +615,5 @@ static void __exit ghash_ce_mod_exit(void)
 		crypto_unregister_shash(&ghash_alg);
 }
 
-static const struct cpu_feature ghash_cpu_feature[] = {
-	{ cpu_feature(PMULL) }, { }
-};
-MODULE_DEVICE_TABLE(cpu, ghash_cpu_feature);
-
 module_init(ghash_ce_mod_init);
 module_exit(ghash_ce_mod_exit);
