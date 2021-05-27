@@ -458,13 +458,18 @@ int drm_mm_reserve_node(struct drm_mm *mm, struct drm_mm_node *node)
 	u64 end;
 
 	end = node->start + node->size;
-	if (unlikely(end <= node->start))
+	if (unlikely(end <= node->start)) {
+		DRM_DEBUG("ENOSPC with incorrect node->size %llx\n", node->size);
 		return -ENOSPC;
+	}
 
 	/* Find the relevant hole to add our node to */
 	hole = find_hole_addr(mm, node->start, 0);
-	if (!hole)
+	if (!hole) {
+		DRM_DEBUG("ENOSPC when not find hole with node->start %llx\n",
+			  node->start);
 		return -ENOSPC;
+	}
 
 	adj_start = hole_start = __drm_mm_hole_node_start(hole);
 	adj_end = hole_end = hole_start + hole->hole_size;
@@ -472,8 +477,11 @@ int drm_mm_reserve_node(struct drm_mm *mm, struct drm_mm_node *node)
 	if (mm->color_adjust)
 		mm->color_adjust(hole, node->color, &adj_start, &adj_end);
 
-	if (adj_start > node->start || adj_end < end)
+	if (adj_start > node->start || adj_end < end) {
+		DRM_DEBUG("ENOSPC after adjust adj_start:%llx adj_end:%llx node->start:%llx end:%llx\n",
+			  adj_start, adj_end, node->start, end);
 		return -ENOSPC;
+	}
 
 	node->mm = mm;
 
