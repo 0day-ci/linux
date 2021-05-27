@@ -762,8 +762,11 @@
 			};
 
 			pxp: pxp@20f0000 {
+				compatible = "fsl,imx6sl-pxp", "fsl,imx6ull-pxp";
 				reg = <0x020f0000 0x4000>;
 				interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMX6SL_CLK_PXP_AXI>;
+				clock-names = "axi";
 			};
 
 			epdc: epdc@20f4000 {
