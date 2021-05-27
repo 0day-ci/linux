@@ -20062,6 +20062,16 @@ F:	Documentation/devicetree/bindings/media/xilinx/
 F:	drivers/media/platform/xilinx/
 F:	include/uapi/linux/xilinx-v4l2-controls.h
 
+XILINX WATCHDOG DRIVER
+M:	Srinivas Neeli <srinivas.neeli@xilinx.com>
+R:	Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+R:	Michal Simek <michal.simek@xilinx.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt
+F:	Documentation/devicetree/bindings/watchdog/xlnx,versal-wwdt.yaml
+F:	drivers/watchdog/of_xilinx_wdt.c
+F:	drivers/watchdog/xilinx_wwdt.c
+
 XILINX ZYNQMP DPDMA DRIVER
 M:	Hyun Kwon <hyun.kwon@xilinx.com>
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
