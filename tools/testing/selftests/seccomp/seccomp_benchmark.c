@@ -42,6 +42,7 @@ unsigned long long timing(clockid_t clk_id, unsigned long long samples)
 		finish.tv_sec, finish.tv_nsec,
 		start.tv_sec, start.tv_nsec,
 		i, (double)i / 1000000000.0);
+	fflush(NULL);
 
 	return i;
 }
@@ -54,6 +55,7 @@ unsigned long long calibrate(void)
 	int seconds = 15;
 
 	printf("Calibrating sample size for %d seconds worth of syscalls ...\n", seconds);
+	fflush(NULL);
 
 	samples = 0;
 	pid = getpid();
@@ -157,6 +159,7 @@ int main(int argc, char *argv[])
 	/* Native call */
 	native = timing(CLOCK_PROCESS_CPUTIME_ID, samples) / samples;
 	printf("getpid native: %llu ns\n", native);
+	fflush(NULL);
 
 	ret = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
 	assert(ret == 0);
@@ -167,6 +170,7 @@ int main(int argc, char *argv[])
 
 	bitmap1 = timing(CLOCK_PROCESS_CPUTIME_ID, samples) / samples;
 	printf("getpid RET_ALLOW 1 filter (bitmap): %llu ns\n", bitmap1);
+	fflush(NULL);
 
 	/* Second filter resulting in a bitmap */
 	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &bitmap_prog);
@@ -174,6 +178,7 @@ int main(int argc, char *argv[])
 
 	bitmap2 = timing(CLOCK_PROCESS_CPUTIME_ID, samples) / samples;
 	printf("getpid RET_ALLOW 2 filters (bitmap): %llu ns\n", bitmap2);
+	fflush(NULL);
 
 	/* Third filter, can no longer be converted to bitmap */
 	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog);
@@ -181,6 +186,7 @@ int main(int argc, char *argv[])
 
 	filter1 = timing(CLOCK_PROCESS_CPUTIME_ID, samples) / samples;
 	printf("getpid RET_ALLOW 3 filters (full): %llu ns\n", filter1);
+	fflush(NULL);
 
 	/* Fourth filter, can not be converted to bitmap because of filter 3 */
 	ret = prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &bitmap_prog);
@@ -188,6 +194,7 @@ int main(int argc, char *argv[])
 
 	filter2 = timing(CLOCK_PROCESS_CPUTIME_ID, samples) / samples;
 	printf("getpid RET_ALLOW 4 filters (full): %llu ns\n", filter2);
+	fflush(NULL);
 
 	/* Estimations */
 #define ESTIMATE(fmt, var, what)	do {			\
