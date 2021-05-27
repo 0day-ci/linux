@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/soc/rockchip/io-domain.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Rockchip SRAM for IO Voltage Domains
+
+maintainers:
+  - Heiko Stuebner <heiko@sntech.de>
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+            - rockchip,px30-io-voltage-domain
+            - rockchip,px30-pmu-io-voltage-domain
+            - rockchip,rk3188-io-voltage-domain
+            - rockchip,rk3228-io-voltage-domain
+            - rockchip,rk3288-io-voltage-domain
+            - rockchip,rk3328-io-voltage-domain
+            - rockchip,rk3368-io-voltage-domain
+            - rockchip,rk3368-pmu-io-voltage-domain
+            - rockchip,rk3399-io-voltage-domain
+            - rockchip,rk3399-pmu-io-voltage-domain
+            - rockchip,rv1108-io-voltage-domain
+            - rockchip,rv1108-pmu-io-voltage-domain
+
+
+examples:
+  - |
+    io-domains {
+        compatible = "rockchip,rk3288-io-voltage-domain";
+
+	audio-supply = <&vcc18_codec>;
+	bb-supply = <&vcc33_io>;
+	dvp-supply = <&vcc_18>;
+	flash0-supply = <&vcc18_flashio>;
+	gpio1830-supply = <&vcc33_io>;
+	gpio30-supply = <&vcc33_pmuio>;
+	lcdc-supply = <&vcc33_lcd>;
+	sdcard-supply = <&vccio_sd>;
+	wifi-supply = <&vcc18_wl>;
+    };
