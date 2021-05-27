@@ -233,6 +233,7 @@ static int scr24x_probe(struct pcmcia_device *link)
 {
 	struct scr24x_dev *dev;
 	int ret;
+	struct device *dev_ret;
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
@@ -270,22 +271,28 @@ static int scr24x_probe(struct pcmcia_device *link)
 		goto err;
 
 	ret = pcmcia_enable_device(link);
-	if (ret < 0) {
-		pcmcia_disable_device(link);
-		goto err;
-	}
+	if (ret < 0)
+		goto err_device;
 
-	device_create(scr24x_class, NULL, MKDEV(MAJOR(scr24x_devt), dev->devno),
+	dev_ret = device_create(scr24x_class, NULL, MKDEV(MAJOR(scr24x_devt), dev->devno),
 		      NULL, "scr24x%d", dev->devno);
+	if (IS_ERR(dev_ret)) {
+		dev_err(&link->dev, "device_create failed for %d\n",
+			dev->devno);
+		goto err_device;
+	}
 
 	dev_info(&link->dev, "SCR24x Chip Card Interface\n");
 	return 0;
 
+err_device:
+	pcmcia_disable_device(link);
+	cdev_del(&dev->c_dev);
 err:
 	if (dev->devno < SCR24X_DEVS)
 		clear_bit(dev->devno, scr24x_minors);
 	kfree (dev);
-	return ret;
+	return -ENODEV;
 }
 
 static void scr24x_remove(struct pcmcia_device *link)
