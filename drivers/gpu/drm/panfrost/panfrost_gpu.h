@@ -18,4 +18,7 @@ void panfrost_gpu_power_off(struct panfrost_device *pfdev);
 
 void panfrost_gpu_amlogic_quirk(struct panfrost_device *pfdev);
 
+void panfrost_acquire_permon(struct panfrost_device *pfdev);
+void panfrost_release_permon(struct panfrost_device *pfdev);
+
 #endif

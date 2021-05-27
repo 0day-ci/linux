@@ -399,3 +399,23 @@ u32 panfrost_gpu_get_latest_flush_id(struct panfrost_device *pfdev)
 
 	return 0;
 }
+
+void panfrost_acquire_permon(struct panfrost_device *pfdev)
+{
+	/* If another in-flight job enabled permon, we don't have to */
+	if (atomic_inc_return(&pfdev->permon_pending) > 1)
+		return;
+
+	/* Otherwise, we're the first user */
+	gpu_write(pfdev, GPU_CMD, GPU_CMD_CYCLE_COUNT_START);
+}
+
+void panfrost_release_permon(struct panfrost_device *pfdev)
+{
+	/* If another in-flight job needs permon, keep it active */
+	if (atomic_dec_return(&pfdev->permon_pending) > 0)
+		return;
+
+	/* Otherwise, we're the last user */
+	gpu_write(pfdev, GPU_CMD, GPU_CMD_CYCLE_COUNT_STOP);
+}

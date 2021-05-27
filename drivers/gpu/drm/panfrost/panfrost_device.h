@@ -117,6 +117,9 @@ struct panfrost_device {
 	struct shrinker shrinker;
 
 	struct panfrost_devfreq pfdevfreq;
+
+	/* Number of active jobs requiring performance monitoring */
+	atomic_t permon_pending;
 };
 
 struct panfrost_mmu {
