@@ -11,9 +11,9 @@ hantro-vpu-y += \
 		hantro_g1_h264_dec.o \
 		hantro_g1_mpeg2_dec.o \
 		hantro_g1_vp8_dec.o \
-		rk3399_vpu_hw_jpeg_enc.o \
-		rk3399_vpu_hw_mpeg2_dec.o \
-		rk3399_vpu_hw_vp8_dec.o \
+		rockchip_vpu2_hw_jpeg_enc.o \
+		rockchip_vpu2_hw_mpeg2_dec.o \
+		rockchip_vpu2_hw_vp8_dec.o \
 		hantro_jpeg.o \
 		hantro_h264.o \
 		hantro_mpeg2.o \
@@ -26,5 +26,4 @@ hantro-vpu-$(CONFIG_VIDEO_HANTRO_SAMA5D4) += \
 		sama5d4_vdec_hw.o
 
 hantro-vpu-$(CONFIG_VIDEO_HANTRO_ROCKCHIP) += \
-		rk3288_vpu_hw.o \
-		rk3399_vpu_hw.o
+		rockchip_vpu_hw.o
