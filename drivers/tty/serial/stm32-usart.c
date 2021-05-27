@@ -1168,6 +1168,8 @@ static struct stm32_port *stm32_usart_of_get_port(struct platform_device *pdev)
 	stm32_ports[id].cr1_irq = USART_CR1_RXNEIE;
 	stm32_ports[id].cr3_irq = 0;
 	stm32_ports[id].last_res = RX_BUF_L;
+	stm32_ports[id].rx_dma_buf = 0;
+	stm32_ports[id].tx_dma_buf = 0;
 	return &stm32_ports[id];
 }
 
