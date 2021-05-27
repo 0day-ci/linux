@@ -24,6 +24,8 @@ struct hyp_pool {
 
 static inline void hyp_page_ref_inc(struct hyp_page *p)
 {
+	if (p->refcount == USHRT_MAX)
+		BUG();
 	p->refcount++;
 }
 
