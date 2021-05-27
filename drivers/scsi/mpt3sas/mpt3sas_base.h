@@ -1933,7 +1933,6 @@ void mpt3sas_transport_update_links(struct MPT3SAS_ADAPTER *ioc,
 	u64 sas_address, u16 handle, u8 phy_number, u8 link_rate,
 	struct hba_port *port);
 extern struct sas_function_template mpt3sas_transport_functions;
-extern struct scsi_transport_template *mpt3sas_transport_template;
 void
 mpt3sas_transport_del_phy_from_an_existing_port(struct MPT3SAS_ADAPTER *ioc,
 	struct _sas_node *sas_node, struct _sas_phy *mpt3sas_phy);
