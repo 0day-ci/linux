@@ -760,6 +760,7 @@ struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm);
 
 struct lruvec *lock_page_lruvec(struct page *page);
 struct lruvec *lock_page_lruvec_irq(struct page *page);
+struct lruvec *trylock_page_lruvec_irq(struct page *page);
 struct lruvec *lock_page_lruvec_irqsave(struct page *page,
 						unsigned long *flags);
 
@@ -1248,6 +1249,15 @@ static inline struct lruvec *lock_page_lruvec_irq(struct page *page)
 
 	spin_lock_irq(&pgdat->__lruvec.lru_lock);
 	return &pgdat->__lruvec;
+}
+
+static inline struct lruvec *trylock_page_lruvec_irq(struct page *page)
+{
+	struct pglist_data *pgdat = page_pgdat(page);
+
+	if (spin_trylock_irq(&pgdat->__lruvec.lru_lock))
+		return &pgdat->__lruvec;
+	return NULL;
 }
 
 static inline struct lruvec *lock_page_lruvec_irqsave(struct page *page,

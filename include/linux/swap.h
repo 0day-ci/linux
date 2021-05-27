@@ -509,6 +509,7 @@ extern struct swap_info_struct *page_swap_info(struct page *);
 extern struct swap_info_struct *swp_swap_info(swp_entry_t entry);
 extern bool reuse_swap_page(struct page *, int *);
 extern int try_to_free_swap(struct page *);
+extern void deactivate_idle_swapcache(struct page *page);
 struct backing_dev_info;
 extern int init_swap_address_space(unsigned int type, unsigned long nr_pages);
 extern void exit_swap_address_space(unsigned int type);
@@ -676,6 +677,8 @@ static inline int try_to_free_swap(struct page *page)
 {
 	return 0;
 }
+
+static inline void deactivate_idle_swapcache(struct page *page) {}
 
 static inline swp_entry_t get_swap_page(struct page *page)
 {

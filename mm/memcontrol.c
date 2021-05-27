@@ -1213,6 +1213,18 @@ struct lruvec *lock_page_lruvec_irq(struct page *page)
 	return lruvec;
 }
 
+struct lruvec *trylock_page_lruvec_irq(struct page *page)
+{
+	struct lruvec *lruvec;
+
+	lruvec = mem_cgroup_page_lruvec(page);
+	if (spin_trylock_irq(&lruvec->lru_lock)) {
+		lruvec_memcg_debug(lruvec, page);
+		return lruvec;
+	}
+	return NULL;
+}
+
 struct lruvec *lock_page_lruvec_irqsave(struct page *page, unsigned long *flags)
 {
 	struct lruvec *lruvec;

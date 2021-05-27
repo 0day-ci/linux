@@ -40,6 +40,7 @@
 #include <linux/swap_slots.h>
 #include <linux/sort.h>
 #include <linux/completion.h>
+#include <linux/mm_inline.h>
 
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
@@ -1746,6 +1747,44 @@ int try_to_free_swap(struct page *page)
 	delete_from_swap_cache(page);
 	SetPageDirty(page);
 	return 1;
+}
+
+static inline void locked_deactivate_idle_swapcache(struct page *page)
+{
+	struct lruvec *lruvec;
+
+	page = compound_head(page);
+	if (!PageSwapCache(page))
+		return;
+	if (PageWriteback(page))
+		return;
+	if (page_mapped(page))
+		return;
+	if (!PageLRU(page))
+		return;
+	if (page_swapped(page))
+		return;
+	lruvec = trylock_page_lruvec_irq(page);
+	if (!lruvec)
+		return;
+
+	if (TestClearPageLRU(page)) {
+		del_page_from_lru_list(page, lruvec);
+		ClearPageActive(page);
+		ClearPageReferenced(page);
+		add_page_to_lru_list_tail(page, lruvec);
+		SetPageLRU(page);
+	}
+
+	unlock_page_lruvec_irq(lruvec);
+}
+
+void deactivate_idle_swapcache(struct page *page)
+{
+	if (trylock_page(page)) {
+		locked_deactivate_idle_swapcache(page);
+		unlock_page(page);
+	}
 }
 
 /*
