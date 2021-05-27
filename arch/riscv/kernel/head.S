@@ -93,12 +93,18 @@ relocate:
 	add a2, a2, a1
 	csrw CSR_TVEC, a2
 
-	/* Compute satp for kernel page tables, but don't load it yet */
+	/* Compute satp for kernel page tables */
 	srl a2, a0, PAGE_SHIFT
 	li a1, SATP_MODE
 	or a2, a2, a1
-
+#ifdef CONFIG_64BIT
+	/* Load kernel page directory */
+	sfence.vma
+	csrw CSR_SATP, a2
+#else
 	/*
+	 * 32bit system need a trampoline to handle a corner case where
+	 * load address range overlaps kernel virtual address range.
 	 * Load trampoline page directory, which will cause us to trap to
 	 * stvec if VA != PA, or simply fall through if VA == PA.  We need a
 	 * full fence here because setup_vm() just wrote these PTEs and we need
@@ -110,6 +116,7 @@ relocate:
 	or a0, a0, a1
 	sfence.vma
 	csrw CSR_SATP, a0
+#endif /* CONFIG_64BIT */
 .align 2
 1:
 	/* Set trap vector to spin forever to help debug */
@@ -122,6 +129,7 @@ relocate:
 	la gp, __global_pointer$
 .option pop
 
+#ifdef CONFIG_32BIT
 	/*
 	 * Switch to kernel page tables.  A full fence is necessary in order to
 	 * avoid using the trampoline translations, which are only correct for
@@ -130,6 +138,7 @@ relocate:
 	 */
 	csrw CSR_SATP, a2
 	sfence.vma
+#endif /* CONFIG_32BIT */
 
 	ret
 #endif /* CONFIG_MMU */
