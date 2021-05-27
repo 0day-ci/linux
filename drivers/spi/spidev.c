@@ -25,6 +25,8 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spidev.h>
 
+#include <linux/platform_device.h>
+
 #include <linux/uaccess.h>
 
 
@@ -827,6 +829,40 @@ static struct spi_driver spidev_spi_driver = {
 	 */
 };
 
+static int spidev_platform_probe(struct platform_device *pdev)
+{
+	struct device *parent = pdev->dev.parent;
+	struct spi_device *spi;
+
+	if (strcmp(parent->bus->name, "spi"))
+		return -ENODEV;
+
+	spi = to_spi_device(parent);
+
+	/* This only works if no drvdata is stored */
+	if (spi_get_drvdata(spi)) {
+		dev_err(&pdev->dev, "drvdata is not NULL\n");
+		return -EOPNOTSUPP;
+	}
+
+	return spidev_probe(spi);
+}
+
+static int spidev_platform_remove(struct platform_device *pdev)
+{
+	struct spi_device *spi = to_spi_device(pdev->dev.parent);
+
+	return spidev_remove(spi);
+}
+
+static struct platform_driver spidev_platfoem_driver = {
+	.probe = spidev_platform_probe,
+	.remove = spidev_platform_remove,
+	.driver = {
+		.name = "spidev",
+	},
+};
+
 /*-------------------------------------------------------------------------*/
 
 static int __init spidev_init(void)
@@ -853,12 +889,21 @@ static int __init spidev_init(void)
 		class_destroy(spidev_class);
 		unregister_chrdev(SPIDEV_MAJOR, spidev_spi_driver.driver.name);
 	}
+
+	status = platform_driver_register(&spidev_platfoem_driver);
+	if (status < 0) {
+		spi_unregister_driver(&spidev_spi_driver);
+		class_destroy(spidev_class);
+		unregister_chrdev(SPIDEV_MAJOR, spidev_spi_driver.driver.name);
+	}
+
 	return status;
 }
 module_init(spidev_init);
 
 static void __exit spidev_exit(void)
 {
+	platform_driver_unregister(&spidev_platfoem_driver);
 	spi_unregister_driver(&spidev_spi_driver);
 	class_destroy(spidev_class);
 	unregister_chrdev(SPIDEV_MAJOR, spidev_spi_driver.driver.name);
