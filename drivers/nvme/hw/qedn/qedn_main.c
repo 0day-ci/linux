@@ -23,12 +23,55 @@ static struct pci_device_id qedn_pci_tbl[] = {
 };
 
 static int
+qedn_find_dev(struct nvme_tcp_ofld_dev *dev,
+	      struct nvme_tcp_ofld_ctrl_con_params *conn_params,
+	      void *qctrl)
+{
+	struct pci_dev *qede_pdev = NULL;
+	struct sockaddr remote_mac_addr;
+	struct net_device *ndev = NULL;
+	u16 vlan_id = 0;
+	int rc = 0;
+
+	/* qedn utilizes host network stack through paired qede device for
+	 * non-offload traffic. First we verify there is valid route to remote
+	 * peer.
+	 */
+	if (conn_params->remote_ip_addr.ss_family == AF_INET) {
+		rc = qed_route_ipv4(&conn_params->local_ip_addr,
+				    &conn_params->remote_ip_addr,
+				    &remote_mac_addr, &ndev);
+	} else if (conn_params->remote_ip_addr.ss_family == AF_INET6) {
+		rc = qed_route_ipv6(&conn_params->local_ip_addr,
+				    &conn_params->remote_ip_addr,
+				    &remote_mac_addr, &ndev);
+	} else {
+		pr_err("address family %d not supported\n",
+		       conn_params->remote_ip_addr.ss_family);
+
+		return false;
+	}
+
+	if (rc)
+		return false;
+
+	qed_vlan_get_ndev(&ndev, &vlan_id);
+
+	dev->ndev = ndev;
+
+	/* route found through ndev - validate this is qede*/
+	qede_pdev = qed_validate_ndev(ndev);
+	if (!qede_pdev)
+		return false;
+
+	return true;
+}
+
+static int
 qedn_claim_dev(struct nvme_tcp_ofld_dev *dev,
 	       struct nvme_tcp_ofld_ctrl_con_params *conn_params)
 {
-	/* Placeholder - qedn_claim_dev */
-
-	return 0;
+	return qedn_find_dev(dev, conn_params, NULL);
 }
 
 static int qedn_setup_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
@@ -41,7 +84,6 @@ static int qedn_setup_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 static int qedn_release_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 {
 	/* Placeholder - qedn_release_ctrl */
-
 	return 0;
 }
 
