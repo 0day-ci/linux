@@ -11,15 +11,18 @@
 #include <linux/kernel.h>
 #include <linux/net.h>
 #include <linux/ioam6.h>
+#include <linux/ioam6_genl.h>
 #include <linux/rhashtable.h>
 
 #include <net/addrconf.h>
+#include <net/genetlink.h>
 #include <net/ioam6.h>
 
 #define IOAM6_EMPTY_u16 0xffff
 #define IOAM6_EMPTY_u24 0x00ffffff
 #define IOAM6_EMPTY_u32 0xffffffff
 #define IOAM6_EMPTY_u56 0x00ffffffffffffff
+#define IOAM6_EMPTY_u64 0xffffffffffffffff
 
 #define IOAM6_MASK_u24	IOAM6_EMPTY_u24
 #define IOAM6_MASK_u56	IOAM6_EMPTY_u56
@@ -78,6 +81,496 @@ static const struct rhashtable_params rht_sc_params = {
 	.head_offset		= offsetof(struct ioam6_schema, head),
 	.automatic_shrinking	= true,
 	.obj_cmpfn		= ioam6_sc_cmpfn,
+};
+
+static struct genl_family ioam6_genl_family;
+
+static const struct nla_policy ioam6_genl_policy[IOAM6_ATTR_MAX + 1] = {
+	[IOAM6_ATTR_NS_ID]	= { .type = NLA_U16 },
+	[IOAM6_ATTR_NS_DATA]	= { .type = NLA_U64 },
+	[IOAM6_ATTR_SC_ID]	= { .type = NLA_U32 },
+	[IOAM6_ATTR_SC_DATA]	= { .type = NLA_BINARY,
+				    .len = IOAM6_MAX_SCHEMA_DATA_LEN },
+	[IOAM6_ATTR_SC_NONE]	= { .type = NLA_FLAG },
+};
+
+static int ioam6_genl_addns(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ioam6_pernet_data *nsdata;
+	struct ioam6_namespace *ns;
+	__be16 ns_id;
+	int err;
+
+	if (!info->attrs[IOAM6_ATTR_NS_ID])
+		return -EINVAL;
+
+	ns_id = cpu_to_be16(nla_get_u16(info->attrs[IOAM6_ATTR_NS_ID]));
+	nsdata = ioam6_pernet(genl_info_net(info));
+
+	mutex_lock(&nsdata->lock);
+
+	ns = rhashtable_lookup_fast(&nsdata->namespaces, &ns_id, rht_ns_params);
+	if (ns) {
+		err = -EEXIST;
+		goto out_unlock;
+	}
+
+	ns = kzalloc(sizeof(*ns), GFP_KERNEL);
+	if (!ns) {
+		err = -ENOMEM;
+		goto out_unlock;
+	}
+
+	ns->id = ns_id;
+
+	if (!info->attrs[IOAM6_ATTR_NS_DATA]) {
+		ns->data = cpu_to_be64(IOAM6_EMPTY_u64);
+	} else {
+		ns->data = cpu_to_be64(
+				nla_get_u64(info->attrs[IOAM6_ATTR_NS_DATA]));
+	}
+
+	err = rhashtable_lookup_insert_fast(&nsdata->namespaces, &ns->head,
+					    rht_ns_params);
+	if (err)
+		kfree(ns);
+
+out_unlock:
+	mutex_unlock(&nsdata->lock);
+	return err;
+}
+
+static int ioam6_genl_delns(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ioam6_pernet_data *nsdata;
+	struct ioam6_namespace *ns;
+	struct ioam6_schema *sc;
+	__be16 ns_id;
+	int err;
+
+	if (!info->attrs[IOAM6_ATTR_NS_ID])
+		return -EINVAL;
+
+	ns_id = cpu_to_be16(nla_get_u16(info->attrs[IOAM6_ATTR_NS_ID]));
+	nsdata = ioam6_pernet(genl_info_net(info));
+
+	mutex_lock(&nsdata->lock);
+
+	ns = rhashtable_lookup_fast(&nsdata->namespaces, &ns_id, rht_ns_params);
+	if (!ns) {
+		err = -ENOENT;
+		goto out_unlock;
+	}
+
+	sc = ns->schema;
+	err = rhashtable_remove_fast(&nsdata->namespaces, &ns->head,
+				     rht_ns_params);
+	if (err)
+		goto out_unlock;
+
+	if (sc)
+		sc->ns = NULL;
+
+	ioam6_ns_release(ns);
+
+out_unlock:
+	mutex_unlock(&nsdata->lock);
+	return err;
+}
+
+static int __ioam6_genl_dumpns_element(struct ioam6_namespace *ns,
+				       u32 portid,
+				       u32 seq,
+				       u32 flags,
+				       struct sk_buff *skb,
+				       u8 cmd)
+{
+	void *hdr;
+	u64 data;
+
+	hdr = genlmsg_put(skb, portid, seq, &ioam6_genl_family, flags, cmd);
+	if (!hdr)
+		return -ENOMEM;
+
+	data = be64_to_cpu(ns->data);
+
+	if (nla_put_u16(skb, IOAM6_ATTR_NS_ID, be16_to_cpu(ns->id)) ||
+	    (data != IOAM6_EMPTY_u64 &&
+	     nla_put_u64_64bit(skb, IOAM6_ATTR_NS_DATA, data, IOAM6_ATTR_PAD)) ||
+	    (ns->schema && nla_put_u32(skb, IOAM6_ATTR_SC_ID, ns->schema->id)))
+		goto nla_put_failure;
+
+	genlmsg_end(skb, hdr);
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(skb, hdr);
+	return -EMSGSIZE;
+}
+
+static int ioam6_genl_dumpns_start(struct netlink_callback *cb)
+{
+	struct ioam6_pernet_data *nsdata = ioam6_pernet(sock_net(cb->skb->sk));
+	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
+
+	if (!iter) {
+		iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+		if (!iter)
+			return -ENOMEM;
+
+		cb->args[0] = (long)iter;
+	}
+
+	rhashtable_walk_enter(&nsdata->namespaces, iter);
+
+	return 0;
+}
+
+static int ioam6_genl_dumpns_done(struct netlink_callback *cb)
+{
+	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
+
+	rhashtable_walk_exit(iter);
+	kfree(iter);
+
+	return 0;
+}
+
+static int ioam6_genl_dumpns(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	struct rhashtable_iter *iter;
+	struct ioam6_namespace *ns;
+	int err;
+
+	iter = (struct rhashtable_iter *)cb->args[0];
+	rhashtable_walk_start(iter);
+
+	for (;;) {
+		ns = rhashtable_walk_next(iter);
+
+		if (IS_ERR(ns)) {
+			if (PTR_ERR(ns) == -EAGAIN)
+				continue;
+			err = PTR_ERR(ns);
+			goto done;
+		} else if (!ns) {
+			break;
+		}
+
+		err = __ioam6_genl_dumpns_element(ns,
+						  NETLINK_CB(cb->skb).portid,
+						  cb->nlh->nlmsg_seq,
+						  NLM_F_MULTI,
+						  skb,
+						  IOAM6_CMD_DUMP_NAMESPACES);
+		if (err)
+			goto done;
+	}
+
+	err = skb->len;
+
+done:
+	rhashtable_walk_stop(iter);
+	return err;
+}
+
+static int ioam6_genl_addsc(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ioam6_pernet_data *nsdata;
+	int len, len_aligned, err;
+	struct ioam6_schema *sc;
+	u32 sc_id;
+
+	if (!info->attrs[IOAM6_ATTR_SC_ID] || !info->attrs[IOAM6_ATTR_SC_DATA])
+		return -EINVAL;
+
+	sc_id = nla_get_u32(info->attrs[IOAM6_ATTR_SC_ID]);
+	nsdata = ioam6_pernet(genl_info_net(info));
+
+	mutex_lock(&nsdata->lock);
+
+	sc = rhashtable_lookup_fast(&nsdata->schemas, &sc_id, rht_sc_params);
+	if (sc) {
+		err = -EEXIST;
+		goto out_unlock;
+	}
+
+	sc = kzalloc(sizeof(*sc), GFP_KERNEL);
+	if (!sc) {
+		err = -ENOMEM;
+		goto out_unlock;
+	}
+
+	len = nla_len(info->attrs[IOAM6_ATTR_SC_DATA]);
+	len_aligned = ALIGN(len, 4);
+
+	sc->data = kzalloc(len_aligned, GFP_KERNEL);
+	if (!sc->data) {
+		err = -ENOMEM;
+		goto free_sc;
+	}
+
+	sc->id = sc_id;
+	sc->len = len_aligned;
+	sc->hdr = cpu_to_be32(sc->id | ((u8)(sc->len / 4) << 24));
+
+	nla_memcpy(sc->data, info->attrs[IOAM6_ATTR_SC_DATA], len);
+
+	err = rhashtable_lookup_insert_fast(&nsdata->schemas, &sc->head,
+					    rht_sc_params);
+	if (err)
+		goto free_data;
+
+out_unlock:
+	mutex_unlock(&nsdata->lock);
+	return err;
+free_data:
+	kfree(sc->data);
+free_sc:
+	kfree(sc);
+	goto out_unlock;
+}
+
+static int ioam6_genl_delsc(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ioam6_pernet_data *nsdata;
+	struct ioam6_namespace *ns;
+	struct ioam6_schema *sc;
+	u32 sc_id;
+	int err;
+
+	if (!info->attrs[IOAM6_ATTR_SC_ID])
+		return -EINVAL;
+
+	sc_id = nla_get_u32(info->attrs[IOAM6_ATTR_SC_ID]);
+	nsdata = ioam6_pernet(genl_info_net(info));
+
+	mutex_lock(&nsdata->lock);
+
+	sc = rhashtable_lookup_fast(&nsdata->schemas, &sc_id, rht_sc_params);
+	if (!sc) {
+		err = -ENOENT;
+		goto out_unlock;
+	}
+
+	ns = sc->ns;
+	err = rhashtable_remove_fast(&nsdata->schemas, &sc->head,
+				     rht_sc_params);
+	if (err)
+		goto out_unlock;
+
+	if (ns)
+		ns->schema = NULL;
+
+	ioam6_sc_release(sc);
+
+out_unlock:
+	mutex_unlock(&nsdata->lock);
+	return err;
+}
+
+static int __ioam6_genl_dumpsc_element(struct ioam6_schema *sc,
+				       u32 portid, u32 seq, u32 flags,
+				       struct sk_buff *skb, u8 cmd)
+{
+	void *hdr;
+
+	hdr = genlmsg_put(skb, portid, seq, &ioam6_genl_family, flags, cmd);
+	if (!hdr)
+		return -ENOMEM;
+
+	if (nla_put_u32(skb, IOAM6_ATTR_SC_ID, sc->id) ||
+	    nla_put(skb, IOAM6_ATTR_SC_DATA, sc->len, sc->data) ||
+	    (sc->ns && nla_put_u16(skb, IOAM6_ATTR_NS_ID,
+				   be16_to_cpu(sc->ns->id))))
+		goto nla_put_failure;
+
+	genlmsg_end(skb, hdr);
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(skb, hdr);
+	return -EMSGSIZE;
+}
+
+static int ioam6_genl_dumpsc_start(struct netlink_callback *cb)
+{
+	struct ioam6_pernet_data *nsdata = ioam6_pernet(sock_net(cb->skb->sk));
+	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
+
+	if (!iter) {
+		iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+		if (!iter)
+			return -ENOMEM;
+
+		cb->args[0] = (long)iter;
+	}
+
+	rhashtable_walk_enter(&nsdata->schemas, iter);
+
+	return 0;
+}
+
+static int ioam6_genl_dumpsc_done(struct netlink_callback *cb)
+{
+	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
+
+	rhashtable_walk_exit(iter);
+	kfree(iter);
+
+	return 0;
+}
+
+static int ioam6_genl_dumpsc(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	struct rhashtable_iter *iter;
+	struct ioam6_schema *sc;
+	int err;
+
+	iter = (struct rhashtable_iter *)cb->args[0];
+	rhashtable_walk_start(iter);
+
+	for (;;) {
+		sc = rhashtable_walk_next(iter);
+
+		if (IS_ERR(sc)) {
+			if (PTR_ERR(sc) == -EAGAIN)
+				continue;
+			err = PTR_ERR(sc);
+			goto done;
+		} else if (!sc) {
+			break;
+		}
+
+		err = __ioam6_genl_dumpsc_element(sc,
+						  NETLINK_CB(cb->skb).portid,
+						  cb->nlh->nlmsg_seq,
+						  NLM_F_MULTI,
+						  skb,
+						  IOAM6_CMD_DUMP_SCHEMAS);
+		if (err)
+			goto done;
+	}
+
+	err = skb->len;
+
+done:
+	rhashtable_walk_stop(iter);
+	return err;
+}
+
+static int ioam6_genl_ns_set_schema(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ioam6_pernet_data *nsdata;
+	struct ioam6_namespace *ns;
+	struct ioam6_schema *sc;
+	__be16 ns_id;
+	int err = 0;
+	u32 sc_id;
+
+	if (!info->attrs[IOAM6_ATTR_NS_ID] ||
+	    (!info->attrs[IOAM6_ATTR_SC_ID] &&
+	     !info->attrs[IOAM6_ATTR_SC_NONE]))
+		return -EINVAL;
+
+	ns_id = cpu_to_be16(nla_get_u16(info->attrs[IOAM6_ATTR_NS_ID]));
+	nsdata = ioam6_pernet(genl_info_net(info));
+
+	mutex_lock(&nsdata->lock);
+
+	ns = rhashtable_lookup_fast(&nsdata->namespaces, &ns_id, rht_ns_params);
+	if (!ns) {
+		err = -ENOENT;
+		goto out_unlock;
+	}
+
+	if (info->attrs[IOAM6_ATTR_SC_NONE]) {
+		sc = NULL;
+	} else {
+		sc_id = nla_get_u32(info->attrs[IOAM6_ATTR_SC_ID]);
+		sc = rhashtable_lookup_fast(&nsdata->schemas, &sc_id,
+					    rht_sc_params);
+		if (!sc) {
+			err = -ENOENT;
+			goto out_unlock;
+		}
+	}
+
+	if (ns->schema)
+		ns->schema->ns = NULL;
+	ns->schema = sc;
+
+	if (sc) {
+		if (sc->ns)
+			sc->ns->schema = NULL;
+		sc->ns = ns;
+	}
+
+out_unlock:
+	mutex_unlock(&nsdata->lock);
+	return err;
+}
+
+static const struct genl_ops ioam6_genl_ops[] = {
+	{
+		.cmd	= IOAM6_CMD_ADD_NAMESPACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit	= ioam6_genl_addns,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_DEL_NAMESPACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit	= ioam6_genl_delns,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_DUMP_NAMESPACES,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.start	= ioam6_genl_dumpns_start,
+		.dumpit	= ioam6_genl_dumpns,
+		.done	= ioam6_genl_dumpns_done,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_ADD_SCHEMA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit	= ioam6_genl_addsc,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_DEL_SCHEMA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit	= ioam6_genl_delsc,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_DUMP_SCHEMAS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.start	= ioam6_genl_dumpsc_start,
+		.dumpit	= ioam6_genl_dumpsc,
+		.done	= ioam6_genl_dumpsc_done,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= IOAM6_CMD_NS_SET_SCHEMA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit	= ioam6_genl_ns_set_schema,
+		.flags	= GENL_ADMIN_PERM,
+	},
+};
+
+static struct genl_family ioam6_genl_family __ro_after_init = {
+	.hdrsize	= 0,
+	.name		= IOAM6_GENL_NAME,
+	.version	= IOAM6_GENL_VERSION,
+	.maxattr	= IOAM6_ATTR_MAX,
+	.policy		= ioam6_genl_policy,
+	.netnsok	= true,
+	.parallel_ops	= true,
+	.ops		= ioam6_genl_ops,
+	.n_ops		= ARRAY_SIZE(ioam6_genl_ops),
+	.module		= THIS_MODULE,
 };
 
 struct ioam6_namespace *ioam6_namespace(struct net *net, __be16 id)
@@ -343,15 +836,24 @@ static struct pernet_operations ioam6_net_ops = {
 int __init ioam6_init(void)
 {
 	int err = register_pernet_subsys(&ioam6_net_ops);
-
 	if (err)
-		return err;
+		goto out;
+
+	err = genl_register_family(&ioam6_genl_family);
+	if (err)
+		goto out_unregister_pernet_subsys;
 
 	pr_info("In-situ OAM (IOAM) with IPv6\n");
-	return 0;
+
+out:
+	return err;
+out_unregister_pernet_subsys:
+	unregister_pernet_subsys(&ioam6_net_ops);
+	goto out;
 }
 
 void ioam6_exit(void)
 {
+	genl_unregister_family(&ioam6_genl_family);
 	unregister_pernet_subsys(&ioam6_net_ops);
 }
