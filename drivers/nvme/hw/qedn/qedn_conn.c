@@ -179,6 +179,7 @@ static void qedn_release_conn_ctx(struct qedn_conn_ctx *conn_ctx)
 		pr_err("Conn resources state isn't 0 as expected 0x%lx\n",
 		       conn_ctx->resrc_state);
 
+	mutex_destroy(&conn_ctx->send_mutex);
 	atomic_inc(&conn_ctx->destroy_conn_indicator);
 	qedn_set_con_state(conn_ctx, CONN_STATE_DESTROY_COMPLETE);
 	wake_up_interruptible(&conn_ctx->conn_waitq);
@@ -407,6 +408,7 @@ static int qedn_prep_and_offload_queue(struct qedn_conn_ctx *conn_ctx)
 	}
 
 	set_bit(QEDN_CONN_RESRC_FW_SQ, &conn_ctx->resrc_state);
+
 	rc = qed_ops->acquire_conn(qedn->cdev,
 				   &conn_ctx->conn_handle,
 				   &conn_ctx->fw_cid,
