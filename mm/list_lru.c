@@ -339,22 +339,30 @@ static void memcg_destroy_list_lru_range(struct list_lru_memcg *memcg_lrus,
 		kfree(memcg_lrus->lrus[i]);
 }
 
+static struct list_lru_per_memcg *memcg_list_lru_alloc(gfp_t gfp)
+{
+	int nid;
+	struct list_lru_per_memcg *lru;
+
+	lru = kmalloc(struct_size(lru, nodes, nr_node_ids), gfp);
+	if (!lru)
+		return NULL;
+
+	for_each_node(nid)
+		init_one_lru(&lru->nodes[nid]);
+
+	return lru;
+}
+
 static int memcg_init_list_lru_range(struct list_lru_memcg *memcg_lrus,
 				     int begin, int end)
 {
 	int i;
 
 	for (i = begin; i < end; i++) {
-		int nid;
-		struct list_lru_per_memcg *lru;
-
-		lru = kmalloc(struct_size(lru, nodes, nr_node_ids), GFP_KERNEL);
-		if (!lru)
+		memcg_lrus->lrus[i] = memcg_list_lru_alloc(GFP_KERNEL);
+		if (!memcg_lrus->lrus[i])
 			goto fail;
-
-		for_each_node(nid)
-			init_one_lru(&lru->nodes[nid]);
-		memcg_lrus->lrus[i] = lru;
 	}
 	return 0;
 fail:
@@ -371,6 +379,8 @@ static int memcg_init_list_lru(struct list_lru *lru, bool memcg_aware)
 		lru->memcg_lrus = NULL;
 		return 0;
 	}
+
+	spin_lock_init(&lru->lock);
 
 	memcg_lrus = kvmalloc(sizeof(*memcg_lrus) +
 			      size * sizeof(memcg_lrus->lrus[0]), GFP_KERNEL);
@@ -419,9 +429,11 @@ static int memcg_update_list_lru(struct list_lru *lru, int old_size, int new_siz
 		return -ENOMEM;
 	}
 
+	spin_lock_irq(&lru->lock);
 	memcpy(&new->lrus, &old->lrus, old_size * sizeof(new->lrus[0]));
-
 	rcu_assign_pointer(lru->memcg_lrus, new);
+	spin_unlock_irq(&lru->lock);
+
 	kvfree_rcu(old, rcu);
 
 	return 0;
@@ -506,6 +518,89 @@ void memcg_drain_all_list_lrus(int src_idx, struct mem_cgroup *dst_memcg)
 	list_for_each_entry(lru, &list_lrus, list)
 		memcg_drain_list_lru(lru, src_idx, dst_memcg);
 	mutex_unlock(&list_lrus_mutex);
+}
+
+static bool memcg_list_lru_skip_alloc(struct list_lru *lru,
+				      struct mem_cgroup *memcg)
+{
+	struct list_lru_memcg *memcg_lrus;
+	int idx = memcg_cache_id(memcg);
+
+	if (unlikely(idx < 0))
+		return true;
+
+	rcu_read_lock();
+	memcg_lrus = rcu_dereference(lru->memcg_lrus);
+	if (memcg_lrus->lrus[idx]) {
+		rcu_read_unlock();
+		return true;
+	}
+	rcu_read_unlock();
+
+	return false;
+}
+
+int list_lru_memcg_alloc(struct list_lru *lru, struct mem_cgroup *memcg, gfp_t gfp)
+{
+	unsigned long flags;
+	struct list_lru_memcg *memcg_lrus;
+	int i;
+
+	struct list_lru_memcg {
+		struct list_lru_per_memcg *mlru;
+		struct mem_cgroup *memcg;
+	} *table;
+
+	if (!list_lru_memcg_aware(lru))
+		return 0;
+
+	if (memcg_list_lru_skip_alloc(lru, memcg))
+		return 0;
+
+	/*
+	 * The allocated list_lru_per_memcg array is not accounted directly.
+	 * Moreover, it should not come from DMA buffer and is not readily
+	 * reclaimable. So those GFP bits should be masked off.
+	 */
+	gfp &= ~(__GFP_DMA | __GFP_RECLAIMABLE | __GFP_ACCOUNT | __GFP_ZERO);
+	table = kmalloc_array(memcg->css.cgroup->level, sizeof(*table), gfp);
+	if (!table)
+		return -ENOMEM;
+
+	/*
+	 * Because the list_lru can be reparented to the parent cgroup's
+	 * list_lru, we should make sure that this cgroup and all its
+	 * ancestors have allocated list_lru_per_memcg.
+	 */
+	for (i = 0; memcg; memcg = parent_mem_cgroup(memcg), i++) {
+		if (memcg_list_lru_skip_alloc(lru, memcg))
+			break;
+
+		table[i].memcg = memcg;
+		table[i].mlru = memcg_list_lru_alloc(gfp);
+		if (!table[i].mlru) {
+			while (i--)
+				kfree(table[i].mlru);
+			kfree(table);
+			return -ENOMEM;
+		}
+	}
+
+	spin_lock_irqsave(&lru->lock, flags);
+	memcg_lrus = rcu_dereference_protected(lru->memcg_lrus, true);
+	while (i--) {
+		int index = memcg_cache_id(table[i].memcg);
+
+		if (memcg_lrus->lrus[index])
+			kfree(table[i].mlru);
+		else
+			memcg_lrus->lrus[index] = table[i].mlru;
+	}
+	spin_unlock_irqrestore(&lru->lock, flags);
+
+	kfree(table);
+
+	return 0;
 }
 #else
 static int memcg_init_list_lru(struct list_lru *lru, bool memcg_aware)
