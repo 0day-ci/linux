@@ -173,7 +173,13 @@ truncate_cleanup_page(struct address_space *mapping, struct page *page)
 	if (page_mapped(page)) {
 		unsigned int nr = thp_nr_pages(page);
 		unmap_mapping_pages(mapping, page->index, nr,
-				    ZAP_FLAG_CHECK_MAPPING);
+				    ZAP_FLAG_CHECK_MAPPING |
+				    /*
+				     * Now it's safe to drop uffd-wp because
+				     * we're with page lock, and the page is
+				     * being truncated.
+				     */
+				    ZAP_FLAG_DROP_FILE_UFFD_WP);
 	}
 
 	if (page_has_private(page))
