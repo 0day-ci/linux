@@ -66,6 +66,19 @@ properties:
       by the given provider should be subdomains of the domain specified
       by this binding.
 
+  assigned-performance-states:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+       Some devices might need to configure their power domains in a default
+       performance state while the device is active. These devices typically
+       would also run off a fixed clock and not support dynamically scaling the
+       device's performance, also known as DVFS techniques. The list of performance
+       state values should correspond to the list of power domains specified as part
+       of the power-domains property. Each cell corresponds to one power-domain.
+       A value of 0 can be used for power-domains with no performance state
+       requirement. In case the power-domains have OPP tables associated, the values
+       here would typically match with one of the entries in the OPP table.
+
 required:
   - "#power-domain-cells"
 
@@ -130,4 +143,41 @@ examples:
             exit-latency-us = <8000>;
             min-residency-us = <7000>;
         };
+    };
+
+  - |
+    parent4: power-controller@12340000 {
+        compatible = "foo,power-controller";
+        reg = <0x12340000 0x1000>;
+        #power-domain-cells = <0>;
+    };
+
+    parent5: power-controller@43210000 {
+        compatible = "foo,power-controller";
+        reg = <0x43210000 0x1000>;
+        #power-domain-cells = <0>;
+        operating-points-v2 = <&power_opp_table>;
+
+        power_opp_table: opp-table {
+            compatible = "operating-points-v2";
+
+            power_opp_low: opp1 {
+                opp-level = <16>;
+            };
+
+            rpmpd_opp_ret: opp2 {
+                opp-level = <64>;
+            };
+
+            rpmpd_opp_svs: opp3 {
+                opp-level = <256>;
+            };
+        };
+    };
+
+    child4: consumer@12341000 {
+        compatible = "foo,consumer";
+        reg = <0x12341000 0x1000>;
+        power-domains = <&parent4>, <&parent5>;
+        assigned-performance-states = <0>, <256>;
     };
