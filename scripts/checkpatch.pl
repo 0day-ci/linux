@@ -1614,15 +1614,13 @@ sub ctx_statement_block {
 
 	my $type = '';
 	my $level = 0;
-	my @stack = ();
+	my @stack = (['', $level]);
 	my $p;
 	my $c;
 	my $len = 0;
 
 	my $remainder;
 	while (1) {
-		@stack = (['', 0]) if ($#stack == -1);
-
 		#warn "CSB: blk<$blk> remain<$remain>\n";
 		# If we are about to drop off the end, pull in more
 		# context.
@@ -1656,9 +1654,9 @@ sub ctx_statement_block {
 		# Handle nested #if/#else.
 		if ($remainder =~ /^#\s*(?:ifndef|ifdef|if)\s/) {
 			push(@stack, [ $type, $level ]);
-		} elsif ($remainder =~ /^#\s*(?:else|elif)\b/) {
-			($type, $level) = @{$stack[$#stack - 1]};
-		} elsif ($remainder =~ /^#\s*endif\b/) {
+		} elsif ($remainder =~ /^#\s*(?:else|elif)\b/ && $#stack > 0) {
+			($type, $level) = @{$stack[$#stack]};
+		} elsif ($remainder =~ /^#\s*endif\b/ && $#stack > 0) {
 			($type, $level) = @{pop(@stack)};
 		}
 
@@ -1828,9 +1826,9 @@ sub ctx_block_get {
 		# Handle nested #if/#else.
 		if ($lines[$line] =~ /^.\s*#\s*(?:ifndef|ifdef|if)\s/) {
 			push(@stack, $level);
-		} elsif ($lines[$line] =~ /^.\s*#\s*(?:else|elif)\b/) {
-			$level = $stack[$#stack - 1];
-		} elsif ($lines[$line] =~ /^.\s*#\s*endif\b/) {
+		} elsif ($lines[$line] =~ /^.\s*#\s*(?:else|elif)\b/ && $#stack > 0) {
+			$level = $stack[$#stack];
+		} elsif ($lines[$line] =~ /^.\s*#\s*endif\b/ && $#stack > 0) {
 			$level = pop(@stack);
 		}
 
