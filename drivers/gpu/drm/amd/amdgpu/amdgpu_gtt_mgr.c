@@ -111,14 +111,15 @@ static int amdgpu_gtt_mgr_new(struct ttm_resource_manager *man,
 	struct amdgpu_gtt_node *node;
 	int r;
 
-	spin_lock(&mgr->lock);
-	if ((&tbo->mem == mem || tbo->mem.mem_type != TTM_PL_TT) &&
-	    atomic64_read(&mgr->available) < mem->num_pages) {
+	if (!(mem->placement & TTM_PL_FLAG_TEMPORARY)) {
+		spin_lock(&mgr->lock);
+		if (atomic64_read(&mgr->available) < mem->num_pages) {
+			spin_unlock(&mgr->lock);
+			return -ENOSPC;
+		}
+		atomic64_sub(mem->num_pages, &mgr->available);
 		spin_unlock(&mgr->lock);
-		return -ENOSPC;
 	}
-	atomic64_sub(mem->num_pages, &mgr->available);
-	spin_unlock(&mgr->lock);
 
 	if (!place->lpfn) {
 		mem->mm_node = NULL;
@@ -177,6 +178,9 @@ static void amdgpu_gtt_mgr_del(struct ttm_resource_manager *man,
 		spin_unlock(&mgr->lock);
 		kfree(node);
 	}
+
+	if (mem->placement & TTM_PL_FLAG_TEMPORARY)
+		return;
 
 	atomic64_add(mem->num_pages, &mgr->available);
 }
