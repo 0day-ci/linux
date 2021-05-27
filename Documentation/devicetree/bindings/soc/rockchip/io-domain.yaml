@@ -24,6 +24,7 @@ properties:
             - rockchip,rk3368-pmu-io-voltage-domain
             - rockchip,rk3399-io-voltage-domain
             - rockchip,rk3399-pmu-io-voltage-domain
+            - rockchip,rk3568-pmu-io-voltage-domain
             - rockchip,rv1108-io-voltage-domain
             - rockchip,rv1108-pmu-io-voltage-domain
 
