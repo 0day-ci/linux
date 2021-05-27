@@ -221,6 +221,16 @@ int fscrypt_derive_dirhash_key(struct fscrypt_info *ci,
 				  sizeof(ci->ci_dirhash_key));
 	if (err)
 		return err;
+
+	/*
+	 * The SipHash APIs expect the key as a pair of 64-bit words, not as a
+	 * byte array.  Make sure to use a consistent endianness.
+	 */
+	BUILD_BUG_ON(sizeof(ci->ci_dirhash_key) != 16);
+	BUILD_BUG_ON(ARRAY_SIZE(ci->ci_dirhash_key.key) != 2);
+	le64_to_cpus(&ci->ci_dirhash_key.key[0]);
+	le64_to_cpus(&ci->ci_dirhash_key.key[1]);
+
 	ci->ci_dirhash_key_initialized = true;
 	return 0;
 }
