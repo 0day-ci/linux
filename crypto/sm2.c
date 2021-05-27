@@ -9,41 +9,16 @@
  */
 
 #include <linux/module.h>
-#include <linux/mpi.h>
 #include <crypto/internal/akcipher.h>
 #include <crypto/akcipher.h>
 #include <crypto/hash.h>
 #include <crypto/sm3_base.h>
 #include <crypto/rng.h>
 #include <crypto/sm2.h>
+#include "ec_mpi.h"
 #include "sm2signature.asn1.h"
 
 #define MPI_NBYTES(m)   ((mpi_get_nbits(m) + 7) / 8)
-
-struct ecc_domain_parms {
-	const char *desc;           /* Description of the curve.  */
-	unsigned int nbits;         /* Number of bits.  */
-	unsigned int fips:1; /* True if this is a FIPS140-2 approved curve */
-
-	/* The model describing this curve.  This is mainly used to select
-	 * the group equation.
-	 */
-	enum gcry_mpi_ec_models model;
-
-	/* The actual ECC dialect used.  This is used for curve specific
-	 * optimizations and to select encodings etc.
-	 */
-	enum ecc_dialects dialect;
-
-	const char *p;              /* The prime defining the field.  */
-	const char *a, *b;          /* The coefficients.  For Twisted Edwards
-				     * Curves b is used for d.  For Montgomery
-				     * Curves (a,b) has ((A-2)/4,B^-1).
-				     */
-	const char *n;              /* The order of the base point.  */
-	const char *g_x, *g_y;      /* Base point.  */
-	unsigned int h;             /* Cofactor.  */
-};
 
 static const struct ecc_domain_parms sm2_ecp = {
 	.desc = "sm2p256v1",
@@ -59,73 +34,6 @@ static const struct ecc_domain_parms sm2_ecp = {
 	.g_y = "0xbc3736a2f4f6779c59bdcee36b692153d0a9877cc62a474002df32e52139f0a0",
 	.h = 1
 };
-
-static int sm2_ec_ctx_init(struct mpi_ec_ctx *ec)
-{
-	const struct ecc_domain_parms *ecp = &sm2_ecp;
-	MPI p, a, b;
-	MPI x, y;
-	int rc = -EINVAL;
-
-	p = mpi_scanval(ecp->p);
-	a = mpi_scanval(ecp->a);
-	b = mpi_scanval(ecp->b);
-	if (!p || !a || !b)
-		goto free_p;
-
-	x = mpi_scanval(ecp->g_x);
-	y = mpi_scanval(ecp->g_y);
-	if (!x || !y)
-		goto free;
-
-	rc = -ENOMEM;
-
-	ec->Q = mpi_point_new(0);
-	if (!ec->Q)
-		goto free;
-
-	/* mpi_ec_setup_elliptic_curve */
-	ec->G = mpi_point_new(0);
-	if (!ec->G) {
-		mpi_point_release(ec->Q);
-		goto free;
-	}
-
-	mpi_set(ec->G->x, x);
-	mpi_set(ec->G->y, y);
-	mpi_set_ui(ec->G->z, 1);
-
-	rc = -EINVAL;
-	ec->n = mpi_scanval(ecp->n);
-	if (!ec->n) {
-		mpi_point_release(ec->Q);
-		mpi_point_release(ec->G);
-		goto free;
-	}
-
-	ec->h = ecp->h;
-	ec->name = ecp->desc;
-	mpi_ec_init(ec, ecp->model, ecp->dialect, 0, p, a, b);
-
-	rc = 0;
-
-free:
-	mpi_free(x);
-	mpi_free(y);
-free_p:
-	mpi_free(p);
-	mpi_free(a);
-	mpi_free(b);
-
-	return rc;
-}
-
-static void sm2_ec_ctx_deinit(struct mpi_ec_ctx *ec)
-{
-	mpi_ec_deinit(ec);
-
-	memset(ec, 0, sizeof(*ec));
-}
 
 /* RESULT must have been initialized and is set on success to the
  * point given by VALUE.
@@ -416,14 +324,14 @@ static int sm2_init_tfm(struct crypto_akcipher *tfm)
 {
 	struct mpi_ec_ctx *ec = akcipher_tfm_ctx(tfm);
 
-	return sm2_ec_ctx_init(ec);
+	return ec_mpi_ctx_init(ec, &sm2_ecp);
 }
 
 static void sm2_exit_tfm(struct crypto_akcipher *tfm)
 {
 	struct mpi_ec_ctx *ec = akcipher_tfm_ctx(tfm);
 
-	sm2_ec_ctx_deinit(ec);
+	ec_mpi_ctx_deinit(ec);
 }
 
 static struct akcipher_alg sm2 = {

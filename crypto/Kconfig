@@ -265,6 +265,9 @@ config CRYPTO_ECRDSA
 	  standard algorithms (called GOST algorithms). Only signature verification
 	  is implemented.
 
+config CRYPTO_EC_MPI
+	tristate
+
 config CRYPTO_SM2
 	tristate "SM2 algorithm"
 	select CRYPTO_SM3
@@ -272,6 +275,7 @@ config CRYPTO_SM2
 	select CRYPTO_MANAGER
 	select MPILIB
 	select ASN1
+	select CRYPTO_EC_MPI
 	help
 	  Generic implementation of the SM2 public key algorithm. It was
 	  published by State Encryption Management Bureau, China.
