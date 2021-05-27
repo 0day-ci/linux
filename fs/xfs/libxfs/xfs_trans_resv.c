@@ -80,6 +80,23 @@ xfs_allocfree_log_count(
 }
 
 /*
+ * Log reservation required to add or remove a single extent to the free space
+ * btrees.  This requires modifying:
+ *
+ * the agf header: 1 sector
+ * the agfl header: 1 sector
+ * the allocation btrees: 2 trees * (max depth - 1) * block size
+ */
+uint
+xfs_allocfree_extent_res(
+	struct xfs_mount *mp)
+{
+	return xfs_calc_buf_res(2, mp->m_sb.sb_sectsize) +
+	       xfs_calc_buf_res(xfs_allocfree_log_count(mp, 1),
+				XFS_FSB_TO_B(mp, 1));
+}
+
+/*
  * Logging inodes is really tricksy. They are logged in memory format,
  * which means that what we write into the log doesn't directly translate into
  * the amount of space they use on disk.
