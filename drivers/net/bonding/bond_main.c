@@ -107,6 +107,7 @@ static char *lacp_rate;
 static int min_links;
 static char *ad_select;
 static char *xmit_hash_policy;
+static int novlan_srcmac;
 static int arp_interval;
 static char *arp_ip_target[BOND_MAX_ARP_TARGETS];
 static char *arp_validate;
@@ -168,6 +169,9 @@ MODULE_PARM_DESC(xmit_hash_policy, "balance-alb, balance-tlb, balance-xor, 802.3
 				   "0 for layer 2 (default), 1 for layer 3+4, "
 				   "2 for layer 2+3, 3 for encap layer 2+3, "
 				   "4 for encap layer 3+4, 5 for vlan+srcmac");
+module_param(novlan_srcmac, int, 0);
+MODULE_PARM_DESC(novlan_srcmac, "include vlan ID in vlan+srcmac xmit_hash_policy or not; "
+			      "0 to include it (default), 1 to exclude it");
 module_param(arp_interval, int, 0);
 MODULE_PARM_DESC(arp_interval, "arp interval in milliseconds");
 module_param_array(arp_ip_target, charp, NULL, 0);
@@ -3523,9 +3527,9 @@ static bool bond_flow_ip(struct sk_buff *skb, struct flow_keys *fk,
 
 static u32 bond_vlan_srcmac_hash(struct sk_buff *skb)
 {
-	struct ethhdr *mac_hdr = (struct ethhdr *)skb_mac_header(skb);
+	struct ethhdr *mac_hdr = eth_hdr(skb);
 	u32 srcmac_vendor = 0, srcmac_dev = 0;
-	u16 vlan;
+	u32 hash;
 	int i;
 
 	for (i = 0; i < 3; i++)
@@ -3534,12 +3538,14 @@ static u32 bond_vlan_srcmac_hash(struct sk_buff *skb)
 	for (i = 3; i < ETH_ALEN; i++)
 		srcmac_dev = (srcmac_dev << 8) | mac_hdr->h_source[i];
 
-	if (!skb_vlan_tag_present(skb))
-		return srcmac_vendor ^ srcmac_dev;
+	hash = srcmac_vendor ^ srcmac_dev;
 
-	vlan = skb_vlan_tag_get(skb);
+	if (novlan_srcmac || !skb_vlan_tag_present(skb))
+		return hash;
 
-	return vlan ^ srcmac_vendor ^ srcmac_dev;
+	hash ^= skb_vlan_tag_get(skb);
+
+	return hash;
 }
 
 /* Extract the appropriate headers based on bond's xmit policy */
