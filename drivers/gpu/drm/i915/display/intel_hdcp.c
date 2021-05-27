@@ -665,13 +665,13 @@ int intel_hdcp_auth_downstream(struct intel_connector *connector)
 
 	ret = shim->read_ksv_fifo(dig_port, num_downstream, ksv_fifo);
 	if (ret)
-		goto err;
+		goto out;
 
 	if (drm_hdcp_check_ksvs_revoked(&dev_priv->drm, ksv_fifo,
 					num_downstream) > 0) {
 		drm_err(&dev_priv->drm, "Revoked Ksv(s) in ksv_fifo\n");
 		ret = -EPERM;
-		goto err;
+		goto out;
 	}
 
 	/*
@@ -682,20 +682,16 @@ int intel_hdcp_auth_downstream(struct intel_connector *connector)
 		ret = intel_hdcp_validate_v_prime(connector, shim,
 						  ksv_fifo, num_downstream,
 						  bstatus);
-		if (!ret)
-			break;
+		if (!ret) {
+			drm_dbg_kms(&dev_priv->drm,
+				    "HDCP is enabled (%d downstream devices)\n",
+				    num_downstream);
+			goto out;
+		}
 	}
 
-	if (i == tries) {
-		drm_dbg_kms(&dev_priv->drm,
-			    "V Prime validation failed.(%d)\n", ret);
-		goto err;
-	}
-
-	drm_dbg_kms(&dev_priv->drm, "HDCP is enabled (%d downstream devices)\n",
-		    num_downstream);
-	ret = 0;
-err:
+	drm_dbg_kms(&dev_priv->drm, "V Prime validation failed.(%d)\n", ret);
+out:
 	kfree(ksv_fifo);
 	return ret;
 }
