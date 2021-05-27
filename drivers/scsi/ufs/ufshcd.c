@@ -6824,6 +6824,9 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	u8 resp = 0xF, lun;
 	unsigned long flags;
 
+	if (hba->quirks & UFSHCD_QUIRK_BROKEN_RESET_HANDLER)
+		return ufshcd_eh_host_reset_handler(cmd);
+
 	host = cmd->device->host;
 	hba = shost_priv(host);
 
@@ -6970,6 +6973,10 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	host = cmd->device->host;
 	hba = shost_priv(host);
 	tag = cmd->request->tag;
+
+	if (hba->quirks & UFSHCD_QUIRK_BROKEN_RESET_HANDLER)
+		return ufshcd_eh_host_reset_handler(cmd);
+
 	lrbp = &hba->lrb[tag];
 	if (!ufshcd_valid_tag(hba, tag)) {
 		dev_err(hba->dev,

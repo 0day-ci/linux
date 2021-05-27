@@ -581,6 +581,12 @@ enum ufshcd_quirks {
 	 * support interface configuration.
 	 */
 	UFSHCD_QUIRK_SKIP_INTERFACE_CONFIGURATION	= 1 << 16,
+
+	/*
+	 * This quirk needs to be enabled if the host controller support
+	 * host reset handler only.
+	 */
+	UFSHCD_QUIRK_BROKEN_RESET_HANDLER		= 1 << 17,
 };
 
 enum ufshcd_caps {
