@@ -370,6 +370,12 @@ struct bpf_flow_dissector {
 	const struct sk_buff	*skb;
 	const void		*data;
 	const void		*data_end;
+	__u8			vhdr_flags;
+	__u8			vhdr_gso_type;
+	__u16			vhdr_hdr_len;
+	__u16			vhdr_gso_size;
+	__u16			vhdr_csum_start;
+	__u16			vhdr_csum_offset;
 };
 
 static inline void

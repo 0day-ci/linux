@@ -28,6 +28,7 @@
 #include <scsi/fc/fc_fcoe.h>
 #include <uapi/linux/batadv_packet.h>
 #include <linux/bpf.h>
+#include <linux/virtio_net.h>
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_labels.h>
@@ -915,7 +916,8 @@ bool __skb_flow_dissect(const struct net *net,
 			const struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
 			void *target_container, const void *data,
-			__be16 proto, int nhoff, int hlen, unsigned int flags)
+			__be16 proto, int nhoff, int hlen, unsigned int flags,
+			const struct virtio_net_hdr *vhdr)
 {
 	struct flow_dissector_key_control *key_control;
 	struct flow_dissector_key_basic *key_basic;
@@ -1000,6 +1002,23 @@ bool __skb_flow_dissect(const struct net *net,
 			};
 			__be16 n_proto = proto;
 			struct bpf_prog *prog;
+
+			if (vhdr) {
+				ctx.vhdr_flags = vhdr->flags;
+				ctx.vhdr_gso_type = vhdr->gso_type;
+				ctx.vhdr_hdr_len =
+					__virtio16_to_cpu(virtio_legacy_is_little_endian(),
+							  vhdr->hdr_len);
+				ctx.vhdr_gso_size =
+					__virtio16_to_cpu(virtio_legacy_is_little_endian(),
+							  vhdr->gso_size);
+				ctx.vhdr_csum_start =
+					__virtio16_to_cpu(virtio_legacy_is_little_endian(),
+							  vhdr->csum_start);
+				ctx.vhdr_csum_offset =
+					__virtio16_to_cpu(virtio_legacy_is_little_endian(),
+							  vhdr->csum_offset);
+			}
 
 			if (skb) {
 				ctx.skb = skb;
@@ -1610,7 +1629,7 @@ u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
 	memset(&keys, 0, sizeof(keys));
 	__skb_flow_dissect(NULL, skb, &flow_keys_dissector_symmetric,
 			   &keys, NULL, 0, 0, 0,
-			   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+			   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL, NULL);
 
 	return __flow_hash_from_keys(&keys, &hashrnd);
 }
