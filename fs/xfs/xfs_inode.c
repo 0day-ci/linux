@@ -40,9 +40,18 @@ kmem_zone_t *xfs_inode_zone;
 
 /*
  * Used in xfs_itruncate_extents().  This is the maximum number of extents
- * freed from a file in a single transaction.
+ * we will unmap and defer for freeing in a single call to xfs_bunmapi().
+ * Realtime inodes directly free extents in xfs_bunmapi(), so are bound
+ * by transaction reservation size to 2 extents.
  */
-#define	XFS_ITRUNC_MAX_EXTENTS	2
+static inline int
+xfs_itrunc_max_extents(
+	struct xfs_inode	*ip)
+{
+	if (XFS_IS_REALTIME_INODE(ip))
+		return 2;
+	return 64;
+}
 
 STATIC int xfs_iunlink(struct xfs_trans *, struct xfs_inode *);
 STATIC int xfs_iunlink_remove(struct xfs_trans *, struct xfs_inode *);
@@ -1402,7 +1411,7 @@ xfs_itruncate_extents_flags(
 	while (unmap_len > 0) {
 		ASSERT(tp->t_firstblock == NULLFSBLOCK);
 		error = __xfs_bunmapi(tp, ip, first_unmap_block, &unmap_len,
-				flags, XFS_ITRUNC_MAX_EXTENTS);
+				flags, xfs_itrunc_max_extents(ip));
 		if (error)
 			goto out;
 
