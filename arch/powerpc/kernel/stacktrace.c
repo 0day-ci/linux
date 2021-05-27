@@ -174,11 +174,14 @@ static void raise_backtrace_ipi(cpumask_t *mask)
 {
 	unsigned int cpu;
 
+	if (cpumask_test_cpu(smp_processor_id(), mask)) {
+		handle_backtrace_ipi(NULL);
+		cpumask_clear_cpu(smp_processor_id(), mask);
+	}
+
 	for_each_cpu(cpu, mask) {
-		if (cpu == smp_processor_id())
-			handle_backtrace_ipi(NULL);
-		else
-			smp_send_safe_nmi_ipi(cpu, handle_backtrace_ipi, 5 * USEC_PER_SEC);
+		if (smp_send_safe_nmi_ipi(cpu, handle_backtrace_ipi, 5 * USEC_PER_SEC))
+			cpumask_clear_cpu(cpu, mask);
 	}
 
 	for_each_cpu(cpu, mask) {
