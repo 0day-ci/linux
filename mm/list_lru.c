@@ -74,7 +74,7 @@ list_lru_from_kmem(struct list_lru *lru, int nid, void *ptr,
 	if (!memcg)
 		goto out;
 
-	l = list_lru_from_memcg_idx(lru, nid, memcg_cache_id(memcg));
+	l = list_lru_from_memcg_idx(lru, nid, memcg_kmem_id(memcg));
 out:
 	if (memcg_ptr)
 		*memcg_ptr = memcg;
@@ -181,7 +181,7 @@ unsigned long list_lru_count_one(struct list_lru *lru,
 	long count = 0;
 
 	rcu_read_lock();
-	l = list_lru_from_memcg_idx(lru, nid, memcg_cache_id(memcg));
+	l = list_lru_from_memcg_idx(lru, nid, memcg_kmem_id(memcg));
 	if (l)
 		count = READ_ONCE(l->nr_items);
 	rcu_read_unlock();
@@ -273,7 +273,7 @@ list_lru_walk_one(struct list_lru *lru, int nid, struct mem_cgroup *memcg,
 	unsigned long ret;
 
 	spin_lock(&nlru->lock);
-	ret = __list_lru_walk_one(lru, nid, memcg_cache_id(memcg), isolate,
+	ret = __list_lru_walk_one(lru, nid, memcg_kmem_id(memcg), isolate,
 				  cb_arg, nr_to_walk);
 	spin_unlock(&nlru->lock);
 	return ret;
@@ -289,7 +289,7 @@ list_lru_walk_one_irq(struct list_lru *lru, int nid, struct mem_cgroup *memcg,
 	unsigned long ret;
 
 	spin_lock_irq(&nlru->lock);
-	ret = __list_lru_walk_one(lru, nid, memcg_cache_id(memcg), isolate,
+	ret = __list_lru_walk_one(lru, nid, memcg_kmem_id(memcg), isolate,
 				  cb_arg, nr_to_walk);
 	spin_unlock_irq(&nlru->lock);
 	return ret;
@@ -469,7 +469,7 @@ void memcg_reparent_list_lrus(struct mem_cgroup *memcg, struct mem_cgroup *paren
 static bool memcg_list_lru_skip_alloc(struct list_lru *lru,
 				      struct mem_cgroup *memcg)
 {
-	int idx = memcg_cache_id(memcg);
+	int idx = memcg_kmem_id(memcg);
 
 	if (unlikely(idx < 0) || xa_load(lru->xa, idx))
 		return true;
@@ -524,7 +524,7 @@ int list_lru_memcg_alloc(struct list_lru *lru, struct mem_cgroup *memcg, gfp_t g
 
 	xas_lock_irqsave(&xas, flags);
 	while (i--) {
-		int index = memcg_cache_id(table[i].memcg);
+		int index = memcg_kmem_id(table[i].memcg);
 		struct list_lru_memcg *mlru = table[i].mlru;
 
 		xas_set(&xas, index);
@@ -544,7 +544,7 @@ retry:
 				 * memcg id. More details see the comments
 				 * in memcg_reparent_list_lrus().
 				 */
-				index = memcg_cache_id(table[i].memcg);
+				index = memcg_kmem_id(table[i].memcg);
 				if (index < 0)
 					ret = 0;
 				else if (!ret && index != xas.xa_index)
