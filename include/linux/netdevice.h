@@ -1405,6 +1405,10 @@ struct net_device_ops {
 						     struct ifla_vf_info *ivf);
 	int			(*ndo_set_vf_link_state)(struct net_device *dev,
 							 int vf, int link_state);
+	int                     (*ndo_set_vf_mirror)(struct net_device *dev,
+						     struct nlattr *vf_mirror);
+	int                     (*ndo_get_vf_mirror)(struct net_device *dev,
+						     struct ifla_vf_mirror_info *vf_mirror);
 	int			(*ndo_get_vf_stats)(struct net_device *dev,
 						    int vf,
 						    struct ifla_vf_stats

@@ -907,6 +907,7 @@ enum {
 	IFLA_VF_IB_PORT_GUID,	/* VF Infiniband port GUID */
 	IFLA_VF_VLAN_LIST,	/* nested list of vlans, option for QinQ */
 	IFLA_VF_BROADCAST,	/* VF broadcast */
+	IFLA_VF_MIRROR,
 	__IFLA_VF_MAX,
 };
 
@@ -1000,6 +1001,51 @@ struct ifla_vf_trust {
 	__u32 vf;
 	__u32 setting;
 };
+
+
+enum mirror_type {
+	IFLA_VF_MIRROR_CLEAR,
+	IFLA_VF_MIRROR_PF,
+	IFLA_VF_MIRROR_VF,
+	IFLA_VF_MIRROR_VLAN,
+	IFLA_VF_MIRROR_MAX,
+};
+
+#define PORT_MIRRORING_INGRESS (1U)
+#define PORT_MIRRORING_EGRESS (1U << 1)
+
+struct ifla_vf_mirror_vf {
+	__u32 dst_vf;
+	__u32 src_vf;
+	__u8 dir_mask;
+};
+
+struct ifla_vf_mirror_pf {
+	__u32 dst_vf;
+	__u8 dir_mask;
+};
+
+
+struct ifla_vf_mirror_vlan {
+	__u32 dst_vf;
+	__u32 vlan;
+};
+
+struct ifla_vf_mirror_clear {
+	__u32 dst_vf;
+};
+
+struct ifla_vf_mirror_info {
+	enum mirror_type action;
+	__u32 ele_index;
+	union {
+		__u32 dst_vf;
+		struct ifla_vf_mirror_vf vf_to_vf;
+		struct ifla_vf_mirror_pf pf_to_vf;
+		struct ifla_vf_mirror_vlan vlan_mirror;
+	};
+};
+
 
 /* VF ports management section
  *
