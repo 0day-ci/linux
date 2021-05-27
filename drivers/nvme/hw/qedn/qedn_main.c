@@ -22,14 +22,24 @@ static struct pci_device_id qedn_pci_tbl[] = {
 	{0, 0},
 };
 
+static bool qedn_matches_qede(struct qedn_ctx *qedn, struct pci_dev *qede_pdev)
+{
+	struct pci_dev *qedn_pdev = qedn->pdev;
+
+	return (qede_pdev->bus->number == qedn_pdev->bus->number &&
+		PCI_SLOT(qede_pdev->devfn) == PCI_SLOT(qedn_pdev->devfn) &&
+		PCI_FUNC(qede_pdev->devfn) == qedn->dev_info.port_id);
+}
+
 static int
 qedn_find_dev(struct nvme_tcp_ofld_dev *dev,
 	      struct nvme_tcp_ofld_ctrl_con_params *conn_params,
-	      void *qctrl)
+	      struct qedn_ctrl *qctrl)
 {
 	struct pci_dev *qede_pdev = NULL;
 	struct sockaddr remote_mac_addr;
 	struct net_device *ndev = NULL;
+	struct qedn_ctx *qedn = NULL;
 	u16 vlan_id = 0;
 	int rc = 0;
 
@@ -57,11 +67,23 @@ qedn_find_dev(struct nvme_tcp_ofld_dev *dev,
 
 	qed_vlan_get_ndev(&ndev, &vlan_id);
 
+	if (qctrl) {
+		qctrl->remote_mac_addr = remote_mac_addr;
+		qctrl->vlan_id = vlan_id;
+	}
+
 	dev->ndev = ndev;
 
 	/* route found through ndev - validate this is qede*/
 	qede_pdev = qed_validate_ndev(ndev);
 	if (!qede_pdev)
+		return false;
+
+	qedn = container_of(dev, struct qedn_ctx, qedn_ofld_dev);
+	if (!qedn)
+		return false;
+
+	if (!qedn_matches_qede(qedn, qede_pdev))
 		return false;
 
 	return true;
@@ -76,14 +98,67 @@ qedn_claim_dev(struct nvme_tcp_ofld_dev *dev,
 
 static int qedn_setup_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 {
-	/* Placeholder - qedn_setup_ctrl */
+	struct nvme_tcp_ofld_dev *dev = ctrl->dev;
+	struct qedn_ctrl *qctrl = NULL;
+	struct qedn_ctx *qedn = NULL;
+	bool new = true;
+	int rc = 0;
+
+	if (ctrl->private_data) {
+		qctrl = (struct qedn_ctrl *)ctrl->private_data;
+		new = false;
+	}
+
+	if (new) {
+		qctrl = kzalloc(sizeof(*qctrl), GFP_KERNEL);
+		if (!qctrl)
+			return -ENOMEM;
+
+		ctrl->private_data = (void *)qctrl;
+		set_bit(QEDN_CTRL_SET_TO_OFLD_CTRL, &qctrl->agg_state);
+
+		qctrl->sp_wq = alloc_workqueue(QEDN_SP_WORKQUEUE, WQ_MEM_RECLAIM,
+					       QEDN_SP_WORKQUEUE_MAX_ACTIVE);
+		if (!qctrl->sp_wq) {
+			rc = -ENODEV;
+			pr_err("Unable to create slowpath work queue!\n");
+			kfree(qctrl);
+
+			return rc;
+		}
+
+		set_bit(QEDN_STATE_SP_WORK_THREAD_SET, &qctrl->agg_state);
+	}
+
+	if (!qedn_find_dev(dev, &ctrl->conn_params, qctrl)) {
+		rc = -ENODEV;
+		goto err_out;
+	}
+
+	qedn = container_of(dev, struct qedn_ctx, qedn_ofld_dev);
+	qctrl->qedn = qedn;
+
+	/* Placeholder - setup LLH filter */
 
 	return 0;
+err_out:
+	flush_workqueue(qctrl->sp_wq);
+	kfree(qctrl);
+
+	return rc;
 }
 
 static int qedn_release_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 {
-	/* Placeholder - qedn_release_ctrl */
+	struct qedn_ctrl *qctrl = (struct qedn_ctrl *)ctrl->private_data;
+
+	if (test_and_clear_bit(QEDN_STATE_SP_WORK_THREAD_SET, &qctrl->agg_state))
+		flush_workqueue(qctrl->sp_wq);
+
+	if (test_and_clear_bit(QEDN_CTRL_SET_TO_OFLD_CTRL, &qctrl->agg_state)) {
+		kfree(qctrl);
+		ctrl->private_data = NULL;
+	}
 
 	return 0;
 }
@@ -91,19 +166,114 @@ static int qedn_release_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid,
 			     size_t queue_size)
 {
-	/* Placeholder - qedn_create_queue */
+	struct nvme_tcp_ofld_ctrl *ctrl = queue->ctrl;
+	struct nvme_ctrl *nctrl = &ctrl->nctrl;
+	struct qedn_conn_ctx *conn_ctx;
+	struct qedn_ctrl *qctrl;
+	struct qedn_ctx *qedn;
+	int rc;
+
+	qctrl = (struct qedn_ctrl *)ctrl->private_data;
+	qedn = qctrl->qedn;
+
+	/* Allocate qedn connection context */
+	conn_ctx = kzalloc(sizeof(*conn_ctx), GFP_KERNEL);
+	if (!conn_ctx)
+		return -ENOMEM;
+
+	queue->private_data = conn_ctx;
+	queue->hdr_digest = nctrl->opts->hdr_digest;
+	queue->data_digest = nctrl->opts->data_digest;
+	queue->tos = nctrl->opts->tos;
+
+	conn_ctx->qedn = qedn;
+	conn_ctx->queue = queue;
+	conn_ctx->ctrl = ctrl;
+	conn_ctx->sq_depth = queue_size;
+
+	init_waitqueue_head(&conn_ctx->conn_waitq);
+	atomic_set(&conn_ctx->est_conn_indicator, 0);
+	atomic_set(&conn_ctx->destroy_conn_indicator, 0);
+
+	spin_lock_init(&conn_ctx->conn_state_lock);
+
+	qedn_initialize_endpoint(&conn_ctx->ep, qedn->local_mac_addr, ctrl);
+
+	atomic_inc(&qctrl->host_num_active_conns);
+
+	qedn_set_sp_wa(conn_ctx, CREATE_CONNECTION);
+	qedn_set_con_state(conn_ctx, CONN_STATE_CREATE_CONNECTION);
+	INIT_WORK(&conn_ctx->sp_wq_entry, qedn_sp_wq_handler);
+	queue_work(qctrl->sp_wq, &conn_ctx->sp_wq_entry);
+
+	/* Wait for the connection establishment to complete - this includes the
+	 * FW TCP connection establishment and the NVMeTCP ICReq & ICResp
+	 */
+	rc = qedn_wait_for_conn_est(conn_ctx);
+	if (rc)
+		return -ENXIO;
 
 	return 0;
 }
 
 static void qedn_drain_queue(struct nvme_tcp_ofld_queue *queue)
 {
-	/* Placeholder - qedn_drain_queue */
+	struct qedn_conn_ctx *conn_ctx;
+
+	if (!queue) {
+		pr_err("ctrl has no queues\n");
+
+		return;
+	}
+
+	conn_ctx = (struct qedn_conn_ctx *)queue->private_data;
+	if (!conn_ctx)
+		return;
+
+	qedn_cleanp_fw(conn_ctx);
+}
+
+#define ATOMIC_READ_DESTROY_IND atomic_read(&conn_ctx->destroy_conn_indicator)
+#define TERMINATE_TIMEOUT msecs_to_jiffies(QEDN_RLS_CONS_TMO)
+static inline void
+qedn_queue_wait_for_terminate_complete(struct qedn_conn_ctx *conn_ctx)
+{
+	/* Returns valid non-0 */
+	int wrc, state;
+
+	wrc = wait_event_interruptible_timeout(conn_ctx->conn_waitq,
+					       ATOMIC_READ_DESTROY_IND > 0,
+					       TERMINATE_TIMEOUT);
+
+	atomic_set(&conn_ctx->destroy_conn_indicator, 0);
+
+	spin_lock_bh(&conn_ctx->conn_state_lock);
+	state = conn_ctx->state;
+	spin_unlock_bh(&conn_ctx->conn_state_lock);
+
+	if (!wrc  || state != CONN_STATE_DESTROY_COMPLETE)
+		pr_warn("Timed out waiting for clear-SQ on FW conns");
 }
 
 static void qedn_destroy_queue(struct nvme_tcp_ofld_queue *queue)
 {
-	/* Placeholder - qedn_destroy_queue */
+	struct qedn_conn_ctx *conn_ctx;
+
+	if (!queue) {
+		pr_err("ctrl has no queues\n");
+
+		return;
+	}
+
+	conn_ctx = (struct qedn_conn_ctx *)queue->private_data;
+	if (!conn_ctx)
+		return;
+
+	qedn_terminate_connection(conn_ctx);
+
+	qedn_queue_wait_for_terminate_complete(conn_ctx);
+
+	kfree(conn_ctx);
 }
 
 static int qedn_poll_queue(struct nvme_tcp_ofld_queue *queue)
@@ -143,6 +313,21 @@ static struct nvme_tcp_ofld_ops qedn_ofld_ops = {
 	.poll_queue = qedn_poll_queue,
 	.send_req = qedn_send_req,
 };
+
+struct qedn_conn_ctx *qedn_get_conn_hash(struct qedn_ctx *qedn, u16 icid)
+{
+	struct qedn_conn_ctx *conn = NULL;
+
+	hash_for_each_possible(qedn->conn_ctx_hash, conn, hash_node, icid) {
+		if (conn->conn_handle == icid)
+			break;
+	}
+
+	if (!conn || conn->conn_handle != icid)
+		return NULL;
+
+	return conn;
+}
 
 /* Fastpath IRQ handler */
 static irqreturn_t qedn_irq_handler(int irq, void *dev_id)
@@ -244,7 +429,7 @@ exit_setup_int:
 
 static inline void qedn_init_pf_struct(struct qedn_ctx *qedn)
 {
-	/* Placeholder - Initialize qedn fields */
+	hash_init(qedn->conn_ctx_hash);
 }
 
 static inline void
@@ -584,7 +769,7 @@ static int __qedn_probe(struct pci_dev *pdev)
 	rc = qed_ops->start(qedn->cdev,
 			    NULL /* Placeholder for FW IO-path resources */,
 			    qedn,
-			    NULL /* Placeholder for FW Event callback */);
+			    qedn_event_cb);
 	if (rc) {
 		rc = -ENODEV;
 		pr_err("Cannot start NVMeTCP Function\n");
