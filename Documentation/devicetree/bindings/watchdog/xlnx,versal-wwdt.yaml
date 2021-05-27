@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/watchdog/xlnx,versal-wwdt.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Xilinx Versal Window Watchdog Timer Controller
+
+maintainers:
+  - Neeli Srinivas <sneeli@xilinx.com>
+
+description:
+  Versal watchdog driver uses Window watchdog mode. Window watchdog
+  timer(WWDT) contains closed(first) and open(second) window with
+  32 bit width. WWDT will generate an interrupt after the first window
+  timeout and reset signal after the second window timeout. Timeout
+  and pretimeout configuration, Stop and Refresh trigger only in open
+  window.
+
+properties:
+  compatible:
+    enum:
+      - xlnx,versal-wwdt-1.0
+  reg:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  timeout-sec: true
+
+  pretimeout-sec: true
+
+  interrupts:
+    items:
+      - description: Watchdog interrupt
+      - description: Watchdog reset pending interrupt
+    description:
+      Interrupt line names "wdt" or "wwdt_reset_pending".
+      wdt - will assert high after first (closed) window
+      timer expires. wwdt_reset_pending - will assert high
+      after second (open) window timer expires if WRP
+      (Watchdog Reset pending) is configured with third
+      (SST) timer.
+
+  interrupt-names:
+    items:
+      - const: wdt
+      - const: wwdt_reset_pending
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - interrupts
+  - interrupt-names
+
+additionalProperties: false
+
+examples:
+  - |
+        watchdog@fd4d0000 {
+           compatible = "xlnx,versal-wwdt-1.0";
+           reg = <0xfd4d0000 0x10000>;
+           clocks = <&clock25>;
+           timeout-sec = <30>;
+           pretimeout-sec = <25>;
+           interrupts = <0 0x64 1>, <0 0x6D 1>;
+           interrupt-names = "wdt", "wwdt_reset_pending";
+        };
+...
