@@ -29,6 +29,11 @@ static const char * const qedn_conn_state_str[] = {
 	NULL
 };
 
+inline int qedn_qid(struct nvme_tcp_ofld_queue *queue)
+{
+	return queue - queue->ctrl->queues;
+}
+
 int qedn_set_con_state(struct qedn_conn_ctx *conn_ctx, enum qedn_conn_state new_state)
 {
 	spin_lock_bh(&conn_ctx->conn_state_lock);
@@ -159,6 +164,11 @@ static void qedn_release_conn_ctx(struct qedn_conn_ctx *conn_ctx)
 		clear_bit(QEDN_CONN_RESRC_ACQUIRE_CONN, &conn_ctx->resrc_state);
 	}
 
+	if (test_bit(QEDN_CONN_RESRC_TASKS, &conn_ctx->resrc_state)) {
+		clear_bit(QEDN_CONN_RESRC_TASKS, &conn_ctx->resrc_state);
+			qedn_return_active_tasks(conn_ctx);
+	}
+
 	if (test_bit(QEDN_CONN_RESRC_CCCID_ITID_MAP, &conn_ctx->resrc_state)) {
 		dma_free_coherent(&qedn->pdev->dev,
 				  conn_ctx->sq_depth *
@@ -261,6 +271,7 @@ static int qedn_nvmetcp_offload_conn(struct qedn_conn_ctx *conn_ctx)
 	offld_prms.max_rt_time = QEDN_TCP_MAX_RT_TIME;
 	offld_prms.sq_pbl_addr =
 		(u64)qed_chain_get_pbl_phys(&qedn_ep->fw_sq_chain);
+	offld_prms.default_cq = conn_ctx->default_cq;
 
 	rc = qed_ops->offload_conn(qedn->cdev,
 				   conn_ctx->conn_handle,
@@ -398,6 +409,9 @@ void qedn_prep_db_data(struct qedn_conn_ctx *conn_ctx)
 static int qedn_prep_and_offload_queue(struct qedn_conn_ctx *conn_ctx)
 {
 	struct qedn_ctx *qedn = conn_ctx->qedn;
+	struct qedn_io_resources *io_resrc;
+	struct qedn_fp_queue *fp_q;
+	u8 default_cq_idx, qid;
 	size_t dma_size;
 	int rc;
 
@@ -408,6 +422,9 @@ static int qedn_prep_and_offload_queue(struct qedn_conn_ctx *conn_ctx)
 	}
 
 	set_bit(QEDN_CONN_RESRC_FW_SQ, &conn_ctx->resrc_state);
+
+	atomic_set(&conn_ctx->num_active_tasks, 0);
+	atomic_set(&conn_ctx->num_active_fw_tasks, 0);
 
 	rc = qed_ops->acquire_conn(qedn->cdev,
 				   &conn_ctx->conn_handle,
@@ -422,7 +439,32 @@ static int qedn_prep_and_offload_queue(struct qedn_conn_ctx *conn_ctx)
 		 conn_ctx->conn_handle);
 	set_bit(QEDN_CONN_RESRC_ACQUIRE_CONN, &conn_ctx->resrc_state);
 
-	/* Placeholder - Allocate task resources and initialize fields */
+	qid = qedn_qid(conn_ctx->queue);
+	default_cq_idx = qid ? qid - 1 : 0; /* Offset adminq */
+
+	conn_ctx->default_cq = (default_cq_idx % qedn->num_fw_cqs);
+	fp_q = &qedn->fp_q_arr[conn_ctx->default_cq];
+	conn_ctx->fp_q = fp_q;
+	io_resrc = &fp_q->host_resrc;
+
+	/* The first connection on each fp_q will fill task
+	 * resources
+	 */
+	spin_lock(&io_resrc->resources_lock);
+	if (io_resrc->num_alloc_tasks == 0) {
+		rc = qedn_alloc_tasks(conn_ctx);
+		if (rc) {
+			pr_err("Failed allocating tasks: CID=0x%x\n",
+			       conn_ctx->fw_cid);
+			spin_unlock(&io_resrc->resources_lock);
+			goto rel_conn;
+		}
+	}
+	spin_unlock(&io_resrc->resources_lock);
+
+	spin_lock_init(&conn_ctx->task_list_lock);
+	INIT_LIST_HEAD(&conn_ctx->active_task_list);
+	set_bit(QEDN_CONN_RESRC_TASKS, &conn_ctx->resrc_state);
 
 	rc = qedn_fetch_tcp_port(conn_ctx);
 	if (rc)

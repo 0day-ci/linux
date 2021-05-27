@@ -40,6 +40,20 @@
 
 #define QEDN_FW_CQ_FP_WQ_WORKQUEUE "qedn_fw_cq_fp_wq"
 
+/* Protocol defines */
+#define QEDN_MAX_IO_SIZE QED_NVMETCP_MAX_IO_SIZE
+
+#define QEDN_SGE_BUFF_SIZE 4096
+#define QEDN_MAX_SGES_PER_TASK DIV_ROUND_UP(QEDN_MAX_IO_SIZE, QEDN_SGE_BUFF_SIZE)
+#define QEDN_FW_SGE_SIZE sizeof(struct nvmetcp_sge)
+#define QEDN_MAX_FW_SGL_SIZE ((QEDN_MAX_SGES_PER_TASK) * QEDN_FW_SGE_SIZE)
+#define QEDN_FW_SLOW_IO_MIN_SGE_LIMIT (9700 / 6)
+
+#define QEDN_MAX_HW_SECTORS (QEDN_MAX_IO_SIZE / 512)
+#define QEDN_MAX_SEGMENTS QEDN_MAX_SGES_PER_TASK
+
+#define QEDN_INVALID_ITID 0xFFFF
+
 /*
  * TCP offload stack default configurations and defines.
  * Future enhancements will allow controlling the configurable
@@ -84,6 +98,15 @@ enum qedn_state {
 	QEDN_STATE_MODULE_REMOVE_ONGOING,
 };
 
+struct qedn_io_resources {
+	/* Lock for IO resources */
+	spinlock_t resources_lock;
+	struct list_head task_free_list;
+	u32 num_alloc_tasks;
+	u32 num_free_tasks;
+	u32 no_avail_resrc_cnt;
+};
+
 /* Per CPU core params */
 struct qedn_fp_queue {
 	struct qed_chain cq_chain;
@@ -93,6 +116,10 @@ struct qedn_fp_queue {
 	struct qed_sb_info *sb_info;
 	unsigned int cpu;
 	struct work_struct fw_cq_fp_wq_entry;
+
+	/* IO related resources for host */
+	struct qedn_io_resources host_resrc;
+
 	u16 sb_id;
 	char irqname[QEDN_IRQ_NAME_LEN];
 };
@@ -116,12 +143,35 @@ struct qedn_ctx {
 	/* Connections */
 	DECLARE_HASHTABLE(conn_ctx_hash, 16);
 
+	u32 num_tasks_per_pool;
+
 	/* Fast path queues */
 	u8 num_fw_cqs;
 	struct qedn_fp_queue *fp_q_arr;
 	struct nvmetcp_glbl_queue_entry *fw_cq_array_virt;
 	dma_addr_t fw_cq_array_phy; /* Physical address of fw_cq_array_virt */
 	struct workqueue_struct *fw_cq_fp_wq;
+
+	/* Fast Path Tasks */
+	struct qed_nvmetcp_tid	tasks;
+};
+
+struct qedn_task_ctx {
+	struct qedn_conn_ctx *qedn_conn;
+	struct qedn_ctx *qedn;
+	void *fw_task_ctx;
+	struct qedn_fp_queue *fp_q;
+	struct scatterlist *nvme_sg;
+	struct nvme_tcp_ofld_req *req; /* currently proccessed request */
+	struct list_head entry;
+	spinlock_t lock; /* To protect task resources */
+	bool valid;
+	unsigned long flags; /* Used by qedn_task_flags */
+	u32 task_size;
+	u16 itid;
+	u16 cccid;
+	int req_direction;
+	struct storage_sgl_task_params sgl_task_params;
 };
 
 struct qedn_endpoint {
@@ -220,6 +270,7 @@ struct qedn_conn_ctx {
 	struct nvme_tcp_ofld_ctrl *ctrl;
 	u32 conn_handle;
 	u32 fw_cid;
+	u8 default_cq;
 
 	atomic_t est_conn_indicator;
 	atomic_t destroy_conn_indicator;
@@ -237,6 +288,11 @@ struct qedn_conn_ctx {
 	dma_addr_t host_cccid_itid_phy_addr;
 	struct qedn_endpoint ep;
 	int abrt_flag;
+	/* Spinlock for accessing active_task_list */
+	spinlock_t task_list_lock;
+	struct list_head active_task_list;
+	atomic_t num_active_tasks;
+	atomic_t num_active_fw_tasks;
 
 	/* Connection resources - turned on to indicate what resource was
 	 * allocated, to that it can later be released.
@@ -256,6 +312,7 @@ struct qedn_conn_ctx {
 enum qedn_conn_resources_state {
 	QEDN_CONN_RESRC_FW_SQ,
 	QEDN_CONN_RESRC_ACQUIRE_CONN,
+	QEDN_CONN_RESRC_TASKS,
 	QEDN_CONN_RESRC_CCCID_ITID_MAP,
 	QEDN_CONN_RESRC_TCP_PORT,
 	QEDN_CONN_RESRC_DB_ADD,
@@ -278,5 +335,13 @@ inline int qedn_validate_cccid_in_range(struct qedn_conn_ctx *conn_ctx, u16 ccci
 int qedn_queue_request(struct qedn_conn_ctx *qedn_conn, struct nvme_tcp_ofld_req *req);
 void qedn_nvme_req_fp_wq_handler(struct work_struct *work);
 void qedn_io_work_cq(struct qedn_ctx *qedn, struct nvmetcp_fw_cqe *cqe);
+int qedn_alloc_tasks(struct qedn_conn_ctx *conn_ctx);
+inline int qedn_qid(struct nvme_tcp_ofld_queue *queue);
+void qedn_common_clear_fw_sgl(struct storage_sgl_task_params *sgl_task_params);
+void qedn_return_active_tasks(struct qedn_conn_ctx *conn_ctx);
+struct qedn_task_ctx *
+qedn_get_free_task_from_pool(struct qedn_conn_ctx *conn_ctx, u16 cccid);
+void qedn_destroy_free_tasks(struct qedn_fp_queue *fp_q,
+			     struct qedn_io_resources *io_resrc);
 
 #endif /* _QEDN_H_ */

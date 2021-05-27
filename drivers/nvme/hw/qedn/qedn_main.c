@@ -29,6 +29,12 @@ __be16 qedn_get_in_port(struct sockaddr_storage *sa)
 		: ((struct sockaddr_in6 *)sa)->sin6_port;
 }
 
+static void qedn_init_io_resc(struct qedn_io_resources *io_resrc)
+{
+	spin_lock_init(&io_resrc->resources_lock);
+	INIT_LIST_HEAD(&io_resrc->task_free_list);
+}
+
 struct qedn_llh_filter *qedn_add_llh_filter(struct qedn_ctx *qedn, u16 tcp_port)
 {
 	struct qedn_llh_filter *llh_filter = NULL;
@@ -437,6 +443,8 @@ static struct nvme_tcp_ofld_ops qedn_ofld_ops = {
 		 *	NVMF_OPT_HDR_DIGEST | NVMF_OPT_DATA_DIGEST |
 		 *	NVMF_OPT_NR_POLL_QUEUES | NVMF_OPT_TOS
 		 */
+	.max_hw_sectors = QEDN_MAX_HW_SECTORS,
+	.max_segments = QEDN_MAX_SEGMENTS,
 	.claim_dev = qedn_claim_dev,
 	.setup_ctrl = qedn_setup_ctrl,
 	.release_ctrl = qedn_release_ctrl,
@@ -642,8 +650,24 @@ static inline int qedn_core_probe(struct qedn_ctx *qedn)
 	return rc;
 }
 
+static void qedn_call_destroy_free_tasks(struct qedn_fp_queue *fp_q,
+					 struct qedn_io_resources *io_resrc)
+{
+	if (list_empty(&io_resrc->task_free_list))
+		return;
+
+	if (io_resrc->num_alloc_tasks != io_resrc->num_free_tasks)
+		pr_err("Task Pool:Not all returned allocated=0x%x, free=0x%x\n",
+		       io_resrc->num_alloc_tasks, io_resrc->num_free_tasks);
+
+	qedn_destroy_free_tasks(fp_q, io_resrc);
+	if (io_resrc->num_free_tasks)
+		pr_err("Expected num_free_tasks to be 0\n");
+}
+
 static void qedn_free_function_queues(struct qedn_ctx *qedn)
 {
+	struct qedn_io_resources *host_resrc;
 	struct qed_sb_info *sb_info = NULL;
 	struct qedn_fp_queue *fp_q;
 	int i;
@@ -655,6 +679,9 @@ static void qedn_free_function_queues(struct qedn_ctx *qedn)
 	/* Free the fast path queues*/
 	for (i = 0; i < qedn->num_fw_cqs; i++) {
 		fp_q = &qedn->fp_q_arr[i];
+		host_resrc = &fp_q->host_resrc;
+
+		qedn_call_destroy_free_tasks(fp_q, host_resrc);
 
 		/* Free SB */
 		sb_info = fp_q->sb_info;
@@ -742,7 +769,8 @@ static int qedn_alloc_function_queues(struct qedn_ctx *qedn)
 		goto mem_alloc_failure;
 	}
 
-	/* placeholder - create task pools */
+	qedn->num_tasks_per_pool =
+		qedn->pf_params.nvmetcp_pf_params.num_tasks / qedn->num_fw_cqs;
 
 	for (i = 0; i < qedn->num_fw_cqs; i++) {
 		fp_q = &qedn->fp_q_arr[i];
@@ -784,7 +812,7 @@ static int qedn_alloc_function_queues(struct qedn_ctx *qedn)
 		fp_q->qedn = qedn;
 		INIT_WORK(&fp_q->fw_cq_fp_wq_entry, qedn_fw_cq_fq_wq_handler);
 
-		/* Placeholder - Init IO-path resources */
+		qedn_init_io_resc(&fp_q->host_resrc);
 	}
 
 	return 0;
@@ -966,7 +994,7 @@ static int __qedn_probe(struct pci_dev *pdev)
 
 	/* NVMeTCP start HW PF */
 	rc = qed_ops->start(qedn->cdev,
-			    NULL /* Placeholder for FW IO-path resources */,
+			    &qedn->tasks,
 			    qedn,
 			    qedn_event_cb);
 	if (rc) {
