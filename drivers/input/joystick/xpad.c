@@ -79,6 +79,7 @@
 #define MAP_DPAD_TO_BUTTONS		(1 << 0)
 #define MAP_TRIGGERS_TO_BUTTONS		(1 << 1)
 #define MAP_STICKS_TO_NULL		(1 << 2)
+#define HIDPP_CAPABLE			BIT(3)
 #define DANCEPAD_MAP_CONFIG	(MAP_DPAD_TO_BUTTONS |			\
 				MAP_TRIGGERS_TO_BUTTONS | MAP_STICKS_TO_NULL)
 
@@ -103,6 +104,10 @@ MODULE_PARM_DESC(sticks_to_null, "Do not map sticks at all for unknown pads");
 static bool auto_poweroff = true;
 module_param(auto_poweroff, bool, S_IWUSR | S_IRUGO);
 MODULE_PARM_DESC(auto_poweroff, "Power off wireless controllers on suspend");
+
+static bool switch_to_hidpp = true;
+module_param(switch_to_hidpp, bool, 0444);
+MODULE_PARM_DESC(switch_to_hidpp, "Switch appropriate devices over to the HID++ protocol");
 
 static const struct xpad_device {
 	u16 idVendor;
@@ -332,6 +337,8 @@ static const struct xpad_device {
 	{ 0x24c6, 0x5d04, "Razer Sabertooth", 0, XTYPE_XBOX360 },
 	{ 0x24c6, 0xfafe, "Rock Candy Gamepad for Xbox 360", 0, XTYPE_XBOX360 },
 	{ 0x3767, 0x0101, "Fanatec Speedster 3 Forceshock Wheel", 0, XTYPE_XBOX },
+	{ 0x046d, 0xc262, "Logitech G920 Wheel (Xbox Mode)", HIDPP_CAPABLE, XTYPE_XBOXONE },
+	{ 0x046d, 0xc26d, "Logitech G923 Wheel (Xbox Mode)", HIDPP_CAPABLE, XTYPE_XBOXONE },
 	{ 0xffff, 0xffff, "Chinese-made Xbox Controller", 0, XTYPE_XBOX },
 	{ 0x0000, 0x0000, "Generic X-Box pad", 0, XTYPE_UNKNOWN }
 };
@@ -419,6 +426,7 @@ static const struct usb_device_id xpad_table[] = {
 	XPAD_XBOX360_VENDOR(0x045e),		/* Microsoft X-Box 360 controllers */
 	XPAD_XBOXONE_VENDOR(0x045e),		/* Microsoft X-Box One controllers */
 	XPAD_XBOX360_VENDOR(0x046d),		/* Logitech X-Box 360 style controllers */
+	XPAD_XBOXONE_VENDOR(0x046d),		/* Logitech X-Box One style controllers */
 	XPAD_XBOX360_VENDOR(0x056e),		/* Elecom JC-U3613M */
 	XPAD_XBOX360_VENDOR(0x06a3),		/* Saitek P3600 */
 	XPAD_XBOX360_VENDOR(0x0738),		/* Mad Catz X-Box 360 controllers */
@@ -554,6 +562,17 @@ static const struct xboxone_init_packet xboxone_init_packets[] = {
 	XBOXONE_INIT_PKT(0x24c6, 0x541a, xboxone_rumbleend_init),
 	XBOXONE_INIT_PKT(0x24c6, 0x542a, xboxone_rumbleend_init),
 	XBOXONE_INIT_PKT(0x24c6, 0x543a, xboxone_rumbleend_init),
+};
+
+/*
+ * A magic packet sent to Logitech devices to tell them to change to the HID++
+ * protocol. This is preferred when in use on a PC.
+ *
+ * After receiving this packet, the device will disconnect and reappear with
+ * a different productId, which will be picked up by the Logitech HID++ driver.
+ */
+static const u8 switch_to_hidpp_cmd[] = {
+	0x0f, 0x00, 0x01, 0x01, 0x42
 };
 
 struct xpad_output_packet {
@@ -992,6 +1011,14 @@ static bool xpad_prepare_next_init_packet(struct usb_xpad *xpad)
 		xpad->irq_out->transfer_buffer_length = init_packet->len;
 
 		/* Update packet with current sequence number */
+		xpad->odata[2] = xpad->odata_serial++;
+		return true;
+	}
+
+	if (switch_to_hidpp && xpad->mapping & HIDPP_CAPABLE) {
+		dev_dbg(&xpad->intf->dev, "%s - switching to HID++", __func__);
+		memcpy(xpad->odata, g923_hidpp_init, ARRAY_SIZE(g923_hidpp_init));
+		xpad->irq_out->transfer_buffer_length = ARRAY_SIZE(g923_hidpp_init);
 		xpad->odata[2] = xpad->odata_serial++;
 		return true;
 	}
