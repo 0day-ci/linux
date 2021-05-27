@@ -4939,6 +4939,12 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.akcipher = __VECS(ecrdsa_tv_template)
 		}
 	}, {
+		.alg = "eddsa-25519",
+		.test = alg_test_akcipher,
+		.suite = {
+			.akcipher = __VECS(eddsa_25519_tv_template)
+		}
+	}, {
 		.alg = "essiv(authenc(hmac(sha256),cbc(aes)),sha256)",
 		.test = alg_test_aead,
 		.fips_allowed = 1,
