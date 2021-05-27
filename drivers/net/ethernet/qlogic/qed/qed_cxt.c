@@ -2106,6 +2106,30 @@ int qed_cxt_set_pf_params(struct qed_hwfn *p_hwfn, u32 rdma_tasks)
 		}
 		break;
 	}
+	case QED_PCI_NVMETCP:
+	{
+		struct qed_nvmetcp_pf_params *p_params;
+
+		p_params = &p_hwfn->pf_params.nvmetcp_pf_params;
+
+		if (p_params->num_cons && p_params->num_tasks) {
+			qed_cxt_set_proto_cid_count(p_hwfn,
+						    PROTOCOLID_TCP_ULP,
+						    p_params->num_cons,
+						    0);
+
+			qed_cxt_set_proto_tid_count(p_hwfn,
+						    PROTOCOLID_TCP_ULP,
+						    QED_CXT_TCP_ULP_TID_SEG,
+						    0,
+						    p_params->num_tasks,
+						    true);
+		} else {
+			DP_INFO(p_hwfn->cdev,
+				"NvmeTCP personality used without setting params!\n");
+		}
+		break;
+	}
 	default:
 		return -EINVAL;
 	}
@@ -2129,6 +2153,7 @@ int qed_cxt_get_tid_mem_info(struct qed_hwfn *p_hwfn,
 		seg = QED_CXT_FCOE_TID_SEG;
 		break;
 	case QED_PCI_ISCSI:
+	case QED_PCI_NVMETCP:
 		proto = PROTOCOLID_TCP_ULP;
 		seg = QED_CXT_TCP_ULP_TID_SEG;
 		break;
@@ -2455,6 +2480,7 @@ int qed_cxt_get_task_ctx(struct qed_hwfn *p_hwfn,
 		seg = QED_CXT_FCOE_TID_SEG;
 		break;
 	case QED_PCI_ISCSI:
+	case QED_PCI_NVMETCP:
 		proto = PROTOCOLID_TCP_ULP;
 		seg = QED_CXT_TCP_ULP_TID_SEG;
 		break;
