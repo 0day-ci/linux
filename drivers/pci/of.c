@@ -565,10 +565,14 @@ static int pci_parse_request_of_pci_ranges(struct device *dev,
 		case IORESOURCE_MEM:
 			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
 
-			if (!(res->flags & IORESOURCE_PREFETCH))
+			if (!(res->flags & IORESOURCE_PREFETCH)) {
 				if (upper_32_bits(resource_size(res)))
 					dev_warn(dev, "Memory resource size exceeds max for 32 bits\n");
-
+				if ((res->flags & IORESOURCE_MEM_64) && !upper_32_bits(res->end)) {
+					dev_warn(dev, "Overriding 64-bit flag for non-prefetchable memory below 4GB\n");
+					res->flags &= ~IORESOURCE_MEM_64;
+				}
+			}
 			break;
 		}
 	}
