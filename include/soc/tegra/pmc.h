@@ -231,10 +231,16 @@ static inline void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
 
 #if defined(CONFIG_SOC_TEGRA_PMC) && defined(CONFIG_PM_SLEEP)
 enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void);
+bool tegra_pmc_core_domain_state_synced(void);
 #else
 static inline enum tegra_suspend_mode tegra_pmc_get_suspend_mode(void)
 {
 	return TEGRA_SUSPEND_NONE;
+}
+
+static inline bool tegra_pmc_core_domain_state_synced(void)
+{
+	return false;
 }
 #endif
 
