@@ -42,6 +42,15 @@ static void *host_s2_zalloc_page(void *pool)
 {
 	return hyp_alloc_pages(pool, 0);
 }
+static void host_s2_get_page(void *addr)
+{
+	hyp_get_page(addr, &host_s2_pool);
+}
+
+static void host_s2_put_page(void *addr)
+{
+	hyp_put_page(addr, &host_s2_pool);
+}
 
 static int prepare_s2_pool(void *pgt_pool_base)
 {
@@ -60,8 +69,8 @@ static int prepare_s2_pool(void *pgt_pool_base)
 		.phys_to_virt = hyp_phys_to_virt,
 		.virt_to_phys = hyp_virt_to_phys,
 		.page_count = hyp_page_count,
-		.get_page = hyp_get_page,
-		.put_page = hyp_put_page,
+		.get_page = host_s2_get_page,
+		.put_page = host_s2_put_page,
 	};
 
 	return 0;

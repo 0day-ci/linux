@@ -42,8 +42,8 @@ static inline void hyp_set_page_refcounted(struct hyp_page *p)
 
 /* Allocation */
 void *hyp_alloc_pages(struct hyp_pool *pool, unsigned int order);
-void hyp_get_page(void *addr);
-void hyp_put_page(void *addr);
+void hyp_get_page(void *addr, struct hyp_pool *pool);
+void hyp_put_page(void *addr, struct hyp_pool *pool);
 
 /* Used pages cannot be freed */
 int hyp_pool_init(struct hyp_pool *pool, u64 pfn, unsigned int nr_pages,
