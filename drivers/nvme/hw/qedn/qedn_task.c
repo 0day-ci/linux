@@ -397,9 +397,11 @@ void qedn_io_work_cq(struct qedn_ctx *qedn, struct nvmetcp_fw_cqe *cqe)
 			break;
 
 		case NVMETCP_TASK_TYPE_INIT_CONN_REQUEST:
-
-			/* Placeholder - ICReq flow */
-
+			/* Clear ICReq-padding SGE from SGL */
+			qedn_common_clear_fw_sgl(&qedn_task->sgl_task_params);
+			/* Task is not required for icresp processing */
+			qedn_return_task_to_pool(conn_ctx, qedn_task);
+			qedn_prep_icresp(conn_ctx, cqe);
 			break;
 		default:
 			pr_info("Could not identify task type\n");

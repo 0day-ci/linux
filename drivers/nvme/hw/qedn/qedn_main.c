@@ -279,6 +279,19 @@ static void qedn_set_ctrl_io_cpus(struct qedn_conn_ctx *conn_ctx, int qid)
 	conn_ctx->cpu = fp_q->cpu;
 }
 
+static void qedn_set_pdu_params(struct qedn_conn_ctx *conn_ctx)
+{
+	/* Enable digest once supported */
+	conn_ctx->required_params.hdr_digest = 0;
+	conn_ctx->required_params.data_digest = 0;
+
+	conn_ctx->required_params.maxr2t = QEDN_MAX_OUTSTANDING_R2T_PDUS;
+	conn_ctx->required_params.pfv = NVME_TCP_PFV_1_0;
+	conn_ctx->required_params.cpda = 0;
+	conn_ctx->required_params.hpda = 0;
+	conn_ctx->required_params.maxh2cdata = QEDN_MAX_PDU_SIZE;
+}
+
 static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid,
 			     size_t queue_size)
 {
@@ -308,6 +321,7 @@ static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid,
 	conn_ctx->sq_depth = queue_size;
 	mutex_init(&conn_ctx->send_mutex);
 	qedn_set_ctrl_io_cpus(conn_ctx, qid);
+	qedn_set_pdu_params(conn_ctx);
 
 	init_waitqueue_head(&conn_ctx->conn_waitq);
 	atomic_set(&conn_ctx->est_conn_indicator, 0);
