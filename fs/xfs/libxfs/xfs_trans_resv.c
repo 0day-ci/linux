@@ -232,8 +232,7 @@ xfs_rtalloc_log_count(
  * Various log reservation values.
  *
  * These are based on the size of the file system block because that is what
- * most transactions manipulate.  Each adds in an additional 128 bytes per
- * item logged to try to account for the overhead of the transaction mechanism.
+ * most transactions manipulate.
  *
  * Note:  Most of the reservations underestimate the number of allocation
  * groups into which they could free extents in the xfs_defer_finish() call.
@@ -262,9 +261,9 @@ xfs_rtalloc_log_count(
  *    the superblock free block counter: sector size
  *    the realtime bitmap: ((MAXEXTLEN / rtextsize) / NBBY) bytes
  *    the realtime summary: 1 block
- * And the bmap_finish transaction can free bmap blocks in a join (t3):
+ * And the deferred freeing can free bmap blocks in a join (t3):
  *    the super block free block counter: sector size
- *    two extent allocfree reservations for the AG.
+ *    one extent allocfree reservation for the AG.
  */
 STATIC uint
 xfs_calc_write_reservation(
@@ -290,23 +289,25 @@ xfs_calc_write_reservation(
 	}
 
 	t3 = xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-	     xfs_allocfree_extent_res(mp) * 2;
+	     xfs_allocfree_extent_res(mp);
 
 	return XFS_DQUOT_LOGRES(mp) + max3(t1, t2, t3);
 }
 
 /*
- * In truncating a file we free up to two extents at once.  We can modify (t1):
+ * In truncating a file we defer freeing so we only free one extent per
+ * transaction for normal files. For rt files we limit to 2 extents per
+ * transaction.
+ * We can modify (t1):
  *    the inode being truncated: inode size
  *    the inode's bmap btree: (max depth + 1) * block size
- * And the bmap_finish transaction can free the blocks and bmap blocks (t2):
- *    the super block to reflect the freed blocks: sector size
- *    four extent allocfree reservations for the AG.
- * Or, if it's a realtime file (t3):
+ * Or, if it's a realtime file (t2):
  *    the super block to reflect the freed blocks: sector size
  *    the realtime bitmap: 2 exts * ((MAXEXTLEN / rtextsize) / NBBY) bytes
  *    the realtime summary: 2 exts * 1 block
- *    two extent allocfree reservations for the AG.
+ * And the deferred freeing can free the blocks and bmap blocks (t3):
+ *    the super block to reflect the freed blocks: sector size
+ *    one extent allocfree reservation for the AG.
  */
 STATIC uint
 xfs_calc_itruncate_reservation(
@@ -318,16 +319,15 @@ xfs_calc_itruncate_reservation(
 	t1 = xfs_calc_inode_res(mp, 1) +
 	     xfs_calc_buf_res(XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + 1, blksz);
 
-	t2 = xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-	     xfs_allocfree_extent_res(mp) * 4;
-
 	if (xfs_sb_version_hasrealtime(&mp->m_sb)) {
-		t3 = xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-		     xfs_calc_buf_res(xfs_rtalloc_log_count(mp, 2), blksz) +
-		     xfs_allocfree_extent_res(mp) * 2;
+		t2 = xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
+		     xfs_calc_buf_res(xfs_rtalloc_log_count(mp, 2), blksz);
 	} else {
-		t3 = 0;
+		t2 = 0;
 	}
+
+	t3 = xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
+	     xfs_allocfree_extent_res(mp);
 
 	return XFS_DQUOT_LOGRES(mp) + max3(t1, t2, t3);
 }
@@ -337,10 +337,9 @@ xfs_calc_itruncate_reservation(
  *    the four inodes involved: 4 * inode size
  *    the two directory btrees: 2 * (max depth + v2) * dir block size
  *    the two directory bmap btrees: 2 * max depth * block size
- * And the bmap_finish transaction can free dir and bmap blocks (two sets
- *	of bmap blocks) giving:
+ * And the deferred freeing can free dir and bmap blocks giving:
  *    the superblock for the free block count: sector size
- *    three extent allocfree reservations for the AG.
+ *    one extent allocfree reservations for the AG.
  */
 STATIC uint
 xfs_calc_rename_reservation(
@@ -351,7 +350,7 @@ xfs_calc_rename_reservation(
 		     xfs_calc_buf_res(2 * XFS_DIROP_LOG_COUNT(mp),
 				      XFS_FSB_TO_B(mp, 1))),
 		    (xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-		     xfs_allocfree_extent_res(mp) * 3));
+		     xfs_allocfree_extent_res(mp)));
 }
 
 /*
@@ -375,7 +374,7 @@ xfs_calc_iunlink_remove_reservation(
  *    the linked inode: inode size
  *    the directory btree could split: (max depth + v2) * dir block size
  *    the directory bmap btree could join or split: (max depth + v2) * blocksize
- * And the bmap_finish transaction can free some bmap blocks giving:
+ * And the deferred freeing can free bmap blocks giving:
  *    the superblock for the free block count: sector size
  *    one extent allocfree reservation for the AG.
  */
@@ -411,9 +410,9 @@ xfs_calc_iunlink_add_reservation(xfs_mount_t *mp)
  *    the removed inode: inode size
  *    the directory btree could join: (max depth + v2) * dir block size
  *    the directory bmap btree could join or split: (max depth + v2) * blocksize
- * And the bmap_finish transaction can free the dir and bmap blocks giving:
+ * And the deferred freeing can free the dir and bmap blocks giving:
  *    the superblock for the free block count: sector size
- *    two extent allocfree reservations for the AG.
+ *    one extent allocfree reservation for the AG.
  */
 STATIC uint
 xfs_calc_remove_reservation(
@@ -425,7 +424,7 @@ xfs_calc_remove_reservation(
 		     xfs_calc_buf_res(XFS_DIROP_LOG_COUNT(mp),
 				      XFS_FSB_TO_B(mp, 1))),
 		    (xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-		     xfs_allocfree_extent_res(mp) * 2));
+		     xfs_allocfree_extent_res(mp)));
 }
 
 /*
@@ -670,9 +669,9 @@ xfs_calc_addafork_reservation(
  * Removing the attribute fork of a file
  *    the inode being truncated: inode size
  *    the inode's bmap btree: max depth * block size
- * And the bmap_finish transaction can free the blocks and bmap blocks:
+ * And the deferred freeing can free the blocks and bmap blocks:
  *    the super block to reflect the freed blocks: sector size
- *    four extent allocfree reservations for the AG.
+ *    one extent allocfree reservation for the AG.
  */
 STATIC uint
 xfs_calc_attrinval_reservation(
@@ -682,7 +681,7 @@ xfs_calc_attrinval_reservation(
 		    xfs_calc_buf_res(XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK),
 				     XFS_FSB_TO_B(mp, 1))),
 		   (xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-		    xfs_allocfree_extent_res(mp) * 4));
+		    xfs_allocfree_extent_res(mp)));
 }
 
 /*
@@ -730,9 +729,9 @@ xfs_calc_attrsetrt_reservation(
  *    the inode: inode size
  *    the attribute btree could join: max depth * block size
  *    the inode bmap btree could join or split: max depth * block size
- * And the bmap_finish transaction can free the attr blocks freed giving:
+ * And the deferred freeing can free the attr blocks freed giving:
  *    the superblock for the free block count: sector size
- *    two extent allocfree reservations for the AG.
+ *    one extent allocfree reservations for the AG.
  */
 STATIC uint
 xfs_calc_attrrm_reservation(
@@ -746,7 +745,7 @@ xfs_calc_attrrm_reservation(
 					XFS_BM_MAXLEVELS(mp, XFS_ATTR_FORK)) +
 		     xfs_calc_buf_res(XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK), 0)),
 		    (xfs_calc_buf_res(1, mp->m_sb.sb_sectsize) +
-		     xfs_allocfree_extent_res(mp) * 2));
+		     xfs_allocfree_extent_res(mp)));
 }
 
 /*
