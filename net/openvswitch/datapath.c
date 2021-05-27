@@ -43,6 +43,7 @@
 #include "flow_table.h"
 #include "flow_netlink.h"
 #include "meter.h"
+#include "openvswitch_trace.h"
 #include "vport-internal_dev.h"
 #include "vport-netdev.h"
 
@@ -274,6 +275,12 @@ int ovs_dp_upcall(struct datapath *dp, struct sk_buff *skb,
 {
 	struct dp_stats_percpu *stats;
 	int err;
+
+	if (trace_openvswitch_probe_userspace_enabled()) {
+		struct sw_flow_key ukey = *key;
+
+		trace_openvswitch_probe_userspace(dp, skb, &ukey, upcall_info);
+	}
 
 	if (upcall_info->portid == 0) {
 		err = -ENOTCONN;
