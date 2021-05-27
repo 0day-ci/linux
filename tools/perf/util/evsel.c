@@ -1217,7 +1217,7 @@ void evsel__config(struct evsel *evsel, struct record_opts *opts,
 		attr->namespaces  = track;
 
 	if (opts->record_cgroup) {
-		attr->cgroup = track && !perf_missing_features.cgroup;
+		attr->cgroup = track;
 		evsel__set_sample_bit(evsel, CGROUP);
 	}
 
@@ -1932,10 +1932,6 @@ try_fallback:
 	    (evsel->core.attr.sample_type & PERF_SAMPLE_DATA_PAGE_SIZE)) {
 		perf_missing_features.data_page_size = true;
 		pr_debug2_peo("Kernel has no PERF_SAMPLE_DATA_PAGE_SIZE support, bailing out\n");
-		goto out_close;
-	} else if (!perf_missing_features.cgroup && evsel->core.attr.cgroup) {
-		perf_missing_features.cgroup = true;
-		pr_debug2_peo("Kernel has no cgroup sampling support, bailing out\n");
 		goto out_close;
         } else if (!perf_missing_features.branch_hw_idx &&
 	    (evsel->core.attr.branch_sample_type & PERF_SAMPLE_BRANCH_HW_INDEX)) {

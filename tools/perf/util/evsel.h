@@ -168,7 +168,6 @@ struct perf_missing_features {
 	bool bpf;
 	bool aux_output;
 	bool branch_hw_idx;
-	bool cgroup;
 	bool data_page_size;
 	bool code_page_size;
 	bool weight_struct;
