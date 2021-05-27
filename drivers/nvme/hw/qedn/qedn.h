@@ -176,6 +176,10 @@ struct qedn_ctx {
 	struct qed_nvmetcp_tid	tasks;
 };
 
+enum qedn_task_flags {
+	QEDN_TASK_USED_BY_FW,
+};
+
 struct qedn_task_ctx {
 	struct qedn_conn_ctx *qedn_conn;
 	struct qedn_ctx *qedn;
@@ -378,6 +382,7 @@ struct qedn_task_ctx *
 qedn_get_free_task_from_pool(struct qedn_conn_ctx *conn_ctx, u16 cccid);
 void qedn_destroy_free_tasks(struct qedn_fp_queue *fp_q,
 			     struct qedn_io_resources *io_resrc);
+void qedn_swap_bytes(u32 *p, int size);
 void qedn_prep_icresp(struct qedn_conn_ctx *conn_ctx, struct nvmetcp_fw_cqe *cqe);
 void qedn_ring_doorbell(struct qedn_conn_ctx *conn_ctx);
 

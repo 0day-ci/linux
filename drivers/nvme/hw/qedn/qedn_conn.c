@@ -511,6 +511,7 @@ static int qedn_send_icreq(struct qedn_conn_ctx *conn_ctx)
 	qed_ops->init_icreq_exchange(&task_params, &icreq, sgl_task_params,  NULL);
 
 	qedn_set_con_state(conn_ctx, CONN_STATE_WAIT_FOR_IC_COMP);
+	set_bit(QEDN_TASK_USED_BY_FW, &qedn_task->flags);
 	atomic_inc(&conn_ctx->num_active_fw_tasks);
 
 	/* spin_lock - doorbell is accessed  both Rx flow and response flow */
