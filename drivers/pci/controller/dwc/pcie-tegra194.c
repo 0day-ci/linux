@@ -615,10 +615,10 @@ static irqreturn_t tegra_pcie_ep_hard_irq(int irq, void *arg)
 	struct tegra_pcie_dw *pcie = arg;
 	struct dw_pcie_ep *ep = &pcie->pci.ep;
 	int spurious = 1;
-	u32 val, tmp;
+	u32 val_l0, val, tmp;
 
-	val = appl_readl(pcie, APPL_INTR_STATUS_L0);
-	if (val & APPL_INTR_STATUS_L0_LINK_STATE_INT) {
+	val_l0 = appl_readl(pcie, APPL_INTR_STATUS_L0);
+	if (val_l0 & APPL_INTR_STATUS_L0_LINK_STATE_INT) {
 		val = appl_readl(pcie, APPL_INTR_STATUS_L1_0_0);
 		appl_writel(pcie, val, APPL_INTR_STATUS_L1_0_0);
 
@@ -636,7 +636,7 @@ static irqreturn_t tegra_pcie_ep_hard_irq(int irq, void *arg)
 		spurious = 0;
 	}
 
-	if (val & APPL_INTR_STATUS_L0_PCI_CMD_EN_INT) {
+	if (val_l0 & APPL_INTR_STATUS_L0_PCI_CMD_EN_INT) {
 		val = appl_readl(pcie, APPL_INTR_STATUS_L1_15);
 		appl_writel(pcie, val, APPL_INTR_STATUS_L1_15);
 
@@ -648,8 +648,8 @@ static irqreturn_t tegra_pcie_ep_hard_irq(int irq, void *arg)
 
 	if (spurious) {
 		dev_warn(pcie->dev, "Random interrupt (STATUS = 0x%08X)\n",
-			 val);
-		appl_writel(pcie, val, APPL_INTR_STATUS_L0);
+			 val_l0);
+		appl_writel(pcie, val_l0, APPL_INTR_STATUS_L0);
 	}
 
 	return IRQ_HANDLED;
