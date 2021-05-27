@@ -165,6 +165,9 @@ static void panfrost_job_hw_submit(struct panfrost_job *job, int js)
 		return;
 	}
 
+	if (job->requirements & PANFROST_JD_REQ_PERMON)
+		panfrost_acquire_permon(job->pfdev);
+
 	cfg = panfrost_mmu_as_get(pfdev, &job->file_priv->mmu);
 
 	job_write(pfdev, JS_HEAD_NEXT_LO(js), jc_head & 0xFFFFFFFF);
@@ -295,6 +298,9 @@ static void panfrost_job_cleanup(struct kref *ref)
 
 		kvfree(job->bos);
 	}
+
+	if (job->requirements & PANFROST_JD_REQ_PERMON)
+		panfrost_release_permon(job->pfdev);
 
 	kfree(job);
 }
