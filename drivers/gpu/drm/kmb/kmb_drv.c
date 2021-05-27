@@ -144,7 +144,7 @@ static int kmb_hw_init(struct drm_device *drm, unsigned long flags)
 	/* Get the optional framebuffer memory resource */
 	ret = of_reserved_mem_device_init(drm->dev);
 	if (ret && ret != -ENODEV)
-		return ret;
+		goto setup_fail;
 
 	spin_lock_init(&kmb->irq_lock);
 
@@ -153,7 +153,7 @@ static int kmb_hw_init(struct drm_device *drm, unsigned long flags)
 	return 0;
 
  setup_fail:
-	of_reserved_mem_device_release(drm->dev);
+	kmb_display_clk_disable(kmb);
 
 	return ret;
 }
