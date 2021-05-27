@@ -32,7 +32,9 @@ static struct pci_driver adf_driver = {
 	.name = ADF_C62X_DEVICE_NAME,
 	.probe = adf_probe,
 	.remove = adf_remove,
+#ifdef CONFIG_PCI_IOV
 	.sriov_configure = adf_sriov_configure,
+#endif
 };
 
 static void adf_cleanup_pci_dev(struct adf_accel_dev *accel_dev)

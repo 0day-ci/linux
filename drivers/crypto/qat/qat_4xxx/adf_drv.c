@@ -309,7 +309,9 @@ static struct pci_driver adf_driver = {
 	.name = ADF_4XXX_DEVICE_NAME,
 	.probe = adf_probe,
 	.remove = adf_remove,
+#ifdef CONFIG_PCI_IOV
 	.sriov_configure = adf_sriov_configure,
+#endif
 };
 
 module_pci_driver(adf_driver);
