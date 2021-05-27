@@ -1,0 +1,26 @@
+drm drm-fixes dd6ad0516ee38112321e99ce368fddd49ee3b9db
+	Merge tag 'amd-drm-fixes-5.13-2021-05-19' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes 35f819d218035ddfbc71e7cf62a4849231701e58
+	drm/ttm: Skip swapout if ttm object is not populated
+drm-intel drm-intel-fixes e11851429fdc23524aa244f76508c3c7aeaefdf6
+	drm/i915: Reenable LTTPR non-transparent LT mode for DPCD_REV<1.4
+drm drm-next 5522e9f7b0fbe2a0cb89c199b574523becc8c3ab
+	Merge v5.13-rc3 into drm-next
+drm-misc drm-misc-next-fixes b9d79e4ca4ff23543d6b33c736ba07c1f0a9dcb1
+	fbmem: Mark proc_fb_seq_ops as __maybe_unused
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-misc drm-misc-next ffa52910faff64f2070af42c22d782c4572d889e
+	Merge drm/drm-next into drm-misc-next
+drm-intel drm-intel-next 40e40e63f7be028ff8dc2a2dcef4a812539e86cc
+	drm/i915/display: relax 2big checking around initial fb
+drm-intel drm-intel-gt-next 615160334f3f09d508511aae1297106fb4f49b1e
+	drm/i915/params: Align visibility of device level and global modparams
+sound-upstream for-linus 50dbfae972cbe0e3c631e73c7c58cbc48bfc6a49
+	ALSA: hda/realtek: fix mute/micmute LEDs and speaker for HP Zbook Fury 17 G8
+sound-upstream for-next d955782da2901f977ef1ededba8a2764e35c1187
+	ALSA: hda/ca0132: Make a const array static, makes object smaller
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
