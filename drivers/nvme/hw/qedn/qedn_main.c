@@ -249,6 +249,11 @@ err_out:
 static int qedn_release_ctrl(struct nvme_tcp_ofld_ctrl *ctrl)
 {
 	struct qedn_ctrl *qctrl = (struct qedn_ctrl *)ctrl->private_data;
+	struct nvme_ctrl *nctrl = &ctrl->nctrl;
+
+	if (nctrl->state == NVME_CTRL_CONNECTING ||
+	    nctrl->state == NVME_CTRL_RESETTING)
+		return 0;
 
 	if (test_and_clear_bit(LLH_FILTER, &qctrl->agg_state) &&
 	    qctrl->llh_filter) {
@@ -324,6 +329,7 @@ static int qedn_create_queue(struct nvme_tcp_ofld_queue *queue, int qid,
 	qedn_set_pdu_params(conn_ctx);
 
 	init_waitqueue_head(&conn_ctx->conn_waitq);
+	init_waitqueue_head(&conn_ctx->cleanup_waitq);
 	atomic_set(&conn_ctx->est_conn_indicator, 0);
 	atomic_set(&conn_ctx->destroy_conn_indicator, 0);
 
