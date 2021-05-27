@@ -53,6 +53,7 @@ struct netns_sysctl_ipv6 {
 	int seg6_flowlabel;
 	bool skip_notify_on_dev_down;
 	u8 fib_notify_on_flag_change;
+	unsigned int ioam6_id;
 };
 
 struct netns_ipv6 {
@@ -110,6 +111,7 @@ struct netns_ipv6 {
 		spinlock_t	lock;
 		u32		seq;
 	} ip6addrlbl_table;
+	struct ioam6_pernet_data *ioam6_data;
 };
 
 #if IS_ENABLED(CONFIG_NF_DEFRAG_IPV6)
