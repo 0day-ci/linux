@@ -172,7 +172,8 @@ truncate_cleanup_page(struct address_space *mapping, struct page *page)
 {
 	if (page_mapped(page)) {
 		unsigned int nr = thp_nr_pages(page);
-		unmap_mapping_pages(mapping, page->index, nr, false);
+		unmap_mapping_pages(mapping, page->index, nr,
+				    ZAP_FLAG_CHECK_MAPPING);
 	}
 
 	if (page_has_private(page))
@@ -652,14 +653,15 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 					 * Zap the rest of the file in one hit.
 					 */
 					unmap_mapping_pages(mapping, index,
-						(1 + end - index), false);
+							    (1 + end - index),
+							    ZAP_FLAG_CHECK_MAPPING);
 					did_range_unmap = 1;
 				} else {
 					/*
 					 * Just zap this page
 					 */
 					unmap_mapping_pages(mapping, index,
-								1, false);
+							    1, ZAP_FLAG_CHECK_MAPPING);
 				}
 			}
 			BUG_ON(page_mapped(page));
@@ -685,7 +687,8 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 	 * get remapped later.
 	 */
 	if (dax_mapping(mapping)) {
-		unmap_mapping_pages(mapping, start, end - start + 1, false);
+		unmap_mapping_pages(mapping, start, end - start + 1,
+				    ZAP_FLAG_CHECK_MAPPING);
 	}
 out:
 	cleancache_invalidate_inode(mapping);

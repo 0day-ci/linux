@@ -1830,7 +1830,8 @@ static void collapse_file(struct mm_struct *mm,
 		}
 
 		if (page_mapped(page))
-			unmap_mapping_pages(mapping, index, 1, false);
+			unmap_mapping_pages(mapping, index, 1,
+					    ZAP_FLAG_CHECK_MAPPING);
 
 		xas_lock_irq(&xas);
 		xas_set(&xas, index);

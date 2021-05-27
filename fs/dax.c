@@ -528,7 +528,7 @@ retry:
 			xas_unlock_irq(xas);
 			unmap_mapping_pages(mapping,
 					xas->xa_index & ~PG_PMD_COLOUR,
-					PG_PMD_NR, false);
+					PG_PMD_NR, ZAP_FLAG_CHECK_MAPPING);
 			xas_reset(xas);
 			xas_lock_irq(xas);
 		}
@@ -623,7 +623,8 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
 	 * guaranteed to either see new references or prevent new
 	 * references from being established.
 	 */
-	unmap_mapping_pages(mapping, start_idx, end_idx - start_idx + 1, 0);
+	unmap_mapping_pages(mapping, start_idx, end_idx - start_idx + 1,
+			    ZAP_FLAG_CHECK_MAPPING);
 
 	xas_lock_irq(&xas);
 	xas_for_each(&xas, entry, end_idx) {
@@ -754,9 +755,10 @@ static void *dax_insert_entry(struct xa_state *xas,
 		/* we are replacing a zero page with block mapping */
 		if (dax_is_pmd_entry(entry))
 			unmap_mapping_pages(mapping, index & ~PG_PMD_COLOUR,
-					PG_PMD_NR, false);
+					PG_PMD_NR, ZAP_FLAG_CHECK_MAPPING);
 		else /* pte entry */
-			unmap_mapping_pages(mapping, index, 1, false);
+			unmap_mapping_pages(mapping, index, 1,
+					    ZAP_FLAG_CHECK_MAPPING);
 	}
 
 	xas_reset(xas);

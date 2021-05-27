@@ -3316,7 +3316,10 @@ static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
  * @mapping: The address space containing pages to be unmapped.
  * @start: Index of first page to be unmapped.
  * @nr: Number of pages to be unmapped.  0 to unmap to end of file.
- * @even_cows: Whether to unmap even private COWed pages.
+ * @zap_flags: Zap flags for the process.  E.g., when ZAP_FLAG_CHECK_MAPPING is
+ *   passed into it, we will only zap the pages that are in the same mapping
+ *   specified in the @mapping parameter; otherwise we will not check mapping,
+ *   IOW cow pages will be zapped too.
  *
  * Unmap the pages in this address space from any userspace process which
  * has them mmaped.  Generally, you want to remove COWed pages as well when
@@ -3324,16 +3327,13 @@ static inline void unmap_mapping_range_tree(struct rb_root_cached *root,
  * cache.
  */
 void unmap_mapping_pages(struct address_space *mapping, pgoff_t start,
-		pgoff_t nr, bool even_cows)
+		pgoff_t nr, unsigned long zap_flags)
 {
 	pgoff_t	first_index = start, last_index = start + nr - 1;
 	struct zap_details details = {
 		.zap_mapping = mapping,
-		.zap_flags = ZAP_FLAG_SKIP_SWAP,
+		.zap_flags = zap_flags | ZAP_FLAG_SKIP_SWAP,
 	};
-
-	if (!even_cows)
-		details.zap_flags |= ZAP_FLAG_CHECK_MAPPING;
 
 	if (last_index < first_index)
 		last_index = ULONG_MAX;
@@ -3376,7 +3376,8 @@ void unmap_mapping_range(struct address_space *mapping,
 			hlen = ULONG_MAX - hba + 1;
 	}
 
-	unmap_mapping_pages(mapping, hba, hlen, even_cows);
+	unmap_mapping_pages(mapping, hba, hlen, even_cows ?
+			    0 : ZAP_FLAG_CHECK_MAPPING);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 
