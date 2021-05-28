@@ -558,6 +558,22 @@ mshv_partition_ioctl_unmap_memory(struct mshv_partition *partition,
 }
 
 static long
+mshv_partition_ioctl_install_intercept(struct mshv_partition *partition,
+				       void __user *user_args)
+{
+	struct mshv_install_intercept args;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	return hv_call_install_intercept(
+			partition->id,
+			args.access_type_mask,
+			args.intercept_type,
+			args.intercept_parameter);
+}
+
+static long
 mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
 	struct mshv_partition *partition = filp->private_data;
@@ -577,6 +593,10 @@ mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_CREATE_VP:
 		ret = mshv_partition_ioctl_create_vp(partition,
+							(void __user *)arg);
+		break;
+	case MSHV_INSTALL_INTERCEPT:
+		ret = mshv_partition_ioctl_install_intercept(partition,
 							(void __user *)arg);
 		break;
 	default:

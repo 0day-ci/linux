@@ -152,6 +152,7 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_WITHDRAW_MEMORY			0x0049
 #define HVCALL_MAP_GPA_PAGES			0x004b
 #define HVCALL_UNMAP_GPA_PAGES			0x004c
+#define HVCALL_INSTALL_INTERCEPT		0x004d
 #define HVCALL_CREATE_VP			0x004e
 #define HVCALL_GET_VP_REGISTERS			0x0050
 #define HVCALL_SET_VP_REGISTERS			0x0051
@@ -811,6 +812,13 @@ struct hv_unmap_gpa_pages {
 	u64 target_gpa_base;
 	u32 unmap_flags;
         u32 padding;
+} __packed;
+
+struct hv_install_intercept {
+	u64 partition_id;
+	u32 access_type; /* mask */
+	u32 intercept_type;
+	union hv_intercept_parameters intercept_parameter;
 } __packed;
 
 #endif

@@ -396,3 +396,41 @@ int hv_call_set_vp_registers(
 	return hv_status_to_errno(status);
 }
 
+int hv_call_install_intercept(
+		u64 partition_id,
+		u32 access_type,
+		enum hv_intercept_type intercept_type,
+		union hv_intercept_parameters intercept_parameter)
+{
+	struct hv_install_intercept *input;
+	unsigned long flags;
+	u64 status;
+	int ret;
+
+	do {
+		local_irq_save(flags);
+		input = (struct hv_install_intercept *)(*this_cpu_ptr(
+					hyperv_pcpu_input_arg));
+		input->partition_id = partition_id;
+		input->access_type = access_type;
+		input->intercept_type = intercept_type;
+		input->intercept_parameter = intercept_parameter;
+		status = hv_do_hypercall(
+				HVCALL_INSTALL_INTERCEPT, input, NULL);
+
+		local_irq_restore(flags);
+		if (hv_result(status) != HV_STATUS_INSUFFICIENT_MEMORY) {
+			if (!hv_result_success(status))
+				pr_err("%s: %s\n", __func__,
+				       hv_status_to_string(status));
+			ret = hv_status_to_errno(status);
+			break;
+		}
+
+		ret = hv_call_deposit_pages(NUMA_NO_NODE, partition_id, 1);
+
+	} while (!ret);
+
+	return ret;
+}
+
