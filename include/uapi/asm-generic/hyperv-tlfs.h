@@ -131,4 +131,9 @@ enum hv_get_set_vp_state_type {
 	HV_GET_SET_VP_STATE_SYNTHETIC_TIMERS	= 4,
 };
 
+enum hv_vp_state_page_type {
+	HV_VP_STATE_PAGE_REGISTERS = 0,
+	HV_VP_STATE_PAGE_COUNT
+};
+
 #endif

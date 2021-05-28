@@ -149,3 +149,14 @@ HV_PARTITION_CREATION_FLAG_LAPIC_ENABLED
 Get/set various vp state. Currently these can be used to get and set
 emulated LAPIC state, and xsave data.
 
+3.10 mmap(vp)
+-------------
+:Type: vp mmap
+:Parameters: offset should be HV_VP_MMAP_REGISTERS_OFFSET
+:Returns: 0 on success
+
+Maps a page into userspace that can be used to get and set common registers
+while the vp is suspended.
+The page is laid out in struct hv_vp_register_page in asm/hyperv-tlfs.h.
+
+

@@ -1072,4 +1072,78 @@ struct hv_vp_state_data_xsave {
 	union hv_x64_xsave_xfem_register states;
 } __packed;
 
+/* Bits for dirty mask of hv_vp_register_page */
+#define HV_X64_REGISTER_CLASS_GENERAL	0
+#define HV_X64_REGISTER_CLASS_IP	1
+#define HV_X64_REGISTER_CLASS_XMM	2
+#define HV_X64_REGISTER_CLASS_SEGMENT	3
+#define HV_X64_REGISTER_CLASS_FLAGS	4
+
+#define HV_VP_REGISTER_PAGE_VERSION_1	1u
+
+struct hv_vp_register_page {
+	__u16 version;
+	__u8 isvalid;
+	__u8 rsvdz;
+	__u32 dirty;
+	union {
+		struct {
+			__u64 rax;
+			__u64 rcx;
+			__u64 rdx;
+			__u64 rbx;
+			__u64 rsp;
+			__u64 rbp;
+			__u64 rsi;
+			__u64 rdi;
+			__u64 r8;
+			__u64 r9;
+			__u64 r10;
+			__u64 r11;
+			__u64 r12;
+			__u64 r13;
+			__u64 r14;
+			__u64 r15;
+		} __packed;
+
+		__u64 gp_registers[16];
+	};
+	__u64 rip;
+	__u64 rflags;
+	union {
+		struct {
+			struct hv_u128 xmm0;
+			struct hv_u128 xmm1;
+			struct hv_u128 xmm2;
+			struct hv_u128 xmm3;
+			struct hv_u128 xmm4;
+			struct hv_u128 xmm5;
+		} __packed;
+
+		struct hv_u128 xmm_registers[6];
+	};
+	union {
+		struct {
+			struct hv_x64_segment_register es;
+			struct hv_x64_segment_register cs;
+			struct hv_x64_segment_register ss;
+			struct hv_x64_segment_register ds;
+			struct hv_x64_segment_register fs;
+			struct hv_x64_segment_register gs;
+		} __packed;
+
+		struct hv_x64_segment_register segment_registers[6];
+	};
+	/* read only */
+	__u64 cr0;
+	__u64 cr3;
+	__u64 cr4;
+	__u64 cr8;
+	__u64 efer;
+	__u64 dr7;
+	union hv_x64_pending_interruption_register pending_interruption;
+	union hv_x64_interrupt_state_register interrupt_state;
+	__u64 instruction_emulation_hints;
+} __packed;
+
 #endif

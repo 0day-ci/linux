@@ -20,6 +20,7 @@ struct mshv_vp {
 	u32 index;
 	struct mshv_partition *partition;
 	struct mutex mutex;
+	struct page *register_page;
 	struct {
 		struct semaphore sem;
 		struct task_struct *task;

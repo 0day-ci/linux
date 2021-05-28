@@ -14,6 +14,8 @@
 
 #define MSHV_CAP_CORE_API_STABLE    0x0
 
+#define MSHV_VP_MMAP_REGISTERS_OFFSET (HV_VP_STATE_PAGE_REGISTERS * 0x1000)
+
 struct mshv_create_partition {
 	__u64 flags;
 	struct hv_partition_creation_properties partition_creation_properties;
@@ -83,5 +85,15 @@ struct mshv_vp_state {
 #define MSHV_RUN_VP		_IOR(MSHV_IOCTL, 0x07, struct hv_message)
 #define MSHV_GET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0A, struct mshv_vp_state)
 #define MSHV_SET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0B, struct mshv_vp_state)
+
+/* register page mapping example:
+ * struct hv_vp_register_page *regs = mmap(NULL,
+ *					   4096,
+ *					   PROT_READ | PROT_WRITE,
+ *					   MAP_SHARED,
+ *					   vp_fd,
+ *					   HV_VP_MMAP_REGISTERS_OFFSET);
+ * munmap(regs, 4096);
+ */
 
 #endif

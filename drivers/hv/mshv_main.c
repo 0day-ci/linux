@@ -37,11 +37,18 @@ static long mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned
 static int mshv_dev_open(struct inode *inode, struct file *filp);
 static int mshv_dev_release(struct inode *inode, struct file *filp);
 static long mshv_dev_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg);
+static int mshv_vp_mmap(struct file *file, struct vm_area_struct *vma);
+static vm_fault_t mshv_vp_fault(struct vm_fault *vmf);
+
+static const struct vm_operations_struct mshv_vp_vm_ops = {
+	.fault = mshv_vp_fault,
+};
 
 static const struct file_operations mshv_vp_fops = {
 	.release = mshv_vp_release,
 	.unlocked_ioctl = mshv_vp_ioctl,
 	.llseek = noop_llseek,
+	.mmap = mshv_vp_mmap,
 };
 
 static const struct file_operations mshv_partition_fops = {
@@ -426,6 +433,42 @@ mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 	mutex_unlock(&vp->mutex);
 
 	return r;
+}
+
+static vm_fault_t mshv_vp_fault(struct vm_fault *vmf)
+{
+	struct mshv_vp *vp = vmf->vma->vm_file->private_data;
+	vmf->page = vp->register_page;
+	get_page(vp->register_page);
+
+	return 0;
+}
+
+static int mshv_vp_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	int ret;
+	struct mshv_vp *vp = file->private_data;
+
+	if (vma->vm_pgoff != MSHV_VP_MMAP_REGISTERS_OFFSET)
+		return -EINVAL;
+
+	if (mutex_lock_killable(&vp->mutex))
+		return -EINTR;
+
+	if (!vp->register_page) {
+		ret = hv_call_map_vp_state_page(vp->index,
+						vp->partition->id,
+						&vp->register_page);
+		if (ret) {
+			mutex_unlock(&vp->mutex);
+			return ret;
+		}
+	}
+
+	mutex_unlock(&vp->mutex);
+
+	vma->vm_ops = &mshv_vp_vm_ops;
+	return 0;
 }
 
 static int
