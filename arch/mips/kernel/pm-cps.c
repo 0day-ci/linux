@@ -63,7 +63,7 @@ static DEFINE_PER_CPU_ALIGNED(cpumask_t, online_coupled);
 static DEFINE_PER_CPU_ALIGNED(atomic_t, pm_barrier);
 
 /* Saved CPU state across the CPS_PM_POWER_GATED state */
-DEFINE_PER_CPU_ALIGNED(struct mips_static_suspend_state, cps_cpu_state);
+static DEFINE_PER_CPU_ALIGNED(struct mips_static_suspend_state, cps_cpu_state);
 
 /* A somewhat arbitrary number of labels & relocs for uasm */
 static struct uasm_label labels[32];
