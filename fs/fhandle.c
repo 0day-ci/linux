@@ -122,7 +122,7 @@ static struct vfsmount *get_vfsmount_from_fd(int fd)
 		mnt = mntget(fs->pwd.mnt);
 		spin_unlock(&fs->lock);
 	} else {
-		struct fd f = fdget(fd);
+		struct fd f = fdget_raw(fd);
 		if (!f.file)
 			return ERR_PTR(-EBADF);
 		mnt = mntget(f.file->f_path.mnt);
