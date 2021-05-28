@@ -338,12 +338,23 @@ static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
 	hns_roce_uar_free(to_hr_dev(ibcontext->device), &context->uar);
 }
 
-static int hns_roce_mmap(struct ib_ucontext *context,
-			 struct vm_area_struct *vma)
+/* command value is offset[15:8] */
+static inline int hns_roce_mmap_get_command(unsigned long offset)
+{
+	return (offset >> 8) & 0xff;
+}
+
+/* index value is offset[63:16] | offset[7:0] */
+static inline unsigned long hns_roce_mmap_get_index(unsigned long offset)
+{
+	return ((offset >> 16) << 8) | (offset & 0xff);
+}
+
+static int mmap_uar(struct ib_ucontext *context, struct vm_area_struct *vma)
 {
 	struct hns_roce_dev *hr_dev = to_hr_dev(context->device);
 
-	switch (vma->vm_pgoff) {
+	switch (hns_roce_mmap_get_index(vma->vm_pgoff)) {
 	case 0:
 		return rdma_user_mmap_io(context, vma,
 					 to_hr_ucontext(context)->uar.pfn,
@@ -365,6 +376,16 @@ static int hns_roce_mmap(struct ib_ucontext *context,
 					 vma->vm_page_prot,
 					 NULL);
 
+	default:
+		return -EINVAL;
+	}
+}
+
+static int hns_roce_mmap(struct ib_ucontext *uctx, struct vm_area_struct *vma)
+{
+	switch (hns_roce_mmap_get_command(vma->vm_pgoff)) {
+	case HNS_ROCE_MMAP_REGULAR_PAGE:
+		return mmap_uar(uctx, vma);
 	default:
 		return -EINVAL;
 	}

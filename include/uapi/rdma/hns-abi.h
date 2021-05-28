@@ -94,4 +94,8 @@ struct hns_roce_ib_alloc_pd_resp {
 	__u32 pdn;
 };
 
+enum {
+	HNS_ROCE_MMAP_REGULAR_PAGE,
+};
+
 #endif /* HNS_ABI_USER_H */
