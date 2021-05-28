@@ -11,6 +11,8 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/slab.h>
+#include <linux/mshv.h>
 
 MODULE_AUTHOR("Microsoft");
 MODULE_LICENSE("GPL");
@@ -35,8 +37,29 @@ static struct miscdevice mshv_dev = {
 };
 
 static long
+mshv_ioctl_check_extension(void __user *user_arg)
+{
+	u32 arg;
+
+	if (copy_from_user(&arg, user_arg, sizeof(arg)))
+		return -EFAULT;
+
+	switch (arg) {
+	case MSHV_CAP_CORE_API_STABLE:
+		return 0;
+	}
+
+	return -ENOTSUPP;
+}
+
+static long
 mshv_dev_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
+	switch (ioctl) {
+	case MSHV_CHECK_EXTENSION:
+		return mshv_ioctl_check_extension((void __user *)arg);
+	}
+
 	return -ENOTTY;
 }
 
