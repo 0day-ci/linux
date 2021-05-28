@@ -640,3 +640,61 @@ int hv_call_map_vp_state_page(
 
 	return ret;
 }
+
+int hv_call_get_partition_property(
+		u64 partition_id,
+		u64 property_code,
+		u64 *property_value)
+{
+	u64 status;
+	unsigned long flags;
+	struct hv_get_partition_property_in *input;
+	struct hv_get_partition_property_out *output;
+
+	local_irq_save(flags);
+	input = (struct hv_get_partition_property_in *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+	output = (struct hv_get_partition_property_out *)(*this_cpu_ptr(
+			hyperv_pcpu_output_arg));
+	memset(input, 0, sizeof(*input));
+	input->partition_id = partition_id;
+	input->property_code = property_code;
+	status = hv_do_hypercall(HVCALL_GET_PARTITION_PROPERTY, input,
+			output);
+
+	if (!hv_result_success(status)) {
+		pr_err("%s: %s\n", __func__, hv_status_to_string(status));
+		local_irq_restore(flags);
+		return hv_status_to_errno(status);
+	}
+	*property_value = output->property_value;
+
+	local_irq_restore(flags);
+
+	return 0;
+}
+
+int hv_call_set_partition_property(
+		u64 partition_id,
+		u64 property_code,
+		u64 property_value)
+{
+	u64 status;
+	unsigned long flags;
+	struct hv_set_partition_property *input;
+
+	local_irq_save(flags);
+	input = (struct hv_set_partition_property *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+	memset(input, 0, sizeof(*input));
+	input->partition_id = partition_id;
+	input->property_code = property_code;
+	input->property_value = property_value;
+	status = hv_do_hypercall(HVCALL_SET_PARTITION_PROPERTY, input, NULL);
+	local_irq_restore(flags);
+
+	if (!hv_result_success(status))
+		pr_err("%s: %s\n", __func__, hv_status_to_string(status));
+
+	return hv_status_to_errno(status);
+}

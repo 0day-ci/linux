@@ -566,6 +566,45 @@ free_vp:
 }
 
 static long
+mshv_partition_ioctl_get_property(struct mshv_partition *partition,
+				  void __user *user_args)
+{
+	struct mshv_partition_property args;
+	long ret;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	ret = hv_call_get_partition_property(
+					partition->id,
+					args.property_code,
+					&args.property_value);
+
+	if (ret)
+		return ret;
+
+	if (copy_to_user(user_args, &args, sizeof(args)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static long
+mshv_partition_ioctl_set_property(struct mshv_partition *partition,
+				  void __user *user_args)
+{
+	struct mshv_partition_property args;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	return hv_call_set_partition_property(
+			partition->id,
+			args.property_code,
+			args.property_value);
+}
+
+static long
 mshv_partition_ioctl_map_memory(struct mshv_partition *partition,
 				struct mshv_user_mem_region __user *user_mem)
 {
@@ -782,6 +821,14 @@ mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_ASSERT_INTERRUPT:
 		ret = mshv_partition_ioctl_assert_interrupt(partition,
+							(void __user *)arg);
+		break;
+	case MSHV_GET_PARTITION_PROPERTY:
+		ret = mshv_partition_ioctl_get_property(partition,
+							(void __user *)arg);
+		break;
+	case MSHV_SET_PARTITION_PROPERTY:
+		ret = mshv_partition_ioctl_set_property(partition,
 							(void __user *)arg);
 		break;
 	default:

@@ -101,5 +101,13 @@ int hv_call_map_vp_state_page(
 		u32 vp_index,
 		u64 partition_id,
 		struct page **state_page);
+int hv_call_get_partition_property(
+		u64 partition_id,
+		u64 property_code,
+		u64 *property_value);
+int hv_call_set_partition_property(
+		u64 partition_id,
+		u64 property_code,
+		u64 property_value);
 
 #endif /* _MSHV_H */

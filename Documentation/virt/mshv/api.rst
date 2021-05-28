@@ -159,4 +159,12 @@ Maps a page into userspace that can be used to get and set common registers
 while the vp is suspended.
 The page is laid out in struct hv_vp_register_page in asm/hyperv-tlfs.h.
 
+3.11 MSHV_SET_PARTITION_PROPERTY and MSHV_GET_PARTITION_PROPERTY
+----------------------------------------------------------------
+:Type: partition ioctl
+:Parameters: struct mshv_partition_property
+:Returns: 0 on success
+
+Can be used to get/set various properties of a partition.
+
 
