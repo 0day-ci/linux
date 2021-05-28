@@ -371,6 +371,10 @@ static void snd_ctl_led_disconnect(struct snd_card *card)
 	snd_ctl_led_refresh();
 }
 
+static void snd_ctl_led_release(struct device *dev)
+{
+}
+
 /*
  * sysfs
  */
@@ -667,6 +671,7 @@ static void snd_ctl_led_sysfs_add(struct snd_card *card)
 		led_card->number = card->number;
 		led_card->led = led;
 		device_initialize(&led_card->dev);
+		led_card->dev.release = snd_ctl_led_release;
 		if (dev_set_name(&led_card->dev, "card%d", card->number) < 0)
 			goto cerr;
 		led_card->dev.parent = &led->dev;
@@ -705,6 +710,7 @@ static void snd_ctl_led_sysfs_remove(struct snd_card *card)
 		sysfs_remove_link(&card->ctl_dev.kobj, link_name);
 		sysfs_remove_link(&led_card->dev.kobj, "card");
 		device_del(&led_card->dev);
+		put_device(&led_card->dev);
 		kfree(led_card);
 		led->cards[card->number] = NULL;
 	}
