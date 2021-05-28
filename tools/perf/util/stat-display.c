@@ -465,7 +465,8 @@ static void printout(struct perf_stat_config *config, struct aggr_cpu_id id, int
 			config->csv_sep);
 
 		if (counter->supported) {
-			config->print_free_counters_hint = 1;
+			if (!perf_pmu__is_hybrid(counter->pmu_name))
+				config->print_free_counters_hint = 1;
 			if (is_mixed_hw_group(counter))
 				config->print_mixed_hw_group_error = 1;
 		}
