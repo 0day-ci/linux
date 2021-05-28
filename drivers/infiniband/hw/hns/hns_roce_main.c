@@ -331,13 +331,6 @@ error_fail_uar_alloc:
 	return ret;
 }
 
-static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
-{
-	struct hns_roce_ucontext *context = to_hr_ucontext(ibcontext);
-
-	hns_roce_uar_free(to_hr_dev(ibcontext->device), &context->uar);
-}
-
 /* command value is offset[15:8] */
 static inline int hns_roce_mmap_get_command(unsigned long offset)
 {
@@ -348,6 +341,56 @@ static inline int hns_roce_mmap_get_command(unsigned long offset)
 static inline unsigned long hns_roce_mmap_get_index(unsigned long offset)
 {
 	return ((offset >> 16) << 8) | (offset & 0xff);
+}
+
+static int mmap_dwqe(struct ib_ucontext *uctx, struct vm_area_struct *vma)
+{
+	struct hns_roce_ucontext *context = to_hr_ucontext(uctx);
+	struct hns_roce_dev *hr_dev = to_hr_dev(uctx->device);
+	struct ib_device *ibdev = &hr_dev->ib_dev;
+	struct hns_roce_qp *hr_qp;
+	unsigned long pgoff;
+	unsigned long qpn;
+	phys_addr_t pfn;
+	pgprot_t prot;
+	int ret;
+
+	pgoff = hns_roce_mmap_get_index(vma->vm_pgoff);
+	qpn = pgoff / (HNS_ROCE_DWQE_SIZE / PAGE_SIZE);
+	hr_qp = __hns_roce_qp_lookup(hr_dev, qpn);
+	if (!hr_qp) {
+		ibdev_err(ibdev, "failed to find QP.\n");
+		return -EINVAL;
+	}
+
+	if (hr_qp->ibqp.pd->uobject->context != uctx) {
+		ibdev_err(ibdev,
+			  "the QP is not owned by the context, QPN = %lu.\n",
+			  hr_qp->qpn);
+		return -EINVAL;
+	}
+
+	if (hr_qp->has_mmaped) {
+		ibdev_err(ibdev,
+			  "the QP has been already mapped, QPN = %lu.\n",
+			  hr_qp->qpn);
+		return -EINVAL;
+	}
+
+	hr_qp->has_mmaped = true;
+	pfn = context->uar.dwqe_page + pgoff;
+	prot = pgprot_device(vma->vm_page_prot);
+
+	ret = rdma_user_mmap_io(uctx, vma, pfn, HNS_ROCE_DWQE_SIZE, prot, NULL);
+
+	return ret;
+}
+
+static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
+{
+	struct hns_roce_ucontext *context = to_hr_ucontext(ibcontext);
+
+	hns_roce_uar_free(to_hr_dev(ibcontext->device), &context->uar);
 }
 
 static int mmap_uar(struct ib_ucontext *context, struct vm_area_struct *vma)
@@ -386,6 +429,8 @@ static int hns_roce_mmap(struct ib_ucontext *uctx, struct vm_area_struct *vma)
 	switch (hns_roce_mmap_get_command(vma->vm_pgoff)) {
 	case HNS_ROCE_MMAP_REGULAR_PAGE:
 		return mmap_uar(uctx, vma);
+	case HNS_ROCE_MMAP_DWQE_PAGE:
+		return mmap_dwqe(uctx, vma);
 	default:
 		return -EINVAL;
 	}

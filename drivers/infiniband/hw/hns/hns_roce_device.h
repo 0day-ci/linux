@@ -187,6 +187,7 @@ enum {
 	HNS_ROCE_CAP_FLAG_FRMR                  = BIT(8),
 	HNS_ROCE_CAP_FLAG_QP_FLOW_CTRL		= BIT(9),
 	HNS_ROCE_CAP_FLAG_ATOMIC		= BIT(10),
+	HNS_ROCE_CAP_FLAG_DIRECT_WQE		= BIT(12),
 	HNS_ROCE_CAP_FLAG_SDI_MODE		= BIT(14),
 	HNS_ROCE_CAP_FLAG_STASH			= BIT(17),
 };
@@ -226,6 +227,7 @@ enum {
 
 struct hns_roce_uar {
 	u64		pfn;
+	u64		dwqe_page;
 	unsigned long	index;
 	unsigned long	logic_idx;
 };
@@ -608,10 +610,6 @@ struct hns_roce_work {
 	u32 queue_num;
 };
 
-enum {
-	HNS_ROCE_QP_CAP_DIRECT_WQE = BIT(5),
-};
-
 struct hns_roce_qp {
 	struct ib_qp		ibqp;
 	struct hns_roce_wq	rq;
@@ -656,6 +654,7 @@ struct hns_roce_qp {
 	struct list_head	node;		/* all qps are on a list */
 	struct list_head	rq_node;	/* all recv qps are on a list */
 	struct list_head	sq_node;	/* all send qps are on a list */
+	bool			has_mmaped;	/* mark qp of direct wqe */
 };
 
 struct hns_roce_ib_iboe {

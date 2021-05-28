@@ -77,6 +77,7 @@ enum hns_roce_qp_cap_flags {
 	HNS_ROCE_QP_CAP_RQ_RECORD_DB = 1 << 0,
 	HNS_ROCE_QP_CAP_SQ_RECORD_DB = 1 << 1,
 	HNS_ROCE_QP_CAP_OWNER_DB = 1 << 2,
+	HNS_ROCE_QP_CAP_DIRECT_WQE = 1 << 5,
 };
 
 struct hns_roce_ib_create_qp_resp {
@@ -96,6 +97,7 @@ struct hns_roce_ib_alloc_pd_resp {
 
 enum {
 	HNS_ROCE_MMAP_REGULAR_PAGE,
+	HNS_ROCE_MMAP_DWQE_PAGE,
 };
 
 #endif /* HNS_ABI_USER_H */
