@@ -716,7 +716,14 @@ void __init init_user_rootfs(void)
 		}
 	}
 }
-#endif
+
+struct file_system_type rootfs_fs_type = {
+	.name		= "rootfs",
+	.init_fs_context = ramfs_init_fs_context,
+	.kill_sb	= kill_litter_super,
+};
+
+#else
 
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
@@ -739,3 +746,4 @@ void __init init_rootfs(void)
 		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
 		is_tmpfs = true;
 }
+#endif
