@@ -8,6 +8,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/module.h>
+#include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/err.h>
@@ -25,18 +26,37 @@
 
 static inline u32 clk_gate_readl(struct clk_gate *gate)
 {
-	if (gate->flags & CLK_GATE_BIG_ENDIAN)
+	int ret;
+	u32 val;
+
+	if (gate->flags & CLK_GATE_BIG_ENDIAN) {
 		return ioread32be(gate->reg);
+	} else if (gate->flags & CLK_GATE_REGMAP) {
+		ret = regmap_read(gate->regmap, gate->reg_off, &val);
+		if (ret < 0) {
+			pr_warn("%s: failed %x, %d\n", __func__, gate->reg_off, ret);
+			return ret;
+		} else {
+			return val;
+		}
+	}
 
 	return readl(gate->reg);
 }
 
 static inline void clk_gate_writel(struct clk_gate *gate, u32 val)
 {
-	if (gate->flags & CLK_GATE_BIG_ENDIAN)
+	int ret;
+
+	if (gate->flags & CLK_GATE_BIG_ENDIAN) {
 		iowrite32be(val, gate->reg);
-	else
+	} else if (gate->flags & CLK_GATE_REGMAP) {
+		ret = regmap_write(gate->regmap, gate->reg_off, val);
+		if (ret < 0)
+			pr_warn("%s: %x: %d\n", __func__, gate->reg_off, ret);
+	} else {
 		writel(val, gate->reg);
+	}
 }
 
 /*

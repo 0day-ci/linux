@@ -474,6 +474,8 @@ struct clk_gate {
 	u8		bit_idx;
 	u8		flags;
 	spinlock_t	*lock;
+	struct regmap	*regmap;
+	u32		reg_off;
 };
 
 #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
@@ -481,6 +483,7 @@ struct clk_gate {
 #define CLK_GATE_SET_TO_DISABLE		BIT(0)
 #define CLK_GATE_HIWORD_MASK		BIT(1)
 #define CLK_GATE_BIG_ENDIAN		BIT(2)
+#define CLK_GATE_REGMAP			BIT(3)
 
 extern const struct clk_ops clk_gate_ops;
 struct clk_hw *__clk_hw_register_gate(struct device *dev,
