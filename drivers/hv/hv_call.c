@@ -10,6 +10,7 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/hyperv.h>
 #include <asm/mshyperv.h>
 
 #include "mshv.h"
@@ -698,3 +699,46 @@ int hv_call_set_partition_property(
 
 	return hv_status_to_errno(status);
 }
+
+int hv_call_translate_virtual_address(
+		u32 vp_index,
+		u64 partition_id,
+		u32 flags,
+		u64 gva,
+		u64 *gpa,
+		union hv_translate_gva_result *result)
+{
+	u64 status;
+	unsigned long irq_flags;
+	struct hv_translate_virtual_address_in *input;
+	struct hv_translate_virtual_address_out *output;
+
+	local_irq_save(irq_flags);
+
+	input = *this_cpu_ptr(hyperv_pcpu_input_arg);
+	output = *this_cpu_ptr(hyperv_pcpu_output_arg);
+
+	memset(input, 0, sizeof(*input));
+	memset(output, 0, sizeof(*output));
+
+	input->partition_id = partition_id;
+	input->vp_index = vp_index;
+	input->control_flags = flags;
+	input->gva_page = gva >> HV_HYP_PAGE_SHIFT;
+
+	status = hv_do_hypercall(HVCALL_TRANSLATE_VIRTUAL_ADDRESS, input, output);
+
+	if (!hv_result_success(status)) {
+		pr_err("%s: %s\n", __func__, hv_status_to_string(status));
+		goto out;
+	}
+
+	*result = output->translation_result;
+	*gpa = (output->gpa_page << HV_HYP_PAGE_SHIFT) + offset_in_hvpage(gva);
+
+out:
+	local_irq_restore(irq_flags);
+
+	return hv_status_to_errno(status);
+}
+

@@ -109,5 +109,12 @@ int hv_call_set_partition_property(
 		u64 partition_id,
 		u64 property_code,
 		u64 property_value);
+int hv_call_translate_virtual_address(
+		u32 vp_index,
+		u64 partition_id,
+		u32 flags,
+		u64 gva,
+		u64 *gpa,
+		union hv_translate_gva_result *result);
 
 #endif /* _MSHV_H */

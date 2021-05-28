@@ -402,6 +402,37 @@ mshv_vp_ioctl_get_set_state(struct mshv_vp *vp, void __user *user_args, bool is_
 }
 
 static long
+mshv_vp_ioctl_translate_gva(struct mshv_vp *vp, void __user *user_args)
+{
+	long ret;
+	struct mshv_translate_gva args;
+	u64 gpa;
+	union hv_translate_gva_result result;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	ret = hv_call_translate_virtual_address(
+			vp->index,
+			vp->partition->id,
+			args.flags,
+			args.gva,
+			&gpa,
+			&result);
+
+	if (ret)
+		return ret;
+
+	if (copy_to_user(args.result, &result, sizeof(*args.result)))
+		return -EFAULT;
+
+	if (copy_to_user(args.gpa, &gpa, sizeof(*args.gpa)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static long
 mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
 	struct mshv_vp *vp = filp->private_data;
@@ -425,6 +456,9 @@ mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_SET_VP_STATE:
 		r = mshv_vp_ioctl_get_set_state(vp, (void __user *)arg, true);
+		break;
+	case MSHV_TRANSLATE_GVA:
+		r = mshv_vp_ioctl_translate_gva(vp, (void __user *)arg);
 		break;
 	default:
 		r = -ENOTTY;

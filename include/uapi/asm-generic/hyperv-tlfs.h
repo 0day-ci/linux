@@ -196,4 +196,47 @@ enum hv_partition_property_code {
 	HV_PARTITION_PROPERTY_PROCESSOR_VIRTUALIZATION_FEATURES		= 0x00080000,
 };
 
+enum hv_translate_gva_result_code {
+	HV_TRANSLATE_GVA_SUCCESS			= 0,
+
+	/* Translation failures. */
+	HV_TRANSLATE_GVA_PAGE_NOT_PRESENT		= 1,
+	HV_TRANSLATE_GVA_PRIVILEGE_VIOLATION		= 2,
+	HV_TRANSLATE_GVA_INVALIDE_PAGE_TABLE_FLAGS	= 3,
+
+	/* GPA access failures. */
+	HV_TRANSLATE_GVA_GPA_UNMAPPED			= 4,
+	HV_TRANSLATE_GVA_GPA_NO_READ_ACCESS		= 5,
+	HV_TRANSLATE_GVA_GPA_NO_WRITE_ACCESS		= 6,
+	HV_TRANSLATE_GVA_GPA_ILLEGAL_OVERLAY_ACCESS	= 7,
+
+	/*
+	 * Intercept for memory access by either
+	 *  - a higher VTL
+	 *  - a nested hypervisor (due to a violation of the nested page table)
+	 */
+	HV_TRANSLATE_GVA_INTERCEPT			= 8,
+
+	HV_TRANSLATE_GVA_GPA_UNACCEPTED			= 9,
+};
+
+union hv_translate_gva_result {
+	__u64 as_uint64;
+	struct {
+		__u32 result_code; /* enum hv_translate_hva_result_code */
+		__u32 cache_type : 8;
+		__u32 overlay_page : 1;
+		__u32 reserved : 23;
+	} __packed;
+};
+
+/* hv_translage_gva flags */
+#define HV_TRANSLATE_GVA_VALIDATE_READ		0x0001
+#define HV_TRANSLATE_GVA_VALIDATE_WRITE		0x0002
+#define HV_TRANSLATE_GVA_VALIDATE_EXECUTE	0x0004
+#define HV_TRANSLATE_GVA_PRIVILEGE_EXCEMP	0x0008
+#define HV_TRANSLATE_GVA_SET_PAGE_TABLE_BITS	0x0010
+#define HV_TRANSLATE_GVA_TLB_FLUSH_INHIBIT	0x0020
+#define HV_TRANSLATE_GVA_CONTROL_MASK		0x003f
+
 #endif
