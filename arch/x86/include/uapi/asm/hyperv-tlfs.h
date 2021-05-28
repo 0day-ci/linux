@@ -101,7 +101,7 @@ union hv_partition_processor_features {
 		__u64 fsrep_stosb:1;
 		__u64 fsrep_cmpsb:1;
 		__u64 reserved_bank1:42;
-	};
+	} __packed;
 	__u64 as_uint64[HV_PARTITION_PROCESSOR_FEATURE_BANKS];
 };
 
@@ -111,7 +111,7 @@ union hv_partition_processor_xsave_features {
 		__u64 xsaveopt_support : 1;
 		__u64 avx_support : 1;
 		__u64 reserved1 : 61;
-	};
+	} __packed;
 	__u64 as_uint64;
 };
 
@@ -119,6 +119,6 @@ struct hv_partition_creation_properties {
 	union hv_partition_processor_features disabled_processor_features;
 	union hv_partition_processor_xsave_features
 		disabled_processor_xsave_features;
-};
+} __packed;
 
 #endif

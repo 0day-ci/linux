@@ -15,6 +15,9 @@
 #include <linux/file.h>
 #include <linux/anon_inodes.h>
 #include <linux/mshv.h>
+#include <asm/mshyperv.h>
+
+#include "mshv.h"
 
 MODULE_AUTHOR("Microsoft");
 MODULE_LICENSE("GPL");
@@ -49,6 +52,7 @@ static struct miscdevice mshv_dev = {
 	.mode = 600,
 };
 
+
 static long
 mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
@@ -77,6 +81,17 @@ destroy_partition(struct mshv_partition *partition)
 	}
 
 	spin_unlock_irqrestore(&mshv.partitions.lock, flags);
+
+	/*
+	 * There are no remaining references to the partition,
+	 * so the remaining cleanup can be lockless
+	 */
+
+	/* Deallocates and unmaps everything including vcpus, GPA mappings etc */
+	hv_call_finalize_partition(partition->id);
+	/* TODO: Withdraw and free all pages we deposited */
+
+	hv_call_delete_partition(partition->id);
 
 	kfree(partition);
 }
@@ -138,6 +153,9 @@ mshv_ioctl_create_partition(void __user *user_arg)
 	if (copy_from_user(&args, user_arg, sizeof(args)))
 		return -EFAULT;
 
+	/* Only support EXO partitions */
+	args.flags |= HV_PARTITION_CREATION_FLAG_EXO_PARTITION;
+
 	partition = kzalloc(sizeof(*partition), GFP_KERNEL);
 	if (!partition)
 		return -ENOMEM;
@@ -148,11 +166,21 @@ mshv_ioctl_create_partition(void __user *user_arg)
 		goto free_partition;
 	}
 
+	ret = hv_call_create_partition(args.flags,
+				       args.partition_creation_properties,
+				       &partition->id);
+	if (ret)
+		goto put_fd;
+
+	ret = hv_call_initialize_partition(partition->id);
+	if (ret)
+		goto delete_partition;
+
 	file = anon_inode_getfile("mshv_partition", &mshv_partition_fops,
 				  partition, O_RDWR);
 	if (IS_ERR(file)) {
 		ret = PTR_ERR(file);
-		goto put_fd;
+		goto finalize_partition;
 	}
 	refcount_set(&partition->ref_count, 1);
 
@@ -166,6 +194,10 @@ mshv_ioctl_create_partition(void __user *user_arg)
 
 release_file:
 	file->f_op->release(file->f_inode, file);
+finalize_partition:
+	hv_call_finalize_partition(partition->id);
+delete_partition:
+	hv_call_delete_partition(partition->id);
 put_fd:
 	put_unused_fd(fd);
 free_partition:
