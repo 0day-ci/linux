@@ -130,3 +130,14 @@ Enable and configure different types of intercepts. Intercepts are events in a
 guest partition that will suspend the guest vp and send a message to the root
 partition (returned from MSHV_RUN_VP).
 
+3.8 MSHV_ASSERT_INTERRUPT
+--------------------------
+:Type: partition ioctl
+:Parameters: struct mshv_assert_interrupt
+:Returns: 0 on success
+
+Assert interrupts in partitions that use Microsoft Hypervisor's internal
+emulated LAPIC. This must be enabled on partition creation with the flag:
+HV_PARTITION_CREATION_FLAG_LAPIC_ENABLED
+
+

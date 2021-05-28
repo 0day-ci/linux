@@ -574,6 +574,22 @@ mshv_partition_ioctl_install_intercept(struct mshv_partition *partition,
 }
 
 static long
+mshv_partition_ioctl_assert_interrupt(struct mshv_partition *partition,
+				      void __user *user_args)
+{
+	struct mshv_assert_interrupt args;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	return hv_call_assert_virtual_interrupt(
+			partition->id,
+			args.vector,
+			args.dest_addr,
+			args.control);
+}
+
+static long
 mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
 	struct mshv_partition *partition = filp->private_data;
@@ -597,6 +613,10 @@ mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_INSTALL_INTERCEPT:
 		ret = mshv_partition_ioctl_install_intercept(partition,
+							(void __user *)arg);
+		break;
+	case MSHV_ASSERT_INTERRUPT:
+		ret = mshv_partition_ioctl_assert_interrupt(partition,
 							(void __user *)arg);
 		break;
 	default:

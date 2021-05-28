@@ -434,3 +434,32 @@ int hv_call_install_intercept(
 	return ret;
 }
 
+int hv_call_assert_virtual_interrupt(
+		u64 partition_id,
+		u32 vector,
+		u64 dest_addr,
+		union hv_interrupt_control control)
+{
+	struct hv_assert_virtual_interrupt *input;
+	unsigned long flags;
+	u64 status;
+
+	local_irq_save(flags);
+	input = (struct hv_assert_virtual_interrupt *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+	memset(input, 0, sizeof(*input));
+	input->partition_id = partition_id;
+	input->vector = vector;
+	input->dest_addr = dest_addr;
+	input->control = control;
+	status = hv_do_hypercall(HVCALL_ASSERT_VIRTUAL_INTERRUPT, input, NULL);
+	local_irq_restore(flags);
+
+	if (!hv_result_success(status)) {
+		pr_err("%s: %s\n", __func__, hv_status_to_string(status));
+		return hv_status_to_errno(status);
+	}
+
+	return 0;
+}
+
