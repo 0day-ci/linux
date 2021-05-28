@@ -55,6 +55,7 @@ TARGETS += seccomp
 TARGETS += sgx
 TARGETS += sigaltstack
 TARGETS += size
+TARGETS += soft-dirty
 TARGETS += sparc64
 TARGETS += splice
 TARGETS += static_keys
