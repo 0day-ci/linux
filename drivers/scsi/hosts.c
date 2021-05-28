@@ -298,6 +298,7 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 	 * scsi_host_dev_release, so not free them in the failure path
 	 */
  out_del_dev:
+	put_device(&shost->shost_gendev);
 	device_del(&shost->shost_dev);
  out_del_gendev:
 	device_del(&shost->shost_gendev);
