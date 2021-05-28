@@ -617,6 +617,107 @@ out:
 	init_chroot(".");
 }
 
+#ifdef CONFIG_INITRAMFS_USER_ROOT
+#ifdef CONFIG_TMPFS
+static __init bool is_tmpfs_enabled(void)
+{
+	return (!root_fs_names || strstr(root_fs_names, "tmpfs")) &&
+	       !saved_root_name[0];
+}
+#endif
+
+static __init bool is_ramfs_enabled(void)
+{
+	return true;
+}
+
+struct fs_user_root {
+	bool (*enabled)(void);
+	char *dev_name;
+	char *fs_name;
+};
+
+static struct fs_user_root user_roots[] __initdata = {
+#ifdef CONFIG_TMPFS
+	{
+		.enabled  = is_tmpfs_enabled,
+		.dev_name = "tmpfs",
+		.fs_name  = "tmpfs",
+	},
+#endif
+	{
+		.enabled  = is_ramfs_enabled,
+		.dev_name = "ramfs",
+		.fs_name  = "ramfs"
+	}
+};
+static struct fs_user_root * __initdata user_root;
+
+/*
+ * The syscall 'pivot_root' is used to change root and it is able to
+ * clean the old mounts, which make it preferred by container platforms
+ * such as Docker. However, initramfs is not supported by pivot_root,
+ * and 'chroot()' has to be used, which is unable to clean the mounts
+ * that propagate from HOST. These useless mounts make the release of
+ * removable device or network namespace a big problem.
+ *
+ * To make initramfs supported by pivot_root, the mount of the root
+ * filesystem should have a parent, which will make it unmountable. In
+ * this function, the second mount, which is called 'user root', is
+ * created and mounted on '/root', and it will be made the root filesystem
+ * in end_mount_user_root() by init_chroot().
+ *
+ * The 'user root' has a parent mount, which makes it unmountable and
+ * pivot_root work.
+ *
+ * What's more, root_mountflags and root_mount_data are used here, which
+ * makes the 'rootflags' in boot cmd work for 'user root'.
+ */
+int __init mount_user_root(void)
+{
+	return do_mount_root(user_root->dev_name,
+			     user_root->fs_name,
+			     root_mountflags & ~MS_RDONLY,
+			     root_mount_data);
+}
+
+/*
+ * This function is used to chroot to new initramfs root that
+ * we unpacked on success. It will chdir to '/' and umount
+ * the secound mount on failure.
+ */
+void __init end_mount_user_root(bool succeed)
+{
+	init_chdir("/");
+	if (!succeed) {
+		init_umount("/root", 0);
+		return;
+	}
+
+	init_mount("/root", "/", NULL, MS_MOVE, NULL);
+	if (!ramdisk_exec_exist()) {
+		init_umount("/..", 0);
+		return;
+	}
+
+	init_chroot("/..");
+}
+
+void __init init_user_rootfs(void)
+{
+	struct fs_user_root *root;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(user_roots); i++) {
+		root = &user_roots[i];
+		if (root->enabled()) {
+			user_root = root;
+			break;
+		}
+	}
+}
+#endif
+
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
 {
