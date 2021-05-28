@@ -1200,6 +1200,8 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 
 		/* Enable/disable SerDes auto-negotiation as necessary */
 		ret = qca8k_read(priv, QCA8K_REG_PWS, &val);
+		if (ret)
+			return;
 		if (phylink_autoneg_inband(mode))
 			val &= ~QCA8K_PWS_SERDES_AEN_DIS;
 		else
@@ -1208,6 +1210,8 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 
 		/* Configure the SGMII parameters */
 		ret = qca8k_read(priv, QCA8K_REG_SGMII_CTRL, &val);
+		if (ret)
+			return;
 
 		val |= QCA8K_SGMII_EN_PLL | QCA8K_SGMII_EN_RX |
 			QCA8K_SGMII_EN_TX | QCA8K_SGMII_EN_SD;
