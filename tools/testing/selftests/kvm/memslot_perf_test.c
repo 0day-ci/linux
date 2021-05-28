@@ -29,7 +29,7 @@
 
 #define MEM_SIZE		((512U << 20) + 4096)
 #define MEM_SIZE_PAGES		(MEM_SIZE / 4096)
-#define MEM_GPA		0x10000000UL
+#define MEM_GPA			(MEM_SIZE + 0x10000000UL)
 #define MEM_AUX_GPA		MEM_GPA
 #define MEM_SYNC_GPA		MEM_AUX_GPA
 #define MEM_TEST_GPA		(MEM_AUX_GPA + 4096)
