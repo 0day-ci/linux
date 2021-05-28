@@ -837,6 +837,8 @@ void clk_hw_unregister_divider(struct clk_hw *hw);
  * @mask:	mask of mutliplexer bit field
  * @flags:	hardware-specific flags
  * @lock:	register lock
+ * @regmap:	register controlling regmap
+ * @reg_off:	register offset
  *
  * Clock with multiple selectable parents.  Implements .get_parent, .set_parent
  * and .recalc_rate
@@ -855,6 +857,7 @@ void clk_hw_unregister_divider(struct clk_hw *hw);
  * CLK_MUX_BIG_ENDIAN - By default little endian register accesses are used for
  *	the mux register.  Setting this flag makes the register accesses big
  *	endian.
+ * CLK_MUX_REGMAP - Indicate the accessing method is using regmap API.
  */
 struct clk_mux {
 	struct clk_hw	hw;
@@ -864,6 +867,8 @@ struct clk_mux {
 	u8		shift;
 	u8		flags;
 	spinlock_t	*lock;
+	struct regmap	*regmap;
+	u32		reg_off;
 };
 
 #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
@@ -874,6 +879,7 @@ struct clk_mux {
 #define CLK_MUX_READ_ONLY		BIT(3) /* mux can't be changed */
 #define CLK_MUX_ROUND_CLOSEST		BIT(4)
 #define CLK_MUX_BIG_ENDIAN		BIT(5)
+#define CLK_MUX_REGMAP			BIT(6)
 
 extern const struct clk_ops clk_mux_ops;
 extern const struct clk_ops clk_mux_ro_ops;

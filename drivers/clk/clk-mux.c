@@ -10,6 +10,7 @@
 #include <linux/clk-provider.h>
 #include <linux/device.h>
 #include <linux/module.h>
+#include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/err.h>
@@ -26,18 +27,37 @@
 
 static inline u32 clk_mux_readl(struct clk_mux *mux)
 {
-	if (mux->flags & CLK_MUX_BIG_ENDIAN)
+	int ret;
+	uint32_t val;
+
+	if (mux->flags & CLK_MUX_BIG_ENDIAN) {
 		return ioread32be(mux->reg);
+	} else if (mux->flags & CLK_MUX_REGMAP) {
+		ret = regmap_read(mux->regmap, mux->reg_off, &val);
+		if (ret < 0) {
+			pr_warn("%s: failed read %x, %d\n", __func__, mux->reg_off, ret);
+			return ret;
+		} else {
+			return val;
+		}
+	}
 
 	return readl(mux->reg);
 }
 
 static inline void clk_mux_writel(struct clk_mux *mux, u32 val)
 {
-	if (mux->flags & CLK_MUX_BIG_ENDIAN)
+	int ret;
+
+	if (mux->flags & CLK_MUX_BIG_ENDIAN) {
 		iowrite32be(val, mux->reg);
-	else
+	} else if (mux->flags & CLK_MUX_REGMAP) {
+		ret = regmap_write(mux->regmap, mux->reg_off, val);
+		if (ret < 0)
+			pr_warn("%s: failed write %x, %d\n", __func__, mux->reg_off, ret);
+	} else {
 		writel(val, mux->reg);
+	}
 }
 
 int clk_mux_val_to_index(struct clk_hw *hw, u32 *table, unsigned int flags,
