@@ -348,19 +348,20 @@ static int i2c_gpio_init_generic_recovery(struct i2c_adapter *adap)
 	 * GPIO recovery is available
 	 */
 	if (!bri->scl_gpiod) {
-		gpiod = devm_gpiod_get(dev, "scl", GPIOD_OUT_HIGH_OPEN_DRAIN);
-		if (PTR_ERR(gpiod) == -EPROBE_DEFER) {
-			ret  = -EPROBE_DEFER;
+		gpiod = devm_gpiod_get_optional(dev, "scl", GPIOD_OUT_HIGH_OPEN_DRAIN);
+		if (IS_ERR(gpiod)) {
+			ret = PTR_ERR(gpiod);
 			goto cleanup_pinctrl_state;
 		}
-		if (!IS_ERR(gpiod)) {
+
+		if (gpiod) {
 			bri->scl_gpiod = gpiod;
 			bri->recover_bus = i2c_generic_scl_recovery;
 			dev_info(dev, "using generic GPIOs for recovery\n");
 		}
 	}
 
-	/* SDA GPIOD line is optional, so we care about DEFER only */
+	/* SDA GPIO line is optional */
 	if (!bri->sda_gpiod) {
 		/*
 		 * We have SCL. Pull SCL low and wait a bit so that SDA glitches
@@ -368,18 +369,19 @@ static int i2c_gpio_init_generic_recovery(struct i2c_adapter *adap)
 		 */
 		gpiod_direction_output(bri->scl_gpiod, 0);
 		udelay(10);
-		gpiod = devm_gpiod_get(dev, "sda", GPIOD_IN);
+
+		gpiod = devm_gpiod_get_optional(dev, "sda", GPIOD_IN);
 
 		/* Wait a bit in case of a SDA glitch, and then release SCL. */
 		udelay(10);
 		gpiod_direction_output(bri->scl_gpiod, 1);
 
-		if (PTR_ERR(gpiod) == -EPROBE_DEFER) {
-			ret = -EPROBE_DEFER;
+		if (IS_ERR(gpiod)) {
+			ret = PTR_ERR(gpiod);
 			goto cleanup_pinctrl_state;
 		}
-		if (!IS_ERR(gpiod))
-			bri->sda_gpiod = gpiod;
+
+		bri->sda_gpiod = gpiod;
 	}
 
 cleanup_pinctrl_state:
@@ -401,12 +403,14 @@ static int i2c_init_recovery(struct i2c_adapter *adap)
 	struct i2c_bus_recovery_info *bri = adap->bus_recovery_info;
 	bool is_error_level = true;
 	char *err_str;
+	int ret;
 
 	if (!bri)
 		return 0;
 
-	if (i2c_gpio_init_recovery(adap) == -EPROBE_DEFER)
-		return -EPROBE_DEFER;
+	ret = i2c_gpio_init_recovery(adap);
+	if (ret)
+		return ret;
 
 	if (!bri->recover_bus) {
 		err_str = "no suitable method provided";
