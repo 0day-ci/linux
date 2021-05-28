@@ -63,9 +63,102 @@ static struct miscdevice mshv_dev = {
 };
 
 static long
+mshv_vp_ioctl_get_regs(struct mshv_vp *vp, void __user *user_args)
+{
+	struct mshv_vp_registers args;
+	struct hv_register_assoc *registers;
+	long ret;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	if (args.count > MSHV_VP_MAX_REGISTERS)
+		return -EINVAL;
+
+	registers = kmalloc_array(args.count,
+				  sizeof(*registers),
+				  GFP_KERNEL);
+	if (!registers)
+		return -ENOMEM;
+
+	if (copy_from_user(registers, args.regs,
+			   sizeof(*registers) * args.count)) {
+		ret = -EFAULT;
+		goto free_return;
+	}
+
+	ret = hv_call_get_vp_registers(vp->index, vp->partition->id,
+				       args.count, registers);
+	if (ret)
+		goto free_return;
+
+	if (copy_to_user(args.regs, registers,
+			 sizeof(*registers) * args.count)) {
+		ret = -EFAULT;
+	}
+
+free_return:
+	kfree(registers);
+	return ret;
+}
+
+static long
+mshv_vp_ioctl_set_regs(struct mshv_vp *vp, void __user *user_args)
+{
+	struct mshv_vp_registers args;
+	struct hv_register_assoc *registers;
+	long ret;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	if (args.count > MSHV_VP_MAX_REGISTERS)
+		return -EINVAL;
+
+	registers = kmalloc_array(args.count,
+				  sizeof(*registers),
+				  GFP_KERNEL);
+	if (!registers) {
+		return -ENOMEM;
+	}
+
+	if (copy_from_user(registers, args.regs,
+			   sizeof(*registers) * args.count)) {
+		ret = -EFAULT;
+		goto free_return;
+	}
+
+	ret = hv_call_set_vp_registers(vp->index, vp->partition->id,
+				       args.count, registers);
+
+free_return:
+	kfree(registers);
+	return ret;
+}
+
+static long
 mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
-	return -ENOTTY;
+	struct mshv_vp *vp = filp->private_data;
+	long r = 0;
+
+	if (mutex_lock_killable(&vp->mutex))
+		return -EINTR;
+
+	switch (ioctl) {
+	case MSHV_GET_VP_REGISTERS:
+		r = mshv_vp_ioctl_get_regs(vp, (void __user *)arg);
+		break;
+	case MSHV_SET_VP_REGISTERS:
+		r = mshv_vp_ioctl_set_regs(vp, (void __user *)arg);
+		break;
+	default:
+		r = -ENOTTY;
+		break;
+	}
+	mutex_unlock(&vp->mutex);
+
+	return r;
 }
 
 static int
@@ -101,6 +194,8 @@ mshv_partition_ioctl_create_vp(struct mshv_partition *partition,
 
 	if (!vp)
 		return -ENOMEM;
+
+	mutex_init(&vp->mutex);
 
 	vp->index = args.vp_index;
 	vp->partition = mshv_partition_get(partition);

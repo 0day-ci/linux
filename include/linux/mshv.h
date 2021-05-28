@@ -17,6 +17,7 @@
 struct mshv_vp {
 	u32 index;
 	struct mshv_partition *partition;
+	struct mutex mutex;
 };
 
 struct mshv_mem_region {

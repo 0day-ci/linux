@@ -294,3 +294,105 @@ int hv_call_unmap_gpa_pages(
 	return ret;
 }
 
+int hv_call_get_vp_registers(
+		u32 vp_index,
+		u64 partition_id,
+		u16 count,
+		struct hv_register_assoc *registers)
+{
+	struct hv_get_vp_registers *input_page;
+	union hv_register_value *output_page;
+	u16 completed = 0;
+	unsigned long remaining = count;
+	int rep_count, i;
+	u64 status;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	input_page = (struct hv_get_vp_registers *)(*this_cpu_ptr(
+		hyperv_pcpu_input_arg));
+	output_page = (union hv_register_value *)(*this_cpu_ptr(
+		hyperv_pcpu_output_arg));
+
+	input_page->partition_id = partition_id;
+	input_page->vp_index = vp_index;
+	input_page->input_vtl = 0;
+	input_page->rsvd_z8 = 0;
+	input_page->rsvd_z16 = 0;
+
+	while (remaining) {
+		rep_count = min(remaining, HV_GET_REGISTER_BATCH_SIZE);
+		for (i = 0; i < rep_count; ++i) {
+			input_page->names[i] = registers[i].name;
+		}
+
+		status = hv_do_rep_hypercall(HVCALL_GET_VP_REGISTERS, rep_count,
+					     0, input_page, output_page);
+		if (!hv_result_success(status)) {
+			pr_err("%s: completed %li out of %u, %s\n",
+			       __func__,
+			       count - remaining, count,
+			       hv_status_to_string(status));
+			break;
+		}
+		completed = hv_repcomp(status);
+		for (i = 0; i < completed; ++i) {
+			registers[i].value = output_page[i];
+		}
+
+		registers += completed;
+		remaining -= completed;
+	}
+	local_irq_restore(flags);
+
+	return hv_status_to_errno(status);
+}
+
+int hv_call_set_vp_registers(
+		u32 vp_index,
+		u64 partition_id,
+		u16 count,
+		struct hv_register_assoc *registers)
+{
+	struct hv_set_vp_registers *input_page;
+	u16 completed = 0;
+	unsigned long remaining = count;
+	int rep_count;
+	u64 status;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	input_page = (struct hv_set_vp_registers *)(*this_cpu_ptr(
+		hyperv_pcpu_input_arg));
+
+	input_page->partition_id = partition_id;
+	input_page->vp_index = vp_index;
+	input_page->input_vtl = 0;
+	input_page->rsvd_z8 = 0;
+	input_page->rsvd_z16 = 0;
+
+	while (remaining) {
+		rep_count = min(remaining, HV_SET_REGISTER_BATCH_SIZE);
+		memcpy(input_page->elements, registers,
+			sizeof(struct hv_register_assoc) * rep_count);
+
+		status = hv_do_rep_hypercall(HVCALL_SET_VP_REGISTERS, rep_count,
+					     0, input_page, NULL);
+		if (!hv_result_success(status)) {
+			pr_err("%s: completed %li out of %u, %s\n",
+			       __func__,
+			       count - remaining, count,
+			       hv_status_to_string(status));
+			break;
+		}
+		completed = hv_repcomp(status);
+		registers += completed;
+		remaining -= completed;
+	}
+
+	local_irq_restore(flags);
+
+	return hv_status_to_errno(status);
+}
+
