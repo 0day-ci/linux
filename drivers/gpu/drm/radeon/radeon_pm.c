@@ -352,9 +352,8 @@ static void radeon_pm_print_states(struct radeon_device *rdev)
 	}
 }
 
-static ssize_t radeon_get_pm_profile(struct device *dev,
-				     struct device_attribute *attr,
-				     char *buf)
+static ssize_t power_profile_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -366,10 +365,8 @@ static ssize_t radeon_get_pm_profile(struct device *dev,
 			  (cp == PM_PROFILE_HIGH) ? "high" : "default");
 }
 
-static ssize_t radeon_set_pm_profile(struct device *dev,
-				     struct device_attribute *attr,
-				     const char *buf,
-				     size_t count)
+static ssize_t power_profile_store(struct device *dev, struct device_attribute *attr,
+				   const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -406,9 +403,8 @@ fail:
 	return count;
 }
 
-static ssize_t radeon_get_pm_method(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
+static ssize_t power_method_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -418,10 +414,9 @@ static ssize_t radeon_get_pm_method(struct device *dev,
 			  (pm == PM_METHOD_PROFILE) ? "profile" : "dpm");
 }
 
-static ssize_t radeon_set_pm_method(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf,
-				    size_t count)
+static ssize_t power_method_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -462,9 +457,8 @@ fail:
 	return count;
 }
 
-static ssize_t radeon_get_dpm_state(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
+static ssize_t power_dpm_state_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -475,10 +469,9 @@ static ssize_t radeon_get_dpm_state(struct device *dev,
 			  (pm == POWER_STATE_TYPE_BALANCED) ? "balanced" : "performance");
 }
 
-static ssize_t radeon_set_dpm_state(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf,
-				    size_t count)
+static ssize_t power_dpm_state_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -506,9 +499,9 @@ fail:
 	return count;
 }
 
-static ssize_t radeon_get_dpm_forced_performance_level(struct device *dev,
-						       struct device_attribute *attr,
-						       char *buf)
+static ssize_t power_dpm_force_performance_level_show(struct device *dev,
+						      struct device_attribute *attr,
+						      char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -523,10 +516,9 @@ static ssize_t radeon_get_dpm_forced_performance_level(struct device *dev,
 			  (level == RADEON_DPM_FORCED_LEVEL_LOW) ? "low" : "high");
 }
 
-static ssize_t radeon_set_dpm_forced_performance_level(struct device *dev,
+static ssize_t power_dpm_force_performance_level_store(struct device *dev,
 						       struct device_attribute *attr,
-						       const char *buf,
-						       size_t count)
+						       const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct radeon_device *rdev = ddev->dev_private;
@@ -658,12 +650,10 @@ static ssize_t radeon_hwmon_get_pwm1(struct device *dev,
 	return sprintf(buf, "%i\n", speed);
 }
 
-static DEVICE_ATTR(power_profile, S_IRUGO | S_IWUSR, radeon_get_pm_profile, radeon_set_pm_profile);
-static DEVICE_ATTR(power_method, S_IRUGO | S_IWUSR, radeon_get_pm_method, radeon_set_pm_method);
-static DEVICE_ATTR(power_dpm_state, S_IRUGO | S_IWUSR, radeon_get_dpm_state, radeon_set_dpm_state);
-static DEVICE_ATTR(power_dpm_force_performance_level, S_IRUGO | S_IWUSR,
-		   radeon_get_dpm_forced_performance_level,
-		   radeon_set_dpm_forced_performance_level);
+static DEVICE_ATTR_RW(power_profile);
+static DEVICE_ATTR_RW(power_method);
+static DEVICE_ATTR_RW(power_dpm_state);
+static DEVICE_ATTR_RW(power_dpm_force_performance_level);
 
 static ssize_t radeon_hwmon_show_temp(struct device *dev,
 				      struct device_attribute *attr,
