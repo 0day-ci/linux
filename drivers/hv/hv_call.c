@@ -180,3 +180,117 @@ int hv_call_delete_partition(u64 partition_id)
 	return hv_status_to_errno(status);
 }
 
+int hv_call_map_gpa_pages(
+		u64 partition_id,
+		u64 gpa_target,
+		u64 page_count, u32 flags,
+		struct page **pages)
+{
+	struct hv_map_gpa_pages *input_page;
+	u64 status;
+	int i;
+	struct page **p;
+	u32 completed = 0;
+	unsigned long remaining = page_count;
+	int rep_count;
+	unsigned long irq_flags;
+	int ret = 0;
+
+	while (remaining) {
+
+		rep_count = min(remaining, HV_MAP_GPA_BATCH_SIZE);
+
+		local_irq_save(irq_flags);
+		input_page = (struct hv_map_gpa_pages *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+
+		input_page->target_partition_id = partition_id;
+		input_page->target_gpa_base = gpa_target;
+		input_page->map_flags = flags;
+
+		for (i = 0, p = pages; i < rep_count; i++, p++)
+			input_page->source_gpa_page_list[i] = page_to_pfn(*p);
+		status = hv_do_rep_hypercall(
+			HVCALL_MAP_GPA_PAGES, rep_count, 0, input_page, NULL);
+		local_irq_restore(irq_flags);
+
+		completed = hv_repcomp(status);
+
+		if (hv_result(status) == HV_STATUS_INSUFFICIENT_MEMORY) {
+			ret = hv_call_deposit_pages(NUMA_NO_NODE,
+						    partition_id,
+                                                    HV_MAP_GPA_DEPOSIT_PAGES);
+			if (ret)
+				break;
+		} else if (!hv_result_success(status)) {
+			pr_err("%s: completed %llu out of %llu, %s\n",
+			       __func__,
+			       page_count - remaining, page_count,
+			       hv_status_to_string(status));
+			ret = hv_status_to_errno(status);
+			break;
+		}
+
+		pages += completed;
+		remaining -= completed;
+		gpa_target += completed;
+	}
+
+	if (ret && remaining < page_count) {
+		pr_err("%s: Partially succeeded; mapped regions may be in invalid state",
+		       __func__);
+		ret = -EBADFD;
+	}
+
+	return ret;
+}
+
+int hv_call_unmap_gpa_pages(
+		u64 partition_id,
+		u64 gpa_target,
+		u64 page_count, u32 flags)
+{
+	struct hv_unmap_gpa_pages *input_page;
+	u64 status;
+	int ret = 0;
+	u32 completed = 0;
+	unsigned long remaining = page_count;
+	int rep_count;
+	unsigned long irq_flags;
+
+	while (remaining) {
+		local_irq_save(irq_flags);
+		input_page = (struct hv_unmap_gpa_pages *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+
+		input_page->target_partition_id = partition_id;
+		input_page->target_gpa_base = gpa_target;
+		input_page->unmap_flags = flags;
+		rep_count = min(remaining, HV_MAP_GPA_BATCH_SIZE);
+		status = hv_do_rep_hypercall(
+			HVCALL_UNMAP_GPA_PAGES, rep_count, 0, input_page, NULL);
+		local_irq_restore(irq_flags);
+
+		completed = hv_repcomp(status);
+		if (!hv_result_success(status)) {
+			pr_err("%s: completed %llu out of %llu, %s\n",
+			       __func__,
+			       page_count - remaining, page_count,
+			       hv_status_to_string(status));
+			ret = hv_status_to_errno(status);
+			break;
+		}
+
+		remaining -= completed;
+		gpa_target += completed;
+	}
+
+	if (ret && remaining < page_count) {
+		pr_err("%s: Partially succeeded; mapped regions may be in invalid state",
+		       __func__);
+		ret = -EBADFD;
+	}
+
+	return ret;
+}
+

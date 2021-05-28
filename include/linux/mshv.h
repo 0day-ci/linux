@@ -7,13 +7,27 @@
  */
 
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <uapi/linux/mshv.h>
 
 #define MSHV_MAX_PARTITIONS		128
+#define MSHV_MAX_MEM_REGIONS		64
+
+struct mshv_mem_region {
+	u64 size; /* bytes */
+	u64 guest_pfn;
+	u64 userspace_addr; /* start of the userspace allocated memory */
+	struct page **pages;
+};
 
 struct mshv_partition {
 	u64 id;
 	refcount_t ref_count;
+	struct mutex mutex;
+	struct {
+		u32 count;
+		struct mshv_mem_region slots[MSHV_MAX_MEM_REGIONS];
+	} regions;
 };
 
 struct mshv {

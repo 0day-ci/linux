@@ -12,4 +12,13 @@
 #define HV_PARTITION_CREATION_FLAG_GPA_SUPER_PAGES_ENABLED          BIT(4)
 #define HV_PARTITION_CREATION_FLAG_LAPIC_ENABLED                    BIT(13)
 
+/* HV Map GPA (Guest Physical Address) Flags */
+#define HV_MAP_GPA_PERMISSIONS_NONE     0x0
+#define HV_MAP_GPA_READABLE             0x1
+#define HV_MAP_GPA_WRITABLE             0x2
+#define HV_MAP_GPA_KERNEL_EXECUTABLE    0x4
+#define HV_MAP_GPA_USER_EXECUTABLE      0x8
+#define HV_MAP_GPA_EXECUTABLE           0xC
+#define HV_MAP_GPA_PERMISSIONS_MASK     0xF
+
 #endif

@@ -20,9 +20,9 @@
  * guest physical pages and guest physical page addresses, since the guest page
  * size may not be 4096 on all architectures.
  */
-#define HV_HYP_PAGE_SHIFT      12
-#define HV_HYP_PAGE_SIZE       BIT(HV_HYP_PAGE_SHIFT)
-#define HV_HYP_PAGE_MASK       (~(HV_HYP_PAGE_SIZE - 1))
+#define HV_HYP_PAGE_SHIFT		12
+#define HV_HYP_PAGE_SIZE		BIT(HV_HYP_PAGE_SHIFT)
+#define HV_HYP_PAGE_MASK		(~(HV_HYP_PAGE_SIZE - 1))
 
 /*
  * Hyper-V provides two categories of flags relevant to guest VMs.  The
@@ -150,6 +150,8 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_GET_PARTITION_ID			0x0046
 #define HVCALL_DEPOSIT_MEMORY			0x0048
 #define HVCALL_WITHDRAW_MEMORY			0x0049
+#define HVCALL_MAP_GPA_PAGES			0x004b
+#define HVCALL_UNMAP_GPA_PAGES			0x004c
 #define HVCALL_CREATE_VP			0x004e
 #define HVCALL_GET_VP_REGISTERS			0x0050
 #define HVCALL_SET_VP_REGISTERS			0x0051
@@ -884,6 +886,21 @@ struct hv_finalize_partition {
 
 struct hv_delete_partition {
 	u64 partition_id;
+} __packed;
+
+struct hv_map_gpa_pages {
+	u64 target_partition_id;
+	u64 target_gpa_base;
+	u32 map_flags;
+        u32 padding;
+	u64 source_gpa_page_list[];
+} __packed;
+
+struct hv_unmap_gpa_pages {
+	u64 target_partition_id;
+	u64 target_gpa_base;
+	u32 unmap_flags;
+        u32 padding;
 } __packed;
 
 #endif
