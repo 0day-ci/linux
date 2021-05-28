@@ -11,23 +11,43 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/rational.h>
 
 static inline u32 clk_fd_readl(struct clk_fractional_divider *fd)
 {
-	if (fd->flags & CLK_FRAC_DIVIDER_BIG_ENDIAN)
+	int ret;
+	u32 val;
+
+	if (fd->flags & CLK_FRAC_DIVIDER_BIG_ENDIAN) {
 		return ioread32be(fd->reg);
+	} else if (fd->flags & CLK_FRAC_DIVIDER_REGMAP) {
+		ret = regmap_read(fd->regmap, fd->reg_off, &val);
+		if (ret < 0) {
+			pr_warn("%s: failed %x, %d\n", __func__, fd->reg_off, ret);
+			return ret;
+		} else {
+			return val;
+		}
+	}
 
 	return readl(fd->reg);
 }
 
 static inline void clk_fd_writel(struct clk_fractional_divider *fd, u32 val)
 {
-	if (fd->flags & CLK_FRAC_DIVIDER_BIG_ENDIAN)
+	int ret;
+
+	if (fd->flags & CLK_FRAC_DIVIDER_BIG_ENDIAN) {
 		iowrite32be(val, fd->reg);
-	else
+	} else if (fd->flags & CLK_FRAC_DIVIDER_REGMAP) {
+		ret = regmap_write(fd->regmap, fd->reg_off, val);
+		if (ret < 0)
+			pr_warn("%s: failed %x, %d\n", __func__, fd->reg_off, ret);
+	} else {
 		writel(val, fd->reg);
+	}
 }
 
 static unsigned long clk_fd_recalc_rate(struct clk_hw *hw,

@@ -990,6 +990,8 @@ struct clk_hw *devm_clk_hw_register_fixed_factor(struct device *dev,
  * @nshift:	shift to the denominator bit field
  * @nwidth:	width of the denominator bit field
  * @lock:	register lock
+ * @regmap:	register regmap
+ * @reg_off:	register offset
  *
  * Clock with adjustable fractional divider affecting its output frequency.
  *
@@ -1012,6 +1014,8 @@ struct clk_fractional_divider {
 	u8		nwidth;
 	u32		nmask;
 	u8		flags;
+	struct regmap	*regmap;
+	u32		reg_off;
 	void		(*approximation)(struct clk_hw *hw,
 				unsigned long rate, unsigned long *parent_rate,
 				unsigned long *m, unsigned long *n);
@@ -1022,6 +1026,7 @@ struct clk_fractional_divider {
 
 #define CLK_FRAC_DIVIDER_ZERO_BASED		BIT(0)
 #define CLK_FRAC_DIVIDER_BIG_ENDIAN		BIT(1)
+#define CLK_FRAC_DIVIDER_REGMAP			BIT(2)
 
 extern const struct clk_ops clk_fractional_divider_ops;
 struct clk *clk_register_fractional_divider(struct device *dev,
