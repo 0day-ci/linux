@@ -103,4 +103,32 @@ struct hv_register_assoc {
 	union hv_register_value value;
 } __packed;
 
+/*
+ * For getting and setting VP state, there are two options based on the state type:
+ *
+ *     1.) Data that is accessed by PFNs in the input hypercall page. This is used
+ *         for state which may not fit into the hypercall pages.
+ *     2.) Data that is accessed directly in the input\output hypercall pages.
+ *         This is used for state that will always fit into the hypercall pages.
+ *
+ * In the future this could be dynamic based on the size if needed.
+ *
+ * Note these hypercalls have an 8-byte aligned variable header size as per the tlfs
+ */
+
+#define HV_GET_SET_VP_STATE_TYPE_PFN	BIT(31)
+
+enum hv_get_set_vp_state_type {
+	HV_GET_SET_VP_STATE_LOCAL_INTERRUPT_CONTROLLER_STATE = 0,
+
+	HV_GET_SET_VP_STATE_XSAVE		= 1 | HV_GET_SET_VP_STATE_TYPE_PFN,
+	/* Synthetic message page */
+	HV_GET_SET_VP_STATE_SIM_PAGE		= 2 | HV_GET_SET_VP_STATE_TYPE_PFN,
+	/* Synthetic interrupt event flags page. */
+	HV_GET_SET_VP_STATE_SIEF_PAGE		= 3 | HV_GET_SET_VP_STATE_TYPE_PFN,
+
+	/* Synthetic timers. */
+	HV_GET_SET_VP_STATE_SYNTHETIC_TIMERS	= 4,
+};
+
 #endif

@@ -428,7 +428,6 @@ int hv_call_install_intercept(
 		}
 
 		ret = hv_call_deposit_pages(NUMA_NO_NODE, partition_id, 1);
-
 	} while (!ret);
 
 	return ret;
@@ -461,5 +460,142 @@ int hv_call_assert_virtual_interrupt(
 	}
 
 	return 0;
+}
+
+int hv_call_get_vp_state(
+		u32 vp_index,
+		u64 partition_id,
+		enum hv_get_set_vp_state_type type,
+		struct hv_vp_state_data_xsave xsave,
+		/* Choose between pages and ret_output */
+		u64 page_count,
+		struct page **pages,
+		union hv_get_vp_state_out *ret_output)
+{
+	struct hv_get_vp_state_in *input;
+	union hv_get_vp_state_out *output;
+	u64 status;
+	int i;
+	u64 control;
+	unsigned long flags;
+	int ret = 0;
+
+	if (page_count > HV_GET_VP_STATE_BATCH_SIZE)
+		return -EINVAL;
+
+	if (!page_count && !ret_output)
+		return -EINVAL;
+
+	do {
+		local_irq_save(flags);
+		input = (struct hv_get_vp_state_in *)
+				(*this_cpu_ptr(hyperv_pcpu_input_arg));
+		output = (union hv_get_vp_state_out *)
+				(*this_cpu_ptr(hyperv_pcpu_output_arg));
+		memset(input, 0, sizeof(*input));
+		memset(output, 0, sizeof(*output));
+
+		input->partition_id = partition_id;
+		input->vp_index = vp_index;
+		input->state_data.type = type;
+		memcpy(&input->state_data.xsave, &xsave, sizeof(xsave));
+		for (i = 0; i < page_count; i++)
+			input->output_data_pfns[i] = page_to_pfn(pages[i]);
+
+		control = (HVCALL_GET_VP_STATE) |
+			  (page_count << HV_HYPERCALL_VARHEAD_OFFSET);
+
+		status = hv_do_hypercall(control, input, output);
+
+		if (hv_result(status) != HV_STATUS_INSUFFICIENT_MEMORY) {
+			if (!hv_result_success(status))
+				pr_err("%s: %s\n", __func__,
+				       hv_status_to_string(status));
+			else if (ret_output)
+				memcpy(ret_output, output, sizeof(*output));
+
+			local_irq_restore(flags);
+			ret = hv_status_to_errno(status);
+			break;
+		}
+		local_irq_restore(flags);
+
+		ret = hv_call_deposit_pages(NUMA_NO_NODE,
+					    partition_id, 1);
+	} while (!ret);
+
+	return ret;
+}
+
+int hv_call_set_vp_state(
+		u32 vp_index,
+		u64 partition_id,
+		enum hv_get_set_vp_state_type type,
+		struct hv_vp_state_data_xsave xsave,
+		/* Choose between pages and bytes */
+		u64 page_count,
+		struct page **pages,
+		u32 num_bytes,
+		u8 *bytes)
+{
+	struct hv_set_vp_state_in *input;
+	u64 status;
+	int i;
+	u64 control;
+	unsigned long flags;
+	int ret = 0;
+	u16 varhead_sz;
+
+	if (page_count > HV_SET_VP_STATE_BATCH_SIZE)
+		return -EINVAL;
+	if (sizeof(*input) + num_bytes > HV_HYP_PAGE_SIZE)
+		return -EINVAL;
+
+	if (num_bytes)
+		/* round up to 8 and divide by 8 */
+		varhead_sz = (num_bytes + 7) >> 3;
+	else if (page_count)
+		varhead_sz =  page_count;
+	else
+		return -EINVAL;
+
+	do {
+		local_irq_save(flags);
+		input = (struct hv_set_vp_state_in *)
+				(*this_cpu_ptr(hyperv_pcpu_input_arg));
+		memset(input, 0, sizeof(*input));
+
+		input->partition_id = partition_id;
+		input->vp_index = vp_index;
+		input->state_data.type = type;
+		memcpy(&input->state_data.xsave, &xsave, sizeof(xsave));
+		if (num_bytes) {
+			memcpy((u8 *)input->data, bytes, num_bytes);
+		} else {
+			for (i = 0; i < page_count; i++)
+				input->data[i].pfns = page_to_pfn(pages[i]);
+		}
+
+		control = (HVCALL_SET_VP_STATE) |
+			  (varhead_sz << HV_HYPERCALL_VARHEAD_OFFSET);
+
+		status = hv_do_hypercall(control, input, NULL);
+
+		if (hv_result(status) != HV_STATUS_INSUFFICIENT_MEMORY) {
+			if (!hv_result_success(status))
+				pr_err("%s: %s\n", __func__,
+				       hv_status_to_string(status));
+
+			local_irq_restore(flags);
+			ret = hv_status_to_errno(status);
+			break;
+		}
+		local_irq_restore(flags);
+
+		ret = hv_call_deposit_pages(NUMA_NO_NODE,
+					    partition_id, 1);
+	} while (!ret);
+
+	return ret;
 }
 

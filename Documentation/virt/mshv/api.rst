@@ -140,4 +140,12 @@ Assert interrupts in partitions that use Microsoft Hypervisor's internal
 emulated LAPIC. This must be enabled on partition creation with the flag:
 HV_PARTITION_CREATION_FLAG_LAPIC_ENABLED
 
+3.9 MSHV_GET_VP_STATE and MSHV_SET_VP_STATE
+--------------------------
+:Type: vp ioctl
+:Parameters: struct mshv_vp_state
+:Returns: 0 on success
+
+Get/set various vp state. Currently these can be used to get and set
+emulated LAPIC state, and xsave data.
 

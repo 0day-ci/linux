@@ -279,6 +279,122 @@ free_return:
 }
 
 static long
+mshv_vp_ioctl_get_set_state_pfn(struct mshv_vp *vp,
+				struct mshv_vp_state *args,
+				bool is_set)
+{
+	u64 page_count, remaining;
+	int completed;
+	struct page **pages;
+	long ret;
+	unsigned long u_buf;
+
+	/* Buffer must be page aligned */
+	if (!PAGE_ALIGNED(args->buf_size) ||
+	    !PAGE_ALIGNED(args->buf.bytes))
+		return -EINVAL;
+
+	if (!access_ok(args->buf.bytes, args->buf_size))
+		return -EFAULT;
+
+	/* Pin user pages so hypervisor can copy directly to them */
+	page_count = args->buf_size >> HV_HYP_PAGE_SHIFT;
+	pages = kcalloc(page_count, sizeof(struct page *), GFP_KERNEL);
+	if (!pages)
+		return -ENOMEM;
+
+	remaining = page_count;
+	u_buf = (unsigned long)args->buf.bytes;
+	while (remaining) {
+		completed = pin_user_pages_fast(
+				u_buf,
+				remaining,
+				FOLL_WRITE,
+				&pages[page_count - remaining]);
+		if (completed < 0) {
+			pr_err("%s: failed to pin user pages error %i\n",
+			       __func__, completed);
+			ret = completed;
+			goto unpin_pages;
+		}
+		remaining -= completed;
+		u_buf += completed * HV_HYP_PAGE_SIZE;
+	}
+
+	if (is_set)
+		ret = hv_call_set_vp_state(vp->index,
+					   vp->partition->id,
+					   args->type, args->xsave,
+					   page_count, pages,
+					   0, NULL);
+	else
+		ret = hv_call_get_vp_state(vp->index,
+					   vp->partition->id,
+					   args->type, args->xsave,
+					   page_count, pages,
+					   NULL);
+
+unpin_pages:
+	unpin_user_pages(pages, page_count - remaining);
+	kfree(pages);
+	return ret;
+}
+
+static long
+mshv_vp_ioctl_get_set_state(struct mshv_vp *vp, void __user *user_args, bool is_set)
+{
+	struct mshv_vp_state args;
+	long ret = 0;
+	union hv_get_vp_state_out vp_state;
+
+	if (copy_from_user(&args, user_args, sizeof(args)))
+		return -EFAULT;
+
+	/* For now just support these */
+	if (args.type != HV_GET_SET_VP_STATE_LOCAL_INTERRUPT_CONTROLLER_STATE &&
+	    args.type != HV_GET_SET_VP_STATE_XSAVE)
+		return -EINVAL;
+
+	/* If we need to pin pfns, delegate to helper */
+	if (args.type & HV_GET_SET_VP_STATE_TYPE_PFN)
+		return mshv_vp_ioctl_get_set_state_pfn(vp, &args, is_set);
+
+	if (args.buf_size < sizeof(vp_state))
+		return -EINVAL;
+
+	if (is_set) {
+		if (copy_from_user(
+				&vp_state,
+				args.buf.lapic,
+				sizeof(vp_state)))
+			return -EFAULT;
+
+		return hv_call_set_vp_state(vp->index,
+					    vp->partition->id,
+					    args.type, args.xsave,
+					    0, NULL,
+					    sizeof(vp_state),
+					    (u8 *)&vp_state);
+	}
+
+	ret = hv_call_get_vp_state(vp->index,
+				   vp->partition->id,
+				   args.type, args.xsave,
+				   0, NULL,
+				   &vp_state);
+
+	if (ret)
+		return ret;
+
+	if (copy_to_user(args.buf.lapic,
+			 &vp_state.interrupt_controller_state,
+			 sizeof(vp_state.interrupt_controller_state)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static long
 mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
 	struct mshv_vp *vp = filp->private_data;
@@ -296,6 +412,12 @@ mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_SET_VP_REGISTERS:
 		r = mshv_vp_ioctl_set_regs(vp, (void __user *)arg);
+		break;
+	case MSHV_GET_VP_STATE:
+		r = mshv_vp_ioctl_get_set_state(vp, (void __user *)arg, false);
+		break;
+	case MSHV_SET_VP_STATE:
+		r = mshv_vp_ioctl_get_set_state(vp, (void __user *)arg, true);
 		break;
 	default:
 		r = -ENOTTY;
