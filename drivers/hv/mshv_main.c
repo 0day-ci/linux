@@ -990,6 +990,13 @@ mshv_ioctl_create_partition(void __user *user_arg)
 	if (ret)
 		goto put_fd;
 
+	ret = hv_call_set_partition_property(
+				partition->id,
+				HV_PARTITION_PROPERTY_SYNTHETIC_PROC_FEATURES,
+				args.synthetic_processor_features.as_uint64[0]);
+	if (ret)
+		goto delete_partition;
+
 	ret = hv_call_initialize_partition(partition->id);
 	if (ret)
 		goto delete_partition;
