@@ -25,12 +25,21 @@ MODULE_LICENSE("GPL");
 
 struct mshv mshv = {};
 
+static int mshv_vp_release(struct inode *inode, struct file *filp);
+static long mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg);
+static struct mshv_partition *mshv_partition_get(struct mshv_partition *partition);
 static void mshv_partition_put(struct mshv_partition *partition);
 static int mshv_partition_release(struct inode *inode, struct file *filp);
 static long mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg);
 static int mshv_dev_open(struct inode *inode, struct file *filp);
 static int mshv_dev_release(struct inode *inode, struct file *filp);
 static long mshv_dev_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg);
+
+static const struct file_operations mshv_vp_fops = {
+	.release = mshv_vp_release,
+	.unlocked_ioctl = mshv_vp_ioctl,
+	.llseek = noop_llseek,
+};
 
 static const struct file_operations mshv_partition_fops = {
 	.release = mshv_partition_release,
@@ -52,6 +61,94 @@ static struct miscdevice mshv_dev = {
 	.fops = &mshv_dev_fops,
 	.mode = 600,
 };
+
+static long
+mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
+{
+	return -ENOTTY;
+}
+
+static int
+mshv_vp_release(struct inode *inode, struct file *filp)
+{
+	struct mshv_vp *vp = filp->private_data;
+	mshv_partition_put(vp->partition);
+
+	/* Rest of VP cleanup happens in destroy_partition() */
+	return 0;
+}
+
+static long
+mshv_partition_ioctl_create_vp(struct mshv_partition *partition,
+			       void __user *arg)
+{
+	struct mshv_create_vp args;
+	struct mshv_vp *vp;
+	struct file *file;
+	int fd;
+	long ret;
+
+	if (copy_from_user(&args, arg, sizeof(args)))
+		return -EFAULT;
+
+	if (args.vp_index >= MSHV_MAX_VPS)
+		return -EINVAL;
+
+	if (partition->vps.array[args.vp_index])
+		return -EEXIST;
+
+	vp = kzalloc(sizeof(*vp), GFP_KERNEL);
+
+	if (!vp)
+		return -ENOMEM;
+
+	vp->index = args.vp_index;
+	vp->partition = mshv_partition_get(partition);
+	if (!vp->partition) {
+		ret = -EBADF;
+		goto free_vp;
+	}
+
+	fd = get_unused_fd_flags(O_CLOEXEC);
+	if (fd < 0) {
+		ret = fd;
+		goto put_partition;
+	}
+
+	file = anon_inode_getfile("mshv_vp", &mshv_vp_fops, vp, O_RDWR);
+	if (IS_ERR(file)) {
+		ret = PTR_ERR(file);
+		goto put_fd;
+	}
+
+	ret = hv_call_create_vp(
+			NUMA_NO_NODE,
+			partition->id,
+			args.vp_index,
+			0 /* Only valid for root partition VPs */
+			);
+	if (ret)
+		goto release_file;
+
+	/* already exclusive with the partition mutex for all ioctls */
+	partition->vps.count++;
+	partition->vps.array[args.vp_index] = vp;
+
+	fd_install(fd, file);
+
+	return fd;
+
+release_file:
+	file->f_op->release(file->f_inode, file);
+put_fd:
+	put_unused_fd(fd);
+put_partition:
+	mshv_partition_put(partition);
+free_vp:
+	kfree(vp);
+
+	return ret;
+}
 
 static long
 mshv_partition_ioctl_map_memory(struct mshv_partition *partition,
@@ -228,6 +325,10 @@ mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		ret = mshv_partition_ioctl_unmap_memory(partition,
 							(void __user *)arg);
 		break;
+	case MSHV_CREATE_VP:
+		ret = mshv_partition_ioctl_create_vp(partition,
+							(void __user *)arg);
+		break;
 	default:
 		ret = -ENOTTY;
 	}
@@ -240,6 +341,7 @@ static void
 destroy_partition(struct mshv_partition *partition)
 {
 	unsigned long flags, page_count;
+	struct mshv_vp *vp;
 	struct mshv_mem_region *region;
 	int i;
 
@@ -271,6 +373,14 @@ destroy_partition(struct mshv_partition *partition)
 	hv_call_withdraw_memory(U64_MAX, NUMA_NO_NODE, partition->id);
 
 	hv_call_delete_partition(partition->id);
+	
+	/* Remove vps */
+	for (i = 0; i < MSHV_MAX_VPS; ++i) {
+		vp = partition->vps.array[i];
+		if (!vp)
+			continue;
+		kfree(vp);
+	}
 
 	/* Remove regions and unpin the pages */
 	for (i = 0; i < MSHV_MAX_MEM_REGIONS; ++i) {
@@ -283,6 +393,14 @@ destroy_partition(struct mshv_partition *partition)
 	}
 
 	kfree(partition);
+}
+
+static struct
+mshv_partition *mshv_partition_get(struct mshv_partition *partition)
+{
+	if (refcount_inc_not_zero(&partition->ref_count))
+		return partition;
+	return NULL;
 }
 
 static void

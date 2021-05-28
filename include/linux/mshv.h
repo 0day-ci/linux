@@ -12,6 +12,12 @@
 
 #define MSHV_MAX_PARTITIONS		128
 #define MSHV_MAX_MEM_REGIONS		64
+#define MSHV_MAX_VPS			256
+
+struct mshv_vp {
+	u32 index;
+	struct mshv_partition *partition;
+};
 
 struct mshv_mem_region {
 	u64 size; /* bytes */
@@ -28,6 +34,10 @@ struct mshv_partition {
 		u32 count;
 		struct mshv_mem_region slots[MSHV_MAX_MEM_REGIONS];
 	} regions;
+	struct {
+		u32 count;
+		struct mshv_vp *array[MSHV_MAX_VPS];
+	} vps;
 };
 
 struct mshv {

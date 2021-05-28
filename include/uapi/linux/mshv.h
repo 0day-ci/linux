@@ -30,6 +30,10 @@ struct mshv_user_mem_region {
 	__u32 flags;		/* ignored on unmap */
 };
 
+struct mshv_create_vp {
+	__u32 vp_index;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -39,5 +43,6 @@ struct mshv_user_mem_region {
 /* partition device */
 #define MSHV_MAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x02, struct mshv_user_mem_region)
 #define MSHV_UNMAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x03, struct mshv_user_mem_region)
+#define MSHV_CREATE_VP		_IOW(MSHV_IOCTL, 0x04, struct mshv_create_vp)
 
 #endif
