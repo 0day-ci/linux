@@ -291,6 +291,27 @@ char *d_path(const struct path *path, char *buf, int buflen)
 }
 EXPORT_SYMBOL(d_path);
 
+/**
+ * d_path_fast - fast return the full path of a dentry without taking
+ * any seqlock/spinlock. This helper is typical for debugging purpose
+ */
+char *d_path_fast(const struct path *path, char *buf, int buflen)
+{
+	struct path root;
+	struct mount *mnt = real_mount(path->mnt);
+	DECLARE_BUFFER(b, buf, buflen);
+
+	rcu_read_lock();
+	get_fs_root_rcu(current->fs, &root);
+
+	prepend(&b, "", 1);
+	__prepend_path(path->dentry, mnt, &root, &b);
+	rcu_read_unlock();
+
+	return extract_string(&b);
+}
+EXPORT_SYMBOL(d_path_fast);
+
 /*
  * Helper function for dentry_operations.d_dname() members
  */
