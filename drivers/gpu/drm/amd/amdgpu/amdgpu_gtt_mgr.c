@@ -43,9 +43,8 @@ struct amdgpu_gtt_node {
  * The file mem_info_gtt_total is used for this, and returns the total size of
  * the GTT block, in bytes
  */
-static ssize_t amdgpu_mem_info_gtt_total_show(struct device *dev,
-					      struct device_attribute *attr,
-					      char *buf)
+static ssize_t mem_info_gtt_total_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -63,9 +62,8 @@ static ssize_t amdgpu_mem_info_gtt_total_show(struct device *dev,
  * The file mem_info_gtt_used is used for this, and returns the current used
  * size of the GTT block, in bytes
  */
-static ssize_t amdgpu_mem_info_gtt_used_show(struct device *dev,
-					     struct device_attribute *attr,
-					     char *buf)
+static ssize_t mem_info_gtt_used_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -75,10 +73,8 @@ static ssize_t amdgpu_mem_info_gtt_used_show(struct device *dev,
 	return sysfs_emit(buf, "%llu\n", amdgpu_gtt_mgr_usage(man));
 }
 
-static DEVICE_ATTR(mem_info_gtt_total, S_IRUGO,
-	           amdgpu_mem_info_gtt_total_show, NULL);
-static DEVICE_ATTR(mem_info_gtt_used, S_IRUGO,
-	           amdgpu_mem_info_gtt_used_show, NULL);
+static DEVICE_ATTR_RO(mem_info_gtt_total);
+static DEVICE_ATTR_RO(mem_info_gtt_used);
 
 static struct attribute *amdgpu_gtt_mgr_attributes[] = {
 	&dev_attr_mem_info_gtt_total.attr,

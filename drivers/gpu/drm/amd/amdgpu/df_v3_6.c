@@ -188,9 +188,8 @@ static int df_v3_6_perfmon_arm_with_retry(struct amdgpu_device *adev,
 }
 
 /* get the number of df counters available */
-static ssize_t df_v3_6_get_df_cntr_avail(struct device *dev,
-		struct device_attribute *attr,
-		char *buf)
+static ssize_t df_cntr_avail_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
 	struct amdgpu_device *adev;
 	struct drm_device *ddev;
@@ -209,7 +208,7 @@ static ssize_t df_v3_6_get_df_cntr_avail(struct device *dev,
 }
 
 /* device attr for available perfmon counters */
-static DEVICE_ATTR(df_cntr_avail, S_IRUGO, df_v3_6_get_df_cntr_avail, NULL);
+static DEVICE_ATTR_RO(df_cntr_avail);
 
 static void df_v3_6_query_hashes(struct amdgpu_device *adev)
 {

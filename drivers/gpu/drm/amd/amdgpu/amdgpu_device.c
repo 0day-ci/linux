@@ -134,8 +134,8 @@ const char *amdgpu_asic_name[] = {
  * number of replays as a sum of the NAKs generated and NAKs received
  */
 
-static ssize_t amdgpu_device_get_pcie_replay_count(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t pcie_replay_count_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -144,8 +144,7 @@ static ssize_t amdgpu_device_get_pcie_replay_count(struct device *dev,
 	return sysfs_emit(buf, "%llu\n", cnt);
 }
 
-static DEVICE_ATTR(pcie_replay_count, S_IRUGO,
-		amdgpu_device_get_pcie_replay_count, NULL);
+static DEVICE_ATTR_RO(pcie_replay_count);
 
 static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev);
 
@@ -159,8 +158,8 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev);
  * NOTE: This is only available for certain server cards
  */
 
-static ssize_t amdgpu_device_get_product_name(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t product_name_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -168,8 +167,7 @@ static ssize_t amdgpu_device_get_product_name(struct device *dev,
 	return sysfs_emit(buf, "%s\n", adev->product_name);
 }
 
-static DEVICE_ATTR(product_name, S_IRUGO,
-		amdgpu_device_get_product_name, NULL);
+static DEVICE_ATTR_RO(product_name);
 
 /**
  * DOC: product_number
@@ -181,8 +179,8 @@ static DEVICE_ATTR(product_name, S_IRUGO,
  * NOTE: This is only available for certain server cards
  */
 
-static ssize_t amdgpu_device_get_product_number(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t product_number_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -190,8 +188,7 @@ static ssize_t amdgpu_device_get_product_number(struct device *dev,
 	return sysfs_emit(buf, "%s\n", adev->product_number);
 }
 
-static DEVICE_ATTR(product_number, S_IRUGO,
-		amdgpu_device_get_product_number, NULL);
+static DEVICE_ATTR_RO(product_number);
 
 /**
  * DOC: serial_number
@@ -203,8 +200,8 @@ static DEVICE_ATTR(product_number, S_IRUGO,
  * NOTE: This is only available for certain server cards
  */
 
-static ssize_t amdgpu_device_get_serial_number(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t serial_number_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -212,8 +209,7 @@ static ssize_t amdgpu_device_get_serial_number(struct device *dev,
 	return sysfs_emit(buf, "%s\n", adev->serial);
 }
 
-static DEVICE_ATTR(serial_number, S_IRUGO,
-		amdgpu_device_get_serial_number, NULL);
+static DEVICE_ATTR_RO(serial_number);
 
 /**
  * amdgpu_device_supports_px - Is the device a dGPU with ATPX power control

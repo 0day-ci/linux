@@ -1158,8 +1158,8 @@ static ssize_t amdgpu_ras_sysfs_badpages_read(struct file *f,
 	return s;
 }
 
-static ssize_t amdgpu_ras_sysfs_features_read(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t features_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
 {
 	struct amdgpu_ras *con =
 		container_of(attr, struct amdgpu_ras, features_attr);
@@ -1368,8 +1368,8 @@ void amdgpu_ras_debugfs_create_all(struct amdgpu_device *adev)
 /* ras fs */
 static BIN_ATTR(gpu_vram_bad_pages, S_IRUGO,
 		amdgpu_ras_sysfs_badpages_read, NULL, 0);
-static DEVICE_ATTR(features, S_IRUGO,
-		amdgpu_ras_sysfs_features_read, NULL);
+static DEVICE_ATTR_RO(features);
+
 static int amdgpu_ras_fs_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);

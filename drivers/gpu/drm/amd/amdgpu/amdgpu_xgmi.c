@@ -209,9 +209,8 @@ struct kobj_type amdgpu_xgmi_hive_type = {
 	.default_attrs = amdgpu_xgmi_hive_attrs,
 };
 
-static ssize_t amdgpu_xgmi_show_device_id(struct device *dev,
-				     struct device_attribute *attr,
-				     char *buf)
+static ssize_t xgmi_device_id_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -221,9 +220,8 @@ static ssize_t amdgpu_xgmi_show_device_id(struct device *dev,
 }
 
 #define AMDGPU_XGMI_SET_FICAA(o)	((o) | 0x456801)
-static ssize_t amdgpu_xgmi_show_error(struct device *dev,
-				      struct device_attribute *attr,
-				      char *buf)
+static ssize_t xgmi_error_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -249,8 +247,8 @@ static ssize_t amdgpu_xgmi_show_error(struct device *dev,
 }
 
 
-static DEVICE_ATTR(xgmi_device_id, S_IRUGO, amdgpu_xgmi_show_device_id, NULL);
-static DEVICE_ATTR(xgmi_error, S_IRUGO, amdgpu_xgmi_show_error, NULL);
+static DEVICE_ATTR_RO(xgmi_device_id);
+static DEVICE_ATTR_RO(xgmi_error);
 
 static int amdgpu_xgmi_sysfs_add_dev_info(struct amdgpu_device *adev,
 					 struct amdgpu_hive_info *hive)

@@ -1754,9 +1754,8 @@ static uint32_t cail_reg_read(struct card_info *info, uint32_t reg)
 	return r;
 }
 
-static ssize_t amdgpu_atombios_get_vbios_version(struct device *dev,
-						 struct device_attribute *attr,
-						 char *buf)
+static ssize_t vbios_version_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -1765,8 +1764,7 @@ static ssize_t amdgpu_atombios_get_vbios_version(struct device *dev,
 	return sysfs_emit(buf, "%s\n", ctx->vbios_version);
 }
 
-static DEVICE_ATTR(vbios_version, 0444, amdgpu_atombios_get_vbios_version,
-		   NULL);
+static DEVICE_ATTR_RO(vbios_version);
 
 static struct attribute *amdgpu_vbios_version_attrs[] = {
 	&dev_attr_vbios_version.attr,

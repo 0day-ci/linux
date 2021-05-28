@@ -54,8 +54,8 @@ to_amdgpu_device(struct amdgpu_vram_mgr *mgr)
  * The file mem_info_vram_total is used for this and returns the total
  * amount of VRAM in bytes
  */
-static ssize_t amdgpu_mem_info_vram_total_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t mem_info_vram_total_show(struct device *dev,
+					struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -71,8 +71,8 @@ static ssize_t amdgpu_mem_info_vram_total_show(struct device *dev,
  * The file mem_info_vis_vram_total is used for this and returns the total
  * amount of visible VRAM in bytes
  */
-static ssize_t amdgpu_mem_info_vis_vram_total_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t mem_info_vis_vram_total_show(struct device *dev,
+					    struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -88,9 +88,8 @@ static ssize_t amdgpu_mem_info_vis_vram_total_show(struct device *dev,
  * The file mem_info_vram_used is used for this and returns the total
  * amount of currently used VRAM in bytes
  */
-static ssize_t amdgpu_mem_info_vram_used_show(struct device *dev,
-					      struct device_attribute *attr,
-					      char *buf)
+static ssize_t mem_info_vram_used_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -108,9 +107,8 @@ static ssize_t amdgpu_mem_info_vram_used_show(struct device *dev,
  * The file mem_info_vis_vram_used is used for this and returns the total
  * amount of currently used visible VRAM in bytes
  */
-static ssize_t amdgpu_mem_info_vis_vram_used_show(struct device *dev,
-						  struct device_attribute *attr,
-						  char *buf)
+static ssize_t mem_info_vis_vram_used_show(struct device *dev,
+					   struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -128,9 +126,8 @@ static ssize_t amdgpu_mem_info_vis_vram_used_show(struct device *dev,
  * The file mem_info_vram_vendor is used for this and returns the name of the
  * vendor.
  */
-static ssize_t amdgpu_mem_info_vram_vendor(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
+static ssize_t mem_info_vram_vendor_show(struct device *dev,
+					 struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -161,16 +158,11 @@ static ssize_t amdgpu_mem_info_vram_vendor(struct device *dev,
 	}
 }
 
-static DEVICE_ATTR(mem_info_vram_total, S_IRUGO,
-		   amdgpu_mem_info_vram_total_show, NULL);
-static DEVICE_ATTR(mem_info_vis_vram_total, S_IRUGO,
-		   amdgpu_mem_info_vis_vram_total_show,NULL);
-static DEVICE_ATTR(mem_info_vram_used, S_IRUGO,
-		   amdgpu_mem_info_vram_used_show, NULL);
-static DEVICE_ATTR(mem_info_vis_vram_used, S_IRUGO,
-		   amdgpu_mem_info_vis_vram_used_show, NULL);
-static DEVICE_ATTR(mem_info_vram_vendor, S_IRUGO,
-		   amdgpu_mem_info_vram_vendor, NULL);
+static DEVICE_ATTR_RO(mem_info_vram_total);
+static DEVICE_ATTR_RO(mem_info_vis_vram_total);
+static DEVICE_ATTR_RO(mem_info_vram_used);
+static DEVICE_ATTR_RO(mem_info_vis_vram_used);
+static DEVICE_ATTR_RO(mem_info_vram_vendor);
 
 static struct attribute *amdgpu_vram_mgr_attributes[] = {
 	&dev_attr_mem_info_vram_total.attr,

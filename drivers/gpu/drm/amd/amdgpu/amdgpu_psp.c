@@ -2985,9 +2985,8 @@ static int psp_set_powergating_state(void *handle,
 	return 0;
 }
 
-static ssize_t psp_usbc_pd_fw_sysfs_read(struct device *dev,
-					 struct device_attribute *attr,
-					 char *buf)
+static ssize_t usbc_pd_fw_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -3011,10 +3010,8 @@ static ssize_t psp_usbc_pd_fw_sysfs_read(struct device *dev,
 	return sysfs_emit(buf, "%x\n", fw_ver);
 }
 
-static ssize_t psp_usbc_pd_fw_sysfs_write(struct device *dev,
-						       struct device_attribute *attr,
-						       const char *buf,
-						       size_t count)
+static ssize_t usbc_pd_fw_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -3086,11 +3083,7 @@ void psp_copy_fw(struct psp_context *psp, uint8_t *start_addr, uint32_t bin_size
 	drm_dev_exit(idx);
 }
 
-static DEVICE_ATTR(usbc_pd_fw, S_IRUGO | S_IWUSR,
-		   psp_usbc_pd_fw_sysfs_read,
-		   psp_usbc_pd_fw_sysfs_write);
-
-
+static DEVICE_ATTR_RW(usbc_pd_fw);
 
 const struct amd_ip_funcs psp_ip_funcs = {
 	.name = "psp",
