@@ -677,7 +677,6 @@ static struct class *spidev_class;
 static const struct of_device_id spidev_dt_ids[] = {
 	{ .compatible = "rohm,dh2228fv" },
 	{ .compatible = "lineartechnology,ltc2488" },
-	{ .compatible = "ge,achc" },
 	{ .compatible = "semtech,sx1301" },
 	{ .compatible = "lwn,bk4" },
 	{ .compatible = "dh,dhcom-board" },
@@ -728,7 +727,7 @@ static inline void spidev_probe_acpi(struct spi_device *spi) {}
 
 /*-------------------------------------------------------------------------*/
 
-static int spidev_probe(struct spi_device *spi)
+int spidev_probe(struct spi_device *spi)
 {
 	struct spidev_data	*spidev;
 	int			status;
@@ -789,8 +788,9 @@ static int spidev_probe(struct spi_device *spi)
 
 	return status;
 }
+EXPORT_SYMBOL_GPL(spidev_probe);
 
-static int spidev_remove(struct spi_device *spi)
+int spidev_remove(struct spi_device *spi)
 {
 	struct spidev_data	*spidev = spi_get_drvdata(spi);
 
@@ -810,6 +810,7 @@ static int spidev_remove(struct spi_device *spi)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(spidev_remove);
 
 static struct spi_driver spidev_spi_driver = {
 	.driver = {

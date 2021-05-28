@@ -1525,6 +1525,11 @@ of_find_spi_device_by_node(struct device_node *node)
 
 #endif /* IS_ENABLED(CONFIG_OF) */
 
+#ifdef CONFIG_SPI_SPIDEV
+extern int spidev_probe(struct spi_device *spi);
+extern int spidev_remove(struct spi_device *spi);
+#endif
+
 /* Compatibility layer */
 #define spi_master			spi_controller
 
