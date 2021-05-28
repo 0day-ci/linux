@@ -54,8 +54,13 @@ static void __dump_page(struct page *page)
 	 * inaccuracy here due to racing.
 	 */
 	bool page_cma = is_migrate_cma_page(page);
-	int mapcount;
+	int mapcount, total_mapcount;
+	int nr;
+	int refcount;
+	int pincount = 0;
+	int comp_mapcnt;
 	char *type = "";
+	bool is_slab = PageSlab(head);
 
 	if (page < head || (page >= head + MAX_ORDER_NR_PAGES)) {
 		/*
@@ -82,22 +87,40 @@ static void __dump_page(struct page *page)
 	 * page->_mapcount space in struct page is used by sl[aou]b pages to
 	 * encode own info.
 	 */
-	mapcount = PageSlab(head) ? 0 : page_mapcount(page);
+	mapcount = is_slab ? 0 : page_mapcount(page);
+
+	refcount = page_ref_count(head);
 
 	pr_warn("page:%p refcount:%d mapcount:%d mapping:%p index:%#lx pfn:%#lx\n",
-			page, page_ref_count(head), mapcount, mapping,
+			page, refcount, mapcount, mapping,
 			page_to_pgoff(page), page_to_pfn(page));
 	if (compound) {
+		comp_mapcnt = head_compound_mapcount(head);
 		if (hpage_pincount_available(page)) {
+			pincount = head_compound_pincount(head);
 			pr_warn("head:%p order:%u compound_mapcount:%d compound_pincount:%d\n",
 					head, compound_order(head),
-					head_compound_mapcount(head),
-					head_compound_pincount(head));
+					comp_mapcnt, pincount);
 		} else {
 			pr_warn("head:%p order:%u compound_mapcount:%d\n",
 					head, compound_order(head),
-					head_compound_mapcount(head));
+					comp_mapcnt);
 		}
+
+		nr = compound_nr(head);
+		if (is_slab)
+			total_mapcount = 0;
+		else if (PageHuge(head))
+			total_mapcount = comp_mapcnt;
+		else {
+			if (mapping) {
+				if (!PageAnon(head))
+					nr = nr * (comp_mapcnt + 1) - comp_mapcnt;
+			} else
+				nr = 0;
+			total_mapcount = refcount - pincount - nr;
+		}
+		pr_warn("total_mapcount(estimated):%d\n", total_mapcount);
 	}
 
 #ifdef CONFIG_MEMCG
