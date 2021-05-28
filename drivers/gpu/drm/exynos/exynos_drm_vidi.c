@@ -165,8 +165,8 @@ static void vidi_fake_vblank_timer(struct timer_list *t)
 			jiffies + msecs_to_jiffies(VIDI_REFRESH_TIME) - 1);
 }
 
-static ssize_t vidi_show_connection(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t connection_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
 	struct vidi_context *ctx = dev_get_drvdata(dev);
 	int rc;
@@ -180,7 +180,7 @@ static ssize_t vidi_show_connection(struct device *dev,
 	return rc;
 }
 
-static ssize_t vidi_store_connection(struct device *dev,
+static ssize_t connection_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t len)
 {
@@ -211,8 +211,7 @@ static ssize_t vidi_store_connection(struct device *dev,
 	return len;
 }
 
-static DEVICE_ATTR(connection, 0644, vidi_show_connection,
-			vidi_store_connection);
+static DEVICE_ATTR_RW(connection);
 
 static struct attribute *vidi_attrs[] = {
 	&dev_attr_connection.attr,
