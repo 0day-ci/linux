@@ -698,7 +698,7 @@ static umode_t queue_attr_visible(struct kobject *kobj, struct attribute *attr,
 	return attr->mode;
 }
 
-static struct attribute_group queue_attr_group = {
+static const struct attribute_group queue_attr_group = {
 	.attrs = queue_attrs,
 	.is_visible = queue_attr_visible,
 };
