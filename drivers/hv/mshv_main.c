@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/anon_inodes.h>
+#include <linux/mm.h>
 #include <linux/mshv.h>
 #include <asm/mshyperv.h>
 
@@ -52,7 +53,6 @@ static struct miscdevice mshv_dev = {
 	.mode = 600,
 };
 
-
 static long
 mshv_partition_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 {
@@ -89,7 +89,8 @@ destroy_partition(struct mshv_partition *partition)
 
 	/* Deallocates and unmaps everything including vcpus, GPA mappings etc */
 	hv_call_finalize_partition(partition->id);
-	/* TODO: Withdraw and free all pages we deposited */
+	/* Withdraw and free all pages we deposited */
+	hv_call_withdraw_memory(U64_MAX, NUMA_NO_NODE, partition->id);
 
 	hv_call_delete_partition(partition->id);
 
