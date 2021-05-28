@@ -17,6 +17,7 @@
 #include <linux/mm.h>
 #include <linux/io.h>
 #include <linux/cpuhotplug.h>
+#include <linux/random.h>
 #include <linux/mshv.h>
 #include <asm/mshyperv.h>
 
@@ -65,6 +66,130 @@ static struct miscdevice mshv_dev = {
 };
 
 static long
+mshv_vp_ioctl_run_vp(struct mshv_vp *vp, void __user *ret_message)
+{
+	long ret;
+	u32 msg_type;
+	struct hv_register_assoc suspend_registers[2] = {
+		{ .name = HV_REGISTER_EXPLICIT_SUSPEND },
+		{ .name = HV_REGISTER_INTERCEPT_SUSPEND }
+	};
+	/* Pointers to values for convenience */
+	union hv_explicit_suspend_register *explicit_suspend =
+				&suspend_registers[0].value.explicit_suspend;
+	union hv_intercept_suspend_register *intercept_suspend =
+				&suspend_registers[1].value.intercept_suspend;
+
+	/* Check that the VP is suspended */
+	ret = hv_call_get_vp_registers(
+			vp->index,
+			vp->partition->id,
+			2,
+			suspend_registers);
+	if (ret)
+		return ret;
+
+	if (!explicit_suspend->suspended &&
+	    !intercept_suspend->suspended) {
+		pr_err("%s: vp not suspended!\n", __func__);
+		return -EBADFD;
+	}
+
+	/*
+	 * If intercept_suspend is set, we missed a message and need to
+	 * wait for mshv_isr to complete
+	 */
+	if (intercept_suspend->suspended) {
+		if (down_interruptible(&vp->run.sem))
+			return -EINTR;
+		if (copy_to_user(ret_message, vp->run.intercept_message,
+				 sizeof(struct hv_message)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/*
+	 * At this point the semaphore ensures that mshv_isr is done,
+	 * and the mutex ensures that no other threads are touching this vp
+	 */
+	vp->run.task = current;
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	/* Now actually start the vp running */
+	explicit_suspend->suspended = 0;
+	intercept_suspend->suspended = 0;
+	ret = hv_call_set_vp_registers(
+			vp->index,
+			vp->partition->id,
+			2,
+			suspend_registers);
+	if (ret) {
+		pr_err("%s: failed to clear suspend bits\n", __func__);
+		set_current_state(TASK_RUNNING);
+		vp->run.task = NULL;
+		return ret;
+	}
+
+	schedule();
+
+	/* Explicitly suspend the vp to make sure it's stopped */
+	explicit_suspend->suspended = 1;
+	ret = hv_call_set_vp_registers(
+		vp->index,
+		vp->partition->id,
+		1,
+		&suspend_registers[0]);
+	if (ret) {
+		pr_err("%s: failed to set explicit suspend bit\n", __func__);
+		return -EBADFD;
+	}
+
+	/*
+	 * Check if woken up by a signal
+	 * Note that if the signal came after being woken by mshv_isr(),
+	 * we will still get the message correctly on re-entry
+	 */
+	if (signal_pending(current)) {
+		pr_debug("%s: woke up, received signal\n", __func__);
+		return -EINTR;
+	}
+
+	/*
+	 * No signal pending, so we were woken by hv_host_isr()
+	 * The isr can't be running now, and the intercept_suspend bit is set
+	 * We use it as a flag to tell if we missed a message due to a signal,
+	 * so we must clear it here and reset the semaphore
+	 */
+	intercept_suspend->suspended = 0;
+	ret = hv_call_set_vp_registers(
+		vp->index,
+		vp->partition->id,
+		1,
+		&suspend_registers[1]);
+	if (ret) {
+		pr_err("%s: failed to clear intercept suspend bit\n", __func__);
+		return -EBADFD;
+	}
+	if (down_trylock(&vp->run.sem)) {
+		pr_err("%s: semaphore in unexpected state\n", __func__);
+		return -EBADFD;
+	}
+
+	msg_type = vp->run.intercept_message->header.message_type;
+
+	if (msg_type == HVMSG_NONE) {
+		pr_err("%s: woke up, but no message\n", __func__);
+		return -ENOMSG;
+	}
+
+	if (copy_to_user(ret_message, vp->run.intercept_message,
+			 sizeof(struct hv_message)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static long
 mshv_vp_ioctl_get_regs(struct mshv_vp *vp, void __user *user_args)
 {
 	struct mshv_vp_registers args;
@@ -110,6 +235,7 @@ mshv_vp_ioctl_set_regs(struct mshv_vp *vp, void __user *user_args)
 	struct mshv_vp_registers args;
 	struct hv_register_assoc *registers;
 	long ret;
+	int i;
 
 	if (copy_from_user(&args, user_args, sizeof(args)))
 		return -EFAULT;
@@ -130,6 +256,20 @@ mshv_vp_ioctl_set_regs(struct mshv_vp *vp, void __user *user_args)
 		goto free_return;
 	}
 
+	for (i = 0; i < args.count; i++) {
+		/*
+		 * Disallow setting suspend registers to ensure run vp state
+		 * is consistent
+		 */
+		if (registers[i].name == HV_REGISTER_EXPLICIT_SUSPEND ||
+		    registers[i].name == HV_REGISTER_INTERCEPT_SUSPEND) {
+			pr_err("%s: not allowed to set suspend registers\n",
+			       __func__);
+			ret = -EINVAL;
+			goto free_return;
+		}
+	}
+
 	ret = hv_call_set_vp_registers(vp->index, vp->partition->id,
 				       args.count, registers);
 
@@ -148,6 +288,9 @@ mshv_vp_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		return -EINTR;
 
 	switch (ioctl) {
+	case MSHV_RUN_VP:
+		r = mshv_vp_ioctl_run_vp(vp, (void __user *)arg);
+		break;
 	case MSHV_GET_VP_REGISTERS:
 		r = mshv_vp_ioctl_get_regs(vp, (void __user *)arg);
 		break;
@@ -198,12 +341,20 @@ mshv_partition_ioctl_create_vp(struct mshv_partition *partition,
 		return -ENOMEM;
 
 	mutex_init(&vp->mutex);
+	sema_init(&vp->run.sem, 0);
+
+	vp->run.intercept_message =
+		(struct hv_message *)get_zeroed_page(GFP_KERNEL);
+	if (!vp->run.intercept_message) {
+		ret = -ENOMEM;
+		goto free_vp;
+	}
 
 	vp->index = args.vp_index;
 	vp->partition = mshv_partition_get(partition);
 	if (!vp->partition) {
 		ret = -EBADF;
-		goto free_vp;
+		goto free_message;
 	}
 
 	fd = get_unused_fd_flags(O_CLOEXEC);
@@ -241,6 +392,8 @@ put_fd:
 	put_unused_fd(fd);
 put_partition:
 	mshv_partition_put(partition);
+free_message:
+	free_page((unsigned long)vp->run.intercept_message);
 free_vp:
 	kfree(vp);
 
@@ -457,6 +610,9 @@ destroy_partition(struct mshv_partition *partition)
 		mshv.partitions.array[i] = NULL;
 	}
 
+	if (!mshv.partitions.count)
+		hv_remove_mshv_irq();
+
 	spin_unlock_irqrestore(&mshv.partitions.lock, flags);
 
 	/*
@@ -476,6 +632,7 @@ destroy_partition(struct mshv_partition *partition)
 		vp = partition->vps.array[i];
 		if (!vp)
 			continue;
+		free_page((unsigned long)vp->run.intercept_message);
 		kfree(vp);
 	}
 
@@ -538,6 +695,9 @@ add_partition(struct mshv_partition *partition)
 
 	mshv.partitions.count++;
 	mshv.partitions.array[i] = partition;
+
+	if (mshv.partitions.count == 1)
+		hv_setup_mshv_irq(mshv_isr);
 
 out_unlock:
 	spin_unlock_irqrestore(&mshv.partitions.lock, flags);

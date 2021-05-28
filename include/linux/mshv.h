@@ -8,6 +8,8 @@
 
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
+#include <linux/semaphore.h>
+#include <linux/sched.h>
 #include <uapi/linux/mshv.h>
 
 #define MSHV_MAX_PARTITIONS		128
@@ -18,6 +20,11 @@ struct mshv_vp {
 	u32 index;
 	struct mshv_partition *partition;
 	struct mutex mutex;
+	struct {
+		struct semaphore sem;
+		struct task_struct *task;
+		struct hv_message *intercept_message;
+	} run;
 };
 
 struct mshv_mem_region {

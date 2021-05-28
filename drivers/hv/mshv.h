@@ -29,6 +29,7 @@
 
 extern struct mshv mshv;
 
+void mshv_isr(void);
 int mshv_synic_init(unsigned int cpu);
 int mshv_synic_cleanup(unsigned int cpu);
 

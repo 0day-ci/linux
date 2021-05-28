@@ -106,4 +106,18 @@ Get/set vp registers. See asm/hyperv-tlfs.h for the complete set of registers.
 Includes general purpose platform registers, MSRs, and virtual registers that
 are part of Microsoft Hypervisor platform and not directly exposed to the guest.
 
+3.6 MSHV_RUN_VP
+---------------
+:Type: vp ioctl
+:Parameters: struct hv_message
+:Returns: 0 on success
+
+Run the vp, returning when it triggers an intercept, or if the calling thread
+is interrupted by a signal. In this case errno will be set to EINTR.
+
+On return, the vp will be suspended.
+This ioctl will fail on any vp that's already running (not suspended).
+
+Information about the intercept is returned in the hv_message struct.
+
 

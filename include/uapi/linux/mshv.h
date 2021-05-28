@@ -55,5 +55,6 @@ struct mshv_vp_registers {
 /* vp device */
 #define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)
 #define MSHV_SET_VP_REGISTERS   _IOW(MSHV_IOCTL, 0x06, struct mshv_vp_registers)
+#define MSHV_RUN_VP		_IOR(MSHV_IOCTL, 0x07, struct hv_message)
 
 #endif
