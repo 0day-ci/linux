@@ -723,4 +723,229 @@ union hv_register_value {
 		pending_virtualization_fault_event;
 };
 
+union hv_x64_vp_execution_state {
+	__u16 as_uint16;
+	struct {
+		__u16 cpl:2;
+		__u16 cr0_pe:1;
+		__u16 cr0_am:1;
+		__u16 efer_lma:1;
+		__u16 debug_active:1;
+		__u16 interruption_pending:1;
+		__u16 vtl:4;
+		__u16 enclave_mode:1;
+		__u16 interrupt_shadow:1;
+		__u16 virtualization_fault_active:1;
+		__u16 reserved:2;
+	} __packed;
+};
+
+/* Values for intercept_access_type field */
+#define HV_INTERCEPT_ACCESS_READ	0
+#define HV_INTERCEPT_ACCESS_WRITE	1
+#define HV_INTERCEPT_ACCESS_EXECUTE	2
+
+struct hv_x64_intercept_message_header {
+	__u32 vp_index;
+	__u8 instruction_length:4;
+	__u8 cr8:4; // only set for exo partitions
+	__u8 intercept_access_type;
+	union hv_x64_vp_execution_state execution_state;
+	struct hv_x64_segment_register cs_segment;
+	__u64 rip;
+	__u64 rflags;
+} __packed;
+
+#define HV_HYPERCALL_INTERCEPT_MAX_XMM_REGISTERS 6
+
+struct hv_x64_hypercall_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u64 rax;
+	__u64 rbx;
+	__u64 rcx;
+	__u64 rdx;
+	__u64 r8;
+	__u64 rsi;
+	__u64 rdi;
+	struct hv_u128 xmmregisters[HV_HYPERCALL_INTERCEPT_MAX_XMM_REGISTERS];
+	struct {
+		__u32 isolated:1;
+		__u32 reserved:31;
+	} __packed;
+} __packed;
+
+union hv_x64_register_access_info {
+	union hv_register_value source_value;
+	__u32 destination_register;
+	__u64 source_address;
+	__u64 destination_address;
+};
+
+struct hv_x64_register_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	struct {
+		__u8 is_memory_op:1;
+		__u8 reserved:7;
+	} __packed;
+	__u8 reserved8;
+	__u16 reserved16;
+	__u32 register_name;
+	union hv_x64_register_access_info access_info;
+} __packed;
+
+union hv_x64_memory_access_info {
+	__u8 as_uint8;
+	struct {
+		__u8 gva_valid:1;
+		__u8 gva_gpa_valid:1;
+		__u8 hypercall_output_pending:1;
+		__u8 tlb_locked_no_overlay:1;
+		__u8 reserved:4;
+	} __packed;
+};
+
+union hv_x64_io_port_access_info {
+	__u8 as_uint8;
+	struct {
+		__u8 access_size:3;
+		__u8 string_op:1;
+		__u8 rep_prefix:1;
+		__u8 reserved:3;
+	} __packed;
+};
+
+union hv_x64_exception_info {
+	__u8 as_uint8;
+	struct {
+		__u8 error_code_valid:1;
+		__u8 software_exception:1;
+		__u8 reserved:6;
+	} __packed;
+};
+
+#define HV_CACHE_TYPE_UNCACHED		0
+#define HV_CACHE_TYPE_WRITE_COMBINING	1
+#define HV_CACHE_TYPE_WRITE_THROUGH	4
+#define HV_CACHE_TYPE_WRITE_PROTECTED	5
+#define HV_CACHE_TYPE_WRITE_BACK	6
+
+struct hv_x64_memory_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u32 cache_type;
+	__u8 instruction_byte_count;
+	union hv_x64_memory_access_info memory_access_info;
+	__u8 tpr_priority;
+	__u8 reserved1;
+	__u64 guest_virtual_address;
+	__u64 guest_physical_address;
+	__u8 instruction_bytes[16];
+} __packed;
+
+struct hv_x64_cpuid_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u64 rax;
+	__u64 rcx;
+	__u64 rdx;
+	__u64 rbx;
+	__u64 default_result_rax;
+	__u64 default_result_rcx;
+	__u64 default_result_rdx;
+	__u64 default_result_rbx;
+} __packed;
+
+struct hv_x64_msr_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u32 msr_number;
+	__u32 reserved;
+	__u64 rdx;
+	__u64 rax;
+} __packed;
+
+struct hv_x64_io_port_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u16 port_number;
+	union hv_x64_io_port_access_info access_info;
+	__u8 instruction_byte_count;
+	__u32 reserved;
+	__u64 rax;
+	__u8 instruction_bytes[16];
+	struct hv_x64_segment_register ds_segment;
+	struct hv_x64_segment_register es_segment;
+	__u64 rcx;
+	__u64 rsi;
+	__u64 rdi;
+} __packed;
+
+struct hv_x64_exception_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u16 exception_vector;
+	union hv_x64_exception_info exception_info;
+	__u8 instruction_byte_count;
+	__u32 error_code;
+	__u64 exception_parameter;
+	__u64 reserved;
+	__u8 instruction_bytes[16];
+	struct hv_x64_segment_register ds_segment;
+	struct hv_x64_segment_register ss_segment;
+	__u64 rax;
+	__u64 rcx;
+	__u64 rdx;
+	__u64 rbx;
+	__u64 rsp;
+	__u64 rbp;
+	__u64 rsi;
+	__u64 rdi;
+	__u64 r8;
+	__u64 r9;
+	__u64 r10;
+	__u64 r11;
+	__u64 r12;
+	__u64 r13;
+	__u64 r14;
+	__u64 r15;
+} __packed;
+
+struct hv_x64_invalid_vp_register_message {
+	__u32 vp_index;
+	__u32 reserved;
+} __packed;
+
+struct hv_x64_unrecoverable_exception_message {
+	struct hv_x64_intercept_message_header header;
+} __packed;
+
+#define HV_UNSUPPORTED_FEATURE_INTERCEPT	1
+#define HV_UNSUPPORTED_FEATURE_TASK_SWITCH_TSS	2
+
+struct hv_x64_unsupported_feature_message {
+	__u32 vp_index;
+	__u32 feature_code;
+	__u64 feature_parameter;
+} __packed;
+
+struct hv_x64_halt_message {
+	struct hv_x64_intercept_message_header header;
+} __packed;
+
+#define HV_X64_PENDING_INTERRUPT	0
+#define HV_X64_PENDING_NMI		2
+#define HV_X64_PENDING_EXCEPTION	3
+
+struct hv_x64_interruption_deliverable_message {
+	struct hv_x64_intercept_message_header header;
+	__u32 deliverable_type; /* pending interruption type */
+	__u32 rsvd;
+} __packed;
+
+struct hv_x64_sipi_intercept_message {
+	struct hv_x64_intercept_message_header header;
+	__u32 target_vp_index;
+	__u32 interrupt_vector;
+} __packed;
+
+struct hv_x64_apic_eoi_message {
+	__u32 vp_index;
+	__u32 interrupt_vector;
+} __packed;
+
 #endif

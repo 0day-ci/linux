@@ -42,6 +42,7 @@ struct mshv_partition {
 };
 
 struct mshv {
+	struct hv_message_page __percpu **synic_message_page;
 	struct {
 		spinlock_t lock;
 		u64 count;

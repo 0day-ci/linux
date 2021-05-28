@@ -15,6 +15,8 @@
 #include <linux/file.h>
 #include <linux/anon_inodes.h>
 #include <linux/mm.h>
+#include <linux/io.h>
+#include <linux/cpuhotplug.h>
 #include <linux/mshv.h>
 #include <asm/mshyperv.h>
 
@@ -650,23 +652,47 @@ mshv_dev_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static int mshv_cpuhp_online;
+
 static int
 __init mshv_init(void)
 {
 	int ret;
 
 	ret = misc_register(&mshv_dev);
-	if (ret)
+	if (ret) {
 		pr_err("%s: misc device register failed\n", __func__);
+		return ret;
+	}
 
+	mshv.synic_message_page = alloc_percpu(struct hv_message_page *);
+	if (!mshv.synic_message_page) {
+		pr_err("%s: failed to allocate percpu synic page\n", __func__);
+		misc_deregister(&mshv_dev);
+		return -ENOMEM;
+	}
+
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "mshv_synic",
+				mshv_synic_init,
+				mshv_synic_cleanup);
+	if (ret < 0) {
+		pr_err("%s: failed to setup cpu hotplug state: %i\n",
+		       __func__, ret);
+		return ret;
+	}
+
+	mshv_cpuhp_online = ret;
 	spin_lock_init(&mshv.partitions.lock);
 
-	return ret;
+	return 0;
 }
 
 static void
 __exit mshv_exit(void)
 {
+	cpuhp_remove_state(mshv_cpuhp_online);
+	free_percpu(mshv.synic_message_page);
+
 	misc_deregister(&mshv_dev);
 }
 
