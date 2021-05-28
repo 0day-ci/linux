@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <linux/bits.h>
 #include <linux/time64.h>
+#include <uapi/asm-generic/hyperv-tlfs.h>
 
 /*
  * While not explicitly listed in the TLFS, Hyper-V always runs with a page size

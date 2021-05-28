@@ -39,6 +39,9 @@ root partition can use mshv APIs to create guest partitions.
 
 The module is named mshv and can be configured with CONFIG_HYPERV_ROOT_API.
 
+The uapi header files you need are linux/mshv.h, asm/hyperv-tlfs.h, and
+asm-generic/hyperv-tlfs.h.
+
 Mshv is file descriptor-based, following a similar pattern to KVM.
 
 To get a handle to the mshv driver, use open("/dev/mshv").
@@ -57,4 +60,13 @@ number. If not, it will return 0.
 
 The first extension that can be checked is MSHV_CAP_CORE_API_STABLE. This
 will be supported when the core API is stable.
+
+3.2 MSHV_CREATE_PARTITION
+-------------------------
+:Type: /dev/mshv ioctl
+:Parameters: struct mshv_create_partition
+:Returns: partition file descriptor, or -1 on failure
+
+This ioctl creates a guest partition, returning a file descriptor to use as a
+handle for partition ioctls.
 
