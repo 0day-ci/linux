@@ -5155,6 +5155,12 @@ struct __sk_buff {
 	__u32 gso_segs;
 	__bpf_md_ptr(struct bpf_sock *, sk);
 	__u32 gso_size;
+	__u8  vhdr_flags;
+	__u8  vhdr_gso_type;
+	__u16 vhdr_hdr_len;
+	__u16 vhdr_gso_size;
+	__u16 vhdr_csum_start;
+	__u16 vhdr_csum_offset;
 };
 
 struct bpf_tunnel_key {

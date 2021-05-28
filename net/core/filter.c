@@ -8358,6 +8358,16 @@ static bool flow_dissector_is_valid_access(int off, int size,
 			return false;
 		info->reg_type = PTR_TO_FLOW_KEYS;
 		return true;
+	case bpf_ctx_range(struct __sk_buff, len):
+		return size == size_default;
+	case bpf_ctx_range(struct __sk_buff, vhdr_flags):
+	case bpf_ctx_range(struct __sk_buff, vhdr_gso_type):
+		return size == sizeof(__u8);
+	case bpf_ctx_range(struct __sk_buff, vhdr_hdr_len):
+	case bpf_ctx_range(struct __sk_buff, vhdr_gso_size):
+	case bpf_ctx_range(struct __sk_buff, vhdr_csum_start):
+	case bpf_ctx_range(struct __sk_buff, vhdr_csum_offset):
+		return size == sizeof(__u16);
 	default:
 		return false;
 	}
@@ -8389,6 +8399,51 @@ static u32 flow_dissector_convert_ctx_access(enum bpf_access_type type,
 		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, flow_keys),
 				      si->dst_reg, si->src_reg,
 				      offsetof(struct bpf_flow_dissector, flow_keys));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_flags):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_flags),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_flags));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_gso_type):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_gso_type),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_gso_type));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_hdr_len):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_hdr_len),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_hdr_len));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_gso_size):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_gso_size),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_gso_size));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_csum_start):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_csum_start),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_csum_start));
+		break;
+
+	case offsetof(struct __sk_buff, vhdr_csum_offset):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, vhdr_csum_offset),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, vhdr_csum_offset));
+		break;
+
+	case offsetof(struct __sk_buff, len):
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_flow_dissector, skb),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_flow_dissector, skb));
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct sk_buff, len),
+				      si->dst_reg, si->dst_reg,
+				      offsetof(struct sk_buff, len));
 		break;
 	}
 
