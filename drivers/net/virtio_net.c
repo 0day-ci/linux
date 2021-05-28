@@ -732,6 +732,17 @@ static struct sk_buff *receive_small(struct net_device *dev,
 
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(rq->xdp_prog);
+	if (unlikely(len > GOOD_PACKET_LEN)) {
+		pr_debug("%s: rx error: len %u exceeds max size %d\n",
+			 dev->name, len, GOOD_PACKET_LEN);
+		dev->stats.rx_length_errors++;
+		if (xdp_prog)
+			goto err_xdp;
+
+		rcu_read_unlock();
+		put_page(page);
+		return NULL;
+	}
 	if (xdp_prog) {
 		struct virtio_net_hdr_mrg_rxbuf *hdr = buf + header_offset;
 		struct xdp_frame *xdpf;
@@ -888,6 +899,16 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(rq->xdp_prog);
+	if (unlikely(len > truesize)) {
+		pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
+			 dev->name, len, (unsigned long)ctx);
+		dev->stats.rx_length_errors++;
+		if (xdp_prog)
+			goto err_xdp;
+
+		rcu_read_unlock();
+		goto err_skb;
+	}
 	if (xdp_prog) {
 		struct xdp_frame *xdpf;
 		struct page *xdp_page;
@@ -1011,13 +1032,6 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		}
 	}
 	rcu_read_unlock();
-
-	if (unlikely(len > truesize)) {
-		pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
-			 dev->name, len, (unsigned long)ctx);
-		dev->stats.rx_length_errors++;
-		goto err_skb;
-	}
 
 	head_skb = page_to_skb(vi, rq, page, offset, len, truesize, !xdp_prog,
 			       metasize, !!headroom);
