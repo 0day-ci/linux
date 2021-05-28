@@ -95,7 +95,7 @@
 #define LM3692X_FAULT_FLAG_SHRT BIT(3)
 #define LM3692X_FAULT_FLAG_OPEN BIT(4)
 
-/**
+/*
  * struct lm3692x_led
  * @lock: Lock for reading/writing the device
  * @client: Pointer to the I2C client
