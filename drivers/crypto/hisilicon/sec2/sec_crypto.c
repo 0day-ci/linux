@@ -21,6 +21,7 @@
 
 #define SEC_PRIORITY		4001
 #define SEC_XTS_MIN_KEY_SIZE	(2 * AES_MIN_KEY_SIZE)
+#define SEC_XTS_MID_KEY_SIZE	(3 * AES_MIN_KEY_SIZE)
 #define SEC_XTS_MAX_KEY_SIZE	(2 * AES_MAX_KEY_SIZE)
 #define SEC_DES3_2KEY_SIZE	(2 * DES_KEY_SIZE)
 #define SEC_DES3_3KEY_SIZE	(3 * DES_KEY_SIZE)
@@ -69,6 +70,7 @@
 #define MAX_INPUT_DATA_LEN	0xFFFE00
 #define BITS_MASK		0xFF
 #define BYTE_BITS		0x8
+#define SEC_XTS_NAME_SZ		0x3
 
 /* Get an en/de-cipher queue cyclically to balance load over queues of TFM */
 static inline int sec_alloc_queue_id(struct sec_ctx *ctx, struct sec_req *req)
@@ -539,6 +541,26 @@ static void sec_auth_uninit(struct sec_ctx *ctx)
 			  a_ctx->a_key, a_ctx->a_key_dma);
 }
 
+static int sec_skcipher_fbtfm_init(struct crypto_skcipher *tfm)
+{
+	const char *alg = crypto_tfm_alg_name(&tfm->base);
+	struct sec_ctx *ctx = crypto_skcipher_ctx(tfm);
+	struct sec_cipher_ctx *c_ctx = &ctx->c_ctx;
+
+	c_ctx->fallback = false;
+	if (likely(strncmp(alg, "xts", SEC_XTS_NAME_SZ)))
+		return 0;
+
+	c_ctx->fbtfm = crypto_alloc_sync_skcipher(alg, 0,
+						  CRYPTO_ALG_NEED_FALLBACK);
+	if (IS_ERR(c_ctx->fbtfm)) {
+		pr_err("failed to alloc fallback tfm!\n");
+		return PTR_ERR(c_ctx->fbtfm);
+	}
+
+	return 0;
+}
+
 static int sec_skcipher_init(struct crypto_skcipher *tfm)
 {
 	struct sec_ctx *ctx = crypto_skcipher_ctx(tfm);
@@ -560,8 +582,14 @@ static int sec_skcipher_init(struct crypto_skcipher *tfm)
 	if (ret)
 		goto err_cipher_init;
 
+	ret = sec_skcipher_fbtfm_init(tfm);
+	if (ret)
+		goto err_fbtfm_init;
+
 	return 0;
 
+err_fbtfm_init:
+	sec_cipher_uninit(ctx);
 err_cipher_init:
 	sec_ctx_base_uninit(ctx);
 	return ret;
@@ -570,6 +598,9 @@ err_cipher_init:
 static void sec_skcipher_uninit(struct crypto_skcipher *tfm)
 {
 	struct sec_ctx *ctx = crypto_skcipher_ctx(tfm);
+
+	if (ctx->c_ctx.fbtfm)
+		crypto_free_sync_skcipher(ctx->c_ctx.fbtfm);
 
 	sec_cipher_uninit(ctx);
 	sec_ctx_base_uninit(ctx);
@@ -609,6 +640,9 @@ static int sec_skcipher_aes_sm4_setkey(struct sec_cipher_ctx *c_ctx,
 		switch (keylen) {
 		case SEC_XTS_MIN_KEY_SIZE:
 			c_ctx->c_key_len = SEC_CKEY_128BIT;
+			break;
+		case SEC_XTS_MID_KEY_SIZE:
+			c_ctx->fallback = true;
 			break;
 		case SEC_XTS_MAX_KEY_SIZE:
 			c_ctx->c_key_len = SEC_CKEY_256BIT;
@@ -675,7 +709,13 @@ static int sec_skcipher_setkey(struct crypto_skcipher *tfm, const u8 *key,
 	}
 
 	memcpy(c_ctx->c_key, key, keylen);
-
+	if (c_ctx->fallback) {
+		ret = crypto_sync_skcipher_setkey(c_ctx->fbtfm, key, keylen);
+		if (ret) {
+			dev_err(dev, "failed to set fallback skcipher key!\n");
+			return ret;
+		}
+	}
 	return 0;
 }
 
@@ -1504,6 +1544,37 @@ static int sec_skcipher_param_check(struct sec_ctx *ctx, struct sec_req *sreq)
 	return -EINVAL;
 }
 
+static int sec_skcipher_soft_crypto(struct sec_ctx *ctx,
+				    struct skcipher_request *sreq, bool encrypt)
+{
+	struct sec_cipher_ctx *c_ctx = &ctx->c_ctx;
+	struct device *dev = ctx->dev;
+	int ret;
+
+	SYNC_SKCIPHER_REQUEST_ON_STACK(subreq, c_ctx->fbtfm);
+
+	if (!c_ctx->fbtfm) {
+		dev_err(dev, "failed to check fallback tfm\n");
+		return -EINVAL;
+	}
+
+	skcipher_request_set_sync_tfm(subreq, c_ctx->fbtfm);
+
+	/* software need sync mode to do crypto */
+	skcipher_request_set_callback(subreq, sreq->base.flags,
+				      NULL, NULL);
+	skcipher_request_set_crypt(subreq, sreq->src, sreq->dst,
+				   sreq->cryptlen, sreq->iv);
+	if (encrypt)
+		ret = crypto_skcipher_encrypt(subreq);
+	else
+		ret = crypto_skcipher_decrypt(subreq);
+
+	skcipher_request_zero(subreq);
+
+	return ret;
+}
+
 static int sec_skcipher_crypto(struct skcipher_request *sk_req, bool encrypt)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(sk_req);
@@ -1511,8 +1582,11 @@ static int sec_skcipher_crypto(struct skcipher_request *sk_req, bool encrypt)
 	struct sec_ctx *ctx = crypto_skcipher_ctx(tfm);
 	int ret;
 
-	if (!sk_req->cryptlen)
+	if (!sk_req->cryptlen) {
+		if (ctx->c_ctx.c_mode == SEC_CMODE_XTS)
+			return -EINVAL;
 		return 0;
+	}
 
 	req->flag = sk_req->base.flags;
 	req->c_req.sk_req = sk_req;
@@ -1673,6 +1747,9 @@ static int sec_aead_crypto(struct aead_request *a_req, bool encrypt)
 	if (unlikely(ret))
 		return -EINVAL;
 
+	if (unlikely(ctx->c_ctx.fallback))
+		return sec_skcipher_soft_crypto(ctx, sk_req, encrypt);
+
 	return ctx->req_op->process(ctx, req);
 }
 
@@ -1693,7 +1770,9 @@ static int sec_aead_decrypt(struct aead_request *a_req)
 		.cra_name = sec_cra_name,\
 		.cra_driver_name = "hisi_sec_"sec_cra_name,\
 		.cra_priority = SEC_PRIORITY,\
-		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_ALLOCATES_MEMORY,\
+		.cra_flags = CRYPTO_ALG_ASYNC |\
+		 CRYPTO_ALG_ALLOCATES_MEMORY |\
+		 CRYPTO_ALG_NEED_FALLBACK,\
 		.cra_blocksize = blk_size,\
 		.cra_ctxsize = sizeof(struct sec_ctx),\
 		.cra_module = THIS_MODULE,\
