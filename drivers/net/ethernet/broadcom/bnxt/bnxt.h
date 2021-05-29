@@ -2042,6 +2042,8 @@ struct bnxt {
 
 	struct bpf_prog		*xdp_prog;
 
+	struct bnxt_ptp_cfg	*ptp_cfg;
+
 	/* devlink interface and vf-rep structs */
 	struct devlink		*dl;
 	struct devlink_port	dl_port;
