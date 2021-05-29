@@ -10,6 +10,14 @@
 #ifndef BNXT_PTP_H
 #define BNXT_PTP_H
 
+#define BNXT_MAX_PHC_DRIFT	31000000
+#define BNXT_LO_TIMER_MASK	0x0000ffffffffUL
+#define BNXT_HI_TIMER_MASK	0xffff00000000UL
+
+#define BNXT_PTP_QTS_TIMEOUT	1000
+#define BNXT_PTP_QTS_TX_ENABLES	(PORT_TS_QUERY_REQ_ENABLES_PTP_SEQ_ID |	\
+				 PORT_TS_QUERY_REQ_ENABLES_TS_REQ_TIMEOUT)
+
 struct bnxt_ptp_cfg {
 	struct ptp_clock_info	ptp_info;
 	struct ptp_clock	*ptp_clock;
@@ -41,4 +49,9 @@ struct bnxt_ptp_cfg {
 	u8			tx_tstamp_en:1;
 	int			rx_filter;
 };
+
+int bnxt_hwtstamp_set(struct net_device *dev, struct ifreq *ifr);
+int bnxt_hwtstamp_get(struct net_device *dev, struct ifreq *ifr);
+int bnxt_ptp_init(struct bnxt *bp);
+void bnxt_ptp_clear(struct bnxt *bp);
 #endif
