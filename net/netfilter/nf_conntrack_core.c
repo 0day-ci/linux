@@ -87,8 +87,6 @@ static __read_mostly bool nf_conntrack_locks_all;
 
 static struct conntrack_gc_work conntrack_gc_work;
 
-extern unsigned int nf_conntrack_net_id;
-
 void nf_conntrack_lock(spinlock_t *lock) __acquires(lock)
 {
 	/* 1) Acquire the lock */
