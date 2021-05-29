@@ -39,7 +39,7 @@ static inline void __freelist_add(struct freelist_node *node, struct freelist_he
 	 * and a refcount increment of a node in try_get, then back up to
 	 * something non-zero, then the refcount increment is done by the other
 	 * thread) -- so if the CAS to add the node to the actual list fails,
-	 * decrese the refcount and leave the add operation to the next thread
+	 * decrease the refcount and leave the add operation to the next thread
 	 * who puts the refcount back to zero (which could be us, hence the
 	 * loop).
 	 */
