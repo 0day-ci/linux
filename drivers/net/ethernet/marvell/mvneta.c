@@ -4501,7 +4501,9 @@ static int mvneta_ethtool_nway_reset(struct net_device *dev)
 
 /* Set interrupt coalescing for ethtools */
 static int mvneta_ethtool_set_coalesce(struct net_device *dev,
-				       struct ethtool_coalesce *c)
+				       struct ethtool_coalesce *c,
+				       struct kernel_ethtool_coalesce *kernel_coal,
+				       struct netlink_ext_ack *extack)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 	int queue;
@@ -4525,7 +4527,9 @@ static int mvneta_ethtool_set_coalesce(struct net_device *dev,
 
 /* get coalescing for ethtools */
 static int mvneta_ethtool_get_coalesce(struct net_device *dev,
-				       struct ethtool_coalesce *c)
+				       struct ethtool_coalesce *c,
+				       struct kernel_ethtool_coalesce *kernel_coal,
+				       struct netlink_ext_ack *extack)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 
