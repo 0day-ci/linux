@@ -163,13 +163,13 @@ enum rx_ctrl_state{
 #define W_VALUE         (0x0)
 #define W_LENGTH        (0x2)
 
-#define B_OVERRUN       (0x1<<6)
-#define B_PARITY        (0x1<<5)
-#define B_FRAMING       (0x1<<4)
-#define B_RING_SIGNAL   (0x1<<3)
-#define B_BREAK         (0x1<<2)
-#define B_TX_CARRIER    (0x1<<1)
-#define B_RX_CARRIER    (0x1<<0)
+#define B_OVERRUN       BIT(6)
+#define B_PARITY        BIT(5)
+#define B_FRAMING       BIT(4)
+#define B_RING_SIGNAL   BIT(3)
+#define B_BREAK         BIT(2)
+#define B_TX_CARRIER    BIT(1)
+#define B_RX_CARRIER    BIT(0)
 
 struct hso_serial_state_notification {
 	u8 bmRequestType;
