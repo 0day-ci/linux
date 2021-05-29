@@ -211,7 +211,7 @@ void cpufreq_stats_free_table(struct cpufreq_policy *policy)
 
 void cpufreq_stats_create_table(struct cpufreq_policy *policy)
 {
-	unsigned int i = 0, count = 0, ret = -ENOMEM;
+	unsigned int i = 0, count, ret;
 	struct cpufreq_stats *stats;
 	unsigned int alloc_size;
 	struct cpufreq_frequency_table *pos;
