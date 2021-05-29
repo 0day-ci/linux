@@ -6006,7 +6006,10 @@ static struct fwevent wlanevents[] = {
 
 u8 mlme_evt_hdl(struct adapter *padapter, unsigned char *pbuf)
 {
-	u8 evt_code, evt_seq;
+#ifdef CHECK_EVENT_SEQ
+	u8 evt_seq;
+#endif
+	u8 evt_code;
 	u16 evt_sz;
 	uint	*peventbuf;
 	void (*event_callback)(struct adapter *dev, u8 *pbuf);
@@ -6017,18 +6020,17 @@ u8 mlme_evt_hdl(struct adapter *padapter, unsigned char *pbuf)
 
 	peventbuf = (uint *)pbuf;
 	evt_sz = (u16)(*peventbuf&0xffff);
-	evt_seq = (u8)((*peventbuf>>24)&0x7f);
 	evt_code = (u8)((*peventbuf>>16)&0xff);
 
-
-	#ifdef CHECK_EVENT_SEQ
+#ifdef CHECK_EVENT_SEQ
 	/*  checking event sequence... */
+	evt_seq = (u8)((*peventbuf>>24)&0x7f);
 	if (evt_seq != (atomic_read(&pevt_priv->event_seq) & 0x7f)) {
 		pevt_priv->event_seq = (evt_seq+1)&0x7f;
 
 		goto _abort_event_;
 	}
-	#endif
+#endif
 
 	/*  checking if event code is valid */
 	if (evt_code >= MAX_C2HEVT)
