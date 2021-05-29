@@ -131,7 +131,6 @@ intel_dp_set_lttpr_transparent_mode(struct intel_dp *intel_dp, bool enable)
 static int intel_dp_init_lttpr(struct intel_dp *intel_dp)
 {
 	int lttpr_count;
-	int i;
 
 	if (!intel_dp_read_lttpr_common_caps(intel_dp))
 		return 0;
@@ -151,27 +150,6 @@ static int intel_dp_init_lttpr(struct intel_dp *intel_dp)
 	 * sequence.
 	 */
 	intel_dp_set_lttpr_transparent_mode(intel_dp, true);
-
-	/*
-	 * In case of unsupported number of LTTPRs or failing to switch to
-	 * non-transparent mode fall-back to transparent link training mode,
-	 * still taking into account any LTTPR common lane- rate/count limits.
-	 */
-	if (lttpr_count < 0)
-		return 0;
-
-	if (!intel_dp_set_lttpr_transparent_mode(intel_dp, false)) {
-		drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
-			    "Switching to LTTPR non-transparent LT mode failed, fall-back to transparent mode\n");
-
-		intel_dp_set_lttpr_transparent_mode(intel_dp, true);
-		intel_dp_reset_lttpr_count(intel_dp);
-
-		return 0;
-	}
-
-	for (i = 0; i < lttpr_count; i++)
-		intel_dp_read_lttpr_phy_caps(intel_dp, DP_PHY_LTTPR(i));
 
 	return lttpr_count;
 }
@@ -197,12 +175,34 @@ static int intel_dp_init_lttpr(struct intel_dp *intel_dp)
 int intel_dp_init_lttpr_and_dprx_caps(struct intel_dp *intel_dp)
 {
 	int lttpr_count = intel_dp_init_lttpr(intel_dp);
+	int i;
 
 	/* The DPTX shall read the DPRX caps after LTTPR detection. */
 	if (drm_dp_read_dpcd_caps(&intel_dp->aux, intel_dp->dpcd)) {
 		intel_dp_reset_lttpr_common_caps(intel_dp);
 		return -EIO;
 	}
+
+	/*
+	 * In case of unsupported number of LTTPRs or failing to switch to
+	 * non-transparent mode fall-back to transparent link training mode,
+	 * still taking into account any LTTPR common lane- rate/count limits.
+	 */
+	if (lttpr_count <= 0)
+		return 0;
+
+	if (!intel_dp_set_lttpr_transparent_mode(intel_dp, false)) {
+		drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
+		"Switching to LTTPR non-transparent LT mode failed, fall-back to transparent mode\n");
+
+		intel_dp_set_lttpr_transparent_mode(intel_dp, true);
+		intel_dp_reset_lttpr_count(intel_dp);
+
+		return 0;
+	}
+
+	for (i = 0; i < lttpr_count; i++)
+		intel_dp_read_lttpr_phy_caps(intel_dp, DP_PHY_LTTPR(i));
 
 	return lttpr_count;
 }
