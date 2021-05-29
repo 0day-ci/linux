@@ -290,6 +290,7 @@ static int ksmbd_vfs_stream_read(struct ksmbd_file *fp, char *buf, loff_t *pos,
 	}
 
 	memcpy(buf, &stream_buf[*pos], count);
+	kfree(stream_buf);
 	return v_len > count ? count : v_len;
 }
 
