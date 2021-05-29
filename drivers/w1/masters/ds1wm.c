@@ -509,7 +509,6 @@ static int ds1wm_probe(struct platform_device *pdev)
 	struct ds1wm_driver_data *plat;
 	struct resource *res;
 	int ret;
-	u8 inten;
 
 	if (!pdev)
 		return -ENODEV;
@@ -564,7 +563,7 @@ static int ds1wm_probe(struct platform_device *pdev)
 	ds1wm_data->reset_recover_delay = plat->reset_recover_delay;
 
 	/* Mask interrupts, set IAS before claiming interrupt */
-	inten = ds1wm_read_register(ds1wm_data, DS1WM_INT_EN);
+	ds1wm_read_register(ds1wm_data, DS1WM_INT_EN);
 	ds1wm_write_register(ds1wm_data,
 		DS1WM_INT_EN, ds1wm_data->int_en_reg_none);
 
