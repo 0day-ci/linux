@@ -241,8 +241,13 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 		vm_flags = VM_WRITE;
 	}
 
-	if (fsr & FSR_LNX_PF)
+	if (fsr & FSR_LNX_PF) {
 		vm_flags = VM_EXEC;
+#ifdef CONFIG_ARM_LPAE
+		if (addr < TASK_SIZE && !user_mode(regs))
+			__do_kernel_fault(mm, addr, fsr, regs);
+#endif
+	}
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
 
