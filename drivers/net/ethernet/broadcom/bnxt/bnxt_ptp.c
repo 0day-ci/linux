@@ -55,6 +55,17 @@ static int bnxt_hwrm_port_ts_query(struct bnxt *bp, u32 flags, u64 *ts,
 	return rc;
 }
 
+int bnxt_ptp_get_current_time(struct bnxt *bp)
+{
+	u32 flags = PORT_TS_QUERY_REQ_FLAGS_CURRENT_TIME;
+	struct bnxt_ptp_cfg *ptp = bp->ptp_cfg;
+
+	if (!ptp)
+		return 0;
+	ptp->old_time = ptp->current_time;
+	return bnxt_hwrm_port_ts_query(bp, flags, &ptp->current_time, NULL);
+}
+
 static int bnxt_ptp_gettimex(struct ptp_clock_info *ptp_info,
 			     struct timespec64 *ts,
 			     struct ptp_system_timestamp *sts)
@@ -234,6 +245,24 @@ static u64 bnxt_cc_read(const struct cyclecounter *cc)
 		netdev_err(bp->dev, "TS query for cc_read failed rc = %x\n",
 			   rc);
 	return ns;
+}
+
+int bnxt_ptp_start(struct bnxt *bp)
+{
+	struct bnxt_ptp_cfg *ptp = bp->ptp_cfg;
+	int rc = 0;
+
+	if (!ptp)
+		return 0;
+
+	if (bp->flags & BNXT_FLAG_CHIP_P5) {
+		u32 flags = PORT_TS_QUERY_REQ_FLAGS_CURRENT_TIME;
+
+		rc = bnxt_hwrm_port_ts_query(bp, flags, &ptp->current_time,
+					     NULL);
+		ptp->old_time = ptp->current_time;
+	}
+	return rc;
 }
 
 static const struct ptp_clock_info bnxt_ptp_caps = {

@@ -10064,6 +10064,7 @@ static int __bnxt_open_nic(struct bnxt *bp, bool irq_re_init, bool link_re_init)
 		}
 	}
 
+	bnxt_ptp_start(bp);
 	rc = bnxt_init_nic(bp, irq_re_init);
 	if (rc) {
 		netdev_err(bp->dev, "bnxt_init_nic err: %x\n", rc);
@@ -11154,6 +11155,11 @@ static void bnxt_timer(struct timer_list *t)
 		bnxt_queue_sp_work(bp);
 	}
 
+	if (bp->ptp_cfg && (bp->flags & BNXT_FLAG_CHIP_P5)) {
+		set_bit(BNXT_PTP_CURRENT_TIME_EVENT, &bp->sp_event);
+		bnxt_queue_sp_work(bp);
+	}
+
 #ifdef CONFIG_RFS_ACCEL
 	if ((bp->flags & BNXT_FLAG_RFS) && bp->ntp_fltr_count) {
 		set_bit(BNXT_RX_NTP_FLTR_SP_EVENT, &bp->sp_event);
@@ -11557,6 +11563,9 @@ static void bnxt_sp_task(struct work_struct *work)
 
 	if (test_and_clear_bit(BNXT_RING_COAL_NOW_SP_EVENT, &bp->sp_event))
 		bnxt_chk_missed_irq(bp);
+
+	if (test_and_clear_bit(BNXT_PTP_CURRENT_TIME_EVENT, &bp->sp_event))
+		bnxt_ptp_get_current_time(bp);
 
 	if (test_and_clear_bit(BNXT_FW_ECHO_REQUEST_SP_EVENT, &bp->sp_event))
 		bnxt_fw_echo_reply(bp);
