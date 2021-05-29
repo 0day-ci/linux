@@ -15,9 +15,31 @@
 #include <linux/net_tstamp.h>
 #include <linux/timecounter.h>
 #include <linux/timekeeping.h>
+#include <linux/ptp_classify.h>
 #include "bnxt_hsi.h"
 #include "bnxt.h"
 #include "bnxt_ptp.h"
+
+int bnxt_ptp_parse(struct sk_buff *skb, u16 *seq_id)
+{
+	unsigned int ptp_class;
+	struct ptp_header *hdr;
+
+	ptp_class = ptp_classify_raw(skb);
+
+	switch (ptp_class & PTP_CLASS_VMASK) {
+	case PTP_CLASS_V1:
+	case PTP_CLASS_V2:
+		hdr = ptp_parse_header(skb, ptp_class);
+		if (!hdr)
+			return -EINVAL;
+
+		*seq_id	 = ntohs(hdr->sequence_id);
+		return 0;
+	default:
+		return -ERANGE;
+	}
+}
 
 static int bnxt_ptp_settime(struct ptp_clock_info *ptp_info,
 			    const struct timespec64 *ts)
@@ -247,6 +269,48 @@ static u64 bnxt_cc_read(const struct cyclecounter *cc)
 	return ns;
 }
 
+static void bnxt_ptp_ts_task(struct work_struct *work)
+{
+	struct bnxt_ptp_cfg *ptp = container_of(work, struct bnxt_ptp_cfg,
+						ptp_ts_task);
+	u32 flags = PORT_TS_QUERY_REQ_FLAGS_PATH_TX;
+	struct skb_shared_hwtstamps timestamp;
+	struct bnxt *bp = ptp->bp;
+	u64 ts = 0, ns = 0;
+	int rc;
+
+	if (!ptp->tx_skb)
+		return;
+
+	rc = bnxt_hwrm_port_ts_query(bp, flags, &ts, NULL);
+	if (!rc) {
+		memset(&timestamp, 0, sizeof(timestamp));
+		ns = timecounter_cyc2time(&ptp->tc, ts);
+		timestamp.hwtstamp = ns_to_ktime(ns);
+		skb_tstamp_tx(ptp->tx_skb, &timestamp);
+	} else {
+		netdev_err(bp->dev, "TS query for TX timer failed rc = %x\n",
+			   rc);
+	}
+
+	dev_kfree_skb_any(ptp->tx_skb);
+	ptp->tx_skb = NULL;
+	atomic_inc(&bp->ptp_cfg->tx_avail);
+}
+
+int bnxt_get_tx_ts_p5(struct bnxt *bp, struct sk_buff *skb)
+{
+	struct bnxt_ptp_cfg *ptp = bp->ptp_cfg;
+
+	if (ptp->tx_skb) {
+		netdev_err(bp->dev, "deferring skb:one SKB is still outstanding\n");
+		return -EBUSY;
+	}
+	ptp->tx_skb = skb;
+	schedule_work(&ptp->ptp_ts_task);
+	return 0;
+}
+
 int bnxt_get_rx_ts_p5(struct bnxt *bp, u64 *ts, u32 pkt_ts)
 {
 	struct bnxt_ptp_cfg *ptp = bp->ptp_cfg;
@@ -319,6 +383,7 @@ int bnxt_ptp_init(struct bnxt *bp)
 	if (IS_ERR(ptp->ptp_clock))
 		ptp->ptp_clock = NULL;
 
+	INIT_WORK(&ptp->ptp_ts_task, bnxt_ptp_ts_task);
 	return 0;
 }
 
@@ -333,4 +398,9 @@ void bnxt_ptp_clear(struct bnxt *bp)
 		ptp_clock_unregister(ptp->ptp_clock);
 
 	ptp->ptp_clock = NULL;
+	cancel_work_sync(&ptp->ptp_ts_task);
+	if (ptp->tx_skb) {
+		dev_kfree_skb_any(ptp->tx_skb);
+		ptp->tx_skb = NULL;
+	}
 }
