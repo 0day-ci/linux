@@ -1487,8 +1487,7 @@ static struct xol_area *__create_xol_area(unsigned long vaddr)
 	if (unlikely(!area))
 		goto out;
 
-	area->bitmap = kcalloc(BITS_TO_LONGS(UINSNS_PER_PAGE), sizeof(long),
-			       GFP_KERNEL);
+	area->bitmap = bitmap_kzalloc(UINSNS_PER_PAGE, GFP_KERNEL);
 	if (!area->bitmap)
 		goto free_area;
 
@@ -1512,7 +1511,7 @@ static struct xol_area *__create_xol_area(unsigned long vaddr)
 
 	__free_page(area->pages[0]);
  free_bitmap:
-	kfree(area->bitmap);
+	bitmap_kfree(area->bitmap);
  free_area:
 	kfree(area);
  out:
@@ -1553,7 +1552,7 @@ void uprobe_clear_state(struct mm_struct *mm)
 		return;
 
 	put_page(area->pages[0]);
-	kfree(area->bitmap);
+	bitmap_kfree(area->bitmap);
 	kfree(area);
 }
 
