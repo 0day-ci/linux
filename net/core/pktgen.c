@@ -218,10 +218,10 @@ static char *pkt_flag_names[] = {
 #define NR_PKT_FLAGS		ARRAY_SIZE(pkt_flag_names)
 
 /* Thread control flag bits */
-#define T_STOP        (1<<0)	/* Stop run */
-#define T_RUN         (1<<1)	/* Start run */
-#define T_REMDEVALL   (1<<2)	/* Remove all devs */
-#define T_REMDEV      (1<<3)	/* Remove one dev */
+#define T_STOP        BIT(0)	/* Stop run */
+#define T_RUN         BIT(1)	/* Start run */
+#define T_REMDEVALL   BIT(2)	/* Remove all devs */
+#define T_REMDEV      BIT(3)	/* Remove one dev */
 
 /* Xmit modes */
 #define M_START_XMIT		0	/* Default normal TX */
