@@ -231,6 +231,8 @@ int ide_cdrom_select_speed(struct cdrom_device_info *cdi, int speed)
 	}
 
 	stat = ide_cd_queue_pc(drive, cmd, 0, NULL, NULL, NULL, 0, 0);
+	if (stat)
+		return stat;
 
 	if (!ide_cdrom_get_capabilities(drive, buf)) {
 		ide_cdrom_update_speed(drive, buf);
