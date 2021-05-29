@@ -811,8 +811,58 @@ static int asus_input_configured(struct hid_device *hdev, struct hid_input *hi)
 	return 0;
 }
 
-#define asus_map_key_clear(c)	hid_map_usage_clear(hi, usage, bit, \
-						    max, EV_KEY, (c))
+static int asus_map_use_to_btn(int use)
+{
+	switch (use) {
+	case 0x10: return KEY_BRIGHTNESSDOWN;
+	case 0x20: return KEY_BRIGHTNESSUP;
+	case 0x35: return KEY_DISPLAY_OFF;
+	case 0x6c: return KEY_SLEEP;
+	case 0x7c: return KEY_MICMUTE;
+	case 0x82: return KEY_CAMERA;
+	case 0x88: return KEY_RFKILL;
+	case 0xb5: return KEY_CALC;
+	case 0xc4: return KEY_KBDILLUMUP;
+	case 0xc5: return KEY_KBDILLUMDOWN;
+	case 0x6b: return KEY_F21;	/* ASUS touchpad toggle */
+	case 0x38: return KEY_PROG1;	/* ROG key */
+	case 0xba: return KEY_PROG2;	/* Fn+C ASUS Splendid */
+	case 0x5c: return KEY_PROG3;	/* Fn+Space Power4Gear Hybrid */
+	case 0x99: return KEY_PROG4;	/* Fn+F5 "fan" symbol on FX503VD */
+	/* for N-Key keyboard */
+	case 0xae: return KEY_PROG4;	/* Fn+F5 "fan" symbol */
+	case 0x92: return KEY_CALC;	/* Fn+Ret "Calc" symbol */
+	case 0xb2: return KEY_PROG2;	/* Fn+Left Aura mode previous */
+	case 0xb3: return KEY_PROG3;	/* Fn+Right Aura mode next */
+	}
+
+	return 0;
+}
+
+static int ms_map_use_to_btn(int use)
+{
+	switch (use) {
+	case 0xff01: return BTN_1;
+	case 0xff02: return BTN_2;
+	case 0xff03: return BTN_3;
+	case 0xff04: return BTN_4;
+	case 0xff05: return BTN_5;
+	case 0xff06: return BTN_6;
+	case 0xff07: return BTN_7;
+	case 0xff08: return BTN_8;
+	case 0xff09: return BTN_9;
+	case 0xff0a: return BTN_A;
+	case 0xff0b: return BTN_B;
+	case 0x00f1: return KEY_WLAN;
+	case 0x00f2: return KEY_BRIGHTNESSDOWN;
+	case 0x00f3: return KEY_BRIGHTNESSUP;
+	case 0x00f4: return KEY_DISPLAY_OFF;
+	case 0x00f7: return KEY_CAMERA;
+	case 0x00f8: return KEY_PROG1;
+	}
+
+	return 0;
+}
 static int asus_input_mapping(struct hid_device *hdev,
 		struct hid_input *hi, struct hid_field *field,
 		struct hid_usage *usage, unsigned long **bit,
@@ -842,50 +892,16 @@ static int asus_input_mapping(struct hid_device *hdev,
 
 	/* ASUS-specific keyboard hotkeys and led backlight */
 	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_ASUSVENDOR) {
-		switch (usage->hid & HID_USAGE) {
-		case 0x10: asus_map_key_clear(KEY_BRIGHTNESSDOWN);	break;
-		case 0x20: asus_map_key_clear(KEY_BRIGHTNESSUP);		break;
-		case 0x35: asus_map_key_clear(KEY_DISPLAY_OFF);		break;
-		case 0x6c: asus_map_key_clear(KEY_SLEEP);		break;
-		case 0x7c: asus_map_key_clear(KEY_MICMUTE);		break;
-		case 0x82: asus_map_key_clear(KEY_CAMERA);		break;
-		case 0x88: asus_map_key_clear(KEY_RFKILL);			break;
-		case 0xb5: asus_map_key_clear(KEY_CALC);			break;
-		case 0xc4: asus_map_key_clear(KEY_KBDILLUMUP);		break;
-		case 0xc5: asus_map_key_clear(KEY_KBDILLUMDOWN);		break;
+		int btn = asus_map_use_to_btn(usage->hid & HID_USAGE);
 
-		/* ASUS touchpad toggle */
-		case 0x6b: asus_map_key_clear(KEY_F21);			break;
-
-		/* ROG key */
-		case 0x38: asus_map_key_clear(KEY_PROG1);		break;
-
-		/* Fn+C ASUS Splendid */
-		case 0xba: asus_map_key_clear(KEY_PROG2);		break;
-
-		/* Fn+Space Power4Gear Hybrid */
-		case 0x5c: asus_map_key_clear(KEY_PROG3);		break;
-
-		/* Fn+F5 "fan" symbol on FX503VD */
-		case 0x99: asus_map_key_clear(KEY_PROG4);		break;
-
-		/* Fn+F5 "fan" symbol on N-Key keyboard */
-		case 0xae: asus_map_key_clear(KEY_PROG4);		break;
-
-		/* Fn+Ret "Calc" symbol on N-Key keyboard */
-		case 0x92: asus_map_key_clear(KEY_CALC);		break;
-
-		/* Fn+Left Aura mode previous on N-Key keyboard */
-		case 0xb2: asus_map_key_clear(KEY_PROG2);		break;
-
-		/* Fn+Right Aura mode next on N-Key keyboard */
-		case 0xb3: asus_map_key_clear(KEY_PROG3);		break;
-
-		default:
-			/* ASUS lazily declares 256 usages, ignore the rest,
-			 * as some make the keyboard appear as a pointer device. */
+		/*
+		 * ASUS lazily declares 256 usages, ignore the rest,
+		 * as some make the keyboard appear as a pointer device.
+		 */
+		if (!btn)
 			return -1;
-		}
+
+		hid_map_usage_clear(hi, usage, bit, max, EV_KEY, btn);
 
 		/*
 		 * Check and enable backlight only on devices with UsagePage ==
@@ -901,28 +917,12 @@ static int asus_input_mapping(struct hid_device *hdev,
 	}
 
 	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_MSVENDOR) {
-		switch (usage->hid & HID_USAGE) {
-		case 0xff01: asus_map_key_clear(BTN_1);	break;
-		case 0xff02: asus_map_key_clear(BTN_2);	break;
-		case 0xff03: asus_map_key_clear(BTN_3);	break;
-		case 0xff04: asus_map_key_clear(BTN_4);	break;
-		case 0xff05: asus_map_key_clear(BTN_5);	break;
-		case 0xff06: asus_map_key_clear(BTN_6);	break;
-		case 0xff07: asus_map_key_clear(BTN_7);	break;
-		case 0xff08: asus_map_key_clear(BTN_8);	break;
-		case 0xff09: asus_map_key_clear(BTN_9);	break;
-		case 0xff0a: asus_map_key_clear(BTN_A);	break;
-		case 0xff0b: asus_map_key_clear(BTN_B);	break;
-		case 0x00f1: asus_map_key_clear(KEY_WLAN);	break;
-		case 0x00f2: asus_map_key_clear(KEY_BRIGHTNESSDOWN);	break;
-		case 0x00f3: asus_map_key_clear(KEY_BRIGHTNESSUP);	break;
-		case 0x00f4: asus_map_key_clear(KEY_DISPLAY_OFF);	break;
-		case 0x00f7: asus_map_key_clear(KEY_CAMERA);	break;
-		case 0x00f8: asus_map_key_clear(KEY_PROG1);	break;
-		default:
-			return 0;
-		}
+		int btn = ms_map_use_to_btn(usage->hid & HID_USAGE);
 
+		if (!btn)
+			return 0;
+
+		hid_map_usage_clear(hi, usage, bit, max, EV_KEY, btn);
 		set_bit(EV_REP, hi->input->evbit);
 		return 1;
 	}
