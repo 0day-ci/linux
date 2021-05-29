@@ -220,7 +220,11 @@ void rtc_timer_do_work(struct work_struct *work);
 
 static inline bool is_leap_year(unsigned int year)
 {
-	return (!(year % 4) && (year % 100)) || !(year % 400);
+	/* This implementation is more branch-predictor friendly than the
+	 * traditional:
+	 *   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+	 */
+	return year % 100 != 0 ? year % 4 == 0 : year % 400 == 0;
 }
 
 #define devm_rtc_register_device(device) \

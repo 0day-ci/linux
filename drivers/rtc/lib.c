@@ -6,6 +6,8 @@
  * Author: Alessandro Zummo <a.zummo@towertech.it>
  *
  * based on arch/arm/common/rtctime.c and other bits
+ *
+ * Author: Cassio Neri <cassio.neri@gmail.com> (rtc_time64_to_tm)
  */
 
 #include <linux/export.h>
@@ -21,8 +23,6 @@ static const unsigned short rtc_ydays[2][13] = {
 	/* Leap years */
 	{ 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
 };
-
-#define LEAPS_THRU_END_OF(y) ((y) / 4 - (y) / 100 + (y) / 400)
 
 /*
  * The number of days in the month.
@@ -43,13 +43,25 @@ int rtc_year_days(unsigned int day, unsigned int month, unsigned int year)
 EXPORT_SYMBOL(rtc_year_days);
 
 /*
- * rtc_time64_to_tm - Converts time64_t to rtc_time.
- * Convert seconds since 01-01-1970 00:00:00 to Gregorian date.
+ * This function converts time64_t to rtc_time.
+ *
+ * @param[in]  time   The number of seconds since 01-01-1970 00:00:00.
+ *                    (Must be positive.)
+ * @param[out] tm     Pointer to the struct rtc_time.
  */
 void rtc_time64_to_tm(time64_t time, struct rtc_time *tm)
 {
-	unsigned int month, year, secs;
+	unsigned int secs;
 	int days;
+
+	u32 r0, n1, q1;
+	u32 r1, n2, q2, r2;
+	u64 u2;
+	u32 n3, q3, r3;
+
+	u32 j;
+	u32 y;
+	u32 m, d;
 
 	/* time must be positive */
 	days = div_s64_rem(time, 86400, &secs);
@@ -57,27 +69,42 @@ void rtc_time64_to_tm(time64_t time, struct rtc_time *tm)
 	/* day of the week, 1970-01-01 was a Thursday */
 	tm->tm_wday = (days + 4) % 7;
 
-	year = 1970 + days / 365;
-	days -= (year - 1970) * 365
-		+ LEAPS_THRU_END_OF(year - 1)
-		- LEAPS_THRU_END_OF(1970 - 1);
-	while (days < 0) {
-		year -= 1;
-		days += 365 + is_leap_year(year);
-	}
-	tm->tm_year = year - 1900;
-	tm->tm_yday = days + 1;
+	/*
+	 * The following algorithm is Proposition 6.3 of Neri and Schneider,
+	 * "Euclidean Affine Functions and Applications to Calendar Algorithms".
+	 * https://arxiv.org/abs/2102.06959
+	 */
 
-	for (month = 0; month < 11; month++) {
-		int newdays;
+	r0 = days + 719468;
 
-		newdays = days - rtc_month_days(month, year);
-		if (newdays < 0)
-			break;
-		days = newdays;
-	}
-	tm->tm_mon = month;
-	tm->tm_mday = days + 1;
+	n1 = 4 * r0 + 3;
+	q1 = n1 / 146097;
+	r1 = n1 % 146097 / 4;
+
+	n2 = 4 * r1 + 3;
+	u2 = ((u64) 2939745) * n2;
+	q2 = u2 >> 32;
+	r2 = ((u32) u2) / 2939745 / 4;
+
+	n3 = 2141 * r2 + 197913;
+	q3 = n3 >> 16;
+	r3 = ((u16) n3) / 2141;
+
+	j = r2 >= 306;
+	y = 100 * q1 + q2 + j;
+	m = j ? q3 - 12 : q3;
+	d = r3 + 1;
+
+	tm->tm_year = y - 1900;
+	tm->tm_mon  = m - 1;
+	tm->tm_mday = d;
+
+	/*
+	 * r2 contains the number of days since previous Mar 1st and j == true
+	 * if and only if month is Jan or Feb. The bellow is then a correction
+	 * to get the numbers of days since previous Jan 1st.
+	 */
+	tm->tm_yday = j ? r2 - 305 : r2 + 60 + is_leap_year(y);
 
 	tm->tm_hour = secs / 3600;
 	secs -= tm->tm_hour * 3600;
