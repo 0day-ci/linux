@@ -97,27 +97,22 @@ static int el15203000_cmd(struct el15203000_led *led, u8 brightness)
 
 	/* to avoid SPI mistiming with firmware we should wait some time */
 	if (time_after(led->priv->delay, jiffies)) {
-		dev_dbg(led->priv->dev, "Wait %luus to sync",
-			EL_FW_DELAY_USEC);
+		dev_dbg(led->priv->dev, "Wait %luus to sync", EL_FW_DELAY_USEC);
 
-		usleep_range(EL_FW_DELAY_USEC,
-			     EL_FW_DELAY_USEC + 1);
+		usleep_range(EL_FW_DELAY_USEC, EL_FW_DELAY_USEC + 100);
 	}
 
 	cmd[0] = led->reg;
 	cmd[1] = brightness;
 
 	for (i = 0; i < ARRAY_SIZE(cmd); i++) {
-		if (i)
-			usleep_range(EL_FW_DELAY_USEC,
-				     EL_FW_DELAY_USEC + 1);
-
 		ret = spi_write(led->priv->spi, &cmd[i], sizeof(cmd[i]));
 		if (ret) {
 			dev_err(led->priv->dev,
 				"spi_write() error %d", ret);
 			break;
 		}
+		usleep_range(EL_FW_DELAY_USEC, EL_FW_DELAY_USEC + 100);
 	}
 
 	led->priv->delay = jiffies + usecs_to_jiffies(EL_FW_DELAY_USEC);
@@ -306,8 +301,7 @@ static int el15203000_probe(struct spi_device *spi)
 	priv->count	= count;
 	priv->dev	= &spi->dev;
 	priv->spi	= spi;
-	priv->delay	= jiffies -
-			  usecs_to_jiffies(EL_FW_DELAY_USEC);
+	priv->delay	= jiffies - usecs_to_jiffies(EL_FW_DELAY_USEC);
 
 	spi_set_drvdata(spi, priv);
 
