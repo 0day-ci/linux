@@ -11,6 +11,7 @@
  */
 
 #include <linux/sort.h>
+#include <linux/videodev2.h>
 
 #include "u_uvc.h"
 #include "uvc_configfs.h"
@@ -1547,6 +1548,8 @@ static struct config_group *uvcg_uncompressed_make(struct config_group *group,
 	h->desc.bCopyProtect		= 0;
 
 	h->fmt.type = UVCG_UNCOMPRESSED;
+	h->fmt.fcc = V4L2_PIX_FMT_YUYV;
+	h->fmt.name = "YUV 4:2:2 (YUYV)";
 	config_group_init_type_name(&h->fmt.group, name,
 				    &uvcg_uncompressed_type);
 
@@ -1721,6 +1724,8 @@ static struct config_group *uvcg_mjpeg_make(struct config_group *group,
 	h->desc.bCopyProtect		= 0;
 
 	h->fmt.type = UVCG_MJPEG;
+	h->fmt.fcc = V4L2_PIX_FMT_MJPEG;
+	h->fmt.name = "MJPEG";
 	config_group_init_type_name(&h->fmt.group, name,
 				    &uvcg_mjpeg_type);
 

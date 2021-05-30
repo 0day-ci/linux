@@ -52,6 +52,8 @@ struct uvcg_format {
 	enum uvcg_format_type	type;
 	unsigned		linked;
 	unsigned		num_frames;
+	char			*name;
+	u32			fcc;
 	__u8			bmaControls[UVCG_STREAMING_CONTROL_SIZE];
 };
 

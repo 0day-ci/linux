@@ -411,6 +411,44 @@ static ssize_t function_name_show(struct device *dev,
 static DEVICE_ATTR_RO(function_name);
 
 static int
+uvc_analyze_configfs(struct uvc_device *uvc)
+{
+	struct uvcg_streaming_header *src_hdr = uvc->h;
+	struct config_item *item;
+	struct config_group *grp;
+	struct uvcg_format_ptr *f;
+	int i = 0, j = 0;
+
+	if (!src_hdr->linked)
+		return -EBUSY;
+
+	list_for_each_entry(f, &src_hdr->formats, entry)
+		uvc->nframes += f->fmt->num_frames;
+
+	uvc->nformats = src_hdr->num_fmt;
+
+	uvc->frm = kcalloc(uvc->nframes, sizeof(struct uvcg_frame *), GFP_KERNEL);
+	if (!uvc->frm)
+		return -ENOMEM;
+
+	uvc->fmt = kcalloc(uvc->nformats, sizeof(struct uvcg_format *), GFP_KERNEL);
+	if (!uvc->fmt) {
+		kfree(uvc->frm);
+		return -ENOMEM;
+	}
+
+	list_for_each_entry(f, &src_hdr->formats, entry) {
+		uvc->fmt[i++] = f->fmt;
+		grp = &f->fmt->group;
+		list_for_each_entry(item, &grp->cg_children, ci_entry) {
+			uvc->frm[j++] = to_uvcg_frame(item);
+		}
+	}
+
+	return 0;
+}
+
+static int
 uvc_register_video(struct uvc_device *uvc)
 {
 	struct usb_composite_dev *cdev = uvc->func.config->cdev;
@@ -742,6 +780,13 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 		goto error;
 	}
 
+	/* Register configfs formats and frames. */
+	ret = uvc_analyze_configfs(uvc);
+	if (ret < 0) {
+		uvcg_err(f, "failed to read configfs\n");
+		goto v4l2_error;
+	}
+
 	/* Initialise video. */
 	ret = uvcg_video_init(&uvc->video, uvc);
 	if (ret < 0)
@@ -905,6 +950,8 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	struct uvc_device *uvc;
 	struct f_uvc_opts *opts;
 	struct uvc_descriptor_header **strm_cls;
+	struct config_item *item;
+	struct config_group *grp;
 
 	uvc = kzalloc(sizeof(*uvc), GFP_KERNEL);
 	if (uvc == NULL)
@@ -936,6 +983,13 @@ static struct usb_function *uvc_alloc(struct usb_function_instance *fi)
 	uvc->desc.fs_streaming = opts->fs_streaming;
 	uvc->desc.hs_streaming = opts->hs_streaming;
 	uvc->desc.ss_streaming = opts->ss_streaming;
+
+	grp = &opts->func_inst.group;
+	item = config_group_find_item(grp, "streaming");
+	item = config_group_find_item(to_config_group(item), "header");
+	item = config_group_find_item(to_config_group(item), "h");
+	uvc->h = to_uvcg_streaming_header(item);
+
 	++opts->refcnt;
 	mutex_unlock(&opts->lock);
 

@@ -17,7 +17,10 @@
 
 #include "uvc.h"
 #include "uvc_queue.h"
+#include "uvc_v4l2.h"
 #include "uvc_video.h"
+#include "u_uvc.h"
+#include "uvc_configfs.h"
 
 /* --------------------------------------------------------------------------
  * Video codecs
@@ -348,11 +351,8 @@ int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 	INIT_WORK(&video->pump, uvcg_video_pump);
 
 	video->uvc = uvc;
-	video->fcc = V4L2_PIX_FMT_YUYV;
-	video->bpp = 16;
-	video->width = 320;
-	video->height = 240;
-	video->imagesize = 320 * 240 * 2;
+	video->def_format = video->cur_format = uvc->fmt[0];
+	video->cur_frame = uvc->frm[uvc_frame_default(video->def_format) - 1];
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(&video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
