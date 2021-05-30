@@ -19,12 +19,14 @@ config SND_ATMEL_SOC_DMA
 
 config SND_ATMEL_SOC_SSC
 	tristate
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_DMA
 	select SND_ATMEL_SOC_PDC
 
 config SND_ATMEL_SOC_SSC_PDC
 	tristate "SoC PCM DAI support for AT91 SSC controller using PDC"
 	depends on ATMEL_SSC
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_PDC
 	select SND_ATMEL_SOC_SSC
 	help
@@ -34,6 +36,7 @@ config SND_ATMEL_SOC_SSC_PDC
 config SND_ATMEL_SOC_SSC_DMA
 	tristate "SoC PCM DAI support for AT91 SSC controller using DMA"
 	depends on ATMEL_SSC
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_DMA
 	select SND_ATMEL_SOC_SSC
 	help
@@ -44,6 +47,7 @@ config SND_AT91_SOC_SAM9G20_WM8731
 	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
 	depends on ARCH_AT91 || COMPILE_TEST
 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_SSC_PDC
 	select SND_SOC_WM8731
 	help
@@ -54,6 +58,7 @@ config SND_ATMEL_SOC_WM8904
 	tristate "Atmel ASoC driver for boards using WM8904 codec"
 	depends on ARCH_AT91 || COMPILE_TEST
 	depends on ATMEL_SSC && I2C
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_SSC_DMA
 	select SND_SOC_WM8904
 	help
@@ -64,6 +69,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
 	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
 	depends on ARCH_AT91 || COMPILE_TEST
 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
+	depends on HAS_DMA
 	select SND_ATMEL_SOC_SSC_DMA
 	select SND_SOC_WM8731
 	help
