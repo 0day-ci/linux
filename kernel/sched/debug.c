@@ -9,7 +9,7 @@
 #include "sched.h"
 
 /*
- * This allows printing both to /proc/sched_debug and
+ * This allows printing both to debugfs/sched/debug and
  * to the console
  */
 #define SEQ_printf(m, x...)			\
