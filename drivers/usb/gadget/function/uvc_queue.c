@@ -43,6 +43,8 @@ static int uvc_queue_setup(struct vb2_queue *vq,
 {
 	struct uvc_video_queue *queue = vb2_get_drv_priv(vq);
 	struct uvc_video *video = container_of(queue, struct uvc_video, queue);
+	struct uvc_device *uvc = video->uvc;
+	struct usb_composite_dev *cdev = uvc->func.config->cdev;
 
 	if (*nbuffers > UVC_MAX_VIDEO_BUFFERS)
 		*nbuffers = UVC_MAX_VIDEO_BUFFERS;
@@ -50,6 +52,11 @@ static int uvc_queue_setup(struct vb2_queue *vq,
 	*nplanes = 1;
 
 	sizes[0] = video->imagesize;
+
+	if (cdev->gadget->speed < USB_SPEED_SUPER)
+		video->uvc_num_requests = 4;
+	else
+		video->uvc_num_requests = 64;
 
 	return 0;
 }
