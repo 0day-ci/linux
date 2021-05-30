@@ -612,8 +612,10 @@ static int rtl28xxu_read_config(struct dvb_usb_device *d)
 static int rtl28xxu_identify_state(struct dvb_usb_device *d, const char **name)
 {
 	struct rtl28xxu_dev *dev = d_to_priv(d);
+	u8 buf[1];
 	int ret;
 	struct rtl28xxu_req req_demod_i2c = {0x0020, CMD_I2C_DA_RD, 0, NULL};
+	struct rtl28xxu_req req_demod_i2c2 = {0x0020, CMD_I2C_DA_RD, 1, buf};
 
 	dev_dbg(&d->intf->dev, "\n");
 
@@ -622,6 +624,11 @@ static int rtl28xxu_identify_state(struct dvb_usb_device *d, const char **name)
 	 * by old RTL2831U.
 	 */
 	ret = rtl28xxu_ctrl_msg(d, &req_demod_i2c);
+	dev_info(&d->intf->dev, "%s - ret1 = %d\n", __func__, ret);
+
+	ret = rtl28xxu_ctrl_msg(d, &req_demod_i2c2);
+	dev_info(&d->intf->dev, "%s - ret2 = %d\n", __func__, ret);
+
 	if (ret == -EPIPE) {
 		dev->chip_id = CHIP_ID_RTL2831U;
 	} else if (ret == 0) {
