@@ -307,8 +307,8 @@ static int tcf_vlan_dump(struct sk_buff *skb, struct tc_action *a,
 	    (nla_put_u16(skb, TCA_VLAN_PUSH_VLAN_ID, p->tcfv_push_vid) ||
 	     nla_put_be16(skb, TCA_VLAN_PUSH_VLAN_PROTOCOL,
 			  p->tcfv_push_proto) ||
-	     (nla_put_u8(skb, TCA_VLAN_PUSH_VLAN_PRIORITY,
-					      p->tcfv_push_prio))))
+	     (p->tcfv_push_prio_exists &&
+	      nla_put_u8(skb, TCA_VLAN_PUSH_VLAN_PRIORITY, p->tcfv_push_prio))))
 		goto nla_put_failure;
 
 	if (p->tcfv_action == TCA_VLAN_ACT_PUSH_ETH) {
@@ -362,10 +362,19 @@ static int tcf_vlan_search(struct net *net, struct tc_action **a, u32 index)
 
 static size_t tcf_vlan_get_fill_size(const struct tc_action *act)
 {
-	return nla_total_size(sizeof(struct tc_vlan))
+	struct tcf_vlan *v = to_vlan(act);
+	struct tcf_vlan_params *p;
+	size_t ret = nla_total_size(sizeof(struct tc_vlan))
 		+ nla_total_size(sizeof(u16)) /* TCA_VLAN_PUSH_VLAN_ID */
-		+ nla_total_size(sizeof(u16)) /* TCA_VLAN_PUSH_VLAN_PROTOCOL */
-		+ nla_total_size(sizeof(u8)); /* TCA_VLAN_PUSH_VLAN_PRIORITY */
+		+ nla_total_size(sizeof(u16)); /* TCA_VLAN_PUSH_VLAN_PROTOCOL */
+
+	spin_lock_bh(&v->tcf_lock);
+	p = rcu_dereference_protected(v->vlan_p, lockdep_is_held(&v->tcf_lock));
+	if (p->tcfv_push_prio_exists)
+		ret += nla_total_size(sizeof(u8)); /* TCA_VLAN_PUSH_VLAN_PRIORITY */
+	spin_unlock_bh(&v->tcf_lock);
+
+	return ret;
 }
 
 static struct tc_action_ops act_vlan_ops = {
