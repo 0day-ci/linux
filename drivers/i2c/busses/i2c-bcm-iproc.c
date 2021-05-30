@@ -26,6 +26,7 @@
 #define CFG_RESET_SHIFT              31
 #define CFG_EN_SHIFT                 30
 #define CFG_SLAVE_ADDR_0_SHIFT       28
+#define CFG_BIT_BANG_SHIFT           29
 #define CFG_M_RETRY_CNT_SHIFT        16
 #define CFG_M_RETRY_CNT_MASK         0x0f
 
@@ -65,6 +66,12 @@
 #define S_FIFO_RX_CNT_MASK           0x7f
 #define S_FIFO_RX_THLD_SHIFT         8
 #define S_FIFO_RX_THLD_MASK          0x3f
+
+#define M_BB_CTRL_OFFSET             0x14
+#define M_BB_SMBCLK_IN               31
+#define M_BB_SMBCLK_OUT_EN           30
+#define M_BB_SMBDAT_IN               29
+#define M_BB_SMBDAT_OUT_EN           28
 
 #define M_CMD_OFFSET                 0x30
 #define M_CMD_START_BUSY_SHIFT       31
@@ -713,6 +720,112 @@ static void bcm_iproc_i2c_enable_disable(struct bcm_iproc_i2c_dev *iproc_i2c,
 	iproc_i2c_wr_reg(iproc_i2c, CFG_OFFSET, val);
 }
 
+static void bcm_iproc_i2c_reset(struct bcm_iproc_i2c_dev *iproc_i2c)
+{
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp |= BIT(CFG_RESET_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+	udelay(100);
+
+}
+
+static void bcm_iproc_i2c_prepare_recovery(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	dev_dbg(iproc_i2c->device, "Prepare recovery\n");
+
+	/* Disable interrupts */
+	writel(0, iproc_i2c->base + IE_OFFSET);
+	readl(iproc_i2c->base + IE_OFFSET);
+	synchronize_irq(iproc_i2c->irq);
+
+	bcm_iproc_i2c_reset(iproc_i2c);
+
+	/* Switch to bit-bang mode */
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp |= BIT(CFG_BIT_BANG_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+}
+
+static void bcm_iproc_i2c_unprepare_recovery(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	/* Switch to normal mode */
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp &= ~BIT(CFG_BIT_BANG_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+	udelay(100);
+
+	bcm_iproc_i2c_init(iproc_i2c);
+	bcm_iproc_i2c_enable_disable(iproc_i2c, true);
+
+	dev_dbg(iproc_i2c->device, "Recovery complete\n");
+}
+
+static int bcm_iproc_i2c_get_scl(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+
+	return !!(tmp & BIT(M_BB_SMBCLK_IN));
+}
+
+static void bcm_iproc_i2c_set_scl(struct i2c_adapter *adap, int val)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+	if (val)
+		tmp |= BIT(M_BB_SMBCLK_OUT_EN);
+	else
+		tmp &= ~BIT(M_BB_SMBCLK_OUT_EN);
+
+	writel(tmp, iproc_i2c->base + M_BB_CTRL_OFFSET);
+}
+
+static void bcm_iproc_i2c_set_sda(struct i2c_adapter *adap, int val)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+	if (val)
+		tmp |= BIT(M_BB_SMBDAT_OUT_EN);
+	else
+		tmp &= ~BIT(M_BB_SMBDAT_OUT_EN);
+
+	writel(tmp, iproc_i2c->base + M_BB_CTRL_OFFSET);
+}
+
+static int bcm_iproc_i2c_get_sda(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+
+	return !!(tmp & BIT(M_BB_SMBDAT_IN));
+}
+
+static struct i2c_bus_recovery_info bcm_iproc_recovery_info = {
+	.recover_bus = i2c_generic_scl_recovery,
+	.prepare_recovery = bcm_iproc_i2c_prepare_recovery,
+	.unprepare_recovery = bcm_iproc_i2c_unprepare_recovery,
+	.set_scl = bcm_iproc_i2c_set_scl,
+	.get_scl = bcm_iproc_i2c_get_scl,
+	.set_sda = bcm_iproc_i2c_set_sda,
+	.get_sda = bcm_iproc_i2c_get_sda,
+};
+
 static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c,
 				      struct i2c_msg *msg)
 {
@@ -839,6 +952,7 @@ static int bcm_iproc_i2c_xfer_internal(struct bcm_iproc_i2c_dev *iproc_i2c,
 	if (!!(iproc_i2c_rd_reg(iproc_i2c,
 				M_CMD_OFFSET) & BIT(M_CMD_START_BUSY_SHIFT))) {
 		dev_warn(iproc_i2c->device, "bus is busy\n");
+		i2c_recover_bus(&iproc_i2c->adapter);
 		return -EBUSY;
 	}
 
@@ -1111,6 +1225,7 @@ static int bcm_iproc_i2c_probe(struct platform_device *pdev)
 		of_node_full_name(iproc_i2c->device->of_node));
 	adap->algo = &bcm_iproc_algo;
 	adap->quirks = &bcm_iproc_i2c_quirks;
+	adap->bus_recovery_info = &bcm_iproc_recovery_info;
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 
