@@ -13,6 +13,7 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/usb/composite.h>
+#include <linux/usb/video.h>
 #include <linux/videodev2.h>
 
 #include <media/v4l2-device.h>
@@ -85,6 +86,12 @@ struct uvc_video {
 	struct uvcg_frame *cur_frame;
 
 	struct mutex mutex;	/* protects frame parameters */
+	spinlock_t frame_lock;
+
+	struct uvc_streaming_control probe;
+	struct uvc_streaming_control commit;
+
+	int control;
 
 	/* Requests */
 	unsigned int req_size;
@@ -170,4 +177,11 @@ extern void uvc_function_connect(struct uvc_device *uvc);
 extern void uvc_function_disconnect(struct uvc_device *uvc);
 
 extern int uvc_frame_default(struct uvcg_format *ufmt);
+extern struct uvcg_frame *find_frame_by_index(struct uvc_device *uvc,
+					      struct uvcg_format *ufmt,
+					      int index);
+extern void uvc_fill_streaming_control(struct uvc_device *uvc,
+			   struct uvc_streaming_control *ctrl,
+			   int iframe, int iformat, unsigned int ival);
+
 #endif /* _UVC_GADGET_H_ */

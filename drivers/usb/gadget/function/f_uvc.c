@@ -201,21 +201,253 @@ static const struct usb_descriptor_header * const uvc_ss_streaming[] = {
  * Control requests
  */
 
+void uvc_fill_streaming_control(struct uvc_device *uvc,
+			   struct uvc_streaming_control *ctrl,
+			   int iframe, int iformat, unsigned int ival)
+{
+	struct uvcg_format *ufmt;
+	struct uvcg_frame *ufrm;
+	unsigned int i;
+
+	/* Restrict the iformat, iframe and ival to valid values. Negative
+	 * values for ifrmat and iframe will result in the maximum valid value
+	 * being selected
+	 */
+	iformat = clamp((unsigned int)iformat, 1U, (unsigned int)uvc->nformats);
+	ufmt = uvc->fmt[iformat-1];
+
+	iframe = clamp((unsigned int)iframe, 1U, (unsigned int)uvc->nframes);
+	ufrm = find_frame_by_index(uvc, ufmt, iframe);
+	if (!ufrm)
+		return;
+
+	for (i = 0; i < ufrm->frame.b_frame_interval_type; i++) {
+		if (ival <= ufrm->dw_frame_interval[i]) {
+			ival = ufrm->dw_frame_interval[i];
+			break;
+		}
+	}
+
+	if (i == ufrm->frame.b_frame_interval_type)
+		ival = ufrm->dw_frame_interval[ufrm->frame.b_frame_interval_type-1];
+
+	memset(ctrl, 0, sizeof(*ctrl));
+
+	ctrl->bmHint = 1;
+	ctrl->bFormatIndex = iformat;
+	ctrl->bFrameIndex = iframe;
+	ctrl->dwFrameInterval = ival;
+	ctrl->dwMaxVideoFrameSize = ufrm->frame.dw_max_video_frame_buffer_size;
+
+	switch (uvc->func.config->cdev->gadget->speed) {
+	case USB_SPEED_SUPER:
+		ctrl->dwMaxPayloadTransferSize = uvc_ss_streaming_ep.wMaxPacketSize;
+		break;
+	case USB_SPEED_HIGH:
+		ctrl->dwMaxPayloadTransferSize = uvc_hs_streaming_ep.wMaxPacketSize;
+		break;
+	case USB_SPEED_FULL:
+	default:
+		ctrl->dwMaxPayloadTransferSize = uvc_fs_streaming_ep.wMaxPacketSize;
+		break;
+	}
+	ctrl->bmFramingInfo = 3;
+	ctrl->bPreferedVersion = 1;
+	ctrl->bMaxVersion = 1;
+}
+
+static int uvc_events_process_data(struct uvc_device *uvc, struct usb_request *req)
+{
+	struct uvc_video *video = &uvc->video;
+	struct uvc_streaming_control *target;
+	struct uvc_streaming_control *ctrl;
+	struct uvcg_frame *ufrm;
+	struct uvcg_format *ufmt;
+
+	switch (video->control) {
+	case UVC_VS_PROBE_CONTROL:
+		pr_debug("setting probe control, length = %d\n", req->actual);
+		target = &video->probe;
+		break;
+
+	case UVC_VS_COMMIT_CONTROL:
+		pr_debug("setting commit control, length = %d\n", req->actual);
+		target = &video->commit;
+		break;
+
+	default:
+		pr_debug("setting unknown control, length = %d\n", req->actual);
+		return -EOPNOTSUPP;
+	}
+
+	ctrl = (struct uvc_streaming_control *)req->buf;
+
+	if (video->control == UVC_VS_PROBE_CONTROL)
+		uvc_fill_streaming_control(uvc, target, ctrl->bFormatIndex,
+					   ctrl->bFrameIndex, ctrl->dwFrameInterval);
+
+	ufmt = uvc->fmt[target->bFormatIndex-1];
+	if (!ufmt)
+		return -EINVAL;
+
+	ufrm = find_frame_by_index(uvc, ufmt, ctrl->bFrameIndex);
+	if (!ufrm)
+		return -EINVAL;
+
+	if (video->control == UVC_VS_COMMIT_CONTROL) {
+		spin_lock(&video->frame_lock);
+
+		uvc_fill_streaming_control(uvc, target, ctrl->bFormatIndex,
+				   ctrl->bFrameIndex, ctrl->dwFrameInterval);
+
+		video->cur_frame = ufrm;
+		video->cur_format = ufmt;
+
+		spin_unlock(&video->frame_lock);
+	}
+
+	return 0;
+}
+
+static void
+uvc_events_process_streaming(struct uvc_device *uvc, uint8_t req, uint8_t cs,
+			     struct uvc_request_data *resp)
+{
+	struct uvc_streaming_control *ctrl;
+
+	pr_debug("streaming request (req %02x cs %02x)\n", req, cs);
+
+	if (cs != UVC_VS_PROBE_CONTROL && cs != UVC_VS_COMMIT_CONTROL)
+		return;
+
+	ctrl = (struct uvc_streaming_control *)&resp->data;
+	resp->length = sizeof(*ctrl);
+
+	switch (req) {
+	case UVC_SET_CUR:
+		uvc->video.control = cs;
+		resp->length = 34;
+		break;
+
+	case UVC_GET_CUR:
+		if (cs == UVC_VS_PROBE_CONTROL)
+			memcpy(ctrl, &uvc->video.probe, sizeof(*ctrl));
+		else
+			memcpy(ctrl, &uvc->video.commit, sizeof(*ctrl));
+		break;
+
+	case UVC_GET_MIN:
+	case UVC_GET_MAX:
+	case UVC_GET_DEF:
+		if (req == UVC_GET_MAX)
+			uvc_fill_streaming_control(uvc, ctrl, -1, -1, UINT_MAX);
+		else
+			uvc_fill_streaming_control(uvc, ctrl, 1, 1, 0);
+		break;
+
+	case UVC_GET_RES:
+		memset(ctrl, 0, sizeof(*ctrl));
+		break;
+
+	case UVC_GET_LEN:
+		resp->data[0] = 0x00;
+		resp->data[1] = 0x22;
+		resp->length = 2;
+		break;
+
+	case UVC_GET_INFO:
+		resp->data[0] = 0x03;
+		resp->length = 1;
+		break;
+	}
+}
+
+static int
+uvc_events_process_class(struct uvc_device *uvc, const struct usb_ctrlrequest *ctrl,
+			 struct uvc_request_data *resp)
+{
+	if ((ctrl->bRequestType & USB_RECIP_MASK) != USB_RECIP_INTERFACE)
+		return -EINVAL;
+
+	switch (ctrl->wIndex & 0xff) {
+	case UVC_INTF_VIDEO_CONTROL:
+		return -EOPNOTSUPP;
+
+	case UVC_INTF_VIDEO_STREAMING:
+		uvc_events_process_streaming(uvc, ctrl->bRequest, ctrl->wValue >> 8, resp);
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int
+uvc_events_process_setup(struct uvc_device *uvc, const struct usb_ctrlrequest *ctrl,
+			 struct uvc_request_data *resp)
+{
+	uvc->video.control = 0;
+
+	pr_debug("bRequestType %02x bRequest %02x wValue %04x wIndex %04x wLength %04x\n",
+		ctrl->bRequestType, ctrl->bRequest, ctrl->wValue,
+		ctrl->wIndex, ctrl->wLength);
+
+	switch (ctrl->bRequestType & USB_TYPE_MASK) {
+	case USB_TYPE_STANDARD:
+		return -EOPNOTSUPP;
+
+	case USB_TYPE_CLASS:
+		return uvc_events_process_class(uvc, ctrl, resp);
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Requests handling
+ */
+
+static
+int uvc_send_response(struct uvc_device *uvc, struct uvc_request_data *data)
+{
+	struct usb_composite_dev *cdev = uvc->func.config->cdev;
+	struct usb_request *req = uvc->control_req;
+
+	if (data->length < 0)
+		return usb_ep_set_halt(cdev->gadget->ep0);
+
+	req->length = min_t(unsigned int, uvc->event_length, data->length);
+	req->zero = data->length < uvc->event_length;
+
+	memcpy(req->buf, data->data, req->length);
+
+	return usb_ep_queue(cdev->gadget->ep0, req, GFP_KERNEL);
+}
+
 static void
 uvc_function_ep0_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct uvc_device *uvc = req->context;
-	struct v4l2_event v4l2_event;
-	struct uvc_event *uvc_event = (void *)&v4l2_event.u.data;
+	int ret;
 
 	if (uvc->event_setup_out) {
 		uvc->event_setup_out = 0;
+		ret = uvc_events_process_data(uvc, req);
+		if (ret == -EOPNOTSUPP) {
+			struct v4l2_event v4l2_event;
+			struct uvc_event *uvc_event = (void *)&v4l2_event.u.data;
 
-		memset(&v4l2_event, 0, sizeof(v4l2_event));
-		v4l2_event.type = UVC_EVENT_DATA;
-		uvc_event->data.length = req->actual;
-		memcpy(&uvc_event->data.data, req->buf, req->actual);
-		v4l2_event_queue(&uvc->vdev, &v4l2_event);
+			memset(&v4l2_event, 0, sizeof(v4l2_event));
+			v4l2_event.type = UVC_EVENT_DATA;
+			uvc_event->data.length = req->actual;
+			memcpy(&uvc_event->data.data, req->buf, req->actual);
+			v4l2_event_queue(&uvc->vdev, &v4l2_event);
+		}
 	}
 }
 
@@ -223,8 +455,8 @@ static int
 uvc_function_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 {
 	struct uvc_device *uvc = to_uvc(f);
-	struct v4l2_event v4l2_event;
-	struct uvc_event *uvc_event = (void *)&v4l2_event.u.data;
+	struct uvc_request_data resp;
+	int ret = 0;
 
 	if ((ctrl->bRequestType & USB_TYPE_MASK) != USB_TYPE_CLASS) {
 		uvcg_info(f, "invalid request type\n");
@@ -241,12 +473,22 @@ uvc_function_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	uvc->event_setup_out = !(ctrl->bRequestType & USB_DIR_IN);
 	uvc->event_length = le16_to_cpu(ctrl->wLength);
 
-	memset(&v4l2_event, 0, sizeof(v4l2_event));
-	v4l2_event.type = UVC_EVENT_SETUP;
-	memcpy(&uvc_event->req, ctrl, sizeof(uvc_event->req));
-	v4l2_event_queue(&uvc->vdev, &v4l2_event);
+	ret = uvc_events_process_setup(uvc, ctrl, &resp);
+	if (ret == -EOPNOTSUPP) {
+		struct v4l2_event v4l2_event;
+		struct uvc_event *uvc_event = (void *)&v4l2_event.u.data;
 
-	return 0;
+		memset(&v4l2_event, 0, sizeof(v4l2_event));
+		v4l2_event.type = UVC_EVENT_SETUP;
+		memcpy(&uvc_event->req, ctrl, sizeof(uvc_event->req));
+		v4l2_event_queue(&uvc->vdev, &v4l2_event);
+
+		return 0;
+	} else if (ret) {
+		return ret;
+	}
+
+	return uvc_send_response(uvc, &resp);
 }
 
 void uvc_function_setup_continue(struct uvc_device *uvc)

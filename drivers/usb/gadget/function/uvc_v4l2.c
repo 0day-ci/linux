@@ -205,7 +205,8 @@ uvc_v4l2_get_format(struct file *file, void *fh, struct v4l2_format *fmt)
 }
 
 static int _uvc_v4l2_try_fmt(struct uvc_video *video,
-	struct v4l2_format *fmt, struct uvcg_format **uvc_format, struct uvcg_frame **uvc_frame)
+	struct v4l2_format *fmt, struct uvc_streaming_control *probe,
+	struct uvcg_format **uvc_format, struct uvcg_frame **uvc_frame)
 {
 	struct uvc_device *uvc = video->uvc;
 	struct uvcg_format *ufmt;
@@ -253,6 +254,9 @@ static int _uvc_v4l2_try_fmt(struct uvc_video *video,
 		*uvc_format = ufmt;
 	if (uvc_frame != NULL)
 		*uvc_frame = ufrm;
+	if (probe)
+		uvc_fill_streaming_control(uvc, probe,
+				i + 1, ufrm->frame.b_frame_index, 0);
 
 	return 0;
 }
@@ -264,7 +268,7 @@ uvc_v4l2_try_fmt(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct uvc_device *uvc = video_get_drvdata(vdev);
 	struct uvc_video *video = &uvc->video;
 
-	return _uvc_v4l2_try_fmt(video, fmt, NULL, NULL);
+	return _uvc_v4l2_try_fmt(video, fmt, NULL, NULL, NULL);
 }
 
 static int
@@ -273,16 +277,22 @@ uvc_v4l2_set_format(struct file *file, void *fh, struct v4l2_format *fmt)
 	struct video_device *vdev = video_devdata(file);
 	struct uvc_device *uvc = video_get_drvdata(vdev);
 	struct uvc_video *video = &uvc->video;
+	struct uvc_streaming_control probe;
 	struct uvcg_format *ufmt;
 	struct uvcg_frame *ufrm;
 	int ret;
 
-	ret = _uvc_v4l2_try_fmt(video, fmt, &ufmt, &ufrm);
+	ret = _uvc_v4l2_try_fmt(video, fmt, &probe, &ufmt, &ufrm);
 	if (ret)
 		return ret;
 
+	spin_lock(&video->frame_lock);
+
+	video->commit = probe;
 	video->cur_format = ufmt;
 	video->cur_frame = ufrm;
+
+	spin_unlock(&video->frame_lock);
 
 	return ret;
 }

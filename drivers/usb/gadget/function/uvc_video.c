@@ -346,13 +346,26 @@ int uvcg_video_enable(struct uvc_video *video, int enable)
  */
 int uvcg_video_init(struct uvc_video *video, struct uvc_device *uvc)
 {
+	int framedef;
+
 	INIT_LIST_HEAD(&video->req_free);
 	spin_lock_init(&video->req_lock);
+	spin_lock_init(&video->frame_lock);
+
+	/* Allocate a stream specific work queue for asynchronous tasks. */
+	video->async_wq = alloc_workqueue("uvcvideo", WQ_UNBOUND | WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+	if (!video->async_wq)
+		return -EINVAL;
+
 	INIT_WORK(&video->pump, uvcg_video_pump);
 
 	video->uvc = uvc;
 	video->def_format = video->cur_format = uvc->fmt[0];
-	video->cur_frame = uvc->frm[uvc_frame_default(video->def_format) - 1];
+	framedef = uvc_frame_default(video->def_format);
+	video->cur_frame = uvc->frm[framedef - 1];
+
+	uvc_fill_streaming_control(uvc, &video->probe, 1, framedef, 0);
+	uvc_fill_streaming_control(uvc, &video->commit, 1, framedef, 0);
 
 	/* Initialize the video buffers queue. */
 	uvcg_queue_init(&video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
