@@ -205,6 +205,7 @@ struct adv7180_state {
 	struct mutex		mutex; /* mutual excl. when accessing chip */
 	int			irq;
 	struct gpio_desc	*pwdn_gpio;
+	struct gpio_desc	*reset_gpio;
 	v4l2_std_id		curr_norm;
 	bool			powered;
 	bool			streaming;
@@ -473,13 +474,15 @@ static int adv7180_g_frame_interval(struct v4l2_subdev *sd,
 
 static void adv7180_set_power_pin(struct adv7180_state *state, bool on)
 {
-	if (!state->pwdn_gpio)
+	if (!state->pwdn_gpio && !state->reset_gpio)
 		return;
 
 	if (on) {
+		gpiod_set_value_cansleep(state->reset_gpio, 0);
 		gpiod_set_value_cansleep(state->pwdn_gpio, 0);
 		usleep_range(5000, 10000);
 	} else {
+		gpiod_set_value_cansleep(state->reset_gpio, 1);
 		gpiod_set_value_cansleep(state->pwdn_gpio, 1);
 	}
 }
@@ -1337,6 +1340,15 @@ static int adv7180_probe(struct i2c_client *client,
 		v4l_err(client, "request for power pin failed: %d\n", ret);
 		return ret;
 	}
+
+	state->reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						     GPIOD_OUT_HIGH);
+	if (IS_ERR(state->reset_gpio)) {
+		ret = PTR_ERR(state->reset_gpio);
+		v4l_err(client, "request for reset pin failed: %d\n", ret);
+		return ret;
+	}
+
 
 	if (state->chip_info->flags & ADV7180_FLAG_MIPI_CSI2) {
 		state->csi_client = i2c_new_dummy_device(client->adapter,
