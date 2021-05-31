@@ -784,8 +784,10 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	dci->dev_name = drvdata->edac_dev_name;
 
 	res = edac_device_add_device(dci);
-	if (res)
+	if (res) {
+		res = -ENXIO;
 		goto fail1;
+	}
 
 	altr_create_edacdev_dbgfs(dci, drvdata->data);
 
@@ -1555,7 +1557,7 @@ static int altr_portb_setup(struct altr_edac_device_dev *device)
 	if (rc) {
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "edac_device_add_device portB failed\n");
-		rc = -ENOMEM;
+		rc = -ENXIO;
 		goto err_release_group_1;
 	}
 	altr_create_edacdev_dbgfs(dci, prv);
@@ -1963,7 +1965,7 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
 	rc = edac_device_add_device(dci);
 	if (rc) {
 		dev_err(edac->dev, "edac_device_add_device failed\n");
-		rc = -ENOMEM;
+		rc = -ENXIO;
 		goto err_release_group1;
 	}
 

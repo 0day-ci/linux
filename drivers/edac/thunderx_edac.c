@@ -1421,6 +1421,7 @@ static int thunderx_ocx_probe(struct pci_dev *pdev,
 	ret = edac_device_add_device(edac_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Cannot add EDAC device: %d\n", ret);
+		ret = -ENXIO;
 		goto err_free;
 	}
 
@@ -2051,6 +2052,7 @@ static int thunderx_l2c_probe(struct pci_dev *pdev,
 	ret = edac_device_add_device(edac_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Cannot add EDAC device: %d\n", ret);
+		ret = -ENXIO;
 		goto err_free;
 	}
 

@@ -388,6 +388,7 @@ static int amd8111_dev_probe(struct pci_dev *dev,
 	if (edac_device_add_device(dev_info->edac_dev) > 0) {
 		printk(KERN_ERR "failed to add edac_dev for %s\n",
 			dev_info->ctl_name);
+		ret = -ENXIO;
 		goto err_edac_free_ctl;
 	}
 

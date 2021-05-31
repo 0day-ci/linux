@@ -90,8 +90,10 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 	dci->ctl_name = id ? id->compatible : "unknown";
 	dci->dev_name = dev_name(&pdev->dev);
 
-	if (edac_device_add_device(dci))
+	if (edac_device_add_device(dci)) {
+		res = -ENXIO;
 		goto err;
+	}
 
 	drvdata->db_irq = platform_get_irq(pdev, 0);
 	res = devm_request_irq(&pdev->dev, drvdata->db_irq,

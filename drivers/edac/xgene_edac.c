@@ -953,7 +953,7 @@ static int xgene_edac_pmd_add(struct xgene_edac *edac, struct device_node *np,
 	rc = edac_device_add_device(edac_dev);
 	if (rc > 0) {
 		dev_err(edac->dev, "edac_device_add_device failed\n");
-		rc = -ENOMEM;
+		rc = -ENXIO;
 		goto err_free;
 	}
 
@@ -1236,7 +1236,7 @@ static int xgene_edac_l3_add(struct xgene_edac *edac, struct device_node *np,
 	rc = edac_device_add_device(edac_dev);
 	if (rc > 0) {
 		dev_err(edac->dev, "failed edac_device_add_device()\n");
-		rc = -ENOMEM;
+		rc = -ENXIO;
 		goto err_ctl_free;
 	}
 
@@ -1774,7 +1774,7 @@ static int xgene_edac_soc_add(struct xgene_edac *edac, struct device_node *np,
 	rc = edac_device_add_device(edac_dev);
 	if (rc > 0) {
 		dev_err(edac->dev, "failed edac_device_add_device()\n");
-		rc = -ENOMEM;
+		rc = -ENXIO;
 		goto err_ctl_free;
 	}
 

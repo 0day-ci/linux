@@ -558,7 +558,7 @@ static int aurora_l2_probe(struct platform_device *pdev)
 
 	if (edac_device_add_device(dci)) {
 		edac_device_free_ctl_info(dci);
-		return -EINVAL;
+		return -ENXIO;
 	}
 
 #ifdef CONFIG_EDAC_DEBUG

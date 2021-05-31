@@ -553,6 +553,7 @@ static int mpc85xx_l2_err_probe(struct platform_device *op)
 
 	if (edac_device_add_device(edac_dev) > 0) {
 		edac_dbg(3, "failed edac_device_add_device()\n");
+		res = -ENXIO;
 		goto err;
 	}
 

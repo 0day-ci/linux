@@ -361,8 +361,10 @@ static int qcom_llcc_edac_probe(struct platform_device *pdev)
 	edev_ctl->pvt_info = llcc_driv_data;
 
 	rc = edac_device_add_device(edev_ctl);
-	if (rc)
+	if (rc) {
+		rc = -ENXIO;
 		goto out_mem;
+	}
 
 	platform_set_drvdata(pdev, edev_ctl);
 
