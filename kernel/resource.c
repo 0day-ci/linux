@@ -493,6 +493,21 @@ int walk_system_ram_res(u64 start, u64 end, void *arg,
 }
 
 /*
+ * This function calls the @func callback against all memory ranges of type
+ * System RAM which are marked as IORESOURCE_SYSTEM_RAM and IORESOUCE_BUSY,
+ * excluding RAM ranges that have overlapping child resources.
+ * Same constraints as @walk_system_ram_res apply.
+ */
+int walk_system_ram_excluding_child_res(u64 start, u64 end, void *arg,
+					int (*func)(struct resource *, void *))
+{
+	unsigned long flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+
+	return __walk_iomem_res_desc(start, end, flags, IORES_DESC_NONE,
+				     true, arg, func);
+}
+
+/*
  * This function calls the @func callback against all memory ranges, which
  * are ranges marked as IORESOURCE_MEM and IORESOUCE_BUSY.
  */
