@@ -145,3 +145,23 @@ const struct kexec_file_ops kexec_image_ops = {
 	.verify_sig = image_verify_sig,
 #endif
 };
+
+/**
+ * arch_kexec_locate_mem_hole - Find free memory to place the segments.
+ * @kbuf:                       Parameters for the memory search.
+ *
+ * On success, kbuf->mem will have the start address of the memory region found.
+ *
+ * Return: 0 on success, negative errno on error.
+ */
+int arch_kexec_locate_mem_hole(struct kexec_buf *kbuf)
+{
+	/*
+	 * For the time being, kexec_file_load isn't reliable except
+	 * for crash kernel. Say sorry to the user.
+	 */
+	if (kbuf->image->type != KEXEC_TYPE_CRASH)
+		return -EADDRNOTAVAIL;
+
+	return kexec_locate_mem_hole(kbuf);
+}
