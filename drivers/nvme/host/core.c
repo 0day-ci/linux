@@ -2905,6 +2905,16 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 	if (ret < 0)
 		goto out_free;
 
+#ifdef CONFIG_NVME_MULTIPATH
+	if (ctrl->ana_log_buf && (!ctrl->max_namespaces ||
+				  ctrl->max_namespaces > le32_to_cpu(id->nn))) {
+		dev_err(ctrl->device,
+			"Invalid MNAN value %u\n", ctrl->max_namespaces);
+		ret = -EINVAL;
+		goto out_free;
+	}
+#endif
+
 	if (ctrl->apst_enabled && !prev_apst_enabled)
 		dev_pm_qos_expose_latency_tolerance(ctrl->device);
 	else if (!ctrl->apst_enabled && prev_apst_enabled)
