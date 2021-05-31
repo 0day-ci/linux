@@ -22,64 +22,53 @@
 
 /*
  * Converts the calendar time to broken-down time representation
- * Based on code from glibc-2.6
  *
  * 2009-7-14:
  *   Moved from glibc-2.6 to kernel by Zhaolei<zhaolei@cn.fujitsu.com>
+ * 2021-5-22:
+ *   Partially reimplemented by Cassio Neri <cassio.neri@gmail.com>
  */
 
 #include <linux/time.h>
 #include <linux/module.h>
 
 /*
- * Nonzero if YEAR is a leap year (every 4 years,
- * except every 100th isn't, and every 400th is).
+ * True if y is a leap year (every 4 years, except every 100th isn't, and
+ * every 400th is).
  */
-static int __isleap(long year)
+static bool is_leap(long year)
 {
-	return (year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0);
+	/* This implementation is more branch-predictor friendly than the
+	 * traditional:
+	 *   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+	 */
+	return year % 100 != 0 ? year % 4 == 0 : year % 400 == 0;
 }
-
-/* do a mathdiv for long type */
-static long math_div(long a, long b)
-{
-	return a / b - (a % b < 0);
-}
-
-/* How many leap years between y1 and y2, y1 must less or equal to y2 */
-static long leaps_between(long y1, long y2)
-{
-	long leaps1 = math_div(y1 - 1, 4) - math_div(y1 - 1, 100)
-		+ math_div(y1 - 1, 400);
-	long leaps2 = math_div(y2 - 1, 4) - math_div(y2 - 1, 100)
-		+ math_div(y2 - 1, 400);
-	return leaps2 - leaps1;
-}
-
-/* How many days come before each month (0-12). */
-static const unsigned short __mon_yday[2][13] = {
-	/* Normal years. */
-	{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365},
-	/* Leap years. */
-	{0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366}
-};
 
 #define SECS_PER_HOUR	(60 * 60)
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
 
-/**
- * time64_to_tm - converts the calendar time to local broken-down time
+/*
+ * This function converts time64_t to rtc_time.
  *
- * @totalsecs:	the number of seconds elapsed since 00:00:00 on January 1, 1970,
- *		Coordinated Universal Time (UTC).
- * @offset:	offset seconds adding to totalsecs.
- * @result:	pointer to struct tm variable to receive broken-down time
+ * @param[in]  totalsecs   The number of seconds since 01-01-1970 00:00:00.
+ * @param[in]  offset      Seconds added to totalsecs.
+ * @param[out] result      Pointer to struct tm variable to receive
+ *                         broken-down time.
  */
 void time64_to_tm(time64_t totalsecs, int offset, struct tm *result)
 {
-	long days, rem, y;
+	long days, rem;
 	int remainder;
-	const unsigned short *ip;
+
+	u64 r0, n1, q1, u64rem;
+	u32 r1, n2, q2, r2;
+	u64 u2;
+	u32 n3, q3, r3;
+
+	u32 j;
+	u64 y;
+	u32 m, d;
 
 	days = div_s64_rem(totalsecs, SECS_PER_DAY, &remainder);
 	rem = remainder;
@@ -103,27 +92,40 @@ void time64_to_tm(time64_t totalsecs, int offset, struct tm *result)
 	if (result->tm_wday < 0)
 		result->tm_wday += 7;
 
-	y = 1970;
+	/*
+	 * The following algorithm is Proposition 6.3 of Neri and Schneider,
+	 * "Euclidean Affine Functions and Applications to Calendar Algorithms".
+	 * https://arxiv.org/abs/2102.06959
+	 */
 
-	while (days < 0 || days >= (__isleap(y) ? 366 : 365)) {
-		/* Guess a corrected year, assuming 365 days per year. */
-		long yg = y + math_div(days, 365);
+	r0 = days + 2305843009213814918;
 
-		/* Adjust DAYS and Y to match the guessed year. */
-		days -= (yg - y) * 365 + leaps_between(y, yg);
-		y = yg;
-	}
+	n1 = 4 * r0 + 3;
+	q1 = div64_u64_rem(n1, 146097, &u64rem);
+	r1 = u64rem / 4;
+
+	n2 = 4 * r1 + 3;
+	u2 = ((u64) 2939745) * n2;
+	q2 = u2 >> 32;
+	r2 = ((u32) u2) / 2939745 / 4;
+
+	n3 = 2141 * r2 + 197913;
+	q3 = n3 >> 16;
+	r3 = ((u16) n3) / 2141;
+
+	j = r2 >= 306;
+	y = 100 * q1 + q2 + j - 6313183731940000;
+	m = j ? q3 - 12 : q3;
+	d = r3 + 1;
 
 	result->tm_year = y - 1900;
+	result->tm_mon  = m - 1;
+	result->tm_mday = d;
 
-	result->tm_yday = days;
-
-	ip = __mon_yday[__isleap(y)];
-	for (y = 11; days < ip[y]; y--)
-		continue;
-	days -= ip[y];
-
-	result->tm_mon = y;
-	result->tm_mday = days + 1;
+	/* r2 contains the number of days since previous Mar 1st and j == true
+	 * if and only if month is Jan or Feb. The bellow is then a correction
+	 * to get the numbers of days since previous Jan 1st.
+	 */
+	result->tm_yday = j ? r2 - 306 : r2 + 59 + is_leap(y);
 }
 EXPORT_SYMBOL(time64_to_tm);
