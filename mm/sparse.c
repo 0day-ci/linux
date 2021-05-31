@@ -533,7 +533,7 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 			mem_section_usage_size() * map_count);
 	if (!usage) {
 		pr_err("%s: node[%d] usemap allocation failed", __func__, nid);
-		goto failed;
+		goto failed1;
 	}
 	sparse_buffer_init(map_count * section_map_size(), nid);
 	for_each_present_section_nr(pnum_begin, pnum) {
@@ -548,17 +548,20 @@ static void __init sparse_init_nid(int nid, unsigned long pnum_begin,
 			pr_err("%s: node[%d] memory map backing failed. Some memory will not be available.",
 			       __func__, nid);
 			pnum_begin = pnum;
-			sparse_buffer_fini();
-			goto failed;
+			goto failed2;
 		}
 		check_usemap_section_nr(nid, usage);
 		sparse_init_one_section(__nr_to_section(pnum), pnum, map, usage,
 				SECTION_IS_EARLY);
 		usage = (void *) usage + mem_section_usage_size();
+		map_count--;
 	}
 	sparse_buffer_fini();
 	return;
-failed:
+failed2:
+	sparse_buffer_fini();
+	memblock_free_early(__pa(usage), map_count * mem_section_usage_size());
+failed1:
 	/* We failed to allocate, mark all the following pnums as not present */
 	for_each_present_section_nr(pnum_begin, pnum) {
 		struct mem_section *ms;
