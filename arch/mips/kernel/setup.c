@@ -79,10 +79,6 @@ static const char builtin_cmdline[] __initconst = "";
 unsigned long mips_io_port_base = -1;
 EXPORT_SYMBOL(mips_io_port_base);
 
-static struct resource code_resource = { .name = "Kernel code", };
-static struct resource data_resource = { .name = "Kernel data", };
-static struct resource bss_resource = { .name = "Kernel bss", };
-
 unsigned long __kaslr_offset __ro_after_init;
 EXPORT_SYMBOL(__kaslr_offset);
 
@@ -469,29 +465,16 @@ static void __init mips_parse_crashkernel(void)
 		}
 	}
 
+	memblock_reserve(crashk_res.start, resource_size(&crashk_res));
+
 	crashk_res.start = crash_base;
 	crashk_res.end	 = crash_base + crash_size - 1;
-}
 
-static void __init request_crashkernel(struct resource *res)
-{
-	int ret;
-
-	if (crashk_res.start == crashk_res.end)
-		return;
-
-	ret = request_resource(res, &crashk_res);
-	if (!ret)
-		pr_info("Reserving %ldMB of memory at %ldMB for crashkernel\n",
-			(unsigned long)(resource_size(&crashk_res) >> 20),
-			(unsigned long)(crashk_res.start  >> 20));
+	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+		crash_base >> 20, crash_size);
 }
 #else /* !defined(CONFIG_KEXEC)		*/
 static void __init mips_parse_crashkernel(void)
-{
-}
-
-static void __init request_crashkernel(struct resource *res)
 {
 }
 #endif /* !defined(CONFIG_KEXEC)  */
@@ -656,10 +639,6 @@ static void __init arch_mem_init(char **cmdline_p)
 	mips_reserve_vmcore();
 
 	mips_parse_crashkernel();
-#ifdef CONFIG_KEXEC
-	if (crashk_res.start != crashk_res.end)
-		memblock_reserve(crashk_res.start, resource_size(&crashk_res));
-#endif
 	device_tree_init();
 
 	/*
@@ -681,53 +660,6 @@ static void __init arch_mem_init(char **cmdline_p)
 		__pa_symbol(&__nosave_end) - __pa_symbol(&__nosave_begin));
 
 	early_memtest(PFN_PHYS(ARCH_PFN_OFFSET), PFN_PHYS(max_low_pfn));
-}
-
-static void __init resource_init(void)
-{
-	phys_addr_t start, end;
-	u64 i;
-
-	if (UNCAC_BASE != IO_BASE)
-		return;
-
-	code_resource.start = __pa_symbol(&_text);
-	code_resource.end = __pa_symbol(&_etext) - 1;
-	data_resource.start = __pa_symbol(&_etext);
-	data_resource.end = __pa_symbol(&_edata) - 1;
-	bss_resource.start = __pa_symbol(&__bss_start);
-	bss_resource.end = __pa_symbol(&__bss_stop) - 1;
-
-	for_each_mem_range(i, &start, &end) {
-		struct resource *res;
-
-		res = memblock_alloc(sizeof(struct resource), SMP_CACHE_BYTES);
-		if (!res)
-			panic("%s: Failed to allocate %zu bytes\n", __func__,
-			      sizeof(struct resource));
-
-		res->start = start;
-		/*
-		 * In memblock, end points to the first byte after the
-		 * range while in resourses, end points to the last byte in
-		 * the range.
-		 */
-		res->end = end - 1;
-		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-		res->name = "System RAM";
-
-		request_resource(&iomem_resource, res);
-
-		/*
-		 *  We don't know which RAM region contains kernel data,
-		 *  so we try it repeatedly and let the resource manager
-		 *  test it.
-		 */
-		request_resource(res, &code_resource);
-		request_resource(res, &data_resource);
-		request_resource(res, &bss_resource);
-		request_crashkernel(res);
-	}
 }
 
 #ifdef CONFIG_SMP
@@ -771,7 +703,7 @@ void __init setup_arch(char **cmdline_p)
 	arch_mem_init(cmdline_p);
 	dmi_setup();
 
-	resource_init();
+	memblock_setup_resources();
 	plat_smp_setup();
 	prefill_possible_map();
 
