@@ -156,12 +156,31 @@ const struct kexec_file_ops kexec_image_ops = {
  */
 int arch_kexec_locate_mem_hole(struct kexec_buf *kbuf)
 {
-	/*
-	 * For the time being, kexec_file_load isn't reliable except
-	 * for crash kernel. Say sorry to the user.
-	 */
-	if (kbuf->image->type != KEXEC_TYPE_CRASH)
-		return -EADDRNOTAVAIL;
+	int ret;
 
-	return kexec_locate_mem_hole(kbuf);
+	/* Arch knows where to place */
+	if (kbuf->mem != KEXEC_BUF_MEM_UNKNOWN)
+		return 0;
+
+	/*
+	 * Crash kernels land in a well known place that has been
+	 * reserved upfront.
+	 *
+	 * Normal kexec kernels can however land anywhere in memory.
+	 * We have to be extra careful not to step over critical
+	 * memory ranges that have been marked as reserved in the
+	 * iomem resource tree (LPI and ACPI tables, among others),
+	 * hence the use of the child-excluding iterator.  This
+	 * matches what the userspace version of kexec does.
+	 */
+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+		ret = walk_iomem_res_desc(crashk_res.desc,
+					  IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
+					  crashk_res.start, crashk_res.end,
+					  kbuf, kexec_locate_mem_hole_callback);
+	else
+		ret = walk_system_ram_excluding_child_res(0, ULONG_MAX, kbuf,
+							  kexec_locate_mem_hole_callback);
+
+	return ret == 1 ? 0 : -EADDRNOTAVAIL;
 }
