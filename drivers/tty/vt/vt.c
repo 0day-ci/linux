@@ -1219,6 +1219,10 @@ static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
 	new_row_size = new_cols << 1;
 	new_screen_size = new_row_size * new_rows;
 
+	err = resize_screen(vc, new_cols, new_rows, user);
+	if (err)
+		return err;
+
 	if (new_cols == vc->vc_cols && new_rows == vc->vc_rows)
 		return 0;
 
@@ -1241,14 +1245,6 @@ static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
 
 	old_rows = vc->vc_rows;
 	old_row_size = vc->vc_size_row;
-
-	err = resize_screen(vc, new_cols, new_rows, user);
-	if (err) {
-		kfree(newscreen);
-		vc_uniscr_free(new_uniscr);
-		return err;
-	}
-
 	vc->vc_rows = new_rows;
 	vc->vc_cols = new_cols;
 	vc->vc_size_row = new_row_size;
