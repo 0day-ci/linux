@@ -9769,10 +9769,7 @@ static const struct dev_pm_ops ufs_rpmb_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(NULL, ufshcd_rpmb_resume)
 };
 
-/**
- * Describes the ufs rpmb wlun.
- * Used only to send uac.
- */
+/* ufs_rpmb_wlun_template - Describes UFS rpmb wlun. Used only to send uac. */
 static struct scsi_driver ufs_rpmb_wlun_template = {
 	.gendrv = {
 		.name = "ufs_rpmb_wlun",
