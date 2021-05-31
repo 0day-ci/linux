@@ -11610,8 +11610,10 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 		if (tiling == I915_TILING_X) {
 			mode_cmd->modifier[0] = I915_FORMAT_MOD_X_TILED;
 		} else if (tiling == I915_TILING_Y) {
+			mode_cmd->modifier[0] = I915_FORMAT_MOD_Y_TILED;
+		} else {
 			drm_dbg_kms(&dev_priv->drm,
-				    "No Y tiling for legacy addfb\n");
+				    "Unsupported tiling for legacy addfb\n");
 			goto err;
 		}
 	}
