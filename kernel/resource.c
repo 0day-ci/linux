@@ -318,6 +318,42 @@ int release_resource(struct resource *old)
 
 EXPORT_SYMBOL(release_resource);
 
+static int exclude_overlapping_child_res(struct resource *res,
+					 struct resource *child)
+{
+	struct resource cursor = *res;
+
+	for (; child; child = child->sibling) {
+		if (!resource_overlaps(&cursor, child))
+			continue;
+
+		if (cursor.start < child->start) {
+			*res = (struct resource) {
+				.start	= cursor.start,
+				.end	= child->start - 1,
+				.flags	= res->flags,
+				.desc	= res->desc,
+				.parent	= res->parent,
+			};
+
+			return 0;
+		}
+
+		/*
+		 * This may result in a resource with a negative size
+		 * at the very end of the loop.
+		 */
+		cursor.start = child->end + 1;
+	}
+
+	if (cursor.start <= cursor.end) {
+		*res = cursor;
+		return 0;
+	}
+
+	return -ENODEV;
+}
+
 /**
  * find_next_iomem_res - Finds the lowest iomem resource that covers part of
  *			 [@start..@end].
@@ -330,6 +366,7 @@ EXPORT_SYMBOL(release_resource);
  * @end:	end address of same resource
  * @flags:	flags which the resource must have
  * @desc:	descriptor the resource must have
+ * @exclude_child_res: exclude parts of resource that have overlapping children
  * @res:	return ptr, if resource found
  *
  * The caller must specify @start, @end, @flags, and @desc
@@ -337,7 +374,7 @@ EXPORT_SYMBOL(release_resource);
  */
 static int find_next_iomem_res(resource_size_t start, resource_size_t end,
 			       unsigned long flags, unsigned long desc,
-			       struct resource *res)
+			       bool exclude_child_res, struct resource *res)
 {
 	struct resource *p;
 
@@ -348,7 +385,7 @@ static int find_next_iomem_res(resource_size_t start, resource_size_t end,
 		return -EINVAL;
 
 	read_lock(&resource_lock);
-
+again:
 	for (p = iomem_resource.child; p; p = next_resource(p)) {
 		/* If we passed the resource we are looking for, stop */
 		if (p->start > end) {
@@ -378,6 +415,15 @@ static int find_next_iomem_res(resource_size_t start, resource_size_t end,
 			.desc = p->desc,
 			.parent = p->parent,
 		};
+
+		if (exclude_child_res &&
+		    exclude_overlapping_child_res(res, p->child)) {
+			start = res->end + 1;
+			if (start >= end)
+				p = NULL;
+			else
+				goto again;
+		}
 	}
 
 	read_unlock(&resource_lock);
@@ -386,6 +432,7 @@ static int find_next_iomem_res(resource_size_t start, resource_size_t end,
 
 static int __walk_iomem_res_desc(resource_size_t start, resource_size_t end,
 				 unsigned long flags, unsigned long desc,
+				 bool exclude_child_res,
 				 void *arg,
 				 int (*func)(struct resource *, void *))
 {
@@ -393,7 +440,8 @@ static int __walk_iomem_res_desc(resource_size_t start, resource_size_t end,
 	int ret = -EINVAL;
 
 	while (start < end &&
-	       !find_next_iomem_res(start, end, flags, desc, &res)) {
+	       !find_next_iomem_res(start, end, flags, desc,
+				    exclude_child_res, &res)) {
 		ret = (*func)(&res, arg);
 		if (ret)
 			break;
@@ -424,7 +472,7 @@ static int __walk_iomem_res_desc(resource_size_t start, resource_size_t end,
 int walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start,
 		u64 end, void *arg, int (*func)(struct resource *, void *))
 {
-	return __walk_iomem_res_desc(start, end, flags, desc, arg, func);
+	return __walk_iomem_res_desc(start, end, flags, desc, false, arg, func);
 }
 EXPORT_SYMBOL_GPL(walk_iomem_res_desc);
 
@@ -440,8 +488,8 @@ int walk_system_ram_res(u64 start, u64 end, void *arg,
 {
 	unsigned long flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 
-	return __walk_iomem_res_desc(start, end, flags, IORES_DESC_NONE, arg,
-				     func);
+	return __walk_iomem_res_desc(start, end, flags, IORES_DESC_NONE,
+				     false, arg, func);
 }
 
 /*
@@ -453,8 +501,8 @@ int walk_mem_res(u64 start, u64 end, void *arg,
 {
 	unsigned long flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 
-	return __walk_iomem_res_desc(start, end, flags, IORES_DESC_NONE, arg,
-				     func);
+	return __walk_iomem_res_desc(start, end, flags, IORES_DESC_NONE,
+				     false, arg, func);
 }
 
 /*
@@ -475,7 +523,8 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 	end = ((u64)(start_pfn + nr_pages) << PAGE_SHIFT) - 1;
 	flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 	while (start < end &&
-	       !find_next_iomem_res(start, end, flags, IORES_DESC_NONE, &res)) {
+	       !find_next_iomem_res(start, end, flags, IORES_DESC_NONE,
+				    false, &res)) {
 		pfn = PFN_UP(res.start);
 		end_pfn = PFN_DOWN(res.end + 1);
 		if (end_pfn > pfn)
