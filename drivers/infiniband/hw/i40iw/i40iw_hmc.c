@@ -781,7 +781,7 @@ enum i40iw_status_code i40iw_prep_remove_pd_page(struct i40iw_hmc_info *hmc_info
 }
 
 /**
- * i40iw_pf_init_vfhmc -
+ * i40iw_pf_init_vfhmc - init vfhmc
  * @vf_cnt_array: array of cnt values of iwarp hmc objects
  * @vf_hmc_fn_id: hmc function id ofr vf driver
  * @dev: pointer to i40iw_dev struct

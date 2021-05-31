@@ -963,7 +963,7 @@ void i40iw_cqp_spawn_worker(struct i40iw_sc_dev *dev,
 }
 
 /**
- * i40iw_cqp_manage_hmc_fcn_worker -
+ * i40iw_cqp_manage_hmc_fcn_worker - manage hmc
  * @work: work pointer for hmc info
  */
 static void i40iw_cqp_manage_hmc_fcn_worker(struct work_struct *work)

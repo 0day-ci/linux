@@ -506,9 +506,6 @@ static inline void i40iw_free_resource(struct i40iw_device *iwdev,
 
 struct i40iw_handler *i40iw_find_netdev(struct net_device *netdev);
 
-/**
- * iw_init_resources -
- */
 u32 i40iw_initialize_hw_resources(struct i40iw_device *iwdev);
 
 int i40iw_register_rdma_device(struct i40iw_device *iwdev);

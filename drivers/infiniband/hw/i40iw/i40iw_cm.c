@@ -207,7 +207,7 @@ static inline void i40iw_fill_sockaddr6(struct i40iw_cm_node *cm_node,
 }
 
 /**
- * i40iw_get_addr_info
+ * i40iw_get_addr_info - get addr info
  * @cm_node: contains ip/tcp info
  * @cm_info: to get a copy of the cm_node ip/tcp info
 */
@@ -628,7 +628,7 @@ static void i40iw_event_connect_error(struct i40iw_cm_event *event)
 }
 
 /**
- * i40iw_process_options
+ * i40iw_process_options - process options
  * @cm_node: connection's node
  * @optionsloc: point to start of options
  * @optionsize: size of all options
@@ -687,7 +687,7 @@ static int i40iw_process_options(struct i40iw_cm_node *cm_node,
 }
 
 /**
- * i40iw_handle_tcp_options -
+ * i40iw_handle_tcp_options - handle TCP options
  * @cm_node: connection's node
  * @tcph: pointer tcp header
  * @optionsize: size of options rcvd
@@ -870,7 +870,7 @@ static int i40iw_send_mpa_request(struct i40iw_cm_node *cm_node)
 }
 
 /**
- * i40iw_send_mpa_reject -
+ * i40iw_send_mpa_reject - send MPA reject
  * @cm_node: connection's node
  * @pdata: reject data for connection
  * @plen: length of reject data
@@ -1040,7 +1040,7 @@ negotiate_done:
 }
 
 /**
- * i40iw_schedule_cm_timer
+ * i40iw_schedule_cm_timer - schedule CM timer
  * @cm_node: connection's node
  * @sqbuf: buffer to send
  * @type: if it is send or close
