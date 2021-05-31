@@ -2574,6 +2574,8 @@ typedef struct fc_port {
 		uint16_t	app_started:1;
 		uint16_t	secured_login:1;
 		uint16_t	app_sess_online:1;
+		uint16_t	rekey_cnt;	// num of times rekeyed
+		uint8_t		auth_state;	/* cureent auth state */
 		uint32_t	tx_rekey_cnt;
 		uint32_t	rx_rekey_cnt;
 		// delayed rx delete data structure list
