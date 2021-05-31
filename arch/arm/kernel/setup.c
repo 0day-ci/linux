@@ -174,23 +174,9 @@ static struct resource mem_res[] = {
 		.end = 0,
 		.flags = IORESOURCE_MEM
 	},
-	{
-		.name = "Kernel code",
-		.start = 0,
-		.end = 0,
-		.flags = IORESOURCE_SYSTEM_RAM
-	},
-	{
-		.name = "Kernel data",
-		.start = 0,
-		.end = 0,
-		.flags = IORESOURCE_SYSTEM_RAM
-	}
 };
 
 #define video_ram   mem_res[0]
-#define kernel_code mem_res[1]
-#define kernel_data mem_res[2]
 
 static struct resource io_res[] = {
 	{
@@ -849,10 +835,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 	struct resource *res;
 	u64 i;
 
-	kernel_code.start   = virt_to_phys(_text);
-	kernel_code.end     = virt_to_phys(__init_begin - 1);
-	kernel_data.start   = virt_to_phys(_sdata);
-	kernel_data.end     = virt_to_phys(_end - 1);
+	memblock_setup_resources();
 
 	for_each_mem_range(i, &start, &end) {
 		unsigned long boot_alias_start;
@@ -881,24 +864,6 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 			request_resource(&iomem_resource, res);
 		}
-
-		res = memblock_alloc(sizeof(*res), SMP_CACHE_BYTES);
-		if (!res)
-			panic("%s: Failed to allocate %zu bytes\n", __func__,
-			      sizeof(*res));
-		res->name  = "System RAM";
-		res->start = start;
-		res->end = res_end;
-		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-
-		request_resource(&iomem_resource, res);
-
-		if (kernel_code.start >= res->start &&
-		    kernel_code.end <= res->end)
-			request_resource(res, &kernel_code);
-		if (kernel_data.start >= res->start &&
-		    kernel_data.end <= res->end)
-			request_resource(res, &kernel_data);
 	}
 
 	if (mdesc->video_start) {
