@@ -114,16 +114,7 @@ static int __meminit sparse_index_init(unsigned long section_nr, int nid)
 
 	return 0;
 }
-#else /* !SPARSEMEM_EXTREME */
-static inline int sparse_index_init(unsigned long section_nr, int nid)
-{
-	return 0;
-}
 
-static inline void sparse_alloc_section_roots(void) {}
-#endif
-
-#ifdef CONFIG_SPARSEMEM_EXTREME
 unsigned long __section_nr(struct mem_section *ms)
 {
 	unsigned long root_nr;
@@ -142,11 +133,18 @@ unsigned long __section_nr(struct mem_section *ms)
 
 	return (root_nr * SECTIONS_PER_ROOT) + (ms - root);
 }
-#else
+#else /* !SPARSEMEM_EXTREME */
+static inline int sparse_index_init(unsigned long section_nr, int nid)
+{
+	return 0;
+}
+
 unsigned long __section_nr(struct mem_section *ms)
 {
 	return (unsigned long)(ms - mem_sections[0]);
 }
+
+static inline void sparse_alloc_section_roots(void) {}
 #endif
 
 /*
