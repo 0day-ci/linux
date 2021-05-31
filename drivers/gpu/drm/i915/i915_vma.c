@@ -436,7 +436,7 @@ int i915_vma_bind(struct i915_vma *vma,
 			work->pinned = i915_gem_object_get(vma->obj);
 		}
 	} else {
-		vma->ops->bind_vma(vma->vm, NULL, vma, cache_level, bind_flags);
+		vma->ops->bind_vma(vma->vm, work ? &work->stash : NULL, vma, cache_level, bind_flags);
 	}
 
 	atomic_or(bind_flags, &vma->flags);
@@ -883,7 +883,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 	if (flags & PIN_GLOBAL)
 		wakeref = intel_runtime_pm_get(&vma->vm->i915->runtime_pm);
 
-	if (flags & vma->vm->bind_async_flags) {
+	if ((flags & vma->vm->bind_async_flags) || vma->vm->allocate_va_range) {
 		/* lock VM */
 		err = i915_vm_lock_objects(vma->vm, ww);
 		if (err)
