@@ -36,7 +36,7 @@ static struct platform_driver fsl_ddr_mc_err_driver = {
 
 static int __init fsl_ddr_mc_init(void)
 {
-	int res;
+	int ret;
 
 	/* make sure error reporting method is sane */
 	switch (edac_op_state) {
@@ -48,10 +48,10 @@ static int __init fsl_ddr_mc_init(void)
 		break;
 	}
 
-	res = platform_driver_register(&fsl_ddr_mc_err_driver);
-	if (res) {
+	ret = platform_driver_register(&fsl_ddr_mc_err_driver);
+	if (ret) {
 		pr_err("MC fails to register\n");
-		return res;
+		return ret;
 	}
 
 	return 0;

@@ -911,19 +911,19 @@ static int cpc925_probe(struct platform_device *pdev)
 	void __iomem *vbase;
 	struct cpc925_mc_pdata *pdata;
 	struct resource *r;
-	int res = 0, nr_channels;
+	int ret = 0, nr_channels;
 
 	edac_dbg(0, "%s platform device found!\n", pdev->name);
 
 	if (!devres_open_group(&pdev->dev, cpc925_probe, GFP_KERNEL)) {
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto out;
 	}
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!r) {
 		cpc925_printk(KERN_ERR, "Unable to get resource\n");
-		res = -ENOENT;
+		ret = -ENOENT;
 		goto err1;
 	}
 
@@ -932,14 +932,14 @@ static int cpc925_probe(struct platform_device *pdev)
 				     resource_size(r),
 				     pdev->name)) {
 		cpc925_printk(KERN_ERR, "Unable to request mem region\n");
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err1;
 	}
 
 	vbase = devm_ioremap(&pdev->dev, r->start, resource_size(r));
 	if (!vbase) {
 		cpc925_printk(KERN_ERR, "Unable to ioremap device\n");
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err2;
 	}
 
@@ -955,7 +955,7 @@ static int cpc925_probe(struct platform_device *pdev)
 			    sizeof(struct cpc925_mc_pdata));
 	if (!mci) {
 		cpc925_printk(KERN_ERR, "No memory for mem_ctl_info\n");
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err2;
 	}
 
@@ -996,7 +996,7 @@ static int cpc925_probe(struct platform_device *pdev)
 	/* get this far and it's successful */
 	edac_dbg(0, "success\n");
 
-	res = 0;
+	ret = 0;
 	goto out;
 
 err3:
@@ -1007,7 +1007,7 @@ err2:
 err1:
 	devres_release_group(&pdev->dev, cpc925_probe);
 out:
-	return res;
+	return ret;
 }
 
 static int cpc925_remove(struct platform_device *pdev)

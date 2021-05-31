@@ -286,7 +286,7 @@ static int altr_sdram_probe(struct platform_device *pdev)
 	struct regmap *mc_vbase;
 	struct dimm_info *dimm;
 	u32 read_reg;
-	int irq, irq2, res = 0;
+	int irq, irq2, ret = 0;
 	unsigned long mem_size, irqflags = 0;
 
 	id = of_match_device(altr_sdram_ctrl_of_match, &pdev->dev);
@@ -375,7 +375,7 @@ static int altr_sdram_probe(struct platform_device *pdev)
 	if (!devres_open_group(&pdev->dev, NULL, GFP_KERNEL)) {
 		edac_printk(KERN_ERR, EDAC_MC,
 			    "Unable to get managed device resource\n");
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto free;
 	}
 
@@ -394,40 +394,40 @@ static int altr_sdram_probe(struct platform_device *pdev)
 	dimm->mtype = MEM_DDR3;
 	dimm->edac_mode = EDAC_SECDED;
 
-	res = edac_mc_add_mc(mci);
-	if (res < 0)
+	ret = edac_mc_add_mc(mci);
+	if (ret < 0)
 		goto err;
 
 	/* Only the Arria10 has separate IRQs */
 	if (of_machine_is_compatible("altr,socfpga-arria10")) {
 		/* Arria10 specific initialization */
-		res = a10_init(mc_vbase);
-		if (res < 0)
+		ret = a10_init(mc_vbase);
+		if (ret < 0)
 			goto err2;
 
-		res = devm_request_irq(&pdev->dev, irq2,
+		ret = devm_request_irq(&pdev->dev, irq2,
 				       altr_sdram_mc_err_handler,
 				       IRQF_SHARED, dev_name(&pdev->dev), mci);
-		if (res < 0) {
+		if (ret < 0) {
 			edac_mc_printk(mci, KERN_ERR,
 				       "Unable to request irq %d\n", irq2);
-			res = -ENODEV;
+			ret = -ENODEV;
 			goto err2;
 		}
 
-		res = a10_unmask_irq(pdev, A10_DDR0_IRQ_MASK);
-		if (res < 0)
+		ret = a10_unmask_irq(pdev, A10_DDR0_IRQ_MASK);
+		if (ret < 0)
 			goto err2;
 
 		irqflags = IRQF_SHARED;
 	}
 
-	res = devm_request_irq(&pdev->dev, irq, altr_sdram_mc_err_handler,
+	ret = devm_request_irq(&pdev->dev, irq, altr_sdram_mc_err_handler,
 			       irqflags, dev_name(&pdev->dev), mci);
-	if (res < 0) {
+	if (ret < 0) {
 		edac_mc_printk(mci, KERN_ERR,
 			       "Unable to request irq %d\n", irq);
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err2;
 	}
 
@@ -436,7 +436,7 @@ static int altr_sdram_probe(struct platform_device *pdev)
 			       priv->ecc_irq_en_mask, priv->ecc_irq_en_mask)) {
 		edac_mc_printk(mci, KERN_ERR,
 			       "Error enabling SDRAM ECC IRQ\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err2;
 	}
 
@@ -453,9 +453,9 @@ err:
 free:
 	edac_mc_free(mci);
 	edac_printk(KERN_ERR, EDAC_MC,
-		    "EDAC Probe Failed; Error %d\n", res);
+		    "EDAC Probe Failed; Error %d\n", ret);
 
-	return res;
+	return ret;
 }
 
 static int altr_sdram_remove(struct platform_device *pdev)
@@ -707,7 +707,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	struct edac_device_ctl_info *dci;
 	struct altr_edac_device_dev *drvdata;
 	struct resource *r;
-	int res = 0;
+	int ret = 0;
 	struct device_node *np = pdev->dev.of_node;
 	char *ecc_name = (char *)np->name;
 	static int dev_instance;
@@ -722,7 +722,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	if (!r) {
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "Unable to get mem resource\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto fail;
 	}
 
@@ -730,7 +730,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 				     dev_name(&pdev->dev))) {
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "%s:Error requesting mem region\n", ecc_name);
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto fail;
 	}
 
@@ -741,7 +741,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 	if (!dci) {
 		edac_printk(KERN_ERR, EDAC_DEVICE,
 			    "%s: Unable to allocate EDAC device\n", ecc_name);
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto fail;
 	}
 
@@ -752,7 +752,7 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 
 	drvdata->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
 	if (!drvdata->base) {
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto fail1;
 	}
 
@@ -761,31 +761,31 @@ static int altr_edac_device_probe(struct platform_device *pdev)
 
 	/* Check specific dependencies for the module */
 	if (drvdata->data->setup) {
-		res = drvdata->data->setup(drvdata);
-		if (res)
+		ret = drvdata->data->setup(drvdata);
+		if (ret)
 			goto fail1;
 	}
 
 	drvdata->sb_irq = platform_get_irq(pdev, 0);
-	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
+	ret = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       altr_edac_device_handler,
 			       0, dev_name(&pdev->dev), dci);
-	if (res)
+	if (ret)
 		goto fail1;
 
 	drvdata->db_irq = platform_get_irq(pdev, 1);
-	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
+	ret = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       altr_edac_device_handler,
 			       0, dev_name(&pdev->dev), dci);
-	if (res)
+	if (ret)
 		goto fail1;
 
 	dci->mod_name = "Altera ECC Manager";
 	dci->dev_name = drvdata->edac_dev_name;
 
-	res = edac_device_add_device(dci);
-	if (res) {
-		res = -ENXIO;
+	ret = edac_device_add_device(dci);
+	if (ret) {
+		ret = -ENXIO;
 		goto fail1;
 	}
 
@@ -800,9 +800,9 @@ fail1:
 fail:
 	devres_release_group(&pdev->dev, NULL);
 	edac_printk(KERN_ERR, EDAC_DEVICE,
-		    "%s:Error setting up EDAC device: %d\n", ecc_name, res);
+		    "%s:Error setting up EDAC device: %d\n", ecc_name, ret);
 
-	return res;
+	return ret;
 }
 
 static int altr_edac_device_remove(struct platform_device *pdev)

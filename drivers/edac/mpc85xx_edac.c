@@ -148,7 +148,7 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 	struct mpc85xx_edac_pci_plat_data *plat_data;
 	struct device_node *of_node;
 	struct resource r;
-	int res = 0;
+	int ret = 0;
 
 	if (!devres_open_group(&op->dev, mpc85xx_pci_err_probe, GFP_KERNEL))
 		return -ENOMEM;
@@ -173,7 +173,7 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 	plat_data = op->dev.platform_data;
 	if (!plat_data) {
 		dev_err(&op->dev, "no platform data");
-		res = -ENXIO;
+		ret = -ENXIO;
 		goto err;
 	}
 	of_node = plat_data->of_node;
@@ -196,8 +196,8 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 
 	pdata->edac_idx = edac_pci_idx++;
 
-	res = of_address_to_resource(of_node, 0, &r);
-	if (res) {
+	ret = of_address_to_resource(of_node, 0, &r);
+	if (ret) {
 		pr_err("%s: Unable to get resource for PCI err regs\n", __func__);
 		goto err;
 	}
@@ -208,14 +208,14 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 	if (!devm_request_mem_region(&op->dev, r.start, resource_size(&r),
 					pdata->name)) {
 		pr_err("%s: Error while requesting mem region\n", __func__);
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err;
 	}
 
 	pdata->pci_vbase = devm_ioremap(&op->dev, r.start, resource_size(&r));
 	if (!pdata->pci_vbase) {
 		pr_err("%s: Unable to setup PCI err regs\n", __func__);
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -248,21 +248,21 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 
 	if (edac_pci_add_device(pci, pdata->edac_idx) > 0) {
 		edac_dbg(3, "failed edac_pci_add_device()\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err;
 	}
 
 	if (edac_op_state == EDAC_OPSTATE_INT) {
 		pdata->irq = irq_of_parse_and_map(of_node, 0);
-		res = devm_request_irq(&op->dev, pdata->irq,
+		ret = devm_request_irq(&op->dev, pdata->irq,
 				       mpc85xx_pci_isr,
 				       IRQF_SHARED,
 				       "[EDAC] PCI err", pci);
-		if (res < 0) {
+		if (ret < 0) {
 			pr_err("%s: Unable to request irq %d for MPC85xx PCI err\n",
 				__func__, pdata->irq);
 			irq_dispose_mapping(pdata->irq);
-			res = -ENODEV;
+			ret = -ENODEV;
 			goto err2;
 		}
 
@@ -297,7 +297,7 @@ err2:
 err:
 	edac_pci_free_ctl_info(pci);
 	devres_release_group(&op->dev, mpc85xx_pci_err_probe);
-	return res;
+	return ret;
 }
 
 static int mpc85xx_pci_err_remove(struct platform_device *op)
@@ -492,7 +492,7 @@ static int mpc85xx_l2_err_probe(struct platform_device *op)
 	struct edac_device_ctl_info *edac_dev;
 	struct mpc85xx_l2_pdata *pdata;
 	struct resource r;
-	int res;
+	int ret;
 
 	if (!devres_open_group(&op->dev, mpc85xx_l2_err_probe, GFP_KERNEL))
 		return -ENOMEM;
@@ -512,8 +512,8 @@ static int mpc85xx_l2_err_probe(struct platform_device *op)
 	edac_dev->ctl_name = pdata->name;
 	edac_dev->dev_name = pdata->name;
 
-	res = of_address_to_resource(op->dev.of_node, 0, &r);
-	if (res) {
+	ret = of_address_to_resource(op->dev.of_node, 0, &r);
+	if (ret) {
 		pr_err("%s: Unable to get resource for L2 err regs\n", __func__);
 		goto err;
 	}
@@ -524,14 +524,14 @@ static int mpc85xx_l2_err_probe(struct platform_device *op)
 	if (!devm_request_mem_region(&op->dev, r.start, resource_size(&r),
 				     pdata->name)) {
 		pr_err("%s: Error while requesting mem region\n", __func__);
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err;
 	}
 
 	pdata->l2_vbase = devm_ioremap(&op->dev, r.start, resource_size(&r));
 	if (!pdata->l2_vbase) {
 		pr_err("%s: Unable to setup L2 err regs\n", __func__);
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -553,20 +553,20 @@ static int mpc85xx_l2_err_probe(struct platform_device *op)
 
 	if (edac_device_add_device(edac_dev) > 0) {
 		edac_dbg(3, "failed edac_device_add_device()\n");
-		res = -ENXIO;
+		ret = -ENXIO;
 		goto err;
 	}
 
 	if (edac_op_state == EDAC_OPSTATE_INT) {
 		pdata->irq = irq_of_parse_and_map(op->dev.of_node, 0);
-		res = devm_request_irq(&op->dev, pdata->irq,
+		ret = devm_request_irq(&op->dev, pdata->irq,
 				       mpc85xx_l2_isr, IRQF_SHARED,
 				       "[EDAC] L2 err", edac_dev);
-		if (res < 0) {
+		if (ret < 0) {
 			pr_err("%s: Unable to request irq %d for MPC85xx L2 err\n",
 				__func__, pdata->irq);
 			irq_dispose_mapping(pdata->irq);
-			res = -ENODEV;
+			ret = -ENODEV;
 			goto err2;
 		}
 
@@ -589,7 +589,7 @@ err2:
 err:
 	devres_release_group(&op->dev, mpc85xx_l2_err_probe);
 	edac_device_free_ctl_info(edac_dev);
-	return res;
+	return ret;
 }
 
 static int mpc85xx_l2_err_remove(struct platform_device *op)
@@ -691,7 +691,7 @@ static struct platform_driver * const drivers[] = {
 
 static int __init mpc85xx_mc_init(void)
 {
-	int res = 0;
+	int ret;
 	u32 __maybe_unused pvr = 0;
 
 	pr_info("Freescale(R) MPC85xx EDAC driver, (C) 2006 Montavista Software\n");
@@ -706,8 +706,8 @@ static int __init mpc85xx_mc_init(void)
 		break;
 	}
 
-	res = platform_register_drivers(drivers, ARRAY_SIZE(drivers));
-	if (res)
+	ret = platform_register_drivers(drivers, ARRAY_SIZE(drivers));
+	if (ret)
 		pr_warn(EDAC_MOD_STR "drivers fail to register\n");
 
 	return 0;

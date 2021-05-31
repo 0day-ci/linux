@@ -50,7 +50,7 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 	struct edac_device_ctl_info *dci;
 	struct hb_l2_drvdata *drvdata;
 	struct resource *r;
-	int res = 0;
+	int ret = 0;
 
 	dci = edac_device_alloc_ctl_info(sizeof(*drvdata), "cpu",
 		1, "L", 1, 2, NULL, 0, 0);
@@ -67,21 +67,21 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!r) {
 		dev_err(&pdev->dev, "Unable to get mem resource\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err;
 	}
 
 	if (!devm_request_mem_region(&pdev->dev, r->start,
 				     resource_size(r), dev_name(&pdev->dev))) {
 		dev_err(&pdev->dev, "Error while requesting mem region\n");
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err;
 	}
 
 	drvdata->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
 	if (!drvdata->base) {
 		dev_err(&pdev->dev, "Unable to map regs\n");
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -91,22 +91,22 @@ static int highbank_l2_err_probe(struct platform_device *pdev)
 	dci->dev_name = dev_name(&pdev->dev);
 
 	if (edac_device_add_device(dci)) {
-		res = -ENXIO;
+		ret = -ENXIO;
 		goto err;
 	}
 
 	drvdata->db_irq = platform_get_irq(pdev, 0);
-	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
+	ret = devm_request_irq(&pdev->dev, drvdata->db_irq,
 			       highbank_l2_err_handler,
 			       0, dev_name(&pdev->dev), dci);
-	if (res < 0)
+	if (ret < 0)
 		goto err2;
 
 	drvdata->sb_irq = platform_get_irq(pdev, 1);
-	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
+	ret = devm_request_irq(&pdev->dev, drvdata->sb_irq,
 			       highbank_l2_err_handler,
 			       0, dev_name(&pdev->dev), dci);
-	if (res < 0)
+	if (ret < 0)
 		goto err2;
 
 	devres_close_group(&pdev->dev, NULL);
@@ -116,7 +116,7 @@ err2:
 err:
 	devres_release_group(&pdev->dev, NULL);
 	edac_device_free_ctl_info(dci);
-	return res;
+	return ret;
 }
 
 static int highbank_l2_err_remove(struct platform_device *pdev)

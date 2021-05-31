@@ -153,7 +153,7 @@ static int highbank_mc_probe(struct platform_device *pdev)
 	void __iomem *base;
 	u32 control;
 	int irq;
-	int res = 0;
+	int ret = 0;
 
 	id = of_match_device(hb_ddr_ctrl_of_match, &pdev->dev);
 	if (!id)
@@ -180,21 +180,21 @@ static int highbank_mc_probe(struct platform_device *pdev)
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!r) {
 		dev_err(&pdev->dev, "Unable to get mem resource\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err;
 	}
 
 	if (!devm_request_mem_region(&pdev->dev, r->start,
 				     resource_size(r), dev_name(&pdev->dev))) {
 		dev_err(&pdev->dev, "Error while requesting mem region\n");
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err;
 	}
 
 	base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
 	if (!base) {
 		dev_err(&pdev->dev, "Unable to map regs\n");
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -205,7 +205,7 @@ static int highbank_mc_probe(struct platform_device *pdev)
 	control = readl(drvdata->mc_err_base + HB_DDR_ECC_OPT) & 0x3;
 	if (!control || (control == 0x2)) {
 		dev_err(&pdev->dev, "No ECC present, or ECC disabled\n");
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err;
 	}
 
@@ -225,14 +225,14 @@ static int highbank_mc_probe(struct platform_device *pdev)
 	dimm->mtype = MEM_DDR3;
 	dimm->edac_mode = EDAC_SECDED;
 
-	res = edac_mc_add_mc_with_groups(mci, highbank_dev_groups);
-	if (res < 0)
+	ret = edac_mc_add_mc_with_groups(mci, highbank_dev_groups);
+	if (ret < 0)
 		goto err;
 
 	irq = platform_get_irq(pdev, 0);
-	res = devm_request_irq(&pdev->dev, irq, highbank_mc_err_handler,
+	ret = devm_request_irq(&pdev->dev, irq, highbank_mc_err_handler,
 			       0, dev_name(&pdev->dev), mci);
-	if (res < 0) {
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Unable to request irq %d\n", irq);
 		goto err2;
 	}
@@ -244,7 +244,7 @@ err2:
 err:
 	devres_release_group(&pdev->dev, NULL);
 	edac_mc_free(mci);
-	return res;
+	return ret;
 }
 
 static int highbank_mc_remove(struct platform_device *pdev)

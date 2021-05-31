@@ -611,13 +611,13 @@ static struct platform_driver * const drivers[] = {
 
 static int __init armada_xp_edac_init(void)
 {
-	int res;
+	int ret;
 
 	/* only polling is supported */
 	edac_op_state = EDAC_OPSTATE_POLL;
 
-	res = platform_register_drivers(drivers, ARRAY_SIZE(drivers));
-	if (res)
+	ret = platform_register_drivers(drivers, ARRAY_SIZE(drivers));
+	if (ret)
 		pr_warn("Armada XP EDAC drivers fail to register\n");
 
 	return 0;

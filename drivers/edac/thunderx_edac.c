@@ -243,11 +243,11 @@ static ssize_t thunderx_##_type##_##_field##_write(struct file *file,	    \
 					     size_t count, loff_t *ppos)    \
 {									    \
 	struct thunderx_##_type *pdata = file->private_data;		    \
-	int res;							    \
+	int ret;							    \
 									    \
-	res = kstrtoull_from_user(data, count, 0, &pdata->_field);	    \
+	ret = kstrtoull_from_user(data, count, 0, &pdata->_field);	    \
 									    \
-	return res ? res : count;					    \
+	return ret ? ret : count;					    \
 }									    \
 									    \
 DEBUGFS_STRUCT(_field, 0600,						    \
@@ -273,16 +273,16 @@ static ssize_t thunderx_##_type##_##_name##_write(struct file *file,	    \
 {									    \
 	struct thunderx_##_type *pdata = file->private_data;		    \
 	u64 val;							    \
-	int res;							    \
+	int ret;							    \
 									    \
-	res = kstrtoull_from_user(data, count, 0, &val);		    \
+	ret = kstrtoull_from_user(data, count, 0, &val);		    \
 									    \
-	if (!res) {							    \
+	if (!ret) {							    \
 		writeq(val, pdata->regs + _reg);			    \
-		res = count;						    \
+		ret = count;						    \
 	}								    \
 									    \
-	return res;							    \
+	return ret;							    \
 }									    \
 									    \
 DEBUGFS_STRUCT(_name, 0600,						    \
@@ -306,17 +306,17 @@ static ssize_t thunderx_lmc_inject_int_write(struct file *file,
 {
 	struct thunderx_lmc *lmc = file->private_data;
 	u64 val;
-	int res;
+	int ret;
 
-	res = kstrtoull_from_user(data, count, 0, &val);
+	ret = kstrtoull_from_user(data, count, 0, &val);
 
-	if (!res) {
+	if (!ret) {
 		/* Trigger the interrupt */
 		writeq(val, lmc->regs + LMC_INT_W1S);
-		res = count;
+		ret = count;
 	}
 
-	return res;
+	return ret;
 }
 
 static ssize_t thunderx_lmc_int_read(struct file *file,

@@ -480,7 +480,7 @@ int fsl_mc_err_probe(struct platform_device *op)
 	struct fsl_mc_pdata *pdata;
 	struct resource r;
 	u32 sdram_ctl;
-	int res;
+	int ret;
 
 	if (!devres_open_group(&op->dev, fsl_mc_err_probe, GFP_KERNEL))
 		return -ENOMEM;
@@ -512,8 +512,8 @@ int fsl_mc_err_probe(struct platform_device *op)
 	 */
 	little_endian = of_property_read_bool(op->dev.of_node, "little-endian");
 
-	res = of_address_to_resource(op->dev.of_node, 0, &r);
-	if (res) {
+	ret = of_address_to_resource(op->dev.of_node, 0, &r);
+	if (ret) {
 		pr_err("%s: Unable to get resource for MC err regs\n",
 		       __func__);
 		goto err;
@@ -523,14 +523,14 @@ int fsl_mc_err_probe(struct platform_device *op)
 				     pdata->name)) {
 		pr_err("%s: Error while requesting mem region\n",
 		       __func__);
-		res = -EBUSY;
+		ret = -EBUSY;
 		goto err;
 	}
 
 	pdata->mc_vbase = devm_ioremap(&op->dev, r.start, resource_size(&r));
 	if (!pdata->mc_vbase) {
 		pr_err("%s: Unable to setup MC err regs\n", __func__);
-		res = -ENOMEM;
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -538,7 +538,7 @@ int fsl_mc_err_probe(struct platform_device *op)
 	if (!(sdram_ctl & DSC_ECC_EN)) {
 		/* no ECC */
 		pr_warn("%s: No ECC DIMMs discovered\n", __func__);
-		res = -ENODEV;
+		ret = -ENODEV;
 		goto err;
 	}
 
@@ -567,8 +567,8 @@ int fsl_mc_err_probe(struct platform_device *op)
 	/* clear all error bits */
 	ddr_out32(pdata->mc_vbase + FSL_MC_ERR_DETECT, ~0);
 
-	res = edac_mc_add_mc_with_groups(mci, fsl_ddr_dev_groups);
-	if (res) {
+	ret = edac_mc_add_mc_with_groups(mci, fsl_ddr_dev_groups);
+	if (ret) {
 		edac_dbg(3, "failed edac_mc_add_mc()\n");
 		goto err;
 	}
@@ -586,14 +586,14 @@ int fsl_mc_err_probe(struct platform_device *op)
 
 		/* register interrupts */
 		pdata->irq = platform_get_irq(op, 0);
-		res = devm_request_irq(&op->dev, pdata->irq,
+		ret = devm_request_irq(&op->dev, pdata->irq,
 				       fsl_mc_isr,
 				       IRQF_SHARED,
 				       "[EDAC] MC err", mci);
-		if (res < 0) {
+		if (ret < 0) {
 			pr_err("%s: Unable to request irq %d for FSL DDR DRAM ERR\n",
 			       __func__, pdata->irq);
-			res = -ENODEV;
+			ret = -ENODEV;
 			goto err2;
 		}
 
@@ -612,7 +612,7 @@ err2:
 err:
 	devres_release_group(&op->dev, fsl_mc_err_probe);
 	edac_mc_free(mci);
-	return res;
+	return ret;
 }
 
 int fsl_mc_err_remove(struct platform_device *op)

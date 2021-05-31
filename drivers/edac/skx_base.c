@@ -530,11 +530,11 @@ static u8 skx_open_fine_column[] = {
 
 static int skx_bits(u64 addr, int nbits, u8 *bits)
 {
-	int i, res = 0;
+	int i, ret = 0;
 
 	for (i = 0; i < nbits; i++)
-		res |= ((addr >> bits[i]) & 1) << i;
-	return res;
+		ret |= ((addr >> bits[i]) & 1) << i;
+	return ret;
 }
 
 static int skx_bank_bits(u64 addr, int b0, int b1, int do_xor, int x0, int x1)
