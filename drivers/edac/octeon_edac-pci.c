@@ -60,7 +60,6 @@ static void octeon_pci_poll(struct edac_pci_ctl_info *pci)
 static int octeon_pci_probe(struct platform_device *pdev)
 {
 	struct edac_pci_ctl_info *pci;
-	int res = 0;
 
 	pci = edac_pci_alloc_ctl_info(0, "octeon_pci_err");
 	if (!pci)
@@ -76,15 +75,11 @@ static int octeon_pci_probe(struct platform_device *pdev)
 
 	if (edac_pci_add_device(pci, 0) > 0) {
 		pr_err("%s: edac_pci_add_device() failed\n", __func__);
-		goto err;
+		edac_pci_free_ctl_info(pci);
+		return -ENODEV;
 	}
 
 	return 0;
-
-err:
-	edac_pci_free_ctl_info(pci);
-
-	return res;
 }
 
 static int octeon_pci_remove(struct platform_device *pdev)

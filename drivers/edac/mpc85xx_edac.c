@@ -248,6 +248,7 @@ static int mpc85xx_pci_err_probe(struct platform_device *op)
 
 	if (edac_pci_add_device(pci, pdata->edac_idx) > 0) {
 		edac_dbg(3, "failed edac_pci_add_device()\n");
+		res = -ENODEV;
 		goto err;
 	}
 
