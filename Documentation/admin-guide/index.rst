@@ -111,6 +111,7 @@ configure specific aspects of kernel behavior to your liking.
    ras
    rtc
    serial-console
+   spkguide
    svga
    syscall-user-dispatch
    sysrq
