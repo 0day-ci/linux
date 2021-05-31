@@ -55,7 +55,7 @@ static DEFINE_IDA(host_index_ida);
 
 static void scsi_host_cls_release(struct device *dev)
 {
-	put_device(&class_to_shost(dev)->shost_gendev);
+	put_device(dev->parent);
 }
 
 static struct class shost_class = {
@@ -260,8 +260,6 @@ int scsi_add_host_with_dma(struct Scsi_Host *shost, struct device *dev,
 	error = device_add(&shost->shost_dev);
 	if (error)
 		goto out_del_gendev;
-
-	get_device(&shost->shost_gendev);
 
 	if (shost->transportt->host_size) {
 		shost->shost_data = kzalloc(shost->transportt->host_size,
@@ -473,7 +471,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->shost_gendev.type = &scsi_host_type;
 
 	device_initialize(&shost->shost_dev);
-	shost->shost_dev.parent = &shost->shost_gendev;
+	shost->shost_dev.parent = get_device(&shost->shost_gendev);
 	shost->shost_dev.class = &shost_class;
 	dev_set_name(&shost->shost_dev, "host%d", shost->host_no);
 	shost->shost_dev.groups = scsi_sysfs_shost_attr_groups;
@@ -503,7 +501,9 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
  fail_index_remove:
 	ida_simple_remove(&host_index_ida, shost->host_no);
  fail_kfree:
-	kfree(shost);
+	put_device(&shost->shost_dev);
+	put_device(&shost->shost_gendev);
+
 	return NULL;
 }
 EXPORT_SYMBOL(scsi_host_alloc);
