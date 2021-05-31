@@ -3174,6 +3174,8 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	}
 
 	/* Fast path completion. */
+	qla_chk_edif_rx_sa_delete_pending(vha, sp, sts24);
+
 	if (comp_status == CS_COMPLETE && scsi_status == 0) {
 		qla2x00_process_completed_request(vha, req, handle);
 
@@ -3568,6 +3570,9 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 		}
 		break;
 
+	case SA_UPDATE_IOCB_TYPE:
+		return 1;	// let sa_update_iocb_entry cleanup everything
+
 	case ABTS_RESP_24XX:
 	case CTIO_TYPE7:
 	case CTIO_CRC2:
@@ -3858,6 +3863,11 @@ process_err:
 				       purex_entry->els_frame_payload[3]);
 			}
 			break;
+		case SA_UPDATE_IOCB_TYPE:
+			qla28xx_sa_update_iocb_entry(vha, rsp->req,
+				(struct sa_update_28xx *)pkt);
+			break;
+
 		default:
 			/* Type Not Supported. */
 			ql_dbg(ql_dbg_async, vha, 0x5042,
