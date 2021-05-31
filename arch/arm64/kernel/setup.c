@@ -51,31 +51,7 @@
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
 
-static int num_standard_resources;
-static struct resource *standard_resources;
-
 phys_addr_t __fdt_pointer __initdata;
-
-/*
- * Standard memory resources
- */
-static struct resource mem_res[] = {
-	{
-		.name = "Kernel code",
-		.start = 0,
-		.end = 0,
-		.flags = IORESOURCE_SYSTEM_RAM
-	},
-	{
-		.name = "Kernel data",
-		.start = 0,
-		.end = 0,
-		.flags = IORESOURCE_SYSTEM_RAM
-	}
-};
-
-#define kernel_code mem_res[0]
-#define kernel_data mem_res[1]
 
 /*
  * The recorded values of x0 .. x3 upon kernel entry.
@@ -214,81 +190,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 	dump_stack_set_arch_desc("%s (DT)", name);
 }
 
-static void __init request_standard_resources(void)
-{
-	struct memblock_region *region;
-	struct resource *res;
-	unsigned long i = 0;
-	size_t res_size;
-
-	kernel_code.start   = __pa_symbol(_stext);
-	kernel_code.end     = __pa_symbol(__init_begin - 1);
-	kernel_data.start   = __pa_symbol(_sdata);
-	kernel_data.end     = __pa_symbol(_end - 1);
-
-	num_standard_resources = memblock.memory.cnt;
-	res_size = num_standard_resources * sizeof(*standard_resources);
-	standard_resources = memblock_alloc(res_size, SMP_CACHE_BYTES);
-	if (!standard_resources)
-		panic("%s: Failed to allocate %zu bytes\n", __func__, res_size);
-
-	for_each_mem_region(region) {
-		res = &standard_resources[i++];
-		if (memblock_is_nomap(region)) {
-			res->name  = "reserved";
-			res->flags = IORESOURCE_MEM;
-		} else {
-			res->name  = "System RAM";
-			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
-		}
-		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
-		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
-
-		request_resource(&iomem_resource, res);
-
-		if (kernel_code.start >= res->start &&
-		    kernel_code.end <= res->end)
-			request_resource(res, &kernel_code);
-		if (kernel_data.start >= res->start &&
-		    kernel_data.end <= res->end)
-			request_resource(res, &kernel_data);
-#ifdef CONFIG_KEXEC_CORE
-		/* Userspace will find "Crash kernel" region in /proc/iomem. */
-		if (crashk_res.end && crashk_res.start >= res->start &&
-		    crashk_res.end <= res->end)
-			request_resource(res, &crashk_res);
-#endif
-	}
-}
-
-static int __init reserve_memblock_reserved_regions(void)
-{
-	u64 i, j;
-
-	for (i = 0; i < num_standard_resources; ++i) {
-		struct resource *mem = &standard_resources[i];
-		phys_addr_t r_start, r_end, mem_size = resource_size(mem);
-
-		if (!memblock_is_region_reserved(mem->start, mem_size))
-			continue;
-
-		for_each_reserved_mem_range(j, &r_start, &r_end) {
-			resource_size_t start, end;
-
-			start = max(PFN_PHYS(PFN_DOWN(r_start)), mem->start);
-			end = min(PFN_PHYS(PFN_UP(r_end)) - 1, mem->end);
-
-			if (start > mem->end || end < mem->start)
-				continue;
-
-			reserve_region_with_split(mem, start, end, "reserved");
-		}
-	}
-
-	return 0;
-}
-arch_initcall(reserve_memblock_reserved_regions);
-
 u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
 u64 cpu_logical_map(unsigned int cpu)
@@ -359,7 +260,7 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	kasan_init();
 
-	request_standard_resources();
+	memblock_setup_resources();
 
 	early_ioremap_reset();
 

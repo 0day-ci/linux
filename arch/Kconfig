@@ -1275,6 +1275,13 @@ config ARCH_SPLIT_ARG64
 config ARCH_HAS_ELFCORE_COMPAT
 	bool
 
+config ARCH_WANT_RESERVE_MEMBLOCK_RESERVED_REGIONS
+	bool
+	help
+	  If an architecture requires that memory regions reserved in
+	  memblock will appear as "Reserved" in the resource tree, select
+	  this option.
+
 source "kernel/gcov/Kconfig"
 
 source "scripts/gcc-plugins/Kconfig"
