@@ -60,6 +60,18 @@ static inline void set_section_nid(unsigned long section_nr, int nid)
 #endif
 
 #ifdef CONFIG_SPARSEMEM_EXTREME
+static void __init sparse_alloc_section_roots(void)
+{
+	unsigned long size, align;
+
+	size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
+	align = 1 << (INTERNODE_CACHE_SHIFT);
+	mem_section = memblock_alloc(size, align);
+	if (!mem_section)
+		panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
+		      __func__, size, align);
+}
+
 static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 {
 	struct mem_section *section = NULL;
@@ -107,6 +119,8 @@ static inline int sparse_index_init(unsigned long section_nr, int nid)
 {
 	return 0;
 }
+
+static inline void sparse_alloc_section_roots(void) {}
 #endif
 
 #ifdef CONFIG_SPARSEMEM_EXTREME
@@ -253,19 +267,6 @@ void __init subsection_map_init(unsigned long pfn, unsigned long nr_pages)
 static void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
 	unsigned long pfn;
-
-#ifdef CONFIG_SPARSEMEM_EXTREME
-	if (unlikely(!mem_section)) {
-		unsigned long size, align;
-
-		size = sizeof(struct mem_section *) * NR_SECTION_ROOTS;
-		align = 1 << (INTERNODE_CACHE_SHIFT);
-		mem_section = memblock_alloc(size, align);
-		if (!mem_section)
-			panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
-			      __func__, size, align);
-	}
-#endif
 
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
@@ -581,6 +582,8 @@ void __init sparse_init(void)
 {
 	unsigned long pnum_end, pnum_begin, map_count = 1;
 	int nid_begin;
+
+	sparse_alloc_section_roots();
 
 	memblocks_present();
 
