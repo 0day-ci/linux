@@ -661,6 +661,214 @@ qla_edif_app_stop(scsi_qla_host_t *vha, struct bsg_job *bsg_job)
 	return rval;
 }
 
+static int
+qla_edif_app_chk_sa_update(scsi_qla_host_t *vha, fc_port_t *fcport,
+		struct app_plogi_reply *appplogireply)
+{
+	int	ret = 0;
+
+	if (!(fcport->edif.rx_sa_set && fcport->edif.tx_sa_set)) {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s: wwpn %8phC Both SA indexes has not been SET TX %d, RX %d.\n",
+		    __func__, fcport->port_name, fcport->edif.tx_sa_set,
+		    fcport->edif.rx_sa_set);
+		appplogireply->prli_status = 0;
+		ret = 1;
+	} else  {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s wwpn %8phC Both SA(s) updated.\n", __func__,
+		    fcport->port_name);
+		fcport->edif.rx_sa_set = fcport->edif.tx_sa_set = 0;
+		fcport->edif.rx_sa_pending = fcport->edif.tx_sa_pending = 0;
+		appplogireply->prli_status = 1;
+	}
+	return ret;
+}
+
+/*
+ * event that the app has approved plogi to complete (e.g., finish
+ * up with prli
+ */
+static int
+qla_edif_app_authok(scsi_qla_host_t *vha, struct bsg_job *bsg_job)
+{
+	int32_t			rval = 0;
+	struct auth_complete_cmd appplogiok;
+	struct app_plogi_reply	appplogireply = {0};
+	struct fc_bsg_reply	*bsg_reply = bsg_job->reply;
+	fc_port_t		*fcport = NULL;
+	port_id_t		portid = {0};
+	/* port_id_t		portid = {0x10100}; */
+	/* int i; */
+
+	/* ql_dbg(ql_dbg_edif, vha, 0x911d, "%s app auth ok\n", __func__); */
+
+	sg_copy_to_buffer(bsg_job->request_payload.sg_list,
+	    bsg_job->request_payload.sg_cnt, &appplogiok,
+	    sizeof(struct auth_complete_cmd));
+
+	switch (appplogiok.type) {
+	case PL_TYPE_WWPN:
+		fcport = qla2x00_find_fcport_by_wwpn(vha,
+		    appplogiok.u.wwpn, 0);
+		if (!fcport)
+			ql_dbg(ql_dbg_edif, vha, 0x911d,
+			    "%s wwpn lookup failed: %8phC\n",
+			    __func__, appplogiok.u.wwpn);
+		break;
+	case PL_TYPE_DID:
+		fcport = qla2x00_find_fcport_by_pid(vha, &appplogiok.u.d_id);
+		if (!fcport)
+			ql_dbg(ql_dbg_edif, vha, 0x911d,
+			    "%s d_id lookup failed: %x\n", __func__,
+			    portid.b24);
+		break;
+	default:
+		ql_dbg(ql_dbg_edif, vha, 0x911d,
+		    "%s undefined type: %x\n", __func__,
+		    appplogiok.type);
+		break;
+	}
+
+	if (!fcport) {
+		SET_DID_STATUS(bsg_reply->result, DID_ERROR);
+		goto errstate_exit;
+	}
+
+	/* TODO: edif: Kill prli timer... */
+
+	/*
+	 * if port is online then this is a REKEY operation
+	 * Only do sa update checking
+	 */
+	if (atomic_read(&fcport->state) == FCS_ONLINE) {
+		ql_dbg(ql_dbg_edif, vha, 0x911d,
+		    "%s Skipping PRLI complete based on rekey\n", __func__);
+		appplogireply.prli_status = 1;
+		SET_DID_STATUS(bsg_reply->result, DID_OK);
+		qla_edif_app_chk_sa_update(vha, fcport, &appplogireply);
+		goto errstate_exit;
+	}
+
+	/* make sure in AUTH_PENDING or else reject */
+	if (fcport->disc_state != DSC_LOGIN_AUTH_PEND) {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s wwpn %8phC is not in auth pending state (%x)\n",
+		    __func__, fcport->port_name, fcport->disc_state);
+		/* SET_DID_STATUS(bsg_reply->result, DID_ERROR); */
+		/* App can't fix us - initaitor will retry */
+		SET_DID_STATUS(bsg_reply->result, DID_OK);
+		appplogireply.prli_status = 0;
+		goto errstate_exit;
+	}
+
+	SET_DID_STATUS(bsg_reply->result, DID_OK);
+	appplogireply.prli_status = 1;
+	if (!(fcport->edif.rx_sa_set && fcport->edif.tx_sa_set)) {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s: wwpn %8phC Both SA indexes has not been SET TX %d, RX %d.\n",
+		    __func__, fcport->port_name, fcport->edif.tx_sa_set,
+		    fcport->edif.rx_sa_set);
+		SET_DID_STATUS(bsg_reply->result, DID_OK);
+		appplogireply.prli_status = 0;
+		goto errstate_exit;
+
+	} else {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s wwpn %8phC Both SA(s) updated.\n", __func__,
+		    fcport->port_name);
+		fcport->edif.rx_sa_set = fcport->edif.tx_sa_set = 0;
+		fcport->edif.rx_sa_pending = fcport->edif.tx_sa_pending = 0;
+	}
+	/* qla_edif_app_chk_sa_update(vha, fcport, &appplogireply); */
+	/*
+	 * TODO: edif: check this - discovery state changed by prli work?
+	 * TODO: Can't call this for target mode
+	 */
+	if (qla_ini_mode_enabled(vha)) {
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s AUTH complete - RESUME with prli for wwpn %8phC\n",
+		    __func__, fcport->port_name);
+		qla_edif_reset_auth_wait(fcport, DSC_LOGIN_PEND, 1);
+		/* qla2x00_set_fcport_disc_state(fcport, DSC_LOGIN_PEND); */
+		qla24xx_post_prli_work(vha, fcport);
+	}
+
+errstate_exit:
+
+	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
+	sg_copy_from_buffer(bsg_job->reply_payload.sg_list,
+	    bsg_job->reply_payload.sg_cnt, &appplogireply,
+	    sizeof(struct app_plogi_reply));
+
+	return rval;
+}
+
+/*
+ * event that the app has failed the plogi. logout the device (tbd)
+ */
+static int
+qla_edif_app_authfail(scsi_qla_host_t *vha, struct bsg_job *bsg_job)
+{
+	int32_t			rval = 0;
+	struct auth_complete_cmd appplogifail;
+	struct fc_bsg_reply	*bsg_reply = bsg_job->reply;
+	fc_port_t		*fcport = NULL;
+	port_id_t		portid = {0};
+
+	ql_dbg(ql_dbg_edif, vha, 0x911d, "%s app auth fail\n", __func__);
+
+	sg_copy_to_buffer(bsg_job->request_payload.sg_list,
+	    bsg_job->request_payload.sg_cnt, &appplogifail,
+	    sizeof(struct auth_complete_cmd));
+
+	/*
+	 * TODO: edif: app has failed this plogi. Inform driver to
+	 * take any action (if any).
+	 */
+	switch (appplogifail.type) {
+	case PL_TYPE_WWPN:
+		fcport = qla2x00_find_fcport_by_wwpn(vha,
+		    appplogifail.u.wwpn, 0);
+		SET_DID_STATUS(bsg_reply->result, DID_OK);
+		break;
+	case PL_TYPE_DID:
+		fcport = qla2x00_find_fcport_by_pid(vha, &appplogifail.u.d_id);
+		if (!fcport)
+			ql_dbg(ql_dbg_edif, vha, 0x911d,
+			    "%s d_id lookup failed: %x\n", __func__,
+			    portid.b24);
+		SET_DID_STATUS(bsg_reply->result, DID_OK);
+		break;
+	default:
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s undefined type: %x\n", __func__,
+		    appplogifail.type);
+		bsg_job->reply_len = sizeof(struct fc_bsg_reply);
+		SET_DID_STATUS(bsg_reply->result, DID_ERROR);
+		rval = -1;
+		break;
+	}
+
+	ql_dbg(ql_dbg_edif, vha, 0x911d,
+	    "%s fcport is 0x%p\n", __func__, fcport);
+
+	if (fcport) {
+		/* set/reset edif values and flags */
+		ql_dbg(ql_dbg_edif, vha, 0x911e,
+		    "%s reset the auth process - %8phC, loopid=%x portid=%06x.\n",
+		    __func__, fcport->port_name, fcport->loop_id,
+		    fcport->d_id.b24);
+
+		if (qla_ini_mode_enabled(fcport->vha)) {
+			fcport->send_els_logo = 1;
+			qla_edif_reset_auth_wait(fcport, DSC_LOGIN_PEND, 0);
+		}
+	}
+
+	return rval;
+}
+
 /*
  * event that the app needs fc port info (either all or individual d_id)
  */
@@ -886,6 +1094,12 @@ qla_edif_app_mgmt(struct bsg_job *bsg_job)
 		break;
 	case QL_VND_SC_APP_STOP:
 		rval = qla_edif_app_stop(vha, bsg_job);
+		break;
+	case QL_VND_SC_AUTH_OK:
+		rval = qla_edif_app_authok(vha, bsg_job);
+		break;
+	case QL_VND_SC_AUTH_FAIL:
+		rval = qla_edif_app_authfail(vha, bsg_job);
 		break;
 	case QL_VND_SC_GET_FCINFO:
 		rval = qla_edif_app_getfcinfo(vha, bsg_job);
