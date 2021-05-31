@@ -204,6 +204,7 @@ int arch_kexec_locate_mem_hole(struct kexec_buf *kbuf);
 
 extern int kexec_add_buffer(struct kexec_buf *kbuf);
 int kexec_locate_mem_hole(struct kexec_buf *kbuf);
+int kexec_locate_mem_hole_callback(struct resource *res, void *arg);
 
 /* Alignment required for elf header segment */
 #define ELF_CORE_HEADER_ALIGN   4096

@@ -517,7 +517,7 @@ static int locate_mem_hole_bottom_up(unsigned long start, unsigned long end,
 	return 1;
 }
 
-static int locate_mem_hole_callback(struct resource *res, void *arg)
+int kexec_locate_mem_hole_callback(struct resource *res, void *arg)
 {
 	struct kexec_buf *kbuf = (struct kexec_buf *)arg;
 	u64 start = res->start, end = res->end;
@@ -634,9 +634,9 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
 		return 0;
 
 	if (!IS_ENABLED(CONFIG_ARCH_KEEP_MEMBLOCK))
-		ret = kexec_walk_resources(kbuf, locate_mem_hole_callback);
+		ret = kexec_walk_resources(kbuf, kexec_locate_mem_hole_callback);
 	else
-		ret = kexec_walk_memblock(kbuf, locate_mem_hole_callback);
+		ret = kexec_walk_memblock(kbuf, kexec_locate_mem_hole_callback);
 
 	return ret == 1 ? 0 : -EADDRNOTAVAIL;
 }
