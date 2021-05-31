@@ -909,11 +909,11 @@ static int tk_request(struct l2cap_conn *conn, u8 remote_oob, u8 auth,
 			hcon->pending_sec_level = BT_SECURITY_HIGH;
 	}
 
-	/* If both devices have Keyoard-Display I/O, the master
-	 * Confirms and the slave Enters the passkey.
+	/* If both devices have Keyboard-Display I/O, the central
+	 * Confirms and the peripheral Enters the passkey.
 	 */
 	if (smp->method == OVERLAP) {
-		if (hcon->role == HCI_ROLE_MASTER)
+		if (hcon->role == HCI_ROLE_CENTRAL)
 			smp->method = CFM_PASSKEY;
 		else
 			smp->method = REQ_PASSKEY;
@@ -1741,7 +1741,7 @@ static u8 smp_cmd_pairing_req(struct l2cap_conn *conn, struct sk_buff *skb)
 	if (skb->len < sizeof(*req))
 		return SMP_INVALID_PARAMS;
 
-	if (conn->hcon->role != HCI_ROLE_SLAVE)
+	if (conn->hcon->role != HCI_ROLE_PERIPHERAL)
 		return SMP_CMD_NOTSUPP;
 
 	if (!chan->data)
@@ -1932,7 +1932,7 @@ static u8 smp_cmd_pairing_rsp(struct l2cap_conn *conn, struct sk_buff *skb)
 	if (skb->len < sizeof(*rsp))
 		return SMP_INVALID_PARAMS;
 
-	if (conn->hcon->role != HCI_ROLE_MASTER)
+	if (conn->hcon->role != HCI_ROLE_CENTRAL)
 		return SMP_CMD_NOTSUPP;
 
 	skb_pull(skb, sizeof(*rsp));
@@ -2294,7 +2294,7 @@ static u8 smp_cmd_security_req(struct l2cap_conn *conn, struct sk_buff *skb)
 	if (skb->len < sizeof(*rp))
 		return SMP_INVALID_PARAMS;
 
-	if (hcon->role != HCI_ROLE_MASTER)
+	if (hcon->role != HCI_ROLE_CENTRAL)
 		return SMP_CMD_NOTSUPP;
 
 	auth = rp->auth_req & AUTH_REQ_MASK(hdev);
@@ -2368,7 +2368,7 @@ int smp_conn_security(struct hci_conn *hcon, __u8 sec_level)
 	if (sec_level > hcon->pending_sec_level)
 		hcon->pending_sec_level = sec_level;
 
-	if (hcon->role == HCI_ROLE_MASTER)
+	if (hcon->role == HCI_ROLE_CENTRAL)
 		if (smp_ltk_encrypt(conn, hcon->pending_sec_level))
 			return 0;
 
@@ -2412,7 +2412,7 @@ int smp_conn_security(struct hci_conn *hcon, __u8 sec_level)
 			authreq |= SMP_AUTH_MITM;
 	}
 
-	if (hcon->role == HCI_ROLE_MASTER) {
+	if (hcon->role == HCI_ROLE_CENTRAL) {
 		struct smp_cmd_pairing cp;
 
 		build_pairing_cmd(conn, &cp, NULL, authreq);
@@ -3081,8 +3081,8 @@ static void bredr_pairing(struct l2cap_chan *chan)
 	if (!test_bit(HCI_CONN_ENCRYPT, &hcon->flags))
 		return;
 
-	/* Only master may initiate SMP over BR/EDR */
-	if (hcon->role != HCI_ROLE_MASTER)
+	/* Only central may initiate SMP over BR/EDR */
+	if (hcon->role != HCI_ROLE_CENTRAL)
 		return;
 
 	/* Secure Connections support must be enabled */

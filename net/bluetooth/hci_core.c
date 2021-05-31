@@ -2069,7 +2069,7 @@ int hci_dev_cmd(unsigned int cmd, void __user *arg)
 
 	case HCISETLINKMODE:
 		hdev->link_mode = ((__u16) dr.dev_opt) &
-					(HCI_LM_MASTER | HCI_LM_ACCEPT);
+					(HCI_LM_CENTRAL | HCI_LM_ACCEPT);
 		break;
 
 	case HCISETPTYPE:
@@ -2465,9 +2465,9 @@ static bool hci_persistent_key(struct hci_dev *hdev, struct hci_conn *conn,
 static u8 ltk_role(u8 type)
 {
 	if (type == SMP_LTK)
-		return HCI_ROLE_MASTER;
+		return HCI_ROLE_CENTRAL;
 
-	return HCI_ROLE_SLAVE;
+	return HCI_ROLE_PERIPHERAL;
 }
 
 struct smp_ltk *hci_find_ltk(struct hci_dev *hdev, bdaddr_t *bdaddr,
