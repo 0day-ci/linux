@@ -481,80 +481,9 @@ static void __init setup_lowcore_dat_on(void)
 	__ctl_set_bit(0, 28);
 }
 
-static struct resource code_resource = {
-	.name  = "Kernel code",
-	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
-};
-
-static struct resource data_resource = {
-	.name = "Kernel data",
-	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
-};
-
-static struct resource bss_resource = {
-	.name = "Kernel bss",
-	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
-};
-
-static struct resource __initdata *standard_resources[] = {
-	&code_resource,
-	&data_resource,
-	&bss_resource,
-#ifdef CONFIG_CRASH_DUMP
-	&crashk_res,
-#endif
-};
-
 static void __init setup_resources(void)
 {
-	struct resource *res, *std_res, *sub_res;
-	phys_addr_t start, end;
-	int j;
-	u64 i;
-
-	code_resource.start = (unsigned long) _text;
-	code_resource.end = (unsigned long) _etext - 1;
-	data_resource.start = (unsigned long) _etext;
-	data_resource.end = (unsigned long) _edata - 1;
-	bss_resource.start = (unsigned long) __bss_start;
-	bss_resource.end = (unsigned long) __bss_stop - 1;
-
-	for_each_mem_range(i, &start, &end) {
-		res = memblock_alloc(sizeof(*res), 8);
-		if (!res)
-			panic("%s: Failed to allocate %zu bytes align=0x%x\n",
-			      __func__, sizeof(*res), 8);
-		res->flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM;
-
-		res->name = "System RAM";
-		res->start = start;
-		/*
-		 * In memblock, end points to the first byte after the
-		 * range while in resourses, end points to the last byte in
-		 * the range.
-		 */
-		res->end = end - 1;
-		request_resource(&iomem_resource, res);
-
-		for (j = 0; j < ARRAY_SIZE(standard_resources); j++) {
-			std_res = standard_resources[j];
-			if (!std_res->end || std_res->start < res->start ||
-			    std_res->start > res->end)
-				continue;
-			if (std_res->end > res->end) {
-				sub_res = memblock_alloc(sizeof(*sub_res), 8);
-				if (!sub_res)
-					panic("%s: Failed to allocate %zu bytes align=0x%x\n",
-					      __func__, sizeof(*sub_res), 8);
-				*sub_res = *std_res;
-				sub_res->end = res->end;
-				std_res->start = res->end + 1;
-				request_resource(res, sub_res);
-			} else {
-				request_resource(res, std_res);
-			}
-		}
-	}
+	memblock_setup_resources();
 }
 
 static void __init setup_ident_map_size(void)

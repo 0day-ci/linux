@@ -16,6 +16,8 @@
 #include <linux/kmemleak.h>
 #include <linux/seq_file.h>
 #include <linux/memblock.h>
+#include <linux/ioport.h>
+#include <linux/kexec.h>
 
 #include <asm/sections.h>
 #include <linux/io.h>
@@ -2060,6 +2062,91 @@ void __init memblock_free_all(void)
 
 	pages = free_low_memory_core_early();
 	totalram_pages_add(pages);
+}
+
+static struct resource code_resource = {
+	.name  = "Kernel code",
+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
+};
+
+static struct resource rodata_resource = {
+	.name = "Kernel rodata",
+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
+};
+
+static struct resource data_resource = {
+	.name = "Kernel data",
+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
+};
+
+static struct resource bss_resource = {
+	.name = "Kernel bss",
+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
+};
+
+static struct resource __initdata *standard_resources[] = {
+	&code_resource,
+	&rodata_resource,
+	&data_resource,
+	&bss_resource,
+#ifdef CONFIG_KEXEC_CORE
+	&crashk_res,
+#endif
+};
+
+void __init memblock_setup_resources(void)
+{
+	struct resource *res, *kres, *sub_res;
+	phys_addr_t start, end;
+	int j;
+	u64 i;
+
+	code_resource.start = __pa_symbol(_text);
+	code_resource.end = __pa_symbol(_etext)-1;
+	rodata_resource.start = __pa_symbol(__start_rodata);
+	rodata_resource.end = __pa_symbol(__end_rodata)-1;
+	data_resource.start = __pa_symbol(_sdata);
+	data_resource.end = __pa_symbol(_edata)-1;
+	bss_resource.start = __pa_symbol(__bss_start);
+	bss_resource.end = __pa_symbol(__bss_stop)-1;
+
+	for_each_mem_range(i, &start, &end) {
+		res = memblock_alloc(sizeof(*res), 8);
+		if (!res)
+			panic("%s: Failed to allocate %zu bytes align=0x%x\n",
+			      __func__, sizeof(*res), 8);
+		res->flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM;
+
+		res->name = "System RAM";
+		res->start = start;
+
+		/*
+		 * In memblock, end points to the first byte after the
+		 * range while in resourses, end points to the last byte in
+		 * the range.
+		 */
+		res->end = end - 1;
+		request_resource(&iomem_resource, res);
+
+		for (j = 0; j < ARRAY_SIZE(standard_resources); j++) {
+			kres = standard_resources[j];
+			if (!kres->end || kres->start < res->start ||
+			    kres->start > res->end)
+				continue;
+			if (kres->end > res->end) {
+				sub_res = memblock_alloc(sizeof(*sub_res), 8);
+				if (!sub_res)
+					panic("%s: Failed to allocate %zu bytes align=0x%x\n",
+					      __func__, sizeof(*sub_res), 8);
+				*sub_res = *kres;
+				sub_res->end = res->end;
+				kres->start = res->end + 1;
+				request_resource(res, sub_res);
+			} else {
+				request_resource(res, kres);
+			}
+		}
+	}
 }
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_ARCH_KEEP_MEMBLOCK)
