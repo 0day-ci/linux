@@ -789,6 +789,8 @@ static int dra7xx_pcie_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "gpio request failed, ret %d\n", ret);
 		goto err_gpio;
 	}
+	usleep_range(1000, 2000);
+	gpiod_set_value(reset, 0);
 
 	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
 	reg &= ~LTSSM_EN;
