@@ -448,6 +448,7 @@ int main(int argc, const char **argv)
 	pager_init(PERF_PAGER_ENVIRONMENT);
 
 	libperf_init(libperf_print);
+	perf_debug_setup();
 
 	cmd = extract_argv0_path(argv[0]);
 	if (!cmd)
@@ -530,8 +531,6 @@ int main(int argc, const char **argv)
 	 * forever while the signal goes to some other non interested thread.
 	 */
 	pthread__block_sigwinch();
-
-	perf_debug_setup();
 
 	while (1) {
 		static int done_help;
