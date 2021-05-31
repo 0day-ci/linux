@@ -2002,7 +2002,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 	}
 
 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
-	    best_parent_rate != parent->rate)
+	    best_parent_rate != parent->rate && !clk_core_rate_is_protected(parent))
 		top = clk_calc_new_rates(parent, best_parent_rate);
 
 out:
