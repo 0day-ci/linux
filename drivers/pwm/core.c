@@ -852,8 +852,10 @@ static struct pwm_chip *device_to_pwmchip(struct device *dev)
  *
  * This is analogous to of_pwm_get() except con_id is not yet supported.
  * ACPI entries must look like
- * Package () {"pwms", Package ()
- *     { <PWM device reference>, <PWM index>, <PWM period> [, <PWM flags>]}}
+ * Package () { "pwms", Package () {
+ *		<PWM device reference>, <PWM index>, <PWM period>, <PWM flags>,
+ *	}
+ * }
  *
  * Returns: A pointer to the requested PWM device or an ERR_PTR()-encoded
  * error code on failure.
@@ -877,7 +879,7 @@ static struct pwm_device *acpi_pwm_get(struct fwnode_handle *fwnode)
 	if (!acpi)
 		return ERR_PTR(-EINVAL);
 
-	if (args.nargs < 2)
+	if (args.nargs < 3)
 		return ERR_PTR(-EPROTO);
 
 	chip = device_to_pwmchip(&acpi->dev);
@@ -891,7 +893,7 @@ static struct pwm_device *acpi_pwm_get(struct fwnode_handle *fwnode)
 	pwm->args.period = args.args[1];
 	pwm->args.polarity = PWM_POLARITY_NORMAL;
 
-	if (args.nargs > 2 && args.args[2] & PWM_POLARITY_INVERTED)
+	if (args.args[2] & PWM_POLARITY_INVERTED)
 		pwm->args.polarity = PWM_POLARITY_INVERSED;
 #endif
 
