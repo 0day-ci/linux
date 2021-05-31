@@ -3531,4 +3531,96 @@ void kmsg_dump_rewind(struct kmsg_dump_iter *iter)
 }
 EXPORT_SYMBOL_GPL(kmsg_dump_rewind);
 
+#ifdef CONFIG_SMP
+static atomic_t printk_cpulock_owner = ATOMIC_INIT(-1);
+
+/*
+ * printk_cpu_lock: Acquire the printk cpu-reentrant spinning lock.
+ * @cpu_store: A buffer to store lock state.
+ * @flags: A buffer to store irq state.
+ *
+ * If no processor has the lock, the calling processor takes the lock and
+ * becomes the owner. If the calling processor is already the owner of the
+ * lock, this function succeeds immediately. If the lock is locked by another
+ * processor, that function spins until the calling processor becomes the
+ * owner.
+ *
+ * It is safe to call this function from any context and state.
+ */
+void printk_cpu_lock(unsigned int *cpu_store, unsigned long *flags)
+{
+	unsigned int cpu;
+
+	for (;;) {
+		cpu = get_cpu();
+
+		*cpu_store = atomic_read(&printk_cpulock_owner);
+
+		if (*cpu_store == -1) {
+			local_irq_save(*flags);
+
+			/*
+			 * Guarantee loads an stores from the previous lock
+			 * owner are visible to this CPU once it is the lock
+			 * owner. This pairs with cpu_lock:A.
+			 *
+			 * Memory barrier involvement:
+			 *
+			 * If cpu_lock:A reads from cpu_unlock:B, then
+			 * cpu_lock:B reads from cpu_unlock:A.
+			 *
+			 * Relies on:
+			 *
+			 * RELEASE from cpu_unlock:A to cpu_unlock:B
+			 *    matching
+			 * ACQUIRE from cpu_lock:A to cpu_lock:B
+			 */
+			if (atomic_try_cmpxchg_acquire(&printk_cpulock_owner,
+						       cpu_store, cpu)) { /* LMM(cpu_lock:A) */
+
+				/* This CPU begins loading/storing data: LMM(cpu_lock:B) */
+				break;
+			}
+
+			local_irq_restore(*flags);
+
+		} else if (*cpu_store == cpu) {
+			break;
+		}
+
+		put_cpu();
+		cpu_relax();
+	}
+}
+EXPORT_SYMBOL(printk_cpu_lock);
+
+/*
+ * printk_cpu_unlock: Release the printk cpu-reentrant spinning lock.
+ * @cpu_store: The current lock state.
+ * @flags: The current irq state.
+ *
+ * Release the lock. The calling processor must be the owner of the lock.
+ *
+ * It is safe to call this function from any context and state.
+ */
+void printk_cpu_unlock(unsigned int cpu_store, unsigned long flags)
+{
+	if (cpu_store == -1) {
+		/* This CPU is finished loading/storing data: LMM(cpu_unlock:A) */
+
+		/*
+		 * Guarantee loads an stores from this CPU when it is the lock
+		 * owner are visible to the next lock owner. This pairs with
+		 * cpu_lock:A.
+		 */
+		atomic_set_release(&printk_cpulock_owner, cpu_store); /* LMM(cpu_unlock:B) */
+
+		local_irq_restore(flags);
+	}
+
+	put_cpu();
+}
+EXPORT_SYMBOL(printk_cpu_unlock);
+#endif /* CONFIG_SMP */
+
 #endif

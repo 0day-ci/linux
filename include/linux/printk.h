@@ -287,6 +287,19 @@ static inline void printk_safe_flush_on_panic(void)
 }
 #endif
 
+#if defined(CONFIG_PRINTK) && defined(CONFIG_SMP)
+extern void printk_cpu_lock(unsigned int *cpu_store, unsigned long *flags);
+extern void printk_cpu_unlock(unsigned int cpu_store, unsigned long flags);
+#else
+static inline void printk_cpu_lock(unsigned int *cpu_store, unsigned long *flags)
+{
+}
+
+static inline void printk_cpu_unlock(unsigned int cpu_store, unsigned long flags)
+{
+}
+#endif
+
 extern int kptr_restrict;
 
 /**
