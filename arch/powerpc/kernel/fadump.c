@@ -1638,12 +1638,14 @@ int __init setup_fadump(void)
 			fadump_invalidate_release_mem();
 	}
 	/* Initialize the kernel dump memory structure for FAD registration. */
-	else if (fw_dump.reserve_dump_area_size)
+	else if (fw_dump.reserve_dump_area_size) {
 		fw_dump.ops->fadump_init_mem_struct(&fw_dump);
+		register_fadump();
+	}
 
 	return 1;
 }
-subsys_initcall(setup_fadump);
+subsys_initcall_sync(setup_fadump);
 #else /* !CONFIG_PRESERVE_FA_DUMP */
 
 /* Scan the Firmware Assisted dump configuration details. */
