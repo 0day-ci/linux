@@ -1625,7 +1625,6 @@ static void *__test_alloc(struct nfit_test *t, size_t size, dma_addr_t *dma,
 	if (rc)
 		goto err;
 	INIT_LIST_HEAD(&nfit_res->list);
-	memset(buf, 0, size);
 	nfit_res->dev = dev;
 	nfit_res->buf = buf;
 	nfit_res->res.start = *dma;
@@ -1652,7 +1651,7 @@ static void *test_alloc(struct nfit_test *t, size_t size, dma_addr_t *dma)
 	struct genpool_data_align data = {
 		.align = SZ_128M,
 	};
-	void *buf = vmalloc(size);
+	void *buf = vzalloc(size);
 
 	if (size >= DIMM_SIZE)
 		*dma = gen_pool_alloc_algo(nfit_pool, size,
