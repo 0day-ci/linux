@@ -1178,6 +1178,7 @@ pkt_session_set_property_4xx(struct hfi_session_set_property_pkt *pkt,
 {
 	void *prop_data;
 
+
 	if (!pkt || !cookie || !pdata)
 		return -EINVAL;
 
@@ -1225,6 +1226,15 @@ pkt_session_set_property_4xx(struct hfi_session_set_property_pkt *pkt,
 		memcpy(hdr10, in, sizeof(*hdr10));
 		pkt->shdr.hdr.size += sizeof(u32) + sizeof(*hdr10);
 		break;
+	}
+
+	case HFI_PROPERTY_PARAM_VENC_H264_TRANSFORM_8X8: {
+		struct hfi_h264_8x8x_transform *in = pdata, *tm = prop_data;
+
+		tm->enable_type = in->enable_type;
+		pkt->shdr.hdr.size += sizeof(u32) + sizeof(*tm);
+		break;
+
 	}
 
 	case HFI_PROPERTY_CONFIG_VENC_MAX_BITRATE:
