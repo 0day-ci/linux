@@ -355,6 +355,9 @@ void stmmac_selftest_run(struct net_device *dev,
 void stmmac_selftest_get_strings(struct stmmac_priv *priv, u8 *data);
 int stmmac_selftest_get_count(struct stmmac_priv *priv);
 #else
+struct timespec64 stmmac_calc_tas_basetime(ktime_t old_base_time,
+					   ktime_t current_time,
+					   u64 cycle_time);
 static inline void stmmac_selftest_run(struct net_device *dev,
 				       struct ethtool_test *etest, u64 *buf)
 {
