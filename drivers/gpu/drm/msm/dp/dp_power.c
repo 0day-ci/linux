@@ -262,6 +262,21 @@ int dp_power_clk_enable(struct dp_power *dp_power,
 			}
 			dp_power->core_clks_on = true;
 		}
+	} else {
+		if (pm_type == DP_CORE_PM && !dp_power->core_clks_on) {
+			DRM_DEBUG_DP("core clks already disabled\n");
+			return 0;
+		}
+
+		if (pm_type == DP_CTRL_PM && !dp_power->link_clks_on) {
+			DRM_DEBUG_DP("links clks already disabled\n");
+			return 0;
+		}
+
+		if (pm_type == DP_STREAM_PM && !dp_power->stream_clks_on) {
+			DRM_DEBUG_DP("pixel clks already disabled\n");
+			return 0;
+		}
 	}
 
 	rc = dp_power_clk_set_rate(power, pm_type, enable);
