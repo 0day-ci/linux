@@ -17,7 +17,10 @@
 struct io_uring_sqe {
 	__u8	opcode;		/* type of operation for this sqe */
 	__u8	flags;		/* IOSQE_ flags */
-	__u16	ioprio;		/* ioprio for the request */
+	union {
+		__u16	ioprio;		/* ioprio for the request */
+		__u16	futex_op;	/* futex operation */
+	} __attribute__((packed));
 	__s32	fd;		/* file descriptor to do IO on */
 	union {
 		__u64	off;	/* offset into file */
@@ -160,6 +163,11 @@ enum {
  * extends splice(2) flags
  */
 #define SPLICE_F_FD_IN_FIXED	(1U << 31) /* the last bit of __u32 */
+
+/*
+ * sqe->futex_flags
+ */
+#define IORING_FUTEX_SHARED	(1U << 0)
 
 /*
  * POLL_ADD flags. Note that since sqe->poll_events is the flag space, the
