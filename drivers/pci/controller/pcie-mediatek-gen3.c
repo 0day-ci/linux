@@ -1010,6 +1010,7 @@ static const struct dev_pm_ops mtk_pcie_pm_ops = {
 
 static const struct of_device_id mtk_pcie_of_match[] = {
 	{ .compatible = "mediatek,mt8192-pcie" },
+	{ .compatible = "mediatek,mt8195-pcie" },
 	{},
 };
 
