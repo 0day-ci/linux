@@ -1606,13 +1606,17 @@ static u32 icl_gamma_mode(const struct intel_crtc_state *crtc_state)
 		gamma_mode |= POST_CSC_GAMMA_ENABLE;
 
 	if (!crtc_state->hw.gamma_lut ||
-	    crtc_state_is_legacy_gamma(crtc_state))
+	    crtc_state_is_legacy_gamma(crtc_state)) {
 		gamma_mode |= GAMMA_MODE_MODE_8BIT;
-	else if (crtc_state->uapi.gamma_mode_type ==
-		 GAMMA_MODE_LOGARITHMIC_12BIT)
-		gamma_mode |= GAMMA_MODE_MODE_12BIT_LOGARITHMIC;
-	else
+	} else if (crtc_state->uapi.gamma_mode_type ==
+		 GAMMA_MODE_LOGARITHMIC_12BIT) {
+		if (crtc_state->uapi.advance_gamma_mode_active)
+			gamma_mode |= GAMMA_MODE_MODE_12BIT_LOGARITHMIC;
+		else
+			gamma_mode |= GAMMA_MODE_MODE_10BIT;
+	} else {
 		gamma_mode |= GAMMA_MODE_MODE_12BIT_MULTI_SEGMENTED;
+	}
 
 	return gamma_mode;
 }
