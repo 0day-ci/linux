@@ -784,7 +784,8 @@ static int riocm_ch_send(u16 ch_id, void *buf, int len)
 	struct rio_ch_chan_hdr *hdr;
 	int ret;
 
-	if (buf == NULL || ch_id == 0 || len == 0 || len > RIO_MAX_MSG_SIZE)
+	if (buf == NULL || ch_id == 0 ||
+	    len < sizeof(*hdr) || len > RIO_MAX_MSG_SIZE)
 		return -EINVAL;
 
 	ch = riocm_get_channel(ch_id);
