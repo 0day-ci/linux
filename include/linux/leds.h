@@ -148,6 +148,11 @@ struct led_classdev {
 
 	/* LEDs that have private triggers have this set */
 	struct led_hw_trigger_type	*trigger_type;
+
+	/* some LEDs may be able to offload some SW triggers to HW */
+	int		(*trigger_offload)(struct led_classdev *led_cdev,
+					   bool enable);
+	bool			offloaded;
 #endif
 
 #ifdef CONFIG_LEDS_BRIGHTNESS_HW_CHANGED
@@ -401,6 +406,30 @@ static inline void led_set_trigger_data(struct led_classdev *led_cdev,
 static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
 {
 	return led_cdev->trigger_data;
+}
+
+static inline int led_trigger_offload(struct led_classdev *led_cdev)
+{
+	int ret;
+
+	if (!led_cdev->trigger_offload)
+		return -EOPNOTSUPP;
+
+	ret = led_cdev->trigger_offload(led_cdev, true);
+	led_cdev->offloaded = !ret;
+
+	return ret;
+}
+
+static inline void led_trigger_offload_stop(struct led_classdev *led_cdev)
+{
+	if (!led_cdev->trigger_offload)
+		return;
+
+	if (led_cdev->offloaded) {
+		led_cdev->trigger_offload(led_cdev, false);
+		led_cdev->offloaded = false;
+	}
 }
 
 /**
