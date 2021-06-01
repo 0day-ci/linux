@@ -194,7 +194,7 @@ static void rt_fibinfo_free_cpus(struct rtable __rcu * __percpu *rtp)
 	if (!rtp)
 		return;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct rtable *rt;
 
 		rt = rcu_dereference_protected(*per_cpu_ptr(rtp, cpu), 1);

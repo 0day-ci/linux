@@ -152,7 +152,7 @@ static void cgroup_rstat_flush_locked(struct cgroup *cgrp, bool may_sleep)
 
 	lockdep_assert_held(&cgroup_rstat_lock);
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		raw_spinlock_t *cpu_lock = per_cpu_ptr(&cgroup_rstat_cpu_lock,
 						       cpu);
 		struct cgroup *pos = NULL;
@@ -245,19 +245,31 @@ void cgroup_rstat_flush_release(void)
 	spin_unlock_irq(&cgroup_rstat_lock);
 }
 
+static int cgroup_rstat_cpuhp_handler(void __percpu *ptr, unsigned int cpu, void *data)
+{
+	struct cgroup *cgrp = (struct cgroup *)data;
+	struct cgroup_rstat_cpu *rstatc = per_cpu_ptr(ptr, cpu);
+
+	rstatc->updated_children = cgrp;
+	u64_stats_init(&rstatc->bsync);
+	return 0;
+}
+
 int cgroup_rstat_init(struct cgroup *cgrp)
 {
 	int cpu;
 
 	/* the root cgrp has rstat_cpu preallocated */
 	if (!cgrp->rstat_cpu) {
-		cgrp->rstat_cpu = alloc_percpu(struct cgroup_rstat_cpu);
+		cgrp->rstat_cpu = alloc_percpu_cb(struct cgroup_rstat_cpu,
+						  cgroup_rstat_cpuhp_handler,
+						  cgrp);
 		if (!cgrp->rstat_cpu)
 			return -ENOMEM;
 	}
 
 	/* ->updated_children list is self terminated */
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct cgroup_rstat_cpu *rstatc = cgroup_rstat_cpu(cgrp, cpu);
 
 		rstatc->updated_children = cgrp;
@@ -274,7 +286,7 @@ void cgroup_rstat_exit(struct cgroup *cgrp)
 	cgroup_rstat_flush(cgrp);
 
 	/* sanity check */
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct cgroup_rstat_cpu *rstatc = cgroup_rstat_cpu(cgrp, cpu);
 
 		if (WARN_ON_ONCE(rstatc->updated_children != cgrp) ||

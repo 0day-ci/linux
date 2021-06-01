@@ -186,7 +186,7 @@ static void group_init(struct psi_group *group)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu)
+	for_each_online_cpu(cpu)
 		seqcount_init(&per_cpu_ptr(group->pcpu, cpu)->seq);
 	group->avg_last_update = sched_clock();
 	group->avg_next_update = group->avg_last_update + psi_period;
@@ -321,7 +321,7 @@ static void collect_percpu_times(struct psi_group *group,
 	 * the sampling period. This eliminates artifacts from uneven
 	 * loading, or even entirely idle CPUs.
 	 */
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		u32 times[NR_PSI_STATES];
 		u32 nonidle;
 		u32 cpu_changed_states;
@@ -935,12 +935,20 @@ void psi_memstall_leave(unsigned long *flags)
 }
 
 #ifdef CONFIG_CGROUPS
+static int psi_cpuhp_handler(void __percpu *ptr, unsigned int cpu, void *unused)
+{
+	struct psi_group_cpu *groupc = per_cpu_ptr(ptr, cpu);
+
+	seqcount_init(&groupc->seq);
+	return 0;
+}
+
 int psi_cgroup_alloc(struct cgroup *cgroup)
 {
 	if (static_branch_likely(&psi_disabled))
 		return 0;
 
-	cgroup->psi.pcpu = alloc_percpu(struct psi_group_cpu);
+	cgroup->psi.pcpu = alloc_percpu_cb(struct psi_group_cpu, psi_cpuhp_handler, NULL);
 	if (!cgroup->psi.pcpu)
 		return -ENOMEM;
 	group_init(&cgroup->psi);

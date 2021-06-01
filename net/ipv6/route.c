@@ -165,7 +165,7 @@ static void rt6_uncached_list_flush_dev(struct net *net, struct net_device *dev)
 	if (dev == loopback_dev)
 		return;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct uncached_list *ul = per_cpu_ptr(&rt6_uncached_list, cpu);
 		struct rt6_info *rt;
 
@@ -3542,7 +3542,7 @@ void fib6_nh_release(struct fib6_nh *fib6_nh)
 	if (fib6_nh->rt6i_pcpu) {
 		int cpu;
 
-		for_each_possible_cpu(cpu) {
+		for_each_online_cpu(cpu) {
 			struct rt6_info **ppcpu_rt;
 			struct rt6_info *pcpu_rt;
 
@@ -6569,7 +6569,7 @@ int __init ip6_route_init(void)
 #endif
 #endif
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct uncached_list *ul = per_cpu_ptr(&rt6_uncached_list, cpu);
 
 		INIT_LIST_HEAD(&ul->head);

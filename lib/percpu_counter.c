@@ -63,7 +63,7 @@ void percpu_counter_set(struct percpu_counter *fbc, s64 amount)
 	unsigned long flags;
 
 	raw_spin_lock_irqsave(&fbc->lock, flags);
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		s32 *pcount = per_cpu_ptr(fbc->counters, cpu);
 		*pcount = 0;
 	}

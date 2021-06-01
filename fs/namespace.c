@@ -182,7 +182,7 @@ int mnt_get_count(struct mount *mnt)
 	int count = 0;
 	int cpu;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		count += per_cpu_ptr(mnt->mnt_pcp, cpu)->mnt_count;
 	}
 
@@ -294,7 +294,7 @@ static unsigned int mnt_get_writers(struct mount *mnt)
 	unsigned int count = 0;
 	int cpu;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		count += per_cpu_ptr(mnt->mnt_pcp, cpu)->mnt_writers;
 	}
 
