@@ -32,6 +32,10 @@ properties:
     oneOf:
       - const: arm,scpi               # SCPI v1.0 and above
       - const: arm,scpi-pre-1.0       # Unversioned SCPI before v1.0
+      - items:
+          - enum:
+              - amlogic,meson-gxbb-scpi
+          - const: arm,scpi-pre-1.0
 
   mboxes:
     description: |
@@ -62,6 +66,10 @@ patternProperties:
         oneOf:
           - const: arm,scpi-sensors
           - const: arm,scpi-power-domains
+          - items:
+              - enum:
+                  - amlogic,meson-gxbb-scpi-sensors
+              - const: arm,scpi-sensors
 
   "^clocks(-[0-9a-f]+)?$":
     type: object
@@ -282,4 +290,28 @@ examples:
         };
     };
 
+  - |
+    firmware {
+        scpi {
+            compatible = "amlogic,meson-gxbb-scpi", "arm,scpi-pre-1.0";
+            mboxes = <&mailbox 1 &mailbox 2>;
+            shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+
+            clocks {
+                compatible = "arm,scpi-clocks";
+
+                scpi_dvfs1: clocks-0 {
+                    compatible = "arm,scpi-dvfs-clocks";
+                    #clock-cells = <1>;
+                    clock-indices = <0>;
+                    clock-output-names = "vcpu";
+                };
+            };
+
+            scpi_sensors1: sensors {
+                compatible = "amlogic,meson-gxbb-scpi-sensors", "arm,scpi-sensors";
+                #thermal-sensor-cells = <1>;
+            };
+        };
+    };
 ...
