@@ -1812,7 +1812,22 @@ static int shmem_getpage_gfp(struct inode *inode, pgoff_t index,
 repeat:
 	if (sgp <= SGP_CACHE &&
 	    ((loff_t)index << PAGE_SHIFT) >= i_size_read(inode)) {
-		return -EINVAL;
+		if (!vma || !(vma->vm_flags & VM_NOSIGBUS))
+			return -EINVAL;
+
+		vma->vm_flags |= VM_MIXEDMAP;
+		/*
+		 * Get zero page for MAP_NOSIGBUS mapping, which isn't
+                 * coherent wrt shmem contents that are expanded and
+		 * filled in later.
+		 */
+		error = vm_insert_page(vma, (unsigned long)vmf->address,
+					ZERO_PAGE(0));
+		if (error)
+			return error;
+
+		*fault_type = VM_FAULT_NOPAGE;
+		return 0;
 	}
 
 	sbinfo = SHMEM_SB(inode->i_sb);
