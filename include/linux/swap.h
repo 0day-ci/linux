@@ -451,6 +451,7 @@ extern void __delete_from_swap_cache(struct page *page,
 extern void delete_from_swap_cache(struct page *);
 extern void clear_shadow_from_swap_cache(int type, unsigned long begin,
 				unsigned long end);
+extern void free_swap_cache(struct page *);
 extern void free_page_and_swap_cache(struct page *);
 extern void free_pages_and_swap_cache(struct page **, int);
 extern struct page *lookup_swap_cache(swp_entry_t entry,
@@ -559,6 +560,10 @@ static inline struct address_space *swap_address_space(swp_entry_t entry)
 	put_page(page)
 #define free_pages_and_swap_cache(pages, nr) \
 	release_pages((pages), (nr));
+
+static inline void free_swap_cache(struct page *page)
+{
+}
 
 static inline void show_swap_cache_info(void)
 {
