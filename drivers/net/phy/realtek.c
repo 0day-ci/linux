@@ -8,6 +8,7 @@
  * Copyright (c) 2004 Freescale Semiconductor, Inc.
  */
 #include <linux/bitops.h>
+#include <linux/of.h>
 #include <linux/phy.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -27,6 +28,7 @@
 #define RTL821x_PAGE_SELECT			0x1f
 
 #define RTL8211F_PHYCR1				0x18
+#define RTL8211F_PHYCR2				0x19
 #define RTL8211F_INSR				0x1d
 
 #define RTL8211F_TX_DELAY			BIT(8)
@@ -39,6 +41,8 @@
 #define RTL8211E_CTRL_DELAY			BIT(13)
 #define RTL8211E_TX_DELAY			BIT(12)
 #define RTL8211E_RX_DELAY			BIT(11)
+
+#define RTL8211F_CLKOUT_EN			BIT(0)
 
 #define RTL8201F_ISR				0x1e
 #define RTL8201F_ISR_ANERR			BIT(15)
@@ -67,9 +71,16 @@
 
 #define RTL_GENERIC_PHYID			0x001cc800
 
+/* quirks for realtek phy */
+#define RTL821X_CLKOUT_DISABLE_FEATURE		BIT(0)
+
 MODULE_DESCRIPTION("Realtek PHY driver");
 MODULE_AUTHOR("Johnson Leung");
 MODULE_LICENSE("GPL");
+
+struct rtl821x_priv {
+	u32 quirks;
+};
 
 static int rtl821x_read_page(struct phy_device *phydev)
 {
@@ -79,6 +90,23 @@ static int rtl821x_read_page(struct phy_device *phydev)
 static int rtl821x_write_page(struct phy_device *phydev, int page)
 {
 	return __phy_write(phydev, RTL821x_PAGE_SELECT, page);
+}
+
+static int rtl821x_probe(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	struct rtl821x_priv *priv;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	if (of_property_read_bool(dev->of_node, "rtl821x,clkout-disable"))
+		priv->quirks |= RTL821X_CLKOUT_DISABLE_FEATURE;
+
+	phydev->priv = priv;
+
+	return 0;
 }
 
 static int rtl8201_ack_interrupt(struct phy_device *phydev)
@@ -291,6 +319,7 @@ static int rtl8211c_config_init(struct phy_device *phydev)
 
 static int rtl8211f_config_init(struct phy_device *phydev)
 {
+	struct rtl821x_priv *priv = phydev->priv;
 	struct device *dev = &phydev->mdio.dev;
 	u16 val_txdly, val_rxdly;
 	u16 val;
@@ -354,7 +383,23 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 			val_rxdly ? "enabled" : "disabled");
 	}
 
-	return 0;
+	if (priv->quirks & RTL821X_CLKOUT_DISABLE_FEATURE) {
+		ret = phy_modify_paged(phydev, 0xa43, RTL8211F_PHYCR2,
+				       RTL8211F_CLKOUT_EN, 0);
+		if (ret < 0) {
+			dev_err(&phydev->mdio.dev, "clkout disable failed\n");
+			return ret;
+		}
+	} else {
+		ret = phy_modify_paged(phydev, 0xa43, RTL8211F_PHYCR2,
+				       RTL8211F_CLKOUT_EN, RTL8211F_CLKOUT_EN);
+		if (ret < 0) {
+			dev_err(&phydev->mdio.dev, "clkout enable failed\n");
+			return ret;
+		}
+	}
+
+	return genphy_soft_reset(phydev);
 }
 
 static int rtl8211e_config_init(struct phy_device *phydev)
@@ -847,6 +892,7 @@ static struct phy_driver realtek_drvs[] = {
 	}, {
 		PHY_ID_MATCH_EXACT(0x001cc916),
 		.name		= "RTL8211F Gigabit Ethernet",
+		.probe		= rtl821x_probe,
 		.config_init	= &rtl8211f_config_init,
 		.read_status	= rtlgen_read_status,
 		.config_intr	= &rtl8211f_config_intr,
