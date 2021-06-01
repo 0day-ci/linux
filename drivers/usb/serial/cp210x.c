@@ -1159,6 +1159,12 @@ static void cp210x_set_flow_control(struct tty_struct *tty,
 	ctl_hs = le32_to_cpu(flow_ctl.ulControlHandshake);
 	flow_repl = le32_to_cpu(flow_ctl.ulFlowReplace);
 
+	dev_dbg(&port->dev, "%s - ctrl = 0x%02x, flow = 0x%02x\n", __func__,
+			ctl_hs, flow_repl);
+	dev_dbg(&port->dev, "%s - xon_limit = %u, xoff_limit = %u\n", __func__,
+			le32_to_cpu(flow_ctl.ulXonLimit),
+			le32_to_cpu(flow_ctl.ulXoffLimit));
+
 	ctl_hs &= ~CP210X_SERIAL_DSR_HANDSHAKE;
 	ctl_hs &= ~CP210X_SERIAL_DCD_HANDSHAKE;
 	ctl_hs &= ~CP210X_SERIAL_DSR_SENSITIVITY;
