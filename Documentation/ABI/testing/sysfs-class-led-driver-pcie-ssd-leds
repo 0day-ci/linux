@@ -1,0 +1,18 @@
+What:		/sys/class/leds/<led>/states
+Date:		April 2021
+Contact:	linux-pci@vger.kernel.org
+Description:
+		This attribute indicates the status states supported by a drive
+		or drive slot's LEDs, as defined in the "_DSM additions for PCIe
+		SSD Status LED Management" ECN to the PCI Firmware Specification
+		Revision 3.2, dated 12 February 2020, and in "Native PCIe
+		Enclosure Management", section 6.29 of the PCIe Base Spec 5.0.
+
+		Only supported states will be shown, and the currently active
+		states are shown in brackets.  The active state(s) can be written
+		by echoing a space or comma separated string of states to this
+		attribute.  For example:
+
+		# echo "ok locate" >/sys/class/leds/0000:88:00.0::drive_status/states
+		# cat /sys/class/leds/0000:88:00.0::drive_status/states
+		[ok] [locate] failed rebuild pfa hotspare ica ifa invalid disabled

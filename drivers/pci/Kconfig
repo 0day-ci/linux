@@ -190,6 +190,18 @@ config PCI_HYPERV
 	  The PCI device frontend driver allows the kernel to import arbitrary
 	  PCI devices from a PCI backend to support PCI driver domains.
 
+config PCIE_SSD_LEDS
+	tristate "PCIe SSD status LED support"
+	depends on ACPI && NEW_LEDS
+	help
+	  Driver for PCIe SSD status LED management as described in a PCI
+	  Firmware Specification, Revision 3.2 ECN.
+
+	  When enabled, an LED interface will be created for each PCIe device
+	  that has the ACPI method described in the referenced specification,
+	  to allow the device status LEDs for that PCIe device (presumably a
+	  solid state storage device or its slot) to be seen and controlled.
+
 choice
 	prompt "PCI Express hierarchy optimization setting"
 	default PCIE_BUS_DEFAULT
