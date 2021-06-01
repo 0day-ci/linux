@@ -73,6 +73,13 @@ static int omnia_led_brightness_set_blocking(struct led_classdev *cdev,
 	return ret;
 }
 
+static int omnia_led_set_sw_mode(struct i2c_client *client, int led, bool sw)
+{
+	return i2c_smbus_write_byte_data(client, CMD_LED_MODE,
+					 CMD_LED_MODE_LED(led) |
+					 (sw ? CMD_LED_MODE_USER : 0));
+}
+
 static int omnia_led_register(struct i2c_client *client, struct omnia_led *led,
 			      struct device_node *np)
 {
@@ -114,9 +121,7 @@ static int omnia_led_register(struct i2c_client *client, struct omnia_led *led,
 	cdev->brightness_set_blocking = omnia_led_brightness_set_blocking;
 
 	/* put the LED into software mode */
-	ret = i2c_smbus_write_byte_data(client, CMD_LED_MODE,
-					CMD_LED_MODE_LED(led->reg) |
-					CMD_LED_MODE_USER);
+	ret = omnia_led_set_sw_mode(client, led->reg, true);
 	if (ret < 0) {
 		dev_err(dev, "Cannot set LED %pOF to software mode: %i\n", np,
 			ret);
@@ -250,8 +255,7 @@ static int omnia_leds_remove(struct i2c_client *client)
 	u8 buf[5];
 
 	/* put all LEDs into default (HW triggered) mode */
-	i2c_smbus_write_byte_data(client, CMD_LED_MODE,
-				  CMD_LED_MODE_LED(OMNIA_BOARD_LEDS));
+	omnia_led_set_sw_mode(client, OMNIA_BOARD_LEDS, false);
 
 	/* set all LEDs color to [255, 255, 255] */
 	buf[0] = CMD_LED_COLOR;
