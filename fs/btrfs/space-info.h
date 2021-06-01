@@ -73,6 +73,12 @@ struct btrfs_space_info {
 	 */
 	u64 tickets_id;
 
+	/*
+	 * Counter for the number of times user facing flush actions have
+	 * failed.
+	 */
+	atomic_t enospc_events;
+
 	struct rw_semaphore groups_sem;
 	/* for block groups in our same type */
 	struct list_head block_groups[BTRFS_NR_RAID_TYPES];

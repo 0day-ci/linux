@@ -213,6 +213,7 @@ static int create_space_info(struct btrfs_fs_info *info, u64 flags)
 	INIT_LIST_HEAD(&space_info->ro_bgs);
 	INIT_LIST_HEAD(&space_info->tickets);
 	INIT_LIST_HEAD(&space_info->priority_tickets);
+	atomic_set(&space_info->enospc_events, 0);
 	space_info->clamp = 1;
 
 	ret = btrfs_sysfs_add_space_info_type(info, space_info);
@@ -1675,6 +1676,11 @@ int btrfs_reserve_metadata_bytes(struct btrfs_root *root,
 			ret = 0;
 	}
 	if (ret == -ENOSPC) {
+		if (flush == BTRFS_RESERVE_FLUSH_ALL ||
+		    flush == BTRFS_RESERVE_FLUSH_ALL_STEAL ||
+		    flush == BTRFS_RESERVE_FLUSH_EVICT)
+			atomic_inc(&block_rsv->space_info->enospc_events);
+
 		trace_btrfs_space_reservation(fs_info, "space_info:enospc",
 					      block_rsv->space_info->flags,
 					      orig_bytes, 1);
@@ -1708,6 +1714,8 @@ int btrfs_reserve_data_bytes(struct btrfs_fs_info *fs_info, u64 bytes,
 
 	ret = __reserve_bytes(fs_info, data_sinfo, bytes, flush);
 	if (ret == -ENOSPC) {
+		if (flush == BTRFS_RESERVE_FLUSH_DATA)
+			atomic_inc(&data_sinfo->enospc_events);
 		trace_btrfs_space_reservation(fs_info, "space_info:enospc",
 					      data_sinfo->flags, bytes, 1);
 		if (btrfs_test_opt(fs_info, ENOSPC_DEBUG))
