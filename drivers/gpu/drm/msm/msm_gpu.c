@@ -368,7 +368,8 @@ out:
 }
 
 static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
-		struct msm_gem_submit *submit, char *comm, char *cmd)
+		struct msm_gem_submit *submit, char *comm, char *cmd,
+		bool stalled)
 {
 	struct msm_gpu_state *state;
 
@@ -380,7 +381,7 @@ static void msm_gpu_crashstate_capture(struct msm_gpu *gpu,
 	if (gpu->crashstate)
 		return;
 
-	state = gpu->funcs->gpu_state_get(gpu);
+	state = gpu->funcs->gpu_state_get(gpu, stalled);
 	if (IS_ERR_OR_NULL(state))
 		return;
 
@@ -506,7 +507,7 @@ static void recover_worker(struct kthread_work *work)
 
 	/* Record the crash state */
 	pm_runtime_get_sync(&gpu->pdev->dev);
-	msm_gpu_crashstate_capture(gpu, submit, comm, cmd);
+	msm_gpu_crashstate_capture(gpu, submit, comm, cmd, false);
 	pm_runtime_put_sync(&gpu->pdev->dev);
 
 	kfree(cmd);

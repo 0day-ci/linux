@@ -86,7 +86,7 @@ unsigned long a6xx_gmu_get_freq(struct msm_gpu *gpu);
 void a6xx_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		struct drm_printer *p);
 
-struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu);
+struct msm_gpu_state *a6xx_gpu_state_get(struct msm_gpu *gpu, bool stalled);
 int a6xx_gpu_state_put(struct msm_gpu_state *state);
 
 #endif /* __A6XX_GPU_H__ */

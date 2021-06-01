@@ -464,7 +464,7 @@ static void a3xx_dump(struct msm_gpu *gpu)
 	adreno_dump(gpu);
 }
 
-static struct msm_gpu_state *a3xx_gpu_state_get(struct msm_gpu *gpu)
+static struct msm_gpu_state *a3xx_gpu_state_get(struct msm_gpu *gpu, bool stalled)
 {
 	struct msm_gpu_state *state = kzalloc(sizeof(*state), GFP_KERNEL);
 
