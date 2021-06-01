@@ -2385,8 +2385,10 @@ int ef4_reset_up(struct ef4_nic *efx, enum reset_type method, bool ok)
 		goto fail;
 	}
 
-	if (!ok)
+	if (!ok) {
+		rc = -EINVAL;
 		goto fail;
+	}
 
 	if (efx->port_initialized && method != RESET_TYPE_INVISIBLE &&
 	    method != RESET_TYPE_DATAPATH) {
