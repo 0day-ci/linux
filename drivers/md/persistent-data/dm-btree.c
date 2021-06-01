@@ -743,8 +743,10 @@ static int split_two_into_three(struct shadow_spine *s, unsigned parent_index,
 			return r;
 	} else {
 		middle_index = parent_index;
-		r = shadow_child(s->info, vt, pn, parent_index - 1, &left);
 		right = shadow_current(s);
+		r = shadow_child(s->info, vt, pn, parent_index - 1, &left);
+		if (r)
+			return r;
 	}
 
 	r = new_block(s->info, &middle);
