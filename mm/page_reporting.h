@@ -10,9 +10,10 @@
 #include <linux/pgtable.h>
 #include <linux/scatterlist.h>
 
-#define PAGE_REPORTING_MIN_ORDER	pageblock_order
-
 #ifdef CONFIG_PAGE_REPORTING
+#define PAGE_REPORTING_MIN_ORDER	\
+	min_t(unsigned int, pageblock_order, (MAX_ORDER / 2))
+
 DECLARE_STATIC_KEY_FALSE(page_reporting_enabled);
 void __page_reporting_notify(void);
 
