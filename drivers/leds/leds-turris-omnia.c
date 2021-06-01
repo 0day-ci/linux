@@ -41,32 +41,43 @@ struct omnia_leds {
 	struct omnia_led leds[];
 };
 
+static int omnia_led_brightness_set(struct i2c_client *client,
+				    struct omnia_led *led,
+				    enum led_brightness brightness)
+{
+	u8 buf[5], state;
+	int ret;
+
+	led_mc_calc_color_components(&led->mc_cdev, brightness);
+
+	buf[0] = CMD_LED_COLOR;
+	buf[1] = led->reg;
+	buf[2] = led->mc_cdev.subled_info[0].brightness;
+	buf[3] = led->mc_cdev.subled_info[1].brightness;
+	buf[4] = led->mc_cdev.subled_info[2].brightness;
+
+	state = CMD_LED_STATE_LED(led->reg);
+	if (buf[2] || buf[3] || buf[4])
+		state |= CMD_LED_STATE_ON;
+
+	ret = i2c_smbus_write_byte_data(client, CMD_LED_STATE, state);
+	if (ret >= 0 && (state & CMD_LED_STATE_ON))
+		ret = i2c_master_send(client, buf, 5);
+
+	return ret < 0 ? ret : 0;
+}
+
 static int omnia_led_brightness_set_blocking(struct led_classdev *cdev,
 					     enum led_brightness brightness)
 {
 	struct led_classdev_mc *mc_cdev = lcdev_to_mccdev(cdev);
 	struct omnia_leds *leds = dev_get_drvdata(cdev->dev->parent);
 	struct omnia_led *led = to_omnia_led(mc_cdev);
-	u8 buf[5], state;
 	int ret;
 
 	mutex_lock(&leds->lock);
 
-	led_mc_calc_color_components(&led->mc_cdev, brightness);
-
-	buf[0] = CMD_LED_COLOR;
-	buf[1] = led->reg;
-	buf[2] = mc_cdev->subled_info[0].brightness;
-	buf[3] = mc_cdev->subled_info[1].brightness;
-	buf[4] = mc_cdev->subled_info[2].brightness;
-
-	state = CMD_LED_STATE_LED(led->reg);
-	if (buf[2] || buf[3] || buf[4])
-		state |= CMD_LED_STATE_ON;
-
-	ret = i2c_smbus_write_byte_data(leds->client, CMD_LED_STATE, state);
-	if (ret >= 0 && (state & CMD_LED_STATE_ON))
-		ret = i2c_master_send(leds->client, buf, 5);
+	ret = omnia_led_brightness_set(leds->client, led, brightness);
 
 	mutex_unlock(&leds->lock);
 
