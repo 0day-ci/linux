@@ -452,6 +452,11 @@ int ice_setup_rx_ctx(struct ice_ring *ring)
 	else
 		ice_set_ring_build_skb_ena(ring);
 
+	/* XDP is executed per Rx ring, so we need to indicate there is
+	 * insufficient count of XDP queues and we need a locking
+	 */
+	if (test_bit(ICE_VSI_XDP_FALLBACK, vsi->state))
+		ring->flags |= ICE_TX_XDP_LOCKED;
 	ring->rx_offset = ice_rx_offset(ring);
 
 	/* init queue specific tail register */

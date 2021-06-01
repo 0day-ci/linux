@@ -299,12 +299,14 @@ struct ice_ring {
 	u16 rx_offset;
 	/* CL3 - 3rd cacheline starts here */
 	struct xdp_rxq_info xdp_rxq;
+	spinlock_t tx_lock;
 	struct sk_buff *skb;
 	/* CLX - the below items are only accessed infrequently and should be
 	 * in their own cache line if possible
 	 */
 #define ICE_TX_FLAGS_RING_XDP		BIT(0)
 #define ICE_RX_FLAGS_RING_BUILD_SKB	BIT(1)
+#define ICE_TX_XDP_LOCKED		BIT(2)
 	u8 flags;
 	dma_addr_t dma;			/* physical address of ring */
 	unsigned int size;		/* length of descriptor ring in bytes */

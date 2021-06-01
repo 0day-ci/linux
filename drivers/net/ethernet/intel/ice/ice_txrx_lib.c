@@ -274,13 +274,20 @@ int ice_xmit_xdp_buff(struct xdp_buff *xdp, struct ice_ring *xdp_ring)
  */
 void ice_finalize_xdp_rx(struct ice_ring *rx_ring, unsigned int xdp_res)
 {
+	struct ice_ring *xdp_ring;
+
 	if (xdp_res & ICE_XDP_REDIR)
 		xdp_do_flush_map();
 
 	if (xdp_res & ICE_XDP_TX) {
-		struct ice_ring *xdp_ring =
-			rx_ring->vsi->xdp_rings[smp_processor_id()];
-
+		if (unlikely(rx_ring->flags & ICE_TX_XDP_LOCKED))
+			xdp_ring = ice_get_xdp_ring_locked(rx_ring->vsi);
+		else
+			xdp_ring = ice_get_xdp_ring(rx_ring->vsi);
 		ice_xdp_ring_update_tail(xdp_ring);
+		if (unlikely(rx_ring->flags & ICE_TX_XDP_LOCKED))
+			ice_put_xdp_ring_locked(xdp_ring);
+		else
+			ice_put_xdp_ring(xdp_ring);
 	}
 }

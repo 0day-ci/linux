@@ -531,8 +531,16 @@ ice_run_xdp(struct ice_ring *rx_ring, struct xdp_buff *xdp,
 	case XDP_PASS:
 		return ICE_XDP_PASS;
 	case XDP_TX:
-		xdp_ring = rx_ring->vsi->xdp_rings[smp_processor_id()];
-		return ice_xmit_xdp_buff(xdp, xdp_ring);
+		if (unlikely(rx_ring->flags & ICE_TX_XDP_LOCKED))
+			xdp_ring = ice_get_xdp_ring_locked(rx_ring->vsi);
+		else
+			xdp_ring = ice_get_xdp_ring(rx_ring->vsi);
+		err = ice_xmit_xdp_buff(xdp, xdp_ring);
+		if (unlikely(rx_ring->flags & ICE_TX_XDP_LOCKED))
+			ice_put_xdp_ring_locked(xdp_ring);
+		else
+			ice_put_xdp_ring(xdp_ring);
+		return err;
 	case XDP_REDIRECT:
 		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
 		return !err ? ICE_XDP_REDIR : ICE_XDP_CONSUMED;
@@ -595,6 +603,56 @@ ice_xdp_xmit(struct net_device *dev, int n, struct xdp_frame **frames,
 	return nxmit;
 }
 
+/**
+ * ice_xdp_xmit_locked - submit packets to XDP ring for tx and hold a lock
+ * @dev: netdev
+ * @n: number of XDP frames to be transmitted
+ * @frames: XDP frames to be transmitted
+ * @flags: transmit flags
+ *
+ * Returns number of frames successfully sent. Failed frames
+ * will be free'ed by XDP core.
+ * For error cases, a negative errno code is returned and no-frames
+ * are transmitted (caller must handle freeing frames).
+ * This function is used when the requirement for having a XDP Tx ring per
+ * CPU is not fulfilled.
+ */
+int
+ice_xdp_xmit_locked(struct net_device *dev, int n, struct xdp_frame **frames,
+		    u32 flags)
+{
+	struct ice_netdev_priv *np = netdev_priv(dev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_ring *xdp_ring;
+	int nxmit = 0, i;
+
+	if (test_bit(ICE_VSI_DOWN, vsi->state))
+		return -ENETDOWN;
+
+	if (!ice_is_xdp_ena_vsi(vsi))
+		return -ENXIO;
+
+	if (unlikely(flags & ~XDP_XMIT_FLAGS_MASK))
+		return -EINVAL;
+
+	xdp_ring = vsi->xdp_rings[smp_processor_id() % vsi->num_xdp_txq];
+	spin_lock(&xdp_ring->tx_lock);
+	for (i = 0; i < n; i++) {
+		struct xdp_frame *xdpf = frames[i];
+		int err;
+
+		err = ice_xmit_xdp_ring(xdpf->data, xdpf->len, xdp_ring);
+		if (err != ICE_XDP_TX)
+			break;
+		nxmit++;
+	}
+
+	if (unlikely(flags & XDP_XMIT_FLUSH))
+		ice_xdp_ring_update_tail(xdp_ring);
+	spin_unlock(&xdp_ring->tx_lock);
+
+	return nxmit;
+}
 /**
  * ice_alloc_mapped_page - recycle or make a new page
  * @rx_ring: ring to use

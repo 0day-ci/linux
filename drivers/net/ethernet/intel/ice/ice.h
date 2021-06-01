@@ -248,6 +248,7 @@ enum ice_vsi_state {
 	ICE_VSI_MMAC_FLTR_CHANGED,
 	ICE_VSI_VLAN_FLTR_CHANGED,
 	ICE_VSI_PROMISC_CHANGED,
+	ICE_VSI_XDP_FALLBACK,
 	ICE_VSI_STATE_NBITS		/* must be last */
 };
 
@@ -538,6 +539,38 @@ static inline void ice_set_ring_xdp(struct ice_ring *ring)
 	ring->flags |= ICE_TX_FLAGS_RING_XDP;
 }
 
+static inline struct ice_ring *ice_get_xdp_ring(struct ice_vsi *vsi)
+{
+	struct ice_ring *xdp_ring;
+
+	xdp_ring = vsi->xdp_rings[smp_processor_id()];
+	/* make sparse happy */
+	__acquire(&xdp_ring->tx_lock);
+
+	return xdp_ring;
+}
+
+static inline struct ice_ring *ice_get_xdp_ring_locked(struct ice_vsi *vsi)
+{
+	struct ice_ring *xdp_ring;
+
+	xdp_ring = vsi->xdp_rings[smp_processor_id() % vsi->num_xdp_txq];
+	spin_lock(&xdp_ring->tx_lock);
+
+	return xdp_ring;
+}
+
+static inline void ice_put_xdp_ring(struct ice_ring __always_unused *xdp_ring)
+{
+	/* make sparse happy */
+	__release(&xdp_ring->tx_lock);
+}
+
+static inline void ice_put_xdp_ring_locked(struct ice_ring *xdp_ring)
+{
+	spin_unlock(&xdp_ring->tx_lock);
+}
+
 /**
  * ice_xsk_pool - get XSK buffer pool bound to a ring
  * @ring: ring to use
@@ -624,11 +657,15 @@ int ice_up(struct ice_vsi *vsi);
 int ice_down(struct ice_vsi *vsi);
 int ice_vsi_cfg(struct ice_vsi *vsi);
 struct ice_vsi *ice_lb_vsi_setup(struct ice_pf *pf, struct ice_port_info *pi);
+int ice_vsi_determine_xdp_res(struct ice_vsi *vsi);
 int ice_prepare_xdp_rings(struct ice_vsi *vsi, struct bpf_prog *prog);
 int ice_destroy_xdp_rings(struct ice_vsi *vsi);
 int
 ice_xdp_xmit(struct net_device *dev, int n, struct xdp_frame **frames,
 	     u32 flags);
+int
+ice_xdp_xmit_locked(struct net_device *dev, int n, struct xdp_frame **frames,
+		    u32 flags);
 int ice_set_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size);
 int ice_get_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size);
 int ice_set_rss_key(struct ice_vsi *vsi, u8 *seed);
