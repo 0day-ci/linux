@@ -48,6 +48,7 @@ static void afs_dir_invalidatepage(struct page *page, unsigned int offset,
 static int afs_dir_set_page_dirty(struct page *page)
 {
 	BUG(); /* This should never happen. */
+	return -EINVAL;
 }
 
 const struct file_operations afs_dir_file_operations = {
