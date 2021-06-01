@@ -1324,6 +1324,7 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
 		      alloc_size);
 
 	INIT_LIST_HEAD(&chunk->list);
+	INIT_LIST_HEAD(&chunk->cpuhp);
 
 	chunk->base_addr = (void *)aligned_addr;
 	chunk->start_offset = start_offset;
@@ -1404,6 +1405,7 @@ static struct pcpu_chunk *pcpu_alloc_chunk(enum pcpu_chunk_type type, gfp_t gfp)
 		return NULL;
 
 	INIT_LIST_HEAD(&chunk->list);
+	INIT_LIST_HEAD(&chunk->cpuhp);
 	chunk->nr_pages = pcpu_unit_pages;
 	region_bits = pcpu_chunk_map_bits(chunk);
 
@@ -1659,6 +1661,161 @@ static void pcpu_memcg_free_hook(struct pcpu_chunk *chunk, int off, size_t size)
 }
 #endif /* CONFIG_MEMCG_KMEM */
 
+static void pcpu_cpuhp_register(struct pcpu_chunk *chunk,
+				struct percpu_cpuhp_notifier *n)
+{
+	list_add(&n->list, &chunk->cpuhp);
+}
+
+static void pcpu_cpuhp_deregister(struct pcpu_chunk *chunk,
+				  void __percpu *ptr)
+{
+	struct percpu_cpuhp_notifier *n, *next;
+
+	list_for_each_entry_safe(n, next, &chunk->cpuhp, list)
+		if (n->ptr == ptr) {
+			list_del(&n->list);
+			kfree(n);
+			return;
+		}
+}
+
+static void __pcpu_cpuhp_setup(enum pcpu_chunk_type type, unsigned int cpu)
+{
+	int slot;
+	struct list_head *pcpu_slot = pcpu_chunk_list(type);
+	struct pcpu_chunk *chunk;
+
+	for (slot = 0; slot < pcpu_nr_slots; slot++) {
+		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
+			unsigned int rs, re;
+
+			if (chunk == pcpu_first_chunk)
+				continue;
+
+			bitmap_for_each_set_region(chunk->populated, rs, re, 0,
+						   chunk->nr_pages)
+				pcpu_populate_chunk_cpu(cpu, chunk, rs, re,
+							GFP_KERNEL);
+		}
+	}
+}
+
+/**
+ * cpu hotplug callback for percpu allocator
+ * @cpu: cpu that is being hotplugged
+ *
+ * Allocates and maps the pages that corresponds to @cpu's unit
+ * in all chunks.
+ */
+static int percpu_cpuhp_setup(unsigned int cpu)
+{
+	enum pcpu_chunk_type type;
+
+	mutex_lock(&pcpu_alloc_mutex);
+	for (type = 0; type < PCPU_NR_CHUNK_TYPES; type++)
+		__pcpu_cpuhp_setup(type, cpu);
+	mutex_unlock(&pcpu_alloc_mutex);
+
+	return 0;
+}
+
+static void __pcpu_cpuhp_destroy(enum pcpu_chunk_type type, unsigned int cpu)
+{
+	int slot;
+	struct list_head *pcpu_slot = pcpu_chunk_list(type);
+	struct pcpu_chunk *chunk;
+
+	for (slot = 0; slot < pcpu_nr_slots; slot++) {
+		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
+			unsigned int rs, re;
+
+			if (chunk == pcpu_first_chunk)
+				continue;
+
+			bitmap_for_each_set_region(chunk->populated, rs, re, 0,
+						   chunk->nr_pages)
+				pcpu_depopulate_chunk_cpu(cpu, chunk, rs, re);
+		}
+	}
+}
+
+/**
+ * cpu unplug callback for percpu allocator
+ * @cpu: cpu that is being hotplugged
+ *
+ * Unmaps and frees the pages that corresponds to @cpu's unit
+ * in all chunks.
+ */
+static int percpu_cpuhp_destroy(unsigned int cpu)
+{
+	enum pcpu_chunk_type type;
+
+	mutex_lock(&pcpu_alloc_mutex);
+	for (type = 0; type < PCPU_NR_CHUNK_TYPES; type++)
+		__pcpu_cpuhp_destroy(type, cpu);
+	mutex_unlock(&pcpu_alloc_mutex);
+
+	return 0;
+}
+
+static void __pcpu_cpuhp_alloc(enum pcpu_chunk_type type, unsigned int cpu)
+{
+	int slot;
+	struct list_head *pcpu_slot = pcpu_chunk_list(type);
+	struct pcpu_chunk *chunk;
+	struct percpu_cpuhp_notifier *n;
+
+	for (slot = 0; slot < pcpu_nr_slots; slot++) {
+		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
+			list_for_each_entry(n, &chunk->cpuhp, list)
+				n->cb(n->ptr, cpu, n->data);
+		}
+	}
+}
+
+/**
+ * cpu hotplug callback for executing any initialization routines
+ * registered by the callers of alloc_percpu_cb()
+ *
+ * @cpu: cpu that is being hotplugged
+ */
+static int percpu_cpuhp_alloc(unsigned int cpu)
+{
+	enum pcpu_chunk_type type;
+
+	mutex_lock(&pcpu_alloc_mutex);
+	for (type = 0; type < PCPU_NR_CHUNK_TYPES; type++)
+		__pcpu_cpuhp_alloc(type, cpu);
+	mutex_unlock(&pcpu_alloc_mutex);
+
+	return 0;
+}
+
+static int percpu_cpuhp_free(unsigned int cpu)
+{
+	return 0;
+}
+
+/**
+ * Register cpu hotplug callbacks for the percpu allocator
+ * and its callers
+ */
+static int percpu_hotplug_setup(void)
+{
+	/* Callback for percpu allocator */
+	if (cpuhp_setup_state(CPUHP_PERCPU_SETUP, "percpu:setup",
+	    percpu_cpuhp_setup, percpu_cpuhp_destroy))
+		return -EINVAL;
+
+	/* Callback for the callers of alloc_percpu() */
+	if (cpuhp_setup_state(CPUHP_PERCPU_ALLOC, "percpu:alloc",
+	    percpu_cpuhp_alloc, percpu_cpuhp_free))
+		return -EINVAL;
+
+	return 0;
+}
+
 /**
  * pcpu_alloc - the percpu allocator
  * @size: size of area to allocate in bytes
@@ -1675,7 +1832,7 @@ static void pcpu_memcg_free_hook(struct pcpu_chunk *chunk, int off, size_t size)
  * Percpu pointer to the allocated area on success, NULL on failure.
  */
 static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
-				 gfp_t gfp)
+				 gfp_t gfp,  pcpu_cpuhp_fn_t cb, void *data)
 {
 	gfp_t pcpu_gfp;
 	bool is_atomic;
@@ -1690,12 +1847,19 @@ static void __percpu *pcpu_alloc(size_t size, size_t align, bool reserved,
 	unsigned long flags;
 	void __percpu *ptr;
 	size_t bits, bit_align;
+	struct percpu_cpuhp_notifier *n;
 
 	gfp = current_gfp_context(gfp);
 	/* whitelisted flags that can be passed to the backing allocators */
 	pcpu_gfp = gfp & (GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
 	is_atomic = (gfp & GFP_KERNEL) != GFP_KERNEL;
 	do_warn = !(gfp & __GFP_NOWARN);
+
+	if (cb) {
+		n = kmalloc(sizeof(*n), gfp);
+		if (!n)
+			return NULL;
+	}
 
 	/*
 	 * There is now a minimum allocation size of PCPU_MIN_ALLOC_SIZE,
@@ -1847,6 +2011,13 @@ area_found:
 
 	pcpu_memcg_post_alloc_hook(objcg, chunk, off, size);
 
+	if (cb) {
+		n->ptr = ptr;
+		n->cb = cb;
+		n->data = data;
+		pcpu_cpuhp_register(chunk, n);
+	}
+
 	return ptr;
 
 fail_unlock:
@@ -1870,6 +2041,7 @@ fail:
 	}
 
 	pcpu_memcg_post_alloc_hook(objcg, NULL, 0, size);
+	kfree(n);
 
 	return NULL;
 }
@@ -1891,7 +2063,7 @@ fail:
  */
 void __percpu *__alloc_percpu_gfp(size_t size, size_t align, gfp_t gfp)
 {
-	return pcpu_alloc(size, align, false, gfp);
+	return pcpu_alloc(size, align, false, gfp, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(__alloc_percpu_gfp);
 
@@ -1904,7 +2076,7 @@ EXPORT_SYMBOL_GPL(__alloc_percpu_gfp);
  */
 void __percpu *__alloc_percpu(size_t size, size_t align)
 {
-	return pcpu_alloc(size, align, false, GFP_KERNEL);
+	return pcpu_alloc(size, align, false, GFP_KERNEL, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(__alloc_percpu);
 
@@ -1926,7 +2098,33 @@ EXPORT_SYMBOL_GPL(__alloc_percpu);
  */
 void __percpu *__alloc_reserved_percpu(size_t size, size_t align)
 {
-	return pcpu_alloc(size, align, true, GFP_KERNEL);
+	return pcpu_alloc(size, align, true, GFP_KERNEL, NULL, NULL);
+}
+
+/**
+ * alloc_percpu variants that take a callback to handle
+ * any required initialization to the percpu ptr corresponding
+ * to the cpu that is coming online.
+ * @cb: This callback will be called whenever a cpu is hotplugged.
+ */
+void __percpu *__alloc_percpu_gfp_cb(size_t size, size_t align, gfp_t gfp,
+				     pcpu_cpuhp_fn_t cb, void *data)
+{
+	return pcpu_alloc(size, align, false, gfp, cb, data);
+}
+EXPORT_SYMBOL_GPL(__alloc_percpu_gfp_cb);
+
+void __percpu *__alloc_percpu_cb(size_t size, size_t align, pcpu_cpuhp_fn_t cb,
+				 void *data)
+{
+	return pcpu_alloc(size, align, false, GFP_KERNEL, cb, data);
+}
+EXPORT_SYMBOL_GPL(__alloc_percpu_cb);
+
+void __percpu *__alloc_reserved_percpu_cb(size_t size, size_t align,
+					  pcpu_cpuhp_fn_t cb, void *data)
+{
+	return pcpu_alloc(size, align, true, GFP_KERNEL, cb, data);
 }
 
 /**
@@ -2116,6 +2314,7 @@ void free_percpu(void __percpu *ptr)
 			}
 	}
 
+	pcpu_cpuhp_deregister(chunk, ptr);
 	trace_percpu_free_percpu(chunk->base_addr, off, ptr);
 
 	spin_unlock_irqrestore(&pcpu_lock, flags);
@@ -2425,6 +2624,8 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		BUG();							\
 	}								\
 } while (0)
+
+	PCPU_SETUP_BUG_ON(percpu_hotplug_setup() < 0);
 
 	/* sanity checks */
 	PCPU_SETUP_BUG_ON(ai->nr_groups <= 0);

@@ -42,6 +42,67 @@ static struct page **pcpu_get_pages(void)
 }
 
 /**
+ * pcpu_alloc_pages_cpu - allocates pages for @chunk for a given cpu
+ * @cpu: target cpu
+ * @chunk: target chunk
+ * @pages: array to put the allocated pages into, indexed by pcpu_page_idx()
+ * @page_start: page index of the first page to be allocated
+ * @page_end: page index of the last page to be allocated + 1
+ * @gfp: allocation flags passed to the underlying allocator
+ *
+ * Allocate pages [@page_start,@page_end) into @pages for the given cpu.
+ * The allocation is for @chunk.  Percpu core doesn't care about the
+ * content of @pages and will pass it verbatim to pcpu_map_pages().
+ */
+static int pcpu_alloc_pages_cpu(unsigned int cpu, struct pcpu_chunk *chunk,
+				struct page **pages, int page_start, int page_end,
+				gfp_t gfp)
+{
+	int i;
+
+	gfp |= __GFP_HIGHMEM;
+
+	for (i = page_start; i < page_end; i++) {
+		struct page **pagep = &pages[pcpu_page_idx(cpu, i)];
+
+		*pagep = alloc_pages_node(cpu_to_node(cpu), gfp, 0);
+		if (!*pagep)
+			goto err;
+	}
+	return 0;
+
+err:
+	while (--i >= page_start)
+		__free_page(pages[pcpu_page_idx(cpu, i)]);
+
+	return -ENOMEM;
+}
+
+/**
+ * pcpu_free_pages_cpu - free pages which were allocated for @chunk for @cpu
+ * @cpu: cpu for which the pages were allocated
+ * @chunk: chunk pages were allocated for
+ * @pages: array of pages to be freed, indexed by pcpu_page_idx()
+ * @page_start: page index of the first page to be freed
+ * @page_end: page index of the last page to be freed + 1
+ *
+ * Free pages [@page_start and @page_end) in @pages for @cpu.
+ * The pages were allocated for @chunk.
+ */
+static void pcpu_free_pages_cpu(unsigned int cpu, struct pcpu_chunk *chunk,
+				struct page **pages, int page_start, int page_end)
+{
+	int i;
+
+	for (i = page_start; i < page_end; i++) {
+		struct page *page = pages[pcpu_page_idx(cpu, i)];
+
+		if (page)
+			__free_page(page);
+	}
+}
+
+/**
  * pcpu_free_pages - free pages which were allocated for @chunk
  * @chunk: chunk pages were allocated for
  * @pages: array of pages to be freed, indexed by pcpu_page_idx()
@@ -138,6 +199,37 @@ static void __pcpu_unmap_pages(unsigned long addr, int nr_pages)
 }
 
 /**
+ * pcpu_unmap_pages_cpu - unmap pages out of a pcpu_chunk for a cpu
+ * @cpu: cpu of interest
+ * @chunk: chunk of interest
+ * @pages: pages array which can be used to pass information to free
+ * @page_start: page index of the first page to unmap
+ * @page_end: page index of the last page to unmap + 1
+ *
+ * For the given cpu, unmap pages [@page_start,@page_end) out of @chunk.
+ * Corresponding elements in @pages were cleared by the caller and can
+ * be used to carry information to pcpu_free_pages() which will be
+ * called after all unmaps are finished.  The caller should call
+ * proper pre/post flush functions.
+ */
+static void pcpu_unmap_pages_cpu(unsigned int cpu, struct pcpu_chunk *chunk,
+				 struct page **pages, int page_start,
+				 int page_end)
+{
+	int i;
+
+	for (i = page_start; i < page_end; i++) {
+		struct page *page;
+
+		page = pcpu_chunk_page(chunk, cpu, i);
+		WARN_ON(!page);
+		pages[pcpu_page_idx(cpu, i)] = page;
+	}
+	__pcpu_unmap_pages(pcpu_chunk_addr(chunk, cpu, page_start),
+				   page_end - page_start);
+}
+
+/**
  * pcpu_unmap_pages - unmap pages out of a pcpu_chunk
  * @chunk: chunk of interest
  * @pages: pages array which can be used to pass information to free
@@ -195,6 +287,41 @@ static int __pcpu_map_pages(unsigned long addr, struct page **pages,
 {
 	return vmap_pages_range_noflush(addr, addr + (nr_pages << PAGE_SHIFT),
 					PAGE_KERNEL, pages, PAGE_SHIFT);
+}
+
+/**
+ * pcpu_map_pages_cpu - map pages into a pcpu_chunk for a cpu
+ * @cpu: cpu of interest
+ * @chunk: chunk of interest
+ * @pages: pages array containing pages to be mapped
+ * @page_start: page index of the first page to map
+ * @page_end: page index of the last page to map + 1
+ *
+ * For the given cpu, map pages [@page_start,@page_end) into @chunk.  The
+ * caller is responsible for calling pcpu_post_map_flush() after all
+ * mappings are complete.
+ *
+ * This function is responsible for setting up whatever is necessary for
+ * reverse lookup (addr -> chunk).
+ */
+static int pcpu_map_pages_cpu(unsigned int cpu, struct pcpu_chunk *chunk,
+			      struct page **pages, int page_start, int page_end)
+{
+	int i, err;
+
+	err = __pcpu_map_pages(pcpu_chunk_addr(chunk, cpu, page_start),
+			       &pages[pcpu_page_idx(cpu, page_start)],
+			       page_end - page_start);
+	if (err < 0)
+		goto err;
+
+	for (i = page_start; i < page_end; i++)
+		pcpu_set_page_chunk(pages[pcpu_page_idx(cpu, i)],
+				    chunk);
+	return 0;
+err:
+	pcpu_post_unmap_tlb_flush(chunk, page_start, page_end);
+	return err;
 }
 
 /**
@@ -261,6 +388,40 @@ static void pcpu_post_map_flush(struct pcpu_chunk *chunk,
 }
 
 /**
+ * pcpu_populate_chunk_cpu - populate and map an area of a pcpu_chunk for a cpu
+ * @cpu: cpu of interest
+ * @chunk: chunk of interest
+ * @page_start: the start page
+ * @page_end: the end page
+ * @gfp: allocation flags passed to the underlying memory allocator
+ *
+ * For the given cpu, populate and map pages [@page_start,@page_end) into
+ * @chunk.
+ *
+ * CONTEXT:
+ * pcpu_alloc_mutex, does GFP_KERNEL allocation.
+ */
+static int pcpu_populate_chunk_cpu(unsigned int cpu, struct pcpu_chunk *chunk,
+				   int page_start, int page_end, gfp_t gfp)
+{
+	struct page **pages;
+
+	pages = pcpu_get_pages();
+	if (!pages)
+		return -ENOMEM;
+
+	if (pcpu_alloc_pages_cpu(cpu, chunk, pages, page_start, page_end, gfp))
+		return -ENOMEM;
+
+	if (pcpu_map_pages_cpu(cpu, chunk, pages, page_start, page_end)) {
+		pcpu_free_pages_cpu(cpu, chunk, pages, page_start, page_end);
+		return -ENOMEM;
+	}
+	pcpu_post_map_flush(chunk, page_start, page_end);
+
+	return 0;
+}
+/**
  * pcpu_populate_chunk - populate and map an area of a pcpu_chunk
  * @chunk: chunk of interest
  * @page_start: the start page
@@ -292,6 +453,44 @@ static int pcpu_populate_chunk(struct pcpu_chunk *chunk,
 	pcpu_post_map_flush(chunk, page_start, page_end);
 
 	return 0;
+}
+
+/**
+ * pcpu_depopulate_chunk_cpu - depopulate and unmap an area of a pcpu_chunk
+ * for a cpu
+ * @cpu: cpu of interest
+ * @chunk: chunk to depopulate
+ * @page_start: the start page
+ * @page_end: the end page
+ *
+ * For the given cpu, depopulate and unmap pages [@page_start,@page_end)
+ * from @chunk.
+ *
+ * CONTEXT:
+ * pcpu_alloc_mutex.
+ */
+static void pcpu_depopulate_chunk_cpu(unsigned int cpu,
+				      struct pcpu_chunk *chunk,
+				      int page_start, int page_end)
+{
+	struct page **pages;
+
+	/*
+	 * If control reaches here, there must have been at least one
+	 * successful population attempt so the temp pages array must
+	 * be available now.
+	 */
+	pages = pcpu_get_pages();
+	BUG_ON(!pages);
+
+	/* unmap and free */
+	pcpu_pre_unmap_flush(chunk, page_start, page_end);
+
+	pcpu_unmap_pages_cpu(cpu, chunk, pages, page_start, page_end);
+
+	/* no need to flush tlb, vmalloc will handle it lazily */
+
+	pcpu_free_pages_cpu(cpu, chunk, pages, page_start, page_end);
 }
 
 /**

@@ -100,6 +100,7 @@ typedef void * (*pcpu_fc_alloc_fn_t)(unsigned int cpu, size_t size,
 typedef void (*pcpu_fc_free_fn_t)(void *ptr, size_t size);
 typedef void (*pcpu_fc_populate_pte_fn_t)(unsigned long addr);
 typedef int (pcpu_fc_cpu_distance_fn_t)(unsigned int from, unsigned int to);
+typedef int (*pcpu_cpuhp_fn_t)(void __percpu *ptr, unsigned int cpu, void *data);
 
 extern struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 							     int nr_units);
@@ -133,6 +134,11 @@ extern void __init setup_per_cpu_areas(void);
 
 extern void __percpu *__alloc_percpu_gfp(size_t size, size_t align, gfp_t gfp);
 extern void __percpu *__alloc_percpu(size_t size, size_t align);
+extern void __percpu *__alloc_percpu_gfp_cb(size_t size, size_t align,
+					    gfp_t gfp, pcpu_cpuhp_fn_t fn,
+					    void *data);
+extern void __percpu *__alloc_percpu_cb(size_t size, size_t align,
+					pcpu_cpuhp_fn_t fn, void *data);
 extern void free_percpu(void __percpu *__pdata);
 extern phys_addr_t per_cpu_ptr_to_phys(void *addr);
 
@@ -142,6 +148,15 @@ extern phys_addr_t per_cpu_ptr_to_phys(void *addr);
 #define alloc_percpu(type)						\
 	(typeof(type) __percpu *)__alloc_percpu(sizeof(type),		\
 						__alignof__(type))
+
+#define alloc_percpu_gfp_cb(type, gfp, fn, data)			\
+	(typeof(type) __percpu *)__alloc_percpu_gfp_cb(sizeof(type),	\
+						__alignof__(type), gfp,	\
+						fn, data)
+#define alloc_percpu_cb(type, fn, data)					\
+	(typeof(type) __percpu *)__alloc_percpu_cb(sizeof(type),	\
+						__alignof__(type),	\
+						fn, data)
 
 extern unsigned long pcpu_nr_pages(void);
 

@@ -57,6 +57,8 @@ struct pcpu_chunk {
 #endif
 
 	struct list_head	list;		/* linked to pcpu_slot lists */
+	struct list_head	cpuhp;		/* list of registered cpu hotplug
+						   notifiers */
 	int			free_bytes;	/* free bytes in the chunk */
 	struct pcpu_block_md	chunk_md;
 	void			*base_addr;	/* base address of this chunk */
@@ -281,5 +283,12 @@ static inline void pcpu_stats_chunk_dealloc(void)
 }
 
 #endif /* !CONFIG_PERCPU_STATS */
+
+struct percpu_cpuhp_notifier {
+	void __percpu *ptr;
+	void *data;
+	pcpu_cpuhp_fn_t cb;
+	struct list_head list;
+};
 
 #endif
