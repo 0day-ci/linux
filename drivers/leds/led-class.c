@@ -432,14 +432,14 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
 	if (IS_ERR_OR_NULL(led_cdev->dev))
 		return;
 
+	led_cdev->flags |= LED_UNREGISTERING;
+
 #ifdef CONFIG_LEDS_TRIGGERS
 	down_write(&led_cdev->trigger_lock);
 	if (led_cdev->trigger)
 		led_trigger_set(led_cdev, NULL);
 	up_write(&led_cdev->trigger_lock);
 #endif
-
-	led_cdev->flags |= LED_UNREGISTERING;
 
 	/* Stop blinking */
 	led_stop_software_blink(led_cdev);
