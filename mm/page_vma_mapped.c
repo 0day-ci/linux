@@ -212,6 +212,14 @@ restart:
 			pvmw->ptl = NULL;
 		}
 	} else if (!pmd_present(pmde)) {
+		/*
+		 * If PVMW_SYNC, take and drop THP pmd lock so that we
+		 * cannot return prematurely, while zap_huge_pmd() has
+		 * cleared *pmd but not decremented compound_mapcount().
+		 */
+		if ((pvmw->flags & PVMW_SYNC) &&
+		    PageTransCompound(pvmw->page))
+			spin_unlock(pmd_lock(mm, pvmw->pmd));
 		return false;
 	}
 	if (!map_pte(pvmw))

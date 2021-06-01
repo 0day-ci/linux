@@ -2357,6 +2357,10 @@ static void unmap_page(struct page *page)
 	if (PageAnon(page))
 		ttu_flags |= TTU_SPLIT_FREEZE;
 
+	/* Make sure that the BUGs will not bite */
+	if (IS_ENABLED(CONFIG_DEBUG_VM))
+		ttu_flags |= TTU_SYNC;
+
 	unmap_success = try_to_unmap(page, ttu_flags);
 	VM_BUG_ON_PAGE(!unmap_success, page);
 }
