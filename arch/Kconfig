@@ -418,6 +418,32 @@ config ARCH_WANT_IRQS_OFF_ACTIVATE_MM
 	  irqs disabled over activate_mm. Architectures that do IPI based TLB
 	  shootdowns should enable this.
 
+# Enable "lazy TLB", which means a user->kernel thread context switch does not
+# switch the mm to init_mm and the kernel thread takes a reference to the user
+# mm to provide its kernel mapping. This is how Linux has traditionally worked
+# (see Documentation/vm/active_mm.rst), for performance. Switching to and from
+# idle thread is a performance-critical case.
+#
+# If mm context switches are inexpensive or free (in the case of NOMMU) then
+# this could be disabled.
+#
+# It would make sense to have this depend on MMU, but need to audit and test
+# the NOMMU architectures for lazy mm refcounting first.
+config MMU_LAZY_TLB
+	def_bool y
+	depends on !NO_MMU_LAZY_TLB
+
+# This allows archs to disable MMU_LAZY_TLB. mmgrab/mmdrop in arch/ code has
+# to be audited and switched to _lazy_tlb postfix as necessary.
+config NO_MMU_LAZY_TLB
+	def_bool n
+
+# Use normal mm refcounting for MMU_LAZY_TLB kernel thread references.
+# For now, this must be enabled if MMU_LAZY_TLB is enabled.
+config MMU_LAZY_TLB_REFCOUNT
+	def_bool y
+	depends on MMU_LAZY_TLB
+
 config ARCH_HAVE_NMI_SAFE_CMPXCHG
 	bool
 
