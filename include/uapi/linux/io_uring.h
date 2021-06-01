@@ -44,6 +44,7 @@ struct io_uring_sqe {
 		__u32		splice_flags;
 		__u32		rename_flags;
 		__u32		unlink_flags;
+		__u32		futex_flags;
 	};
 	__u64	user_data;	/* data to be passed back at completion time */
 	union {
@@ -137,6 +138,7 @@ enum {
 	IORING_OP_SHUTDOWN,
 	IORING_OP_RENAMEAT,
 	IORING_OP_UNLINKAT,
+	IORING_OP_FUTEX,
 
 	/* this goes last, obviously */
 	IORING_OP_LAST,
@@ -173,6 +175,13 @@ enum {
 #define IORING_POLL_ADD_MULTI	(1U << 0)
 #define IORING_POLL_UPDATE_EVENTS	(1U << 1)
 #define IORING_POLL_UPDATE_USER_DATA	(1U << 2)
+
+enum {
+	IORING_FUTEX_WAKE_OP = 0,
+
+	IORING_FUTEX_LAST,
+};
+
 
 /*
  * IO completion data structure (Completion Queue Entry)

@@ -77,6 +77,7 @@
 #include <linux/splice.h>
 #include <linux/task_work.h>
 #include <linux/pagemap.h>
+#include <linux/futex.h>
 #include <linux/io_uring.h>
 
 #define CREATE_TRACE_POINTS
@@ -668,6 +669,10 @@ struct io_unlink {
 	struct filename			*filename;
 };
 
+struct io_futex {
+	struct file			*file;
+};
+
 struct io_completion {
 	struct file			*file;
 	struct list_head		list;
@@ -812,6 +817,7 @@ struct io_kiocb {
 		struct io_shutdown	shutdown;
 		struct io_rename	rename;
 		struct io_unlink	unlink;
+		struct io_futex		futex;
 		/* use only after cleaning per-op data, see io_clean_op() */
 		struct io_completion	compl;
 	};
@@ -1024,6 +1030,7 @@ static const struct io_op_def io_op_defs[] = {
 	},
 	[IORING_OP_RENAMEAT] = {},
 	[IORING_OP_UNLINKAT] = {},
+	[IORING_OP_FUTEX] = {},
 };
 
 static bool io_disarm_next(struct io_kiocb *req);
@@ -5868,6 +5875,16 @@ static int io_files_update(struct io_kiocb *req, unsigned int issue_flags)
 	return 0;
 }
 
+static int io_futex_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
+{
+	return -EINVAL;
+}
+
+static int io_futex(struct io_kiocb *req, unsigned int issue_flags)
+{
+	return -EINVAL;
+}
+
 static int io_req_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	switch (req->opcode) {
@@ -5939,6 +5956,8 @@ static int io_req_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 		return io_renameat_prep(req, sqe);
 	case IORING_OP_UNLINKAT:
 		return io_unlinkat_prep(req, sqe);
+	case IORING_OP_FUTEX:
+		return io_futex_prep(req, sqe);
 	}
 
 	printk_once(KERN_WARNING "io_uring: unhandled opcode %d\n",
@@ -6205,6 +6224,9 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 		break;
 	case IORING_OP_UNLINKAT:
 		ret = io_unlinkat(req, issue_flags);
+		break;
+	case IORING_OP_FUTEX:
+		ret = io_futex(req, issue_flags);
 		break;
 	default:
 		ret = -EINVAL;
@@ -10157,6 +10179,7 @@ static int __init io_uring_init(void)
 	BUILD_BUG_SQE_ELEM(28, __u32,  statx_flags);
 	BUILD_BUG_SQE_ELEM(28, __u32,  fadvise_advice);
 	BUILD_BUG_SQE_ELEM(28, __u32,  splice_flags);
+	BUILD_BUG_SQE_ELEM(28, __u32,  futex_flags);
 	BUILD_BUG_SQE_ELEM(32, __u64,  user_data);
 	BUILD_BUG_SQE_ELEM(40, __u16,  buf_index);
 	BUILD_BUG_SQE_ELEM(42, __u16,  personality);
