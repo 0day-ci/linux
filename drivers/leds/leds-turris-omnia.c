@@ -117,10 +117,13 @@ static int omnia_led_register(struct i2c_client *client, struct omnia_led *led,
 
 	led->subled_info[0].color_index = LED_COLOR_ID_RED;
 	led->subled_info[0].channel = 0;
+	led->subled_info[0].intensity = 255;
 	led->subled_info[1].color_index = LED_COLOR_ID_GREEN;
 	led->subled_info[1].channel = 1;
+	led->subled_info[1].intensity = 255;
 	led->subled_info[2].color_index = LED_COLOR_ID_BLUE;
 	led->subled_info[2].channel = 2;
+	led->subled_info[2].intensity = 255;
 
 	led->mc_cdev.subled_info = led->subled_info;
 	led->mc_cdev.num_colors = OMNIA_LED_NUM_CHANNELS;
