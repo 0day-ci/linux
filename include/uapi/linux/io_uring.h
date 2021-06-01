@@ -186,7 +186,7 @@ enum {
 
 enum {
 	IORING_FUTEX_WAKE_OP = 0,
-
+	IORING_FUTEX_WAIT,
 	IORING_FUTEX_LAST,
 };
 

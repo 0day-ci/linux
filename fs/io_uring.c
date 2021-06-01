@@ -673,8 +673,15 @@ struct io_futex {
 	struct file			*file;
 	unsigned int			futex_op;
 
-	unsigned int			nr_wake;
-	unsigned int			wake_op_arg;
+	union {
+		/* wake */
+		struct {
+			unsigned int	nr_wake;
+			unsigned int	wake_op_arg;
+		};
+		/* wait */
+		u32 			val;
+	};
 	unsigned int			flags;
 	void __user			*uaddr;
 };
@@ -5897,10 +5904,23 @@ static int io_futex_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 		return -EINVAL;
 
 	v = READ_ONCE(sqe->off);
-	f->nr_wake = (u32)v;
-	f->wake_op_arg = (u32)(v >> 32);
-	f->futex_op = READ_ONCE(sqe->futex_op);
 	f->uaddr = u64_to_user_ptr(READ_ONCE(sqe->addr));
+	f->futex_op = READ_ONCE(sqe->futex_op);
+
+	switch (f->futex_op) {
+	case IORING_FUTEX_WAKE_OP:
+		f->nr_wake = (u32)v;
+		f->wake_op_arg = (u32)(v >> 32);
+		break;
+	case IORING_FUTEX_WAIT:
+		f->val = (u32)v;
+		if (unlikely(v >> 32))
+			return -EINVAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
@@ -5919,8 +5939,12 @@ static int io_futex(struct io_kiocb *req, unsigned int issue_flags)
 		if (nonblock && ret == -EAGAIN)
 			return -EAGAIN;
 		break;
-	default:
-		ret = -EINVAL;
+	case IORING_FUTEX_WAIT:
+		if (nonblock)
+			return -EAGAIN;
+		ret = futex_wait(f->uaddr, f->flags, f->val, NULL,
+				 FUTEX_BITSET_MATCH_ANY);
+		break;
 	}
 
 	if (ret < 0)
