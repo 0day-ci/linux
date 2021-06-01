@@ -65,5 +65,6 @@ int intel_atomic_plane_check_clipping(struct intel_plane_state *plane_state,
 				      bool can_position);
 void intel_plane_set_invisible(struct intel_crtc_state *crtc_state,
 			       struct intel_plane_state *plane_state);
+int intel_plane_color_init(struct drm_plane *plane);
 
 #endif /* __INTEL_ATOMIC_PLANE_H__ */
