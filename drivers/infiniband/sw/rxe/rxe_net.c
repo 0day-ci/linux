@@ -617,12 +617,14 @@ static int rxe_net_ipv6_init(void)
 {
 #if IS_ENABLED(CONFIG_IPV6)
 
-	recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
-						htons(ROCE_V2_UDP_DPORT), true);
-	if (IS_ERR(recv_sockets.sk6)) {
-		recv_sockets.sk6 = NULL;
-		pr_err("Failed to create IPv6 UDP tunnel\n");
-		return -1;
+	if (ipv6_mod_enabled()) {
+		recv_sockets.sk6 = rxe_setup_udp_tunnel(&init_net,
+					htons(ROCE_V2_UDP_DPORT), true);
+		if (IS_ERR(recv_sockets.sk6)) {
+			recv_sockets.sk6 = NULL;
+			pr_err("Failed to create IPv6 UDP tunnel\n");
+			return -1;
+		}
 	}
 #endif
 	return 0;
