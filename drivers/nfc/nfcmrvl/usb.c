@@ -325,7 +325,6 @@ static int nfcmrvl_probe(struct usb_interface *intf,
 		if (!drv_data->bulk_rx_ep &&
 		    usb_endpoint_is_bulk_in(ep_desc)) {
 			drv_data->bulk_rx_ep = ep_desc;
-			continue;
 		}
 	}
 
