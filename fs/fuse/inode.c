@@ -23,6 +23,7 @@
 #include <linux/exportfs.h>
 #include <linux/posix_acl.h>
 #include <linux/pid_namespace.h>
+#include <linux/idr.h>
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
@@ -31,6 +32,9 @@ MODULE_LICENSE("GPL");
 static struct kmem_cache *fuse_inode_cachep;
 struct list_head fuse_conn_list;
 DEFINE_MUTEX(fuse_mutex);
+
+DEFINE_IDR(fuse_filp_store);
+DEFINE_MUTEX(fuse_filp_store_mutex);
 
 static int set_global_limit(const char *val, const struct kernel_param *kp);
 
@@ -1623,6 +1627,86 @@ static inline void unregister_fuseblk(void)
 }
 #endif
 
+int fuse_filp_save(int fd)
+{
+	struct file *filp;
+	int res = -EBADF;
+
+	filp = fget(fd);
+	if (!filp) {
+		pr_err("FUSE: invalid file descriptor to save.\n");
+		goto out;
+	}
+
+	idr_preload(GFP_KERNEL);
+	mutex_lock(&fuse_filp_store_mutex);
+	res = idr_alloc(&fuse_filp_store, filp, 1, 0, GFP_ATOMIC);
+	mutex_unlock(&fuse_filp_store_mutex);
+	idr_preload_end();
+
+	if (res < 0)
+		fput(filp);
+
+out:
+	return res;
+}
+
+static struct file *do_fuse_filp_restore(int id)
+{
+	struct file *filp;
+
+	rcu_read_lock();
+	filp = idr_find(&fuse_filp_store, id);
+	if (filp && !get_file_rcu(filp))
+		filp = NULL;
+	rcu_read_unlock();
+
+	return filp;
+}
+
+int fuse_filp_restore(int id)
+{
+	struct file *filp;
+	int res;
+
+	filp = do_fuse_filp_restore(id);
+	if (!filp)
+		return -ENOENT;
+
+	res = get_unused_fd_flags(0);
+	if (res >= 0)
+		fd_install(res, filp);
+	else
+		fput(filp);
+
+	return res;
+}
+
+void fuse_filp_remove(int id)
+{
+	struct file *filp;
+
+	mutex_lock(&fuse_filp_store_mutex);
+	filp = idr_remove(&fuse_filp_store, id);
+	mutex_unlock(&fuse_filp_store_mutex);
+	if (filp)
+		fput(filp);
+}
+
+static int fuse_filp_free(int id, void *p, void *data)
+{
+	struct file *filp = (struct file *)p;
+	fput(filp);
+
+	return 0;
+}
+
+static void fuse_filp_store_cleanup(void)
+{
+	idr_for_each(&fuse_filp_store, &fuse_filp_free, NULL);
+	idr_destroy(&fuse_filp_store);
+}
+
 static void fuse_inode_init_once(void *foo)
 {
 	struct inode *inode = foo;
@@ -1746,6 +1830,7 @@ static void __exit fuse_exit(void)
 {
 	pr_debug("exit\n");
 
+	fuse_filp_store_cleanup();
 	fuse_ctl_cleanup();
 	fuse_sysfs_cleanup();
 	fuse_fs_cleanup();

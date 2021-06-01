@@ -2229,15 +2229,14 @@ static int fuse_device_clone(struct fuse_conn *fc, struct file *new)
 static long fuse_dev_ioctl(struct file *file, unsigned int cmd,
 			   unsigned long arg)
 {
-	int res;
-	int oldfd;
+	int res = -EFAULT;
+	int fd;
 	struct fuse_dev *fud = NULL;
 
 	switch (cmd) {
 	case FUSE_DEV_IOC_CLONE:
-		res = -EFAULT;
-		if (!get_user(oldfd, (__u32 __user *)arg)) {
-			struct file *old = fget(oldfd);
+		if (!get_user(fd, (__u32 __user *)arg)) {
+			struct file *old = fget(fd);
 
 			res = -EINVAL;
 			if (old) {
@@ -2256,6 +2255,28 @@ static long fuse_dev_ioctl(struct file *file, unsigned int cmd,
 				}
 				fput(old);
 			}
+		}
+		break;
+	case FUSE_DEV_IOC_SAVE_FD:
+		if (!get_user(fd, (__u32 __user *) arg)) {
+			res = fuse_filp_save(fd);
+			if (res > 0) {
+				res = put_user(res, (__u32 __user *) arg);
+			}
+		}
+		break;
+	case FUSE_DEV_IOC_RESTORE_FD:
+		if (!get_user(fd, (__u32 __user *) arg)) {
+			res = fuse_filp_restore(fd);
+			if (res > 0) {
+				res = put_user(res, (__u32 __user *) arg);
+			}
+		}
+		break;
+	case FUSE_DEV_IOC_REMOVE_FD:
+		if (!get_user(fd, (__u32 __user *) arg)) {
+			fuse_filp_remove(fd);
+			res = 0;
 		}
 		break;
 	default:

@@ -1259,4 +1259,9 @@ struct fuse_file *fuse_file_open(struct fuse_mount *fm, u64 nodeid,
 void fuse_file_release(struct inode *inode, struct fuse_file *ff,
 		       unsigned int open_flags, fl_owner_t id, bool isdir);
 
+/* fuse fd store management */
+int fuse_filp_save(int fd);
+int fuse_filp_restore(int id);
+void fuse_filp_remove(int id);
+
 #endif /* _FS_FUSE_I_H */
