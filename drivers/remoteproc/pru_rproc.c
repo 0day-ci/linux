@@ -822,8 +822,6 @@ static int pru_rproc_probe(struct platform_device *pdev)
 						   mem_names[i]);
 		pru->mem_regions[i].va = devm_ioremap_resource(dev, res);
 		if (IS_ERR(pru->mem_regions[i].va)) {
-			dev_err(dev, "failed to parse and map memory resource %d %s\n",
-				i, mem_names[i]);
 			ret = PTR_ERR(pru->mem_regions[i].va);
 			return ret;
 		}
