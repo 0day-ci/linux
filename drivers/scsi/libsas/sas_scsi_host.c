@@ -174,6 +174,12 @@ int sas_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	}
 
 	if (dev_is_sata(dev)) {
+		/* sas ata just have one lun */
+		if (cmd->device->lun != 0) {
+			cmd->result = (DID_BAD_TARGET << 16);
+			cmd->scsi_done(cmd);
+			return res;
+		}
 		spin_lock_irq(dev->sata_dev.ap->lock);
 		res = ata_sas_queuecmd(cmd, dev->sata_dev.ap);
 		spin_unlock_irq(dev->sata_dev.ap->lock);
