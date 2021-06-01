@@ -682,7 +682,7 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 	switch (hw->mac.type) {
 	case e1000_i210:
 	case e1000_i211:
-		ret_val = igb_init_nvm_params_i210(hw);
+		igb_init_nvm_params_i210(hw);
 		break;
 	default:
 		break;
