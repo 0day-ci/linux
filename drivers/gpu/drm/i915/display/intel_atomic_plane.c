@@ -499,6 +499,7 @@ void skl_update_planes_on_crtc(struct intel_atomic_state *state,
 		intel_atomic_get_new_crtc_state(state, crtc);
 	struct skl_ddb_entry entries_y[I915_MAX_PLANES];
 	struct skl_ddb_entry entries_uv[I915_MAX_PLANES];
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	u32 update_mask = new_crtc_state->update_planes;
 	struct intel_plane *plane;
 
@@ -513,8 +514,10 @@ void skl_update_planes_on_crtc(struct intel_atomic_state *state,
 		struct intel_plane_state *new_plane_state =
 			intel_atomic_get_new_plane_state(state, plane);
 
-		if (new_plane_state->uapi.color_mgmt_changed)
+		if (new_plane_state->uapi.color_mgmt_changed) {
 			intel_color_load_plane_luts(&new_plane_state->uapi);
+			dev_priv->display.load_plane_csc_matrix(&new_plane_state->uapi);
+		}
 
 		if (new_plane_state->uapi.visible ||
 		    new_plane_state->planar_slave) {
