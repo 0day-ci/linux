@@ -120,4 +120,6 @@ static inline int objs_per_slab_page(const struct kmem_cache *cache,
 	return cache->num;
 }
 
+static inline void debugfs_slab_release(struct kmem_cache *s) { }
+
 #endif	/* _LINUX_SLAB_DEF_H */
