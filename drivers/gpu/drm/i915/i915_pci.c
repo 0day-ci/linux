@@ -947,7 +947,8 @@ static const struct intel_device_info adl_s_info = {
 	.cpu_transcoder_mask = BIT(TRANSCODER_A) | BIT(TRANSCODER_B) |	\
 		BIT(TRANSCODER_C) | BIT(TRANSCODER_D),			\
 	.dbuf.size = 4096,						\
-	.dbuf.slice_mask = BIT(DBUF_S1) | BIT(DBUF_S2) | BIT(DBUF_S3) | BIT(DBUF_S4)
+	.dbuf.slice_mask = BIT(DBUF_S1) | BIT(DBUF_S2) | BIT(DBUF_S3) | BIT(DBUF_S4), \
+	.color = { .degamma_lut_size = 128, .gamma_lut_size = 513 }
 
 static const struct intel_device_info adl_p_info = {
 	GEN12_FEATURES,
