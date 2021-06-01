@@ -73,6 +73,7 @@
 
 /* quirks for realtek phy */
 #define RTL821X_CLKOUT_DISABLE_FEATURE		BIT(0)
+#define RTL821X_ALDPS_DISABLE_FEATURE		BIT(1)
 
 MODULE_DESCRIPTION("Realtek PHY driver");
 MODULE_AUTHOR("Johnson Leung");
@@ -103,6 +104,9 @@ static int rtl821x_probe(struct phy_device *phydev)
 
 	if (of_property_read_bool(dev->of_node, "rtl821x,clkout-disable"))
 		priv->quirks |= RTL821X_CLKOUT_DISABLE_FEATURE;
+
+	if (of_property_read_bool(dev->of_node, "rtl821x,aldps-disable"))
+		priv->quirks |= RTL821X_ALDPS_DISABLE_FEATURE;
 
 	phydev->priv = priv;
 
@@ -325,8 +329,10 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 	u16 val;
 	int ret;
 
-	val = RTL8211F_ALDPS_ENABLE | RTL8211F_ALDPS_PLL_OFF | RTL8211F_ALDPS_XTAL_OFF;
-	phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR1, val, val);
+	if (!(priv->quirks & RTL821X_ALDPS_DISABLE_FEATURE)) {
+		val = RTL8211F_ALDPS_ENABLE | RTL8211F_ALDPS_PLL_OFF | RTL8211F_ALDPS_XTAL_OFF;
+		phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR1, val, val);
+	}
 
 	switch (phydev->interface) {
 	case PHY_INTERFACE_MODE_RGMII:
