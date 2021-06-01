@@ -17,7 +17,7 @@
 
 /* adminq functions */
 enum iavf_status iavf_init_adminq(struct iavf_hw *hw);
-enum iavf_status iavf_shutdown_adminq(struct iavf_hw *hw);
+void iavf_shutdown_adminq(struct iavf_hw *hw);
 void iavf_adminq_init_ring_data(struct iavf_hw *hw);
 enum iavf_status iavf_clean_arq_element(struct iavf_hw *hw,
 					struct iavf_arq_event_info *e,
