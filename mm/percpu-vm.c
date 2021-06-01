@@ -118,7 +118,7 @@ static void pcpu_free_pages(struct pcpu_chunk *chunk,
 	unsigned int cpu;
 	int i;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		for (i = page_start; i < page_end; i++) {
 			struct page *page = pages[pcpu_page_idx(cpu, i)];
 
@@ -149,7 +149,7 @@ static int pcpu_alloc_pages(struct pcpu_chunk *chunk,
 
 	gfp |= __GFP_HIGHMEM;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		for (i = page_start; i < page_end; i++) {
 			struct page **pagep = &pages[pcpu_page_idx(cpu, i)];
 
@@ -164,7 +164,7 @@ err:
 	while (--i >= page_start)
 		__free_page(pages[pcpu_page_idx(cpu, i)]);
 
-	for_each_possible_cpu(tcpu) {
+	for_each_online_cpu(tcpu) {
 		if (tcpu == cpu)
 			break;
 		for (i = page_start; i < page_end; i++)
@@ -248,7 +248,7 @@ static void pcpu_unmap_pages(struct pcpu_chunk *chunk,
 	unsigned int cpu;
 	int i;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		for (i = page_start; i < page_end; i++) {
 			struct page *page;
 
@@ -344,7 +344,7 @@ static int pcpu_map_pages(struct pcpu_chunk *chunk,
 	unsigned int cpu, tcpu;
 	int i, err;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		err = __pcpu_map_pages(pcpu_chunk_addr(chunk, cpu, page_start),
 				       &pages[pcpu_page_idx(cpu, page_start)],
 				       page_end - page_start);
@@ -357,7 +357,7 @@ static int pcpu_map_pages(struct pcpu_chunk *chunk,
 	}
 	return 0;
 err:
-	for_each_possible_cpu(tcpu) {
+	for_each_online_cpu(tcpu) {
 		if (tcpu == cpu)
 			break;
 		__pcpu_unmap_pages(pcpu_chunk_addr(chunk, tcpu, page_start),

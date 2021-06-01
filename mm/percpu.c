@@ -1594,7 +1594,7 @@ static enum pcpu_chunk_type pcpu_memcg_pre_alloc_hook(size_t size, gfp_t gfp,
 	if (!objcg)
 		return PCPU_CHUNK_ROOT;
 
-	if (obj_cgroup_charge(objcg, gfp, size * num_possible_cpus())) {
+	if (obj_cgroup_charge(objcg, gfp, size * num_online_cpus())) {
 		obj_cgroup_put(objcg);
 		return PCPU_FAIL_ALLOC;
 	}
@@ -1615,10 +1615,10 @@ static void pcpu_memcg_post_alloc_hook(struct obj_cgroup *objcg,
 
 		rcu_read_lock();
 		mod_memcg_state(obj_cgroup_memcg(objcg), MEMCG_PERCPU_B,
-				size * num_possible_cpus());
+				size * num_online_cpus());
 		rcu_read_unlock();
 	} else {
-		obj_cgroup_uncharge(objcg, size * num_possible_cpus());
+		obj_cgroup_uncharge(objcg, size * num_online_cpus());
 		obj_cgroup_put(objcg);
 	}
 }
@@ -1633,11 +1633,11 @@ static void pcpu_memcg_free_hook(struct pcpu_chunk *chunk, int off, size_t size)
 	objcg = chunk->obj_cgroups[off >> PCPU_MIN_ALLOC_SHIFT];
 	chunk->obj_cgroups[off >> PCPU_MIN_ALLOC_SHIFT] = NULL;
 
-	obj_cgroup_uncharge(objcg, size * num_possible_cpus());
+	obj_cgroup_uncharge(objcg, size * num_online_cpus());
 
 	rcu_read_lock();
 	mod_memcg_state(obj_cgroup_memcg(objcg), MEMCG_PERCPU_B,
-			-(size * num_possible_cpus()));
+			-(size * num_online_cpus()));
 	rcu_read_unlock();
 
 	obj_cgroup_put(objcg);
@@ -1680,6 +1680,9 @@ static void pcpu_cpuhp_deregister(struct pcpu_chunk *chunk,
 		}
 }
 
+/*
+ * TODO: Grow the memcg charge
+ */
 static void __pcpu_cpuhp_setup(enum pcpu_chunk_type type, unsigned int cpu)
 {
 	int slot;
@@ -1720,6 +1723,9 @@ static int percpu_cpuhp_setup(unsigned int cpu)
 	return 0;
 }
 
+/*
+ * TODO: Reduce the memcg charge
+ */
 static void __pcpu_cpuhp_destroy(enum pcpu_chunk_type type, unsigned int cpu)
 {
 	int slot;
@@ -2000,7 +2006,7 @@ area_found:
 		pcpu_schedule_balance_work();
 
 	/* clear the areas and return address relative to base address */
-	for_each_possible_cpu(cpu)
+	for_each_online_cpu(cpu)
 		memset((void *)pcpu_chunk_addr(chunk, cpu, 0) + off, 0, size);
 
 	ptr = __addr_to_pcpu_ptr(chunk->base_addr + off);
@@ -3372,7 +3378,7 @@ void __init setup_per_cpu_areas(void)
  */
 unsigned long pcpu_nr_pages(void)
 {
-	return pcpu_nr_populated * pcpu_nr_units;
+	return pcpu_nr_populated * num_online_cpus();
 }
 
 /*
