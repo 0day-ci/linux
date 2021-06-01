@@ -1353,7 +1353,7 @@ static inline unsigned long round_hint_to_min(unsigned long hint)
 }
 
 static inline int mlock_future_check(struct mm_struct *mm,
-				     unsigned long flags,
+				     vm_flags_t flags,
 				     unsigned long len)
 {
 	unsigned long locked, lock_limit;

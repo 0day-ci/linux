@@ -264,7 +264,7 @@ struct page_frag_cache {
 	bool pfmemalloc;
 };
 
-typedef unsigned long vm_flags_t;
+typedef u64 vm_flags_t;
 
 /*
  * A region containing a mapping of a non-memory backed file under NOMMU
@@ -330,7 +330,7 @@ struct vm_area_struct {
 	 * See vmf_insert_mixed_prot() for discussion.
 	 */
 	pgprot_t vm_page_prot;
-	unsigned long vm_flags;		/* Flags, see mm.h. */
+	vm_flags_t vm_flags;			/* Flags, see mm.h. */
 
 	/*
 	 * For areas with an address space and backing store,
