@@ -26,16 +26,8 @@ struct tc6387xb {
 };
 
 static const struct resource tc6387xb_mmc_resources[] = {
-	{
-		.start = 0x800,
-		.end   = 0x9ff,
-		.flags = IORESOURCE_MEM,
-	},
-	{
-		.start = 0,
-		.end   = 0,
-		.flags = IORESOURCE_IRQ,
-	},
+	DEFINE_RES_MEM(0x800, 0x200),
+	DEFINE_RES_IRQ(0)
 };
 
 /*--------------------------------------------------------------------------*/
