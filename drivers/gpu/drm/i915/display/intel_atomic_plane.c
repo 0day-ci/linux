@@ -513,6 +513,9 @@ void skl_update_planes_on_crtc(struct intel_atomic_state *state,
 		struct intel_plane_state *new_plane_state =
 			intel_atomic_get_new_plane_state(state, plane);
 
+		if (new_plane_state->uapi.color_mgmt_changed)
+			intel_color_load_plane_luts(&new_plane_state->uapi);
+
 		if (new_plane_state->uapi.visible ||
 		    new_plane_state->planar_slave) {
 			intel_update_plane(plane, new_crtc_state, new_plane_state);
