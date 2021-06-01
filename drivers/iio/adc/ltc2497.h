@@ -2,7 +2,7 @@
 
 #define LTC2497_ENABLE			0xA0
 #define LTC2497_CONFIG_DEFAULT		LTC2497_ENABLE
-#define LTC2497_CONVERSION_TIME_MS	150ULL
+#define LTC2497_CONVERSION_TIME_MS	180ULL
 
 struct ltc2497core_driverdata {
 	struct regulator *ref;
