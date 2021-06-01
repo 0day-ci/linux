@@ -403,13 +403,24 @@ clk_err:
 
 static int imx_gpc_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *of_id =
-			of_match_device(imx_gpc_dt_ids, &pdev->dev);
-	const struct imx_gpc_dt_data *of_id_data = of_id->data;
+	const struct of_device_id *of_id;
+	const struct imx_gpc_dt_data *of_id_data;
 	struct device_node *pgc_node;
 	struct regmap *regmap;
 	void __iomem *base;
 	int ret;
+
+	of_id = of_match_device(imx_gpc_dt_ids, &pdev->dev);
+	if (!of_id) {
+		dev_err(&pdev->dev, "OF id missing\n");
+		return -EINVAL;
+	}
+
+	of_id_data = of_id->data;
+	if (!of_id_data) {
+		dev_err(&pdev->dev, "OF id data missing\n");
+		return -EINVAL;
+	}
 
 	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
 
