@@ -52,9 +52,17 @@ static void set_baseline_state(struct led_netdev_data *trigger_data)
 	if (!led_cdev->blink_brightness)
 		led_cdev->blink_brightness = led_cdev->max_brightness;
 
-	if (!test_bit(NETDEV_LED_MODE_LINKUP, &trigger_data->mode))
+	if (!test_bit(NETDEV_LED_MODE_LINKUP, &trigger_data->mode)) {
+		led_trigger_offload_stop(led_cdev);
 		led_set_brightness(led_cdev, LED_OFF);
-	else {
+	} else {
+		bool blink = test_bit(NETDEV_LED_TX, &trigger_data->mode) ||
+			     test_bit(NETDEV_LED_RX, &trigger_data->mode);
+		/* Try offload to HW only if RX/TX blinking is requested */
+		if (blink)
+			if (!led_trigger_offload(led_cdev))
+				return;
+
 		if (test_bit(NETDEV_LED_LINK, &trigger_data->mode))
 			led_set_brightness(led_cdev,
 					   led_cdev->blink_brightness);
@@ -64,8 +72,7 @@ static void set_baseline_state(struct led_netdev_data *trigger_data)
 		/* If we are looking for RX/TX start periodically
 		 * checking stats
 		 */
-		if (test_bit(NETDEV_LED_TX, &trigger_data->mode) ||
-		    test_bit(NETDEV_LED_RX, &trigger_data->mode))
+		if (blink)
 			schedule_delayed_work(&trigger_data->work, 0);
 	}
 }
