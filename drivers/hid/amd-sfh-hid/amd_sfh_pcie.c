@@ -160,11 +160,16 @@ static int amd_mp2_pci_probe(struct pci_dev *pdev, const struct pci_device_id *i
 		rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 		return rc;
 	}
+
+	rc = amd_sfh_hid_client_init(privdata);
+	if (rc)
+		return rc;
+
 	rc = devm_add_action_or_reset(&pdev->dev, amd_mp2_pci_remove, privdata);
 	if (rc)
 		return rc;
 
-	return amd_sfh_hid_client_init(privdata);
+	return 0;
 }
 
 static const struct pci_device_id amd_mp2_pci_tbl[] = {
