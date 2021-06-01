@@ -534,7 +534,7 @@ static long lirc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	/* Generic timeout support */
 	case LIRC_GET_MIN_TIMEOUT:
-		if (!dev->max_timeout)
+		if (!dev->min_timeout)
 			ret = -ENOTTY;
 		else
 			val = dev->min_timeout;
