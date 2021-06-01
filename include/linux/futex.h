@@ -77,6 +77,10 @@ void futex_exec_release(struct task_struct *tsk);
 
 long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 	      u32 __user *uaddr2, u32 val2, u32 val3);
+int futex_wake_op_single(u32 __user *uaddr, int nr_wake, unsigned int op,
+			 bool shared, bool try);
+int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val,
+	       ktime_t *abs_time, u32 bitset);
 #else
 static inline void futex_init_task(struct task_struct *tsk) { }
 static inline void futex_exit_recursive(struct task_struct *tsk) { }
@@ -88,6 +92,17 @@ static inline long do_futex(u32 __user *uaddr, int op, u32 val,
 {
 	return -EINVAL;
 }
+static inline int futex_wake_op_single(u32 __user *uaddr, int nr_wake,
+				       unsigned int op, bool shared, bool try)
+{
+	return -EINVAL;
+}
+static inline int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val,
+			     ktime_t *abs_time, u32 bitset)
+{
+	return -EINVAL;
+}
+
 #endif
 
 #endif

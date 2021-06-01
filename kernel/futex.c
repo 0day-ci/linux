@@ -1681,6 +1681,66 @@ static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
 	}
 }
 
+int futex_wake_op_single(u32 __user *uaddr, int nr_wake, unsigned int op,
+			 bool shared, bool try)
+{
+	union futex_key key;
+	struct futex_hash_bucket *hb;
+	struct futex_q *this, *next;
+	int ret, op_ret;
+	DEFINE_WAKE_Q(wake_q);
+
+retry:
+	ret = get_futex_key(uaddr, shared, &key, FUTEX_WRITE);
+	if (unlikely(ret != 0))
+		return ret;
+	hb = hash_futex(&key);
+retry_private:
+	spin_lock(&hb->lock);
+	op_ret = futex_atomic_op_inuser(op, uaddr);
+	if (unlikely(op_ret < 0)) {
+		spin_unlock(&hb->lock);
+
+		if (!IS_ENABLED(CONFIG_MMU) ||
+		    unlikely(op_ret != -EFAULT && op_ret != -EAGAIN)) {
+			/*
+			 * we don't get EFAULT from MMU faults if we don't have
+			 * an MMU, but we might get them from range checking
+			 */
+			ret = op_ret;
+			return ret;
+		}
+		if (try)
+			return -EAGAIN;
+
+		if (op_ret == -EFAULT) {
+			ret = fault_in_user_writeable(uaddr);
+			if (ret)
+				return ret;
+		}
+		cond_resched();
+		if (shared)
+			goto retry;
+		goto retry_private;
+	}
+	if (op_ret) {
+		plist_for_each_entry_safe(this, next, &hb->chain, list) {
+			if (match_futex(&this->key, &key)) {
+				if (this->pi_state || this->rt_waiter) {
+					ret = -EINVAL;
+					break;
+				}
+				mark_wake_futex(&wake_q, this);
+				if (++ret >= nr_wake)
+					break;
+			}
+		}
+	}
+	spin_unlock(&hb->lock);
+	wake_up_q(&wake_q);
+	return ret;
+}
+
 /*
  * Wake up all waiters hashed on the physical page that is mapped
  * to this virtual address:
@@ -2677,8 +2737,8 @@ retry_private:
 	return ret;
 }
 
-static int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val,
-		      ktime_t *abs_time, u32 bitset)
+int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val,
+	       ktime_t *abs_time, u32 bitset)
 {
 	struct hrtimer_sleeper timeout, *to;
 	struct restart_block *restart;
