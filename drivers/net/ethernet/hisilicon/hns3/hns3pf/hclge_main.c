@@ -3337,6 +3337,12 @@ static u32 hclge_check_event_cause(struct hclge_dev *hdev, u32 *clearval)
 		return HCLGE_VECTOR0_EVENT_ERR;
 	}
 
+	/* check for vector0 ptp event source */
+	if (BIT(HCLGE_VECTOR0_REG_PTP_INT_B) & msix_src_reg) {
+		*clearval = msix_src_reg;
+		return HCLGE_VECTOR0_EVENT_PTP;
+	}
+
 	/* check for vector0 mailbox(=CMDQ RX) event source */
 	if (BIT(HCLGE_VECTOR0_RX_CMDQ_INT_B) & cmdq_src_reg) {
 		cmdq_src_reg &= ~BIT(HCLGE_VECTOR0_RX_CMDQ_INT_B);
@@ -3357,6 +3363,7 @@ static void hclge_clear_event_cause(struct hclge_dev *hdev, u32 event_type,
 				    u32 regclr)
 {
 	switch (event_type) {
+	case HCLGE_VECTOR0_EVENT_PTP:
 	case HCLGE_VECTOR0_EVENT_RST:
 		hclge_write_dev(&hdev->hw, HCLGE_MISC_RESET_STS_REG, regclr);
 		break;
@@ -3409,6 +3416,9 @@ static irqreturn_t hclge_misc_irq_handle(int irq, void *data)
 	case HCLGE_VECTOR0_EVENT_RST:
 		hclge_reset_task_schedule(hdev);
 		break;
+	case HCLGE_VECTOR0_EVENT_PTP:
+		hclge_ptp_clean_tx_hwts(hdev);
+		break;
 	case HCLGE_VECTOR0_EVENT_MBX:
 		/* If we are here then,
 		 * 1. Either we are not handling any mbx task and we are not
@@ -3434,7 +3444,7 @@ static irqreturn_t hclge_misc_irq_handle(int irq, void *data)
 	 * cleared by hardware before driver reads status register.
 	 * For this case, vector0 interrupt also should be enabled.
 	 */
-	if (!clearval ||
+	if (!clearval || event_cause == HCLGE_VECTOR0_EVENT_PTP ||
 	    event_cause == HCLGE_VECTOR0_EVENT_MBX) {
 		hclge_enable_vector(&hdev->misc_vector, true);
 	}
@@ -4342,12 +4352,34 @@ out:
 	hclge_task_schedule(hdev, delta);
 }
 
+static void hclge_ptp_service_task(struct hclge_dev *hdev)
+{
+	if (!test_bit(HCLGE_STATE_PTP_EN, &hdev->state) ||
+	    !test_bit(HCLGE_STATE_PTP_TX_HANDLING, &hdev->state) ||
+	    !time_is_before_jiffies(hdev->ptp->tx_start + HZ))
+		return;
+
+	/* to prevent concurrence with the irq handler, disable vector0
+	 * before handling ptp service task.
+	 */
+	disable_irq(hdev->misc_vector.vector_irq);
+
+	/* check HCLGE_STATE_PTP_TX_HANDLING here again, since the irq
+	 * handler may handle it just before disable_irq().
+	 */
+	if (test_bit(HCLGE_STATE_PTP_TX_HANDLING, &hdev->state))
+		hclge_ptp_clean_tx_hwts(hdev);
+
+	enable_irq(hdev->misc_vector.vector_irq);
+}
+
 static void hclge_service_task(struct work_struct *work)
 {
 	struct hclge_dev *hdev =
 		container_of(work, struct hclge_dev, service_task.work);
 
 	hclge_reset_service_task(hdev);
+	hclge_ptp_service_task(hdev);
 	hclge_mailbox_service_task(hdev);
 	hclge_periodic_service_task(hdev);
 
@@ -9383,8 +9415,15 @@ static int hclge_do_ioctl(struct hnae3_handle *handle, struct ifreq *ifr,
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
 
-	if (!hdev->hw.mac.phydev)
-		return hclge_mii_ioctl(hdev, ifr, cmd);
+	switch (cmd) {
+	case SIOCGHWTSTAMP:
+		return hclge_ptp_get_cfg(hdev, ifr);
+	case SIOCSHWTSTAMP:
+		return hclge_ptp_set_cfg(hdev, ifr);
+	default:
+		if (!hdev->hw.mac.phydev)
+			return hclge_mii_ioctl(hdev, ifr, cmd);
+	}
 
 	return phy_mii_ioctl(hdev->hw.mac.phydev, ifr, cmd);
 }
@@ -11500,6 +11539,10 @@ static int hclge_init_ae_dev(struct hnae3_ae_dev *ae_dev)
 		goto err_mdiobus_unreg;
 	}
 
+	ret = hclge_ptp_init(hdev);
+	if (ret)
+		goto err_mdiobus_unreg;
+
 	INIT_KFIFO(hdev->mac_tnl_log);
 
 	hclge_dcb_ops_set(hdev);
@@ -11868,6 +11911,10 @@ static int hclge_reset_ae_dev(struct hnae3_ae_dev *ae_dev)
 		return ret;
 	}
 
+	ret = hclge_ptp_init(hdev);
+	if (ret)
+		return ret;
+
 	/* Log and clear the hw errors those already occurred */
 	hclge_handle_all_hns_hw_errors(ae_dev);
 
@@ -11918,6 +11965,7 @@ static void hclge_uninit_ae_dev(struct hnae3_ae_dev *ae_dev)
 	hclge_clear_vf_vlan(hdev);
 	hclge_misc_affinity_teardown(hdev);
 	hclge_state_uninit(hdev);
+	hclge_ptp_uninit(hdev);
 	hclge_uninit_rxd_adv_layout(hdev);
 	hclge_uninit_mac_table(hdev);
 	hclge_del_all_fd_entries(hdev);
@@ -12814,6 +12862,9 @@ static const struct hnae3_ae_ops hclge_ops = {
 	.cls_flower_active = hclge_is_cls_flower_active,
 	.get_phy_link_ksettings = hclge_get_phy_link_ksettings,
 	.set_phy_link_ksettings = hclge_set_phy_link_ksettings,
+	.set_tx_hwts_info = hclge_ptp_set_tx_info,
+	.get_rx_hwts = hclge_ptp_get_rx_hwts,
+	.get_ts_info = hclge_ptp_get_ts_info,
 };
 
 static struct hnae3_ae_algo ae_algo = {
