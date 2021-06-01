@@ -367,7 +367,7 @@ static void microread_im_transceive_cb(void *context, struct sk_buff *skb,
 				err = -EPROTO;
 				kfree_skb(skb);
 				info->async_cb(info->async_cb_context, NULL,
-					       -EPROTO);
+					       err);
 				return;
 			}
 
