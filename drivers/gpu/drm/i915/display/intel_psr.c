@@ -1113,6 +1113,7 @@ static void intel_psr_enable_locked(struct intel_dp *intel_dp,
 	intel_psr_enable_sink(intel_dp);
 	intel_psr_enable_source(intel_dp);
 	intel_dp->psr.enabled = true;
+	intel_dp->psr.paused = false;
 
 	intel_psr_activate(intel_dp);
 }
@@ -1182,21 +1183,11 @@ static void intel_psr_exit(struct intel_dp *intel_dp)
 	intel_dp->psr.active = false;
 }
 
-static void intel_psr_disable_locked(struct intel_dp *intel_dp)
+static void intel_psr_post_exit(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	i915_reg_t psr_status;
 	u32 psr_status_mask;
-
-	lockdep_assert_held(&intel_dp->psr.lock);
-
-	if (!intel_dp->psr.enabled)
-		return;
-
-	drm_dbg_kms(&dev_priv->drm, "Disabling PSR%s\n",
-		    intel_dp->psr.psr2_enabled ? "2" : "1");
-
-	intel_psr_exit(intel_dp);
 
 	if (intel_dp->psr.psr2_enabled) {
 		psr_status = EDP_PSR2_STATUS(intel_dp->psr.transcoder);
@@ -1217,6 +1208,22 @@ static void intel_psr_disable_locked(struct intel_dp *intel_dp)
 	     IS_RKL_REVID(dev_priv, RKL_REVID_A0, RKL_REVID_A0)))
 		intel_de_rmw(dev_priv, CHICKEN_PAR1_1,
 			     DIS_RAM_BYPASS_PSR2_MAN_TRACK, 0);
+}
+
+static void intel_psr_disable_locked(struct intel_dp *intel_dp)
+{
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+
+	lockdep_assert_held(&intel_dp->psr.lock);
+
+	if (!intel_dp->psr.enabled)
+		return;
+
+	drm_dbg_kms(&dev_priv->drm, "Disabling PSR%s\n",
+		    intel_dp->psr.psr2_enabled ? "2" : "1");
+
+	intel_psr_exit(intel_dp);
+	intel_psr_post_exit(intel_dp);
 
 	/* Disable PSR on Sink */
 	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
@@ -1252,6 +1259,61 @@ void intel_psr_disable(struct intel_dp *intel_dp,
 	mutex_unlock(&intel_dp->psr.lock);
 	cancel_work_sync(&intel_dp->psr.work);
 	cancel_delayed_work_sync(&intel_dp->psr.dc3co_work);
+}
+
+/**
+ * intel_psr_pause - Pause PSR
+ * @intel_dp: Intel DP
+ *
+ * This function need to be called after enabling psr.
+ */
+void intel_psr_pause(struct intel_dp *intel_dp)
+{
+	struct intel_psr *psr = &intel_dp->psr;
+
+	if (!CAN_PSR(intel_dp))
+		return;
+
+	mutex_lock(&psr->lock);
+
+	if (!psr->active) {
+		mutex_unlock(&psr->lock);
+		return;
+	}
+
+	intel_psr_exit(intel_dp);
+	intel_psr_post_exit(intel_dp);
+	psr->paused = true;
+
+	mutex_unlock(&psr->lock);
+
+	cancel_work_sync(&psr->work);
+	cancel_delayed_work_sync(&psr->dc3co_work);
+}
+
+/**
+ * intel_psr_resume - Resume PSR
+ * @intel_dp: Intel DP
+ *
+ * This function need to be called after pausing psr.
+ */
+void intel_psr_resume(struct intel_dp *intel_dp)
+{
+	struct intel_psr *psr = &intel_dp->psr;
+
+	if (!CAN_PSR(intel_dp))
+		return;
+
+	mutex_lock(&psr->lock);
+
+	if (!psr->paused)
+		goto unlock;
+
+	psr->paused = false;
+	intel_psr_activate(intel_dp);
+
+unlock:
+	mutex_unlock(&psr->lock);
 }
 
 static void psr_force_hw_tracking_exit(struct intel_dp *intel_dp)
