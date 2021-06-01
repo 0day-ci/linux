@@ -1667,8 +1667,8 @@ struct sk_buff *__hci_cmd_sync(struct hci_dev *hdev, u16 opcode, u32 plen,
 			       const void *param, u32 timeout);
 struct sk_buff *__hci_cmd_sync_ev(struct hci_dev *hdev, u16 opcode, u32 plen,
 				  const void *param, u8 event, u32 timeout);
-int __hci_cmd_sync_status(struct hci_dev *hdev, u16 opcode, u32 plen,
-			  const void *param, u32 timeout);
+u8 __hci_cmd_sync_status(struct hci_dev *hdev, u16 opcode, u32 plen,
+			 const void *param, u32 timeout);
 int __hci_cmd_send(struct hci_dev *hdev, u16 opcode, u32 plen,
 		   const void *param);
 
