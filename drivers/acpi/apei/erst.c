@@ -1110,9 +1110,10 @@ static int __init erst_init(void)
 
 	status = acpi_get_table(ACPI_SIG_ERST, 0,
 				(struct acpi_table_header **)&erst_tab);
-	if (status == AE_NOT_FOUND)
+	if (status == AE_NOT_FOUND) {
+		rc = -EINVAL;
 		goto err;
-	else if (ACPI_FAILURE(status)) {
+	} else if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 		pr_err("Failed to get table, %s\n", msg);
 		rc = -EINVAL;
