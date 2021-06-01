@@ -230,7 +230,7 @@ static void setup_demand_paging(struct kvm_vm *vm,
 
 	PER_PAGE_DEBUG("Userfaultfd %s mode, faults resolved with %s\n",
 		       is_minor ? "MINOR" : "MISSING",
-		       is_minor ? "UFFDIO_CONINUE" : "UFFDIO_COPY");
+		       is_minor ? "UFFDIO_CONTINUE" : "UFFDIO_COPY");
 
 	/* In order to get minor faults, prefault via the alias. */
 	if (is_minor) {
