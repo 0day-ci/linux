@@ -1373,7 +1373,10 @@ static inline u32 BTRFS_MAX_XATTR_SIZE(const struct btrfs_fs_info *info)
 
 static inline u64 btrfs_get_max_extent_size(struct btrfs_fs_info *fs_info)
 {
-	return BTRFS_MAX_EXTENT_SIZE;
+	if (!fs_info || !fs_info->max_zone_append_size)
+		return BTRFS_MAX_EXTENT_SIZE;
+	return min_t(u64, BTRFS_MAX_EXTENT_SIZE,
+		     ALIGN_DOWN(fs_info->max_zone_append_size, PAGE_SIZE));
 }
 
 /*
