@@ -458,9 +458,9 @@ static int rx8025_set_clock_adjust(struct device *dev, int adj)
 	return 0;
 }
 
-static ssize_t rx8025_sysfs_show_clock_adjust(struct device *dev,
-					      struct device_attribute *attr,
-					      char *buf)
+static ssize_t clock_adjust_ppb_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
 {
 	int err, adj;
 
@@ -471,9 +471,9 @@ static ssize_t rx8025_sysfs_show_clock_adjust(struct device *dev,
 	return sprintf(buf, "%d\n", adj);
 }
 
-static ssize_t rx8025_sysfs_store_clock_adjust(struct device *dev,
-					       struct device_attribute *attr,
-					       const char *buf, size_t count)
+static ssize_t clock_adjust_ppb_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
 {
 	int adj, err;
 
@@ -485,9 +485,7 @@ static ssize_t rx8025_sysfs_store_clock_adjust(struct device *dev,
 	return err ? err : count;
 }
 
-static DEVICE_ATTR(clock_adjust_ppb, S_IRUGO | S_IWUSR,
-		   rx8025_sysfs_show_clock_adjust,
-		   rx8025_sysfs_store_clock_adjust);
+static DEVICE_ATTR_RW(clock_adjust_ppb);
 
 static int rx8025_sysfs_register(struct device *dev)
 {
