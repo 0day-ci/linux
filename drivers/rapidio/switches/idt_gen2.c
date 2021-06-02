@@ -366,7 +366,7 @@ idtg2_em_handler(struct rio_dev *rdev, u8 portnum)
 }
 
 static ssize_t
-idtg2_show_errlog(struct device *dev, struct device_attribute *attr, char *buf)
+errlog_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct rio_dev *rdev = to_rio_dev(dev);
 	ssize_t len = 0;
@@ -384,7 +384,7 @@ idtg2_show_errlog(struct device *dev, struct device_attribute *attr, char *buf)
 	return len;
 }
 
-static DEVICE_ATTR(errlog, S_IRUGO, idtg2_show_errlog, NULL);
+static DEVICE_ATTR_RO(errlog);
 
 static int idtg2_sysfs(struct rio_dev *rdev, bool create)
 {
