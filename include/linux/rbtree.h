@@ -186,7 +186,7 @@ static inline void rb_replace_node_cached(struct rb_node *victim,
  * @tree: leftmost cached tree to insert @node into
  * @less: operator defining the (partial) node order
  *
- * Returns @node when it is the new leftmost, or NULL.
+ * Return: @node when it is the new leftmost, or %NULL.
  */
 static __always_inline struct rb_node *
 rb_add_cached(struct rb_node *node, struct rb_root_cached *tree,
@@ -243,7 +243,7 @@ rb_add(struct rb_node *node, struct rb_root *tree,
  * @tree: tree to search / modify
  * @cmp: operator defining the node order
  *
- * Returns the rb_node matching @node, or NULL when no match is found and @node
+ * Return: the rb_node matching @node, or %NULL when no match is found and @node
  * is inserted.
  */
 static __always_inline struct rb_node *
@@ -277,7 +277,7 @@ rb_find_add(struct rb_node *node, struct rb_root *tree,
  * @tree: tree to search
  * @cmp: operator defining the node order
  *
- * Returns the rb_node matching @key or NULL.
+ * Return: the rb_node matching @key or %NULL.
  */
 static __always_inline struct rb_node *
 rb_find(const void *key, const struct rb_root *tree,
@@ -305,7 +305,7 @@ rb_find(const void *key, const struct rb_root *tree,
  * @tree: tree to search
  * @cmp: operator defining node order
  *
- * Returns the leftmost node matching @key, or NULL.
+ * Return: the leftmost node matching @key, or %NULL.
  */
 static __always_inline struct rb_node *
 rb_find_first(const void *key, const struct rb_root *tree,
@@ -330,12 +330,12 @@ rb_find_first(const void *key, const struct rb_root *tree,
 }
 
 /**
- * rb_next_match() - find the next @key in @tree
+ * rb_next_match() - find the next @key in tree
  * @key: key to match
- * @tree: tree to search
+ * @node: where the previous match was found, then continue searching from here
  * @cmp: operator defining node order
  *
- * Returns the next node matching @key, or NULL.
+ * Return: the next node matching @key, or %NULL.
  */
 static __always_inline struct rb_node *
 rb_next_match(const void *key, struct rb_node *node,
