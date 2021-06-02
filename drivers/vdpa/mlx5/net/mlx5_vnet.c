@@ -868,6 +868,7 @@ static void destroy_virtqueue(struct mlx5_vdpa_net *ndev, struct mlx5_vdpa_virtq
 		return;
 	}
 	umems_destroy(ndev, mvq);
+	mvq->ready = false;
 }
 
 static u32 get_rqpn(struct mlx5_vdpa_virtqueue *mvq, bool fw)
