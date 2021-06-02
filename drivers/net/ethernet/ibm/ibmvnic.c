@@ -2485,7 +2485,6 @@ static int ibmvnic_poll(struct napi_struct *napi, int budget)
 	frames_processed = 0;
 	rx_scrq = adapter->rx_scrq[scrq_num];
 
-restart_poll:
 	while (frames_processed < budget) {
 		struct sk_buff *skb;
 		struct ibmvnic_rx_buff *rx_buff;
@@ -2562,20 +2561,12 @@ restart_poll:
 	}
 
 	if (adapter->state != VNIC_CLOSING &&
-	    ((atomic_read(&adapter->rx_pool[scrq_num].available) <
-	      adapter->req_rx_add_entries_per_subcrq / 2) ||
-	      frames_processed < budget))
+	    (atomic_read(&adapter->rx_pool[scrq_num].available) <
+	      adapter->req_rx_add_entries_per_subcrq / 2))
 		replenish_rx_pool(adapter, &adapter->rx_pool[scrq_num]);
 	if (frames_processed < budget) {
-		if (napi_complete_done(napi, frames_processed)) {
+		if (napi_complete_done(napi, frames_processed))
 			enable_scrq_irq(adapter, rx_scrq);
-			if (pending_scrq(adapter, rx_scrq)) {
-				if (napi_reschedule(napi)) {
-					disable_scrq_irq(adapter, rx_scrq);
-					goto restart_poll;
-				}
-			}
-		}
 	}
 	return frames_processed;
 }
