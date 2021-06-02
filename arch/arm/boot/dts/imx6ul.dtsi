@@ -731,6 +731,7 @@
 				compatible = "fsl,imx6ul-iomuxc-gpr",
 					     "fsl,imx6q-iomuxc-gpr", "syscon";
 				reg = <0x020e4000 0x4000>;
+				enet1-tx-clock = "enable";
 			};
 
 			gpt2: timer@20e8000 {

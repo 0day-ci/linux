@@ -19,11 +19,24 @@
 static void __init imx6ul_enet_clk_init(void)
 {
 	struct regmap *gpr;
+	unsigned int enet_clk_output = 0;
+	struct device_node *node = of_find_compatible_node(NULL, NULL, "fsl,imx6ul-iomuxc-gpr");
+	const char *enable;
+
+	if (node) {
+		if (!of_property_read_string(node, "enet1-tx-clock", &enable))
+			if (strcmp(enable, "enable") == 0)
+				enet_clk_output |= IMX6UL_GPR1_ENET_CLK_OUTPUT;
+
+		if (!of_property_read_string(node, "enet2-tx-clock", &enable))
+			if (strcmp(enable, "enable") == 0)
+				enet_clk_output |= IMX6UL_GPR1_ENET2_CLK_OUTPUT;
+	}
 
 	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
 	if (!IS_ERR(gpr))
 		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_ENET_CLK_DIR,
-				   IMX6UL_GPR1_ENET_CLK_OUTPUT);
+				   enet_clk_output);
 	else
 		pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
 }
