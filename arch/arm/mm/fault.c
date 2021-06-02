@@ -45,7 +45,7 @@ void show_pte(const char *lvl, unsigned long addr)
 		mm = &init_mm;
 	}
 
-	printk("%spgd = %p\n", lvl, mm->pgd);
+	printk("%spgd = %08lx\n", lvl, (unsigned long)virt_to_phys(mm->pgd));
 	pgd = pgd_offset(mm, addr);
 	printk("%s[%08lx] *pgd=%08llx", lvl, addr, (long long)pgd_val(*pgd));
 
