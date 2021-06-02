@@ -252,7 +252,7 @@ void ide_init_sg_cmd(struct ide_cmd *cmd, unsigned int nr_bytes)
 EXPORT_SYMBOL_GPL(ide_init_sg_cmd);
 
 /**
- *	execute_drive_command	-	issue special drive command
+ *	execute_drive_cmd	-	issue special drive command
  *	@drive: the drive to issue the command on
  *	@rq: the request structure holding the command
  *
@@ -309,6 +309,8 @@ static ide_startstop_t ide_special_rq(ide_drive_t *drive, struct request *rq)
 
 /**
  *	start_request	-	start of I/O and command issuing for IDE
+ *	@drive: the drive to issue the command on
+ *	@rq: the request structure holding the command
  *
  *	start_request() initiates handling of a new I/O request. It
  *	accepts commands and I/O (read/write) requests.
@@ -602,7 +604,7 @@ static int drive_is_ready(ide_drive_t *drive)
 
 /**
  *	ide_timer_expiry	-	handle lack of an IDE interrupt
- *	@data: timer callback magic (hwif)
+ *	@t: timer callback magic (hwif)
  *
  *	An IDE command has timed out before the expected drive return
  *	occurred. At this point we attempt to clean up the current
@@ -748,9 +750,7 @@ static void unexpected_intr(int irq, ide_hwif_t *hwif)
 
 /**
  *	ide_intr	-	default IDE interrupt handler
- *	@irq: interrupt number
  *	@dev_id: hwif
- *	@regs: unused weirdness from the kernel irq layer
  *
  *	This is the default IRQ handler for the IDE layer. You should
  *	not need to override it. If you do be aware it is subtle in
