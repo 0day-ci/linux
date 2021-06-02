@@ -700,7 +700,10 @@ on_fail:
 	init_chdir("/");
 	init_umount(".", 0);
 }
-#endif
+
+#define rootfs_init_fs_context ramfs_init_fs_context
+
+#else
 
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
@@ -711,13 +714,14 @@ static int rootfs_init_fs_context(struct fs_context *fc)
 	return ramfs_init_fs_context(fc);
 }
 
+void __init init_rootfs(void)
+{
+	is_tmpfs = check_tmpfs_enabled();
+}
+#endif
+
 struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
 	.init_fs_context = rootfs_init_fs_context,
 	.kill_sb	= kill_litter_super,
 };
-
-void __init init_rootfs(void)
-{
-	is_tmpfs = check_tmpfs_enabled();
-}
