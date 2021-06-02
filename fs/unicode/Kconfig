@@ -8,7 +8,20 @@ config UNICODE
 	  Say Y here to enable UTF-8 NFD normalization and NFD+CF casefolding
 	  support.
 
-config UNICODE_NORMALIZATION_SELFTEST
-	tristate "Test UTF-8 normalization support"
-	depends on UNICODE
-	default n
+config UNICODE_KUNIT_TESTS
+	tristate "KUnit test UTF-8 normalization support" if !KUNIT_ALL_TESTS
+	depends on UNICODE && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds the KUnit test suite for Unicode normalization and
+	  casefolding support.
+
+	  KUnit tests run during boot and output the results to the debug log
+	  in TAP format (http://testanything.org/). Only useful for kernel devs
+	  running KUnit test harness and are not for inclusion into a production
+	  build.
+
+	  For more information on KUnit and unit tests in general please refer
+	  to the KUnit documentation in Documentation/dev-tools/kunit/.
+
+	  If unsure, say N.

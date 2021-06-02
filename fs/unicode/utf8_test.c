@@ -1,39 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Kernel module for testing utf-8 support.
+ * KUnit tests for utf-8 support.
  *
- * Copyright 2017 Collabora Ltd.
+ * Copyright 2020 Collabora Ltd.
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
-#include <linux/module.h>
-#include <linux/printk.h>
+#include <kunit/test.h>
 #include <linux/unicode.h>
-#include <linux/dcache.h>
-
 #include "utf8n.h"
-
-unsigned int failed_tests;
-unsigned int total_tests;
 
 /* Tests will be based on this version. */
 #define latest_maj 12
 #define latest_min 1
 #define latest_rev 0
 
-#define _test(cond, func, line, fmt, ...) do {				\
-		total_tests++;						\
-		if (!cond) {						\
-			failed_tests++;					\
-			pr_err("test %s:%d Failed: %s%s",		\
-			       func, line, #cond, (fmt?":":"."));	\
-			if (fmt)					\
-				pr_err(fmt, ##__VA_ARGS__);		\
-		}							\
-	} while (0)
-#define test_f(cond, fmt, ...) _test(cond, __func__, __LINE__, fmt, ##__VA_ARGS__)
-#define test(cond) _test(cond, __func__, __LINE__, "")
+#define str(s) #s
+#define VERSION_STR(maj, min, rev) str(maj) "." str(min) "." str(rev)
+
+/* Test data */
 
 static const struct {
 	/* UTF-8 strings in this vector _must_ be NULL-terminated. */
@@ -160,88 +144,117 @@ static const struct {
 	}
 };
 
-static void check_utf8_nfdi(void)
+
+/* Test cases */
+
+static void supported_versions(struct kunit *test)
+{
+	/* Unicode 7.0.0 should be supported. */
+	KUNIT_EXPECT_TRUE(test, utf8version_is_supported(7, 0, 0));
+
+	/* Unicode 9.0.0 should be supported. */
+	KUNIT_EXPECT_TRUE(test, utf8version_is_supported(9, 0, 0));
+
+	/* Unicode 1x.0.0 (the latest version) should be supported. */
+	KUNIT_EXPECT_TRUE(test,
+		utf8version_is_supported(latest_maj, latest_min, latest_rev));
+
+	/* Next versions don't exist. */
+	KUNIT_EXPECT_FALSE(test,
+		utf8version_is_supported(latest_maj + 1, 0, 0));
+
+	/* Test for invalid version values */
+	KUNIT_EXPECT_FALSE(test, utf8version_is_supported(0, 0, 0));
+	KUNIT_EXPECT_FALSE(test, utf8version_is_supported(-1, -1, -1));
+}
+
+static void nfdi(struct kunit *test)
 {
 	int i;
 	struct utf8cursor u8c;
 	const struct utf8data *data;
 
 	data = utf8nfdi(UNICODE_AGE(latest_maj, latest_min, latest_rev));
-	if (!data) {
-		pr_err("%s: Unable to load utf8-%d.%d.%d. Skipping.\n",
-		       __func__, latest_maj, latest_min, latest_rev);
-		return;
-	}
+	KUNIT_ASSERT_NOT_ERR_OR_NULL_MSG(test, data,
+		"Unable to load utf8-%d.%d.%d. Skipping.",
+		latest_maj, latest_min, latest_rev);
 
 	for (i = 0; i < ARRAY_SIZE(nfdi_test_data); i++) {
-		int len = strlen(nfdi_test_data[i].str);
-		int nlen = strlen(nfdi_test_data[i].dec);
+		size_t len = strlen(nfdi_test_data[i].str);
+		size_t nlen = strlen(nfdi_test_data[i].dec);
 		int j = 0;
 		unsigned char c;
 
-		test((utf8len(data, nfdi_test_data[i].str) == nlen));
-		test((utf8nlen(data, nfdi_test_data[i].str, len) == nlen));
+		KUNIT_EXPECT_EQ(test,
+			utf8len(data, nfdi_test_data[i].str),
+			(ssize_t)nlen);
+		KUNIT_EXPECT_EQ(test,
+			utf8nlen(data, nfdi_test_data[i].str, len),
+			(ssize_t)nlen);
 
-		if (utf8cursor(&u8c, data, nfdi_test_data[i].str) < 0)
-			pr_err("can't create cursor\n");
+		KUNIT_ASSERT_EQ_MSG(test,
+			utf8cursor(&u8c, data, nfdi_test_data[i].str), 0,
+			"Can't create cursor");
 
 		while ((c = utf8byte(&u8c)) > 0) {
-			test_f((c == nfdi_test_data[i].dec[j]),
-			       "Unexpected byte 0x%x should be 0x%x\n",
-			       c, nfdi_test_data[i].dec[j]);
+			KUNIT_EXPECT_EQ_MSG(test, c, nfdi_test_data[i].dec[j],
+				"Unexpected byte 0x%x should be 0x%x",
+				c, nfdi_test_data[i].dec[j]);
 			j++;
 		}
 
-		test((j == nlen));
+		KUNIT_EXPECT_EQ(test, j, (int)nlen);
 	}
 }
 
-static void check_utf8_nfdicf(void)
+static void nfdicf(struct kunit *test)
 {
 	int i;
 	struct utf8cursor u8c;
 	const struct utf8data *data;
 
 	data = utf8nfdicf(UNICODE_AGE(latest_maj, latest_min, latest_rev));
-	if (!data) {
-		pr_err("%s: Unable to load utf8-%d.%d.%d. Skipping.\n",
-		       __func__, latest_maj, latest_min, latest_rev);
-		return;
-	}
+	KUNIT_ASSERT_NOT_ERR_OR_NULL_MSG(test, data,
+		"Unable to load utf8-%d.%d.%d. Skipping.",
+		latest_maj, latest_min, latest_rev);
 
 	for (i = 0; i < ARRAY_SIZE(nfdicf_test_data); i++) {
-		int len = strlen(nfdicf_test_data[i].str);
-		int nlen = strlen(nfdicf_test_data[i].ncf);
+		size_t len = strlen(nfdicf_test_data[i].str);
+		size_t nlen = strlen(nfdicf_test_data[i].ncf);
 		int j = 0;
 		unsigned char c;
 
-		test((utf8len(data, nfdicf_test_data[i].str) == nlen));
-		test((utf8nlen(data, nfdicf_test_data[i].str, len) == nlen));
+		KUNIT_EXPECT_EQ(test,
+			utf8len(data, nfdicf_test_data[i].str),
+			(ssize_t)nlen);
+		KUNIT_EXPECT_EQ(test,
+			utf8nlen(data, nfdicf_test_data[i].str, len),
+			(ssize_t)nlen);
 
-		if (utf8cursor(&u8c, data, nfdicf_test_data[i].str) < 0)
-			pr_err("can't create cursor\n");
+		KUNIT_ASSERT_EQ_MSG(test,
+			utf8cursor(&u8c, data, nfdicf_test_data[i].str), 0,
+			"Can't create cursor");
 
 		while ((c = utf8byte(&u8c)) > 0) {
-			test_f((c == nfdicf_test_data[i].ncf[j]),
-			       "Unexpected byte 0x%x should be 0x%x\n",
-			       c, nfdicf_test_data[i].ncf[j]);
+			KUNIT_EXPECT_EQ_MSG(test, c, nfdicf_test_data[i].ncf[j],
+				"Unexpected byte 0x%x should be 0x%x\n",
+				c, nfdicf_test_data[i].ncf[j]);
 			j++;
 		}
 
-		test((j == nlen));
+		KUNIT_EXPECT_EQ(test, j, (int)nlen);
 	}
 }
 
-static void check_utf8_comparisons(void)
+static void comparisons(struct kunit *test)
 {
 	int i;
-	struct unicode_map *table = utf8_load("12.1.0");
+	struct unicode_map *table;
 
-	if (IS_ERR(table)) {
-		pr_err("%s: Unable to load utf8 %d.%d.%d. Skipping.\n",
-		       __func__, latest_maj, latest_min, latest_rev);
-		return;
-	}
+	table = utf8_load(VERSION_STR(latest_maj, latest_min, latest_rev));
+	KUNIT_ASSERT_NOT_ERR_OR_NULL_MSG(test, table,
+		"Unable to load utf8-%d.%d.%d. Skipping.\n",
+		latest_maj, latest_min, latest_rev);
 
 	for (i = 0; i < ARRAY_SIZE(nfdi_test_data); i++) {
 		const struct qstr s1 = {.name = nfdi_test_data[i].str,
@@ -249,8 +262,8 @@ static void check_utf8_comparisons(void)
 		const struct qstr s2 = {.name = nfdi_test_data[i].dec,
 					.len = sizeof(nfdi_test_data[i].dec)};
 
-		test_f(!utf8_strncmp(table, &s1, &s2),
-		       "%s %s comparison mismatch\n", s1.name, s2.name);
+		KUNIT_EXPECT_EQ_MSG(test, utf8_strncmp(table, &s1, &s2), 0,
+			"%s %s comparison mismatch", s1.name, s2.name);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(nfdicf_test_data); i++) {
@@ -259,54 +272,24 @@ static void check_utf8_comparisons(void)
 		const struct qstr s2 = {.name = nfdicf_test_data[i].ncf,
 					.len = sizeof(nfdicf_test_data[i].ncf)};
 
-		test_f(!utf8_strncasecmp(table, &s1, &s2),
-		       "%s %s comparison mismatch\n", s1.name, s2.name);
+		KUNIT_EXPECT_EQ_MSG(test, utf8_strncasecmp(table, &s1, &s2), 0,
+			"%s %s comparison mismatch", s1.name, s2.name);
 	}
 
 	utf8_unload(table);
 }
 
-static void check_supported_versions(void)
-{
-	/* Unicode 7.0.0 should be supported. */
-	test(utf8version_is_supported(7, 0, 0));
+static struct kunit_case utf8_test_cases[] = {
+	KUNIT_CASE(supported_versions),
+	KUNIT_CASE(nfdi),
+	KUNIT_CASE(nfdicf),
+	KUNIT_CASE(comparisons),
+	{}
+};
 
-	/* Unicode 9.0.0 should be supported. */
-	test(utf8version_is_supported(9, 0, 0));
+static struct kunit_suite utf8_test_suite = {
+	.name = "utf8",
+	.test_cases = utf8_test_cases,
+};
 
-	/* Unicode 1x.0.0 (the latest version) should be supported. */
-	test(utf8version_is_supported(latest_maj, latest_min, latest_rev));
-
-	/* Next versions don't exist. */
-	test(!utf8version_is_supported(13, 0, 0));
-	test(!utf8version_is_supported(0, 0, 0));
-	test(!utf8version_is_supported(-1, -1, -1));
-}
-
-static int __init init_test_ucd(void)
-{
-	failed_tests = 0;
-	total_tests = 0;
-
-	check_supported_versions();
-	check_utf8_nfdi();
-	check_utf8_nfdicf();
-	check_utf8_comparisons();
-
-	if (!failed_tests)
-		pr_info("All %u tests passed\n", total_tests);
-	else
-		pr_err("%u out of %u tests failed\n", failed_tests,
-		       total_tests);
-	return 0;
-}
-
-static void __exit exit_test_ucd(void)
-{
-}
-
-module_init(init_test_ucd);
-module_exit(exit_test_ucd);
-
-MODULE_AUTHOR("Gabriel Krisman Bertazi <krisman@collabora.co.uk>");
-MODULE_LICENSE("GPL");
+kunit_test_suite(utf8_test_suite);
