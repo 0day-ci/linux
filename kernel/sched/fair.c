@@ -9807,13 +9807,11 @@ more_balance:
 				busiest->push_cpu = this_cpu;
 				active_balance = 1;
 			}
-			raw_spin_unlock_irqrestore(&busiest->lock, flags);
 
-			if (active_balance) {
-				stop_one_cpu_nowait(cpu_of(busiest),
-					active_load_balance_cpu_stop, busiest,
-					&busiest->active_balance_work);
-			}
+			if (active_balance)
+				active_load_balance_cpu_stop(busiest);
+
+			raw_spin_unlock_irqrestore(&busiest->lock, flags);
 		}
 	} else {
 		sd->nr_balance_failed = 0;
@@ -9923,7 +9921,6 @@ static int active_load_balance_cpu_stop(void *data)
 	struct task_struct *p = NULL;
 	struct rq_flags rf;
 
-	rq_lock_irq(busiest_rq, &rf);
 	/*
 	 * Between queueing the stop-work and running it is a hole in which
 	 * CPUs can become inactive. We should not move tasks from or to
@@ -9933,8 +9930,7 @@ static int active_load_balance_cpu_stop(void *data)
 		goto out_unlock;
 
 	/* Make sure the requested CPU hasn't gone down in the meantime: */
-	if (unlikely(busiest_cpu != smp_processor_id() ||
-		     !busiest_rq->active_balance))
+	if (unlikely(!busiest_rq->active_balance))
 		goto out_unlock;
 
 	/* Is there any task to move? */
@@ -9981,12 +9977,9 @@ static int active_load_balance_cpu_stop(void *data)
 	rcu_read_unlock();
 out_unlock:
 	busiest_rq->active_balance = 0;
-	rq_unlock(busiest_rq, &rf);
 
 	if (p)
 		attach_one_task(target_rq, p);
-
-	local_irq_enable();
 
 	return 0;
 }
