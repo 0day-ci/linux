@@ -80,7 +80,6 @@ static __init struct clk_hw *__socfpga_pll_init(struct device_node *node,
 	const char *parent_name[SOCFPGA_MAX_PARENTS];
 	struct clk_init_data init;
 	struct device_node *clkmgr_np;
-	int rc;
 	int err;
 
 	of_property_read_u32(node, "reg", &reg);
@@ -110,12 +109,16 @@ static __init struct clk_hw *__socfpga_pll_init(struct device_node *node,
 	hw_clk = &pll_clk->hw.hw;
 
 	err = clk_hw_register(NULL, hw_clk);
-	if (err) {
-		kfree(pll_clk);
-		return ERR_PTR(err);
-	}
-	rc = of_clk_add_provider(node, of_clk_src_simple_get, hw_clk);
+	if (err)
+		goto err_out;
+	err = of_clk_add_provider(node, of_clk_src_simple_get, hw_clk);
+	if (err)
+		goto err_out;
 	return hw_clk;
+
+err_out:
+	kfree(pll_clk);
+	return ERR_PTR(err);
 }
 
 void __init socfpga_pll_init(struct device_node *node)
