@@ -54,6 +54,14 @@ properties:
           For LVDS encoders, port 0 is the parallel input
           For LVDS decoders, port 0 is the LVDS input
 
+        properties:
+          endpoint:
+            $ref: /schemas/media/video-interfaces.yaml#
+            unevaluatedProperties: false
+
+            properties:
+              pclk-sample: true
+
       port@1:
         $ref: /schemas/graph.yaml#/properties/port
         description: |
@@ -70,6 +78,22 @@ properties:
     maxItems: 1
 
   power-supply: true
+
+if:
+  not:
+    properties:
+      compatible:
+        contains:
+          const: lvds-encoder
+then:
+  properties:
+    ports:
+      properties:
+        port@0:
+          properties:
+            endpoint:
+              properties:
+                pclk-sample: false
 
 required:
   - compatible
