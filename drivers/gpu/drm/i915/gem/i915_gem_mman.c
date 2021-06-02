@@ -682,6 +682,10 @@ __assign_mmap_offset(struct drm_file *file,
 		goto out;
 	}
 
+	if (mmap_type != I915_MMAP_TYPE_WC &&
+	    i915_gem_object_placements_contain_type(obj, INTEL_MEMORY_LOCAL))
+		return -ENODEV;
+
 	mmo = mmap_offset_attach(obj, mmap_type, file);
 	if (IS_ERR(mmo)) {
 		err = PTR_ERR(mmo);
