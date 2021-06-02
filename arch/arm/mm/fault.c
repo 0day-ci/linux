@@ -27,15 +27,23 @@
 #ifdef CONFIG_MMU
 
 /*
- * This is useful to dump out the page tables associated with
- * 'addr' in mm 'mm'.
+ * Dump out the page tables associated with 'addr' in the currently active mm
  */
-void show_pte(const char *lvl, struct mm_struct *mm, unsigned long addr)
+void show_pte(const char *lvl, unsigned long addr)
 {
 	pgd_t *pgd;
+	struct mm_struct *mm;
 
-	if (!mm)
+	if (addr < TASK_SIZE) {
+		mm = current->active_mm;
+		if (mm == &init_mm) {
+			printk("%s[%08lx] user address but active_mm is swapper\n",
+				lvl, addr);
+			return;
+		}
+	} else {
 		mm = &init_mm;
+	}
 
 	printk("%spgd = %p\n", lvl, mm->pgd);
 	pgd = pgd_offset(mm, addr);
@@ -96,7 +104,7 @@ void show_pte(const char *lvl, struct mm_struct *mm, unsigned long addr)
 	pr_cont("\n");
 }
 #else					/* CONFIG_MMU */
-void show_pte(const char *lvl, struct mm_struct *mm, unsigned long addr)
+void show_pte(const char *lvl, unsigned long addr)
 { }
 #endif					/* CONFIG_MMU */
 
@@ -104,8 +112,7 @@ void show_pte(const char *lvl, struct mm_struct *mm, unsigned long addr)
  * Oops.  The kernel tried to access some page that wasn't present.
  */
 static void
-__do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
-		  struct pt_regs *regs)
+__do_kernel_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	/*
 	 * Are we prepared to handle this kernel fault?
@@ -122,7 +129,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
 		 "paging request", addr);
 
-	show_pte(KERN_ALERT, mm, addr);
+	show_pte(KERN_ALERT, addr);
 	die("Oops", regs, fsr);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
@@ -147,7 +154,7 @@ __do_user_fault(unsigned long addr, unsigned int fsr, unsigned int sig,
 		pr_err("8<--- cut here ---\n");
 		pr_err("%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
 		       tsk->comm, sig, addr, fsr);
-		show_pte(KERN_ERR, tsk->mm, addr);
+		show_pte(KERN_ERR, addr);
 		show_regs(regs);
 	}
 #endif
@@ -166,9 +173,6 @@ __do_user_fault(unsigned long addr, unsigned int fsr, unsigned int sig,
 
 void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
-	struct task_struct *tsk = current;
-	struct mm_struct *mm = tsk->active_mm;
-
 	/*
 	 * If we are in kernel mode at this point, we
 	 * have no context to handle this fault with.
@@ -176,7 +180,7 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (user_mode(regs))
 		__do_user_fault(addr, fsr, SIGSEGV, SEGV_MAPERR, regs);
 	else
-		__do_kernel_fault(mm, addr, fsr, regs);
+		__do_kernel_fault(addr, fsr, regs);
 }
 
 #ifdef CONFIG_MMU
@@ -336,7 +340,7 @@ retry:
 	return 0;
 
 no_context:
-	__do_kernel_fault(mm, addr, fsr, regs);
+	__do_kernel_fault(addr, fsr, regs);
 	return 0;
 }
 #else					/* CONFIG_MMU */
@@ -503,7 +507,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	pr_alert("8<--- cut here ---\n");
 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
-	show_pte(KERN_ALERT, current->mm, addr);
+	show_pte(KERN_ALERT, addr);
 
 	arm_notify_die("", regs, inf->sig, inf->code, (void __user *)addr,
 		       fsr, 0);

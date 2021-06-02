@@ -86,7 +86,7 @@ extern asmlinkage void c_backtrace(unsigned long fp, int pmode,
 				   const char *loglvl);
 
 struct mm_struct;
-void show_pte(const char *lvl, struct mm_struct *mm, unsigned long addr);
+void show_pte(const char *lvl, unsigned long addr);
 extern void __show_regs(struct pt_regs *);
 extern void __show_regs_alloc_free(struct pt_regs *regs);
 
