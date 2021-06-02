@@ -111,7 +111,7 @@ struct via82cxxx_dev
 
 /**
  *	via_set_speed			-	write timing registers
- *	@dev: PCI device
+ *	@hwif: IDE interface
  *	@dn: device
  *	@timing: IDE timing data to use
  *
