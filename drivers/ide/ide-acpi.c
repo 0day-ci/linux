@@ -123,7 +123,8 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 			       u64 *pcidevfn)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	unsigned int bus, devnum, func;
+	unsigned int __maybe_unused bus;
+	unsigned int devnum, func;
 	u64 addr;
 	acpi_handle dev_handle;
 	acpi_status status;
