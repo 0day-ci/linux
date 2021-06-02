@@ -496,8 +496,8 @@ static const struct rtc_class_ops rs5c372_rtc_ops = {
 
 #if IS_ENABLED(CONFIG_RTC_INTF_SYSFS)
 
-static ssize_t rs5c372_sysfs_show_trim(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t trim_show(struct device *dev,
+			 struct device_attribute *attr, char *buf)
 {
 	int err, trim;
 
@@ -507,10 +507,10 @@ static ssize_t rs5c372_sysfs_show_trim(struct device *dev,
 
 	return sprintf(buf, "%d\n", trim);
 }
-static DEVICE_ATTR(trim, S_IRUGO, rs5c372_sysfs_show_trim, NULL);
+static DEVICE_ATTR_RO(trim);
 
-static ssize_t rs5c372_sysfs_show_osc(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t osc_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
 {
 	int err, osc;
 
@@ -520,7 +520,7 @@ static ssize_t rs5c372_sysfs_show_osc(struct device *dev,
 
 	return sprintf(buf, "%d.%03d KHz\n", osc / 1000, osc % 1000);
 }
-static DEVICE_ATTR(osc, S_IRUGO, rs5c372_sysfs_show_osc, NULL);
+static DEVICE_ATTR_RO(osc);
 
 static int rs5c_sysfs_register(struct device *dev)
 {
