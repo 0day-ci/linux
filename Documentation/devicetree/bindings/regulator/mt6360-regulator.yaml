@@ -24,6 +24,16 @@ properties:
   LDO_VIN3-supply:
     description: Input supply phandle(s) for LDO6/7
 
+  mediatek,power-off-sequence:
+    description: |
+      Power off sequence time selection for BUCK1/BUCK2/LDO7/LDO6, respetively.
+      Cause these regulators are all default-on power. Each value from 0 to 63,
+      and step is 1. Each step means 2 millisecond delay.
+      Therefore, the power off sequence delay time range is from 0ms to 126ms.
+    $ref: "/schemas/types.yaml#/definitions/uint8-array"
+    minItems: 4
+    maxItems: 4
+
 patternProperties:
   "^buck[12]$":
     $ref: "regulator.yaml#"
@@ -42,6 +52,7 @@ examples:
     #include <dt-bindings/regulator/mediatek,mt6360-regulator.h>
     regulator {
       compatible = "mediatek,mt6360-regulator";
+      mediatek,power-off-sequence = /bits/ 8 <0 0 0 0>;
       LDO_VIN3-supply = <&BUCK2>;
       buck1 {
         regulator-compatible = "BUCK1";
