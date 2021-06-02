@@ -275,7 +275,7 @@ static void ide_cd_free_sense(ide_drive_t *drive)
 	drive->sense_rq_armed = false;
 }
 
-/**
+/*
  * Returns:
  * 0: if the request should be continued.
  * 1: if the request will be going through error recovery.
