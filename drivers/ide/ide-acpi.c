@@ -214,6 +214,7 @@ static acpi_handle ide_acpi_hwif_get_handle(ide_hwif_t *hwif)
  * @drive: the drive for which the taskfile settings should be retrieved
  * @gtf_length: number of bytes of _GTF data returned at @gtf_address
  * @gtf_address: buffer containing _GTF taskfile arrays
+ * @obj_loc: placeholder for return data
  *
  * The _GTF method has no input parameters.
  * It returns a variable number of register set values (registers
