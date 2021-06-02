@@ -9705,6 +9705,30 @@ static ssize_t cpu_uclamp_write(struct kernfs_open_file *of, char *buf,
 	rcu_read_lock();
 
 	tg = css_tg(of_css(of));
+
+	switch (clamp_id) {
+	case UCLAMP_MIN: {
+		unsigned int uc_req_max = tg->uclamp_req[UCLAMP_MAX].value;
+
+		if (req.util > uc_req_max) {
+			nbytes = -EINVAL;
+			goto unlock;
+		}
+		break;
+	}
+	case UCLAMP_MAX: {
+		unsigned int uc_req_min = tg->uclamp_req[UCLAMP_MIN].value;
+
+		if (req.util < uc_req_min) {
+			nbytes = -EINVAL;
+			goto unlock;
+		}
+		break;
+	}
+	default:
+		nbytes = -EINVAL;
+		goto unlock;
+	}
 	if (tg->uclamp_req[clamp_id].value != req.util)
 		uclamp_se_set(&tg->uclamp_req[clamp_id], req.util, false);
 
@@ -9716,7 +9740,7 @@ static ssize_t cpu_uclamp_write(struct kernfs_open_file *of, char *buf,
 
 	/* Update effective clamps to track the most restrictive value */
 	cpu_util_update_eff(of_css(of));
-
+unlock:
 	rcu_read_unlock();
 	mutex_unlock(&uclamp_mutex);
 
