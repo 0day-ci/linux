@@ -327,6 +327,8 @@ enum blk_bounce {
 };
 
 struct queue_limits {
+	unsigned int		max_bio_bytes;
+
 	enum blk_bounce		bounce;
 	unsigned long		seg_boundary_mask;
 	unsigned long		virt_boundary_mask;
@@ -1131,6 +1133,7 @@ extern void blk_abort_request(struct request *);
  * Access functions for manipulating queue properties
  */
 extern void blk_cleanup_queue(struct request_queue *);
+extern void blk_queue_max_bio_bytes(struct request_queue *, unsigned int);
 void blk_queue_bounce_limit(struct request_queue *q, enum blk_bounce limit);
 extern void blk_queue_max_hw_sectors(struct request_queue *, unsigned int);
 extern void blk_queue_chunk_sectors(struct request_queue *, unsigned int);
