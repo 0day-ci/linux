@@ -20,9 +20,9 @@
 struct gb_gpio_line {
 	/* The following has to be an array of line_max entries */
 	/* --> make them just a flags field */
-	u8			active:    1,
-				direction: 1,	/* 0 = output, 1 = input */
-				value:     1;	/* 0 = low, 1 = high */
+	u8			active:1,
+				direction:1,	/* 0 = output, 1 = input */
+				value:1;	/* 0 = low, 1 = high */
 	u16			debounce_usec;
 
 	u8			irq_type;
