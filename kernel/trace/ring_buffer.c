@@ -5,6 +5,7 @@
  * Copyright (C) 2008 Steven Rostedt <srostedt@redhat.com>
  */
 #include <linux/trace_recursion.h>
+#include <linux/sched/isolation.h>
 #include <linux/trace_events.h>
 #include <linux/ring_buffer.h>
 #include <linux/trace_clock.h>
@@ -3052,6 +3053,20 @@ static void rb_commit(struct ring_buffer_per_cpu *cpu_buffer,
 	rb_end_commit(cpu_buffer);
 }
 
+/*
+ * Offload the irq_work into a housekeeping CPU unless in NMI context, which
+ * doesn't support it. Systems not using nohz_full trigger the IPI locally.
+ *
+ * Note that irq_work supplies its own memory barriers.
+ */
+static __always_inline void rb_irq_work_queue(struct irq_work *work)
+{
+	if (in_nmi())
+		irq_work_queue(work);
+	else
+		irq_work_queue_on(work, housekeeping_any_cpu(HK_FLAG_MISC));
+}
+
 static __always_inline void
 rb_wakeups(struct trace_buffer *buffer, struct ring_buffer_per_cpu *cpu_buffer)
 {
@@ -3061,14 +3076,12 @@ rb_wakeups(struct trace_buffer *buffer, struct ring_buffer_per_cpu *cpu_buffer)
 
 	if (buffer->irq_work.waiters_pending) {
 		buffer->irq_work.waiters_pending = false;
-		/* irq_work_queue() supplies it's own memory barriers */
-		irq_work_queue(&buffer->irq_work.work);
+		rb_irq_work_queue(&buffer->irq_work.work);
 	}
 
 	if (cpu_buffer->irq_work.waiters_pending) {
 		cpu_buffer->irq_work.waiters_pending = false;
-		/* irq_work_queue() supplies it's own memory barriers */
-		irq_work_queue(&cpu_buffer->irq_work.work);
+		rb_irq_work_queue(&cpu_buffer->irq_work.work);
 	}
 
 	if (cpu_buffer->last_pages_touch == local_read(&cpu_buffer->pages_touched))
@@ -3090,8 +3103,7 @@ rb_wakeups(struct trace_buffer *buffer, struct ring_buffer_per_cpu *cpu_buffer)
 
 	cpu_buffer->irq_work.wakeup_full = true;
 	cpu_buffer->irq_work.full_waiters_pending = false;
-	/* irq_work_queue() supplies it's own memory barriers */
-	irq_work_queue(&cpu_buffer->irq_work.work);
+	rb_irq_work_queue(&cpu_buffer->irq_work.work);
 }
 
 #ifdef CONFIG_RING_BUFFER_RECORD_RECURSION
