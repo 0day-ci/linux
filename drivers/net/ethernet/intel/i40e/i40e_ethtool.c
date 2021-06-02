@@ -3139,8 +3139,8 @@ static int i40e_parse_rx_flow_user_data(struct ethtool_rx_flow_spec *fsp,
 	if (!(fsp->flow_type & FLOW_EXT))
 		return 0;
 
-	value = be64_to_cpu(*((__be64 *)fsp->h_ext.data));
-	mask = be64_to_cpu(*((__be64 *)fsp->m_ext.data));
+	value = be64_to_cpu(*((__force __be64 *)fsp->h_ext.data));
+	mask = be64_to_cpu(*((__force __be64 *)fsp->m_ext.data));
 
 #define I40E_USERDEF_FLEX_WORD		GENMASK_ULL(15, 0)
 #define I40E_USERDEF_FLEX_OFFSET	GENMASK_ULL(31, 16)
@@ -3181,8 +3181,8 @@ static void i40e_fill_rx_flow_user_data(struct ethtool_rx_flow_spec *fsp,
 	if (value || mask)
 		fsp->flow_type |= FLOW_EXT;
 
-	*((__be64 *)fsp->h_ext.data) = cpu_to_be64(value);
-	*((__be64 *)fsp->m_ext.data) = cpu_to_be64(mask);
+	*((__force __be64 *)fsp->h_ext.data) = cpu_to_be64(value);
+	*((__force __be64 *)fsp->m_ext.data) = cpu_to_be64(mask);
 }
 
 /**
@@ -4151,9 +4151,9 @@ static int i40e_check_fdir_input_set(struct i40e_vsi *vsi,
 				     struct ethtool_rx_flow_spec *fsp,
 				     struct i40e_rx_flow_userdef *userdef)
 {
-	static const __be32 ipv6_full_mask[4] = {cpu_to_be32(0xffffffff),
+	static const __be32 ipv6_full_mask[4] = {
 		cpu_to_be32(0xffffffff), cpu_to_be32(0xffffffff),
-		cpu_to_be32(0xffffffff)};
+		cpu_to_be32(0xffffffff), cpu_to_be32(0xffffffff)};
 	struct ethtool_tcpip6_spec *tcp_ip6_spec;
 	struct ethtool_usrip6_spec *usr_ip6_spec;
 	struct ethtool_tcpip4_spec *tcp_ip4_spec;
@@ -5600,7 +5600,7 @@ static int i40e_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
 		config.eeer |= cpu_to_le32(I40E_PRTPM_EEER_TX_LPI_EN_MASK);
 	} else {
 		config.eee_capability = 0;
-		config.eeer &= cpu_to_le32(~I40E_PRTPM_EEER_TX_LPI_EN_MASK);
+		config.eeer &= ~cpu_to_le32(I40E_PRTPM_EEER_TX_LPI_EN_MASK);
 	}
 
 	/* Apply modified PHY configuration */
