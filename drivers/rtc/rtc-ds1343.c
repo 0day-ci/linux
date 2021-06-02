@@ -80,8 +80,8 @@ struct ds1343_priv {
 	int irq;
 };
 
-static ssize_t ds1343_show_glitchfilter(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t glitch_filter_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
 	struct ds1343_priv *priv = dev_get_drvdata(dev->parent);
 	int glitch_filt_status, data;
@@ -99,9 +99,9 @@ static ssize_t ds1343_show_glitchfilter(struct device *dev,
 		return sprintf(buf, "disabled\n");
 }
 
-static ssize_t ds1343_store_glitchfilter(struct device *dev,
-					struct device_attribute *attr,
-					const char *buf, size_t count)
+static ssize_t glitch_filter_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
 {
 	struct ds1343_priv *priv = dev_get_drvdata(dev->parent);
 	int data = 0;
@@ -120,8 +120,7 @@ static ssize_t ds1343_store_glitchfilter(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(glitch_filter, S_IRUGO | S_IWUSR, ds1343_show_glitchfilter,
-			ds1343_store_glitchfilter);
+static DEVICE_ATTR_RW(glitch_filter);
 
 static int ds1343_nvram_write(void *priv, unsigned int off, void *val,
 			      size_t bytes)
@@ -139,8 +138,8 @@ static int ds1343_nvram_read(void *priv, unsigned int off, void *val,
 	return regmap_bulk_read(ds1343->map, DS1343_NVRAM + off, val, bytes);
 }
 
-static ssize_t ds1343_show_tricklecharger(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t trickle_charger_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
 	struct ds1343_priv *priv = dev_get_drvdata(dev->parent);
 	int res, data;
@@ -183,7 +182,7 @@ static ssize_t ds1343_show_tricklecharger(struct device *dev,
 	return sprintf(buf, "%s %s\n", diodes, resistors);
 }
 
-static DEVICE_ATTR(trickle_charger, S_IRUGO, ds1343_show_tricklecharger, NULL);
+static DEVICE_ATTR_RO(trickle_charger);
 
 static struct attribute *ds1343_attrs[] = {
 	&dev_attr_glitch_filter.attr,
