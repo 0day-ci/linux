@@ -438,7 +438,7 @@ static void guc_interrupts_capture(struct intel_gt *gt)
 	u32 irqs = GT_CONTEXT_SWITCH_INTERRUPT;
 	u32 dmask = irqs << 16 | irqs;
 
-	GEM_BUG_ON(INTEL_GEN(gt->i915) < 11);
+	GEM_BUG_ON(GRAPHICS_VER(gt->i915) < 11);
 
 	/* Don't handle the ctx switch interrupt in GuC submission mode */
 	intel_uncore_rmw(uncore, GEN11_RENDER_COPY_INTR_ENABLE, dmask, 0);
@@ -451,7 +451,7 @@ static void guc_interrupts_release(struct intel_gt *gt)
 	u32 irqs = GT_CONTEXT_SWITCH_INTERRUPT;
 	u32 dmask = irqs << 16 | irqs;
 
-	GEM_BUG_ON(INTEL_GEN(gt->i915) < 11);
+	GEM_BUG_ON(GRAPHICS_VER(gt->i915) < 11);
 
 	/* Handle ctx switch interrupts again */
 	intel_uncore_rmw(uncore, GEN11_RENDER_COPY_INTR_ENABLE, 0, dmask);
@@ -648,7 +648,7 @@ static void guc_default_vfuncs(struct intel_engine_cs *engine)
 	engine->emit_flush = gen8_emit_flush_xcs;
 	engine->emit_init_breadcrumb = gen8_emit_init_breadcrumb;
 	engine->emit_fini_breadcrumb = gen8_emit_fini_breadcrumb_xcs;
-	if (INTEL_GEN(engine->i915) >= 12) {
+	if (GRAPHICS_VER(engine->i915) >= 12) {
 		engine->emit_fini_breadcrumb = gen12_emit_fini_breadcrumb_xcs;
 		engine->emit_flush = gen12_emit_flush_xcs;
 	}
@@ -670,7 +670,7 @@ static void guc_default_vfuncs(struct intel_engine_cs *engine)
 
 static void rcs_submission_override(struct intel_engine_cs *engine)
 {
-	switch (INTEL_GEN(engine->i915)) {
+	switch (GRAPHICS_VER(engine->i915)) {
 	case 12:
 		engine->emit_flush = gen12_emit_flush_rcs;
 		engine->emit_fini_breadcrumb = gen12_emit_fini_breadcrumb_rcs;
@@ -700,7 +700,7 @@ int intel_guc_submission_setup(struct intel_engine_cs *engine)
 	 * The setup relies on several assumptions (e.g. irqs always enabled)
 	 * that are only valid on gen11+
 	 */
-	GEM_BUG_ON(INTEL_GEN(i915) < 11);
+	GEM_BUG_ON(GRAPHICS_VER(i915) < 11);
 
 	tasklet_setup(&engine->execlists.tasklet, guc_submission_tasklet);
 
