@@ -55,6 +55,10 @@ void prf_unlock(unsigned long flags)
 static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 						 u32 index, u64 value)
 {
+	/* check if p points into vmlinux. If not, don't allocate. */
+	if (p < __llvm_prf_data_start || p >= __llvm_prf_data_end)
+		return NULL;
+
 	if (&__llvm_prf_vnds_start[current_node + 1] >= __llvm_prf_vnds_end)
 		return NULL; /* Out of nodes */
 
