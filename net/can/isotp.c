@@ -128,6 +128,13 @@ struct tpcon {
 	u8 buf[MAX_MSG_LENGTH + 1];
 };
 
+struct isotp_notifier_block {
+	/* Linked to isotp_notifier_list list. Becomes empty when removed. */
+	struct list_head list;
+	/* Notifier call is in progress when this value is 0. */
+	unsigned int sequence;
+};
+
 struct isotp_sock {
 	struct sock sk;
 	int bound;
@@ -143,9 +150,14 @@ struct isotp_sock {
 	u32 force_tx_stmin;
 	u32 force_rx_stmin;
 	struct tpcon rx, tx;
-	struct notifier_block notifier;
+	struct isotp_notifier_block notifier;
 	wait_queue_head_t wait;
 };
+
+static DECLARE_WAIT_QUEUE_HEAD(isotp_notifier_wait);
+static LIST_HEAD(isotp_notifier_list);
+static DEFINE_SPINLOCK(isotp_notifier_lock);
+static unsigned int isotp_notifier_sequence = 1; /* Cannot become 0. */
 
 static inline struct isotp_sock *isotp_sk(const struct sock *sk)
 {
@@ -1013,7 +1025,10 @@ static int isotp_release(struct socket *sock)
 	/* wait for complete transmission of current pdu */
 	wait_event_interruptible(so->wait, so->tx.state == ISOTP_IDLE);
 
-	unregister_netdevice_notifier(&so->notifier);
+	spin_lock(&isotp_notifier_lock);
+	list_del_init(&so->notifier.list);
+	spin_unlock(&isotp_notifier_lock);
+	wait_event(isotp_notifier_wait, so->notifier.sequence);
 
 	lock_sock(sk);
 
@@ -1300,21 +1315,16 @@ static int isotp_getsockopt(struct socket *sock, int level, int optname,
 	return 0;
 }
 
-static int isotp_notifier(struct notifier_block *nb, unsigned long msg,
-			  void *ptr)
+static void isotp_notify(struct isotp_sock *so, unsigned long msg,
+			 struct net_device *dev)
 {
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-	struct isotp_sock *so = container_of(nb, struct isotp_sock, notifier);
 	struct sock *sk = &so->sk;
 
 	if (!net_eq(dev_net(dev), sock_net(sk)))
-		return NOTIFY_DONE;
-
-	if (dev->type != ARPHRD_CAN)
-		return NOTIFY_DONE;
+		return;
 
 	if (so->ifindex != dev->ifindex)
-		return NOTIFY_DONE;
+		return;
 
 	switch (msg) {
 	case NETDEV_UNREGISTER:
@@ -1340,7 +1350,44 @@ static int isotp_notifier(struct notifier_block *nb, unsigned long msg,
 			sk->sk_error_report(sk);
 		break;
 	}
+}
 
+static int isotp_notifier(struct notifier_block *nb, unsigned long msg,
+			  void *ptr)
+{
+	struct isotp_notifier_block *notify;
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+
+	if (dev->type != ARPHRD_CAN)
+		return NOTIFY_DONE;
+
+	spin_lock(&isotp_notifier_lock);
+	if (unlikely(!++isotp_notifier_sequence))
+		isotp_notifier_sequence = 1;
+ restart:
+	list_for_each_entry(notify, &isotp_notifier_list, list) {
+		if (unlikely(notify->sequence == isotp_notifier_sequence))
+			continue;
+		notify->sequence = 0;
+		spin_unlock(&isotp_notifier_lock);
+		isotp_notify(container_of(notify, struct isotp_sock, notifier),
+			     msg, dev);
+		spin_lock(&isotp_notifier_lock);
+		notify->sequence = isotp_notifier_sequence;
+		/*
+		 * If isotp_release() did not remove this entry while we were
+		 * at isotp_notify(), we can continue list traversal.
+		 * Otherwise, tell isotp_release() that the sequence number
+		 * became non-zero, and then restart list traversal. The
+		 * sequence number also protects us from calling isotp_notify()
+		 * for more than once.
+		 */
+		if (likely(!list_empty(&notify->list)))
+			continue;
+		wake_up_all(&isotp_notifier_wait);
+		goto restart;
+	}
+	spin_unlock(&isotp_notifier_lock);
 	return NOTIFY_DONE;
 }
 
@@ -1377,8 +1424,10 @@ static int isotp_init(struct sock *sk)
 
 	init_waitqueue_head(&so->wait);
 
-	so->notifier.notifier_call = isotp_notifier;
-	register_netdevice_notifier(&so->notifier);
+	spin_lock(&isotp_notifier_lock);
+	so->notifier.sequence = isotp_notifier_sequence;
+	list_add_tail(&so->notifier.list, &isotp_notifier_list);
+	spin_unlock(&isotp_notifier_lock);
 
 	return 0;
 }
@@ -1425,6 +1474,10 @@ static const struct can_proto isotp_can_proto = {
 	.prot = &isotp_proto,
 };
 
+static struct notifier_block canisotp_notifier = {
+	.notifier_call = isotp_notifier
+};
+
 static __init int isotp_module_init(void)
 {
 	int err;
@@ -1434,6 +1487,8 @@ static __init int isotp_module_init(void)
 	err = can_proto_register(&isotp_can_proto);
 	if (err < 0)
 		pr_err("can: registration of isotp protocol failed\n");
+	else
+		register_netdevice_notifier(&canisotp_notifier);
 
 	return err;
 }
@@ -1441,6 +1496,7 @@ static __init int isotp_module_init(void)
 static __exit void isotp_module_exit(void)
 {
 	can_proto_unregister(&isotp_can_proto);
+	unregister_netdevice_notifier(&canisotp_notifier);
 }
 
 module_init(isotp_module_init);

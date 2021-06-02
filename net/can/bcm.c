@@ -121,17 +121,29 @@ struct bcm_op {
 	struct net_device *rx_reg_dev;
 };
 
+struct bcm_notifier_block {
+	/* Linked to bcm_notifier_list list. Becomes empty when removed. */
+	struct list_head list;
+	/* Notifier call is in progress when this value is 0. */
+	unsigned int sequence;
+};
+
 struct bcm_sock {
 	struct sock sk;
 	int bound;
 	int ifindex;
-	struct notifier_block notifier;
+	struct bcm_notifier_block notifier;
 	struct list_head rx_ops;
 	struct list_head tx_ops;
 	unsigned long dropped_usr_msgs;
 	struct proc_dir_entry *bcm_proc_read;
 	char procname [32]; /* inode number in decimal with \0 */
 };
+
+static DECLARE_WAIT_QUEUE_HEAD(bcm_notifier_wait);
+static LIST_HEAD(bcm_notifier_list);
+static DEFINE_SPINLOCK(bcm_notifier_lock);
+static unsigned int bcm_notifier_sequence = 1; /* Cannot become 0. */
 
 static inline struct bcm_sock *bcm_sk(const struct sock *sk)
 {
@@ -1378,20 +1390,15 @@ static int bcm_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 /*
  * notification handler for netdevice status changes
  */
-static int bcm_notifier(struct notifier_block *nb, unsigned long msg,
-			void *ptr)
+static void bcm_notify(struct bcm_sock *bo, unsigned long msg,
+		       struct net_device *dev)
 {
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-	struct bcm_sock *bo = container_of(nb, struct bcm_sock, notifier);
 	struct sock *sk = &bo->sk;
 	struct bcm_op *op;
 	int notify_enodev = 0;
 
 	if (!net_eq(dev_net(dev), sock_net(sk)))
-		return NOTIFY_DONE;
-
-	if (dev->type != ARPHRD_CAN)
-		return NOTIFY_DONE;
+		return;
 
 	switch (msg) {
 
@@ -1426,7 +1433,43 @@ static int bcm_notifier(struct notifier_block *nb, unsigned long msg,
 				sk->sk_error_report(sk);
 		}
 	}
+}
 
+static int bcm_notifier(struct notifier_block *nb, unsigned long msg,
+			void *ptr)
+{
+	struct bcm_notifier_block *notify;
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+
+	if (dev->type != ARPHRD_CAN)
+		return NOTIFY_DONE;
+
+	spin_lock(&bcm_notifier_lock);
+	if (unlikely(!++bcm_notifier_sequence))
+		bcm_notifier_sequence = 1;
+ restart:
+	list_for_each_entry(notify, &bcm_notifier_list, list) {
+		if (unlikely(notify->sequence == bcm_notifier_sequence))
+			continue;
+		notify->sequence = 0;
+		spin_unlock(&bcm_notifier_lock);
+		bcm_notify(container_of(notify, struct bcm_sock, notifier),
+			   msg, dev);
+		spin_lock(&bcm_notifier_lock);
+		notify->sequence = bcm_notifier_sequence;
+		/*
+		 * If bcm_release() did not remove this entry while we were at
+		 * bcm_notify(), we can continue list traversal. Otherwise,
+		 * tell bcm_release() that the sequence number became non-zero,
+		 * and then restart list traversal. The sequence number also
+		 * protects us from calling bcm_notify() for more than once.
+		 */
+		if (likely(!list_empty(&notify->list)))
+			continue;
+		wake_up_all(&bcm_notifier_wait);
+		goto restart;
+	}
+	spin_unlock(&bcm_notifier_lock);
 	return NOTIFY_DONE;
 }
 
@@ -1446,9 +1489,10 @@ static int bcm_init(struct sock *sk)
 	INIT_LIST_HEAD(&bo->rx_ops);
 
 	/* set notifier */
-	bo->notifier.notifier_call = bcm_notifier;
-
-	register_netdevice_notifier(&bo->notifier);
+	spin_lock(&bcm_notifier_lock);
+	bo->notifier.sequence = bcm_notifier_sequence;
+	list_add_tail(&bo->notifier.list, &bcm_notifier_list);
+	spin_unlock(&bcm_notifier_lock);
 
 	return 0;
 }
@@ -1471,7 +1515,10 @@ static int bcm_release(struct socket *sock)
 
 	/* remove bcm_ops, timer, rx_unregister(), etc. */
 
-	unregister_netdevice_notifier(&bo->notifier);
+	spin_lock(&bcm_notifier_lock);
+	list_del_init(&bo->notifier.list);
+	spin_unlock(&bcm_notifier_lock);
+	wait_event(bcm_notifier_wait, bo->notifier.sequence);
 
 	lock_sock(sk);
 
@@ -1692,6 +1739,10 @@ static struct pernet_operations canbcm_pernet_ops __read_mostly = {
 	.exit = canbcm_pernet_exit,
 };
 
+static struct notifier_block canbcm_notifier = {
+	.notifier_call = bcm_notifier
+};
+
 static int __init bcm_module_init(void)
 {
 	int err;
@@ -1705,12 +1756,14 @@ static int __init bcm_module_init(void)
 	}
 
 	register_pernet_subsys(&canbcm_pernet_ops);
+	register_netdevice_notifier(&canbcm_notifier);
 	return 0;
 }
 
 static void __exit bcm_module_exit(void)
 {
 	can_proto_unregister(&bcm_can_proto);
+	unregister_netdevice_notifier(&canbcm_notifier);
 	unregister_pernet_subsys(&canbcm_pernet_ops);
 }
 

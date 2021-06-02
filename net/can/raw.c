@@ -79,11 +79,18 @@ struct uniqframe {
 	unsigned int join_rx_count;
 };
 
+struct raw_notifier_block {
+	/* Linked to raw_notifier_list list. Becomes empty when removed. */
+	struct list_head list;
+	/* Notifier call is in progress when this value is 0. */
+	unsigned int sequence;
+};
+
 struct raw_sock {
 	struct sock sk;
 	int bound;
 	int ifindex;
-	struct notifier_block notifier;
+	struct raw_notifier_block notifier;
 	int loopback;
 	int recv_own_msgs;
 	int fd_frames;
@@ -94,6 +101,11 @@ struct raw_sock {
 	can_err_mask_t err_mask;
 	struct uniqframe __percpu *uniq;
 };
+
+static DECLARE_WAIT_QUEUE_HEAD(raw_notifier_wait);
+static LIST_HEAD(raw_notifier_list);
+static DEFINE_SPINLOCK(raw_notifier_lock);
+static unsigned int raw_notifier_sequence = 1; /* Cannot become 0. */
 
 /* Return pointer to store the extra msg flags for raw_recvmsg().
  * We use the space of one unsigned int beyond the 'struct sockaddr_can'
@@ -263,21 +275,16 @@ static int raw_enable_allfilters(struct net *net, struct net_device *dev,
 	return err;
 }
 
-static int raw_notifier(struct notifier_block *nb,
-			unsigned long msg, void *ptr)
+static void raw_notify(struct raw_sock *ro, unsigned long msg,
+		       struct net_device *dev)
 {
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
-	struct raw_sock *ro = container_of(nb, struct raw_sock, notifier);
 	struct sock *sk = &ro->sk;
 
 	if (!net_eq(dev_net(dev), sock_net(sk)))
-		return NOTIFY_DONE;
-
-	if (dev->type != ARPHRD_CAN)
-		return NOTIFY_DONE;
+		return;
 
 	if (ro->ifindex != dev->ifindex)
-		return NOTIFY_DONE;
+		return;
 
 	switch (msg) {
 	case NETDEV_UNREGISTER:
@@ -305,7 +312,43 @@ static int raw_notifier(struct notifier_block *nb,
 			sk->sk_error_report(sk);
 		break;
 	}
+}
 
+static int raw_notifier(struct notifier_block *nb, unsigned long msg,
+			void *ptr)
+{
+	struct raw_notifier_block *notify;
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+
+	if (dev->type != ARPHRD_CAN)
+		return NOTIFY_DONE;
+
+	spin_lock(&raw_notifier_lock);
+	if (unlikely(!++raw_notifier_sequence))
+		raw_notifier_sequence = 1;
+ restart:
+	list_for_each_entry(notify, &raw_notifier_list, list) {
+		if (unlikely(notify->sequence == raw_notifier_sequence))
+			continue;
+		notify->sequence = 0;
+		spin_unlock(&raw_notifier_lock);
+		raw_notify(container_of(notify, struct raw_sock, notifier),
+			   msg, dev);
+		spin_lock(&raw_notifier_lock);
+		notify->sequence = raw_notifier_sequence;
+		/*
+		 * If raw_release() did not remove this entry while we were at
+		 * raw_notify(), we can continue list traversal. Otherwise,
+		 * tell raw_release() that the sequence number became non-zero,
+		 * and then restart list traversal. The sequence number also
+		 * protects us from calling raw_notify() for more than once.
+		 */
+		if (likely(!list_empty(&notify->list)))
+			continue;
+		wake_up_all(&raw_notifier_wait);
+		goto restart;
+	}
+	spin_unlock(&raw_notifier_lock);
 	return NOTIFY_DONE;
 }
 
@@ -334,9 +377,10 @@ static int raw_init(struct sock *sk)
 		return -ENOMEM;
 
 	/* set notifier */
-	ro->notifier.notifier_call = raw_notifier;
-
-	register_netdevice_notifier(&ro->notifier);
+	spin_lock(&raw_notifier_lock);
+	ro->notifier.sequence = raw_notifier_sequence;
+	list_add_tail(&ro->notifier.list, &raw_notifier_list);
+	spin_unlock(&raw_notifier_lock);
 
 	return 0;
 }
@@ -351,7 +395,10 @@ static int raw_release(struct socket *sock)
 
 	ro = raw_sk(sk);
 
-	unregister_netdevice_notifier(&ro->notifier);
+	spin_lock(&raw_notifier_lock);
+	list_del_init(&ro->notifier.list);
+	spin_unlock(&raw_notifier_lock);
+	wait_event(raw_notifier_wait, ro->notifier.sequence);
 
 	lock_sock(sk);
 
@@ -889,6 +936,10 @@ static const struct can_proto raw_can_proto = {
 	.prot       = &raw_proto,
 };
 
+static struct notifier_block canraw_notifier = {
+	.notifier_call = raw_notifier
+};
+
 static __init int raw_module_init(void)
 {
 	int err;
@@ -898,6 +949,8 @@ static __init int raw_module_init(void)
 	err = can_proto_register(&raw_can_proto);
 	if (err < 0)
 		pr_err("can: registration of raw protocol failed\n");
+	else
+		register_netdevice_notifier(&canraw_notifier);
 
 	return err;
 }
@@ -905,6 +958,7 @@ static __init int raw_module_init(void)
 static __exit void raw_module_exit(void)
 {
 	can_proto_unregister(&raw_can_proto);
+	unregister_netdevice_notifier(&canraw_notifier);
 }
 
 module_init(raw_module_init);
