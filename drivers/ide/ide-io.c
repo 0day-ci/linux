@@ -750,6 +750,7 @@ static void unexpected_intr(int irq, ide_hwif_t *hwif)
 
 /**
  *	ide_intr	-	default IDE interrupt handler
+ *	@irq: IRQ number
  *	@dev_id: hwif
  *
  *	This is the default IRQ handler for the IDE layer. You should
