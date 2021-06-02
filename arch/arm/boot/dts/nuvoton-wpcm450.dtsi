@@ -77,5 +77,16 @@
 			interrupt-controller;
 			#interrupt-cells = <2>;
 		};
+
+		pinctrl: pinctrl@b8003000 {
+			compatible = "nuvoton,wpcm450-pinctrl";
+			reg = <0xb8003000 0x1000>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupts = <2 IRQ_TYPE_LEVEL_HIGH
+				      3 IRQ_TYPE_LEVEL_HIGH
+				      4 IRQ_TYPE_LEVEL_HIGH
+				      5 IRQ_TYPE_LEVEL_HIGH>;
+		};
 	};
 };
