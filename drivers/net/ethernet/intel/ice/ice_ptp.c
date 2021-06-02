@@ -329,23 +329,25 @@ static void ice_ptp_update_cached_phctime(struct ice_pf *pf)
  */
 static u64 ice_ptp_extend_32b_ts(u64 cached_phc_time, u32 in_tstamp)
 {
-	const u64 mask = GENMASK_ULL(31, 0);
-	u32 delta;
+	u32 delta, phc_time_lo;
 	u64 ns;
+
+	/* Extract the lower 32 bits of the PHC time */
+	phc_time_lo = (u32)cached_phc_time;
 
 	/* Calculate the delta between the lower 32bits of the cached PHC
 	 * time and the in_tstamp value
 	 */
-	delta = (in_tstamp - (u32)(cached_phc_time & mask));
+	delta = (in_tstamp - phc_time_lo);
 
 	/* Do not assume that the in_tstamp is always more recent than the
 	 * cached PHC time. If the delta is large, it indicates that the
 	 * in_tstamp was taken in the past, and should be converted
 	 * forward.
 	 */
-	if (delta > (mask / 2)) {
+	if (delta > (U32_MAX / 2)) {
 		/* reverse the delta calculation here */
-		delta = ((u32)(cached_phc_time & mask) - in_tstamp);
+		delta = (phc_time_lo - in_tstamp);
 		ns = cached_phc_time - delta;
 	} else {
 		ns = cached_phc_time + delta;
