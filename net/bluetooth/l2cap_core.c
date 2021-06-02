@@ -414,10 +414,20 @@ static void l2cap_chan_timeout(struct work_struct *work)
 {
 	struct l2cap_chan *chan = container_of(work, struct l2cap_chan,
 					       chan_timer.work);
-	struct l2cap_conn *conn = chan->conn;
+	struct l2cap_conn *conn;
 	int reason;
 
 	BT_DBG("chan %p state %s", chan, state_to_string(chan->state));
+
+	conn = chan->conn;
+	if (!conn) {
+		/* Channel is no longer attached to a connection so
+		 * l2cap_conn_del might have run, just release reference
+		 * acquired via __set_chan_timer.
+		 */
+		l2cap_chan_put(chan);
+		return;
+	}
 
 	mutex_lock(&conn->chan_lock);
 	/* __set_chan_timer() calls l2cap_chan_hold(chan) while scheduling
