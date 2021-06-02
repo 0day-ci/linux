@@ -10,6 +10,7 @@
 
 #include "intel_region_ttm.h"
 
+#include "gem/i915_gem_ttm.h" /* For the funcs/ops export only */
 /**
  * DOC: TTM support structure
  *
@@ -18,9 +19,6 @@
  * the managers to struct sg_table, Basically providing the mapping from
  * i915 GEM regions to TTM memory types and resource managers.
  */
-
-/* A Zero-initialized driver for now. We don't have a TTM backend yet. */
-static struct ttm_device_funcs i915_ttm_bo_driver;
 
 /**
  * intel_region_ttm_device_init - Initialize a TTM device
@@ -32,7 +30,7 @@ int intel_region_ttm_device_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *drm = &dev_priv->drm;
 
-	return ttm_device_init(&dev_priv->bdev, &i915_ttm_bo_driver,
+	return ttm_device_init(&dev_priv->bdev, i915_ttm_driver(),
 			       drm->dev, drm->anon_inode->i_mapping,
 			       drm->vma_offset_manager, false, false);
 }
@@ -172,6 +170,7 @@ struct sg_table *intel_region_ttm_node_to_st(struct intel_memory_region *mem,
 	return i915_sg_from_mm_node(node, mem->region.start);
 }
 
+#ifdef CONFIG_DRM_I915_SELFTEST
 /**
  * intel_region_ttm_node_alloc - Allocate memory resources from a region
  * @mem: The memory region,
@@ -218,3 +217,4 @@ void *intel_region_ttm_node_alloc(struct intel_memory_region *mem,
 		ret = -ENXIO;
 	return ret ? ERR_PTR(ret) : res.mm_node;
 }
+#endif
