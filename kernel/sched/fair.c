@@ -6525,8 +6525,9 @@ static long
 compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
 {
 	struct cpumask *pd_mask = perf_domain_span(pd);
-	unsigned long cpu_cap = arch_scale_cpu_capacity(cpumask_first(pd_mask));
+	unsigned long _cpu_cap = arch_scale_cpu_capacity(cpumask_first(pd_mask));
 	unsigned long max_util = 0, sum_util = 0;
+	unsigned long cpu_cap = _cpu_cap;
 	int cpu;
 
 	/*
@@ -6557,6 +6558,14 @@ compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
 			util_running =
 				cpu_util_next(cpu, p, -1) + task_util_est(p);
 		}
+
+		/*
+		 * Take the thermal pressure from non-idle CPUs. They have
+		 * most up-to-date information. For idle CPUs thermal pressure
+		 * signal is not updated so often.
+		 */
+		if (!idle_cpu(cpu))
+			cpu_cap = _cpu_cap - thermal_load_avg(cpu_rq(cpu));
 
 		/*
 		 * Busy time computation: utilization clamping is not
