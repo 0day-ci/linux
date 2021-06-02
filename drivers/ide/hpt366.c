@@ -841,6 +841,8 @@ static void hpt3xxn_rw_disk(ide_drive_t *drive, struct request *rq)
 /**
  *	hpt37x_calibrate_dpll	-	calibrate the DPLL
  *	@dev: PCI device
+ *	@f_low: DPLL low value
+ *	@f_high: DPLL high value
  *
  *	Perform a calibration cycle on the DPLL.
  *	Returns 1 if this succeeds
