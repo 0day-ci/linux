@@ -108,7 +108,7 @@ static ssize_t flip_store(struct device *dev, struct device_attribute *attr, con
 
 static DEVICE_ATTR_RW(flip);
 
-static ssize_t w100fb_reg_read(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t reg_read_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
 	unsigned long regs, param;
 	regs = simple_strtoul(buf, NULL, 16);
@@ -117,9 +117,9 @@ static ssize_t w100fb_reg_read(struct device *dev, struct device_attribute *attr
 	return count;
 }
 
-static DEVICE_ATTR(reg_read, 0200, NULL, w100fb_reg_read);
+static DEVICE_ATTR_WO(reg_read);
 
-static ssize_t w100fb_reg_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t reg_write_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
 	unsigned long regs, param;
 	sscanf(buf, "%lx %lx", &regs, &param);
@@ -132,7 +132,7 @@ static ssize_t w100fb_reg_write(struct device *dev, struct device_attribute *att
 	return count;
 }
 
-static DEVICE_ATTR(reg_write, 0200, NULL, w100fb_reg_write);
+static DEVICE_ATTR_WO(reg_write);
 
 
 static ssize_t fastpllclk_show(struct device *dev, struct device_attribute *attr, char *buf)
