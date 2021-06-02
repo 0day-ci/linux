@@ -59,7 +59,7 @@ static int no_piix_dma;
 
 /**
  *	piix_set_pio_mode	-	set host controller for PIO mode
- *	@port: port
+ *	@hwif: IDE interface
  *	@drive: drive
  *
  *	Set the interface PIO mode based upon the settings done by AMI BIOS.
