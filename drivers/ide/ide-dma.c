@@ -153,6 +153,7 @@ static int ide_dma_map_sg(ide_drive_t *drive, struct ide_cmd *cmd)
 /**
  *	ide_dma_unmap_sg	-	clean up DMA mapping
  *	@drive: The drive to unmap
+ *	@cmd: The IDEcommand
  *
  *	Teardown mappings after DMA has completed. This must be called
  *	after the completion of each use of ide_build_dmatable and before
