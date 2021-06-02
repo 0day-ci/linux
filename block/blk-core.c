@@ -649,11 +649,9 @@ EXPORT_SYMBOL(blk_put_request);
 
 static void handle_bad_sector(struct bio *bio, sector_t maxsector)
 {
-	char b[BDEVNAME_SIZE];
-
 	pr_info_ratelimited("attempt to access beyond end of device\n"
-			    "%s: rw=%d, want=%llu, limit=%llu\n",
-			    bio_devname(bio, b), bio->bi_opf,
+			    "%pg: rw=%d, want=%llu, limit=%llu\n",
+			    bio->bi_bdev, bio->bi_opf,
 			    bio_end_sector(bio), maxsector);
 }
 
@@ -695,14 +693,12 @@ static inline bool should_fail_request(struct block_device *part,
 static inline bool bio_check_ro(struct bio *bio)
 {
 	if (op_is_write(bio_op(bio)) && bdev_read_only(bio->bi_bdev)) {
-		char b[BDEVNAME_SIZE];
-
 		if (op_is_flush(bio->bi_opf) && !bio_sectors(bio))
 			return false;
 
 		WARN_ONCE(1,
-		       "Trying to write to read-only block-device %s (partno %d)\n",
-			bio_devname(bio, b), bio->bi_bdev->bd_partno);
+		       "Trying to write to read-only block-device %pg (partno %d)\n",
+			bio->bi_bdev, bio->bi_bdev->bd_partno);
 		/* Older lvm-tools actually trigger this */
 		return false;
 	}
