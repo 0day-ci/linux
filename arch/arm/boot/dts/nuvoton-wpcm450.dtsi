@@ -87,6 +87,311 @@
 				      3 IRQ_TYPE_LEVEL_HIGH
 				      4 IRQ_TYPE_LEVEL_HIGH
 				      5 IRQ_TYPE_LEVEL_HIGH>;
+
+			smb3_pins: smb3-pins {
+				groups = "smb3";
+				function = "smb3";
+			};
+
+			smb4_pins: smb4-pins {
+				groups = "smb4";
+				function = "smb4";
+			};
+
+			smb5_pins: smb5-pins {
+				groups = "smb5";
+				function = "smb5";
+			};
+
+			scs1_pins: scs1-pins {
+				groups = "scs1";
+				function = "scs1";
+			};
+
+			scs2_pins: scs2-pins {
+				groups = "scs2";
+				function = "scs2";
+			};
+
+			scs3_pins: scs3-pins {
+				groups = "scs3";
+				function = "scs3";
+			};
+
+			smb0_pins: smb0-pins {
+				groups = "smb0";
+				function = "smb0";
+			};
+
+			smb1_pins: smb1-pins {
+				groups = "smb1";
+				function = "smb1";
+			};
+
+			smb2_pins: smb2-pins {
+				groups = "smb2";
+				function = "smb2";
+			};
+
+			bsp_pins: bsp-pins {
+				groups = "bsp";
+				function = "bsp";
+			};
+
+			hsp1_pins: hsp1-pins {
+				groups = "hsp1";
+				function = "hsp1";
+			};
+
+			hsp2_pins: hsp2-pins {
+				groups = "hsp2";
+				function = "hsp2";
+			};
+
+			r1err_pins: r1err-pins {
+				groups = "r1err";
+				function = "r1err";
+			};
+
+			r1md_pins: r1md-pins {
+				groups = "r1md";
+				function = "r1md";
+			};
+
+			rmii2_pins: rmii2-pins {
+				groups = "rmii2";
+				function = "rmii2";
+			};
+
+			r2err_pins: r2err-pins {
+				groups = "r2err";
+				function = "r2err";
+			};
+
+			r2md_pins: r2md-pins {
+				groups = "r2md";
+				function = "r2md";
+			};
+
+			kbcc_pins: kbcc-pins {
+				groups = "kbcc";
+				function = "kbcc";
+			};
+
+			dvo0_pins: dvo0-pins {
+				groups = "dvo";
+				function = "dvo0";
+			};
+
+			dvo3_pins: dvo3-pins {
+				groups = "dvo";
+				function = "dvo3";
+			};
+
+			clko_pins: clko-pins {
+				groups = "clko";
+				function = "clko";
+			};
+
+			smi_pins: smi-pins {
+				groups = "smi";
+				function = "smi";
+			};
+
+			uinc_pins: uinc-pins {
+				groups = "uinc";
+				function = "uinc";
+			};
+
+			gspi_pins: gspi-pins {
+				groups = "gspi";
+				function = "gspi";
+			};
+
+			mben_pins: mben-pins {
+				groups = "mben";
+				function = "mben";
+			};
+
+			xcs2_pins: xcs2-pins {
+				groups = "xcs2";
+				function = "xcs2";
+			};
+
+			xcs1_pins: xcs1-pins {
+				groups = "xcs1";
+				function = "xcs1";
+			};
+
+			sdio_pins: sdio-pins {
+				groups = "sdio";
+				function = "sdio";
+			};
+
+			sspi_pins: sspi-pins {
+				groups = "sspi";
+				function = "sspi";
+			};
+
+			fi0_pins: fi0-pins {
+				groups = "fi0";
+				function = "fi0";
+			};
+
+			fi1_pins: fi1-pins {
+				groups = "fi1";
+				function = "fi1";
+			};
+
+			fi2_pins: fi2-pins {
+				groups = "fi2";
+				function = "fi2";
+			};
+
+			fi3_pins: fi3-pins {
+				groups = "fi3";
+				function = "fi3";
+			};
+
+			fi4_pins: fi4-pins {
+				groups = "fi4";
+				function = "fi4";
+			};
+
+			fi5_pins: fi5-pins {
+				groups = "fi5";
+				function = "fi5";
+			};
+
+			fi6_pins: fi6-pins {
+				groups = "fi6";
+				function = "fi6";
+			};
+
+			fi7_pins: fi7-pins {
+				groups = "fi7";
+				function = "fi7";
+			};
+
+			fi8_pins: fi8-pins {
+				groups = "fi8";
+				function = "fi8";
+			};
+
+			fi9_pins: fi9-pins {
+				groups = "fi9";
+				function = "fi9";
+			};
+
+			fi10_pins: fi10-pins {
+				groups = "fi10";
+				function = "fi10";
+			};
+
+			fi11_pins: fi11-pins {
+				groups = "fi11";
+				function = "fi11";
+			};
+
+			fi12_pins: fi12-pins {
+				groups = "fi12";
+				function = "fi12";
+			};
+
+			fi13_pins: fi13-pins {
+				groups = "fi13";
+				function = "fi13";
+			};
+
+			fi14_pins: fi14-pins {
+				groups = "fi14";
+				function = "fi14";
+			};
+
+			fi15_pins: fi15-pins {
+				groups = "fi15";
+				function = "fi15";
+			};
+
+			pwm0_pins: pwm0-pins {
+				groups = "pwm0";
+				function = "pwm0";
+			};
+
+			pwm1_pins: pwm1-pins {
+				groups = "pwm1";
+				function = "pwm1";
+			};
+
+			pwm2_pins: pwm2-pins {
+				groups = "pwm2";
+				function = "pwm2";
+			};
+
+			pwm3_pins: pwm3-pins {
+				groups = "pwm3";
+				function = "pwm3";
+			};
+
+			pwm4_pins: pwm4-pins {
+				groups = "pwm4";
+				function = "pwm4";
+			};
+
+			pwm5_pins: pwm5-pins {
+				groups = "pwm5";
+				function = "pwm5";
+			};
+
+			pwm6_pins: pwm6-pins {
+				groups = "pwm6";
+				function = "pwm6";
+			};
+
+			pwm7_pins: pwm7-pins {
+				groups = "pwm7";
+				function = "pwm7";
+			};
+
+			hg0_pins: hg0-pins {
+				groups = "hg0";
+				function = "hg0";
+			};
+
+			hg1_pins: hg1-pins {
+				groups = "hg1";
+				function = "hg1";
+			};
+
+			hg2_pins: hg2-pins {
+				groups = "hg2";
+				function = "hg2";
+			};
+
+			hg3_pins: hg3-pins {
+				groups = "hg3";
+				function = "hg3";
+			};
+
+			hg4_pins: hg4-pins {
+				groups = "hg4";
+				function = "hg4";
+			};
+
+			hg5_pins: hg5-pins {
+				groups = "hg5";
+				function = "hg5";
+			};
+
+			hg6_pins: hg6-pins {
+				groups = "hg6";
+				function = "hg6";
+			};
+
+			hg7_pins: hg7-pins {
+				groups = "hg7";
+				function = "hg7";
+			};
 		};
 	};
 };
