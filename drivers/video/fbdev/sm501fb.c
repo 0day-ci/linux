@@ -1238,8 +1238,8 @@ static int sm501fb_show_regs(struct sm501fb_info *info, char *ptr,
  * show the crt control and cursor registers
 */
 
-static ssize_t sm501fb_debug_show_crt(struct device *dev,
-				  struct device_attribute *attr, char *buf)
+static ssize_t fbregs_crt_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
 	struct sm501fb_info *info = dev_get_drvdata(dev);
 	char *ptr = buf;
@@ -1250,15 +1250,15 @@ static ssize_t sm501fb_debug_show_crt(struct device *dev,
 	return ptr - buf;
 }
 
-static DEVICE_ATTR(fbregs_crt, 0444, sm501fb_debug_show_crt, NULL);
+static DEVICE_ATTR_RO(fbregs_crt);
 
 /* sm501fb_debug_show_pnl
  *
  * show the panel control and cursor registers
 */
 
-static ssize_t sm501fb_debug_show_pnl(struct device *dev,
-				  struct device_attribute *attr, char *buf)
+static ssize_t fbregs_pnl_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
 {
 	struct sm501fb_info *info = dev_get_drvdata(dev);
 	char *ptr = buf;
@@ -1269,7 +1269,7 @@ static ssize_t sm501fb_debug_show_pnl(struct device *dev,
 	return ptr - buf;
 }
 
-static DEVICE_ATTR(fbregs_pnl, 0444, sm501fb_debug_show_pnl, NULL);
+static DEVICE_ATTR_RO(fbregs_pnl);
 
 static struct attribute *sm501fb_attrs[] = {
 	&dev_attr_crt_src.attr,
