@@ -975,14 +975,13 @@ static int ds1685_nvram_write(void *priv, unsigned int pos, void *val,
 /* SysFS interface */
 
 /**
- * ds1685_rtc_sysfs_battery_show - sysfs file for main battery status.
+ * battery_show - sysfs file for main battery status.
  * @dev: pointer to device structure.
  * @attr: pointer to device_attribute structure.
  * @buf: pointer to char array to hold the output.
  */
-static ssize_t
-ds1685_rtc_sysfs_battery_show(struct device *dev,
-			      struct device_attribute *attr, char *buf)
+static ssize_t battery_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
 {
 	struct ds1685_priv *rtc = dev_get_drvdata(dev->parent);
 	u8 ctrld;
@@ -992,17 +991,16 @@ ds1685_rtc_sysfs_battery_show(struct device *dev,
 	return sprintf(buf, "%s\n",
 			(ctrld & RTC_CTRL_D_VRT) ? "ok" : "not ok or N/A");
 }
-static DEVICE_ATTR(battery, S_IRUGO, ds1685_rtc_sysfs_battery_show, NULL);
+static DEVICE_ATTR_RO(battery);
 
 /**
- * ds1685_rtc_sysfs_auxbatt_show - sysfs file for aux battery status.
+ * auxbatt_show - sysfs file for aux battery status.
  * @dev: pointer to device structure.
  * @attr: pointer to device_attribute structure.
  * @buf: pointer to char array to hold the output.
  */
-static ssize_t
-ds1685_rtc_sysfs_auxbatt_show(struct device *dev,
-			      struct device_attribute *attr, char *buf)
+static ssize_t auxbatt_show(struct device *dev,
+			    struct device_attribute *attr, char *buf)
 {
 	struct ds1685_priv *rtc = dev_get_drvdata(dev->parent);
 	u8 ctrl4a;
@@ -1014,17 +1012,16 @@ ds1685_rtc_sysfs_auxbatt_show(struct device *dev,
 	return sprintf(buf, "%s\n",
 			(ctrl4a & RTC_CTRL_4A_VRT2) ? "ok" : "not ok or N/A");
 }
-static DEVICE_ATTR(auxbatt, S_IRUGO, ds1685_rtc_sysfs_auxbatt_show, NULL);
+static DEVICE_ATTR_RO(auxbatt);
 
 /**
- * ds1685_rtc_sysfs_serial_show - sysfs file for silicon serial number.
+ * serial_show - sysfs file for silicon serial number.
  * @dev: pointer to device structure.
  * @attr: pointer to device_attribute structure.
  * @buf: pointer to char array to hold the output.
  */
-static ssize_t
-ds1685_rtc_sysfs_serial_show(struct device *dev,
-			     struct device_attribute *attr, char *buf)
+static ssize_t serial_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
 {
 	struct ds1685_priv *rtc = dev_get_drvdata(dev->parent);
 	u8 ssn[8];
@@ -1035,7 +1032,7 @@ ds1685_rtc_sysfs_serial_show(struct device *dev,
 
 	return sprintf(buf, "%8phC\n", ssn);
 }
-static DEVICE_ATTR(serial, S_IRUGO, ds1685_rtc_sysfs_serial_show, NULL);
+static DEVICE_ATTR_RO(serial);
 
 /*
  * struct ds1685_rtc_sysfs_misc_attrs - list for misc RTC features.
