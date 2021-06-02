@@ -2301,6 +2301,7 @@ void tracing_start(void)
  out:
 	raw_spin_unlock_irqrestore(&global_trace.start_lock, flags);
 }
+EXPORT_SYMBOL_GPL(tracing_start);
 
 static void tracing_start_tr(struct trace_array *tr)
 {
@@ -2366,6 +2367,7 @@ void tracing_stop(void)
  out:
 	raw_spin_unlock_irqrestore(&global_trace.start_lock, flags);
 }
+EXPORT_SYMBOL_GPL(tracing_stop);
 
 static void tracing_stop_tr(struct trace_array *tr)
 {
