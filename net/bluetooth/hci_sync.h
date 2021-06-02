@@ -29,3 +29,5 @@ int hci_remove_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance);
 void hci_clear_adv_instance_sync(struct hci_dev *hdev, struct sock *sk,
 				 u8 instance, bool force);
 int hci_disable_advertising_sync(struct hci_dev *hdev);
+
+int hci_update_background_scan_sync(struct hci_dev *hdev);
