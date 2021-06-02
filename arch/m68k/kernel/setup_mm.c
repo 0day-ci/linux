@@ -386,6 +386,10 @@ void __init setup_arch(char **cmdline_p)
 		isa_type = ISA_TYPE_ENEC;
 		isa_sex = 0;
 	}
+#else
+	if (MACH_IS_ATARI) {
+		isa_sex = 0;
+	}
 #endif
 #endif
 }
