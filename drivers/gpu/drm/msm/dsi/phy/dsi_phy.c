@@ -835,6 +835,21 @@ void msm_dsi_phy_set_usecase(struct msm_dsi_phy *phy,
 		phy->usecase = uc;
 }
 
+bool msm_dsi_phy_needs_hs_phy_sel(struct msm_dsi_phy *phy)
+{
+	if (!phy)
+		return false;
+	return phy->cfg->needs_continuous_clock;
+}
+
+void msm_dsi_phy_set_continuous_clock(struct msm_dsi_phy *phy, bool enable)
+{
+	if (!phy || !phy->cfg->ops.set_continuous_clock)
+		return;
+
+	phy->cfg->ops.set_continuous_clock(phy, enable);
+}
+
 int msm_dsi_phy_get_clk_provider(struct msm_dsi_phy *phy,
 	struct clk **byte_clk_provider, struct clk **pixel_clk_provider)
 {
