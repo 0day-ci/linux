@@ -684,12 +684,6 @@ err_put:
 }
 EXPORT_SYMBOL(bio_clone_fast);
 
-const char *bio_devname(struct bio *bio, char *buf)
-{
-	return bdevname(bio->bi_bdev, buf);
-}
-EXPORT_SYMBOL(bio_devname);
-
 static inline bool page_is_mergeable(const struct bio_vec *bv,
 		struct page *page, unsigned int len, unsigned int off,
 		bool *same_page)

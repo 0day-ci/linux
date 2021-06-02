@@ -488,8 +488,6 @@ void bio_truncate(struct bio *bio, unsigned new_size);
 void guard_bio_eod(struct bio *bio);
 void zero_fill_bio(struct bio *bio);
 
-extern const char *bio_devname(struct bio *bio, char *buffer);
-
 #define bio_set_dev(bio, bdev) 				\
 do {							\
 	bio_clear_flag(bio, BIO_REMAPPED);		\
