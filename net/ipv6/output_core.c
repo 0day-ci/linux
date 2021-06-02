@@ -32,7 +32,7 @@ static u32 __ipv6_select_ident(struct net *net,
 	hash = siphash(&combined, sizeof(combined), &net->ipv4.ip_id_key);
 
 	/* Treat id of 0 as unset and if we get 0 back from ip_idents_reserve,
-	 * set the hight order instead thus minimizing possible future
+	 * set the height order instead thus minimizing possible future
 	 * collisions.
 	 */
 	id = ip_idents_reserve(hash, 1);

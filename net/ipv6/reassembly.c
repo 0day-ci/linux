@@ -182,7 +182,7 @@ static int ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 
 	/* Note : skb->rbnode and skb->dev share the same location. */
 	dev = skb->dev;
-	/* Makes sure compiler wont do silly aliasing games */
+	/* Makes sure compiler won't do silly aliasing games */
 	barrier();
 
 	prev_tail = fq->q.fragments_tail;
