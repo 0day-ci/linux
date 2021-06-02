@@ -654,9 +654,8 @@ static const struct rtc_class_ops isl1208_rtc_ops = {
 
 /* sysfs interface */
 
-static ssize_t
-isl1208_sysfs_show_atrim(struct device *dev,
-			 struct device_attribute *attr, char *buf)
+static ssize_t atrim_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
 	int atr = isl1208_i2c_get_atr(to_i2c_client(dev->parent));
 	if (atr < 0)
@@ -665,11 +664,10 @@ isl1208_sysfs_show_atrim(struct device *dev,
 	return sprintf(buf, "%d.%.2d pF\n", atr >> 2, (atr & 0x3) * 25);
 }
 
-static DEVICE_ATTR(atrim, S_IRUGO, isl1208_sysfs_show_atrim, NULL);
+static DEVICE_ATTR_RO(atrim);
 
-static ssize_t
-isl1208_sysfs_show_dtrim(struct device *dev,
-			 struct device_attribute *attr, char *buf)
+static ssize_t dtrim_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
 	int dtr = isl1208_i2c_get_dtr(to_i2c_client(dev->parent));
 	if (dtr < 0)
@@ -678,11 +676,10 @@ isl1208_sysfs_show_dtrim(struct device *dev,
 	return sprintf(buf, "%d ppm\n", dtr - 100);
 }
 
-static DEVICE_ATTR(dtrim, S_IRUGO, isl1208_sysfs_show_dtrim, NULL);
+static DEVICE_ATTR_RO(dtrim);
 
-static ssize_t
-isl1208_sysfs_show_usr(struct device *dev,
-		       struct device_attribute *attr, char *buf)
+static ssize_t usr_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
 {
 	int usr = isl1208_i2c_get_usr(to_i2c_client(dev->parent));
 	if (usr < 0)
@@ -691,10 +688,9 @@ isl1208_sysfs_show_usr(struct device *dev,
 	return sprintf(buf, "0x%.4x\n", usr);
 }
 
-static ssize_t
-isl1208_sysfs_store_usr(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
+static ssize_t usr_store(struct device *dev,
+			 struct device_attribute *attr,
+			 const char *buf, size_t count)
 {
 	int usr = -1;
 
@@ -715,8 +711,7 @@ isl1208_sysfs_store_usr(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(usr, S_IRUGO | S_IWUSR, isl1208_sysfs_show_usr,
-		   isl1208_sysfs_store_usr);
+static DEVICE_ATTR_RW(usr);
 
 static struct attribute *isl1208_rtc_attrs[] = {
 	&dev_attr_atrim.attr,
