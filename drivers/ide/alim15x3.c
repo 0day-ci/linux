@@ -526,6 +526,7 @@ static const struct ide_port_info ali15x3_chipset = {
 /**
  *	alim15x3_init_one	-	set up an ALi15x3 IDE controller
  *	@dev: PCI device to set up
+ *	@id: PCI ID
  *
  *	Perform the actual set up for an ALi15x3 that has been found by the
  *	hot plug layer.
