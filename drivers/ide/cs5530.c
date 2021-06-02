@@ -129,7 +129,7 @@ static void cs5530_set_dma_mode(ide_hwif_t *hwif, ide_drive_t *drive)
 }
 
 /**
- *	init_chipset_5530	-	set up 5530 bridge
+ *	init_chipset_cs5530	-	set up 5530 bridge
  *	@dev: PCI device
  *
  *	Initialize the cs5530 bridge for reliable IDE DMA operation.
