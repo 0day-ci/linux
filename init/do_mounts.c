@@ -617,6 +617,91 @@ out:
 	init_chroot(".");
 }
 
+static inline __init bool check_tmpfs_enabled(void)
+{
+	return IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
+		(!root_fs_names || strstr(root_fs_names, "tmpfs"));
+}
+
+#ifdef CONFIG_INITRAMFS_MOUNT
+
+static __init bool is_ramfs_enabled(void)
+{
+	return true;
+}
+
+static __init bool is_tmpfs_enabled(void)
+{
+	return check_tmpfs_enabled();
+}
+
+struct fs_rootfs_root {
+	bool (*enabled)(void);
+	char *dev_name;
+	char *fs_name;
+};
+
+static struct fs_rootfs_root rootfs_roots[] __initdata = {
+	{
+		.enabled  = is_tmpfs_enabled,
+		.dev_name = "tmpfs",
+		.fs_name  = "tmpfs",
+	},
+	{
+		.enabled  = is_ramfs_enabled,
+		.dev_name = "ramfs",
+		.fs_name  = "ramfs"
+	}
+};
+
+/*
+ * Give systems running from the initramfs and making use of pivot_root a
+ * proper mount so it can be umounted during pivot_root.
+ */
+int __init prepare_mount_rootfs(void)
+{
+	struct fs_rootfs_root *root = NULL;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rootfs_roots); i++) {
+		if (rootfs_roots[i].enabled()) {
+			root = &rootfs_roots[i];
+			break;
+		}
+	}
+
+	if (unlikely(!root))
+		return -EFAULT;
+
+	return do_mount_root(root->dev_name,
+			     root->fs_name,
+			     root_mountflags & ~MS_RDONLY,
+			     root_mount_data);
+}
+
+/*
+ * Change root to the new rootfs that mounted in prepare_mount_rootfs()
+ * if cpio is unpacked successfully and 'ramdisk_execute_command' exist.
+ * Otherwise, umount the new rootfs.
+ */
+void __init finish_mount_rootfs(bool success)
+{
+	if (!success)
+		goto on_fail;
+
+	init_mount(".", "/", NULL, MS_MOVE, NULL);
+	if (!ramdisk_exec_exist())
+		goto on_fail;
+
+	init_chroot(".");
+	return;
+
+on_fail:
+	init_chdir("/");
+	init_umount(".", 0);
+}
+#endif
+
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
 {
@@ -634,7 +719,5 @@ struct file_system_type rootfs_fs_type = {
 
 void __init init_rootfs(void)
 {
-	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
-		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
-		is_tmpfs = true;
+	is_tmpfs = check_tmpfs_enabled();
 }
