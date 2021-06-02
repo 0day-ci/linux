@@ -664,4 +664,10 @@ static inline void nfs4_xattr_cache_zap(struct inode *inode)
 
 
 #endif /* CONFIG_NFS_V4 */
+
+/* nfs4file.c */
+#ifdef CONFIG_NFS_V4_2
+struct file *nfs42_ssc_open(struct vfsmount *ss_mnt, struct nfs_fh *src_fh, nfs4_stateid *stateid);
+void nfs42_ssc_close(struct file *filep);
+#endif
 #endif /* __LINUX_FS_NFS_NFS4_FS.H */
