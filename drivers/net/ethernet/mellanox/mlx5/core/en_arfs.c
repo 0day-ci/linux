@@ -369,8 +369,10 @@ int mlx5e_arfs_create_tables(struct mlx5e_priv *priv)
 	spin_lock_init(&priv->fs.arfs->arfs_lock);
 	INIT_LIST_HEAD(&priv->fs.arfs->rules);
 	priv->fs.arfs->wq = create_singlethread_workqueue("mlx5e_arfs");
-	if (!priv->fs.arfs->wq)
+	if (!priv->fs.arfs->wq) {
+		err = -ENOMEM;
 		goto err;
+	}
 
 	for (i = 0; i < ARFS_NUM_TYPES; i++) {
 		err = arfs_create_table(priv, i);
