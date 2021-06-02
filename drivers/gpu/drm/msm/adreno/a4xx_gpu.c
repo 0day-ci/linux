@@ -549,7 +549,7 @@ static const unsigned int a405_registers[] = {
 	~0 /* sentinel */
 };
 
-static struct msm_gpu_state *a4xx_gpu_state_get(struct msm_gpu *gpu)
+static struct msm_gpu_state *a4xx_gpu_state_get(struct msm_gpu *gpu, bool stalled)
 {
 	struct msm_gpu_state *state = kzalloc(sizeof(*state), GFP_KERNEL);
 

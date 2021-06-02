@@ -60,7 +60,7 @@ struct msm_gpu_funcs {
 	void (*debugfs_init)(struct msm_gpu *gpu, struct drm_minor *minor);
 #endif
 	unsigned long (*gpu_busy)(struct msm_gpu *gpu);
-	struct msm_gpu_state *(*gpu_state_get)(struct msm_gpu *gpu);
+	struct msm_gpu_state *(*gpu_state_get)(struct msm_gpu *gpu, bool stalled);
 	int (*gpu_state_put)(struct msm_gpu_state *state);
 	unsigned long (*gpu_get_freq)(struct msm_gpu *gpu);
 	void (*gpu_set_freq)(struct msm_gpu *gpu, struct dev_pm_opp *opp);
