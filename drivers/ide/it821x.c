@@ -346,7 +346,7 @@ static void it821x_tune_udma(ide_drive_t *drive, u8 mode_wanted)
 }
 
 /**
- *	it821x_dma_read	-	DMA hook
+ *	it821x_dma_start	-	DMA hook
  *	@drive: drive for DMA
  *
  *	The IT821x has a single timing register for MWDMA and for PIO
@@ -372,7 +372,7 @@ static void it821x_dma_start(ide_drive_t *drive)
 }
 
 /**
- *	it821x_dma_write	-	DMA hook
+ *	it821x_dma_end	-	DMA hook
  *	@drive: drive for DMA stop
  *
  *	The IT821x has a single timing register for MWDMA and for PIO
