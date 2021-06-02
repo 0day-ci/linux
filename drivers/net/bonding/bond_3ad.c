@@ -1793,6 +1793,8 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 static void ad_clear_agg(struct aggregator *aggregator)
 {
 	if (aggregator) {
+		struct port *port, *next;
+
 		aggregator->is_individual = false;
 		aggregator->actor_admin_aggregator_key = 0;
 		aggregator->actor_oper_aggregator_key = 0;
@@ -1801,6 +1803,11 @@ static void ad_clear_agg(struct aggregator *aggregator)
 		aggregator->partner_oper_aggregator_key = 0;
 		aggregator->receive_state = 0;
 		aggregator->transmit_state = 0;
+		for (port = aggregator->lag_ports; port; port = next) {
+			next = port->next_port_in_aggregator;
+			if (port->aggregator == aggregator)
+				port->next_port_in_aggregator = NULL;
+		}
 		aggregator->lag_ports = NULL;
 		aggregator->is_active = 0;
 		aggregator->num_of_ports = 0;
