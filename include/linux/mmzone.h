@@ -738,8 +738,8 @@ struct zonelist {
 	struct zoneref _zonerefs[MAX_ZONES_PER_ZONELIST + 1];
 };
 
-#ifndef CONFIG_DISCONTIGMEM
-/* The array of struct pages - for discontigmem use pgdat->lmem_map */
+#ifdef CONFIG_FLATMEM
+/* The array of struct pages for flatmem */
 extern struct page *mem_map;
 #endif
 
