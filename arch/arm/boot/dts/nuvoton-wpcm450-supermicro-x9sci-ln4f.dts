@@ -8,6 +8,9 @@
 
 #include "nuvoton-wpcm450.dtsi"
 
+#include <dt-bindings/input/linux-event-codes.h>
+#include <dt-bindings/gpio/gpio.h>
+
 / {
 	model = "Supermicro X9SCi-LN4F BMC";
 	compatible = "supermicro,x9sci-ln4f-bmc", "nuvoton,wpcm450";
@@ -19,6 +22,30 @@
 	memory@0 {
 		device_type = "memory";
 		reg = <0 0x08000000>; /* 128 MiB */
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		uid {
+			label = "UID button";
+			linux,code = <KEY_HOME>;
+			gpios = <&pinctrl 14 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		uid {
+			label = "UID";
+			gpios = <&pinctrl 23 GPIO_ACTIVE_HIGH>;
+		};
+
+		heartbeat {
+			label = "heartbeat";
+			gpios = <&pinctrl 20 GPIO_ACTIVE_LOW>;
+		};
 	};
 };
 
