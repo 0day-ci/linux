@@ -45,6 +45,7 @@ struct gcov_info;
 const char *gcov_info_filename(struct gcov_info *info);
 unsigned int gcov_info_version(struct gcov_info *info);
 struct gcov_info *gcov_info_next(struct gcov_info *info);
+bool gcov_info_is_valid(struct gcov_info *info);
 void gcov_info_link(struct gcov_info *info);
 void gcov_info_unlink(struct gcov_info *prev, struct gcov_info *info);
 bool gcov_info_within_module(struct gcov_info *info, struct module *mod);

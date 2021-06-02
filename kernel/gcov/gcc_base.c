@@ -13,6 +13,11 @@ void __gcov_init(struct gcov_info *info)
 {
 	static unsigned int gcov_version;
 
+	if (!gcov_info_is_valid(info)) {
+		pr_err_once("Invalid gcov_info structure\n");
+		return;
+	}
+
 	mutex_lock(&gcov_lock);
 	if (gcov_version == 0) {
 		gcov_version = gcov_info_version(info);

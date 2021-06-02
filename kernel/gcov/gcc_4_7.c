@@ -126,6 +126,14 @@ struct gcov_info *gcov_info_next(struct gcov_info *info)
 	return info->next;
 }
 
+bool gcov_info_is_valid(struct gcov_info *info)
+{
+	if (!info || !info->functions)
+		return false;
+
+	return true;
+}
+
 /**
  * gcov_info_link - link/add profiling data set to the list
  * @info: profiling data set
