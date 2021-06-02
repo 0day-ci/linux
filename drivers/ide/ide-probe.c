@@ -461,7 +461,7 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 }
 
 /**
- *	probe_for_drives	-	upper level drive probe
+ *	probe_for_drive	-	upper level drive probe
  *	@drive: drive to probe for
  *
  *	probe_for_drive() tests for existence of a given drive using do_probe()
