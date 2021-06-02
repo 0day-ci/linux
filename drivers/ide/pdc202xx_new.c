@@ -79,6 +79,7 @@ static u8 get_indexed_reg(ide_hwif_t *hwif, u8 index)
  * set_indexed_reg - Set indexed register
  * @hwif: for the port address
  * @index: index of the indexed register
+ * @value: value of the indexed register
  */
 static void set_indexed_reg(ide_hwif_t *hwif, u8 index, u8 value)
 {
