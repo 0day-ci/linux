@@ -564,7 +564,7 @@ static void uniquify_event_name(struct evsel *counter)
 				       counter->name, counter->pmu_name);
 		}
 
-		if (ret) {
+		if (ret > 0) {
 			free(counter->name);
 			counter->name = new_name;
 		}
