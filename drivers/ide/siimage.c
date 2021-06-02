@@ -103,7 +103,7 @@ static unsigned long siimage_selreg(ide_hwif_t *hwif, int r)
 
 /**
  *	siimage_seldev		-	return register base
- *	@hwif: interface
+ *	@drive: interface
  *	@r: config offset
  *
  *	Turn a config register offset into the right address in either
@@ -183,7 +183,7 @@ static void sil_iowrite32(struct pci_dev *dev, u32 val, unsigned long addr)
 }
 
 /**
- *	sil_udma_filter		-	compute UDMA mask
+ *	sil_pata_udma_filter		-	compute UDMA mask
  *	@drive: IDE device
  *
  *	Compute the available UDMA speeds for the device on the interface.
