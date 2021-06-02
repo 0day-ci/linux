@@ -75,6 +75,7 @@ static void ide_dma_sff_write_status(ide_hwif_t *hwif, u8 val)
 /**
  *	ide_dma_host_set	-	Enable/disable DMA on a host
  *	@drive: drive to control
+ *	@on: whether to enable/disable the IDE controller's DMA
  *
  *	Enable/disable DMA on an IDE controller following generic
  *	bus-mastering IDE controller behaviour.
@@ -97,6 +98,9 @@ EXPORT_SYMBOL_GPL(ide_dma_host_set);
 
 /**
  *	ide_build_dmatable	-	build IDE DMA table
+ *
+ *	@drive: The drive to unmap
+ *	@cmd: The IDEcommand
  *
  *	ide_build_dmatable() prepares a dma request. We map the command
  *	to get the pci bus addresses of the buffers and then build up
