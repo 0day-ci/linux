@@ -7156,7 +7156,6 @@ static void __meminit zone_init_internals(struct zone *zone, enum zone_type idx,
 	zone->name = zone_names[idx];
 	zone->zone_pgdat = NODE_DATA(nid);
 	spin_lock_init(&zone->lock);
-	zone_seqlock_init(zone);
 	zone_pcp_init(zone);
 }
 

@@ -13,7 +13,6 @@
 #include <linux/threads.h>
 #include <linux/numa.h>
 #include <linux/init.h>
-#include <linux/seqlock.h>
 #include <linux/nodemask.h>
 #include <linux/pageblock-flags.h>
 #include <linux/page-flags-layout.h>
@@ -528,18 +527,11 @@ struct zone {
 	 *
 	 * Locking rules:
 	 *
-	 * zone_start_pfn and spanned_pages are protected by span_seqlock.
-	 * It is a seqlock because it has to be read outside of zone->lock,
-	 * and it is done in the main allocator path.  But, it is written
-	 * quite infrequently.
-	 *
-	 * The span_seq lock is declared along with zone->lock because it is
-	 * frequently read in proximity to zone->lock.  It's good to
-	 * give them a chance of being in the same cacheline.
-	 *
-	 * Write access to present_pages at runtime should be protected by
-	 * mem_hotplug_begin/end(). Any reader who can't tolerant drift of
-	 * present_pages should get_online_mems() to get a stable value.
+	 * Besides system initialization functions, memory-hotplug is the only
+	 * user that can change zone's {spanned,present} pages at runtime, and
+	 * it does so by holding the mem_hotplug_lock lock. Any readers who
+	 * can't tolerate drift values should use {get,put}_online_mems to get
+	 * a stable value.
 	 */
 	atomic_long_t		managed_pages;
 	unsigned long		spanned_pages;
@@ -557,11 +549,6 @@ struct zone {
 	 * of pageblock. Protected by zone->lock.
 	 */
 	unsigned long		nr_isolate_pageblock;
-#endif
-
-#ifdef CONFIG_MEMORY_HOTPLUG
-	/* see spanned/present_pages for more description */
-	seqlock_t		span_seqlock;
 #endif
 
 	int initialized;
