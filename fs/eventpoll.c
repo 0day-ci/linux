@@ -928,15 +928,15 @@ void eventpoll_release_file(struct file *file)
 
 static int ep_alloc(struct eventpoll **pep)
 {
-	int error;
 	struct user_struct *user;
 	struct eventpoll *ep;
 
 	user = get_current_user();
-	error = -ENOMEM;
 	ep = kzalloc(sizeof(*ep), GFP_KERNEL);
-	if (unlikely(!ep))
-		goto free_uid;
+	if (unlikely(!ep)) {
+		free_uid(user);
+		return -ENOMEM;
+	}
 
 	mutex_init(&ep->mtx);
 	rwlock_init(&ep->lock);
@@ -950,10 +950,6 @@ static int ep_alloc(struct eventpoll **pep)
 	*pep = ep;
 
 	return 0;
-
-free_uid:
-	free_uid(user);
-	return error;
 }
 
 /*
