@@ -9,11 +9,16 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
+#include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 
 #include <dt-bindings/regulator/mediatek,mt6360-regulator.h>
+
+#define MT6360_REG_BUCK1_SEQTD	0x117
+#define MT6360_SEQOFF_REGNUM	4
 
 enum {
 	MT6360_REGULATOR_BUCK1 = 0,
@@ -45,6 +50,9 @@ struct mt6360_regulator_desc {
 struct mt6360_regulator_data {
 	struct device *dev;
 	struct regmap *regmap;
+	struct notifier_block reboot_notifier;
+	/* Only for BUCK1/BUCK2/LDO7/LDO6, these are default on power */
+	u8 power_off_seq[MT6360_SEQOFF_REGNUM];
 };
 
 static irqreturn_t mt6360_pgb_event_handler(int irq, void *data)
@@ -394,10 +402,28 @@ static int mt6360_regulator_irq_register(struct platform_device *pdev,
 	return 0;
 }
 
+static int reboot_notify_call(struct notifier_block *nb, unsigned long action, void *data)
+{
+	struct mt6360_regulator_data *mrd = container_of(nb, struct mt6360_regulator_data,
+							 reboot_notifier);
+	int ret;
+
+	if (action != SYS_HALT && action != SYS_POWER_OFF)
+		return NOTIFY_DONE;
+
+	ret = regmap_raw_write(mrd->regmap, MT6360_REG_BUCK1_SEQTD, mrd->power_off_seq,
+			       MT6360_SEQOFF_REGNUM);
+	if (ret)
+		dev_err(mrd->dev, "Failed to apply the power off sequence\n");
+
+	return NOTIFY_DONE;
+}
+
 static int mt6360_regulator_probe(struct platform_device *pdev)
 {
 	struct mt6360_regulator_data *mrd;
 	struct regulator_config config = {};
+	struct fwnode_handle *fwnode;
 	int i, ret;
 
 	mrd = devm_kzalloc(&pdev->dev, sizeof(*mrd), GFP_KERNEL);
@@ -434,7 +460,16 @@ static int mt6360_regulator_probe(struct platform_device *pdev)
 		}
 	}
 
-	return 0;
+	fwnode = device_get_named_child_node(pdev->dev.parent, "regulator");
+	if (fwnode) {
+		ret = fwnode_property_read_u8_array(fwnode, "mediatek,power-off-sequence",
+						    mrd->power_off_seq, MT6360_SEQOFF_REGNUM);
+		if (ret)
+			dev_warn(&pdev->dev, "Use no delay immediate off by default [%d]\n", ret);
+	}
+
+	mrd->reboot_notifier.notifier_call = reboot_notify_call;
+	return devm_register_reboot_notifier(&pdev->dev, &mrd->reboot_notifier);
 }
 
 static const struct platform_device_id mt6360_regulator_id_table[] = {
