@@ -17,7 +17,7 @@ description: |
   created. The number of this io-channel is the same as the index into the list
   of strings in the channels property, and also matches the mux controller
   state. The mux controller state is described in
-  Documentation/device-tree/bindings/mux/mux-controller.yaml
+  Documentation/devicetree/bindings/mux/mux-controller.yaml
 
 properties:
 
