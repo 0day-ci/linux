@@ -190,9 +190,9 @@ static int trickle_charger_of_init(struct device *dev, struct device_node *node)
 	return 0;
 }
 
-static ssize_t bq32k_sysfs_show_tricklecharge_bypass(struct device *dev,
-					       struct device_attribute *attr,
-					       char *buf)
+static ssize_t trickle_charge_bypass_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
 {
 	int reg, error;
 
@@ -203,9 +203,9 @@ static ssize_t bq32k_sysfs_show_tricklecharge_bypass(struct device *dev,
 	return sprintf(buf, "%d\n", (reg & BQ32K_TCFE) ? 1 : 0);
 }
 
-static ssize_t bq32k_sysfs_store_tricklecharge_bypass(struct device *dev,
-						struct device_attribute *attr,
-						const char *buf, size_t count)
+static ssize_t trickle_charge_bypass_store(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t count)
 {
 	int reg, enable, error;
 
@@ -235,9 +235,7 @@ static ssize_t bq32k_sysfs_store_tricklecharge_bypass(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(trickle_charge_bypass, 0644,
-		   bq32k_sysfs_show_tricklecharge_bypass,
-		   bq32k_sysfs_store_tricklecharge_bypass);
+static DEVICE_ATTR_RW(trickle_charge_bypass);
 
 static int bq32k_sysfs_register(struct device *dev)
 {
