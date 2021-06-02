@@ -397,6 +397,18 @@ static int genpd_set_performance_state(struct device *dev, unsigned int state)
 	return ret;
 }
 
+static int genpd_drop_performance_state(struct device *dev)
+{
+	struct generic_pm_domain_data *gpd_data = dev_gpd_data(dev);
+	unsigned int prev_state;
+
+	prev_state = gpd_data->performance_state;
+	if (prev_state && !genpd_set_performance_state(dev, 0))
+		return prev_state;
+
+	return 0;
+}
+
 /**
  * dev_pm_genpd_set_performance_state- Set performance state of device's power
  * domain.
@@ -839,7 +851,8 @@ static int genpd_runtime_suspend(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
 	bool (*suspend_ok)(struct device *__dev);
-	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
+	struct generic_pm_domain_data *gpd_data = dev_gpd_data(dev);
+	struct gpd_timing_data *td = &gpd_data->td;
 	bool runtime_pm = pm_runtime_enabled(dev);
 	ktime_t time_start;
 	s64 elapsed_ns;
@@ -896,6 +909,7 @@ static int genpd_runtime_suspend(struct device *dev)
 		return 0;
 
 	genpd_lock(genpd);
+	gpd_data->rpm_saved_pstate = genpd_drop_performance_state(dev);
 	genpd_power_off(genpd, true, 0);
 	genpd_unlock(genpd);
 
@@ -913,7 +927,8 @@ static int genpd_runtime_suspend(struct device *dev)
 static int genpd_runtime_resume(struct device *dev)
 {
 	struct generic_pm_domain *genpd;
-	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
+	struct generic_pm_domain_data *gpd_data = dev_gpd_data(dev);
+	struct gpd_timing_data *td = &gpd_data->td;
 	bool runtime_pm = pm_runtime_enabled(dev);
 	ktime_t time_start;
 	s64 elapsed_ns;
@@ -937,6 +952,8 @@ static int genpd_runtime_resume(struct device *dev)
 
 	genpd_lock(genpd);
 	ret = genpd_power_on(genpd, 0);
+	if (!ret && gpd_data->rpm_saved_pstate)
+		genpd_set_performance_state(dev, gpd_data->rpm_saved_pstate);
 	genpd_unlock(genpd);
 
 	if (ret)
