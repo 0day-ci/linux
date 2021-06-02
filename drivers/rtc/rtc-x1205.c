@@ -566,8 +566,8 @@ static const struct rtc_class_ops x1205_rtc_ops = {
 	.set_alarm	= x1205_rtc_set_alarm,
 };
 
-static ssize_t x1205_sysfs_show_atrim(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t atrim_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
 	int err, atrim;
 
@@ -577,10 +577,10 @@ static ssize_t x1205_sysfs_show_atrim(struct device *dev,
 
 	return sprintf(buf, "%d.%02d pF\n", atrim / 1000, atrim % 1000);
 }
-static DEVICE_ATTR(atrim, S_IRUGO, x1205_sysfs_show_atrim, NULL);
+static DEVICE_ATTR_RO(atrim);
 
-static ssize_t x1205_sysfs_show_dtrim(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t dtrim_show(struct device *dev,
+			  struct device_attribute *attr, char *buf)
 {
 	int err, dtrim;
 
@@ -590,7 +590,7 @@ static ssize_t x1205_sysfs_show_dtrim(struct device *dev,
 
 	return sprintf(buf, "%d ppm\n", dtrim);
 }
-static DEVICE_ATTR(dtrim, S_IRUGO, x1205_sysfs_show_dtrim, NULL);
+static DEVICE_ATTR_RO(dtrim);
 
 static int x1205_sysfs_register(struct device *dev)
 {
