@@ -398,7 +398,9 @@ int SetOverlayViewPort(volatile STG4000REG __iomem *pSTGReg,
 		ulDecimated =
 		    (ulBits * ulApplied) + Overlap((ulSrc % 32),
 						   ulPattern);
-		ulSrc = ulSrc - ulDecimated;	/* the number number of lines that will go into the scaler */
+
+		/* the number of lines that will go into the scaler */
+		ulSrc = ulSrc - ulDecimated;
 	}
 
 	if (ulBits && (ulBits != 32)) {
