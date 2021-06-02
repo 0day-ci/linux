@@ -274,9 +274,9 @@ static int ab8500_rtc_get_calibration(struct device *dev, int *calibration)
 	return retval;
 }
 
-static ssize_t ab8500_sysfs_store_rtc_calibration(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
+static ssize_t rtc_calibration_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
 {
 	int retval;
 	int calibration = 0;
@@ -291,8 +291,8 @@ static ssize_t ab8500_sysfs_store_rtc_calibration(struct device *dev,
 	return retval ? retval : count;
 }
 
-static ssize_t ab8500_sysfs_show_rtc_calibration(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t rtc_calibration_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
 {
 	int  retval = 0;
 	int  calibration = 0;
@@ -307,9 +307,7 @@ static ssize_t ab8500_sysfs_show_rtc_calibration(struct device *dev,
 	return sprintf(buf, "%d\n", calibration);
 }
 
-static DEVICE_ATTR(rtc_calibration, S_IRUGO | S_IWUSR,
-		   ab8500_sysfs_show_rtc_calibration,
-		   ab8500_sysfs_store_rtc_calibration);
+static DEVICE_ATTR_RW(rtc_calibration);
 
 static struct attribute *ab8500_rtc_attrs[] = {
 	&dev_attr_rtc_calibration.attr,
