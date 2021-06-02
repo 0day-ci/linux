@@ -173,8 +173,8 @@ static int check_pfn_span(unsigned long pfn, unsigned long nr_pages,
 	else
 		min_align = PAGES_PER_SECTION;
 	if (!IS_ALIGNED(pfn, min_align) || !IS_ALIGNED(nr_pages, min_align)) {
-		WARN(1, "Misaligned __%s_pages start: %#lx end: %#lx\n",
-		     reason, pfn, pfn + nr_pages - 1);
+		WARN(1, "Misaligned __%s_pages min_align: %#lx start: %#lx end: %#lx\n",
+		     reason, min_align, pfn, pfn + nr_pages - 1);
 		return -EINVAL;
 	}
 	return 0;
