@@ -242,6 +242,12 @@ static inline int proc_net_init(void) { return 0; }
 #endif
 
 /*
+ * meminfo.c
+ */
+extern int proc_meminfo_show(struct seq_file *m, struct pid_namespace *ns,
+		struct pid *pid, struct task_struct *tsk);
+
+/*
  * proc_self.c
  */
 extern int proc_setup_self(struct super_block *);
