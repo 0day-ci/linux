@@ -3295,6 +3295,7 @@ int mpi3mr_init_ioc(struct mpi3mr_ioc *mrioc, u8 re_init)
 	}
 	ioc_state = mpi3mr_get_iocstate(mrioc);
 	if (ioc_state != MRIOC_STATE_RESET) {
+		retval = -1;
 		ioc_err(mrioc, "Cannot bring IOC to reset state\n");
 		goto out_failed;
 	}
