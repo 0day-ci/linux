@@ -2056,7 +2056,8 @@ int btrfs_commit_transaction(struct btrfs_trans_handle *trans)
 	}
 
 	cur_trans->state = TRANS_STATE_COMMIT_START;
-	wake_up(&fs_info->transaction_blocked_wait);
+	/* Serialize state change, but there are no waiters */
+	smp_mb();
 
 	if (cur_trans->list.prev != &fs_info->trans_list) {
 		enum btrfs_trans_state want_state = TRANS_STATE_COMPLETED;

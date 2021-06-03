@@ -302,7 +302,6 @@ void __btrfs_abort_transaction(struct btrfs_trans_handle *trans,
 	WRITE_ONCE(trans->transaction->aborted, errno);
 	/* Wake up anybody who may be waiting on this transaction */
 	wake_up(&fs_info->transaction_wait);
-	wake_up(&fs_info->transaction_blocked_wait);
 	__btrfs_handle_fs_error(fs_info, function, line, errno, NULL);
 }
 /*
