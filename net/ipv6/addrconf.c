@@ -2833,9 +2833,6 @@ static int addrconf_set_sit_dstaddr(struct net *net, struct net_device *dev,
 	if (err)
 		return err;
 
-	dev = __dev_get_by_name(net, p.name);
-	if (!dev)
-		return -ENOBUFS;
 	return dev_open(dev, NULL);
 }
 
