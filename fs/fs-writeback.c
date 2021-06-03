@@ -335,10 +335,10 @@ static struct bdi_writeback *inode_to_wb_and_lock_list(struct inode *inode)
 }
 
 struct inode_switch_wbs_context {
-	struct inode		*inode;
-	struct bdi_writeback	*new_wb;
-
 	struct rcu_work		work;
+
+	struct bdi_writeback	*new_wb;
+	struct inode		*inodes[];
 };
 
 static void bdi_down_write_wb_switch_rwsem(struct backing_dev_info *bdi)
@@ -473,10 +473,14 @@ static void inode_switch_wbs_work_fn(struct work_struct *work)
 {
 	struct inode_switch_wbs_context *isw =
 		container_of(to_rcu_work(work), struct inode_switch_wbs_context, work);
+	struct inode **inodep;
 
-	inode_do_switch_wbs(isw->inode, isw->new_wb);
+	for (inodep = &isw->inodes[0]; *inodep; inodep++) {
+		inode_do_switch_wbs(*inodep, isw->new_wb);
+		iput(*inodep);
+	}
+
 	wb_put(isw->new_wb);
-	iput(isw->inode);
 	kfree(isw);
 	atomic_dec(&isw_nr_in_flight);
 }
@@ -503,7 +507,7 @@ static void inode_switch_wbs(struct inode *inode, int new_wb_id)
 	if (atomic_read(&isw_nr_in_flight) > WB_FRN_MAX_IN_FLIGHT)
 		return;
 
-	isw = kzalloc(sizeof(*isw), GFP_ATOMIC);
+	isw = kzalloc(sizeof(*isw) + 2 * sizeof(struct inode *), GFP_ATOMIC);
 	if (!isw)
 		return;
 
@@ -528,7 +532,7 @@ static void inode_switch_wbs(struct inode *inode, int new_wb_id)
 	__iget(inode);
 	spin_unlock(&inode->i_lock);
 
-	isw->inode = inode;
+	isw->inodes[0] = inode;
 
 	/*
 	 * In addition to synchronizing among switchers, I_WB_SWITCH tells
