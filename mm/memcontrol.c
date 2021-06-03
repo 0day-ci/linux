@@ -1989,7 +1989,7 @@ void lock_page_memcg(struct page *page)
 	 * The RCU lock is held throughout the transaction.  The fast
 	 * path can get away without acquiring the memcg->move_lock
 	 * because page moving starts with an RCU grace period.
-         */
+	 */
 	rcu_read_lock();
 
 	if (mem_cgroup_disabled())
