@@ -1624,6 +1624,8 @@ int ib_cache_setup_one(struct ib_device *device)
 		err = ib_cache_update(device, p, true);
 		if (err)
 			return err;
+		set_bit(IB_PORT_CACHE_INITIALIZED,
+			&device->port_data[p].flags);
 	}
 
 	return 0;
@@ -1639,8 +1641,11 @@ void ib_cache_release_one(struct ib_device *device)
 	 * all the device's resources when the cache could no
 	 * longer be accessed.
 	 */
-	rdma_for_each_port (device, p)
+	rdma_for_each_port (device, p) {
+		clear_bit(IB_PORT_CACHE_INITIALIZED,
+			 &device->port_data[p].flags);
 		kfree(device->port_data[p].cache.pkey);
+	}
 
 	gid_table_release_one(device);
 }

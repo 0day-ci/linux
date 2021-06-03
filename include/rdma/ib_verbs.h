@@ -2169,6 +2169,10 @@ struct ib_port_immutable {
 	u32                           max_mad_size;
 };
 
+enum ib_port_data_flags {
+	IB_PORT_CACHE_INITIALIZED = 1 << 0,
+};
+
 struct ib_port_data {
 	struct ib_device *ib_dev;
 
@@ -2177,6 +2181,8 @@ struct ib_port_data {
 	spinlock_t pkey_list_lock;
 
 	spinlock_t netdev_lock;
+
+	unsigned long flags;
 
 	struct list_head pkey_list;
 

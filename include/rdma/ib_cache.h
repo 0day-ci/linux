@@ -114,4 +114,10 @@ ssize_t rdma_query_gid_table(struct ib_device *device,
 			     struct ib_uverbs_gid_entry *entries,
 			     size_t max_entries);
 
+static inline bool ib_cache_is_initialised(struct ib_device *device,
+					  u8 port_num)
+{
+	return test_bit(IB_PORT_CACHE_INITIALIZED,
+			&device->port_data[port_num].flags);
+}
 #endif /* _IB_CACHE_H */
