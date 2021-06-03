@@ -716,7 +716,7 @@ static void neo_parse_isr(struct jsm_board *brd, u32 port)
 		return;
 
 	ch = brd->channels[port];
-	if (!ch)
+	if (!ch || !ch->ch_equeue || !ch->ch_rqueue)
 		return;
 
 	/* Here we try to figure out what caused the interrupt to happen */
@@ -832,7 +832,7 @@ static inline void neo_parse_lsr(struct jsm_board *brd, u32 port)
 		return;
 
 	ch = brd->channels[port];
-	if (!ch)
+	if (!ch || !ch->ch_equeue || !ch->ch_rqueue)
 		return;
 
 	linestatus = readb(&ch->ch_neo_uart->lsr);
@@ -1172,7 +1172,7 @@ static irqreturn_t neo_intr(int irq, void *voidbrd)
 				continue;
 
 			ch = brd->channels[port];
-			if (!ch)
+			if (!ch || !ch->ch_equeue || !ch->ch_rqueue)
 				continue;
 
 			neo_copy_data_from_uart_to_queue(ch);
