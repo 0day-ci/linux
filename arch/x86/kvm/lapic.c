@@ -2344,6 +2344,7 @@ void kvm_lapic_reset(struct kvm_vcpu *vcpu, bool init_event)
 	kvm_lapic_set_reg(apic, APIC_ICR2, 0);
 	kvm_lapic_set_reg(apic, APIC_TDCR, 0);
 	kvm_lapic_set_reg(apic, APIC_TMICT, 0);
+	kvm_lapic_set_reg(apic, APIC_TMCCT, 0);
 	for (i = 0; i < 8; i++) {
 		kvm_lapic_set_reg(apic, APIC_IRR + 0x10 * i, 0);
 		kvm_lapic_set_reg(apic, APIC_ISR + 0x10 * i, 0);
