@@ -225,6 +225,8 @@ void wb_wait_for_completion(struct wb_completion *done)
 					/* one round can affect upto 5 slots */
 #define WB_FRN_MAX_IN_FLIGHT	1024	/* don't queue too many concurrently */
 
+#define WB_MAX_INODES_PER_ISW	116	/* maximum inodes per isw */
+
 static atomic_t isw_nr_in_flight = ATOMIC_INIT(0);
 static struct workqueue_struct *isw_wq;
 
@@ -550,6 +552,72 @@ out_free:
 	if (isw->new_wb)
 		wb_put(isw->new_wb);
 	kfree(isw);
+}
+
+/**
+ * cleanup_offline_cgwb - detach associated inodes
+ * @wb: target wb
+ *
+ * Switch all inodes attached to @wb to the bdi's root wb in order to eventually
+ * release the dying @wb.  Returns %true if not all inodes were switched and
+ * the function has to be restarted.
+ */
+bool cleanup_offline_cgwb(struct bdi_writeback *wb)
+{
+	struct inode_switch_wbs_context *isw;
+	struct inode *inode;
+	int nr;
+	bool restart = false;
+
+	isw = kzalloc(sizeof(*isw) + WB_MAX_INODES_PER_ISW *
+		      sizeof(struct inode *), GFP_KERNEL);
+	if (!isw)
+		return restart;
+
+	/* no need to call wb_get() here: bdi's root wb is not refcounted */
+	isw->new_wb = &wb->bdi->wb;
+
+	nr = 0;
+	spin_lock(&wb->list_lock);
+	list_for_each_entry(inode, &wb->b_attached, i_io_list) {
+		spin_lock(&inode->i_lock);
+		if (!(inode->i_sb->s_flags & SB_ACTIVE) ||
+		    inode->i_state & (I_WB_SWITCH | I_FREEING) ||
+		    inode_to_wb(inode) == isw->new_wb) {
+			spin_unlock(&inode->i_lock);
+			continue;
+		}
+		inode->i_state |= I_WB_SWITCH;
+		__iget(inode);
+		spin_unlock(&inode->i_lock);
+
+		isw->inodes[nr++] = inode;
+
+		if (nr >= WB_MAX_INODES_PER_ISW - 1) {
+			restart = true;
+			break;
+		}
+	}
+	spin_unlock(&wb->list_lock);
+
+	/* no attached inodes? bail out */
+	if (nr == 0) {
+		kfree(isw);
+		return restart;
+	}
+
+	/*
+	 * In addition to synchronizing among switchers, I_WB_SWITCH tells
+	 * the RCU protected stat update paths to grab the i_page
+	 * lock so that stat transfer can synchronize against them.
+	 * Let's continue after I_WB_SWITCH is guaranteed to be visible.
+	 */
+	INIT_RCU_WORK(&isw->work, inode_switch_wbs_work_fn);
+	queue_rcu_work(isw_wq, &isw->work);
+
+	atomic_inc(&isw_nr_in_flight);
+
+	return restart;
 }
 
 /**
