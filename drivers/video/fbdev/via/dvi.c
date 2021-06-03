@@ -398,8 +398,10 @@ void viafb_dvi_enable(void)
 		if (viaparinfo->chip_info->gfx_chip_name == UNICHROME_CLE266)
 			tmds_register_write(0x88, 0x3b);
 		else
-			/*clear CR91[5] to direct on display period
-			   in the secondary diplay path */
+			/*
+			 * clear CR91[5] to direct on display period
+			 * in the secondary display path
+			 */
 			via_write_reg_mask(VIACR, 0x91, 0x00, 0x20);
 		break;
 
@@ -411,8 +413,10 @@ void viafb_dvi_enable(void)
 		if (viaparinfo->chip_info->gfx_chip_name == UNICHROME_CLE266)
 			tmds_register_write(0x88, 0x3b);
 		else
-			/*clear CR91[5] to direct on display period
-			  in the secondary diplay path */
+			/*
+			 * clear CR91[5] to direct on display period
+			 * in the secondary display path
+			 */
 			via_write_reg_mask(VIACR, 0x91, 0x00, 0x20);
 
 		/*fix DVI cannot enable on EPIA-M board */
