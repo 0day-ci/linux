@@ -430,7 +430,7 @@ static int rk817_probe(struct snd_soc_component *component)
 
 	snd_soc_component_set_pll(component, 0, 0, 0, 0);
 
-	return 0;
+	return ret;
 }
 
 static void rk817_remove(struct snd_soc_component *component)
