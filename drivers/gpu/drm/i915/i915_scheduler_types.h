@@ -104,6 +104,11 @@ struct i915_sched_engine {
 	struct list_head hold; /* ready requests, but on hold */
 
 	/**
+	 * @tasklet: softirq tasklet for bottom handler
+	 */
+	struct tasklet_struct tasklet;
+
+	/**
 	 * @default_priolist: priority list for I915_PRIORITY_NORMAL
 	 */
 	struct i915_priolist default_priolist;
@@ -131,6 +136,9 @@ struct i915_sched_engine {
 	 * @no_priolist: priority lists disabled
 	 */
 	bool no_priolist;
+
+	/* Back pointer to engine */
+	struct intel_engine_cs *engine;
 
 	/* Kick backend */
 	void	(*kick_backend)(const struct i915_request *rq,
