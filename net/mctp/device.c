@@ -191,6 +191,8 @@ static int mctp_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh,
 	ifaddr->dev = mdev;
 	list_add(&ifaddr->dev_list, &mdev->addrs);
 
+	mctp_route_add_local(mdev, addr->s_addr);
+
 	return 0;
 }
 
@@ -282,10 +284,7 @@ static void mctp_unregister(struct net_device *dev)
 
 	RCU_INIT_POINTER(mdev->dev->mctp_ptr, NULL);
 
-	/* TODO: drop routes, to the point where we can dev_put(); requires
-	 * coordination with the route layer; each route should hold a dev
-	 * reference. We should only need to synchronize_rcu() once for this.
-	 */
+	mctp_route_remove_dev(mdev);
 	list_for_each_entry_safe(ifa, tmp, &mdev->addrs, dev_list) {
 		list_del_rcu(&ifa->dev_list);
 		kfree_rcu(ifa, rcu);
