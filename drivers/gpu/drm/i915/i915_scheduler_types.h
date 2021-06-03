@@ -132,6 +132,10 @@ struct i915_sched_engine {
 	 */
 	bool no_priolist;
 
+	/* Kick backend */
+	void	(*kick_backend)(const struct i915_request *rq,
+				int prio);
+
 	/*
 	 * Call when the priority on a request has changed and it and its
 	 * dependencies may need rescheduling. Note the request itself may
