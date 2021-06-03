@@ -906,6 +906,8 @@ __SYSCALL(__NR_futex_wait, compat_sys_futex_wait)
 __SYSCALL(__NR_futex_wake, sys_futex_wake)
 #define __NR_futex_waitv 449
 __SYSCALL(__NR_futex_waitv, compat_sys_futex_waitv)
+#define __NR_futex_requeue 450
+__SYSCALL(__NR_futex_requeue, compat_sys_futex_requeue)
 
 /*
  * Please add new compat syscalls above this comment and update
