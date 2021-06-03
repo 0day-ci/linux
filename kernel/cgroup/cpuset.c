@@ -1891,7 +1891,7 @@ static void update_tasks_flags(struct cpuset *cs)
  * cs:		the cpuset to update
  * turning_on: 	whether the flag is being set or cleared
  *
- * Call with cpuset_mutex held.
+ * Call with cpuset_mutex held & cpumasks remain unchanged.
  */
 
 static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
@@ -1911,15 +1911,21 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	else
 		clear_bit(bit, &trialcs->flags);
 
-	err = validate_change(cs, trialcs);
-	if (err < 0)
-		goto out;
-
 	balance_flag_changed = (is_sched_load_balance(cs) !=
 				is_sched_load_balance(trialcs));
 
 	spread_flag_changed = ((is_spread_slab(cs) != is_spread_slab(trialcs))
 			|| (is_spread_page(cs) != is_spread_page(trialcs)));
+
+	/*
+	 * validate_change() doesn't validate changes in load balance
+	 * and spread flags.
+	 */
+	if (!balance_flag_changed && !spread_flag_changed) {
+		err = validate_change(cs, trialcs);
+		if (err < 0)
+			goto out;
+	}
 
 	spin_lock_irq(&callback_lock);
 	cs->flags = trialcs->flags;
