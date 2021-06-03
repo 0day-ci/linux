@@ -23,6 +23,7 @@
 #include <linux/export.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <asm-generic/sections.h>
 #include "pgo.h"
 
 /*
@@ -55,17 +56,19 @@ void prf_unlock(unsigned long flags)
 static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 						 u32 index, u64 value)
 {
-	if (&__llvm_prf_vnds_start[current_node + 1] >= __llvm_prf_vnds_end)
-		return NULL; /* Out of nodes */
-
-	current_node++;
-
-	/* Make sure the node is entirely within the section */
-	if (&__llvm_prf_vnds_start[current_node] >= __llvm_prf_vnds_end ||
-	    &__llvm_prf_vnds_start[current_node + 1] > __llvm_prf_vnds_end)
+	const int max_vnds = prf_vnds_count();
+	/* Check that p is within vmlinux __llvm_prf_data section.
+	 * If not, don't allocate since we can't handle modules yet.
+	 */
+	if (!memory_contains(__llvm_prf_data_start,
+		__llvm_prf_data_end, p, sizeof(*p)))
 		return NULL;
 
-	return &__llvm_prf_vnds_start[current_node];
+	if (WARN_ON_ONCE(current_node >= max_vnds))
+		return NULL; /* Out of nodes */
+
+	/* reserve vnode for vmlinux */
+	return &__llvm_prf_vnds_start[current_node++];
 }
 
 /*
