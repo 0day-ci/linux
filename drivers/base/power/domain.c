@@ -1171,6 +1171,7 @@ static int genpd_prepare(struct device *dev)
  */
 static int genpd_finish_suspend(struct device *dev, bool poweroff)
 {
+	struct generic_pm_domain_data *gpd_data = dev_gpd_data(dev);
 	struct generic_pm_domain *genpd;
 	int ret = 0;
 
@@ -1201,6 +1202,7 @@ static int genpd_finish_suspend(struct device *dev, bool poweroff)
 	}
 
 	genpd_lock(genpd);
+	gpd_data->pm_pstate = genpd_drop_performance_state(dev);
 	genpd->suspended_count++;
 	genpd_sync_power_off(genpd, true, 0);
 	genpd_unlock(genpd);
@@ -1245,6 +1247,7 @@ static int genpd_resume_noirq(struct device *dev)
 	genpd_lock(genpd);
 	genpd_sync_power_on(genpd, true, 0);
 	genpd->suspended_count--;
+	genpd_restore_performance_state(dev, dev_gpd_data(dev)->pm_pstate);
 	genpd_unlock(genpd);
 
 	if (genpd->dev_ops.stop && genpd->dev_ops.start &&
@@ -1364,6 +1367,7 @@ static int genpd_restore_noirq(struct device *dev)
 	}
 
 	genpd_sync_power_on(genpd, true, 0);
+	genpd_restore_performance_state(dev, dev_gpd_data(dev)->pm_pstate);
 	genpd_unlock(genpd);
 
 	if (genpd->dev_ops.stop && genpd->dev_ops.start &&
@@ -1409,11 +1413,14 @@ static void genpd_complete(struct device *dev)
 static void genpd_switch_state(struct device *dev, bool suspend)
 {
 	struct generic_pm_domain *genpd;
+	struct generic_pm_domain_data *gpd_data;
 	bool use_lock;
 
 	genpd = dev_to_genpd_safe(dev);
 	if (!genpd)
 		return;
+
+	gpd_data = dev_gpd_data(dev);
 
 	use_lock = genpd_is_irq_safe(genpd);
 
@@ -1421,11 +1428,13 @@ static void genpd_switch_state(struct device *dev, bool suspend)
 		genpd_lock(genpd);
 
 	if (suspend) {
+		gpd_data->pm_pstate = genpd_drop_performance_state(dev);
 		genpd->suspended_count++;
 		genpd_sync_power_off(genpd, use_lock, 0);
 	} else {
 		genpd_sync_power_on(genpd, use_lock, 0);
 		genpd->suspended_count--;
+		genpd_restore_performance_state(dev, gpd_data->pm_pstate);
 	}
 
 	if (use_lock)
