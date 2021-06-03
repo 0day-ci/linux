@@ -673,6 +673,14 @@ struct io_hardlink {
 	int				flags;
 };
 
+struct io_mknod {
+	struct file			*file;
+	int				dfd;
+	umode_t				mode;
+	struct filename		*filename;
+	unsigned int		dev;
+};
+
 struct io_completion {
 	struct file			*file;
 	struct list_head		list;
@@ -812,6 +820,7 @@ struct io_kiocb {
 		struct io_mkdir		mkdir;
 		struct io_symlink	symlink;
 		struct io_hardlink	hardlink;
+		struct io_mknod		mknod;
 		/* use only after cleaning per-op data, see io_clean_op() */
 		struct io_completion	compl;
 	};
@@ -1030,6 +1039,7 @@ static const struct io_op_def io_op_defs[] = {
 	[IORING_OP_MKDIRAT] = {},
 	[IORING_OP_SYMLINKAT] = {},
 	[IORING_OP_LINKAT] = {},
+	[IORING_OP_MKNODAT] = {},
 };
 
 static bool io_disarm_next(struct io_kiocb *req);
@@ -3697,6 +3707,44 @@ static int io_linkat(struct io_kiocb *req, int issue_flags)
 	io_req_complete(req, ret);
 	return 0;
 }
+static int io_mknodat_prep(struct io_kiocb *req,
+			    const struct io_uring_sqe *sqe)
+{
+	struct io_mknod *mkn = &req->mknod;
+	const char __user *fname;
+
+	if (unlikely(req->flags & REQ_F_FIXED_FILE))
+		return -EBADF;
+
+	mkn->dfd = READ_ONCE(sqe->fd);
+	mkn->mode = READ_ONCE(sqe->len);
+	fname = u64_to_user_ptr(READ_ONCE(sqe->addr));
+	mkn->dev = READ_ONCE(sqe->mknod_dev);
+
+	mkn->filename = getname(fname);
+	if (IS_ERR(mkn->filename))
+		return PTR_ERR(mkn->filename);
+
+	req->flags |= REQ_F_NEED_CLEANUP;
+	return 0;
+}
+
+static int io_mknodat(struct io_kiocb *req, int issue_flags)
+{
+	struct io_mknod *mkn = &req->mknod;
+	int ret;
+
+	if (issue_flags & IO_URING_F_NONBLOCK)
+		return -EAGAIN;
+
+	ret = do_mknodat(mkn->dfd, mkn->filename, mkn->mode, mkn->dev);
+
+	req->flags &= ~REQ_F_NEED_CLEANUP;
+	if (ret < 0)
+		req_set_fail(req);
+	io_req_complete(req, ret);
+	return 0;
+}
 
 static int io_shutdown_prep(struct io_kiocb *req,
 			    const struct io_uring_sqe *sqe)
@@ -6030,6 +6078,8 @@ static int io_req_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 		return io_symlinkat_prep(req, sqe);
 	case IORING_OP_LINKAT:
 		return io_linkat_prep(req, sqe);
+	case IORING_OP_MKNODAT:
+		return io_mknodat_prep(req, sqe);
 	}
 
 	printk_once(KERN_WARNING "io_uring: unhandled opcode %d\n",
@@ -6191,6 +6241,9 @@ static void __io_clean_op(struct io_kiocb *req)
 			putname(req->hardlink.oldpath);
 			putname(req->hardlink.newpath);
 			break;
+		case IORING_OP_MKNODAT:
+			putname(req->mknod.filename);
+			break;
 		}
 		req->flags &= ~REQ_F_NEED_CLEANUP;
 	}
@@ -6314,6 +6367,9 @@ static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
 		break;
 	case IORING_OP_LINKAT:
 		ret = io_linkat(req, issue_flags);
+		break;
+	case IORING_OP_MKNODAT:
+		ret = io_mknodat(req, issue_flags);
 		break;
 	default:
 		ret = -EINVAL;

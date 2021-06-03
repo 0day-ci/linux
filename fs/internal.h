@@ -81,6 +81,8 @@ int do_mkdirat(int dfd, struct filename *name, umode_t mode);
 int do_symlinkat(struct filename *from, int newdfd, struct filename *to);
 int do_linkat(int olddfd, struct filename *old, int newdfd,
 			struct filename *new, int flags);
+int do_mknodat(int dfd, struct filename *name, umode_t mode,
+		unsigned int dev);
 
 /*
  * namespace.c
