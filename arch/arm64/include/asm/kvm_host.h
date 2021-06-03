@@ -100,6 +100,11 @@ struct kvm_s2_mmu {
 struct kvm_arch_memory_slot {
 };
 
+struct kvm_protected_vm {
+	bool enabled;
+	struct kvm_memory_slot *firmware_slot;
+};
+
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
 
@@ -132,6 +137,8 @@ struct kvm_arch {
 
 	u8 pfr0_csv2;
 	u8 pfr0_csv3;
+
+	struct kvm_protected_vm pkvm;
 };
 
 struct kvm_vcpu_fault_info {
@@ -762,6 +769,9 @@ struct kvm *kvm_arch_alloc_vm(void);
 void kvm_arch_free_vm(struct kvm *kvm);
 
 int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type);
+
+int kvm_arm_vm_ioctl_pkvm(struct kvm *kvm, struct kvm_enable_cap *cap);
+#define kvm_vm_is_protected(kvm) (kvm->arch.pkvm.enabled)
 
 int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu, int feature);
 bool kvm_arm_vcpu_is_finalized(struct kvm_vcpu *vcpu);

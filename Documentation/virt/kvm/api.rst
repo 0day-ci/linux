@@ -6362,6 +6362,75 @@ default.
 
 See Documentation/x86/sgx/2.Kernel-internals.rst for more details.
 
+7.26 KVM_CAP_ARM_PROTECTED_VM
+-----------------------------
+
+:Architectures: arm64
+:Target: VM
+:Parameters: flags is a single KVM_CAP_ARM_PROTECTED_VM_FLAGS_* value
+
+The presence of this capability indicates that KVM supports running in a
+configuration where the host Linux kernel does not have access to guest memory.
+On such a system, a small hypervisor layer at EL2 can configure the stage-2
+page tables for both the CPU and any DMA-capable devices to protect guest
+memory pages so that they are inaccessible to the host unless access is granted
+explicitly by the guest.
+
+The 'flags' parameter is defined as follows:
+
+7.26.1 KVM_CAP_ARM_PROTECTED_VM_FLAGS_ENABLE
+--------------------------------------------
+
+:Capability: 'flag' parameter to KVM_CAP_ARM_PROTECTED_VM
+:Architectures: arm64
+:Target: VM
+:Parameters: args[0] contains memory slot ID to hold guest firmware
+:Returns: 0 on success; negative error code on failure
+
+Enabling this capability causes all memory slots of the specified VM to be
+unmapped from the host system and put into a state where they are no longer
+configurable. The memory slot corresponding to the ID passed in args[0] is
+populated with the guest firmware image provided by the host firmware.
+
+The first vCPU to enter the guest is defined to be the primary vCPU. All other
+vCPUs belonging to the VM are secondary vCPUs.
+
+All vCPUs belonging to a VM with this capability enabled are initialised to a
+pre-determined reset state irrespective of any prior configuration according to
+the KVM_ARM_VCPU_INIT ioctl, with the following exceptions for the primary
+vCPU:
+
+	===========	===========
+	Register(s)	Reset value
+	===========	===========
+	X0-X14:		Preserved (see KVM_SET_ONE_REG)
+	X15:		Boot protocol version (0)
+	X16-X30:	Reserved (0)
+	PC:		IPA base of firmware memory slot
+	SP:		IPA end of firmware memory slot
+	===========	===========
+
+Secondary vCPUs belonging to a VM with this capability enabled will return
+-EPERM in response to a KVM_RUN ioctl() if the vCPU was not initialised with
+the KVM_ARM_VCPU_POWER_OFF feature.
+
+There is no support for AArch32 at any exception level.
+
+It is an error to enable this capability on a VM after issuing a KVM_RUN
+ioctl() on one of its vCPUs.
+
+7.26.2 KVM_CAP_ARM_PROTECTED_VM_FLAGS_INFO
+------------------------------------------
+
+:Capability: 'flag' parameter to KVM_CAP_ARM_PROTECTED_VM
+:Architectures: arm64
+:Target: VM
+:Parameters: args[0] contains pointer to 'struct kvm_protected_vm_info'
+:Returns: 0 on success; negative error code on failure
+
+Populates the 'struct kvm_protected_vm_info' pointed to by args[0] with
+information about the protected environment for the VM.
+
 8. Other capabilities.
 ======================
 
