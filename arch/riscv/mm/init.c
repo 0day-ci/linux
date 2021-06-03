@@ -194,10 +194,8 @@ EXPORT_SYMBOL(va_kernel_pa_offset);
 #endif
 #ifdef CONFIG_XIP_KERNEL
 #define va_kernel_pa_offset    (*((unsigned long *)XIP_FIXUP(&va_kernel_pa_offset)))
-#endif
 unsigned long va_kernel_xip_pa_offset __ro_after_init;
 EXPORT_SYMBOL(va_kernel_xip_pa_offset);
-#ifdef CONFIG_XIP_KERNEL
 #define va_kernel_xip_pa_offset        (*((unsigned long *)XIP_FIXUP(&va_kernel_xip_pa_offset)))
 #endif
 unsigned long pfn_base __ro_after_init;
