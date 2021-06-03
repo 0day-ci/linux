@@ -2340,7 +2340,6 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		 unsigned long phys_pfn, unsigned long nr_pages, int prot)
 {
 	unsigned int largepage_lvl = 0;
-	unsigned long lvl_pages = 0;
 	struct dma_pte *pte = NULL;
 	phys_addr_t pteval;
 	u64 attr;
@@ -2366,6 +2365,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 
 	while (nr_pages > 0) {
 		uint64_t tmp;
+		unsigned long lvl_pages;
 
 		if (!pte) {
 			largepage_lvl = hardware_largepage_caps(domain, iov_pfn,
