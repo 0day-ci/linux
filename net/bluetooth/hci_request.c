@@ -305,7 +305,7 @@ struct sk_buff *hci_prepare_cmd(struct hci_dev *hdev, u16 opcode, u32 plen,
 	if (plen)
 		skb_put_data(skb, param, plen);
 
-	bt_dev_dbg(hdev, "skb len %d", skb->len);
+	bt_dev_dbg(hdev, "skb len %u", skb->len);
 
 	hci_skb_pkt_type(skb) = HCI_COMMAND_PKT;
 	hci_skb_opcode(skb) = opcode;
@@ -320,7 +320,7 @@ void hci_req_add_ev(struct hci_request *req, u16 opcode, u32 plen,
 	struct hci_dev *hdev = req->hdev;
 	struct sk_buff *skb;
 
-	bt_dev_dbg(hdev, "opcode 0x%4.4x plen %d", opcode, plen);
+	bt_dev_dbg(hdev, "opcode 0x%4.4x plen %u", opcode, plen);
 
 	/* If an error occurred during request building, there is no point in
 	 * queueing the HCI command. We can simply return.
@@ -1111,7 +1111,7 @@ void hci_req_add_le_passive_scan(struct hci_request *req)
 		interval = hdev->le_scan_interval;
 	}
 
-	bt_dev_dbg(hdev, "LE passive scan with whitelist = %d", filter_policy);
+	bt_dev_dbg(hdev, "LE passive scan with whitelist = %u", filter_policy);
 	hci_req_start_scan(req, LE_SCAN_PASSIVE, interval, window,
 			   own_addr_type, filter_policy, addr_resolv);
 }
@@ -3089,7 +3089,7 @@ static void le_scan_restart_work(struct work_struct *work)
 
 	hci_req_sync(hdev, le_scan_restart, 0, HCI_CMD_TIMEOUT, &status);
 	if (status) {
-		bt_dev_err(hdev, "failed to restart LE scan: status %d",
+		bt_dev_err(hdev, "failed to restart LE scan: status %u",
 			   status);
 		return;
 	}
