@@ -564,6 +564,29 @@ config DEBUG_FS_ALLOW_NONE
 
 endchoice
 
+config DEBUG_FS_PROBE_ERR
+	bool "Show device driver probe failures"
+	depends on DEBUG_FS
+	help
+	  This feature enables a devices_failed debugfs attribute exposing
+	  driver probe failures different from -EPROBE_DEFER.
+
+config DEBUG_FS_PROBE_ERR_BUF_SHIFT
+	int "Probe failures log buffer size"
+	depends on DEBUG_FS && DEBUG_FS_PROBE_ERR
+	range 12 16
+	default 12
+	help
+	  This options allows to increase the default ringbuffer size for
+	  driver probe failures as a power of 2.
+
+	  Examples:
+		     16 => 64 KB
+		     15 => 32 KB
+		     14 => 16 KB
+		     13 =>  8 KB
+		     12 =>  4 KB
+
 source "lib/Kconfig.kgdb"
 source "lib/Kconfig.ubsan"
 source "lib/Kconfig.kcsan"

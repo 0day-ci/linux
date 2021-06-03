@@ -9,7 +9,9 @@
  */
 
 #include <linux/acpi.h>
+#include <linux/circ_buf.h>
 #include <linux/cpufreq.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/fwnode.h>
@@ -52,6 +54,15 @@ static unsigned int defer_sync_state_count = 1;
 static DEFINE_MUTEX(fwnode_link_lock);
 static bool fw_devlink_is_permissive(void);
 static bool fw_devlink_drv_reg_done;
+
+#ifdef CONFIG_DEBUG_FS_PROBE_ERR
+#define PROBE_ERR_BUF_ELEM_SIZE	64
+#define PROBE_ERR_BUF_SIZE	(1 << CONFIG_DEBUG_FS_PROBE_ERR_BUF_SHIFT)
+static struct circ_buf probe_err_crbuf;
+static char failed_probe_buffer[PROBE_ERR_BUF_SIZE];
+static DEFINE_MUTEX(failed_probe_mutex);
+static struct dentry *devices_failed_probe;
+#endif
 
 /**
  * fwnode_link_add - Create a link between two fwnode_handles.
@@ -3741,6 +3752,29 @@ struct device *device_find_child_by_name(struct device *parent,
 }
 EXPORT_SYMBOL_GPL(device_find_child_by_name);
 
+/*
+ * failed_devs_show() - Show devices & drivers which failed to probe.
+ */
+#ifdef CONFIG_DEBUG_FS_PROBE_ERR
+static int failed_devs_show(struct seq_file *s, void *data)
+{
+	size_t offset;
+
+	mutex_lock(&failed_probe_mutex);
+
+	for (offset = 0;
+	     offset < PROBE_ERR_BUF_SIZE;
+	     offset += PROBE_ERR_BUF_ELEM_SIZE)
+		if (probe_err_crbuf.buf[offset])
+			seq_printf(s, "%s\n", probe_err_crbuf.buf + offset);
+
+	mutex_unlock(&failed_probe_mutex);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(failed_devs);
+#endif
+
 int __init devices_init(void)
 {
 	devices_kset = kset_create_and_add("devices", &device_uevent_ops, NULL);
@@ -3755,6 +3789,12 @@ int __init devices_init(void)
 	sysfs_dev_char_kobj = kobject_create_and_add("char", dev_kobj);
 	if (!sysfs_dev_char_kobj)
 		goto char_kobj_err;
+
+#ifdef CONFIG_DEBUG_FS_PROBE_ERR
+	devices_failed_probe = debugfs_create_file("devices_failed", 0444, NULL,
+						   NULL, &failed_devs_fops);
+	probe_err_crbuf.buf = failed_probe_buffer;
+#endif
 
 	return 0;
 
@@ -4596,6 +4636,34 @@ define_dev_printk_level(_dev_info, KERN_INFO);
 #endif
 
 /**
+ * device_log_probe_failure: Print err to kernel log then add debugfs entry
+ * @dev: the pointer to the struct device
+ * @err: error value to print
+ * @vaf: struct containing printf-style error format string and arguments
+ */
+void device_log_probe_failure(const struct device *dev, int err,
+			      struct va_format *vaf)
+{
+	dev_err(dev, "error %pe: %pV", ERR_PTR(err), vaf);
+
+#ifdef CONFIG_DEBUG_FS_PROBE_ERR
+	mutex_lock(&failed_probe_mutex);
+
+	snprintf(probe_err_crbuf.buf + probe_err_crbuf.head,
+		 PROBE_ERR_BUF_ELEM_SIZE,
+		 "%s %s %d %pV",
+		 dev_driver_string(dev), dev_name(dev), err, vaf);
+
+	if (probe_err_crbuf.head < PROBE_ERR_BUF_SIZE - PROBE_ERR_BUF_ELEM_SIZE)
+		probe_err_crbuf.head += PROBE_ERR_BUF_ELEM_SIZE;
+	else
+		probe_err_crbuf.head = 0;
+
+	mutex_unlock(&failed_probe_mutex);
+#endif
+}
+
+/**
  * dev_err_probe - probe error check and log helper
  * @dev: the pointer to the struct device
  * @err: error value to test
@@ -4603,10 +4671,12 @@ define_dev_printk_level(_dev_info, KERN_INFO);
  * @...: arguments as specified in the format string
  *
  * This helper implements common pattern present in probe functions for error
- * checking: print debug or error message depending if the error value is
- * -EPROBE_DEFER and propagate error upwards.
+ * checking: print debug or error message depending on the error value and then
+ * propagate the error upwards.
  * In case of -EPROBE_DEFER it sets also defer probe reason, which can be
  * checked later by reading devices_deferred debugfs attribute.
+ * Errors other than -EPROBE_DEFER can be checked by reading the devices_failed
+ * debugfs attribute if CONFIG_DEBUG_FS_PROBE_ERR is enabled.
  * It replaces code sequence::
  *
  * 	if (err != -EPROBE_DEFER)
@@ -4632,7 +4702,7 @@ int dev_err_probe(const struct device *dev, int err, const char *fmt, ...)
 	vaf.va = &args;
 
 	if (err != -EPROBE_DEFER) {
-		dev_err(dev, "error %pe: %pV", ERR_PTR(err), &vaf);
+		device_log_probe_failure(dev, err, &vaf);
 	} else {
 		device_set_deferred_probe_reason(dev, &vaf);
 		dev_dbg(dev, "error %pe: %pV", ERR_PTR(err), &vaf);
