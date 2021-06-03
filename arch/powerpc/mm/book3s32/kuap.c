@@ -5,10 +5,20 @@
 
 struct static_key_false disable_kuap_key;
 
+void kuap_lock_all_ool(void)
+{
+	kuap_lock_all();
+}
+
+void kuap_unlock_all_ool(void)
+{
+	kuap_unlock_all();
+}
+
 void __init setup_kuap(bool disabled)
 {
 	if (!disabled)
-		kuap_update_sr(mfsr(0) | SR_KS, 0, TASK_SIZE);
+		kuap_lock_all_ool();
 
 	if (smp_processor_id() != boot_cpuid)
 		return;
