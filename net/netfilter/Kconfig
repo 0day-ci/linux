@@ -509,6 +509,12 @@ config NFT_CONNLIMIT
 	  This option adds the "connlimit" expression that you can use to
 	  ratelimit rule matchings per connections.
 
+config NFT_LAST
+	tristate "Netfilter nf_tables last module"
+	help
+	  This option adds the "last" expression that you can use to know
+	  when this rule has matched last time.
+
 config NFT_LOG
 	tristate "Netfilter nf_tables log module"
 	help
