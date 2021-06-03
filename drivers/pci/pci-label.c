@@ -175,11 +175,11 @@ static int dsm_get_label(struct device *dev, char *buf,
 		 * this entry must return a null string.
 		 */
 		if (attr == ACPI_ATTR_INDEX_SHOW) {
-			scnprintf(buf, PAGE_SIZE, "%llu\n", tmp->integer.value);
+			sysfs_emit(buf, "%llu\n", tmp->integer.value);
 		} else if (attr == ACPI_ATTR_LABEL_SHOW) {
 			if (tmp[1].type == ACPI_TYPE_STRING)
-				scnprintf(buf, PAGE_SIZE, "%s\n",
-					  tmp[1].string.pointer);
+				sysfs_emit(buf, "%s\n",
+					   tmp[1].string.pointer);
 			else if (tmp[1].type == ACPI_TYPE_BUFFER)
 				dsm_label_utf16s_to_utf8s(tmp + 1, buf);
 		}
