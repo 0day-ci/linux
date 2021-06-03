@@ -2669,7 +2669,7 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 		} else {
 			retval = filemap_write_and_wait_range(mapping,
 						iocb->ki_pos,
-					        iocb->ki_pos + count - 1);
+						iocb->ki_pos + count - 1);
 			if (retval < 0)
 				return retval;
 		}
