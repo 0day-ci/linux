@@ -2025,8 +2025,9 @@ Cpuset Interface Files
 	It accepts only the following input values when written to.
 
 	  ========	================================
-	  "root"	a partition root
-	  "member"	a non-root member of a partition
+	  "member"	Non-root member of a partition
+	  "root"	Partition root
+	  "root-nolb"	Partition root with no load balancing
 	  ========	================================
 
 	When set to be a partition root, the current cgroup is the
@@ -2034,6 +2035,10 @@ Cpuset Interface Files
 	itself and all its descendants except those that are separate
 	partition roots themselves and their descendants.  The root
 	cgroup is always a partition root.
+
+        With "root-nolb", the CPUs in that partition root will be in an
+        isolated state with no load balancing by the scheduler.  Tasks in
+        such a partition must be explicitly bind to each individual CPU.
 
 	There are constraints on where a partition root can be set.
 	It can only be set in a cgroup if all the following conditions
@@ -2053,9 +2058,12 @@ Cpuset Interface Files
 	file cannot be reverted back to "member" if there are any child
 	cgroups with cpuset enabled.
 
-	A parent partition cannot distribute all its CPUs to its
-	child partitions.  There must be at least one cpu left in the
-	parent partition.
+	A parent partition may distribute all its CPUs to its child
+	partitions as long as it is not the root cgroup and there is no
+	task directly associated with that parent partition.  Otherwise,
+	there must be at least one cpu left in the parent partition.
+	A new task cannot be moved to a partition root with no effective
+	cpu.
 
 	Once becoming a partition root, changes to "cpuset.cpus" is
 	generally allowed as long as the first condition above is true,
@@ -2071,6 +2079,7 @@ Cpuset Interface Files
 	  ==============	==============================
 	  "member"		Non-root member of a partition
 	  "root"		Partition root
+	  "root-nolb"		Partition root with no load balancing
 	  "root invalid"	Invalid partition root
 	  ==============	==============================
 
