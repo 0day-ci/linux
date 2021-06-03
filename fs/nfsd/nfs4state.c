@@ -171,6 +171,7 @@ renew_client_locked(struct nfs4_client *clp)
 
 	list_move_tail(&clp->cl_lru, &nn->client_lru);
 	clp->cl_time = ktime_get_boottime_seconds();
+	clear_bit(NFSD4_CLIENT_COURTESY, &clp->cl_flags);
 }
 
 static void put_client_renew_locked(struct nfs4_client *clp)
@@ -4610,6 +4611,38 @@ static void nfsd_break_one_deleg(struct nfs4_delegation *dp)
 	nfsd4_run_cb(&dp->dl_recall);
 }
 
+/*
+ * Set rq_conflict_client if the conflict client have expired
+ * and return true, otherwise return false.
+ */
+static bool
+nfsd_set_conflict_client(struct nfs4_delegation *dp)
+{
+	struct svc_rqst *rqst;
+	struct nfs4_client *clp;
+	struct nfsd_net *nn;
+	bool ret;
+
+	if (!i_am_nfsd())
+		return false;
+	rqst = kthread_data(current);
+	if (rqst->rq_prog != NFS_PROGRAM || rqst->rq_vers < 4)
+		return false;
+	rqst->rq_conflict_client = NULL;
+	clp = dp->dl_recall.cb_clp;
+	nn = net_generic(clp->net, nfsd_net_id);
+	spin_lock(&nn->client_lock);
+
+	if (test_bit(NFSD4_CLIENT_COURTESY, &clp->cl_flags) &&
+				!mark_client_expired_locked(clp)) {
+		rqst->rq_conflict_client = clp;
+		ret = true;
+	} else
+		ret = false;
+	spin_unlock(&nn->client_lock);
+	return ret;
+}
+
 /* Called from break_lease() with i_lock held. */
 static bool
 nfsd_break_deleg_cb(struct file_lock *fl)
@@ -4618,6 +4651,8 @@ nfsd_break_deleg_cb(struct file_lock *fl)
 	struct nfs4_delegation *dp = (struct nfs4_delegation *)fl->fl_owner;
 	struct nfs4_file *fp = dp->dl_stid.sc_file;
 
+	if (nfsd_set_conflict_client(dp))
+		return false;
 	trace_nfsd_deleg_break(&dp->dl_stid.sc_stateid);
 
 	/*
@@ -5237,6 +5272,22 @@ static void nfsd4_deleg_xgrade_none_ext(struct nfsd4_open *open,
 	 */
 }
 
+static bool
+nfs4_destroy_courtesy_client(struct nfs4_client *clp)
+{
+	struct nfsd_net *nn = net_generic(clp->net, nfsd_net_id);
+
+	spin_lock(&nn->client_lock);
+	if (!test_bit(NFSD4_CLIENT_COURTESY, &clp->cl_flags) ||
+			mark_client_expired_locked(clp)) {
+		spin_unlock(&nn->client_lock);
+		return false;
+	}
+	spin_unlock(&nn->client_lock);
+	expire_client(clp);
+	return true;
+}
+
 __be32
 nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
@@ -5286,7 +5337,13 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			goto out;
 		}
 	} else {
+		rqstp->rq_conflict_client = NULL;
 		status = nfs4_get_vfs_file(rqstp, fp, current_fh, stp, open);
+		if (status == nfserr_jukebox && rqstp->rq_conflict_client) {
+			if (nfs4_destroy_courtesy_client(rqstp->rq_conflict_client))
+				status = nfs4_get_vfs_file(rqstp, fp, current_fh, stp, open);
+		}
+
 		if (status) {
 			stp->st_stid.sc_type = NFS4_CLOSED_STID;
 			release_open_stateid(stp);
@@ -5472,6 +5529,8 @@ nfs4_laundromat(struct nfsd_net *nn)
 	};
 	struct nfs4_cpntf_state *cps;
 	copy_stateid_t *cps_t;
+	struct nfs4_stid *stid;
+	int id = 0;
 	int i;
 
 	if (clients_still_reclaiming(nn)) {
@@ -5495,6 +5554,15 @@ nfs4_laundromat(struct nfsd_net *nn)
 		clp = list_entry(pos, struct nfs4_client, cl_lru);
 		if (!state_expired(&lt, clp->cl_time))
 			break;
+
+		spin_lock(&clp->cl_lock);
+		stid = idr_get_next(&clp->cl_stateids, &id);
+		spin_unlock(&clp->cl_lock);
+		if (stid) {
+			/* client still has states */
+			set_bit(NFSD4_CLIENT_COURTESY, &clp->cl_flags);
+			continue;
+		}
 		if (mark_client_expired_locked(clp)) {
 			trace_nfsd_clid_expired(&clp->cl_clientid);
 			continue;
@@ -6440,7 +6508,7 @@ static const struct lock_manager_operations nfsd_posix_mng_ops  = {
 	.lm_put_owner = nfsd4_fl_put_owner,
 };
 
-static inline void
+static inline int
 nfs4_set_lock_denied(struct file_lock *fl, struct nfsd4_lock_denied *deny)
 {
 	struct nfs4_lockowner *lo;
@@ -6453,6 +6521,8 @@ nfs4_set_lock_denied(struct file_lock *fl, struct nfsd4_lock_denied *deny)
 			/* We just don't care that much */
 			goto nevermind;
 		deny->ld_clientid = lo->lo_owner.so_client->cl_clientid;
+		if (nfs4_destroy_courtesy_client(lo->lo_owner.so_client))
+			return -EAGAIN;
 	} else {
 nevermind:
 		deny->ld_owner.len = 0;
@@ -6467,6 +6537,7 @@ nevermind:
 	deny->ld_type = NFS4_READ_LT;
 	if (fl->fl_type != F_RDLCK)
 		deny->ld_type = NFS4_WRITE_LT;
+	return 0;
 }
 
 static struct nfs4_lockowner *
@@ -6734,6 +6805,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	unsigned int fl_flags = FL_POSIX;
 	struct net *net = SVC_NET(rqstp);
 	struct nfsd_net *nn = net_generic(net, nfsd_net_id);
+	bool retried = false;
 
 	dprintk("NFSD: nfsd4_lock: start=%Ld length=%Ld\n",
 		(long long) lock->lk_offset,
@@ -6860,7 +6932,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		list_add_tail(&nbl->nbl_lru, &nn->blocked_locks_lru);
 		spin_unlock(&nn->blocked_locks_lock);
 	}
-
+again:
 	err = vfs_lock_file(nf->nf_file, F_SETLK, file_lock, conflock);
 	switch (err) {
 	case 0: /* success! */
@@ -6875,7 +6947,12 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	case -EAGAIN:		/* conflock holds conflicting lock */
 		status = nfserr_denied;
 		dprintk("NFSD: nfsd4_lock: conflicting lock found!\n");
-		nfs4_set_lock_denied(conflock, &lock->lk_denied);
+
+		/* try again if conflict with courtesy client  */
+		if (nfs4_set_lock_denied(conflock, &lock->lk_denied) == -EAGAIN && !retried) {
+			retried = true;
+			goto again;
+		}
 		break;
 	case -EDEADLK:
 		status = nfserr_deadlock;
@@ -6962,6 +7039,8 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct nfs4_lockowner *lo = NULL;
 	__be32 status;
 	struct nfsd_net *nn = net_generic(SVC_NET(rqstp), nfsd_net_id);
+	bool retried = false;
+	int ret;
 
 	if (locks_in_grace(SVC_NET(rqstp)))
 		return nfserr_grace;
@@ -7010,14 +7089,19 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	file_lock->fl_end = last_byte_offset(lockt->lt_offset, lockt->lt_length);
 
 	nfs4_transform_lock_offset(file_lock);
-
+again:
 	status = nfsd_test_lock(rqstp, &cstate->current_fh, file_lock);
 	if (status)
 		goto out;
 
 	if (file_lock->fl_type != F_UNLCK) {
 		status = nfserr_denied;
-		nfs4_set_lock_denied(file_lock, &lockt->lt_denied);
+		ret = nfs4_set_lock_denied(file_lock, &lockt->lt_denied);
+		if (ret == -EAGAIN && !retried) {
+			retried = true;
+			fh_clear_wcc(&cstate->current_fh);
+			goto again;
+		}
 	}
 out:
 	if (lo)
