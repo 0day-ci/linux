@@ -1106,6 +1106,32 @@ static i915_reg_t dss_ctl2_reg(const struct intel_crtc_state *crtc_state)
 	return is_pipe_dsc(crtc_state) ? ICL_PIPE_DSS_CTL2(pipe) : DSS_CTL2;
 }
 
+struct intel_crtc *
+intel_dsc_get_bigjoiner_secondary(const struct intel_crtc *primary_crtc)
+{
+	struct drm_i915_private *i915 = to_i915(primary_crtc->base.dev);
+	enum pipe pipe = primary_crtc->pipe + 1;
+
+	if (drm_WARN_ON(&i915->drm, pipe >= I915_MAX_PIPES ||
+			!(INTEL_INFO(i915)->pipe_mask & BIT(pipe))))
+		return NULL;
+
+	return intel_get_crtc_for_pipe(i915, pipe);
+}
+
+struct intel_crtc *
+intel_dsc_get_bigjoiner_primary(const struct intel_crtc *secondary_crtc)
+{
+	struct drm_i915_private *i915 = to_i915(secondary_crtc->base.dev);
+	enum pipe pipe = secondary_crtc->pipe - 1;
+
+	if (drm_WARN_ON(&i915->drm, pipe <= INVALID_PIPE ||
+			!(INTEL_INFO(i915)->pipe_mask & BIT(pipe))))
+		return NULL;
+
+	return intel_get_crtc_for_pipe(i915, pipe);
+}
+
 void intel_uncompressed_joiner_enable(const struct intel_crtc_state *crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
@@ -1178,15 +1204,11 @@ void intel_uncompressed_joiner_get_config(struct intel_crtc_state *crtc_state)
 	dss_ctl1 = intel_de_read(dev_priv, dss_ctl1_reg(crtc_state));
 	if (dss_ctl1 & UNCOMPRESSED_JOINER_MASTER) {
 		crtc_state->bigjoiner = true;
-		if (!WARN_ON(INTEL_NUM_PIPES(dev_priv) == crtc->pipe + 1))
-			crtc_state->bigjoiner_linked_crtc =
-				intel_get_crtc_for_pipe(dev_priv, crtc->pipe + 1);
+		crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_secondary(crtc);
 	} else if (dss_ctl1 & UNCOMPRESSED_JOINER_SLAVE) {
 		crtc_state->bigjoiner = true;
 		crtc_state->bigjoiner_slave = true;
-		if (!WARN_ON(crtc->pipe == PIPE_A))
-			crtc_state->bigjoiner_linked_crtc =
-				intel_get_crtc_for_pipe(dev_priv, crtc->pipe - 1);
+		crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_primary(crtc);
 	}
 }
 
@@ -1224,13 +1246,9 @@ void intel_dsc_get_config(struct intel_crtc_state *crtc_state)
 
 		if (!(dss_ctl1 & MASTER_BIG_JOINER_ENABLE)) {
 			crtc_state->bigjoiner_slave = true;
-			if (!WARN_ON(crtc->pipe == PIPE_A))
-				crtc_state->bigjoiner_linked_crtc =
-					intel_get_crtc_for_pipe(dev_priv, crtc->pipe - 1);
+			crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_primary(crtc);
 		} else {
-			if (!WARN_ON(INTEL_NUM_PIPES(dev_priv) == crtc->pipe + 1))
-				crtc_state->bigjoiner_linked_crtc =
-					intel_get_crtc_for_pipe(dev_priv, crtc->pipe + 1);
+			crtc_state->bigjoiner_linked_crtc = intel_dsc_get_bigjoiner_secondary(crtc);
 		}
 	}
 
