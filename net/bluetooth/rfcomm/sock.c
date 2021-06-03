@@ -194,7 +194,7 @@ static void rfcomm_sock_kill(struct sock *sk)
 	if (!sock_flag(sk, SOCK_ZAPPED) || sk->sk_socket)
 		return;
 
-	BT_DBG("sk %p state %d refcnt %d", sk, sk->sk_state, refcount_read(&sk->sk_refcnt));
+	BT_DBG("sk %p state %d refcnt %u", sk, sk->sk_state, refcount_read(&sk->sk_refcnt));
 
 	/* Kill poor orphan */
 	bt_sock_unlink(&rfcomm_sk_list, sk);
@@ -965,7 +965,7 @@ int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc *
 	bdaddr_t src, dst;
 	int result = 0;
 
-	BT_DBG("session %p channel %d", s, channel);
+	BT_DBG("session %p channel %u", s, channel);
 
 	rfcomm_session_getaddr(s, &src, &dst);
 
@@ -978,7 +978,7 @@ int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc *
 
 	/* Check for backlog size */
 	if (sk_acceptq_is_full(parent)) {
-		BT_DBG("backlog full %d", parent->sk_ack_backlog);
+		BT_DBG("backlog full %u", parent->sk_ack_backlog);
 		goto done;
 	}
 
@@ -1016,7 +1016,7 @@ static int rfcomm_sock_debugfs_show(struct seq_file *f, void *p)
 	read_lock(&rfcomm_sk_list.lock);
 
 	sk_for_each(sk, &rfcomm_sk_list.head) {
-		seq_printf(f, "%pMR %pMR %d %d\n",
+		seq_printf(f, "%pMR %pMR %d %u\n",
 			   &rfcomm_pi(sk)->src, &rfcomm_pi(sk)->dst,
 			   sk->sk_state, rfcomm_pi(sk)->channel);
 	}
