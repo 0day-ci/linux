@@ -208,7 +208,7 @@ static struct mctp_dev *mctp_add_dev(struct net_device *dev)
 
 	INIT_LIST_HEAD(&mdev->addrs);
 
-	mdev->net = MCTP_INITIAL_DEFAULT_NET;
+	mdev->net = mctp_default_net(dev_net(dev));
 
 	/* associate to net_device */
 	rcu_assign_pointer(dev->mctp_ptr, mdev);
