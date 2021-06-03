@@ -4697,8 +4697,11 @@ static int tg_unthrottle_up(struct task_group *tg, void *data)
 		cfs_rq->throttled_clock_task_time += rq_clock_task(rq) -
 					     cfs_rq->throttled_clock_task;
 
-		/* Add cfs_rq with already running entity in the list */
-		if (cfs_rq->nr_running >= 1)
+		/*
+		 * Add cfs_rq with tg load avg contribution or one or more
+		 * already running entities to the list
+		 */
+		if (cfs_rq->tg_load_avg_contrib || cfs_rq->nr_running)
 			list_add_leaf_cfs_rq(cfs_rq);
 	}
 
