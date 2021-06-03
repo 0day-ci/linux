@@ -157,6 +157,7 @@ config PINCTRL_MT8365
 	bool "Mediatek MT8365 pin control"
 	depends on OF
 	depends on ARM64 || COMPILE_TEST
+	depends on PINCTRL_MTK
 	default ARM64 && ARCH_MEDIATEK
 
 config PINCTRL_MT8516
