@@ -95,6 +95,15 @@ struct i915_sched_engine {
 	struct kref ref;
 
 	/**
+	 * @lock: protects requests in priority lists, requests, hold and
+	 * tasklet while running
+	 */
+	spinlock_t lock;
+
+	struct list_head requests;
+	struct list_head hold; /* ready requests, but on hold */
+
+	/**
 	 * @default_priolist: priority list for I915_PRIORITY_NORMAL
 	 */
 	struct i915_priolist default_priolist;
