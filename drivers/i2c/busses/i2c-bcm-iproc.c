@@ -25,6 +25,7 @@
 #define CFG_OFFSET                   0x00
 #define CFG_RESET_SHIFT              31
 #define CFG_EN_SHIFT                 30
+#define CFG_BIT_BANG_SHIFT           29
 #define CFG_SLAVE_ADDR_0_SHIFT       28
 #define CFG_M_RETRY_CNT_SHIFT        16
 #define CFG_M_RETRY_CNT_MASK         0x0f
@@ -65,6 +66,12 @@
 #define S_FIFO_RX_CNT_MASK           0x7f
 #define S_FIFO_RX_THLD_SHIFT         8
 #define S_FIFO_RX_THLD_MASK          0x3f
+
+#define M_BB_CTRL_OFFSET             0x14
+#define M_BB_SMBCLK_IN_SHIFT         31
+#define M_BB_SMBCLK_OUT_EN_SHIFT     30
+#define M_BB_SMBDAT_IN_SHIFT         29
+#define M_BB_SMBDAT_OUT_EN_SHIFT     28
 
 #define M_CMD_OFFSET                 0x30
 #define M_CMD_START_BUSY_SHIFT       31
@@ -713,6 +720,147 @@ static void bcm_iproc_i2c_enable_disable(struct bcm_iproc_i2c_dev *iproc_i2c,
 	iproc_i2c_wr_reg(iproc_i2c, CFG_OFFSET, val);
 }
 
+static int bcm_iproc_i2c_resume(struct device *dev)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = dev_get_drvdata(dev);
+	int ret;
+	u32 val;
+
+	/*
+	 * Power domain could have been shut off completely in system deep
+	 * sleep, so re-initialize the block here
+	 */
+	ret = bcm_iproc_i2c_init(iproc_i2c);
+	if (ret)
+		return ret;
+
+	/* configure to the desired bus speed */
+	val = iproc_i2c_rd_reg(iproc_i2c, TIM_CFG_OFFSET);
+	val &= ~BIT(TIM_CFG_MODE_400_SHIFT);
+	val |= (iproc_i2c->bus_speed == I2C_MAX_FAST_MODE_FREQ) << TIM_CFG_MODE_400_SHIFT;
+	iproc_i2c_wr_reg(iproc_i2c, TIM_CFG_OFFSET, val);
+
+	bcm_iproc_i2c_enable_disable(iproc_i2c, true);
+
+	return 0;
+}
+
+static void bcm_iproc_i2c_prepare_recovery(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	dev_dbg(iproc_i2c->device, "Prepare recovery\n");
+
+	/* Disable interrupts */
+	writel(0, iproc_i2c->base + IE_OFFSET);
+	readl(iproc_i2c->base + IE_OFFSET);
+	synchronize_irq(iproc_i2c->irq);
+
+	/* Place controller in reset */
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp |= BIT(CFG_RESET_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+	usleep_range(100, 200);
+
+	/* Switch to bit-bang mode */
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp |= BIT(CFG_BIT_BANG_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+	usleep_range(100, 200);
+}
+
+static void bcm_iproc_i2c_unprepare_recovery(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	/* Switch to normal mode */
+	tmp = readl(iproc_i2c->base + CFG_OFFSET);
+	tmp &= ~BIT(CFG_BIT_BANG_SHIFT);
+	writel(tmp, iproc_i2c->base + CFG_OFFSET);
+	usleep_range(100, 200);
+
+	bcm_iproc_i2c_resume(iproc_i2c->device);
+
+	dev_dbg(iproc_i2c->device, "Recovery complete\n");
+}
+
+static int bcm_iproc_i2c_get_scl(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+
+	return !!(tmp & BIT(M_BB_SMBCLK_IN_SHIFT));
+}
+
+static void bcm_iproc_i2c_set_scl(struct i2c_adapter *adap, int val)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+	if (val)
+		tmp |= BIT(M_BB_SMBCLK_OUT_EN_SHIFT);
+	else
+		tmp &= ~BIT(M_BB_SMBCLK_OUT_EN_SHIFT);
+
+	writel(tmp, iproc_i2c->base + M_BB_CTRL_OFFSET);
+}
+
+static void bcm_iproc_i2c_set_sda(struct i2c_adapter *adap, int val)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+	if (val)
+		tmp |= BIT(M_BB_SMBDAT_OUT_EN_SHIFT);
+	else
+		tmp &= ~BIT(M_BB_SMBDAT_OUT_EN_SHIFT);
+
+	writel(tmp, iproc_i2c->base + M_BB_CTRL_OFFSET);
+}
+
+static int bcm_iproc_i2c_get_sda(struct i2c_adapter *adap)
+{
+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adap);
+	u32 tmp;
+
+	tmp = readl(iproc_i2c->base + M_BB_CTRL_OFFSET);
+
+	return !!(tmp & BIT(M_BB_SMBDAT_IN_SHIFT));
+}
+
+/* Check if bus lockup occurred, and invoke recovery if so. */
+static void iproc_i2c_lockup_recover(struct bcm_iproc_i2c_dev *iproc_i2c)
+{
+	/*
+	 * assume bus lockup if SDA line is low;
+	 * note that there is no need to switch to
+	 * bit-bang mode for this check.
+	 */
+	if (!bcm_iproc_i2c_get_sda(&iproc_i2c->adapter)) {
+		/* locked up - invoke i2c bus recovery. */
+		int ret = i2c_recover_bus(&iproc_i2c->adapter);
+
+		if (ret)
+			dev_err(iproc_i2c->device, "bus recovery: error %d\n", ret);
+	}
+}
+
+static struct i2c_bus_recovery_info bcm_iproc_recovery_info = {
+	.recover_bus = i2c_generic_scl_recovery,
+	.prepare_recovery = bcm_iproc_i2c_prepare_recovery,
+	.unprepare_recovery = bcm_iproc_i2c_unprepare_recovery,
+	.set_scl = bcm_iproc_i2c_set_scl,
+	.get_scl = bcm_iproc_i2c_get_scl,
+	.set_sda = bcm_iproc_i2c_set_sda,
+	.get_sda = bcm_iproc_i2c_get_sda,
+};
+
 static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c,
 				      struct i2c_msg *msg)
 {
@@ -806,6 +954,7 @@ static int bcm_iproc_i2c_xfer_wait(struct bcm_iproc_i2c_dev *iproc_i2c,
 		/* flush both TX/RX FIFOs */
 		val = BIT(M_FIFO_RX_FLUSH_SHIFT) | BIT(M_FIFO_TX_FLUSH_SHIFT);
 		iproc_i2c_wr_reg(iproc_i2c, M_FIFO_CTRL_OFFSET, val);
+		iproc_i2c_lockup_recover(iproc_i2c);
 		return -ETIMEDOUT;
 	}
 
@@ -814,6 +963,7 @@ static int bcm_iproc_i2c_xfer_wait(struct bcm_iproc_i2c_dev *iproc_i2c,
 		/* flush both TX/RX FIFOs */
 		val = BIT(M_FIFO_RX_FLUSH_SHIFT) | BIT(M_FIFO_TX_FLUSH_SHIFT);
 		iproc_i2c_wr_reg(iproc_i2c, M_FIFO_CTRL_OFFSET, val);
+		iproc_i2c_lockup_recover(iproc_i2c);
 		return ret;
 	}
 
@@ -1111,6 +1261,7 @@ static int bcm_iproc_i2c_probe(struct platform_device *pdev)
 		of_node_full_name(iproc_i2c->device->of_node));
 	adap->algo = &bcm_iproc_algo;
 	adap->quirks = &bcm_iproc_i2c_quirks;
+	adap->bus_recovery_info = &bcm_iproc_recovery_info;
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 
@@ -1155,31 +1306,6 @@ static int bcm_iproc_i2c_suspend(struct device *dev)
 
 	/* now disable the controller */
 	bcm_iproc_i2c_enable_disable(iproc_i2c, false);
-
-	return 0;
-}
-
-static int bcm_iproc_i2c_resume(struct device *dev)
-{
-	struct bcm_iproc_i2c_dev *iproc_i2c = dev_get_drvdata(dev);
-	int ret;
-	u32 val;
-
-	/*
-	 * Power domain could have been shut off completely in system deep
-	 * sleep, so re-initialize the block here
-	 */
-	ret = bcm_iproc_i2c_init(iproc_i2c);
-	if (ret)
-		return ret;
-
-	/* configure to the desired bus speed */
-	val = iproc_i2c_rd_reg(iproc_i2c, TIM_CFG_OFFSET);
-	val &= ~BIT(TIM_CFG_MODE_400_SHIFT);
-	val |= (iproc_i2c->bus_speed == I2C_MAX_FAST_MODE_FREQ) << TIM_CFG_MODE_400_SHIFT;
-	iproc_i2c_wr_reg(iproc_i2c, TIM_CFG_OFFSET, val);
-
-	bcm_iproc_i2c_enable_disable(iproc_i2c, true);
 
 	return 0;
 }
