@@ -7,14 +7,36 @@
 #include "intel_guc_ct.h"
 #include "gt/intel_gt.h"
 
+static inline struct intel_guc *ct_to_guc(struct intel_guc_ct *ct)
+{
+	return container_of(ct, struct intel_guc, ct);
+}
+
+static inline struct intel_gt *ct_to_gt(struct intel_guc_ct *ct)
+{
+	return guc_to_gt(ct_to_guc(ct));
+}
+
+static inline struct drm_i915_private *ct_to_i915(struct intel_guc_ct *ct)
+{
+	return ct_to_gt(ct)->i915;
+}
+
+static inline struct drm_device *ct_to_drm(struct intel_guc_ct *ct)
+{
+	return &ct_to_i915(ct)->drm;
+}
+
 #define CT_ERROR(_ct, _fmt, ...) \
-	DRM_DEV_ERROR(ct_to_dev(_ct), "CT: " _fmt, ##__VA_ARGS__)
+	drm_err(ct_to_drm(_ct), "CT: " _fmt, ##__VA_ARGS__)
 #ifdef CONFIG_DRM_I915_DEBUG_GUC
 #define CT_DEBUG(_ct, _fmt, ...) \
-	DRM_DEV_DEBUG_DRIVER(ct_to_dev(_ct), "CT: " _fmt, ##__VA_ARGS__)
+	drm_dbg(ct_to_drm(_ct), "CT: " _fmt, ##__VA_ARGS__)
 #else
 #define CT_DEBUG(...)	do { } while (0)
 #endif
+#define CT_PROBE_ERROR(_ct, _fmt, ...) \
+	i915_probe_error(ct_to_i915(ct), "CT: " _fmt, ##__VA_ARGS__)
 
 struct ct_request {
 	struct list_head link;
@@ -47,26 +69,6 @@ void intel_guc_ct_init_early(struct intel_guc_ct *ct)
 	INIT_WORK(&ct->requests.worker, ct_incoming_request_worker_func);
 }
 
-static inline struct intel_guc *ct_to_guc(struct intel_guc_ct *ct)
-{
-	return container_of(ct, struct intel_guc, ct);
-}
-
-static inline struct intel_gt *ct_to_gt(struct intel_guc_ct *ct)
-{
-	return guc_to_gt(ct_to_guc(ct));
-}
-
-static inline struct drm_i915_private *ct_to_i915(struct intel_guc_ct *ct)
-{
-	return ct_to_gt(ct)->i915;
-}
-
-static inline struct device *ct_to_dev(struct intel_guc_ct *ct)
-{
-	return ct_to_i915(ct)->drm.dev;
-}
-
 static inline const char *guc_ct_buffer_type_to_str(u32 type)
 {
 	switch (type) {
@@ -88,11 +90,22 @@ static void guc_ct_buffer_desc_init(struct guc_ct_buffer_desc *desc,
 	desc->owner = CTB_OWNER_HOST;
 }
 
-static void guc_ct_buffer_desc_reset(struct guc_ct_buffer_desc *desc)
+static void guc_ct_buffer_reset(struct intel_guc_ct_buffer *ctb, u32 cmds_addr)
 {
-	desc->head = 0;
-	desc->tail = 0;
-	desc->is_in_error = 0;
+	guc_ct_buffer_desc_init(ctb->desc, cmds_addr, ctb->size);
+}
+
+static void guc_ct_buffer_init(struct intel_guc_ct_buffer *ctb,
+			       struct guc_ct_buffer_desc *desc,
+			       u32 *cmds, u32 size)
+{
+	GEM_BUG_ON(size % 4);
+
+	ctb->desc = desc;
+	ctb->cmds = cmds;
+	ctb->size = size;
+
+	guc_ct_buffer_reset(ctb, 0);
 }
 
 static int guc_action_register_ct_buffer(struct intel_guc *guc,
@@ -153,7 +166,10 @@ static int ct_deregister_buffer(struct intel_guc_ct *ct, u32 type)
 int intel_guc_ct_init(struct intel_guc_ct *ct)
 {
 	struct intel_guc *guc = ct_to_guc(ct);
+	struct guc_ct_buffer_desc *desc;
+	u32 blob_size;
 	void *blob;
+	u32 *cmds;
 	int err;
 	int i;
 
@@ -181,19 +197,24 @@ int intel_guc_ct_init(struct intel_guc_ct *ct)
 	 * other code will need updating as well.
 	 */
 
-	err = intel_guc_allocate_and_map_vma(guc, PAGE_SIZE, &ct->vma, &blob);
+	blob_size = PAGE_SIZE;
+	err = intel_guc_allocate_and_map_vma(guc, blob_size, &ct->vma, &blob);
 	if (unlikely(err)) {
-		CT_ERROR(ct, "Failed to allocate CT channel (err=%d)\n", err);
+		CT_PROBE_ERROR(ct, "Failed to allocate %u for CTB data (%pe)\n",
+			       blob_size, ERR_PTR(err));
 		return err;
 	}
 
-	CT_DEBUG(ct, "vma base=%#x\n", intel_guc_ggtt_offset(guc, ct->vma));
+	CT_DEBUG(ct, "base=%#x size=%u\n", intel_guc_ggtt_offset(guc, ct->vma), blob_size);
 
 	/* store pointers to desc and cmds */
 	for (i = 0; i < ARRAY_SIZE(ct->ctbs); i++) {
 		GEM_BUG_ON((i !=  CTB_SEND) && (i != CTB_RECV));
-		ct->ctbs[i].desc = blob + PAGE_SIZE/4 * i;
-		ct->ctbs[i].cmds = blob + PAGE_SIZE/4 * i + PAGE_SIZE/2;
+
+		desc = blob + PAGE_SIZE / 4 * i;
+		cmds = blob + PAGE_SIZE / 4 * i + PAGE_SIZE / 2;
+
+		guc_ct_buffer_init(&ct->ctbs[i], desc, cmds, PAGE_SIZE / 4);
 	}
 
 	return 0;
@@ -222,7 +243,8 @@ void intel_guc_ct_fini(struct intel_guc_ct *ct)
 int intel_guc_ct_enable(struct intel_guc_ct *ct)
 {
 	struct intel_guc *guc = ct_to_guc(ct);
-	u32 base, cmds, size;
+	u32 base, cmds;
+	void *blob;
 	int err;
 	int i;
 
@@ -230,29 +252,33 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 
 	/* vma should be already allocated and map'ed */
 	GEM_BUG_ON(!ct->vma);
+	GEM_BUG_ON(!i915_gem_object_has_pinned_pages(ct->vma->obj));
 	base = intel_guc_ggtt_offset(guc, ct->vma);
 
-	/* (re)initialize descriptors
-	 * cmds buffers are in the second half of the blob page
-	 */
+	/* blob should start with send descriptor */
+	blob = __px_vaddr(ct->vma->obj);
+	GEM_BUG_ON(blob != ct->ctbs[CTB_SEND].desc);
+
+	/* (re)initialize descriptors */
 	for (i = 0; i < ARRAY_SIZE(ct->ctbs); i++) {
 		GEM_BUG_ON((i != CTB_SEND) && (i != CTB_RECV));
-		cmds = base + PAGE_SIZE / 4 * i + PAGE_SIZE / 2;
-		size = PAGE_SIZE / 4;
-		CT_DEBUG(ct, "%d: addr=%#x size=%u\n", i, cmds, size);
-		guc_ct_buffer_desc_init(ct->ctbs[i].desc, cmds, size);
+
+		cmds = base + ptrdiff(ct->ctbs[i].cmds, blob);
+		CT_DEBUG(ct, "%d: cmds addr=%#x\n", i, cmds);
+
+		guc_ct_buffer_reset(&ct->ctbs[i], cmds);
 	}
 
 	/*
 	 * Register both CT buffers starting with RECV buffer.
 	 * Descriptors are in first half of the blob.
 	 */
-	err = ct_register_buffer(ct, base + PAGE_SIZE / 4 * CTB_RECV,
+	err = ct_register_buffer(ct, base + ptrdiff(ct->ctbs[CTB_RECV].desc, blob),
 				 INTEL_GUC_CT_BUFFER_TYPE_RECV);
 	if (unlikely(err))
 		goto err_out;
 
-	err = ct_register_buffer(ct, base + PAGE_SIZE / 4 * CTB_SEND,
+	err = ct_register_buffer(ct, base + ptrdiff(ct->ctbs[CTB_SEND].desc, blob),
 				 INTEL_GUC_CT_BUFFER_TYPE_SEND);
 	if (unlikely(err))
 		goto err_deregister;
@@ -264,7 +290,7 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 err_deregister:
 	ct_deregister_buffer(ct, INTEL_GUC_CT_BUFFER_TYPE_RECV);
 err_out:
-	CT_ERROR(ct, "Failed to open open CT channel (err=%d)\n", err);
+	CT_PROBE_ERROR(ct, "Failed to enable CTB (%pe)\n", ERR_PTR(err));
 	return err;
 }
 
@@ -313,14 +339,13 @@ static u32 ct_get_next_fence(struct intel_guc_ct *ct)
 static int ct_write(struct intel_guc_ct *ct,
 		    const u32 *action,
 		    u32 len /* in dwords */,
-		    u32 fence,
-		    bool want_response)
+		    u32 fence)
 {
 	struct intel_guc_ct_buffer *ctb = &ct->ctbs[CTB_SEND];
 	struct guc_ct_buffer_desc *desc = ctb->desc;
 	u32 head = desc->head;
 	u32 tail = desc->tail;
-	u32 size = desc->size;
+	u32 size = ctb->size;
 	u32 used;
 	u32 header;
 	u32 *cmds = ctb->cmds;
@@ -329,7 +354,7 @@ static int ct_write(struct intel_guc_ct *ct,
 	if (unlikely(desc->is_in_error))
 		return -EPIPE;
 
-	if (unlikely(!IS_ALIGNED(head | tail | size, 4) ||
+	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
 		     (tail | head) >= size))
 		goto corrupted;
 
@@ -358,8 +383,7 @@ static int ct_write(struct intel_guc_ct *ct,
 	 * DW2+: action data
 	 */
 	header = (len << GUC_CT_MSG_LEN_SHIFT) |
-		 (GUC_CT_MSG_WRITE_FENCE_TO_DESC) |
-		 (want_response ? GUC_CT_MSG_SEND_STATUS : 0) |
+		 GUC_CT_MSG_SEND_STATUS |
 		 (action[0] << GUC_CT_MSG_ACTION_SHIFT);
 
 	CT_DEBUG(ct, "writing %*ph %*ph %*ph\n",
@@ -386,56 +410,6 @@ corrupted:
 		 desc->addr, desc->head, desc->tail, desc->size);
 	desc->is_in_error = 1;
 	return -EPIPE;
-}
-
-/**
- * wait_for_ctb_desc_update - Wait for the CT buffer descriptor update.
- * @desc:	buffer descriptor
- * @fence:	response fence
- * @status:	placeholder for status
- *
- * Guc will update CT buffer descriptor with new fence and status
- * after processing the command identified by the fence. Wait for
- * specified fence and then read from the descriptor status of the
- * command.
- *
- * Return:
- * *	0 response received (status is valid)
- * *	-ETIMEDOUT no response within hardcoded timeout
- * *	-EPROTO no response, CT buffer is in error
- */
-static int wait_for_ctb_desc_update(struct guc_ct_buffer_desc *desc,
-				    u32 fence,
-				    u32 *status)
-{
-	int err;
-
-	/*
-	 * Fast commands should complete in less than 10us, so sample quickly
-	 * up to that length of time, then switch to a slower sleep-wait loop.
-	 * No GuC command should ever take longer than 10ms.
-	 */
-#define done (READ_ONCE(desc->fence) == fence)
-	err = wait_for_us(done, 10);
-	if (err)
-		err = wait_for(done, 10);
-#undef done
-
-	if (unlikely(err)) {
-		DRM_ERROR("CT: fence %u failed; reported fence=%u\n",
-			  fence, desc->fence);
-
-		if (WARN_ON(desc->is_in_error)) {
-			/* Something went wrong with the messaging, try to reset
-			 * the buffer and hope for the best
-			 */
-			guc_ct_buffer_desc_reset(desc);
-			err = -EPROTO;
-		}
-	}
-
-	*status = desc->status;
-	return err;
 }
 
 /**
@@ -481,8 +455,6 @@ static int ct_send(struct intel_guc_ct *ct,
 		   u32 response_buf_size,
 		   u32 *status)
 {
-	struct intel_guc_ct_buffer *ctb = &ct->ctbs[CTB_SEND];
-	struct guc_ct_buffer_desc *desc = ctb->desc;
 	struct ct_request request;
 	unsigned long flags;
 	u32 fence;
@@ -503,16 +475,13 @@ static int ct_send(struct intel_guc_ct *ct,
 	list_add_tail(&request.link, &ct->requests.pending);
 	spin_unlock_irqrestore(&ct->requests.lock, flags);
 
-	err = ct_write(ct, action, len, fence, !!response_buf);
+	err = ct_write(ct, action, len, fence);
 	if (unlikely(err))
 		goto unlink;
 
 	intel_guc_notify(ct_to_guc(ct));
 
-	if (response_buf)
-		err = wait_for_ct_request_update(&request, status);
-	else
-		err = wait_for_ctb_desc_update(desc, fence, status);
+	err = wait_for_ct_request_update(&request, status);
 	if (unlikely(err))
 		goto unlink;
 
@@ -592,7 +561,7 @@ static int ct_read(struct intel_guc_ct *ct, u32 *data)
 	struct guc_ct_buffer_desc *desc = ctb->desc;
 	u32 head = desc->head;
 	u32 tail = desc->tail;
-	u32 size = desc->size;
+	u32 size = ctb->size;
 	u32 *cmds = ctb->cmds;
 	s32 available;
 	unsigned int len;
@@ -601,7 +570,7 @@ static int ct_read(struct intel_guc_ct *ct, u32 *data)
 	if (unlikely(desc->is_in_error))
 		return -EPIPE;
 
-	if (unlikely(!IS_ALIGNED(head | tail | size, 4) ||
+	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
 		     (tail | head) >= size))
 		goto corrupted;
 
