@@ -200,7 +200,7 @@ int calculate_normal_threshold(struct zone *zone)
 	 * The threshold scales with the number of processors and the amount
 	 * of memory per zone. More memory means that we can defer updates for
 	 * longer, more processors could lead to more contention.
- 	 * fls() is used to have a cheap way of logarithmic scaling.
+	 * fls() is used to have a cheap way of logarithmic scaling.
 	 *
 	 * Some sample thresholds:
 	 *
@@ -439,7 +439,7 @@ void __dec_zone_state(struct zone *zone, enum zone_stat_item item)
 
 	v = __this_cpu_dec_return(*p);
 	t = __this_cpu_read(pcp->stat_threshold);
-	if (unlikely(v < - t)) {
+	if (unlikely(v < -t)) {
 		s8 overstep = t >> 1;
 
 		zone_page_state_add(v - overstep, zone, item);
@@ -457,7 +457,7 @@ void __dec_node_state(struct pglist_data *pgdat, enum node_stat_item item)
 
 	v = __this_cpu_dec_return(*p);
 	t = __this_cpu_read(pcp->stat_threshold);
-	if (unlikely(v < - t)) {
+	if (unlikely(v < -t)) {
 		s8 overstep = t >> 1;
 
 		node_page_state_add(v - overstep, pgdat, item);
@@ -1063,7 +1063,7 @@ static int __fragmentation_index(unsigned int order, struct contig_page_info *in
 	 * 0 => allocation would fail due to lack of memory
 	 * 1 => allocation would fail due to fragmentation
 	 */
-	return 1000 - div_u64( (1000+(div_u64(info->free_pages * 1000ULL, requested))), info->free_blocks_total);
+	return 1000 - div_u64((1000+(div_u64(info->free_pages * 1000ULL, requested))), info->free_blocks_total);
 }
 
 /*
