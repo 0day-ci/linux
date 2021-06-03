@@ -11,6 +11,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
 #include <linux/udmabuf.h>
+#include <linux/hugetlb.h>
 
 static const u32    list_limit = 1024;  /* udmabuf_create_list->count limit */
 static const size_t size_limit_mb = 64; /* total dmabuf size, in megabytes  */
@@ -162,8 +163,9 @@ static long udmabuf_create(struct miscdevice *device,
 	struct file *memfd = NULL;
 	struct udmabuf *ubuf;
 	struct dma_buf *buf;
-	pgoff_t pgoff, pgcnt, pgidx, pgbuf = 0, pglimit;
-	struct page *page;
+	pgoff_t pgoff, pgcnt, pgidx, pgbuf = 0, pglimit, subpgoff;
+	struct page *page, *hpage = NULL;
+	struct hstate *hpstate;
 	int seals, ret = -EINVAL;
 	u32 i, flags;
 
@@ -194,7 +196,8 @@ static long udmabuf_create(struct miscdevice *device,
 		memfd = fget(list[i].memfd);
 		if (!memfd)
 			goto err;
-		if (!shmem_mapping(file_inode(memfd)->i_mapping))
+		if (!shmem_mapping(file_inode(memfd)->i_mapping) &&
+		    !is_file_hugepages(memfd))
 			goto err;
 		seals = memfd_fcntl(memfd, F_GET_SEALS, 0);
 		if (seals == -EINVAL)
@@ -205,17 +208,38 @@ static long udmabuf_create(struct miscdevice *device,
 			goto err;
 		pgoff = list[i].offset >> PAGE_SHIFT;
 		pgcnt = list[i].size   >> PAGE_SHIFT;
-		for (pgidx = 0; pgidx < pgcnt; pgidx++) {
-			page = shmem_read_mapping_page(
-				file_inode(memfd)->i_mapping, pgoff + pgidx);
-			if (IS_ERR(page)) {
-				ret = PTR_ERR(page);
+		if (is_file_hugepages(memfd)) {
+			hpstate = hstate_file(memfd);
+			pgoff = list[i].offset >> huge_page_shift(hpstate);
+			subpgoff = (list[i].offset &
+				    ~huge_page_mask(hpstate)) >> PAGE_SHIFT;
+			hpage = find_get_page_flags(
+					file_inode(memfd)->i_mapping,
+					pgoff, FGP_ACCESSED);
+			if (IS_ERR(hpage)) {
+				ret = PTR_ERR(hpage);
 				goto err;
+			}
+		}
+		for (pgidx = 0; pgidx < pgcnt; pgidx++) {
+			if (is_file_hugepages(memfd)) {
+				page = hpage + subpgoff + pgidx;
+				get_page(page);
+			} else {
+				page = shmem_read_mapping_page(
+					file_inode(memfd)->i_mapping,
+					pgoff + pgidx);
+				if (IS_ERR(page)) {
+					ret = PTR_ERR(page);
+					goto err;
+				}
 			}
 			ubuf->pages[pgbuf++] = page;
 		}
 		fput(memfd);
 		memfd = NULL;
+		if (hpage)
+			put_page(hpage);
 	}
 
 	exp_info.ops  = &udmabuf_ops;
