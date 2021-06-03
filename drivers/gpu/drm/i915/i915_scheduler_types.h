@@ -91,7 +91,21 @@ struct i915_dependency {
 				&(rq__)->sched.signalers_list, \
 				signal_link)
 
+/**
+ * sturct i915_sched_engine - scheduler engine
+ *
+ * A schedule engine represents a submission queue with different priority
+ * bands. It contains all the common state (relative to the backend) to queue,
+ * track, and submit a request.
+ *
+ * This object at the moment is quite i915 specific but will transition into a
+ * container for the drm_gpu_scheduler plus a few other variables once the i915
+ * is integrated with the DRM scheduler.
+ */
 struct i915_sched_engine {
+	/**
+	 * @ref: reference count of schedule engine object
+	 */
 	struct kref ref;
 
 	/**
@@ -100,11 +114,18 @@ struct i915_sched_engine {
 	 */
 	spinlock_t lock;
 
+	/**
+	 * @requests: list of requests inflight on this schedule engine
+	 */
 	struct list_head requests;
-	struct list_head hold; /* ready requests, but on hold */
 
 	/**
-	 * @tasklet: softirq tasklet for bottom handler
+	 * @hold: list of requests on hold.
+	 */
+	struct list_head hold;
+
+	/**
+	 * @tasklet: softirq tasklet for submission
 	 */
 	struct tasklet_struct tasklet;
 
@@ -137,14 +158,20 @@ struct i915_sched_engine {
 	 */
 	bool no_priolist;
 
-	/* Back pointer to engine */
+	/**
+	 * @engine: back pointer to engine
+	 */
 	struct intel_engine_cs *engine;
 
-	/* Kick backend */
+	/**
+	 * @kick_backed: kick back after a request's priority has changed
+	 */
 	void	(*kick_backend)(const struct i915_request *rq,
 				int prio);
 
-	/*
+	/**
+	 * @schedule: schedule function to adjust priority of request
+	 *
 	 * Call when the priority on a request has changed and it and its
 	 * dependencies may need rescheduling. Note the request itself may
 	 * not be ready to run!
