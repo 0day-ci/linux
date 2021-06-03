@@ -15,6 +15,7 @@
  *****************************************************************************/
 #include "futextest.h"
 #include <stdio.h>
+#include <stdint.h>
 
 #define NSEC_PER_SEC	1000000000L
 
@@ -65,7 +66,7 @@ int gettime64(clock_t clockid, struct timespec64 *tv)
  * @flags: Operation flags
  * @timo:  Optional timeout for operation
  */
-static inline int futex2_wait(volatile void *uaddr, unsigned long val,
+static inline int futex2_wait(volatile void *uaddr, uint64_t val,
 			      unsigned long flags, struct timespec64 *timo)
 {
 	return syscall(__NR_futex_wait, uaddr, val, flags, timo);

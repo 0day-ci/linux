@@ -9,3 +9,4 @@ futex_wait_wouldblock
 futex2_wait
 futex2_waitv
 futex2_requeue
+futex2_sizes
