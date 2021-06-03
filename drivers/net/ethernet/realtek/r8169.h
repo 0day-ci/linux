@@ -11,6 +11,8 @@
 #include <linux/types.h>
 #include <linux/phy.h>
 
+#define RTL8169_LINK_TIMEOUT (1 * HZ)
+
 enum mac_version {
 	/* support for ancient RTL_GIGA_MAC_VER_01 has been removed */
 	RTL_GIGA_MAC_VER_02,

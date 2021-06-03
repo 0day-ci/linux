@@ -178,6 +178,11 @@ static const struct pci_device_id rtl8169_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, rtl8169_pci_tbl);
 
+static const struct pci_device_id rtl8169_linkChg_polling_enabled[] = {
+	{ PCI_VDEVICE(REALTEK, 0x8136), RTL_CFG_NO_GBIT },
+	{ 0 }
+};
+
 enum rtl_registers {
 	MAC0		= 0,	/* Ethernet hardware address. */
 	MAC4		= 4,
@@ -618,6 +623,7 @@ struct rtl8169_private {
 	u16 cp_cmd;
 	u32 irq_mask;
 	struct clk *clk;
+	struct timer_list link_timer;
 
 	struct {
 		DECLARE_BITMAP(flags, RTL_FLAG_MAX);
@@ -1177,6 +1183,16 @@ static void rtl8168ep_stop_cmac(struct rtl8169_private *tp)
 	rtl_loop_wait_high(tp, &rtl_ocp_tx_cond, 50000, 2000);
 	RTL_W8(tp, IBISR0, RTL_R8(tp, IBISR0) | 0x20);
 	RTL_W8(tp, IBCR0, RTL_R8(tp, IBCR0) & ~0x01);
+}
+
+static int rtl_link_chng_polling_quirk(struct rtl8169_private *tp)
+{
+	struct pci_dev *pdev = tp->pci_dev;
+
+	if (pdev->vendor == 0x10ec && pdev->device == 0x8136 && !tp->supports_gmii)
+		return 1;
+
+	return 0;
 }
 
 static void rtl8168dp_driver_start(struct rtl8169_private *tp)
@@ -4608,6 +4624,75 @@ out_unlock:
 	rtnl_unlock();
 }
 
+static void r8169_phylink_handler(struct net_device *ndev)
+{
+	struct rtl8169_private *tp = netdev_priv(ndev);
+
+	if (netif_carrier_ok(ndev)) {
+		rtl_link_chg_patch(tp);
+		pm_request_resume(&tp->pci_dev->dev);
+	} else {
+		pm_runtime_idle(&tp->pci_dev->dev);
+	}
+
+	if (net_ratelimit())
+		phy_print_status(tp->phydev);
+}
+
+static unsigned int
+rtl8169_xmii_link_ok(struct net_device *dev)
+{
+	struct rtl8169_private *tp = netdev_priv(dev);
+	unsigned int retval;
+
+	retval = (RTL_R8(tp, PHYstatus) & LinkStatus) ? 1 : 0;
+
+	return retval;
+}
+
+static void
+rtl8169_check_link_status(struct net_device *dev)
+{
+	struct rtl8169_private *tp = netdev_priv(dev);
+	int link_status_on;
+
+	link_status_on = rtl8169_xmii_link_ok(dev);
+
+	if (netif_carrier_ok(dev) == link_status_on)
+		return;
+
+	phy_mac_interrupt(tp->phydev);
+
+	r8169_phylink_handler (dev);
+}
+
+static void rtl8169_link_timer(struct timer_list *t)
+{
+	struct rtl8169_private *tp = from_timer(tp, t, link_timer);
+	struct net_device *dev = tp->dev;
+	struct timer_list *timer = t;
+	unsigned long flags;
+
+	rtl8169_check_link_status(dev);
+
+	if (timer_pending(&tp->link_timer))
+		return;
+
+	mod_timer(timer, jiffies + RTL8169_LINK_TIMEOUT);
+}
+
+static inline void rtl8169_delete_link_timer(struct net_device *dev, struct timer_list *timer)
+{
+	del_timer_sync(timer);
+}
+
+static inline void rtl8169_request_link_timer(struct net_device *dev)
+{
+	struct rtl8169_private *tp = netdev_priv(dev);
+
+	timer_setup(&tp->link_timer, rtl8169_link_timer, TIMER_INIT_FLAGS);
+}
+
 static int rtl8169_poll(struct napi_struct *napi, int budget)
 {
 	struct rtl8169_private *tp = container_of(napi, struct rtl8169_private, napi);
@@ -4622,21 +4707,6 @@ static int rtl8169_poll(struct napi_struct *napi, int budget)
 		rtl_irq_enable(tp);
 
 	return work_done;
-}
-
-static void r8169_phylink_handler(struct net_device *ndev)
-{
-	struct rtl8169_private *tp = netdev_priv(ndev);
-
-	if (netif_carrier_ok(ndev)) {
-		rtl_link_chg_patch(tp);
-		pm_request_resume(&tp->pci_dev->dev);
-	} else {
-		pm_runtime_idle(&tp->pci_dev->dev);
-	}
-
-	if (net_ratelimit())
-		phy_print_status(tp->phydev);
 }
 
 static int r8169_phy_connect(struct rtl8169_private *tp)
@@ -4769,6 +4839,10 @@ static int rtl_open(struct net_device *dev)
 		goto err_free_irq;
 
 	rtl8169_up(tp);
+
+	if (rtl_link_chng_polling_quirk(tp))
+		mod_timer(&tp->link_timer, jiffies + RTL8169_LINK_TIMEOUT);
+
 	rtl8169_init_counter_offsets(tp);
 	netif_start_queue(dev);
 out:
@@ -4991,7 +5065,10 @@ static const struct net_device_ops rtl_netdev_ops = {
 
 static void rtl_set_irq_mask(struct rtl8169_private *tp)
 {
-	tp->irq_mask = RxOK | RxErr | TxOK | TxErr | LinkChg;
+	tp->irq_mask = RxOK | RxErr | TxOK | TxErr;
+
+	if (!rtl_link_chng_polling_quirk(tp))
+		tp->irq_mask |= LinkChg;
 
 	if (tp->mac_version <= RTL_GIGA_MAC_VER_06)
 		tp->irq_mask |= SYSErr | RxOverflow | RxFIFOOver;
@@ -5435,6 +5512,9 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (pci_dev_run_wake(pdev))
 		pm_runtime_put_sync(&pdev->dev);
+
+	if (rtl_link_chng_polling_quirk(tp))
+		rtl8169_request_link_timer(dev);
 
 	return 0;
 }
