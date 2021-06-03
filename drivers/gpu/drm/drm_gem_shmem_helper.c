@@ -24,7 +24,7 @@
  * allocated using anonymous pageable memory.
  */
 
-static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
+const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 	.free = drm_gem_shmem_free_object,
 	.print_info = drm_gem_shmem_print_info,
 	.pin = drm_gem_shmem_pin,
@@ -34,6 +34,7 @@ static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 	.vunmap = drm_gem_shmem_vunmap,
 	.mmap = drm_gem_shmem_mmap,
 };
+EXPORT_SYMBOL(drm_gem_shmem_funcs);
 
 static struct drm_gem_shmem_object *
 __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
