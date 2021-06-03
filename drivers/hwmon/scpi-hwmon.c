@@ -99,7 +99,10 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
 
 	scpi_scale_reading(&value, sensor);
 
-	return sprintf(buf, "%llu\n", value);
+	if (sensor->info.class == TEMPERATURE)
+		return sprintf(buf, "%lld\n", value);
+	else
+		return sprintf(buf, "%llu\n", value);
 }
 
 static ssize_t
