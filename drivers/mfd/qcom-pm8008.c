@@ -223,7 +223,7 @@ static int pm8008_probe(struct i2c_client *client)
 	struct pm8008_data *chip;
 
 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
-	if (!chip)
+	if (IS_ERR(chip))
 		return -ENOMEM;
 
 	chip->dev = &client->dev;
