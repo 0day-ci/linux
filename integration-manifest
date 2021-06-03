@@ -1,0 +1,26 @@
+drm drm-fixes 8124c8a6b35386f73523d27eacb71b5364a68c4c
+	Linux 5.13-rc4
+drm-misc drm-misc-fixes 0b78f8bcf4951af30b0ae83ea4fad27d641ab617
+	Revert "fb_defio: Remove custom address_space_operations"
+drm-intel drm-intel-fixes b87482dfe800f326f8f5b0093273ee6bd5b5fe9f
+	Revert "i915: use io_mapping_map_user"
+drm drm-next ccd1950c2f7e38ae45aeefb99a08b39407cd6c63
+	Merge tag 'drm-intel-gt-next-2021-05-28' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes b9d79e4ca4ff23543d6b33c736ba07c1f0a9dcb1
+	fbmem: Mark proc_fb_seq_ops as __maybe_unused
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-misc drm-misc-next 610d9c311b1387f8c4ac602fee1f2a1cb0508707
+	drm/panel: add rotation support for Elida KD35T133 panels
+drm-intel drm-intel-next 3ed131e5a43b469afcb1dd6d24399e05ce1f0eb0
+	drm/i915/dmc: Move struct intel_dmc to intel_dmc.h
+drm-intel drm-intel-gt-next f4db23f2c0d18c3a41746326e3eda0402b5c6b93
+	drm/i915/ttm: Embed a ttm buffer object in the i915 gem object
+sound-upstream for-linus b8b90c17602689eeaa5b219d104bbc215d1225cc
+	ALSA: hda: update the power_state during the direct-complete
+sound-upstream for-next 9ce650a75a3b262c90789b42aedee8fc2ee04d53
+	ALSA: usb-audio: Reduce latency at playback start
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
