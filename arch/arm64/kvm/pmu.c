@@ -162,6 +162,21 @@ static void kvm_vcpu_pmu_disable_el0(unsigned long events)
 }
 
 /*
+ * Restore PMU events on first vcpu load.
+ */
+void kvm_vcpu_pmu_restore(struct kvm_vcpu *vcpu)
+{
+	if (kvm_arm_pmu_v3_restored(vcpu))
+		return;
+ 
+	u64 val = __vcpu_sys_reg(vcpu, PMCR_EL0);
+ 
+	kvm_pmu_handle_pmcr(vcpu, val);
+ 
+	vcpu->arch.pmu.restored = true;
+}
+
+/*
  * On VHE ensure that only guest events have EL0 counting enabled.
  * This is called from both vcpu_{load,put} and the sysreg handling.
  * Since the latter is preemptible, special care must be taken to

@@ -574,10 +574,16 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
 		kvm_pmu_disable_counter_mask(vcpu, mask);
 	}
 
-	if (val & ARMV8_PMU_PMCR_C)
+	/*
+	 * Cycle counter needs to reset in case of first vcpu load.
+	 */
+	if (val & ARMV8_PMU_PMCR_C || !kvm_arm_pmu_v3_restored(vcpu))
 		kvm_pmu_set_counter_value(vcpu, ARMV8_PMU_CYCLE_IDX, 0);
 
-	if (val & ARMV8_PMU_PMCR_P) {
+	/*
+	 * All the counters needs to reset in case of first vcpu load.
+	 */
+	if (val & ARMV8_PMU_PMCR_P || !kvm_arm_pmu_v3_restored(vcpu)) {
 		for_each_set_bit(i, &mask, 32)
 			kvm_pmu_set_counter_value(vcpu, i, 0);
 	}

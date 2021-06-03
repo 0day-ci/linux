@@ -32,10 +32,12 @@ struct kvm_pmu {
 	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
 	DECLARE_BITMAP(chained, ARMV8_PMU_MAX_COUNTER_PAIRS);
 	bool created;
+	bool restored;
 	bool irq_level;
 	struct irq_work overflow_work;
 };
 
+#define kvm_arm_pmu_v3_restored(v)	((v)->arch.pmu.restored)
 #define kvm_arm_pmu_irq_initialized(v)	((v)->arch.pmu.irq_num >= VGIC_NR_SGIS)
 u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
 void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val);
@@ -67,6 +69,7 @@ struct kvm_pmu {
 };
 
 #define kvm_arm_pmu_irq_initialized(v)	(false)
+#define kvm_arm_pmu_v3_restored(v)	(false)
 static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
 					    u64 select_idx)
 {
