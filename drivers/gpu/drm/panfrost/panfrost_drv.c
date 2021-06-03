@@ -63,6 +63,7 @@ static int panfrost_ioctl_get_param(struct drm_device *ddev, void *data, struct 
 		PANFROST_FEATURE(THREAD_MAX_BARRIER_SZ,
 				thread_max_barrier_sz);
 		PANFROST_FEATURE(COHERENCY_FEATURES, coherency_features);
+		PANFROST_FEATURE(AFBC_FEATURES, afbc_features);
 		PANFROST_FEATURE_ARRAY(TEXTURE_FEATURES, texture_features, 3);
 		PANFROST_FEATURE_ARRAY(JS_FEATURES, js_features, 15);
 		PANFROST_FEATURE(NR_CORE_GROUPS, nr_core_groups);
