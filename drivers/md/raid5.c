@@ -90,18 +90,20 @@ static inline void unlock_device_hash_lock(struct r5conf *conf, int hash)
 	spin_unlock_irq(conf->hash_locks + hash);
 }
 
-static inline void lock_all_device_hash_locks_irq(struct r5conf *conf)
+static inline void lock_all_quiesce_locks_irq(struct r5conf *conf)
 {
 	int i;
 	spin_lock_irq(conf->hash_locks);
 	for (i = 1; i < NR_STRIPE_HASH_LOCKS; i++)
 		spin_lock_nest_lock(conf->hash_locks + i, conf->hash_locks);
 	spin_lock(&conf->device_lock);
+	write_lock(&conf->aligned_reads_lock);
 }
 
-static inline void unlock_all_device_hash_locks_irq(struct r5conf *conf)
+static inline void unlock_all_quiesce_locks_irq(struct r5conf *conf)
 {
 	int i;
+	write_unlock(&conf->aligned_reads_lock);
 	spin_unlock(&conf->device_lock);
 	for (i = NR_STRIPE_HASH_LOCKS - 1; i; i--)
 		spin_unlock(conf->hash_locks + i);
@@ -5454,11 +5456,13 @@ static int raid5_read_one_chunk(struct mddev *mddev, struct bio *raid_bio)
 	/* No reshape active, so we can trust rdev->data_offset */
 	align_bio->bi_iter.bi_sector += rdev->data_offset;
 
-	spin_lock_irq(&conf->device_lock);
-	wait_event_lock_irq(conf->wait_for_quiescent, conf->quiesce == 0,
-			    conf->device_lock);
+	/* Ensure that active_aligned_reads and quiesce are synced */
+	read_lock_irq(&conf->aligned_reads_lock);
+	wait_event_cmd(conf->wait_for_quiescent, conf->quiesce == 0,
+			read_unlock_irq(&conf->aligned_reads_lock),
+			read_lock_irq(&conf->aligned_reads_lock));
 	atomic_inc(&conf->active_aligned_reads);
-	spin_unlock_irq(&conf->device_lock);
+	read_unlock_irq(&conf->aligned_reads_lock);
 
 	if (mddev->gendisk)
 		trace_block_bio_remap(align_bio, disk_devt(mddev->gendisk),
@@ -7210,6 +7214,7 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 	} else
 		goto abort;
 	spin_lock_init(&conf->device_lock);
+	rwlock_init(&conf->aligned_reads_lock);
 	seqcount_spinlock_init(&conf->gen_lock, &conf->device_lock);
 	mutex_init(&conf->cache_size_mutex);
 	init_waitqueue_head(&conf->wait_for_quiescent);
@@ -7267,7 +7272,7 @@ static struct r5conf *setup_conf(struct mddev *mddev)
 
 	/* We init hash_locks[0] separately to that it can be used
 	 * as the reference lock in the spin_lock_nest_lock() call
-	 * in lock_all_device_hash_locks_irq in order to convince
+	 * in lock_all_quiesce_locks_irq in order to convince
 	 * lockdep that we know what we are doing.
 	 */
 	spin_lock_init(conf->hash_locks);
@@ -8341,7 +8346,7 @@ static void raid5_quiesce(struct mddev *mddev, int quiesce)
 
 	if (quiesce) {
 		/* stop all writes */
-		lock_all_device_hash_locks_irq(conf);
+		lock_all_quiesce_locks_irq(conf);
 		/* '2' tells resync/reshape to pause so that all
 		 * active stripes can drain
 		 */
@@ -8350,19 +8355,19 @@ static void raid5_quiesce(struct mddev *mddev, int quiesce)
 		wait_event_cmd(conf->wait_for_quiescent,
 				    atomic_read(&conf->active_stripes) == 0 &&
 				    atomic_read(&conf->active_aligned_reads) == 0,
-				    unlock_all_device_hash_locks_irq(conf),
-				    lock_all_device_hash_locks_irq(conf));
+				    unlock_all_quiesce_locks_irq(conf),
+				    lock_all_quiesce_locks_irq(conf));
 		conf->quiesce = 1;
-		unlock_all_device_hash_locks_irq(conf);
+		unlock_all_quiesce_locks_irq(conf);
 		/* allow reshape to continue */
 		wake_up(&conf->wait_for_overlap);
 	} else {
 		/* re-enable writes */
-		lock_all_device_hash_locks_irq(conf);
+		lock_all_quiesce_locks_irq(conf);
 		conf->quiesce = 0;
 		wake_up(&conf->wait_for_quiescent);
 		wake_up(&conf->wait_for_overlap);
-		unlock_all_device_hash_locks_irq(conf);
+		unlock_all_quiesce_locks_irq(conf);
 	}
 	log_quiesce(conf, quiesce);
 }
