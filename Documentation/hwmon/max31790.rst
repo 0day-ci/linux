@@ -50,6 +50,10 @@ fan[1-12]_min      RW  minimum fan speed in RPM. Equivalent to target fan speed
                        and the chip will report a fault condition if the fan
                        speed is below the target fan speed.
 fan[1-6]_target    RW  desired fan speed in RPM
+fan[1-12]_div      RW  fan speed range
+		       The value is RO for companion channels (7-12). For those
+		       channels, the value matches the value of the primary channel.
+		       Setting fanX_target or fanX_min also sets this value.
 pwm[1-6]_enable    RW  regulator mode, 0=disabled (duty cycle=0%), 1=manual mode, 2=rpm mode
 pwm[1-6]           RW  read: current pwm duty cycle,
                        write: target pwm duty cycle (0-255)
