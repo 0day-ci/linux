@@ -951,7 +951,6 @@ static void hvfb_get_option(struct fb_info *info)
 
 	screen_width = x;
 	screen_height = y;
-	return;
 }
 
 /*
