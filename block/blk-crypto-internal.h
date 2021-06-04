@@ -60,6 +60,21 @@ static inline bool blk_crypto_rq_is_encrypted(struct request *rq)
 	return rq->crypt_ctx;
 }
 
+/*
+ * Returns the alignment requirement for the number of sectors in this bio based
+ * on its bi_crypt_context. Any bios split from this bio must follow this
+ * alignment requirement as well. Note that a bio must contain a whole number of
+ * crypto data units (which is selected by the submitter of bio), since
+ * encryption/decryption can only be performed on a complete crypto data unit.
+ */
+static inline unsigned int blk_crypto_bio_sectors_alignment(struct bio *bio)
+{
+	if (!bio_has_crypt_ctx(bio))
+		return 1;
+	return bio->bi_crypt_context->bc_key->crypto_cfg.data_unit_size >>
+								SECTOR_SHIFT;
+}
+
 #else /* CONFIG_BLK_INLINE_ENCRYPTION */
 
 static inline bool bio_crypt_rq_ctx_compatible(struct request *rq,
@@ -91,6 +106,11 @@ static inline void blk_crypto_rq_set_defaults(struct request *rq) { }
 static inline bool blk_crypto_rq_is_encrypted(struct request *rq)
 {
 	return false;
+}
+
+static inline unsigned int blk_crypto_bio_sectors_alignment(struct bio *bio)
+{
+	return 1;
 }
 
 #endif /* CONFIG_BLK_INLINE_ENCRYPTION */
