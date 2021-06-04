@@ -390,6 +390,27 @@ static struct page *dax_busy_page(void *entry)
 }
 
 /*
+ * dax_load_pfn - Load pfn of the DAX entry corresponding to a page
+ * @mapping: The file whose entry we want to load
+ * @index:   The offset where the DAX entry located in
+ *
+ * Return:   pfn of the DAX entry
+ */
+unsigned long dax_load_pfn(struct address_space *mapping, unsigned long index)
+{
+	XA_STATE(xas, &mapping->i_pages, index);
+	void *entry;
+	unsigned long pfn;
+
+	xas_lock_irq(&xas);
+	entry = xas_load(&xas);
+	pfn = dax_to_pfn(entry);
+	xas_unlock_irq(&xas);
+
+	return pfn;
+}
+
+/*
  * dax_lock_mapping_entry - Lock the DAX entry corresponding to a page
  * @page: The page whose entry we want to lock
  *
