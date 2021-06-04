@@ -1234,6 +1234,9 @@ struct rtsx_pcr {
 	u8				card_drive_sel;
 #define ASPM_L1_EN			0x02
 	u8				aspm_en;
+#define ASPM_MODE_CFG		0x01
+#define ASPM_MODE_REG		0x02
+	u8				aspm_mode;
 	bool				aspm_enabled;
 
 #define PCR_MS_PMOS			(1 << 0)
