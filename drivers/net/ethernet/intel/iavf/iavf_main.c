@@ -3185,14 +3185,15 @@ static int iavf_open(struct net_device *netdev)
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 	int err;
 
-	if (adapter->flags & IAVF_FLAG_PF_COMMS_FAILED) {
-		dev_err(&adapter->pdev->dev, "Unable to open device due to PF driver failure.\n");
-		return -EIO;
-	}
-
 	while (test_and_set_bit(__IAVF_IN_CRITICAL_TASK,
 				&adapter->crit_section))
 		usleep_range(500, 1000);
+
+	if (adapter->flags & IAVF_FLAG_PF_COMMS_FAILED) {
+		dev_err(&adapter->pdev->dev, "Unable to open device due to PF driver failure.\n");
+		err = -EIO;
+		goto err_unlock;
+	}
 
 	if (adapter->state != __IAVF_DOWN) {
 		err = -EBUSY;
