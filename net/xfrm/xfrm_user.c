@@ -3159,7 +3159,7 @@ static struct xfrm_policy *xfrm_compile_policy(struct sock *sk, int opt,
 
 	xp = xfrm_policy_alloc(net, GFP_ATOMIC);
 	if (xp == NULL) {
-		*dir = -ENOBUFS;
+		*dir = -ENOMEM;
 		return NULL;
 	}
 
