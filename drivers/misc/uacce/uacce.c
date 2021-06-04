@@ -387,15 +387,22 @@ static void uacce_release(struct device *dev)
 
 static unsigned int uacce_enable_sva(struct device *parent, unsigned int flags)
 {
+	int ret;
+
 	if (!(flags & UACCE_DEV_SVA))
 		return flags;
 
 	flags &= ~UACCE_DEV_SVA;
 
-	if (iommu_dev_enable_feature(parent, IOMMU_DEV_FEAT_IOPF))
+	ret = iommu_dev_enable_feature(parent, IOMMU_DEV_FEAT_IOPF);
+	if (ret) {
+		dev_err(parent, "failed to enable IOPF feature! ret = %d\n", ret);
 		return flags;
+	}
 
-	if (iommu_dev_enable_feature(parent, IOMMU_DEV_FEAT_SVA)) {
+	ret = iommu_dev_enable_feature(parent, IOMMU_DEV_FEAT_SVA);
+	if (ret) {
+		dev_err(parent, "failed to enable SVA feature! ret = %d\n", ret);
 		iommu_dev_disable_feature(parent, IOMMU_DEV_FEAT_IOPF);
 		return flags;
 	}
