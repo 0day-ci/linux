@@ -10164,6 +10164,8 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_crtc_state *new_crtc_state, *old_crtc_state;
 	struct intel_crtc *crtc;
+	struct drm_connector *connector;
+	struct drm_connector_state *new_conn_state;
 	u64 put_domains[I915_MAX_PIPES] = {};
 	intel_wakeref_t wakeref = 0;
 	int i;
@@ -10323,6 +10325,17 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 		intel_display_power_put(dev_priv, POWER_DOMAIN_MODESET, wakeref);
 	}
 	intel_runtime_pm_put(&dev_priv->runtime_pm, state->wakeref);
+
+	/* Extract information from crtc to communicate it to userspace as connector properties */
+	for_each_new_connector_in_state(&state->base, connector, new_conn_state, i) {
+		struct drm_crtc *crtc = new_conn_state->crtc;
+		if (crtc) {
+			new_crtc_state = to_intel_crtc_state(drm_atomic_get_new_crtc_state(&state->base, crtc));
+			new_conn_state->active_bpc = new_crtc_state->pipe_bpp / 3;
+		}
+		else
+			new_conn_state->active_bpc = 0;
+	}
 
 	/*
 	 * Defer the cleanup of the old state to a separate worker to not
