@@ -232,7 +232,7 @@ static void audit_set_auditable(struct audit_context *ctx)
 {
 	if (!ctx->prio) {
 		ctx->prio = 1;
-		ctx->current_state = AUDIT_RECORD_CONTEXT;
+		ctx->current_state = AUDITSC_RECORD_CONTEXT;
 	}
 }
 
@@ -757,10 +757,10 @@ static int audit_filter_rules(struct task_struct *tsk,
 	}
 	switch (rule->action) {
 	case AUDIT_NEVER:
-		*state = AUDIT_DISABLED;
+		*state = AUDITSC_DISABLED;
 		break;
 	case AUDIT_ALWAYS:
-		*state = AUDIT_RECORD_CONTEXT;
+		*state = AUDITSC_RECORD_CONTEXT;
 		break;
 	}
 	return 1;
@@ -779,14 +779,14 @@ static enum audit_state audit_filter_task(struct task_struct *tsk, char **key)
 	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) {
 		if (audit_filter_rules(tsk, &e->rule, NULL, NULL,
 				       &state, true)) {
-			if (state == AUDIT_RECORD_CONTEXT)
+			if (state == AUDITSC_RECORD_CONTEXT)
 				*key = kstrdup(e->rule.filterkey, GFP_ATOMIC);
 			rcu_read_unlock();
 			return state;
 		}
 	}
 	rcu_read_unlock();
-	return AUDIT_BUILD_CONTEXT;
+	return AUDITSC_BUILD_CONTEXT;
 }
 
 static int audit_in_mask(const struct audit_krule *rule, unsigned long val)
@@ -808,7 +808,7 @@ static int audit_in_mask(const struct audit_krule *rule, unsigned long val)
 /* At syscall exit time, this filter is called if the audit_state is
  * not low enough that auditing cannot take place, but is also not
  * high enough that we already know we have to write an audit record
- * (i.e., the state is AUDIT_SETUP_CONTEXT or AUDIT_BUILD_CONTEXT).
+ * (i.e., the state is AUDIT_SETUP_CONTEXT or AUDITSC_BUILD_CONTEXT).
  */
 static void audit_filter_syscall(struct task_struct *tsk,
 				 struct audit_context *ctx)
@@ -929,7 +929,7 @@ static inline struct audit_context *audit_alloc_context(enum audit_state state)
 	if (!context)
 		return NULL;
 	context->state = state;
-	context->prio = state == AUDIT_RECORD_CONTEXT ? ~0ULL : 0;
+	context->prio = state == AUDITSC_RECORD_CONTEXT ? ~0ULL : 0;
 	INIT_LIST_HEAD(&context->killed_trees);
 	INIT_LIST_HEAD(&context->names_list);
 	context->fds[0] = -1;
@@ -956,7 +956,7 @@ int audit_alloc(struct task_struct *tsk)
 		return 0; /* Return if not auditing. */
 
 	state = audit_filter_task(tsk, &key);
-	if (state == AUDIT_DISABLED) {
+	if (state == AUDITSC_DISABLED) {
 		clear_task_syscall_work(tsk, SYSCALL_AUDIT);
 		return 0;
 	}
@@ -1639,7 +1639,7 @@ void __audit_free(struct task_struct *tsk)
 
 		audit_filter_syscall(tsk, context);
 		audit_filter_inodes(tsk, context);
-		if (context->current_state == AUDIT_RECORD_CONTEXT)
+		if (context->current_state == AUDITSC_RECORD_CONTEXT)
 			audit_log_exit();
 	}
 
@@ -1658,7 +1658,7 @@ void __audit_free(struct task_struct *tsk)
  * Fill in audit context at syscall entry.  This only happens if the
  * audit context was created when the task was created and the state or
  * filters demand the audit context be built.  If the state from the
- * per-task filter or from the per-syscall filter is AUDIT_RECORD_CONTEXT,
+ * per-task filter or from the per-syscall filter is AUDITSC_RECORD_CONTEXT,
  * then the record will be written at syscall exit time (otherwise, it
  * will only be written if another part of the kernel requests that it
  * be written).
@@ -1675,11 +1675,11 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
 	BUG_ON(context->in_syscall || context->name_count);
 
 	state = context->state;
-	if (state == AUDIT_DISABLED)
+	if (state == AUDITSC_DISABLED)
 		return;
 
 	context->dummy = !audit_n_rules;
-	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) {
+	if (!context->dummy && state == AUDITSC_BUILD_CONTEXT) {
 		context->prio = 0;
 		if (auditd_test_task(current))
 			return;
@@ -1704,7 +1704,7 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
  * @return_code: return value of the syscall
  *
  * Tear down after system call.  If the audit context has been marked as
- * auditable (either because of the AUDIT_RECORD_CONTEXT state from
+ * auditable (either because of the AUDITSC_RECORD_CONTEXT state from
  * filtering, or because some other part of the kernel wrote an audit
  * message), then write out the syscall information.  In call cases,
  * free the names stored from getname().
@@ -1746,12 +1746,12 @@ void __audit_syscall_exit(int success, long return_code)
 
 		audit_filter_syscall(current, context);
 		audit_filter_inodes(current, context);
-		if (context->current_state == AUDIT_RECORD_CONTEXT)
+		if (context->current_state == AUDITSC_RECORD_CONTEXT)
 			audit_log_exit();
 	}
 
 	context->in_syscall = 0;
-	context->prio = context->state == AUDIT_RECORD_CONTEXT ? ~0ULL : 0;
+	context->prio = context->state == AUDITSC_RECORD_CONTEXT ? ~0ULL : 0;
 
 	audit_free_module(context);
 	audit_free_names(context);
@@ -1764,7 +1764,7 @@ void __audit_syscall_exit(int success, long return_code)
 	context->sockaddr_len = 0;
 	context->type = 0;
 	context->fds[0] = -1;
-	if (context->state != AUDIT_RECORD_CONTEXT) {
+	if (context->state != AUDITSC_RECORD_CONTEXT) {
 		kfree(context->filterkey);
 		context->filterkey = NULL;
 	}
@@ -2217,7 +2217,7 @@ int auditsc_get_stamp(struct audit_context *ctx,
 	*serial    = ctx->serial;
 	if (!ctx->prio) {
 		ctx->prio = 1;
-		ctx->current_state = AUDIT_RECORD_CONTEXT;
+		ctx->current_state = AUDITSC_RECORD_CONTEXT;
 	}
 	return 1;
 }
