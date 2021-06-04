@@ -286,4 +286,11 @@ sequential zones of zoned block devices (devices with a zoned attributed
 that reports "host-managed" or "host-aware"). This value is always 0 for
 regular block devices.
 
+max_bio_bytes (RO)
+---------------------------
+This is the maximum number of bytes that bio size to be submitted will be
+limited. A value of 4,294,967,295(UINT_MAX) means no limit of bio size,
+and it's a default value. The minimum value is 1MB. It's legacy maximum
+bio size. (=BIO_MAX_VECS * PAGE_SIZE)
+
 Jens Axboe <jens.axboe@oracle.com>, February 2009

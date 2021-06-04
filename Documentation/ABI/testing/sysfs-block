@@ -316,3 +316,13 @@ Description:
 		does not complete in this time then the block driver timeout
 		handler is invoked. That timeout handler can decide to retry
 		the request, to fail it or to start a device recovery strategy.
+
+What:		/sys/block/<disk>/queue/max_bio_bytes
+Date:		June 2021
+Contact:	Changheun Lee <nanich.lee@samsung.com>
+Description:
+		max_bio_bytes is the maximum bio size to be submitted in bytes.
+		It shows current maximum bio size, and bio size to be submitted
+		will be limited with this. Default value is UINT_MAX, and
+		the minimum value is 1MB. 1MB(=BIO_MAX_VECS * PAGE_SIZE) is
+		legacy maximum bio size.

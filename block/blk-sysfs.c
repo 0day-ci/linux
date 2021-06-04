@@ -108,6 +108,11 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	return ret;
 }
 
+static ssize_t queue_max_bio_bytes_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->limits.max_bio_bytes, (page));
+}
+
 static ssize_t queue_max_sectors_show(struct request_queue *q, char *page)
 {
 	int max_sectors_kb = queue_max_sectors(q) >> 1;
@@ -577,6 +582,7 @@ static struct queue_sysfs_entry _prefix##_entry = {	\
 
 QUEUE_RW_ENTRY(queue_requests, "nr_requests");
 QUEUE_RW_ENTRY(queue_ra, "read_ahead_kb");
+QUEUE_RO_ENTRY(queue_max_bio_bytes, "max_bio_bytes");
 QUEUE_RW_ENTRY(queue_max_sectors, "max_sectors_kb");
 QUEUE_RO_ENTRY(queue_max_hw_sectors, "max_hw_sectors_kb");
 QUEUE_RO_ENTRY(queue_max_segments, "max_segments");
@@ -635,6 +641,7 @@ QUEUE_RW_ENTRY(queue_stable_writes, "stable_writes");
 static struct attribute *queue_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
+	&queue_max_bio_bytes_entry.attr,
 	&queue_max_hw_sectors_entry.attr,
 	&queue_max_sectors_entry.attr,
 	&queue_max_segments_entry.attr,
