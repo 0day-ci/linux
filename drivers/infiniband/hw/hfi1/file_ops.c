@@ -569,7 +569,7 @@ static int hfi1_file_mmap(struct file *fp, struct vm_area_struct *vma)
 
 	vma->vm_flags = flags;
 	hfi1_cdbg(PROC,
-		  "%u:%u type:%u io/vf:%d/%d, addr:0x%llx, len:%lu(%lu), flags:0x%lx\n",
+		  "%u:%u type:%u io/vf:%d/%d, addr:0x%llx, len:%lu(%lu), flags:0x%llx\n",
 		    ctxt, subctxt, type, mapio, vmf, memaddr, memlen,
 		    vma->vm_end - vma->vm_start, vma->vm_flags);
 	if (vmf) {

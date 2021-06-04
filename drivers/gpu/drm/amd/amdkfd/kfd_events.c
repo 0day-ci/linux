@@ -808,7 +808,7 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
 	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
 	pr_debug("     pfn                 == 0x%016lX\n", pfn);
-	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
+	pr_debug("     vm_flags            == 0x%08llX\n", vma->vm_flags);
 	pr_debug("     size                == 0x%08lX\n",
 			vma->vm_end - vma->vm_start);
 

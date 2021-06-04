@@ -846,7 +846,7 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 	struct vm_area_struct *vma, *prev;
 	/* len == 0 means wake all */
 	struct userfaultfd_wake_range range = { .len = 0, };
-	unsigned long new_flags;
+	vm_flags_t new_flags;
 
 	WRITE_ONCE(ctx->released, true);
 
@@ -1284,7 +1284,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	int ret;
 	struct uffdio_register uffdio_register;
 	struct uffdio_register __user *user_uffdio_register;
-	unsigned long vm_flags, new_flags;
+	vm_flags_t vm_flags, new_flags;
 	bool found;
 	bool basic_ioctls;
 	unsigned long start, end, vma_end;
@@ -1510,7 +1510,7 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 	struct vm_area_struct *vma, *prev, *cur;
 	int ret;
 	struct uffdio_range uffdio_unregister;
-	unsigned long new_flags;
+	vm_flags_t new_flags;
 	bool found;
 	unsigned long start, end, vma_end;
 	const void __user *buf = (void __user *)arg;

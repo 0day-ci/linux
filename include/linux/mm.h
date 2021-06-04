@@ -264,73 +264,68 @@ extern struct rw_semaphore nommu_region_sem;
 extern unsigned int kobjsize(const void *objp);
 #endif
 
+#define VM_FLAGS_BIT(N)	(1ULL << (N))
+
 /*
  * vm_flags in vm_area_struct, see mm_types.h.
  * When changing, update also include/trace/events/mmflags.h
  */
 #define VM_NONE		0x00000000
 
-#define VM_READ		0x00000001	/* currently active flags */
-#define VM_WRITE	0x00000002
-#define VM_EXEC		0x00000004
-#define VM_SHARED	0x00000008
+#define VM_READ		VM_FLAGS_BIT(0)	 /* currently active flags */
+#define VM_WRITE	VM_FLAGS_BIT(1)
+#define VM_EXEC		VM_FLAGS_BIT(2)
+#define VM_SHARED	VM_FLAGS_BIT(3)
 
 /* mprotect() hardcodes VM_MAYREAD >> 4 == VM_READ, and so for r/w/x bits. */
-#define VM_MAYREAD	0x00000010	/* limits for mprotect() etc */
-#define VM_MAYWRITE	0x00000020
-#define VM_MAYEXEC	0x00000040
-#define VM_MAYSHARE	0x00000080
+#define VM_MAYREAD	VM_FLAGS_BIT(4)	 /* limits for mprotect() etc */
+#define VM_MAYWRITE	VM_FLAGS_BIT(5)
+#define VM_MAYEXEC	VM_FLAGS_BIT(6)
+#define VM_MAYSHARE	VM_FLAGS_BIT(7)
 
-#define VM_GROWSDOWN	0x00000100	/* general info on the segment */
-#define VM_UFFD_MISSING	0x00000200	/* missing pages tracking */
-#define VM_PFNMAP	0x00000400	/* Page-ranges managed without "struct page", just pure PFN */
-#define VM_DENYWRITE	0x00000800	/* ETXTBSY on write attempts.. */
-#define VM_UFFD_WP	0x00001000	/* wrprotect pages tracking */
+#define VM_GROWSDOWN	VM_FLAGS_BIT(8)	 /* general info on the segment */
+#define VM_UFFD_MISSING	VM_FLAGS_BIT(9)	 /* missing pages tracking */
+#define VM_PFNMAP	VM_FLAGS_BIT(10) /* Page-ranges managed without "struct page", just pure PFN */
+#define VM_DENYWRITE	VM_FLAGS_BIT(11) /* ETXTBSY on write attempts.. */
+#define VM_UFFD_WP	VM_FLAGS_BIT(12) /* wrprotect pages tracking */
 
-#define VM_LOCKED	0x00002000
-#define VM_IO           0x00004000	/* Memory mapped I/O or similar */
+#define VM_LOCKED	VM_FLAGS_BIT(13)
+#define VM_IO           VM_FLAGS_BIT(14) /* Memory mapped I/O or similar */
 
-					/* Used by sys_madvise() */
-#define VM_SEQ_READ	0x00008000	/* App will access data sequentially */
-#define VM_RAND_READ	0x00010000	/* App will not benefit from clustered reads */
+					 /* Used by sys_madvise() */
+#define VM_SEQ_READ	VM_FLAGS_BIT(15) /* App will access data sequentially */
+#define VM_RAND_READ	VM_FLAGS_BIT(16) /* App will not benefit from clustered reads */
 
-#define VM_DONTCOPY	0x00020000      /* Do not copy this vma on fork */
-#define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
-#define VM_LOCKONFAULT	0x00080000	/* Lock the pages covered when they are faulted in */
-#define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
-#define VM_NORESERVE	0x00200000	/* should the VM suppress accounting */
-#define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
-#define VM_SYNC		0x00800000	/* Synchronous page faults */
-#define VM_ARCH_1	0x01000000	/* Architecture-specific flag */
-#define VM_WIPEONFORK	0x02000000	/* Wipe VMA contents in child. */
-#define VM_DONTDUMP	0x04000000	/* Do not include in the core dump */
+#define VM_DONTCOPY	VM_FLAGS_BIT(17) /* Do not copy this vma on fork */
+#define VM_DONTEXPAND	VM_FLAGS_BIT(18) /* Cannot expand with mremap() */
+#define VM_LOCKONFAULT	VM_FLAGS_BIT(19) /* Lock the pages covered when they are faulted in */
+#define VM_ACCOUNT	VM_FLAGS_BIT(20) /* Is a VM accounted object */
+#define VM_NORESERVE	VM_FLAGS_BIT(21) /* should the VM suppress accounting */
+#define VM_HUGETLB	VM_FLAGS_BIT(22) /* Huge TLB Page VM */
+#define VM_SYNC		VM_FLAGS_BIT(23) /* Synchronous page faults */
+#define VM_ARCH_1	VM_FLAGS_BIT(24) /* Architecture-specific flag */
+#define VM_WIPEONFORK	VM_FLAGS_BIT(25) /* Wipe VMA contents in child. */
+#define VM_DONTDUMP	VM_FLAGS_BIT(26) /* Do not include in the core dump */
 
 #ifdef CONFIG_MEM_SOFT_DIRTY
-# define VM_SOFTDIRTY	0x08000000	/* Not soft dirty clean area */
+# define VM_SOFTDIRTY	VM_FLAGS_BIT(27) /* Not soft dirty clean area */
 #else
 # define VM_SOFTDIRTY	0
 #endif
 
-#define VM_MIXEDMAP	0x10000000	/* Can contain "struct page" and pure PFN pages */
-#define VM_HUGEPAGE	0x20000000	/* MADV_HUGEPAGE marked this vma */
-#define VM_NOHUGEPAGE	0x40000000	/* MADV_NOHUGEPAGE marked this vma */
-#define VM_MERGEABLE	0x80000000	/* KSM may merge identical pages */
+#define VM_MIXEDMAP	VM_FLAGS_BIT(28) /* Can contain "struct page" and pure PFN pages */
+#define VM_HUGEPAGE	VM_FLAGS_BIT(29) /* MADV_HUGEPAGE marked this vma */
+#define VM_NOHUGEPAGE	VM_FLAGS_BIT(30) /* MADV_NOHUGEPAGE marked this vma */
+#define VM_MERGEABLE	VM_FLAGS_BIT(31) /* KSM may merge identical pages */
 
-#ifdef CONFIG_ARCH_USES_HIGH_VMA_FLAGS
-#define VM_HIGH_ARCH_BIT_0	32	/* bit only usable on 64-bit architectures */
-#define VM_HIGH_ARCH_BIT_1	33	/* bit only usable on 64-bit architectures */
-#define VM_HIGH_ARCH_BIT_2	34	/* bit only usable on 64-bit architectures */
-#define VM_HIGH_ARCH_BIT_3	35	/* bit only usable on 64-bit architectures */
-#define VM_HIGH_ARCH_BIT_4	36	/* bit only usable on 64-bit architectures */
-#define VM_HIGH_ARCH_0	BIT(VM_HIGH_ARCH_BIT_0)
-#define VM_HIGH_ARCH_1	BIT(VM_HIGH_ARCH_BIT_1)
-#define VM_HIGH_ARCH_2	BIT(VM_HIGH_ARCH_BIT_2)
-#define VM_HIGH_ARCH_3	BIT(VM_HIGH_ARCH_BIT_3)
-#define VM_HIGH_ARCH_4	BIT(VM_HIGH_ARCH_BIT_4)
-#endif /* CONFIG_ARCH_USES_HIGH_VMA_FLAGS */
+#define VM_HIGH_ARCH_0	VM_FLAGS_BIT(32)
+#define VM_HIGH_ARCH_1	VM_FLAGS_BIT(33)
+#define VM_HIGH_ARCH_2	VM_FLAGS_BIT(34)
+#define VM_HIGH_ARCH_3	VM_FLAGS_BIT(35)
+#define VM_HIGH_ARCH_4	VM_FLAGS_BIT(36)
 
 #ifdef CONFIG_ARCH_HAS_PKEYS
-# define VM_PKEY_SHIFT	VM_HIGH_ARCH_BIT_0
+# define VM_PKEY_SHIFT	32
 # define VM_PKEY_BIT0	VM_HIGH_ARCH_0	/* A protection key is a 4-bit value */
 # define VM_PKEY_BIT1	VM_HIGH_ARCH_1	/* on x86 and 5-bit value on ppc64   */
 # define VM_PKEY_BIT2	VM_HIGH_ARCH_2
@@ -373,8 +368,7 @@ extern unsigned int kobjsize(const void *objp);
 #endif
 
 #ifdef CONFIG_HAVE_ARCH_USERFAULTFD_MINOR
-# define VM_UFFD_MINOR_BIT	37
-# define VM_UFFD_MINOR		BIT(VM_UFFD_MINOR_BIT)	/* UFFD minor faults */
+# define VM_UFFD_MINOR		VM_FLAGS_BIT(37)	/* UFFD minor faults */
 #else /* !CONFIG_HAVE_ARCH_USERFAULTFD_MINOR */
 # define VM_UFFD_MINOR		VM_NONE
 #endif /* CONFIG_HAVE_ARCH_USERFAULTFD_MINOR */
@@ -1894,7 +1888,7 @@ extern unsigned long change_protection(struct vm_area_struct *vma, unsigned long
 			      unsigned long cp_flags);
 extern int mprotect_fixup(struct vm_area_struct *vma,
 			  struct vm_area_struct **pprev, unsigned long start,
-			  unsigned long end, unsigned long newflags);
+			  unsigned long end, vm_flags_t newflags);
 
 /*
  * doesn't attempt to fault and will return short.
@@ -2545,7 +2539,7 @@ static inline int vma_adjust(struct vm_area_struct *vma, unsigned long start,
 }
 extern struct vm_area_struct *vma_merge(struct mm_struct *,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
-	unsigned long vm_flags, struct anon_vma *, struct file *, pgoff_t,
+	vm_flags_t vm_flags, struct anon_vma *, struct file *, pgoff_t,
 	struct mempolicy *, struct vm_userfaultfd_ctx);
 extern struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *);
 extern int __split_vma(struct mm_struct *, struct vm_area_struct *,
@@ -2626,7 +2620,7 @@ static inline void mm_populate(unsigned long addr, unsigned long len) {}
 
 /* These take the mm semaphore themselves */
 extern int __must_check vm_brk(unsigned long, unsigned long);
-extern int __must_check vm_brk_flags(unsigned long, unsigned long, unsigned long);
+extern int __must_check vm_brk_flags(unsigned long, unsigned long, vm_flags_t);
 extern int vm_munmap(unsigned long, size_t);
 extern unsigned long __must_check vm_mmap(struct file *, unsigned long,
         unsigned long, unsigned long,

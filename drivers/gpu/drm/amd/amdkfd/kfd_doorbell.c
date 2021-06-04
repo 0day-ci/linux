@@ -150,7 +150,7 @@ int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 	pr_debug("Mapping doorbell page\n"
 		 "     target user address == 0x%08llX\n"
 		 "     physical address    == 0x%08llX\n"
-		 "     vm_flags            == 0x%04lX\n"
+		 "     vm_flags            == 0x%08llX\n"
 		 "     size                == 0x%04lX\n",
 		 (unsigned long long) vma->vm_start, address, vma->vm_flags,
 		 kfd_doorbell_process_slice(dev));

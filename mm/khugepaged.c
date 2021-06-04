@@ -345,7 +345,7 @@ struct attribute_group khugepaged_attr_group = {
 #endif /* CONFIG_SYSFS */
 
 int hugepage_madvise(struct vm_area_struct *vma,
-		     unsigned long *vm_flags, int advice)
+		     vm_flags_t *vm_flags, int advice)
 {
 	switch (advice) {
 	case MADV_HUGEPAGE:

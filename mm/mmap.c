@@ -191,7 +191,7 @@ static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
 	return next;
 }
 
-static int do_brk_flags(unsigned long addr, unsigned long request, unsigned long flags,
+static int do_brk_flags(unsigned long addr, unsigned long request, vm_flags_t flags,
 		struct list_head *uf);
 SYSCALL_DEFINE1(brk, unsigned long, brk)
 {
@@ -1160,7 +1160,7 @@ can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
  */
 struct vm_area_struct *vma_merge(struct mm_struct *mm,
 			struct vm_area_struct *prev, unsigned long addr,
-			unsigned long end, unsigned long vm_flags,
+			unsigned long end, vm_flags_t vm_flags,
 			struct anon_vma *anon_vma, struct file *file,
 			pgoff_t pgoff, struct mempolicy *policy,
 			struct vm_userfaultfd_ctx vm_userfaultfd_ctx)
@@ -1353,7 +1353,7 @@ static inline unsigned long round_hint_to_min(unsigned long hint)
 }
 
 static inline int mlock_future_check(struct mm_struct *mm,
-				     unsigned long flags,
+				     vm_flags_t flags,
 				     unsigned long len)
 {
 	unsigned long locked, lock_limit;
@@ -3050,7 +3050,7 @@ out:
  *  anonymous maps.  eventually we may be able to do some
  *  brk-specific accounting here.
  */
-static int do_brk_flags(unsigned long addr, unsigned long len, unsigned long flags, struct list_head *uf)
+static int do_brk_flags(unsigned long addr, unsigned long len, vm_flags_t flags, struct list_head *uf)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma, *prev;
@@ -3118,7 +3118,7 @@ out:
 	return 0;
 }
 
-int vm_brk_flags(unsigned long addr, unsigned long request, unsigned long flags)
+int vm_brk_flags(unsigned long addr, unsigned long request, vm_flags_t flags)
 {
 	struct mm_struct *mm = current->mm;
 	unsigned long len;
