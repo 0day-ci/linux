@@ -2,7 +2,7 @@
 /*
  *  linux/fs/9p/vfs_file.c
  *
- * This file contians vfs file ops for 9P2000.
+ * This file contains vfs file ops for 9P2000.
  *
  *  Copyright (C) 2004 by Eric Van Hensbergen <ericvh@gmail.com>
  *  Copyright (C) 2002 by Ron Minnich <rminnich@lanl.gov>
@@ -223,7 +223,7 @@ static int v9fs_file_do_lock(struct file *filp, int cmd, struct file_lock *fl)
 
 out_unlock:
 	/*
-	 * incase server returned error for lock request, revert
+	 * in case server returned error for lock request, revert
 	 * it locally
 	 */
 	if (res < 0 && fl->fl_type != F_UNLCK) {

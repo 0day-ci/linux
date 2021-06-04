@@ -505,7 +505,7 @@ static int v9fs_at_to_dotl_flags(int flags)
 }
 
 /**
- * v9fs_dec_count - helper functon to drop i_nlink.
+ * v9fs_dec_count - helper function to drop i_nlink.
  *
  * If a directory had nlink <= 2 (including . and ..), then we should not drop
  * the link count, which indicates the underlying exported fs doesn't maintain
@@ -778,7 +778,7 @@ struct dentry *v9fs_vfs_lookup(struct inode *dir, struct dentry *dentry,
 	 * If we had a rename on the server and a parallel lookup
 	 * for the new name, then make sure we instantiate with
 	 * the new name. ie look up for a/b, while on server somebody
-	 * moved b under k and client parallely did a lookup for
+	 * moved b under k and client parallelly did a lookup for
 	 * k/b.
 	 */
 	res = d_splice_alias(inode, dentry);

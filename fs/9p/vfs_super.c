@@ -2,7 +2,7 @@
 /*
  *  linux/fs/9p/vfs_super.c
  *
- * This file contians superblock ops for 9P2000. It is intended that
+ * This file contains superblock ops for 9P2000. It is intended that
  * you mount this file system on directories.
  *
  *  Copyright (C) 2004 by Eric Van Hensbergen <ericvh@gmail.com>

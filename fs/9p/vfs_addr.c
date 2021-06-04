@@ -2,7 +2,7 @@
 /*
  *  linux/fs/9p/vfs_addr.c
  *
- * This file contians vfs address (mmap) ops for 9P2000.
+ * This file contains vfs address (mmap) ops for 9P2000.
  *
  *  Copyright (C) 2005 by Eric Van Hensbergen <ericvh@gmail.com>
  *  Copyright (C) 2002 by Ron Minnich <rminnich@lanl.gov>
@@ -139,7 +139,7 @@ static void v9fs_invalidate_page(struct page *page, unsigned int offset,
 {
 	/*
 	 * If called with zero offset, we should release
-	 * the private state assocated with the page
+	 * the private state associated with the page
 	 */
 	if (offset == 0 && length == PAGE_SIZE)
 		v9fs_fscache_invalidate_page(page);

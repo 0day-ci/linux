@@ -689,7 +689,7 @@ static int __init init_v9fs(void)
 {
 	int err;
 	pr_info("Installing v9fs 9p2000 file system support\n");
-	/* TODO: Setup list of registered trasnport modules */
+	/* TODO: Setup list of registered transport modules */
 
 	err = v9fs_cache_register();
 	if (err < 0) {
