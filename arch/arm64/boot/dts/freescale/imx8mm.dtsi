@@ -7,6 +7,8 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/power/imx8mm-power.h>
+#include <dt-bindings/reset/imx8mq-reset.h>
 #include <dt-bindings/thermal/thermal.h>
 
 #include "imx8mm-pinfunc.h"
@@ -600,6 +602,109 @@
 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
 				#reset-cells = <1>;
 			};
+
+			gpc: gpc@303a0000 {
+				compatible = "fsl,imx8mm-gpc";
+				reg = <0x303a0000 0x10000>;
+				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-parent = <&gic>;
+				interrupt-controller;
+				#interrupt-cells = <3>;
+
+				pgc {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					pgc_hsiomix: power-domain@0 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_HSIOMIX>;
+						clocks = <&clk IMX8MM_CLK_USB1_CTRL_ROOT>;
+					};
+
+					pgc_pcie: power-domain@1 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_PCIE>;
+						power-domains = <&pgc_hsiomix>;
+						clocks = <&clk IMX8MM_CLK_PCIE1_ROOT>;
+					};
+
+					pgc_otg1: power-domain@2 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_OTG1>;
+						power-domains = <&pgc_hsiomix>;
+					};
+
+					pgc_otg2: power-domain@3 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_OTG2>;
+						power-domains = <&pgc_hsiomix>;
+					};
+
+					pgc_gpumix: power-domain@4 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_GPUMIX>;
+						clocks = <&clk IMX8MM_CLK_GPU_BUS_ROOT>,
+							 <&clk IMX8MM_CLK_GPU_AHB>;
+					};
+
+					pgc_gpu: power-domain@5 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_GPU>;
+						clocks = <&clk IMX8MM_CLK_GPU_AHB>,
+							 <&clk IMX8MM_CLK_GPU_BUS_ROOT>,
+							 <&clk IMX8MM_CLK_GPU2D_ROOT>,
+							 <&clk IMX8MM_CLK_GPU3D_ROOT>;
+						resets = <&src IMX8MQ_RESET_GPU_RESET>;
+						power-domains = <&pgc_gpumix>;
+					};
+
+					pgc_vpumix: power-domain@6 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_VPUMIX>;
+						clocks = <&clk IMX8MM_CLK_VPU_DEC_ROOT>;
+						resets = <&src IMX8MQ_RESET_VPU_RESET>;
+					};
+
+					pgc_vpu_g1: power-domain@7 {
+						#power-domain-cells = <0>;
+						power-domains =
+						<&vpumix_blk_ctl IMX8MM_BLK_CTL_PD_VPU_BUS>;
+						reg = <IMX8MM_POWER_DOMAIN_VPUG1>;
+						clocks = <&clk IMX8MM_CLK_VPU_G1_ROOT>;
+					};
+
+					pgc_vpu_g2: power-domain@8 {
+						#power-domain-cells = <0>;
+						power-domains =
+						<&vpumix_blk_ctl IMX8MM_BLK_CTL_PD_VPU_BUS>;
+						reg = <IMX8MM_POWER_DOMAIN_VPUG2>;
+						clocks = <&clk IMX8MM_CLK_VPU_G2_ROOT>;
+					};
+
+					pgc_vpu_h1: power-domain@9 {
+						#power-domain-cells = <0>;
+						power-domains =
+						<&vpumix_blk_ctl IMX8MM_BLK_CTL_PD_VPU_BUS>;
+						reg = <IMX8MM_POWER_DOMAIN_VPUH1>;
+						clocks = <&clk IMX8MM_CLK_VPU_H1_ROOT>;
+					};
+
+					pgc_dispmix: power-domain@10 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_DISPMIX>;
+						clocks = <&clk IMX8MM_CLK_DISP_ROOT>,
+							 <&clk IMX8MM_CLK_DISP_AXI_ROOT>,
+							 <&clk IMX8MM_CLK_DISP_APB_ROOT>;
+					};
+
+					pgc_mipi: power-domain@11 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_MIPI>;
+						power-domains =
+						<&dispmix_blk_ctl IMX8MM_BLK_CTL_PD_DISPMIX_BUS>;
+					};
+				};
+			};
 		};
 
 		aips2: bus@30400000 {
@@ -943,6 +1048,18 @@
 			#size-cells = <1>;
 			ranges = <0x32c00000 0x32c00000 0x400000>;
 
+			dispmix_blk_ctl: blk_ctl@32e28000 {
+				compatible = "fsl,imx8mm-dispmix-blk-ctl", "syscon";
+				reg = <0x32e28000 0x100>;
+				#power-domain-cells = <1>;
+				#reset-cells = <1>;
+				power-domains = <&pgc_dispmix>, <&pgc_mipi>;
+				power-domain-names = "dispmix", "mipi";
+				clocks = <&clk IMX8MM_CLK_DISP_ROOT>,
+					 <&clk IMX8MM_CLK_DISP_AXI_ROOT>,
+					 <&clk IMX8MM_CLK_DISP_APB_ROOT>;
+			};
+
 			usbotg1: usb@32e40000 {
 				compatible = "fsl,imx8mm-usb", "fsl,imx7d-usb";
 				reg = <0x32e40000 0x200>;
@@ -1010,6 +1127,17 @@
 			dmas = <&dma_apbh 0>;
 			dma-names = "rx-tx";
 			status = "disabled";
+		};
+
+		vpumix_blk_ctl: blk-ctl@38330000 {
+			compatible = "fsl,imx8mm-vpumix-blk-ctl", "syscon";
+			reg = <0x38330000 0x100>;
+			#power-domain-cells = <1>;
+			#reset-cells = <1>;
+			power-domains = <&pgc_vpumix>, <&pgc_vpu_g1>, <&pgc_vpu_g2>, <&pgc_vpu_h1>;
+			power-domain-names = "vpumix", "vpu-g1", "vpu-g2", "vpu-h1";
+			clocks = <&clk IMX8MM_CLK_VPU_DEC_ROOT>, <&clk IMX8MM_CLK_VPU_G1_ROOT>,
+				 <&clk IMX8MM_CLK_VPU_G2_ROOT>, <&clk IMX8MM_CLK_VPU_H1_ROOT>;
 		};
 
 		gic: interrupt-controller@38800000 {
