@@ -21,8 +21,17 @@ void mmc_crypto_set_initial_state(struct mmc_host *host)
 
 void mmc_crypto_setup_queue(struct request_queue *q, struct mmc_host *host)
 {
-	if (host->caps2 & MMC_CAP2_CRYPTO)
-		blk_ksm_register(&host->ksm, q);
+	if (host->caps2 & MMC_CAP2_CRYPTO) {
+		/*
+		 * This WARN_ON should never trigger since &host->ksm won't be
+		 * "empty" (i.e. will support at least 1 crypto capability), an
+		 * MMC device's request queue doesn't support integrity, and
+		 * it also satisfies all the block layer constraints (i.e.
+		 * supports SG gaps, doesn't have chunk sectors, has a
+		 * sufficiently large supported max_segments per bio)
+		 */
+		WARN_ON(!blk_ksm_register(&host->ksm, q));
+	}
 }
 EXPORT_SYMBOL_GPL(mmc_crypto_setup_queue);
 
