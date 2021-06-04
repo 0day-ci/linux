@@ -348,13 +348,13 @@ static int inject_build_id(struct bench_data *data, u64 *max_rss)
 	int status;
 	unsigned int i, k;
 	struct rusage rusage;
-	u64 len = 0;
+	u64 len;
 
 	/* this makes the child to run */
 	if (perf_header__write_pipe(data->input_pipe[1]) < 0)
 		return -1;
 
-	len += synthesize_attr(data);
+	len = synthesize_attr(data);
 	len += synthesize_fork(data);
 
 	for (i = 0; i < nr_mmaps; i++) {
