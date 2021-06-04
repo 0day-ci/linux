@@ -628,3 +628,26 @@ void page_pool_update_nid(struct page_pool *pool, int new_nid)
 	}
 }
 EXPORT_SYMBOL(page_pool_update_nid);
+
+bool page_pool_return_skb_page(void *data)
+{
+	struct page_pool *pp;
+	struct page *page;
+
+	page = virt_to_head_page(data);
+	if (unlikely(page->pp_magic != PP_SIGNATURE))
+		return false;
+
+	pp = (struct page_pool *)page->pp;
+
+	/* Driver set this to memory recycling info. Reset it on recycle.
+	 * This will *not* work for NIC using a split-page memory model.
+	 * The page will be returned to the pool here regardless of the
+	 * 'flipped' fragment being in use or not.
+	 */
+	page->pp = NULL;
+	page_pool_put_full_page(pp, page, false);
+
+	return true;
+}
+EXPORT_SYMBOL(page_pool_return_skb_page);
