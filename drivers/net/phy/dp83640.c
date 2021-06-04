@@ -1141,12 +1141,7 @@ static int dp83640_config_init(struct phy_device *phydev)
 
 static int dp83640_ack_interrupt(struct phy_device *phydev)
 {
-	int err = phy_read(phydev, MII_DP83640_MISR);
-
-	if (err < 0)
-		return err;
-
-	return 0;
+	return phy_read(phydev, MII_DP83640_MISR);
 }
 
 static int dp83640_config_intr(struct phy_device *phydev)
