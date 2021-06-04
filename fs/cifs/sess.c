@@ -94,7 +94,7 @@ void
 cifs_chan_set_need_reconnect(struct cifs_ses *ses,
 			     struct TCP_Server_Info *server)
 {
-	size_t chan_index = cifs_ses_get_chan_index(ses, server);
+	unsigned long chan_index = cifs_ses_get_chan_index(ses, server);
 	set_bit(chan_index, &ses->chans_need_reconnect);
 	cifs_dbg(FYI, "Set reconnect bitmask for chan %lu; now 0x%lx\n",
 		 chan_index, ses->chans_need_reconnect);
@@ -104,7 +104,7 @@ void
 cifs_chan_clear_need_reconnect(struct cifs_ses *ses,
 			       struct TCP_Server_Info *server)
 {
-	size_t chan_index = cifs_ses_get_chan_index(ses, server);
+	unsigned long chan_index = cifs_ses_get_chan_index(ses, server);
 	clear_bit(chan_index, &ses->chans_need_reconnect);
 	cifs_dbg(FYI, "Cleared reconnect bitmask for chan %lu; now 0x%lx\n",
 		 chan_index, ses->chans_need_reconnect);
@@ -114,7 +114,7 @@ bool
 cifs_chan_needs_reconnect(struct cifs_ses *ses,
 			    struct TCP_Server_Info *server)
 {
-	size_t chan_index = cifs_ses_get_chan_index(ses, server);
+	unsigned long chan_index = cifs_ses_get_chan_index(ses, server);
 	return CIFS_CHAN_NEEDS_RECONNECT(ses, chan_index);
 }
 
