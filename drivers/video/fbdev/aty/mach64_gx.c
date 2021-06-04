@@ -33,7 +33,7 @@
 #define MIN_M		2
 #define MAX_M		30
 #define MIN_N		35
-#define MAX_N		255-8
+#define MAX_N		(255-8)
 
 
     /*
