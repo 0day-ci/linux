@@ -107,7 +107,7 @@ static int cpio_mkslink(const char *name, const char *target,
 
 	if (name[0] == '/')
 		name++;
-	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+	sprintf(s, "%s%08X%08X%08lX%08lX%08X%08lX"
 	       "%08X%08X%08X%08X%08X%08X%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
@@ -156,7 +156,7 @@ static int cpio_mkgeneric(const char *name, unsigned int mode,
 
 	if (name[0] == '/')
 		name++;
-	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+	sprintf(s, "%s%08X%08X%08lX%08lX%08X%08lX"
 	       "%08X%08X%08X%08X%08X%08X%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
@@ -250,7 +250,7 @@ static int cpio_mknod(const char *name, unsigned int mode,
 
 	if (name[0] == '/')
 		name++;
-	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+	sprintf(s, "%s%08X%08X%08lX%08lX%08X%08lX"
 	       "%08X%08X%08X%08X%08X%08X%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
@@ -335,12 +335,13 @@ static int cpio_mkfile(const char *name, const char *location,
 	size = 0;
 	for (i = 1; i <= nlinks; i++) {
 		/* data goes on last link */
-		if (i == nlinks) size = buf.st_size;
+		if (i == nlinks)
+			size = buf.st_size;
 
 		if (name[0] == '/')
 			name++;
 		namesize = strlen(name) + 1;
-		sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+		sprintf(s, "%s%08X%08X%08lX%08lX%08X%08lX"
 		       "%08lX%08X%08X%08X%08X%08X%08X",
 			"070701",		/* magic */
 			ino,			/* ino */
@@ -373,10 +374,12 @@ static int cpio_mkfile(const char *name, const char *location,
 	}
 	ino++;
 	rc = 0;
-	
+
 error:
-	if (filebuf) free(filebuf);
-	if (file >= 0) close(file);
+	if (filebuf)
+		free(filebuf);
+	if (file >= 0)
+		close(file);
 	return rc;
 }
 
@@ -443,9 +446,10 @@ static int cpio_mkfile_line(const char *line)
 		dname = name;
 	}
 	rc = cpio_mkfile(dname, cpio_replace_env(location),
-	                 mode, uid, gid, nlinks);
+			mode, uid, gid, nlinks);
  fail:
-	if (dname_len) free(dname);
+	if (dname_len)
+		free(dname);
 	return rc;
 }
 
@@ -603,7 +607,7 @@ int main (int argc, char *argv[])
 
 		for (type_idx = 0; file_handler_table[type_idx].type; type_idx++) {
 			int rc;
-			if (! strcmp(line, file_handler_table[type_idx].type)) {
+			if (!strcmp(line, file_handler_table[type_idx].type)) {
 				if ((rc = file_handler_table[type_idx].handler(args))) {
 					ec = rc;
 					fprintf(stderr, " line %d\n", line_nr);
