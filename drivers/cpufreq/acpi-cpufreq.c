@@ -1042,7 +1042,18 @@ static int __init acpi_cpufreq_init(void)
 
 static void __exit acpi_cpufreq_exit(void)
 {
+	const char *current_driver;
+
 	pr_debug("%s\n", __func__);
+
+	/*
+	 * If another cpufreq_driver was loaded, preventing acpi-cpufreq from
+	 * registering, there's no need to unregister it.
+	 */
+	current_driver = cpufreq_get_current_driver();
+	if (!current_driver ||
+	    strncmp(current_driver, acpi_cpufreq_driver.name, strlen(acpi_cpufreq_driver.name)))
+		return;
 
 	acpi_cpufreq_boost_exit();
 
