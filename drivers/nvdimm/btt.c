@@ -1230,6 +1230,7 @@ static int btt_read_pg(struct btt *btt, struct bio_integrity_payload *bip,
 
 			if (t_flag) {
 				zero_fill_data(page, off, cur_len);
+				ret = -EIO;
 				goto out_lane;
 			}
 
