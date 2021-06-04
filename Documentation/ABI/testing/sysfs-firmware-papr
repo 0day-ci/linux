@@ -1,0 +1,24 @@
+What:		/sys/firmware/papr
+Date:		June 2021
+Contact:	Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description :	Director hosting a set of platform attributes on Linux
+		running as a PAPR guest.
+
+		Each file in a directory contains a platform
+		attribute pertaining to performance/energy-savings
+		mode and processor frequency.
+
+What:		/sys/firmware/papr/attr_X_name
+		/sys/firmware/papr/attr_X_val
+Date:		June 2021
+Contact:	Linux for PowerPC mailing list <linuxppc-dev@ozlabs.org>
+Description:	PAPR attributes directory for POWERVM servers
+
+		This directory provides PAPR information. It
+		contains below sysfs attributes:
+
+		- attr_X_name: File contains the name of
+		attribute X
+
+		- attr_X_val: Numeric/string value of
+		attribute X
