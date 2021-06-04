@@ -222,8 +222,10 @@ struct dax_device {
 	struct cdev cdev;
 	const char *host;
 	void *private;
+	void *holder;
 	unsigned long flags;
 	const struct dax_operations *ops;
+	const struct dax_holder_operations *holder_ops;
 };
 
 static ssize_t write_cache_show(struct device *dev,
@@ -372,6 +374,24 @@ int dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 	return dax_dev->ops->zero_page_range(dax_dev, pgoff, nr_pages);
 }
 EXPORT_SYMBOL_GPL(dax_zero_page_range);
+
+int dax_corrupted_range(struct dax_device *dax_dev, struct block_device *bdev,
+		loff_t offset, size_t size, void *data)
+{
+	int rc = -ENXIO;
+	if (!dax_dev)
+		return rc;
+
+	if (dax_dev->holder) {
+		rc = dax_dev->holder_ops->corrupted_range(dax_dev, bdev, offset,
+							  size, data);
+		if (rc == -ENODEV)
+			rc = -ENXIO;
+	} else
+		rc = -EOPNOTSUPP;
+	return rc;
+}
+EXPORT_SYMBOL_GPL(dax_corrupted_range);
 
 #ifdef CONFIG_ARCH_HAS_PMEM_API
 void arch_wb_cache_pmem(void *addr, size_t size);
@@ -623,6 +643,24 @@ void put_dax(struct dax_device *dax_dev)
 	iput(&dax_dev->inode);
 }
 EXPORT_SYMBOL_GPL(put_dax);
+
+void dax_set_holder(struct dax_device *dax_dev, void *holder,
+		const struct dax_holder_operations *ops)
+{
+	if (!dax_dev)
+		return;
+	dax_dev->holder = holder;
+	dax_dev->holder_ops = ops;
+}
+EXPORT_SYMBOL_GPL(dax_set_holder);
+
+void *dax_get_holder(struct dax_device *dax_dev)
+{
+	if (!dax_dev)
+		return NULL;
+	return dax_dev->holder;
+}
+EXPORT_SYMBOL_GPL(dax_get_holder);
 
 /**
  * dax_get_by_host() - temporary lookup mechanism for filesystem-dax
