@@ -1025,6 +1025,12 @@ void iavf_down(struct iavf_adapter *adapter)
 		adapter->aq_required |= IAVF_FLAG_AQ_DEL_FDIR_FILTER;
 		adapter->aq_required |= IAVF_FLAG_AQ_DEL_ADV_RSS_CFG;
 		adapter->aq_required |= IAVF_FLAG_AQ_DISABLE_QUEUES;
+		/* In case the queue configure or enable operations are still
+		 * pending from when the interface was opened, make sure
+		 * they're canceled here.
+		 */
+		adapter->aq_required &= ~IAVF_FLAG_AQ_ENABLE_QUEUES;
+		adapter->aq_required &= ~IAVF_FLAG_AQ_CONFIGURE_QUEUES;
 	}
 
 	mod_delayed_work(iavf_wq, &adapter->watchdog_task, 0);
@@ -2314,8 +2320,12 @@ static void iavf_adminq_task(struct work_struct *work)
 		if (ret || !v_op)
 			break; /* No event to process or error cleaning ARQ */
 
+		while (test_and_set_bit(__IAVF_IN_CRITICAL_TASK,
+					&adapter->crit_section))
+			usleep_range(500, 1000);
 		iavf_virtchnl_completion(adapter, v_op, v_ret, event.msg_buf,
 					 event.msg_len);
+		clear_bit(__IAVF_IN_CRITICAL_TASK, &adapter->crit_section);
 		if (pending != 0)
 			memset(event.msg_buf, 0, IAVF_MAX_AQ_BUF_SIZE);
 	} while (pending);
