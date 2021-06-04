@@ -231,7 +231,6 @@ static void
 cyber2000fb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	cfb_imageblit(info, image);
-	return;
 }
 
 static int cyber2000fb_sync(struct fb_info *info)
