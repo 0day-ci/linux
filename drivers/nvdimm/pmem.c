@@ -364,9 +364,23 @@ static void pmem_release_disk(void *__pmem)
 	put_disk(pmem->disk);
 }
 
+static int pmem_pagemap_memory_failure(struct dev_pagemap *pgmap,
+		unsigned long pfn, int flags)
+{
+	struct pmem_device *pdev =
+			container_of(pgmap, struct pmem_device, pgmap);
+	loff_t offset = PFN_PHYS(pfn) - pdev->phys_addr - pdev->data_offset;
+	struct block_device *bdev =
+			bdget_disk_sector(pdev->disk, offset >> SECTOR_SHIFT);
+
+	return dax_corrupted_range(pdev->dax_dev, bdev, offset,
+				   page_size(pfn_to_page(pfn)), &flags);
+}
+
 static const struct dev_pagemap_ops fsdax_pagemap_ops = {
 	.kill			= pmem_pagemap_kill,
 	.cleanup		= pmem_pagemap_cleanup,
+	.memory_failure		= pmem_pagemap_memory_failure,
 };
 
 static int pmem_attach_disk(struct device *dev,
