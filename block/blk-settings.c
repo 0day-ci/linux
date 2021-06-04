@@ -32,6 +32,7 @@ EXPORT_SYMBOL_GPL(blk_queue_rq_timeout);
  */
 void blk_set_default_limits(struct queue_limits *lim)
 {
+	lim->max_bio_bytes = UINT_MAX;
 	lim->max_segments = BLK_MAX_SEGMENTS;
 	lim->max_discard_segments = 1;
 	lim->max_integrity_segments = 0;
@@ -99,6 +100,24 @@ void blk_queue_bounce_limit(struct request_queue *q, enum blk_bounce bounce)
 	q->limits.bounce = bounce;
 }
 EXPORT_SYMBOL(blk_queue_bounce_limit);
+
+/**
+ * blk_queue_max_bio_bytes - set bio max size for queue
+ * @q: the request queue for the device
+ * @bytes : bio max bytes to be set
+ *
+ * Description:
+ *    Set proper bio max size to optimize queue operating.
+ **/
+void blk_queue_max_bio_bytes(struct request_queue *q, unsigned int bytes)
+{
+	struct queue_limits *limits = &q->limits;
+	unsigned int max_bio_bytes = round_up(bytes, PAGE_SIZE);
+
+	limits->max_bio_bytes = max_t(unsigned int, max_bio_bytes,
+				      BIO_MAX_VECS * PAGE_SIZE);
+}
+EXPORT_SYMBOL(blk_queue_max_bio_bytes);
 
 /**
  * blk_queue_max_hw_sectors - set max sectors for a request for this queue
