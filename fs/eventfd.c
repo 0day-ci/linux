@@ -25,7 +25,6 @@
 #include <linux/idr.h>
 #include <linux/uio.h>
 
-DEFINE_PER_CPU(int, eventfd_wake_count);
 
 static DEFINE_IDA(eventfd_ida);
 
@@ -43,7 +42,14 @@ struct eventfd_ctx {
 	__u64 count;
 	unsigned int flags;
 	int id;
+	int __percpu *eventfd_wake_count;
 };
+
+inline bool eventfd_signal_count(struct eventfd_ctx *ctx)
+{
+	return this_cpu_read(*ctx->eventfd_wake_count);
+}
+EXPORT_SYMBOL_GPL(eventfd_signal_count);
 
 /**
  * eventfd_signal - Adds @n to the eventfd counter.
@@ -71,17 +77,17 @@ __u64 eventfd_signal(struct eventfd_ctx *ctx, __u64 n)
 	 * it returns true, the eventfd_signal() call should be deferred to a
 	 * safe context.
 	 */
-	if (WARN_ON_ONCE(this_cpu_read(eventfd_wake_count)))
+	if (WARN_ON_ONCE(this_cpu_read(*ctx->eventfd_wake_count)))
 		return 0;
 
 	spin_lock_irqsave(&ctx->wqh.lock, flags);
-	this_cpu_inc(eventfd_wake_count);
+	this_cpu_inc(*ctx->eventfd_wake_count);
 	if (ULLONG_MAX - ctx->count < n)
 		n = ULLONG_MAX - ctx->count;
 	ctx->count += n;
 	if (waitqueue_active(&ctx->wqh))
 		wake_up_locked_poll(&ctx->wqh, EPOLLIN);
-	this_cpu_dec(eventfd_wake_count);
+	this_cpu_dec(*ctx->eventfd_wake_count);
 	spin_unlock_irqrestore(&ctx->wqh.lock, flags);
 
 	return n;
@@ -92,6 +98,9 @@ static void eventfd_free_ctx(struct eventfd_ctx *ctx)
 {
 	if (ctx->id >= 0)
 		ida_simple_remove(&eventfd_ida, ctx->id);
+
+	if (ctx->eventfd_wake_count)
+		free_percpu(ctx->eventfd_wake_count);
 	kfree(ctx);
 }
 
@@ -420,6 +429,10 @@ static int do_eventfd(unsigned int count, int flags)
 	ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
+
+	ctx->eventfd_wake_count = alloc_percpu(int);
+	if (!ctx->eventfd_wake_count)
+		goto err;
 
 	kref_init(&ctx->kref);
 	init_waitqueue_head(&ctx->wqh);
