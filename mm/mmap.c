@@ -1419,6 +1419,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	if (!len)
 		return -EINVAL;
 
+	/* Restrict MAP_NOSIGBUS to MAP_PRIVATE mapping */
+	if ((flags & MAP_NOSIGBUS) && !(flags & MAP_PRIVATE))
+		return -EINVAL;
+
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?
 	 *

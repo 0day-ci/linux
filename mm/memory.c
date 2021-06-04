@@ -3676,6 +3676,17 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
 	}
 
 	ret = vma->vm_ops->fault(vmf);
+	if (unlikely(ret & VM_FAULT_SIGBUS) && (vma->vm_flags & VM_NOSIGBUS)) {
+		/*
+		 * For MAP_NOSIGBUS mapping, map in the zero page on read fault
+		 * or fill a freshly allocated page with zeroes on write fault
+		 */
+		ret = do_anonymous_page(vmf);
+		if (!ret)
+			ret = VM_FAULT_NOPAGE;
+		return ret;
+	}
+
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
 		return ret;
