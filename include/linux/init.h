@@ -148,7 +148,11 @@ extern unsigned int reset_devices;
 /* used by init/main.c */
 void setup_arch(char **);
 void prepare_namespace(void);
+#ifndef CONFIG_INITRAMFS_MOUNT
 void __init init_rootfs(void);
+#else
+static inline void __init init_rootfs(void) { }
+#endif
 bool ramdisk_exec_exist(void);
 extern struct file_system_type rootfs_fs_type;
 

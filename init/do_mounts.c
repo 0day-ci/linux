@@ -660,7 +660,10 @@ void __init finish_mount_rootfs(void)
 	else
 		revert_mount_rootfs();
 }
-#endif
+
+#define rootfs_init_fs_context ramfs_init_fs_context
+
+#else
 
 static bool is_tmpfs;
 static int rootfs_init_fs_context(struct fs_context *fc)
@@ -671,13 +674,14 @@ static int rootfs_init_fs_context(struct fs_context *fc)
 	return ramfs_init_fs_context(fc);
 }
 
+void __init init_rootfs(void)
+{
+	is_tmpfs = is_tmpfs_enabled();
+}
+#endif
+
 struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
 	.init_fs_context = rootfs_init_fs_context,
 	.kill_sb	= kill_litter_super,
 };
-
-void __init init_rootfs(void)
-{
-	is_tmpfs = is_tmpfs_enabled();
-}
