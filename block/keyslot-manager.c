@@ -458,12 +458,103 @@ bool blk_ksm_is_empty(struct blk_keyslot_manager *ksm)
 }
 EXPORT_SYMBOL_GPL(blk_ksm_is_empty);
 
+/*
+ * Restrict the supported data unit sizes of the ksm based on the request queue
+ * limits
+ */
+static void
+blk_ksm_restrict_dus_to_queue_limits(struct blk_keyslot_manager *ksm,
+				     struct request_queue *q)
+{
+	/* The largest possible data unit size we support is PAGE_SIZE. */
+	unsigned long largest_dus = PAGE_SIZE;
+	unsigned int dus_allowed_mask;
+	int i;
+	bool dus_was_restricted = false;
+	struct queue_limits *limits = &q->limits;
+
+	/*
+	 * If the queue doesn't support SG gaps, a bio might get split in the
+	 * middle of a data unit. So require SG gap support for inline
+	 * encryption for any data unit size larger than a single sector.
+	 *
+	 * A crypto data unit might straddle an SG gap, and only a single sector
+	 * of that data unit might be before the gap - the block layer will need
+	 * to split that bio at the gap, which will result in an incomplete
+	 * crypto data unit unless the crypto data unit size is a single sector.
+	 */
+	if (limits->virt_boundary_mask)
+		largest_dus = SECTOR_SIZE;
+
+	/*
+	 * If the queue has chunk_sectors, the bio might be split within a data
+	 * unit if the data unit size is larger than a single sector. So only
+	 * support a single sector data unit size in this case.
+	 *
+	 * Just like the SG gap case above, a crypto data unit might straddle a
+	 * chunk sector boundary, and in the worst case, only a single sector of
+	 * the data unit might be before/after the boundary.
+	 */
+	if (limits->chunk_sectors)
+		largest_dus = SECTOR_SIZE;
+
+	/*
+	 * Any bio sent to the queue must be allowed to contain at least a
+	 * data_unit_size worth of data. Since each segment in a bio contains
+	 * at least a SECTOR_SIZE worth of data, it's sufficient that
+	 * queue_max_segments(q) * SECTOR_SIZE >= data_unit_size. So disable
+	 * all data_unit_sizes not satisfiable.
+	 *
+	 * We assume the worst case of only SECTOR_SIZE bytes of data in each
+	 * segment since users of the block layer are free to construct bios
+	 * with such segments.
+	 */
+	largest_dus = min(largest_dus,
+			1UL << (fls(limits->max_segments) - 1 + SECTOR_SHIFT));
+
+	/* Clear all unsupported data unit sizes. */
+	dus_allowed_mask = (largest_dus << 1) - 1;
+	for (i = 0; i < ARRAY_SIZE(ksm->crypto_modes_supported); i++) {
+		if (ksm->crypto_modes_supported[i] & (~dus_allowed_mask))
+			dus_was_restricted = true;
+		ksm->crypto_modes_supported[i] &= dus_allowed_mask;
+	}
+
+	if (dus_was_restricted) {
+		pr_warn("Disallowed use of encryption data unit sizes above %lu bytes with inline encryption hardware because of device request queue limits on device %s.\n",
+			largest_dus, q->backing_dev_info->dev_name);
+	}
+}
+
+/**
+ * blk_ksm_register() - Sets the queue's keyslot manager to the provided ksm, if
+ *			compatible
+ * @ksm: The ksm to register
+ * @q: The request_queue to register the ksm to
+ *
+ * Checks if the keyslot manager provided is compatible with the request queue
+ * (i.e. the queue shouldn't also support integrity). After that, the crypto
+ * capabilities of the given keyslot manager are restricted to what the queue
+ * can support based on it's limits. Note that if @ksm doesn't support any
+ * crypto capabilities after the capability restriction, the queue's ksm is
+ * set to NULL, instead of being set to a pointer to the now "empty" @ksm.
+ *
+ * Return: true if @q's ksm is set to the provided @ksm, false otherwise
+ *	   (including the case when @ksm becomes "empty" due to crypto
+ *	    capability restrictions)
+ */
 bool blk_ksm_register(struct blk_keyslot_manager *ksm, struct request_queue *q)
 {
 	if (blk_integrity_queue_supports_integrity(q)) {
 		pr_warn("Integrity and hardware inline encryption are not supported together. Disabling hardware inline encryption.\n");
 		return false;
 	}
+
+	blk_ksm_restrict_dus_to_queue_limits(ksm, q);
+
+	if (blk_ksm_is_empty(ksm))
+		return false;
+
 	q->ksm = ksm;
 	return true;
 }
