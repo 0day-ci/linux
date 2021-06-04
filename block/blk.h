@@ -263,6 +263,20 @@ static inline unsigned int bio_allowed_max_sectors(struct request_queue *q)
 }
 
 /*
+ * The required sector alignment for a bio. The number of sectors in any bio
+ * must be aligned to this value.
+ */
+static inline unsigned int bio_required_sector_alignment(struct bio *bio)
+{
+	unsigned int alignmask =
+		(bdev_logical_block_size(bio->bi_bdev) >> SECTOR_SHIFT) - 1;
+
+	alignmask |= blk_crypto_bio_sectors_alignment(bio) - 1;
+
+	return alignmask + 1;
+}
+
+/*
  * The max bio size which is aligned to q->limits.discard_granularity. This
  * is a hint to split large discard bio in generic block layer, then if device
  * driver needs to split the discard bio into smaller ones, their bi_size can
