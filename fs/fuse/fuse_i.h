@@ -1075,6 +1075,11 @@ int fuse_fill_super_submount(struct super_block *sb,
 bool fuse_mount_remove(struct fuse_mount *fm);
 
 /*
+ * Setup context ops for submounts
+ */
+int fuse_init_fs_context_submount(struct fs_context *fsc);
+
+/*
  * Shut down the connection (possibly sending DESTROY request).
  */
 void fuse_conn_destroy(struct fuse_mount *fm);
