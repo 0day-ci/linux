@@ -970,8 +970,8 @@ void iavf_down(struct iavf_adapter *adapter)
 	netif_carrier_off(netdev);
 	netif_tx_disable(netdev);
 	adapter->link_up = false;
-	iavf_napi_disable_all(adapter);
 	iavf_irq_disable(adapter);
+	iavf_napi_disable_all(adapter);
 
 	spin_lock_bh(&adapter->mac_vlan_list_lock);
 
@@ -2035,8 +2035,8 @@ static void iavf_disable_vf(struct iavf_adapter *adapter)
 		netif_carrier_off(adapter->netdev);
 		netif_tx_disable(adapter->netdev);
 		adapter->link_up = false;
-		iavf_napi_disable_all(adapter);
 		iavf_irq_disable(adapter);
+		iavf_napi_disable_all(adapter);
 		iavf_free_traffic_irqs(adapter);
 		iavf_free_all_tx_resources(adapter);
 		iavf_free_all_rx_resources(adapter);
@@ -2166,6 +2166,8 @@ static void iavf_reset_task(struct work_struct *work)
 	}
 
 continue_reset:
+	iavf_irq_disable(adapter);
+
 	/* We don't use netif_running() because it may be true prior to
 	 * ndo_open() returning, so we can't assume it means all our open
 	 * tasks have finished, since we're not holding the rtnl_lock here.
@@ -2177,7 +2179,6 @@ continue_reset:
 		adapter->link_up = false;
 		iavf_napi_disable_all(adapter);
 	}
-	iavf_irq_disable(adapter);
 
 	adapter->state = __IAVF_RESETTING;
 	adapter->flags &= ~IAVF_FLAG_RESET_PENDING;
