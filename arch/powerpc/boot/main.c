@@ -268,7 +268,16 @@ void start(void)
 	if (console_ops.close)
 		console_ops.close();
 
+#ifdef CONFIG_PPC64_BOOT_WRAPPER
+	/*
+	 * For PPC-elf64abi, the value of a function pointer is the address
+	 * of the function descriptor. And the first doubleword of a function
+	 * descriptor contains the address of the entry point of the function.
+	 */
+	kentry = (kernel_entry_t) &vmlinux.addr;
+#else
 	kentry = (kernel_entry_t) vmlinux.addr;
+#endif
 	if (ft_addr) {
 		if(platform_ops.kentry)
 			platform_ops.kentry(ft_addr, vmlinux.addr);
