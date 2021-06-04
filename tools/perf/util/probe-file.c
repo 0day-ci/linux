@@ -48,6 +48,8 @@ static void print_open_warning(int err, bool uprobe)
 			   uprobe ? 'u' : 'k', config);
 	} else if (err == -ENOTSUP)
 		pr_warning("Tracefs or debugfs is not mounted.\n");
+	else if (err == -EACCES)
+		pr_warning("No permission to access tracefs. Please run this command again with sudo.\n");
 	else
 		pr_warning("Failed to open %cprobe_events: %s\n",
 			   uprobe ? 'u' : 'k',
@@ -62,6 +64,8 @@ static void print_both_open_warning(int kerr, int uerr)
 	else if (kerr == -ENOENT && uerr == -ENOENT)
 		pr_warning("Please rebuild kernel with CONFIG_KPROBE_EVENTS "
 			   "or/and CONFIG_UPROBE_EVENTS.\n");
+	else if (kerr == -EACCES && uerr == -EACCES)
+		pr_warning("No permission to access tracefs. Please run this command again with sudo.\n");
 	else {
 		char sbuf[STRERR_BUFSIZE];
 		pr_warning("Failed to open kprobe events: %s.\n",
