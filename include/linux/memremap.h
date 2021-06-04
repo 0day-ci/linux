@@ -87,6 +87,14 @@ struct dev_pagemap_ops {
 	 * the page back to a CPU accessible page.
 	 */
 	vm_fault_t (*migrate_to_ram)(struct vm_fault *vmf);
+
+	/*
+	 * Handle the memory failure happens on one page.  Notify the processes
+	 * who are using this page, and try to recover the data on this page
+	 * if necessary.
+	 */
+	int (*memory_failure)(struct dev_pagemap *pgmap, unsigned long pfn,
+			      int flags);
 };
 
 #define PGMAP_ALTMAP_VALID	(1 << 0)
