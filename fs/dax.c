@@ -1762,3 +1762,19 @@ vm_fault_t dax_finish_sync_fault(struct vm_fault *vmf,
 	return dax_insert_pfn_mkwrite(vmf, pfn, order);
 }
 EXPORT_SYMBOL_GPL(dax_finish_sync_fault);
+
+static int fs_dax_corrupted_range(struct dax_device *dax_dev,
+		struct block_device *bdev, loff_t offset, size_t size,
+		void *data)
+{
+	struct super_block *sb = dax_get_holder(dax_dev);
+	loff_t bdev_off = offset - (get_start_sect(bdev) << SECTOR_SHIFT);
+
+	if (!sb->s_op->corrupted_range)
+		return -EOPNOTSUPP;
+	return sb->s_op->corrupted_range(sb, bdev, bdev_off, size, data);
+}
+
+const struct dax_holder_operations fs_dax_holder_ops = {
+	.corrupted_range = fs_dax_corrupted_range,
+};
