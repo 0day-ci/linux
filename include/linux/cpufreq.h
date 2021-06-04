@@ -994,6 +994,17 @@ static inline int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 	}
 }
 
+static inline unsigned int
+cpufreq_frequency_find_efficient(struct cpufreq_policy *policy,
+				 unsigned int idx)
+{
+	struct cpufreq_frequency_table *table = policy->freq_table;
+	unsigned int efficient_idx = table[idx].efficient;
+
+	return table[efficient_idx].frequency <= policy->max ? efficient_idx :
+							       idx;
+}
+
 static inline int cpufreq_table_count_valid_entries(const struct cpufreq_policy *policy)
 {
 	struct cpufreq_frequency_table *pos;

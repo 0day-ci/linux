@@ -546,6 +546,10 @@ unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 
 		idx = cpufreq_frequency_table_target(policy, target_freq,
 						     CPUFREQ_RELATION_L);
+
+		/* Replace the target with an efficient one */
+		idx = cpufreq_frequency_find_efficient(policy, idx);
+
 		policy->cached_resolved_idx = idx;
 		return policy->freq_table[idx].frequency;
 	}
