@@ -844,9 +844,15 @@ static int cifs_filldir(char *find_entry, struct file *file,
 	struct qstr name;
 	int rc = 0;
 	ino_t ino;
+	int retry_count = 0;
 
+again:
 	rc = cifs_fill_dirent(&de, find_entry, file_info->srch_inf.info_level,
 			      file_info->srch_inf.unicode);
+
+	if (rc == -EAGAIN && retry_count++ < 10)
+		goto again;
+
 	if (rc)
 		return rc;
 
