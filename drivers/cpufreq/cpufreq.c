@@ -19,6 +19,7 @@
 #include <linux/cpu_cooling.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/energy_model.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
@@ -1317,6 +1318,31 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy)
 	kfree(policy);
 }
 
+static void cpufreq_inefficiencies_from_em(struct cpufreq_policy *policy,
+					   struct em_perf_domain *em_pd)
+{
+	struct cpufreq_frequency_table *pos, *table = policy->freq_table;
+	struct em_perf_state *em_table;
+	int i;
+
+	if (!em_pd)
+		return;
+
+	em_table = em_pd->table;
+
+	for (i = 0; i < em_pd->nr_perf_states; i++) {
+		if (!(em_table[i].flags & EM_PERF_STATE_INEFFICIENT))
+			continue;
+
+		cpufreq_for_each_valid_entry(pos, table) {
+			if (pos->frequency == em_table[i].frequency) {
+				pos->flags |= CPUFREQ_INEFFICIENT_FREQ;
+				break;
+			}
+		}
+	}
+}
+
 static int cpufreq_online(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
@@ -1370,6 +1396,12 @@ static int cpufreq_online(unsigned int cpu)
 				 __LINE__);
 			goto out_free_policy;
 		}
+
+		/*
+		 * Sync potential inefficiencies with an Energy Model that the
+		 * driver might have registered.
+		 */
+		cpufreq_inefficiencies_from_em(policy, em_cpu_get(cpu));
 
 		ret = cpufreq_table_validate_and_sort(policy);
 		if (ret)
