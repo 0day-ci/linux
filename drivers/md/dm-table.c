@@ -1354,7 +1354,21 @@ static void dm_update_keyslot_manager(struct request_queue *q,
 
 	/* Make the ksm less restrictive */
 	if (!q->ksm) {
-		blk_ksm_register(t->ksm, q);
+		/*
+		 * This WARN_ON should never trigger since t->ksm isn't be
+		 * "empty" (i.e. will support at least 1 crypto capability), the
+		 * request queue doesn't support integrity (since
+		 * dm_table_construct_keyslot_manager() checks that), and
+		 * it also satisfies all the block layer constraints
+		 * "sufficiently" (as in the constraints of the DM device's
+		 * request queue won't preclude any of the intersection of the
+		 * supported capabilities of the underlying devices, since if
+		 * some capability were precluded by the DM device's request
+		 * queue's constraints, that capability would also have been
+		 * precluded by one of the child device's request queues)
+		 */
+		if (WARN_ON(!blk_ksm_register(t->ksm, q)))
+			dm_destroy_keyslot_manager(t->ksm);
 	} else {
 		blk_ksm_update_capabilities(q->ksm, t->ksm);
 		dm_destroy_keyslot_manager(t->ksm);
