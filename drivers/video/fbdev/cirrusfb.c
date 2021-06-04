@@ -1662,7 +1662,6 @@ static void init_vgachip(struct fb_info *info)
 
 	/* misc... */
 	WHDR(cinfo, 0);	/* Hidden DAC register: - */
-	return;
 }
 
 static void switch_monitor(struct cirrusfb_info *cinfo, int on)
