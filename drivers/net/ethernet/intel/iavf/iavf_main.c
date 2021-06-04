@@ -1486,7 +1486,7 @@ static int iavf_reinit_interrupt_scheme(struct iavf_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	int err;
 
-	if (netif_running(netdev))
+	if (!test_bit(__IAVF_VSI_DOWN, adapter->vsi.state))
 		iavf_free_traffic_irqs(adapter);
 	iavf_free_misc_irq(adapter);
 	iavf_reset_interrupt_capability(adapter);
@@ -2024,7 +2024,7 @@ static void iavf_disable_vf(struct iavf_adapter *adapter)
 	 * ndo_open() returning, so we can't assume it means all our open
 	 * tasks have finished, since we're not holding the rtnl_lock here.
 	 */
-	if (adapter->state == __IAVF_RUNNING) {
+	if (!test_bit(__IAVF_VSI_DOWN, adapter->vsi.state)) {
 		set_bit(__IAVF_VSI_DOWN, adapter->vsi.state);
 		netif_carrier_off(adapter->netdev);
 		netif_tx_disable(adapter->netdev);
@@ -2164,9 +2164,7 @@ continue_reset:
 	 * ndo_open() returning, so we can't assume it means all our open
 	 * tasks have finished, since we're not holding the rtnl_lock here.
 	 */
-	running = ((adapter->state == __IAVF_RUNNING) ||
-		   (adapter->state == __IAVF_RESETTING));
-
+	running = !test_bit(__IAVF_VSI_DOWN, adapter->vsi.state);
 	if (running) {
 		netif_carrier_off(netdev);
 		netif_tx_stop_all_queues(netdev);
