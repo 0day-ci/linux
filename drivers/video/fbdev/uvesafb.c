@@ -106,7 +106,6 @@ static void uvesafb_cn_callback(struct cn_msg *msg, struct netlink_skb_parms *ns
 		memcpy(task->buf, utask + 1, task->t.buf_len);
 
 	complete(task->done);
-	return;
 }
 
 static int uvesafb_helper_start(void)
@@ -748,8 +747,6 @@ static void uvesafb_vbe_getmonspecs(struct uvesafb_ktask *task,
 			fb_add_videomode(&info->monspecs.modedb[i],
 					&info->modelist);
 	}
-
-	return;
 }
 
 static void uvesafb_vbe_getstatesize(struct uvesafb_ktask *task,
