@@ -58,7 +58,6 @@ static void aty_StrobeClock(const struct atyfb_par *par)
 
 	tmp = aty_ld_8(CLOCK_CNTL, par);
 	aty_st_8(CLOCK_CNTL + par->clk_wr_offset, tmp | CLOCK_STROBE, par);
-	return;
 }
 
 
@@ -423,7 +422,6 @@ static void aty_ICS2595_put1bit(u8 data, const struct atyfb_par *par)
 		 par);
 
 	aty_StrobeClock(par);
-	return;
 }
 
 static void aty_set_pll18818(const struct fb_info *info,
@@ -480,7 +478,6 @@ static void aty_set_pll18818(const struct fb_info *info,
 	mdelay(50);		/* delay for 50 (15) ms */
 	aty_st_8(CLOCK_CNTL + par->clk_wr_offset,
 		 ((pll->ics2595.locationAddr & 0x0F) | CLOCK_STROBE), par);
-	return;
 }
 
 const struct aty_pll_ops aty_pll_ati18818_1 = {
@@ -596,7 +593,6 @@ static void aty_set_pll_1703(const struct fb_info *info,
 
 	(void) aty_ld_8(DAC_REGS, par);	/* Clear DAC Counter */
 	aty_st_8(CRTC_GEN_CNTL + 3, old_crtc_ext_disp, par);
-	return;
 }
 
 const struct aty_pll_ops aty_pll_stg1703 = {
@@ -718,8 +714,6 @@ static void aty_set_pll_8398(const struct fb_info *info,
 
 	(void) aty_ld_8(DAC_REGS, par);	/* Clear DAC Counter */
 	aty_st_8(CRTC_GEN_CNTL + 3, old_crtc_ext_disp, par);
-
-	return;
 }
 
 const struct aty_pll_ops aty_pll_ch8398 = {
@@ -866,7 +860,6 @@ static void aty_set_pll_408(const struct fb_info *info,
 
 	(void) aty_ld_8(DAC_REGS, par);	/* Clear DAC Counter */
 	aty_st_8(CRTC_GEN_CNTL + 3, old_crtc_ext_disp, par);
-	return;
 }
 
 const struct aty_pll_ops aty_pll_att20c408 = {
