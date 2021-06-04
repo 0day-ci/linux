@@ -11,9 +11,10 @@
 
 /* Interface history:
  * 0.1 - original.
+ * 0.2 - add i2c and connector detect.
  */
 #define DRIVER_MAJOR 0
-#define DRIVER_MINOR 1
+#define DRIVER_MINOR 2
 
 static const struct drm_mode_config_funcs loongson_mode_funcs = {
 	.fb_create = drm_gem_fb_create,
@@ -31,6 +32,7 @@ static int loongson_device_init(struct drm_device *dev, uint32_t flags)
 	resource_size_t aper_size;
 	resource_size_t mmio_base;
 	resource_size_t mmio_size;
+	u32 ret;
 
 	/* GPU MEM */
 	/* We need get 7A-gpu pci device information for ldev->gpu_pdev */
@@ -71,6 +73,18 @@ static int loongson_device_init(struct drm_device *dev, uint32_t flags)
 	ldev->io = ioremap(LS7A_CHIPCFG_REG_BASE, 0xf);
 	if (ldev->io == NULL)
 		return -ENOMEM;
+
+	ret = loongson_dc_gpio_init(ldev);
+	if (ret) {
+		DRM_ERROR("Failed to initialize dc gpios\n");
+		return ret;
+	}
+
+	ret = loongson_i2c_init(ldev);
+	if (ret) {
+		DRM_ERROR("Failed to initialize dc i2c\n");
+		return ret;
+	}
 
 	DRM_INFO("DC mmio base 0x%llx size 0x%llx io 0x%llx\n",
 		 mmio_base, mmio_size, *(u64 *)ldev->io);
