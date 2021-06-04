@@ -328,7 +328,7 @@ static int __drm_object_property_get_value(struct drm_mode_object *obj,
  * @property: property to retrieve
  * @val: storage for the property value
  *
- * This function retrieves the softare state of the given property for the given
+ * This function retrieves the software state of the given property for the given
  * property. Since there is no driver callback to retrieve the current property
  * value this might be out of sync with the hardware, depending upon the driver
  * and property.

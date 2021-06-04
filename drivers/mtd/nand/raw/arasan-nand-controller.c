@@ -351,7 +351,7 @@ static int anfc_read_page_hw_ecc(struct nand_chip *chip, u8 *buf,
 		return ret;
 
 	/*
-	 * For each step, compute by softare the BCH syndrome over the raw data.
+	 * For each step, compute by software the BCH syndrome over the raw data.
 	 * Compare the theoretical amount of errors and compare with the
 	 * hardware engine feedback.
 	 */

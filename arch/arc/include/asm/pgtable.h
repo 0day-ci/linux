@@ -40,7 +40,7 @@
 /**************************************************************************
  * Page Table Flags
  *
- * ARC700 MMU only deals with softare managed TLB entries.
+ * ARC700 MMU only deals with software managed TLB entries.
  * Page Tables are purely for Linux VM's consumption and the bits below are
  * suited to that (uniqueness). Hence some are not implemented in the TLB and
  * some have different value in TLB.
