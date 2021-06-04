@@ -41,6 +41,7 @@
 #include "bcast.h"
 #include "link.h"
 #include "name_table.h"
+#include "mtu.h"
 
 #define BCLINK_WIN_DEFAULT  50	/* bcast link window size (default) */
 #define BCLINK_WIN_MIN      32	/* bcast minimum link window size */

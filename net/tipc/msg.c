@@ -40,15 +40,9 @@
 #include "addr.h"
 #include "name_table.h"
 #include "crypto.h"
+#include "mtu.h"
 
 #define MAX_FORWARD_SIZE 1024
-#ifdef CONFIG_TIPC_CRYPTO
-#define BUF_HEADROOM ALIGN(((LL_MAX_HEADER + 48) + EHDR_MAX_SIZE), 16)
-#define BUF_TAILROOM (TIPC_AES_GCM_TAG_SIZE)
-#else
-#define BUF_HEADROOM (LL_MAX_HEADER + 48)
-#define BUF_TAILROOM 16
-#endif
 
 static unsigned int align(unsigned int i)
 {
