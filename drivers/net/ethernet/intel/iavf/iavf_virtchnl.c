@@ -1685,8 +1685,17 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		break;
 	case VIRTCHNL_OP_ENABLE_QUEUES:
 		/* enable transmits */
-		if (adapter->state == __IAVF_RUNNING)
+		if (adapter->state == __IAVF_RUNNING) {
 			iavf_irq_enable(adapter, true);
+
+			/* If queues not enabled when handling link event,
+			 * then set carrier on now
+			 */
+			if (adapter->link_up && !netif_carrier_ok(netdev)) {
+				netif_tx_start_all_queues(netdev);
+				netif_carrier_on(netdev);
+			}
+		}
 		adapter->flags &= ~IAVF_FLAG_QUEUES_DISABLED;
 		break;
 	case VIRTCHNL_OP_DISABLE_QUEUES:
