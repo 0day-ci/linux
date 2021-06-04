@@ -16,15 +16,8 @@
  *		.id = -1,
  *		.num_resources = 2,
  *		.resource = (struct resource []) {
- *			{
- *				.start = 0x1001e000,
- *				.end = 0x1001e0ff,
- *				.flags = IORESOURCE_MEM,
- *			}, {
- *				.start = 42 + 32,
- *				.end = 42 + 32,
- *				.flags = IORESOURCE_IRQ,
- *			},
+ *			DEFINE_RES_MEM(0x1001e000, 0x100),
+ *			DEFINE_RES_IRQ(42 + 32),
  *		}
  *	};
  *
