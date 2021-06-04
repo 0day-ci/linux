@@ -297,10 +297,8 @@ static int axp_mc_probe(struct platform_device *pdev)
 	}
 
 	base = devm_ioremap_resource(&pdev->dev, r);
-	if (IS_ERR(base)) {
-		dev_err(&pdev->dev, "Unable to map regs\n");
+	if (IS_ERR(base))
 		return PTR_ERR(base);
-	}
 
 	config = readl(base + SDRAM_CONFIG_REG);
 	if (!(config & SDRAM_CONFIG_ECC_MASK)) {
@@ -525,10 +523,8 @@ static int aurora_l2_probe(struct platform_device *pdev)
 	}
 
 	base = devm_ioremap_resource(&pdev->dev, r);
-	if (IS_ERR(base)) {
-		dev_err(&pdev->dev, "Unable to map regs\n");
+	if (IS_ERR(base))
 		return PTR_ERR(base);
-	}
 
 	l2x0_aux_ctrl = readl(base + L2X0_AUX_CTRL);
 	if (!(l2x0_aux_ctrl & AURORA_ACR_PARITY_EN))
