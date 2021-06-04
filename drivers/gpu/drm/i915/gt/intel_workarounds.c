@@ -1601,9 +1601,9 @@ rcs_engine_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
 			    GEN7_DISABLE_SAMPLER_PREFETCH);
 	}
 
-	if (IS_ALDERLAKE_S(i915) || IS_DG1(i915) ||
+	if (IS_ALDERLAKE_P(i915) || IS_ALDERLAKE_S(i915) || IS_DG1(i915) ||
 	    IS_ROCKETLAKE(i915) || IS_TIGERLAKE(i915)) {
-		/* Wa_1606931601:tgl,rkl,dg1,adl-s */
+		/* Wa_1606931601:tgl,rkl,dg1,adl-s,adl-p */
 		wa_masked_en(wal, GEN7_ROW_CHICKEN2, GEN12_DISABLE_EARLY_READ);
 
 		/*
