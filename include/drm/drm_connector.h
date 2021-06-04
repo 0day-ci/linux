@@ -782,6 +782,13 @@ struct drm_connector_state {
 	u8 max_bpc;
 
 	/**
+	 * @active_bpc: Read only property set by the GPU driver to the actually
+	 * applied bit depth of the pixels after evaluating all hardware
+	 * limitations.
+	 */
+	u8 active_bpc;
+
+	/**
 	 * @hdr_output_metadata:
 	 * DRM blob property for HDR output metadata
 	 */
@@ -1380,6 +1387,12 @@ struct drm_connector {
 	 */
 	struct drm_property *max_bpc_property;
 
+	/**
+	 * @active_bpc_property: Default connector property for the active bpc
+	 * to be driven out of the connector.
+	 */
+	struct drm_property *active_bpc_property;
+
 #define DRM_CONNECTOR_POLL_HPD (1 << 0)
 #define DRM_CONNECTOR_POLL_CONNECT (1 << 1)
 #define DRM_CONNECTOR_POLL_DISCONNECT (1 << 2)
@@ -1697,6 +1710,8 @@ int drm_connector_set_panel_orientation_with_quirk(
 	enum drm_panel_orientation panel_orientation,
 	int width, int height);
 int drm_connector_attach_max_bpc_property(struct drm_connector *connector,
+					  int min, int max);
+int drm_connector_attach_active_bpc_property(struct drm_connector *connector,
 					  int min, int max);
 
 /**
