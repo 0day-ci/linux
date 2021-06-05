@@ -508,6 +508,8 @@ extern int init_swap_address_space(unsigned int type, unsigned long nr_pages);
 extern void exit_swap_address_space(unsigned int type);
 extern struct swap_info_struct *get_swap_device(swp_entry_t entry);
 sector_t swap_page_sector(struct page *page);
+extern void update_zram_zstats(void);
+extern u64 count_avail_swaps(void);
 
 static inline void put_swap_device(struct swap_info_struct *si)
 {
@@ -663,6 +665,14 @@ static inline swp_entry_t get_swap_page(struct page *page)
 	swp_entry_t entry;
 	entry.val = 0;
 	return entry;
+}
+
+void update_zram_zstats(void)
+{
+}
+
+u64 count_avail_swaps(void)
+{
 }
 
 #endif /* CONFIG_SWAP */

@@ -59,6 +59,10 @@ static void zram_free_page(struct zram *zram, size_t index);
 static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 				u32 index, int offset, struct bio *bio);
 
+int get_zram_major(void)
+{
+	return zram_major;
+}
 
 static int zram_slot_trylock(struct zram *zram, u32 index)
 {
@@ -1040,6 +1044,19 @@ static ssize_t compact_store(struct device *dev,
 	return len;
 }
 
+static ssize_t min_compr_ratio_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+	ssize_t ret;
+
+	down_read(&zram->init_lock);
+	ret = scnprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&zram->stats.min_compr_ratio));
+	up_read(&zram->init_lock);
+
+	return ret;
+}
+
 static ssize_t io_stat_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1132,6 +1149,7 @@ static ssize_t debug_stat_show(struct device *dev,
 	return ret;
 }
 
+static DEVICE_ATTR_RO(min_compr_ratio);
 static DEVICE_ATTR_RO(io_stat);
 static DEVICE_ATTR_RO(mm_stat);
 #ifdef CONFIG_ZRAM_WRITEBACK
@@ -1859,6 +1877,7 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_idle.attr,
 	&dev_attr_max_comp_streams.attr,
 	&dev_attr_comp_algorithm.attr,
+	&dev_attr_min_compr_ratio.attr,
 #ifdef CONFIG_ZRAM_WRITEBACK
 	&dev_attr_backing_dev.attr,
 	&dev_attr_writeback.attr,
