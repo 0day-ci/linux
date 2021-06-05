@@ -30,6 +30,7 @@ Example:
 		clocks = <&gcc GMAC_CORE1_CLK>;
 		clock-names = "stmmaceth";
 
-		resets = <&gcc GMAC_CORE1_RESET>;
-		reset-names = "stmmaceth";
+		resets = <&gcc GMAC_CORE1_RESET>,
+			 <&gcc GMAC_AHB_RESET>;
+		reset-names = "stmmaceth", "ahb";
 	};
