@@ -195,44 +195,6 @@ static int jsm_tty_open(struct uart_port *port)
 	/* Get board pointer from our array of majors we have allocated */
 	brd = channel->ch_bd;
 
-	/*
-	 * Allocate channel buffers for read/write/error.
-	 * Set flag, so we don't get trounced on.
-	 */
-	channel->ch_flags |= (CH_OPENING);
-
-	/* Drop locks, as malloc with GFP_KERNEL can sleep */
-
-	if (!channel->ch_rqueue) {
-		channel->ch_rqueue = kzalloc(RQUEUESIZE, GFP_KERNEL);
-		if (!channel->ch_rqueue) {
-			jsm_dbg(INIT, &channel->ch_bd->pci_dev,
-				"unable to allocate read queue buf\n");
-			return -ENOMEM;
-		}
-	}
-	if (!channel->ch_equeue) {
-		channel->ch_equeue = kzalloc(EQUEUESIZE, GFP_KERNEL);
-		if (!channel->ch_equeue) {
-			jsm_dbg(INIT, &channel->ch_bd->pci_dev,
-				"unable to allocate error queue buf\n");
-			return -ENOMEM;
-		}
-	}
-
-	channel->ch_flags &= ~(CH_OPENING);
-	/*
-	 * Initialize if neither terminal is open.
-	 */
-	jsm_dbg(OPEN, &channel->ch_bd->pci_dev,
-		"jsm_open: initializing channel in open...\n");
-
-	/*
-	 * Flush input queues.
-	 */
-	channel->ch_r_head = channel->ch_r_tail = 0;
-	channel->ch_e_head = channel->ch_e_tail = 0;
-
 	brd->bd_ops->flush_uart_write(channel);
 	brd->bd_ops->flush_uart_read(channel);
 
@@ -420,6 +382,32 @@ int jsm_tty_init(struct jsm_board *brd)
 		ch->ch_close_delay = 250;
 
 		init_waitqueue_head(&ch->ch_flags_wait);
+
+		/*
+		 * Allocate channel buffers for read/write/error.
+		 * Set flag, so we don't get trounced on.
+		 */
+		ch->ch_flags |= (CH_OPENING);
+
+		/* Drop locks, as malloc with GFP_KERNEL can sleep */
+
+		if (!ch->ch_rqueue) {
+			ch->ch_rqueue = kzalloc(RQUEUESIZE, GFP_KERNEL);
+			if (!ch->ch_rqueue)
+				return -ENOMEM;
+		}
+		if (!ch->ch_equeue) {
+			ch->ch_equeue = kzalloc(EQUEUESIZE, GFP_KERNEL);
+			if (!ch->ch_equeue)
+				return -ENOMEM;
+		}
+
+		ch->ch_flags &= ~(CH_OPENING);
+		/*
+		 * Flush input queues.
+		 */
+		ch->ch_r_head = ch->ch_r_tail = 0;
+		ch->ch_e_head = ch->ch_e_tail = 0;
 	}
 
 	jsm_dbg(INIT, &brd->pci_dev, "finish\n");
