@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/async_tx.h>
+#include <linux/dmaengine.h>
 
 #ifdef CONFIG_DMA_ENGINE
 static int __init async_tx_init(void)
@@ -110,7 +111,7 @@ async_tx_channel_switch(struct dma_async_tx_descriptor *depend_tx,
 
 		if (intr_tx) {
 			txd_clear_parent(intr_tx);
-			intr_tx->tx_submit(intr_tx);
+			dmaengine_submit(intr_tx);
 			async_tx_ack(intr_tx);
 		}
 		device->device_issue_pending(chan);
@@ -118,7 +119,7 @@ async_tx_channel_switch(struct dma_async_tx_descriptor *depend_tx,
 		if (dma_wait_for_async_tx(depend_tx) != DMA_COMPLETE)
 			panic("%s: DMA error waiting for depend_tx\n",
 			      __func__);
-		tx->tx_submit(tx);
+		dmaengine_submit(tx);
 	}
 }
 
