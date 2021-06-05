@@ -2390,22 +2390,12 @@ static int gemini_ethernet_port_probe(struct platform_device *pdev)
 	port->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
 
 	/* DMA memory */
-	dmares = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!dmares) {
-		dev_err(dev, "no DMA resource\n");
-		return -ENODEV;
-	}
-	port->dma_base = devm_ioremap_resource(dev, dmares);
+	port->dma_base = devm_platform_get_and_ioremap_resource(pdev, 0, &dmares);
 	if (IS_ERR(port->dma_base))
 		return PTR_ERR(port->dma_base);
 
 	/* GMAC config memory */
-	gmacres = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (!gmacres) {
-		dev_err(dev, "no GMAC resource\n");
-		return -ENODEV;
-	}
-	port->gmac_base = devm_ioremap_resource(dev, gmacres);
+	port->gmac_base = devm_platform_get_and_ioremap_resource(pdev, 1, &gmacres);
 	if (IS_ERR(port->gmac_base))
 		return PTR_ERR(port->gmac_base);
 
