@@ -20,12 +20,26 @@
 
 static const struct crypto_type crypto_shash_type;
 
-int shash_no_setkey(struct crypto_shash *tfm, const u8 *key,
-		    unsigned int keylen)
+static int shash_no_setkey(struct crypto_shash *tfm, const u8 *key,
+			   unsigned int keylen)
 {
 	return -ENOSYS;
 }
-EXPORT_SYMBOL_GPL(shash_no_setkey);
+
+bool crypto_shash_alg_has_setkey(struct shash_alg *alg)
+{
+	/*
+	 * Function pointer comparisons such as the one below will not work as
+	 * expected when CFI is enabled, and the comparison involves an
+	 * exported symbol: as indirect function calls are routed via CFI stubs
+	 * that are private to each module, the pointer values may be different
+	 * even if they refer to the same function.
+	 *
+	 * Therefore, this function must remain out of line.
+	 */
+	return alg->setkey != shash_no_setkey;
+}
+EXPORT_SYMBOL_GPL(crypto_shash_alg_has_setkey);
 
 static int shash_setkey_unaligned(struct crypto_shash *tfm, const u8 *key,
 				  unsigned int keylen)
