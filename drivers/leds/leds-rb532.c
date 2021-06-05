@@ -39,18 +39,11 @@ static struct led_classdev rb532_uled = {
 
 static int rb532_led_probe(struct platform_device *pdev)
 {
-	return led_classdev_register(&pdev->dev, &rb532_uled);
-}
-
-static int rb532_led_remove(struct platform_device *pdev)
-{
-	led_classdev_unregister(&rb532_uled);
-	return 0;
+	return devm_led_classdev_register(&pdev->dev, &rb532_uled);
 }
 
 static struct platform_driver rb532_led_driver = {
 	.probe = rb532_led_probe,
-	.remove = rb532_led_remove,
 	.driver = {
 		.name = "rb532-led",
 	},
