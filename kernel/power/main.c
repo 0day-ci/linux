@@ -579,7 +579,9 @@ struct kobject *power_kobj;
 
 /**
  * state - control system sleep states.
- *
+ * @kobj: Pointer to the kernel object.
+ * @attr: Pointer to the kernel object attribute.
+ * @buf: buffer.
  * show() returns available sleep state labels, which may be "mem", "standby",
  * "freeze" and "disk" (hibernation).
  * See Documentation/admin-guide/pm/sleep-states.rst for a description of
