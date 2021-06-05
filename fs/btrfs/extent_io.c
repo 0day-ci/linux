@@ -3803,11 +3803,12 @@ static void find_next_dirty_byte(struct btrfs_fs_info *fs_info,
 {
 	struct btrfs_subpage *subpage = (struct btrfs_subpage *)page->private;
 	u64 orig_start = *start;
-	u16 dirty_bitmap;
+	/* Declare as unsigned long so we can use bitmap ops */
+	unsigned long dirty_bitmap;
 	unsigned long flags;
-	int nbits = (orig_start - page_offset(page)) >> fs_info->sectorsize;
-	int first_bit_set;
-	int first_bit_zero;
+	int nbits = (orig_start - page_offset(page)) >> fs_info->sectorsize_bits;
+	int range_start_bit = nbits;
+	int range_end_bit;
 
 	/*
 	 * For regular sector size == page size case, since one page only
@@ -3824,31 +3825,10 @@ static void find_next_dirty_byte(struct btrfs_fs_info *fs_info,
 	dirty_bitmap = subpage->dirty_bitmap;
 	spin_unlock_irqrestore(&subpage->lock, flags);
 
-	/* Set bits lower than @nbits with 0 */
-	dirty_bitmap &= ~((1 << nbits) - 1);
-
-	first_bit_set = ffs(dirty_bitmap);
-	/* No dirty range found */
-	if (first_bit_set == 0) {
-		*start = page_offset(page) + PAGE_SIZE;
-		return;
-	}
-
-	ASSERT(first_bit_set > 0 && first_bit_set <= BTRFS_SUBPAGE_BITMAP_SIZE);
-	*start = page_offset(page) + (first_bit_set - 1) * fs_info->sectorsize;
-
-	/* Set all bits lower than @nbits to 1 for ffz() */
-	dirty_bitmap |= ((1 << nbits) - 1);
-
-	first_bit_zero = ffz(dirty_bitmap);
-	if (first_bit_zero == 0 || first_bit_zero > BTRFS_SUBPAGE_BITMAP_SIZE) {
-		*end = page_offset(page) + PAGE_SIZE;
-		return;
-	}
-	ASSERT(first_bit_zero > 0 &&
-	       first_bit_zero <= BTRFS_SUBPAGE_BITMAP_SIZE);
-	*end = page_offset(page) + first_bit_zero * fs_info->sectorsize;
-	ASSERT(*end > *start);
+	bitmap_next_set_region(&dirty_bitmap, &range_start_bit, &range_end_bit,
+			       BTRFS_SUBPAGE_BITMAP_SIZE);
+	*start = page_offset(page) + range_start_bit * fs_info->sectorsize;
+	*end = page_offset(page) + range_end_bit * fs_info->sectorsize;
 }
 
 /*
