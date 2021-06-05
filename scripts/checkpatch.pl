@@ -331,6 +331,7 @@ help(0) if ($help);
 
 die "$P: --git cannot be used with --file or --fix\n" if ($git && ($file || $fix));
 die "$P: --verbose cannot be used with --terse\n" if ($verbose && $terse);
+die "$P: -f/--file requires at least one filename\n" if ($file && $#ARGV < 0);
 
 if ($color =~ /^[01]$/) {
 	$color = !$color;
