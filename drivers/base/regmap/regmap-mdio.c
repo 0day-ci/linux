@@ -5,16 +5,22 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 
+#define REGVAL_MASK		GENMASK(15, 0)
+#define REGNUM_C22_MASK		GENMASK(4, 0)
+
 static int regmap_mdio_read(void *context, unsigned int reg, unsigned int *val)
 {
 	struct mdio_device *mdio_dev = context;
 	int ret;
 
-	ret = mdiobus_read(mdio_dev->bus, mdio_dev->addr, reg);
+	if (unlikely(reg & ~REGNUM_C22_MASK))
+		return -ENXIO;
+
+	ret = mdiobus_read(mdio_dev->bus, mdio_dev->addr, reg & REGNUM_C22_MASK);
 	if (ret < 0)
 		return ret;
 
-	*val = ret & 0xffff;
+	*val = ret & REGVAL_MASK;
 	return 0;
 }
 
@@ -22,7 +28,10 @@ static int regmap_mdio_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct mdio_device *mdio_dev = context;
 
-	return mdiobus_write(mdio_dev->bus, mdio_dev->addr, reg, val);
+	if (unlikely(reg & ~REGNUM_C22_MASK))
+		return -ENXIO;
+
+	return mdiobus_write(mdio_dev->bus, mdio_dev->addr, reg & REGNUM_C22_MASK, val);
 }
 
 static const struct regmap_bus regmap_mdio_bus = {
