@@ -96,7 +96,7 @@ struct ttm_lru_bulk_move {
  */
 int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 		     struct ttm_placement *placement,
-		     struct ttm_resource *mem,
+		     struct ttm_resource **mem,
 		     struct ttm_operation_ctx *ctx);
 
 /**
@@ -181,15 +181,15 @@ static inline void
 ttm_bo_move_to_lru_tail_unlocked(struct ttm_buffer_object *bo)
 {
 	spin_lock(&bo->bdev->lru_lock);
-	ttm_bo_move_to_lru_tail(bo, &bo->mem, NULL);
+	ttm_bo_move_to_lru_tail(bo, bo->resource, NULL);
 	spin_unlock(&bo->bdev->lru_lock);
 }
 
 static inline void ttm_bo_assign_mem(struct ttm_buffer_object *bo,
 				     struct ttm_resource *new_mem)
 {
-	bo->mem = *new_mem;
-	new_mem->mm_node = NULL;
+	WARN_ON(bo->resource);
+	bo->resource = new_mem;
 }
 
 /**
@@ -202,9 +202,7 @@ static inline void ttm_bo_assign_mem(struct ttm_buffer_object *bo,
 static inline void ttm_bo_move_null(struct ttm_buffer_object *bo,
 				    struct ttm_resource *new_mem)
 {
-	struct ttm_resource *old_mem = &bo->mem;
-
-	WARN_ON(old_mem->mm_node != NULL);
+	ttm_resource_free(bo, &bo->resource);
 	ttm_bo_assign_mem(bo, new_mem);
 }
 
@@ -305,31 +303,5 @@ int ttm_bo_tt_bind(struct ttm_buffer_object *bo, struct ttm_resource *mem);
  * ttm_bo_tt_destroy.
  */
 void ttm_bo_tt_destroy(struct ttm_buffer_object *bo);
-
-/**
- * ttm_range_man_init
- *
- * @bdev: ttm device
- * @type: memory manager type
- * @use_tt: if the memory manager uses tt
- * @p_size: size of area to be managed in pages.
- *
- * Initialise a generic range manager for the selected memory type.
- * The range manager is installed for this device in the type slot.
- */
-int ttm_range_man_init(struct ttm_device *bdev,
-		       unsigned type, bool use_tt,
-		       unsigned long p_size);
-
-/**
- * ttm_range_man_fini
- *
- * @bdev: ttm device
- * @type: memory manager type
- *
- * Remove the generic range manager from a slot and tear it down.
- */
-int ttm_range_man_fini(struct ttm_device *bdev,
-		       unsigned type);
 
 #endif
