@@ -262,6 +262,8 @@ enum mddev_flags {
 	MD_BROKEN,              /* This is used in RAID-0/LINEAR only, to stop
 				 * I/O in case an array member is gone/failed.
 				 */
+	MD_DELETING,		/* If set, we are deleting the array, do not open
+				 * it then */
 };
 
 enum mddev_sb_flags {
