@@ -2188,9 +2188,6 @@ config TEST_BITMAP
 
 	  If unsure, say N.
 
-config TEST_UUID
-	tristate "Test functions located in the uuid module at runtime"
-
 config TEST_XARRAY
 	tristate "Test the XArray code at runtime"
 
@@ -2426,6 +2423,16 @@ config BITS_TEST
 	  Tests the logic of macros defined in bits.h.
 	  For more information on KUnit and unit tests in general please refer
 	  to the KUnit documentation in Documentation/dev-tools/kunit/.
+
+	  If unsure, say N.
+
+config TEST_UUID
+	tristate "Unit test for UUID" if !KUNIT_ALL_TESTS
+	depends on KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds the UUID unit test.
+	  Tests parsing functions for UUID/GUID strings.
 
 	  If unsure, say N.
 
