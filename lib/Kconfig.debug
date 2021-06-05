@@ -1163,12 +1163,13 @@ menu "Scheduler Debugging"
 
 config SCHED_DEBUG
 	bool "Collect scheduler debugging info"
-	depends on DEBUG_KERNEL && PROC_FS
+	depends on DEBUG_KERNEL && PROC_FS && DEBUG_FS
 	default y
 	help
-	  If you say Y here, the /proc/sched_debug file will be provided
-	  that can help debug the scheduler. The runtime overhead of this
-	  option is minimal.
+	  If you say Y here, the dictory debugfs/sched/ with various
+	  scheduler-related debug files (such as debug, features, etc.)
+	  and files /proc/pid/sched will be provided, that can help debug
+	  the scheduler. The runtime overhead of this option is minimal.
 
 config SCHED_INFO
 	bool
