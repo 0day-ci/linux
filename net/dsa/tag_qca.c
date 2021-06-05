@@ -52,18 +52,27 @@ static struct sk_buff *qca_tag_rcv(struct sk_buff *skb, struct net_device *dev,
 				   struct packet_type *pt)
 {
 	u8 ver;
-	u16  hdr;
-	int port;
-	__be16 *phdr;
+	u16 hdr, vlan_hdr;
+	int port, vlan_offset = 0, vlan_skip = 0;
+	__be16 *phdr, *vlan_phdr;
 
 	if (unlikely(!pskb_may_pull(skb, QCA_HDR_LEN)))
 		return NULL;
 
-	/* The QCA header is added by the switch between src addr and Ethertype
-	 * At this point, skb->data points to ethertype so header should be
-	 * right before
+	/* The QCA header is added by the switch between src addr and
+	 * Ethertype. Normally at this point, skb->data points to ethertype so the
+	 * header should be right before. However if a VLAN tag has subsequently
+	 * been added upstream, we need to skip past it to find the QCA header.
 	 */
-	phdr = (__be16 *)(skb->data - 2);
+	vlan_phdr = (__be16 *)(skb->data - 2);
+	vlan_hdr = ntohs(*vlan_phdr);
+
+	/* Check for VLAN tag before QCA tag */
+	if (!(vlan_hdr ^ ETH_P_8021Q))
+		vlan_offset = VLAN_HLEN;
+
+	/* Look for QCA tag at the correct location */
+	phdr = (__be16 *)(skb->data - 2 + vlan_offset);
 	hdr = ntohs(*phdr);
 
 	/* Make sure the version is correct */
@@ -71,10 +80,22 @@ static struct sk_buff *qca_tag_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (unlikely(ver != QCA_HDR_VERSION))
 		return NULL;
 
+	/* Check for second VLAN tag after QCA tag if one was found prior */
+	if (!!(vlan_offset)) {
+		vlan_phdr = (__be16 *)(skb->data + 4);
+		vlan_hdr = ntohs(*vlan_phdr);
+		if (!!(vlan_hdr ^ ETH_P_8021Q)) {
+		/* Do not remove existing tag in case a tag is required */
+			vlan_offset = 0;
+			vlan_skip = VLAN_HLEN;
+		}
+	}
+
 	/* Remove QCA tag and recalculate checksum */
-	skb_pull_rcsum(skb, QCA_HDR_LEN);
-	memmove(skb->data - ETH_HLEN, skb->data - ETH_HLEN - QCA_HDR_LEN,
-		ETH_HLEN - QCA_HDR_LEN);
+	skb_pull_rcsum(skb, QCA_HDR_LEN + vlan_offset);
+	memmove(skb->data - ETH_HLEN,
+		skb->data - ETH_HLEN - QCA_HDR_LEN - vlan_offset,
+		ETH_HLEN - QCA_HDR_LEN + vlan_skip);
 
 	/* Get source port information */
 	port = (hdr & QCA_HDR_RECV_SOURCE_PORT_MASK);
