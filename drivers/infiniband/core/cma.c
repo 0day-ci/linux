@@ -1874,6 +1874,7 @@ static void _destroy_id(struct rdma_id_private *id_priv,
 
 	kfree(id_priv->id.route.path_rec);
 
+	rdma_restrack_put(&id_priv->res);
 	put_net(id_priv->id.route.addr.dev_addr.net);
 	kfree(id_priv);
 }
