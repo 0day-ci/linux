@@ -110,7 +110,7 @@ static int asic3_led_probe(struct platform_device *pdev)
 	led->cdev->blink_set = blink_set;
 	led->cdev->default_trigger = led->default_trigger;
 
-	ret = led_classdev_register(&pdev->dev, led->cdev);
+	ret = devm_led_classdev_register(&pdev->dev, led->cdev);
 	if (ret < 0)
 		goto out;
 
@@ -123,10 +123,6 @@ out:
 
 static int asic3_led_remove(struct platform_device *pdev)
 {
-	struct asic3_led *led = dev_get_platdata(&pdev->dev);
-
-	led_classdev_unregister(led->cdev);
-
 	return mfd_cell_disable(pdev);
 }
 
