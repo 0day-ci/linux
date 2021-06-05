@@ -96,7 +96,7 @@
 struct zbud_pool {
 	spinlock_t lock;
 	struct list_head unbuddied[NCHUNKS];
-	struct list_head buddied;
+#define buddied unbuddied[0]
 	struct list_head lru;
 	u64 pages_nr;
 	const struct zbud_ops *ops;
