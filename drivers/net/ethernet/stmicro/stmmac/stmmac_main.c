@@ -6840,6 +6840,13 @@ int stmmac_dvr_probe(struct device *device,
 			reset_control_reset(priv->plat->stmmac_rst);
 	}
 
+	if (priv->plat->stmmac_ahb_rst) {
+		ret = reset_control_deassert(priv->plat->stmmac_ahb_rst);
+		if (ret == -ENOTSUPP)
+			dev_err(priv->device,
+				"unable to bring out of ahb reset\n");
+	}
+
 	/* Init MAC and get the capabilities */
 	ret = stmmac_hw_init(priv);
 	if (ret)
