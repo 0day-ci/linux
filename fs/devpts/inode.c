@@ -552,8 +552,7 @@ void devpts_kill_index(struct pts_fs_info *fsi, int idx)
 
 /**
  * devpts_pty_new -- create a new inode in /dev/pts/
- * @ptmx_inode: inode of the master
- * @device: major+minor of the node to be created
+ * @fsi: pointer to pts_fs_info
  * @index: used as a name of the node
  * @priv: what's given back by devpts_get_priv
  *
@@ -598,7 +597,7 @@ struct dentry *devpts_pty_new(struct pts_fs_info *fsi, int index, void *priv)
 
 /**
  * devpts_get_priv -- get private data for a slave
- * @pts_inode: inode of the slave
+ * @dentry: dentry of the slave
  *
  * Returns whatever was passed as priv in devpts_pty_new for a given inode.
  */
@@ -611,7 +610,7 @@ void *devpts_get_priv(struct dentry *dentry)
 
 /**
  * devpts_pty_kill -- remove inode form /dev/pts/
- * @inode: inode of the slave to be removed
+ * @dentry: dentry of the slave to be removed
  *
  * This is an inverse operation of devpts_pty_new.
  */
