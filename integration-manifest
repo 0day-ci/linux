@@ -1,0 +1,26 @@
+drm drm-fixes 37e2f2e800dc6d65aa77f9d4dbc4512d841e2f0b
+	Merge tag 'drm/tegra/for-5.13-rc5' of ssh://git.freedesktop.org/git/tegra/linux into drm-fixes
+drm-misc drm-misc-fixes 0b78f8bcf4951af30b0ae83ea4fad27d641ab617
+	Revert "fb_defio: Remove custom address_space_operations"
+drm-intel drm-intel-fixes b87482dfe800f326f8f5b0093273ee6bd5b5fe9f
+	Revert "i915: use io_mapping_map_user"
+drm drm-next 5745d647d5563d3e9d32013ad4e5c629acff04d7
+	Merge tag 'amd-drm-next-5.14-2021-06-02' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes b9d79e4ca4ff23543d6b33c736ba07c1f0a9dcb1
+	fbmem: Mark proc_fb_seq_ops as __maybe_unused
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-misc drm-misc-next 415f6767d80761997f6dbe8b72864ca5eb3ddf40
+	dma-buf: add missing EXPORT_SYMBOL
+drm-intel drm-intel-next 07960a4cc44ff6f51eacd3a5c2935e73cebbceca
+	drm/i915/display: replace IS_GEN() in commented code
+drm-intel drm-intel-gt-next 84bdf4571d4dc36207bbc4b0fb2711723ee313d4
+	drm/i915/guc: Use guc_class instead of engine_class in fw interface
+sound-upstream for-linus b8b90c17602689eeaa5b219d104bbc215d1225cc
+	ALSA: hda: update the power_state during the direct-complete
+sound-upstream for-next ce9f50e7ac807b7651903c44f1b14a4f97725daa
+	ALSA: firewire-motu: fix error return code in snd_motu_stream_reserve_duplex()
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
