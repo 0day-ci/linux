@@ -663,6 +663,7 @@ static int pmc_usb_probe(struct platform_device *pdev)
 	return 0;
 
 err_remove_ports:
+	fwnode_handle_put(fwnode);
 	for (i = 0; i < pmc->num_ports; i++) {
 		typec_switch_unregister(pmc->port[i].typec_sw);
 		typec_mux_unregister(pmc->port[i].typec_mux);
