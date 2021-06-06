@@ -232,7 +232,7 @@ W:	http://swik.net/v9fs
 Q:	http://patchwork.kernel.org/project/v9fs-devel/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ericvh/v9fs.git
 T:	git git://github.com/martinetd/linux.git
-F:	Documentation/filesystems/9p.rst
+F:	Documentation/filesystems/v9fs/
 F:	fs/9p/
 F:	include/net/9p/
 F:	include/trace/events/9p.h
