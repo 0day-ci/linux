@@ -264,6 +264,7 @@ static int gef_wdt_probe(struct platform_device *dev)
 {
 	int timeout = 10;
 	u32 freq;
+	int ret;
 
 	bus_clk = 133; /* in MHz */
 
@@ -280,7 +281,15 @@ static int gef_wdt_probe(struct platform_device *dev)
 
 	gef_wdt_handler_disable();	/* in case timer was already running */
 
-	return misc_register(&gef_wdt_miscdev);
+	ret = misc_register(&gef_wdt_miscdev);
+	if (ret)
+		goto iounmap_err;
+
+	return 0;
+
+iounmap_err:
+	iounmap(gef_wdt_regs);
+	return ret;
 }
 
 static int gef_wdt_remove(struct platform_device *dev)
