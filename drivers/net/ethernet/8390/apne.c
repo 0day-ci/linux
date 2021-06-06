@@ -120,6 +120,10 @@ static u32 apne_msg_enable;
 module_param_named(msg_enable, apne_msg_enable, uint, 0444);
 MODULE_PARM_DESC(msg_enable, "Debug message level (see linux/netdevice.h for bitmap)");
 
+static u32 apne_100_mbit;
+module_param_named(apne_100_mbit, uint, 0);
+MODULE_PARM_DESC(apne_100_mbit, "Enable 100 Mbit support");
+
 struct net_device * __init apne_probe(int unit)
 {
 	struct net_device *dev;
@@ -138,6 +142,9 @@ struct net_device * __init apne_probe(int unit)
 
 	if ( !(AMIGAHW_PRESENT(PCMCIA)) )
 		return ERR_PTR(-ENODEV);
+
+        if (apne_100_mbit)
+                isa_type = ISA_TYPE_AG100;
 
 	pr_info("Looking for PCMCIA ethernet card : ");
 
@@ -589,6 +596,16 @@ static int init_pcmcia(void)
 	int offset_len;
 #endif
 	u_long offset;
+
+#ifdef CONFIG_APNE100MBIT
+	/* reset card (idea taken from CardReset by Artur Pogoda) */
+	{
+		u_char  tmp = gayle.intreq;
+
+		gayle.intreq = 0xff;    mdelay(1);
+		gayle.intreq = tmp;     mdelay(300);
+	}
+#endif
 
 	pcmcia_reset();
 	pcmcia_program_voltage(PCMCIA_0V);

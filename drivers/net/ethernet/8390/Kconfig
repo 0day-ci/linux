@@ -143,6 +143,19 @@ config APNE
 	  To compile this driver as a module, choose M here: the module
 	  will be called apne.
 
+if APNE
+config APNE100MBIT
+	bool "PCMCIA NE2000 100MBit support"
+	default n
+	---help---
+	  This changes the driver to support 10/100Mbit cards (e.g. Netgear
+	  FA411, CNet Singlepoint). 10 MBit cards and 100 MBit cards are
+	  supported by the same driver.
+
+	  To activate 100 Mbit support at runtime, use the apne100 module
+	  parameter. 
+endif
+
 config PCMCIA_PCNET
 	tristate "NE2000 compatible PCMCIA support"
 	depends on PCMCIA
