@@ -9,3 +9,4 @@ v9fs
    :numbered:
 
    9p
+   v9fsroot

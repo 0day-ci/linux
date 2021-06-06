@@ -243,6 +243,7 @@ F:	net/9p/
 R:	Changbin Du <changbin.du@gmail.com>
 S:	Supported
 F:	fs/9p/v9fsroot.c
+F:	Documentation/filesystems/v9fs/v9fsroot.rst
 
 A8293 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
