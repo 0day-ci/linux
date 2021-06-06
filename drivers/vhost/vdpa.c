@@ -1083,7 +1083,11 @@ static void vhost_vdpa_remove(struct vdpa_device *vdpa)
 		opened = atomic_cmpxchg(&v->opened, 0, 1);
 		if (!opened)
 			break;
-		wait_for_completion(&v->completion);
+		wait_for_completion_timeout(&v->completion,
+					    msecs_to_jiffies(1000));
+		dev_warn_ratelimited(&v->dev,
+				     "%s waiting for /dev/%s to be closed\n",
+				     __func__, dev_name(&v->dev));
 	} while (1);
 
 	put_device(&v->dev);
