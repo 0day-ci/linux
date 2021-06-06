@@ -193,16 +193,17 @@ static int xrx200_hw_receive(struct xrx200_chan *ch)
 	int ret;
 
 	ret = xrx200_alloc_skb(ch);
-
-	ch->dma.desc++;
-	ch->dma.desc %= LTQ_DESC_NUM;
-
 	if (ret) {
 		ch->skb[ch->dma.desc] = skb;
 		net_dev->stats.rx_dropped++;
+		ch->dma.desc++;
+		ch->dma.desc %= LTQ_DESC_NUM;
 		netdev_err(net_dev, "failed to allocate new rx buffer\n");
 		return ret;
 	}
+
+	ch->dma.desc++;
+	ch->dma.desc %= LTQ_DESC_NUM;
 
 	skb_put(skb, len);
 	skb->protocol = eth_type_trans(skb, net_dev);
