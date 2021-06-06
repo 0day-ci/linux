@@ -239,6 +239,11 @@ F:	include/trace/events/9p.h
 F:	include/uapi/linux/virtio_9p.h
 F:	net/9p/
 
+9P FILE SYSTEM ROOTFS SUPPORT
+R:	Changbin Du <changbin.du@gmail.com>
+S:	Supported
+F:	fs/9p/v9fsroot.c
+
 A8293 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
 L:	linux-media@vger.kernel.org

@@ -287,6 +287,8 @@ dev_t name_to_dev_t(const char *name)
 		return Root_NFS;
 	if (strcmp(name, "/dev/cifs") == 0)
 		return Root_CIFS;
+	if (strcmp(name, "/dev/v9fs") == 0)
+		return Root_V9FS;
 	if (strcmp(name, "/dev/ram") == 0)
 		return Root_RAM0;
 #ifdef CONFIG_BLOCK
@@ -536,6 +538,52 @@ static int __init mount_cifs_root(void)
 }
 #endif
 
+#ifdef CONFIG_9P_FS_ROOT
+
+extern int v9fs_root_data(char **dev, char **opts);
+
+#define V9FSROOT_TIMEOUT_MIN	5
+#define V9FSROOT_TIMEOUT_MAX	30
+#define V9FSROOT_RETRY_MAX	5
+
+static bool v9fs_should_retry(char *mount_opts)
+{
+	if (strstr(mount_opts, "trans=virtio") || strstr(mount_opts, "trans=fd"))
+		return false;
+	return true;
+}
+
+static int __init mount_v9fs_root(void)
+{
+	char *root_dev, *root_data;
+	unsigned int timeout = V9FSROOT_TIMEOUT_MIN;
+	bool should_retry;
+	int try, err;
+
+	err = v9fs_root_data(&root_dev, &root_data);
+	if (err != 0)
+		return 0;
+
+	should_retry = v9fs_should_retry(root_data);
+	for (try = 1; ; try++) {
+		err = do_mount_root(root_dev, "9p",
+				    root_mountflags, root_data);
+		if (err == 0)
+			return 1;
+
+		if (!should_retry || try > V9FSROOT_RETRY_MAX)
+			break;
+
+		/* Wait, in case the server refused us immediately */
+		ssleep(timeout);
+		timeout <<= 1;
+		if (timeout > V9FSROOT_TIMEOUT_MAX)
+			timeout = V9FSROOT_TIMEOUT_MAX;
+	}
+	return 0;
+}
+#endif
+
 void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
@@ -549,6 +597,13 @@ void __init mount_root(void)
 	if (ROOT_DEV == Root_CIFS) {
 		if (!mount_cifs_root())
 			printk(KERN_ERR "VFS: Unable to mount root fs via SMB.\n");
+		return;
+	}
+#endif
+#ifdef CONFIG_9P_FS_ROOT
+	if (ROOT_DEV == Root_V9FS) {
+		if (!mount_v9fs_root())
+			pr_err("VFS: Unable to mount root fs via 9p.\n");
 		return;
 	}
 #endif
