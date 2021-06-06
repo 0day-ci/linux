@@ -2082,20 +2082,22 @@ static int cfg80211_rtw_flush_pmksa(struct wiphy *wiphy,
 void rtw_cfg80211_indicate_sta_assoc(struct adapter *padapter, u8 *pmgmt_frame, uint frame_len)
 {
 	struct net_device *ndev = padapter->pnetdev;
+	struct station_info *sinfo;
+	u8 ie_offset;
 
-	{
-		struct station_info sinfo;
-		u8 ie_offset;
-		if (GetFrameSubType(pmgmt_frame) == WIFI_ASSOCREQ)
-			ie_offset = _ASOCREQ_IE_OFFSET_;
-		else /*  WIFI_REASSOCREQ */
-			ie_offset = _REASOCREQ_IE_OFFSET_;
+	sinfo = kzalloc(sizeof(*sinfo), GFP_KERNEL);
+	if (!sinfo)
+		return;
 
-		sinfo.filled = 0;
-		sinfo.assoc_req_ies = pmgmt_frame + WLAN_HDR_A3_LEN + ie_offset;
-		sinfo.assoc_req_ies_len = frame_len - WLAN_HDR_A3_LEN - ie_offset;
-		cfg80211_new_sta(ndev, GetAddr2Ptr(pmgmt_frame), &sinfo, GFP_ATOMIC);
-	}
+	if (GetFrameSubType(pmgmt_frame) == WIFI_ASSOCREQ)
+		ie_offset = _ASOCREQ_IE_OFFSET_;
+	else /*  WIFI_REASSOCREQ */
+		ie_offset = _REASOCREQ_IE_OFFSET_;
+
+	sinfo->assoc_req_ies = pmgmt_frame + WLAN_HDR_A3_LEN + ie_offset;
+	sinfo->assoc_req_ies_len = frame_len - WLAN_HDR_A3_LEN - ie_offset;
+	cfg80211_new_sta(ndev, GetAddr2Ptr(pmgmt_frame), sinfo, GFP_ATOMIC);
+	kfree(sinfo);
 }
 
 void rtw_cfg80211_indicate_sta_disassoc(struct adapter *padapter, unsigned char *da, unsigned short reason)
