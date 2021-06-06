@@ -1777,28 +1777,13 @@ int snd_pcm_lib_ioctl(struct snd_pcm_substream *substream,
 }
 EXPORT_SYMBOL(snd_pcm_lib_ioctl);
 
-/**
- * snd_pcm_period_elapsed - update the pcm status for the next period
- * @substream: the pcm substream instance
- *
- * This function is called from the interrupt handler when the
- * PCM has processed the period size.  It will update the current
- * pointer, wake up sleepers, etc.
- *
- * Even if more than one periods have elapsed since the last call, you
- * have to call this only once.
- */
-void snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
+// The pointer to PCM substream should not be NULL as precondition.
+void __snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime;
-	unsigned long flags;
 
-	if (snd_BUG_ON(!substream))
-		return;
-
-	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (PCM_RUNTIME_CHECK(substream))
-		goto _unlock;
+		return;
 	runtime = substream->runtime;
 
 	if (!snd_pcm_running(substream) ||
@@ -1811,10 +1796,8 @@ void snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
 #endif
  _end:
 	kill_fasync(&runtime->fasync, SIGIO, POLL_IN);
- _unlock:
-	snd_pcm_stream_unlock_irqrestore(substream, flags);
 }
-EXPORT_SYMBOL(snd_pcm_period_elapsed);
+EXPORT_SYMBOL(__snd_pcm_period_elapsed);
 
 /*
  * Wait until avail_min data becomes available

@@ -11,6 +11,7 @@
 #include <sound/asound.h>
 #include <sound/memalloc.h>
 #include <sound/minors.h>
+#include <sound/core.h>
 #include <linux/poll.h>
 #include <linux/mm.h>
 #include <linux/bitops.h>
@@ -1066,7 +1067,57 @@ void snd_pcm_set_ops(struct snd_pcm * pcm, int direction,
 void snd_pcm_set_sync(struct snd_pcm_substream *substream);
 int snd_pcm_lib_ioctl(struct snd_pcm_substream *substream,
 		      unsigned int cmd, void *arg);                      
-void snd_pcm_period_elapsed(struct snd_pcm_substream *substream);
+
+void __snd_pcm_period_elapsed(struct snd_pcm_substream *substream);
+
+/**
+ * snd_pcm_period_elapsed - update the pcm status for the next period
+ * @substream: the pcm substream instance
+ *
+ * This function is called when the batch of PCM frames as the same as period of PCM buffer are
+ * processed in audio data transmission. It's typically called by any type of IRQ handler when
+ * hardware IRQ occurs to notify the event. It acquires lock of PCM substream, then will update the
+ * current pointer, wake up sleepers, etc.
+ *
+ * Developer should pay enough attention that some callbacks in &snd_pcm_ops are done by the call of
+ * function:
+ *
+ * - .pointer - to retrieve current position of audio data transmission by frame count or XRUN state.
+ * - .trigger - with SNDRV_PCM_TRIGGER_STOP at XRUN or DRAINING state.
+ * - .get_time_info - to retrieve audio time stamp.
+ *
+ * Even if more than one periods have elapsed since the last call, you have to call this only once.
+ */
+static inline void snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
+{
+	unsigned long flags;
+
+	if (snd_BUG_ON(!substream))
+		return;
+
+	snd_pcm_stream_lock_irqsave(substream, flags);
+	__snd_pcm_period_elapsed(substream);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
+}
+
+/**
+ * snd_pcm_period_elapsed_without_lock() - update the pcm status for the next period without
+ *					   acquiring lock of PCM substream.
+ * @substream: the pcm substream instance
+ *
+ * This function is variant of ``snd_pcm_period_elapsed()`` without voluntarily acquiring lock of
+ * PCM substream. It's intended to use for the case that PCM driver operates PCM frames under
+ * acquiring lock of PCM substream; e.g. in callback of any operation of &snd_pcm_ops in process
+ * context, then queueing period wakeup event.
+ */
+static inline void snd_pcm_period_elapsed_without_lock(struct snd_pcm_substream *substream)
+{
+	if (snd_BUG_ON(!substream))
+		return;
+
+	__snd_pcm_period_elapsed(substream);
+}
+
 snd_pcm_sframes_t __snd_pcm_lib_xfer(struct snd_pcm_substream *substream,
 				     void *buf, bool interleaved,
 				     snd_pcm_uframes_t frames, bool in_kernel);
