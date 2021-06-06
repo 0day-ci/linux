@@ -2,6 +2,7 @@
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
  *  Copyright (C) 2013, Imagination Technologies
+ *  Copyright (C) 2021, 周琰杰 (Zhou Yanjie) <zhouyanjie@wanyeetech.com>
  *
  *  JZ4740 SD/MMC controller driver
  */
@@ -114,6 +115,7 @@ enum jz4740_mmc_version {
 	JZ_MMC_JZ4740,
 	JZ_MMC_JZ4725B,
 	JZ_MMC_JZ4760,
+	JZ_MMC_JZ4775,
 	JZ_MMC_JZ4780,
 	JZ_MMC_X1000,
 };
@@ -138,7 +140,7 @@ enum jz4740_mmc_state {
  * COOKIE_MAPPED: the request was mapped in the irq handler,
  * and should be unmapped before mmc_request_done is called..
  */
-enum jz4780_cookie {
+enum jz4775_cookie {
 	COOKIE_UNMAPPED = 0,
 	COOKIE_PREMAPPED,
 	COOKIE_MAPPED,
@@ -194,7 +196,7 @@ static void jz4740_mmc_write_irq_mask(struct jz4740_mmc_host *host,
 static void jz4740_mmc_write_irq_reg(struct jz4740_mmc_host *host,
 				     uint32_t val)
 {
-	if (host->version >= JZ_MMC_JZ4780)
+	if (host->version >= JZ_MMC_JZ4775)
 		writel(val, host->base + JZ_REG_MMC_IREG);
 	else
 		writew(val, host->base + JZ_REG_MMC_IREG);
@@ -202,7 +204,7 @@ static void jz4740_mmc_write_irq_reg(struct jz4740_mmc_host *host,
 
 static uint32_t jz4740_mmc_read_irq_reg(struct jz4740_mmc_host *host)
 {
-	if (host->version >= JZ_MMC_JZ4780)
+	if (host->version >= JZ_MMC_JZ4775)
 		return readl(host->base + JZ_REG_MMC_IREG);
 	else
 		return readw(host->base + JZ_REG_MMC_IREG);
@@ -674,7 +676,7 @@ static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
 			cmdat |= JZ_MMC_CMDAT_WRITE;
 		if (host->use_dma) {
 			/*
-			 * The 4780's MMC controller has integrated DMA ability
+			 * The JZ4775's MMC controller has integrated DMA ability
 			 * in addition to being able to use the external DMA
 			 * controller. It moves DMA control bits to a separate
 			 * register. The DMA_SEL bit chooses the external
@@ -682,13 +684,13 @@ static void jz4740_mmc_send_command(struct jz4740_mmc_host *host,
 			 * can only use the external controller, and have a
 			 * single DMA enable bit in CMDAT.
 			 */
-			if (host->version >= JZ_MMC_JZ4780) {
+			if (host->version >= JZ_MMC_JZ4775) {
 				writel(JZ_MMC_DMAC_DMA_EN | JZ_MMC_DMAC_DMA_SEL,
 				       host->base + JZ_REG_MMC_DMAC);
 			} else {
 				cmdat |= JZ_MMC_CMDAT_DMA_EN;
 			}
-		} else if (host->version >= JZ_MMC_JZ4780) {
+		} else if (host->version >= JZ_MMC_JZ4775) {
 			writel(0, host->base + JZ_REG_MMC_DMAC);
 		}
 
@@ -866,7 +868,7 @@ static int jz4740_mmc_set_clock_rate(struct jz4740_mmc_host *host, int rate)
 	writew(div, host->base + JZ_REG_MMC_CLKRT);
 
 	if (real_rate > 25000000) {
-		if (host->version >= JZ_MMC_X1000) {
+		if (host->version >= JZ_MMC_JZ4775) {
 			writel(JZ_MMC_LPM_DRV_RISING_QTR_PHASE_DLY |
 				   JZ_MMC_LPM_SMP_RISING_QTR_OR_HALF_PHASE_DLY |
 				   JZ_MMC_LPM_LOW_POWER_MODE_EN,
@@ -955,15 +957,16 @@ static const struct mmc_host_ops jz4740_mmc_ops = {
 	.enable_sdio_irq = jz4740_mmc_enable_sdio_irq,
 };
 
-static const struct of_device_id jz4740_mmc_of_match[] = {
+static const struct of_device_id jz4740_mmc_of_matches[] = {
 	{ .compatible = "ingenic,jz4740-mmc", .data = (void *) JZ_MMC_JZ4740 },
 	{ .compatible = "ingenic,jz4725b-mmc", .data = (void *)JZ_MMC_JZ4725B },
 	{ .compatible = "ingenic,jz4760-mmc", .data = (void *) JZ_MMC_JZ4760 },
+	{ .compatible = "ingenic,jz4775-mmc", .data = (void *) JZ_MMC_JZ4775 },
 	{ .compatible = "ingenic,jz4780-mmc", .data = (void *) JZ_MMC_JZ4780 },
 	{ .compatible = "ingenic,x1000-mmc", .data = (void *) JZ_MMC_X1000 },
 	{},
 };
-MODULE_DEVICE_TABLE(of, jz4740_mmc_of_match);
+MODULE_DEVICE_TABLE(of, jz4740_mmc_of_matches);
 
 static int jz4740_mmc_probe(struct platform_device* pdev)
 {
@@ -980,7 +983,7 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 
 	host = mmc_priv(mmc);
 
-	match = of_match_device(jz4740_mmc_of_match, &pdev->dev);
+	match = of_match_device(jz4740_mmc_of_matches, &pdev->dev);
 	if (match) {
 		host->version = (enum jz4740_mmc_version)match->data;
 	} else {
@@ -1124,7 +1127,7 @@ static struct platform_driver jz4740_mmc_driver = {
 	.driver = {
 		.name = "jz4740-mmc",
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
-		.of_match_table = of_match_ptr(jz4740_mmc_of_match),
+		.of_match_table = of_match_ptr(jz4740_mmc_of_matches),
 		.pm = pm_ptr(&jz4740_mmc_pm_ops),
 	},
 };
