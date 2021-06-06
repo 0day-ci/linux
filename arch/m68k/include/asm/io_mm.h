@@ -97,6 +97,11 @@
 #define ISA_TYPE_Q40  (1)
 #define ISA_TYPE_AG   (2)
 #define ISA_TYPE_ENEC (3)
+#define ISA_TYPE_AG100 (4)	/* for 100 MBit APNE card */
+
+#if defined(CONFIG_APNE100MBIT)
+#define MULTI_ISA 1
+#endif
 
 #if defined(CONFIG_Q40) && !defined(MULTI_ISA)
 #define ISA_TYPE ISA_TYPE_Q40
@@ -131,6 +136,9 @@ static inline u8 __iomem *isa_itb(unsigned long addr)
 #ifdef CONFIG_Q40
     case ISA_TYPE_Q40: return (u8 __iomem *)Q40_ISA_IO_B(addr);
 #endif
+#if defined(CONFIG_APNE100MBIT)
+    case ISA_TYPE_AG100: fallthrough;
+#endif
 #ifdef CONFIG_AMIGA_PCMCIA
     case ISA_TYPE_AG: return (u8 __iomem *)AG_ISA_IO_B(addr);
 #endif
@@ -147,6 +155,9 @@ static inline u16 __iomem *isa_itw(unsigned long addr)
 #ifdef CONFIG_Q40
     case ISA_TYPE_Q40: return (u16 __iomem *)Q40_ISA_IO_W(addr);
 #endif
+#if defined(CONFIG_APNE100MBIT)
+    case ISA_TYPE_AG100: fallthrough;
+#endif
 #ifdef CONFIG_AMIGA_PCMCIA
     case ISA_TYPE_AG: return (u16 __iomem *)AG_ISA_IO_W(addr);
 #endif
@@ -160,6 +171,9 @@ static inline u32 __iomem *isa_itl(unsigned long addr)
 {
   switch(ISA_TYPE)
     {
+#if defined(CONFIG_APNE100MBIT)
+    case ISA_TYPE_AG100: fallthrough;
+#endif
 #ifdef CONFIG_AMIGA_PCMCIA
     case ISA_TYPE_AG: return (u32 __iomem *)AG_ISA_IO_W(addr);
 #endif
@@ -172,6 +186,9 @@ static inline u8 __iomem *isa_mtb(unsigned long addr)
     {
 #ifdef CONFIG_Q40
     case ISA_TYPE_Q40: return (u8 __iomem *)Q40_ISA_MEM_B(addr);
+#endif
+#if defined(CONFIG_APNE100MBIT)
+    case ISA_TYPE_AG100: fallthrough;
 #endif
 #ifdef CONFIG_AMIGA_PCMCIA
     case ISA_TYPE_AG: return (u8 __iomem *)addr;
@@ -189,6 +206,9 @@ static inline u16 __iomem *isa_mtw(unsigned long addr)
 #ifdef CONFIG_Q40
     case ISA_TYPE_Q40: return (u16 __iomem *)Q40_ISA_MEM_W(addr);
 #endif
+#if defined(CONFIG_APNE100MBIT)
+    case ISA_TYPE_AG100: fallthrough;
+#endif
 #ifdef CONFIG_AMIGA_PCMCIA
     case ISA_TYPE_AG: return (u16 __iomem *)addr;
 #endif
@@ -200,12 +220,15 @@ static inline u16 __iomem *isa_mtw(unsigned long addr)
 }
 
 
-#define isa_inb(port)      in_8(isa_itb(port))
 #define isa_inw(port)      (ISA_SEX ? in_be16(isa_itw(port)) : in_le16(isa_itw(port)))
 #define isa_inl(port)      (ISA_SEX ? in_be32(isa_itl(port)) : in_le32(isa_itl(port)))
 #define isa_outb(val,port) out_8(isa_itb(port),(val))
 #define isa_outw(val,port) (ISA_SEX ? out_be16(isa_itw(port),(val)) : out_le16(isa_itw(port),(val)))
 #define isa_outl(val,port) (ISA_SEX ? out_be32(isa_itl(port),(val)) : out_le32(isa_itl(port),(val)))
+
+/* for APNE 100 Mbit cards - hope the APNE 100 case will be eliminated as
+ * dead code if MULTI_ISA is not set */
+#define isa_inb(port)      ((ISA_TYPE == ISA_TYPE_AG100) ? ((port) & 1 ? isa_inw((port) - 1) & 0xff : isa_inw(port) >> 8) : in_8(isa_itb(port))
 
 #define isa_readb(p)       in_8(isa_mtb((unsigned long)(p)))
 #define isa_readw(p)       \
