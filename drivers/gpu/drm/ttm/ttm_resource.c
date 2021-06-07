@@ -25,14 +25,10 @@
 #include <drm/ttm/ttm_resource.h>
 #include <drm/ttm/ttm_bo_driver.h>
 
-int ttm_resource_alloc(struct ttm_buffer_object *bo,
-		       const struct ttm_place *place,
-		       struct ttm_resource *res)
+void ttm_resource_init(struct ttm_buffer_object *bo,
+                       const struct ttm_place *place,
+                       struct ttm_resource *res)
 {
-	struct ttm_resource_manager *man =
-		ttm_manager_type(bo->bdev, place->mem_type);
-
-	res->mm_node = NULL;
 	res->start = 0;
 	res->num_pages = PFN_UP(bo->base.size);
 	res->mem_type = place->mem_type;
@@ -41,18 +37,29 @@ int ttm_resource_alloc(struct ttm_buffer_object *bo,
 	res->bus.offset = 0;
 	res->bus.is_iomem = false;
 	res->bus.caching = ttm_cached;
-
-	return man->func->alloc(man, bo, place, res);
 }
+EXPORT_SYMBOL(ttm_resource_init);
 
-void ttm_resource_free(struct ttm_buffer_object *bo, struct ttm_resource *res)
+int ttm_resource_alloc(struct ttm_buffer_object *bo,
+		       const struct ttm_place *place,
+		       struct ttm_resource **res_ptr)
 {
 	struct ttm_resource_manager *man =
-		ttm_manager_type(bo->bdev, res->mem_type);
+		ttm_manager_type(bo->bdev, place->mem_type);
 
-	man->func->free(man, res);
-	res->mm_node = NULL;
-	res->mem_type = TTM_PL_SYSTEM;
+	return man->func->alloc(man, bo, place, res_ptr);
+}
+
+void ttm_resource_free(struct ttm_buffer_object *bo, struct ttm_resource **res)
+{
+	struct ttm_resource_manager *man;
+
+	if (!*res)
+		return;
+
+	man = ttm_manager_type(bo->bdev, (*res)->mem_type);
+	man->func->free(man, *res);
+	*res = NULL;
 }
 EXPORT_SYMBOL(ttm_resource_free);
 
