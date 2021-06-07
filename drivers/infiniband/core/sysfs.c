@@ -1236,11 +1236,9 @@ static struct ib_port *setup_port(struct ib_core_device *coredev, int port_num,
 	ret = sysfs_create_groups(&p->kobj, p->groups_list);
 	if (ret)
 		goto err_del;
-	if (is_full_dev) {
-		ret = sysfs_create_groups(&p->kobj, device->ops.port_groups);
-		if (ret)
-			goto err_groups;
-	}
+	ret = sysfs_create_groups(&p->kobj, device->ops.port_groups);
+	if (ret)
+		goto err_groups;
 
 	list_add_tail(&p->kobj.entry, &coredev->port_list);
 	if (device->port_data && is_full_dev)
@@ -1257,16 +1255,13 @@ err_put:
 	return ERR_PTR(ret);
 }
 
-static void destroy_port(struct ib_core_device *coredev, struct ib_port *port)
+static void destroy_port(struct ib_port *port)
 {
-	bool is_full_dev = &port->ibdev->coredev == coredev;
-
 	if (port->ibdev->port_data &&
 	    port->ibdev->port_data[port->port_num].sysfs == port)
 		port->ibdev->port_data[port->port_num].sysfs = NULL;
 	list_del(&port->kobj.entry);
-	if (is_full_dev)
-		sysfs_remove_groups(&port->kobj, port->ibdev->ops.port_groups);
+	sysfs_remove_groups(&port->kobj, port->ibdev->ops.port_groups);
 	sysfs_remove_groups(&port->kobj, port->groups_list);
 	kobject_del(&port->kobj);
 	kobject_put(&port->kobj);
@@ -1392,7 +1387,7 @@ void ib_free_port_attrs(struct ib_core_device *coredev)
 		struct ib_port *port = container_of(p, struct ib_port, kobj);
 
 		destroy_gid_attrs(port);
-		destroy_port(coredev, port);
+		destroy_port(port);
 	}
 
 	kobject_put(coredev->ports_kobj);
