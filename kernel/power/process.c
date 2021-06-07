@@ -48,7 +48,7 @@ static int try_to_freeze_tasks(bool user_only)
 
 	while (true) {
 		todo = 0;
-		read_lock(&tasklist_lock);
+		rcu_read_lock();
 		for_each_process_thread(g, p) {
 			if (p == current || !freeze_task(p))
 				continue;
@@ -56,7 +56,7 @@ static int try_to_freeze_tasks(bool user_only)
 			if (!freezer_should_skip(p))
 				todo++;
 		}
-		read_unlock(&tasklist_lock);
+		rcu_read_unlock();
 
 		if (!user_only) {
 			wq_busy = freeze_workqueues_busy();
@@ -97,13 +97,13 @@ static int try_to_freeze_tasks(bool user_only)
 			show_workqueue_state();
 
 		if (!wakeup || pm_debug_messages_on) {
-			read_lock(&tasklist_lock);
+			rcu_read_lock();
 			for_each_process_thread(g, p) {
 				if (p != current && !freezer_should_skip(p)
 				    && freezing(p) && !frozen(p))
 					sched_show_task(p);
 			}
-			read_unlock(&tasklist_lock);
+			rcu_read_unlock();
 		}
 	} else {
 		pr_cont("(elapsed %d.%03d seconds) ", elapsed_msecs / 1000,
@@ -206,13 +206,13 @@ void thaw_processes(void)
 
 	cpuset_wait_for_hotplug();
 
-	read_lock(&tasklist_lock);
+	rcu_read_lock();
 	for_each_process_thread(g, p) {
 		/* No other threads should have PF_SUSPEND_TASK set */
 		WARN_ON((p != curr) && (p->flags & PF_SUSPEND_TASK));
 		__thaw_task(p);
 	}
-	read_unlock(&tasklist_lock);
+	rcu_read_unlock();
 
 	WARN_ON(!(curr->flags & PF_SUSPEND_TASK));
 	curr->flags &= ~PF_SUSPEND_TASK;
@@ -233,12 +233,12 @@ void thaw_kernel_threads(void)
 
 	thaw_workqueues();
 
-	read_lock(&tasklist_lock);
+	rcu_read_lock();
 	for_each_process_thread(g, p) {
 		if (p->flags & PF_KTHREAD)
 			__thaw_task(p);
 	}
-	read_unlock(&tasklist_lock);
+	rcu_read_unlock();
 
 	schedule();
 	pr_cont("done.\n");
