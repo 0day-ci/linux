@@ -655,13 +655,13 @@ struct msm_gpu *a4xx_gpu_init(struct drm_device *dev)
 	if (!pdev) {
 		DRM_DEV_ERROR(dev->dev, "no a4xx device\n");
 		ret = -ENXIO;
-		goto fail;
+		return ERR_PTR(ret);
 	}
 
 	a4xx_gpu = kzalloc(sizeof(*a4xx_gpu), GFP_KERNEL);
 	if (!a4xx_gpu) {
 		ret = -ENOMEM;
-		goto fail;
+		return ERR_PTR(ret);
 	}
 
 	adreno_gpu = &a4xx_gpu->base;
