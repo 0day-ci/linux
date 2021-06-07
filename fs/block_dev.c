@@ -934,7 +934,7 @@ static struct block_device *bdget(dev_t dev)
  * @bdev:	Block device to grab a reference to.
  *
  * Returns the block_device with an additional reference when successful,
- * or NULL if the inode is already beeing freed.
+ * or NULL if the inode is already being freed.
  */
 struct block_device *bdgrab(struct block_device *bdev)
 {
