@@ -474,7 +474,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 	root_res = &rdev->resource[0];
 
 	/* First scan 1st level */
-	for (np = NULL; (np = of_get_next_child(pnode, np)) != NULL;) {
+	for_each_child_of_node(pnode, np) {
 		if (macio_skip_device(np))
 			continue;
 		of_node_get(np);
@@ -491,7 +491,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 	/* Add media bay devices if any */
 	if (mbdev) {
 		pnode = mbdev->ofdev.dev.of_node;
-		for (np = NULL; (np = of_get_next_child(pnode, np)) != NULL;) {
+		for_each_child_of_node(pnode, np) {
 			if (macio_skip_device(np))
 				continue;
 			of_node_get(np);
@@ -504,7 +504,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 	/* Add serial ports if any */
 	if (sdev) {
 		pnode = sdev->ofdev.dev.of_node;
-		for (np = NULL; (np = of_get_next_child(pnode, np)) != NULL;) {
+		for_each_child_of_node(pnode, np) {
 			if (macio_skip_device(np))
 				continue;
 			of_node_get(np);
