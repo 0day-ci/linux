@@ -573,7 +573,7 @@ int propagate_umount(struct list_head *list)
 				continue;
 			} else if (child->mnt.mnt_flags & MNT_UMOUNT) {
 				/*
-				 * We have come accross an partially unmounted
+				 * We have come across an partially unmounted
 				 * mount in list that has not been visited yet.
 				 * Remember it has been visited and continue
 				 * about our merry way.
