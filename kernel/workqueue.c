@@ -5449,6 +5449,9 @@ static ssize_t wq_pool_ids_show(struct device *dev,
 	return written;
 }
 
+static struct device_attribute wq_sysfs_unbound_attr_pool_ids =
+	__ATTR(pool_ids, 0444, wq_pool_ids_show, NULL);
+
 static ssize_t wq_nice_show(struct device *dev, struct device_attribute *attr,
 			    char *buf)
 {
@@ -5502,6 +5505,9 @@ out_unlock:
 	return ret ?: count;
 }
 
+static struct device_attribute wq_sysfs_unbound_attr_nice =
+	__ATTR(nice, 0644, wq_nice_show, wq_nice_store);
+
 static ssize_t wq_cpumask_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
@@ -5538,6 +5544,9 @@ out_unlock:
 	free_workqueue_attrs(attrs);
 	return ret ?: count;
 }
+
+static struct device_attribute wq_sysfs_unbound_attr_cpumask =
+	__ATTR(cpumask, 0644, wq_cpumask_show, wq_cpumask_store);
 
 static ssize_t wq_numa_show(struct device *dev, struct device_attribute *attr,
 			    char *buf)
@@ -5578,13 +5587,17 @@ out_unlock:
 	return ret ?: count;
 }
 
-static struct device_attribute wq_sysfs_unbound_attrs[] = {
-	__ATTR(pool_ids, 0444, wq_pool_ids_show, NULL),
-	__ATTR(nice, 0644, wq_nice_show, wq_nice_store),
-	__ATTR(cpumask, 0644, wq_cpumask_show, wq_cpumask_store),
-	__ATTR(numa, 0644, wq_numa_show, wq_numa_store),
-	__ATTR_NULL,
+static struct device_attribute wq_sysfs_unbound_attr_numa =
+	__ATTR(numa, 0644, wq_numa_show, wq_numa_store);
+
+static struct attribute *wq_sysfs_unbound_attrs[] = {
+	&wq_sysfs_unbound_attr_pool_ids.attr,
+	&wq_sysfs_unbound_attr_nice.attr,
+	&wq_sysfs_unbound_attr_cpumask.attr,
+	&wq_sysfs_unbound_attr_numa.attr,
+	NULL,
 };
+ATTRIBUTE_GROUPS(wq_sysfs_unbound);
 
 static struct bus_type wq_subsys = {
 	.name				= "workqueue",
@@ -5679,37 +5692,17 @@ int workqueue_sysfs_register(struct workqueue_struct *wq)
 	wq_dev->wq = wq;
 	wq_dev->dev.bus = &wq_subsys;
 	wq_dev->dev.release = wq_device_release;
+	if (wq->flags & WQ_UNBOUND)
+		wq_dev->dev.groups = wq_sysfs_unbound_groups;
 	dev_set_name(&wq_dev->dev, "%s", wq->name);
-
-	/*
-	 * unbound_attrs are created separately.  Suppress uevent until
-	 * everything is ready.
-	 */
-	dev_set_uevent_suppress(&wq_dev->dev, true);
 
 	ret = device_register(&wq_dev->dev);
 	if (ret) {
 		put_device(&wq_dev->dev);
 		wq->wq_dev = NULL;
-		return ret;
 	}
 
-	if (wq->flags & WQ_UNBOUND) {
-		struct device_attribute *attr;
-
-		for (attr = wq_sysfs_unbound_attrs; attr->attr.name; attr++) {
-			ret = device_create_file(&wq_dev->dev, attr);
-			if (ret) {
-				device_unregister(&wq_dev->dev);
-				wq->wq_dev = NULL;
-				return ret;
-			}
-		}
-	}
-
-	dev_set_uevent_suppress(&wq_dev->dev, false);
-	kobject_uevent(&wq_dev->dev.kobj, KOBJ_ADD);
-	return 0;
+	return ret;
 }
 
 /**
