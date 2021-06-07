@@ -112,10 +112,6 @@ static_assert(sizeof(struct guc_ct_buffer_desc) == 64);
  * - **flags**, holds various bits to control message handling
  */
 
-/* Type of command transport buffer */
-#define INTEL_GUC_CT_BUFFER_TYPE_SEND	0x0u
-#define INTEL_GUC_CT_BUFFER_TYPE_RECV	0x1u
-
 /*
  * Definition of the command transport message header (DW0)
  *
