@@ -135,7 +135,7 @@ examples:
   - |
     / {
         model = "Texas Instruments K3 J721E SoC";
-        compatible = "ti,j721e";
+        compatible = "ti,j721e-eaik", "ti,j721e";
         #address-cells = <2>;
         #size-cells = <2>;
 
