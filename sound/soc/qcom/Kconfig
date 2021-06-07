@@ -106,11 +106,15 @@ config SND_SOC_QDSP6
 config SND_SOC_QCOM_APM_DAI
 	tristate
 
+config SND_SOC_QCOM_APM_BEDAI
+	tristate
+
 config SND_SOC_QCOM_AUDIOREACH
 	tristate "SoC ALSA audio drives for Qualcomm AUDIOREACH"
 	depends on QCOM_GPR
 	select SND_SOC_TOPOLOGY
 	select SND_SOC_QCOM_APM_DAI
+	select SND_SOC_QCOM_APM_BEDAI
 	help
 	 Support for AudioReach in QDSP
 
