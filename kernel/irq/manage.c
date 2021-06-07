@@ -487,6 +487,23 @@ int irq_force_affinity(unsigned int irq, const struct cpumask *cpumask)
 }
 EXPORT_SYMBOL_GPL(irq_force_affinity);
 
+/**
+ * irq_get_effective_cpu - Retrieve the effective CPU index
+ * @irq:	Target interrupt to retrieve effective CPU index
+ *
+ * When the effective affinity cpumask has multiple CPU toggled, it just
+ * returns the first CPU in the cpumask.
+ */
+int irq_get_effective_cpu(unsigned int irq)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+	struct cpumask *m;
+
+	m = irq_data_get_effective_affinity_mask(data);
+	return cpumask_first(m);
+}
+EXPORT_SYMBOL_GPL(irq_get_effective_cpu);
+
 int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 {
 	unsigned long flags;
