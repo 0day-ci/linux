@@ -158,6 +158,30 @@ static inline void set_default_inode_attr(struct inode *inode, umode_t mode)
 		inode->i_ctime = current_time(inode);
 }
 
+static bool kernfs_need_inode_refresh(struct kernfs_node *kn,
+				      struct inode *inode,
+				      struct kernfs_iattrs *attrs)
+{
+	if (kernfs_type(kn) == KERNFS_DIR) {
+		if (inode->i_nlink != kn->dir.subdirs + 2)
+			return true;
+	}
+
+	if (inode->i_mode != kn->mode)
+		return true;
+
+	if (attrs) {
+		if (!timespec64_equal(&inode->i_atime, &attrs->ia_atime) ||
+		    !timespec64_equal(&inode->i_mtime, &attrs->ia_mtime) ||
+		    !timespec64_equal(&inode->i_ctime, &attrs->ia_ctime) ||
+		    !uid_eq(inode->i_uid, attrs->ia_uid) ||
+		    !gid_eq(inode->i_gid, attrs->ia_gid))
+			return true;
+	}
+
+	return false;
+}
+
 static inline void set_inode_attr(struct inode *inode,
 				  struct kernfs_iattrs *attrs)
 {
@@ -171,6 +195,9 @@ static inline void set_inode_attr(struct inode *inode,
 static void kernfs_refresh_inode(struct kernfs_node *kn, struct inode *inode)
 {
 	struct kernfs_iattrs *attrs = kn->iattr;
+
+	if (!kernfs_need_inode_refresh(kn, inode, attrs))
+		return;
 
 	spin_lock(&inode->i_lock);
 	inode->i_mode = kn->mode;
