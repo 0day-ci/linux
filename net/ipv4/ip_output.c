@@ -734,8 +734,7 @@ struct sk_buff *ip_frag_next(struct sk_buff *skb, struct ip_frag_state *state)
 	/*
 	 *	Copy a block of the IP datagram.
 	 */
-	if (skb_copy_bits(skb, state->ptr, skb_transport_header(skb2), len))
-		BUG();
+	BUG_ON(skb_copy_bits(skb, state->ptr, skb_transport_header(skb2), len));
 	state->left -= len;
 
 	/*
