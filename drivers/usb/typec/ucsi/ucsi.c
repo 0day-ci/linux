@@ -839,6 +839,11 @@ static void ucsi_handle_connector_change(struct work_struct *work)
 		goto out_ack;
 	}
 
+	if (!status.change) {
+		dev_dbg(con->ucsi->dev, "con%d: spurious event\n", con->num);
+		goto out_ack;
+	}
+
 	event = kzalloc(sizeof(*event), GFP_KERNEL);
 	if (!event)
 		goto out_ack;
