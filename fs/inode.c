@@ -1429,7 +1429,7 @@ EXPORT_SYMBOL(ilookup);
  * function must never block --- find_inode() can block in
  * __wait_on_freeing_inode() --- or when the caller can not increment
  * the reference count because the resulting iput() might cause an
- * inode eviction.  The tradeoff is that the @match funtion must be
+ * inode eviction.  The tradeoff is that the @match function must be
  * very carefully implemented.
  */
 struct inode *find_inode_nowait(struct super_block *sb,
@@ -1926,7 +1926,7 @@ static int __remove_privs(struct user_namespace *mnt_userns,
 }
 
 /*
- * Remove special file priviledges (suid, capabilities) when file is written
+ * Remove special file privileges (suid, capabilities) when file is written
  * to or truncated.
  */
 int file_remove_privs(struct file *file)
