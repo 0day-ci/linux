@@ -4,6 +4,22 @@
 
 #include <linux/math.h>
 
+/* Metric prefixes in accordance with Système international (d'unités) */
+#define PETA	1000000000000000LL
+#define TERA	1000000000000LL
+#define GIGA	1000000000L
+#define MEGA	1000000L
+#define KILO	1000L
+#define HECTO	100L
+#define DECA	10L
+#define DECI	10L
+#define CENTI	100L
+#define MILLI	1000L
+#define MICRO	1000000L
+#define NANO	1000000000L
+#define PICO	1000000000000LL
+#define FEMTO	1000000000000000LL
+
 #define MILLIWATT_PER_WATT	1000L
 #define MICROWATT_PER_MILLIWATT	1000L
 #define MICROWATT_PER_WATT	1000000L
