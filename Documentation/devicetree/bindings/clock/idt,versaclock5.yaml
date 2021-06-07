@@ -65,6 +65,10 @@ properties:
     maximum: 22760
     description: Optional load capacitor for XTAL1 and XTAL2
 
+  idt,sd-active-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: SD/OE pin polarity is active-high
+
 patternProperties:
   "^OUT[1-4]$":
     type: object
