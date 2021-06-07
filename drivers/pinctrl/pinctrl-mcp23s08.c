@@ -353,6 +353,7 @@ static irqreturn_t mcp23s08_irq(int irq, void *data)
 
 	if (intf == 0) {
 		/* There is no interrupt pending */
+		goto unlock;
 		return IRQ_HANDLED;
 	}
 
