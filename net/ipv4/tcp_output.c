@@ -1833,7 +1833,8 @@ unsigned int tcp_current_mss(struct sock *sk)
 
 	if (dst) {
 		u32 mtu = dst_mtu(dst);
-		if (mtu != inet_csk(sk)->icsk_pmtu_cookie)
+		if (mtu != inet_csk(sk)->icsk_pmtu_cookie ||
+		    (tp->snd_wnd && tp->snd_wnd < mss_now))
 			mss_now = tcp_sync_mss(sk, mtu);
 	}
 
