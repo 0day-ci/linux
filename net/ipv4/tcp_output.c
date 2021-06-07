@@ -2771,6 +2771,20 @@ bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto)
 	return true;
 }
 
+static int sock_is_loopback(const struct sock *sk)
+{
+	struct dst_entry *dst;
+	int loopback = 0;
+
+	rcu_read_lock();
+	dst = rcu_dereference(sk->sk_dst_cache);
+	if (dst && dst->dev &&
+	    (dst->dev->features & NETIF_F_LOOPBACK))
+		loopback = 1;
+	rcu_read_unlock();
+	return loopback;
+}
+
 /* Thanks to skb fast clones, we can detect if a prior transmit of
  * a packet is still in a qdisc or driver queue.
  * In this case, there is very little point doing a retransmit !
@@ -2778,15 +2792,24 @@ bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto)
 static bool skb_still_in_host_queue(struct sock *sk,
 				    const struct sk_buff *skb)
 {
-	if (unlikely(skb_fclone_busy(sk, skb))) {
-		set_bit(TSQ_THROTTLED, &sk->sk_tsq_flags);
-		smp_mb__after_atomic();
-		if (skb_fclone_busy(sk, skb)) {
+	bool is_loopback = sock_is_loopback(sk);
+
+	if (unlikely(skb_fclone_busy(sk, skb, is_loopback))) {
+		if (!is_loopback) {
+			set_bit(TSQ_THROTTLED, &sk->sk_tsq_flags);
+			smp_mb__after_atomic();
+			if (skb_fclone_busy(sk, skb, is_loopback)) {
+				NET_INC_STATS(sock_net(sk),
+					      LINUX_MIB_TCPSPURIOUS_RTX_HOSTQUEUES);
+				return true;
+			}
+		} else {
 			NET_INC_STATS(sock_net(sk),
 				      LINUX_MIB_TCPSPURIOUS_RTX_HOSTQUEUES);
 			return true;
 		}
 	}
+
 	return false;
 }
 

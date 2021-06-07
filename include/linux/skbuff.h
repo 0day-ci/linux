@@ -1131,9 +1131,12 @@ struct sk_buff_fclones {
  * Returns true if skb is a fast clone, and its clone is not freed.
  * Some drivers call skb_orphan() in their ndo_start_xmit(),
  * so we also check that this didnt happen.
+ * For loopback, the skb maybe in the target sock's receive_queue
+ * we need to ignore that case.
  */
 static inline bool skb_fclone_busy(const struct sock *sk,
-				   const struct sk_buff *skb)
+				   const struct sk_buff *skb,
+				   bool is_loopback)
 {
 	const struct sk_buff_fclones *fclones;
 
@@ -1141,7 +1144,7 @@ static inline bool skb_fclone_busy(const struct sock *sk,
 
 	return skb->fclone == SKB_FCLONE_ORIG &&
 	       refcount_read(&fclones->fclone_ref) > 1 &&
-	       READ_ONCE(fclones->skb2.sk) == sk;
+	       is_loopback ? true : READ_ONCE(fclones->skb2.sk) == sk;
 }
 
 /**
