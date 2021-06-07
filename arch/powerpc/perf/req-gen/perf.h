@@ -51,7 +51,6 @@ enum CAT2(NAME_LOWER, _requests) {
  *	r_fields
  * };
  */
-#include "_clear.h"
 #define STRUCT_NAME__(name_lower, r_name) name_lower ## _ ## r_name
 #define STRUCT_NAME_(name_lower, r_name) STRUCT_NAME__(name_lower, r_name)
 #define STRUCT_NAME(r_name) STRUCT_NAME_(NAME_LOWER, r_name)
