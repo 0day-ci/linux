@@ -1127,6 +1127,10 @@ static const struct of_device_id pmic_gpio_of_match[] = {
 	{ .compatible = "qcom,pm8150b-gpio", .data = (void *) 12 },
 	/* pm8150l has 12 GPIOs with holes on 7 */
 	{ .compatible = "qcom,pm8150l-gpio", .data = (void *) 12 },
+	/* pmm8155au-1 has 10 GPIOs with holes on 2, 5, 7 and 8 */
+	{ .compatible = "qcom,pmm8155au-1-gpio", .data = (void *) 10 },
+	/* pmm8155au-2 has 10 GPIOs with holes on 2, 5 and 7 */
+	{ .compatible = "qcom,pmm8155au-2-gpio", .data = (void *) 10 },
 	{ .compatible = "qcom,pm8350-gpio", .data = (void *) 10 },
 	{ .compatible = "qcom,pm8350b-gpio", .data = (void *) 8 },
 	{ .compatible = "qcom,pm8350c-gpio", .data = (void *) 9 },
