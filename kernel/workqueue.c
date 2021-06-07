@@ -5625,15 +5625,15 @@ static struct device_attribute wq_sysfs_cpumask_attr =
 	__ATTR(cpumask, 0644, wq_unbound_cpumask_show,
 	       wq_unbound_cpumask_store);
 
+static struct attribute *wq_sysfs_dev_root_attrs[] = {
+	&wq_sysfs_cpumask_attr.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(wq_sysfs_dev_root);
+
 static int __init wq_sysfs_init(void)
 {
-	int err;
-
-	err = subsys_virtual_register(&wq_subsys, NULL);
-	if (err)
-		return err;
-
-	return device_create_file(wq_subsys.dev_root, &wq_sysfs_cpumask_attr);
+	return subsys_virtual_register(&wq_subsys, wq_sysfs_dev_root_groups);
 }
 core_initcall(wq_sysfs_init);
 
