@@ -914,6 +914,10 @@ static int vc5_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return PTR_ERR(vc5->regmap);
 	}
 
+	if (of_property_read_bool(client->dev.of_node, "idt,sd-active-high"))
+		regmap_update_bits(vc5->regmap, VC5_PRIM_SRC_SHDN,
+				   VC5_PRIM_SRC_SHDN_SP, VC5_PRIM_SRC_SHDN_SP);
+
 	/* Register clock input mux */
 	memset(&init, 0, sizeof(init));
 
