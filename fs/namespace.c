@@ -3182,7 +3182,7 @@ int path_mount(const char *dev_name, struct path *path,
 	if ((flags & SB_MANDLOCK) && !may_mandlock())
 		return -EPERM;
 
-	/* Default to relatime unless overriden */
+	/* Default to relatime unless overridden */
 	if (!(flags & MS_NOATIME))
 		mnt_flags |= MNT_RELATIME;
 
