@@ -343,9 +343,34 @@ xfs_ilock_demote(
 }
 
 #if defined(DEBUG) || defined(XFS_WARN)
-int
+static inline bool
+__xfs_rwsem_islocked(
+	struct rw_semaphore	*rwsem,
+	int			lock_flags,
+	int			shift)
+{
+	lock_flags >>= shift;
+
+	if (!debug_locks)
+		return rwsem_is_locked(rwsem);
+	/*
+	 * If the shared flag is not set, pass 0 to explicitly check for
+	 * exclusive access to the lock. If the shared flag is set, we typically
+	 * want to make sure the lock is at least held in shared mode
+	 * (i.e., shared | excl) but we don't necessarily care that it might
+	 * actually be held exclusive. Therefore, pass -1 to check whether the
+	 * lock is held in any mode rather than one of the explicit shared mode
+	 * values (1 or 2)."
+	 */
+	if (lock_flags & (1 << XFS_SHARED_LOCK_SHIFT)) {
+		return lockdep_is_held_type(rwsem, -1);
+	}
+	return lockdep_is_held_type(rwsem, 0);
+}
+
+bool
 xfs_isilocked(
-	xfs_inode_t		*ip,
+	struct xfs_inode	*ip,
 	uint			lock_flags)
 {
 	if (lock_flags & (XFS_ILOCK_EXCL|XFS_ILOCK_SHARED)) {
@@ -360,15 +385,13 @@ xfs_isilocked(
 		return rwsem_is_locked(&ip->i_mmaplock.mr_lock);
 	}
 
-	if (lock_flags & (XFS_IOLOCK_EXCL|XFS_IOLOCK_SHARED)) {
-		if (!(lock_flags & XFS_IOLOCK_SHARED))
-			return !debug_locks ||
-				lockdep_is_held_type(&VFS_I(ip)->i_rwsem, 0);
-		return rwsem_is_locked(&VFS_I(ip)->i_rwsem);
+	if (lock_flags & (XFS_IOLOCK_EXCL | XFS_IOLOCK_SHARED)) {
+		return __xfs_rwsem_islocked(&VFS_I(ip)->i_rwsem, lock_flags,
+				XFS_IOLOCK_FLAG_SHIFT);
 	}
 
 	ASSERT(0);
-	return 0;
+	return false;
 }
 #endif
 
