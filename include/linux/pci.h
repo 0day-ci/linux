@@ -49,7 +49,7 @@
 			       PCI_STATUS_SIG_TARGET_ABORT | \
 			       PCI_STATUS_PARITY)
 
-#define PCI_RESET_METHODS_NUM 5
+#define PCI_RESET_METHODS_NUM 6
 
 /*
  * The PCI interface treats multi-function devices as independent
