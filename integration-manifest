@@ -1,0 +1,26 @@
+drm drm-fixes 614124bea77e452aa6df7a8714e8bc820b489922
+	Linux 5.13-rc5
+drm-misc drm-misc-fixes 9bf3797796f570b34438235a6a537df85832bdad
+	drm/sun4i: dw-hdmi: Make HDMI PHY into a platform device
+drm-intel drm-intel-fixes 614124bea77e452aa6df7a8714e8bc820b489922
+	Linux 5.13-rc5
+drm drm-next 5745d647d5563d3e9d32013ad4e5c629acff04d7
+	Merge tag 'amd-drm-next-5.14-2021-06-02' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes b9d79e4ca4ff23543d6b33c736ba07c1f0a9dcb1
+	fbmem: Mark proc_fb_seq_ops as __maybe_unused
+drm-intel drm-intel-next-fixes c7b397e9ca4d6828e3e3f504c80bcb1fe535c348
+	Merge tag 'gvt-next-fixes-2021-04-29' of https://github.com/intel/gvt-linux into drm-intel-next-fixes
+drm-misc drm-misc-next 72db41c9336d155d441541e9010c868e3cf62451
+	drm/ttm: fix warning after moving resource to ghost obj
+drm-intel drm-intel-next 3f409e4cd579b287a6c41d017e62c392f7997193
+	drm/i915/display: Drop FIXME about turn off infoframes
+drm-intel drm-intel-gt-next 40e1956ec505a1aba96f9d202308a1ece87b6b93
+	drm/i915/gem: replace IS_GEN and friends with GRAPHICS_VER
+sound-upstream for-linus 9981b20a5e3694f4625ab5a1ddc98ce7503f6d12
+	ALSA: firewire-lib: fix the context to call snd_pcm_stop_xrun()
+sound-upstream for-next 5fe8f0a0a83ab78c75010e161fa27ae66e36cd64
+	ALSA: firewire-lib: delete unused kernel API
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
