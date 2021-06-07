@@ -5,6 +5,9 @@
 #include <linux/types.h>
 #include <linux/soc/qcom/gpr.h>
 #include <sound/soc.h>
+struct q6apm;
+struct q6apm_graph;
+
 
 /* Module IDs */
 #define MODULE_ID_WR_SHARED_MEM_EP	0x07001000
@@ -621,4 +624,7 @@ void *audioreach_alloc_apm_pkt(int pkt_size, uint32_t opcode, uint32_t token,
 				uint32_t src_port);
 void *audioreach_alloc_pkt(int pkt_size, uint32_t opcode, uint32_t token,
 				uint32_t src_port, uint32_t dest_port);
+void *audioreach_alloc_graph_pkt(struct q6apm *apm,
+				 struct list_head *sg_list,
+				  int graph_id);
 #endif /* __AUDIOREACH_H__ */
