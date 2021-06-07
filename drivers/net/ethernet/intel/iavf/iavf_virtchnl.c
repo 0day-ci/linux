@@ -1899,8 +1899,8 @@ void iavf_virtchnl_completion(struct iavf_adapter *adapter,
 		break;
 	default:
 		if (adapter->current_op && (v_opcode != adapter->current_op))
-			dev_warn(&adapter->pdev->dev, "Expected response %d from PF, received %d\n",
-				 adapter->current_op, v_opcode);
+			dev_dbg(&adapter->pdev->dev, "Expected response %d from PF, received %d\n",
+				adapter->current_op, v_opcode);
 		break;
 	} /* switch v_opcode */
 	adapter->current_op = VIRTCHNL_OP_UNKNOWN;
