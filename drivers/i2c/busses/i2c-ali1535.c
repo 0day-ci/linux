@@ -206,6 +206,7 @@ static int ali1535_setup(struct pci_dev *dev)
 exit_free:
 	release_region(ali1535_smba, ALI1535_SMB_IOSIZE);
 exit:
+	pci_disable_device(dev);
 	return retval;
 }
 
