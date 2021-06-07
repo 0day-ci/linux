@@ -72,6 +72,23 @@ out:
 	spin_unlock_irqrestore(&tag_sync_lock, flags);
 }
 
+void mte_prepare_page_tags(struct page *page)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&tag_sync_lock, flags);
+
+	/* Recheck with the lock held */
+	if (test_bit(PG_mte_tagged, &page->flags))
+		goto out;
+
+	mte_clear_page_tags(page_address(page));
+	set_bit(PG_mte_tagged, &page->flags);
+
+out:
+	spin_unlock_irqrestore(&tag_sync_lock, flags);
+}
+
 void mte_sync_tags(pte_t old_pte, pte_t pte)
 {
 	struct page *page = pte_page(pte);
