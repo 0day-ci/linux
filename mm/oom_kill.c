@@ -1089,9 +1089,9 @@ bool out_of_memory(struct oom_control *oc)
 		oc->nodemask = NULL;
 	check_panic_on_oom(oc);
 
-	if (!is_memcg_oom(oc) && sysctl_oom_kill_allocating_task &&
-	    current->mm && !oom_unkillable_task(current) &&
-	    oom_cpuset_eligible(current, oc) &&
+	if (sysctl_oom_kill_allocating_task && current->mm &&
+            !oom_unkillable_task(current) &&
+            oom_cpuset_eligible(current, oc) &&
 	    current->signal->oom_score_adj != OOM_SCORE_ADJ_MIN) {
 		get_task_struct(current);
 		oc->chosen = current;
