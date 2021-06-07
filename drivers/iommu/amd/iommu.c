@@ -2048,6 +2048,48 @@ static int amd_iommu_map(struct iommu_domain *dom, unsigned long iova,
 	return ret;
 }
 
+static void amd_iommu_iotlb_gather_add_page(struct iommu_domain *domain,
+					    struct iommu_iotlb_gather *gather,
+					    unsigned long iova, size_t size)
+{
+	/*
+	 * AMD's IOMMU can flush as many pages as necessary in a single flush.
+	 * Unless we run in a virtual machine, which can be inferred according
+	 * to whether "non-present cache" is on, it is probably best to prefer
+	 * (potentially) too extensive TLB flushing (i.e., more misses) over
+	 * mutliple TLB flushes (i.e., more flushes). For virtual machines the
+	 * hypervisor needs to synchronize the host IOMMU PTEs with those of
+	 * the guest, and the trade-off is different: unnecessary TLB flushes
+	 * should be avoided.
+	 */
+	if (amd_iommu_np_cache && gather->end != 0) {
+		unsigned long start = iova, end = start + size - 1;
+
+		if (iommu_iotlb_gather_is_disjoint(gather, iova, size)) {
+			/*
+			 * If the new page is disjoint from the current range,
+			 * flush.
+			 */
+			iommu_iotlb_sync(domain, gather);
+		} else {
+			/*
+			 * If the order of TLB flushes increases by more than
+			 * 1, it means that we would have to flush PTEs that
+			 * were not modified. In this case, flush.
+			 */
+			unsigned long new_start = min(gather->start, start);
+			unsigned long new_end = min(gather->end, end);
+			int msb_diff = fls64(gather->end ^ gather->start);
+			int new_msb_diff = fls64(new_end ^ new_start);
+
+			if (new_msb_diff > msb_diff + 1)
+				iommu_iotlb_sync(domain, gather);
+		}
+	}
+
+	iommu_iotlb_gather_add_range(gather, iova, size);
+}
+
 static size_t amd_iommu_unmap(struct iommu_domain *dom, unsigned long iova,
 			      size_t page_size,
 			      struct iommu_iotlb_gather *gather)
@@ -2062,7 +2104,7 @@ static size_t amd_iommu_unmap(struct iommu_domain *dom, unsigned long iova,
 
 	r = (ops->unmap) ? ops->unmap(ops, iova, page_size, gather) : 0;
 
-	iommu_iotlb_gather_add_page(dom, gather, iova, page_size);
+	amd_iommu_iotlb_gather_add_page(dom, gather, iova, page_size);
 
 	return r;
 }
