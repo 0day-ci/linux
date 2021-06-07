@@ -714,7 +714,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 		if (rds_cmsg_recv(inc, msg, rs)) {
 			ret = -EFAULT;
-			goto out;
+			goto out_put;
 		}
 		rds_recvmsg_zcookie(rs, msg);
 
@@ -740,6 +740,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		break;
 	}
 
+out_put:
 	if (inc)
 		rds_inc_put(inc);
 
