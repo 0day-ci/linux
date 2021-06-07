@@ -47,8 +47,10 @@ static bool map_pte(struct page_vma_mapped_walk *pvmw)
 				return false;
 		}
 	}
-	pvmw->ptl = pte_lockptr(pvmw->vma->vm_mm, pvmw->pmd);
-	spin_lock(pvmw->ptl);
+	if (USE_SPLIT_PTE_PTLOCKS) {
+		pvmw->pte_ptl = pte_lockptr(pvmw->vma->vm_mm, pvmw->pmd);
+		spin_lock(pvmw->pte_ptl);
+	}
 	return true;
 }
 
@@ -162,8 +164,8 @@ bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw)
 		if (!pvmw->pte)
 			return false;
 
-		pvmw->ptl = huge_pte_lockptr(page_hstate(page), mm, pvmw->pte);
-		spin_lock(pvmw->ptl);
+		pvmw->pte_ptl = huge_pte_lockptr(page_hstate(page), mm, pvmw->pte);
+		spin_lock(pvmw->pte_ptl);
 		if (!check_pte(pvmw))
 			return not_found(pvmw);
 		return true;
@@ -179,6 +181,7 @@ restart:
 	if (!pud_present(*pud))
 		return false;
 	pvmw->pmd = pmd_offset(pud, pvmw->address);
+	pvmw->pmd_ptl = pmd_lock(mm, pvmw->pmd);
 	/*
 	 * Make sure the pmd value isn't cached in a register by the
 	 * compiler and used as a stale value after we've observed a
@@ -186,7 +189,6 @@ restart:
 	 */
 	pmde = READ_ONCE(*pvmw->pmd);
 	if (pmd_trans_huge(pmde) || is_pmd_migration_entry(pmde)) {
-		pvmw->ptl = pmd_lock(mm, pvmw->pmd);
 		if (likely(pmd_trans_huge(*pvmw->pmd))) {
 			if (pvmw->flags & PVMW_MIGRATION)
 				return not_found(pvmw);
@@ -206,14 +208,10 @@ restart:
 				}
 			}
 			return not_found(pvmw);
-		} else {
-			/* THP pmd was split under us: handle on pte level */
-			spin_unlock(pvmw->ptl);
-			pvmw->ptl = NULL;
 		}
-	} else if (!pmd_present(pmde)) {
-		return false;
-	}
+	} else if (!pmd_present(pmde))
+		return not_found(pvmw);
+
 	if (!map_pte(pvmw))
 		goto next_pte;
 	while (1) {
@@ -233,19 +231,21 @@ next_pte:
 			/* Did we cross page table boundary? */
 			if (pvmw->address % PMD_SIZE == 0) {
 				pte_unmap(pvmw->pte);
-				if (pvmw->ptl) {
-					spin_unlock(pvmw->ptl);
-					pvmw->ptl = NULL;
+				if (pvmw->pte_ptl) {
+					spin_unlock(pvmw->pte_ptl);
+					pvmw->pte_ptl = NULL;
 				}
+				spin_unlock(pvmw->pmd_ptl);
+				pvmw->pmd_ptl = NULL;
 				goto restart;
 			} else {
 				pvmw->pte++;
 			}
 		} while (pte_none(*pvmw->pte));
 
-		if (!pvmw->ptl) {
-			pvmw->ptl = pte_lockptr(mm, pvmw->pmd);
-			spin_lock(pvmw->ptl);
+		if (USE_SPLIT_PTE_PTLOCKS && !pvmw->pte_ptl) {
+			pvmw->pte_ptl = pte_lockptr(mm, pvmw->pmd);
+			spin_lock(pvmw->pte_ptl);
 		}
 	}
 }

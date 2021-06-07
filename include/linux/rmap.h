@@ -207,7 +207,8 @@ struct page_vma_mapped_walk {
 	unsigned long address;
 	pmd_t *pmd;
 	pte_t *pte;
-	spinlock_t *ptl;
+	spinlock_t *pte_ptl;
+	spinlock_t *pmd_ptl;
 	unsigned int flags;
 };
 
@@ -216,8 +217,10 @@ static inline void page_vma_mapped_walk_done(struct page_vma_mapped_walk *pvmw)
 	/* HugeTLB pte is set to the relevant page table entry without pte_mapped. */
 	if (pvmw->pte && !PageHuge(pvmw->page))
 		pte_unmap(pvmw->pte);
-	if (pvmw->ptl)
-		spin_unlock(pvmw->ptl);
+	if (pvmw->pte_ptl)
+		spin_unlock(pvmw->pte_ptl);
+	if (pvmw->pmd_ptl)
+		spin_unlock(pvmw->pmd_ptl);
 }
 
 bool page_vma_mapped_walk(struct page_vma_mapped_walk *pvmw);
