@@ -328,7 +328,7 @@ static int check_ci(const struct atm_vcc *vcc, short vpi, int vci)
 			return -EADDRINUSE;
 	}
 
-	/* allow VCCs with same VPI/VCI iff they don't collide on
+	/* allow VCCs with same VPI/VCI if they don't collide on
 	   TX/RX (but we may refuse such sharing for other reasons,
 	   e.g. if protocol requires to have both channels) */
 
