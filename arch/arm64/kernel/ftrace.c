@@ -201,7 +201,7 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
 			preempt_enable();
 
 			if (WARN_ON(!mod))
-				return -EINVAL;
+				return -EFAULT;
 		}
 
 		/*
