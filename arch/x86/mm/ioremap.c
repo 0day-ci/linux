@@ -74,8 +74,8 @@ static unsigned int __ioremap_check_ram(struct resource *res)
 	if ((res->flags & IORESOURCE_SYSTEM_RAM) != IORESOURCE_SYSTEM_RAM)
 		return 0;
 
-	start_pfn = (res->start + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	stop_pfn = (res->end + 1) >> PAGE_SHIFT;
+	start_pfn = res->start >> PAGE_SHIFT;
+	stop_pfn = (res->end + PAGE_SIZE) >> PAGE_SHIFT;
 	if (stop_pfn > start_pfn) {
 		for (i = 0; i < (stop_pfn - start_pfn); ++i)
 			if (pfn_valid(start_pfn + i) &&
