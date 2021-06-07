@@ -423,7 +423,6 @@ struct pwm_device *devm_of_pwm_get(struct device *dev, struct device_node *np,
 struct pwm_device *devm_fwnode_pwm_get(struct device *dev,
 				       struct fwnode_handle *fwnode,
 				       const char *con_id);
-void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
 #else
 static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
 {
@@ -529,10 +528,6 @@ devm_fwnode_pwm_get(struct device *dev, struct fwnode_handle *fwnode,
 		    const char *con_id)
 {
 	return ERR_PTR(-ENODEV);
-}
-
-static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
-{
 }
 #endif
 
