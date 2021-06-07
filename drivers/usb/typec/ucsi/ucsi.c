@@ -575,7 +575,7 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	command |= UCSI_GET_PDOS_SRC_PDOS;
 	ret = ucsi_send_command(ucsi, command, pdos + offset,
 				num_pdos * sizeof(u32));
-	if (ret < 0)
+	if (ret < 0 && ret != -ETIMEDOUT)
 		dev_err(ucsi->dev, "UCSI_GET_PDOS failed (%d)\n", ret);
 	if (ret == 0 && offset == 0)
 		dev_warn(ucsi->dev, "UCSI_GET_PDOS returned 0 bytes\n");
@@ -583,26 +583,30 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	return ret;
 }
 
-static void ucsi_get_src_pdos(struct ucsi_connector *con, int is_partner)
+static int ucsi_get_src_pdos(struct ucsi_connector *con)
 {
 	int ret;
 
 	/* UCSI max payload means only getting at most 4 PDOs at a time */
 	ret = ucsi_get_pdos(con, 1, con->src_pdos, 0, UCSI_MAX_PDOS);
 	if (ret < 0)
-		return;
+		return ret;
 
 	con->num_pdos = ret / sizeof(u32); /* number of bytes to 32-bit PDOs */
 	if (con->num_pdos < UCSI_MAX_PDOS)
-		return;
+		return 0;
 
 	/* get the remaining PDOs, if any */
 	ret = ucsi_get_pdos(con, 1, con->src_pdos, UCSI_MAX_PDOS,
 			    PDO_MAX_OBJECTS - UCSI_MAX_PDOS);
 	if (ret < 0)
-		return;
+		return ret;
 
 	con->num_pdos += ret / sizeof(u32);
+
+	ucsi_port_psy_changed(con);
+
+	return 0;
 }
 
 static int ucsi_check_altmodes(struct ucsi_connector *con)
@@ -630,7 +634,7 @@ static void ucsi_pwr_opmode_change(struct ucsi_connector *con)
 	case UCSI_CONSTAT_PWR_OPMODE_PD:
 		con->rdo = con->status.request_data_obj;
 		typec_set_pwr_opmode(con->port, TYPEC_PWR_MODE_PD);
-		ucsi_get_src_pdos(con, 1);
+		ucsi_partner_task(con, ucsi_get_src_pdos, 20);
 		break;
 	case UCSI_CONSTAT_PWR_OPMODE_TYPEC1_5:
 		con->rdo = 0;
@@ -758,10 +762,8 @@ static void ucsi_connector_work(struct work_struct *work)
 	role = !!(con->status.flags & UCSI_CONSTAT_PWR_DIR);
 
 	if (con->status.change & UCSI_CONSTAT_POWER_OPMODE_CHANGE ||
-	    con->status.change & UCSI_CONSTAT_POWER_LEVEL_CHANGE) {
+	    con->status.change & UCSI_CONSTAT_POWER_LEVEL_CHANGE)
 		ucsi_pwr_opmode_change(con);
-		ucsi_port_psy_changed(con);
-	}
 
 	if (con->status.change & UCSI_CONSTAT_POWER_DIR_CHANGE) {
 		typec_set_pwr_role(con->port, role);
@@ -1170,9 +1172,9 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	if (con->status.flags & UCSI_CONSTAT_CONNECTED) {
 		typec_set_pwr_role(con->port,
 				  !!(con->status.flags & UCSI_CONSTAT_PWR_DIR));
-		ucsi_pwr_opmode_change(con);
 		ucsi_register_partner(con);
 		ucsi_port_psy_changed(con);
+		ucsi_pwr_opmode_change(con);
 	}
 
 	con->usb_role_sw = fwnode_usb_role_switch_get(cap->fwnode);
