@@ -437,8 +437,11 @@ static int ucsi_register_altmodes(struct ucsi_connector *con, u8 recipient)
 		command |= UCSI_GET_ALTMODE_CONNECTOR_NUMBER(con->num);
 		command |= UCSI_GET_ALTMODE_OFFSET(i);
 		len = ucsi_send_command(con->ucsi, command, alt, sizeof(alt));
-		if (len <= 0)
+		if (len <= 0) {
+			if (len == -EBUSY)
+				continue;
 			return len;
+		}
 
 		/*
 		 * This code is requesting one alt mode at a time, but some PPMs
