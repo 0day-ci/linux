@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/netlink.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter/nf_tables.h>
+#include <net/netfilter/nf_tables.h>
+
+struct nft_last_priv {
+	unsigned long last_jiffies;
+};
+
+static const struct nla_policy nft_last_policy[NFTA_LAST_MAX + 1] = {
+	[NFTA_LAST_MSECS] = { .type = NLA_U64 },
+};
+
+static int nft_last_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
+			 const struct nlattr * const tb[])
+{
+	struct nft_last_priv *priv = nft_expr_priv(expr);
+	u64 last;
+	int err;
+
+	if (tb[NFTA_LAST_MSECS]) {
+		err = nf_msecs_to_jiffies64(tb[NFTA_LAST_MSECS], &last);
+		if (err < 0)
+			return err;
+
+		priv->last_jiffies = (unsigned long)last;
+	}
+
+	return 0;
+}
+
+static void nft_last_eval(const struct nft_expr *expr,
+			  struct nft_regs *regs, const struct nft_pktinfo *pkt)
+{
+	struct nft_last_priv *priv = nft_expr_priv(expr);
+
+	priv->last_jiffies = jiffies;
+}
+
+static int nft_last_dump(struct sk_buff *skb, const struct nft_expr *expr)
+{
+	struct nft_last_priv *priv = nft_expr_priv(expr);
+
+	if (nla_put_be64(skb, NFTA_LAST_MSECS,
+			 nf_jiffies64_to_msecs(priv->last_jiffies),
+			 NFTA_LAST_PAD))
+		goto nla_put_failure;
+
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+
+static struct nft_expr_type nft_last_type;
+static const struct nft_expr_ops nft_last_ops = {
+	.type		= &nft_last_type,
+	.size		= NFT_EXPR_SIZE(sizeof(struct nft_last_priv)),
+	.eval		= nft_last_eval,
+	.init		= nft_last_init,
+	.dump		= nft_last_dump,
+};
+
+static struct nft_expr_type nft_last_type __read_mostly = {
+	.name		= "last",
+	.ops		= &nft_last_ops,
+	.policy		= nft_last_policy,
+	.maxattr	= NFTA_LAST_MAX,
+	.flags		= NFT_EXPR_STATEFUL,
+	.owner		= THIS_MODULE,
+};
+
+static int __init nft_last_module_init(void)
+{
+	return nft_register_expr(&nft_last_type);
+}
+
+static void __exit nft_last_module_exit(void)
+{
+	nft_unregister_expr(&nft_last_type);
+}
+
+module_init(nft_last_module_init);
+module_exit(nft_last_module_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Pablo Neira Ayuso <pablo@netfilter.org>");
+MODULE_ALIAS_NFT_EXPR("last");
+MODULE_DESCRIPTION("nftables last expression support");
