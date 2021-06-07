@@ -684,7 +684,7 @@ cifs_show_options(struct seq_file *s, struct dentry *root)
 	}
 
 	if (tcon->ses->chan_max > 1)
-		seq_printf(s, ",multichannel,max_channels=%zu",
+		seq_printf(s, ",multichannel,max_channels=%lu",
 			   tcon->ses->chan_max);
 
 	if (tcon->use_witness)

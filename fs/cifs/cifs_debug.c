@@ -425,7 +425,7 @@ skip_rdma:
 				   from_kuid(&init_user_ns, ses->cred_uid));
 
 			if (ses->chan_count > 1) {
-				seq_printf(m, "\n\n\tExtra Channels: %zu ",
+				seq_printf(m, "\n\n\tExtra Channels: %lu ",
 					   ses->chan_count-1);
 				for (j = 1; j < ses->chan_count; j++)
 					cifs_dump_channel(m, j, &ses->chans[j]);

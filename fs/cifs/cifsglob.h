@@ -955,8 +955,8 @@ struct cifs_ses {
 	test_bit((index), &(ses)->chans_need_reconnect)
 
 	struct cifs_chan chans[CIFS_MAX_CHANNELS];
-	size_t chan_count;
-	size_t chan_max;
+	unsigned long chan_count;
+	unsigned long chan_max;
 	atomic_t chan_seq; /* round robin state */
 	/*
 	 * chans_need_reconnect is a bitmap indicating which of the channels
@@ -968,7 +968,7 @@ struct cifs_ses {
 	 * enable the sessions on top to continue to live till any
 	 * of the channels below are active.
 	 */
-	size_t chans_need_reconnect;
+	unsigned long chans_need_reconnect;
 };
 
 static inline bool
