@@ -121,7 +121,7 @@ static struct file *__alloc_file(int flags, const struct cred *cred)
 }
 
 /* Find an unused file structure and return a pointer to it.
- * Returns an error pointer if some error happend e.g. we over file
+ * Returns an error pointer if some error happen e.g. we over file
  * structures limit, run out of memory or operation is not permitted.
  *
  * Be very careful using this.  You are responsible for
