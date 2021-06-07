@@ -40,4 +40,12 @@ int zcomp_decompress(struct zcomp_strm *zstrm,
 		const void *src, unsigned int src_len, void *dst);
 
 bool zcomp_set_max_streams(struct zcomp *comp, int num_strm);
+#ifdef CONFIG_ZRAM
+int get_zram_major(void);
+#else
+int get_zram_major(void)
+{
+	return -1;
+}
+#endif
 #endif /* _ZCOMP_H_ */

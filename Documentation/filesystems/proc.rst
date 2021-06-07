@@ -954,6 +954,7 @@ varies by architecture and compile options.  The following is from a
     LowFree:          4432 kB
     SwapTotal:           0 kB
     SwapFree:            0 kB
+    SwapAvailable:       0 kB
     Dirty:             968 kB
     Writeback:           0 kB
     AnonPages:      861800 kB
@@ -1025,6 +1026,9 @@ SwapTotal
 SwapFree
               Memory which has been evicted from RAM, and is temporarily
               on the disk
+SwapAvailable
+              The memory savings when use swap devices. it takes zram
+              compression ratio into considerations, when zram is used    
 Dirty
               Memory which is waiting to get written back to the disk
 Writeback

@@ -88,6 +88,7 @@ struct zram_stats {
 	atomic64_t bd_reads;		/* no. of reads from backing device */
 	atomic64_t bd_writes;		/* no. of writes from backing device */
 #endif
+	atomic_t min_compr_ratio;
 };
 
 struct zram {

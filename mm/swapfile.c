@@ -43,6 +43,7 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 #include <linux/swap_cgroup.h>
+#include "../drivers/block/zram/zram_drv.h"
 
 static bool swap_count_continued(struct swap_info_struct *, pgoff_t,
 				 unsigned char);
@@ -3390,6 +3391,100 @@ out:
 	if (!error)
 		enable_swap_slots_cache();
 	return error;
+}
+
+u64 count_avail_swap(struct swap_info_struct *si)
+{
+	u64 result;
+	struct zram *z;
+	unsigned int free;
+	unsigned int ratio;
+
+	result = 0;
+	if (!si)
+		return 0;
+
+	//zram calculate available mem
+	if (si->flags & SWP_USED && si->swap_map) {
+		if (si->bdev->bd_disk->major == get_zram_major()) {
+			z = (struct zram *)si->bdev->bd_disk->private_data;
+			down_read(&z->init_lock);
+			ratio = atomic_read(&z->stats.min_compr_ratio);
+			free = (si->pages << (PAGE_SHIFT - 10))
+				- (si->inuse_pages << (PAGE_SHIFT - 10));
+			if (!ratio)
+				result += free / 2;
+			else
+				result = free * (100 - 10000 / ratio) / 100;
+			up_read(&z->init_lock);
+		} else
+			result += (si->pages << (PAGE_SHIFT - 10))
+					- (si->inuse_pages << (PAGE_SHIFT - 10));
+	}
+
+	return result;
+}
+
+u64 count_avail_swaps(void)
+{
+	int type;
+	u64 result;
+	struct swap_info_struct *si;
+
+	result = 0;
+	spin_lock(&swap_lock);
+	for (type = 0; type < nr_swapfiles; type++) {
+		si = swap_info[type];
+		spin_lock(&si->lock);
+		result += count_avail_swap(si);
+		spin_unlock(&si->lock);
+	}
+	spin_unlock(&swap_lock);
+
+	return result;
+}
+
+void update_zram_zstat(struct swap_info_struct *si)
+{
+	int ratio;
+	struct zram *z;
+	struct zram_stats *stat;
+	u64 orig_size, compr_data_size;
+
+	if (!si)
+		return;
+
+	//update zram min compress ratio
+	if (si->flags & SWP_USED && si->swap_map) {
+		if (si->bdev->bd_disk->major == get_zram_major()) {
+			z = (struct zram *)si->bdev->bd_disk->private_data;
+			down_read(&z->init_lock);
+			stat = &z->stats;
+			ratio = atomic_read(&stat->min_compr_ratio);
+			orig_size = atomic64_read(&stat->pages_stored) << PAGE_SHIFT;
+			compr_data_size = atomic64_read(&stat->compr_data_size);
+			if (compr_data_size && (!ratio
+					    || ((orig_size * 100) / compr_data_size < ratio)))
+				atomic_set(&stat->min_compr_ratio,
+					   (orig_size * 100) / compr_data_size);
+			up_read(&z->init_lock);
+		}
+	}
+}
+
+void update_zram_zstats(void)
+{
+	int type;
+	struct swap_info_struct *si;
+
+	spin_lock(&swap_lock);
+	for (type = 0; type < nr_swapfiles; type++) {
+		si = swap_info[type];
+		spin_lock(&si->lock);
+		update_zram_zstat(si);
+		spin_unlock(&si->lock);
+	}
+	spin_unlock(&swap_lock);
 }
 
 void si_swapinfo(struct sysinfo *val)

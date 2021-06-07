@@ -283,6 +283,12 @@ a single line of text and contains the following stats separated by whitespace:
 		Unit: 4K bytes
  ============== =============================================================
 
+File /sys/block/zram<id>/min_compr_ratio
+
+The min_compr_ratio file represents the min_compr_ratio during zram swapping out.The calculation formula is as follows:
+(orig_size * 100) / compr_data_size
+
+
 9) Deactivate
 =============
 

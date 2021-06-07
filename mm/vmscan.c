@@ -4124,6 +4124,7 @@ kswapd_try_sleep:
 						alloc_order);
 		reclaim_order = balance_pgdat(pgdat, alloc_order,
 						highest_zoneidx);
+		update_zram_zstats();
 		if (reclaim_order < alloc_order)
 			goto kswapd_try_sleep;
 	}
