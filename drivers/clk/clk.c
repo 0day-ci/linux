@@ -4348,7 +4348,7 @@ int clk_notifier_register(struct clk *clk, struct notifier_block *nb)
 			goto found;
 
 	/* if clk wasn't in the notifier list, allocate new clk_notifier */
-	cn = kzalloc(sizeof(*cn), GFP_KERNEL);
+	cn = kzalloc(sizeof(*cn), GFP_ATOMIC);
 	if (!cn)
 		goto out;
 
