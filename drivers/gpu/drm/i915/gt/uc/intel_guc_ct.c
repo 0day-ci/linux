@@ -123,6 +123,7 @@ static void guc_ct_buffer_desc_init(struct guc_ct_buffer_desc *desc,
 
 static void guc_ct_buffer_reset(struct intel_guc_ct_buffer *ctb, u32 cmds_addr)
 {
+	ctb->broken = false;
 	guc_ct_buffer_desc_init(ctb->desc, cmds_addr, ctb->size);
 }
 
@@ -387,8 +388,11 @@ static int ct_write(struct intel_guc_ct *ct,
 	u32 *cmds = ctb->cmds;
 	unsigned int i;
 
-	if (unlikely(desc->is_in_error))
+	if (unlikely(ctb->broken))
 		return -EPIPE;
+
+	if (unlikely(desc->is_in_error))
+		goto corrupted;
 
 	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
 		     (tail | head) >= size))
@@ -451,6 +455,7 @@ corrupted:
 	CT_ERROR(ct, "Corrupted descriptor addr=%#x head=%u tail=%u size=%u\n",
 		 desc->addr, desc->head, desc->tail, desc->size);
 	desc->is_in_error = 1;
+	ctb->broken = true;
 	return -EPIPE;
 }
 
@@ -632,8 +637,11 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 	unsigned int i;
 	u32 header;
 
-	if (unlikely(desc->is_in_error))
+	if (unlikely(ctb->broken))
 		return -EPIPE;
+
+	if (unlikely(desc->is_in_error))
+		goto corrupted;
 
 	if (unlikely(!IS_ALIGNED(head | tail, 4) ||
 		     (tail | head) >= size))
@@ -698,6 +706,7 @@ corrupted:
 	CT_ERROR(ct, "Corrupted descriptor addr=%#x head=%u tail=%u size=%u\n",
 		 desc->addr, desc->head, desc->tail, desc->size);
 	desc->is_in_error = 1;
+	ctb->broken = true;
 	return -EPIPE;
 }
 
