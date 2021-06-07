@@ -42,11 +42,13 @@ description: |
         sdm660
         sdm845
         sdx55
+        sm8150
         sm8250
         sm8350
 
   The 'board' element must be one of the following strings:
 
+        adp
         cdp
         cp01-c1
         dragonboard
@@ -197,6 +199,12 @@ properties:
               - qcom,ipq6018-cp01
               - qcom,ipq6018-cp01-c1
           - const: qcom,ipq6018
+
+      - items:
+          - enum:
+              - qcom,sa8155p-adp
+              - qcom,sm8150-mtp
+          - const: qcom,sm8150
 
       - items:
           - enum:
