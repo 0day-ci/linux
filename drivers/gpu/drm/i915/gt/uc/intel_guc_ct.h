@@ -61,7 +61,7 @@ struct intel_guc_ct {
 	struct tasklet_struct receive_tasklet;
 
 	struct {
-		u32 last_fence; /* last fence used to send request */
+		u16 last_fence; /* last fence used to send request */
 
 		spinlock_t lock; /* protects pending requests list */
 		struct list_head pending; /* requests waiting for response */
