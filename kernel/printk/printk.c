@@ -3560,9 +3560,28 @@ retry:
 
 	cpu = smp_processor_id();
 
-	old = atomic_cmpxchg(&printk_cpulock_owner, -1, cpu);
+	/*
+	 * Guarantee loads and stores from the previous lock owner are
+	 * visible to this CPU once it is the lock owner. This pairs
+	 * with cpu_unlock:B.
+	 *
+	 * Memory barrier involvement:
+	 *
+	 * If cpu_lock:A reads from cpu_unlock:B, then cpu_lock:B
+	 * reads from cpu_unlock:A.
+	 *
+	 * Relies on:
+	 *
+	 * RELEASE from cpu_unlock:A to cpu_unlock:B
+	 *    matching
+	 * ACQUIRE from cpu_lock:A to cpu_lock:B
+	 */
+	old = atomic_cmpxchg_acquire(&printk_cpulock_owner,
+				     -1, cpu); /* LMM(cpu_lock:A) */
 	if (old == -1) {
 		/* This CPU is now the owner. */
+
+		/* This CPU begins loading/storing data: LMM(cpu_lock:B) */
 
 		*lock_flag = true;
 
@@ -3600,7 +3619,14 @@ EXPORT_SYMBOL(printk_cpu_lock_irqsave);
 void printk_cpu_unlock_irqrestore(bool lock_flag, unsigned long irq_flags)
 {
 	if (lock_flag) {
-		atomic_set(&printk_cpulock_owner, -1);
+		/* This CPU is finished loading/storing data: LMM(cpu_unlock:A) */
+
+		/*
+		 * Guarantee loads and stores from this CPU when it was the
+		 * lock owner are visible to the next lock owner. This pairs
+		 * with cpu_lock:A.
+		 */
+		atomic_set_release(&printk_cpulock_owner, -1); /* LMM(cpu_unlock:B) */
 
 		local_irq_restore(irq_flags);
 	}
