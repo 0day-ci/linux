@@ -761,6 +761,15 @@ void hugetlb_fix_reserve_counts(struct inode *inode)
 		pr_warn("hugetlb: Huge Page Reserved count may go negative.\n");
 }
 
+void hugetlb_fix_hwcrp_counts(struct page *page)
+{
+	struct hstate *h = &default_hstate;
+	int nid = page_to_nid(page);
+
+	h->hwcrp_huge_pages++;
+	h->hwcrp_huge_pages_node[nid]++;
+}
+
 /*
  * Count and return the number of huge pages in the reserve map
  * that intersect with the range [f, t).
@@ -3089,12 +3098,30 @@ static ssize_t surplus_hugepages_show(struct kobject *kobj,
 }
 HSTATE_ATTR_RO(surplus_hugepages);
 
+static ssize_t hwcrp_hugepages_show(struct kobject *kobj,
+					struct kobj_attribute *attr, char *buf)
+{
+	struct hstate *h;
+	unsigned long hwcrp_huge_pages;
+	int nid;
+
+	h = kobj_to_hstate(kobj, &nid);
+	if (nid == NUMA_NO_NODE)
+		hwcrp_huge_pages = h->hwcrp_huge_pages;
+	else
+		hwcrp_huge_pages = h->hwcrp_huge_pages_node[nid];
+
+	return sprintf(buf, "%lu\n", hwcrp_huge_pages);
+}
+HSTATE_ATTR_RO(hwcrp_hugepages);
+
 static struct attribute *hstate_attrs[] = {
 	&nr_hugepages_attr.attr,
 	&nr_overcommit_hugepages_attr.attr,
 	&free_hugepages_attr.attr,
 	&resv_hugepages_attr.attr,
 	&surplus_hugepages_attr.attr,
+	&hwcrp_hugepages_attr.attr,
 #ifdef CONFIG_NUMA
 	&nr_hugepages_mempolicy_attr.attr,
 #endif
@@ -3164,6 +3191,7 @@ static struct attribute *per_node_hstate_attrs[] = {
 	&nr_hugepages_attr.attr,
 	&free_hugepages_attr.attr,
 	&surplus_hugepages_attr.attr,
+	&hwcrp_hugepages_attr.attr,
 	NULL,
 };
 
@@ -3657,11 +3685,13 @@ void hugetlb_report_meminfo(struct seq_file *m)
 				   "HugePages_Free:    %5lu\n"
 				   "HugePages_Rsvd:    %5lu\n"
 				   "HugePages_Surp:    %5lu\n"
+				   "HugePages_Hwcrp:   %5lu\n"
 				   "Hugepagesize:   %8lu kB\n",
 				   count,
 				   h->free_huge_pages,
 				   h->resv_huge_pages,
 				   h->surplus_huge_pages,
+				   h->hwcrp_huge_pages,
 				   huge_page_size(h) / SZ_1K);
 	}
 
