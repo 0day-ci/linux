@@ -3532,3 +3532,78 @@ void kmsg_dump_rewind(struct kmsg_dump_iter *iter)
 EXPORT_SYMBOL_GPL(kmsg_dump_rewind);
 
 #endif
+
+#ifdef CONFIG_SMP
+static atomic_t printk_cpulock_owner = ATOMIC_INIT(-1);
+
+/*
+ * printk_cpu_lock_irqsave: Acquire the printk cpu-reentrant spinning lock
+ *                          and disable interrupts.
+ * @lock_flag: A buffer to store lock state.
+ * @irq_flags: A buffer to store irq state.
+ *
+ * If no processor has the lock, the calling processor takes the lock and
+ * becomes the owner. If the calling processor is already the owner of the
+ * lock, this function succeeds immediately. If the lock is held by another
+ * processor, this function spins until the calling processor becomes the
+ * owner. This function returns with interrupts disabled.
+ *
+ * It is safe to call this function from any context and state.
+ */
+void printk_cpu_lock_irqsave(bool *lock_flag, unsigned long *irq_flags)
+{
+	int old;
+	int cpu;
+
+retry:
+	local_irq_save(*irq_flags);
+
+	cpu = smp_processor_id();
+
+	old = atomic_cmpxchg(&printk_cpulock_owner, -1, cpu);
+	if (old == -1) {
+		/* This CPU is now the owner. */
+
+		*lock_flag = true;
+
+	} else if (old == cpu) {
+		/* This CPU is already the owner. */
+
+		*lock_flag = false;
+
+	} else {
+		local_irq_restore(*irq_flags);
+
+		/*
+		 * Wait for the lock to release before jumping to cmpxchg()
+		 * in order to mitigate the thundering herd problem.
+		 */
+		do {
+			cpu_relax();
+		} while (atomic_read(&printk_cpulock_owner) != -1);
+
+		goto retry;
+	}
+}
+EXPORT_SYMBOL(printk_cpu_lock_irqsave);
+
+/*
+ * printk_cpu_unlock_irqrestore: Release the printk cpu-reentrant spinning
+ *                               lock and restore interrupts.
+ * @lock_flag: The current lock state.
+ * @irq_flags: The current irq state.
+ *
+ * Release the lock. The calling processor must be the owner of the lock.
+ *
+ * It is safe to call this function from any context and state.
+ */
+void printk_cpu_unlock_irqrestore(bool lock_flag, unsigned long irq_flags)
+{
+	if (lock_flag) {
+		atomic_set(&printk_cpulock_owner, -1);
+
+		local_irq_restore(irq_flags);
+	}
+}
+EXPORT_SYMBOL(printk_cpu_unlock_irqrestore);
+#endif /* CONFIG_SMP */

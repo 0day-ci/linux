@@ -287,6 +287,19 @@ static inline void printk_safe_flush_on_panic(void)
 }
 #endif
 
+#if defined(CONFIG_SMP)
+extern void printk_cpu_lock_irqsave(bool *lock_flag, unsigned long *irq_flags);
+extern void printk_cpu_unlock_irqrestore(bool lock_flag, unsigned long irq_flags);
+#else
+static inline void printk_cpu_lock_irqsave(bool *lock_flag, unsigned long *irq_flags)
+{
+}
+
+static inline void printk_cpu_unlock_irqrestore(bool lock_flag, unsigned long irq_flags)
+{
+}
+#endif
+
 extern int kptr_restrict;
 
 /**
