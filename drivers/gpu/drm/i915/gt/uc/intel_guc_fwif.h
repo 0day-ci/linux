@@ -295,19 +295,9 @@ struct guc_gt_system_info {
 } __packed;
 
 /* Clients info */
-struct guc_ct_pool_entry {
-	struct guc_ct_buffer_desc desc;
-	u32 reserved[7];
-} __packed;
-
-#define GUC_CT_POOL_SIZE	2
-
 struct guc_clients_info {
 	u32 clients_num;
-	u32 reserved0[13];
-	u32 ct_pool_addr;
-	u32 ct_pool_count;
-	u32 reserved[4];
+	u32 reserved[19];
 } __packed;
 
 /* GuC Additional Data Struct */
