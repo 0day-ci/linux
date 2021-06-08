@@ -1076,7 +1076,9 @@ out:
 #ifdef CONFIG_COMPAT
 /**
  * compat_ptr_ioctl - generic implementation of .compat_ioctl file operation
- *
+ * @file:	open file to invoke ioctl method on
+ * @cmd:	ioctl command to execute
+ * @arg:	command-specific argument for ioctl
  * This is not normally called as a function, but instead set in struct
  * file_operations as
  *
