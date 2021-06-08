@@ -572,6 +572,10 @@ static int __init aspeed_sgpio_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Number of GPIOs exceeds the maximum of %d: %d\n",
 			gpio->max_ngpios, nr_gpios);
 		return -EINVAL;
+	} else if (nr_gpios % 8) {
+		dev_err(&pdev->dev, "Number of GPIOs not multiple of 8: %d\n",
+			nr_gpios);
+		return -EINVAL;
 	}
 	gpio->n_sgpio = nr_gpios;
 
