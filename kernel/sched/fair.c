@@ -5759,13 +5759,13 @@ static void record_wakee(struct task_struct *p)
  */
 static int wake_wide(struct task_struct *p)
 {
-	unsigned int master = current->wakee_flips;
-	unsigned int slave = p->wakee_flips;
+	unsigned int primary = current->wakee_flips;
+	unsigned int secondary = p->wakee_flips;
 	int factor = __this_cpu_read(sd_llc_size);
 
-	if (master < slave)
-		swap(master, slave);
-	if (slave < factor || master < slave * factor)
+	if (primary < secondary)
+		swap(primary, secondary);
+	if (secondary < factor || primary < secondary * factor)
 		return 0;
 	return 1;
 }
