@@ -95,7 +95,7 @@ choice
 	depends on IOMMU_API
 	depends on X86 || IA64 || X86_64 || ARM || ARM64
 
-	default IOMMU_DEFAULT_LAZY if INTEL_IOMMU
+	default IOMMU_DEFAULT_LAZY if (AMD_IOMMU || INTEL_IOMMU)
 	default IOMMU_DEFAULT_STRICT
 	help
 	  This option allows an IOMMU DMA mode to be chosen at build time, to
