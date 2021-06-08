@@ -2619,6 +2619,10 @@ static inline struct hci_sco_hdr *hci_sco_hdr(const struct sk_buff *skb)
 #define hci_iso_data_len(h)		((h) & 0x3fff)
 #define hci_iso_data_flags(h)		((h) >> 14)
 
+/* codec transport types */
+#define TRANSPORT_ACL		0x00
+#define TRANSPORT_SCO_ESCO	0x01
+
 /* le24 support */
 static inline void hci_cpu_to_le24(__u32 val, __u8 dst[3])
 {
