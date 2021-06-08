@@ -416,9 +416,16 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	int err = 0;
 	u32 status;
+	bool busy;
 
 	do {
 		bool done = time_after(jiffies, timeout);
+
+		if (card->host->ops->card_busy) {
+			busy = card->host->ops->card_busy(card->host);
+			status = busy ?	0 : R1_READY_FOR_DATA | R1_STATE_TRAN << 9;
+			goto cb;
+		}
 
 		err = __mmc_send_status(card, &status, 5);
 		if (err) {
@@ -430,7 +437,7 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 		/* Accumulate any response error bits seen */
 		if (resp_errs)
 			*resp_errs |= status;
-
+cb:
 		/*
 		 * Timeout if the device never becomes ready for data and never
 		 * leaves the program state.
