@@ -565,6 +565,9 @@ static int armpmu_filter_match(struct perf_event *event)
 	int ret;
 
 	ret = cpumask_test_cpu(cpu, &armpmu->supported_cpus);
+	if (!ret)
+		pr_err("PMU doesn't support current CPU %d\n", cpu);
+
 	if (ret && armpmu->filter_match)
 		return armpmu->filter_match(event);
 
