@@ -963,19 +963,20 @@ bool ping_rcv(struct sk_buff *skb)
 	/* Push ICMP header back */
 	skb_push(skb, skb->data - (u8 *)icmph);
 
+	bool rc = false;
 	sk = ping_lookup(net, skb, ntohs(icmph->un.echo.id));
 	if (sk) {
 		struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 
 		pr_debug("rcv on socket %p\n", sk);
-		if (skb2)
-			ping_queue_rcv_skb(sk, skb2);
+		if (skb2 && !ping_queue_rcv_skb(sk, skb2)) {
+			rc = true;
+		}
 		sock_put(sk);
-		return true;
 	}
 	pr_debug("no socket, dropping\n");
 
-	return false;
+	return rc;
 }
 EXPORT_SYMBOL_GPL(ping_rcv);
 
