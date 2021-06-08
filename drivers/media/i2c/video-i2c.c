@@ -74,7 +74,8 @@ static const struct v4l2_fmtdesc mlx90640_format = {
 
 static const struct v4l2_frmsize_discrete mlx90640_size = {
 	.width = 32,
-	.height = 26, /* 24 lines of pixel data + 2 lines of processing data */
+	.height = 27,
+	/* 24 lines of pixel data + 2 lines of processing data + 1 line of registers */
 };
 
 static const struct regmap_config amg88xx_regmap_config = {
@@ -168,8 +169,12 @@ static int amg88xx_xfer(struct video_i2c_data *data, char *buf)
 
 static int mlx90640_xfer(struct video_i2c_data *data, char *buf)
 {
-	return regmap_bulk_read(data->regmap, 0x400, buf,
-				data->chip->buffer_size);
+	int ret = regmap_bulk_read(data->regmap, 0x400, buf,
+				   data->chip->buffer_size - 64);
+	if (ret)
+		return ret;
+	return regmap_bulk_read(data->regmap, 0x8000, buf + (data->chip->buffer_size - 64),
+				64);
 }
 
 static int amg88xx_setup(struct video_i2c_data *data)
@@ -373,7 +378,7 @@ static const struct video_i2c_chip video_i2c_chip[] = {
 		.format		= &mlx90640_format,
 		.frame_intervals	= mlx90640_frame_intervals,
 		.num_frame_intervals	= ARRAY_SIZE(mlx90640_frame_intervals),
-		.buffer_size	= 1664,
+		.buffer_size	= 1728,
 		.bpp		= 16,
 		.regmap_config	= &mlx90640_regmap_config,
 		.nvmem_config	= &mlx90640_nvram_config,
