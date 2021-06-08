@@ -416,9 +416,8 @@ intel_context_migrate_copy(struct intel_context *ce,
 	struct i915_request *rq;
 	int err;
 
+	GEM_BUG_ON(ce->vm != ce->engine->gt->migrate.context->vm);
 	*out = NULL;
-
-	/* GEM_BUG_ON(ce->vm != migrate_vm); */
 
 	GEM_BUG_ON(ce->ring->size < SZ_64K);
 
@@ -534,6 +533,7 @@ intel_context_migrate_clear(struct intel_context *ce,
 	struct i915_request *rq;
 	int err;
 
+	GEM_BUG_ON(ce->vm != ce->engine->gt->migrate.context->vm);
 	*out = NULL;
 
 	GEM_BUG_ON(ce->ring->size < SZ_64K);
