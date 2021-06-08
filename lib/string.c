@@ -982,7 +982,7 @@ void *memscan(void *addr, int c, size_t size)
 		p++;
 		size--;
 	}
-  	return (void *)p;
+	return (void *)p;
 }
 EXPORT_SYMBOL(memscan);
 #endif
@@ -1051,7 +1051,7 @@ void *memchr(const void *s, int c, size_t n)
 {
 	const unsigned char *p = s;
 	while (n-- != 0) {
-        	if ((unsigned char)c == *p++) {
+		if ((unsigned char)c == *p++) {
 			return (void *)(p - 1);
 		}
 	}
