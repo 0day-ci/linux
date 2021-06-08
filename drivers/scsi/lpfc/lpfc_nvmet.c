@@ -1469,7 +1469,7 @@ lpfc_nvmet_cleanup_io_context(struct lpfc_hba *phba)
 	if (!infop)
 		return;
 
-	/* Cycle the the entire CPU context list for every MRQ */
+	/* Cycle the entire CPU context list for every MRQ */
 	for (i = 0; i < phba->cfg_nvmet_mrq; i++) {
 		for_each_present_cpu(j) {
 			infop = lpfc_get_ctx_list(phba, j, i);
@@ -3562,7 +3562,7 @@ aerr:
  * lpfc_nvme_unsol_ls_issue_abort - issue ABTS on an exchange received
  *        via async frame receive where the frame is not handled.
  * @phba: pointer to adapter structure
- * @ctxp: pointer to the asynchronously received received sequence
+ * @ctxp: pointer to the asynchronously received sequence
  * @sid: address of the remote port to send the ABTS to
  * @xri: oxid value to for the ABTS (other side's exchange id).
  **/
