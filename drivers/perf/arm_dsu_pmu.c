@@ -82,7 +82,7 @@
 	})[0].attr.attr)
 
 #define DSU_EVENT_ATTR(_name, _config)		\
-	DSU_EXT_ATTR(_name, dsu_pmu_sysfs_event_show, (unsigned long)_config)
+	PMU_EVENT_ATTR_ID(_name, dsu_pmu_sysfs_event_show, _config)
 
 #define DSU_FORMAT_ATTR(_name, _config)		\
 	DSU_EXT_ATTR(_name, dsu_pmu_sysfs_format_show, (char *)_config)
