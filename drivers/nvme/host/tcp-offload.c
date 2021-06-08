@@ -622,6 +622,7 @@ static int nvme_tcp_ofld_setup_ctrl(struct nvme_ctrl *nctrl, bool new)
 
 	if (!(nctrl->sgls & ((1 << 0) | (1 << 1)))) {
 		dev_err(nctrl->device, "Mandatory sgls are not supported!\n");
+		rc = -EINVAL;
 		goto destroy_admin;
 	}
 
