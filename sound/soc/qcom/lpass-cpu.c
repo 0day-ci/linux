@@ -403,10 +403,43 @@ const struct snd_soc_dai_ops asoc_qcom_lpass_cpu_dai_ops = {
 };
 EXPORT_SYMBOL_GPL(asoc_qcom_lpass_cpu_dai_ops);
 
+int lpass_cpu_pcm_new(struct snd_soc_pcm_runtime *rtd,
+				struct snd_soc_dai *dai)
+{
+	int ret;
+	struct snd_soc_dai_driver *drv = dai->driver;
+	struct lpass_data *drvdata = snd_soc_dai_get_drvdata(dai);
+
+	ret =  snd_pcm_add_chmap_ctls(rtd->pcm, SNDRV_PCM_STREAM_PLAYBACK,
+			snd_pcm_alt_chmaps, drv->playback.channels_max, 0,
+			&drvdata->chmap_info);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(lpass_cpu_pcm_new);
+
 int asoc_qcom_lpass_cpu_dai_probe(struct snd_soc_dai *dai)
 {
 	struct lpass_data *drvdata = snd_soc_dai_get_drvdata(dai);
-	int ret;
+	struct snd_soc_dai_driver *drv = dai->driver;
+	int ret, i;
+
+	drvdata->rx_chmap.channels = drv->playback.channels_max;
+	drvdata->tx_chmap.channels = drv->playback.channels_max;
+
+	if (drv->playback.channels_max == 2)
+		drvdata->chmap_idx = 1;
+	else if (drv->playback.channels_max == 4)
+		drvdata->chmap_idx = 2;
+
+	for (i = 0; i < drv->playback.channels_max; i++) {
+		drvdata->tx_chmap.map[i] =
+				snd_pcm_alt_chmaps[drvdata->chmap_idx].map[i];
+		drvdata->rx_chmap.map[i] =
+				snd_pcm_alt_chmaps[drvdata->chmap_idx].map[i];
+	}
 
 	/* ensure audio hardware is disabled */
 	ret = regmap_write(drvdata->lpaif_map,
@@ -924,6 +957,11 @@ int asoc_qcom_lpass_cpu_platform_probe(struct platform_device *pdev)
 				variant->dai_bit_clk_names[i],
 				PTR_ERR(drvdata->mi2s_bit_clk[dai_id]));
 			return PTR_ERR(drvdata->mi2s_bit_clk[dai_id]);
+		}
+		if (drvdata->mi2s_playback_sd_mode[dai_id] ==
+			LPAIF_I2SCTL_MODE_QUAD01) {
+			variant->dai_driver[dai_id].playback.channels_min = 4;
+			variant->dai_driver[dai_id].playback.channels_max = 4;
 		}
 	}
 

@@ -114,6 +114,11 @@ struct lpass_data {
 	struct lpass_hdmitx_dmactl *hdmi_tx_dmactl[LPASS_MAX_HDMI_DMA_CHANNELS];
 	struct lpass_dp_metadata_ctl *meta_ctl;
 	struct lpass_sstream_ctl *sstream_ctl;
+	/* Channel map information */
+	struct snd_pcm_chmap *chmap_info;
+	struct snd_pcm_chmap_elem rx_chmap;
+	struct snd_pcm_chmap_elem tx_chmap;
+	int chmap_idx;
 };
 
 /* Vairant data per each SOC */
@@ -263,5 +268,6 @@ void asoc_qcom_lpass_cpu_platform_shutdown(struct platform_device *pdev);
 int asoc_qcom_lpass_cpu_platform_probe(struct platform_device *pdev);
 int asoc_qcom_lpass_cpu_dai_probe(struct snd_soc_dai *dai);
 extern const struct snd_soc_dai_ops asoc_qcom_lpass_cpu_dai_ops;
-
+int lpass_cpu_pcm_new(struct snd_soc_pcm_runtime *rtd,
+				struct snd_soc_dai *dai);
 #endif /* __LPASS_H__ */
