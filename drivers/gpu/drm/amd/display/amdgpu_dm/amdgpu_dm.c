@@ -7519,8 +7519,10 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.underscan_vborder_property,
 				0);
 
-	if (!aconnector->mst_port)
+	if (!aconnector->mst_port) {
 		drm_connector_attach_max_bpc_property(&aconnector->base, 8, 16);
+		drm_connector_attach_active_bpc_property(&aconnector->base, 8, 16);
+	}
 
 	/* This defaults to the max in the range, but we want 8bpc for non-edp. */
 	aconnector->base.state->max_bpc = (connector_type == DRM_MODE_CONNECTOR_eDP) ? 16 : 8;
@@ -8888,6 +8890,20 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						     &stream_update,
 						     dc_state);
 		mutex_unlock(&dm->dc_lock);
+	}
+
+	/* Extract information from crtc to communicate it to userspace as connector properties */
+	for_each_new_connector_in_state(state, connector, new_con_state, i) {
+		struct drm_crtc *crtc = new_con_state->crtc;
+		if (crtc) {
+			new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+			dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
+			if (dm_new_crtc_state->stream)
+				new_con_state->active_bpc = convert_dc_color_depth_into_bpc(
+					dm_new_crtc_state->stream->timing.display_color_depth);
+		}
+		else
+			new_con_state->active_bpc = 0;
 	}
 
 	/* Count number of newly disabled CRTCs for dropping PM refs later. */
