@@ -83,8 +83,8 @@ static LIST_HEAD(nvs_list);
 
 /**
  *	suspend_nvs_register - register platform NVS memory region to save
- *	@start - physical address of the region
- *	@size - size of the region
+ *	@start: physical address of the region
+ *	@size: size of the region
  *
  *	The NVS region need not be page-aligned (both ends) and we arrange
  *	things so that the data from page-aligned addresses in this region will
