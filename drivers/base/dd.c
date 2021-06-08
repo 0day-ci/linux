@@ -656,7 +656,7 @@ pinctrl_bind_failed:
 		/* Driver requested deferred probing */
 		dev_dbg(dev, "Driver %s requests probe deferral\n", drv->name);
 		driver_deferred_probe_add_trigger(dev, local_trigger_count);
-		break;
+		goto done;
 	case -ENODEV:
 	case -ENXIO:
 		pr_debug("%s: probe of %s rejects match %d\n",
