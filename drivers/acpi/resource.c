@@ -380,6 +380,16 @@ unsigned int acpi_dev_get_irq_type(int triggering, int polarity)
 }
 EXPORT_SYMBOL_GPL(acpi_dev_get_irq_type);
 
+static bool acpi_dev_irq_empty_or_noflags(bool legacy, u8 triggering, u8 polarity,
+					  u8 shareable)
+{
+	if (legacy && (triggering == ACPI_EDGE_SENSITIVE) &&
+	    (polarity == ACPI_ACTIVE_HIGH) && (shareable == ACPI_EXCLUSIVE))
+		return true;
+	else
+		return false;
+}
+
 static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
 				     u8 triggering, u8 polarity, u8 shareable,
 				     bool legacy)
@@ -401,7 +411,8 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
 	 * using extended IRQ descriptors we take the IRQ configuration
 	 * from _CRS directly.
 	 */
-	if (legacy && !acpi_get_override_irq(gsi, &t, &p)) {
+	if (acpi_dev_irq_empty_or_noflags(legacy, triggering, polarity, shareable)
+	    && !acpi_get_override_irq(gsi, &t, &p)) {
 		u8 trig = t ? ACPI_LEVEL_SENSITIVE : ACPI_EDGE_SENSITIVE;
 		u8 pol = p ? ACPI_ACTIVE_LOW : ACPI_ACTIVE_HIGH;
 
