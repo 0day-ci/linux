@@ -205,7 +205,8 @@ static int ax88172a_bind(struct usbnet *dev, struct usb_interface *intf)
 		goto free;
 	}
 
-	priv->phy_addr = asix_read_phy_addr(dev, priv->use_embdphy);
+	ret = asix_read_phy_addr(dev, priv->use_embdphy);
+	priv->phy_addr = ret;
 	if (priv->phy_addr < 0) {
 		ret = priv->phy_addr;
 		goto free;
