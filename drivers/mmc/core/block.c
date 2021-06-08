@@ -410,7 +410,23 @@ static int mmc_blk_ioctl_copy_to_user(struct mmc_ioc_cmd __user *ic_ptr,
 	return 0;
 }
 
-static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
+static int is_return_to_tran_cmd(struct mmc_command *cmd)
+{
+	/* Cards will never return to TRAN after completing
+	 * identification commands or MMC_SEND_STATUS if they are not selected.
+	 */
+	return !(cmd->opcode == MMC_SEND_CID
+			|| cmd->opcode == MMC_ALL_SEND_CID
+			|| cmd->opcode == MMC_SEND_CSD
+			|| cmd->opcode == MMC_SEND_STATUS
+			|| cmd->opcode == MMC_SELECT_CARD
+			|| cmd->opcode == MMC_APP_CMD
+			|| cmd->opcode == MMC_GO_INACTIVE_STATE
+			|| cmd->opcode == MMC_GO_IDLE_STATE);
+
+}
+
+static int card_poll_until_tran(struct mmc_card *card, unsigned int timeout_ms,
 			    u32 *resp_errs)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
@@ -593,12 +609,13 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 
 	memcpy(&(idata->ic.response), cmd.resp, sizeof(cmd.resp));
 
-	if (idata->rpmb || (cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
+	if (idata->rpmb || (cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B
+			|| is_return_to_tran_cmd(&cmd)) {
 		/*
 		 * Ensure RPMB/R1B command has completed by polling CMD13
 		 * "Send Status".
 		 */
-		err = card_busy_detect(card, MMC_BLK_TIMEOUT_MS, NULL);
+		err = card_poll_until_tran(card, MMC_BLK_TIMEOUT_MS, NULL);
 	}
 
 	return err;
@@ -1621,7 +1638,7 @@ static int mmc_blk_fix_state(struct mmc_card *card, struct request *req)
 
 	mmc_blk_send_stop(card, timeout);
 
-	err = card_busy_detect(card, timeout, NULL);
+	err = card_poll_until_tran(card, timeout, NULL);
 
 	mmc_retune_release(card->host);
 
@@ -1845,7 +1862,7 @@ static int mmc_blk_card_busy(struct mmc_card *card, struct request *req)
 	if (mmc_host_is_spi(card->host) || rq_data_dir(req) == READ)
 		return 0;
 
-	err = card_busy_detect(card, MMC_BLK_TIMEOUT_MS, &status);
+	err = card_poll_until_tran(card, MMC_BLK_TIMEOUT_MS, &status);
 
 	/*
 	 * Do not assume data transferred correctly if there are any error bits
