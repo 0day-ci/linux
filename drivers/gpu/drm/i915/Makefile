@@ -45,6 +45,7 @@ i915-y += i915_drv.o \
 	  i915_switcheroo.o \
 	  i915_sysfs.o \
 	  i915_utils.o \
+	  i915_gem_ww.o \
 	  intel_device_info.o \
 	  intel_dram.o \
 	  intel_memory_region.o \

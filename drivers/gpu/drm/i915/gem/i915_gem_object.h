@@ -15,6 +15,7 @@
 #include "i915_gem_object_types.h"
 #include "i915_gem_gtt.h"
 #include "i915_vma_types.h"
+#include "i915_gem_ww.h"
 
 /*
  * XXX: There is a prevalence of the assumption that we fit the
