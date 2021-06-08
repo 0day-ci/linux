@@ -3012,8 +3012,10 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 	err = btintel_read_offload_usecases(hdev, &usecases);
 	if (!err) {
 		/* set get_data_path callback if offload is supported */
-		if (usecases.preset[0] & 0x03)
+		if (usecases.preset[0] & 0x03) {
 			hdev->get_data_path = btintel_get_data_path;
+			hdev->set_data_path = btintel_set_data_path;
+		}
 	}
 
 	/* Read the Intel version information after loading the FW  */
