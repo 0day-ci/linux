@@ -124,6 +124,7 @@ struct kvm_arch {
 	 */
 	bool return_nisv_io_abort_to_user;
 	bool hvc_to_user;
+	bool psci_to_user;
 
 	/*
 	 * VM-wide PMU filter, implemented as a bitmap and big enough for

@@ -34,6 +34,7 @@ The following register is defined:
   - Allows any PSCI version implemented by KVM and compatible with
     v0.2 to be set with SET_ONE_REG
   - Affects the whole VM (even if the register view is per-vcpu)
+  - Defaults to PSCI 1.0 if userspace enables KVM_CAP_ARM_PSCI_TO_USER.
 
 * KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1:
     Holds the state of the firmware support to mitigate CVE-2017-5715, as

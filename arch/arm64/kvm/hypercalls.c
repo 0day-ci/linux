@@ -58,7 +58,7 @@ static void kvm_ptp_get_time(struct kvm_vcpu *vcpu, u64 *val)
 	val[3] = lower_32_bits(cycles);
 }
 
-static int kvm_hvc_user(struct kvm_vcpu *vcpu)
+int kvm_hvc_user(struct kvm_vcpu *vcpu)
 {
 	int i;
 	struct kvm_run *run = vcpu->run;

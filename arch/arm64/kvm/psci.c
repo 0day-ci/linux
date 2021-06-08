@@ -353,6 +353,16 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
 	return 1;
 }
 
+static bool kvm_psci_call_is_user(struct kvm_vcpu *vcpu)
+{
+	/* Handle the special case of SMCCC probe through PSCI */
+	if (smccc_get_function(vcpu) == PSCI_1_0_FN_PSCI_FEATURES &&
+	    smccc_get_arg1(vcpu) == ARM_SMCCC_VERSION_FUNC_ID)
+		return false;
+
+	return vcpu->kvm->arch.psci_to_user;
+}
+
 /**
  * kvm_psci_call - handle PSCI call if r0 value is in range
  * @vcpu: Pointer to the VCPU struct
@@ -369,6 +379,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
  */
 int kvm_psci_call(struct kvm_vcpu *vcpu)
 {
+	if (kvm_psci_call_is_user(vcpu))
+		return kvm_hvc_user(vcpu);
+
 	switch (kvm_psci_version(vcpu, vcpu->kvm)) {
 	case KVM_ARM_PSCI_1_0:
 		return kvm_psci_1_0_call(vcpu);

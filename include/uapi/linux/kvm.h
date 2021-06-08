@@ -1085,6 +1085,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_PTP_KVM 198
 #define KVM_CAP_ARM_MP_HALTED 199
 #define KVM_CAP_ARM_HVC_TO_USER 200
+#define KVM_CAP_ARM_PSCI_TO_USER 201
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
