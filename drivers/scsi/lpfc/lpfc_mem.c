@@ -269,7 +269,6 @@ lpfc_mem_free(struct lpfc_hba *phba)
 		mempool_destroy(phba->device_data_mem_pool);
 	}
 	phba->device_data_mem_pool = NULL;
-	return;
 }
 
 /**
@@ -338,8 +337,6 @@ lpfc_mem_free_all(struct lpfc_hba *phba)
 	/* Free the iocb lookup array */
 	kfree(psli->iocbq_lookup);
 	psli->iocbq_lookup = NULL;
-
-	return;
 }
 
 /**
@@ -405,7 +402,6 @@ __lpfc_mbuf_free(struct lpfc_hba * phba, void *virt, dma_addr_t dma)
 	} else {
 		dma_pool_free(phba->lpfc_mbuf_pool, virt, dma);
 	}
-	return;
 }
 
 /**
@@ -429,7 +425,6 @@ lpfc_mbuf_free(struct lpfc_hba * phba, void *virt, dma_addr_t dma)
 	spin_lock_irqsave(&phba->hbalock, iflags);
 	__lpfc_mbuf_free(phba, virt, dma);
 	spin_unlock_irqrestore(&phba->hbalock, iflags);
-	return;
 }
 
 /**
@@ -519,7 +514,6 @@ lpfc_els_hbq_free(struct lpfc_hba *phba, struct hbq_dmabuf *hbqbp)
 {
 	dma_pool_free(phba->lpfc_hbq_pool, hbqbp->dbuf.virt, hbqbp->dbuf.phys);
 	kfree(hbqbp);
-	return;
 }
 
 /**
@@ -682,7 +676,6 @@ lpfc_in_buf_free(struct lpfc_hba *phba, struct lpfc_dmabuf *mp)
 		lpfc_mbuf_free(phba, mp->virt, mp->phys);
 		kfree(mp);
 	}
-	return;
 }
 
 /**
