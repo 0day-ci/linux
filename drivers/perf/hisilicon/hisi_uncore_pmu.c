@@ -43,11 +43,10 @@ EXPORT_SYMBOL_GPL(hisi_format_sysfs_show);
 ssize_t hisi_event_sysfs_show(struct device *dev,
 			      struct device_attribute *attr, char *page)
 {
-	struct dev_ext_attribute *eattr;
+	struct perf_pmu_events_attr *pmu_attr =
+		container_of(attr, struct perf_pmu_events_attr, attr);
 
-	eattr = container_of(attr, struct dev_ext_attribute, attr);
-
-	return sysfs_emit(page, "config=0x%lx\n", (unsigned long)eattr->var);
+	return sysfs_emit(page, "config=0x%llx\n", pmu_attr->id);
 }
 EXPORT_SYMBOL_GPL(hisi_event_sysfs_show);
 

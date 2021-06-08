@@ -35,7 +35,7 @@
 #define HISI_PMU_FORMAT_ATTR(_name, _config)		\
 	HISI_PMU_ATTR(_name, hisi_format_sysfs_show, (void *)_config)
 #define HISI_PMU_EVENT_ATTR(_name, _config)		\
-	HISI_PMU_ATTR(_name, hisi_event_sysfs_show, (unsigned long)_config)
+	PMU_EVENT_ATTR_ID(_name, hisi_event_sysfs_show, _config)
 
 #define HISI_PMU_EVENT_ATTR_EXTRACTOR(name, config, hi, lo)        \
 	static inline u32 hisi_get_##name(struct perf_event *event)            \
