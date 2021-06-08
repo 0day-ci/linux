@@ -582,6 +582,7 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 {
 	static const struct ttm_place sys_mem = { .mem_type = TTM_PL_SYSTEM };
 	struct ttm_buffer_object *ghost;
+	struct ttm_resource *sys_res;
 	struct ttm_tt *ttm;
 	int ret;
 
@@ -602,6 +603,9 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 		return ttm_resource_alloc(bo, &sys_mem, &bo->resource);
 	}
 
+
+	ret = ttm_resource_alloc(bo, &sys_mem, &sys_res);
+
 	/*
 	 * We need an unpopulated ttm_tt after giving our current one,
 	 * if any, to the ghost object. And we can't afford to fail
@@ -615,13 +619,11 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	ret = ttm_tt_create(bo, true);
 	swap(bo->ttm, ttm);
 	if (ret)
-		return ret;
+		goto error_free_sys_mem;
 
 	ret = ttm_buffer_object_transfer(bo, &ghost);
-	if (ret) {
-		ttm_tt_destroy(bo->bdev, ttm);
-		return ret;
-	}
+	if (ret)
+		goto error_destroy_tt;
 
 	ret = dma_resv_copy_fences(&ghost->base._resv, bo->base.resv);
 	/* Last resort, wait for the BO to be idle when we are OOM */
@@ -631,6 +633,14 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	dma_resv_unlock(&ghost->base._resv);
 	ttm_bo_put(ghost);
 	bo->ttm = ttm;
+	bo->resource = NULL;
+	ttm_bo_assign_mem(bo, sys_mem);
+	return 0;
 
-	return ttm_resource_alloc(bo, &sys_mem, &bo->resource);
+error_destroy_tt:
+	ttm_tt_destroy(bo->bdev, ttm);
+
+error_free_sys_mem:
+	ttm_resource_free(bo, &sys_mem);
+	return ret;
 }
