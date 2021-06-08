@@ -16,6 +16,10 @@
 
 #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
 
+#define KVM_PSCI_FN_LAST	KVM_PSCI_FN(3)
+#define PSCI_0_2_FN_LAST	PSCI_0_2_FN(0x3f)
+#define PSCI_0_2_FN64_LAST	PSCI_0_2_FN64(0x3f)
+
 /*
  * We need the KVM pointer independently from the vcpu as we can call
  * this from HYP, and need to apply kern_hyp_va on it...
