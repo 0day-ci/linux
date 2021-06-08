@@ -2083,8 +2083,7 @@ static struct name_cache_entry *name_cache_search(struct send_ctx *sctx,
  */
 static void name_cache_used(struct send_ctx *sctx, struct name_cache_entry *nce)
 {
-	list_del(&nce->list);
-	list_add_tail(&nce->list, &sctx->name_cache_list);
+	list_move_tail(&nce->list, &sctx->name_cache_list);
 }
 
 /*
