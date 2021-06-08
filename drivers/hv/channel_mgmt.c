@@ -153,6 +153,12 @@ const struct vmbus_device vmbus_devs[] = {
 	  .allowed_in_isolated = false,
 	},
 
+	/* XStore Fastpath */
+	{ .dev_type = HV_XS_FASTPATH,
+	  HV_XS_FASTPATH_GUID,
+	  .perf_device = true,
+	},
+
 	/* Unknown GUID */
 	{ .dev_type = HV_UNKNOWN,
 	  .perf_device = false,

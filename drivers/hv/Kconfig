@@ -27,4 +27,15 @@ config HYPERV_BALLOON
 	help
 	  Select this option to enable Hyper-V Balloon driver.
 
+config HYPERV_XS_FASTPATH
+	tristate "Microsoft Azure XStore Fastpath driver"
+	depends on HYPERV && X86_64
+	help
+	  Select this option to enable Microsoft Azure XStore Fastpath driver.
+
+	  This driver supports accelerated Microsoft Azure XStore Blob access.
+	  To compile this driver as a module, choose M here. The module will be
+	  called hv_xs_fastpath.
+
+
 endmenu
