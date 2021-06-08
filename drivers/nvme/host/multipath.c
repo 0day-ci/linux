@@ -522,13 +522,11 @@ static int nvme_parse_ana_log(struct nvme_ctrl *ctrl, void *data,
 		nr_nsids = le32_to_cpu(desc->nnsids);
 		nsid_buf_size = nr_nsids * sizeof(__le32);
 
-		if (WARN_ON_ONCE(desc->grpid == 0))
+		if (WARN_ON_ONCE(desc->grpid == 0 ||
+			le32_to_cpu(desc->grpid) > ctrl->anagrpmax))
 			return -EINVAL;
-		if (WARN_ON_ONCE(le32_to_cpu(desc->grpid) > ctrl->anagrpmax))
-			return -EINVAL;
-		if (WARN_ON_ONCE(desc->state == 0))
-			return -EINVAL;
-		if (WARN_ON_ONCE(desc->state > NVME_ANA_CHANGE))
+		if (WARN_ON_ONCE(desc->state == 0 ||
+			desc->state > NVME_ANA_CHANGE))
 			return -EINVAL;
 
 		offset += sizeof(*desc);
