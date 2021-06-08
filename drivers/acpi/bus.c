@@ -430,6 +430,9 @@ out_free:
 
 /**
  * acpi_bus_notify
+ * @handle: Handle to acpi device.
+ * @type: ACPI device event type.
+ * @data: ACPI device data.
  * ---------------
  * Callback for all 'system-level' device notifications (values 0x00-0x7F).
  */
