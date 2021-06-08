@@ -346,11 +346,8 @@ static int al_pcie_probe(struct platform_device *pdev)
 	controller_res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						      "controller");
 	al_pcie->controller_base = devm_ioremap_resource(dev, controller_res);
-	if (IS_ERR(al_pcie->controller_base)) {
-		dev_err(dev, "couldn't remap controller base %pR\n",
-			controller_res);
+	if (IS_ERR(al_pcie->controller_base))
 		return PTR_ERR(al_pcie->controller_base);
-	}
 
 	dev_dbg(dev, "From DT: controller_base: %pR\n", controller_res);
 
