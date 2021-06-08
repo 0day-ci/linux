@@ -675,7 +675,6 @@ static void _aac_probe_container2(void * context, struct fib * fibptr)
 	callback = (int (*)(struct scsi_cmnd *))(scsicmd->SCp.ptr);
 	scsicmd->SCp.ptr = NULL;
 	(*callback)(scsicmd);
-	return;
 }
 
 static void _aac_probe_container1(void * context, struct fib * fibptr)
