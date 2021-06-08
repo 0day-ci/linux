@@ -533,8 +533,10 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
 
 	ret = -ENOMEM;
 	controller = spi_alloc_master(&pdev->dev, sizeof(*aus));
-	if (!controller)
-		goto at91_usart_spi_probe_fail;
+	if (!controller) {
+		dev_err(&pdev->dev, "Error allocating SPI controller\n");
+		return -ENOMEM;
+	}
 
 	ret = at91_usart_gpio_setup(pdev);
 	if (ret)
