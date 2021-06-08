@@ -5887,7 +5887,7 @@ static __init int test_ringbuffer(void)
 		}
 
 		kthread_bind(rb_threads[cpu], cpu);
- 		wake_up_process(rb_threads[cpu]);
+		wake_up_process(rb_threads[cpu]);
 	}
 
 	/* Now create the rb hammer! */
