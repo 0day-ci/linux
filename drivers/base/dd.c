@@ -516,12 +516,17 @@ static DEVICE_ATTR_RO(state_synced);
 enum {
 	/* Set on output if the -ERR has come from a probe() function */
 	PROBEF_DRV_FAILED = 1 << 0,
+	/*
+	 * Set on input to call driver_deferred_probe_add() if -EPROBE_DEFER
+	 * is returned
+	 */
+	PROBEF_SCHEDULE_DEFER = 1 << 1,
 };
 
 static int really_probe(struct device *dev, struct device_driver *drv,
 			unsigned int *flags)
 {
-	int ret = -EPROBE_DEFER;
+	int ret;
 	int local_trigger_count = atomic_read(&deferred_trigger_count);
 	bool test_remove = IS_ENABLED(CONFIG_DEBUG_TEST_DRIVER_REMOVE) &&
 			   !drv->suppress_bind_attrs;
@@ -533,15 +538,18 @@ static int really_probe(struct device *dev, struct device_driver *drv,
 		 * wait_for_device_probe() right after that to avoid any races.
 		 */
 		dev_dbg(dev, "Driver %s force probe deferral\n", drv->name);
-		driver_deferred_probe_add(dev);
-		return ret;
+		if (*flags & PROBEF_SCHEDULE_DEFER)
+			driver_deferred_probe_add(dev);
+		return -EPROBE_DEFER;
 	}
 
 	ret = device_links_check_suppliers(dev);
-	if (ret == -EPROBE_DEFER)
-		driver_deferred_probe_add_trigger(dev, local_trigger_count);
-	if (ret)
+	if (ret) {
+		if (ret == -EPROBE_DEFER && *flags & PROBEF_SCHEDULE_DEFER)
+			driver_deferred_probe_add_trigger(dev,
+							  local_trigger_count);
 		return ret;
+	}
 
 	atomic_inc(&probe_count);
 	pr_debug("bus: '%s': %s: probing driver %s with device %s\n",
@@ -664,7 +672,9 @@ pinctrl_bind_failed:
 	case -EPROBE_DEFER:
 		/* Driver requested deferred probing */
 		dev_dbg(dev, "Driver %s requests probe deferral\n", drv->name);
-		driver_deferred_probe_add_trigger(dev, local_trigger_count);
+		if (*flags & PROBEF_SCHEDULE_DEFER)
+			driver_deferred_probe_add_trigger(dev,
+							  local_trigger_count);
 		break;
 	case -ENODEV:
 	case -ENXIO:
@@ -853,7 +863,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
 	struct device_attach_data *data = _data;
 	struct device *dev = data->dev;
 	bool async_allowed;
-	int flags = 0;
+	int flags = PROBEF_SCHEDULE_DEFER;
 	int ret;
 
 	ret = driver_match_device(drv, dev);
@@ -1043,7 +1053,9 @@ static void __device_driver_unlock(struct device *dev, struct device *parent)
  * @dev: Device to attach it to
  *
  * Manually attach driver to a device. Will acquire both @dev lock and
- * @dev->parent lock if needed. Returns 0 on success, -ERR on failure.
+ * @dev->parent lock if needed. Returns 0 on success, -ERR on failure. If
+ * EPROBE_DEFER is returned from probe() then no background probe is scheduled
+ * and -EAGAIN will be returned.
  */
 int device_driver_attach(struct device_driver *drv, struct device *dev)
 {
@@ -1061,6 +1073,8 @@ int device_driver_attach(struct device_driver *drv, struct device *dev)
 
 	__device_driver_unlock(dev, dev->parent);
 
+	if (ret == -EPROBE_DEFER)
+		return -EAGAIN;
 	return ret;
 }
 
@@ -1068,7 +1082,7 @@ static void __driver_attach_async_helper(void *_dev, async_cookie_t cookie)
 {
 	struct device *dev = _dev;
 	struct device_driver *drv;
-	unsigned int flags = 0;
+	unsigned int flags = PROBEF_SCHEDULE_DEFER;
 	int ret;
 
 	__device_driver_lock(dev, dev->parent);
@@ -1083,6 +1097,7 @@ static void __driver_attach_async_helper(void *_dev, async_cookie_t cookie)
 
 static int __driver_attach(struct device *dev, void *data)
 {
+	unsigned int flags = PROBEF_SCHEDULE_DEFER;
 	struct device_driver *drv = data;
 	int ret;
 
@@ -1128,7 +1143,9 @@ static int __driver_attach(struct device *dev, void *data)
 		return 0;
 	}
 
-	device_driver_attach(drv, dev);
+	__device_driver_lock(dev, dev->parent);
+	driver_probe_device(drv, dev, &flags);
+	__device_driver_unlock(dev, dev->parent);
 
 	return 0;
 }
