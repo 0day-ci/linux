@@ -15,10 +15,15 @@
 
 struct nvmem_device;
 struct nvmem_cell_info;
+struct nvmem_cell_table;
+struct nvmem_parser_data;
+
 typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
 				void *val, size_t bytes);
 typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
 				 void *val, size_t bytes);
+typedef int (*nvmem_parse_t)(struct nvmem_device *nvmem,
+			     struct nvmem_parser_data *data);
 
 enum nvmem_type {
 	NVMEM_TYPE_UNKNOWN = 0,
@@ -117,6 +122,19 @@ struct nvmem_cell_table {
 	struct list_head	node;
 };
 
+struct nvmem_parser_config {
+	const char	*name;
+	nvmem_parse_t	cells_parse;
+	struct module	*owner;
+};
+
+struct nvmem_parser_data {
+	struct nvmem_cell_table		table;
+	struct nvmem_cell_lookup	*lookup;
+	int				nlookups;
+	struct nvmem_parser		*parser;
+};
+
 #if IS_ENABLED(CONFIG_NVMEM)
 
 struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
@@ -129,6 +147,11 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem);
 
 void nvmem_add_cell_table(struct nvmem_cell_table *table);
 void nvmem_del_cell_table(struct nvmem_cell_table *table);
+
+struct nvmem_parser *
+nvmem_parser_register(const struct nvmem_parser_config *config);
+
+void nvmem_parser_unregister(struct nvmem_parser *parser);
 
 #else
 
@@ -153,6 +176,14 @@ devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
 
 static inline void nvmem_add_cell_table(struct nvmem_cell_table *table) {}
 static inline void nvmem_del_cell_table(struct nvmem_cell_table *table) {}
+
+static inline struct nvmem_parser *
+nvmem_parser_register(const struct nvmem_parser_config *config)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void nvmem_parser_unregister(struct nvmem_parser *parser) {}
 
 #endif /* CONFIG_NVMEM */
 #endif  /* ifndef _LINUX_NVMEM_PROVIDER_H */

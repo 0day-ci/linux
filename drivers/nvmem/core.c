@@ -39,6 +39,7 @@ struct nvmem_device {
 	nvmem_reg_read_t	reg_read;
 	nvmem_reg_write_t	reg_write;
 	struct gpio_desc	*wp_gpio;
+	struct nvmem_parser_data *parser_data;
 	void *priv;
 };
 
@@ -57,6 +58,13 @@ struct nvmem_cell {
 	struct list_head	node;
 };
 
+struct nvmem_parser {
+	struct list_head	head;
+	nvmem_parse_t		cells_parse;
+	const char		*name;
+	struct module		*owner;
+};
+
 static DEFINE_MUTEX(nvmem_mutex);
 static DEFINE_IDA(nvmem_ida);
 
@@ -65,6 +73,9 @@ static LIST_HEAD(nvmem_cell_tables);
 
 static DEFINE_MUTEX(nvmem_lookup_mutex);
 static LIST_HEAD(nvmem_lookup_list);
+
+static DEFINE_MUTEX(nvmem_parser_mutex);
+static LIST_HEAD(nvmem_parser_list);
 
 static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
 
@@ -418,6 +429,118 @@ static struct bus_type nvmem_bus_type = {
 	.name		= "nvmem",
 };
 
+static struct nvmem_parser *__nvmem_parser_get(const char *name)
+{
+	struct nvmem_parser *tmp, *parser = NULL;
+
+	list_for_each_entry(tmp, &nvmem_parser_list, head) {
+		if (strcmp(name, tmp->name) == 0) {
+			parser = tmp;
+			break;
+		}
+	}
+
+	if (!parser)
+		return ERR_PTR(-EPROBE_DEFER);
+
+	if (!try_module_get(parser->owner)) {
+		pr_err("could not increase module refcount for parser %s\n",
+		       parser->name);
+		return ERR_PTR(-EINVAL);
+
+	}
+
+	return parser;
+}
+
+static void nvmem_parser_put(const struct nvmem_parser *parser)
+{
+	module_put(parser->owner);
+}
+
+static int nvmem_parser_bind(struct nvmem_device *nvmem, const char *name)
+{
+	struct nvmem_parser_data *data;
+	struct nvmem_parser *parser;
+	int err;
+
+	mutex_lock(&nvmem_parser_mutex);
+
+	parser = __nvmem_parser_get(name);
+	err = PTR_ERR_OR_ZERO(parser);
+	if (!err) {
+		data = kzalloc(sizeof(*data), GFP_KERNEL);
+		if (data) {
+			data->parser = parser;
+			nvmem->parser_data = data;
+		} else {
+			nvmem_parser_put(parser);
+			err = -ENOMEM;
+		}
+	}
+
+	mutex_unlock(&nvmem_parser_mutex);
+
+	return err;
+}
+
+static void nvmem_parser_unbind(const struct nvmem_device *nvmem)
+{
+	struct nvmem_parser_data *data = nvmem->parser_data;
+
+	if (data->table.cells) {
+		nvmem_del_cell_table(&data->table);
+		kfree(data->table.cells);
+	}
+	if (data->lookup) {
+		nvmem_del_cell_lookups(data->lookup, data->nlookups);
+		kfree(data->lookup);
+	}
+
+	nvmem_parser_put(data->parser);
+}
+
+static void nvmem_parser_data_register(struct nvmem_device *nvmem,
+				       struct nvmem_parser_data *data)
+{
+	if (data->table.cells) {
+		if (!data->table.nvmem_name)
+			data->table.nvmem_name = nvmem_dev_name(nvmem);
+
+		nvmem_add_cell_table(&data->table);
+	}
+
+	if (data->lookup) {
+		struct nvmem_cell_lookup *lookup = &data->lookup[0];
+		int i = 0;
+
+		for (i = 0; i < data->nlookups; i++, lookup++) {
+			if (!lookup->nvmem_name)
+				lookup->nvmem_name = nvmem_dev_name(nvmem);
+
+			if (!lookup->dev_id)
+				lookup->dev_id = data->parser->name;
+		}
+
+		nvmem_add_cell_lookups(data->lookup, data->nlookups);
+	}
+}
+
+static void nvmem_cells_parse(struct nvmem_device *nvmem)
+{
+	struct nvmem_parser_data *data = nvmem->parser_data;
+	struct nvmem_parser *parser = data->parser;
+	int err;
+
+	mutex_lock(&nvmem_parser_mutex);
+
+	err = parser->cells_parse(nvmem, data);
+	if (!err)
+		nvmem_parser_data_register(nvmem, data);
+
+	mutex_unlock(&nvmem_parser_mutex);
+}
+
 static void nvmem_cell_drop(struct nvmem_cell *cell)
 {
 	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
@@ -435,6 +558,9 @@ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
 
 	list_for_each_entry_safe(cell, p, &nvmem->cells, node)
 		nvmem_cell_drop(cell);
+
+	if (nvmem->parser_data)
+		nvmem_parser_unbind(nvmem);
 }
 
 static void nvmem_cell_add(struct nvmem_cell *cell)
@@ -739,6 +865,7 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 {
 	struct nvmem_device *nvmem;
+	const char *parser_name;
 	int rval;
 
 	if (!config->dev)
@@ -809,6 +936,16 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 	nvmem->read_only = device_property_present(config->dev, "read-only") ||
 			   config->read_only || !nvmem->reg_write;
 
+	if (!device_property_read_string(config->dev, "nvmem-cell-parser-name",
+					 &parser_name)) {
+		rval = nvmem_parser_bind(nvmem, parser_name);
+		if (rval) {
+			ida_free(&nvmem_ida, nvmem->id);
+			kfree(nvmem);
+			return ERR_PTR(rval);
+		}
+	}
+
 #ifdef CONFIG_NVMEM_SYSFS
 	nvmem->dev.groups = nvmem_dev_groups;
 #endif
@@ -837,6 +974,9 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 			goto err_teardown_compat;
 	}
 
+	if (nvmem->parser_data)
+		nvmem_cells_parse(nvmem);
+
 	rval = nvmem_add_cells_from_table(nvmem);
 	if (rval)
 		goto err_remove_cells;
@@ -857,6 +997,8 @@ err_teardown_compat:
 err_device_del:
 	device_del(&nvmem->dev);
 err_put_device:
+	if (nvmem->parser_data)
+		nvmem_parser_unbind(nvmem);
 	put_device(&nvmem->dev);
 
 	return ERR_PTR(rval);
@@ -1890,6 +2032,42 @@ const char *nvmem_dev_name(struct nvmem_device *nvmem)
 	return dev_name(&nvmem->dev);
 }
 EXPORT_SYMBOL_GPL(nvmem_dev_name);
+
+struct nvmem_parser *
+nvmem_parser_register(const struct nvmem_parser_config *config)
+{
+	struct nvmem_parser *parser;
+
+	if (!config->cells_parse)
+		return ERR_PTR(-EINVAL);
+
+	if (!config->name)
+		return ERR_PTR(-EINVAL);
+
+	parser = kzalloc(sizeof(*parser), GFP_KERNEL);
+	if (!parser)
+		return ERR_PTR(-ENOMEM);
+
+	parser->cells_parse = config->cells_parse;
+	parser->owner = config->owner;
+	parser->name = config->name;
+
+	mutex_lock(&nvmem_parser_mutex);
+	list_add(&parser->head, &nvmem_parser_list);
+	mutex_unlock(&nvmem_parser_mutex);
+
+	return parser;
+}
+EXPORT_SYMBOL(nvmem_parser_register);
+
+void nvmem_parser_unregister(struct nvmem_parser *parser)
+{
+	mutex_lock(&nvmem_parser_mutex);
+	list_del(&parser->head);
+	kfree(parser);
+	mutex_unlock(&nvmem_parser_mutex);
+}
+EXPORT_SYMBOL(nvmem_parser_unregister);
 
 static int __init nvmem_init(void)
 {
