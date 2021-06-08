@@ -2402,6 +2402,8 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		return NULL;
 	}
 
+	pci_set_acpi_fwnode(dev);
+
 	return dev;
 }
 
