@@ -2040,14 +2040,11 @@ static int s10_edac_dberr_handler(struct notifier_block *this,
 		    &dberror);
 	regmap_write(edac->ecc_mgr_map, S10_SYSMGR_UE_VAL_OFST, dberror);
 	if (dberror & S10_DBE_IRQ_MASK) {
-		struct list_head *position;
 		struct altr_edac_device_dev *ed;
 		struct arm_smccc_res result;
 
 		/* Find the matching DBE in the list of devices */
-		list_for_each(position, &edac->a10_ecc_devices) {
-			ed = list_entry(position, struct altr_edac_device_dev,
-					next);
+		list_for_each_entry(ed, &edac->a10_ecc_devices, next) {
 			if (!(BIT(ed->db_irq) & dberror))
 				continue;
 
