@@ -183,6 +183,7 @@ struct venus_core {
 	struct completion done;
 	unsigned int error;
 	unsigned long sys_error;
+	wait_queue_head_t sys_err_done;
 	const struct hfi_core_ops *core_ops;
 	const struct venus_pm_ops *pm_ops;
 	struct mutex pm_lock;
@@ -333,6 +334,7 @@ enum venus_inst_modes {
  * @registeredbufs:	a list of registered capture bufferes
  * @delayed_process:	a list of delayed buffers
  * @delayed_process_work:	a work_struct for process delayed buffers
+ * @nonblock:		nonblocking flag
  * @ctrl_handler:	v4l control handler
  * @controls:	a union of decoder and encoder control parameters
  * @fh:	 a holder of v4l file handle structure
@@ -396,6 +398,7 @@ struct venus_inst {
 	struct list_head registeredbufs;
 	struct list_head delayed_process;
 	struct work_struct delayed_process_work;
+	bool nonblock;
 
 	struct v4l2_ctrl_handler ctrl_handler;
 	union {
