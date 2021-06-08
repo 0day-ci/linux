@@ -789,6 +789,12 @@ struct drm_connector_state {
 	u8 active_bpc;
 
 	/**
+	 * active_color_format: Read only property set by the GPU driver to the
+	 * actually used color format after evaluating all hardware limitations.
+	 */
+	u32 active_color_format;
+
+	/**
 	 * @hdr_output_metadata:
 	 * DRM blob property for HDR output metadata
 	 */
@@ -1393,6 +1399,12 @@ struct drm_connector {
 	 */
 	struct drm_property *active_bpc_property;
 
+	/**
+	 * @active_color_format_property: Default connector property for the
+	 * active color format to be driven out of the connector.
+	 */
+	struct drm_property *active_color_format_property;
+
 #define DRM_CONNECTOR_POLL_HPD (1 << 0)
 #define DRM_CONNECTOR_POLL_CONNECT (1 << 1)
 #define DRM_CONNECTOR_POLL_DISCONNECT (1 << 2)
@@ -1713,6 +1725,7 @@ int drm_connector_attach_max_bpc_property(struct drm_connector *connector,
 					  int min, int max);
 int drm_connector_attach_active_bpc_property(struct drm_connector *connector,
 					  int min, int max);
+int drm_connector_attach_active_color_format_property(struct drm_connector *connector);
 
 /**
  * struct drm_tile_group - Tile group metadata
