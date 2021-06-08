@@ -301,11 +301,12 @@ void rtl88eu_dm_txpower_track_adjust(struct odm_dm_struct *dm_odm, u8 type,
 				     u8 *direction, u32 *out_write_val)
 {
 	u8 pwr_value = 0;
+	struct net_device *pnetdev = dm_odm->Adapter->pnetdev;
+
 	/*  Tx power tracking BB swing table. */
 	if (type == 0) { /* For OFDM adjust */
-		ODM_RT_TRACE(dm_odm, ODM_COMP_TX_PWR_TRACK, ODM_DBG_LOUD,
-			     ("BbSwingIdxOfdm = %d BbSwingFlagOfdm=%d\n",
-			     dm_odm->BbSwingIdxOfdm, dm_odm->BbSwingFlagOfdm));
+		netdev_dbg(pnetdev, "%s(): BbSwingIdxOfdm = %d BbSwingFlagOfdm = %d\n",
+			   __func__, dm_odm->BbSwingIdxOfdm, dm_odm->BbSwingFlagOfdm);
 
 		if (dm_odm->BbSwingIdxOfdm <= dm_odm->BbSwingIdxOfdmBase) {
 			*direction = 1;
@@ -318,9 +319,8 @@ void rtl88eu_dm_txpower_track_adjust(struct odm_dm_struct *dm_odm, u8 type,
 		}
 
 	} else if (type == 1) { /* For CCK adjust. */
-		ODM_RT_TRACE(dm_odm, ODM_COMP_TX_PWR_TRACK, ODM_DBG_LOUD,
-			     ("dm_odm->BbSwingIdxCck = %d dm_odm->BbSwingIdxCckBase = %d\n",
-			     dm_odm->BbSwingIdxCck, dm_odm->BbSwingIdxCckBase));
+		netdev_dbg(pnetdev, "%s(): BbSwingIdxCck = %d BbSwingIdxCckBase = %d\n",
+			   __func__, dm_odm->BbSwingIdxCck, dm_odm->BbSwingIdxCckBase);
 
 		if (dm_odm->BbSwingIdxCck <= dm_odm->BbSwingIdxCckBase) {
 			*direction = 1;
