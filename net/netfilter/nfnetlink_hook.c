@@ -61,6 +61,7 @@ static int nfnl_hook_put_nft_chain_info(struct sk_buff *nlskb,
 					unsigned int seq,
 					const struct nf_hook_ops *ops)
 {
+#if IS_ENABLED(CONFIG_NF_TABLES)
 	struct net *net = sock_net(nlskb->sk);
 	struct nlattr *nest, *nest2;
 	struct nft_chain *chain;
@@ -104,6 +105,9 @@ static int nfnl_hook_put_nft_chain_info(struct sk_buff *nlskb,
 cancel_nest:
 	nla_nest_cancel(nlskb, nest);
 	return -EMSGSIZE;
+#else
+	return 0;
+#endif
 }
 
 static int nfnl_hook_dump_one(struct sk_buff *nlskb,
