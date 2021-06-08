@@ -6525,6 +6525,23 @@ static int convert_dc_color_depth_into_bpc (enum dc_color_depth display_color_de
 	return 0;
 }
 
+static int convert_dc_pixel_encoding_into_drm_color_format(enum dc_pixel_encoding display_pixel_encoding)
+{
+	switch (display_pixel_encoding) {
+		case PIXEL_ENCODING_RGB:
+			return DRM_COLOR_FORMAT_RGB444;
+		case PIXEL_ENCODING_YCBCR422:
+			return DRM_COLOR_FORMAT_YCRCB422;
+		case PIXEL_ENCODING_YCBCR444:
+			return DRM_COLOR_FORMAT_YCRCB444;
+		case PIXEL_ENCODING_YCBCR420:
+			return DRM_COLOR_FORMAT_YCRCB420;
+		default:
+			break;
+		}
+	return 0;
+}
+
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
 					  struct drm_connector_state *conn_state)
@@ -7522,6 +7539,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	if (!aconnector->mst_port) {
 		drm_connector_attach_max_bpc_property(&aconnector->base, 8, 16);
 		drm_connector_attach_active_bpc_property(&aconnector->base, 8, 16);
+		drm_connector_attach_active_color_format_property(&aconnector->base);
 	}
 
 	/* This defaults to the max in the range, but we want 8bpc for non-edp. */
@@ -8898,12 +8916,17 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		if (crtc) {
 			new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
 			dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
-			if (dm_new_crtc_state->stream)
+			if (dm_new_crtc_state->stream) {
 				new_con_state->active_bpc = convert_dc_color_depth_into_bpc(
 					dm_new_crtc_state->stream->timing.display_color_depth);
+				new_con_state->active_color_format = convert_dc_pixel_encoding_into_drm_color_format(
+					dm_new_crtc_state->stream->timing.pixel_encoding);
+			}
 		}
-		else
+		else {
 			new_con_state->active_bpc = 0;
+			new_con_state->active_color_format = 0;
+		}
 	}
 
 	/* Count number of newly disabled CRTCs for dropping PM refs later. */

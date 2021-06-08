@@ -400,6 +400,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	if (connector->max_bpc_property) {
 		drm_connector_attach_max_bpc_property(connector, 8, 16);
 		drm_connector_attach_active_bpc_property(&aconnector->base, 8, 16);
+		drm_connector_attach_active_color_format_property(&aconnector->base);
 	}
 
 	connector->vrr_capable_property = master->base.vrr_capable_property;
