@@ -1272,6 +1272,42 @@ int btintel_set_debug_features(struct hci_dev *hdev,
 }
 EXPORT_SYMBOL_GPL(btintel_set_debug_features);
 
+int btintel_get_data_path(struct hci_dev *hdev)
+{
+	return 1;
+}
+EXPORT_SYMBOL_GPL(btintel_get_data_path);
+
+int btintel_read_offload_usecases(struct hci_dev *hdev,
+				  struct intel_offload_usecases *usecases)
+{
+	struct sk_buff *skb;
+	int err = 0;
+
+	skb = __hci_cmd_sync(hdev, 0xfc86, 0, NULL, HCI_INIT_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Reading offload usecases failed (%ld)",
+			   PTR_ERR(skb));
+		return PTR_ERR(skb);
+	}
+
+	if (skb->len < sizeof(*usecases)) {
+		err = -EIO;
+		goto error;
+	}
+
+	if (skb->data[0]) {
+		err = -bt_to_errno(skb->data[0]);
+		goto error;
+	}
+
+	memcpy(usecases, skb->data, sizeof(*usecases));
+error:
+	kfree_skb(skb);
+	return err;
+}
+EXPORT_SYMBOL_GPL(btintel_read_offload_usecases);
+
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth support for Intel devices ver " VERSION);
 MODULE_VERSION(VERSION);

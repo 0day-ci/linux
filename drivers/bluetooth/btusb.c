@@ -2952,6 +2952,7 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 	int err;
 	struct intel_debug_features features;
 	struct intel_version_tlv version;
+	struct intel_offload_usecases usecases;
 
 	bt_dev_dbg(hdev, "");
 
@@ -3007,6 +3008,13 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 
 	/* Set DDC mask for available debug features */
 	btintel_set_debug_features(hdev, &features);
+
+	err = btintel_read_offload_usecases(hdev, &usecases);
+	if (!err) {
+		/* set get_data_path callback if offload is supported */
+		if (usecases.preset[0] & 0x03)
+			hdev->get_data_path = btintel_get_data_path;
+	}
 
 	/* Read the Intel version information after loading the FW  */
 	err = btintel_read_version_tlv(hdev, &version);
