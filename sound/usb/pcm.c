@@ -197,6 +197,10 @@ int snd_usb_init_pitch(struct snd_usb_audio *chip,
 	if (!(fmt->attributes & UAC_EP_CS_ATTR_PITCH_CONTROL))
 		return 0;
 
+	/* Denon DN-X1600 doesn't properly handle this, bail out too */
+	if (chip->usb_id == USB_ID(0x154e, 0x500e))
+		return 0;
+
 	usb_audio_dbg(chip, "enable PITCH for EP 0x%x\n", fmt->endpoint);
 
 	switch (fmt->protocol) {
