@@ -26,6 +26,20 @@
 
 static void init_vp_index(struct vmbus_channel *channel);
 
+/*
+ * Hyper-v presents FlexIOV devices on the PCIE.
+ * Those devices have no real PCI implementation in Hyper-V, and should be
+ * ignored and not presented to the PCI layer.
+ */
+static const guid_t vpci_ignore_instances[] = {
+	/*
+	 * XStore Fastpath instance ID in VPCI introduced by FlexIOV
+	 * {d4573da2-2caa-4711-a8f9-bbabf4ee9685}
+	 */
+	GUID_INIT(0xd4573da2, 0x2caa, 0x4711, 0xa8, 0xf9,
+		0xbb, 0xab, 0xf4, 0xee, 0x96, 0x85),
+};
+
 const struct vmbus_device vmbus_devs[] = {
 	/* IDE */
 	{ .dev_type = HV_IDE,
@@ -485,6 +499,16 @@ void vmbus_free_channels(void)
 
 		vmbus_device_unregister(channel->device_obj);
 	}
+}
+
+static bool ignore_pcie_device(guid_t *if_instance)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(vpci_ignore_instances); i++)
+		if (guid_equal(&vpci_ignore_instances[i], if_instance))
+			return true;
+	return false;
 }
 
 /* Note: the function can run concurrently for primary/sub channels. */
@@ -958,6 +982,17 @@ static bool vmbus_is_valid_device(const guid_t *guid)
 	return false;
 }
 
+static bool is_pcie_offer(struct vmbus_channel_offer_channel *offer)
+{
+	int i;
+
+	for (i = HV_IDE; i < HV_UNKNOWN; i++)
+		if (guid_equal(&offer->offer.if_type, &vmbus_devs[i].guid))
+			break;
+
+	return i == HV_PCIE;
+}
+
 /*
  * vmbus_onoffer - Handler for channel offers from vmbus in parent partition.
  *
@@ -1048,6 +1083,14 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 		check_ready_for_resume_event();
 
 		mutex_unlock(&vmbus_connection.channel_mutex);
+		return;
+	}
+
+	/* Check to see if we should ignore this PCIe channel */
+	if (is_pcie_offer(offer) &&
+	    ignore_pcie_device(&offer->offer.if_instance)) {
+		pr_info("Ignore instance %pUl over VPCI\n",
+			&offer->offer.if_instance);
 		return;
 	}
 
