@@ -1821,6 +1821,11 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb,
 	if (rtnl_fill_prop_list(skb, dev))
 		goto nla_put_failure;
 
+	if (dev->dev.parent &&
+	    nla_put_string(skb, IFLA_PARENT_DEV_NAME,
+			   dev_name(dev->dev.parent)))
+		goto nla_put_failure;
+
 	nlmsg_end(skb, nlh);
 	return 0;
 
