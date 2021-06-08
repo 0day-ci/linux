@@ -39,6 +39,11 @@ properties:
       when it's driven low (logical '0') to allow writing.
     maxItems: 1
 
+  nvmem-cells-parser-name:
+    description:
+      Name of the registered parser to parse and register the cells.
+    maxItems: 1
+
 patternProperties:
   "^.*@[0-9a-f]+$":
     type: object
