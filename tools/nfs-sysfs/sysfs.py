@@ -16,3 +16,13 @@ SUNRPC = pathlib.Path(MOUNT) / "kernel" / "sunrpc"
 if not SUNRPC.is_dir():
     print("ERROR: sysfs does not have sunrpc directory")
     sys.exit(1)
+
+
+def read_info_file(path):
+    res = dict()
+    with open(path) as info:
+        for line in info:
+            if "=" in line:
+                (key, val) = line.strip().split("=")
+                res[key] = int(val)
+    return res
