@@ -31,27 +31,6 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
 	return 0;
 }
 
-static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-{
-	/*
-	 * NOTE: For simplicity, we make VCPU suspend emulation to be
-	 * same-as WFI (Wait-for-interrupt) emulation.
-	 *
-	 * This means for KVM the wakeup events are interrupts and
-	 * this is consistent with intended use of StateID as described
-	 * in section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
-	 *
-	 * Further, we also treat power-down request to be same as
-	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
-	 * specification (ARM DEN 0022A). This means all suspend states
-	 * for KVM will preserve the register state.
-	 */
-	kvm_vcpu_block(vcpu);
-	kvm_clear_request(KVM_REQ_UNHALT, vcpu);
-
-	return PSCI_RET_SUCCESS;
-}
-
 static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
 {
 	struct vcpu_reset_state *reset_state;
@@ -227,7 +206,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
 		break;
 	case PSCI_0_2_FN_CPU_SUSPEND:
 	case PSCI_0_2_FN64_CPU_SUSPEND:
-		val = kvm_psci_vcpu_suspend(vcpu);
+		/*
+		 * NOTE: For simplicity, we make VCPU suspend emulation to be
+		 * same-as WFI (Wait-for-interrupt) emulation.
+		 *
+		 * This means for KVM the wakeup events are interrupts and this
+		 * is consistent with intended use of StateID as described in
+		 * section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
+		 *
+		 * Further, we also treat power-down request to be same as
+		 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
+		 * specification (ARM DEN 0022A). This means all suspend states
+		 * for KVM will preserve the register state.
+		 */
+		kvm_arm_vcpu_suspend(vcpu);
+		val = PSCI_RET_SUCCESS;
 		break;
 	case PSCI_0_2_FN_CPU_OFF:
 		kvm_arm_vcpu_power_off(vcpu);

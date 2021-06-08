@@ -447,6 +447,12 @@ bool kvm_arm_vcpu_is_off(struct kvm_vcpu *vcpu)
 	return vcpu->arch.mp_state == KVM_MP_STATE_STOPPED;
 }
 
+void kvm_arm_vcpu_suspend(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.mp_state = KVM_MP_STATE_HALTED;
+	kvm_make_request(KVM_REQ_SUSPEND, vcpu);
+}
+
 int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
 				    struct kvm_mp_state *mp_state)
 {
@@ -667,6 +673,8 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
 
 static void check_vcpu_requests(struct kvm_vcpu *vcpu)
 {
+	bool irq_pending;
+
 	if (kvm_request_pending(vcpu)) {
 		if (kvm_check_request(KVM_REQ_SLEEP, vcpu))
 			vcpu_req_sleep(vcpu);
@@ -678,7 +686,7 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
 		 * Clear IRQ_PENDING requests that were made to guarantee
 		 * that a VCPU sees new virtual interrupts.
 		 */
-		kvm_check_request(KVM_REQ_IRQ_PENDING, vcpu);
+		irq_pending = kvm_check_request(KVM_REQ_IRQ_PENDING, vcpu);
 
 		if (kvm_check_request(KVM_REQ_RECORD_STEAL, vcpu))
 			kvm_update_stolen_time(vcpu);
@@ -689,6 +697,14 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
 			vgic_v4_put(vcpu, false);
 			vgic_v4_load(vcpu);
 			preempt_enable();
+		}
+
+		if (kvm_check_request(KVM_REQ_SUSPEND, vcpu)) {
+			if (!irq_pending) {
+				kvm_vcpu_block(vcpu);
+				kvm_clear_request(KVM_REQ_UNHALT, vcpu);
+			}
+			vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
 		}
 	}
 }
