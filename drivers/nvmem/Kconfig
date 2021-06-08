@@ -288,4 +288,13 @@ config NVMEM_BRCM_NVRAM
 	  This driver provides support for Broadcom's NVRAM that can be accessed
 	  using I/O mapping.
 
+config NVMEM_ONIE_TLV_CELLS
+	tristate "ONIE TLV cells support"
+	help
+	  This is a driver to provide cells from ONIE TLV structure stored
+	  on NVME device.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called nvmem-onie-tlv-cells.
+
 endif
