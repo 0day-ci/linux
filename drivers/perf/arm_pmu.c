@@ -502,9 +502,9 @@ static int armpmu_event_init(struct perf_event *event)
 	/*
 	 * Reject CPU-affine events for CPUs that are of a different class to
 	 * that which this PMU handles. Process-following events (where
-	 * event->cpu == -1) can be migrated between CPUs, and thus we have to
-	 * reject them later (in armpmu_add) if they're scheduled on a
-	 * different class of CPU.
+	 * event->cpu == -1) can be migrated between CPUs, and thus we will
+	 * reject them when map_event() detects absent entry at below or later
+	 * (in armpmu_add) if they're scheduled on a different class of CPU.
 	 */
 	if (event->cpu != -1 &&
 		!cpumask_test_cpu(event->cpu, &armpmu->supported_cpus))
@@ -514,8 +514,16 @@ static int armpmu_event_init(struct perf_event *event)
 	if (has_branch_stack(event))
 		return -EOPNOTSUPP;
 
-	if (armpmu->map_event(event) == -ENOENT)
+	if (armpmu->map_event(event) == -ENOENT) {
+		/*
+		 * Process-following event is not supported on current PMU,
+		 * returns -EOPNOTSUPP to stop perf at the initialization
+		 * phase.
+		 */
+		if (event->cpu == -1)
+			return -EOPNOTSUPP;
 		return -ENOENT;
+	}
 
 	return __hw_perf_event_init(event);
 }
