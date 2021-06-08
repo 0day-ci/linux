@@ -327,7 +327,8 @@ static void nft_exthdr_sctp_eval(const struct nft_expr *expr,
 				break;
 
 			dest[priv->len / NFT_REG32_SIZE] = 0;
-			memcpy(dest, (char *)sch + priv->offset, priv->len);
+			skb_copy_bits(pkt->skb, offset + priv->offset,
+				      dest, priv->len);
 			return;
 		}
 		offset += SCTP_PAD4(ntohs(sch->length));
