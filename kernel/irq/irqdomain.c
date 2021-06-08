@@ -1449,7 +1449,7 @@ int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
 			goto out_free_irq_data;
 		}
 	}
-	
+
 	for (i = 0; i < nr_irqs; i++)
 		irq_domain_insert_irq(virq + i);
 	mutex_unlock(&irq_domain_mutex);
