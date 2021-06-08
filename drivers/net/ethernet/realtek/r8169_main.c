@@ -4914,6 +4914,19 @@ static const struct dev_pm_ops rtl8169_pm_ops = {
 
 #endif /* CONFIG_PM */
 
+static int rtl_phy_poll_quirk(struct rtl8169_private *tp)
+{
+	struct pci_dev *pdev = tp->pci_dev;
+
+	if (!pcie_aspm_enabled(pdev))
+		return 0;
+
+	if (tp->mac_version == RTL_GIGA_MAC_VER_39)
+		return 1;
+
+	return 0;
+}
+
 static void rtl_wol_shutdown_quirk(struct rtl8169_private *tp)
 {
 	/* WoL fails with 8168b when the receiver is disabled. */
@@ -4991,7 +5004,10 @@ static const struct net_device_ops rtl_netdev_ops = {
 
 static void rtl_set_irq_mask(struct rtl8169_private *tp)
 {
-	tp->irq_mask = RxOK | RxErr | TxOK | TxErr | LinkChg;
+	tp->irq_mask = RxOK | RxErr | TxOK | TxErr;
+
+	if (!rtl_phy_poll_quirk(tp))
+		tp->irq_mask |= LinkChg;
 
 	if (tp->mac_version <= RTL_GIGA_MAC_VER_06)
 		tp->irq_mask |= SYSErr | RxOverflow | RxFIFOOver;
@@ -5085,7 +5101,8 @@ static int r8169_mdio_register(struct rtl8169_private *tp)
 	new_bus->name = "r8169";
 	new_bus->priv = tp;
 	new_bus->parent = &pdev->dev;
-	new_bus->irq[0] = PHY_MAC_INTERRUPT;
+	new_bus->irq[0] =
+		(rtl_phy_poll_quirk(tp) ? PHY_POLL : PHY_MAC_INTERRUPT);
 	snprintf(new_bus->id, MII_BUS_ID_SIZE, "r8169-%x", pci_dev_id(pdev));
 
 	new_bus->read = r8169_mdio_read_reg;
