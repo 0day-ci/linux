@@ -1195,6 +1195,14 @@ static const struct drm_prop_enum_list dp_colorspaces[] = {
  *	drm_connector_attach_max_bpc_property() to create and attach the
  *	property to the connector during initialization.
  *
+ * active bpc:
+ *	This read-only range property tells userspace the pixel color bit depth
+ *	actually used by the hardware display engine on "the cable" on a
+ *	connector. The chosen value depends on hardware capabilities, both
+ *	display engine and connected monitor, and the "max bpc" property.
+ *	Drivers shall use drm_connector_attach_active_bpc_property() to install
+ *	this property.
+ *
  * Connectors also have one standardized atomic property:
  *
  * CRTC_ID:
@@ -2149,6 +2157,39 @@ int drm_connector_attach_max_bpc_property(struct drm_connector *connector,
 	return 0;
 }
 EXPORT_SYMBOL(drm_connector_attach_max_bpc_property);
+
+/**
+ * drm_connector_attach_active_bpc_property - attach "active bpc" property
+ * @connector: connector to attach active bpc property on.
+ * @min: The minimum bit depth supported by the connector.
+ * @max: The maximum bit depth supported by the connector.
+ *
+ * This is used to check the applied bit depth on a connector.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_connector_attach_active_bpc_property(struct drm_connector *connector,
+					  int min, int max)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	prop = connector->active_bpc_property;
+	if (!prop) {
+		prop = drm_property_create_range(dev, 0, "active bpc", min, max);
+		if (!prop)
+			return -ENOMEM;
+
+		connector->active_bpc_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base, prop, 0);
+	connector->state->active_bpc = 0;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_connector_attach_active_bpc_property);
 
 /**
  * drm_connector_set_vrr_capable_property - sets the variable refresh rate
