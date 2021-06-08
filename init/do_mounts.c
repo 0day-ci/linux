@@ -275,6 +275,7 @@ static dev_t devt_from_devnum(const char *name)
  *	9) PARTLABEL=<name> with name being the GPT partition label.
  *	   MSDOS partitions do not support labels!
  *	10) /dev/cifs represents Root_CIFS (0xfe)
+ *	11) fstag:<tag> represents Root_FSTAG (0xfd)
  *
  *	If name doesn't have fall into the categories above, we return (0,0).
  *	block_class is used to check if something is a disk name. If the disk
@@ -287,6 +288,8 @@ dev_t name_to_dev_t(const char *name)
 		return Root_NFS;
 	if (strcmp(name, "/dev/cifs") == 0)
 		return Root_CIFS;
+	if (strncmp(name, "fstag:", 6) == 0)
+		return Root_FSTAG;
 	if (strcmp(name, "/dev/ram") == 0)
 		return Root_RAM0;
 #ifdef CONFIG_BLOCK
@@ -552,6 +555,16 @@ void __init mount_root(void)
 		return;
 	}
 #endif
+	if (ROOT_DEV == Root_FSTAG && root_fs_names) {
+		/* Skip "fstag:" prefix and point to real tag */
+		root_device_name += 6;
+		if (!do_mount_root(root_device_name, root_fs_names,
+					root_mountflags, root_mount_data))
+			return;
+		panic("VFS: Unable to mount root \"fstag:%s\" via \"%s\"\n",
+			root_device_name, root_fs_names);
+	}
+
 #ifdef CONFIG_BLOCK
 	{
 		int err = create_dev("/dev/root", ROOT_DEV);
