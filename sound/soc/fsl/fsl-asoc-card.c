@@ -540,7 +540,6 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 	struct device *codec_dev = NULL;
 	const char *codec_dai_name;
 	const char *codec_dev_name;
-	unsigned int daifmt;
 	u32 width;
 	int ret;
 
@@ -684,19 +683,12 @@ static int fsl_asoc_card_probe(struct platform_device *pdev)
 	}
 
 	/* Format info from DT is optional. */
-	daifmt = snd_soc_of_parse_daifmt(np, NULL,
-					 &bitclkmaster, &framemaster);
-	daifmt &= ~SND_SOC_DAIFMT_MASTER_MASK;
+	snd_soc_daifmt_parse_clock_provider(np, NULL, &bitclkmaster, &framemaster);
 	if (bitclkmaster || framemaster) {
-		if (codec_np == bitclkmaster)
-			daifmt |= (codec_np == framemaster) ?
-				SND_SOC_DAIFMT_CBM_CFM : SND_SOC_DAIFMT_CBM_CFS;
-		else
-			daifmt |= (codec_np == framemaster) ?
-				SND_SOC_DAIFMT_CBS_CFM : SND_SOC_DAIFMT_CBS_CFS;
-
 		/* Override dai_fmt with value from DT */
-		priv->dai_fmt = daifmt;
+		priv->dai_fmt = snd_soc_daifmt_parse_format(np, NULL) |
+			snd_soc_daifmt_clock_provider_pickup(((codec_np == bitclkmaster) << 4) +
+							      (codec_np == framemaster));
 	}
 
 	/* Change direction according to format */
