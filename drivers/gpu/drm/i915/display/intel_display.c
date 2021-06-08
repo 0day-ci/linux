@@ -10158,6 +10158,21 @@ static void intel_atomic_prepare_plane_clear_colors(struct intel_atomic_state *s
 	}
 }
 
+static int convert_intel_output_format_into_drm_color_format(enum intel_output_format output_format)
+{
+	switch (output_format) {
+		case INTEL_OUTPUT_FORMAT_RGB:
+			return DRM_COLOR_FORMAT_RGB444;
+		case INTEL_OUTPUT_FORMAT_YCBCR420:
+			return DRM_COLOR_FORMAT_YCRCB420;
+		case INTEL_OUTPUT_FORMAT_YCBCR444:
+			return DRM_COLOR_FORMAT_YCRCB444;
+		default:
+			break;
+		}
+	return 0;
+}
+
 static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 {
 	struct drm_device *dev = state->base.dev;
@@ -10465,9 +10480,12 @@ static int intel_atomic_commit(struct drm_device *dev,
 		if (crtc) {
 			struct intel_crtc_state *new_crtc_state = intel_atomic_get_new_crtc_state(state, crtc);
 			new_conn_state->active_bpc = new_crtc_state->pipe_bpp / 3;
+			new_conn_state->active_color_format = convert_intel_output_format_into_drm_color_format(new_crtc_state->output_format);
 		}
-		else
+		else {
 			new_conn_state->active_bpc = 0;
+			new_conn_state->active_color_format = 0;
+		}
 	}
 
 	drm_atomic_state_get(&state->base);
