@@ -556,7 +556,7 @@ static ssize_t param_attr_store(struct module_attribute *mattr,
 				struct module_kobject *mk,
 				const char *buf, size_t len)
 {
- 	int err;
+	int err;
 	struct param_attribute *attribute = to_param_attr(mattr);
 
 	if (!attribute->param->ops->set)
