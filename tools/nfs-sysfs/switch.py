@@ -2,9 +2,10 @@ import sysfs
 import xprt
 
 class XprtSwitch:
-    def __init__(self, path):
+    def __init__(self, path, sep=":"):
         self.path = path
         self.id = int(str(path).rsplit("-", 1)[1])
+        self.sep = sep
 
         self.xprts = [ xprt.Xprt(p) for p in self.path.iterdir() if p.is_dir() ]
         self.xprts.sort()
@@ -15,8 +16,8 @@ class XprtSwitch:
         return self.path < rhs.path
 
     def __str__(self):
-        line = "switch %s: num_xprts %s, num_active %s, queue_len %s" % \
-                (self.id, self.num_xprts, self.num_active, self.queue_len)
+        line = "switch %s%s num_xprts %s, num_active %s, queue_len %s" % \
+                (self.id, self.sep, self.num_xprts, self.num_active, self.queue_len)
         for x in self.xprts:
             line += "\n	%s" % x.small_str()
         return line
