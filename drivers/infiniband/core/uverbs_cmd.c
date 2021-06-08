@@ -3205,6 +3205,7 @@ static int ib_uverbs_ex_create_flow(struct uverbs_attr_bundle *attrs)
 	struct ib_qp			  *qp;
 	struct ib_uflow_resources	  *uflow_res;
 	struct ib_uverbs_flow_spec_hdr	  *kern_spec;
+	struct ib_ucontext *ucontext;
 	struct uverbs_req_iter iter;
 	int err;
 	void *ib_spec;
@@ -3214,6 +3215,13 @@ static int ib_uverbs_ex_create_flow(struct uverbs_attr_bundle *attrs)
 	err = uverbs_request_start(attrs, &iter, &cmd, sizeof(cmd));
 	if (err)
 		return err;
+
+	ucontext = ib_uverbs_get_ucontext(attrs);
+	if (IS_ERR(ucontext))
+		return PTR_ERR(ucontext);
+
+	if (!rdma_is_port_valid(ucontext->device, cmd.flow_attr.port))
+		return -EINVAL;
 
 	if (cmd.comp_mask)
 		return -EINVAL;
