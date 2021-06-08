@@ -384,5 +384,109 @@ c) Execute ``slabinfo-gnuplot.sh`` in '-t' mode, passing all of the
       40,60`` range will plot only samples collected between 40th and
       60th seconds).
 
+KUnit tests for SLUB debugging functionality
+============================================
+
+These KUnit tests are used to test some of the SLUB debugging
+functionalities.
+
+KUnit tests are used for unit testing in Linux kernel and easy to run,
+so it is probably the best choice for this type of tests.
+
+There are tests, which corrupt redzone, the free objects and the freelist.
+Tests are corrupting specific bytes in cache and checking if validation
+finds expected number of bugs. Bug reports are silenced.
+
+Config option
+
+In order to built and then run this tests you need to switch
+option SLUB_KUNIT_TEST on. It is tristate option so it can also
+be built as a module. This option depends on SLUB_DEBUG and
+KUNIT options. By default it is on with all kunit tests.
+
+Error counting
+
+To get number of errors discovered in slub is used test API kunit_resource.
+In test_init the reference to the integer variable slab_errors is added
+to the resource of this tests.
+
+During slub cache checking always when bug should be reported or fixed function
+slab_add_kunit_errors() is called. This function find resource to kunit test
+and increment value of data in founded resource, which is slab_errors
+variable.
+
+Silence bug reports
+
+The function slab_add_kunit_errors() is returning bool, which is true if there is kunit test
+with correct kunit_resource running, to silence bug reports, so they are not printed.
+We do not want to correct errors we only want to know they occurred, so these reports
+are unnnecessary.
+
+KASAN option
+
+Only 2 out of 5 tests are runnig with KASAN option is on.
+The other three tests deliberately modifies non-allocated objects. And KASAN
+does not detect some errors in the same way as SLUB_DEBUG. So, these tests
+does not run when KASAN option is on.
+
+TESTS
+
+1. test_clobber_zone
+
+   SLUB cache with SLUB_REDZONE flag can detects writings after object. This
+   functionality is tested here on allocated memory.
+
+   First, there is allocated memory with SLAB_REDZONE and then the first byte
+   after allocated space is modified. Validation founds 2 errors, because of
+   the bug and the fix of the memory.
+
+
+2. test_next_pointer
+
+   SLUB have list of free objects and the address of the next free object
+   is always saved in free object at offset specified in variable offset
+   in struct kmem_cache. This test try to corrupt this freelist and
+   then correct it.
+
+   First, there is allocated and freed memory to get a pointer to free object.
+   After that, the pointer to next free object is corrupted. The first validation finds
+   3 errors. One for corrupted freechain, the second for the wrong count of objects
+   in use and the third for fixing the issue. This fix only set number of objects
+   in use to a number of all objects minus 1, because the first free object
+   was corrupted.
+
+   Then the free pointer is fixed to his previous value. The second validation finds
+   2 errors. One for the wrong count of objects in use and one for fixing this error.
+
+   Last validation is used to check if all errors were corrected so no error
+   is found.
+
+3. test_first_word
+
+   SLUB cache with SLAB_POISON flag can detect poisoning free objects. This
+   functionality is tested in this test. The test tries to corrupt
+   the first byte in freed memory.
+
+   First of all, memory is allocated and freed to get a pointer to a free object
+   and then the first byte is corrupted. After that, validation finds 2 errors,
+   one for the bug and the other one for the fix of the memory.
+
+4. test_clobber_50th_byte
+
+   In this test SLAB_POISON functionality is tested. The test tries to
+   corrupt the 50th byte in freed memory.
+
+   First, pointer to a free memory is acquired by allocating and freeing memory.
+   Then 50th byte is corrupted and validation finds 2 errors for the bug and
+   the fix of the memory.
+
+5. test_clobber_redzone_free
+
+   This test tests redzone functionality of SLUB cache on a freed object.
+
+   First, it gets pointer to the free object with allocating and freeing and
+   then corrupts the first byte after the freed object. Validation finds
+   2 errors for the bug and the fix of the memory.
+
 Christoph Lameter, May 30, 2007
 Sergey Senozhatsky, October 23, 2015
