@@ -358,17 +358,36 @@ static void collect_percpu_times(struct psi_group *group,
 		*pchanged_states = changed_states;
 }
 
-static u64 update_averages(struct psi_group *group, u64 now)
+static void update_averages(struct psi_group *group)
 {
 	unsigned long missed_periods = 0;
-	u64 expires, period;
-	u64 avg_next_update;
+	u64 now, expires, period;
+	u32 changed_states;
 	int s;
 
 	/* avgX= */
+	mutex_lock(&group->avgs_lock);
+
+	now = sched_clock();
 	expires = group->avg_next_update;
-	if (now - expires >= psi_period)
-		missed_periods = div_u64(now - expires, psi_period);
+
+	/*
+	 * Periodic aggregation.
+	 *
+	 * When tasks in the group are active, we make sure to
+	 * aggregate per-cpu samples and calculate the running
+	 * averages at exactly once per PSI_FREQ period.
+	 *
+	 * When tasks go idle, there is no point in keeping the
+	 * workers running, so we shut them down too. Once restarted,
+	 * we backfill zeroes for the missed periods in calc_avgs().
+	 *
+	 * We can get here from inside the aggregation worker, but
+	 * also from psi_show() as userspace may query pressure files
+	 * of an idle group whose aggregation worker shut down.
+	 */
+	if (now < expires)
+		goto unlock;
 
 	/*
 	 * The periodic clock tick can get delayed for various
@@ -377,10 +396,13 @@ static u64 update_averages(struct psi_group *group, u64 now)
 	 * But the deltas we sample out of the per-cpu buckets above
 	 * are based on the actual time elapsing between clock ticks.
 	 */
-	avg_next_update = expires + ((1 + missed_periods) * psi_period);
+	if (now - expires >= psi_period)
+		missed_periods = div_u64(now - expires, psi_period);
 	period = now - (group->avg_last_update + (missed_periods * psi_period));
 	group->avg_last_update = now;
+	group->avg_next_update = expires + ((1 + missed_periods) * psi_period);
 
+	collect_percpu_times(group, PSI_AVGS, &changed_states);
 	for (s = 0; s < NR_PSI_STATES - 1; s++) {
 		u32 sample;
 
@@ -408,42 +430,25 @@ static u64 update_averages(struct psi_group *group, u64 now)
 		calc_avgs(group->avg[s], missed_periods, sample, period);
 	}
 
-	return avg_next_update;
+	if (changed_states & (1 << PSI_NONIDLE)) {
+		unsigned long delay;
+
+		delay = nsecs_to_jiffies(group->avg_next_update - now) + 1;
+		schedule_delayed_work(&group->avgs_work, delay);
+	}
+unlock:
+	mutex_unlock(&group->avgs_lock);
 }
 
 static void psi_avgs_work(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct psi_group *group;
-	u32 changed_states;
-	bool nonidle;
-	u64 now;
 
 	dwork = to_delayed_work(work);
 	group = container_of(dwork, struct psi_group, avgs_work);
 
-	mutex_lock(&group->avgs_lock);
-
-	now = sched_clock();
-
-	collect_percpu_times(group, PSI_AVGS, &changed_states);
-	nonidle = changed_states & (1 << PSI_NONIDLE);
-	/*
-	 * If there is task activity, periodically fold the per-cpu
-	 * times and feed samples into the running averages. If things
-	 * are idle and there is no data to process, stop the clock.
-	 * Once restarted, we'll catch up the running averages in one
-	 * go - see calc_avgs() and missed_periods.
-	 */
-	if (now >= group->avg_next_update)
-		group->avg_next_update = update_averages(group, now);
-
-	if (nonidle) {
-		schedule_delayed_work(dwork, nsecs_to_jiffies(
-				group->avg_next_update - now) + 1);
-	}
-
-	mutex_unlock(&group->avgs_lock);
+	update_averages(group);
 }
 
 /* Trigger tracking window manipulations */
@@ -1029,18 +1034,16 @@ void cgroup_move_task(struct task_struct *task, struct css_set *to)
 int psi_show(struct seq_file *m, struct psi_group *group, enum psi_res res)
 {
 	int full;
-	u64 now;
 
 	if (static_branch_likely(&psi_disabled))
 		return -EOPNOTSUPP;
 
-	/* Update averages before reporting them */
-	mutex_lock(&group->avgs_lock);
-	now = sched_clock();
-	collect_percpu_times(group, PSI_AVGS, NULL);
-	if (now >= group->avg_next_update)
-		group->avg_next_update = update_averages(group, now);
-	mutex_unlock(&group->avgs_lock);
+	/*
+	 * Periodic aggregation should do all the sampling for us, but
+	 * if the workload goes idle, the worker goes to sleep before
+	 * old stalls may have averaged out. Backfill any idle zeroes.
+	 */
+	update_averages(group);
 
 	for (full = 0; full < 2; full++) {
 		unsigned long avg[3];
