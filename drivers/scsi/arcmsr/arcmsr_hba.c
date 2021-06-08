@@ -532,7 +532,6 @@ static void arcmsr_hbaC_flush_cache(struct AdapterControlBlock *pACB)
 			timeout,retry count down = %d \n", pACB->host->host_no, retry_count);
 		}
 	} while (retry_count != 0);
-	return;
 }
 
 static void arcmsr_hbaD_flush_cache(struct AdapterControlBlock *pACB)
@@ -1972,7 +1971,6 @@ static void arcmsr_hbaC_stop_bgrb(struct AdapterControlBlock *pACB)
 			"arcmsr%d: wait 'stop adapter background rebuild' timeout\n"
 			, pACB->host->host_no);
 	}
-	return;
 }
 
 static void arcmsr_hbaD_stop_bgrb(struct AdapterControlBlock *pACB)
@@ -4257,7 +4255,6 @@ static void arcmsr_hbaC_start_bgrb(struct AdapterControlBlock *pACB)
 		printk(KERN_NOTICE "arcmsr%d: wait 'start adapter background \
 				rebuild' timeout \n", pACB->host->host_no);
 	}
-	return;
 }
 
 static void arcmsr_hbaD_start_bgrb(struct AdapterControlBlock *pACB)
@@ -4425,7 +4422,6 @@ static void arcmsr_enable_eoi_mode(struct AdapterControlBlock *acb)
 	case ACB_ADAPTER_TYPE_C:
 		return;
 	}
-	return;
 }
 
 static void arcmsr_hardware_reset(struct AdapterControlBlock *acb)
@@ -4479,7 +4475,6 @@ static void arcmsr_hardware_reset(struct AdapterControlBlock *acb)
 		pci_write_config_byte(acb->pdev, i, value[i]);
 	}
 	msleep(1000);
-	return;
 }
 
 static bool arcmsr_reset_in_progress(struct AdapterControlBlock *acb)
