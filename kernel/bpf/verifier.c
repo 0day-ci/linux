@@ -22,6 +22,7 @@
 #include <linux/error-injection.h>
 #include <linux/bpf_lsm.h>
 #include <linux/btf_ids.h>
+#include <linux/virtio_net.h>
 
 #include "disasm.h"
 
@@ -441,7 +442,8 @@ static bool reg_type_not_null(enum bpf_reg_type type)
 		type == PTR_TO_TCP_SOCK ||
 		type == PTR_TO_MAP_VALUE ||
 		type == PTR_TO_MAP_KEY ||
-		type == PTR_TO_SOCK_COMMON;
+		type == PTR_TO_SOCK_COMMON ||
+		type == PTR_TO_VNET_HDR;
 }
 
 static bool reg_type_may_be_null(enum bpf_reg_type type)
@@ -453,7 +455,8 @@ static bool reg_type_may_be_null(enum bpf_reg_type type)
 	       type == PTR_TO_BTF_ID_OR_NULL ||
 	       type == PTR_TO_MEM_OR_NULL ||
 	       type == PTR_TO_RDONLY_BUF_OR_NULL ||
-	       type == PTR_TO_RDWR_BUF_OR_NULL;
+	       type == PTR_TO_RDWR_BUF_OR_NULL ||
+	       type == PTR_TO_VNET_HDR_OR_NULL;
 }
 
 static bool reg_may_point_to_spin_lock(const struct bpf_reg_state *reg)
@@ -576,6 +579,8 @@ static const char * const reg_type_str[] = {
 	[PTR_TO_RDWR_BUF_OR_NULL] = "rdwr_buf_or_null",
 	[PTR_TO_FUNC]		= "func",
 	[PTR_TO_MAP_KEY]	= "map_key",
+	[PTR_TO_VNET_HDR]	= "virtio_net_hdr",
+	[PTR_TO_VNET_HDR_OR_NULL] = "virtio_net_hdr_or_null",
 };
 
 static char slot_type_char[] = {
@@ -1165,6 +1170,9 @@ static void mark_ptr_not_null_reg(struct bpf_reg_state *reg)
 		break;
 	case PTR_TO_RDWR_BUF_OR_NULL:
 		reg->type = PTR_TO_RDWR_BUF;
+		break;
+	case PTR_TO_VNET_HDR_OR_NULL:
+		reg->type = PTR_TO_VNET_HDR;
 		break;
 	default:
 		WARN_ONCE(1, "unknown nullable register type");
@@ -2528,6 +2536,8 @@ static bool is_spillable_regtype(enum bpf_reg_type type)
 	case PTR_TO_MEM_OR_NULL:
 	case PTR_TO_FUNC:
 	case PTR_TO_MAP_KEY:
+	case PTR_TO_VNET_HDR:
+	case PTR_TO_VNET_HDR_OR_NULL:
 		return true;
 	default:
 		return false;
@@ -3384,6 +3394,18 @@ static int check_flow_keys_access(struct bpf_verifier_env *env, int off,
 	return 0;
 }
 
+static int check_virtio_net_hdr_access(struct bpf_verifier_env *env, int off,
+				       int size)
+{
+	if (size < 0 || off < 0 ||
+	    (u64)off + size > sizeof(struct virtio_net_hdr)) {
+		verbose(env, "invalid access to virtio_net_hdr off=%d size=%d\n",
+			off, size);
+		return -EACCES;
+	}
+	return 0;
+}
+
 static int check_sock_access(struct bpf_verifier_env *env, int insn_idx,
 			     u32 regno, int off, int size,
 			     enum bpf_access_type t)
@@ -3567,6 +3589,9 @@ static int check_ptr_alignment(struct bpf_verifier_env *env,
 		break;
 	case PTR_TO_XDP_SOCK:
 		pointer_desc = "xdp_sock ";
+		break;
+	case PTR_TO_VNET_HDR:
+		pointer_desc = "virtio_net_hdr ";
 		break;
 	default:
 		break;
@@ -4218,6 +4243,23 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 		}
 
 		err = check_flow_keys_access(env, off, size);
+		if (!err && t == BPF_READ && value_regno >= 0) {
+			if (off == offsetof(struct bpf_flow_keys, vhdr)) {
+				regs[value_regno].type = PTR_TO_VNET_HDR_OR_NULL;
+				/* required for dropping or_null */
+				regs[value_regno].id = ++env->id_gen;
+			} else {
+				mark_reg_unknown(env, regs, value_regno);
+			}
+		}
+	} else if (reg->type == PTR_TO_VNET_HDR) {
+		if (t == BPF_WRITE) {
+			verbose(env, "R%d cannot write into %s\n",
+				regno, reg_type_str[reg->type]);
+			return -EACCES;
+		}
+
+		err = check_virtio_net_hdr_access(env, off, size);
 		if (!err && t == BPF_READ && value_regno >= 0)
 			mark_reg_unknown(env, regs, value_regno);
 	} else if (type_is_sk_pointer(reg->type)) {
@@ -9989,6 +10031,8 @@ static bool regsafe(struct bpf_reg_state *rold, struct bpf_reg_state *rcur,
 	case PTR_TO_TCP_SOCK:
 	case PTR_TO_TCP_SOCK_OR_NULL:
 	case PTR_TO_XDP_SOCK:
+	case PTR_TO_VNET_HDR:
+	case PTR_TO_VNET_HDR_OR_NULL:
 		/* Only valid matches are exact, which memcmp() above
 		 * would have accepted
 		 */

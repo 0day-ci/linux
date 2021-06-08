@@ -430,6 +430,8 @@ enum bpf_reg_type {
 	PTR_TO_PERCPU_BTF_ID,	 /* reg points to a percpu kernel variable */
 	PTR_TO_FUNC,		 /* reg points to a bpf program function */
 	PTR_TO_MAP_KEY,		 /* reg points to a map element key */
+	PTR_TO_VNET_HDR,	 /* reg points to struct virtio_net_hdr */
+	PTR_TO_VNET_HDR_OR_NULL, /* reg points to virtio_net_hdr or NULL */
 	__BPF_REG_TYPE_MAX,
 };
 
