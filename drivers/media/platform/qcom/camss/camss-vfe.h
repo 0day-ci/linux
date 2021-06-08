@@ -101,30 +101,15 @@ struct vfe_line {
 struct vfe_device;
 
 struct vfe_hw_ops {
-	void (*enable_irq_common)(struct vfe_device *vfe);
 	void (*global_reset)(struct vfe_device *vfe);
 	void (*hw_version_read)(struct vfe_device *vfe, struct device *dev);
 	irqreturn_t (*isr)(int irq, void *dev);
-	void (*isr_read)(struct vfe_device *vfe, u32 *value0, u32 *value1);
 	void (*pm_domain_off)(struct vfe_device *vfe);
 	int (*pm_domain_on)(struct vfe_device *vfe);
-	void (*reg_update)(struct vfe_device *vfe, enum vfe_line_id line_id);
-	void (*reg_update_clear)(struct vfe_device *vfe,
-				 enum vfe_line_id line_id);
 	void (*subdev_init)(struct device *dev, struct vfe_device *vfe);
 	int (*vfe_disable)(struct vfe_line *line);
 	int (*vfe_enable)(struct vfe_line *line);
 	int (*vfe_halt)(struct vfe_device *vfe);
-	void (*violation_read)(struct vfe_device *vfe);
-};
-
-struct vfe_isr_ops {
-	void (*reset_ack)(struct vfe_device *vfe);
-	void (*halt_ack)(struct vfe_device *vfe);
-	void (*reg_update)(struct vfe_device *vfe, enum vfe_line_id line_id);
-	void (*sof)(struct vfe_device *vfe, enum vfe_line_id line_id);
-	void (*comp_done)(struct vfe_device *vfe, u8 comp);
-	void (*wm_done)(struct vfe_device *vfe, u8 wm);
 };
 
 struct vfe_device {
@@ -149,7 +134,6 @@ struct vfe_device {
 	u8 was_streaming;
 	const struct vfe_hw_ops *ops;
 	const struct vfe_hw_ops_gen1 *ops_gen1;
-	struct vfe_isr_ops isr_ops;
 	struct camss_video_ops video_ops;
 };
 

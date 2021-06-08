@@ -37,7 +37,6 @@ static int vfe_disable_output(struct vfe_line *line)
 {
 	struct vfe_device *vfe = to_vfe(line);
 	struct vfe_output *output = &line->output;
-	const struct vfe_hw_ops *ops = vfe->ops;
 	unsigned long flags;
 	unsigned long time;
 	unsigned int i;
@@ -55,7 +54,7 @@ static int vfe_disable_output(struct vfe_line *line)
 	for (i = 0; i < output->wm_num; i++)
 		vfe->ops_gen1->wm_enable(vfe, output->wm_idx[i], 0);
 
-	ops->reg_update(vfe, line->id);
+	vfe->ops_gen1->reg_update(vfe, line->id);
 	output->wait_reg_update = 1;
 	spin_unlock_irqrestore(&vfe->output_lock, flags);
 
@@ -162,21 +161,21 @@ static void vfe_output_frame_drop(struct vfe_device *vfe,
 		vfe->ops_gen1->wm_set_framedrop_pattern(vfe, output->wm_idx[i], drop_pattern);
 	}
 
-	vfe->ops->reg_update(vfe, container_of(output, struct vfe_line, output)->id);
+	vfe->ops_gen1->reg_update(vfe, container_of(output, struct vfe_line, output)->id);
 }
 
 static int vfe_enable_output(struct vfe_line *line)
 {
 	struct vfe_device *vfe = to_vfe(line);
 	struct vfe_output *output = &line->output;
-	const struct vfe_hw_ops *ops = vfe->ops;
+	const struct vfe_hw_ops_gen1 *ops = vfe->ops_gen1;
 	struct media_entity *sensor;
 	unsigned long flags;
 	unsigned int frame_skip = 0;
 	unsigned int i;
 	u16 ub_size;
 
-	ub_size = vfe->ops_gen1->get_ub_size(vfe->id);
+	ub_size = ops->get_ub_size(vfe->id);
 	if (!ub_size)
 		return -EINVAL;
 
@@ -236,38 +235,38 @@ static int vfe_enable_output(struct vfe_line *line)
 	vfe_output_init_addrs(vfe, output, 0, line);
 
 	if (line->id != VFE_LINE_PIX) {
-		vfe->ops_gen1->set_cgc_override(vfe, output->wm_idx[0], 1);
-		vfe->ops_gen1->enable_irq_wm_line(vfe, output->wm_idx[0], line->id, 1);
-		vfe->ops_gen1->bus_connect_wm_to_rdi(vfe, output->wm_idx[0], line->id);
-		vfe->ops_gen1->wm_set_subsample(vfe, output->wm_idx[0]);
-		vfe->ops_gen1->set_rdi_cid(vfe, line->id, 0);
-		vfe->ops_gen1->wm_set_ub_cfg(vfe, output->wm_idx[0],
+		ops->set_cgc_override(vfe, output->wm_idx[0], 1);
+		ops->enable_irq_wm_line(vfe, output->wm_idx[0], line->id, 1);
+		ops->bus_connect_wm_to_rdi(vfe, output->wm_idx[0], line->id);
+		ops->wm_set_subsample(vfe, output->wm_idx[0]);
+		ops->set_rdi_cid(vfe, line->id, 0);
+		ops->wm_set_ub_cfg(vfe, output->wm_idx[0],
 					    (ub_size + 1) * output->wm_idx[0], ub_size);
-		vfe->ops_gen1->wm_frame_based(vfe, output->wm_idx[0], 1);
-		vfe->ops_gen1->wm_enable(vfe, output->wm_idx[0], 1);
-		vfe->ops_gen1->bus_reload_wm(vfe, output->wm_idx[0]);
+		ops->wm_frame_based(vfe, output->wm_idx[0], 1);
+		ops->wm_enable(vfe, output->wm_idx[0], 1);
+		ops->bus_reload_wm(vfe, output->wm_idx[0]);
 	} else {
 		ub_size /= output->wm_num;
 		for (i = 0; i < output->wm_num; i++) {
-			vfe->ops_gen1->set_cgc_override(vfe, output->wm_idx[i], 1);
-			vfe->ops_gen1->wm_set_subsample(vfe, output->wm_idx[i]);
-			vfe->ops_gen1->wm_set_ub_cfg(vfe, output->wm_idx[i],
+			ops->set_cgc_override(vfe, output->wm_idx[i], 1);
+			ops->wm_set_subsample(vfe, output->wm_idx[i]);
+			ops->wm_set_ub_cfg(vfe, output->wm_idx[i],
 						     (ub_size + 1) * output->wm_idx[i], ub_size);
-			vfe->ops_gen1->wm_line_based(vfe, output->wm_idx[i],
+			ops->wm_line_based(vfe, output->wm_idx[i],
 						     &line->video_out.active_fmt.fmt.pix_mp, i, 1);
-			vfe->ops_gen1->wm_enable(vfe, output->wm_idx[i], 1);
-			vfe->ops_gen1->bus_reload_wm(vfe, output->wm_idx[i]);
+			ops->wm_enable(vfe, output->wm_idx[i], 1);
+			ops->bus_reload_wm(vfe, output->wm_idx[i]);
 		}
-		vfe->ops_gen1->enable_irq_pix_line(vfe, 0, line->id, 1);
-		vfe->ops_gen1->set_module_cfg(vfe, 1);
-		vfe->ops_gen1->set_camif_cfg(vfe, line);
-		vfe->ops_gen1->set_realign_cfg(vfe, line, 1);
-		vfe->ops_gen1->set_xbar_cfg(vfe, output, 1);
-		vfe->ops_gen1->set_demux_cfg(vfe, line);
-		vfe->ops_gen1->set_scale_cfg(vfe, line);
-		vfe->ops_gen1->set_crop_cfg(vfe, line);
-		vfe->ops_gen1->set_clamp_cfg(vfe);
-		vfe->ops_gen1->set_camif_cmd(vfe, 1);
+		ops->enable_irq_pix_line(vfe, 0, line->id, 1);
+		ops->set_module_cfg(vfe, 1);
+		ops->set_camif_cfg(vfe, line);
+		ops->set_realign_cfg(vfe, line, 1);
+		ops->set_xbar_cfg(vfe, output, 1);
+		ops->set_demux_cfg(vfe, line);
+		ops->set_scale_cfg(vfe, line);
+		ops->set_crop_cfg(vfe, line);
+		ops->set_clamp_cfg(vfe);
+		ops->set_camif_cmd(vfe, 1);
 	}
 
 	ops->reg_update(vfe, line->id);
@@ -508,7 +507,7 @@ static void vfe_buf_update_wm_on_new(struct vfe_device *vfe,
  * vfe_isr_halt_ack - Process halt ack
  * @vfe: VFE Device
  */
-static void vfe_isr_halt_ack(struct vfe_device *vfe)
+void vfe_gen1_isr_halt_ack(struct vfe_device *vfe)
 {
 	complete(&vfe->halt_complete);
 	vfe->ops_gen1->halt_clear(vfe);
@@ -519,7 +518,7 @@ static void vfe_isr_halt_ack(struct vfe_device *vfe)
  * @vfe: VFE Device
  * @line_id: VFE line
  */
-static void vfe_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id)
+void vfe_gen1_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id)
 {
 	struct vfe_output *output;
 	unsigned long flags;
@@ -538,14 +537,14 @@ static void vfe_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id)
  * @vfe: VFE Device
  * @line_id: VFE line
  */
-static void vfe_isr_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
+void vfe_gen1_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
 {
 	struct vfe_output *output;
 	struct vfe_line *line = &vfe->line[line_id];
 	unsigned long flags;
 
 	spin_lock_irqsave(&vfe->output_lock, flags);
-	vfe->ops->reg_update_clear(vfe, line_id);
+	vfe->ops_gen1->reg_update_clear(vfe, line_id);
 
 	output = &line->output;
 
@@ -605,7 +604,7 @@ static void vfe_isr_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
  * @vfe: VFE Device
  * @wm: Write master id
  */
-static void vfe_isr_wm_done(struct vfe_device *vfe, u8 wm)
+void vfe_gen1_isr_wm_done(struct vfe_device *vfe, u8 wm)
 {
 	struct camss_buffer *ready_buf;
 	struct vfe_output *output;
@@ -675,6 +674,22 @@ out_unlock:
 	spin_unlock_irqrestore(&vfe->output_lock, flags);
 }
 
+/**
+ * vfe_isr_comp_done() - Process composite image done interrupt
+ * @vfe: VFE Device
+ * @comp: Composite image id
+ */
+void vfe_gen1_isr_comp_done(struct vfe_device *vfe, u8 comp)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(vfe->wm_output_map); i++)
+		if (vfe->wm_output_map[i] == VFE_LINE_PIX) {
+			vfe_gen1_isr_wm_done(vfe, i);
+			break;
+		}
+}
+
 /*
  * vfe_queue_buffer - Add empty buffer
  * @vid: Video device structure
@@ -726,15 +741,6 @@ int vfe_word_per_line(u32 format, u32 width)
 
 	return val;
 }
-
-const struct vfe_isr_ops vfe_isr_ops_gen1 = {
-	.reset_ack = vfe_isr_reset_ack,
-	.halt_ack = vfe_isr_halt_ack,
-	.reg_update = vfe_isr_reg_update,
-	.sof = vfe_isr_sof,
-	.comp_done = vfe_isr_comp_done,
-	.wm_done = vfe_isr_wm_done,
-};
 
 const struct camss_video_ops vfe_video_ops_gen1 = {
 	.queue_buffer = vfe_queue_buffer,

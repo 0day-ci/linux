@@ -405,22 +405,6 @@ int vfe_put_output(struct vfe_line *line)
 	return 0;
 }
 
-/**
- * vfe_isr_comp_done() - Process composite image done interrupt
- * @vfe: VFE Device
- * @comp: Composite image id
- */
-void vfe_isr_comp_done(struct vfe_device *vfe, u8 comp)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(vfe->wm_output_map); i++)
-		if (vfe->wm_output_map[i] == VFE_LINE_PIX) {
-			vfe->isr_ops.wm_done(vfe, i);
-			break;
-		}
-}
-
 void vfe_isr_reset_ack(struct vfe_device *vfe)
 {
 	complete(&vfe->reset_complete);

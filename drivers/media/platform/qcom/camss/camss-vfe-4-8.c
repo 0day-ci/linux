@@ -968,6 +968,26 @@ static int vfe_camif_wait_for_stop(struct vfe_device *vfe, struct device *dev)
 	return ret;
 }
 
+static void vfe_isr_read(struct vfe_device *vfe, u32 *value0, u32 *value1)
+{
+	*value0 = readl_relaxed(vfe->base + VFE_0_IRQ_STATUS_0);
+	*value1 = readl_relaxed(vfe->base + VFE_0_IRQ_STATUS_1);
+
+	writel_relaxed(*value0, vfe->base + VFE_0_IRQ_CLEAR_0);
+	writel_relaxed(*value1, vfe->base + VFE_0_IRQ_CLEAR_1);
+
+	/* Enforce barrier between local & global IRQ clear */
+	wmb();
+	writel_relaxed(VFE_0_IRQ_CMD_GLOBAL_CLEAR, vfe->base + VFE_0_IRQ_CMD);
+}
+
+static void vfe_violation_read(struct vfe_device *vfe)
+{
+	u32 violation = readl_relaxed(vfe->base + VFE_0_VIOLATION_STATUS);
+
+	pr_err_ratelimited("VFE: violation = 0x%08x\n", violation);
+}
+
 /*
  * vfe_isr - VFE module interrupt handler
  * @irq: Interrupt line
@@ -981,34 +1001,34 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 	u32 value0, value1;
 	int i, j;
 
-	vfe->ops->isr_read(vfe, &value0, &value1);
+	vfe_isr_read(vfe, &value0, &value1);
 
 	dev_dbg(vfe->camss->dev, "VFE: status0 = 0x%08x, status1 = 0x%08x\n",
 		value0, value1);
 
 	if (value0 & VFE_0_IRQ_STATUS_0_RESET_ACK)
-		vfe->isr_ops.reset_ack(vfe);
+		vfe_isr_reset_ack(vfe);
 
 	if (value1 & VFE_0_IRQ_STATUS_1_VIOLATION)
-		vfe->ops->violation_read(vfe);
+		vfe_violation_read(vfe);
 
 	if (value1 & VFE_0_IRQ_STATUS_1_BUS_BDG_HALT_ACK)
-		vfe->isr_ops.halt_ack(vfe);
+		vfe_gen1_isr_halt_ack(vfe);
 
 	for (i = VFE_LINE_RDI0; i < vfe->line_num; i++)
 		if (value0 & VFE_0_IRQ_STATUS_0_line_n_REG_UPDATE(i))
-			vfe->isr_ops.reg_update(vfe, i);
+			vfe_gen1_reg_update(vfe, i);
 
 	if (value0 & VFE_0_IRQ_STATUS_0_CAMIF_SOF)
-		vfe->isr_ops.sof(vfe, VFE_LINE_PIX);
+		vfe_gen1_isr_sof(vfe, VFE_LINE_PIX);
 
 	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
 		if (value1 & VFE_0_IRQ_STATUS_1_RDIn_SOF(i))
-			vfe->isr_ops.sof(vfe, i);
+			vfe_gen1_isr_sof(vfe, i);
 
 	for (i = 0; i < MSM_VFE_COMPOSITE_IRQ_NUM; i++)
 		if (value0 & VFE_0_IRQ_STATUS_0_IMAGE_COMPOSITE_DONE_n(i)) {
-			vfe->isr_ops.comp_done(vfe, i);
+			vfe_gen1_isr_comp_done(vfe, i);
 			for (j = 0; j < ARRAY_SIZE(vfe->wm_output_map); j++)
 				if (vfe->wm_output_map[j] == VFE_LINE_PIX)
 					value0 &= ~VFE_0_IRQ_MASK_0_IMAGE_MASTER_n_PING_PONG(j);
@@ -1016,7 +1036,7 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 
 	for (i = 0; i < MSM_VFE_IMAGE_MASTERS_NUM; i++)
 		if (value0 & VFE_0_IRQ_STATUS_0_IMAGE_MASTER_n_PING_PONG(i))
-			vfe->isr_ops.wm_done(vfe, i);
+			vfe_gen1_isr_wm_done(vfe, i);
 
 	return IRQ_HANDLED;
 }
@@ -1081,19 +1101,6 @@ static void vfe_set_ds(struct vfe_device *vfe)
 	writel_relaxed(val16, vfe->base + VFE_0_BUS_BDG_DS_CFG_16);
 }
 
-static void vfe_isr_read(struct vfe_device *vfe, u32 *value0, u32 *value1)
-{
-	*value0 = readl_relaxed(vfe->base + VFE_0_IRQ_STATUS_0);
-	*value1 = readl_relaxed(vfe->base + VFE_0_IRQ_STATUS_1);
-
-	writel_relaxed(*value0, vfe->base + VFE_0_IRQ_CLEAR_0);
-	writel_relaxed(*value1, vfe->base + VFE_0_IRQ_CLEAR_1);
-
-	/* Enforce barrier between local & global IRQ clear */
-	wmb();
-	writel_relaxed(VFE_0_IRQ_CMD_GLOBAL_CLEAR, vfe->base + VFE_0_IRQ_CMD);
-}
-
 /*
  * vfe_pm_domain_off - Disable power domains specific to this VFE.
  * @vfe: VFE Device
@@ -1123,13 +1130,6 @@ static int vfe_pm_domain_on(struct vfe_device *vfe)
 	}
 
 	return 0;
-}
-
-static void vfe_violation_read(struct vfe_device *vfe)
-{
-	u32 violation = readl_relaxed(vfe->base + VFE_0_VIOLATION_STATUS);
-
-	pr_err_ratelimited("VFE: violation = 0x%08x\n", violation);
 }
 
 static const struct vfe_hw_ops_gen1 vfe_ops_gen1_4_8 = {
@@ -1167,11 +1167,12 @@ static const struct vfe_hw_ops_gen1 vfe_ops_gen1_4_8 = {
 	.wm_set_pong_addr = vfe_wm_set_pong_addr,
 	.wm_set_subsample = vfe_wm_set_subsample,
 	.wm_set_ub_cfg = vfe_wm_set_ub_cfg,
+	.reg_update_clear = vfe_reg_update_clear,
+	.reg_update = vfe_reg_update,
 };
 
 static void vfe_subdev_init(struct device *dev, struct vfe_device *vfe)
 {
-	vfe->isr_ops = vfe_isr_ops_gen1;
 	vfe->ops_gen1 = &vfe_ops_gen1_4_8;
 	vfe->video_ops = vfe_video_ops_gen1;
 
@@ -1181,15 +1182,11 @@ static void vfe_subdev_init(struct device *dev, struct vfe_device *vfe)
 const struct vfe_hw_ops vfe_ops_4_8 = {
 	.global_reset = vfe_global_reset,
 	.hw_version_read = vfe_hw_version_read,
-	.isr_read = vfe_isr_read,
 	.isr = vfe_isr,
 	.pm_domain_off = vfe_pm_domain_off,
 	.pm_domain_on = vfe_pm_domain_on,
-	.reg_update_clear = vfe_reg_update_clear,
-	.reg_update = vfe_reg_update,
 	.subdev_init = vfe_subdev_init,
 	.vfe_disable = vfe_gen1_disable,
 	.vfe_enable = vfe_gen1_enable,
 	.vfe_halt = vfe_gen1_halt,
-	.violation_read = vfe_violation_read,
 };

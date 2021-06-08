@@ -55,6 +55,9 @@ struct vfe_hw_ops_gen1 {
 	void (*wm_set_pong_addr)(struct vfe_device *vfe, u8 wm, u32 addr);
 	int (*wm_get_ping_pong_status)(struct vfe_device *vfe, u8 wm);
 	void (*wm_enable)(struct vfe_device *vfe, u8 wm, u8 enable);
+	void (*reg_update)(struct vfe_device *vfe, enum vfe_line_id line_id);
+	void (*reg_update_clear)(struct vfe_device *vfe,
+				 enum vfe_line_id line_id);
 };
 
 /*
@@ -95,12 +98,46 @@ int vfe_gen1_disable(struct vfe_line *line);
 int vfe_gen1_enable(struct vfe_line *line);
 
 /*
- * vfe_gen1_enable - Halt VFE module
+ * vfe_gen1_halt - Halt VFE module
  * @vfe: VFE device
  *
  * Return 0 on success
  */
 int vfe_gen1_halt(struct vfe_device *vfe);
+
+/*
+ * vfe_gen1_isr_halt_ack - Process halt ack
+ * @vfe: VFE Device
+ */
+void vfe_gen1_isr_halt_ack(struct vfe_device *vfe);
+
+/*
+ * vfe_gen1_isr_sof - Process start of frame interrupt
+ * @vfe: VFE Device
+ * @line_id: VFE line
+ */
+void vfe_gen1_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id);
+
+/*
+ * vfe_gen1_reg_update - Process reg update interrupt
+ * @vfe: VFE Device
+ * @line_id: VFE line
+ */
+void vfe_gen1_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id);
+
+/*
+ * vfe_gen1_isr_wm_done - Process write master done interrupt
+ * @vfe: VFE Device
+ * @wm: Write master id
+ */
+void vfe_gen1_isr_wm_done(struct vfe_device *vfe, u8 wm);
+
+/**
+ * vfe_gen1_isr_comp_done() - Process composite image done interrupt
+ * @vfe: VFE Device
+ * @comp: Composite image id
+ */
+void vfe_gen1_isr_comp_done(struct vfe_device *vfe, u8 comp);
 
 /*
  * vfe_word_per_line - Calculate number of words per frame width

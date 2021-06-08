@@ -188,20 +188,6 @@ static void vfe_hw_version_read(struct vfe_device *vfe, struct device *dev)
 	dev_err(dev, "VFE HW Version = %u.%u.%u\n", gen, rev, step);
 }
 
-static inline void vfe_reg_clr(struct vfe_device *vfe, u32 reg, u32 clr_bits)
-{
-	u32 bits = readl_relaxed(vfe->base + reg);
-
-	writel_relaxed(bits & ~clr_bits, vfe->base + reg);
-}
-
-static inline void vfe_reg_set(struct vfe_device *vfe, u32 reg, u32 set_bits)
-{
-	u32 bits = readl_relaxed(vfe->base + reg);
-
-	writel_relaxed(bits | set_bits, vfe->base + reg);
-}
-
 static void vfe_global_reset(struct vfe_device *vfe)
 {
 	u32 reset_bits = GLOBAL_RESET_CMD_CORE		|
@@ -305,38 +291,16 @@ static inline void vfe_reg_update_clear(struct vfe_device *vfe,
 
 static void vfe_enable_irq_common(struct vfe_device *vfe)
 {
-	vfe_reg_set(vfe, VFE_IRQ_MASK_0, ~0u);
-	vfe_reg_set(vfe, VFE_IRQ_MASK_1, ~0u);
+	writel_relaxed(~0u, vfe->base + VFE_IRQ_MASK_0);
+	writel_relaxed(~0u, vfe->base + VFE_IRQ_MASK_1);
 
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(0));
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(1));
 	writel_relaxed(~0u, vfe->base + VFE_BUS_IRQ_MASK(2));
 }
 
-static void vfe_isr_halt_ack(struct vfe_device *vfe)
-{
-	complete(&vfe->halt_complete);
-}
-
-static void vfe_isr_read(struct vfe_device *vfe, u32 *status0, u32 *status1)
-{
-	*status0 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_0);
-	*status1 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_1);
-
-	writel_relaxed(*status0, vfe->base + VFE_IRQ_CLEAR_0);
-	writel_relaxed(*status1, vfe->base + VFE_IRQ_CLEAR_1);
-
-	/* Enforce ordering between IRQ Clear and Global IRQ Clear */
-	wmb();
-	writel_relaxed(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD);
-}
-
-static void vfe_violation_read(struct vfe_device *vfe)
-{
-	u32 violation = readl_relaxed(vfe->base + VFE_VIOLATION_STATUS);
-
-	pr_err_ratelimited("VFE: violation = 0x%08x\n", violation);
-}
+static void vfe_isr_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id);
+static void vfe_isr_wm_done(struct vfe_device *vfe, u8 wm);
 
 /*
  * vfe_isr - VFE module interrupt handler
@@ -369,24 +333,16 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 	writel_relaxed(1, vfe->base + VFE_BUS_IRQ_CLEAR_GLOBAL);
 
 	if (status0 & STATUS_0_RESET_ACK)
-		vfe->isr_ops.reset_ack(vfe);
+		vfe_isr_reset_ack(vfe);
 
 	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
 		if (status0 & STATUS_0_RDI_REG_UPDATE(i))
-			vfe->isr_ops.reg_update(vfe, i);
-
-	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
-		if (status0 & STATUS_1_RDI_SOF(i))
-			vfe->isr_ops.sof(vfe, i);
-
-	for (i = 0; i < MSM_VFE_COMPOSITE_IRQ_NUM; i++)
-		if (vfe_bus_status[0] & STATUS0_COMP_BUF_DONE(i))
-			vfe->isr_ops.comp_done(vfe, i);
+			vfe_isr_reg_update(vfe, i);
 
 	for (wm = 0; wm < MSM_VFE_IMAGE_MASTERS_NUM; wm++)
 		if (status0 & BIT(9))
 			if (vfe_bus_status[1] & STATUS1_WM_CLIENT_BUF_DONE(wm))
-				vfe->isr_ops.wm_done(vfe, wm);
+				vfe_isr_wm_done(vfe, wm);
 
 	return IRQ_HANDLED;
 }
@@ -456,7 +412,6 @@ static int vfe_enable_output(struct vfe_line *line)
 {
 	struct vfe_device *vfe = to_vfe(line);
 	struct vfe_output *output = &line->output;
-	const struct vfe_hw_ops *ops = vfe->ops;
 	struct media_entity *sensor;
 	unsigned long flags;
 	unsigned int frame_skip = 0;
@@ -474,7 +429,7 @@ static int vfe_enable_output(struct vfe_line *line)
 
 	spin_lock_irqsave(&vfe->output_lock, flags);
 
-	ops->reg_update_clear(vfe, line->id);
+	vfe_reg_update_clear(vfe, line->id);
 
 	if (output->state != VFE_OUTPUT_OFF) {
 		dev_err(vfe->camss->dev, "Output is not in reserved state %d\n",
@@ -501,7 +456,7 @@ static int vfe_enable_output(struct vfe_line *line)
 		vfe_wm_update(vfe, output->wm_idx[0], output->buf[i]->addr[0], line);
 	}
 
-	ops->reg_update(vfe, line->id);
+	vfe_reg_update(vfe, line->id);
 
 	spin_unlock_irqrestore(&vfe->output_lock, flags);
 
@@ -608,16 +563,6 @@ static int vfe_disable(struct vfe_line *line)
 }
 
 /*
- * vfe_isr_sof - Process start of frame interrupt
- * @vfe: VFE Device
- * @line_id: VFE line
- */
-static void vfe_isr_sof(struct vfe_device *vfe, enum vfe_line_id line_id)
-{
-	/* nop */
-}
-
-/*
  * vfe_isr_reg_update - Process reg update interrupt
  * @vfe: VFE Device
  * @line_id: VFE line
@@ -628,7 +573,7 @@ static void vfe_isr_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
 	unsigned long flags;
 
 	spin_lock_irqsave(&vfe->output_lock, flags);
-	vfe->ops->reg_update_clear(vfe, line_id);
+	vfe_reg_update_clear(vfe, line_id);
 
 	output = &vfe->line[line_id].output;
 
@@ -747,15 +692,6 @@ static int vfe_queue_buffer(struct camss_video *vid,
 	return 0;
 }
 
-static const struct vfe_isr_ops vfe_isr_ops_170 = {
-	.reset_ack = vfe_isr_reset_ack,
-	.halt_ack = vfe_isr_halt_ack,
-	.reg_update = vfe_isr_reg_update,
-	.sof = vfe_isr_sof,
-	.comp_done = vfe_isr_comp_done,
-	.wm_done = vfe_isr_wm_done,
-};
-
 static const struct camss_video_ops vfe_video_ops_170 = {
 	.queue_buffer = vfe_queue_buffer,
 	.flush_buffers = vfe_flush_buffers,
@@ -763,7 +699,6 @@ static const struct camss_video_ops vfe_video_ops_170 = {
 
 static void vfe_subdev_init(struct device *dev, struct vfe_device *vfe)
 {
-	vfe->isr_ops = vfe_isr_ops_170;
 	vfe->video_ops = vfe_video_ops_170;
 
 	vfe->line_num = VFE_LINE_NUM_GEN2;
@@ -772,15 +707,11 @@ static void vfe_subdev_init(struct device *dev, struct vfe_device *vfe)
 const struct vfe_hw_ops vfe_ops_170 = {
 	.global_reset = vfe_global_reset,
 	.hw_version_read = vfe_hw_version_read,
-	.isr_read = vfe_isr_read,
 	.isr = vfe_isr,
 	.pm_domain_off = vfe_pm_domain_off,
 	.pm_domain_on = vfe_pm_domain_on,
-	.reg_update_clear = vfe_reg_update_clear,
-	.reg_update = vfe_reg_update,
 	.subdev_init = vfe_subdev_init,
 	.vfe_disable = vfe_disable,
 	.vfe_enable = vfe_enable,
 	.vfe_halt = vfe_halt,
-	.violation_read = vfe_violation_read,
 };
