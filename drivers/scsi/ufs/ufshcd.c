@@ -2972,7 +2972,7 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 
 	if (unlikely(test_bit(tag, &hba->outstanding_reqs))) {
 		err = -EBUSY;
-		goto out;
+		goto out_put_tag;
 	}
 
 	init_completion(&wait);
