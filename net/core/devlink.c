@@ -9267,6 +9267,48 @@ void devlink_port_params_unregister(struct devlink_port *devlink_port,
 }
 EXPORT_SYMBOL_GPL(devlink_port_params_unregister);
 
+/**
+ *	devlink_port_params_publish - publish port configuration parameters
+ *
+ *	@devlink_port: devlink port
+ *
+ *	Publish previously registered port configuration parameters.
+ */
+void devlink_port_params_publish(struct devlink_port *devlink_port)
+{
+	struct devlink_param_item *param_item;
+
+	list_for_each_entry(param_item, &devlink_port->param_list, list) {
+		if (param_item->published)
+			continue;
+		param_item->published = true;
+		devlink_param_notify(devlink_port->devlink, devlink_port->index,
+				     param_item, DEVLINK_CMD_PORT_PARAM_NEW);
+	}
+}
+EXPORT_SYMBOL_GPL(devlink_port_params_publish);
+
+/**
+ *	devlink_port_params_unpublish - unpublish port configuration parameters
+ *
+ *	@devlink_port: devlink port
+ *
+ *	Unpublish previously registered port configuration parameters.
+ */
+void devlink_port_params_unpublish(struct devlink_port *devlink_port)
+{
+	struct devlink_param_item *param_item;
+
+	list_for_each_entry(param_item, &devlink_port->param_list, list) {
+		if (!param_item->published)
+			continue;
+		param_item->published = false;
+		devlink_param_notify(devlink_port->devlink, devlink_port->index,
+				     param_item, DEVLINK_CMD_PORT_PARAM_DEL);
+	}
+}
+EXPORT_SYMBOL_GPL(devlink_port_params_unpublish);
+
 static int
 __devlink_param_driverinit_value_get(struct list_head *param_list, u32 param_id,
 				     union devlink_param_value *init_val)

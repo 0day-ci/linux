@@ -1575,6 +1575,8 @@ int devlink_port_params_register(struct devlink_port *devlink_port,
 void devlink_port_params_unregister(struct devlink_port *devlink_port,
 				    const struct devlink_param *params,
 				    size_t params_count);
+void devlink_port_params_publish(struct devlink_port *devlink_port);
+void devlink_port_params_unpublish(struct devlink_port *ddevlink_port);
 int devlink_param_driverinit_value_get(struct devlink *devlink, u32 param_id,
 				       union devlink_param_value *init_val);
 int devlink_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
