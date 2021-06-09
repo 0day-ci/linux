@@ -4438,7 +4438,6 @@ static int svm_vm_init(struct kvm *kvm)
 			return ret;
 	}
 
-	kvm_apicv_init(kvm, enable_apicv);
 	return 0;
 }
 
