@@ -37,8 +37,7 @@ nvkm_sw_mthd(struct nvkm_sw *sw, int chid, int subc, u32 mthd, u32 data)
 	list_for_each_entry(chan, &sw->chan, head) {
 		if (chan->fifo->chid == chid) {
 			handled = nvkm_sw_chan_mthd(chan, subc, mthd, data);
-			list_del(&chan->head);
-			list_add(&chan->head, &sw->chan);
+			list_move(&chan->head, &sw->chan);
 			break;
 		}
 	}
