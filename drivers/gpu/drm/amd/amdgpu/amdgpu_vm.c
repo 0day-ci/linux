@@ -2518,8 +2518,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 			list_add(&after->list, &tmp->bo_va->invalids);
 		}
 
-		list_del(&tmp->list);
-		list_add(&tmp->list, &removed);
+		list_move(&tmp->list, &removed);
 
 		tmp = amdgpu_vm_it_iter_next(tmp, saddr, eaddr);
 	}
