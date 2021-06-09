@@ -19,36 +19,27 @@
 
 #define CHAIN_SZ (4 << 10)
 
-static struct kmem_cache *slab_fences;
-
-static inline struct mock_fence {
+struct mock_fence {
 	struct dma_fence base;
 	spinlock_t lock;
-} *to_mock_fence(struct dma_fence *f) {
-	return container_of(f, struct mock_fence, base);
-}
+};
 
 static const char *mock_name(struct dma_fence *f)
 {
 	return "mock";
 }
 
-static void mock_fence_release(struct dma_fence *f)
-{
-	kmem_cache_free(slab_fences, to_mock_fence(f));
-}
-
 static const struct dma_fence_ops mock_ops = {
 	.get_driver_name = mock_name,
 	.get_timeline_name = mock_name,
-	.release = mock_fence_release,
+	.release = dma_fence_free,
 };
 
 static struct dma_fence *mock_fence(void)
 {
 	struct mock_fence *f;
 
-	f = kmem_cache_alloc(slab_fences, GFP_KERNEL);
+	f = kmalloc(sizeof(*f), GFP_KERNEL);
 	if (!f)
 		return NULL;
 
@@ -701,14 +692,7 @@ int dma_fence_chain(void)
 	pr_info("sizeof(dma_fence_chain)=%zu\n",
 		sizeof(struct dma_fence_chain));
 
-	slab_fences = KMEM_CACHE(mock_fence,
-				 SLAB_TYPESAFE_BY_RCU |
-				 SLAB_HWCACHE_ALIGN);
-	if (!slab_fences)
-		return -ENOMEM;
-
 	ret = subtests(tests, NULL);
 
-	kmem_cache_destroy(slab_fences);
 	return ret;
 }

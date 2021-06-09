@@ -14,23 +14,14 @@
 
 #include "selftest.h"
 
-static struct kmem_cache *slab_fences;
-
-static struct mock_fence {
+struct mock_fence {
 	struct dma_fence base;
 	struct spinlock lock;
-} *to_mock_fence(struct dma_fence *f) {
-	return container_of(f, struct mock_fence, base);
-}
+};
 
 static const char *mock_name(struct dma_fence *f)
 {
 	return "mock";
-}
-
-static void mock_fence_release(struct dma_fence *f)
-{
-	kmem_cache_free(slab_fences, to_mock_fence(f));
 }
 
 struct wait_cb {
@@ -77,14 +68,14 @@ static const struct dma_fence_ops mock_ops = {
 	.get_driver_name = mock_name,
 	.get_timeline_name = mock_name,
 	.wait = mock_wait,
-	.release = mock_fence_release,
+	.release = dma_fence_free,
 };
 
 static struct dma_fence *mock_fence(void)
 {
 	struct mock_fence *f;
 
-	f = kmem_cache_alloc(slab_fences, GFP_KERNEL);
+	f = kmalloc(sizeof(*f), GFP_KERNEL);
 	if (!f)
 		return NULL;
 
@@ -463,7 +454,7 @@ static int thread_signal_callback(void *arg)
 
 		rcu_read_lock();
 		do {
-			f2 = dma_fence_get_rcu_safe(&t->fences[!t->id]);
+			f2 = dma_fence_get_rcu(t->fences[!t->id]);
 		} while (!f2 && !kthread_should_stop());
 		rcu_read_unlock();
 
@@ -563,15 +554,7 @@ int dma_fence(void)
 
 	pr_info("sizeof(dma_fence)=%zu\n", sizeof(struct dma_fence));
 
-	slab_fences = KMEM_CACHE(mock_fence,
-				 SLAB_TYPESAFE_BY_RCU |
-				 SLAB_HWCACHE_ALIGN);
-	if (!slab_fences)
-		return -ENOMEM;
-
 	ret = subtests(tests, NULL);
-
-	kmem_cache_destroy(slab_fences);
 
 	return ret;
 }
