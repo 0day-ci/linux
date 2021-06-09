@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -255,6 +256,13 @@ static int tegra_ehci_hub_control(struct ci_hdrc *ci, u16 typeReq, u16 wValue,
 
 static void tegra_usb_enter_lpm(struct ci_hdrc *ci, bool enable)
 {
+	/*
+	 * Give hardware time to settle down after VBUS disconnection,
+	 * otherwise PHY may wake up from suspend immediately.
+	 */
+	if (enable)
+		msleep(25);
+
 	/*
 	 * Touching any register which belongs to AHB clock domain will
 	 * hang CPU if USB controller is put into low power mode because
