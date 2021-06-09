@@ -150,7 +150,6 @@ lpfc_free_bsg_buffers(struct lpfc_hba *phba, struct lpfc_dmabuf *mlist)
 		lpfc_mbuf_free(phba, mlist->virt, mlist->phys);
 		kfree(mlist);
 	}
-	return;
 }
 
 static struct lpfc_dmabuf *
@@ -377,7 +376,6 @@ lpfc_bsg_send_mgmt_cmd_cmp(struct lpfc_hba *phba,
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-	return;
 }
 
 /**
@@ -647,7 +645,6 @@ lpfc_bsg_rport_els_cmp(struct lpfc_hba *phba,
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-	return;
 }
 
 /**
@@ -1442,7 +1439,6 @@ lpfc_issue_ct_rsp_cmp(struct lpfc_hba *phba,
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-	return;
 }
 
 /**
@@ -1755,7 +1751,6 @@ lpfc_bsg_diag_mode_exit(struct lpfc_hba *phba)
 		shost = lpfc_shost_from_vport(phba->pport);
 		scsi_unblock_requests(shost);
 	}
-	return;
 }
 
 /**
@@ -2816,7 +2811,6 @@ lpfc_bsg_dma_page_free(struct lpfc_hba *phba, struct lpfc_dmabuf *dmabuf)
 		dma_free_coherent(&pcidev->dev, BSG_MBOX_SIZE,
 				  dmabuf->virt, dmabuf->phys);
 	kfree(dmabuf);
-	return;
 }
 
 /**
@@ -2840,7 +2834,6 @@ lpfc_bsg_dma_page_list_free(struct lpfc_hba *phba,
 		list_del_init(&dmabuf->list);
 		lpfc_bsg_dma_page_free(phba, dmabuf);
 	}
-	return;
 }
 
 /**
@@ -3485,7 +3478,6 @@ lpfc_bsg_issue_mbox_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-	return;
 }
 
 /**
@@ -3602,8 +3594,6 @@ lpfc_bsg_mbox_ext_session_reset(struct lpfc_hba *phba)
 	memset((char *)&phba->mbox_ext_buf_ctx, 0,
 	       sizeof(struct lpfc_mbox_ext_buf_ctx));
 	INIT_LIST_HEAD(&phba->mbox_ext_buf_ctx.ext_dmabuf_list);
-
-	return;
 }
 
 /**
@@ -3735,7 +3725,6 @@ lpfc_bsg_issue_read_mbox_ext_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-	return;
 }
 
 /**
@@ -3773,8 +3762,6 @@ lpfc_bsg_issue_write_mbox_ext_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-
-	return;
 }
 
 static void
@@ -3867,7 +3854,6 @@ lpfc_bsg_sli_cfg_dma_desc_setup(struct lpfc_hba *phba, enum nemb_type nemb_tp,
 				hbd[index].pa_lo);
 		}
 	}
-	return;
 }
 
 /**
@@ -4375,7 +4361,6 @@ lpfc_bsg_mbox_ext_abort(struct lpfc_hba *phba)
 		phba->mbox_ext_buf_ctx.state = LPFC_BSG_MBOX_ABTS;
 	else
 		lpfc_bsg_mbox_ext_session_reset(phba);
-	return;
 }
 
 /**
@@ -5146,8 +5131,6 @@ lpfc_bsg_menlo_cmd_cmp(struct lpfc_hba *phba,
 		bsg_job_done(job, bsg_reply->result,
 			       bsg_reply->reply_payload_rcv_len);
 	}
-
-	return;
 }
 
 /**
