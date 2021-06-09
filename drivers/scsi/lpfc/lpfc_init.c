@@ -289,7 +289,6 @@ lpfc_config_async_cmpl(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmboxq)
 	else
 		phba->temp_sensor_support = 0;
 	mempool_free(pmboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -333,7 +332,6 @@ lpfc_dump_wakeup_param_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 			prg->ver, prg->rev, prg->lev,
 			dist, prg->num);
 	mempool_free(pmboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -1150,7 +1148,6 @@ lpfc_hb_timeout(struct timer_list *t)
 	/* Tell the worker thread there is work to do */
 	if (!tmo_posted)
 		lpfc_worker_wake_up(phba);
-	return;
 }
 
 /**
@@ -1216,7 +1213,6 @@ lpfc_hb_mbox_cmpl(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmboxq)
 		mod_timer(&phba->hb_tmofunc,
 			  jiffies +
 			  msecs_to_jiffies(1000 * LPFC_HB_MBOX_INTERVAL));
-	return;
 }
 
 /*
@@ -1590,7 +1586,6 @@ lpfc_offline_eratt(struct lpfc_hba *phba)
 	lpfc_sli_brdready(phba, HS_MBRDY);
 	lpfc_unblock_mgmt_io(phba);
 	phba->link_state = LPFC_HBA_ERROR;
-	return;
 }
 
 /**
@@ -1832,7 +1827,6 @@ lpfc_handle_eratt_s3(struct lpfc_hba *phba)
 
 		lpfc_offline_eratt(phba);
 	}
-	return;
 }
 
 /**
@@ -2193,8 +2187,6 @@ lpfc_handle_latt_err_exit:
 
 	lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
 			"0300 LATT: Cannot issue READ_LA: Data:%d\n", rc);
-
-	return;
 }
 
 /**
@@ -2963,7 +2955,6 @@ lpfc_stop_vport_timers(struct lpfc_vport *vport)
 	del_timer_sync(&vport->els_tmofunc);
 	del_timer_sync(&vport->delayed_disc_tmo);
 	lpfc_can_disctmo(vport);
-	return;
 }
 
 /**
@@ -3046,7 +3037,6 @@ lpfc_stop_hba_timers(struct lpfc_hba *phba)
 				phba->pci_dev_grp);
 		break;
 	}
-	return;
 }
 
 /**
@@ -4572,7 +4562,6 @@ destroy_port(struct lpfc_vport *vport)
 	spin_unlock_irq(&phba->port_list_lock);
 
 	lpfc_cleanup(vport);
-	return;
 }
 
 /**
@@ -6223,7 +6212,6 @@ static void lpfc_log_intr_mode(struct lpfc_hba *phba, uint32_t intr_mode)
 				"0482 Illegal interrupt mode.\n");
 		break;
 	}
-	return;
 }
 
 /**
@@ -6292,8 +6280,6 @@ lpfc_disable_pci_dev(struct lpfc_hba *phba)
 	/* Release PCI resource and disable PCI device */
 	pci_release_mem_regions(pdev);
 	pci_disable_device(pdev);
-
-	return;
 }
 
 /**
@@ -6639,8 +6625,6 @@ lpfc_sli_driver_resource_unset(struct lpfc_hba *phba)
 {
 	/* Free device driver memory allocated */
 	lpfc_mem_free_all(phba);
-
-	return;
 }
 
 /**
@@ -7254,8 +7238,6 @@ lpfc_sli4_driver_resource_unset(struct lpfc_hba *phba)
 		list_del_init(&conn_entry->list);
 		kfree(conn_entry);
 	}
-
-	return;
 }
 
 /**
@@ -7362,8 +7344,6 @@ lpfc_free_iocb_list(struct lpfc_hba *phba)
 		phba->total_iocbq_bufs--;
 	}
 	spin_unlock_irq(&phba->hbalock);
-
-	return;
 }
 
 /**
@@ -7773,7 +7753,6 @@ lpfc_hba_free(struct lpfc_hba *phba)
 	phba->sli.sli3_ring = NULL;
 
 	kfree(phba);
-	return;
 }
 
 /**
@@ -7851,8 +7830,6 @@ lpfc_destroy_shost(struct lpfc_hba *phba)
 
 	/* Destroy physical port that associated with the SCSI host */
 	destroy_port(vport);
-
-	return;
 }
 
 /**
@@ -7947,7 +7924,6 @@ lpfc_post_init_setup(struct lpfc_hba *phba)
 				  sizeof(adapter_event),
 				  (char *) &adapter_event,
 				  LPFC_NL_VENDOR_ID);
-	return;
 }
 
 /**
@@ -8085,8 +8061,6 @@ lpfc_sli_pci_mem_unset(struct lpfc_hba *phba)
 	/* I/O memory unmap */
 	iounmap(phba->ctrl_regs_memmap_p);
 	iounmap(phba->slim_memmap_p);
-
-	return;
 }
 
 /**
@@ -11331,7 +11305,6 @@ found_any:
 	/* The cpu_map array will be used later during initialization
 	 * when EQ / CQ / WQs are allocated and configured.
 	 */
-	return;
 }
 
 /**
@@ -11948,8 +11921,6 @@ lpfc_unset_hba(struct lpfc_hba *phba)
 	lpfc_sli_brdrestart(phba);
 
 	lpfc_sli_disable_intr(phba);
-
-	return;
 }
 
 /**
@@ -13435,8 +13406,6 @@ lpfc_pci_remove_one_s4(struct pci_dev *pdev)
 
 	/* Finally, free the driver's device data structure */
 	lpfc_hba_free(phba);
-
-	return;
 }
 
 /**
@@ -13820,7 +13789,6 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 				phba->pci_dev_grp);
 		break;
 	}
-	return;
 }
 
 /**
@@ -13999,7 +13967,6 @@ lpfc_io_resume(struct pci_dev *pdev)
 				phba->pci_dev_grp);
 		break;
 	}
-	return;
 }
 
 /**
@@ -14026,8 +13993,6 @@ lpfc_sli4_oas_verify(struct lpfc_hba *phba)
 		mempool_destroy(phba->device_data_mem_pool);
 		phba->device_data_mem_pool = NULL;
 	}
-
-	return;
 }
 
 /**
