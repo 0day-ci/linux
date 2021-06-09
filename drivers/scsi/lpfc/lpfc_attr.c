@@ -109,7 +109,6 @@ lpfc_jedec_to_ascii(int incr, char hdw[])
 		incr = (incr >> 4);
 	}
 	hdw[8] = 0;
-	return;
 }
 
 /**
@@ -7022,8 +7021,6 @@ lpfc_reset_stats(struct Scsi_Host *shost)
 	psli->stats_start = ktime_get_seconds();
 
 	mempool_free(pmboxq, phba->mbox_mem_pool);
-
-	return;
 }
 
 /*
@@ -7492,8 +7489,6 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_ras_fwlog_buffsize_init(phba, lpfc_ras_fwlog_buffsize);
 	lpfc_ras_fwlog_level_init(phba, lpfc_ras_fwlog_level);
 	lpfc_ras_fwlog_func_init(phba, lpfc_ras_fwlog_func);
-
-	return;
 }
 
 /**
@@ -7586,5 +7581,4 @@ lpfc_get_vport_cfgparam(struct lpfc_vport *vport)
 	lpfc_max_luns_init(vport, lpfc_max_luns);
 	lpfc_scan_down_init(vport, lpfc_scan_down);
 	lpfc_enable_da_id_init(vport, lpfc_enable_da_id);
-	return;
 }
