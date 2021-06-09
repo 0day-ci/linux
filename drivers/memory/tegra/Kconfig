@@ -48,6 +48,8 @@ config TEGRA124_EMC
 config TEGRA210_EMC_TABLE
 	bool
 	depends on ARCH_TEGRA_210_SOC || COMPILE_TEST
+	select OF_EARLY_FLATTREE
+	select OF_RESERVED_MEM
 
 config TEGRA210_EMC
 	tristate "NVIDIA Tegra210 External Memory Controller driver"
