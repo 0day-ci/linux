@@ -1572,8 +1572,7 @@ bfa_lps_login_rsp(struct bfa_s *bfa, struct bfi_lps_login_rsp_s *rsp)
 		break;
 	}
 
-	list_del(&lps->qe);
-	list_add_tail(&lps->qe, &mod->lps_active_q);
+	list_move_tail(&lps->qe, &mod->lps_active_q);
 	bfa_sm_send_event(lps, BFA_LPS_SM_FWRSP);
 }
 
@@ -1594,8 +1593,7 @@ bfa_lps_no_res(struct bfa_lps_s *first_lps, u8 count)
 		lps = (struct bfa_lps_s *)qe;
 		bfa_trc(bfa, lps->bfa_tag);
 		lps->status = first_lps->status;
-		list_del(&lps->qe);
-		list_add_tail(&lps->qe, &mod->lps_active_q);
+		list_move_tail(&lps->qe, &mod->lps_active_q);
 		bfa_sm_send_event(lps, BFA_LPS_SM_FWRSP);
 		qe = qe_next;
 		count--;
@@ -1651,8 +1649,7 @@ bfa_lps_free(struct bfa_lps_s *lps)
 	struct bfa_lps_mod_s	*mod = BFA_LPS_MOD(lps->bfa);
 
 	lps->lp_pid = 0;
-	list_del(&lps->qe);
-	list_add_tail(&lps->qe, &mod->lps_free_q);
+	list_move_tail(&lps->qe, &mod->lps_free_q);
 }
 
 /*
@@ -1679,8 +1676,7 @@ bfa_lps_send_login(struct bfa_lps_s *lps)
 	m->auth_en	= lps->auth_en;
 
 	bfa_reqq_produce(lps->bfa, lps->reqq, m->mh);
-	list_del(&lps->qe);
-	list_add_tail(&lps->qe, &mod->lps_login_q);
+	list_move_tail(&lps->qe, &mod->lps_login_q);
 }
 
 /*
@@ -4877,8 +4873,7 @@ bfa_rport_free(struct bfa_rport_s *rport)
 	struct bfa_rport_mod_s *mod = BFA_RPORT_MOD(rport->bfa);
 
 	WARN_ON(!bfa_q_is_on_q(&mod->rp_active_q, rport));
-	list_del(&rport->qe);
-	list_add_tail(&rport->qe, &mod->rp_free_q);
+	list_move_tail(&rport->qe, &mod->rp_free_q);
 }
 
 static bfa_boolean_t
