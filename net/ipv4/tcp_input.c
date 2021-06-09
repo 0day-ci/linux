@@ -4941,8 +4941,13 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	bool fragstolen;
 	int eaten;
 
-	if (sk_is_mptcp(sk))
+	if (sk_is_mptcp(sk)) {
 		mptcp_incoming_options(sk, skb);
+		if (sk->sk_state == TCP_CLOSE) {
+			__kfree_skb(skb);
+			return;
+		}
+	}
 
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
 		__kfree_skb(skb);
