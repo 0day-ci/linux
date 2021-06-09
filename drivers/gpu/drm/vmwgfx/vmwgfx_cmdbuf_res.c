@@ -167,8 +167,7 @@ void vmw_cmdbuf_res_revert(struct list_head *list)
 			break;
 		case VMW_CMDBUF_RES_DEL:
 			drm_ht_insert_item(&entry->man->resources, &entry->hash);
-			list_del(&entry->head);
-			list_add_tail(&entry->head, &entry->man->list);
+			list_move_tail(&entry->head, &entry->man->list);
 			entry->state = VMW_CMDBUF_RES_COMMITTED;
 			break;
 		default:
