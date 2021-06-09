@@ -1567,7 +1567,7 @@ static int kmemleak_scan_thread(void *arg)
 	}
 
 	while (!kthread_should_stop()) {
-		signed long timeout = jiffies_scan_wait;
+		signed long timeout = READ_ONCE(jiffies_scan_wait);
 
 		mutex_lock(&scan_mutex);
 		kmemleak_scan();
@@ -1812,11 +1812,8 @@ static ssize_t kmemleak_write(struct file *file, const char __user *user_buf,
 		ret = kstrtoul(buf + 5, 0, &secs);
 		if (ret < 0)
 			goto out;
-		stop_scan_thread();
-		if (secs) {
+		if (secs)
 			jiffies_scan_wait = msecs_to_jiffies(secs * 1000);
-			start_scan_thread();
-		}
 	} else if (strncmp(buf, "scan", 4) == 0)
 		kmemleak_scan();
 	else if (strncmp(buf, "dump=", 5) == 0)
