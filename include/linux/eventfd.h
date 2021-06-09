@@ -14,6 +14,7 @@
 #include <linux/err.h>
 #include <linux/percpu-defs.h>
 #include <linux/percpu.h>
+#include <linux/kref.h>
 
 /*
  * CAREFUL: Check include/uapi/asm-generic/fcntl.h when defining
@@ -29,10 +30,26 @@
 #define EFD_SHARED_FCNTL_FLAGS (O_CLOEXEC | O_NONBLOCK)
 #define EFD_FLAGS_SET (EFD_SHARED_FCNTL_FLAGS | EFD_SEMAPHORE)
 
-struct eventfd_ctx;
 struct file;
 
 #ifdef CONFIG_EVENTFD
+
+struct eventfd_ctx {
+	struct kref kref;
+	wait_queue_head_t wqh;
+       /*
+	* Every time that a write(2) is performed on an eventfd, the
+	* value of the __u64 being written is added to "count" and a
+	* wakeup is performed on "wqh". A read(2) will return the "count"
+	* value to userspace, and will reset "count" to zero. The kernel
+	* side eventfd_signal() also, adds to the "count" counter and
+	* issue a wakeup.
+	*/
+	__u64 count;
+	unsigned int flags;
+	int id;
+	int __percpu *eventfd_wake_count;
+};
 
 void eventfd_ctx_put(struct eventfd_ctx *ctx);
 struct file *eventfd_fget(int fd);
@@ -43,11 +60,10 @@ int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx, wait_queue_entry_t *w
 				  __u64 *cnt);
 void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt);
 
-DECLARE_PER_CPU(int, eventfd_wake_count);
 
-static inline bool eventfd_signal_count(void)
+static inline bool eventfd_signal_count(struct eventfd_ctx *ctx)
 {
-	return this_cpu_read(eventfd_wake_count);
+	return this_cpu_read(*ctx->eventfd_wake_count);
 }
 
 #else /* CONFIG_EVENTFD */
@@ -78,7 +94,7 @@ static inline int eventfd_ctx_remove_wait_queue(struct eventfd_ctx *ctx,
 	return -ENOSYS;
 }
 
-static inline bool eventfd_signal_count(void)
+static inline bool eventfd_signal_count(struct eventfd_ctx *ctx)
 {
 	return false;
 }
