@@ -1564,8 +1564,6 @@ lpfc_more_plogi(struct lpfc_vport *vport)
 	if (vport->fc_flag & FC_NLP_MORE)
 		/* go thru NPR nodes and issue any remaining ELS PLOGIs */
 		lpfc_els_disc_plogi(vport);
-
-	return;
 }
 
 /**
@@ -1893,7 +1891,6 @@ lpfc_cmpl_els_rrq(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 	lpfc_clr_rrq_active(phba, rrq->xritag, rrq);
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(ndlp);
-	return;
 }
 /**
  * lpfc_cmpl_els_plogi - Completion callback function for plogi
@@ -2045,7 +2042,6 @@ out_freeiocb:
 
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(free_ndlp);
-	return;
 }
 
 /**
@@ -2281,7 +2277,6 @@ lpfc_cmpl_els_prli(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 out:
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
 /**
@@ -2603,7 +2598,6 @@ lpfc_more_adisc(struct lpfc_vport *vport)
 	}
 	if (!vport->num_disc_nodes)
 		lpfc_adisc_done(vport);
-	return;
 }
 
 /**
@@ -2710,7 +2704,6 @@ lpfc_cmpl_els_adisc(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 out:
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
 /**
@@ -3161,7 +3154,6 @@ out:
 	lpfc_els_chk_latt(vport);
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
 /**
@@ -3589,7 +3581,6 @@ lpfc_cancel_retry_delay_tmo(struct lpfc_vport *vport, struct lpfc_nodelist *nlp)
 			}
 		}
 	}
-	return;
 }
 
 /**
@@ -3631,7 +3622,6 @@ lpfc_els_retry_delay(struct timer_list *t)
 		lpfc_worker_wake_up(phba);
 	}
 	spin_unlock_irqrestore(&phba->hbalock, flags);
-	return;
 }
 
 /**
@@ -3703,7 +3693,6 @@ lpfc_els_retry_delay_handler(struct lpfc_nodelist *ndlp)
 			lpfc_issue_els_fdisc(vport, ndlp, retry);
 		break;
 	}
-	return;
 }
 
 /**
@@ -4445,8 +4434,6 @@ lpfc_mbx_cmpl_dflt_rpi(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 		lpfc_nlp_put(ndlp);
 		lpfc_nlp_not_used(ndlp);
 	}
-
-	return;
 }
 
 /**
@@ -4590,7 +4577,6 @@ out:
 	/* Release the originating I/O reference. */
 	lpfc_els_free_iocb(phba, cmdiocb);
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
 /**
@@ -5267,7 +5253,6 @@ lpfc_els_clear_rrq(struct lpfc_vport *vport,
 	prrq = lpfc_get_active_rrq(vport, xri, ndlp->nlp_DID);
 	if (prrq)
 		lpfc_clr_rrq_active(phba, xri, prrq);
-	return;
 }
 
 /**
@@ -7345,7 +7330,6 @@ lpfc_els_rsp_rls_acc(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 		lpfc_els_free_iocb(phba, elsiocb);
 		lpfc_nlp_put(ndlp);
 	}
-	return;
 }
 
 /**
@@ -7945,7 +7929,6 @@ lpfc_els_timeout(struct timer_list *t)
 
 	if ((!tmo_posted) && (!(vport->load_flag & FC_UNLOADING)))
 		lpfc_worker_wake_up(phba);
-	return;
 }
 
 
@@ -8195,8 +8178,6 @@ lpfc_els_flush_cmd(struct lpfc_vport *vport)
 	/* Cancel all the IOCBs from the completions list */
 	lpfc_sli_cancel_iocbs(phba, &abort_list,
 			      IOSTAT_LOCAL_REJECT, IOERR_SLI_ABORTED);
-
-	return;
 }
 
 /**
@@ -8225,8 +8206,6 @@ lpfc_els_flush_all_cmd(struct lpfc_hba  *phba)
 	list_for_each_entry(vport, &phba->port_list, listentry)
 		lpfc_els_flush_cmd(vport);
 	spin_unlock_irq(&phba->port_list_lock);
-
-	return;
 }
 
 /**
@@ -8371,8 +8350,6 @@ lpfc_send_els_event(struct lpfc_vport *vport,
 			LPFC_NL_VENDOR_ID);
 		kfree(els_data);
 	}
-
-	return;
 }
 
 
@@ -9206,7 +9183,6 @@ mbox_err_exit:
 	lpfc_nlp_put(ndlp);
 
 	mempool_free(pmb, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -9260,7 +9236,6 @@ mbox_err_exit:
 	spin_lock_irq(shost->host_lock);
 	vport->fc_flag &= ~FC_VPORT_NEEDS_REG_VPI;
 	spin_unlock_irq(shost->host_lock);
-	return;
 }
 
 /**
@@ -9322,7 +9297,6 @@ lpfc_retry_pport_discovery(struct lpfc_hba *phba)
 	spin_unlock_irq(&ndlp->lock);
 	ndlp->nlp_last_elscmd = ELS_CMD_FLOGI;
 	phba->pport->port_state = LPFC_FLOGI;
-	return;
 }
 
 /**
@@ -9755,7 +9729,6 @@ lpfc_fabric_block_timeout(struct timer_list *t)
 
 	if (!tmo_posted)
 		lpfc_worker_wake_up(phba);
-	return;
 }
 
 /**
@@ -9829,7 +9802,6 @@ lpfc_unblock_fabric_iocbs(struct lpfc_hba *phba)
 	clear_bit(FABRIC_COMANDS_BLOCKED, &phba->bit_flags);
 
 	lpfc_resume_fabric_iocbs(phba);
-	return;
 }
 
 /**
@@ -9851,8 +9823,6 @@ lpfc_block_fabric_iocbs(struct lpfc_hba *phba)
 	if (!blocked)
 		mod_timer(&phba->fabric_block_timer,
 			  jiffies + msecs_to_jiffies(100));
-
-	return;
 }
 
 /**
@@ -10097,7 +10067,6 @@ lpfc_sli4_vport_delete_els_xri_aborted(struct lpfc_vport *vport)
 		}
 	}
 	spin_unlock_irqrestore(&phba->sli4_hba.sgl_list_lock, iflag);
-	return;
 }
 
 /**
@@ -10162,7 +10131,6 @@ lpfc_sli4_els_xri_aborted(struct lpfc_hba *phba,
 	}
 	sglq_entry->state = SGL_XRI_ABORTED;
 	spin_unlock_irqrestore(&phba->hbalock, iflag);
-	return;
 }
 
 /* lpfc_sli_abts_recover_port - Recover a port that failed a BLS_ABORT req.
