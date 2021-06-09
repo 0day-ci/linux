@@ -256,7 +256,7 @@ static int ftpm_tee_probe(struct device *dev)
 	/* Allocate dynamic shared memory with fTPM TA */
 	pvt_data->shm = tee_shm_alloc(pvt_data->ctx,
 				      MAX_COMMAND_SIZE + MAX_RESPONSE_SIZE,
-				      TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
+				      TEE_SHM_MAPPED | TEE_SHM_REGISTER);
 	if (IS_ERR(pvt_data->shm)) {
 		dev_err(dev, "%s: tee_shm_alloc failed\n", __func__);
 		rc = -ENOMEM;
