@@ -1996,7 +1996,7 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 			goto err_pc;
 	}
 
-	if (GRAPHICS_VER(i915) > 12) {
+	if (1 || (GRAPHICS_VER(i915) > 12)) {
 		struct i915_gem_context *ctx;
 
 		/* Get ourselves a context ID */
