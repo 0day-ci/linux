@@ -35,9 +35,31 @@ struct join_entry {
 static struct join_entry join_entries[COOKIE_JOIN_SLOTS] __cacheline_aligned_in_smp;
 static spinlock_t join_entry_locks[COOKIE_JOIN_SLOTS] __cacheline_aligned_in_smp;
 
+static u32 mptcp_join_hashfn(const struct net *net, const __be32 laddr,
+			     const __be16 lport, const __be32 faddr,
+			     const __be16 fport)
+{
+	static u32 mptcp_join_hash_secret __read_mostly;
+
+	net_get_random_once(&mptcp_join_hash_secret, sizeof(mptcp_join_hash_secret));
+
+	return jhash_3words((__force __u32) laddr,
+			    (__force __u32) faddr,
+			    ((__u32) lport) << 16 | (__force __u32)fport,
+			    mptcp_join_hash_secret + net_hash_mix(net));
+}
+
 static u32 mptcp_join_entry_hash(struct sk_buff *skb, struct net *net)
 {
-	u32 i = skb_get_hash(skb) ^ net_hash_mix(net);
+	u32 i;
+	struct iphdr *iph = ip_hdr(skb);
+	struct tcphdr *th = tcp_hdr(skb);
+
+	if (!skb_get_hash_raw(skb))
+		i = mptcp_join_hashfn(net, iph->daddr, th->dest,
+				      iph->saddr, th->source);
+	else
+		i = skb_get_hash_raw(skb) ^ net_hash_mix(net);
 
 	return i % ARRAY_SIZE(join_entries);
 }
