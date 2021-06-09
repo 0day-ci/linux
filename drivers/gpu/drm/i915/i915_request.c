@@ -111,7 +111,42 @@ void intel_engine_free_request_pool(struct intel_engine_cs *engine)
 	if (!engine->request_pool)
 		return;
 
+	/*
+	 * It's safe to free this right away because we always put a fresh
+	 * i915_request in the cache that's never been touched by an RCU
+	 * reader.
+	 */
 	kmem_cache_free(global.slab_requests, engine->request_pool);
+}
+
+static void __i915_request_free(struct rcu_head *head)
+{
+	struct i915_request *rq = container_of(head, typeof(*rq), fence.rcu);
+
+	kmem_cache_free(global.slab_requests, rq);
+}
+
+static void i915_request_free_rcu(struct i915_request *rq)
+{
+	/*
+	 * Because we're on a slab allocator, memory may be re-used the
+	 * moment we free it.  There is no kfree_rcu() equivalent for
+	 * slabs.  Instead, we hand-roll it here with call_rcu().  This
+	 * gives us all the perf benefits to slab allocation while ensuring
+	 * that we never release a request back to the slab until there are
+	 * no more readers.
+	 *
+	 * We do have to be careful, though, when calling kmem_cache_destroy()
+	 * as there may be outstanding free requests.  This is solved by
+	 * inserting an rcu_barrier() before kmem_cache_destroy().  An RCU
+	 * barrier is sufficient and we don't need synchronize_rcu()
+	 * because the call_rcu() here will wait on any outstanding RCU
+	 * readers and the rcu_barrier() will wait on any outstanding
+	 * call_rcu() callbacks.  So, if there are any readers who once had
+	 * valid references to a request, rcu_barrier() will end up waiting
+	 * on them by transitivity.
+	 */
+	call_rcu(&rq->fence.rcu, __i915_request_free);
 }
 
 static void i915_fence_release(struct dma_fence *fence)
@@ -127,8 +162,7 @@ static void i915_fence_release(struct dma_fence *fence)
 	 */
 	i915_sw_fence_fini(&rq->submit);
 	i915_sw_fence_fini(&rq->semaphore);
-
-	kmem_cache_free(global.slab_requests, rq);
+	i915_request_free_rcu(rq);
 }
 
 const struct dma_fence_ops i915_fence_ops = {
@@ -933,35 +967,6 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 	 */
 	ensure_cached_request(&ce->engine->request_pool, gfp);
 
-	/*
-	 * Beware: Dragons be flying overhead.
-	 *
-	 * We use RCU to look up requests in flight. The lookups may
-	 * race with the request being allocated from the slab freelist.
-	 * That is the request we are writing to here, may be in the process
-	 * of being read by __i915_active_request_get_rcu(). As such,
-	 * we have to be very careful when overwriting the contents. During
-	 * the RCU lookup, we change chase the request->engine pointer,
-	 * read the request->global_seqno and increment the reference count.
-	 *
-	 * The reference count is incremented atomically. If it is zero,
-	 * the lookup knows the request is unallocated and complete. Otherwise,
-	 * it is either still in use, or has been reallocated and reset
-	 * with dma_fence_init(). This increment is safe for release as we
-	 * check that the request we have a reference to and matches the active
-	 * request.
-	 *
-	 * Before we increment the refcount, we chase the request->engine
-	 * pointer. We must not call kmem_cache_zalloc() or else we set
-	 * that pointer to NULL and cause a crash during the lookup. If
-	 * we see the request is completed (based on the value of the
-	 * old engine and seqno), the lookup is complete and reports NULL.
-	 * If we decide the request is not completed (new engine or seqno),
-	 * then we grab a reference and double check that it is still the
-	 * active request - which it won't be and restart the lookup.
-	 *
-	 * Do not use kmem_cache_zalloc() here!
-	 */
 	rq = kmem_cache_alloc(global.slab_requests,
 			      gfp | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (unlikely(!rq)) {
@@ -2116,6 +2121,12 @@ static void i915_global_request_shrink(void)
 
 static void i915_global_request_exit(void)
 {
+	/*
+	 * We need to rcu_barrier() before destroying slab_requests.  See
+	 * i915_request_free_rcu() for more details.
+	 */
+	rcu_barrier();
+
 	kmem_cache_destroy(global.slab_execute_cbs);
 	kmem_cache_destroy(global.slab_requests);
 }
@@ -2132,8 +2143,7 @@ int __init i915_global_request_init(void)
 				  sizeof(struct i915_request),
 				  __alignof__(struct i915_request),
 				  SLAB_HWCACHE_ALIGN |
-				  SLAB_RECLAIM_ACCOUNT |
-				  SLAB_TYPESAFE_BY_RCU,
+				  SLAB_RECLAIM_ACCOUNT,
 				  __i915_request_ctor);
 	if (!global.slab_requests)
 		return -ENOMEM;
