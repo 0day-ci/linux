@@ -136,7 +136,7 @@ static struct lpfc_idiag idiag;
  * gather from the beginning of the log and process until the current entry.
  *
  * Notes:
- * Discovery logging will be disabled while while this routine dumps the log.
+ * Discovery logging will be disabled while this routine dumps the log.
  *
  * Return Value:
  * This routine returns the amount of bytes that were dumped into @buf and will
@@ -202,7 +202,7 @@ lpfc_debugfs_disc_trc_data(struct lpfc_vport *vport, char *buf, int size)
  * gather from the beginning of the log and process until the current entry.
  *
  * Notes:
- * Slow ring logging will be disabled while while this routine dumps the log.
+ * Slow ring logging will be disabled while this routine dumps the log.
  *
  * Return Value:
  * This routine returns the amount of bytes that were dumped into @buf and will
@@ -2538,7 +2538,7 @@ lpfc_debugfs_lseek(struct file *file, loff_t off, int whence)
  * @ppos: The position in the file to start reading from.
  *
  * Description:
- * This routine reads data from from the buffer indicated in the private_data
+ * This routine reads data from the buffer indicated in the private_data
  * field of @file. It will start reading at @ppos and copy up to @nbytes of
  * data to @buf.
  *
