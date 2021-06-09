@@ -1496,8 +1496,11 @@ static int hci_dev_do_open(struct hci_dev *hdev)
 
 		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
 
-		if (hdev->setup)
+		if (hdev->setup) {
 			ret = hdev->setup(hdev);
+			if (ret && ret == -EAGAIN)
+				ret = hdev->setup(hdev);
+		}
 
 		/* The transport driver can set the quirk to mark the
 		 * BD_ADDR invalid before creating the HCI device or in

@@ -583,6 +583,9 @@ struct btusb_data {
 	unsigned cmd_timeout_cnt;
 };
 
+static int btusb_setup_intel_newgen(struct hci_dev *hdev);
+static int btusb_shutdown_intel_new(struct hci_dev *hdev);
+
 static void btusb_intel_cmd_timeout(struct hci_dev *hdev)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
@@ -2842,6 +2845,18 @@ static int btusb_intel_boot(struct hci_dev *hdev, u32 boot_addr)
 	return err;
 }
 
+static bool btintel_is_newgen_controller(struct hci_dev *hdev, u32 cnvi)
+{
+	switch (cnvi & 0xFFF) {
+	case 0x400: /* Slr */
+	case 0x401: /* Slr-F */
+	case 0x410: /* TyP */
+	case 0x810: /* Mgr */
+		return true;
+	}
+	return false;
+}
+
 static int btusb_setup_intel_new(struct hci_dev *hdev)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
@@ -2851,6 +2866,8 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	char ddcname[64];
 	int err;
 	struct intel_debug_features features;
+	struct intel_version_tlv ver_tlv;
+	bool is_tlv;
 
 	BT_DBG("%s", hdev->name);
 
@@ -2864,11 +2881,37 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	 * is in bootloader mode or if it already has operational firmware
 	 * loaded.
 	 */
-	err = btintel_read_version(hdev, &ver);
+	err = btintel_generic_read_version(hdev, &ver_tlv, &ver, &is_tlv);
 	if (err) {
 		bt_dev_err(hdev, "Intel Read version failed (%d)", err);
 		btintel_reset_to_bootloader(hdev);
 		return err;
+	}
+	if (is_tlv) {
+		/* We got TLV data. Check for new generation CNVi. If present,
+		 * then map the callbacks to BTUSB_INTEL_NEWGEN and attempt
+		 * setup function again
+		 */
+		if (btintel_is_newgen_controller(hdev, ver_tlv.cnvi_top)) {
+			hdev->send = btusb_send_frame_intel;
+			hdev->setup = btusb_setup_intel_newgen;
+			hdev->shutdown = btusb_shutdown_intel_new;
+			hdev->hw_error = btintel_hw_error;
+			hdev->set_diag = btintel_set_diag;
+			hdev->set_bdaddr = btintel_set_bdaddr;
+			hdev->cmd_timeout = btusb_intel_cmd_timeout;
+			return -EAGAIN;
+		}
+
+		/* we need to read legacy version here to minimize the changes
+		 * and keep the esixiting flow
+		 */
+		err = btintel_read_version(hdev, &ver);
+		if (err) {
+			bt_dev_err(hdev, "Intel Read version failed (%d)", err);
+			btintel_reset_to_bootloader(hdev);
+			return err;
+		}
 	}
 
 	err = btintel_version_info(hdev, &ver);

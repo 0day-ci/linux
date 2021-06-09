@@ -175,6 +175,10 @@ int btintel_read_debug_features(struct hci_dev *hdev,
 				struct intel_debug_features *features);
 int btintel_set_debug_features(struct hci_dev *hdev,
 			       const struct intel_debug_features *features);
+int btintel_generic_read_version(struct hci_dev *hdev,
+				 struct intel_version_tlv *ver_tlv,
+				 struct intel_version *ver,
+				 bool *is_tlv);
 #else
 
 static inline int btintel_check_bdaddr(struct hci_dev *hdev)
@@ -307,4 +311,10 @@ static inline int btintel_set_debug_features(struct hci_dev *hdev,
 	return -EOPNOTSUPP;
 }
 
+static int btintel_generic_read_version(struct hci_dev *hdev,
+					struct intel_version_tlv *ver_tlv,
+					struct intel_version *ver, bool *is_tlv)
+{
+	return -EOPNOTSUPP;
+}
 #endif
