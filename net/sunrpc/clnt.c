@@ -2959,6 +2959,19 @@ bool rpc_clnt_xprt_switch_has_addr(struct rpc_clnt *clnt,
 }
 EXPORT_SYMBOL_GPL(rpc_clnt_xprt_switch_has_addr);
 
+size_t rpc_clnt_xprt_switch_nactive(struct rpc_clnt *clnt)
+{
+	struct rpc_xprt_switch *xps;
+	size_t num;
+
+	rcu_read_lock();
+	xps = rcu_dereference(clnt->cl_xpi.xpi_xpswitch);
+	num = xps->xps_nactive;
+	rcu_read_unlock();
+	return num;
+}
+EXPORT_SYMBOL_GPL(rpc_clnt_xprt_switch_nactive);
+
 #if IS_ENABLED(CONFIG_SUNRPC_DEBUG)
 static void rpc_show_header(void)
 {
