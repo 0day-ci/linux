@@ -342,7 +342,6 @@ static int vfio_ap_mdev_create(struct mdev_device *mdev)
 	init_rwsem(&matrix_mdev->rwsem);
 	mdev_set_drvdata(mdev, matrix_mdev);
 	matrix_mdev->pqap_hook.hook = handle_pqap;
-	matrix_mdev->pqap_hook.owner = THIS_MODULE;
 
 	mutex_lock(&matrix_dev->lock);
 	list_add(&matrix_mdev->node, &matrix_dev->mdev_list);
@@ -1063,7 +1062,6 @@ static int vfio_ap_mdev_set_kvm(struct ap_matrix_mdev *matrix_mdev,
 	down_write(&matrix_mdev->rwsem);
 	matrix_mdev->kvm = kvm;
 	kvm_get_kvm(kvm);
-	kvm->arch.crypto.pqap_hook = &matrix_mdev->pqap_hook;
 	up_write(&matrix_mdev->rwsem);
 
 	/*
@@ -1071,6 +1069,10 @@ static int vfio_ap_mdev_set_kvm(struct ap_matrix_mdev *matrix_mdev,
 	 * masks for the KVM guest
 	 */
 	if (kvm->arch.crypto.crycbd) {
+		down_write(&matrix_mdev->kvm->arch.crypto.pqap_hook_rwsem);
+		kvm->arch.crypto.pqap_hook = &matrix_mdev->pqap_hook;
+		up_write(&matrix_mdev->kvm->arch.crypto.pqap_hook_rwsem);
+
 		down_read(&matrix_mdev->matrix.rwsem);
 		kvm_arch_crypto_set_masks(kvm,
 					  matrix_mdev->matrix.apm,
@@ -1122,11 +1124,15 @@ static int vfio_ap_mdev_iommu_notifier(struct notifier_block *nb,
 static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev)
 {
 	if (matrix_mdev->kvm) {
-		if (matrix_mdev->kvm->arch.crypto.crycbd)
+		if (matrix_mdev->kvm->arch.crypto.crycbd) {
+			down_write(&matrix_mdev->kvm->arch.crypto.pqap_hook_rwsem);
+			matrix_mdev->kvm->arch.crypto.pqap_hook = NULL;
+			up_write(&matrix_mdev->kvm->arch.crypto.pqap_hook_rwsem);
+
 			kvm_arch_crypto_clear_masks(matrix_mdev->kvm);
+		}
 
 		down_write(&matrix_mdev->rwsem);
-		matrix_mdev->kvm->arch.crypto.pqap_hook = NULL;
 		vfio_ap_mdev_reset_queues(matrix_mdev->mdev);
 		kvm_put_kvm(matrix_mdev->kvm);
 		matrix_mdev->kvm = NULL;

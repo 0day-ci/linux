@@ -90,7 +90,7 @@ struct ap_matrix_mdev {
 	struct notifier_block iommu_notifier;
 	struct rw_semaphore rwsem;
 	struct kvm *kvm;
-	struct kvm_s390_module_hook pqap_hook;
+	struct kvm_s390_crypto_hook pqap_hook;
 	struct mdev_device *mdev;
 };
 
