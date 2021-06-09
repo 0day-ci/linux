@@ -158,8 +158,7 @@ nv44_mpeg_intr(struct nvkm_engine *engine)
 	list_for_each_entry(temp, &mpeg->chan, head) {
 		if (temp->inst >> 4 == inst) {
 			chan = temp;
-			list_del(&chan->head);
-			list_add(&chan->head, &mpeg->chan);
+			list_move(&chan->head, &mpeg->chan);
 			break;
 		}
 	}
