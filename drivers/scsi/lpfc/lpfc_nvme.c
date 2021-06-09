@@ -2437,7 +2437,7 @@ lpfc_nvme_rescan_port(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
  * For now, the driver just unbinds the DID and port_role so that
  * no further IO can be issued.  Changes are planned for later.
  *
- * Notes - the ndlp reference count is not decremented here since
+ * Notes - the ndlp reference count is not decremented here
  * since there is no nvme_transport api for devloss.  Node ref count
  * is only adjusted in driver unload.
  */
