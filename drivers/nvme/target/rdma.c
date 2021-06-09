@@ -1545,7 +1545,7 @@ static int nvmet_rdma_cm_accept(struct rdma_cm_id *cm_id,
 {
 	struct rdma_conn_param  param = { };
 	struct nvme_rdma_cm_rep priv = { };
-	int ret = -ENOMEM;
+	int ret;
 
 	param.rnr_retry_count = 7;
 	param.flow_control = 1;
