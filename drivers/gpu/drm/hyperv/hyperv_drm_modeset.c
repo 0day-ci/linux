@@ -149,11 +149,6 @@ static const uint32_t hyperv_formats[] = {
 	DRM_FORMAT_XRGB8888,
 };
 
-static const uint64_t hyperv_modifiers[] = {
-	DRM_FORMAT_MOD_LINEAR,
-	DRM_FORMAT_MOD_INVALID
-};
-
 static inline int hyperv_pipe_init(struct hyperv_drm_device *hv)
 {
 	int ret;
