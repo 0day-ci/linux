@@ -96,6 +96,8 @@
 
 #ifndef __ASSEMBLY__
 
+#define pmd_pgtable(pmd) pmd_page(pmd)
+
 /*
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
