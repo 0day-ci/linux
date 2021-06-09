@@ -79,8 +79,7 @@ nvkm_fifo_chan_inst_locked(struct nvkm_fifo *fifo, u64 inst)
 	struct nvkm_fifo_chan *chan;
 	list_for_each_entry(chan, &fifo->chan, head) {
 		if (chan->inst->addr == inst) {
-			list_del(&chan->head);
-			list_add(&chan->head, &fifo->chan);
+			list_move(&chan->head, &fifo->chan);
 			return chan;
 		}
 	}
@@ -109,8 +108,7 @@ nvkm_fifo_chan_chid(struct nvkm_fifo *fifo, int chid, unsigned long *rflags)
 	spin_lock_irqsave(&fifo->lock, flags);
 	list_for_each_entry(chan, &fifo->chan, head) {
 		if (chan->chid == chid) {
-			list_del(&chan->head);
-			list_add(&chan->head, &fifo->chan);
+			list_move(&chan->head, &fifo->chan);
 			*rflags = flags;
 			return chan;
 		}
