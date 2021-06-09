@@ -96,24 +96,13 @@ static const struct dma_buf_ops tee_shm_dma_buf_ops = {
 	.mmap = tee_shm_op_mmap,
 };
 
-struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
+static struct tee_shm *shm_alloc_helper(struct tee_context *ctx, size_t size,
+					size_t align, u32 flags)
 {
 	struct tee_device *teedev = ctx->teedev;
 	struct tee_shm *shm;
-	size_t align;
 	void *ret;
 	int rc;
-
-	if (!(flags & TEE_SHM_MAPPED)) {
-		dev_err(teedev->dev.parent,
-			"only mapped allocations supported\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	if ((flags & ~(TEE_SHM_MAPPED | TEE_SHM_DMA_BUF))) {
-		dev_err(teedev->dev.parent, "invalid shm flags 0x%x", flags);
-		return ERR_PTR(-EINVAL);
-	}
 
 	if (!tee_device_get(teedev))
 		return ERR_PTR(-EINVAL);
@@ -131,17 +120,14 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 	}
 
 	shm->flags = flags | TEE_SHM_POOL;
+
+	/*
+	 * We're assigning this as it is needed if the shm is to be
+	 * registered. If this function returns OK then the caller expected
+	 * to call teedev_ctx_get() or clear shm->ctx in case it's not
+	 * needed any longer.
+	 */
 	shm->ctx = ctx;
-	if (flags & TEE_SHM_DMA_BUF) {
-		align = PAGE_SIZE;
-		/*
-		 * Request to register the shm in the pool allocator below
-		 * if supported.
-		 */
-		shm->flags |= TEE_SHM_REGISTER;
-	} else {
-		align = 2 * sizeof(long);
-	}
 
 	rc = teedev->pool->ops->alloc(teedev->pool, shm, size, align);
 	if (rc) {
@@ -149,48 +135,71 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 		goto err_kfree;
 	}
 
-
-	if (flags & TEE_SHM_DMA_BUF) {
-		DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
-
-		mutex_lock(&teedev->mutex);
-		shm->id = idr_alloc(&teedev->idr, shm, 1, 0, GFP_KERNEL);
-		mutex_unlock(&teedev->mutex);
-		if (shm->id < 0) {
-			ret = ERR_PTR(shm->id);
-			goto err_pool_free;
-		}
-
-		exp_info.ops = &tee_shm_dma_buf_ops;
-		exp_info.size = shm->size;
-		exp_info.flags = O_RDWR;
-		exp_info.priv = shm;
-
-		shm->dmabuf = dma_buf_export(&exp_info);
-		if (IS_ERR(shm->dmabuf)) {
-			ret = ERR_CAST(shm->dmabuf);
-			goto err_rem;
-		}
-	}
-
-	teedev_ctx_get(ctx);
-
 	return shm;
-err_rem:
-	if (flags & TEE_SHM_DMA_BUF) {
-		mutex_lock(&teedev->mutex);
-		idr_remove(&teedev->idr, shm->id);
-		mutex_unlock(&teedev->mutex);
-	}
-err_pool_free:
-	teedev->pool->ops->free(teedev->pool, shm);
 err_kfree:
 	kfree(shm);
 err_dev_put:
 	tee_device_put(teedev);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(tee_shm_alloc);
+
+/**
+ * tee_shm_alloc_user_buf() - Allocate shared memory for user space
+ * @ctx:	Context that allocates the shared memory
+ * @size:	Requested size of shared memory
+ *
+ * Memory allocated as user space shared memory is automatically freed when
+ * the TEE file pointer is closed. The primary usage of this function is
+ * when the TEE driver doesn't support registering ordinary user space
+ * memory.
+ *
+ * @returns a pointer to 'struct tee_shm'
+ */
+struct tee_shm *tee_shm_alloc_user_buf(struct tee_context *ctx, size_t size)
+{
+	u32 flags = TEE_SHM_MAPPED | TEE_SHM_DMA_BUF | TEE_SHM_REGISTER;
+	struct tee_device *teedev = ctx->teedev;
+	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
+	struct tee_shm *shm;
+	void *ret;
+
+	shm = shm_alloc_helper(ctx, size, PAGE_SIZE, flags);
+	if (IS_ERR(shm))
+		return shm;
+
+	mutex_lock(&teedev->mutex);
+	shm->id = idr_alloc(&teedev->idr, shm, 1, 0, GFP_KERNEL);
+	mutex_unlock(&teedev->mutex);
+	if (shm->id < 0) {
+		ret = ERR_PTR(shm->id);
+		goto err_pool_free;
+	}
+
+	exp_info.ops = &tee_shm_dma_buf_ops;
+	exp_info.size = shm->size;
+	exp_info.flags = O_RDWR;
+	exp_info.priv = shm;
+
+	shm->dmabuf = dma_buf_export(&exp_info);
+	if (IS_ERR(shm->dmabuf)) {
+		ret = ERR_CAST(shm->dmabuf);
+		goto err_rem;
+	}
+
+	teedev_ctx_get(ctx);
+	return shm;
+err_rem:
+	mutex_lock(&teedev->mutex);
+	idr_remove(&teedev->idr, shm->id);
+	mutex_unlock(&teedev->mutex);
+err_pool_free:
+	teedev->pool->ops->free(teedev->pool, shm);
+	kfree(shm);
+	tee_device_put(teedev);
+	return ret;
+
+}
+EXPORT_SYMBOL_GPL(tee_shm_alloc_user_buf);
 
 /**
  * tee_shm_alloc_kernel_buf() - Allocate shared memory for kernel buffer
@@ -206,9 +215,84 @@ EXPORT_SYMBOL_GPL(tee_shm_alloc);
  */
 struct tee_shm *tee_shm_alloc_kernel_buf(struct tee_context *ctx, size_t size)
 {
-	return tee_shm_alloc(ctx, size, TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
+	u32 flags = TEE_SHM_MAPPED | TEE_SHM_REGISTER;
+	struct tee_shm *shm;
+
+	shm = shm_alloc_helper(ctx, size, PAGE_SIZE, flags);
+	if (IS_ERR(shm))
+		return shm;
+
+	teedev_ctx_get(ctx);
+	return shm;
 }
 EXPORT_SYMBOL_GPL(tee_shm_alloc_kernel_buf);
+
+/**
+ * tee_shm_alloc_anon_kernel_buf() - Allocate shared memory for anonymous
+ *				     kernel buffer
+ * @ctx:	Context that allocates the shared memory
+ * @size:	Requested size of shared memory
+ *
+ * This function returns similar shared memory as tee_shm_alloc_kernel_buf(),
+ * but with two differences:
+ * 1. The memory might not be registered in secure world
+ *    in case the driver supports passing memory not registered in advance.
+ * 2. The memory is not directly associated with the passed tee_context,
+ *    rather the tee_device used by the context.
+ *
+ * This function should normally only be used internally in the TEE
+ * drivers. The memory must later only be freed using
+ * tee_shm_free_anon_kernel_buf() with a tee_contex with the same internal
+ * tee_device as when the memory was allocated.
+ *
+ * This allows allocating the shared memory using one context which is
+ * destroyed while the memory continues to live and finally freed using
+ * another context.
+ *
+ * @returns a pointer to 'struct tee_shm'
+ */
+struct tee_shm *tee_shm_alloc_anon_kernel_buf(struct tee_context *ctx,
+					      size_t size)
+{
+	struct tee_shm *shm;
+
+	shm = shm_alloc_helper(ctx, size, sizeof(long) * 2, TEE_SHM_MAPPED);
+	if (IS_ERR(shm))
+		return shm;
+
+	shm->ctx = NULL;
+	return shm;
+}
+EXPORT_SYMBOL_GPL(tee_shm_alloc_anon_kernel_buf);
+
+/**
+ * tee_shm_free_anon_kernel_buf() - Free anonymous shared kernel memory
+ * @ctx:	Borrowed context when freeing the shared memory
+ * @shm:	Handle to shared memory to free
+ *
+ * This function must only be used to free a tee_shm allocated with
+ * tee_shm_alloc_anon_kernel_buf(). The passed @ctx has to have the same
+ * internal tee_device as was used by the tee_context passed when the
+ * memory was allocated.
+ */
+void tee_shm_free_anon_kernel_buf(struct tee_context *ctx, struct tee_shm *shm)
+{
+	struct tee_device *teedev = ctx->teedev;
+
+	/*
+	 * The anonymous kernel buffer isn't attached to any tee_context
+	 * we're instead assigning the current tee_context temporarily.
+	 * This is needed because an eventual call to unregister the shared
+	 * memory might need a context. As long as this context uses the
+	 * same tee_device as in the ctx in the call in
+	 * tee_shm_alloc_anon_kernel_buf() above we are OK.
+	 */
+	shm->ctx = ctx;
+	teedev->pool->ops->free(teedev->pool, shm);
+	kfree(shm);
+	tee_device_put(teedev);
+}
+EXPORT_SYMBOL_GPL(tee_shm_free_anon_kernel_buf);
 
 struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
 				 size_t length, u32 flags)

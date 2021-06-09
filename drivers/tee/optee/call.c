@@ -183,8 +183,8 @@ static struct tee_shm *get_msg_arg(struct tee_context *ctx, size_t num_params,
 	struct tee_shm *shm;
 	struct optee_msg_arg *ma;
 
-	shm = tee_shm_alloc(ctx, OPTEE_MSG_GET_ARG_SIZE(num_params),
-			    TEE_SHM_MAPPED);
+	shm = tee_shm_alloc_anon_kernel_buf(ctx,
+					    OPTEE_MSG_GET_ARG_SIZE(num_params));
 	if (IS_ERR(shm))
 		return shm;
 
@@ -283,7 +283,7 @@ int optee_open_session(struct tee_context *ctx,
 		arg->ret_origin = msg_arg->ret_origin;
 	}
 out:
-	tee_shm_free(shm);
+	tee_shm_free_anon_kernel_buf(ctx, shm);
 
 	return rc;
 }
@@ -314,7 +314,7 @@ int optee_close_session(struct tee_context *ctx, u32 session)
 	msg_arg->session = session;
 	optee_do_call_with_arg(ctx, msg_parg);
 
-	tee_shm_free(shm);
+	tee_shm_free_anon_kernel_buf(ctx, shm);
 	return 0;
 }
 
@@ -360,7 +360,7 @@ int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
 	arg->ret = msg_arg->ret;
 	arg->ret_origin = msg_arg->ret_origin;
 out:
-	tee_shm_free(shm);
+	tee_shm_free_anon_kernel_buf(ctx, shm);
 	return rc;
 }
 
@@ -388,7 +388,7 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session)
 	msg_arg->cancel_id = cancel_id;
 	optee_do_call_with_arg(ctx, msg_parg);
 
-	tee_shm_free(shm);
+	tee_shm_free_anon_kernel_buf(ctx, shm);
 	return 0;
 }
 
@@ -627,7 +627,7 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 	    msg_arg->ret != TEEC_SUCCESS)
 		rc = -EINVAL;
 
-	tee_shm_free(shm_arg);
+	tee_shm_free_anon_kernel_buf(ctx, shm_arg);
 out:
 	optee_free_pages_list(pages_list, num_pages);
 	return rc;
@@ -652,7 +652,7 @@ int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
 	if (optee_do_call_with_arg(ctx, msg_parg) ||
 	    msg_arg->ret != TEEC_SUCCESS)
 		rc = -EINVAL;
-	tee_shm_free(shm_arg);
+	tee_shm_free_anon_kernel_buf(ctx, shm_arg);
 	return rc;
 }
 

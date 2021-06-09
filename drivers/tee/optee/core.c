@@ -277,7 +277,7 @@ static void optee_release(struct tee_context *ctx)
 	if (!ctxdata)
 		return;
 
-	shm = tee_shm_alloc(ctx, sizeof(struct optee_msg_arg), TEE_SHM_MAPPED);
+	shm = tee_shm_alloc_anon_kernel_buf(ctx, sizeof(struct optee_msg_arg));
 	if (!IS_ERR(shm)) {
 		arg = tee_shm_get_va(shm, 0);
 		/*
@@ -305,7 +305,7 @@ static void optee_release(struct tee_context *ctx)
 	kfree(ctxdata);
 
 	if (!IS_ERR(shm))
-		tee_shm_free(shm);
+		tee_shm_free_anon_kernel_buf(ctx, shm);
 
 	ctx->data = NULL;
 
