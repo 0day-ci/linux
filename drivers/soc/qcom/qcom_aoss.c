@@ -8,10 +8,12 @@
 #include <linux/io.h>
 #include <linux/mailbox_client.h>
 #include <linux/module.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
 #include <linux/thermal.h>
 #include <linux/slab.h>
+#include <linux/soc/qcom/qcom_aoss.h>
 
 #define QMP_DESC_MAGIC			0x0
 #define QMP_DESC_VERSION		0x4
@@ -61,6 +63,7 @@ struct qmp_cooling_device {
  * @mbox_chan: mailbox channel used to ring the doorbell on transmit
  * @offset: offset within @msgram where messages should be written
  * @size: maximum size of the messages to be transmitted
+ * @orphan: tracks whether qmp handle is valid
  * @event: wait_queue for synchronization with the IRQ
  * @tx_lock: provides synchronization between multiple callers of qmp_send()
  * @qdss_clk: QDSS clock hw struct
@@ -76,6 +79,8 @@ struct qmp {
 
 	size_t offset;
 	size_t size;
+	atomic_t  orphan;
+	struct kref refcount;
 
 	wait_queue_head_t event;
 
@@ -223,10 +228,16 @@ static bool qmp_message_empty(struct qmp *qmp)
  *
  * Return: 0 on success, negative errno on failure
  */
-static int qmp_send(struct qmp *qmp, const void *data, size_t len)
+int qmp_send(struct qmp *qmp, const void *data, size_t len)
 {
 	long time_left;
 	int ret;
+
+	if (WARN_ON(IS_ERR_OR_NULL(qmp) || !data))
+		return -EINVAL;
+
+	if (atomic_read(&qmp->orphan))
+		return -EINVAL;
 
 	if (WARN_ON(len + sizeof(u32) > qmp->size))
 		return -EINVAL;
@@ -261,6 +272,7 @@ static int qmp_send(struct qmp *qmp, const void *data, size_t len)
 
 	return ret;
 }
+EXPORT_SYMBOL(qmp_send);
 
 static int qmp_qdss_clk_prepare(struct clk_hw *hw)
 {
@@ -515,6 +527,54 @@ static void qmp_cooling_devices_remove(struct qmp *qmp)
 		thermal_cooling_device_unregister(qmp->cooling_devs[i].cdev);
 }
 
+/**
+ * qmp_get() - get a qmp handle from a device
+ * @dev: client device pointer
+ *
+ * Return: handle to qmp device on success, ERR_PTR() on failure
+ */
+struct qmp *qmp_get(struct device *dev)
+{
+	struct platform_device *pdev;
+	struct device_node *np;
+	struct qmp *qmp;
+
+	if (!dev || !dev->of_node)
+		return ERR_PTR(-EINVAL);
+
+	np = of_parse_phandle(dev->of_node, "qcom,qmp", 0);
+	if (!np)
+		return ERR_PTR(-ENODEV);
+
+	pdev = of_find_device_by_node(np);
+	of_node_put(np);
+	if (!pdev)
+		return ERR_PTR(-EINVAL);
+
+	qmp = platform_get_drvdata(pdev);
+	platform_device_put(pdev);
+
+	if (qmp)
+		kref_get(&qmp->refcount);
+
+	return qmp ? qmp : ERR_PTR(-EPROBE_DEFER);
+}
+EXPORT_SYMBOL(qmp_get);
+
+static void qmp_handle_release(struct kref *ref)
+{
+	struct qmp *qmp = container_of(ref, struct qmp, refcount);
+
+	kfree(qmp);
+}
+
+void qmp_put(struct qmp *qmp)
+{
+	if (!IS_ERR_OR_NULL(qmp))
+		kref_put(&qmp->refcount, qmp_handle_release);
+}
+EXPORT_SYMBOL(qmp_put);
+
 static int qmp_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -522,13 +582,14 @@ static int qmp_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 
-	qmp = devm_kzalloc(&pdev->dev, sizeof(*qmp), GFP_KERNEL);
+	qmp = kzalloc(sizeof(*qmp), GFP_KERNEL);
 	if (!qmp)
 		return -ENOMEM;
 
 	qmp->dev = &pdev->dev;
 	init_waitqueue_head(&qmp->event);
 	mutex_init(&qmp->tx_lock);
+	kref_init(&qmp->refcount);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	qmp->msgram = devm_ioremap_resource(&pdev->dev, res);
@@ -569,6 +630,8 @@ static int qmp_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, qmp);
 
+	atomic_set(&qmp->orphan, 0);
+
 	return 0;
 
 err_remove_qdss_clk:
@@ -577,6 +640,7 @@ err_close_qmp:
 	qmp_close(qmp);
 err_free_mbox:
 	mbox_free_channel(qmp->mbox_chan);
+	kfree(qmp);
 
 	return ret;
 }
@@ -590,7 +654,9 @@ static int qmp_remove(struct platform_device *pdev)
 	qmp_cooling_devices_remove(qmp);
 
 	qmp_close(qmp);
+	atomic_set(&qmp->orphan, 1);
 	mbox_free_channel(qmp->mbox_chan);
+	kref_put(&qmp->refcount, qmp_handle_release);
 
 	return 0;
 }
