@@ -49,17 +49,13 @@
 #define BUF_HEADROOM (LL_MAX_HEADER + 48)
 #define BUF_TAILROOM 0
 #endif
+#define BUF_ALIGN(x) ALIGN(x, 4)
 #define FB_MTU (PAGE_SIZE - \
 		SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) - \
 		SKB_DATA_ALIGN(BUF_HEADROOM + BUF_TAILROOM) \
 		)
 
 const int fb_mtu = FB_MTU;
-
-static unsigned int align(unsigned int i)
-{
-	return (i + 3) & ~3u;
-}
 
 /**
  * tipc_buf_acquire - creates a TIPC message buffer
@@ -489,10 +485,10 @@ static bool tipc_msg_bundle(struct sk_buff *bskb, struct tipc_msg *msg,
 	struct tipc_msg *bmsg = buf_msg(bskb);
 	u32 msz, bsz, offset, pad;
 
-	msz = msg_size(msg);
-	bsz = msg_size(bmsg);
-	offset = align(bsz);
-	pad = offset - bsz;
+	msz	= msg_size(msg);
+	bsz	= msg_size(bmsg);
+	offset	= BUF_ALIGN(bsz);
+	pad	= offset - bsz;
 
 	if (unlikely(skb_tailroom(bskb) < (pad + msz)))
 		return false;
@@ -548,7 +544,7 @@ bool tipc_msg_try_bundle(struct sk_buff *tskb, struct sk_buff **skb, u32 mss,
 
 	/* Make a new bundle of the two messages if possible */
 	tsz = msg_size(buf_msg(tskb));
-	if (unlikely(mss < align(INT_H_SIZE + tsz) + msg_size(msg)))
+	if (unlikely(mss < BUF_ALIGN(INT_H_SIZE + tsz) + msg_size(msg)))
 		return true;
 	if (unlikely(pskb_expand_head(tskb, INT_H_SIZE, mss - tsz - INT_H_SIZE,
 				      GFP_ATOMIC)))
@@ -607,7 +603,7 @@ bool tipc_msg_extract(struct sk_buff *skb, struct sk_buff **iskb, int *pos)
 	if (unlikely(!tipc_msg_validate(iskb)))
 		goto none;
 
-	*pos += align(imsz);
+	*pos += BUF_ALIGN(imsz);
 	return true;
 none:
 	kfree_skb(skb);
