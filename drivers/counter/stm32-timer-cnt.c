@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
+#include <linux/types.h>
 
 #define TIM_CCMR_CCXS	(BIT(8) | BIT(0))
 #define TIM_CCMR_MASK	(TIM_CCMR_CC1S | TIM_CCMR_CC2S | \
@@ -44,21 +45,21 @@ struct stm32_timer_cnt {
  * @STM32_COUNT_ENCODER_MODE_3: counts on both TI1FP1 and TI2FP2 edges
  */
 enum stm32_count_function {
+	STM32_COUNT_SLAVE_MODE_DISABLED = COUNTER_FUNCTION_INCREASE,
+	STM32_COUNT_ENCODER_MODE_1 = COUNTER_FUNCTION_QUADRATURE_X2_A,
+	STM32_COUNT_ENCODER_MODE_2 = COUNTER_FUNCTION_QUADRATURE_X2_B,
+	STM32_COUNT_ENCODER_MODE_3 = COUNTER_FUNCTION_QUADRATURE_X4,
+};
+
+static const enum counter_function stm32_count_functions[] = {
 	STM32_COUNT_SLAVE_MODE_DISABLED,
 	STM32_COUNT_ENCODER_MODE_1,
 	STM32_COUNT_ENCODER_MODE_2,
 	STM32_COUNT_ENCODER_MODE_3,
 };
 
-static const enum counter_function stm32_count_functions[] = {
-	[STM32_COUNT_SLAVE_MODE_DISABLED] = COUNTER_FUNCTION_INCREASE,
-	[STM32_COUNT_ENCODER_MODE_1] = COUNTER_FUNCTION_QUADRATURE_X2_A,
-	[STM32_COUNT_ENCODER_MODE_2] = COUNTER_FUNCTION_QUADRATURE_X2_B,
-	[STM32_COUNT_ENCODER_MODE_3] = COUNTER_FUNCTION_QUADRATURE_X4,
-};
-
 static int stm32_count_read(struct counter_device *counter,
-			    struct counter_count *count, unsigned long *val)
+			    struct counter_count *count, u64 *val)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 cnt;
@@ -70,8 +71,7 @@ static int stm32_count_read(struct counter_device *counter,
 }
 
 static int stm32_count_write(struct counter_device *counter,
-			     struct counter_count *count,
-			     const unsigned long val)
+			     struct counter_count *count, const u64 val)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 ceiling;
@@ -83,9 +83,9 @@ static int stm32_count_write(struct counter_device *counter,
 	return regmap_write(priv->regmap, TIM_CNT, val);
 }
 
-static int stm32_count_function_get(struct counter_device *counter,
-				    struct counter_count *count,
-				    size_t *function)
+static int stm32_count_function_read(struct counter_device *counter,
+				     struct counter_count *count,
+				     enum counter_function *function)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 smcr;
@@ -110,9 +110,9 @@ static int stm32_count_function_get(struct counter_device *counter,
 	}
 }
 
-static int stm32_count_function_set(struct counter_device *counter,
-				    struct counter_count *count,
-				    size_t function)
+static int stm32_count_function_write(struct counter_device *counter,
+				      struct counter_count *count,
+				      enum counter_function function)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 cr1, sms;
@@ -150,44 +150,37 @@ static int stm32_count_function_set(struct counter_device *counter,
 	return 0;
 }
 
-static ssize_t stm32_count_direction_read(struct counter_device *counter,
+static int stm32_count_direction_read(struct counter_device *counter,
 				      struct counter_count *count,
-				      void *private, char *buf)
+				      enum counter_count_direction *direction)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
-	const char *direction;
 	u32 cr1;
 
 	regmap_read(priv->regmap, TIM_CR1, &cr1);
-	direction = (cr1 & TIM_CR1_DIR) ? "backward" : "forward";
+	*direction = (cr1 & TIM_CR1_DIR) ? COUNTER_COUNT_DIRECTION_BACKWARD :
+		COUNTER_COUNT_DIRECTION_FORWARD;
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n", direction);
+	return 0;
 }
 
-static ssize_t stm32_count_ceiling_read(struct counter_device *counter,
-					struct counter_count *count,
-					void *private, char *buf)
+static int stm32_count_ceiling_read(struct counter_device *counter,
+				    struct counter_count *count, u64 *ceiling)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 arr;
 
 	regmap_read(priv->regmap, TIM_ARR, &arr);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n", arr);
+	*ceiling = arr;
+
+	return 0;
 }
 
-static ssize_t stm32_count_ceiling_write(struct counter_device *counter,
-					 struct counter_count *count,
-					 void *private,
-					 const char *buf, size_t len)
+static int stm32_count_ceiling_write(struct counter_device *counter,
+				     struct counter_count *count, u64 ceiling)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
-	unsigned int ceiling;
-	int ret;
-
-	ret = kstrtouint(buf, 0, &ceiling);
-	if (ret)
-		return ret;
 
 	if (ceiling > priv->max_arr)
 		return -ERANGE;
@@ -196,34 +189,27 @@ static ssize_t stm32_count_ceiling_write(struct counter_device *counter,
 	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
 	regmap_write(priv->regmap, TIM_ARR, ceiling);
 
-	return len;
+	return 0;
 }
 
-static ssize_t stm32_count_enable_read(struct counter_device *counter,
-				       struct counter_count *count,
-				       void *private, char *buf)
+static int stm32_count_enable_read(struct counter_device *counter,
+				   struct counter_count *count, u8 *enable)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
 	u32 cr1;
 
 	regmap_read(priv->regmap, TIM_CR1, &cr1);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", (bool)(cr1 & TIM_CR1_CEN));
+	*enable = cr1 & TIM_CR1_CEN;
+
+	return 0;
 }
 
-static ssize_t stm32_count_enable_write(struct counter_device *counter,
-					struct counter_count *count,
-					void *private,
-					const char *buf, size_t len)
+static int stm32_count_enable_write(struct counter_device *counter,
+				    struct counter_count *count, u8 enable)
 {
 	struct stm32_timer_cnt *const priv = counter->priv;
-	int err;
 	u32 cr1;
-	bool enable;
-
-	err = kstrtobool(buf, &enable);
-	if (err)
-		return err;
 
 	if (enable) {
 		regmap_read(priv->regmap, TIM_CR1, &cr1);
@@ -242,70 +228,55 @@ static ssize_t stm32_count_enable_write(struct counter_device *counter,
 	/* Keep enabled state to properly handle low power states */
 	priv->enabled = enable;
 
-	return len;
+	return 0;
 }
 
-static const struct counter_count_ext stm32_count_ext[] = {
-	{
-		.name = "direction",
-		.read = stm32_count_direction_read,
-	},
-	{
-		.name = "enable",
-		.read = stm32_count_enable_read,
-		.write = stm32_count_enable_write
-	},
-	{
-		.name = "ceiling",
-		.read = stm32_count_ceiling_read,
-		.write = stm32_count_ceiling_write
-	},
-};
-
-enum stm32_synapse_action {
-	STM32_SYNAPSE_ACTION_NONE,
-	STM32_SYNAPSE_ACTION_BOTH_EDGES
+static struct counter_comp stm32_count_ext[] = {
+	COUNTER_COMP_DIRECTION(stm32_count_direction_read),
+	COUNTER_COMP_ENABLE(stm32_count_enable_read, stm32_count_enable_write),
+	COUNTER_COMP_CEILING(stm32_count_ceiling_read,
+			     stm32_count_ceiling_write),
 };
 
 static const enum counter_synapse_action stm32_synapse_actions[] = {
-	[STM32_SYNAPSE_ACTION_NONE] = COUNTER_SYNAPSE_ACTION_NONE,
-	[STM32_SYNAPSE_ACTION_BOTH_EDGES] = COUNTER_SYNAPSE_ACTION_BOTH_EDGES
+	COUNTER_SYNAPSE_ACTION_NONE,
+	COUNTER_SYNAPSE_ACTION_BOTH_EDGES
 };
 
-static int stm32_action_get(struct counter_device *counter,
-			    struct counter_count *count,
-			    struct counter_synapse *synapse,
-			    size_t *action)
+static int stm32_action_read(struct counter_device *counter,
+			     struct counter_count *count,
+			     struct counter_synapse *synapse,
+			     enum counter_synapse_action *action)
 {
-	size_t function;
+	enum counter_function function;
 	int err;
 
-	err = stm32_count_function_get(counter, count, &function);
+	err = stm32_count_function_read(counter, count, &function);
 	if (err)
 		return err;
 
 	switch (function) {
 	case STM32_COUNT_SLAVE_MODE_DISABLED:
 		/* counts on internal clock when CEN=1 */
-		*action = STM32_SYNAPSE_ACTION_NONE;
+		*action = COUNTER_SYNAPSE_ACTION_NONE;
 		return 0;
 	case STM32_COUNT_ENCODER_MODE_1:
 		/* counts up/down on TI1FP1 edge depending on TI2FP2 level */
 		if (synapse->signal->id == count->synapses[0].signal->id)
-			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
+			*action = COUNTER_SYNAPSE_ACTION_BOTH_EDGES;
 		else
-			*action = STM32_SYNAPSE_ACTION_NONE;
+			*action = COUNTER_SYNAPSE_ACTION_NONE;
 		return 0;
 	case STM32_COUNT_ENCODER_MODE_2:
 		/* counts up/down on TI2FP2 edge depending on TI1FP1 level */
 		if (synapse->signal->id == count->synapses[1].signal->id)
-			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
+			*action = COUNTER_SYNAPSE_ACTION_BOTH_EDGES;
 		else
-			*action = STM32_SYNAPSE_ACTION_NONE;
+			*action = COUNTER_SYNAPSE_ACTION_NONE;
 		return 0;
 	case STM32_COUNT_ENCODER_MODE_3:
 		/* counts up/down on both TI1FP1 and TI2FP2 edges */
-		*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
+		*action = COUNTER_SYNAPSE_ACTION_BOTH_EDGES;
 		return 0;
 	default:
 		return -EINVAL;
@@ -315,9 +286,9 @@ static int stm32_action_get(struct counter_device *counter,
 static const struct counter_ops stm32_timer_cnt_ops = {
 	.count_read = stm32_count_read,
 	.count_write = stm32_count_write,
-	.function_get = stm32_count_function_get,
-	.function_set = stm32_count_function_set,
-	.action_get = stm32_action_get,
+	.function_read = stm32_count_function_read,
+	.function_write = stm32_count_function_write,
+	.action_read = stm32_action_read,
 };
 
 static struct counter_signal stm32_signals[] = {
