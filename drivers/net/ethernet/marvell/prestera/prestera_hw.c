@@ -41,6 +41,8 @@ enum prestera_cmd_type_t {
 
 	PRESTERA_CMD_TYPE_STP_PORT_SET = 0x1000,
 
+	PRESTERA_CMD_TYPE_CPU_CODE_COUNTERS_GET = 0x2000,
+
 	PRESTERA_CMD_TYPE_ACK = 0x10000,
 	PRESTERA_CMD_TYPE_MAX
 };
@@ -291,6 +293,17 @@ struct prestera_msg_rxtx_port_req {
 	struct prestera_msg_cmd cmd;
 	u32 port;
 	u32 dev;
+};
+
+struct prestera_msg_cpu_code_counter_req {
+	struct prestera_msg_cmd cmd;
+	u8 counter_type;
+	u8 code;
+};
+
+struct mvsw_msg_cpu_code_counter_ret {
+	struct prestera_msg_ret ret;
+	u64 packet_count;
 };
 
 struct prestera_msg_event {
@@ -1210,6 +1223,28 @@ int prestera_hw_rxtx_port_init(struct prestera_port *port)
 
 	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_RXTX_PORT_INIT,
 			    &req.cmd, sizeof(req));
+}
+
+int
+prestera_hw_cpu_code_counters_get(struct prestera_switch *sw, u8 code,
+				  enum prestera_hw_cpu_code_cnt_t counter_type,
+				  u64 *packet_count)
+{
+	struct prestera_msg_cpu_code_counter_req req = {
+		.counter_type = counter_type,
+		.code = code,
+	};
+	struct mvsw_msg_cpu_code_counter_ret resp;
+	int err;
+
+	err = prestera_cmd_ret(sw, PRESTERA_CMD_TYPE_CPU_CODE_COUNTERS_GET,
+			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
+	if (err)
+		return err;
+
+	*packet_count = resp.packet_count;
+
+	return 0;
 }
 
 int prestera_hw_event_handler_register(struct prestera_switch *sw,

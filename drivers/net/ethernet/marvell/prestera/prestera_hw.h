@@ -89,6 +89,11 @@ enum {
 	PRESTERA_STP_FORWARD,
 };
 
+enum prestera_hw_cpu_code_cnt_t {
+	PRESTERA_HW_CPU_CODE_CNT_TYPE_DROP = 0,
+	PRESTERA_HW_CPU_CODE_CNT_TYPE_TRAP = 1,
+};
+
 struct prestera_switch;
 struct prestera_port;
 struct prestera_port_stats;
@@ -178,5 +183,11 @@ void prestera_hw_event_handler_unregister(struct prestera_switch *sw,
 int prestera_hw_rxtx_init(struct prestera_switch *sw,
 			  struct prestera_rxtx_params *params);
 int prestera_hw_rxtx_port_init(struct prestera_port *port);
+
+/* HW trap/drop counters API */
+int
+prestera_hw_cpu_code_counters_get(struct prestera_switch *sw, u8 code,
+				  enum prestera_hw_cpu_code_cnt_t counter_type,
+				  u64 *packet_count);
 
 #endif /* _PRESTERA_HW_H_ */
