@@ -1766,7 +1766,7 @@ lpfc_bsg_diag_mode_exit(struct lpfc_hba *phba)
  * This function is responsible for placing an sli3  port into diagnostic
  * loopback mode in order to perform a diagnostic loopback test.
  * All new scsi requests are blocked, a small delay is used to allow the
- * scsi requests to complete then the link is brought down. If the link is
+ * scsi requests to complete then the link is brought down. If the link
  * is placed in loopback mode then scsi requests are again allowed
  * so the scsi mid-layer doesn't give up on the port.
  * All of this is done in-line.
@@ -5883,7 +5883,7 @@ lpfc_bsg_timeout(struct bsg_job *job)
 		return -EIO;
 
 	/* if job's driver data is NULL, the command completed or is in the
-	 * the process of completing.  In this case, return status to request
+	 * process of completing.  In this case, return status to request
 	 * so the timeout is retried.  This avoids double completion issues
 	 * and the request will be pulled off the timer queue when the
 	 * command's completion handler executes.  Otherwise, prevent the
