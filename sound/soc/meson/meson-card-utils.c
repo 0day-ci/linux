@@ -118,24 +118,25 @@ unsigned int meson_card_parse_daifmt(struct device_node *node,
 	struct device_node *bitclkmaster = NULL;
 	struct device_node *framemaster = NULL;
 	unsigned int daifmt;
+	unsigned int daiclk;
 
-	daifmt = snd_soc_of_parse_daifmt(node, "",
-					 &bitclkmaster, &framemaster);
-	daifmt &= ~SND_SOC_DAIFMT_MASTER_MASK;
+	daifmt = snd_soc_daifmt_parse_format(node, NULL);
+
+	snd_soc_daifmt_parse_clock_provider_as_phandle(node, NULL, &bitclkmaster, &framemaster);
 
 	/* If no master is provided, default to cpu master */
 	if (!bitclkmaster || bitclkmaster == cpu_node) {
-		daifmt |= (!framemaster || framemaster == cpu_node) ?
+		daiclk = (!framemaster || framemaster == cpu_node) ?
 			SND_SOC_DAIFMT_CBS_CFS : SND_SOC_DAIFMT_CBS_CFM;
 	} else {
-		daifmt |= (!framemaster || framemaster == cpu_node) ?
+		daiclk = (!framemaster || framemaster == cpu_node) ?
 			SND_SOC_DAIFMT_CBM_CFS : SND_SOC_DAIFMT_CBM_CFM;
 	}
 
 	of_node_put(bitclkmaster);
 	of_node_put(framemaster);
 
-	return daifmt;
+	return daifmt | daiclk;
 }
 EXPORT_SYMBOL_GPL(meson_card_parse_daifmt);
 
