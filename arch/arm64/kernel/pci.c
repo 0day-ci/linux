@@ -84,7 +84,12 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
 	if (!acpi_disabled) {
 		struct pci_config_window *cfg = bridge->bus->sysdata;
-		struct acpi_device *adev = to_acpi_device(cfg->parent);
+		/*
+		 * On Hyper-V, there is no corresponding APCI device for a root
+		 * bridge, therefore ->parent is set as NULL by the driver. Then
+		 * 'adev' should be NULL in this case.
+		 */
+		struct acpi_device *adev = cfg->parent ? to_acpi_device(cfg->parent) : NULL;
 		struct device *bus_dev = &bridge->bus->dev;
 
 		ACPI_COMPANION_SET(&bridge->dev, adev);
