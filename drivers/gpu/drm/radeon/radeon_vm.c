@@ -933,8 +933,7 @@ int radeon_vm_bo_update(struct radeon_device *rdev,
 		}
 		list_del_init(&bo_va->vm_status);
 	} else {
-		list_del(&bo_va->vm_status);
-		list_add(&bo_va->vm_status, &vm->cleared);
+		list_move(&bo_va->vm_status, &vm->cleared);
 	}
 	spin_unlock(&vm->status_lock);
 
