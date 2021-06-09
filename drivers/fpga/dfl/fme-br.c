@@ -17,7 +17,7 @@
 #include <linux/fpga/fpga-bridge.h>
 
 #include "dfl.h"
-#include "dfl-fme-pr.h"
+#include "fme-pr.h"
 
 struct fme_br_priv {
 	struct dfl_fme_br_pdata *pdata;

@@ -8,7 +8,7 @@
  *   Wu Hao <hao.wu@intel.com>
  *   Xiao Guangrong <guangrong.xiao@linux.intel.com>
  */
-#include "dfl-afu.h"
+#include "afu.h"
 
 /**
  * afu_mmio_region_init - init function for afu mmio region support

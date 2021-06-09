@@ -19,7 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/fpga-dfl.h>
 
-#include "dfl-afu.h"
+#include "afu.h"
 
 #define RST_POLL_INVL 10 /* us */
 #define RST_POLL_TIMEOUT 1000 /* us */

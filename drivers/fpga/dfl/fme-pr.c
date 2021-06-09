@@ -26,8 +26,8 @@
 #include <linux/fpga-dfl.h>
 
 #include "dfl.h"
-#include "dfl-fme.h"
-#include "dfl-fme-pr.h"
+#include "fme.h"
+#include "fme-pr.h"
 
 static struct dfl_fme_region *
 dfl_fme_region_find_by_port_id(struct dfl_fme *fme, int port_id)

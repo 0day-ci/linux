@@ -19,7 +19,7 @@
 #include <linux/uaccess.h>
 
 #include "dfl.h"
-#include "dfl-fme.h"
+#include "fme.h"
 
 #define FME_ERROR_MASK		0x8
 #define FME_ERROR		0x10

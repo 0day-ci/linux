@@ -15,8 +15,8 @@
  *   Henry Mitchel <henry.mitchel@intel.com>
  */
 
-#ifndef __DFL_FME_H
-#define __DFL_FME_H
+#ifndef __FME_H
+#define __FME_H
 
 /**
  * struct dfl_fme - dfl fme private data
@@ -41,4 +41,4 @@ extern const struct attribute_group fme_global_err_group;
 extern const struct dfl_feature_ops fme_perf_ops;
 extern const struct dfl_feature_id fme_perf_id_table[];
 
-#endif /* __DFL_FME_H */
+#endif /* __FME_H */

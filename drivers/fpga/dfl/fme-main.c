@@ -22,7 +22,7 @@
 #include <linux/fpga-dfl.h>
 
 #include "dfl.h"
-#include "dfl-fme.h"
+#include "fme.h"
 
 static ssize_t ports_num_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)

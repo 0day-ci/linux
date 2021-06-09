@@ -14,7 +14,7 @@
 #include <linux/uaccess.h>
 #include <linux/mm.h>
 
-#include "dfl-afu.h"
+#include "afu.h"
 
 void afu_dma_region_init(struct dfl_feature_platform_data *pdata)
 {

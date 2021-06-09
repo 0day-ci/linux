@@ -22,7 +22,7 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/fpga/fpga-mgr.h>
 
-#include "dfl-fme-pr.h"
+#include "fme-pr.h"
 
 /* FME Partial Reconfiguration Sub Feature Register Set */
 #define FME_PR_DFH		0x0

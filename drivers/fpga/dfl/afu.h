@@ -14,8 +14,8 @@
  *     Henry Mitchel <henry.mitchel@intel.com>
  */
 
-#ifndef __DFL_AFU_H
-#define __DFL_AFU_H
+#ifndef __AFU_H
+#define __AFU_H
 
 #include <linux/mm.h>
 
@@ -106,4 +106,4 @@ extern const struct dfl_feature_ops port_err_ops;
 extern const struct dfl_feature_id port_err_id_table[];
 extern const struct attribute_group port_err_group;
 
-#endif /* __DFL_AFU_H */
+#endif /* __AFU_H */

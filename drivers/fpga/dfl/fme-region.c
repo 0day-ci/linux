@@ -17,7 +17,7 @@
 #include <linux/fpga/fpga-mgr.h>
 #include <linux/fpga/fpga-region.h>
 
-#include "dfl-fme-pr.h"
+#include "fme-pr.h"
 
 static int fme_region_get_bridges(struct fpga_region *region)
 {

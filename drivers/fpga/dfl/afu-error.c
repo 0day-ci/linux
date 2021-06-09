@@ -17,7 +17,7 @@
 #include <linux/fpga-dfl.h>
 #include <linux/uaccess.h>
 
-#include "dfl-afu.h"
+#include "afu.h"
 
 #define PORT_ERROR_MASK		0x8
 #define PORT_ERROR		0x10

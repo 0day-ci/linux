@@ -15,8 +15,8 @@
  *   Henry Mitchel <henry.mitchel@intel.com>
  */
 
-#ifndef __DFL_FME_PR_H
-#define __DFL_FME_PR_H
+#ifndef __FME_PR_H
+#define __FME_PR_H
 
 #include <linux/platform_device.h>
 
@@ -81,4 +81,4 @@ struct dfl_fme_mgr_pdata {
 #define DFL_FPGA_FME_BRIDGE	"dfl-fme-bridge"
 #define DFL_FPGA_FME_REGION	"dfl-fme-region"
 
-#endif /* __DFL_FME_PR_H */
+#endif /* __FME_PR_H */
