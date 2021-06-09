@@ -39,6 +39,11 @@ static struct dentry *nsim_dev_ddir;
 
 #define NSIM_DEV_DUMMY_REGION_SIZE (1024 * 32)
 
+static int nsim_dev_devlink_port_param_set(struct devlink_port *port, u32 id,
+					   struct devlink_param_gset_ctx *ctx);
+static int nsim_dev_devlink_port_param_get(struct devlink_port *port, u32 id,
+					   struct devlink_param_gset_ctx *ctx);
+
 static int
 nsim_dev_take_snapshot(struct devlink *devlink,
 		       const struct devlink_region_ops *ops,
@@ -342,6 +347,17 @@ out:
 enum nsim_devlink_param_id {
 	NSIM_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
 	NSIM_DEVLINK_PARAM_ID_TEST1,
+	NSIM_DEVLINK_PARAM_ID_MAX,
+};
+
+#define NSIM_DEV_DEVLINK_PORT_PARAM_NUM \
+	(NSIM_DEVLINK_PORT_PARAM_ID_MAX - NSIM_DEVLINK_PORT_PARAM_ID_BASE - 1)
+
+enum nsim_devlink_port_param_id {
+	NSIM_DEVLINK_PORT_PARAM_ID_BASE = NSIM_DEVLINK_PARAM_ID_MAX,
+	NSIM_DEVLINK_PORT_PARAM_ID_TEST_STR,
+	NSIM_DEVLINK_PORT_PARAM_ID_TEST_BOOL,
+	NSIM_DEVLINK_PORT_PARAM_ID_MAX,
 };
 
 static const struct devlink_param nsim_devlink_params[] = {
@@ -913,6 +929,11 @@ nsim_dev_devlink_trap_hw_counter_get(struct devlink *devlink,
 	return 0;
 }
 
+static const struct devlink_port_param_ops nsim_dev_port_param_ops = {
+	.get = nsim_dev_devlink_port_param_get,
+	.set = nsim_dev_devlink_port_param_set,
+};
+
 static const struct devlink_ops nsim_dev_devlink_ops = {
 	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_COMPONENT |
 					 DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK,
@@ -927,6 +948,25 @@ static const struct devlink_ops nsim_dev_devlink_ops = {
 	.trap_policer_set = nsim_dev_devlink_trap_policer_set,
 	.trap_policer_counter_get = nsim_dev_devlink_trap_policer_counter_get,
 	.trap_drop_counter_get = nsim_dev_devlink_trap_hw_counter_get,
+	.port_param_ops = &nsim_dev_port_param_ops,
+};
+
+
+static struct devlink_param nsim_dev_port_params[] = {
+	{
+		.id = NSIM_DEVLINK_PORT_PARAM_ID_TEST_STR,
+		.name = "port_param_test_str",
+		.generic = false,
+		.type = DEVLINK_PARAM_TYPE_STRING,
+		.supported_cmodes = BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+	},
+	{
+		.id = NSIM_DEVLINK_PORT_PARAM_ID_TEST_BOOL,
+		.name = "port_param_test_bool",
+		.generic = false,
+		.type = DEVLINK_PARAM_TYPE_BOOL,
+		.supported_cmodes = BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+	},
 };
 
 #define NSIM_DEV_MAX_MACS_DEFAULT 32
@@ -956,9 +996,14 @@ static int __nsim_dev_port_add(struct nsim_dev *nsim_dev,
 	if (err)
 		goto err_port_free;
 
-	err = nsim_dev_port_debugfs_init(nsim_dev, nsim_dev_port);
+	err = devlink_port_params_register(devlink_port, nsim_dev_port_params,
+					   ARRAY_SIZE(nsim_dev_port_params));
 	if (err)
 		goto err_dl_port_unregister;
+
+	err = nsim_dev_port_debugfs_init(nsim_dev, nsim_dev_port);
+	if (err)
+		goto err_port_params_unregister;
 
 	nsim_dev_port->ns = nsim_create(nsim_dev, nsim_dev_port);
 	if (IS_ERR(nsim_dev_port->ns)) {
@@ -973,6 +1018,9 @@ static int __nsim_dev_port_add(struct nsim_dev *nsim_dev,
 
 err_port_debugfs_exit:
 	nsim_dev_port_debugfs_exit(nsim_dev_port);
+err_port_params_unregister:
+	devlink_port_params_unregister(devlink_port, nsim_dev_port_params,
+				       ARRAY_SIZE(nsim_dev_port_params));
 err_dl_port_unregister:
 	devlink_port_unregister(devlink_port);
 err_port_free:
@@ -1259,6 +1307,42 @@ int nsim_dev_port_del(struct nsim_bus_dev *nsim_bus_dev,
 		__nsim_dev_port_del(nsim_dev_port);
 	mutex_unlock(&nsim_dev->port_list_lock);
 	return err;
+}
+
+static int nsim_dev_devlink_port_param_get(struct devlink_port *port, u32 id,
+					   struct devlink_param_gset_ctx *ctx)
+{
+	struct nsim_dev *nsim_dev = devlink_priv(port->devlink);
+	struct nsim_dev_port *nsim_port =
+		__nsim_dev_port_lookup(nsim_dev, port->index);
+
+	if (id == NSIM_DEVLINK_PORT_PARAM_ID_TEST_STR) {
+		strcpy(ctx->val.vstr, nsim_port->devlink_test_param_str);
+		return 0;
+	} else if (id == NSIM_DEVLINK_PORT_PARAM_ID_TEST_BOOL) {
+		ctx->val.vbool = nsim_port->devlink_test_param_bool;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int nsim_dev_devlink_port_param_set(struct devlink_port *port, u32 id,
+					   struct devlink_param_gset_ctx *ctx)
+{
+	struct nsim_dev *nsim_dev = devlink_priv(port->devlink);
+	struct nsim_dev_port *nsim_port =
+		__nsim_dev_port_lookup(nsim_dev, port->index);
+
+	if (id == NSIM_DEVLINK_PORT_PARAM_ID_TEST_STR) {
+		strcpy(nsim_port->devlink_test_param_str, ctx->val.vstr);
+		return 0;
+	} else if (id == NSIM_DEVLINK_PORT_PARAM_ID_TEST_BOOL) {
+		nsim_port->devlink_test_param_bool = ctx->val.vbool;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 int nsim_dev_init(void)
