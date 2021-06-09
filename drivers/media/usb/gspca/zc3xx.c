@@ -5806,7 +5806,7 @@ static void setquality(struct gspca_dev *gspca_dev)
  * Valid frequencies are:
  *	50Hz, for European and Asian lighting (default)
  *	60Hz, for American lighting
- *	0 = No Fliker (for outdoore usage)
+ *	0 = No Fliker (for outdoor usage)
  */
 static void setlightfreq(struct gspca_dev *gspca_dev, s32 val)
 {
