@@ -8128,7 +8128,7 @@ int nl80211_parse_random_mac(struct nlattr **attrs,
 	memcpy(mac_addr, nla_data(attrs[NL80211_ATTR_MAC]), ETH_ALEN);
 	memcpy(mac_addr_mask, nla_data(attrs[NL80211_ATTR_MAC_MASK]), ETH_ALEN);
 
-	/* don't allow or configure an mcast address */
+	/* don't allow or configure a mcast address */
 	if (!is_multicast_ether_addr(mac_addr_mask) ||
 	    is_multicast_ether_addr(mac_addr))
 		return -EINVAL;
