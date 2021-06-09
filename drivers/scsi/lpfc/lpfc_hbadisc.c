@@ -232,8 +232,6 @@ lpfc_dev_loss_tmo_callbk(struct fc_rport *rport)
 		lpfc_worker_wake_up(phba);
 	}
 	spin_unlock_irqrestore(&phba->hbalock, iflags);
-
-	return;
 }
 
 /**
@@ -510,7 +508,6 @@ lpfc_send_fastpath_evt(struct lpfc_hba *phba,
 			LPFC_NL_VENDOR_ID);
 
 	lpfc_free_fast_evt(phba, fast_evt_data);
-	return;
 }
 
 static void
@@ -1141,8 +1138,6 @@ out:
 	writel(control, phba->HCregaddr);
 	readl(phba->HCregaddr); /* flush */
 	spin_unlock_irq(&phba->hbalock);
-
-	return;
 }
 
 void
@@ -1232,7 +1227,6 @@ sparam_out:
 			 vport->port_state);
 
 	lpfc_issue_clear_la(phba, vport);
-	return;
 }
 
 /**
@@ -1567,8 +1561,6 @@ lpfc_register_fcf(struct lpfc_hba *phba)
 		spin_unlock_irq(&phba->hbalock);
 		mempool_free(fcf_mbxq, phba->mbox_mem_pool);
 	}
-
-	return;
 }
 
 /**
@@ -2624,8 +2616,6 @@ read_next_fcf:
 out:
 	lpfc_sli4_mbox_cmd_free(phba, mboxq);
 	lpfc_register_fcf(phba);
-
-	return;
 }
 
 /**
@@ -2826,7 +2816,6 @@ lpfc_init_vfi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 
 	lpfc_initial_flogi(vport);
 	mempool_free(mboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -2908,7 +2897,6 @@ lpfc_init_vpi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 				 "2606 No NPIV Fabric support\n");
 	}
 	mempool_free(mboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -3090,7 +3078,6 @@ out_free_mem:
 		lpfc_mbuf_free(phba, dmabuf->virt, dmabuf->phys);
 		kfree(dmabuf);
 	}
-	return;
 }
 
 static void
@@ -3154,7 +3141,6 @@ out:
 	kfree(mp);
 	lpfc_issue_clear_la(phba, vport);
 	mempool_free(pmb, phba->mbox_mem_pool);
-	return;
 }
 
 static void
@@ -3381,7 +3367,6 @@ out:
 			 "0263 Discovery Mailbox error: state: 0x%x : x%px x%px\n",
 			 vport->port_state, sparam_mbox, cfglink_mbox);
 	lpfc_issue_clear_la(phba, vport);
-	return;
 }
 
 static void
@@ -3569,7 +3554,6 @@ lpfc_mbx_cmpl_read_topology_free_mbuf:
 	lpfc_mbuf_free(phba, mp->virt, mp->phys);
 	kfree(mp);
 	mempool_free(pmb, phba->mbox_mem_pool);
-	return;
 }
 
 /*
@@ -3629,8 +3613,6 @@ lpfc_mbx_cmpl_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 * function.
 	 */
 	lpfc_nlp_put(ndlp);
-
-	return;
 }
 
 static void
@@ -3745,7 +3727,6 @@ lpfc_mbx_cmpl_reg_vpi(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 
 out:
 	mempool_free(pmb, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -3890,8 +3871,6 @@ out:
 		}
 		mempool_free(pmb, phba->mbox_mem_pool);
 	}
-
-	return;
 }
 
 /*
@@ -3970,7 +3949,6 @@ lpfc_mbx_cmpl_fabric_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 * all the current reference to the ndlp have been done.
 	 */
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
  /*
@@ -4156,8 +4134,6 @@ out:
 	lpfc_mbuf_free(phba, mp->virt, mp->phys);
 	kfree(mp);
 	mempool_free(pmb, phba->mbox_mem_pool);
-
-	return;
 }
 
 static void
@@ -4242,8 +4218,6 @@ lpfc_register_remote_port(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 	    (rport->scsi_target_id < LPFC_MAX_TARGET)) {
 		ndlp->nlp_sid = rport->scsi_target_id;
 	}
-
-	return;
 }
 
 static void
@@ -4557,7 +4531,6 @@ lpfc_drop_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 	}
 
 	lpfc_nlp_put(ndlp);
-	return;
 }
 
 /*
@@ -4599,8 +4572,6 @@ lpfc_set_disctmo(struct lpfc_vport *vport)
 			 vport->port_state, tmo,
 			 (unsigned long)&vport->fc_disctmo, vport->fc_plogi_cnt,
 			 vport->fc_adisc_cnt);
-
-	return;
 }
 
 /*
@@ -5414,7 +5385,6 @@ lpfc_disc_list_loopmap(struct lpfc_vport *vport)
 			lpfc_setup_disc_node(vport, alpa);
 		}
 	}
-	return;
 }
 
 /* SLI3 only */
@@ -5566,7 +5536,6 @@ lpfc_disc_start(struct lpfc_vport *vport)
 				lpfc_els_handle_rscn(vport);
 		}
 	}
-	return;
 }
 
 /*
@@ -5681,7 +5650,6 @@ lpfc_disc_timeout(struct timer_list *t)
 
 	if (!tmo_posted)
 		lpfc_worker_wake_up(phba);
-	return;
 }
 
 static void
@@ -5916,7 +5884,6 @@ restart_disc:
 		}
 		vport->port_state = LPFC_VPORT_READY;
 	}
-	return;
 }
 
 /*
@@ -5967,8 +5934,6 @@ lpfc_mbx_cmpl_fdmi_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	lpfc_mbuf_free(phba, mp->virt, mp->phys);
 	kfree(mp);
 	mempool_free(pmb, phba->mbox_mem_pool);
-
-	return;
 }
 
 static int
@@ -6347,7 +6312,6 @@ lpfc_unregister_vfi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 	phba->pport->fc_flag &= ~FC_VFI_REGISTERED;
 	spin_unlock_irq(shost->host_lock);
 	mempool_free(mboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -6369,7 +6333,6 @@ lpfc_unregister_fcfi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 				mboxq->u.mb.mbxStatus, vport->port_state);
 	}
 	mempool_free(mboxq, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -6713,7 +6676,6 @@ lpfc_read_fcoe_param(struct lpfc_hba *phba,
 	phba->fc_map[0] = fcoe_param->fc_map[0];
 	phba->fc_map[1] = fcoe_param->fc_map[1];
 	phba->fc_map[2] = fcoe_param->fc_map[2];
-	return;
 }
 
 /**
