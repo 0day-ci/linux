@@ -422,14 +422,6 @@ void intel_engines_release(struct intel_gt *gt)
 	}
 }
 
-void intel_engine_free_request_pool(struct intel_engine_cs *engine)
-{
-	if (!engine->request_pool)
-		return;
-
-	kmem_cache_free(i915_request_slab_cache(), engine->request_pool);
-}
-
 void intel_engines_free(struct intel_gt *gt)
 {
 	struct intel_engine_cs *engine;

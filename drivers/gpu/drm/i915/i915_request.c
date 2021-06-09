@@ -106,9 +106,12 @@ static signed long i915_fence_wait(struct dma_fence *fence,
 				 timeout);
 }
 
-struct kmem_cache *i915_request_slab_cache(void)
+void intel_engine_free_request_pool(struct intel_engine_cs *engine)
 {
-	return global.slab_requests;
+	if (!engine->request_pool)
+		return;
+
+	kmem_cache_free(global.slab_requests, engine->request_pool);
 }
 
 static void i915_fence_release(struct dma_fence *fence)
