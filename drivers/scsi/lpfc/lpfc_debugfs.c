@@ -1842,7 +1842,6 @@ lpfc_debugfs_disc_trc(struct lpfc_vport *vport, int mask, char *fmt,
 	dtp->seq_cnt = atomic_inc_return(&lpfc_debugfs_seq_trc_cnt);
 	dtp->jif = jiffies;
 #endif
-	return;
 }
 
 /**
@@ -1880,7 +1879,6 @@ lpfc_debugfs_slow_ring_trc(struct lpfc_hba *phba, char *fmt,
 	dtp->seq_cnt = atomic_inc_return(&lpfc_debugfs_seq_trc_cnt);
 	dtp->jif = jiffies;
 #endif
-	return;
 }
 
 /**
@@ -6441,7 +6439,6 @@ lpfc_debugfs_terminate(struct lpfc_vport *vport)
 		}
 	}
 #endif
-	return;
 }
 
 /*
