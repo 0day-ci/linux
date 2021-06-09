@@ -60,6 +60,12 @@ struct prestera_port_caps {
 	u8 transceiver;
 };
 
+struct prestera_strom_control_cfg {
+	u32 bc_kbyte_per_sec_rate;
+	u32 unk_uc_kbyte_per_sec_rate;
+	u32 unreg_mc_kbyte_per_sec_rate;
+};
+
 struct prestera_port {
 	struct net_device *dev;
 	struct prestera_switch *sw;
@@ -79,6 +85,7 @@ struct prestera_port {
 		struct prestera_port_stats stats;
 		struct delayed_work caching_dw;
 	} cached_hw_stats;
+	struct prestera_strom_control_cfg storm_control;
 };
 
 struct prestera_device {

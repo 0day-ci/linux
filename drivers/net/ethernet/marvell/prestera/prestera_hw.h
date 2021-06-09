@@ -89,6 +89,12 @@ enum {
 	PRESTERA_STP_FORWARD,
 };
 
+enum {
+	PRESTERA_PORT_STORM_CTL_TYPE_BC = 0,
+	PRESTERA_PORT_STORM_CTL_TYPE_UC_UNK = 1,
+	PRESTERA_PORT_STORM_CTL_TYPE_MC = 2
+};
+
 enum prestera_hw_cpu_code_cnt_t {
 	PRESTERA_HW_CPU_CODE_CNT_TYPE_DROP = 0,
 	PRESTERA_HW_CPU_CODE_CNT_TYPE_TRAP = 1,
@@ -123,6 +129,9 @@ int prestera_hw_port_mac_set(const struct prestera_port *port, const char *mac);
 int prestera_hw_port_mac_get(const struct prestera_port *port, char *mac);
 int prestera_hw_port_cap_get(const struct prestera_port *port,
 			     struct prestera_port_caps *caps);
+int prestera_hw_port_storm_control_cfg_set(const struct prestera_port *port,
+					   u32 storm_type,
+					   u32 kbyte_per_sec_rate);
 int prestera_hw_port_remote_cap_get(const struct prestera_port *port,
 				    u64 *link_mode_bitmap);
 int prestera_hw_port_remote_fc_get(const struct prestera_port *port,

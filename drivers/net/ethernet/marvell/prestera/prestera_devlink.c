@@ -2,6 +2,8 @@
 /* Copyright (c) 2019-2020 Marvell International Ltd. All rights reserved */
 
 #include <net/devlink.h>
+#include <linux/bitops.h>
+#include <linux/bitfield.h>
 
 #include "prestera_devlink.h"
 #include "prestera_hw.h"
@@ -158,6 +160,34 @@ struct prestera_trap_data {
 			    DEVLINK_PRESTERA_TRAP_NAME_##_id,		      \
 			    DEVLINK_TRAP_GROUP_GENERIC_ID_##_group_id,	      \
 			    PRESTERA_TRAP_METADATA)
+
+#define PRESTERA_PORT_PARAM_DRIVER_RUNTIME(_id, _name, _type)		      \
+	DEVLINK_PARAM_DRIVER(PRESTERA_DEVLINK_PORT_PARAM_ID_##_id, _name,     \
+			     _type, BIT(DEVLINK_PARAM_CMODE_RUNTIME), NULL,   \
+			     NULL, NULL)
+
+struct prestera_storm_control {
+	struct prestera_switch *sw;
+	struct prestera_strom_control_cfg *cfg;
+};
+
+enum prestera_devlink_port_param_id {
+	PRESTERA_DEVLINK_PORT_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX + 1,
+	PRESTERA_DEVLINK_PORT_PARAM_ID_BC_RATE,
+	PRESTERA_DEVLINK_PORT_PARAM_ID_UC_UNK_RATE,
+	PRESTERA_DEVLINK_PORT_PARAM_ID_MC_RATE,
+};
+
+struct devlink_param prestera_devlink_port_params[] = {
+	PRESTERA_PORT_PARAM_DRIVER_RUNTIME(BC_RATE, "bc_kbyte_per_sec_rate",
+					   DEVLINK_PARAM_TYPE_U32),
+	PRESTERA_PORT_PARAM_DRIVER_RUNTIME(UC_UNK_RATE,
+					   "unk_uc_kbyte_per_sec_rate",
+					   DEVLINK_PARAM_TYPE_U32),
+	PRESTERA_PORT_PARAM_DRIVER_RUNTIME(MC_RATE,
+					   "unreg_mc_kbyte_per_sec_rate",
+					   DEVLINK_PARAM_TYPE_U32),
+};
 
 static const struct devlink_trap_group prestera_trap_groups_arr[] = {
 	/* No policer is associated with following groups (policerid == 0)*/
@@ -350,6 +380,10 @@ static void prestera_devlink_traps_fini(struct prestera_switch *sw);
 static int prestera_drop_counter_get(struct devlink *devlink,
 				     const struct devlink_trap *trap,
 				     u64 *p_drops);
+static int prestera_devlink_port_param_set(struct devlink_port *dl_port, u32 id,
+					   struct devlink_param_gset_ctx *ctx);
+static int prestera_devlink_port_param_get(struct devlink_port *dl_port, u32 id,
+					   struct devlink_param_gset_ctx *ctx);
 
 static int prestera_dl_info_get(struct devlink *dl,
 				struct devlink_info_req *req,
@@ -383,11 +417,17 @@ static int prestera_trap_action_set(struct devlink *devlink,
 
 static int prestera_devlink_traps_register(struct prestera_switch *sw);
 
+static const struct devlink_port_param_ops prestera_devlink_port_param_ops = {
+	.get = prestera_devlink_port_param_get,
+	.set = prestera_devlink_port_param_set,
+};
+
 static const struct devlink_ops prestera_dl_ops = {
 	.info_get = prestera_dl_info_get,
 	.trap_init = prestera_trap_init,
 	.trap_action_set = prestera_trap_action_set,
 	.trap_drop_counter_get = prestera_drop_counter_get,
+	.port_param_ops = &prestera_devlink_port_param_ops,
 };
 
 struct prestera_switch *prestera_devlink_alloc(void)
@@ -443,9 +483,11 @@ void prestera_devlink_unregister(struct prestera_switch *sw)
 int prestera_devlink_port_register(struct prestera_port *port)
 {
 	struct prestera_switch *sw = port->sw;
-	struct devlink *dl = priv_to_devlink(sw);
 	struct devlink_port_attrs attrs = {};
+	struct devlink *dl;
 	int err;
+
+	dl = priv_to_devlink(sw);
 
 	attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
 	attrs.phys.port_number = port->fp_id;
@@ -460,12 +502,32 @@ int prestera_devlink_port_register(struct prestera_port *port)
 		return err;
 	}
 
+	err = devlink_port_params_register(
+			&port->dl_port,
+			prestera_devlink_port_params,
+			ARRAY_SIZE(prestera_devlink_port_params));
+	if (err) {
+		devlink_port_unregister(&port->dl_port);
+		dev_err(sw->dev->dev, "devlink_port_params_register failed\n");
+		return err;
+	}
+
+	devlink_port_params_publish(&port->dl_port);
+
 	return 0;
 }
 
 void prestera_devlink_port_unregister(struct prestera_port *port)
 {
+	devlink_port_params_unpublish(&port->dl_port);
+
+	devlink_port_params_unregister(
+			&port->dl_port,
+			prestera_devlink_port_params,
+			ARRAY_SIZE(prestera_devlink_port_params));
+
 	devlink_port_unregister(&port->dl_port);
+
 }
 
 void prestera_devlink_port_set(struct prestera_port *port)
@@ -620,6 +682,76 @@ static int prestera_drop_counter_get(struct devlink *devlink,
 
 	return prestera_hw_cpu_code_counters_get(sw, prestera_trap->cpu_code,
 						 cpu_code_type, p_drops);
+}
+
+static int prestera_devlink_port_param_set(struct devlink_port *dl_port, u32 id,
+					   struct devlink_param_gset_ctx *ctx)
+{
+	struct prestera_strom_control_cfg *cfg;
+	u32 kbyte_per_sec_rate = ctx->val.vu32;
+	struct prestera_port *port;
+	struct prestera_switch *sw;
+	u32 *param_to_set;
+	u32 storm_type;
+	int ret;
+
+	port = container_of(dl_port, struct prestera_port, dl_port);
+	sw = devlink_priv(dl_port->devlink);
+	cfg = &port->storm_control;
+
+	switch (id) {
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_BC_RATE:
+		param_to_set = &cfg->bc_kbyte_per_sec_rate;
+		storm_type = PRESTERA_PORT_STORM_CTL_TYPE_BC;
+		break;
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_UC_UNK_RATE:
+		param_to_set = &cfg->unk_uc_kbyte_per_sec_rate;
+		storm_type = PRESTERA_PORT_STORM_CTL_TYPE_UC_UNK;
+		break;
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_MC_RATE:
+		param_to_set = &cfg->unreg_mc_kbyte_per_sec_rate;
+		storm_type = PRESTERA_PORT_STORM_CTL_TYPE_MC;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (kbyte_per_sec_rate != *param_to_set) {
+		ret = prestera_hw_port_storm_control_cfg_set(port, storm_type,
+							     kbyte_per_sec_rate);
+		if (ret)
+			return ret;
+
+		*param_to_set = kbyte_per_sec_rate;
+	}
+
+	return 0;
+}
+
+static int prestera_devlink_port_param_get(struct devlink_port *dl_port, u32 id,
+					   struct devlink_param_gset_ctx *ctx)
+{
+	struct prestera_strom_control_cfg *cfg;
+	struct prestera_port *port;
+	struct prestera_switch *sw;
+
+	port = container_of(dl_port, struct prestera_port, dl_port);
+	sw = devlink_priv(dl_port->devlink);
+	cfg = &port->storm_control;
+
+	switch (id) {
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_BC_RATE:
+		ctx->val.vu32 = cfg->bc_kbyte_per_sec_rate;
+		return 0;
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_UC_UNK_RATE:
+		ctx->val.vu32 = cfg->unk_uc_kbyte_per_sec_rate;
+		return 0;
+	case PRESTERA_DEVLINK_PORT_PARAM_ID_MC_RATE:
+		ctx->val.vu32 = cfg->unreg_mc_kbyte_per_sec_rate;
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }
 
 static void prestera_devlink_traps_fini(struct prestera_switch *sw)

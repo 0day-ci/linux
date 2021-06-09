@@ -19,6 +19,7 @@ enum prestera_cmd_type_t {
 	PRESTERA_CMD_TYPE_PORT_ATTR_SET = 0x100,
 	PRESTERA_CMD_TYPE_PORT_ATTR_GET = 0x101,
 	PRESTERA_CMD_TYPE_PORT_INFO_GET = 0x110,
+	PRESTERA_CMD_TYPE_PORT_RATE_LIMIT_MODE_SET = 0x111,
 
 	PRESTERA_CMD_TYPE_VLAN_CREATE = 0x200,
 	PRESTERA_CMD_TYPE_VLAN_DELETE = 0x201,
@@ -237,6 +238,14 @@ struct prestera_msg_port_info_resp {
 	u32 hw_id;
 	u32 dev_id;
 	u16 fp_id;
+};
+
+struct prestera_msg_port_storm_control_cfg_set_req {
+	struct prestera_msg_cmd cmd;
+	u32 port;
+	u32 dev;
+	u32 storm_type;
+	u32 kbyte_per_sec_rate;
 };
 
 struct prestera_msg_vlan_req {
@@ -624,6 +633,22 @@ int prestera_hw_port_accept_frm_type(struct prestera_port *port,
 	};
 
 	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
+			    &req.cmd, sizeof(req));
+}
+
+int prestera_hw_port_storm_control_cfg_set(const struct prestera_port *port,
+					   u32 storm_type,
+					   u32 kbyte_per_sec_rate)
+{
+	struct prestera_msg_port_storm_control_cfg_set_req req = {
+		.port = port->hw_id,
+		.dev = port->dev_id,
+		.storm_type = storm_type,
+		.kbyte_per_sec_rate = kbyte_per_sec_rate
+	};
+
+	return prestera_cmd(port->sw,
+			    PRESTERA_CMD_TYPE_PORT_RATE_LIMIT_MODE_SET,
 			    &req.cmd, sizeof(req));
 }
 
