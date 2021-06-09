@@ -62,6 +62,9 @@ static int __ns_get_path(struct path *path, struct ns_common *ns)
 	struct inode *inode;
 	unsigned long d;
 
+	if (WARN_ON_ONCE(!ns->ops))
+		return -EINVAL;
+
 	rcu_read_lock();
 	d = atomic_long_read(&ns->stashed);
 	if (!d)
