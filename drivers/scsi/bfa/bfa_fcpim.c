@@ -83,8 +83,7 @@ enum bfa_itnim_event {
  *  BFA IOIM related definitions
  */
 #define bfa_ioim_move_to_comp_q(__ioim) do {				\
-	list_del(&(__ioim)->qe);					\
-	list_add_tail(&(__ioim)->qe, &(__ioim)->fcpim->ioim_comp_q);	\
+	list_move_tail(&(__ioim)->qe, &(__ioim)->fcpim->ioim_comp_q);	\
 } while (0)
 
 
@@ -1023,8 +1022,7 @@ bfa_itnim_cleanup(struct bfa_itnim_s *itnim)
 		 * Move IO to a cleanup queue from active queue so that a later
 		 * TM will not pickup this IO.
 		 */
-		list_del(&ioim->qe);
-		list_add_tail(&ioim->qe, &itnim->io_cleanup_q);
+		list_move_tail(&ioim->qe, &itnim->io_cleanup_q);
 
 		bfa_wc_up(&itnim->wc);
 		bfa_ioim_cleanup(ioim);
@@ -1509,15 +1507,13 @@ bfa_ioim_sm_uninit(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		if (!bfa_itnim_is_online(ioim->itnim)) {
 			if (!bfa_itnim_hold_io(ioim->itnim)) {
 				bfa_sm_set_state(ioim, bfa_ioim_sm_hcb);
-				list_del(&ioim->qe);
-				list_add_tail(&ioim->qe,
-					&ioim->fcpim->ioim_comp_q);
+				list_move_tail(&ioim->qe,
+					       &ioim->fcpim->ioim_comp_q);
 				bfa_cb_queue(ioim->bfa, &ioim->hcb_qe,
 						__bfa_cb_ioim_pathtov, ioim);
 			} else {
-				list_del(&ioim->qe);
-				list_add_tail(&ioim->qe,
-					&ioim->itnim->pending_q);
+				list_move_tail(&ioim->qe,
+					       &ioim->itnim->pending_q);
 			}
 			break;
 		}
@@ -2044,8 +2040,7 @@ bfa_ioim_sm_hcb_free(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 	switch (event) {
 	case BFA_IOIM_SM_HCB:
 		bfa_sm_set_state(ioim, bfa_ioim_sm_resfree);
-		list_del(&ioim->qe);
-		list_add_tail(&ioim->qe, &ioim->fcpim->ioim_resfree_q);
+		list_move_tail(&ioim->qe, &ioim->fcpim->ioim_resfree_q);
 		break;
 
 	case BFA_IOIM_SM_FREE:
@@ -2672,14 +2667,12 @@ bfa_ioim_notify_cleanup(struct bfa_ioim_s *ioim)
 	 * Move IO from itnim queue to fcpim global queue since itnim will be
 	 * freed.
 	 */
-	list_del(&ioim->qe);
-	list_add_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
+	list_move_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
 
 	if (!ioim->iosp->tskim) {
 		if (ioim->fcpim->delay_comp && ioim->itnim->iotov_active) {
 			bfa_cb_dequeue(&ioim->hcb_qe);
-			list_del(&ioim->qe);
-			list_add_tail(&ioim->qe, &ioim->itnim->delay_comp_q);
+			list_move_tail(&ioim->qe, &ioim->itnim->delay_comp_q);
 		}
 		bfa_itnim_iodone(ioim->itnim);
 	} else
@@ -2723,8 +2716,7 @@ bfa_ioim_delayed_comp(struct bfa_ioim_s *ioim, bfa_boolean_t iotov)
 	 * Move IO to fcpim global queue since itnim will be
 	 * freed.
 	 */
-	list_del(&ioim->qe);
-	list_add_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
+	list_move_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
 }
 
 
@@ -3318,8 +3310,7 @@ bfa_tskim_gather_ios(struct bfa_tskim_s *tskim)
 		cmnd = (struct scsi_cmnd *) ioim->dio;
 		int_to_scsilun(cmnd->device->lun, &scsilun);
 		if (bfa_tskim_match_scope(tskim, scsilun)) {
-			list_del(&ioim->qe);
-			list_add_tail(&ioim->qe, &tskim->io_q);
+			list_move_tail(&ioim->qe, &tskim->io_q);
 		}
 	}
 
@@ -3331,8 +3322,7 @@ bfa_tskim_gather_ios(struct bfa_tskim_s *tskim)
 		cmnd = (struct scsi_cmnd *) ioim->dio;
 		int_to_scsilun(cmnd->device->lun, &scsilun);
 		if (bfa_tskim_match_scope(tskim, scsilun)) {
-			list_del(&ioim->qe);
-			list_add_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
+			list_move_tail(&ioim->qe, &ioim->fcpim->ioim_comp_q);
 			bfa_ioim_tov(ioim);
 		}
 	}
@@ -3576,8 +3566,7 @@ void
 bfa_tskim_free(struct bfa_tskim_s *tskim)
 {
 	WARN_ON(!bfa_q_is_on_q_func(&tskim->itnim->tsk_q, &tskim->qe));
-	list_del(&tskim->qe);
-	list_add_tail(&tskim->qe, &tskim->fcpim->tskim_free_q);
+	list_move_tail(&tskim->qe, &tskim->fcpim->tskim_free_q);
 }
 
 /*
