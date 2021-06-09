@@ -1149,11 +1149,15 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			mutex_unlock(&vlan_ioctl_mutex);
 			break;
 		case SIOCGSKNS:
+#ifdef CONFIG_NET_NS
 			err = -EPERM;
 			if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
 				break;
 
 			err = open_related_ns(&net->ns, get_net_ns);
+#else
+			err = -EOPNOTSUPP;
+#endif
 			break;
 		case SIOCGSTAMP_OLD:
 		case SIOCGSTAMPNS_OLD:

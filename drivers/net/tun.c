@@ -3003,9 +3003,13 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 	} else if (cmd == TUNSETQUEUE) {
 		return tun_set_queue(file, &ifr);
 	} else if (cmd == SIOCGSKNS) {
+#ifdef CONFIG_NET_NS
 		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
 			return -EPERM;
 		return open_related_ns(&net->ns, get_net_ns);
+#else
+		return -EOPNOTSUPP;
+#endif
 	}
 
 	rtnl_lock();
