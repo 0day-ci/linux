@@ -908,7 +908,7 @@ lpfc_ns_rsp(struct lpfc_vport *vport, struct lpfc_dmabuf *mp, uint8_t fc4_type,
 
 	}
 
-	/* All GID_FT entries processed.  If the driver is running in
+	/* All GID_FT entries processed.  If the driver is running
 	 * in target mode, put impacted nodes into recovery and drop
 	 * the RPI to flush outstanding IO.
 	 */
