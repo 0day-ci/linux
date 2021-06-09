@@ -239,7 +239,8 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 		if (!ret) {
 			fi = get_fuse_inode(inode);
 			if (outarg.nodeid != get_node_id(inode) ||
-			    (bool) IS_AUTOMOUNT(inode) != (bool) (outarg.attr.flags & FUSE_ATTR_SUBMOUNT)) {
+			    fuse_stale_inode(inode, outarg.generation,
+					     &outarg.attr)) {
 				fuse_queue_forget(fm->fc, forget,
 						  outarg.nodeid, 1);
 				goto invalid;
