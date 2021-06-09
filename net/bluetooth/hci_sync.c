@@ -272,8 +272,7 @@ int hci_update_random_address_sync(struct hci_dev *hdev, bool require_privacy,
 		/* If Controller supports LL Privacy use own address type is
 		 * 0x03
 		 */
-		if (use_ll_privacy(hdev) &&
-		    hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
+		if (use_ll_privacy(hdev))
 			*own_addr_type = ADDR_LE_DEV_RANDOM_RESOLVED;
 		else
 			*own_addr_type = ADDR_LE_DEV_RANDOM;
@@ -633,11 +632,9 @@ int hci_enable_advertising_sync(struct hci_dev *hdev)
 	if (!is_advertising_allowed(hdev, connectable))
 		return -EINVAL;
 
-	if (hci_dev_test_flag(hdev, HCI_LE_ADV)) {
-		status = hci_disable_advertising_sync(hdev);
-		if (status)
-			return status;
-	}
+	status = hci_disable_advertising_sync(hdev);
+	if (status)
+		return status;
 
 	/* Clear the HCI_LE_ADV bit temporarily so that the
 	 * hci_update_random_address knows that it's safe to go ahead
@@ -926,6 +923,10 @@ int hci_disable_advertising_sync(struct hci_dev *hdev)
 {
 	u8 enable = 0x00;
 
+	/* If controller is not advertising we are done. */
+	if (!hci_dev_test_flag(hdev, HCI_LE_ADV))
+		return 0;
+
 	if (ext_adv_capable(hdev))
 		return hci_disable_ext_adv_instance_sync(hdev, 0x00);
 
@@ -964,15 +965,18 @@ static int hci_le_set_scan_enable_sync(struct hci_dev *hdev, u8 val,
 
 static int hci_le_set_addr_resolution_enable_sync(struct hci_dev *hdev, u8 val)
 {
-	if (!use_ll_privacy(hdev) ||
-	    !hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
+	if (!use_ll_privacy(hdev))
+		return 0;
+
+	/* If controller is not/already resolving we are done. */
+	if (val == hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION))
 		return 0;
 
 	return __hci_cmd_sync_status(hdev, HCI_OP_LE_SET_ADDR_RESOLV_ENABLE,
 				     sizeof(val), &val, HCI_CMD_TIMEOUT);
 }
 
-int hci_scan_disable_sync(struct hci_dev *hdev, bool rpa_le_conn)
+int hci_scan_disable_sync(struct hci_dev *hdev)
 {
 	int err;
 
@@ -992,13 +996,6 @@ int hci_scan_disable_sync(struct hci_dev *hdev, bool rpa_le_conn)
 	if (err) {
 		bt_dev_err(hdev, "Unable to disable scanning: %d", err);
 		return err;
-	}
-
-	if (rpa_le_conn) {
-		err = hci_le_set_addr_resolution_enable_sync(hdev, 0x00);
-		if (err)
-			bt_dev_err(hdev, "Unable to disable LL privacy: %d",
-				   err);
 	}
 
 	return err;
@@ -1068,8 +1065,7 @@ static int hci_le_del_resolve_list_sync(struct hci_dev *hdev,
 	struct hci_cp_le_del_from_resolv_list cp;
 	struct smp_irk *irk;
 
-	if (!use_ll_privacy(hdev) ||
-	    !hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
+	if (!use_ll_privacy(hdev))
 		return 0;
 
 	irk = hci_find_irk_by_addr(hdev, bdaddr, bdaddr_type);
@@ -1111,9 +1107,9 @@ static int hci_le_add_resolve_list_sync(struct hci_dev *hdev,
 {
 	struct hci_cp_le_add_to_resolv_list cp;
 	struct smp_irk *irk;
+	int err;
 
-	if (!use_ll_privacy(hdev) ||
-	    !hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
+	if (!use_ll_privacy(hdev))
 		return 0;
 
 	irk = hci_find_irk_by_addr(hdev, &params->addr, params->addr_type);
@@ -1129,8 +1125,16 @@ static int hci_le_add_resolve_list_sync(struct hci_dev *hdev,
 	else
 		memset(cp.local_irk, 0, 16);
 
-	return __hci_cmd_sync_status(hdev, HCI_OP_LE_ADD_TO_RESOLV_LIST,
-				     sizeof(cp), &cp, HCI_CMD_TIMEOUT);
+	err = __hci_cmd_sync_status(hdev, HCI_OP_LE_ADD_TO_RESOLV_LIST,
+				    sizeof(cp), &cp, HCI_CMD_TIMEOUT);
+	/* When a controller cannot add a device to the list because there is
+	 * no space available, it shall return the error code Memory Capacity
+	 * Exceeded (0x07).
+	 */
+	if (err == HCI_ERROR_MEMORY_EXCEEDED)
+		return 0;
+
+	return err;
 }
 
 /* Adds connection to allow list if needed.*/
@@ -1192,8 +1196,7 @@ static u8 hci_update_accept_list_sync(struct hci_dev *hdev)
 	 */
 	bool allow_rpa = hdev->suspended;
 
-	if (use_ll_privacy(hdev) &&
-	    hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
+	if (use_ll_privacy(hdev))
 		allow_rpa = true;
 
 	/* Go through the current accept list programmed into the
@@ -1382,20 +1385,23 @@ static int hci_start_scan_sync(struct hci_dev *hdev, u8 type, u16 interval,
 					   LE_SCAN_FILTER_DUP_ENABLE);
 }
 
-/* Ensure to call hci_scan_disable_sync first to disable the controller based
- * address resolution to be able to reconfigure resolving list.
- */
 int hci_passive_scan_sync(struct hci_dev *hdev)
 {
 	u8 own_addr_type;
 	u8 filter_policy;
 	u16 window, interval;
-	/* Background scanning should run with address resolution */
-	bool addr_resolv = true;
+	bool restart_adv = false;
+	int err;
 
 	if (hdev->scanning_paused) {
 		bt_dev_dbg(hdev, "Scanning is paused for suspend");
 		return 0;
+	}
+
+	err = hci_scan_disable_sync(hdev);
+	if (err) {
+		bt_dev_err(hdev, "disable scanning failed: %d", err);
+		return err;
 	}
 
 	/* Set require_privacy to false since no SCAN_REQ are send
@@ -1413,6 +1419,25 @@ int hci_passive_scan_sync(struct hci_dev *hdev)
 		return 0;
 
 	bt_dev_dbg(hdev, "interleave state %d", hdev->interleave_scan_state);
+
+	/* Stop advertising if resolving list can be used as controllers are
+	 * cannot accept resolving list modifications while advertising.
+	 */
+	if (use_ll_privacy(hdev) && hci_dev_test_flag(hdev, HCI_LE_ADV)) {
+		err = hci_disable_advertising_sync(hdev);
+		if (err) {
+			bt_dev_err(hdev, "disable advertising failed: %d", err);
+			return err;
+		}
+		restart_adv = true;
+	}
+
+	err = hci_le_set_addr_resolution_enable_sync(hdev, 0x00);
+	if (err) {
+		bt_dev_err(hdev, "Unable to disable LL privacy: %d", err);
+		return err;
+	}
+
 	/* Adding or removing entries from the accept list must
 	 * happen before enabling scanning. The controller does
 	 * not allow accept list modification while scanning.
@@ -1450,8 +1475,16 @@ int hci_passive_scan_sync(struct hci_dev *hdev)
 
 	bt_dev_dbg(hdev, "LE passive scan with acceptlist = %d", filter_policy);
 
-	return hci_start_scan_sync(hdev, LE_SCAN_PASSIVE, interval, window,
-				   own_addr_type, filter_policy, addr_resolv);
+	/* Start scanning, it will also program allowlist and resolvinglist so
+	 * it needs to be done before restarting advertising.
+	 */
+	err = hci_start_scan_sync(hdev, LE_SCAN_PASSIVE, interval, window,
+				  own_addr_type, filter_policy, true);
+	if (err || !restart_adv)
+		return err;
+
+	/* Restart advertising if it was stopped */
+	return hci_enable_advertising_sync(hdev);
 }
 
 /* This function controls the background scanning based on hdev->pend_le_conns
@@ -1500,7 +1533,7 @@ int hci_update_background_scan_sync(struct hci_dev *hdev)
 
 		bt_dev_dbg(hdev, "stopping background scanning");
 
-		err = hci_scan_disable_sync(hdev, false);
+		err = hci_scan_disable_sync(hdev);
 		if (err)
 			bt_dev_err(hdev, "stop background scanning failed: %d",
 				   err);
@@ -1515,13 +1548,6 @@ int hci_update_background_scan_sync(struct hci_dev *hdev)
 		 */
 		if (hci_lookup_le_connect(hdev))
 			return 0;
-
-		err = hci_scan_disable_sync(hdev, false);
-		if (err) {
-			bt_dev_err(hdev, "stop background scanning failed: %d",
-				   err);
-			return err;
-		}
 
 		bt_dev_dbg(hdev, "start background scanning");
 

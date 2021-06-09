@@ -840,12 +840,7 @@ static u32 get_supported_settings(struct hci_dev *hdev)
 		settings |= MGMT_SETTING_SECURE_CONN;
 		settings |= MGMT_SETTING_PRIVACY;
 		settings |= MGMT_SETTING_STATIC_ADDRESS;
-
-		/* When the experimental feature for LL Privacy support is
-		 * enabled, then advertising is no longer supported.
-		 */
-		if (!hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
-			settings |= MGMT_SETTING_ADVERTISING;
+		settings |= MGMT_SETTING_ADVERTISING;
 	}
 
 	if (test_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks) ||
@@ -3835,7 +3830,7 @@ static int read_exp_features_info(struct sock *sk, struct hci_dev *hdev,
 		idx++;
 	}
 
-	if (hdev && use_ll_privacy(hdev)) {
+	if (hdev && ll_privacy_capable(hdev)) {
 		if (hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
 			flags = BIT(0) | BIT(1);
 		else
@@ -3911,7 +3906,8 @@ static int set_exp_feature(struct sock *sk, struct hci_dev *hdev,
 		}
 #endif
 
-		if (hdev && use_ll_privacy(hdev) && !hdev_is_powered(hdev)) {
+		if (hdev && ll_privacy_capable(hdev) &&
+		    !hdev_is_powered(hdev)) {
 			bool changed = hci_dev_test_flag(hdev,
 							 HCI_ENABLE_LL_PRIVACY);
 
@@ -5393,13 +5389,6 @@ static int set_advertising(struct sock *sk, struct hci_dev *hdev, void *data,
 	if (status)
 		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_ADVERTISING,
 				       status);
-
-	/* Enabling the experimental LL Privay support disables support for
-	 * advertising.
-	 */
-	if (hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
-		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_ADVERTISING,
-				       MGMT_STATUS_NOT_SUPPORTED);
 
 	if (cp->val != 0x00 && cp->val != 0x01 && cp->val != 0x02)
 		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_ADVERTISING,
@@ -7491,13 +7480,6 @@ static int read_adv_features(struct sock *sk, struct hci_dev *hdev,
 		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_READ_ADV_FEATURES,
 				       MGMT_STATUS_REJECTED);
 
-	/* Enabling the experimental LL Privay support disables support for
-	 * advertising.
-	 */
-	if (hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
-		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_READ_ADV_FEATURES,
-				       MGMT_STATUS_NOT_SUPPORTED);
-
 	hci_dev_lock(hdev);
 
 	rp_len = sizeof(*rp) + hdev->adv_instance_cnt;
@@ -7736,13 +7718,6 @@ static int add_advertising(struct sock *sk, struct hci_dev *hdev,
 	if (status)
 		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_ADD_ADVERTISING,
 				       status);
-
-	/* Enabling the experimental LL Privay support disables support for
-	 * advertising.
-	 */
-	if (hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
-		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_ADVERTISING,
-				       MGMT_STATUS_NOT_SUPPORTED);
 
 	if (cp->instance < 1 || cp->instance > hdev->le_num_of_adv_sets)
 		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_ADD_ADVERTISING,
@@ -8247,13 +8222,6 @@ static int remove_advertising(struct sock *sk, struct hci_dev *hdev,
 	int err;
 
 	bt_dev_dbg(hdev, "sock %p", sk);
-
-	/* Enabling the experimental LL Privay support disables support for
-	 * advertising.
-	 */
-	if (hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY))
-		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_SET_ADVERTISING,
-				       MGMT_STATUS_NOT_SUPPORTED);
 
 	hci_dev_lock(hdev);
 
