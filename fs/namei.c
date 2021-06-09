@@ -1271,7 +1271,7 @@ static bool choose_mountpoint(struct mount *m, const struct path *root,
 
 /*
  * Perform an automount
- * - return -EISDIR to tell follow_managed() to stop and return the path we
+ * - return -EISDIR to tell __traverse_mounts() to stop and return the path we
  *   were called with.
  */
 static int follow_automount(struct path *path, int *count, unsigned lookup_flags)
