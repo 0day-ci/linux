@@ -61,6 +61,14 @@ config VHOST_VSOCK
 	To compile this driver as a module, choose M here: the module will be called
 	vhost_vsock.
 
+config VHOST_VSOCK_DGRAM
+	bool "vhost vsock datagram sockets support"
+	depends on VHOST_VSOCK
+	default n
+	help
+	Enable vhost-vsock to support datagram types vsock.  The QEMU
+	and the guest must support datagram types too to use it.
+
 config VHOST_VDPA
 	tristate "Vhost driver for vDPA-based backend"
 	depends on EVENTFD
