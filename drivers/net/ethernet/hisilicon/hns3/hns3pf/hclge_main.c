@@ -8770,8 +8770,7 @@ static bool hclge_sync_from_add_list(struct list_head *add_list,
 			kfree(mac_node);
 		} else if (mac_node->state == HCLGE_MAC_ACTIVE) {
 			mac_node->state = HCLGE_MAC_TO_DEL;
-			list_del(&mac_node->node);
-			list_add_tail(&mac_node->node, mac_list);
+			list_move_tail(&mac_node->node, mac_list);
 		} else {
 			list_del(&mac_node->node);
 			kfree(mac_node);
@@ -8800,8 +8799,7 @@ static void hclge_sync_from_del_list(struct list_head *del_list,
 			list_del(&mac_node->node);
 			kfree(mac_node);
 		} else {
-			list_del(&mac_node->node);
-			list_add_tail(&mac_node->node, mac_list);
+			list_move_tail(&mac_node->node, mac_list);
 		}
 	}
 }
@@ -8845,8 +8843,7 @@ static void hclge_sync_vport_mac_table(struct hclge_vport *vport,
 	list_for_each_entry_safe(mac_node, tmp, list, node) {
 		switch (mac_node->state) {
 		case HCLGE_MAC_TO_DEL:
-			list_del(&mac_node->node);
-			list_add_tail(&mac_node->node, &tmp_del_list);
+			list_move_tail(&mac_node->node, &tmp_del_list);
 			break;
 		case HCLGE_MAC_TO_ADD:
 			new_node = kzalloc(sizeof(*new_node), GFP_ATOMIC);
@@ -8928,8 +8925,7 @@ static void hclge_build_del_list(struct list_head *list,
 		switch (mac_cfg->state) {
 		case HCLGE_MAC_TO_DEL:
 		case HCLGE_MAC_ACTIVE:
-			list_del(&mac_cfg->node);
-			list_add_tail(&mac_cfg->node, tmp_del_list);
+			list_move_tail(&mac_cfg->node, tmp_del_list);
 			break;
 		case HCLGE_MAC_TO_ADD:
 			if (is_del_list) {
@@ -9024,8 +9020,7 @@ static void hclge_uninit_vport_mac_list(struct hclge_vport *vport,
 		switch (mac_node->state) {
 		case HCLGE_MAC_TO_DEL:
 		case HCLGE_MAC_ACTIVE:
-			list_del(&mac_node->node);
-			list_add_tail(&mac_node->node, &tmp_del_list);
+			list_move_tail(&mac_node->node, &tmp_del_list);
 			break;
 		case HCLGE_MAC_TO_ADD:
 			list_del(&mac_node->node);
