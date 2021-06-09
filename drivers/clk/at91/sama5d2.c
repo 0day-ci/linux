@@ -170,7 +170,7 @@ static void __init sama5d2_pmc_setup(struct device_node *np)
 
 	sama5d2_pmc = pmc_data_allocate(PMC_AUDIOPLLCK + 1,
 					nck(sama5d2_systemck),
-					nck(sama5d2_periph32ck),
+					nck(sama5d2_periphck) + nck(sama5d2_periph32ck),
 					nck(sama5d2_gck), 3);
 	if (!sama5d2_pmc)
 		return;
