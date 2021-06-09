@@ -92,6 +92,9 @@ static bool intel_dp_read_lttpr_common_caps(struct intel_dp *intel_dp)
 	if (intel_dp_is_edp(intel_dp))
 		return false;
 
+	if (!i915->params.enable_lttpr)
+		return 0;
+
 	/*
 	 * Detecting LTTPRs must be avoided on platforms with an AUX timeout
 	 * period < 3.2ms. (see DP Standard v2.0, 2.11.2, 3.6.6.1).
@@ -132,6 +135,7 @@ static int intel_dp_init_lttpr(struct intel_dp *intel_dp)
 {
 	int lttpr_count;
 	int i;
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 
 	if (!intel_dp_read_lttpr_common_caps(intel_dp))
 		return 0;
@@ -151,6 +155,9 @@ static int intel_dp_init_lttpr(struct intel_dp *intel_dp)
 	 * sequence.
 	 */
 	intel_dp_set_lttpr_transparent_mode(intel_dp, true);
+
+	if (i915->params.enable_lttpr > 0)
+		return 0;
 
 	/*
 	 * In case of unsupported number of LTTPRs or failing to switch to

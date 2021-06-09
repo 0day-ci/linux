@@ -178,6 +178,10 @@ i915_param_named_unsafe(dmc_firmware_path, charp, 0400,
 i915_param_named_unsafe(enable_dp_mst, bool, 0400,
 	"Enable multi-stream transport (MST) for new DisplayPort sinks. (default: true)");
 
+i915_param_named_unsafe(enable_lttpr, int, 0400,
+	"Enable LTTPR "
+	"(-1= non-transparent mode [default], 0=Non-LTTPR, 1=transparent-mode)");
+
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
 i915_param_named_unsafe(inject_probe_failure, uint, 0400,
 	"Force an error after a number of failure check points (0:disabled (default), N:force failure at the Nth failure check point)");
