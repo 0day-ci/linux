@@ -325,6 +325,7 @@ static int fpga_mgr_firmware_load(struct fpga_manager *mgr,
 				  const char *image_name)
 {
 	struct device *dev = &mgr->dev;
+	const struct firmware *enc_fw;
 	const struct firmware *fw;
 	int ret;
 
@@ -339,8 +340,22 @@ static int fpga_mgr_firmware_load(struct fpga_manager *mgr,
 		return ret;
 	}
 
+	if (info->encrypted_key_name) {
+		ret = request_firmware(&enc_fw, info->encrypted_key_name, dev);
+		if (ret) {
+			mgr->state = FPGA_MGR_STATE_FIRMWARE_REQ_ERR;
+			dev_err(dev, "Error requesting firmware %s\n",
+				info->encrypted_key_name);
+			return ret;
+		}
+		info->enc_key_buf = enc_fw->data;
+		info->enc_key_buf_size = enc_fw->size;
+	}
+
 	ret = fpga_mgr_buf_load(mgr, info, fw->data, fw->size);
 
+	if (info->encrypted_key_name)
+		release_firmware(enc_fw);
 	release_firmware(fw);
 
 	return ret;
