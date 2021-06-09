@@ -3201,8 +3201,7 @@ bfa_timer_beat(struct bfa_timer_mod_s *mod)
 		elem = (struct bfa_timer_s *) qe;
 		if (elem->timeout <= BFA_TIMER_FREQ) {
 			elem->timeout = 0;
-			list_del(&elem->qe);
-			list_add_tail(&elem->qe, &timedout_q);
+			list_move_tail(&elem->qe, &timedout_q);
 		} else {
 			elem->timeout -= BFA_TIMER_FREQ;
 		}
