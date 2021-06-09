@@ -853,8 +853,7 @@ static unsigned long fcoe_ctlr_age_fcfs(struct fcoe_ctlr *fip)
 			 * fcoe_sysfs_fcf_del (which can sleep)
 			 * after the put_cpu().
 			 */
-			list_del(&fcf->list);
-			list_add(&fcf->list, &del_list);
+			list_move(&fcf->list, &del_list);
 			stats->VLinkFailureCount++;
 		} else {
 			if (time_after(next_timer, deadline))
