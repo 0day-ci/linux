@@ -1012,6 +1012,19 @@ static struct clk_rcg2 sdcc1_apps_clk_src = {
 	},
 };
 
+static struct freq_tbl ftbl_sdcc2_40mhz_apps_clk_src[] = {
+	F(144000, P_XO, 16, 3, 25),
+	F(400000, P_XO, 12, 1, 4),
+	F(20000000, P_GPLL0, 15, 1, 2),
+	F(25000000, P_GPLL0, 12, 1, 2),
+	F(40000000, P_GPLL0, 15, 0, 0),
+	F(50000000, P_GPLL0, 12, 0, 0),
+	F(80000000, P_GPLL0, 7.5, 0, 0),
+	F(100000000, P_GPLL0, 6, 0, 0),
+	F(200000000, P_GPLL0, 3, 0, 0),
+	{ }
+};
+
 static struct freq_tbl ftbl_sdcc2_4_apps_clk_src[] = {
 	F(144000, P_XO, 16, 3, 25),
 	F(400000, P_XO, 12, 1, 4),
@@ -2787,6 +2800,9 @@ static int gcc_msm8994_probe(struct platform_device *pdev)
 		gcc_msm8994_desc.clks[GCC_PCIE_1_SLV_AXI_CLK] = NULL;
 		gcc_msm8994_desc.clks[GCC_SYS_NOC_UFS_AXI_CLK] = NULL;
 	}
+
+	if (of_find_property(dev->of_node, "qcom,sdcc2-clk-src-40mhz", NULL))
+		sdcc2_apps_clk_src.freq_tbl = ftbl_sdcc2_40mhz_apps_clk_src;
 
 	return qcom_cc_probe(pdev, &gcc_msm8994_desc);
 }
