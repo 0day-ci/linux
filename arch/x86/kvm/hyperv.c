@@ -85,9 +85,32 @@ static bool synic_has_vector_auto_eoi(struct kvm_vcpu_hv_synic *synic,
 	return false;
 }
 
+static void hv_apicv_update_work(struct work_struct *work)
+{
+	struct kvm_hv *hv = container_of(work, struct kvm_hv,
+					 apic_update_work);
+	struct kvm_arch *ka = container_of(hv, struct kvm_arch,
+					   hyperv);
+	struct kvm *kvm = container_of(ka, struct kvm, arch);
+	struct kvm_vcpu *vcpu;
+	int i;
+
+	mutex_lock(&kvm->lock);
+	kvm_request_apicv_update(kvm, atomic_read(&hv->synic_auto_eoi_used) == 0,
+				 APICV_INHIBIT_REASON_HYPERV);
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		kvm_clear_request(KVM_REQ_APICV_INPROGRESS, vcpu);
+	mutex_unlock(&kvm->lock);
+}
+
 static void synic_update_vector(struct kvm_vcpu_hv_synic *synic,
 				int vector)
 {
+	struct kvm_vcpu *vcpu = hv_synic_to_vcpu(synic);
+	struct kvm_hv *hv = to_kvm_hv(vcpu->kvm);
+	int auto_eoi_old, auto_eoi_new;
+	bool apicv_update_needed = false;
+
 	if (vector < HV_SYNIC_FIRST_VALID_VECTOR)
 		return;
 
@@ -96,10 +119,28 @@ static void synic_update_vector(struct kvm_vcpu_hv_synic *synic,
 	else
 		__clear_bit(vector, synic->vec_bitmap);
 
+	auto_eoi_old = bitmap_weight(synic->auto_eoi_bitmap, 256);
+
 	if (synic_has_vector_auto_eoi(synic, vector))
 		__set_bit(vector, synic->auto_eoi_bitmap);
 	else
 		__clear_bit(vector, synic->auto_eoi_bitmap);
+
+	auto_eoi_new = bitmap_weight(synic->auto_eoi_bitmap, 256);
+
+	/* Hyper-V SynIC auto EOI SINTs are not compatible with APICv */
+	if (!auto_eoi_old && auto_eoi_new) {
+		if (atomic_inc_return(&hv->synic_auto_eoi_used) == 1)
+			apicv_update_needed = true;
+	} else if (!auto_eoi_new && auto_eoi_old) {
+		if (atomic_dec_return(&hv->synic_auto_eoi_used) == 0)
+			apicv_update_needed = true;
+	}
+
+	if (apicv_update_needed) {
+		kvm_make_all_cpus_request(vcpu->kvm, KVM_REQ_APICV_INPROGRESS);
+		schedule_work(&hv->apic_update_work);
+	}
 }
 
 static int synic_set_sint(struct kvm_vcpu_hv_synic *synic, int sint,
@@ -933,12 +974,6 @@ int kvm_hv_activate_synic(struct kvm_vcpu *vcpu, bool dont_zero_synic_pages)
 
 	synic = to_hv_synic(vcpu);
 
-	/*
-	 * Hyper-V SynIC auto EOI SINT's are
-	 * not compatible with APICV, so request
-	 * to deactivate APICV permanently.
-	 */
-	kvm_request_apicv_update(vcpu->kvm, false, APICV_INHIBIT_REASON_HYPERV);
 	synic->active = true;
 	synic->dont_zero_synic_pages = dont_zero_synic_pages;
 	synic->control = HV_SYNIC_CONTROL_ENABLE;
@@ -2300,6 +2335,7 @@ void kvm_hv_init_vm(struct kvm *kvm)
 
 	mutex_init(&hv->hv_lock);
 	idr_init(&hv->conn_to_evt);
+	INIT_WORK(&hv->apic_update_work, hv_apicv_update_work);
 }
 
 void kvm_hv_destroy_vm(struct kvm *kvm)
@@ -2311,6 +2347,7 @@ void kvm_hv_destroy_vm(struct kvm *kvm)
 	idr_for_each_entry(&hv->conn_to_evt, eventfd, i)
 		eventfd_ctx_put(eventfd);
 	idr_destroy(&hv->conn_to_evt);
+	cancel_work_sync(&hv->apic_update_work);
 }
 
 static int kvm_hv_eventfd_assign(struct kvm *kvm, u32 conn_id, int fd)
@@ -2466,6 +2503,8 @@ int kvm_get_hv_cpuid(struct kvm_vcpu *vcpu, struct kvm_cpuid2 *cpuid,
 				ent->eax |= HV_X64_ENLIGHTENED_VMCS_RECOMMENDED;
 			if (!cpu_smt_possible())
 				ent->eax |= HV_X64_NO_NONARCH_CORESHARING;
+			if (enable_apicv)
+				ent->eax |= HV_DEPRECATING_AEOI_RECOMMENDED;
 			/*
 			 * Default number of spinlock retry attempts, matches
 			 * HyperV 2016.
