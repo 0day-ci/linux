@@ -1544,7 +1544,6 @@ lpfc_sli_cancel_iocbs(struct lpfc_hba *phba, struct list_head *iocblist,
 			lpfc_sli_release_iocbq(phba, piocb);
 		}
 	}
-	return;
 }
 
 /**
@@ -2054,8 +2053,6 @@ lpfc_sli_resume_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 		else
 			lpfc_sli_update_full_ring(phba, pring);
 	}
-
-	return;
 }
 
 /**
@@ -2566,7 +2563,6 @@ lpfc_sli_wake_mbox_wait(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
 	if (pmbox_done)
 		complete(pmbox_done);
 	spin_unlock_irqrestore(&phba->hbalock, drvr_flag);
-	return;
 }
 
 static void
@@ -3565,8 +3561,6 @@ lpfc_sli_rsp_pointers_error(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 	phba->work_hs = HS_FFER3;
 
 	lpfc_worker_wake_up(phba);
-
-	return;
 }
 
 /**
@@ -3613,7 +3607,6 @@ void lpfc_poll_eratt(struct timer_list *t)
 		mod_timer(&phba->eratt_poll,
 			  jiffies +
 			  msecs_to_jiffies(1000 * phba->eratt_poll_interval));
-	return;
 }
 
 
@@ -4140,7 +4133,6 @@ lpfc_sli_handle_slow_ring_event_s3(struct lpfc_hba *phba,
 	}
 
 	spin_unlock_irqrestore(&phba->hbalock, iflag);
-	return;
 }
 
 /**
@@ -6444,8 +6436,6 @@ lpfc_set_features(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbox,
 		mbox->u.mqe.un.set_feature.param_len = 4;
 		break;
 	}
-
-	return;
 }
 
 /**
@@ -8177,7 +8167,6 @@ lpfc_mbox_timeout(struct timer_list *t)
 
 	if (!tmo_posted)
 		lpfc_worker_wake_up(phba);
-	return;
 }
 
 /**
@@ -11601,7 +11590,6 @@ lpfc_sli_abort_els_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 	}
 release_iocb:
 	lpfc_sli_release_iocbq(phba, cmdiocb);
-	return;
 }
 
 /**
@@ -11968,7 +11956,6 @@ lpfc_sli_abort_fcp_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			cmdiocb->iotag, rspiocb->iocb.ulpStatus,
 			rspiocb->iocb.un.ulpWord[4]);
 	lpfc_sli_release_iocbq(phba, cmdiocb);
-	return;
 }
 
 /**
@@ -12248,7 +12235,6 @@ lpfc_sli_wake_iocb_wait(struct lpfc_hba *phba,
 	if (pdone_q)
 		wake_up(pdone_q);
 	spin_unlock_irqrestore(&phba->hbalock, iflags);
-	return;
 }
 
 /**
@@ -15113,7 +15099,6 @@ lpfc_sli4_queue_free(struct lpfc_queue *queue)
 		list_del(&queue->cpu_list);
 
 	kfree(queue);
-	return;
 }
 
 /**
@@ -15341,7 +15326,6 @@ lpfc_modify_hba_eq_delay(struct lpfc_hba *phba, uint32_t startq,
 				shdr_status, shdr_add_status, rc);
 	}
 	mempool_free(mbox, phba->mbox_mem_pool);
-	return;
 }
 
 /**
@@ -20017,7 +20001,6 @@ lpfc_sli_read_link_ste(struct lpfc_hba *phba)
 
 out:
 	kfree(rgn23_data);
-	return;
 }
 
 /**
