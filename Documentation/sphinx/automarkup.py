@@ -72,6 +72,40 @@ Skipfuncs = [ 'open', 'close', 'read', 'write', 'fcntl', 'mmap',
               'select', 'poll', 'fork', 'execve', 'clone', 'ioctl',
               'socket' ]
 
+#
+# Words that are automatically converted to literals
+#
+Literals = [ 'NULL', 'ULONG_MAX', 'LONG_MAX', 'EPERM', 'ENOENT', 'ESRCH',
+            'EINTR', 'EIO', 'ENXIO', 'E2BIG', 'ENOEXEC', 'EBADF', 'ECHILD',
+            'EAGAIN', 'ENOMEM', 'EACCES', 'EFAULT', 'ENOTBLK', 'EBUSY',
+            'EEXIST', 'EXDEV', 'ENODEV', 'ENOTDIR', 'EISDIR', 'EINVAL',
+            'ENFILE', 'EMFILE', 'ENOTTY', 'ETXTBSY', 'EFBIG', 'ENOSPC',
+            'ESPIPE', 'EROFS', 'EMLINK', 'EPIPE', 'EDOM', 'ERANGE', 'EDEADLK',
+            'ENAMETOOLONG', 'ENOLCK', 'ENOSYS', 'ENOTEMPTY', 'ELOOP',
+            'EWOULDBLOCK', 'ENOMSG', 'EIDRM', 'ECHRNG', 'EL2NSYNC', 'EL3HLT',
+            'EL3RST', 'ELNRNG', 'EUNATCH', 'ENOCSI', 'EL2HLT', 'EBADE', 'EBADR',
+            'EXFULL', 'ENOANO', 'EBADRQC', 'EBADSLT', 'EDEADLOCK', 'EBFONT',
+            'ENOSTR', 'ENODATA', 'ETIME', 'ENOSR', 'ENONET', 'ENOPKG',
+            'EREMOTE', 'ENOLINK', 'EADV', 'ESRMNT', 'ECOMM', 'EPROTO',
+            'EMULTIHOP', 'EDOTDOT', 'EBADMSG', 'EOVERFLOW', 'ENOTUNIQ',
+            'EBADFD', 'EREMCHG', 'ELIBACC', 'ELIBBAD', 'ELIBSCN', 'ELIBMAX',
+            'ELIBEXEC', 'EILSEQ', 'ERESTART', 'ESTRPIPE', 'EUSERS', 'ENOTSOCK',
+            'EDESTADDRREQ', 'EMSGSIZE', 'EPROTOTYPE', 'ENOPROTOOPT',
+            'EPROTONOSUPPORT', 'ESOCKTNOSUPPORT', 'EOPNOTSUPP', 'EPFNOSUPPORT',
+            'EAFNOSUPPORT', 'EADDRINUSE', 'EADDRNOTAVAIL', 'ENETDOWN',
+            'ENETUNREACH', 'ENETRESET', 'ECONNABORTED', 'ECONNRESET', 'ENOBUFS',
+            'EISCONN', 'ENOTCONN', 'ESHUTDOWN', 'ETOOMANYREFS', 'ETIMEDOUT',
+            'ECONNREFUSED', 'EHOSTDOWN', 'EHOSTUNREACH', 'EALREADY',
+            'EINPROGRESS', 'ESTALE', 'EUCLEAN', 'ENOTNAM', 'ENAVAIL', 'EISNAM',
+            'EREMOTEIO', 'EDQUOT', 'ENOMEDIUM', 'EMEDIUMTYPE', 'ECANCELED',
+            'ENOKEY', 'EKEYEXPIRED', 'EKEYREVOKED', 'EKEYREJECTED',
+            'EOWNERDEAD', 'ENOTRECOVERABLE', 'ERFKILL', 'EHWPOISON' ]
+
+#
+# Any of the words in Literals, optionally prefixed with a '-'
+#
+RE_literal = re.compile(r'-?\b(' + str(r'|'.join(Literals)) + r')\b')
+
 c_namespace = ''
 
 def markup_refs(docname, app, node):
@@ -83,14 +117,18 @@ def markup_refs(docname, app, node):
     #
     markup_func_sphinx2 = {RE_doc: markup_doc_ref,
                            RE_function: markup_c_ref,
-                           RE_generic_type: markup_c_ref}
+                           RE_generic_type: markup_c_ref,
+                           RE_literal: markup_literal,
+                           }
 
     markup_func_sphinx3 = {RE_doc: markup_doc_ref,
                            RE_function: markup_func_ref_sphinx3,
                            RE_struct: markup_c_ref,
                            RE_union: markup_c_ref,
                            RE_enum: markup_c_ref,
-                           RE_typedef: markup_c_ref}
+                           RE_typedef: markup_c_ref,
+                           RE_literal: markup_literal,
+                           }
 
     if sphinx.version_info[0] >= 3:
         markup_func = markup_func_sphinx3
@@ -224,6 +262,9 @@ def markup_c_ref(docname, app, match):
                     return xref
 
     return target_text
+
+def markup_literal(docname, app, match):
+    return nodes.literal('', match.group(0))
 
 #
 # Try to replace a documentation reference of the form Documentation/... with a
