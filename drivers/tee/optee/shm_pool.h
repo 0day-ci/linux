@@ -9,6 +9,6 @@
 
 #include <linux/tee_drv.h>
 
-struct tee_shm_pool_mgr *optee_shm_pool_alloc_pages(void);
+struct tee_shm_pool *optee_shm_pool_alloc_pages(void);
 
 #endif
