@@ -917,9 +917,12 @@ static void gid_table_cleanup_one(struct ib_device *ib_dev)
 {
 	u32 p;
 
-	rdma_for_each_port (ib_dev, p)
+	rdma_for_each_port (ib_dev, p) {
+		clear_bit(IB_PORT_CACHE_INITIALIZED,
+			&ib_dev->port_data[p].flags);
 		cleanup_gid_table_port(ib_dev, p,
 				       ib_dev->port_data[p].cache.gid);
+	}
 }
 
 static int gid_table_setup_one(struct ib_device *ib_dev)
@@ -1623,6 +1626,8 @@ int ib_cache_setup_one(struct ib_device *device)
 		err = ib_cache_update(device, p, true);
 		if (err)
 			return err;
+		set_bit(IB_PORT_CACHE_INITIALIZED,
+			&device->port_data[p].flags);
 	}
 
 	return 0;
