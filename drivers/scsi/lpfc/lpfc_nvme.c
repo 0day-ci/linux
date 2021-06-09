@@ -1881,7 +1881,6 @@ lpfc_nvme_fcp_abort(struct nvme_fc_local_port *pnvme_lport,
 out_unlock:
 	spin_unlock(&lpfc_nbuf->buf_lock);
 	spin_unlock_irqrestore(&phba->hbalock, flags);
-	return;
 }
 
 /* Declare and initialization an instance of the FC NVME template. */
