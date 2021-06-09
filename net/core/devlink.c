@@ -3923,6 +3923,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 	const struct devlink_param *param = param_item->param;
 	struct devlink_param_gset_ctx ctx;
 	struct nlattr *param_values_list;
+	struct devlink_port *dl_port;
 	struct nlattr *param_attr;
 	int nla_type;
 	void *hdr;
@@ -3941,7 +3942,20 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 			if (!param_item->published)
 				continue;
 			ctx.cmode = i;
-			err = devlink_param_get(devlink, param, &ctx);
+			if ((cmd == DEVLINK_CMD_PORT_PARAM_GET ||
+			     cmd == DEVLINK_CMD_PORT_PARAM_NEW ||
+			     cmd == DEVLINK_CMD_PORT_PARAM_DEL) &&
+			     devlink->ops->port_param_ops &&
+			     devlink->ops->port_param_ops->get) {
+				dl_port = devlink_port_get_by_index(devlink,
+								    port_index);
+				err = devlink->ops->port_param_ops->get(dl_port,
+									param->id,
+									&ctx);
+			} else {
+				err = devlink_param_get(devlink, param, &ctx);
+			}
+
 			if (err)
 				return err;
 			param_value[i] = ctx.val;
@@ -4201,6 +4215,7 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 	struct devlink_param_item *param_item;
 	const struct devlink_param *param;
 	union devlink_param_value value;
+	struct devlink_port *dl_port;
 	int err = 0;
 
 	param_item = devlink_param_get_from_info(param_list, info);
@@ -4234,13 +4249,28 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 			param_item->driverinit_value = value;
 		param_item->driverinit_value_valid = true;
 	} else {
-		if (!param->set)
-			return -EOPNOTSUPP;
 		ctx.val = value;
 		ctx.cmode = cmode;
-		err = devlink_param_set(devlink, param, &ctx);
-		if (err)
-			return err;
+
+		if ((cmd == DEVLINK_CMD_PORT_PARAM_SET ||
+		     cmd == DEVLINK_CMD_PORT_PARAM_NEW) &&
+		    devlink->ops->port_param_ops &&
+		    devlink->ops->port_param_ops->set) {
+			dl_port = devlink_port_get_by_index(devlink,
+							    port_index);
+			err = devlink->ops->port_param_ops->set(dl_port,
+								param->id,
+								&ctx);
+			if (err)
+				return err;
+		} else {
+			if (!param->set)
+				return -EOPNOTSUPP;
+
+			err = devlink_param_set(devlink, param, &ctx);
+			if (err)
+				return err;
+		}
 	}
 
 	devlink_param_notify(devlink, port_index, param_item, cmd);
@@ -4269,8 +4299,6 @@ static int devlink_param_register_one(struct devlink *devlink,
 
 	if (param->supported_cmodes == BIT(DEVLINK_PARAM_CMODE_DRIVERINIT))
 		WARN_ON(param->get || param->set);
-	else
-		WARN_ON(!param->get || !param->set);
 
 	param_item = kzalloc(sizeof(*param_item), GFP_KERNEL);
 	if (!param_item)
