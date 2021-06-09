@@ -83,6 +83,7 @@ struct dpu_irq_callback {
  * @total_irq:    total number of irq_idx obtained from HW interrupts mapping
  * @irq_cb_tbl:   array of IRQ callbacks setting
  * @cb_lock:      callback lock
+ * @hw_enable_lock: lock to synchronize callback register and unregister
  * @debugfs_file: debugfs file for irq statistics
  */
 struct dpu_irq {
@@ -90,6 +91,7 @@ struct dpu_irq {
 	struct list_head *irq_cb_tbl;
 	atomic_t *irq_counts;
 	spinlock_t cb_lock;
+	struct mutex hw_enable_lock;
 };
 
 struct dpu_kms {
