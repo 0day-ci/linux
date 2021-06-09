@@ -351,7 +351,9 @@ int i915_vma_wait_for_bind(struct i915_vma *vma)
 		struct dma_fence *fence;
 
 		rcu_read_lock();
-		fence = dma_fence_get_rcu_safe(&vma->active.excl.fence);
+		fence = rcu_dereference(vma->active.excl.fence);
+		if (fence)
+			fence = dma_fence_get_rcu(fence);
 		rcu_read_unlock();
 		if (fence) {
 			err = dma_fence_wait(fence, MAX_SCHEDULE_TIMEOUT);

@@ -376,7 +376,9 @@ retry:
 		dst_list = NULL;
 	}
 
-	new = dma_fence_get_rcu_safe(&src->fence_excl);
+	new = rcu_dereference(src->fence_excl);
+	if (new)
+		new = dma_fence_get_rcu(new);
 	rcu_read_unlock();
 
 	src_list = dma_resv_shared_list(dst);

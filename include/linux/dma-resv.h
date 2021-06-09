@@ -248,7 +248,9 @@ dma_resv_get_excl_unlocked(struct dma_resv *obj)
 		return NULL;
 
 	rcu_read_lock();
-	fence = dma_fence_get_rcu_safe(&obj->fence_excl);
+	fence = rcu_dereference(obj->fence_excl);
+	if (fence)
+		fence = dma_fence_get_rcu(fence);
 	rcu_read_unlock();
 
 	return fence;

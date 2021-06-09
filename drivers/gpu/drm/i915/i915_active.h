@@ -103,7 +103,9 @@ i915_active_fence_get(struct i915_active_fence *active)
 	struct dma_fence *fence;
 
 	rcu_read_lock();
-	fence = dma_fence_get_rcu_safe(&active->fence);
+	fence = rcu_dereference(active->fence);
+	if (fence)
+		fence = dma_fence_get_rcu(fence);
 	rcu_read_unlock();
 
 	return fence;

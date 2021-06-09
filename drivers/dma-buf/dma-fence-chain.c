@@ -15,15 +15,17 @@ static bool dma_fence_chain_enable_signaling(struct dma_fence *fence);
  * dma_fence_chain_get_prev - use RCU to get a reference to the previous fence
  * @chain: chain node to get the previous node from
  *
- * Use dma_fence_get_rcu_safe to get a reference to the previous fence of the
- * chain node.
+ * Use rcu_dereference and dma_fence_get_rcu to get a reference to the
+ * previous fence of the chain node.
  */
 static struct dma_fence *dma_fence_chain_get_prev(struct dma_fence_chain *chain)
 {
 	struct dma_fence *prev;
 
 	rcu_read_lock();
-	prev = dma_fence_get_rcu_safe(&chain->prev);
+	prev = rcu_dereference(chain->prev);
+	if (prev)
+		prev = dma_fence_get_rcu(prev);
 	rcu_read_unlock();
 	return prev;
 }

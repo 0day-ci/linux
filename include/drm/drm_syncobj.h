@@ -105,7 +105,9 @@ drm_syncobj_fence_get(struct drm_syncobj *syncobj)
 	struct dma_fence *fence;
 
 	rcu_read_lock();
-	fence = dma_fence_get_rcu_safe(&syncobj->fence);
+	fence = rcu_dereference(syncobj->fence);
+	if (fence)
+		fence = dma_fence_get_rcu(syncobj->fence);
 	rcu_read_unlock();
 
 	return fence;
