@@ -153,7 +153,6 @@ lpfc_dump_mem(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb, uint16_t offset,
 	mb->un.varDmp.resp_offset = 0;
 	pmb->ctx_buf = ctx;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -187,7 +186,6 @@ lpfc_dump_wakeup_param(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	mb->un.varDmp.co = 0;
 	mb->un.varDmp.resp_offset = 0;
 	pmb->ctx_buf = ctx;
-	return;
 }
 
 /**
@@ -210,7 +208,6 @@ lpfc_read_nv(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 	memset(pmb, 0, sizeof (LPFC_MBOXQ_t));
 	mb->mbxCommand = MBX_READ_NV;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -237,7 +234,6 @@ lpfc_config_async(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb,
 	mb->mbxCommand = MBX_ASYNCEVT_ENABLE;
 	mb->un.varCfgAsyncEvent.ring = ring;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -262,7 +258,6 @@ lpfc_heart_beat(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 	memset(pmb, 0, sizeof (LPFC_MBOXQ_t));
 	mb->mbxCommand = MBX_HEARTBEAT;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -335,7 +330,6 @@ lpfc_clear_la(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 	mb->un.varClearLA.eventTag = phba->fc_eventTag;
 	mb->mbxCommand = MBX_CLEAR_LA;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -388,7 +382,6 @@ lpfc_config_link(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 
 	mb->mbxCommand = MBX_CONFIG_LINK;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -576,7 +569,6 @@ lpfc_init_link(struct lpfc_hba * phba,
 	mb->mbxCommand = (volatile uint8_t)MBX_INIT_LINK;
 	mb->mbxOwner = OWN_HOST;
 	mb->un.varInitLnk.fabric_AL_PA = phba->fc_pref_ALPA;
-	return;
 }
 
 /**
@@ -670,7 +662,6 @@ lpfc_unreg_did(struct lpfc_hba * phba, uint16_t vpi, uint32_t did,
 
 	mb->mbxCommand = MBX_UNREG_D_ID;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -696,7 +687,6 @@ lpfc_read_config(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 
 	mb->mbxCommand = MBX_READ_CONFIG;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -721,7 +711,6 @@ lpfc_read_lnk_stat(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 
 	mb->mbxCommand = MBX_READ_LNK_STAT;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -828,8 +817,6 @@ lpfc_unreg_login(struct lpfc_hba *phba, uint16_t vpi, uint32_t rpi,
 
 	mb->mbxCommand = MBX_UNREG_LOGIN;
 	mb->mbxOwner = OWN_HOST;
-
-	return;
 }
 
 /**
@@ -1034,7 +1021,6 @@ lpfc_read_rev(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 	mb->un.varRdRev.v3req = 1; /* Request SLI3 info */
 	mb->mbxCommand = MBX_READ_REV;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 void
@@ -1054,7 +1040,6 @@ lpfc_sli4_swap_str(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	default:
 		break;
 	}
-	return;
 }
 
 /**
@@ -1191,8 +1176,6 @@ lpfc_config_hbq(struct lpfc_hba *phba, uint32_t id,
 		hbqmb->hbqMasks[i].rctlmatch = hbq_desc->hbqMasks[i].rctlmatch;
 		hbqmb->hbqMasks[i].rctlmask  = hbq_desc->hbqMasks[i].rctlmask;
 	}
-
-	return;
 }
 
 /**
@@ -1249,8 +1232,6 @@ lpfc_config_ring(struct lpfc_hba * phba, int ring, LPFC_MBOXQ_t * pmb)
 		mb->un.varCfgRing.rrRegs[i].tval = pring->prt[i].type;
 		mb->un.varCfgRing.rrRegs[i].tmask = 0xff;
 	}
-
-	return;
 }
 
 /**
@@ -1463,7 +1444,6 @@ lpfc_kill_board(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmb)
 	memset(pmb, 0, sizeof(LPFC_MBOXQ_t));
 	mb->mbxCommand = MBX_KILL_BOARD;
 	mb->mbxOwner = OWN_HOST;
-	return;
 }
 
 /**
@@ -1486,8 +1466,6 @@ lpfc_mbox_put(struct lpfc_hba * phba, LPFC_MBOXQ_t * mbq)
 	list_add_tail(&mbq->list, &psli->mboxq);
 
 	psli->mboxq_cnt++;
-
-	return;
 }
 
 /**
@@ -1552,7 +1530,6 @@ lpfc_mbox_cmpl_put(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbq)
 	spin_lock_irqsave(&phba->hbalock, iflag);
 	__lpfc_mbox_cmpl_put(phba, mbq);
 	spin_unlock_irqrestore(&phba->hbalock, iflag);
-	return;
 }
 
 /**
@@ -2101,7 +2078,6 @@ lpfc_request_features(struct lpfc_hba *phba, struct lpfcMboxq *mboxq)
 		bf_set(lpfc_mbx_rq_ftr_rq_iaab, &mboxq->u.mqe.un.req_ftrs, 0);
 		bf_set(lpfc_mbx_rq_ftr_rq_iaar, &mboxq->u.mqe.un.req_ftrs, 0);
 	}
-	return;
 }
 
 /**
