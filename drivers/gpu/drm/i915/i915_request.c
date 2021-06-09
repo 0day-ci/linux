@@ -128,41 +128,6 @@ static void i915_fence_release(struct dma_fence *fence)
 	i915_sw_fence_fini(&rq->submit);
 	i915_sw_fence_fini(&rq->semaphore);
 
-	/*
-	 * Keep one request on each engine for reserved use under mempressure
-	 *
-	 * We do not hold a reference to the engine here and so have to be
-	 * very careful in what rq->engine we poke. The virtual engine is
-	 * referenced via the rq->context and we released that ref during
-	 * i915_request_retire(), ergo we must not dereference a virtual
-	 * engine here. Not that we would want to, as the only consumer of
-	 * the reserved engine->request_pool is the power management parking,
-	 * which must-not-fail, and that is only run on the physical engines.
-	 *
-	 * Since the request must have been executed to be have completed,
-	 * we know that it will have been processed by the HW and will
-	 * not be unsubmitted again, so rq->engine and rq->execution_mask
-	 * at this point is stable. rq->execution_mask will be a single
-	 * bit if the last and _only_ engine it could execution on was a
-	 * physical engine, if it's multiple bits then it started on and
-	 * could still be on a virtual engine. Thus if the mask is not a
-	 * power-of-two we assume that rq->engine may still be a virtual
-	 * engine and so a dangling invalid pointer that we cannot dereference
-	 *
-	 * For example, consider the flow of a bonded request through a virtual
-	 * engine. The request is created with a wide engine mask (all engines
-	 * that we might execute on). On processing the bond, the request mask
-	 * is reduced to one or more engines. If the request is subsequently
-	 * bound to a single engine, it will then be constrained to only
-	 * execute on that engine and never returned to the virtual engine
-	 * after timeslicing away, see __unwind_incomplete_requests(). Thus we
-	 * know that if the rq->execution_mask is a single bit, rq->engine
-	 * can be a physical engine with the exact corresponding mask.
-	 */
-	if (is_power_of_2(rq->execution_mask) &&
-	    !cmpxchg(&rq->engine->request_pool, NULL, rq))
-		return;
-
 	kmem_cache_free(global.slab_requests, rq);
 }
 
@@ -869,6 +834,29 @@ static void retire_requests(struct intel_timeline *tl)
 			break;
 }
 
+static void
+ensure_cached_request(struct i915_request **rsvd, gfp_t gfp)
+{
+	struct i915_request *rq;
+
+	/* Don't try to add to the cache if we don't allow blocking.  That
+	 * just increases the chance that the actual allocation will fail.
+	 */
+	if (gfpflags_allow_blocking(gfp))
+		return;
+
+	if (READ_ONCE(rsvd))
+		return;
+
+	rq = kmem_cache_alloc(global.slab_requests,
+			      gfp | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
+	if (!rq)
+		return; /* Oops but nothing we can do */
+
+	if (cmpxchg(rsvd, NULL, rq))
+		kmem_cache_free(global.slab_requests, rq);
+}
+
 static noinline struct i915_request *
 request_alloc_slow(struct intel_timeline *tl,
 		   struct i915_request **rsvd,
@@ -936,6 +924,14 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 
 	/* Check that the caller provided an already pinned context */
 	__intel_context_pin(ce);
+
+	/* Before we do anything, try to make sure we have at least one
+	 * request in the engine's cache.  If we get here with GPF_NOWAIT
+	 * (this can happen when switching to a kernel context), we we want
+	 * to try very hard to not fail and we fall back to this cache.
+	 * Top it off with a fresh request whenever it's empty.
+	 */
+	ensure_cached_request(&ce->engine->request_pool, gfp);
 
 	/*
 	 * Beware: Dragons be flying overhead.
