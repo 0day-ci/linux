@@ -16,6 +16,9 @@ void free_huge_page_vmemmap(struct hstate *h, struct page *head);
 void hugetlb_vmemmap_init(struct hstate *h);
 int vmemmap_pgtable_prealloc(struct hstate *h, struct list_head *pgtables);
 void vmemmap_pgtable_free(struct list_head *pgtables);
+unsigned long gigantic_vmemmap_pgtable_prealloc(void);
+void gigantic_vmemmap_pgtable_init(struct huge_bootmem_page *m,
+				   struct page *head);
 
 /*
  * How many vmemmap pages associated with a HugeTLB page that can be freed
@@ -42,6 +45,16 @@ static inline int vmemmap_pgtable_prealloc(struct hstate *h,
 }
 
 static inline void vmemmap_pgtable_free(struct list_head *pgtables)
+{
+}
+
+static inline unsigned long gigantic_vmemmap_pgtable_prealloc(void)
+{
+	return 0;
+}
+
+static inline void gigantic_vmemmap_pgtable_init(struct huge_bootmem_page *m,
+						 struct page *head)
 {
 }
 
