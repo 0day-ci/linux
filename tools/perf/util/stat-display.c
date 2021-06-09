@@ -404,6 +404,19 @@ static bool is_mixed_hw_group(struct evsel *counter)
 	return false;
 }
 
+static bool is_mixed_hybrid_group(struct evsel *counter)
+{
+	struct evlist *evlist = counter->evlist;
+	struct evsel *pos;
+
+	evlist__for_each_entry(evlist, pos) {
+		if (perf_pmu__is_hybrid(pos->pmu_name))
+			return true;
+	}
+
+	return false;
+}
+
 static void printout(struct perf_stat_config *config, struct aggr_cpu_id id, int nr,
 		     struct evsel *counter, double uval,
 		     char *prefix, u64 run, u64 ena, double noise,
@@ -465,9 +478,12 @@ static void printout(struct perf_stat_config *config, struct aggr_cpu_id id, int
 			config->csv_sep);
 
 		if (counter->supported) {
-			config->print_free_counters_hint = 1;
-			if (is_mixed_hw_group(counter))
-				config->print_mixed_hw_group_error = 1;
+			if (!is_mixed_hybrid_group(counter)) {
+				if (!perf_pmu__is_hybrid(counter->pmu_name))
+					config->print_free_counters_hint = 1;
+				if (is_mixed_hw_group(counter))
+					config->print_mixed_hw_group_error = 1;
+			}
 		}
 
 		fprintf(config->output, "%-*s%s",
