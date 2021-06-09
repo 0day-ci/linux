@@ -1610,6 +1610,13 @@ static void __prep_account_new_huge_page(struct hstate *h, int nid)
 static void __prep_new_huge_page(struct hstate *h, struct page *page)
 {
 	free_huge_page_vmemmap(h, page);
+	/*
+	 * Because we store preallocated pages on @page->lru,
+	 * vmemmap_pgtable_free() must be called before the
+	 * initialization of @page->lru in INIT_LIST_HEAD().
+	 */
+	vmemmap_pgtable_free(&page->lru);
+
 	INIT_LIST_HEAD(&page->lru);
 	set_compound_page_dtor(page, HUGETLB_PAGE_DTOR);
 	hugetlb_set_page_subpool(page, NULL);
@@ -1773,14 +1780,29 @@ static struct page *alloc_fresh_huge_page(struct hstate *h,
 		nodemask_t *node_alloc_noretry)
 {
 	struct page *page;
+	LIST_HEAD(pgtables);
+
+	if (vmemmap_pgtable_prealloc(h, &pgtables))
+		return NULL;
 
 	if (hstate_is_gigantic(h))
 		page = alloc_gigantic_page(h, gfp_mask, nid, nmask);
 	else
 		page = alloc_buddy_huge_page(h, gfp_mask,
 				nid, nmask, node_alloc_noretry);
-	if (!page)
+	if (!page) {
+		vmemmap_pgtable_free(&pgtables);
 		return NULL;
+	}
+
+	/*
+	 * Use the huge page lru list to temporarily store the preallocated
+	 * pages. The preallocated pages are used and the list is emptied
+	 * before the huge page is put into use. When the huge page is put
+	 * into use by __prep_new_huge_page() the list will be reinitialized.
+	 */
+	INIT_LIST_HEAD(&page->lru);
+	list_splice(&pgtables, &page->lru);
 
 	if (hstate_is_gigantic(h))
 		prep_compound_gigantic_page(page, huge_page_order(h));
@@ -2486,6 +2508,10 @@ static int alloc_and_dissolve_huge_page(struct hstate *h, struct page *old_page,
 	int nid = page_to_nid(old_page);
 	struct page *new_page;
 	int ret = 0;
+	LIST_HEAD(pgtables);
+
+	if (vmemmap_pgtable_prealloc(h, &pgtables))
+		return -ENOMEM;
 
 	/*
 	 * Before dissolving the page, we need to allocate a new one for the
@@ -2495,8 +2521,15 @@ static int alloc_and_dissolve_huge_page(struct hstate *h, struct page *old_page,
 	 * under the lock.
 	 */
 	new_page = alloc_buddy_huge_page(h, gfp_mask, nid, NULL, NULL);
-	if (!new_page)
+	if (!new_page) {
+		vmemmap_pgtable_free(&pgtables);
 		return -ENOMEM;
+	}
+
+	/* See the comments in alloc_fresh_huge_page(). */
+	INIT_LIST_HEAD(&new_page->lru);
+	list_splice(&pgtables, &new_page->lru);
+
 	__prep_new_huge_page(h, new_page);
 
 retry:
@@ -2780,6 +2813,7 @@ static void __init gather_bootmem_prealloc(void)
 		WARN_ON(page_count(page) != 1);
 		prep_compound_huge_page(page, huge_page_order(h));
 		WARN_ON(PageReserved(page));
+		gigantic_vmemmap_pgtable_init(m, page);
 		prep_new_huge_page(h, page, page_to_nid(page));
 		put_page(page); /* free it into the hugepage allocator */
 
@@ -2832,6 +2866,10 @@ static void __init hugetlb_hstate_alloc_pages(struct hstate *h)
 			break;
 		cond_resched();
 	}
+
+	if (hstate_is_gigantic(h))
+		i -= gigantic_vmemmap_pgtable_prealloc();
+
 	if (i < h->max_huge_pages) {
 		char buf[32];
 

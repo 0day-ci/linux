@@ -42,6 +42,8 @@
  * @reuse_addr:		the virtual address of the @reuse_page page.
  * @vmemmap_pages:	the list head of the vmemmap pages that can be freed
  *			or is mapped from.
+ * @pgtables:		the list of page tables which is used for splitting huge
+ *			PMD page tables.
  */
 struct vmemmap_remap_walk {
 	void (*remap_pte)(pte_t *pte, unsigned long addr,
@@ -49,7 +51,48 @@ struct vmemmap_remap_walk {
 	struct page *reuse_page;
 	unsigned long reuse_addr;
 	struct list_head *vmemmap_pages;
+	struct list_head *pgtables;
 };
+
+#define VMEMMAP_HPMD_ORDER		(PMD_SHIFT - PAGE_SHIFT)
+#define VMEMMAP_HPMD_NR			(1 << VMEMMAP_HPMD_ORDER)
+
+static inline pte_t *pte_withdraw(struct vmemmap_remap_walk *walk)
+{
+	pgtable_t pgtable;
+
+	pgtable = list_first_entry(walk->pgtables, struct page, lru);
+	list_del(&pgtable->lru);
+
+	return page_to_virt(pgtable);
+}
+
+static void split_vmemmap_huge_pmd(pmd_t *pmd, unsigned long start,
+				   struct vmemmap_remap_walk *walk)
+{
+	int i;
+	pmd_t tmp;
+	pte_t *new = pte_withdraw(walk);
+	struct page *page = pmd_page(*pmd);
+	unsigned long addr = start;
+
+	pmd_populate_kernel(&init_mm, &tmp, new);
+
+	for (i = 0; i < VMEMMAP_HPMD_NR; i++, addr += PAGE_SIZE) {
+		pte_t entry, *pte;
+		pgprot_t pgprot = PAGE_KERNEL;
+
+		entry = mk_pte(page + i, pgprot);
+		pte = pte_offset_kernel(&tmp, addr);
+		set_pte_at(&init_mm, addr, pte, entry);
+	}
+
+	/* Make pte visible before pmd. See comment in __pte_alloc(). */
+	smp_wmb();
+	pmd_populate_kernel(&init_mm, pmd, new);
+
+	flush_tlb_kernel_range(start, start + PMD_SIZE);
+}
 
 static void vmemmap_pte_range(pmd_t *pmd, unsigned long addr,
 			      unsigned long end,
@@ -84,8 +127,8 @@ static void vmemmap_pmd_range(pud_t *pud, unsigned long addr,
 
 	pmd = pmd_offset(pud, addr);
 	do {
-		BUG_ON(pmd_leaf(*pmd));
-
+		if (pmd_leaf(*pmd))
+			split_vmemmap_huge_pmd(pmd, addr & PMD_MASK, walk);
 		next = pmd_addr_end(addr, end);
 		vmemmap_pte_range(pmd, addr, next, walk);
 	} while (pmd++, addr = next, addr != end);
@@ -192,18 +235,17 @@ static void vmemmap_remap_pte(pte_t *pte, unsigned long addr,
  * @end:	end address of the vmemmap virtual address range that we want to
  *		remap.
  * @reuse:	reuse address.
- *
- * Note: This function depends on vmemmap being base page mapped. Please make
- * sure that we disable PMD mapping of vmemmap pages when calling this function.
+ * @pgtables:	the list of page tables used for splitting huge PMD.
  */
 void vmemmap_remap_free(unsigned long start, unsigned long end,
-			unsigned long reuse)
+			unsigned long reuse, struct list_head *pgtables)
 {
 	LIST_HEAD(vmemmap_pages);
 	struct vmemmap_remap_walk walk = {
 		.remap_pte	= vmemmap_remap_pte,
 		.reuse_addr	= reuse,
 		.vmemmap_pages	= &vmemmap_pages,
+		.pgtables	= pgtables,
 	};
 
 	/*
@@ -221,7 +263,10 @@ void vmemmap_remap_free(unsigned long start, unsigned long end,
 	 */
 	BUG_ON(start - reuse != PAGE_SIZE);
 
+	mmap_write_lock(&init_mm);
 	vmemmap_remap_range(reuse, end, &walk);
+	mmap_write_unlock(&init_mm);
+
 	free_vmemmap_page_list(&vmemmap_pages);
 }
 
@@ -287,12 +332,12 @@ int vmemmap_remap_alloc(unsigned long start, unsigned long end,
 	/* See the comment in the vmemmap_remap_free(). */
 	BUG_ON(start - reuse != PAGE_SIZE);
 
-	might_sleep_if(gfpflags_allow_blocking(gfp_mask));
-
 	if (alloc_vmemmap_page_list(start, end, gfp_mask, &vmemmap_pages))
 		return -ENOMEM;
 
+	mmap_read_lock(&init_mm);
 	vmemmap_remap_range(reuse, end, &walk);
+	mmap_read_unlock(&init_mm);
 
 	return 0;
 }
