@@ -780,10 +780,12 @@ void v4l2_async_unregister_subdev(struct v4l2_subdev *sd)
 
 	mutex_lock(&list_lock);
 
-	__v4l2_async_notifier_unregister(sd->subdev_notifier);
-	__v4l2_async_notifier_cleanup(sd->subdev_notifier);
-	kfree(sd->subdev_notifier);
-	sd->subdev_notifier = NULL;
+	if (sd->subdev_notifier) {
+		__v4l2_async_notifier_unregister(sd->subdev_notifier);
+		__v4l2_async_notifier_cleanup(sd->subdev_notifier);
+		kfree(sd->subdev_notifier);
+		sd->subdev_notifier = NULL;
+	}
 
 	if (sd->asd) {
 		struct v4l2_async_notifier *notifier = sd->notifier;
