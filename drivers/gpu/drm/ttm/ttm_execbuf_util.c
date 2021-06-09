@@ -95,8 +95,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 		if (ret == -EALREADY && dups) {
 			struct ttm_validate_buffer *safe = entry;
 			entry = list_prev_entry(entry, head);
-			list_del(&safe->head);
-			list_add(&safe->head, dups);
+			list_move(&safe->head, dups);
 			continue;
 		}
 
@@ -135,8 +134,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 		/* move this item to the front of the list,
 		 * forces correct iteration of the loop without keeping track
 		 */
-		list_del(&entry->head);
-		list_add(&entry->head, list);
+		list_move(&entry->head, list);
 	}
 
 	return 0;
