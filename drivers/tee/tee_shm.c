@@ -117,7 +117,7 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 		return ERR_PTR(-EINVAL);
 	}
 
-	if ((flags & ~(TEE_SHM_MAPPED | TEE_SHM_DMA_BUF))) {
+	if ((flags & ~(TEE_SHM_MAPPED | TEE_SHM_DMA_BUF | TEE_SHM_REGISTER))) {
 		dev_err(teedev->dev.parent, "invalid shm flags 0x%x", flags);
 		return ERR_PTR(-EINVAL);
 	}
@@ -135,6 +135,15 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 	if (!shm) {
 		ret = ERR_PTR(-ENOMEM);
 		goto err_dev_put;
+	}
+
+	if (!teedev->desc->ops->shm_register ||
+	    !teedev->desc->ops->shm_unregister) {
+		/* registration is not required by the TEE implementation */
+		flags &= ~TEE_SHM_REGISTER;
+	} else if (flags & TEE_SHM_DMA_BUF) {
+		/* all dma-buf backed shm allocations are registered */
+		flags |= TEE_SHM_REGISTER;
 	}
 
 	shm->flags = flags | TEE_SHM_POOL;
