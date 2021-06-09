@@ -59,6 +59,8 @@ extern struct ap_matrix_dev *matrix_dev;
  * @aqm identifies the AP queues (domains) in the matrix
  * @adm_max: max domain number in @adm
  * @adm identifies the AP control domains in the matrix
+ * @rwsem: semaphore to ensure integrity when making changes to the @apm, @aqm
+ *	   and @adm while the guest's AP matrix is being updated.
  */
 struct ap_matrix {
 	unsigned long apm_max;
@@ -67,6 +69,7 @@ struct ap_matrix {
 	DECLARE_BITMAP(aqm, 256);
 	unsigned long adm_max;
 	DECLARE_BITMAP(adm, 256);
+	struct rw_semaphore rwsem;
 };
 
 /**
@@ -76,6 +79,8 @@ struct ap_matrix {
  *		mediated matrix device.
  * @group_notifier: notifier block used for specifying callback function for
  *		    handling the VFIO_GROUP_NOTIFY_SET_KVM event
+ * @rwsem	a semaphore to ensure integrity when making changes to the
+ *		structure's attribute values.
  * @kvm:	the struct holding guest's state
  */
 struct ap_matrix_mdev {
@@ -83,8 +88,7 @@ struct ap_matrix_mdev {
 	struct ap_matrix matrix;
 	struct notifier_block group_notifier;
 	struct notifier_block iommu_notifier;
-	bool kvm_busy;
-	wait_queue_head_t wait_for_kvm;
+	struct rw_semaphore rwsem;
 	struct kvm *kvm;
 	struct kvm_s390_module_hook pqap_hook;
 	struct mdev_device *mdev;
