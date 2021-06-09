@@ -211,6 +211,18 @@ config CS5535_CLOCK_EVENT_SRC
 config NXP_EZPORT
 	tristate
 
+config GEHC_ACHC
+	tristate "GEHC ACHC support"
+	depends on SPI && SYSFS && SPI_SPIDEV
+	select FW_LOADER
+	select NXP_EZPORT
+	help
+	  Support for GE ACHC microcontroller, that is part of the GE
+	  PPD device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gehc-achc.
+
 config HP_ILO
 	tristate "Channel interface driver for the HP iLO processor"
 	depends on PCI

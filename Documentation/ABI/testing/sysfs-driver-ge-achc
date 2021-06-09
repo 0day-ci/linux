@@ -1,0 +1,9 @@
+What:		/sys/bus/spi/drivers/gehc-achc/<dev>/update_firmware
+Date:		June 2021
+Contact:	linux-kernel@vger.kernel.org
+Description:	Write 1 to this file to trigger a firmware update.
+
+What:		/sys/bus/spi/drivers/gehc-achc/<dev>/reset
+Date:		June 2021
+Contact:	linux-kernel@vger.kernel.org
+Description:	Write 1 to this file to trigger a device reset.
