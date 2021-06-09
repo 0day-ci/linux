@@ -787,15 +787,12 @@ static int intel_context_set_gem(struct intel_context *ce,
 
 	ce->ring_size = SZ_16K;
 
-	if (rcu_access_pointer(ctx->vm)) {
-		struct i915_address_space *vm;
-
-		rcu_read_lock();
-		vm = context_get_vm_rcu(ctx); /* hmm */
-		rcu_read_unlock();
-
+	if (ctx->vm) {
+		/* This only happens during context creation so no need to
+		 * bother with any RCU nonsense.
+		 */
 		i915_vm_put(ce->vm);
-		ce->vm = vm;
+		ce->vm = i915_vm_get(ctx->vm);
 	}
 
 	if (ctx->sched.priority >= I915_PRIORITY_NORMAL &&
