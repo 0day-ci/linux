@@ -531,10 +531,9 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
-	ret = -ENOMEM;
 	controller = spi_alloc_master(&pdev->dev, sizeof(*aus));
 	if (!controller)
-		goto at91_usart_spi_probe_fail;
+		return -ENOMEM;
 
 	ret = at91_usart_gpio_setup(pdev);
 	if (ret)
