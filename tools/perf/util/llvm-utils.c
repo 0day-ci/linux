@@ -504,8 +504,9 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 			goto errout;
 		}
 
-		if (asprintf(&pipe_template, "%s -emit-llvm | %s -march=bpf %s -filetype=obj -o -",
-			      template, llc_path, opts) < 0) {
+		err = asprintf(&pipe_template, "%s -emit-llvm | %s -march=bpf %s -filetype=obj -o -",
+			       template, llc_path, opts);
+		if (err < 0) {
 			pr_err("ERROR:\tnot enough memory to setup command line\n");
 			goto errout;
 		}
@@ -524,7 +525,8 @@ int llvm__compile_bpf(const char *path, void **p_obj_buf,
 
 	pr_debug("llvm compiling command template: %s\n", template);
 
-	if (asprintf(&command_echo, "echo -n \"%s\"", template) < 0)
+	err = asprintf(&command_echo, "echo -n \"%s\"", template);
+	if (err < 0)
 		goto errout;
 
 	err = read_from_pipe(command_echo, (void **) &command_out, NULL);
