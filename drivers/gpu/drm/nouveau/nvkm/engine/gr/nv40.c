@@ -252,8 +252,7 @@ nv40_gr_intr(struct nvkm_gr *base)
 	list_for_each_entry(temp, &gr->chan, head) {
 		if (temp->inst >> 4 == inst) {
 			chan = temp;
-			list_del(&chan->head);
-			list_add(&chan->head, &gr->chan);
+			list_move(&chan->head, &gr->chan);
 			break;
 		}
 	}
