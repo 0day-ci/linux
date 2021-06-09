@@ -839,7 +839,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
 
 	ret = arm_smmu_rpm_get(smmu);
 	if (ret < 0)
-		return;
+		goto rpm_put;
 
 	/*
 	 * Disable the context bank and free the page tables before freeing
@@ -856,6 +856,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
 	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
 
+rpm_put:
 	arm_smmu_rpm_put(smmu);
 }
 
@@ -1152,7 +1153,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	ret = arm_smmu_rpm_get(smmu);
 	if (ret < 0)
-		return ret;
+		goto rpm_put;
 
 	/* Ensure that the domain is finalised */
 	ret = arm_smmu_init_domain_context(domain, smmu, dev);
@@ -1403,7 +1404,7 @@ static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 
 	ret = arm_smmu_rpm_get(smmu);
 	if (ret < 0)
-		goto out_cfg_free;
+		goto rpm_put;
 
 	ret = arm_smmu_master_alloc_smes(dev);
 	arm_smmu_rpm_put(smmu);
@@ -1416,6 +1417,8 @@ static struct iommu_device *arm_smmu_probe_device(struct device *dev)
 
 	return &smmu->iommu;
 
+rpm_put:
+	arm_smmu_rpm_put(smmu);
 out_cfg_free:
 	kfree(cfg);
 out_free:
@@ -1437,8 +1440,10 @@ static void arm_smmu_release_device(struct device *dev)
 	smmu = cfg->smmu;
 
 	ret = arm_smmu_rpm_get(smmu);
-	if (ret < 0)
+	if (ret < 0) {
+		arm_smmu_rpm_put(smmu);
 		return;
+	}
 
 	arm_smmu_master_free_smes(cfg, fwspec);
 
