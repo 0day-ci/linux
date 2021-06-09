@@ -5098,7 +5098,7 @@ lpfc_sli4_async_link_evt(struct lpfc_hba *phba,
 	bf_set(lpfc_mbx_read_top_link_spd, la,
 	       (bf_get(lpfc_acqe_link_speed, acqe_link)));
 
-	/* Fake the the following irrelvant fields */
+	/* Fake the following irrelvant fields */
 	bf_set(lpfc_mbx_read_top_topology, la, LPFC_TOPOLOGY_PT_PT);
 	bf_set(lpfc_mbx_read_top_alpa_granted, la, 0);
 	bf_set(lpfc_mbx_read_top_il, la, 0);
@@ -5898,7 +5898,7 @@ lpfc_sli4_async_fip_evt(struct lpfc_hba *phba,
 				phba->fcf.fcf_flag &= ~FCF_ACVL_DISC;
 				spin_unlock_irq(&phba->hbalock);
 				/*
-				 * Last resort will be re-try on the
+				 * Last resort will be re-try on
 				 * the current registered FCF entry.
 				 */
 				lpfc_retry_pport_discovery(phba);
@@ -10822,7 +10822,7 @@ lpfc_find_cpu_handle(struct lpfc_hba *phba, uint16_t id, int match)
 	for_each_present_cpu(cpu) {
 		cpup = &phba->sli4_hba.cpu_map[cpu];
 
-		/* If we are matching by EQ, there may be multiple CPUs using
+		/* If we are matching by EQ, there may be multiple CPUs
 		 * using the same vector, so select the one with
 		 * LPFC_CPU_FIRST_IRQ set.
 		 */
@@ -11010,7 +11010,7 @@ lpfc_cpu_affinity_check(struct lpfc_hba *phba, int vectors)
 			/* Mark CPU as IRQ not assigned by the kernel */
 			cpup->flag |= LPFC_CPU_MAP_UNASSIGN;
 
-			/* If so, find a new_cpup thats on the the SAME
+			/* If so, find a new_cpup thats on the SAME
 			 * phys_id as cpup. start_cpu will start where we
 			 * left off so all unassigned entries don't get assgined
 			 * the IRQ of the first entry.
@@ -11861,7 +11861,7 @@ lpfc_unset_hba(struct lpfc_hba *phba)
  * I/Os every 30 seconds, log error message, and wait forever. Only when
  * all XRI exchange busy complete, the driver unload shall proceed with
  * invoking the function reset ioctl mailbox command to the CNA and the
- * the rest of the driver unload resource release.
+ * rest of the driver unload resource release.
  **/
 static void
 lpfc_sli4_xri_exchange_busy_wait(struct lpfc_hba *phba)
@@ -12039,7 +12039,7 @@ lpfc_sli4_hba_unset(struct lpfc_hba *phba)
  * This function is called in the SLI4 code path to read the port's
  * sli4 capabilities.
  *
- * This function may be be called from any context that can block-wait
+ * This function may be called from any context that can block-wait
  * for the completion.  The expectation is that this routine is called
  * typically from probe_one or from the online routine.
  **/
