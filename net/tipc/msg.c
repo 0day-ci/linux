@@ -47,8 +47,14 @@
 #define BUF_TAILROOM (TIPC_AES_GCM_TAG_SIZE)
 #else
 #define BUF_HEADROOM (LL_MAX_HEADER + 48)
-#define BUF_TAILROOM 16
+#define BUF_TAILROOM 0
 #endif
+#define FB_MTU (PAGE_SIZE - \
+		SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) - \
+		SKB_DATA_ALIGN(BUF_HEADROOM + BUF_TAILROOM) \
+		)
+
+const int fb_mtu = FB_MTU;
 
 static unsigned int align(unsigned int i)
 {
@@ -69,13 +75,8 @@ static unsigned int align(unsigned int i)
 struct sk_buff *tipc_buf_acquire(u32 size, gfp_t gfp)
 {
 	struct sk_buff *skb;
-#ifdef CONFIG_TIPC_CRYPTO
-	unsigned int buf_size = (BUF_HEADROOM + size + BUF_TAILROOM + 3) & ~3u;
-#else
-	unsigned int buf_size = (BUF_HEADROOM + size + 3) & ~3u;
-#endif
 
-	skb = alloc_skb_fclone(buf_size, gfp);
+	skb = alloc_skb_fclone(BUF_HEADROOM + size + BUF_TAILROOM, gfp);
 	if (skb) {
 		skb_reserve(skb, BUF_HEADROOM);
 		skb_put(skb, size);
