@@ -1292,12 +1292,20 @@ EXPORT_SYMBOL_GPL(vb2_ops_wait_finish);
 int vb2_request_validate(struct media_request *req)
 {
 	struct media_request_object *obj;
+	struct vb2_queue *q = NULL;
+	bool buffers_only = true;
 	int ret = 0;
 
-	if (!vb2_request_buffer_cnt(req))
-		return -ENOENT;
-
 	list_for_each_entry(obj, &req->objects, list) {
+		if (!vb2_request_object_is_buffer(obj)) {
+			buffers_only = false;
+		} else if (!q) {
+			struct vb2_buffer *vb;
+
+			vb = container_of(obj, struct vb2_buffer, req_obj);
+			q = vb->vb2_queue;
+		}
+
 		if (!obj->ops->prepare)
 			continue;
 
@@ -1305,6 +1313,11 @@ int vb2_request_validate(struct media_request *req)
 		if (ret)
 			break;
 	}
+
+	if (!q)
+		ret = -ENOENT;
+	else if (q->supports_ro_requests && !buffers_only)
+		ret = -EINVAL;
 
 	if (ret) {
 		list_for_each_entry_continue_reverse(obj, &req->objects, list)
