@@ -704,3 +704,18 @@ void intel_gt_info_print(const struct intel_gt_info *info,
 
 	intel_sseu_dump(&info->sseu, p);
 }
+
+int intel_gt_get_l3bank_count(struct intel_gt *gt)
+{
+	struct drm_i915_private *i915 = gt->i915;
+	intel_wakeref_t wakeref;
+	u32 fuse3;
+
+	if (GRAPHICS_VER(i915) < 12)
+		return -ENODEV;
+
+	with_intel_runtime_pm(gt->uncore->rpm, wakeref)
+		fuse3 = intel_uncore_read(gt->uncore, GEN10_MIRROR_FUSE3);
+
+	return hweight32(REG_FIELD_GET(GEN12_GT_L3_MODE_MASK, ~fuse3));
+}

@@ -10,6 +10,7 @@
 #include "i915_perf.h"
 #include "i915_query.h"
 #include <uapi/drm/i915_drm.h>
+#include "gt/intel_gt.h"
 
 static int copy_query_item(void *query_hdr, size_t query_sz,
 			   u32 total_length,
@@ -502,6 +503,26 @@ static int query_hwconfig_table(struct drm_i915_private *i915,
 	return hwconfig->size;
 }
 
+static int query_l3banks(struct drm_i915_private *i915,
+			 struct drm_i915_query_item *query_item)
+{
+	u32 banks;
+
+	if (query_item->length == 0)
+		return sizeof(banks);
+
+	if (query_item->length < sizeof(banks))
+		return -EINVAL;
+
+	banks = intel_gt_get_l3bank_count(&i915->gt);
+
+	if (copy_to_user(u64_to_user_ptr(query_item->data_ptr),
+			 &banks, sizeof(banks)))
+		return -EFAULT;
+
+	return sizeof(banks);
+}
+
 static int (* const i915_query_funcs[])(struct drm_i915_private *dev_priv,
 					struct drm_i915_query_item *query_item) = {
 	query_topology_info,
@@ -509,6 +530,7 @@ static int (* const i915_query_funcs[])(struct drm_i915_private *dev_priv,
 	query_perf_config,
 	query_memregion_info,
 	query_hwconfig_table,
+	query_l3banks,
 };
 
 int i915_query_ioctl(struct drm_device *dev, void *data, struct drm_file *file)

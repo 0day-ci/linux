@@ -77,6 +77,7 @@ static inline bool intel_gt_is_wedged(const struct intel_gt *gt)
 
 void intel_gt_info_print(const struct intel_gt_info *info,
 			 struct drm_printer *p);
+int intel_gt_get_l3bank_count(struct intel_gt *gt);
 
 void intel_gt_watchdog_work(struct work_struct *work);
 

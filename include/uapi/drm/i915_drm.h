@@ -2234,6 +2234,7 @@ struct drm_i915_query_item {
 #define DRM_I915_QUERY_PERF_CONFIG      3
 #define DRM_I915_QUERY_MEMORY_REGIONS   4
 #define DRM_I915_QUERY_HWCONFIG_TABLE   5
+#define DRM_I915_QUERY_L3_BANK_COUNT    6
 /* Must be kept compact -- no holes and well documented */
 
 	/**
