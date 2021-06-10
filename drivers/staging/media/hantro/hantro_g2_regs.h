@@ -174,6 +174,10 @@
 #define g2_buswidth		G2_DEC_REG(58, 8,  0x7)
 #define g2_max_burst		G2_DEC_REG(58, 0,  0xff)
 
+#define g2_down_scale_e	G2_DEC_REG(184, 7, 0x1)
+#define g2_down_scale_y	G2_DEC_REG(184, 2, 0x3)
+#define g2_down_scale_x	G2_DEC_REG(184, 0, 0x3)
+
 #define G2_REG_CONFIG				G2_SWREG(58)
 #define G2_REG_CONFIG_DEC_CLK_GATE_E		BIT(16)
 #define G2_REG_CONFIG_DEC_CLK_GATE_IDLE_E	BIT(17)
@@ -193,6 +197,8 @@
 #define G2_TILE_FILTER		(G2_SWREG(179))
 #define G2_TILE_SAO		(G2_SWREG(181))
 #define G2_TILE_BSD		(G2_SWREG(183))
+#define G2_DS_DST		(G2_SWREG(186))
+#define G2_DS_DST_CHR		(G2_SWREG(188))
 #define G2_COMP_ADDR_DST	(G2_SWREG(190))
 #define G2_COMP_ADDR_REF(i)	(G2_SWREG(192) + ((i) * 0x8))
 #define G2_COMP_CHR		(G2_SWREG(224))

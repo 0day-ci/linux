@@ -70,6 +70,9 @@ struct hantro_irq {
  * @reg_names:			array of register range names
  * @num_regs:			number of register range names in the array
  * @postproc_regs:		&struct hantro_postproc_regs pointer
+ * @scaling:			Set possible scaled output formats.
+ *				Returns zero if OK, a negative value in error cases.
+ *				Optional.
  */
 struct hantro_variant {
 	unsigned int enc_offset;
@@ -91,6 +94,7 @@ struct hantro_variant {
 	const char * const *reg_names;
 	int num_regs;
 	const struct hantro_postproc_regs *postproc_regs;
+	int (*scaling)(struct hantro_ctx *ctx, struct v4l2_frmsizeenum *fsize);
 };
 
 /**
