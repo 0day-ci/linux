@@ -22,7 +22,8 @@ int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 
 	lockdep_assert_held(&msk->pm.lock);
 
-	if (add_addr) {
+	if (add_addr &
+	    (echo ? BIT(MPTCP_ADD_ADDR_ECHO) : BIT(MPTCP_ADD_ADDR_SIGNAL))) {
 		pr_warn("addr_signal error, add_addr=%d", add_addr);
 		return -EINVAL;
 	}
@@ -252,32 +253,21 @@ void mptcp_pm_mp_prio_received(struct sock *sk, u8 bkup)
 
 /* path manager helpers */
 
-bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			      struct mptcp_addr_info *saddr, bool *echo, bool *port)
+bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct mptcp_addr_info *saddr,
+			      struct mptcp_addr_info *daddr, u8 *add_addr)
 {
-	u8 add_addr;
-	int ret = false;
-
 	spin_lock_bh(&msk->pm.lock);
 
-	/* double check after the lock is acquired */
-	if (!mptcp_pm_should_add_signal(msk))
-		goto out_unlock;
-
-	*echo = mptcp_pm_should_add_signal_echo(msk);
-	*port = mptcp_pm_should_add_signal_port(msk);
-
-	if (remaining < mptcp_add_addr_len(msk->pm.local.family, *echo, *port))
-		goto out_unlock;
-
 	*saddr = msk->pm.local;
-	add_addr = READ_ONCE(msk->pm.addr_signal) & BIT(MPTCP_RM_ADDR_SIGNAL);
-	WRITE_ONCE(msk->pm.addr_signal, add_addr);
-	ret = true;
+	*daddr = msk->pm.remote;
+	*add_addr = READ_ONCE(msk->pm.addr_signal);
 
-out_unlock:
 	spin_unlock_bh(&msk->pm.lock);
-	return ret;
+
+	if ((mptcp_pm_should_add_signal_echo(msk)) && (mptcp_pm_should_add_addr(msk)))
+		mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_SEND_ACK);
+
+	return true;
 }
 
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
