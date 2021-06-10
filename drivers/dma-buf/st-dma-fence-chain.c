@@ -95,6 +95,53 @@ static int sanitycheck(void *arg)
 	return err;
 }
 
+static int __alloc_free(void *arg)
+{
+	atomic_t *counter = arg;
+	int i, j;
+
+	for (i = 0; i < 1024; ++i) {
+		struct dma_fence_chain *chains[64];
+
+		for (j = 0; j < ARRAY_SIZE(chains); ++j)
+			chains[j] = dma_fence_chain_alloc();
+
+		for (j = 0; j < ARRAY_SIZE(chains); ++j)
+			dma_fence_chain_free(chains[j]);
+
+		atomic_add(ARRAY_SIZE(chains), counter);
+	}
+	return 0;
+}
+
+static int alloc_free(void *arg)
+{
+	struct task_struct *threads[8];
+	atomic_t counter = ATOMIC_INIT(0);
+	int i, err = 0;
+
+	for (i = 0; i < ARRAY_SIZE(threads); i++) {
+		threads[i] = kthread_run(__alloc_free, &counter, "dmabuf/%d",
+					 i);
+		if (IS_ERR(threads[i])) {
+			err = PTR_ERR(threads[i]);
+			break;
+		}
+	}
+
+	while (i--) {
+		int ret;
+
+		ret = kthread_stop(threads[i]);
+		if (ret && !err)
+			err = ret;
+	}
+
+	pr_info("Completed %u cycles\n", atomic_read(&counter));
+
+	return err;
+}
+
 struct fence_chains {
 	unsigned int chain_length;
 	struct dma_fence **fences;
@@ -677,6 +724,7 @@ int dma_fence_chain(void)
 {
 	static const struct subtest tests[] = {
 		SUBTEST(sanitycheck),
+		SUBTEST(alloc_free),
 		SUBTEST(find_seqno),
 		SUBTEST(find_signaled),
 		SUBTEST(find_out_of_order),
