@@ -177,7 +177,22 @@ struct receive_queue {
 	char name[40];
 
 	struct xdp_rxq_info xdp_rxq;
+
+	struct {
+		struct xsk_buff_pool __rcu *pool;
+
+		/* xdp rxq used by xsk */
+		struct xdp_rxq_info xdp_rxq;
+
+		/* ctx used to record the page added to vq */
+		struct virtnet_xsk_ctx_head *ctx_head;
+	} xsk;
 };
+
+static inline struct virtio_net_hdr_mrg_rxbuf *skb_vnet_hdr(struct sk_buff *skb)
+{
+	return (struct virtio_net_hdr_mrg_rxbuf *)skb->cb;
+}
 
 static inline bool is_xdp_raw_buffer_queue(struct virtnet_info *vi, int q)
 {
@@ -258,4 +273,16 @@ static inline void __free_old_xmit(struct send_queue *sq, bool in_napi,
 	if (xsknum)
 		virtnet_xsk_complete(sq, xsknum);
 }
+
+int virtnet_run_xdp(struct net_device *dev, struct bpf_prog *xdp_prog,
+		    struct xdp_buff *xdp, unsigned int *xdp_xmit,
+		    struct virtnet_rq_stats *stats);
+struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
+					  struct virtnet_info *vi,
+					  struct receive_queue *rq,
+					  struct sk_buff *head_skb,
+					  u16 num_buf,
+					  struct virtnet_rq_stats *stats);
+void merge_drop_follow_bufs(struct net_device *dev, struct receive_queue *rq,
+			    u16 num_buf, struct virtnet_rq_stats *stats);
 #endif

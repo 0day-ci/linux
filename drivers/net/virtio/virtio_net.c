@@ -125,11 +125,6 @@ static int rxq2vq(int rxq)
 	return rxq * 2;
 }
 
-static inline struct virtio_net_hdr_mrg_rxbuf *skb_vnet_hdr(struct sk_buff *skb)
-{
-	return (struct virtio_net_hdr_mrg_rxbuf *)skb->cb;
-}
-
 /*
  * private is used to chain pages for big packets, put the whole
  * most recent used list in the beginning for reuse
@@ -458,6 +453,68 @@ static unsigned int virtnet_get_headroom(struct virtnet_info *vi)
 	return vi->xdp_enabled ? VIRTIO_XDP_HEADROOM : 0;
 }
 
+/* return value:
+ *  1: XDP_PASS should handle to build skb
+ * -1: xdp err, should handle to free the buf and return NULL
+ *  0: buf has been consumed by xdp
+ */
+int virtnet_run_xdp(struct net_device *dev,
+		    struct bpf_prog *xdp_prog,
+		    struct xdp_buff *xdp,
+		    unsigned int *xdp_xmit,
+		    struct virtnet_rq_stats *stats)
+{
+	struct xdp_frame *xdpf;
+	int act, err;
+
+	act = bpf_prog_run_xdp(xdp_prog, xdp);
+	stats->xdp_packets++;
+
+	switch (act) {
+	case XDP_PASS:
+		return 1;
+
+	case XDP_TX:
+		stats->xdp_tx++;
+		xdpf = xdp_convert_buff_to_frame(xdp);
+		if (unlikely(!xdpf))
+			goto err_xdp;
+		err = virtnet_xdp_xmit(dev, 1, &xdpf, 0);
+		if (unlikely(!err)) {
+			xdp_return_frame_rx_napi(xdpf);
+		} else if (unlikely(err < 0)) {
+			trace_xdp_exception(dev, xdp_prog, act);
+			goto err_xdp;
+		}
+		*xdp_xmit |= VIRTIO_XDP_TX;
+		return 0;
+
+	case XDP_REDIRECT:
+		stats->xdp_redirects++;
+		err = xdp_do_redirect(dev, xdp, xdp_prog);
+		if (err)
+			goto err_xdp;
+
+		*xdp_xmit |= VIRTIO_XDP_REDIR;
+		return 0;
+
+	default:
+		bpf_warn_invalid_xdp_action(act);
+		fallthrough;
+
+	case XDP_ABORTED:
+		trace_xdp_exception(dev, xdp_prog, act);
+		fallthrough;
+
+	case XDP_DROP:
+		break;
+	}
+
+err_xdp:
+	stats->xdp_drops++;
+	return -1;
+}
+
 /* We copy the packet for XDP in the following cases:
  *
  * 1) Packet is scattered across multiple rx buffers.
@@ -491,27 +548,40 @@ static struct page *xdp_linearize_page(struct receive_queue *rq,
 		int tailroom = SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 		unsigned int buflen;
 		void *buf;
+		void *ctx;
 		int off;
 
-		buf = virtqueue_get_buf(rq->vq, &buflen);
+		buf = virtqueue_get_buf_ctx(rq->vq, &buflen, &ctx);
 		if (unlikely(!buf))
 			goto err_buf;
-
-		p = virt_to_head_page(buf);
-		off = buf - page_address(p);
 
 		/* guard against a misconfigured or uncooperative backend that
 		 * is sending packet larger than the MTU.
 		 */
 		if ((page_off + buflen + tailroom) > PAGE_SIZE) {
-			put_page(p);
+			virtnet_rx_put_buf(buf, ctx);
 			goto err_buf;
 		}
 
-		memcpy(page_address(page) + page_off,
-		       page_address(p) + off, buflen);
+		if (is_xsk_ctx(ctx)) {
+			struct virtnet_xsk_ctx_rx *xsk_ctx;
+
+			xsk_ctx = (struct virtnet_xsk_ctx_rx *)buf;
+
+			virtnet_xsk_ctx_rx_copy(xsk_ctx,
+						page_address(page) + page_off,
+						buflen, true);
+
+			virtnet_xsk_ctx_rx_put(xsk_ctx);
+		} else {
+			p = virt_to_head_page(buf);
+			off = buf - page_address(p);
+
+			memcpy(page_address(page) + page_off,
+			       page_address(p) + off, buflen);
+			put_page(p);
+		}
 		page_off += buflen;
-		put_page(p);
 	}
 
 	/* Headroom does not contribute to packet length */
@@ -522,17 +592,16 @@ err_buf:
 	return NULL;
 }
 
-static void merge_drop_follow_bufs(struct net_device *dev,
-				   struct receive_queue *rq,
-				   u16 num_buf,
-				   struct virtnet_rq_stats *stats)
+void merge_drop_follow_bufs(struct net_device *dev,
+			    struct receive_queue *rq,
+			    u16 num_buf,
+			    struct virtnet_rq_stats *stats)
 {
-	struct page *page;
 	unsigned int len;
-	void *buf;
+	void *buf, *ctx;
 
 	while (num_buf-- > 1) {
-		buf = virtqueue_get_buf(rq->vq, &len);
+		buf = virtqueue_get_buf_ctx(rq->vq, &len, &ctx);
 		if (unlikely(!buf)) {
 			pr_debug("%s: rx error: %d buffers missing\n",
 				 dev->name, num_buf);
@@ -540,23 +609,80 @@ static void merge_drop_follow_bufs(struct net_device *dev,
 			break;
 		}
 		stats->bytes += len;
-		page = virt_to_head_page(buf);
-		put_page(page);
+		virtnet_rx_put_buf(buf, ctx);
 	}
 }
 
-static struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
-						 struct virtnet_info *vi,
-						 struct receive_queue *rq,
-						 struct sk_buff *head_skb,
-						 u16 num_buf,
-						 struct virtnet_rq_stats *stats)
+static char *merge_get_follow_buf(struct net_device *dev,
+				  struct receive_queue *rq,
+				  int *plen, int *ptruesize,
+				  int index, int total)
+{
+	struct virtnet_xsk_ctx_rx *xsk_ctx;
+	unsigned int truesize;
+	char *buf;
+	void *ctx;
+	int len;
+
+	buf = virtqueue_get_buf_ctx(rq->vq, &len, &ctx);
+	if (unlikely(!buf)) {
+		pr_debug("%s: rx error: %d buffers out of %d missing\n",
+			 dev->name, index, total);
+		dev->stats.rx_length_errors++;
+		return NULL;
+	}
+
+	if (is_xsk_ctx(ctx)) {
+		xsk_ctx = (struct virtnet_xsk_ctx_rx *)buf;
+
+		if (unlikely(len > xsk_ctx->ctx.head->truesize)) {
+			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
+				 dev->name, len, (unsigned long)ctx);
+			dev->stats.rx_length_errors++;
+			virtnet_xsk_ctx_rx_put(xsk_ctx);
+			return ERR_PTR(-EDQUOT);
+		}
+
+		truesize = len;
+
+		buf = virtnet_alloc_frag(rq, truesize, GFP_ATOMIC);
+		if (unlikely(!buf)) {
+			virtnet_xsk_ctx_rx_put(xsk_ctx);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		virtnet_xsk_ctx_rx_copy(xsk_ctx, buf, len, true);
+		virtnet_xsk_ctx_rx_put(xsk_ctx);
+	} else {
+		truesize = mergeable_ctx_to_truesize(ctx);
+		if (unlikely(len > truesize)) {
+			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
+				 dev->name, len, (unsigned long)ctx);
+			dev->stats.rx_length_errors++;
+
+			put_page(virt_to_head_page(buf));
+			return ERR_PTR(-EDQUOT);
+		}
+	}
+
+	*plen = len;
+	*ptruesize = truesize;
+
+	return buf;
+}
+
+struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
+					  struct virtnet_info *vi,
+					  struct receive_queue *rq,
+					  struct sk_buff *head_skb,
+					  u16 num_buf,
+					  struct virtnet_rq_stats *stats)
 {
 	struct sk_buff *curr_skb;
 	unsigned int truesize;
 	unsigned int len, num;
 	struct page *page;
-	void *buf, *ctx;
+	void *buf;
 	int offset;
 
 	curr_skb = head_skb;
@@ -565,24 +691,16 @@ static struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
 	while (--num_buf) {
 		int num_skb_frags;
 
-		buf = virtqueue_get_buf_ctx(rq->vq, &len, &ctx);
-		if (unlikely(!buf)) {
-			pr_debug("%s: rx error: %d buffers out of %d missing\n",
-				 dev->name, num_buf, num);
-			dev->stats.rx_length_errors++;
+		buf = merge_get_follow_buf(dev, rq, &len, &truesize,
+					   num_buf, num);
+		if (unlikely(!buf))
 			goto err_buf;
-		}
+
+		if (IS_ERR(buf))
+			goto err_drop;
 
 		stats->bytes += len;
 		page = virt_to_head_page(buf);
-
-		truesize = mergeable_ctx_to_truesize(ctx);
-		if (unlikely(len > truesize)) {
-			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
-				 dev->name, len, (unsigned long)ctx);
-			dev->stats.rx_length_errors++;
-			goto err_skb;
-		}
 
 		num_skb_frags = skb_shinfo(curr_skb)->nr_frags;
 		if (unlikely(num_skb_frags == MAX_SKB_FRAGS)) {
@@ -618,6 +736,7 @@ static struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
 
 err_skb:
 	put_page(page);
+err_drop:
 	merge_drop_follow_bufs(dev, rq, num_buf, stats);
 err_buf:
 	stats->drops++;
@@ -982,16 +1101,18 @@ static void receive_buf(struct virtnet_info *vi, struct receive_queue *rq,
 		pr_debug("%s: short packet %i\n", dev->name, len);
 		dev->stats.rx_length_errors++;
 		if (vi->mergeable_rx_bufs) {
-			put_page(virt_to_head_page(buf));
+			virtnet_rx_put_buf(buf, ctx);
 		} else if (vi->big_packets) {
 			give_pages(rq, buf);
 		} else {
-			put_page(virt_to_head_page(buf));
+			virtnet_rx_put_buf(buf, ctx);
 		}
 		return;
 	}
 
-	if (vi->mergeable_rx_bufs)
+	if (is_xsk_ctx(ctx))
+		skb = receive_xsk(dev, vi, rq, buf, len, xdp_xmit, stats);
+	else if (vi->mergeable_rx_bufs)
 		skb = receive_mergeable(dev, vi, rq, buf, ctx, len, xdp_xmit,
 					stats);
 	else if (vi->big_packets)
@@ -1175,6 +1296,14 @@ static bool try_fill_recv(struct virtnet_info *vi, struct receive_queue *rq,
 	int err;
 	bool oom;
 
+	/* Because virtio-net does not yet support flow direct, all rx
+	 * channels must also process other non-xsk packets. If there is
+	 * no buf available from xsk temporarily, we try to allocate
+	 * memory to the channel.
+	 */
+	if (fill_recv_xsk(vi, rq, gfp))
+		goto kick;
+
 	do {
 		if (vi->mergeable_rx_bufs)
 			err = add_recvbuf_mergeable(vi, rq, gfp);
@@ -1187,6 +1316,8 @@ static bool try_fill_recv(struct virtnet_info *vi, struct receive_queue *rq,
 		if (err)
 			break;
 	} while (rq->vq->num_free);
+
+kick:
 	if (virtqueue_kick_prepare(rq->vq) && virtqueue_notify(rq->vq)) {
 		unsigned long flags;
 
@@ -2575,7 +2706,7 @@ static void free_receive_page_frags(struct virtnet_info *vi)
 
 static void free_unused_bufs(struct virtnet_info *vi)
 {
-	void *buf;
+	void *buf, *ctx;
 	int i;
 
 	for (i = 0; i < vi->max_queue_pairs; i++) {
@@ -2593,14 +2724,13 @@ static void free_unused_bufs(struct virtnet_info *vi)
 	for (i = 0; i < vi->max_queue_pairs; i++) {
 		struct virtqueue *vq = vi->rq[i].vq;
 
-		while ((buf = virtqueue_detach_unused_buf(vq)) != NULL) {
-			if (vi->mergeable_rx_bufs) {
-				put_page(virt_to_head_page(buf));
-			} else if (vi->big_packets) {
+		while ((buf = virtqueue_detach_unused_buf_ctx(vq, &ctx)) != NULL) {
+			if (vi->mergeable_rx_bufs)
+				virtnet_rx_put_buf(buf, ctx);
+			else if (vi->big_packets)
 				give_pages(&vi->rq[i], buf);
-			} else {
-				put_page(virt_to_head_page(buf));
-			}
+			else
+				virtnet_rx_put_buf(buf, ctx);
 		}
 	}
 }

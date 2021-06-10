@@ -20,6 +20,75 @@ static struct virtnet_xsk_ctx *virtnet_xsk_ctx_get(struct virtnet_xsk_ctx_head *
 }
 
 #define virtnet_xsk_ctx_tx_get(head) ((struct virtnet_xsk_ctx_tx *)virtnet_xsk_ctx_get(head))
+#define virtnet_xsk_ctx_rx_get(head) ((struct virtnet_xsk_ctx_rx *)virtnet_xsk_ctx_get(head))
+
+static unsigned int virtnet_receive_buf_num(struct virtnet_info *vi, char *buf)
+{
+	struct virtio_net_hdr_mrg_rxbuf *hdr;
+
+	if (vi->mergeable_rx_bufs) {
+		hdr = (struct virtio_net_hdr_mrg_rxbuf *)buf;
+		return virtio16_to_cpu(vi->vdev, hdr->num_buffers);
+	}
+
+	return 1;
+}
+
+/* when xsk rx ctx ref two page, copy to dst from two page */
+static void virtnet_xsk_rx_ctx_merge(struct virtnet_xsk_ctx_rx *ctx,
+				     char *dst, unsigned int len)
+{
+	unsigned int size;
+	int offset;
+	char *src;
+
+	/* data start from first page */
+	if (ctx->offset >= 0) {
+		offset = ctx->offset;
+
+		size = min_t(int, PAGE_SIZE - offset, len);
+		src = page_address(ctx->ctx.page) + offset;
+		memcpy(dst, src, size);
+
+		if (len > size) {
+			src = page_address(ctx->ctx.page_unaligned);
+			memcpy(dst + size, src, len - size);
+		}
+
+	} else {
+		offset = -ctx->offset;
+
+		src = page_address(ctx->ctx.page_unaligned) + offset;
+
+		memcpy(dst, src, len);
+	}
+}
+
+/* copy ctx to dst, need to make sure that len is safe */
+void virtnet_xsk_ctx_rx_copy(struct virtnet_xsk_ctx_rx *ctx,
+			     char *dst, unsigned int len,
+			     bool hdr)
+{
+	char *src;
+	int size;
+
+	if (hdr) {
+		size = min_t(int, ctx->ctx.head->hdr_len, len);
+		memcpy(dst, &ctx->hdr, size);
+		len -= size;
+		if (!len)
+			return;
+		dst += size;
+	}
+
+	if (!ctx->ctx.page_unaligned) {
+		src = page_address(ctx->ctx.page) + ctx->offset;
+		memcpy(dst, src, len);
+
+	} else {
+		virtnet_xsk_rx_ctx_merge(ctx, dst, len);
+	}
+}
 
 static void virtnet_xsk_check_queue(struct send_queue *sq)
 {
@@ -43,6 +112,267 @@ static void virtnet_xsk_check_queue(struct send_queue *sq)
 	 */
 	if (sq->vq->num_free < 2 + MAX_SKB_FRAGS)
 		netif_stop_subqueue(dev, qnum);
+}
+
+static struct sk_buff *virtnet_xsk_construct_skb_xdp(struct receive_queue *rq,
+						     struct xdp_buff *xdp)
+{
+	unsigned int metasize = xdp->data - xdp->data_meta;
+	struct sk_buff *skb;
+	unsigned int size;
+
+	size = xdp->data_end - xdp->data_hard_start;
+	skb = napi_alloc_skb(&rq->napi, size);
+	if (unlikely(!skb))
+		return NULL;
+
+	skb_reserve(skb, xdp->data_meta - xdp->data_hard_start);
+
+	size = xdp->data_end - xdp->data_meta;
+	memcpy(__skb_put(skb, size), xdp->data_meta, size);
+
+	if (metasize) {
+		__skb_pull(skb, metasize);
+		skb_metadata_set(skb, metasize);
+	}
+
+	return skb;
+}
+
+static struct sk_buff *virtnet_xsk_construct_skb_ctx(struct net_device *dev,
+						     struct virtnet_info *vi,
+						     struct receive_queue *rq,
+						     struct virtnet_xsk_ctx_rx *ctx,
+						     unsigned int len,
+						     struct virtnet_rq_stats *stats)
+{
+	struct virtio_net_hdr_mrg_rxbuf *hdr;
+	struct sk_buff *skb;
+	int num_buf;
+	char *dst;
+
+	len -= vi->hdr_len;
+
+	skb = napi_alloc_skb(&rq->napi, len);
+	if (unlikely(!skb))
+		return NULL;
+
+	dst = __skb_put(skb, len);
+
+	virtnet_xsk_ctx_rx_copy(ctx, dst, len, false);
+
+	num_buf = virtnet_receive_buf_num(vi, (char *)&ctx->hdr);
+	if (num_buf > 1) {
+		skb = merge_receive_follow_bufs(dev, vi, rq, skb, num_buf,
+						stats);
+		if (!skb)
+			return NULL;
+	}
+
+	hdr = skb_vnet_hdr(skb);
+	memcpy(hdr, &ctx->hdr, vi->hdr_len);
+
+	return skb;
+}
+
+/* len not include virtio-net hdr */
+static struct xdp_buff *virtnet_xsk_check_xdp(struct virtnet_info *vi,
+					      struct receive_queue *rq,
+					      struct virtnet_xsk_ctx_rx *ctx,
+					      struct xdp_buff *_xdp,
+					      unsigned int len)
+{
+	struct xdp_buff *xdp;
+	struct page *page;
+	int frame_sz;
+	char *data;
+
+	if (ctx->ctx.head->active) {
+		xdp = ctx->xdp;
+		xdp->data_end = xdp->data + len;
+
+		return xdp;
+	}
+
+	/* ctx->xdp is invalid, because of that is released */
+
+	if (!ctx->ctx.page_unaligned) {
+		data = page_address(ctx->ctx.page) + ctx->offset;
+		page = ctx->ctx.page;
+	} else {
+		page = alloc_page(GFP_ATOMIC);
+		if (!page)
+			return NULL;
+
+		data = page_address(page) + ctx->headroom;
+
+		virtnet_xsk_rx_ctx_merge(ctx, data, len);
+
+		put_page(ctx->ctx.page);
+		put_page(ctx->ctx.page_unaligned);
+
+		/* page will been put when ctx is put */
+		ctx->ctx.page = page;
+		ctx->ctx.page_unaligned = NULL;
+	}
+
+	/* If xdp consume the data with XDP_REDIRECT/XDP_TX, the page
+	 * ref will been dec. So call get_page here.
+	 *
+	 * If xdp has been consumed, the page ref will dec auto and
+	 * virtnet_xsk_ctx_rx_put will dec the ref again.
+	 *
+	 * If xdp has not been consumed, then manually put_page once before
+	 * virtnet_xsk_ctx_rx_put.
+	 */
+	get_page(page);
+
+	xdp = _xdp;
+
+	frame_sz = ctx->ctx.head->frame_size + ctx->headroom;
+
+	/* use xdp rxq without MEM_TYPE_XSK_BUFF_POOL */
+	xdp_init_buff(xdp, frame_sz, &rq->xdp_rxq);
+	xdp_prepare_buff(xdp, data - ctx->headroom, ctx->headroom, len, true);
+
+	return xdp;
+}
+
+int add_recvbuf_xsk(struct virtnet_info *vi, struct receive_queue *rq,
+		    struct xsk_buff_pool *pool, gfp_t gfp)
+{
+	struct page *page, *page_start, *page_end;
+	unsigned long data, data_end, data_start;
+	struct virtnet_xsk_ctx_rx *ctx;
+	struct xdp_buff *xsk_xdp;
+	int err, size, n;
+	u32 offset;
+
+	xsk_xdp = xsk_buff_alloc(pool);
+	if (!xsk_xdp)
+		return -ENOMEM;
+
+	ctx = virtnet_xsk_ctx_rx_get(rq->xsk.ctx_head);
+
+	ctx->xdp = xsk_xdp;
+	ctx->headroom = xsk_xdp->data - xsk_xdp->data_hard_start;
+
+	offset = offset_in_page(xsk_xdp->data);
+
+	data_start = (unsigned long)xsk_xdp->data_hard_start;
+	data       = (unsigned long)xsk_xdp->data;
+	data_end   = data + ctx->ctx.head->frame_size - 1;
+
+	page_start = vmalloc_to_page((void *)data_start);
+
+	ctx->ctx.page = page_start;
+	get_page(page_start);
+
+	if ((data_end & PAGE_MASK) == (data_start & PAGE_MASK)) {
+		page_end = page_start;
+		page = page_start;
+		ctx->offset = offset;
+
+		ctx->ctx.page_unaligned = NULL;
+		n = 2;
+	} else {
+		page_end = vmalloc_to_page((void *)data_end);
+
+		ctx->ctx.page_unaligned = page_end;
+		get_page(page_end);
+
+		if ((data_start & PAGE_MASK) == (data & PAGE_MASK)) {
+			page = page_start;
+			ctx->offset = offset;
+			n = 3;
+		} else {
+			page = page_end;
+			ctx->offset = -offset;
+			n = 2;
+		}
+	}
+
+	size = min_t(int, PAGE_SIZE - offset, ctx->ctx.head->frame_size);
+
+	sg_init_table(rq->sg, n);
+	sg_set_buf(rq->sg, &ctx->hdr, vi->hdr_len);
+	sg_set_page(rq->sg + 1, page, size, offset);
+
+	if (n == 3) {
+		size = ctx->ctx.head->frame_size - size;
+		sg_set_page(rq->sg + 2, page_end, size, 0);
+	}
+
+	err = virtqueue_add_inbuf_ctx(rq->vq, rq->sg, n, ctx,
+				      VIRTNET_XSK_BUFF_CTX, gfp);
+	if (err < 0)
+		virtnet_xsk_ctx_rx_put(ctx);
+
+	return err;
+}
+
+struct sk_buff *receive_xsk(struct net_device *dev, struct virtnet_info *vi,
+			    struct receive_queue *rq, void *buf,
+			    unsigned int len, unsigned int *xdp_xmit,
+			    struct virtnet_rq_stats *stats)
+{
+	struct virtnet_xsk_ctx_rx *ctx;
+	struct xsk_buff_pool *pool;
+	struct sk_buff *skb = NULL;
+	struct xdp_buff *xdp, _xdp;
+	struct bpf_prog *xdp_prog;
+	u16 num_buf = 1;
+	int ret;
+
+	ctx = (struct virtnet_xsk_ctx_rx *)buf;
+
+	rcu_read_lock();
+
+	pool     = rcu_dereference(rq->xsk.pool);
+	xdp_prog = rcu_dereference(rq->xdp_prog);
+	if (!pool || !xdp_prog)
+		goto skb;
+
+	/* this may happen when xsk chunk size too small. */
+	num_buf = virtnet_receive_buf_num(vi, (char *)&ctx->hdr);
+	if (num_buf > 1)
+		goto drop;
+
+	xdp = virtnet_xsk_check_xdp(vi, rq, ctx, &_xdp, len - vi->hdr_len);
+	if (!xdp)
+		goto drop;
+
+	ret = virtnet_run_xdp(dev, xdp_prog, xdp, xdp_xmit, stats);
+	if (unlikely(ret)) {
+		/* pair for get_page inside virtnet_xsk_check_xdp */
+		if (!ctx->ctx.head->active)
+			put_page(ctx->ctx.page);
+
+		if (unlikely(ret < 0))
+			goto drop;
+
+		/* XDP_PASS */
+		skb = virtnet_xsk_construct_skb_xdp(rq, xdp);
+	} else {
+		/* ctx->xdp has been consumed */
+		ctx->xdp = NULL;
+	}
+
+end:
+	virtnet_xsk_ctx_rx_put(ctx);
+	rcu_read_unlock();
+	return skb;
+
+skb:
+	skb = virtnet_xsk_construct_skb_ctx(dev, vi, rq, ctx, len, stats);
+	goto end;
+
+drop:
+	stats->drops++;
+
+	if (num_buf > 1)
+		merge_drop_follow_bufs(dev, rq, num_buf, stats);
+	goto end;
 }
 
 void virtnet_xsk_complete(struct send_queue *sq, u32 num)
@@ -238,15 +568,20 @@ int virtnet_xsk_wakeup(struct net_device *dev, u32 qid, u32 flag)
 	return 0;
 }
 
-static struct virtnet_xsk_ctx_head *virtnet_xsk_ctx_alloc(struct xsk_buff_pool *pool,
-							  struct virtqueue *vq)
+static struct virtnet_xsk_ctx_head *virtnet_xsk_ctx_alloc(struct virtnet_info *vi,
+							  struct xsk_buff_pool *pool,
+							  struct virtqueue *vq,
+							  bool rx)
 {
 	struct virtnet_xsk_ctx_head *head;
 	u32 size, n, ring_size, ctx_sz;
 	struct virtnet_xsk_ctx *ctx;
 	void *p;
 
-	ctx_sz = sizeof(struct virtnet_xsk_ctx_tx);
+	if (rx)
+		ctx_sz = sizeof(struct virtnet_xsk_ctx_rx);
+	else
+		ctx_sz = sizeof(struct virtnet_xsk_ctx_tx);
 
 	ring_size = virtqueue_get_vring_size(vq);
 	size = sizeof(*head) + ctx_sz * ring_size;
@@ -259,6 +594,8 @@ static struct virtnet_xsk_ctx_head *virtnet_xsk_ctx_alloc(struct xsk_buff_pool *
 
 	head->active = true;
 	head->frame_size = xsk_pool_get_rx_frame_size(pool);
+	head->hdr_len = vi->hdr_len;
+	head->truesize = head->frame_size + vi->hdr_len;
 
 	p = head + 1;
 	for (n = 0; n < ring_size; ++n) {
@@ -278,12 +615,15 @@ static int virtnet_xsk_pool_enable(struct net_device *dev,
 				   u16 qid)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
+	struct receive_queue *rq;
 	struct send_queue *sq;
+	int err;
 
 	if (qid >= vi->curr_queue_pairs)
 		return -EINVAL;
 
 	sq = &vi->sq[qid];
+	rq = &vi->rq[qid];
 
 	/* xsk zerocopy depend on the tx napi.
 	 *
@@ -295,9 +635,39 @@ static int virtnet_xsk_pool_enable(struct net_device *dev,
 
 	memset(&sq->xsk, 0, sizeof(sq->xsk));
 
-	sq->xsk.ctx_head = virtnet_xsk_ctx_alloc(pool, sq->vq);
+	sq->xsk.ctx_head = virtnet_xsk_ctx_alloc(vi, pool, sq->vq, false);
 	if (!sq->xsk.ctx_head)
 		return -ENOMEM;
+
+	/* In big_packets mode, xdp cannot work, so there is no need to
+	 * initialize xsk of rq.
+	 */
+	if (!vi->big_packets || vi->mergeable_rx_bufs) {
+		err = xdp_rxq_info_reg(&rq->xsk.xdp_rxq, dev, qid,
+				       rq->napi.napi_id);
+		if (err < 0)
+			goto err;
+
+		err = xdp_rxq_info_reg_mem_model(&rq->xsk.xdp_rxq,
+						 MEM_TYPE_XSK_BUFF_POOL, NULL);
+		if (err < 0) {
+			xdp_rxq_info_unreg(&rq->xsk.xdp_rxq);
+			goto err;
+		}
+
+		rq->xsk.ctx_head = virtnet_xsk_ctx_alloc(vi, pool, rq->vq, true);
+		if (!rq->xsk.ctx_head) {
+			err = -ENOMEM;
+			goto err;
+		}
+
+		xsk_pool_set_rxq_info(pool, &rq->xsk.xdp_rxq);
+
+		/* Here is already protected by rtnl_lock, so rcu_assign_pointer
+		 * is safe.
+		 */
+		rcu_assign_pointer(rq->xsk.pool, pool);
+	}
 
 	/* Here is already protected by rtnl_lock, so rcu_assign_pointer is
 	 * safe.
@@ -305,21 +675,28 @@ static int virtnet_xsk_pool_enable(struct net_device *dev,
 	rcu_assign_pointer(sq->xsk.pool, pool);
 
 	return 0;
+
+err:
+	kfree(sq->xsk.ctx_head);
+	return err;
 }
 
 static int virtnet_xsk_pool_disable(struct net_device *dev, u16 qid)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
+	struct receive_queue *rq;
 	struct send_queue *sq;
 
 	if (qid >= vi->curr_queue_pairs)
 		return -EINVAL;
 
 	sq = &vi->sq[qid];
+	rq = &vi->rq[qid];
 
 	/* Here is already protected by rtnl_lock, so rcu_assign_pointer is
 	 * safe.
 	 */
+	rcu_assign_pointer(rq->xsk.pool, NULL);
 	rcu_assign_pointer(sq->xsk.pool, NULL);
 
 	/* Sync with the XSK wakeup and with NAPI. */
@@ -331,6 +708,17 @@ static int virtnet_xsk_pool_disable(struct net_device *dev, u16 qid)
 		kfree(sq->xsk.ctx_head);
 
 	sq->xsk.ctx_head = NULL;
+
+	if (!vi->big_packets || vi->mergeable_rx_bufs) {
+		if (READ_ONCE(rq->xsk.ctx_head->ref))
+			WRITE_ONCE(rq->xsk.ctx_head->active, false);
+		else
+			kfree(rq->xsk.ctx_head);
+
+		rq->xsk.ctx_head = NULL;
+
+		xdp_rxq_info_unreg(&rq->xsk.xdp_rxq);
+	}
 
 	return 0;
 }
