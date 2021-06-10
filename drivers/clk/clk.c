@@ -4340,17 +4340,20 @@ int clk_notifier_register(struct clk *clk, struct notifier_block *nb)
 	if (!clk || !nb)
 		return -EINVAL;
 
+	/* allocate new clk_notifier */
+	cn = kzalloc(sizeof(*cn), GFP_KERNEL);
+	if (!cn)
+		goto out;
+
 	clk_prepare_lock();
 
 	/* search the list of notifiers for this clk */
 	list_for_each_entry(cn, &clk_notifier_list, node)
-		if (cn->clk == clk)
+		if (cn->clk == clk) {
+			/* if clk is in the notifier list, free new clk_notifier */
+			kfree(cn);
 			goto found;
-
-	/* if clk wasn't in the notifier list, allocate new clk_notifier */
-	cn = kzalloc(sizeof(*cn), GFP_KERNEL);
-	if (!cn)
-		goto out;
+		}
 
 	cn->clk = clk;
 	srcu_init_notifier_head(&cn->notifier_head);
@@ -4362,9 +4365,9 @@ found:
 
 	clk->core->notifier_count++;
 
-out:
 	clk_prepare_unlock();
 
+out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(clk_notifier_register);
