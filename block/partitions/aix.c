@@ -84,10 +84,10 @@ static u64 last_lba(struct block_device *bdev)
 
 /**
  * read_lba(): Read bytes from disk, starting at given LBA
- * @state
- * @lba
- * @buffer
- * @count
+ * @state: Pointer to "struct parsed_partitions"
+ * @lba: Logical block address
+ * @buffer: Pointer to "u8"
+ * @count: Bytes reads from @state->bdev into @buffer
  *
  * Description:  Reads @count bytes from @state->bdev into @buffer.
  * Returns number of bytes read on success, 0 on error.
@@ -119,8 +119,8 @@ static size_t read_lba(struct parsed_partitions *state, u64 lba, u8 *buffer,
 
 /**
  * alloc_pvd(): reads physical volume descriptor
- * @state
- * @lba
+ * @state: Pointer to "struct parsed_partitions"
+ * @lba: Logical block address
  *
  * Description: Returns pvd on success,  NULL on error.
  * Allocates space for pvd and fill it with disk blocks at @lba
@@ -144,8 +144,8 @@ static struct pvd *alloc_pvd(struct parsed_partitions *state, u32 lba)
 
 /**
  * alloc_lvn(): reads logical volume names
- * @state
- * @lba
+ * @state: Pointer to "struct parsed_partitions"
+ * @lba: Logical block address
  *
  * Description: Returns lvn on success,  NULL on error.
  * Allocates space for lvn and fill it with disk blocks at @lba
