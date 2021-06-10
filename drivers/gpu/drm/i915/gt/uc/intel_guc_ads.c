@@ -24,8 +24,6 @@
  *      +---------------------------------------+
  *      | guc_gt_system_info                    |
  *      +---------------------------------------+
- *      | guc_clients_info                      |
- *      +---------------------------------------+
  *      | padding                               |
  *      +---------------------------------------+ <== 4K aligned
  *      | private data                          |
@@ -37,7 +35,6 @@ struct __guc_ads_blob {
 	struct guc_ads ads;
 	struct guc_policies policies;
 	struct guc_gt_system_info system_info;
-	struct guc_clients_info clients_info;
 } __packed;
 
 static u32 guc_ads_private_data_size(struct intel_guc *guc)
@@ -152,13 +149,9 @@ static void __guc_ads_init(struct intel_guc *guc)
 
 	base = intel_guc_ggtt_offset(guc, guc->ads_vma);
 
-	/* Clients info  */
-	blob->clients_info.clients_num = 1;
-
 	/* ADS */
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
 	blob->ads.gt_system_info = base + ptr_offset(blob, system_info);
-	blob->ads.clients_info = base + ptr_offset(blob, clients_info);
 
 	/* Private Data */
 	blob->ads.private_data = base + guc_ads_private_data_offset(guc);
