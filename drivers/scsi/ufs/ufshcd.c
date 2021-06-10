@@ -2758,6 +2758,16 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 		goto out;
 	}
 
+	if (unlikely(test_bit(tag, &hba->outstanding_reqs))) {
+		if (hba->wl_pm_op_in_progress) {
+			set_host_byte(cmd, DID_BAD_TARGET);
+			cmd->scsi_done(cmd);
+		} else {
+			err = SCSI_MLQUEUE_HOST_BUSY;
+		}
+		goto out;
+	}
+
 	hba->req_abort_count = 0;
 
 	err = ufshcd_hold(hba, true);
@@ -2767,15 +2777,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	}
 	WARN_ON(ufshcd_is_clkgating_allowed(hba) &&
 		(hba->clk_gating.state != CLKS_ON));
-
-	if (unlikely(test_bit(tag, &hba->outstanding_reqs))) {
-		if (hba->wl_pm_op_in_progress)
-			set_host_byte(cmd, DID_BAD_TARGET);
-		else
-			err = SCSI_MLQUEUE_HOST_BUSY;
-		ufshcd_release(hba);
-		goto out;
-	}
 
 	lrbp = &hba->lrb[tag];
 	WARN_ON(lrbp->cmd);
