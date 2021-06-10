@@ -112,6 +112,39 @@ on PowerPC.
 The ``smp_mb__after_unlock_lock()`` invocations prevent this
 ``WARN_ON()`` from triggering.
 
++-----------------------------------------------------------------------+
+| **Quick Quiz**:                                                       |
++-----------------------------------------------------------------------+
+| But the whole chain of rnp locking is enough for the readers to see   |
+| all the pre-grace-period accesses from the updater and for the updater|
+| to see all the accesses from the readers performed before the end of  |
+| the grace period. So why do we need to enforce full ordering at all   |
+| through smp_mb__after_unlock_lock()?                                  |
++-----------------------------------------------------------------------+
+| **Answer**:                                                           |
++-----------------------------------------------------------------------+
+| Because we still need to take care of the lockless counterparts of    |
+| RCU. The first key example here is grace period polling. Using        |
+| poll_state_synchronize_rcu() or cond_synchronize_rcu(), an updater    |
+| can rely solely on lockess full ordering to benefit from the usual    |
+| TREE RCU ordering guarantees.                                         |
+|                                                                       |
+| The second example lays behind the fact that a grace period still     |
+| claims to imply full memory ordering. Therefore in the following      |
+| scenario:                                                             |
+|                                                                       |
+| CPU 0                     CPU 1                                       |
+| ----                      ----                                        |
+| WRITE_ONCE(X, 1)          WRITE_ONCE(Y, 1)                            |
+| synchronize_rcu()         smp_mb()                                    |
+| r0 = READ_ONCE(Y)         r1 = READ_ONCE(X)                           |
+|                                                                       |
+| It must be impossible to have r0 == 0 && r1 == 0 after both CPUs      |
+| have completed their sequences, even if CPU 1 is in an RCU extended   |
+| quiescent state (idle mode) and thus won't report a quiescent state   |
+| throughout the common rnp locking chain.                              |
++-----------------------------------------------------------------------+
+
 This approach must be extended to include idle CPUs, which need
 RCU's grace-period memory ordering guarantee to extend to any
 RCU read-side critical sections preceding and following the current
