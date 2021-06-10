@@ -1542,8 +1542,10 @@ static int check_kprobe_address_safe(struct kprobe *p,
 	int ret;
 
 	ret = arch_check_ftrace_location(p);
-	if (ret)
+	if (ret) {
+		pr_err("kprobes: can't probe at the provided ftrace location\n");
 		return ret;
+	}
 	jump_label_lock();
 	preempt_disable();
 
@@ -1552,6 +1554,7 @@ static int check_kprobe_address_safe(struct kprobe *p,
 	    within_kprobe_blacklist((unsigned long) p->addr) ||
 	    jump_label_text_reserved(p->addr, p->addr) ||
 	    find_bug((unsigned long)p->addr)) {
+		pr_err("kprobes: can't probe at address in reject list\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -1976,8 +1979,10 @@ int register_kretprobe(struct kretprobe *rp)
 	void *addr;
 
 	ret = kprobe_on_func_entry(rp->kp.addr, rp->kp.symbol_name, rp->kp.offset);
-	if (ret)
+	if (ret) {
+		pr_err("kretprobes: can't probe at address outside function entry\n");
 		return ret;
+	}
 
 	/* If only rp->kp.addr is specified, check reregistering kprobes */
 	if (rp->kp.addr && warn_kprobe_rereg(&rp->kp))
@@ -1989,8 +1994,10 @@ int register_kretprobe(struct kretprobe *rp)
 			return PTR_ERR(addr);
 
 		for (i = 0; kretprobe_blacklist[i].name != NULL; i++) {
-			if (kretprobe_blacklist[i].addr == addr)
+			if (kretprobe_blacklist[i].addr == addr) {
+				pr_err("kretprobes: can't probe at address in reject list\n");
 				return -EINVAL;
+			}
 		}
 	}
 
