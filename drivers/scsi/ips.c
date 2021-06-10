@@ -1685,10 +1685,8 @@ ips_flash_copperhead(ips_ha_t * ha, ips_passthru_t * pt, ips_scb_t * scb)
 			    pt->CoppCP.cmd.flashfw.count;
 			ha->flash_data = dma_alloc_coherent(&ha->pcidev->dev,
 					datasize, &ha->flash_busaddr, GFP_KERNEL);
-			if (!ha->flash_data){
-				printk(KERN_WARNING "Unable to allocate a flash buffer\n");
+			if (!ha->flash_data)
 				return IPS_FAILURE;
-			}
 			ha->flash_datasize = 0;
 			ha->flash_len = datasize;
 		} else
