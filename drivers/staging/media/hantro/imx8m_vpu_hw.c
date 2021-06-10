@@ -137,6 +137,10 @@ static const struct hantro_fmt imx8m_vpu_g2_dec_fmts[] = {
 		.codec_mode = HANTRO_MODE_NONE,
 	},
 	{
+		.fourcc = V4L2_PIX_FMT_P010,
+		.codec_mode = HANTRO_MODE_NONE,
+	},
+	{
 		.fourcc = V4L2_PIX_FMT_HEVC_SLICE,
 		.codec_mode = HANTRO_MODE_HEVC_DEC,
 		.max_depth = 2,

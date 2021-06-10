@@ -243,6 +243,16 @@ queue_init(void *priv, struct vb2_queue *src_vq, struct vb2_queue *dst_vq)
 	return vb2_queue_init(dst_vq);
 }
 
+static bool hantro_is_10bit_dst_format(struct hantro_ctx *ctx)
+{
+	switch (ctx->vpu_dst_fmt->fourcc) {
+	case V4L2_PIX_FMT_P010:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int hantro_try_ctrl(struct v4l2_ctrl *ctrl)
 {
 	if (ctrl->id == V4L2_CID_STATELESS_H264_SPS) {
@@ -259,6 +269,10 @@ static int hantro_try_ctrl(struct v4l2_ctrl *ctrl)
 			return -EINVAL;
 	} else if (ctrl->id == V4L2_CID_MPEG_VIDEO_HEVC_SPS) {
 		const struct v4l2_ctrl_hevc_sps *sps = ctrl->p_new.p_hevc_sps;
+		struct hantro_ctx *ctx;
+
+		ctx = container_of(ctrl->handler,
+				   struct hantro_ctx, ctrl_handler);
 
 		if (sps->bit_depth_luma_minus8 != sps->bit_depth_chroma_minus8)
 			/* Luma and chroma bit depth mismatch */
@@ -270,6 +284,10 @@ static int hantro_try_ctrl(struct v4l2_ctrl *ctrl)
 		if (sps->flags & V4L2_HEVC_SPS_FLAG_SCALING_LIST_ENABLED)
 			/* No scaling support */
 			return -EINVAL;
+		if (sps->bit_depth_luma_minus8 == 0 &&
+		    hantro_is_10bit_dst_format(ctx)) {
+			return -EINVAL;
+		}
 	}
 	return 0;
 }
