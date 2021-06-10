@@ -267,6 +267,11 @@ static int device_process(struct vicodec_ctx *ctx,
 	if (ctx->is_stateless) {
 		struct media_request *src_req = src_vb->vb2_buf.req_obj.req;
 
+		/*
+		 * Apply request controls if any.
+		 * The dst_vb queue has read-only requests, so no need to
+		 * setup any controls for that buffer.
+		 */
 		ret = v4l2_ctrl_request_setup(src_req, &ctx->hdl);
 		if (ret)
 			return ret;
@@ -408,11 +413,12 @@ static void device_run(void *priv)
 	struct vb2_v4l2_buffer *src_buf, *dst_buf;
 	struct vicodec_q_data *q_src, *q_dst;
 	u32 state;
-	struct media_request *src_req;
+	struct media_request *src_req, *dst_req;
 
 	src_buf = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
 	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
 	src_req = src_buf->vb2_buf.req_obj.req;
+	dst_req = dst_buf->vb2_buf.req_obj.req;
 
 	q_src = get_q_data(ctx, V4L2_BUF_TYPE_VIDEO_OUTPUT);
 	q_dst = get_q_data(ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
@@ -452,6 +458,8 @@ static void device_run(void *priv)
 	spin_unlock(ctx->lock);
 	if (ctx->is_stateless && src_req)
 		v4l2_ctrl_request_complete(src_req, &ctx->hdl);
+	if (ctx->is_stateless && dst_req)
+		v4l2_ctrl_request_complete(dst_req, &ctx->hdl);
 
 	if (ctx->is_enc)
 		v4l2_m2m_job_finish(dev->stateful_enc.m2m_dev, ctx->fh.m2m_ctx);
@@ -1728,6 +1736,8 @@ static int queue_init(void *priv, struct vb2_queue *src_vq,
 	dst_vq->mem_ops = &vb2_vmalloc_memops;
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	dst_vq->lock = src_vq->lock;
+	dst_vq->supports_requests = ctx->is_stateless;
+	dst_vq->supports_ro_requests = ctx->is_stateless;
 
 	return vb2_queue_init(dst_vq);
 }
@@ -1947,34 +1957,19 @@ static int vicodec_release(struct file *file)
 
 static int vicodec_request_validate(struct media_request *req)
 {
-	struct media_request_object *obj;
+	struct vb2_buffer *vb = vb2_request_buffer_first(req);
 	struct v4l2_ctrl_handler *parent_hdl, *hdl;
-	struct vicodec_ctx *ctx = NULL;
+	struct vicodec_ctx *ctx;
 	struct v4l2_ctrl *ctrl;
-	unsigned int count;
 
-	list_for_each_entry(obj, &req->objects, list) {
-		struct vb2_buffer *vb;
-
-		if (vb2_request_object_is_buffer(obj)) {
-			vb = container_of(obj, struct vb2_buffer, req_obj);
-			ctx = vb2_get_drv_priv(vb->vb2_queue);
-
-			break;
-		}
-	}
-
-	if (!ctx) {
-		pr_err("No buffer was provided with the request\n");
+	if (!vb) {
+		dev_info(req->mdev->dev,
+			 "No buffer was provided with the request\n");
 		return -ENOENT;
 	}
+	ctx = vb2_get_drv_priv(vb->vb2_queue);
 
-	count = vb2_request_buffer_cnt(req);
-	if (!count) {
-		v4l2_info(&ctx->dev->v4l2_dev,
-			  "No buffer was provided with the request\n");
-		return -ENOENT;
-	} else if (count > 1) {
+	if (vb2_request_buffer_cnt(req) > 1) {
 		v4l2_info(&ctx->dev->v4l2_dev,
 			  "More than one buffer was provided with the request\n");
 		return -EINVAL;
@@ -1982,18 +1977,20 @@ static int vicodec_request_validate(struct media_request *req)
 
 	parent_hdl = &ctx->hdl;
 
-	hdl = v4l2_ctrl_request_hdl_find(req, parent_hdl);
-	if (!hdl) {
-		v4l2_info(&ctx->dev->v4l2_dev, "Missing codec control\n");
-		return -ENOENT;
-	}
-	ctrl = v4l2_ctrl_request_hdl_ctrl_find(hdl,
-					       vicodec_ctrl_stateless_state.id);
-	v4l2_ctrl_request_hdl_put(hdl);
-	if (!ctrl) {
-		v4l2_info(&ctx->dev->v4l2_dev,
-			  "Missing required codec control\n");
-		return -ENOENT;
+	if (vb->vb2_queue->is_output) {
+		hdl = v4l2_ctrl_request_hdl_find(req, parent_hdl);
+		if (!hdl) {
+			v4l2_info(&ctx->dev->v4l2_dev, "Missing codec control\n");
+			return -ENOENT;
+		}
+		ctrl = v4l2_ctrl_request_hdl_ctrl_find(hdl,
+						       vicodec_ctrl_stateless_state.id);
+		v4l2_ctrl_request_hdl_put(hdl);
+		if (!ctrl) {
+			v4l2_info(&ctx->dev->v4l2_dev,
+				  "Missing required codec control\n");
+			return -ENOENT;
+		}
 	}
 
 	return vb2_request_validate(req);
