@@ -733,6 +733,109 @@ err_buf:
 	return NULL;
 }
 
+static void merge_drop_follow_bufs(struct net_device *dev,
+				   struct receive_queue *rq,
+				   u16 num_buf,
+				   struct virtnet_rq_stats *stats)
+{
+	struct page *page;
+	unsigned int len;
+	void *buf;
+
+	while (num_buf-- > 1) {
+		buf = virtqueue_get_buf(rq->vq, &len);
+		if (unlikely(!buf)) {
+			pr_debug("%s: rx error: %d buffers missing\n",
+				 dev->name, num_buf);
+			dev->stats.rx_length_errors++;
+			break;
+		}
+		stats->bytes += len;
+		page = virt_to_head_page(buf);
+		put_page(page);
+	}
+}
+
+static struct sk_buff *merge_receive_follow_bufs(struct net_device *dev,
+						 struct virtnet_info *vi,
+						 struct receive_queue *rq,
+						 struct sk_buff *head_skb,
+						 u16 num_buf,
+						 struct virtnet_rq_stats *stats)
+{
+	struct sk_buff *curr_skb;
+	unsigned int truesize;
+	unsigned int len, num;
+	struct page *page;
+	void *buf, *ctx;
+	int offset;
+
+	curr_skb = head_skb;
+	num = num_buf;
+
+	while (--num_buf) {
+		int num_skb_frags;
+
+		buf = virtqueue_get_buf_ctx(rq->vq, &len, &ctx);
+		if (unlikely(!buf)) {
+			pr_debug("%s: rx error: %d buffers out of %d missing\n",
+				 dev->name, num_buf, num);
+			dev->stats.rx_length_errors++;
+			goto err_buf;
+		}
+
+		stats->bytes += len;
+		page = virt_to_head_page(buf);
+
+		truesize = mergeable_ctx_to_truesize(ctx);
+		if (unlikely(len > truesize)) {
+			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
+				 dev->name, len, (unsigned long)ctx);
+			dev->stats.rx_length_errors++;
+			goto err_skb;
+		}
+
+		num_skb_frags = skb_shinfo(curr_skb)->nr_frags;
+		if (unlikely(num_skb_frags == MAX_SKB_FRAGS)) {
+			struct sk_buff *nskb = alloc_skb(0, GFP_ATOMIC);
+
+			if (unlikely(!nskb))
+				goto err_skb;
+			if (curr_skb == head_skb)
+				skb_shinfo(curr_skb)->frag_list = nskb;
+			else
+				curr_skb->next = nskb;
+			curr_skb = nskb;
+			head_skb->truesize += nskb->truesize;
+			num_skb_frags = 0;
+		}
+		if (curr_skb != head_skb) {
+			head_skb->data_len += len;
+			head_skb->len += len;
+			head_skb->truesize += truesize;
+		}
+		offset = buf - page_address(page);
+		if (skb_can_coalesce(curr_skb, num_skb_frags, page, offset)) {
+			put_page(page);
+			skb_coalesce_rx_frag(curr_skb, num_skb_frags - 1,
+					     len, truesize);
+		} else {
+			skb_add_rx_frag(curr_skb, num_skb_frags, page,
+					offset, len, truesize);
+		}
+	}
+
+	return head_skb;
+
+err_skb:
+	put_page(page);
+	merge_drop_follow_bufs(dev, rq, num_buf, stats);
+err_buf:
+	stats->drops++;
+	dev_kfree_skb(head_skb);
+	return NULL;
+}
+
 static struct sk_buff *receive_small(struct net_device *dev,
 				     struct virtnet_info *vi,
 				     struct receive_queue *rq,
@@ -909,7 +1012,7 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 	u16 num_buf = virtio16_to_cpu(vi->vdev, hdr->num_buffers);
 	struct page *page = virt_to_head_page(buf);
 	int offset = buf - page_address(page);
-	struct sk_buff *head_skb, *curr_skb;
+	struct sk_buff *head_skb;
 	struct bpf_prog *xdp_prog;
 	unsigned int truesize = mergeable_ctx_to_truesize(ctx);
 	unsigned int headroom = mergeable_ctx_to_headroom(ctx);
@@ -1054,65 +1157,15 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 
 	head_skb = page_to_skb(vi, rq, page, offset, len, truesize, !xdp_prog,
 			       metasize, !!headroom);
-	curr_skb = head_skb;
-
-	if (unlikely(!curr_skb))
+	if (unlikely(!head_skb))
 		goto err_skb;
-	while (--num_buf) {
-		int num_skb_frags;
 
-		buf = virtqueue_get_buf_ctx(rq->vq, &len, &ctx);
-		if (unlikely(!buf)) {
-			pr_debug("%s: rx error: %d buffers out of %d missing\n",
-				 dev->name, num_buf,
-				 virtio16_to_cpu(vi->vdev,
-						 hdr->num_buffers));
-			dev->stats.rx_length_errors++;
-			goto err_buf;
-		}
+	if (num_buf > 1)
+		head_skb = merge_receive_follow_bufs(dev, vi, rq, head_skb,
+						     num_buf, stats);
+	if (head_skb)
+		ewma_pkt_len_add(&rq->mrg_avg_pkt_len, head_skb->len);
 
-		stats->bytes += len;
-		page = virt_to_head_page(buf);
-
-		truesize = mergeable_ctx_to_truesize(ctx);
-		if (unlikely(len > truesize)) {
-			pr_debug("%s: rx error: len %u exceeds truesize %lu\n",
-				 dev->name, len, (unsigned long)ctx);
-			dev->stats.rx_length_errors++;
-			goto err_skb;
-		}
-
-		num_skb_frags = skb_shinfo(curr_skb)->nr_frags;
-		if (unlikely(num_skb_frags == MAX_SKB_FRAGS)) {
-			struct sk_buff *nskb = alloc_skb(0, GFP_ATOMIC);
-
-			if (unlikely(!nskb))
-				goto err_skb;
-			if (curr_skb == head_skb)
-				skb_shinfo(curr_skb)->frag_list = nskb;
-			else
-				curr_skb->next = nskb;
-			curr_skb = nskb;
-			head_skb->truesize += nskb->truesize;
-			num_skb_frags = 0;
-		}
-		if (curr_skb != head_skb) {
-			head_skb->data_len += len;
-			head_skb->len += len;
-			head_skb->truesize += truesize;
-		}
-		offset = buf - page_address(page);
-		if (skb_can_coalesce(curr_skb, num_skb_frags, page, offset)) {
-			put_page(page);
-			skb_coalesce_rx_frag(curr_skb, num_skb_frags - 1,
-					     len, truesize);
-		} else {
-			skb_add_rx_frag(curr_skb, num_skb_frags, page,
-					offset, len, truesize);
-		}
-	}
-
-	ewma_pkt_len_add(&rq->mrg_avg_pkt_len, head_skb->len);
 	return head_skb;
 
 err_xdp:
@@ -1120,19 +1173,7 @@ err_xdp:
 	stats->xdp_drops++;
 err_skb:
 	put_page(page);
-	while (num_buf-- > 1) {
-		buf = virtqueue_get_buf(rq->vq, &len);
-		if (unlikely(!buf)) {
-			pr_debug("%s: rx error: %d buffers missing\n",
-				 dev->name, num_buf);
-			dev->stats.rx_length_errors++;
-			break;
-		}
-		stats->bytes += len;
-		page = virt_to_head_page(buf);
-		put_page(page);
-	}
-err_buf:
+	merge_drop_follow_bufs(dev, rq, num_buf, stats);
 	stats->drops++;
 	dev_kfree_skb(head_skb);
 xdp_xmit:
