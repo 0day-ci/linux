@@ -30,6 +30,13 @@ with different configurations in advance, knowing that the configuration will be
 applied when needed to get the expected result. Configuration values at the time
 of request completion are also available for reading.
 
+In some cases it does not make sense for user-space to associate configuration
+values with a frame, instead it only makes sense to retrieving configuration
+values at the time of request completion. In that case read-only requests can be
+used that only allow buffers to be queued and not configuration values. Which
+type of requests (regular or read-only) are supported is signalled through
+:ref:`buffer capabilities <v4l2-buf-capabilities>`.
+
 General Usage
 -------------
 
@@ -71,6 +78,10 @@ A queued request cannot be modified anymore.
    For :ref:`memory-to-memory devices <mem2mem>` you can use requests only for
    output buffers, not for capture buffers. Attempting to add a capture buffer
    to a request will result in an ``EBADR`` error.
+
+If the buffer type supports only read-only requests, and the request contains
+configuration values such as controls, then ``EINVAL`` is returned since no
+configuration values are allowed when submitting a read-only request.
 
 If the request contains configurations for multiple entities, individual drivers
 may synchronize so the requested pipeline's topology is applied before the

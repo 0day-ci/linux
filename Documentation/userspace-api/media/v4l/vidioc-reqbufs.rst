@@ -117,6 +117,7 @@ aborting or finishing any DMA in progress, an implicit
 .. _V4L2-BUF-CAP-SUPPORTS-ORPHANED-BUFS:
 .. _V4L2-BUF-CAP-SUPPORTS-M2M-HOLD-CAPTURE-BUF:
 .. _V4L2-BUF-CAP-SUPPORTS-MMAP-CACHE-HINTS:
+.. _V4L2-BUF-CAP-SUPPORTS-RO-REQUESTS:
 
 .. raw:: latex
 
@@ -143,6 +144,7 @@ aborting or finishing any DMA in progress, an implicit
     * - ``V4L2_BUF_CAP_SUPPORTS_REQUESTS``
       - 0x00000008
       - This buffer type supports :ref:`requests <media-request-api>`.
+        This flag is mutually exclusive with ``V4L2_BUF_CAP_SUPPORTS_RO_REQUESTS``.
     * - ``V4L2_BUF_CAP_SUPPORTS_ORPHANED_BUFS``
       - 0x00000010
       - The kernel allows calling :ref:`VIDIOC_REQBUFS` while buffers are still
@@ -160,6 +162,10 @@ aborting or finishing any DMA in progress, an implicit
         queue is used for :ref:`memory mapping <mmap>` streaming I/O. See
         :ref:`V4L2_BUF_FLAG_NO_CACHE_INVALIDATE <V4L2-BUF-FLAG-NO-CACHE-INVALIDATE>` and
         :ref:`V4L2_BUF_FLAG_NO_CACHE_CLEAN <V4L2-BUF-FLAG-NO-CACHE-CLEAN>`.
+    * - ``V4L2_BUF_CAP_SUPPORTS_RO_REQUESTS``
+      - 0x00000080
+      - This buffer type supports read-only :ref:`requests <media-request-api>`.
+        This flag is mutually exclusive with ``V4L2_BUF_CAP_SUPPORTS_REQUESTS``.
 
 .. raw:: latex
 

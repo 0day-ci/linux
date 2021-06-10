@@ -51,6 +51,11 @@ queued directly and you next try to queue a request, or vice versa.
 A request must contain at least one buffer, otherwise this ioctl will
 return an ``ENOENT`` error.
 
+If the :ref:`buffer capabilities <v4l2-buf-capabilities>` indicate that
+only read-only requests are supported, then the request can only contain
+buffers. If anything else is present then this ioctl will return an
+``EINVAL`` error.
+
 Return Value
 ============
 
