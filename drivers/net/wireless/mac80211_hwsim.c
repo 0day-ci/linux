@@ -3649,7 +3649,7 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 	if (skb == NULL)
 		goto err;
 
-	if (frame_data_len > IEEE80211_MAX_DATA_LEN)
+	if (frame_data_len == 0 || frame_data_len > IEEE80211_MAX_DATA_LEN)
 		goto err;
 
 	/* Copy the data */
