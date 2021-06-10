@@ -195,8 +195,7 @@ struct v4l2_subdev_core_ops {
 	int (*s_gpio)(struct v4l2_subdev *sd, u32 val);
 	long (*ioctl)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
 #ifdef CONFIG_COMPAT
-	long (*compat_ioctl32)(struct v4l2_subdev *sd, unsigned int cmd,
-			       unsigned long arg);
+	long (*compat_ioctl32)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
 #endif
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	int (*g_register)(struct v4l2_subdev *sd, struct v4l2_dbg_register *reg);

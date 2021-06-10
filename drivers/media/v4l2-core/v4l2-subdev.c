@@ -686,13 +686,26 @@ static long subdev_ioctl(struct file *file, unsigned int cmd,
 }
 
 #ifdef CONFIG_COMPAT
-static long subdev_compat_ioctl32(struct file *file, unsigned int cmd,
-	unsigned long arg)
+static long subdev_do_compat_ioctl32(struct file *file, unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
+	struct mutex *lock = vdev->lock;
+	long ret = -ENODEV;
 
-	return v4l2_subdev_call(sd, core, compat_ioctl32, cmd, arg);
+	if (lock && mutex_lock_interruptible(lock))
+		return -ERESTARTSYS;
+	if (video_is_registered(vdev))
+		ret = v4l2_subdev_call(sd, core, compat_ioctl32, cmd, arg);
+	if (lock)
+		mutex_unlock(lock);
+	return ret;
+}
+
+static long subdev_compat_ioctl32(struct file *file, unsigned int cmd,
+	unsigned long arg)
+{
+	return video_usercopy(file, cmd, arg, subdev_do_compat_ioctl32);
 }
 #endif
 

@@ -3293,6 +3293,9 @@ static const struct v4l2_ctrl_ops adv7842_ctrl_ops = {
 static const struct v4l2_subdev_core_ops adv7842_core_ops = {
 	.log_status = adv7842_log_status,
 	.ioctl = adv7842_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = adv7842_ioctl,
+#endif
 	.interrupt_service_routine = adv7842_isr,
 	.subscribe_event = adv7842_subscribe_event,
 	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
