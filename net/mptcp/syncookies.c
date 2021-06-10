@@ -35,11 +35,60 @@ struct join_entry {
 static struct join_entry join_entries[COOKIE_JOIN_SLOTS] __cacheline_aligned_in_smp;
 static spinlock_t join_entry_locks[COOKIE_JOIN_SLOTS] __cacheline_aligned_in_smp;
 
-static u32 mptcp_join_entry_hash(struct sk_buff *skb, struct net *net)
+static u32 mptcp_join_hashfn(const struct net *net, const __be32 laddr,
+			     const __be16 lport, const __be32 faddr,
+			     const __be16 fport)
 {
-	u32 i = skb_get_hash(skb) ^ net_hash_mix(net);
+	static u32 mptcp_join_hash_secret __read_mostly;
+	u32 i;
+
+	net_get_random_once(&mptcp_join_hash_secret,
+			    sizeof(mptcp_join_hash_secret));
+
+	i = jhash_3words((__force __u32) laddr,
+			 (__force __u32) faddr,
+			 ((__u32) lport) << 16 | (__force __u32)fport,
+			 mptcp_join_hash_secret + net_hash_mix(net));
 
 	return i % ARRAY_SIZE(join_entries);
+}
+
+static u32 mptcp_join_hashfn_inet6(const struct net *net,
+				   const struct in6_addr *laddr, const u16 lport,
+				   const struct in6_addr *faddr, const __be16 fport)
+{
+        static u32 mptcp_join_hash_secret_v6 __read_mostly;
+        static u32 ipv6_hash_secret __read_mostly;
+        u32 lhash, fhash, ports, i;
+
+        net_get_random_once(&mptcp_join_hash_secret_v6,
+			    sizeof(mptcp_join_hash_secret_v6));
+        net_get_random_once(&ipv6_hash_secret, sizeof(ipv6_hash_secret));
+
+        lhash = (__force u32)laddr->s6_addr32[3];
+        fhash = __ipv6_addr_jhash(faddr, ipv6_hash_secret);
+	ports = (((u32)lport) << 16) | (__force u32)fport;
+
+	i = jhash_3words(lhash, fhash, ports,
+			 mptcp_join_hash_secret_v6 + net_hash_mix(net));
+
+	return i % ARRAY_SIZE(join_entries);
+}
+
+static u32 mptcp_join_entry_hash(struct sk_buff *skb, struct net *net,
+				 unsigned short family)
+{
+	struct tcphdr *th = tcp_hdr(skb);
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (family == AF_INET6 &&
+	    !ipv6_addr_v4mapped(&ipv6_hdr(skb)->saddr))
+		return mptcp_join_hashfn_inet6(net,
+					       &ipv6_hdr(skb)->daddr, th->dest,
+					       &ipv6_hdr(skb)->saddr, th->source);
+#endif
+	return mptcp_join_hashfn(net, ip_hdr(skb)->daddr, th->dest,
+				 ip_hdr(skb)->saddr, th->source);
 }
 
 static void mptcp_join_store_state(struct join_entry *entry,
@@ -58,7 +107,7 @@ void subflow_init_req_cookie_join_save(const struct mptcp_subflow_request_sock *
 				       struct sk_buff *skb)
 {
 	struct net *net = read_pnet(&subflow_req->sk.req.ireq_net);
-	u32 i = mptcp_join_entry_hash(skb, net);
+	u32 i = mptcp_join_entry_hash(skb, net, subflow_req->sk.req.ireq_family);
 
 	/* No use in waiting if other cpu is already using this slot --
 	 * would overwrite the data that got stored.
@@ -79,7 +128,7 @@ bool mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subfl
 					struct sk_buff *skb)
 {
 	struct net *net = read_pnet(&subflow_req->sk.req.ireq_net);
-	u32 i = mptcp_join_entry_hash(skb, net);
+	u32 i = mptcp_join_entry_hash(skb, net, subflow_req->sk.req.ireq_family);
 	struct mptcp_sock *msk;
 	struct join_entry *e;
 
