@@ -501,8 +501,10 @@ static int mana_hwc_create_wq(struct hw_channel_context *hwc,
 	*hwc_wq_ptr = hwc_wq;
 	return 0;
 out:
-	if (err)
+	if (err) {
+		kfree(queue);
 		mana_hwc_destroy_wq(hwc, hwc_wq);
+	}
 	return err;
 }
 
