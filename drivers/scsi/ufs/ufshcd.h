@@ -901,7 +901,7 @@ static inline bool ufshcd_is_intr_aggr_allowed(struct ufs_hba *hba)
 	else
 		return false;
 #else
-return true;
+	return true;
 #endif
 }
 
