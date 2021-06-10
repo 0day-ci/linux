@@ -5450,16 +5450,18 @@ static void i40e_vsi_update_queue_map(struct i40e_vsi *vsi,
  */
 int i40e_update_adq_vsi_queues(struct i40e_vsi *vsi, int vsi_offset)
 {
-	struct i40e_pf *pf = vsi->back;
-	struct i40e_hw *hw = &pf->hw;
 	struct i40e_vsi_context ctxt = {};
-	int ret = 0;
+	struct i40e_pf *pf;
+	struct i40e_hw *hw;
+	int ret;
 
 	if (!vsi)
 		return I40E_ERR_PARAM;
+	pf = vsi->back;
+	hw = &pf->hw;
 
 	ctxt.seid = vsi->seid;
-	ctxt.pf_num = vsi->back->hw.pf_id;
+	ctxt.pf_num = hw->pf_id;
 	ctxt.vf_num = vsi->vf_id + hw->func_caps.vf_base_id + vsi_offset;
 	ctxt.uplink_seid = vsi->uplink_seid;
 	ctxt.connection_type = I40E_AQ_VSI_CONN_TYPE_NORMAL;
@@ -5469,11 +5471,11 @@ int i40e_update_adq_vsi_queues(struct i40e_vsi *vsi, int vsi_offset)
 	i40e_vsi_setup_queue_map(vsi, &ctxt, vsi->tc_config.enabled_tc,
 				 false);
 	if (vsi->reconfig_rss) {
-		vsi->rss_size = min_t(int, vsi->back->alloc_rss_size,
+		vsi->rss_size = min_t(int, pf->alloc_rss_size,
 				      vsi->num_queue_pairs);
 		ret = i40e_vsi_config_rss(vsi);
 		if (ret) {
-			dev_info(&vsi->back->pdev->dev, "Failed to reconfig rss for num_queues\n");
+			dev_info(&pf->pdev->dev, "Failed to reconfig rss for num_queues\n");
 			return ret;
 		}
 		vsi->reconfig_rss = false;
