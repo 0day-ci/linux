@@ -1004,7 +1004,8 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 						struct device_attribute *attr,
 						const char *buf,
 						size_t len),
-			   enum iio_shared_by shared_by)
+			   enum iio_shared_by shared_by,
+			   bool extend_name)
 {
 	int ret = 0;
 	char *name = NULL;
@@ -1013,25 +1014,28 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 
 	/* Build up postfix of <extend_name>_<modifier>_postfix */
 	if (chan->modified && (shared_by == IIO_SEPARATE)) {
-		if (chan->extend_name)
+		if (extend_name && chan->extend_name) {
 			full_postfix = kasprintf(GFP_KERNEL, "%s_%s_%s",
 						 iio_modifier_names[chan
 								    ->channel2],
 						 chan->extend_name,
 						 postfix);
-		else
+		} else {
 			full_postfix = kasprintf(GFP_KERNEL, "%s_%s",
 						 iio_modifier_names[chan
 								    ->channel2],
 						 postfix);
+		}
 	} else {
-		if (chan->extend_name == NULL || shared_by != IIO_SEPARATE)
+		if (!extend_name || chan->extend_name == NULL
+		    || shared_by != IIO_SEPARATE) {
 			full_postfix = kstrdup(postfix, GFP_KERNEL);
-		else
+		} else {
 			full_postfix = kasprintf(GFP_KERNEL,
 						 "%s_%s",
 						 chan->extend_name,
 						 postfix);
+		}
 	}
 	if (full_postfix == NULL)
 		return -ENOMEM;
@@ -1141,7 +1145,8 @@ int __iio_add_chan_devattr(const char *postfix,
 			   enum iio_shared_by shared_by,
 			   struct device *dev,
 			   struct iio_buffer *buffer,
-			   struct list_head *attr_list)
+			   struct list_head *attr_list,
+			   bool extend_name)
 {
 	int ret;
 	struct iio_dev_attr *iio_attr, *t;
@@ -1151,7 +1156,8 @@ int __iio_add_chan_devattr(const char *postfix,
 		return -ENOMEM;
 	ret = __iio_device_attr_init(&iio_attr->dev_attr,
 				     postfix, chan,
-				     readfunc, writefunc, shared_by);
+				     readfunc, writefunc,
+				     shared_by, extend_name);
 	if (ret)
 		goto error_iio_dev_attr_free;
 	iio_attr->c = chan;
@@ -1194,7 +1200,8 @@ static int iio_device_add_channel_label(struct iio_dev *indio_dev,
 				     IIO_SEPARATE,
 				     &indio_dev->dev,
 				     NULL,
-				     &iio_dev_opaque->channel_attr_list);
+				     &iio_dev_opaque->channel_attr_list,
+				     true);
 	if (ret < 0)
 		return ret;
 
@@ -1220,7 +1227,8 @@ static int iio_device_add_info_mask_type(struct iio_dev *indio_dev,
 					     shared_by,
 					     &indio_dev->dev,
 					     NULL,
-					     &iio_dev_opaque->channel_attr_list);
+					     &iio_dev_opaque->channel_attr_list,
+					     true);
 		if ((ret == -EBUSY) && (shared_by != IIO_SEPARATE))
 			continue;
 		else if (ret < 0)
@@ -1257,7 +1265,8 @@ static int iio_device_add_info_mask_type_avail(struct iio_dev *indio_dev,
 					     shared_by,
 					     &indio_dev->dev,
 					     NULL,
-					     &iio_dev_opaque->channel_attr_list);
+					     &iio_dev_opaque->channel_attr_list,
+					     true);
 		kfree(avail_postfix);
 		if ((ret == -EBUSY) && (shared_by != IIO_SEPARATE))
 			continue;
@@ -1354,7 +1363,8 @@ static int iio_device_add_channel_sysfs(struct iio_dev *indio_dev,
 					ext_info->shared,
 					&indio_dev->dev,
 					NULL,
-					&iio_dev_opaque->channel_attr_list);
+					&iio_dev_opaque->channel_attr_list,
+					true);
 			i++;
 			if (ret == -EBUSY && ext_info->shared)
 				continue;

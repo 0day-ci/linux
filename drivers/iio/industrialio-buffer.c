@@ -492,7 +492,8 @@ static int iio_buffer_add_channel_sysfs(struct iio_dev *indio_dev,
 				     IIO_SEPARATE,
 				     &indio_dev->dev,
 				     buffer,
-				     &buffer->buffer_attr_list);
+				     &buffer->buffer_attr_list,
+				     true);
 	if (ret)
 		return ret;
 	attrcount++;
@@ -504,7 +505,8 @@ static int iio_buffer_add_channel_sysfs(struct iio_dev *indio_dev,
 				     0,
 				     &indio_dev->dev,
 				     buffer,
-				     &buffer->buffer_attr_list);
+				     &buffer->buffer_attr_list,
+				     true);
 	if (ret)
 		return ret;
 	attrcount++;
@@ -517,7 +519,8 @@ static int iio_buffer_add_channel_sysfs(struct iio_dev *indio_dev,
 					     0,
 					     &indio_dev->dev,
 					     buffer,
-					     &buffer->buffer_attr_list);
+					     &buffer->buffer_attr_list,
+					     true);
 	else
 		ret = __iio_add_chan_devattr("en",
 					     chan,
@@ -527,7 +530,8 @@ static int iio_buffer_add_channel_sysfs(struct iio_dev *indio_dev,
 					     0,
 					     &indio_dev->dev,
 					     buffer,
-					     &buffer->buffer_attr_list);
+					     &buffer->buffer_attr_list,
+					     true);
 	if (ret)
 		return ret;
 	attrcount++;

@@ -387,7 +387,8 @@ static int iio_device_add_event(struct iio_dev *indio_dev,
 		ret = __iio_add_chan_devattr(postfix, chan, show, store,
 			 (i << 16) | spec_index, shared_by, &indio_dev->dev,
 			 NULL,
-			&iio_dev_opaque->event_interface->dev_attr_list);
+			&iio_dev_opaque->event_interface->dev_attr_list,
+			true);
 		kfree(postfix);
 
 		if ((ret == -EBUSY) && (shared_by != IIO_SEPARATE))
