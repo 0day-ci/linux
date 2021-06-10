@@ -191,6 +191,12 @@ static int netlbl_mgmt_add_common(struct genl_info *info,
 		entry->family = AF_INET;
 		entry->def.type = NETLBL_NLTYPE_ADDRSELECT;
 		entry->def.addrsel = addrmap;
+
+		ret_val = netlbl_domhsh_add(entry, audit_info);
+		if (ret_val != 0) {
+			kfree(map);
+			goto add_free_addrmap;
+		}
 #if IS_ENABLED(CONFIG_IPV6)
 	} else if (info->attrs[NLBL_MGMT_A_IPV6ADDR]) {
 		struct in6_addr *addr;
@@ -243,12 +249,18 @@ static int netlbl_mgmt_add_common(struct genl_info *info,
 		entry->family = AF_INET6;
 		entry->def.type = NETLBL_NLTYPE_ADDRSELECT;
 		entry->def.addrsel = addrmap;
-#endif /* IPv6 */
-	}
 
-	ret_val = netlbl_domhsh_add(entry, audit_info);
-	if (ret_val != 0)
-		goto add_free_addrmap;
+		ret_val = netlbl_domhsh_add(entry, audit_info);
+		if (ret_val != 0) {
+			kfree(map);
+			goto add_free_addrmap;
+		}
+#endif /* IPv6 */
+	} else {
+		ret_val = netlbl_domhsh_add(entry, audit_info);
+		if (ret_val != 0)
+			goto add_free_addrmap;
+	}
 
 	return 0;
 
