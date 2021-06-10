@@ -836,10 +836,8 @@ static int tw_allocate_memory(TW_Device_Extension *tw_dev, int size, int which)
 
 	cpu_addr = dma_alloc_coherent(&tw_dev->tw_pci_dev->dev,
 			size * TW_Q_LENGTH, &dma_handle, GFP_KERNEL);
-	if (cpu_addr == NULL) {
-		printk(KERN_WARNING "3w-xxxx: dma_alloc_coherent() failed.\n");
+	if (!cpu_addr)
 		return 1;
-	}
 
 	if ((unsigned long)cpu_addr % (tw_dev->tw_pci_dev->device == TW_DEVICE_ID ? TW_ALIGNMENT_6000 : TW_ALIGNMENT_7000)) {
 		printk(KERN_WARNING "3w-xxxx: Couldn't allocate correctly aligned memory.\n");
