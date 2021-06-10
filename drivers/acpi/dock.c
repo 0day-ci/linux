@@ -380,6 +380,8 @@ static int dock_in_progress(struct dock_station *ds)
 
 /**
  * handle_eject_request - handle an undock request checking for error conditions
+ * @ds: the dock station.
+ * @event: Event code.
  *
  * Check to make sure the dock device is still present, then undock and
  * hotremove all the devices that may need removing.
