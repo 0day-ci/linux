@@ -7,6 +7,8 @@
 
 #define VIRTNET_XSK_BUFF_CTX  ((void *)(unsigned long)~0L)
 
+extern int xsk_kick_thr;
+
 /* When xsk disable, under normal circumstances, the network card must reclaim
  * all the memory that has been sent and the memory added to the rq queue by
  * destroying the queue.

@@ -5,6 +5,8 @@
 
 #include "virtio_net.h"
 
+int xsk_kick_thr = 8;
+
 static struct virtio_net_hdr_mrg_rxbuf xsk_hdr;
 
 static struct virtnet_xsk_ctx *virtnet_xsk_ctx_get(struct virtnet_xsk_ctx_head *head)
@@ -455,6 +457,7 @@ static int virtnet_xsk_xmit_batch(struct send_queue *sq,
 	struct xdp_desc desc;
 	int err, packet = 0;
 	int ret = -EAGAIN;
+	int need_kick = 0;
 
 	while (budget-- > 0) {
 		if (sq->vq->num_free < 2 + MAX_SKB_FRAGS) {
@@ -475,11 +478,22 @@ static int virtnet_xsk_xmit_batch(struct send_queue *sq,
 		}
 
 		++packet;
+		++need_kick;
+		if (need_kick > xsk_kick_thr) {
+			if (virtqueue_kick_prepare(sq->vq) &&
+			    virtqueue_notify(sq->vq))
+				++stats->kicks;
+
+			need_kick = 0;
+		}
 	}
 
 	if (packet) {
-		if (virtqueue_kick_prepare(sq->vq) && virtqueue_notify(sq->vq))
-			++stats->kicks;
+		if (need_kick) {
+			if (virtqueue_kick_prepare(sq->vq) &&
+			    virtqueue_notify(sq->vq))
+				++stats->kicks;
+		}
 
 		*done += packet;
 		stats->xdp_tx += packet;
