@@ -85,10 +85,8 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 			printfbufsiz + host_rrq_size;
 
 	base = dma_alloc_coherent(&dev->pdev->dev, size, &phys, GFP_KERNEL);
-	if (base == NULL) {
-		printk(KERN_ERR "aacraid: unable to create mapping.\n");
+	if (!base)
 		return 0;
-	}
 
 	dev->comm_addr = (void *)base;
 	dev->comm_phys = phys;
@@ -635,10 +633,8 @@ struct aac_dev *aac_init_adapter(struct aac_dev *dev)
 	 */
 
 	dev->queues = kzalloc(sizeof(struct aac_queue_block), GFP_KERNEL);
-	if (dev->queues == NULL) {
-		printk(KERN_ERR "Error could not allocate comm region.\n");
+	if (!dev->queues)
 		return NULL;
-	}
 
 	if (aac_comm_init(dev)<0){
 		kfree(dev->queues);
