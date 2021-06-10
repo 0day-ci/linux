@@ -693,7 +693,7 @@ struct ufs_hba_monitor {
  * @ee_ctrl_mask: Exception event control mask
  * @is_powered: flag to check if HBA is powered
  * @shutting_down: flag to check if shutdown has been invoked
- * @host_sem: semaphore used to serialize concurrent contexts
+ * @host_sem: semaphore used to avoid concurrency of contexts
  * @eh_wq: Workqueue that eh_work works on
  * @eh_work: Worker to handle UFS errors that require s/w attention
  * @eeh_work: Worker to handle exception events

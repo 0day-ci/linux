@@ -9060,16 +9060,13 @@ static int ufshcd_wl_suspend(struct device *dev)
 	ktime_t start = ktime_get();
 
 	hba = shost_priv(sdev->host);
-	down(&hba->host_sem);
 
 	if (pm_runtime_suspended(dev))
 		goto out;
 
 	ret = __ufshcd_wl_suspend(hba, UFS_SYSTEM_PM);
-	if (ret) {
+	if (ret)
 		dev_err(&sdev->sdev_gendev, "%s failed: %d\n", __func__,  ret);
-		up(&hba->host_sem);
-	}
 
 out:
 	if (!ret)
@@ -9102,7 +9099,6 @@ out:
 		hba->curr_dev_pwr_mode, hba->uic_link_state);
 	if (!ret)
 		hba->is_wl_sys_suspended = false;
-	up(&hba->host_sem);
 	return ret;
 }
 #endif
@@ -9665,6 +9661,7 @@ void ufshcd_resume_complete(struct device *dev)
 		ufshcd_rpmb_rpm_put(hba);
 		hba->rpmb_complete_put = false;
 	}
+	up(&hba->host_sem);
 }
 EXPORT_SYMBOL_GPL(ufshcd_resume_complete);
 
@@ -9691,6 +9688,7 @@ int ufshcd_suspend_prepare(struct device *dev)
 		ufshcd_rpmb_rpm_get_sync(hba);
 		hba->rpmb_complete_put = true;
 	}
+	down(&hba->host_sem);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ufshcd_suspend_prepare);
