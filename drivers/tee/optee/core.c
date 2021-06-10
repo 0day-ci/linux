@@ -589,7 +589,7 @@ static int optee_remove(struct platform_device *pdev)
 	 * reference counters and also avoid wild pointers in secure world
 	 * into the old shared memory range.
 	 */
-	optee_disable_shm_cache(optee);
+	optee_disable_shm_cache(optee, true);
 
 	/*
 	 * The two devices have to be unregistered before we can free the
@@ -619,7 +619,7 @@ static int optee_remove(struct platform_device *pdev)
  */
 static void optee_shutdown(struct platform_device *pdev)
 {
-	optee_disable_shm_cache(platform_get_drvdata(pdev));
+	optee_disable_shm_cache(platform_get_drvdata(pdev), true);
 }
 
 static int optee_probe(struct platform_device *pdev)
@@ -715,6 +715,15 @@ static int optee_probe(struct platform_device *pdev)
 	optee_supp_init(&optee->supp);
 	optee->memremaped_shm = memremaped_shm;
 	optee->pool = pool;
+
+	/*
+	 * Ensure that there are no pre-existing shm objects before enabling
+	 * the shm cache so that there's no chance of receiving an invalid
+	 * address during shutdown. This could occur, for example, if we're
+	 * kexec booting from an older kernel that did not properly cleanup the
+	 * shm cache.
+	 */
+	optee_disable_shm_cache(optee, false);
 
 	optee_enable_shm_cache(optee);
 
