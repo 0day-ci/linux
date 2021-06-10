@@ -2309,6 +2309,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *uport)
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
+	char report_extra[64];
 	char address[64];
 
 	switch (port->iotype) {
@@ -2333,11 +2334,17 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 		break;
 	}
 
-	pr_info("%s%s%s at %s (irq = %d, base_baud = %d) is a %s\n",
+	if (port->report_extra)
+		port->report_extra(port, report_extra, sizeof(report_extra));
+	else
+		report_extra[0] = '\0';
+
+	pr_info("%s%s%s at %s (irq = %d, base_baud = %d%s) is a %s\n",
 	       port->dev ? dev_name(port->dev) : "",
 	       port->dev ? ": " : "",
 	       port->name,
-	       address, port->irq, port->uartclk / 16, uart_type(port));
+	       address, port->irq, port->uartclk / 16, report_extra,
+	       uart_type(port));
 }
 
 static void

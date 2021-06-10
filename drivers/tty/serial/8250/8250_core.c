@@ -952,6 +952,13 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	return NULL;
 }
 
+static void serial8250_report_magic(struct uart_port *port,
+				    char *report_buf, size_t report_size)
+{
+	snprintf(report_buf, report_size,
+		 " [+%d, %d]", port->uartclk / 8, port->uartclk / 4);
+}
+
 static void serial_8250_overrun_backoff_work(struct work_struct *work)
 {
 	struct uart_8250_port *up =
@@ -1047,6 +1054,9 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 				uart->gpios = gpios;
 			}
 		}
+
+		if (up->port.flags & UPF_MAGIC_MULTIPLIER)
+			uart->port.report_extra = serial8250_report_magic;
 
 		serial8250_set_defaults(uart);
 
