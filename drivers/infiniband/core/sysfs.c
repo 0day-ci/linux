@@ -196,7 +196,7 @@ static ssize_t lid_mask_count_show(struct ib_port *p,
 	if (ret)
 		return ret;
 
-	return sysfs_emit(buf, "%d\n", attr.lmc);
+	return sysfs_emit(buf, "%u\n", attr.lmc);
 }
 
 static ssize_t sm_lid_show(struct ib_port *p, struct port_attribute *unused,
@@ -222,7 +222,7 @@ static ssize_t sm_sl_show(struct ib_port *p, struct port_attribute *unused,
 	if (ret)
 		return ret;
 
-	return sysfs_emit(buf, "%d\n", attr.sm_sl);
+	return sysfs_emit(buf, "%u\n", attr.sm_sl);
 }
 
 static ssize_t cap_mask_show(struct ib_port *p, struct port_attribute *unused,
@@ -324,7 +324,7 @@ static ssize_t phys_state_show(struct ib_port *p, struct port_attribute *unused,
 	if (ret)
 		return ret;
 
-	return sysfs_emit(buf, "%d: %s\n", attr.phys_state,
+	return sysfs_emit(buf, "%u: %s\n", attr.phys_state,
 			  phys_state_to_str(attr.phys_state));
 }
 
@@ -546,7 +546,7 @@ static ssize_t show_pma_counter(struct ib_port *p, struct port_attribute *attr,
 
 	switch (width) {
 	case 4:
-		len = sysfs_emit(buf, "%u\n",
+		len = sysfs_emit(buf, "%d\n",
 				 (*data >> (4 - (offset % 8))) & 0xf);
 		break;
 	case 8:
@@ -1259,7 +1259,7 @@ static ssize_t node_type_show(struct device *device,
 {
 	struct ib_device *dev = rdma_device_to_ibdev(device);
 
-	return sysfs_emit(buf, "%d: %s\n", dev->node_type,
+	return sysfs_emit(buf, "%u: %s\n", dev->node_type,
 			  node_type_string(dev->node_type));
 }
 static DEVICE_ATTR_RO(node_type);
