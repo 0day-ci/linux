@@ -304,9 +304,6 @@ void drm_syncobj_add_point(struct drm_syncobj *syncobj,
 	list_for_each_entry_safe(cur, tmp, &syncobj->cb_list, node)
 		syncobj_wait_syncobj_func(syncobj, cur);
 	spin_unlock(&syncobj->lock);
-
-	/* Walk the chain once to trigger garbage collection */
-	dma_fence_chain_for_each(fence, prev);
 	dma_fence_put(prev);
 }
 EXPORT_SYMBOL(drm_syncobj_add_point);
