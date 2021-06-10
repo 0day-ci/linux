@@ -103,9 +103,9 @@ void intel_guc_ct_init_early(struct intel_guc_ct *ct)
 static inline const char *guc_ct_buffer_type_to_str(u32 type)
 {
 	switch (type) {
-	case INTEL_GUC_CT_BUFFER_TYPE_SEND:
+	case GUC_CTB_TYPE_HOST2GUC:
 		return "SEND";
-	case INTEL_GUC_CT_BUFFER_TYPE_RECV:
+	case GUC_CTB_TYPE_GUC2HOST:
 		return "RECV";
 	default:
 		return "<invalid>";
@@ -136,25 +136,33 @@ static void guc_ct_buffer_init(struct intel_guc_ct_buffer *ctb,
 	guc_ct_buffer_reset(ctb);
 }
 
-static int guc_action_register_ct_buffer(struct intel_guc *guc,
-					 u32 desc_addr,
-					 u32 type)
+static int guc_action_register_ct_buffer(struct intel_guc *guc, u32 type,
+					 u32 desc_addr, u32 buff_addr, u32 size)
 {
-	u32 action[] = {
-		INTEL_GUC_ACTION_REGISTER_COMMAND_TRANSPORT_BUFFER,
-		desc_addr,
-		sizeof(struct guc_ct_buffer_desc),
-		type
+	u32 request[HOST2GUC_REGISTER_CTB_REQUEST_MSG_LEN] = {
+		FIELD_PREP(GUC_HXG_MSG_0_ORIGIN, GUC_HXG_ORIGIN_HOST) |
+		FIELD_PREP(GUC_HXG_MSG_0_TYPE, GUC_HXG_TYPE_REQUEST) |
+		FIELD_PREP(GUC_HXG_REQUEST_MSG_0_ACTION, GUC_ACTION_HOST2GUC_REGISTER_CTB),
+		FIELD_PREP(HOST2GUC_REGISTER_CTB_REQUEST_MSG_1_SIZE, size / SZ_4K - 1) |
+		FIELD_PREP(HOST2GUC_REGISTER_CTB_REQUEST_MSG_1_TYPE, type),
+		FIELD_PREP(HOST2GUC_REGISTER_CTB_REQUEST_MSG_2_DESC_ADDR, desc_addr),
+		FIELD_PREP(HOST2GUC_REGISTER_CTB_REQUEST_MSG_3_BUFF_ADDR, buff_addr),
 	};
 
-	/* Can't use generic send(), CT registration must go over MMIO */
-	return intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+	GEM_BUG_ON(type != GUC_CTB_TYPE_HOST2GUC && type != GUC_CTB_TYPE_GUC2HOST);
+	GEM_BUG_ON(size % SZ_4K);
+
+	/* CT registration must go over MMIO */
+	return intel_guc_send_mmio(guc, request, ARRAY_SIZE(request), NULL, 0);
 }
 
-static int ct_register_buffer(struct intel_guc_ct *ct, u32 desc_addr, u32 type)
+static int ct_register_buffer(struct intel_guc_ct *ct, u32 type,
+			      u32 desc_addr, u32 buff_addr, u32 size)
 {
-	int err = guc_action_register_ct_buffer(ct_to_guc(ct), desc_addr, type);
+	int err;
 
+	err = guc_action_register_ct_buffer(ct_to_guc(ct), type,
+					    desc_addr, buff_addr, size);
 	if (unlikely(err))
 		CT_ERROR(ct, "Failed to register %s buffer (err=%d)\n",
 			 guc_ct_buffer_type_to_str(type), err);
@@ -163,14 +171,17 @@ static int ct_register_buffer(struct intel_guc_ct *ct, u32 desc_addr, u32 type)
 
 static int guc_action_deregister_ct_buffer(struct intel_guc *guc, u32 type)
 {
-	u32 action[] = {
-		INTEL_GUC_ACTION_DEREGISTER_COMMAND_TRANSPORT_BUFFER,
-		CTB_OWNER_HOST,
-		type
+	u32 request[HOST2GUC_DEREGISTER_CTB_REQUEST_MSG_LEN] = {
+		FIELD_PREP(GUC_HXG_MSG_0_ORIGIN, GUC_HXG_ORIGIN_HOST) |
+		FIELD_PREP(GUC_HXG_MSG_0_TYPE, GUC_HXG_TYPE_REQUEST) |
+		FIELD_PREP(GUC_HXG_REQUEST_MSG_0_ACTION, GUC_ACTION_HOST2GUC_DEREGISTER_CTB),
+		FIELD_PREP(HOST2GUC_DEREGISTER_CTB_REQUEST_MSG_1_TYPE, type),
 	};
 
-	/* Can't use generic send(), CT deregistration must go over MMIO */
-	return intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+	GEM_BUG_ON(type != GUC_CTB_TYPE_HOST2GUC && type != GUC_CTB_TYPE_GUC2HOST);
+
+	/* CT deregistration must go over MMIO */
+	return intel_guc_send_mmio(guc, request, ARRAY_SIZE(request), NULL, 0);
 }
 
 static int ct_deregister_buffer(struct intel_guc_ct *ct, u32 type)
@@ -258,7 +269,7 @@ void intel_guc_ct_fini(struct intel_guc_ct *ct)
 int intel_guc_ct_enable(struct intel_guc_ct *ct)
 {
 	struct intel_guc *guc = ct_to_guc(ct);
-	u32 base, cmds;
+	u32 base, desc, cmds;
 	void *blob;
 	int err;
 
@@ -274,23 +285,26 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 	GEM_BUG_ON(blob != ct->ctbs.send.desc);
 
 	/* (re)initialize descriptors */
-	cmds = base + ptrdiff(ct->ctbs.send.cmds, blob);
 	guc_ct_buffer_reset(&ct->ctbs.send);
-
-	cmds = base + ptrdiff(ct->ctbs.recv.cmds, blob);
 	guc_ct_buffer_reset(&ct->ctbs.recv);
 
 	/*
 	 * Register both CT buffers starting with RECV buffer.
 	 * Descriptors are in first half of the blob.
 	 */
-	err = ct_register_buffer(ct, base + ptrdiff(ct->ctbs.recv.desc, blob),
-				 INTEL_GUC_CT_BUFFER_TYPE_RECV);
+	desc = base + ptrdiff(ct->ctbs.recv.desc, blob);
+	cmds = base + ptrdiff(ct->ctbs.recv.cmds, blob);
+	err = ct_register_buffer(ct, GUC_CTB_TYPE_GUC2HOST,
+				 desc, cmds, ct->ctbs.recv.size * 4);
+
 	if (unlikely(err))
 		goto err_out;
 
-	err = ct_register_buffer(ct, base + ptrdiff(ct->ctbs.send.desc, blob),
-				 INTEL_GUC_CT_BUFFER_TYPE_SEND);
+	desc = base + ptrdiff(ct->ctbs.send.desc, blob);
+	cmds = base + ptrdiff(ct->ctbs.send.cmds, blob);
+	err = ct_register_buffer(ct, GUC_CTB_TYPE_HOST2GUC,
+				 desc, cmds, ct->ctbs.send.size * 4);
+
 	if (unlikely(err))
 		goto err_deregister;
 
@@ -299,7 +313,7 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 	return 0;
 
 err_deregister:
-	ct_deregister_buffer(ct, INTEL_GUC_CT_BUFFER_TYPE_RECV);
+	ct_deregister_buffer(ct, GUC_CTB_TYPE_GUC2HOST);
 err_out:
 	CT_PROBE_ERROR(ct, "Failed to enable CTB (%pe)\n", ERR_PTR(err));
 	return err;
@@ -318,8 +332,8 @@ void intel_guc_ct_disable(struct intel_guc_ct *ct)
 	ct->enabled = false;
 
 	if (intel_guc_is_fw_running(guc)) {
-		ct_deregister_buffer(ct, INTEL_GUC_CT_BUFFER_TYPE_SEND);
-		ct_deregister_buffer(ct, INTEL_GUC_CT_BUFFER_TYPE_RECV);
+		ct_deregister_buffer(ct, GUC_CTB_TYPE_HOST2GUC);
+		ct_deregister_buffer(ct, GUC_CTB_TYPE_GUC2HOST);
 	}
 }
 
