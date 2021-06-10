@@ -135,6 +135,16 @@ struct send_queue {
 	struct virtnet_sq_stats stats;
 
 	struct napi_struct napi;
+
+	struct {
+		struct xsk_buff_pool __rcu *pool;
+
+		/* xsk wait for tx inter or softirq */
+		bool need_wakeup;
+
+		/* ctx used to record the page added to vq */
+		struct virtnet_xsk_ctx_head *ctx_head;
+	} xsk;
 };
 
 /* Internal representation of a receive virtqueue */
@@ -188,6 +198,13 @@ static inline void virtqueue_napi_schedule(struct napi_struct *napi,
 	}
 }
 
+#include "xsk.h"
+
+static inline bool is_skb_ptr(void *ptr)
+{
+	return !((unsigned long)ptr & (VIRTIO_XDP_FLAG | VIRTIO_XSK_FLAG));
+}
+
 static inline bool is_xdp_frame(void *ptr)
 {
 	return (unsigned long)ptr & VIRTIO_XDP_FLAG;
@@ -206,25 +223,39 @@ static inline struct xdp_frame *ptr_to_xdp(void *ptr)
 static inline void __free_old_xmit(struct send_queue *sq, bool in_napi,
 				   struct virtnet_sq_stats *stats)
 {
+	unsigned int xsknum = 0;
 	unsigned int len;
 	void *ptr;
 
 	while ((ptr = virtqueue_get_buf(sq->vq, &len)) != NULL) {
-		if (!is_xdp_frame(ptr)) {
+		if (is_skb_ptr(ptr)) {
 			struct sk_buff *skb = ptr;
 
 			pr_debug("Sent skb %p\n", skb);
 
 			stats->bytes += skb->len;
 			napi_consume_skb(skb, in_napi);
-		} else {
+		} else if (is_xdp_frame(ptr)) {
 			struct xdp_frame *frame = ptr_to_xdp(ptr);
 
 			stats->bytes += frame->len;
 			xdp_return_frame(frame);
+		} else {
+			struct virtnet_xsk_ctx_tx *ctx;
+
+			ctx = ptr_to_xsk(ptr);
+
+			/* Maybe this ptr was sent by the last xsk. */
+			if (ctx->ctx.head->active)
+				++xsknum;
+
+			stats->bytes += ctx->len;
+			virtnet_xsk_ctx_tx_put(ctx);
 		}
 		stats->packets++;
 	}
-}
 
+	if (xsknum)
+		virtnet_xsk_complete(sq, xsknum);
+}
 #endif
