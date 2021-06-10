@@ -1781,6 +1781,11 @@ static int uclamp_validate(struct task_struct *p,
 	if (util_min != -1 && util_max != -1 && util_min > util_max)
 		return -EINVAL;
 
+	return 0;
+}
+
+static void uclamp_enable(void)
+{
 	/*
 	 * We have valid uclamp attributes; make sure uclamp is enabled.
 	 *
@@ -1789,8 +1794,32 @@ static int uclamp_validate(struct task_struct *p,
 	 * scheduler locks.
 	 */
 	static_branch_enable(&sched_uclamp_used);
+}
 
-	return 0;
+static bool uclamp_reduce(struct task_struct *p, const struct sched_attr *attr)
+{
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN) {
+		int util_min = p->uclamp_req[UCLAMP_MIN].value;
+
+		if (attr->sched_util_min + 1 > util_min + 1)
+			return false;
+
+		if (rt_task(p) && attr->sched_util_min == -1 &&
+		    util_min < sysctl_sched_uclamp_util_min_rt_default)
+			return false;
+	}
+
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX) {
+		int util_max = p->uclamp_req[UCLAMP_MAX].value;
+
+		if (attr->sched_util_max + 1 > util_max + 1)
+			return false;
+
+		if (attr->sched_util_max == -1 && util_max < uclamp_none(UCLAMP_MAX))
+			return false;
+	}
+
+	return true;
 }
 
 static bool uclamp_reset(const struct sched_attr *attr,
@@ -1930,6 +1959,11 @@ static inline int uclamp_validate(struct task_struct *p,
 				  const struct sched_attr *attr)
 {
 	return -EOPNOTSUPP;
+}
+static inline void uclamp_enable(void) { }
+static bool uclamp_reduce(struct task_struct *p, const struct sched_attr *attr)
+{
+	return true;
 }
 static void __setscheduler_uclamp(struct task_struct *p,
 				  const struct sched_attr *attr) { }
@@ -6913,6 +6947,13 @@ recheck:
 	    (rt_policy(policy) != (attr->sched_priority != 0)))
 		return -EINVAL;
 
+	/* Update task specific "requested" clamps */
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP) {
+		retval = uclamp_validate(p, attr);
+		if (retval)
+			return retval;
+	}
+
 	/*
 	 * Allow unprivileged RT tasks to decrease priority:
 	 */
@@ -6962,6 +7003,10 @@ recheck:
 		/* Normal users shall not reset the sched_reset_on_fork flag: */
 		if (p->sched_reset_on_fork && !reset_on_fork)
 			return -EPERM;
+
+		/* Can't increase util-clamps */
+		if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP && !uclamp_reduce(p, attr))
+			return -EPERM;
 	}
 
 	if (user) {
@@ -6973,12 +7018,8 @@ recheck:
 			return retval;
 	}
 
-	/* Update task specific "requested" clamps */
-	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP) {
-		retval = uclamp_validate(p, attr);
-		if (retval)
-			return retval;
-	}
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP)
+		uclamp_enable();
 
 	if (pi)
 		cpuset_read_lock();
