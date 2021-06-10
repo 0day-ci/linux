@@ -556,12 +556,11 @@ EXPORT_SYMBOL_GPL(cxgbi_sock_free_cpl_skbs);
 
 static struct cxgbi_sock *cxgbi_sock_create(struct cxgbi_device *cdev)
 {
-	struct cxgbi_sock *csk = kzalloc(sizeof(*csk), GFP_NOIO);
+	struct cxgbi_sock *csk;
 
-	if (!csk) {
-		pr_info("alloc csk %zu failed.\n", sizeof(*csk));
+	csk = kzalloc(sizeof(*csk), GFP_NOIO);
+	if (!csk)
 		return NULL;
-	}
 
 	if (cdev->csk_alloc_cpls(csk) < 0) {
 		pr_info("csk 0x%p, alloc cpls failed.\n", csk);
