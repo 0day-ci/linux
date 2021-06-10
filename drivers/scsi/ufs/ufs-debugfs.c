@@ -52,25 +52,6 @@ static int ee_usr_mask_get(void *data, u64 *val)
 	return 0;
 }
 
-static int ufs_debugfs_get_user_access(struct ufs_hba *hba)
-__acquires(&hba->host_sem)
-{
-	down(&hba->host_sem);
-	if (!ufshcd_is_user_access_allowed(hba)) {
-		up(&hba->host_sem);
-		return -EBUSY;
-	}
-	ufshcd_rpm_get_sync(hba);
-	return 0;
-}
-
-static void ufs_debugfs_put_user_access(struct ufs_hba *hba)
-__releases(&hba->host_sem)
-{
-	ufshcd_rpm_put_sync(hba);
-	up(&hba->host_sem);
-}
-
 static int ee_usr_mask_set(void *data, u64 val)
 {
 	struct ufs_hba *hba = data;
@@ -78,11 +59,11 @@ static int ee_usr_mask_set(void *data, u64 val)
 
 	if (val & ~(u64)MASK_EE_STATUS)
 		return -EINVAL;
-	err = ufs_debugfs_get_user_access(hba);
+	err = ufshcd_get_user_access(hba);
 	if (err)
 		return err;
 	err = ufshcd_update_ee_usr_mask(hba, val, MASK_EE_STATUS);
-	ufs_debugfs_put_user_access(hba);
+	ufshcd_put_user_access(hba);
 	return err;
 }
 
@@ -120,10 +101,10 @@ static void ufs_debugfs_restart_ee(struct work_struct *work)
 	struct ufs_hba *hba = container_of(work, struct ufs_hba, debugfs_ee_work.work);
 
 	if (!hba->ee_usr_mask || pm_runtime_suspended(hba->dev) ||
-	    ufs_debugfs_get_user_access(hba))
+	    ufshcd_get_user_access(hba))
 		return;
 	ufshcd_write_ee_control(hba);
-	ufs_debugfs_put_user_access(hba);
+	ufshcd_put_user_access(hba);
 }
 
 void ufs_debugfs_hba_init(struct ufs_hba *hba)
