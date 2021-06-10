@@ -268,7 +268,8 @@ int __acpi_device_uevent_modalias(struct acpi_device *adev,
 
 /**
  * acpi_device_uevent_modalias - uevent modalias for ACPI-enumerated devices.
- *
+ * @dev: Struct device.
+ * @env: Uevent kobject.
  * Create the uevent modalias field for ACPI-enumerated devices.
  *
  * Because other buses do not support ACPI HIDs & CIDs, e.g. for a device with
@@ -313,7 +314,9 @@ static int __acpi_device_modalias(struct acpi_device *adev, char *buf, int size)
 
 /**
  * acpi_device_modalias - modalias sysfs attribute for ACPI-enumerated devices.
- *
+ * @dev: Struct device.
+ * @buf: The buffer.
+ * @size: Size of the buffer.
  * Create the modalias sysfs attribute for ACPI-enumerated devices.
  *
  * Because other buses do not support ACPI HIDs & CIDs, e.g. for a device with
