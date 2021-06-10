@@ -177,6 +177,14 @@ MODULE_PARM_DESC(cache_hints, " user-space cache hints, default is 0.\n"
 			     "\t\t    0 == forbid\n"
 			     "\t\t    1 == allow");
 
+static unsigned int ro_requests[VIVID_MAX_DEVS] = {
+	[0 ... (VIVID_MAX_DEVS - 1)] = 0
+};
+module_param_array(ro_requests, uint, NULL, 0444);
+MODULE_PARM_DESC(ro_requests, " use read-only requests for video capture instead of regular requests, default is 0.\n"
+			     "\t\t    0 == regular requests\n"
+			     "\t\t    1 == read-only requests");
+
 static struct vivid_dev *vivid_devs[VIVID_MAX_DEVS];
 
 const struct v4l2_rect vivid_min_rect = {
@@ -887,6 +895,8 @@ static int vivid_create_queue(struct vivid_dev *dev,
 	q->lock = &dev->mutex;
 	q->dev = dev->v4l2_dev.dev;
 	q->supports_requests = true;
+	if (V4L2_TYPE_IS_CAPTURE(buf_type))
+		q->supports_ro_requests = (ro_requests[dev->inst] == 1);
 	q->allow_cache_hints = (cache_hints[dev->inst] == 1);
 
 	return vb2_queue_init(q);

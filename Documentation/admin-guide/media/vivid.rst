@@ -302,6 +302,16 @@ all configurable using the following module options:
 		- 0: forbid hints
 		- 1: allow hints
 
+- ro_requests:
+
+	specifies if the capture device supports the standard Request API (i.e.
+	userspace can set controls in a request before queueing it), or
+	the Read-Only Request API (userspace can only read back controls after
+	the request was completed). Default is 0.
+
+		- 0: regular requests
+		- 1: read-only requests
+
 Taken together, all these module options allow you to precisely customize
 the driver behavior and test your application with all sorts of permutations.
 It is also very suitable to emulate hardware that is not yet available, e.g.
