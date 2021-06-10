@@ -9,7 +9,52 @@
 
 #include <linux/dma-fence-chain.h>
 
+static struct dma_fence_chain __rcu *fifo_front;
+static struct dma_fence_chain __rcu **fifo_back = &fifo_front;
+
 static bool dma_fence_chain_enable_signaling(struct dma_fence *fence);
+
+/**
+ * dma_fence_chain_enqueue - enqeue a chain node for garbage collection
+ * @chain: the chain node to enqueue
+ *
+ * Add the chain node to the end of the gc fifo.
+ */
+static void dma_fence_chain_enqueue(struct dma_fence_chain *chain)
+{
+	struct dma_fence_chain __rcu **tmp;
+
+	RCU_INIT_POINTER(chain->next, NULL);
+	tmp = xchg((struct dma_fence_chain __force ***)&fifo_back,
+		   &chain->next);
+
+	/* This is intentionally unordered since we only need the fifo for gc */
+	rcu_assign_pointer(*tmp, chain);
+}
+
+/**
+ * dma_fence_chain_dequeue - deqeueue a chain node for garbage collection
+ *
+ * Remove the first chain node from the gc fifo while making sure that always
+ * keep at least one node on the fifo for lockless fifo implementation.
+ * Returns the dequeued chain node or NULL.
+ */
+static struct dma_fence_chain *dma_fence_chain_dequeue(void)
+{
+	struct dma_fence_chain *chain, *tmp;
+
+	rcu_read_lock();
+	chain = rcu_dereference(fifo_front);
+	/* Never dequeue the last chain node for lockless fifo */
+	if (unlikely(!chain || !rcu_access_pointer(chain->next))) {
+		rcu_read_unlock();
+		return NULL;
+	}
+	tmp = cmpxchg((struct dma_fence_chain __force **)&fifo_front,
+		      chain, rcu_access_pointer(chain->next));
+	rcu_read_unlock();
+	return tmp == chain ? chain : NULL;
+}
 
 /**
  * dma_fence_chain_get_prev - use RCU to get a reference to the previous fence
@@ -29,6 +74,43 @@ static struct dma_fence *dma_fence_chain_get_prev(struct dma_fence_chain *chain)
 }
 
 /**
+ * dma_fence_chain_try_replace - try to replace the prev node
+ * @chain: Chain node we try to replace prev.
+ * @prev: the old prev node
+ *
+ * Try to replace the previous chain node when it or its containing fence is
+ * signaled. Returns true if we tried, false if we need to wait.
+ */
+static bool dma_fence_chain_try_replace(struct dma_fence_chain *chain,
+					struct dma_fence *prev)
+{
+	struct dma_fence *replacement, *tmp;
+	struct dma_fence_chain *prev_chain;
+
+	prev_chain = to_dma_fence_chain(prev);
+	if (prev_chain) {
+		if (!dma_fence_is_signaled(prev_chain->fence))
+			return false;
+
+		replacement = dma_fence_chain_get_prev(prev_chain);
+	} else {
+		if (!dma_fence_is_signaled(prev))
+			return false;
+
+		replacement = NULL;
+	}
+
+	tmp = cmpxchg((struct dma_fence __force **)&chain->prev, prev,
+		      replacement);
+	if (tmp == prev)
+		dma_fence_put(tmp);
+	else
+		dma_fence_put(replacement);
+
+	return true;
+}
+
+/**
  * dma_fence_chain_walk - chain walking function
  * @fence: current chain node
  *
@@ -38,8 +120,8 @@ static struct dma_fence *dma_fence_chain_get_prev(struct dma_fence_chain *chain)
  */
 struct dma_fence *dma_fence_chain_walk(struct dma_fence *fence)
 {
-	struct dma_fence_chain *chain, *prev_chain;
-	struct dma_fence *prev, *replacement, *tmp;
+	struct dma_fence_chain *chain;
+	struct dma_fence *prev;
 
 	chain = to_dma_fence_chain(fence);
 	if (!chain) {
@@ -48,26 +130,8 @@ struct dma_fence *dma_fence_chain_walk(struct dma_fence *fence)
 	}
 
 	while ((prev = dma_fence_chain_get_prev(chain))) {
-
-		prev_chain = to_dma_fence_chain(prev);
-		if (prev_chain) {
-			if (!dma_fence_is_signaled(prev_chain->fence))
-				break;
-
-			replacement = dma_fence_chain_get_prev(prev_chain);
-		} else {
-			if (!dma_fence_is_signaled(prev))
-				break;
-
-			replacement = NULL;
-		}
-
-		tmp = cmpxchg((struct dma_fence __force **)&chain->prev,
-			      prev, replacement);
-		if (tmp == prev)
-			dma_fence_put(tmp);
-		else
-			dma_fence_put(replacement);
+		if (!dma_fence_chain_try_replace(chain, prev))
+			break;
 		dma_fence_put(prev);
 	}
 
@@ -205,7 +269,21 @@ static void dma_fence_chain_release(struct dma_fence *fence)
 	dma_fence_put(prev);
 
 	dma_fence_put(chain->fence);
-	dma_fence_free(fence);
+	WRITE_ONCE(chain->fence, NULL);
+
+	/*
+	 * Don't garbage collect here to avoid recursion and potential stack
+	 * overflow.
+	 */
+	chain = dma_fence_chain_dequeue();
+	if (!chain)
+		return;
+
+	if (kref_read(&chain->base.refcount) ||
+	    READ_ONCE(chain->fence))
+		dma_fence_chain_enqueue(chain);
+	else
+		dma_fence_free(&chain->base);
 }
 
 const struct dma_fence_ops dma_fence_chain_ops = {
@@ -217,6 +295,40 @@ const struct dma_fence_ops dma_fence_chain_ops = {
 	.release = dma_fence_chain_release,
 };
 EXPORT_SYMBOL(dma_fence_chain_ops);
+
+/**
+ * dma_fence_chain_garbage_collect - cleanup chain nodes
+ *
+ * Do some garbage collection and try to release chain nodes.
+ */
+void dma_fence_chain_garbage_collect(void)
+{
+	struct dma_fence_chain *chain = dma_fence_chain_dequeue();
+
+	if (!chain)
+		return;
+
+	if (!dma_fence_get_rcu(&chain->base)) {
+		/* Unused, check if it's also clean */
+		if (likely(!READ_ONCE(chain->fence))) {
+			dma_fence_free(&chain->base);
+			return;
+		}
+
+	} else {
+		struct dma_fence *prev;
+
+		/* Used, do some chain walk */
+		prev = dma_fence_chain_get_prev(chain);
+		if (prev) {
+			dma_fence_chain_try_replace(chain, prev);
+			dma_fence_put(prev);
+		}
+		dma_fence_put(&chain->base);
+	}
+	dma_fence_chain_enqueue(chain);
+}
+EXPORT_SYMBOL(dma_fence_chain_garbage_collect);
 
 /**
  * dma_fence_chain_init - initialize a fence chain
@@ -254,5 +366,7 @@ void dma_fence_chain_init(struct dma_fence_chain *chain,
 
 	dma_fence_init(&chain->base, &dma_fence_chain_ops,
 		       &chain->lock, context, seqno);
+	dma_fence_chain_enqueue(chain);
 }
+
 EXPORT_SYMBOL(dma_fence_chain_init);

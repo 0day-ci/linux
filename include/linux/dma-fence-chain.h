@@ -19,6 +19,7 @@
  * @base: fence base class
  * @lock: spinlock for fence handling
  * @prev: previous fence of the chain
+ * @next: next chain node for garbage collection
  * @prev_seqno: original previous seqno before garbage collection
  * @fence: encapsulated fence
  * @cb: callback structure for signaling
@@ -27,6 +28,7 @@
 struct dma_fence_chain {
 	struct dma_fence base;
 	struct dma_fence __rcu *prev;
+	struct dma_fence_chain __rcu *next;
 	u64 prev_seqno;
 	struct dma_fence *fence;
 	union {
@@ -37,6 +39,8 @@ struct dma_fence_chain {
 };
 
 extern const struct dma_fence_ops dma_fence_chain_ops;
+
+void dma_fence_chain_garbage_collect(void);
 
 /**
  * to_dma_fence_chain - cast a fence to a dma_fence_chain
@@ -61,6 +65,7 @@ to_dma_fence_chain(struct dma_fence *fence)
  */
 static inline struct dma_fence_chain *dma_fence_chain_alloc(void)
 {
+	dma_fence_chain_garbage_collect();
 	return kmalloc(sizeof(struct dma_fence_chain), GFP_KERNEL);
 };
 
