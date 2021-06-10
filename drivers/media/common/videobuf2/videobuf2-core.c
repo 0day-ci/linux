@@ -2331,6 +2331,9 @@ int vb2_core_queue_init(struct vb2_queue *q)
 	if (WARN_ON(q->requires_requests && !q->supports_requests))
 		return -EINVAL;
 
+	if (WARN_ON(q->supports_ro_requests && !q->supports_requests))
+		return -EINVAL;
+
 	INIT_LIST_HEAD(&q->queued_list);
 	INIT_LIST_HEAD(&q->done_list);
 	spin_lock_init(&q->done_lock);

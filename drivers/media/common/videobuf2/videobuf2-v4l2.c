@@ -712,7 +712,9 @@ static void fill_buf_caps(struct vb2_queue *q, u32 *caps)
 	if (q->allow_cache_hints && q->io_modes & VB2_MMAP)
 		*caps |= V4L2_BUF_CAP_SUPPORTS_MMAP_CACHE_HINTS;
 #ifdef CONFIG_MEDIA_CONTROLLER_REQUEST_API
-	if (q->supports_requests)
+	if (q->supports_ro_requests)
+		*caps |= V4L2_BUF_CAP_SUPPORTS_RO_REQUESTS;
+	else if (q->supports_requests)
 		*caps |= V4L2_BUF_CAP_SUPPORTS_REQUESTS;
 #endif
 }

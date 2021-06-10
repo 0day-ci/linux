@@ -753,7 +753,8 @@ int v4l2_m2m_qbuf(struct file *file, struct v4l2_m2m_ctx *m2m_ctx,
 
 	vq = v4l2_m2m_get_vq(m2m_ctx, buf->type);
 	if (V4L2_TYPE_IS_CAPTURE(vq->type) &&
-	    (buf->flags & V4L2_BUF_FLAG_REQUEST_FD)) {
+	    (buf->flags & V4L2_BUF_FLAG_REQUEST_FD) &&
+	    !vq->supports_ro_requests) {
 		dprintk("%s: requests cannot be used with capture buffers\n",
 			__func__);
 		return -EPERM;

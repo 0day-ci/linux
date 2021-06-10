@@ -578,6 +578,7 @@ struct vb2_queue {
 	unsigned int			allow_zero_bytesused:1;
 	unsigned int		   quirk_poll_must_check_waiting_for_buffers:1;
 	unsigned int			supports_requests:1;
+	unsigned int			supports_ro_requests:1;
 	unsigned int			requires_requests:1;
 	unsigned int			uses_qbuf:1;
 	unsigned int			uses_requests:1;
