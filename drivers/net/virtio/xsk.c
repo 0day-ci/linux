@@ -547,6 +547,7 @@ int virtnet_xsk_wakeup(struct net_device *dev, u32 qid, u32 flag)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
 	struct xsk_buff_pool *pool;
+	struct netdev_queue *txq;
 	struct send_queue *sq;
 
 	if (!netif_running(dev))
@@ -559,11 +560,28 @@ int virtnet_xsk_wakeup(struct net_device *dev, u32 qid, u32 flag)
 
 	rcu_read_lock();
 	pool = rcu_dereference(sq->xsk.pool);
-	if (pool) {
-		local_bh_disable();
-		virtqueue_napi_schedule(&sq->napi, sq->vq);
-		local_bh_enable();
-	}
+	if (!pool)
+		goto end;
+
+	if (napi_if_scheduled_mark_missed(&sq->napi))
+		goto end;
+
+	txq = netdev_get_tx_queue(dev, qid);
+
+	__netif_tx_lock_bh(txq);
+
+	/* Send part of the packet directly to reduce the delay in sending the
+	 * packet, and this can actively trigger the tx interrupts.
+	 *
+	 * If no packet is sent out, the ring of the device is full. In this
+	 * case, we will still get a tx interrupt response. Then we will deal
+	 * with the subsequent packet sending work.
+	 */
+	virtnet_xsk_run(sq, pool, sq->napi.weight, false);
+
+	__netif_tx_unlock_bh(txq);
+
+end:
 	rcu_read_unlock();
 	return 0;
 }
