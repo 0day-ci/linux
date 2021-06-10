@@ -117,12 +117,25 @@ static const struct file_operations pstore_knob_fops = {
 
 static struct dentry *pstore_ftrace_dir;
 
+static unsigned int record_ftrace_init;
+module_param(record_ftrace_init, uint, 0400);
+
 void pstore_register_ftrace(void)
 {
+	int ret;
+
 	if (!psinfo->write)
 		return;
 
 	pstore_ftrace_dir = debugfs_create_dir("pstore", NULL);
+
+	if (record_ftrace_init) {
+		ret = register_ftrace_function(&pstore_ftrace_ops);
+		if (ret)
+			return;
+
+		pstore_ftrace_enabled = 1;
+	}
 
 	debugfs_create_file("record_ftrace", 0600, pstore_ftrace_dir, NULL,
 			    &pstore_knob_fops);
