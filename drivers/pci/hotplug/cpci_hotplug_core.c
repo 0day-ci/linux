@@ -47,7 +47,7 @@ static atomic_t extracting;
 int cpci_debug;
 static struct cpci_hp_controller *controller;
 static struct task_struct *cpci_thread;
-static int thread_finished;
+static int thread_finished = 1;
 
 static int enable_slot(struct hotplug_slot *slot);
 static int disable_slot(struct hotplug_slot *slot);
