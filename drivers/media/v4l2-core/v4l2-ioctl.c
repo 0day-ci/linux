@@ -3073,7 +3073,7 @@ static int check_array_args(unsigned int cmd, void *parg, size_t *array_size,
 static unsigned int video_translate_cmd(unsigned int cmd)
 {
 	switch (cmd) {
-#ifdef CONFIG_COMPAT_32BIT_TIME
+#if !defined(CONFIG_64BIT) && defined(CONFIG_COMPAT_32BIT_TIME)
 	case VIDIOC_DQEVENT_TIME32:
 		return VIDIOC_DQEVENT;
 	case VIDIOC_QUERYBUF_TIME32:
@@ -3127,7 +3127,7 @@ static int video_get_user(void __user *arg, void *parg,
 		err = v4l2_compat_get_user(arg, parg, cmd);
 	} else {
 		switch (cmd) {
-#ifdef CONFIG_COMPAT_32BIT_TIME
+#if !defined(CONFIG_64BIT) && defined(CONFIG_COMPAT_32BIT_TIME)
 		case VIDIOC_QUERYBUF_TIME32:
 		case VIDIOC_QBUF_TIME32:
 		case VIDIOC_DQBUF_TIME32:
@@ -3182,7 +3182,7 @@ static int video_put_user(void __user *arg, void *parg,
 		return v4l2_compat_put_user(arg, parg, cmd);
 
 	switch (cmd) {
-#ifdef CONFIG_COMPAT_32BIT_TIME
+#if !defined(CONFIG_64BIT) && defined(CONFIG_COMPAT_32BIT_TIME)
 	case VIDIOC_DQEVENT_TIME32: {
 		struct v4l2_event *ev = parg;
 		struct v4l2_event_time32 ev32;
