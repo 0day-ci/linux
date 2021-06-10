@@ -727,10 +727,8 @@ static int zorro_esp_probe(struct zorro_dev *z,
 	pr_info("%s found at address 0x%lx.\n", zdd->name, board);
 
 	zep = kzalloc(sizeof(*zep), GFP_KERNEL);
-	if (!zep) {
-		pr_err("Can't allocate device private data!\n");
+	if (!zep)
 		return -ENOMEM;
-	}
 
 	/* let's figure out whether we have a Zorro II or Zorro III board */
 	if ((z->rom.er_Type & ERT_TYPEMASK) == ERT_ZORROIII) {
