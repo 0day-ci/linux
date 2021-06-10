@@ -407,13 +407,14 @@ int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len,
 	/*
 	 * No GuC command should ever take longer than 10ms.
 	 * Fast commands should still complete in 10us.
+	 * Except for the hwconfig table query, which takes ~50ms.
 	 */
 	ret = __intel_wait_for_register_fw(uncore,
 					   guc_send_reg(guc, 0),
 					   INTEL_GUC_MSG_TYPE_MASK,
 					   INTEL_GUC_MSG_TYPE_RESPONSE <<
 					   INTEL_GUC_MSG_TYPE_SHIFT,
-					   10, 10, &status);
+					   10, 100, &status);
 	/* If GuC explicitly returned an error, convert it to -EIO */
 	if (!ret && !INTEL_GUC_MSG_IS_RESPONSE_SUCCESS(status))
 		ret = -EIO;
