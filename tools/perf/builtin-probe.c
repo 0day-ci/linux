@@ -352,8 +352,11 @@ static int perf_add_probe_events(struct perf_probe_event *pevs, int npevs)
 	}
 
 	ret = apply_perf_probe_events(pevs, npevs);
-	if (ret < 0)
+	if (ret < 0) {
+		pr_info("Hint: Check dmesg to understand reason for probe failure.\n"
+			"      Consider probing at the next/previous instruction.\n");
 		goto out_cleanup;
+	}
 
 	for (i = k = 0; i < npevs; i++)
 		k += pevs[i].ntevs;
