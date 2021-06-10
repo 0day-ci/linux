@@ -463,6 +463,33 @@ KMS Properties
 This section of the documentation is primarily aimed at user-space developers.
 For the driver APIs, see the other sections.
 
+Requirements
+------------
+
+KMS drivers might need to add extra properties to support new features.
+Each new property introduced in a driver need to meet a few
+requirements, in addition to the one mentioned above.:
+
+- Before the introduction of any vendor-specific properties, they must
+  be first checked against the generic ones to avoid any conflict or
+  redundancy.
+
+- Vendor-specific properties must be prefixed by the vendor's name,
+  following the syntax "$vendor:$property".
+
+- Generic properties must be standardized, with some documentation to
+  describe how the property can be used.
+
+- Generic properties must provide a generic helper in the core code to
+  register that property on the object it attaches to.
+
+- Generic properties content must be decoded by the core and provided in
+  the object's associated state structure. That includes anything
+  drivers might want to precompute, like :c:type:`struct drm_clip_rect
+  <drm_clip_rect>` for planes.
+
+- An IGT test should be submitted.
+
 Property Types and Blob Property Support
 ----------------------------------------
 
