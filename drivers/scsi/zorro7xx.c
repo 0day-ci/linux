@@ -96,10 +96,8 @@ static int zorro7xx_init_one(struct zorro_dev *z,
 	}
 
 	hostdata = kzalloc(sizeof(struct NCR_700_Host_Parameters), GFP_KERNEL);
-	if (!hostdata) {
-		printk(KERN_ERR "zorro7xx: Failed to allocate host data\n");
+	if (!hostdata)
 		goto out_release;
-	}
 
 	/* Fill in the required pieces of hostdata */
 	if (ioaddr > 0x01000000)
