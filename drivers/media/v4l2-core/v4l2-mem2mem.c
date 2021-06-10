@@ -20,6 +20,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
+#include <media/v4l2-ctrls.h>
 
 MODULE_DESCRIPTION("Mem to mem device framework for videobuf");
 MODULE_AUTHOR("Pawel Osciak, <pawel@osciak.com>");
@@ -1284,10 +1285,14 @@ void v4l2_m2m_request_queue(struct media_request *req)
 		if (vb2_request_object_is_buffer(obj)) {
 			/* Sanity checks */
 			vb = container_of(obj, struct vb2_buffer, req_obj);
-			WARN_ON(!V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type));
-			m2m_ctx_obj = container_of(vb->vb2_queue,
-						   struct v4l2_m2m_ctx,
-						   out_q_ctx.q);
+			if (V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type))
+				m2m_ctx_obj = container_of(vb->vb2_queue,
+							   struct v4l2_m2m_ctx,
+							   out_q_ctx.q);
+			else
+				m2m_ctx_obj = container_of(vb->vb2_queue,
+							   struct v4l2_m2m_ctx,
+							   cap_q_ctx.q);
 			WARN_ON(m2m_ctx && m2m_ctx_obj != m2m_ctx);
 			m2m_ctx = m2m_ctx_obj;
 		}
