@@ -113,8 +113,7 @@ static int tomoyo_bprm_check_security(struct linux_binprm *bprm)
 /**
  * tomoyo_inode_getattr - Target for security_inode_getattr().
  *
- * @mnt:    Pointer to "struct vfsmount".
- * @dentry: Pointer to "struct dentry".
+ * @path:    Pointer to "struct path".
  *
  * Returns 0 on success, negative value otherwise.
  */
@@ -488,7 +487,7 @@ struct lsm_blob_sizes tomoyo_blob_sizes __lsm_ro_after_init = {
  * tomoyo_task_alloc - Target for security_task_alloc().
  *
  * @task:  Pointer to "struct task_struct".
- * @flags: clone() flags.
+ * @clone_flags: clone() flags.
  *
  * Returns 0.
  */
