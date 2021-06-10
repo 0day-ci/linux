@@ -1477,6 +1477,25 @@ unsigned int vb2_request_buffer_cnt(struct media_request *req)
 }
 EXPORT_SYMBOL_GPL(vb2_request_buffer_cnt);
 
+struct vb2_buffer *vb2_request_buffer_first(struct media_request *req)
+{
+	struct media_request_object *obj;
+	struct vb2_buffer *vb = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&req->lock, flags);
+	list_for_each_entry(obj, &req->objects, list) {
+		if (vb2_request_object_is_buffer(obj)) {
+			vb = container_of(obj, struct vb2_buffer, req_obj);
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&req->lock, flags);
+
+	return vb;
+}
+EXPORT_SYMBOL_GPL(vb2_request_buffer_first);
+
 int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
 {
 	struct vb2_buffer *vb;
