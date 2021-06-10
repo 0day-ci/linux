@@ -1184,6 +1184,7 @@ static int dwc3_core_get_phy(struct dwc3 *dwc)
 		ret = PTR_ERR(dwc->usb3_generic_phy);
 		if (ret == -ENOSYS || ret == -ENODEV) {
 			dwc->usb3_generic_phy = NULL;
+			return dev_err_probe(dev, ret, "no usb phy device\n");
 		} else {
 			return dev_err_probe(dev, ret, "no usb3 phy configured\n");
 		}
