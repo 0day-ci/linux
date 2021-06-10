@@ -497,17 +497,6 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 
 	idx = srcu_read_lock(&kvm->srcu);
 
-	/* The on_lock() path does not yet support lock elision. */
-	if (!IS_KVM_NULL_FN(range->on_lock)) {
-		locked = true;
-		KVM_MMU_LOCK(kvm);
-
-		range->on_lock(kvm, range->start, range->end);
-
-		if (IS_KVM_NULL_FN(range->handler))
-			goto out_unlock;
-	}
-
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
 		slots = __kvm_memslots(kvm, i);
 		kvm_for_each_memslot(slot, slots) {
@@ -539,6 +528,10 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 			if (!locked) {
 				locked = true;
 				KVM_MMU_LOCK(kvm);
+				if (!IS_KVM_NULL_FN(range->on_lock))
+					range->on_lock(kvm, range->start, range->end);
+				if (IS_KVM_NULL_FN(range->handler))
+					break;
 			}
 			ret |= range->handler(kvm, &gfn_range);
 		}
@@ -547,7 +540,6 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 	if (range->flush_on_ret && (ret || kvm->tlbs_dirty))
 		kvm_flush_remote_tlbs(kvm);
 
-out_unlock:
 	if (locked)
 		KVM_MMU_UNLOCK(kvm);
 
@@ -1359,7 +1351,8 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 
 	/*
 	 * Do not store the new memslots while there are invalidations in
-	 * progress (preparatory change for the next commit).
+	 * progress, otherwise the locking in invalidate_range_start and
+	 * invalidate_range_end will be unbalanced.
 	 */
 	spin_lock(&kvm->mn_invalidate_lock);
 	prepare_to_rcuwait(&kvm->mn_memslots_update_rcuwait);
