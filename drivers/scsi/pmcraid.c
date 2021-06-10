@@ -3601,11 +3601,8 @@ static long pmcraid_ioctl_passthrough(
 
 	buffer_size = sizeof(struct pmcraid_passthrough_ioctl_buffer);
 	buffer = kmalloc(buffer_size, GFP_KERNEL);
-
-	if (!buffer) {
-		pmcraid_err("no memory for passthrough buffer\n");
+	if (!buffer)
 		return -ENOMEM;
-	}
 
 	request_offset =
 	    offsetof(struct pmcraid_passthrough_ioctl_buffer, request_buffer);
@@ -3903,11 +3900,8 @@ static long pmcraid_chr_ioctl(
 	int retval = -ENOTTY;
 
 	hdr = kmalloc(sizeof(struct pmcraid_ioctl_header), GFP_KERNEL);
-
-	if (!hdr) {
-		pmcraid_err("failed to allocate memory for ioctl header\n");
+	if (!hdr)
 		return -ENOMEM;
-	}
 
 	retval = pmcraid_check_ioctl_buffer(cmd, argp, hdr);
 
