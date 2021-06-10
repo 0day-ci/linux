@@ -1020,6 +1020,12 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 		uart->rs485_stop_tx	= up->rs485_stop_tx;
 		uart->dma		= up->dma;
 
+		/* Override ALPHA_KLUDGE_MCR default.  */
+		if (up->mcr_mask | up->mcr_force) {
+			uart->mcr_mask = up->mcr_mask;
+			uart->mcr_force = up->mcr_force;
+		}
+
 		/* Take tx_loadsz from fifosize if it wasn't set separately */
 		if (uart->port.fifosize && !uart->tx_loadsz)
 			uart->tx_loadsz = uart->port.fifosize;
