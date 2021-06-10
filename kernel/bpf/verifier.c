@@ -22,6 +22,7 @@
 #include <linux/error-injection.h>
 #include <linux/bpf_lsm.h>
 #include <linux/btf_ids.h>
+#include <linux/virtio_net.h>
 
 #include "disasm.h"
 
@@ -3373,7 +3374,7 @@ static int check_ctx_access(struct bpf_verifier_env *env, int insn_idx, int off,
 }
 
 static int check_flow_keys_access(struct bpf_verifier_env *env, int off,
-				  int size)
+				  int size, enum bpf_access_type t)
 {
 	if (size < 0 || off < 0 ||
 	    (u64)off + size > sizeof(struct bpf_flow_keys)) {
@@ -3381,6 +3382,35 @@ static int check_flow_keys_access(struct bpf_verifier_env *env, int off,
 			off, size);
 		return -EACCES;
 	}
+
+	switch (off) {
+	case offsetof(struct bpf_flow_keys, vhdr):
+		if (t == BPF_WRITE) {
+			verbose(env,
+				"invalid write to flow keys off=%d size=%d\n",
+				off, size);
+			return -EACCES;
+		}
+
+		if (size != sizeof(__u64)) {
+			verbose(env,
+				"invalid access to flow keys off=%d size=%d\n",
+				off, size);
+			return -EACCES;
+		}
+
+		break;
+	case offsetof(struct bpf_flow_keys, vhdr_is_little_endian):
+		if (t == BPF_WRITE) {
+			verbose(env,
+				"invalid write to flow keys off=%d size=%d\n",
+				off, size);
+			return -EACCES;
+		}
+
+		break;
+	}
+
 	return 0;
 }
 
@@ -4053,6 +4083,8 @@ static int check_stack_access_within_bounds(
 	return err;
 }
 
+BTF_ID_LIST_SINGLE(bpf_flow_dissector_btf_ids, struct, virtio_net_hdr);
+
 /* check whether memory at (regno + off) is accessible for t = (read | write)
  * if t==write, value_regno is a register which value is stored into memory
  * if t==read, value_regno is a register which will receive the value from memory
@@ -4217,9 +4249,19 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 			return -EACCES;
 		}
 
-		err = check_flow_keys_access(env, off, size);
-		if (!err && t == BPF_READ && value_regno >= 0)
-			mark_reg_unknown(env, regs, value_regno);
+		err = check_flow_keys_access(env, off, size, t);
+		if (!err && t == BPF_READ && value_regno >= 0) {
+			if (off == offsetof(struct bpf_flow_keys, vhdr)) {
+				mark_reg_known_zero(env, regs, value_regno);
+				regs[value_regno].type = PTR_TO_BTF_ID_OR_NULL;
+				regs[value_regno].btf = btf_vmlinux;
+				regs[value_regno].btf_id = bpf_flow_dissector_btf_ids[0];
+				/* required for dropping or_null */
+				regs[value_regno].id = ++env->id_gen;
+			} else {
+				mark_reg_unknown(env, regs, value_regno);
+			}
+		}
 	} else if (type_is_sk_pointer(reg->type)) {
 		if (t == BPF_WRITE) {
 			verbose(env, "R%d cannot write into %s\n",
