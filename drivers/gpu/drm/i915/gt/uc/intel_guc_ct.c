@@ -477,7 +477,9 @@ static int wait_for_ct_request_update(struct ct_request *req, u32 *status)
 	 * up to that length of time, then switch to a slower sleep-wait loop.
 	 * No GuC command should ever take longer than 10ms.
 	 */
-#define done INTEL_GUC_MSG_IS_RESPONSE(READ_ONCE(req->status))
+#define done \
+	(FIELD_GET(GUC_HXG_MSG_0_ORIGIN, READ_ONCE(req->status)) == \
+	 GUC_HXG_ORIGIN_GUC)
 	err = wait_for_us(done, 10);
 	if (err)
 		err = wait_for(done, 10);
@@ -532,21 +534,21 @@ static int ct_send(struct intel_guc_ct *ct,
 	if (unlikely(err))
 		goto unlink;
 
-	if (!INTEL_GUC_MSG_IS_RESPONSE_SUCCESS(*status)) {
+	if (FIELD_GET(GUC_HXG_MSG_0_TYPE, *status) != GUC_HXG_TYPE_RESPONSE_SUCCESS) {
 		err = -EIO;
 		goto unlink;
 	}
 
 	if (response_buf) {
 		/* There shall be no data in the status */
-		WARN_ON(INTEL_GUC_MSG_TO_DATA(request.status));
+		WARN_ON(FIELD_GET(GUC_HXG_RESPONSE_MSG_0_DATA0, request.status));
 		/* Return actual response len */
 		err = request.response_len;
 	} else {
 		/* There shall be no response payload */
 		WARN_ON(request.response_len);
 		/* Return data decoded from the status dword */
-		err = INTEL_GUC_MSG_TO_DATA(*status);
+		err = FIELD_GET(GUC_HXG_RESPONSE_MSG_0_DATA0, *status);
 	}
 
 unlink:
@@ -741,8 +743,8 @@ static int ct_handle_response(struct intel_guc_ct *ct, struct ct_incoming_msg *r
 	status = response->msg[2];
 	datalen = len - 2;
 
-	/* Format of the status follows RESPONSE message */
-	if (unlikely(!INTEL_GUC_MSG_IS_RESPONSE(status))) {
+	/* Format of the status dword follows HXG header */
+	if (unlikely(FIELD_GET(GUC_HXG_MSG_0_ORIGIN, status) != GUC_HXG_ORIGIN_GUC)) {
 		CT_ERROR(ct, "Corrupted response (status %#x)\n", status);
 		return -EPROTO;
 	}
