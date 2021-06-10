@@ -602,7 +602,11 @@ static void device_run(void *priv)
 	src_buf = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
 	dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
 
-	/* Apply request controls if any */
+	/*
+	 * Apply request controls if any.
+	 * The dst_buf queue has read-only requests, so no need to
+	 * setup any controls for that buffer.
+	 */
 	v4l2_ctrl_request_setup(src_buf->vb2_buf.req_obj.req,
 				&ctx->hdl);
 
@@ -610,6 +614,8 @@ static void device_run(void *priv)
 
 	/* Complete request controls if any */
 	v4l2_ctrl_request_complete(src_buf->vb2_buf.req_obj.req,
+				   &ctx->hdl);
+	v4l2_ctrl_request_complete(dst_buf->vb2_buf.req_obj.req,
 				   &ctx->hdl);
 
 	/* Run delayed work, which simulates a hardware irq  */
@@ -1138,6 +1144,8 @@ static int queue_init(void *priv, struct vb2_queue *src_vq,
 	dst_vq->mem_ops = &vb2_vmalloc_memops;
 	dst_vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 	dst_vq->lock = &ctx->vb_mutex;
+	dst_vq->supports_requests = true;
+	dst_vq->supports_ro_requests = true;
 
 	return vb2_queue_init(dst_vq);
 }
