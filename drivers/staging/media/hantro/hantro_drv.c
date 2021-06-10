@@ -28,6 +28,9 @@
 #include "hantro.h"
 #include "hantro_hw.h"
 
+#define CREATE_TRACE_POINTS
+#include "trace.h"
+
 #define DRIVER_NAME "hantro-vpu"
 
 int hantro_debug;

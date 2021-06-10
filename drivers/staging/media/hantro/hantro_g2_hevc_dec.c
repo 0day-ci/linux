@@ -7,6 +7,7 @@
 
 #include "hantro_hw.h"
 #include "hantro_g2_regs.h"
+#include "trace.h"
 
 #define HEVC_DEC_MODE	0xC
 
@@ -20,6 +21,21 @@ static inline void hantro_write_addr(struct hantro_dev *vpu,
 				     dma_addr_t addr)
 {
 	vdpu_write(vpu, addr & 0xffffffff, offset);
+}
+
+void hantro_g2_hevc_dec_done(struct hantro_ctx *ctx)
+{
+	const struct hantro_hevc_dec_ctrls *ctrls = &ctx->hevc_dec.ctrls;
+	const struct v4l2_ctrl_hevc_sps *sps = ctrls->sps;
+	struct hantro_dev *vpu = ctx->dev;
+	u32 hw_cycles = 0;
+	u32 mbs = (sps->pic_width_in_luma_samples *
+		   sps->pic_height_in_luma_samples) >> 8;
+
+	if (mbs)
+		hw_cycles = vdpu_read(vpu, G2_HW_PERFORMANCE) / mbs;
+
+	trace_hantro_hevc_perf(ctx, hw_cycles);
 }
 
 static void prepare_tile_info_buffer(struct hantro_ctx *ctx)
