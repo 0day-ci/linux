@@ -342,10 +342,8 @@ int asd_read_ocm(struct asd_ha_struct *asd_ha)
 		return -1;
 
 	dir = kmalloc(sizeof(*dir), GFP_KERNEL);
-	if (!dir) {
-		asd_printk("no memory for ocm dir\n");
+	if (!dir)
 		return -ENOMEM;
-	}
 
 	err = asd_read_ocm_dir(asd_ha, dir, 0);
 	if (err)
