@@ -481,8 +481,6 @@ int fnic_trace_buf_init(void)
 
 	fnic_trace_buf_p = (unsigned long)vzalloc(trace_max_pages * PAGE_SIZE);
 	if (!fnic_trace_buf_p) {
-		printk(KERN_ERR PFX "Failed to allocate memory "
-				  "for fnic_trace_buf_p\n");
 		err = -ENOMEM;
 		goto err_fnic_trace_buf_init;
 	}
