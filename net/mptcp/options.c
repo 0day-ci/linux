@@ -938,6 +938,8 @@ fully_established:
 	return true;
 
 reset:
+	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq;
+
 	mptcp_subflow_reset(ssk);
 	return false;
 }
