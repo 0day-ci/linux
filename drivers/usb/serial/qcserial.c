@@ -26,12 +26,15 @@ enum qcserial_layouts {
 	QCSERIAL_G1K = 1,	/* Gobi 1000 */
 	QCSERIAL_SWI = 2,	/* Sierra Wireless */
 	QCSERIAL_HWI = 3,	/* Huawei */
+	QCSERIAL_SWI2 = 4,	/* Sierra Wireless */
 };
 
 #define DEVICE_G1K(v, p) \
 	USB_DEVICE(v, p), .driver_info = QCSERIAL_G1K
 #define DEVICE_SWI(v, p) \
 	USB_DEVICE(v, p), .driver_info = QCSERIAL_SWI
+#define DEVICE_SWI2(v, p) \
+	USB_DEVICE(v, p), .driver_info = QCSERIAL_SWI2
 #define DEVICE_HWI(v, p) \
 	USB_DEVICE(v, p), .driver_info = QCSERIAL_HWI
 
@@ -180,6 +183,10 @@ static const struct usb_device_id id_table[] = {
 	{DEVICE_SWI(0x413c, 0x81d0)},   /* Dell Wireless 5819 */
 	{DEVICE_SWI(0x413c, 0x81d1)},   /* Dell Wireless 5818 */
 	{DEVICE_SWI(0x413c, 0x81d2)},   /* Dell Wireless 5818 */
+
+	/* SDX55 based Sierra Wireless devices */
+	{DEVICE_SWI2(0x1199, 0x90d2)},	/* Sierra Wireless EM919x QDL */
+	{DEVICE_SWI2(0x1199, 0x90d3)},	/* Sierra Wireless EM919x */
 
 	/* Huawei devices */
 	{DEVICE_HWI(0x03f0, 0x581d)},	/* HP lt4112 LTE/HSPA+ Gobi 4G Modem (Huawei me906e) */
@@ -352,6 +359,28 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 		case 3:
 			dev_dbg(dev, "Modem port found\n");
 			sendsetup = true;
+			break;
+		default:
+			/* don't claim any unsupported interface */
+			altsetting = -1;
+			break;
+		}
+		break;
+	case QCSERIAL_SWI2:
+		/*
+		 * Sierra Wireless SDX55 in MBIM mode:
+		 * 0/1: MBIM Control/Data
+		 * 3: AT-capable modem port
+		 * 4: DM/DIAG (use libqcdm from ModemManager for communication)
+		 * 5: ADB
+		 */
+		switch (ifnum) {
+		case 3:
+			dev_dbg(dev, "Modem port found\n");
+			sendsetup = true;
+			break;
+		case 4:
+			dev_dbg(dev, "DM/DIAG interface found\n");
 			break;
 		default:
 			/* don't claim any unsupported interface */
