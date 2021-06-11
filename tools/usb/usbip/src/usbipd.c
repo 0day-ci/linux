@@ -532,8 +532,7 @@ static int do_standalone_mode(int daemonize, int ipv4, int ipv6)
 		usbip_driver_close(driver);
 		return -1;
 	}
-	nsockfd = listen_all_addrinfo(ai_head, sockfdlist,
-		sizeof(sockfdlist) / sizeof(*sockfdlist));
+	nsockfd = listen_all_addrinfo(ai_head, sockfdlist, ARRAY_SIZE(sockfdlist));
 	freeaddrinfo(ai_head);
 	if (nsockfd <= 0) {
 		err("failed to open a listening socket");
