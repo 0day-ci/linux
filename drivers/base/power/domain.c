@@ -1933,20 +1933,33 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
 	return 0;
 }
 
-static void genpd_lock_init(struct generic_pm_domain *genpd)
+static int genpd_lock_init(struct generic_pm_domain *genpd)
 {
 	if (genpd->flags & GENPD_FLAG_IRQ_SAFE) {
 		spin_lock_init(&genpd->slock);
 		genpd->lock_ops = &genpd_spin_ops;
 	} else {
-		mutex_init(&genpd->mlock);
+		/* Some genpds are static, some are dynamically allocated. To
+		 * make lockdep happy always allocate the key dynamically and
+		 * register it. */
+		genpd->mlock_key = kzalloc(sizeof(genpd->mlock_key), GFP_KERNEL);
+		if (!genpd->mlock_key)
+			return -ENOMEM;
+
+		lockdep_register_key(genpd->mlock_key);
+
+		__mutex_init(&genpd->mlock, genpd->name, genpd->mlock_key);
 		genpd->lock_ops = &genpd_mtx_ops;
 	}
+
+	return 0;
 }
 
 static void genpd_lock_destroy(struct generic_pm_domain *genpd) {
-	if (!(genpd->flags & GENPD_FLAG_IRQ_SAFE))
+	if (!(genpd->flags & GENPD_FLAG_IRQ_SAFE)) {
 		mutex_destroy(&genpd->mlock);
+		kfree(genpd->mlock_key);
+	}
 }
 
 /**
@@ -1969,7 +1982,10 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 	INIT_LIST_HEAD(&genpd->child_links);
 	INIT_LIST_HEAD(&genpd->dev_list);
 	RAW_INIT_NOTIFIER_HEAD(&genpd->power_notifiers);
-	genpd_lock_init(genpd);
+	ret = genpd_lock_init(genpd);
+	if (ret)
+		return ret;
+
 	genpd->gov = gov;
 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
 	atomic_set(&genpd->sd_count, 0);
@@ -2074,7 +2090,6 @@ static int genpd_remove(struct generic_pm_domain *genpd)
 		free_cpumask_var(genpd->cpus);
 	if (genpd->free_states)
 		genpd->free_states(genpd->states, genpd->state_count);
-	genpd_lock_destroy(genpd);
 
 	pr_debug("%s: removed %s\n", __func__, genpd->name);
 
