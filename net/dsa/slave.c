@@ -1760,6 +1760,10 @@ static int dsa_slave_phy_connect(struct net_device *slave_dev, int addr)
 		return -ENODEV;
 	}
 
+	if (ds->ops->get_phy_flags)
+		slave_dev->phydev->dev_flags |=
+			ds->ops->get_phy_flags(ds, dp->index);
+
 	return phylink_connect_phy(dp->pl, slave_dev->phydev);
 }
 
