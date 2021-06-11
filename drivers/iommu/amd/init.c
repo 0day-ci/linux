@@ -3098,7 +3098,7 @@ static int __init parse_amd_iommu_options(char *str)
 {
 	for (; *str; ++str) {
 		if (strncmp(str, "fullflush", 9) == 0)
-			iommu_set_dma_strict(true);
+			iommu_set_dma_strict();
 		if (strncmp(str, "force_enable", 12) == 0)
 			amd_iommu_force_enable = true;
 		if (strncmp(str, "off", 3) == 0)
