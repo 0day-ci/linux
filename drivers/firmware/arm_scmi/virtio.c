@@ -37,23 +37,24 @@
 /**
  * struct scmi_vio_channel - Transport channel information
  *
- * @lock: Protects access to all members except ready.
- * @ready_lock: Protects access to ready. If required, it must be taken before
- *              lock.
  * @vqueue: Associated virtqueue
  * @cinfo: SCMI Tx or Rx channel
  * @free_list: List of unused scmi_vio_msg, maintained for Tx channels only
  * @is_rx: Whether channel is an Rx channel
  * @ready: Whether transport user is ready to hear about channel
+ * @lock: Protects access to all members except ready.
+ * @ready_lock: Protects access to ready. If required, it must be taken before
+ *              lock.
  */
 struct scmi_vio_channel {
-	spinlock_t lock;
-	spinlock_t ready_lock;
 	struct virtqueue *vqueue;
 	struct scmi_chan_info *cinfo;
 	struct list_head free_list;
-	u8 is_rx;
-	u8 ready;
+	bool is_rx;
+	bool ready;
+	unsigned int max_msg;
+	spinlock_t lock;
+	spinlock_t ready_lock;
 };
 
 /**
@@ -100,6 +101,73 @@ static int scmi_vio_feed_vq_rx(struct scmi_vio_channel *vioch,
 	return rc;
 }
 
+static void scmi_finalize_message(struct scmi_vio_channel *vioch,
+				  struct scmi_vio_msg *msg)
+{
+	unsigned long flags;
+
+	if (vioch->is_rx) {
+		scmi_vio_feed_vq_rx(vioch, msg);
+	} else {
+		spin_lock_irqsave(&vioch->lock, flags);
+		list_add(&msg->list, &vioch->free_list);
+		spin_unlock_irqrestore(&vioch->lock, flags);
+	}
+}
+
+static void scmi_process_vqueue_input(struct scmi_vio_channel *vioch,
+				      struct scmi_vio_msg *msg)
+{
+	u32 msg_hdr;
+	int ret;
+	struct scmi_xfer *xfer = NULL;
+
+	msg_hdr = msg_read_header(msg->input);
+	/*
+	 * Acquire from the core transport layer a currently valid xfer
+	 * descriptor associated to the received msg_hdr: this could be a
+	 * previously allocated xfer for responses and delayed responses to
+	 * in-flight commands, or a freshly allocated new xfer for a just
+	 * received notification.
+	 *
+	 * In case of responses and delayed_responses the acquired xfer, at
+	 * the time scmi_transfer_acquire() succcessfully returns is guaranteed
+	 * to be still associated with a valid (not timed-out nor stale)
+	 * descriptor and proper refcounting is kept in the core along this xfer
+	 * so that should the core time out the xfer concurrently to this receive
+	 * path the xfer will be properly deallocated only once the last user is
+	 * done with it. (and this code path will terminate normally even though
+	 * all the processing related to the timed out xfer will be discarded).
+	 */
+	ret = scmi_transfer_acquire(vioch->cinfo, &msg_hdr, &xfer);
+	if (ret) {
+		dev_err(vioch->cinfo->dev,
+			"Cannot find matching xfer for hdr:0x%X\n", msg_hdr);
+		scmi_finalize_message(vioch, msg);
+		return;
+	}
+
+	dev_dbg(vioch->cinfo->dev,
+		"VQUEUE[%d] - INPUT MSG_RX_LEN:%d - HDR:0x%X  TYPE:%d  XFER_ID:%d  XFER:%px\n",
+		vioch->vqueue->index, msg->rx_len, msg_hdr, xfer->hdr.type,
+		xfer->hdr.seq, xfer);
+
+	msg_fetch_raw_payload(msg->input, msg->rx_len,
+			      scmi_virtio_desc.max_msg_size, xfer);
+
+	/* Drop processed virtio message anyway */
+	scmi_finalize_message(vioch, msg);
+
+	if (vioch->is_rx || !xfer->hdr.poll_completion)
+		scmi_rx_callback(vioch->cinfo, msg_hdr);
+	else
+		dev_warn(vioch->cinfo->dev,
+			 "Polling mode NOT supported. Dropped hdr:0X%X\n",
+			 msg_hdr);
+
+	scmi_transfer_release(vioch->cinfo, xfer);
+}
+
 static void scmi_vio_complete_cb(struct virtqueue *vqueue)
 {
 	unsigned long ready_flags;
@@ -138,15 +206,9 @@ static void scmi_vio_complete_cb(struct virtqueue *vqueue)
 
 		if (msg) {
 			msg->rx_len = length;
-
-			/*
-			 * Hold the ready_lock during the callback to avoid
-			 * races when the arm-scmi driver is unbinding while
-			 * the virtio device is not quiesced yet.
-			 */
-			scmi_rx_callback(vioch->cinfo,
-					 msg_read_header(msg->input), msg);
+			scmi_process_vqueue_input(vioch, msg);
 		}
+
 		spin_unlock_irqrestore(&vioch->ready_lock, ready_flags);
 	}
 
@@ -163,27 +225,11 @@ static vq_callback_t *scmi_vio_complete_callbacks[] = {
 	scmi_vio_complete_cb
 };
 
-static unsigned int virtio_get_max_msg(bool tx,
-				       struct scmi_chan_info *base_cinfo)
+static unsigned int virtio_get_max_msg(struct scmi_chan_info *base_cinfo)
 {
 	struct scmi_vio_channel *vioch = base_cinfo->transport_info;
-	unsigned int ret;
 
-	ret = virtqueue_get_vring_size(vioch->vqueue);
-
-	/* Tx messages need multiple descriptors. */
-	if (tx)
-		ret /= DESCRIPTORS_PER_TX_MSG;
-
-	if (ret > MSG_TOKEN_MAX) {
-		dev_info_once(
-			base_cinfo->dev,
-			"Only %ld messages can be pending simultaneously, while the %s virtqueue could hold %d\n",
-			MSG_TOKEN_MAX, tx ? "tx" : "rx", ret);
-		ret = MSG_TOKEN_MAX;
-	}
-
-	return ret;
+	return vioch->max_msg;
 }
 
 static int scmi_vio_match_any_dev(struct device *dev, const void *data)
@@ -195,13 +241,14 @@ static struct virtio_driver virtio_scmi_driver; /* Forward declaration */
 
 static int virtio_link_supplier(struct device *dev)
 {
-	struct device *vdev = driver_find_device(
-		&virtio_scmi_driver.driver, NULL, NULL, scmi_vio_match_any_dev);
+	struct device *vdev;
+
+	vdev = driver_find_device(&virtio_scmi_driver.driver,
+				  NULL, NULL, scmi_vio_match_any_dev);
 
 	if (!vdev) {
-		dev_notice_once(
-			dev,
-			"Deferring probe after not finding a bound scmi-virtio device\n");
+		dev_notice_once(dev,
+				"Deferring probe after not finding a bound scmi-virtio device\n");
 		return -EPROBE_DEFER;
 	}
 
@@ -245,11 +292,7 @@ static int virtio_chan_setup(struct scmi_chan_info *cinfo, struct device *dev,
 	struct virtio_device *vdev;
 	struct scmi_vio_channel *vioch;
 	int index = tx ? VIRTIO_SCMI_VQ_TX : VIRTIO_SCMI_VQ_RX;
-	int max_msg;
 	int i;
-
-	if (!virtio_chan_available(dev, index))
-		return -ENODEV;
 
 	vdev = scmi_get_transport_info(dev);
 	vioch = &((struct scmi_vio_channel *)vdev->priv)[index];
@@ -259,9 +302,7 @@ static int virtio_chan_setup(struct scmi_chan_info *cinfo, struct device *dev,
 	vioch->cinfo = cinfo;
 	spin_unlock_irqrestore(&vioch->lock, flags);
 
-	max_msg = virtio_get_max_msg(tx, cinfo);
-
-	for (i = 0; i < max_msg; i++) {
+	for (i = 0; i < vioch->max_msg; i++) {
 		struct scmi_vio_msg *msg;
 
 		msg = devm_kzalloc(cinfo->dev, sizeof(*msg), GFP_KERNEL);
@@ -322,13 +363,6 @@ static int virtio_send_message(struct scmi_chan_info *cinfo,
 	int rc;
 	struct scmi_vio_msg *msg;
 
-	/*
-	 * TODO: For now, we don't support polling. But it should not be
-	 * difficult to add support.
-	 */
-	if (xfer->hdr.poll_completion)
-		return -EINVAL;
-
 	spin_lock_irqsave(&vioch->lock, flags);
 
 	if (list_empty(&vioch->free_list)) {
@@ -351,6 +385,11 @@ static int virtio_send_message(struct scmi_chan_info *cinfo,
 			     "%s() failed to add to virtqueue (%d)\n", __func__,
 			     rc);
 	} else {
+		dev_dbg(vioch->cinfo->dev,
+			"VQUEUE[%d] - REQUEST - PROTO:0x%X  ID:0x%X  XFER_ID:%d  XFER:%px  RX_LEN:%zd\n",
+		 vioch->vqueue->index, xfer->hdr.protocol_id,
+		 xfer->hdr.id, xfer->hdr.seq, xfer, xfer->rx.len);
+
 		virtqueue_kick(vioch->vqueue);
 	}
 
@@ -360,36 +399,15 @@ static int virtio_send_message(struct scmi_chan_info *cinfo,
 }
 
 static void virtio_fetch_response(struct scmi_chan_info *cinfo,
-				  struct scmi_xfer *xfer, void *msg_handle)
+				  struct scmi_xfer *xfer)
 {
-	struct scmi_vio_msg *msg = msg_handle;
-	struct scmi_vio_channel *vioch = cinfo->transport_info;
-
-	if (!msg) {
-		dev_dbg_once(&vioch->vqueue->vdev->dev,
-			     "Ignoring %s() call with NULL msg_handle\n",
-			     __func__);
-		return;
-	}
-
-	msg_fetch_response(msg->input, msg->rx_len, xfer);
+	msg_fetch_raw_response(xfer);
 }
 
 static void virtio_fetch_notification(struct scmi_chan_info *cinfo,
-				      size_t max_len, struct scmi_xfer *xfer,
-				      void *msg_handle)
+				      size_t max_len, struct scmi_xfer *xfer)
 {
-	struct scmi_vio_msg *msg = msg_handle;
-	struct scmi_vio_channel *vioch = cinfo->transport_info;
-
-	if (!msg) {
-		dev_dbg_once(&vioch->vqueue->vdev->dev,
-			     "Ignoring %s() call with NULL msg_handle\n",
-			     __func__);
-		return;
-	}
-
-	msg_fetch_notification(msg->input, msg->rx_len, max_len, xfer);
+	msg_fetch_raw_notification(xfer);
 }
 
 static void dummy_clear_channel(struct scmi_chan_info *cinfo)
@@ -400,28 +418,6 @@ static bool dummy_poll_done(struct scmi_chan_info *cinfo,
 			    struct scmi_xfer *xfer)
 {
 	return false;
-}
-
-static void virtio_drop_message(struct scmi_chan_info *cinfo, void *msg_handle)
-{
-	unsigned long flags;
-	struct scmi_vio_channel *vioch = cinfo->transport_info;
-	struct scmi_vio_msg *msg = msg_handle;
-
-	if (!msg) {
-		dev_dbg_once(&vioch->vqueue->vdev->dev,
-			     "Ignoring %s() call with NULL msg_handle\n",
-			     __func__);
-		return;
-	}
-
-	if (vioch->is_rx) {
-		scmi_vio_feed_vq_rx(vioch, msg);
-	} else {
-		spin_lock_irqsave(&vioch->lock, flags);
-		list_add(&msg->list, &vioch->free_list);
-		spin_unlock_irqrestore(&vioch->lock, flags);
-	}
 }
 
 static const struct scmi_transport_ops scmi_virtio_ops = {
@@ -435,7 +431,6 @@ static const struct scmi_transport_ops scmi_virtio_ops = {
 	.fetch_notification = virtio_fetch_notification,
 	.clear_channel = dummy_clear_channel,
 	.poll_done = dummy_poll_done,
-	.drop_message = virtio_drop_message,
 };
 
 static int scmi_vio_probe(struct virtio_device *vdev)
@@ -467,10 +462,26 @@ static int scmi_vio_probe(struct virtio_device *vdev)
 	dev_info(dev, "Found %d virtqueue(s)\n", vq_cnt);
 
 	for (i = 0; i < vq_cnt; i++) {
+		unsigned int sz;
+
 		spin_lock_init(&channels[i].lock);
 		spin_lock_init(&channels[i].ready_lock);
 		INIT_LIST_HEAD(&channels[i].free_list);
 		channels[i].vqueue = vqs[i];
+
+		sz = virtqueue_get_vring_size(channels[i].vqueue);
+		/* Tx messages need multiple descriptors. */
+		if (!channels[i].is_rx)
+			sz /= DESCRIPTORS_PER_TX_MSG;
+
+		if (sz > MSG_TOKEN_MAX) {
+			dev_info_once(dev,
+				      "%s virtqueue could hold %d messages. Only %ld allowed to be pending.\n",
+				      channels[i].is_rx ? "rx" : "tx",
+				      sz, MSG_TOKEN_MAX);
+			sz = MSG_TOKEN_MAX;
+		}
+		channels[i].max_msg = sz;
 	}
 
 	vdev->priv = channels;
@@ -520,4 +531,5 @@ const struct scmi_desc scmi_virtio_desc = {
 	.max_rx_timeout_ms = 60000, /* for non-realtime virtio devices */
 	.max_msg = 0, /* overridden by virtio_get_max_msg() */
 	.max_msg_size = VIRTIO_SCMI_MAX_MSG_SIZE,
+	.support_xfers_delegation = true,
 };

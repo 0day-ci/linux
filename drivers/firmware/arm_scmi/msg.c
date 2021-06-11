@@ -74,6 +74,17 @@ u32 msg_read_header(struct scmi_msg_payld *msg)
 	return le32_to_cpu(msg->msg_header);
 }
 
+void msg_fetch_raw_payload(struct scmi_msg_payld *msg, size_t msg_len,
+			   size_t max_len, struct scmi_xfer *xfer)
+{
+	xfer->rx_raw_len = min_t(size_t, max_len,
+				 msg_len >= sizeof(*msg) ?
+				 msg_len - sizeof(*msg) : 0);
+
+	/* Take a copy to the rx buffer.. */
+	memcpy(xfer->rx.buf, msg->msg_payload, xfer->rx_raw_len);
+}
+
 /**
  * msg_fetch_response() - Fetch response SCMI payload from transport SDU.
  *
@@ -94,6 +105,25 @@ void msg_fetch_response(struct scmi_msg_payld *msg, size_t len,
 	memcpy(xfer->rx.buf, &msg->msg_payload[1], xfer->rx.len);
 }
 
+void msg_fetch_raw_response(struct scmi_xfer *xfer)
+{
+	__le32 *msg_payload = xfer->rx.buf;
+
+	if (xfer->rx_raw_len < sizeof(xfer->hdr.status)) {
+		xfer->rx.len = 0;
+		return;
+	}
+
+	xfer->hdr.status = le32_to_cpu(msg_payload[0]);
+	/*
+	 * rx.len has been already pre-calculated by fetch_raw
+	 * for the whole payload including status, so shrink it
+	 */
+	xfer->rx.len = xfer->rx_raw_len - sizeof(xfer->hdr.status);
+	/* Carveout status 4-byte field */
+	memmove(xfer->rx.buf, &msg_payload[1], xfer->rx.len);
+}
+
 /**
  * msg_fetch_notification() - Fetch notification payload from transport SDU.
  *
@@ -110,4 +140,9 @@ void msg_fetch_notification(struct scmi_msg_payld *msg, size_t len,
 
 	/* Take a copy to the rx buffer.. */
 	memcpy(xfer->rx.buf, msg->msg_payload, xfer->rx.len);
+}
+
+void msg_fetch_raw_notification(struct scmi_xfer *xfer)
+{
+	xfer->rx.len = xfer->rx_raw_len;
 }

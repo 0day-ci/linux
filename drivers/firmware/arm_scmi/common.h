@@ -428,6 +428,11 @@ void msg_fetch_response(struct scmi_msg_payld *msg, size_t len,
 void msg_fetch_notification(struct scmi_msg_payld *msg, size_t len,
 			    size_t max_len, struct scmi_xfer *xfer);
 
+void msg_fetch_raw_payload(struct scmi_msg_payld *msg, size_t msg_len,
+			   size_t max_len, struct scmi_xfer *xfer);
+void msg_fetch_raw_response(struct scmi_xfer *xfer);
+void msg_fetch_raw_notification(struct scmi_xfer *xfer);
+
 void scmi_notification_instance_data_set(const struct scmi_handle *handle,
 					 void *priv);
 void *scmi_notification_instance_data_get(const struct scmi_handle *handle);
