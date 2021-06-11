@@ -375,7 +375,9 @@ struct scmi_desc {
 	bool support_xfers_delegation;
 };
 
+#ifdef CONFIG_MAILBOX
 extern const struct scmi_desc scmi_mailbox_desc;
+#endif
 #ifdef CONFIG_HAVE_ARM_SMCCC_DISCOVERY
 extern const struct scmi_desc scmi_smc_desc;
 #endif

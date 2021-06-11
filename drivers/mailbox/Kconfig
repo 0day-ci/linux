@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 menuconfig MAILBOX
 	bool "Mailbox Hardware Support"
+	select ARM_SCMI_HAVE_SHMEM
 	help
 	  Mailbox is a framework to control hardware communication between
 	  on-chip processors through queued messages and interrupt driven
