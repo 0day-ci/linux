@@ -10,6 +10,8 @@
 #include <linux/irqdomain.h>
 #include <linux/irqchip/arm-gic-common.h>
 
+extern struct gic_kvm_info gic_v3_kvm_info;
+
 struct gic_quirk {
 	const char *desc;
 	const char *compatible;
