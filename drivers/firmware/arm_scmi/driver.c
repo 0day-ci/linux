@@ -432,6 +432,124 @@ scmi_xfer_lookup_unlocked(struct scmi_xfers_info *minfo, u16 xfer_id)
 	return xfer ?: ERR_PTR(-EINVAL);
 }
 
+/**
+ * scmi_xfer_acquire  -  Helper to lookup and acquire an xfer
+ *
+ * @minfo: Pointer to Tx/Rx Message management info based on channel type
+ * @xfer_id: Token ID to lookup in @pending_xfers
+ *
+ * When a valid xfer is found for the provided @xfer_id, reference counting is
+ * properly updated.
+ *
+ * Return: A valid @xfer on Success or error otherwise.
+ */
+static struct scmi_xfer *
+scmi_xfer_acquire(struct scmi_xfers_info *minfo, u16 xfer_id)
+{
+	unsigned long flags;
+	struct scmi_xfer *xfer;
+
+	spin_lock_irqsave(&minfo->xfer_lock, flags);
+	xfer = scmi_xfer_lookup_unlocked(minfo, xfer_id);
+	if (!IS_ERR(xfer))
+		refcount_inc(&xfer->users);
+	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
+
+	return xfer;
+}
+
+/**
+ * scmi_transfer_acquire  -  Lookup for an existing xfer or freshly allocate a
+ * new one depending on the type of the message
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @msg_hdr: A pointer to the message header to lookup.
+ * @xfer: A reference to the pre-existent or freshly allocated xfer
+ *	  associated with the provided *msg_hdr.
+ *
+ * This function can be used by transports supporting delegated xfers to obtain
+ * a valid @xfer associated with the provided @msg_hdr param.
+ *
+ * The nature of the resulting @xfer depends on the type of message specified in
+ * @msg_hdr:
+ *  - for responses and delayed responses a pre-existent/pre-allocated in-flight
+ *    xfer descriptor will be returned (properly refcounted)
+ *  - for notifications a brand new xfer will be allocated; in this case the
+ *    provided message header sequence number will also be mangled to match
+ *    the token in the freshly allocated xfer: this is needed to establish a
+ *    link between the picked xfer and the msg_hdr that will be subsequently
+ *    passed back via usual scmi_rx_callback().
+ *
+ * Return: 0 if a valid xfer is returned in @xfer, error otherwise.
+ */
+int scmi_transfer_acquire(struct scmi_chan_info *cinfo, u32 *msg_hdr,
+			  struct scmi_xfer **xfer)
+{
+	u8 msg_type;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+
+	if (!xfer || !msg_hdr || !info->desc->support_xfers_delegation)
+		return -EINVAL;
+
+	msg_type = MSG_XTRACT_TYPE(*msg_hdr);
+	switch (msg_type) {
+	case MSG_TYPE_COMMAND:
+	case MSG_TYPE_DELAYED_RESP:
+		/* Grab an existing xfer for xfer_id */
+		*xfer = scmi_xfer_acquire(&info->tx_minfo,
+					  MSG_XTRACT_TOKEN(*msg_hdr));
+		break;
+	case MSG_TYPE_NOTIFICATION:
+		/* Get a brand new RX xfer */
+		*xfer = scmi_xfer_get(cinfo->handle, &info->rx_minfo);
+		if (!IS_ERR(*xfer)) {
+			/* Save original msg_hdr and fix sequence number */
+			(*xfer)->hdr.saved_hdr = *msg_hdr;
+			*msg_hdr &= ~MSG_TOKEN_ID_MASK;
+			*msg_hdr |= FIELD_PREP(MSG_TOKEN_ID_MASK,
+					       (*xfer)->hdr.seq);
+		}
+		break;
+	default:
+		*xfer = ERR_PTR(-EINVAL);
+		break;
+	}
+
+	if (IS_ERR(*xfer)) {
+		dev_err(cinfo->dev,
+			"Failed to acquire a valid xfer for hdr:0x%X\n",
+			*msg_hdr);
+		return PTR_ERR(*xfer);
+	}
+
+	/* Fix xfer->hdr.type with actual msg_hdr carried type */
+	unpack_scmi_header(*msg_hdr, &((*xfer)->hdr));
+
+	return 0;
+}
+
+/**
+ * scmi_transfer_release  - Release an previously acquired xfer
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @xfer: A reference to the xfer to release.
+ */
+void scmi_transfer_release(struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
+{
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+	struct scmi_xfers_info *minfo;
+
+	if (!xfer || !info->desc->support_xfers_delegation)
+		return;
+
+	if (xfer->hdr.type == MSG_TYPE_NOTIFICATION)
+		minfo = &info->rx_minfo;
+	else
+		minfo = &info->tx_minfo;
+
+	__scmi_xfer_put(minfo, xfer);
+}
+
 static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 {
 	struct scmi_xfer *xfer;
@@ -441,7 +559,11 @@ static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 	ktime_t ts;
 
 	ts = ktime_get_boottime();
-	xfer = scmi_xfer_get(cinfo->handle, minfo);
+
+	if (!info->desc->support_xfers_delegation)
+		xfer = scmi_xfer_get(cinfo->handle, minfo);
+	else
+		xfer = scmi_xfer_acquire(minfo, MSG_XTRACT_TOKEN(msg_hdr));
 	if (IS_ERR(xfer)) {
 		dev_err(dev, "failed to get free message slot (%ld)\n",
 			PTR_ERR(xfer));
@@ -449,8 +571,11 @@ static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 		return;
 	}
 
-	unpack_scmi_header(msg_hdr, &xfer->hdr);
 	scmi_dump_header_dbg(dev, &xfer->hdr);
+
+	if (!info->desc->support_xfers_delegation)
+		unpack_scmi_header(msg_hdr, &xfer->hdr);
+
 	info->desc->ops->fetch_notification(cinfo, info->desc->max_msg_size,
 					    xfer);
 	scmi_notify(cinfo->handle, xfer->hdr.protocol_id,
@@ -496,7 +621,8 @@ static void scmi_handle_response(struct scmi_chan_info *cinfo,
 			xfer_id);
 		info->desc->ops->clear_channel(cinfo);
 		/* It was unexpected, so nobody will clear the xfer if not us */
-		__scmi_xfer_put(minfo, xfer);
+		if (!info->desc->support_xfers_delegation) //XXX ??? Really
+			__scmi_xfer_put(minfo, xfer);
 		return;
 	}
 

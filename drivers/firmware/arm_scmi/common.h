@@ -80,6 +80,7 @@ struct scmi_msg_resp_prot_version {
  * @status: Status of the transfer once it's complete
  * @poll_completion: Indicate if the transfer needs to be polled for
  *	completion or interrupt mode is used
+ * @saved_hdr: A copy of the original msg_hdr
  */
 struct scmi_msg_hdr {
 	u8 id;
@@ -88,6 +89,7 @@ struct scmi_msg_hdr {
 	u16 seq;
 	u32 status;
 	bool poll_completion;
+	u32 saved_hdr;
 };
 
 /**
@@ -154,6 +156,9 @@ struct scmi_msg {
  * @rx: Receive message, the buffer should be pre-allocated to store
  *	message. If request-ACK protocol is used, we can reuse the same
  *	buffer for the rx path as we use for the tx path.
+ * @rx_raw_len: A field which can be optionally used by a specific transport
+ *		to save transport specific message length
+ *		It is not used by the SCMI transport core
  * @done: command message transmit completion event
  * @async_done: pointer to delayed response message received event completion
  * @users: A refcount to track the active users for this xfer
@@ -165,6 +170,7 @@ struct scmi_xfer {
 	struct scmi_msg_hdr hdr;
 	struct scmi_msg tx;
 	struct scmi_msg rx;
+	size_t rx_raw_len;
 	struct completion done;
 	struct completion *async_done;
 	refcount_t users;
@@ -355,6 +361,9 @@ struct scmi_device *scmi_child_dev_find(struct device *parent,
  * @max_msg: Maximum number of messages that can be pending
  *	simultaneously in the system
  * @max_msg_size: Maximum size of data per message that can be handled.
+ * @support_xfers_delegation: A flag to indicate if the described transport
+ *			      will handle delegated xfers, so the core can
+ *			      derive proper related assumptions.
  */
 struct scmi_desc {
 	int (*init)(void);
@@ -363,6 +372,7 @@ struct scmi_desc {
 	int max_rx_timeout_ms;
 	int max_msg;
 	int max_msg_size;
+	bool support_xfers_delegation;
 };
 
 extern const struct scmi_desc scmi_mailbox_desc;
@@ -391,4 +401,8 @@ void scmi_notification_instance_data_set(const struct scmi_handle *handle,
 					 void *priv);
 void *scmi_notification_instance_data_get(const struct scmi_handle *handle);
 
+int scmi_transfer_acquire(struct scmi_chan_info *cinfo, u32 *msg_hdr,
+			  struct scmi_xfer **xfer);
+void scmi_transfer_release(struct scmi_chan_info *cinfo,
+			   struct scmi_xfer *xfer);
 #endif /* _SCMI_COMMON_H */
