@@ -324,6 +324,7 @@ done:
 	if (DWC3_VER_IS_WITHIN(DWC31, ANY, 180A))
 		msleep(50);
 
+	dwc->phys_ready = true;
 	return 0;
 }
 
@@ -979,7 +980,6 @@ static int dwc3_core_init(struct dwc3 *dwc)
 		ret = dwc3_core_get_phy(dwc);
 		if (ret)
 			goto err0a;
-		dwc->phys_ready = true;
 	}
 
 	ret = dwc3_core_soft_reset(dwc);
