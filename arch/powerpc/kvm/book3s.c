@@ -68,6 +68,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VCPU_STAT("pthru_bad_aff", pthru_bad_aff),
 	VM_STAT("largepages_2M", num_2M_pages, .mode = 0444),
 	VM_STAT("largepages_1G", num_1G_pages, .mode = 0444),
+	VM_STAT("vcpus", vcpus),
 	{ NULL }
 };
 

@@ -557,6 +557,7 @@ static inline bool __vcpu_write_sys_reg_to_cpu(u64 val, int reg)
 
 struct kvm_vm_stat {
 	ulong remote_tlb_flush;
+	ulong vcpus;
 };
 
 struct kvm_vcpu_stat {

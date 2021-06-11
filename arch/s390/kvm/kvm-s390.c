@@ -163,6 +163,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VCPU_STAT("instruction_diag_308", diagnose_308),
 	VCPU_STAT("instruction_diag_500", diagnose_500),
 	VCPU_STAT("instruction_diag_other", diagnose_other),
+	VM_STAT("vcpus", vcpus),
 	{ NULL }
 };
 

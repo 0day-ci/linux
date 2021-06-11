@@ -3320,6 +3320,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	}
 
 	kvm->created_vcpus++;
+	kvm->stat.vcpus++;
 	mutex_unlock(&kvm->lock);
 
 	r = kvm_arch_vcpu_precreate(kvm, id);
@@ -3396,6 +3397,7 @@ vcpu_free:
 vcpu_decrement:
 	mutex_lock(&kvm->lock);
 	kvm->created_vcpus--;
+	kvm->stat.vcpus--;
 	mutex_unlock(&kvm->lock);
 	return r;
 }

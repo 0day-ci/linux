@@ -761,6 +761,7 @@ struct kvm_vm_stat {
 	u64 inject_service_signal;
 	u64 inject_virtio;
 	u64 remote_tlb_flush;
+	ulong vcpus;
 };
 
 struct kvm_arch_memory_slot {
