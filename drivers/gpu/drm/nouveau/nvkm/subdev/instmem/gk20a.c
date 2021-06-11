@@ -296,12 +296,12 @@ gk20a_instobj_dtor_dma(struct nvkm_memory *memory)
 {
 	struct gk20a_instobj_dma *node = gk20a_instobj_dma(memory);
 	struct gk20a_instmem *imem = node->base.imem;
-	struct device *dev = imem->base.subdev.device->dev;
 
 	if (unlikely(!node->base.vaddr))
 		goto out;
 
-	dma_free_attrs(dev, (u64)node->base.mn->length << PAGE_SHIFT,
+	dma_free_attrs(imem->base.subdev.device->dev,
+		       (u64)node->base.mn->length << PAGE_SHIFT,
 		       node->base.vaddr, node->handle, imem->attrs);
 
 out:
