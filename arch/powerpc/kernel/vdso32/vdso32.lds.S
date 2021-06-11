@@ -85,9 +85,10 @@ SECTIONS
 
 	/DISCARD/	: {
 		*(.note.GNU-stack)
+		*(.branch_lt)
 		*(.data .data.* .gnu.linkonce.d.* .sdata*)
 		*(.bss .sbss .dynbss .dynsbss)
-		*(.got1)
+		*(.got1 .glink .iplt .rela*)
 	}
 }
 
