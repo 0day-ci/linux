@@ -91,16 +91,18 @@ static inline bool is_tdp_mmu_enabled(struct kvm *kvm) { return false; }
 static inline bool is_tdp_mmu_page(struct kvm_mmu_page *sp) { return false; }
 #endif
 
-static inline bool is_tdp_mmu_root(struct kvm *kvm, hpa_t hpa)
+static inline bool is_vcpu_using_tdp_mmu(struct kvm_vcpu *vcpu)
 {
+	struct kvm *kvm = vcpu->kvm;
 	struct kvm_mmu_page *sp;
+	hpa_t root_hpa = vcpu->arch.mmu->root_hpa;
 
 	if (!is_tdp_mmu_enabled(kvm))
 		return false;
-	if (WARN_ON(!VALID_PAGE(hpa)))
+	if (WARN_ON(!VALID_PAGE(root_hpa)))
 		return false;
 
-	sp = to_shadow_page(hpa);
+	sp = to_shadow_page(root_hpa);
 	if (WARN_ON(!sp))
 		return false;
 
