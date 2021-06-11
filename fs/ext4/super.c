@@ -5579,6 +5579,7 @@ static void ext4_update_super(struct super_block *sb)
 		if (!es->s_error_count)
 			mod_timer(&sbi->s_err_report, jiffies + 24*60*60*HZ);
 		le32_add_cpu(&es->s_error_count, sbi->s_add_error_count);
+		ext4_notify_error_sysfs(sb);
 		sbi->s_add_error_count = 0;
 	}
 	spin_unlock(&sbi->s_error_lock);
