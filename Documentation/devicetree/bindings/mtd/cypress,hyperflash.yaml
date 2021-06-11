@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mtd/cypress,hyperflash.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: HyperFlash serial NOR flash chips
+
+maintainers:
+  - Vignesh Raghavendra <vigneshr@ti.com>
+
+allOf:
+  - $ref: "mtd.yaml#"
+
+properties:
+  compatible:
+    items:
+      - const: cypress,hyperflash
+      - const: cfi-flash
+    description:
+      HyperFlash serial NOR flash chips compliant with Cypress HyperBus
+      specification and supports Cypress CFI specification 1.5 command set.
+
+  reg:
+    maxItems: 1
+
+  partitions:
+    type: object
+
+  '#address-cells': true
+  '#size-cells': true
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    memory-controller {
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        flash@0 {
+            #address-cells = <1>;
+            #size-cells = <1>;
+            compatible = "cypress,hyperflash", "cfi-flash";
+            reg = <0x0 0x4000000>;
+        };
+    };
