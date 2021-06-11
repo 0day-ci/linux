@@ -2606,18 +2606,8 @@ static void change_pageblock_range(struct page *pageblock_page,
  * is worse than movable allocations stealing from unmovable and reclaimable
  * pageblocks.
  */
-static bool can_steal_fallback(unsigned int order, int start_mt)
+static inline bool can_steal_fallback(unsigned int order, int start_mt)
 {
-	/*
-	 * Leaving this order check is intended, although there is
-	 * relaxed order check in next check. The reason is that
-	 * we can actually steal whole pageblock if this condition met,
-	 * but, below check doesn't guarantee it and that is just heuristic
-	 * so could be changed anytime.
-	 */
-	if (order >= pageblock_order)
-		return true;
-
 	if (order >= pageblock_order / 2 ||
 		start_mt == MIGRATE_RECLAIMABLE ||
 		start_mt == MIGRATE_UNMOVABLE ||
