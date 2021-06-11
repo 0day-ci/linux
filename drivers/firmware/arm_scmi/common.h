@@ -14,7 +14,10 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
+#include <linux/hashtable.h>
+#include <linux/list.h>
 #include <linux/module.h>
+#include <linux/refcount.h>
 #include <linux/scmi_protocol.h>
 #include <linux/types.h>
 
@@ -128,6 +131,21 @@ struct scmi_msg {
 };
 
 /**
+ * An helper macro to lookup an xfer from the @pending_xfers hashtable
+ * using the message sequence number token as a key.
+ */
+#define XFER_FIND(__ht, __k)					\
+({								\
+	typeof(__k) k_ = __k;					\
+	struct scmi_xfer *xfer_ = NULL;				\
+								\
+	hash_for_each_possible((__ht), xfer_, node, k_)		\
+		if (xfer_->hdr.seq == k_)			\
+			break;					\
+	 xfer_;							\
+})
+
+/**
  * struct scmi_xfer - Structure representing a message flow
  *
  * @transfer_id: Unique ID for debug & profiling purpose
@@ -138,6 +156,9 @@ struct scmi_msg {
  *	buffer for the rx path as we use for the tx path.
  * @done: command message transmit completion event
  * @async_done: pointer to delayed response message received event completion
+ * @users: A refcount to track the active users for this xfer
+ * @node: An hlist_node reference used to store this xfer, alternatively, on
+ *	  the free list @free_xfers or in the @pending_xfers hashtable
  */
 struct scmi_xfer {
 	int transfer_id;
@@ -146,6 +167,8 @@ struct scmi_xfer {
 	struct scmi_msg rx;
 	struct completion done;
 	struct completion *async_done;
+	refcount_t users;
+	struct hlist_node node;
 };
 
 struct scmi_xfer_ops;
