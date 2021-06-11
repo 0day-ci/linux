@@ -4049,9 +4049,13 @@ skl_ddb_entry_for_slices(struct drm_i915_private *dev_priv, u8 slice_mask,
 		ddb->end = 0;
 		return;
 	}
-
-	ddb->start = (ffs(slice_mask) - 1) * slice_size;
-	ddb->end = fls(slice_mask) * slice_size;
+	if (GRAPHICS_VER(dev_priv) == 11) {
+		ddb->start = (fls(slice_mask) - 1) * slice_size;
+		ddb->end = ffs(slice_mask) * slice_size;
+	} else {
+		ddb->start = (ffs(slice_mask) - 1) * slice_size;
+		ddb->end = fls(slice_mask) * slice_size;
+	}
 
 	WARN_ON(ddb->start >= ddb->end);
 	WARN_ON(ddb->end > INTEL_INFO(dev_priv)->dbuf.size);
