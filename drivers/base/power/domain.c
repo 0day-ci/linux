@@ -1944,6 +1944,11 @@ static void genpd_lock_init(struct generic_pm_domain *genpd)
 	}
 }
 
+static void genpd_lock_destroy(struct generic_pm_domain *genpd) {
+	if (!(genpd->flags & GENPD_FLAG_IRQ_SAFE))
+		mutex_destroy(&genpd->mlock);
+}
+
 /**
  * pm_genpd_init - Initialize a generic I/O PM domain object.
  * @genpd: PM domain object to initialize.
@@ -1994,12 +1999,16 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 
 	/* Always-on domains must be powered on at initialization. */
 	if ((genpd_is_always_on(genpd) || genpd_is_rpm_always_on(genpd)) &&
-			!genpd_status_on(genpd))
-		return -EINVAL;
+			!genpd_status_on(genpd)) {
+		ret = -EINVAL;
+		goto fail;
+	}
 
 	if (genpd_is_cpu_domain(genpd) &&
-	    !zalloc_cpumask_var(&genpd->cpus, GFP_KERNEL))
-		return -ENOMEM;
+	    !zalloc_cpumask_var(&genpd->cpus, GFP_KERNEL)) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	/* Use only one "off" state if there were no states declared */
 	if (genpd->state_count == 0) {
@@ -2007,7 +2016,7 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 		if (ret) {
 			if (genpd_is_cpu_domain(genpd))
 				free_cpumask_var(genpd->cpus);
-			return ret;
+			goto fail;
 		}
 	} else if (!gov && genpd->state_count > 1) {
 		pr_warn("%s: no governor for states\n", genpd->name);
@@ -2022,6 +2031,11 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 	mutex_unlock(&gpd_list_lock);
 
 	return 0;
+
+fail:
+	genpd_lock_destroy(genpd);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(pm_genpd_init);
 
@@ -2060,6 +2074,7 @@ static int genpd_remove(struct generic_pm_domain *genpd)
 		free_cpumask_var(genpd->cpus);
 	if (genpd->free_states)
 		genpd->free_states(genpd->states, genpd->state_count);
+	genpd_lock_destroy(genpd);
 
 	pr_debug("%s: removed %s\n", __func__, genpd->name);
 
