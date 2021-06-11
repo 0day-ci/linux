@@ -3538,6 +3538,7 @@ static bool walk_shadow_page_lockless(struct kvm_vcpu *vcpu, u64 addr,
 		spte = mmu_spte_get_lockless(it.sptep);
 		walk->last_level = it.level;
 		walk->sptes[it.level] = spte;
+		walk->spteps[it.level] = it.sptep;
 
 		if (!is_shadow_present_pte(spte))
 			break;

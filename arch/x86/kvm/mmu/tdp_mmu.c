@@ -1529,6 +1529,7 @@ bool kvm_tdp_mmu_walk_lockless(struct kvm_vcpu *vcpu, u64 addr,
 
 		walk->last_level = iter.level;
 		walk->sptes[iter.level] = iter.old_spte;
+		walk->spteps[iter.level] = iter.sptep;
 	}
 
 	return walk_ok;

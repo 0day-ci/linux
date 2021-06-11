@@ -178,6 +178,9 @@ struct shadow_page_walk {
 
 	/* The spte value at each level. */
 	u64 sptes[PT64_ROOT_MAX_LEVEL + 1];
+
+	/* The spte pointers at each level. */
+	u64 *spteps[PT64_ROOT_MAX_LEVEL + 1];
 };
 
 #endif /* __KVM_X86_MMU_INTERNAL_H */
