@@ -31,6 +31,7 @@
  *   AT25M02, AT25128B
  */
 
+#define	FM25_SN_LEN	8		/* serial number length */
 struct at25_data {
 	struct spi_device	*spi;
 	struct mutex		lock;
@@ -38,6 +39,7 @@ struct at25_data {
 	unsigned		addrlen;
 	struct nvmem_config	nvmem_config;
 	struct nvmem_device	*nvmem;
+	u8 sernum[FM25_SN_LEN];
 };
 
 #define	AT25_WREN	0x06		/* latch the write enable */
@@ -170,6 +172,21 @@ static int fm25_aux_read(struct at25_data *at25, u8 *buf, uint8_t command,
 	mutex_unlock(&at25->lock);
 	return status;
 }
+
+static ssize_t sernum_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct at25_data *at25;
+
+	at25 = dev_get_drvdata(dev);
+	return sysfs_emit(buf, "%*ph\n", sizeof(at25->sernum), at25->sernum);
+}
+static DEVICE_ATTR_RO(sernum);
+
+static struct attribute *sernum_attrs[] = {
+	&dev_attr_sernum.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(sernum);
 
 static int at25_ee_write(void *priv, unsigned int off, void *val, size_t count)
 {
@@ -359,6 +376,8 @@ static int at25_probe(struct spi_device *spi)
 	int			err;
 	int			sr;
 	u8 id[FM25_ID_LEN];
+	u8 sernum[FM25_SN_LEN];
+	int i;
 	const struct of_device_id *match;
 	int is_fram = 0;
 
@@ -415,6 +434,13 @@ static int at25_probe(struct spi_device *spi)
 		else
 			at25->chip.flags |= EE_ADDR2;
 
+		if (id[8]) {
+			fm25_aux_read(at25, sernum, FM25_RDSN, FM25_SN_LEN);
+			/* swap byte order */
+			for (i = 0; i < FM25_SN_LEN; i++)
+				at25->sernum[i] = sernum[FM25_SN_LEN - 1 - i];
+		}
+
 		at25->chip.page_size = PAGE_SIZE;
 		strncpy(at25->chip.name, "fm25", sizeof(at25->chip.name));
 	}
@@ -465,6 +491,7 @@ static struct spi_driver at25_driver = {
 	.driver = {
 		.name		= "at25",
 		.of_match_table = at25_of_match,
+		.dev_groups	= sernum_groups,
 	},
 	.probe		= at25_probe,
 };
