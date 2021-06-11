@@ -2402,6 +2402,9 @@ struct ieee80211_txq {
  *	usage and 802.11 frames with %RX_FLAG_ONLY_MONITOR set for monitor to
  *	the stack.
  *
+ * @IEEE80211_HW_HE_NULLFUNC_STACK: HE hardware needs stack to send nullfunc
+ *	frames.
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2457,6 +2460,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_SUPPORTS_TX_ENCAP_OFFLOAD,
 	IEEE80211_HW_SUPPORTS_RX_DECAP_OFFLOAD,
 	IEEE80211_HW_SUPPORTS_CONC_MON_RX_DECAP,
+	IEEE80211_HW_HE_NULLFUNC_STACK,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
