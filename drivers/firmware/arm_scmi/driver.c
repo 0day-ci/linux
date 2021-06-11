@@ -75,6 +75,7 @@ struct scmi_requested_dev {
  *	Index of this bitmap table is also used for message
  *	sequence identifier.
  * @xfer_lock: Protection for message allocation
+ * @max_msg: Maximum number of messages that can be pending
  * @last_token: A counter to use as base to generate for monotonically
  *		increasing tokens.
  * @free_xfers: A free list for available to use xfers. It is initialized with
@@ -86,6 +87,7 @@ struct scmi_requested_dev {
 struct scmi_xfers_info {
 	unsigned long *xfer_alloc_table;
 	spinlock_t xfer_lock;
+	int max_msg;
 	atomic_t last_token;
 	struct hlist_head free_xfers;
 	DECLARE_HASHTABLE(pending_xfers, SCMI_PENDING_XFERS_HT_ORDER_SZ);
@@ -1310,18 +1312,25 @@ int scmi_handle_put(const struct scmi_handle *handle)
 }
 
 static int __scmi_xfer_info_init(struct scmi_info *sinfo,
-				 struct scmi_xfers_info *info)
+				 struct scmi_xfers_info *info,
+				 bool tx,
+				 struct scmi_chan_info *base_cinfo)
 {
 	int i;
 	struct scmi_xfer *xfer;
 	struct device *dev = sinfo->dev;
 	const struct scmi_desc *desc = sinfo->desc;
 
+	info->max_msg = desc->max_msg;
+
+	if (desc->ops->get_max_msg)
+		info->max_msg =	desc->ops->get_max_msg(tx, base_cinfo);
+
 	/* Pre-allocated messages, no more than what hdr.seq can support */
-	if (WARN_ON(!desc->max_msg || desc->max_msg > MSG_TOKEN_MAX)) {
+	if (WARN_ON(!info->max_msg || info->max_msg > MSG_TOKEN_MAX)) {
 		dev_err(dev,
 			"Invalid max_msg %d. Maximum messages supported %ld.\n",
-			desc->max_msg, MSG_TOKEN_MAX);
+			info->max_msg, MSG_TOKEN_MAX);
 		return -EINVAL;
 	}
 
@@ -1339,7 +1348,7 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 	 * attach all of them to the free list
 	 */
 	INIT_HLIST_HEAD(&info->free_xfers);
-	for (i = 0; i < desc->max_msg; i++) {
+	for (i = 0; i < info->max_msg; i++) {
 		xfer = devm_kzalloc(dev, sizeof(*xfer), GFP_KERNEL);
 		if (!xfer)
 			return -ENOMEM;
@@ -1364,10 +1373,21 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 
 static int scmi_xfer_info_init(struct scmi_info *sinfo)
 {
-	int ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo);
+	int ret;
+	struct scmi_chan_info *base_tx_cinfo;
+	struct scmi_chan_info *base_rx_cinfo;
 
-	if (!ret && idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE))
-		ret = __scmi_xfer_info_init(sinfo, &sinfo->rx_minfo);
+	base_tx_cinfo = idr_find(&sinfo->tx_idr, SCMI_PROTOCOL_BASE);
+	if (unlikely(!base_tx_cinfo))
+		return -EINVAL;
+
+	ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo, true,
+				    base_tx_cinfo);
+
+	base_rx_cinfo = idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE);
+	if (!ret && base_rx_cinfo)
+		ret = __scmi_xfer_info_init(sinfo, &sinfo->rx_minfo, false,
+					    base_rx_cinfo);
 
 	return ret;
 }
