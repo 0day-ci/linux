@@ -1,0 +1,8 @@
+What:		/sys/class/spi_master/spi<bus>/spi<bus>.<dev>/fram
+Date:		June 2021
+KernelVersion:	5.14
+Contact:	Jiri Prchal <jiri.prchal@aksignal.cz>
+Description:
+	Contains the FRAM binary data. Same as EEPROM, just another file
+	name to indicate that it employs ferroelectric process.
+	It performs write operations at bus speed - no write delays.
