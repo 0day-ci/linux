@@ -450,14 +450,14 @@ struct vsc85xx_ptphdr {
 	__be16 seq_id;
 	u8 ctrl;
 	u8 log_interval;
-} __attribute__((__packed__));
+} __packed;
 
 /* Represents an entry in the timestamping FIFO */
 struct vsc85xx_ts_fifo {
 	u32 ns;
 	u64 secs:48;
 	u8 sig[16];
-} __attribute__((__packed__));
+} __packed;
 
 struct vsc85xx_ptp {
 	struct phy_device *phydev;
