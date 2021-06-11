@@ -72,6 +72,13 @@ static int msg_level = -1;
 module_param (msg_level, int, 0);
 MODULE_PARM_DESC (msg_level, "Override default message level");
 
+#define DEFAULT_ETH_DEV_NAME "eth%d"
+
+static char *eth_device_name = DEFAULT_ETH_DEV_NAME;
+module_param(eth_device_name, charp, 0644);
+MODULE_PARM_DESC(eth_device_name, "Device name pattern for Ethernet devices"
+				  " (default: \"" DEFAULT_ETH_DEV_NAME "\")");
+
 /*-------------------------------------------------------------------------*/
 
 /* handles CDC Ethernet and many other network "bulk data" interfaces */
@@ -1730,12 +1737,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 			goto out1;
 
 		// heuristic:  "usb%d" for links we know are two-host,
-		// else "eth%d" when there's reasonable doubt.  userspace
-		// can rename the link if it knows better.
+		// else eth_device_name when there's reasonable doubt.
+		// userspace can rename the link if it knows better.
 		if ((dev->driver_info->flags & FLAG_ETHER) != 0 &&
 		    ((dev->driver_info->flags & FLAG_POINTTOPOINT) == 0 ||
 		     (net->dev_addr [0] & 0x02) == 0))
-			strcpy (net->name, "eth%d");
+			strscpy(net->name, eth_device_name, sizeof(net->name));
 		/* WLAN devices should always be named "wlan%d" */
 		if ((dev->driver_info->flags & FLAG_WLAN) != 0)
 			strcpy(net->name, "wlan%d");
