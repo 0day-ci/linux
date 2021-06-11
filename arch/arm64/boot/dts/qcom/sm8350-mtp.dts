@@ -40,7 +40,7 @@
 
 &adsp {
 	status = "okay";
-	firmware-name = "qcom/sm8350/adsp.mbn";
+	irmware-name = "qcom/sm8350/adsp.mdt";
 };
 
 &apps_rsc {
@@ -278,12 +278,12 @@
 
 &cdsp {
 	status = "okay";
-	firmware-name = "qcom/sm8350/cdsp.mbn";
+	firmware-name = "qcom/sm8350/cdsp.mdt";
 };
 
 &mpss {
 	status = "okay";
-	firmware-name = "qcom/sm8350/modem.mbn";
+	firmware-name = "qcom/sm8350/modem.mdt";
 };
 
 &qupv3_id_1 {
@@ -292,7 +292,7 @@
 
 &slpi {
 	status = "okay";
-	firmware-name = "qcom/sm8350/slpi.mbn";
+	firmware-name = "qcom/sm8350/slpi.mdt";
 };
 
 &tlmm {
