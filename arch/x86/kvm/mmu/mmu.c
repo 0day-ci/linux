@@ -623,6 +623,11 @@ static bool mmu_spte_age(u64 *sptep)
 
 static void walk_shadow_page_lockless_begin(struct kvm_vcpu *vcpu)
 {
+	if (is_vcpu_using_tdp_mmu(vcpu)) {
+		kvm_tdp_mmu_walk_lockless_begin();
+		return;
+	}
+
 	/*
 	 * Prevent page table teardown by making any free-er wait during
 	 * kvm_flush_remote_tlbs() IPI to all active vcpus.
@@ -638,6 +643,11 @@ static void walk_shadow_page_lockless_begin(struct kvm_vcpu *vcpu)
 
 static void walk_shadow_page_lockless_end(struct kvm_vcpu *vcpu)
 {
+	if (is_vcpu_using_tdp_mmu(vcpu)) {
+		kvm_tdp_mmu_walk_lockless_end();
+		return;
+	}
+
 	/*
 	 * Make sure the write to vcpu->mode is not reordered in front of
 	 * reads to sptes.  If it does, kvm_mmu_commit_zap_page() can see us
@@ -3501,59 +3511,61 @@ static bool mmio_info_in_cache(struct kvm_vcpu *vcpu, u64 addr, bool direct)
 }
 
 /*
- * Return the level of the lowest level SPTE added to sptes.
- * That SPTE may be non-present.
+ * Walks the shadow page table for the given address until a leaf or non-present
+ * spte is encountered.
+ *
+ * Returns false if no walk could be performed, in which case `walk` does not
+ * contain any valid data.
+ *
+ * Must be called between walk_shadow_page_lockless_{begin,end}.
  */
-static int get_walk(struct kvm_vcpu *vcpu, u64 addr, u64 *sptes, int *root_level)
+static bool walk_shadow_page_lockless(struct kvm_vcpu *vcpu, u64 addr,
+				      struct shadow_page_walk *walk)
 {
-	struct kvm_shadow_walk_iterator iterator;
-	int leaf = -1;
+	struct kvm_shadow_walk_iterator it;
+	bool walk_ok = false;
 	u64 spte;
 
-	walk_shadow_page_lockless_begin(vcpu);
+	if (is_vcpu_using_tdp_mmu(vcpu))
+		return kvm_tdp_mmu_walk_lockless(vcpu, addr, walk);
 
-	for (shadow_walk_init(&iterator, vcpu, addr),
-	     *root_level = iterator.level;
-	     shadow_walk_okay(&iterator);
-	     __shadow_walk_next(&iterator, spte)) {
-		leaf = iterator.level;
-		spte = mmu_spte_get_lockless(iterator.sptep);
+	shadow_walk_init(&it, vcpu, addr);
+	walk->root_level = it.level;
 
-		sptes[leaf] = spte;
+	for (; shadow_walk_okay(&it); __shadow_walk_next(&it, spte)) {
+		walk_ok = true;
+
+		spte = mmu_spte_get_lockless(it.sptep);
+		walk->last_level = it.level;
+		walk->sptes[it.level] = spte;
 
 		if (!is_shadow_present_pte(spte))
 			break;
 	}
 
-	walk_shadow_page_lockless_end(vcpu);
-
-	return leaf;
+	return walk_ok;
 }
 
 /* return true if reserved bit(s) are detected on a valid, non-MMIO SPTE. */
 static bool get_mmio_spte(struct kvm_vcpu *vcpu, u64 addr, u64 *sptep)
 {
-	u64 sptes[PT64_ROOT_MAX_LEVEL + 1];
+	struct shadow_page_walk walk;
 	struct rsvd_bits_validate *rsvd_check;
-	int root, leaf, level;
+	int last_level, level;
 	bool reserved = false;
 
-	if (!VALID_PAGE(vcpu->arch.mmu->root_hpa)) {
-		*sptep = 0ull;
+	*sptep = 0ull;
+
+	if (!VALID_PAGE(vcpu->arch.mmu->root_hpa))
 		return reserved;
-	}
 
-	if (is_vcpu_using_tdp_mmu(vcpu))
-		leaf = kvm_tdp_mmu_get_walk(vcpu, addr, sptes, &root);
-	else
-		leaf = get_walk(vcpu, addr, sptes, &root);
+	walk_shadow_page_lockless_begin(vcpu);
 
-	if (unlikely(leaf < 0)) {
-		*sptep = 0ull;
-		return reserved;
-	}
+	if (!walk_shadow_page_lockless(vcpu, addr, &walk))
+		goto out;
 
-	*sptep = sptes[leaf];
+	last_level = walk.last_level;
+	*sptep = walk.sptes[last_level];
 
 	/*
 	 * Skip reserved bits checks on the terminal leaf if it's not a valid
@@ -3561,29 +3573,37 @@ static bool get_mmio_spte(struct kvm_vcpu *vcpu, u64 addr, u64 *sptep)
 	 * design, always have reserved bits set.  The purpose of the checks is
 	 * to detect reserved bits on non-MMIO SPTEs. i.e. buggy SPTEs.
 	 */
-	if (!is_shadow_present_pte(sptes[leaf]))
-		leaf++;
+	if (!is_shadow_present_pte(walk.sptes[last_level]))
+		last_level++;
 
 	rsvd_check = &vcpu->arch.mmu->shadow_zero_check;
 
-	for (level = root; level >= leaf; level--)
+	for (level = walk.root_level; level >= last_level; level--) {
+		u64 spte = walk.sptes[level];
+
 		/*
 		 * Use a bitwise-OR instead of a logical-OR to aggregate the
 		 * reserved bit and EPT's invalid memtype/XWR checks to avoid
 		 * adding a Jcc in the loop.
 		 */
-		reserved |= __is_bad_mt_xwr(rsvd_check, sptes[level]) |
-			    __is_rsvd_bits_set(rsvd_check, sptes[level], level);
+		reserved |= __is_bad_mt_xwr(rsvd_check, spte) |
+			    __is_rsvd_bits_set(rsvd_check, spte, level);
+	}
 
 	if (reserved) {
 		pr_err("%s: reserved bits set on MMU-present spte, addr 0x%llx, hierarchy:\n",
 		       __func__, addr);
-		for (level = root; level >= leaf; level--)
+		for (level = walk.root_level; level >= last_level; level--) {
+			u64 spte = walk.sptes[level];
+
 			pr_err("------ spte = 0x%llx level = %d, rsvd bits = 0x%llx",
-			       sptes[level], level,
-			       rsvd_check->rsvd_bits_mask[(sptes[level] >> 7) & 1][level-1]);
+			       spte, level,
+			       rsvd_check->rsvd_bits_mask[(spte >> 7) & 1][level-1]);
+		}
 	}
 
+out:
+	walk_shadow_page_lockless_end(vcpu);
 	return reserved;
 }
 

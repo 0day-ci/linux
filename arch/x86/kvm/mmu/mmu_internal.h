@@ -165,4 +165,19 @@ void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc);
 void account_huge_nx_page(struct kvm *kvm, struct kvm_mmu_page *sp);
 void unaccount_huge_nx_page(struct kvm *kvm, struct kvm_mmu_page *sp);
 
+struct shadow_page_walk {
+	/* The level of the root spte in the walk. */
+	int root_level;
+
+	/*
+	 * The level of the last spte in the walk. The last spte is either the
+	 * leaf of the walk (which may or may not be present) or the first
+	 * non-present spte encountered during the walk.
+	 */
+	int last_level;
+
+	/* The spte value at each level. */
+	u64 sptes[PT64_ROOT_MAX_LEVEL + 1];
+};
+
 #endif /* __KVM_X86_MMU_INTERNAL_H */

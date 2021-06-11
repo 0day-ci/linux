@@ -1504,28 +1504,32 @@ bool kvm_tdp_mmu_write_protect_gfn(struct kvm *kvm,
 	return spte_set;
 }
 
-/*
- * Return the level of the lowest level SPTE added to sptes.
- * That SPTE may be non-present.
- */
-int kvm_tdp_mmu_get_walk(struct kvm_vcpu *vcpu, u64 addr, u64 *sptes,
-			 int *root_level)
+void kvm_tdp_mmu_walk_lockless_begin(void)
+{
+	rcu_read_lock();
+}
+
+void kvm_tdp_mmu_walk_lockless_end(void)
+{
+	rcu_read_unlock();
+}
+
+bool kvm_tdp_mmu_walk_lockless(struct kvm_vcpu *vcpu, u64 addr,
+			       struct shadow_page_walk *walk)
 {
 	struct tdp_iter iter;
 	struct kvm_mmu *mmu = vcpu->arch.mmu;
 	gfn_t gfn = addr >> PAGE_SHIFT;
-	int leaf = -1;
+	bool walk_ok = false;
 
-	*root_level = vcpu->arch.mmu->shadow_root_level;
-
-	rcu_read_lock();
+	walk->root_level = vcpu->arch.mmu->shadow_root_level;
 
 	tdp_mmu_for_each_pte(iter, mmu, gfn, gfn + 1) {
-		leaf = iter.level;
-		sptes[leaf] = iter.old_spte;
+		walk_ok = true;
+
+		walk->last_level = iter.level;
+		walk->sptes[iter.level] = iter.old_spte;
 	}
 
-	rcu_read_unlock();
-
-	return leaf;
+	return walk_ok;
 }

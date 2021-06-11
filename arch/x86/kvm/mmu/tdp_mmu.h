@@ -76,8 +76,10 @@ bool kvm_tdp_mmu_zap_collapsible_sptes(struct kvm *kvm,
 bool kvm_tdp_mmu_write_protect_gfn(struct kvm *kvm,
 				   struct kvm_memory_slot *slot, gfn_t gfn);
 
-int kvm_tdp_mmu_get_walk(struct kvm_vcpu *vcpu, u64 addr, u64 *sptes,
-			 int *root_level);
+void kvm_tdp_mmu_walk_lockless_begin(void);
+void kvm_tdp_mmu_walk_lockless_end(void);
+bool kvm_tdp_mmu_walk_lockless(struct kvm_vcpu *vcpu, u64 addr,
+			       struct shadow_page_walk *walk);
 
 #ifdef CONFIG_X86_64
 void kvm_mmu_init_tdp_mmu(struct kvm *kvm);
