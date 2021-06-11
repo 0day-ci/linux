@@ -3,7 +3,7 @@
 mc-objs	:= mc-device.o mc-devnode.o mc-entity.o \
 	   mc-request.o
 
-ifeq ($(CONFIG_USB),y)
+ifeq ($(CONFIG_USB),$(filter $(CONFIG_USB),y m))
 	mc-objs += mc-dev-allocator.o
 endif
 
