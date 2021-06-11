@@ -158,12 +158,12 @@ static void scmi_process_vqueue_input(struct scmi_vio_channel *vioch,
 	/* Drop processed virtio message anyway */
 	scmi_finalize_message(vioch, msg);
 
+	/* Deliver DRESP, NOTIF and non-polled RESP */
 	if (vioch->is_rx || !xfer->hdr.poll_completion)
 		scmi_rx_callback(vioch->cinfo, msg_hdr);
 	else
-		dev_warn(vioch->cinfo->dev,
-			 "Polling mode NOT supported. Dropped hdr:0X%X\n",
-			 msg_hdr);
+		/* poll_done() is busy-waiting on this */
+		complete(&xfer->done);
 
 	scmi_transfer_release(vioch->cinfo, xfer);
 }
@@ -414,10 +414,16 @@ static void dummy_clear_channel(struct scmi_chan_info *cinfo)
 {
 }
 
-static bool dummy_poll_done(struct scmi_chan_info *cinfo,
-			    struct scmi_xfer *xfer)
+static bool virtio_poll_done(struct scmi_chan_info *cinfo,
+			     struct scmi_xfer *xfer)
 {
-	return false;
+	/*
+	 * In polling mode SCMI core does not use xfer->done completion,
+	 * so we can busy-wait on this same completion without adding
+	 * a new flag: this is completed properly upon msg reception in
+	 * scmi_process_vqueue_input().
+	 */
+	return try_wait_for_completion(&xfer->done);
 }
 
 static const struct scmi_transport_ops scmi_virtio_ops = {
@@ -430,7 +436,7 @@ static const struct scmi_transport_ops scmi_virtio_ops = {
 	.fetch_response = virtio_fetch_response,
 	.fetch_notification = virtio_fetch_notification,
 	.clear_channel = dummy_clear_channel,
-	.poll_done = dummy_poll_done,
+	.poll_done = virtio_poll_done,
 };
 
 static int scmi_vio_probe(struct virtio_device *vdev)
