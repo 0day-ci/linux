@@ -1955,6 +1955,9 @@ static const struct of_device_id scmi_of_match[] = {
 #ifdef CONFIG_HAVE_ARM_SMCCC_DISCOVERY
 	{ .compatible = "arm,scmi-smc", .data = &scmi_smc_desc},
 #endif
+#ifdef CONFIG_VIRTIO_SCMI
+	{ .compatible = "arm,scmi-virtio", .data = &scmi_virtio_desc},
+#endif
 	{ /* Sentinel */ },
 };
 

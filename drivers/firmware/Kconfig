@@ -39,6 +39,18 @@ config ARM_SCMI_HAVE_MSG
 	  This declares whether a message passing based transport for SCMI is
 	  available.
 
+# This config option includes the dependencies of ARM_SCMI_PROTOCOL so that
+# this config doesn't show up when SCMI wouldn't be available.
+config VIRTIO_SCMI
+	bool "Virtio transport for SCMI"
+	select ARM_SCMI_HAVE_MSG
+	depends on VIRTIO && (ARM || ARM64 || COMPILE_TEST)
+	help
+	  This enables the virtio based transport for SCMI.
+
+	  If you want to use the ARM SCMI protocol between the virtio guest and
+	  a host providing a virtio SCMI device, answer Y.
+
 config ARM_SCMI_POWER_DOMAIN
 	tristate "SCMI power domain driver"
 	depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)

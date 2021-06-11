@@ -390,6 +390,9 @@ extern const struct scmi_desc scmi_mailbox_desc;
 #ifdef CONFIG_HAVE_ARM_SMCCC_DISCOVERY
 extern const struct scmi_desc scmi_smc_desc;
 #endif
+#ifdef CONFIG_VIRTIO_SCMI
+extern const struct scmi_desc scmi_virtio_desc;
+#endif
 
 int scmi_set_transport_info(struct device *dev, void *transport_info);
 void *scmi_get_transport_info(struct device *dev);
