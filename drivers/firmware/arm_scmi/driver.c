@@ -1312,19 +1312,12 @@ int scmi_handle_put(const struct scmi_handle *handle)
 }
 
 static int __scmi_xfer_info_init(struct scmi_info *sinfo,
-				 struct scmi_xfers_info *info,
-				 bool tx,
-				 struct scmi_chan_info *base_cinfo)
+				 struct scmi_xfers_info *info)
 {
 	int i;
 	struct scmi_xfer *xfer;
 	struct device *dev = sinfo->dev;
 	const struct scmi_desc *desc = sinfo->desc;
-
-	info->max_msg = desc->max_msg;
-
-	if (desc->ops->get_max_msg)
-		info->max_msg =	desc->ops->get_max_msg(tx, base_cinfo);
 
 	/* Pre-allocated messages, no more than what hdr.seq can support */
 	if (WARN_ON(!info->max_msg || info->max_msg > MSG_TOKEN_MAX)) {
@@ -1371,23 +1364,42 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 	return 0;
 }
 
+static int scmi_channels_max_msg_configure(struct scmi_info *sinfo)
+{
+	const struct scmi_desc *desc = sinfo->desc;
+
+	if (!desc->ops->get_max_msg) {
+		sinfo->tx_minfo.max_msg = desc->max_msg;
+		sinfo->rx_minfo.max_msg = desc->max_msg;
+	} else {
+		struct scmi_chan_info *base_cinfo;
+
+		base_cinfo = idr_find(&sinfo->tx_idr, SCMI_PROTOCOL_BASE);
+		if (!base_cinfo)
+			return -EINVAL;
+
+		sinfo->tx_minfo.max_msg = desc->ops->get_max_msg(base_cinfo);
+
+		base_cinfo = idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE);
+		if (base_cinfo)
+			sinfo->rx_minfo.max_msg =
+				desc->ops->get_max_msg(base_cinfo);
+	}
+
+	return 0;
+}
+
 static int scmi_xfer_info_init(struct scmi_info *sinfo)
 {
 	int ret;
-	struct scmi_chan_info *base_tx_cinfo;
-	struct scmi_chan_info *base_rx_cinfo;
 
-	base_tx_cinfo = idr_find(&sinfo->tx_idr, SCMI_PROTOCOL_BASE);
-	if (unlikely(!base_tx_cinfo))
-		return -EINVAL;
+	ret = scmi_channels_max_msg_configure(sinfo);
+	if (ret)
+		return ret;
 
-	ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo, true,
-				    base_tx_cinfo);
-
-	base_rx_cinfo = idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE);
-	if (!ret && base_rx_cinfo)
-		ret = __scmi_xfer_info_init(sinfo, &sinfo->rx_minfo, false,
-					    base_rx_cinfo);
+	ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo);
+	if (!ret && idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE))
+		ret = __scmi_xfer_info_init(sinfo, &sinfo->rx_minfo);
 
 	return ret;
 }

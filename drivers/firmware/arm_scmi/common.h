@@ -320,8 +320,8 @@ struct scmi_chan_info {
  * @chan_setup: Callback to allocate and setup a channel
  * @chan_free: Callback to free a channel
  * @get_max_msg: Optional callback to provide max_msg dynamically
- * 	@return: Maximum number of messages for the channel type (tx or rx)
- * 		 that can be pending simultaneously in the system
+ *		 Returns the maximum number of messages for the channel type
+ *		 (tx or rx) that can be pending simultaneously in the system
  * @send_message: Callback to send a message
  * @mark_txdone: Callback to mark tx as done
  * @fetch_response: Callback to fetch response
@@ -334,7 +334,7 @@ struct scmi_transport_ops {
 	int (*chan_setup)(struct scmi_chan_info *cinfo, struct device *dev,
 			  bool tx);
 	int (*chan_free)(int id, void *p, void *data);
-	unsigned int (*get_max_msg)(bool tx, struct scmi_chan_info *base_cinfo);
+	unsigned int (*get_max_msg)(struct scmi_chan_info *base_cinfo);
 	int (*send_message)(struct scmi_chan_info *cinfo,
 			    struct scmi_xfer *xfer);
 	void (*mark_txdone)(struct scmi_chan_info *cinfo, int ret);
