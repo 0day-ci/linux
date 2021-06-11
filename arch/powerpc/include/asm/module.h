@@ -53,6 +53,30 @@ struct mod_arch_specific {
 };
 
 /*
+ * Check kernel module ELF header architecture specific compatibility.
+ */
+static inline bool elf_check_module_arch(Elf_Ehdr *hdr)
+{
+	if (!elf_check_arch(hdr))
+		return false;
+
+	if (IS_ENABLED(CONFIG_PPC64)) {
+		unsigned long abi_level = hdr->e_flags & 0x3;
+
+		if (IS_ENABLED(CONFIG_PPC64_BUILD_ELF_V2_ABI)) {
+			if (abi_level != 2)
+				return false;
+		} else {
+			if (abi_level >= 2)
+				return false;
+		}
+	}
+
+	return true;
+}
+#define elf_check_module_arch elf_check_module_arch
+
+/*
  * Select ELF headers.
  * Make empty section for module_frob_arch_sections to expand.
  */
