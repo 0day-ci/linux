@@ -9,7 +9,7 @@ menu "Firmware Drivers"
 config ARM_SCMI_PROTOCOL
 	tristate "ARM System Control and Management Interface (SCMI) Message Protocol"
 	depends on ARM || ARM64 || COMPILE_TEST
-	depends on ARM_SCMI_HAVE_SHMEM
+	depends on ARM_SCMI_HAVE_SHMEM || ARM_SCMI_HAVE_MSG
 	help
 	  ARM System Control and Management Interface (SCMI) protocol is a
 	  set of operating system-independent software interfaces that are
@@ -31,6 +31,12 @@ config ARM_SCMI_HAVE_SHMEM
 	bool
 	help
 	  This declares whether a shared memory based transport for SCMI is
+	  available.
+
+config ARM_SCMI_HAVE_MSG
+	bool
+	help
+	  This declares whether a message passing based transport for SCMI is
 	  available.
 
 config ARM_SCMI_POWER_DOMAIN
