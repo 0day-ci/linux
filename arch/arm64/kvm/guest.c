@@ -28,6 +28,40 @@
 
 #include "trace.h"
 
+struct _kvm_stats_desc kvm_vm_stats_desc[] = {
+	KVM_GENERIC_VM_STATS()
+};
+
+struct _kvm_stats_header kvm_vm_stats_header = {
+	{
+		.name_size = KVM_STATS_NAME_LEN,
+		.count = ARRAY_SIZE(kvm_vm_stats_desc),
+		.desc_offset = sizeof(struct _kvm_stats_header),
+		.data_offset = sizeof(struct _kvm_stats_header) +
+			sizeof(kvm_vm_stats_desc),
+	}
+};
+
+struct _kvm_stats_desc kvm_vcpu_stats_desc[] = {
+	KVM_GENERIC_VCPU_STATS(),
+	STATS_DESC_COUNTER("hvc_exit_stat"),
+	STATS_DESC_COUNTER("wfe_exit_stat"),
+	STATS_DESC_COUNTER("wfi_exit_stat"),
+	STATS_DESC_COUNTER("mmio_exit_user"),
+	STATS_DESC_COUNTER("mmio_exit_kernel"),
+	STATS_DESC_COUNTER("exits")
+};
+
+struct _kvm_stats_header kvm_vcpu_stats_header = {
+	{
+		.name_size = KVM_STATS_NAME_LEN,
+		.count = ARRAY_SIZE(kvm_vcpu_stats_desc),
+		.desc_offset = sizeof(struct _kvm_stats_header),
+		.data_offset = sizeof(struct _kvm_stats_header) +
+			sizeof(kvm_vcpu_stats_desc),
+	}
+};
+
 struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VCPU_STAT_GENERIC("halt_successful_poll", halt_successful_poll),
 	VCPU_STAT_GENERIC("halt_attempted_poll", halt_attempted_poll),
