@@ -134,6 +134,11 @@ static struct bus_type scmi_bus_type = {
 	.remove = scmi_dev_remove,
 };
 
+bool is_scmi_protocol_device(struct device *dev)
+{
+	return dev->bus == &scmi_bus_type;
+}
+
 int scmi_driver_register(struct scmi_driver *driver, struct module *owner,
 			 const char *mod_name)
 {
