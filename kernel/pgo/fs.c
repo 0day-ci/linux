@@ -294,7 +294,7 @@ static int prf_open(struct inode *inode, struct file *file)
 	int err = -EINVAL;
 
 	if (WARN_ON(!inode->i_private)) {
-		/* bug: inode was not initialized by us */
+		/* Bug: inode was not initialized by us. */
 		return err;
 	}
 
@@ -302,7 +302,7 @@ static int prf_open(struct inode *inode, struct file *file)
 	if (!data)
 		return -ENOMEM;
 
-	/* Get prf_object of this inode */
+	/* Get prf_object of this inode. */
 	data->core = inode->i_private;
 
 	/* Get initial buffer size. */
@@ -425,17 +425,17 @@ static void pgo_module_init(struct module *mod)
 	char fname[MODULE_NAME_LEN + 9]; /* +strlen(".profraw") */
 	unsigned long flags;
 
-	/* add new prf_object entry for the module */
+	/* Add new prf_object entry for the module. */
 	po = kzalloc(sizeof(*po), GFP_KERNEL);
 	if (!po)
-		goto out;
+		return; /* -ENOMEM */
 
 	po->mod_name = mod->name;
 
 	fname[0] = 0;
 	snprintf(fname, sizeof(fname), "%s.profraw", po->mod_name);
 
-	/* setup prf_object sections */
+	/* Setup prf_object sections. */
 	po->data = mod->prf_data;
 	po->data_num = prf_get_count(mod->prf_data,
 		(char *)mod->prf_data + mod->prf_data_size, sizeof(po->data[0]));
@@ -452,20 +452,19 @@ static void pgo_module_init(struct module *mod)
 	po->vnds_num = prf_get_count(mod->prf_vnds,
 		(char *)mod->prf_vnds + mod->prf_vnds_size, sizeof(po->vnds[0]));
 
-	/* create debugfs entry */
+	/* Create debugfs entry. */
 	po->file = debugfs_create_file(fname, 0600, directory, po, &prf_fops);
 	if (!po->file) {
 		pr_err("Failed to setup module pgo: %s", fname);
 		kfree(po);
-		goto out;
+
+	} else {
+		/* Finally enable profiling for the module. */
+		flags = prf_list_lock();
+		list_add_tail_rcu(&po->link, &prf_list);
+		prf_list_unlock(flags);
 	}
 
-	/* finally enable profiling for the module */
-	flags = prf_list_lock();
-	list_add_tail_rcu(&po->link, &prf_list);
-	prf_list_unlock(flags);
-
-out:
 	return;
 }
 
@@ -477,33 +476,33 @@ static int pgo_module_notifier(struct notifier_block *nb, unsigned long event,
 	unsigned long flags;
 
 	if (event == MODULE_STATE_LIVE) {
-		/* does the module have profiling info? */
+		/* Does the module have profiling info? */
 		if (mod->prf_data
 			&& mod->prf_cnts
 			&& mod->prf_names
 			&& mod->prf_vnds) {
 
-			/* setup module profiling */
+			/* Setup module profiling. */
 			pgo_module_init(mod);
 		}
 	}
 
 	if (event == MODULE_STATE_GOING) {
-		/* find the prf_object from the list */
+		/* Find the prf_object from the list. */
 		rcu_read_lock();
 
 		list_for_each_entry_rcu(po, &prf_list, link) {
 			if (strcmp(po->mod_name, mod->name) == 0)
 				goto out_unlock;
 		}
-		/* no such module */
+		/* No such module. */
 		po = NULL;
 
 out_unlock:
 		rcu_read_unlock();
 
 		if (po) {
-			/* remove from profiled modules */
+			/* Remove from profiled modules. */
 			flags = prf_list_lock();
 			list_del_rcu(&po->link);
 			prf_list_unlock(flags);
@@ -511,7 +510,7 @@ out_unlock:
 			debugfs_remove(po->file);
 			po->file = NULL;
 
-			/* cleanup memory */
+			/* Cleanup memory. */
 			kfree_rcu(po, rcu);
 		}
 	}
@@ -528,7 +527,7 @@ static int __init pgo_init(void)
 {
 	unsigned long flags;
 
-	/* Init profiler vmlinux core entry */
+	/* Init profiler vmlinux core entry. */
 	memset(&prf_vmlinux, 0, sizeof(prf_vmlinux));
 	prf_vmlinux.data = __llvm_prf_data_start;
 	prf_vmlinux.data_num = prf_get_count(__llvm_prf_data_start,
@@ -546,7 +545,7 @@ static int __init pgo_init(void)
 	prf_vmlinux.vnds_num = prf_get_count(__llvm_prf_vnds_start,
 		__llvm_prf_vnds_end, sizeof(__llvm_prf_vnds_start[0]));
 
-	/* enable profiling */
+	/* Enable profiling. */
 	flags = prf_list_lock();
 	prf_vmlinux.mod_name = "vmlinux";
 	list_add_tail_rcu(&prf_vmlinux.link, &prf_list);
@@ -565,10 +564,10 @@ static int __init pgo_init(void)
 				 &prf_reset_fops))
 		goto err_remove;
 
-	/* register module notifer */
+	/* Register module notifer. */
 	register_module_notifier(&pgo_module_nb);
 
-	/* show notice why the system slower: */
+	/* Show notice why the system slower: */
 	pr_notice("Clang PGO instrumentation is active.");
 
 	return 0;
@@ -581,7 +580,7 @@ err_remove:
 /* Remove debugfs entries. */
 static void __exit pgo_exit(void)
 {
-	/* unsubscribe the notifier and do cleanup. */
+	/* Unsubscribe the notifier and do cleanup. */
 	unregister_module_notifier(&pgo_module_nb);
 
 	debugfs_remove_recursive(directory);
