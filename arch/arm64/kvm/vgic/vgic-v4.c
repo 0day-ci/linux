@@ -116,7 +116,7 @@ static void vgic_v4_enable_vsgis(struct kvm_vcpu *vcpu)
 {
 	struct its_vpe *vpe = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
 	int i;
-
+	unsigned long flags;
 	/*
 	 * With GICv4.1, every virtual SGI can be directly injected. So
 	 * let's pretend that they are HW interrupts, tied to a host
@@ -125,7 +125,6 @@ static void vgic_v4_enable_vsgis(struct kvm_vcpu *vcpu)
 	for (i = 0; i < VGIC_NR_SGIS; i++) {
 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, i);
 		struct irq_desc *desc;
-		unsigned long flags;
 		int ret;
 
 		raw_spin_lock_irqsave(&irq->irq_lock, flags);
@@ -158,11 +157,11 @@ static void vgic_v4_enable_vsgis(struct kvm_vcpu *vcpu)
 static void vgic_v4_disable_vsgis(struct kvm_vcpu *vcpu)
 {
 	int i;
+	unsigned long flags;
 
 	for (i = 0; i < VGIC_NR_SGIS; i++) {
 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, i);
 		struct irq_desc *desc;
-		unsigned long flags;
 		int ret;
 
 		raw_spin_lock_irqsave(&irq->irq_lock, flags);

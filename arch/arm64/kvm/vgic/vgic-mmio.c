@@ -232,11 +232,11 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 	u32 value = 0;
 	int i;
+	unsigned long flags;
 
 	/* Loop over all IRQs affected by this read */
 	for (i = 0; i < len * 8; i++) {
 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-		unsigned long flags;
 		bool val;
 
 		raw_spin_lock_irqsave(&irq->irq_lock, flags);
