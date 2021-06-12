@@ -260,30 +260,29 @@ static int bridge_has_boot_interrupt_variant(struct pci_bus *bus)
 static int acpi_reroute_boot_interrupt(struct pci_dev *dev,
 				       struct acpi_prt_entry *entry)
 {
-	if (noioapicquirk || noioapicreroute) {
+	if (noioapicquirk || noioapicreroute)
 		return 0;
-	} else {
-		switch (bridge_has_boot_interrupt_variant(dev->bus)) {
-		case 0:
-			/* no rerouting necessary */
-			return 0;
-		case INTEL_IRQ_REROUTE_VARIANT:
-			/*
-			 * Remap according to INTx routing table in 6700PXH
-			 * specs, intel order number 302628-002, section
-			 * 2.15.2. Other chipsets (80332, ...) have the same
-			 * mapping and are handled here as well.
-			 */
-			dev_info(&dev->dev, "PCI IRQ %d -> rerouted to legacy "
-				 "IRQ %d\n", entry->index,
-				 (entry->index % 4) + 16);
-			entry->index = (entry->index % 4) + 16;
-			return 1;
-		default:
-			dev_warn(&dev->dev, "Cannot reroute IRQ %d to legacy "
-				 "IRQ: unknown mapping\n", entry->index);
-			return -1;
-		}
+
+	switch (bridge_has_boot_interrupt_variant(dev->bus)) {
+	case 0:
+		/* no rerouting necessary */
+		return 0;
+	case INTEL_IRQ_REROUTE_VARIANT:
+		/*
+		 * Remap according to INTx routing table in 6700PXH
+		 * specs, intel order number 302628-002, section
+		 * 2.15.2. Other chipsets (80332, ...) have the same
+		 * mapping and are handled here as well.
+		 */
+		dev_info(&dev->dev, "PCI IRQ %d -> rerouted to legacy "
+			 "IRQ %d\n", entry->index,
+			 (entry->index % 4) + 16);
+		entry->index = (entry->index % 4) + 16;
+		return 1;
+	default:
+		dev_warn(&dev->dev, "Cannot reroute IRQ %d to legacy "
+			 "IRQ: unknown mapping\n", entry->index);
+		return -1;
 	}
 }
 #endif /* CONFIG_X86_IO_APIC */
