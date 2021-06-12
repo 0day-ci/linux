@@ -2338,7 +2338,7 @@ static int cake_config_precedence(struct Qdisc *sch)
 
 /*	List of known Diffserv codepoints:
  *
- *	Least Effort (CS1)
+ *	Least Effort (CS1, LE)
  *	Best Effort (CS0)
  *	Max Reliability & LLT "Lo" (TOS1)
  *	Max Throughput (TOS2)
@@ -2360,7 +2360,7 @@ static int cake_config_precedence(struct Qdisc *sch)
  *	Total 25 codepoints.
  */
 
-/*	List of traffic classes in RFC 4594:
+/*	List of traffic classes in RFC 4594, updated by RFC 8622:
  *		(roughly descending order of contended priority)
  *		(roughly ascending order of uncontended throughput)
  *
@@ -2375,7 +2375,7 @@ static int cake_config_precedence(struct Qdisc *sch)
  *	Ops, Admin, Management (CS2,TOS1) - eg. ssh
  *	Standard Service (CS0 & unrecognised codepoints)
  *	High Throughput Data (AF1x,TOS2)  - eg. web traffic
- *	Low Priority Data (CS1)           - eg. BitTorrent
+ *	Low Priority Data (CS1,LE)        - eg. BitTorrent
 
  *	Total 12 traffic classes.
  */
@@ -2391,7 +2391,7 @@ static int cake_config_diffserv8(struct Qdisc *sch)
  *		Video Streaming          (AF4x, AF3x, CS3)
  *		Bog Standard             (CS0 etc.)
  *		High Throughput          (AF1x, TOS2)
- *		Background Traffic       (CS1)
+ *		Background Traffic       (CS1, LE)
  *
  *		Total 8 traffic classes.
  */
@@ -2435,7 +2435,7 @@ static int cake_config_diffserv4(struct Qdisc *sch)
  *	    Latency Sensitive  (CS7, CS6, EF, VA, CS5, CS4)
  *	    Streaming Media    (AF4x, AF3x, CS3, AF2x, TOS4, CS2, TOS1)
  *	    Best Effort        (CS0, AF1x, TOS2, and those not specified)
- *	    Background Traffic (CS1)
+ *	    Background Traffic (CS1, LE)
  *
  *		Total 4 traffic classes.
  */
@@ -2473,7 +2473,7 @@ static int cake_config_diffserv4(struct Qdisc *sch)
 static int cake_config_diffserv3(struct Qdisc *sch)
 {
 /*  Simplified Diffserv structure with 3 tins.
- *		Low Priority		(CS1)
+ *		Low Priority		(CS1, LE)
  *		Best Effort
  *		Latency Sensitive	(TOS4, VA, EF, CS6, CS7)
  */
