@@ -401,6 +401,7 @@ static ssize_t read_vmcore(struct file *file, char __user *buffer,
 	return __read_vmcore((__force char *) buffer, buflen, fpos, 1);
 }
 
+#ifdef CONFIG_MMU
 /*
  * The vmcore fault handler uses the page cache and fills data using the
  * standard __vmcore_read() function.
@@ -443,6 +444,7 @@ static vm_fault_t mmap_vmcore_fault(struct vm_fault *vmf)
 static const struct vm_operations_struct vmcore_mmap_ops = {
 	.fault = mmap_vmcore_fault,
 };
+#endif
 
 /**
  * vmcore_alloc_buf - allocate buffer in vmalloc memory
