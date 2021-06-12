@@ -2300,7 +2300,7 @@ _vortex_interrupt(int irq, struct net_device *dev)
 		}
 
 		if (status & DMADone) {
-			if (ioread16(ioaddr + Wn7_MasterStatus) & 0x1000) {
+			if ((ioread16(ioaddr + Wn7_MasterStatus) & 0x1000) && vp->tx_skb_dma) {
 				iowrite16(0x1000, ioaddr + Wn7_MasterStatus); /* Ack the event. */
 				dma_unmap_single(vp->gendev, vp->tx_skb_dma, (vp->tx_skb->len + 3) & ~3, DMA_TO_DEVICE);
 				pkts_compl++;
