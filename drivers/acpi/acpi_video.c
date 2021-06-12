@@ -134,8 +134,7 @@ struct acpi_video_device_attrib {
 	u32 display_type:4;	/* Describe the specific type in use */
 	u32 vendor_specific:4;	/* Chipset Vendor Specific */
 	u32 bios_can_detect:1;	/* BIOS can detect the device */
-	u32 depend_on_vga:1;	/* Non-VGA output device whose power is related to
-				   the VGA device. */
+	u32 depend_on_vga:1;	/* Non-VGA output device whose power is related to the VGA device */
 	u32 pipe_id:3;		/* For VGA multiple-head devices. */
 	u32 reserved:10;	/* Must be 0 */
 
@@ -1581,13 +1580,11 @@ static void acpi_video_bus_notify(struct acpi_device *device, u32 event)
 	input = video->input;
 
 	switch (event) {
-	case ACPI_VIDEO_NOTIFY_SWITCH:	/* User requested a switch,
-					 * most likely via hotkey. */
+	case ACPI_VIDEO_NOTIFY_SWITCH:	/* User requested a switch, most likely via hotkey. */
 		keycode = KEY_SWITCHVIDEOMODE;
 		break;
 
-	case ACPI_VIDEO_NOTIFY_PROBE:	/* User plugged in or removed a video
-					 * connector. */
+	case ACPI_VIDEO_NOTIFY_PROBE:	/* User plugged in or removed a video connector. */
 		acpi_video_device_enumerate(video);
 		acpi_video_device_rebind(video);
 		keycode = KEY_SWITCHVIDEOMODE;
