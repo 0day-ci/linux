@@ -160,6 +160,27 @@ static inline bool is_sysrq_oom(struct oom_control *oc)
 	return oc->order == -1;
 }
 
+/**
+ * is_task_eligible_oom - determine if and why a task cannot be OOM killed
+ * @tsk: task to check
+ *
+ * Needs to be called with task_lock().
+ */
+static const char * is_task_oom_eligible(struct task_struct *p)
+{
+	long adj;
+
+	adj = (long)p->signal->oom_score_adj;
+	if (adj == OOM_SCORE_ADJ_MIN)
+		return "S";
+	else if (test_bit(MMF_OOM_SKIP, &p->mm->flags)
+		return "R";
+	else if (in_vfork(p))
+		return "V";
+	else
+		return "";
+}
+
 /* return true if the task is not adequate as candidate victim task. */
 static bool oom_unkillable_task(struct task_struct *p)
 {
@@ -401,12 +422,13 @@ static int dump_task(struct task_struct *p, void *arg)
 		return 0;
 	}
 
-	pr_info("[%7d] %5d %5d %8lu %8lu %8ld %8lu         %5hd %s\n",
+	pr_info("[%7d] %5d %5d %8lu %8lu %8ld %8lu         %5hd %13s %s\n",
 		task->pid, from_kuid(&init_user_ns, task_uid(task)),
 		task->tgid, task->mm->total_vm, get_mm_rss(task->mm),
 		mm_pgtables_bytes(task->mm),
 		get_mm_counter(task->mm, MM_SWAPENTS),
-		task->signal->oom_score_adj, task->comm);
+		task->signal->oom_score_adj, is_task_oom_eligible(task),
+		task->comm);
 	task_unlock(task);
 
 	return 0;
@@ -420,12 +442,13 @@ static int dump_task(struct task_struct *p, void *arg)
  * memcg, not in the same cpuset, or bound to a disjoint set of mempolicy nodes
  * are not shown.
  * State information includes task's pid, uid, tgid, vm size, rss,
- * pgtables_bytes, swapents, oom_score_adj value, and name.
+ * pgtables_bytes, swapents, oom_score_adj value, oom eligibility status
+ * and name.
  */
 static void dump_tasks(struct oom_control *oc)
 {
 	pr_info("Tasks state (memory values in pages):\n");
-	pr_info("[  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name\n");
+	pr_info("[  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj oom eligible? name\n");
 
 	if (is_memcg_oom(oc))
 		mem_cgroup_scan_tasks(oc->memcg, dump_task, oc);
