@@ -44,6 +44,12 @@ CFLAGS_kcov.o := $(call cc-option, -fno-conserve-stack) -fno-stack-protector
 # Don't instrument error handlers
 CFLAGS_REMOVE_cfi.o := $(CC_FLAGS_CFI)
 
+# Don't profile module.c:
+# CLANG_PGO changes the layout of struct module
+# for instrumented kernel so the profile data
+# will mismatch on final build.
+PGO_PROFILE_module.o := n
+
 obj-y += sched/
 obj-y += locking/
 obj-y += power/

@@ -492,6 +492,21 @@ struct module {
 	unsigned long *kprobe_blacklist;
 	unsigned int num_kprobe_blacklist;
 #endif
+#ifdef CONFIG_PGO_CLANG
+	/*
+	 * Keep in sync with the PGO_CLANG_DATA sections
+	 * in include/asm-generic/vmlinux.lds.h
+	 * The prf_xxx_size is the section size in bytes.
+	 */
+	void *prf_data; /* struct llvm_prf_data */
+	int prf_data_size;
+	void *prf_cnts;
+	int prf_cnts_size;
+	const void *prf_names;
+	int prf_names_size;
+	void *prf_vnds; /* struct llvm_prf_value_node */
+	int prf_vnds_size;
+#endif
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 	int num_static_call_sites;
 	struct static_call_site *static_call_sites;

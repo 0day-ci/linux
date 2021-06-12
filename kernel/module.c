@@ -3329,6 +3329,13 @@ static int find_module_sections(struct module *mod, struct load_info *info)
 					      sizeof(*mod->static_call_sites),
 					      &mod->num_static_call_sites);
 #endif
+#ifdef CONFIG_PGO_CLANG
+	mod->prf_data = section_objs(info, "__llvm_prf_data", 1, &mod->prf_data_size);
+	mod->prf_cnts = section_objs(info, "__llvm_prf_cnts", 1, &mod->prf_cnts_size);
+	mod->prf_names = section_objs(info, "__llvm_prf_names", 1, &mod->prf_names_size);
+	mod->prf_vnds = section_objs(info, "__llvm_prf_vnds", 1, &mod->prf_vnds_size);
+#endif
+
 	mod->extable = section_objs(info, "__ex_table",
 				    sizeof(*mod->extable), &mod->num_exentries);
 
