@@ -185,27 +185,72 @@ void __llvm_profile_instrument_range(u64 target_value, void *data,
 void __llvm_profile_instrument_memop(u64 target_value, void *data,
 				     u32 counter_index);
 
-#define __DEFINE_PRF_SIZE(s) \
-	static inline unsigned long prf_ ## s ## _size(void)		\
-	{								\
-		unsigned long start =					\
-			(unsigned long)__llvm_prf_ ## s ## _start;	\
-		unsigned long end =					\
-			(unsigned long)__llvm_prf_ ## s ## _end;	\
-		return roundup(end - start,				\
-				sizeof(__llvm_prf_ ## s ## _start[0]));	\
-	}								\
-	static inline unsigned long prf_ ## s ## _count(void)		\
-	{								\
-		return prf_ ## s ## _size() /				\
-			sizeof(__llvm_prf_ ## s ## _start[0]);		\
+/*
+ * profiler object:
+ * maintain profiler internal state
+ * of vmlinux or any instrumented module.
+ */
+struct prf_object {
+	struct list_head link;
+	struct rcu_head rcu;
+
+	/*
+	 * module name of this prf_object
+	 * refers to struct module::name
+	 * or "vmlinux"
+	 */
+	const char *mod_name;
+
+	/* debugfs file of this profile data set */
+	struct dentry *file;
+
+	int current_node;
+
+	struct llvm_prf_data *data;
+	int data_num;
+	u64 *cnts;
+	int cnts_num;
+	const char *names;
+	int names_num;
+	struct llvm_prf_value_node *vnds;
+	int vnds_num;
+};
+
+/*
+ * List of profiled modules and vmlinux.
+ * Readers must take rcu_read_lock() and
+ * updaters must take prf_list_lock() mutex.
+ */
+extern struct list_head prf_list;
+
+/*
+ * define helpers to get __llvm_prf_xxx sections bounds
+ */
+#define __DEFINE_PRF_OBJ_SIZE(s) \
+	static inline unsigned long prf_ ## s ## _size(struct prf_object *po) \
+	{ \
+		return po->s ## _num * sizeof(po->s[0]); \
+	} \
+	static inline unsigned long prf_ ## s ## _count(struct prf_object *po) \
+	{ \
+		return po->s ## _num; \
 	}
 
-__DEFINE_PRF_SIZE(data);
-__DEFINE_PRF_SIZE(cnts);
-__DEFINE_PRF_SIZE(names);
-__DEFINE_PRF_SIZE(vnds);
+__DEFINE_PRF_OBJ_SIZE(data);
+__DEFINE_PRF_OBJ_SIZE(cnts);
+__DEFINE_PRF_OBJ_SIZE(names);
+__DEFINE_PRF_OBJ_SIZE(vnds);
 
-#undef __DEFINE_PRF_SIZE
+#undef __DEFINE_PRF_OBJ_SIZE
+
+/* count number of items in range */
+static inline unsigned int prf_get_count(const void *_start, const void *_end,
+	unsigned int objsize)
+{
+	unsigned long start = (unsigned long)_start;
+	unsigned long end =	(unsigned long)_end;
+
+	return roundup(end - start, objsize) / objsize;
+}
 
 #endif /* _PGO_H */

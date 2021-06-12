@@ -34,6 +34,31 @@ struct prf_private_data {
 	size_t size;
 };
 
+static struct prf_object prf_vmlinux;
+
+/*
+ * This lock guards prf_list from concurrent access:
+ * - New module is registered.
+ * - Module is unloaded.
+ * It does *not* protect any PGO serialization functions.
+ */
+DEFINE_SPINLOCK(prf_reg_lock);
+LIST_HEAD(prf_list);
+
+static inline unsigned long prf_list_lock(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&prf_reg_lock, flags);
+
+	return flags;
+}
+
+static inline void prf_list_unlock(unsigned long flags)
+{
+	spin_unlock_irqrestore(&prf_reg_lock, flags);
+}
+
 /*
  * Raw profile data format:
  *
@@ -51,7 +76,7 @@ struct prf_private_data {
  *		...
  */
 
-static void prf_fill_header(void **buffer)
+static void prf_fill_header(struct prf_object *po, void **buffer)
 {
 	struct llvm_prf_header *header = *(struct llvm_prf_header **)buffer;
 
@@ -61,13 +86,13 @@ static void prf_fill_header(void **buffer)
 	header->magic = LLVM_INSTR_PROF_RAW_MAGIC_32;
 #endif
 	header->version = LLVM_VARIANT_MASK_IR_PROF | LLVM_INSTR_PROF_RAW_VERSION;
-	header->data_size = prf_data_count();
+	header->data_size = po->data_num;
 	header->padding_bytes_before_counters = 0;
-	header->counters_size = prf_cnts_count();
+	header->counters_size = po->cnts_num;
 	header->padding_bytes_after_counters = 0;
-	header->names_size = prf_names_count();
-	header->counters_delta = (u64)__llvm_prf_cnts_start;
-	header->names_delta = (u64)__llvm_prf_names_start;
+	header->names_size = po->names_num;
+	header->counters_delta = (u64)po->cnts;
+	header->names_delta = (u64)po->names;
 	header->value_kind_last = LLVM_INSTR_PROF_IPVK_LAST;
 
 	*buffer += sizeof(*header);
@@ -77,7 +102,7 @@ static void prf_fill_header(void **buffer)
  * Copy the source into the buffer, incrementing the pointer into buffer in the
  * process.
  */
-static void prf_copy_to_buffer(void **buffer, void *src, unsigned long size)
+static void prf_copy_to_buffer(void **buffer, const void *src, unsigned long size)
 {
 	memcpy(*buffer, src, size);
 	*buffer += size;
@@ -129,12 +154,13 @@ static u32 __prf_get_value_size(struct llvm_prf_data *p, u32 *value_kinds)
 	return size;
 }
 
-static u32 prf_get_value_size(void)
+static u32 prf_get_value_size(struct prf_object *po)
 {
 	u32 size = 0;
 	struct llvm_prf_data *p;
+	struct llvm_prf_data *end = po->data + po->data_num;
 
-	for (p = __llvm_prf_data_start; p < __llvm_prf_data_end; p++)
+	for (p = po->data; p < end; p++)
 		size += __prf_get_value_size(p, NULL);
 
 	return size;
@@ -201,11 +227,12 @@ static void prf_serialize_value(struct llvm_prf_data *p, void **buffer)
 	}
 }
 
-static void prf_serialize_values(void **buffer)
+static void prf_serialize_values(struct prf_object *po, void **buffer)
 {
 	struct llvm_prf_data *p;
+	struct llvm_prf_data *end = po->data + po->data_num;
 
-	for (p = __llvm_prf_data_start; p < __llvm_prf_data_end; p++)
+	for (p = po->data; p < end; p++)
 		prf_serialize_value(p, buffer);
 }
 
@@ -215,14 +242,14 @@ static inline unsigned long prf_get_padding(unsigned long size)
 }
 
 /* Note: caller *must* hold pgo_lock */
-static unsigned long prf_buffer_size(void)
+static unsigned long prf_buffer_size(struct prf_object *po)
 {
-	return sizeof(struct llvm_prf_header) +
-			prf_data_size()	+
-			prf_cnts_size() +
-			prf_names_size() +
-			prf_get_padding(prf_names_size()) +
-			prf_get_value_size();
+	return sizeof(struct llvm_prf_header)	+
+			prf_data_size(po)	+
+			prf_cnts_size(po)	+
+			prf_names_size(po)	+
+			prf_get_padding(prf_names_size(po)) +
+			prf_get_value_size(po);
 }
 
 /*
@@ -232,12 +259,12 @@ static unsigned long prf_buffer_size(void)
  * area of at least prf_buffer_size() in size.
  * Note: caller *must* hold pgo_lock.
  */
-static int prf_serialize(struct prf_private_data *p, size_t buf_size)
+static int prf_serialize(struct prf_object *po, struct prf_private_data *p, size_t buf_size)
 {
 	void *buffer;
 
 	/* get buffer size, again. */
-	p->size = prf_buffer_size();
+	p->size = prf_buffer_size(po);
 
 	/* check for unlikely overflow. */
 	if (p->size > buf_size)
@@ -245,15 +272,16 @@ static int prf_serialize(struct prf_private_data *p, size_t buf_size)
 
 	buffer = p->buffer;
 
-	prf_fill_header(&buffer);
-	prf_copy_to_buffer(&buffer, __llvm_prf_data_start,  prf_data_size());
-	prf_copy_to_buffer(&buffer, __llvm_prf_cnts_start,  prf_cnts_size());
-	prf_copy_to_buffer(&buffer, __llvm_prf_names_start, prf_names_size());
-	buffer += prf_get_padding(prf_names_size());
+	prf_fill_header(po, &buffer);
+	prf_copy_to_buffer(&buffer, po->data,  prf_data_size(po));
+	prf_copy_to_buffer(&buffer, po->cnts,  prf_cnts_size(po));
+	prf_copy_to_buffer(&buffer, po->names, prf_names_size(po));
+	buffer += prf_get_padding(prf_names_size(po));
 
-	prf_serialize_values(&buffer);
+	prf_serialize_values(po, &buffer);
 
 	return 0;
+
 }
 
 /* open() implementation for PGO. Creates a copy of the profiling data set. */
@@ -270,7 +298,7 @@ static int prf_open(struct inode *inode, struct file *file)
 
 	/* Get initial buffer size. */
 	flags = prf_lock();
-	data->size = prf_buffer_size();
+	data->size = prf_buffer_size(&prf_vmlinux);
 	prf_unlock(flags);
 
 	do {
@@ -290,7 +318,7 @@ static int prf_open(struct inode *inode, struct file *file)
 		 * data length in data->size.
 		 */
 		flags = prf_lock();
-		err = prf_serialize(data, buf_size);
+		err = prf_serialize(&prf_vmlinux, data, buf_size);
 		prf_unlock(flags);
 		/* In unlikely case, try again. */
 	} while (err == -EAGAIN);
@@ -346,7 +374,7 @@ static ssize_t reset_write(struct file *file, const char __user *addr,
 {
 	struct llvm_prf_data *data;
 
-	memset(__llvm_prf_cnts_start, 0, prf_cnts_size());
+	memset(__llvm_prf_cnts_start, 0, prf_cnts_size(&prf_vmlinux));
 
 	for (data = __llvm_prf_data_start; data < __llvm_prf_data_end; data++) {
 		struct llvm_prf_value_node **vnodes;
@@ -384,6 +412,25 @@ static const struct file_operations prf_reset_fops = {
 /* Create debugfs entries. */
 static int __init pgo_init(void)
 {
+	/* Init profiler vmlinux core entry */
+	memset(&prf_vmlinux, 0, sizeof(prf_vmlinux));
+	prf_vmlinux.data = __llvm_prf_data_start;
+	prf_vmlinux.data_num = prf_get_count(__llvm_prf_data_start,
+		__llvm_prf_data_end, sizeof(__llvm_prf_data_start[0]));
+
+	prf_vmlinux.cnts = __llvm_prf_cnts_start;
+	prf_vmlinux.cnts_num = prf_get_count(__llvm_prf_cnts_start,
+		__llvm_prf_cnts_end, sizeof(__llvm_prf_cnts_start[0]));
+
+	prf_vmlinux.names = __llvm_prf_names_start;
+	prf_vmlinux.names_num = prf_get_count(__llvm_prf_names_start,
+		__llvm_prf_names_end, sizeof(__llvm_prf_names_start[0]));
+
+	prf_vmlinux.vnds = __llvm_prf_vnds_start;
+	prf_vmlinux.vnds_num = prf_get_count(__llvm_prf_vnds_start,
+		__llvm_prf_vnds_end, sizeof(__llvm_prf_vnds_start[0]));
+
+
 	directory = debugfs_create_dir("pgo", NULL);
 	if (!directory)
 		goto err_remove;

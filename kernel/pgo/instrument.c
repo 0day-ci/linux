@@ -56,7 +56,8 @@ void prf_unlock(unsigned long flags)
 static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 						 u32 index, u64 value)
 {
-	const int max_vnds = prf_vnds_count();
+	const int max_vnds = prf_get_count(__llvm_prf_vnds_start,
+		__llvm_prf_vnds_end, sizeof(struct llvm_prf_value_node));
 
 	/*
 	 * Check that p is within vmlinux __llvm_prf_data section.
