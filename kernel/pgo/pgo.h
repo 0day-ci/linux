@@ -19,6 +19,8 @@
 #ifndef _PGO_H
 #define _PGO_H
 
+#include <linux/rculist.h>
+
 /*
  * Note: These internal LLVM definitions must match the compiler version.
  * See llvm/include/llvm/ProfileData/InstrProfData.inc in LLVM's source code.

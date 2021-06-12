@@ -24,6 +24,7 @@
 #include <linux/export.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <linux/rculist.h>
 #include "pgo.h"
 
 /*
@@ -56,22 +57,38 @@ void prf_unlock(unsigned long flags)
 static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 						 u32 index, u64 value)
 {
-	const int max_vnds = prf_get_count(__llvm_prf_vnds_start,
-		__llvm_prf_vnds_end, sizeof(struct llvm_prf_value_node));
+	struct llvm_prf_value_node *vnode = NULL;
+	struct prf_object *po;
+	struct llvm_prf_data *data_end;
+	int max_vnds;
 
-	/*
-	 * Check that p is within vmlinux __llvm_prf_data section.
-	 * If not, don't allocate since we can't handle modules yet.
-	 */
-	if (!memory_contains(__llvm_prf_data_start,
-		__llvm_prf_data_end, p, sizeof(*p)))
-		return NULL;
+	rcu_read_lock();
 
-	if (WARN_ON_ONCE(current_node >= max_vnds))
-		return NULL; /* Out of nodes */
+	list_for_each_entry_rcu(po, &prf_list, link) {
+		/* get section limits */
+		max_vnds = prf_vnds_count(po);
+		data_end = po->data + prf_data_count(po);
 
-	/* reserve vnode for vmlinux */
-	return &__llvm_prf_vnds_start[current_node++];
+		/*
+		 * Check that p is within:
+		 * [po->data, po->data + prf_data_count(po)] section.
+		 * If yes, allocate vnode from this prf_object.
+		 */
+		if (memory_contains(po->data, data_end, p, sizeof(*p))) {
+
+
+			if (WARN_ON_ONCE(po->current_node >= max_vnds))
+				return NULL; /* Out of nodes */
+
+			/* reserve the vnode */
+			vnode = &po->vnds[po->current_node++];
+			goto out;
+		}
+	}
+
+out:
+	rcu_read_unlock();
+	return vnode;
 }
 
 /*

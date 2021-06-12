@@ -32,8 +32,10 @@ static struct dentry *directory;
 struct prf_private_data {
 	void *buffer;
 	size_t size;
+	struct prf_object *core;
 };
 
+/* vmlinux's prf core */
 static struct prf_object prf_vmlinux;
 
 /*
@@ -281,7 +283,6 @@ static int prf_serialize(struct prf_object *po, struct prf_private_data *p, size
 	prf_serialize_values(po, &buffer);
 
 	return 0;
-
 }
 
 /* open() implementation for PGO. Creates a copy of the profiling data set. */
@@ -292,13 +293,21 @@ static int prf_open(struct inode *inode, struct file *file)
 	size_t buf_size;
 	int err = -EINVAL;
 
+	if (WARN_ON(!inode->i_private)) {
+		/* bug: inode was not initialized by us */
+		return err;
+	}
+
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
+	/* Get prf_object of this inode */
+	data->core = inode->i_private;
+
 	/* Get initial buffer size. */
 	flags = prf_lock();
-	data->size = prf_buffer_size(&prf_vmlinux);
+	data->size = prf_buffer_size(data->core);
 	prf_unlock(flags);
 
 	do {
@@ -318,12 +327,13 @@ static int prf_open(struct inode *inode, struct file *file)
 		 * data length in data->size.
 		 */
 		flags = prf_lock();
-		err = prf_serialize(&prf_vmlinux, data, buf_size);
+		err = prf_serialize(data->core, data, buf_size);
 		prf_unlock(flags);
 		/* In unlikely case, try again. */
 	} while (err == -EAGAIN);
 
 	if (err < 0) {
+
 		if (data)
 			vfree(data->buffer);
 		kfree(data);
@@ -412,6 +422,8 @@ static const struct file_operations prf_reset_fops = {
 /* Create debugfs entries. */
 static int __init pgo_init(void)
 {
+	unsigned long flags;
+
 	/* Init profiler vmlinux core entry */
 	memset(&prf_vmlinux, 0, sizeof(prf_vmlinux));
 	prf_vmlinux.data = __llvm_prf_data_start;
@@ -430,18 +442,26 @@ static int __init pgo_init(void)
 	prf_vmlinux.vnds_num = prf_get_count(__llvm_prf_vnds_start,
 		__llvm_prf_vnds_end, sizeof(__llvm_prf_vnds_start[0]));
 
+	/* enable profiling */
+	flags = prf_list_lock();
+	list_add_tail_rcu(&prf_vmlinux.link, &prf_list);
+	prf_list_unlock(flags);
 
 	directory = debugfs_create_dir("pgo", NULL);
 	if (!directory)
 		goto err_remove;
 
-	if (!debugfs_create_file("vmlinux.profraw", 0600, directory, NULL,
-				 &prf_fops))
+	prf_vmlinux.file = debugfs_create_file("vmlinux.profraw",
+		0600, directory, &prf_vmlinux, &prf_fops);
+	if (!prf_vmlinux.file)
 		goto err_remove;
 
 	if (!debugfs_create_file("reset", 0200, directory, NULL,
 				 &prf_reset_fops))
 		goto err_remove;
+
+	/* show notice why the system slower: */
+	pr_notice("Clang PGO instrumentation is active.");
 
 	return 0;
 
