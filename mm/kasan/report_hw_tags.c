@@ -14,11 +14,7 @@
 #include <linux/types.h>
 
 #include "kasan.h"
-
-const char *kasan_get_bug_type(struct kasan_access_info *info)
-{
-	return "invalid-access";
-}
+#include "report_tags.h"
 
 void *kasan_find_first_bad_addr(void *addr, size_t size)
 {
