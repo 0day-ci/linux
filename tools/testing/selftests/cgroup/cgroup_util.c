@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include "cgroup_util.h"
@@ -456,22 +457,28 @@ int get_temp_fd(void)
 	return open(".", O_TMPFILE | O_RDWR | O_EXCL);
 }
 
+int touch_file(int fd, size_t size, off_t offset) {
+	char *buf;
+
+	buf = mmap(0, size, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, offset);
+	if (!buf)
+		return -1;
+	munmap(buf, size);
+	return 0;
+}
+
 int alloc_pagecache(int fd, size_t size)
 {
-	char buf[PAGE_SIZE];
 	struct stat st;
-	int i;
 
 	if (fstat(fd, &st))
 		goto cleanup;
 
-	size += st.st_size;
-
-	if (ftruncate(fd, size))
+	if (ftruncate(fd, st.st_size + size))
 		goto cleanup;
 
-	for (i = 0; i < size; i += sizeof(buf))
-		read(fd, buf, sizeof(buf));
+	if (touch_file(fd, size, st.st_size))
+		goto cleanup;
 
 	return 0;
 

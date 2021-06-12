@@ -20,6 +20,7 @@
 #include "../kselftest.h"
 #include "cgroup_util.h"
 
+
 /*
  * This test creates two nested cgroups with and without enabling
  * the memory controller.
@@ -578,6 +579,24 @@ cleanup:
 	return ret;
 
 }
+
+static int touch_pagecache(const char *cgroup, void *arg) {
+	int fd = (long)arg;
+	struct stat st;
+
+	if (fstat(fd, &st))
+		return -1;
+
+	return touch_file(fd, st.st_size, 0);
+}
+
+static int alloc_pagecache_300M(const char *cgroup, void *arg)
+{
+	int fd = (long)arg;
+
+	return alloc_pagecache(fd, MB(300));
+}
+
 
 /*
  * This test checks that memory.high limits the amount of
@@ -1169,6 +1188,82 @@ cleanup:
 	return ret;
 }
 
+/* 
+ * First, this test creates the following hierarchy: 
+ * A   memory.low = 200M, memory.max = 200M
+ * A/B memory.low = 200M, memory.max = 200M
+ * A/C memory.low = 200M, memory.max = 200M
+ *
+ * Then it triggers relaim in A, by allocating A/B and A/C
+ * pagecaches. During this reclaim elow values of A/B and A/C are
+ * filled.  
+ * Then it lowers limits for A/C to create memory pressure
+ * and trigger reclaim in A/C. Usage of elow value assigned during
+ * previous step as memory protection will lead with high probabilty
+ * to OOM.
+ */
+static int test_memcg_stale_protection_oom(const char *root) {
+	int i;
+	int fd = -1;
+	char *memcgs[3] = {0};
+	const int memcgs_count = sizeof(memcgs)/sizeof(memcgs[0]);
+	int ret = -1;
+	char *low1 = "200M", *low2 = "100M";
+
+	for (i = 0; i < memcgs_count; ++i) {
+		char name[] = "memcg_test_\0";
+		name[sizeof(name)-2] = '0' + i;
+		memcgs[i] = cg_name(memcgs[0] ? : root, name);
+		if (!memcgs[i])
+			goto cleanup;
+		if (cg_create(memcgs[i]))
+			goto cleanup;
+	}
+
+	if (cg_write(memcgs[0], "cgroup.subtree_control", "+memory"))
+		goto cleanup;
+
+	for (i = 0; i < memcgs_count; ++i) {
+		if (cg_write(memcgs[i], "memory.max", low1)) {
+			goto cleanup;
+		}
+		if (cg_write(memcgs[i], "memory.low", low1)) {
+			goto cleanup;
+		}
+	}
+
+	fd = get_temp_fd();
+	if (fd < 0)
+		goto cleanup;
+
+	if (cg_run(memcgs[1], alloc_pagecache_300M, (void*)(long)fd)) {
+		goto cleanup;
+	}
+	if (cg_run(memcgs[2], touch_pagecache, (void*)(long)fd)) {
+		goto cleanup;
+	}
+
+	if (cg_write(memcgs[2], "memory.max", low2))
+		goto cleanup;
+	if (cg_write(memcgs[2], "memory.low", low2))
+		goto cleanup;
+	if (cg_run(memcgs[2], touch_pagecache, (void*)(long)fd))
+		goto cleanup;
+
+	ret = 0;
+cleanup:
+	for (i = memcgs_count; i > 0; --i) {
+		if (memcgs[i - 1]) {
+			cg_destroy(memcgs[i - 1]);
+			free(memcgs[i - 1]);
+		}
+	}
+
+	if (fd >= 0)
+		close(fd);
+	return ret;
+}
+
 
 #define T(x) { x, #x }
 struct memcg_test {
@@ -1187,6 +1282,7 @@ struct memcg_test {
 	T(test_memcg_oom_group_leaf_events),
 	T(test_memcg_oom_group_parent_events),
 	T(test_memcg_oom_group_score_events),
+	T(test_memcg_stale_protection_oom),
 };
 #undef T
 

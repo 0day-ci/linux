@@ -42,6 +42,7 @@ extern int cg_run_nowait(const char *cgroup,
 			 int (*fn)(const char *cgroup, void *arg),
 			 void *arg);
 extern int get_temp_fd(void);
+extern int touch_file(int fd, size_t size, off_t offset);
 extern int alloc_pagecache(int fd, size_t size);
 extern int alloc_anon(const char *cgroup, void *arg);
 extern int is_swap_enabled(void);
