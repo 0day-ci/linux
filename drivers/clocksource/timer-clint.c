@@ -55,6 +55,8 @@ static void clint_clear_ipi(void)
 }
 
 static struct riscv_ipi_ops clint_ipi_ops = {
+	.name = "CLINT",
+	.use_for_rfence = true,
 	.ipi_inject = clint_send_ipi,
 	.ipi_clear = clint_clear_ipi,
 };

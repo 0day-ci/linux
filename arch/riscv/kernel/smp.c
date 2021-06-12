@@ -90,9 +90,32 @@ static void ipi_stop(void)
 
 static const struct riscv_ipi_ops *ipi_ops __ro_after_init;
 
+DEFINE_STATIC_KEY_FALSE(riscv_ipi_for_rfence);
+EXPORT_SYMBOL_GPL(riscv_ipi_for_rfence);
+
 void riscv_set_ipi_ops(const struct riscv_ipi_ops *ops)
 {
-	ipi_ops = ops;
+	bool updated = true;
+
+	if (!ops)
+		return;
+
+	if (!ipi_ops) {
+		ipi_ops = ops;
+	} else {
+		if (!ipi_ops->use_for_rfence && ops->use_for_rfence)
+			ipi_ops = ops;
+		else
+			updated = false;
+	}
+
+	if (updated) {
+		if (ipi_ops->use_for_rfence)
+			static_branch_enable(&riscv_ipi_for_rfence);
+		else
+			static_branch_disable(&riscv_ipi_for_rfence);
+		pr_info("switched IPI operations to %s\n", ipi_ops->name);
+	}
 }
 EXPORT_SYMBOL_GPL(riscv_set_ipi_ops);
 

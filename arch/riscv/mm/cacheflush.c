@@ -16,7 +16,7 @@ static void ipi_remote_fence_i(void *info)
 
 void flush_icache_all(void)
 {
-	if (IS_ENABLED(CONFIG_RISCV_SBI))
+	if (!riscv_use_ipi_for_rfence())
 		sbi_remote_fence_i(NULL);
 	else
 		on_each_cpu(ipi_remote_fence_i, NULL, 1);

@@ -16,11 +16,16 @@ struct seq_file;
 extern unsigned long boot_cpu_hartid;
 
 struct riscv_ipi_ops {
+	const char *name;
+	bool use_for_rfence;
 	void (*ipi_inject)(const struct cpumask *target);
 	void (*ipi_clear)(void);
 };
 
 #ifdef CONFIG_SMP
+
+#include <linux/jump_label.h>
+
 /*
  * Mapping between linux logical cpu index and hartid.
  */
@@ -44,6 +49,11 @@ void arch_send_call_function_single_ipi(int cpu);
 
 int riscv_hartid_to_cpuid(int hartid);
 void riscv_cpuid_to_hartid_mask(const struct cpumask *in, struct cpumask *out);
+
+/* Check if we can use IPIs for remote FENCE */
+extern struct static_key_false riscv_ipi_for_rfence;
+#define riscv_use_ipi_for_rfence() \
+	static_branch_unlikely(&riscv_ipi_for_rfence)
 
 /* Set custom IPI operations */
 void riscv_set_ipi_ops(const struct riscv_ipi_ops *ops);
@@ -90,6 +100,11 @@ static inline void riscv_cpuid_to_hartid_mask(const struct cpumask *in,
 {
 	cpumask_clear(out);
 	cpumask_set_cpu(boot_cpu_hartid, out);
+}
+
+static inline bool riscv_use_ipi_for_rfence(void)
+{
+	return false;
 }
 
 static inline void riscv_set_ipi_ops(const struct riscv_ipi_ops *ops)

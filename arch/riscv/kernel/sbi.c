@@ -577,6 +577,8 @@ static void sbi_ipi_clear(void)
 }
 
 static const struct riscv_ipi_ops sbi_ipi_ops = {
+	.name = "SBI",
+	.use_for_rfence = false,
 	.ipi_inject = sbi_send_cpumask_ipi,
 	.ipi_clear = sbi_ipi_clear
 };
