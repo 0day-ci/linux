@@ -33,7 +33,6 @@
  * ensures that we don't try to serialize data that's only partially updated.
  */
 static DEFINE_SPINLOCK(pgo_lock);
-static int current_node;
 
 unsigned long prf_lock(void)
 {
@@ -62,8 +61,6 @@ static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 	struct llvm_prf_data *data_end;
 	int max_vnds;
 
-	rcu_read_lock();
-
 	list_for_each_entry_rcu(po, &prf_list, link) {
 		/* get section limits */
 		max_vnds = prf_vnds_count(po);
@@ -76,7 +73,6 @@ static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 		 */
 		if (memory_contains(po->data, data_end, p, sizeof(*p))) {
 
-
 			if (WARN_ON_ONCE(po->current_node >= max_vnds))
 				return NULL; /* Out of nodes */
 
@@ -87,7 +83,6 @@ static struct llvm_prf_value_node *allocate_node(struct llvm_prf_data *p,
 	}
 
 out:
-	rcu_read_unlock();
 	return vnode;
 }
 
@@ -108,8 +103,14 @@ void __llvm_profile_instrument_target(u64 target_value, void *data, u32 index)
 	u8 values = 0;
 	unsigned long flags;
 
+	/*
+	 * lock the underlying prf_object(s) in place,
+	 * so they won't vanish while we are operating on it.
+	 */
+	rcu_read_lock();
+
 	if (!p || !p->values)
-		return;
+		goto rcu_unlock;
 
 	counters = (struct llvm_prf_value_node **)p->values;
 	curr = counters[index];
@@ -117,7 +118,7 @@ void __llvm_profile_instrument_target(u64 target_value, void *data, u32 index)
 	while (curr) {
 		if (target_value == curr->value) {
 			curr->count++;
-			return;
+			goto rcu_unlock;
 		}
 
 		if (curr->count < min_count) {
@@ -136,7 +137,7 @@ void __llvm_profile_instrument_target(u64 target_value, void *data, u32 index)
 			curr->value = target_value;
 			curr->count++;
 		}
-		return;
+		goto rcu_unlock;
 	}
 
 	/* Lock when updating the value node structure. */
@@ -156,6 +157,8 @@ void __llvm_profile_instrument_target(u64 target_value, void *data, u32 index)
 
 out:
 	prf_unlock(flags);
+rcu_unlock:
+	rcu_read_unlock();
 }
 EXPORT_SYMBOL(__llvm_profile_instrument_target);
 

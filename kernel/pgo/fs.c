@@ -419,6 +419,110 @@ static const struct file_operations prf_reset_fops = {
 	.llseek		= noop_llseek,
 };
 
+static void pgo_module_init(struct module *mod)
+{
+	struct prf_object *po;
+	char fname[MODULE_NAME_LEN + 9]; /* +strlen(".profraw") */
+	unsigned long flags;
+
+	/* add new prf_object entry for the module */
+	po = kzalloc(sizeof(*po), GFP_KERNEL);
+	if (!po)
+		goto out;
+
+	po->mod_name = mod->name;
+
+	fname[0] = 0;
+	snprintf(fname, sizeof(fname), "%s.profraw", po->mod_name);
+
+	/* setup prf_object sections */
+	po->data = mod->prf_data;
+	po->data_num = prf_get_count(mod->prf_data,
+		(char *)mod->prf_data + mod->prf_data_size, sizeof(po->data[0]));
+
+	po->cnts = mod->prf_cnts;
+	po->cnts_num = prf_get_count(mod->prf_cnts,
+		(char *)mod->prf_cnts + mod->prf_cnts_size, sizeof(po->cnts[0]));
+
+	po->names = mod->prf_names;
+	po->names_num = prf_get_count(mod->prf_names,
+		(char *)mod->prf_names + mod->prf_names_size, sizeof(po->names[0]));
+
+	po->vnds = mod->prf_vnds;
+	po->vnds_num = prf_get_count(mod->prf_vnds,
+		(char *)mod->prf_vnds + mod->prf_vnds_size, sizeof(po->vnds[0]));
+
+	/* create debugfs entry */
+	po->file = debugfs_create_file(fname, 0600, directory, po, &prf_fops);
+	if (!po->file) {
+		pr_err("Failed to setup module pgo: %s", fname);
+		kfree(po);
+		goto out;
+	}
+
+	/* finally enable profiling for the module */
+	flags = prf_list_lock();
+	list_add_tail_rcu(&po->link, &prf_list);
+	prf_list_unlock(flags);
+
+out:
+	return;
+}
+
+static int pgo_module_notifier(struct notifier_block *nb, unsigned long event,
+				void *pdata)
+{
+	struct module *mod = pdata;
+	struct prf_object *po;
+	unsigned long flags;
+
+	if (event == MODULE_STATE_LIVE) {
+		/* does the module have profiling info? */
+		if (mod->prf_data
+			&& mod->prf_cnts
+			&& mod->prf_names
+			&& mod->prf_vnds) {
+
+			/* setup module profiling */
+			pgo_module_init(mod);
+		}
+	}
+
+	if (event == MODULE_STATE_GOING) {
+		/* find the prf_object from the list */
+		rcu_read_lock();
+
+		list_for_each_entry_rcu(po, &prf_list, link) {
+			if (strcmp(po->mod_name, mod->name) == 0)
+				goto out_unlock;
+		}
+		/* no such module */
+		po = NULL;
+
+out_unlock:
+		rcu_read_unlock();
+
+		if (po) {
+			/* remove from profiled modules */
+			flags = prf_list_lock();
+			list_del_rcu(&po->link);
+			prf_list_unlock(flags);
+
+			debugfs_remove(po->file);
+			po->file = NULL;
+
+			/* cleanup memory */
+			kfree_rcu(po, rcu);
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block pgo_module_nb = {
+	.notifier_call = pgo_module_notifier
+};
+
 /* Create debugfs entries. */
 static int __init pgo_init(void)
 {
@@ -444,6 +548,7 @@ static int __init pgo_init(void)
 
 	/* enable profiling */
 	flags = prf_list_lock();
+	prf_vmlinux.mod_name = "vmlinux";
 	list_add_tail_rcu(&prf_vmlinux.link, &prf_list);
 	prf_list_unlock(flags);
 
@@ -460,6 +565,9 @@ static int __init pgo_init(void)
 				 &prf_reset_fops))
 		goto err_remove;
 
+	/* register module notifer */
+	register_module_notifier(&pgo_module_nb);
+
 	/* show notice why the system slower: */
 	pr_notice("Clang PGO instrumentation is active.");
 
@@ -473,6 +581,9 @@ err_remove:
 /* Remove debugfs entries. */
 static void __exit pgo_exit(void)
 {
+	/* unsubscribe the notifier and do cleanup. */
+	unregister_module_notifier(&pgo_module_nb);
+
 	debugfs_remove_recursive(directory);
 }
 
