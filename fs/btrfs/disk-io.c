@@ -946,9 +946,12 @@ blk_status_t btrfs_submit_metadata_bio(struct inode *inode, struct bio *bio,
 			goto out_w_error;
 		ret = btrfs_map_bio(fs_info, bio, mirror_num);
 	} else if (!should_async_write(fs_info, BTRFS_I(inode))) {
-		ret = btree_csum_one_bio(bio);
-		if (ret)
-			goto out_w_error;
+		/* Do not checksum free space inode */
+		if (!btrfs_is_free_space_inode(BTRFS_I(inode))) {
+			ret = btree_csum_one_bio(bio);
+			if (ret)
+				goto out_w_error;
+		}
 		ret = btrfs_map_bio(fs_info, bio, mirror_num);
 	} else {
 		/*
