@@ -63,6 +63,11 @@ struct btrfs_iomap {
 	u64 lockend;
 	struct extent_state *cached_state;
 	int extents_locked;
+
+	/* Reservation */
+	bool metadata_only;
+	struct extent_changeset *data_reserved;
+	size_t reserved_bytes;
 };
 
 static int __compare_inode_defrag(struct inode_defrag *defrag1,
@@ -1630,12 +1635,10 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 	struct inode *inode = file_inode(file);
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct page **pages = NULL;
-	struct extent_changeset *data_reserved = NULL;
 	u64 release_bytes = 0;
 	size_t num_written = 0;
 	int nrptrs;
-	ssize_t ret;
-	bool only_release_metadata = false;
+	int ret;
 	loff_t old_isize = i_size_read(inode);
 	unsigned int ilock_flags = 0;
 	struct btrfs_iomap *bi = NULL;
@@ -1673,14 +1676,12 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 	}
 
 	while (iov_iter_count(i) > 0) {
-		struct extent_state *cached_state = NULL;
 		size_t offset = offset_in_page(pos);
 		size_t sector_offset;
 		size_t write_bytes = min(iov_iter_count(i),
 					 nrptrs * (size_t)PAGE_SIZE -
 					 offset);
 		size_t num_pages;
-		size_t reserve_bytes;
 		size_t dirty_pages;
 		size_t copied;
 		size_t dirty_sectors;
@@ -1696,12 +1697,12 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 		}
 
 		bi->extents_locked = false;
-		only_release_metadata = false;
+		bi->metadata_only = false;
 		sector_offset = pos & (fs_info->sectorsize - 1);
 
-		extent_changeset_release(data_reserved);
+		extent_changeset_release(bi->data_reserved);
 		ret = btrfs_check_data_free_space(BTRFS_I(inode),
-						  &data_reserved, pos,
+						  &bi->data_reserved, pos,
 						  write_bytes);
 		if (ret < 0) {
 			/*
@@ -1711,36 +1712,36 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 			 */
 			if (btrfs_check_nocow_lock(BTRFS_I(inode), pos,
 						   &write_bytes) > 0)
-				only_release_metadata = true;
+				bi->metadata_only = true;
 			else
 				break;
 		}
 
 		num_pages = DIV_ROUND_UP(write_bytes + offset, PAGE_SIZE);
 		WARN_ON(num_pages > nrptrs);
-		reserve_bytes = round_up(write_bytes + sector_offset,
+		bi->reserved_bytes = round_up(write_bytes + sector_offset,
 					 fs_info->sectorsize);
-		WARN_ON(reserve_bytes == 0);
+		WARN_ON(bi->reserved_bytes == 0);
 		ret = btrfs_delalloc_reserve_metadata(BTRFS_I(inode),
-				reserve_bytes);
+				bi->reserved_bytes);
 		if (ret) {
-			if (!only_release_metadata)
+			if (!bi->metadata_only)
 				btrfs_free_reserved_data_space(BTRFS_I(inode),
-						data_reserved, pos,
+						bi->data_reserved, pos,
 						write_bytes);
 			else
 				btrfs_check_nocow_unlock(BTRFS_I(inode));
 			break;
 		}
 
-		release_bytes = reserve_bytes;
+		release_bytes = bi->reserved_bytes;
 
 		if (pos < inode->i_size) {
 			bi->lockstart = round_down(pos, fs_info->sectorsize);
 			bi->lockend = round_up(pos + write_bytes, fs_info->sectorsize) - 1;
 			btrfs_lock_and_flush_ordered_range(BTRFS_I(inode),
 					bi->lockstart, bi->lockend,
-					&cached_state);
+					&bi->cached_state);
 			bi->extents_locked = true;
 		}
 
@@ -1753,13 +1754,13 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 				    pos, write_bytes);
 		if (ret) {
 			btrfs_delalloc_release_extents(BTRFS_I(inode),
-						       reserve_bytes);
+						       bi->reserved_bytes);
 			break;
 		}
 
 		copied = btrfs_copy_from_user(pos, write_bytes, pages, i);
 
-		num_sectors = BTRFS_BYTES_TO_BLKS(fs_info, reserve_bytes);
+		num_sectors = BTRFS_BYTES_TO_BLKS(fs_info, bi->reserved_bytes);
 		dirty_sectors = round_up(copied + sector_offset,
 					fs_info->sectorsize);
 		dirty_sectors = BTRFS_BYTES_TO_BLKS(fs_info, dirty_sectors);
@@ -1782,7 +1783,7 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 		if (num_sectors > dirty_sectors) {
 			/* release everything except the sectors we dirtied */
 			release_bytes -= dirty_sectors << fs_info->sectorsize_bits;
-			if (only_release_metadata) {
+			if (bi->metadata_only) {
 				btrfs_delalloc_release_metadata(BTRFS_I(inode),
 							release_bytes, true);
 			} else {
@@ -1792,7 +1793,7 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 						   fs_info->sectorsize) +
 					(dirty_pages << PAGE_SHIFT);
 				btrfs_delalloc_release_space(BTRFS_I(inode),
-						data_reserved, __pos,
+						bi->data_reserved, __pos,
 						release_bytes, true);
 			}
 		}
@@ -1802,7 +1803,8 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 
 		ret = btrfs_dirty_pages(BTRFS_I(inode), pages,
 					dirty_pages, pos, copied,
-					&cached_state, only_release_metadata);
+					&bi->cached_state,
+					bi->metadata_only);
 
 		/*
 		 * If we have not locked the extent range, because the range's
@@ -1819,14 +1821,14 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 			free_extent_state(bi->cached_state);
 		bi->extents_locked = false;
 
-		btrfs_delalloc_release_extents(BTRFS_I(inode), reserve_bytes);
+		btrfs_delalloc_release_extents(BTRFS_I(inode), bi->reserved_bytes);
 		if (ret) {
 			btrfs_drop_pages(pages, num_pages);
 			break;
 		}
 
 		release_bytes = 0;
-		if (only_release_metadata)
+		if (bi->metadata_only)
 			btrfs_check_nocow_unlock(BTRFS_I(inode));
 
 		btrfs_drop_pages(pages, num_pages);
@@ -1850,7 +1852,6 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 		btrfs_check_nocow_unlock(BTRFS_I(inode));
 	btrfs_iomap_release(inode, pos, release_bytes, bi);
 out:
-	kfree(bi);
 	btrfs_inode_unlock(inode, ilock_flags);
 	return num_written ? num_written : ret;
 }
