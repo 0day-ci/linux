@@ -1112,7 +1112,8 @@ static noinline int cow_file_range(struct btrfs_inode *inode,
 			 * can't use page_started to determine if it's an
 			 * inline extent or a compressed extent.
 			 */
-			unlock_page(locked_page);
+			if (locked_page)
+				unlock_page(locked_page);
 			goto out;
 		} else if (ret < 0) {
 			goto out_unlock;
