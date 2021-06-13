@@ -72,7 +72,7 @@ static void efuse_power_switch(struct adapter *pAdapter, u8 write, u8 pwrstate)
 }
 
 static void
-efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
+efuse_phymap_to_logical(struct net_device *dev, u8 *phymap, u16 _offset, u16 _size_byte, u8 *pbuf)
 {
 	u8 *efuseTbl = NULL;
 	u8 rtemp8;
@@ -92,7 +92,7 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 		      sizeof(void *) + EFUSE_MAX_WORD_UNIT * sizeof(u16),
 		      GFP_KERNEL);
 	if (!tmp) {
-		DBG_88E("%s: alloc eFuseWord fail!\n", __func__);
+		netdev_dbg(dev, "alloc eFuseWord fail!\n");
 		goto eFuseWord_failed;
 	}
 	for (i = 0; i < EFUSE_MAX_SECTION_88E; i++)
@@ -113,7 +113,9 @@ efuse_phymap_to_logical(u8 *phymap, u16 _offset, u16 _size_byte, u8  *pbuf)
 		efuse_utilized++;
 		eFuse_Addr++;
 	} else {
-		DBG_88E("EFUSE is empty efuse_Addr-%d efuse_data =%x\n", eFuse_Addr, rtemp8);
+		netdev_dbg(dev,
+			   "EFUSE is empty efuse_Addr-%d efuse_data =%x\n",
+			   eFuse_Addr, rtemp8);
 		goto exit;
 	}
 
@@ -220,7 +222,7 @@ static void efuse_read_phymap_from_txpktbuf(
 	if (bcnhead < 0) /* if not valid */
 		bcnhead = usb_read8(adapter, REG_TDECTRL + 1);
 
-	DBG_88E("%s bcnhead:%d\n", __func__, bcnhead);
+	netdev_dbg(adapter->pnetdev, "bcnhead:%d\n", bcnhead);
 
 	usb_write8(adapter, REG_PKT_BUFF_ACCESS_CTRL, TXPKT_BUF_SELECT);
 
@@ -232,8 +234,10 @@ static void efuse_read_phymap_from_txpktbuf(
 		usb_write8(adapter, REG_TXPKTBUF_DBG, 0);
 		start = jiffies;
 		while (!(reg_0x143 = usb_read8(adapter, REG_TXPKTBUF_DBG)) &&
-		       jiffies_to_msecs(jiffies - start) < 1000) {
-			DBG_88E("%s polling reg_0x143:0x%02x, reg_0x106:0x%02x\n", __func__, reg_0x143, usb_read8(adapter, 0x106));
+			jiffies_to_msecs(jiffies - start) < 1000) {
+			netdev_dbg(adapter->pnetdev,
+				   "polling reg_0x143:0x%02x, reg_0x106:0x%02x\n",
+				   reg_0x143, usb_read8(adapter, 0x106));
 			usleep_range(1000, 2000);
 		}
 
@@ -255,7 +259,9 @@ static void efuse_read_phymap_from_txpktbuf(
 
 			limit = min_t(u16, len - 2, limit);
 
-			DBG_88E("%s len:%u, lenbak:%u, aaa:%u, aaabak:%u\n", __func__, len, lenbak, aaa, aaabak);
+			netdev_dbg(adapter->pnetdev,
+				   "len:%u, lenbak:%u, aaa:%u, aaabak:%u\n",
+				   len, lenbak, aaa, aaabak);
 
 			memcpy(pos, ((u8 *)&lo32) + 2, (limit >= count + 2) ? 2 : limit - count);
 			count += (limit >= count + 2) ? 2 : limit - count;
@@ -278,7 +284,7 @@ static void efuse_read_phymap_from_txpktbuf(
 		i++;
 	}
 	usb_write8(adapter, REG_PKT_BUFF_ACCESS_CTRL, DISABLE_TRXPKT_BUF_ACCESS);
-	DBG_88E("%s read count:%u\n", __func__, count);
+	netdev_dbg(adapter->pnetdev, "read count:%u\n", count);
 	*size = count;
 }
 
@@ -294,7 +300,7 @@ static s32 iol_read_efuse(struct adapter *padapter, u8 txpktbuf_bndy, u16 offset
 	status = iol_execute(padapter, CMD_READ_EFUSE_MAP);
 	if (status == _SUCCESS)
 		efuse_read_phymap_from_txpktbuf(padapter, txpktbuf_bndy, physical_map, &size);
-	efuse_phymap_to_logical(physical_map, offset, size_byte, logical_map);
+	efuse_phymap_to_logical(padapter->pnetdev, physical_map, offset, size_byte, logical_map);
 	return status;
 }
 
@@ -432,7 +438,8 @@ int Efuse_PgPacketRead(struct adapter *pAdapter, u8 offset, u8 *data)
 						hoffset = ((tmp_header & 0xE0) >> 5) | ((efuse_data & 0xF0) >> 1);
 						hworden = efuse_data & 0x0F;
 					} else {
-						DBG_88E("Error, All words disabled\n");
+						netdev_dbg(pAdapter->pnetdev,
+							   "Error, All words disabled\n");
 						efuse_addr++;
 						continue;
 					}
