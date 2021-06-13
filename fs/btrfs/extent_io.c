@@ -1488,6 +1488,47 @@ int try_lock_extent(struct extent_io_tree *tree, u64 start, u64 end)
 	return 1;
 }
 
+/*
+ * best_effort_lock_extent() - locks the extent to the best of effort
+ * making sure the minimum range is locked and the
+ * delalloc bits are set. If the full requested range is not locked,
+ * delalloc_end shifts to until the range that can be locked.
+ */
+static bool best_effort_lock_extent(struct extent_io_tree *tree, u64 start,
+		u64 *delalloc_end, u64 min_end, struct extent_state **cached_state)
+{
+	u64 failed_start;
+	u64 end = *delalloc_end;
+	int ret;
+
+	ret = set_extent_bit(tree, start, end, EXTENT_LOCKED, EXTENT_LOCKED,
+			     &failed_start, cached_state, GFP_NOFS, NULL);
+
+	if (!ret)
+		return false;
+
+	if (failed_start < min_end) {
+		/* Could not lock the whole range */
+		if (failed_start > start)
+			unlock_extent_cached(tree, start,
+					failed_start - 1, cached_state);
+		return false;
+	} else if (end > failed_start) {
+		/* Work with what could be locked */
+		end = failed_start - 1;
+	}
+
+	/* Check if delalloc bits are set */
+	ret = test_range_bit(tree, start, end,
+			     EXTENT_DELALLOC, 1, *cached_state);
+	if (!ret) {
+		unlock_extent_cached(tree, start, end - 1, cached_state);
+		return false;
+	}
+	*delalloc_end = end;
+	return true;
+}
+
 void extent_range_clear_dirty_for_io(struct inode *inode, u64 start, u64 end)
 {
 	unsigned long index = start >> PAGE_SHIFT;
@@ -2018,7 +2059,16 @@ again:
 	if (delalloc_end + 1 - delalloc_start > max_bytes)
 		delalloc_end = delalloc_start + max_bytes - 1;
 
-	/* step two, lock all the pages after the page that has start */
+	/* step two, lock the state bits for the range */
+	found = best_effort_lock_extent(tree, delalloc_start, &delalloc_end,
+			((page_index(locked_page) + 1) << PAGE_SHIFT),
+			&cached_state);
+	if (!found) {
+		free_extent_state(cached_state);
+		goto out_failed;
+	}
+
+	/* step three, lock all the pages after the page that has start */
 	ret = lock_delalloc_pages(inode, locked_page,
 				  delalloc_start, delalloc_end);
 	ASSERT(!ret || ret == -EAGAIN);
@@ -2038,20 +2088,6 @@ again:
 		}
 	}
 
-	/* step three, lock the state bits for the whole range */
-	lock_extent_bits(tree, delalloc_start, delalloc_end, &cached_state);
-
-	/* then test to make sure it is all still delalloc */
-	ret = test_range_bit(tree, delalloc_start, delalloc_end,
-			     EXTENT_DELALLOC, 1, cached_state);
-	if (!ret) {
-		unlock_extent_cached(tree, delalloc_start, delalloc_end,
-				     &cached_state);
-		__unlock_for_delalloc(inode, locked_page,
-			      delalloc_start, delalloc_end);
-		cond_resched();
-		goto again;
-	}
 	free_extent_state(cached_state);
 	*start = delalloc_start;
 	*end = delalloc_end;
