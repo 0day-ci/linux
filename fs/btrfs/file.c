@@ -64,6 +64,9 @@ struct btrfs_iomap {
 	struct extent_state *cached_state;
 	int extents_locked;
 
+	/* Source extent-map in order to read from in case not sector aligned */
+	struct extent_map *em;
+
 	/* Reservation */
 	bool metadata_only;
 	struct extent_changeset *data_reserved;
@@ -1479,6 +1482,7 @@ static void btrfs_iomap_release(struct inode *inode,
 		}
 	}
 	extent_changeset_free(bi->data_reserved);
+	free_extent_map(bi->em);
 	kfree(bi);
 }
 
@@ -1491,10 +1495,36 @@ static int btrfs_buffered_iomap_begin(struct inode *inode, loff_t pos,
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	size_t sector_offset = pos & (fs_info->sectorsize - 1);
 	struct btrfs_iomap *bi;
+	loff_t end = pos + length;
 
 	bi = kzalloc(sizeof(struct btrfs_iomap), GFP_NOFS);
 	if (!bi)
 		return -ENOMEM;
+
+	if ((pos & (PAGE_SIZE - 1) || end & (PAGE_SIZE - 1))) {
+		loff_t isize = i_size_read(inode);
+
+		if (pos >= isize) {
+			srcmap->addr = IOMAP_NULL_ADDR;
+			srcmap->type = IOMAP_HOLE;
+			srcmap->offset = isize;
+			srcmap->length = end - isize;
+		} else {
+			bi->em = btrfs_get_extent(BTRFS_I(inode), NULL, 0,
+					pos - sector_offset, length);
+			if (IS_ERR(bi->em)) {
+				kfree(bi);
+				return PTR_ERR(bi->em);
+			}
+			btrfs_em_to_iomap(inode, bi->em, srcmap,
+					pos - sector_offset);
+		}
+	}
+
+	if ((srcmap->type != IOMAP_HOLE) &&
+	    (end > srcmap->offset + srcmap->length))
+			write_bytes = srcmap->offset + srcmap->length - pos;
+
 
 	ret = btrfs_check_data_free_space(BTRFS_I(inode),
 			&bi->data_reserved, pos, write_bytes);
