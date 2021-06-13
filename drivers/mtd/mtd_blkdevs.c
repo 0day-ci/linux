@@ -211,7 +211,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 
 	mutex_lock(&dev->lock);
 
-	if (dev->open)
+	if (dev->open++)
 		goto unlock;
 
 	kref_get(&dev->ref);
@@ -232,7 +232,6 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	dev->file_mode = mode;
 
 unlock:
-	dev->open++;
 	mutex_unlock(&dev->lock);
 	blktrans_dev_put(dev);
 	return ret;
