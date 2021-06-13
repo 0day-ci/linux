@@ -1682,44 +1682,38 @@ static int btrfs_buffered_iomap_end(struct inode *inode, loff_t pos,
 		loff_t length, ssize_t written, struct btrfs_iomap *bi)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
-	size_t num_sectors = BTRFS_BYTES_TO_BLKS(fs_info, bi->reserved_bytes);
-	size_t dirty_sectors = 0;
-	int dirty_pages = 0;
-	int sector_offset = pos & (fs_info->sectorsize - 1);
+	int ret = 0;
+	size_t release_bytes = 0;
+	u64 start = round_down(pos, fs_info->sectorsize);
+	u64 written_block_end = round_up(pos + written, fs_info->sectorsize) - 1;
+	u64 block_end = round_up(pos + length, fs_info->sectorsize) - 1;
+        int extra_bits = 0;
 
-	if (written) {
-		dirty_sectors = round_up(written + sector_offset,
-				fs_info->sectorsize);
-		dirty_sectors = BTRFS_BYTES_TO_BLKS(fs_info, dirty_sectors);
-		dirty_pages = DIV_ROUND_UP(written + offset_in_page(pos),
-				PAGE_SIZE);
-	}
+	if (written == 0)
+		release_bytes = bi->reserved_bytes;
+	else if (written < length)
+		release_bytes = block_end - written_block_end + 1;
 
-	/* Release excess reservations */
-	if (num_sectors > dirty_sectors) {
-		size_t release_bytes = bi->reserved_bytes -
-			(dirty_sectors << fs_info->sb->s_blocksize_bits);
-		if (bi->metadata_only) {
-			btrfs_delalloc_release_metadata(BTRFS_I(inode),
-					release_bytes, true);
-		} else {
-			u64 p;
+	if (bi->metadata_only)
+		extra_bits |= EXTENT_NORESERVE;
 
-			p = round_down(pos,
-					fs_info->sectorsize) +
-				(dirty_pages << PAGE_SHIFT);
-			btrfs_delalloc_release_space(BTRFS_I(inode),
-					bi->data_reserved, p,
-					release_bytes, true);
-		}
-	}
+	clear_extent_bit(&BTRFS_I(inode)->io_tree, start, written_block_end,
+			 EXTENT_DELALLOC | EXTENT_DO_ACCOUNTING | EXTENT_DEFRAG,
+			 0, 0, &bi->cached_state);
+
+	ret = btrfs_set_extent_delalloc(BTRFS_I(inode), start,
+			written_block_end, extra_bits, &bi->cached_state);
+
+	/* In case of error, release everything in btrfs_iomap_release() */
+	if (ret < 0)
+		release_bytes = bi->reserved_bytes;
 
 	/*
 	 * If we have not locked the extent range, because the range's
 	 * start offset is >= i_size, we might still have a non-NULL
 	 * cached extent state, acquired while marking the extent range
-	 * as delalloc through btrfs_dirty_pages(). Therefore free any
-	 * possible cached extent state to avoid a memory leak.
+	 * as delalloc. Therefore free any possible cached extent state
+	 * to avoid a memory leak.
 	 */
 	if (bi->extents_locked)
 		unlock_extent_cached(&BTRFS_I(inode)->io_tree,
@@ -1731,6 +1725,8 @@ static int btrfs_buffered_iomap_end(struct inode *inode, loff_t pos,
 	btrfs_delalloc_release_extents(BTRFS_I(inode), bi->reserved_bytes);
 	if (bi->metadata_only)
 		btrfs_check_nocow_unlock(BTRFS_I(inode));
+
+	btrfs_iomap_release(inode, pos, release_bytes, bi);
 
 	return 0;
 }
