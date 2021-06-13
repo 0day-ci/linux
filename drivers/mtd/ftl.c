@@ -70,6 +70,7 @@
 #include <linux/hdreg.h>
 #include <linux/vmalloc.h>
 #include <linux/blkpg.h>
+#include <linux/blkdev.h>
 #include <linux/uaccess.h>
 
 #include <linux/mtd/ftl.h>
@@ -1029,8 +1030,11 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 
 		partition->mbd.tr = tr;
 		partition->mbd.devnum = -1;
-		if (!add_mtd_blktrans_dev((void *)partition))
+		if (!add_mtd_blktrans_dev((void *)partition)) {
+			partition->mbd.rq->limits.discard_granularity =
+								tr->blksize;
 			return;
+		}
 	}
 
 	kfree(partition);
