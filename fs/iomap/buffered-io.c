@@ -1173,12 +1173,13 @@ iomap_sort_ioends(struct list_head *ioend_list)
 }
 EXPORT_SYMBOL_GPL(iomap_sort_ioends);
 
-static void iomap_writepage_end_bio(struct bio *bio)
+void iomap_writepage_end_bio(struct bio *bio)
 {
 	struct iomap_ioend *ioend = bio->bi_private;
 
 	iomap_finish_ioend(ioend, blk_status_to_errno(bio->bi_status));
 }
+EXPORT_SYMBOL_GPL(iomap_writepage_end_bio);
 
 /*
  * Submit the final bio for an ioend.

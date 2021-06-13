@@ -238,6 +238,7 @@ struct iomap_writepage_ctx {
 };
 
 void iomap_finish_ioends(struct iomap_ioend *ioend, int error);
+void iomap_writepage_end_bio(struct bio *bio);
 void iomap_ioend_try_merge(struct iomap_ioend *ioend,
 		struct list_head *more_ioends);
 void iomap_sort_ioends(struct list_head *ioend_list);
