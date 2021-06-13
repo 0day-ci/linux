@@ -8322,18 +8322,8 @@ const struct iomap_ops btrfs_buffered_read_iomap_ops = {
 
 int btrfs_readpage(struct file *file, struct page *page)
 {
-	struct btrfs_inode *inode = BTRFS_I(page->mapping->host);
-	u64 start = page_offset(page);
-	u64 end = start + PAGE_SIZE - 1;
-	struct btrfs_bio_ctrl bio_ctrl = { 0 };
-	int ret;
-
-	btrfs_lock_and_flush_ordered_range(inode, start, end, NULL);
-
-	ret = btrfs_do_readpage(page, NULL, &bio_ctrl, 0, NULL);
-	if (bio_ctrl.bio)
-		ret = submit_one_bio(bio_ctrl.bio, 0, bio_ctrl.bio_flags);
-	return ret;
+	return iomap_readpage(page, &btrfs_buffered_read_iomap_ops,
+				&btrfs_iomap_readpage_ops);
 }
 
 static int find_delalloc_range(struct inode *inode, u64 *start, u64 *end)
@@ -8494,7 +8484,8 @@ static int btrfs_writepages(struct address_space *mapping,
 
 static void btrfs_readahead(struct readahead_control *rac)
 {
-	extent_readahead(rac);
+	iomap_readahead(rac, &btrfs_buffered_read_iomap_ops,
+			&btrfs_iomap_readpage_ops);
 }
 
 static int __btrfs_releasepage(struct page *page, gfp_t gfp_flags)
