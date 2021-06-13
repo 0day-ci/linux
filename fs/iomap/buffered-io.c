@@ -201,10 +201,11 @@ iomap_read_end_io(struct bio *bio)
 }
 
 struct iomap_readpage_ctx {
-	struct page		*cur_page;
-	bool			cur_page_in_bio;
-	struct bio		*bio;
-	struct readahead_control *rac;
+	struct page			*cur_page;
+	bool				cur_page_in_bio;
+	struct bio			*bio;
+	struct readahead_control	*rac;
+	const struct iomap_readpage_ops	*ops;
 };
 
 static void
@@ -282,19 +283,31 @@ iomap_readpage_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		gfp_t orig_gfp = gfp;
 		unsigned int nr_vecs = DIV_ROUND_UP(length, PAGE_SIZE);
 
-		if (ctx->bio)
-			submit_bio(ctx->bio);
+		if (ctx->bio) {
+			if (ctx->ops && ctx->ops->submit_io)
+				ctx->ops->submit_io(inode, ctx->bio);
+			else
+				submit_bio(ctx->bio);
+		}
 
 		if (ctx->rac) /* same as readahead_gfp_mask */
 			gfp |= __GFP_NORETRY | __GFP_NOWARN;
-		ctx->bio = bio_alloc(gfp, bio_max_segs(nr_vecs));
+		if (ctx->ops->alloc_bio)
+			ctx->bio = ctx->ops->alloc_bio(gfp,
+					bio_max_segs(nr_vecs));
+		else
+			ctx->bio = bio_alloc(gfp, bio_max_segs(nr_vecs));
 		/*
 		 * If the bio_alloc fails, try it again for a single page to
 		 * avoid having to deal with partial page reads.  This emulates
 		 * what do_mpage_readpage does.
 		 */
-		if (!ctx->bio)
-			ctx->bio = bio_alloc(orig_gfp, 1);
+		if (!ctx->bio) {
+			if (ctx->ops->alloc_bio)
+				ctx->bio = ctx->ops->alloc_bio(orig_gfp, 1);
+			else
+				ctx->bio = bio_alloc(orig_gfp, 1);
+		}
 		ctx->bio->bi_opf = REQ_OP_READ;
 		if (ctx->rac)
 			ctx->bio->bi_opf |= REQ_RAHEAD;
@@ -315,9 +328,13 @@ done:
 }
 
 int
-iomap_readpage(struct page *page, const struct iomap_ops *ops)
+iomap_readpage(struct page *page, const struct iomap_ops *ops,
+		const struct iomap_readpage_ops *readpage_ops)
 {
-	struct iomap_readpage_ctx ctx = { .cur_page = page };
+	struct iomap_readpage_ctx ctx = {
+		.cur_page	= page,
+		.ops		= readpage_ops,
+	};
 	struct inode *inode = page->mapping->host;
 	unsigned poff;
 	loff_t ret;
@@ -336,7 +353,10 @@ iomap_readpage(struct page *page, const struct iomap_ops *ops)
 	}
 
 	if (ctx.bio) {
-		submit_bio(ctx.bio);
+		if (ctx.ops->submit_io)
+			ctx.ops->submit_io(inode, ctx.bio);
+		else
+			submit_bio(ctx.bio);
 		WARN_ON_ONCE(!ctx.cur_page_in_bio);
 	} else {
 		WARN_ON_ONCE(ctx.cur_page_in_bio);
@@ -392,13 +412,15 @@ iomap_readahead_actor(struct inode *inode, loff_t pos, loff_t length,
  * function is called with memalloc_nofs set, so allocations will not cause
  * the filesystem to be reentered.
  */
-void iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops)
+void iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops,
+		const struct iomap_readpage_ops *readpage_ops)
 {
 	struct inode *inode = rac->mapping->host;
 	loff_t pos = readahead_pos(rac);
 	size_t length = readahead_length(rac);
 	struct iomap_readpage_ctx ctx = {
 		.rac	= rac,
+		.ops	= readpage_ops,
 	};
 
 	trace_iomap_readahead(inode, readahead_count(rac));
@@ -414,8 +436,12 @@ void iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops)
 		length -= ret;
 	}
 
-	if (ctx.bio)
-		submit_bio(ctx.bio);
+	if (ctx.bio) {
+		if (ctx.ops && ctx.ops->submit_io)
+			ctx.ops->submit_io(inode, ctx.bio);
+		else
+			submit_bio(ctx.bio);
+	}
 	if (ctx.cur_page) {
 		if (!ctx.cur_page_in_bio)
 			unlock_page(ctx.cur_page);

@@ -157,8 +157,6 @@ loff_t iomap_apply(struct inode *inode, loff_t pos, loff_t length,
 
 ssize_t iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *from,
 		const struct iomap_ops *ops);
-int iomap_readpage(struct page *page, const struct iomap_ops *ops);
-void iomap_readahead(struct readahead_control *, const struct iomap_ops *ops);
 int iomap_set_page_dirty(struct page *page);
 int iomap_is_partially_uptodate(struct page *page, unsigned long from,
 		unsigned long count);
@@ -187,6 +185,23 @@ loff_t iomap_seek_data(struct inode *inode, loff_t offset,
 		const struct iomap_ops *ops);
 sector_t iomap_bmap(struct address_space *mapping, sector_t bno,
 		const struct iomap_ops *ops);
+
+struct iomap_readpage_ops {
+
+	/* allow the filesystem to allocate custom struct bio */
+	struct bio *(*alloc_bio)(gfp_t gfp_mask, unsigned short nr_iovecs);
+
+	/*
+	 * Optional, allows the filesystem to perform a custom submission of
+	 * bio, such as csum calculations or multi-device bio split
+	 */
+	void (*submit_io)(struct inode *inode, struct bio *bio);
+};
+
+int iomap_readpage(struct page *page, const struct iomap_ops *ops,
+		const struct iomap_readpage_ops *readpage_ops);
+void iomap_readahead(struct readahead_control *rac, const struct iomap_ops *ops,
+		const struct iomap_readpage_ops *readpage_ops);
 
 /*
  * Structure for writeback I/O completions.

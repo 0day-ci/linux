@@ -535,14 +535,14 @@ xfs_vm_readpage(
 	struct file		*unused,
 	struct page		*page)
 {
-	return iomap_readpage(page, &xfs_read_iomap_ops);
+	return iomap_readpage(page, &xfs_read_iomap_ops, NULL);
 }
 
 STATIC void
 xfs_vm_readahead(
 	struct readahead_control	*rac)
 {
-	iomap_readahead(rac, &xfs_read_iomap_ops);
+	iomap_readahead(rac, &xfs_read_iomap_ops, NULL);
 }
 
 static int

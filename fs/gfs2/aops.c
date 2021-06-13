@@ -474,7 +474,7 @@ static int __gfs2_readpage(void *file, struct page *page)
 
 	if (!gfs2_is_jdata(ip) ||
 	    (i_blocksize(inode) == PAGE_SIZE && !page_has_buffers(page))) {
-		error = iomap_readpage(page, &gfs2_iomap_ops);
+		error = iomap_readpage(page, &gfs2_iomap_ops, NULL);
 	} else if (gfs2_is_stuffed(ip)) {
 		error = stuffed_readpage(ip, page);
 		unlock_page(page);
@@ -563,7 +563,7 @@ static void gfs2_readahead(struct readahead_control *rac)
 	else if (gfs2_is_jdata(ip))
 		mpage_readahead(rac, gfs2_block_map);
 	else
-		iomap_readahead(rac, &gfs2_iomap_ops);
+		iomap_readahead(rac, &gfs2_iomap_ops, NULL);
 }
 
 /**
