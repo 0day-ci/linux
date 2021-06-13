@@ -205,7 +205,7 @@ static blk_status_t mtd_queue_rq(struct blk_mq_hw_ctx *hctx,
 static int blktrans_open(struct block_device *bdev, fmode_t mode)
 {
 	struct mtd_blktrans_dev *dev = blktrans_dev_get(bdev->bd_disk);
-	int ret = 0;
+	int ret;
 
 	if (!dev)
 		return -ERESTARTSYS; /* FIXME: busy loop! -arnd*/
@@ -213,16 +213,16 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	mutex_lock(&mtd_blkdevs_mutex);
 	mutex_lock(&dev->lock);
 
-	if (dev->open++)
+	if (!dev->mtd) {
+		ret = -ENXIO;
 		goto unlock;
-
-	kref_get(&dev->ref);
-	__module_get(dev->tr->owner);
-
-	if (dev->mtd) {
-		ret = dev->tr->open ? dev->tr->open(dev) : 0;
-		__get_mtd_device(dev->mtd);
 	}
+
+	ret = !dev->open++ && dev->tr->open ? dev->tr->open(dev) : 0;
+	/* Take another reference on the device so it won't go away till
+	 * last release */
+	if (!ret)
+		kref_get(&dev->ref);
 
 	dev->file_mode = mode;
 
@@ -243,17 +243,14 @@ static void blktrans_release(struct gendisk *disk, fmode_t mode)
 	mutex_lock(&mtd_blkdevs_mutex);
 	mutex_lock(&dev->lock);
 
-	if (--dev->open)
+	/* Release one reference, we sure its not the last one here*/
+	kref_put(&dev->ref, blktrans_dev_release);
+
+	if (!dev->mtd)
 		goto unlock;
 
-	kref_put(&dev->ref, blktrans_dev_release);
-	module_put(dev->tr->owner);
-
-	if (dev->mtd) {
-		if (dev->tr->release)
-			dev->tr->release(dev);
-		__put_mtd_device(dev->mtd);
-	}
+	if (!--dev->open && dev->tr->release)
+		dev->tr->release(dev);
 unlock:
 	mutex_unlock(&dev->lock);
 	blktrans_dev_put(dev);
@@ -408,6 +405,9 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 
 	gd->queue = new->rq;
 
+	__get_mtd_device(new->mtd);
+	__module_get(tr->owner);
+
 	if (new->readonly)
 		set_disk_ro(gd, 1);
 
@@ -456,15 +456,16 @@ int del_mtd_blktrans_dev(struct mtd_blktrans_dev *old)
 	blk_mq_unquiesce_queue(old->rq);
 	blk_mq_unfreeze_queue(old->rq);
 
-	/* If the device is currently open, tell trans driver to close it,
-		then put mtd device, and don't touch it again */
+	/* Ask trans driver for release to the mtd device */
 	mutex_lock(&old->lock);
-	if (old->open) {
-		if (old->tr->release)
-			old->tr->release(old);
-		__put_mtd_device(old->mtd);
+	if (old->open && old->tr->release) {
+		old->tr->release(old);
+		old->open = 0;
 	}
+	__put_mtd_device(old->mtd);
+	module_put(old->tr->owner);
 
+	/* At that point, we don't touch the mtd anymore */
 	old->mtd = NULL;
 
 	mutex_unlock(&old->lock);
