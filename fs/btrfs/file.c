@@ -1598,6 +1598,30 @@ void btrfs_em_to_iomap(struct inode *inode,
 	iomap->length = em->len - diff;
 }
 
+/*
+ * btrfs_iomap_release - release reservation passed as length and free
+ * the btrfs_iomap structure
+ */
+static void btrfs_iomap_release(struct inode *inode,
+		loff_t pos, size_t length, struct btrfs_iomap *bi)
+{
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+
+	if (length) {
+		if (bi->metadata_only) {
+			btrfs_delalloc_release_metadata(BTRFS_I(inode),
+					length, true);
+		} else {
+			btrfs_delalloc_release_space(BTRFS_I(inode),
+					bi->data_reserved,
+					round_down(pos, fs_info->sectorsize),
+					length, true);
+		}
+	}
+	extent_changeset_free(bi->data_reserved);
+	kfree(bi);
+}
+
 static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 					       struct iov_iter *i)
 {
@@ -1817,24 +1841,14 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 
 	kfree(pages);
 
-	if (release_bytes) {
-		if (only_release_metadata) {
-			btrfs_check_nocow_unlock(BTRFS_I(inode));
-			btrfs_delalloc_release_metadata(BTRFS_I(inode),
-					release_bytes, true);
-		} else {
-			btrfs_delalloc_release_space(BTRFS_I(inode),
-					data_reserved,
-					round_down(pos, fs_info->sectorsize),
-					release_bytes, true);
-		}
-	}
-
-	extent_changeset_free(data_reserved);
 	if (num_written > 0) {
 		pagecache_isize_extended(inode, old_isize, iocb->ki_pos);
 		iocb->ki_pos += num_written;
 	}
+
+	if (release_bytes && bi->metadata_only)
+		btrfs_check_nocow_unlock(BTRFS_I(inode));
+	btrfs_iomap_release(inode, pos, release_bytes, bi);
 out:
 	kfree(bi);
 	btrfs_inode_unlock(inode, ilock_flags);
