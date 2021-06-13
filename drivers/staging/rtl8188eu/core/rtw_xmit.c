@@ -340,7 +340,7 @@ static void update_attrib_phy_info(struct pkt_attrib *pattrib, struct sta_info *
 	pattrib->retry_ctrl = false;
 }
 
-u8 qos_acm(u8 acm_mask, u8 priority)
+u8 qos_acm(struct net_device *dev, u8 acm_mask, u8 priority)
 {
 	u8 change_priority = priority;
 
@@ -364,8 +364,7 @@ u8 qos_acm(u8 acm_mask, u8 priority)
 			change_priority = 5;
 		break;
 	default:
-		DBG_88E("%s(): invalid pattrib->priority: %d!!!\n",
-			__func__, priority);
+		netdev_dbg(dev, "invalid pattrib->priority: %d!!!\n", priority);
 		break;
 	}
 
@@ -451,7 +450,7 @@ static s32 update_attrib(struct adapter *padapter, struct sk_buff *pkt, struct p
 			}
 		}
 	} else if (pattrib->ether_type == ETH_P_PAE) {
-		DBG_88E_LEVEL(_drv_info_, "send eapol packet\n");
+		netdev_dbg(padapter->pnetdev, "send eapol packet\n");
 	}
 
 	if ((pattrib->ether_type == ETH_P_PAE) || (pattrib->dhcp_pkt == 1))
@@ -481,7 +480,6 @@ static s32 update_attrib(struct adapter *padapter, struct sk_buff *pkt, struct p
 
 	if (psta) {
 		pattrib->mac_id = psta->mac_id;
-		/* DBG_88E("%s ==> mac_id(%d)\n", __func__, pattrib->mac_id); */
 		pattrib->psta = psta;
 	} else {
 		/*  if we cannot get psta => drop the pkt */
@@ -505,7 +503,9 @@ static s32 update_attrib(struct adapter *padapter, struct sk_buff *pkt, struct p
 			set_qos(pkt, pattrib);
 
 			if (pmlmepriv->acm_mask != 0)
-				pattrib->priority = qos_acm(pmlmepriv->acm_mask, pattrib->priority);
+				pattrib->priority = qos_acm(padapter->pnetdev,
+							    pmlmepriv->acm_mask,
+							    pattrib->priority);
 		}
 	}
 
@@ -927,7 +927,7 @@ s32 rtw_xmitframe_coalesce(struct adapter *padapter, struct sk_buff *pkt, struct
 		return _FAIL;
 
 	if (!pxmitframe->buf_addr) {
-		DBG_88E("==> %s buf_addr == NULL\n", __func__);
+		netdev_dbg(padapter->pnetdev, "buf_addr == NULL\n");
 		return _FAIL;
 	}
 
@@ -939,7 +939,7 @@ s32 rtw_xmitframe_coalesce(struct adapter *padapter, struct sk_buff *pkt, struct
 
 	if (rtw_make_wlanhdr(padapter, mem_start, pattrib) == _FAIL) {
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_, ("%s: rtw_make_wlanhdr fail; drop pkt\n", __func__));
-		DBG_88E("%s: rtw_make_wlanhdr fail; drop pkt\n", __func__);
+		netdev_dbg(padapter->pnetdev, "rtw_make_wlanhdr fail; drop pkt\n");
 		res = _FAIL;
 		goto exit;
 	}
@@ -1040,7 +1040,8 @@ s32 rtw_xmitframe_coalesce(struct adapter *padapter, struct sk_buff *pkt, struct
 
 	if (xmitframe_addmic(padapter, pxmitframe) == _FAIL) {
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_, ("xmitframe_addmic(padapter, pxmitframe) == _FAIL\n"));
-		DBG_88E("xmitframe_addmic(padapter, pxmitframe) == _FAIL\n");
+		netdev_dbg(padapter->pnetdev,
+			   "xmitframe_addmic(padapter, pxmitframe) == _FAIL\n");
 		res = _FAIL;
 		goto exit;
 	}
@@ -1154,8 +1155,11 @@ struct xmit_buf *rtw_alloc_xmitbuf_ext(struct xmit_priv *pxmitpriv)
 		pxmitpriv->free_xmit_extbuf_cnt--;
 		pxmitbuf->priv_data = NULL;
 		if (pxmitbuf->sctx) {
-			DBG_88E("%s pxmitbuf->sctx is not NULL\n", __func__);
-			rtw_sctx_done_err(&pxmitbuf->sctx, RTW_SCTX_DONE_BUF_ALLOC);
+			netdev_dbg(pxmitpriv->adapter->pnetdev,
+				   "pxmitbuf->sctx is not NULL\n");
+			rtw_sctx_done_err(pxmitpriv->adapter->pnetdev,
+					  &pxmitbuf->sctx,
+					  RTW_SCTX_DONE_BUF_ALLOC);
 		}
 	}
 	spin_unlock_irqrestore(&pfree_queue->lock, irql);
@@ -1197,8 +1201,11 @@ struct xmit_buf *rtw_alloc_xmitbuf(struct xmit_priv *pxmitpriv)
 		pxmitpriv->free_xmitbuf_cnt--;
 		pxmitbuf->priv_data = NULL;
 		if (pxmitbuf->sctx) {
-			DBG_88E("%s pxmitbuf->sctx is not NULL\n", __func__);
-			rtw_sctx_done_err(&pxmitbuf->sctx, RTW_SCTX_DONE_BUF_ALLOC);
+			netdev_dbg(pxmitpriv->adapter->pnetdev,
+				   "pxmitbuf->sctx is not NULL\n");
+			rtw_sctx_done_err(pxmitpriv->adapter->pnetdev,
+					  &pxmitbuf->sctx,
+					  RTW_SCTX_DONE_BUF_ALLOC);
 		}
 	}
 	spin_unlock_irqrestore(&pfree_xmitbuf_queue->lock, irql);
@@ -1215,8 +1222,11 @@ s32 rtw_free_xmitbuf(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
 		return _FAIL;
 
 	if (pxmitbuf->sctx) {
-		DBG_88E("%s pxmitbuf->sctx is not NULL\n", __func__);
-		rtw_sctx_done_err(&pxmitbuf->sctx, RTW_SCTX_DONE_BUF_FREE);
+		netdev_dbg(pxmitpriv->adapter->pnetdev,
+			   "pxmitbuf->sctx is not NULL\n");
+		rtw_sctx_done_err(pxmitpriv->adapter->pnetdev,
+				  &pxmitbuf->sctx,
+				  RTW_SCTX_DONE_BUF_FREE);
 	}
 
 	if (pxmitbuf->ext_tag) {
@@ -1482,7 +1492,7 @@ s32 rtw_xmit_classifier(struct adapter *padapter, struct xmit_frame *pxmitframe)
 
 	if (!psta) {
 		res = _FAIL;
-		DBG_88E("%s: psta == NULL\n", __func__);
+		netdev_dbg(padapter->pnetdev, "psta == NULL\n");
 		RT_TRACE(_module_rtl871x_xmit_c_, _drv_err_, ("%s: psta == NULL\n", __func__));
 		goto exit;
 	}
@@ -1591,7 +1601,7 @@ s32 rtw_xmit(struct adapter *padapter, struct sk_buff **ppkt)
 	pxmitframe = rtw_alloc_xmitframe(pxmitpriv);
 	if (!pxmitframe) {
 		RT_TRACE(_module_xmit_osdep_c_, _drv_err_, ("%s: no more pxmitframe\n", __func__));
-		DBG_88E("DBG_TX_DROP_FRAME %s no more pxmitframe\n", __func__);
+		netdev_dbg(padapter->pnetdev, "DBG_TX_DROP_FRAME no more pxmitframe\n");
 		return -1;
 	}
 
@@ -1982,7 +1992,7 @@ void rtw_sctx_init(struct submit_ctx *sctx, int timeout_ms)
 	sctx->status = RTW_SCTX_SUBMITTED;
 }
 
-int rtw_sctx_wait(struct submit_ctx *sctx)
+int rtw_sctx_wait(struct net_device *dev, struct submit_ctx *sctx)
 {
 	int ret = _FAIL;
 	unsigned long expire;
@@ -1992,7 +2002,7 @@ int rtw_sctx_wait(struct submit_ctx *sctx)
 	if (!wait_for_completion_timeout(&sctx->done, expire)) {
 		/* timeout, do something?? */
 		status = RTW_SCTX_DONE_TIMEOUT;
-		DBG_88E("%s timeout\n", __func__);
+		netdev_dbg(dev, "timeout\n");
 	} else {
 		status = sctx->status;
 	}
@@ -2018,11 +2028,11 @@ static bool rtw_sctx_chk_warning_status(int status)
 	}
 }
 
-void rtw_sctx_done_err(struct submit_ctx **sctx, int status)
+void rtw_sctx_done_err(struct net_device *dev, struct submit_ctx **sctx, int status)
 {
 	if (*sctx) {
 		if (rtw_sctx_chk_warning_status(status))
-			DBG_88E("%s status:%d\n", __func__, status);
+			netdev_dbg(dev, "status:%d\n", status);
 		(*sctx)->status = status;
 		complete(&((*sctx)->done));
 		*sctx = NULL;
@@ -2037,7 +2047,7 @@ int rtw_ack_tx_wait(struct xmit_priv *pxmitpriv, u32 timeout_ms)
 	pack_tx_ops->timeout_ms = timeout_ms;
 	pack_tx_ops->status = RTW_SCTX_SUBMITTED;
 
-	return rtw_sctx_wait(pack_tx_ops);
+	return rtw_sctx_wait(pxmitpriv->adapter->pnetdev, pack_tx_ops);
 }
 
 void rtw_ack_tx_done(struct xmit_priv *pxmitpriv, int status)
@@ -2045,7 +2055,9 @@ void rtw_ack_tx_done(struct xmit_priv *pxmitpriv, int status)
 	struct submit_ctx *pack_tx_ops = &pxmitpriv->ack_tx_ops;
 
 	if (pxmitpriv->ack_tx)
-		rtw_sctx_done_err(&pack_tx_ops, status);
+		rtw_sctx_done_err(pxmitpriv->adapter->pnetdev,
+				  &pack_tx_ops,
+				  status);
 	else
-		DBG_88E("%s ack_tx not set\n", __func__);
+		netdev_dbg(pxmitpriv->adapter->pnetdev, "ack_tx not set\n");
 }

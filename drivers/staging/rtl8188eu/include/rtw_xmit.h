@@ -182,8 +182,8 @@ enum {
 };
 
 void rtw_sctx_init(struct submit_ctx *sctx, int timeout_ms);
-int rtw_sctx_wait(struct submit_ctx *sctx);
-void rtw_sctx_done_err(struct submit_ctx **sctx, int status);
+int rtw_sctx_wait(struct net_device *dev, struct submit_ctx *sctx);
+void rtw_sctx_done_err(struct net_device *dev, struct submit_ctx **sctx, int status);
 
 struct xmit_buf {
 	struct list_head list;
@@ -341,7 +341,7 @@ void wakeup_sta_to_xmit(struct adapter *padapter, struct sta_info *psta);
 void xmit_delivery_enabled_frames(struct adapter *padapter, struct sta_info *psta);
 #endif
 
-u8	qos_acm(u8 acm_mask, u8 priority);
+u8	qos_acm(struct net_device *dev, u8 acm_mask, u8 priority);
 u32	rtw_get_ff_hwaddr(struct xmit_frame *pxmitframe);
 int rtw_ack_tx_wait(struct xmit_priv *pxmitpriv, u32 timeout_ms);
 void rtw_ack_tx_done(struct xmit_priv *pxmitpriv, int status);

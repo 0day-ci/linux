@@ -240,7 +240,7 @@ static s32 dump_mgntframe_and_wait(struct adapter *padapter,
 	ret = rtw_hal_mgnt_xmit(padapter, pmgntframe);
 
 	if (ret == _SUCCESS)
-		ret = rtw_sctx_wait(&sctx);
+		ret = rtw_sctx_wait(padapter->pnetdev, &sctx);
 
 	return ret;
 }

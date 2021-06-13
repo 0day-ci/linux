@@ -500,7 +500,8 @@ static void usb_write_port_complete(struct urb *purb)
 	}
 
 check_completion:
-	rtw_sctx_done_err(&pxmitbuf->sctx,
+	rtw_sctx_done_err(padapter->pnetdev,
+			  &pxmitbuf->sctx,
 			  purb->status ? RTW_SCTX_DONE_WRITE_PORT_ERR :
 			  RTW_SCTX_DONE_SUCCESS);
 
@@ -523,7 +524,9 @@ u32 usb_write_port(struct adapter *padapter, u32 addr, u32 cnt, struct xmit_buf 
 
 	if ((padapter->bDriverStopped) || (padapter->bSurpriseRemoved) ||
 	    (padapter->pwrctrlpriv.pnp_bstop_trx)) {
-		rtw_sctx_done_err(&xmitbuf->sctx, RTW_SCTX_DONE_TX_DENY);
+		rtw_sctx_done_err(padapter->pnetdev,
+				  &xmitbuf->sctx,
+				  RTW_SCTX_DONE_TX_DENY);
 		goto exit;
 	}
 
@@ -569,7 +572,9 @@ u32 usb_write_port(struct adapter *padapter, u32 addr, u32 cnt, struct xmit_buf 
 
 	status = usb_submit_urb(purb, GFP_ATOMIC);
 	if (status) {
-		rtw_sctx_done_err(&xmitbuf->sctx, RTW_SCTX_DONE_WRITE_PORT_ERR);
+		rtw_sctx_done_err(padapter->pnetdev,
+				  &xmitbuf->sctx,
+				  RTW_SCTX_DONE_WRITE_PORT_ERR);
 		if (status == -ENODEV)
 			padapter->bDriverStopped = true;
 

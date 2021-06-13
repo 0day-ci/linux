@@ -387,7 +387,9 @@ static s32 rtw_dump_xframe(struct adapter *adapt, struct xmit_frame *pxmitframe)
 	rtw_free_xmitframe(pxmitpriv, pxmitframe);
 
 	if  (ret != _SUCCESS)
-		rtw_sctx_done_err(&pxmitbuf->sctx, RTW_SCTX_DONE_UNKNOWN);
+		rtw_sctx_done_err(adapt->pnetdev,
+				  &pxmitbuf->sctx,
+				  RTW_SCTX_DONE_UNKNOWN);
 
 	return ret;
 }
