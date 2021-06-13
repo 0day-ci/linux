@@ -1665,15 +1665,14 @@ mpt_mapresources(MPT_ADAPTER *ioc)
 	if (sizeof(dma_addr_t) > 4) {
 		const uint64_t required_mask = dma_get_required_mask
 		    (&pdev->dev);
-		if (required_mask > DMA_BIT_MASK(32)
-			&& !dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))
-			&& !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+		if (required_mask > DMA_BIT_MASK(32) &&
+		    !dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 			ioc->dma_mask = DMA_BIT_MASK(64);
 			dinitprintk(ioc, printk(MYIOC_s_INFO_FMT
 				": 64 BIT PCI BUS DMA ADDRESSING SUPPORTED\n",
 				ioc->name));
-		} else if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))
-			   && !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+		} else if (!dma_set_mask_and_coherent(&pdev->dev,
+						      DMA_BIT_MASK(32))) {
 			ioc->dma_mask = DMA_BIT_MASK(32);
 			dinitprintk(ioc, printk(MYIOC_s_INFO_FMT
 				": 32 BIT PCI BUS DMA ADDRESSING SUPPORTED\n",
@@ -1684,8 +1683,7 @@ mpt_mapresources(MPT_ADAPTER *ioc)
 			goto out_pci_release_region;
 		}
 	} else {
-		if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))
-			&& !dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+		if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32))) {
 			ioc->dma_mask = DMA_BIT_MASK(32);
 			dinitprintk(ioc, printk(MYIOC_s_INFO_FMT
 				": 32 BIT PCI BUS DMA ADDRESSING SUPPORTED\n",
@@ -4451,19 +4449,17 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 		 */
 		if (ioc->pcidev->device == MPI_MANUFACTPAGE_DEVID_SAS1078 &&
 		    ioc->dma_mask > DMA_BIT_MASK(35)) {
-			if (!dma_set_mask(&ioc->pcidev->dev, DMA_BIT_MASK(32))
-			    && !dma_set_coherent_mask(&ioc->pcidev->dev, DMA_BIT_MASK(32))) {
+			if (!dma_set_mask_and_coherent(&ioc->pcidev->dev,
+						       DMA_BIT_MASK(32))) {
 				dma_mask = DMA_BIT_MASK(35);
 				d36memprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 				    "setting 35 bit addressing for "
 				    "Request/Reply/Chain and Sense Buffers\n",
 				    ioc->name));
 			} else {
-				/*Reseting DMA mask to 64 bit*/
-				dma_set_mask(&ioc->pcidev->dev,
-					     DMA_BIT_MASK(64));
-				dma_set_coherent_mask(&ioc->pcidev->dev,
-						      DMA_BIT_MASK(64));
+				/* Resetting DMA mask to 64 bit */
+				dma_set_mask_and_coherent(&ioc->pcidev->dev,
+							  DMA_BIT_MASK(64));
 
 				printk(MYIOC_s_ERR_FMT
 				    "failed setting 35 bit addressing for "
@@ -4599,8 +4595,7 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 	}
 
 	if (dma_mask == DMA_BIT_MASK(35) &&
-	    !dma_set_mask(&ioc->pcidev->dev, ioc->dma_mask) &&
-	    !dma_set_coherent_mask(&ioc->pcidev->dev, ioc->dma_mask))
+	    !dma_set_mask_and_coherent(&ioc->pcidev->dev, ioc->dma_mask))
 		d36memprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 		    "restoring 64 bit addressing\n", ioc->name));
 
@@ -4624,8 +4619,7 @@ out_fail:
 	}
 
 	if (dma_mask == DMA_BIT_MASK(35) &&
-	    !dma_set_mask(&ioc->pcidev->dev, DMA_BIT_MASK(64)) &&
-	    !dma_set_coherent_mask(&ioc->pcidev->dev, DMA_BIT_MASK(64)))
+	    !dma_set_mask_and_coherent(&ioc->pcidev->dev, DMA_BIT_MASK(64)))
 		d36memprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 		    "restoring 64 bit addressing\n", ioc->name));
 
