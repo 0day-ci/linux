@@ -22,6 +22,7 @@
 
 #include "mtdcore.h"
 
+static DEFINE_MUTEX(mtd_blkdevs_mutex);
 static LIST_HEAD(blktrans_majors);
 static DEFINE_MUTEX(blktrans_ref_mutex);
 
@@ -209,6 +210,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 	if (!dev)
 		return -ERESTARTSYS; /* FIXME: busy loop! -arnd*/
 
+	mutex_lock(&mtd_blkdevs_mutex);
 	mutex_lock(&dev->lock);
 
 	if (dev->open++)
@@ -227,6 +229,7 @@ static int blktrans_open(struct block_device *bdev, fmode_t mode)
 unlock:
 	mutex_unlock(&dev->lock);
 	blktrans_dev_put(dev);
+	mutex_unlock(&mtd_blkdevs_mutex);
 	return ret;
 }
 
@@ -237,6 +240,7 @@ static void blktrans_release(struct gendisk *disk, fmode_t mode)
 	if (!dev)
 		return;
 
+	mutex_lock(&mtd_blkdevs_mutex);
 	mutex_lock(&dev->lock);
 
 	if (--dev->open)
@@ -253,6 +257,7 @@ static void blktrans_release(struct gendisk *disk, fmode_t mode)
 unlock:
 	mutex_unlock(&dev->lock);
 	blktrans_dev_put(dev);
+	mutex_unlock(&mtd_blkdevs_mutex);
 }
 
 static int blktrans_getgeo(struct block_device *bdev, struct hd_geometry *geo)
