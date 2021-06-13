@@ -1209,7 +1209,11 @@ iomap_submit_ioend(struct iomap_writepage_ctx *wpc, struct iomap_ioend *ioend,
 		return error;
 	}
 
-	submit_bio(ioend->io_bio);
+	if (wpc->ops->submit_io)
+		wpc->ops->submit_io(ioend->io_inode, ioend->io_bio);
+	else
+		submit_bio(ioend->io_bio);
+
 	return 0;
 }
 
@@ -1305,8 +1309,13 @@ iomap_add_to_ioend(struct inode *inode, loff_t offset, struct page *page,
 
 	if (!merged) {
 		if (bio_full(wpc->ioend->io_bio, len)) {
+			struct bio *bio = wpc->ioend->io_bio;
 			wpc->ioend->io_bio =
 				iomap_chain_bio(wpc->ioend->io_bio);
+			if (wpc->ops->submit_io)
+				wpc->ops->submit_io(inode, bio);
+			else
+				submit_bio(bio);
 		}
 		bio_add_page(wpc->ioend->io_bio, page, len, poff);
 	}
