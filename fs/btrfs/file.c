@@ -1570,6 +1570,28 @@ static int btrfs_write_check(struct kiocb *iocb, struct iov_iter *from,
 	return 0;
 }
 
+void btrfs_em_to_iomap(struct inode *inode,
+		struct extent_map *em, struct iomap *iomap,
+		loff_t sector_pos)
+{
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	loff_t diff = sector_pos - em->start;
+
+	if (em->block_start == EXTENT_MAP_HOLE) {
+		iomap->addr = IOMAP_NULL_ADDR;
+		iomap->type = IOMAP_HOLE;
+	} else if (em->block_start == EXTENT_MAP_INLINE) {
+		iomap->addr = IOMAP_NULL_ADDR;
+		iomap->type = IOMAP_INLINE;
+	} else {
+		iomap->addr = em->block_start + diff;
+		iomap->type = IOMAP_MAPPED;
+	}
+	iomap->offset = em->start + diff;
+	iomap->bdev = fs_info->fs_devices->latest_bdev;
+	iomap->length = em->len - diff;
+}
+
 static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 					       struct iov_iter *i)
 {
