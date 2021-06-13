@@ -167,7 +167,7 @@ bool amdgpu_gtt_mgr_has_gart_addr(struct ttm_resource *mem)
  * @man: TTM memory type manager
  * @tbo: TTM BO we need this range for
  * @place: placement flags and restrictions
- * @mem: the resulting mem object
+ * @res: the resulting TTM memory object
  *
  * Dummy, allocate the node but no space for it yet.
  */
@@ -230,7 +230,7 @@ err_out:
  * amdgpu_gtt_mgr_del - free ranges
  *
  * @man: TTM memory type manager
- * @mem: TTM memory object
+ * @res: TTM memory object
  *
  * Free the allocated GTT again.
  */
