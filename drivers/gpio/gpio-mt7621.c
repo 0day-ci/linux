@@ -234,6 +234,7 @@ mediatek_gpio_bank_probe(struct device *dev,
 		return ret;
 	}
 
+	rg->chip.base = rg->bank * MTK_BANK_WIDTH;
 	rg->chip.of_gpio_n_cells = 2;
 	rg->chip.of_xlate = mediatek_gpio_xlate;
 	rg->chip.label = devm_kasprintf(dev, GFP_KERNEL, "%s-bank%d",
