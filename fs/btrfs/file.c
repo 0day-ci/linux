@@ -467,6 +467,17 @@ static void btrfs_drop_pages(struct page **pages, size_t num_pages)
 	}
 }
 
+static void btrfs_page_done(struct inode *inode, loff_t pos,
+		unsigned int copied, struct page *page,
+		struct iomap *iomap)
+{
+	set_page_extent_mapped(page);
+}
+
+static const struct iomap_page_ops btrfs_iomap_page_ops = {
+	.page_done = btrfs_page_done,
+};
+
 /*
  * After btrfs_copy_from_user(), update the following things for delalloc:
  * - Mark newly dirtied pages as DELALLOC in the io tree.
