@@ -2890,7 +2890,8 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 
 	sz = sizeof(struct rep_manu_request) + sizeof(struct rep_manu_reply);
 
-	data_out = pci_alloc_consistent(ioc->pcidev, sz, &data_out_dma);
+	data_out = dma_alloc_coherent(&ioc->pcidev->dev, sz, &data_out_dma,
+				      GFP_KERNEL);
 	if (!data_out) {
 		printk(KERN_ERR "Memory allocation failure at %s:%d/%s()!\n",
 			__FILE__, __LINE__, __func__);
@@ -2929,7 +2930,7 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	flagsLength = flagsLength << MPI_SGE_FLAGS_SHIFT;
 	flagsLength |= sizeof(struct rep_manu_reply);
 	ioc->add_sge(psge, flagsLength, data_out_dma +
-	sizeof(struct rep_manu_request));
+					sizeof(struct rep_manu_request));
 
 	INITIALIZE_MGMT_STATUS(ioc->sas_mgmt.status)
 	mpt_put_msg_frame(mptsasMgmtCtx, ioc, mf);
@@ -2981,7 +2982,8 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	}
 out_free:
 	if (data_out_dma)
-		pci_free_consistent(ioc->pcidev, sz, data_out, data_out_dma);
+		dma_free_coherent(&ioc->pcidev->dev, sz, data_out,
+				  data_out_dma);
 put_mf:
 	if (mf)
 		mpt_free_msg_frame(ioc, mf);
