@@ -375,6 +375,7 @@
 				     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&iprocslow>;
 			clock-names = "apb_pclk";
+			status = "disabled";
 		};
 
 		ccbtimer1: timer@35000 {
@@ -384,6 +385,7 @@
 				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&iprocslow>;
 			clock-names = "apb_pclk";
+			status = "disabled";
 		};
 
 		srab: ethernet-switch@36000 {
