@@ -41,9 +41,11 @@ static inline struct iomap_page *to_iomap_page(struct page *page)
 	 */
 	VM_BUG_ON_PGFLAGS(PageTail(page), page);
 
-	if (page_has_private(page))
-		return (struct iomap_page *)page_private(page);
-	return NULL;
+	if (i_blocksize(page->mapping->host) == PAGE_SIZE)
+		return NULL;
+	if (!page_has_private(page))
+		return NULL;
+	return (struct iomap_page *)page_private(page);
 }
 
 static struct bio_set iomap_ioend_bioset;
@@ -163,7 +165,7 @@ iomap_set_range_uptodate(struct page *page, unsigned off, unsigned len)
 	if (PageError(page))
 		return;
 
-	if (page_has_private(page))
+	if (i_blocksize(page->mapping->host) != PAGE_SIZE)
 		iomap_iop_set_range_uptodate(page, off, len);
 	else
 		SetPageUptodate(page);
