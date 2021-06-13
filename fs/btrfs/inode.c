@@ -8351,6 +8351,23 @@ static int btrfs_map_blocks(struct iomap_writepage_ctx *wpc,
 	return btrfs_set_iomap(inode, offset, end - offset, &wpc->iomap);
 }
 
+static void btrfs_writepage_endio(struct bio *bio)
+{
+	int error = blk_status_to_errno(bio->bi_status);
+	struct iomap_ioend *ioend = bio->bi_private;
+	struct btrfs_inode *inode = BTRFS_I(ioend->io_inode);
+	struct btrfs_fs_info *fs_info = btrfs_sb(ioend->io_inode->i_sb);
+	struct btrfs_ordered_extent *ordered = NULL;
+
+	if (!btrfs_dec_test_ordered_pending(inode, &ordered, ioend->io_offset,
+					    ioend->io_size, !error))
+		return;
+
+	btrfs_init_work(&ordered->work, finish_ordered_fn, NULL, NULL);
+	btrfs_queue_work(fs_info->endio_write_workers, &ordered->work);
+	iomap_writepage_end_bio(bio);
+}
+
 static void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
 {
 	struct bio_vec *bvec;
@@ -8360,6 +8377,7 @@ static void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
 		bio_for_each_segment_all(bvec, bio, iter_all)
 			set_page_extent_mapped(bvec->bv_page);
 
+	bio->bi_end_io = btrfs_writepage_endio;
 	if (is_data_inode(inode))
 		btrfs_submit_data_bio(inode, bio, 0, 0);
 	else
