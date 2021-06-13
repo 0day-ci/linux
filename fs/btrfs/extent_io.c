@@ -3032,6 +3032,7 @@ void btrfs_readpage_endio(struct bio *bio)
 	struct btrfs_io_bio *io_bio = btrfs_io_bio(bio);
 	struct extent_io_tree *tree, *failure_tree;
 	struct processed_extent processed = { 0 };
+	struct inode *inode;
 	/*
 	 * The offset to the beginning of a bio, since one bio can never be
 	 * larger than UINT_MAX, u32 here is enough.
@@ -3045,14 +3046,16 @@ void btrfs_readpage_endio(struct bio *bio)
 	bio_for_each_segment_all(bvec, bio, iter_all) {
 		bool uptodate = !bio->bi_status;
 		struct page *page = bvec->bv_page;
-		struct inode *inode = page->mapping->host;
-		struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
-		const u32 sectorsize = fs_info->sectorsize;
+		struct btrfs_fs_info *fs_info;
+		u32 sectorsize;
 		unsigned int error_bitmap = (unsigned int)-1;
 		u64 start;
 		u64 end;
 		u32 len;
 
+		inode = page->mapping->host;
+		fs_info = btrfs_sb(inode->i_sb);
+		sectorsize = fs_info->sectorsize;
 		btrfs_debug(fs_info,
 			"btrfs_readpage_endio: bi_sector=%llu, err=%d, mirror=%u",
 			bio->bi_iter.bi_sector, bio->bi_status,
@@ -3159,7 +3162,8 @@ readpage_ok:
 	}
 	/* Release the last extent */
 	endio_readpage_release_extent(&processed, NULL, 0, 0, false);
-	btrfs_io_bio_free_csum(io_bio);
+	if (!(BTRFS_I(inode)->flags & BTRFS_INODE_NODATASUM))
+		btrfs_io_bio_free_csum(io_bio);
 	bio_put(bio);
 }
 
