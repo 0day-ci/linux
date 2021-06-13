@@ -11,6 +11,7 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <asm/machdep.h>
 #include <asm/hvcall.h>
 #include <asm/plpar_wrappers.h>
@@ -191,6 +192,58 @@ int h_query_vas_capabilities(const u64 hcall, u8 query_type, u64 result)
 EXPORT_SYMBOL_GPL(h_query_vas_capabilities);
 
 /*
+ * hcall to get fault CRB from pHyp.
+ */
+static int h_get_nx_fault(u32 winid, u64 buffer)
+{
+	long rc;
+
+	rc = plpar_hcall_norets(H_GET_NX_FAULT, winid, buffer);
+
+	switch (rc) {
+	case H_SUCCESS:
+		return 0;
+	case H_PARAMETER:
+		pr_err("HCALL(%x): Invalid window ID %u\n", H_GET_NX_FAULT,
+		       winid);
+		return -EINVAL;
+	case H_PRIVILEGE:
+		pr_err("HCALL(%x): Window(%u): Invalid fault buffer 0x%llx\n",
+		       H_GET_NX_FAULT, winid, buffer);
+		return -EACCES;
+	default:
+		pr_err("HCALL(%x): Failed with error %ld for window(%u)\n",
+		       H_GET_NX_FAULT, rc, winid);
+		return -EIO;
+	}
+}
+
+/*
+ * Handle the fault interrupt.
+ * When the fault interrupt is received for each window, query pHyp to get
+ * the fault CRB on the specific fault. Then process the CRB by updating
+ * CSB or send signal if the user space CSB is invalid.
+ * Note: pHyp forwards an interrupt for each fault request. So one fault
+ *	CRB to process for each H_GET_NX_FAULT HCALL.
+ */
+irqreturn_t pseries_vas_fault_thread_fn(int irq, void *data)
+{
+	struct pseries_vas_window *txwin = data;
+	struct coprocessor_request_block crb;
+	struct vas_user_win_ref *tsk_ref;
+	int rc;
+
+	rc = h_get_nx_fault(txwin->vas_win.winid, (u64)virt_to_phys(&crb));
+	if (!rc) {
+		tsk_ref = &txwin->vas_win.task_ref;
+		vas_dump_crb(&crb);
+		vas_update_csb(&crb, tsk_ref);
+	}
+
+	return IRQ_HANDLED;
+}
+
+/*
  * Allocate window and setup IRQ mapping.
  */
 static int allocate_setup_window(struct pseries_vas_window *txwin,
@@ -201,10 +254,51 @@ static int allocate_setup_window(struct pseries_vas_window *txwin,
 	rc = h_allocate_vas_window(txwin, domain, wintype, DEF_WIN_CREDS);
 	if (rc)
 		return rc;
+	/*
+	 * On powerVM, pHyp setup and forwards the fault interrupt per
+	 * window. So the IRQ setup and fault handling will be done for
+	 * each open window separately.
+	 */
+	txwin->fault_virq = irq_create_mapping(NULL, txwin->fault_irq);
+	if (!txwin->fault_virq) {
+		pr_err("Failed irq mapping %d\n", txwin->fault_irq);
+		rc = -EINVAL;
+		goto out_win;
+	}
+
+	txwin->name = kasprintf(GFP_KERNEL, "vas-win-%d",
+				txwin->vas_win.winid);
+	if (!txwin->name) {
+		rc = -ENOMEM;
+		goto out_irq;
+	}
+
+	rc = request_threaded_irq(txwin->fault_virq, NULL,
+				  pseries_vas_fault_thread_fn, IRQF_ONESHOT,
+				  txwin->name, txwin);
+	if (rc) {
+		pr_err("VAS-Window[%d]: Request IRQ(%u) failed with %d\n",
+		       txwin->vas_win.winid, txwin->fault_virq, rc);
+		goto out_free;
+	}
 
 	txwin->vas_win.wcreds_max = DEF_WIN_CREDS;
 
 	return 0;
+out_free:
+	kfree(txwin->name);
+out_irq:
+	irq_dispose_mapping(txwin->fault_virq);
+out_win:
+	h_deallocate_vas_window(txwin->vas_win.winid);
+	return rc;
+}
+
+static inline void free_irq_setup(struct pseries_vas_window *txwin)
+{
+	free_irq(txwin->fault_virq, txwin);
+	irq_dispose_mapping(txwin->fault_virq);
+	kfree(txwin->name);
 }
 
 static struct vas_window *vas_allocate_window(struct vas_tx_win_open_attr *uattr,
@@ -320,6 +414,11 @@ static struct vas_window *vas_allocate_window(struct vas_tx_win_open_attr *uattr
 	return &txwin->vas_win;
 
 out_free:
+	/*
+	 * Window is not operational. Free IRQ before closing
+	 * window so that do not have to hold mutex.
+	 */
+	free_irq_setup(txwin);
 	h_deallocate_vas_window(txwin->vas_win.winid);
 out:
 	atomic_dec(&ct_caps->used_lpar_creds);
@@ -339,7 +438,16 @@ static int deallocate_free_window(struct pseries_vas_window *win)
 {
 	int rc = 0;
 
+	/*
+	 * Free IRQ after executing H_DEALLOCATE_VAS_WINDOW HCALL
+	 * to close the window. pHyp waits for all requests including
+	 * faults are processed before closing the window - Means all
+	 * credits are returned. In the case of fault request, credit
+	 * is returned after OS issues H_GET_NX_FAULT HCALL.
+	 */
 	rc = h_deallocate_vas_window(win->vas_win.winid);
+	if (!rc)
+		free_irq_setup(win);
 
 	return rc;
 }
