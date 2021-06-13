@@ -2989,7 +2989,7 @@ static void begin_page_read(struct btrfs_fs_info *fs_info, struct page *page)
 /*
  * Find extent buffer for a givne bytenr.
  *
- * This is for end_bio_extent_readpage(), thus we can't do any unsafe locking
+ * This is for btrfs_readpage_endio(), thus we can't do any unsafe locking
  * in endio context.
  */
 static struct extent_buffer *find_extent_buffer_readpage(
@@ -3026,7 +3026,7 @@ static struct extent_buffer *find_extent_buffer_readpage(
  * Scheduling is not allowed, so the extent state tree is expected
  * to have one and only one object corresponding to this IO.
  */
-static void end_bio_extent_readpage(struct bio *bio)
+void btrfs_readpage_endio(struct bio *bio)
 {
 	struct bio_vec *bvec;
 	struct btrfs_io_bio *io_bio = btrfs_io_bio(bio);
@@ -3054,7 +3054,7 @@ static void end_bio_extent_readpage(struct bio *bio)
 		u32 len;
 
 		btrfs_debug(fs_info,
-			"end_bio_extent_readpage: bi_sector=%llu, err=%d, mirror=%u",
+			"btrfs_readpage_endio: bi_sector=%llu, err=%d, mirror=%u",
 			bio->bi_iter.bi_sector, bio->bi_status,
 			io_bio->mirror_num);
 		tree = &BTRFS_I(inode)->io_tree;
@@ -3706,7 +3706,7 @@ int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 		ret = submit_extent_page(REQ_OP_READ | read_flags, NULL,
 					 bio_ctrl, page, disk_bytenr, iosize,
 					 pg_offset,
-					 end_bio_extent_readpage, 0,
+					 btrfs_readpage_endio, 0,
 					 this_bio_flag,
 					 force_bio_submit);
 		if (!ret) {
@@ -6443,7 +6443,7 @@ static int read_extent_buffer_subpage(struct extent_buffer *eb, int wait,
 	ret = submit_extent_page(REQ_OP_READ | REQ_META, NULL, &bio_ctrl,
 				 page, eb->start, eb->len,
 				 eb->start - page_offset(page),
-				 end_bio_extent_readpage, mirror_num, 0,
+				 btrfs_readpage_endio, mirror_num, 0,
 				 true);
 	if (ret) {
 		/*
@@ -6545,7 +6545,7 @@ int read_extent_buffer_pages(struct extent_buffer *eb, int wait, int mirror_num)
 			ClearPageError(page);
 			err = submit_extent_page(REQ_OP_READ | REQ_META, NULL,
 					 &bio_ctrl, page, page_offset(page),
-					 PAGE_SIZE, 0, end_bio_extent_readpage,
+					 PAGE_SIZE, 0, btrfs_readpage_endio,
 					 mirror_num, 0, false);
 			if (err) {
 				/*
