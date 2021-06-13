@@ -685,7 +685,7 @@ irqreturn_t z8530_interrupt(int irq, void *dev_id)
 {
 	struct z8530_dev *dev=dev_id;
 	u8 intr;
-	static volatile int locker=0;
+	static int locker;
 	int work=0;
 	struct z8530_irqhandler *irqs;
 	
