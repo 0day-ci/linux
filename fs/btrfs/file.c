@@ -1627,6 +1627,57 @@ static void btrfs_iomap_release(struct inode *inode,
 	kfree(bi);
 }
 
+static int btrfs_buffered_iomap_begin(struct inode *inode, loff_t pos,
+		size_t length, struct btrfs_iomap *bi)
+{
+	int ret;
+	size_t write_bytes = length;
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	size_t sector_offset = pos & (fs_info->sectorsize - 1);
+
+	ret = btrfs_check_data_free_space(BTRFS_I(inode),
+			&bi->data_reserved, pos, write_bytes);
+	if (ret < 0) {
+		/*
+		 * If we don't have to COW at the offset, reserve
+		 * metadata only. write_bytes may get smaller than
+		 * requested here.
+		 */
+		if (btrfs_check_nocow_lock(BTRFS_I(inode), pos,
+					&write_bytes) > 0)
+			bi->metadata_only = true;
+		else
+			return ret;
+	}
+
+	bi->reserved_bytes = round_up(write_bytes + sector_offset,
+			fs_info->sectorsize);
+	WARN_ON(bi->reserved_bytes == 0);
+	ret = btrfs_delalloc_reserve_metadata(BTRFS_I(inode),
+			bi->reserved_bytes);
+	if (ret) {
+		if (!bi->metadata_only)
+			btrfs_free_reserved_data_space(BTRFS_I(inode),
+					bi->data_reserved, pos,
+					write_bytes);
+		else
+			btrfs_check_nocow_unlock(BTRFS_I(inode));
+		return ret;
+	}
+
+	if (pos < inode->i_size) {
+		bi->lockstart = round_down(pos, fs_info->sectorsize);
+		bi->lockend = round_up(pos + write_bytes, fs_info->sectorsize) - 1;
+		btrfs_lock_and_flush_ordered_range(BTRFS_I(inode),
+				bi->lockstart, bi->lockend,
+				&bi->cached_state);
+		bi->extents_locked = true;
+	}
+
+	return 0;
+
+}
+
 static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 					       struct iov_iter *i)
 {
@@ -1701,50 +1752,15 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 		sector_offset = pos & (fs_info->sectorsize - 1);
 
 		extent_changeset_release(bi->data_reserved);
-		ret = btrfs_check_data_free_space(BTRFS_I(inode),
-						  &bi->data_reserved, pos,
-						  write_bytes);
-		if (ret < 0) {
-			/*
-			 * If we don't have to COW at the offset, reserve
-			 * metadata only. write_bytes may get smaller than
-			 * requested here.
-			 */
-			if (btrfs_check_nocow_lock(BTRFS_I(inode), pos,
-						   &write_bytes) > 0)
-				bi->metadata_only = true;
-			else
-				break;
-		}
+
+		ret = btrfs_buffered_iomap_begin(inode, pos, write_bytes,
+				bi);
+
+		if (ret < 0)
+			goto out;
 
 		num_pages = DIV_ROUND_UP(write_bytes + offset, PAGE_SIZE);
 		WARN_ON(num_pages > nrptrs);
-		bi->reserved_bytes = round_up(write_bytes + sector_offset,
-					 fs_info->sectorsize);
-		WARN_ON(bi->reserved_bytes == 0);
-		ret = btrfs_delalloc_reserve_metadata(BTRFS_I(inode),
-				bi->reserved_bytes);
-		if (ret) {
-			if (!bi->metadata_only)
-				btrfs_free_reserved_data_space(BTRFS_I(inode),
-						bi->data_reserved, pos,
-						write_bytes);
-			else
-				btrfs_check_nocow_unlock(BTRFS_I(inode));
-			break;
-		}
-
-		release_bytes = bi->reserved_bytes;
-
-		if (pos < inode->i_size) {
-			bi->lockstart = round_down(pos, fs_info->sectorsize);
-			bi->lockend = round_up(pos + write_bytes, fs_info->sectorsize) - 1;
-			btrfs_lock_and_flush_ordered_range(BTRFS_I(inode),
-					bi->lockstart, bi->lockend,
-					&bi->cached_state);
-			bi->extents_locked = true;
-		}
-
 		/*
 		 * This is going to setup the pages array with the number of
 		 * pages we want, so we don't really need to worry about the
@@ -1779,6 +1795,8 @@ static noinline ssize_t btrfs_buffered_write(struct kiocb *iocb,
 			dirty_pages = DIV_ROUND_UP(copied + offset,
 						   PAGE_SIZE);
 		}
+
+		release_bytes = bi->reserved_bytes;
 
 		if (num_sectors > dirty_sectors) {
 			/* release everything except the sectors we dirtied */
