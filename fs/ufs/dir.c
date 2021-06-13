@@ -176,7 +176,6 @@ bad_entry:
 		   rec_len, ufs_get_de_namlen(sb, p));
 	goto fail;
 Eend:
-	p = (struct ufs_dir_entry *)(kaddr + offs);
 	ufs_error(sb, __func__,
 		   "entry in directory #%lu spans the page boundary"
 		   "offset=%lu",
