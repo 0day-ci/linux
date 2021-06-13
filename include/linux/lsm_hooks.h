@@ -1557,6 +1557,11 @@
  * 	Read perf_event security info if allowed.
  * @perf_event_write:
  * 	Write perf_event security info if allowed.
+ *
+ * Security hooks for anonymous file
+ *
+ * @memfd_create:
+ *	Check whether anonymous file creation is allowed
  */
 union security_list_options {
 	#define LSM_HOOK(RET, DEFAULT, NAME, ...) RET (*NAME)(__VA_ARGS__);

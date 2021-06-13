@@ -18,6 +18,7 @@
 #include <linux/hugetlb.h>
 #include <linux/shmem_fs.h>
 #include <linux/memfd.h>
+#include <linux/security.h>
 #include <uapi/linux/memfd.h>
 
 /*
@@ -287,6 +288,11 @@ SYSCALL_DEFINE2(memfd_create,
 	/* terminating-zero may have changed after strnlen_user() returned */
 	if (name[len + MFD_NAME_PREFIX_LEN - 1]) {
 		error = -EFAULT;
+		goto err_name;
+	}
+
+	if (security_memfd_create(name, flags)) {
+		error = -EPERM;
 		goto err_name;
 	}
 

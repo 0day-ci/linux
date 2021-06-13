@@ -2624,3 +2624,10 @@ int security_perf_event_write(struct perf_event *event)
 	return call_int_hook(perf_event_write, 0, event);
 }
 #endif /* CONFIG_PERF_EVENTS */
+
+#ifdef CONFIG_MEMFD_CREATE
+int security_memfd_create(const char *name, unsigned int flags)
+{
+	return call_int_hook(memfd_create, 0, name, flags);
+}
+#endif /* CONFIG_MEMFD_CREATE */

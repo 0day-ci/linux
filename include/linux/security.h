@@ -2037,4 +2037,19 @@ static inline int security_perf_event_write(struct perf_event *event)
 #endif /* CONFIG_SECURITY */
 #endif /* CONFIG_PERF_EVENTS */
 
+#ifdef CONFIG_MEMFD_CREATE
+#ifdef CONFIG_SECURITY
+
+extern int security_memfd_create(const char *name, unsigned int flags);
+
+#else
+
+static inline int security_memfd_create(const char *name, unsigned int flags)
+{
+	return 0;
+}
+
+#endif /* CONFIG_SECURITY */
+#endif /* CONFIG_MEMFD_CREATE */
+
 #endif /* ! __LINUX_SECURITY_H */
