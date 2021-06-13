@@ -5203,6 +5203,9 @@ static int btrfs_setsize(struct inode *inode, struct iattr *attr)
 		btrfs_end_transaction(trans);
 	} else {
 		struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+		u64 start = round_down(oldsize, fs_info->sectorsize);
+		u64 end = round_up(newsize, fs_info->sectorsize) - 1;
+		struct extent_state **cached = NULL;
 
 		if (btrfs_is_zoned(fs_info)) {
 			ret = btrfs_wait_ordered_range(inode,
@@ -5221,7 +5224,10 @@ static int btrfs_setsize(struct inode *inode, struct iattr *attr)
 			set_bit(BTRFS_INODE_FLUSH_ON_CLOSE,
 				&BTRFS_I(inode)->runtime_flags);
 
+		lock_extent_bits(&BTRFS_I(inode)->io_tree, start, end, cached);
 		truncate_setsize(inode, newsize);
+		unlock_extent_cached(&BTRFS_I(inode)->io_tree, start, end,
+				cached);
 
 		inode_dio_wait(inode);
 
@@ -8324,9 +8330,23 @@ static int __btrfs_releasepage(struct page *page, gfp_t gfp_flags)
 
 static int btrfs_releasepage(struct page *page, gfp_t gfp_flags)
 {
+	struct btrfs_inode *inode = BTRFS_I(page->mapping->host);
+	struct extent_map *em;
+	int ret;
+
 	if (PageWriteback(page) || PageDirty(page))
 		return 0;
-	return __btrfs_releasepage(page, gfp_flags);
+
+	em = lookup_extent_mapping(&inode->extent_tree, page_offset(page),
+			PAGE_SIZE - 1);
+	if (!em)
+		return 0;
+	if (!try_lock_extent(&inode->io_tree, em->start, extent_map_end(em) - 1))
+		return 0;
+	ret = __btrfs_releasepage(page, gfp_flags);
+	unlock_extent(&inode->io_tree, em->start, extent_map_end(em));
+	free_extent_map(em);
+	return ret;
 }
 
 #ifdef CONFIG_MIGRATION
@@ -8400,9 +8420,6 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 		return;
 	}
 
-	if (!inode_evicting)
-		lock_extent_bits(tree, page_start, page_end, &cached_state);
-
 	cur = page_start;
 	while (cur < page_end) {
 		struct btrfs_ordered_extent *ordered;
@@ -8460,7 +8477,7 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 		if (!inode_evicting)
 			clear_extent_bit(tree, cur, range_end,
 					 EXTENT_DELALLOC |
-					 EXTENT_LOCKED | EXTENT_DO_ACCOUNTING |
+					 EXTENT_DO_ACCOUNTING |
 					 EXTENT_DEFRAG, 1, 0, &cached_state);
 
 		spin_lock_irq(&inode->ordered_tree.lock);
@@ -8505,7 +8522,7 @@ next:
 		 */
 		btrfs_qgroup_free_data(inode, NULL, cur, range_end + 1 - cur);
 		if (!inode_evicting) {
-			clear_extent_bit(tree, cur, range_end, EXTENT_LOCKED |
+			clear_extent_bit(tree, cur, range_end,
 				 EXTENT_DELALLOC | EXTENT_UPTODATE |
 				 EXTENT_DO_ACCOUNTING | EXTENT_DEFRAG, 1,
 				 delete_states, &cached_state);
