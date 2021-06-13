@@ -51,6 +51,9 @@ Required properties:
 	is equal to 0 and the MAC uses fixed-link to connect
 	with internal switch such as MT7530.
 
+Optional properties:
+- label: Name of interface, defaults to ethX if missing
+
 Example:
 
 eth: ethernet@1b100000 {
@@ -76,6 +79,7 @@ eth: ethernet@1b100000 {
 		compatible = "mediatek,eth-mac";
 		reg = <0>;
 		phy-handle = <&phy0>;
+		label = "mac1";
 	};
 
 	gmac2: mac@1 {
