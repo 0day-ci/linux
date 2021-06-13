@@ -35,6 +35,7 @@
 #include "misc.h"
 #include "ctree.h"
 #include "disk-io.h"
+#include "extent_io.h"
 #include "transaction.h"
 #include "btrfs_inode.h"
 #include "print-tree.h"
@@ -8433,7 +8434,7 @@ static void btrfs_writepage_endio(struct bio *bio)
 	iomap_writepage_end_bio(bio);
 }
 
-static void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
+void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
 {
 	struct bio_vec *bvec;
 	struct bvec_iter_all iter_all;
@@ -8442,7 +8443,11 @@ static void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
 		bio_for_each_segment_all(bvec, bio, iter_all)
 			set_page_extent_mapped(bvec->bv_page);
 
-	bio->bi_end_io = btrfs_writepage_endio;
+	if (bio_op(bio) == REQ_OP_WRITE)
+		bio->bi_end_io = btrfs_writepage_endio;
+	else
+		bio->bi_end_io = btrfs_readpage_endio;
+
 	if (is_data_inode(inode))
 		btrfs_submit_data_bio(inode, bio, 0, 0);
 	else

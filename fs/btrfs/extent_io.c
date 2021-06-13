@@ -7316,3 +7316,13 @@ void btrfs_readahead_node_child(struct extent_buffer *node, int slot)
 				   btrfs_node_ptr_generation(node, slot),
 				   btrfs_header_level(node) - 1);
 }
+
+static struct bio *btrfs_readpage_alloc_bio(gfp_t gfp_mask, unsigned short nr)
+{
+	return btrfs_io_bio_alloc(nr);
+}
+
+const struct iomap_readpage_ops btrfs_iomap_readpage_ops = {
+	.alloc_bio = btrfs_readpage_alloc_bio,
+	.submit_io = btrfs_buffered_submit_io,
+};

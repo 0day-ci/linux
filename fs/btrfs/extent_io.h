@@ -7,6 +7,7 @@
 #include <linux/refcount.h>
 #include <linux/fiemap.h>
 #include <linux/btrfs_tree.h>
+#include <linux/iomap.h>
 #include "ulist.h"
 
 /*
@@ -312,6 +313,8 @@ int btrfs_repair_one_sector(struct inode *inode,
 			    struct page *page, unsigned int pgoff,
 			    u64 start, int failed_mirror,
 			    submit_bio_hook_t *submit_bio_hook);
+
+extern const struct iomap_readpage_ops btrfs_iomap_readpage_ops;
 
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS
 bool find_lock_delalloc_range(struct inode *inode,
