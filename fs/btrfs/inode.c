@@ -8432,7 +8432,9 @@ static int btrfs_writepage(struct page *page, struct writeback_control *wbc)
 static int btrfs_writepages(struct address_space *mapping,
 			    struct writeback_control *wbc)
 {
-	return extent_writepages(mapping, wbc);
+	struct iomap_writepage_ctx wpc = {0};
+
+	return iomap_writepages(mapping, wbc, &wpc, &btrfs_writeback_ops);
 }
 
 static void btrfs_readahead(struct readahead_control *rac)
