@@ -8351,10 +8351,25 @@ static int btrfs_map_blocks(struct iomap_writepage_ctx *wpc,
 	return btrfs_set_iomap(inode, offset, end - offset, &wpc->iomap);
 }
 
+static void btrfs_buffered_submit_io(struct inode *inode, struct bio *bio)
+{
+	struct bio_vec *bvec;
+	struct bvec_iter_all iter_all;
+
+	if (is_data_inode(inode))
+		bio_for_each_segment_all(bvec, bio, iter_all)
+			set_page_extent_mapped(bvec->bv_page);
+
+	if (is_data_inode(inode))
+		btrfs_submit_data_bio(inode, bio, 0, 0);
+	else
+		btrfs_submit_metadata_bio(inode, bio, 0, 0);
+}
+
 static const struct iomap_writeback_ops btrfs_writeback_ops = {
 	.map_blocks             = btrfs_map_blocks,
+	.submit_io		= btrfs_buffered_submit_io,
 };
-
 
 static int btrfs_writepage(struct page *page, struct writeback_control *wbc)
 {
