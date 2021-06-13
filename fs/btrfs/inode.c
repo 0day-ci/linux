@@ -8285,6 +8285,77 @@ int btrfs_readpage(struct file *file, struct page *page)
 	return ret;
 }
 
+static int find_delalloc_range(struct inode *inode, u64 *start, u64 *end)
+{
+	struct extent_io_tree *tree = &BTRFS_I(inode)->io_tree;
+	bool found;
+	int ret;
+	struct extent_state *cached = NULL;
+
+	/* Find the range */
+	found = btrfs_find_delalloc_range(tree, start, end,
+			BTRFS_MAX_EXTENT_SIZE, &cached);
+	if (!found)
+		return -EIO;
+
+	lock_extent(tree, *start, *end);
+
+	/* Verify it is set to delalloc */
+	ret = test_range_bit(tree, *start, *end,
+			EXTENT_DELALLOC, 1, cached);
+	return ret;
+}
+
+static int btrfs_set_iomap(struct inode *inode, loff_t pos,
+			   loff_t length, struct iomap *srcmap)
+{
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	loff_t sector_start = round_down(pos, fs_info->sectorsize);
+	struct extent_map *em;
+
+	em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, sector_start, length);
+	if (IS_ERR(em))
+		return PTR_ERR(em);
+
+	btrfs_em_to_iomap(inode, em, srcmap, sector_start);
+
+	free_extent_map(em);
+	return 0;
+}
+
+static int btrfs_map_blocks(struct iomap_writepage_ctx *wpc,
+		struct inode *inode, loff_t offset)
+{
+	int ret;
+	unsigned long nr_written; /* unused */
+	int page_started; /* unused */
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	u64 start = round_down(offset, fs_info->sectorsize);
+	u64 end = 0;
+
+	/* Check if iomap is valid */
+	if (offset >= wpc->iomap.offset &&
+			offset < wpc->iomap.offset + wpc->iomap.length)
+		return 0;
+
+	ret = find_delalloc_range(inode, &start, &end);
+	if (ret < 0)
+		return ret;
+
+	ret = btrfs_run_delalloc_range(BTRFS_I(inode), NULL,
+			start, end, &page_started, &nr_written, NULL);
+	if (ret < 0)
+		return ret;
+
+	/* TODO: handle compressed extents */
+	return btrfs_set_iomap(inode, offset, end - offset, &wpc->iomap);
+}
+
+static const struct iomap_writeback_ops btrfs_writeback_ops = {
+	.map_blocks             = btrfs_map_blocks,
+};
+
+
 static int btrfs_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
