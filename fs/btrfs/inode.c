@@ -8348,7 +8348,22 @@ static int btrfs_map_blocks(struct iomap_writepage_ctx *wpc,
 		return ret;
 
 	/* TODO: handle compressed extents */
-	return btrfs_set_iomap(inode, offset, end - offset, &wpc->iomap);
+	ret = btrfs_set_iomap(inode, offset, end - offset, &wpc->iomap);
+	if (ret < 0) {
+		__endio_write_update_ordered(BTRFS_I(inode), start, end, false);
+		return ret;
+	}
+
+	if (wpc->iomap.type == IOMAP_INLINE) {
+		/*
+		 * In case of EXTENT_MAP_INLINE, call endio function
+		 * and reset type to IOMAP_HOLE, so iomap code does not
+		 * perform any action
+		 */
+		__endio_write_update_ordered(BTRFS_I(inode), start, end, true);
+		wpc->iomap.type = IOMAP_HOLE;
+	}
+	return 0;
 }
 
 static void btrfs_writepage_endio(struct bio *bio)
