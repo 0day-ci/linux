@@ -8269,6 +8269,56 @@ static int btrfs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 	return extent_fiemap(BTRFS_I(inode), fieinfo, start, len);
 }
 
+
+static int btrfs_read_iomap_begin(struct inode *inode, loff_t pos,
+		loff_t length, unsigned int flags, struct iomap *iomap,
+		struct iomap *srcmap)
+{
+	struct extent_state *cached_state = NULL;
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
+	struct extent_map *em;
+	u64 start = round_down(pos, fs_info->sectorsize);
+	u64 end = round_up(pos + length, fs_info->sectorsize) - 1;
+
+	/* Lock the extent */
+	btrfs_lock_and_flush_ordered_range(BTRFS_I(inode),
+			start, end, &cached_state);
+
+	em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, start, end - start + 1);
+	if (IS_ERR(em))
+		return PTR_ERR(em);
+
+	btrfs_em_to_iomap(inode, em, iomap, start);
+	iomap->private = em;
+
+	if (iomap->type == IOMAP_HOLE) {
+		unlock_extent_cached(&BTRFS_I(inode)->io_tree,
+				start, end, &cached_state);
+	} else if (end > iomap->offset + iomap->length) {
+		/* Unlock part beyond iomap */
+		unlock_extent_cached(&BTRFS_I(inode)->io_tree,
+				iomap->offset + iomap->length,
+				end, &cached_state);
+	}
+
+	return 0;
+}
+
+static int btrfs_read_iomap_end(struct inode *inode, loff_t pos,
+		loff_t length, ssize_t written, unsigned int flags,
+		struct iomap *iomap)
+{
+	struct extent_map *em = iomap->private;
+
+	free_extent_map(em);
+	return 0;
+}
+
+const struct iomap_ops btrfs_buffered_read_iomap_ops = {
+	.iomap_begin = btrfs_read_iomap_begin,
+	.iomap_end = btrfs_read_iomap_end,
+};
+
 int btrfs_readpage(struct file *file, struct page *page)
 {
 	struct btrfs_inode *inode = BTRFS_I(page->mapping->host);
