@@ -9398,6 +9398,7 @@ bool take_page_off_buddy(struct page *page)
 			del_page_from_free_list(page_head, zone, page_order);
 			break_down_buddy_pages(zone, page_head, page, 0,
 						page_order, migratetype);
+			SetPageHWPoisonTakenOff(page);
 			if (!is_migrate_isolate(migratetype))
 				__mod_zone_freepage_state(zone, -1, migratetype);
 			ret = true;
@@ -9408,5 +9409,23 @@ bool take_page_off_buddy(struct page *page)
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
 	return ret;
+}
+
+/*
+ * Cancel takeoff done by take_page_off_buddy().
+ */
+void take_page_back_buddy(struct page *page)
+{
+	struct zone *zone = page_zone(page);
+	unsigned long pfn = page_to_pfn(page);
+	unsigned long flags;
+	int migratetype = get_pfnblock_migratetype(page, pfn);
+
+	spin_lock_irqsave(&zone->lock, flags);
+	if (put_page_testzero(page)) {
+		ClearPageHWPoisonTakenOff(page);
+		__free_one_page(page, pfn, zone, 0, migratetype, FPI_NONE);
+	}
+	spin_unlock_irqrestore(&zone->lock, flags);
 }
 #endif
