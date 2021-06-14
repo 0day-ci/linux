@@ -1113,7 +1113,8 @@ static int page_action(struct page_state *ps, struct page *p,
  */
 static inline bool HWPoisonHandlable(struct page *page)
 {
-	return PageLRU(page) || __PageMovable(page);
+	return PageLRU(page) || __PageMovable(page) ||
+		PageSlab(page) || PageTable(page) || PageReserved(page);
 }
 
 static int __get_hwpoison_page(struct page *page)
@@ -1260,12 +1261,6 @@ static bool hwpoison_user_mappings(struct page *p, unsigned long pfn,
 	struct page *hpage = *hpagep;
 	bool mlocked = PageMlocked(hpage);
 
-	/*
-	 * Here we are interested only in user-mapped pages, so skip any
-	 * other types of pages.
-	 */
-	if (PageReserved(p) || PageSlab(p))
-		return true;
 	if (!(PageLRU(hpage) || PageHuge(p)))
 		return true;
 
@@ -1669,7 +1664,10 @@ try_again:
 				action_result(pfn, MF_MSG_BUDDY, res);
 				res = res == MF_RECOVERED ? 0 : -EBUSY;
 			} else {
-				action_result(pfn, MF_MSG_KERNEL_HIGH_ORDER, MF_IGNORED);
+				if (PageCompound(p))
+					action_result(pfn, MF_MSG_KERNEL_HIGH_ORDER, MF_IGNORED);
+				else
+					action_result(pfn, MF_MSG_KERNEL, MF_IGNORED);
 				res = -EBUSY;
 			}
 			goto unlock_mutex;
@@ -1678,6 +1676,20 @@ try_again:
 			res = -EBUSY;
 			goto unlock_mutex;
 		}
+	}
+
+	if (PageSlab(p)) {
+		action_result(pfn, MF_MSG_SLAB, MF_IGNORED);
+		res = -EBUSY;
+		goto unlock_mutex;
+	} else if (PageTable(p)) {
+		action_result(pfn, MF_MSG_PAGETABLE, MF_IGNORED);
+		res = -EBUSY;
+		goto unlock_mutex;
+	} else if (PageReserved(p)) {
+		action_result(pfn, MF_MSG_KERNEL, MF_IGNORED);
+		res = -EBUSY;
+		goto unlock_mutex;
 	}
 
 	if (PageTransHuge(hpage)) {
