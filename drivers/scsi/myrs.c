@@ -2263,8 +2263,10 @@ static void myrs_cleanup(struct myrs_hba *cs)
 	/* Free the memory mailbox, status, and related structures */
 	myrs_unmap(cs);
 
-	if (cs->mmio_base) {
+	if (cs->disable_intr)
 		cs->disable_intr(cs);
+
+	if (cs->mmio_base) {
 		iounmap(cs->mmio_base);
 		cs->mmio_base = NULL;
 	}
