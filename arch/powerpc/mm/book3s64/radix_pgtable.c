@@ -646,10 +646,15 @@ void __init radix__early_init_mmu(void)
 	radix_init_pgtable();
 
 	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
-		lpcr = mfspr(SPRN_LPCR);
-		mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
-		radix_init_partition_table();
-		radix_init_amor();
+		if (cpu_has_feature(CPU_FTR_HVMODE)) {
+			lpcr = mfspr(SPRN_LPCR);
+			mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
+			radix_init_partition_table();
+			radix_init_amor();
+		} else {
+			mtspr(SPRN_PRTBL, (__pa(process_tb) |
+					   (PRTB_SIZE_SHIFT - 12)));
+		}
 	} else {
 		radix_init_pseries();
 	}

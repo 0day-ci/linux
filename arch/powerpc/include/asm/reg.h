@@ -730,6 +730,7 @@
 #endif
 #define SPRN_TIR	0x1BE	/* Thread Identification Register */
 #define SPRN_PTCR	0x1D0	/* Partition table control Register */
+#define SPRN_PRTBL	0x2D0	/* Process table pointer */
 #define SPRN_PSPB	0x09F	/* Problem State Priority Boost reg */
 #define SPRN_PTEHI	0x3D5	/* 981 7450 PTE HI word (S/W TLB load) */
 #define SPRN_PTELO	0x3D6	/* 982 7450 PTE LO word (S/W TLB load) */
