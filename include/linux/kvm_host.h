@@ -1262,14 +1262,8 @@ enum kvm_stat_kind {
 
 struct kvm_stat_data {
 	struct kvm *kvm;
-	struct kvm_stats_debugfs_item *dbgfs_item;
-};
-
-struct kvm_stats_debugfs_item {
-	const char *name;
-	int offset;
+	struct _kvm_stats_desc *desc;
 	enum kvm_stat_kind kind;
-	int mode;
 };
 
 struct _kvm_stats_header {
@@ -1283,68 +1277,64 @@ struct _kvm_stats_desc {
 	char name[KVM_STATS_NAME_LEN];
 };
 
-#define KVM_DBGFS_GET_MODE(dbgfs_item)                                         \
-	((dbgfs_item)->mode ? (dbgfs_item)->mode : 0644)
-
-#define VM_STAT(n, x, ...)						       \
-	{ n, offsetof(struct kvm, stat.x), KVM_STAT_VM, ## __VA_ARGS__ }
-#define VCPU_STAT(n, x, ...)						       \
-	{ n, offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU, ## __VA_ARGS__ }
-#define VM_STAT_GENERIC(n, x, ...)					       \
-	{ n, offsetof(struct kvm, stat.generic.x), KVM_STAT_VM, ## __VA_ARGS__ }
-#define VCPU_STAT_GENERIC(n, x, ...)					       \
-	{ n, offsetof(struct kvm_vcpu, stat.generic.x),			       \
-	  KVM_STAT_VCPU, ## __VA_ARGS__ }
-
-#define STATS_DESC_COMMON(type, unit, base, exp)			       \
-	.flags = type | unit | base |					       \
+#define STATS_DESC_COMMON(type, unit, base, exp, mode)			       \
+	.flags = type | unit | base | mode |				       \
 	    BUILD_BUG_ON_ZERO(type & ~KVM_STATS_TYPE_MASK) |		       \
 	    BUILD_BUG_ON_ZERO(unit & ~KVM_STATS_UNIT_MASK) |		       \
-	    BUILD_BUG_ON_ZERO(base & ~KVM_STATS_BASE_MASK),		       \
+	    BUILD_BUG_ON_ZERO(base & ~KVM_STATS_BASE_MASK) |		       \
+	    BUILD_BUG_ON_ZERO(mode & ~KVM_STATS_MODE_MASK),		       \
 	.exponent = exp,						       \
 	.size = 1
 
-#define VM_GENERIC_STATS_DESC(stat, type, unit, base, exp)		       \
+#define VM_GENERIC_STATS_DESC(stat, type, unit, base, exp, mode)	       \
 	{								       \
 		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			STATS_DESC_COMMON(type, unit, base, exp, mode),	       \
 			.offset = offsetof(struct kvm_vm_stat, generic.stat)   \
 		},							       \
 		.name = #stat,						       \
 	}
-#define VCPU_GENERIC_STATS_DESC(stat, type, unit, base, exp)		       \
+#define VCPU_GENERIC_STATS_DESC(stat, type, unit, base, exp, mode)	       \
 	{								       \
 		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			STATS_DESC_COMMON(type, unit, base, exp, mode),	       \
 			.offset = offsetof(struct kvm_vcpu_stat, generic.stat) \
 		},							       \
 		.name = #stat,						       \
 	}
-#define VM_STATS_DESC(stat, type, unit, base, exp)			       \
+#define VM_STATS_DESC(stat, type, unit, base, exp, mode)		       \
 	{								       \
 		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			STATS_DESC_COMMON(type, unit, base, exp, mode),	       \
 			.offset = offsetof(struct kvm_vm_stat, stat)	       \
 		},							       \
 		.name = #stat,						       \
 	}
-#define VCPU_STATS_DESC(stat, type, unit, base, exp)			       \
+#define VCPU_STATS_DESC(stat, type, unit, base, exp, mode)		       \
 	{								       \
 		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			STATS_DESC_COMMON(type, unit, base, exp, mode),	       \
 			.offset = offsetof(struct kvm_vcpu_stat, stat)	       \
 		},							       \
 		.name = #stat,						       \
 	}
 /* SCOPE: VM, VM_GENERIC, VCPU, VCPU_GENERIC */
-#define STATS_DESC(SCOPE, stat, type, unit, base, exp)			       \
-	SCOPE##_STATS_DESC(stat, type, unit, base, exp)
+#define STATS_DESC_RW(SCOPE, stat, type, unit, base, exp)		       \
+	SCOPE##_STATS_DESC(stat, type, unit, base, exp, KVM_STATS_MODE_RW)
+#define STATS_DESC_RONLY(SCOPE, stat, type, unit, base, exp)		       \
+	SCOPE##_STATS_DESC(stat, type, unit, base, exp, KVM_STATS_MODE_READ)
+#define STATS_DESC_WONLY(SCOPE, stat, type, unit, base, exp)		       \
+	SCOPE##_STATS_DESC(stat, type, unit, base, exp, KVM_STATS_MODE_WRITE)
 
 #define STATS_DESC_CUMULATIVE(SCOPE, name, unit, base, exponent)	       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_CUMULATIVE,		       \
+	STATS_DESC_RW(SCOPE, name, KVM_STATS_TYPE_CUMULATIVE,		       \
 		      unit, base, exponent)
 #define STATS_DESC_INSTANT(SCOPE, name, unit, base, exponent)		       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_INSTANT, unit, base, exponent)  \
+	STATS_DESC_RW(SCOPE, name, KVM_STATS_TYPE_INSTANT,		       \
+		   unit, base, exponent)
+#define STATS_DESC_INSTANT_RONLY(SCOPE, name, unit, base, exponent)	       \
+	STATS_DESC_RONLY(SCOPE, name, KVM_STATS_TYPE_INSTANT,		       \
+		   unit, base, exponent)
 
 /* Cumulative counter */
 #define STATS_DESC_COUNTER(SCOPE, name)					       \
@@ -1353,6 +1343,10 @@ struct _kvm_stats_desc {
 /* Instantaneous counter */
 #define STATS_DESC_ICOUNTER(SCOPE, name)				       \
 	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
+		KVM_STATS_BASE_POW10, 0)
+/* Instantaneous read only counter */
+#define STATS_DESC_ICOUNTER_RONLY(SCOPE, name)				       \
+	STATS_DESC_INSTANT_RONLY(SCOPE, name, KVM_STATS_UNIT_NONE,	       \
 		KVM_STATS_BASE_POW10, 0)
 
 /* Cumulative clock cycles */
@@ -1443,7 +1437,6 @@ struct _kvm_stats_desc {
 	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_success_ns),	       \
 	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_fail_ns)
 
-extern struct kvm_stats_debugfs_item debugfs_entries[];
 extern struct dentry *kvm_debugfs_dir;
 extern struct _kvm_stats_header kvm_vm_stats_header;
 extern struct _kvm_stats_header kvm_vcpu_stats_header;

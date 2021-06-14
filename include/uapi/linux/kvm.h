@@ -1936,6 +1936,13 @@ struct kvm_stats_header {
 #define KVM_STATS_BASE_POW2		(0x1 << KVM_STATS_BASE_SHIFT)
 #define KVM_STATS_BASE_MAX		KVM_STATS_BASE_POW2
 
+#define KVM_STATS_MODE_SHIFT		12
+#define KVM_STATS_MODE_MASK		(0xF << KVM_STATS_MODE_SHIFT)
+#define KVM_STATS_MODE_RW		(0x0 << KVM_STATS_MODE_SHIFT)
+#define KVM_STATS_MODE_READ		(0x1 << KVM_STATS_MODE_SHIFT)
+#define KVM_STATS_MODE_WRITE		(0x2 << KVM_STATS_MODE_SHIFT)
+#define KVM_STATS_MODE_MAX		KVM_STATS_MODE_WRITE
+
 struct kvm_stats_desc {
 	__u32 flags;
 	__s16 exponent;
