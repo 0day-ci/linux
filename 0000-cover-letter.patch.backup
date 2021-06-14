@@ -1,0 +1,26 @@
+From 78fcb27d574d2f7b06e37b77b257f98858a88d9d Mon Sep 17 00:00:00 2001
+From: Siddharth Gupta <sidgup@codeaurora.org>
+Date: Mon, 17 May 2021 13:33:25 -0700
+Subject: [PATCH 0/3] remoteproc: core: Fixes for rproc cdev and add
+To: bjorn.andersson@linaro.org,ohad@wizery.com,linux-remoteproc@vger.kernel.org
+Cc: linux-kernel@vger.kernel.org,linux-arm-msm@vger.kernel.org,linux-arm-kernel@lists.infradead.org,psodagud@codeaurora.org,stable@vger.kernel.org
+
+This patch series contains stability fixes and error handling for remoteproc.
+
+The changes included in this series do the following:
+Patch 1: Fixes the creation of the rproc character device.
+Patch 2: Validates rproc as the first step of rproc_add().
+Patch 3: Adds error handling in rproc_add().
+
+Siddharth Gupta (3):
+  remoteproc: core: Move cdev add before device add
+  remoteproc: core: Move validate before device add
+  remoteproc: core: Cleanup device in case of failure
+
+ drivers/remoteproc/remoteproc_core.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
+
