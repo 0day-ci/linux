@@ -335,6 +335,24 @@ for execution also include a list of all locations within buffers that
 refer to GPU-addresses so that the kernel can edit the buffer correctly.
 This process is dubbed relocation.
 
+Engine Discovery uAPI
+---------------------
+
+.. kernel-doc:: include/uapi/drm/i915_drm.h
+   :doc: Engine Discovery uAPI
+
+Context Engine Map uAPI
+-----------------------
+
+.. kernel-doc:: include/uapi/drm/i915_drm.h
+   :doc: Context Engine Map uAPI
+
+Virtual Engine uAPI
+-------------------
+
+.. kernel-doc:: include/uapi/drm/i915_drm.h
+   :doc: Virtual Engine uAPI
+
 Locking Guidelines
 ------------------
 
