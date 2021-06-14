@@ -1192,7 +1192,8 @@ static int probes_profile_seq_show(struct seq_file *m, void *v)
 	seq_printf(m, "  %-44s %15lu %15lu\n",
 		   trace_probe_name(&tk->tp),
 		   trace_kprobe_nhit(tk),
-		   tk->rp.kp.nmissed);
+		   trace_kprobe_is_return(tk) ? tk->rp.kp.nmissed + tk->rp.nmissed
+					      : tk->rp.kp.nmissed);
 
 	return 0;
 }
