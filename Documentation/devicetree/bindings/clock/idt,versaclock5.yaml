@@ -30,6 +30,22 @@ description: |
     3 -- OUT3
     4 -- OUT4
 
+  The idt,enable-shutdown and idt,output-enable-active-high properties
+  correspond to the SH and SP bits of the Primary Source and Shutdown
+  Register, respectively. Their behavior is summarized by the following
+  table:
+
+  SH SP SD/OE Output
+  == == ===== ========
+   0  0 Low   Active
+   0  0 High  Inactive
+   0  1 Low   Inactive
+   0  1 High  Active
+   1  0 Low   Active
+   1  0 High  Shutdown
+   1  1 Low   Inactive
+   1  1 High  Shutdown
+
 maintainers:
   - Luca Ceresoli <luca@lucaceresoli.net>
 
@@ -64,6 +80,23 @@ properties:
     minimum: 9000
     maximum: 22760
     description: Optional load capacitor for XTAL1 and XTAL2
+
+  idt,enable-shutdown:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      Enable the shutdown function when the SD/OE pin is high. This
+      corresponds to setting the SH bit of the Primary Source and
+      Shutdown Register. If this property is set, it takes precedence
+      over the usual enable/disable semantics of the SD/OE pin.
+
+  idt,output-enable-active-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      This enables output when the SD/OE pin is high, and disables
+      output when the SD/OE pin is low. This corresponds to setting the
+      SP bit of the Primary Source and Shutdown Register. If this
+      property is not present, then the SD/OE pin has the opposite
+      polarity (enabled when low, disabled when high).
 
 patternProperties:
   "^OUT[1-4]$":
