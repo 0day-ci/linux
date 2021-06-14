@@ -21,7 +21,6 @@
 #include "trace_probe_tmpl.h"
 
 #define KPROBE_EVENT_SYSTEM "kprobes"
-#define KRETPROBE_MAXACTIVE_MAX 4096
 
 /* Kprobe early definition from command line */
 static char kprobe_boot_events_buf[COMMAND_LINE_SIZE] __initdata;
@@ -784,13 +783,6 @@ static int __trace_kprobe_create(int argc, const char *argv[])
 		ret = kstrtouint(buf, 0, &maxactive);
 		if (ret || !maxactive) {
 			trace_probe_log_err(1, BAD_MAXACT);
-			goto parse_error;
-		}
-		/* kretprobes instances are iterated over via a list. The
-		 * maximum should stay reasonable.
-		 */
-		if (maxactive > KRETPROBE_MAXACTIVE_MAX) {
-			trace_probe_log_err(1, MAXACT_TOO_BIG);
 			goto parse_error;
 		}
 	}

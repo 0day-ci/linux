@@ -6,9 +6,6 @@
 # Test if we successfully reject unknown messages
 if echo 'a:myprobeaccept inet_csk_accept' > kprobe_events; then false; else true; fi
 
-# Test if we successfully reject too big maxactive
-if echo 'r1000000:myprobeaccept inet_csk_accept' > kprobe_events; then false; else true; fi
-
 # Test if we successfully reject unparsable numbers for maxactive
 if echo 'r10fuzz:myprobeaccept inet_csk_accept' > kprobe_events; then false; else true; fi
 
