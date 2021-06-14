@@ -99,9 +99,10 @@ static inline void svm_hv_update_vp_id(struct vmcb *vmcb,
 {
 	struct hv_enlightenments *hve =
 		(struct hv_enlightenments *)vmcb->control.reserved_sw;
+	u32 vp_index = kvm_hv_get_vpindex(vcpu);
 
-	if (hve->hv_vp_id != to_hv_vcpu(vcpu)->vp_index) {
-		hve->hv_vp_id = to_hv_vcpu(vcpu)->vp_index;
+	if (hve->hv_vp_id != vp_index) {
+		hve->hv_vp_id = vp_index;
 		vmcb_mark_dirty(vmcb, VMCB_HV_NESTED_ENLIGHTENMENTS);
 	}
 }
