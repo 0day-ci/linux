@@ -8,6 +8,7 @@
 
 #include <keys/user-type.h>
 #include <keys/trusted-type.h>
+#include <keys/trusted_dcp.h>
 #include <keys/trusted_tee.h>
 #include <keys/trusted_tpm.h>
 #include <linux/capability.h>
@@ -24,7 +25,7 @@
 
 static char *trusted_key_source;
 module_param_named(source, trusted_key_source, charp, 0);
-MODULE_PARM_DESC(source, "Select trusted keys source (tpm or tee)");
+MODULE_PARM_DESC(source, "Select trusted keys source (tpm, tee or dcp)");
 
 static const struct trusted_key_source trusted_key_sources[] = {
 #if defined(CONFIG_TCG_TPM)
@@ -32,6 +33,9 @@ static const struct trusted_key_source trusted_key_sources[] = {
 #endif
 #if defined(CONFIG_TEE)
 	{ "tee", &trusted_key_tee_ops },
+#endif
+#if defined(CONFIG_CRYPTO_DEV_MXS_DCP)
+	{ "dcp", &dcp_trusted_key_ops },
 #endif
 };
 
