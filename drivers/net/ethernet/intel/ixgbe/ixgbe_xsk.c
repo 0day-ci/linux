@@ -207,7 +207,7 @@ static struct sk_buff *ixgbe_construct_skb_zc(struct ixgbe_ring *rx_ring,
 					      struct ixgbe_rx_buffer *bi)
 {
 	unsigned int metasize = bi->xdp->data - bi->xdp->data_meta;
-	unsigned int datasize = bi->xdp->data_end - bi->xdp->data;
+	unsigned int datasize = bi->xdp->data_end - bi->xdp->data_meta;
 	struct sk_buff *skb;
 
 	/* allocate a skb to store the frags */
@@ -217,10 +217,12 @@ static struct sk_buff *ixgbe_construct_skb_zc(struct ixgbe_ring *rx_ring,
 	if (unlikely(!skb))
 		return NULL;
 
-	skb_reserve(skb, bi->xdp->data - bi->xdp->data_hard_start);
-	memcpy(__skb_put(skb, datasize), bi->xdp->data, datasize);
-	if (metasize)
+	skb_reserve(skb, bi->xdp->data_meta - bi->xdp->data_hard_start);
+	memcpy(__skb_put(skb, datasize), bi->xdp->data_meta, datasize);
+	if (metasize) {
+		__skb_pull(skb, metasize);
 		skb_metadata_set(skb, metasize);
+	}
 
 	xsk_buff_free(bi->xdp);
 	bi->xdp = NULL;
