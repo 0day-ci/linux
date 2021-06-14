@@ -3231,7 +3231,7 @@ static inline struct l2cap_chan *smp_new_conn_cb(struct l2cap_chan *pchan)
 {
 	struct l2cap_chan *chan;
 
-	bt_dev_dbg(pchan->conn->hcon->hdev, "pchan %p", pchan);
+	BT_DBG("pchan %p", pchan);
 
 	chan = l2cap_chan_create();
 	if (!chan)
@@ -3252,7 +3252,7 @@ static inline struct l2cap_chan *smp_new_conn_cb(struct l2cap_chan *pchan)
 	 */
 	atomic_set(&chan->nesting, L2CAP_NESTING_SMP);
 
-	bt_dev_dbg(pchan->conn->hcon->hdev, "created chan %p", chan);
+	BT_DBG("created chan %p", chan);
 
 	return chan;
 }
