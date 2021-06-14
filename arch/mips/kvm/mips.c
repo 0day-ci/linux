@@ -41,6 +41,8 @@
 struct _kvm_stats_desc kvm_vm_stats_desc[] = {
 	KVM_GENERIC_VM_STATS()
 };
+static_assert(ARRAY_SIZE(kvm_vm_stats_desc) ==
+		sizeof(struct kvm_vm_stat) / sizeof(u64));
 
 struct _kvm_stats_header kvm_vm_stats_header = {
 	{
@@ -54,38 +56,38 @@ struct _kvm_stats_header kvm_vm_stats_header = {
 
 struct _kvm_stats_desc kvm_vcpu_stats_desc[] = {
 	KVM_GENERIC_VCPU_STATS(),
-	STATS_DESC_COUNTER("wait_exits"),
-	STATS_DESC_COUNTER("cache_exits"),
-	STATS_DESC_COUNTER("signal_exits"),
-	STATS_DESC_COUNTER("int_exits"),
-	STATS_DESC_COUNTER("cop_unusable_exits"),
-	STATS_DESC_COUNTER("tlbmod_exits"),
-	STATS_DESC_COUNTER("tlbmiss_ld_exits"),
-	STATS_DESC_COUNTER("tlbmiss_st_exits"),
-	STATS_DESC_COUNTER("addrerr_st_exits"),
-	STATS_DESC_COUNTER("addrerr_ld_exits"),
-	STATS_DESC_COUNTER("syscall_exits"),
-	STATS_DESC_COUNTER("resvd_inst_exits"),
-	STATS_DESC_COUNTER("break_inst_exits"),
-	STATS_DESC_COUNTER("trap_inst_exits"),
-	STATS_DESC_COUNTER("msa_fpe_exits"),
-	STATS_DESC_COUNTER("fpe_exits"),
-	STATS_DESC_COUNTER("msa_disabled_exits"),
-	STATS_DESC_COUNTER("flush_dcache_exits"),
-#ifdef CONFIG_KVM_MIPS_VZ
-	STATS_DESC_COUNTER("vz_gpsi_exits"),
-	STATS_DESC_COUNTER("vz_gsfc_exits"),
-	STATS_DESC_COUNTER("vz_hc_exits"),
-	STATS_DESC_COUNTER("vz_grr_exits"),
-	STATS_DESC_COUNTER("vz_gva_exits"),
-	STATS_DESC_COUNTER("vz_ghfc_exits"),
-	STATS_DESC_COUNTER("vz_gpa_exits"),
-	STATS_DESC_COUNTER("vz_resvd_exits"),
+	STATS_DESC_COUNTER(VCPU, wait_exits),
+	STATS_DESC_COUNTER(VCPU, cache_exits),
+	STATS_DESC_COUNTER(VCPU, signal_exits),
+	STATS_DESC_COUNTER(VCPU, int_exits),
+	STATS_DESC_COUNTER(VCPU, cop_unusable_exits),
+	STATS_DESC_COUNTER(VCPU, tlbmod_exits),
+	STATS_DESC_COUNTER(VCPU, tlbmiss_ld_exits),
+	STATS_DESC_COUNTER(VCPU, tlbmiss_st_exits),
+	STATS_DESC_COUNTER(VCPU, addrerr_st_exits),
+	STATS_DESC_COUNTER(VCPU, addrerr_ld_exits),
+	STATS_DESC_COUNTER(VCPU, syscall_exits),
+	STATS_DESC_COUNTER(VCPU, resvd_inst_exits),
+	STATS_DESC_COUNTER(VCPU, break_inst_exits),
+	STATS_DESC_COUNTER(VCPU, trap_inst_exits),
+	STATS_DESC_COUNTER(VCPU, msa_fpe_exits),
+	STATS_DESC_COUNTER(VCPU, fpe_exits),
+	STATS_DESC_COUNTER(VCPU, msa_disabled_exits),
+	STATS_DESC_COUNTER(VCPU, flush_dcache_exits),
+	STATS_DESC_COUNTER(VCPU, vz_gpsi_exits),
+	STATS_DESC_COUNTER(VCPU, vz_gsfc_exits),
+	STATS_DESC_COUNTER(VCPU, vz_hc_exits),
+	STATS_DESC_COUNTER(VCPU, vz_grr_exits),
+	STATS_DESC_COUNTER(VCPU, vz_gva_exits),
+	STATS_DESC_COUNTER(VCPU, vz_ghfc_exits),
+	STATS_DESC_COUNTER(VCPU, vz_gpa_exits),
+	STATS_DESC_COUNTER(VCPU, vz_resvd_exits),
 #ifdef CONFIG_CPU_LOONGSON64
-	STATS_DESC_COUNTER("vz_cpucfg_exits"),
-#endif
+	STATS_DESC_COUNTER(VCPU, vz_cpucfg_exits),
 #endif
 };
+static_assert(ARRAY_SIZE(kvm_vcpu_stats_desc) ==
+		sizeof(struct kvm_vcpu_stat) / sizeof(u64));
 
 struct _kvm_stats_header kvm_vcpu_stats_header = {
 	{

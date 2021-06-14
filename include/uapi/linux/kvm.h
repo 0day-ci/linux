@@ -1940,8 +1940,8 @@ struct kvm_stats_desc {
 	__u32 flags;
 	__s16 exponent;
 	__u16 size;
-	__u32 unused1;
-	__u32 unused2;
+	__u32 offset;
+	__u32 unused;
 	char name[0];
 };
 

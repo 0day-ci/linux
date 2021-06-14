@@ -1296,119 +1296,152 @@ struct _kvm_stats_desc {
 	{ n, offsetof(struct kvm_vcpu, stat.generic.x),			       \
 	  KVM_STAT_VCPU, ## __VA_ARGS__ }
 
-#define STATS_DESC(stat, type, unit, base, exp)			       \
+#define STATS_DESC_COMMON(type, unit, base, exp)			       \
+	.flags = type | unit | base |					       \
+	    BUILD_BUG_ON_ZERO(type & ~KVM_STATS_TYPE_MASK) |		       \
+	    BUILD_BUG_ON_ZERO(unit & ~KVM_STATS_UNIT_MASK) |		       \
+	    BUILD_BUG_ON_ZERO(base & ~KVM_STATS_BASE_MASK),		       \
+	.exponent = exp,						       \
+	.size = 1
+
+#define VM_GENERIC_STATS_DESC(stat, type, unit, base, exp)		       \
 	{								       \
 		{							       \
-			.flags = type | unit | base |			       \
-			    BUILD_BUG_ON_ZERO(type & ~KVM_STATS_TYPE_MASK) |   \
-			    BUILD_BUG_ON_ZERO(unit & ~KVM_STATS_UNIT_MASK) |   \
-			    BUILD_BUG_ON_ZERO(base & ~KVM_STATS_BASE_MASK),    \
-			.exponent = exp,				       \
-			.size = 1					       \
+			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			.offset = offsetof(struct kvm_vm_stat, generic.stat)   \
 		},							       \
-		.name = stat,						       \
+		.name = #stat,						       \
 	}
-#define STATS_DESC_CUMULATIVE(name, unit, base, exponent)		       \
-	STATS_DESC(name, KVM_STATS_TYPE_CUMULATIVE, unit, base, exponent)
-#define STATS_DESC_INSTANT(name, unit, base, exponent)			       \
-	STATS_DESC(name, KVM_STATS_TYPE_INSTANT, unit, base, exponent)
+#define VCPU_GENERIC_STATS_DESC(stat, type, unit, base, exp)		       \
+	{								       \
+		{							       \
+			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			.offset = offsetof(struct kvm_vcpu_stat, generic.stat) \
+		},							       \
+		.name = #stat,						       \
+	}
+#define VM_STATS_DESC(stat, type, unit, base, exp)			       \
+	{								       \
+		{							       \
+			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			.offset = offsetof(struct kvm_vm_stat, stat)	       \
+		},							       \
+		.name = #stat,						       \
+	}
+#define VCPU_STATS_DESC(stat, type, unit, base, exp)			       \
+	{								       \
+		{							       \
+			STATS_DESC_COMMON(type, unit, base, exp),	       \
+			.offset = offsetof(struct kvm_vcpu_stat, stat)	       \
+		},							       \
+		.name = #stat,						       \
+	}
+/* SCOPE: VM, VM_GENERIC, VCPU, VCPU_GENERIC */
+#define STATS_DESC(SCOPE, stat, type, unit, base, exp)			       \
+	SCOPE##_STATS_DESC(stat, type, unit, base, exp)
+
+#define STATS_DESC_CUMULATIVE(SCOPE, name, unit, base, exponent)	       \
+	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_CUMULATIVE,		       \
+		      unit, base, exponent)
+#define STATS_DESC_INSTANT(SCOPE, name, unit, base, exponent)		       \
+	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_INSTANT, unit, base, exponent)  \
 
 /* Cumulative counter */
-#define STATS_DESC_COUNTER(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_NONE,		       \
+#define STATS_DESC_COUNTER(SCOPE, name)					       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
 		KVM_STATS_BASE_POW10, 0)
 /* Instantaneous counter */
-#define STATS_DESC_ICOUNTER(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_NONE,			       \
+#define STATS_DESC_ICOUNTER(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
 		KVM_STATS_BASE_POW10, 0)
 
 /* Cumulative clock cycles */
-#define STATS_DESC_CYCLE(name)						       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_CYCLES,		       \
+#define STATS_DESC_CYCLE(SCOPE, name)					       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_CYCLES,	       \
 		KVM_STATS_BASE_POW10, 0)
 /* Instantaneous clock cycles */
-#define STATS_DESC_ICYCLE(name)						       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_CYCLES,			       \
+#define STATS_DESC_ICYCLE(SCOPE, name)					       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_CYCLES,		       \
 		KVM_STATS_BASE_POW10, 0)
 
 /* Cumulative memory size in Byte */
-#define STATS_DESC_SIZE_BYTE(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_BYTES,		       \
+#define STATS_DESC_SIZE_BYTE(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_BYTES,	       \
 		KVM_STATS_BASE_POW2, 0)
 /* Cumulative memory size in KiByte */
-#define STATS_DESC_SIZE_KBYTE(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_BYTES,		       \
+#define STATS_DESC_SIZE_KBYTE(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_BYTES,	       \
 		KVM_STATS_BASE_POW2, 10)
 /* Cumulative memory size in MiByte */
-#define STATS_DESC_SIZE_MBYTE(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_BYTES,		       \
+#define STATS_DESC_SIZE_MBYTE(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_BYTES,	       \
 		KVM_STATS_BASE_POW2, 20)
 /* Cumulative memory size in GiByte */
-#define STATS_DESC_SIZE_GBYTE(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_BYTES,		       \
+#define STATS_DESC_SIZE_GBYTE(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_BYTES,	       \
 		KVM_STATS_BASE_POW2, 30)
 
 /* Instantaneous memory size in Byte */
-#define STATS_DESC_ISIZE_BYTE(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_BYTES,			       \
+#define STATS_DESC_ISIZE_BYTE(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_BYTES,		       \
 		KVM_STATS_BASE_POW2, 0)
 /* Instantaneous memory size in KiByte */
-#define STATS_DESC_ISIZE_KBYTE(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_BYTES,			       \
+#define STATS_DESC_ISIZE_KBYTE(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_BYTES,		       \
 		KVM_STATS_BASE_POW2, 10)
 /* Instantaneous memory size in MiByte */
-#define STATS_DESC_ISIZE_MBYTE(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_BYTES,			       \
+#define STATS_DESC_ISIZE_MBYTE(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_BYTES,		       \
 		KVM_STATS_BASE_POW2, 20)
 /* Instantaneous memory size in GiByte */
-#define STATS_DESC_ISIZE_GBYTE(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_BYTES,			       \
+#define STATS_DESC_ISIZE_GBYTE(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_BYTES,		       \
 		KVM_STATS_BASE_POW2, 30)
 
 /* Cumulative time in second */
-#define STATS_DESC_TIME_SEC(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_TIME_SEC(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
 		KVM_STATS_BASE_POW10, 0)
 /* Cumulative time in millisecond */
-#define STATS_DESC_TIME_MSEC(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_TIME_MSEC(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
 		KVM_STATS_BASE_POW10, -3)
 /* Cumulative time in microsecond */
-#define STATS_DESC_TIME_USEC(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_TIME_USEC(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
 		KVM_STATS_BASE_POW10, -6)
 /* Cumulative time in nanosecond */
-#define STATS_DESC_TIME_NSEC(name)					       \
-	STATS_DESC_CUMULATIVE(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_TIME_NSEC(SCOPE, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
 		KVM_STATS_BASE_POW10, -9)
 
 /* Instantaneous time in second */
-#define STATS_DESC_ITIME_SEC(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_ITIME_SEC(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_SECONDS,		       \
 		KVM_STATS_BASE_POW10, 0)
 /* Instantaneous time in millisecond */
-#define STATS_DESC_ITIME_MSEC(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_ITIME_MSEC(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_SECONDS,		       \
 		KVM_STATS_BASE_POW10, -3)
 /* Instantaneous time in microsecond */
-#define STATS_DESC_ITIME_USEC(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_ITIME_USEC(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_SECONDS,		       \
 		KVM_STATS_BASE_POW10, -6)
 /* Instantaneous time in nanosecond */
-#define STATS_DESC_ITIME_NSEC(name)					       \
-	STATS_DESC_INSTANT(name, KVM_STATS_UNIT_SECONDS,		       \
+#define STATS_DESC_ITIME_NSEC(SCOPE, name)				       \
+	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_SECONDS,		       \
 		KVM_STATS_BASE_POW10, -9)
 
 #define KVM_GENERIC_VM_STATS()						       \
-	STATS_DESC_COUNTER("remote_tlb_flush")
+	STATS_DESC_COUNTER(VM_GENERIC, remote_tlb_flush)
 
 #define KVM_GENERIC_VCPU_STATS()					       \
-	STATS_DESC_COUNTER("halt_successful_poll"),			       \
-	STATS_DESC_COUNTER("halt_attempted_poll"),			       \
-	STATS_DESC_COUNTER("halt_poll_invalid"),			       \
-	STATS_DESC_COUNTER("halt_wakeup"),				       \
-	STATS_DESC_TIME_NSEC("halt_poll_success_ns"),			       \
-	STATS_DESC_TIME_NSEC("halt_poll_fail_ns")
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_successful_poll),		       \
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_attempted_poll),		       \
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_poll_invalid),		       \
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_wakeup),			       \
+	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_success_ns),	       \
+	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_fail_ns)
 
 extern struct kvm_stats_debugfs_item debugfs_entries[];
 extern struct dentry *kvm_debugfs_dir;
