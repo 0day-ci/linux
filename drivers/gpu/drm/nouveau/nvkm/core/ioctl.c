@@ -134,8 +134,8 @@ nvkm_ioctl_new(struct nvkm_client *client,
 				return 0;
 			}
 			ret = -EEXIST;
+			nvkm_object_fini(object, false);
 		}
-		nvkm_object_fini(object, false);
 	}
 
 	nvkm_object_del(&object);
