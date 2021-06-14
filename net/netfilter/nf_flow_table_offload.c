@@ -902,11 +902,10 @@ static void flow_offload_work_add(struct flow_offload_work *offload)
 
 	err = flow_offload_rule_add(offload, flow_rule);
 	if (err < 0)
-		goto out;
+		set_bit(NF_FLOW_HW_REFRESH, &offload->flow->flags);
+	else
+		set_bit(IPS_HW_OFFLOAD_BIT, &offload->flow->ct->status);
 
-	set_bit(IPS_HW_OFFLOAD_BIT, &offload->flow->ct->status);
-
-out:
 	nf_flow_offload_destroy(flow_rule);
 }
 
