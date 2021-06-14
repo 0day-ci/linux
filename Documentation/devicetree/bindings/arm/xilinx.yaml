@@ -116,6 +116,37 @@ properties:
           - const: xlnx,zynqmp-zcu111
           - const: xlnx,zynqmp
 
+      - description: Xilinx Kria SOMs
+        items:
+          - const: xlnx,zynqmp-sm-k26-rev1
+          - const: xlnx,zynqmp-sm-k26-revB
+          - const: xlnx,zynqmp-sm-k26-revA
+          - const: xlnx,zynqmp-sm-k26
+          - const: xlnx,zynqmp
+
+      - description: Xilinx Kria SOMs (starter)
+        items:
+          - const: xlnx,zynqmp-smk-k26-rev1
+          - const: xlnx,zynqmp-smk-k26-revB
+          - const: xlnx,zynqmp-smk-k26-revA
+          - const: xlnx,zynqmp-smk-k26
+          - const: xlnx,zynqmp
+
+      - description: Xilinx Kria Carrier Cards (revA/Y/Z)
+        items:
+          - const: xlnx,zynqmp-sk-kv260-revZ
+          - const: xlnx,zynqmp-sk-kv260-revY
+          - const: xlnx,zynqmp-sk-kv260-revA
+          - const: xlnx,zynqmp-sk-k260
+          - const: xlnx,zynqmp
+
+      - description: Xilinx Kria Carrier Cards (revB/1)
+        items:
+          - const: xlnx,zynqmp-sk-kv260-rev1
+          - const: xlnx,zynqmp-sk-kv260-revB
+          - const: xlnx,zynqmp-sk-k260
+          - const: xlnx,zynqmp
+
 additionalProperties: true
 
 ...
