@@ -952,7 +952,7 @@ static u64 expand_ack(u64 old_ack, u64 cur_ack, bool use_64bit)
 	old_ack32 = (u32)old_ack;
 	cur_ack32 = (u32)cur_ack;
 	cur_ack = (old_ack & GENMASK_ULL(63, 32)) + cur_ack32;
-	if (unlikely(before(cur_ack32, old_ack32)))
+	if (unlikely(cur_ack32 < old_ack32))
 		return cur_ack + (1LL << 32);
 	return cur_ack;
 }
