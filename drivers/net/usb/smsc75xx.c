@@ -1504,7 +1504,10 @@ static int smsc75xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	return 0;
 
 err:
+	cancel_work_sync(&pdata->set_multicast);
 	kfree(pdata);
+	pdata = NULL;
+	dev->data[0] = 0;
 	return ret;
 }
 
