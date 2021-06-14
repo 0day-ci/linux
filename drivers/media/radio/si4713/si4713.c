@@ -1398,6 +1398,9 @@ static const struct v4l2_ctrl_ops si4713_ctrl_ops = {
 
 static const struct v4l2_subdev_core_ops si4713_subdev_core_ops = {
 	.ioctl		= si4713_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32	= si4713_ioctl,
+#endif
 };
 
 static const struct v4l2_subdev_tuner_ops si4713_subdev_tuner_ops = {
