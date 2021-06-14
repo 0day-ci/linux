@@ -35,6 +35,9 @@ static char *__initdata tag_based_rootfs[] = {
 #if IS_BUILTIN(CONFIG_VIRTIO_FS)
 	"virtiofs",
 #endif
+#if IS_BUILTIN(CONFIG_9P_FS)
+	"9p",
+#endif
 };
 static bool __initdata tag_based_root;
 static int root_wait;
