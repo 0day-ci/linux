@@ -31,6 +31,12 @@
 int root_mountflags = MS_RDONLY | MS_SILENT;
 static char * __initdata root_device_name;
 static char __initdata saved_root_name[64];
+static char *__initdata tag_based_rootfs[] = {
+#if IS_BUILTIN(CONFIG_VIRTIO_FS)
+	"virtiofs",
+#endif
+};
+static bool __initdata tag_based_root;
 static int root_wait;
 
 dev_t ROOT_DEV;
@@ -552,6 +558,14 @@ void __init mount_root(void)
 		return;
 	}
 #endif
+	if (tag_based_root) {
+		if (!do_mount_root(root_device_name, root_fs_names,
+				   root_mountflags, root_mount_data))
+			return;
+		panic("VFS: Unable to mount root \"%s\" via \"%s\"\n",
+		      root_device_name, root_fs_names);
+	}
+
 #ifdef CONFIG_BLOCK
 	{
 		int err = create_dev("/dev/root", ROOT_DEV);
@@ -561,6 +575,20 @@ void __init mount_root(void)
 		mount_block_root("/dev/root", root_mountflags);
 	}
 #endif
+}
+
+static bool is_tag_based_rootfs(char *name)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(tag_based_rootfs); i++) {
+		int name_len = strlen(tag_based_rootfs[i]) + 1;
+
+		if (!strncmp(tag_based_rootfs[i], name, name_len))
+			return true;
+	}
+
+	return false;
 }
 
 /*
@@ -593,6 +621,10 @@ void __init prepare_namespace(void)
 			goto out;
 		}
 		ROOT_DEV = name_to_dev_t(root_device_name);
+		if (ROOT_DEV == 0 && root_fs_names) {
+			if (is_tag_based_rootfs(root_fs_names))
+				tag_based_root = true;
+		}
 		if (strncmp(root_device_name, "/dev/", 5) == 0)
 			root_device_name += 5;
 	}
