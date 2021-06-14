@@ -907,6 +907,7 @@ static const struct of_device_id clk_vc5_of_match[];
 
 static int vc5_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+	bool oe_polarity, sd_enable;
 	struct vc5_driver_data *vc5;
 	struct clk_init_data init;
 	const char *parent_names[2];
@@ -934,6 +935,15 @@ static int vc5_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "failed to allocate register map\n");
 		return PTR_ERR(vc5->regmap);
 	}
+
+	oe_polarity = of_property_read_bool(client->dev.of_node,
+					    "idt,output-enable-active-high");
+	sd_enable = of_property_read_bool(client->dev.of_node,
+					  "idt,enable-shutdown");
+	regmap_update_bits(vc5->regmap, VC5_PRIM_SRC_SHDN,
+			   VC5_PRIM_SRC_SHDN_SP | VC5_PRIM_SRC_SHDN_EN_GBL_SHDN,
+			   (oe_polarity ? VC5_PRIM_SRC_SHDN_SP : 0)
+			   | (sd_enable ? VC5_PRIM_SRC_SHDN_EN_GBL_SHDN : 0));
 
 	/* Register clock input mux */
 	memset(&init, 0, sizeof(init));
