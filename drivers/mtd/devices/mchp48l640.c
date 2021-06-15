@@ -210,7 +210,7 @@ static int mchp48l640_write(struct mtd_info *mtd, loff_t to, size_t len,
 			    size_t *retlen, const unsigned char *buf)
 {
 	struct mchp48l640_flash *flash = to_mchp48l640_flash(mtd);
-	int ret;
+	int ret = 0;
 	size_t wlen = 0;
 	loff_t woff = to;
 	size_t ws;
@@ -267,7 +267,7 @@ static int mchp48l640_read(struct mtd_info *mtd, loff_t from, size_t len,
 			   size_t *retlen, unsigned char *buf)
 {
 	struct mchp48l640_flash *flash = to_mchp48l640_flash(mtd);
-	int ret;
+	int ret = 0;
 	size_t wlen = 0;
 	loff_t woff = from;
 	size_t ws;
