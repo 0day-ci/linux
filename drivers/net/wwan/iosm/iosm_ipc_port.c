@@ -31,7 +31,8 @@ static void ipc_port_ctrl_stop(struct wwan_port *port)
 }
 
 /* transfer control data to modem */
-static int ipc_port_ctrl_tx(struct wwan_port *port, struct sk_buff *skb)
+static int ipc_port_ctrl_tx(struct wwan_port *port, struct sk_buff *skb,
+			    bool nonblock)
 {
 	struct iosm_cdev *ipc_port = wwan_port_get_drvdata(port);
 
