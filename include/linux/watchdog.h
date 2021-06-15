@@ -209,6 +209,8 @@ extern int watchdog_init_timeout(struct watchdog_device *wdd,
 				  unsigned int timeout_parm, struct device *dev);
 extern int watchdog_register_device(struct watchdog_device *);
 extern void watchdog_unregister_device(struct watchdog_device *);
+int watchdog_dev_suspend(struct watchdog_device *wdd);
+int watchdog_dev_resume(struct watchdog_device *wdd);
 
 int watchdog_set_last_hw_keepalive(struct watchdog_device *, unsigned int);
 
