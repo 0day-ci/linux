@@ -375,6 +375,8 @@ static int cros_typec_init_ports(struct cros_typec_data *typec)
 	return 0;
 
 unregister_ports:
+	/* Drop the referece that bumped by device_for_each_child_node() */
+	fwnode_handle_put(fwnode);
 	cros_unregister_ports(typec);
 	return ret;
 }
