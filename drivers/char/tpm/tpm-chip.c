@@ -358,10 +358,9 @@ struct tpm_chip *tpm_chip_alloc(struct device *pdev,
 	/* get extra reference on main device to hold on
 	 * behalf of devs.  This holds the chip structure
 	 * while cdevs is in use.  The corresponding put
-	 * is in the tpm_devs_release (TPM2 only)
+	 * is in the tpm_devs_release
 	 */
-	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-		get_device(&chip->dev);
+	get_device(&chip->dev);
 
 	if (chip->dev_num == 0)
 		chip->dev.devt = MKDEV(MISC_MAJOR, TPM_MINOR);
@@ -402,6 +401,14 @@ out:
 }
 EXPORT_SYMBOL_GPL(tpm_chip_alloc);
 
+static void tpmm_chip_release(void *data)
+{
+	struct tpm_chip *chip = data;
+
+	put_device(&chip->devs);
+	put_device(&chip->dev);
+}
+
 /**
  * tpmm_chip_alloc() - allocate a new struct tpm_chip instance
  * @pdev: parent device to which the chip is associated
@@ -419,9 +426,7 @@ struct tpm_chip *tpmm_chip_alloc(struct device *pdev,
 	if (IS_ERR(chip))
 		return chip;
 
-	rc = devm_add_action_or_reset(pdev,
-				      (void (*)(void *)) put_device,
-				      &chip->dev);
+	rc = devm_add_action_or_reset(pdev, tpmm_chip_release, chip);
 	if (rc)
 		return ERR_PTR(rc);
 
