@@ -659,6 +659,25 @@ void pci_epc_init_notify(struct pci_epc *epc)
 EXPORT_SYMBOL_GPL(pci_epc_init_notify);
 
 /**
+ * pci_epc_custom_notify() - Notify the EPF device about the custom events
+ *			     in the EPC device
+ * @epc: EPC device that generates the custom notification
+ * @data: Data for the custom notifier
+ *
+ * Invoke to notify the EPF device about the custom events in the EPC device.
+ * This notifier can be used to pass the EPC specific custom events that are
+ * shared with the EPF device.
+ */
+void pci_epc_custom_notify(struct pci_epc *epc, void *data)
+{
+	if (!epc || IS_ERR(epc))
+		return;
+
+	atomic_notifier_call_chain(&epc->notifier, CUSTOM, data);
+}
+EXPORT_SYMBOL_GPL(pci_epc_custom_notify);
+
+/**
  * pci_epc_destroy() - destroy the EPC device
  * @epc: the EPC device that has to be destroyed
  *
