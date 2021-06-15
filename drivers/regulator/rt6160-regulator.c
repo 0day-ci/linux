@@ -42,6 +42,7 @@ struct rt6160_priv {
 	struct regulator_desc desc;
 	struct gpio_desc *enable_gpio;
 	struct regmap *regmap;
+	bool vsel_active_low;
 	bool enable_state;
 };
 
@@ -127,15 +128,19 @@ static unsigned int rt6160_get_mode(struct regulator_dev *rdev)
 
 static int rt6160_set_suspend_voltage(struct regulator_dev *rdev, int uV)
 {
+	struct rt6160_priv *priv = rdev_get_drvdata(rdev);
 	struct regmap *regmap = rdev_get_regmap(rdev);
+	unsigned int reg = RT6160_REG_VSELH;
 	int vsel;
 
 	vsel = regulator_map_voltage_linear(rdev, uV, uV);
 	if (vsel < 0)
 		return vsel;
 
-	return regmap_update_bits(regmap, rdev->desc->vsel_reg,
-				  RT6160_VSEL_MASK, vsel);
+	if (!priv->vsel_active_low)
+		reg = RT6160_REG_VSELL;
+
+	return regmap_update_bits(regmap, reg, RT6160_VSEL_MASK, vsel);
 }
 
 static int rt6160_get_error_flags(struct regulator_dev *rdev, unsigned int *flags)
@@ -223,7 +228,6 @@ static int rt6160_probe(struct i2c_client *i2c)
 	struct rt6160_priv *priv;
 	struct regulator_config regulator_cfg = {};
 	struct regulator_dev *rdev;
-	bool vsel_active_low;
 	unsigned int devid;
 	int ret;
 
@@ -231,8 +235,7 @@ static int rt6160_probe(struct i2c_client *i2c)
 	if (!priv)
 		return -ENOMEM;
 
-	vsel_active_low =
-		device_property_present(&i2c->dev, "richtek,vsel-active-low");
+	priv->vsel_active_low = device_property_present(&i2c->dev, "richtek,vsel-active-low");
 
 	priv->enable_gpio = devm_gpiod_get_optional(&i2c->dev, "enable", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->enable_gpio)) {
@@ -264,10 +267,7 @@ static int rt6160_probe(struct i2c_client *i2c)
 	priv->desc.owner = THIS_MODULE;
 	priv->desc.min_uV = RT6160_VOUT_MINUV;
 	priv->desc.uV_step = RT6160_VOUT_STPUV;
-	if (vsel_active_low)
-		priv->desc.vsel_reg = RT6160_REG_VSELL;
-	else
-		priv->desc.vsel_reg = RT6160_REG_VSELH;
+	priv->desc.vsel_reg = RT6160_REG_VSELH;
 	priv->desc.vsel_mask = RT6160_VSEL_MASK;
 	priv->desc.n_voltages = RT6160_N_VOUTS;
 	priv->desc.ramp_reg = RT6160_REG_CNTL;
@@ -276,6 +276,8 @@ static int rt6160_probe(struct i2c_client *i2c)
 	priv->desc.n_ramp_values = ARRAY_SIZE(rt6160_ramp_tables);
 	priv->desc.of_map_mode = rt6160_of_map_mode;
 	priv->desc.ops = &rt6160_regulator_ops;
+	if (priv->vsel_active_low)
+		priv->desc.vsel_reg = RT6160_REG_VSELL;
 
 	regulator_cfg.dev = &i2c->dev;
 	regulator_cfg.of_node = i2c->dev.of_node;
