@@ -385,18 +385,15 @@ err_unreg_isp_subdev:
 
 static irqreturn_t rkisp1_isr(int irq, void *ctx)
 {
-	struct device *dev = ctx;
-	struct rkisp1_device *rkisp1 = dev_get_drvdata(dev);
-
 	/*
 	 * Call rkisp1_capture_isr() first to handle the frame that
 	 * potentially completed using the current frame_sequence number before
 	 * it is potentially incremented by rkisp1_isp_isr() in the vertical
 	 * sync.
 	 */
-	rkisp1_capture_isr(rkisp1);
-	rkisp1_isp_isr(rkisp1);
-	rkisp1_mipi_isr(rkisp1);
+	rkisp1_capture_isr(irq, ctx);
+	rkisp1_isp_isr(irq, ctx);
+	rkisp1_mipi_isr(irq, ctx);
 
 	return IRQ_HANDLED;
 }
@@ -478,15 +475,50 @@ static int rkisp1_probe(struct platform_device *pdev)
 	if (IS_ERR(rkisp1->base_addr))
 		return PTR_ERR(rkisp1->base_addr);
 
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
+	irq = platform_get_irq_byname_optional(pdev, "mi");
+	if (irq == -EPROBE_DEFER) {
 		return irq;
+	} else if (irq < 0) {
+		irq = platform_get_irq(pdev, 0);
+		if (irq < 0)
+			return irq;
 
-	ret = devm_request_irq(dev, irq, rkisp1_isr, IRQF_SHARED,
-			       dev_driver_string(dev), dev);
-	if (ret) {
-		dev_err(dev, "request irq failed: %d\n", ret);
-		return ret;
+		ret = devm_request_irq(dev, irq, rkisp1_isr, IRQF_SHARED,
+				       dev_driver_string(dev), dev);
+		if (ret) {
+			dev_err(dev, "request irq failed: %d\n", ret);
+			return ret;
+		}
+	} else {
+		/* we test-got the MI (capture) interrupt */
+		ret = devm_request_irq(dev, irq, rkisp1_capture_isr, IRQF_SHARED,
+				       dev_driver_string(dev), dev);
+		if (ret) {
+			dev_err(dev, "request mi irq failed: %d\n", ret);
+			return ret;
+		}
+
+		irq = platform_get_irq_byname_optional(pdev, "mipi");
+		if (irq < 0)
+			return irq;
+
+		ret = devm_request_irq(dev, irq, rkisp1_mipi_isr, IRQF_SHARED,
+				       dev_driver_string(dev), dev);
+		if (ret) {
+			dev_err(dev, "request mipi irq failed: %d\n", ret);
+			return ret;
+		}
+
+		irq = platform_get_irq_byname_optional(pdev, "isp");
+		if (irq < 0)
+			return irq;
+
+		ret = devm_request_irq(dev, irq, rkisp1_isp_isr, IRQF_SHARED,
+				       dev_driver_string(dev), dev);
+		if (ret) {
+			dev_err(dev, "request isp irq failed: %d\n", ret);
+			return ret;
+		}
 	}
 
 	for (i = 0; i < match_data->size; i++)
