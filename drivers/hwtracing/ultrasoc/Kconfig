@@ -22,4 +22,13 @@ config ULTRASOC_AXI_COM
 	  the upstream channel is used to transmit user configuration, and
 	  downstream channel to carry response and trace data to the users.
 
+config ULTRASOC_SMB
+	tristate "Ultrasoc System memory buffer drivers"
+	help
+	  This config enables support for Ultrasoc System Memory Buffer
+	  drivers. The System Memory Buffer provides a way to buffer and
+	  store messages in system memory. It provides a capability to
+	  store messages received on its input message interface to an
+	  area of system memory.
+
 endif
