@@ -208,15 +208,13 @@ static void kvm_vcpu_after_set_cpuid(struct kvm_vcpu *vcpu)
 	kvm_mmu_reset_context(vcpu);
 }
 
-static int is_efer_nx(void)
-{
-	return host_efer & EFER_NX;
-}
-
 static void cpuid_fix_nx_cap(struct kvm_vcpu *vcpu)
 {
 	int i;
 	struct kvm_cpuid_entry2 *e, *entry;
+
+	if (boot_cpu_has(X86_FEATURE_NX))
+		return;
 
 	entry = NULL;
 	for (i = 0; i < vcpu->arch.cpuid_nent; ++i) {
@@ -226,7 +224,7 @@ static void cpuid_fix_nx_cap(struct kvm_vcpu *vcpu)
 			break;
 		}
 	}
-	if (entry && cpuid_entry_has(entry, X86_FEATURE_NX) && !is_efer_nx()) {
+	if (entry && cpuid_entry_has(entry, X86_FEATURE_NX)) {
 		cpuid_entry_clear(entry, X86_FEATURE_NX);
 		printk(KERN_INFO "kvm: guest NX capability removed\n");
 	}
@@ -401,7 +399,6 @@ static __always_inline void kvm_cpu_cap_mask(enum cpuid_leafs leaf, u32 mask)
 
 void kvm_set_cpu_caps(void)
 {
-	unsigned int f_nx = is_efer_nx() ? F(NX) : 0;
 #ifdef CONFIG_X86_64
 	unsigned int f_gbpages = F(GBPAGES);
 	unsigned int f_lm = F(LM);
@@ -515,7 +512,7 @@ void kvm_set_cpu_caps(void)
 		F(CX8) | F(APIC) | 0 /* Reserved */ | F(SYSCALL) |
 		F(MTRR) | F(PGE) | F(MCA) | F(CMOV) |
 		F(PAT) | F(PSE36) | 0 /* Reserved */ |
-		f_nx | 0 /* Reserved */ | F(MMXEXT) | F(MMX) |
+		F(NX) | 0 /* Reserved */ | F(MMXEXT) | F(MMX) |
 		F(FXSR) | F(FXSR_OPT) | f_gbpages | F(RDTSCP) |
 		0 /* Reserved */ | f_lm | F(3DNOWEXT) | F(3DNOW)
 	);
