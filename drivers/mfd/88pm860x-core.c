@@ -651,7 +651,6 @@ static void device_irq_exit(struct pm860x_chip *chip)
 
 int pm8606_osc_enable(struct pm860x_chip *chip, unsigned short client)
 {
-	int ret = -EIO;
 	struct i2c_client *i2c = (chip->id == CHIP_PM8606) ?
 		chip->client : chip->companion;
 
@@ -680,19 +679,18 @@ int pm8606_osc_enable(struct pm860x_chip *chip, unsigned short client)
 	}
 	mutex_unlock(&chip->osc_lock);
 
-	dev_dbg(chip->dev, "%s(A): vote=0x%x status=%d ret=%d\n",
+	dev_dbg(chip->dev, "%s(A): vote=0x%x status=%d\n",
 			__func__, chip->osc_vote,
-			chip->osc_status, ret);
+			chip->osc_status);
 	return 0;
 out:
 	mutex_unlock(&chip->osc_lock);
-	return ret;
+	return -EIO;
 }
 EXPORT_SYMBOL(pm8606_osc_enable);
 
 int pm8606_osc_disable(struct pm860x_chip *chip, unsigned short client)
 {
-	int ret = -EIO;
 	struct i2c_client *i2c = (chip->id == CHIP_PM8606) ?
 		chip->client : chip->companion;
 
@@ -721,13 +719,13 @@ int pm8606_osc_disable(struct pm860x_chip *chip, unsigned short client)
 	}
 	mutex_unlock(&chip->osc_lock);
 
-	dev_dbg(chip->dev, "%s(A): vote=0x%x status=%d ret=%d\n",
+	dev_dbg(chip->dev, "%s(A): vote=0x%x status=%d\n",
 			__func__, chip->osc_vote,
-			chip->osc_status, ret);
+			chip->osc_status);
 	return 0;
 out:
 	mutex_unlock(&chip->osc_lock);
-	return ret;
+	return -EIO;
 }
 EXPORT_SYMBOL(pm8606_osc_disable);
 
