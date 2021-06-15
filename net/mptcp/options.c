@@ -542,7 +542,6 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
 
-		remaining -= map_size;
 		dss_size = map_size;
 		if (mpext)
 			opts->ext_copy = *mpext;
@@ -774,7 +773,6 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	if (mptcp_established_options_mp_prio(sk, &opt_size, remaining, opts)) {
 		*size += opt_size;
-		remaining -= opt_size;
 		ret = true;
 	}
 
