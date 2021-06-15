@@ -781,13 +781,19 @@ enum mapping_status {
 	MAPPING_DUMMY
 };
 
-static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
+static u64 expand_seq(u64 old_seq, u64 cur_seq)
 {
-	if ((u32)seq == (u32)old_seq)
-		return old_seq;
+	u32 old_seq32 = (u32)old_seq;
+	u32 cur_seq32 = (u32)cur_seq;
 
-	/* Assume map covers data not mapped yet. */
-	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63, 32));
+	cur_seq = (old_seq & GENMASK_ULL(63, 32)) + cur_seq32;
+	if (unlikely(cur_seq32 < old_seq32 && before(old_seq32, cur_seq32)))
+		return cur_seq + (1LL << 32);
+
+	/* on re-injection we can have wrap around towards bottom */
+	if (unlikely(cur_seq32 > old_seq32 && after(old_seq32, cur_seq32)))
+		return cur_seq - (1LL << 32);
+	return cur_seq;
 }
 
 static void dbg_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
@@ -996,9 +1002,8 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	}
 
 	if (!mpext->dsn64) {
-		map_seq = expand_seq(subflow->map_seq, subflow->map_data_len,
-				     mpext->data_seq);
-		pr_debug("expanded seq=%llu", subflow->map_seq);
+		map_seq = expand_seq(READ_ONCE(msk->ack_seq), mpext->data_seq);
+		pr_debug("expanded seq=%llu->%llu", mpext->data_seq, map_seq);
 	} else {
 		map_seq = mpext->data_seq;
 	}
