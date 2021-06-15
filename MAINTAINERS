@@ -143,6 +143,12 @@ Maintainers List
           first. When adding to this list, please keep the entries in
           alphabetical order.
 
+.. note:: There is no entry in this list for the MAINTAINERS file itself.
+          Patches which modify existing MAINTAINERS entries should be sent to
+          all other maintainers in the relevant entry. When adding new
+          MAINTAINERS entries please use ``scripts/get_maintainer.pl`` to find
+          other maintainers with overlapping entries in this list.
+
 3C59X NETWORK DRIVER
 M:	Steffen Klassert <klassert@kernel.org>
 L:	netdev@vger.kernel.org
