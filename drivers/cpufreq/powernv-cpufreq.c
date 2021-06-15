@@ -1078,6 +1078,8 @@ static int init_chip_info(void)
 		INIT_WORK(&chips[i].throttle, powernv_cpufreq_work_fn);
 		for_each_cpu(cpu, &chips[i].mask)
 			per_cpu(chip_info, cpu) =  &chips[i];
+		if (num_possible_nodes() == 1)
+			break;
 	}
 
 free_and_return:
