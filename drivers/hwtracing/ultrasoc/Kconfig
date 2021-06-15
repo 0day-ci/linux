@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+#
+# ultrasoc configuration
+#
+
+menuconfig ULTRASOC
+	tristate "Ultrasoc Tracing Support"
+	select CORESIGHT
+	help
+	  This framework provides a kernel interface for the Ultrasoc trace
+	  drivers to register themselves with. It's intended to build
+	  a topological view of the Ultrasoc components based on ACPI
+	  specification and configure the right series of components when a
+	  trace source gets enabled.
+
+endif

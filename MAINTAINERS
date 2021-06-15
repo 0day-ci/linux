@@ -8235,6 +8235,13 @@ S:	Maintained
 F:	drivers/misc/hisi_hikey_usb.c
 F:	Documentation/devicetree/bindings/misc/hisilicon-hikey-usb.yaml
 
+SIEMENS EMBEDDED ANALYTICS DRIVER
+M:	Jonathan Zhou <Jonathan.zhouwen@huawei.com>
+M:	Qi Liu <liuqi115@huawei.com>
+S:	Supported
+F:	Documentation/trace/ultrasoc-trace.rst
+F:	drivers/hwtracing/ultrasoc/
+
 HISILICON PMU DRIVER
 M:	Shaokun Zhang <zhangshaokun@hisilicon.com>
 S:	Supported
