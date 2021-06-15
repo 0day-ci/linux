@@ -3894,6 +3894,12 @@ restart:
 		sc.may_swap = !nr_boost_reclaim;
 
 		/*
+		 * Flush the memory cgroup stats, so that we read accurate
+		 * per-memcg lruvec stats for heuristics later.
+		 */
+		mem_cgroup_flush_stats();
+
+		/*
 		 * Do some background aging of the anon list, to give
 		 * pages a chance to be referenced before reclaiming. All
 		 * pages are rotated regardless of classzone as this is
