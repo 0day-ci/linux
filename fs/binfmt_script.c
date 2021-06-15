@@ -68,6 +68,9 @@ static int load_script(struct linux_binprm *bprm)
 		if (!next_terminator(i_end, buf_end))
 			return -ENOEXEC;
 		i_end = buf_end;
+		/* Trim zero bytes from i_end */
+		while (i_end[-1] == 0)
+			i_end--;
 	}
 	/* Trim any trailing spaces/tabs from i_end */
 	while (spacetab(i_end[-1]))
