@@ -28,14 +28,15 @@ enum prestera_acl_rule_action {
 	PRESTERA_ACL_RULE_ACTION_TRAP
 };
 
-struct prestera_switch;
 struct prestera_port;
+struct prestera_switch;
 struct prestera_acl_rule;
 struct prestera_acl_ruleset;
 
 struct prestera_flow_block_binding {
 	struct list_head list;
 	struct prestera_port *port;
+	int span_id;
 };
 
 struct prestera_flow_block {
