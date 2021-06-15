@@ -1075,15 +1075,21 @@ restart:
 	ticket = ctx->ticket;
 
 	/*
-	 * If the checkpoint spans multiple iclogs, wait for all previous
-	 * iclogs to complete before we submit the commit_iclog. In this case,
-	 * the commit_iclog write needs to issue a pre-flush so that the
-	 * ordering is correctly preserved down to stable storage.
+	 * If the checkpoint spans multiple iclogs, wait for all previous iclogs
+	 * to complete before we submit the commit_iclog. If the commit iclog is
+	 * at the head of the iclog ring, then all other iclogs have completed
+	 * and are waiting on this one and hence we don't need to wait.
+	 *
+	 * Regardless of whether we need to wait or not, the the commit_iclog
+	 * write needs to issue a pre-flush so that the ordering for this
+	 * checkpoint is correctly preserved down to stable storage.
 	 */
 	spin_lock(&log->l_icloglock);
 	if (ctx->start_lsn != commit_lsn) {
-		xlog_wait_on_iclog(commit_iclog->ic_prev);
-		spin_lock(&log->l_icloglock);
+		if (commit_iclog != log->l_iclog) {
+			xlog_wait_on_iclog(commit_iclog->ic_prev);
+			spin_lock(&log->l_icloglock);
+		}
 		commit_iclog->ic_flags |= XLOG_ICL_NEED_FLUSH;
 	}
 
