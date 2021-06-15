@@ -92,7 +92,7 @@ MODULE_PARM_DESC(blkdev, "block device for pstore storage");
  */
 static DEFINE_MUTEX(pstore_blk_lock);
 static struct file *psblk_file;
-static struct pstore_zone_info *pstore_zone_info;
+static struct pstore_device_info *pstore_device_info;
 
 #define check_size(name, alignsize) ({				\
 	long _##name_ = (name);					\
@@ -105,68 +105,60 @@ static struct pstore_zone_info *pstore_zone_info;
 	_##name_;						\
 })
 
-static int __register_pstore_device(struct pstore_device_info *dev)
-{
-	int ret;
-
-	lockdep_assert_held(&pstore_blk_lock);
-
-	if (!dev || !dev->total_size || !dev->read || !dev->write) {
-		if (!dev)
-			pr_err("NULL device info\n");
-		else {
-			if (!dev->total_size)
-				pr_err("zero sized device\n");
-			if (!dev->read)
-				pr_err("no read handler for device\n");
-			if (!dev->write)
-				pr_err("no write handler for device\n");
-		}
-		return -EINVAL;
-	}
-
-	/* someone already registered before */
-	if (pstore_zone_info)
-		return -EBUSY;
-
-	pstore_zone_info = kzalloc(sizeof(struct pstore_zone_info), GFP_KERNEL);
-	if (!pstore_zone_info)
-		return -ENOMEM;
-
-	/* zero means not limit on which backends to attempt to store. */
-	if (!dev->flags)
-		dev->flags = UINT_MAX;
-
 #define verify_size(name, alignsize, enabled) {				\
 		long _##name_;						\
 		if (enabled)						\
 			_##name_ = check_size(name, alignsize);		\
 		else							\
 			_##name_ = 0;					\
+		/* synchronize visible module parameters to result. */	\
 		name = _##name_ / 1024;					\
-		pstore_zone_info->name = _##name_;			\
+		dev->zone.name = _##name_;				\
 	}
 
+static int __register_pstore_device(struct pstore_device_info *dev)
+{
+	int ret;
+
+	lockdep_assert_held(&pstore_blk_lock);
+
+	if (!dev || !dev->zone.total_size || !dev->zone.read || !dev->zone.write) {
+		if (!dev)
+			pr_err("NULL pstore_device_info\n");
+		else {
+			if (!dev->zone.total_size)
+				pr_err("zero sized device\n");
+			if (!dev->zone.read)
+				pr_err("no read handler for device\n");
+			if (!dev->zone.write)
+				pr_err("no write handler for device\n");
+		}
+		return -EINVAL;
+	}
+
+	/* someone already registered before */
+	if (pstore_device_info)
+		return -EBUSY;
+
+	/* zero means not limit on which backends to attempt to store. */
+	if (!dev->flags)
+		dev->flags = UINT_MAX;
+
+	/* Copy in module parameters. */
 	verify_size(kmsg_size, 4096, dev->flags & PSTORE_FLAGS_DMESG);
 	verify_size(pmsg_size, 4096, dev->flags & PSTORE_FLAGS_PMSG);
 	verify_size(console_size, 4096, dev->flags & PSTORE_FLAGS_CONSOLE);
 	verify_size(ftrace_size, 4096, dev->flags & PSTORE_FLAGS_FTRACE);
-#undef verify_size
+	dev->zone.max_reason = max_reason;
 
-	pstore_zone_info->total_size = dev->total_size;
-	pstore_zone_info->max_reason = max_reason;
-	pstore_zone_info->read = dev->read;
-	pstore_zone_info->write = dev->write;
-	pstore_zone_info->erase = dev->erase;
-	pstore_zone_info->panic_write = dev->panic_write;
-	pstore_zone_info->name = KBUILD_MODNAME;
-	pstore_zone_info->owner = THIS_MODULE;
+	/* Initialize required zone ownership details. */
+	dev->zone.name = KBUILD_MODNAME;
+	dev->zone.owner = THIS_MODULE;
 
-	ret = register_pstore_zone(pstore_zone_info);
-	if (ret) {
-		kfree(pstore_zone_info);
-		pstore_zone_info = NULL;
-	}
+	ret = register_pstore_zone(&dev->zone);
+	if (ret == 0)
+		pstore_device_info = dev;
+
 	return ret;
 }
 /**
@@ -193,10 +185,9 @@ EXPORT_SYMBOL_GPL(register_pstore_device);
 static void __unregister_pstore_device(struct pstore_device_info *dev)
 {
 	lockdep_assert_held(&pstore_blk_lock);
-	if (pstore_zone_info && pstore_zone_info->read == dev->read) {
-		unregister_pstore_zone(pstore_zone_info);
-		kfree(pstore_zone_info);
-		pstore_zone_info = NULL;
+	if (pstore_device_info && pstore_device_info == dev) {
+		unregister_pstore_zone(&dev->zone);
+		pstore_device_info = NULL;
 	}
 }
 
@@ -230,12 +221,9 @@ static ssize_t psblk_generic_blk_write(const char *buf, size_t bytes,
 /*
  * This takes its configuration only from the module parameters now.
  */
-static int __register_pstore_blk(const char *devpath)
+static int __register_pstore_blk(struct pstore_device_info *dev,
+				 const char *devpath)
 {
-	struct pstore_device_info dev = {
-		.read = psblk_generic_blk_read,
-		.write = psblk_generic_blk_write,
-	};
 	int ret = -ENODEV;
 
 	lockdep_assert_held(&pstore_blk_lock);
@@ -252,9 +240,9 @@ static int __register_pstore_blk(const char *devpath)
 		goto err_fput;
 	}
 
-	dev.total_size = i_size_read(I_BDEV(psblk_file->f_mapping->host)->bd_inode);
+	dev->zone.total_size = i_size_read(I_BDEV(psblk_file->f_mapping->host)->bd_inode);
 
-	ret = __register_pstore_device(&dev);
+	ret = __register_pstore_device(dev);
 	if (ret)
 		goto err_fput;
 
@@ -266,18 +254,6 @@ err:
 	psblk_file = NULL;
 
 	return ret;
-}
-
-static void __unregister_pstore_blk(struct file *device)
-{
-	struct pstore_device_info dev = { .read = psblk_generic_blk_read };
-
-	lockdep_assert_held(&pstore_blk_lock);
-	if (psblk_file && psblk_file == device) {
-		__unregister_pstore_device(&dev);
-		fput(psblk_file);
-		psblk_file = NULL;
-	}
 }
 
 /* get information of pstore/blk */
@@ -329,13 +305,27 @@ static int __init pstore_blk_init(void)
 	int ret = 0;
 
 	mutex_lock(&pstore_blk_lock);
-	if (!pstore_zone_info && best_effort && blkdev[0]) {
-		ret = __register_pstore_blk(early_boot_devpath(blkdev));
-		if (ret == 0 && pstore_zone_info)
-			pr_info("attached %s:%s (%zu) (no dedicated panic_write!)\n",
-				pstore_zone_info->name, blkdev,
-				pstore_zone_info->total_size);
+	if (!pstore_device_info && best_effort && blkdev[0]) {
+		struct pstore_device_info *best_effort_dev;
+
+		best_effort_dev = kzalloc(sizeof(*best_effort_dev), GFP_KERNEL);
+		if (!best_effort) {
+			ret = -ENOMEM;
+			goto unlock;
+		}
+		best_effort_dev->zone.read = psblk_generic_blk_read;
+		best_effort_dev->zone.write = psblk_generic_blk_write;
+
+		ret = __register_pstore_blk(best_effort_dev,
+					    early_boot_devpath(blkdev));
+		if (ret)
+			kfree(best_effort_dev);
+		else
+			pr_info("attached %s (%zu) (no dedicated panic_write!)\n",
+				blkdev, best_effort_dev->zone.total_size);
 	}
+
+unlock:
 	mutex_unlock(&pstore_blk_lock);
 
 	return ret;
@@ -345,15 +335,18 @@ late_initcall(pstore_blk_init);
 static void __exit pstore_blk_exit(void)
 {
 	mutex_lock(&pstore_blk_lock);
-	if (psblk_file)
-		__unregister_pstore_blk(psblk_file);
-	else {
-		struct pstore_device_info dev = { };
+	/* Unregister and free the best_effort device. */
+	if (psblk_file) {
+		struct pstore_device_info *dev = pstore_device_info;
 
-		if (pstore_zone_info)
-			dev.read = pstore_zone_info->read;
-		__unregister_pstore_device(&dev);
+		__unregister_pstore_device(dev);
+		kfree(dev);
+		fput(psblk_file);
+		psblk_file = NULL;
 	}
+	/* If we've been asked to unload, unregister any registered device. */
+	if (pstore_device_info)
+		__unregister_pstore_device(pstore_device_info);
 	mutex_unlock(&pstore_blk_lock);
 }
 module_exit(pstore_blk_exit);
