@@ -78,6 +78,7 @@ struct task_struct *secondary_current;
 bool has_big_cores;
 bool coregroup_enabled;
 bool thread_group_shares_l2;
+bool thread_group_shares_l3;
 
 DEFINE_PER_CPU(cpumask_var_t, cpu_sibling_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_smallcore_map);
@@ -101,7 +102,7 @@ enum {
 
 #define MAX_THREAD_LIST_SIZE	8
 #define THREAD_GROUP_SHARE_L1   1
-#define THREAD_GROUP_SHARE_L2   2
+#define THREAD_GROUP_SHARE_L2_L3 2
 struct thread_groups {
 	unsigned int property;
 	unsigned int nr_groups;
@@ -887,9 +888,16 @@ static int __init init_thread_group_cache_map(int cpu, int cache_property)
 	cpumask_var_t *mask = NULL;
 
 	if (cache_property != THREAD_GROUP_SHARE_L1 &&
-	    cache_property != THREAD_GROUP_SHARE_L2)
+	    cache_property != THREAD_GROUP_SHARE_L2_L3)
 		return -EINVAL;
 
+	/*
+	 * On P10 fused-core system, the L3 cache is shared between threads of a
+	 * small core only, but the "ibm,thread-groups" property is indicated as
+	 * "2" only which is interpreted as the thread-groups sharing both L2
+	 * and L3 caches. Hence cache_property of THREAD_GROUP_SHARE_L2_L3 is
+	 * used for both L2 and L3 cache sibling detection.
+	 */
 	tg = get_thread_groups(cpu, cache_property, &err);
 	if (!tg)
 		return err;
@@ -903,7 +911,7 @@ static int __init init_thread_group_cache_map(int cpu, int cache_property)
 
 	if (cache_property == THREAD_GROUP_SHARE_L1)
 		mask = &per_cpu(thread_group_l1_cache_map, cpu);
-	else if (cache_property == THREAD_GROUP_SHARE_L2)
+	else if (cache_property == THREAD_GROUP_SHARE_L2_L3)
 		mask = &per_cpu(thread_group_l2_cache_map, cpu);
 
 	zalloc_cpumask_var_node(mask, GFP_KERNEL, cpu_to_node(cpu));
@@ -1009,14 +1017,16 @@ static int __init init_big_cores(void)
 	has_big_cores = true;
 
 	for_each_possible_cpu(cpu) {
-		int err = init_thread_group_cache_map(cpu, THREAD_GROUP_SHARE_L2);
+		int err = init_thread_group_cache_map(cpu, THREAD_GROUP_SHARE_L2_L3);
 
 		if (err)
 			return err;
 	}
 
 	thread_group_shares_l2 = true;
-	pr_debug("L2 cache only shared by the threads in the small core\n");
+	thread_group_shares_l3 = true;
+	pr_debug("L2/L3 cache only shared by the threads in the small core\n");
+
 	return 0;
 }
 
