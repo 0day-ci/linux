@@ -140,7 +140,10 @@ static void mptcp_so_incoming_cpu(struct mptcp_sock *msk, int val)
 	mptcp_sol_socket_sync_intval(msk, SO_INCOMING_CPU, val);
 }
 
-static int mptcp_setsockopt_sol_socket_tstamp(struct mptcp_sock *msk, int optname, int val)
+static int mptcp_setsockopt_sol_socket_tstamp(struct mptcp_sock *msk,
+					      int optname, int val,
+					      sockptr_t optval,
+					      unsigned int optlen)
 {
 	sockptr_t optval = KERNEL_SOCKPTR(&val);
 	struct mptcp_subflow_context *subflow;
@@ -166,7 +169,7 @@ static int mptcp_setsockopt_sol_socket_tstamp(struct mptcp_sock *msk, int optnam
 			break;
 		case SO_TIMESTAMPING_NEW:
 		case SO_TIMESTAMPING_OLD:
-			sock_set_timestamping(sk, optname, val);
+			sock_set_timestamping(sk, optname, val, optval, optlen);
 			break;
 		}
 
@@ -207,7 +210,8 @@ static int mptcp_setsockopt_sol_socket_int(struct mptcp_sock *msk, int optname,
 	case SO_TIMESTAMPNS_NEW:
 	case SO_TIMESTAMPING_OLD:
 	case SO_TIMESTAMPING_NEW:
-		return mptcp_setsockopt_sol_socket_tstamp(msk, optname, val);
+		return mptcp_setsockopt_sol_socket_tstamp(msk, optname, val,
+							  optval, optlen);
 	}
 
 	return -ENOPROTOOPT;
