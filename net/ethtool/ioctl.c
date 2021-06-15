@@ -2188,6 +2188,29 @@ static int ethtool_get_ts_info(struct net_device *dev, void __user *useraddr)
 	return 0;
 }
 
+static int ethtool_get_phc_vclocks(struct net_device *dev,
+				   void __user *useraddr)
+{
+	struct ethtool_phc_vclocks phc_vclocks;
+	int err;
+
+	err = __ethtool_get_phc_vclocks(dev, &phc_vclocks);
+	if (err)
+		return err;
+
+	if (copy_to_user(useraddr, &phc_vclocks, sizeof(phc_vclocks)))
+		return -EFAULT;
+
+	return 0;
+}
+
+int ethtool_op_get_phc_vclocks(struct net_device *dev,
+			       struct ethtool_phc_vclocks *phc_vclocks)
+{
+	return __ethtool_get_phc_vclocks(dev, phc_vclocks);
+}
+EXPORT_SYMBOL(ethtool_op_get_phc_vclocks);
+
 int ethtool_get_module_info_call(struct net_device *dev,
 				 struct ethtool_modinfo *modinfo)
 {
@@ -2634,6 +2657,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_GFEATURES:
 	case ETHTOOL_GCHANNELS:
 	case ETHTOOL_GET_TS_INFO:
+	case ETHTOOL_GET_PHC_VCLOCKS:
 	case ETHTOOL_GEEE:
 	case ETHTOOL_GTUNABLE:
 	case ETHTOOL_PHY_GTUNABLE:
@@ -2857,6 +2881,9 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		break;
 	case ETHTOOL_SFECPARAM:
 		rc = ethtool_set_fecparam(dev, useraddr);
+		break;
+	case ETHTOOL_GET_PHC_VCLOCKS:
+		rc = ethtool_get_phc_vclocks(dev, useraddr);
 		break;
 	default:
 		rc = -EOPNOTSUPP;

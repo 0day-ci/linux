@@ -4,6 +4,7 @@
 #include <linux/net_tstamp.h>
 #include <linux/phy.h>
 #include <linux/rtnetlink.h>
+#include <linux/ptp_clock_kernel.h>
 
 #include "common.h"
 
@@ -550,6 +551,28 @@ int __ethtool_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
 	info->so_timestamping = SOF_TIMESTAMPING_RX_SOFTWARE |
 				SOF_TIMESTAMPING_SOFTWARE;
 	info->phc_index = -1;
+
+	return 0;
+}
+
+int __ethtool_get_phc_vclocks(struct net_device *dev,
+			      struct ethtool_phc_vclocks *phc_vclocks)
+{
+	struct ethtool_ts_info info = { };
+	int index[PTP_MAX_VCLOCKS];
+	int num = 0;
+
+	phc_vclocks->cmd = ETHTOOL_GET_PHC_VCLOCKS;
+	phc_vclocks->num = 0;
+	memset(phc_vclocks->index, -1, sizeof(phc_vclocks->index));
+
+	if (!__ethtool_get_ts_info(dev, &info))
+		num = ptp_get_vclocks_index(info.phc_index, index);
+
+	if (num > 0) {
+		phc_vclocks->num = num;
+		memcpy(phc_vclocks->index, index, sizeof(int) * num);
+	}
 
 	return 0;
 }

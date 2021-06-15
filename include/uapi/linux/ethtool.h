@@ -17,6 +17,7 @@
 #include <linux/const.h>
 #include <linux/types.h>
 #include <linux/if_ether.h>
+#include <linux/ptp_clock.h>
 
 #ifndef __KERNEL__
 #include <limits.h> /* for INT_MAX */
@@ -1341,6 +1342,18 @@ struct ethtool_ts_info {
 	__u32	rx_reserved[3];
 };
 
+/**
+ * struct ethtool_phc_vclocks - holds a device's PTP virtual clocks
+ * @cmd: command number = %ETHTOOL_GET_PHC_VCLOCKS
+ * @num: number of PTP vclocks
+ * @index: all index values of PTP vclocks
+ */
+struct ethtool_phc_vclocks {
+	__u32	cmd;
+	__u8	num;
+	__s32	index[PTP_MAX_VCLOCKS];
+};
+
 /*
  * %ETHTOOL_SFEATURES changes features present in features[].valid to the
  * values of corresponding bits in features[].requested. Bits in .requested
@@ -1552,6 +1565,7 @@ enum ethtool_fec_config_bits {
 #define ETHTOOL_PHY_STUNABLE	0x0000004f /* Set PHY tunable configuration */
 #define ETHTOOL_GFECPARAM	0x00000050 /* Get FEC settings */
 #define ETHTOOL_SFECPARAM	0x00000051 /* Set FEC settings */
+#define ETHTOOL_GET_PHC_VCLOCKS	0x00000052 /* Get PHC virtual clocks info */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

@@ -86,6 +86,8 @@ struct netlink_ext_ack;
 /* Some generic methods drivers may use in their ethtool_ops */
 u32 ethtool_op_get_link(struct net_device *dev);
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti);
+int ethtool_op_get_phc_vclocks(struct net_device *dev,
+			       struct ethtool_phc_vclocks *phc_vclocks);
 
 
 /* Link extended state and substate. */
