@@ -348,6 +348,17 @@ static int __maybe_unused imx2_wdt_suspend(struct device *dev)
 {
 	struct watchdog_device *wdog = dev_get_drvdata(dev);
 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+	int ret;
+
+	/*
+	 * Before disabling clk we need to notify wdog subsystem that HW wdog
+	 * is being suspended. This e.g. prevents watchdog_ping_work to fire
+	 * when the clk is disabled, which would result with system hang caused
+	 * by wdog register access while wdog clock is disabled.
+	 */
+	ret = watchdog_dev_suspend(wdog);
+	if (ret)
+		return ret;
 
 	/* The watchdog IP block is running */
 	if (imx2_wdt_is_running(wdev)) {
@@ -356,7 +367,6 @@ static int __maybe_unused imx2_wdt_suspend(struct device *dev)
 		 * during resume.
 		 */
 		__imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
-		imx2_wdt_ping(wdog);
 	}
 
 	clk_disable_unprepare(wdev->clk);
@@ -383,12 +393,12 @@ static int __maybe_unused imx2_wdt_resume(struct device *dev)
 		 */
 		imx2_wdt_setup(wdog);
 	}
-	if (imx2_wdt_is_running(wdev)) {
+	if (imx2_wdt_is_running(wdev))
 		imx2_wdt_set_timeout(wdog, wdog->timeout);
-		imx2_wdt_ping(wdog);
-	}
 
-	return 0;
+	ret = watchdog_dev_resume(wdog);
+
+	return ret;
 }
 
 static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
