@@ -1056,29 +1056,31 @@ static int de_thread(struct task_struct *tsk)
 		return -EAGAIN;
 	}
 
+	sig->group_exit_task = tsk;
+	sig->notify_count = zap_other_threads(tsk);
+	if (!thread_group_leader(tsk))
+		sig->notify_count--;
+
 	while_each_thread(tsk, t) {
 		if (unlikely(t->ptrace) && t != tsk->group_leader)
 			sig->unsafe_execve_in_progress = true;
 	}
 
-	sig->group_exit_task = tsk;
-	sig->notify_count = zap_other_threads(tsk);
-	if (!thread_group_leader(tsk))
-		sig->notify_count--;
-	spin_unlock_irq(lock);
-
-	if (unlikely(sig->unsafe_execve_in_progress))
+	if (unlikely(sig->unsafe_execve_in_progress)) {
+		spin_unlock_irq(lock);
 		mutex_unlock(&sig->cred_guard_mutex);
+		spin_lock_irq(lock);
+	}
 
-	for (;;) {
-		set_current_state(TASK_KILLABLE);
-		if (!sig->notify_count)
-			break;
+	while (sig->notify_count) {
+		__set_current_state(TASK_KILLABLE);
+		spin_unlock_irq(lock);
 		schedule();
 		if (__fatal_signal_pending(tsk))
 			goto killed;
+		spin_lock_irq(lock);
 	}
-	__set_current_state(TASK_RUNNING);
+	spin_unlock_irq(lock);
 
 	if (unlikely(sig->unsafe_execve_in_progress)) {
 		if (mutex_lock_killable(&sig->cred_guard_mutex))
