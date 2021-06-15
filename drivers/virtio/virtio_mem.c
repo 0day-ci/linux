@@ -2472,8 +2472,9 @@ static int virtio_mem_init(struct virtio_mem *vm)
 	vm->offline_threshold = max_t(uint64_t, 2 * memory_block_size_bytes(),
 				      VIRTIO_MEM_DEFAULT_OFFLINE_THRESHOLD);
 	/* In BBM, we also want at least two big blocks. */
-	vm->offline_threshold = max_t(uint64_t, 2 * vm->bbm.bb_size,
-				      vm->offline_threshold);
+	if (!vm->in_sbm)
+		vm->offline_threshold = max_t(uint64_t, 2 * vm->bbm.bb_size,
+					      vm->offline_threshold);
 
 	dev_info(&vm->vdev->dev, "start address: 0x%llx", vm->addr);
 	dev_info(&vm->vdev->dev, "region size: 0x%llx", vm->region_size);
