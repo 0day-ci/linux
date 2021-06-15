@@ -686,6 +686,13 @@ static void acpi_pci_root_validate_resources(struct device *dev,
 		if (!(res1->flags & type))
 			goto next;
 
+		if ((type & IORESOURCE_MEM) && res1->start == 0) {
+			dev_info(dev, "host bridge window %pR (ignored, start address not set)\n",
+				 res1);
+			free = true;
+			goto next;
+		}
+
 		/* Exclude non-addressable range or non-addressable portion */
 		end = min(res1->end, root->end);
 		if (end <= res1->start) {
