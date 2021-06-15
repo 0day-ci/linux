@@ -47,6 +47,7 @@ struct ptp_clock {
 	struct kthread_worker *kworker;
 	struct kthread_delayed_work aux_work;
 	u8 n_vclocks;
+	int vclock_index[PTP_MAX_VCLOCKS];
 	struct mutex n_vclocks_mux; /* protect concurrent n_vclocks access */
 	bool vclock_flag;
 };

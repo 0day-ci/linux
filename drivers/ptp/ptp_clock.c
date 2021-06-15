@@ -236,6 +236,8 @@ struct ptp_clock *ptp_clock_register(struct ptp_clock_info *info,
 	if (parent->class && strcmp(parent->class->name, "ptp") == 0)
 		ptp->vclock_flag = true;
 
+	memset(ptp->vclock_index, -1, sizeof(ptp->vclock_index));
+
 	err = ptp_populate_pin_groups(ptp);
 	if (err)
 		goto no_pin_groups;

@@ -207,6 +207,9 @@ static ssize_t n_vclocks_store(struct device *dev,
 				goto out;
 			}
 
+			ptp->vclock_index[ptp->n_vclocks + i] =
+				vclock->clock->index;
+
 			dev_info(dev, "new virtual clock ptp%d\n",
 				 vclock->clock->index);
 		}
@@ -217,6 +220,9 @@ static ssize_t n_vclocks_store(struct device *dev,
 		i = ptp->n_vclocks - num;
 		device_for_each_child_reverse(dev, &i,
 					      unregister_vclock);
+
+		for (i = 1; i <= ptp->n_vclocks - num; i++)
+			ptp->vclock_index[ptp->n_vclocks - i] = -1;
 	}
 
 	if (num == 0)
