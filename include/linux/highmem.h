@@ -322,7 +322,7 @@ static inline void memcpy_to_page(struct page *page, size_t offset,
 
 	VM_BUG_ON(offset + len > PAGE_SIZE);
 	memcpy(to + offset, from, len);
-	kunmap_local(to);
+	kunmap_local_dirty(page, to);
 }
 
 static inline void memzero_page(struct page *page, size_t offset, size_t len)
