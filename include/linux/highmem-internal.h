@@ -224,4 +224,11 @@ do {								\
 	__kunmap_local(__addr);					\
 } while (0)
 
+#define kunmap_local_dirty(__page, __addr)			\
+do {								\
+	if (!PageSlab(__page))					\
+		flush_kernel_dcache_page(__page);		\
+	kunmap_local(__addr);					\
+} while (0)
+
 #endif

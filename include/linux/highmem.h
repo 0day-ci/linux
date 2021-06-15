@@ -93,6 +93,10 @@ static inline void kmap_flush_unused(void);
  * On HIGHMEM enabled systems mapping a highmem page has the side effect of
  * disabling migration in order to keep the virtual address stable across
  * preemption. No caller of kmap_local_page() can rely on this side effect.
+ *
+ * If data is written to the returned kernel mapping, the callers needs to
+ * unmap the mapping using kunmap_local_dirty(), else kunmap_local() should
+ * be used.
  */
 static inline void *kmap_local_page(struct page *page);
 
