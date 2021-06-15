@@ -247,6 +247,14 @@ out:
 	return ret;
 }
 
+static bool fanotify_event_reports_path(const struct fsnotify_group *group,
+					u32 mask)
+{
+	unsigned int fid_mode = FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS);
+
+	return !fid_mode && !fanotify_is_error_event(mask);
+}
+
 /*
  * This function returns a mask for an event that only contains the flags
  * that have been specifically requested by the user. Flags that may have
@@ -261,7 +269,6 @@ static u32 fanotify_group_event_mask(
 	__u32 marks_mask = 0, marks_ignored_mask = 0;
 	__u32 test_mask, user_mask = FANOTIFY_OUTGOING_EVENTS |
 				     FANOTIFY_EVENT_FLAGS;
-	const struct path *path = fsnotify_event_info_path(event_info);
 	unsigned int fid_mode = FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS);
 	struct fsnotify_mark *mark;
 	int type;
@@ -270,14 +277,17 @@ static u32 fanotify_group_event_mask(
 		 __func__, iter_info->report_mask, event_mask,
 		 event_info->data, event_info->data_type);
 
-	if (!fid_mode) {
+	if (fanotify_event_reports_path(group, event_mask)) {
+		const struct path *path;
+
 		/* Do we have path to open a file descriptor? */
+		path = fsnotify_event_info_path(event_info);
 		if (!path)
 			return 0;
 		/* Path type events are only relevant for files and dirs */
 		if (!d_is_reg(path->dentry) && !d_can_lookup(path->dentry))
 			return 0;
-	} else if (!(fid_mode & FAN_REPORT_FID)) {
+	} else if (fid_mode && !(fid_mode & FAN_REPORT_FID)) {
 		/* Do we have a directory inode to report? */
 		if (!event_info->dir && !(event_mask & FS_ISDIR))
 			return 0;
@@ -658,6 +668,78 @@ out:
 	return event;
 }
 
+static void fanotify_init_error_event(struct fanotify_error_event *event,
+				      __kernel_fsid_t fsid,
+				      const struct fs_error_report *report)
+{
+	event->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	event->err_count = 1;
+	event->fsid = fsid;
+	event->error = report->error;
+	event->ino = (report->inode) ? report->inode->i_ino : 0;
+	event->ino_generation =
+		(report->inode) ? report->inode->i_generation : 0;
+}
+
+struct fanotify_insert_error_data {
+	const struct fs_error_report *report;
+	__kernel_fsid_t fsid;
+};
+
+static void fanotify_insert_error_event(struct fsnotify_group *group,
+					struct fsnotify_event *event,
+					const void *data)
+{
+	struct fanotify_event *fae = FANOTIFY_E(event);
+	struct fanotify_error_event *error_event = FANOTIFY_EE(fae);
+	const struct fanotify_insert_error_data *idata =
+		((struct fanotify_insert_error_data *) data);
+
+	fsnotify_get_mark(error_event->mark);
+	fanotify_init_error_event(error_event, idata->fsid, idata->report);
+}
+
+static int fanotify_merge_error_event(struct fsnotify_group *group,
+				      struct fsnotify_event *event)
+{
+	struct fanotify_event *fae = FANOTIFY_E(event);
+
+	if (!list_empty(&event->list)) {
+		FANOTIFY_EE(fae)->err_count++;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int fanotify_queue_error_event(struct fsnotify_iter_info *iter_info,
+				      struct fsnotify_group *group,
+				      __kernel_fsid_t fsid,
+				      const struct fs_error_report *report)
+{
+	struct fanotify_error_event *error_event;
+	struct fsnotify_mark *mark = fsnotify_iter_sb_mark(iter_info);
+	int ret = -ENOMEM;
+
+	if (!mark || !FANOTIFY_SB_MARK(mark)->error_event)
+		return ret;
+
+	spin_lock(&mark->lock);
+	error_event = FANOTIFY_SB_MARK(mark)->error_event;
+	if (error_event) {
+		ret = fsnotify_add_event(group, &error_event->fae.fse,
+					 fanotify_merge_error_event,
+					 fanotify_insert_error_event,
+					 &(struct fanotify_insert_error_data) {
+						 .fsid = fsid,
+						 .report = report
+					 });
+	}
+	spin_unlock(&mark->lock);
+
+	return ret;
+}
+
 /*
  * Get cached fsid of the filesystem containing the object from any connector.
  * All connectors are supposed to have the same fsid, but we do not verify that
@@ -738,8 +820,9 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 	BUILD_BUG_ON(FAN_ONDIR != FS_ISDIR);
 	BUILD_BUG_ON(FAN_OPEN_EXEC != FS_OPEN_EXEC);
 	BUILD_BUG_ON(FAN_OPEN_EXEC_PERM != FS_OPEN_EXEC_PERM);
+	BUILD_BUG_ON(FAN_FS_ERROR != FS_ERROR);
 
-	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 19);
+	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 20);
 
 	mask = fanotify_group_event_mask(group, mask, event_info, iter_info);
 	if (!mask)
@@ -756,11 +839,18 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 			return 0;
 	}
 
-	if (FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS)) {
+	if (FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS) ||
+	    fanotify_is_error_event(mask)) {
 		fsid = fanotify_get_fsid(iter_info);
 		/* Racing with mark destruction or creation? */
 		if (!fsid.val[0] && !fsid.val[1])
 			return 0;
+	}
+
+	if (fanotify_is_error_event(mask)) {
+		ret = fanotify_queue_error_event(iter_info, group, fsid,
+						 event_info->data);
+		goto finish;
 	}
 
 	event = fanotify_alloc_event(group, mask, event_info, &fsid);
@@ -831,6 +921,17 @@ static void fanotify_free_name_event(struct fanotify_event *event)
 	kfree(FANOTIFY_NE(event));
 }
 
+static void fanotify_free_error_event(struct fanotify_event *event)
+{
+	/*
+	 * Just drop the reference acquired by
+	 * fanotify_queue_error_event.
+	 *
+	 * The actual memory is freed with the mark.
+	 */
+	fsnotify_put_mark(FANOTIFY_EE(event)->mark);
+}
+
 static void fanotify_free_event(struct fsnotify_event *fsn_event)
 {
 	struct fanotify_event *event;
@@ -853,6 +954,9 @@ static void fanotify_free_event(struct fsnotify_event *fsn_event)
 	case FANOTIFY_EVENT_TYPE_OVERFLOW:
 		kfree(event);
 		break;
+	case FANOTIFY_EVENT_TYPE_FS_ERROR:
+		fanotify_free_error_event(event);
+		break;
 	default:
 		WARN_ON_ONCE(1);
 	}
@@ -870,6 +974,7 @@ static void fanotify_free_mark(struct fsnotify_mark *mark)
 	if (mark->flags & FSNOTIFY_MARK_FLAG_SB) {
 		struct fanotify_sb_mark *fa_mark = FANOTIFY_SB_MARK(mark);
 
+		kfree(fa_mark->error_event);
 		kmem_cache_free(fanotify_sb_mark_cache, fa_mark);
 	} else {
 		kmem_cache_free(fanotify_mark_cache, mark);

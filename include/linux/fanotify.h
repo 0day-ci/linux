@@ -85,9 +85,12 @@ extern struct ctl_table fanotify_table[]; /* for sysctl */
 #define FANOTIFY_INODE_EVENTS	(FANOTIFY_DIRENT_EVENTS | \
 				 FAN_ATTRIB | FAN_MOVE_SELF | FAN_DELETE_SELF)
 
+#define FANOTIFY_ERROR_EVENTS	(FAN_FS_ERROR)
+
 /* Events that user can request to be notified on */
 #define FANOTIFY_EVENTS		(FANOTIFY_PATH_EVENTS | \
-				 FANOTIFY_INODE_EVENTS)
+				 FANOTIFY_INODE_EVENTS | \
+				 FANOTIFY_ERROR_EVENTS)
 
 /* Events that require a permission response from user */
 #define FANOTIFY_PERM_EVENTS	(FAN_OPEN_PERM | FAN_ACCESS_PERM | \
@@ -99,6 +102,7 @@ extern struct ctl_table fanotify_table[]; /* for sysctl */
 /* Events that may be reported to user */
 #define FANOTIFY_OUTGOING_EVENTS	(FANOTIFY_EVENTS | \
 					 FANOTIFY_PERM_EVENTS | \
+					 FANOTIFY_ERROR_EVENTS | \
 					 FAN_Q_OVERFLOW | FAN_ONDIR)
 
 #define ALL_FANOTIFY_EVENT_BITS		(FANOTIFY_OUTGOING_EVENTS | \
