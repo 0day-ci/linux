@@ -62,6 +62,7 @@ struct mptcp_out_options {
 	u64 rcvr_key;
 	u64 ahmac;
 	struct mptcp_addr_info addr;
+	struct mptcp_addr_info remote;
 	struct mptcp_rm_list rm_list;
 	u8 join_id;
 	u8 backup;
