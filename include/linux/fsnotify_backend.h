@@ -138,6 +138,7 @@ struct fsnotify_event_info {
 	struct inode *dir;
 	const struct qstr *name;
 	struct inode *inode;
+	struct super_block *sb;
 	u32 cookie;
 };
 

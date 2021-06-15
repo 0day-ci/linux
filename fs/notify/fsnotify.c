@@ -491,7 +491,7 @@ int __fsnotify(__u32 mask, const struct fsnotify_event_info *event_info)
 		 */
 		parent = event_info->dir;
 	}
-	sb = inode->i_sb;
+	sb = event_info->sb ?: inode->i_sb;
 
 	/*
 	 * Optimization: srcu_read_lock() has a memory barrier which can
