@@ -143,4 +143,14 @@ static inline int paste_last(void *i)
 #define PSTXV0(s, a, r, d)		PREFIX_8LS(0xd8000000, s, a, r, d)
 #define PSTXV1(s, a, r, d)		PREFIX_8LS(0xdc000000, s, a, r, d)
 
+/* Load and Store Multiple Instructions */
+#define LMW(t, a, d)			stringify_in_c(.long (46 << 26) |		\
+						       __PPC_RT(t) |			\
+						       __PPC_RA(a) |			\
+						       ((d) & 0xffff);\n)
+#define STMW(t, a, d)			stringify_in_c(.long (47 << 26) |		\
+						       __PPC_RT(t) |			\
+						       __PPC_RA(a) |			\
+						       ((d) & 0xffff);\n)
+
 #endif /* _SELFTESTS_POWERPC_INSTRUCTIONS_H */

@@ -45,6 +45,7 @@
 #include <getopt.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "utils.h"
 #include "instructions.h"
@@ -453,11 +454,6 @@ int test_alignment_handler_integer(void)
 	STORE_DFORM_TEST(stdu);
 	STORE_XFORM_TEST(stdux);
 
-#ifdef __BIG_ENDIAN__
-	LOAD_DFORM_TEST(lmw);
-	STORE_DFORM_TEST(stmw);
-#endif
-
 	return rc;
 }
 
@@ -602,6 +598,99 @@ int test_alignment_handler_fp_prefix(void)
 	return rc;
 }
 
+int test_alignment_handler_multiple(void)
+{
+	int offset, width, r, rc = 0;
+	void *src1, *dst1, *src2, *dst2;
+
+	rc = posix_memalign(&src1, bufsize, bufsize);
+	if (rc) {
+		printf("\n");
+		return rc;
+	}
+
+	rc = posix_memalign(&dst1, bufsize, bufsize);
+	if (rc) {
+		printf("\n");
+		free(src1);
+		return rc;
+	}
+
+	src2 = malloc(bufsize);
+	if (!src2) {
+		printf("\n");
+		free(src1);
+		free(dst1);
+		return -ENOMEM;
+	}
+
+	dst2 = malloc(bufsize);
+	if (!dst2) {
+		printf("\n");
+		free(src1);
+		free(dst1);
+		free(src2);
+		return -ENOMEM;
+	}
+
+	/* lmw */
+	width = 4;
+	printf("\tDoing lmw:\t");
+	for (offset = 0; offset < width; offset++) {
+		preload_data(src1, offset, width);
+		preload_data(src2, offset, width);
+
+		asm volatile(LMW(31, %0, 0)
+			     "std 31, 0(%1)"
+			     :: "r"(src1 + offset), "r"(dst1 + offset), "r"(0)
+			     : "memory", "r31");
+
+		memcpy(dst2 + offset, src1 + offset, width);
+
+		r = test_memcmp(dst1, dst2, width, offset, "test_lmw");
+		if (r && !debug) {
+			printf("FAILED: Wrong Data\n");
+			break;
+		}
+	}
+
+	if (!r)
+		printf("PASSED\n");
+	else
+		rc |= 1;
+
+	/* stmw */
+	width = 4;
+	printf("\tDoing stmw:\t");
+	for (offset = 0; offset < width; offset++) {
+		preload_data(src1, offset, width);
+		preload_data(src2, offset, width);
+
+		asm volatile("ld  31, 0(%0) ;"
+			     STMW(31, %1, 0)
+			     :: "r"(src1 + offset), "r"(dst1 + offset), "r"(0)
+			     : "memory", "r31");
+
+		memcpy(dst2 + offset, src1 + offset, width);
+
+		r = test_memcmp(dst1, dst2, width, offset, "test_stmw");
+		if (r && !debug) {
+			printf("FAILED: Wrong Data\n");
+			break;
+		}
+	}
+	if (!r)
+		printf("PASSED\n");
+	else
+		rc |= 1;
+
+	free(src1);
+	free(src2);
+	free(dst1);
+	free(dst2);
+	return rc;
+}
+
 void usage(char *prog)
 {
 	printf("Usage: %s [options] [path [offset]]\n", prog);
@@ -676,5 +765,7 @@ int main(int argc, char *argv[])
 			   "test_alignment_handler_fp_206");
 	rc |= test_harness(test_alignment_handler_fp_prefix,
 			   "test_alignment_handler_fp_prefix");
+	rc |= test_harness(test_alignment_handler_multiple,
+			   "test_alignment_handler_multiple");
 	return rc;
 }
