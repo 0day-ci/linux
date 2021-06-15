@@ -9823,6 +9823,20 @@ more_balance:
 			env.flags &= ~LBF_ALL_PINNED;
 
 			/*
+			 * There may be a race between load balance starting migration
+			 * thread to pull the cfs running thread and the RT thread
+			 * waking up and preempting cfs task before migration threads
+			 * which then preempt the RT thread.
+			 * We'd better do the last minute check before starting
+			 * migration thread to avoid preempting latency-sensitive thread.
+			 */
+			if (busiest->curr->sched_class != &fair_sched_class) {
+				raw_spin_unlock_irqrestore(&busiest->lock,
+							   flags);
+				goto out;
+			}
+
+			/*
 			 * ->active_balance synchronizes accesses to
 			 * ->active_balance_work.  Once set, it's cleared
 			 * only after active load balance is finished.
