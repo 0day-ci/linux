@@ -526,11 +526,14 @@ extern int fsnotify_add_event(struct fsnotify_group *group,
 			      int (*merge)(struct fsnotify_group *,
 					   struct fsnotify_event *),
 			      void (*insert)(struct fsnotify_group *,
-					     struct fsnotify_event *));
+					     struct fsnotify_event *,
+					     const void *),
+			      const void *insert_data);
+
 /* Queue overflow event to a notification group */
 static inline void fsnotify_queue_overflow(struct fsnotify_group *group)
 {
-	fsnotify_add_event(group, group->overflow_event, NULL, NULL);
+	fsnotify_add_event(group, group->overflow_event, NULL, NULL, NULL);
 }
 
 static inline bool fsnotify_is_overflow_event(u32 mask)

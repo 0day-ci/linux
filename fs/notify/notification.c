@@ -83,7 +83,9 @@ int fsnotify_add_event(struct fsnotify_group *group,
 		       int (*merge)(struct fsnotify_group *,
 				    struct fsnotify_event *),
 		       void (*insert)(struct fsnotify_group *,
-				      struct fsnotify_event *))
+				      struct fsnotify_event *,
+				      const void *),
+		       const void *insert_data)
 {
 	int ret = 0;
 	struct list_head *list = &group->notification_list;
@@ -111,6 +113,7 @@ int fsnotify_add_event(struct fsnotify_group *group,
 		 * them in the merge hash.
 		 */
 		insert = NULL;
+		insert_data = NULL;
 		goto queue;
 	}
 
@@ -126,7 +129,7 @@ queue:
 	group->q_len++;
 	list_add_tail(&event->list, list);
 	if (insert)
-		insert(group, event);
+		insert(group, event, insert_data);
 	spin_unlock(&group->notification_lock);
 
 	wake_up(&group->notification_waitq);
