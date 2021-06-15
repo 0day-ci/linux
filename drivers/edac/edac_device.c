@@ -245,13 +245,10 @@ EXPORT_SYMBOL_GPL(edac_device_free_ctl_info);
 static struct edac_device_ctl_info *find_edac_device_by_dev(struct device *dev)
 {
 	struct edac_device_ctl_info *edac_dev;
-	struct list_head *item;
 
 	edac_dbg(0, "\n");
 
-	list_for_each(item, &edac_device_list) {
-		edac_dev = list_entry(item, struct edac_device_ctl_info, link);
-
+	list_for_each_entry(edac_dev, &edac_device_list, link) {
 		if (edac_dev->dev == dev)
 			return edac_dev;
 	}
