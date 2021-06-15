@@ -39,6 +39,9 @@ struct compressed_bio {
 	 */
 	atomic_t io_sectors;
 
+	/* To wait for any submitted bio, used in error handling */
+	wait_queue_head_t pending_bio_wait;
+
 	/* Number of compressed pages in the array */
 	unsigned int nr_pages;
 
