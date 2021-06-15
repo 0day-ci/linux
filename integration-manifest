@@ -1,0 +1,28 @@
+drm drm-fixes 7de5c0d70c779454785dd2431707df5b841eaeaf
+	Merge tag 'amd-drm-fixes-5.13-2021-06-09' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes c336a5ee984708db4826ef9e47d184e638e29717
+	drm: Lock pointer access in drm_master_release()
+drm-intel drm-intel-fixes 009c9aa5be652675a06d5211e1640e02bbb1c33d
+	Linux 5.13-rc6
+drm drm-next 1bd8a7dc28c1c410f1ceefae1f2a97c06d1a67c2
+	Merge tag 'exynos-drm-next-for-v5.14' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-next
+drm-misc drm-misc-next-fixes d29b4295c325a0214d51b82fdc929d330e20979c
+	drm/hyperv: Fix unused const variable 'hyperv_modifiers'
+drm-intel drm-intel-next-fixes 1bd8a7dc28c1c410f1ceefae1f2a97c06d1a67c2
+	Merge tag 'exynos-drm-next-for-v5.14' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-next
+drm-misc drm-misc-next bdb8d06dfefd666d5981d884b535b04105869fcc
+	dmabuf: Add the capability to expose DMA-BUF stats in sysfs
+drm-intel drm-intel-next b91e3c830f00814c0f5c2e3afaf63b48d8ccb9d3
+	drm/i915/xelpd: break feature inheritance
+drm-intel drm-intel-gt-next 8c209f42cb3a209c366bae2956c98d8ed0514773
+	drm/i915/adl_p: Add initial ADL_P Workarounds
+sound-upstream for-linus 83e197a8414c0ba545e7e3916ce05f836f349273
+	ALSA: seq: Fix race of snd_seq_timer_open()
+sound-upstream for-next e381a14c3e3a4e90e293d4eaa5a3ab8ae98b9973
+	ALSA: control_led - fix initialization in the mode show callback
+drm-intel topic/core-for-CI 62f7e7988fa44b40cfea5db004118554723273cb
+	rtc: cmos: Disable irq around direct invocation of cmos_interrupt()
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
