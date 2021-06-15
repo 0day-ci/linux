@@ -267,12 +267,10 @@ int usbip_export_device(struct usbip_exported_device *edev, int sockfd)
 struct usbip_exported_device *usbip_generic_get_device(
 		struct usbip_host_driver *hdriver, int num)
 {
-	struct list_head *i;
 	struct usbip_exported_device *edev;
 	int cnt = 0;
 
-	list_for_each(i, &hdriver->edev_list) {
-		edev = list_entry(i, struct usbip_exported_device, node);
+	list_for_each_entry(edev, &hdriver->edev_list, node) {
 		if (num == cnt)
 			return edev;
 		cnt++;

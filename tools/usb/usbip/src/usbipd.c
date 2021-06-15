@@ -93,7 +93,6 @@ static int recv_request_import(int sockfd)
 	struct op_import_request req;
 	struct usbip_exported_device *edev;
 	struct usbip_usb_device pdu_udev;
-	struct list_head *i;
 	int found = 0;
 	int status = ST_OK;
 	int rc;
@@ -107,8 +106,7 @@ static int recv_request_import(int sockfd)
 	}
 	PACK_OP_IMPORT_REQUEST(0, &req);
 
-	list_for_each(i, &driver->edev_list) {
-		edev = list_entry(i, struct usbip_exported_device, node);
+	list_for_each_entry(edev, &driver->edev_list, node) {
 		if (!strncmp(req.busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
 			info("found requested device: %s", req.busid);
 			found = 1;
@@ -160,7 +158,6 @@ static int send_reply_devlist(int connfd)
 	struct usbip_usb_device pdu_udev;
 	struct usbip_usb_interface pdu_uinf;
 	struct op_devlist_reply reply;
-	struct list_head *j;
 	int rc, i;
 
 	/*
@@ -174,8 +171,7 @@ static int send_reply_devlist(int connfd)
 
 	reply.ndev = 0;
 	/* number of exported devices */
-	list_for_each(j, &driver->edev_list) {
-		edev = list_entry(j, struct usbip_exported_device, node);
+	list_for_each_entry(edev, &driver->edev_list, node) {
 		if (edev->status != SDEV_ST_USED)
 			reply.ndev += 1;
 	}
