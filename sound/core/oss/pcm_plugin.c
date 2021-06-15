@@ -469,7 +469,6 @@ int snd_pcm_plug_format_plugins(struct snd_pcm_substream *plug,
 				return err;
 			}
 			srcformat = tmpformat;
-			src_access = dst_access;
 		}
 		tmpformat.rate = dstformat.rate;
         	err = snd_pcm_plugin_build_rate(plug,
