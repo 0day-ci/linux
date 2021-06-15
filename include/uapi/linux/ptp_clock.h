@@ -70,6 +70,11 @@
 #define PTP_PEROUT_V1_VALID_FLAGS	(0)
 
 /*
+ * Max number of PTP virtual clocks per PTP physical clock
+ */
+#define PTP_MAX_VCLOCKS			20
+
+/*
  * struct ptp_clock_time - represents a time value
  *
  * The sign of the seconds field applies to the whole value. The
