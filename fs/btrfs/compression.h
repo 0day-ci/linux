@@ -29,7 +29,15 @@ struct btrfs_inode;
 
 struct compressed_bio {
 	/* number of bios pending for this compressed extent */
-	refcount_t pending_bios;
+	atomic_t pending_bios;
+
+	/*
+	 * Number of sectors which hasn't finished.
+	 *
+	 * Combined with pending_bios, we can manually finish the compressed_bio
+	 * if we hit some error while there is still some pages not added.
+	 */
+	atomic_t io_sectors;
 
 	/* Number of compressed pages in the array */
 	unsigned int nr_pages;
