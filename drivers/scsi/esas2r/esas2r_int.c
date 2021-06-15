@@ -392,7 +392,6 @@ void esas2r_process_adapter_reset(struct esas2r_adapter *a)
 	struct esas2r_disc_context *dc;
 
 	LIST_HEAD(comp_list);
-	struct list_head *element;
 
 	esas2r_trace_enter();
 
@@ -429,9 +428,7 @@ void esas2r_process_adapter_reset(struct esas2r_adapter *a)
 	set_bit(AF_COMM_LIST_TOGGLE, &a->flags);
 
 	/* Kill all the requests on the active list */
-	list_for_each(element, &a->defer_list) {
-		rq = list_entry(element, struct esas2r_request, req_list);
-
+	list_for_each_entry(rq, &a->defer_list, req_list) {
 		if (rq->req_stat == RS_STARTED)
 			if (esas2r_ioreq_aborted(a, rq, RS_ABORTED))
 				list_add_tail(&rq->comp_list, &comp_list);
@@ -446,7 +443,6 @@ void esas2r_process_adapter_reset(struct esas2r_adapter *a)
 static void esas2r_process_bus_reset(struct esas2r_adapter *a)
 {
 	struct esas2r_request *rq;
-	struct list_head *element;
 	unsigned long flags;
 
 	LIST_HEAD(comp_list);
@@ -458,8 +454,7 @@ static void esas2r_process_bus_reset(struct esas2r_adapter *a)
 	spin_lock_irqsave(&a->queue_lock, flags);
 
 	/* kill all the requests on the deferred queue */
-	list_for_each(element, &a->defer_list) {
-		rq = list_entry(element, struct esas2r_request, req_list);
+	list_for_each_entry(rq, &a->defer_list, req_list) {
 		if (esas2r_ioreq_aborted(a, rq, RS_ABORTED))
 			list_add_tail(&rq->comp_list, &comp_list);
 	}
