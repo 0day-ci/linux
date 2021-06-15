@@ -152,3 +152,27 @@ void ptp_vclock_unregister(struct ptp_vclock *vclock)
 	ptp_clock_unregister(vclock->clock);
 	kfree(vclock);
 }
+
+int ptp_get_vclocks_index(int pclock_index, int *vclock_index)
+{
+	char name[PTP_CLOCK_NAME_LEN] = "";
+	struct ptp_clock *ptp;
+	struct device *dev;
+	int num = 0;
+
+	if (pclock_index < 0)
+		return num;
+
+	snprintf(name, PTP_CLOCK_NAME_LEN, "ptp%d", pclock_index);
+	dev = class_find_device_by_name(ptp_class, name);
+	if (!dev)
+		return num;
+
+	ptp = dev_get_drvdata(dev);
+	num = ptp->n_vclocks;
+	memcpy(vclock_index, ptp->vclock_index, sizeof(int) * ptp->n_vclocks);
+	put_device(dev);
+
+	return num;
+}
+EXPORT_SYMBOL(ptp_get_vclocks_index);

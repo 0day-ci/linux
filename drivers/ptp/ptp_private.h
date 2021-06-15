@@ -91,6 +91,8 @@ static inline bool ptp_guaranteed_pclock(struct ptp_clock *ptp)
 	return false;
 }
 
+extern struct class *ptp_class;
+
 /*
  * see ptp_chardev.c
  */
