@@ -4333,7 +4333,7 @@ static void ath11k_mac_op_tx(struct ieee80211_hw *hw,
 	}
 
 	ret = ath11k_dp_tx(ar, arvif, skb);
-	if (ret) {
+	if (unlikely(ret)) {
 		ath11k_warn(ar->ab, "failed to transmit frame %d\n", ret);
 		ieee80211_free_txskb(ar->hw, skb);
 	}
