@@ -5584,6 +5584,7 @@ static void ext4_update_super(struct super_block *sb)
 	spin_unlock(&sbi->s_error_lock);
 
 	ext4_superblock_csum_set(sb);
+	set_buffer_uptodate(sbh);
 	unlock_buffer(sbh);
 }
 
