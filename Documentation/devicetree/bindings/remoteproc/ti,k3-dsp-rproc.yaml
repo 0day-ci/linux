@@ -57,7 +57,6 @@ properties:
 
   memory-region:
     minItems: 2
-    maxItems: 8
     description: |
       phandle to the reserved memory nodes to be associated with the remoteproc
       device. There should be at least two reserved memory nodes defined. The
