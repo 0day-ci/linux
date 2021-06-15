@@ -106,6 +106,11 @@ int fsnotify_add_event(struct fsnotify_group *group,
 			return ret;
 		}
 		event = group->overflow_event;
+		/*
+		 * Since overflow events are not mergeable, don't insert
+		 * them in the merge hash.
+		 */
+		insert = NULL;
 		goto queue;
 	}
 
