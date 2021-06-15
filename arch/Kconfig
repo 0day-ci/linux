@@ -1304,6 +1304,7 @@ config ARCH_HAS_ELFCORE_COMPAT
 	bool
 
 source "kernel/gcov/Kconfig"
+source "kernel/pgo/Kconfig"
 
 source "scripts/gcc-plugins/Kconfig"
 
