@@ -217,7 +217,18 @@ static inline bool intel_context_is_banned(const struct intel_context *ce)
 
 static inline bool intel_context_set_banned(struct intel_context *ce)
 {
+	clear_bit(CONTEXT_SCHEDULABLE, &ce->flags);
 	return test_and_set_bit(CONTEXT_BANNED, &ce->flags);
+}
+
+static inline bool intel_context_clear_schedulable(struct intel_context *ce)
+{
+	return test_and_clear_bit(CONTEXT_SCHEDULABLE, &ce->flags);
+}
+
+static inline bool intel_context_is_schedulable(const struct intel_context *ce)
+{
+	return test_bit(CONTEXT_SCHEDULABLE, &ce->flags);
 }
 
 static inline bool
