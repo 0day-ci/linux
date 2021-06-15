@@ -251,8 +251,17 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 
 	if (unlikely(p->flags & (PF_KTHREAD | PF_IO_WORKER))) {
 		/* kernel thread */
+		/*
+		 * Give it *two* switch stacks, one for the kernel
+		 * state return that is used up by alpha_switch_to,
+		 * and one for the "user state" which is accessed
+		 * by ptrace.
+		 */
+		childstack--;
+		childti->pcb.ksp = (unsigned long) childstack;
+
 		memset(childstack, 0,
-			sizeof(struct switch_stack) + sizeof(struct pt_regs));
+			2*sizeof(struct switch_stack) + sizeof(struct pt_regs));
 		childstack->r26 = (unsigned long) ret_from_kernel_thread;
 		childstack->r9 = usp;	/* function */
 		childstack->r10 = kthread_arg;

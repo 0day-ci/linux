@@ -785,6 +785,7 @@ ret_from_kernel_thread:
 	mov	$9, $27
 	mov	$10, $16
 	jsr	$26, ($9)
+	lda	$sp, SWITCH_STACK_SIZE($sp)
 	br	$31, ret_to_user
 .end ret_from_kernel_thread
 
@@ -811,6 +812,26 @@ alpha_\name:
 fork_like fork
 fork_like vfork
 fork_like clone
+fork_like exit
+fork_like exit_group
+
+.macro	exec_like name
+	.align	4
+	.globl	alpha_\name
+	.ent	alpha_\name
+	.cfi_startproc
+alpha_\name:
+	.prologue 0
+	DO_SWITCH_STACK
+	jsr	$26, sys_\name
+	UNDO_SWITCH_STACK
+	ret
+	.cfi_endproc
+.end	alpha_\name
+.endm
+
+exec_like execve
+exec_like execveat
 
 .macro	sigreturn_like name
 	.align	4
