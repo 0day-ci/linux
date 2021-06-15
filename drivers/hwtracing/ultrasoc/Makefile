@@ -5,3 +5,6 @@
 
 obj-$(CONFIG_ULTRASOC) += ultrasoc-drv.o
 ultrasoc-drv-objs := ultrasoc.o
+
+obj-$(CONFIG_ULTRASOC_AXI_COM) += ultrasoc-axi-com-drv.o
+ultrasoc-axi-com-drv-objs := ultrasoc-axi-com.o

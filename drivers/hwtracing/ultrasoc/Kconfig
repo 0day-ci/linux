@@ -13,4 +13,13 @@ menuconfig ULTRASOC
 	  specification and configure the right series of components when a
 	  trace source gets enabled.
 
+if ULTRASOC
+config ULTRASOC_AXI_COM
+	tristate "Ultrasoc AXI communicator drivers"
+	help
+	  This config enables support for Ultrasoc AXI Bus Communicator
+	  drivers. The AXI Communicator has upstream and downstream channels,
+	  the upstream channel is used to transmit user configuration, and
+	  downstream channel to carry response and trace data to the users.
+
 endif
