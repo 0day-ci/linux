@@ -178,12 +178,12 @@ struct vgic_its_abi {
 
 static const struct vgic_its_abi its_table_abi_versions[] = {
 	[0] = {
-	 .cte_esz = ABI_0_ESZ,
-	 .dte_esz = ABI_0_ESZ,
-	 .ite_esz = ABI_0_ESZ,
-	 .save_tables = vgic_its_save_tables_v0,
-	 .restore_tables = vgic_its_restore_tables_v0,
-	 .commit = vgic_its_commit_v0,
+		.cte_esz = ABI_0_ESZ,
+		.dte_esz = ABI_0_ESZ,
+		.ite_esz = ABI_0_ESZ,
+		.save_tables = vgic_its_save_tables_v0,
+		.restore_tables = vgic_its_restore_tables_v0,
+		.commit = vgic_its_commit_v0,
 	},
 };
 
@@ -224,7 +224,7 @@ static struct its_device *find_its_device(struct vgic_its *its, u32 device_id)
  * Must be called with the its_lock mutex held.
  */
 static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
-				  u32 event_id)
+				u32 event_id)
 {
 	struct its_device *device;
 	struct its_ite *ite;
@@ -1258,7 +1258,6 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
 	u32 event_id = its_cmd_get_id(its_cmd);
 	struct its_ite *ite;
 
-
 	ite = find_ite(its, device_id, event_id);
 	if (!ite)
 		return E_ITS_CLEAR_UNMAPPED_INTERRUPT;
@@ -1282,7 +1281,6 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
 	u32 device_id = its_cmd_get_deviceid(its_cmd);
 	u32 event_id = its_cmd_get_id(its_cmd);
 	struct its_ite *ite;
-
 
 	ite = find_ite(its, device_id, event_id);
 	if (!ite)
@@ -2120,7 +2118,7 @@ static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
  * vgic_its_save_ite - Save an interrupt translation entry at @gpa
  */
 static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
-			      struct its_ite *ite, gpa_t gpa, int ite_esz)
+			     struct its_ite *ite, gpa_t gpa, int ite_esz)
 {
 	struct kvm *kvm = its->dev->kvm;
 	u32 next_offset;
@@ -2276,7 +2274,7 @@ static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
 	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
 	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
 	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
-		(dev->num_eventid_bits - 1));
+	       (dev->num_eventid_bits - 1));
 	val = cpu_to_le64(val);
 	return kvm_write_guest_lock(kvm, ptr, &val, dte_esz);
 }

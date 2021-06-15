@@ -194,7 +194,6 @@ bool vgic_get_phys_line_level(struct vgic_irq *irq)
 /* Set/Clear the physical active state */
 void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
 {
-
 	BUG_ON(!irq->hw);
 	WARN_ON(irq_set_irqchip_state(irq->host_irq,
 				      IRQCHIP_STATE_ACTIVE,
@@ -234,7 +233,8 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
 		return irq->target_vcpu;
 	}
 
-	/* If neither active nor pending and enabled, then this IRQ should not
+	/*
+	 * If neither active nor pending and enabled, then this IRQ should not
 	 * be queued to any VCPU.
 	 */
 	return NULL;

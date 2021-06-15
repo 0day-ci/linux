@@ -464,7 +464,6 @@ static int vgic_init_cpu_starting(unsigned int cpu)
 	return 0;
 }
 
-
 static int vgic_init_cpu_dying(unsigned int cpu)
 {
 	disable_percpu_irq(kvm_vgic_global_state.maint_irq);

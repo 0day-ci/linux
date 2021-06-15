@@ -75,9 +75,9 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
 static bool end_of_vgic(struct vgic_state_iter *iter)
 {
 	return iter->dist_id > 0 &&
-		iter->vcpu_id == iter->nr_cpus &&
-		iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS) &&
-		iter->lpi_idx > iter->nr_lpis;
+	       iter->vcpu_id == iter->nr_cpus &&
+	       iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS) &&
+	       iter->lpi_idx > iter->nr_lpis;
 }
 
 static void *vgic_debug_start(struct seq_file *s, loff_t *pos)

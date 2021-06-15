@@ -505,7 +505,7 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
 }
 
 unsigned long vgic_uaccess_read_active(struct kvm_vcpu *vcpu,
-				    gpa_t addr, unsigned int len)
+				       gpa_t addr, unsigned int len)
 {
 	return __vgic_mmio_read_active(vcpu, addr, len);
 }
@@ -598,8 +598,8 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
 }
 
 int vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
-				     gpa_t addr, unsigned int len,
-				     unsigned long val)
+				    gpa_t addr, unsigned int len,
+				    unsigned long val)
 {
 	__vgic_mmio_write_cactive(vcpu, addr, len, val);
 	return 0;
@@ -635,8 +635,8 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
 }
 
 int vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
-				     gpa_t addr, unsigned int len,
-				     unsigned long val)
+				    gpa_t addr, unsigned int len,
+				    unsigned long val)
 {
 	__vgic_mmio_write_sactive(vcpu, addr, len, val);
 	return 0;

@@ -43,7 +43,7 @@ static int vgic_check_type(struct kvm *kvm, int type_needed)
  * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
  * @addr:  pointer to address value
  * @write: if true set the address in the VM address space, if false read the
- *          address
+ *         address
  *
  * Set or get the vgic base addresses for the distributor and the virtual CPU
  * interface in the VM physical address space.  These addresses are properties

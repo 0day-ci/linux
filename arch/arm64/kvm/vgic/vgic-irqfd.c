@@ -16,8 +16,8 @@
  * This is the entry point for irqfd IRQ injection
  */
 static int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
-			struct kvm *kvm, int irq_source_id,
-			int level, bool line_status)
+			      struct kvm *kvm, int irq_source_id,
+			      int level, bool line_status)
 {
 	unsigned int spi_id = e->irqchip.pin + VGIC_NR_PRIVATE_IRQS;
 
