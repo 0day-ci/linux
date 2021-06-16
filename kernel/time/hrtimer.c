@@ -1848,6 +1848,7 @@ static void __hrtimer_init_sleeper(struct hrtimer_sleeper *sl,
 	__hrtimer_init(&sl->timer, clock_id, mode);
 	sl->timer.function = hrtimer_wakeup;
 	sl->task = current;
+	sl->mode = mode;
 }
 
 /**
@@ -1884,19 +1885,19 @@ int nanosleep_copyout(struct restart_block *restart, struct timespec64 *ts)
 	return -ERESTART_RESTARTBLOCK;
 }
 
-static int __sched do_nanosleep(struct hrtimer_sleeper *t, enum hrtimer_mode mode)
+static int __sched do_nanosleep(struct hrtimer_sleeper *t)
 {
 	struct restart_block *restart;
 
 	do {
 		set_current_state(TASK_INTERRUPTIBLE);
-		hrtimer_sleeper_start_expires(t, mode);
+		hrtimer_sleeper_start_expires(t, t->mode);
 
 		if (likely(t->task))
 			freezable_schedule();
 
 		hrtimer_cancel(&t->timer);
-		mode = HRTIMER_MODE_ABS;
+		t->mode = HRTIMER_MODE_ABS;
 
 	} while (t->task && !signal_pending(current));
 
@@ -1927,7 +1928,7 @@ static long __sched hrtimer_nanosleep_restart(struct restart_block *restart)
 	hrtimer_init_sleeper_on_stack(&t, restart->nanosleep.clockid,
 				      HRTIMER_MODE_ABS);
 	hrtimer_set_expires_tv64(&t.timer, restart->nanosleep.expires);
-	ret = do_nanosleep(&t, HRTIMER_MODE_ABS);
+	ret = do_nanosleep(&t);
 	destroy_hrtimer_on_stack(&t.timer);
 	return ret;
 }
@@ -1946,7 +1947,7 @@ long hrtimer_nanosleep(ktime_t rqtp, const enum hrtimer_mode mode,
 
 	hrtimer_init_sleeper_on_stack(&t, clockid, mode);
 	hrtimer_set_expires_range_ns(&t.timer, rqtp, slack);
-	ret = do_nanosleep(&t, mode);
+	ret = do_nanosleep(&t);
 	if (ret != -ERESTART_RESTARTBLOCK)
 		goto out;
 
