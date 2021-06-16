@@ -180,12 +180,12 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		 */
 		ret = ttm_tt_create(bo, old_man->use_tt);
 		if (ret)
-			goto out_err;
+			return ret;
 
 		if (mem->mem_type != TTM_PL_SYSTEM) {
 			ret = ttm_tt_populate(bo->bdev, bo->ttm, ctx);
 			if (ret)
-				goto out_err;
+				goto err_destroy;
 		}
 	}
 
@@ -193,15 +193,17 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 	if (ret) {
 		if (ret == -EMULTIHOP)
 			return ret;
-		goto out_err;
+		goto err_unpopulate;
 	}
 
 	ctx->bytes_moved += bo->base.size;
 	return 0;
 
-out_err:
-	new_man = ttm_manager_type(bdev, bo->mem.mem_type);
-	if (!new_man->use_tt)
+err_unpopulate:
+	if (new_man->use_tt)
+		ttm_tt_unpopulate(bo->bdev, bo->ttm);
+err_destroy:
+	if (new_man->use_tt)
 		ttm_bo_tt_destroy(bo);
 
 	return ret;
