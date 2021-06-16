@@ -111,7 +111,9 @@ int __weak arch_asym_cpu_priority(int cpu)
  *
  * (default: ~20%)
  */
-#define fits_capacity(cap, max)	((cap) * 1280 < (max) * 1024)
+unsigned int sysctl_sched_capacity_margin = 1280;
+EXPORT_SYMBOL_GPL(sysctl_sched_capacity_margin);
+#define fits_capacity(cap, max)	((cap) * sysctl_sched_capacity_margin < (max) * 1024)
 
 /*
  * The margin used when comparing CPU capacities.

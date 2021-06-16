@@ -10,6 +10,7 @@ struct ctl_table;
 
 #ifdef CONFIG_SMP
 extern unsigned int sysctl_hung_task_all_cpu_backtrace;
+extern unsigned int sysctl_sched_capacity_margin;
 #else
 #define sysctl_hung_task_all_cpu_backtrace 0
 #endif /* CONFIG_SMP */
