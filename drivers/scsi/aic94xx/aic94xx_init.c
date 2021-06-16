@@ -725,10 +725,8 @@ static int asd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	asd_dev = &asd_pcidev_data[asd_id];
 
 	asd_ha = kzalloc(sizeof(*asd_ha), GFP_KERNEL);
-	if (!asd_ha) {
-		asd_printk("out of memory\n");
+	if (!asd_ha)
 		goto Err_put;
-	}
 	asd_ha->pcidev = dev;
 	asd_ha->sas_ha.dev = &asd_ha->pcidev->dev;
 	asd_ha->sas_ha.lldd_ha = asd_ha;
