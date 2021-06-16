@@ -636,7 +636,6 @@ struct x86_hybrid_pmu {
 	struct pmu			pmu;
 	const char			*name;
 	u8				cpu_type;
-	cpumask_t			supported_cpus;
 	union perf_capabilities		intel_cap;
 	u64				intel_ctrl;
 	int				max_pebs_events;

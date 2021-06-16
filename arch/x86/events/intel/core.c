@@ -4311,7 +4311,7 @@ static bool init_hybrid_pmu(int cpu)
 	}
 
 	/* Only check and dump the PMU information for the first CPU */
-	if (!cpumask_empty(&pmu->supported_cpus))
+	if (!cpumask_empty(&pmu->pmu.supported_cpus))
 		goto end;
 
 	if (!check_hw_exists(&pmu->pmu, pmu->num_counters, pmu->num_counters_fixed))
@@ -4328,9 +4328,7 @@ static bool init_hybrid_pmu(int cpu)
 			     pmu->intel_ctrl);
 
 end:
-	cpumask_set_cpu(cpu, &pmu->supported_cpus);
 	cpuc->pmu = &pmu->pmu;
-
 	x86_pmu_update_cpu_context(&pmu->pmu, cpu);
 
 	return true;
@@ -4463,7 +4461,7 @@ static void intel_pmu_cpu_dead(int cpu)
 	intel_cpuc_finish(cpuc);
 
 	if (is_hybrid() && cpuc->pmu)
-		cpumask_clear_cpu(cpu, &hybrid_pmu(cpuc->pmu)->supported_cpus);
+		cpumask_clear_cpu(cpu, &cpuc->pmu->supported_cpus);
 }
 
 static void intel_pmu_sched_task(struct perf_event_context *ctx,
@@ -4494,10 +4492,9 @@ static int intel_pmu_aux_output_match(struct perf_event *event)
 
 static int intel_pmu_filter_match(struct perf_event *event)
 {
-	struct x86_hybrid_pmu *pmu = hybrid_pmu(event->pmu);
 	unsigned int cpu = smp_processor_id();
 
-	return cpumask_test_cpu(cpu, &pmu->supported_cpus);
+	return cpumask_test_cpu(cpu, &event->pmu->supported_cpus);
 }
 
 PMU_FORMAT_ATTR(offcore_rsp, "config1:0-63");
@@ -5299,7 +5296,7 @@ static umode_t hybrid_events_is_visible(struct kobject *kobj,
 
 static inline int hybrid_find_supported_cpu(struct x86_hybrid_pmu *pmu)
 {
-	int cpu = cpumask_first(&pmu->supported_cpus);
+	int cpu = cpumask_first(&pmu->pmu.supported_cpus);
 
 	return (cpu >= nr_cpu_ids) ? -1 : cpu;
 }
@@ -5355,7 +5352,7 @@ static ssize_t intel_hybrid_get_attr_cpus(struct device *dev,
 	struct x86_hybrid_pmu *pmu =
 		container_of(dev_get_drvdata(dev), struct x86_hybrid_pmu, pmu);
 
-	return cpumap_print_to_pagebuf(true, buf, &pmu->supported_cpus);
+	return cpumap_print_to_pagebuf(true, buf, &pmu->pmu.supported_cpus);
 }
 
 static DEVICE_ATTR(cpus, S_IRUGO, intel_hybrid_get_attr_cpus, NULL);

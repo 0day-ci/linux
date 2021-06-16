@@ -2058,6 +2058,7 @@ void x86_pmu_update_cpu_context(struct pmu *pmu, int cpu)
 
 	cpuctx = per_cpu_ptr(pmu->pmu_cpu_context, cpu);
 	cpuctx->ctx.pmu = pmu;
+	cpumask_set_cpu(cpu, &pmu->supported_cpus);
 }
 
 static int __init init_hw_perf_events(void)
@@ -2329,12 +2330,9 @@ static struct cpu_hw_events *allocate_fake_cpuc(struct pmu *event_pmu)
 	cpuc->is_fake = 1;
 
 	if (is_hybrid()) {
-		struct x86_hybrid_pmu *h_pmu;
-
-		h_pmu = hybrid_pmu(event_pmu);
-		if (cpumask_empty(&h_pmu->supported_cpus))
+		if (cpumask_empty(&event_pmu->supported_cpus))
 			goto error;
-		cpu = cpumask_first(&h_pmu->supported_cpus);
+		cpu = cpumask_first(&event_pmu->supported_cpus);
 	} else
 		cpu = raw_smp_processor_id();
 	cpuc->pmu = event_pmu;
@@ -2439,7 +2437,6 @@ out:
 
 static int x86_pmu_event_init(struct perf_event *event)
 {
-	struct x86_hybrid_pmu *pmu = NULL;
 	int err;
 
 	if ((event->attr.type != event->pmu->type) &&
@@ -2448,8 +2445,7 @@ static int x86_pmu_event_init(struct perf_event *event)
 		return -ENOENT;
 
 	if (is_hybrid() && (event->cpu != -1)) {
-		pmu = hybrid_pmu(event->pmu);
-		if (!cpumask_test_cpu(event->cpu, &pmu->supported_cpus))
+		if (!cpumask_test_cpu(event->cpu, &event->pmu->supported_cpus))
 			return -ENOENT;
 	}
 
