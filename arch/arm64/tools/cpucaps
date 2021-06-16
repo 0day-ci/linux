@@ -3,6 +3,7 @@
 # Internal CPU capabilities constants, keep this list sorted
 
 BTI
+HAS_16BIT_VMID
 HAS_32BIT_EL0
 HAS_32BIT_EL1
 HAS_ADDRESS_AUTH
