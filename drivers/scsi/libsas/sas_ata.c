@@ -552,10 +552,8 @@ int sas_ata_init(struct domain_device *found_dev)
 	int rc;
 
 	ata_host = kzalloc(sizeof(*ata_host), GFP_KERNEL);
-	if (!ata_host)	{
-		pr_err("ata host alloc failed.\n");
+	if (!ata_host)
 		return -ENOMEM;
-	}
 
 	ata_host_init(ata_host, ha->dev, &sas_sata_ops);
 
