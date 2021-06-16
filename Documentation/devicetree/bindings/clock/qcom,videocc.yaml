@@ -18,6 +18,7 @@ description: |
     dt-bindings/clock/qcom,videocc-sdm845.h
     dt-bindings/clock/qcom,videocc-sm8150.h
     dt-bindings/clock/qcom,videocc-sm8250.h
+    dt-bindings/clock/qcom,videocc-sm8350.h
 
 properties:
   compatible:
@@ -26,6 +27,7 @@ properties:
       - qcom,sdm845-videocc
       - qcom,sm8150-videocc
       - qcom,sm8250-videocc
+      - qcom,sm8350-videocc
 
   clocks:
     items:
