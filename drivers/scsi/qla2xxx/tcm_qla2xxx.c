@@ -1035,10 +1035,8 @@ static struct se_portal_group *tcm_qla2xxx_make_tpg(struct se_wwn *wwn,
 	}
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
-	if (!tpg) {
-		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
+	if (!tpg)
 		return ERR_PTR(-ENOMEM);
-	}
 	tpg->lport = lport;
 	tpg->lport_tpgt = tpgt;
 	/*
@@ -1151,10 +1149,8 @@ static struct se_portal_group *tcm_qla2xxx_npiv_make_tpg(struct se_wwn *wwn,
 		return ERR_PTR(-EINVAL);
 
 	tpg = kzalloc(sizeof(struct tcm_qla2xxx_tpg), GFP_KERNEL);
-	if (!tpg) {
-		pr_err("Unable to allocate struct tcm_qla2xxx_tpg\n");
+	if (!tpg)
 		return ERR_PTR(-ENOMEM);
-	}
 	tpg->lport = lport;
 	tpg->lport_tpgt = tpgt;
 
@@ -1653,10 +1649,8 @@ static struct se_wwn *tcm_qla2xxx_make_lport(
 		return ERR_PTR(-EINVAL);
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
-	if (!lport) {
-		pr_err("Unable to allocate struct tcm_qla2xxx_lport\n");
+	if (!lport)
 		return ERR_PTR(-ENOMEM);
-	}
 	lport->lport_wwpn = wwpn;
 	tcm_qla2xxx_format_wwn(&lport->lport_name[0], TCM_QLA2XXX_NAMELEN,
 				wwpn);
@@ -1779,10 +1773,8 @@ static struct se_wwn *tcm_qla2xxx_npiv_make_lport(
 		return ERR_PTR(-EINVAL);
 
 	lport = kzalloc(sizeof(struct tcm_qla2xxx_lport), GFP_KERNEL);
-	if (!lport) {
-		pr_err("Unable to allocate struct tcm_qla2xxx_lport for NPIV\n");
+	if (!lport)
 		return ERR_PTR(-ENOMEM);
-	}
 	lport->lport_npiv_wwpn = npiv_wwpn;
 	lport->lport_npiv_wwnn = npiv_wwnn;
 	sprintf(lport->lport_naa_name, "naa.%016llx", (unsigned long long) npiv_wwpn);
