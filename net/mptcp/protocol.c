@@ -2916,6 +2916,8 @@ static void mptcp_release_cb(struct sock *sk)
 		__mptcp_clean_una_wakeup(sk);
 	if (test_and_clear_bit(MPTCP_ERROR_REPORT, &mptcp_sk(sk)->flags))
 		__mptcp_error_report(sk);
+	if (test_and_clear_bit(MPTCP_CONNECTED, &mptcp_sk(sk)->flags))
+		__mptcp_set_connected(sk);
 
 	/* push_pending may touch wmem_reserved, ensure we do the cleanup
 	 * later
