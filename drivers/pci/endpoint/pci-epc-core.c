@@ -711,6 +711,24 @@ void pci_epc_pme_notify(struct pci_epc *epc, void *data)
 EXPORT_SYMBOL_GPL(pci_epc_pme_notify);
 
 /**
+ * pci_epc_d_state_notify() - Notify the EPF device that the EPC device has
+ *			      received the Device State event from Root complex
+ * @epc: the EPC device that received the Device State event
+ * @data: Data for the D_STATE notifier
+ *
+ * Invoke to notify the EPF device that the EPC device has received the Device
+ * State (D_STATE) event from the Root complex
+ */
+void pci_epc_d_state_notify(struct pci_epc *epc, void *data)
+{
+	if (!epc || IS_ERR(epc))
+		return;
+
+	atomic_notifier_call_chain(&epc->notifier, D_STATE, data);
+}
+EXPORT_SYMBOL_GPL(pci_epc_d_state_notify);
+
+/**
  * pci_epc_destroy() - destroy the EPC device
  * @epc: the EPC device that has to be destroyed
  *
