@@ -62,9 +62,11 @@
 #define MVMDIO_XSMI_POLL_INTERVAL_MIN	150
 #define MVMDIO_XSMI_POLL_INTERVAL_MAX	160
 
+#define MVMDIO_CLOCK_COUNT		4
+
 struct orion_mdio_dev {
 	void __iomem *regs;
-	struct clk *clk[4];
+	struct clk_bulk_data clks[MVMDIO_CLOCK_COUNT];
 	/*
 	 * If we have access to the error interrupt pin (which is
 	 * somewhat misnamed as it not only reflects internal errors
@@ -279,7 +281,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
 	struct resource *r;
 	struct mii_bus *bus;
 	struct orion_mdio_dev *dev;
-	int i, ret;
+	int ret;
 
 	type = (enum orion_mdio_bus_type)of_device_get_match_data(&pdev->dev);
 
@@ -319,33 +321,20 @@ static int orion_mdio_probe(struct platform_device *pdev)
 
 	init_waitqueue_head(&dev->smi_busy_wait);
 
-	if (pdev->dev.of_node) {
-		for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
-			dev->clk[i] = of_clk_get(pdev->dev.of_node, i);
-			if (PTR_ERR(dev->clk[i]) == -EPROBE_DEFER) {
-				ret = -EPROBE_DEFER;
-				goto out_clk;
-			}
-			if (IS_ERR(dev->clk[i]))
-				break;
-			clk_prepare_enable(dev->clk[i]);
-		}
+	dev->clks[0].id = "core";
+	dev->clks[1].id = "mg";
+	dev->clks[2].id = "mg_core";
+	dev->clks[3].id = "axi";
+	ret = devm_clk_bulk_get_optional(&pdev->dev, MVMDIO_CLOCK_COUNT,
+					 dev->clks);
+	if (ret)
+		return ret;
 
-		if (!IS_ERR(of_clk_get(pdev->dev.of_node,
-				       ARRAY_SIZE(dev->clk))))
-			dev_warn(&pdev->dev,
-				 "unsupported number of clocks, limiting to the first "
-				 __stringify(ARRAY_SIZE(dev->clk)) "\n");
-	} else {
-		dev->clk[0] = clk_get(&pdev->dev, NULL);
-		if (PTR_ERR(dev->clk[0]) == -EPROBE_DEFER) {
-			ret = -EPROBE_DEFER;
-			goto out_clk;
-		}
-		if (!IS_ERR(dev->clk[0]))
-			clk_prepare_enable(dev->clk[0]);
+	ret = clk_bulk_prepare_enable(MVMDIO_CLOCK_COUNT, dev->clks);
+	if (ret) {
+		dev_err(&pdev->dev, "Cannot enable clocks\n");
+		return ret;
 	}
-
 
 	dev->err_interrupt = platform_get_irq_optional(pdev, 0);
 	if (dev->err_interrupt > 0 &&
@@ -383,14 +372,6 @@ out_mdio:
 	if (dev->err_interrupt > 0)
 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
 
-out_clk:
-	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
-		if (IS_ERR(dev->clk[i]))
-			break;
-		clk_disable_unprepare(dev->clk[i]);
-		clk_put(dev->clk[i]);
-	}
-
 	return ret;
 }
 
@@ -398,18 +379,12 @@ static int orion_mdio_remove(struct platform_device *pdev)
 {
 	struct mii_bus *bus = platform_get_drvdata(pdev);
 	struct orion_mdio_dev *dev = bus->priv;
-	int i;
 
 	if (dev->err_interrupt > 0)
 		writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
 	mdiobus_unregister(bus);
 
-	for (i = 0; i < ARRAY_SIZE(dev->clk); i++) {
-		if (IS_ERR(dev->clk[i]))
-			break;
-		clk_disable_unprepare(dev->clk[i]);
-		clk_put(dev->clk[i]);
-	}
+	clk_bulk_disable_unprepare(MVMDIO_CLOCK_COUNT, dev->clks);
 
 	return 0;
 }
