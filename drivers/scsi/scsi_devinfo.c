@@ -356,10 +356,8 @@ int scsi_dev_info_list_add_keyed(int compatible, char *vendor, char *model,
 		return PTR_ERR(devinfo_table);
 
 	devinfo = kmalloc(sizeof(*devinfo), GFP_KERNEL);
-	if (!devinfo) {
-		printk(KERN_ERR "%s: no memory\n", __func__);
+	if (!devinfo)
 		return -ENOMEM;
-	}
 
 	scsi_strcpy_devinfo("vendor", devinfo->vendor, sizeof(devinfo->vendor),
 			    vendor, compatible);
