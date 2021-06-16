@@ -316,7 +316,8 @@
 #define H_SCM_PERFORMANCE_STATS 0x418
 #define H_RPT_INVALIDATE	0x448
 #define H_SCM_FLUSH		0x44C
-#define MAX_HCALL_OPCODE	H_SCM_FLUSH
+#define H_GET_ENERGY_SCALE_INFO	0x450
+#define MAX_HCALL_OPCODE	H_GET_ENERGY_SCALE_INFO
 
 /* Scope args for H_SCM_UNBIND_ALL */
 #define H_UNBIND_SCOPE_ALL (0x1)
@@ -630,6 +631,24 @@ struct hv_gpci_request_buffer {
 	struct hv_get_perf_counter_info_params params;
 	uint8_t bytes[HGPCI_MAX_DATA_BYTES];
 } __packed;
+
+#define MAX_EM_ATTRS	10
+#define MAX_EM_DATA_BYTES \
+	(sizeof(struct energy_scale_attributes) * MAX_EM_ATTRS)
+struct energy_scale_attributes {
+	__be64 attr_id;
+	__be64 attr_value;
+	unsigned char attr_desc[64];
+	unsigned char attr_value_desc[64];
+} __packed;
+
+struct hv_energy_scale_buffer {
+	__be64 num_attr;
+	__be64 array_offset;
+	__u8 data_header_version;
+	unsigned char data[MAX_EM_DATA_BYTES];
+} __packed;
+
 
 #endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
