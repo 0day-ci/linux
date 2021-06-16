@@ -5780,7 +5780,7 @@ static void hci_le_remote_feat_complete_evt(struct hci_dev *hdev,
 			 * for unsupported remote feature gets returned.
 			 *
 			 * In this specific case, allow the connection to
-			 * transition into connected state and mark it as
+			 * transit into connected state and mark it as
 			 * successful.
 			 */
 			if (!conn->out && ev->status == 0x1a &&
