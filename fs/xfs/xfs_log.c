@@ -2331,24 +2331,22 @@ xlog_write_partial(
 			 * a new iclog. This is necessary so that we reserve
 			 * space in the iclog for it.
 			 */
-			*len += sizeof(struct xlog_op_header);
 			ticket->t_curr_res -= sizeof(struct xlog_op_header);
 
 			error = xlog_write_get_more_iclog_space(log, ticket,
-					&iclog, log_offset, *len, record_cnt,
-					data_cnt);
+					&iclog, log_offset,
+					*len + sizeof(struct xlog_op_header),
+					record_cnt, data_cnt);
 			if (error)
 				return ERR_PTR(error);
-			ptr = iclog->ic_datap + *log_offset;
 
-			ophdr = ptr;
+			ophdr = iclog->ic_datap + *log_offset;
 			ophdr->oh_tid = cpu_to_be32(ticket->t_tid);
 			ophdr->oh_clientid = XFS_TRANSACTION;
 			ophdr->oh_res2 = 0;
 			ophdr->oh_flags = XLOG_WAS_CONT_TRANS;
 
-			xlog_write_adv_cnt(&ptr, len, log_offset,
-						sizeof(struct xlog_op_header));
+			*log_offset += sizeof(struct xlog_op_header);
 			*data_cnt += sizeof(struct xlog_op_header);
 
 			/*
