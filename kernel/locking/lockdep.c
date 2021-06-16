@@ -2638,7 +2638,7 @@ static int check_irq_usage(struct task_struct *curr, struct held_lock *prev,
 	bfs_init_rootb(&this, prev);
 
 	ret = __bfs_backwards(&this, &usage_mask, usage_accumulate, usage_skip, NULL);
-	if (bfs_error(ret)) {
+	if (unlikely(bfs_error(ret))) {
 		print_bfs_bug(ret);
 		return 0;
 	}
@@ -2656,7 +2656,7 @@ static int check_irq_usage(struct task_struct *curr, struct held_lock *prev,
 	bfs_init_root(&that, next);
 
 	ret = find_usage_forwards(&that, forward_mask, &target_entry1);
-	if (bfs_error(ret)) {
+	if (unlikely(bfs_error(ret))) {
 		print_bfs_bug(ret);
 		return 0;
 	}
@@ -2671,7 +2671,7 @@ static int check_irq_usage(struct task_struct *curr, struct held_lock *prev,
 	backward_mask = original_mask(target_entry1->class->usage_mask);
 
 	ret = find_usage_backwards(&this, backward_mask, &target_entry);
-	if (bfs_error(ret)) {
+	if (unlikely(bfs_error(ret))) {
 		print_bfs_bug(ret);
 		return 0;
 	}
@@ -2990,7 +2990,7 @@ check_prev_add(struct task_struct *curr, struct held_lock *prev,
 	 * Is the <prev> -> <next> link redundant?
 	 */
 	ret = check_redundant(prev, next);
-	if (bfs_error(ret))
+	if (unlikely(bfs_error(ret)))
 		return 0;
 	else if (ret == BFS_RMATCH)
 		return 2;
@@ -3903,7 +3903,7 @@ check_usage_forwards(struct task_struct *curr, struct held_lock *this,
 
 	bfs_init_root(&root, this);
 	ret = find_usage_forwards(&root, usage_mask, &target_entry);
-	if (bfs_error(ret)) {
+	if (unlikely(bfs_error(ret))) {
 		print_bfs_bug(ret);
 		return 0;
 	}
@@ -3938,7 +3938,7 @@ check_usage_backwards(struct task_struct *curr, struct held_lock *this,
 
 	bfs_init_rootb(&root, this);
 	ret = find_usage_backwards(&root, usage_mask, &target_entry);
-	if (bfs_error(ret)) {
+	if (unlikely(bfs_error(ret))) {
 		print_bfs_bug(ret);
 		return 0;
 	}
