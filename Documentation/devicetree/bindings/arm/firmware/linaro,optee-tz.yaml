@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/arm/firmware/linaro,optee-tz.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: OP-TEE Device Tree Bindings
+
+maintainers:
+  - Jens Wiklander <jens.wiklander@linaro.org>
+
+description: |
+  OP-TEE is a piece of software using hardware features to provide a Trusted
+  Execution Environment. The security can be provided with ARM TrustZone, but
+  also by virtualization or a separate chip.
+
+properties:
+  $nodename:
+    const: optee
+  compatible:
+      oneOf:
+        - description:
+            We're using "linaro" as the first part of the compatible property
+            for the reference implementation maintained by Linaro.
+          const: linaro,optee-tz
+
+  method:
+    description: The method of calling the OP-TEE Trusted OS.
+    $ref: /schemas/types.yaml#/definitions/string-array
+    oneOf:
+      - description: |
+          SMC #0, with the register assignments specified in
+          in drivers/tee/optee/optee_smc.h
+        const: smc
+      - description: |
+          HVC #0, with the register assignments specified in
+          in drivers/tee/optee/optee_smc.h
+        const: hvc
+
+additionalProperties: false
+
+examples:
+  - |
+    firmware {
+      optee {
+        compatible = "linaro,optee-tz";
+        method = "smc";
+      };
+    };
