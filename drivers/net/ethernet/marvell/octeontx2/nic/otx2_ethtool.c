@@ -690,6 +690,9 @@ static int otx2_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *nfc)
 		if (netif_running(dev) && ntuple)
 			ret = otx2_remove_flow(pfvf, nfc->fs.location);
 		break;
+	case ETHTOOL_SRXCLSRLCNT:
+		ret = otx2_set_flow_rule_count(pfvf, nfc->rule_cnt);
+		break;
 	default:
 		break;
 	}
