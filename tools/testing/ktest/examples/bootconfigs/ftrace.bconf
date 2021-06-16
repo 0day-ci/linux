@@ -1,0 +1,82 @@
+#!/bin/sh
+
+ftrace {
+	options = "sym-addr", "context-info"
+	buffer_size = 1MB
+}
+
+ftrace.event {
+	# Sample1: Make a histogram for initcall functions
+	synthetic.initcall_latency {
+                fields = "unsigned long func", "u64 lat"
+		hist {
+			keys = func.sym, lat
+			vals = lat
+			sort = lat
+		}
+	}
+	initcall.initcall_start.hist {
+		keys = func
+		var.ts0 = common_timestamp.usecs
+	}
+	initcall.initcall_finish.hist {
+		keys = func
+		var.lat = common_timestamp.usecs - $ts0
+		onmatch {
+			event = initcall.initcall_start
+			action = "initcall_latency(func, $lat)"
+		}
+	}
+
+	# Sample2: kmalloc() tracing in read(2) syscall
+	syscalls.sys_enter_read.enable_event {
+		event = kmem.kmalloc
+		count = 1
+	}
+	syscalls.sys_exit_read.disable_event {
+		event = kmem.kmalloc
+	}
+
+	# Sample3: Stacktrace at the event
+	kmem.kmalloc.stacktrace {
+		count = 5
+		filter = 'bytes_req >= 65536'
+	}
+
+	# Sample4: Take a snapshot
+	block.block_unplug.snapshot {
+		count = 1
+		filter = nr_rq > 1
+	}
+
+	# Sample5: Trace-on/off
+	block.block_plug.traceon {
+		filter = nr_rq > 1
+	}
+	block.block_unplug.traceoff {
+		filter = nr_rq > 1
+	}
+
+        # Sample6: onmax
+	sched.sched_waking {
+		enable
+		hist {
+			keys = pid
+			ts1 = common_timestamp.usecs
+			filter = 'comm == "cyclictest"'
+		}
+	}
+	sched.sched_switch {
+		enable
+		hist {
+			keys = next_pid
+			var.wakeup_lat = common_timestamp.usecs - $ts1
+			onmax {
+				var = wakeup_lat
+				action = "save(next_prio,next_comm,prev_pid,prev_prio,prev_comm)"
+			}
+			filter = 'next_comm == "cyclictest"'
+		}
+	}
+}
+

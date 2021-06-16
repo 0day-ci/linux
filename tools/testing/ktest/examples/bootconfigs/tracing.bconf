@@ -1,0 +1,51 @@
+ftrace {
+	tracer = function;
+	options = event-fork, sym-addr, stacktrace;
+	buffer_size = 1M;
+	alloc_snapshot;
+	trace_clock = global;
+	events = "task:task_newtask", "initcall:*";
+	event.sched.sched_process_exec {
+		filter = "pid < 128";
+	}
+	event.kprobes.myevent {
+		probes = "vfs_read $arg1 $arg2", "vfs_write $arg1 $arg2"
+	}
+	event.kprobes.myevent2 {
+		probes = "initrd_load";
+	}
+	event.kprobes.enable
+	instance.bar {
+		event.synthetic.initcall_latency {
+			fields = "unsigned long func", "u64 lat";
+			actions.hist {
+				keys = func.sym, lat;
+				vals = lat;
+				sort = lat;
+			}
+		}
+		event.initcall {
+			initcall_start.actions.hist {
+				keys = func;
+				ts0 = "common_timestamp.usecs";
+			}
+			initcall_finish.actions.hist {
+				keys = "func";
+				lat = "common_timestamp.usecs-$ts0";
+				onmatch = "initcall.initcall_start",
+					  "initcall_latency(func,$lat)";
+			}
+		}
+	}
+	instance.foo {
+		tracer = function-graph;
+		tracing_on = false;
+		event.workqueue.workqueue_start.actions = "tracing_on";
+		event.workqueue.workqueue_end.actions = "tracing_off";
+	};
+}
+kernel {
+	tp_printk;
+	dump_on_oops = 2
+	traceoff_on_warning
+}
