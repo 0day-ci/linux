@@ -1068,9 +1068,13 @@ static void nfs_fill_super(struct super_block *sb, struct nfs_fs_context *ctx)
 	snprintf(sb->s_id, sizeof(sb->s_id),
 		 "%u:%u", MAJOR(sb->s_dev), MINOR(sb->s_dev));
 
-	if (sb->s_blocksize == 0)
-		sb->s_blocksize = nfs_block_bits(server->wsize,
+	if (sb->s_blocksize == 0) {
+		unsigned int blksize = server->pnfs_blksize ?
+			server->pnfs_blksize : server->wsize;
+
+		sb->s_blocksize = nfs_block_bits(blksize,
 						 &sb->s_blocksize_bits);
+	}
 
 	nfs_super_set_maxbytes(sb, server->maxfilesize);
 	server->has_sec_mnt_opts = ctx->has_sec_mnt_opts;
