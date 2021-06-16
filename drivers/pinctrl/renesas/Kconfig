@@ -176,6 +176,17 @@ config PINCTRL_RZA2
 	help
 	  This selects GPIO and pinctrl driver for Renesas RZ/A2 platforms.
 
+config PINCTRL_RZG2L
+	bool "pin control support for RZ/G2L family"
+	depends on OF
+	depends on ARCH_R9A07G044 || COMPILE_TEST
+	select GPIOLIB
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+	select GENERIC_PINCONF
+	help
+	  This enables common pin control functionality for platforms based on RZ/G2L family.
+
 config PINCTRL_PFC_R8A77470
 	bool "pin control support for RZ/G1C" if COMPILE_TEST
 	select PINCTRL_SH_PFC
