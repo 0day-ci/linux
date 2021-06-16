@@ -420,12 +420,27 @@ vfs_getxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 		const char *suffix = name + XATTR_SECURITY_PREFIX_LEN;
 		int ret = xattr_getsecurity(mnt_userns, inode, suffix, value,
 					    size);
+		int ret_raw;
+
 		/*
 		 * Only overwrite the return value if a security module
 		 * is actually active.
 		 */
 		if (ret == -EOPNOTSUPP)
 			goto nolsm;
+
+		if (ret < 0)
+			return ret;
+
+		/*
+		 * Read raw xattr if the size from the filesystem handler
+		 * differs from that returned by xattr_getsecurity() and is
+		 * equal or greater than zero.
+		 */
+		ret_raw = __vfs_getxattr(dentry, inode, name, NULL, 0);
+		if (ret_raw >= 0 && ret_raw != ret)
+			goto nolsm;
+
 		return ret;
 	}
 nolsm:
