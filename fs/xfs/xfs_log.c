@@ -2175,47 +2175,6 @@ xlog_write_full(
 	}
 }
 
-/*
- * Write whole log vectors into a single iclog which is guaranteed to have
- * either sufficient space for the entire log vector chain to be written or
- * exclusive access to the remaining space in the iclog.
- *
- * Return the number of iovecs and data written into the iclog, as well as
- * a pointer to the logvec that doesn't fit in the log (or NULL if we hit the
- * end of the chain.
- */
-static struct xfs_log_vec *
-xlog_write_single(
-	struct list_head	*lv_chain,
-	struct xfs_log_vec	*log_vector,
-	struct xlog_ticket	*ticket,
-	struct xlog_in_core	*iclog,
-	uint32_t		*log_offset,
-	uint32_t		*len,
-	uint32_t		*record_cnt,
-	uint32_t		*data_cnt)
-{
-	struct xfs_log_vec	*lv;
-
-	for (lv = log_vector;
-	     !list_entry_is_head(lv, lv_chain, lv_list);
-	     lv = list_next_entry(lv, lv_list)) {
-		/*
-		 * If the entire log vec does not fit in the iclog, punt it to
-		 * the partial copy loop which can handle this case.
-		 */
-		if (lv->lv_niovecs &&
-		    lv->lv_bytes > iclog->ic_size - *log_offset)
-			break;
-		xlog_write_full(lv, ticket, iclog, log_offset, len, record_cnt,
-				data_cnt);
-	}
-	if (list_entry_is_head(lv, lv_chain, lv_list))
-		lv = NULL;
-	ASSERT(*len == 0 || lv);
-	return lv;
-}
-
 static int
 xlog_write_get_more_iclog_space(
 	struct xlog		*log,
@@ -2454,22 +2413,24 @@ xlog_write(
 	if (start_lsn)
 		*start_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
 
-	lv = list_first_entry_or_null(lv_chain, struct xfs_log_vec, lv_list);
-	while (lv) {
-		lv = xlog_write_single(lv_chain, lv, ticket, iclog, &log_offset,
-					&len, &record_cnt, &data_cnt);
-		if (!lv)
-			break;
-
-		error = xlog_write_partial(lv, ticket, &iclog, &log_offset,
-					   &len, &record_cnt, &data_cnt);
-		if (error)
-			break;
-		lv = list_next_entry(lv, lv_list);
-		if (list_entry_is_head(lv, lv_chain, lv_list))
-			break;
+	list_for_each_entry(lv, lv_chain, lv_list) {
+		/*
+		 * If the entire log vec does not fit in the iclog, punt it to
+		 * the partial copy loop which can handle this case.
+		 */
+		if (lv->lv_niovecs &&
+		    lv->lv_bytes > iclog->ic_size - log_offset) {
+			error = xlog_write_partial(lv, ticket, &iclog,
+						   &log_offset, &len,
+						   &record_cnt, &data_cnt);
+			if (error)
+				break;
+		} else {
+			xlog_write_full(lv, ticket, iclog, &log_offset, &len,
+					&record_cnt, &data_cnt);
+		}
 	}
-	ASSERT((len == 0 && !lv) || error);
+	ASSERT(len == 0 || error);
 
 	/*
 	 * We've already been guaranteed that the last writes will fit inside
