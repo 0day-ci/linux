@@ -917,9 +917,11 @@ static void gid_table_cleanup_one(struct ib_device *ib_dev)
 {
 	u32 p;
 
-	rdma_for_each_port (ib_dev, p)
+	rdma_for_each_port (ib_dev, p) {
+		ib_dev->port_data[p].cache_is_initialized = 0;
 		cleanup_gid_table_port(ib_dev, p,
 				       ib_dev->port_data[p].cache.gid);
+	}
 }
 
 static int gid_table_setup_one(struct ib_device *ib_dev)
@@ -1466,6 +1468,7 @@ ib_cache_update(struct ib_device *device, u32 port, bool update_gids,
 	struct ib_port_attr       *tprops = NULL;
 	struct ib_pkey_cache      *pkey_cache = NULL;
 	struct ib_pkey_cache      *old_pkey_cache = NULL;
+	union ib_gid               gid;
 	int                        i;
 	int                        ret;
 
@@ -1523,13 +1526,21 @@ ib_cache_update(struct ib_device *device, u32 port, bool update_gids,
 	device->port_data[port].cache.lmc = tprops->lmc;
 	device->port_data[port].cache.port_state = tprops->state;
 
-	device->port_data[port].cache.subnet_prefix = tprops->subnet_prefix;
+	ret = rdma_query_gid(device, port, 0, &gid);
+	if (ret) {
+		write_unlock_irq(&device->cache.lock);
+		goto err;
+	}
+
+	device->port_data[port].cache.subnet_prefix =
+			be64_to_cpu(gid.global.subnet_prefix);
+
 	write_unlock_irq(&device->cache_lock);
 
 	if (enforce_security)
 		ib_security_cache_change(device,
 					 port,
-					 tprops->subnet_prefix);
+					 be64_to_cpu(gid.global.subnet_prefix));
 
 	kfree(old_pkey_cache);
 	kfree(tprops);
@@ -1629,6 +1640,7 @@ int ib_cache_setup_one(struct ib_device *device)
 		err = ib_cache_update(device, p, true, true, true);
 		if (err)
 			return err;
+		device->port_data[p].cache_is_initialized = 1;
 	}
 
 	return 0;
