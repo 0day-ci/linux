@@ -373,6 +373,17 @@ struct subprocess_info *call_usermodehelper_setup(const char *path, char **argv,
 #else
 	sub_info->path = path;
 #endif
+	if (strlen(sub_info->path) != 0) {
+		struct file *fp;
+
+		fp = filp_open(sub_info->path, O_RDONLY, 0);
+		if (IS_ERR(fp)) {
+			sub_info->path = "";
+			return sub_info;
+		}
+		filp_close(fp, NULL);
+	}
+
 	sub_info->argv = argv;
 	sub_info->envp = envp;
 
