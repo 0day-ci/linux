@@ -2232,14 +2232,11 @@ xlog_write_get_more_iclog_space(
 /*
  * Write log vectors into a single iclog which is smaller than the current chain
  * length. We write until we cannot fit a full record into the remaining space
- * and then stop. We return the log vector that is to be written that cannot
- * wholly fit in the iclog.
+ * and then stop.
  */
-static struct xfs_log_vec *
+static int
 xlog_write_partial(
-	struct xlog		*log,
-	struct list_head	*lv_chain,
-	struct xfs_log_vec	*log_vector,
+	struct xfs_log_vec	*lv,
 	struct xlog_ticket	*ticket,
 	struct xlog_in_core	**iclogp,
 	uint32_t		*log_offset,
@@ -2248,8 +2245,7 @@ xlog_write_partial(
 	uint32_t		*data_cnt)
 {
 	struct xlog_in_core	*iclog = *iclogp;
-	struct xfs_log_vec	*lv = log_vector;
-	struct xfs_log_iovec	*reg;
+	struct xlog		*log = iclog->ic_log;
 	struct xlog_op_header	*ophdr;
 	int			index = 0;
 	uint32_t		rlen;
@@ -2257,9 +2253,8 @@ xlog_write_partial(
 
 	/* walk the logvec, copying until we run out of space in the iclog */
 	for (index = 0; index < lv->lv_niovecs; index++) {
-		uint32_t	reg_offset = 0;
-
-		reg = &lv->lv_iovecp[index];
+		struct xfs_log_iovec	*reg = &lv->lv_iovecp[index];
+		uint32_t		reg_offset = 0;
 
 		/*
 		 * The first region of a continuation must have a non-zero
@@ -2278,7 +2273,7 @@ xlog_write_partial(
 					&iclog, log_offset, *len, record_cnt,
 					data_cnt);
 			if (error)
-				return ERR_PTR(error);
+				return error;
 		}
 
 		ophdr = reg->i_addr;
@@ -2329,7 +2324,7 @@ xlog_write_partial(
 					*len + sizeof(struct xlog_op_header),
 					record_cnt, data_cnt);
 			if (error)
-				return ERR_PTR(error);
+				return error;
 
 			ophdr = iclog->ic_datap + *log_offset;
 			ophdr->oh_tid = cpu_to_be32(ticket->t_tid);
@@ -2365,10 +2360,7 @@ xlog_write_partial(
 	 * the caller so it can go back to fast path copying.
 	 */
 	*iclogp = iclog;
-	lv = list_next_entry(lv, lv_list);
-	if (list_entry_is_head(lv, lv_chain, lv_list))
-		return NULL;
-	return lv;
+	return 0;
 }
 
 /*
@@ -2450,13 +2442,13 @@ xlog_write(
 		if (!lv)
 			break;
 
-		lv = xlog_write_partial(log, lv_chain, lv, ticket, &iclog,
-					&log_offset, &len, &record_cnt,
-					&data_cnt);
-		if (IS_ERR_OR_NULL(lv)) {
-			error = PTR_ERR_OR_ZERO(lv);
+		error = xlog_write_partial(lv, ticket, &iclog, &log_offset,
+					   &len, &record_cnt, &data_cnt);
+		if (error)
 			break;
-		}
+		lv = list_next_entry(lv, lv_list);
+		if (list_entry_is_head(lv, lv_chain, lv_list))
+			break;
 	}
 	ASSERT((len == 0 && !lv) || error);
 
