@@ -82,11 +82,9 @@ struct rdma_id_private {
 	u32			qkey;
 	u32			qp_num;
 	u32			options;
+	unsigned long		flags;
 	u8			srq;
 	u8			tos;
-	u8			tos_set:1;
-	u8                      timeout_set:1;
-	u8			min_rnr_timer_set:1;
 	u8			reuseaddr;
 	u8			afonly;
 	u8			timeout;
@@ -126,5 +124,29 @@ int cma_get_default_roce_tos(struct cma_device *dev, u32 port);
 int cma_set_default_roce_tos(struct cma_device *dev, u32 port,
 			     u8 default_roce_tos);
 struct ib_device *cma_get_ib_dev(struct cma_device *dev);
+
+#define BIT_ACCESS_FUNCTIONS(b)							\
+	static inline void set_##b(unsigned long flags)				\
+	{									\
+		/* set_bit() does not imply a memory barrier */			\
+		smp_mb__before_atomic();					\
+		set_bit(b, &flags);						\
+		/* set_bit() does not imply a memory barrier */			\
+		smp_mb__after_atomic();						\
+	}									\
+	static inline bool get_##b(unsigned long flags)				\
+	{									\
+		return test_bit(b, &flags);					\
+	}
+
+enum cm_id_flag_bits {
+	TOS_SET,
+	TIMEOUT_SET,
+	MIN_RNR_TIMER_SET,
+};
+
+BIT_ACCESS_FUNCTIONS(TIMEOUT_SET);
+BIT_ACCESS_FUNCTIONS(TOS_SET);
+BIT_ACCESS_FUNCTIONS(MIN_RNR_TIMER_SET);
 
 #endif /* _CMA_PRIV_H */
