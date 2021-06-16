@@ -4364,11 +4364,8 @@ static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
 	unsigned long lock_flags = 0;
 
 	dump = kzalloc(sizeof(struct ipr_dump), GFP_KERNEL);
-
-	if (!dump) {
-		ipr_err("Dump memory allocation failed\n");
+	if (!dump)
 		return -ENOMEM;
-	}
 
 	if (ioa_cfg->sis64)
 		ioa_data = vmalloc(array_size(IPR_FMT3_MAX_NUM_DUMP_PAGES,
