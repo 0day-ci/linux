@@ -693,6 +693,24 @@ void pci_epc_bme_notify(struct pci_epc *epc)
 EXPORT_SYMBOL_GPL(pci_epc_bme_notify);
 
 /**
+ * pci_epc_pme_notify() - Notify the EPF device that the EPC device has received
+ *			  the PME from the Root complex
+ * @epc: the EPC device that received the PME
+ * @data: Data for the PME notifier
+ *
+ * Invoke to Notify the EPF device that the EPC device has received the Power
+ * Management Event (PME) from the Root complex
+ */
+void pci_epc_pme_notify(struct pci_epc *epc, void *data)
+{
+	if (!epc || IS_ERR(epc))
+		return;
+
+	atomic_notifier_call_chain(&epc->notifier, PME, data);
+}
+EXPORT_SYMBOL_GPL(pci_epc_pme_notify);
+
+/**
  * pci_epc_destroy() - destroy the EPC device
  * @epc: the EPC device that has to be destroyed
  *

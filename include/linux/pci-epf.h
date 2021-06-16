@@ -22,6 +22,7 @@ enum pci_notify_event {
 	LINK_UP,
 	LINK_DOWN,
 	BME,
+	PME,
 };
 
 enum pci_barno {
