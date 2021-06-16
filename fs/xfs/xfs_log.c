@@ -2124,6 +2124,26 @@ xlog_print_trans(
 	}
 }
 
+static inline void
+xlog_write_iovec(
+	struct xlog_in_core	*iclog,
+	uint32_t		*log_offset,
+	void			*data,
+	uint32_t		write_len,
+	int			*bytes_left,
+	uint32_t		*record_cnt,
+	uint32_t		*data_cnt)
+{
+	ASSERT(*log_offset % sizeof(int32_t) == 0);
+	ASSERT(write_len % sizeof(int32_t) == 0);
+
+	memcpy(iclog->ic_datap + *log_offset, data, write_len);
+	*log_offset += write_len;
+	*bytes_left -= write_len;
+	(*record_cnt)++;
+	*data_cnt += write_len;
+}
+
 /*
  * Write whole log vectors into a single iclog which is guaranteed to have
  * either sufficient space for the entire log vector chain to be written or
@@ -2145,13 +2165,11 @@ xlog_write_single(
 	uint32_t		*data_cnt)
 {
 	struct xfs_log_vec	*lv;
-	void			*ptr;
 	int			index;
 
 	ASSERT(*log_offset + *len <= iclog->ic_size ||
 		iclog->ic_state == XLOG_STATE_WANT_SYNC);
 
-	ptr = iclog->ic_datap + *log_offset;
 	for (lv = log_vector;
 	     !list_entry_is_head(lv, lv_chain, lv_list);
 	     lv = list_next_entry(lv, lv_list)) {
@@ -2171,16 +2189,13 @@ xlog_write_single(
 			struct xfs_log_iovec	*reg = &lv->lv_iovecp[index];
 			struct xlog_op_header	*ophdr = reg->i_addr;
 
-			ASSERT(reg->i_len % sizeof(int32_t) == 0);
-			ASSERT((unsigned long)ptr % sizeof(int32_t) == 0);
-
 			ophdr->oh_tid = cpu_to_be32(ticket->t_tid);
 			ophdr->oh_len = cpu_to_be32(reg->i_len -
 						sizeof(struct xlog_op_header));
-			memcpy(ptr, reg->i_addr, reg->i_len);
-			xlog_write_adv_cnt(&ptr, len, log_offset, reg->i_len);
-			(*record_cnt)++;
-			*data_cnt += reg->i_len;
+
+			xlog_write_iovec(iclog, log_offset, reg->i_addr,
+					 reg->i_len, len, record_cnt,
+					 data_cnt);
 		}
 	}
 	if (list_entry_is_head(lv, lv_chain, lv_list))
@@ -2249,12 +2264,10 @@ xlog_write_partial(
 	int			error;
 
 	/* walk the logvec, copying until we run out of space in the iclog */
-	ptr = iclog->ic_datap + *log_offset;
 	for (index = 0; index < lv->lv_niovecs; index++) {
 		uint32_t	reg_offset = 0;
 
 		reg = &lv->lv_iovecp[index];
-		ASSERT(reg->i_len % sizeof(int32_t) == 0);
 
 		/*
 		 * The first region of a continuation must have a non-zero
@@ -2274,7 +2287,6 @@ xlog_write_partial(
 					data_cnt);
 			if (error)
 				return ERR_PTR(error);
-			ptr = iclog->ic_datap + *log_offset;
 		}
 
 		ophdr = reg->i_addr;
@@ -2285,12 +2297,9 @@ xlog_write_partial(
 		if (rlen != reg->i_len)
 			ophdr->oh_flags |= XLOG_CONTINUE_TRANS;
 
-		ASSERT((unsigned long)ptr % sizeof(int32_t) == 0);
-		xlog_verify_dest_ptr(log, ptr);
-		memcpy(ptr, reg->i_addr, rlen);
-		xlog_write_adv_cnt(&ptr, len, log_offset, rlen);
-		(*record_cnt)++;
-		*data_cnt += rlen;
+		xlog_verify_dest_ptr(log, iclog->ic_datap + *log_offset);
+		xlog_write_iovec(iclog, log_offset, reg->i_addr, rlen, len,
+				 record_cnt, data_cnt);
 
 		/* If we wrote the whole region, move to the next. */
 		if (rlen == reg->i_len)
@@ -2356,12 +2365,10 @@ xlog_write_partial(
 			rlen = min_t(uint32_t, rlen, iclog->ic_size - *log_offset);
 			ophdr->oh_len = cpu_to_be32(rlen);
 
-			xlog_verify_dest_ptr(log, ptr);
-			memcpy(ptr, reg->i_addr + reg_offset, rlen);
-			xlog_write_adv_cnt(&ptr, len, log_offset, rlen);
-			(*record_cnt)++;
-			*data_cnt += rlen;
-
+			xlog_verify_dest_ptr(log, iclog->ic_datap + *log_offset);
+			xlog_write_iovec(iclog, log_offset,
+					 reg->i_addr + reg_offset, rlen, len,
+					 record_cnt, data_cnt);
 		} while (ophdr->oh_flags & XLOG_CONTINUE_TRANS);
 	}
 
