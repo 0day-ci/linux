@@ -4490,13 +4490,6 @@ static int intel_pmu_aux_output_match(struct perf_event *event)
 	return is_intel_pt_event(event);
 }
 
-static int intel_pmu_filter_match(struct perf_event *event)
-{
-	unsigned int cpu = smp_processor_id();
-
-	return cpumask_test_cpu(cpu, &event->pmu->supported_cpus);
-}
-
 PMU_FORMAT_ATTR(offcore_rsp, "config1:0-63");
 
 PMU_FORMAT_ATTR(ldlat, "config1:0-15");
@@ -6131,7 +6124,6 @@ __init int intel_pmu_init(void)
 		x86_pmu.update_topdown_event = adl_update_topdown_event;
 		x86_pmu.set_topdown_event_period = adl_set_topdown_event_period;
 
-		x86_pmu.filter_match = intel_pmu_filter_match;
 		x86_pmu.get_event_constraints = adl_get_event_constraints;
 		x86_pmu.hw_config = adl_hw_config;
 		x86_pmu.limit_period = spr_limit_period;
