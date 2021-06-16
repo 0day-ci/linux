@@ -24,6 +24,7 @@ enum pci_notify_event {
 	BME,
 	PME,
 	D_STATE,
+	CUSTOM,
 };
 
 enum pci_barno {
