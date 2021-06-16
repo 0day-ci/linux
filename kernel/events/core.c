@@ -2226,9 +2226,19 @@ static bool is_orphaned_event(struct perf_event *event)
 	return event->state == PERF_EVENT_STATE_DEAD;
 }
 
+static __always_inline bool pmu_can_sched_on_this_cpu(struct pmu *pmu)
+{
+	return cpumask_empty(&pmu->supported_cpus) ||
+	       cpumask_test_cpu(smp_processor_id(), &pmu->supported_cpus);
+}
+
 static inline int __pmu_filter_match(struct perf_event *event)
 {
 	struct pmu *pmu = event->pmu;
+
+	if (!pmu_can_sched_on_this_cpu(pmu))
+		return 0;
+
 	return pmu->filter_match ? pmu->filter_match(event) : 1;
 }
 
@@ -3826,7 +3836,7 @@ static inline void perf_event_context_update_hybrid(struct perf_event_context *c
 {
 	struct pmu *pmu = ctx->pmu;
 
-	if (cpumask_empty(&pmu->supported_cpus) || cpumask_test_cpu(smp_processor_id(), &pmu->supported_cpus))
+	if (pmu_can_sched_on_this_cpu(pmu))
 		return;
 
 	rcu_read_lock();
