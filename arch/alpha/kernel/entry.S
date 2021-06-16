@@ -801,13 +801,18 @@ ret_from_fork:
 	.align 4
 	.globl	ret_from_kernel_thread
 	.ent	ret_from_kernel_thread
+	.cfi_startproc
 ret_from_kernel_thread:
 	mov	$17, $16
 	jsr	$26, schedule_tail
+	/* PF_IO_WORKER threads can be ptraced */
+	SAVE_SWITCH_STACK
 	mov	$9, $27
 	mov	$10, $16
 	jsr	$26, ($9)
+	RESTORE_SWITCH_STACK
 	br	$31, ret_to_user
+	.cfi_endproc
 .end ret_from_kernel_thread
 
 
@@ -816,23 +821,28 @@ ret_from_kernel_thread:
  * have to play switch_stack games.
  */
 
-.macro	fork_like name
+.macro	allregs name
 	.align	4
 	.globl	alpha_\name
 	.ent	alpha_\name
+	.cfi_startproc
 alpha_\name:
 	.prologue 0
-	bsr	$1, do_switch_stack
+	SAVE_SWITCH_STACK
 	jsr	$26, sys_\name
-	ldq	$26, 56($sp)
-	lda	$sp, SWITCH_STACK_SIZE($sp)
+	RESTORE_SWITCH_STACK
 	ret
+	.cfi_endproc
 .end	alpha_\name
 .endm
 
-fork_like fork
-fork_like vfork
-fork_like clone
+allregs fork
+allregs vfork
+allregs clone
+allregs exit
+allregs exit_group
+allregs execve
+allregs execveat
 
 .macro	sigreturn_like name
 	.align	4
