@@ -95,6 +95,7 @@ struct intel_context {
 #define CONTEXT_BANNED			6
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	7
 #define CONTEXT_NOPREEMPT		8
+#define CONTEXT_SCHEDULABLE		9  /* Unless banned or non-persistent closed. */
 
 	struct {
 		u64 timeout_us;
