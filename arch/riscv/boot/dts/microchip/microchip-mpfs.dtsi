@@ -25,6 +25,7 @@
 			i-cache-size = <16384>;
 			reg = <0>;
 			riscv,isa = "rv64imac";
+			clocks = <&clkcfg 0>;
 			status = "disabled";
 
 			cpu0_intc: interrupt-controller {
@@ -52,6 +53,7 @@
 			reg = <1>;
 			riscv,isa = "rv64imafdc";
 			tlb-split;
+			clocks = <&clkcfg 0>;
 			status = "okay";
 
 			cpu1_intc: interrupt-controller {
@@ -79,6 +81,7 @@
 			reg = <2>;
 			riscv,isa = "rv64imafdc";
 			tlb-split;
+			clocks = <&clkcfg 0>;
 			status = "okay";
 
 			cpu2_intc: interrupt-controller {
@@ -106,6 +109,7 @@
 			reg = <3>;
 			riscv,isa = "rv64imafdc";
 			tlb-split;
+			clocks = <&clkcfg 0>;
 			status = "okay";
 
 			cpu3_intc: interrupt-controller {
@@ -133,6 +137,7 @@
 			reg = <4>;
 			riscv,isa = "rv64imafdc";
 			tlb-split;
+			clocks = <&clkcfg 0>;
 			status = "okay";
 			cpu4_intc: interrupt-controller {
 				#interrupt-cells = <1>;
