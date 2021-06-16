@@ -50,11 +50,8 @@ static int mvme16x_probe(struct platform_device *dev)
 	}
 
 	hostdata = kzalloc(sizeof(struct NCR_700_Host_Parameters), GFP_KERNEL);
-	if (hostdata == NULL) {
-		printk(KERN_ERR "mvme16x-scsi: "
-				"Failed to allocate host data\n");
+	if (!hostdata)
 		goto out;
-	}
 
 	/* Fill in the required pieces of hostdata */
 	hostdata->base = (void __iomem *)0xfff47000UL;
