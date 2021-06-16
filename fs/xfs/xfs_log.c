@@ -851,7 +851,7 @@ xlog_write_unmount_record(
 		.lv_iovecp = &reg,
 	};
 	LIST_HEAD(lv_chain);
-	INIT_LIST_HEAD(&vec.lv_list);
+
 	list_add(&vec.lv_list, &lv_chain);
 
 	BUILD_BUG_ON((sizeof(struct xlog_op_header) +
@@ -1587,7 +1587,7 @@ xlog_commit_record(
 	};
 	int	error;
 	LIST_HEAD(lv_chain);
-	INIT_LIST_HEAD(&vec.lv_list);
+
 	list_add(&vec.lv_list, &lv_chain);
 
 	if (XLOG_FORCED_SHUTDOWN(log))
