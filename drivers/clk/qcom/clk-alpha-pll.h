@@ -37,6 +37,9 @@ enum {
 	PLL_OFF_OPMODE,
 	PLL_OFF_FRAC,
 	PLL_OFF_CAL_VAL,
+	PLL_OFF_SSC_DELTA_ALPHA,
+	PLL_OFF_SSC_NUM_STEPS,
+	PLL_OFF_SSC_UPDATE_RATE,
 	PLL_OFF_MAX_REGS
 };
 
@@ -157,6 +160,8 @@ void clk_trion_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 void clk_agera_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 				const struct alpha_pll_config *config);
 #define clk_lucid_pll_configure(pll, regmap, config) \
+	clk_trion_pll_configure(pll, regmap, config)
+#define clk_lucid_5lpe_pll_configure(pll, regmap, config) \
 	clk_trion_pll_configure(pll, regmap, config)
 
 
