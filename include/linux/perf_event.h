@@ -301,6 +301,13 @@ struct pmu {
 	unsigned int			nr_addr_filters;
 
 	/*
+	 * For hybrid systems with PERF_PMU_CAP_HETEROGENEOUS_CPUS capability
+	 * @supported_cpus: The supported CPU mask of the current PMU.
+	 *		    Empty means a non-hybrid system or not implemented.
+	 */
+	cpumask_t			supported_cpus;
+
+	/*
 	 * Fully disable/enable this PMU, can be used to protect from the PMI
 	 * as well as for lazy/batch writing of the MSRs.
 	 */

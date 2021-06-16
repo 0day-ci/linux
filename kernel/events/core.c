@@ -3818,11 +3818,38 @@ static void cpu_ctx_sched_in(struct perf_cpu_context *cpuctx,
 	ctx_sched_in(ctx, cpuctx, event_type, task);
 }
 
+/*
+ * Update the ctx->pmu if the new task is scheduled in a CPU
+ * which has a different type of PMU
+ */
+static inline void perf_event_context_update_hybrid(struct perf_event_context *ctx)
+{
+	struct pmu *pmu = ctx->pmu;
+
+	if (cpumask_empty(&pmu->supported_cpus) || cpumask_test_cpu(smp_processor_id(), &pmu->supported_cpus))
+		return;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(pmu, &pmus, entry) {
+		if ((pmu->task_ctx_nr == perf_hw_context) &&
+		    cpumask_test_cpu(smp_processor_id(), &pmu->supported_cpus)) {
+			ctx->pmu = pmu;
+			break;
+		}
+	}
+	rcu_read_unlock();
+	WARN_ON_ONCE(!cpumask_test_cpu(smp_processor_id(), &ctx->pmu->supported_cpus));
+}
+
 static void perf_event_context_sched_in(struct perf_event_context *ctx,
 					struct task_struct *task)
 {
 	struct perf_cpu_context *cpuctx;
-	struct pmu *pmu = ctx->pmu;
+	struct pmu *pmu;
+
+	if (ctx->pmu->capabilities & PERF_PMU_CAP_HETEROGENEOUS_CPUS)
+		perf_event_context_update_hybrid(ctx);
+	pmu = ctx->pmu;
 
 	cpuctx = __get_cpu_context(ctx);
 	if (cpuctx->task_ctx == ctx) {
