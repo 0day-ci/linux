@@ -800,7 +800,8 @@ static int j1939_session_tx_dat(struct j1939_session *session)
 		if (offset + len > se_skb->len) {
 			netdev_err_once(priv->ndev,
 					"%s: 0x%p: requested data outside of queued buffer: offset %i, len %i, pkt.tx: %i\n",
-					__func__, session, skcb->offset, se_skb->len , session->pkt.tx);
+					__func__, session, se_skcb->offset,
+					se_skb->len, session->pkt.tx);
 			return -EOVERFLOW;
 		}
 
@@ -1069,7 +1070,7 @@ j1939_session_deactivate_activate_next(struct j1939_session *session)
 }
 
 static void __j1939_session_cancel(struct j1939_session *session,
-				 enum j1939_xtp_abort err)
+				   enum j1939_xtp_abort err)
 {
 	struct j1939_priv *priv = session->priv;
 
