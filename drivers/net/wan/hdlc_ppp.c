@@ -257,27 +257,25 @@ static void ppp_tx_cp(struct net_device *dev, u16 pid, u8 code,
 }
 
 /* State transition table (compare STD-51)
-   Events                                   Actions
-   TO+  = Timeout with counter > 0          irc = Initialize-Restart-Count
-   TO-  = Timeout with counter expired      zrc = Zero-Restart-Count
-
-   RCR+ = Receive-Configure-Request (Good)  scr = Send-Configure-Request
-   RCR- = Receive-Configure-Request (Bad)
-   RCA  = Receive-Configure-Ack             sca = Send-Configure-Ack
-   RCN  = Receive-Configure-Nak/Rej         scn = Send-Configure-Nak/Rej
-
-   RTR  = Receive-Terminate-Request         str = Send-Terminate-Request
-   RTA  = Receive-Terminate-Ack             sta = Send-Terminate-Ack
-
-   RUC  = Receive-Unknown-Code              scj = Send-Code-Reject
-   RXJ+ = Receive-Code-Reject (permitted)
-       or Receive-Protocol-Reject
-   RXJ- = Receive-Code-Reject (catastrophic)
-       or Receive-Protocol-Reject
-*/
+ * Events                                   Actions
+ * TO+  = Timeout with counter > 0          irc = Initialize-Restart-Count
+ * TO-  = Timeout with counter expired      zrc = Zero-Restart-Count
+ * RCR+ = Receive-Configure-Request (Good)  scr = Send-Configure-Request
+ * RCR- = Receive-Configure-Request (Bad)
+ * RCA  = Receive-Configure-Ack             sca = Send-Configure-Ack
+ * RCN  = Receive-Configure-Nak/Rej         scn = Send-Configure-Nak/Rej
+ * RTR  = Receive-Terminate-Request         str = Send-Terminate-Request
+ * RTA  = Receive-Terminate-Ack             sta = Send-Terminate-Ack
+ * RUC  = Receive-Unknown-Code              scj = Send-Code-Reject
+ * RXJ+ = Receive-Code-Reject (permitted)
+ *     or Receive-Protocol-Reject
+ * RXJ- = Receive-Code-Reject (catastrophic)
+ *     or Receive-Protocol-Reject
+ */
 static int cp_table[EVENTS][STATES] = {
 	/* CLOSED     STOPPED STOPPING REQ_SENT ACK_RECV ACK_SENT OPENED
-	     0           1         2       3       4      5          6    */
+	 *   0           1         2       3       4      5          6
+	 */
 	{IRC|SCR|3,     INV     , INV ,   INV   , INV ,  INV    ,   INV   }, /* START */
 	{   INV   ,      0      ,  0  ,    0    ,  0  ,   0     ,    0    }, /* STOP */
 	{   INV   ,     INV     ,STR|2,  SCR|3  ,SCR|3,  SCR|5  ,   INV   }, /* TO+ */
@@ -294,9 +292,10 @@ static int cp_table[EVENTS][STATES] = {
 };
 
 /* SCA: RCR+ must supply id, len and data
-   SCN: RCR- must supply code, id, len and data
-   STA: RTR must supply id
-   SCJ: RUC must supply CP packet len and data */
+ * SCN: RCR- must supply code, id, len and data
+ * STA: RTR must supply id
+ * SCJ: RUC must supply CP packet len and data
+ */
 static void ppp_cp_event(struct net_device *dev, u16 pid, u16 event, u8 code,
 			 u8 id, unsigned int len, const void *data)
 {
