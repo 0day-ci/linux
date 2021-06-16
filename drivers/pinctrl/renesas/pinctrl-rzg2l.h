@@ -91,4 +91,6 @@ struct rzg2l_pin_soc {
 
 #define RZ_G2L_FN_DESC(id)	{ #id, id##_groups, ARRAY_SIZE(id##_groups) }
 
+extern const struct rzg2l_pin_soc r9a07g044_pinctrl_data;
+
 #endif
