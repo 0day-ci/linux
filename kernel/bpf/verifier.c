@@ -3372,18 +3372,6 @@ static int check_ctx_access(struct bpf_verifier_env *env, int insn_idx, int off,
 	return -EACCES;
 }
 
-static int check_flow_keys_access(struct bpf_verifier_env *env, int off,
-				  int size)
-{
-	if (size < 0 || off < 0 ||
-	    (u64)off + size > sizeof(struct bpf_flow_keys)) {
-		verbose(env, "invalid access to flow keys off=%d size=%d\n",
-			off, size);
-		return -EACCES;
-	}
-	return 0;
-}
-
 static int check_sock_access(struct bpf_verifier_env *env, int insn_idx,
 			     u32 regno, int off, int size,
 			     enum bpf_access_type t)
@@ -4210,6 +4198,8 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 		if (!err && t == BPF_READ && value_regno >= 0)
 			mark_reg_unknown(env, regs, value_regno);
 	} else if (reg->type == PTR_TO_FLOW_KEYS) {
+		struct bpf_insn_access_aux info = {};
+
 		if (t == BPF_WRITE && value_regno >= 0 &&
 		    is_pointer_value(env, value_regno)) {
 			verbose(env, "R%d leaks addr into flow keys\n",
@@ -4217,9 +4207,22 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 			return -EACCES;
 		}
 
-		err = check_flow_keys_access(env, off, size);
-		if (!err && t == BPF_READ && value_regno >= 0)
-			mark_reg_unknown(env, regs, value_regno);
+		err = bpf_flow_keys_is_valid_access(off, size, t, &info);
+		if (err) {
+			verbose(env,
+				"invalid access to flow keys off=%d size=%d\n",
+				off, size);
+		} else if (t == BPF_READ && value_regno >= 0) {
+			if (info.reg_type == PTR_TO_BTF_ID_OR_NULL) {
+				mark_reg_known_zero(env, regs, value_regno);
+				regs[value_regno].type = info.reg_type;
+				regs[value_regno].btf = info.btf;
+				regs[value_regno].btf_id = info.btf_id;
+				regs[value_regno].id = ++env->id_gen;
+			} else {
+				mark_reg_unknown(env, regs, value_regno);
+			}
+		}
 	} else if (type_is_sk_pointer(reg->type)) {
 		if (t == BPF_WRITE) {
 			verbose(env, "R%d cannot write into %s\n",

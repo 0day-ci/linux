@@ -28,6 +28,7 @@
 #include <scsi/fc/fc_fcoe.h>
 #include <uapi/linux/batadv_packet.h>
 #include <linux/bpf.h>
+#include <linux/virtio_net.h>
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_labels.h>
@@ -864,16 +865,38 @@ static void __skb_flow_bpf_to_target(const struct bpf_flow_keys *flow_keys,
 }
 
 bool bpf_flow_dissect(struct bpf_prog *prog, struct bpf_flow_dissector *ctx,
-		      __be16 proto, int nhoff, int hlen, unsigned int flags)
+		      __be16 proto, int nhoff, int hlen, unsigned int flags,
+		      const struct virtio_net_hdr *vhdr,
+		      bool vhdr_is_little_endian)
 {
 	struct bpf_flow_keys *flow_keys = ctx->flow_keys;
 	u32 result;
+
+/* vnet hdr is either machine endian (virtio spec < v1) or le (>= v1) */
+#if defined(__BIG_ENDIAN_BITFIELD)
+	struct virtio_net_hdr vnet_hdr_local;
+
+	if (vhdr && vhdr_is_little_endian) {
+		vnet_hdr_local.flags = vhdr->flags;
+		vnet_hdr_local.gso_type = vhdr->gso_type;
+		vnet_hdr_local.hdr_len = __virtio16_to_cpu(false,
+							   vhdr->hdr_len);
+		vnet_hdr_local.gso_size = __virtio16_to_cpu(false,
+							    vhdr->gso_size);
+		vnet_hdr_local.csum_start = __virtio16_to_cpu(false,
+							      vhdr->csum_start);
+		vnet_hdr_local.csum_offset = __virtio16_to_cpu(false,
+							       vhdr->csum_offset);
+		vhdr = &vnet_hdr_local;
+	}
+#endif
 
 	/* Pass parameters to the BPF program */
 	memset(flow_keys, 0, sizeof(*flow_keys));
 	flow_keys->n_proto = proto;
 	flow_keys->nhoff = nhoff;
 	flow_keys->thoff = flow_keys->nhoff;
+	flow_keys->vhdr = vhdr;
 
 	BUILD_BUG_ON((int)BPF_FLOW_DISSECTOR_F_PARSE_1ST_FRAG !=
 		     (int)FLOW_DISSECTOR_F_PARSE_1ST_FRAG);
@@ -904,6 +927,8 @@ bool bpf_flow_dissect(struct bpf_prog *prog, struct bpf_flow_dissector *ctx,
  * @hlen: packet header length, if @data is NULL use skb_headlen(skb)
  * @flags: flags that control the dissection process, e.g.
  *         FLOW_DISSECTOR_F_STOP_AT_ENCAP.
+ * @vhdr: virtio_net_header to include in kernel context for BPF flow dissector
+ * @vhdr_is_little_endian: whether virtio_net_hdr fields are little endian
  *
  * The function will try to retrieve individual keys into target specified
  * by flow_dissector from either the skbuff or a raw buffer specified by the
@@ -915,7 +940,9 @@ bool __skb_flow_dissect(const struct net *net,
 			const struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
 			void *target_container, const void *data,
-			__be16 proto, int nhoff, int hlen, unsigned int flags)
+			__be16 proto, int nhoff, int hlen, unsigned int flags,
+			const struct virtio_net_hdr *vhdr,
+			bool vhdr_is_little_endian)
 {
 	struct flow_dissector_key_control *key_control;
 	struct flow_dissector_key_basic *key_basic;
@@ -1012,7 +1039,8 @@ bool __skb_flow_dissect(const struct net *net,
 
 			prog = READ_ONCE(run_array->items[0].prog);
 			ret = bpf_flow_dissect(prog, &ctx, n_proto, nhoff,
-					       hlen, flags);
+					       hlen, flags, vhdr,
+					       vhdr_is_little_endian);
 			__skb_flow_bpf_to_target(&flow_keys, flow_dissector,
 						 target_container);
 			rcu_read_unlock();
@@ -1610,7 +1638,7 @@ u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
 	memset(&keys, 0, sizeof(keys));
 	__skb_flow_dissect(NULL, skb, &flow_keys_dissector_symmetric,
 			   &keys, NULL, 0, 0, 0,
-			   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+			   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL, NULL, false);
 
 	return __flow_hash_from_keys(&keys, &hashrnd);
 }

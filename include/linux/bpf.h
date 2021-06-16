@@ -1998,6 +1998,8 @@ u32 bpf_sock_convert_ctx_access(enum bpf_access_type type,
 				struct bpf_insn *insn_buf,
 				struct bpf_prog *prog,
 				u32 *target_size);
+int bpf_flow_keys_is_valid_access(int off, int size, enum bpf_access_type t,
+				  struct bpf_insn_access_aux *info);
 #else
 static inline bool bpf_sock_common_is_valid_access(int off, int size,
 						   enum bpf_access_type type,
@@ -2018,6 +2020,12 @@ static inline u32 bpf_sock_convert_ctx_access(enum bpf_access_type type,
 					      u32 *target_size)
 {
 	return 0;
+}
+static inline int bpf_flow_keys_is_valid_access(int off, int size,
+						enum bpf_access_type t,
+						struct bpf_insn_access_aux *info)
+{
+	return -EINVAL;
 }
 #endif
 
