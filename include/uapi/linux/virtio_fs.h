@@ -8,12 +8,17 @@
 #include <linux/virtio_config.h>
 #include <linux/virtio_types.h>
 
+/* Feature bits */
+#define VIRTIO_FS_F_NOTIFICATION 0	/* Notification queue supported */
+
 struct virtio_fs_config {
 	/* Filesystem name (UTF-8, not NUL-terminated, padded with NULs) */
 	__u8 tag[36];
 
 	/* Number of request queues */
 	__le32 num_request_queues;
+	/* Size of notification buffer */
+	__u32 notify_buf_size;
 } __attribute__((packed));
 
 /* For the id field in virtio_pci_shm_cap */
