@@ -578,8 +578,6 @@ static void delete_gpe_attr_array(void)
 		kfree(counter_attrs);
 	}
 	kfree(all_attrs);
-
-	return;
 }
 
 static void gpe_count(u32 gpe_number)
@@ -594,8 +592,6 @@ static void gpe_count(u32 gpe_number)
 	else
 		all_counters[num_gpes + ACPI_NUM_FIXED_EVENTS +
 			     COUNT_ERROR].count++;
-
-	return;
 }
 
 static void fixed_event_count(u32 event_number)
@@ -608,8 +604,6 @@ static void fixed_event_count(u32 event_number)
 	else
 		all_counters[num_gpes + ACPI_NUM_FIXED_EVENTS +
 			     COUNT_ERROR].count++;
-
-	return;
 }
 
 static void acpi_global_event_handler(u32 event_type, acpi_handle device,
@@ -905,7 +899,6 @@ void acpi_irq_stats_init(void)
 
 fail:
 	delete_gpe_attr_array();
-	return;
 }
 
 static void __exit interrupt_stats_exit(void)
@@ -913,8 +906,6 @@ static void __exit interrupt_stats_exit(void)
 	sysfs_remove_group(acpi_kobj, &interrupt_stats_attr_group);
 
 	delete_gpe_attr_array();
-
-	return;
 }
 
 static ssize_t pm_profile_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
