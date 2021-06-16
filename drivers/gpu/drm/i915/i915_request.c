@@ -61,7 +61,7 @@ static struct i915_global_request {
 
 static const char *i915_fence_get_driver_name(struct dma_fence *fence)
 {
-	return dev_name(to_request(fence)->engine->i915->drm.dev);
+	return DRIVER_NAME;
 }
 
 static const char *i915_fence_get_timeline_name(struct dma_fence *fence)
