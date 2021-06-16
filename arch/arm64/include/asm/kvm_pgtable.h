@@ -44,6 +44,11 @@ typedef u64 kvm_pte_t;
  *			in the current context.
  * @virt_to_phys:	Convert a virtual address mapped in the current context
  *			into a physical address.
+ * @flush_dcache:	Clean data cache for a guest page address range before
+ *			creating the corresponding stage-2 mapping.
+ * @flush_icache:	Invalidate instruction cache for a guest page address
+ *			range before creating or updating the corresponding
+ *			stage-2 mapping.
  */
 struct kvm_pgtable_mm_ops {
 	void*		(*zalloc_page)(void *arg);
@@ -54,6 +59,8 @@ struct kvm_pgtable_mm_ops {
 	int		(*page_count)(void *addr);
 	void*		(*phys_to_virt)(phys_addr_t phys);
 	phys_addr_t	(*virt_to_phys)(void *addr);
+	void		(*flush_dcache)(void *addr, size_t size);
+	void		(*flush_icache)(void *addr, size_t size);
 };
 
 /**
