@@ -45,6 +45,7 @@ struct virtio_fs_vq {
 	struct virtqueue *vq;     /* protected by ->lock */
 	struct work_struct done_work;
 	struct list_head queued_reqs;
+	struct list_head wait_reqs;     /* Requests waiting for notification  */
 	struct list_head end_reqs;	/* End these requests */
 	struct virtio_fs_notify_node *notify_nodes;
 	struct list_head notify_reqs;	/* List for queuing notify requests */
@@ -566,13 +567,74 @@ static int virtio_fs_enqueue_all_notify(struct virtio_fs_vq *fsvq)
 	return 0;
 }
 
+static int notify_complete_waiting_req(struct virtio_fs *vfs,
+				       struct fuse_notify_lock_out *out_args)
+{
+	struct virtio_fs_vq *fsvq = &vfs->vqs[VQ_REQUEST];
+	struct fuse_req *req, *next;
+	bool found = false;
+
+	/* Find waiting request with the unique number and end it */
+	spin_lock(&fsvq->lock);
+		list_for_each_entry_safe(req, next, &fsvq->wait_reqs, list) {
+			if (req->in.h.unique == out_args->unique) {
+				list_del_init(&req->list);
+				clear_bit(FR_SENT, &req->flags);
+				/* Transfer error code from notify */
+				req->out.h.error = out_args->error;
+				found = true;
+				break;
+			}
+		}
+	spin_unlock(&fsvq->lock);
+
+	/*
+	 * TODO: It is possible that some re-ordering happens in notify
+	 * comes before request is complete. Deal with it.
+	 */
+	if (found) {
+		fuse_request_end(req);
+		spin_lock(&fsvq->lock);
+		dec_in_flight_req(fsvq);
+		spin_unlock(&fsvq->lock);
+	} else
+		pr_debug("virtio-fs: Did not find waiting request"
+				" with unique=0x%llx\n", out_args->unique);
+
+	return 0;
+}
+
+static int virtio_fs_handle_notify(struct virtio_fs *vfs,
+				   struct virtio_fs_notify *notify)
+{
+	int ret = 0;
+	struct fuse_out_header *oh = &notify->out_hdr;
+	struct fuse_notify_lock_out *lo;
+
+	/*
+	 * For notifications, oh.unique is 0 and oh->error contains code
+	 * for which notification as arrived.
+	 */
+	switch (oh->error) {
+	case FUSE_NOTIFY_LOCK:
+		lo = (struct fuse_notify_lock_out *) &notify->outarg;
+		notify_complete_waiting_req(vfs, lo);
+		break;
+	default:
+		pr_err("virtio-fs: Unexpected notification %d\n", oh->error);
+	}
+	return ret;
+}
+
 static void virtio_fs_notify_done_work(struct work_struct *work)
 {
 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
 						 done_work);
 	struct virtqueue *vq = fsvq->vq;
+	struct virtio_fs *vfs = vq->vdev->priv;
 	LIST_HEAD(reqs);
 	struct virtio_fs_notify_node *notify, *next;
+	struct fuse_out_header *oh;
 
 	spin_lock(&fsvq->lock);
 	do {
@@ -588,6 +650,10 @@ static void virtio_fs_notify_done_work(struct work_struct *work)
 
 	/* Process notify */
 	list_for_each_entry_safe(notify, next, &reqs, list) {
+		oh = &notify->notify.out_hdr;
+		WARN_ON(oh->unique);
+		/* Handle notification */
+		virtio_fs_handle_notify(vfs, &notify->notify);
 		spin_lock(&fsvq->lock);
 		dec_in_flight_req(fsvq);
 		list_del_init(&notify->list);
@@ -688,6 +754,14 @@ static void virtio_fs_request_complete(struct fuse_req *req,
 	 * TODO verify that server properly follows FUSE protocol
 	 * (oh.uniq, oh.len)
 	 */
+	if (req->out.h.error == 1) {
+		/* Wait for notification to complete request */
+		spin_lock(&fsvq->lock);
+		list_add_tail(&req->list, &fsvq->wait_reqs);
+		spin_unlock(&fsvq->lock);
+		return;
+	}
+
 	args = req->args;
 	copy_args_from_argbuf(args, req);
 
@@ -787,6 +861,7 @@ static int virtio_fs_init_vq(struct virtio_fs *fs, struct virtio_fs_vq *fsvq,
 	strncpy(fsvq->name, name, VQ_NAME_LEN);
 	spin_lock_init(&fsvq->lock);
 	INIT_LIST_HEAD(&fsvq->queued_reqs);
+	INIT_LIST_HEAD(&fsvq->wait_reqs);
 	INIT_LIST_HEAD(&fsvq->end_reqs);
 	INIT_LIST_HEAD(&fsvq->notify_reqs);
 	init_completion(&fsvq->in_flight_zero);
