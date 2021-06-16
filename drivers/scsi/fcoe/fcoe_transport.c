@@ -639,10 +639,8 @@ static int fcoe_add_netdev_mapping(struct net_device *netdev,
 	struct fcoe_netdev_mapping *nm;
 
 	nm = kmalloc(sizeof(*nm), GFP_KERNEL);
-	if (!nm) {
-		printk(KERN_ERR "Unable to allocate netdev_mapping");
+	if (!nm)
 		return -ENOMEM;
-	}
 
 	nm->netdev = netdev;
 	nm->ft = ft;
