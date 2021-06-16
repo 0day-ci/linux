@@ -117,7 +117,13 @@ get_reg_addr(struct task_struct * task, unsigned long regno)
 		zero = 0;
 		addr = &zero;
 	} else {
-		addr = task_stack_page(task) + regoff[regno];
+		int off = regoff[regno];
+		if (WARN_ON_ONCE((off < PT_REG(r0)) &&
+				!test_ti_thread_flag(task_thread_info(task),
+						     TIF_ALLREGS_SAVED)))
+			addr = &zero;
+		else
+			addr = task_stack_page(task) + off;
 	}
 	return addr;
 }
@@ -145,13 +151,16 @@ get_reg(struct task_struct * task, unsigned long regno)
 static int
 put_reg(struct task_struct *task, unsigned long regno, unsigned long data)
 {
+	unsigned long *addr;
 	if (regno == 63) {
 		task_thread_info(task)->ieee_state
 		  = ((task_thread_info(task)->ieee_state & ~IEEE_SW_MASK)
 		     | (data & IEEE_SW_MASK));
 		data = (data & FPCR_DYN_MASK) | ieee_swcr_to_fpcr(data);
 	}
-	*get_reg_addr(task, regno) = data;
+	addr = get_reg_addr(task, regno);
+	if (addr != &zero)
+		*addr = data;
 	return 0;
 }
 

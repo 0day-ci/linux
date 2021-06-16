@@ -174,6 +174,28 @@
 	.cfi_adjust_cfa_offset	-SWITCH_STACK_SIZE
 .endm
 
+.macro	SAVE_SWITCH_STACK
+	DO_SWITCH_STACK
+1:	ldl_l	$1, TI_FLAGS($8)
+	bis	$1, _TIF_ALLREGS_SAVED, $1
+	stl_c	$1, TI_FLAGS($8)
+	beq	$1, 2f
+.subsection 2
+2:	br	1b
+.previous
+.endm
+
+.macro	RESTORE_SWITCH_STACK
+1:	ldl_l	$1, TI_FLAGS($8)
+	bic	$1, _TIF_ALLREGS_SAVED, $1
+	stl_c	$1, TI_FLAGS($8)
+	beq	$1, 2f
+.subsection 2
+2:	br	1b
+.previous
+	UNDO_SWITCH_STACK
+.endm
+
 /*
  * Non-syscall kernel entry points.
  */
@@ -559,9 +581,9 @@ $work_resched:
 
 $work_notifysig:
 	mov	$sp, $16
-	DO_SWITCH_STACK
+	SAVE_SWITCH_STACK
 	jsr	$26, do_work_pending
-	UNDO_SWITCH_STACK
+	RESTORE_SWITCH_STACK
 	br	restore_all
 
 /*
@@ -572,9 +594,9 @@ $work_notifysig:
 	.type	strace, @function
 strace:
 	/* set up signal stack, call syscall_trace */
-	DO_SWITCH_STACK
+	SAVE_SWITCH_STACK
 	jsr	$26, syscall_trace_enter /* returns the syscall number */
-	UNDO_SWITCH_STACK
+	RESTORE_SWITCH_STACK
 
 	/* get the arguments back.. */
 	ldq	$16, SP_OFF+24($sp)
@@ -602,9 +624,9 @@ ret_from_straced:
 $strace_success:
 	stq	$0, 0($sp)		/* save return value */
 
-	DO_SWITCH_STACK
+	SAVE_SWITCH_STACK
 	jsr	$26, syscall_trace_leave
-	UNDO_SWITCH_STACK
+	RESTORE_SWITCH_STACK
 	br	$31, ret_from_sys_call
 
 	.align	3
@@ -618,13 +640,13 @@ $strace_error:
 	stq	$0, 0($sp)
 	stq	$1, 72($sp)	/* a3 for return */
 
-	DO_SWITCH_STACK
+	SAVE_SWITCH_STACK
 	mov	$18, $9		/* save old syscall number */
 	mov	$19, $10	/* save old a3 */
 	jsr	$26, syscall_trace_leave
 	mov	$9, $18
 	mov	$10, $19
-	UNDO_SWITCH_STACK
+	RESTORE_SWITCH_STACK
 
 	mov	$31, $26	/* tell "ret_from_sys_call" we can restart */
 	br	ret_from_sys_call
