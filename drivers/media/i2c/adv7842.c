@@ -85,6 +85,10 @@ struct adv7842_format_info {
 	u8 op_format_sel;
 };
 
+#define EDID_BLOCK_SIZE		128
+#define EDID_MAX_HDMI_BLOCKS	4
+#define EDID_MAX_VGA_BLOCKS	1
+
 struct adv7842_state {
 	struct adv7842_platform_data pdata;
 	struct v4l2_subdev sd;
@@ -98,12 +102,12 @@ struct adv7842_state {
 
 	v4l2_std_id norm;
 	struct {
-		u8 edid[512];
+		u8 edid[EDID_BLOCK_SIZE * EDID_MAX_HDMI_BLOCKS];
 		u32 blocks;
 		u32 present;
 	} hdmi_edid;
 	struct {
-		u8 edid[128];
+		u8 edid[EDID_MAX_VGA_BLOCKS * EDID_MAX_VGA_BLOCKS];
 		u32 blocks;
 		u32 present;
 	} vga_edid;
@@ -732,12 +736,13 @@ static int edid_write_vga_segment(struct v4l2_subdev *sd)
 	/* edid segment pointer '1' for VGA port */
 	rep_write_and_or(sd, 0x77, 0xef, 0x10);
 
-	for (i = 0; !err && i < blocks * 128; i += I2C_SMBUS_BLOCK_MAX)
+	for (i = 0; && i < blocks * EDID_BLOCK_SIZE; i += I2C_SMBUS_BLOCK_MAX) {
 		err = i2c_smbus_write_i2c_block_data(state->i2c_edid, i,
 						     I2C_SMBUS_BLOCK_MAX,
 						     edid + i);
-	if (err)
-		return err;
+		if (err)
+			return err;
+	}
 
 	/* Calculates the checksums and enables I2C access
 	 * to internal EDID ram from VGA DDC port.
@@ -785,7 +790,7 @@ static int edid_write_hdmi_segment(struct v4l2_subdev *sd, u8 port)
 		return 0;
 	}
 
-	pa = v4l2_get_edid_phys_addr(edid, blocks * 128, &spa_loc);
+	pa = v4l2_get_edid_phys_addr(edid, blocks * EDID_BLOCK_SIZE, &spa_loc);
 	err = v4l2_phys_addr_validate(pa, &parent_pa, NULL);
 	if (err)
 		return err;
@@ -800,7 +805,7 @@ static int edid_write_hdmi_segment(struct v4l2_subdev *sd, u8 port)
 	}
 
 
-	for (i = 0; !err && i < blocks * 128; i += I2C_SMBUS_BLOCK_MAX) {
+	for (i = 0; !err && i < blocks * EDID_BLOCK_SIZE; i += I2C_SMBUS_BLOCK_MAX) {
 		/* set edid segment pointer for HDMI ports */
 		if (i % 256 == 0)
 			rep_write_and_or(sd, 0x77, 0xef, i >= 256 ? 0x10 : 0x00);
@@ -2491,7 +2496,9 @@ static int adv7842_get_edid(struct v4l2_subdev *sd, struct v4l2_edid *edid)
 	if (edid->start_block + edid->blocks > blocks)
 		edid->blocks = blocks - edid->start_block;
 
-	memcpy(edid->edid, data + edid->start_block * 128, edid->blocks * 128);
+	memcpy(edid->edid,
+	       data + edid->start_block * EDID_BLOCK_SIZE,
+	       edid->blocks * EDID_BLOCK_SIZE);
 
 	return 0;
 }
@@ -2506,8 +2513,11 @@ static int adv7842_get_edid(struct v4l2_subdev *sd, struct v4l2_edid *edid)
 static int adv7842_set_edid(struct v4l2_subdev *sd, struct v4l2_edid *e)
 {
 	struct adv7842_state *state = to_state(sd);
-	unsigned int max_blocks = e->pad == ADV7842_EDID_PORT_VGA ? 1 : 4;
+	unsigned int max_blocks;
 	int err = 0;
+
+	max_blocks = e->pad == ADV7842_EDID_PORT_VGA ?
+		     EDID_MAX_VGA_BLOCKS  : EDID_MAX_HDMI_BLOCKS;
 
 	memset(e->reserved, 0, sizeof(e->reserved));
 
@@ -2535,7 +2545,7 @@ static int adv7842_set_edid(struct v4l2_subdev *sd, struct v4l2_edid *e)
 		state->vga_edid.blocks = e->blocks;
 		state->vga_edid.present = e->blocks ? 0x1 : 0x0;
 		if (e->blocks)
-			memcpy(&state->vga_edid.edid, e->edid, 128 * e->blocks);
+			memcpy(&state->vga_edid.edid, e->edid, EDID_BLOCK_SIZE);
 		err = edid_write_vga_segment(sd);
 		break;
 	case ADV7842_EDID_PORT_A:
@@ -2544,7 +2554,8 @@ static int adv7842_set_edid(struct v4l2_subdev *sd, struct v4l2_edid *e)
 		state->hdmi_edid.blocks = e->blocks;
 		if (e->blocks) {
 			state->hdmi_edid.present |= 0x04 << e->pad;
-			memcpy(&state->hdmi_edid.edid, e->edid, 128 * e->blocks);
+			memcpy(&state->hdmi_edid.edid, e->edid,
+			       EDID_BLOCK_SIZE * e->blocks);
 		} else {
 			state->hdmi_edid.present &= ~(0x04 << e->pad);
 			adv7842_s_detect_tx_5v_ctrl(sd);
