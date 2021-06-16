@@ -831,6 +831,7 @@ int afs_fsync(struct file *file, loff_t start, loff_t end, int datasync)
  */
 vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 {
+	vm_fault_t ret = VM_FAULT_RETRY;
 	struct page *page = thp_head(vmf->page);
 	struct file *file = vmf->vma->vm_file;
 	struct inode *inode = file_inode(file);
@@ -847,14 +848,14 @@ vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 #ifdef CONFIG_AFS_FSCACHE
 	if (PageFsCache(page) &&
 	    wait_on_page_fscache_killable(page) < 0)
-		return VM_FAULT_RETRY;
+		goto out;
 #endif
 
 	if (wait_on_page_writeback_killable(page))
-		return VM_FAULT_RETRY;
+		goto out;
 
 	if (lock_page_killable(page) < 0)
-		return VM_FAULT_RETRY;
+		goto out;
 
 	/* We mustn't change page->private until writeback is complete as that
 	 * details the portion of the page we need to write back and we might
@@ -862,7 +863,7 @@ vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 	 */
 	if (wait_on_page_writeback_killable(page) < 0) {
 		unlock_page(page);
-		return VM_FAULT_RETRY;
+		goto out;
 	}
 
 	priv = afs_page_dirty(page, 0, thp_size(page));
@@ -876,8 +877,10 @@ vm_fault_t afs_page_mkwrite(struct vm_fault *vmf)
 	}
 	file_update_time(file);
 
+	ret = VM_FAULT_LOCKED;
+out:
 	sb_end_pagefault(inode->i_sb);
-	return VM_FAULT_LOCKED;
+	return ret;
 }
 
 /*
