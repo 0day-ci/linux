@@ -1670,7 +1670,14 @@ static bool sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	else if (!cmd->data && cmd->busy_timeout > 9000)
 		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
 	else
-		timeout += 10 * HZ;
+	       /*
+		* In some of the conditions hardware data timeout value could be
+		* approx 21.5 seconds and driver is setting software data timeout
+		* value less than the hardware data timeout value and software data
+		* timeout value should be more than the hardware data timeout value.
+		* So, set software data timeout value more than 21.5 sec i.e. 22sec.
+		*/
+		timeout += 22 * HZ;
 	sdhci_mod_timer(host, cmd->mrq, timeout);
 
 	if (host->use_external_dma)
