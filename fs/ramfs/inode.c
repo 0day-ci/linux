@@ -106,6 +106,8 @@ ramfs_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 {
 	struct inode * inode = ramfs_get_inode(dir->i_sb, dir, mode, dev);
 	int error = -ENOSPC;
+	if (dentry->d_inode)
+		return -EEXIST;
 
 	if (inode) {
 		d_instantiate(dentry, inode);
