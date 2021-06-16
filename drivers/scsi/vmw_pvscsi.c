@@ -1298,10 +1298,8 @@ static u32 pvscsi_get_max_targets(struct pvscsi_adapter *adapter)
 	dev = pvscsi_dev(adapter);
 	config_page = dma_alloc_coherent(&adapter->dev->dev, PAGE_SIZE,
 			&configPagePA, GFP_KERNEL);
-	if (!config_page) {
-		dev_warn(dev, "vmw_pvscsi: failed to allocate memory for config page\n");
+	if (!config_page)
 		goto exit;
-	}
 	BUG_ON(configPagePA & ~PAGE_MASK);
 
 	/* Fetch config info from the device. */
@@ -1473,7 +1471,6 @@ static int pvscsi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	adapter->cmd_map = kcalloc(adapter->req_depth,
 				   sizeof(struct pvscsi_ctx), GFP_KERNEL);
 	if (!adapter->cmd_map) {
-		printk(KERN_ERR "vmw_pvscsi: failed to allocate memory.\n");
 		error = -ENOMEM;
 		goto out_reset_adapter;
 	}
