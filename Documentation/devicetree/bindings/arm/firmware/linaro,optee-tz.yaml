@@ -24,6 +24,9 @@ properties:
             for the reference implementation maintained by Linaro.
           const: linaro,optee-tz
 
+  interrupts:
+    maxItems: 1
+
   method:
     description: The method of calling the OP-TEE Trusted OS.
     $ref: /schemas/types.yaml#/definitions/string-array
@@ -37,6 +40,10 @@ properties:
           in drivers/tee/optee/optee_smc.h
         const: hvc
 
+required:
+  - compatible
+  - method
+
 additionalProperties: false
 
 examples:
@@ -45,5 +52,6 @@ examples:
       optee {
         compatible = "linaro,optee-tz";
         method = "smc";
+        interrupts = <0 187 4>;
       };
     };
