@@ -1842,7 +1842,7 @@ static void __hrtimer_init_sleeper(struct hrtimer_sleeper *sl,
 	 */
 	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
 		if (task_is_realtime(current) && !(mode & HRTIMER_MODE_SOFT))
-			mode |= HRTIMER_MODE_HARD;
+			mode |= HRTIMER_MODE_PINNED_HARD;
 	}
 
 	__hrtimer_init(&sl->timer, clock_id, mode);
