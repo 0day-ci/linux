@@ -34,8 +34,8 @@
 
 enum {IDX_LCP = 0, IDX_IPCP, IDX_IPV6CP, IDX_COUNT};
 enum {CP_CONF_REQ = 1, CP_CONF_ACK, CP_CONF_NAK, CP_CONF_REJ, CP_TERM_REQ,
-      CP_TERM_ACK, CP_CODE_REJ, LCP_PROTO_REJ, LCP_ECHO_REQ, LCP_ECHO_REPLY,
-      LCP_DISC_REQ, CP_CODES};
+	CP_TERM_ACK, CP_CODE_REJ, LCP_PROTO_REJ, LCP_ECHO_REQ, LCP_ECHO_REPLY,
+	LCP_DISC_REQ, CP_CODES};
 #if DEBUG_CP
 static const char *const code_names[CP_CODES] = {
 	"0", "ConfReq", "ConfAck", "ConfNak", "ConfRej", "TermReq",
@@ -80,11 +80,11 @@ struct ppp {
 };
 
 enum {CLOSED = 0, STOPPED, STOPPING, REQ_SENT, ACK_RECV, ACK_SENT, OPENED,
-      STATES, STATE_MASK = 0xF};
+	STATES, STATE_MASK = 0xF};
 enum {START = 0, STOP, TO_GOOD, TO_BAD, RCR_GOOD, RCR_BAD, RCA, RCN, RTR, RTA,
-      RUC, RXJ_GOOD, RXJ_BAD, EVENTS};
+	RUC, RXJ_GOOD, RXJ_BAD, EVENTS};
 enum {INV = 0x10, IRC = 0x20, ZRC = 0x40, SCR = 0x80, SCA = 0x100,
-      SCN = 0x200, STR = 0x400, STA = 0x800, SCJ = 0x1000};
+	SCN = 0x200, STR = 0x400, STA = 0x800, SCJ = 0x1000};
 
 #if DEBUG_STATE
 static const char *const state_names[STATES] = {
