@@ -1254,6 +1254,7 @@ static int snd_fm801_create(struct snd_card *card,
 				IRQF_SHARED, KBUILD_MODNAME, chip)) {
 			dev_err(card->dev, "unable to grab IRQ %d\n", pci->irq);
 			snd_fm801_free(chip);
+			pci_release_regions(pci);
 			return -EBUSY;
 		}
 		chip->irq = pci->irq;
@@ -1266,6 +1267,7 @@ static int snd_fm801_create(struct snd_card *card,
 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
 	if (err < 0) {
 		snd_fm801_free(chip);
+		pci_release_regions(pci);
 		return err;
 	}
 
@@ -1273,6 +1275,7 @@ static int snd_fm801_create(struct snd_card *card,
 	err = v4l2_device_register(&pci->dev, &chip->v4l2_dev);
 	if (err < 0) {
 		snd_fm801_free(chip);
+		pci_release_regions(pci);
 		return err;
 	}
 	chip->tea.v4l2_dev = &chip->v4l2_dev;
@@ -1285,6 +1288,7 @@ static int snd_fm801_create(struct snd_card *card,
 		if (snd_tea575x_init(&chip->tea, THIS_MODULE)) {
 			dev_err(card->dev, "TEA575x radio not found\n");
 			snd_fm801_free(chip);
+			pci_release_regions(pci);
 			return -ENODEV;
 		}
 	} else if ((chip->tea575x_tuner & TUNER_TYPE_MASK) == 0) {
