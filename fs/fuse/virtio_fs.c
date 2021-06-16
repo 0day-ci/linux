@@ -61,6 +61,7 @@ struct virtio_fs {
 	unsigned int nvqs;               /* number of virtqueues */
 	unsigned int num_request_queues; /* number of request queues */
 	struct dax_device *dax_dev;
+	unsigned int first_reqq_idx;     /* First request queue idx */
 
 	/* DAX memory window where file contents are mapped */
 	void *window_kaddr;
@@ -681,7 +682,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 	if (fs->num_request_queues == 0)
 		return -EINVAL;
 
-	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
+	/* One hiprio queue and rest are request queues */
+	fs->nvqs = 1 + fs->num_request_queues;
+	fs->first_reqq_idx = 1;
 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
 	if (!fs->vqs)
 		return -ENOMEM;
@@ -701,10 +704,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 	names[VQ_HIPRIO] = fs->vqs[VQ_HIPRIO].name;
 
 	/* Initialize the requests virtqueues */
-	for (i = VQ_REQUEST; i < fs->nvqs; i++) {
+	for (i = fs->first_reqq_idx; i < fs->nvqs; i++) {
 		char vq_name[VQ_NAME_LEN];
 
-		snprintf(vq_name, VQ_NAME_LEN, "requests.%u", i - VQ_REQUEST);
+		snprintf(vq_name, VQ_NAME_LEN, "requests.%u",
+			 i - fs->first_reqq_idx);
 		virtio_fs_init_vq(&fs->vqs[i], vq_name, VQ_REQUEST);
 		callbacks[i] = virtio_fs_vq_done;
 		names[i] = fs->vqs[i].name;
@@ -1225,7 +1229,7 @@ out:
 static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
 __releases(fiq->lock)
 {
-	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
+	unsigned int queue_id;
 	struct virtio_fs *fs;
 	struct fuse_req *req;
 	struct virtio_fs_vq *fsvq;
@@ -1239,6 +1243,7 @@ __releases(fiq->lock)
 	spin_unlock(&fiq->lock);
 
 	fs = fiq->priv;
+	queue_id = fs->first_reqq_idx;
 
 	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
 		  __func__, req->in.h.opcode, req->in.h.unique,
@@ -1316,7 +1321,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
 
 	err = -ENOMEM;
 	/* Allocate fuse_dev for hiprio and notification queues */
-	for (i = 0; i < fs->nvqs; i++) {
+	for (i = 0; i < fs->first_reqq_idx; i++) {
 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
 
 		fsvq->fud = fuse_dev_alloc();
@@ -1325,7 +1330,7 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
 	}
 
 	/* virtiofs allocates and installs its own fuse devices */
-	ctx->fudptr = NULL;
+	ctx->fudptr = (void **)&fs->vqs[fs->first_reqq_idx].fud;
 	if (ctx->dax) {
 		if (!fs->dax_dev) {
 			err = -EINVAL;
@@ -1339,8 +1344,13 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
 	if (err < 0)
 		goto err_free_fuse_devs;
 
+	fc = fs->vqs[fs->first_reqq_idx].fud->fc;
+
 	for (i = 0; i < fs->nvqs; i++) {
 		struct virtio_fs_vq *fsvq = &fs->vqs[i];
+
+		if (i == fs->first_reqq_idx)
+			continue;
 
 		fuse_dev_install(fsvq->fud, fc);
 	}
