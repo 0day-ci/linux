@@ -1123,19 +1123,15 @@ static int inia100_probe_one(struct pci_dev *pdev,
 	sz = ORC_MAXQUEUE * sizeof(struct orc_scb);
 	host->scb_virt = dma_alloc_coherent(&pdev->dev, sz, &host->scb_phys,
 					    GFP_KERNEL);
-	if (!host->scb_virt) {
-		printk("inia100: SCB memory allocation error\n");
+	if (!host->scb_virt)
 		goto out_host_put;
-	}
 
 	/* Get total memory needed for ESCB */
 	sz = ORC_MAXQUEUE * sizeof(struct orc_extended_scb);
 	host->escb_virt = dma_alloc_coherent(&pdev->dev, sz, &host->escb_phys,
 					     GFP_KERNEL);
-	if (!host->escb_virt) {
-		printk("inia100: ESCB memory allocation error\n");
+	if (!host->escb_virt)
 		goto out_free_scb_array;
-	}
 
 	if (init_orchid(host)) {	/* Initialize orchid chip */
 		printk("inia100: initial orchid fail!!\n");
