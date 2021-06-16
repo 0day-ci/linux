@@ -7,7 +7,6 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/component.h>
-#include <sound/soc.h>
 #include <linux/pm_runtime.h>
 #include <linux/irqdomain.h>
 #include <linux/of.h>
