@@ -3613,7 +3613,7 @@ xlog_verify_iclog(
 		if (field_offset & 0x1ff) {
 			clientid = ophead->oh_clientid;
 		} else {
-			idx = BTOBBT((char *)&ophead->oh_clientid - iclog->ic_datap);
+			idx = BTOBBT((void *)&ophead->oh_clientid - iclog->ic_datap);
 			if (idx >= (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
 				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);

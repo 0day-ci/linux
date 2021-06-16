@@ -185,7 +185,7 @@ typedef struct xlog_in_core {
 	u32			ic_offset;
 	enum xlog_iclog_state	ic_state;
 	unsigned int		ic_flags;
-	char			*ic_datap;	/* pointer to iclog data */
+	void			*ic_datap;	/* pointer to iclog data */
 
 	/* Callback structures need their own cacheline */
 	spinlock_t		ic_callback_lock ____cacheline_aligned_in_smp;
