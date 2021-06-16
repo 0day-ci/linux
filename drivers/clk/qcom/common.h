@@ -29,6 +29,7 @@ struct qcom_cc_desc {
 	size_t num_gdscs;
 	struct clk_hw **clk_hws;
 	size_t num_clk_hws;
+	struct icc_path *path;
 };
 
 /**
@@ -63,5 +64,10 @@ extern int qcom_cc_probe(struct platform_device *pdev,
 			 const struct qcom_cc_desc *desc);
 extern int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 				  const struct qcom_cc_desc *desc);
+
+int qcom_cc_runtime_init(struct platform_device *pdev,
+			 struct qcom_cc_desc *desc);
+int qcom_cc_runtime_suspend(struct device *dev);
+int qcom_cc_runtime_resume(struct device *dev);
 
 #endif
