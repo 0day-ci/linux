@@ -938,6 +938,12 @@ fully_established:
 	return true;
 
 reset:
+	/* If a subflow is reset, the packet should not continue to be
+	 * processed in tcp_data_queue(), so setting: end_seq = seq,
+	 * then tcp_data_queue() will drop the packet.
+	 */
+	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq;
+
 	mptcp_subflow_reset(ssk);
 	return false;
 }
