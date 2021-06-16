@@ -2138,6 +2138,44 @@ xlog_write_iovec(
 }
 
 /*
+ * Write a whole log vector into a single iclog which is guaranteed to have
+ * either sufficient space for the entire log vector chain to be written or
+ * exclusive access to the remaining space in the iclog.
+ *
+ * Return the number of iovecs and data written into the iclog.
+ */
+static void
+xlog_write_full(
+	struct xfs_log_vec	*lv,
+	struct xlog_ticket	*ticket,
+	struct xlog_in_core	*iclog,
+	uint32_t		*log_offset,
+	uint32_t		*len,
+	uint32_t		*record_cnt,
+	uint32_t		*data_cnt)
+{
+	int			i;
+
+	ASSERT(*log_offset + *len <= iclog->ic_size ||
+		iclog->ic_state == XLOG_STATE_WANT_SYNC);
+
+	/*
+	 * Ordered log vectors have no regions to write so this loop will
+	 * naturally skip them.
+	 */
+	for (i = 0; i < lv->lv_niovecs; i++) {
+		struct xfs_log_iovec	*reg = &lv->lv_iovecp[i];
+		struct xlog_op_header	*ophdr = reg->i_addr;
+
+		ophdr->oh_tid = cpu_to_be32(ticket->t_tid);
+		ophdr->oh_len =
+			cpu_to_be32(reg->i_len - sizeof(struct xlog_op_header));
+		xlog_write_iovec(iclog, log_offset, reg->i_addr, reg->i_len,
+				 len, record_cnt, data_cnt);
+	}
+}
+
+/*
  * Write whole log vectors into a single iclog which is guaranteed to have
  * either sufficient space for the entire log vector chain to be written or
  * exclusive access to the remaining space in the iclog.
@@ -2158,10 +2196,6 @@ xlog_write_single(
 	uint32_t		*data_cnt)
 {
 	struct xfs_log_vec	*lv;
-	int			index;
-
-	ASSERT(*log_offset + *len <= iclog->ic_size ||
-		iclog->ic_state == XLOG_STATE_WANT_SYNC);
 
 	for (lv = log_vector;
 	     !list_entry_is_head(lv, lv_chain, lv_list);
@@ -2173,23 +2207,8 @@ xlog_write_single(
 		if (lv->lv_niovecs &&
 		    lv->lv_bytes > iclog->ic_size - *log_offset)
 			break;
-
-		/*
-		 * Ordered log vectors have no regions to write so this
-		 * loop will naturally skip them.
-		 */
-		for (index = 0; index < lv->lv_niovecs; index++) {
-			struct xfs_log_iovec	*reg = &lv->lv_iovecp[index];
-			struct xlog_op_header	*ophdr = reg->i_addr;
-
-			ophdr->oh_tid = cpu_to_be32(ticket->t_tid);
-			ophdr->oh_len = cpu_to_be32(reg->i_len -
-						sizeof(struct xlog_op_header));
-
-			xlog_write_iovec(iclog, log_offset, reg->i_addr,
-					 reg->i_len, len, record_cnt,
-					 data_cnt);
-		}
+		xlog_write_full(lv, ticket, iclog, log_offset, len, record_cnt,
+				data_cnt);
 	}
 	if (list_entry_is_head(lv, lv_chain, lv_list))
 		lv = NULL;
