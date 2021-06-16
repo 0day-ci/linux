@@ -2684,11 +2684,17 @@ core_initcall(iommu_init);
 
 int iommu_enable_nesting(struct iommu_domain *domain)
 {
+	int ret;
+
 	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
 		return -EINVAL;
 	if (!domain->ops->enable_nesting)
 		return -EINVAL;
-	return domain->ops->enable_nesting(domain);
+	ret = domain->ops->enable_nesting(domain);
+	if (!ret)
+		domain->nested = 1;
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(iommu_enable_nesting);
 
