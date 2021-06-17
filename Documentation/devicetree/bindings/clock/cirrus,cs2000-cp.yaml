@@ -22,14 +22,15 @@ properties:
 
   clocks:
     description:
-      Common clock binding for CLK_IN, XTI/REF_CLK
-    minItems: 2
+      Common clock binding for XTI/REF_CLK, CLK_IN.
+      CLK_IN is optional and only used in dynamic mode.
+    minItems: 1
     maxItems: 2
 
   clock-names:
     items:
-      - const: clk_in
       - const: ref_clk
+      - const: clk_in
 
   '#clock-cells':
     const: 0
@@ -70,8 +71,8 @@ examples:
         #clock-cells = <0>;
         compatible = "cirrus,cs2000-cp";
         reg = <0x4f>;
-        clocks = <&rcar_sound 0>, <&x12_clk>;
-        clock-names = "clk_in", "ref_clk";
+        clocks = <&x12_clk>, <&rcar_sound 0>;
+        clock-names = "ref_clk", "clk_in";
         cirrus,aux-output-source = <CS2000CP_AUX_OUTPUT_CLK_OUT>;
       };
     };
