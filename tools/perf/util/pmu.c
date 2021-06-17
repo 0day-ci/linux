@@ -1872,3 +1872,26 @@ bool perf_pmu__has_hybrid(void)
 
 	return !list_empty(&perf_pmu__hybrid_pmus);
 }
+
+bool perf_pmu__cpus_matched(struct perf_pmu *pmu, struct perf_cpu_map *cpus,
+			    bool *exact_match)
+{
+	struct perf_cpu_map *pmu_cpus = pmu->cpus;
+	int cpu;
+
+	*exact_match = false;
+
+	for (int i = 0; i < cpus->nr; i++) {
+		cpu = perf_cpu_map__idx(pmu_cpus, cpus->map[i]);
+		if (cpu == -1) {
+			pr_err("'%s' doesn't have cpu %d\n",
+			       pmu->name, cpus->map[i]);
+			return false;
+		}
+	}
+
+	if (cpus->nr == pmu_cpus->nr)
+		*exact_match = true;
+
+	return true;
+}

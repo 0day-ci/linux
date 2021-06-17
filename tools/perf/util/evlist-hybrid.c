@@ -86,3 +86,46 @@ bool evlist__has_hybrid(struct evlist *evlist)
 
 	return false;
 }
+
+int evlist__use_cpu_list(struct evlist *evlist, const char *cpu_list)
+{
+	struct perf_cpu_map *cpus;
+	struct evsel *evsel;
+	struct perf_pmu *pmu;
+	int ret;
+
+	if (!perf_pmu__has_hybrid() || !cpu_list)
+		return 0;
+
+	cpus = perf_cpu_map__new(cpu_list);
+	if (!cpus)
+		return -1;
+
+	evlist__for_each_entry(evlist, evsel) {
+		bool exact_match;
+
+		pmu = perf_pmu__find_hybrid_pmu(evsel->pmu_name);
+		if (!pmu)
+			continue;
+
+		if (!perf_pmu__cpus_matched(pmu, cpus, &exact_match)) {
+			ret = -1;
+			goto out;
+		}
+
+		if (!exact_match) {
+			/*
+			 * Use the cpus in cpu_list.
+			 */
+			perf_cpu_map__put(evsel->core.cpus);
+			perf_cpu_map__put(evsel->core.own_cpus);
+			evsel->core.cpus = perf_cpu_map__get(cpus);
+			evsel->core.own_cpus = perf_cpu_map__get(cpus);
+		}
+	}
+
+	ret = 0;
+out:
+	perf_cpu_map__put(cpus);
+	return ret;
+}
