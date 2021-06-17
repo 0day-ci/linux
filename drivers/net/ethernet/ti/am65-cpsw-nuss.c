@@ -346,12 +346,20 @@ static void am65_cpsw_nuss_ndo_host_tx_timeout(struct net_device *ndev,
 	tx_chn = &common->tx_chns[txqueue];
 	trans_start = netif_txq->trans_start;
 
+#ifdef CONFIG_BQL
 	netdev_err(ndev, "txq:%d DRV_XOFF:%d tmo:%u dql_avail:%d free_desc:%zu\n",
 		   txqueue,
 		   netif_tx_queue_stopped(netif_txq),
 		   jiffies_to_msecs(jiffies - trans_start),
 		   dql_avail(&netif_txq->dql),
 		   k3_cppi_desc_pool_avail(tx_chn->desc_pool));
+#else
+	netdev_err(ndev, "txq:%d DRV_XOFF:%d tmo:%u free_desc:%zu\n",
+		   txqueue,
+		   netif_tx_queue_stopped(netif_txq),
+		   jiffies_to_msecs(jiffies - trans_start),
+		   k3_cppi_desc_pool_avail(tx_chn->desc_pool));
+#endif
 
 	if (netif_tx_queue_stopped(netif_txq)) {
 		/* try recover if stopped by us */
