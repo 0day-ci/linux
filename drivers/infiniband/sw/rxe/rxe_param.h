@@ -76,7 +76,7 @@ enum rxe_device_param {
 	RXE_MAX_PKEYS			= 1,
 	RXE_LOCAL_CA_ACK_DELAY		= 15,
 
-	RXE_MAX_UCONTEXT		= 512,
+	RXE_MAX_UCONTEXT		= 17408,
 
 	RXE_NUM_PORT			= 1,
 
