@@ -173,10 +173,42 @@ static int phy_meson8b_usb2_exit(struct phy *phy)
 	return 0;
 }
 
-static int phy_meson8b_usb2_power_on(struct phy *phy)
+static int phy_meson8b_usb2_setmode(struct phy *phy, enum phy_mode mode,
+				    int submode)
 {
 	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
 	u32 reg;
+
+	switch (mode) {
+	case PHY_MODE_USB_HOST:
+		if (priv->match->host_enable_aca) {
+			regmap_update_bits(priv->regmap, REG_ADP_BC,
+					   REG_ADP_BC_ACA_ENABLE,
+					   REG_ADP_BC_ACA_ENABLE);
+
+			udelay(ACA_ENABLE_COMPLETE_TIME);
+
+			regmap_read(priv->regmap, REG_ADP_BC, &reg);
+			if (reg & REG_ADP_BC_ACA_PIN_FLOAT) {
+				dev_warn(&phy->dev, "USB ID detect failed!\n");
+				return -EINVAL;
+			}
+		}
+		break;
+	default:
+		dev_warn(&phy->dev, "USB ID detect failed to setnode! %d\n", mode);
+		return -EINVAL;
+	}
+
+	priv->dr_mode = mode;
+
+	return 0;
+}
+
+static int phy_meson8b_usb2_power_on(struct phy *phy)
+{
+	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+	int ret;
 
 	regmap_update_bits(priv->regmap, REG_CONFIG, REG_CONFIG_CLK_32k_ALTSEL,
 			   REG_CONFIG_CLK_32k_ALTSEL);
@@ -197,24 +229,12 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 	regmap_update_bits(priv->regmap, REG_CTRL, REG_CTRL_SOF_TOGGLE_OUT,
 			   REG_CTRL_SOF_TOGGLE_OUT);
 
-	if (priv->dr_mode == USB_DR_MODE_HOST) {
-		regmap_update_bits(priv->regmap, REG_DBG_UART,
-				   REG_DBG_UART_SET_IDDQ, 0);
-
-		if (priv->match->host_enable_aca) {
-			regmap_update_bits(priv->regmap, REG_ADP_BC,
-					   REG_ADP_BC_ACA_ENABLE,
-					   REG_ADP_BC_ACA_ENABLE);
-
-			udelay(ACA_ENABLE_COMPLETE_TIME);
-
-			regmap_read(priv->regmap, REG_ADP_BC, &reg);
-			if (reg & REG_ADP_BC_ACA_PIN_FLOAT) {
-				dev_warn(&phy->dev, "USB ID detect failed!\n");
-				clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
-				return -EINVAL;
-			}
-		}
+	ret = phy_meson8b_usb2_setmode(phy, priv->dr_mode, 0);
+	if (ret) {
+		phy_meson8b_usb2_power_off(phy);
+		dev_err(&phy->dev, "Failed to initialize PHY with mode %d\n",
+			priv->dr_mode);
+		return ret;
 	}
 
 	return 0;
@@ -238,6 +258,7 @@ static const struct phy_ops phy_meson8b_usb2_ops = {
 	.exit           = phy_meson8b_usb2_exit,
 	.power_on	= phy_meson8b_usb2_power_on,
 	.power_off	= phy_meson8b_usb2_power_off,
+	.set_mode	= phy_meson8b_usb2_setmode,
 	.owner		= THIS_MODULE,
 };
 
@@ -260,6 +281,9 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
 	priv->match = device_get_match_data(&pdev->dev);
 	if (!priv->match)
 		return -ENODEV;
+
+	/* start in host mode */
+	priv->dr_mode = PHY_MODE_USB_HOST;
 
 	priv->regmap = devm_regmap_init_mmio(&pdev->dev, base,
 					     &phy_meson8b_usb2_regmap_conf);
