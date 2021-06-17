@@ -674,10 +674,14 @@ config MFD_INTEL_PMC_BXT
 	  Register and P-unit access. In addition this creates devices
 	  for iTCO watchdog and telemetry that are part of the PMC.
 
+config MFD_INTEL_EXTENDED_CAPS
+	tristate
+
 config MFD_INTEL_PMT
 	tristate "Intel Platform Monitoring Technology (PMT) support"
 	depends on PCI
 	select MFD_CORE
+	select MFD_INTEL_EXTENDED_CAPS
 	help
 	  The Intel Platform Monitoring Technology (PMT) is an interface that
 	  provides access to hardware monitor registers. This driver supports
