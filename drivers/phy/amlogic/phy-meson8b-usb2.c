@@ -142,10 +142,9 @@ static const struct regmap_config phy_meson8b_usb2_regmap_conf = {
 	.max_register = REG_TUNE,
 };
 
-static int phy_meson8b_usb2_power_on(struct phy *phy)
+static int phy_meson8b_usb2_init(struct phy *phy)
 {
 	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
-	u32 reg;
 	int ret;
 
 	if (!IS_ERR_OR_NULL(priv->reset)) {
@@ -161,6 +160,14 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 		dev_err(&phy->dev, "Failed to enable USB clock\n");
 		return ret;
 	}
+
+	return 0;
+}
+
+static int phy_meson8b_usb2_power_on(struct phy *phy)
+{
+	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+	u32 reg;
 
 	regmap_update_bits(priv->regmap, REG_CONFIG, REG_CONFIG_CLK_32k_ALTSEL,
 			   REG_CONFIG_CLK_32k_ALTSEL);
@@ -219,6 +226,7 @@ static int phy_meson8b_usb2_power_off(struct phy *phy)
 }
 
 static const struct phy_ops phy_meson8b_usb2_ops = {
+	.init           = phy_meson8b_usb2_init,
 	.power_on	= phy_meson8b_usb2_power_on,
 	.power_off	= phy_meson8b_usb2_power_off,
 	.owner		= THIS_MODULE,
