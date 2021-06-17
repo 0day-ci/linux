@@ -28,3 +28,8 @@ handle which encodes actual location of the allocated object.
 Keeping effective compression ratio close to zsmalloc's, z3fold doesn't
 depend on MMU enabled and provides more predictable reclaim behavior
 which makes it a better fit for small and response-critical systems.
+
+Functions and structures
+========================
+
+.. kernel-doc:: mm/z3fold.c

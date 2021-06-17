@@ -80,3 +80,10 @@ Similarly, we assign zspage to:
 * ZS_ALMOST_FULL  when n > N / f
 * ZS_EMPTY        when n == 0
 * ZS_FULL         when n == N
+
+Functions and structures
+========================
+
+.. kernel-doc:: mm/zsmalloc.c
+.. kernel-doc:: mm/zbud.c
+.. kernel-doc:: mm/zpool.c
