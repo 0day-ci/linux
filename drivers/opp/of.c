@@ -197,10 +197,8 @@ static void _opp_table_alloc_required_tables(struct opp_table *opp_table,
 		required_opp_tables[i] = _find_table_of_opp_np(required_np);
 		of_node_put(required_np);
 
-		if (IS_ERR(required_opp_tables[i])) {
+		if (IS_ERR(required_opp_tables[i]))
 			lazy = true;
-			continue;
-		}
 	}
 
 	/* Let's do the linking later on */
