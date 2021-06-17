@@ -398,6 +398,9 @@ static int j1939_sk_init(struct sock *sk)
 	atomic_set(&jsk->skb_pending, 0);
 	spin_lock_init(&jsk->sk_session_queue_lock);
 	INIT_LIST_HEAD(&jsk->sk_session_queue);
+
+	sock_set_flag(sk, SOCK_RCU_FREE);
+	/* j1939_sk_sock_destruct() depends on SOCK_RCU_FREE flag */
 	sk->sk_destruct = j1939_sk_sock_destruct;
 	sk->sk_protocol = CAN_J1939;
 
