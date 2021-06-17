@@ -199,11 +199,7 @@ rzg2l_cpg_pll_clk_register(const struct cpg_core_clk *core,
 	pll_clk->priv = priv;
 	pll_clk->type = core->type;
 
-	clk = clk_register(NULL, &pll_clk->hw);
-	if (IS_ERR(clk))
-		kfree(pll_clk);
-
-	return clk;
+	return clk_register(NULL, &pll_clk->hw);
 }
 
 static struct clk
@@ -473,7 +469,6 @@ rzg2l_cpg_register_mod_clk(const struct rzg2l_mod_clk *mod,
 fail:
 	dev_err(dev, "Failed to register %s clock %s: %ld\n", "module",
 		mod->name, PTR_ERR(clk));
-	kfree(clock);
 }
 
 #define rcdev_to_priv(x)	container_of(x, struct rzg2l_cpg_priv, rcdev)
