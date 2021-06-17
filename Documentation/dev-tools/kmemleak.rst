@@ -38,6 +38,9 @@ Note that the orphan objects are listed in the order they were allocated
 and one object at the beginning of the list may cause other subsequent
 objects to be reported as orphan.
 
+If you are triggering a manual memory scan, you might need to do it at least
+twice before kmemleak reports an orphan object.
+
 Memory scanning parameters can be modified at run-time by writing to the
 ``/sys/kernel/debug/kmemleak`` file. The following parameters are supported:
 
@@ -235,7 +238,7 @@ enabled. Load the module and perform a scan with::
         # modprobe kmemleak-test
         # echo scan > /sys/kernel/debug/kmemleak
 
-Note that the you may not get results instantly or on the first scanning. When
+Note that you may not get the results instantly or on the first scanning. When
 kmemleak gets results, it'll log ``kmemleak: <count of leaks> new suspected
 memory leaks``. Then read the file to see then::
 
