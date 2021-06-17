@@ -871,7 +871,7 @@ xlog_write_unmount_record(
 	 */
 	if (log->l_targ != log->l_mp->m_ddev_targp)
 		blkdev_issue_flush(log->l_targ->bt_bdev);
-	return xlog_write(log, NULL, &lv_chain, ticket, NULL, reg.i_len);
+	return xlog_write(log, NULL, &lv_chain, ticket, reg.i_len);
 }
 
 /*
@@ -2386,7 +2386,6 @@ xlog_write(
 	struct xfs_cil_ctx	*ctx,
 	struct list_head	*lv_chain,
 	struct xlog_ticket	*ticket,
-	struct xlog_in_core	**commit_iclog,
 	uint32_t		len)
 {
 	struct xlog_in_core	*iclog = NULL;
@@ -2436,10 +2435,7 @@ xlog_write(
 	 */
 	spin_lock(&log->l_icloglock);
 	xlog_state_finish_copy(log, iclog, record_cnt, 0);
-	if (commit_iclog)
-		*commit_iclog = iclog;
-	else
-		error = xlog_state_release_iclog(log, iclog, ticket);
+	error = xlog_state_release_iclog(log, iclog, ticket);
 	spin_unlock(&log->l_icloglock);
 
 	return error;

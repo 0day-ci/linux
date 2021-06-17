@@ -799,11 +799,34 @@ xlog_cil_set_ctx_write_state(
 
 	ASSERT(!ctx->commit_lsn);
 	spin_lock(&cil->xc_push_lock);
-	if (!ctx->start_lsn)
+	if (!ctx->start_lsn) {
 		ctx->start_lsn = lsn;
-	else
-		ctx->commit_lsn = lsn;
+		spin_unlock(&cil->xc_push_lock);
+		return;
+	}
+
+	/*
+	 * Take a reference to the iclog for the context so that we still hold
+	 * it when xlog_write is done and has released it. This means the
+	 * context controls when the iclog is released for IO.
+	 */
+	atomic_inc(&iclog->ic_refcnt);
+	ctx->commit_iclog = iclog;
+	ctx->commit_lsn = lsn;
 	spin_unlock(&cil->xc_push_lock);
+
+	/*
+	 * xlog_state_get_iclog_space() guarantees there is enough space in the
+	 * iclog for an entire commit record, so attach the context callbacks to
+	 * the iclog at this time if we are not already in a shutdown state.
+	 */
+	spin_lock(&iclog->ic_callback_lock);
+	if (iclog->ic_state == XLOG_STATE_IOERROR) {
+		spin_unlock(&iclog->ic_callback_lock);
+		return;
+	}
+	list_add_tail(&ctx->iclog_entry, &iclog->ic_callbacks);
+	spin_unlock(&iclog->ic_callback_lock);
 }
 
 /*
@@ -858,8 +881,7 @@ restart:
  */
 int
 xlog_cil_write_commit_record(
-	struct xfs_cil_ctx	*ctx,
-	struct xlog_in_core	**iclog)
+	struct xfs_cil_ctx	*ctx)
 {
 	struct xlog		*log = ctx->cil->xc_log;
 	struct xlog_op_header	ophdr = {
@@ -890,7 +912,7 @@ xlog_cil_write_commit_record(
 
 	/* account for space used by record data */
 	ctx->ticket->t_curr_res -= reg.i_len;
-	error = xlog_write(log, ctx, &lv_chain, ctx->ticket, iclog, reg.i_len);
+	error = xlog_write(log, ctx, &lv_chain, ctx->ticket, reg.i_len);
 	if (error)
 		xfs_force_shutdown(log->l_mp, SHUTDOWN_LOG_IO_ERROR);
 	return error;
@@ -940,7 +962,6 @@ xlog_cil_push_work(
 	struct xlog		*log = cil->xc_log;
 	struct xfs_log_vec	*lv;
 	struct xfs_cil_ctx	*new_ctx;
-	struct xlog_in_core	*commit_iclog;
 	int			num_iovecs = 0;
 	int			num_bytes = 0;
 	int			error = 0;
@@ -1109,8 +1130,7 @@ xlog_cil_push_work(
 	 * use the commit record lsn then we can move the tail beyond the grant
 	 * write head.
 	 */
-	error = xlog_write(log, ctx, &ctx->lv_chain, ctx->ticket,
-				NULL, num_bytes);
+	error = xlog_write(log, ctx, &ctx->lv_chain, ctx->ticket, num_bytes);
 
 	/*
 	 * Take the lvhdr back off the lv_chain as it should not be passed
@@ -1120,19 +1140,9 @@ xlog_cil_push_work(
 	if (error)
 		goto out_abort_free_ticket;
 
-	error = xlog_cil_write_commit_record(ctx, &commit_iclog);
+	error = xlog_cil_write_commit_record(ctx);
 	if (error)
 		goto out_abort_free_ticket;
-
-	spin_lock(&commit_iclog->ic_callback_lock);
-	if (commit_iclog->ic_state == XLOG_STATE_IOERROR) {
-		spin_unlock(&commit_iclog->ic_callback_lock);
-		goto out_abort_free_ticket;
-	}
-	ASSERT_ALWAYS(commit_iclog->ic_state == XLOG_STATE_ACTIVE ||
-		      commit_iclog->ic_state == XLOG_STATE_WANT_SYNC);
-	list_add_tail(&ctx->iclog_entry, &commit_iclog->ic_callbacks);
-	spin_unlock(&commit_iclog->ic_callback_lock);
 
 	/*
 	 * now the checkpoint commit is complete and we've attached the
@@ -1168,8 +1178,8 @@ xlog_cil_push_work(
 	if (ctx->start_lsn != commit_lsn) {
 		struct xlog_in_core	*iclog;
 
-		for (iclog = commit_iclog->ic_prev;
-		     iclog != commit_iclog;
+		for (iclog = ctx->commit_iclog->ic_prev;
+		     iclog != ctx->commit_iclog;
 		     iclog = iclog->ic_prev) {
 			xfs_lsn_t	hlsn;
 
@@ -1201,7 +1211,7 @@ xlog_cil_push_work(
 		 * ordering for this checkpoint is correctly preserved down to
 		 * stable storage.
 		 */
-		commit_iclog->ic_flags |= XLOG_ICL_NEED_FLUSH;
+		ctx->commit_iclog->ic_flags |= XLOG_ICL_NEED_FLUSH;
 	}
 
 	/*
@@ -1214,10 +1224,11 @@ xlog_cil_push_work(
 	 * will be written when released, switch it's state to WANT_SYNC right
 	 * now.
 	 */
-	commit_iclog->ic_flags |= XLOG_ICL_NEED_FUA;
-	if (push_commit_stable && commit_iclog->ic_state == XLOG_STATE_ACTIVE)
-		xlog_state_switch_iclogs(log, commit_iclog, 0);
-	xlog_state_release_iclog(log, commit_iclog, ticket);
+	ctx->commit_iclog->ic_flags |= XLOG_ICL_NEED_FUA;
+	if (push_commit_stable &&
+	    ctx->commit_iclog->ic_state == XLOG_STATE_ACTIVE)
+		xlog_state_switch_iclogs(log, ctx->commit_iclog, 0);
+	xlog_state_release_iclog(log, ctx->commit_iclog, ticket);
 	spin_unlock(&log->l_icloglock);
 
 	xfs_log_ticket_ungrant(log, ticket);
