@@ -540,6 +540,44 @@ static int __init mount_cifs_root(void)
 }
 #endif
 
+static int __init try_mount_nodev(char *fstype)
+{
+	struct file_system_type *fs = get_fs_type(fstype);
+	int err = -EINVAL;
+
+	if (!fs)
+		return -EINVAL;
+	if (!(fs->fs_flags & (FS_REQUIRES_DEV | FS_BINARY_MOUNTDATA)))
+		err = do_mount_root(root_device_name, fstype, root_mountflags,
+					root_mount_data);
+	put_filesystem(fs);
+
+	if (err != -EACCES && err != -EINVAL)
+		panic("VFS: Unable to mount root \"%s\" (%s), err=%d\n",
+			      root_device_name, fstype, err);
+	return err;
+}
+
+static int __init mount_nodev_root(void)
+{
+	char *fs_names, *p;
+	int err = -EINVAL;
+
+	fs_names = (void *)__get_free_page(GFP_KERNEL);
+	if (!fs_names)
+		return -EINVAL;
+	split_fs_names(fs_names, root_fs_names);
+
+	for (p = fs_names; *p; p += strlen(p) + 1) {
+		err = try_mount_nodev(p);
+		if (!err)
+			break;
+	}
+
+	free_page((unsigned long)fs_names);
+	return err;
+}
+
 void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
@@ -556,6 +594,8 @@ void __init mount_root(void)
 		return;
 	}
 #endif
+	if (ROOT_DEV == 0 && mount_nodev_root() == 0)
+		return;
 #ifdef CONFIG_BLOCK
 	{
 		int err = create_dev("/dev/root", ROOT_DEV);
