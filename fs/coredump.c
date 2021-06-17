@@ -679,11 +679,8 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 
 		helper_argv = kmalloc_array(argc + 1, sizeof(*helper_argv),
 					    GFP_KERNEL);
-		if (!helper_argv) {
-			printk(KERN_WARNING "%s failed to allocate memory\n",
-			       __func__);
+		if (!helper_argv)
 			goto fail_dropcount;
-		}
 		for (argi = 0; argi < argc; argi++)
 			helper_argv[argi] = cn.corename + argv[argi];
 		helper_argv[argi] = NULL;
