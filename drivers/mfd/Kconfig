@@ -688,6 +688,17 @@ config MFD_INTEL_PMT
 	  Telemetry, Watcher, and Crashlog PMT capabilities/devices for
 	  platforms starting from Tiger Lake.
 
+config MFD_INTEL_OOBMSM
+	tristate "Intel Out Of Band Management Services Module (OOBMSM) support"
+	depends on PCI
+	select MFD_INTEL_EXTENDED_CAPS
+	help
+	  The Intel Out of Band Management Service Module driver is used to
+	  enumerate auxiliary platform features described in both Vendor
+	  Specific and Designated Vendor Specific PCIe config space. Supported
+	  features include Intel Platform Monitoring Technology (PMT) as well
+	  as other non-PMT capabilities.
+
 config MFD_IPAQ_MICRO
 	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
 	depends on SA1100_H3100 || SA1100_H3600

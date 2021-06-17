@@ -9337,6 +9337,7 @@ INTEL PMT DRIVER
 M:	"David E. Box" <david.e.box@linux.intel.com>
 S:	Maintained
 F:	drivers/mfd/intel_extended_cap.c
+F:	drivers/mfd/intel_oobmsm.c
 F:	drivers/mfd/intel_pmt.c
 F:	drivers/platform/x86/intel_pmt_*
 
