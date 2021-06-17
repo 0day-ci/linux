@@ -27,23 +27,29 @@ typedef u64 kvm_pte_t;
 
 /**
  * struct kvm_pgtable_mm_ops - Memory management callbacks.
- * @zalloc_page:	Allocate a single zeroed memory page. The @arg parameter
- *			can be used by the walker to pass a memcache. The
- *			initial refcount of the page is 1.
- * @zalloc_pages_exact:	Allocate an exact number of zeroed memory pages. The
- *			@size parameter is in bytes, and is rounded-up to the
- *			next page boundary. The resulting allocation is
- *			physically contiguous.
- * @free_pages_exact:	Free an exact number of memory pages previously
- *			allocated by zalloc_pages_exact.
- * @get_page:		Increment the refcount on a page.
- * @put_page:		Decrement the refcount on a page. When the refcount
- *			reaches 0 the page is automatically freed.
- * @page_count:		Return the refcount of a page.
- * @phys_to_virt:	Convert a physical address into a virtual address mapped
- *			in the current context.
- * @virt_to_phys:	Convert a virtual address mapped in the current context
- *			into a physical address.
+ * @zalloc_page:		Allocate a single zeroed memory page.
+ *				The @arg parameter can be used by the walker
+ *				to pass a memcache. The initial refcount of
+ *				the page is 1.
+ * @zalloc_pages_exact:		Allocate an exact number of zeroed memory pages.
+ *				The @size parameter is in bytes, and is rounded
+ *				up to the next page boundary. The resulting
+ *				allocation is physically contiguous.
+ * @free_pages_exact:		Free an exact number of memory pages previously
+ *				allocated by zalloc_pages_exact.
+ * @get_page:			Increment the refcount on a page.
+ * @put_page:			Decrement the refcount on a page. When the
+ *				refcount reaches 0 the page is automatically
+ *				freed.
+ * @page_count:			Return the refcount of a page.
+ * @phys_to_virt:		Convert a physical address into a virtual address
+ *				mapped in the current context.
+ * @virt_to_phys:		Convert a virtual address mapped in the current
+ *				context into a physical address.
+ * @clean_invalidate_dcache:	Clean and invalidate the data cache for the
+ *				specified memory address range.
+ * @invalidate_icache:		Invalidate the instruction cache for the
+ *				specified memory address range.
  */
 struct kvm_pgtable_mm_ops {
 	void*		(*zalloc_page)(void *arg);
@@ -54,6 +60,8 @@ struct kvm_pgtable_mm_ops {
 	int		(*page_count)(void *addr);
 	void*		(*phys_to_virt)(phys_addr_t phys);
 	phys_addr_t	(*virt_to_phys)(void *addr);
+	void		(*clean_invalidate_dcache)(void *addr, size_t size);
+	void		(*invalidate_icache)(void *addr, size_t size);
 };
 
 /**
