@@ -216,10 +216,8 @@ static int vxfs_fill_super(struct super_block *sbp, void *dp, int silent)
 	sbp->s_flags |= SB_RDONLY;
 
 	infp = kzalloc(sizeof(*infp), GFP_KERNEL);
-	if (!infp) {
-		printk(KERN_WARNING "vxfs: unable to allocate incore superblock\n");
+	if (!infp)
 		return -ENOMEM;
-	}
 
 	bsize = sb_min_blocksize(sbp, BLOCK_SIZE);
 	if (!bsize) {
