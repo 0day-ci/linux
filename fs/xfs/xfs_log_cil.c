@@ -784,6 +784,48 @@ xlog_cil_build_trans_hdr(
 }
 
 /*
+ * Write out the commit record of a checkpoint transaction associated with the
+ * given ticket to close off a running log write. Return the lsn of the commit
+ * record.
+ */
+int
+xlog_cil_write_commit_record(
+	struct xlog		*log,
+	struct xlog_ticket	*ticket,
+	struct xlog_in_core	**iclog,
+	xfs_lsn_t		*lsn)
+{
+	struct xlog_op_header	ophdr = {
+		.oh_clientid = XFS_TRANSACTION,
+		.oh_tid = cpu_to_be32(ticket->t_tid),
+		.oh_flags = XLOG_COMMIT_TRANS,
+	};
+	struct xfs_log_iovec reg = {
+		.i_addr = &ophdr,
+		.i_len = sizeof(struct xlog_op_header),
+		.i_type = XLOG_REG_TYPE_COMMIT,
+	};
+	struct xfs_log_vec vec = {
+		.lv_niovecs = 1,
+		.lv_iovecp = &reg,
+	};
+	int	error;
+	LIST_HEAD(lv_chain);
+	INIT_LIST_HEAD(&vec.lv_list);
+	list_add(&vec.lv_list, &lv_chain);
+
+	if (XLOG_FORCED_SHUTDOWN(log))
+		return -EIO;
+
+	/* account for space used by record data */
+	ticket->t_curr_res -= reg.i_len;
+	error = xlog_write(log, &lv_chain, ticket, lsn, iclog, reg.i_len);
+	if (error)
+		xfs_force_shutdown(log->l_mp, SHUTDOWN_LOG_IO_ERROR);
+	return error;
+}
+
+/*
  * CIL item reordering compare function. We want to order in ascending ID order,
  * but we want to leave items with the same ID in the order they were added to
  * the list. This is important for operations like reflink where we log 4 order
@@ -1041,7 +1083,8 @@ restart:
 	}
 	spin_unlock(&cil->xc_push_lock);
 
-	error = xlog_commit_record(log, ctx->ticket, &commit_iclog, &commit_lsn);
+	error = xlog_cil_write_commit_record(log, ctx->ticket, &commit_iclog,
+			&commit_lsn);
 	if (error)
 		goto out_abort_free_ticket;
 
