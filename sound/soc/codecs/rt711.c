@@ -154,26 +154,26 @@ static unsigned int rt711_button_detect(struct rt711_priv *rt711)
 	case 0x0200:
 	case 0x0100:
 	case 0x0080:
-		btn_type |= SND_JACK_BTN_0;
+		btn_type |= SND_JACK_BTN_2;
 		break;
 	case 0x0001:
-		btn_type |= SND_JACK_BTN_3;
+		btn_type |= SND_JACK_BTN_1;
 		break;
 	}
 	switch (val81) {
 	case 0x8000:
 	case 0x4000:
 	case 0x2000:
-		btn_type |= SND_JACK_BTN_1;
+		btn_type |= SND_JACK_BTN_0;
 		break;
 	case 0x1000:
 	case 0x0800:
 	case 0x0400:
-		btn_type |= SND_JACK_BTN_2;
+		btn_type |= SND_JACK_BTN_3;
 		break;
 	case 0x0200:
 	case 0x0100:
-		btn_type |= SND_JACK_BTN_3;
+		btn_type |= SND_JACK_BTN_1;
 		break;
 	}
 read_error:
