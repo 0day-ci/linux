@@ -287,7 +287,7 @@ static int __init pstore_blk_init(void)
 		struct pstore_device_info *best_effort_dev;
 
 		best_effort_dev = kzalloc(sizeof(*best_effort_dev), GFP_KERNEL);
-		if (!best_effort) {
+		if (!best_effort_dev) {
 			ret = -ENOMEM;
 			goto unlock;
 		}
