@@ -1220,7 +1220,20 @@ static int vc_do_resize(struct tty_struct *tty, struct vc_data *vc,
 	new_screen_size = new_row_size * new_rows;
 
 	if (new_cols == vc->vc_cols && new_rows == vc->vc_rows)
-		return 0;
+		/* This function is being called here to cover the case
+		 * where the userspace calls the FBIOPUT_VSCREENINFO twice,
+		 * passing the same fb_var_screeninfo containing only the
+		 * fields xres, yres, and bits_per_pixel with yeird(but valid)
+		 * values.
+		 * In the second call, the struct fb_var_screeninfo isn't
+		 * being modified by the underlying driver because of the
+		 * if above, and this eventually causes out-of-bound
+		 * access by the imageblit function.
+		 * To give the correct values to the struct and to not have
+		 * to deal with possible erros from the code bellow, we call
+		 * the resize_screen here as well.
+		 */
+		return resize_screen(vc, new_cols, new_rows, user);
 
 	if (new_screen_size > KMALLOC_MAX_SIZE || !new_screen_size)
 		return -EINVAL;
