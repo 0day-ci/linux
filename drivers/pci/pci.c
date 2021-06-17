@@ -2485,7 +2485,13 @@ static int __pci_enable_wake(struct pci_dev *dev, pci_power_t state, bool enable
 	if (enable) {
 		int error;
 
-		if (pci_pme_capable(dev, state))
+		/*
+		 * Enable PME if device is capable from given state.
+		 * Special case is device that can only generate PME
+		 * from D3cold then we enable PME too.
+		 */
+		if (pci_pme_capable(dev, state) ||
+		    (state == PCI_D3hot && pci_pme_capable(dev, PCI_D3cold)))
 			pci_pme_active(dev, true);
 		else
 			ret = 1;
@@ -2595,6 +2601,14 @@ static pci_power_t pci_target_state(struct pci_dev *dev, bool wakeup)
 		 * PME#.
 		 */
 		if (dev->pme_support) {
+			/*
+			 * Special case if device supports only PME from
+			 * D3cold but not from D3hot we still return D3hot.
+			 */
+			if (target_state == PCI_D3hot &&
+				(dev->pme_support & (1 << PCI_D3cold)))
+				return target_state;
+
 			while (target_state
 			      && !(dev->pme_support & (1 << target_state)))
 				target_state--;
