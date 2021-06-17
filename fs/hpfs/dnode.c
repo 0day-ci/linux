@@ -34,10 +34,8 @@ int hpfs_add_pos(struct inode *inode, loff_t *pos)
 				return 0;
 	if (!(i&0x0f)) {
 		ppos = kmalloc_array(i + 0x11, sizeof(loff_t *), GFP_NOFS);
-		if (!ppos) {
-			pr_err("out of memory for position list\n");
+		if (!ppos)
 			return -ENOMEM;
-		}
 		if (hpfs_inode->i_rddir_off) {
 			memcpy(ppos, hpfs_inode->i_rddir_off, i * sizeof(loff_t));
 			kfree(hpfs_inode->i_rddir_off);
