@@ -332,8 +332,8 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
 
 	phy = devm_phy_create(&pdev->dev, NULL, &phy_meson8b_usb2_ops);
 	if (IS_ERR(phy)) {
-		dev_err(&pdev->dev, "failed to create PHY\n");
-		return PTR_ERR(phy);
+		ret = PTR_ERR(phy);
+		return dev_err_probe(&pdev->dev, ret, "failed to create PHY\n");
 	}
 
 	phy_set_drvdata(phy, priv);
