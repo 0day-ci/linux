@@ -105,7 +105,7 @@ static int intel_ext_cap_add_dev(struct pci_dev *pdev, struct intel_ext_cap_head
 		header->offset >>= 3;
 
 	/*
-	 * The DVSEC contains the starting offset and count for a block of
+	 * The DVSEC/VSEC contains the starting offset and count for a block of
 	 * discovery tables, each providing access to monitoring facilities for
 	 * a section of the device. Create a resource list of these tables to
 	 * provide to the driver.
@@ -124,11 +124,112 @@ static int intel_ext_cap_add_dev(struct pci_dev *pdev, struct intel_ext_cap_head
 	return devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cell, 1, NULL, 0, NULL);
 }
 
+static bool intel_ext_cap_walk_dvsec(struct pci_dev *pdev, unsigned long quirks)
+{
+	int count = 0;
+	int pos = 0;
+
+	do {
+		struct intel_ext_cap_header header;
+		u32 table, hdr;
+		u16 vid;
+		int ret;
+
+		pos = pci_find_next_ext_capability(pdev, pos, PCI_EXT_CAP_ID_DVSEC);
+		if (!pos)
+			break;
+
+		pci_read_config_dword(pdev, pos + PCI_DVSEC_HEADER1, &hdr);
+		vid = PCI_DVSEC_HEADER1_VID(hdr);
+		if (vid != PCI_VENDOR_ID_INTEL)
+			continue;
+
+		/* Support only revision 1 */
+		header.rev = PCI_DVSEC_HEADER1_REV(hdr);
+		if (header.rev != 1) {
+			dev_warn(&pdev->dev, "Unsupported DVSEC revision %d\n",
+				 header.rev);
+			continue;
+		}
+
+		header.length = PCI_DVSEC_HEADER1_LEN(hdr);
+
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_ENTRIES,
+				     &header.num_entries);
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_SIZE,
+				     &header.entry_size);
+		pci_read_config_dword(pdev, pos + INTEL_DVSEC_TABLE,
+				      &table);
+
+		header.tbir = INTEL_DVSEC_TABLE_BAR(table);
+		header.offset = INTEL_DVSEC_TABLE_OFFSET(table);
+
+		pci_read_config_dword(pdev, pos + PCI_DVSEC_HEADER2, &hdr);
+		header.id = PCI_DVSEC_HEADER2_ID(hdr);
+
+		ret = intel_ext_cap_add_dev(pdev, &header, quirks);
+		if (ret)
+			continue;
+
+		count++;
+	} while (true);
+
+	return count;
+}
+
+static bool intel_ext_cap_walk_vsec(struct pci_dev *pdev, unsigned long quirks)
+{
+	int count = 0;
+	int pos = 0;
+
+	do {
+		struct intel_ext_cap_header header;
+		u32 table, hdr;
+		int ret;
+
+		pos = pci_find_next_ext_capability(pdev, pos, PCI_EXT_CAP_ID_VNDR);
+		if (!pos)
+			break;
+
+		pci_read_config_dword(pdev, pos + PCI_VNDR_HEADER, &hdr);
+
+		/* Support only revision 1 */
+		header.rev = PCI_VNDR_HEADER_REV(hdr);
+		if (header.rev != 1) {
+			dev_warn(&pdev->dev, "Unsupported VSEC revision %d\n",
+				 header.rev);
+			continue;
+		}
+
+		header.id = PCI_VNDR_HEADER_ID(hdr);
+		header.length = PCI_VNDR_HEADER_LEN(hdr);
+
+		/* entry, size, and table offset are the same as DVSEC */
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_ENTRIES,
+				     &header.num_entries);
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_SIZE,
+				     &header.entry_size);
+		pci_read_config_dword(pdev, pos + INTEL_DVSEC_TABLE,
+				      &table);
+
+		header.tbir = INTEL_DVSEC_TABLE_BAR(table);
+		header.offset = INTEL_DVSEC_TABLE_OFFSET(table);
+
+		ret = intel_ext_cap_add_dev(pdev, &header, quirks);
+		if (ret)
+			continue;
+
+		count++;
+	} while (true);
+
+	return count;
+}
+
 int intel_ext_cap_probe(struct pci_dev *pdev, struct intel_ext_cap_platform_info *info)
 {
 	unsigned long quirks = 0;
-	bool found_devices = false;
-	int ret, pos;
+	int device_count = 0;
+	int ret;
 
 	if (info)
 		quirks = info->quirks;
@@ -144,59 +245,17 @@ int intel_ext_cap_probe(struct pci_dev *pdev, struct intel_ext_cap_platform_info
 					 "Failed to add device for DVSEC id %d\n",
 					 (*header)->id);
 			else
-				found_devices = true;
+				device_count++;
 
 			header++;
 		}
+
 	} else {
-		/* Find DVSEC features */
-		pos = 0;
-		do {
-			struct intel_ext_cap_header header;
-			u32 table, hdr;
-			u16 vid;
-
-			pos = pci_find_next_ext_capability(pdev, pos, PCI_EXT_CAP_ID_DVSEC);
-			if (!pos)
-				break;
-
-			pci_read_config_dword(pdev, pos + PCI_DVSEC_HEADER1, &hdr);
-			vid = PCI_DVSEC_HEADER1_VID(hdr);
-			if (vid != PCI_VENDOR_ID_INTEL)
-				continue;
-
-			/* Support only revision 1 */
-			header.rev = PCI_DVSEC_HEADER1_REV(hdr);
-			if (header.rev != 1) {
-				dev_warn(&pdev->dev, "Unsupported DVSEC revision %d\n",
-					 header.rev);
-				continue;
-			}
-
-			header.length = PCI_DVSEC_HEADER1_LEN(hdr);
-
-			pci_read_config_byte(pdev, pos + INTEL_DVSEC_ENTRIES,
-					     &header.num_entries);
-			pci_read_config_byte(pdev, pos + INTEL_DVSEC_SIZE,
-					     &header.entry_size);
-			pci_read_config_dword(pdev, pos + INTEL_DVSEC_TABLE,
-					      &table);
-
-			header.tbir = INTEL_DVSEC_TABLE_BAR(table);
-			header.offset = INTEL_DVSEC_TABLE_OFFSET(table);
-
-			pci_read_config_dword(pdev, pos + PCI_DVSEC_HEADER2, &hdr);
-			header.id = PCI_DVSEC_HEADER2_ID(hdr);
-
-			ret = intel_ext_cap_add_dev(pdev, &header, quirks);
-			if (ret)
-				continue;
-
-			found_devices = true;
-		} while (true);
+		device_count += intel_ext_cap_walk_dvsec(pdev, quirks);
+		device_count += intel_ext_cap_walk_vsec(pdev, quirks);
 	}
 
-	if (!found_devices)
+	if (!device_count)
 		return -ENODEV;
 
 	return 0;
