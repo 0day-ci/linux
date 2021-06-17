@@ -1625,7 +1625,8 @@ gpi_peripheral_config(struct dma_chan *chan, struct dma_slave_config *config)
 	if (!config->peripheral_config)
 		return -EINVAL;
 
-	gchan->config = krealloc(gchan->config, config->peripheral_size, GFP_NOWAIT);
+	kfree(gchan->config);
+	gchan->config = kmalloc(config->peripheral_size, GFP_NOWAIT);
 	if (!gchan->config)
 		return -ENOMEM;
 
