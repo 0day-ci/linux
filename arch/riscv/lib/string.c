@@ -92,3 +92,29 @@ void *__memcpy(void *dest, const void *src, size_t count)
 	return memcpy(dest, src, count);
 }
 EXPORT_SYMBOL(__memcpy);
+
+/*
+ * Simply check if the buffer overlaps an call memcpy() in case,
+ * otherwise do a simple one byte at time backward copy.
+ */
+void __weak *memmove(void *dest, const void *src, size_t count)
+{
+	if (dest < src || src + count <= dest)
+		return memcpy(dest, src, count);
+
+	if (dest > src) {
+		const char *s = src + count;
+		char *tmp = dest + count;
+
+		while (count--)
+			*--tmp = *--s;
+	}
+	return dest;
+}
+EXPORT_SYMBOL(memmove);
+
+void *__memmove(void *dest, const void *src, size_t count)
+{
+	return memmove(dest, src, count);
+}
+EXPORT_SYMBOL(__memmove);
