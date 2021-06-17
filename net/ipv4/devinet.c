@@ -2014,6 +2014,8 @@ static int inet_netconf_msgsize_devconf(int type)
 		size += nla_total_size(4);
 	if (all || type == NETCONFA_MC_FORWARDING)
 		size += nla_total_size(4);
+	if (all || type == NETCONFA_MC_SNOOPING)
+		size += nla_total_size(4);
 	if (all || type == NETCONFA_BC_FORWARDING)
 		size += nla_total_size(4);
 	if (all || type == NETCONFA_PROXY_NEIGH)
@@ -2061,6 +2063,10 @@ static int inet_netconf_fill_devconf(struct sk_buff *skb, int ifindex,
 	if ((all || type == NETCONFA_MC_FORWARDING) &&
 	    nla_put_s32(skb, NETCONFA_MC_FORWARDING,
 			IPV4_DEVCONF(*devconf, MC_FORWARDING)) < 0)
+		goto nla_put_failure;
+	if ((all || type == NETCONFA_MC_SNOOPING) &&
+	    nla_put_s32(skb, NETCONFA_MC_SNOOPING,
+			IPV4_DEVCONF(*devconf, NETCONFA_MC_SNOOPING)) < 0)
 		goto nla_put_failure;
 	if ((all || type == NETCONFA_BC_FORWARDING) &&
 	    nla_put_s32(skb, NETCONFA_BC_FORWARDING,
@@ -2506,6 +2512,7 @@ static struct devinet_sysctl_table {
 		DEVINET_SYSCTL_COMPLEX_ENTRY(FORWARDING, "forwarding",
 					     devinet_sysctl_forward),
 		DEVINET_SYSCTL_RO_ENTRY(MC_FORWARDING, "mc_forwarding"),
+		DEVINET_SYSCTL_RW_ENTRY(MC_SNOOPING, "mc_snooping"),
 		DEVINET_SYSCTL_RW_ENTRY(BC_FORWARDING, "bc_forwarding"),
 
 		DEVINET_SYSCTL_RW_ENTRY(ACCEPT_REDIRECTS, "accept_redirects"),

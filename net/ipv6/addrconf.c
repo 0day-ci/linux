@@ -502,6 +502,8 @@ static int inet6_netconf_msgsize_devconf(int type)
 #ifdef CONFIG_IPV6_MROUTE
 	if (all || type == NETCONFA_MC_FORWARDING)
 		size += nla_total_size(4);
+	if (all || type == NETCONFA_MC_SNOOPING)
+		size += nla_total_size(4);
 #endif
 	if (all || type == NETCONFA_PROXY_NEIGH)
 		size += nla_total_size(4);
@@ -545,6 +547,10 @@ static int inet6_netconf_fill_devconf(struct sk_buff *skb, int ifindex,
 	if ((all || type == NETCONFA_MC_FORWARDING) &&
 	    nla_put_s32(skb, NETCONFA_MC_FORWARDING,
 			devconf->mc_forwarding) < 0)
+		goto nla_put_failure;
+	if ((all || type == NETCONFA_MC_SNOOPING) &&
+	    nla_put_s32(skb, NETCONFA_MC_SNOOPING,
+			devconf->mc_snooping) < 0)
 		goto nla_put_failure;
 #endif
 	if ((all || type == NETCONFA_PROXY_NEIGH) &&
@@ -5503,6 +5509,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 #endif
 #ifdef CONFIG_IPV6_MROUTE
 	array[DEVCONF_MC_FORWARDING] = cnf->mc_forwarding;
+	array[DEVCONF_MC_SNOOPING] = cnf->mc_snooping;
 #endif
 	array[DEVCONF_DISABLE_IPV6] = cnf->disable_ipv6;
 	array[DEVCONF_ACCEPT_DAD] = cnf->accept_dad;
@@ -6784,6 +6791,13 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.data		= &ipv6_devconf.mc_forwarding,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "mc_snooping",
+		.data		= &ipv6_devconf.mc_snooping,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
 #endif

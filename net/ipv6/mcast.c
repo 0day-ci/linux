@@ -1013,6 +1013,11 @@ bool ipv6_chk_mcast_addr(struct net_device *dev, const struct in6_addr *group,
 	struct ifmcaddr6 *mc;
 	bool rv = false;
 
+#ifdef CONFIG_IPV6_MROUTE
+	if (dev_net(dev)->ipv6.devconf_all->mc_snooping)
+		return true;
+#endif
+
 	rcu_read_lock();
 	idev = __in6_dev_get(dev);
 	if (idev) {

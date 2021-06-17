@@ -1328,6 +1328,14 @@ mc_forwarding - BOOLEAN
 	conf/all/mc_forwarding must also be set to TRUE to enable multicast
 	routing	for the interface
 
+mc_snooping - BOOLEAN
+	Enable multicast snooping on the interface. This allows any given
+	multicast group to be received without explicitly being joined.
+	The kernel needs to be compiled with CONFIG_MROUTE and/or
+	CONFIG_IPV6_MROUTE.
+	conf/all/mc_snooping must also be set to TRUE to enable multicast
+	snooping for the interface.
+
 medium_id - INTEGER
 	Integer value used to differentiate the devices by the medium they
 	are attached to. Two devices can have different id values when
