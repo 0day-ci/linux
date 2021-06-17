@@ -185,3 +185,9 @@ a THP crosses a VMA boundary.
 The function deferred_split_huge_page() is used to queue a page for splitting.
 The splitting itself will happen when we get memory pressure via shrinker
 interface.
+
+Functions and structures
+========================
+
+.. kernel-doc:: mm/huge_memory.c
+.. kernel-doc:: mm/khugepaged.c

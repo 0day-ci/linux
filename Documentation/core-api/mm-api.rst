@@ -66,6 +66,8 @@ File Mapping and Page Cache
 
 .. kernel-doc:: mm/page-writeback.c
    :export:
+.. kernel-doc:: mm/backing-dev.c
+   :export:
 
 .. kernel-doc:: mm/truncate.c
    :export:
@@ -93,6 +95,8 @@ More Memory Management Functions
 
 .. kernel-doc:: mm/page_alloc.c
 .. kernel-doc:: mm/mempolicy.c
+.. kernel-doc:: mm/vmscan.c
+   :export:
 .. kernel-doc:: include/linux/mm_types.h
    :internal:
 .. kernel-doc:: include/linux/mm.h
