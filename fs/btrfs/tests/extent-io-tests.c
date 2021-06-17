@@ -393,7 +393,6 @@ static int test_eb_bitmaps(u32 sectorsize, u32 nodesize)
 
 	bitmap = kmalloc(nodesize, GFP_KERNEL);
 	if (!bitmap) {
-		test_err("couldn't allocate test bitmap");
 		ret = -ENOMEM;
 		goto out;
 	}
