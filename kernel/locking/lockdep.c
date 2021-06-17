@@ -2750,7 +2750,7 @@ check_redundant(struct held_lock *src, struct held_lock *target)
 	 */
 	ret = check_path(target, &src_entry, hlock_equal, usage_skip, &target_entry);
 
-	if (ret == BFS_RMATCH)
+	if (unlikely(ret == BFS_RMATCH))
 		debug_atomic_inc(nr_redundant);
 
 	return ret;
@@ -2992,7 +2992,7 @@ check_prev_add(struct task_struct *curr, struct held_lock *prev,
 	ret = check_redundant(prev, next);
 	if (bfs_error(ret))
 		return 0;
-	else if (ret == BFS_RMATCH)
+	else if (unlikely(ret == BFS_RMATCH))
 		return 2;
 
 	if (!*trace) {
