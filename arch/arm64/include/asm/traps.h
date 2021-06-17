@@ -22,8 +22,14 @@ struct undef_hook {
 	int (*fn)(struct pt_regs *regs, u32 instr);
 };
 
+struct serror_hook {
+	struct list_head node;
+	void (*fn)(void);
+};
+
 void register_undef_hook(struct undef_hook *hook);
 void unregister_undef_hook(struct undef_hook *hook);
+void register_serror_hook(struct serror_hook *hook);
 void force_signal_inject(int signal, int code, unsigned long address, unsigned int err);
 void arm64_notify_segfault(unsigned long addr);
 void arm64_force_sig_fault(int signo, int code, unsigned long far, const char *str);

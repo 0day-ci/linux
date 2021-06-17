@@ -892,14 +892,34 @@ void panic_bad_stack(struct pt_regs *regs, unsigned int esr, unsigned long far)
 }
 #endif
 
+static LIST_HEAD(serror_hook);
+static DEFINE_RAW_SPINLOCK(serror_lock);
+
+void register_serror_hook(struct serror_hook *hook)
+{
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&serror_lock, flags);
+	list_add(&hook->node, &serror_hook);
+	raw_spin_unlock_irqrestore(&serror_lock, flags);
+}
+
 void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
 {
+	struct serror_hook *hook;
+	unsigned long flags;
+
 	console_verbose();
 
 	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
 		smp_processor_id(), esr, esr_get_class_string(esr));
 	if (regs)
 		__show_regs(regs);
+
+	raw_spin_lock_irqsave(&serror_lock, flags);
+	list_for_each_entry(hook, &serror_hook, node)
+		hook->fn();
+	raw_spin_unlock_irqrestore(&serror_lock, flags);
 
 	nmi_panic(regs, "Asynchronous SError Interrupt");
 
