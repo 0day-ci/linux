@@ -281,7 +281,7 @@ static void panfrost_job_cleanup(struct kref *ref)
 	if (job->mappings) {
 		for (i = 0; i < job->bo_count; i++) {
 			if (!job->mappings[i])
-				break;
+				continue;
 
 			atomic_dec(&job->mappings[i]->obj->gpu_usecount);
 			panfrost_gem_mapping_put(job->mappings[i]);
