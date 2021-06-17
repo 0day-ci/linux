@@ -289,7 +289,7 @@ void atl1c_post_phy_linkchg(struct atl1c_hw *hw, u16 link_speed);
 #define MDIO_CTRL_REG_SHIFT		16
 #define MDIO_CTRL_DATA_MASK		0xFFFFUL
 #define MDIO_CTRL_DATA_SHIFT		0
-#define MDIO_MAX_AC_TO			120	/* 1.2ms timeout for slow clk */
+#define MDIO_MAX_AC_TO			1200	/* 12ms timeout for slow clk */
 
 /* for extension reg access */
 #define REG_MDIO_EXTN			0x1448
