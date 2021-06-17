@@ -694,8 +694,10 @@ static int cdnsp_alloc_priv_device(struct cdnsp_device *pdev)
 
 	/* Allocate endpoint 0 ring. */
 	pdev->eps[0].ring = cdnsp_ring_alloc(pdev, 2, TYPE_CTRL, 0, GFP_ATOMIC);
-	if (!pdev->eps[0].ring)
+	if (!pdev->eps[0].ring) {
+		ret = -ENOMEM;
 		goto fail;
+	}
 
 	/* Point to output device context in dcbaa. */
 	pdev->dcbaa->dev_context_ptrs[1] = cpu_to_le64(pdev->out_ctx.dma);
