@@ -372,6 +372,7 @@ void dp_catalog_ctrl_mainlink_ctrl(struct dp_catalog *dp_catalog,
 	struct dp_catalog_private *catalog = container_of(dp_catalog,
 				struct dp_catalog_private, dp_catalog);
 
+	DRM_DEBUG_DP("%s enable=0x%x\n", __func__, enable);
 	if (enable) {
 		/*
 		 * To make sure link reg writes happens before other operation,
@@ -580,6 +581,7 @@ void dp_catalog_hpd_config_intr(struct dp_catalog *dp_catalog,
 
 	config = (en ? config | intr_mask : config & ~intr_mask);
 
+	DRM_DEBUG_DP("%s intr_mask=0x%x config=0x%x\n", __func__, intr_mask, config);
 	dp_write_aux(catalog, REG_DP_DP_HPD_INT_MASK,
 				config & DP_DP_HPD_INT_MASK);
 }
@@ -610,6 +612,7 @@ u32 dp_catalog_link_is_connected(struct dp_catalog *dp_catalog)
 	u32 status;
 
 	status = dp_read_aux(catalog, REG_DP_DP_HPD_INT_STATUS);
+	DRM_DEBUG_DP("%s aux status:0x%x\n", __func__, status);
 	status >>= DP_DP_HPD_STATE_STATUS_BITS_SHIFT;
 	status &= DP_DP_HPD_STATE_STATUS_BITS_MASK;
 
@@ -685,6 +688,7 @@ void dp_catalog_ctrl_send_phy_pattern(struct dp_catalog *dp_catalog,
 	/* Make sure to clear the current pattern before starting a new one */
 	dp_write_link(catalog, REG_DP_STATE_CTRL, 0x0);
 
+	DRM_DEBUG_DP("%s pattern:0x%x\n", __func__, pattern);
 	switch (pattern) {
 	case DP_PHY_TEST_PATTERN_D10_2:
 		dp_write_link(catalog, REG_DP_STATE_CTRL,

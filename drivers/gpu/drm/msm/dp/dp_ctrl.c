@@ -99,6 +99,7 @@ static int dp_aux_link_configure(struct drm_dp_aux *aux,
 	values[0] = drm_dp_link_rate_to_bw_code(link->rate);
 	values[1] = link->num_lanes;
 
+	DRM_DEBUG_DP("%s value0:0x%x value1:0x%x\n", __func__, values[0], values[1]);
 	if (link->capabilities & DP_LINK_CAP_ENHANCED_FRAMING)
 		values[1] |= DP_LANE_COUNT_ENHANCED_FRAME_EN;
 
@@ -122,6 +123,7 @@ void dp_ctrl_push_idle(struct dp_ctrl *dp_ctrl)
 			IDLE_PATTERN_COMPLETION_TIMEOUT_JIFFIES))
 		pr_warn("PUSH_IDLE pattern timedout\n");
 
+	DRM_DEBUG_DP("PUSH IDLE\n");
 	pr_debug("mainlink off done\n");
 }
 
@@ -1013,6 +1015,8 @@ static int dp_ctrl_update_vx_px(struct dp_ctrl_private *ctrl)
 	u32 voltage_swing_level = link->phy_params.v_level;
 	u32 pre_emphasis_level = link->phy_params.p_level;
 
+	DRM_DEBUG_DP("%s: voltage level:%d emphasis level:%d\n", __func__,
+			voltage_swing_level, pre_emphasis_level);
 	ret = dp_catalog_ctrl_update_vx_px(ctrl->catalog,
 		voltage_swing_level, pre_emphasis_level);
 
@@ -1112,6 +1116,8 @@ static int dp_ctrl_link_train_1(struct dp_ctrl_private *ctrl,
 		cr->lane_0_1 = link_status[0];
 		cr->lane_2_3 = link_status[1];
 
+		DRM_DEBUG_DP("link status:0x%x 0x%x 0x%x 0x%x 0x%x\n", link_status[0],
+				link_status[1], link_status[2], link_status[3], link_status[4]);
 		if (drm_dp_clock_recovery_ok(link_status,
 			ctrl->link->link_params.num_lanes)) {
 			return 0;
@@ -1384,6 +1390,7 @@ int dp_ctrl_host_init(struct dp_ctrl *dp_ctrl, bool flip, bool reset)
 	if (reset)
 		dp_catalog_ctrl_reset(ctrl->catalog);
 
+	DRM_DEBUG_DP("%s Flip:%d\n", __func__, flip);
 	dp_catalog_ctrl_phy_reset(ctrl->catalog);
 	phy_init(phy);
 	dp_catalog_ctrl_enable_irq(ctrl->catalog, true);

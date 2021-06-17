@@ -973,6 +973,9 @@ static int dp_link_process_link_status_update(struct dp_link_private *link)
  */
 static int dp_link_process_ds_port_status_change(struct dp_link_private *link)
 {
+	DRM_DEBUG_DP("link status 0:0x%x 1:0x%x 2:0x%x 3:0x%x 4:0x%x", link->link_status[0],
+			link->link_status[1], link->link_status[2],
+			link->link_status[3], link->link_status[4]);
 	if (get_link_status(link->link_status, DP_LANE_ALIGN_STATUS_UPDATED) &
 					DP_DOWNSTREAM_PORT_STATUS_CHANGED)
 		goto reset;
@@ -1036,43 +1039,46 @@ int dp_link_process_request(struct dp_link *dp_link)
 
 	if (link->request.test_requested == DP_TEST_LINK_EDID_READ) {
 		dp_link->sink_request |= DP_TEST_LINK_EDID_READ;
-		return ret;
+		goto error;
 	}
 
 	ret = dp_link_process_ds_port_status_change(link);
 	if (!ret) {
 		dp_link->sink_request |= DS_PORT_STATUS_CHANGED;
-		return ret;
+		goto error;
 	}
 
 	ret = dp_link_process_link_training_request(link);
 	if (!ret) {
 		dp_link->sink_request |= DP_TEST_LINK_TRAINING;
-		return ret;
+		goto error;
 	}
 
 	ret = dp_link_process_phy_test_pattern_request(link);
 	if (!ret) {
 		dp_link->sink_request |= DP_TEST_LINK_PHY_TEST_PATTERN;
-		return ret;
+		goto error;
 	}
 
 	ret = dp_link_process_link_status_update(link);
 	if (!ret) {
 		dp_link->sink_request |= DP_LINK_STATUS_UPDATED;
-		return ret;
+		goto error;
 	}
 
 	if (dp_link_is_video_pattern_requested(link)) {
-		ret = 0;
 		dp_link->sink_request |= DP_TEST_LINK_VIDEO_PATTERN;
+		goto error;
 	}
 
 	if (dp_link_is_audio_pattern_requested(link)) {
 		dp_link->sink_request |= DP_TEST_LINK_AUDIO_PATTERN;
-		return -EINVAL;
+		ret = -EINVAL;
+		goto error;
 	}
 
+error:
+	DRM_DEBUG_DP("%s sink request:%x", __func__, dp_link->sink_request);
 	return ret;
 }
 

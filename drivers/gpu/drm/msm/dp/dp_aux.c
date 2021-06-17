@@ -121,9 +121,10 @@ static ssize_t dp_aux_cmd_fifo_tx(struct dp_aux_private *aux,
 
 	time_left = wait_for_completion_timeout(&aux->comp,
 						msecs_to_jiffies(250));
-	if (!time_left)
+	if (!time_left) {
+		DRM_DEBUG_DP("%s aux timeout error timeout:%lu\n", __func__, time_left);
 		return -ETIMEDOUT;
-
+	}
 	return ret;
 }
 
