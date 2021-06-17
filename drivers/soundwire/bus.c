@@ -1351,7 +1351,6 @@ static int sdw_handle_dp0_interrupt(struct sdw_slave *slave, u8 *slave_status)
 		 */
 
 		if (status & SDW_DP0_INT_PORT_READY) {
-			complete(&slave->port_ready[0]);
 			clear |= SDW_DP0_INT_PORT_READY;
 		}
 
@@ -1429,7 +1428,6 @@ static int sdw_handle_port_interrupt(struct sdw_slave *slave,
 		 * for ports implementing CP_SM.
 		 */
 		if (status & SDW_DPN_INT_PORT_READY) {
-			complete(&slave->port_ready[port]);
 			clear |= SDW_DPN_INT_PORT_READY;
 		}
 

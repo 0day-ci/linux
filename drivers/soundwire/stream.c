@@ -8,11 +8,13 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/slab.h>
 #include <linux/soundwire/sdw_registers.h>
 #include <linux/soundwire/sdw.h>
+#include <linux/time.h>
 #include <sound/soc.h>
 #include "bus.h"
 
@@ -419,11 +421,10 @@ static int sdw_prep_deprep_slave_ports(struct sdw_bus *bus,
 				       struct sdw_port_runtime *p_rt,
 				       bool prep)
 {
-	struct completion *port_ready;
 	struct sdw_dpn_prop *dpn_prop;
 	struct sdw_prepare_ch prep_ch;
-	unsigned int time_left;
 	bool intr = false;
+	unsigned long prep_poll_us, prep_timeout_us;
 	int ret = 0, val;
 	u32 addr;
 
@@ -478,16 +479,19 @@ static int sdw_prep_deprep_slave_ports(struct sdw_bus *bus,
 		}
 
 		/* Wait for completion on port ready */
-		port_ready = &s_rt->slave->port_ready[prep_ch.num];
-		time_left = wait_for_completion_timeout(port_ready,
-				msecs_to_jiffies(dpn_prop->ch_prep_timeout));
+		prep_timeout_us = dpn_prop->ch_prep_timeout * USEC_PER_MSEC;
+		if (dpn_prop->ch_prep_poll_us)
+			prep_poll_us = dpn_prop->ch_prep_poll_us;
+		else
+			prep_poll_us = SDW_DEFAULT_DP_PREP_POLL_US;
 
-		val = sdw_read(s_rt->slave, SDW_DPN_PREPARESTATUS(p_rt->num));
-		val &= p_rt->ch_mask;
-		if (!time_left || val) {
+		ret = read_poll_timeout(sdw_read, val, ((val & p_rt->ch_mask) == 0),
+					prep_poll_us, prep_timeout_us, false,
+					s_rt->slave, SDW_DPN_PREPARESTATUS(p_rt->num));
+		if (ret < 0) {
 			dev_err(&s_rt->slave->dev,
-				"Chn prep failed for port:%d\n", prep_ch.num);
-			return -ETIMEDOUT;
+				"Chn prep failed for port %d: %d\n", prep_ch.num, ret);
+			return ret;
 		}
 	}
 

@@ -67,6 +67,9 @@ enum {
 #define SDW_BLOCK_PACKG_PER_PORT	BIT(0)
 #define SDW_BLOCK_PACKG_PER_CH		BIT(1)
 
+/* Default interval to poll for DP prepare completion */
+#define SDW_DEFAULT_DP_PREP_POLL_US	500
+
 /**
  * enum sdw_slave_status - Slave status
  * @SDW_SLAVE_UNATTACHED: Slave is not attached with the bus.
@@ -295,6 +298,8 @@ struct sdw_dpn_audio_mode {
  * @simple_ch_prep_sm: If the port supports simplified channel prepare state
  * machine
  * @ch_prep_timeout: Port-specific timeout value, in milliseconds
+ * @ch_prep_poll_us: Interval to poll for CP_SM prepare completion. Zero means
+ *                   poll at SDW_DEFAULT_DP_PREP_POLL_US intervals.
  * @imp_def_interrupts: If set, each bit corresponds to support for
  * implementation-defined interrupts
  * @max_ch: Maximum channels supported
@@ -321,6 +326,7 @@ struct sdw_dpn_prop {
 	u32 max_grouping;
 	bool simple_ch_prep_sm;
 	u32 ch_prep_timeout;
+	u32 ch_prep_poll_us;
 	u32 imp_def_interrupts;
 	u32 max_ch;
 	u32 min_ch;
@@ -641,7 +647,6 @@ struct sdw_slave_ops {
  * @prop: Slave properties
  * @debugfs: Slave debugfs
  * @node: node for bus list
- * @port_ready: Port ready completion flag for each Slave port
  * @m_port_map: static Master port map for each Slave port
  * @dev_num: Current Device Number, values can be 0 or dev_num_sticky
  * @dev_num_sticky: one-time static Device Number assigned by Bus
@@ -673,7 +678,6 @@ struct sdw_slave {
 	struct dentry *debugfs;
 #endif
 	struct list_head node;
-	struct completion port_ready[SDW_MAX_PORTS];
 	unsigned int m_port_map[SDW_MAX_PORTS];
 	u16 dev_num;
 	u16 dev_num_sticky;
