@@ -107,6 +107,9 @@ static inline unsigned long wb_stat_error(void)
 int bdi_set_min_ratio(struct backing_dev_info *bdi, unsigned int min_ratio);
 int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned int max_ratio);
 
+int bdi_set_min_bw(struct backing_dev_info *bdi, u64 min_bw);
+int bdi_set_max_bw(struct backing_dev_info *bdi, u64 max_bw);
+
 /*
  * Flags in backing_dev_info::capability
  *

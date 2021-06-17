@@ -197,6 +197,44 @@ static ssize_t max_ratio_store(struct device *dev,
 }
 BDI_SHOW(max_ratio, bdi->max_ratio)
 
+static ssize_t min_bw_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct backing_dev_info *bdi = dev_get_drvdata(dev);
+	unsigned long long limit;
+	ssize_t ret;
+
+	ret = kstrtoull(buf, 10, &limit);
+	if (ret < 0)
+		return ret;
+
+	ret = bdi_set_min_bw(bdi, limit);
+	if (!ret)
+		ret = count;
+
+	return ret;
+}
+BDI_SHOW(min_bw, bdi->min_bw)
+
+static ssize_t max_bw_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct backing_dev_info *bdi = dev_get_drvdata(dev);
+	unsigned long long limit;
+	ssize_t ret;
+
+	ret = kstrtoull(buf, 10, &limit);
+	if (ret < 0)
+		return ret;
+
+	ret = bdi_set_max_bw(bdi, limit);
+	if (!ret)
+		ret = count;
+
+	return ret;
+}
+BDI_SHOW(max_bw, bdi->max_bw)
+
 static ssize_t stable_pages_required_show(struct device *dev,
 					  struct device_attribute *attr,
 					  char *buf)
@@ -211,6 +249,8 @@ static struct attribute *bdi_dev_attrs[] = {
 	&dev_attr_read_ahead_kb.attr,
 	&dev_attr_min_ratio.attr,
 	&dev_attr_max_ratio.attr,
+	&dev_attr_min_bw.attr,
+	&dev_attr_max_bw.attr,
 	&dev_attr_stable_pages_required.attr,
 	NULL,
 };

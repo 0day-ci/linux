@@ -175,6 +175,8 @@ struct backing_dev_info {
 	unsigned int capabilities; /* Device capabilities */
 	unsigned int min_ratio;
 	unsigned int max_ratio, max_prop_frac;
+	u64 min_bw;
+	u64 max_bw;
 
 	/*
 	 * Sum of avg_write_bw of wbs with dirty inodes.  > 0 if there are

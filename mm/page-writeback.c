@@ -701,6 +701,22 @@ int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned max_ratio)
 }
 EXPORT_SYMBOL(bdi_set_max_ratio);
 
+int bdi_set_min_bw(struct backing_dev_info *bdi, u64 min_bw)
+{
+	spin_lock_bh(&bdi_lock);
+	bdi->min_bw = min_bw;
+	spin_unlock_bh(&bdi_lock);
+	return 0;
+}
+
+int bdi_set_max_bw(struct backing_dev_info *bdi, u64 max_bw)
+{
+	spin_lock_bh(&bdi_lock);
+	bdi->max_bw = max_bw;
+	spin_unlock_bh(&bdi_lock);
+	return 0;
+}
+
 static unsigned long dirty_freerun_ceiling(unsigned long thresh,
 					   unsigned long bg_thresh)
 {
@@ -1068,6 +1084,15 @@ static void wb_position_ratio(struct dirty_throttle_control *dtc)
 	dtc->pos_ratio = pos_ratio;
 }
 
+static u64 clamp_bw(struct backing_dev_info *bdi, u64 bw)
+{
+	if (bdi->min_bw > 0 && bw < bdi->min_bw)
+		bw = bdi->min_bw;
+	if (bdi->max_bw > 0 && bw > bdi->max_bw)
+		bw = bdi->max_bw;
+	return bw;
+}
+
 static void wb_update_write_bandwidth(struct bdi_writeback *wb,
 				      unsigned long elapsed,
 				      unsigned long written)
@@ -1091,11 +1116,14 @@ static void wb_update_write_bandwidth(struct bdi_writeback *wb,
 	bw *= HZ;
 	if (unlikely(elapsed > period)) {
 		bw = div64_ul(bw, elapsed);
+		bw = clamp_bw(wb->bdi, bw);
 		avg = bw;
 		goto out;
 	}
 	bw += (u64)wb->write_bandwidth * (period - elapsed);
 	bw >>= ilog2(period);
+
+	bw = clamp_bw(wb->bdi, bw);
 
 	/*
 	 * one more level of smoothing, for filtering out sudden spikes
