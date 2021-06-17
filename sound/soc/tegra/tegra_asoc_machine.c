@@ -306,6 +306,7 @@ static int tegra_machine_hw_params(struct snd_pcm_substream *substream,
 
 	err = snd_soc_dai_set_sysclk(codec_dai, clk_id, mclk, SND_SOC_CLOCK_IN);
 	if (err < 0) {
+		clk_disable_unprepare(machine->clk_cdev1);
 		dev_err(card->dev, "codec_dai clock not set: %d\n", err);
 		return err;
 	}
@@ -523,8 +524,10 @@ int tegra_asoc_machine_probe(struct platform_device *pdev)
 	}
 
 	err = devm_snd_soc_register_card(dev, card);
-	if (err)
+	if (err) {
+		clk_disable_unprepare(machine->clk_cdev1);
 		return err;
+	}
 
 	return 0;
 }
