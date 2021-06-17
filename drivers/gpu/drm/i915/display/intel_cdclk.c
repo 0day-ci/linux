@@ -1962,10 +1962,18 @@ static void intel_set_cdclk(struct drm_i915_private *dev_priv,
 
 	intel_dump_cdclk_config(cdclk_config, "Changing CDCLK to");
 
-	for_each_intel_encoder_with_psr(&dev_priv->drm, encoder) {
-		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	/*
+	 * Only ADL-P platform requires a temporal disabling of PSR for changing
+	 * the CDCLK PLL frequency with crawling.
+	 * Changing the CDCLK PLL frequency on prior platforms of ADL-P or changing
+	 * the CDCLK PLL frequency without crawling on ADL-P don't need to disable of PSR.
+	 */
+	if (IS_ALDERLAKE_P(dev_priv)) {
+		for_each_intel_encoder_with_psr(&dev_priv->drm, encoder) {
+			struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		intel_psr_pause(intel_dp);
+			intel_psr_pause(intel_dp);
+		}
 	}
 
 	/*
@@ -1990,10 +1998,12 @@ static void intel_set_cdclk(struct drm_i915_private *dev_priv,
 	}
 	mutex_unlock(&dev_priv->gmbus_mutex);
 
-	for_each_intel_encoder_with_psr(&dev_priv->drm, encoder) {
-		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	if (IS_ALDERLAKE_P(dev_priv)) {
+		for_each_intel_encoder_with_psr(&dev_priv->drm, encoder) {
+			struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-		intel_psr_resume(intel_dp);
+			intel_psr_resume(intel_dp);
+		}
 	}
 
 	if (drm_WARN(&dev_priv->drm,
