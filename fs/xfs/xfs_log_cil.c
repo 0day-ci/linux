@@ -684,6 +684,7 @@ xlog_cil_committed(
 	 */
 	if (abort) {
 		spin_lock(&ctx->cil->xc_push_lock);
+		wake_up_all(&ctx->cil->xc_start_wait);
 		wake_up_all(&ctx->cil->xc_commit_wait);
 		spin_unlock(&ctx->cil->xc_push_lock);
 	}
@@ -788,6 +789,10 @@ xlog_cil_build_trans_hdr(
  * If the context doesn't have a start_lsn recorded, then this iclog will
  * contain the start record for the checkpoint. Otherwise this write contains
  * the commit record for the checkpoint.
+ *
+ * Once we've set the LSN for the given operation, wake up any ordered write
+ * waiters that can make progress now that we have a stable LSN for write
+ * ordering purposes.
  */
 void
 xlog_cil_set_ctx_write_state(
@@ -798,9 +803,16 @@ xlog_cil_set_ctx_write_state(
 	xfs_lsn_t		lsn = be64_to_cpu(iclog->ic_header.h_lsn);
 
 	ASSERT(!ctx->commit_lsn);
-	spin_lock(&cil->xc_push_lock);
 	if (!ctx->start_lsn) {
+		spin_lock(&cil->xc_push_lock);
+		/*
+		 * The LSN we need to pass to the log items on transaction
+		 * commit is the LSN reported by the first log vector write, not
+		 * the commit lsn. If we use the commit record lsn then we can
+		 * move the tail beyond the grant write head.
+		 */
 		ctx->start_lsn = lsn;
+		wake_up_all(&cil->xc_start_wait);
 		spin_unlock(&cil->xc_push_lock);
 		return;
 	}
@@ -811,9 +823,6 @@ xlog_cil_set_ctx_write_state(
 	 * context controls when the iclog is released for IO.
 	 */
 	atomic_inc(&iclog->ic_refcnt);
-	ctx->commit_iclog = iclog;
-	ctx->commit_lsn = lsn;
-	spin_unlock(&cil->xc_push_lock);
 
 	/*
 	 * xlog_state_get_iclog_space() guarantees there is enough space in the
@@ -827,6 +836,12 @@ xlog_cil_set_ctx_write_state(
 	}
 	list_add_tail(&ctx->iclog_entry, &iclog->ic_callbacks);
 	spin_unlock(&iclog->ic_callback_lock);
+
+	spin_lock(&cil->xc_push_lock);
+	ctx->commit_iclog = iclog;
+	ctx->commit_lsn = lsn;
+	wake_up_all(&cil->xc_commit_wait);
+	spin_unlock(&cil->xc_push_lock);
 }
 
 /*
@@ -834,10 +849,16 @@ xlog_cil_set_ctx_write_state(
  * relies on the context LSN being zero until the log write has guaranteed the
  * LSN that the log write will start at via xlog_state_get_iclog_space().
  */
+enum {
+	_START_RECORD,
+	_COMMIT_RECORD,
+};
+
 static int
 xlog_cil_order_write(
 	struct xfs_cil		*cil,
-	xfs_csn_t		sequence)
+	xfs_csn_t		sequence,
+	int			record)
 {
 	struct xfs_cil_ctx	*ctx;
 
@@ -860,17 +881,48 @@ restart:
 		 */
 		if (ctx->sequence >= sequence)
 			continue;
-		if (!ctx->commit_lsn) {
-			/*
-			 * It is still being pushed! Wait for the push to
-			 * complete, then start again from the beginning.
-			 */
-			xlog_wait(&cil->xc_commit_wait, &cil->xc_push_lock);
-			goto restart;
+
+		/* Wait until the LSN for the record has been recorded. */
+		switch (record) {
+		case _START_RECORD:
+			if (!ctx->start_lsn) {
+				xlog_wait(&cil->xc_start_wait, &cil->xc_push_lock);
+				goto restart;
+			}
+			break;
+		case _COMMIT_RECORD:
+			if (!ctx->commit_lsn) {
+				xlog_wait(&cil->xc_commit_wait, &cil->xc_push_lock);
+				goto restart;
+			}
+			break;
+		default:
+			ASSERT(0);
+			break;
 		}
 	}
 	spin_unlock(&cil->xc_push_lock);
 	return 0;
+}
+
+/*
+ * Write out the log vector change now attached to the CIL context. This will
+ * write a start record that needs to be strictly ordered in ascending CIL
+ * sequence order so that log recovery will always use in-order start LSNs when
+ * replaying checkpoints.
+ */
+static int
+xlog_cil_write_chain(
+	struct xfs_cil_ctx	*ctx,
+	uint32_t		num_bytes)
+{
+	struct xlog		*log = ctx->cil->xc_log;
+	int			error;
+
+	error = xlog_cil_order_write(ctx->cil, ctx->sequence, _START_RECORD);
+	if (error)
+		return error;
+	return xlog_write(log, ctx, &ctx->lv_chain, ctx->ticket, num_bytes);
 }
 
 /*
@@ -906,7 +958,7 @@ xlog_cil_write_commit_record(
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return -EIO;
 
-	error = xlog_cil_order_write(ctx->cil, ctx->sequence);
+	error = xlog_cil_order_write(ctx->cil, ctx->sequence, _COMMIT_RECORD);
 	if (error)
 		return error;
 
@@ -1125,17 +1177,10 @@ xlog_cil_push_work(
 	wait_for_completion(&bdev_flush);
 
 	/*
-	 * The LSN we need to pass to the log items on transaction commit is the
-	 * LSN reported by the first log vector write, not the commit lsn. If we
-	 * use the commit record lsn then we can move the tail beyond the grant
-	 * write head.
+	 * Once we write the log vector chain, take the lvhdr back off it as it
+	 * must not be passed to log IO completion.
 	 */
-	error = xlog_write(log, ctx, &ctx->lv_chain, ctx->ticket, num_bytes);
-
-	/*
-	 * Take the lvhdr back off the lv_chain as it should not be passed
-	 * to log IO completion.
-	 */
+	error = xlog_cil_write_chain(ctx, num_bytes);
 	list_del(&lvhdr.lv_list);
 	if (error)
 		goto out_abort_free_ticket;
@@ -1143,15 +1188,6 @@ xlog_cil_push_work(
 	error = xlog_cil_write_commit_record(ctx);
 	if (error)
 		goto out_abort_free_ticket;
-
-	/*
-	 * now the checkpoint commit is complete and we've attached the
-	 * callbacks to the iclog we can assign the commit LSN to the context
-	 * and wake up anyone who is waiting for the commit to complete.
-	 */
-	spin_lock(&cil->xc_push_lock);
-	wake_up_all(&cil->xc_commit_wait);
-	spin_unlock(&cil->xc_push_lock);
 
 	/*
 	 * Pull the ticket off the ctx so we can ungrant it after releasing the
@@ -1728,6 +1764,7 @@ xlog_cil_init(
 	init_waitqueue_head(&cil->xc_push_wait);
 	init_rwsem(&cil->xc_ctx_lock);
 	init_waitqueue_head(&cil->xc_commit_wait);
+	init_waitqueue_head(&cil->xc_start_wait);
 	log->l_cilp = cil;
 
 	ctx = xlog_cil_ctx_alloc();
