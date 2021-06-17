@@ -80,10 +80,8 @@ static int jffs2_selected_compress(u8 compr, unsigned char *data_in,
 	char *output_buf;
 
 	output_buf = kmalloc(*cdatalen, GFP_KERNEL);
-	if (!output_buf) {
-		pr_warn("No memory for compressor allocation. Compression failed.\n");
+	if (!output_buf)
 		return ret;
-	}
 	orig_slen = *datalen;
 	orig_dlen = *cdatalen;
 	spin_lock(&jffs2_compressor_list_lock);
@@ -189,15 +187,11 @@ uint16_t jffs2_compress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 				spin_unlock(&jffs2_compressor_list_lock);
 				tmp_buf = kmalloc(orig_slen, GFP_KERNEL);
 				spin_lock(&jffs2_compressor_list_lock);
-				if (!tmp_buf) {
-					pr_warn("No memory for compressor allocation. (%d bytes)\n",
-						orig_slen);
+				if (!tmp_buf)
 					continue;
-				}
-				else {
-					this->compr_buf = tmp_buf;
-					this->compr_buf_size = orig_slen;
-				}
+
+				this->compr_buf = tmp_buf;
+				this->compr_buf_size = orig_slen;
 			}
 			this->usecount++;
 			spin_unlock(&jffs2_compressor_list_lock);
