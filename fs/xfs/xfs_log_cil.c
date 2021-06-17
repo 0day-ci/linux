@@ -790,14 +790,13 @@ xlog_cil_build_trans_hdr(
  */
 int
 xlog_cil_write_commit_record(
-	struct xlog		*log,
-	struct xlog_ticket	*ticket,
-	struct xlog_in_core	**iclog,
-	xfs_lsn_t		*lsn)
+	struct xfs_cil_ctx	*ctx,
+	struct xlog_in_core	**iclog)
 {
+	struct xlog		*log = ctx->cil->xc_log;
 	struct xlog_op_header	ophdr = {
 		.oh_clientid = XFS_TRANSACTION,
-		.oh_tid = cpu_to_be32(ticket->t_tid),
+		.oh_tid = cpu_to_be32(ctx->ticket->t_tid),
 		.oh_flags = XLOG_COMMIT_TRANS,
 	};
 	struct xfs_log_iovec reg = {
@@ -818,8 +817,8 @@ xlog_cil_write_commit_record(
 		return -EIO;
 
 	/* account for space used by record data */
-	ticket->t_curr_res -= reg.i_len;
-	error = xlog_write(log, &lv_chain, ticket, lsn, iclog, reg.i_len);
+	ctx->ticket->t_curr_res -= reg.i_len;
+	error = xlog_write(log, ctx, &lv_chain, ctx->ticket, iclog, reg.i_len);
 	if (error)
 		xfs_force_shutdown(log->l_mp, SHUTDOWN_LOG_IO_ERROR);
 	return error;
@@ -1038,7 +1037,7 @@ xlog_cil_push_work(
 	 * use the commit record lsn then we can move the tail beyond the grant
 	 * write head.
 	 */
-	error = xlog_write(log, &ctx->lv_chain, ctx->ticket, &ctx->start_lsn,
+	error = xlog_write(log, ctx, &ctx->lv_chain, ctx->ticket,
 				NULL, num_bytes);
 
 	/*
@@ -1083,8 +1082,7 @@ restart:
 	}
 	spin_unlock(&cil->xc_push_lock);
 
-	error = xlog_cil_write_commit_record(log, ctx->ticket, &commit_iclog,
-			&commit_lsn);
+	error = xlog_cil_write_commit_record(ctx, &commit_iclog);
 	if (error)
 		goto out_abort_free_ticket;
 
@@ -1104,7 +1102,6 @@ restart:
 	 * and wake up anyone who is waiting for the commit to complete.
 	 */
 	spin_lock(&cil->xc_push_lock);
-	ctx->commit_lsn = commit_lsn;
 	wake_up_all(&cil->xc_commit_wait);
 	spin_unlock(&cil->xc_push_lock);
 

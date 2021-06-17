@@ -871,7 +871,7 @@ xlog_write_unmount_record(
 	 */
 	if (log->l_targ != log->l_mp->m_ddev_targp)
 		blkdev_issue_flush(log->l_targ->bt_bdev);
-	return xlog_write(log, &lv_chain, ticket, NULL, NULL, reg.i_len);
+	return xlog_write(log, NULL, &lv_chain, ticket, NULL, reg.i_len);
 }
 
 /*
@@ -2383,9 +2383,9 @@ xlog_write_partial(
 int
 xlog_write(
 	struct xlog		*log,
+	struct xfs_cil_ctx	*ctx,
 	struct list_head	*lv_chain,
 	struct xlog_ticket	*ticket,
-	xfs_lsn_t		*start_lsn,
 	struct xlog_in_core	**commit_iclog,
 	uint32_t		len)
 {
@@ -2408,9 +2408,21 @@ xlog_write(
 	if (error)
 		return error;
 
-	/* start_lsn is the LSN of the first iclog written to. */
-	if (start_lsn)
-		*start_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
+	/*
+	 * If we have a CIL context, record the LSN of the iclog we were just
+	 * granted space to start writing into. If the context doesn't have
+	 * a start_lsn recorded, then this iclog will contain the start record
+	 * for the checkpoint. Otherwise this write contains the commit record
+	 * for the checkpoint.
+	 */
+	if (ctx) {
+		spin_lock(&ctx->cil->xc_push_lock);
+		if (!ctx->start_lsn)
+			ctx->start_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
+		else
+			ctx->commit_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
+		spin_unlock(&ctx->cil->xc_push_lock);
+	}
 
 	lv = list_first_entry_or_null(lv_chain, struct xfs_log_vec, lv_list);
 	while (lv) {
