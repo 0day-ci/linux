@@ -2028,8 +2028,12 @@ static unsigned long __lockdep_count_forward_deps(struct lock_list *this)
 {
 	unsigned long  count = 0;
 	struct lock_list *target_entry;
+	enum bfs_result ret;
 
-	__bfs_forwards(this, (void *)&count, noop_count, NULL, &target_entry);
+	ret = __bfs_forwards(this, (void *)&count, noop_count, NULL, &target_entry);
+
+	if (bfs_error(ret))
+		print_bfs_bug(ret);
 
 	return count;
 }
@@ -2053,8 +2057,12 @@ static unsigned long __lockdep_count_backward_deps(struct lock_list *this)
 {
 	unsigned long  count = 0;
 	struct lock_list *target_entry;
+	enum bfs_result ret;
 
-	__bfs_backwards(this, (void *)&count, noop_count, NULL, &target_entry);
+	ret = __bfs_backwards(this, (void *)&count, noop_count, NULL, &target_entry);
+
+	if (bfs_error(ret))
+		print_bfs_bug(ret);
 
 	return count;
 }
