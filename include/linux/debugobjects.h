@@ -99,6 +99,9 @@ static inline void
 debug_object_free      (void *addr, const struct debug_obj_descr *descr) { }
 static inline void
 debug_object_assert_init(void *addr, const struct debug_obj_descr *descr) { }
+static inline void
+debug_object_active_state(void *addr, const struct debug_obj_descr *descr,
+			  unsigned int expect, unsigned int next) { }
 
 static inline void debug_objects_early_init(void) { }
 static inline void debug_objects_mem_init(void) { }
