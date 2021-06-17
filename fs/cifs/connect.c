@@ -97,10 +97,8 @@ static int reconn_set_ipaddr_from_hostname(struct TCP_Server_Info *server)
 	len = strlen(server->hostname) + 3;
 
 	unc = kmalloc(len, GFP_KERNEL);
-	if (!unc) {
-		cifs_dbg(FYI, "%s: failed to create UNC path\n", __func__);
+	if (!unc)
 		return -ENOMEM;
-	}
 	scnprintf(unc, len, "\\\\%s", server->hostname);
 
 	rc = dns_resolve_server_name_to_ip(unc, &ipaddr);
@@ -1764,8 +1762,6 @@ cifs_set_cifscreds(struct smb3_fs_context *ctx, struct cifs_ses *ses)
 	if (is_domain && ses->domainName) {
 		ctx->domainname = kstrdup(ses->domainName, GFP_KERNEL);
 		if (!ctx->domainname) {
-			cifs_dbg(FYI, "Unable to allocate %zd bytes for domain\n",
-				 len);
 			rc = -ENOMEM;
 			kfree(ctx->username);
 			ctx->username = NULL;

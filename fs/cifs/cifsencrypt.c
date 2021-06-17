@@ -787,10 +787,8 @@ calc_seckey(struct cifs_ses *ses)
 	get_random_bytes(sec_key, CIFS_SESS_KEY_SIZE);
 
 	ctx_arc4 = kmalloc(sizeof(*ctx_arc4), GFP_KERNEL);
-	if (!ctx_arc4) {
-		cifs_dbg(VFS, "Could not allocate arc4 context\n");
+	if (!ctx_arc4)
 		return -ENOMEM;
-	}
 
 	arc4_setkey(ctx_arc4, ses->auth_key.response, CIFS_SESS_KEY_SIZE);
 	arc4_crypt(ctx_arc4, ses->ntlmssp->ciphertext, sec_key,
