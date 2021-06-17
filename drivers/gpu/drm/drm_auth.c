@@ -302,7 +302,7 @@ int drm_master_open(struct drm_file *file_priv)
 	/* if there is no current master make this fd it, but do not create
 	 * any master object for render clients */
 	mutex_lock(&dev->master_mutex);
-	if (!dev->master)
+	if (!file_priv->master)
 		ret = drm_new_set_master(dev, file_priv);
 	else
 		file_priv->master = drm_master_get(dev->master);
