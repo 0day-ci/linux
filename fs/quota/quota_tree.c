@@ -49,11 +49,7 @@ static int qtree_dqstr_in_blk(struct qtree_mem_dqinfo *info)
 
 static char *getdqbuf(size_t size)
 {
-	char *buf = kmalloc(size, GFP_NOFS);
-	if (!buf)
-		printk(KERN_WARNING
-		       "VFS: Not enough memory for quota buffers.\n");
-	return buf;
+	return kmalloc(size, GFP_NOFS);
 }
 
 static ssize_t read_blk(struct qtree_mem_dqinfo *info, uint blk, char *buf)
