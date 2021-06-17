@@ -419,6 +419,21 @@ static int ptrace_attach(struct task_struct *task, long request,
 	if (task->ptrace)
 		goto unlock_tasklist;
 
+	/*
+	 * It may happen that de_thread() has to release the
+	 * cred_guard_mutex in order to prevent deadlocks.
+	 * In that case unsafe_execve_in_progress will be set.
+	 * If that happens you cannot assume that the usual
+	 * guarantees implied by cred_guard_mutex are valid.
+	 * Just return -EAGAIN in that case.
+	 * The tracer is expected to call wait(2) and handle
+	 * possible events before calling this API again.
+	 */
+	retval = -EAGAIN;
+	if (unlikely(task->signal->unsafe_execve_in_progress) &&
+	    task->in_execve)
+		goto unlock_tasklist;
+
 	if (seize)
 		flags |= PT_SEIZED;
 	task->ptrace = flags;
@@ -485,6 +500,14 @@ static int ptrace_traceme(void)
 {
 	int ret = -EPERM;
 
+	if (mutex_lock_interruptible(&current->signal->cred_guard_mutex))
+		return -ERESTARTNOINTR;
+
+	if (unlikely(current->signal->unsafe_execve_in_progress)) {
+		mutex_unlock(&current->signal->cred_guard_mutex);
+		return -ERESTARTNOINTR;
+	}
+
 	write_lock_irq(&tasklist_lock);
 	/* Are we already being traced? */
 	if (!current->ptrace) {
@@ -500,6 +523,7 @@ static int ptrace_traceme(void)
 		}
 	}
 	write_unlock_irq(&tasklist_lock);
+	mutex_unlock(&current->signal->cred_guard_mutex);
 
 	return ret;
 }
