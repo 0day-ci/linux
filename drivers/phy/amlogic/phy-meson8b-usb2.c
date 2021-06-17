@@ -205,6 +205,17 @@ static int phy_meson8b_usb2_setmode(struct phy *phy, enum phy_mode mode,
 	return 0;
 }
 
+static int phy_meson8b_usb2_power_off(struct phy *phy)
+{
+	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+
+	if (priv->dr_mode == USB_DR_MODE_HOST)
+		regmap_update_bits(priv->regmap, REG_DBG_UART,
+				   REG_DBG_UART_SET_IDDQ,
+				   REG_DBG_UART_SET_IDDQ);
+	return 0;
+}
+
 static int phy_meson8b_usb2_power_on(struct phy *phy)
 {
 	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
@@ -236,19 +247,6 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 			priv->dr_mode);
 		return ret;
 	}
-
-	return 0;
-}
-
-static int phy_meson8b_usb2_power_off(struct phy *phy)
-{
-	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
-
-	if (priv->dr_mode == USB_DR_MODE_HOST)
-		regmap_update_bits(priv->regmap, REG_DBG_UART,
-				   REG_DBG_UART_SET_IDDQ,
-				   REG_DBG_UART_SET_IDDQ);
-
 
 	return 0;
 }
