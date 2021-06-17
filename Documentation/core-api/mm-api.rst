@@ -87,6 +87,12 @@ DMA pools
 .. kernel-doc:: mm/dmapool.c
    :export:
 
+Per-CPU memory allocation
+=========================
+
+.. kernel-doc:: mm/percpu.c
+   :export:
+
 More Memory Management Functions
 ================================
 
