@@ -1534,10 +1534,12 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 					mask->basic.n_proto = cpu_to_be16(0);
 				} else {
 					key->basic.n_proto = ethertype;
+					mask->basic.n_proto = cpu_to_be16(~0);
 				}
 			}
 		} else {
 			key->basic.n_proto = ethertype;
+			mask->basic.n_proto = cpu_to_be16(~0);
 		}
 	}
 
