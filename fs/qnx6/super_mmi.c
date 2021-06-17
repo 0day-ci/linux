@@ -101,10 +101,8 @@ struct qnx6_super_block *qnx6_mmi_fill_super(struct super_block *s, int silent)
 	}
 
 	qsb = kmalloc(sizeof(*qsb), GFP_KERNEL);
-	if (!qsb) {
-		pr_err("unable to allocate memory.\n");
+	if (!qsb)
 		goto out;
-	}
 
 	if (fs64_to_cpu(sbi, sb1->sb_serial) >
 					fs64_to_cpu(sbi, sb2->sb_serial)) {
