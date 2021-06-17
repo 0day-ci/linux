@@ -5,6 +5,7 @@
  * Author: Thierry Reding <treding@nvidia.com>
  */
 
+#include <linux/acpi.h>
 #include <linux/gpio/driver.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -620,13 +621,18 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 	if (!gpio)
 		return -ENOMEM;
 
-	gpio->soc = of_device_get_match_data(&pdev->dev);
+	gpio->soc = device_get_match_data(&pdev->dev);
+	if (has_acpi_companion(&pdev->dev)) {
+		gpio->secure = devm_platform_ioremap_resource(pdev, 0);
+		gpio->base = devm_platform_ioremap_resource(pdev, 1);
+	} else {
+		gpio->secure = devm_platform_ioremap_resource_byname(pdev, "security");
+		gpio->base = devm_platform_ioremap_resource_byname(pdev, "gpio");
+	}
 
-	gpio->secure = devm_platform_ioremap_resource_byname(pdev, "security");
 	if (IS_ERR(gpio->secure))
 		return PTR_ERR(gpio->secure);
 
-	gpio->base = devm_platform_ioremap_resource_byname(pdev, "gpio");
 	if (IS_ERR(gpio->base))
 		return PTR_ERR(gpio->base);
 
@@ -690,11 +696,15 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 
 	gpio->gpio.names = (const char * const *)names;
 
-	gpio->gpio.of_node = pdev->dev.of_node;
-	gpio->gpio.of_gpio_n_cells = 2;
-	gpio->gpio.of_xlate = tegra186_gpio_of_xlate;
 
-	gpio->intc.name = pdev->dev.of_node->name;
+	if (!has_acpi_companion(&pdev->dev)) {
+		gpio->gpio.of_node = pdev->dev.of_node;
+		gpio->gpio.of_gpio_n_cells = 2;
+		gpio->gpio.of_xlate = tegra186_gpio_of_xlate;
+		gpio->intc.name = pdev->dev.of_node->name;
+	} else {
+		gpio->intc.name = gpio->soc->name;
+	}
 	gpio->intc.irq_ack = tegra186_irq_ack;
 	gpio->intc.irq_mask = tegra186_irq_mask;
 	gpio->intc.irq_unmask = tegra186_irq_unmask;
@@ -918,10 +928,21 @@ static const struct of_device_id tegra186_gpio_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tegra186_gpio_of_match);
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id tegra186_gpio_acpi_match[] = {
+	{ .id = "NVDA0108", .driver_data = (kernel_ulong_t)&tegra186_main_soc },
+	{ .id = "NVDA0208", .driver_data = (kernel_ulong_t)&tegra186_aon_soc },
+	{ .id = "NVDA0308", .driver_data = (kernel_ulong_t)&tegra194_main_soc },
+	{ .id = "NVDA0408", .driver_data = (kernel_ulong_t)&tegra194_aon_soc },
+};
+MODULE_DEVICE_TABLE(acpi, tegra186_gpio_acpi_match);
+#endif
+
 static struct platform_driver tegra186_gpio_driver = {
 	.driver = {
 		.name = "tegra186-gpio",
 		.of_match_table = tegra186_gpio_of_match,
+		.acpi_match_table = ACPI_PTR(tegra186_gpio_acpi_match),
 	},
 	.probe = tegra186_gpio_probe,
 	.remove = tegra186_gpio_remove,
