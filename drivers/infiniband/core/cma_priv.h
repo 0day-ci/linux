@@ -82,11 +82,9 @@ struct rdma_id_private {
 	u32			qkey;
 	u32			qp_num;
 	u32			options;
+	unsigned long		flags;
 	u8			srq;
 	u8			tos;
-	u8			tos_set:1;
-	u8                      timeout_set:1;
-	u8			min_rnr_timer_set:1;
 	u8			reuseaddr;
 	u8			afonly;
 	u8			timeout;
