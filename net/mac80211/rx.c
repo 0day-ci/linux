@@ -559,6 +559,8 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 
 	if (status->encoding == RX_ENC_HE &&
 	    status->flag & RX_FLAG_RADIOTAP_HE) {
+		struct ieee80211_radiotap_he *he_ptr;
+
 #define HE_PREP(f, val)	le16_encode_bits(val, IEEE80211_RADIOTAP_HE_##f)
 
 		if (status->enc_flags & RX_ENC_FLAG_STBC_MASK) {
@@ -626,18 +628,22 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 		while ((pos - (u8 *)rthdr) & 1)
 			pos++;
 		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_HE);
-		memcpy(pos, &he, sizeof(he));
-		pos += sizeof(he);
+		he_ptr = (void *)pos;
+		memcpy(he_ptr, &he, sizeof(he));
+		pos += sizeof(*he_ptr);
 	}
 
 	if (status->encoding == RX_ENC_HE &&
 	    status->flag & RX_FLAG_RADIOTAP_HE_MU) {
+		struct ieee80211_radiotap_he_mu *he_mu_ptr;
+
 		/* ensure 2 byte alignment */
 		while ((pos - (u8 *)rthdr) & 1)
 			pos++;
 		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_HE_MU);
-		memcpy(pos, &he_mu, sizeof(he_mu));
-		pos += sizeof(he_mu);
+		he_mu_ptr = (void *)pos;
+		memcpy(he_mu_ptr, &he_mu, sizeof(he_mu));
+		pos += sizeof(*he_mu_ptr);
 	}
 
 	if (status->flag & RX_FLAG_NO_PSDU) {
@@ -647,12 +653,14 @@ ieee80211_add_rx_radiotap_header(struct ieee80211_local *local,
 	}
 
 	if (status->flag & RX_FLAG_RADIOTAP_LSIG) {
+		struct ieee80211_radiotap_lsig *lsig_ptr;
 		/* ensure 2 byte alignment */
 		while ((pos - (u8 *)rthdr) & 1)
 			pos++;
 		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_LSIG);
-		memcpy(pos, &lsig, sizeof(lsig));
-		pos += sizeof(lsig);
+		lsig_ptr = (void *)pos;
+		memcpy(lsig_ptr, &lsig, sizeof(lsig));
+		pos += sizeof(*lsig_ptr);
 	}
 
 	for_each_set_bit(chain, &chains, IEEE80211_MAX_CHAINS) {
