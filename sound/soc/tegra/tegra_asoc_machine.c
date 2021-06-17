@@ -335,9 +335,12 @@ tegra_machine_parse_phandle(struct device *dev, const char *name)
 	}
 
 	err = devm_add_action_or_reset(dev, tegra_machine_node_release, np);
-	if (err)
+	if (err) {
+		of_node_put(np);
 		return ERR_PTR(err);
+	}
 
+	of_node_put(np);
 	return np;
 }
 
