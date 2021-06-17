@@ -320,6 +320,7 @@ static void sl3516_ce_unregister_algs(struct sl3516_ce_dev *ce)
 	}
 }
 
+#ifdef CONFIG_PM
 static void sl3516_ce_start(struct sl3516_ce_dev *ce)
 {
 	ce->ctx = 0;
@@ -365,6 +366,7 @@ error:
 	sl3516_ce_pm_suspend(dev);
 	return err;
 }
+#endif
 
 static const struct dev_pm_ops sl3516_ce_pm_ops = {
 	SET_RUNTIME_PM_OPS(sl3516_ce_pm_suspend, sl3516_ce_pm_resume, NULL)
