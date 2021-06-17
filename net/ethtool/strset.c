@@ -367,7 +367,7 @@ static int strset_reply_size(const struct ethnl_req_info *req_base,
 		len += ret;
 	}
 
-	return len;
+	return nla_total_size(len);
 }
 
 /* fill one string into reply */
