@@ -185,7 +185,7 @@ struct inst_curr_result_list {
  * @avg_cap:		Average capacity filter
  * @parent:		Pointer to the struct ab8500
  * @main_bat_v:		ADC channel for the main battery voltage
- * @bm:           	Platform specific battery management information
+ * @bm:			Platform specific battery management information
  * @fg_psy:		Structure that holds the FG specific battery properties
  * @fg_wq:		Work queue for running the FG algorithm
  * @fg_periodic_work:	Work to run the FG algorithm periodically
@@ -271,70 +271,70 @@ static enum power_supply_property ab8500_fg_props[] = {
  * Values taken from the UM0836
  */
 static int ab8500_fg_lowbat_voltage_map[] = {
-	2300 ,
-	2325 ,
-	2350 ,
-	2375 ,
-	2400 ,
-	2425 ,
-	2450 ,
-	2475 ,
-	2500 ,
-	2525 ,
-	2550 ,
-	2575 ,
-	2600 ,
-	2625 ,
-	2650 ,
-	2675 ,
-	2700 ,
-	2725 ,
-	2750 ,
-	2775 ,
-	2800 ,
-	2825 ,
-	2850 ,
-	2875 ,
-	2900 ,
-	2925 ,
-	2950 ,
-	2975 ,
-	3000 ,
-	3025 ,
-	3050 ,
-	3075 ,
-	3100 ,
-	3125 ,
-	3150 ,
-	3175 ,
-	3200 ,
-	3225 ,
-	3250 ,
-	3275 ,
-	3300 ,
-	3325 ,
-	3350 ,
-	3375 ,
-	3400 ,
-	3425 ,
-	3450 ,
-	3475 ,
-	3500 ,
-	3525 ,
-	3550 ,
-	3575 ,
-	3600 ,
-	3625 ,
-	3650 ,
-	3675 ,
-	3700 ,
-	3725 ,
-	3750 ,
-	3775 ,
-	3800 ,
-	3825 ,
-	3850 ,
-	3850 ,
+	2300,
+	2325,
+	2350,
+	2375,
+	2400,
+	2425,
+	2450,
+	2475,
+	2500,
+	2525,
+	2550,
+	2575,
+	2600,
+	2625,
+	2650,
+	2675,
+	2700,
+	2725,
+	2750,
+	2775,
+	2800,
+	2825,
+	2850,
+	2875,
+	2900,
+	2925,
+	2950,
+	2975,
+	3000,
+	3025,
+	3050,
+	3075,
+	3100,
+	3125,
+	3150,
+	3175,
+	3200,
+	3225,
+	3250,
+	3275,
+	3300,
+	3325,
+	3350,
+	3375,
+	3400,
+	3425,
+	3450,
+	3475,
+	3500,
+	3525,
+	3550,
+	3575,
+	3600,
+	3625,
+	3650,
+	3675,
+	3700,
+	3725,
+	3750,
+	3775,
+	3800,
+	3825,
+	3850,
+	3850,
 };
 
 static u8 ab8500_volt_to_regval(int voltage)
@@ -411,7 +411,7 @@ static int ab8500_fg_add_cap_sample(struct ab8500_fg *di, int sample)
  * ab8500_fg_clear_cap_samples() - Clear average filter
  * @di:		pointer to the ab8500_fg structure
  *
- * The capacity filter is is reset to zero.
+ * The capacity filter is reset to zero.
  */
 static void ab8500_fg_clear_cap_samples(struct ab8500_fg *di)
 {
@@ -466,10 +466,12 @@ static void ab8500_fg_fill_cap_sample(struct ab8500_fg *di, int sample)
 static int ab8500_fg_coulomb_counter(struct ab8500_fg *di, bool enable)
 {
 	int ret = 0;
+
 	mutex_lock(&di->cc_lock);
 	if (enable) {
 		/* To be able to reprogram the number of samples, we have to
-		 * first stop the CC and then enable it again */
+		 * first stop the CC and then enable it again
+		 */
 		ret = abx500_set_register_interruptible(di->dev, AB8500_RTC,
 			AB8500_RTC_CC_CONF_REG, 0x00);
 		if (ret)
@@ -1877,10 +1879,10 @@ static void ab8500_fg_low_bat_work(struct work_struct *work)
 			dev_warn(di->dev, "Shut down pending...\n");
 		} else {
 			/*
-			* Else we need to re-schedule this check to be able to detect
-			* if the voltage increases again during charging or
-			* due to decreasing load.
-			*/
+			 * Else we need to re-schedule this check to be able to detect
+			 * if the voltage increases again during charging or
+			 * due to decreasing load.
+			 */
 			di->low_bat_cnt--;
 			dev_warn(di->dev, "Battery voltage still LOW\n");
 			queue_delayed_work(di->fg_wq, &di->fg_low_bat_work,
@@ -1981,6 +1983,7 @@ static void ab8500_fg_instant_work(struct work_struct *work)
 static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
 {
 	struct ab8500_fg *di = _di;
+
 	if (!di->nbr_cceoc_irq_cnt) {
 		di->nbr_cceoc_irq_cnt++;
 		complete(&di->ab8500_fg_started);
@@ -2001,6 +2004,7 @@ static irqreturn_t ab8500_fg_cc_data_end_handler(int irq, void *_di)
 static irqreturn_t ab8500_fg_cc_int_calib_handler(int irq, void *_di)
 {
 	struct ab8500_fg *di = _di;
+
 	di->calib_state = AB8500_FG_CALIB_END;
 	queue_delayed_work(di->fg_wq, &di->fg_periodic_work, 0);
 	return IRQ_HANDLED;
@@ -2183,6 +2187,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
 	/* Go through all properties for the psy */
 	for (j = 0; j < ext->desc->num_properties; j++) {
 		enum power_supply_property prop;
+
 		prop = ext->desc->properties[j];
 
 		if (power_supply_get_property(ext, prop, &ret))
