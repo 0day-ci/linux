@@ -434,14 +434,16 @@ int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
 }
 
 static struct kvm_pgtable_mm_ops kvm_s2_mm_ops = {
-	.zalloc_page		= stage2_memcache_zalloc_page,
-	.zalloc_pages_exact	= kvm_host_zalloc_pages_exact,
-	.free_pages_exact	= free_pages_exact,
-	.get_page		= kvm_host_get_page,
-	.put_page		= kvm_host_put_page,
-	.page_count		= kvm_host_page_count,
-	.phys_to_virt		= kvm_host_va,
-	.virt_to_phys		= kvm_host_pa,
+	.zalloc_page			= stage2_memcache_zalloc_page,
+	.zalloc_pages_exact		= kvm_host_zalloc_pages_exact,
+	.free_pages_exact		= free_pages_exact,
+	.get_page			= kvm_host_get_page,
+	.put_page			= kvm_host_put_page,
+	.page_count			= kvm_host_page_count,
+	.phys_to_virt			= kvm_host_va,
+	.virt_to_phys			= kvm_host_pa,
+	.clean_invalidate_dcache	= clean_dcache_guest_page,
+	.invalidate_icache		= invalidate_icache_guest_page,
 };
 
 /**
@@ -1012,15 +1014,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (writable)
 		prot |= KVM_PGTABLE_PROT_W;
 
-	if (fault_status != FSC_PERM && !device)
-		clean_dcache_guest_page(page_address(pfn_to_page(pfn)),
-					vma_pagesize);
-
-	if (exec_fault) {
+	if (exec_fault)
 		prot |= KVM_PGTABLE_PROT_X;
-		invalidate_icache_guest_page(page_address(pfn_to_page(pfn)),
-					     vma_pagesize);
-	}
 
 	if (device)
 		prot |= KVM_PGTABLE_PROT_DEVICE;
@@ -1218,12 +1213,10 @@ bool kvm_set_spte_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
 	WARN_ON(range->end - range->start != 1);
 
 	/*
-	 * We've moved a page around, probably through CoW, so let's treat it
-	 * just like a translation fault and clean the cache to the PoC.
-	 */
-	clean_dcache_guest_page(page_address(pfn_to_page(pfn), PAGE_SIZE);
-
-	/*
+	 * We've moved a page around, probably through CoW, so let's treat
+	 * it just like a translation fault and the map handler will clean
+	 * the cache to the PoC.
+	 *
 	 * The MMU notifiers will have unmapped a huge PMD before calling
 	 * ->change_pte() (which in turn calls kvm_set_spte_gfn()) and
 	 * therefore we never need to clear out a huge PMD through this
