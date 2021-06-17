@@ -6,6 +6,7 @@
  * Copyright (C) Huawei Futurewei Technologies.
  */
 
+#include <linux/console.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
@@ -187,6 +188,12 @@ void machine_kexec(struct kimage *kimage)
 		kexec_segment_flush(kimage);
 
 	pr_info("Bye!\n");
+
+	if (in_nmi()) {
+		/* Flush the log to console if we are in NMI context */
+		printk_safe_flush_on_panic();
+		console_flush_on_panic(CONSOLE_FLUSH_PENDING);
+	}
 
 	local_daif_mask();
 
