@@ -121,11 +121,16 @@ struct phy_meson8b_usb2_match_data {
 	bool			host_enable_aca;
 };
 
+static const char * const meson_phy_clks[] = {
+	"usb_general",
+	"usb",
+};
+
 struct phy_meson8b_usb2_priv {
 	struct regmap					*regmap;
 	enum usb_dr_mode				dr_mode;
-	struct clk					*clk_usb_general;
-	struct clk					*clk_usb;
+	int                                             num_clks;
+	struct clk_bulk_data                            *clks;
 	struct reset_control				*reset;
 	const struct phy_meson8b_usb2_match_data	*match;
 };
@@ -151,16 +156,9 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 		}
 	}
 
-	ret = clk_prepare_enable(priv->clk_usb_general);
+	ret = clk_bulk_prepare_enable(priv->num_clks, priv->clks);
 	if (ret) {
-		dev_err(&phy->dev, "Failed to enable USB general clock\n");
-		return ret;
-	}
-
-	ret = clk_prepare_enable(priv->clk_usb);
-	if (ret) {
-		dev_err(&phy->dev, "Failed to enable USB DDR clock\n");
-		clk_disable_unprepare(priv->clk_usb_general);
+		dev_err(&phy->dev, "Failed to enable USB clock\n");
 		return ret;
 	}
 
@@ -197,8 +195,7 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 			regmap_read(priv->regmap, REG_ADP_BC, &reg);
 			if (reg & REG_ADP_BC_ACA_PIN_FLOAT) {
 				dev_warn(&phy->dev, "USB ID detect failed!\n");
-				clk_disable_unprepare(priv->clk_usb);
-				clk_disable_unprepare(priv->clk_usb_general);
+				clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
 				return -EINVAL;
 			}
 		}
@@ -216,8 +213,7 @@ static int phy_meson8b_usb2_power_off(struct phy *phy)
 				   REG_DBG_UART_SET_IDDQ,
 				   REG_DBG_UART_SET_IDDQ);
 
-	clk_disable_unprepare(priv->clk_usb);
-	clk_disable_unprepare(priv->clk_usb_general);
+	clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
 
 	return 0;
 }
@@ -234,6 +230,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
 	struct phy *phy;
 	struct phy_provider *phy_provider;
 	void __iomem *base;
+	int i, ret;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -252,13 +249,18 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
 
-	priv->clk_usb_general = devm_clk_get(&pdev->dev, "usb_general");
-	if (IS_ERR(priv->clk_usb_general))
-		return PTR_ERR(priv->clk_usb_general);
+	priv->num_clks = ARRAY_SIZE(meson_phy_clks);
+	priv->clks = devm_kcalloc(&pdev->dev, priv->num_clks,
+				  sizeof(*priv->clks), GFP_KERNEL);
+	if (!priv->clks)
+		return -ENOMEM;
 
-	priv->clk_usb = devm_clk_get(&pdev->dev, "usb");
-	if (IS_ERR(priv->clk_usb))
-		return PTR_ERR(priv->clk_usb);
+	for (i = 0; i < priv->num_clks; i++)
+		priv->clks[i].id = meson_phy_clks[i];
+
+	ret = devm_clk_bulk_get(&pdev->dev, priv->num_clks, priv->clks);
+	if (ret)
+		return ret;
 
 	priv->reset = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
 	if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
