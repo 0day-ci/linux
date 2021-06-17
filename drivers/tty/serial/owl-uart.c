@@ -751,8 +751,15 @@ static int owl_uart_probe(struct platform_device *pdev)
 static int owl_uart_remove(struct platform_device *pdev)
 {
 	struct owl_uart_port *owl_port = platform_get_drvdata(pdev);
+	struct uart_port *port = &owl_port->port;
 
-	uart_remove_one_port(&owl_uart_driver, &owl_port->port);
+	/* It is possible to release device without closing a port.
+	 * Thus, need to check it and call shutdown.
+	 */
+	if (owl_uart_read(port, OWL_UART_CTL) & OWL_UART_CTL_EN)
+		owl_uart_shutdown(port);
+
+	uart_remove_one_port(&owl_uart_driver, port);
 	owl_uart_ports[pdev->id] = NULL;
 	clk_disable_unprepare(owl_port->clk);
 
