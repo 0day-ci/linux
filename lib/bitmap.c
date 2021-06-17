@@ -462,6 +462,40 @@ int bitmap_parse_user(const char __user *ubuf,
 EXPORT_SYMBOL(bitmap_parse_user);
 
 /**
+ * bitmap_print_to_buf - convert bitmap to list or hex format ASCII string
+ * @list: indicates whether the bitmap must be list
+ * @buf: the kernel space buffer to read to
+ * @maskp: pointer to bitmap to convert
+ * @nmaskbits: size of bitmap, in bits
+ * @off: offset in data buffer below
+ * @count: the maximum number of bytes to print
+ *
+ * The role of bitmap_print_to_buf() and bitmap_print_to_pagebuf() is
+ * the same, the difference is that buf of bitmap_print_to_buf()
+ * can be more than one pagesize.
+ */
+int bitmap_print_to_buf(bool list, char *buf, const unsigned long *maskp,
+			int nmaskbits, loff_t off, size_t count)
+{
+	const char *fmt = list ? "%*pbl\n" : "%*pb\n";
+	ssize_t size;
+	void *data;
+
+	if (off == LLONG_MAX && count == PAGE_SIZE - offset_in_page(buf))
+		return scnprintf(buf, count, fmt, nmaskbits, maskp);
+
+	data = kasprintf(GFP_KERNEL, fmt, nmaskbits, maskp);
+	if (!data)
+		return -ENOMEM;
+
+	size = memory_read_from_buffer(buf, count, &off, data, strlen(data) + 1);
+	kfree(data);
+
+	return size;
+}
+EXPORT_SYMBOL(bitmap_print_to_buf);
+
+/**
  * bitmap_print_to_pagebuf - convert bitmap to list or hex format ASCII string
  * @list: indicates whether the bitmap must be list
  * @buf: page aligned buffer into which string is placed
@@ -482,8 +516,7 @@ int bitmap_print_to_pagebuf(bool list, char *buf, const unsigned long *maskp,
 {
 	ptrdiff_t len = PAGE_SIZE - offset_in_page(buf);
 
-	return list ? scnprintf(buf, len, "%*pbl\n", nmaskbits, maskp) :
-		      scnprintf(buf, len, "%*pb\n", nmaskbits, maskp);
+	return bitmap_print_to_buf(list, buf, maskp, nmaskbits, LLONG_MAX, len);
 }
 EXPORT_SYMBOL(bitmap_print_to_pagebuf);
 
