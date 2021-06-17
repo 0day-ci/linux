@@ -784,6 +784,29 @@ xlog_cil_build_trans_hdr(
 }
 
 /*
+ * Record the LSN of the iclog we were just granted space to start writing into.
+ * If the context doesn't have a start_lsn recorded, then this iclog will
+ * contain the start record for the checkpoint. Otherwise this write contains
+ * the commit record for the checkpoint.
+ */
+void
+xlog_cil_set_ctx_write_state(
+	struct xfs_cil_ctx	*ctx,
+	struct xlog_in_core	*iclog)
+{
+	struct xfs_cil		*cil = ctx->cil;
+	xfs_lsn_t		lsn = be64_to_cpu(iclog->ic_header.h_lsn);
+
+	ASSERT(!ctx->commit_lsn);
+	spin_lock(&cil->xc_push_lock);
+	if (!ctx->start_lsn)
+		ctx->start_lsn = lsn;
+	else
+		ctx->commit_lsn = lsn;
+	spin_unlock(&cil->xc_push_lock);
+}
+
+/*
  * Ensure that the order of log writes follows checkpoint sequence order. This
  * relies on the context LSN being zero until the log write has guaranteed the
  * LSN that the log write will start at via xlog_state_get_iclog_space().

@@ -2408,21 +2408,8 @@ xlog_write(
 	if (error)
 		return error;
 
-	/*
-	 * If we have a CIL context, record the LSN of the iclog we were just
-	 * granted space to start writing into. If the context doesn't have
-	 * a start_lsn recorded, then this iclog will contain the start record
-	 * for the checkpoint. Otherwise this write contains the commit record
-	 * for the checkpoint.
-	 */
-	if (ctx) {
-		spin_lock(&ctx->cil->xc_push_lock);
-		if (!ctx->start_lsn)
-			ctx->start_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
-		else
-			ctx->commit_lsn = be64_to_cpu(iclog->ic_header.h_lsn);
-		spin_unlock(&ctx->cil->xc_push_lock);
-	}
+	if (ctx)
+		xlog_cil_set_ctx_write_state(ctx, iclog);
 
 	lv = list_first_entry_or_null(lv_chain, struct xfs_log_vec, lv_list);
 	while (lv) {
