@@ -933,6 +933,7 @@ struct btrfs_fs_info {
 
 	/* qgroup rescan items */
 	struct mutex qgroup_rescan_lock; /* protects the progress item */
+	bool qgroup_cancel_rescan;
 	struct btrfs_key qgroup_rescan_progress;
 	struct btrfs_workqueue *qgroup_rescan_workers;
 	struct completion qgroup_rescan_completion;

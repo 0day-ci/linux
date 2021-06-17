@@ -1233,6 +1233,21 @@ out:
 	return ret;
 }
 
+int btrfs_quota_cancel_rescan(struct btrfs_fs_info *fs_info)
+{
+	int ret;
+
+	mutex_lock(&fs_info->qgroup_ioctl_lock);
+	fs_info->qgroup_cancel_rescan = true;
+
+	ret = btrfs_qgroup_wait_for_completion(fs_info, false);
+
+	fs_info->qgroup_cancel_rescan = false;
+	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+
+	return ret;
+}
+
 static void qgroup_dirty(struct btrfs_fs_info *fs_info,
 			 struct btrfs_qgroup *qgroup)
 {
@@ -3214,6 +3229,7 @@ static void btrfs_qgroup_rescan_worker(struct btrfs_work *work)
 	int err = -ENOMEM;
 	int ret = 0;
 	bool stopped = false;
+	bool canceled = false;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -3234,6 +3250,9 @@ static void btrfs_qgroup_rescan_worker(struct btrfs_work *work)
 		}
 		if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags)) {
 			err = -EINTR;
+		} else if (fs_info->qgroup_cancel_rescan) {
+			canceled = true;
+			err = -ECANCELED;
 		} else {
 			err = qgroup_rescan_leaf(trans, path);
 		}
@@ -3280,6 +3299,14 @@ out:
 		}
 	}
 	fs_info->qgroup_rescan_running = false;
+
+	/*
+	 * If we cancel the current rescan, set progress to zero to start over
+	 * on next rescan.
+	 */
+	if (canceled)
+		fs_info->qgroup_rescan_progress.objectid = 0;
+
 	complete_all(&fs_info->qgroup_rescan_completion);
 	mutex_unlock(&fs_info->qgroup_rescan_lock);
 
@@ -3290,6 +3317,8 @@ out:
 
 	if (stopped) {
 		btrfs_info(fs_info, "qgroup scan paused");
+	} else if (canceled) {
+		btrfs_info(fs_info, "qgroup scan canceled");
 	} else if (err >= 0) {
 		btrfs_info(fs_info, "qgroup scan completed%s",
 			err > 0 ? " (inconsistency flag cleared)" : "");

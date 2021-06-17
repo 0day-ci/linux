@@ -4206,6 +4206,9 @@ static long btrfs_ioctl_quota_ctl(struct file *file, void __user *arg)
 	case BTRFS_QUOTA_CTL_DISABLE:
 		ret = btrfs_quota_disable(fs_info);
 		break;
+	case BTRFS_QUOTA_CTL_CANCEL_RESCAN:
+		ret = btrfs_quota_cancel_rescan(fs_info);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
