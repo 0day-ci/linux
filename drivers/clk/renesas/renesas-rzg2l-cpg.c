@@ -124,7 +124,7 @@ rzg2l_cpg_div_clk_register(const struct cpg_core_clk *core,
 						 core->flag, &priv->rmw_lock);
 
 	if (IS_ERR(clk_hw))
-		return NULL;
+		return ERR_CAST(clk_hw);
 
 	return clk_hw->clk;
 }
@@ -174,17 +174,14 @@ rzg2l_cpg_pll_clk_register(const struct cpg_core_clk *core,
 	struct clk_init_data init;
 	const char *parent_name;
 	struct pll_clk *pll_clk;
-	struct clk *clk;
 
 	parent = clks[core->parent & 0xffff];
 	if (IS_ERR(parent))
 		return ERR_CAST(parent);
 
 	pll_clk = devm_kzalloc(dev, sizeof(*pll_clk), GFP_KERNEL);
-	if (!pll_clk) {
-		clk = ERR_PTR(-ENOMEM);
-		return NULL;
-	}
+	if (!pll_clk)
+		return ERR_PTR(-ENOMEM);
 
 	parent_name = __clk_get_name(parent);
 	init.name = core->name;
