@@ -239,7 +239,7 @@ struct ab8500_charger_max_usb_in_curr {
  * @adc_main_charger_c	ADC channel for main charger current
  * @adc_vbus_v		ADC channel for USB charger voltage
  * @adc_usb_charger_c	ADC channel for USB charger current
- * @bm:           	Platform specific battery management information
+ * @bm:			Platform specific battery management information
  * @flags:		Structure for information about events triggered
  * @usb_state:		Structure for usb stack information
  * @max_usb_in_curr:	Max USB charger input current
@@ -1077,6 +1077,7 @@ static int ab8500_vbus_in_curr_to_regval(struct ab8500_charger *di, int curr)
 static int ab8500_charger_get_usb_cur(struct ab8500_charger *di)
 {
 	int ret = 0;
+
 	switch (di->usb_state.usb_current) {
 	case 100:
 		di->max_usb_in_curr.usb_type_max = USB_CH_IP_CUR_LVL_0P09;
@@ -1224,6 +1225,7 @@ static int ab8500_charger_set_current(struct ab8500_charger *di,
 		}
 	} else {
 		bool allow = true;
+
 		for (i = prev_curr_index + 1; i <= curr_index && allow; i++) {
 			dev_dbg(di->dev, "curr change_2 to: %x for 0x%02x\n",
 				(u8)i << shift_value, reg);
@@ -1911,6 +1913,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
 	/* Go through all properties for the psy */
 	for (j = 0; j < ext->desc->num_properties; j++) {
 		enum power_supply_property prop;
+
 		prop = ext->desc->properties[j];
 
 		if (power_supply_get_property(ext, prop, &ret))
@@ -1940,7 +1943,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
  * Due to a asic bug it is necessary to lower the input current to the vbus
  * charger when charging with at some specific levels. This issue is only valid
  * for below a certain battery voltage. This function makes sure that the
- * the allowed current limit isn't exceeded.
+ * allowed current limit isn't exceeded.
  */
 static void ab8500_charger_check_vbat_work(struct work_struct *work)
 {
@@ -1976,7 +1979,7 @@ static void ab8500_charger_check_vbat_work(struct work_struct *work)
 	 */
 	if (di->vbat < (VBAT_TRESH_IP_CUR_RED + 100) &&
 		(di->vbat > (VBAT_TRESH_IP_CUR_RED - 100)))
-			t = 1;
+		t = 1;
 
 	queue_delayed_work(di->charger_wq, &di->check_vbat_work, t * HZ);
 }
