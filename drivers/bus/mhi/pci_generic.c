@@ -72,17 +72,17 @@ struct mhi_pci_dev_info {
 		.doorbell_mode_switch = false,		\
 	}
 
-#define MHI_EVENT_CONFIG_CTRL(ev_ring, el_count) \
-	{					\
-		.num_elements = el_count,	\
-		.irq_moderation_ms = 0,		\
-		.irq = (ev_ring) + 1,		\
-		.priority = 1,			\
-		.mode = MHI_DB_BRST_DISABLE,	\
-		.data_type = MHI_ER_CTRL,	\
-		.hardware_event = false,	\
-		.client_managed = false,	\
-		.offload_channel = false,	\
+#define MHI_EVENT_CONFIG_CTRL(ev_ring, el_count)	\
+	{						\
+		.num_elements = el_count,		\
+		.irq_moderation_ms = 0,			\
+		.irq = (ev_ring) + 1,			\
+		.priority = MHI_ER_PRIORITY_DEFAULT,	\
+		.mode = MHI_DB_BRST_DISABLE,		\
+		.data_type = MHI_ER_CTRL,		\
+		.hardware_event = false,		\
+		.client_managed = false,		\
+		.offload_channel = false,		\
 	}
 
 #define MHI_CHANNEL_CONFIG_HW_UL(ch_num, ch_name, el_count, ev_ring) \
@@ -175,31 +175,31 @@ struct mhi_pci_dev_info {
 		.doorbell_mode_switch = false,		\
 	}
 
-#define MHI_EVENT_CONFIG_DATA(ev_ring, el_count) \
-	{					\
-		.num_elements = el_count,	\
-		.irq_moderation_ms = 5,		\
-		.irq = (ev_ring) + 1,		\
-		.priority = 1,			\
-		.mode = MHI_DB_BRST_DISABLE,	\
-		.data_type = MHI_ER_DATA,	\
-		.hardware_event = false,	\
-		.client_managed = false,	\
-		.offload_channel = false,	\
+#define MHI_EVENT_CONFIG_DATA(ev_ring, el_count)	\
+	{						\
+		.num_elements = el_count,		\
+		.irq_moderation_ms = 5,			\
+		.irq = (ev_ring) + 1,			\
+		.priority = MHI_ER_PRIORITY_DEFAULT,	\
+		.mode = MHI_DB_BRST_DISABLE,		\
+		.data_type = MHI_ER_DATA,		\
+		.hardware_event = false,		\
+		.client_managed = false,		\
+		.offload_channel = false,		\
 	}
 
 #define MHI_EVENT_CONFIG_HW_DATA(ev_ring, el_count, ch_num) \
-	{					\
-		.num_elements = el_count,	\
-		.irq_moderation_ms = 1,		\
-		.irq = (ev_ring) + 1,		\
-		.priority = 1,			\
-		.mode = MHI_DB_BRST_DISABLE,	\
-		.data_type = MHI_ER_DATA,	\
-		.hardware_event = true,		\
-		.client_managed = false,	\
-		.offload_channel = false,	\
-		.channel = ch_num,		\
+	{						\
+		.num_elements = el_count,		\
+		.irq_moderation_ms = 1,			\
+		.irq = (ev_ring) + 1,			\
+		.priority = MHI_ER_PRIORITY_DEFAULT,	\
+		.mode = MHI_DB_BRST_DISABLE,		\
+		.data_type = MHI_ER_DATA,		\
+		.hardware_event = true,			\
+		.client_managed = false,		\
+		.offload_channel = false,		\
+		.channel = ch_num,			\
 	}
 
 static const struct mhi_channel_config modem_qcom_v1_mhi_channels[] = {
