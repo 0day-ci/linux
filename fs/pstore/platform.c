@@ -752,10 +752,8 @@ void pstore_get_backend_records(struct pstore_info *psi,
 		int rc;
 
 		record = kzalloc(sizeof(*record), GFP_KERNEL);
-		if (!record) {
-			pr_err("out of memory creating record\n");
+		if (!record)
 			break;
-		}
 		pstore_record_init(record, psi);
 
 		record->size = psi->read(record);

@@ -301,10 +301,8 @@ void persistent_ram_save_old(struct persistent_ram_zone *prz)
 	if (!prz->old_log) {
 		persistent_ram_ecc_old(prz);
 		prz->old_log = kmalloc(size, GFP_KERNEL);
-	}
-	if (!prz->old_log) {
-		pr_err("failed to allocate buffer\n");
-		return;
+		if (!prz->old_log)
+			return;
 	}
 
 	prz->old_log_size = size;
@@ -429,11 +427,8 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size,
 	}
 
 	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
-	if (!pages) {
-		pr_err("%s: Failed to allocate array for %u pages\n",
-		       __func__, page_count);
+	if (!pages)
 		return NULL;
-	}
 
 	for (i = 0; i < page_count; i++) {
 		phys_addr_t addr = page_start + i * PAGE_SIZE;
@@ -578,10 +573,8 @@ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
 	int ret = -ENOMEM;
 
 	prz = kzalloc(sizeof(struct persistent_ram_zone), GFP_KERNEL);
-	if (!prz) {
-		pr_err("failed to allocate persistent ram zone\n");
+	if (!prz)
 		goto err;
-	}
 
 	/* Initialize general buffer state. */
 	raw_spin_lock_init(&prz->buffer_lock);
