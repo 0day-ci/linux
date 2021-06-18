@@ -832,23 +832,6 @@ TEST_F(tls, bidir)
 	char const *test_str = "test_read";
 	int send_len = 10;
 	char buf[10];
-	int ret;
-
-	if (!self->notls) {
-		struct tls12_crypto_info_aes_gcm_128 tls12;
-
-		memset(&tls12, 0, sizeof(tls12));
-		tls12.info.version = variant->tls_version;
-		tls12.info.cipher_type = TLS_CIPHER_AES_GCM_128;
-
-		ret = setsockopt(self->fd, SOL_TLS, TLS_RX, &tls12,
-				 sizeof(tls12));
-		ASSERT_EQ(ret, 0);
-
-		ret = setsockopt(self->cfd, SOL_TLS, TLS_TX, &tls12,
-				 sizeof(tls12));
-		ASSERT_EQ(ret, 0);
-	}
 
 	ASSERT_EQ(strlen(test_str) + 1, send_len);
 
