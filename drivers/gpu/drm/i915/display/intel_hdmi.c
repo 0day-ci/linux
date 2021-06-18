@@ -2517,6 +2517,7 @@ intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *c
 		drm_connector_attach_max_bpc_property(connector, 8, 12);
 		drm_connector_attach_active_bpc_property(connector, 8, 12);
 		drm_connector_attach_active_color_format_property(connector);
+		drm_connector_attach_active_color_range_property(connector);
 	}
 }
 
