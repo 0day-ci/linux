@@ -310,7 +310,7 @@ static void prepare_write_keepalive(struct ceph_connection *con)
 	if (con->peer_features & CEPH_FEATURE_MSGR_KEEPALIVE2) {
 		struct timespec64 now;
 
-		ktime_get_real_ts64(&now);
+		ktime_get_ts64(&now);
 		con_out_kvec_add(con, sizeof(tag_keepalive2), &tag_keepalive2);
 		ceph_encode_timespec64(&con->v1.out_temp_keepalive2, &now);
 		con_out_kvec_add(con, sizeof(con->v1.out_temp_keepalive2),

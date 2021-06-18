@@ -1439,7 +1439,7 @@ static int prepare_keepalive2(struct ceph_connection *con)
 	struct ceph_timespec *ts = CTRL_BODY(con->v2.out_buf);
 	struct timespec64 now;
 
-	ktime_get_real_ts64(&now);
+	ktime_get_ts64(&now);
 	dout("%s con %p timestamp %lld.%09ld\n", __func__, con, now.tv_sec,
 	     now.tv_nsec);
 

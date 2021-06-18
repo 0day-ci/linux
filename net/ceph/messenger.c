@@ -1809,7 +1809,7 @@ bool ceph_con_keepalive_expired(struct ceph_connection *con,
 	    (con->peer_features & CEPH_FEATURE_MSGR_KEEPALIVE2)) {
 		struct timespec64 now;
 		struct timespec64 ts;
-		ktime_get_real_ts64(&now);
+		ktime_get_ts64(&now);
 		jiffies_to_timespec64(interval, &ts);
 		ts = timespec64_add(con->last_keepalive_ack, ts);
 		return timespec64_compare(&now, &ts) >= 0;
