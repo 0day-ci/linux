@@ -466,6 +466,33 @@ err_phy:
 	return ret;
 }
 
+static void meson_pcie_quirk(struct pci_dev *dev)
+{
+	int mrrs;
+
+	/* no need quirk */
+	if (pcie_bus_config != PCIE_BUS_DEFAULT)
+		return;
+
+	/* no need for root bus */
+	if (pci_is_root_bus(dev->bus))
+		return;
+
+	mrrs = pcie_get_readrq(dev);
+
+	/*
+	 * set same 256 bytes maximum read request size equal MAX_READ_REQ_SIZE
+	 * was find some issue with HDMI scrambled picture and nvme devices
+	 * at intensive writing...
+	 */
+
+	if (mrrs != MAX_READ_REQ_SIZE) {
+		dev_info(&dev->dev, "fix MRRS from %d to %d\n", mrrs, MAX_READ_REQ_SIZE);
+		pcie_set_readrq(dev, MAX_READ_REQ_SIZE);
+	}
+}
+DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, meson_pcie_quirk);
+
 static const struct of_device_id meson_pcie_of_match[] = {
 	{
 		.compatible = "amlogic,axg-pcie",
