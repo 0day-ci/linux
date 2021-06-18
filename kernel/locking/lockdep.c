@@ -2024,55 +2024,52 @@ static bool noop_count(struct lock_list *entry, void *data)
 	return false;
 }
 
-static unsigned long __lockdep_count_forward_deps(struct lock_list *this)
-{
-	unsigned long  count = 0;
-	struct lock_list *target_entry;
-
-	__bfs_forwards(this, (void *)&count, noop_count, NULL, &target_entry);
-
-	return count;
-}
 unsigned long lockdep_count_forward_deps(struct lock_class *class)
 {
-	unsigned long ret, flags;
+	unsigned long count = 0, flags;
 	struct lock_list this;
+	struct lock_list *target_entry;
+	enum bfs_result result;
 
 	__bfs_init_root(&this, class);
 
 	raw_local_irq_save(flags);
 	lockdep_lock();
-	ret = __lockdep_count_forward_deps(&this);
-	lockdep_unlock();
+
+	result = __bfs_forwards(&this, (void *)&count, noop_count, NULL, &target_entry);
+
+	if (bfs_error(result))
+		print_bfs_bug(result);
+	else
+		lockdep_unlock();
+
 	raw_local_irq_restore(flags);
-
-	return ret;
-}
-
-static unsigned long __lockdep_count_backward_deps(struct lock_list *this)
-{
-	unsigned long  count = 0;
-	struct lock_list *target_entry;
-
-	__bfs_backwards(this, (void *)&count, noop_count, NULL, &target_entry);
 
 	return count;
 }
 
 unsigned long lockdep_count_backward_deps(struct lock_class *class)
 {
-	unsigned long ret, flags;
+	unsigned long  count = 0, flags;
 	struct lock_list this;
+	struct lock_list *target_entry;
+	enum bfs_result result;
 
 	__bfs_init_root(&this, class);
 
 	raw_local_irq_save(flags);
 	lockdep_lock();
-	ret = __lockdep_count_backward_deps(&this);
-	lockdep_unlock();
+
+	result = __bfs_backwards(&this, (void *)&count, noop_count, NULL, &target_entry);
+
+	if (bfs_error(result))
+		print_bfs_bug(result);
+	else
+		lockdep_unlock();
+
 	raw_local_irq_restore(flags);
 
-	return ret;
+	return count;
 }
 
 /*
