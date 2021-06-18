@@ -53,6 +53,9 @@ extern int sysctl_resched_latency_warn_ms;
 extern int sysctl_resched_latency_warn_once;
 #endif
 
+extern unsigned int sysctl_iowait_reset_ticks;
+extern unsigned int sysctl_iowait_apply_ticks;
+
 /*
  *  control realtime throttling:
  *
