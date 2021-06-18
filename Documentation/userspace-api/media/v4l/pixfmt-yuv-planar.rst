@@ -100,8 +100,13 @@ All components are stored with the same number of bits per component.
       - Cb, Cr
       - No
       - 64x32 macroblocks
-
-        Horizontal Z order
+    * - V4L2_PIX_FMT_P010
+      - 'P010'
+      - 16
+      - 4:2:0
+      - Cb, Cr
+      - No
+      - Linear
     * - V4L2_PIX_FMT_NV12MT_16X16
       - 'VM12'
       - 8
@@ -171,6 +176,7 @@ horizontally.
 .. _V4L2-PIX-FMT-NV21:
 .. _V4L2-PIX-FMT-NV12M:
 .. _V4L2-PIX-FMT-NV21M:
+.. _V4L2-PIX-FMT-P010:
 
 NV12, NV21, NV12M and NV21M
 ---------------------------
@@ -470,6 +476,74 @@ number of lines as the luma plane.
       - Cb\ :sub:`33`
       - Cr\ :sub:`33`
 
+.. _V4L2_PIX_FMT_P010:
+
+P010
+----
+
+The number of bytes in one luminance row must be divisible by 16,
+which means there will be padded 0 in the right edge when necessary.
+
+.. raw:: latex
+
+    \begingroup
+    \small
+    \setlength{\tabcolsep}{2pt}
+
+.. tabularcolumns:: |p{2.6cm}|p{0.70cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|p{0.22cm}|
+
+.. flat-table:: P010 16 Bits per component
+    :header-rows:  2
+    :stub-columns: 0
+
+    * - Identifier
+      - Code
+      - :cspan:`7` Byte 0 in memory
+
+      - :cspan:`7` Byte 1
+    * -
+      -
+      - 7
+      - 6
+      - 5
+      - 4
+      - 3
+      - 2
+      - 1
+      - 0
+
+      - 7
+      - 6
+      - 5
+      - 4
+      - 3
+      - 2
+      - 1
+      - 0
+    * - ``V4L2_PIX_FMT_P010``
+      - 'P010'
+
+      - Y\ :sub:`9`
+      - Y\ :sub:`8`
+      - Y\ :sub:`7`
+      - Y\ :sub:`6`
+      - Y\ :sub:`5`
+      - Y\ :sub:`4`
+      - Y\ :sub:`3`
+      - Y\ :sub:`2`
+
+      - Y\ :sub:`1`
+      - Y\ :sub:`0`
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+
+.. raw:: latex
+
+    \endgroup
 
 Fully Planar YUV Formats
 ========================
