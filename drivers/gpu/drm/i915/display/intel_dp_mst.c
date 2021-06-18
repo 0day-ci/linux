@@ -851,6 +851,11 @@ static struct drm_connector *intel_dp_add_mst_connector(struct drm_dp_mst_topolo
 	if (connector->max_bpc_property)
 		drm_connector_attach_max_bpc_property(connector, 6, 12);
 
+	connector->active_bpc_property =
+		intel_dp->attached_connector->base.active_bpc_property;
+	if (connector->active_bpc_property)
+		drm_connector_attach_active_bpc_property(connector, 6, 12);
+
 	return connector;
 
 err:
