@@ -927,6 +927,8 @@ int mmc_execute_tuning(struct mmc_card *card)
 	if (!host->ops->execute_tuning)
 		return 0;
 
+	mmc_retune_disable(host);
+
 	if (host->cqe_on)
 		host->cqe_ops->cqe_off(host);
 
