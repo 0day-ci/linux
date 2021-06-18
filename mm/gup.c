@@ -1615,6 +1615,7 @@ static long check_and_migrate_movable_pages(unsigned long nr_pages,
 	unsigned long i;
 	unsigned long isolation_error_count = 0;
 	bool drain_allow = true;
+	unsigned int nr_succeeded = 0;
 	LIST_HEAD(movable_page_list);
 	long ret = 0;
 	struct page *prev_head = NULL;
@@ -1672,7 +1673,7 @@ static long check_and_migrate_movable_pages(unsigned long nr_pages,
 	if (!list_empty(&movable_page_list)) {
 		ret = migrate_pages(&movable_page_list, alloc_migration_target,
 				    NULL, (unsigned long)&mtc, MIGRATE_SYNC,
-				    MR_LONGTERM_PIN);
+				    MR_LONGTERM_PIN, &nr_succeeded);
 		if (ret && !list_empty(&movable_page_list))
 			putback_movable_pages(&movable_page_list);
 	}
