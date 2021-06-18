@@ -2825,7 +2825,10 @@ unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
 
 	if (p) {
 		min_util = max(min_util, uclamp_eff_value(p, UCLAMP_MIN));
-		max_util = max(max_util, uclamp_eff_value(p, UCLAMP_MAX));
+		if (rq->uclamp_flags & UCLAMP_FLAG_IDLE)
+			max_util = uclamp_eff_value(p, UCLAMP_MAX);
+		else
+			max_util = max(max_util, uclamp_eff_value(p, UCLAMP_MAX));
 	}
 
 	/*
