@@ -307,6 +307,32 @@ static void geni_se_select_dma_mode(struct geni_se *se)
 		writel_relaxed(val, se->base + SE_GENI_DMA_MODE_EN);
 }
 
+static void geni_se_select_gpi_mode(struct geni_se *se)
+{
+	unsigned int gpi_event_en;
+	unsigned int m_irq_en;
+	unsigned int s_irq_en;
+
+	geni_se_irq_clear(se);
+	writel(0, se->base + SE_IRQ_EN);
+
+	s_irq_en = readl_relaxed(se->base + SE_GENI_S_IRQ_EN);
+	s_irq_en &= ~S_CMD_DONE_EN;
+	writel(s_irq_en, se->base + SE_GENI_S_IRQ_EN);
+
+	m_irq_en = readl(se->base + SE_GENI_M_IRQ_EN);
+	m_irq_en &= ~(M_CMD_DONE_EN | M_TX_FIFO_WATERMARK_EN |
+		      M_RX_FIFO_WATERMARK_EN | M_RX_FIFO_LAST_EN);
+	writel(m_irq_en, se->base + SE_GENI_M_IRQ_EN);
+
+	writel(GENI_DMA_MODE_EN, se->base + SE_GENI_DMA_MODE_EN);
+
+	gpi_event_en = readl(se->base + SE_GSI_EVENT_EN);
+	gpi_event_en |= (DMA_RX_EVENT_EN | DMA_TX_EVENT_EN |
+			 GENI_M_EVENT_EN | GENI_S_EVENT_EN);
+	writel(gpi_event_en, se->base + SE_GSI_EVENT_EN);
+}
+
 /**
  * geni_se_select_mode() - Select the serial engine transfer mode
  * @se:		Pointer to the concerned serial engine.
@@ -314,7 +340,8 @@ static void geni_se_select_dma_mode(struct geni_se *se)
  */
 void geni_se_select_mode(struct geni_se *se, enum geni_se_xfer_mode mode)
 {
-	WARN_ON(mode != GENI_SE_FIFO && mode != GENI_SE_DMA);
+	WARN_ON(mode != GENI_SE_FIFO && mode != GENI_SE_DMA &&
+		mode != GENI_GPI_DMA);
 
 	switch (mode) {
 	case GENI_SE_FIFO:
@@ -322,6 +349,9 @@ void geni_se_select_mode(struct geni_se *se, enum geni_se_xfer_mode mode)
 		break;
 	case GENI_SE_DMA:
 		geni_se_select_dma_mode(se);
+		break;
+	case GENI_GPI_DMA:
+		geni_se_select_gpi_mode(se);
 		break;
 	case GENI_SE_INVALID:
 	default:

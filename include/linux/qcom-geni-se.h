@@ -11,8 +11,9 @@
 /* Transfer mode supported by GENI Serial Engines */
 enum geni_se_xfer_mode {
 	GENI_SE_INVALID,
-	GENI_SE_FIFO,
-	GENI_SE_DMA,
+	GENI_SE_FIFO, /* FIFO mode */
+	GENI_GPI_DMA, /* GSI aka GPI DMA mode */
+	GENI_SE_DMA,  /* SE DMA mode */
 };
 
 /* Protocols supported by GENI Serial Engines */
