@@ -349,8 +349,8 @@ static int strset_reply_size(const struct ethnl_req_info *req_base,
 {
 	const struct strset_req_info *req_info = STRSET_REQINFO(req_base);
 	const struct strset_reply_data *data = STRSET_REPDATA(reply_base);
+	int len = nla_total_size(0); /* account for nesting */
 	unsigned int i;
-	int len = 0;
 	int ret;
 
 	for (i = 0; i < ETH_SS_COUNT; i++) {
