@@ -2149,7 +2149,8 @@ xlog_write_single(
 	int			index;
 
 	ASSERT(*log_offset + *len <= iclog->ic_size ||
-		iclog->ic_state == XLOG_STATE_WANT_SYNC);
+		iclog->ic_state == XLOG_STATE_WANT_SYNC ||
+		iclog->ic_state == XLOG_STATE_IOERROR);
 
 	ptr = iclog->ic_datap + *log_offset;
 	for (lv = log_vector;
