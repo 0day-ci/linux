@@ -300,20 +300,18 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
 
 	struct scatterlist *dst = req->dst;
 	struct scatterlist *src = req->src;
-	const int nents = sg_nents(req->src);
+	struct sg_mapping_iter dst_iter;
 
 	const int out_off = DCP_BUF_SZ;
 	uint8_t *in_buf = sdcp->coh->aes_in_buf;
 	uint8_t *out_buf = sdcp->coh->aes_out_buf;
 
-	uint8_t *out_tmp, *src_buf, *dst_buf = NULL;
-	uint32_t dst_off = 0;
+	uint8_t *out_tmp, *src_buf = NULL;
 	uint32_t last_out_len = 0;
 
 	uint8_t *key = sdcp->coh->aes_key;
 
 	int ret = 0;
-	int split = 0;
 	unsigned int i, len, clen, rem = 0, tlen = 0;
 	int init = 0;
 	bool limit_hit = false;
@@ -332,7 +330,8 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
 		memset(key + AES_KEYSIZE_128, 0, AES_KEYSIZE_128);
 	}
 
-	for_each_sg(req->src, src, nents, i) {
+	sg_miter_start(&dst_iter, dst, sg_nents(dst), SG_MITER_TO_SG);
+	for_each_sg(req->src, src, sg_nents(src), i) {
 		src_buf = sg_virt(src);
 		len = sg_dma_len(src);
 		tlen += len;
@@ -357,7 +356,7 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
 			 * submit the buffer.
 			 */
 			if (actx->fill == out_off || sg_is_last(src) ||
-				limit_hit) {
+			    limit_hit) {
 				ret = mxs_dcp_run_aes(actx, req, init);
 				if (ret)
 					return ret;
@@ -365,25 +364,13 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
 
 				out_tmp = out_buf;
 				last_out_len = actx->fill;
-				while (dst && actx->fill) {
-					if (!split) {
-						dst_buf = sg_virt(dst);
-						dst_off = 0;
-					}
-					rem = min(sg_dma_len(dst) - dst_off,
-						  actx->fill);
 
-					memcpy(dst_buf + dst_off, out_tmp, rem);
+				while (sg_miter_next(&dst_iter) && actx->fill) {
+					rem = min(dst_iter.length, actx->fill);
+
+					memcpy(dst_iter.addr, out_tmp, rem);
 					out_tmp += rem;
-					dst_off += rem;
 					actx->fill -= rem;
-
-					if (dst_off == sg_dma_len(dst)) {
-						dst = sg_next(dst);
-						split = 0;
-					} else {
-						split = 1;
-					}
 				}
 			}
 		} while (len);
@@ -391,6 +378,7 @@ static int mxs_dcp_aes_block_crypt(struct crypto_async_request *arq)
 		if (limit_hit)
 			break;
 	}
+	sg_miter_stop(&dst_iter);
 
 	/* Copy the IV for CBC for chaining */
 	if (!rctx->ecb) {
