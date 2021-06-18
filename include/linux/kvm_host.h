@@ -599,6 +599,7 @@ struct kvm {
 #ifdef CONFIG_HAVE_KVM_PM_NOTIFIER
 	struct notifier_block pm_notifier;
 #endif
+	char stats_id[KVM_STATS_ID_MAXLEN];
 };
 
 #define kvm_err(fmt, ...) \
@@ -1427,11 +1428,16 @@ struct _kvm_stats_desc {
 	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_SECONDS,		       \
 		KVM_STATS_BASE_POW10, -9)
 
+#define KVM_GENERIC_VM_STATS()						       \
+	STATS_DESC_COUNTER(VM_GENERIC, remote_tlb_flush)
+
 extern struct kvm_stats_debugfs_item debugfs_entries[];
 extern struct dentry *kvm_debugfs_dir;
 ssize_t kvm_stats_read(char *id, struct kvm_stats_header *header,
 		struct _kvm_stats_desc *desc, void *stats, size_t size_stats,
 		char __user *user_buffer, size_t size, loff_t *offset);
+extern struct kvm_stats_header kvm_vm_stats_header;
+extern struct _kvm_stats_desc kvm_vm_stats_desc[];
 
 #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
 static inline int mmu_notifier_retry(struct kvm *kvm, unsigned long mmu_seq)
