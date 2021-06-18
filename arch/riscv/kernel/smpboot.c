@@ -159,11 +159,11 @@ asmlinkage __visible void smp_callin(void)
 	struct mm_struct *mm = &init_mm;
 	unsigned int curr_cpuid = smp_processor_id();
 
-	riscv_clear_ipi();
-
 	/* All kernel threads share the same mm context.  */
 	mmgrab(mm);
 	current->active_mm = mm;
+
+	riscv_ipi_enable();
 
 	notify_cpu_starting(curr_cpuid);
 	numa_add_cpu(curr_cpuid);
