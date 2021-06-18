@@ -1540,7 +1540,7 @@ enum bfs_result {
  */
 static inline bool bfs_error(enum bfs_result res)
 {
-	return res < 0;
+	return unlikely(res < 0);
 }
 
 /*
@@ -2089,7 +2089,7 @@ check_path(struct held_lock *target, struct lock_list *src_entry,
 
 	ret = __bfs_forwards(src_entry, target, match, skip, target_entry);
 
-	if (unlikely(bfs_error(ret)))
+	if (bfs_error(ret))
 		print_bfs_bug(ret);
 
 	return ret;
@@ -2936,7 +2936,7 @@ check_prev_add(struct task_struct *curr, struct held_lock *prev,
 	 * in the graph whose neighbours are to be checked.
 	 */
 	ret = check_noncircular(next, prev, trace);
-	if (unlikely(bfs_error(ret) || ret == BFS_RMATCH))
+	if (bfs_error(ret) || unlikely(ret == BFS_RMATCH))
 		return 0;
 
 	if (!check_irq_usage(curr, prev, next))
