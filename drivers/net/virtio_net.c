@@ -2720,6 +2720,11 @@ static void virtnet_del_vqs(struct virtnet_info *vi)
 	virtnet_free_queues(vi);
 }
 
+static void virtnet_ctrlq_done(struct virtqueue *rvq)
+{
+	/* Do nothing */
+}
+
 /* How large should a single buffer be so a queue full of these can fit at
  * least one full packet?
  * Logic below assumes the mergeable buffer header is used.
@@ -2772,7 +2777,7 @@ static int virtnet_find_vqs(struct virtnet_info *vi)
 
 	/* Parameters for control virtqueue, if any */
 	if (vi->has_cvq) {
-		callbacks[total_vqs - 1] = NULL;
+		callbacks[total_vqs - 1] = virtnet_ctrlq_done;
 		names[total_vqs - 1] = "control";
 	}
 
