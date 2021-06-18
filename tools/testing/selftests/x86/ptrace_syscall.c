@@ -407,7 +407,68 @@ static void test_restart_under_ptrace(void)
 		err(1, "waitpid");
 }
 
-int main()
+static void test_ptrace_a_bit(void)
+{
+	struct user_fpregs_struct regs;
+	int status;
+	pid_t chld;
+
+	printf("[RUN]\tTest some ptrace(2) requests\n");
+
+	chld = fork();
+	if (chld < 0)
+		err(1, "fork");
+
+	if (!chld) {
+		if (ptrace(PTRACE_TRACEME, 0, 0, 0) != 0)
+			err(1, "PTRACE_TRACEME");
+
+		pid_t pid = getpid(), tid = syscall(SYS_gettid);
+
+		printf("\tChild will take a nap until signaled\n");
+		setsigign(SIGUSR1, SA_RESTART);
+		syscall(SYS_tgkill, pid, tid, SIGSTOP);
+
+		syscall(SYS_pause, 0, 0, 0, 0, 0, 0);
+		_exit(0);
+	}
+
+	/* Wait for SIGSTOP. */
+	if (waitpid(chld, &status, 0) != chld || !WIFSTOPPED(status))
+		err(1, "waitpid");
+
+	printf("[RUN]\tGETFPREGS\n");
+	if (ptrace(PTRACE_GETFPREGS, chld, 0, &regs) != 0)
+		err(1, "PTRACE_GETFPREGS");
+
+#ifdef __i386__
+	if (regs.cwd != 0xffff037fu || regs.swd != 0xffff0000u ||
+	    regs.twd != 0xffffffffu) {
+		printf("[FAIL]\t32-bit args after PTRACE_GETFPREGS are wrong: ");
+		printf("cwd: 0x%lx, swd: 0x%lx ",  regs.cwd, regs.swd);
+		printf("twd: 0x%lx\n", regs.twd);
+		goto out;
+	}
+#else
+	if (regs.cwd != 0x37f || regs.mxcsr != 0x1f80 || regs.mxcr_mask != 0x2ffff) {
+		printf("[FAIL]\t64-bit args after PTRACE_GETFPREGS are wrong: ");
+		printf("cwd: 0x%x, ", regs.cwd);
+		/* Yeah, it is mxcr_mask - sys/user.h has a typo :-) */
+		printf("mxcsr: 0x%x, mxcsr_mask: 0x%x\n", regs.mxcsr, regs.mxcr_mask);
+		goto out;
+	}
+#endif
+
+	printf("[OK]\tptrace(PTRACE_GETFPREGS)\n");
+
+out:
+	/* Kill it. */
+	kill(chld, SIGKILL);
+	if (waitpid(chld, &status, 0) != chld)
+		err(1, "waitpid");
+}
+
+int main(void)
 {
 	printf("[RUN]\tCheck int80 return regs\n");
 	test_sys32_regs(do_full_int80);
@@ -425,6 +486,8 @@ int main()
 	test_ptrace_syscall_restart();
 
 	test_restart_under_ptrace();
+
+	test_ptrace_a_bit();
 
 	return 0;
 }
