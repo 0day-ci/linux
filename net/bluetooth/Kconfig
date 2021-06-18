@@ -148,4 +148,15 @@ config BT_FEATURE_DEBUG
 	  This provides an option to enable/disable debugging statements
 	  at runtime via the experimental features interface.
 
+config BT_FEATURE_QUALITY_REPORT
+	bool "Runtime option for logging controller quality report events"
+	depends on BT
+	default n
+	help
+	  This provides an option to enable/disable controller quality report
+	  events logging at runtime via the experimental features interface.
+	  The quality report events may include the categories of system
+	  exceptions, connections/disconnection, the link quality statistics,
+	  etc.
+
 source "drivers/bluetooth/Kconfig"
