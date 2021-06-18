@@ -965,6 +965,8 @@ int ath9k_htc_probe_device(struct htc_target *htc_handle, struct device *dev,
 	if (ret)
 		goto err_init;
 
+	atomic_set(&priv->initialized, 1);
+
 	return 0;
 
 err_init:

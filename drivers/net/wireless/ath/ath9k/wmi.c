@@ -146,6 +146,12 @@ void ath9k_wmi_event_tasklet(struct tasklet_struct *t)
 	unsigned long flags;
 	u16 cmd_id;
 
+	if (!atomic_read(&priv->initialized))
+		/* If tasked has been called with uninitalized ath9k_htc_priv,
+		 * it can cause divide-by-zero error in ath9k_htc_swba
+		 */
+		return;
+
 	do {
 		spin_lock_irqsave(&wmi->wmi_lock, flags);
 		skb = __skb_dequeue(&wmi->wmi_event_queue);

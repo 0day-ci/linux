@@ -532,6 +532,7 @@ struct ath9k_htc_priv {
 #endif
 	struct mutex mutex;
 	struct ieee80211_vif *csa_vif;
+	atomic_t initialized;
 };
 
 static inline void ath_read_cachesize(struct ath_common *common, int *csz)
