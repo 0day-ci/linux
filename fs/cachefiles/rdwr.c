@@ -629,7 +629,6 @@ static int cachefiles_read_backing_file(struct cachefiles_object *object,
 		put_page(netpage);
 		netpage = NULL;
 		fscache_retrieval_complete(op, 1);
-		continue;
 	}
 
 	netpage = NULL;
