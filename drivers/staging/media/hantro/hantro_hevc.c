@@ -25,7 +25,7 @@
 
 #define UNUSED_REF	-1
 
-#define G2_ALIGN		16
+#define G2_ALIGN	16
 
 #define CBS_SIZE	16 	/* compression table size in bytes */
 #define CBS_LUMA 	8 	/* luminance CBS is composed of 1 8x8 coded block */

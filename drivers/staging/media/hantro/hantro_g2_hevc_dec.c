@@ -143,6 +143,16 @@ static bool is_8bit_dst_format(struct hantro_ctx *ctx)
 	}
 }
 
+static int get_dst_format(struct hantro_ctx *ctx)
+{
+	switch (ctx->vpu_dst_fmt->fourcc) {
+	case V4L2_PIX_FMT_P010:
+		return 0x1;
+	default:
+		return 0x0;
+	}
+}
+
 static void set_params(struct hantro_ctx *ctx)
 {
 	const struct hantro_hevc_dec_ctrls *ctrls = &ctx->hevc_dec.ctrls;
@@ -158,8 +168,8 @@ static void set_params(struct hantro_ctx *ctx)
 	hantro_reg_write(vpu, &g2_bit_depth_y_minus8, sps->bit_depth_luma_minus8);
 	hantro_reg_write(vpu, &g2_bit_depth_c_minus8, sps->bit_depth_chroma_minus8);
 
-	hantro_reg_write(vpu, &g2_output_8_bits, 1);
-	hantro_reg_write(vpu, &g2_output_format, 0);
+	hantro_reg_write(vpu, &g2_output_8_bits, is_8bit_dst_format(ctx));
+	hantro_reg_write(vpu, &g2_output_format, get_dst_format(ctx));
 
 	hantro_reg_write(vpu, &g2_hdr_skip_length, ctrls->hevc_hdr_skip_length);
 
@@ -540,7 +550,7 @@ static size_t hantro_hevc_output_chroma_offset(struct hantro_ctx *ctx)
 	int bytes_per_pixel = is_8bit_dst_format(ctx) ? 1 : 2;
 
 	return sps->pic_width_in_luma_samples *
-		sps->pic_height_in_luma_samples * bytes_per_pixel;
+	       sps->pic_height_in_luma_samples * bytes_per_pixel;
 }
 
 static void set_buffers(struct hantro_ctx *ctx)
@@ -627,7 +637,7 @@ int hantro_g2_hevc_dec_run(struct hantro_ctx *ctx)
 	/* Compress buffers */
 	hantro_reg_write(vpu, &g2_ref_compress_bypass, 0);
 
-	/* use NV12 as output format */
+	/* Use raster-scan as output format */
 	hantro_reg_write(vpu, &g2_out_rs_e, 1);
 
 	/* Bus width and max burst */
