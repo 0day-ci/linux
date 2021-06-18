@@ -403,8 +403,6 @@ static int dib0090_identify(struct dvb_frontend *fe)
 			break;
 		case P1A_B:
 			dprintk("P1-A/B detected: driver is deactivated - not available\n");
-			goto identification_error;
-			break;
 		default:
 			goto identification_error;
 		}
@@ -493,8 +491,6 @@ static int dib0090_fw_identify(struct dvb_frontend *fe)
 			break;
 		case P1A_B:
 			dprintk("P1-A/B detected: driver is deactivated - not available\n");
-			goto identification_error;
-			break;
 		default:
 			goto identification_error;
 		}
