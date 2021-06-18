@@ -207,7 +207,6 @@ static int da9052_regulator_set_voltage_sel(struct regulator_dev *rdev,
 {
 	struct da9052_regulator *regulator = rdev_get_drvdata(rdev);
 	struct da9052_regulator_info *info = regulator->info;
-	int id = rdev_get_id(rdev);
 	int ret;
 
 	ret = da9052_reg_update(regulator->da9052, rdev->desc->vsel_reg,
@@ -218,16 +217,9 @@ static int da9052_regulator_set_voltage_sel(struct regulator_dev *rdev,
 	/* Some LDOs and DCDCs are DVC controlled which requires enabling of
 	 * the activate bit to implment the changes on the output.
 	 */
-	switch (id) {
-	case DA9052_ID_BUCK1:
-	case DA9052_ID_BUCK2:
-	case DA9052_ID_BUCK3:
-	case DA9052_ID_LDO2:
-	case DA9052_ID_LDO3:
+	if (info->activate_bit)
 		ret = da9052_reg_update(regulator->da9052, DA9052_SUPPLY_REG,
 					info->activate_bit, info->activate_bit);
-		break;
-	}
 
 	return ret;
 }
@@ -238,22 +230,14 @@ static int da9052_regulator_set_voltage_time_sel(struct regulator_dev *rdev,
 {
 	struct da9052_regulator *regulator = rdev_get_drvdata(rdev);
 	struct da9052_regulator_info *info = regulator->info;
-	int id = rdev_get_id(rdev);
 	int ret = 0;
 
 	/* The DVC controlled LDOs and DCDCs ramp with 6.25mV/µs after enabling
 	 * the activate bit.
 	 */
-	switch (id) {
-	case DA9052_ID_BUCK1:
-	case DA9052_ID_BUCK2:
-	case DA9052_ID_BUCK3:
-	case DA9052_ID_LDO2:
-	case DA9052_ID_LDO3:
+	if (info->activate_bit)
 		ret = DIV_ROUND_UP(abs(new_sel - old_sel) * info->step_uV,
 				   6250);
-		break;
-	}
 
 	return ret;
 }
