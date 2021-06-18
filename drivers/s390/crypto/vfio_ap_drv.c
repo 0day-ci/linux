@@ -86,9 +86,8 @@ static struct ap_driver vfio_ap_drv = {
 
 static void vfio_ap_matrix_dev_release(struct device *dev)
 {
-	struct ap_matrix_dev *matrix_dev = dev_get_drvdata(dev);
-
-	kfree(matrix_dev);
+	kfree(container_of(dev, struct ap_matrix_dev, device));
+	matrix_dev = NULL;
 }
 
 static int matrix_bus_match(struct device *dev, struct device_driver *drv)
