@@ -149,9 +149,12 @@ static int guc_action_register_ct_buffer(struct intel_guc *guc,
 		sizeof(struct guc_ct_buffer_desc),
 		type
 	};
+	int ret;
 
 	/* Can't use generic send(), CT registration must go over MMIO */
-	return intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+	ret = intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+
+	return ret > 0 ? -EPROTO : ret;
 }
 
 static int ct_register_buffer(struct intel_guc_ct *ct, u32 desc_addr, u32 type)
@@ -171,9 +174,12 @@ static int guc_action_deregister_ct_buffer(struct intel_guc *guc, u32 type)
 		CTB_OWNER_HOST,
 		type
 	};
+	int ret;
 
 	/* Can't use generic send(), CT deregistration must go over MMIO */
-	return intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+	ret = intel_guc_send_mmio(guc, action, ARRAY_SIZE(action), NULL, 0);
+
+	return ret > 0 ? -EPROTO : ret;
 }
 
 static int ct_deregister_buffer(struct intel_guc_ct *ct, u32 type)
