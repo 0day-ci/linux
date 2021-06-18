@@ -2102,6 +2102,9 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 	if (!host->card || mmc_card_removed(host->card))
 		return 1;
 
+	/* we expect a failure if the card is removed */
+	mmc_retune_disable(host);
+
 	ret = host->bus_ops->alive(host);
 
 	/*
@@ -2120,6 +2123,8 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 		mmc_card_set_removed(host->card);
 		pr_debug("%s: card remove detected\n", mmc_hostname(host));
 	}
+
+	mmc_retune_enable(host);
 
 	return ret;
 }
