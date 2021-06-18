@@ -2033,7 +2033,7 @@ static void pcpu_balance_free(bool empty_only)
 static void pcpu_balance_populated(void)
 {
 	/* gfp flags passed to underlying allocators */
-	const gfp_t gfp = GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN;
+	const gfp_t gfp = GFP_ATOMIC | __GFP_NORETRY | __GFP_NOWARN;
 	struct pcpu_chunk *chunk;
 	int slot, nr_to_pop, ret;
 
