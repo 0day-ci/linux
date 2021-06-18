@@ -219,6 +219,12 @@ static inline void
 io_pgtable_tlb_flush_walk(struct io_pgtable *iop, unsigned long iova,
 			  size_t size, size_t granule)
 {
+	if (iop->cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT ||
+	    iop->cfg.quirks & IO_PGTABLE_QUIRK_TLB_INV_ALL) {
+		iop->cfg.tlb->tlb_flush_all(iop->cookie);
+		return;
+	}
+
 	if (iop->cfg.tlb && iop->cfg.tlb->tlb_flush_walk)
 		iop->cfg.tlb->tlb_flush_walk(iova, size, granule, iop->cookie);
 }
