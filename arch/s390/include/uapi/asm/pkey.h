@@ -365,7 +365,7 @@ struct pkey_kblob2pkey2 {
  * is empty (apqn_entries is 0) the apqn_entries field is updated to the number
  * of apqn targets found and the ioctl returns with 0. If apqn_entries is > 0
  * but the number of apqn targets does not fit into the list, the apqn_targets
- * field is updatedd with the number of reqired entries but there are no apqn
+ * field is updatedd with the number of required entries but there are no apqn
  * values stored in the list and the ioctl returns with ENOSPC. If no matching
  * APQN is found, the ioctl returns with 0 but the apqn_entries value is 0.
  */
@@ -403,7 +403,7 @@ struct pkey_apqns4key {
  * is empty (apqn_entries is 0) the apqn_entries field is updated to the number
  * of apqn targets found and the ioctl returns with 0. If apqn_entries is > 0
  * but the number of apqn targets does not fit into the list, the apqn_targets
- * field is updatedd with the number of reqired entries but there are no apqn
+ * field is updatedd with the number of required entries but there are no apqn
  * values stored in the list and the ioctl returns with ENOSPC. If no matching
  * APQN is found, the ioctl returns with 0 but the apqn_entries value is 0.
  */

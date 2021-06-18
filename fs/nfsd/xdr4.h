@@ -198,7 +198,7 @@ struct nfsd4_lockt {
 	struct nfsd4_lock_denied  	lt_denied;
 };
 
- 
+
 struct nfsd4_locku {
 	u32             lu_type;
 	u32             lu_seqid;
@@ -301,7 +301,7 @@ struct nfsd4_read {
 	u32			rd_length;          /* request */
 	int			rd_vlen;
 	struct nfsd_file	*rd_nf;
-	
+
 	struct svc_rqst		*rd_rqstp;          /* response */
 	struct svc_fh		*rd_fhp;             /* response */
 };
@@ -821,7 +821,7 @@ extern void nfsd4_bump_seqid(struct nfsd4_compound_state *, __be32 nfserr);
 enum nfsd4_op_flags {
 	ALLOWED_WITHOUT_FH = 1 << 0,    /* No current filehandle required */
 	ALLOWED_ON_ABSENT_FS = 1 << 1,  /* ops processed on absent fs */
-	ALLOWED_AS_FIRST_OP = 1 << 2,   /* ops reqired first in compound */
+	ALLOWED_AS_FIRST_OP = 1 << 2,   /* ops required first in compound */
 	/* For rfc 5661 section 2.6.3.1.1: */
 	OP_HANDLES_WRONGSEC = 1 << 3,
 	OP_IS_PUTFH_LIKE = 1 << 4,
