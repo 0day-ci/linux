@@ -8,6 +8,7 @@
  * Copyright (C) 2017 SiFive
  */
 
+#define pr_fmt(fmt) "riscv: " fmt
 #include <linux/cpu.h>
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
@@ -114,7 +115,7 @@ static void send_ipi_mask(const struct cpumask *mask, enum ipi_message_type op)
 	if (ipi_ops && ipi_ops->ipi_inject)
 		ipi_ops->ipi_inject(mask);
 	else
-		pr_warn("SMP: IPI inject method not available\n");
+		pr_warn("IPI inject method not available\n");
 }
 
 static void send_ipi_single(int cpu, enum ipi_message_type op)
@@ -126,7 +127,7 @@ static void send_ipi_single(int cpu, enum ipi_message_type op)
 	if (ipi_ops && ipi_ops->ipi_inject)
 		ipi_ops->ipi_inject(cpumask_of(cpu));
 	else
-		pr_warn("SMP: IPI inject method not available\n");
+		pr_warn("IPI inject method not available\n");
 }
 
 #ifdef CONFIG_IRQ_WORK
@@ -242,7 +243,7 @@ void smp_send_stop(void)
 		cpumask_clear_cpu(smp_processor_id(), &mask);
 
 		if (system_state <= SYSTEM_RUNNING)
-			pr_crit("SMP: stopping secondary CPUs\n");
+			pr_crit("stopping secondary CPUs\n");
 		send_ipi_mask(&mask, IPI_CPU_STOP);
 	}
 
@@ -252,7 +253,7 @@ void smp_send_stop(void)
 		udelay(1);
 
 	if (num_online_cpus() > 1)
-		pr_warn("SMP: failed to stop secondary CPUs %*pbl\n",
+		pr_warn("failed to stop secondary CPUs %*pbl\n",
 			   cpumask_pr_args(cpu_online_mask));
 }
 
