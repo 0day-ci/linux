@@ -454,9 +454,14 @@ irqreturn_t mhi_irq_handler(int irq_number, void *dev)
 
 		if (mhi_dev)
 			mhi_notify(mhi_dev, MHI_CB_PENDING_DATA);
-	} else {
-		tasklet_schedule(&mhi_event->task);
+
+		return IRQ_HANDLED;
 	}
+
+	if (!mhi_event->priority)
+		tasklet_hi_schedule(&mhi_event->task);
+	else
+		tasklet_schedule(&mhi_event->task);
 
 	return IRQ_HANDLED;
 }
