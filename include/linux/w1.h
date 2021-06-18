@@ -311,7 +311,7 @@ static inline struct w1_slave* dev_to_w1_slave(struct device *dev)
 
 static inline struct w1_slave* kobj_to_w1_slave(struct kobject *kobj)
 {
-	return dev_to_w1_slave(container_of(kobj, struct device, kobj));
+	return dev_to_w1_slave(kobj_to_dev(kobj));
 }
 
 static inline struct w1_master* dev_to_w1_master(struct device *dev)
