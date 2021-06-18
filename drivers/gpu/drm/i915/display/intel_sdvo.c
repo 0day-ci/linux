@@ -2722,7 +2722,7 @@ intel_sdvo_add_hdmi_properties(struct intel_sdvo *intel_sdvo,
 {
 	intel_attach_force_audio_property(&connector->base.base);
 	if (intel_sdvo->colorimetry_cap & SDVO_COLORIMETRY_RGB220)
-		intel_attach_broadcast_rgb_property(&connector->base.base);
+		drm_connector_attach_preferred_color_range_property(&connector->base.base);
 	intel_attach_aspect_ratio_property(&connector->base.base);
 }
 

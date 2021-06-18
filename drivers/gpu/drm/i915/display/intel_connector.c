@@ -241,34 +241,6 @@ intel_attach_force_audio_property(struct drm_connector *connector)
 	drm_object_attach_property(&connector->base, prop, 0);
 }
 
-static const struct drm_prop_enum_list broadcast_rgb_names[] = {
-	{ INTEL_BROADCAST_RGB_AUTO, "Automatic" },
-	{ INTEL_BROADCAST_RGB_FULL, "Full" },
-	{ INTEL_BROADCAST_RGB_LIMITED, "Limited 16:235" },
-};
-
-void
-intel_attach_broadcast_rgb_property(struct drm_connector *connector)
-{
-	struct drm_device *dev = connector->dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_property *prop;
-
-	prop = dev_priv->broadcast_rgb_property;
-	if (prop == NULL) {
-		prop = drm_property_create_enum(dev, DRM_MODE_PROP_ENUM,
-					   "Broadcast RGB",
-					   broadcast_rgb_names,
-					   ARRAY_SIZE(broadcast_rgb_names));
-		if (prop == NULL)
-			return;
-
-		dev_priv->broadcast_rgb_property = prop;
-	}
-
-	drm_object_attach_property(&connector->base, prop, 0);
-}
-
 void
 intel_attach_aspect_ratio_property(struct drm_connector *connector)
 {

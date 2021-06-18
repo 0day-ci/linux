@@ -77,13 +77,6 @@ enum hdmi_force_audio {
 	HDMI_AUDIO_ON,			/* force turn on HDMI audio */
 };
 
-/* "Broadcast RGB" property */
-enum intel_broadcast_rgb {
-	INTEL_BROADCAST_RGB_AUTO,
-	INTEL_BROADCAST_RGB_FULL,
-	INTEL_BROADCAST_RGB_LIMITED,
-};
-
 struct intel_fb_view {
 	/*
 	 * The remap information used in the remapped and rotated views to
@@ -552,7 +545,6 @@ struct intel_digital_connector_state {
 	struct drm_connector_state base;
 
 	enum hdmi_force_audio force_audio;
-	int broadcast_rgb;
 };
 
 #define to_intel_digital_connector_state(x) container_of(x, struct intel_digital_connector_state, base)
