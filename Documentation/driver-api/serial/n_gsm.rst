@@ -14,11 +14,11 @@ How to use it
 -------------
 1. initialize the modem in 0710 mux mode (usually AT+CMUX= command) through
    its serial port. Depending on the modem used, you can pass more or less
-   parameters to this command,
+   parameters to this command.
 2. switch the serial line to using the n_gsm line discipline by using
-   TIOCSETD ioctl,
-3. configure the mux using GSMIOC_GETCONF / GSMIOC_SETCONF ioctl,
-4. obtain base gsmtty number for the used serial port,
+   TIOCSETD ioctl.
+3. configure the mux using GSMIOC_GETCONF / GSMIOC_SETCONF ioctl.
+4. obtain base gsmtty number for the used serial port.
 
 Major parts of the initialization program :
 (a good starting point is util-linux-ng/sys-utils/ldattach.c)::
