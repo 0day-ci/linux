@@ -8,6 +8,7 @@
 
 #include "fuse_i.h"
 
+#include <linux/freezer.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/poll.h>
@@ -386,9 +387,11 @@ static void request_wait_answer(struct fuse_req *req)
 	}
 
 	if (!test_bit(FR_FORCE, &req->flags)) {
+		freezer_do_not_count();
 		/* Only fatal signals may interrupt this */
 		err = wait_event_killable(req->waitq,
 					test_bit(FR_FINISHED, &req->flags));
+		freezer_count();
 		if (!err)
 			return;
 
