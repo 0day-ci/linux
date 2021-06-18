@@ -37,6 +37,7 @@ enum clk_ids {
 	CLK_PLL5,
 	CLK_PLL5_DIV2,
 	CLK_PLL6,
+	CLK_P1_DIV2,
 
 	/* Module Clocks */
 	MOD_CLK_BASE,
@@ -86,6 +87,7 @@ static const struct cpg_core_clk r9a07g044_core_clks[] __initconst = {
 	DEF_FIXED("TSU", R9A07G044_CLK_TSU, CLK_PLL2_DIV20, 1, 1),
 	DEF_DIV("P1", R9A07G044_CLK_P1, CLK_PLL3_DIV8,
 		DIVPL3B, dtable_3b, CLK_DIVIDER_HIWORD_MASK),
+	DEF_FIXED("P1_DIV2", CLK_P1_DIV2, R9A07G044_CLK_P1, 1, 2),
 	DEF_DIV("P2", R9A07G044_CLK_P2, CLK_PLL3_DIV16,
 		DIVPL3A, dtable_3a, CLK_DIVIDER_HIWORD_MASK),
 };
@@ -100,6 +102,12 @@ static struct rzg2l_mod_clk r9a07g044_mod_clks[] = {
 	DEF_MOD("ia55_clk",	R9A07G044_IA55_CLK,
 				R9A07G044_CLK_P1,
 				0x518, BIT(1), BIT(0)),
+	DEF_MOD("dmac_aclk",	R9A07G044_DMAC_ACLK,
+				R9A07G044_CLK_P1,
+				0x52c, BIT(0), BIT(0)),
+	DEF_MOD("dmac_pclk",	R9A07G044_DMAC_PCLK,
+				CLK_P1_DIV2,
+				0x52c, BIT(1), BIT(1)),
 	DEF_MOD("i2c0",		R9A07G044_I2C0_PCLK,
 				R9A07G044_CLK_P0,
 				0x580, BIT(0), BIT(0)),
