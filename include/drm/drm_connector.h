@@ -810,6 +810,15 @@ struct drm_connector_state {
 	u32 preferred_color_format;
 
 	/**
+	 * preferred_color_range: Property set by userspace via "Broadcast RGB"
+	 * property to tell the GPU driver which color range to use. It
+	 * overwrites existing automatic detection mechanisms, if set and valid
+	 * for the current color format. Userspace can check for (un-)successful
+	 * application via the "active color range" property.
+	 */
+	enum drm_mode_color_range preferred_color_range;
+
+	/**
 	 * @hdr_output_metadata:
 	 * DRM blob property for HDR output metadata
 	 */
@@ -1427,6 +1436,12 @@ struct drm_connector {
 	struct drm_property *active_color_format_property;
 
 	/**
+	 * @preferred_color_range_property: Default connector property for the
+	 * preferred color range to be driven out of the connector.
+	 */
+	struct drm_property *preferred_color_range_property;
+
+	/**
 	 * @active_color_range_property: Default connector property for the
 	 * active color range to be driven out of the connector.
 	 */
@@ -1760,6 +1775,7 @@ int drm_connector_attach_preferred_color_format_property(struct drm_connector *c
 int drm_connector_attach_active_color_format_property(struct drm_connector *connector);
 void drm_connector_set_active_color_format_property(struct drm_connector *connector,
 						    u32 active_color_format);
+int drm_connector_attach_preferred_color_range_property(struct drm_connector *connector);
 int drm_connector_attach_active_color_range_property(struct drm_connector *connector);
 void drm_connector_set_active_color_range_property(struct drm_connector *connector,
 						   enum drm_mode_color_range active_color_range);

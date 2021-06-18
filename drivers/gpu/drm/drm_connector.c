@@ -905,6 +905,12 @@ static const struct drm_prop_enum_list drm_active_color_format_enum_list[] = {
 	{ DRM_COLOR_FORMAT_YCRCB420, "ycbcr420" },
 };
 
+static const struct drm_prop_enum_list drm_preferred_color_range_enum_list[] = {
+	{ DRM_MODE_COLOR_RANGE_UNSET, "Automatic" },
+	{ DRM_MODE_COLOR_RANGE_FULL, "Full" },
+	{ DRM_MODE_COLOR_RANGE_LIMITED_16_235, "Limited 16:235" },
+};
+
 static const struct drm_prop_enum_list drm_active_color_range_enum_list[] = {
 	{ DRM_MODE_COLOR_RANGE_UNSET, "Unknown" },
 	{ DRM_MODE_COLOR_RANGE_FULL, "Full" },
@@ -1242,6 +1248,13 @@ static const struct drm_prop_enum_list dp_colorspaces[] = {
  *	connected monitor, and the "preferred color format". Drivers shall use
  *	drm_connector_attach_active_color_format_property() to install this
  *	property.
+ *
+ * Broadcast RGB:
+ *	This property is used by userspace to change the used color range. When
+ *	used the driver will use the selected range if valid for the current
+ *	color format. Drivers to use the function
+ *	drm_connector_attach_preferred_color_format_property() to create and
+ *	attach the property to the connector during initialization.
  *
  * active color range:
  *	This read-only property tells userspace the color range actually used by
@@ -2323,6 +2336,36 @@ void drm_connector_set_active_color_format_property(struct drm_connector *connec
 				      active_color_format);
 }
 EXPORT_SYMBOL(drm_connector_set_active_color_format_property);
+
+/**
+ * drm_connector_attach_preferred_color_range_property - attach "Broadcast RGB" property
+ * @connector: connector to attach preferred color range property on.
+ *
+ * This is used to add support for selecting a color range on a connector.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_connector_attach_preferred_color_range_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	if (!connector->preferred_color_range_property) {
+		prop = drm_property_create_enum(dev, 0, "Broadcast RGB",
+						drm_preferred_color_range_enum_list,
+						ARRAY_SIZE(drm_preferred_color_range_enum_list));
+		if (!prop)
+			return -ENOMEM;
+
+		connector->preferred_color_range_property = prop;
+		drm_object_attach_property(&connector->base, prop, DRM_MODE_COLOR_RANGE_UNSET);
+		connector->state->preferred_color_range = DRM_MODE_COLOR_RANGE_UNSET;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_connector_attach_preferred_color_range_property);
 
 /**
  * drm_connector_attach_active_color_range_property - attach "active color range" property
