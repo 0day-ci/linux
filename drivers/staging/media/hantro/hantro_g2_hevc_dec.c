@@ -396,6 +396,17 @@ static void set_ref_pic_list(struct hantro_ctx *ctx)
 	}
 }
 
+static int down_scale_factor(struct hantro_ctx *ctx)
+{
+	const struct hantro_hevc_dec_ctrls *ctrls = &ctx->hevc_dec.ctrls;
+	const struct v4l2_ctrl_hevc_sps *sps = ctrls->sps;
+
+	if (sps->pic_width_in_luma_samples == ctx->dst_fmt.width)
+		return 0;
+
+	return DIV_ROUND_CLOSEST(sps->pic_width_in_luma_samples, ctx->dst_fmt.width);
+}
+
 static int set_ref(struct hantro_ctx *ctx)
 {
 	const struct hantro_hevc_dec_ctrls *ctrls = &ctx->hevc_dec.ctrls;
@@ -409,6 +420,7 @@ static int set_ref(struct hantro_ctx *ctx)
 	size_t mv_offset = hantro_hevc_motion_vectors_offset(sps);
 	size_t compress_luma_offset = hantro_hevc_luma_compress_offset(sps);
 	size_t compress_chroma_offset = hantro_hevc_chroma_compress_offset(sps);
+	int down_scale = down_scale_factor(ctx);
 	u32 max_ref_frames;
 	u16 dpb_longterm_e;
 	static const struct hantro_reg cur_poc[] = {
@@ -521,8 +533,18 @@ static int set_ref(struct hantro_ctx *ctx)
 	hantro_write_addr(vpu, G2_REG_CHR_REF(i), chroma_addr);
 	hantro_write_addr(vpu, G2_REG_DMV_REF(i++), mv_addr);
 
-	hantro_write_addr(vpu, G2_ADDR_DST, luma_addr);
-	hantro_write_addr(vpu, G2_ADDR_DST_CHR, chroma_addr);
+	if (down_scale) {
+		chroma_addr = luma_addr + (cr_offset >> down_scale);
+		hantro_reg_write(vpu, &g2_down_scale_e, 1);
+		hantro_reg_write(vpu, &g2_down_scale_y, down_scale >> 2);
+		hantro_reg_write(vpu, &g2_down_scale_x, down_scale >> 2);
+		hantro_write_addr(vpu, G2_DS_DST, luma_addr);
+		hantro_write_addr(vpu, G2_DS_DST_CHR, chroma_addr);
+	} else {
+		hantro_write_addr(vpu, G2_ADDR_DST, luma_addr);
+		hantro_write_addr(vpu, G2_ADDR_DST_CHR, chroma_addr);
+	}
+
 	hantro_write_addr(vpu, G2_ADDR_DST_MV, mv_addr);
 	hantro_write_addr(vpu, G2_COMP_ADDR_DST, compress_luma_addr);
 	hantro_write_addr(vpu, G2_COMP_CHR, compress_chroma_addr);
@@ -601,6 +623,26 @@ static void hantro_g2_check_idle(struct hantro_dev *vpu)
 			vdpu_write(vpu, status, G2_REG_INTERRUPT);
 		}
 	}
+}
+
+int hantro_g2_hevc_dec_scaling(struct hantro_ctx *ctx,
+			       struct v4l2_frmsizeenum *fsize)
+{
+	/**
+	 * G2 scaler can scale down by 0, 2, 4 or 8
+	 * use fsize->index has power of 2 diviser
+	 **/
+	if (fsize->index > 3)
+		return -EINVAL;
+
+	if (!ctx->src_fmt.width || !ctx->src_fmt.height)
+		return -EINVAL;
+
+	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
+	fsize->discrete.width = ctx->src_fmt.width >> fsize->index;
+	fsize->discrete.height = ctx->src_fmt.height >> fsize->index;
+
+	return 0;
 }
 
 int hantro_g2_hevc_dec_run(struct hantro_ctx *ctx)

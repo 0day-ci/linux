@@ -118,7 +118,7 @@ static int vidioc_enum_framesizes(struct file *file, void *priv,
 	struct hantro_ctx *ctx = fh_to_ctx(priv);
 	const struct hantro_fmt *fmt;
 
-	if (fsize->index != 0) {
+	if (fsize->index != 0 && !ctx->dev->variant->scaling) {
 		vpu_debug(0, "invalid frame size index (expected 0, got %d)\n",
 			  fsize->index);
 		return -EINVAL;
@@ -131,9 +131,13 @@ static int vidioc_enum_framesizes(struct file *file, void *priv,
 		return -EINVAL;
 	}
 
-	/* This only makes sense for coded formats */
-	if (fmt->codec_mode == HANTRO_MODE_NONE)
+	/* For non-coded formats check if scaling is possible */
+	if (fmt->codec_mode == HANTRO_MODE_NONE) {
+		if (ctx->dev->variant->scaling)
+			return ctx->dev->variant->scaling(ctx, fsize);
+
 		return -EINVAL;
+	}
 
 	fsize->type = V4L2_FRMSIZE_TYPE_STEPWISE;
 	fsize->stepwise = fmt->frmsize;
