@@ -32,6 +32,7 @@ enum clk_ids {
 	CLK_PLL3_DIV2,
 	CLK_PLL3_DIV4,
 	CLK_PLL3_DIV8,
+	CLK_PLL3_DIV16,
 	CLK_PLL4,
 	CLK_PLL5,
 	CLK_PLL5_DIV2,
@@ -42,6 +43,14 @@ enum clk_ids {
 };
 
 /* Divider tables */
+static const struct clk_div_table dtable_3a[] = {
+	{0, 1},
+	{1, 2},
+	{2, 4},
+	{3, 8},
+	{4, 32},
+};
+
 static const struct clk_div_table dtable_3b[] = {
 	{0, 1},
 	{1, 2},
@@ -68,6 +77,7 @@ static const struct cpg_core_clk r9a07g044_core_clks[] __initconst = {
 	DEF_FIXED(".pll3_div2", CLK_PLL3_DIV2, CLK_PLL3, 1, 2),
 	DEF_FIXED(".pll3_div4", CLK_PLL3_DIV4, CLK_PLL3, 1, 4),
 	DEF_FIXED(".pll3_div8", CLK_PLL3_DIV8, CLK_PLL3, 1, 8),
+	DEF_FIXED(".pll3_div16", CLK_PLL3_DIV16, CLK_PLL3, 1, 16),
 
 	/* Core output clk */
 	DEF_FIXED("I", R9A07G044_CLK_I, CLK_PLL1, 1, 1),
@@ -76,37 +86,42 @@ static const struct cpg_core_clk r9a07g044_core_clks[] __initconst = {
 	DEF_FIXED("TSU", R9A07G044_CLK_TSU, CLK_PLL2_DIV20, 1, 1),
 	DEF_DIV("P1", R9A07G044_CLK_P1, CLK_PLL3_DIV8,
 		DIVPL3B, dtable_3b, CLK_DIVIDER_HIWORD_MASK),
+	DEF_DIV("P2", R9A07G044_CLK_P2, CLK_PLL3_DIV16,
+		DIVPL3A, dtable_3a, CLK_DIVIDER_HIWORD_MASK),
 };
 
 static struct rzg2l_mod_clk r9a07g044_mod_clks[] = {
-	DEF_MOD("gic",		R9A07G044_CLK_GIC600,
+	DEF_MOD("gic",		R9A07G044_GIC600_GICCLK,
 				R9A07G044_CLK_P1,
 				0x514, BIT(0), (BIT(0) | BIT(1))),
-	DEF_MOD("ia55",		R9A07G044_CLK_IA55,
+	DEF_MOD("ia55_pclk",	R9A07G044_IA55_PCLK,
+				R9A07G044_CLK_P2,
+				0x518, BIT(0), BIT(0)),
+	DEF_MOD("ia55_clk",	R9A07G044_IA55_CLK,
 				R9A07G044_CLK_P1,
-				0x518, (BIT(0) | BIT(1)), BIT(0)),
-	DEF_MOD("scif0",	R9A07G044_CLK_SCIF0,
+				0x518, BIT(1), BIT(0)),
+	DEF_MOD("scif0",	R9A07G044_SCIF0_CLK_PCK,
 				R9A07G044_CLK_P0,
 				0x584, BIT(0), BIT(0)),
-	DEF_MOD("scif1",	R9A07G044_CLK_SCIF1,
+	DEF_MOD("scif1",	R9A07G044_SCIF1_CLK_PCK,
 				R9A07G044_CLK_P0,
 				0x584, BIT(1), BIT(1)),
-	DEF_MOD("scif2",	R9A07G044_CLK_SCIF2,
+	DEF_MOD("scif2",	R9A07G044_SCIF2_CLK_PCK,
 				R9A07G044_CLK_P0,
 				0x584, BIT(2), BIT(2)),
-	DEF_MOD("scif3",	R9A07G044_CLK_SCIF3,
+	DEF_MOD("scif3",	R9A07G044_SCIF3_CLK_PCK,
 				R9A07G044_CLK_P0,
 				0x584, BIT(3), BIT(3)),
-	DEF_MOD("scif4",	R9A07G044_CLK_SCIF4,
+	DEF_MOD("scif4",	R9A07G044_SCIF4_CLK_PCK,
 				R9A07G044_CLK_P0,
 				0x584, BIT(4), BIT(4)),
-	DEF_MOD("sci0",		R9A07G044_CLK_SCI0,
+	DEF_MOD("sci0",		R9A07G044_SCI0_CLKP,
 				R9A07G044_CLK_P0,
 				0x588, BIT(0), BIT(0)),
 };
 
 static const unsigned int r9a07g044_crit_mod_clks[] __initconst = {
-	MOD_CLK_BASE + R9A07G044_CLK_GIC600,
+	MOD_CLK_BASE + R9A07G044_GIC600_GICCLK,
 };
 
 const struct rzg2l_cpg_info r9a07g044_cpg_info = {
@@ -123,5 +138,5 @@ const struct rzg2l_cpg_info r9a07g044_cpg_info = {
 	/* Module Clocks */
 	.mod_clks = r9a07g044_mod_clks,
 	.num_mod_clks = ARRAY_SIZE(r9a07g044_mod_clks),
-	.num_hw_mod_clks = R9A07G044_CLK_MIPI_DSI_PIN + 1,
+	.num_hw_mod_clks = R9A07G044_TSU_PCLK + 1,
 };
