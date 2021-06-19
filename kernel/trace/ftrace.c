@@ -5517,6 +5517,14 @@ static char ftrace_filter_buf[FTRACE_FILTER_SIZE] __initdata;
 /* Used by function selftest to not test if filter is set */
 bool ftrace_filter_param __initdata;
 
+static int __init set_ftrace_disabled(char *str)
+{
+	pr_info("Set ftrace_disabled to disable ftrace\n");
+	ftrace_disabled = 1;
+	return 1;
+}
+__setup("ftrace_disabled", set_ftrace_disabled);
+
 static int __init set_ftrace_notrace(char *str)
 {
 	ftrace_filter_param = true;
