@@ -651,6 +651,7 @@ static int mtk_jpeg_queue_setup(struct vb2_queue *q,
 	struct mtk_jpeg_ctx *ctx = vb2_get_drv_priv(q);
 	struct mtk_jpeg_q_data *q_data = NULL;
 	struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+	unsigned int exif_extra;
 	int i;
 
 	v4l2_dbg(1, debug, &jpeg->v4l2_dev, "(%d) buf_req count=%u\n",
@@ -660,18 +661,20 @@ static int mtk_jpeg_queue_setup(struct vb2_queue *q,
 	if (!q_data)
 		return -EINVAL;
 
+	exif_extra = ctx->enable_exif && V4L2_TYPE_IS_CAPTURE(q->type) ?
+		     MTK_JPEG_MAX_EXIF_SIZE : 0;
+
 	if (*num_planes) {
 		for (i = 0; i < *num_planes; i++)
-			if (sizes[i] < q_data->pix_mp.plane_fmt[i].sizeimage)
+			if (sizes[i] < q_data->pix_mp.plane_fmt[i].sizeimage + exif_extra)
 				return -EINVAL;
 		return 0;
 	}
 
 	*num_planes = q_data->fmt->colplanes;
 	for (i = 0; i < q_data->fmt->colplanes; i++) {
-		sizes[i] =  q_data->pix_mp.plane_fmt[i].sizeimage;
-		v4l2_dbg(1, debug, &jpeg->v4l2_dev, "sizeimage[%d]=%u\n",
-			 i, sizes[i]);
+		sizes[i] =  q_data->pix_mp.plane_fmt[i].sizeimage + exif_extra;
+		v4l2_dbg(1, debug, &jpeg->v4l2_dev, "sizes[%d]=%u\n", i, sizes[i]);
 	}
 
 	return 0;
@@ -690,12 +693,11 @@ static int mtk_jpeg_buf_prepare(struct vb2_buffer *vb)
 
 	for (i = 0; i < q_data->fmt->colplanes; i++) {
 		plane_fmt = q_data->pix_mp.plane_fmt[i];
-		if (ctx->enable_exif &&
-		    q_data->fmt->fourcc == V4L2_PIX_FMT_JPEG)
-			vb2_set_plane_payload(vb, i, plane_fmt.sizeimage +
+		if (q_data->fmt->fourcc != V4L2_PIX_FMT_JPEG)
+			vb2_set_plane_payload(vb, i, plane_fmt.sizeimage);
+		else if (ctx->enable_exif)
+			vb2_set_plane_payload(vb, i,  plane_fmt.sizeimage +
 					      MTK_JPEG_MAX_EXIF_SIZE);
-		else
-			vb2_set_plane_payload(vb, i,  plane_fmt.sizeimage);
 	}
 
 	return 0;
