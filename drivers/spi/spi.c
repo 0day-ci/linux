@@ -873,9 +873,8 @@ int spi_map_buf(struct spi_controller *ctlr, struct device *dev,
 	const bool vmalloced_buf = is_vmalloc_addr(buf);
 	unsigned int max_seg_size = dma_get_max_seg_size(dev);
 #ifdef CONFIG_HIGHMEM
-	const bool kmap_buf = ((unsigned long)buf >= PKMAP_BASE &&
-				(unsigned long)buf < (PKMAP_BASE +
-					(LAST_PKMAP * PAGE_SIZE)));
+	const bool kmap_buf = (unsigned long)buf >= PKMAP_BASE &&
+			      (unsigned long)buf < (PKMAP_BASE + LAST_PKMAP * PAGE_SIZE);
 #else
 	const bool kmap_buf = false;
 #endif
