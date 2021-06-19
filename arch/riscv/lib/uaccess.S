@@ -67,6 +67,39 @@ ENTRY(__asm_copy_from_user)
 	bnez	a3, .Lshift_copy
 
 .Lword_copy:
+        /*
+	 * Both src and dst are aligned, unrolled word copy
+	 *
+	 * a0 - start of aligned dst
+	 * a1 - start of aligned src
+	 * a3 - a1 & mask:(SZREG-1)
+	 * t0 - end of aligned dst
+	 */
+	addi	t0, t0, -(8*SZREG-1) /* not to over run */
+2:
+	fixup REG_L   a4,        0(a1), 10f
+	fixup REG_L   a5,    SZREG(a1), 10f
+	fixup REG_L   a6,  2*SZREG(a1), 10f
+	fixup REG_L   a7,  3*SZREG(a1), 10f
+	fixup REG_L   t1,  4*SZREG(a1), 10f
+	fixup REG_L   t2,  5*SZREG(a1), 10f
+	fixup REG_L   t3,  6*SZREG(a1), 10f
+	fixup REG_L   t4,  7*SZREG(a1), 10f
+	fixup REG_S   a4,        0(a0), 10f
+	fixup REG_S   a5,    SZREG(a0), 10f
+	fixup REG_S   a6,  2*SZREG(a0), 10f
+	fixup REG_S   a7,  3*SZREG(a0), 10f
+	fixup REG_S   t1,  4*SZREG(a0), 10f
+	fixup REG_S   t2,  5*SZREG(a0), 10f
+	fixup REG_S   t3,  6*SZREG(a0), 10f
+	fixup REG_S   t4,  7*SZREG(a0), 10f
+	addi	a0, a0, 8*SZREG
+	addi	a1, a1, 8*SZREG
+	bltu	a0, t0, 2b
+
+	addi	t0, t0, 8*SZREG-1 /* revert to original value */
+	j	.Lbyte_copy_tail
+
 .Lshift_copy:
 
 	/*
