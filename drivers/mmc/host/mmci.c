@@ -2125,6 +2125,10 @@ static int mmci_probe(struct amba_device *dev,
 	if (IS_ERR(host->rst)) {
 		ret = PTR_ERR(host->rst);
 		goto clk_disable;
+	} else {
+		ret = reset_control_deassert(host->rst);
+		if (ret)
+			dev_err(mmc_dev(mmc), "failed to de-assert reset\n");
 	}
 
 	/* Get regulators and the supported OCR mask */
