@@ -171,6 +171,7 @@ static struct blk_major_name {
 	int major;
 	char name[16];
 	void (*probe)(dev_t devt);
+	struct module *owner;
 } *major_names[BLKDEV_MAJOR_HASH_SIZE];
 static DEFINE_MUTEX(major_names_lock);
 
@@ -199,7 +200,8 @@ void blkdev_show(struct seq_file *seqf, off_t offset)
  * @major: the requested major device number [1..BLKDEV_MAJOR_MAX-1]. If
  *         @major = 0, try to allocate any unused major number.
  * @name: the name of the new block device as a zero terminated string
- * @probe: allback that is called on access to any minor number of @major
+ * @probe: callback that is called on access to any minor number of @major
+ * @owner: the owner of @probe function (i.e. THIS_MODULE or NULL).
  *
  * The @name must be unique within the system.
  *
@@ -216,8 +218,8 @@ void blkdev_show(struct seq_file *seqf, off_t offset)
  *
  * Use register_blkdev instead for any new code.
  */
-int __register_blkdev(unsigned int major, const char *name,
-		void (*probe)(dev_t devt))
+int ____register_blkdev(unsigned int major, const char *name,
+			void (*probe)(dev_t devt), struct module *owner)
 {
 	struct blk_major_name **n, *p;
 	int index, ret = 0;
@@ -257,6 +259,7 @@ int __register_blkdev(unsigned int major, const char *name,
 
 	p->major = major;
 	p->probe = probe;
+	p->owner = owner;
 	strlcpy(p->name, name, sizeof(p->name));
 	p->next = NULL;
 	index = major_to_index(major);
@@ -279,7 +282,7 @@ out:
 	mutex_unlock(&major_names_lock);
 	return ret;
 }
-EXPORT_SYMBOL(__register_blkdev);
+EXPORT_SYMBOL(____register_blkdev);
 
 void unregister_blkdev(unsigned int major, const char *name)
 {
@@ -685,14 +688,29 @@ void blk_request_module(dev_t devt)
 {
 	unsigned int major = MAJOR(devt);
 	struct blk_major_name **n;
+	void (*probe_fn)(dev_t devt);
 
 	mutex_lock(&major_names_lock);
 	for (n = &major_names[major_to_index(major)]; *n; n = &(*n)->next) {
-		if ((*n)->major == major && (*n)->probe) {
-			(*n)->probe(devt);
-			mutex_unlock(&major_names_lock);
-			return;
-		}
+		if ((*n)->major != major || !(*n)->probe)
+			continue;
+		if (!try_module_get((*n)->owner))
+			break;
+		/*
+		 * Calling probe function with major_names_lock held causes
+		 * circular locking dependency problem. Thus, call it after
+		 * releasing major_names_lock.
+		 */
+		probe_fn = (*n)->probe;
+		mutex_unlock(&major_names_lock);
+		/*
+		 * Assuming that unregister_blkdev() is called from module's
+		 * __exit function, a module refcount taken above allows us
+		 * to safely call probe function without major_names_lock held.
+		 */
+		probe_fn(devt);
+		module_put((*n)->owner);
+		return;
 	}
 	mutex_unlock(&major_names_lock);
 

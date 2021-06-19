@@ -277,10 +277,12 @@ extern void put_disk(struct gendisk *disk);
 
 #define alloc_disk(minors) alloc_disk_node(minors, NUMA_NO_NODE)
 
-int __register_blkdev(unsigned int major, const char *name,
-		void (*probe)(dev_t devt));
+int ____register_blkdev(unsigned int major, const char *name,
+			void (*probe)(dev_t devt), struct module *owner);
+#define __register_blkdev(major, name, probe) \
+	____register_blkdev(major, name, probe, THIS_MODULE)
 #define register_blkdev(major, name) \
-	__register_blkdev(major, name, NULL)
+	____register_blkdev(major, name, NULL, NULL)
 void unregister_blkdev(unsigned int major, const char *name);
 
 bool bdev_check_media_change(struct block_device *bdev);
