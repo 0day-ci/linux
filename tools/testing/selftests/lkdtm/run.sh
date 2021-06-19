@@ -78,8 +78,9 @@ dmesg > "$DMESG"
 
 # Most shells yell about signals and we're expecting the "cat" process
 # to usually be killed by the kernel. So we have to run it in a sub-shell
-# and silence errors.
-($SHELL -c 'cat <(echo '"$test"') >'"$TRIGGER" 2>/dev/null) || true
+# to avoid terminating this script. Leave stderr alone, just in case
+# something _else_ happens.
+(/bin/sh -c '(echo '"$test"') | cat >'"$TRIGGER") || true
 
 # Record and dump the results
 dmesg | comm --nocheck-order -13 "$DMESG" - > "$LOG" || true
