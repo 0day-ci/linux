@@ -111,10 +111,8 @@ struct zbud_pool {
 	struct list_head lru;
 	u64 pages_nr;
 	const struct zbud_ops *ops;
-#ifdef CONFIG_ZPOOL
 	struct zpool *zpool;
 	const struct zpool_ops *zpool_ops;
-#endif
 };
 
 /*
@@ -526,8 +524,6 @@ static u64 zbud_get_pool_size(struct zbud_pool *pool)
  * zpool
  ****************/
 
-#ifdef CONFIG_ZPOOL
-
 static int zbud_zpool_evict(struct zbud_pool *pool, unsigned long handle)
 {
 	if (pool->zpool && pool->zpool_ops && pool->zpool_ops->evict)
@@ -618,7 +614,6 @@ static struct zpool_driver zbud_zpool_driver = {
 };
 
 MODULE_ALIAS("zpool-zbud");
-#endif /* CONFIG_ZPOOL */
 
 static int __init init_zbud(void)
 {
@@ -626,19 +621,14 @@ static int __init init_zbud(void)
 	BUILD_BUG_ON(sizeof(struct zbud_header) > ZHDR_SIZE_ALIGNED);
 	pr_info("loaded\n");
 
-#ifdef CONFIG_ZPOOL
 	zpool_register_driver(&zbud_zpool_driver);
-#endif
 
 	return 0;
 }
 
 static void __exit exit_zbud(void)
 {
-#ifdef CONFIG_ZPOOL
 	zpool_unregister_driver(&zbud_zpool_driver);
-#endif
-
 	pr_info("unloaded\n");
 }
 
