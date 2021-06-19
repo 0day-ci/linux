@@ -1052,6 +1052,45 @@ void usb_udc_vbus_handler(struct usb_gadget *gadget, bool status)
 }
 EXPORT_SYMBOL_GPL(usb_udc_vbus_handler);
 
+void usb_gadget_udc_disconnect(struct usb_gadget *gadget)
+{
+	struct usb_udc *udc = gadget->udc;
+
+	if (udc && udc->driver && udc->driver->disconnect)
+		udc->driver->disconnect(gadget);
+}
+EXPORT_SYMBOL_GPL(usb_gadget_udc_disconnect);
+
+void usb_gadget_udc_suspend(struct usb_gadget *gadget)
+{
+	struct usb_udc *udc = gadget->udc;
+
+	if (udc && udc->driver && udc->driver->suspend)
+		udc->driver->suspend(gadget);
+}
+EXPORT_SYMBOL_GPL(usb_gadget_udc_suspend);
+
+void usb_gadget_udc_resume(struct usb_gadget *gadget)
+{
+	struct usb_udc *udc = gadget->udc;
+
+	if (udc && udc->driver && udc->driver->resume)
+		udc->driver->resume(gadget);
+}
+EXPORT_SYMBOL_GPL(usb_gadget_udc_resume);
+
+int usb_gadget_udc_setup(struct usb_gadget *gadget,
+			const struct usb_ctrlrequest *ctrl)
+{
+	struct usb_udc *udc = gadget->udc;
+
+	if (udc && udc->driver)
+		return udc->driver->setup(gadget, ctrl);
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(usb_gadget_udc_setup);
+
 /**
  * usb_gadget_udc_reset - notifies the udc core that bus reset occurs
  * @gadget: The gadget which bus reset occurs
@@ -1064,7 +1103,13 @@ EXPORT_SYMBOL_GPL(usb_udc_vbus_handler);
 void usb_gadget_udc_reset(struct usb_gadget *gadget,
 		struct usb_gadget_driver *driver)
 {
-	driver->reset(gadget);
+	struct usb_udc *udc = gadget->udc;
+
+	if (driver)
+		driver->reset(gadget);
+	else if (udc && udc->driver)
+		udc->driver->reset(gadget);
+
 	usb_gadget_set_state(gadget, USB_STATE_DEFAULT);
 }
 EXPORT_SYMBOL_GPL(usb_gadget_udc_reset);

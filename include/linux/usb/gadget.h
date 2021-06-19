@@ -880,6 +880,12 @@ extern void usb_gadget_set_state(struct usb_gadget *gadget,
 
 /*-------------------------------------------------------------------------*/
 
+extern void usb_gadget_udc_disconnect(struct usb_gadget *gadget);
+extern void usb_gadget_udc_suspend(struct usb_gadget *gadget);
+extern void usb_gadget_udc_resume(struct usb_gadget *gadget);
+extern int usb_gadget_udc_setup(struct usb_gadget *gadget,
+			const struct usb_ctrlrequest *ctrl);
+
 /* utility to tell udc core that the bus reset occurs */
 extern void usb_gadget_udc_reset(struct usb_gadget *gadget,
 		struct usb_gadget_driver *driver);
