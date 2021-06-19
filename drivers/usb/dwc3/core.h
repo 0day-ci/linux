@@ -962,7 +962,6 @@ struct dwc3_scratchpad_array {
  * @ev_buf: struct dwc3_event_buffer pointer
  * @eps: endpoint array
  * @gadget: device side representation of the peripheral controller
- * @gadget_driver: pointer to the gadget driver
  * @clks: array of clocks
  * @num_clks: number of clocks
  * @reset: reset control
@@ -1109,7 +1108,6 @@ struct dwc3 {
 	struct dwc3_ep		*eps[DWC3_ENDPOINTS_NUM];
 
 	struct usb_gadget	*gadget;
-	struct usb_gadget_driver *gadget_driver;
 
 	struct clk_bulk_data	*clks;
 	int			num_clks;
