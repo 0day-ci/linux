@@ -56,8 +56,10 @@ static void nft_flow_rule_transfer_vlan(struct nft_offload_ctx *ctx,
 	struct nft_flow_match *match = &flow->match;
 	struct nft_offload_ethertype ethertype;
 
-	if (match->dissector.used_keys & BIT(FLOW_DISSECTOR_KEY_CONTROL) &&
-	    match->key.basic.n_proto != htons(ETH_P_8021Q) &&
+	if (!(match->dissector.used_keys & BIT(FLOW_DISSECTOR_KEY_CONTROL)))
+		return;
+
+	if (match->key.basic.n_proto != htons(ETH_P_8021Q) &&
 	    match->key.basic.n_proto != htons(ETH_P_8021AD))
 		return;
 
