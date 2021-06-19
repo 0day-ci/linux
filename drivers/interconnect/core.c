@@ -1106,7 +1106,16 @@ void icc_sync_state(struct device *dev)
 		dev_dbg(p->dev, "interconnect provider is in synced state\n");
 		list_for_each_entry(n, &p->nodes, node_list) {
 			if (n->init_avg || n->init_peak) {
-				aggregate_requests(n);
+				if (hlist_empty(&n->req_list)) {
+					if (p->pre_aggregate)
+						p->pre_aggregate(n);
+
+					p->aggregate(n, 0, 0, 0, &n->avg_bw,
+						&n->peak_bw);
+				} else {
+					aggregate_requests(n);
+				}
+
 				p->set(n, n);
 			}
 		}
