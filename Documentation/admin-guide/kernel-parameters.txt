@@ -1392,6 +1392,10 @@
 			dump only the buffer of the CPU that triggered the
 			oops.
 
+	ftrace_disabled
+			Set ftrace_disabled in cmdline to disable ftrace when
+			boot up.
+
 	ftrace_filter=[function-list]
 			[FTRACE] Limit the functions traced by the function
 			tracer at boot up. function-list is a comma-separated
