@@ -1883,6 +1883,15 @@ static int mmci_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
 	return ret;
 }
 
+static void mmci_hw_reset(struct mmc_host *mmc)
+{
+	struct mmci_host *host = mmc_priv(mmc);
+
+	reset_control_assert(host->rst);
+	udelay(2);
+	reset_control_deassert(host->rst);
+}
+
 static struct mmc_host_ops mmci_ops = {
 	.request	= mmci_request,
 	.pre_req	= mmci_pre_request,
@@ -1891,6 +1900,7 @@ static struct mmc_host_ops mmci_ops = {
 	.get_ro		= mmc_gpio_get_ro,
 	.get_cd		= mmci_get_cd,
 	.start_signal_voltage_switch = mmci_sig_volt_switch,
+	.hw_reset	= mmci_hw_reset,
 };
 
 static void mmci_probe_level_translator(struct mmc_host *mmc)
