@@ -600,7 +600,7 @@ static int dwc3_ep0_delegate_req(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 	int ret;
 
 	spin_unlock(&dwc->lock);
-	ret = dwc->gadget_driver->setup(dwc->gadget, ctrl);
+	ret = usb_gadget_udc_setup(dwc->gadget, ctrl);
 	spin_lock(&dwc->lock);
 	return ret;
 }
@@ -795,9 +795,6 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 	int ret = -EINVAL;
 	u32 len;
 
-	if (!dwc->gadget_driver)
-		goto out;
-
 	trace_dwc3_ctrl_req(ctrl);
 
 	len = le16_to_cpu(ctrl->wLength);
@@ -819,7 +816,6 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 	if (ret == USB_GADGET_DELAYED_STATUS)
 		dwc->delayed_status = true;
 
-out:
 	if (ret < 0)
 		dwc3_ep0_stall_and_restart(dwc);
 }
