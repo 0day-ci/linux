@@ -5612,3 +5612,57 @@ static void apex_pci_fixup_class(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_CLASS_HEADER(0x1ac1, 0x089a,
 			       PCI_CLASS_NOT_DEFINED, 8, apex_pci_fixup_class);
+
+/*
+ * Some Loongson PCIe ports have a h/w limitation of
+ * 256 bytes maximum read request size...
+ *
+ * Keystone PCI controller has a h/w limitation of
+ * 256 bytes maximum read request size.
+ *
+ * Amlogic DesignWare PCI controller on Khadas VIM3/VIM3L have some
+ * issue with HDMI scrambled picture and nvme devices
+ * at intensive writing...
+ */
+static void mrrs_limit_quirk(struct pci_dev *dev)
+{
+	struct pci_bus *bus = dev->bus;
+	struct pci_dev *bridge;
+	int mrrs;
+	int mrrs_limit = 256;
+	static const struct pci_device_id bridge_devids[] = {
+		{ PCI_VDEVICE(LOONGSON, PCI_DEVICE_ID_LOONGSON_PCIE_PORT_0) },
+		{ PCI_VDEVICE(LOONGSON, PCI_DEVICE_ID_LOONGSON_PCIE_PORT_1) },
+		{ PCI_VDEVICE(LOONGSON, PCI_DEVICE_ID_LOONGSON_PCIE_PORT_2) },
+		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_RC_K2HK),
+		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_RC_K2E),
+		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_RC_K2L),
+		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_RC_K2G),
+		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+		{ PCI_DEVICE(PCI_VENDOR_ID_SYNOPSYS, PCI_DEVICE_ID_SYNOPSYS_HAPSUSB3) },
+		{ 0, },
+	};
+
+	/* look for the matching bridge */
+	while (!pci_is_root_bus(bus)) {
+		bridge = bus->self;
+		bus = bus->parent;
+		/*
+		 * 256 bytes maximum read request size. They can't handle
+		 * anything larger than this. So force this limit on
+		 * any devices attached under these ports.
+		 */
+		if (pci_match_id(bridge_devids, bridge)) {
+			mrrs = pcie_get_readrq(dev);
+			if (mrrs > mrrs_limit) {
+				pci_info(dev, "limiting MRRS %d to %d\n", mrrs, mrrs_limit);
+				pcie_set_readrq(dev, mrrs_limit);
+			}
+			break;
+		}
+	}
+}
+DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, mrrs_limit_quirk);
