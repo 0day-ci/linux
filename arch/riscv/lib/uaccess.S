@@ -32,6 +32,34 @@ ENTRY(__asm_copy_from_user)
 	add	t0, a0, a2
 	bgtu	a0, t0, 5f
 
+	/*
+	 * Use byte copy only if too small.
+	 */
+	li	a3, 8*SZREG /* size must be larger than size in word_copy */
+	bltu	a2, a3, .Lbyte_copy_tail
+
+	/*
+	 * Copy first bytes until dst is align to word boundary.
+	 * a0 - start of dst
+	 * t1 - start of aligned dst
+	 */
+	addi	t1, a0, SZREG-1
+	andi	t1, t1, ~(SZREG-1)
+	/* dst is already aligned, skip */
+	beq	a0, t1, .Lskip_first_bytes
+1:
+	/* a5 - one byte for copying data */
+	fixup lb      a5, 0(a1), 10f
+	addi	a1, a1, 1	/* src */
+	fixup sb      a5, 0(a0), 10f
+	addi	a0, a0, 1	/* dst */
+	bltu	a0, t1, 1b	/* t1 - start of aligned dst */
+
+.Lskip_first_bytes:
+
+.Lword_copy:
+.Lshift_copy:
+
 .Lbyte_copy_tail:
 	/*
 	 * Byte copy anything left.
