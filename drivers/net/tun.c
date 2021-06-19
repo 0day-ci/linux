@@ -2397,8 +2397,50 @@ build:
 		err = -EINVAL;
 		goto out;
 	}
+	switch (tun->flags & TUN_TYPE_MASK) {
+	case IFF_TUN:
+		if (tun->flags & IFF_NO_PI) {
+			u8 ip_version = skb->len ? (skb->data[0] >> 4) : 0;
 
-	skb->protocol = eth_type_trans(skb, tun->dev);
+			switch (ip_version) {
+			case 4:
+				skb->protocol = htons(ETH_P_IP);
+				break;
+			case 6:
+				skb->protocol = htons(ETH_P_IPV6);
+				break;
+			default:
+				atomic_long_inc(&tun->dev->rx_dropped);
+				kfree_skb(skb);
+				err = -EINVAL;
+				goto out;
+			}
+		} else {
+			struct tun_pi *pi = (struct tun_pi *)skb->data;
+			if (!pskb_may_pull(skb, sizeof(*pi))) {
+				atomic_long_inc(&tun->dev->rx_dropped);
+				kfree_skb(skb);
+				err = -ENOMEM;
+				goto out;
+			}
+			skb_pull_inline(skb, sizeof(*pi));
+			skb->protocol = pi->proto;
+		}
+
+		skb_reset_mac_header(skb);
+		skb->dev = tun->dev;
+		break;
+	case IFF_TAP:
+		if (!pskb_may_pull(skb, ETH_HLEN)) {
+			atomic_long_inc(&tun->dev->rx_dropped);
+			kfree_skb(skb);
+			err = -ENOMEM;
+			goto out;
+		}
+		skb->protocol = eth_type_trans(skb, tun->dev);
+		break;
+	}
+
 	skb_reset_network_header(skb);
 	skb_probe_transport_header(skb);
 	skb_record_rx_queue(skb, tfile->queue_index);
