@@ -479,6 +479,8 @@ struct regulator_dev {
 	ktime_t last_off;
 };
 
+#if defined(CONFIG_REGULATOR)
+
 struct regulator_dev *
 regulator_register(const struct regulator_desc *regulator_desc,
 		   const struct regulator_config *config);
@@ -551,4 +553,239 @@ int regulator_desc_list_voltage_linear_range(const struct regulator_desc *desc,
 
 int regulator_desc_list_voltage_linear(const struct regulator_desc *desc,
 				       unsigned int selector);
+
+#else
+
+static inline struct regulator_dev *
+regulator_register(const struct regulator_desc *regulator_desc,
+		   const struct regulator_config *config)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline struct regulator_dev *
+devm_regulator_register(struct device *dev,
+			const struct regulator_desc *regulator_desc,
+			const struct regulator_config *config)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline void regulator_unregister(struct regulator_dev *rdev)
+{
+}
+
+static inline void
+devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev)
+{
+}
+
+static inline int regulator_notifier_call_chain(struct regulator_dev *rdev,
+						unsigned long event, void *data)
+{
+	return 0;
+}
+
+static inline void *rdev_get_drvdata(struct regulator_dev *rdev)
+{
+	return NULL;
+}
+
+static inline struct device *rdev_get_dev(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline struct regmap *rdev_get_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int rdev_get_id(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int regulator_mode_to_status(unsigned int mode)
+{
+	return 0;
+}
+
+static inline int regulator_list_voltage_linear(struct regulator_dev *rdev,
+						unsigned int selector)
+{
+	return 0;
+}
+
+static inline int
+regulator_list_voltage_pickable_linear_range(struct regulator_dev *rdev,
+					     unsigned int selector)
+{
+	return 0;
+}
+
+static inline int
+regulator_list_voltage_linear_range(struct regulator_dev *rdev,
+				    unsigned int selector)
+{
+	return 0;
+}
+
+static inline int regulator_list_voltage_table(struct regulator_dev *rdev,
+					       unsigned int selector)
+{
+	return 0;
+}
+
+static inline int regulator_map_voltage_linear(struct regulator_dev *rdev,
+					       int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int
+regulator_map_voltage_pickable_linear_range(struct regulator_dev *rdev,
+					    int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int regulator_map_voltage_linear_range(struct regulator_dev *rdev,
+						     int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int regulator_map_voltage_iterate(struct regulator_dev *rdev,
+						int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int regulator_map_voltage_ascend(struct regulator_dev *rdev,
+					       int min_uV, int max_uV)
+{
+	return 0;
+}
+
+static inline int
+regulator_get_voltage_sel_pickable_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int
+regulator_set_voltage_sel_pickable_regmap(struct regulator_dev *rdev,
+					  unsigned int sel)
+{
+	return 0;
+}
+
+static inline int regulator_get_voltage_sel_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int regulator_set_voltage_sel_regmap(struct regulator_dev *rdev,
+						   unsigned sel)
+{
+	return 0;
+}
+
+static inline int regulator_is_enabled_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int regulator_enable_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int regulator_disable_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int
+regulator_set_voltage_time_sel(struct regulator_dev *rdev,
+			       unsigned int old_selector,
+			       unsigned int new_selector)
+{
+	return 0;
+}
+
+static inline int regulator_set_bypass_regmap(struct regulator_dev *rdev,
+					      bool enable)
+{
+	return 0;
+}
+
+static inline int regulator_get_bypass_regmap(struct regulator_dev *rdev,
+					      bool *enable)
+{
+	return 0;
+}
+
+static inline int regulator_set_soft_start_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int regulator_set_pull_down_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int
+regulator_set_active_discharge_regmap(struct regulator_dev *rdev,
+				      bool enable)
+{
+	return 0;
+}
+
+static inline int
+regulator_set_current_limit_regmap(struct regulator_dev *rdev,
+				   int min_uA, int max_uA)
+{
+	return 0;
+}
+
+static inline int regulator_get_current_limit_regmap(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline void *
+regulator_get_init_drvdata(struct regulator_init_data *reg_init_data)
+{
+	return NULL;
+}
+
+static inline int regulator_set_ramp_delay_regmap(struct regulator_dev *rdev,
+						  int ramp_delay)
+{
+	return 0;
+}
+
+static inline int regulator_sync_voltage_rdev(struct regulator_dev *rdev)
+{
+	return 0;
+}
+
+static inline int
+regulator_desc_list_voltage_linear_range(const struct regulator_desc *desc,
+					 unsigned int selector)
+{
+	return 0;
+}
+
+static inline int
+regulator_desc_list_voltage_linear(const struct regulator_desc *desc,
+				   unsigned int selector)
+{
+	return 0;
+}
+#endif
+
 #endif
