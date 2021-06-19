@@ -3334,8 +3334,6 @@ static int do_open(struct nameidata *nd,
 	if (open_flag & O_CREAT) {
 		if ((open_flag & O_EXCL) && !(file->f_mode & FMODE_CREATED))
 			return -EEXIST;
-		if (d_is_dir(nd->path.dentry))
-			return -EISDIR;
 		error = may_create_in_sticky(mnt_userns, nd,
 					     d_backing_inode(nd->path.dentry));
 		if (unlikely(error))
