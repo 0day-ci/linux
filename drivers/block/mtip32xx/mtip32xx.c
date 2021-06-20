@@ -3726,6 +3726,7 @@ kthread_run_error:
 read_capacity_error:
 init_hw_cmds_error:
 	blk_cleanup_queue(dd->queue);
+	dd->disk->queue = NULL;
 block_queue_alloc_init_error:
 	blk_mq_free_tag_set(&dd->tags);
 block_queue_alloc_tag_error:
