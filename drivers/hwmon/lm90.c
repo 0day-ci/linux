@@ -1406,6 +1406,35 @@ static int lm90_write(struct device *dev, enum hwmon_sensor_types type,
 	}
 }
 
+static int lm90_set_trips(struct device *dev, int channel, int low, int high)
+{
+	struct lm90_data *data = dev_get_drvdata(dev);
+	struct i2c_client *client = data->client;
+	int err;
+
+	/*
+	 * It makes sense to set temperature trips only if interrupt is
+	 * provided since the whole point of temperature trips is to get
+	 * a quick notification about temperature changes.
+	 */
+	if (!client->irq)
+		return 0;
+
+	/* prevent integer overflow of temperature calculations */
+	low  = max(low, -255000);
+	high = min(high, 255000);
+
+	err = lm90_temp_write(dev, hwmon_temp_min, channel, low);
+	if (err < 0)
+		return err;
+
+	err = lm90_temp_write(dev, hwmon_temp_max, channel, high);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
 static umode_t lm90_is_visible(const void *data, enum hwmon_sensor_types type,
 			       u32 attr, int channel)
 {
@@ -1804,6 +1833,7 @@ static const struct hwmon_ops lm90_ops = {
 	.is_visible = lm90_is_visible,
 	.read = lm90_read,
 	.write = lm90_write,
+	.set_trips = lm90_set_trips,
 };
 
 static int lm90_probe(struct i2c_client *client)
