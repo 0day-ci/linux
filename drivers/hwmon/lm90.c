@@ -1028,6 +1028,9 @@ static int lm90_set_temp11(struct lm90_data *data, int index, long val)
 	struct reg *regp = &reg[index];
 	int err;
 
+	/* prevent integer overflow */
+	val = max(val, -128000l);
+
 	/* +16 degrees offset for temp2 for the LM99 */
 	if (data->kind == lm99 && index <= 2)
 		val -= 16000;
@@ -1087,6 +1090,9 @@ static int lm90_set_temp8(struct lm90_data *data, int index, long val)
 	};
 	struct i2c_client *client = data->client;
 	int err;
+
+	/* prevent integer overflow */
+	val = max(val, -128000l);
 
 	/* +16 degrees offset for temp2 for the LM99 */
 	if (data->kind == lm99 && index == 3)
