@@ -192,8 +192,11 @@ void clear_sched_clock_stable(void)
 
 	smp_mb(); /* matches sched_clock_init_late() */
 
-	if (static_key_count(&sched_clock_running.key) == 2)
+	if (static_key_count(&sched_clock_running.key) == 2) {
 		__clear_sched_clock_stable();
+		WARN_ONCE(sched_clock_stable(),
+			  "sched clock is now marked unstable.");
+	}
 }
 
 static void __sched_clock_gtod_offset(void)
