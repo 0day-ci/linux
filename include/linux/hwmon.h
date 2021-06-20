@@ -390,6 +390,14 @@ enum hwmon_intrusion_attributes {
  *			Channel number
  *		@val:	Value to write
  *		The function returns 0 on success or a negative error number.
+ * @set_trips:	Callback to set temperature trips. Optional.
+ *		Parameters are:
+ *		@dev:	Pointer to hardware monitoring device
+ *		@channel:
+ *			Channel number
+ *		@low:	Low temperature trip
+ *		@high:	High temperature trip
+ *		The function returns 0 on success or a negative error number.
  */
 struct hwmon_ops {
 	umode_t (*is_visible)(const void *drvdata, enum hwmon_sensor_types type,
@@ -400,6 +408,7 @@ struct hwmon_ops {
 		    u32 attr, int channel, const char **str);
 	int (*write)(struct device *dev, enum hwmon_sensor_types type,
 		     u32 attr, int channel, long val);
+	int (*set_trips)(struct device *dev, int channel, int low, int high);
 };
 
 /**
