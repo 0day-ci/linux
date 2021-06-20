@@ -199,7 +199,8 @@ int tpm_tis_spi_init(struct spi_device *spi, struct tpm_tis_spi_phy *phy,
 
 	phy->spi_device = spi;
 
-	return tpm_tis_core_init(&spi->dev, &phy->priv, irq, phy_ops, NULL);
+	return tpm_tis_core_init(&spi->dev, &phy->priv, irq, phy_ops, NULL,
+				 true);
 }
 
 static const struct tpm_tis_phy_ops tpm_spi_phy_ops = {

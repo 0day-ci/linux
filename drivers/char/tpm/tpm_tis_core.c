@@ -728,19 +728,31 @@ static int tpm_tis_gen_interrupt(struct tpm_chip *chip)
  * everything and leave in polling mode. Returns 0 on success.
  */
 static int tpm_tis_probe_irq_single(struct tpm_chip *chip, u32 intmask,
-				    int flags, int irq)
+				    int flags, int irq, bool threaded_irq)
 {
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 	u8 original_int_vec;
 	int rc;
 	u32 int_status;
 
-	if (devm_request_irq(chip->dev.parent, irq, tis_int_handler, flags,
-			     dev_name(&chip->dev), chip) != 0) {
+
+	if (threaded_irq) {
+		rc = devm_request_threaded_irq(chip->dev.parent, irq, NULL,
+					       tis_int_handler,
+					       IRQF_ONESHOT | flags,
+					       dev_name(&chip->dev),
+					       chip);
+	} else {
+		rc = devm_request_irq(chip->dev.parent, irq, tis_int_handler,
+				      flags, dev_name(&chip->dev), chip);
+	}
+
+	if (rc) {
 		dev_info(&chip->dev, "Unable to request irq: %d for probe\n",
 			 irq);
 		return -1;
 	}
+
 	priv->irq = irq;
 
 	rc = tpm_tis_read8(priv, TPM_INT_VECTOR(priv->locality),
@@ -795,7 +807,8 @@ static int tpm_tis_probe_irq_single(struct tpm_chip *chip, u32 intmask,
  * do not have ACPI/etc. We typically expect the interrupt to be declared if
  * present.
  */
-static void tpm_tis_probe_irq(struct tpm_chip *chip, u32 intmask)
+static void tpm_tis_probe_irq(struct tpm_chip *chip, u32 intmask,
+			      bool threaded_irq)
 {
 	struct tpm_tis_data *priv = dev_get_drvdata(&chip->dev);
 	u8 original_int_vec;
@@ -810,10 +823,11 @@ static void tpm_tis_probe_irq(struct tpm_chip *chip, u32 intmask)
 		if (IS_ENABLED(CONFIG_X86))
 			for (i = 3; i <= 15; i++)
 				if (!tpm_tis_probe_irq_single(chip, intmask, 0,
-							      i))
+							      i, threaded_irq))
 					return;
 	} else if (!tpm_tis_probe_irq_single(chip, intmask, 0,
-					     original_int_vec))
+					     original_int_vec,
+					     threaded_irq))
 		return;
 }
 
@@ -909,7 +923,7 @@ static const struct tpm_class_ops tpm_tis = {
 
 int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 		      const struct tpm_tis_phy_ops *phy_ops,
-		      acpi_handle acpi_dev_handle)
+		      acpi_handle acpi_dev_handle, bool threaded_irq)
 {
 	u32 vendor;
 	u32 intfcaps;
@@ -1049,7 +1063,7 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 
 		if (irq) {
 			tpm_tis_probe_irq_single(chip, intmask, IRQF_SHARED,
-						 irq);
+						 irq, threaded_irq);
 			if (!(chip->flags & TPM_CHIP_FLAG_IRQ)) {
 				dev_err(&chip->dev, FW_BUG
 					"TPM interrupt not working, polling instead\n");
@@ -1057,7 +1071,7 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 				disable_interrupts(chip);
 			}
 		} else {
-			tpm_tis_probe_irq(chip, intmask);
+			tpm_tis_probe_irq(chip, intmask, threaded_irq);
 		}
 	}
 

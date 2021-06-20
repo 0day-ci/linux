@@ -161,7 +161,7 @@ static inline bool is_bsw(void)
 void tpm_tis_remove(struct tpm_chip *chip);
 int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 		      const struct tpm_tis_phy_ops *phy_ops,
-		      acpi_handle acpi_dev_handle);
+		      acpi_handle acpi_dev_handle, bool use_threaded_irq);
 
 #ifdef CONFIG_PM_SLEEP
 int tpm_tis_resume(struct device *dev);

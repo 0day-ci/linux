@@ -236,7 +236,7 @@ static int tpm_tis_init(struct device *dev, struct tpm_info *tpm_info)
 		phy->priv.flags |= TPM_TIS_ITPM_WORKAROUND;
 
 	return tpm_tis_core_init(dev, &phy->priv, irq, &tpm_tcg,
-				 ACPI_HANDLE(dev));
+				 ACPI_HANDLE(dev), false);
 }
 
 static SIMPLE_DEV_PM_OPS(tpm_tis_pm, tpm_pm_suspend, tpm_tis_resume);

@@ -127,7 +127,7 @@ static int tpm_tis_synquacer_init(struct device *dev,
 		return PTR_ERR(phy->iobase);
 
 	return tpm_tis_core_init(dev, &phy->priv, tpm_info->irq, &tpm_tcg_bw,
-				 ACPI_HANDLE(dev));
+				 ACPI_HANDLE(dev), false);
 }
 
 static SIMPLE_DEV_PM_OPS(tpm_tis_synquacer_pm, tpm_pm_suspend, tpm_tis_resume);
