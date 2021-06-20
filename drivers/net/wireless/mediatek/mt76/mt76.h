@@ -636,6 +636,9 @@ struct mt76_phy {
 		struct sk_buff **tail;
 		u16 seqno;
 	} rx_amsdu[__MT_RXQ_MAX];
+
+	void *frp_data;
+	u8 num_frps;
 };
 
 struct mt76_dev {
