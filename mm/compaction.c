@@ -1378,7 +1378,7 @@ static int next_search_order(struct compact_control *cc, int order)
 static unsigned long
 fast_isolate_freepages(struct compact_control *cc)
 {
-	unsigned int limit = min(1U, freelist_scan_limit(cc) >> 1);
+	unsigned int limit = max(1U, freelist_scan_limit(cc) >> 1);
 	unsigned int nr_scanned = 0;
 	unsigned long low_pfn, min_pfn, highest = 0;
 	unsigned long nr_isolated = 0;
@@ -1454,7 +1454,7 @@ fast_isolate_freepages(struct compact_control *cc)
 				high_pfn = pfn;
 
 				/* Shorten the scan if a candidate is found */
-				limit >>= 1;
+				limit = max(1U, limit >> 1);
 			}
 
 			if (order_scanned >= limit)
@@ -1494,7 +1494,7 @@ fast_isolate_freepages(struct compact_control *cc)
 		 * to freelist_scan_limit.
 		 */
 		if (order_scanned >= limit)
-			limit = min(1U, limit >> 1);
+			limit = max(1U, limit >> 1);
 	}
 
 	if (!page) {
