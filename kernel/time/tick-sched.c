@@ -937,10 +937,18 @@ static void tick_nohz_full_update_tick(struct tick_sched *ts)
 	if (!ts->tick_stopped && ts->nohz_mode == NOHZ_MODE_INACTIVE)
 		return;
 
-	if (can_stop_full_tick(cpu, ts))
+	if (can_stop_full_tick(cpu, ts)) {
 		tick_nohz_stop_sched_tick(ts, cpu);
-	else if (ts->tick_stopped)
-		tick_nohz_restart_sched_tick(ts, ktime_get());
+	} else {
+		/*
+		 * Don't allow the user to think they can get
+		 * full NO_HZ with this machine.
+		 */
+		WARN_ONCE(tick_nohz_full_running,
+			  "NO_HZ_FULL will not work for the current system.");
+		if (ts->tick_stopped)
+			tick_nohz_restart_sched_tick(ts, ktime_get());
+	}
 #endif
 }
 
