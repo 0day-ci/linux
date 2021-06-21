@@ -537,6 +537,7 @@ struct acpi_dbg2_device {
 #define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
 #define ACPI_DBG2_ARM_DCC           0x000F
 #define ACPI_DBG2_BCM2835           0x0010
+#define ACPI_DBG2_16550_WITH_GAS    0x0012
 
 #define ACPI_DBG2_1394_STANDARD     0x0000
 
