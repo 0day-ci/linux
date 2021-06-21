@@ -10,7 +10,7 @@
 #include "page_reporting.h"
 #include "internal.h"
 
-unsigned int page_reporting_order = PAGE_REPORTING_MIN_ORDER;
+unsigned int page_reporting_order = PAGE_REPORTING_ORDER;
 module_param(page_reporting_order, uint, 0644);
 MODULE_PARM_DESC(page_reporting_order, "Set page reporting order");
 
