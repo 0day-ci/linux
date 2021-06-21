@@ -12,6 +12,9 @@ int intel_context_set_ring_size(struct intel_context *ce, long sz)
 {
 	int err;
 
+	if (ce->engine->gt->submission_method == INTEL_SUBMISSION_RING)
+		return 0;
+
 	if (intel_context_lock_pinned(ce))
 		return -EINTR;
 
