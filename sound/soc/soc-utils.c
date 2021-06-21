@@ -7,6 +7,8 @@
 // Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
 //         Liam Girdwood <lrg@slimlogic.co.uk>
 
+#include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/export.h>
 #include <sound/core.h>
@@ -181,9 +183,18 @@ static int snd_soc_dummy_probe(struct platform_device *pdev)
 	return ret;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id soc_dummy_device_id[] = {
+	{ .compatible = "asoc,snd-soc-dummy" },
+	{}
+};
+MODULE_DEVICE_TABLE(of, soc_dummy_device_id);
+#endif
+
 static struct platform_driver soc_dummy_driver = {
 	.driver = {
 		.name = "snd-soc-dummy",
+		.of_match_table = of_match_ptr(soc_dummy_device_id),
 	},
 	.probe = snd_soc_dummy_probe,
 };

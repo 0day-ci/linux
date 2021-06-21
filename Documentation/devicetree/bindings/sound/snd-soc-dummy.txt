@@ -1,0 +1,16 @@
+* snd-soc-dummy
+
+This node models the snd-soc-dummy.
+This is useful to create dummy codec devices where we need to have
+some DAI links without a real Codec.
+
+Required properties:
+- compatible   : "asoc,snd-soc-dummy"
+
+
+Example:
+
+dummy_codec {
+	compatible = "asoc,snd-soc-dummy";
+	#sound-dai-cells = <0>;
+};
