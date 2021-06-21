@@ -42,16 +42,15 @@
 
 #define DB_PAGE_SIZE 4096
 
-/* Calculate the number of (4k) pages required to
- * contain a buffer queue of the given length.
+/*
+ * The number of (4k) pages required to contain a buffer queue.
  */
-#define MAX_DB_PAGES_PER_BQ(x) \
-		(((x * sizeof(u64)) / DB_PAGE_SIZE) + \
-		(((x * sizeof(u64)) % DB_PAGE_SIZE) ? 1 : 0))
+#define MAX_DB_PAGES_PER_BQ \
+		(((QLGE_BQ_LEN * sizeof(u64)) / DB_PAGE_SIZE) + \
+		(((QLGE_BQ_LEN * sizeof(u64)) % DB_PAGE_SIZE) ? 1 : 0))
 
 #define RX_RING_SHADOW_SPACE	(sizeof(u64) + \
-		MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN) * sizeof(u64) + \
-		MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN) * sizeof(u64))
+		MAX_DB_PAGES_PER_BQ * sizeof(u64) * 2)
 #define LARGE_BUFFER_MAX_SIZE 4096
 #define LARGE_BUFFER_MIN_SIZE 2048
 
