@@ -3907,6 +3907,7 @@ static void iavf_remove(struct pci_dev *pdev)
 				 err);
 	}
 
+	dev_info(&adapter->pdev->dev, "Removing device\n");
 	/* Shut down all the garbage mashers on the detention level */
 	adapter->state = __IAVF_REMOVE;
 	adapter->aq_required = 0;
