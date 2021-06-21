@@ -899,8 +899,6 @@ int ubifs_gc_start_commit(struct ubifs_info *c)
 			err = -ENOMEM;
 			goto out;
 		}
-		if (!lp)
-			break;
 		idx_gc = kmalloc(sizeof(struct ubifs_gced_idx_leb), GFP_NOFS);
 		if (!idx_gc) {
 			err = -ENOMEM;
