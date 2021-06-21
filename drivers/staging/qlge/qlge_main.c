@@ -1092,6 +1092,7 @@ static int qlge_refill_bq(struct qlge_bq *bq, gfp_t gfp)
 	struct qlge_bq_desc *bq_desc;
 	int refill_count;
 	int retval;
+	int count;
 	int i;
 
 	refill_count = QLGE_BQ_WRAP(QLGE_BQ_ALIGN(bq->next_to_clean - 1) -
@@ -1102,7 +1103,7 @@ static int qlge_refill_bq(struct qlge_bq *bq, gfp_t gfp)
 	i = bq->next_to_use;
 	bq_desc = &bq->queue[i];
 	i -= QLGE_BQ_LEN;
-	do {
+	for (count = 0; count < refill_count; count++) {
 		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
 			     "ring %u %s: try cleaning idx %d\n",
 			     rx_ring->cq_id, bq_type_name[bq->type], i);
@@ -1124,8 +1125,7 @@ static int qlge_refill_bq(struct qlge_bq *bq, gfp_t gfp)
 			bq_desc = &bq->queue[0];
 			i -= QLGE_BQ_LEN;
 		}
-		refill_count--;
-	} while (refill_count);
+	}
 	i += QLGE_BQ_LEN;
 
 	if (bq->next_to_use != i) {
