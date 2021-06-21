@@ -414,6 +414,7 @@ out:
 static void panfrost_scheduler_start(struct panfrost_queue_state *queue)
 {
 	enum panfrost_queue_status old_status;
+	bool cookie;
 
 	mutex_lock(&queue->lock);
 	old_status = atomic_xchg(&queue->status,
@@ -423,7 +424,9 @@ static void panfrost_scheduler_start(struct panfrost_queue_state *queue)
 	/* Restore the original timeout before starting the scheduler. */
 	queue->sched.timeout = msecs_to_jiffies(JOB_TIMEOUT_MS);
 	drm_sched_resubmit_jobs(&queue->sched);
+	cookie = dma_fence_begin_signalling();
 	drm_sched_start(&queue->sched, true);
+	dma_fence_end_signalling(cookie);
 	old_status = atomic_xchg(&queue->status,
 				 PANFROST_QUEUE_STATUS_ACTIVE);
 	if (old_status == PANFROST_QUEUE_STATUS_FAULT_PENDING)
@@ -566,9 +569,7 @@ static void panfrost_reset(struct work_struct *work)
 						     reset.work);
 	unsigned long flags;
 	unsigned int i;
-	bool cookie;
 
-	cookie = dma_fence_begin_signalling();
 	for (i = 0; i < NUM_JOB_SLOTS; i++) {
 		/*
 		 * We want pending timeouts to be handled before we attempt
@@ -608,8 +609,6 @@ static void panfrost_reset(struct work_struct *work)
 
 	for (i = 0; i < NUM_JOB_SLOTS; i++)
 		panfrost_scheduler_start(&pfdev->js->queue[i]);
-
-	dma_fence_end_signalling(cookie);
 }
 
 int panfrost_job_init(struct panfrost_device *pfdev)
