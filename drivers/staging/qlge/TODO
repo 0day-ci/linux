@@ -4,9 +4,6 @@
   ql_build_rx_skb(). That function is now used exclusively to handle packets
   that underwent header splitting but it still contains code to handle non
   split cases.
-* the flow control implementation in firmware is buggy (sends a flood of pause
-  frames, resets the link, device and driver buffer queues become
-  desynchronized), disable it by default
 * some structures are initialized redundantly (ex. memset 0 after
   alloc_etherdev())
 * the driver has a habit of using runtime checks where compile time checks are

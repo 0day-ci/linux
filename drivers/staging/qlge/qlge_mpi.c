@@ -806,6 +806,7 @@ int qlge_mb_get_port_cfg(struct qlge_adapter *qdev)
 {
 	struct mbox_params mbc;
 	struct mbox_params *mbcp = &mbc;
+	u32 saved_pause_link_config = 0;
 	int status = 0;
 
 	memset(mbcp, 0, sizeof(struct mbox_params));
@@ -826,7 +827,15 @@ int qlge_mb_get_port_cfg(struct qlge_adapter *qdev)
 	} else	{
 		netif_printk(qdev, drv, KERN_DEBUG, qdev->ndev,
 			     "Passed Get Port Configuration.\n");
-		qdev->link_config = mbcp->mbox_out[1];
+		/*
+		 * Don't let the pause parameter be overwritten by
+		 *
+		 * In this way, follow control can be disabled by default
+		 * and the setting could also survive the MPI reset
+		 */
+		saved_pause_link_config = qdev->link_config & CFG_PAUSE_STD;
+		qdev->link_config = ~CFG_PAUSE_STD & mbcp->mbox_out[1];
+		qdev->link_config |= saved_pause_link_config;
 		qdev->max_frame_size = mbcp->mbox_out[2];
 	}
 	return status;
