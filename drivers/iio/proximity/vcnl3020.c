@@ -3,7 +3,6 @@
  * Support for Vishay VCNL3020 proximity sensor on i2c bus.
  * Based on Vishay VCNL4000 driver code.
  *
- * TODO: interrupts.
  */
 
 #include <linux/module.h>
@@ -11,9 +10,11 @@
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/regmap.h>
+#include <linux/interrupt.h>
 
 #include <linux/iio/iio.h>
-#include <linux/iio/sysfs.h>
+#include <linux/iio/iio.h>
+#include <linux/iio/events.h>
 
 #define VCNL3020_PROD_ID	0x21
 
@@ -36,6 +37,21 @@
 #define VCNL_PS_OD		BIT(3) /* start on-demand proximity
 					* measurement
 					*/
+
+/* Enables periodic proximity measurement */
+#define VCNL_PS_EN		BIT(1)
+
+/* Enables state machine and LP oscillator for self timed  measurements */
+#define VCNL_PS_SELFTIMED_EN	BIT(0)
+
+/* Bit masks for ICR */
+
+/* Enable interrupts on low or high thresholds */
+#define  VCNL_ICR_THRES_EN	BIT(1)
+
+/* Bit masks for ISR */
+#define VCNL_INT_TH_HI		BIT(0)	/* High threshold hit */
+#define VCNL_INT_TH_LOW		BIT(1)	/* Low threshold hit */
 
 #define VCNL_ON_DEMAND_TIMEOUT_US	100000
 #define VCNL_POLL_US			20000
@@ -215,12 +231,145 @@ static int vcnl3020_write_proxy_samp_freq(struct vcnl3020_data *data, int val,
 	return regmap_write(data->regmap, VCNL_PROXIMITY_RATE, index);
 }
 
+static bool vcnl3020_is_in_periodic_mode(struct vcnl3020_data *data)
+{
+	int rc;
+	unsigned int cmd;
+
+	rc = regmap_read(data->regmap, VCNL_COMMAND, &cmd);
+	if (rc)
+		return false;
+
+	return !!(cmd & VCNL_PS_SELFTIMED_EN);
+}
+
+static bool vcnl3020_is_thr_enabled(struct vcnl3020_data *data)
+{
+	int rc;
+	unsigned int icr;
+
+	rc = regmap_read(data->regmap, VCNL_PS_ICR, &icr);
+	if (rc)
+		return false;
+
+	return !!(icr & VCNL_ICR_THRES_EN);
+}
+
+static int vcnl3020_enable_periodic(struct iio_dev *indio_dev,
+				    struct vcnl3020_data *data)
+{
+	int rc;
+	int icr;
+	int cmd;
+
+	mutex_lock(&data->lock);
+
+	/* Enable periodic measurement of proximity data. */
+	cmd = VCNL_PS_EN | VCNL_PS_SELFTIMED_EN;
+
+	/*
+	 * Enable interrupts on threshold, for proximity data by
+	 * default.
+	 */
+	icr = VCNL_ICR_THRES_EN;
+
+	rc = regmap_write(data->regmap, VCNL_COMMAND, cmd);
+	if (rc)
+		goto out_mutex;
+
+	rc = regmap_write(data->regmap, VCNL_PS_ICR, icr);
+
+out_mutex:
+	mutex_unlock(&data->lock);
+
+	return rc;
+}
+
+static int vcnl3020_disable_periodic(struct iio_dev *indio_dev,
+				     struct vcnl3020_data *data)
+{
+	int rc;
+
+	mutex_lock(&data->lock);
+
+	rc = regmap_write(data->regmap, VCNL_COMMAND, 0);
+	if (rc)
+		goto out_mutex;
+
+	rc = regmap_write(data->regmap, VCNL_PS_ICR, 0);
+	if (rc)
+		goto out_mutex;
+
+	/* Clear interrupt flag bit */
+	rc = regmap_write(data->regmap, VCNL_ISR, 0);
+
+out_mutex:
+	mutex_unlock(&data->lock);
+
+	return rc;
+}
+
+static int vcnl3020_config_threshold(struct iio_dev *indio_dev, bool state)
+{
+	struct vcnl3020_data *data = iio_priv(indio_dev);
+	int rc;
+
+	if (state) {
+		rc = vcnl3020_enable_periodic(indio_dev, data);
+	} else {
+		if (!vcnl3020_is_thr_enabled(data))
+			return 0;
+		rc = vcnl3020_disable_periodic(indio_dev, data);
+	}
+
+	return rc;
+}
+
+static int vcnl3020_write_event_config(struct iio_dev *indio_dev,
+				       const struct iio_chan_spec *chan,
+				       enum iio_event_type type,
+				       enum iio_event_direction dir,
+				       int state)
+{
+	switch (chan->type) {
+	case IIO_PROXIMITY:
+		return vcnl3020_config_threshold(indio_dev, state);
+	default:
+		return -EINVAL;
+	}
+}
+
+static int vcnl3020_read_event_config(struct iio_dev *indio_dev,
+				      const struct iio_chan_spec *chan,
+				      enum iio_event_type type,
+				      enum iio_event_direction dir)
+{
+	struct vcnl3020_data *data = iio_priv(indio_dev);
+
+	switch (chan->type) {
+	case IIO_PROXIMITY:
+		return vcnl3020_is_thr_enabled(data);
+	default:
+		return -EINVAL;
+	}
+}
+
+static const struct iio_event_spec vcnl3020_event_spec[] = {
+	{
+		.type = IIO_EV_TYPE_THRESH,
+		.dir = IIO_EV_DIR_EITHER,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE),
+	},
+};
+
 static const struct iio_chan_spec vcnl3020_channels[] = {
 	{
 		.type = IIO_PROXIMITY,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
 				      BIT(IIO_CHAN_INFO_SAMP_FREQ),
 		.info_mask_separate_available = BIT(IIO_CHAN_INFO_SAMP_FREQ),
+		.event_spec = vcnl3020_event_spec,
+		.num_event_specs = ARRAY_SIZE(vcnl3020_event_spec),
 	},
 };
 
@@ -233,6 +382,11 @@ static int vcnl3020_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
+
+		/* Protect against event capture. */
+		if (vcnl3020_is_in_periodic_mode(data))
+			return -EBUSY;
+
 		rc = vcnl3020_measure_proximity(data, val);
 		if (rc)
 			return rc;
@@ -253,6 +407,10 @@ static int vcnl3020_write_raw(struct iio_dev *indio_dev,
 {
 	int rc;
 	struct vcnl3020_data *data = iio_priv(indio_dev);
+
+	/* Protect against event capture. */
+	if (vcnl3020_is_in_periodic_mode(data))
+		return -EBUSY;
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SAMP_FREQ:
@@ -287,6 +445,8 @@ static const struct iio_info vcnl3020_info = {
 	.read_raw = vcnl3020_read_raw,
 	.write_raw = vcnl3020_write_raw,
 	.read_avail = vcnl3020_read_avail,
+	.read_event_config = vcnl3020_read_event_config,
+	.write_event_config = vcnl3020_write_event_config,
 };
 
 static const struct regmap_config vcnl3020_regmap_config = {
@@ -294,6 +454,38 @@ static const struct regmap_config vcnl3020_regmap_config = {
 	.val_bits	= 8,
 	.max_register	= VCNL_PS_MOD_ADJ,
 };
+
+static irqreturn_t vcnl3020_handle_irq(int irq, void *p)
+{
+	struct iio_dev *indio_dev = p;
+	struct vcnl3020_data *data = iio_priv(indio_dev);
+	unsigned int isr;
+	int rc;
+
+	rc = regmap_read(data->regmap, VCNL_ISR, &isr);
+	if (rc) {
+		dev_err(data->dev, "Error (%d) reading reg (0x%x)\n",
+			rc, VCNL_ISR);
+		return IRQ_HANDLED;
+	}
+
+	if (isr & VCNL_ICR_THRES_EN) {
+		iio_push_event(indio_dev,
+			       IIO_UNMOD_EVENT_CODE(IIO_PROXIMITY,
+						    1,
+						    IIO_EV_TYPE_THRESH,
+						    IIO_EV_DIR_RISING),
+			       iio_get_time_ns(indio_dev));
+
+		rc = regmap_write(data->regmap, VCNL_ISR,
+				  isr & VCNL_ICR_THRES_EN);
+		if (rc)
+			dev_err(data->dev, "Error (%d) writing in reg (0x%x)\n",
+				rc, VCNL_ISR);
+	}
+
+	return IRQ_HANDLED;
+}
 
 static int vcnl3020_probe(struct i2c_client *client)
 {
@@ -326,6 +518,21 @@ static int vcnl3020_probe(struct i2c_client *client)
 	indio_dev->num_channels = ARRAY_SIZE(vcnl3020_channels);
 	indio_dev->name = "vcnl3020";
 	indio_dev->modes = INDIO_DIRECT_MODE;
+
+	if (client->irq) {
+		rc = devm_request_irq(&client->dev, client->irq,
+				      vcnl3020_handle_irq,
+				      IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+				      indio_dev->name, indio_dev);
+		if (rc) {
+			dev_err(&client->dev,
+				"Error (%d) irq request failed (%u)\n", rc,
+				client->irq);
+			return rc;
+		}
+	} else {
+		dev_info(&client->dev, "Starting without irq handle\n");
+	}
 
 	return devm_iio_device_register(&client->dev, indio_dev);
 }
