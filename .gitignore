@@ -131,15 +131,6 @@ ID
 *~
 \#*#
 
-#
-# Leavings from module signing
-#
-extra_certificates
-signing_key.pem
-signing_key.priv
-signing_key.x509
-x509.genkey
-
 # Kconfig presets
 /all.config
 /alldef.config

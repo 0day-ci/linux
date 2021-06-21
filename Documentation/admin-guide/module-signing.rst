@@ -132,23 +132,19 @@ it can be deleted or stored securely.  The public key gets built into the
 kernel so that it can be used to check the signatures as the modules are
 loaded.
 
-Under normal conditions, when ``CONFIG_MODULE_SIG_KEY`` is unchanged from its
-default, the kernel build will automatically generate a new keypair using
-openssl if one does not exist in the file::
+If ``CONFIG_MODULE_SIG_KEY`` is unchanged from its default, the kernel build will
+automatically generate a new keypair using openssl if one does not exist in the file::
 
 	certs/signing_key.pem
 
-during the building of vmlinux (the public part of the key needs to be built
-into vmlinux) using parameters in the::
+the public part of the key needs to be built into the kernel using parameters in the::
 
 	certs/x509.genkey
 
 file (which is also generated if it does not already exist).
 
-It is strongly recommended that you provide your own x509.genkey file.
-
-Most notably, in the x509.genkey file, the req_distinguished_name section
-should be altered from the default::
+It is strongly recommended that you provide your own x509.genkey file.  Most notably the
+the *req_distinguished_name* section should be altered from the default::
 
 	[ req_distinguished_name ]
 	#O = Unspecified company
@@ -160,15 +156,17 @@ The generated RSA key size can also be set with::
 	[ req ]
 	default_bits = 4096
 
+It is also possible to manually generate the private/public key files using openssl
+and the key generation configuration file::
 
-It is also possible to manually generate the key private/public files using the
-x509.genkey key generation configuration file in the root node of the Linux
-kernel sources tree and the openssl command.  The following is an example to
-generate the public/private key files::
+        certs/x509.genkey
 
-	openssl req -new -nodes -utf8 -sha256 -days 36500 -batch -x509 \
-	   -config x509.genkey -outform PEM -out kernel_key.pem \
-	   -keyout kernel_key.pem
+The following is an example of how to generate the X.509 keypair to be used for
+signing modules::
+
+	$ openssl req -new -nodes -utf8 -sha256 -days 36500 -batch -x509 \
+	     -config x509.genkey -outform PEM -out signing_key.pem \
+	     -keyout signing_key.pem
 
 The full pathname for the resulting kernel_key.pem file can then be specified
 in the ``CONFIG_MODULE_SIG_KEY`` option, and the certificate and key therein will
@@ -276,7 +274,7 @@ Administering/protecting the private key
 Since the private key is used to sign modules, viruses and malware could use
 the private key to sign modules and compromise the operating system.  The
 private key must be either destroyed or moved to a secure location and not kept
-in the root node of the kernel source tree.
+in the certs/ directory of the kernel source tree.
 
 If you use the same private key to sign modules for multiple kernel
 configurations, you must ensure that the module version information is
