@@ -494,14 +494,22 @@ static irqreturn_t panfrost_job_irq_handler(int irq, void *data)
 		if (status & JOB_INT_MASK_ERR(j)) {
 			enum panfrost_queue_status old_status;
 			u32 js_status = job_read(pfdev, JS_STATUS(j));
+			int error = panfrost_exception_to_error(js_status);
+			const char *exception_name = panfrost_exception_name(js_status);
 
 			job_write(pfdev, JS_COMMAND_NEXT(j), JS_COMMAND_NOP);
 
-			dev_err(pfdev->dev, "js fault, js=%d, status=%s, head=0x%x, tail=0x%x",
-				j,
-				panfrost_exception_name(js_status),
-				job_read(pfdev, JS_HEAD_LO(j)),
-				job_read(pfdev, JS_TAIL_LO(j)));
+			if (!error) {
+				dev_dbg(pfdev->dev, "js interrupt, js=%d, status=%s, head=0x%x, tail=0x%x",
+					j, exception_name,
+					job_read(pfdev, JS_HEAD_LO(j)),
+					job_read(pfdev, JS_TAIL_LO(j)));
+			} else {
+				dev_err(pfdev->dev, "js fault, js=%d, status=%s, head=0x%x, tail=0x%x",
+					j, exception_name,
+					job_read(pfdev, JS_HEAD_LO(j)),
+					job_read(pfdev, JS_TAIL_LO(j)));
+			}
 
 			/* If we need a reset, signal it to the reset handler,
 			 * otherwise, update the fence error field and signal
@@ -688,10 +696,25 @@ int panfrost_job_open(struct panfrost_file_priv *panfrost_priv)
 
 void panfrost_job_close(struct panfrost_file_priv *panfrost_priv)
 {
+	struct panfrost_device *pfdev = panfrost_priv->pfdev;
+	unsigned long flags;
 	int i;
 
 	for (i = 0; i < NUM_JOB_SLOTS; i++)
 		drm_sched_entity_destroy(&panfrost_priv->sched_entity[i]);
+
+	/* Kill in-flight jobs */
+	spin_lock_irqsave(&pfdev->js->job_lock, flags);
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		struct drm_sched_entity *entity = &panfrost_priv->sched_entity[i];
+		struct panfrost_job *job = pfdev->jobs[i];
+
+		if (!job || job->base.entity != entity)
+			continue;
+
+		job_write(pfdev, JS_COMMAND(i), JS_COMMAND_HARD_STOP);
+	}
+	spin_unlock_irqrestore(&pfdev->js->job_lock, flags);
 }
 
 int panfrost_job_is_idle(struct panfrost_device *pfdev)
