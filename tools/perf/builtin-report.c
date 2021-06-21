@@ -1618,6 +1618,7 @@ repeat:
 
 	ret = __cmd_report(&report);
 	if (ret == K_SWITCH_INPUT_DATA || ret == K_RELOAD) {
+		evlist__delete(session->evlist);
 		perf_session__delete(session);
 		last_key = K_SWITCH_INPUT_DATA;
 		goto repeat;
@@ -1637,6 +1638,7 @@ error:
 	}
 
 	zstd_fini(&(session->zstd_data));
+	evlist__delete(session->evlist);
 	perf_session__delete(session);
 	return ret;
 }
