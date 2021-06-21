@@ -14,6 +14,7 @@
 #include <linux/psp-sev.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
+#include <linux/random.h>
 #include <linux/misc_cgroup.h>
 #include <linux/processor.h>
 #include <linux/trace_events.h>
@@ -57,6 +58,8 @@ module_param_named(sev_es, sev_es_enabled, bool, 0444);
 #define sev_es_enabled false
 #endif /* CONFIG_KVM_AMD_SEV */
 
+#define MAX_RAND_RETRY    3
+
 static u8 sev_enc_bit;
 static DECLARE_RWSEM(sev_deactivate_lock);
 static DEFINE_MUTEX(sev_bitmap_lock);
@@ -73,6 +76,22 @@ struct enc_region {
 	unsigned long uaddr;
 	unsigned long size;
 };
+
+struct sev_info_migration_node {
+	struct hlist_node hnode;
+	u64 token;
+	bool valid;
+
+	unsigned int asid;
+	unsigned int handle;
+	unsigned long pages_locked;
+	struct list_head regions_list;
+	struct misc_cg *misc_cg;
+};
+
+#define SEV_INFO_MIGRATION_HASH_BITS    7
+static DEFINE_HASHTABLE(sev_info_migration_hash, SEV_INFO_MIGRATION_HASH_BITS);
+static DEFINE_SPINLOCK(sev_info_migration_hash_lock);
 
 /* Called with the sev_bitmap_lock held, or on shutdown  */
 static int sev_flush_asids(int min_asid, int max_asid)
@@ -1104,6 +1123,185 @@ e_free_blob:
 	return ret;
 }
 
+static struct sev_info_migration_node *find_migration_info(unsigned long token)
+{
+	struct sev_info_migration_node *entry;
+
+	hash_for_each_possible(sev_info_migration_hash, entry, hnode, token) {
+		if (entry->token == token)
+			return entry;
+	}
+
+	return NULL;
+}
+
+/*
+ * Places @entry into the |sev_info_migration_hash|. Returns 0 if successful
+ * and ownership of @entry is transferred to the hashmap.
+ */
+static int place_migration_node(struct sev_info_migration_node *entry)
+{
+	u64 token = 0;
+	unsigned int retries;
+	int ret = -EFAULT;
+
+	/*
+	 * Generate a token associated with this VM's SEV info that userspace
+	 * can use to import on the other side. We use 0 to indicate a not-
+	 * present token. The token cannot collide with other existing ones, so
+	 * reroll a few times until we get a valid token. In the unlikely event
+	 * we're having trouble generating a unique token, give up and let
+	 * userspace retry if it needs to.
+	 */
+	spin_lock(&sev_info_migration_hash_lock);
+	for (retries = 0; retries < MAX_RAND_RETRY; retries++)  {
+		get_random_bytes((void *)&token, sizeof(token));
+
+		if (find_migration_info(token))
+			continue;
+
+		entry->token = token;
+		entry->valid = true;
+
+		hash_add(sev_info_migration_hash, &entry->hnode, token);
+		ret = 0;
+		goto out;
+	}
+
+out:
+	spin_unlock(&sev_info_migration_hash_lock);
+	return ret;
+}
+
+static int sev_local_send(struct kvm *kvm, struct kvm_sev_cmd *argp)
+{
+	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
+	struct sev_info_migration_node *entry;
+	struct kvm_sev_local_send params;
+	u64 token;
+	int ret = -EFAULT;
+
+	if (!sev_guest(kvm))
+		return -ENOTTY;
+
+	if (sev->es_active)
+		return -EPERM;
+
+	if (sev->info_token != 0)
+		return -EEXIST;
+
+	if (copy_from_user(&params, (void __user *)(uintptr_t)argp->data,
+			   sizeof(params)))
+		return -EFAULT;
+
+	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+	if (!entry)
+		return -ENOMEM;
+
+	entry->asid = sev->asid;
+	entry->handle = sev->handle;
+	entry->pages_locked = sev->pages_locked;
+	entry->misc_cg = sev->misc_cg;
+
+	INIT_LIST_HEAD(&entry->regions_list);
+	list_replace_init(&sev->regions_list, &entry->regions_list);
+
+	if (place_migration_node(entry))
+		goto e_listdel;
+
+	token = entry->token;
+
+	params.info_token = token;
+	if (copy_to_user((void __user *)(uintptr_t)argp->data, &params,
+			 sizeof(params)))
+		goto e_hashdel;
+
+	sev->info_token = token;
+
+	return 0;
+
+e_hashdel:
+	spin_lock(&sev_info_migration_hash_lock);
+	hash_del(&entry->hnode);
+	spin_unlock(&sev_info_migration_hash_lock);
+
+e_listdel:
+	list_replace_init(&entry->regions_list, &sev->regions_list);
+
+	kfree(entry);
+
+	return ret;
+}
+
+static int sev_local_receive(struct kvm *kvm, struct kvm_sev_cmd *argp)
+{
+	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
+	struct sev_info_migration_node *entry;
+	struct kvm_sev_local_receive params;
+	struct kvm_sev_info old_info;
+
+	if (!sev_guest(kvm))
+		return -ENOTTY;
+
+	if (sev->es_active)
+		return -EPERM;
+
+	if (sev->handle != 0)
+		return -EPERM;
+
+	if (!list_empty(&sev->regions_list))
+		return -EPERM;
+
+	if (copy_from_user(&params,
+			   (void __user *)(uintptr_t)argp->data,
+			   sizeof(params)))
+		return -EFAULT;
+
+	spin_lock(&sev_info_migration_hash_lock);
+	entry = find_migration_info(params.info_token);
+	if (!entry || !entry->valid)
+		goto err_unlock;
+
+	memcpy(&old_info, sev, sizeof(old_info));
+
+	/*
+	 * The source VM always frees @entry On the target we simply
+	 * mark the token as invalid to notify the source the sev info
+	 * has been moved successfully.
+	 */
+	entry->valid = false;
+	sev->active = true;
+	sev->asid = entry->asid;
+	sev->handle = entry->handle;
+	sev->pages_locked = entry->pages_locked;
+	sev->misc_cg = entry->misc_cg;
+
+	INIT_LIST_HEAD(&sev->regions_list);
+	list_replace_init(&entry->regions_list, &sev->regions_list);
+
+	spin_unlock(&sev_info_migration_hash_lock);
+
+	params.handle = sev->handle;
+
+	if (copy_to_user((void __user *)(uintptr_t)argp->data, &params,
+			 sizeof(params)))
+		goto err_unwind;
+
+	sev_asid_free(&old_info);
+	return 0;
+
+err_unwind:
+	spin_lock(&sev_info_migration_hash_lock);
+	list_replace_init(&sev->regions_list, &entry->regions_list);
+	entry->valid = true;
+	memcpy(sev, &old_info, sizeof(*sev));
+
+err_unlock:
+	spin_unlock(&sev_info_migration_hash_lock);
+
+	return -EFAULT;
+}
+
 /* Userspace wants to query session length. */
 static int
 __sev_send_start_query_session_length(struct kvm *kvm, struct kvm_sev_cmd *argp,
@@ -1521,6 +1719,18 @@ int svm_mem_enc_op(struct kvm *kvm, void __user *argp)
 		goto out;
 	}
 
+	/*
+	 * If this VM has started exporting its SEV contents to another VM,
+	 * it's not allowed to do any more SEV operations that may modify the
+	 * SEV state.
+	 */
+	if (to_kvm_svm(kvm)->sev_info.info_token &&
+	    sev_cmd.id != KVM_SEV_DBG_ENCRYPT &&
+	    sev_cmd.id != KVM_SEV_DBG_DECRYPT) {
+		r = -EPERM;
+		goto out;
+	}
+
 	switch (sev_cmd.id) {
 	case KVM_SEV_ES_INIT:
 		if (!sev_es_enabled) {
@@ -1560,6 +1770,12 @@ int svm_mem_enc_op(struct kvm *kvm, void __user *argp)
 		break;
 	case KVM_SEV_GET_ATTESTATION_REPORT:
 		r = sev_get_attestation_report(kvm, &sev_cmd);
+		break;
+	case KVM_SEV_LOCAL_SEND:
+		r = sev_local_send(kvm, &sev_cmd);
+		break;
+	case KVM_SEV_LOCAL_RECEIVE:
+		r = sev_local_receive(kvm, &sev_cmd);
 		break;
 	case KVM_SEV_SEND_START:
 		r = sev_send_start(kvm, &sev_cmd);
@@ -1794,6 +2010,8 @@ static void __unregister_region_list_locked(struct kvm *kvm,
 void sev_vm_destroy(struct kvm *kvm)
 {
 	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
+	struct sev_info_migration_node *entry = NULL;
+	bool info_migrated = false;
 
 	if (!sev_guest(kvm))
 		return;
@@ -1804,7 +2022,46 @@ void sev_vm_destroy(struct kvm *kvm)
 		return;
 	}
 
+	/*
+	 * If userspace has requested that we migrate the SEV info to a new VM,
+	 * then we own and must remove an entry node in the tracking data
+	 * structure. Whether we clean up the data in our SEV info struct and
+	 * entry node depends on whether userspace has done the migration,
+	 * which transfers ownership to a new VM. We can identify that
+	 * migration has occurred by checking if the node is marked invalid.
+	 */
+	if (sev->info_token != 0) {
+		spin_lock(&sev_info_migration_hash_lock);
+		entry = find_migration_info(sev->info_token);
+		if (entry) {
+			info_migrated = !entry->valid;
+			hash_del(&entry->hnode);
+		} else
+			WARN(1,
+			     "SEV VM was marked for export, but does not have associated export node.\n");
+		spin_unlock(&sev_info_migration_hash_lock);
+	}
+
 	mutex_lock(&kvm->lock);
+
+	/*
+	 * Adding memory regions after a local send has started
+	 * is dangerous.
+	 */
+	if (sev->info_token != 0 && !list_empty(&sev->regions_list)) {
+		WARN(1,
+		     "Source SEV regions list non-empty after export request. List is not expected to be modified after export request.\n");
+		__unregister_region_list_locked(kvm, &sev->regions_list);
+	}
+
+	/*
+	 * If userspace was terminated before unregistering the memory
+	 * regions then lets unpin all the registered memory.
+	 */
+	if (entry)
+		__unregister_region_list_locked(kvm, &entry->regions_list);
+
+	mutex_unlock(&kvm->lock);
 
 	/*
 	 * Ensure that all guest tagged cache entries are flushed before
@@ -1812,17 +2069,12 @@ void sev_vm_destroy(struct kvm *kvm)
 	 * not do this, so issue a WBINVD.
 	 */
 	wbinvd_on_all_cpus();
+	if (!info_migrated) {
+		sev_unbind_asid(kvm, sev->handle);
+		sev_asid_free(sev);
+	}
 
-	/*
-	 * if userspace was terminated before unregistering the memory regions
-	 * then lets unpin all the registered memory.
-	 */
-	__unregister_region_list_locked(kvm, &sev->regions_list);
-
-	mutex_unlock(&kvm->lock);
-
-	sev_unbind_asid(kvm, sev->handle);
-	sev_asid_free(sev);
+	kfree(entry);
 }
 
 void __init sev_set_cpu_caps(void)

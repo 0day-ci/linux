@@ -1684,6 +1684,9 @@ enum sev_cmd_id {
 	KVM_SEV_GET_ATTESTATION_REPORT,
 	/* Guest Migration Extension */
 	KVM_SEV_SEND_CANCEL,
+	/* Local migration commands */
+	KVM_SEV_LOCAL_SEND,
+	KVM_SEV_LOCAL_RECEIVE,
 
 	KVM_SEV_NR_MAX,
 };
@@ -1779,6 +1782,15 @@ struct kvm_sev_receive_update_data {
 	__u32 guest_len;
 	__u64 trans_uaddr;
 	__u32 trans_len;
+};
+
+struct kvm_sev_local_send {
+	__u64 info_token;
+};
+
+struct kvm_sev_local_receive {
+	__u64 info_token;
+	__u32 handle;
 };
 
 #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
