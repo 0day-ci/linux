@@ -475,6 +475,9 @@ struct uvc_video_chain {
 	struct mutex ctrl_mutex;		/* Protects ctrl.info */
 
 	struct v4l2_prio_state prio;		/* V4L2 priority state */
+
+	u8 input;				/* buffer for set/get input */
+
 	u32 caps;				/* V4L2 chain-wide caps */
 };
 
