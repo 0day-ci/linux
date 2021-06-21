@@ -153,8 +153,40 @@ static int hwmon_thermal_get_temp(void *data, int *temp)
 	return 0;
 }
 
+static int hwmon_thermal_set_trips(void *data, int low, int high)
+{
+	struct hwmon_thermal_data *tdata = data;
+	struct hwmon_device *hwdev = to_hwmon_device(tdata->dev);
+	const struct hwmon_chip_info *chip = hwdev->chip;
+	const struct hwmon_channel_info **info = chip->info;
+	unsigned int i;
+
+	if (!chip->ops->write)
+		return 0;
+
+	for (i = 1; info[i] && info[i]->type != hwmon_temp; i++)
+		continue;
+
+	if (info[i] && info[i]->config[tdata->index] & HWMON_T_MIN) {
+		int err = chip->ops->write(tdata->dev, hwmon_temp,
+					   hwmon_temp_min, tdata->index, low);
+		if (err < 0 && err != -EOPNOTSUPP)
+			return err;
+	}
+
+	if (info[i] && info[i]->config[tdata->index] & HWMON_T_MAX) {
+		int err = chip->ops->write(tdata->dev, hwmon_temp,
+					   hwmon_temp_max, tdata->index, high);
+		if (err < 0 && err != -EOPNOTSUPP)
+			return err;
+	}
+
+	return 0;
+}
+
 static const struct thermal_zone_of_device_ops hwmon_thermal_ops = {
 	.get_temp = hwmon_thermal_get_temp,
+	.set_trips = hwmon_thermal_set_trips,
 };
 
 static void hwmon_thermal_remove_sensor(void *data)
