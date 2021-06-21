@@ -699,8 +699,8 @@ static int qlge_get_8000_flash_params(struct qlge_adapter *qdev)
 
 	status = qlge_validate_flash(qdev,
 				     sizeof(struct flash_params_8000) /
-				   sizeof(u16),
-				   "8000");
+				       sizeof(u16),
+				     "8000");
 	if (status) {
 		netif_err(qdev, ifup, qdev->ndev, "Invalid flash.\n");
 		status = -EINVAL;
