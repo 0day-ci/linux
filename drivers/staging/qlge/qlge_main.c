@@ -1446,7 +1446,7 @@ static void qlge_process_mac_rx_gro_page(struct qlge_adapter *qdev,
 
 	skb->len += length;
 	skb->data_len += length;
-	skb->truesize += length;
+	skb->truesize += qdev->lbq_buf_size;
 	skb_shinfo(skb)->nr_frags++;
 
 	rx_ring->rx_packets++;
@@ -1507,7 +1507,7 @@ static void qlge_process_mac_rx_page(struct qlge_adapter *qdev,
 			   lbq_desc->p.pg_chunk.offset + hlen, length - hlen);
 	skb->len += length - hlen;
 	skb->data_len += length - hlen;
-	skb->truesize += length - hlen;
+	skb->truesize += qdev->lbq_buf_size;
 
 	rx_ring->rx_packets++;
 	rx_ring->rx_bytes += skb->len;
@@ -1757,7 +1757,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 					   lbq_desc->p.pg_chunk.offset, length);
 			skb->len += length;
 			skb->data_len += length;
-			skb->truesize += length;
+			skb->truesize += qdev->lbq_buf_size;
 		} else {
 			/*
 			 * The headers and data are in a single large buffer. We
@@ -1783,7 +1783,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 					   length);
 			skb->len += length;
 			skb->data_len += length;
-			skb->truesize += length;
+			skb->truesize += qdev->lbq_buf_size;
 			qlge_update_mac_hdr_len(qdev, ib_mac_rsp,
 						lbq_desc->p.pg_chunk.va,
 						&hlen);
@@ -1835,7 +1835,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 					   lbq_desc->p.pg_chunk.offset, size);
 			skb->len += size;
 			skb->data_len += size;
-			skb->truesize += size;
+			skb->truesize += qdev->lbq_buf_size;
 			length -= size;
 			i++;
 		} while (length > 0);
