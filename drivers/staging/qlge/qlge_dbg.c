@@ -403,7 +403,7 @@ static void qlge_get_intr_states(struct qlge_adapter *qdev, u32 *buf)
 {
 	int i;
 
-	for (i = 0; i < qdev->rx_ring_count; i++, buf++) {
+	for (i = 0; i < qdev->cq_count; i++, buf++) {
 		qlge_write32(qdev, INTR_EN,
 			     qdev->intr_context[i].intr_read_mask);
 		*buf = qlge_read32(qdev, INTR_EN);
@@ -1074,7 +1074,7 @@ int qlge_core_dump(struct qlge_adapter *qdev, struct qlge_mpi_coredump *mpi_core
 				       sizeof(struct mpi_coredump_segment_header)
 				       + sizeof(mpi_coredump->misc_nic_info),
 				       "MISC NIC INFO");
-	mpi_coredump->misc_nic_info.rx_ring_count = qdev->rx_ring_count;
+	mpi_coredump->misc_nic_info.cq_count = qdev->cq_count;
 	mpi_coredump->misc_nic_info.tx_ring_count = qdev->tx_ring_count;
 	mpi_coredump->misc_nic_info.intr_count = qdev->intr_count;
 	mpi_coredump->misc_nic_info.function = qdev->func;
@@ -1237,7 +1237,7 @@ static void qlge_gen_reg_dump(struct qlge_adapter *qdev,
 				       sizeof(struct mpi_coredump_segment_header)
 				       + sizeof(mpi_coredump->misc_nic_info),
 				       "MISC NIC INFO");
-	mpi_coredump->misc_nic_info.rx_ring_count = qdev->rx_ring_count;
+	mpi_coredump->misc_nic_info.cq_count = qdev->cq_count;
 	mpi_coredump->misc_nic_info.tx_ring_count = qdev->tx_ring_count;
 	mpi_coredump->misc_nic_info.intr_count = qdev->intr_count;
 	mpi_coredump->misc_nic_info.function = qdev->func;

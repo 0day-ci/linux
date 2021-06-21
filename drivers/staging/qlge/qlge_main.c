@@ -982,19 +982,19 @@ static struct qlge_bq_desc *qlge_get_curr_lchunk(struct qlge_adapter *qdev,
 }
 
 /* Update an rx ring index. */
-static void qlge_update_cq(struct qlge_rx_ring *rx_ring)
+static void qlge_update_cq(struct qlge_cq *cq)
 {
-	rx_ring->cnsmr_idx++;
-	rx_ring->curr_entry++;
-	if (unlikely(rx_ring->cnsmr_idx == rx_ring->cq_len)) {
-		rx_ring->cnsmr_idx = 0;
-		rx_ring->curr_entry = rx_ring->cq_base;
+	cq->cnsmr_idx++;
+	cq->curr_entry++;
+	if (unlikely(cq->cnsmr_idx == cq->cq_len)) {
+		cq->cnsmr_idx = 0;
+		cq->curr_entry = cq->cq_base;
 	}
 }
 
-static void qlge_write_cq_idx(struct qlge_rx_ring *rx_ring)
+static void qlge_write_cq_idx(struct qlge_cq *cq)
 {
-	qlge_write_db_reg(rx_ring->cnsmr_idx, rx_ring->cnsmr_idx_db_reg);
+	qlge_write_db_reg(cq->cnsmr_idx, cq->cnsmr_idx_db_reg);
 }
 
 static const char * const bq_type_name[] = {
@@ -2087,21 +2087,21 @@ static void qlge_process_chip_ae_intr(struct qlge_adapter *qdev,
 	}
 }
 
-static int qlge_clean_outbound_rx_ring(struct qlge_rx_ring *rx_ring)
+static int qlge_clean_outbound_cq(struct qlge_cq *cq)
 {
-	struct qlge_adapter *qdev = rx_ring->qdev;
-	u32 prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
+	struct qlge_adapter *qdev = cq->qdev;
+	u32 prod = qlge_read_sh_reg(cq->prod_idx_sh_reg);
 	struct qlge_ob_mac_iocb_rsp *net_rsp = NULL;
 	int count = 0;
 
 	struct qlge_tx_ring *tx_ring;
 	/* While there are entries in the completion queue. */
-	while (prod != rx_ring->cnsmr_idx) {
+	while (prod != cq->cnsmr_idx) {
 		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
 			     "cq_id = %d, prod = %d, cnsmr = %d\n",
-			     rx_ring->cq_id, prod, rx_ring->cnsmr_idx);
+			     cq->cq_id, prod, cq->cnsmr_idx);
 
-		net_rsp = (struct qlge_ob_mac_iocb_rsp *)rx_ring->curr_entry;
+		net_rsp = (struct qlge_ob_mac_iocb_rsp *)cq->curr_entry;
 		rmb();
 		switch (net_rsp->opcode) {
 		case OPCODE_OB_MAC_TSO_IOCB:
@@ -2114,12 +2114,12 @@ static int qlge_clean_outbound_rx_ring(struct qlge_rx_ring *rx_ring)
 				     net_rsp->opcode);
 		}
 		count++;
-		qlge_update_cq(rx_ring);
-		prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
+		qlge_update_cq(cq);
+		prod = qlge_read_sh_reg(cq->prod_idx_sh_reg);
 	}
 	if (!net_rsp)
 		return 0;
-	qlge_write_cq_idx(rx_ring);
+	qlge_write_cq_idx(cq);
 	tx_ring = &qdev->tx_ring[net_rsp->txq_idx];
 	if (__netif_subqueue_stopped(qdev->ndev, tx_ring->wq_id)) {
 		if ((atomic_read(&tx_ring->tx_count) > (tx_ring->wq_len / 4)))
@@ -2133,20 +2133,21 @@ static int qlge_clean_outbound_rx_ring(struct qlge_rx_ring *rx_ring)
 	return count;
 }
 
-static int qlge_clean_inbound_rx_ring(struct qlge_rx_ring *rx_ring, int budget)
+static int qlge_clean_inbound_cq(struct qlge_cq *cq, int budget)
 {
-	struct qlge_adapter *qdev = rx_ring->qdev;
-	u32 prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
+	struct qlge_adapter *qdev = cq->qdev;
+	u32 prod = qlge_read_sh_reg(cq->prod_idx_sh_reg);
+	struct qlge_rx_ring *rx_ring = &qdev->rx_ring[cq->cq_id];
 	struct qlge_net_rsp_iocb *net_rsp;
 	int count = 0;
 
 	/* While there are entries in the completion queue. */
-	while (prod != rx_ring->cnsmr_idx) {
+	while (prod != cq->cnsmr_idx) {
 		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
 			     "cq_id = %d, prod = %d, cnsmr = %d\n",
-			     rx_ring->cq_id, prod, rx_ring->cnsmr_idx);
+			     cq->cq_id, prod, cq->cnsmr_idx);
 
-		net_rsp = rx_ring->curr_entry;
+		net_rsp = cq->curr_entry;
 		rmb();
 		switch (net_rsp->opcode) {
 		case OPCODE_IB_MAC_IOCB:
@@ -2166,13 +2167,13 @@ static int qlge_clean_inbound_rx_ring(struct qlge_rx_ring *rx_ring, int budget)
 			break;
 		}
 		count++;
-		qlge_update_cq(rx_ring);
-		prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
+		qlge_update_cq(cq);
+		prod = qlge_read_sh_reg(cq->prod_idx_sh_reg);
 		if (count == budget)
 			break;
 	}
 	qlge_update_buffer_queues(rx_ring, GFP_ATOMIC, 0);
-	qlge_write_cq_idx(rx_ring);
+	qlge_write_cq_idx(cq);
 	return count;
 }
 
@@ -2180,9 +2181,11 @@ static int qlge_napi_poll_msix(struct napi_struct *napi, int budget)
 {
 	struct qlge_rx_ring *rx_ring = container_of(napi, struct qlge_rx_ring, napi);
 	struct qlge_adapter *qdev = rx_ring->qdev;
-	struct qlge_rx_ring *trx_ring;
+	struct qlge_cq *tcq, *rcq;
 	int i, work_done = 0;
 	struct intr_context *ctx = &qdev->intr_context[rx_ring->cq_id];
+
+	rcq =  &qdev->cq[rx_ring->cq_id];
 
 	netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
 		     "Enter, NAPI POLL cq_id = %d.\n", rx_ring->cq_id);
@@ -2190,35 +2193,34 @@ static int qlge_napi_poll_msix(struct napi_struct *napi, int budget)
 	/* Service the TX rings first.  They start
 	 * right after the RSS rings.
 	 */
-	for (i = qdev->rss_ring_count; i < qdev->rx_ring_count; i++) {
-		trx_ring = &qdev->rx_ring[i];
+	for (i = qdev->rss_ring_count; i < qdev->cq_count; i++) {
+		tcq = &qdev->cq[i];
 		/* If this TX completion ring belongs to this vector and
 		 * it's not empty then service it.
 		 */
-		if ((ctx->irq_mask & (1 << trx_ring->cq_id)) &&
-		    (qlge_read_sh_reg(trx_ring->prod_idx_sh_reg) !=
-		     trx_ring->cnsmr_idx)) {
+		if ((ctx->irq_mask & (1 << tcq->cq_id)) &&
+		    (qlge_read_sh_reg(tcq->prod_idx_sh_reg) !=
+		     tcq->cnsmr_idx)) {
 			netif_printk(qdev, intr, KERN_DEBUG, qdev->ndev,
 				     "%s: Servicing TX completion ring %d.\n",
-				     __func__, trx_ring->cq_id);
-			qlge_clean_outbound_rx_ring(trx_ring);
+				     __func__, tcq->cq_id);
+			qlge_clean_outbound_cq(tcq);
 		}
 	}
 
 	/*
 	 * Now service the RSS ring if it's active.
 	 */
-	if (qlge_read_sh_reg(rx_ring->prod_idx_sh_reg) !=
-	    rx_ring->cnsmr_idx) {
+	if (qlge_read_sh_reg(rcq->prod_idx_sh_reg) != rcq->cnsmr_idx) {
 		netif_printk(qdev, intr, KERN_DEBUG, qdev->ndev,
 			     "%s: Servicing RX completion ring %d.\n",
-			     __func__, rx_ring->cq_id);
-		work_done = qlge_clean_inbound_rx_ring(rx_ring, budget);
+			     __func__, rcq->cq_id);
+		work_done = qlge_clean_inbound_cq(rcq, budget);
 	}
 
 	if (work_done < budget) {
 		napi_complete_done(napi, work_done);
-		qlge_enable_completion_interrupt(qdev, rx_ring->irq);
+		qlge_enable_completion_interrupt(qdev, rcq->irq);
 	}
 	return work_done;
 }
@@ -2368,8 +2370,10 @@ static void qlge_restore_vlan(struct qlge_adapter *qdev)
 /* MSI-X Multiple Vector Interrupt Handler for inbound completions. */
 static irqreturn_t qlge_msix_rx_isr(int irq, void *dev_id)
 {
-	struct qlge_rx_ring *rx_ring = dev_id;
+	struct qlge_cq *cq = dev_id;
+	struct qlge_rx_ring *rx_ring;
 
+	rx_ring = &cq->qdev->rx_ring[cq->cq_id];
 	napi_schedule(&rx_ring->napi);
 	return IRQ_HANDLED;
 }
@@ -2381,11 +2385,16 @@ static irqreturn_t qlge_msix_rx_isr(int irq, void *dev_id)
  */
 static irqreturn_t qlge_isr(int irq, void *dev_id)
 {
-	struct qlge_rx_ring *rx_ring = dev_id;
-	struct qlge_adapter *qdev = rx_ring->qdev;
-	struct intr_context *intr_context = &qdev->intr_context[0];
-	u32 var;
+	struct intr_context *intr_context;
+	struct qlge_rx_ring *rx_ring;
+	struct qlge_cq *cq = dev_id;
+	struct qlge_adapter *qdev;
 	int work_done = 0;
+	u32 var;
+
+	qdev = cq->qdev;
+	rx_ring = &qdev->rx_ring[cq->cq_id];
+	intr_context = &qdev->intr_context[0];
 
 	/* Experience shows that when using INTx interrupts, interrupts must
 	 * be masked manually.
@@ -2767,7 +2776,7 @@ static void qlge_free_rx_buffers(struct qlge_adapter *qdev)
 {
 	int i;
 
-	for (i = 0; i < qdev->rx_ring_count; i++) {
+	for (i = 0; i < qdev->rss_ring_count; i++) {
 		struct qlge_rx_ring *rx_ring = &qdev->rx_ring[i];
 
 		if (rx_ring->lbq.queue)
@@ -2819,9 +2828,12 @@ static int qlge_init_bq(struct qlge_bq *bq)
 	return 0;
 }
 
-static void qlge_free_rx_resources(struct qlge_adapter *qdev,
-				   struct qlge_rx_ring *rx_ring)
+static void qlge_free_cq_resources(struct qlge_adapter *qdev,
+				   struct qlge_cq *cq)
 {
+	struct qlge_rx_ring *rx_ring;
+
+	rx_ring = &qdev->rx_ring[cq->cq_id];
 	/* Free the small buffer queue. */
 	if (rx_ring->sbq.base) {
 		dma_free_coherent(&qdev->pdev->dev, QLGE_BQ_SIZE,
@@ -2840,40 +2852,43 @@ static void qlge_free_rx_resources(struct qlge_adapter *qdev,
 		rx_ring->lbq.base = NULL;
 	}
 
+	rx_ring = &qdev->rx_ring[cq->cq_id];
 	/* Free the large buffer queue control blocks. */
 	kfree(rx_ring->lbq.queue);
 	rx_ring->lbq.queue = NULL;
 
-	/* Free the rx queue. */
-	if (rx_ring->cq_base) {
+	/* Free the completion queue. */
+	if (cq->cq_base) {
 		dma_free_coherent(&qdev->pdev->dev,
-				  rx_ring->cq_size,
-				  rx_ring->cq_base, rx_ring->cq_base_dma);
-		rx_ring->cq_base = NULL;
+				  cq->cq_size,
+				  cq->cq_base, cq->cq_base_dma);
+		cq->cq_base = NULL;
 	}
 }
 
 /* Allocate queues and buffers for this completions queue based
  * on the values in the parameter structure.
  */
-static int qlge_alloc_rx_resources(struct qlge_adapter *qdev,
-				   struct qlge_rx_ring *rx_ring)
+static int qlge_alloc_cq_resources(struct qlge_adapter *qdev,
+				   struct qlge_cq *cq)
 {
+	struct qlge_rx_ring *rx_ring;
 	/*
 	 * Allocate the completion queue for this rx_ring.
 	 */
-	rx_ring->cq_base =
-		dma_alloc_coherent(&qdev->pdev->dev, rx_ring->cq_size,
-				   &rx_ring->cq_base_dma, GFP_ATOMIC);
+	cq->cq_base =
+		dma_alloc_coherent(&qdev->pdev->dev, cq->cq_size,
+				   &cq->cq_base_dma, GFP_ATOMIC);
 
-	if (!rx_ring->cq_base) {
-		netif_err(qdev, ifup, qdev->ndev, "rx_ring alloc failed.\n");
+	if (!cq->cq_base) {
+		netif_err(qdev, ifup, qdev->ndev, "cq alloc failed.\n");
 		return -ENOMEM;
 	}
 
-	if (rx_ring->cq_id < qdev->rss_ring_count &&
+	rx_ring = &qdev->rx_ring[cq->cq_id];
+	if (cq->cq_id < qdev->rss_ring_count &&
 	    (qlge_init_bq(&rx_ring->sbq) || qlge_init_bq(&rx_ring->lbq))) {
-		qlge_free_rx_resources(qdev, rx_ring);
+		qlge_free_cq_resources(qdev, cq);
 		return -ENOMEM;
 	}
 
@@ -2914,8 +2929,8 @@ static void qlge_free_mem_resources(struct qlge_adapter *qdev)
 
 	for (i = 0; i < qdev->tx_ring_count; i++)
 		qlge_free_tx_resources(qdev, &qdev->tx_ring[i]);
-	for (i = 0; i < qdev->rx_ring_count; i++)
-		qlge_free_rx_resources(qdev, &qdev->rx_ring[i]);
+	for (i = 0; i < qdev->cq_count; i++)
+		qlge_free_cq_resources(qdev, &qdev->cq[i]);
 	qlge_free_shadow_space(qdev);
 }
 
@@ -2927,8 +2942,8 @@ static int qlge_alloc_mem_resources(struct qlge_adapter *qdev)
 	if (qlge_alloc_shadow_space(qdev))
 		return -ENOMEM;
 
-	for (i = 0; i < qdev->rx_ring_count; i++) {
-		if (qlge_alloc_rx_resources(qdev, &qdev->rx_ring[i]) != 0) {
+	for (i = 0; i < qdev->cq_count; i++) {
+		if (qlge_alloc_cq_resources(qdev, &qdev->cq[i]) != 0) {
 			netif_err(qdev, ifup, qdev->ndev,
 				  "RX resource allocation failed.\n");
 			goto err_mem;
@@ -2953,56 +2968,43 @@ err_mem:
  * The control block is defined as
  * "Completion Queue Initialization Control Block", or cqicb.
  */
-static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct qlge_rx_ring *rx_ring)
+static int qlge_start_cq(struct qlge_adapter *qdev, struct qlge_cq *cq)
 {
-	struct cqicb *cqicb = &rx_ring->cqicb;
+	struct cqicb *cqicb = &cq->cqicb;
 	void *shadow_reg = qdev->rx_ring_shadow_reg_area +
-		(rx_ring->cq_id * RX_RING_SHADOW_SPACE);
+		(cq->cq_id * RX_RING_SHADOW_SPACE);
 	u64 shadow_reg_dma = qdev->rx_ring_shadow_reg_dma +
-		(rx_ring->cq_id * RX_RING_SHADOW_SPACE);
+		(cq->cq_id * RX_RING_SHADOW_SPACE);
 	void __iomem *doorbell_area =
-		qdev->doorbell_area + (DB_PAGE_SIZE * (128 + rx_ring->cq_id));
+		qdev->doorbell_area + (DB_PAGE_SIZE * (128 + cq->cq_id));
+	struct qlge_rx_ring *rx_ring;
 	int err = 0;
 	u64 tmp;
 	__le64 *base_indirect_ptr;
 	int page_entries;
 
-	/* Set up the shadow registers for this ring. */
-	rx_ring->prod_idx_sh_reg = shadow_reg;
-	rx_ring->prod_idx_sh_reg_dma = shadow_reg_dma;
-	*rx_ring->prod_idx_sh_reg = 0;
-	shadow_reg += sizeof(u64);
-	shadow_reg_dma += sizeof(u64);
-	rx_ring->lbq.base_indirect = shadow_reg;
-	rx_ring->lbq.base_indirect_dma = shadow_reg_dma;
-	shadow_reg += (sizeof(u64) * MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
-	shadow_reg_dma += (sizeof(u64) * MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
-	rx_ring->sbq.base_indirect = shadow_reg;
-	rx_ring->sbq.base_indirect_dma = shadow_reg_dma;
+	/* Set up the shadow registers for this cq. */
+	cq->prod_idx_sh_reg = shadow_reg;
+	cq->prod_idx_sh_reg_dma = shadow_reg_dma;
+	*cq->prod_idx_sh_reg = 0;
 
 	/* PCI doorbell mem area + 0x00 for consumer index register */
-	rx_ring->cnsmr_idx_db_reg = (u32 __iomem *)doorbell_area;
-	rx_ring->cnsmr_idx = 0;
-	rx_ring->curr_entry = rx_ring->cq_base;
+	cq->cnsmr_idx_db_reg = (u32 __iomem *)doorbell_area;
+	cq->cnsmr_idx = 0;
+	cq->curr_entry = cq->cq_base;
 
 	/* PCI doorbell mem area + 0x04 for valid register */
-	rx_ring->valid_db_reg = doorbell_area + 0x04;
-
-	/* PCI doorbell mem area + 0x18 for large buffer consumer */
-	rx_ring->lbq.prod_idx_db_reg = (u32 __iomem *)(doorbell_area + 0x18);
-
-	/* PCI doorbell mem area + 0x1c */
-	rx_ring->sbq.prod_idx_db_reg = (u32 __iomem *)(doorbell_area + 0x1c);
+	cq->valid_db_reg = doorbell_area + 0x04;
 
 	memset((void *)cqicb, 0, sizeof(struct cqicb));
-	cqicb->msix_vect = rx_ring->irq;
+	cqicb->msix_vect = cq->irq;
 
-	cqicb->len = cpu_to_le16(QLGE_FIT16(rx_ring->cq_len) | LEN_V |
+	cqicb->len = cpu_to_le16(QLGE_FIT16(cq->cq_len) | LEN_V |
 				 LEN_CPP_CONT);
 
-	cqicb->addr = cpu_to_le64(rx_ring->cq_base_dma);
+	cqicb->addr = cpu_to_le64(cq->cq_base_dma);
 
-	cqicb->prod_idx_addr = cpu_to_le64(rx_ring->prod_idx_sh_reg_dma);
+	cqicb->prod_idx_addr = cpu_to_le64(cq->prod_idx_sh_reg_dma);
 
 	/*
 	 * Set up the control block load flags.
@@ -3010,7 +3012,23 @@ static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct qlge_rx_ring *rx
 	cqicb->flags = FLAGS_LC |	/* Load queue base address */
 		FLAGS_LV |		/* Load MSI-X vector */
 		FLAGS_LI;		/* Load irq delay values */
-	if (rx_ring->cq_id < qdev->rss_ring_count) {
+
+	if (cq->cq_id < qdev->rss_ring_count) {
+		rx_ring = &qdev->rx_ring[cq->cq_id];
+		shadow_reg += sizeof(u64);
+		shadow_reg_dma += sizeof(u64);
+		rx_ring->lbq.base_indirect = shadow_reg;
+		rx_ring->lbq.base_indirect_dma = shadow_reg_dma;
+		shadow_reg += (sizeof(u64) * MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
+		shadow_reg_dma += (sizeof(u64) * MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
+		rx_ring->sbq.base_indirect = shadow_reg;
+		rx_ring->sbq.base_indirect_dma = shadow_reg_dma;
+		/* PCI doorbell mem area + 0x18 for large buffer consumer */
+		rx_ring->lbq.prod_idx_db_reg = (u32 __iomem *)(doorbell_area + 0x18);
+
+		/* PCI doorbell mem area + 0x1c */
+		rx_ring->sbq.prod_idx_db_reg = (u32 __iomem *)(doorbell_area + 0x1c);
+
 		cqicb->flags |= FLAGS_LL;	/* Load lbq values */
 		tmp = (u64)rx_ring->lbq.base_dma;
 		base_indirect_ptr = rx_ring->lbq.base_indirect;
@@ -3038,14 +3056,12 @@ static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct qlge_rx_ring *rx
 			base_indirect_ptr++;
 			page_entries++;
 		} while (page_entries < MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
-		cqicb->sbq_addr =
-			cpu_to_le64(rx_ring->sbq.base_indirect_dma);
+		cqicb->sbq_addr = cpu_to_le64(rx_ring->sbq.base_indirect_dma);
 		cqicb->sbq_buf_size = cpu_to_le16(QLGE_SMALL_BUFFER_SIZE);
 		cqicb->sbq_len = cpu_to_le16(QLGE_FIT16(QLGE_BQ_LEN));
 		rx_ring->sbq.next_to_use = 0;
 		rx_ring->sbq.next_to_clean = 0;
-	}
-	if (rx_ring->cq_id < qdev->rss_ring_count) {
+
 		/* Inbound completion handling rx_rings run in
 		 * separate NAPI contexts.
 		 */
@@ -3058,7 +3074,7 @@ static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct qlge_rx_ring *rx
 		cqicb->pkt_delay = cpu_to_le16(qdev->tx_max_coalesced_frames);
 	}
 	err = qlge_write_cfg(qdev, cqicb, sizeof(struct cqicb),
-			     CFG_LCQ, rx_ring->cq_id);
+			     CFG_LCQ, cq->cq_id);
 	if (err) {
 		netif_err(qdev, ifup, qdev->ndev, "Failed to load CQICB.\n");
 		return err;
@@ -3199,20 +3215,20 @@ static void qlge_set_tx_vect(struct qlge_adapter *qdev)
 	if (likely(test_bit(QL_MSIX_ENABLED, &qdev->flags))) {
 		/* Assign irq vectors to TX rx_rings.*/
 		for (vect = 0, j = 0, i = qdev->rss_ring_count;
-		     i < qdev->rx_ring_count; i++) {
+		     i < qdev->cq_count; i++) {
 			if (j == tx_rings_per_vector) {
 				vect++;
 				j = 0;
 			}
-			qdev->rx_ring[i].irq = vect;
+			qdev->cq[i].irq = vect;
 			j++;
 		}
 	} else {
 		/* For single vector all rings have an irq
 		 * of zero.
 		 */
-		for (i = 0; i < qdev->rx_ring_count; i++)
-			qdev->rx_ring[i].irq = 0;
+		for (i = 0; i < qdev->cq_count; i++)
+			qdev->cq[i].irq = 0;
 	}
 }
 
@@ -3230,21 +3246,21 @@ static void qlge_set_irq_mask(struct qlge_adapter *qdev, struct intr_context *ct
 		/* Add the RSS ring serviced by this vector
 		 * to the mask.
 		 */
-		ctx->irq_mask = (1 << qdev->rx_ring[vect].cq_id);
+		ctx->irq_mask = (1 << qdev->cq[vect].cq_id);
 		/* Add the TX ring(s) serviced by this vector
 		 * to the mask.
 		 */
 		for (j = 0; j < tx_rings_per_vector; j++) {
 			ctx->irq_mask |=
-				(1 << qdev->rx_ring[qdev->rss_ring_count +
+				(1 << qdev->cq[qdev->rss_ring_count +
 				 (vect * tx_rings_per_vector) + j].cq_id);
 		}
 	} else {
 		/* For single vector we just shift each queue's
 		 * ID into the mask.
 		 */
-		for (j = 0; j < qdev->rx_ring_count; j++)
-			ctx->irq_mask |= (1 << qdev->rx_ring[j].cq_id);
+		for (j = 0; j < qdev->cq_count; j++)
+			ctx->irq_mask |= (1 << qdev->cq[j].cq_id);
 	}
 }
 
@@ -3265,7 +3281,7 @@ static void qlge_resolve_queues_to_irqs(struct qlge_adapter *qdev)
 		 * vectors for each queue.
 		 */
 		for (i = 0; i < qdev->intr_count; i++, intr_context++) {
-			qdev->rx_ring[i].irq = i;
+			qdev->cq[i].irq = i;
 			intr_context->intr = i;
 			intr_context->qdev = qdev;
 			/* Set up this vector's bit-mask that indicates
@@ -3361,9 +3377,9 @@ static void qlge_free_irq(struct qlge_adapter *qdev)
 		if (intr_context->hooked) {
 			if (test_bit(QL_MSIX_ENABLED, &qdev->flags)) {
 				free_irq(qdev->msi_x_entry[i].vector,
-					 &qdev->rx_ring[i]);
+					 &qdev->cq[i]);
 			} else {
-				free_irq(qdev->pdev->irq, &qdev->rx_ring[0]);
+				free_irq(qdev->pdev->irq, &qdev->cq[0]);
 			}
 		}
 	}
@@ -3385,7 +3401,7 @@ static int qlge_request_irq(struct qlge_adapter *qdev)
 					     intr_context->handler,
 					     0,
 					     intr_context->name,
-					     &qdev->rx_ring[i]);
+					     &qdev->cq[i]);
 			if (status) {
 				netif_err(qdev, ifup, qdev->ndev,
 					  "Failed request for MSIX interrupt %d.\n",
@@ -3402,13 +3418,13 @@ static int qlge_request_irq(struct qlge_adapter *qdev)
 				     intr_context->name);
 			netif_printk(qdev, ifup, KERN_DEBUG, qdev->ndev,
 				     "%s: dev_id = 0x%p.\n", __func__,
-				     &qdev->rx_ring[0]);
+				     &qdev->cq[0]);
 			status =
 				request_irq(pdev->irq, qlge_isr,
 					    test_bit(QL_MSI_ENABLED, &qdev->flags)
 					    ? 0
 					    : IRQF_SHARED,
-					    intr_context->name, &qdev->rx_ring[0]);
+					    intr_context->name, &qdev->cq[0]);
 			if (status)
 				goto err_irq;
 
@@ -3624,8 +3640,8 @@ static int qlge_adapter_initialize(struct qlge_adapter *qdev)
 		qdev->wol = WAKE_MAGIC;
 
 	/* Start up the rx queues. */
-	for (i = 0; i < qdev->rx_ring_count; i++) {
-		status = qlge_start_rx_ring(qdev, &qdev->rx_ring[i]);
+	for (i = 0; i < qdev->cq_count; i++) {
+		status = qlge_start_cq(qdev, &qdev->cq[i]);
 		if (status) {
 			netif_err(qdev, ifup, qdev->ndev,
 				  "Failed to start rx ring[%d].\n", i);
@@ -3920,10 +3936,11 @@ static void qlge_set_lb_size(struct qlge_adapter *qdev)
 
 static int qlge_configure_rings(struct qlge_adapter *qdev)
 {
-	int i;
+	int cpu_cnt = min_t(int, MAX_CPUS, num_online_cpus());
 	struct qlge_rx_ring *rx_ring;
 	struct qlge_tx_ring *tx_ring;
-	int cpu_cnt = min_t(int, MAX_CPUS, num_online_cpus());
+	struct qlge_cq *cq;
+	int i;
 
 	/* In a perfect world we have one RSS ring for each CPU
 	 * and each has it's own vector.  To do that we ask for
@@ -3937,7 +3954,7 @@ static int qlge_configure_rings(struct qlge_adapter *qdev)
 	/* Adjust the RSS ring count to the actual vector count. */
 	qdev->rss_ring_count = qdev->intr_count;
 	qdev->tx_ring_count = cpu_cnt;
-	qdev->rx_ring_count = qdev->tx_ring_count + qdev->rss_ring_count;
+	qdev->cq_count = qdev->tx_ring_count + qdev->rss_ring_count;
 
 	for (i = 0; i < qdev->tx_ring_count; i++) {
 		tx_ring = &qdev->tx_ring[i];
@@ -3955,31 +3972,35 @@ static int qlge_configure_rings(struct qlge_adapter *qdev)
 		tx_ring->cq_id = qdev->rss_ring_count + i;
 	}
 
-	for (i = 0; i < qdev->rx_ring_count; i++) {
-		rx_ring = &qdev->rx_ring[i];
-		memset((void *)rx_ring, 0, sizeof(*rx_ring));
-		rx_ring->qdev = qdev;
-		rx_ring->cq_id = i;
-		rx_ring->cpu = i % cpu_cnt;	/* CPU to run handler on. */
+	for (i = 0; i < qdev->cq_count; i++) {
+		cq = &qdev->cq[i];
+		memset((void *)cq, 0, sizeof(*cq));
+		cq->qdev = qdev;
+		cq->cq_id = i;
+		cq->cpu = i % cpu_cnt;	/* CPU to run handler on. */
 		if (i < qdev->rss_ring_count) {
 			/*
 			 * Inbound (RSS) queues.
 			 */
-			rx_ring->cq_len = qdev->rx_ring_size;
-			rx_ring->cq_size =
-				rx_ring->cq_len * sizeof(struct qlge_net_rsp_iocb);
+			cq->cq_len = qdev->rx_ring_size;
+			cq->cq_size =
+				cq->cq_len * sizeof(struct qlge_net_rsp_iocb);
+			rx_ring = &qdev->rx_ring[i];
+			memset((void *)rx_ring, 0, sizeof(*rx_ring));
 			rx_ring->lbq.type = QLGE_LB;
+			rx_ring->cq_id = i;
 			rx_ring->sbq.type = QLGE_SB;
 			INIT_DELAYED_WORK(&rx_ring->refill_work,
 					  &qlge_slow_refill);
+			rx_ring->qdev = qdev;
 		} else {
 			/*
 			 * Outbound queue handles outbound completions only.
 			 */
 			/* outbound cq is same size as tx_ring it services. */
-			rx_ring->cq_len = qdev->tx_ring_size;
-			rx_ring->cq_size =
-				rx_ring->cq_len * sizeof(struct qlge_net_rsp_iocb);
+			cq->cq_len = qdev->tx_ring_size;
+			cq->cq_size =
+				cq->cq_len * sizeof(struct qlge_net_rsp_iocb);
 		}
 	}
 	return 0;
@@ -4652,9 +4673,9 @@ netdev_tx_t qlge_lb_send(struct sk_buff *skb, struct net_device *ndev)
 	return qlge_send(skb, ndev);
 }
 
-int qlge_clean_lb_rx_ring(struct qlge_rx_ring *rx_ring, int budget)
+int qlge_clean_lb_cq(struct qlge_cq *cq, int budget)
 {
-	return qlge_clean_inbound_rx_ring(rx_ring, budget);
+	return qlge_clean_inbound_cq(cq, budget);
 }
 
 static void qlge_remove(struct pci_dev *pdev)

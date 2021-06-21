@@ -1456,15 +1456,15 @@ struct qlge_bq {
 		     (_bq)->next_to_clean); \
 })
 
-struct qlge_rx_ring {
+struct qlge_cq {
 	struct cqicb cqicb;	/* The chip's completion queue init control block. */
 
 	/* Completion queue elements. */
+	u16 cq_id;
 	void *cq_base;
 	dma_addr_t cq_base_dma;
 	u32 cq_size;
 	u32 cq_len;
-	u16 cq_id;
 	__le32 *prod_idx_sh_reg;	/* Shadowed producer register. */
 	dma_addr_t prod_idx_sh_reg_dma;
 	void __iomem *cnsmr_idx_db_reg;	/* PCI doorbell mem area + 0 */
@@ -1472,6 +1472,13 @@ struct qlge_rx_ring {
 	struct qlge_net_rsp_iocb *curr_entry;	/* next entry on queue */
 	void __iomem *valid_db_reg;	/* PCI doorbell mem area + 0x04 */
 
+	/* Misc. handler elements. */
+	u32 irq;		/* Which vector this ring is assigned. */
+	u32 cpu;		/* Which CPU this should run on. */
+	struct qlge_adapter *qdev;
+};
+
+struct qlge_rx_ring {
 	/* Large buffer queue elements. */
 	struct qlge_bq lbq;
 	struct qlge_page_chunk master_chunk;
@@ -1480,19 +1487,15 @@ struct qlge_rx_ring {
 	/* Small buffer queue elements. */
 	struct qlge_bq sbq;
 
-	/* Misc. handler elements. */
-	u32 irq;		/* Which vector this ring is assigned. */
-	u32 cpu;		/* Which CPU this should run on. */
-	struct delayed_work refill_work;
-	char name[IFNAMSIZ + 5];
 	struct napi_struct napi;
-	u8 reserved;
-	struct qlge_adapter *qdev;
+	struct delayed_work refill_work;
 	u64 rx_packets;
 	u64 rx_multicast;
 	u64 rx_bytes;
 	u64 rx_dropped;
 	u64 rx_errors;
+	struct qlge_adapter *qdev;
+	u16 cq_id;
 };
 
 /*
@@ -1753,7 +1756,7 @@ enum {
 #define SHADOW_REG_SHIFT	20
 
 struct qlge_nic_misc {
-	u32 rx_ring_count;
+	u32 cq_count;
 	u32 tx_ring_count;
 	u32 intr_count;
 	u32 function;
@@ -2127,14 +2130,15 @@ struct qlge_adapter {
 	int tx_ring_count;	/* One per online CPU. */
 	u32 rss_ring_count;	/* One per irq vector.  */
 	/*
-	 * rx_ring_count =
+	 * cq_count =
 	 *  (CPU count * outbound completion rx_ring) +
 	 *  (irq_vector_cnt * inbound (RSS) completion rx_ring)
 	 */
-	int rx_ring_count;
+	int cq_count;
 	int ring_mem_size;
 	void *ring_mem;
 
+	struct qlge_cq cq[MAX_RX_RINGS];
 	struct qlge_rx_ring rx_ring[MAX_RX_RINGS];
 	struct qlge_tx_ring tx_ring[MAX_TX_RINGS];
 	unsigned int lbq_buf_order;
@@ -2287,6 +2291,6 @@ void qlge_get_dump(struct qlge_adapter *qdev, void *buff);
 netdev_tx_t qlge_lb_send(struct sk_buff *skb, struct net_device *ndev);
 void qlge_check_lb_frame(struct qlge_adapter *qdev, struct sk_buff *skb);
 int qlge_own_firmware(struct qlge_adapter *qdev);
-int qlge_clean_lb_rx_ring(struct qlge_rx_ring *rx_ring, int budget);
+int qlge_clean_lb_cq(struct qlge_cq *cq, int budget);
 
 #endif /* _QLGE_H_ */
