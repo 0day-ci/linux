@@ -1848,6 +1848,11 @@ static const struct spi_nor_manufacturer *manufacturers[] = {
 	&spi_nor_xmc,
 };
 
+static bool spi_nor_match_part(const struct flash_info *part, const u8 *id)
+{
+	return part->id_len && !memcmp(part->id, id, part->id_len);
+}
+
 static const struct flash_info *
 spi_nor_search_part_by_id(const struct flash_info *parts, unsigned int nparts,
 			  const u8 *id)
@@ -1855,8 +1860,7 @@ spi_nor_search_part_by_id(const struct flash_info *parts, unsigned int nparts,
 	unsigned int i;
 
 	for (i = 0; i < nparts; i++) {
-		if (parts[i].id_len &&
-		    !memcmp(parts[i].id, id, parts[i].id_len))
+		if (spi_nor_match_part(&parts[i], id))
 			return &parts[i];
 	}
 
