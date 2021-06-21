@@ -1,4 +1,2 @@
-* the driver has a habit of using runtime checks where compile time checks are
-  possible (ex. ql_free_rx_buffers(), ql_alloc_rx_buffers())
 * remove duplicate and useless comments
 * fix checkpatch issues
