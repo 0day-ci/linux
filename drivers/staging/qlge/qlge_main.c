@@ -1471,7 +1471,7 @@ static void qlge_process_mac_rx_page(struct qlge_adapter *qdev,
 	struct napi_struct *napi = &rx_ring->napi;
 	size_t hlen = ETH_HLEN;
 
-	skb = netdev_alloc_skb(ndev, length);
+	skb = napi_alloc_skb(&rx_ring->napi, SMALL_BUFFER_SIZE);
 	if (!skb) {
 		rx_ring->rx_dropped++;
 		put_page(lbq_desc->p.pg_chunk.page);
@@ -1765,7 +1765,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 			 * jumbo mtu on a non-TCP/UDP frame.
 			 */
 			lbq_desc = qlge_get_curr_lchunk(qdev, rx_ring);
-			skb = netdev_alloc_skb(qdev->ndev, length);
+			skb = napi_alloc_skb(&rx_ring->napi, SMALL_BUFFER_SIZE);
 			if (!skb) {
 				netif_printk(qdev, probe, KERN_DEBUG, qdev->ndev,
 					     "No skb available, drop the packet.\n");
