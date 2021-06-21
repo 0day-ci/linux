@@ -383,6 +383,15 @@ int panfrost_exception_to_error(u32 exception_code)
 	return panfrost_exception_infos[exception_code].error;
 }
 
+bool panfrost_exception_needs_reset(const struct panfrost_device *pfdev,
+				    u32 exception_code)
+{
+	/* Right now, none of the GPU we support need a reset, but this
+	 * might change (e.g. Valhall GPUs require a when a BUS_FAULT occurs).
+	 */
+	return false;
+}
+
 void panfrost_device_reset(struct panfrost_device *pfdev)
 {
 	panfrost_gpu_soft_reset(pfdev);
