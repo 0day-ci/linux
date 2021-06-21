@@ -368,6 +368,7 @@ static void sn65dsi83_enable(struct drm_bridge *bridge)
 {
 	struct sn65dsi83 *ctx = bridge_to_sn65dsi83(bridge);
 	unsigned int pval;
+	__le16 le16val;
 	u16 val;
 	int ret;
 
@@ -426,21 +427,21 @@ static void sn65dsi83_enable(struct drm_bridge *bridge)
 		     REG_LVDS_LANE_CHB_LVDS_TERM);
 	regmap_write(ctx->regmap, REG_LVDS_CM, 0x00);
 
-	val = cpu_to_le16(ctx->mode.hdisplay);
+	le16val = cpu_to_le16(ctx->mode.hdisplay);
 	regmap_bulk_write(ctx->regmap, REG_VID_CHA_ACTIVE_LINE_LENGTH_LOW,
-			  &val, 2);
-	val = cpu_to_le16(ctx->mode.vdisplay);
+			  &le16val, 2);
+	le16val = cpu_to_le16(ctx->mode.vdisplay);
 	regmap_bulk_write(ctx->regmap, REG_VID_CHA_VERTICAL_DISPLAY_SIZE_LOW,
-			  &val, 2);
+			  &le16val, 2);
 	/* 32 + 1 pixel clock to ensure proper operation */
-	val = cpu_to_le16(32 + 1);
-	regmap_bulk_write(ctx->regmap, REG_VID_CHA_SYNC_DELAY_LOW, &val, 2);
-	val = cpu_to_le16(ctx->mode.hsync_end - ctx->mode.hsync_start);
+	le16val = cpu_to_le16(32 + 1);
+	regmap_bulk_write(ctx->regmap, REG_VID_CHA_SYNC_DELAY_LOW, &le16val, 2);
+	le16val = cpu_to_le16(ctx->mode.hsync_end - ctx->mode.hsync_start);
 	regmap_bulk_write(ctx->regmap, REG_VID_CHA_HSYNC_PULSE_WIDTH_LOW,
-			  &val, 2);
-	val = cpu_to_le16(ctx->mode.vsync_end - ctx->mode.vsync_start);
+			  &le16val, 2);
+	le16val = cpu_to_le16(ctx->mode.vsync_end - ctx->mode.vsync_start);
 	regmap_bulk_write(ctx->regmap, REG_VID_CHA_VSYNC_PULSE_WIDTH_LOW,
-			  &val, 2);
+			  &le16val, 2);
 	regmap_write(ctx->regmap, REG_VID_CHA_HORIZONTAL_BACK_PORCH,
 		     ctx->mode.htotal - ctx->mode.hsync_end);
 	regmap_write(ctx->regmap, REG_VID_CHA_VERTICAL_BACK_PORCH,
@@ -517,7 +518,6 @@ static bool sn65dsi83_mode_fixup(struct drm_bridge *bridge,
 				 struct drm_display_mode *adj)
 {
 	struct sn65dsi83 *ctx = bridge_to_sn65dsi83(bridge);
-	u32 input_bus_format = MEDIA_BUS_FMT_RGB888_1X24;
 	struct drm_encoder *encoder = bridge->encoder;
 	struct drm_device *ddev = encoder->dev;
 	struct drm_connector *connector;
@@ -550,12 +550,35 @@ static bool sn65dsi83_mode_fixup(struct drm_bridge *bridge,
 				 connector->display_info.bus_formats[0]);
 			break;
 		}
-
-		drm_display_info_set_bus_formats(&connector->display_info,
-						 &input_bus_format, 1);
 	}
 
 	return true;
+}
+
+#define MAX_INPUT_SEL_FORMATS	1
+
+static u32 *
+sn65dsi83_atomic_get_input_bus_fmts(struct drm_bridge *bridge,
+				    struct drm_bridge_state *bridge_state,
+				    struct drm_crtc_state *crtc_state,
+				    struct drm_connector_state *conn_state,
+				    u32 output_fmt,
+				    unsigned int *num_input_fmts)
+{
+	u32 *input_fmts;
+
+	*num_input_fmts = 0;
+
+	input_fmts = kcalloc(MAX_INPUT_SEL_FORMATS, sizeof(*input_fmts),
+			     GFP_KERNEL);
+	if (!input_fmts)
+		return NULL;
+
+	/* This is the DSI-end bus format */
+	input_fmts[0] = MEDIA_BUS_FMT_RGB888_1X24;
+	*num_input_fmts = 1;
+
+	return input_fmts;
 }
 
 static const struct drm_bridge_funcs sn65dsi83_funcs = {
@@ -567,6 +590,11 @@ static const struct drm_bridge_funcs sn65dsi83_funcs = {
 	.mode_valid	= sn65dsi83_mode_valid,
 	.mode_set	= sn65dsi83_mode_set,
 	.mode_fixup	= sn65dsi83_mode_fixup,
+
+	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state,
+	.atomic_reset = drm_atomic_helper_bridge_reset,
+	.atomic_get_input_bus_fmts = sn65dsi83_atomic_get_input_bus_fmts,
 };
 
 static int sn65dsi83_parse_dt(struct sn65dsi83 *ctx, enum sn65dsi83_model model)
