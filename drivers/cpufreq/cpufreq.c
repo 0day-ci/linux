@@ -1516,6 +1516,9 @@ out_destroy_policy:
 	up_write(&policy->rwsem);
 
 out_exit_policy:
+	if (cpufreq_driver->offline)
+		cpufreq_driver->offline(policy);
+
 	if (cpufreq_driver->exit)
 		cpufreq_driver->exit(policy);
 
