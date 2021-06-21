@@ -1741,55 +1741,23 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 			sbq_desc->p.skb = NULL;
 		}
 	} else if (ib_mac_rsp->flags3 & IB_MAC_IOCB_RSP_DL) {
-		if (ib_mac_rsp->flags4 & IB_MAC_IOCB_RSP_HS) {
-			netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
-				     "Header in small, %d bytes in large. Chain large to small!\n",
-				     length);
-			/*
-			 * The data is in a single large buffer.  We
-			 * chain it to the header buffer's skb and let
-			 * it rip.
-			 */
-			lbq_desc = qlge_get_curr_lchunk(qdev, rx_ring);
-			netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
-				     "Chaining page at offset = %d, for %d bytes  to skb.\n",
-				     lbq_desc->p.pg_chunk.offset, length);
-			skb_fill_page_desc(skb, 0, lbq_desc->p.pg_chunk.page,
-					   lbq_desc->p.pg_chunk.offset, length);
-			skb->len += length;
-			skb->data_len += length;
-			skb->truesize += qdev->lbq_buf_size;
-		} else {
-			/*
-			 * The headers and data are in a single large buffer. We
-			 * copy it to a new skb and let it go. This can happen with
-			 * jumbo mtu on a non-TCP/UDP frame.
-			 */
-			lbq_desc = qlge_get_curr_lchunk(qdev, rx_ring);
-			skb = napi_alloc_skb(&rx_ring->napi, QLGE_SMALL_BUFFER_SIZE);
-			if (!skb) {
-				netif_printk(qdev, probe, KERN_DEBUG, qdev->ndev,
-					     "No skb available, drop the packet.\n");
-				return NULL;
-			}
-			dma_unmap_page(&qdev->pdev->dev, lbq_desc->dma_addr,
-				       qdev->lbq_buf_size,
-				       DMA_FROM_DEVICE);
-			skb_reserve(skb, NET_IP_ALIGN);
-			netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
-				     "%d bytes of headers and data in large. Chain page to new skb and pull tail.\n",
-				     length);
-			skb_fill_page_desc(skb, 0, lbq_desc->p.pg_chunk.page,
-					   lbq_desc->p.pg_chunk.offset,
-					   length);
-			skb->len += length;
-			skb->data_len += length;
-			skb->truesize += qdev->lbq_buf_size;
-			qlge_update_mac_hdr_len(qdev, ib_mac_rsp,
-						lbq_desc->p.pg_chunk.va,
-						&hlen);
-			__pskb_pull_tail(skb, hlen);
-		}
+		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
+			     "Header in small, %d bytes in large. Chain large to small!\n",
+			     length);
+		/*
+		 * The data is in a single large buffer.  We
+		 * chain it to the header buffer's skb and let
+		 * it rip.
+		 */
+		lbq_desc = qlge_get_curr_lchunk(qdev, rx_ring);
+		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
+			     "Chaining page at offset = %d, for %d bytes  to skb.\n",
+			     lbq_desc->p.pg_chunk.offset, length);
+		skb_fill_page_desc(skb, 0, lbq_desc->p.pg_chunk.page,
+				   lbq_desc->p.pg_chunk.offset, length);
+		skb->len += length;
+		skb->data_len += length;
+		skb->truesize += qdev->lbq_buf_size;
 	} else {
 		/*
 		 * The data is in a chain of large buffers
