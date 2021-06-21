@@ -140,12 +140,13 @@ static int qlge_sem_trylock(struct qlge_adapter *qdev, u32 sem_mask)
 int qlge_sem_spinlock(struct qlge_adapter *qdev, u32 sem_mask)
 {
 	unsigned int wait_count = 30;
+	int count;
 
-	do {
+	for (count = 0; count < wait_count; count++) {
 		if (!qlge_sem_trylock(qdev, sem_mask))
 			return 0;
-		udelay(100);
-	} while (--wait_count);
+		udelay(UDELAY_DELAY);
+	}
 	return -ETIMEDOUT;
 }
 
