@@ -45,6 +45,10 @@
 #define CRYPTO_AES_CTX_SIZE (sizeof(struct crypto_aes_ctx) + AESNI_ALIGN_EXTRA)
 #define XTS_AES_CTX_SIZE (sizeof(struct aesni_xts_ctx) + AESNI_ALIGN_EXTRA)
 
+static bool use_avx512;
+module_param(use_avx512, bool, 0644);
+MODULE_PARM_DESC(use_avx512, "Use AVX512 optimized algorithm, if available");
+
 /* This data is stored at the end of the crypto_tfm struct.
  * It's a type of per "session" data storage location.
  * This needs to be 16 byte aligned.
@@ -135,6 +139,20 @@ asmlinkage void aes_ctr_enc_192_avx_by8(const u8 *in, u8 *iv,
 		void *keys, u8 *out, unsigned int num_bytes);
 asmlinkage void aes_ctr_enc_256_avx_by8(const u8 *in, u8 *iv,
 		void *keys, u8 *out, unsigned int num_bytes);
+
+asmlinkage void aes_ctr_enc_128_avx512_by16(void *keys, u8 *out,
+					    const u8 *in,
+					    unsigned int num_bytes,
+					    u8 *iv);
+asmlinkage void aes_ctr_enc_192_avx512_by16(void *keys, u8 *out,
+					    const u8 *in,
+					    unsigned int num_bytes,
+					    u8 *iv);
+asmlinkage void aes_ctr_enc_256_avx512_by16(void *keys, u8 *out,
+					    const u8 *in,
+					    unsigned int num_bytes,
+					    u8 *iv);
+
 /*
  * asmlinkage void aesni_gcm_init_avx_gen2()
  * gcm_data *my_ctx_data, context data
@@ -491,6 +509,23 @@ static void aesni_ctr_enc_avx_tfm(struct crypto_aes_ctx *ctx, u8 *out,
 		aes_ctr_enc_192_avx_by8(in, iv, (void *)ctx, out, len);
 	else
 		aes_ctr_enc_256_avx_by8(in, iv, (void *)ctx, out, len);
+}
+
+static void aesni_ctr_enc_avx512_tfm(struct crypto_aes_ctx *ctx, u8 *out,
+				     const u8 *in, unsigned int len, u8 *iv)
+{
+	/*
+	 * Based on key length, override with the by16 version
+	 * of ctr mode encryption/decryption for improved performance.
+	 * aes_set_key_common() ensures that key length is one of
+	 * {128,192,256}
+	 */
+	if (ctx->key_length == AES_KEYSIZE_128)
+		aes_ctr_enc_128_avx512_by16((void *)ctx, out, in, len, iv);
+	else if (ctx->key_length == AES_KEYSIZE_192)
+		aes_ctr_enc_192_avx512_by16((void *)ctx, out, in, len, iv);
+	else
+		aes_ctr_enc_256_avx512_by16((void *)ctx, out, in, len, iv);
 }
 
 static int ctr_crypt(struct skcipher_request *req)
@@ -1152,7 +1187,12 @@ static int __init aesni_init(void)
 	} else {
 		pr_info("SSE version of gcm_enc/dec engaged.\n");
 	}
-	if (boot_cpu_has(X86_FEATURE_AVX)) {
+	if (use_avx512 && IS_ENABLED(CONFIG_CRYPTO_AES_CTR_AVX512) &&
+	    cpu_feature_enabled(X86_FEATURE_VAES)) {
+		/* Ctr mode performance optimization using AVX512 */
+		static_call_update(aesni_ctr_enc_tfm, aesni_ctr_enc_avx512_tfm);
+		pr_info("AES CTR mode by16 optimization enabled\n");
+	} else if (boot_cpu_has(X86_FEATURE_AVX)) {
 		/* optimize performance of ctr mode encryption transform */
 		static_call_update(aesni_ctr_enc_tfm, aesni_ctr_enc_avx_tfm);
 		pr_info("AES CTR mode by8 optimization enabled\n");
