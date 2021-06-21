@@ -1856,7 +1856,10 @@ static const struct qca_device_data qca_soc_data_wcn3998 = {
 
 static const struct qca_device_data qca_soc_data_qca6390 = {
 	.soc_type = QCA_QCA6390,
-	.num_vregs = 0,
+	.vregs = (struct qca_vreg []) {
+		{ "vin", 1000 },
+	},
+	.num_vregs = 1,
 	.capabilities = QCA_CAP_NEEDS_BT_ENABLE,
 	.name = "qca6390",
 };
