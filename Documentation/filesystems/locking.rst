@@ -522,8 +522,6 @@ prototypes::
 			loff_t *);
 	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long,
 			loff_t *);
-	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t,
-			void __user *);
 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t,
 			loff_t *, int);
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long,
