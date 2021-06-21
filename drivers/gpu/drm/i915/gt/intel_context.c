@@ -53,7 +53,10 @@ int intel_context_alloc_state(struct intel_context *ce)
 {
 	int err = 0;
 
-	if (mutex_lock_interruptible(&ce->pin_mutex))
+	if (test_bit(CONTEXT_ALLOC_BIT, &ce->flags))
+		return 0;
+
+	if (mutex_lock_interruptible(&ce->alloc_mutex))
 		return -EINTR;
 
 	if (!test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
@@ -66,11 +69,12 @@ int intel_context_alloc_state(struct intel_context *ce)
 		if (unlikely(err))
 			goto unlock;
 
+		smp_mb__before_atomic();
 		set_bit(CONTEXT_ALLOC_BIT, &ce->flags);
 	}
 
 unlock:
-	mutex_unlock(&ce->pin_mutex);
+	mutex_unlock(&ce->alloc_mutex);
 	return err;
 }
 
@@ -205,19 +209,11 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 {
 	bool handoff = false;
 	void *vaddr;
-	int err = 0;
+	int err;
 
-	if (unlikely(!test_bit(CONTEXT_ALLOC_BIT, &ce->flags))) {
-		err = intel_context_alloc_state(ce);
-		if (err)
-			return err;
-	}
-
-	/*
-	 * We always pin the context/ring/timeline here, to ensure a pin
-	 * refcount for __intel_context_active(), which prevent a lock
-	 * inversion of ce->pin_mutex vs dma_resv_lock().
-	 */
+	err = intel_context_alloc_state(ce);
+	if (err)
+		return err;
 
 	err = i915_gem_object_lock(ce->timeline->hwsp_ggtt->obj, ww);
 	if (!err && ce->ring->vma->obj)
@@ -237,24 +233,20 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 	if (err)
 		goto err_release;
 
-	err = mutex_lock_interruptible(&ce->pin_mutex);
-	if (err)
-		goto err_post_unpin;
-
 	if (unlikely(intel_context_is_closed(ce))) {
 		err = -ENOENT;
-		goto err_unlock;
+		goto err_post_unpin;
 	}
 
 	if (likely(!atomic_add_unless(&ce->pin_count, 1, 0))) {
 		err = intel_context_active_acquire(ce);
 		if (unlikely(err))
-			goto err_unlock;
+			goto err_post_unpin;
 
 		err = ce->ops->pin(ce, vaddr);
 		if (err) {
 			intel_context_active_release(ce);
-			goto err_unlock;
+			goto err_post_unpin;
 		}
 
 		CE_TRACE(ce, "pin ring:{start:%08x, head:%04x, tail:%04x}\n",
@@ -268,8 +260,6 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 
 	GEM_BUG_ON(!intel_context_is_pinned(ce)); /* no overflow! */
 
-err_unlock:
-	mutex_unlock(&ce->pin_mutex);
 err_post_unpin:
 	if (!handoff)
 		ce->ops->post_unpin(ce);
@@ -381,7 +371,7 @@ intel_context_init(struct intel_context *ce, struct intel_engine_cs *engine)
 	spin_lock_init(&ce->signal_lock);
 	INIT_LIST_HEAD(&ce->signals);
 
-	mutex_init(&ce->pin_mutex);
+	mutex_init(&ce->alloc_mutex);
 
 	i915_active_init(&ce->active,
 			 __intel_context_active, __intel_context_retire, 0);
@@ -393,7 +383,7 @@ void intel_context_fini(struct intel_context *ce)
 		intel_timeline_put(ce->timeline);
 	i915_vm_put(ce->vm);
 
-	mutex_destroy(&ce->pin_mutex);
+	mutex_destroy(&ce->alloc_mutex);
 	i915_active_fini(&ce->active);
 }
 

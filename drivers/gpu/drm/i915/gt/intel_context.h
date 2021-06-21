@@ -49,9 +49,16 @@ int intel_context_reconfigure_sseu(struct intel_context *ce,
  * intel_context_is_pinned() remains stable.
  */
 static inline int intel_context_lock_pinned(struct intel_context *ce)
-	__acquires(ce->pin_mutex)
 {
-	return mutex_lock_interruptible(&ce->pin_mutex);
+	int ret = intel_context_alloc_state(ce);
+
+	if (ret)
+		return ret;
+
+	if (ce->state)
+		return i915_gem_object_lock_interruptible(ce->state->obj, NULL);
+	else
+		return i915_gem_object_lock_interruptible(ce->timeline->hwsp_ggtt->obj, NULL);
 }
 
 /**
@@ -76,9 +83,11 @@ intel_context_is_pinned(struct intel_context *ce)
  * Releases the lock earlier acquired by intel_context_unlock_pinned().
  */
 static inline void intel_context_unlock_pinned(struct intel_context *ce)
-	__releases(ce->pin_mutex)
 {
-	mutex_unlock(&ce->pin_mutex);
+	if (ce->state)
+		return i915_gem_object_unlock(ce->state->obj);
+	else
+		return i915_gem_object_unlock(ce->timeline->hwsp_ggtt->obj);
 }
 
 int __intel_context_do_pin(struct intel_context *ce);

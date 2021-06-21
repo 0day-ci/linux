@@ -42,7 +42,7 @@ gen8_modify_rpcs(struct intel_context *ce, const struct intel_sseu sseu)
 	struct i915_request *rq;
 	int ret;
 
-	lockdep_assert_held(&ce->pin_mutex);
+	assert_object_held(ce->state->obj);
 
 	/*
 	 * If the context is not idle, we have to submit an ordered request to

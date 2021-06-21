@@ -10,13 +10,34 @@
 
 int intel_context_set_ring_size(struct intel_context *ce, long sz)
 {
+	struct intel_ring *ring;
 	int err;
 
 	if (ce->engine->gt->submission_method == INTEL_SUBMISSION_RING)
 		return 0;
 
-	if (intel_context_lock_pinned(ce))
-		return -EINTR;
+	/* Try fast case (unallocated) first */
+	if (!test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
+		bool done = false;
+
+		err = mutex_lock_interruptible(&ce->alloc_mutex);
+		if (err)
+			return err;
+
+		if (!test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
+			ce->ring = __intel_context_ring_size(sz);
+			done = true;
+		}
+		mutex_unlock(&ce->alloc_mutex);
+
+		if (done)
+			return 0;
+	}
+
+	/* Context already allocated */
+	err = intel_context_lock_pinned(ce);
+	if (err)
+		return err;
 
 	err = i915_active_wait(&ce->active);
 	if (err < 0)
@@ -27,23 +48,17 @@ int intel_context_set_ring_size(struct intel_context *ce, long sz)
 		goto unlock;
 	}
 
-	if (test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
-		struct intel_ring *ring;
-
-		/* Replace the existing ringbuffer */
-		ring = intel_engine_create_ring(ce->engine, sz);
-		if (IS_ERR(ring)) {
-			err = PTR_ERR(ring);
-			goto unlock;
-		}
-
-		intel_ring_put(ce->ring);
-		ce->ring = ring;
-
-		/* Context image will be updated on next pin */
-	} else {
-		ce->ring = __intel_context_ring_size(sz);
+	/* Replace the existing ringbuffer */
+	ring = intel_engine_create_ring(ce->engine, sz);
+	if (IS_ERR(ring)) {
+		err = PTR_ERR(ring);
+		goto unlock;
 	}
+
+	intel_ring_put(ce->ring);
+	ce->ring = ring;
+
+	/* Context image will be updated on next pin */
 
 unlock:
 	intel_context_unlock_pinned(ce);
