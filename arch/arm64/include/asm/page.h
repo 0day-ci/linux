@@ -19,6 +19,19 @@
 struct page;
 struct vm_area_struct;
 
+/*
+ * The page reporting won't be started if the freeing page can't come up
+ * with a huge page, which is 512MB with 64KB base page size. It's hard
+ * to have 512MB free area when the memory becomes fragmented, stop page
+ * reporting from working properly. So we choose smaller page reporting
+ * order, which is same to the huge page size (2MB) with 4KB base page
+ * size. However, more overheads will be introduced because page reporting
+ * will be running more frequently.
+ */
+#if defined(CONFIG_PAGE_REPORTING) && defined(CONFIG_ARM64_64K_PAGES)
+#define PAGE_REPORTING_ORDER 5
+#endif
+
 extern void copy_page(void *to, const void *from);
 extern void clear_page(void *to);
 
