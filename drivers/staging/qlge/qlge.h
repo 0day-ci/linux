@@ -2081,8 +2081,8 @@ struct qlge_adapter *netdev_to_qdev(struct net_device *ndev)
  */
 struct qlge_adapter {
 	struct ricb ricb;
-	unsigned long flags;
 	u32 wol;
+	unsigned long flags;
 
 	struct nic_stats nic_stats;
 
@@ -2102,6 +2102,8 @@ struct qlge_adapter {
 
 	spinlock_t adapter_lock;
 	spinlock_t stats_lock;
+
+	u32 intr_count;
 
 	/* PCI Bus Relative Register Addresses */
 	void __iomem *reg_base;
@@ -2123,7 +2125,6 @@ struct qlge_adapter {
 
 	int tx_ring_size;
 	int rx_ring_size;
-	u32 intr_count;
 	struct msix_entry *msi_x_entry;
 	struct intr_context intr_context[MAX_RX_RINGS];
 
@@ -2162,6 +2163,7 @@ struct qlge_adapter {
 	u32 max_frame_size;
 
 	union flash_params flash;
+	u16 device_id;
 
 	struct workqueue_struct *workqueue;
 	struct delayed_work asic_reset_work;
@@ -2171,7 +2173,6 @@ struct qlge_adapter {
 	struct delayed_work mpi_idc_work;
 	struct completion ide_completion;
 	const struct nic_operations *nic_ops;
-	u16 device_id;
 	struct timer_list timer;
 	atomic_t lb_count;
 	/* Keep local copy of current mac address. */
