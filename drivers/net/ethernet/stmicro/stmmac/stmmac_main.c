@@ -7264,6 +7264,16 @@ int stmmac_resume(struct device *dev)
 		phylink_start(priv->phylink);
 		/* We may have called phylink_speed_down before */
 		phylink_speed_up(priv->phylink);
+		/* Reconfigure PHY WOL if the WOL is enabled in ethtool,
+		 * so that subsequent WOL still can be triggered.
+		 */
+		if (!priv->plat->pmt) {
+			struct ethtool_wolinfo phy_wol = { .cmd = ETHTOOL_GWOL };
+
+			phylink_ethtool_get_wol(priv->phylink, &phy_wol);
+			if (phy_wol.wolopts)
+				phylink_ethtool_set_wol(priv->phylink, &phy_wol);
+		}
 		rtnl_unlock();
 	}
 
