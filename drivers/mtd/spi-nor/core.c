@@ -1867,7 +1867,8 @@ spi_nor_search_part_by_id(const struct flash_info *parts, unsigned int nparts,
 	return NULL;
 }
 
-static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+static const struct flash_info *
+spi_nor_read_id(struct spi_nor *nor, const struct flash_info *guess)
 {
 	const struct flash_info *info;
 	u8 *id = nor->bouncebuf;
@@ -1890,6 +1891,9 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
 		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", ret);
 		return ERR_PTR(ret);
 	}
+
+	if (guess && spi_nor_match_part(guess, id))
+		return guess;
 
 	for (i = 0; i < ARRAY_SIZE(manufacturers); i++) {
 		info = spi_nor_search_part_by_id(manufacturers[i]->parts,
@@ -3044,7 +3048,7 @@ static const struct flash_info *spi_nor_get_flash_info(struct spi_nor *nor,
 		info = spi_nor_match_id(nor, name);
 	/* Try to auto-detect if chip name wasn't specified or not found */
 	if (!info)
-		info = spi_nor_read_id(nor);
+		info = spi_nor_read_id(nor, NULL);
 	if (IS_ERR_OR_NULL(info))
 		return ERR_PTR(-ENOENT);
 
@@ -3055,7 +3059,7 @@ static const struct flash_info *spi_nor_get_flash_info(struct spi_nor *nor,
 	if (name && info->id_len) {
 		const struct flash_info *jinfo;
 
-		jinfo = spi_nor_read_id(nor);
+		jinfo = spi_nor_read_id(nor, info);
 		if (IS_ERR(jinfo)) {
 			return jinfo;
 		} else if (jinfo != info) {
