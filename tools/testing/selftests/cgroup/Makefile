@@ -4,7 +4,7 @@ CFLAGS += -Wall -pthread
 all:
 
 TEST_FILES     := with_stress.sh
-TEST_PROGS     := test_stress.sh
+TEST_PROGS     := test_stress.sh test_cpuset_prs.sh
 TEST_GEN_PROGS = test_memcontrol
 TEST_GEN_PROGS += test_kmem
 TEST_GEN_PROGS += test_core
