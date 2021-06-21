@@ -618,6 +618,32 @@ config CRYPTO_CRC32C_VPMSUM
 	  (vpmsum) instructions, introduced in POWER8. Enable on POWER8
 	  and newer processors for improved performance.
 
+config CRYPTO_AVX512
+	bool "AVX512 hardware acceleration for crypto algorithms"
+	depends on X86
+	depends on 64BIT
+	help
+	  This option will compile in AVX512 hardware accelerated crypto
+	  algorithms. These optimized algorithms provide substantial(2-10x)
+	  improvements over existing crypto algorithms for large data size.
+	  However, it may also incur a frequency penalty (aka. "bin drops")
+	  and cause collateral damage to other workloads running on the
+	  same core. Only enabling this option will not ensure that AVX512
+	  optimized crypto algorithms are selected. User would also need
+	  to enable the use_avx512 module parameter associated with each
+	  of the AVX512 optimized crypto algorithms
+
+# We default CRYPTO_CRCT10DIF_AVX512 to Y but depend on CRYPTO_AVX512 in
+# order to have a singular option (CRYPTO_AVX512) select multiple algorithms
+# when supported. Specifically, if the platform and/or toolset does not
+# support VPLMULQDQ. Then this algorithm should not be supported as part of
+# the set that CRYPTO_AVX512 selects.
+config CRYPTO_CRCT10DIF_AVX512
+	bool
+	default y
+	depends on CRYPTO_AVX512
+	depends on CRYPTO_CRCT10DIF_PCLMUL
+	depends on AS_VPCLMULQDQ
 
 config CRYPTO_CRC32C_SPARC64
 	tristate "CRC32c CRC algorithm (SPARC64)"
