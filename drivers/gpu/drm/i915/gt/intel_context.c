@@ -207,8 +207,6 @@ static void intel_context_post_unpin(struct intel_context *ce)
 int __intel_context_do_pin_ww(struct intel_context *ce,
 			      struct i915_gem_ww_ctx *ww)
 {
-	bool handoff = false;
-	void *vaddr;
 	int err;
 
 	err = intel_context_alloc_state(ce);
@@ -229,40 +227,32 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 	if (err)
 		goto err_ctx_unpin;
 
-	err = ce->ops->pre_pin(ce, ww, &vaddr);
-	if (err)
-		goto err_release;
-
 	if (unlikely(intel_context_is_closed(ce))) {
 		err = -ENOENT;
-		goto err_post_unpin;
+		goto err_release;
 	}
 
 	if (likely(!atomic_add_unless(&ce->pin_count, 1, 0))) {
 		err = intel_context_active_acquire(ce);
 		if (unlikely(err))
-			goto err_post_unpin;
+			goto err_release;
 
-		err = ce->ops->pin(ce, vaddr);
+		err = ce->ops->pin(ce, ww);
 		if (err) {
 			intel_context_active_release(ce);
-			goto err_post_unpin;
+			goto err_release;
 		}
 
 		CE_TRACE(ce, "pin ring:{start:%08x, head:%04x, tail:%04x}\n",
 			 i915_ggtt_offset(ce->ring->vma),
 			 ce->ring->head, ce->ring->tail);
 
-		handoff = true;
 		smp_mb__before_atomic(); /* flush pin before it is visible */
 		atomic_inc(&ce->pin_count);
 	}
 
 	GEM_BUG_ON(!intel_context_is_pinned(ce)); /* no overflow! */
 
-err_post_unpin:
-	if (!handoff)
-		ce->ops->post_unpin(ce);
 err_release:
 	i915_active_release(&ce->active);
 err_ctx_unpin:
@@ -303,7 +293,6 @@ void intel_context_unpin(struct intel_context *ce)
 
 	CE_TRACE(ce, "unpin\n");
 	ce->ops->unpin(ce);
-	ce->ops->post_unpin(ce);
 
 	/*
 	 * Once released, we may asynchronously drop the active reference.

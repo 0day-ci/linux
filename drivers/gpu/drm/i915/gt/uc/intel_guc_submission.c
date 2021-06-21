@@ -437,25 +437,32 @@ static int guc_context_alloc(struct intel_context *ce)
 	return lrc_alloc(ce, ce->engine);
 }
 
-static int guc_context_pre_pin(struct intel_context *ce,
-			       struct i915_gem_ww_ctx *ww,
-			       void **vaddr)
+static int guc_context_pin(struct intel_context *ce, struct i915_gem_ww_ctx *ww)
 {
-	return lrc_pre_pin(ce, ce->engine, ww, vaddr);
+	void *vaddr;
+	int err;
+
+	err = lrc_pre_pin(ce, ce->engine, ww, &vaddr);
+	if (err)
+		return err;
+
+	err = lrc_pin(ce, ce->engine, vaddr);
+	if (err)
+		lrc_post_unpin(ce);
+	return err;
 }
 
-static int guc_context_pin(struct intel_context *ce, void *vaddr)
+static void guc_context_unpin(struct intel_context *ce)
 {
-	return lrc_pin(ce, ce->engine, vaddr);
+	lrc_unpin(ce);
+	lrc_post_unpin(ce);
 }
 
 static const struct intel_context_ops guc_context_ops = {
 	.alloc = guc_context_alloc,
 
-	.pre_pin = guc_context_pre_pin,
 	.pin = guc_context_pin,
-	.unpin = lrc_unpin,
-	.post_unpin = lrc_post_unpin,
+	.unpin = guc_context_unpin,
 
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,

@@ -123,10 +123,6 @@ static void mock_context_unpin(struct intel_context *ce)
 {
 }
 
-static void mock_context_post_unpin(struct intel_context *ce)
-{
-}
-
 static void mock_context_destroy(struct kref *ref)
 {
 	struct intel_context *ce = container_of(ref, typeof(*ce), ref);
@@ -166,13 +162,7 @@ static int mock_context_alloc(struct intel_context *ce)
 	return 0;
 }
 
-static int mock_context_pre_pin(struct intel_context *ce,
-				struct i915_gem_ww_ctx *ww, void **unused)
-{
-	return 0;
-}
-
-static int mock_context_pin(struct intel_context *ce, void *unused)
+static int mock_context_pin(struct intel_context *ce, struct i915_gem_ww_ctx *ww)
 {
 	return 0;
 }
@@ -184,10 +174,8 @@ static void mock_context_reset(struct intel_context *ce)
 static const struct intel_context_ops mock_context_ops = {
 	.alloc = mock_context_alloc,
 
-	.pre_pin = mock_context_pre_pin,
 	.pin = mock_context_pin,
 	.unpin = mock_context_unpin,
-	.post_unpin = mock_context_post_unpin,
 
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,

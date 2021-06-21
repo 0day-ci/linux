@@ -2497,35 +2497,38 @@ static void execlists_submit_request(struct i915_request *request)
 }
 
 static int
-__execlists_context_pre_pin(struct intel_context *ce,
-			    struct intel_engine_cs *engine,
-			    struct i915_gem_ww_ctx *ww, void **vaddr)
+__execlists_context_pin(struct intel_context *ce,
+			struct intel_engine_cs *engine,
+			struct i915_gem_ww_ctx *ww)
 {
 	int err;
+	void *vaddr;
 
-	err = lrc_pre_pin(ce, engine, ww, vaddr);
+	err = lrc_pre_pin(ce, engine, ww, &vaddr);
 	if (err)
 		return err;
 
 	if (!__test_and_set_bit(CONTEXT_INIT_BIT, &ce->flags)) {
-		lrc_init_state(ce, engine, *vaddr);
+		lrc_init_state(ce, engine, vaddr);
 
 		 __i915_gem_object_flush_map(ce->state->obj, 0, engine->context_size);
 	}
 
-	return 0;
+	err = lrc_pin(ce, ce->engine, vaddr);
+	if (err)
+		lrc_post_unpin(ce);
+	return err;
 }
 
-static int execlists_context_pre_pin(struct intel_context *ce,
-				     struct i915_gem_ww_ctx *ww,
-				     void **vaddr)
+static int execlists_context_pin(struct intel_context *ce, struct i915_gem_ww_ctx *ww)
 {
-	return __execlists_context_pre_pin(ce, ce->engine, ww, vaddr);
+	return __execlists_context_pin(ce, ce->engine, ww);
 }
 
-static int execlists_context_pin(struct intel_context *ce, void *vaddr)
+static void execlists_context_unpin(struct intel_context *ce)
 {
-	return lrc_pin(ce, ce->engine, vaddr);
+	lrc_unpin(ce);
+	lrc_post_unpin(ce);
 }
 
 static int execlists_context_alloc(struct intel_context *ce)
@@ -2533,15 +2536,14 @@ static int execlists_context_alloc(struct intel_context *ce)
 	return lrc_alloc(ce, ce->engine);
 }
 
+
 static const struct intel_context_ops execlists_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
 	.alloc = execlists_context_alloc,
 
-	.pre_pin = execlists_context_pre_pin,
 	.pin = execlists_context_pin,
-	.unpin = lrc_unpin,
-	.post_unpin = lrc_post_unpin,
+	.unpin = execlists_context_unpin,
 
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,
@@ -3401,21 +3403,11 @@ static int virtual_context_alloc(struct intel_context *ce)
 	return lrc_alloc(ce, ve->siblings[0]);
 }
 
-static int virtual_context_pre_pin(struct intel_context *ce,
-				   struct i915_gem_ww_ctx *ww,
-				   void **vaddr)
+static int virtual_context_pin(struct intel_context *ce, struct i915_gem_ww_ctx *ww)
 {
 	struct virtual_engine *ve = container_of(ce, typeof(*ve), context);
 
-	 /* Note: we must use a real engine class for setting up reg state */
-	return __execlists_context_pre_pin(ce, ve->siblings[0], ww, vaddr);
-}
-
-static int virtual_context_pin(struct intel_context *ce, void *vaddr)
-{
-	struct virtual_engine *ve = container_of(ce, typeof(*ve), context);
-
-	return lrc_pin(ce, ve->siblings[0], vaddr);
+	return __execlists_context_pin(ce, ve->siblings[0], ww);
 }
 
 static void virtual_context_enter(struct intel_context *ce)
@@ -3445,10 +3437,8 @@ static const struct intel_context_ops virtual_context_ops = {
 
 	.alloc = virtual_context_alloc,
 
-	.pre_pin = virtual_context_pre_pin,
 	.pin = virtual_context_pin,
-	.unpin = lrc_unpin,
-	.post_unpin = lrc_post_unpin,
+	.unpin = execlists_context_unpin,
 
 	.enter = virtual_context_enter,
 	.exit = virtual_context_exit,
