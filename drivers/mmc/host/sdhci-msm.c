@@ -2465,6 +2465,13 @@ static inline void sdhci_msm_get_of_property(struct platform_device *pdev,
 }
 
 
+static int sdhci_msm_pre_probe(struct device *dev)
+{
+	dev->request_non_strict_iommu = true;
+
+	return 0;
+}
+
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -2811,6 +2818,7 @@ static struct platform_driver sdhci_msm_driver = {
 		   .of_match_table = sdhci_msm_dt_match,
 		   .pm = &sdhci_msm_pm_ops,
 		   .probe_type = PROBE_PREFER_ASYNCHRONOUS,
+		   .pre_probe = sdhci_msm_pre_probe,
 	},
 };
 
