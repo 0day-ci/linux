@@ -50,3 +50,7 @@ config DRM_RCAR_WRITEBACK
 	bool
 	default y if ARM64
 	depends on DRM_RCAR_DU
+
+config DRM_RCAR_DU_VDRM
+	tristate "Virtual DRM for R-Car DU"
+	depends on DRM_RCAR_DU && DRM_VDRM
