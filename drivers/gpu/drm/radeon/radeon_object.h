@@ -133,6 +133,9 @@ static inline u64 radeon_bo_mmap_offset(struct radeon_bo *bo)
 	return drm_vma_node_offset_addr(&bo->tbo.base.vma_node);
 }
 
+extern void radeon_update_memory_usage(struct radeon_bo *bo,
+				       unsigned int mem_type, int sign);
+
 extern int radeon_bo_create(struct radeon_device *rdev,
 			    unsigned long size, int byte_align,
 			    bool kernel, u32 domain, u32 flags,
@@ -160,9 +163,7 @@ extern void radeon_bo_get_tiling_flags(struct radeon_bo *bo,
 				u32 *tiling_flags, u32 *pitch);
 extern int radeon_bo_check_tiling(struct radeon_bo *bo, bool has_moved,
 				bool force_drop);
-extern void radeon_bo_move_notify(struct ttm_buffer_object *bo,
-				  bool evict,
-				  struct ttm_resource *new_mem);
+extern void radeon_bo_move_notify(struct radeon_bo *rbo);
 extern vm_fault_t radeon_bo_fault_reserve_notify(struct ttm_buffer_object *bo);
 extern int radeon_bo_get_surface_reg(struct radeon_bo *bo);
 extern void radeon_bo_fence(struct radeon_bo *bo, struct radeon_fence *fence,

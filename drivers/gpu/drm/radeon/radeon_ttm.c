@@ -199,7 +199,7 @@ static int radeon_bo_move(struct ttm_buffer_object *bo, bool evict,
 	struct ttm_resource *old_mem = bo->resource;
 	struct radeon_device *rdev;
 	struct radeon_bo *rbo;
-	int r;
+	int r, old_type;
 
 	if (new_mem->mem_type == TTM_PL_TT) {
 		r = radeon_ttm_tt_bind(bo->bdev, bo->ttm, new_mem);
@@ -215,6 +215,9 @@ static int radeon_bo_move(struct ttm_buffer_object *bo, bool evict,
 	rbo = container_of(bo, struct radeon_bo, tbo);
 	if (WARN_ON_ONCE(rbo->tbo.pin_count > 0))
 		return -EINVAL;
+
+	/* Save old type for statistics update */
+	old_type = old_mem->mem_type;
 
 	rdev = radeon_get_rdev(bo->bdev);
 	if (old_mem->mem_type == TTM_PL_SYSTEM && bo->ttm == NULL) {
@@ -261,7 +264,9 @@ static int radeon_bo_move(struct ttm_buffer_object *bo, bool evict,
 out:
 	/* update statistics */
 	atomic64_add(bo->base.size, &rdev->num_bytes_moved);
-	radeon_bo_move_notify(bo, evict, new_mem);
+	radeon_update_memory_usage(rbo, old_type, -1);
+	radeon_update_memory_usage(rbo, new_mem->mem_type, 1);
+	radeon_bo_move_notify(rbo);
 	return 0;
 }
 
@@ -682,7 +687,16 @@ bool radeon_ttm_tt_is_readonly(struct radeon_device *rdev,
 static void
 radeon_bo_delete_mem_notify(struct ttm_buffer_object *bo)
 {
-	radeon_bo_move_notify(bo, false, NULL);
+	struct radeon_bo *rbo;
+
+	if (!radeon_ttm_bo_is_radeon_bo(bo))
+		return;
+
+	rbo = container_of(bo, struct radeon_bo, tbo);
+
+	if (bo->resource)
+		radeon_update_memory_usage(rbo, bo->resource->mem_type, -1);
+	radeon_bo_move_notify(rbo);
 }
 
 static struct ttm_device_funcs radeon_bo_driver = {
