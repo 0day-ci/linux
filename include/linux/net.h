@@ -21,7 +21,7 @@
 #include <linux/rcupdate.h>
 #include <linux/once.h>
 #include <linux/fs.h>
-#include <linux/mm.h>
+#include <linux/page_ref.h>
 #include <linux/sockptr.h>
 
 #include <uapi/linux/net.h>
