@@ -3991,7 +3991,7 @@ out_delete:
 		zfree(&script.ptime_range);
 	}
 
-	evlist__free_stats(session->evlist);
+	evlist__delete(session->evlist);
 	perf_session__delete(session);
 
 	if (script_started)
