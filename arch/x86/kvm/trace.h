@@ -21,14 +21,17 @@ TRACE_EVENT(kvm_entry,
 	TP_STRUCT__entry(
 		__field(	unsigned int,	vcpu_id		)
 		__field(	unsigned long,	rip		)
+		__field(        bool,           guest_mode      )
 	),
 
 	TP_fast_assign(
 		__entry->vcpu_id        = vcpu->vcpu_id;
 		__entry->rip		= kvm_rip_read(vcpu);
+		__entry->guest_mode     = is_guest_mode(vcpu);
 	),
 
-	TP_printk("vcpu %u, rip 0x%lx", __entry->vcpu_id, __entry->rip)
+	TP_printk("vcpu %u, rip 0x%lx, guest_mode %d", __entry->vcpu_id,
+		  __entry->rip, __entry->guest_mode)
 );
 
 /*
@@ -285,6 +288,7 @@ TRACE_EVENT(name,							     \
 		__field(	u32,	        intr_info	)	     \
 		__field(	u32,	        error_code	)	     \
 		__field(	unsigned int,	vcpu_id         )	     \
+		__field(        bool,           guest_mode      )            \
 	),								     \
 									     \
 	TP_fast_assign(							     \
@@ -295,15 +299,17 @@ TRACE_EVENT(name,							     \
 		static_call(kvm_x86_get_exit_info)(vcpu, &__entry->info1,    \
 					  &__entry->info2,		     \
 					  &__entry->intr_info,		     \
-					  &__entry->error_code);	     \
+					  &__entry->error_code);     	     \
+		__entry->guest_mode      = is_guest_mode(vcpu);		     \
 	),								     \
 									     \
 	TP_printk("vcpu %u reason %s%s%s rip 0x%lx info1 0x%016llx "	     \
-		  "info2 0x%016llx intr_info 0x%08x error_code 0x%08x",	     \
-		  __entry->vcpu_id,					     \
+		  "info2 0x%016llx intr_info 0x%08x error_code 0x%08x "	     \
+		  "guest_mode = %d", __entry->vcpu_id,          	     \
 		  kvm_print_exit_reason(__entry->exit_reason, __entry->isa), \
 		  __entry->guest_rip, __entry->info1, __entry->info2,	     \
-		  __entry->intr_info, __entry->error_code)		     \
+		  __entry->intr_info, __entry->error_code,                   \
+		  __entry->guest_mode)               			     \
 )
 
 /*
