@@ -266,8 +266,7 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	 */
 	sdev->borken = 1;
 
-	sdev->request_queue = scsi_mq_alloc_queue(sdev);
-	if (!sdev->request_queue) {
+	if (!scsi_mq_alloc_queue(sdev)) {
 		/* release fn is set up in scsi_sysfs_device_initialise, so
 		 * have to free and put manually here */
 		put_device(&starget->dev);
@@ -275,7 +274,6 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 		goto out;
 	}
 	WARN_ON_ONCE(!blk_get_queue(sdev->request_queue));
-	sdev->request_queue->queuedata = sdev;
 
 	depth = sdev->host->cmd_per_lun ?: 1;
 
