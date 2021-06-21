@@ -924,6 +924,17 @@ static inline gfp_t sk_gfp_mask(const struct sock *sk, gfp_t gfp_mask)
 	return gfp_mask | (sk->sk_allocation & __GFP_MEMALLOC);
 }
 
+static inline void sk_allocation_push(struct sock *sk, gfp_t flag, gfp_t *old)
+{
+	*old = sk->sk_allocation;
+	sk->sk_allocation |= flag;
+}
+
+static inline void sk_allocation_pop(struct sock *sk, gfp_t old)
+{
+	sk->sk_allocation = old;
+}
+
 static inline void sk_acceptq_removed(struct sock *sk)
 {
 	WRITE_ONCE(sk->sk_ack_backlog, sk->sk_ack_backlog - 1);

@@ -1095,9 +1095,24 @@ alloc_new_skb:
 				alloclen += rt->dst.trailer_len;
 
 			if (transhdrlen) {
-				skb = sock_alloc_send_skb(sk,
-						alloclen + hh_len + 15,
+				size_t header_len = alloclen + hh_len + 15;
+				gfp_t sk_allocation;
+
+				if (header_len > PAGE_SIZE)
+					sk_allocation_push(sk, __GFP_NORETRY,
+							   &sk_allocation);
+				skb = sock_alloc_send_skb(sk, header_len,
 						(flags & MSG_DONTWAIT), &err);
+				if (header_len > PAGE_SIZE) {
+					BUILD_BUG_ON(MAX_HEADER >= PAGE_SIZE);
+
+					sk_allocation_pop(sk, sk_allocation);
+					if (unlikely(!skb) && !paged &&
+					    rt->dst.dev->features & NETIF_F_SG) {
+						paged = true;
+						goto alloc_new_skb;
+					}
+				}
 			} else {
 				skb = NULL;
 				if (refcount_read(&sk->sk_wmem_alloc) + wmem_alloc_delta <=
