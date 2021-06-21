@@ -147,7 +147,6 @@ static int dvb_usb_exit(struct dvb_usb_device *d)
 		d->props.priv_destroy(d);
 
 	kfree(d->priv);
-	kfree(d);
 	return 0;
 }
 
@@ -333,9 +332,10 @@ void dvb_usb_device_exit(struct usb_interface *intf)
 	char name[40];
 
 	usb_set_intfdata(intf, NULL);
-	if (d != NULL && d->desc != NULL) {
+	if (d && d->desc) {
 		strscpy(name, d->desc->name, sizeof(name));
 		dvb_usb_exit(d);
+		kfree(d);
 	} else {
 		strscpy(name, default_name, sizeof(name));
 	}
