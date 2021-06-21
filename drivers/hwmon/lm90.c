@@ -1028,6 +1028,9 @@ static int lm90_set_temp11(struct lm90_data *data, int index, long val)
 	struct reg *regp = &reg[index];
 	int err;
 
+	/* prevent integer underflow */
+	val = max(val, -128000l);
+
 	/* +16 degrees offset for temp2 for the LM99 */
 	if (data->kind == lm99 && index <= 2)
 		val -= 16000;
@@ -1088,6 +1091,9 @@ static int lm90_set_temp8(struct lm90_data *data, int index, long val)
 	struct i2c_client *client = data->client;
 	int err;
 
+	/* prevent integer underflow */
+	val = max(val, -128000l);
+
 	/* +16 degrees offset for temp2 for the LM99 */
 	if (data->kind == lm99 && index == 3)
 		val -= 16000;
@@ -1129,6 +1135,9 @@ static int lm90_set_temphyst(struct lm90_data *data, long val)
 	struct i2c_client *client = data->client;
 	int temp;
 	int err;
+
+	/* prevent integer underflow */
+	val = max(val, -128000l);
 
 	if (data->kind == adt7461 || data->kind == tmp451)
 		temp = temp_from_u8_adt7461(data, data->temp8[LOCAL_CRIT]);
