@@ -493,27 +493,38 @@ static irqreturn_t panfrost_job_irq_handler(int irq, void *data)
 
 		if (status & JOB_INT_MASK_ERR(j)) {
 			enum panfrost_queue_status old_status;
+			u32 js_status = job_read(pfdev, JS_STATUS(j));
 
 			job_write(pfdev, JS_COMMAND_NEXT(j), JS_COMMAND_NOP);
 
 			dev_err(pfdev->dev, "js fault, js=%d, status=%s, head=0x%x, tail=0x%x",
 				j,
-				panfrost_exception_name(job_read(pfdev, JS_STATUS(j))),
+				panfrost_exception_name(js_status),
 				job_read(pfdev, JS_HEAD_LO(j)),
 				job_read(pfdev, JS_TAIL_LO(j)));
 
-			/*
-			 * When the queue is being restarted we don't report
-			 * faults directly to avoid races between the timeout
-			 * and reset handlers. panfrost_scheduler_start() will
-			 * call drm_sched_fault() after the queue has been
-			 * started if status == FAULT_PENDING.
+			/* If we need a reset, signal it to the reset handler,
+			 * otherwise, update the fence error field and signal
+			 * the job fence.
 			 */
-			old_status = atomic_cmpxchg(&pfdev->js->queue[j].status,
-						    PANFROST_QUEUE_STATUS_STARTING,
-						    PANFROST_QUEUE_STATUS_FAULT_PENDING);
-			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE)
-				drm_sched_fault(&pfdev->js->queue[j].sched);
+			if (panfrost_exception_needs_reset(pfdev, js_status)) {
+				/*
+				 * When the queue is being restarted we don't report
+				 * faults directly to avoid races between the timeout
+				 * and reset handlers. panfrost_scheduler_start() will
+				 * call drm_sched_fault() after the queue has been
+				 * started if status == FAULT_PENDING.
+				 */
+				old_status = atomic_cmpxchg(&pfdev->js->queue[j].status,
+							    PANFROST_QUEUE_STATUS_STARTING,
+							    PANFROST_QUEUE_STATUS_FAULT_PENDING);
+				if (old_status == PANFROST_QUEUE_STATUS_ACTIVE)
+					drm_sched_fault(&pfdev->js->queue[j].sched);
+			} else {
+				dma_fence_set_error(pfdev->jobs[j]->done_fence,
+						    panfrost_exception_to_error(js_status));
+				status |= JOB_INT_MASK_DONE(j);
+			}
 		}
 
 		if (status & JOB_INT_MASK_DONE(j)) {
