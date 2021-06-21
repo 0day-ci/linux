@@ -17,6 +17,7 @@
 #include <linux/bitfield.h>
 #include <linux/cdev.h>
 #include <linux/delay.h>
+#include <linux/dfl.h>
 #include <linux/eventfd.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -52,32 +53,6 @@
 #define PORT_FEATURE_ID_UMSG		0x11
 #define PORT_FEATURE_ID_UINT		0x12
 #define PORT_FEATURE_ID_STP		0x13
-
-/*
- * Device Feature Header Register Set
- *
- * For FIUs, they all have DFH + GUID + NEXT_AFU as common header registers.
- * For AFUs, they have DFH + GUID as common header registers.
- * For private features, they only have DFH register as common header.
- */
-#define DFH			0x0
-#define GUID_L			0x8
-#define GUID_H			0x10
-#define NEXT_AFU		0x18
-
-#define DFH_SIZE		0x8
-
-/* Device Feature Header Register Bitfield */
-#define DFH_ID			GENMASK_ULL(11, 0)	/* Feature ID */
-#define DFH_ID_FIU_FME		0
-#define DFH_ID_FIU_PORT		1
-#define DFH_REVISION		GENMASK_ULL(15, 12)	/* Feature revision */
-#define DFH_NEXT_HDR_OFST	GENMASK_ULL(39, 16)	/* Offset to next DFH */
-#define DFH_EOL			BIT_ULL(40)		/* End of list */
-#define DFH_TYPE		GENMASK_ULL(63, 60)	/* Feature type */
-#define DFH_TYPE_AFU		1
-#define DFH_TYPE_PRIVATE	3
-#define DFH_TYPE_FIU		4
 
 /* Next AFU Register Bitfield */
 #define NEXT_AFU_NEXT_DFH_OFST	GENMASK_ULL(23, 0)	/* Offset to next AFU */
@@ -401,27 +376,6 @@ static inline
 struct device *dfl_fpga_pdata_to_parent(struct dfl_feature_platform_data *pdata)
 {
 	return pdata->dev->dev.parent->parent;
-}
-
-static inline bool dfl_feature_is_fme(void __iomem *base)
-{
-	u64 v = readq(base + DFH);
-
-	return (FIELD_GET(DFH_TYPE, v) == DFH_TYPE_FIU) &&
-		(FIELD_GET(DFH_ID, v) == DFH_ID_FIU_FME);
-}
-
-static inline bool dfl_feature_is_port(void __iomem *base)
-{
-	u64 v = readq(base + DFH);
-
-	return (FIELD_GET(DFH_TYPE, v) == DFH_TYPE_FIU) &&
-		(FIELD_GET(DFH_ID, v) == DFH_ID_FIU_PORT);
-}
-
-static inline u8 dfl_feature_revision(void __iomem *base)
-{
-	return (u8)FIELD_GET(DFH_REVISION, readq(base + DFH));
 }
 
 /**
