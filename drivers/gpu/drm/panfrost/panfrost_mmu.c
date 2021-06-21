@@ -661,7 +661,7 @@ static irqreturn_t panfrost_mmu_irq_handler_thread(int irq, void *data)
 		if ((status & mask) == BIT(as) && (exception_type & 0xF8) == 0xC0)
 			ret = panfrost_mmu_map_fault_addr(pfdev, as, addr);
 
-		if (ret)
+		if (ret) {
 			/* terminal fault, print info about the fault */
 			dev_err(pfdev->dev,
 				"Unhandled Page fault in AS%d at VA 0x%016llX\n"
@@ -678,6 +678,10 @@ static irqreturn_t panfrost_mmu_irq_handler_thread(int irq, void *data)
 				exception_type, panfrost_exception_name(exception_type),
 				access_type, access_type_name(pfdev, fault_status),
 				source_id);
+
+			/* Disable the MMU to stop jobs on this AS immediately */
+			panfrost_mmu_disable(pfdev, as);
+		}
 
 		status &= ~mask;
 
