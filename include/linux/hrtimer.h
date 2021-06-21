@@ -112,6 +112,7 @@ enum hrtimer_restart {
  * @is_soft:	Set if hrtimer will be expired in soft interrupt context.
  * @is_hard:	Set if hrtimer will be expired in hard interrupt context
  *		even on RT.
+ * @allow_suspend:	Set if hrtimer will suspend when CPU suspend
  *
  * The hrtimer structure must be initialized by hrtimer_init()
  */
@@ -124,6 +125,7 @@ struct hrtimer {
 	u8				is_rel;
 	u8				is_soft;
 	u8				is_hard;
+	u8				allow_suspend;
 };
 
 /**
