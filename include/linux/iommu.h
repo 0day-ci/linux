@@ -81,6 +81,8 @@ struct iommu_domain_geometry {
 
 struct iommu_domain {
 	unsigned type;
+	bool force_strict:1;
+	bool request_non_strict:1;
 	const struct iommu_ops *ops;
 	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
 	iommu_fault_handler_t handler;
