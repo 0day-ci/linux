@@ -442,8 +442,7 @@ static int qlge_set_mac_addr(struct qlge_adapter *qdev, int set)
 	status = qlge_sem_spinlock(qdev, SEM_MAC_ADDR_MASK);
 	if (status)
 		return status;
-	status = qlge_set_mac_addr_reg(qdev, (u8 *)addr,
-				       MAC_ADDR_TYPE_CAM_MAC,
+	status = qlge_set_mac_addr_reg(qdev, (u8 *)addr, MAC_ADDR_TYPE_CAM_MAC,
 				       qdev->func * MAX_CQ);
 	qlge_sem_unlock(qdev, SEM_MAC_ADDR_MASK);
 	if (status)
@@ -524,8 +523,8 @@ static int qlge_set_routing_reg(struct qlge_adapter *qdev, u32 index, u32 mask,
 		{
 			value = RT_IDX_DST_DFLT_Q | /* dest */
 				RT_IDX_TYPE_NICQ | /* type */
-				(RT_IDX_IP_CSUM_ERR_SLOT <<
-				RT_IDX_IDX_SHIFT); /* index */
+			(RT_IDX_IP_CSUM_ERR_SLOT
+			 << RT_IDX_IDX_SHIFT); /* index */
 			break;
 		}
 	case RT_IDX_TU_CSUM_ERR: /* Pass up TCP/UDP CSUM error frames. */
@@ -554,7 +553,8 @@ static int qlge_set_routing_reg(struct qlge_adapter *qdev, u32 index, u32 mask,
 		{
 			value = RT_IDX_DST_DFLT_Q |	/* dest */
 			    RT_IDX_TYPE_NICQ |	/* type */
-			    (RT_IDX_MCAST_MATCH_SLOT << RT_IDX_IDX_SHIFT);/* index */
+			(RT_IDX_MCAST_MATCH_SLOT
+			 << RT_IDX_IDX_SHIFT); /* index */
 			break;
 		}
 	case RT_IDX_RSS_MATCH:	/* Pass up matched RSS frames. */
@@ -648,15 +648,15 @@ static int qlge_read_flash_word(struct qlge_adapter *qdev, int offset, __le32 *d
 {
 	int status = 0;
 	/* wait for reg to come ready */
-	status = qlge_wait_reg_rdy(qdev,
-				   FLASH_ADDR, FLASH_ADDR_RDY, FLASH_ADDR_ERR);
+	status = qlge_wait_reg_rdy(qdev, FLASH_ADDR, FLASH_ADDR_RDY,
+				   FLASH_ADDR_ERR);
 	if (status)
 		goto exit;
 	/* set up for reg read */
 	qlge_write32(qdev, FLASH_ADDR, FLASH_ADDR_R | offset);
 	/* wait for reg to come ready */
-	status = qlge_wait_reg_rdy(qdev,
-				   FLASH_ADDR, FLASH_ADDR_RDY, FLASH_ADDR_ERR);
+	status = qlge_wait_reg_rdy(qdev, FLASH_ADDR, FLASH_ADDR_RDY,
+				   FLASH_ADDR_ERR);
 	if (status)
 		goto exit;
 	/* This data is stored on flash as an array of
@@ -792,8 +792,8 @@ static int qlge_write_xgmac_reg(struct qlge_adapter *qdev, u32 reg, u32 data)
 {
 	int status;
 	/* wait for reg to come ready */
-	status = qlge_wait_reg_rdy(qdev,
-				   XGMAC_ADDR, XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
+	status = qlge_wait_reg_rdy(qdev, XGMAC_ADDR, XGMAC_ADDR_RDY,
+				   XGMAC_ADDR_XME);
 	if (status)
 		return status;
 	/* write the data to the data reg */
@@ -811,15 +811,15 @@ int qlge_read_xgmac_reg(struct qlge_adapter *qdev, u32 reg, u32 *data)
 {
 	int status = 0;
 	/* wait for reg to come ready */
-	status = qlge_wait_reg_rdy(qdev,
-				   XGMAC_ADDR, XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
+	status = qlge_wait_reg_rdy(qdev, XGMAC_ADDR, XGMAC_ADDR_RDY,
+				   XGMAC_ADDR_XME);
 	if (status)
 		goto exit;
 	/* set up for reg read */
 	qlge_write32(qdev, XGMAC_ADDR, reg | XGMAC_ADDR_R);
 	/* wait for reg to come ready */
-	status = qlge_wait_reg_rdy(qdev,
-				   XGMAC_ADDR, XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
+	status = qlge_wait_reg_rdy(qdev, XGMAC_ADDR, XGMAC_ADDR_RDY,
+				   XGMAC_ADDR_XME);
 	if (status)
 		goto exit;
 	/* get the data */
@@ -1067,8 +1067,8 @@ static int qlge_refill_lb(struct qlge_rx_ring *rx_ring,
 
 	lbq_desc->p.pg_chunk = *master_chunk;
 	lbq_desc->dma_addr = rx_ring->chunk_dma_addr;
-	*lbq_desc->buf_ptr = cpu_to_le64(lbq_desc->dma_addr +
-					 lbq_desc->p.pg_chunk.offset);
+	*lbq_desc->buf_ptr =
+		cpu_to_le64(lbq_desc->dma_addr + lbq_desc->p.pg_chunk.offset);
 
 	/* Adjust the master page chunk for next
 	 * buffer get.
@@ -1233,7 +1233,8 @@ static void qlge_unmap_send(struct qlge_adapter *qdev,
  */
 static int qlge_map_send(struct qlge_adapter *qdev,
 			 struct qlge_ob_mac_iocb_req *mac_iocb_ptr,
-			 struct sk_buff *skb, struct qlge_tx_ring_desc *tx_ring_desc)
+			 struct sk_buff *skb,
+			 struct qlge_tx_ring_desc *tx_ring_desc)
 {
 	int len = skb_headlen(skb);
 	dma_addr_t map;
@@ -1295,7 +1296,8 @@ static int qlge_map_send(struct qlge_adapter *qdev,
 			 *      etc...
 			 */
 			/* Tack on the OAL in the eighth segment of IOCB. */
-			map = dma_map_single(&qdev->pdev->dev, &tx_ring_desc->oal,
+			map = dma_map_single(&qdev->pdev->dev,
+					     &tx_ring_desc->oal,
 					     sizeof(struct qlge_oal),
 					     DMA_TO_DEVICE);
 			err = dma_mapping_error(&qdev->pdev->dev, map);
@@ -1405,8 +1407,7 @@ static void qlge_update_mac_hdr_len(struct qlge_adapter *qdev,
 	if (ib_mac_rsp->flags2 & IB_MAC_IOCB_RSP_V) {
 		tags = (u16 *)page;
 		/* Look for stacked vlan tags in ethertype field */
-		if (tags[6] == ETH_P_8021Q &&
-		    tags[8] == ETH_P_8021Q)
+		if (tags[6] == ETH_P_8021Q && tags[8] == ETH_P_8021Q)
 			*len += 2 * VLAN_HLEN;
 		else
 			*len += VLAN_HLEN;
@@ -1442,8 +1443,7 @@ static void qlge_process_mac_rx_gro_page(struct qlge_adapter *qdev,
 	prefetch(lbq_desc->p.pg_chunk.va);
 	__skb_fill_page_desc(skb, skb_shinfo(skb)->nr_frags,
 			     lbq_desc->p.pg_chunk.page,
-			     lbq_desc->p.pg_chunk.offset,
-			     length);
+			     lbq_desc->p.pg_chunk.offset, length);
 
 	skb->len += length;
 	skb->data_len += length;
@@ -2264,8 +2264,8 @@ static int __qlge_vlan_rx_add_vid(struct qlge_adapter *qdev, u16 vid)
 	u32 enable_bit = MAC_ADDR_E;
 	int err;
 
-	err = qlge_set_mac_addr_reg(qdev, (u8 *)&enable_bit,
-				    MAC_ADDR_TYPE_VLAN, vid);
+	err = qlge_set_mac_addr_reg(qdev, (u8 *)&enable_bit, MAC_ADDR_TYPE_VLAN,
+				    vid);
 	if (err)
 		netif_err(qdev, ifup, qdev->ndev,
 			  "Failed to init vlan address.\n");
@@ -2295,8 +2295,8 @@ static int __qlge_vlan_rx_kill_vid(struct qlge_adapter *qdev, u16 vid)
 	u32 enable_bit = 0;
 	int err;
 
-	err = qlge_set_mac_addr_reg(qdev, (u8 *)&enable_bit,
-				    MAC_ADDR_TYPE_VLAN, vid);
+	err = qlge_set_mac_addr_reg(qdev, (u8 *)&enable_bit, MAC_ADDR_TYPE_VLAN,
+				    vid);
 	if (err)
 		netif_err(qdev, ifup, qdev->ndev,
 			  "Failed to clear vlan address.\n");
@@ -2400,8 +2400,8 @@ static irqreturn_t qlge_isr(int irq, void *dev_id)
 		netif_err(qdev, intr, qdev->ndev,
 			  "Got MPI processor interrupt.\n");
 		qlge_write32(qdev, INTR_MASK, (INTR_MASK_PI << 16));
-		queue_delayed_work_on(smp_processor_id(),
-				      qdev->workqueue, &qdev->mpi_work, 0);
+		queue_delayed_work_on(smp_processor_id(), qdev->workqueue,
+				      &qdev->mpi_work, 0);
 		work_done++;
 	}
 
@@ -2730,8 +2730,7 @@ static void qlge_free_sbq_buffers(struct qlge_adapter *qdev, struct qlge_rx_ring
 		}
 		if (sbq_desc->p.skb) {
 			dma_unmap_single(&qdev->pdev->dev, sbq_desc->dma_addr,
-					 QLGE_SMALL_BUF_MAP_SIZE,
-					 DMA_FROM_DEVICE);
+					 QLGE_SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
 			dev_kfree_skb(sbq_desc->p.skb);
 			sbq_desc->p.skb = NULL;
 		}
@@ -2828,9 +2827,8 @@ static void qlge_free_cq_resources(struct qlge_adapter *qdev,
 
 	/* Free the completion queue. */
 	if (cq->cq_base) {
-		dma_free_coherent(&qdev->pdev->dev,
-				  cq->cq_size,
-				  cq->cq_base, cq->cq_base_dma);
+		dma_free_coherent(&qdev->pdev->dev, cq->cq_size, cq->cq_base,
+				  cq->cq_base_dma);
 		cq->cq_base = NULL;
 	}
 }
@@ -3132,8 +3130,8 @@ static void qlge_enable_msix(struct qlge_adapter *qdev)
 		for (i = 0; i < qdev->intr_count; i++)
 			qdev->msi_x_entry[i].entry = i;
 
-		err = pci_enable_msix_range(qdev->pdev, qdev->msi_x_entry,
-					    1, qdev->intr_count);
+		err = pci_enable_msix_range(qdev->pdev, qdev->msi_x_entry, 1,
+					    qdev->intr_count);
 		if (err < 0) {
 			kfree(qdev->msi_x_entry);
 			qdev->msi_x_entry = NULL;
@@ -3513,8 +3511,8 @@ static int qlge_route_initialize(struct qlge_adapter *qdev)
 		}
 	}
 
-	status = qlge_set_routing_reg(qdev, RT_IDX_CAM_HIT_SLOT,
-				      RT_IDX_CAM_HIT, 1);
+	status = qlge_set_routing_reg(qdev, RT_IDX_CAM_HIT_SLOT, RT_IDX_CAM_HIT,
+				      1);
 	if (status)
 		netif_err(qdev, ifup, qdev->ndev,
 			  "Failed to init routing register for CAM packets.\n");
@@ -3717,8 +3715,8 @@ static void qlge_display_dev_info(struct net_device *ndev)
 		   qdev->chip_rev_id >> 4 & 0x0000000f,
 		   qdev->chip_rev_id >> 8 & 0x0000000f,
 		   qdev->chip_rev_id >> 12 & 0x0000000f);
-	netif_info(qdev, probe, qdev->ndev,
-		   "MAC address %pM\n", ndev->dev_addr);
+	netif_info(qdev, probe, qdev->ndev, "MAC address %pM\n",
+		   ndev->dev_addr);
 }
 
 static int qlge_wol(struct qlge_adapter *qdev)
@@ -4123,8 +4121,8 @@ static void qlge_set_multicast_list(struct net_device *ndev)
 	 */
 	if (ndev->flags & IFF_PROMISC) {
 		if (!test_bit(QL_PROMISCUOUS, &qdev->flags)) {
-			if (qlge_set_routing_reg
-			    (qdev, RT_IDX_PROMISCUOUS_SLOT, RT_IDX_VALID, 1)) {
+			if (qlge_set_routing_reg(qdev, RT_IDX_PROMISCUOUS_SLOT,
+						 RT_IDX_VALID, 1)) {
 				netif_err(qdev, hw, qdev->ndev,
 					  "Failed to set promiscuous mode.\n");
 			} else {
@@ -4133,8 +4131,8 @@ static void qlge_set_multicast_list(struct net_device *ndev)
 		}
 	} else {
 		if (test_bit(QL_PROMISCUOUS, &qdev->flags)) {
-			if (qlge_set_routing_reg
-			    (qdev, RT_IDX_PROMISCUOUS_SLOT, RT_IDX_VALID, 0)) {
+			if (qlge_set_routing_reg(qdev, RT_IDX_PROMISCUOUS_SLOT,
+						 RT_IDX_VALID, 0)) {
 				netif_err(qdev, hw, qdev->ndev,
 					  "Failed to clear promiscuous mode.\n");
 			} else {
@@ -4150,8 +4148,8 @@ static void qlge_set_multicast_list(struct net_device *ndev)
 	if ((ndev->flags & IFF_ALLMULTI) ||
 	    (netdev_mc_count(ndev) > MAX_MULTICAST_ENTRIES)) {
 		if (!test_bit(QL_ALLMULTI, &qdev->flags)) {
-			if (qlge_set_routing_reg
-			    (qdev, RT_IDX_ALLMULTI_SLOT, RT_IDX_MCAST, 1)) {
+			if (qlge_set_routing_reg(qdev, RT_IDX_ALLMULTI_SLOT,
+						 RT_IDX_MCAST, 1)) {
 				netif_err(qdev, hw, qdev->ndev,
 					  "Failed to set all-multi mode.\n");
 			} else {
@@ -4160,8 +4158,8 @@ static void qlge_set_multicast_list(struct net_device *ndev)
 		}
 	} else {
 		if (test_bit(QL_ALLMULTI, &qdev->flags)) {
-			if (qlge_set_routing_reg
-			    (qdev, RT_IDX_ALLMULTI_SLOT, RT_IDX_MCAST, 0)) {
+			if (qlge_set_routing_reg(qdev, RT_IDX_ALLMULTI_SLOT,
+						 RT_IDX_MCAST, 0)) {
 				netif_err(qdev, hw, qdev->ndev,
 					  "Failed to clear all-multi mode.\n");
 			} else {
@@ -4186,8 +4184,8 @@ static void qlge_set_multicast_list(struct net_device *ndev)
 			i++;
 		}
 		qlge_sem_unlock(qdev, SEM_MAC_ADDR_MASK);
-		if (qlge_set_routing_reg
-		    (qdev, RT_IDX_MCAST_MATCH_SLOT, RT_IDX_MCAST_MATCH, 1)) {
+		if (qlge_set_routing_reg(qdev, RT_IDX_MCAST_MATCH_SLOT,
+					 RT_IDX_MCAST_MATCH, 1)) {
 			netif_err(qdev, hw, qdev->ndev,
 				  "Failed to set multicast match mode.\n");
 		} else {
@@ -4462,8 +4460,8 @@ static int qlge_init_device(struct pci_dev *pdev, struct qlge_adapter *qdev,
 	/*
 	 * Set up the operating parameters.
 	 */
-	qdev->workqueue = alloc_ordered_workqueue("%s", WQ_MEM_RECLAIM,
-						  ndev->name);
+	qdev->workqueue =
+		alloc_ordered_workqueue("%s", WQ_MEM_RECLAIM, ndev->name);
 	if (!qdev->workqueue) {
 		err = -ENOMEM;
 		goto err_free_mpi_coredump;
@@ -4706,8 +4704,8 @@ static pci_ers_result_t qlge_io_error_detected(struct pci_dev *pdev,
 		pci_disable_device(pdev);
 		return PCI_ERS_RESULT_NEED_RESET;
 	case pci_channel_io_perm_failure:
-		dev_err(&pdev->dev,
-			"%s: pci_channel_io_perm_failure.\n", __func__);
+		dev_err(&pdev->dev, "%s: pci_channel_io_perm_failure.\n",
+			__func__);
 		del_timer_sync(&qdev->timer);
 		qlge_eeh_close(ndev);
 		set_bit(QL_EEH_FATAL, &qdev->flags);
