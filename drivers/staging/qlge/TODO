@@ -4,8 +4,6 @@
   ql_build_rx_skb(). That function is now used exclusively to handle packets
   that underwent header splitting but it still contains code to handle non
   split cases.
-* while in that area, using two 8k buffers to store one 9k frame is a poor
-  choice of buffer size.
 * in the "chain of large buffers" case, the driver uses an skb allocated with
   head room but only puts data in the frags.
 * rename "rx" queues to "completion" queues. Calling tx completion queues "rx
