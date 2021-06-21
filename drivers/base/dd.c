@@ -549,10 +549,16 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 re_probe:
 	dev->driver = drv;
 
+	if (drv->pre_probe) {
+		ret = drv->pre_probe(dev);
+		if (ret)
+			goto probe_failed_pre_dma;
+	}
+
 	/* If using pinctrl, bind pins now before probing */
 	ret = pinctrl_bind_pins(dev);
 	if (ret)
-		goto pinctrl_bind_failed;
+		goto probe_failed_pre_dma;
 
 	if (dev->bus->dma_configure) {
 		ret = dev->bus->dma_configure(dev);
@@ -639,7 +645,7 @@ probe_failed:
 	if (dev->bus)
 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
 					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
-pinctrl_bind_failed:
+probe_failed_pre_dma:
 	device_links_no_driver(dev);
 	devres_release_all(dev);
 	arch_teardown_dma_ops(dev);

@@ -57,6 +57,14 @@ enum probe_type {
  * @probe_type:	Type of the probe (synchronous or asynchronous) to use.
  * @of_match_table: The open firmware table.
  * @acpi_match_table: The ACPI match table.
+ * @pre_probe:	Called after a device has been bound to a driver but before
+ *		anything "automatic" (pinctrl, DMA, IOMMUs, ...) has been
+ *		setup. This is mostly a chance for the driver to do things
+ *		that might need to be run before any of those automatic
+ *		processes. The vast majority of devices don't need to
+ *		implement this. Note that there is no "post_remove" at the
+ *		moment. If you need to undo something that you did in
+ *		pre_probe() you can use devres.
  * @probe:	Called to query the existence of a specific device,
  *		whether this driver can work with it, and bind the driver
  *		to a specific device.
@@ -105,6 +113,7 @@ struct device_driver {
 	const struct of_device_id	*of_match_table;
 	const struct acpi_device_id	*acpi_match_table;
 
+	int (*pre_probe) (struct device *dev);
 	int (*probe) (struct device *dev);
 	void (*sync_state)(struct device *dev);
 	int (*remove) (struct device *dev);
