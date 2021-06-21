@@ -289,6 +289,7 @@ int bcmgenet_mii_probe(struct net_device *dev)
 	struct phy_device *phydev;
 	u32 phy_flags = 0;
 	int ret;
+	int i;
 
 	/* Communicate the integrated PHY revision */
 	if (priv->internal_phy)
@@ -301,8 +302,22 @@ int bcmgenet_mii_probe(struct net_device *dev)
 	priv->old_pause = -1;
 
 	if (dn) {
-		phydev = of_phy_connect(dev, priv->phy_dn, bcmgenet_mii_setup,
-					phy_flags, priv->phy_interface);
+		/* Try to connect the PHY on UniMAC DMIO bus up to 3 times.
+		 * Wait a while between each time for mdio-bcm-unimac module's
+		 * loading and probing.
+		 */
+		phydev = NULL;
+		for (i = 1; i < 4 && !phydev; i++) {
+			netdev_info(dev,
+				    "connect %s on UniMAC MDIO bus %d time",
+				    priv->phy_dn->full_name, i);
+			phydev = of_phy_connect(dev, priv->phy_dn,
+						bcmgenet_mii_setup,
+						phy_flags, priv->phy_interface);
+			if (!phydev && i < 3)
+				msleep(500);
+		}
+
 		if (!phydev) {
 			pr_err("could not attach to PHY\n");
 			return -ENODEV;
