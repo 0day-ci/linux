@@ -286,13 +286,15 @@ int dvb_usb_device_init(struct usb_interface *intf,
 
 	desc = dvb_usb_find_device(udev, &d->props, &cold);
 	if (!desc) {
-		deb_err("something went very wrong, device was not found in current device list - let's see what comes next.\n");
+		deb_err("something went very wrong,
+			 device was not found in current device list.\n");
 		ret = -ENODEV;
 		goto error;
 	}
 
 	if (cold) {
-		info("found a '%s' in cold state, will try to load a firmware", desc->name);
+		info("found a %s in cold state, will try to load a firmware",
+		     desc->name);
 		ret = dvb_usb_download_firmware(udev, props);
 		if (!props->no_reconnect || ret != 0)
 			goto error;
@@ -314,7 +316,7 @@ int dvb_usb_device_init(struct usb_interface *intf,
 	if (du)
 		*du = d;
 
-	info("%s successfully initialized and connected.", desc->name);
+	info("%s is successfully initialized and connected.", desc->name);
 	return 0;
 
  error:
