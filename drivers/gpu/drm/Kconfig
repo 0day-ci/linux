@@ -294,6 +294,13 @@ config DRM_VKMS
 
 	  If M is selected the module will be called vkms.
 
+config DRM_VDRM
+	tristate "Virtual DRM"
+	depends on DRM
+	help
+	  Virtual DRM splits the resources of an overlay plane into multiple
+	  virtual devices to allow each plane to be accessed by each process.
+
 source "drivers/gpu/drm/exynos/Kconfig"
 
 source "drivers/gpu/drm/rockchip/Kconfig"
