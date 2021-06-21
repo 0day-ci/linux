@@ -48,6 +48,21 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define CMA_IBOE_PACKET_LIFETIME 18
 #define CMA_PREFERRED_ROCE_GID_TYPE IB_GID_TYPE_ROCE_UDP_ENCAP
 
+static void set_bit_mb(unsigned long nr, unsigned long *flags)
+{
+	/* set_bit() does not imply a memory barrier */
+	smp_mb__before_atomic();
+	set_bit(nr, flags);
+	/* set_bit() does not imply a memory barrier */
+	smp_mb__after_atomic();
+}
+
+enum cm_id_priv_flag_bits {
+	TOS_SET,
+	TIMEOUT_SET,
+	MIN_RNR_TIMER_SET,
+};
+
 static const char * const cma_events[] = {
 	[RDMA_CM_EVENT_ADDR_RESOLVED]	 = "address resolved",
 	[RDMA_CM_EVENT_ADDR_ERROR]	 = "address error",
@@ -844,9 +859,6 @@ __rdma_create_id(struct net *net, rdma_cm_event_handler event_handler,
 	id_priv->id.event_handler = event_handler;
 	id_priv->id.ps = ps;
 	id_priv->id.qp_type = qp_type;
-	id_priv->tos_set = false;
-	id_priv->timeout_set = false;
-	id_priv->min_rnr_timer_set = false;
 	id_priv->gid_type = IB_GID_TYPE_IB;
 	spin_lock_init(&id_priv->lock);
 	mutex_init(&id_priv->qp_mutex);
@@ -1134,10 +1146,12 @@ int rdma_init_qp_attr(struct rdma_cm_id *id, struct ib_qp_attr *qp_attr,
 		ret = -ENOSYS;
 	}
 
-	if ((*qp_attr_mask & IB_QP_TIMEOUT) && id_priv->timeout_set)
+	if ((*qp_attr_mask & IB_QP_TIMEOUT) &&
+	    test_bit(TIMEOUT_SET, &id_priv->flags))
 		qp_attr->timeout = id_priv->timeout;
 
-	if ((*qp_attr_mask & IB_QP_MIN_RNR_TIMER) && id_priv->min_rnr_timer_set)
+	if ((*qp_attr_mask & IB_QP_MIN_RNR_TIMER) &&
+	    test_bit(MIN_RNR_TIMER_SET, &id_priv->flags))
 		qp_attr->min_rnr_timer = id_priv->min_rnr_timer;
 
 	return ret;
@@ -2472,7 +2486,7 @@ static int cma_iw_listen(struct rdma_id_private *id_priv, int backlog)
 		return PTR_ERR(id);
 
 	id->tos = id_priv->tos;
-	id->tos_set = id_priv->tos_set;
+	id->tos_set = test_bit(TOS_SET, &id_priv->flags);
 	id->afonly = id_priv->afonly;
 	id_priv->cm_id.iw = id;
 
@@ -2533,7 +2547,7 @@ static int cma_listen_on_dev(struct rdma_id_private *id_priv,
 	cma_id_get(id_priv);
 	dev_id_priv->internal_id = 1;
 	dev_id_priv->afonly = id_priv->afonly;
-	dev_id_priv->tos_set = id_priv->tos_set;
+	dev_id_priv->flags = id_priv->flags;
 	dev_id_priv->tos = id_priv->tos;
 
 	ret = rdma_listen(&dev_id_priv->id, id_priv->backlog);
@@ -2582,7 +2596,7 @@ void rdma_set_service_type(struct rdma_cm_id *id, int tos)
 
 	id_priv = container_of(id, struct rdma_id_private, id);
 	id_priv->tos = (u8) tos;
-	id_priv->tos_set = true;
+	set_bit_mb(TOS_SET, &id_priv->flags);
 }
 EXPORT_SYMBOL(rdma_set_service_type);
 
@@ -2610,7 +2624,7 @@ int rdma_set_ack_timeout(struct rdma_cm_id *id, u8 timeout)
 
 	id_priv = container_of(id, struct rdma_id_private, id);
 	id_priv->timeout = timeout;
-	id_priv->timeout_set = true;
+	set_bit_mb(TIMEOUT_SET, &id_priv->flags);
 
 	return 0;
 }
@@ -2647,7 +2661,7 @@ int rdma_set_min_rnr_timer(struct rdma_cm_id *id, u8 min_rnr_timer)
 
 	id_priv = container_of(id, struct rdma_id_private, id);
 	id_priv->min_rnr_timer = min_rnr_timer;
-	id_priv->min_rnr_timer_set = true;
+	set_bit_mb(MIN_RNR_TIMER_SET, &id_priv->flags);
 
 	return 0;
 }
@@ -3033,7 +3047,8 @@ static int cma_resolve_iboe_route(struct rdma_id_private *id_priv)
 
 	u8 default_roce_tos = id_priv->cma_dev->default_roce_tos[id_priv->id.port_num -
 					rdma_start_port(id_priv->cma_dev->device)];
-	u8 tos = id_priv->tos_set ? id_priv->tos : default_roce_tos;
+	u8 tos = test_bit(TOS_SET, &id_priv->flags) ?
+		id_priv->tos : default_roce_tos;
 
 
 	work = kzalloc(sizeof *work, GFP_KERNEL);
@@ -3081,7 +3096,8 @@ static int cma_resolve_iboe_route(struct rdma_id_private *id_priv)
 	 * PacketLifeTime = local ACK timeout/2
 	 * as a reasonable approximation for RoCE networks.
 	 */
-	route->path_rec->packet_life_time = id_priv->timeout_set ?
+	route->path_rec->packet_life_time =
+		test_bit(TIMEOUT_SET, &id_priv->flags) ?
 		id_priv->timeout - 1 : CMA_IBOE_PACKET_LIFETIME;
 
 	if (!route->path_rec->mtu) {
@@ -4107,7 +4123,7 @@ static int cma_connect_iw(struct rdma_id_private *id_priv,
 		return PTR_ERR(cm_id);
 
 	cm_id->tos = id_priv->tos;
-	cm_id->tos_set = id_priv->tos_set;
+	cm_id->tos_set = test_bit(TOS_SET, &id_priv->flags);
 	id_priv->cm_id.iw = cm_id;
 
 	memcpy(&cm_id->local_addr, cma_src_addr(id_priv),
