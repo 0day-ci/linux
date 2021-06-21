@@ -186,7 +186,7 @@ static const char qlge_gstrings_test[][ETH_GSTRING_LEN] = {
 static int qlge_update_ring_coalescing(struct qlge_adapter *qdev)
 {
 	int i, status = 0;
-	struct rx_ring *rx_ring;
+	struct qlge_rx_ring *rx_ring;
 	struct cqicb *cqicb;
 
 	if (!netif_running(qdev->ndev))
@@ -537,7 +537,7 @@ static int qlge_run_loopback_test(struct qlge_adapter *qdev)
 	int i;
 	netdev_tx_t rc;
 	struct sk_buff *skb;
-	unsigned int size = SMALL_BUF_MAP_SIZE;
+	unsigned int size = QLGE_SMALL_BUF_MAP_SIZE;
 
 	for (i = 0; i < 64; i++) {
 		skb = netdev_alloc_skb(qdev->ndev, size);

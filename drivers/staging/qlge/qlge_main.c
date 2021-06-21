@@ -964,7 +964,7 @@ static struct qlge_bq_desc *qlge_get_curr_buf(struct qlge_bq *bq)
 }
 
 static struct qlge_bq_desc *qlge_get_curr_lchunk(struct qlge_adapter *qdev,
-						 struct rx_ring *rx_ring)
+						 struct qlge_rx_ring *rx_ring)
 {
 	struct qlge_bq_desc *lbq_desc = qlge_get_curr_buf(&rx_ring->lbq);
 
@@ -982,7 +982,7 @@ static struct qlge_bq_desc *qlge_get_curr_lchunk(struct qlge_adapter *qdev,
 }
 
 /* Update an rx ring index. */
-static void qlge_update_cq(struct rx_ring *rx_ring)
+static void qlge_update_cq(struct qlge_rx_ring *rx_ring)
 {
 	rx_ring->cnsmr_idx++;
 	rx_ring->curr_entry++;
@@ -992,7 +992,7 @@ static void qlge_update_cq(struct rx_ring *rx_ring)
 	}
 }
 
-static void qlge_write_cq_idx(struct rx_ring *rx_ring)
+static void qlge_write_cq_idx(struct qlge_rx_ring *rx_ring)
 {
 	qlge_write_db_reg(rx_ring->cnsmr_idx, rx_ring->cnsmr_idx_db_reg);
 }
@@ -1003,7 +1003,7 @@ static const char * const bq_type_name[] = {
 };
 
 /* return 0 or negative error */
-static int qlge_refill_sb(struct rx_ring *rx_ring,
+static int qlge_refill_sb(struct qlge_rx_ring *rx_ring,
 			  struct qlge_bq_desc *sbq_desc, gfp_t gfp)
 {
 	struct qlge_adapter *qdev = rx_ring->qdev;
@@ -1016,13 +1016,13 @@ static int qlge_refill_sb(struct rx_ring *rx_ring,
 		     "ring %u sbq: getting new skb for index %d.\n",
 		     rx_ring->cq_id, sbq_desc->index);
 
-	skb = __netdev_alloc_skb(qdev->ndev, SMALL_BUFFER_SIZE, gfp);
+	skb = __netdev_alloc_skb(qdev->ndev, QLGE_SMALL_BUFFER_SIZE, gfp);
 	if (!skb)
 		return -ENOMEM;
 	skb_reserve(skb, QLGE_SB_PAD);
 
 	sbq_desc->dma_addr = dma_map_single(&qdev->pdev->dev, skb->data,
-					    SMALL_BUF_MAP_SIZE,
+					    QLGE_SMALL_BUF_MAP_SIZE,
 					    DMA_FROM_DEVICE);
 	if (dma_mapping_error(&qdev->pdev->dev, sbq_desc->dma_addr)) {
 		netif_err(qdev, ifup, qdev->ndev, "PCI mapping failed.\n");
@@ -1036,7 +1036,7 @@ static int qlge_refill_sb(struct rx_ring *rx_ring,
 }
 
 /* return 0 or negative error */
-static int qlge_refill_lb(struct rx_ring *rx_ring,
+static int qlge_refill_lb(struct qlge_rx_ring *rx_ring,
 			  struct qlge_bq_desc *lbq_desc, gfp_t gfp)
 {
 	struct qlge_adapter *qdev = rx_ring->qdev;
@@ -1086,7 +1086,7 @@ static int qlge_refill_lb(struct rx_ring *rx_ring,
 /* return 0 or negative error */
 static int qlge_refill_bq(struct qlge_bq *bq, gfp_t gfp)
 {
-	struct rx_ring *rx_ring = QLGE_BQ_CONTAINER(bq);
+	struct qlge_rx_ring *rx_ring = QLGE_BQ_CONTAINER(bq);
 	struct qlge_adapter *qdev = rx_ring->qdev;
 	struct qlge_bq_desc *bq_desc;
 	int refill_count;
@@ -1141,7 +1141,7 @@ static int qlge_refill_bq(struct qlge_bq *bq, gfp_t gfp)
 	return retval;
 }
 
-static void qlge_update_buffer_queues(struct rx_ring *rx_ring, gfp_t gfp,
+static void qlge_update_buffer_queues(struct qlge_rx_ring *rx_ring, gfp_t gfp,
 				      unsigned long delay)
 {
 	bool sbq_fail, lbq_fail;
@@ -1168,7 +1168,7 @@ static void qlge_update_buffer_queues(struct rx_ring *rx_ring, gfp_t gfp,
 
 static void qlge_slow_refill(struct work_struct *work)
 {
-	struct rx_ring *rx_ring = container_of(work, struct rx_ring,
+	struct qlge_rx_ring *rx_ring = container_of(work, struct qlge_rx_ring,
 					       refill_work.work);
 	struct napi_struct *napi = &rx_ring->napi;
 
@@ -1189,7 +1189,7 @@ static void qlge_slow_refill(struct work_struct *work)
  * fails at some stage, or from the interrupt when a tx completes.
  */
 static void qlge_unmap_send(struct qlge_adapter *qdev,
-			    struct tx_ring_desc *tx_ring_desc, int mapped)
+			    struct qlge_tx_ring_desc *tx_ring_desc, int mapped)
 {
 	int i;
 
@@ -1232,12 +1232,12 @@ static void qlge_unmap_send(struct qlge_adapter *qdev,
  */
 static int qlge_map_send(struct qlge_adapter *qdev,
 			 struct qlge_ob_mac_iocb_req *mac_iocb_ptr,
-			 struct sk_buff *skb, struct tx_ring_desc *tx_ring_desc)
+			 struct sk_buff *skb, struct qlge_tx_ring_desc *tx_ring_desc)
 {
 	int len = skb_headlen(skb);
 	dma_addr_t map;
 	int frag_idx, err, map_idx = 0;
-	struct tx_buf_desc *tbd = mac_iocb_ptr->tbd;
+	struct qlge_tx_buf_desc *tbd = mac_iocb_ptr->tbd;
 	int frag_cnt = skb_shinfo(skb)->nr_frags;
 
 	if (frag_cnt) {
@@ -1312,13 +1312,13 @@ static int qlge_map_send(struct qlge_adapter *qdev,
 			 * of our sglist (OAL).
 			 */
 			tbd->len =
-			    cpu_to_le32((sizeof(struct tx_buf_desc) *
+			    cpu_to_le32((sizeof(struct qlge_tx_buf_desc) *
 					 (frag_cnt - frag_idx)) | TX_DESC_C);
 			dma_unmap_addr_set(&tx_ring_desc->map[map_idx], mapaddr,
 					   map);
 			dma_unmap_len_set(&tx_ring_desc->map[map_idx], maplen,
 					  sizeof(struct qlge_oal));
-			tbd = (struct tx_buf_desc *)&tx_ring_desc->oal;
+			tbd = (struct qlge_tx_buf_desc *)&tx_ring_desc->oal;
 			map_idx++;
 		}
 
@@ -1358,7 +1358,7 @@ map_error:
 
 /* Categorizing receive firmware frame errors */
 static void qlge_categorize_rx_err(struct qlge_adapter *qdev, u8 rx_err,
-				   struct rx_ring *rx_ring)
+				   struct qlge_rx_ring *rx_ring)
 {
 	struct nic_stats *stats = &qdev->nic_stats;
 
@@ -1414,7 +1414,7 @@ static void qlge_update_mac_hdr_len(struct qlge_adapter *qdev,
 
 /* Process an inbound completion from an rx ring. */
 static void qlge_process_mac_rx_gro_page(struct qlge_adapter *qdev,
-					 struct rx_ring *rx_ring,
+					 struct qlge_rx_ring *rx_ring,
 					 struct qlge_ib_mac_iocb_rsp *ib_mac_rsp,
 					 u32 length, u16 vlan_id)
 {
@@ -1460,7 +1460,7 @@ static void qlge_process_mac_rx_gro_page(struct qlge_adapter *qdev,
 
 /* Process an inbound completion from an rx ring. */
 static void qlge_process_mac_rx_page(struct qlge_adapter *qdev,
-				     struct rx_ring *rx_ring,
+				     struct qlge_rx_ring *rx_ring,
 				     struct qlge_ib_mac_iocb_rsp *ib_mac_rsp,
 				     u32 length, u16 vlan_id)
 {
@@ -1471,7 +1471,7 @@ static void qlge_process_mac_rx_page(struct qlge_adapter *qdev,
 	struct napi_struct *napi = &rx_ring->napi;
 	size_t hlen = ETH_HLEN;
 
-	skb = napi_alloc_skb(&rx_ring->napi, SMALL_BUFFER_SIZE);
+	skb = napi_alloc_skb(&rx_ring->napi, QLGE_SMALL_BUFFER_SIZE);
 	if (!skb) {
 		rx_ring->rx_dropped++;
 		put_page(lbq_desc->p.pg_chunk.page);
@@ -1551,7 +1551,7 @@ err_out:
 
 /* Process an inbound completion from an rx ring. */
 static void qlge_process_mac_rx_skb(struct qlge_adapter *qdev,
-				    struct rx_ring *rx_ring,
+				    struct qlge_rx_ring *rx_ring,
 				    struct qlge_ib_mac_iocb_rsp *ib_mac_rsp,
 				    u32 length, u16 vlan_id)
 {
@@ -1569,7 +1569,7 @@ static void qlge_process_mac_rx_skb(struct qlge_adapter *qdev,
 	skb_reserve(new_skb, NET_IP_ALIGN);
 
 	dma_sync_single_for_cpu(&qdev->pdev->dev, sbq_desc->dma_addr,
-				SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
+				QLGE_SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
 
 	skb_put_data(new_skb, skb->data, length);
 
@@ -1671,7 +1671,7 @@ static void qlge_realign_skb(struct sk_buff *skb, int len)
  * future, but for not it works well.
  */
 static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
-					 struct rx_ring *rx_ring,
+					 struct qlge_rx_ring *rx_ring,
 					 struct qlge_ib_mac_iocb_rsp *ib_mac_rsp)
 {
 	u32 length = le32_to_cpu(ib_mac_rsp->data_len);
@@ -1692,7 +1692,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 		 */
 		sbq_desc = qlge_get_curr_buf(&rx_ring->sbq);
 		dma_unmap_single(&qdev->pdev->dev, sbq_desc->dma_addr,
-				 SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
+				 QLGE_SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
 		skb = sbq_desc->p.skb;
 		qlge_realign_skb(skb, hdr_len);
 		skb_put(skb, hdr_len);
@@ -1723,7 +1723,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 			sbq_desc = qlge_get_curr_buf(&rx_ring->sbq);
 			dma_sync_single_for_cpu(&qdev->pdev->dev,
 						sbq_desc->dma_addr,
-						SMALL_BUF_MAP_SIZE,
+						QLGE_SMALL_BUF_MAP_SIZE,
 						DMA_FROM_DEVICE);
 			skb_put_data(skb, sbq_desc->p.skb->data, length);
 		} else {
@@ -1735,7 +1735,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 			qlge_realign_skb(skb, length);
 			skb_put(skb, length);
 			dma_unmap_single(&qdev->pdev->dev, sbq_desc->dma_addr,
-					 SMALL_BUF_MAP_SIZE,
+					 QLGE_SMALL_BUF_MAP_SIZE,
 					 DMA_FROM_DEVICE);
 			sbq_desc->p.skb = NULL;
 		}
@@ -1765,7 +1765,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 			 * jumbo mtu on a non-TCP/UDP frame.
 			 */
 			lbq_desc = qlge_get_curr_lchunk(qdev, rx_ring);
-			skb = napi_alloc_skb(&rx_ring->napi, SMALL_BUFFER_SIZE);
+			skb = napi_alloc_skb(&rx_ring->napi, QLGE_SMALL_BUFFER_SIZE);
 			if (!skb) {
 				netif_printk(qdev, probe, KERN_DEBUG, qdev->ndev,
 					     "No skb available, drop the packet.\n");
@@ -1805,7 +1805,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 
 		sbq_desc = qlge_get_curr_buf(&rx_ring->sbq);
 		dma_unmap_single(&qdev->pdev->dev, sbq_desc->dma_addr,
-				 SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
+				 QLGE_SMALL_BUF_MAP_SIZE, DMA_FROM_DEVICE);
 		if (!(ib_mac_rsp->flags4 & IB_MAC_IOCB_RSP_HS)) {
 			/*
 			 * This is an non TCP/UDP IP frame, so
@@ -1848,7 +1848,7 @@ static struct sk_buff *qlge_build_rx_skb(struct qlge_adapter *qdev,
 
 /* Process an inbound completion from an rx ring. */
 static void qlge_process_mac_split_rx_intr(struct qlge_adapter *qdev,
-					   struct rx_ring *rx_ring,
+					   struct qlge_rx_ring *rx_ring,
 					   struct qlge_ib_mac_iocb_rsp *ib_mac_rsp,
 					   u16 vlan_id)
 {
@@ -1942,7 +1942,7 @@ static void qlge_process_mac_split_rx_intr(struct qlge_adapter *qdev,
 
 /* Process an inbound completion from an rx ring. */
 static unsigned long qlge_process_mac_rx_intr(struct qlge_adapter *qdev,
-					      struct rx_ring *rx_ring,
+					      struct qlge_rx_ring *rx_ring,
 					      struct qlge_ib_mac_iocb_rsp *ib_mac_rsp)
 {
 	u32 length = le32_to_cpu(ib_mac_rsp->data_len);
@@ -1993,8 +1993,8 @@ static unsigned long qlge_process_mac_rx_intr(struct qlge_adapter *qdev,
 static void qlge_process_mac_tx_intr(struct qlge_adapter *qdev,
 				     struct qlge_ob_mac_iocb_rsp *mac_rsp)
 {
-	struct tx_ring *tx_ring;
-	struct tx_ring_desc *tx_ring_desc;
+	struct qlge_tx_ring *tx_ring;
+	struct qlge_tx_ring_desc *tx_ring_desc;
 
 	tx_ring = &qdev->tx_ring[mac_rsp->txq_idx];
 	tx_ring_desc = &tx_ring->q[mac_rsp->tid];
@@ -2087,14 +2087,14 @@ static void qlge_process_chip_ae_intr(struct qlge_adapter *qdev,
 	}
 }
 
-static int qlge_clean_outbound_rx_ring(struct rx_ring *rx_ring)
+static int qlge_clean_outbound_rx_ring(struct qlge_rx_ring *rx_ring)
 {
 	struct qlge_adapter *qdev = rx_ring->qdev;
 	u32 prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
 	struct qlge_ob_mac_iocb_rsp *net_rsp = NULL;
 	int count = 0;
 
-	struct tx_ring *tx_ring;
+	struct qlge_tx_ring *tx_ring;
 	/* While there are entries in the completion queue. */
 	while (prod != rx_ring->cnsmr_idx) {
 		netif_printk(qdev, rx_status, KERN_DEBUG, qdev->ndev,
@@ -2133,7 +2133,7 @@ static int qlge_clean_outbound_rx_ring(struct rx_ring *rx_ring)
 	return count;
 }
 
-static int qlge_clean_inbound_rx_ring(struct rx_ring *rx_ring, int budget)
+static int qlge_clean_inbound_rx_ring(struct qlge_rx_ring *rx_ring, int budget)
 {
 	struct qlge_adapter *qdev = rx_ring->qdev;
 	u32 prod = qlge_read_sh_reg(rx_ring->prod_idx_sh_reg);
@@ -2178,9 +2178,9 @@ static int qlge_clean_inbound_rx_ring(struct rx_ring *rx_ring, int budget)
 
 static int qlge_napi_poll_msix(struct napi_struct *napi, int budget)
 {
-	struct rx_ring *rx_ring = container_of(napi, struct rx_ring, napi);
+	struct qlge_rx_ring *rx_ring = container_of(napi, struct qlge_rx_ring, napi);
 	struct qlge_adapter *qdev = rx_ring->qdev;
-	struct rx_ring *trx_ring;
+	struct qlge_rx_ring *trx_ring;
 	int i, work_done = 0;
 	struct intr_context *ctx = &qdev->intr_context[rx_ring->cq_id];
 
@@ -2368,7 +2368,7 @@ static void qlge_restore_vlan(struct qlge_adapter *qdev)
 /* MSI-X Multiple Vector Interrupt Handler for inbound completions. */
 static irqreturn_t qlge_msix_rx_isr(int irq, void *dev_id)
 {
-	struct rx_ring *rx_ring = dev_id;
+	struct qlge_rx_ring *rx_ring = dev_id;
 
 	napi_schedule(&rx_ring->napi);
 	return IRQ_HANDLED;
@@ -2381,7 +2381,7 @@ static irqreturn_t qlge_msix_rx_isr(int irq, void *dev_id)
  */
 static irqreturn_t qlge_isr(int irq, void *dev_id)
 {
-	struct rx_ring *rx_ring = dev_id;
+	struct qlge_rx_ring *rx_ring = dev_id;
 	struct qlge_adapter *qdev = rx_ring->qdev;
 	struct intr_context *intr_context = &qdev->intr_context[0];
 	u32 var;
@@ -2529,9 +2529,9 @@ static netdev_tx_t qlge_send(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct qlge_adapter *qdev = netdev_to_qdev(ndev);
 	struct qlge_ob_mac_iocb_req *mac_iocb_ptr;
-	struct tx_ring_desc *tx_ring_desc;
+	struct qlge_tx_ring_desc *tx_ring_desc;
 	int tso;
-	struct tx_ring *tx_ring;
+	struct qlge_tx_ring *tx_ring;
 	u32 tx_ring_idx = (u32)skb->queue_mapping;
 
 	tx_ring = &qdev->tx_ring[tx_ring_idx];
@@ -2654,9 +2654,9 @@ err_wqp_sh_area:
 	return -ENOMEM;
 }
 
-static void qlge_init_tx_ring(struct qlge_adapter *qdev, struct tx_ring *tx_ring)
+static void qlge_init_tx_ring(struct qlge_adapter *qdev, struct qlge_tx_ring *tx_ring)
 {
-	struct tx_ring_desc *tx_ring_desc;
+	struct qlge_tx_ring_desc *tx_ring_desc;
 	int i;
 	struct qlge_ob_mac_iocb_req *mac_iocb_ptr;
 
@@ -2673,7 +2673,7 @@ static void qlge_init_tx_ring(struct qlge_adapter *qdev, struct tx_ring *tx_ring
 }
 
 static void qlge_free_tx_resources(struct qlge_adapter *qdev,
-				   struct tx_ring *tx_ring)
+				   struct qlge_tx_ring *tx_ring)
 {
 	if (tx_ring->wq_base) {
 		dma_free_coherent(&qdev->pdev->dev, tx_ring->wq_size,
@@ -2685,7 +2685,7 @@ static void qlge_free_tx_resources(struct qlge_adapter *qdev,
 }
 
 static int qlge_alloc_tx_resources(struct qlge_adapter *qdev,
-				   struct tx_ring *tx_ring)
+				   struct qlge_tx_ring *tx_ring)
 {
 	tx_ring->wq_base =
 		dma_alloc_coherent(&qdev->pdev->dev, tx_ring->wq_size,
@@ -2696,7 +2696,7 @@ static int qlge_alloc_tx_resources(struct qlge_adapter *qdev,
 		goto pci_alloc_err;
 
 	tx_ring->q =
-		kmalloc_array(tx_ring->wq_len, sizeof(struct tx_ring_desc),
+		kmalloc_array(tx_ring->wq_len, sizeof(struct qlge_tx_ring_desc),
 			      GFP_KERNEL);
 	if (!tx_ring->q)
 		goto err;
@@ -2711,7 +2711,7 @@ pci_alloc_err:
 	return -ENOMEM;
 }
 
-static void qlge_free_lbq_buffers(struct qlge_adapter *qdev, struct rx_ring *rx_ring)
+static void qlge_free_lbq_buffers(struct qlge_adapter *qdev, struct qlge_rx_ring *rx_ring)
 {
 	struct qlge_bq *lbq = &rx_ring->lbq;
 	unsigned int last_offset;
@@ -2738,7 +2738,7 @@ static void qlge_free_lbq_buffers(struct qlge_adapter *qdev, struct rx_ring *rx_
 	}
 }
 
-static void qlge_free_sbq_buffers(struct qlge_adapter *qdev, struct rx_ring *rx_ring)
+static void qlge_free_sbq_buffers(struct qlge_adapter *qdev, struct qlge_rx_ring *rx_ring)
 {
 	int i;
 
@@ -2752,7 +2752,7 @@ static void qlge_free_sbq_buffers(struct qlge_adapter *qdev, struct rx_ring *rx_
 		}
 		if (sbq_desc->p.skb) {
 			dma_unmap_single(&qdev->pdev->dev, sbq_desc->dma_addr,
-					 SMALL_BUF_MAP_SIZE,
+					 QLGE_SMALL_BUF_MAP_SIZE,
 					 DMA_FROM_DEVICE);
 			dev_kfree_skb(sbq_desc->p.skb);
 			sbq_desc->p.skb = NULL;
@@ -2768,7 +2768,7 @@ static void qlge_free_rx_buffers(struct qlge_adapter *qdev)
 	int i;
 
 	for (i = 0; i < qdev->rx_ring_count; i++) {
-		struct rx_ring *rx_ring = &qdev->rx_ring[i];
+		struct qlge_rx_ring *rx_ring = &qdev->rx_ring[i];
 
 		if (rx_ring->lbq.queue)
 			qlge_free_lbq_buffers(qdev, rx_ring);
@@ -2788,7 +2788,7 @@ static void qlge_alloc_rx_buffers(struct qlge_adapter *qdev)
 
 static int qlge_init_bq(struct qlge_bq *bq)
 {
-	struct rx_ring *rx_ring = QLGE_BQ_CONTAINER(bq);
+	struct qlge_rx_ring *rx_ring = QLGE_BQ_CONTAINER(bq);
 	struct qlge_adapter *qdev = rx_ring->qdev;
 	struct qlge_bq_desc *bq_desc;
 	__le64 *buf_ptr;
@@ -2820,7 +2820,7 @@ static int qlge_init_bq(struct qlge_bq *bq)
 }
 
 static void qlge_free_rx_resources(struct qlge_adapter *qdev,
-				   struct rx_ring *rx_ring)
+				   struct qlge_rx_ring *rx_ring)
 {
 	/* Free the small buffer queue. */
 	if (rx_ring->sbq.base) {
@@ -2857,7 +2857,7 @@ static void qlge_free_rx_resources(struct qlge_adapter *qdev,
  * on the values in the parameter structure.
  */
 static int qlge_alloc_rx_resources(struct qlge_adapter *qdev,
-				   struct rx_ring *rx_ring)
+				   struct qlge_rx_ring *rx_ring)
 {
 	/*
 	 * Allocate the completion queue for this rx_ring.
@@ -2882,8 +2882,8 @@ static int qlge_alloc_rx_resources(struct qlge_adapter *qdev,
 
 static void qlge_tx_ring_clean(struct qlge_adapter *qdev)
 {
-	struct tx_ring *tx_ring;
-	struct tx_ring_desc *tx_ring_desc;
+	struct qlge_tx_ring *tx_ring;
+	struct qlge_tx_ring_desc *tx_ring_desc;
 	int i, j;
 
 	/*
@@ -2953,7 +2953,7 @@ err_mem:
  * The control block is defined as
  * "Completion Queue Initialization Control Block", or cqicb.
  */
-static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct rx_ring *rx_ring)
+static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct qlge_rx_ring *rx_ring)
 {
 	struct cqicb *cqicb = &rx_ring->cqicb;
 	void *shadow_reg = qdev->rx_ring_shadow_reg_area +
@@ -3040,7 +3040,7 @@ static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct rx_ring *rx_ring
 		} while (page_entries < MAX_DB_PAGES_PER_BQ(QLGE_BQ_LEN));
 		cqicb->sbq_addr =
 			cpu_to_le64(rx_ring->sbq.base_indirect_dma);
-		cqicb->sbq_buf_size = cpu_to_le16(SMALL_BUFFER_SIZE);
+		cqicb->sbq_buf_size = cpu_to_le16(QLGE_SMALL_BUFFER_SIZE);
 		cqicb->sbq_len = cpu_to_le16(QLGE_FIT16(QLGE_BQ_LEN));
 		rx_ring->sbq.next_to_use = 0;
 		rx_ring->sbq.next_to_clean = 0;
@@ -3066,7 +3066,7 @@ static int qlge_start_rx_ring(struct qlge_adapter *qdev, struct rx_ring *rx_ring
 	return err;
 }
 
-static int qlge_start_tx_ring(struct qlge_adapter *qdev, struct tx_ring *tx_ring)
+static int qlge_start_tx_ring(struct qlge_adapter *qdev, struct qlge_tx_ring *tx_ring)
 {
 	struct wqicb *wqicb = (struct wqicb *)tx_ring;
 	void __iomem *doorbell_area =
@@ -3921,8 +3921,8 @@ static void qlge_set_lb_size(struct qlge_adapter *qdev)
 static int qlge_configure_rings(struct qlge_adapter *qdev)
 {
 	int i;
-	struct rx_ring *rx_ring;
-	struct tx_ring *tx_ring;
+	struct qlge_rx_ring *rx_ring;
+	struct qlge_tx_ring *tx_ring;
 	int cpu_cnt = min_t(int, MAX_CPUS, num_online_cpus());
 
 	/* In a perfect world we have one RSS ring for each CPU
@@ -4087,8 +4087,8 @@ static struct net_device_stats *qlge_get_stats(struct net_device
 					       *ndev)
 {
 	struct qlge_adapter *qdev = netdev_to_qdev(ndev);
-	struct rx_ring *rx_ring = &qdev->rx_ring[0];
-	struct tx_ring *tx_ring = &qdev->tx_ring[0];
+	struct qlge_rx_ring *rx_ring = &qdev->rx_ring[0];
+	struct qlge_tx_ring *tx_ring = &qdev->tx_ring[0];
 	unsigned long pkts, mcast, dropped, errors, bytes;
 	int i;
 
@@ -4652,7 +4652,7 @@ netdev_tx_t qlge_lb_send(struct sk_buff *skb, struct net_device *ndev)
 	return qlge_send(skb, ndev);
 }
 
-int qlge_clean_lb_rx_ring(struct rx_ring *rx_ring, int budget)
+int qlge_clean_lb_rx_ring(struct qlge_rx_ring *rx_ring, int budget)
 {
 	return qlge_clean_inbound_rx_ring(rx_ring, budget);
 }

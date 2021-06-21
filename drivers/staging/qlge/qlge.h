@@ -869,17 +869,17 @@ enum {
 };
 
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-#define SMALL_BUFFER_SIZE 256
-#define SMALL_BUF_MAP_SIZE SMALL_BUFFER_SIZE
+#define QLGE_SMALL_BUFFER_SIZE 256
+#define QLGE_SMALL_BUF_MAP_SIZE QLGE_SMALL_BUFFER_SIZE
 #define SPLT_SETTING  FSC_DBRST_1024
 #define SPLT_LEN 0
 #define QLGE_SB_PAD 0
 #else
-#define SMALL_BUFFER_SIZE 512
-#define SMALL_BUF_MAP_SIZE (SMALL_BUFFER_SIZE / 2)
+#define QLGE_SMALL_BUFFER_SIZE 512
+#define QLGE_SMALL_BUF_MAP_SIZE (QLGE_SMALL_BUFFER_SIZE / 2)
 #define SPLT_SETTING  FSC_SH
 #define SPLT_LEN (SPLT_HDR_EP | \
-	min(SMALL_BUF_MAP_SIZE, 1023))
+	min(QLGE_SMALL_BUF_MAP_SIZE, 1023))
 #define QLGE_SB_PAD 32
 #endif
 
@@ -1063,7 +1063,7 @@ struct tx_doorbell_context {
 };
 
 /* DATA STRUCTURES SHARED WITH HARDWARE. */
-struct tx_buf_desc {
+struct qlge_tx_buf_desc {
 	__le64 addr;
 	__le32 len;
 #define TX_DESC_LEN_MASK	0x000fffff
@@ -1101,7 +1101,7 @@ struct qlge_ob_mac_iocb_req {
 	__le32 reserved3;
 	__le16 vlan_tci;
 	__le16 reserved4;
-	struct tx_buf_desc tbd[TX_DESC_PER_IOCB];
+	struct qlge_tx_buf_desc tbd[TX_DESC_PER_IOCB];
 } __packed;
 
 struct qlge_ob_mac_iocb_rsp {
@@ -1146,7 +1146,7 @@ struct qlge_ob_mac_tso_iocb_req {
 #define OB_MAC_TRANSPORT_HDR_SHIFT 6
 	__le16 vlan_tci;
 	__le16 mss;
-	struct tx_buf_desc tbd[TX_DESC_PER_IOCB];
+	struct qlge_tx_buf_desc tbd[TX_DESC_PER_IOCB];
 } __packed;
 
 struct qlge_ob_mac_tso_iocb_rsp {
@@ -1347,7 +1347,7 @@ struct ricb {
 /* SOFTWARE/DRIVER DATA STRUCTURES. */
 
 struct qlge_oal {
-	struct tx_buf_desc oal[TX_DESC_PER_OAL];
+	struct qlge_tx_buf_desc oal[TX_DESC_PER_OAL];
 };
 
 struct map_list {
@@ -1355,19 +1355,19 @@ struct map_list {
 	DEFINE_DMA_UNMAP_LEN(maplen);
 };
 
-struct tx_ring_desc {
+struct qlge_tx_ring_desc {
 	struct sk_buff *skb;
 	struct qlge_ob_mac_iocb_req *queue_entry;
 	u32 index;
 	struct qlge_oal oal;
 	struct map_list map[MAX_SKB_FRAGS + 2];
 	int map_cnt;
-	struct tx_ring_desc *next;
+	struct qlge_tx_ring_desc *next;
 };
 
 #define QL_TXQ_IDX(qdev, skb) (smp_processor_id() % (qdev->tx_ring_count))
 
-struct tx_ring {
+struct qlge_tx_ring {
 	/*
 	 * queue info.
 	 */
@@ -1384,7 +1384,7 @@ struct tx_ring {
 	u16 cq_id;		/* completion (rx) queue for tx completions */
 	u8 wq_id;		/* queue id for this entry */
 	u8 reserved1[3];
-	struct tx_ring_desc *q;	/* descriptor list for the queue */
+	struct qlge_tx_ring_desc *q;	/* descriptor list for the queue */
 	spinlock_t lock;
 	atomic_t tx_count;	/* counts down for every outstanding IO */
 	struct delayed_work tx_work;
@@ -1437,9 +1437,9 @@ struct qlge_bq {
 #define QLGE_BQ_CONTAINER(bq) \
 ({ \
 	typeof(bq) _bq = bq; \
-	(struct rx_ring *)((char *)_bq - (_bq->type == QLGE_SB ? \
-					  offsetof(struct rx_ring, sbq) : \
-					  offsetof(struct rx_ring, lbq))); \
+	(struct qlge_rx_ring *)((char *)_bq - (_bq->type == QLGE_SB ? \
+					  offsetof(struct qlge_rx_ring, sbq) : \
+					  offsetof(struct qlge_rx_ring, lbq))); \
 })
 
 /* Experience shows that the device ignores the low 4 bits of the tail index.
@@ -1456,7 +1456,7 @@ struct qlge_bq {
 		     (_bq)->next_to_clean); \
 })
 
-struct rx_ring {
+struct qlge_rx_ring {
 	struct cqicb cqicb;	/* The chip's completion queue init control block. */
 
 	/* Completion queue elements. */
@@ -2135,8 +2135,8 @@ struct qlge_adapter {
 	int ring_mem_size;
 	void *ring_mem;
 
-	struct rx_ring rx_ring[MAX_RX_RINGS];
-	struct tx_ring tx_ring[MAX_TX_RINGS];
+	struct qlge_rx_ring rx_ring[MAX_RX_RINGS];
+	struct qlge_tx_ring tx_ring[MAX_TX_RINGS];
 	unsigned int lbq_buf_order;
 	u32 lbq_buf_size;
 
@@ -2287,6 +2287,6 @@ void qlge_get_dump(struct qlge_adapter *qdev, void *buff);
 netdev_tx_t qlge_lb_send(struct sk_buff *skb, struct net_device *ndev);
 void qlge_check_lb_frame(struct qlge_adapter *qdev, struct sk_buff *skb);
 int qlge_own_firmware(struct qlge_adapter *qdev);
-int qlge_clean_lb_rx_ring(struct rx_ring *rx_ring, int budget);
+int qlge_clean_lb_rx_ring(struct qlge_rx_ring *rx_ring, int budget);
 
 #endif /* _QLGE_H_ */
