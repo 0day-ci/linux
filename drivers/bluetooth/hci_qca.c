@@ -84,6 +84,7 @@ enum qca_flags {
 enum qca_capabilities {
 	QCA_CAP_WIDEBAND_SPEECH = BIT(0),
 	QCA_CAP_VALID_LE_STATES = BIT(1),
+	QCA_CAP_NEEDS_BT_ENABLE = BIT(2),
 };
 
 /* HCI_IBS transmit side sleep protocol states */
@@ -203,6 +204,7 @@ struct qca_device_data {
 	struct qca_vreg *vregs;
 	size_t num_vregs;
 	uint32_t capabilities;
+	const char *name;
 };
 
 /*
@@ -220,6 +222,7 @@ struct qca_serdev {
 	u32 init_speed;
 	u32 oper_speed;
 	const char *firmware_name;
+	const char *name;
 };
 
 static int qca_regulator_enable(struct qca_serdev *qcadev);
@@ -251,6 +254,17 @@ static const char *qca_get_firmware_name(struct hci_uart *hu)
 		return qsd->firmware_name;
 	} else {
 		return NULL;
+	}
+}
+
+static const char *qca_soc_name(struct hci_uart *hu)
+{
+	if (hu->serdev) {
+		struct qca_serdev *qsd = serdev_device_get_drvdata(hu->serdev);
+
+		return qsd->name;
+	} else {
+		return "ROME";
 	}
 }
 
@@ -1623,14 +1637,16 @@ static int qca_regulator_init(struct hci_uart *hu)
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 		msleep(50);
 		gpiod_set_value_cansleep(qcadev->bt_en, 1);
-		msleep(50);
+		msleep(150);
 		if (qcadev->sw_ctrl) {
 			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
 			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
 		}
 	}
 
-	qca_set_speed(hu, QCA_INIT_SPEED);
+	if (qca_is_wcn399x(soc_type) ||
+	    qca_is_wcn6750(soc_type))
+		qca_set_speed(hu, QCA_INIT_SPEED);
 
 	if (qca_is_wcn399x(soc_type)) {
 		ret = qca_send_power_pulse(hu, true);
@@ -1650,7 +1666,9 @@ static int qca_regulator_init(struct hci_uart *hu)
 		return ret;
 	}
 
-	hci_uart_set_flow_control(hu, false);
+	if (qca_is_wcn399x(soc_type) ||
+	    qca_is_wcn6750(soc_type))
+		hci_uart_set_flow_control(hu, false);
 
 	return 0;
 }
@@ -1658,8 +1676,6 @@ static int qca_regulator_init(struct hci_uart *hu)
 static int qca_power_on(struct hci_dev *hdev)
 {
 	struct hci_uart *hu = hci_get_drvdata(hdev);
-	enum qca_btsoc_type soc_type = qca_soc_type(hu);
-	struct qca_serdev *qcadev;
 	struct qca_data *qca = hu->priv;
 	int ret = 0;
 
@@ -1669,17 +1685,7 @@ static int qca_power_on(struct hci_dev *hdev)
 	if (!hu->serdev)
 		return 0;
 
-	if (qca_is_wcn399x(soc_type) ||
-	    qca_is_wcn6750(soc_type)) {
-		ret = qca_regulator_init(hu);
-	} else {
-		qcadev = serdev_device_get_drvdata(hu->serdev);
-		if (qcadev->bt_en) {
-			gpiod_set_value_cansleep(qcadev->bt_en, 1);
-			/* Controller needs time to bootup. */
-			msleep(150);
-		}
-	}
+	ret = qca_regulator_init(hu);
 
 	clear_bit(QCA_BT_OFF, &qca->flags);
 	return ret;
@@ -1709,9 +1715,7 @@ static int qca_setup(struct hci_uart *hu)
 	 */
 	set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
 
-	bt_dev_info(hdev, "setting up %s",
-		qca_is_wcn399x(soc_type) ? "wcn399x" :
-		(soc_type == QCA_WCN6750) ? "wcn6750" : "ROME/QCA6390");
+	bt_dev_info(hdev, "setting up %s", qca_soc_name(hu));
 
 	qca->memdump_state = QCA_MEMDUMP_IDLE;
 
@@ -1822,6 +1826,7 @@ static const struct qca_device_data qca_soc_data_wcn3990 = {
 		{ "vddch0", 450000 },
 	},
 	.num_vregs = 4,
+	.name = "wcn3990",
 };
 
 static const struct qca_device_data qca_soc_data_wcn3991 = {
@@ -1834,6 +1839,7 @@ static const struct qca_device_data qca_soc_data_wcn3991 = {
 	},
 	.num_vregs = 4,
 	.capabilities = QCA_CAP_WIDEBAND_SPEECH | QCA_CAP_VALID_LE_STATES,
+	.name = "wcn3991",
 };
 
 static const struct qca_device_data qca_soc_data_wcn3998 = {
@@ -1845,11 +1851,14 @@ static const struct qca_device_data qca_soc_data_wcn3998 = {
 		{ "vddch0", 450000 },
 	},
 	.num_vregs = 4,
+	.name = "wcn3998",
 };
 
 static const struct qca_device_data qca_soc_data_qca6390 = {
 	.soc_type = QCA_QCA6390,
 	.num_vregs = 0,
+	.capabilities = QCA_CAP_NEEDS_BT_ENABLE,
+	.name = "qca6390",
 };
 
 static const struct qca_device_data qca_soc_data_wcn6750 = {
@@ -1866,12 +1875,15 @@ static const struct qca_device_data qca_soc_data_wcn6750 = {
 		{ "vddasd", 200 },
 	},
 	.num_vregs = 9,
-	.capabilities = QCA_CAP_WIDEBAND_SPEECH | QCA_CAP_VALID_LE_STATES,
+	.capabilities = QCA_CAP_WIDEBAND_SPEECH | QCA_CAP_VALID_LE_STATES | QCA_CAP_NEEDS_BT_ENABLE,
+	.name = "wcn6750",
 };
 
 static const struct qca_device_data qca_soc_data_default = {
 	.soc_type = QCA_ROME,
 	.num_vregs = 0,
+	.capabilities = QCA_CAP_NEEDS_BT_ENABLE,
+	.name = "ROME",
 };
 
 static void qca_power_shutdown(struct hci_uart *hu)
@@ -1903,7 +1915,7 @@ static void qca_power_shutdown(struct hci_uart *hu)
 		host_set_baudrate(hu, 2400);
 		qca_send_power_pulse(hu, false);
 		qca_regulator_disable(qcadev);
-	} else if (soc_type == QCA_WCN6750) {
+	} else if (qcadev->bt_en) {
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 		msleep(100);
 		qca_regulator_disable(qcadev);
@@ -1911,8 +1923,6 @@ static void qca_power_shutdown(struct hci_uart *hu)
 			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
 			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
 		}
-	} else if (qcadev->bt_en) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 	}
 
 	set_bit(QCA_BT_OFF, &qca->flags);
@@ -2034,71 +2044,51 @@ static int qca_serdev_probe(struct serdev_device *serdev)
 	if (!qcadev->oper_speed)
 		BT_DBG("UART will pick default operating speed");
 
-	if ((qca_is_wcn399x(data->soc_type) ||
-	     qca_is_wcn6750(data->soc_type))) {
-		qcadev->btsoc_type = data->soc_type;
+	qcadev->name = data->name;
+	qcadev->btsoc_type = data->soc_type;
 
-		err = qca_init_regulators(&serdev->dev, qcadev, data->vregs,
-					  data->num_vregs);
-		if (err) {
-			BT_ERR("Failed to init regulators:%d", err);
-			return err;
-		}
+	err = qca_init_regulators(&serdev->dev, qcadev, data->vregs,
+				  data->num_vregs);
+	if (err) {
+		BT_ERR("Failed to init regulators:%d", err);
+		return err;
+	}
 
-		qcadev->vregs_on = false;
+	qcadev->vregs_on = false;
 
-		qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
-					       GPIOD_OUT_LOW);
-		if (!qcadev->bt_en && data->soc_type == QCA_WCN6750) {
-			dev_err(&serdev->dev, "failed to acquire BT_EN gpio\n");
-			power_ctrl_enabled = false;
-		}
+	qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
+						GPIOD_OUT_LOW);
+	if (!qcadev->bt_en && (data->capabilities & QCA_CAP_NEEDS_BT_ENABLE)) {
+		dev_err(&serdev->dev, "failed to acquire BT_EN gpio\n");
+		power_ctrl_enabled = false;
+	}
 
-		qcadev->sw_ctrl = devm_gpiod_get_optional(&serdev->dev, "swctrl",
-					       GPIOD_IN);
-		if (!qcadev->sw_ctrl && data->soc_type == QCA_WCN6750)
-			dev_warn(&serdev->dev, "failed to acquire SW_CTRL gpio\n");
+	qcadev->sw_ctrl = devm_gpiod_get_optional(&serdev->dev, "swctrl",
+						  GPIOD_IN);
+	if (!qcadev->sw_ctrl && data->soc_type == QCA_WCN6750)
+		dev_warn(&serdev->dev, "failed to acquire SW_CTRL gpio\n");
 
-		qcadev->susclk = devm_clk_get_optional(&serdev->dev, NULL);
-		if (IS_ERR(qcadev->susclk)) {
-			dev_err(&serdev->dev, "failed to acquire clk\n");
-			return PTR_ERR(qcadev->susclk);
-		}
+	qcadev->susclk = devm_clk_get_optional(&serdev->dev, NULL);
+	if (IS_ERR(qcadev->susclk)) {
+		dev_err(&serdev->dev, "failed to acquire clk\n");
+		return PTR_ERR(qcadev->susclk);
+	}
 
-		err = hci_uart_register_device(&qcadev->serdev_hu, &qca_proto);
-		if (err) {
-			BT_ERR("wcn3990 serdev registration failed");
-			return err;
-		}
-	} else {
-		qcadev->btsoc_type = data->soc_type;
+	err = clk_set_rate(qcadev->susclk, SUSCLK_RATE_32KHZ);
+	if (err)
+		return err;
 
-		qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
-					       GPIOD_OUT_LOW);
-		if (!qcadev->bt_en) {
-			dev_warn(&serdev->dev, "failed to acquire enable gpio\n");
-			power_ctrl_enabled = false;
-		}
-
-		qcadev->susclk = devm_clk_get_optional(&serdev->dev, NULL);
-		if (IS_ERR(qcadev->susclk)) {
-			dev_warn(&serdev->dev, "failed to acquire clk\n");
-			return PTR_ERR(qcadev->susclk);
-		}
-		err = clk_set_rate(qcadev->susclk, SUSCLK_RATE_32KHZ);
-		if (err)
-			return err;
-
+	if (!qca_is_wcn399x(qcadev->btsoc_type) &&
+	    !qca_is_wcn6750(qcadev->btsoc_type)) {
 		err = clk_prepare_enable(qcadev->susclk);
 		if (err)
 			return err;
+	}
 
-		err = hci_uart_register_device(&qcadev->serdev_hu, &qca_proto);
-		if (err) {
-			BT_ERR("Rome serdev registration failed");
-			clk_disable_unprepare(qcadev->susclk);
-			return err;
-		}
+	err = hci_uart_register_device(&qcadev->serdev_hu, &qca_proto);
+	if (err) {
+		BT_ERR("%s serdev registration failed", qcadev->name);
+		return err;
 	}
 
 	hdev = qcadev->serdev_hu.hdev;
@@ -2127,11 +2117,11 @@ static void qca_serdev_remove(struct serdev_device *serdev)
 {
 	struct qca_serdev *qcadev = serdev_device_get_drvdata(serdev);
 
-	if ((qca_is_wcn399x(qcadev->btsoc_type) ||
-	     qca_is_wcn6750(qcadev->btsoc_type)) &&
-	     qcadev->vregs_on)
+	if (qcadev->vregs_on)
 		qca_power_shutdown(&qcadev->serdev_hu);
-	else if (qcadev->susclk)
+
+	if (!qca_is_wcn399x(qcadev->btsoc_type) &&
+	    !qca_is_wcn6750(qcadev->btsoc_type))
 		clk_disable_unprepare(qcadev->susclk);
 
 	hci_uart_unregister_device(&qcadev->serdev_hu);
