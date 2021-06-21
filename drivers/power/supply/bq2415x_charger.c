@@ -862,8 +862,6 @@ static void bq2415x_set_autotimer(struct bq2415x_device *bq, int state)
 		schedule_delayed_work(&bq->work, BQ2415X_TIMER_TIMEOUT * HZ);
 		bq2415x_exec_command(bq, BQ2415X_TIMER_RESET);
 		bq->timer_error = NULL;
-	} else {
-		cancel_delayed_work_sync(&bq->work);
 	}
 
 	mutex_unlock(&bq2415x_timer_mutex);
