@@ -29,6 +29,7 @@
 #include "rcar_du_kms.h"
 #include "rcar_du_of.h"
 #include "rcar_du_regs.h"
+#include "rcar_du_vdrm.h"
 
 /* -----------------------------------------------------------------------------
  * Device Information
@@ -552,6 +553,8 @@ static int rcar_du_remove(struct platform_device *pdev)
 	struct rcar_du_device *rcdu = platform_get_drvdata(pdev);
 	struct drm_device *ddev = &rcdu->ddev;
 
+	rcar_du_vdrms_fini(rcdu);
+
 	drm_dev_unregister(ddev);
 
 	drm_kms_helper_poll_fini(ddev);
@@ -584,6 +587,11 @@ static int rcar_du_probe(struct platform_device *pdev)
 	if (IS_ERR(rcdu->mmio))
 		return PTR_ERR(rcdu->mmio);
 
+	/* Initialize the vDRM device */
+	ret = rcar_du_vdrms_init(rcdu);
+	if (ret < 0)
+		return ret;
+
 	/* DRM/KMS objects */
 	ret = rcar_du_modeset_init(rcdu);
 	if (ret < 0) {
@@ -606,6 +614,11 @@ static int rcar_du_probe(struct platform_device *pdev)
 	DRM_INFO("Device %s probed\n", dev_name(&pdev->dev));
 
 	drm_fbdev_generic_setup(&rcdu->ddev, 32);
+
+	/* Register the vDRM device */
+	ret = rcar_du_vdrms_register(rcdu);
+	if (ret)
+		DRM_WARN("Setup virtual device failed.\n");
 
 	return 0;
 

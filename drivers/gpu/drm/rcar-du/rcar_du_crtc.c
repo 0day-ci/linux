@@ -32,6 +32,11 @@
 #include "rcar_du_vsp.h"
 #include "rcar_lvds.h"
 
+#include "rcar_du_vdrm.h"
+#ifdef CONFIG_DRM_RCAR_DU_VDRM
+#include "../vdrm/vdrm_api.h"
+#endif
+
 static u32 rcar_du_crtc_read(struct rcar_du_crtc *rcrtc, u32 reg)
 {
 	struct rcar_du_device *rcdu = rcrtc->dev;
@@ -1293,5 +1298,42 @@ int rcar_du_crtc_create(struct rcar_du_group *rgrp, unsigned int swindex,
 
 	rcar_du_crtc_crc_init(rcrtc);
 
+	INIT_LIST_HEAD(&rcrtc->vdrm_displays);
+	ret = rcar_du_vdrm_crtc_init(rcrtc, swindex);
+	if (ret < 0) {
+		dev_err(rcdu->dev,
+			"failed to initialize crtc %u for vDRM\n", swindex);
+		return ret;
+	}
+
 	return 0;
+}
+
+int rcar_du_crtc_add_vdrm_display(struct rcar_du_crtc *rcrtc,
+				  struct vdrm_display *vdisplay)
+{
+	struct rcar_du_vdrm_display *disp;
+
+	disp = kzalloc(sizeof(*disp), GFP_KERNEL);
+	if (!disp)
+		return -ENOMEM;
+
+	disp->display = vdisplay;
+	INIT_LIST_HEAD(&disp->head);
+	list_add_tail(&disp->head, &rcrtc->vdrm_displays);
+
+	return 0;
+}
+
+void rcar_du_crtc_remove_vdrm_displays(struct rcar_du_crtc *rcrtc)
+{
+	struct rcar_du_vdrm_display *disp, *tmp;
+
+	if (!rcrtc->dev)
+		return;
+
+	list_for_each_entry_safe(disp, tmp, &rcrtc->vdrm_displays, head) {
+		list_del(&disp->head);
+		kfree(disp);
+	}
 }
