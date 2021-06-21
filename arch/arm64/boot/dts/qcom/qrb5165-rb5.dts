@@ -20,6 +20,7 @@
 
 	aliases {
 		serial0 = &uart12;
+		serial1 = &uart6;
 		sdhc2 = &sdhc_2;
 	};
 
@@ -222,6 +223,28 @@
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
 		regulator-always-on;
+	};
+
+	qca6391: qca6391 {
+		compatible = "qcom,qca6390";
+
+		vddaon-supply = <&vreg_s6a_0p95>;
+		vddpmu-supply = <&vreg_s2f_0p95>;
+		vddrfa1-supply = <&vreg_s2f_0p95>;
+		vddrfa2-supply = <&vreg_s8c_1p3>;
+		vddrfa3-supply = <&vreg_s5a_1p9>;
+		vddpcie1-supply = <&vreg_s8c_1p3>;
+		vddpcie2-supply = <&vreg_s5a_1p9>;
+		vddio-supply = <&vreg_s4a_1p8>;
+	};
+
+	vreg_wlan: vreg-wlan {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg-wlan";
+
+		vin-supply = <&qca6391>;
+		gpio = <&tlmm 20 GPIO_ACTIVE_LOW>;
+		enable-active-high;
 	};
 };
 
@@ -668,6 +691,8 @@
 	wake-gpio = <&tlmm 81 GPIO_ACTIVE_HIGH>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pcie0_default_state>;
+
+	vddpe-3v3-supply = <&vreg_wlan>;
 };
 
 &pcie0_phy {
@@ -808,6 +833,26 @@
 		output-high;
 		input-disable;
 		power-source = <0>;
+	};
+};
+
+&qup_uart6_default {
+	ctsrx {
+		pins = "gpio16", "gpio19";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	rts {
+		pins = "gpio17";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	tx {
+		pins = "gpio18";
+		drive-strength = <2>;
+		bias-pull-up;
 	};
 };
 
@@ -1272,6 +1317,17 @@
 		pins = "gpio77";
 		function = "gpio";
 		bias-pull-up;
+	};
+};
+
+&uart6 {
+	status = "okay";
+	bluetooth {
+		compatible = "qcom,qca6390-bt";
+		vin-supply = <&qca6391>;
+		clocks = <&sleep_clk>;
+
+		enable-gpios = <&tlmm 21 GPIO_ACTIVE_HIGH>;
 	};
 };
 
