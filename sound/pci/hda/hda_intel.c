@@ -2385,7 +2385,7 @@ static void azx_shutdown(struct pci_dev *pci)
 		return;
 	chip = card->private_data;
 	if (chip && chip->running)
-		azx_stop_chip(chip);
+		__azx_runtime_suspend(chip);
 }
 
 /* PCI IDs */
