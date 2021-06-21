@@ -12,7 +12,6 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/vdpa.h>
-#include <linux/virtio.h>
 #include <linux/virtio_config.h>
 #include <linux/virtio_ring.h>
 #include <linux/virtio_pci.h>

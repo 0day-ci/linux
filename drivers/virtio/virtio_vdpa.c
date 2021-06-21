@@ -13,7 +13,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/uuid.h>
-#include <linux/virtio.h>
 #include <linux/vdpa.h>
 #include <linux/virtio_config.h>
 #include <linux/virtio_ring.h>
