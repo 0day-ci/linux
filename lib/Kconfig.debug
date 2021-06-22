@@ -61,6 +61,19 @@ config CONSOLE_LOGLEVEL_QUIET
 	  will be used as the loglevel. IOW passing "quiet" will be the
 	  equivalent of passing "loglevel=<CONSOLE_LOGLEVEL_QUIET>"
 
+config CONSOLE_LOGLEVEL_PANIC
+	int "panic console loglevel (1-15)"
+	range 0 15
+	default "15"
+	help
+	  loglevel to use in kernel panic or oopses.
+
+	  Usually in order to provide more debug information on console upon
+	  panic, one wants to see everything being printed (loglevel = 15).
+	  With an exception to setups with low baudrate on serial console,
+	  keeping this value high is a good choice.
+	  0 value is to keep the loglevel during panic/oops unchanged.
+
 config MESSAGE_LOGLEVEL_DEFAULT
 	int "Default message log level (1-7)"
 	range 1 7

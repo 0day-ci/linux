@@ -76,8 +76,8 @@ static inline void console_silent(void)
 
 static inline void console_verbose(void)
 {
-	if (console_loglevel)
-		console_loglevel = CONSOLE_LOGLEVEL_MOTORMOUTH;
+	if (console_loglevel && (CONFIG_CONSOLE_LOGLEVEL_PANIC > 0))
+		console_loglevel = CONFIG_CONSOLE_LOGLEVEL_PANIC;
 }
 
 /* strlen("ratelimit") + 1 */
