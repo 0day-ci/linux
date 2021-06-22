@@ -210,7 +210,7 @@ device and etc. Its driver module is always loaded first once the device is
 created by the system. This driver plays an infrastructural role in the
 driver architecture. It locates the DFLs in the device memory, handles them
 and related resources to common interfaces from DFL framework for enumeration.
-(Please refer to drivers/fpga/dfl.c for detailed enumeration APIs).
+(Please refer to drivers/fpga/dfl/dfl.c for detailed enumeration APIs).
 
 The FPGA Management Engine (FME) driver is a platform driver which is loaded
 automatically after FME platform device creation from the DFL device module. It
@@ -499,7 +499,7 @@ In some cases, we may need to add some new private features to existing FIUs
 framework, as each private feature will be parsed automatically and related
 mmio resources can be found under FIU platform device created by DFL framework.
 Developer only needs to provide a sub feature driver with matched feature id.
-FME Partial Reconfiguration Sub Feature driver (see drivers/fpga/dfl-fme-pr.c)
+FME Partial Reconfiguration Sub Feature driver (see drivers/fpga/dfl/dfl-fme-pr.c)
 could be a reference.
 
 Location of DFLs on a PCI Device
