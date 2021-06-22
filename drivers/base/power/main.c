@@ -35,11 +35,14 @@
 #include <linux/cpuidle.h>
 #include <linux/devfreq.h>
 #include <linux/timer.h>
+#include <linux/pci.h>
 
 #include "../base.h"
 #include "power.h"
 
 typedef int (*pm_callback_t)(struct device *);
+#define VIDEO_PCI_CLASS 0x030000
+#define VIDEO_PCI_CLASS_VALID 0xff0000
 
 #define list_for_each_entry_rcu_locked(pos, head, member) \
 	list_for_each_entry_rcu(pos, head, member, \
@@ -693,6 +696,40 @@ static void async_resume_noirq(void *data, async_cookie_t cookie)
 	put_device(dev);
 }
 
+/**
+ * dpm_resume_skip_display_devices - Skip to reusme the display devices.
+ * @dev: Device to handle.
+ * @state: PM transition of the system being carried out.
+ *
+ * Delete the display devices from the wake-up list during the "thaw".
+ */
+static int dpm_resume_skip_display_devices(struct device *dev, pm_message_t state)
+{
+	struct pci_dev *pci_test = to_pci_dev(dev);
+
+	if (state.event == PM_EVENT_THAW) {
+		/*
+		 * Filter out the display devices
+		 */
+		if ((pci_test && ((pci_test->class & VIDEO_PCI_CLASS_VALID) == VIDEO_PCI_CLASS)) ||
+			(dev->driver && dev->driver->name &&
+			strncmp(dev->driver->name, "video", 6) == 0)) {
+
+			pr_info("Skip the display devices during the thaw.");
+			/*
+			 * Remove the display devices from the resume stage
+			 */
+			list_del(&dev->power.entry);
+			/*
+			 * Remove the display devices from the power down stage
+			 */
+			list_del(&dev->kobj.entry);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void dpm_noirq_resume_devices(pm_message_t state)
 {
 	struct device *dev;
@@ -713,6 +750,10 @@ static void dpm_noirq_resume_devices(pm_message_t state)
 	while (!list_empty(&dpm_noirq_list)) {
 		dev = to_device(dpm_noirq_list.next);
 		get_device(dev);
+
+		if (dpm_resume_skip_display_devices(dev, state))
+			continue;
+
 		list_move_tail(&dev->power.entry, &dpm_late_early_list);
 		mutex_unlock(&dpm_list_mtx);
 
@@ -736,6 +777,8 @@ static void dpm_noirq_resume_devices(pm_message_t state)
 	dpm_show_time(starttime, state, 0, "noirq");
 	trace_suspend_resume(TPS("dpm_resume_noirq"), state.event, false);
 }
+
+
 
 /**
  * dpm_resume_noirq - Execute "noirq resume" callbacks for all devices.
