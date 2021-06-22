@@ -2340,8 +2340,7 @@ static void cs_le_create_conn(struct hci_dev *hdev, bdaddr_t *peer_addr,
 	 * address types 0x02 and 0x03 are used. These types need to be
 	 * converted back into either public address or random address type
 	 */
-	if (use_ll_privacy(hdev) &&
-	    hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION)) {
+	if (hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION)) {
 		switch (own_address_type) {
 		case ADDR_LE_DEV_PUBLIC_RESOLVED:
 			own_address_type = ADDR_LE_DEV_PUBLIC;
@@ -5201,9 +5200,7 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 	 * address types 0x02 and 0x03 are used. These types need to be
 	 * converted back into either public address or random address type
 	 */
-	if (use_ll_privacy(hdev) &&
-	    hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY) &&
-	    hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION)) {
+	if (hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION)) {
 		switch (conn->dst_type) {
 		case ADDR_LE_DEV_PUBLIC_RESOLVED:
 			conn->dst_type = ADDR_LE_DEV_PUBLIC;
@@ -5310,9 +5307,7 @@ static void hci_le_enh_conn_complete_evt(struct hci_dev *hdev,
 			     le16_to_cpu(ev->latency),
 			     le16_to_cpu(ev->supervision_timeout));
 
-	if (use_ll_privacy(hdev) &&
-	    hci_dev_test_flag(hdev, HCI_ENABLE_LL_PRIVACY) &&
-	    hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION))
+	if (hci_dev_test_flag(hdev, HCI_LL_RPA_RESOLUTION))
 		hci_req_disable_address_resolution(hdev);
 }
 
