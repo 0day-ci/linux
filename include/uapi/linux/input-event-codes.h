@@ -659,6 +659,33 @@
 /* Select an area of screen to be copied */
 #define KEY_SELECTIVE_SCREENSHOT	0x27a
 
+/* Toggle the focus in or out */
+#define KEY_FOCUSE_TOGGLE		0x27b
+
+/* Move between highlightable items */
+#define KEY_NEXT_HIGHLIGHT		0x27c
+#define KEY_PREVIOUS_HIGHLIGHT		0x27d
+
+/* Toggle Autopilot enagement */
+#define KEY_AUTOPILOT_ENGAGE_TOGGLE	0x27e
+
+/* Navigate Displays */
+#define KEY_NEXT_DISPLAY		0x27f
+#define KEY_PREVIOUS_DISPLAY		0x280
+
+/* Shortcut Keys */
+#define KEY_MARK_WAYPOINT		0x281
+#define KEY_SOS			0x282
+#define KEY_NAV_CHART			0x283
+#define KEY_FISHING_CHART		0x284
+#define KEY_SINGLE_RANGE_RADAR		0x285
+#define KEY_DUAL_RANGE_RADAR		0x286
+#define KEY_RADAR_OVERLAY		0x287
+#define KEY_TRADITIONAL_SONAR		0x288
+#define KEY_CLEARVU_SONAR		0x289
+#define KEY_SIDEVU_SONAR		0x28a
+#define KEY_NAV_INFO			0x28d
+
 /*
  * Some keyboards have keys which do not have a defined meaning, these keys
  * are intended to be programmed / bound to macros by the user. For most
