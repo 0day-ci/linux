@@ -358,6 +358,13 @@ static void intel_update_czclk(struct drm_i915_private *dev_priv)
 		dev_priv->czclk_freq);
 }
 
+static bool
+is_hdr_mode(const struct intel_crtc_state *crtc_state)
+{
+	return (crtc_state->active_planes & ~(icl_hdr_plane_mask() |
+		BIT(PLANE_CURSOR))) == 0;
+}
+
 /* WA Display #0827: Gen9:all */
 static void
 skl_wa_827(struct drm_i915_private *dev_priv, enum pipe pipe, bool enable)
@@ -381,6 +388,23 @@ icl_wa_scalerclkgating(struct drm_i915_private *dev_priv, enum pipe pipe,
 	else
 		intel_de_write(dev_priv, CLKGATE_DIS_PSL(pipe),
 		               intel_de_read(dev_priv, CLKGATE_DIS_PSL(pipe)) & ~DPFR_GATING_DIS);
+}
+
+/* Wa_1604331009:icl,jsl,ehl */
+	static void
+icl_wa_cursorclkgating(const struct intel_crtc_state *crtc_state)
+{
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+
+	if (is_hdr_mode(crtc_state) &&
+	    crtc_state->active_planes & BIT(PLANE_CURSOR) &&
+	    IS_GEN(dev_priv, 11))
+		intel_de_rmw(dev_priv, CLKGATE_DIS_PSL(crtc->pipe),
+			     CURSOR_GATING_DIS, CURSOR_GATING_DIS);
+	else
+		intel_de_rmw(dev_priv, CLKGATE_DIS_PSL(crtc->pipe),
+			     CURSOR_GATING_DIS, 0);
 }
 
 static bool
@@ -2938,6 +2962,9 @@ static void intel_pre_plane_update(struct intel_atomic_state *state,
 	if (!needs_scalerclk_wa(old_crtc_state) &&
 	    needs_scalerclk_wa(new_crtc_state))
 		icl_wa_scalerclkgating(dev_priv, pipe, true);
+
+	/* Wa_1604331009:icl,jsl,ehl */
+	icl_wa_cursorclkgating(new_crtc_state);
 
 	/*
 	 * Vblank time updates from the shadow to live plane control register

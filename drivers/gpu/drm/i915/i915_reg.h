@@ -4236,6 +4236,11 @@ enum {
 #define   CGPSF_CLKGATE_DIS		(1 << 3)
 
 /*
+ * GEN11 clock gating regs
+ */
+#define   CURSOR_GATING_DIS            BIT(28)
+
+/*
  * Display engine regs
  */
 
