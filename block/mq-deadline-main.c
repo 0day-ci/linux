@@ -639,7 +639,6 @@ static int dd_init_sched(struct request_queue *q, struct elevator_type *e)
 	if (ret)
 		goto free_stats;
 
-	ret = 0;
 	q->elevator = eq;
 	return 0;
 
