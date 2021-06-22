@@ -24,6 +24,8 @@
 	 * cpu3 <-/		// DPCM
 	 * cpu4 <==> codec3	// Multi (*1)
 	 * cpu5 <==> codec4	// Multi (*1)
+	 *       /=> codec5	// Codec2Codec
+	 *       \=> codec6	// Codec2Codec
 	 */
 	card2 {
 		/*
@@ -37,11 +39,14 @@
 		routing = "TC DAI2 Playback", "DAI2 Playback",
 			  "TC DAI2 Playback", "DAI3 Playback",
 			  "DAI2 Capture", "TC DAI2 Capture",
-			  "DAI3 Capture", "TC DAI2 Capture";
+			  "DAI3 Capture", "TC DAI2 Capture",
+			  "TC OUT" ,"TC DAI6 Playback",
+			  "TC DAI5 Capture", "TC IN";
 
 		links = <&cpu0 &cpu1			/* normal: cpu side only  */
 			 &mix_fe0 &mix_fe1 &mix_be0	/* dsp   : both fe/be     */
 			 &multi_cpu			/* multi : cpu side only  */
+			 &c2c				/* c2c   : first one only */
 		>;
 	};
 
@@ -73,6 +78,16 @@
 		multi_codec: ports@1 {
 			port@0 { multi_10_ep: endpoint { remote-endpoint = <&codec3_ep>; }; };
 			port@1 { multi_11_ep: endpoint { remote-endpoint = <&codec4_ep>; }; };
+		};
+	};
+
+	codec2codec {
+		compatible = "audio-graph-card2-codec2codec";
+
+		rate = <48000>;
+		ports@1 {
+			c2c: port@0 { c2c_0_ep: endpoint { remote-endpoint = <&codec5_ep>; }; };
+			     port@1 { c2c_1_ep: endpoint { remote-endpoint = <&codec6_ep>; }; };
 		};
 	};
 
@@ -118,6 +133,8 @@
 			port@2 { codec2_ep: endpoint { remote-endpoint = <&mix_be0_ep>; }; };
 			port@3 { codec3_ep: endpoint { remote-endpoint = <&multi_10_ep>; }; };
 			port@4 { codec4_ep: endpoint { remote-endpoint = <&multi_11_ep>; }; };
+			port@5 { codec5_ep: endpoint { remote-endpoint = <&c2c_0_ep>; }; };
+			port@6 { codec6_ep: endpoint { remote-endpoint = <&c2c_1_ep>; }; };
 		};
 	};
 };
