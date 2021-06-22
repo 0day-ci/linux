@@ -38,4 +38,13 @@ struct cgroup *cgroup__find(struct perf_env *env, uint64_t id);
 
 void perf_env__purge_cgroups(struct perf_env *env);
 
+#ifdef HAVE_FILE_HANDLE
+int read_cgroup_id(struct cgroup *cgrp);
+#else
+int read_cgroup_id(struct cgroup *cgrp)
+{
+	return -1;
+}
+#endif  /* HAVE_FILE_HANDLE */
+
 #endif /* __CGROUP_H__ */
