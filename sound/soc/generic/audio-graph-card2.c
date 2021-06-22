@@ -134,14 +134,66 @@
 		...
 	};
  };
+
+
+ ************************************
+	Multi-CPU/Codec
+ ************************************
+
+<- multi_CPU  ->
+	  <-- multi_Codec -->
+	  ******
+CPU1 <--> *    * <--> Codec1
+CPU2 <--> *    * <--> Codec2
+	  ******
+ *NOTE*
+	N cpus to M codecs is not yet supported
+	at ASoC framework for now.
+
+ sound {
+	compatible = "audio-graph-card2";
+
+	links = <&multi>;
+ };
+
+ multi_CPU_CODEC {
+	compatible = "audio-graph-card2-multi";
+
+	multi: ports@0 {
+		port@0 { mcpu1_ep: endpoint { remote-endpoint = <&cpu1_ep>; }; };
+		port@1 { mcpu2_ep: endpoint { remote-endpoint = <&cpu2_ep>; }; };
+	};
+	ports@1 {
+		port@0 { mcodec1_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
+		port@1 { mcodec2_ep: endpoint { remote-endpoint = <&codec2_ep>; }; };
+	};
+};
+
+ CPU {
+	ports {
+		bitclock-master;
+		frame-master;
+		port@0 { cpu1_ep: endpoint { remote-endpoint = <&mcpu1_ep>; }; };
+		port@1 { cpu2_ep: endpoint { remote-endpoint = <&mcpu2_ep>; }; };
+	};
+ };
+
+ Codec {
+	ports {
+		port@0 { codec1_ep: endpoint { remote-endpoint = <&mcodec1_ep>; }; };
+		port@1 { codec2_ep: endpoint { remote-endpoint = <&mcodec2_ep>; }; };
+	};
+ };
 */
 
 enum graph_type {
 	GRAPH_NORMAL,
 	GRAPH_DPCM,
+	GRAPH_MULTI,
 };
 
 #define GRAPH_COMPATIBLE_DPCM	"audio-graph-card2-dsp"
+#define GRAPH_COMPATIBLE_MULTI	"audio-graph-card2-multi"
 
 #define port_to_endpoint(port) of_get_child_by_name(port, "endpoint")
 
@@ -166,6 +218,8 @@ static enum graph_type graph_get_type(struct asoc_simple_priv *priv,
 
 	if (strcmp(string, GRAPH_COMPATIBLE_DPCM) == 0)
 		type = GRAPH_DPCM;
+	else if (strcmp(string, GRAPH_COMPATIBLE_MULTI) == 0)
+		type = GRAPH_MULTI;
 end:
 #ifdef DEBUG
 	{
@@ -178,6 +232,9 @@ end:
 				str = "DPCM Front-End";
 			else
 				str = "DPCM Back-End";
+			break;
+		case GRAPH_MULTI:
+			str = "MULTI";
 			break;
 		default:
 			break;
@@ -649,6 +706,78 @@ err:
 }
 EXPORT_SYMBOL_GPL(audio_graph2_link_dpcm);
 
+int audio_graph2_link_multi(struct asoc_simple_priv *priv,
+			    struct device_node *lnk,
+			    struct link_info *li)
+{
+	struct snd_soc_dai_link *dai_link = simple_priv_to_link(priv, li->link);
+	struct device_node *top = of_get_parent(lnk);
+	struct device_node *first_rep = NULL;
+	struct device_node *ports = lnk;
+	struct device_node *port;
+	char dai_name[64];
+	int is_cpu = 1;
+	int i;
+
+	/*
+	 *	top: MULTI {
+	 *		compatible = "audio-graph-card2-multi";
+	 *
+	 *		// CPU
+	 * loop-0	ports@0 {
+	 *			port@0 { ep: endpoint { remote-endpoint = <&r_ep>; }; };
+	 *			...
+	 *		};
+	 *		// Codec
+	 * loop-1	ports@1 {
+	 *			...
+	 *		};
+	 *	};
+	 */
+ports_loop:
+	i = 0;
+	for_each_port_of_node(ports, port) {
+		struct device_node *ep = port_to_endpoint(port);
+		struct device_node *rep = of_graph_get_remote_endpoint(ep);
+		int ret, is_single_links = 0;
+
+		if (!first_rep)
+			first_rep = rep;
+
+		ret = graph_parse_node(priv, rep, li, i,
+				       is_cpu ? &is_single_links : NULL);
+
+		of_node_put(ep);
+		of_node_put(rep);
+
+		if (ret < 0)
+			return ret;
+
+		if (is_cpu) {
+			struct snd_soc_dai_link_component *cpus = asoc_link_to_cpu(dai_link, i);
+
+			asoc_simple_canonicalize_cpu(cpus, is_single_links);
+		}
+
+		i++;
+	}
+
+	/*
+	 * 1st turn was for CPU   ports (is_cpu = 1)
+	 * 2nd turn  is for Codec ports (is_cpu = 0)
+	 */
+	is_cpu--;
+	if (is_cpu == 0) {
+		ports = of_get_next_child(top, ports);
+		goto ports_loop;
+	}
+
+	snprintf(dai_name, sizeof(dai_name), "multi-%pOFP", top);
+
+	return graph_link_init(priv, first_rep, li, 1, dai_name);
+}
+EXPORT_SYMBOL_GPL(audio_graph2_link_multi);
+
 static int graph_link(struct asoc_simple_priv *priv,
 		      struct graph_custom_hooks *hooks,
 		      enum graph_type gtype,
@@ -671,6 +800,12 @@ static int graph_link(struct asoc_simple_priv *priv,
 			func = hooks->custom_dpcm;
 		else
 			func = audio_graph2_link_dpcm;
+		break;
+	case GRAPH_MULTI:
+		if (hooks && hooks->custom_multi)
+			func = hooks->custom_multi;
+		else
+			func = audio_graph2_link_multi;
 		break;
 	}
 
@@ -734,6 +869,41 @@ static int graph_count_dsp(struct asoc_simple_priv *priv,
 	return 0;
 }
 
+static int graph_count_multi(struct asoc_simple_priv *priv,
+			     struct device_node *lnk,
+			     struct link_info *li)
+{
+	struct device_node *top = of_get_parent(lnk);
+	struct device_node *cpu_ports = lnk;
+	struct device_node *codec_ports = of_get_next_child(top, cpu_ports);
+
+	of_node_get(cpu_ports); /* for vs of_get_next_child() */
+
+	/*
+	 *	MULTI {
+	 *		compatible = "audio-graph-card2-multi";
+	 *
+	 *		// CPU
+	 * =>		lnk: ports@0 {
+	 *			port@0 { endpoint { ... }; };
+	 *			...
+	 *		};
+	 *		// Codec
+	 *		ports@1 {
+	 *			port@0 { endpoint { ... }; };
+	 *			...
+	 *		};
+	 *	};
+	 */
+	li->num[li->link].cpus		= of_graph_get_port_count(cpu_ports);
+	li->num[li->link].codecs	= of_graph_get_port_count(codec_ports);
+
+	of_node_put(top);
+	of_node_put(codec_ports);
+
+	return 0;
+}
+
 static int graph_count(struct asoc_simple_priv *priv,
 		       struct graph_custom_hooks *hooks,
 		       enum graph_type gtype,
@@ -755,6 +925,9 @@ static int graph_count(struct asoc_simple_priv *priv,
 		break;
 	case GRAPH_DPCM:
 		func = graph_count_dsp;
+		break;
+	case GRAPH_MULTI:
+		func = graph_count_multi;
 		break;
 	}
 
