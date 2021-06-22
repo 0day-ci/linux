@@ -1283,7 +1283,7 @@ static int mirror_end_io(struct dm_target *ti, struct bio *bio,
 
 			dm_bio_restore(bd, bio);
 			bio_record->details.bi_bdev = NULL;
-			bio->bi_status = 0;
+			bio->bi_status = BLK_STS_OK;
 
 			queue_bio(ms, bio, rw);
 			return DM_ENDIO_INCOMPLETE;

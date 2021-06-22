@@ -684,7 +684,7 @@ static void hydration_init(struct dm_clone_region_hydration *hd, unsigned long r
 	hd->region_nr = region_nr;
 	hd->overwrite_bio = NULL;
 	bio_list_init(&hd->deferred_bios);
-	hd->status = 0;
+	hd->status = BLK_STS_OK;
 
 	INIT_LIST_HEAD(&hd->list);
 	INIT_HLIST_NODE(&hd->h);

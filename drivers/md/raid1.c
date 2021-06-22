@@ -2081,7 +2081,7 @@ static int fix_sync_read_error(struct r1bio *r1_bio)
 		idx ++;
 	}
 	set_bit(R1BIO_Uptodate, &r1_bio->state);
-	bio->bi_status = 0;
+	bio->bi_status = BLK_STS_OK;
 	return 1;
 }
 
@@ -2144,7 +2144,7 @@ static void process_checks(struct r1bio *r1_bio)
 		if (sbio->bi_end_io != end_sync_read)
 			continue;
 		/* Now we can 'fixup' the error value */
-		sbio->bi_status = 0;
+		sbio->bi_status = BLK_STS_OK;
 
 		bio_for_each_segment_all(bi, sbio, iter_all)
 			page_len[j++] = bi->bv_len;

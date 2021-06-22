@@ -3797,7 +3797,7 @@ static sector_t raid10_sync_request(struct mddev *mddev, sector_t sector_nr,
 
 		if (bio->bi_end_io == end_sync_read) {
 			md_sync_acct_bio(bio, nr_sectors);
-			bio->bi_status = 0;
+			bio->bi_status = BLK_STS_OK;
 			submit_bio_noacct(bio);
 		}
 	}

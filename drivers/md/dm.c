@@ -526,7 +526,7 @@ static struct dm_io *alloc_io(struct mapped_device *md, struct bio *bio)
 
 	io = container_of(tio, struct dm_io, tio);
 	io->magic = DM_IO_MAGIC;
-	io->status = 0;
+	io->status = BLK_STS_OK;
 	atomic_set(&io->io_count, 1);
 	io->orig_bio = bio;
 	io->md = md;

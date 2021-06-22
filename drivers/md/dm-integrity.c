@@ -1848,7 +1848,7 @@ static int dm_integrity_map(struct dm_target *ti, struct bio *bio)
 	sector_t area, offset;
 
 	dio->ic = ic;
-	dio->bi_status = 0;
+	dio->bi_status = BLK_STS_OK;
 	dio->op = bio_op(bio);
 
 	if (unlikely(dio->op == REQ_OP_DISCARD)) {

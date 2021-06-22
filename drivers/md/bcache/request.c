@@ -790,7 +790,7 @@ static void cached_dev_read_error(struct closure *cl)
 		/* Retry from the backing device: */
 		trace_bcache_read_retry(s->orig_bio);
 
-		s->iop.status = 0;
+		s->iop.status = BLK_STS_OK;
 		do_bio_hook(s, s->orig_bio, backing_request_endio);
 
 		/* XXX: invalidate cache */
