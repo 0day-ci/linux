@@ -98,6 +98,12 @@ static void nested_svm_init_mmu_context(struct kvm_vcpu *vcpu)
 	WARN_ON(mmu_is_nested(vcpu));
 
 	vcpu->arch.mmu = &vcpu->arch.guest_mmu;
+
+	/*
+	 * L1's CR4 and EFER are stuffed into vmcb01 by the caller.  Note, when
+	 * called via KVM_SET_NESTED_STATE, that state may _not_ match current
+	 * vCPU state.  CR0.WP is explicitly ignored, while CR0.PG is required.
+	 */
 	kvm_init_shadow_npt_mmu(vcpu, X86_CR0_PG, svm->vmcb01.ptr->save.cr4,
 				svm->vmcb01.ptr->save.efer,
 				svm->nested.ctl.nested_cr3);
