@@ -393,7 +393,7 @@
 &pinctrl {
 	pins_lcd: lcd {
 		function = "lcd";
-		groups = "lcd-24bit";
+		groups = "lcd-8bit", "lcd-16bit", "lcd-18bit", "lcd-24bit";
 	};
 
 	pins_uart2: uart2 {
