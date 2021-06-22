@@ -19,6 +19,7 @@ struct graph_custom_hooks {
 	GRAPH_CUSTOM custom_normal;
 	GRAPH_CUSTOM custom_dpcm;
 	GRAPH_CUSTOM custom_multi;
+	GRAPH_CUSTOM custom_c2c;
 };
 
 int audio_graph_parse_of(struct asoc_simple_priv *priv, struct device *dev);
@@ -31,5 +32,7 @@ int audio_graph2_link_dpcm(struct asoc_simple_priv *priv,
 			   struct device_node *lnk, struct link_info *li);
 int audio_graph2_link_multi(struct asoc_simple_priv *priv,
 			    struct device_node *lnk, struct link_info *li);
+int audio_graph2_link_c2c(struct asoc_simple_priv *priv,
+			  struct device_node *lnk, struct link_info *li);
 
 #endif /* __GRAPH_CARD_H */

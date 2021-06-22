@@ -184,16 +184,58 @@ CPU2 <--> *    * <--> Codec2
 		port@1 { codec2_ep: endpoint { remote-endpoint = <&mcodec2_ep>; }; };
 	};
  };
+
+
+ ************************************
+	Codec to Codec
+ ************************************
+
+ +--+
+ |  |<-- Codec0
+ |  |--> Codec1
+ +--+
+
+ sound {
+	compatible = "audio-graph-card2";
+
+	routing = "OUT" ,"DAI1 Playback",
+		  "DAI0 Capture", "IN";
+
+	links = <&codec2codec>;
+ };
+
+ CODEC2CODEC {
+	compatible = "audio-graph-card2-codec2codec";
+
+	rate = <48000>;
+	ports {
+		codec2codec: port@0 { fe_ep: endpoint { remote-endpoint = <&codec0_ep>; }; };
+			     port@1 { be_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
+	};
+ };
+
+ Codec {
+	ports {
+		port@0 {
+			bitclock-master;
+			frame-master;
+			 codec0_ep: endpoint { remote-endpoint = <&fe_ep>; }; };
+		port@1 { codec1_ep: endpoint { remote-endpoint = <&be_ep>; }; };
+	};
+ };
+
 */
 
 enum graph_type {
 	GRAPH_NORMAL,
 	GRAPH_DPCM,
 	GRAPH_MULTI,
+	GRAPH_C2C,
 };
 
 #define GRAPH_COMPATIBLE_DPCM	"audio-graph-card2-dsp"
 #define GRAPH_COMPATIBLE_MULTI	"audio-graph-card2-multi"
+#define GRAPH_COMPATIBLE_C2C	"audio-graph-card2-codec2codec"
 
 #define port_to_endpoint(port) of_get_child_by_name(port, "endpoint")
 
@@ -220,6 +262,8 @@ static enum graph_type graph_get_type(struct asoc_simple_priv *priv,
 		type = GRAPH_DPCM;
 	else if (strcmp(string, GRAPH_COMPATIBLE_MULTI) == 0)
 		type = GRAPH_MULTI;
+	else if (strcmp(string, GRAPH_COMPATIBLE_C2C) == 0)
+		type = GRAPH_C2C;
 end:
 #ifdef DEBUG
 	{
@@ -235,6 +279,9 @@ end:
 			break;
 		case GRAPH_MULTI:
 			str = "MULTI";
+			break;
+		case GRAPH_C2C:
+			str = "Codec2Codec";
 			break;
 		default:
 			break;
@@ -778,6 +825,93 @@ ports_loop:
 }
 EXPORT_SYMBOL_GPL(audio_graph2_link_multi);
 
+int audio_graph2_link_c2c(struct asoc_simple_priv *priv,
+			  struct device_node *lnk,
+			  struct link_info *li)
+{
+	struct snd_soc_dai_link *dai_link = simple_priv_to_link(priv, li->link);
+	struct simple_dai_props *dai_props = simple_priv_to_props(priv, li->link);
+	struct snd_soc_pcm_stream *c2c_conf = dai_props->c2c_conf;
+	struct device_node *port  = lnk;
+	struct device_node *ports = of_get_parent(port);
+	struct device_node *top = of_get_parent(ports);
+	struct device_node *ep;
+	struct device_node *rep;
+	struct device_node *first_rep = NULL;
+	char dai_name[64];
+	u32 val;
+	int is_cpu;
+	int ret = -EINVAL;
+
+	/*
+	 *	top: CODEC2CODEC {
+	 *		compatible = "audio-graph-card2-codec2codec";
+	 *
+	 *		rate = <48000>;
+	 *		ports {
+	 * =>			lnk: port@0 { ep: endpoint { remote-endpoint = <&rep>; }; };
+	 *			     port@1 { ... };
+	 *		};
+	 *	};
+	 */
+	if (!of_get_property(top, "rate", &val)) {
+		struct device *dev = simple_priv_to_dev(priv);
+
+		dev_err(dev, "unknown codec2codec rate\n");
+		goto err;
+	}
+
+	c2c_conf->formats	= SNDRV_PCM_FMTBIT_S32_LE; /* update ME */
+	c2c_conf->rate_min	=
+	c2c_conf->rate_max	= val;
+	c2c_conf->channels_min	=
+	c2c_conf->channels_max	= 2; /* update ME */
+	dai_link->params	= c2c_conf;
+
+	of_node_get(lnk);
+	for (is_cpu = 1; is_cpu >= 0; is_cpu--) {
+		int is_single_links = 0;
+
+		ep  = port_to_endpoint(port);
+		rep = of_graph_get_remote_endpoint(ep);
+
+		if (!first_rep)
+			first_rep = rep;
+
+		ret = graph_parse_node(priv, rep, li, 0,
+				       is_cpu ? &is_single_links : NULL);
+		if (ret < 0)
+			goto err;
+
+		of_node_put(ep);
+		of_node_put(rep);
+
+		/*
+		 * 1st turn was for CPU   part of Codec (is_cpu = 1)
+		 * 2nd turn  is for Codec part of Codec (is_cpu = 0)
+		 */
+		if (is_cpu) {
+			struct snd_soc_dai_link_component *cpus = asoc_link_to_cpu(dai_link, 0);
+
+			asoc_simple_canonicalize_cpu(cpus, is_single_links);
+
+			/* next port = Codec part port */
+			port = of_get_next_child(ports, port);
+		}
+	}
+
+	snprintf(dai_name, sizeof(dai_name), "codec2codec-%pOFP", top);
+
+	ret = graph_link_init(priv, first_rep, li, 0, dai_name);  /* Codec base */
+err:
+	of_node_put(ports);
+	of_node_put(port);
+	of_node_put(top);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(audio_graph2_link_c2c);
+
 static int graph_link(struct asoc_simple_priv *priv,
 		      struct graph_custom_hooks *hooks,
 		      enum graph_type gtype,
@@ -806,6 +940,12 @@ static int graph_link(struct asoc_simple_priv *priv,
 			func = hooks->custom_multi;
 		else
 			func = audio_graph2_link_multi;
+		break;
+	case GRAPH_C2C:
+		if (hooks && hooks->custom_c2c)
+			func = hooks->custom_c2c;
+		else
+			func = audio_graph2_link_c2c;
 		break;
 	}
 
@@ -904,6 +1044,27 @@ static int graph_count_multi(struct asoc_simple_priv *priv,
 	return 0;
 }
 
+static int graph_count_c2c(struct asoc_simple_priv *priv,
+			   struct device_node *lnk,
+			   struct link_info *li)
+{
+	/*
+	 *	CODEC2CODEC {
+	 *		compatible = "audio-graph-card2-codec2codec";
+	 *
+	 *		ports {
+	 * =>			lnk: port@0 { endpoint { ... }; };
+	 *			     port@1 { endpoint { ... }; };
+	 *		};
+	 *	};
+	 */
+	li->num[li->link].cpus		= 1;
+	li->num[li->link].codecs	= 1;
+	li->num[li->link].c2c		= 1;
+
+	return 0;
+}
+
 static int graph_count(struct asoc_simple_priv *priv,
 		       struct graph_custom_hooks *hooks,
 		       enum graph_type gtype,
@@ -928,6 +1089,9 @@ static int graph_count(struct asoc_simple_priv *priv,
 		break;
 	case GRAPH_MULTI:
 		func = graph_count_multi;
+		break;
+	case GRAPH_C2C:
+		func = graph_count_c2c;
 		break;
 	}
 
