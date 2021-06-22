@@ -373,6 +373,45 @@ struct dma_buf {
 	 * @resv:
 	 *
 	 * Reservation object linked to this dma-buf.
+	 *
+	 * IMPLICIT SYNCHRONIZATION RULES:
+	 *
+	 * Drivers which support implicit synchronization of buffer access as
+	 * e.g. exposed in `Implicit Fence Poll Support`_ should follow the
+	 * below rules.
+	 *
+	 * - Drivers should add a shared fence through
+	 *   dma_resv_add_shared_fence() for anything the userspace API
+	 *   considers a read access. This highly depends upon the API and
+	 *   window system: E.g. OpenGL is generally implicitly synchronized on
+	 *   Linux, but explicitly synchronized on Android. Whereas Vulkan is
+	 *   generally explicitly synchronized for everything, and window system
+	 *   buffers have explicit API calls (which then need to make sure the
+	 *   implicit fences store here in @resv are updated correctly).
+	 *
+	 * - Similarly drivers should set the exclusive fence through
+	 *   dma_resv_add_excl_fence() for anything the userspace API considers
+	 *   write access.
+	 *
+	 * - Drivers may just always set the exclusive fence, since that only
+	 *   causes unecessarily synchronization, but no correctness issues.
+	 *
+	 * - Some drivers only expose a synchronous userspace API with no
+	 *   pipelining across drivers. These do not set any fences for their
+	 *   access. An example here is v4l.
+	 *
+	 * DYNAMIC IMPORTER RULES:
+	 *
+	 * Dynamic importers, see dma_buf_attachment_is_dynamic(), have
+	 * additional constraints on how they set up fences:
+	 *
+	 * - Dynamic importers must obey the exclusive fence and wait for it to
+	 *   signal before allowing access to the buffer's underlying storage
+	 *   through.
+	 *
+	 * - Dynamic importers should set fences for any access that they can't
+	 *   disable immediately from their @dma_buf_attach_ops.move_notify
+	 *   callback.
 	 */
 	struct dma_resv *resv;
 
