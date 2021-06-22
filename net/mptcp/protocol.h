@@ -296,9 +296,14 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
+/* the msk socket don't use the backlog, also account for the bulk
+ * free memory
+ */
 static inline int __mptcp_space(const struct sock *sk)
 {
-	return tcp_space(sk) + READ_ONCE(mptcp_sk(sk)->rmem_released);
+	return tcp_win_from_space(sk, READ_ONCE(sk->sk_rcvbuf) -
+				  atomic_read(&sk->sk_rmem_alloc) +
+				  mptcp_sk(sk)->rmem_released);
 }
 
 static inline struct mptcp_data_frag *mptcp_send_head(const struct sock *sk)

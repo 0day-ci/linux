@@ -720,8 +720,10 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 		sk_rbuf = ssk_rbuf;
 
 	/* over limit? can't append more skbs to msk, Also, no need to wake-up*/
-	if (atomic_read(&sk->sk_rmem_alloc) > sk_rbuf)
+	if (atomic_read(&sk->sk_rmem_alloc) - READ_ONCE(msk->rmem_released) > sk_rbuf) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
 		return;
+	}
 
 	/* Wake-up the reader only for in-sequence data */
 	mptcp_data_lock(sk);
