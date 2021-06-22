@@ -2360,10 +2360,8 @@ static int irdma_handle_q_mem(struct irdma_device *iwdev,
 	u64 *arr = iwmr->pgaddrmem;
 	u32 pg_size;
 	int err = 0;
-	int total;
 	bool ret = true;
 
-	total = req->sq_pages + req->rq_pages + req->cq_pages;
 	pg_size = iwmr->page_size;
 	err = irdma_setup_pbles(iwdev->rf, iwmr, use_pbles);
 	if (err)
@@ -2381,7 +2379,7 @@ static int irdma_handle_q_mem(struct irdma_device *iwdev,
 	switch (iwmr->type) {
 	case IRDMA_MEMREG_TYPE_QP:
 		hmc_p = &qpmr->sq_pbl;
-		qpmr->shadow = (dma_addr_t)arr[total];
+		qpmr->shadow = (dma_addr_t)arr[req->sq_pages + req->rq_pages];
 
 		if (use_pbles) {
 			ret = irdma_check_mem_contiguous(arr, req->sq_pages,
@@ -2406,7 +2404,7 @@ static int irdma_handle_q_mem(struct irdma_device *iwdev,
 		hmc_p = &cqmr->cq_pbl;
 
 		if (!cqmr->split)
-			cqmr->shadow = (dma_addr_t)arr[total];
+			cqmr->shadow = (dma_addr_t)arr[req->cq_pages];
 
 		if (use_pbles)
 			ret = irdma_check_mem_contiguous(arr, req->cq_pages,
@@ -2748,6 +2746,7 @@ static struct ib_mr *irdma_reg_user_mr(struct ib_pd *pd, u64 start, u64 len,
 	struct ib_umem *region;
 	struct irdma_mem_reg_req req;
 	u32 stag = 0;
+	u8 shadow_pgcnt = 1;
 	bool use_pbles = false;
 	unsigned long flags;
 	int err = -EINVAL;
@@ -2795,6 +2794,10 @@ static struct ib_mr *irdma_reg_user_mr(struct ib_pd *pd, u64 start, u64 len,
 
 	switch (req.reg_type) {
 	case IRDMA_MEMREG_TYPE_QP:
+		if (req.sq_pages + req.rq_pages + shadow_pgcnt > iwmr->page_cnt) {
+			err = -EINVAL;
+			goto error;
+		}
 		use_pbles = ((req.sq_pages + req.rq_pages) > 2);
 		err = irdma_handle_q_mem(iwdev, &req, iwpbl, use_pbles);
 		if (err)
@@ -2808,6 +2811,13 @@ static struct ib_mr *irdma_reg_user_mr(struct ib_pd *pd, u64 start, u64 len,
 		spin_unlock_irqrestore(&ucontext->qp_reg_mem_list_lock, flags);
 		break;
 	case IRDMA_MEMREG_TYPE_CQ:
+		if (iwdev->rf->sc_dev.hw_attrs.uk_attrs.feature_flags & IRDMA_FEATURE_CQ_RESIZE)
+			shadow_pgcnt = 0;
+		if (req.cq_pages + shadow_pgcnt > iwmr->page_cnt) {
+			err = -EINVAL;
+			goto error;
+		}
+
 		use_pbles = (req.cq_pages > 1);
 		err = irdma_handle_q_mem(iwdev, &req, iwpbl, use_pbles);
 		if (err)
