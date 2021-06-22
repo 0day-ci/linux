@@ -47,7 +47,7 @@ __page_reporting_request(struct page_reporting_dev_info *prdev)
 }
 
 /* notify prdev of free page reporting request */
-void __page_reporting_notify(void)
+void __page_reporting_notify(unsigned int order)
 {
 	struct page_reporting_dev_info *prdev;
 
@@ -58,7 +58,7 @@ void __page_reporting_notify(void)
 	 */
 	rcu_read_lock();
 	prdev = rcu_dereference(pr_dev_info);
-	if (likely(prdev))
+	if (likely(prdev && order >= prdev->order))
 		__page_reporting_request(prdev);
 
 	rcu_read_unlock();
@@ -229,7 +229,7 @@ page_reporting_process_zone(struct page_reporting_dev_info *prdev,
 
 	/* Generate minimum watermark to be able to guarantee progress */
 	watermark = low_wmark_pages(zone) +
-		    (PAGE_REPORTING_CAPACITY << PAGE_REPORTING_MIN_ORDER);
+		    (PAGE_REPORTING_CAPACITY << prdev->order);
 
 	/*
 	 * Cancel request if insufficient free memory or if we failed
@@ -239,7 +239,7 @@ page_reporting_process_zone(struct page_reporting_dev_info *prdev,
 		return err;
 
 	/* Process each free list starting from lowest order/mt */
-	for (order = PAGE_REPORTING_MIN_ORDER; order < MAX_ORDER; order++) {
+	for (order = prdev->order; order < MAX_ORDER; order++) {
 		for (mt = 0; mt < MIGRATE_TYPES; mt++) {
 			/* We do not pull pages from the isolate free list */
 			if (is_migrate_isolate(mt))
@@ -323,6 +323,12 @@ int page_reporting_register(struct page_reporting_dev_info *prdev)
 		err = -EBUSY;
 		goto err_out;
 	}
+
+	/*
+	 * We need to choose the minimal order of page reporting if it's
+	 * not specified by the driver.
+	 */
+	prdev->order = prdev->order ? prdev->order : pageblock_order;
 
 	/* initialize state and work structures */
 	atomic_set(&prdev->state, PAGE_REPORTING_IDLE);
