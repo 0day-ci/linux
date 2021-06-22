@@ -67,6 +67,7 @@
 #include <net/l3mdev.h>
 
 #include <linux/uaccess.h>
+#include <linux/inetdevice.h>
 
 /*
  *	The ICMP socket(s). This is the most convenient way to flow control
@@ -725,6 +726,13 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	struct ipcm6_cookie ipc6;
 	u32 mark = IP6_REPLY_MARK(net, skb->mark);
 	bool acast;
+	struct icmp_ext_hdr *ext_hdr, _ext_hdr;
+	struct icmp_ext_echo_iio *iio, _iio;
+	struct net_device *dev;
+	char buff[IFNAMSIZ];
+	bool probe = false;
+	u16 ident_len;
+	u8 status;
 
 	if (ipv6_addr_is_multicast(&ipv6_hdr(skb)->daddr) &&
 	    net->ipv6.sysctl.icmpv6_echo_ignore_multicast)
@@ -740,8 +748,17 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	    !(net->ipv6.sysctl.anycast_src_echo_reply && acast))
 		saddr = NULL;
 
+	if (icmph->icmp6_type == ICMPV6_EXT_ECHO_REQUEST) {
+		if (!net->ipv6.sysctl.icmpv6_echo_enable_probe)
+			return;
+		probe = true;
+	}
+
 	memcpy(&tmp_hdr, icmph, sizeof(tmp_hdr));
-	tmp_hdr.icmp6_type = ICMPV6_ECHO_REPLY;
+	if (probe)
+		tmp_hdr.icmp6_type = ICMPV6_EXT_ECHO_REPLY;
+	else
+		tmp_hdr.icmp6_type = ICMPV6_ECHO_REPLY;
 
 	memset(&fl6, 0, sizeof(fl6));
 	if (net->ipv6.sysctl.flowlabel_reflect & FLOWLABEL_REFLECT_ICMPV6_ECHO_REPLIES)
@@ -752,7 +769,10 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	if (saddr)
 		fl6.saddr = *saddr;
 	fl6.flowi6_oif = icmp6_iif(skb);
-	fl6.fl6_icmp_type = ICMPV6_ECHO_REPLY;
+	if (probe)
+		fl6.fl6_icmp_type = ICMPV6_EXT_ECHO_REPLY;
+	else
+		fl6.fl6_icmp_type = ICMPV6_ECHO_REPLY;
 	fl6.flowi6_mark = mark;
 	fl6.flowi6_uid = sock_net_uid(net, NULL);
 	security_skb_classify_flow(skb, flowi6_to_flowi_common(&fl6));
@@ -783,13 +803,20 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	msg.skb = skb;
 	msg.offset = 0;
-	msg.type = ICMPV6_ECHO_REPLY;
+	if (probe)
+		msg.type = ICMPV6_EXT_ECHO_REPLY;
+	else
+		msg.type = ICMPV6_ECHO_REPLY;
 
 	ipcm6_init_sk(&ipc6, np);
 	ipc6.hlimit = ip6_sk_dst_hoplimit(np, &fl6, dst);
 	ipc6.tclass = ipv6_get_dsfield(ipv6_hdr(skb));
 	ipc6.sockc.mark = mark;
 
+	if (icmph->icmp6_type == ICMPV6_EXT_ECHO_REQUEST &&
+	    net->ipv6.sysctl.icmpv6_echo_enable_probe)
+		goto build_probe_reply;
+send_reply:
 	if (ip6_append_data(sk, icmpv6_getfrag, &msg,
 			    skb->len + sizeof(struct icmp6hdr),
 			    sizeof(struct icmp6hdr), &ipc6, &fl6,
@@ -806,6 +833,89 @@ out:
 	icmpv6_xmit_unlock(sk);
 out_bh_enable:
 	local_bh_enable();
+	return;
+build_probe_reply:
+	/* We currently only support probing interfaces on the proxy node
+	 * Check to ensure L-bit is set
+	 */
+	if (!(ntohs(icmph->icmp6_dataun.u_echo.sequence) & 1))
+		goto out_dst_release;
+	/* Clear status bits in reply message */
+	tmp_hdr.icmp6_dataun.u_echo.sequence &= htons(0xFF00);
+	ext_hdr = skb_header_pointer(skb, 0, sizeof(_ext_hdr), &_ext_hdr);
+	/* Size of iio is class_type dependent.
+	 * Only check header here and assign length based on ctype in the switch statement
+	 */
+	iio = skb_header_pointer(skb, sizeof(_ext_hdr), sizeof(iio->extobj_hdr), &_iio);
+	if (!ext_hdr || !iio)
+		goto send_mal_query;
+	if (ntohs(iio->extobj_hdr.length) <= sizeof(iio->extobj_hdr))
+		goto send_mal_query;
+	ident_len = ntohs(iio->extobj_hdr.length) - sizeof(iio->extobj_hdr);
+	status = 0;
+	dev = NULL;
+	switch (iio->extobj_hdr.class_type) {
+	case ICMP_EXT_ECHO_CTYPE_NAME:
+		iio = skb_header_pointer(skb, sizeof(_ext_hdr), sizeof(_iio), &_iio);
+		if (ident_len >= IFNAMSIZ)
+			goto send_mal_query;
+		memset(buff, 0, sizeof(buff));
+		memcpy(buff, &iio->ident.name, ident_len);
+		dev = dev_get_by_name(net, buff);
+		break;
+	case ICMP_EXT_ECHO_CTYPE_INDEX:
+		iio = skb_header_pointer(skb, sizeof(_ext_hdr), sizeof(iio->extobj_hdr) +
+					 sizeof(iio->ident.ifindex), &_iio);
+		if (ident_len != sizeof(iio->ident.ifindex))
+			goto send_mal_query;
+		dev = dev_get_by_index(net, ntohl(iio->ident.ifindex));
+		break;
+	case ICMP_EXT_ECHO_CTYPE_ADDR:
+		if (ident_len != sizeof(iio->ident.addr.ctype3_hdr) +
+				 iio->ident.addr.ctype3_hdr.addrlen)
+			goto send_mal_query;
+		switch (ntohs(iio->ident.addr.ctype3_hdr.afi)) {
+		case ICMP_AFI_IP:
+			iio = skb_header_pointer(skb, sizeof(_ext_hdr), sizeof(iio->extobj_hdr) +
+						 sizeof(struct in_addr), &_iio);
+			if (ident_len != sizeof(iio->ident.addr.ctype3_hdr) +
+					 sizeof(struct in_addr))
+				goto send_mal_query;
+			dev = ip_dev_find(net, iio->ident.addr.ip_addr.ipv4_addr);
+			break;
+		case ICMP_AFI_IP6:
+			iio = skb_header_pointer(skb, sizeof(_ext_hdr), sizeof(_iio), &_iio);
+			if (ident_len != sizeof(iio->ident.addr.ctype3_hdr) +
+					 sizeof(struct in6_addr))
+				goto send_mal_query;
+			dev = ipv6_stub->ipv6_dev_find(net, &iio->ident.addr.ip_addr.ipv6_addr, dev);
+			if (dev)
+				dev_hold(dev);
+			break;
+		default:
+			goto send_mal_query;
+		}
+		break;
+	default:
+		goto send_mal_query;
+	}
+	if (!dev) {
+		tmp_hdr.icmp6_code = ICMP_EXT_CODE_NO_IF;
+		goto send_reply;
+	}
+	/* Fill bits in reply message */
+	if (dev->flags & IFF_UP)
+		status |= ICMP_EXT_ECHOREPLY_ACTIVE;
+	if (__in_dev_get_rcu(dev) && __in_dev_get_rcu(dev)->ifa_list)
+		status |= ICMP_EXT_ECHOREPLY_IPV4;
+	if (!list_empty(&rcu_dereference(dev->ip6_ptr)->addr_list))
+		status |= ICMP_EXT_ECHOREPLY_IPV6;
+	dev_put(dev);
+	tmp_hdr.icmp6_dataun.u_echo.sequence |= htons(status);
+	goto send_reply;
+send_mal_query:
+	tmp_hdr.icmp6_code = ICMP_EXT_CODE_MAL_QUERY;
+	goto send_reply;
 }
 
 void icmpv6_notify(struct sk_buff *skb, u8 type, u8 code, __be32 info)
@@ -908,6 +1018,11 @@ static int icmpv6_rcv(struct sk_buff *skb)
 
 	switch (type) {
 	case ICMPV6_ECHO_REQUEST:
+		if (!net->ipv6.sysctl.icmpv6_echo_ignore_all)
+			icmpv6_echo_reply(skb);
+		break;
+
+	case ICMPV6_EXT_ECHO_REQUEST:
 		if (!net->ipv6.sysctl.icmpv6_echo_ignore_all)
 			icmpv6_echo_reply(skb);
 		break;
@@ -1198,6 +1313,13 @@ static struct ctl_table ipv6_icmp_table_template[] = {
 		.mode		= 0644,
 		.proc_handler = proc_do_large_bitmap,
 	},
+	{
+		.procname	= "echo_enable_probe",
+		.data		= &init_net.ipv6.sysctl.icmpv6_echo_enable_probe,
+		.maxlen		= sizeof(u8),
+		.mode		= 0644,
+		.proc_handler = proc_dou8vec_minmax,
+	},
 	{ },
 };
 
@@ -1215,6 +1337,7 @@ struct ctl_table * __net_init ipv6_icmp_sysctl_init(struct net *net)
 		table[2].data = &net->ipv6.sysctl.icmpv6_echo_ignore_multicast;
 		table[3].data = &net->ipv6.sysctl.icmpv6_echo_ignore_anycast;
 		table[4].data = &net->ipv6.sysctl.icmpv6_ratemask_ptr;
+		table[5].data = &net->ipv6.sysctl.icmpv6_echo_enable_probe;
 	}
 	return table;
 }

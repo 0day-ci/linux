@@ -2471,6 +2471,12 @@ echo_ignore_anycast - BOOLEAN
 
 	Default: 0
 
+echo_ignore_all - BOOLEAN
+        If set to one, then the kernel will respond to RFC 8335 PROBE
+        requests sent to it over the IPv6 protocol.
+
+	Default: 0
+
 xfrm6_gc_thresh - INTEGER
 	(Obsolete since linux-4.14)
 	The threshold at which we will start garbage collecting for IPv6

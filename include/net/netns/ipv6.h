@@ -37,6 +37,7 @@ struct netns_sysctl_ipv6 {
 	u8 icmpv6_echo_ignore_all;
 	u8 icmpv6_echo_ignore_multicast;
 	u8 icmpv6_echo_ignore_anycast;
+	u8 icmpv6_echo_enable_probe;
 	DECLARE_BITMAP(icmpv6_ratemask, ICMPV6_MSG_MAX + 1);
 	unsigned long *icmpv6_ratemask_ptr;
 	u8 anycast_src_echo_reply;
