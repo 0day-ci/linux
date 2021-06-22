@@ -331,3 +331,12 @@ config ENERGY_MODEL
 	  The exact usage of the energy model is subsystem-dependent.
 
 	  If in doubt, say N.
+
+config ACTIVE_STATS
+	bool "Enable Active Stats"
+	depends on CPU_FREQ && CPU_IDLE && PM_OPP
+	help
+	  Enable support for architectures common code for tracking and
+	  processing the CPU performance time residency. It is useful for
+	  power estimation, energy usage and can be used in frameworks such
+	  as thermal.
