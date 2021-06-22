@@ -53,6 +53,12 @@ static void quirk_increase_ddi_disabled_time(struct drm_i915_private *i915)
 	drm_info(&i915->drm, "Applying Increase DDI Disabled quirk\n");
 }
 
+static void quirk_keep_backlight_enable_on(struct drm_i915_private *i915)
+{
+	i915->quirks |= QUIRK_KEEP_BACKLIGHT_ENABLE_ON;
+	drm_info(&i915->drm, "applying keep backlight enable on quirk\n");
+}
+
 struct intel_quirk {
 	int device;
 	int subsystem_vendor;
@@ -69,6 +75,12 @@ struct intel_dmi_quirk {
 static int intel_dmi_reverse_brightness(const struct dmi_system_id *id)
 {
 	DRM_INFO("Backlight polarity reversed on %s\n", id->ident);
+	return 1;
+}
+
+static int backlight_wa_callback(const struct dmi_system_id *id)
+{
+	DRM_INFO("This is WA to ignore backlight off to prevent OLED panel issue on %s device\n", id->ident);
 	return 1;
 }
 
@@ -95,6 +107,28 @@ static const struct intel_dmi_quirk intel_dmi_quirks[] = {
 			{ }  /* terminating entry */
 		},
 		.hook = quirk_invert_brightness,
+	},
+	{
+		.dmi_id_list = &(const struct dmi_system_id[]) {
+			{
+				.callback = backlight_wa_callback,
+				.ident = "Google Lillipup",
+				.matches = {DMI_MATCH(DMI_BOARD_VENDOR, "Google"),
+					    DMI_MATCH(DMI_BOARD_NAME, "Lindar"),
+					    DMI_MATCH(DMI_PRODUCT_SKU, "sku524294"),
+				},
+			},
+			{
+				.callback = backlight_wa_callback,
+				.ident = "Google Lillipup",
+				.matches = {DMI_MATCH(DMI_BOARD_VENDOR, "Google"),
+					    DMI_MATCH(DMI_BOARD_NAME, "Lindar"),
+					    DMI_MATCH(DMI_PRODUCT_SKU, "sku524295"),
+				},
+			},
+			{ }
+		},
+		.hook = quirk_keep_backlight_enable_on,
 	},
 };
 

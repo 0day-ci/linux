@@ -1311,6 +1311,7 @@ static void intel_panel_set_backlight(const struct drm_connector_state *conn_sta
 static int intel_backlight_device_update_status(struct backlight_device *bd)
 {
 	struct intel_connector *connector = bl_get_data(bd);
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
 	struct drm_device *dev = connector->base.dev;
 
@@ -1330,7 +1331,8 @@ static int intel_backlight_device_update_status(struct backlight_device *bd)
 		if (panel->backlight.power) {
 			bool enable = bd->props.power == FB_BLANK_UNBLANK &&
 				bd->props.brightness != 0;
-			panel->backlight.power(connector, enable);
+			if (enable || !(dev_priv->quirks & QUIRK_KEEP_BACKLIGHT_ENABLE_ON))
+				panel->backlight.power(connector, enable);
 		}
 	} else {
 		bd->props.power = FB_BLANK_POWERDOWN;
