@@ -22,6 +22,8 @@
 	 * cpu1 <--> codec1	// Normal
 	 * cpu2 <--> codec2	// DPCM
 	 * cpu3 <-/		// DPCM
+	 * cpu4 <==> codec3	// Multi (*1)
+	 * cpu5 <==> codec4	// Multi (*1)
 	 */
 	card2 {
 		/*
@@ -39,6 +41,7 @@
 
 		links = <&cpu0 &cpu1			/* normal: cpu side only  */
 			 &mix_fe0 &mix_fe1 &mix_be0	/* dsp   : both fe/be     */
+			 &multi_cpu			/* multi : cpu side only  */
 		>;
 	};
 
@@ -50,6 +53,26 @@
 		};
 		DSP_BE: ports@1 {
 			mix_be0: port   { mix_be0_ep: endpoint { remote-endpoint = <&codec2_ep>; }; };
+		};
+	};
+
+	multi {
+		compatible = "audio-graph-card2-multi";
+
+		/*
+		 * (*1)
+		 *
+		 * This uses 2 CPUs x 2 Codecs as Multi connection,
+		 * Because ASoC doesn't support N cpus to M codecs
+		 */
+
+		multi_cpu: ports@0 {
+			port@0 { multi_00_ep: endpoint { remote-endpoint = <&cpu4_ep>; }; };
+			port@1 { multi_01_ep: endpoint { remote-endpoint = <&cpu5_ep>; }; };
+		};
+		multi_codec: ports@1 {
+			port@0 { multi_10_ep: endpoint { remote-endpoint = <&codec3_ep>; }; };
+			port@1 { multi_11_ep: endpoint { remote-endpoint = <&codec4_ep>; }; };
 		};
 	};
 
@@ -69,6 +92,8 @@
 			cpu1: port@1 { cpu1_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
 			      port@2 { cpu2_ep: endpoint { remote-endpoint = <&mix_fe0_ep>; }; };
 			      port@3 { cpu3_ep: endpoint { remote-endpoint = <&mix_fe1_ep>; }; };
+			      port@4 { cpu4_ep: endpoint { remote-endpoint = <&multi_00_ep>; }; };
+			      port@5 { cpu5_ep: endpoint { remote-endpoint = <&multi_01_ep>; }; };
 		};
 	};
 
@@ -91,6 +116,8 @@
 			port@0 { codec0_ep: endpoint { remote-endpoint = <&cpu0_ep>; }; };
 			port@1 { codec1_ep: endpoint { remote-endpoint = <&cpu1_ep>; }; };
 			port@2 { codec2_ep: endpoint { remote-endpoint = <&mix_be0_ep>; }; };
+			port@3 { codec3_ep: endpoint { remote-endpoint = <&multi_10_ep>; }; };
+			port@4 { codec4_ep: endpoint { remote-endpoint = <&multi_11_ep>; }; };
 		};
 	};
 };
