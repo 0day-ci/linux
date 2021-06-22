@@ -2476,6 +2476,9 @@ static int rescuer_thread(void *__rescuer)
 	 * doesn't participate in concurrency management.
 	 */
 	set_pf_worker(true);
+
+	if (wq->flags & WQ_FREEZABLE)
+		set_freezable();
 repeat:
 	set_current_state(TASK_IDLE);
 
@@ -2487,7 +2490,7 @@ repeat:
 	 * @wq->maydays processing before acting on should_stop so that the
 	 * list is always empty on exit.
 	 */
-	should_stop = kthread_should_stop();
+	should_stop = kthread_freezable_should_stop(NULL);
 
 	/* see whether any pwq is asking for help */
 	raw_spin_lock_irq(&wq_mayday_lock);
