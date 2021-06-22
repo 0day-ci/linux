@@ -962,6 +962,51 @@ static int ioctl_fssetxattr(struct file *file, void __user *argp)
 }
 
 /*
+ * ioctl_fitrim() generic handling for FITRIM ioctl() via dedicated file
+ * operation. It does't common things like copying the arg from/to userland,
+ * permission check, etc.
+ *
+ * If the handler in file_operation is NULL, just pass the ioctl down to the
+ * generic ioctl() handler, as it used to be.
+ */
+static int ioctl_fitrim(struct file *filp, unsigned int fd, unsigned int cmd,
+			void __user *argp)
+{
+	struct fstrim_range;
+	int ret;
+
+
+		if (S_ISREG(inode->i_mode))
+			return file_ioctl(filp, cmd, argp);
+		break;
+
+	/* if the fs doesn't implement the fitrim operation, just pass it to
+	   the fs's ioctl() operation, so remaining implementations are kept
+	   intact. this can be removed when all fs'es are converted */
+	if (!filp->f_op->fitrim) {
+		if (S_ISREG(inode->i_mode))
+			return file_ioctl(filp, cmd, argp);
+
+		return -ENOIOCTLCMD;
+	}
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (copy_from_user(&range, (struct fstrim_range __user)*argp,
+			   sizeof(range)))
+		return -EFAULT;
+
+	ret = filp->f_op->fitrim(filp, &range);
+
+	if (copy_to_user((struct fstrim_range __user)*argp, &range,
+			 sizeof(range)))
+		return -EFAULT;
+
+	return ret;
+}
+
+/*
  * do_vfs_ioctl() is not for drivers and not intended to be EXPORT_SYMBOL()'d.
  * It's just a simple helper for sys_ioctl and compat_sys_ioctl.
  *
@@ -1042,6 +1087,9 @@ static int do_vfs_ioctl(struct file *filp, unsigned int fd,
 
 	case FS_IOC_FSSETXATTR:
 		return ioctl_fssetxattr(filp, argp);
+
+	case FITRIM:
+		return ioctl_fitrim(filp, cmd, argp);
 
 	default:
 		if (S_ISREG(inode->i_mode))
