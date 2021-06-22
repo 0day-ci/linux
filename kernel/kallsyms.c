@@ -178,6 +178,24 @@ static inline bool cleanup_symbol_name(char *s)
 
 	return res != NULL;
 }
+#elif defined(CONFIG_LTO_CLANG_FULL)
+/*
+ * LLVM mangles static functions for full LTO so that two static functions with
+ * the same identifier do not collide when all code is combined into one
+ * module. The scheme used converts references to foo into
+ * foo.llvm.974640843467629774, for example. This can break hooking of static
+ * functions with kprobes.
+ */
+static inline bool cleanup_symbol_name(char *s)
+{
+	char *res;
+
+	res = strstr(s, ".llvm.");
+	if (res)
+		*res = '\0';
+
+	return res != NULL;
+}
 #else
 static inline bool cleanup_symbol_name(char *s) { return false; }
 #endif
