@@ -94,6 +94,11 @@ properties:
     required:
       - iommus
 
+  firmware-name:
+    maxItems: 1
+    description: |
+      Relative firmware image path for venus.
+
 required:
   - compatible
   - reg
