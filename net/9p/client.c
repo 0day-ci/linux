@@ -419,7 +419,8 @@ static void p9_tag_cleanup(struct p9_client *c)
  */
 void p9_client_cb(struct p9_client *c, struct p9_req_t *req, int status)
 {
-	p9_debug(P9_DEBUG_MUX, " tag %d\n", req->tc.tag);
+	u16 tag = req->tc.tag;
+	p9_debug(P9_DEBUG_MUX, " tag %d\n", tag);
 
 	/*
 	 * This barrier is needed to make sure any change made to req before
@@ -429,7 +430,8 @@ void p9_client_cb(struct p9_client *c, struct p9_req_t *req, int status)
 	req->status = status;
 
 	wake_up(&req->wq);
-	p9_debug(P9_DEBUG_MUX, "wakeup: %d\n", req->tc.tag);
+	/* req->tc.tag is not safe to access after status has been set */
+	p9_debug(P9_DEBUG_MUX, "wakeup: %d\n", tag);
 	p9_req_put(req);
 }
 EXPORT_SYMBOL(p9_client_cb);
