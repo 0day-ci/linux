@@ -117,9 +117,16 @@ struct its_node {
 	int			vlpi_redist_offset;
 };
 
+/*
+ * LPI can be supported without ITS, in which case, a virtual its_node is
+ * initialized to allow configuring LPI with the DirectLPI approach.
+ */
+static struct its_node *virtual_its_node;
+
 #define is_v4(its)		(!!((its)->typer & GITS_TYPER_VLPIS))
 #define is_v4_1(its)		(!!((its)->typer & GITS_TYPER_VMAPP))
 #define device_ids(its)		(FIELD_GET(GITS_TYPER_DEVBITS, (its)->typer) + 1)
+#define is_virtual(its)		((its) == virtual_its_node)
 
 #define ITS_ITT_ALIGN		SZ_256
 
@@ -1096,6 +1103,10 @@ void name(struct its_node *its,						\
 	unsigned long flags;						\
 	u64 rd_idx;							\
 									\
+	/* Virtual ITS doesn't support ITS commands */			\
+	if (is_virtual(its))						\
+		return;							\
+									\
 	raw_spin_lock_irqsave(&its->lock, flags);			\
 									\
 	cmd = its_allocate_entry(its);					\
@@ -1464,7 +1475,8 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
 
 	lpi_write_config(d, clr, set);
 	if (gic_rdists->has_direct_lpi &&
-	    (is_v4_1(its_dev->its) || !irqd_is_forwarded_to_vcpu(d)))
+	    (is_v4_1(its_dev->its) || !irqd_is_forwarded_to_vcpu(d) ||
+	     is_virtual(its_dev->its)))
 		direct_lpi_inv(d);
 	else if (!irqd_is_forwarded_to_vcpu(d))
 		its_send_inv(its_dev, its_get_event_id(d));
@@ -1690,6 +1702,10 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
 	u64 addr;
 
 	its = its_dev->its;
+
+	/* Virtual ITS doesn't have ->get_msi_base function, skip */
+	if (!its->get_msi_base)
+		return;
 	addr = its->get_msi_base(its_dev);
 
 	msg->address_lo		= lower_32_bits(addr);
@@ -3217,7 +3233,17 @@ static void its_cpu_init_collections(void)
 	raw_spin_lock(&its_lock);
 
 	list_for_each_entry(its, &its_nodes, entry)
-		its_cpu_init_collection(its);
+		/*
+		 * Only initializes the software part of collections for virtual
+		 * ITS.
+		 */
+		if (is_virtual(its)) {
+			int cpu = smp_processor_id();
+
+			its->collections[cpu].col_id = cpu;
+		} else {
+			its_cpu_init_collection(its);
+		}
 
 	raw_spin_unlock(&its_lock);
 }
@@ -3364,7 +3390,8 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
 	int nr_ites;
 	int sz;
 
-	if (!its_alloc_device_table(its, dev_id))
+	/* No need to allocate device table for virtual ITS */
+	if (!is_virtual(its) && !its_alloc_device_table(its, dev_id))
 		return NULL;
 
 	if (WARN_ON(!is_power_of_2(nvecs)))
@@ -3551,9 +3578,12 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
 	if (err)
 		return err;
 
-	err = iommu_dma_prepare_msi(info->desc, its->get_msi_base(its_dev));
-	if (err)
-		return err;
+	/* Virtual ITS doesn't have ->get_msi_base function, skip */
+	if (its->get_msi_base) {
+		err = iommu_dma_prepare_msi(info->desc, its->get_msi_base(its_dev));
+		if (err)
+			return err;
+	}
 
 	for (i = 0; i < nr_irqs; i++) {
 		err = its_irq_gic_domain_alloc(domain, virq + i, hwirq + i);
@@ -5121,6 +5151,63 @@ out_unmap:
 	return err;
 }
 
+static int __init virtual_its_init(void)
+{
+	struct its_node *its;
+	struct fwnode_handle *fwnode;
+	int err;
+
+	fwnode = irq_domain_alloc_named_fwnode("Virtual ITS");
+	if (!fwnode)
+		return -ENOMEM;
+
+	/*
+	 * Use 0 as the ID for virtual ITS, since we only init virtual ITS if
+	 * there is no real ITS in the system, so it's fine.
+	 */
+	err = iort_register_domain_token(0, 0, fwnode);
+	if (err)
+		goto out_free_fwnode;
+
+	its = kzalloc(sizeof(*its), GFP_KERNEL);
+	if (!its) {
+		err = -ENOMEM;
+		goto out_unregister_fwnode;
+	}
+
+	raw_spin_lock_init(&its->lock);
+	mutex_init(&its->dev_alloc_lock);
+	INIT_LIST_HEAD(&its->entry);
+	INIT_LIST_HEAD(&its->its_device_list);
+	its->numa_node = NUMA_NO_NODE;
+	its->msi_domain_flags = IRQ_DOMAIN_FLAG_MSI_REMAP;
+	err = its_alloc_collections(its);
+	if (err)
+		goto out_free_its;
+
+	err = its_init_domain(fwnode, its);
+	if (err)
+		goto out_free_collections;
+
+	raw_spin_lock(&its_lock);
+	virtual_its_node = its;
+	list_add(&its->entry, &its_nodes);
+	raw_spin_unlock(&its_lock);
+
+	return 0;
+
+out_free_collections:
+	its_free_collections(its);
+out_free_its:
+	kvfree(its);
+out_unregister_fwnode:
+	iort_deregister_domain_token(0);
+out_free_fwnode:
+	irq_domain_free_fwnode(fwnode);
+	return err;
+
+}
+
 static bool gic_rdists_supports_plpis(void)
 {
 	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
@@ -5414,8 +5501,19 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 		its_acpi_probe();
 
 	if (list_empty(&its_nodes)) {
-		pr_warn("ITS: No ITS available, not enabling LPIs\n");
-		return -ENXIO;
+		/* Initialize virtual ITS only if DirectLPI is set. */
+		if (gic_rdists->has_direct_lpi) {
+			pr_info("ITS: No ITS available, using virtual ITS\n");
+			err = virtual_its_init();
+			if (err) {
+				pr_info("ITS: Virtual ITS creation fails\n");
+				return err;
+			}
+			pr_info("ITS: Virtual ITS created\n");
+		} else {
+			pr_warn("ITS: No ITS available, not enabling LPIs\n");
+			return -ENXIO;
+		}
 	}
 
 	err = allocate_lpi_tables();
