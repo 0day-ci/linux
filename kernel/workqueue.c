@@ -2476,6 +2476,9 @@ static int rescuer_thread(void *__rescuer)
 	 * doesn't participate in concurrency management.
 	 */
 	set_pf_worker(true);
+
+	if (wq->flags & WQ_FREEZABLE)
+		set_freezable();
 repeat:
 	set_current_state(TASK_IDLE);
 
@@ -2503,6 +2506,9 @@ repeat:
 		list_del_init(&pwq->mayday_node);
 
 		raw_spin_unlock_irq(&wq_mayday_lock);
+
+		if (!kthread_should_stop())
+			try_to_freeze();
 
 		worker_attach_to_pool(rescuer, pool);
 
