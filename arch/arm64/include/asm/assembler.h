@@ -90,6 +90,13 @@
 	.endm
 
 /*
+ * Data gathering hint
+ */
+	.macro	dgh
+	hint	#6
+	.endm
+
+/*
  * RAS Error Synchronization barrier
  */
 	.macro  esb

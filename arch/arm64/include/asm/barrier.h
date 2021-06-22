@@ -22,6 +22,7 @@
 #define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
 #define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
 
+#define dgh()		asm volatile("hint #6" : : : "memory")
 #define psb_csync()	asm volatile("hint #17" : : : "memory")
 #define tsb_csync()	asm volatile("hint #18" : : : "memory")
 #define csdb()		asm volatile("hint #20" : : : "memory")
