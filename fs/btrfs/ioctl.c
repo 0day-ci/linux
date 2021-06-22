@@ -412,18 +412,15 @@ static int btrfs_ioctl_getversion(struct file *file, int __user *arg)
 	return put_user(inode->i_generation, arg);
 }
 
-static noinline int btrfs_ioctl_fitrim(struct btrfs_fs_info *fs_info,
-					void __user *arg)
+long btrfs_ioctl_fitrim(struct file *file, struct fstrim_range *range)
 {
+	struct inode *inode = file_inode(file);
+	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_device *device;
 	struct request_queue *q;
-	struct fstrim_range range;
 	u64 minlen = ULLONG_MAX;
 	u64 num_devices = 0;
 	int ret;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
 
 	/*
 	 * btrfs_trim_block_group() depends on space cache, which is not
@@ -459,26 +456,19 @@ static noinline int btrfs_ioctl_fitrim(struct btrfs_fs_info *fs_info,
 
 	if (!num_devices)
 		return -EOPNOTSUPP;
-	if (copy_from_user(&range, arg, sizeof(range)))
-		return -EFAULT;
 
 	/*
 	 * NOTE: Don't truncate the range using super->total_bytes.  Bytenr of
 	 * block group is in the logical address space, which can be any
 	 * sectorsize aligned bytenr in  the range [0, U64_MAX].
 	 */
-	if (range.len < fs_info->sb->s_blocksize)
+	if (range->len < fs_info->sb->s_blocksize)
 		return -EINVAL;
 
-	range.minlen = max(range.minlen, minlen);
-	ret = btrfs_trim_fs(fs_info, &range);
-	if (ret < 0)
-		return ret;
+	range->minlen = max(range->minlen, minlen);
+	ret = btrfs_trim_fs(fs_info, range);
 
-	if (copy_to_user(arg, &range, sizeof(range)))
-		return -EFAULT;
-
-	return 0;
+	return ret;
 }
 
 int __pure btrfs_is_empty_uuid(u8 *uuid)
@@ -4888,8 +4878,6 @@ long btrfs_ioctl(struct file *file, unsigned int
 		return btrfs_ioctl_get_fslabel(fs_info, argp);
 	case FS_IOC_SETFSLABEL:
 		return btrfs_ioctl_set_fslabel(file, argp);
-	case FITRIM:
-		return btrfs_ioctl_fitrim(fs_info, argp);
 	case BTRFS_IOC_SNAP_CREATE:
 		return btrfs_ioctl_snap_create(file, argp, 0);
 	case BTRFS_IOC_SNAP_CREATE_V2:

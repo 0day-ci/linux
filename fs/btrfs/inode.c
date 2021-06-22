@@ -10649,6 +10649,7 @@ static const struct file_operations btrfs_dir_file_operations = {
 #endif
 	.release        = btrfs_release_file,
 	.fsync		= btrfs_sync_file,
+	.fitrim		= btrfs_ioctl_fitrim,
 };
 
 /*
