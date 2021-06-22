@@ -1772,6 +1772,8 @@ static void mac80211_hwsim_tx_frame(struct ieee80211_hw *hw,
 	if (_pid || hwsim_virtio_enabled)
 		return mac80211_hwsim_tx_frame_nl(hw, skb, _pid);
 
+	data->tx_pkts++;
+	data->tx_bytes += skb->len;
 	mac80211_hwsim_tx_frame_no_nl(hw, skb, chan);
 	dev_kfree_skb(skb);
 }
