@@ -35,6 +35,17 @@ struct meson_gxbb_wdt {
 	struct clk *clk;
 };
 
+static bool nowayout = WATCHDOG_NOWAYOUT;
+static unsigned int timeout = DEFAULT_TIMEOUT;
+
+module_param(nowayout, bool, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started default="
+			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+
+module_param(timeout, uint, 0);
+MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds="
+			__MODULE_STRING(DEFAULT_TIMEOUT) ")");
+
 static int meson_gxbb_wdt_start(struct watchdog_device *wdt_dev)
 {
 	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
@@ -174,7 +185,7 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
 	data->wdt_dev.ops = &meson_gxbb_wdt_ops;
 	data->wdt_dev.max_hw_heartbeat_ms = GXBB_WDT_TCNT_SETUP_MASK;
 	data->wdt_dev.min_timeout = 1;
-	data->wdt_dev.timeout = DEFAULT_TIMEOUT;
+	data->wdt_dev.timeout = timeout;
 	watchdog_set_drvdata(&data->wdt_dev, data);
 
 	/* Setup with 1ms timebase */
@@ -186,7 +197,12 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
 
 	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
 
-	watchdog_stop_on_reboot(&data->wdt_dev);
+	watchdog_set_nowayout(&data->wdt_dev, nowayout);
+	watchdog_stop_on_unregister(&data->wdt_dev);
+
+	dev_info(dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+		data->wdt_dev.timeout, nowayout);
+
 	return devm_watchdog_register_device(dev, &data->wdt_dev);
 }
 
