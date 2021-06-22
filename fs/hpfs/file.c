@@ -216,6 +216,7 @@ const struct file_operations hpfs_file_ops =
 	.splice_read	= generic_file_splice_read,
 	.unlocked_ioctl	= hpfs_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
+	.fitrim		= hpfs_fitrim,
 };
 
 const struct inode_operations hpfs_file_iops =

@@ -329,6 +329,7 @@ void hpfs_error(struct super_block *, const char *, ...);
 int hpfs_stop_cycles(struct super_block *, int, int *, int *, char *);
 unsigned hpfs_get_free_dnodes(struct super_block *);
 long hpfs_ioctl(struct file *file, unsigned cmd, unsigned long arg);
+long hpfs_fitrim(struct file *file, struct fstrim_range *range);
 
 /*
  * local time (HPFS) to GMT (Unix)

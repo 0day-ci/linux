@@ -326,4 +326,5 @@ const struct file_operations hpfs_dir_ops =
 	.fsync		= hpfs_file_fsync,
 	.unlocked_ioctl	= hpfs_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
+	.fitrim		= hpfs_fitrim,
 };
