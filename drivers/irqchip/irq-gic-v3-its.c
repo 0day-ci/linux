@@ -5415,6 +5415,9 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 		has_v4_1 |= is_v4_1(its);
 	}
 
+	gic_v3_kvm_info.has_v4 = has_v4;
+	gic_v3_kvm_info.has_v4_1 = has_v4_1;
+
 	/* Don't bother with inconsistent systems */
 	if (WARN_ON(!has_v4_1 && rdists->has_rvpeid))
 		rdists->has_rvpeid = false;
