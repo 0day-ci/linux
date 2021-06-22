@@ -1077,7 +1077,7 @@ alloc_new_skb:
 
 			if ((flags & MSG_MORE) && !has_sg)
 				alloclen = mtu;
-			else if (!paged)
+			else if (!paged && (fraglen < SKB_MAX_ALLOC || !has_sg))
 				alloclen = fraglen;
 			else {
 				alloclen = min_t(int, fraglen, MAX_HEADER);
