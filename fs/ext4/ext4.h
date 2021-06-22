@@ -1272,6 +1272,7 @@ struct ext4_inode_info {
 #define ext4_find_next_bit		find_next_bit_le
 
 extern void ext4_set_bits(void *bm, int cur, int len);
+extern long ext4_fitrim(struct file *filp, struct fstrim_range *range);
 
 /*
  * Maximal mount counts between two filesystem checks

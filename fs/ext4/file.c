@@ -927,6 +927,7 @@ const struct file_operations ext4_file_operations = {
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
 	.fallocate	= ext4_fallocate,
+	.fitrim		= ext4_fitrim,
 };
 
 const struct inode_operations ext4_file_inode_operations = {
