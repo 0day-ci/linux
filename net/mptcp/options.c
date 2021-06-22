@@ -663,13 +663,19 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	bool drop_other_suboptions = false;
 	unsigned int opt_size = *size;
-	bool echo;
-	bool port;
-	int len;
+	struct mptcp_addr_info remote;
+	struct mptcp_addr_info local;
+	u8 add_addr, flags = 0xff;
+	int len = 0;
 
-	if ((mptcp_pm_should_add_signal_ipv6(msk) ||
-	     mptcp_pm_should_add_signal_port(msk) ||
-	     mptcp_pm_should_add_signal_echo(msk)) &&
+	if (!mptcp_pm_should_add_signal(msk))
+		return false;
+
+	mptcp_pm_add_addr_signal(msk, &local, &remote, &add_addr);
+	if ((mptcp_pm_should_add_signal_echo(msk) ||
+	     (!mptcp_pm_should_add_signal_echo(msk) &&
+	      mptcp_pm_should_add_signal_addr(msk) &&
+	      (local.family == AF_INET6 || local.port))) &&
 	    skb && skb_is_tcp_pure_ack(skb)) {
 		pr_debug("drop other suboptions");
 		opts->suboptions = 0;
@@ -679,25 +685,35 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 		drop_other_suboptions = true;
 	}
 
-	if (!mptcp_pm_should_add_signal(msk) ||
-	    !(mptcp_pm_add_addr_signal(msk, remaining, &opts->addr, &echo, &port)))
-		return false;
-
-	len = mptcp_add_addr_len(opts->addr.family, echo, port);
-	if (remaining < len)
-		return false;
+	if (mptcp_pm_should_add_signal_echo(msk)) {
+		len = mptcp_add_addr_len(remote.family, true, !!remote.port);
+		if (remaining < len)
+			return false;
+		opts->remote = remote;
+		flags = (u8)~BIT(MPTCP_ADD_ADDR_ECHO);
+		opts->suboptions |= OPTION_MPTCP_ADD_ECHO;
+	} else {
+		len = mptcp_add_addr_len(local.family, false, !!local.port);
+		if (remaining < len)
+			return false;
+		opts->local = local;
+		opts->ahmac = add_addr_generate_hmac(msk->local_key,
+						     msk->remote_key,
+						     &opts->local);
+		opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
+		flags = (u8)~BIT(MPTCP_ADD_ADDR_SIGNAL);
+	}
 
 	*size = len;
 	if (drop_other_suboptions)
 		*size -= opt_size;
-	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
-	if (!echo) {
-		opts->ahmac = add_addr_generate_hmac(msk->local_key,
-						     msk->remote_key,
-						     &opts->addr);
-	}
-	pr_debug("addr_id=%d, ahmac=%llu, echo=%d, port=%d",
-		 opts->addr.id, opts->ahmac, echo, ntohs(opts->addr.port));
+	spin_lock_bh(&msk->pm.lock);
+	WRITE_ONCE(msk->pm.addr_signal, flags & msk->pm.addr_signal);
+	spin_unlock_bh(&msk->pm.lock);
+
+	pr_debug("addr_signal:%x, echo=%d, local_addr_id=%d, ahmac=%llu, local_port=%d, remote_addr_id=%d, remote_port=%d",
+		 add_addr, mptcp_pm_should_add_signal_echo(msk), opts->local.id,
+		 opts->ahmac, ntohs(opts->local.port), opts->remote.id, ntohs(opts->remote.port));
 
 	return true;
 }
@@ -1244,45 +1260,51 @@ void mptcp_write_options(__be32 *ptr, const struct tcp_sock *tp,
 	}
 
 mp_capable_done:
-	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
-		u8 len = TCPOLEN_MPTCP_ADD_ADDR_BASE;
-		u8 echo = MPTCP_ADDR_ECHO;
+	if ((OPTION_MPTCP_ADD_ADDR | OPTION_MPTCP_ADD_ECHO) & opts->suboptions) {
+		struct mptcp_addr_info *addr_info;
+		u8 len = 0;
+		u8 echo = 0;
 
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		if (opts->addr.family == AF_INET6)
-			len = TCPOLEN_MPTCP_ADD_ADDR6_BASE;
-#endif
-
-		if (opts->addr.port)
-			len += TCPOLEN_MPTCP_PORT_LEN;
-
-		if (opts->ahmac) {
+		if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
 			len += sizeof(opts->ahmac);
-			echo = 0;
+			addr_info = &opts->local;
+		} else {
+			echo = MPTCP_ADDR_ECHO;
+			addr_info = &opts->remote;
 		}
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+		if (addr_info->family == AF_INET6)
+			len += TCPOLEN_MPTCP_ADD_ADDR6_BASE;
+		else
+#endif
+			len += TCPOLEN_MPTCP_ADD_ADDR_BASE;
+
+		if (addr_info->port)
+			len += TCPOLEN_MPTCP_PORT_LEN;
+
 		*ptr++ = mptcp_option(MPTCPOPT_ADD_ADDR,
-				      len, echo, opts->addr.id);
-		if (opts->addr.family == AF_INET) {
-			memcpy((u8 *)ptr, (u8 *)&opts->addr.addr.s_addr, 4);
+				      len, echo, addr_info->id);
+		if (addr_info->family == AF_INET) {
+			memcpy((u8 *)ptr, (u8 *)&addr_info->addr.s_addr, 4);
 			ptr += 1;
 		}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		else if (opts->addr.family == AF_INET6) {
-			memcpy((u8 *)ptr, opts->addr.addr6.s6_addr, 16);
+		else if (addr_info->family == AF_INET6) {
+			memcpy((u8 *)ptr, addr_info->addr6.s6_addr, 16);
 			ptr += 4;
 		}
 #endif
 
-		if (!opts->addr.port) {
-			if (opts->ahmac) {
+		if (!addr_info->port) {
+			if (!echo) {
 				put_unaligned_be64(opts->ahmac, ptr);
 				ptr += 2;
 			}
 		} else {
-			u16 port = ntohs(opts->addr.port);
+			u16 port = ntohs(addr_info->port);
 
-			if (opts->ahmac) {
+			if (!echo) {
 				u8 *bptr = (u8 *)ptr;
 
 				put_unaligned_be16(port, bptr);
@@ -1291,7 +1313,6 @@ mp_capable_done:
 				bptr += 8;
 				put_unaligned_be16(TCPOPT_NOP << 8 |
 						   TCPOPT_NOP, bptr);
-
 				ptr += 3;
 			} else {
 				put_unaligned_be32(port << 16 |
