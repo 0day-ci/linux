@@ -753,6 +753,25 @@ void i915_ttm_bo_destroy(struct ttm_buffer_object *bo)
 		call_rcu(&obj->rcu, __i915_gem_free_object_rcu);
 }
 
+static u64 i915_gem_object_page_size(struct drm_i915_gem_object *obj)
+{
+	u64 page_size;
+	int i;
+
+	if (!obj->mm.n_placements)
+		return obj->mm.region->min_page_size;
+
+	page_size = 0;
+	for (i = 0; i < obj->mm.n_placements; i++) {
+		struct intel_memory_region *mr = obj->mm.placements[i];
+
+		page_size = max_t(u64, mr->min_page_size, page_size);
+	}
+
+	GEM_BUG_ON(!page_size);
+	return page_size;
+}
+
 /**
  * __i915_gem_ttm_object_init - Initialize a ttm-backed i915 gem object
  * @mem: The initial memory region for the object.
@@ -793,7 +812,7 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 	obj->base.vma_node.driver_private = i915_gem_to_ttm(obj);
 	ret = ttm_bo_init(&i915->bdev, i915_gem_to_ttm(obj), size,
 			  bo_type, &i915_sys_placement,
-			  mem->min_page_size >> PAGE_SHIFT,
+			  i915_gem_object_page_size(obj) >> PAGE_SHIFT,
 			  true, NULL, NULL, i915_ttm_bo_destroy);
 	if (!ret)
 		obj->ttm.created = true;
