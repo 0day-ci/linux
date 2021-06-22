@@ -2931,6 +2931,12 @@ static int its_alloc_collections(struct its_node *its)
 	return 0;
 }
 
+static void its_free_collections(struct its_node *its)
+{
+	if (its)
+		kfree(its->collections);
+}
+
 static struct page *its_allocate_pending_table(gfp_t gfp_flags)
 {
 	struct page *pend_page;
@@ -5090,7 +5096,7 @@ static int __init its_probe_one(struct resource *res,
 
 	err = its_init_domain(handle, its);
 	if (err)
-		goto out_free_tables;
+		goto out_free_collections;
 
 	raw_spin_lock(&its_lock);
 	list_add(&its->entry, &its_nodes);
@@ -5098,6 +5104,8 @@ static int __init its_probe_one(struct resource *res,
 
 	return 0;
 
+out_free_collections:
+	its_free_collections(its);
 out_free_tables:
 	its_free_tables(its);
 out_free_cmd:
