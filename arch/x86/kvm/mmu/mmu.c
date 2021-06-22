@@ -1780,18 +1780,6 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
 	  &(_kvm)->arch.mmu_page_hash[kvm_page_table_hashfn(_gfn)])	\
 		if ((_sp)->gfn != (_gfn) || (_sp)->role.direct) {} else
 
-/* @sp->gfn should be write-protected at the call site */
-static bool __kvm_sync_page(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
-			    struct list_head *invalid_list)
-{
-	if (vcpu->arch.mmu->sync_page(vcpu, sp) == 0) {
-		kvm_mmu_prepare_zap_page(vcpu->kvm, sp, invalid_list);
-		return false;
-	}
-
-	return true;
-}
-
 static bool kvm_mmu_remote_flush_or_zap(struct kvm *kvm,
 					struct list_head *invalid_list,
 					bool remote_flush)
@@ -1833,8 +1821,12 @@ static bool is_obsolete_sp(struct kvm *kvm, struct kvm_mmu_page *sp)
 static bool kvm_sync_page(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 			 struct list_head *invalid_list)
 {
-	kvm_unlink_unsync_page(vcpu->kvm, sp);
-	return __kvm_sync_page(vcpu, sp, invalid_list);
+	if (vcpu->arch.mmu->sync_page(vcpu, sp) == 0) {
+		kvm_mmu_prepare_zap_page(vcpu->kvm, sp, invalid_list);
+		return false;
+	}
+
+	return true;
 }
 
 struct mmu_page_path {
@@ -1931,6 +1923,7 @@ static void mmu_sync_children(struct kvm_vcpu *vcpu,
 		}
 
 		for_each_sp(pages, sp, parents, i) {
+			kvm_unlink_unsync_page(vcpu->kvm, sp);
 			flush |= kvm_sync_page(vcpu, sp, &invalid_list);
 			mmu_pages_clear_parents(&parents);
 		}
@@ -2008,10 +2001,19 @@ static struct kvm_mmu_page *kvm_mmu_get_page(struct kvm_vcpu *vcpu,
 			goto trace_get_page;
 
 		if (sp->unsync) {
-			/* The page is good, but __kvm_sync_page might still end
-			 * up zapping it.  If so, break in order to rebuild it.
+			/*
+			 * The page is good, but is stale.  "Sync" the page to
+			 * get the latest guest state, but don't write-protect
+			 * the page and don't mark it synchronized!  KVM needs
+			 * to ensure the mapping is valid, but doesn't need to
+			 * fully sync (write-protect) the page until the guest
+			 * invalidates the TLB mapping.  This allows multiple
+			 * SPs for a single gfn to be unsync.
+			 *
+			 * If the sync fails, the page is zapped.  If so, break
+			 * If so, break in order to rebuild it.
 			 */
-			if (!__kvm_sync_page(vcpu, sp, &invalid_list))
+			if (!kvm_sync_page(vcpu, sp, &invalid_list))
 				break;
 
 			WARN_ON(!list_empty(&invalid_list));
