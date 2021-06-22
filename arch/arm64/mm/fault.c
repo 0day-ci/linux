@@ -529,10 +529,22 @@ static int __kprobes do_page_fault(unsigned long far, unsigned int esr,
 	vm_fault_t fault;
 	unsigned long vm_flags;
 	unsigned int mm_flags = FAULT_FLAG_DEFAULT;
-	unsigned long addr = untagged_addr(far);
+	unsigned long addr;
 
 	if (kprobe_page_fault(regs, esr))
 		return 0;
+
+	/*
+	 * If TBID0 is set then we may get an IABT with a tagged address here as
+	 * a result of branching to a tagged address. In this case we want to
+	 * avoid untagging the address, let the VMA lookup fail and get a
+	 * SIGSEGV. Leaving the address as is will also work if TBID0 is clear
+	 * or unsupported because the tag bits of FAR_EL1 will be clear.
+	 */
+	if (is_el0_instruction_abort(esr))
+		addr = far;
+	else
+		addr = untagged_addr(far);
 
 	/*
 	 * If we're in an interrupt or have no user context, we must not take

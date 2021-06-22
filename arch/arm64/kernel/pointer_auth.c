@@ -109,3 +109,15 @@ int ptrauth_get_enabled_keys(struct task_struct *tsk)
 
 	return retval;
 }
+
+static int __init tbi_data(char *arg)
+{
+	bool tbi_data;
+
+	if (kstrtobool(arg, &tbi_data))
+		return -EINVAL;
+	if (tbi_data)
+		enable_tcr(TCR_TBID0);
+	return 0;
+}
+early_param("tbi_data", tbi_data);

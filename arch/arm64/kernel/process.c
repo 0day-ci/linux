@@ -644,6 +644,49 @@ void arch_setup_new_exec(void)
 	}
 }
 
+#ifdef CONFIG_ARM64_64K_PAGES
+#define TCR_TG_FLAGS	(TCR_TG0_64K | TCR_TG1_64K)
+#elif defined(CONFIG_ARM64_16K_PAGES)
+#define TCR_TG_FLAGS	(TCR_TG0_16K | TCR_TG1_16K)
+#else /* CONFIG_ARM64_4K_PAGES */
+#define TCR_TG_FLAGS	(TCR_TG0_4K | TCR_TG1_4K)
+#endif
+
+#ifdef CONFIG_RANDOMIZE_BASE
+#define TCR_KASLR_FLAGS	TCR_NFD1
+#else
+#define TCR_KASLR_FLAGS	0
+#endif
+
+#define TCR_SMP_FLAGS	TCR_SHARED
+
+/* PTWs cacheable, inner/outer WBWA */
+#define TCR_CACHE_FLAGS	(TCR_IRGN_WBWA | TCR_ORGN_WBWA)
+
+#ifdef CONFIG_KASAN_SW_TAGS
+#define TCR_KASAN_SW_FLAGS (TCR_TBI1 | TCR_TBID1)
+#else
+#define TCR_KASAN_SW_FLAGS 0
+#endif
+
+u64 __section(".mmuoff.data.read") init_tcr =
+	TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | TCR_TG_FLAGS
+	| TCR_KASLR_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1 | TCR_KASAN_SW_FLAGS;
+EXPORT_SYMBOL(init_tcr);
+
+void __init enable_tcr(u64 tcr)
+{
+	u64 tmp;
+
+	init_tcr |= tcr;
+	__asm__ __volatile__(
+		"mrs %0, tcr_el1\n"
+		"orr %0, %0, %1\n"
+		"msr tcr_el1, %0\n"
+		"tlbi vmalle1\n"
+	 : "=&r"(tmp) : "r"(tcr));
+}
+
 #ifdef CONFIG_ARM64_TAGGED_ADDR_ABI
 /*
  * Control the relaxed ABI allowing tagged user addresses into the kernel.

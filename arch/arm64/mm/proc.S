@@ -20,31 +20,6 @@
 #include <asm/smp.h>
 #include <asm/sysreg.h>
 
-#ifdef CONFIG_ARM64_64K_PAGES
-#define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
-#elif defined(CONFIG_ARM64_16K_PAGES)
-#define TCR_TG_FLAGS	TCR_TG0_16K | TCR_TG1_16K
-#else /* CONFIG_ARM64_4K_PAGES */
-#define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
-#endif
-
-#ifdef CONFIG_RANDOMIZE_BASE
-#define TCR_KASLR_FLAGS	TCR_NFD1
-#else
-#define TCR_KASLR_FLAGS	0
-#endif
-
-#define TCR_SMP_FLAGS	TCR_SHARED
-
-/* PTWs cacheable, inner/outer WBWA */
-#define TCR_CACHE_FLAGS	TCR_IRGN_WBWA | TCR_ORGN_WBWA
-
-#ifdef CONFIG_KASAN_SW_TAGS
-#define TCR_KASAN_SW_FLAGS TCR_TBI1 | TCR_TBID1
-#else
-#define TCR_KASAN_SW_FLAGS 0
-#endif
-
 #ifdef CONFIG_KASAN_HW_TAGS
 #define TCR_KASAN_HW_FLAGS SYS_TCR_EL1_TCMA1 | TCR_TBI1 | TCR_TBID1
 #else
@@ -425,9 +400,7 @@ SYM_FUNC_START(__cpu_setup)
 	mair	.req	x17
 	tcr	.req	x16
 	mov_q	mair, MAIR_EL1_SET
-	mov_q	tcr, TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
-			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
-			TCR_TBI0 | TCR_A1 | TCR_KASAN_SW_FLAGS
+	ldr_l	tcr, init_tcr
 
 #ifdef CONFIG_ARM64_MTE
 	/*

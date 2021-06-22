@@ -253,6 +253,8 @@ unsigned long get_wchan(struct task_struct *p);
 
 void set_task_sctlr_el1(u64 sctlr);
 
+void enable_tcr(u64 tcr);
+
 /* Thread switching */
 extern struct task_struct *cpu_switch_to(struct task_struct *prev,
 					 struct task_struct *next);

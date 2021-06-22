@@ -894,13 +894,11 @@ static int pac_mask_get(struct task_struct *target,
 {
 	/*
 	 * The PAC bits can differ across data and instruction pointers
-	 * depending on TCR_EL1.TBID*, which we may make use of in future, so
-	 * we expose separate masks.
+	 * depending on TCR_EL1.TBID0, so we expose separate masks.
 	 */
-	unsigned long mask = ptrauth_user_pac_mask();
 	struct user_pac_mask uregs = {
-		.data_mask = mask,
-		.insn_mask = mask,
+		.data_mask = ptrauth_user_data_pac_mask(),
+		.insn_mask = ptrauth_user_insn_pac_mask(),
 	};
 
 	if (!system_supports_address_auth())

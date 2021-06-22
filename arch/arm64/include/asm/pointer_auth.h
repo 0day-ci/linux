@@ -92,7 +92,7 @@ extern int ptrauth_get_enabled_keys(struct task_struct *tsk);
 
 static inline unsigned long ptrauth_strip_insn_pac(unsigned long ptr)
 {
-	return ptrauth_clear_pac(ptr);
+	return ptrauth_clear_insn_pac(ptr);
 }
 
 static __always_inline void ptrauth_enable(void)
