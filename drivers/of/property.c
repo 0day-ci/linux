@@ -650,15 +650,7 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 	 * parent port node.
 	 */
 	if (!prev) {
-		struct device_node *node;
-
-		node = of_get_child_by_name(parent, "ports");
-		if (node)
-			parent = node;
-
-		port = of_get_child_by_name(parent, "port");
-		of_node_put(node);
-
+		port = of_graph_get_next_port(parent, NULL);
 		if (!port) {
 			pr_err("graph: no port node found in %pOF\n", parent);
 			return NULL;
@@ -685,14 +677,59 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 		/* No more endpoints under this port, try the next one. */
 		prev = NULL;
 
+		port = of_graph_get_next_port(parent, port);
+		if (!port)
+			return NULL;
+	}
+}
+EXPORT_SYMBOL(of_graph_get_next_endpoint);
+
+/**
+ * of_graph_get_next_port() - get next port node
+ * @parent: pointer to the parent device node
+ * @prev: previous port node, or NULL to get first
+ *
+ * Return: An 'port' node pointer with refcount incremented. Refcount
+ * of the passed @prev node is decremented.
+ */
+struct device_node *of_graph_get_next_port(const struct device_node *parent,
+					   struct device_node *prev)
+{
+	struct device_node *port = prev;
+
+	if (!parent)
+		return NULL;
+
+	/*
+	 * Start by locating the port node. If no previous endpoint is specified
+	 * search for the first port node, otherwise get the previous endpoint
+	 * parent port node.
+	 */
+	if (!port) {
+		struct device_node *node;
+
+		node = of_get_child_by_name(parent, "ports");
+		if (node)
+			parent = node;
+
+		port = of_get_child_by_name(parent, "port");
+		of_node_put(node);
+
+		if (!port) {
+			pr_err("graph: no port node found in %pOF\n", parent);
+			return NULL;
+		}
+	} else {
 		do {
 			port = of_get_next_child(parent, port);
 			if (!port)
 				return NULL;
 		} while (!of_node_name_eq(port, "port"));
 	}
+
+	return port;
 }
-EXPORT_SYMBOL(of_graph_get_next_endpoint);
+EXPORT_SYMBOL(of_graph_get_next_port);
 
 /**
  * of_graph_get_endpoint_by_regs() - get endpoint node of specific identifiers
@@ -818,6 +855,18 @@ int of_graph_get_endpoint_count(const struct device_node *np)
 	return num;
 }
 EXPORT_SYMBOL(of_graph_get_endpoint_count);
+
+int of_graph_get_port_count(const struct device_node *np)
+{
+	struct device_node *port;
+	int num = 0;
+
+	for_each_port_of_node(np, port)
+		num++;
+
+	return num;
+}
+EXPORT_SYMBOL(of_graph_get_port_count);
 
 /**
  * of_graph_get_remote_node() - get remote parent device_node for given port/endpoint

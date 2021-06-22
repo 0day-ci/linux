@@ -27,6 +27,17 @@ struct of_endpoint {
 };
 
 /**
+ * for_each_port_of_node - iterate over every port in a device node
+ * @parent: parent device node containing ports and port
+ * @child: loop variable pointing to the current port node
+ *
+ * When breaking out of the loop, of_node_put(child) has to be called manually.
+ */
+#define for_each_port_of_node(parent, child)			\
+	for (child = of_graph_get_next_port(parent, NULL); child != NULL; \
+	     child = of_graph_get_next_port(parent, child))
+
+/**
  * for_each_endpoint_of_node - iterate over every endpoint in a device node
  * @parent: parent device node containing ports and endpoints
  * @child: loop variable pointing to the current endpoint node
@@ -41,8 +52,11 @@ struct of_endpoint {
 bool of_graph_is_present(const struct device_node *node);
 int of_graph_parse_endpoint(const struct device_node *node,
 				struct of_endpoint *endpoint);
+int of_graph_get_port_count(const struct device_node *np);
 int of_graph_get_endpoint_count(const struct device_node *np);
 struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
+struct device_node *of_graph_get_next_port(const struct device_node *parent,
+					   struct device_node *previous);
 struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 					struct device_node *previous);
 struct device_node *of_graph_get_endpoint_by_regs(
