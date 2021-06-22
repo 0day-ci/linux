@@ -7,6 +7,7 @@
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/mgmt.h>
 
+#include "hci_sync.h"
 #include "hci_request.h"
 #include "mgmt_util.h"
 #include "msft.h"
@@ -165,7 +166,7 @@ static void reregister_monitor_on_restart(struct hci_dev *hdev, int handle)
 		if (!monitor) {
 			/* All monitors have been reregistered */
 			msft->reregistering = false;
-			hci_update_background_scan(hdev);
+			hci_update_scan(hdev);
 			return;
 		}
 
