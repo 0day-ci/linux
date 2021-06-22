@@ -513,7 +513,8 @@ static ktime_t __hrtimer_next_event_base(struct hrtimer_cpu_base *cpu_base,
 
 		next = timerqueue_getnext(&base->active);
 		timer = container_of(next, struct hrtimer, node);
-		if (timer == exclude) {
+		if ((timer == exclude) ||
+		(tick_nohz_tick_inidle() && timer->is_suspend)) {
 			/* Get to the next timer in the queue. */
 			next = timerqueue_iterate_next(next);
 			if (!next)
@@ -1422,6 +1423,7 @@ static void __hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
 	base += hrtimer_clockid_to_base(clock_id);
 	timer->is_soft = softtimer;
 	timer->is_hard = !!(mode & HRTIMER_MODE_HARD);
+	timer->is_suspend = !!(mode & HRTIMER_MODE_SUSPEND);
 	timer->base = &cpu_base->clock_base[base];
 	timerqueue_init(&timer->node);
 }
