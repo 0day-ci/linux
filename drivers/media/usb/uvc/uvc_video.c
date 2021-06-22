@@ -192,9 +192,33 @@ static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
 	if ((ctrl->dwMaxPayloadTransferSize & 0xffff0000) == 0xffff0000)
 		ctrl->dwMaxPayloadTransferSize &= ~0xffff0000;
 
-	if (!(format->flags & UVC_FMT_FLAG_COMPRESSED) &&
-	    stream->dev->quirks & UVC_QUIRK_FIX_BANDWIDTH &&
-	    stream->intf->num_altsetting > 1) {
+
+	if (!(stream->dev->quirks & UVC_QUIRK_FIX_BANDWIDTH))
+		return;
+
+	/* Handle UVC_QUIRK_FIX_BANDWIDTH */
+
+	if (format->flags & UVC_FMT_FLAG_COMPRESSED) {
+		u32 bandwidth;
+
+		if (!stream->dev->info->max_bandwidth || !frame->bFrameIntervalType)
+			return;
+
+		for (i = 0; i < frame->bFrameIntervalType; ++i) {
+			bandwidth = frame->wWidth * frame->wHeight;
+			bandwidth *= 10000000 / frame->dwFrameInterval[i];
+
+			if (bandwidth <= stream->dev->info->max_bandwidth)
+				break;
+		}
+
+		if (ctrl->dwFrameInterval < frame->dwFrameInterval[i])
+			ctrl->dwFrameInterval = frame->dwFrameInterval[i];
+
+		return;
+	}
+
+	if (stream->intf->num_altsetting > 1) {
 		u32 interval;
 		u32 bandwidth;
 

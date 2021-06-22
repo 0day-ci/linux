@@ -2647,6 +2647,11 @@ static const struct uvc_device_info uvc_quirk_fix_bandwidth = {
 	.quirks = UVC_QUIRK_FIX_BANDWIDTH,
 };
 
+static const struct uvc_device_info uvc_quirk_fix_bw_622 = {
+	.quirks = UVC_QUIRK_FIX_BANDWIDTH,
+	.max_bandwidth = 62208000,
+};
+
 static const struct uvc_device_info uvc_quirk_probe_def = {
 	.quirks = UVC_QUIRK_PROBE_DEF,
 };
@@ -2862,6 +2867,15 @@ static const struct usb_device_id uvc_ids[] = {
 	  .bInterfaceSubClass	= 1,
 	  .bInterfaceProtocol	= 0,
 	  .driver_info		= (kernel_ulong_t)&uvc_quirk_fix_bandwidth },
+	/* MacroSilicon HDMI capture */
+	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
+				| USB_DEVICE_ID_MATCH_INT_INFO,
+	  .idVendor		= 0x534d,
+	  .idProduct		= 0x2109,
+	  .bInterfaceClass	= USB_CLASS_VIDEO,
+	  .bInterfaceSubClass	= 1,
+	  .bInterfaceProtocol	= 0,
+	  .driver_info		= (kernel_ulong_t)&uvc_quirk_fix_bw_622 },
 	/* Genesys Logic USB 2.0 PC Camera */
 	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 				| USB_DEVICE_ID_MATCH_INT_INFO,
