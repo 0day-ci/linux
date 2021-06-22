@@ -2044,31 +2044,68 @@ EXPORT_SYMBOL(dev_driver_string);
 
 #define to_dev_attr(_attr) container_of(_attr, struct device_attribute, attr)
 
+struct bus_type *bus_get(struct bus_type *bus);
+void bus_put(struct bus_type *bus);
+
 static ssize_t dev_attr_show(struct kobject *kobj, struct attribute *attr,
 			     char *buf)
 {
-	struct device_attribute *dev_attr = to_dev_attr(attr);
-	struct device *dev = kobj_to_dev(kobj);
+	struct device_attribute *dev_attr;
+	struct device *dev;
+	struct bus_type *bus = NULL;
 	ssize_t ret = -EIO;
 
+	dev = get_device(kobj_to_dev(kobj));
+	if (!dev)
+		return ret;
+
+	if (dev->bus) {
+		bus = bus_get(dev->bus);
+		if (!bus)
+			goto out;
+	}
+
+	dev_attr = to_dev_attr(attr);
 	if (dev_attr->show)
 		ret = dev_attr->show(dev, dev_attr, buf);
 	if (ret >= (ssize_t)PAGE_SIZE) {
 		printk("dev_attr_show: %pS returned bad count\n",
 				dev_attr->show);
 	}
+
+	bus_put(bus);
+out:
+	put_device(dev);
+
 	return ret;
 }
 
 static ssize_t dev_attr_store(struct kobject *kobj, struct attribute *attr,
 			      const char *buf, size_t count)
 {
-	struct device_attribute *dev_attr = to_dev_attr(attr);
-	struct device *dev = kobj_to_dev(kobj);
+	struct device_attribute *dev_attr;
+	struct device *dev;
+	struct bus_type *bus = NULL;
 	ssize_t ret = -EIO;
 
+	dev = get_device(kobj_to_dev(kobj));
+	if (!dev)
+		return ret;
+
+	if (dev->bus) {
+		bus = bus_get(dev->bus);
+		if (!bus)
+			goto out;
+	}
+
+	dev_attr = to_dev_attr(attr);
 	if (dev_attr->store)
 		ret = dev_attr->store(dev, dev_attr, buf, count);
+
+	bus_put(bus);
+out:
+	put_device(dev);
+
 	return ret;
 }
 
