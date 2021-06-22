@@ -166,34 +166,65 @@ int cw1200_reg_write(struct cw1200_common *priv, u16 addr,
 static inline int cw1200_reg_read_16(struct cw1200_common *priv,
 				     u16 addr, u16 *val)
 {
-	__le32 tmp;
+	__le32 *tmp;
 	int i;
-	i = cw1200_reg_read(priv, addr, &tmp, sizeof(tmp));
-	*val = le32_to_cpu(tmp) & 0xfffff;
+
+	tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+
+	i = cw1200_reg_read(priv, addr, tmp, sizeof(*tmp));
+	*val = le32_to_cpu(*tmp) & 0xfffff;
+	kfree(tmp);
 	return i;
 }
 
 static inline int cw1200_reg_write_16(struct cw1200_common *priv,
 				      u16 addr, u16 val)
 {
-	__le32 tmp = cpu_to_le32((u32)val);
-	return cw1200_reg_write(priv, addr, &tmp, sizeof(tmp));
+	__le32 *tmp;
+	int i;
+
+	tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+
+	*tmp = cpu_to_le32((u32)val);
+	i = cw1200_reg_write(priv, addr, tmp, sizeof(*tmp));
+	kfree(tmp);
+	return i;
 }
 
 static inline int cw1200_reg_read_32(struct cw1200_common *priv,
 				     u16 addr, u32 *val)
 {
-	__le32 tmp;
-	int i = cw1200_reg_read(priv, addr, &tmp, sizeof(tmp));
-	*val = le32_to_cpu(tmp);
+	__le32 *tmp;
+	int i;
+
+	tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+
+	i = cw1200_reg_read(priv, addr, tmp, sizeof(*tmp));
+	*val = le32_to_cpu(*tmp);
+	kfree(tmp);
 	return i;
 }
 
 static inline int cw1200_reg_write_32(struct cw1200_common *priv,
 				      u16 addr, u32 val)
 {
-	__le32 tmp = cpu_to_le32(val);
-	return cw1200_reg_write(priv, addr, &tmp, sizeof(val));
+	__le32 *tmp;
+	int i;
+
+	tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
+
+	*tmp = cpu_to_le32(val);
+	i = cw1200_reg_write(priv, addr, tmp, sizeof(val));
+	kfree(tmp);
+	return i;
 }
 
 int cw1200_indirect_read(struct cw1200_common *priv, u32 addr, void *buf,
