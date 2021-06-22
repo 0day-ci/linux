@@ -321,6 +321,12 @@ struct amdgpu_vm {
 	bool			bulk_moveable;
 	/* Flag to indicate if VM is used for compute */
 	bool			is_compute_context;
+	/*
+	 * Flag to indicate whether implicit sync should always be skipped on
+	 * this context. We do not care about races at all, userspace is allowed
+	 * to shoot itself with implicit sync to its fullest liking.
+	 */
+	bool no_implicit_sync;
 };
 
 struct amdgpu_vm_manager {

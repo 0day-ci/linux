@@ -498,6 +498,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	struct amdgpu_bo *gds;
 	struct amdgpu_bo *gws;
 	struct amdgpu_bo *oa;
+	bool no_implicit_sync = READ_ONCE(fpriv->vm.no_implicit_sync);
 	int r;
 
 	INIT_LIST_HEAD(&p->validated);
@@ -577,7 +578,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 		e->bo_va = amdgpu_vm_bo_find(vm, bo);
 
-		if (bo->tbo.base.dma_buf && !amdgpu_bo_explicit_sync(bo)) {
+		if (bo->tbo.base.dma_buf &&
+		    !(no_implicit_sync || amdgpu_bo_explicit_sync(bo))) {
 			e->chain = dma_fence_chain_alloc();
 			if (!e->chain) {
 				r = -ENOMEM;
@@ -649,6 +651,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 {
 	struct amdgpu_fpriv *fpriv = p->filp->driver_priv;
 	struct amdgpu_bo_list_entry *e;
+	bool no_implicit_sync = READ_ONCE(fpriv->vm.no_implicit_sync);
 	int r;
 
 	list_for_each_entry(e, &p->validated, tv.head) {
@@ -656,7 +659,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 		struct dma_resv *resv = bo->tbo.base.resv;
 		enum amdgpu_sync_mode sync_mode;
 
-		sync_mode = amdgpu_bo_explicit_sync(bo) ?
+		sync_mode = no_implicit_sync || amdgpu_bo_explicit_sync(bo) ?
 			AMDGPU_SYNC_EXPLICIT : AMDGPU_SYNC_NE_OWNER;
 		r = amdgpu_sync_resv(p->adev, &p->job->sync, resv, sync_mode,
 				     &fpriv->vm);
