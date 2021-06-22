@@ -1444,14 +1444,16 @@ static int __ip6_append_data(struct sock *sk,
 	struct ipv6_txoptions *opt = v6_cork->opt;
 	int csummode = CHECKSUM_NONE;
 	unsigned int maxnonfragsize, headersize;
+	bool has_sg, paged, extra_uref = false;
 	unsigned int wmem_alloc_delta = 0;
-	bool paged, extra_uref = false;
 
 	skb = skb_peek_tail(queue);
 	if (!skb) {
 		exthdrlen = opt ? opt->opt_flen : 0;
 		dst_exthdrlen = rt->dst.header_len - rt->rt6i_nfheader_len;
 	}
+
+	has_sg = rt->dst.dev->features & NETIF_F_SG;
 
 	paged = !!cork->gso_size;
 	mtu = cork->gso_size ? IP6_MAX_MTU : cork->fragsize;
@@ -1515,8 +1517,7 @@ emsgsize:
 		if (!uarg)
 			return -ENOBUFS;
 		extra_uref = !skb_zcopy(skb);	/* only ref on new uarg */
-		if (rt->dst.dev->features & NETIF_F_SG &&
-		    csummode == CHECKSUM_PARTIAL) {
+		if (has_sg && csummode == CHECKSUM_PARTIAL) {
 			paged = true;
 		} else {
 			uarg->zerocopy = 0;
@@ -1582,8 +1583,7 @@ alloc_new_skb:
 			fraglen = datalen + fragheaderlen;
 			pagedlen = 0;
 
-			if ((flags & MSG_MORE) &&
-			    !(rt->dst.dev->features&NETIF_F_SG))
+			if ((flags & MSG_MORE) && !has_sg)
 				alloclen = mtu;
 			else if (!paged)
 				alloclen = fraglen;
@@ -1698,8 +1698,7 @@ alloc_new_skb:
 		if (copy > length)
 			copy = length;
 
-		if (!(rt->dst.dev->features&NETIF_F_SG) &&
-		    skb_tailroom(skb) >= copy) {
+		if (!has_sg && skb_tailroom(skb) >= copy) {
 			unsigned int off;
 
 			off = skb->len;
