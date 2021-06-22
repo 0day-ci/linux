@@ -54,8 +54,10 @@ struct rcar_du_output_routing {
  * @quirks: device quirks (RCAR_DU_QUIRK_*)
  * @channels_mask: bit mask of available DU channels
  * @routes: array of CRTC to output routes, indexed by output (RCAR_DU_OUTPUT_*)
+ * @num_dsi: number of internal DSI encoders
  * @num_lvds: number of internal LVDS encoders
  * @dpll_mask: bit mask of DU channels equipped with a DPLL
+ * @dsi_clk_mask: bitmask of channels that can use the DSI clock as dot clock
  * @lvds_clk_mask: bitmask of channels that can use the LVDS clock as dot clock
  */
 struct rcar_du_device_info {
@@ -64,8 +66,10 @@ struct rcar_du_device_info {
 	unsigned int quirks;
 	unsigned int channels_mask;
 	struct rcar_du_output_routing routes[RCAR_DU_OUTPUT_MAX];
+	unsigned int num_dsi;
 	unsigned int num_lvds;
 	unsigned int dpll_mask;
+	unsigned int dsi_clk_mask;
 	unsigned int lvds_clk_mask;
 };
 
@@ -73,6 +77,7 @@ struct rcar_du_device_info {
 #define RCAR_DU_MAX_GROUPS		DIV_ROUND_UP(RCAR_DU_MAX_CRTCS, 2)
 #define RCAR_DU_MAX_VSPS		4
 #define RCAR_DU_MAX_LVDS		2
+#define RCAR_DU_MAX_DSI			2
 
 struct rcar_du_device {
 	struct device *dev;
@@ -89,6 +94,7 @@ struct rcar_du_device {
 	struct platform_device *cmms[RCAR_DU_MAX_CRTCS];
 	struct rcar_du_vsp vsps[RCAR_DU_MAX_VSPS];
 	struct drm_bridge *lvds[RCAR_DU_MAX_LVDS];
+	struct drm_bridge *dsi[RCAR_DU_MAX_DSI];
 
 	struct {
 		struct drm_property *colorkey;

@@ -31,6 +31,7 @@
 #include "rcar_du_regs.h"
 #include "rcar_du_vsp.h"
 #include "rcar_lvds.h"
+#include "rcar_mipi_dsi.h"
 
 static u32 rcar_du_crtc_read(struct rcar_du_crtc *rcrtc, u32 reg)
 {
@@ -737,6 +738,16 @@ static void rcar_du_crtc_atomic_enable(struct drm_crtc *crtc,
 		rcar_lvds_clk_enable(bridge, mode->clock * 1000);
 	}
 
+	/*
+	 * On V3U the dot clock is provided by the MIPI DSI encoder which is
+	 * attached to DU. So, the MIPI DSI module should be enable before starting DU.
+	 */
+	if (rcdu->info->dsi_clk_mask & BIT(rcrtc->index)) {
+		struct drm_bridge *bridge = rcdu->dsi[rcrtc->index];
+
+		rcar_mipi_dsi_clk_enable(bridge);
+	}
+
 	rcar_du_crtc_start(rcrtc);
 
 	/*
@@ -768,6 +779,15 @@ static void rcar_du_crtc_atomic_disable(struct drm_crtc *crtc,
 		 * rcar_du_crtc_atomic_enable().
 		 */
 		rcar_lvds_clk_disable(bridge);
+	}
+
+	if (rcdu->info->dsi_clk_mask & BIT(rcrtc->index)) {
+		struct drm_bridge *bridge = rcdu->dsi[rcrtc->index];
+
+		/*
+		 * Disable the MIPI DSI clock output
+		 */
+		rcar_mipi_dsi_clk_disable(bridge);
 	}
 
 	spin_lock_irq(&crtc->dev->event_lock);
