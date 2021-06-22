@@ -2851,7 +2851,10 @@ static int tsi721_probe(struct pci_dev *pdev,
 			tsi_info(&pdev->dev, "Unable to set consistent DMA mask");
 	}
 
-	BUG_ON(!pci_is_pcie(pdev));
+	if (!pci_is_pcie(pdev)) {
+		tsi_err(&pdev->dev, "Can't find PCI Express capability");
+		goto err_unmap_bars;
+	}
 
 	/* Clear "no snoop" and "relaxed ordering" bits. */
 	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
