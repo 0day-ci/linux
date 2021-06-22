@@ -1134,12 +1134,12 @@ static ssize_t debug_stat_show(struct device *dev,
 	return ret;
 }
 
-static DEVICE_ATTR_RO(io_stat);
-static DEVICE_ATTR_RO(mm_stat);
+MODULE_DEVICE_ATTR_RO(io_stat);
+MODULE_DEVICE_ATTR_RO(mm_stat);
 #ifdef CONFIG_ZRAM_WRITEBACK
-static DEVICE_ATTR_RO(bd_stat);
+MODULE_DEVICE_ATTR_RO(bd_stat);
 #endif
-static DEVICE_ATTR_RO(debug_stat);
+MODULE_DEVICE_ATTR_RO(debug_stat);
 
 static void zram_meta_free(struct zram *zram, u64 disksize)
 {
@@ -1861,44 +1861,44 @@ static const struct block_device_operations zram_wb_devops = {
 	.owner = THIS_MODULE
 };
 
-static DEVICE_ATTR_WO(compact);
-static DEVICE_ATTR_RW(disksize);
-static DEVICE_ATTR_RO(initstate);
-static DEVICE_ATTR_WO(reset);
-static DEVICE_ATTR_WO(mem_limit);
-static DEVICE_ATTR_WO(mem_used_max);
-static DEVICE_ATTR_WO(idle);
-static DEVICE_ATTR_RW(max_comp_streams);
-static DEVICE_ATTR_RW(comp_algorithm);
+MODULE_DEVICE_ATTR_WO(compact);
+MODULE_DEVICE_ATTR_RW(disksize);
+MODULE_DEVICE_ATTR_RO(initstate);
+MODULE_DEVICE_ATTR_WO(reset);
+MODULE_DEVICE_ATTR_WO(mem_limit);
+MODULE_DEVICE_ATTR_WO(mem_used_max);
+MODULE_DEVICE_ATTR_WO(idle);
+MODULE_DEVICE_ATTR_RW(max_comp_streams);
+MODULE_DEVICE_ATTR_RW(comp_algorithm);
 #ifdef CONFIG_ZRAM_WRITEBACK
-static DEVICE_ATTR_RW(backing_dev);
-static DEVICE_ATTR_WO(writeback);
-static DEVICE_ATTR_RW(writeback_limit);
-static DEVICE_ATTR_RW(writeback_limit_enable);
+MODULE_DEVICE_ATTR_RW(backing_dev);
+MODULE_DEVICE_ATTR_WO(writeback);
+MODULE_DEVICE_ATTR_RW(writeback_limit);
+MODULE_DEVICE_ATTR_RW(writeback_limit_enable);
 #endif
 
 static struct attribute *zram_disk_attrs[] = {
-	&dev_attr_disksize.attr,
-	&dev_attr_initstate.attr,
-	&dev_attr_reset.attr,
-	&dev_attr_compact.attr,
-	&dev_attr_mem_limit.attr,
-	&dev_attr_mem_used_max.attr,
-	&dev_attr_idle.attr,
-	&dev_attr_max_comp_streams.attr,
-	&dev_attr_comp_algorithm.attr,
+	&dev_attr_module_disksize.attr,
+	&dev_attr_module_initstate.attr,
+	&dev_attr_module_reset.attr,
+	&dev_attr_module_compact.attr,
+	&dev_attr_module_mem_limit.attr,
+	&dev_attr_module_mem_used_max.attr,
+	&dev_attr_module_idle.attr,
+	&dev_attr_module_max_comp_streams.attr,
+	&dev_attr_module_comp_algorithm.attr,
 #ifdef CONFIG_ZRAM_WRITEBACK
-	&dev_attr_backing_dev.attr,
-	&dev_attr_writeback.attr,
-	&dev_attr_writeback_limit.attr,
-	&dev_attr_writeback_limit_enable.attr,
+	&dev_attr_module_backing_dev.attr,
+	&dev_attr_module_writeback.attr,
+	&dev_attr_module_writeback_limit.attr,
+	&dev_attr_module_writeback_limit_enable.attr,
 #endif
-	&dev_attr_io_stat.attr,
-	&dev_attr_mm_stat.attr,
+	&dev_attr_module_io_stat.attr,
+	&dev_attr_module_mm_stat.attr,
 #ifdef CONFIG_ZRAM_WRITEBACK
-	&dev_attr_bd_stat.attr,
+	&dev_attr_module_bd_stat.attr,
 #endif
-	&dev_attr_debug_stat.attr,
+	&dev_attr_module_debug_stat.attr,
 	NULL,
 };
 
@@ -2048,13 +2048,19 @@ static ssize_t hot_add_show(struct class *class,
 {
 	int ret;
 
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
 	mutex_lock(&zram_index_mutex);
 	if (!zram_up) {
 		mutex_unlock(&zram_index_mutex);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto out;
 	}
 	ret = zram_add();
+out:
 	mutex_unlock(&zram_index_mutex);
+	module_put(THIS_MODULE);
 
 	if (ret < 0)
 		return ret;
@@ -2078,6 +2084,9 @@ static ssize_t hot_remove_store(struct class *class,
 	if (dev_id < 0)
 		return -EINVAL;
 
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
 	mutex_lock(&zram_index_mutex);
 
 	if (!zram_up) {
@@ -2096,6 +2105,7 @@ static ssize_t hot_remove_store(struct class *class,
 
 out:
 	mutex_unlock(&zram_index_mutex);
+	module_put(THIS_MODULE);
 	return ret ? ret : count;
 }
 static CLASS_ATTR_WO(hot_remove);
