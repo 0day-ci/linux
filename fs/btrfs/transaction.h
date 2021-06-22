@@ -103,6 +103,8 @@ struct btrfs_transaction {
 	 */
 	atomic64_t chunk_bytes_reserved;
 	wait_queue_head_t chunk_reserve_wait;
+	/* Protected by fs_info->chunk_mutex. */
+	unsigned int chunk_reserve_waiters;
 };
 
 #define __TRANS_FREEZABLE	(1U << 0)

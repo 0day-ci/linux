@@ -388,6 +388,7 @@ loop:
 	spin_lock_init(&cur_trans->releasing_ebs_lock);
 	atomic64_set(&cur_trans->chunk_bytes_reserved, 0);
 	init_waitqueue_head(&cur_trans->chunk_reserve_wait);
+	cur_trans->chunk_reserve_waiters = 0;
 	list_add_tail(&cur_trans->list, &fs_info->trans_list);
 	extent_io_tree_init(fs_info, &cur_trans->dirty_pages,
 			IO_TREE_TRANS_DIRTY_PAGES, fs_info->btree_inode);

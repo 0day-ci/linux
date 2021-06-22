@@ -3238,6 +3238,7 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 	struct btrfs_space_info *space_info;
 	bool wait_for_alloc = false;
 	bool should_alloc = false;
+	bool reset_alloc_state = true;
 	int ret = 0;
 
 	/* Don't re-enter if we're already allocating a chunk */
@@ -3264,16 +3265,37 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 			spin_unlock(&space_info->lock);
 			return 0;
 		} else if (space_info->chunk_alloc) {
-			/*
-			 * Someone is already allocating, so we need to block
-			 * until this someone is finished and then loop to
-			 * recheck if we should continue with our allocation
-			 * attempt.
-			 */
-			wait_for_alloc = true;
 			spin_unlock(&space_info->lock);
-			mutex_lock(&fs_info->chunk_mutex);
-			mutex_unlock(&fs_info->chunk_mutex);
+			if (trans->chunk_bytes_reserved > 0) {
+				/*
+				 * If we have previously allocated a system chunk
+				 * and there is at least one other task waiting
+				 * for us to finish allocation of that chunk and
+				 * release reserved space, do not wait for that
+				 * task because it is waiting on us. Otherwise,
+				 * just wait for the task currently allocating a
+				 * chunk to finish, just like when we have not
+				 * previously allocated a system chunk.
+				 */
+				mutex_lock(&fs_info->chunk_mutex);
+				if (trans->transaction->chunk_reserve_waiters > 0) {
+					reset_alloc_state = false;
+					goto do_alloc;
+				} else {
+					wait_for_alloc = true;
+				}
+				mutex_unlock(&fs_info->chunk_mutex);
+			} else {
+				/*
+				 * Someone is already allocating, so we need to
+				 * block until this someone is finished and then
+				 * loop to recheck if we should continue with our
+				 * allocation attempt.
+				 */
+				wait_for_alloc = true;
+				mutex_lock(&fs_info->chunk_mutex);
+				mutex_unlock(&fs_info->chunk_mutex);
+			}
 		} else {
 			/* Proceed with allocation */
 			space_info->chunk_alloc = 1;
@@ -3285,6 +3307,7 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 	} while (wait_for_alloc);
 
 	mutex_lock(&fs_info->chunk_mutex);
+do_alloc:
 	trans->allocating_chunk = true;
 
 	/*
@@ -3328,7 +3351,8 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 
 	space_info->force_alloc = CHUNK_ALLOC_NO_FORCE;
 out:
-	space_info->chunk_alloc = 0;
+	if (reset_alloc_state)
+		space_info->chunk_alloc = 0;
 	spin_unlock(&space_info->lock);
 	mutex_unlock(&fs_info->chunk_mutex);
 	/*
@@ -3446,11 +3470,13 @@ again:
 		if (reserved > trans->chunk_bytes_reserved) {
 			const u64 min_needed = reserved - thresh;
 
+			cur_trans->chunk_reserve_waiters++;
 			mutex_unlock(&fs_info->chunk_mutex);
 			wait_event(cur_trans->chunk_reserve_wait,
 			   atomic64_read(&cur_trans->chunk_bytes_reserved) <=
 			   min_needed);
 			mutex_lock(&fs_info->chunk_mutex);
+			cur_trans->chunk_reserve_waiters--;
 			goto again;
 		}
 
