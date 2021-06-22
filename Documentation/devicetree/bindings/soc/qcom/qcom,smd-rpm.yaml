@@ -39,6 +39,8 @@ properties:
       - qcom,rpm-msm8996
       - qcom,rpm-msm8998
       - qcom,rpm-sdm660
+      - qcom,rpm-sm4250
+      - qcom,rpm-sm6115
       - qcom,rpm-sm6125
       - qcom,rpm-qcs404
 
