@@ -15,6 +15,7 @@ maintainers:
 properties:
   compatible:
     enum:
+      - fsl,imx8ulp-cm33
       - fsl,imx8mq-cm4
       - fsl,imx8mm-cm4
       - fsl,imx8mn-cm7
