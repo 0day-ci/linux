@@ -333,7 +333,7 @@ int rcu_read_lock_bh_held(void)
 
 	if (rcu_read_lock_held_common(&ret))
 		return ret;
-	return in_softirq() || irqs_disabled();
+	return lock_is_held(&rcu_bh_lock_map) || in_softirq() || irqs_disabled();
 }
 EXPORT_SYMBOL_GPL(rcu_read_lock_bh_held);
 
