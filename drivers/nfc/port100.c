@@ -805,9 +805,15 @@ static void port100_build_cmd_frame(struct port100 *dev, u8 cmd_code,
 	port100_tx_frame_finish(skb->data);
 }
 
+struct port100_sync_cmd_response {
+	struct sk_buff *resp;
+	struct completion done;
+};
+
 static void port100_send_async_complete(struct port100 *dev)
 {
 	struct port100_cmd *cmd = dev->cmd;
+	struct port100_sync_cmd_response *cmd_resp = cmd->complete_cb_context;
 	int status = cmd->status;
 
 	struct sk_buff *req = cmd->req;
@@ -831,6 +837,7 @@ static void port100_send_async_complete(struct port100 *dev)
 	cmd->complete_cb(dev, cmd->complete_cb_context, resp);
 
 done:
+	complete(&cmd_resp->done);
 	kfree(cmd);
 }
 
@@ -882,11 +889,6 @@ static int port100_send_cmd_async(struct port100 *dev, u8 cmd_code,
 
 	return rc;
 }
-
-struct port100_sync_cmd_response {
-	struct sk_buff *resp;
-	struct completion done;
-};
 
 static void port100_wq_cmd_complete(struct work_struct *work)
 {
