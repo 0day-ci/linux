@@ -243,6 +243,7 @@ static irqreturn_t ufshcd_intr(int irq, void *__hba);
 static int ufshcd_change_power_mode(struct ufs_hba *hba,
 			     struct ufs_pa_layer_attr *pwr_mode);
 static void ufshcd_schedule_eh_work(struct ufs_hba *hba);
+static void ufshcd_recover_pm_error(struct ufs_hba *hba);
 static int ufshcd_setup_hba_vreg(struct ufs_hba *hba, bool on);
 static int ufshcd_setup_vreg(struct ufs_hba *hba, bool on);
 static inline int ufshcd_config_vreg_hpm(struct ufs_hba *hba,
@@ -5949,13 +5950,15 @@ static int ufshcd_err_handling_prepare(struct ufs_hba *hba)
 	return 0;
 }
 
-static void ufshcd_err_handling_unprepare(struct ufs_hba *hba)
+static void ufshcd_err_handling_unprepare(struct ufs_hba *hba, int reset_err)
 {
 	ufshcd_clear_eh_in_progress(hba);
 	ufshcd_scsi_unblock_requests(hba);
 	ufshcd_release(hba);
 	if (ufshcd_is_clkscaling_supported(hba))
 		ufshcd_clk_scaling_suspend(hba, false);
+	if (!reset_err)
+		ufshcd_recover_pm_error(hba);
 	ufshcd_clear_ua_wluns(hba);
 	ufshcd_rpm_put(hba);
 	pm_runtime_put(hba->dev);
@@ -5975,34 +5978,26 @@ static inline bool ufshcd_err_handling_should_stop(struct ufs_hba *hba)
 static void ufshcd_recover_pm_error(struct ufs_hba *hba)
 {
 	struct Scsi_Host *shost = hba->host;
-	struct scsi_device *sdev;
-	struct request_queue *q;
+	struct scsi_device *sdev = hba->sdev_ufs_device;
+	struct scsi_target *starget = sdev->sdev_target;
 	int ret;
 
 	hba->is_wlu_sys_suspended = false;
-	/*
-	 * Set RPM status of wlun device to RPM_ACTIVE,
-	 * this also clears its runtime error.
-	 */
-	ret = pm_runtime_set_active(&hba->sdev_ufs_device->sdev_gendev);
 
-	/* hba device might have a runtime error otherwise */
-	if (ret)
-		ret = pm_runtime_set_active(hba->dev);
-	/*
-	 * If wlun device had runtime error, we also need to resume those
-	 * consumer scsi devices in case any of them has failed to be
-	 * resumed due to supplier runtime resume failure. This is to unblock
-	 * blk_queue_enter in case there are bios waiting inside it.
-	 */
-	if (!ret) {
-		shost_for_each_device(sdev, shost) {
-			q = sdev->request_queue;
-			if (q->dev && (q->rpm_status == RPM_SUSPENDED ||
-				       q->rpm_status == RPM_SUSPENDING))
-				pm_request_resume(q->dev);
-		}
+	/* Resume parent/target to clear path for pm_runtime_set_active() */
+	pm_runtime_get_sync(&starget->dev);
+	shost_for_each_device(sdev, shost) {
+		struct device *dev = &sdev->sdev_gendev;
+
+		pm_runtime_get_sync(dev);
+		/* Clear dev->power.runtime_error */
+		ret = pm_runtime_set_active(dev);
+		if (!ret)
+			/* runtime_error cleared, kick blk_queue_enter() */
+			blk_set_runtime_active(sdev->request_queue);
+		pm_runtime_put(dev);
 	}
+	pm_runtime_put(&starget->dev);
 }
 #else
 static inline void ufshcd_recover_pm_error(struct ufs_hba *hba)
@@ -6036,7 +6031,7 @@ static void ufshcd_err_handler(struct work_struct *work)
 	unsigned long flags;
 	bool err_xfer = false;
 	bool err_tm = false;
-	int err = 0, pmc_err;
+	int err = -1, pmc_err;
 	int tag;
 	bool needs_reset = false, needs_restore = false;
 
@@ -6188,8 +6183,6 @@ do_reset:
 		if (err)
 			dev_err(hba->dev, "%s: reset and restore failed with err %d\n",
 					__func__, err);
-		else
-			ufshcd_recover_pm_error(hba);
 		spin_lock_irqsave(hba->host->host_lock, flags);
 	}
 
@@ -6202,7 +6195,7 @@ skip_err_handling:
 			    __func__, hba->saved_err, hba->saved_uic_err);
 	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
-	ufshcd_err_handling_unprepare(hba);
+	ufshcd_err_handling_unprepare(hba, err);
 	up(&hba->host_sem);
 }
 
