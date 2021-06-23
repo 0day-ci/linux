@@ -739,7 +739,11 @@ static int uio_mmap_physical(struct vm_area_struct *vma)
 
 	vma->vm_ops = &uio_physical_vm_ops;
 	if (idev->info->mem[mi].memtype == UIO_MEM_PHYS)
+#if defined(CONFIG_ARM64)
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+#else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 
 	/*
 	 * We cannot use the vm_iomap_memory() helper here,
