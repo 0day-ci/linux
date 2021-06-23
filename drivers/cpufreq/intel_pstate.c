@@ -2538,6 +2538,8 @@ static int intel_pstate_cpu_offline(struct cpufreq_policy *policy)
 
 	pr_debug("CPU %d going offline\n", cpu->cpu);
 
+	intel_pstate_clear_update_util_hook(policy->cpu);
+
 	if (cpu->suspended)
 		return 0;
 
@@ -2575,13 +2577,6 @@ static int intel_pstate_cpu_online(struct cpufreq_policy *policy)
 	}
 
 	return 0;
-}
-
-static void intel_pstate_stop_cpu(struct cpufreq_policy *policy)
-{
-	pr_debug("CPU %d stopping\n", policy->cpu);
-
-	intel_pstate_clear_update_util_hook(policy->cpu);
 }
 
 static int intel_pstate_cpu_exit(struct cpufreq_policy *policy)
@@ -2654,7 +2649,6 @@ static struct cpufreq_driver intel_pstate = {
 	.resume		= intel_pstate_resume,
 	.init		= intel_pstate_cpu_init,
 	.exit		= intel_pstate_cpu_exit,
-	.stop_cpu	= intel_pstate_stop_cpu,
 	.offline	= intel_pstate_cpu_offline,
 	.online		= intel_pstate_cpu_online,
 	.update_limits	= intel_pstate_update_limits,
