@@ -64,12 +64,12 @@ extern int mtk_mdp_debug;
 #define mdp_dbg(level, fmt, ...)\
 	do {\
 		if (mtk_mdp_debug >= (level))\
-			pr_info("[MTK-MDP3] %d %s:%d: " fmt "\n",\
+			pr_info("[MTK-MDP3] %d %s:%d: " fmt,\
 				level, __func__, __LINE__, ##__VA_ARGS__);\
 	} while (0)
 
 #define mdp_err(fmt, ...)\
-	pr_err("[MTK-MDP3][ERR] %s:%d: " fmt "\n", __func__, __LINE__,\
+	pr_err("[MTK-MDP3][ERR] %s:%d: " fmt, __func__, __LINE__,\
 		##__VA_ARGS__)
 
 #else

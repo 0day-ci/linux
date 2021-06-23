@@ -133,7 +133,7 @@ static void mdp_m2m_worker(struct work_struct *work)
 	task.config = ctx->vpu.config;
 	task.param = &param;
 	task.composes[0] = &frame->compose;
-	task.wait = 1;
+	task.wait = 0;
 	task.cmdq_cb = NULL;
 	task.cb_data = NULL;
 	task.mdp_ctx = ctx;
