@@ -130,6 +130,8 @@ static int get_kobj_path_length(struct kobject *kobj)
 {
 	int length = 1;
 	struct kobject *parent = kobj;
+	if (!kobj)
+		return 0;
 
 	/* walk up the ancestors until we hit the one pointing to the
 	 * root.
