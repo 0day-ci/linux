@@ -8971,8 +8971,10 @@ verify_crtc_state(struct intel_crtc *crtc,
 			"(expected %i, found %i)\n",
 			new_crtc_state->hw.active, crtc->active);
 
-	if (new_crtc_state->bigjoiner_slave)
+	if (new_crtc_state->bigjoiner_slave) {
+		pipe_config->shared_dpll = NULL;
 		master = new_crtc_state->bigjoiner_linked_crtc;
+	}
 
 	for_each_encoder_on_crtc(dev, &master->base, encoder) {
 		enum pipe pipe;
