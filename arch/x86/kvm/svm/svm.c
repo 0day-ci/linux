@@ -4286,6 +4286,7 @@ static int svm_smi_allowed(struct kvm_vcpu *vcpu, bool for_injection)
 static int svm_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
+	struct kvm_host_map map_save;
 	int ret;
 
 	if (is_guest_mode(vcpu)) {
@@ -4301,6 +4302,13 @@ static int svm_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 		ret = nested_svm_vmexit(svm);
 		if (ret)
 			return ret;
+
+		/* Save L1 state to L1 HSAVE area as vmcb01 will be used in SMM */
+		if (kvm_vcpu_map(vcpu, gpa_to_gfn(svm->nested.hsave_msr),
+				 &map_save) == -EINVAL)
+			return 1;
+		memcpy(map_save.hva, &svm->vmcb01.ptr->save, sizeof(svm->vmcb01.ptr->save));
+		kvm_vcpu_unmap(vcpu, &map_save, true);
 	}
 	return 0;
 }
@@ -4308,7 +4316,7 @@ static int svm_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 static int svm_leave_smm(struct kvm_vcpu *vcpu, const char *smstate)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
-	struct kvm_host_map map;
+	struct kvm_host_map map, map_save;
 	int ret = 0;
 
 	if (guest_cpuid_has(vcpu, X86_FEATURE_LM)) {
@@ -4332,6 +4340,13 @@ static int svm_leave_smm(struct kvm_vcpu *vcpu, const char *smstate)
 
 			ret = enter_svm_guest_mode(vcpu, vmcb12_gpa, map.hva);
 			kvm_vcpu_unmap(vcpu, &map, true);
+
+			/* Restore L1 state from L1 HSAVE area as vmcb01 was used in SMM */
+			if (kvm_vcpu_map(vcpu, gpa_to_gfn(svm->nested.hsave_msr),
+					 &map_save) == -EINVAL)
+				return 1;
+			memcpy(&svm->vmcb01.ptr->save, map_save.hva, sizeof(svm->vmcb01.ptr->save));
+			kvm_vcpu_unmap(vcpu, &map_save, true);
 		}
 	}
 
