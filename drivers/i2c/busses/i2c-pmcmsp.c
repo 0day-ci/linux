@@ -291,8 +291,13 @@ static int pmcmsptwi_probe(struct platform_device *pldev)
 	}
 
 	/* request the irq */
-	pmcmsptwi_data.irq = platform_get_irq(pldev, 0);
-	if (pmcmsptwi_data.irq) {
+	rc = platform_get_irq(pldev, 0);
+	if (rc == -EPROBE_DEFER)
+		return rc;
+	if (rc <= 0) {
+		pmcmsptwi_data.irq = 0;
+	} else {
+		pmcmsptwi_data.irq = rc;
 		rc = request_irq(pmcmsptwi_data.irq, &pmcmsptwi_interrupt,
 				 IRQF_SHARED, pldev->name, &pmcmsptwi_data);
 		if (rc == 0) {
