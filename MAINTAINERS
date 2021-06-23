@@ -11622,6 +11622,15 @@ F:	Documentation/devicetree/bindings/usb/mediatek,*
 F:	drivers/usb/host/xhci-mtk*
 F:	drivers/usb/mtu3/
 
+MEDIATEK CCMNI DRIVER
+M:	Rocco Yue <rocco.yue@mediatek.com>
+M:	Chao Song <chao.song@mediatek.com>
+M:	Zhuoliang Zhang <zhuoliang.zhang@mediatek.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/networking/device_drivers/cellular/mediatek/ccmni.rst
+F:	drivers/net/ethernet/mediatek/ccmni/
+
 MEGACHIPS STDPXXXX-GE-B850V3-FW LVDS/DP++ BRIDGES
 M:	Peter Senna Tschudin <peter.senna@gmail.com>
 M:	Martin Donnelly <martin.donnelly@ge.com>

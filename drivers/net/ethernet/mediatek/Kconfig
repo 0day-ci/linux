@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
+#
+# MediaTek network device configuration
+#
 config NET_VENDOR_MEDIATEK
 	bool "MediaTek devices"
 	depends on ARCH_MEDIATEK || SOC_MT7621 || SOC_MT7620
@@ -23,5 +26,7 @@ config NET_MEDIATEK_STAR_EMAC
 	help
 	  This driver supports the ethernet MAC IP first used on
 	  MediaTek MT85** SoCs.
+
+source "drivers/net/ethernet/mediatek/ccmni/Kconfig"
 
 endif #NET_VENDOR_MEDIATEK

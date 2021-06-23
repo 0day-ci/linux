@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# MediaTek CCMNI driver
+#
+
+menuconfig MTK_NET_CCMNI
+	tristate "MediaTek CCMNI driver"
+	default n
+	help
+	  Cross Core Multi Network Interface:
+	  If you select this, you will enable the CCMNI module which is used
+	  to shield hardware differences and communicate with kernel netdevice
+	  and be used for handling outgoing/incoimg mobile data. Module provides
+	  virtual network devices which can be used to support different mobile
+	  networks.
