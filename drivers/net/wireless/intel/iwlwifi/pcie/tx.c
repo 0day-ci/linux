@@ -1253,7 +1253,7 @@ static int iwl_fill_data_tbs(struct iwl_trans *trans, struct sk_buff *skb,
 		dma_addr_t tb_phys = dma_map_single(trans->dev,
 						    skb->data + hdr_len,
 						    head_tb_len, DMA_TO_DEVICE);
-		if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+		if (dma_mapping_error(trans->dev, tb_phys))
 			return -EINVAL;
 		trace_iwlwifi_dev_tx_tb(trans->dev, skb, skb->data + hdr_len,
 					tb_phys, head_tb_len);
@@ -1272,7 +1272,7 @@ static int iwl_fill_data_tbs(struct iwl_trans *trans, struct sk_buff *skb,
 		tb_phys = skb_frag_dma_map(trans->dev, frag, 0,
 					   skb_frag_size(frag), DMA_TO_DEVICE);
 
-		if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+		if (dma_mapping_error(trans->dev, tb_phys))
 			return -EINVAL;
 		trace_iwlwifi_dev_tx_tb(trans->dev, skb, skb_frag_address(frag),
 					tb_phys, skb_frag_size(frag));
@@ -1380,7 +1380,7 @@ static int iwl_fill_data_tbs_amsdu(struct iwl_trans *trans, struct sk_buff *skb,
 		hdr_tb_len = hdr_page->pos - start_hdr;
 		hdr_tb_phys = dma_map_single(trans->dev, start_hdr,
 					     hdr_tb_len, DMA_TO_DEVICE);
-		if (unlikely(dma_mapping_error(trans->dev, hdr_tb_phys)))
+		if (dma_mapping_error(trans->dev, hdr_tb_phys))
 			return -EINVAL;
 		iwl_pcie_txq_build_tfd(trans, txq, hdr_tb_phys,
 				       hdr_tb_len, false);
@@ -1400,7 +1400,7 @@ static int iwl_fill_data_tbs_amsdu(struct iwl_trans *trans, struct sk_buff *skb,
 
 			tb_phys = dma_map_single(trans->dev, tso.data,
 						 size, DMA_TO_DEVICE);
-			if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+			if (dma_mapping_error(trans->dev, tb_phys))
 				return -EINVAL;
 
 			iwl_pcie_txq_build_tfd(trans, txq, tb_phys,
@@ -1551,7 +1551,7 @@ int iwl_trans_pcie_tx(struct iwl_trans *trans, struct sk_buff *skb,
 	/* map the data for TB1 */
 	tb1_addr = ((u8 *)&dev_cmd->hdr) + IWL_FIRST_TB_SIZE;
 	tb1_phys = dma_map_single(trans->dev, tb1_addr, tb1_len, DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(trans->dev, tb1_phys)))
+	if (dma_mapping_error(trans->dev, tb1_phys))
 		goto out_err;
 	iwl_pcie_txq_build_tfd(trans, txq, tb1_phys, tb1_len, false);
 

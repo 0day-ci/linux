@@ -211,7 +211,7 @@ static int iwl_txq_gen2_set_tb_with_wa(struct iwl_trans *trans,
 	struct page *page;
 	int ret;
 
-	if (unlikely(dma_mapping_error(trans->dev, phys)))
+	if (dma_mapping_error(trans->dev, phys))
 		return -ENOMEM;
 
 	if (likely(!iwl_txq_crosses_4g_boundary(phys, len))) {
@@ -251,7 +251,7 @@ static int iwl_txq_gen2_set_tb_with_wa(struct iwl_trans *trans,
 
 	phys = dma_map_single(trans->dev, page_address(page), len,
 			      DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(trans->dev, phys)))
+	if (dma_mapping_error(trans->dev, phys))
 		return -ENOMEM;
 	ret = iwl_txq_gen2_set_tb(trans, tfd, phys, len);
 	if (ret < 0) {
@@ -405,7 +405,7 @@ static int iwl_txq_gen2_build_amsdu(struct iwl_trans *trans,
 		tb_len = hdr_page->pos - start_hdr;
 		tb_phys = dma_map_single(trans->dev, start_hdr,
 					 tb_len, DMA_TO_DEVICE);
-		if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+		if (dma_mapping_error(trans->dev, tb_phys))
 			goto out_err;
 		/*
 		 * No need for _with_wa, this is from the TSO page and
@@ -487,7 +487,7 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx_amsdu(struct iwl_trans *trans,
 	/* map the data for TB1 */
 	tb1_addr = ((u8 *)&dev_cmd->hdr) + IWL_FIRST_TB_SIZE;
 	tb_phys = dma_map_single(trans->dev, tb1_addr, len, DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+	if (dma_mapping_error(trans->dev, tb_phys))
 		goto out_err;
 	/*
 	 * No need for _with_wa(), we ensure (via alignment) that the data
@@ -582,7 +582,7 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx(struct iwl_trans *trans,
 	/* map the data for TB1 */
 	tb1_addr = ((u8 *)&dev_cmd->hdr) + IWL_FIRST_TB_SIZE;
 	tb_phys = dma_map_single(trans->dev, tb1_addr, tb1_len, DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
+	if (dma_mapping_error(trans->dev, tb_phys))
 		goto out_err;
 	/*
 	 * No need for _with_wa(), we ensure (via alignment) that the data
