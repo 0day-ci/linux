@@ -97,7 +97,9 @@ static int ufs_bsg_request(struct bsg_job *job)
 
 	bsg_reply->reply_payload_rcv_len = 0;
 
-	ufshcd_rpm_get_sync(hba);
+	ret = ufshcd_get_user_access(hba);
+	if (ret)
+		goto out;
 
 	msgcode = bsg_request->msgcode;
 	switch (msgcode) {
@@ -105,10 +107,8 @@ static int ufs_bsg_request(struct bsg_job *job)
 		desc_op = bsg_request->upiu_req.qr.opcode;
 		ret = ufs_bsg_alloc_desc_buffer(hba, job, &desc_buff,
 						&desc_len, desc_op);
-		if (ret) {
-			ufshcd_rpm_put_sync(hba);
-			goto out;
-		}
+		if (ret)
+			goto out_put_access;
 
 		fallthrough;
 	case UPIU_TRANSACTION_NOP_OUT:
@@ -138,10 +138,8 @@ static int ufs_bsg_request(struct bsg_job *job)
 		break;
 	}
 
-	ufshcd_rpm_put_sync(hba);
-
 	if (!desc_buff)
-		goto out;
+		goto out_put_access;
 
 	if (desc_op == UPIU_QUERY_OPCODE_READ_DESC && desc_len)
 		bsg_reply->reply_payload_rcv_len =
@@ -151,6 +149,8 @@ static int ufs_bsg_request(struct bsg_job *job)
 
 	kfree(desc_buff);
 
+out_put_access:
+	ufshcd_put_user_access(hba);
 out:
 	bsg_reply->result = ret;
 	job->reply_len = sizeof(struct ufs_bsg_reply);

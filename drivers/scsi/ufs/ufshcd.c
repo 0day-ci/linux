@@ -128,15 +128,6 @@ enum {
 	UFSHCD_CAN_QUEUE	= 32,
 };
 
-/* UFSHCD states */
-enum {
-	UFSHCD_STATE_RESET,
-	UFSHCD_STATE_ERROR,
-	UFSHCD_STATE_OPERATIONAL,
-	UFSHCD_STATE_EH_SCHEDULED_FATAL,
-	UFSHCD_STATE_EH_SCHEDULED_NON_FATAL,
-};
-
 /* UFSHCD error handling flags */
 enum {
 	UFSHCD_EH_IN_PROGRESS = (1 << 0),
@@ -253,6 +244,31 @@ static void ufshcd_wb_toggle_flush_during_h8(struct ufs_hba *hba, bool set);
 static inline void ufshcd_wb_toggle_flush(struct ufs_hba *hba, bool enable);
 static void ufshcd_hba_vreg_set_lpm(struct ufs_hba *hba);
 static void ufshcd_hba_vreg_set_hpm(struct ufs_hba *hba);
+
+int ufshcd_get_user_access(struct ufs_hba *hba)
+__acquires(&hba->host_sem)
+{
+	down(&hba->host_sem);
+	if (!ufshcd_is_user_access_allowed(hba)) {
+		up(&hba->host_sem);
+		return -EBUSY;
+	}
+	if (ufshcd_rpm_get_sync(hba)) {
+		ufshcd_rpm_put_sync(hba);
+		up(&hba->host_sem);
+		return -EBUSY;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ufshcd_get_user_access);
+
+void ufshcd_put_user_access(struct ufs_hba *hba)
+__releases(&hba->host_sem)
+{
+	ufshcd_rpm_put_sync(hba);
+	up(&hba->host_sem);
+}
+EXPORT_SYMBOL_GPL(ufshcd_put_user_access);
 
 static inline bool ufshcd_valid_tag(struct ufs_hba *hba, int tag)
 {
@@ -1553,19 +1569,14 @@ static ssize_t ufshcd_clkscale_enable_store(struct device *dev,
 	if (kstrtou32(buf, 0, &value))
 		return -EINVAL;
 
-	down(&hba->host_sem);
-	if (!ufshcd_is_user_access_allowed(hba)) {
-		err = -EBUSY;
-		goto out;
-	}
+	err = ufshcd_get_user_access(hba);
+	if (err)
+		return err;
+	ufshcd_hold(hba, false);
 
 	value = !!value;
 	if (value == hba->clk_scaling.is_enabled)
 		goto out;
-
-	ufshcd_rpm_get_sync(hba);
-	ufshcd_hold(hba, false);
-
 	hba->clk_scaling.is_enabled = value;
 
 	if (value) {
@@ -1578,10 +1589,9 @@ static ssize_t ufshcd_clkscale_enable_store(struct device *dev,
 					__func__, err);
 	}
 
-	ufshcd_release(hba);
-	ufshcd_rpm_put_sync(hba);
 out:
-	up(&hba->host_sem);
+	ufshcd_release(hba);
+	ufshcd_put_user_access(hba);
 	return err ? err : count;
 }
 
@@ -4173,13 +4183,13 @@ int ufshcd_uic_hibern8_exit(struct ufs_hba *hba)
 }
 EXPORT_SYMBOL_GPL(ufshcd_uic_hibern8_exit);
 
-void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit)
+int ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit)
 {
 	unsigned long flags;
 	bool update = false;
 
 	if (!ufshcd_is_auto_hibern8_supported(hba))
-		return;
+		return 0;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	if (hba->ahit != ahit) {
@@ -4190,12 +4200,17 @@ void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit)
 
 	if (update &&
 	    !pm_runtime_suspended(&hba->sdev_ufs_device->sdev_gendev)) {
-		ufshcd_rpm_get_sync(hba);
+		if (ufshcd_rpm_get_sync(hba)) {
+			ufshcd_rpm_put_sync(hba);
+			return -EBUSY;
+		}
 		ufshcd_hold(hba, false);
 		ufshcd_auto_hibern8_enable(hba);
 		ufshcd_release(hba);
 		ufshcd_rpm_put_sync(hba);
 	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ufshcd_auto_hibern8_update);
 

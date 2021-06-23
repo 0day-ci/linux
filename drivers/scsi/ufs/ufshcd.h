@@ -101,6 +101,15 @@ struct uic_command {
 	struct completion done;
 };
 
+/* UFSHCD states */
+enum {
+	UFSHCD_STATE_RESET,
+	UFSHCD_STATE_ERROR,
+	UFSHCD_STATE_OPERATIONAL,
+	UFSHCD_STATE_EH_SCHEDULED_FATAL,
+	UFSHCD_STATE_EH_SCHEDULED_NON_FATAL,
+};
+
 /* Used to differentiate the power management options */
 enum ufs_pm_op {
 	UFS_RUNTIME_PM,
@@ -935,7 +944,9 @@ static inline bool ufshcd_is_wb_allowed(struct ufs_hba *hba)
 
 static inline bool ufshcd_is_user_access_allowed(struct ufs_hba *hba)
 {
-	return !hba->shutting_down;
+	return !hba->shutting_down && !hba->is_sys_suspended &&
+		!hba->is_wlu_sys_suspended &&
+		hba->ufshcd_state == UFSHCD_STATE_OPERATIONAL;
 }
 
 #define ufshcd_writel(hba, val, reg)	\
@@ -1108,7 +1119,7 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	enum flag_idn idn, u8 index, bool *flag_res);
 
 void ufshcd_auto_hibern8_enable(struct ufs_hba *hba);
-void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit);
+int ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit);
 void ufshcd_fixup_dev_quirks(struct ufs_hba *hba, struct ufs_dev_fix *fixups);
 #define SD_ASCII_STD true
 #define SD_RAW false
@@ -1135,6 +1146,8 @@ int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
 int ufshcd_wb_toggle(struct ufs_hba *hba, bool enable);
 int ufshcd_suspend_prepare(struct device *dev);
 void ufshcd_resume_complete(struct device *dev);
+int ufshcd_get_user_access(struct ufs_hba *hba);
+void ufshcd_put_user_access(struct ufs_hba *hba);
 
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
