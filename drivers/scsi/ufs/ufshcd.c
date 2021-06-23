@@ -8925,7 +8925,7 @@ out:
 		ufshcd_release(hba);
 	}
 	hba->wlu_pm_op_in_progress = false;
-	return ret;
+	return ret <= 0 ? ret : -EINVAL;
 }
 
 static int __ufshcd_wl_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
@@ -9012,7 +9012,7 @@ out:
 	hba->clk_gating.is_suspended = false;
 	ufshcd_release(hba);
 	hba->wlu_pm_op_in_progress = false;
-	return ret;
+	return ret <= 0 ? ret : -EINVAL;
 }
 
 static int ufshcd_wl_runtime_suspend(struct device *dev)
