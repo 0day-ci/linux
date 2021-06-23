@@ -246,8 +246,9 @@ static int i915_gem_object_info(struct seq_file *m, void *data)
 		   atomic_read(&i915->mm.free_count),
 		   i915->mm.shrink_memory);
 	for_each_memory_region(mr, i915, id)
-		seq_printf(m, "%s: total:%pa, available:%pa bytes\n",
-			   mr->name, &mr->total, &mr->avail);
+		seq_printf(m, "%s: total:%pa, available:%llu bytes\n",
+			   mr->name, &mr->total,
+			   intel_memory_region_get_avail(mr));
 
 	return 0;
 }

@@ -246,3 +246,16 @@ int i915_ttm_buddy_man_reserve(struct ttm_resource_manager *man,
 	return ret;
 }
 
+/**
+ * i915_ttm_buddy_man_avail - Get the currently available size
+ * @man: The buddy allocator ttm manager
+ *
+ * Return: The available size in bytes
+ */
+u64 i915_ttm_buddy_man_get_avail(struct ttm_resource_manager *man)
+{
+	struct i915_ttm_buddy_manager *bman = to_buddy_manager(man);
+	struct i915_buddy_mm *mm = &bman->mm;
+
+	return mm->avail;
+}

@@ -74,6 +74,7 @@ struct intel_memory_region {
 	resource_size_t io_start;
 	resource_size_t min_page_size;
 	resource_size_t total;
+	/* Do not access directly. Use the accessor instead. */
 	resource_size_t avail;
 
 	u16 type;
@@ -125,4 +126,7 @@ intel_memory_region_set_name(struct intel_memory_region *mem,
 int intel_memory_region_reserve(struct intel_memory_region *mem,
 				resource_size_t offset,
 				resource_size_t size);
+
+u64 intel_memory_region_get_avail(struct intel_memory_region *mem);
+
 #endif

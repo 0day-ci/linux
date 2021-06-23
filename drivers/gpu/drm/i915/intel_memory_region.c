@@ -132,6 +132,21 @@ void intel_memory_region_set_name(struct intel_memory_region *mem,
 	va_end(ap);
 }
 
+/**
+ * intel_memory_region_get_avail - Get the currently available size for the
+ * region
+ * @mr: The memory region
+ *
+ * Return: The available size in bytes
+ */
+u64 intel_memory_region_get_avail(struct intel_memory_region *mr)
+{
+	if (mr->type == INTEL_MEMORY_LOCAL)
+		return i915_ttm_buddy_man_get_avail(mr->region_private);
+
+	return mr->avail;
+}
+
 static void __intel_memory_region_destroy(struct kref *kref)
 {
 	struct intel_memory_region *mem =

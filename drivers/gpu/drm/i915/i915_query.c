@@ -465,7 +465,7 @@ static int query_memregion_info(struct drm_i915_private *i915,
 		info.region.memory_class = mr->type;
 		info.region.memory_instance = mr->instance;
 		info.probed_size = mr->total;
-		info.unallocated_size = mr->avail;
+		info.unallocated_size = intel_memory_region_get_avail(mr);
 
 		if (__copy_to_user(info_ptr, &info, sizeof(info)))
 			return -EFAULT;

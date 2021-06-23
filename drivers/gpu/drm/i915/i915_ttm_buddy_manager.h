@@ -53,4 +53,6 @@ int i915_ttm_buddy_man_fini(struct ttm_device *bdev,
 int i915_ttm_buddy_man_reserve(struct ttm_resource_manager *man,
 			       u64 start, u64 size);
 
+u64 i915_ttm_buddy_man_get_avail(struct ttm_resource_manager *man);
+
 #endif

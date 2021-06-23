@@ -70,6 +70,7 @@ struct i915_buddy_mm {
 	/* Must be at least PAGE_SIZE */
 	u64 chunk_size;
 	u64 size;
+	u64 avail;
 };
 
 static inline u64

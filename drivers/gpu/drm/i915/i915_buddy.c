@@ -80,6 +80,7 @@ int i915_buddy_init(struct i915_buddy_mm *mm, u64 size, u64 chunk_size)
 	size = round_down(size, chunk_size);
 
 	mm->size = size;
+	mm->avail = size;
 	mm->chunk_size = chunk_size;
 	mm->max_order = ilog2(size) - ilog2(chunk_size);
 
@@ -159,6 +160,8 @@ void i915_buddy_fini(struct i915_buddy_mm *mm)
 		i915_block_free(mm, mm->roots[i]);
 	}
 
+	GEM_WARN_ON(mm->avail != mm->size);
+
 	kfree(mm->roots);
 	kfree(mm->free_list);
 	kmem_cache_destroy(mm->slab_blocks);
@@ -235,6 +238,7 @@ void i915_buddy_free(struct i915_buddy_mm *mm,
 		     struct i915_buddy_block *block)
 {
 	GEM_BUG_ON(!i915_buddy_block_is_allocated(block));
+	mm->avail += i915_buddy_block_size(mm, block);
 	__i915_buddy_free(mm, block);
 }
 
@@ -288,6 +292,7 @@ i915_buddy_alloc(struct i915_buddy_mm *mm, unsigned int order)
 	}
 
 	mark_allocated(block);
+	mm->avail -= i915_buddy_block_size(mm, block);
 	kmemleak_update_trace(block);
 	return block;
 
@@ -373,6 +378,7 @@ int i915_buddy_alloc_range(struct i915_buddy_mm *mm,
 			}
 
 			mark_allocated(block);
+			mm->avail -= i915_buddy_block_size(mm, block);
 			list_add_tail(&block->link, &allocated);
 			continue;
 		}
