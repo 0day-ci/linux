@@ -2608,10 +2608,8 @@ static int mpi3mr_issue_iocinit(struct mpi3mr_ioc *mrioc)
 	}
 	drv_info->information_length = cpu_to_le32(data_len);
 	strncpy(drv_info->driver_signature, "Broadcom", sizeof(drv_info->driver_signature));
-	strncpy(drv_info->os_name, utsname()->sysname, sizeof(drv_info->os_name));
-	drv_info->os_name[sizeof(drv_info->os_name) - 1] = 0;
-	strncpy(drv_info->os_version, utsname()->release, sizeof(drv_info->os_version));
-	drv_info->os_version[sizeof(drv_info->os_version) - 1] = 0;
+	memcpy(drv_info->os_name, utsname()->sysname, sizeof(drv_info->os_name) - 1);
+	memcpy(drv_info->os_version, utsname()->release, sizeof(drv_info->os_version) - 1);
 	strncpy(drv_info->driver_name, MPI3MR_DRIVER_NAME, sizeof(drv_info->driver_name));
 	strncpy(drv_info->driver_version, MPI3MR_DRIVER_VERSION, sizeof(drv_info->driver_version));
 	strncpy(drv_info->driver_release_date, MPI3MR_DRIVER_RELDATE, sizeof(drv_info->driver_release_date));
