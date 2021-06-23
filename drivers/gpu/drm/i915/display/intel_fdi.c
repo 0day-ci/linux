@@ -4,7 +4,6 @@
  */
 #include "intel_atomic.h"
 #include "intel_ddi.h"
-#include "intel_ddi_buf_trans.h"
 #include "intel_de.h"
 #include "intel_display_types.h"
 #include "intel_fdi.h"
@@ -569,9 +568,9 @@ void hsw_fdi_link_train(struct intel_encoder *encoder,
 	u32 temp, i, rx_ctl_val;
 	int n_entries;
 
-	intel_ddi_get_buf_trans_fdi(dev_priv, &n_entries);
+	encoder->get_buf_trans(encoder, crtc_state, &n_entries);
 
-	intel_prepare_dp_ddi_buffers(encoder, crtc_state);
+	hsw_prepare_dp_ddi_buffers(encoder, crtc_state);
 
 	/* Set the FDI_RX_MISC pwrdn lanes and the 2 workarounds listed at the
 	 * mode set "sequence for CRT port" document:
