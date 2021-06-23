@@ -2737,7 +2737,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 		 * err handler blocked for too long. So, just fail the scsi cmd
 		 * sent from PM ops, err handler can recover PM error anyways.
 		 */
-		if (hba->wlu_pm_op_in_progress) {
+		if (cmd->request->rq_flags & RQF_PM) {
 			hba->force_reset = true;
 			set_host_byte(cmd, DID_BAD_TARGET);
 			cmd->scsi_done(cmd);
@@ -6984,11 +6984,14 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	int err = 0;
 	struct ufshcd_lrb *lrbp;
 	u32 reg;
+	bool need_eh = false;
 
 	host = cmd->device->host;
 	hba = shost_priv(host);
 	tag = cmd->request->tag;
 	lrbp = &hba->lrb[tag];
+
+	dev_info(hba->dev, "%s: Device abort task at tag %d\n", __func__, tag);
 	if (!ufshcd_valid_tag(hba, tag)) {
 		dev_err(hba->dev,
 			"%s: invalid command tag %d: cmd=0x%p, cmd->request=0x%p",
@@ -7005,9 +7008,6 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 			__func__, tag, hba->outstanding_reqs, reg);
 		goto out;
 	}
-
-	/* Print Transfer Request of aborted task */
-	dev_info(hba->dev, "%s: Device abort task at tag %d\n", __func__, tag);
 
 	/*
 	 * Print detailed info about aborted request.
@@ -7036,21 +7036,21 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	}
 
 	/*
-	 * Task abort to the device W-LUN is illegal. When this command
-	 * will fail, due to spec violation, scsi err handling next step
-	 * will be to send LU reset which, again, is a spec violation.
-	 * To avoid these unnecessary/illegal steps, first we clean up
-	 * the lrb taken by this cmd and re-set it in outstanding_reqs,
-	 * then queue the eh_work and bail.
+	 * This fast path guarantees the cmd always gets aborted successfully,
+	 * meanwhile it invokes the error handler. It allows contexts, which
+	 * are blocked by this cmd, to fail fast. It serves multiple purposes:
+	 * #1 To avoid unnecessary/illagal abort attempts to the W-LU.
+	 * #2 To avoid live lock between eh_work and specific contexts, i.e.,
+	 *    suspend/resume and eh_work itself.
+	 * #3 To let eh_work recover runtime PM error in case abort happens
+	 *    to cmds sent from runtime suspend/resume ops.
 	 */
-	if (lrbp->lun == UFS_UPIU_UFS_DEVICE_WLUN) {
+	if (lrbp->lun == UFS_UPIU_UFS_DEVICE_WLUN ||
+	    (cmd->request->rq_flags & RQF_PM)) {
 		ufshcd_update_evt_hist(hba, UFS_EVT_ABORT, lrbp->lun);
 		__ufshcd_transfer_req_compl(hba, (1UL << tag));
 		set_bit(tag, &hba->outstanding_reqs);
-		spin_lock_irqsave(host->host_lock, flags);
-		hba->force_reset = true;
-		ufshcd_schedule_eh_work(hba);
-		spin_unlock_irqrestore(host->host_lock, flags);
+		need_eh = true;
 		goto out;
 	}
 
@@ -7064,6 +7064,12 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 cleanup:
 		__ufshcd_transfer_req_compl(hba, (1UL << tag));
 out:
+		if (cmd->request->rq_flags & RQF_PM || need_eh) {
+			spin_lock_irqsave(host->host_lock, flags);
+			hba->force_reset = true;
+			ufshcd_schedule_eh_work(hba);
+			spin_unlock_irqrestore(host->host_lock, flags);
+		}
 		err = SUCCESS;
 	} else {
 		dev_err(hba->dev, "%s: failed with err %d\n", __func__, err);
