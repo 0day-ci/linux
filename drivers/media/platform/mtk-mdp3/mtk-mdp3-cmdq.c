@@ -468,71 +468,48 @@ int mdp_cmdq_send(struct mdp_dev *mdp, struct mdp_cmdq_param *param)
 		goto err_destory_pkt;
 	}
 
-	if (param->wait) {
-		ret = cmdq_pkt_flush(cmd.pkt);
-#ifdef MDP_DEBUG
-		if (ret) {
-			struct mdp_func_struct *p_func = mdp_get_func();
+	cb_param = kzalloc(sizeof(*cb_param), GFP_KERNEL);
+	if (!cb_param) {
+		ret = -ENOMEM;
+		goto err_destory_pkt;
+	}
 
-			p_func->mdp_dump_mmsys_config();
-			mdp_dump_info(~0, 1);
-		}
-#endif
-		if (!ret) { /* error handle in mdp_m2m_worker */
-			if (param->mdp_ctx)
-				mdp_m2m_job_finish(param->mdp_ctx);
-		}
+	comps = kcalloc(param->config->num_components, sizeof(*comps),
+			GFP_KERNEL);
+	if (!comps) {
+		mdp_err("%s:comps alloc fail!\n", __func__);
+		ret = -ENOMEM;
+		goto err_destory_pkt;
+	}
+
+	for (i = 0; i < param->config->num_components; i++)
+		memcpy(&comps[i], path.comps[i].comp,
+		       sizeof(struct mdp_comp));
+	cb_param->mdp = mdp;
+	cb_param->user_cmdq_cb = param->cmdq_cb;
+	cb_param->user_cb_data = param->cb_data;
+	cb_param->pkt = cmd.pkt;
+	cb_param->comps = comps;
+	cb_param->num_comps = param->config->num_components;
+	cb_param->mdp_ctx = param->mdp_ctx;
+
+	cmdq_pkt_finalize(cmd.pkt);
+	ret = cmdq_pkt_flush_async(cmd.pkt,
+				   mdp_handle_cmdq_callback,
+				   (void *)cb_param);
+	if (ret) {
+		mdp_err("%s:cmdq_pkt_flush_async fail!\n", __func__);
 		goto err_clock_off;
-	} else {
-		cb_param = kzalloc(sizeof(*cb_param), GFP_KERNEL);
-		if (!cb_param) {
-			ret = -ENOMEM;
-			goto err_destory_pkt;
-		}
-
-		comps = kcalloc(param->config->num_components, sizeof(*comps),
-				GFP_KERNEL);
-		if (!comps) {
-			mdp_err("%s:comps alloc fail!\n", __func__);
-			ret = -ENOMEM;
-			goto err_destory_pkt;
-		}
-
-		for (i = 0; i < param->config->num_components; i++)
-			memcpy(&comps[i], path.comps[i].comp,
-			       sizeof(struct mdp_comp));
-		cb_param->mdp = mdp;
-		cb_param->user_cmdq_cb = param->cmdq_cb;
-		cb_param->user_cb_data = param->cb_data;
-		cb_param->pkt = cmd.pkt;
-		cb_param->comps = comps;
-		cb_param->num_comps = param->config->num_components;
-		cb_param->mdp_ctx = param->mdp_ctx;
-
-		cmdq_pkt_finalize(cmd.pkt);
-		ret = cmdq_pkt_flush_async(cmd.pkt,
-					   mdp_handle_cmdq_callback,
-					   (void *)cb_param);
-		if (ret) {
-			mdp_err("%s:cmdq_pkt_flush_async fail!\n", __func__);
-			goto err_clock_off;
-		}
 	}
 	return 0;
 
 err_clock_off:
-	if (param->wait) {
-		for (i = 0; i < param->config->num_components; i++)
-			mdp_comp_clock_off(&mdp->pdev->dev, path.comps[i].comp);
-	} else {
-		mdp_comp_clocks_off(&mdp->pdev->dev, cb_param->comps,
-					    cb_param->num_comps);
-	}
+	mdp_comp_clocks_off(&mdp->pdev->dev, cb_param->comps,
+				    cb_param->num_comps);
 err_destory_pkt:
 	cmdq_pkt_destroy(cmd.pkt);
 	atomic_dec(&mdp->job_count);
-	if (param->wait)
-		wake_up(&mdp->callback_wq);
+	wake_up(&mdp->callback_wq);
 	if (comps)
 		kfree(comps);
 	if (cb_param)
@@ -543,7 +520,7 @@ err_destory_pkt:
 
 int mdp_cmdq_sendtask(struct platform_device *pdev, struct img_config *config,
 		      struct img_ipi_frameparam *param,
-		      struct v4l2_rect *compose, unsigned int wait,
+		      struct v4l2_rect *compose,
 		      void (*cmdq_cb)(struct cmdq_cb_data data), void *cb_data)
 {
 	struct mdp_dev *mdp = platform_get_drvdata(pdev);
@@ -551,7 +528,6 @@ int mdp_cmdq_sendtask(struct platform_device *pdev, struct img_config *config,
 		.config = config,
 		.param = param,
 		.composes[0] = compose,
-		.wait = wait,
 		.cmdq_cb = cmdq_cb,
 		.cb_data = cb_data,
 	};

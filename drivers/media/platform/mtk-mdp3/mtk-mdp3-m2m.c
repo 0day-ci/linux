@@ -133,7 +133,6 @@ static void mdp_m2m_worker(struct work_struct *work)
 	task.config = ctx->vpu.config;
 	task.param = &param;
 	task.composes[0] = &frame->compose;
-	task.wait = 0;
 	task.cmdq_cb = NULL;
 	task.cb_data = NULL;
 	task.mdp_ctx = ctx;
@@ -769,7 +768,7 @@ int mdp_m2m_device_register(struct mdp_dev *mdp)
 		goto err_m2m_init;
 	}
 
-	ret = video_register_device(mdp->m2m_vdev, VFL_TYPE_GRABBER, 2);
+	ret = video_register_device(mdp->m2m_vdev, VFL_TYPE_VIDEO, 2);
 	if (ret) {
 		dev_err(dev, "Failed to register video device\n");
 		goto err_video_register;

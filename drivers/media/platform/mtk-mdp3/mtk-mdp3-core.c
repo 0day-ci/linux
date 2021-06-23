@@ -137,7 +137,7 @@ static int mdp_probe(struct platform_device *pdev)
 	mutex_init(&mdp->vpu_lock);
 	mutex_init(&mdp->m2m_lock);
 
-	mdp->cmdq_clt = cmdq_mbox_create(dev, 0, 1200);
+	mdp->cmdq_clt = cmdq_mbox_create(dev, 0);
 	if (IS_ERR(mdp->cmdq_clt)) {
 		ret = PTR_ERR(mdp->cmdq_clt);
 		goto err_put_scp;

@@ -16,7 +16,7 @@
 			(0xffffffff) : (mask), ##__VA_ARGS__)
 
 #define MM_REG_WAIT(cmd, evt) \
-	cmdq_pkt_wfe(cmd->pkt, cmd->event[(evt)])
+	cmdq_pkt_wfe(cmd->pkt, cmd->event[(evt)], true)
 
 #define MM_REG_WAIT_NO_CLEAR(cmd, evt) \
 	cmdq_pkt_wait_no_clear(cmd->pkt, cmd->event[(evt)])

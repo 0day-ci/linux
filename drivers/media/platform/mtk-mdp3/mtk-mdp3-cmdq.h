@@ -16,7 +16,7 @@ struct platform_device *mdp_get_plat_device(struct platform_device *pdev);
 
 int mdp_cmdq_sendtask(struct platform_device *pdev, struct img_config *config,
 		      struct img_ipi_frameparam *param,
-		      struct v4l2_rect *compose, unsigned int wait,
+		      struct v4l2_rect *compose,
 		      void (*cmdq_cb)(struct cmdq_cb_data data), void *cb_data);
 
 struct mdp_cmd {
@@ -28,7 +28,6 @@ struct mdp_cmdq_param {
 	struct img_config *config;
 	struct img_ipi_frameparam *param;
 	const struct v4l2_rect *composes[IMG_MAX_HW_OUTPUTS];
-	unsigned int wait;
 
 	void (*cmdq_cb)(struct cmdq_cb_data data);
 	void *cb_data;
