@@ -328,6 +328,10 @@ int page_reporting_register(struct page_reporting_dev_info *prdev)
 		goto err_out;
 	}
 
+	/* Use the page reporting order if it's specified by driver */
+	page_reporting_order = prdev->order ?
+			       prdev->order : page_reporting_order;
+
 	/* initialize state and work structures */
 	atomic_set(&prdev->state, PAGE_REPORTING_IDLE);
 	INIT_DELAYED_WORK(&prdev->work, &page_reporting_process);
