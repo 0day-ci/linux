@@ -391,9 +391,9 @@ static void rcar_i2c_cleanup_dma(struct rcar_i2c_priv *priv)
 	if (priv->dma_direction == DMA_NONE)
 		return;
 	else if (priv->dma_direction == DMA_FROM_DEVICE)
-		dmaengine_terminate_all(priv->dma_rx);
+		dmaengine_terminate_sync(priv->dma_rx);
 	else if (priv->dma_direction == DMA_TO_DEVICE)
-		dmaengine_terminate_all(priv->dma_tx);
+		dmaengine_terminate_sync(priv->dma_tx);
 
 	rcar_i2c_dma_unmap(priv);
 }
