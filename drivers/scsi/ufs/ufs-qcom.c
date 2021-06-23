@@ -641,7 +641,7 @@ static int ufs_qcom_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if (err)
 		return err;
 
-	hba->is_sys_suspended = false;
+	hba->is_wlu_sys_suspended = false;
 	return 0;
 }
 
