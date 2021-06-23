@@ -10,6 +10,8 @@
 
 #include "arm-smmu.h"
 
+extern const struct iommu_flush_ops arm_smmu_s1_tlb_impl_ops;
+
 struct qcom_smmu {
 	struct arm_smmu_device smmu;
 	bool bypass_quirk;
@@ -146,6 +148,8 @@ static int qcom_adreno_smmu_init_context(struct arm_smmu_domain *smmu_domain,
 {
 	struct adreno_smmu_priv *priv;
 
+	pgtbl_cfg->tlb = &arm_smmu_s1_tlb_impl_ops;
+
 	/* Only enable split pagetables for the GPU device (SID 0) */
 	if (!qcom_adreno_smmu_is_gpu_device(dev))
 		return 0;
@@ -184,6 +188,14 @@ static const struct of_device_id qcom_smmu_client_of_match[] __maybe_unused = {
 	{ .compatible = "qcom,sdm845-mss-pil" },
 	{ }
 };
+
+static int qcom_smmu_init_context(struct arm_smmu_domain *smmu_domain,
+		struct io_pgtable_cfg *pgtbl_cfg, struct device *dev)
+{
+	pgtbl_cfg->tlb = &arm_smmu_s1_tlb_impl_ops;
+
+	return 0;
+}
 
 static int qcom_smmu_cfg_probe(struct arm_smmu_device *smmu)
 {
@@ -308,6 +320,7 @@ static int qcom_smmu500_reset(struct arm_smmu_device *smmu)
 }
 
 static const struct arm_smmu_impl qcom_smmu_impl = {
+	.init_context = qcom_smmu_init_context,
 	.cfg_probe = qcom_smmu_cfg_probe,
 	.def_domain_type = qcom_smmu_def_domain_type,
 	.reset = qcom_smmu500_reset,
