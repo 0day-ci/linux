@@ -18,11 +18,16 @@ extern int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
 		struct posix_acl *dfacl);
 extern ssize_t nfs3_listxattr(struct dentry *, char *, size_t);
 extern const struct xattr_handler *nfs3_xattr_handlers[];
+#define nfs3_proc_getacl	get_acl
 #else
 static inline int nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
 		struct posix_acl *dfacl)
 {
 	return 0;
+}
+static inline struct posix_acl *nfs3_proc_getacl(struct inode *inode, int type)
+{
+	return NULL;
 }
 #define nfs3_listxattr NULL
 #endif /* CONFIG_NFS_V3_ACL */
