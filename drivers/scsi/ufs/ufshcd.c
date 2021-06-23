@@ -2727,8 +2727,8 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 		break;
 	case UFSHCD_STATE_EH_SCHEDULED_FATAL:
 		/*
-		 * pm_runtime_get_sync() is used at error handling preparation
-		 * stage. If a scsi cmd, e.g. the SSU cmd, is sent from hba's
+		 * ufshcd_rpm_get_sync() is used at error handling preparation
+		 * stage. If a scsi cmd, e.g., the SSU cmd, is sent from the
 		 * PM ops, it can never be finished if we let SCSI layer keep
 		 * retrying it, which gets err handler stuck forever. Neither
 		 * can we let the scsi cmd pass through, because UFS is in bad
@@ -5908,34 +5908,31 @@ static void ufshcd_clk_scaling_suspend(struct ufs_hba *hba, bool suspend)
 	}
 }
 
-static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
+static int ufshcd_err_handling_prepare(struct ufs_hba *hba)
 {
 	/*
 	 * It is not safe to perform error handling while suspend or resume is
 	 * in progress. Hence the lock_system_sleep() call.
 	 */
 	lock_system_sleep();
-	ufshcd_rpm_get_sync(hba);
-	if (pm_runtime_status_suspended(&hba->sdev_ufs_device->sdev_gendev) ||
-	    hba->is_wlu_sys_suspended) {
-		enum ufs_pm_op pm_op;
+	/*
+	 * Exclusively call pm_runtime_get_sync(hba->dev) once, in case
+	 * following ufshcd_rpm_get_sync() fails.
+	 */
+	pm_runtime_get_sync(hba->dev);
+	if (pm_runtime_suspended(hba->dev) || hba->is_sys_suspended) {
+		pm_runtime_put(hba->dev);
+		unlock_system_sleep();
+		return -EINVAL;
+	}
 
-		/*
-		 * Don't assume anything of resume, if
-		 * resume fails, irq and clocks can be OFF, and powers
-		 * can be OFF or in LPM.
-		 */
-		ufshcd_setup_hba_vreg(hba, true);
-		ufshcd_setup_vreg(hba, true);
-		ufshcd_config_vreg_hpm(hba, hba->vreg_info.vccq);
-		ufshcd_config_vreg_hpm(hba, hba->vreg_info.vccq2);
-		ufshcd_hold(hba, false);
-		if (!ufshcd_is_clkgating_allowed(hba)) {
-			ufshcd_setup_clocks(hba, true);
-			ufshcd_enable_irq(hba);
-		}
-		ufshcd_release(hba);
-		pm_op = hba->is_wlu_sys_suspended ? UFS_SYSTEM_PM : UFS_RUNTIME_PM;
+	ufshcd_set_eh_in_progress(hba);
+	ufshcd_rpm_get_sync(hba);
+	if (pm_runtime_suspended(&hba->sdev_ufs_device->sdev_gendev) ||
+	    hba->is_wlu_sys_suspended) {
+		enum ufs_pm_op pm_op = hba->is_wlu_sys_suspended ?
+				       UFS_SYSTEM_PM : UFS_RUNTIME_PM;
+
 		ufshcd_vops_resume(hba, pm_op);
 	} else {
 		ufshcd_hold(hba, false);
@@ -5949,16 +5946,19 @@ static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
 	down_write(&hba->clk_scaling_lock);
 	up_write(&hba->clk_scaling_lock);
 	cancel_work_sync(&hba->eeh_work);
+	return 0;
 }
 
 static void ufshcd_err_handling_unprepare(struct ufs_hba *hba)
 {
+	ufshcd_clear_eh_in_progress(hba);
 	ufshcd_scsi_unblock_requests(hba);
 	ufshcd_release(hba);
 	if (ufshcd_is_clkscaling_supported(hba))
 		ufshcd_clk_scaling_suspend(hba, false);
 	ufshcd_clear_ua_wluns(hba);
 	ufshcd_rpm_put(hba);
+	pm_runtime_put(hba->dev);
 	unlock_system_sleep();
 }
 
@@ -6051,9 +6051,13 @@ static void ufshcd_err_handler(struct work_struct *work)
 		up(&hba->host_sem);
 		return;
 	}
-	ufshcd_set_eh_in_progress(hba);
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
-	ufshcd_err_handling_prepare(hba);
+	if (ufshcd_err_handling_prepare(hba)) {
+		dev_err(hba->dev, "%s: error handling preparation failed\n",
+				__func__);
+		up(&hba->host_sem);
+		return;
+	}
 	/* Complete requests that have door-bell cleared by h/w */
 	ufshcd_complete_requests(hba);
 	spin_lock_irqsave(hba->host->host_lock, flags);
@@ -6197,7 +6201,6 @@ skip_err_handling:
 			dev_err_ratelimited(hba->dev, "%s: exit: saved_err 0x%x saved_uic_err 0x%x",
 			    __func__, hba->saved_err, hba->saved_uic_err);
 	}
-	ufshcd_clear_eh_in_progress(hba);
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 	ufshcd_err_handling_unprepare(hba);
 	up(&hba->host_sem);
@@ -8998,6 +9001,9 @@ static int __ufshcd_wl_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	/* Enable Auto-Hibernate if configured */
 	ufshcd_auto_hibern8_enable(hba);
+
+	hba->clk_gating.is_suspended = false;
+	ufshcd_release(hba);
 	goto out;
 
 set_old_link_state:
@@ -9007,8 +9013,6 @@ vendor_suspend:
 out:
 	if (ret)
 		ufshcd_update_evt_hist(hba, UFS_EVT_WL_RES_ERR, (u32)ret);
-	hba->clk_gating.is_suspended = false;
-	ufshcd_release(hba);
 	hba->wlu_pm_op_in_progress = false;
 	return ret <= 0 ? ret : -EINVAL;
 }
