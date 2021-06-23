@@ -3844,7 +3844,7 @@ int bnxt_re_alloc_ucontext(struct ib_ucontext *ctx, struct ib_udata *udata)
 		container_of(ctx, struct bnxt_re_ucontext, ib_uctx);
 	struct bnxt_re_dev *rdev = to_bnxt_re_dev(ibdev, ibdev);
 	struct bnxt_qplib_dev_attr *dev_attr = &rdev->dev_attr;
-	struct bnxt_re_uctx_resp resp;
+	struct bnxt_re_uctx_resp resp = {};
 	u32 chip_met_rev_num = 0;
 	int rc;
 
