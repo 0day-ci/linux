@@ -1,0 +1,28 @@
+drm drm-fixes 13311e74253fe64329390df80bed3f07314ddd61
+	Linux 5.13-rc7
+drm-misc drm-misc-fixes 6fd8f323b3e4e5290d02174559308669507c00dd
+	drm/kmb: Fix error return code in kmb_hw_init()
+drm-intel drm-intel-fixes 97ece1dfb2ebabda0be9b2e754d4423a47b60321
+	drm/i915/display: Do not zero past infoframes.vsc
+drm drm-next 61c0cb8ae7943b4fad5d62213c1748f1a07fe594
+	Merge tag 'drm-misc-next-fixes-2021-06-18' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes eed75ce7c8260e0d5612ced4a88180ab991e207c
+	drm/amdgpu: fix amdgpu_preempt_mgr_new()
+drm-intel drm-intel-next-fixes 1bd8a7dc28c1c410f1ceefae1f2a97c06d1a67c2
+	Merge tag 'exynos-drm-next-for-v5.14' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-next
+drm-misc drm-misc-next 89bcadc8f94bd6e6361b5c803ec6f40132e8bace
+	dma-buf: Document non-dynamic exporter expectations better
+drm-intel drm-intel-next 17203224f0536cf223dc5789028d04a768d96ec3
+	drm/i915/dsc: abstract helpers to get bigjoiner primary/secondary crtc
+drm-intel drm-intel-gt-next ca319ee9ca6a6ef95143df8d0a57b2941c2a9566
+	drm/i915/eb: Fix pagefault disabling in the first slowpath
+sound-upstream for-linus 83e197a8414c0ba545e7e3916ce05f836f349273
+	ALSA: seq: Fix race of snd_seq_timer_open()
+sound-upstream for-next ae44705f98ca0ecb117765c9c03950de2b0686dc
+	ALSA: firewire-motu: fix register handling for 896
+drm-intel topic/core-for-CI 6217cb86013a607ae224e6508be029c0363dc813
+	drm/i915: allow DG1 autoprobe for CONFIG_BROKEN
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
