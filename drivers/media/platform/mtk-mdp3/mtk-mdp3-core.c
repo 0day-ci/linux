@@ -40,9 +40,9 @@ struct platform_device *mdp_get_plat_device(struct platform_device *pdev)
 	}
 
 	mdp_pdev = of_find_device_by_node(mdp_node);
+	of_node_put(mdp_node);
 	if (WARN_ON(!mdp_pdev)) {
 		dev_err(dev, "mdp pdev failed\n");
-		of_node_put(mdp_node);
 		return NULL;
 	}
 
@@ -113,7 +113,7 @@ static int mdp_probe(struct platform_device *pdev)
 	if (!mdp->job_wq) {
 		dev_err(dev, "Unable to create job workqueue\n");
 		ret = -ENOMEM;
-		goto err_destroy_job_wq;
+		goto err_deinit_comp;
 	}
 
 	mdp->clock_wq = alloc_workqueue(MDP_MODULE_NAME "-clock", WQ_FREEZABLE,
@@ -121,7 +121,7 @@ static int mdp_probe(struct platform_device *pdev)
 	if (!mdp->clock_wq) {
 		dev_err(dev, "Unable to create clock workqueue\n");
 		ret = -ENOMEM;
-		goto err_destroy_clock_wq;
+		goto err_destroy_job_wq;
 	}
 
 	mdp->scp = scp_get(pdev);
@@ -179,6 +179,8 @@ err_destroy_clock_wq:
 	destroy_workqueue(mdp->clock_wq);
 err_destroy_job_wq:
 	destroy_workqueue(mdp->job_wq);
+err_deinit_comp:
+		mdp_component_deinit(mdp);
 err_return:
 	dev_dbg(dev, "Errno %d\n", ret);
 	return ret;
