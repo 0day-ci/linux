@@ -218,7 +218,7 @@ int mhi_ready_state_transition(struct mhi_controller *mhi_cntrl)
 			continue;
 
 		ring->wp = ring->base + ring->len - ring->el_size;
-		*ring->ctxt_wp = ring->iommu_base + ring->len - ring->el_size;
+		*ring->ctxt_wp = cpu_to_le64(ring->iommu_base + ring->len - ring->el_size);
 		/* Update all cores */
 		smp_wmb();
 
@@ -420,7 +420,7 @@ static int mhi_pm_mission_mode_transition(struct mhi_controller *mhi_cntrl)
 			continue;
 
 		ring->wp = ring->base + ring->len - ring->el_size;
-		*ring->ctxt_wp = ring->iommu_base + ring->len - ring->el_size;
+		*ring->ctxt_wp = cpu_to_le64(ring->iommu_base + ring->len - ring->el_size);
 		/* Update to all cores */
 		smp_wmb();
 
@@ -993,7 +993,7 @@ static void mhi_assert_dev_wake(struct mhi_controller *mhi_cntrl, bool force)
 		atomic_inc(&mhi_cntrl->dev_wake);
 		if (MHI_WAKE_DB_FORCE_SET_VALID(mhi_cntrl->pm_state) &&
 		    !mhi_cntrl->wake_set) {
-			mhi_write_db(mhi_cntrl, mhi_cntrl->wake_db, 1);
+			mhi_write_db(mhi_cntrl, mhi_cntrl->wake_db, cpu_to_le64(1));
 			mhi_cntrl->wake_set = true;
 		}
 		spin_unlock_irqrestore(&mhi_cntrl->wlock, flags);
@@ -1009,7 +1009,7 @@ static void mhi_assert_dev_wake(struct mhi_controller *mhi_cntrl, bool force)
 		if ((atomic_inc_return(&mhi_cntrl->dev_wake) == 1) &&
 		    MHI_WAKE_DB_SET_VALID(mhi_cntrl->pm_state) &&
 		    !mhi_cntrl->wake_set) {
-			mhi_write_db(mhi_cntrl, mhi_cntrl->wake_db, 1);
+			mhi_write_db(mhi_cntrl, mhi_cntrl->wake_db, cpu_to_le64(1));
 			mhi_cntrl->wake_set = true;
 		}
 		spin_unlock_irqrestore(&mhi_cntrl->wlock, flags);
