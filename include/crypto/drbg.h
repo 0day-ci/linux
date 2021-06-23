@@ -168,7 +168,7 @@ static inline size_t drbg_max_request_bytes(struct drbg_state *drbg)
 
 static inline size_t drbg_max_addtl(struct drbg_state *drbg)
 {
-	/* SP800-90A requires 2**35 bytes additional info str / pers str */
+	/* SP800-90A requires 2**35 bits of additional info str / pers str */
 #if (__BITS_PER_LONG == 32)
 	/*
 	 * SP800-90A allows smaller maximum numbers to be returned -- we

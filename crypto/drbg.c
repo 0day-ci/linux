@@ -1119,9 +1119,10 @@ static int drbg_seed(struct drbg_state *drbg, struct drbg_string *pers,
 		     bool reseed)
 {
 	int ret;
-	unsigned char entropy[((32 + 16) * 2)];
-	unsigned int entropylen = drbg_sec_strength(drbg->core->flags);
-	struct drbg_string data1;
+	unsigned char entropy[((32 * 2) + 16)];
+	const unsigned int strength = drbg_sec_strength(drbg->core->flags);
+	unsigned int entropylen = strength;
+	struct drbg_string data1, data2;
 	LIST_HEAD(seedlist);
 
 	/* 9.1 / 9.2 / 9.3.1 step 3 */
@@ -1147,21 +1148,32 @@ static int drbg_seed(struct drbg_state *drbg, struct drbg_string *pers,
 		BUG_ON(!entropylen);
 		if (!reseed)
 			entropylen = ((entropylen + 1) / 2) * 3;
-		BUG_ON((entropylen * 2) > sizeof(entropy));
-
-		/* Get seed from in-kernel /dev/urandom */
-		ret = drbg_get_random_bytes(drbg, entropy, entropylen);
-		if (ret)
-			goto out;
+		/*
+		 * Check that a minimal automatic personalization string
+		 * (instantiation) or additional input (re-seeding) of strength
+		 * length fits in.
+		 */
+		BUG_ON((entropylen + strength) > sizeof(entropy));
 
 		if (!drbg->jent) {
-			drbg_string_fill(&data1, entropy, entropylen);
-			pr_devel("DRBG: (re)seeding with %u bytes of entropy\n",
-				 entropylen);
+			/*
+			 * Get entropy, nonce, personalization string or
+			 * additional input from in-kernel /dev/urandom
+			 */
+			ret = drbg_get_random_bytes(drbg, entropy, entropylen + strength);
+			if (ret)
+				goto out;
+
+			drbg_string_fill(&data1, entropy, entropylen + strength);
+			pr_devel("DRBG: (re)seeding with %u bytes of random\n",
+				 entropylen + strength);
 		} else {
-			/* Get seed from Jitter RNG */
-			ret = crypto_rng_get_bytes(drbg->jent,
-						   entropy + entropylen,
+			/*
+			 * Get entropy (strength length), concatenated with a
+			 * nonce (half strength length) when instantiating,
+			 * both from the SP800-90B compliant Jitter RNG.
+			 */
+			ret = crypto_rng_get_bytes(drbg->jent, entropy,
 						   entropylen);
 			if (ret) {
 				pr_devel("DRBG: jent failed with %d\n", ret);
@@ -1184,9 +1196,25 @@ static int drbg_seed(struct drbg_state *drbg, struct drbg_string *pers,
 					goto out;
 			}
 
-			drbg_string_fill(&data1, entropy, entropylen * 2);
-			pr_devel("DRBG: (re)seeding with %u bytes of entropy\n",
-				 entropylen * 2);
+			/*
+			 * To improve security while still be compliant with
+			 * SP800-90A rev1, automatically append a minimal
+			 * personalization string (instantiation) or additional
+			 * input (re-seeding) of strength length from in-kernel
+			 * /dev/urandom (random source).  This may then replace
+			 * a (small) part of the supplied pers according to
+			 * drbg_max_addtl().
+			 */
+			ret = drbg_get_random_bytes(drbg, entropy + entropylen,
+						    strength);
+			if (ret)
+				goto out;
+
+			drbg_string_fill(&data1, entropy, entropylen + strength);
+
+			pr_devel("DRBG: (re)seeding with %u bytes of entropy "
+				 "and %u bytes of random\n", entropylen,
+				 strength);
 		}
 	}
 	list_add_tail(&data1.list, &seedlist);
@@ -1197,7 +1225,16 @@ static int drbg_seed(struct drbg_state *drbg, struct drbg_string *pers,
 	 * contents whether it is appropriate
 	 */
 	if (pers && pers->buf && 0 < pers->len) {
-		list_add_tail(&pers->list, &seedlist);
+		const size_t available = drbg_max_addtl(drbg) - pers->len;
+
+		data2 = *pers;
+		/*
+		 * Make sure that the drbg_max_addtl() limit is still respected
+		 * according to the automatically appended random values.
+		 */
+		if (available < strength)
+			data2.len -= strength - available;
+		list_add_tail(&data2.list, &seedlist);
 		pr_devel("DRBG: using personalization string\n");
 	}
 
@@ -1209,7 +1246,7 @@ static int drbg_seed(struct drbg_state *drbg, struct drbg_string *pers,
 	ret = __drbg_seed(drbg, &seedlist, reseed);
 
 out:
-	memzero_explicit(entropy, entropylen * 2);
+	memzero_explicit(entropy, sizeof(entropy));
 
 	return ret;
 }
