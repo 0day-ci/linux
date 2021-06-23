@@ -281,7 +281,7 @@ static int caif_seqpkt_recvmsg(struct socket *sock, struct msghdr *m,
 	if (flags & MSG_OOB)
 		goto read_error;
 
-	skb = skb_recv_datagram(sk, flags, 0 , &ret);
+	skb = skb_recv_datagram(sk, flags, 0, &ret);
 	if (!skb)
 		goto read_error;
 	copylen = skb->len;
@@ -295,6 +295,7 @@ static int caif_seqpkt_recvmsg(struct socket *sock, struct msghdr *m,
 		goto out_free;
 
 	ret = (flags & MSG_TRUNC) ? skb->len : copylen;
+	return ret;
 out_free:
 	skb_free_datagram(sk, skb);
 	caif_check_flow_release(sk);
@@ -615,7 +616,7 @@ static int caif_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 	while (sent < len) {
 
-		size = len-sent;
+		size = len - sent;
 
 		if (size > cf_sk->maxframe)
 			size = cf_sk->maxframe;
@@ -815,8 +816,8 @@ static int caif_connect(struct socket *sock, struct sockaddr *uaddr,
 	sock->state = SS_CONNECTING;
 	sk->sk_state = CAIF_CONNECTING;
 
-	/* Check priority value comming from socket */
-	/* if priority value is out of range it will be ajusted */
+	/* Check priority value coming from socket */
+	/* if priority value is out of range it will be adjusted */
 	if (cf_sk->sk.sk_priority > CAIF_PRIO_MAX)
 		cf_sk->conn_req.priority = CAIF_PRIO_MAX;
 	else if (cf_sk->sk.sk_priority < CAIF_PRIO_MIN)
