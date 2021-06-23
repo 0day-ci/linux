@@ -198,7 +198,14 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
 	watchdog_set_nowayout(&data->wdt_dev, nowayout);
 	watchdog_stop_on_unregister(&data->wdt_dev);
 
-	return devm_watchdog_register_device(dev, &data->wdt_dev);
+	ret = devm_watchdog_register_device(dev, &data->wdt_dev);
+	if (ret)
+		return ret;
+
+	dev_info(dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+		 data->wdt_dev.timeout, nowayout);
+
+	return ret;
 }
 
 static struct platform_driver meson_gxbb_wdt_driver = {
