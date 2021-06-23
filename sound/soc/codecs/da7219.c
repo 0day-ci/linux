@@ -2204,12 +2204,14 @@ static int da7219_register_dai_clks(struct snd_soc_component *component)
 					     da7219->clk_hw_data);
 		if (ret) {
 			dev_err(dev, "Failed to register clock provider\n");
-			goto err;
+			goto err_free_all;
 		}
 	}
 
 	return 0;
 
+err_free_all:
+	i = DA7219_DAI_NUM_CLKS - 1;
 err:
 	do {
 		if (da7219->dai_clks_lookup[i])
