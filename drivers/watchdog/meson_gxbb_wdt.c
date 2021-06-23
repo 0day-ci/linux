@@ -34,6 +34,11 @@ module_param(timeout, uint, 0);
 MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds="
 		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
 
+static bool nowayout = WATCHDOG_NOWAYOUT;
+module_param(nowayout, bool, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started default="
+		 __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+
 struct meson_gxbb_wdt {
 	void __iomem *reg_base;
 	struct watchdog_device wdt_dev;
@@ -190,6 +195,7 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
 		data->reg_base + GXBB_WDT_CTRL_REG);
 
 	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
+	watchdog_set_nowayout(&data->wdt_dev, nowayout);
 
 	return devm_watchdog_register_device(dev, &data->wdt_dev);
 }
