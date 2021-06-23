@@ -758,9 +758,6 @@ static u64 i915_gem_object_page_size(struct drm_i915_gem_object *obj)
 	u64 page_size;
 	int i;
 
-	if (!obj->mm.n_placements)
-		return obj->mm.region->min_page_size;
-
 	page_size = 0;
 	for (i = 0; i < obj->mm.n_placements; i++) {
 		struct intel_memory_region *mr = obj->mm.placements[i];
@@ -784,6 +781,7 @@ static u64 i915_gem_object_page_size(struct drm_i915_gem_object *obj)
 int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 			       struct drm_i915_gem_object *obj,
 			       resource_size_t size,
+			       resource_size_t page_size,
 			       unsigned int flags)
 {
 	static struct lock_class_key lock_class;
@@ -802,6 +800,14 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 	bo_type = (obj->flags & I915_BO_ALLOC_USER) ? ttm_bo_type_device :
 		ttm_bo_type_kernel;
 
+	GEM_BUG_ON(!page_size);
+
+	if (obj->mm.n_placements) {
+		/* Forcing the page size is kernel internal only */
+		GEM_BUG_ON(page_size != mem->min_page_size);
+		page_size = i915_gem_object_page_size(obj);
+	}
+
 	/*
 	 * If this function fails, it will call the destructor, but
 	 * our caller still owns the object. So no freeing in the
@@ -812,7 +818,7 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 	obj->base.vma_node.driver_private = i915_gem_to_ttm(obj);
 	ret = ttm_bo_init(&i915->bdev, i915_gem_to_ttm(obj), size,
 			  bo_type, &i915_sys_placement,
-			  i915_gem_object_page_size(obj) >> PAGE_SHIFT,
+			  page_size >> PAGE_SHIFT,
 			  true, NULL, NULL, i915_ttm_bo_destroy);
 	if (!ret)
 		obj->ttm.created = true;
