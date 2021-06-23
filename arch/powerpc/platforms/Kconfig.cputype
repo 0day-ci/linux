@@ -132,6 +132,7 @@ config GENERIC_CPU
 	bool "Generic (POWER8 and above)"
 	depends on PPC64 && CPU_LITTLE_ENDIAN
 	select ARCH_HAS_FAST_MULTIPLIER
+	select PPC_HAS_LBARX_LHARX
 
 config GENERIC_CPU
 	bool "Generic 32 bits powerpc"
@@ -153,16 +154,19 @@ config POWER7_CPU
 	bool "POWER7"
 	depends on PPC_BOOK3S_64
 	select ARCH_HAS_FAST_MULTIPLIER
+	select PPC_HAS_LBARX_LHARX
 
 config POWER8_CPU
 	bool "POWER8"
 	depends on PPC_BOOK3S_64
 	select ARCH_HAS_FAST_MULTIPLIER
+	select PPC_HAS_LBARX_LHARX
 
 config POWER9_CPU
 	bool "POWER9"
 	depends on PPC_BOOK3S_64
 	select ARCH_HAS_FAST_MULTIPLIER
+	select PPC_HAS_LBARX_LHARX
 
 config E5500_CPU
 	bool "Freescale e5500"
@@ -171,6 +175,7 @@ config E5500_CPU
 config E6500_CPU
 	bool "Freescale e6500"
 	depends on E500
+	select PPC_HAS_LBARX_LHARX
 
 config 860_CPU
 	bool "8xx family"
