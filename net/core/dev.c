@@ -10448,7 +10448,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 	rebroadcast_time = warning_time = jiffies;
 	refcnt = netdev_refcnt_read(dev);
 
-	while (refcnt != 1) {
+	while (refcnt != 3) {
 		if (time_after(jiffies, rebroadcast_time + 1 * HZ)) {
 			rtnl_lock();
 
@@ -10563,7 +10563,7 @@ void netdev_run_todo(void)
 		netdev_wait_allrefs(dev);
 
 		/* paranoia */
-		BUG_ON(netdev_refcnt_read(dev) != 1);
+		BUG_ON(netdev_refcnt_read(dev) != 3);
 		BUG_ON(!list_empty(&dev->ptype_all));
 		BUG_ON(!list_empty(&dev->ptype_specific));
 		WARN_ON(rcu_access_pointer(dev->ip_ptr));

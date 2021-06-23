@@ -56,12 +56,14 @@ int sysfs_create_dir_ns(struct kobject *kobj, const void *ns)
 
 	kobject_get_ownership(kobj, &uid, &gid);
 
+	kobject_get(kobj);
 	kn = kernfs_create_dir_ns(parent, kobject_name(kobj),
 				  S_IRWXU | S_IRUGO | S_IXUGO, uid, gid,
 				  kobj, ns);
 	if (IS_ERR(kn)) {
 		if (PTR_ERR(kn) == -EEXIST)
 			sysfs_warn_dup(parent, kobject_name(kobj));
+		kobject_put(kobj);
 		return PTR_ERR(kn);
 	}
 
@@ -100,6 +102,7 @@ void sysfs_remove_dir(struct kobject *kobj)
 	if (kn) {
 		WARN_ON_ONCE(kernfs_type(kn) != KERNFS_DIR);
 		kernfs_remove(kn);
+		kobject_put(kobj);
 	}
 }
 
