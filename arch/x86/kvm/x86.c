@@ -7311,7 +7311,7 @@ static bool reexecute_instruction(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
 				  int emulation_type)
 {
 	gpa_t gpa = cr2_or_gpa;
-	kvm_pfn_t pfn;
+	struct kvm_pfn_page pfnpg;
 
 	if (!(emulation_type & EMULTYPE_ALLOW_RETRY_PF))
 		return false;
@@ -7341,16 +7341,17 @@ static bool reexecute_instruction(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
 	 * retry instruction -> write #PF -> emulation fail -> retry
 	 * instruction -> ...
 	 */
-	pfn = kvm_pfn_page_unwrap(gfn_to_pfn(vcpu->kvm, gpa_to_gfn(gpa)));
+	pfnpg = gfn_to_pfn(vcpu->kvm, gpa_to_gfn(gpa));
 
 	/*
 	 * If the instruction failed on the error pfn, it can not be fixed,
 	 * report the error to userspace.
 	 */
-	if (is_error_noslot_pfn(pfn))
+	if (is_error_noslot_pfn(pfnpg.pfn))
 		return false;
 
-	kvm_release_pfn_clean(pfn);
+	if (pfnpg.page)
+		put_page(pfnpg.page);
 
 	/* The instructions are well-emulated on direct mmu. */
 	if (vcpu->arch.mmu->direct_map) {

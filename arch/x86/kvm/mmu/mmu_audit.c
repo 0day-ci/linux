@@ -94,7 +94,7 @@ static void audit_mappings(struct kvm_vcpu *vcpu, u64 *sptep, int level)
 {
 	struct kvm_mmu_page *sp;
 	gfn_t gfn;
-	kvm_pfn_t pfn;
+	struct kvm_pfn_page pfnpg;
 	hpa_t hpa;
 
 	sp = sptep_to_sp(sptep);
@@ -111,18 +111,19 @@ static void audit_mappings(struct kvm_vcpu *vcpu, u64 *sptep, int level)
 		return;
 
 	gfn = kvm_mmu_page_get_gfn(sp, sptep - sp->spt);
-	pfn = kvm_pfn_page_unwrap(kvm_vcpu_gfn_to_pfn_atomic(vcpu, gfn));
+	pfnpg = kvm_vcpu_gfn_to_pfn_atomic(vcpu, gfn);
 
-	if (is_error_pfn(pfn))
+	if (is_error_pfn(pfnpg.pfn))
 		return;
 
-	hpa =  pfn << PAGE_SHIFT;
+	hpa =  pfnpg.pfn << PAGE_SHIFT;
 	if ((*sptep & PT64_BASE_ADDR_MASK) != hpa)
 		audit_printk(vcpu->kvm, "levels %d pfn %llx hpa %llx "
-			     "ent %llxn", vcpu->arch.mmu->root_level, pfn,
+			     "ent %llxn", vcpu->arch.mmu->root_level, pfnpg.pfn,
 			     hpa, *sptep);
 
-	kvm_release_pfn_clean(pfn);
+	if (pfnpg.page)
+		put_page(pfnpg.page);
 }
 
 static void inspect_spte_has_rmap(struct kvm *kvm, u64 *sptep)
