@@ -889,7 +889,9 @@ EXPORT_SYMBOL(complete_and_exit);
 
 SYSCALL_DEFINE1(exit, int, error_code)
 {
-	do_exit((error_code&0xff)<<8);
+	start_task_exit((error_code&0xff)<<8);
+	/* get_signal will call do_exit */
+	return 0;
 }
 
 

@@ -1250,7 +1250,7 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 			force_sig_seccomp(this_syscall, data, true);
 		} else {
 			if (action == SECCOMP_RET_KILL_THREAD)
-				do_exit(SIGSYS);
+				start_task_exit(SIGSYS);
 			else
 				start_group_exit(SIGSYS);
 		}

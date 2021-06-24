@@ -1439,6 +1439,18 @@ void start_task_exit_locked(struct task_struct *task, int exit_code)
 	}
 }
 
+void start_task_exit(int exit_code)
+{
+	struct task_struct *task = current;
+	if (!fatal_signal_pending(task)) {
+		struct sighand_struct *const sighand = task->sighand;
+		spin_lock_irq(&sighand->siglock);
+		if (!fatal_signal_pending(current))
+			start_task_exit_locked(task, exit_code);
+		spin_unlock_irq(&sighand->siglock);
+	}
+}
+
 struct sighand_struct *__lock_task_sighand(struct task_struct *tsk,
 					   unsigned long *flags)
 {
