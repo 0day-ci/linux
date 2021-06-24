@@ -13,6 +13,7 @@
 #include <linux/of_platform.h>
 #include <linux/pm_opp.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 
 #define LUT_MAX_ENTRIES			40U
 #define LUT_SRC				GENMASK(31, 30)
@@ -22,10 +23,13 @@
 #define CLK_HW_DIV			2
 #define LUT_TURBO_IND			1
 
+#define HZ_PER_KHZ			1000
+
 struct qcom_cpufreq_soc_data {
 	u32 reg_enable;
 	u32 reg_freq_lut;
 	u32 reg_volt_lut;
+	u32 reg_current_vote;
 	u32 reg_perf_state;
 	u8 lut_row_size;
 };
@@ -33,7 +37,10 @@ struct qcom_cpufreq_soc_data {
 struct qcom_cpufreq_data {
 	void __iomem *base;
 	struct resource *res;
+	struct delayed_work lmh_dcvs_poll_work;
 	const struct qcom_cpufreq_soc_data *soc_data;
+	struct cpufreq_policy *policy;
+	int lmh_dcvs_irq;
 };
 
 static unsigned long cpu_hw_rate, xo_rate;
@@ -251,10 +258,79 @@ static void qcom_get_related_cpus(int index, struct cpumask *m)
 	}
 }
 
+static inline unsigned long qcom_lmh_vote_to_freq(u32 val)
+{
+	return (val & 0x3FF) * 19200;
+}
+
+static void qcom_lmh_dcvs_notify(struct qcom_cpufreq_data *data)
+{
+	struct cpufreq_policy *policy = data->policy;
+	struct dev_pm_opp *opp;
+	struct device *dev;
+	unsigned long max_capacity, capacity, freq_hz, throttled_freq;
+	unsigned int val, freq;
+
+	/*
+	 * Get the h/w throttled frequency, normalize it using the
+	 * registered opp table and use it to calculate thermal pressure.
+	 */
+	val = readl_relaxed(data->base + data->soc_data->reg_current_vote);
+	freq = qcom_lmh_vote_to_freq(val);
+	freq_hz = freq * HZ_PER_KHZ;
+
+	dev = get_cpu_device(cpumask_first(policy->cpus));
+	opp = dev_pm_opp_find_freq_floor(dev, &freq_hz);
+	if (IS_ERR(opp) && PTR_ERR(opp) == -ERANGE)
+		opp = dev_pm_opp_find_freq_ceil(dev, &freq_hz);
+
+	throttled_freq = freq_hz / HZ_PER_KHZ;
+
+	/* Update thermal pressure */
+	max_capacity = arch_scale_cpu_capacity(cpumask_first(policy->cpus));
+	capacity = throttled_freq * max_capacity;
+	capacity /= policy->cpuinfo.max_freq;
+	/* Don't pass boost capacity to scheduler */
+	if (capacity > max_capacity)
+		capacity = max_capacity;
+	arch_set_thermal_pressure(policy->cpus, max_capacity - capacity);
+	/*
+	 * If h/w throttled frequency is higher than what cpufreq has requested for, stop
+	 * polling and switch back to interrupt mechanism
+	 */
+	if (throttled_freq >= qcom_cpufreq_hw_get(cpumask_first(policy->cpus)))
+		/* Clear the existing interrupts and enable it back */
+		enable_irq(data->lmh_dcvs_irq);
+	else
+		mod_delayed_work(system_highpri_wq, &data->lmh_dcvs_poll_work,
+				 msecs_to_jiffies(10));
+}
+
+static void qcom_lmh_dcvs_poll(struct work_struct *work)
+{
+	struct qcom_cpufreq_data *data;
+
+	data = container_of(work, struct qcom_cpufreq_data, lmh_dcvs_poll_work.work);
+
+	qcom_lmh_dcvs_notify(data);
+}
+
+static irqreturn_t qcom_lmh_dcvs_handle_irq(int irq, void *data)
+{
+	struct qcom_cpufreq_data *c_data = data;
+
+	/* Disable interrupt and enable polling */
+	disable_irq_nosync(c_data->lmh_dcvs_irq);
+	qcom_lmh_dcvs_notify(c_data);
+
+	return 0;
+}
+
 static const struct qcom_cpufreq_soc_data qcom_soc_data = {
 	.reg_enable = 0x0,
 	.reg_freq_lut = 0x110,
 	.reg_volt_lut = 0x114,
+	.reg_current_vote = 0x704,
 	.reg_perf_state = 0x920,
 	.lut_row_size = 32,
 };
@@ -273,6 +349,23 @@ static const struct of_device_id qcom_cpufreq_hw_match[] = {
 	{}
 };
 MODULE_DEVICE_TABLE(of, qcom_cpufreq_hw_match);
+
+static void qcom_cpufreq_hw_lmh_init(struct cpufreq_policy *policy)
+{
+	struct qcom_cpufreq_data *data = policy->driver_data;
+	struct platform_device *pdev = cpufreq_get_driver_data();
+	struct device *dev = &pdev->dev;
+	int ret;
+
+	ret = devm_request_irq(dev, data->lmh_dcvs_irq, qcom_lmh_dcvs_handle_irq,
+			       0, "dcvsh-irq", data);
+	if (ret) {
+		dev_err(dev, "Error %d registering irq %x\n", ret, data->lmh_dcvs_irq);
+		return;
+	}
+	data->policy = policy;
+	INIT_DEFERRABLE_WORK(&data->lmh_dcvs_poll_work, qcom_lmh_dcvs_poll);
+}
 
 static int qcom_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 {
@@ -370,6 +463,16 @@ static int qcom_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 			dev_warn(cpu_dev, "failed to enable boost: %d\n", ret);
 	}
 
+	/* Look for LMh interrupt. If no interrupt line is specified /
+	 * if there is an error, allow cpufreq to be enabled as usual.
+	 */
+	data->lmh_dcvs_irq = platform_get_irq(pdev, index);
+	if (data->lmh_dcvs_irq > 0) {
+		qcom_cpufreq_hw_lmh_init(policy);
+	} else if (data->lmh_dcvs_irq != -ENXIO) {
+		ret = data->lmh_dcvs_irq;
+		goto error;
+	}
 	return 0;
 error:
 	kfree(data);
