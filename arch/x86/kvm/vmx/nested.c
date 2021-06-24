@@ -5031,6 +5031,17 @@ static int handle_vmresume(struct kvm_vcpu *vcpu)
 	return nested_vmx_run(vcpu, false);
 }
 
+static short vmx_field_to_offset(struct vcpu_vmx *vmx, unsigned long field)
+{
+	/*
+	 * Bits 9:1 are the index of the field, whose limit is found
+	 * in the VMCS_ENUM MSR.
+	 */
+	if ((field & 0x3fe) > (vmx->nested.msrs.vmcs_enum & 0x3fe))
+		return -1;
+	return vmcs_field_to_offset(field);
+}
+
 static int handle_vmread(struct kvm_vcpu *vcpu)
 {
 	struct vmcs12 *vmcs12 = is_guest_mode(vcpu) ? get_shadow_vmcs12(vcpu)
@@ -5060,7 +5071,7 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 	/* Decode instruction info and find the field to read */
 	field = kvm_register_read(vcpu, (((instr_info) >> 28) & 0xf));
 
-	offset = vmcs_field_to_offset(field);
+	offset = vmx_field_to_offset(vmx, field);
 	if (offset < 0)
 		return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
@@ -5163,7 +5174,7 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 
 	field = kvm_register_read(vcpu, (((instr_info) >> 28) & 0xf));
 
-	offset = vmcs_field_to_offset(field);
+	offset = vmx_field_to_offset(vmx, field);
 	if (offset < 0)
 		return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
