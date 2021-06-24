@@ -41,6 +41,9 @@ struct intel_qgv_info {
 #define  DG1_DRAM_T_RP_MASK (0x7F << 0)
 #define  DG1_DRAM_T_RP_SHIFT 0
 
+#define  ICL_GEAR_TYPE_MASK (0x01 << 16)
+#define  ICL_GEAR_TYPE_SHIFT 16
+
 static int dg1_mchbar_read_qgv_point_info(struct drm_i915_private *dev_priv,
 					  struct intel_qgv_point *sp,
 					  int point)
@@ -55,6 +58,11 @@ static int dg1_mchbar_read_qgv_point_info(struct drm_i915_private *dev_priv,
 	else
 		dclk_reference = 8; /* 8 * 16.666 MHz = 133 MHz */
 	sp->dclk = dclk_ratio * dclk_reference;
+
+	val = intel_uncore_read(&dev_priv->uncore, SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU);
+	if ((val & ICL_GEAR_TYPE_MASK) >> ICL_GEAR_TYPE_SHIFT)
+		sp->dclk *= 2;
+
 	if (sp->dclk == 0)
 		return -EINVAL;
 
