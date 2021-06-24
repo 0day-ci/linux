@@ -46,6 +46,7 @@ struct intel_uncore_topology;
 
 struct intel_uncore_type {
 	const char *name;
+	const char *link_name;
 	int num_counters;
 	int num_boxes;
 	int perf_ctr_bits;
@@ -118,6 +119,7 @@ struct intel_uncore_ops {
 struct intel_uncore_pmu {
 	struct pmu			pmu;
 	char				name[UNCORE_PMU_NAME_LEN];
+	char				link_name[UNCORE_PMU_NAME_LEN];
 	int				pmu_idx;
 	int				func_id;
 	bool				registered;

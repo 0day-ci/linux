@@ -842,6 +842,18 @@ static const struct attribute_group uncore_pmu_attr_group = {
 	.attrs = uncore_pmu_attrs,
 };
 
+static void __uncore_get_pmu_name(char *pmu_name, const char *type_name,
+				  int num_boxes, int idx)
+{
+	if (num_boxes == 1) {
+		if (strlen(type_name) > 0)
+			sprintf(pmu_name, "uncore_%s", type_name);
+		else
+			sprintf(pmu_name, "uncore");
+	} else
+		sprintf(pmu_name, "uncore_%s_%d", type_name, idx);
+}
+
 static void uncore_get_pmu_name(struct intel_uncore_pmu *pmu)
 {
 	struct intel_uncore_type *type = pmu->type;
@@ -857,17 +869,17 @@ static void uncore_get_pmu_name(struct intel_uncore_pmu *pmu)
 			sprintf(pmu->name, "uncore_type_%u_%d",
 				type->type_id, type->box_ids[pmu->pmu_idx]);
 		}
+
+		if (type->link_name) {
+			__uncore_get_pmu_name(pmu->link_name, type->link_name,
+					      type->num_boxes, type->box_ids[pmu->pmu_idx]);
+			pmu->pmu.link_name = pmu->link_name;
+		}
 		return;
 	}
 
-	if (type->num_boxes == 1) {
-		if (strlen(type->name) > 0)
-			sprintf(pmu->name, "uncore_%s", type->name);
-		else
-			sprintf(pmu->name, "uncore");
-	} else
-		sprintf(pmu->name, "uncore_%s_%d", type->name, pmu->pmu_idx);
-
+	__uncore_get_pmu_name(pmu->name, type->name,
+			      type->num_boxes, pmu->pmu_idx);
 }
 
 static int uncore_pmu_register(struct intel_uncore_pmu *pmu)
