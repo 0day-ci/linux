@@ -653,6 +653,8 @@ static void __init arch_mem_init(char **cmdline_p)
 	 */
 	memblock_set_current_limit(PFN_PHYS(max_low_pfn));
 
+	memblock_reserve(0, PAGE_SIZE * NODE_DATA(0)->node_start_pfn);
+
 	mips_reserve_vmcore();
 
 	mips_parse_crashkernel();
