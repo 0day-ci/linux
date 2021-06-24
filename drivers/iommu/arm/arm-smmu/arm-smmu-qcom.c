@@ -172,6 +172,24 @@ static const struct of_device_id qcom_smmu_client_of_match[] __maybe_unused = {
 	{ }
 };
 
+static const struct of_device_id qcom_smmu_nonstrict_of_match[] __maybe_unused = {
+	{ .compatible = "qcom,sdhci-msm-v4" },
+	{ .compatible = "qcom,sdhci-msm-v5" },
+	{ }
+};
+
+static int qcom_smmu_init_context(struct arm_smmu_domain *smmu_domain,
+		struct io_pgtable_cfg *pgtbl_cfg, struct device *dev)
+{
+	const struct of_device_id *match =
+		of_match_device(qcom_smmu_nonstrict_of_match, dev);
+
+	if (match)
+		smmu_domain->domain.strictness = IOMMU_NOT_STRICT;
+
+	return 0;
+}
+
 static int qcom_smmu_cfg_probe(struct arm_smmu_device *smmu)
 {
 	unsigned int last_s2cr = ARM_SMMU_GR0_S2CR(smmu->num_mapping_groups - 1);
@@ -295,6 +313,7 @@ static int qcom_smmu500_reset(struct arm_smmu_device *smmu)
 }
 
 static const struct arm_smmu_impl qcom_smmu_impl = {
+	.init_context = qcom_smmu_init_context,
 	.cfg_probe = qcom_smmu_cfg_probe,
 	.def_domain_type = qcom_smmu_def_domain_type,
 	.reset = qcom_smmu500_reset,
