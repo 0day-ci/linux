@@ -601,7 +601,7 @@ static void pch_spi_set_tx(struct pch_spi_data *data, int *bpw)
 	}
 
 	/* copy Tx Data */
-	if (data->cur_trans->tx_buf != NULL) {
+	if ((data->cur_trans->tx_buf != NULL) && (data->pkt_tx_buff != NULL)) {
 		if (*bpw == 8) {
 			tx_buf = data->cur_trans->tx_buf;
 			for (j = 0; j < data->bpw_len; j++)
@@ -623,8 +623,10 @@ static void pch_spi_set_tx(struct pch_spi_data *data, int *bpw)
 		__func__);
 	pch_spi_writereg(data->master, PCH_SSNXCR, SSN_LOW);
 
-	for (j = 0; j < n_writes; j++)
-		pch_spi_writereg(data->master, PCH_SPDWR, data->pkt_tx_buff[j]);
+	if (data->pkt_tx_buff != NULL) {
+		for (j = 0; j < n_writes; j++)
+			pch_spi_writereg(data->master, PCH_SPDWR, data->pkt_tx_buff[j]);
+	}
 
 	/* update tx_index */
 	data->tx_index = j;
