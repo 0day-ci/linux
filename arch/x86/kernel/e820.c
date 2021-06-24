@@ -66,6 +66,7 @@ struct e820_table *e820_table_firmware __refdata	= &e820_table_firmware_init;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0xaeedbabe;
+unsigned long pci_mem_gap_size;
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_mem_start);
 #endif
@@ -677,6 +678,7 @@ __init void e820__setup_pci_gap(void)
 	 * e820__reserve_resources_late() protects stolen RAM already:
 	 */
 	pci_mem_start = gapstart;
+	pci_mem_gap_size = gapsize;
 
 	pr_info("[mem %#010lx-%#010lx] available for PCI devices\n",
 		gapstart, gapstart + gapsize - 1);

@@ -81,6 +81,8 @@ static inline int pcibios_assign_all_busses(void) { return 0; }
 #endif
 
 extern unsigned long pci_mem_start;
+extern unsigned long pci_mem_gap_size;
+
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		(pci_mem_start)
 

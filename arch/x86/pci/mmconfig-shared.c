@@ -813,3 +813,31 @@ int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
 
 	return -ENOENT;
 }
+
+void pci_mmconfig_clip_resource(struct resource *res)
+{
+	struct pci_mmcfg_region *cfg;
+	resource_size_t start, end;
+	resource_size_t low = 0, high = 0;
+
+	/* Refers to the resource_clip() in the x86/kernel/resource.c */
+	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
+		start = cfg->res.start;
+		end = cfg->res.end;
+
+		if (res->end < start || res->start > end)
+			continue;	/* no conflict */
+
+		if (res->start < start)
+			low = start - res->start;
+
+		if (res->end > end)
+			high = res->end - end;
+
+		/* Keep the area above or below the conflict, whichever is larger */
+		if (low > high)
+			res->end = start - 1;
+		else
+			res->start = end + 1;
+	}
+}

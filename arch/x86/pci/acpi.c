@@ -231,6 +231,11 @@ static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
 		info->mcfg_added = false;
 	}
 }
+
+static void clip_resource_from_mmcfg(struct resource *res)
+{
+	return pci_mmconfig_clip_resource(res);
+}
 #else
 static int setup_mcfg_map(struct acpi_pci_root_info *ci)
 {
@@ -238,6 +243,10 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
 }
 
 static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+{
+}
+
+static void clip_resource_from_mmcfg(struct resource *res)
 {
 }
 #endif
@@ -296,13 +305,48 @@ static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
 	struct acpi_device *device = ci->bridge;
 	int busnum = ci->root->secondary.start;
 	struct resource_entry *entry, *tmp;
+	bool has_non_e820_region = false;
 	int status;
 
 	status = acpi_pci_probe_root_resources(ci);
 	if (pci_use_crs) {
-		resource_list_for_each_entry_safe(entry, tmp, &ci->resources)
+		resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
+			struct resource avail = *entry->res;
+
 			if (resource_is_pcicfg_ioport(entry->res))
 				resource_list_destroy_entry(entry);
+
+			if (avail.flags & IORESOURCE_MEM) {
+				arch_remove_reservations(&avail);
+				if (avail.end > avail.start)
+					has_non_e820_region = true;
+			}
+		}
+
+		/* all bridge windows are in the BIOS-e820 mapped region, this
+		 * will make allocate_resource() fail when PCI devices request
+		 * iomem address from bridge. To fix it, we try to build a non
+		 * e820 mapped iomem resource and clip it with MMCONFIG region,
+		 * then add it to the bridge window list.
+		 */
+		if (!has_non_e820_region) {
+			struct resource_entry *rentry;
+			struct resource avail;
+
+			avail.start = pci_mem_start;
+			avail.end = pci_mem_start + pci_mem_gap_size - 1;
+			avail.flags = IORESOURCE_MEM | IORESOURCE_WINDOW;
+			avail.name = ci->name;
+			clip_resource_from_mmcfg(&avail);
+			if (avail.end > avail.start) {
+				rentry = resource_list_create_entry(NULL, 0);
+				if (rentry) {
+					*rentry->res = avail;
+					resource_list_add_tail(rentry, &ci->resources);
+				}
+			}
+		}
+
 		return status;
 	}
 
