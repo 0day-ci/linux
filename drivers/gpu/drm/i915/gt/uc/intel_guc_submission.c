@@ -10,6 +10,7 @@
 #include "gt/intel_breadcrumbs.h"
 #include "gt/intel_context.h"
 #include "gt/intel_engine_pm.h"
+#include "gt/intel_engine_heartbeat.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_irq.h"
 #include "gt/intel_gt_pm.h"
@@ -605,6 +606,7 @@ void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 		/* Reset called during driver load? GuC not yet initialised! */
 		return;
 
+	intel_gt_park_heartbeats(guc_to_gt(guc));
 	disable_submission(guc);
 	guc->interrupts.disable(guc);
 
@@ -890,6 +892,7 @@ void intel_guc_submission_reset_finish(struct intel_guc *guc)
 	atomic_set(&guc->outstanding_submission_g2h, 0);
 
 	enable_submission(guc);
+	intel_gt_unpark_heartbeats(guc_to_gt(guc));
 }
 
 /*
@@ -1859,6 +1862,11 @@ static int guc_resume(struct intel_engine_cs *engine)
 	return 0;
 }
 
+static bool guc_sched_engine_disabled(struct i915_sched_engine *sched_engine)
+{
+	return !sched_engine->tasklet.callback;
+}
+
 static void guc_set_default_submission(struct intel_engine_cs *engine)
 {
 	engine->submit_request = guc_submit_request;
@@ -2009,6 +2017,7 @@ int intel_guc_submission_setup(struct intel_engine_cs *engine)
 			return -ENOMEM;
 
 		guc->sched_engine->schedule = i915_schedule;
+		guc->sched_engine->disabled = guc_sched_engine_disabled;
 		guc->sched_engine->private_data = guc;
 		tasklet_setup(&guc->sched_engine->tasklet,
 			      guc_submission_tasklet);
