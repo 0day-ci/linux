@@ -223,46 +223,46 @@ static int seed_constraint_attributes(void)
 
 	for (i = 0; i < MAX_CONSTRAINTS_PER_ZONE; ++i) {
 		ret = create_constraint_attribute(i, "power_limit_uw",
-					S_IWUSR | S_IRUGO,
+					0644,
 					&constraint_attrs[i].power_limit_attr,
 					show_constraint_power_limit_uw,
 					store_constraint_power_limit_uw);
 		if (ret)
 			goto err_alloc;
 		ret = create_constraint_attribute(i, "time_window_us",
-					S_IWUSR | S_IRUGO,
+					0644,
 					&constraint_attrs[i].time_window_attr,
 					show_constraint_time_window_us,
 					store_constraint_time_window_us);
 		if (ret)
 			goto err_alloc;
-		ret = create_constraint_attribute(i, "name", S_IRUGO,
+		ret = create_constraint_attribute(i, "name", 0444,
 				&constraint_attrs[i].name_attr,
 				show_constraint_name,
 				NULL);
 		if (ret)
 			goto err_alloc;
-		ret = create_constraint_attribute(i, "max_power_uw", S_IRUGO,
+		ret = create_constraint_attribute(i, "max_power_uw", 0444,
 				&constraint_attrs[i].max_power_attr,
 				show_constraint_max_power_uw,
 				NULL);
 		if (ret)
 			goto err_alloc;
-		ret = create_constraint_attribute(i, "min_power_uw", S_IRUGO,
+		ret = create_constraint_attribute(i, "min_power_uw", 0444,
 				&constraint_attrs[i].min_power_attr,
 				show_constraint_min_power_uw,
 				NULL);
 		if (ret)
 			goto err_alloc;
 		ret = create_constraint_attribute(i, "max_time_window_us",
-				S_IRUGO,
+				0444,
 				&constraint_attrs[i].max_time_window_attr,
 				show_constraint_max_time_window_us,
 				NULL);
 		if (ret)
 			goto err_alloc;
 		ret = create_constraint_attribute(i, "min_time_window_us",
-				S_IRUGO,
+				0444,
 				&constraint_attrs[i].min_time_window_attr,
 				show_constraint_min_time_window_us,
 				NULL);
@@ -366,9 +366,9 @@ static void create_power_zone_common_attributes(
 					&dev_attr_max_energy_range_uj.attr;
 	if (power_zone->ops->get_energy_uj) {
 		if (power_zone->ops->reset_energy_uj)
-			dev_attr_energy_uj.attr.mode = S_IWUSR | S_IRUSR;
+			dev_attr_energy_uj.attr.mode = 0600;
 		else
-			dev_attr_energy_uj.attr.mode = S_IRUSR;
+			dev_attr_energy_uj.attr.mode = 0400;
 		power_zone->zone_dev_attrs[count++] =
 					&dev_attr_energy_uj.attr;
 	}
