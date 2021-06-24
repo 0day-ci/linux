@@ -6,12 +6,6 @@
 
 #ifdef CONFIG_PRINTK
 
-#define PRINTK_SAFE_CONTEXT_MASK	0x007ffffff
-#define PRINTK_NMI_DIRECT_CONTEXT_MASK	0x008000000
-#define PRINTK_NMI_CONTEXT_MASK		0xff0000000
-
-#define PRINTK_NMI_CONTEXT_OFFSET	0x010000000
-
 __printf(4, 0)
 int vprintk_store(int facility, int level,
 		  const struct dev_printk_info *dev_info,
