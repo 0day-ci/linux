@@ -860,6 +860,26 @@ static void shrink_ple_window(struct kvm_vcpu *vcpu)
 	}
 }
 
+static __init u8 svm_get_c_bit(bool sev_only)
+{
+	unsigned int eax, ebx, ecx, edx;
+	u64 msr;
+
+	if (cpuid_eax(0x80000000) < 0x8000001f)
+		return 0;
+
+	if (rdmsrl_safe(MSR_AMD64_SYSCFG, &msr) ||
+	    !(msr & MSR_AMD64_SYSCFG_MEM_ENCRYPT))
+		return 0;
+
+	cpuid(0x8000001f, &eax, &ebx, &ecx, &edx);
+
+	if (sev_only && !(eax & feature_bit(SEV)))
+		return 0;
+
+	return ebx & 0x3f;
+}
+
 /*
  * The default MMIO mask is a single bit (excluding the present bit),
  * which could conflict with the memory encryption bit. Check for
@@ -869,18 +889,13 @@ static void shrink_ple_window(struct kvm_vcpu *vcpu)
 static __init void svm_adjust_mmio_mask(void)
 {
 	unsigned int enc_bit, mask_bit;
-	u64 msr, mask;
-
-	/* If there is no memory encryption support, use existing mask */
-	if (cpuid_eax(0x80000000) < 0x8000001f)
-		return;
+	u64 mask;
 
 	/* If memory encryption is not enabled, use existing mask */
-	rdmsrl(MSR_AMD64_SYSCFG, msr);
-	if (!(msr & MSR_AMD64_SYSCFG_MEM_ENCRYPT))
+	enc_bit = svm_get_c_bit(false);
+	if (!enc_bit)
 		return;
 
-	enc_bit = cpuid_ebx(0x8000001f) & 0x3f;
 	mask_bit = boot_cpu_data.x86_phys_bits;
 
 	/* Increment the mask bit if it is the same as the encryption bit */
@@ -1012,6 +1027,12 @@ static __init int svm_hardware_setup(void)
 
 	kvm_configure_mmu(npt_enabled, get_max_npt_level(), PG_LEVEL_1G);
 	pr_info("kvm: Nested Paging %sabled\n", npt_enabled ? "en" : "dis");
+
+	/*
+	 * The SEV C-bit location is needed to correctly enumeration guest
+	 * MAXPHYADDR even if SEV is not fully supported.
+	 */
+	sev_c_bit = svm_get_c_bit(true);
 
 	/* Note, SEV setup consumes npt_enabled. */
 	sev_hardware_setup();
