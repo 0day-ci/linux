@@ -699,10 +699,19 @@ struct vfio_region_info_cap_nvlink2_lnkspd {
  * disabling the entire index.  This is used for interrupts like PCI MSI
  * and MSI-X where the driver may only use a subset of the available
  * indexes, but VFIO needs to enable a specific number of vectors
- * upfront.  In the case of MSI-X, where the user can enable MSI-X and
- * then add and unmask vectors, it's up to userspace to make the decision
- * whether to allocate the maximum supported number of vectors or tear
- * down setup and incrementally increase the vectors as each is enabled.
+ * upfront.
+ *
+ * MSI cannot be resized safely when interrupts are in use already because
+ * resizing requires temporary disablement of MSI for updating the relevant
+ * PCI config space entries. Disabling MSI redirects an interrupt raised by
+ * the device during this time to the unhandled legacy PCI/INTX, which
+ * means the interrupt is lost.
+ *
+ * Enabling additional vectors for MSI-X is possible at least from the
+ * perspective of the MSI-X specification, but not supported by the
+ * exisiting PCI/MSI-X mechanisms in the kernel. The kernel provides
+ * currently only a full teardown/setup cycle which requires to disable
+ * MSI-X temporarily with the same side effects as for MSI.
  */
 struct vfio_irq_info {
 	__u32	argsz;
