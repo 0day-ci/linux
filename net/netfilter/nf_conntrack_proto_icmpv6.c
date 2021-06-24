@@ -139,6 +139,7 @@ int nf_conntrack_icmpv6_error(struct nf_conn *tmpl,
 	const struct icmp6hdr *icmp6h;
 	struct icmp6hdr _ih;
 	int type;
+	int ret;
 
 	icmp6h = skb_header_pointer(skb, dataoff, sizeof(_ih), &_ih);
 	if (icmp6h == NULL) {
@@ -167,8 +168,12 @@ int nf_conntrack_icmpv6_error(struct nf_conn *tmpl,
 	memcpy(&outer_daddr.ip6, &ipv6_hdr(skb)->daddr,
 	       sizeof(outer_daddr.ip6));
 	dataoff += sizeof(*icmp6h);
-	return nf_conntrack_inet_error(tmpl, skb, dataoff, state,
-				       IPPROTO_ICMPV6, &outer_daddr);
+	ret = nf_conntrack_inet_error(tmpl, skb, dataoff, state,
+				      IPPROTO_ICMPV6, &outer_daddr);
+	if (icmp6h->icmp6_type == ICMPV6_PKT_TOOBIG &&
+	    ret == -NF_ACCEPT)
+		return -NF_DROP;
+	return ret;
 }
 
 #if IS_ENABLED(CONFIG_NF_CT_NETLINK)
