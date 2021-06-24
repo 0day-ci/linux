@@ -229,7 +229,7 @@ void *iwl_uefi_get_reduced_power(struct iwl_trans *trans, size_t *len)
 
 	package = kmalloc(package_size, GFP_KERNEL);
 	if (!package) {
-		package = ERR_PTR(-ENOMEM);
+		data = ERR_PTR(-ENOMEM);
 		goto out;
 	}
 
