@@ -11295,7 +11295,7 @@ scsih_shutdown(struct pci_dev *pdev)
 
 	_scsih_ir_shutdown(ioc);
 	_scsih_nvme_shutdown(ioc);
-	mpt3sas_base_detach(ioc);
+	mpt3sas_base_stop_watchdog(ioc);
 }
 
 
