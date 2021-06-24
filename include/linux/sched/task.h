@@ -34,6 +34,8 @@ struct kernel_clone_args {
 	int io_thread;
 	struct cgroup *cgrp;
 	struct css_set *cset;
+	/* User to check RLIMIT_NPROC against */
+	struct user_struct *user;
 };
 
 /*

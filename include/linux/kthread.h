@@ -28,6 +28,11 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
 	kthread_create_on_node(threadfn, data, NUMA_NO_NODE, namefmt, ##arg)
 
 
+struct task_struct *kthread_create_for_user(int (*threadfn)(void *data),
+					    void *data,
+					    struct user_struct *user,
+					    const char namefmt[], ...);
+
 struct task_struct *kthread_create_on_cpu(int (*threadfn)(void *data),
 					  void *data,
 					  unsigned int cpu,

@@ -41,6 +41,7 @@ struct kthread_create_info
 	int (*threadfn)(void *data);
 	void *data;
 	int node;
+	struct user_struct *user;
 
 	/* Result passed back to kthread_create() from kthreadd. */
 	struct task_struct *result;
@@ -306,13 +307,21 @@ int tsk_fork_get_node(struct task_struct *tsk)
 
 static void create_kthread(struct kthread_create_info *create)
 {
+	/* We want our own signal handler (we take no signals by default). */
+	struct kernel_clone_args clone_args = {
+		.flags		= CLONE_FS | CLONE_FILES | CLONE_VM |
+				  CLONE_UNTRACED,
+		.exit_signal	= SIGCHLD,
+		.stack		= (unsigned long)kthread,
+		.stack_size	= (unsigned long)create,
+		.user		= create->user,
+	};
 	int pid;
 
 #ifdef CONFIG_NUMA
 	current->pref_node_fork = create->node;
 #endif
-	/* We want our own signal handler (we take no signals by default). */
-	pid = kernel_thread(kthread, create, CLONE_FS | CLONE_FILES | SIGCHLD);
+	pid = kernel_clone(&clone_args);
 	if (pid < 0) {
 		/* If user was SIGKILLed, I release the structure. */
 		struct completion *done = xchg(&create->done, NULL);
@@ -326,11 +335,11 @@ static void create_kthread(struct kthread_create_info *create)
 	}
 }
 
-static __printf(4, 0)
+static __printf(5, 0)
 struct task_struct *__kthread_create_on_node(int (*threadfn)(void *data),
-						    void *data, int node,
-						    const char namefmt[],
-						    va_list args)
+					     void *data, int node,
+					     struct user_struct *user,
+					     const char namefmt[], va_list args)
 {
 	DECLARE_COMPLETION_ONSTACK(done);
 	struct task_struct *task;
@@ -343,6 +352,7 @@ struct task_struct *__kthread_create_on_node(int (*threadfn)(void *data),
 	create->data = data;
 	create->node = node;
 	create->done = &done;
+	create->user = user;
 
 	spin_lock(&kthread_create_lock);
 	list_add_tail(&create->list, &kthread_create_list);
@@ -423,12 +433,42 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
 	va_list args;
 
 	va_start(args, namefmt);
-	task = __kthread_create_on_node(threadfn, data, node, namefmt, args);
+	task = __kthread_create_on_node(threadfn, data, node, NULL, namefmt,
+					args);
 	va_end(args);
 
 	return task;
 }
 EXPORT_SYMBOL(kthread_create_on_node);
+
+/**
+ * kthread_create_for_user - create a kthread and check @user's RLIMIT_NPROC
+ * @threadfn: the function to run until signal_pending(current).
+ * @data: data ptr for @threadfn.
+ * @user: user_struct that will have its RLIMIT_NPROC checked
+ * @namefmt: printf-style name for the thread.
+ *
+ * This will create a kthread on the current node, leaving it in the stopped
+ * state.  This is just a helper for kthread_create_on_node() that will check
+ * @user's process count against its RLIMIT_NPROC.  See the
+ * kthread_create_on_node() documentation for more details.
+ */
+struct task_struct *kthread_create_for_user(int (*threadfn)(void *data),
+					    void *data,
+					    struct user_struct *user,
+					    const char namefmt[], ...)
+{
+	struct task_struct *task;
+	va_list args;
+
+	va_start(args, namefmt);
+	task = __kthread_create_on_node(threadfn, data, NUMA_NO_NODE, user,
+					namefmt, args);
+	va_end(args);
+
+	return task;
+}
+EXPORT_SYMBOL(kthread_create_for_user);
 
 static void __kthread_bind_mask(struct task_struct *p, const struct cpumask *mask, long state)
 {
@@ -764,8 +804,8 @@ __kthread_create_worker(int cpu, unsigned int flags,
 	if (cpu >= 0)
 		node = cpu_to_node(cpu);
 
-	task = __kthread_create_on_node(kthread_worker_fn, worker,
-						node, namefmt, args);
+	task = __kthread_create_on_node(kthread_worker_fn, worker, node, NULL,
+					namefmt, args);
 	if (IS_ERR(task))
 		goto fail_task;
 
