@@ -1074,6 +1074,9 @@ static void __guc_context_destroy(struct intel_context *ce)
 		struct guc_virtual_engine *ve =
 			container_of(ce, typeof(*ve), context);
 
+		if (ve->base.breadcrumbs)
+			intel_breadcrumbs_put(ve->base.breadcrumbs);
+
 		kfree(ve);
 	} else {
 		intel_context_free(ce);
@@ -1377,6 +1380,62 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 	.get_sibling = guc_virtual_get_sibling,
 };
 
+static bool
+guc_irq_enable_breadcrumbs(struct intel_breadcrumbs *b)
+{
+	struct intel_engine_cs *sibling;
+	intel_engine_mask_t tmp, mask = b->engine_mask;
+	bool result = false;
+
+	for_each_engine_masked(sibling, b->irq_engine->gt, mask, tmp)
+		result |= intel_engine_irq_enable(sibling);
+
+	return result;
+}
+
+static void
+guc_irq_disable_breadcrumbs(struct intel_breadcrumbs *b)
+{
+	struct intel_engine_cs *sibling;
+	intel_engine_mask_t tmp, mask = b->engine_mask;
+
+	for_each_engine_masked(sibling, b->irq_engine->gt, mask, tmp)
+		intel_engine_irq_disable(sibling);
+}
+
+static void guc_init_breadcrumbs(struct intel_engine_cs *engine)
+{
+	int i;
+
+       /*
+        * In GuC submission mode we do not know which physical engine a request
+        * will be scheduled on, this creates a problem because the breadcrumb
+        * interrupt is per physical engine. To work around this we attach
+        * requests and direct all breadcrumb interrupts to the first instance
+        * of an engine per class. In addition all breadcrumb interrupts are
+	* enabled / disabled across an engine class in unison.
+        */
+	for (i = 0; i < MAX_ENGINE_INSTANCE; ++i) {
+		struct intel_engine_cs *sibling =
+			engine->gt->engine_class[engine->class][i];
+
+		if (sibling) {
+			if (engine->breadcrumbs != sibling->breadcrumbs) {
+				intel_breadcrumbs_put(engine->breadcrumbs);
+				engine->breadcrumbs =
+					intel_breadcrumbs_get(sibling->breadcrumbs);
+			}
+			break;
+		}
+	}
+
+	if (engine->breadcrumbs) {
+		engine->breadcrumbs->engine_mask |= engine->mask;
+		engine->breadcrumbs->irq_enable = guc_irq_enable_breadcrumbs;
+		engine->breadcrumbs->irq_disable = guc_irq_disable_breadcrumbs;
+	}
+}
+
 static void sanitize_hwsp(struct intel_engine_cs *engine)
 {
 	struct intel_timeline *tl;
@@ -1600,6 +1659,7 @@ int intel_guc_submission_setup(struct intel_engine_cs *engine)
 
 	guc_default_vfuncs(engine);
 	guc_default_irqs(engine);
+	guc_init_breadcrumbs(engine);
 
 	if (engine->class == RENDER_CLASS)
 		rcs_submission_override(engine);
@@ -1839,11 +1899,6 @@ guc_create_virtual(struct intel_engine_cs **siblings, unsigned int count)
 	ve->base.instance = I915_ENGINE_CLASS_INVALID_VIRTUAL;
 	ve->base.uabi_instance = I915_ENGINE_CLASS_INVALID_VIRTUAL;
 	ve->base.saturated = ALL_ENGINES;
-	ve->base.breadcrumbs = intel_breadcrumbs_create(&ve->base);
-	if (!ve->base.breadcrumbs) {
-		kfree(ve);
-		return ERR_PTR(-ENOMEM);
-	}
 
 	snprintf(ve->base.name, sizeof(ve->base.name), "virtual");
 
@@ -1892,6 +1947,8 @@ guc_create_virtual(struct intel_engine_cs **siblings, unsigned int count)
 				sibling->emit_fini_breadcrumb;
 			ve->base.emit_fini_breadcrumb_dw =
 				sibling->emit_fini_breadcrumb_dw;
+			ve->base.breadcrumbs =
+				intel_breadcrumbs_get(sibling->breadcrumbs);
 
 			ve->base.flags |= sibling->flags;
 
