@@ -399,7 +399,7 @@ setup_wait_dev_with_timeout()
 
 	for ((i = 1; i <= $max_iterations; ++i)); do
 		ip link show dev $dev up \
-			| grep 'state UP' &> /dev/null
+			| grep 'state UP' | grep 'LOWER_UP' &> /dev/null
 		if [[ $? -ne 0 ]]; then
 			sleep 1
 		else
