@@ -50,7 +50,7 @@ config IWLWIFI_LEDS
 	depends on LEDS_CLASS=y || LEDS_CLASS=IWLWIFI
 	depends on IWLMVM || IWLDVM
 	select LEDS_TRIGGERS
-	select MAC80211_LEDS
+	select MAC80211_LEDS if (LEDS_CLASS=y || LEDS_CLASS=MAC80211)
 	default y
 
 config IWLDVM
