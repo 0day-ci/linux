@@ -230,7 +230,7 @@ int seq_buf_putmem_hex(struct seq_buf *s, const void *mem,
 	WARN_ON(s->size == 0);
 
 	while (len) {
-		start_len = min(len, HEX_CHARS - 1);
+		start_len = min(len, MAX_MEMHEX_BYTES);
 #ifdef __BIG_ENDIAN
 		for (i = 0, j = 0; i < start_len; i++) {
 #else
@@ -249,6 +249,8 @@ int seq_buf_putmem_hex(struct seq_buf *s, const void *mem,
 		seq_buf_putmem(s, hex, j);
 		if (seq_buf_has_overflowed(s))
 			return -1;
+
+		data += start_len;
 	}
 	return 0;
 }
