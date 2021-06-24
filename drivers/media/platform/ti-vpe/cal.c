@@ -693,7 +693,7 @@ static int cal_async_notifier_register(struct cal_dev *cal)
 	unsigned int i;
 	int ret;
 
-	v4l2_async_notifier_init(&cal->notifier);
+	v4l2_async_nf_init(&cal->notifier);
 	cal->notifier.ops = &cal_async_notifier_ops;
 
 	for (i = 0; i < cal->data->num_csi2_phy; ++i) {
@@ -705,9 +705,9 @@ static int cal_async_notifier_register(struct cal_dev *cal)
 			continue;
 
 		fwnode = of_fwnode_handle(phy->sensor_node);
-		casd = v4l2_async_notifier_add_fwnode_subdev(&cal->notifier,
-							     fwnode,
-							     struct cal_v4l2_async_subdev);
+		casd = v4l2_async_nf_add_fwnode(&cal->notifier,
+						fwnode,
+						struct cal_v4l2_async_subdev);
 		if (IS_ERR(casd)) {
 			phy_err(phy, "Failed to add subdev to notifier\n");
 			ret = PTR_ERR(casd);
@@ -717,7 +717,7 @@ static int cal_async_notifier_register(struct cal_dev *cal)
 		casd->phy = phy;
 	}
 
-	ret = v4l2_async_notifier_register(&cal->v4l2_dev, &cal->notifier);
+	ret = v4l2_async_nf_register(&cal->v4l2_dev, &cal->notifier);
 	if (ret) {
 		cal_err(cal, "Error registering async notifier\n");
 		goto error;
@@ -726,14 +726,14 @@ static int cal_async_notifier_register(struct cal_dev *cal)
 	return 0;
 
 error:
-	v4l2_async_notifier_cleanup(&cal->notifier);
+	v4l2_async_nf_cleanup(&cal->notifier);
 	return ret;
 }
 
 static void cal_async_notifier_unregister(struct cal_dev *cal)
 {
-	v4l2_async_notifier_unregister(&cal->notifier);
-	v4l2_async_notifier_cleanup(&cal->notifier);
+	v4l2_async_nf_unregister(&cal->notifier);
+	v4l2_async_nf_cleanup(&cal->notifier);
 }
 
 /* ------------------------------------------------------------------
