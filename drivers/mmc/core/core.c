@@ -352,7 +352,11 @@ int mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	if (err)
 		return err;
 
-	led_trigger_event(host->led, LED_FULL);
+	if (host->ops->get_cd)
+		host->ops->get_cd(host) ? led_trigger_event(host->led, LED_FULL) : NULL;
+	else
+		led_trigger_event(host->led, LED_FULL);
+
 	__mmc_start_request(host, mrq);
 
 	return 0;
