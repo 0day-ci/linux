@@ -147,7 +147,6 @@ static int pxa_ssp_probe(struct platform_device *pdev)
 
 	ssp->irq = platform_get_irq(pdev, 0);
 	if (ssp->irq < 0) {
-		dev_err(dev, "no IRQ resource defined\n");
 		return -ENODEV;
 	}
 
