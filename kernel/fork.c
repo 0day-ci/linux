@@ -1861,6 +1861,7 @@ static __latent_entropy struct task_struct *copy_process(
 	struct file *pidfile = NULL;
 	u64 clone_flags = args->flags;
 	struct nsproxy *nsp = current->nsproxy;
+	struct user_struct *user = args->user;
 
 	/*
 	 * Don't allow sharing the root directory with processes in a different
@@ -1977,16 +1978,17 @@ static __latent_entropy struct task_struct *copy_process(
 #ifdef CONFIG_PROVE_LOCKING
 	DEBUG_LOCKS_WARN_ON(!p->softirqs_enabled);
 #endif
+	if (!user)
+		user = p->real_cred->user;
 	retval = -EAGAIN;
-	if (atomic_read(&p->real_cred->user->processes) >=
-			task_rlimit(p, RLIMIT_NPROC)) {
-		if (p->real_cred->user != INIT_USER &&
+	if (atomic_read(&user->processes) >= task_rlimit(p, RLIMIT_NPROC)) {
+		if (user != INIT_USER &&
 		    !capable(CAP_SYS_RESOURCE) && !capable(CAP_SYS_ADMIN))
 			goto bad_fork_free;
 	}
 	current->flags &= ~PF_NPROC_EXCEEDED;
 
-	retval = copy_creds(p, clone_flags);
+	retval = copy_creds(p, clone_flags, user);
 	if (retval < 0)
 		goto bad_fork_free;
 
@@ -2382,7 +2384,7 @@ bad_fork_cleanup_threadgroup_lock:
 #endif
 	delayacct_tsk_free(p);
 bad_fork_cleanup_count:
-	atomic_dec(&p->cred->user->processes);
+	atomic_dec(&user->processes);
 	exit_creds(p);
 bad_fork_free:
 	p->state = TASK_DEAD;
