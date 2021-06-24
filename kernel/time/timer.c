@@ -265,7 +265,7 @@ int timer_migration_handler(struct ctl_table *table, int write,
 
 static inline bool is_timers_nohz_active(void)
 {
-	return static_branch_unlikely(&timers_nohz_active);
+	return static_branch_likely(&timers_nohz_active);
 }
 #else
 static inline bool is_timers_nohz_active(void) { return false; }
