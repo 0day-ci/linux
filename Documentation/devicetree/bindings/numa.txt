@@ -109,6 +109,10 @@ Example:
 Dual socket system consists of 2 boards connected through ccn bus and
 each board having one socket/soc of 8 cpus, memory and pci bus.
 
+Note that the empty NUMA nodes, which no memory resides in, are allowed
+Their NUMA node IDs are still valid so that memory can be added into these
+NUMA nodes through hotplug afterwards.
+
 	memory@c00000 {
 		device_type = "memory";
 		reg = <0x0 0xc00000 0x0 0x80000000>;
