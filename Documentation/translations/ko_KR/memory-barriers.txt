@@ -1364,7 +1364,7 @@ Multicopy 원자성은 실제의 컴퓨터 시스템에서 항상 제공되지�
 	=======================	=======================	=======================
 		{ X = 0, Y = 0 }
 	STORE X=1		r1=LOAD X (reads 1)	LOAD Y (reads 1)
-				<범용 배리어>		<읽기 배리어>
+				<범용 배리어>           <읽기 배리어>
 				STORE Y=r1		LOAD X
 
 CPU 2 의 Y 로의 스토어에 사용되는 X 로드의 결과가 1 이었고 CPU 3 의 Y 로드가
@@ -1394,7 +1394,7 @@ CPU 3 의 X 로드가 CPU 2 의 로드보다 뒤에 이루어졌으므로, CPU 3
 	=======================	=======================	=======================
 		{ X = 0, Y = 0 }
 	STORE X=1		r1=LOAD X (reads 1)	LOAD Y (reads 1)
-				<데이터 의존성>		<읽기 배리어>
+				<데이터 의존성>         <읽기 배리어>
 				STORE Y=r1		LOAD X (reads 0)
 
 이 변화는 non-multicopy 원자성이 만연하게 합니다: 이 예에서, CPU 2 의 X
@@ -1789,10 +1789,10 @@ CPU 메모리 배리어
 
 	TYPE		MANDATORY		SMP CONDITIONAL
 	===============	=======================	===========================
-	범용		mb()			smp_mb()
-	쓰기		wmb()			smp_wmb()
-	읽기		rmb()			smp_rmb()
-	데이터 의존성				READ_ONCE()
+	범용            mb()                    smp_mb()
+	쓰기            wmb()                   smp_wmb()
+	읽기            rmb()                   smp_rmb()
+	데이터 의존성                           READ_ONCE()
 
 
 데이터 의존성 배리어를 제외한 모든 메모리 배리어는 컴파일러 배리어를
@@ -2151,7 +2151,7 @@ wake_up() 이 무언가를 깨우게 되면, 이 함수는 범용 메모리 배�
 	set_current_state();		STORE event_indicated
 	  smp_store_mb();		wake_up();
 	    STORE current->state	  ...
-	    <범용 배리어>		  <범용 배리어>
+	    <범용 배리어>                 <범용 배리어>
 	LOAD event_indicated		  if ((LOAD task->state) & TASK_NORMAL)
 					    STORE task->state
 
