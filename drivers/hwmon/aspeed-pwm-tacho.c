@@ -158,7 +158,7 @@
  * 10: both
  * 11: reserved.
  */
-#define M_TACH_MODE 0x02 /* 10b */
+#define M_TACH_MODE 0x00 /* 10b */
 #define M_TACH_UNIT 0x0210
 #define INIT_FAN_CTRL 0xFF
 
