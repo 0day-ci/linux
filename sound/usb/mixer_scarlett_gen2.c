@@ -1186,7 +1186,7 @@ static int scarlett2_usb_get_config(
 		if (err < 0)
 			return err;
 		if (size == 2)
-			for (i = 0; i < count; i++, (u16 *)buf++)
+			for (i = 0; i < count; i++, buf = (u16 *)buf + 1)
 				*(u16 *)buf = le16_to_cpu(*(__le16 *)buf);
 		return 0;
 	}
