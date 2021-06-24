@@ -79,7 +79,6 @@ static const struct omap_dma_reg reg_map[] = {
 
 static unsigned configure_dma_errata(void)
 {
-	unsigned errata = 0;
 
 	/*
 	 * Errata applicable for OMAP2430ES1.0 and all omap2420
@@ -158,7 +157,7 @@ static unsigned configure_dma_errata(void)
 	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
 		SET_DMA_ERRATA(DMA_ROMCODE_BUG);
 
-	return errata;
+	return 0;
 }
 
 static const struct dma_slave_map omap24xx_sdma_dt_map[] = {
