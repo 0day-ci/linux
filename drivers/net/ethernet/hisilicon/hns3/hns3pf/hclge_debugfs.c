@@ -2301,6 +2301,60 @@ static int hclge_dbg_dump_mac_mc(struct hclge_dev *hdev, char *buf, int len)
 	return 0;
 }
 
+/* The order of each reason is defined by firmware, so don't change the order */
+static const char * const link_down_reason[] = {
+	"Reference clock lost",
+	"SFP tx is disabled",
+	"SFP is absent",
+	"PHY power down",
+	"Serdes analog loss of signal",
+	"Auto negotiation failed",
+	"Link training failed",
+	"Remote fault",
+	"I2C bus error",
+	"BER is too high",
+};
+
+static int hclge_dbg_dump_link_diagnosis_info(struct hclge_dev *hdev, char *buf,
+					      int len)
+{
+#define HCLGE_DBG_BIT_LEN_PER_WORD		32
+
+	u16 word_index, bit_index, i;
+	struct hclge_desc desc;
+	int pos = 0;
+	u32 data;
+	int ret;
+
+	if (hdev->ae_dev->dev_version <= HNAE3_DEVICE_VERSION_V2) {
+		dev_err(&hdev->pdev->dev, "Operation not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_QUERY_LINK_DIAGNOSIS, true);
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret) {
+		dev_err(&hdev->pdev->dev,
+			"failed to query link diagnosis info, ret = %d\n", ret);
+		return ret;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(link_down_reason); i++) {
+		word_index = i / HCLGE_DBG_BIT_LEN_PER_WORD;
+		bit_index = i % HCLGE_DBG_BIT_LEN_PER_WORD;
+
+		data = le32_to_cpu(desc.data[word_index]);
+		if (hnae3_get_bit(data, bit_index))
+			pos += scnprintf(buf + pos, len - pos, "%s\n",
+					 link_down_reason[i]);
+	}
+
+	if (!pos)
+		pos += scnprintf(buf + pos, len - pos, "No error\n");
+
+	return 0;
+}
+
 static const struct hclge_dbg_func hclge_dbg_cmd_func[] = {
 	{
 		.cmd = HNAE3_DBG_CMD_TM_NODES,
@@ -2445,6 +2499,10 @@ static const struct hclge_dbg_func hclge_dbg_cmd_func[] = {
 	{
 		.cmd = HNAE3_DBG_CMD_UMV_INFO,
 		.dbg_dump = hclge_dbg_dump_umv_info,
+	},
+	{
+		.cmd = HNAE3_DBG_CMD_LINK_DIAGNOSIS_INFO,
+		.dbg_dump = hclge_dbg_dump_link_diagnosis_info,
 	},
 };
 
