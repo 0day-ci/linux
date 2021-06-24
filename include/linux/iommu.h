@@ -79,8 +79,15 @@ struct iommu_domain_geometry {
 #define IOMMU_DOMAIN_DMA	(__IOMMU_DOMAIN_PAGING |	\
 				 __IOMMU_DOMAIN_DMA_API)
 
+enum iommu_strictness {
+	IOMMU_DEFAULT_STRICTNESS = 0,	/* zero-init ends up at default */
+	IOMMU_NOT_STRICT,
+	IOMMU_STRICT,
+};
+
 struct iommu_domain {
 	unsigned type;
+	enum iommu_strictness strictness;
 	const struct iommu_ops *ops;
 	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
 	iommu_fault_handler_t handler;
