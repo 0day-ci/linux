@@ -1536,7 +1536,7 @@ static int i915_displayport_test_data_show(struct seq_file *m, void *data)
 			intel_dp = enc_to_intel_dp(encoder);
 			if (intel_dp->compliance.test_type ==
 			    DP_TEST_LINK_EDID_READ)
-				seq_printf(m, "%lx",
+				seq_printf(m, "%lx\n",
 					   intel_dp->compliance.test_data.edid);
 			else if (intel_dp->compliance.test_type ==
 				 DP_TEST_LINK_VIDEO_PATTERN) {
