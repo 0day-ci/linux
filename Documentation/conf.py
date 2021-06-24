@@ -363,12 +363,19 @@ latex_elements['preamble']  += '''
 	% This is needed for translations
 	\\usepackage{xeCJK}
 	\\setCJKmainfont{Noto Sans CJK SC}
+	\\setCJKsansfont{Noto Sans CJK SC}
+	\\setCJKmonofont{Noto Sans Mono CJK SC}
+	\\setmonofont{Noto Sans Mono CJK SC}
 	% Define custom macros to on/off CJK
 	\\newcommand{\\kerneldocCJKon}{\\makexeCJKactive}
 	\\newcommand{\\kerneldocCJKoff}{\\makexeCJKinactive}
 	% Inactivate CJK after tableofcontents (using etoolbox)
 	\\usepackage{etoolbox}
 	\\apptocmd{\\sphinxtableofcontents}{\\kerneldocCJKoff}{}{}
+	\\IfFontExistsTF{Unifont}{
+	    % For alinged Korean ascii-art
+	    \\setCJKmonofont{Unifont}
+	}{}
     }{ % No CJK font
 	% Custom macros to on/off CJK (Dummy)
 	\\newcommand{\\kerneldocCJKon}{}
