@@ -417,7 +417,8 @@ kvm_pfn_t kvmppc_gpa_to_pfn(struct kvm_vcpu *vcpu, gpa_t gpa, bool writing,
 		return pfn;
 	}
 
-	return gfn_to_pfn_prot(vcpu->kvm, gfn, writing, writable);
+	return kvm_pfn_page_unwrap(gfn_to_pfn_prot(vcpu->kvm, gfn,
+						   writing, writable));
 }
 EXPORT_SYMBOL_GPL(kvmppc_gpa_to_pfn);
 

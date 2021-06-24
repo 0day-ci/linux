@@ -630,7 +630,8 @@ retry:
 	smp_rmb();
 
 	/* Slow path - ask KVM core whether we can access this GPA */
-	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writeable);
+	pfn = kvm_pfn_page_unwrap(gfn_to_pfn_prot(kvm, gfn,
+						  write_fault, &writeable));
 	if (is_error_noslot_pfn(pfn)) {
 		err = -EFAULT;
 		goto out;

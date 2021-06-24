@@ -138,6 +138,8 @@ static inline bool is_error_page(struct page *page)
 	return IS_ERR(page);
 }
 
+#define KVM_PFN_PAGE_ERR(e) ((struct kvm_pfn_page) { .pfn = (e), .page = NULL })
+
 #define KVM_REQUEST_MASK           GENMASK(7,0)
 #define KVM_REQUEST_NO_WAKEUP      BIT(8)
 #define KVM_REQUEST_WAIT           BIT(9)
@@ -795,14 +797,19 @@ void kvm_release_page_clean(struct page *page);
 void kvm_release_page_dirty(struct page *page);
 void kvm_set_page_accessed(struct page *page);
 
-kvm_pfn_t gfn_to_pfn(struct kvm *kvm, gfn_t gfn);
-kvm_pfn_t gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn, bool write_fault,
-		      bool *writable);
-kvm_pfn_t gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
-kvm_pfn_t gfn_to_pfn_memslot_atomic(struct kvm_memory_slot *slot, gfn_t gfn);
-kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
-			       bool atomic, bool *async, bool write_fault,
-			       bool *writable, hva_t *hva);
+struct kvm_pfn_page gfn_to_pfn(struct kvm *kvm, gfn_t gfn);
+struct kvm_pfn_page gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn,
+				    bool write_fault, bool *writable);
+struct kvm_pfn_page  gfn_to_pfn_memslot(struct kvm_memory_slot *slot,
+					gfn_t gfn);
+struct kvm_pfn_page  gfn_to_pfn_memslot_atomic(struct kvm_memory_slot *slot,
+					       gfn_t gfn);
+struct kvm_pfn_page  __gfn_to_pfn_memslot(struct kvm_memory_slot *slot,
+					  gfn_t gfn, bool atomic, bool *async,
+					  bool write_fault, bool *writable,
+					  hva_t *hva);
+
+kvm_pfn_t kvm_pfn_page_unwrap(struct kvm_pfn_page pfnpg);
 
 void kvm_release_pfn_clean(kvm_pfn_t pfn);
 void kvm_release_pfn_dirty(kvm_pfn_t pfn);
@@ -883,8 +890,8 @@ void mark_page_dirty(struct kvm *kvm, gfn_t gfn);
 
 struct kvm_memslots *kvm_vcpu_memslots(struct kvm_vcpu *vcpu);
 struct kvm_memory_slot *kvm_vcpu_gfn_to_memslot(struct kvm_vcpu *vcpu, gfn_t gfn);
-kvm_pfn_t kvm_vcpu_gfn_to_pfn_atomic(struct kvm_vcpu *vcpu, gfn_t gfn);
-kvm_pfn_t kvm_vcpu_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn);
+struct kvm_pfn_page kvm_vcpu_gfn_to_pfn_atomic(struct kvm_vcpu *vcpu, gfn_t gfn);
+struct kvm_pfn_page kvm_vcpu_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn);
 int kvm_vcpu_map(struct kvm_vcpu *vcpu, gpa_t gpa, struct kvm_host_map *map);
 int kvm_map_gfn(struct kvm_vcpu *vcpu, gfn_t gfn, struct kvm_host_map *map,
 		struct gfn_to_pfn_cache *cache, bool atomic);

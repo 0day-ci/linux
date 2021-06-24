@@ -821,8 +821,9 @@ int kvmppc_book3s_instantiate_page(struct kvm_vcpu *vcpu,
 		unsigned long pfn;
 
 		/* Call KVM generic code to do the slow-path check */
-		pfn = __gfn_to_pfn_memslot(memslot, gfn, false, NULL,
-					   writing, upgrade_p, NULL);
+		pfn = kvm_pfn_page_unwrap(
+				__gfn_to_pfn_memslot(memslot, gfn, false, NULL,
+						     writing, upgrade_p, NULL));
 		if (is_error_noslot_pfn(pfn))
 			return -EFAULT;
 		page = NULL;

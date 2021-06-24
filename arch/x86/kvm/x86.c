@@ -7341,7 +7341,7 @@ static bool reexecute_instruction(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
 	 * retry instruction -> write #PF -> emulation fail -> retry
 	 * instruction -> ...
 	 */
-	pfn = gfn_to_pfn(vcpu->kvm, gpa_to_gfn(gpa));
+	pfn = kvm_pfn_page_unwrap(gfn_to_pfn(vcpu->kvm, gpa_to_gfn(gpa)));
 
 	/*
 	 * If the instruction failed on the error pfn, it can not be fixed,

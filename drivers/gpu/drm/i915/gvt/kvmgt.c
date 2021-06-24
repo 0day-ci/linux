@@ -2042,7 +2042,7 @@ static unsigned long kvmgt_gfn_to_pfn(unsigned long handle, unsigned long gfn)
 
 	info = (struct kvmgt_guest_info *)handle;
 
-	pfn = gfn_to_pfn(info->kvm, gfn);
+	pfn = kvm_pfn_page_unwrap(gfn_to_pfn(info->kvm, gfn));
 	if (is_error_noslot_pfn(pfn))
 		return INTEL_GVT_INVALID_ADDR;
 

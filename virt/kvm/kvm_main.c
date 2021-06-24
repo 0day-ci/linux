@@ -1982,9 +1982,8 @@ static inline int check_user_page_hwpoison(unsigned long addr)
  * only part that runs if we can in atomic context.
  */
 static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
-			    bool *writable, kvm_pfn_t *pfn)
+			    bool *writable, struct kvm_pfn_page *pfnpg)
 {
-	struct page *page[1];
 
 	/*
 	 * Fast pin a writable pfn only if it is a write fault request
@@ -1994,8 +1993,8 @@ static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
 	if (!(write_fault || writable))
 		return false;
 
-	if (get_user_page_fast_only(addr, FOLL_WRITE, page)) {
-		*pfn = page_to_pfn(page[0]);
+	if (get_user_page_fast_only(addr, FOLL_WRITE, &pfnpg->page)) {
+		pfnpg->pfn = page_to_pfn(pfnpg->page);
 
 		if (writable)
 			*writable = true;
@@ -2010,10 +2009,9 @@ static bool hva_to_pfn_fast(unsigned long addr, bool write_fault,
  * 1 indicates success, -errno is returned if error is detected.
  */
 static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
-			   bool *writable, kvm_pfn_t *pfn)
+			   bool *writable, struct kvm_pfn_page *pfnpg)
 {
 	unsigned int flags = FOLL_HWPOISON;
-	struct page *page;
 	int npages = 0;
 
 	might_sleep();
@@ -2026,7 +2024,7 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 	if (async)
 		flags |= FOLL_NOWAIT;
 
-	npages = get_user_pages_unlocked(addr, 1, &page, flags);
+	npages = get_user_pages_unlocked(addr, 1, &pfnpg->page, flags);
 	if (npages != 1)
 		return npages;
 
@@ -2036,11 +2034,11 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
 
 		if (get_user_page_fast_only(addr, FOLL_WRITE, &wpage)) {
 			*writable = true;
-			put_page(page);
-			page = wpage;
+			put_page(pfnpg->page);
+			pfnpg->page = wpage;
 		}
 	}
-	*pfn = page_to_pfn(page);
+	pfnpg->pfn = page_to_pfn(pfnpg->page);
 	return npages;
 }
 
@@ -2058,7 +2056,7 @@ static bool vma_is_valid(struct vm_area_struct *vma, bool write_fault)
 static int hva_to_pfn_remapped(struct vm_area_struct *vma,
 			       unsigned long addr, bool *async,
 			       bool write_fault, bool *writable,
-			       kvm_pfn_t *p_pfn)
+			       struct kvm_pfn_page *p_pfn)
 {
 	kvm_pfn_t pfn;
 	pte_t *ptep;
@@ -2094,22 +2092,12 @@ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
 		*writable = pte_write(*ptep);
 	pfn = pte_pfn(*ptep);
 
-	/*
-	 * Get a reference here because callers of *hva_to_pfn* and
-	 * *gfn_to_pfn* ultimately call kvm_release_pfn_clean on the
-	 * returned pfn.  This is only needed if the VMA has VM_MIXEDMAP
-	 * set, but the kvm_get_pfn/kvm_release_pfn_clean pair will
-	 * simply do nothing for reserved pfns.
-	 *
-	 * Whoever called remap_pfn_range is also going to call e.g.
-	 * unmap_mapping_range before the underlying pages are freed,
-	 * causing a call to our MMU notifier.
-	 */ 
-	kvm_get_pfn(pfn);
-
 out:
 	pte_unmap_unlock(ptep, ptl);
-	*p_pfn = pfn;
+
+	p_pfn->pfn = pfn;
+	p_pfn->page = NULL;
+
 	return 0;
 }
 
@@ -2127,30 +2115,30 @@ out:
  * 2): @write_fault = false && @writable, @writable will tell the caller
  *     whether the mapping is writable.
  */
-static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
-			bool write_fault, bool *writable)
+static struct kvm_pfn_page hva_to_pfn(unsigned long addr, bool atomic,
+			bool *async, bool write_fault, bool *writable)
 {
 	struct vm_area_struct *vma;
-	kvm_pfn_t pfn = 0;
+	struct kvm_pfn_page pfnpg = {};
 	int npages, r;
 
 	/* we can do it either atomically or asynchronously, not both */
 	BUG_ON(atomic && async);
 
-	if (hva_to_pfn_fast(addr, write_fault, writable, &pfn))
-		return pfn;
+	if (hva_to_pfn_fast(addr, write_fault, writable, &pfnpg))
+		return pfnpg;
 
 	if (atomic)
-		return KVM_PFN_ERR_FAULT;
+		return KVM_PFN_PAGE_ERR(KVM_PFN_ERR_FAULT);
 
-	npages = hva_to_pfn_slow(addr, async, write_fault, writable, &pfn);
+	npages = hva_to_pfn_slow(addr, async, write_fault, writable, &pfnpg);
 	if (npages == 1)
-		return pfn;
+		return pfnpg;
 
 	mmap_read_lock(current->mm);
 	if (npages == -EHWPOISON ||
 	      (!async && check_user_page_hwpoison(addr))) {
-		pfn = KVM_PFN_ERR_HWPOISON;
+		pfnpg.pfn = KVM_PFN_ERR_HWPOISON;
 		goto exit;
 	}
 
@@ -2158,26 +2146,27 @@ retry:
 	vma = find_vma_intersection(current->mm, addr, addr + 1);
 
 	if (vma == NULL)
-		pfn = KVM_PFN_ERR_FAULT;
+		pfnpg.pfn = KVM_PFN_ERR_FAULT;
 	else if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
-		r = hva_to_pfn_remapped(vma, addr, async, write_fault, writable, &pfn);
+		r = hva_to_pfn_remapped(vma, addr, async, write_fault, writable, &pfnpg);
 		if (r == -EAGAIN)
 			goto retry;
 		if (r < 0)
-			pfn = KVM_PFN_ERR_FAULT;
+			pfnpg.pfn = KVM_PFN_ERR_FAULT;
 	} else {
 		if (async && vma_is_valid(vma, write_fault))
 			*async = true;
-		pfn = KVM_PFN_ERR_FAULT;
+		pfnpg.pfn = KVM_PFN_ERR_FAULT;
 	}
 exit:
 	mmap_read_unlock(current->mm);
-	return pfn;
+	return pfnpg;
 }
 
-kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
-			       bool atomic, bool *async, bool write_fault,
-			       bool *writable, hva_t *hva)
+struct kvm_pfn_page __gfn_to_pfn_memslot(struct kvm_memory_slot *slot,
+					 gfn_t gfn, bool atomic, bool *async,
+					 bool write_fault, bool *writable,
+					 hva_t *hva)
 {
 	unsigned long addr = __gfn_to_hva_many(slot, gfn, NULL, write_fault);
 
@@ -2187,13 +2176,13 @@ kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
 	if (addr == KVM_HVA_ERR_RO_BAD) {
 		if (writable)
 			*writable = false;
-		return KVM_PFN_ERR_RO_FAULT;
+		return KVM_PFN_PAGE_ERR(KVM_PFN_ERR_RO_FAULT);
 	}
 
 	if (kvm_is_error_hva(addr)) {
 		if (writable)
 			*writable = false;
-		return KVM_PFN_NOSLOT;
+		return KVM_PFN_PAGE_ERR(KVM_PFN_NOSLOT);
 	}
 
 	/* Do not map writable pfn in the readonly memslot. */
@@ -2207,43 +2196,54 @@ kvm_pfn_t __gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn,
 }
 EXPORT_SYMBOL_GPL(__gfn_to_pfn_memslot);
 
-kvm_pfn_t gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn, bool write_fault,
-		      bool *writable)
+struct kvm_pfn_page gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn,
+				    bool write_fault, bool *writable)
 {
 	return __gfn_to_pfn_memslot(gfn_to_memslot(kvm, gfn), gfn, false, NULL,
 				    write_fault, writable, NULL);
 }
 EXPORT_SYMBOL_GPL(gfn_to_pfn_prot);
 
-kvm_pfn_t gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn)
+struct kvm_pfn_page gfn_to_pfn_memslot(struct kvm_memory_slot *slot, gfn_t gfn)
 {
 	return __gfn_to_pfn_memslot(slot, gfn, false, NULL, true, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(gfn_to_pfn_memslot);
 
-kvm_pfn_t gfn_to_pfn_memslot_atomic(struct kvm_memory_slot *slot, gfn_t gfn)
+struct kvm_pfn_page gfn_to_pfn_memslot_atomic(struct kvm_memory_slot *slot,
+					      gfn_t gfn)
 {
 	return __gfn_to_pfn_memslot(slot, gfn, true, NULL, true, NULL, NULL);
 }
 EXPORT_SYMBOL_GPL(gfn_to_pfn_memslot_atomic);
 
-kvm_pfn_t kvm_vcpu_gfn_to_pfn_atomic(struct kvm_vcpu *vcpu, gfn_t gfn)
+struct kvm_pfn_page kvm_vcpu_gfn_to_pfn_atomic(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
 	return gfn_to_pfn_memslot_atomic(kvm_vcpu_gfn_to_memslot(vcpu, gfn), gfn);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_pfn_atomic);
 
-kvm_pfn_t gfn_to_pfn(struct kvm *kvm, gfn_t gfn)
+struct kvm_pfn_page gfn_to_pfn(struct kvm *kvm, gfn_t gfn)
 {
 	return gfn_to_pfn_memslot(gfn_to_memslot(kvm, gfn), gfn);
 }
 EXPORT_SYMBOL_GPL(gfn_to_pfn);
 
-kvm_pfn_t kvm_vcpu_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn)
+struct kvm_pfn_page kvm_vcpu_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
 	return gfn_to_pfn_memslot(kvm_vcpu_gfn_to_memslot(vcpu, gfn), gfn);
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_pfn);
+
+kvm_pfn_t kvm_pfn_page_unwrap(struct kvm_pfn_page pfnpg)
+{
+	if (pfnpg.page)
+		return pfnpg.pfn;
+
+	kvm_get_pfn(pfnpg.pfn);
+	return pfnpg.pfn;
+}
+EXPORT_SYMBOL_GPL(kvm_pfn_page_unwrap);
 
 int gfn_to_page_many_atomic(struct kvm_memory_slot *slot, gfn_t gfn,
 			    struct page **pages, int nr_pages)
@@ -2277,11 +2277,14 @@ static struct page *kvm_pfn_to_page(kvm_pfn_t pfn)
 
 struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn)
 {
-	kvm_pfn_t pfn;
+	struct kvm_pfn_page pfnpg;
 
-	pfn = gfn_to_pfn(kvm, gfn);
+	pfnpg = gfn_to_pfn(kvm, gfn);
 
-	return kvm_pfn_to_page(pfn);
+	if (pfnpg.page)
+		return pfnpg.page;
+
+	return kvm_pfn_to_page(kvm_pfn_page_unwrap(pfnpg));
 }
 EXPORT_SYMBOL_GPL(gfn_to_page);
 
@@ -2304,7 +2307,7 @@ static void kvm_cache_gfn_to_pfn(struct kvm_memory_slot *slot, gfn_t gfn,
 {
 	kvm_release_pfn(cache->pfn, cache->dirty, cache);
 
-	cache->pfn = gfn_to_pfn_memslot(slot, gfn);
+	cache->pfn = kvm_pfn_page_unwrap(gfn_to_pfn_memslot(slot, gfn));
 	cache->gfn = gfn;
 	cache->dirty = false;
 	cache->generation = gen;
@@ -2335,7 +2338,7 @@ static int __kvm_map_gfn(struct kvm_memslots *slots, gfn_t gfn,
 	} else {
 		if (atomic)
 			return -EAGAIN;
-		pfn = gfn_to_pfn_memslot(slot, gfn);
+		pfn = kvm_pfn_page_unwrap(gfn_to_pfn_memslot(slot, gfn));
 	}
 	if (is_error_noslot_pfn(pfn))
 		return -EINVAL;
@@ -2435,11 +2438,11 @@ EXPORT_SYMBOL_GPL(kvm_vcpu_unmap);
 
 struct page *kvm_vcpu_gfn_to_page(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
-	kvm_pfn_t pfn;
+	struct kvm_pfn_page pfnpg;
 
-	pfn = kvm_vcpu_gfn_to_pfn(vcpu, gfn);
+	pfnpg = kvm_vcpu_gfn_to_pfn(vcpu, gfn);
 
-	return kvm_pfn_to_page(pfn);
+	return kvm_pfn_to_page(kvm_pfn_page_unwrap(pfnpg));
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_page);
 

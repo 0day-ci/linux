@@ -890,7 +890,7 @@ static unsigned long kvmppc_share_page(struct kvm *kvm, unsigned long gpa,
 
 retry:
 	mutex_unlock(&kvm->arch.uvmem_lock);
-	pfn = gfn_to_pfn(kvm, gfn);
+	pfn = kvm_pfn_page_unwrap(gfn_to_pfn(kvm, gfn));
 	if (is_error_noslot_pfn(pfn))
 		goto out;
 
@@ -1075,7 +1075,7 @@ int kvmppc_send_page_to_uv(struct kvm *kvm, unsigned long gfn)
 	unsigned long pfn;
 	int ret = U_SUCCESS;
 
-	pfn = gfn_to_pfn(kvm, gfn);
+	pfn = kvm_pfn_page_unwrap(gfn_to_pfn(kvm, gfn));
 	if (is_error_noslot_pfn(pfn))
 		return -EFAULT;
 

@@ -111,7 +111,7 @@ static void audit_mappings(struct kvm_vcpu *vcpu, u64 *sptep, int level)
 		return;
 
 	gfn = kvm_mmu_page_get_gfn(sp, sptep - sp->spt);
-	pfn = kvm_vcpu_gfn_to_pfn_atomic(vcpu, gfn);
+	pfn = kvm_pfn_page_unwrap(kvm_vcpu_gfn_to_pfn_atomic(vcpu, gfn));
 
 	if (is_error_pfn(pfn))
 		return;
