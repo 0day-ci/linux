@@ -319,6 +319,7 @@ int intel_guc_ct_enable(struct intel_guc_ct *ct)
 		goto err_deregister;
 
 	ct->enabled = true;
+	ct->stall_time = KTIME_MAX;
 
 	return 0;
 
@@ -392,7 +393,7 @@ static int ct_write(struct intel_guc_ct *ct,
 	unsigned int i;
 
 	if (unlikely(ctb->broken))
-		return -EPIPE;
+		return -EIO;
 
 	if (unlikely(desc->status))
 		goto corrupted;
@@ -464,7 +465,7 @@ corrupted:
 	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
 		 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
-	return -EPIPE;
+	return -EIO;
 }
 
 /**
@@ -507,6 +508,18 @@ static int wait_for_ct_request_update(struct ct_request *req, u32 *status)
 	return err;
 }
 
+#define GUC_CTB_TIMEOUT_MS	1500
+static inline bool ct_deadlocked(struct intel_guc_ct *ct)
+{
+	long timeout = GUC_CTB_TIMEOUT_MS;
+	bool ret = ktime_ms_delta(ktime_get(), ct->stall_time) > timeout;
+
+	if (unlikely(ret))
+		CT_ERROR(ct, "CT deadlocked\n");
+
+	return ret;
+}
+
 static inline bool h2g_has_room(struct intel_guc_ct_buffer *ctb, u32 len_dw)
 {
 	struct guc_ct_buffer_desc *desc = ctb->desc;
@@ -516,6 +529,26 @@ static inline bool h2g_has_room(struct intel_guc_ct_buffer *ctb, u32 len_dw)
 	space = CIRC_SPACE(desc->tail, head, ctb->size);
 
 	return space >= len_dw;
+}
+
+static int has_room_nb(struct intel_guc_ct *ct, u32 len_dw)
+{
+	struct intel_guc_ct_buffer *ctb = &ct->ctbs.send;
+
+	lockdep_assert_held(&ct->ctbs.send.lock);
+
+	if (unlikely(!h2g_has_room(ctb, len_dw))) {
+		if (ct->stall_time == KTIME_MAX)
+			ct->stall_time = ktime_get();
+
+		if (unlikely(ct_deadlocked(ct)))
+			return -EIO;
+		else
+			return -EBUSY;
+	}
+
+	ct->stall_time = KTIME_MAX;
+	return 0;
 }
 
 static int ct_send_nb(struct intel_guc_ct *ct,
@@ -530,7 +563,7 @@ static int ct_send_nb(struct intel_guc_ct *ct,
 
 	spin_lock_irqsave(&ctb->lock, spin_flags);
 
-	ret = h2g_has_room(ctb, len + 1);
+	ret = has_room_nb(ct, len + 1);
 	if (unlikely(ret))
 		goto out;
 
@@ -574,10 +607,18 @@ static int ct_send(struct intel_guc_ct *ct,
 retry:
 	spin_lock_irqsave(&ct->ctbs.send.lock, flags);
 	if (unlikely(!h2g_has_room(ctb, len + 1))) {
+		if (ct->stall_time == KTIME_MAX)
+			ct->stall_time = ktime_get();
 		spin_unlock_irqrestore(&ct->ctbs.send.lock, flags);
+
+		if (unlikely(ct_deadlocked(ct)))
+			return -EIO;
+
 		cond_resched();
 		goto retry;
 	}
+
+	ct->stall_time = KTIME_MAX;
 
 	fence = ct_get_next_fence(ct);
 	request.fence = fence;
