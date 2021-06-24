@@ -763,8 +763,6 @@ void __noreturn do_exit(long code)
 	profile_task_exit(tsk);
 	kcov_task_exit(tsk);
 
-	ptrace_event(PTRACE_EVENT_EXIT, code);
-
 	validate_creds_for_do_exit(tsk);
 
 	/*

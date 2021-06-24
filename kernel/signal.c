@@ -2905,6 +2905,8 @@ relock:
 		if (exit_code & 0x7f)
 			current->flags |= PF_SIGNALED;
 
+		ptrace_event(PTRACE_EVENT_EXIT, exit_code);
+
 		/*
 		 * PF_IO_WORKER threads will catch and exit on fatal signals
 		 * themselves. They have cleanup that must be performed, so
