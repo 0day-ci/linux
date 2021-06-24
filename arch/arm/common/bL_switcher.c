@@ -352,10 +352,8 @@ int bL_switch_request_cb(unsigned int cpu, unsigned int new_cluster_id,
 
 	t = &bL_threads[cpu];
 
-	if (IS_ERR(t->task))
-		return PTR_ERR(t->task);
-	if (!t->task)
-		return -ESRCH;
+	if (IS_ERR_OR_NULL(t->task))
+		return t->task ? PTR_ERR(t->task) : -ESRCH;
 
 	spin_lock(&t->lock);
 	if (t->completer) {
