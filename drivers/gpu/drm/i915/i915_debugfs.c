@@ -36,6 +36,7 @@
 #include "gt/intel_gt_clock_utils.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
+#include "gt/intel_gt.h"
 #include "gt/intel_gt_requests.h"
 #include "gt/intel_reset.h"
 #include "gt/intel_rc6.h"

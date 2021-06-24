@@ -254,6 +254,74 @@ static inline void set_lrc_desc_registered(struct intel_guc *guc, u32 id,
 	xa_store_irq(&guc->context_lookup, id, ce, GFP_ATOMIC);
 }
 
+static int guc_submission_busy_loop(struct intel_guc* guc,
+				    const u32 *action,
+				    u32 len,
+				    u32 g2h_len_dw,
+				    bool loop)
+{
+	int err;
+
+	err = intel_guc_send_busy_loop(guc, action, len, g2h_len_dw, loop);
+
+	if (!err && g2h_len_dw)
+		atomic_inc(&guc->outstanding_submission_g2h);
+
+	return err;
+}
+
+static int guc_wait_for_pending_msg(struct intel_guc *guc,
+				    atomic_t *wait_var,
+				    bool interruptible,
+				    long timeout)
+{
+	const int state = interruptible ?
+		TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE;
+	DEFINE_WAIT(wait);
+
+	might_sleep();
+	GEM_BUG_ON(timeout < 0);
+
+	if (!atomic_read(wait_var))
+		return 0;
+
+	if (!timeout)
+		return -ETIME;
+
+	for (;;) {
+		prepare_to_wait(&guc->ct.wq, &wait, state);
+
+		if (!atomic_read(wait_var))
+			break;
+
+		if (signal_pending_state(state, current)) {
+			timeout = -ERESTARTSYS;
+			break;
+		}
+
+		if (!timeout) {
+			timeout = -ETIME;
+			break;
+		}
+
+		timeout = io_schedule_timeout(timeout);
+	}
+	finish_wait(&guc->ct.wq, &wait);
+
+	return (timeout < 0) ? timeout : 0;
+}
+
+int intel_guc_wait_for_idle(struct intel_guc *guc, long timeout)
+{
+	bool interruptible = true;
+
+	if (unlikely(timeout < 0))
+		timeout = -timeout, interruptible = false;
+
+	return guc_wait_for_pending_msg(guc, &guc->outstanding_submission_g2h,
+					interruptible, timeout);
+}
+
 static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 {
 	int err;
@@ -280,6 +348,7 @@ static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 
 	err = intel_guc_send_nb(guc, action, len, g2h_len_dw);
 	if (!enabled && !err) {
+		atomic_inc(&guc->outstanding_submission_g2h);
 		set_context_enabled(ce);
 	} else if (!enabled) {
 		clr_context_pending_enable(ce);
@@ -731,7 +800,7 @@ static int __guc_action_register_context(struct intel_guc *guc,
 		offset,
 	};
 
-	return intel_guc_send_busy_loop(guc, action, ARRAY_SIZE(action), 0, true);
+	return guc_submission_busy_loop(guc, action, ARRAY_SIZE(action), 0, true);
 }
 
 static int register_context(struct intel_context *ce)
@@ -751,7 +820,7 @@ static int __guc_action_deregister_context(struct intel_guc *guc,
 		guc_id,
 	};
 
-	return intel_guc_send_busy_loop(guc, action, ARRAY_SIZE(action),
+	return guc_submission_busy_loop(guc, action, ARRAY_SIZE(action),
 					G2H_LEN_DW_DEREGISTER_CONTEXT, true);
 }
 
@@ -868,7 +937,9 @@ static int guc_context_pin(struct intel_context *ce, void *vaddr)
 
 static void guc_context_unpin(struct intel_context *ce)
 {
-	unpin_guc_id(ce_to_guc(ce), ce);
+	struct intel_guc *guc = ce_to_guc(ce);
+
+	unpin_guc_id(guc, ce);
 	lrc_unpin(ce);
 }
 
@@ -891,7 +962,7 @@ static void __guc_context_sched_disable(struct intel_guc *guc,
 
 	intel_context_get(ce);
 
-	intel_guc_send_busy_loop(guc, action, ARRAY_SIZE(action),
+	guc_submission_busy_loop(guc, action, ARRAY_SIZE(action),
 				 G2H_LEN_DW_SCHED_CONTEXT_MODE_SET, true);
 }
 
@@ -1433,6 +1504,12 @@ g2h_context_lookup(struct intel_guc *guc, u32 desc_idx)
 	return ce;
 }
 
+static void decr_outstanding_submission_g2h(struct intel_guc *guc)
+{
+	if (atomic_dec_and_test(&guc->outstanding_submission_g2h))
+		wake_up_all(&guc->ct.wq);
+}
+
 int intel_guc_deregister_done_process_msg(struct intel_guc *guc,
 					  const u32 *msg,
 					  u32 len)
@@ -1467,6 +1544,8 @@ int intel_guc_deregister_done_process_msg(struct intel_guc *guc,
 		release_guc_id(guc, ce);
 		lrc_destroy(&ce->ref);
 	}
+
+	decr_outstanding_submission_g2h(guc);
 
 	return 0;
 }
@@ -1516,6 +1595,7 @@ int intel_guc_sched_done_process_msg(struct intel_guc *guc,
 		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 	}
 
+	decr_outstanding_submission_g2h(guc);
 	intel_context_put(ce);
 
 	return 0;
