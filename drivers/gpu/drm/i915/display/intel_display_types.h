@@ -48,6 +48,7 @@
 
 struct drm_printer;
 struct __intel_global_objs_state;
+struct intel_ddi_buf_trans;
 
 /*
  * Display related stuff
@@ -263,6 +264,9 @@ struct intel_encoder {
 	 * Returns whether the port clock is enabled or not.
 	 */
 	bool (*is_clock_enabled)(struct intel_encoder *encoder);
+	const struct intel_ddi_buf_trans *(*get_buf_trans)(struct intel_encoder *encoder,
+							   const struct intel_crtc_state *crtc_state,
+							   int *n_entries);
 	enum hpd_pin hpd_pin;
 	enum intel_display_power_domain power_domain;
 	/* for communication with audio component; protected by av_mutex */
@@ -1721,6 +1725,14 @@ vlv_pipe_to_channel(enum pipe pipe)
 	default:
 		BUG();
 	}
+}
+
+static inline bool intel_pipe_valid(struct drm_i915_private *i915, enum pipe pipe)
+{
+	return (pipe >= 0 &&
+		pipe < ARRAY_SIZE(i915->pipe_to_crtc_mapping) &&
+		INTEL_INFO(i915)->pipe_mask & BIT(pipe) &&
+		i915->pipe_to_crtc_mapping[pipe]);
 }
 
 static inline struct intel_crtc *
