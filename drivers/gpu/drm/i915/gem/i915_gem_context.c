@@ -72,7 +72,6 @@
 #include "gt/intel_context_param.h"
 #include "gt/intel_engine_heartbeat.h"
 #include "gt/intel_engine_user.h"
-#include "gt/intel_execlists_submission.h" /* virtual_engine */
 #include "gt/intel_gpu_commands.h"
 #include "gt/intel_ring.h"
 
@@ -1568,9 +1567,6 @@ set_engines__load_balance(struct i915_user_extension __user *base, void *data)
 	if (!HAS_EXECLISTS(i915))
 		return -ENODEV;
 
-	if (intel_uc_uses_guc_submission(&i915->gt.uc))
-		return -ENODEV; /* not implement yet */
-
 	if (get_user(idx, &ext->engine_index))
 		return -EFAULT;
 
@@ -1627,7 +1623,7 @@ set_engines__load_balance(struct i915_user_extension __user *base, void *data)
 		}
 	}
 
-	ce = intel_execlists_create_virtual(siblings, n);
+	ce = intel_engine_create_virtual(siblings, n);
 	if (IS_ERR(ce)) {
 		err = PTR_ERR(ce);
 		goto out_siblings;
@@ -1723,13 +1719,9 @@ set_engines__bond(struct i915_user_extension __user *base, void *data)
 		 * A non-virtual engine has no siblings to choose between; and
 		 * a submit fence will always be directed to the one engine.
 		 */
-		if (intel_engine_is_virtual(virtual)) {
-			err = intel_virtual_engine_attach_bond(virtual,
-							       master,
-							       bond);
-			if (err)
-				return err;
-		}
+		err = intel_engine_attach_bond(virtual, master, bond);
+		if (err)
+			return err;
 	}
 
 	return 0;
@@ -2116,8 +2108,7 @@ static int clone_engines(struct i915_gem_context *dst,
 		 * the virtual engine instead.
 		 */
 		if (intel_engine_is_virtual(engine))
-			clone->engines[n] =
-				intel_execlists_clone_virtual(engine);
+			clone->engines[n] = intel_engine_clone_virtual(engine);
 		else
 			clone->engines[n] = intel_context_create(engine);
 		if (IS_ERR_OR_NULL(clone->engines[n])) {

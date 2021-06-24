@@ -205,6 +205,9 @@ static struct virtual_engine *to_virtual_engine(struct intel_engine_cs *engine)
 	return container_of(engine, struct virtual_engine, base);
 }
 
+static struct intel_context *
+execlists_create_virtual(struct intel_engine_cs **siblings, unsigned int count);
+
 static struct i915_request *
 __active_request(const struct intel_timeline * const tl,
 		 struct i915_request *rq,
@@ -2560,6 +2563,8 @@ static const struct intel_context_ops execlists_context_ops = {
 
 	.reset = lrc_reset,
 	.destroy = lrc_destroy,
+
+	.create_virtual = execlists_create_virtual,
 };
 
 static int emit_pdps(struct i915_request *rq)
@@ -3506,6 +3511,94 @@ static void virtual_context_exit(struct intel_context *ce)
 		intel_engine_pm_put(ve->siblings[n]);
 }
 
+static struct intel_engine_cs *
+virtual_get_sibling(struct intel_engine_cs *engine, unsigned int sibling)
+{
+	struct virtual_engine *ve = to_virtual_engine(engine);
+
+	if (sibling >= ve->num_siblings)
+		return NULL;
+
+	return ve->siblings[sibling];
+}
+
+static struct intel_context *
+virtual_clone(struct intel_engine_cs *src)
+{
+	struct virtual_engine *se = to_virtual_engine(src);
+	struct intel_context *dst;
+
+	dst = execlists_create_virtual(se->siblings, se->num_siblings);
+	if (IS_ERR(dst))
+		return dst;
+
+	if (se->num_bonds) {
+		struct virtual_engine *de = to_virtual_engine(dst->engine);
+
+		de->bonds = kmemdup(se->bonds,
+				    sizeof(*se->bonds) * se->num_bonds,
+				    GFP_KERNEL);
+		if (!de->bonds) {
+			intel_context_put(dst);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		de->num_bonds = se->num_bonds;
+	}
+
+	return dst;
+}
+
+static struct ve_bond *
+virtual_find_bond(struct virtual_engine *ve,
+		  const struct intel_engine_cs *master)
+{
+	int i;
+
+	for (i = 0; i < ve->num_bonds; i++) {
+		if (ve->bonds[i].master == master)
+			return &ve->bonds[i];
+	}
+
+	return NULL;
+}
+
+static int virtual_attach_bond(struct intel_engine_cs *engine,
+			       const struct intel_engine_cs *master,
+			       const struct intel_engine_cs *sibling)
+{
+	struct virtual_engine *ve = to_virtual_engine(engine);
+	struct ve_bond *bond;
+	int n;
+
+	/* Sanity check the sibling is part of the virtual engine */
+	for (n = 0; n < ve->num_siblings; n++)
+		if (sibling == ve->siblings[n])
+			break;
+	if (n == ve->num_siblings)
+		return -EINVAL;
+
+	bond = virtual_find_bond(ve, master);
+	if (bond) {
+		bond->sibling_mask |= sibling->mask;
+		return 0;
+	}
+
+	bond = krealloc(ve->bonds,
+			sizeof(*bond) * (ve->num_bonds + 1),
+			GFP_KERNEL);
+	if (!bond)
+		return -ENOMEM;
+
+	bond[ve->num_bonds].master = master;
+	bond[ve->num_bonds].sibling_mask = sibling->mask;
+
+	ve->bonds = bond;
+	ve->num_bonds++;
+
+	return 0;
+}
+
 static const struct intel_context_ops virtual_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
@@ -3520,6 +3613,10 @@ static const struct intel_context_ops virtual_context_ops = {
 	.exit = virtual_context_exit,
 
 	.destroy = virtual_context_destroy,
+
+	.clone_virtual = virtual_clone,
+	.get_sibling = virtual_get_sibling,
+	.attach_bond = virtual_attach_bond,
 };
 
 static intel_engine_mask_t virtual_submission_mask(struct virtual_engine *ve)
@@ -3668,20 +3765,6 @@ unlock:
 	spin_unlock_irqrestore(&ve->base.sched_engine->lock, flags);
 }
 
-static struct ve_bond *
-virtual_find_bond(struct virtual_engine *ve,
-		  const struct intel_engine_cs *master)
-{
-	int i;
-
-	for (i = 0; i < ve->num_bonds; i++) {
-		if (ve->bonds[i].master == master)
-			return &ve->bonds[i];
-	}
-
-	return NULL;
-}
-
 static void
 virtual_bond_execute(struct i915_request *rq, struct dma_fence *signal)
 {
@@ -3704,19 +3787,12 @@ virtual_bond_execute(struct i915_request *rq, struct dma_fence *signal)
 	to_request(signal)->execution_mask &= ~allowed;
 }
 
-struct intel_context *
-intel_execlists_create_virtual(struct intel_engine_cs **siblings,
-			       unsigned int count)
+static struct intel_context *
+execlists_create_virtual(struct intel_engine_cs **siblings, unsigned int count)
 {
 	struct virtual_engine *ve;
 	unsigned int n;
 	int err;
-
-	if (count == 0)
-		return ERR_PTR(-EINVAL);
-
-	if (count == 1)
-		return intel_context_create(siblings[0]);
 
 	ve = kzalloc(struct_size(ve, siblings, count), GFP_KERNEL);
 	if (!ve)
@@ -3848,70 +3924,6 @@ intel_execlists_create_virtual(struct intel_engine_cs **siblings,
 err_put:
 	intel_context_put(&ve->context);
 	return ERR_PTR(err);
-}
-
-struct intel_context *
-intel_execlists_clone_virtual(struct intel_engine_cs *src)
-{
-	struct virtual_engine *se = to_virtual_engine(src);
-	struct intel_context *dst;
-
-	dst = intel_execlists_create_virtual(se->siblings,
-					     se->num_siblings);
-	if (IS_ERR(dst))
-		return dst;
-
-	if (se->num_bonds) {
-		struct virtual_engine *de = to_virtual_engine(dst->engine);
-
-		de->bonds = kmemdup(se->bonds,
-				    sizeof(*se->bonds) * se->num_bonds,
-				    GFP_KERNEL);
-		if (!de->bonds) {
-			intel_context_put(dst);
-			return ERR_PTR(-ENOMEM);
-		}
-
-		de->num_bonds = se->num_bonds;
-	}
-
-	return dst;
-}
-
-int intel_virtual_engine_attach_bond(struct intel_engine_cs *engine,
-				     const struct intel_engine_cs *master,
-				     const struct intel_engine_cs *sibling)
-{
-	struct virtual_engine *ve = to_virtual_engine(engine);
-	struct ve_bond *bond;
-	int n;
-
-	/* Sanity check the sibling is part of the virtual engine */
-	for (n = 0; n < ve->num_siblings; n++)
-		if (sibling == ve->siblings[n])
-			break;
-	if (n == ve->num_siblings)
-		return -EINVAL;
-
-	bond = virtual_find_bond(ve, master);
-	if (bond) {
-		bond->sibling_mask |= sibling->mask;
-		return 0;
-	}
-
-	bond = krealloc(ve->bonds,
-			sizeof(*bond) * (ve->num_bonds + 1),
-			GFP_KERNEL);
-	if (!bond)
-		return -ENOMEM;
-
-	bond[ve->num_bonds].master = master;
-	bond[ve->num_bonds].sibling_mask = sibling->mask;
-
-	ve->bonds = bond;
-	ve->num_bonds++;
-
-	return 0;
 }
 
 void intel_execlists_show_requests(struct intel_engine_cs *engine,

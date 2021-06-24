@@ -47,6 +47,16 @@ struct intel_context_ops {
 
 	void (*reset)(struct intel_context *ce);
 	void (*destroy)(struct kref *kref);
+
+	/* virtual engine/context interface */
+	struct intel_context *(*create_virtual)(struct intel_engine_cs **engine,
+						unsigned int count);
+	struct intel_context *(*clone_virtual)(struct intel_engine_cs *engine);
+	struct intel_engine_cs *(*get_sibling)(struct intel_engine_cs *engine,
+					       unsigned int sibling);
+	int (*attach_bond)(struct intel_engine_cs *engine,
+			   const struct intel_engine_cs *master,
+			   const struct intel_engine_cs *sibling);
 };
 
 struct intel_context {

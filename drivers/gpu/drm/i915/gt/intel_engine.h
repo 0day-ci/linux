@@ -273,13 +273,56 @@ intel_engine_has_preempt_reset(const struct intel_engine_cs *engine)
 	return intel_engine_has_preemption(engine);
 }
 
+struct intel_context *
+intel_engine_create_virtual(struct intel_engine_cs **siblings,
+			    unsigned int count);
+
+static inline bool
+intel_virtual_engine_has_heartbeat(const struct intel_engine_cs *engine)
+{
+	if (intel_engine_uses_guc(engine))
+		return intel_guc_virtual_engine_has_heartbeat(engine);
+	else
+		GEM_BUG_ON("Only should be called in GuC submission");
+
+	return false;
+}
+
 static inline bool
 intel_engine_has_heartbeat(const struct intel_engine_cs *engine)
 {
 	if (!IS_ACTIVE(CONFIG_DRM_I915_HEARTBEAT_INTERVAL))
 		return false;
 
-	return READ_ONCE(engine->props.heartbeat_interval_ms);
+	if (intel_engine_is_virtual(engine))
+		return intel_virtual_engine_has_heartbeat(engine);
+	else
+		return READ_ONCE(engine->props.heartbeat_interval_ms);
+}
+
+static inline struct intel_context *
+intel_engine_clone_virtual(struct intel_engine_cs *src)
+{
+	GEM_BUG_ON(!intel_engine_is_virtual(src));
+	return src->cops->clone_virtual(src);
+}
+
+static inline int
+intel_engine_attach_bond(struct intel_engine_cs *engine,
+			 const struct intel_engine_cs *master,
+			 const struct intel_engine_cs *sibling)
+{
+	if (!engine->cops->attach_bond)
+		return 0;
+
+	return engine->cops->attach_bond(engine, master, sibling);
+}
+
+static inline struct intel_engine_cs *
+intel_engine_get_sibling(struct intel_engine_cs *engine, unsigned int sibling)
+{
+	GEM_BUG_ON(!intel_engine_is_virtual(engine));
+	return engine->cops->get_sibling(engine, sibling);
 }
 
 #endif /* _INTEL_RINGBUFFER_H_ */
