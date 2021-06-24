@@ -2661,6 +2661,7 @@ bool get_signal(struct ksignal *ksig)
 {
 	struct sighand_struct *sighand = current->sighand;
 	struct signal_struct *signal = current->signal;
+	int exit_code;
 	int signr;
 
 	if (unlikely(current->task_works))
@@ -2863,8 +2864,6 @@ relock:
 		/*
 		 * Anything else is fatal, maybe with a core dump.
 		 */
-		current->flags |= PF_SIGNALED;
-
 		if (sig_kernel_coredump(signr)) {
 			if (print_fatal_signals)
 				print_fatal_signal(ksig->info.si_signo);
@@ -2872,13 +2871,32 @@ relock:
 			/*
 			 * If it was able to dump core, this kills all
 			 * other threads in the group and synchronizes with
-			 * their demise.  If we lost the race with another
-			 * thread getting here, it set group_exit_code
-			 * first and our do_group_exit call below will use
-			 * that value and ignore the one we pass it.
+			 * their demise.  If  another thread makes it
+			 * to do_coredump first, it will set group_exit_code
+			 * which will be passed to do_exit.
 			 */
 			do_coredump(&ksig->info);
 		}
+
+		/*
+		 * Death signals, no core dump.
+		 */
+		exit_code = signr;
+		if (signal_group_exit(signal)) {
+			exit_code = signal->group_exit_code;
+		} else {
+			spin_lock_irq(&sighand->siglock);
+			if (signal_group_exit(signal)) {
+				/* Another thread got here before we took the lock.  */
+				exit_code = signal->group_exit_code;
+			} else {
+				start_group_exit_locked(signal, exit_code);
+			}
+			spin_unlock_irq(&sighand->siglock);
+		}
+
+		if (exit_code & 0x7f)
+			current->flags |= PF_SIGNALED;
 
 		/*
 		 * PF_IO_WORKER threads will catch and exit on fatal signals
@@ -2888,10 +2906,7 @@ relock:
 		if (current->flags & PF_IO_WORKER)
 			goto out;
 
-		/*
-		 * Death signals, no core dump.
-		 */
-		do_group_exit(ksig->info.si_signo);
+		do_exit(exit_code);
 		/* NOTREACHED */
 	}
 	spin_unlock_irq(&sighand->siglock);
