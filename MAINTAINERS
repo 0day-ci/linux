@@ -5954,6 +5954,13 @@ S:	Maintained
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 F:	drivers/gpu/drm/vboxvideo/
 
+DRM DRIVER FOR WIDECHIPS WS2401 PANELS
+M:	Linus Walleij <linus.walleij@linaro.org>
+S:	Maintained
+T:	git git://anongit.freedesktop.org/drm/drm-misc
+F:	Documentation/devicetree/bindings/display/panel/samsung,lms380kf01.yaml
+F:	drivers/gpu/drm/panel/panel-widechips-ws2401.c
+
 DRM DRIVER FOR VMWARE VIRTUAL GPU
 M:	"VMware Graphics" <linux-graphics-maintainer@vmware.com>
 M:	Roland Scheidegger <sroland@vmware.com>
