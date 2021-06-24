@@ -926,7 +926,6 @@ static void guc_context_sched_disable(struct intel_context *ce)
 	 * request doesn't slip through the 'context_pending_disable' fence.
 	 */
 	if (unlikely(atomic_add_unless(&ce->pin_count, -2, 2))) {
-		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 		return;
 	}
 	guc_id = prep_context_pending_disable(ce);
