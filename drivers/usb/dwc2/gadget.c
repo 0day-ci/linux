@@ -2749,9 +2749,11 @@ static void dwc2_hsotg_complete_in(struct dwc2_hsotg *hsotg,
 		return;
 	}
 
-	/* Zlp for all endpoints, for ep0 only in DATA IN stage */
+	/* Zlp for all endpoints in non DDMA, for ep0 only in DATA IN stage */
 	if (hs_ep->send_zlp) {
-		dwc2_hsotg_program_zlp(hsotg, hs_ep);
+		if (!using_desc_dma(hsotg))
+			dwc2_hsotg_program_zlp(hsotg, hs_ep);
+
 		hs_ep->send_zlp = 0;
 		/* transfer will be completed on next complete interrupt */
 		return;
