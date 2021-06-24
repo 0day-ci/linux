@@ -1486,6 +1486,7 @@ static int syslog_print(char __user *buf, int size)
 	struct printk_record r;
 	char *text;
 	int len = 0;
+	u64 seq;
 
 	text = kmalloc(CONSOLE_LOG_MAX, GFP_KERNEL);
 	if (!text)
@@ -1493,11 +1494,38 @@ static int syslog_print(char __user *buf, int size)
 
 	prb_rec_init_rd(&r, &info, text, CONSOLE_LOG_MAX);
 
-	while (size > 0) {
+	/* Get a consistent copy of @syslog_seq. */
+	mutex_lock(&syslog_lock);
+	seq = syslog_seq;
+	mutex_unlock(&syslog_lock);
+
+	/* Wait for the @syslog_seq record to be available. */
+	for (;;) {
+		len = wait_event_interruptible(log_wait, prb_read_valid(prb, seq, NULL));
+		if (len)
+			goto out;
+
+		/*
+		 * @syslog_seq may have changed while waiting. If so, wait
+		 * for the new @syslog_seq record.
+		 */
+
+		mutex_lock(&syslog_lock);
+		if (syslog_seq == seq)
+			break;
+		seq = syslog_seq;
+		mutex_unlock(&syslog_lock);
+	}
+
+	/*
+	 * @syslog_lock is held when entering the read loop to prevent
+	 * another reader from modifying @syslog_seq.
+	 */
+
+	for (;;) {
 		size_t n;
 		size_t skip;
 
-		mutex_lock(&syslog_lock);
 		if (!prb_read_valid(prb, syslog_seq, &r)) {
 			mutex_unlock(&syslog_lock);
 			break;
@@ -1542,8 +1570,13 @@ static int syslog_print(char __user *buf, int size)
 		len += n;
 		size -= n;
 		buf += n;
-	}
 
+		if (!size)
+			break;
+
+		mutex_lock(&syslog_lock);
+	}
+out:
 	kfree(text);
 	return len;
 }
@@ -1614,7 +1647,6 @@ int do_syslog(int type, char __user *buf, int len, int source)
 	bool clear = false;
 	static int saved_console_loglevel = LOGLEVEL_DEFAULT;
 	int error;
-	u64 seq;
 
 	error = check_syslog_permissions(type, source);
 	if (error)
@@ -1632,15 +1664,6 @@ int do_syslog(int type, char __user *buf, int len, int source)
 			return 0;
 		if (!access_ok(buf, len))
 			return -EFAULT;
-
-		/* Get a consistent copy of @syslog_seq. */
-		mutex_lock(&syslog_lock);
-		seq = syslog_seq;
-		mutex_unlock(&syslog_lock);
-
-		error = wait_event_interruptible(log_wait, prb_read_valid(prb, seq, NULL));
-		if (error)
-			return error;
 		error = syslog_print(buf, len);
 		break;
 	/* Read/clear last kernel messages */
@@ -1707,6 +1730,7 @@ int do_syslog(int type, char __user *buf, int len, int source)
 		} else {
 			bool time = syslog_partial ? syslog_time : printk_time;
 			unsigned int line_count;
+			u64 seq;
 
 			prb_for_each_info(syslog_seq, prb, seq, &info,
 					  &line_count) {
