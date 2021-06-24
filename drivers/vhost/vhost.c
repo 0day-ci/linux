@@ -595,8 +595,9 @@ long vhost_dev_set_owner(struct vhost_dev *dev)
 
 	dev->kcov_handle = kcov_common_handle();
 	if (dev->use_worker) {
-		worker = kthread_create(vhost_worker, dev,
-					"vhost-%d", current->pid);
+		worker = kthread_create_for_user(vhost_worker, dev,
+						 current->real_cred->user,
+						 "vhost-%d", current->pid);
 		if (IS_ERR(worker)) {
 			err = PTR_ERR(worker);
 			goto err_worker;
