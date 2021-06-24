@@ -139,6 +139,8 @@ static int i2c_pca_pf_probe(struct platform_device *pdev)
 	int irq;
 
 	irq = platform_get_irq_optional(pdev, 0);
+	if (irq == -EPROBE_DEFER)
+		return irq;
 	/* If irq is 0, we do polling. */
 	if (irq < 0)
 		irq = 0;
