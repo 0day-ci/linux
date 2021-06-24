@@ -899,6 +899,12 @@ struct kset *bus_get_kset(struct bus_type *bus)
 }
 EXPORT_SYMBOL_GPL(bus_get_kset);
 
+struct kset *bus_get_devices_kset(struct bus_type *bus)
+{
+	return bus->p->devices_kset;
+}
+EXPORT_SYMBOL_GPL(bus_get_devices_kset);
+
 struct klist *bus_get_device_klist(struct bus_type *bus)
 {
 	return &bus->p->klist_devices;
