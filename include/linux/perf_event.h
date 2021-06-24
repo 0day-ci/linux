@@ -284,6 +284,7 @@ struct pmu {
 	const struct attribute_group	**attr_groups;
 	const struct attribute_group	**attr_update;
 	const char			*name;
+	const char			*link_name;
 	int				type;
 
 	/*

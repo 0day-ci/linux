@@ -10946,6 +10946,16 @@ static struct bus_type pmu_bus = {
 
 static void pmu_dev_release(struct device *dev)
 {
+	struct pmu *pmu = dev_get_drvdata(dev);
+
+	if (pmu && pmu->link_name) {
+		struct kset *devices_kset;
+
+		devices_kset = bus_get_devices_kset(pmu->dev->bus);
+		if (devices_kset)
+			sysfs_remove_link(&devices_kset->kobj, pmu->link_name);
+	}
+
 	kfree(dev);
 }
 
@@ -10983,6 +10993,15 @@ static int pmu_dev_alloc(struct pmu *pmu)
 	if (ret)
 		goto del_dev;
 
+	if (pmu->link_name) {
+		struct kset *devices_kset;
+
+		devices_kset = bus_get_devices_kset(pmu->dev->bus);
+		if (devices_kset)
+			ret = sysfs_create_link(&devices_kset->kobj,
+						&pmu->dev->kobj,
+						pmu->link_name);
+	}
 out:
 	return ret;
 
