@@ -5646,11 +5646,12 @@ split_irqchip_unlock:
 			r = kvm_x86_ops.vm_copy_enc_context_from(kvm, cap->args[0]);
 		return r;
 	case KVM_CAP_EXIT_HYPERCALL:
-		if (cap->args[0] & ~KVM_EXIT_HYPERCALL_VALID_MASK) {
-			r = -EINVAL;
+		r = -EINVAL;
+		if (cap->args[0] & ~KVM_EXIT_HYPERCALL_VALID_MASK)
 			break;
-		}
+
 		kvm->arch.hypercall_exit_enabled = cap->args[0];
+		r = 0;
 		break;
 	case KVM_CAP_EXIT_ON_EMULATION_FAILURE:
 		kvm->arch.exit_on_emulation_error = cap->args[0];
