@@ -1044,6 +1044,11 @@ static void setup_irq(struct intel_engine_cs *engine)
 	}
 }
 
+static void ring_bump_serial(struct intel_engine_cs *engine)
+{
+	engine->serial++;
+}
+
 static void setup_common(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *i915 = engine->i915;
@@ -1063,6 +1068,7 @@ static void setup_common(struct intel_engine_cs *engine)
 
 	engine->cops = &ring_context_ops;
 	engine->request_alloc = ring_request_alloc;
+	engine->bump_serial = ring_bump_serial;
 
 	/*
 	 * Using a global execution timeline; the previous final breadcrumb is
