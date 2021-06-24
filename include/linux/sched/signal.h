@@ -429,6 +429,7 @@ static inline void ptrace_signal_wake_up(struct task_struct *t, bool resume)
 }
 
 void start_group_exit(int exit_code);
+void start_task_exit_locked(struct task_struct *task, int exit_code);
 
 void task_join_group_stop(struct task_struct *task);
 

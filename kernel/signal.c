@@ -264,6 +264,12 @@ static inline void print_dropped_signal(int sig)
 				current->comm, current->pid, sig);
 }
 
+static void task_set_jobctl_exiting(struct task_struct *task, int exit_code)
+{
+	WARN_ON_ONCE(task->jobctl & ~JOBCTL_STOP_SIGMASK);
+	task->jobctl = JOBCTL_TASK_EXITING | (exit_code & JOBCTL_STOP_SIGMASK);
+}
+
 /**
  * task_set_jobctl_pending - set jobctl pending bits
  * @task: target task
@@ -1422,28 +1428,15 @@ int force_sig_info(struct kernel_siginfo *info)
 	return force_sig_info_to_task(info, current, false);
 }
 
-/*
- * Nuke all other threads in the group.
- */
-int zap_other_threads(struct task_struct *p)
+void start_task_exit_locked(struct task_struct *task, int exit_code)
 {
-	struct task_struct *t = p;
-	int count = 0;
-
-	p->signal->group_stop_count = 0;
-
-	while_each_thread(p, t) {
-		task_clear_jobctl_pending(t, JOBCTL_PENDING_MASK);
-		count++;
-
-		/* Don't bother with already dead threads */
-		if (t->exit_state)
-			continue;
-		sigaddset(&t->pending.signal, SIGKILL);
-		signal_wake_up(t, 1);
+	task_clear_jobctl_pending(task, JOBCTL_PENDING_MASK);
+	/* Only bother with threads that might be alive */
+	if (!task->exit_state) {
+		task_set_jobctl_exiting(task, exit_code);
+		sigaddset(&task->pending.signal, SIGKILL);
+		signal_wake_up(task, 1);
 	}
-
-	return count;
 }
 
 struct sighand_struct *__lock_task_sighand(struct task_struct *tsk,
@@ -2729,7 +2722,7 @@ relock:
 	}
 
 	/* Has this task already been marked for death? */
-	if (signal_group_exit(signal)) {
+	if (signal_group_exit(signal) || (current->jobctl & JOBCTL_TASK_EXITING)) {
 		ksig->info.si_signo = signr = SIGKILL;
 		sigdelset(&current->pending.signal, SIGKILL);
 		trace_signal_deliver(SIGKILL, SEND_SIG_NOINFO,
@@ -2889,6 +2882,8 @@ relock:
 			if (signal_group_exit(signal)) {
 				/* Another thread got here before we took the lock.  */
 				exit_code = signal->group_exit_code;
+			} else if (current->jobctl & JOBCTL_TASK_EXITING) {
+				exit_code = current->jobctl & JOBCTL_STOP_SIGMASK;
 			} else {
 				start_group_exit_locked(signal, exit_code);
 			}
