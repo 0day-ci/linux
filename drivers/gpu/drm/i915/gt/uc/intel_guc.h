@@ -44,6 +44,14 @@ struct intel_guc {
 		void (*disable)(struct intel_guc *guc);
 	} interrupts;
 
+	/*
+	 * contexts_lock protects the pool of free guc ids and a linked list of
+	 * guc ids available to be stolen
+	 */
+	spinlock_t contexts_lock;
+	struct ida guc_ids;
+	struct list_head guc_id_list;
+
 	bool submission_selected;
 
 	struct i915_vma *ads_vma;
@@ -100,6 +108,29 @@ intel_guc_send_and_receive(struct intel_guc *guc, const u32 *action, u32 len,
 {
 	return intel_guc_ct_send(&guc->ct, action, len,
 				 response_buf, response_buf_size, 0);
+}
+
+static inline int intel_guc_send_busy_loop(struct intel_guc* guc,
+					   const u32 *action,
+					   u32 len,
+					   bool loop)
+{
+	int err;
+
+	/* No sleeping with spin locks, just busy loop */
+	might_sleep_if(loop && (!in_atomic() && !irqs_disabled()));
+
+retry:
+	err = intel_guc_send_nb(guc, action, len);
+	if (unlikely(err == -EBUSY && loop)) {
+		if (likely(!in_atomic() && !irqs_disabled()))
+			cond_resched();
+		else
+			cpu_relax();
+		goto retry;
+	}
+
+	return err;
 }
 
 static inline void intel_guc_to_host_event_handler(struct intel_guc *guc)
@@ -202,6 +233,9 @@ static inline void intel_guc_disable_msg(struct intel_guc *guc, u32 mask)
 
 int intel_guc_reset_engine(struct intel_guc *guc,
 			   struct intel_engine_cs *engine);
+
+int intel_guc_deregister_done_process_msg(struct intel_guc *guc,
+					  const u32 *msg, u32 len);
 
 void intel_guc_load_status(struct intel_guc *guc, struct drm_printer *p);
 
