@@ -1092,66 +1092,71 @@ tda1997x_detect_std(struct tda1997x_state *state,
 		    struct v4l2_dv_timings *timings)
 {
 	struct v4l2_subdev *sd = &state->sd;
-	u32 vper;
-	u16 hper;
-	u16 hsper;
-	int i;
 
 	/*
 	 * Read the FMT registers
-	 *   REG_V_PER: Period of a frame (or two fields) in MCLK(27MHz) cycles
-	 *   REG_H_PER: Period of a line in MCLK(27MHz) cycles
-	 *   REG_HS_WIDTH: Period of horiz sync pulse in MCLK(27MHz) cycles
+	 *   REG_V_PER: Period of a frame (or field) in MCLK (27MHz) cycles
+	 *   REG_H_PER: Period of a line in MCLK (27MHz) cycles
+	 *   REG_HS_WIDTH: Period of horiz sync pulse in MCLK (27MHz) cycles
 	 */
-	vper = io_read24(sd, REG_V_PER) & MASK_VPER;
-	hper = io_read16(sd, REG_H_PER) & MASK_HPER;
-	hsper = io_read16(sd, REG_HS_WIDTH) & MASK_HSWIDTH;
+	u32 vper = io_read24(sd, REG_V_PER) & MASK_VPER;
+	u16 hper = io_read16(sd, REG_H_PER) & MASK_HPER;
+	u16 hswidth = io_read16(sd, REG_HS_WIDTH);
+	u16 hsper = hswidth & MASK_HSWIDTH;
+	u16 htot, hact, hfront, hsync, hback;
+	u16 vtot, vact, vfront1, vfront2, vsync, vback1, vback2;
+
 	v4l2_dbg(1, debug, sd, "Signal Timings: %u/%u/%u\n", vper, hper, hsper);
 	if (!vper || !hper || !hsper)
 		return -ENOLINK;
 
-	for (i = 0; v4l2_dv_timings_presets[i].bt.width; i++) {
-		const struct v4l2_bt_timings *bt;
-		u32 lines, width, _hper, _hsper;
-		u32 vmin, vmax, hmin, hmax, hsmin, hsmax;
-		bool vmatch, hmatch, hsmatch;
+	htot = io_read16(sd, REG_FMT_H_TOT);
+	hact = io_read16(sd, REG_FMT_H_ACT);
+	hfront = io_read16(sd, REG_FMT_H_FRONT);
+	hsync = io_read16(sd, REG_FMT_H_SYNC);
+	hback = io_read16(sd, REG_FMT_H_BACK);
 
-		bt = &v4l2_dv_timings_presets[i].bt;
-		width = V4L2_DV_BT_FRAME_WIDTH(bt);
-		lines = V4L2_DV_BT_FRAME_HEIGHT(bt);
-		_hper = (u32)bt->pixelclock / width;
-		if (bt->interlaced)
-			lines /= 2;
-		/* vper +/- 0.7% */
-		vmin = ((27000000 / 1000) * 993) / _hper * lines;
-		vmax = ((27000000 / 1000) * 1007) / _hper * lines;
-		/* hper +/- 1.0% */
-		hmin = ((27000000 / 100) * 99) / _hper;
-		hmax = ((27000000 / 100) * 101) / _hper;
-		/* hsper +/- 2 (take care to avoid 32bit overflow) */
-		_hsper = 27000 * bt->hsync / ((u32)bt->pixelclock/1000);
-		hsmin = _hsper - 2;
-		hsmax = _hsper + 2;
+	vtot = io_read16(sd, REG_FMT_V_TOT);
+	vact = io_read16(sd, REG_FMT_V_ACT);
+	vfront1 = io_read(sd, REG_FMT_V_FRONT_F1);
+	vfront2 = io_read(sd, REG_FMT_V_FRONT_F2);
+	vsync = io_read(sd, REG_FMT_V_SYNC);
+	vback1 = io_read(sd, REG_FMT_V_BACK_F1);
+	vback2 = io_read(sd, REG_FMT_V_BACK_F2);
 
-		/* vmatch matches the framerate */
-		vmatch = ((vper <= vmax) && (vper >= vmin)) ? 1 : 0;
-		/* hmatch matches the width */
-		hmatch = ((hper <= hmax) && (hper >= hmin)) ? 1 : 0;
-		/* hsmatch matches the hswidth */
-		hsmatch = ((hsper <= hsmax) && (hsper >= hsmin)) ? 1 : 0;
-		if (hmatch && vmatch && hsmatch) {
-			v4l2_print_dv_timings(sd->name, "Detected format: ",
-					      &v4l2_dv_timings_presets[i],
-					      false);
-			if (timings)
-				*timings = v4l2_dv_timings_presets[i];
-			return 0;
-		}
+	v4l2_dbg(1, debug, sd, "Geometry: %u %u %u %u %u   %u %u %u %u %u %u %u\n",
+		 htot, hact, hfront, hsync, hback,
+		 vtot, vact, vfront1, vfront2, vsync, vback1, vback2);
+
+	if (!timings)
+		return 0;
+
+	timings->type = V4L2_DV_BT_656_1120;
+	timings->bt.width = hact;
+	timings->bt.hfrontporch = hfront;
+	timings->bt.hsync = hsync;
+	timings->bt.hbackporch = hback;
+	timings->bt.height = vact;
+	timings->bt.vfrontporch = vfront1;
+	timings->bt.vsync = vsync;
+	timings->bt.vbackporch = vback1;
+	timings->bt.interlaced = hswidth & MASK_HSWIDTH_INTERLACED ?
+		V4L2_DV_INTERLACED : V4L2_DV_PROGRESSIVE;
+
+	timings->bt.pixelclock = (u64)htot * vtot * 27000000;
+	if (timings->bt.interlaced == V4L2_DV_INTERLACED) {
+		timings->bt.il_vfrontporch = vfront2;
+		timings->bt.il_vsync = timings->bt.vsync;
+		timings->bt.il_vbackporch = vback2;
+		do_div(timings->bt.pixelclock, vper * 2 /* full frame */);
+	} else {
+		timings->bt.il_vfrontporch = 0;
+		timings->bt.il_vsync = 0;
+		timings->bt.il_vbackporch = 0;
+		do_div(timings->bt.pixelclock, vper);
 	}
-
-	v4l_err(state->client, "no resolution match for timings: %d/%d/%d\n",
-		vper, hper, hsper);
-	return -ERANGE;
+	v4l2_print_dv_timings(sd->name, "Detected format: ", timings, false);
+	return 0;
 }
 
 /* some sort of errata workaround for chip revision 0 (N1) */

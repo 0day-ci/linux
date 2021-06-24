@@ -120,6 +120,7 @@
 #define MASK_VHREF		0x3fff
 #define MASK_HPER		0x0fff
 #define MASK_HSWIDTH		0x03ff
+#define MASK_HSWIDTH_INTERLACED	0x8000
 
 /* HPD Detection */
 #define DETECT_UTIL		BIT(7)	/* utility of HDMI level */
