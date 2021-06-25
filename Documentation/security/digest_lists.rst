@@ -226,3 +226,122 @@ the digest list) (step 5).
 
 Finally, digests can be searched from user space through a securityfs file
 (step 6) or by the kernel itself.
+
+
+Implementation
+==============
+
+This section describes the implementation of Huawei Digest Lists.
+
+
+Basic Definitions
+-----------------
+
+This section introduces the basic definitions required to use digest lists.
+
+
+Compact Digest List Format
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Compact digest lists consist of one or multiple headers defined as:
+
+::
+
+	struct compact_list_hdr {
+		__u8 version;
+		__u8 _reserved;
+		__le16 type;
+		__le16 modifiers;
+		__le16 algo;
+		__le32 count;
+		__le32 datalen;
+	} __packed;
+
+which characterize the subsequent block of concatenated digests.
+
+The ``algo`` field specifies the algorithm used to calculate the digest.
+
+The ``count`` field specifies how many digests are stored in the subsequent
+block of digests.
+
+The ``datalen`` field specifies the length of the subsequent block of
+digests (it is redundant, it is the same as
+``hash_digest_size[algo] * count``).
+
+
+Compact Types
+.............
+
+Digests can be of different types:
+
+- ``COMPACT_PARSER``: digests of executables which are given the ability to
+  parse digest lists not in the compact format and to upload to the kernel
+  the digest list converted to the compact format;
+- ``COMPACT_FILE``: digests of regular files;
+- ``COMPACT_METADATA``: digests of file metadata (e.g. the digest
+  calculated by EVM to verify a portable signature);
+- ``COMPACT_DIGEST_LIST``: digests of digest lists (only used internally by
+  the kernel).
+
+Different users of Huawei Digest Lists might query digests with different
+compact types. For example, IMA would be interested in COMPACT_FILE, as it
+deals with regular files, while EVM would be interested in
+COMPACT_METADATA, as it verifies file metadata.
+
+
+Compact Modifiers
+.................
+
+Digests can also have specific attributes called modifiers (bit position):
+
+- ``COMPACT_MOD_IMMUTABLE``: file content or metadata should not be
+  modifiable.
+
+IMA might use this information to deny open for writing, or EVM to deny
+setxattr operations.
+
+
+Actions
+.......
+
+This section defines a set of possible actions that have been executed on
+the digest lists (bit position):
+
+- ``COMPACT_ACTION_IMA_MEASURED``: the digest list has been measured by
+  IMA;
+- ``COMPACT_ACTION_IMA_APPRAISED``: the digest list has been successfully
+  appraised by IMA;
+- ``COMPACT_ACTION_IMA_APPRAISED_DIGSIG``: the digest list has been
+  successfully appraised by IMA by verifying a digital signature.
+
+This information might help users of Huawei Digest Lists to decide whether
+to use the result of a queried digest.
+
+For example, if a digest belongs to a digest list that was not measured
+before, IMA should ignore the result of the query as the measurement list
+sent to remote verifiers would lack how the database was populated.
+
+
+Compact Digest List Example
+...........................
+
+::
+
+ version: 1, type: 2, modifiers: 0 algo: 4, count: 3, datalen: 96
+ <SHA256 digest1><SHA256 digest2><SHA256 digest3>
+ version: 1, type: 3, modifiers: 1 algo: 6, count: 2, datalen: 128
+ <SHA512 digest1><SHA512 digest2>
+
+This digest list consists of two blocks. The first block contains three
+SHA256 digests of regular files. The second block contains two SHA512
+digests of immutable metadata.
+
+
+Compact Digest List Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Finally, this section defines the possible operations that can be performed
+with digest lists:
+
+- ``DIGEST_LIST_ADD``: the digest list is being added;
+- ``DIGEST_LIST_DEL``: the digest list is being deleted.

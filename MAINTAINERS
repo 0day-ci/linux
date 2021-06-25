@@ -8378,6 +8378,7 @@ L:	linux-integrity@vger.kernel.org
 S:	Supported
 T:	git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
 F:	Documentation/security/digest_lists.rst
+F:	uapi/linux/digest_lists.h
 
 HUAWEI ETHERNET DRIVER
 M:	Bin Luo <luobin9@huawei.com>
