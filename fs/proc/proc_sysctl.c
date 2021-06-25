@@ -400,18 +400,19 @@ static void next_entry(struct ctl_table_header **phead, struct ctl_table **pentr
  * some sysctl variables are readonly even to root.
  */
 
-static int test_perm(int mode, int op)
+static int test_perm(struct inode *inode, int mode, int op)
 {
-	if (uid_eq(current_euid(), GLOBAL_ROOT_UID))
+	if (uid_eq(current_euid(), inode->i_uid))
 		mode >>= 6;
-	else if (in_egroup_p(GLOBAL_ROOT_GID))
+	else if (in_egroup_p(inode->i_gid))
 		mode >>= 3;
 	if ((op & ~mode & (MAY_READ|MAY_WRITE|MAY_EXEC)) == 0)
 		return 0;
 	return -EACCES;
 }
 
-static int sysctl_perm(struct ctl_table_header *head, struct ctl_table *table, int op)
+static int sysctl_perm(struct inode *inode,
+	struct ctl_table_header *head, struct ctl_table *table, int op)
 {
 	struct ctl_table_root *root = head->root;
 	int mode;
@@ -421,7 +422,7 @@ static int sysctl_perm(struct ctl_table_header *head, struct ctl_table *table, i
 	else
 		mode = table->mode;
 
-	return test_perm(mode, op);
+	return test_perm(inode, mode, op);
 }
 
 static struct inode *proc_sys_make_inode(struct super_block *sb,
@@ -554,7 +555,7 @@ static ssize_t proc_sys_call_handler(struct kiocb *iocb, struct iov_iter *iter,
 	 * and won't be until we finish.
 	 */
 	error = -EPERM;
-	if (sysctl_perm(head, table, write ? MAY_WRITE : MAY_READ))
+	if (sysctl_perm(inode, head, table, write ? MAY_WRITE : MAY_READ))
 		goto out;
 
 	/* if that can happen at all, it should be -EINVAL, not -EISDIR */
@@ -803,7 +804,7 @@ static int proc_sys_permission(struct user_namespace *mnt_userns,
 	if (!table) /* global root - r-xr-xr-x */
 		error = mask & MAY_WRITE ? -EACCES : 0;
 	else /* Use the permissions on the sysctl table entry */
-		error = sysctl_perm(head, table, mask & ~MAY_NOT_BLOCK);
+		error = sysctl_perm(inode, head, table, mask & ~MAY_NOT_BLOCK);
 
 	sysctl_head_finish(head);
 	return error;
