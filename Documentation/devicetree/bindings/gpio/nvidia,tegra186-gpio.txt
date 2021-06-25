@@ -127,6 +127,12 @@ Required properties:
             - 8: Active low level-sensitive.
             Valid combinations are 1, 2, 3, 4, 8.
 
+Optional properties:
+- timestamp-engine
+    AON GPIO controller has timestamp engine which can hardware timestamp
+    GPIO configured as input and IRQ. This property specifies hardware
+    timestamp engine (HTE) device-tree node.
+
 Example:
 
 #include <dt-bindings/interrupt-controller/irq.h>
@@ -162,4 +168,5 @@ gpio@c2f0000 {
 	#gpio-cells = <2>;
 	interrupt-controller;
 	#interrupt-cells = <2>;
+	timestamp-engine = <&tegra_hte_aon>;
 };

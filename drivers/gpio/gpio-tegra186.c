@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/hte.h>
 
 #include <dt-bindings/gpio/tegra186-gpio.h>
 #include <dt-bindings/gpio/tegra194-gpio.h>
@@ -34,6 +35,7 @@
 #define  TEGRA186_GPIO_ENABLE_CONFIG_TRIGGER_LEVEL BIT(4)
 #define  TEGRA186_GPIO_ENABLE_CONFIG_DEBOUNCE BIT(5)
 #define  TEGRA186_GPIO_ENABLE_CONFIG_INTERRUPT BIT(6)
+#define  TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC BIT(7)
 
 #define TEGRA186_GPIO_DEBOUNCE_CONTROL 0x04
 #define  TEGRA186_GPIO_DEBOUNCE_CONTROL_THRESHOLD(x) ((x) & 0xff)
@@ -79,6 +81,7 @@ struct tegra_gpio {
 	struct irq_chip intc;
 	unsigned int num_irq;
 	unsigned int *irq;
+	struct device_node *hte_nd;
 
 	const struct tegra_gpio_soc *soc;
 
@@ -184,6 +187,65 @@ static int tegra186_gpio_direction_output(struct gpio_chip *chip,
 	value |= TEGRA186_GPIO_ENABLE_CONFIG_ENABLE;
 	value |= TEGRA186_GPIO_ENABLE_CONFIG_OUT;
 	writel(value, base + TEGRA186_GPIO_ENABLE_CONFIG);
+
+	return 0;
+}
+
+static int tegra186_gpio_timestamp_control(struct gpio_chip *chip,
+					   unsigned int offset,
+					   struct hte_ts_desc **hdesc,
+					   bool enable)
+{
+	struct tegra_gpio *gpio = gpiochip_get_data(chip);
+	void __iomem *base;
+	int value;
+	struct hte_ts_desc *desc;
+
+	if (!gpio->hte_nd)
+		return -ENOTSUPP;
+
+	base = tegra186_gpio_get_base(gpio, offset);
+	if (WARN_ON(base == NULL))
+		return -EINVAL;
+
+	value = readl(base + TEGRA186_GPIO_ENABLE_CONFIG);
+
+	if (enable) {
+		desc = hte_req_ts_by_dt_node(gpio->hte_nd, offset, NULL);
+		if (IS_ERR(desc))
+			return PTR_ERR(desc);
+
+		*hdesc = desc;
+		value |= TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC;
+	} else {
+		desc = *hdesc;
+		hte_release_ts(desc);
+		value &= ~TEGRA186_GPIO_ENABLE_CONFIG_TIMESTAMP_FUNC;
+	}
+
+	writel(value, base + TEGRA186_GPIO_ENABLE_CONFIG);
+	return 0;
+}
+
+static int tegra186_gpio_get_hw_timestamp(struct gpio_chip *chip, bool block,
+					  struct hte_ts_desc *hdesc, u64 *ts)
+{
+	struct hte_ts_data el;
+	int ret;
+
+	if (!hdesc || !ts)
+		return -EINVAL;
+
+	if (!block)
+		ret = hte_retrieve_ts_ns(hdesc, &el, 1);
+	else
+		/* Wait till timestamp is available */
+		ret = hte_retrieve_ts_ns_wait(hdesc, &el, 1);
+
+	if (ret)
+		return ret;
+
+	*ts = el.tsc;
 
 	return 0;
 }
@@ -615,6 +677,7 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 	struct device_node *np;
 	char **names;
 	int err;
+	phandle hte_ph;
 
 	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
 	if (!gpio)
@@ -739,6 +802,21 @@ static int tegra186_gpio_probe(struct platform_device *pdev)
 			irq->map[offset + j] = irq->parents[port->bank];
 
 		offset += port->pins;
+	}
+
+	err = of_property_read_u32(gpio->gpio.of_node,
+				   "timestamp-engine", &hte_ph);
+	if (!err) {
+		gpio->hte_nd = of_find_node_by_phandle(hte_ph);
+		if (!gpio->hte_nd)
+			return -ENOSYS;
+
+		gpio->gpio.timestamp_control = tegra186_gpio_timestamp_control;
+		gpio->gpio.get_hw_timestamp = tegra186_gpio_get_hw_timestamp;
+
+		of_node_put(gpio->hte_nd);
+	} else {
+		gpio->hte_nd = NULL;
 	}
 
 	platform_set_drvdata(pdev, gpio);
