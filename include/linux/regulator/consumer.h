@@ -290,8 +290,6 @@ int devm_regulator_register_notifier(struct regulator *regulator,
 				     struct notifier_block *nb);
 int regulator_unregister_notifier(struct regulator *regulator,
 				struct notifier_block *nb);
-void devm_regulator_unregister_notifier(struct regulator *regulator,
-					struct notifier_block *nb);
 
 /* regulator suspend */
 int regulator_suspend_enable(struct regulator_dev *rdev,
@@ -593,12 +591,6 @@ static inline int devm_regulator_register_notifier(struct regulator *regulator,
 
 static inline int regulator_unregister_notifier(struct regulator *regulator,
 				struct notifier_block *nb)
-{
-	return 0;
-}
-
-static inline int devm_regulator_unregister_notifier(struct regulator *regulator,
-						     struct notifier_block *nb)
 {
 	return 0;
 }
