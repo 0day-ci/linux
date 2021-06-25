@@ -207,14 +207,26 @@ static int mptcp_setsockopt_sol_socket_timestamping(struct mptcp_sock *msk,
 {
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
+	struct so_timestamping timestamping;
 	int val, ret;
 
-	ret = mptcp_get_int_option(msk, optval, optlen, &val);
-	if (ret)
-		return ret;
+	if (optlen == sizeof(timestamping)) {
+		if (copy_from_sockptr(&timestamping, optval,
+				      sizeof(timestamping)))
+			return -EFAULT;
+	} else if (optlen == sizeof(int)) {
+		if (copy_from_sockptr(val, optval, sizeof(*val)))
+			return -EFAULT;
+
+		memset(&timestamping, 0, sizeof(timestamping));
+		timestamping.flags = val;
+	} else {
+		return -EINVAL;
+	}
 
 	ret = sock_setsockopt(sk->sk_socket, SOL_SOCKET, optname,
-			      KERNEL_SOCKPTR(&val), sizeof(val));
+			      KERNEL_SOCKPTR(&timestamping),
+			      sizeof(timestamping));
 	if (ret)
 		return ret;
 
@@ -224,7 +236,7 @@ static int mptcp_setsockopt_sol_socket_timestamping(struct mptcp_sock *msk,
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow = lock_sock_fast(ssk);
 
-		sock_set_timestamping(sk, optname, val);
+		sock_set_timestamping(sk, optname, timestamping);
 		unlock_sock_fast(ssk, slow);
 	}
 
