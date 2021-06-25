@@ -25,11 +25,15 @@
 
 #define TMIO_MMC_MIN_DMA_LEN 8
 
-static const struct renesas_sdhi_of_data of_default_cfg = {
+static const struct renesas_sdhi_of_data of_data_default_cfg = {
 	.tmio_flags = TMIO_MMC_HAS_IDLE_WAIT,
 };
 
-static const struct renesas_sdhi_of_data of_rz_compatible = {
+static const struct renesas_sdhi_of_data_with_quirks of_default_cfg = {
+	.of_data	= &of_data_default_cfg,
+};
+
+static const struct renesas_sdhi_of_data of_data_rz = {
 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_32BIT_DATA_PORT |
 			  TMIO_MMC_HAVE_CBSY,
 	.tmio_ocr_mask	= MMC_VDD_32_33,
@@ -37,11 +41,19 @@ static const struct renesas_sdhi_of_data of_rz_compatible = {
 			  MMC_CAP_WAIT_WHILE_BUSY,
 };
 
-static const struct renesas_sdhi_of_data of_rcar_gen1_compatible = {
+static const struct renesas_sdhi_of_data_with_quirks of_rz_compatible = {
+	.of_data	= &of_data_rz,
+};
+
+static const struct renesas_sdhi_of_data of_data_rcar_gen1 = {
 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_CLK_ACTUAL,
 	.capabilities	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
 			  MMC_CAP_WAIT_WHILE_BUSY,
 	.capabilities2	= MMC_CAP2_NO_WRITE_PROTECT,
+};
+
+static const struct renesas_sdhi_of_data_with_quirks of_rcar_gen1_compatible = {
+	.of_data	= &of_data_rcar_gen1,
 };
 
 /* Definitions for sampling clocks */
@@ -56,7 +68,7 @@ static struct renesas_sdhi_scc rcar_gen2_scc_taps[] = {
 	},
 };
 
-static const struct renesas_sdhi_of_data of_rcar_gen2_compatible = {
+static const struct renesas_sdhi_of_data of_data_rcar_gen2 = {
 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_CLK_ACTUAL |
 			  TMIO_MMC_HAVE_CBSY | TMIO_MMC_MIN_RCAR2,
 	.capabilities	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
@@ -68,6 +80,10 @@ static const struct renesas_sdhi_of_data of_rcar_gen2_compatible = {
 	.taps		= rcar_gen2_scc_taps,
 	.taps_num	= ARRAY_SIZE(rcar_gen2_scc_taps),
 	.max_blk_count	= UINT_MAX / TMIO_MAX_BLK_SIZE,
+};
+
+static const struct renesas_sdhi_of_data_with_quriks of_rcar_gen2_compatible = {
+	.of_data	= &of_data_rcar_gen2,
 };
 
 static const struct of_device_id renesas_sdhi_sys_dmac_of_match[] = {
