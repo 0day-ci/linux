@@ -833,6 +833,9 @@ int ima_post_load_data(char *buf, loff_t size,
  * @pcr: pcr to extend the measurement
  * @func_data: func specific data, may be NULL
  * @buf_hash: measure buffer data hash
+ * @digest: buffer digest will be written to
+ * @algo: digest algorithm
+ * @measured: whether the buffer has been measured by IMA
  *
  * Based on policy, either the buffer data or buffer data hash is measured
  */
@@ -840,7 +843,8 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 				struct inode *inode, const void *buf, int size,
 				const char *eventname, enum ima_hooks func,
 				int pcr, const char *func_data,
-				bool buf_hash)
+				bool buf_hash, u8 *digest, enum hash_algo *algo,
+				bool *measured)
 {
 	int ret = 0;
 	const char *audit_cause = "ENOMEM";
@@ -861,7 +865,7 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 	int action = 0;
 	u32 secid;
 
-	if (!ima_policy_flag)
+	if (!ima_policy_flag && (!digest || !algo || !measured))
 		return;
 
 	template = ima_template_desc_buf();
@@ -883,7 +887,7 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 		action = ima_get_action(mnt_userns, inode, current_cred(),
 					secid, 0, func, &pcr, &template,
 					func_data);
-		if (!(action & IMA_MEASURE))
+		if (!(action & IMA_MEASURE) && (!digest || !algo || !measured))
 			return;
 	}
 
@@ -914,6 +918,15 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 		event_data.buf_len = digest_hash_len;
 	}
 
+	if (digest && algo) {
+		memcpy(digest, iint.ima_hash->digest,
+		       hash_digest_size[ima_hash_algo]);
+		*algo = ima_hash_algo;
+	}
+
+	if (!(action & IMA_MEASURE))
+		return;
+
 	ret = ima_alloc_init_template(&event_data, &entry, template);
 	if (ret < 0) {
 		audit_cause = "alloc_entry";
@@ -924,8 +937,11 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 	if (ret < 0) {
 		audit_cause = "store_entry";
 		ima_free_template_entry(entry);
+		goto out;
 	}
 
+	if (measured)
+		*measured = true;
 out:
 	if (ret < 0)
 		integrity_audit_message(AUDIT_INTEGRITY_PCR, NULL, eventname,
@@ -956,7 +972,7 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 
 	process_buffer_measurement(file_mnt_user_ns(f.file), file_inode(f.file),
 				   buf, size, "kexec-cmdline", KEXEC_CMDLINE, 0,
-				   NULL, false);
+				   NULL, false, NULL, NULL, NULL);
 	fdput(f);
 }
 
@@ -967,6 +983,9 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
  * @buf: pointer to buffer data
  * @buf_len: length of buffer data (in bytes)
  * @hash: measure buffer data hash
+ * @digest: buffer digest will be written to
+ * @algo: digest algorithm
+ * @measured: whether the buffer has been measured by IMA
  *
  * Measure data critical to the integrity of the kernel into the IMA log
  * and extend the pcr.  Examples of critical data could be various data
@@ -976,14 +995,15 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 void ima_measure_critical_data(const char *event_label,
 			       const char *event_name,
 			       const void *buf, size_t buf_len,
-			       bool hash)
+			       bool hash, u8 *digest, enum hash_algo *algo,
+			       bool *measured)
 {
 	if (!event_name || !event_label || !buf || !buf_len)
 		return;
 
 	process_buffer_measurement(&init_user_ns, NULL, buf, buf_len, event_name,
 				   CRITICAL_DATA, 0, event_label,
-				   hash);
+				   hash, digest, algo, measured);
 }
 
 static int __init init_ima(void)
