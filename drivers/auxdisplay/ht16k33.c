@@ -29,6 +29,7 @@
 #include <asm/unaligned.h>
 
 #include "line-display.h"
+#include "../leds/leds.h"		/* for led_colors[] */
 
 /* Registers */
 #define REG_SYSTEM_SETUP		0x20
@@ -36,6 +37,10 @@
 
 #define REG_DISPLAY_SETUP		0x80
 #define REG_DISPLAY_SETUP_ON		BIT(0)
+#define REG_DISPLAY_SETUP_BLINK_OFF	(0 << 1)
+#define REG_DISPLAY_SETUP_BLINK_2HZ	(1 << 1)
+#define REG_DISPLAY_SETUP_BLINK_1HZ	(2 << 1)
+#define REG_DISPLAY_SETUP_BLINK_0HZ5	(3 << 1)
 
 #define REG_ROWINT_SET			0xA0
 #define REG_ROWINT_SET_INT_EN		BIT(0)
@@ -56,6 +61,8 @@
 
 #define BYTES_PER_ROW		(HT16K33_MATRIX_LED_MAX_ROWS / 8)
 #define HT16K33_FB_SIZE		(HT16K33_MATRIX_LED_MAX_COLS * BYTES_PER_ROW)
+
+#define COLOR_DEFAULT		LED_COLOR_ID_RED
 
 enum display_type {
 	DISP_MATRIX = 0,
@@ -85,6 +92,7 @@ struct ht16k33_fbdev {
 
 struct ht16k33_seg {
 	struct linedisp linedisp;
+	struct led_classdev led;
 	union {
 		struct seg7_conversion_map seg7;
 		struct seg14_conversion_map seg14;
@@ -102,6 +110,7 @@ struct ht16k33_priv {
 		struct ht16k33_seg seg;
 	};
 	enum display_type type;
+	uint8_t blink;
 };
 
 static const struct fb_fix_screeninfo ht16k33_fb_fix = {
@@ -160,7 +169,7 @@ static DEVICE_ATTR(map_seg14, 0644, map_seg_show, map_seg_store);
 
 static int ht16k33_display_on(struct ht16k33_priv *priv)
 {
-	uint8_t data = REG_DISPLAY_SETUP | REG_DISPLAY_SETUP_ON;
+	uint8_t data = REG_DISPLAY_SETUP | REG_DISPLAY_SETUP_ON | priv->blink;
 
 	return i2c_smbus_write_byte(priv->client, data);
 }
@@ -175,8 +184,11 @@ static int ht16k33_brightness_set(struct ht16k33_priv *priv,
 {
 	int error;
 
-	if (brightness == 0)
+	if (brightness == 0) {
+		// Disable blink mode
+		priv->blink = REG_DISPLAY_SETUP_BLINK_OFF;
 		return ht16k33_display_off(priv);
+	}
 
 	error = ht16k33_display_on(priv);
 	if (error)
@@ -184,6 +196,49 @@ static int ht16k33_brightness_set(struct ht16k33_priv *priv,
 
 	return i2c_smbus_write_byte(priv->client,
 				    REG_BRIGHTNESS | (brightness - 1));
+}
+
+static int ht16k33_brightness_set_blocking(struct led_classdev *led_cdev,
+					   enum led_brightness brightness)
+{
+	struct ht16k33_priv *priv = container_of(led_cdev, struct ht16k33_priv,
+						 seg.led);
+
+	return ht16k33_brightness_set(priv, brightness);
+}
+
+static int ht16k33_blink_set(struct led_classdev *led_cdev,
+			     unsigned long *delay_on, unsigned long *delay_off)
+{
+	struct ht16k33_priv *priv = container_of(led_cdev, struct ht16k33_priv,
+						 seg.led);
+	unsigned int delay;
+	uint8_t blink;
+	int error;
+
+	if (!*delay_on && !*delay_off) {
+		blink = REG_DISPLAY_SETUP_BLINK_1HZ;
+		delay = 1000;
+	} else if (*delay_on <= 750) {
+		blink = REG_DISPLAY_SETUP_BLINK_2HZ;
+		delay = 500;
+	} else if (*delay_on <= 1500) {
+		blink = REG_DISPLAY_SETUP_BLINK_1HZ;
+		delay = 1000;
+	} else {
+		blink = REG_DISPLAY_SETUP_BLINK_0HZ5;
+		delay = 2000;
+	}
+
+	error = i2c_smbus_write_byte(priv->client,
+				     REG_DISPLAY_SETUP | REG_DISPLAY_SETUP_ON |
+				     blink);
+	if (error)
+		return error;
+
+	priv->blink = blink;
+	*delay_on = *delay_off = delay;
+	return 0;
 }
 
 static void ht16k33_fb_queue(struct ht16k33_priv *priv)
@@ -576,11 +631,29 @@ err_fbdev_buffer:
 static int ht16k33_seg_probe(struct i2c_client *client,
 			     struct ht16k33_priv *priv, uint32_t brightness)
 {
-	struct ht16k33_seg *seg = &priv->seg;
 	struct device *dev = &client->dev;
+	struct device_node *node = dev->of_node;
+	struct ht16k33_seg *seg = &priv->seg;
+	u32 color = COLOR_DEFAULT;
 	int err;
 
-	err = ht16k33_brightness_set(priv, MAX_BRIGHTNESS);
+	of_property_read_u32(node, "color", &color);
+	seg->led.name = devm_kasprintf(dev, GFP_KERNEL,
+			"auxdisplay:%s:" LED_FUNCTION_BACKLIGHT,
+			color < LED_COLOR_ID_MAX ? led_colors[color] : "");
+	seg->led.brightness_set_blocking = ht16k33_brightness_set_blocking;
+	seg->led.blink_set = ht16k33_blink_set;
+	seg->led.flags = LED_CORE_SUSPENDRESUME;
+	seg->led.brightness = brightness;
+	seg->led.max_brightness = MAX_BRIGHTNESS;
+
+	err = devm_led_classdev_register(dev, &seg->led);
+	if (err) {
+		dev_err(dev, "Failed to register LED\n");
+		return err;
+	}
+
+	err = ht16k33_brightness_set(priv, seg->led.brightness);
 	if (err)
 		return err;
 
