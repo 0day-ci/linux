@@ -284,6 +284,10 @@
  * clang: https://clang.llvm.org/docs/AttributeReference.html#nodiscard-warn-unused-result
  */
 #define __must_check                    __attribute__((__warn_unused_result__))
+/*
+ * "(void)" is enough for clang but not for gcc.
+ */
+#define SUPRESS_WARN_UNUSED_RESULT	(void)!
 
 /*
  *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-weak-function-attribute
