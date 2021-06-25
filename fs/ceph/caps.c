@@ -4229,6 +4229,7 @@ void ceph_check_delayed_caps(struct ceph_mds_client *mdsc)
 {
 	struct inode *inode;
 	struct ceph_inode_info *ci;
+	LIST_HEAD(caps_list);
 
 	dout("check_delayed_caps\n");
 	spin_lock(&mdsc->cap_delay_lock);
@@ -4239,19 +4240,23 @@ void ceph_check_delayed_caps(struct ceph_mds_client *mdsc)
 		if ((ci->i_ceph_flags & CEPH_I_FLUSH) == 0 &&
 		    time_before(jiffies, ci->i_hold_caps_max))
 			break;
-		list_del_init(&ci->i_cap_delay_list);
+		list_move_tail(&ci->i_cap_delay_list, &caps_list);
+	}
+	spin_unlock(&mdsc->cap_delay_lock);
 
+	while (!list_empty(&caps_list)) {
+		ci = list_first_entry(&caps_list,
+				      struct ceph_inode_info,
+				      i_cap_delay_list);
+		list_del_init(&ci->i_cap_delay_list);
 		inode = igrab(&ci->vfs_inode);
 		if (inode) {
-			spin_unlock(&mdsc->cap_delay_lock);
 			dout("check_delayed_caps on %p\n", inode);
 			ceph_check_caps(ci, 0, NULL);
 			/* avoid calling iput_final() in tick thread */
 			ceph_async_iput(inode);
-			spin_lock(&mdsc->cap_delay_lock);
 		}
 	}
-	spin_unlock(&mdsc->cap_delay_lock);
 }
 
 /*
