@@ -124,7 +124,8 @@ xattr_permission(struct user_namespace *mnt_userns, struct inode *inode,
 	 * extended attributes. For sticky directories, only the owner and
 	 * privileged users can write attributes.
 	 */
-	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
+	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN) &&
+	    !capable(CAP_SYS_RESOURCE)) {
 		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
 			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
 		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
