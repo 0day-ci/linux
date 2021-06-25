@@ -540,8 +540,9 @@ static inline bool can_reclaim_anon_pages(struct mem_cgroup *memcg,
 	 * The page can not be swapped.
 	 *
 	 * Can it be reclaimed from this node via demotion?
+	 * But it's pointless to do demotion in memcg reclaim.
 	 */
-	if ((!sc || !sc->no_demotion) &&
+	if ((!sc || (!sc->no_demotion && !cgroup_reclaim(sc))) &&
 	    next_demotion_node(node_id) != NUMA_NO_NODE)
 		return true;
 
@@ -1275,6 +1276,9 @@ static bool migrate_demote_page_ok(struct page *page,
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
 	if (sc->no_demotion)
+		return false;
+	/* It is pointless to do demotion in memcg reclaim */
+	if (cgroup_reclaim(sc))
 		return false;
 	next_nid = next_demotion_node(page_to_nid(page));
 	if (next_nid == NUMA_NO_NODE)
@@ -2759,7 +2763,7 @@ static bool anon_can_be_aged(struct pglist_data *pgdat,
 		return true;
 
 	/* Also valuable if anon pages can be demoted: */
-	if (!sc->no_demotion &&
+	if (!sc->no_demotion && !cgroup_reclaim(sc) &&
 	    next_demotion_node(pgdat->node_id) != NUMA_NO_NODE)
 		return true;
 
