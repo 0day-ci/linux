@@ -553,8 +553,10 @@ ltq_etop_init(struct net_device *dev)
 
 	dev->watchdog_timeo = 10 * HZ;
 	err = ltq_etop_hw_init(dev);
-	if (err)
-		goto err_hw;
+	if (err) {
+		ltq_etop_hw_exit(dev);
+		return err;
+	}
 	ltq_etop_change_mtu(dev, 1500);
 
 	memcpy(&mac, &priv->pldata->mac, sizeof(struct sockaddr));
@@ -580,9 +582,8 @@ ltq_etop_init(struct net_device *dev)
 
 err_netdev:
 	unregister_netdev(dev);
-	free_netdev(dev);
-err_hw:
 	ltq_etop_hw_exit(dev);
+	free_netdev(dev);
 	return err;
 }
 
