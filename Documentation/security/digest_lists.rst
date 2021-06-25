@@ -683,3 +683,10 @@ other (with .ascii prefix) shows the digest list in ASCII format.
 
 Files are added and removed at the same time digest lists are added and
 removed.
+
+
+``digest_label``
+~~~~~~~~~~~~~~~~
+
+``digest_label`` can be used to set a label to be applied to the next
+digest list (buffer) loaded ``through digest_list_add``.

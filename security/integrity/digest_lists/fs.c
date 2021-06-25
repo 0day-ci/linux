@@ -34,6 +34,7 @@
 
 static struct dentry *digest_lists_dir;
 static struct dentry *digest_lists_loaded_dir;
+static struct dentry *digest_label_dentry;
 static struct dentry *digest_list_add_dentry;
 static struct dentry *digest_list_del_dentry;
 char digest_label[NAME_MAX + 1];
@@ -465,6 +466,32 @@ static const struct file_operations digest_list_upload_ops = {
 	.llseek = generic_file_llseek,
 };
 
+/*
+ * digest_label_write: write label for next uploaded digest list.
+ */
+static ssize_t digest_label_write(struct file *file, const char __user *buf,
+				  size_t datalen, loff_t *ppos)
+{
+	int rc;
+
+	if (datalen >= sizeof(digest_label))
+		return -EINVAL;
+
+	rc = copy_from_user(digest_label, buf, datalen);
+	if (rc < 0)
+		return rc;
+
+	digest_label[datalen] = '\0';
+	return datalen;
+}
+
+static const struct file_operations digest_label_ops = {
+	.open = generic_file_open,
+	.write = digest_label_write,
+	.read = seq_read,
+	.llseek = generic_file_llseek,
+};
+
 static int __init digest_lists_fs_init(void)
 {
 	digest_lists_dir = securityfs_create_dir("digest_lists", integrity_dir);
@@ -488,8 +515,15 @@ static int __init digest_lists_fs_init(void)
 	if (IS_ERR(digest_list_del_dentry))
 		goto out;
 
+	digest_label_dentry = securityfs_create_file("digest_label", 0600,
+						     digest_lists_dir, NULL,
+						     &digest_label_ops);
+	if (IS_ERR(digest_label_dentry))
+		goto out;
+
 	return 0;
 out:
+	securityfs_remove(digest_label_dentry);
 	securityfs_remove(digest_list_del_dentry);
 	securityfs_remove(digest_list_add_dentry);
 	securityfs_remove(digest_lists_loaded_dir);
