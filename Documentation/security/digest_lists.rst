@@ -672,3 +672,14 @@ policy, to measure it.
 ``digest_list_del`` can be used to upload a digest list and delete the
 digests from the hash table; data are interpreted in the same way as
 described for ``digest_list_add``.
+
+
+``digest_lists_loaded``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+``digest_lists_loaded`` is a directory containing two files for each
+loaded digest list: one shows the digest list in binary format, and the
+other (with .ascii prefix) shows the digest list in ASCII format.
+
+Files are added and removed at the same time digest lists are added and
+removed.
