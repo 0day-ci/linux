@@ -955,17 +955,6 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		else if (!g_phys_as)
 			g_phys_as = phys_as;
 
-		/*
-		 * The exception to the exception is if hardware supports SEV,
-		 * in which case the C-bit is reserved for non-SEV guests and
-		 * isn't a GPA bit for SEV guests.
-		 *
-		 * Note, KVM always reports '0' for the number of reduced PA
-		 * bits (see 0x8000001F).
-		 */
-		if (tdp_enabled && sev_c_bit)
-			g_phys_as = min(g_phys_as, (unsigned int)sev_c_bit);
-
 		entry->eax = g_phys_as | (virt_as << 8);
 		entry->edx = 0;
 		cpuid_entry_override(entry, CPUID_8000_0008_EBX);
