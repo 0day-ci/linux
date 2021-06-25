@@ -518,6 +518,7 @@ struct linereq {
 	 GPIO_V2_LINE_DRIVE_FLAGS | \
 	 GPIO_V2_LINE_EDGE_FLAGS | \
 	 GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME | \
+	 GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE | \
 	 GPIO_V2_LINE_BIAS_FLAGS)
 
 static void linereq_put_event(struct linereq *lr,
@@ -540,8 +541,19 @@ static void linereq_put_event(struct linereq *lr,
 
 static u64 line_event_timestamp(struct line *line)
 {
+	bool block;
+
 	if (test_bit(FLAG_EVENT_CLOCK_REALTIME, &line->desc->flags))
 		return ktime_get_real_ns();
+
+	if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &line->desc->flags)) {
+		if (irq_count())
+			block = false;
+		else
+			block = true;
+
+		return gpiod_get_hw_timestamp(line->desc, block);
+	}
 
 	return ktime_get_ns();
 }
@@ -828,6 +840,7 @@ static int edge_detector_setup(struct line *line,
 		return ret;
 
 	line->irq = irq;
+
 	return 0;
 }
 
@@ -891,13 +904,20 @@ static int gpio_v2_line_flags_validate(u64 flags)
 	/* Return an error if an unknown flag is set */
 	if (flags & ~GPIO_V2_LINE_VALID_FLAGS)
 		return -EINVAL;
-
 	/*
 	 * Do not allow both INPUT and OUTPUT flags to be set as they are
 	 * contradictory.
 	 */
 	if ((flags & GPIO_V2_LINE_FLAG_INPUT) &&
 	    (flags & GPIO_V2_LINE_FLAG_OUTPUT))
+		return -EINVAL;
+
+	/*
+	 * Do not mix with any other clocks if hardware assisted timestamp is
+	 * asked.
+	 */
+	if ((flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME) &&
+	    (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE))
 		return -EINVAL;
 
 	/* Edge detection requires explicit input. */
@@ -992,6 +1012,8 @@ static void gpio_v2_line_config_flags_to_desc_flags(u64 flags,
 
 	assign_bit(FLAG_EVENT_CLOCK_REALTIME, flagsp,
 		   flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME);
+	assign_bit(FLAG_EVENT_CLOCK_HARDWARE, flagsp,
+		   flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE);
 }
 
 static long linereq_get_values(struct linereq *lr, void __user *ip)
@@ -1139,6 +1161,18 @@ static long linereq_set_config_unlocked(struct linereq *lr,
 			int val = gpio_v2_line_config_output_value(lc, i);
 
 			edge_detector_stop(&lr->lines[i]);
+
+			/*
+			 * Assuming line was input before and hardware
+			 * assisted timestamp only timestamps the input
+			 * lines.
+			 */
+			if (gpiod_is_hw_timestamp_enabled(desc)) {
+				ret = gpiod_hw_timestamp_control(desc, false);
+				if (ret)
+					return ret;
+			}
+
 			ret = gpiod_direction_output(desc, val);
 			if (ret)
 				return ret;
@@ -1152,6 +1186,13 @@ static long linereq_set_config_unlocked(struct linereq *lr,
 					polarity_change);
 			if (ret)
 				return ret;
+
+			/* Check if new config sets hardware assisted clock */
+			if (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE) {
+				ret = gpiod_hw_timestamp_control(desc, true);
+				if (ret)
+					return ret;
+			}
 		}
 
 		blocking_notifier_call_chain(&desc->gdev->notifier,
@@ -1281,8 +1322,12 @@ static void linereq_free(struct linereq *lr)
 
 	for (i = 0; i < lr->num_lines; i++) {
 		edge_detector_stop(&lr->lines[i]);
-		if (lr->lines[i].desc)
+		if (lr->lines[i].desc) {
+			if (gpiod_is_hw_timestamp_enabled(lr->lines[i].desc))
+				gpiod_hw_timestamp_control(lr->lines[i].desc,
+							   false);
 			gpiod_free(lr->lines[i].desc);
+		}
 	}
 	kfifo_free(&lr->events);
 	kfree(lr->label);
@@ -1409,6 +1454,15 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 					flags & GPIO_V2_LINE_EDGE_FLAGS);
 			if (ret)
 				goto out_free_linereq;
+
+			/*
+			 * Check if hardware assisted timestamp is requested
+			 */
+			if (flags & GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE) {
+				ret = gpiod_hw_timestamp_control(desc, true);
+				if (ret)
+					goto out_free_linereq;
+			}
 		}
 
 		blocking_notifier_call_chain(&desc->gdev->notifier,
@@ -1956,8 +2010,15 @@ static void gpio_desc_to_lineinfo(struct gpio_desc *desc,
 	if (test_bit(FLAG_EDGE_FALLING, &desc->flags))
 		info->flags |= GPIO_V2_LINE_FLAG_EDGE_FALLING;
 
+	/*
+	 * Practically it is possible that user will want both the real time
+	 * and hardware timestamps on GPIO events, for now however lets just
+	 * work with either clocks
+	 */
 	if (test_bit(FLAG_EVENT_CLOCK_REALTIME, &desc->flags))
 		info->flags |= GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME;
+	else if (test_bit(FLAG_EVENT_CLOCK_HARDWARE, &desc->flags))
+		info->flags |= GPIO_V2_LINE_FLAG_EVENT_CLOCK_HARDWARE;
 
 	debounce_period_us = READ_ONCE(desc->debounce_period_us);
 	if (debounce_period_us) {
