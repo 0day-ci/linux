@@ -300,6 +300,11 @@
 	flash = <&spi1>;
 };
 
+&kcs4 {
+	compatible = "openbmc,mctp-lpc";
+	status = "okay";
+};
+
 &mac0 {
 	status = "okay";
 	pinctrl-names = "default";
