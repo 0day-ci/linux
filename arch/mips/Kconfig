@@ -379,9 +379,7 @@ config MACH_DECSTATION
 	select SYS_SUPPORTS_1024HZ
 	select MIPS_L1_CACHE_SHIFT_4
 	help
-	  This enables support for DEC's MIPS based workstations.  For details
-	  see the Linux/MIPS FAQ on <http://www.linux-mips.org/> and the
-	  DECstation porting pages on <http://decstation.unix-ag.org/>.
+	  This enables support for DEC's MIPS based workstations.
 
 	  If you have one of the following DECstation Models you definitely
 	  want to choose R4xx0 for the CPU Type:
@@ -3249,10 +3247,6 @@ config TC
 	  processors.  TURBOchannel programming specifications are available
 	  at:
 	  <ftp://ftp.hp.com/pub/alphaserver/archive/triadd/>
-	  and:
-	  <http://www.computer-refuge.org/classiccmp/ftp.digital.com/pub/DEC/TriAdd/>
-	  Linux driver support status is documented at:
-	  <http://www.linux-mips.org/wiki/DECstation>
 
 config MMU
 	bool

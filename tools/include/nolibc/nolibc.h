@@ -1027,8 +1027,7 @@ struct sys_stat_struct {
  *   - arguments are in a0, a1, a2, a3, then the stack. The caller needs to
  *     leave some room in the stack for the callee to save a0..a3 if needed.
  *   - Many registers are clobbered, in fact only a0..a2 and s0..s8 are
- *     preserved. See: https://www.linux-mips.org/wiki/Syscall as well as
- *     scall32-o32.S in the kernel sources.
+ *     preserved. See: scall32-o32.S in the kernel sources.
  *   - the system call is performed by calling "syscall"
  *   - syscall return comes in v0, and register a3 needs to be checked to know
  *     if an error occured, in which case errno is in v0.
