@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/hte/nvidia,tegra194-hte.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Tegra194 on chip generic hardware timestamping engine (HTE)
+
+maintainers:
+  - Dipen Patel <dipenp@nvidia.com>
+
+description: |
+  Tegra194 SoC has multiple generic hardware timestamping engines which can
+  monitor subset of GPIO and on chip IRQ lines for the state change, upon
+  detection it will record timestamp (taken from system counter) in its
+  internal hardware FIFO. It has bitmap array arranged in 32bit slices where
+  each bit represent signal/line to enable or disable for the hardware
+  timestamping.
+
+properties:
+  compatible:
+    enum:
+      - nvidia,tegra194-gte-aon
+      - nvidia,tegra194-gte-lic
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  int-threshold:
+    description:
+      HTE device generates its interrupt based on this u32 FIFO threshold
+      value. The recommended value is 1.
+    minimum: 1
+    maximum: 256
+
+  slices:
+   description:
+    HTE lines are arranged in 32 bit slice where each bit represents different
+    line/signal that it can enable/configure for the timestamp. It is u32
+    property and depends on the HTE instance in the chip.
+   oneOf:
+    - items:
+        - const: 3
+    - items:
+        - const: 11
+
+  '#hte-cells':
+    const: 1
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - slices
+  - "#hte-cells"
+
+additionalProperties: false
+
+examples:
+  - |
+    tegra_hte_aon: hte@c1e0000 {
+              compatible = "nvidia,tegra194-gte-aon";
+              reg = <0xc1e0000 0x10000>;
+              interrupts = <0 13 0x4>;
+              int-threshold = <1>;
+              slices = <3>;
+              #hte-cells = <1>;
+    };
+
+  - |
+    tegra_hte_lic: hte@3aa0000 {
+              compatible = "nvidia,tegra194-gte-lic";
+              reg = <0x3aa0000 0x10000>;
+              interrupts = <0 11 0x4>;
+              int-threshold = <1>;
+              slices = <11>;
+              #hte-cells = <1>;
+    };
+
+...

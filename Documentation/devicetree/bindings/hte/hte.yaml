@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/hte/hte.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: HTE providers
+
+maintainers:
+  - Dipen Patel <dipenp@nvidia.com>
+
+properties:
+  $nodename:
+    pattern: "^hte(@.*|-[0-9a-f])*$"
+
+  "#hte-cells":
+    description:
+      Number of cells in a HTE specifier.
+
+required:
+  - "#hte-cells"
+
+additionalProperties: true
+
+examples:
+  - |
+    tegra_hte_aon: hte@c1e0000 {
+              compatible = "nvidia,tegra194-gte-aon";
+              reg = <0xc1e0000 0x10000>;
+              interrupts = <0 13 0x4>;
+              int-threshold = <1>;
+              slices = <3>;
+              #hte-cells = <1>;
+    };
