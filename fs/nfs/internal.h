@@ -62,6 +62,7 @@ struct nfs_client_initdata {
 	const struct sockaddr *addr;		/* Address of the server */
 	const char *nodename;			/* Hostname of the client */
 	const char *ip_addr;			/* IP address of the client */
+	const char *namespace;			/* NFS namespace */
 	size_t addrlen;
 	struct nfs_subversion *nfs_mod;
 	int proto;
@@ -97,6 +98,7 @@ struct nfs_fs_context {
 	unsigned short		protofamily;
 	unsigned short		mountfamily;
 	bool			has_sec_mnt_opts;
+	const char		*namespace;
 
 	struct {
 		union {

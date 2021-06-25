@@ -59,6 +59,7 @@ enum nfs_param {
 	Opt_mountproto,
 	Opt_mountvers,
 	Opt_namelen,
+	Opt_namespace,
 	Opt_nconnect,
 	Opt_port,
 	Opt_posix,
@@ -156,6 +157,7 @@ static const struct fs_parameter_spec nfs_fs_parameters[] = {
 	fsparam_u32   ("mountport",	Opt_mountport),
 	fsparam_string("mountproto",	Opt_mountproto),
 	fsparam_u32   ("mountvers",	Opt_mountvers),
+	fsparam_string("namespace",	Opt_namespace),
 	fsparam_u32   ("namlen",	Opt_namelen),
 	fsparam_u32   ("nconnect",	Opt_nconnect),
 	fsparam_string("nfsvers",	Opt_vers),
@@ -824,7 +826,13 @@ static int nfs_fs_context_parse_param(struct fs_context *fc,
 			goto out_invalid_value;
 		}
 		break;
-
+	case Opt_namespace:
+		if (strpbrk(param->string, " \n\t,"))
+			goto out_invalid_value;
+		kfree(ctx->namespace);
+		ctx->namespace = param->string;
+		param->string = NULL;
+		break;
 		/*
 		 * Special options
 		 */
@@ -1462,6 +1470,7 @@ static void nfs_fs_context_free(struct fs_context *fc)
 		kfree(ctx->nfs_server.export_path);
 		kfree(ctx->nfs_server.hostname);
 		kfree(ctx->fscache_uniq);
+		kfree(ctx->namespace);
 		nfs_free_fhandle(ctx->mntfh);
 		nfs_free_fattr(ctx->clone_data.fattr);
 		kfree(ctx);

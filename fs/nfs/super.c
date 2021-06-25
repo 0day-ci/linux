@@ -479,6 +479,8 @@ static void nfs_show_mount_options(struct seq_file *m, struct nfs_server *nfss,
 	rcu_read_unlock();
 	if (clp->cl_nconnect > 0)
 		seq_printf(m, ",nconnect=%u", clp->cl_nconnect);
+	if (*clp->cl_namespace)
+		seq_printf(m, ",namespace=%s", clp->cl_namespace);
 	if (version == 4) {
 		if (nfss->port != NFS_PORT)
 			seq_printf(m, ",port=%u", nfss->port);
@@ -1185,6 +1187,9 @@ static int nfs_compare_super(struct super_block *sb, struct fs_context *fc)
 		return 0;
 	/* Note: NFS_MOUNT_UNSHARED == NFS4_MOUNT_UNSHARED */
 	if (old->flags & NFS_MOUNT_UNSHARED)
+		return 0;
+	if (strcmp(old->nfs_client->cl_namespace,
+		   server->nfs_client->cl_namespace) != 0)
 		return 0;
 	if (memcmp(&old->fsid, &server->fsid, sizeof(old->fsid)) != 0)
 		return 0;

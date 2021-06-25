@@ -62,8 +62,8 @@ struct nfs_client {
 
 	u32			cl_minorversion;/* NFSv4 minorversion */
 	unsigned int		cl_nconnect;	/* Number of connections */
-	const char *		cl_principal;  /* used for machine cred */
-
+	const char *		cl_principal;	/* used for machine cred */
+	const char *		cl_namespace;	/* used for NFS namespaces */
 #if IS_ENABLED(CONFIG_NFS_V4)
 	struct list_head	cl_ds_clients; /* auth flavor data servers */
 	u64			cl_clientid;	/* constant */
