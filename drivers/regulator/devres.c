@@ -16,7 +16,12 @@
 
 static void devm_regulator_release(struct device *dev, void *res)
 {
-	regulator_put(*(struct regulator **)res);
+	struct regulator *regulator = *(struct regulator **)res;
+
+	if (regulator->enable_count == 1)
+		regulator_disable(regulator);
+
+	regulator_put(regulator);
 }
 
 static struct regulator *_devm_regulator_get(struct device *dev, const char *id,
