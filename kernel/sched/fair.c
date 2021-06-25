@@ -6616,7 +6616,7 @@ static unsigned long cpu_util_next(int cpu, struct task_struct *p, int dst_cpu)
  * to compute what would be the energy if we decided to actually migrate that
  * task.
  */
-static long
+static u64
 compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
 {
 	struct cpumask *pd_mask = perf_domain_span(pd);
@@ -6723,12 +6723,13 @@ compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
  */
 static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 {
-	unsigned long prev_delta = ULONG_MAX, best_delta = ULONG_MAX;
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
+	u64 prev_delta = ULLONG_MAX, best_delta = ULLONG_MAX;
 	int cpu, best_energy_cpu = prev_cpu, target = -1;
-	unsigned long cpu_cap, util, base_energy = 0;
+	unsigned long cpu_cap, util;
 	struct sched_domain *sd;
 	struct perf_domain *pd;
+	u64 base_energy = 0;
 
 	rcu_read_lock();
 	pd = rcu_dereference(rd->pd);
@@ -6752,9 +6753,9 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 		goto unlock;
 
 	for (; pd; pd = pd->next) {
-		unsigned long cur_delta, spare_cap, max_spare_cap = 0;
+		unsigned long spare_cap, max_spare_cap = 0;
 		bool compute_prev_delta = false;
-		unsigned long base_energy_pd;
+		u64 base_energy_pd, cur_delta;
 		int max_spare_cap_cpu = -1;
 
 		for_each_cpu_and(cpu, perf_domain_span(pd), sched_domain_span(sd)) {
@@ -6824,7 +6825,7 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 	 * Pick the best CPU if prev_cpu cannot be used, or if it saves at
 	 * least 6% of the energy used by prev_cpu.
 	 */
-	if ((prev_delta == ULONG_MAX) ||
+	if ((prev_delta == ULLONG_MAX) ||
 	    (prev_delta - best_delta) > ((prev_delta + base_energy) >> 4))
 		target = best_energy_cpu;
 
