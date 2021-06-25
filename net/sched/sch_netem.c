@@ -85,6 +85,7 @@ struct netem_sched_data {
 	s64 latency;
 	s64 jitter;
 
+	u32 bursting;
 	u32 loss;
 	u32 ecn;
 	u32 limit;
@@ -467,7 +468,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	/* If a delay is expected, orphan the skb. (orphaning usually takes
 	 * place at TX completion time, so _before_ the link transit delay)
 	 */
-	if (q->latency || q->jitter || q->rate)
+	if (q->latency || q->jitter || q->rate || q->bursting)
 		skb_orphan_partial(skb);
 
 	/*
@@ -527,8 +528,17 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	qdisc_qstats_backlog_inc(sch, skb);
 
 	cb = netem_skb_cb(skb);
-	if (q->gap == 0 ||		/* not doing reordering */
-	    q->counter < q->gap - 1 ||	/* inside last reordering gap */
+	if (q->bursting > 0) {
+		u64 now;
+
+		now = ktime_get_ns();
+
+		cb->time_to_send = now - (now % q->bursting) + q->bursting;
+
+		++q->counter;
+		tfifo_enqueue(skb, sch);
+	} else if (q->gap == 0 ||		/* not doing reordering */
+	    q->counter < q->gap - 1 ||		/* inside last reordering gap */
 	    q->reorder < get_crandom(&q->reorder_cor)) {
 		u64 now;
 		s64 delay;
@@ -927,6 +937,7 @@ static const struct nla_policy netem_policy[TCA_NETEM_MAX + 1] = {
 	[TCA_NETEM_ECN]		= { .type = NLA_U32 },
 	[TCA_NETEM_RATE64]	= { .type = NLA_U64 },
 	[TCA_NETEM_LATENCY64]	= { .type = NLA_S64 },
+	[TCA_NETEM_BURSTING]	= { .type = NLA_U64 },
 	[TCA_NETEM_JITTER64]	= { .type = NLA_S64 },
 	[TCA_NETEM_SLOT]	= { .len = sizeof(struct tc_netem_slot) },
 };
@@ -1001,6 +1012,7 @@ static int netem_change(struct Qdisc *sch, struct nlattr *opt,
 
 	q->latency = PSCHED_TICKS2NS(qopt->latency);
 	q->jitter = PSCHED_TICKS2NS(qopt->jitter);
+	q->bursting = PSCHED_TICKS2NS(qopt->bursting);
 	q->limit = qopt->limit;
 	q->gap = qopt->gap;
 	q->counter = 0;
@@ -1031,6 +1043,9 @@ static int netem_change(struct Qdisc *sch, struct nlattr *opt,
 
 	if (tb[TCA_NETEM_LATENCY64])
 		q->latency = nla_get_s64(tb[TCA_NETEM_LATENCY64]);
+
+	if (tb[TCA_NETEM_BURSTING])
+		q->bursting = nla_get_u64(tb[TCA_NETEM_BURSTING]);
 
 	if (tb[TCA_NETEM_JITTER64])
 		q->jitter = nla_get_s64(tb[TCA_NETEM_JITTER64]);
@@ -1150,6 +1165,9 @@ static int netem_dump(struct Qdisc *sch, struct sk_buff *skb)
 			     UINT_MAX);
 	qopt.jitter = min_t(psched_tdiff_t, PSCHED_NS2TICKS(q->jitter),
 			    UINT_MAX);
+	qopt.bursting = min_t(psched_tdiff_t, PSCHED_NS2TICKS(q->bursting),
+			    UINT_MAX);
+
 	qopt.limit = q->limit;
 	qopt.loss = q->loss;
 	qopt.gap = q->gap;
