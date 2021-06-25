@@ -37,12 +37,40 @@
 
 static struct dentry *digest_lists_dir;
 static struct dentry *digest_lists_loaded_dir;
+static struct dentry *digests_count;
 static struct dentry *digest_label_dentry;
 static struct dentry *digest_query_dentry;
 static struct dentry *digest_list_add_dentry;
 static struct dentry *digest_list_del_dentry;
 char digest_query[CRYPTO_MAX_ALG_NAME + 1 + IMA_MAX_DIGEST_SIZE * 2 + 1];
 char digest_label[NAME_MAX + 1];
+
+static char *types_str[COMPACT__LAST] = {
+	[COMPACT_PARSER] = "Parser",
+	[COMPACT_FILE] = "File",
+	[COMPACT_METADATA] = "Metadata",
+	[COMPACT_DIGEST_LIST] = "Digest list",
+};
+
+static ssize_t digest_lists_show_htable_len(struct file *filp, char __user *buf,
+					    size_t count, loff_t *ppos)
+{
+	char tmpbuf[1024];
+	ssize_t len = 0;
+	int i;
+
+	for (i = COMPACT_PARSER; i < COMPACT__LAST; i++)
+		len += scnprintf(tmpbuf + len, sizeof(tmpbuf) - len,
+				 "%s digests: %li\n", types_str[i],
+				 atomic_long_read(&htable[i].len));
+
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, len);
+}
+
+static const struct file_operations htable_len_ops = {
+	.read = digest_lists_show_htable_len,
+	.llseek = generic_file_llseek,
+};
 
 static int parse_digest_list_filename(const char *digest_list_filename,
 				      u8 *digest, enum hash_algo *algo)
@@ -646,6 +674,12 @@ static int __init digest_lists_fs_init(void)
 	if (IS_ERR(digest_lists_loaded_dir))
 		goto out;
 
+	digests_count = securityfs_create_file("digests_count", 0440,
+					       digest_lists_dir, NULL,
+					       &htable_len_ops);
+	if (IS_ERR(digests_count))
+		goto out;
+
 	digest_list_add_dentry = securityfs_create_file("digest_list_add", 0200,
 						digest_lists_dir, NULL,
 						&digest_list_upload_ops);
@@ -676,6 +710,7 @@ out:
 	securityfs_remove(digest_label_dentry);
 	securityfs_remove(digest_list_del_dentry);
 	securityfs_remove(digest_list_add_dentry);
+	securityfs_remove(digests_count);
 	securityfs_remove(digest_lists_loaded_dir);
 	securityfs_remove(digest_lists_dir);
 	return -1;

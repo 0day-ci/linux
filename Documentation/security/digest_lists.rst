@@ -697,3 +697,10 @@ digest list (buffer) loaded ``through digest_list_add``.
 
 ``digest_query``: allows to write a query in the format ``<algo>-<digest>``
 and to obtain all digest lists that include that digest.
+
+
+``digests_count``
+~~~~~~~~~~~~~~~~~
+
+``digests_count`` shows the current number of digests stored in the hash
+table by type.
