@@ -319,6 +319,7 @@ DEFINE_STATIC_KEY_FALSE(page_reporting_enabled);
 
 int page_reporting_register(struct page_reporting_dev_info *prdev)
 {
+	unsigned int order;
 	int err = 0;
 
 	mutex_lock(&page_reporting_mutex);
@@ -329,9 +330,13 @@ int page_reporting_register(struct page_reporting_dev_info *prdev)
 		goto err_out;
 	}
 
-	/* Update the page reporting order with @pageblock_order */
-	if (page_reporting_order > pageblock_order)
-		page_reporting_order = pageblock_order;
+	/*
+	 * Update the page reporting order if it's specified by driver.
+	 * Otherwise, it falls back to @pageblock_order.
+	 */
+	order = prdev->order ? : pageblock_order;
+	if (page_reporting_order > order)
+		page_reporting_order = order;
 
 	/* initialize state and work structures */
 	atomic_set(&prdev->state, PAGE_REPORTING_IDLE);
