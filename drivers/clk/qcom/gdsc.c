@@ -359,10 +359,17 @@ static int gdsc_init(struct gdsc *sc)
 
 	/*
 	 * Votable GDSCs can be ON due to Vote from other masters.
-	 * If a Votable GDSC is ON, make sure we have a Vote.
+	 * If a Votable GDSC is ON, make sure we have a Vote. If
+	 * non-votable, ensure that the supply is kept enabled (as
+	 * is done by gdsc_enable).
 	 */
-	if ((sc->flags & VOTABLE) && on)
+	if ((sc->flags & VOTABLE) && on) {
 		gdsc_enable(&sc->pd);
+	} else if (on) {
+		ret = regulator_enable(sc->rsupply);
+		if (ret < 0)
+			return ret;
+	}
 
 	/*
 	 * Make sure the retain bit is set if the GDSC is already on, otherwise
