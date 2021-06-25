@@ -2365,6 +2365,98 @@ set_output_flag:
 EXPORT_SYMBOL_GPL(gpiod_direction_output);
 
 /**
+ * gpiod_hw_timestamp_control - set the hardware assisted timestamp control.
+ * @desc:	GPIO to set
+ * @enable:	Set true to enable the hardware timestamp, false otherwise.
+ *
+ * Certain GPIO chip can rely on hardware assisted timestamp engines which can
+ * record timestamp at the occurance of the configured events on selected GPIO
+ * lines. This is helper API to control such engine.
+ *
+ * Return 0 in case of success, else an error code.
+ */
+int gpiod_hw_timestamp_control(struct gpio_desc *desc, bool enable)
+{
+	struct gpio_chip	*gc;
+	int			ret = 0;
+
+	VALIDATE_DESC(desc);
+	gc = desc->gdev->chip;
+
+	if (!gc->timestamp_control) {
+		gpiod_warn(desc,
+			   "%s: Hardware assisted ts not supported\n",
+			   __func__);
+		return -ENOTSUPP;
+	}
+
+	ret = gc->timestamp_control(gc, gpio_chip_hwgpio(desc),
+				    &desc->hdesc, enable);
+
+	if (ret) {
+		gpiod_warn(desc,
+			   "%s: ts control operation failed\n", __func__);
+		return ret;
+	}
+
+	if (!enable)
+		desc->hdesc = NULL;
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(gpiod_hw_timestamp_control);
+
+/**
+ * gpiod_is_hw_timestamp_enabled - check if hardware assisted timestamp is
+ * enabled.
+ * @desc:	GPIO to check
+ *
+ * Return true in case of success, false otherwise.
+ */
+bool gpiod_is_hw_timestamp_enabled(const struct gpio_desc *desc)
+{
+	if (!desc)
+		return false;
+
+	return (desc->hdesc) ? true : false;
+}
+EXPORT_SYMBOL_GPL(gpiod_is_hw_timestamp_enabled);
+
+/**
+ * gpiod_get_hw_timestamp - Get hardware timestamp in nano seconds.
+ * @desc:	GPIO to get the timestamp.
+ * @block:	Set true to block until data is available.
+ *
+ * Return non-zero on success, else 0.
+ */
+u64 gpiod_get_hw_timestamp(struct gpio_desc *desc, bool block)
+{
+	struct gpio_chip	*gc;
+	int			ret = 0;
+	u64 ts;
+
+	VALIDATE_DESC(desc);
+	gc = desc->gdev->chip;
+
+	if (!gc->get_hw_timestamp) {
+		gpiod_warn(desc,
+			   "%s: Hardware assisted ts not supported\n",
+			   __func__);
+		return -ENOTSUPP;
+	}
+
+	ret = gc->get_hw_timestamp(gc, block, desc->hdesc, &ts);
+	if (ret) {
+		gpiod_warn(desc,
+			   "%s: get timestamp operation failed\n", __func__);
+		return 0;
+	}
+
+	return ts;
+}
+EXPORT_SYMBOL_GPL(gpiod_get_hw_timestamp);
+
+/**
  * gpiod_set_config - sets @config for a GPIO
  * @desc: descriptor of the GPIO for which to set the configuration
  * @config: Same packed config format as generic pinconf

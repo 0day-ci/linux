@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/cdev.h>
+#include <linux/hte.h>
 
 #define GPIOCHIP_NAME	"gpiochip"
 
@@ -117,6 +118,7 @@ struct gpio_desc {
 #define FLAG_EDGE_RISING     16	/* GPIO CDEV detects rising edge events */
 #define FLAG_EDGE_FALLING    17	/* GPIO CDEV detects falling edge events */
 #define FLAG_EVENT_CLOCK_REALTIME	18 /* GPIO CDEV reports REALTIME timestamps in events */
+#define FLAG_EVENT_CLOCK_HARDWARE	19 /* GPIO CDEV reports hardware timestamps in events */
 
 	/* Connection label */
 	const char		*label;
@@ -129,6 +131,15 @@ struct gpio_desc {
 	/* debounce period in microseconds */
 	unsigned int		debounce_period_us;
 #endif
+	/*
+	 * Hardware timestamp engine related internal data structure.
+	 * This gets set when the consumer calls gpiod_hw_timestamp_control to enable
+	 * hardware timestamping on the specified GPIO line. The API calls into HTE
+	 * subsystem, in turns HTE subsystem return the HTE descriptor for the GPIO
+	 * line. The hdesc will be later used with gpiod_is_hw_timestamp_enabled
+	 * and gpiod_get_hw_timestamp API calls.
+	 */
+	struct hte_ts_desc *hdesc;
 };
 
 #define gpiod_not_found(desc)		(IS_ERR(desc) && PTR_ERR(desc) == -ENOENT)
