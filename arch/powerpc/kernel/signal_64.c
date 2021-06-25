@@ -611,32 +611,6 @@ static long restore_tm_sigcontexts(struct task_struct *tsk, struct sigcontext __
 #endif
 
 /*
- * Setup the trampoline code on the stack
- */
-static long setup_trampoline(unsigned int syscall, unsigned int __user *tramp)
-{
-	int i;
-	long err = 0;
-
-	/* Call the handler and pop the dummy stackframe*/
-	err |= __put_user(PPC_RAW_BCTRL(), &tramp[0]);
-	err |= __put_user(PPC_RAW_ADDI(_R1, _R1, __SIGNAL_FRAMESIZE), &tramp[1]);
-
-	err |= __put_user(PPC_RAW_LI(_R0, syscall), &tramp[2]);
-	err |= __put_user(PPC_RAW_SC(), &tramp[3]);
-
-	/* Minimal traceback info */
-	for (i=TRAMP_TRACEBACK; i < TRAMP_SIZE ;i++)
-		err |= __put_user(0, &tramp[i]);
-
-	if (!err)
-		flush_icache_range((unsigned long) &tramp[0],
-			   (unsigned long) &tramp[TRAMP_SIZE]);
-
-	return err;
-}
-
-/*
  * Userspace code may pass a ucontext which doesn't include VSX added
  * at the end.  We need to check for this case.
  */
@@ -910,16 +884,12 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set,
 	tsk->thread.fp_state.fpscr = 0;
 
 	/* Set up to return from userspace. */
-	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER)
 		regs_set_return_ip(regs, (unsigned long)ksig->ka.sa.sa_restorer);
-	} else if (tsk->mm->context.vdso) {
+	else if (tsk->mm->context.vdso)
 		regs_set_return_ip(regs, VDSO64_SYMBOL(tsk->mm->context.vdso, sigtramp_rt64));
-	} else {
-		err |= setup_trampoline(__NR_rt_sigreturn, &frame->tramp[0]);
-		if (err)
-			goto badframe;
-		regs_set_return_ip(regs, (unsigned long) &frame->tramp[0]);
-	}
+	else
+		regs->nip = 0;
 
 	/* Allocate a dummy caller frame for the signal handler. */
 	newsp = ((unsigned long)frame) - __SIGNAL_FRAMESIZE;

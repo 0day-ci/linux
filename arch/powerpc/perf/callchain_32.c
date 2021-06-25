@@ -57,8 +57,6 @@ struct rt_signal_frame_32 {
 
 static int is_sigreturn_32_address(unsigned int nip, unsigned int fp)
 {
-	if (nip == fp + offsetof(struct signal_frame_32, mctx.mc_pad))
-		return 1;
 	if (current->mm->context.vdso &&
 	    nip == VDSO32_SYMBOL(current->mm->context.vdso, sigtramp32))
 		return 1;
@@ -67,9 +65,6 @@ static int is_sigreturn_32_address(unsigned int nip, unsigned int fp)
 
 static int is_rt_sigreturn_32_address(unsigned int nip, unsigned int fp)
 {
-	if (nip == fp + offsetof(struct rt_signal_frame_32,
-				 uc.uc_mcontext.mc_pad))
-		return 1;
 	if (current->mm->context.vdso &&
 	    nip == VDSO32_SYMBOL(current->mm->context.vdso, sigtramp_rt32))
 		return 1;

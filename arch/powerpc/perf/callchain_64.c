@@ -66,8 +66,6 @@ struct signal_frame_64 {
 
 static int is_sigreturn_64_address(unsigned long nip, unsigned long fp)
 {
-	if (nip == fp + offsetof(struct signal_frame_64, tramp))
-		return 1;
 	if (current->mm->context.vdso &&
 	    nip == VDSO64_SYMBOL(current->mm->context.vdso, sigtramp_rt64))
 		return 1;

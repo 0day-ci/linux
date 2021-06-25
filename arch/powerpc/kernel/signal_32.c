@@ -769,16 +769,13 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	}
 
 	/* Save user registers on the stack */
-	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER)
 		tramp = (unsigned long)ksig->ka.sa.sa_restorer;
-	} else if (tsk->mm->context.vdso) {
+	else if (tsk->mm->context.vdso)
 		tramp = VDSO32_SYMBOL(tsk->mm->context.vdso, sigtramp_rt32);
-	} else {
-		tramp = (unsigned long)mctx->mc_pad;
-		unsafe_put_user(PPC_RAW_LI(_R0, __NR_rt_sigreturn), &mctx->mc_pad[0], failed);
-		unsafe_put_user(PPC_RAW_SC(), &mctx->mc_pad[1], failed);
-		asm("dcbst %y0; sync; icbi %y0; sync" :: "Z" (mctx->mc_pad[0]));
-	}
+	else
+		tramp = 0;
+
 	unsafe_put_sigset_t(&frame->uc.uc_sigmask, oldset, failed);
 
 	user_access_end();
@@ -867,16 +864,13 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset,
 	else
 		unsafe_save_user_regs(regs, mctx, tm_mctx, 1, failed);
 
-	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER)
 		tramp = (unsigned long)ksig->ka.sa.sa_restorer;
-	} else if (tsk->mm->context.vdso) {
+	else if (tsk->mm->context.vdso)
 		tramp = VDSO32_SYMBOL(tsk->mm->context.vdso, sigtramp32);
-	} else {
-		tramp = (unsigned long)mctx->mc_pad;
-		unsafe_put_user(PPC_RAW_LI(_R0, __NR_sigreturn), &mctx->mc_pad[0], failed);
-		unsafe_put_user(PPC_RAW_SC(), &mctx->mc_pad[1], failed);
-		asm("dcbst %y0; sync; icbi %y0; sync" :: "Z" (mctx->mc_pad[0]));
-	}
+	else
+		tramp = 0;
+
 	user_access_end();
 
 	regs->link = tramp;
