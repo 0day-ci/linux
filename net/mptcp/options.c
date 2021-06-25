@@ -856,7 +856,8 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 				    struct mptcp_subflow_context *subflow,
 				    struct sk_buff *skb,
-				    struct mptcp_options_received *mp_opt)
+				    struct mptcp_options_received *mp_opt,
+				    bool *subflow_is_rst)
 {
 	/* here we can process OoO, in-window pkts, only in-sequence 4th ack
 	 * will make the subflow fully established
@@ -938,6 +939,7 @@ fully_established:
 	return true;
 
 reset:
+	*subflow_is_rst = true;
 	mptcp_subflow_reset(ssk);
 	return false;
 }
@@ -1035,12 +1037,14 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 	return hmac == mp_opt->ahmac;
 }
 
-void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
+/* Return 0 if a subflow has been reset, else return 1 */
+int mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_options_received mp_opt;
 	struct mptcp_ext *mpext;
+	bool subflow_is_rst = false;
 
 	if (__mptcp_check_fallback(msk)) {
 		/* Keep it simple and unconditionally trigger send data cleanup and
@@ -1053,12 +1057,12 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 			__mptcp_check_push(subflow->conn, sk);
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
-		return;
+		return 1;
 	}
 
 	mptcp_get_options(sk, skb, &mp_opt);
-	if (!check_fully_established(msk, sk, subflow, skb, &mp_opt))
-		return;
+	if (!check_fully_established(msk, sk, subflow, skb, &mp_opt, &subflow_is_rst))
+		return subflow_is_rst ? 0 : 1;
 
 	if (mp_opt.fastclose &&
 	    msk->local_key == mp_opt.rcvr_key) {
@@ -1100,7 +1104,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (!mp_opt.dss)
-		return;
+		return 1;
 
 	/* we can't wait for recvmsg() to update the ack_seq, otherwise
 	 * monodirectional flows will stuck
@@ -1119,12 +1123,12 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		    schedule_work(&msk->work))
 			sock_hold(subflow->conn);
 
-		return;
+		return 1;
 	}
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
 	if (!mpext)
-		return;
+		return 1;
 
 	memset(mpext, 0, sizeof(*mpext));
 
@@ -1153,6 +1157,8 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		if (mpext->csum_reqd)
 			mpext->csum = mp_opt.csum;
 	}
+
+	return 1;
 }
 
 static void mptcp_set_rwin(const struct tcp_sock *tp)
