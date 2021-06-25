@@ -577,6 +577,13 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 		goto out_unpin;
 	}
 
+	if (IS_DGFX(to_i915(obj->base.dev)) && obj->mm.n_placements == 1 &&
+	    i915_gem_object_placements_contain_type(obj, INTEL_MEMORY_SYSTEM) &&
+	    read_domains != I915_GEM_DOMAIN_CPU) {
+		err = -EINVAL;
+		goto out_unpin;
+	}
+
 	if (read_domains & I915_GEM_DOMAIN_WC)
 		err = i915_gem_object_set_to_wc_domain(obj, write_domain);
 	else if (read_domains & I915_GEM_DOMAIN_GTT)

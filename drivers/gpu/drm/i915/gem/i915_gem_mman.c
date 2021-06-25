@@ -673,6 +673,7 @@ __assign_mmap_offset(struct drm_i915_gem_object *obj,
 		     enum i915_mmap_type mmap_type,
 		     u64 *offset, struct drm_file *file)
 {
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct i915_mmap_offset *mmo;
 
 	if (i915_gem_object_never_mmap(obj))
@@ -695,6 +696,15 @@ __assign_mmap_offset(struct drm_i915_gem_object *obj,
 	 */
 	if (mmap_type != I915_MMAP_TYPE_WC &&
 	    i915_gem_object_placements_contain_type(obj, INTEL_MEMORY_LOCAL))
+		return -ENODEV;
+
+	/*
+	 * For smem only placements on DGFX we need to default to WB. On DG1
+	 * everything is snooped always, so should always be coherent.
+	 */
+	 if (IS_DGFX(i915) &&
+	     mmap_type != I915_MMAP_TYPE_WB && obj->mm.n_placements == 1 &&
+	     i915_gem_object_placements_contain_type(obj, INTEL_MEMORY_SYSTEM))
 		return -ENODEV;
 
 	mmo = mmap_offset_attach(obj, mmap_type, file);
