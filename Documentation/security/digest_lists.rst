@@ -345,3 +345,159 @@ with digest lists:
 
 - ``DIGEST_LIST_ADD``: the digest list is being added;
 - ``DIGEST_LIST_DEL``: the digest list is being deleted.
+
+
+Objects
+-------
+
+This section defines the objects to manage digest lists:
+
+- ``digest_list_item``: represents a digest list;
+- ``digest_list_item_ref``: represents a reference to a digest list,
+  i.e. the location at which a digest within a digest list can be accessed;
+- ``digest_item``: represents a unique digest.
+
+They are represented in the following class diagram:
+
+::
+
+ digest_offset,-----------+
+ hdr_offset               |
+                          |
+ +------------------+     |     +----------------------+
+ | digest_list_item |--- N:1 ---| digest_list_item_ref |
+ +------------------+           +----------------------+
+                                           |
+                                          1:N
+                                           |
+                                    +-------------+
+                                    | digest_item |
+                                    +-------------+
+
+A ``digest_list_item`` is associated to one or multiple
+``digest_list_item_ref``, one for each digest it contains. However,
+a ``digest_list_item_ref`` is associated to only one ``digest_list_item``,
+as it represents a single location within a specific digest list.
+
+Given that a ``digest_list_item_ref`` represents a single location, it is
+associated to only one ``digest_item``. However, a ``digest_item`` can have
+multiple references (as it might appears multiple times within the same
+digest list or in different digest lists, if it is duplicated).
+
+
+A ``digest_list_item`` is defined as:
+
+::
+
+	struct digest_list_item {
+		loff_t size;
+		u8 *buf;
+		u8 actions;
+		u8 digest[64];
+		enum hash_algo algo;
+		const char *label;
+	};
+
+- ``size``: size of the digest list buffer;
+- ``buf``: digest list buffer;
+- ``actions``: actions performed on the digest list;
+- ``digest``: digest of the digest list;
+- ``algo``: digest algorithm;
+- ``label``: label used to identify the digest list (e.g. file name).
+
+A ``digest_list_item_ref`` is defined as:
+
+::
+
+	struct digest_list_item_ref {
+		struct digest_list_item *digest_list;
+		loff_t digest_offset;
+		loff_t hdr_offset;
+	};
+
+- ``digest_list``: pointer to a ``digest_list_item`` structure;
+- ``digest_offset``: offset of the digest related to the digest list
+  buffer;
+- ``hdr_offset``: offset of the header of the digest block containing the
+  digest.
+
+A ``digest_item`` is defined as:
+
+::
+
+	struct digest_item {
+		struct hlist_node hnext;
+		struct digest_list_item_ref *refs;
+	};
+
+- ``hnext``: pointers of the hash table;
+- ``refs``: array of ``digest_list_item_ref`` structures including a
+  terminator (protected by RCU).
+
+All digest list references are stored for a given digest, so that a query
+result can include the OR of the modifiers and actions of each referenced
+digest list.
+
+The relationship between the described objects can be graphically
+represented as:
+
+::
+
+ Hash table            +-------------+         +-------------+
+ PARSER      +-----+   | digest_item |         | digest_item |
+ FILE        | key |-->|             |-->...-->|             |
+ METADATA    +-----+   |ref0|...|refN|         |ref0|...|refN|
+                       +-------------+         +-------------+
+            ref0:         |                               | refN:
+            digest_offset | +-----------------------------+ digest_offset
+            hdr_offset    | |                               hdr_offset
+                          V V
+                     +--------------------+
+                     |  digest_list_item  |
+                     |                    |
+                     | size, buf, actions |
+                     +--------------------+
+                          ^
+                          |
+ Hash table            +-------------+         +-------------+
+ DIGEST_LIST +-----+   |ref0         |         |ref0         |
+             | key |-->|             |-->...-->|             |
+             +-----+   | digest_item |         | digest_item |
+                       +-------------+         +-------------+
+
+The reference for the digest of the digest list differs from the references
+for the other digest types. ``digest_offset`` and ``hdr_offset`` are set to
+zero, so that the digest of the digest list is retrieved from the
+``digest_list_item`` structure directly (see ``get_digest()`` below).
+
+Finally, this section defines useful helpers to access a digest or the
+header the digest belongs to. For example:
+
+::
+
+ static inline struct compact_list_hdr *get_hdr(
+                                      struct digest_list_item *digest_list,
+                                      loff_t hdr_offset)
+ {
+         return (struct compact_list_hdr *)(digest_list->buf + hdr_offset);
+ }
+
+the header can be obtained by summing the address of the digest list buffer
+in the ``digest_list_item`` structure with ``hdr_offset``.
+
+Similarly:
+
+::
+
+ static inline u8 *get_digest(struct digest_list_item *digest_list,
+                              loff_t digest_offset, loff_t hdr_offset)
+ {
+         /* Digest list digest is stored in a different place. */
+         if (!digest_offset)
+                 return digest_list->digest;
+         return digest_list->buf + digest_offset;
+ }
+
+the digest can be obtained by summing the address of the digest list buffer
+with ``digest_offset`` (except for the digest lists, where the digest is
+stored in the ``digest`` field of the ``digest_list_item`` structure).
