@@ -62,10 +62,11 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_object *obj;
 	unsigned long addr;
 
-	/* mmap ioctl is disallowed for all platforms after TGL-LP.  This also
-	 * covers all platforms with local memory.
+	/*
+	 * mmap ioctl is disallowed for all discrete platforms,
+	 * and for all platforms with GRAPHICS_VER > 12.
 	 */
-	if (GRAPHICS_VER(i915) >= 12 && !IS_TIGERLAKE(i915))
+	if (IS_DGFX(i915) || GRAPHICS_VER(i915) > 12)
 		return -EOPNOTSUPP;
 
 	if (args->flags & ~(I915_MMAP_WC))
@@ -684,7 +685,7 @@ __assign_mmap_offset(struct drm_i915_gem_object *obj,
 
 	if (mmap_type != I915_MMAP_TYPE_GTT &&
 	    !i915_gem_object_has_struct_page(obj) &&
-	    !i915_gem_object_type_has(obj, I915_GEM_OBJECT_HAS_IOMEM))
+	    !i915_gem_object_has_iomem(obj))
 		return -ENODEV;
 
 	mmo = mmap_offset_attach(obj, mmap_type, file);
@@ -708,7 +709,12 @@ __assign_mmap_offset_handle(struct drm_file *file,
 	if (!obj)
 		return -ENOENT;
 
+	err = i915_gem_object_lock_interruptible(obj, NULL);
+	if (err)
+		goto out_put;
 	err = __assign_mmap_offset(obj, mmap_type, offset, file);
+	i915_gem_object_unlock(obj);
+out_put:
 	i915_gem_object_put(obj);
 	return err;
 }
@@ -932,10 +938,7 @@ int i915_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 		return PTR_ERR(anon);
 	}
 
-	vma->vm_flags |= VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
-
-	if (i915_gem_object_has_iomem(obj))
-		vma->vm_flags |= VM_IO;
+	vma->vm_flags |= VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP | VM_IO;
 
 	/*
 	 * We keep the ref on mmo->obj, not vm_file, but we require

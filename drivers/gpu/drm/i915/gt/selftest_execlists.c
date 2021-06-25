@@ -43,7 +43,7 @@ static int wait_for_submit(struct intel_engine_cs *engine,
 			   unsigned long timeout)
 {
 	/* Ignore our own attempts to suppress excess tasklets */
-	tasklet_hi_schedule(&engine->execlists.tasklet);
+	tasklet_hi_schedule(&engine->sched_engine->tasklet);
 
 	timeout += jiffies;
 	do {
@@ -273,7 +273,7 @@ static int live_unlite_restore(struct intel_gt *gt, int prio)
 			};
 
 			/* Alternatively preempt the spinner with ce[1] */
-			engine->schedule(rq[1], &attr);
+			engine->sched_engine->schedule(rq[1], &attr);
 		}
 
 		/* And switch back to ce[0] for good measure */
@@ -551,6 +551,32 @@ static int live_pin_rewind(void *arg)
 	return err;
 }
 
+static int engine_lock_reset_tasklet(struct intel_engine_cs *engine)
+{
+	tasklet_disable(&engine->sched_engine->tasklet);
+	local_bh_disable();
+
+	if (test_and_set_bit(I915_RESET_ENGINE + engine->id,
+			     &engine->gt->reset.flags)) {
+		local_bh_enable();
+		tasklet_enable(&engine->sched_engine->tasklet);
+
+		intel_gt_set_wedged(engine->gt);
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+static void engine_unlock_reset_tasklet(struct intel_engine_cs *engine)
+{
+	clear_and_wake_up_bit(I915_RESET_ENGINE + engine->id,
+			      &engine->gt->reset.flags);
+
+	local_bh_enable();
+	tasklet_enable(&engine->sched_engine->tasklet);
+}
+
 static int live_hold_reset(void *arg)
 {
 	struct intel_gt *gt = arg;
@@ -598,17 +624,11 @@ static int live_hold_reset(void *arg)
 
 		/* We have our request executing, now remove it and reset */
 
-		local_bh_disable();
-		if (test_and_set_bit(I915_RESET_ENGINE + id,
-				     &gt->reset.flags)) {
-			local_bh_enable();
-			intel_gt_set_wedged(gt);
-			err = -EBUSY;
+		err = engine_lock_reset_tasklet(engine);
+		if (err)
 			goto out;
-		}
-		tasklet_disable(&engine->execlists.tasklet);
 
-		engine->execlists.tasklet.callback(&engine->execlists.tasklet);
+		engine->sched_engine->tasklet.callback(&engine->sched_engine->tasklet);
 		GEM_BUG_ON(execlists_active(&engine->execlists) != rq);
 
 		i915_request_get(rq);
@@ -618,10 +638,7 @@ static int live_hold_reset(void *arg)
 		__intel_engine_reset_bh(engine, NULL);
 		GEM_BUG_ON(rq->fence.error != -EIO);
 
-		tasklet_enable(&engine->execlists.tasklet);
-		clear_and_wake_up_bit(I915_RESET_ENGINE + id,
-				      &gt->reset.flags);
-		local_bh_enable();
+		engine_unlock_reset_tasklet(engine);
 
 		/* Check that we do not resubmit the held request */
 		if (!i915_request_wait(rq, 0, HZ / 5)) {
@@ -900,7 +917,7 @@ release_queue(struct intel_engine_cs *engine,
 	i915_request_add(rq);
 
 	local_bh_disable();
-	engine->schedule(rq, &attr);
+	engine->sched_engine->schedule(rq, &attr);
 	local_bh_enable(); /* kick tasklet */
 
 	i915_request_put(rq);
@@ -1183,7 +1200,7 @@ static int live_timeslice_rewind(void *arg)
 		while (i915_request_is_active(rq[A2])) { /* semaphore yield! */
 			/* Wait for the timeslice to kick in */
 			del_timer(&engine->execlists.timer);
-			tasklet_hi_schedule(&engine->execlists.tasklet);
+			tasklet_hi_schedule(&engine->sched_engine->tasklet);
 			intel_engine_flush_submission(engine);
 		}
 		/* -> ELSP[] = { { A:rq1 }, { B:rq1 } } */
@@ -1325,7 +1342,7 @@ static int live_timeslice_queue(void *arg)
 			err = PTR_ERR(rq);
 			goto err_heartbeat;
 		}
-		engine->schedule(rq, &attr);
+		engine->sched_engine->schedule(rq, &attr);
 		err = wait_for_submit(engine, rq, HZ / 2);
 		if (err) {
 			pr_err("%s: Timed out trying to submit semaphores\n",
@@ -1867,7 +1884,7 @@ static int live_late_preempt(void *arg)
 		}
 
 		attr.priority = I915_PRIORITY_MAX;
-		engine->schedule(rq, &attr);
+		engine->sched_engine->schedule(rq, &attr);
 
 		if (!igt_wait_for_spinner(&spin_hi, rq)) {
 			pr_err("High priority context failed to preempt the low priority context\n");
@@ -2480,7 +2497,7 @@ static int live_suppress_self_preempt(void *arg)
 			i915_request_add(rq_b);
 
 			GEM_BUG_ON(i915_request_completed(rq_a));
-			engine->schedule(rq_a, &attr);
+			engine->sched_engine->schedule(rq_a, &attr);
 			igt_spinner_end(&a.spin);
 
 			if (!igt_wait_for_spinner(&b.spin, rq_b)) {
@@ -2612,7 +2629,7 @@ static int live_chain_preempt(void *arg)
 
 			i915_request_get(rq);
 			i915_request_add(rq);
-			engine->schedule(rq, &attr);
+			engine->sched_engine->schedule(rq, &attr);
 
 			igt_spinner_end(&hi.spin);
 			if (i915_request_wait(rq, 0, HZ / 5) < 0) {
@@ -2971,7 +2988,7 @@ static int live_preempt_gang(void *arg)
 				break;
 
 			/* Submit each spinner at increasing priority */
-			engine->schedule(rq, &attr);
+			engine->sched_engine->schedule(rq, &attr);
 		} while (prio <= I915_PRIORITY_MAX &&
 			 !__igt_timeout(end_time, NULL));
 		pr_debug("%s: Preempt chain of %d requests\n",
@@ -3219,7 +3236,7 @@ static int preempt_user(struct intel_engine_cs *engine,
 	i915_request_get(rq);
 	i915_request_add(rq);
 
-	engine->schedule(rq, &attr);
+	engine->sched_engine->schedule(rq, &attr);
 
 	if (i915_request_wait(rq, 0, HZ / 2) < 0)
 		err = -ETIME;
@@ -4585,23 +4602,17 @@ static int reset_virtual_engine(struct intel_gt *gt,
 	GEM_BUG_ON(engine == ve->engine);
 
 	/* Take ownership of the reset and tasklet */
-	local_bh_disable();
-	if (test_and_set_bit(I915_RESET_ENGINE + engine->id,
-			     &gt->reset.flags)) {
-		local_bh_enable();
-		intel_gt_set_wedged(gt);
-		err = -EBUSY;
+	err = engine_lock_reset_tasklet(engine);
+	if (err)
 		goto out_heartbeat;
-	}
-	tasklet_disable(&engine->execlists.tasklet);
 
-	engine->execlists.tasklet.callback(&engine->execlists.tasklet);
+	engine->sched_engine->tasklet.callback(&engine->sched_engine->tasklet);
 	GEM_BUG_ON(execlists_active(&engine->execlists) != rq);
 
 	/* Fake a preemption event; failed of course */
-	spin_lock_irq(&engine->active.lock);
+	spin_lock_irq(&engine->sched_engine->lock);
 	__unwind_incomplete_requests(engine);
-	spin_unlock_irq(&engine->active.lock);
+	spin_unlock_irq(&engine->sched_engine->lock);
 	GEM_BUG_ON(rq->engine != engine);
 
 	/* Reset the engine while keeping our active request on hold */
@@ -4612,9 +4623,7 @@ static int reset_virtual_engine(struct intel_gt *gt,
 	GEM_BUG_ON(rq->fence.error != -EIO);
 
 	/* Release our grasp on the engine, letting CS flow again */
-	tasklet_enable(&engine->execlists.tasklet);
-	clear_and_wake_up_bit(I915_RESET_ENGINE + engine->id, &gt->reset.flags);
-	local_bh_enable();
+	engine_unlock_reset_tasklet(engine);
 
 	/* Check that we do not resubmit the held request */
 	i915_request_get(rq);
