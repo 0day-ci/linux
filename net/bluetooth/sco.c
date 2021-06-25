@@ -770,6 +770,7 @@ static void sco_conn_defer_accept(struct hci_conn *conn, u16 setting)
 			cp.retrans_effort = 0x02;
 			break;
 		case SCO_AIRMODE_CVSD:
+		default:
 			cp.max_latency = cpu_to_le16(0xffff);
 			cp.retrans_effort = 0xff;
 			break;
