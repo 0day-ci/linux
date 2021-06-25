@@ -704,3 +704,53 @@ and to obtain all digest lists that include that digest.
 
 ``digests_count`` shows the current number of digests stored in the hash
 table by type.
+
+
+Testing
+=======
+
+This section introduces a number of tests to ensure that Huawei Digest
+Lists works as expected:
+
+- ``digest_list_add_del_test_file_upload``;
+- ``digest_list_add_del_test_file_upload_fault``;
+- ``digest_list_add_del_test_buffer_upload``;
+- ``digest_list_add_del_test_buffer_upload_fault``;
+- ``digest_list_fuzzing_test``.
+
+The tests are in ``tools/testing/selftests/digest_lists/selftest.c``.
+
+The first four tests randomly perform add, delete and query of digest
+lists. They internally keep track at any time of the digest lists that are
+currently uploaded to the kernel.
+
+Also, digest lists are generated randomly by selecting an arbitrary digest
+algorithm and an arbitrary the number of digests. To ensure a good number
+of collisions, digests are a sequence of zeros, except for the first four
+bytes that are set with a random number within a defined range.
+
+When a query operation is selected, a digest is chosen by getting another
+random number within the same range. Then, the tests count how many times
+the digest is found in the internally stored digest lists and in the query
+result obtained from the kernel. The tests are successful if the obtained
+numbers are the same.
+
+The ``file_upload`` variant creates a temporary file from a generated
+digest list and sends its path to the kernel, so that the file is uploaded.
+The ``digest_upload`` variant directly sends the digest list buffer to the
+kernel (it will be done by the user space parser after it converts a digest
+list not in the compact format).
+
+The ``fault`` variant performs the test by enabling the ad-hoc fault
+injection mechanism in the kernel (accessible through
+``<debugfs>/fail_digest_lists``). The fault injection mechanism randomly
+injects errors during the addition and deletion of digest lists. When an
+error occurs, the rollback mechanism performs the reverse operation until
+the point the error occurred, so that the kernel is left in the same state
+as when the requested operation began. Since the kernel returns the error
+to user space, the tests also know that the operation didn't succeed and
+behave accordingly (they also revert the internal state).
+
+Lastly, the fuzzing test simply sends randomly generated digest lists to
+the kernel, to ensure that the parser is robust enough to handle malformed
+data.
