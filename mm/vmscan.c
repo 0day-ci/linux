@@ -542,7 +542,8 @@ static inline bool can_reclaim_anon_pages(struct mem_cgroup *memcg,
 	 * Can it be reclaimed from this node via demotion?
 	 * But it's pointless to do demotion in memcg reclaim.
 	 */
-	if ((!sc || (!sc->no_demotion && !cgroup_reclaim(sc))) &&
+	if (numa_demotion_enabled &&
+	    (!sc || (!sc->no_demotion && !cgroup_reclaim(sc))) &&
 	    next_demotion_node(node_id) != NUMA_NO_NODE)
 		return true;
 
@@ -1275,6 +1276,8 @@ static bool migrate_demote_page_ok(struct page *page,
 	VM_BUG_ON_PAGE(PageHuge(page), page);
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
+	if (!numa_demotion_enabled)
+		return false;
 	if (sc->no_demotion)
 		return false;
 	/* It is pointless to do demotion in memcg reclaim */
@@ -1286,8 +1289,7 @@ static bool migrate_demote_page_ok(struct page *page,
 	if (PageTransHuge(page) && !thp_migration_supported())
 		return false;
 
-	// FIXME: actually enable this later in the series
-	return false;
+	return true;
 }
 
 /* Check if a page is dirty or under writeback */
@@ -2763,7 +2765,8 @@ static bool anon_can_be_aged(struct pglist_data *pgdat,
 		return true;
 
 	/* Also valuable if anon pages can be demoted: */
-	if (!sc->no_demotion && !cgroup_reclaim(sc) &&
+	if (numa_demotion_enabled &&
+	    !sc->no_demotion && !cgroup_reclaim(sc) &&
 	    next_demotion_node(pgdat->node_id) != NUMA_NO_NODE)
 		return true;
 
