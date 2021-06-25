@@ -1197,7 +1197,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 	case KVM_GET_REG_LIST: {
 		struct kvm_reg_list __user *user_list = argp;
 		struct kvm_reg_list reg_list;
-		unsigned n;
+		unsigned int n;
 
 		r = -ENOEXEC;
 		if (unlikely(!kvm_vcpu_initialized(vcpu)))

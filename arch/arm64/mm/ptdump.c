@@ -206,7 +206,7 @@ static struct pg_level pg_level[] = {
 static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
 			size_t num)
 {
-	unsigned i;
+	unsigned int i;
 
 	for (i = 0; i < num; i++, bits++) {
 		const char *s;
@@ -333,7 +333,7 @@ void ptdump_walk(struct seq_file *s, struct ptdump_info *info)
 
 static void __init ptdump_initialize(void)
 {
-	unsigned i, j;
+	unsigned int i, j;
 
 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
 		if (pg_level[i].bits)

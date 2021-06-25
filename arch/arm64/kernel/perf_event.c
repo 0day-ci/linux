@@ -39,7 +39,7 @@
  * be supported on any given implementation. Unsupported events will
  * be disabled at run-time based on the PMCEID registers.
  */
-static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+static const unsigned int armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
 	PERF_MAP_ALL_UNSUPPORTED,
 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CPU_CYCLES,
 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INST_RETIRED,
@@ -52,7 +52,7 @@ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
 };
 
-static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 						[PERF_COUNT_HW_CACHE_OP_MAX]
 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -76,7 +76,7 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
 };
 
-static const unsigned armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 					      [PERF_COUNT_HW_CACHE_OP_MAX]
 					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -87,7 +87,7 @@ static const unsigned armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
 };
 
-static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 					      [PERF_COUNT_HW_CACHE_OP_MAX]
 					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -104,7 +104,7 @@ static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
 };
 
-static const unsigned armv8_a73_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_a73_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 					      [PERF_COUNT_HW_CACHE_OP_MAX]
 					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -113,7 +113,7 @@ static const unsigned armv8_a73_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR,
 };
 
-static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 						   [PERF_COUNT_HW_CACHE_OP_MAX]
 						   [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -134,7 +134,7 @@ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_WR,
 };
 
-static const unsigned armv8_vulcan_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+static const unsigned int armv8_vulcan_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 					      [PERF_COUNT_HW_CACHE_OP_MAX]
 					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
@@ -979,9 +979,9 @@ static void armv8pmu_reset(void *info)
 }
 
 static int __armv8_pmuv3_map_event(struct perf_event *event,
-				   const unsigned (*extra_event_map)
+				   const unsigned int (*extra_event_map)
 						  [PERF_COUNT_HW_MAX],
-				   const unsigned (*extra_cache_map)
+				   const unsigned int (*extra_cache_map)
 						  [PERF_COUNT_HW_CACHE_MAX]
 						  [PERF_COUNT_HW_CACHE_OP_MAX]
 						  [PERF_COUNT_HW_CACHE_RESULT_MAX])

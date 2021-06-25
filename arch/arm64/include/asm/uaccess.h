@@ -465,7 +465,7 @@ struct page;
 void memcpy_page_flushcache(char *to, struct page *page, size_t offset, size_t len);
 extern unsigned long __must_check __copy_user_flushcache(void *to, const void __user *from, unsigned long n);
 
-static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned size)
+static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned int size)
 {
 	kasan_check_write(dst, size);
 	return __copy_user_flushcache(dst, __uaccess_mask_ptr(src), size);

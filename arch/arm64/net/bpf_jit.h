@@ -123,7 +123,7 @@
 /* Rd = Rn << shift */
 #define A64_LSL(sf, Rd, Rn, shift) ({	\
 	int sz = (sf) ? 64 : 32;	\
-	A64_UBFM(sf, Rd, Rn, (unsigned)-(shift) % sz, sz - 1 - (shift)); \
+	A64_UBFM(sf, Rd, Rn, (unsigned int)-(shift) % sz, sz - 1 - (shift)); \
 })
 /* Rd = Rn >> shift */
 #define A64_LSR(sf, Rd, Rn, shift) A64_UBFM(sf, Rd, Rn, shift, (sf) ? 63 : 31)
