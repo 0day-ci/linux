@@ -832,6 +832,20 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 extern void kvfree(const void *addr);
 extern void kvfree_sensitive(const void *addr, size_t len);
 
+static inline void *kvrealloc(void *p, size_t oldsize, size_t newsize,
+		gfp_t flags)
+{
+	void *newp;
+
+	if (oldsize >= newsize)
+		return p;
+	newp = kvmalloc(newsize, flags);
+	memcpy(newp, p, oldsize);
+	kvfree(p);
+	return newp;
+}
+
+
 static inline int head_compound_mapcount(struct page *head)
 {
 	return atomic_read(compound_mapcount_ptr(head)) + 1;
