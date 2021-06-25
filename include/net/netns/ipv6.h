@@ -53,6 +53,7 @@ struct netns_sysctl_ipv6 {
 	int seg6_flowlabel;
 	bool skip_notify_on_dev_down;
 	u8 fib_notify_on_flag_change;
+	u32 ip6_rt_defrtr_table;
 };
 
 struct netns_ipv6 {

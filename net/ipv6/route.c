@@ -4336,7 +4336,7 @@ struct fib6_info *rt6_get_dflt_router(struct net *net,
 				     const struct in6_addr *addr,
 				     struct net_device *dev)
 {
-	u32 tb_id = l3mdev_fib_table(dev) ? : RT6_TABLE_DFLT;
+	u32 tb_id = l3mdev_fib_table(dev) ? : net->ipv6.sysctl.ip6_rt_defrtr_table;
 	struct fib6_info *rt;
 	struct fib6_table *table;
 
@@ -4371,7 +4371,7 @@ struct fib6_info *rt6_add_dflt_router(struct net *net,
 				     u32 defrtr_usr_metric)
 {
 	struct fib6_config cfg = {
-		.fc_table	= l3mdev_fib_table(dev) ? : RT6_TABLE_DFLT,
+		.fc_table	= l3mdev_fib_table(dev) ? : net->ipv6.sysctl.ip6_rt_defrtr_table,
 		.fc_metric	= defrtr_usr_metric,
 		.fc_ifindex	= dev->ifindex,
 		.fc_flags	= RTF_GATEWAY | RTF_ADDRCONF | RTF_DEFAULT |
@@ -6391,6 +6391,13 @@ static struct ctl_table ipv6_route_table_template[] = {
 		.extra1		=	SYSCTL_ZERO,
 		.extra2		=	SYSCTL_ONE,
 	},
+	{
+		.procname	=	"defrtr_table",
+		.data		=	&init_net.ipv6.sysctl.ip6_rt_defrtr_table,
+		.maxlen		=	sizeof(u32),
+		.mode		=	0644,
+		.proc_handler	=	proc_dointvec,
+	},
 	{ }
 };
 
@@ -6415,6 +6422,7 @@ struct ctl_table * __net_init ipv6_route_sysctl_init(struct net *net)
 		table[8].data = &net->ipv6.sysctl.ip6_rt_min_advmss;
 		table[9].data = &net->ipv6.sysctl.ip6_rt_gc_min_interval;
 		table[10].data = &net->ipv6.sysctl.skip_notify_on_dev_down;
+		table[11].data = &net->ipv6.sysctl.ip6_rt_defrtr_table;
 
 		/* Don't export sysctls to unprivileged users */
 		if (net->user_ns != &init_user_ns)
@@ -6486,6 +6494,7 @@ static int __net_init ip6_route_net_init(struct net *net)
 	net->ipv6.sysctl.ip6_rt_mtu_expires = 10*60*HZ;
 	net->ipv6.sysctl.ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 	net->ipv6.sysctl.skip_notify_on_dev_down = 0;
+	net->ipv6.sysctl.ip6_rt_defrtr_table = RT6_TABLE_DFLT;
 
 	net->ipv6.ip6_rt_gc_expire = 30*HZ;
 
