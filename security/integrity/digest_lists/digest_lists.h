@@ -64,6 +64,8 @@ static inline unsigned int hash_key(u8 *digest)
 	return (digest[0] | digest[1] << 8) % MEASURE_HTABLE_SIZE;
 }
 
+extern struct h_table htable[COMPACT__LAST];
+
 static inline struct compact_list_hdr *get_hdr(
 					struct digest_list_item *digest_list,
 					loff_t hdr_offset)
@@ -114,4 +116,36 @@ static inline u8 *get_digest_ref(struct digest_list_item_ref *ref)
 
 	return ref->digest_list->buf + ref->digest_offset;
 }
+
+static inline bool digest_list_ref_invalidated(struct digest_list_item_ref *ref)
+{
+	return (ref->digest_list == ZERO_SIZE_PTR);
+}
+
+static inline void digest_list_ref_invalidate(struct digest_list_item_ref *ref)
+{
+	ref->digest_list = ZERO_SIZE_PTR;
+}
+
+static inline bool digest_list_ref_is_last(struct digest_list_item_ref *ref)
+{
+	return (ref->digest_list == NULL);
+}
+
+struct digest_item *digest_lookup(u8 *digest, enum hash_algo algo,
+				  enum compact_types type, u16 *modifiers,
+				  u8 *actions);
+struct digest_item *digest_add(u8 *digest, enum hash_algo algo,
+			       enum compact_types type,
+			       struct digest_list_item *digest_list,
+			       loff_t digest_offset, loff_t hdr_offset);
+struct digest_item *digest_del(u8 *digest, enum hash_algo algo,
+			       enum compact_types type,
+			       struct digest_list_item *digest_list,
+			       loff_t digest_offset, loff_t hdr_offset);
+struct digest_item *digest_list_add(u8 *digest, enum hash_algo algo,
+				    loff_t size, u8 *buf, u8 actions,
+				    const char *label);
+struct digest_item *digest_list_del(u8 *digest, enum hash_algo algo, u8 actions,
+				    struct digest_list_item *digest_list);
 #endif /*__DIGEST_LISTS_INTERNAL_H*/

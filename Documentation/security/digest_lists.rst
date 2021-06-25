@@ -501,3 +501,113 @@ Similarly:
 the digest can be obtained by summing the address of the digest list buffer
 with ``digest_offset`` (except for the digest lists, where the digest is
 stored in the ``digest`` field of the ``digest_list_item`` structure).
+
+
+Methods
+-------
+
+This section introduces the methods requires to manage the three objects
+defined.
+
+
+``digest_item`` Methods
+~~~~~~~~~~~~~~~~~~~~~~~
+
+
+``digest_add()``
+................
+
+``digest_add()`` first checks in the hash table for the passed type if a
+``digest_item`` for the same digest already exists. If not, it creates a
+new one. Then, ``digest_add()`` calls ``digest_list_ref_add()`` to add a
+new reference of the digest list being added to the found or new
+``digest_item``.
+
+
+``digest_del()``
+................
+
+``digest_del()`` also searches the ``digest_item`` in the hash table. It
+should be always found, as digest lists can be deleted only if they were
+added before. Then, ``digest_del()`` calls ``digest_list_ref_del()`` to
+delete a reference of the digest list being deleted from the found
+``digest_item``.
+
+
+``digest_lookup()``
+...................
+
+``digest_lookup()`` searches the passed digest in the hash table. Then, it
+returns immediately a ``digest_item`` (or NULL if the digest is not found)
+if the modifiers and actions information are not requested by the caller,
+or iterates over all the valid references of the digest and calculates the
+OR for both of them. Iteration in the array of references ends when the
+digest list pointer in a reference is set to NULL. Access to the ``refs``
+array is protected by RCU to avoid access to digest lists being added or
+deleted (update is serialized by the securityfs interfaces).
+
+``digest_lookup()`` is not exposed to the rest of the kernel, because
+access to the returned ``digest_item`` outside RCU would be illegal.
+
+
+``digest_get_info()``
+.....................
+
+``digest_get_info()`` is the public version of ``digest_lookup()``, which
+does not return a ``digest_item`` but just the resulting modifiers and
+actions from the OR of the modifiers and actions from the referenced
+digest lists.
+
+
+``digest_list_item_ref`` Methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+``digest_list_ref_add()``
+.........................
+
+``digest_list_ref_add()`` adds a new reference at the end of the ``refs``
+array (also keeps a terminator as the last element). It does not search for
+duplicates, as a duplicate reference simply means that the digest appears
+multiple times in the digest list. ``digest_list_ref_add()`` does not add
+the new element in place, but first creates a copy of the current ``refs``
+array and uses RCU to replace it with the new one.
+
+
+``digest_list_ref_del()``
+.........................
+
+``digest_list_ref_del()`` first searches in the ``refs`` array a reference
+to a given digest list. Then, it invalidates the found reference so that it
+is skipped by the reader. Afterwards, it tries to allocate a smaller
+``refs`` array (with enough slots to store the valid references, except the
+one being deleted). If memory allocation succeeds,
+``digest_list_ref_del()`` copies the valid references to the copy of
+``refs`` and uses RCU to replace the original ``refs``. Otherwise, it keeps
+the original ``refs`` with the invalidated reference.
+
+
+``digest_list_item`` Methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+``digest_list_add()``
+.....................
+
+``digest_list_add()`` first searches the digest of the digest list in the
+hash table for the ``COMPACT_DIGEST_LIST`` type. Addition can be done if
+the digest list is not found (it is pointless to load the same digest list
+again). ``digest_list_add()`` then creates a new ``digest_item``,
+representing the digest of the digest list, a special
+``digest_list_item_ref`` with ``digest_offset`` and ``hdr_offset`` set to
+zero, and a new ``digest_list_item``.
+
+
+``digest_list_del()``
+.....................
+
+``digest_list_del()`` also searches the digest of the digest list in the
+hash table for the ``COMPACT_DIGEST_LIST`` type. Deletion can be done only
+if the digest list is found. ``digest_list_del()`` then deletes the
+``digest_list_item``, the special ``digest_list_item_ref`` and the
+``digest_item``.

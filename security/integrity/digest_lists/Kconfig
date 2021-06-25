@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Huawei Digest Lists
+#
+config DIGEST_LISTS
+	bool "Digest Lists"
+	select SECURITYFS
+	select CRYPTO
+	select CRYPTO_HASH_INFO
+	help
+	  Huawei Digest Lists provides reference values for file content and
+	  metadata, that can be used for measurement and appraisal with IMA.
