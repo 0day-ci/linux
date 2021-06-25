@@ -8372,6 +8372,13 @@ W:	http://www.st.com/
 F:	Documentation/devicetree/bindings/iio/humidity/st,hts221.yaml
 F:	drivers/iio/humidity/hts221*
 
+HUAWEI DIGEST LISTS
+M:	Roberto Sassu <roberto.sassu@huawei.com>
+L:	linux-integrity@vger.kernel.org
+S:	Supported
+T:	git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
+F:	Documentation/security/digest_lists.rst
+
 HUAWEI ETHERNET DRIVER
 M:	Bin Luo <luobin9@huawei.com>
 L:	netdev@vger.kernel.org
