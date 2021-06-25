@@ -92,11 +92,22 @@ config IWLWIFI_BCAST_FILTERING
 	  If unsure, don't enable this option, as some programs might
 	  expect incoming broadcasts for their normal operations.
 
+config IWLMVM_VENDOR_CMDS
+	bool "Enable vendor commands"
+	depends on IWLMVM
+	help
+	  This option enables support for vendor commands, including some
+	  that don't have their own Kconfig option. Other Kconfig options
+	  depend on this one as well.
+
+	  This is not enabled by default, if unsure, say N.
+
 config IWLMEI
 	tristate "Intel Management Engine communication over WLAN"
 	depends on INTEL_MEI
 	depends on PM
 	depends on IWLMVM
+	select IWLMVM_VENDOR_CMDS
 	help
 	  Enables the iwlmei kernel module. This allows to communicate with
 	  the Intel Management Engine over Wifi. This is supported starting
