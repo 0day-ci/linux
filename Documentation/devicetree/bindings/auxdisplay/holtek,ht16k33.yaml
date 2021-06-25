@@ -14,14 +14,23 @@ allOf:
 
 properties:
   compatible:
-    const: holtek,ht16k33
+    oneOf:
+      - items:
+          - const: adafruit,3108  # 0.56" 4-Digit 7-Segment FeatherWing Display (Red)
+          - const: holtek,ht16k33
+
+      - items:
+          - const: adafruit,3130  # 0.54" Quad Alphanumeric FeatherWing Display (Red)
+          - const: holtek,ht16k33
+
+      - const: holtek,ht16k33     # Generic 16*8 LED controller with dot-matrix display
 
   reg:
     maxItems: 1
 
   refresh-rate-hz:
     maxItems: 1
-    description: Display update interval in Hertz
+    description: Display update interval in Hertz for dot-matrix displays
 
   interrupts:
     maxItems: 1
@@ -41,10 +50,26 @@ properties:
     default: 16
     description: Initial brightness level
 
+  color:
+    description:
+      Color of the display.  Use one of the LED_COLOR_ID_* prefixed definitions
+      from the header include/dt-bindings/leds/common.h.  The default is red.
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 0
+    maximum: 9
+    default: 1
+
 required:
   - compatible
   - reg
-  - refresh-rate-hz
+
+if:
+  properties:
+    compatible:
+      const: holtek,ht16k33
+then:
+  required:
+    - refresh-rate-hz
 
 additionalProperties: false
 
