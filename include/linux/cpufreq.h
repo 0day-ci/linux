@@ -975,21 +975,40 @@ static inline int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 						 unsigned int target_freq,
 						 unsigned int relation)
 {
+	int idx = 0;
 	if (unlikely(policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED))
 		return cpufreq_table_index_unsorted(policy, target_freq,
 						    relation);
 
 	switch (relation) {
 	case CPUFREQ_RELATION_L:
-		return cpufreq_table_find_index_l(policy, target_freq);
+		idx = cpufreq_table_find_index_l(policy, target_freq);
+		break;
 	case CPUFREQ_RELATION_H:
-		return cpufreq_table_find_index_h(policy, target_freq);
+		idx = cpufreq_table_find_index_h(policy, target_freq);
+		break;
 	case CPUFREQ_RELATION_C:
-		return cpufreq_table_find_index_c(policy, target_freq);
+		idx = cpufreq_table_find_index_c(policy, target_freq);
+		break;
 	default:
 		WARN_ON_ONCE(1);
 		return 0;
 	}
+
+	/* target index verification */
+	if (policy->freq_table[idx].frequency > policy->max) {
+		if (policy->freq_table_sorted == CPUFREQ_TABLE_SORTED_ASCENDING)
+			idx--;
+		else
+			idx++;
+	} else if (policy->freq_table[idx].frequency < policy->min) {
+		if (policy->freq_table_sorted == CPUFREQ_TABLE_SORTED_ASCENDING)
+			idx++;
+		else
+			idx--;
+	}
+
+	return idx;
 }
 
 static inline int cpufreq_table_count_valid_entries(const struct cpufreq_policy *policy)
