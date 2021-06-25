@@ -910,7 +910,9 @@ int handle_rt_signal64(struct ksignal *ksig, sigset_t *set,
 	tsk->thread.fp_state.fpscr = 0;
 
 	/* Set up to return from userspace. */
-	if (tsk->mm->context.vdso) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+		regs_set_return_ip(regs, (unsigned long)ksig->ka.sa.sa_restorer);
+	} else if (tsk->mm->context.vdso) {
 		regs_set_return_ip(regs, VDSO64_SYMBOL(tsk->mm->context.vdso, sigtramp_rt64));
 	} else {
 		err |= setup_trampoline(__NR_rt_sigreturn, &frame->tramp[0]);

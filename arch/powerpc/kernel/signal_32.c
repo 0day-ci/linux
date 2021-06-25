@@ -769,7 +769,9 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 	}
 
 	/* Save user registers on the stack */
-	if (tsk->mm->context.vdso) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+		tramp = (unsigned long)ksig->ka.sa.sa_restorer;
+	} else if (tsk->mm->context.vdso) {
 		tramp = VDSO32_SYMBOL(tsk->mm->context.vdso, sigtramp_rt32);
 	} else {
 		tramp = (unsigned long)mctx->mc_pad;
@@ -865,7 +867,9 @@ int handle_signal32(struct ksignal *ksig, sigset_t *oldset,
 	else
 		unsafe_save_user_regs(regs, mctx, tm_mctx, 1, failed);
 
-	if (tsk->mm->context.vdso) {
+	if (ksig->ka.sa.sa_flags & SA_RESTORER) {
+		tramp = (unsigned long)ksig->ka.sa.sa_restorer;
+	} else if (tsk->mm->context.vdso) {
 		tramp = VDSO32_SYMBOL(tsk->mm->context.vdso, sigtramp32);
 	} else {
 		tramp = (unsigned long)mctx->mc_pad;
