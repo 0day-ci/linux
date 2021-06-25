@@ -12,6 +12,7 @@
 #include <drm/drm_device.h>
 
 #include "display/intel_frontbuffer.h"
+#include "intel_memory_region.h"
 #include "i915_gem_object_types.h"
 #include "i915_gem_gtt.h"
 #include "i915_gem_ww.h"
@@ -596,6 +597,9 @@ bool i915_gem_object_evictable(struct drm_i915_gem_object *obj);
 bool i915_gem_object_migratable(struct drm_i915_gem_object *obj);
 
 bool i915_gem_object_validates_to_lmem(struct drm_i915_gem_object *obj);
+
+bool i915_gem_object_placements_contain_type(struct drm_i915_gem_object *obj,
+					     enum intel_memory_type type);
 
 #ifdef CONFIG_MMU_NOTIFIER
 static inline bool

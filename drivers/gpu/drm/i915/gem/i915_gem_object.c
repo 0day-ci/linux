@@ -513,6 +513,27 @@ bool i915_gem_object_has_iomem(const struct drm_i915_gem_object *obj)
 	return obj->mem_flags & I915_BO_FLAG_IOMEM;
 }
 
+/**
+ * i915_gem_object_placements_contain_type - Check whether the object can be
+ * placed at certain memory type
+ * @obj: Pointer to the object
+ * @type: The memory type to check
+ *
+ * Return: True if the object can be placed in @type. False otherwise.
+ */
+bool i915_gem_object_placements_contain_type(struct drm_i915_gem_object *obj,
+					     enum intel_memory_type type)
+{
+	unsigned int i;
+
+	for (i = 0; i < obj->mm.n_placements; i++) {
+		if (obj->mm.placements[i]->type == type)
+			return true;
+	}
+
+	return false;
+}
+
 void i915_gem_init__objects(struct drm_i915_private *i915)
 {
 	INIT_WORK(&i915->mm.free_work, __i915_gem_free_work);

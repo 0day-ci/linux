@@ -688,6 +688,15 @@ __assign_mmap_offset(struct drm_i915_gem_object *obj,
 	    !i915_gem_object_has_iomem(obj))
 		return -ENODEV;
 
+	/*
+	 * Note that even if the object can also be placed in smem then we still
+	 * map as WC here, since we can only support a single mode. On DG1 this
+	 * sucks since we can't turn off snooping for this case.
+	 */
+	if (mmap_type != I915_MMAP_TYPE_WC &&
+	    i915_gem_object_placements_contain_type(obj, INTEL_MEMORY_LOCAL))
+		return -ENODEV;
+
 	mmo = mmap_offset_attach(obj, mmap_type, file);
 	if (IS_ERR(mmo))
 		return PTR_ERR(mmo);
