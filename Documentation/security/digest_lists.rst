@@ -690,3 +690,10 @@ removed.
 
 ``digest_label`` can be used to set a label to be applied to the next
 digest list (buffer) loaded ``through digest_list_add``.
+
+
+``digest_query``
+~~~~~~~~~~~~~~~~
+
+``digest_query``: allows to write a query in the format ``<algo>-<digest>``
+and to obtain all digest lists that include that digest.
