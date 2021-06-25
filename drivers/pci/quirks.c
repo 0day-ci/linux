@@ -264,7 +264,13 @@ static void loongson_mrrs_quirk(struct pci_dev *dev)
 		 * anything larger than this. So force this limit on
 		 * any devices attached under these ports.
 		 */
-		if (pci_match_id(bridge_devids, bridge)) {
+		if (bridge && pci_match_id(bridge_devids, bridge)) {
+			dev->dev_flags |= PCI_DEV_FLAGS_NO_INCREASE_MRRS;
+
+			if (pcie_bus_config == PCIE_BUS_DEFAULT ||
+			    pcie_bus_config == PCIE_BUS_TUNE_OFF)
+				break;
+
 			if (pcie_get_readrq(dev) > 256) {
 				pci_info(dev, "limiting MRRS to 256\n");
 				pcie_set_readrq(dev, 256);
