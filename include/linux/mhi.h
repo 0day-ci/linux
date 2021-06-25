@@ -190,6 +190,16 @@ enum mhi_er_data_type {
 };
 
 /**
+ * enum mhi_er_priority - Event ring processing priority
+ * @MHI_ER_PRIORITY_DEFAULT: processed by regular tasklet
+ * @MHI_ER_PRIORITY_HI: processed by high priority tasklet
+ */
+enum mhi_er_priority {
+	MHI_ER_PRIORITY_DEFAULT,
+	MHI_ER_PRIORITY_HI,
+};
+
+/**
  * enum mhi_db_brst_mode - Doorbell mode
  * @MHI_DB_BRST_DISABLE: Burst mode disable
  * @MHI_DB_BRST_ENABLE: Burst mode enable
@@ -242,7 +252,7 @@ struct mhi_channel_config {
  * @irq_moderation_ms: Delay irq for additional events to be aggregated
  * @irq: IRQ associated with this ring
  * @channel: Dedicated channel number. U32_MAX indicates a non-dedicated ring
- * @priority: Priority of this ring. Use 1 for now
+ * @priority: Processing priority of this ring.
  * @mode: Doorbell mode
  * @data_type: Type of data this ring will process
  * @hardware_event: This ring is associated with hardware channels
@@ -254,7 +264,7 @@ struct mhi_event_config {
 	u32 irq_moderation_ms;
 	u32 irq;
 	u32 channel;
-	u32 priority;
+	enum mhi_er_priority priority;
 	enum mhi_db_brst_mode mode;
 	enum mhi_er_data_type data_type;
 	bool hardware_event;

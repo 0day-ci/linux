@@ -535,7 +535,7 @@ struct mhi_event {
 	u32 intmod;
 	u32 irq;
 	int chan; /* this event ring is dedicated to a channel (optional) */
-	u32 priority;
+	enum mhi_er_priority priority;
 	enum mhi_er_data_type data_type;
 	struct mhi_ring ring;
 	struct db_cfg db_cfg;
