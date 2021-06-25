@@ -101,7 +101,7 @@ void em_dev_unregister_perf_domain(struct device *dev);
  * Return: the sum of the energy consumed by the CPUs of the domain assuming
  * a capacity state satisfying the max utilization of the domain.
  */
-static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
+static inline u64 em_cpu_energy(struct em_perf_domain *pd,
 				unsigned long max_util, unsigned long sum_util,
 				unsigned long allowed_cpu_cap)
 {
@@ -180,7 +180,7 @@ static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
 	 *   pd_nrg = ------------------------                       (4)
 	 *                  scale_cpu
 	 */
-	return ps->cost * sum_util / scale_cpu;
+	return div_u64((u64)ps->cost * sum_util, scale_cpu);
 }
 
 /**
@@ -217,7 +217,7 @@ static inline struct em_perf_domain *em_pd_get(struct device *dev)
 {
 	return NULL;
 }
-static inline unsigned long em_cpu_energy(struct em_perf_domain *pd,
+static inline u64 em_cpu_energy(struct em_perf_domain *pd,
 			unsigned long max_util, unsigned long sum_util,
 			unsigned long allowed_cpu_cap)
 {
