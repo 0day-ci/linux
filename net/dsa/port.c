@@ -212,7 +212,22 @@ static int dsa_port_switchdev_sync(struct dsa_port *dp,
 	return 0;
 }
 
-static void dsa_port_switchdev_unsync(struct dsa_port *dp)
+static void dsa_port_switchdev_unsync_objs(struct dsa_port *dp)
+{
+	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
+	struct net_device *br = dp->bridge_dev;
+
+	/* Delete the switchdev objects left on this port */
+	br_mdb_replay(br, brport_dev, dp, false,
+		      &dsa_slave_switchdev_blocking_notifier, NULL);
+
+	br_fdb_replay(br, brport_dev, dp, false, &dsa_slave_switchdev_notifier);
+
+	br_vlan_replay(br, brport_dev, dp, false,
+		       &dsa_slave_switchdev_blocking_notifier, NULL);
+}
+
+static void dsa_port_switchdev_unsync_attrs(struct dsa_port *dp)
 {
 	/* Configure the port for standalone mode (no address learning,
 	 * flood everything).
@@ -288,6 +303,8 @@ void dsa_port_bridge_leave(struct dsa_port *dp, struct net_device *br)
 	};
 	int err;
 
+	dsa_port_switchdev_unsync_objs(dp);
+
 	/* Here the port is already unbridged. Reflect the current configuration
 	 * so that drivers can program their chips accordingly.
 	 */
@@ -297,7 +314,7 @@ void dsa_port_bridge_leave(struct dsa_port *dp, struct net_device *br)
 	if (err)
 		pr_err("DSA: failed to notify DSA_NOTIFIER_BRIDGE_LEAVE\n");
 
-	dsa_port_switchdev_unsync(dp);
+	dsa_port_switchdev_unsync_attrs(dp);
 }
 
 int dsa_port_lag_change(struct dsa_port *dp,
