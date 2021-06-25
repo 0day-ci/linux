@@ -16,7 +16,10 @@
  * @power:	The power consumed at this level (by 1 CPU or by a registered
  *		device). It can be a total power: static and dynamic.
  * @cost:	The cost coefficient associated with this level, used during
- *		energy calculation. Equal to: power * max_frequency / frequency
+ *		energy calculation. Equal to:
+		power * 10000 * max_frequency / frequency
+ *		To increase the energy estimation presision use different
+ *		scale in this coefficient than in @power field.
  */
 struct em_perf_state {
 	unsigned long frequency;
