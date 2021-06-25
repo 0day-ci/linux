@@ -685,12 +685,6 @@
 	};
 };
 
-&i2c3 {
-	i2c-scl-falling-time-ns = <15>;
-	i2c-scl-rising-time-ns = <450>;
-	status = "okay";
-};
-
 &i2c4 {
 	i2c-scl-falling-time-ns = <20>;
 	i2c-scl-rising-time-ns = <600>;
