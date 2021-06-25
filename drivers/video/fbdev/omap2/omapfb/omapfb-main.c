@@ -2025,21 +2025,19 @@ static int omapfb_mode_to_timings(const char *mode_str,
 	fbops = NULL;
 
 	fbi = kzalloc(sizeof(*fbi), GFP_KERNEL);
-	if (fbi == NULL) {
-		r = -ENOMEM;
-		goto err;
-	}
+	if (fbi == NULL)
+		return -ENOMEM;
 
 	var = kzalloc(sizeof(*var), GFP_KERNEL);
 	if (var == NULL) {
 		r = -ENOMEM;
-		goto err;
+		goto err_var;
 	}
 
 	fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
 	if (fbops == NULL) {
 		r = -ENOMEM;
-		goto err;
+		goto err_fbops;
 	}
 
 	fbi->fbops = fbops;
@@ -2047,7 +2045,7 @@ static int omapfb_mode_to_timings(const char *mode_str,
 	r = fb_find_mode(var, fbi, mode_str, NULL, 0, NULL, 24);
 	if (r == 0) {
 		r = -EINVAL;
-		goto err;
+		goto err_find;
 	}
 
 	if (display->driver->get_timings) {
@@ -2088,11 +2086,12 @@ static int omapfb_mode_to_timings(const char *mode_str,
 
 	r = 0;
 
-err:
-	kfree(fbi);
-	kfree(var);
+err_find:
 	kfree(fbops);
-
+err_fbops:
+	kfree(var);
+err_var:
+	kfree(fbi);
 	return r;
 }
 
