@@ -644,3 +644,31 @@ to roll back when one of the steps fails.
 
 #. ``digest_list_parse()`` deletes the ``digest_list_item`` on unsuccessful
    add or successful delete.
+
+
+Interfaces
+----------
+
+This section introduces the interfaces in
+``<securityfs>/integrity/digest_lists`` necessary to interact with Huawei
+Digest Lists.
+
+
+``digest_list_add``
+~~~~~~~~~~~~~~~~~~~
+
+``digest_list_add`` can be used to upload a digest list and add the digests
+to the hash table; passed data are interpreted as file path if the first
+byte is ``/`` or as the digest list itself otherwise.
+
+``ima_measure_critical_data()`` is called to calculate the digest of the
+digest list and eventually, if an appropriate rule is set in the IMA
+policy, to measure it.
+
+
+``digest_list_del``
+~~~~~~~~~~~~~~~~~~~
+
+``digest_list_del`` can be used to upload a digest list and delete the
+digests from the hash table; data are interpreted in the same way as
+described for ``digest_list_add``.

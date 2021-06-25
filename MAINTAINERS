@@ -8380,6 +8380,7 @@ T:	git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
 F:	Documentation/security/digest_lists.rst
 F:	include/linux/digest_list.h
 F:	security/integrity/digest_lists/digest_list.h
+F:	security/integrity/digest_lists/fs.c
 F:	security/integrity/digest_lists/methods.c
 F:	security/integrity/digest_lists/parser.c
 F:	uapi/linux/digest_lists.h

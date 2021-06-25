@@ -6,6 +6,9 @@
  * Mimi Zohar <zohar@us.ibm.com>
  */
 
+#ifndef __INTEGRITY_H
+#define __INTEGRITY_H
+
 #ifdef pr_fmt
 #undef pr_fmt
 #endif
@@ -283,3 +286,4 @@ static inline void __init add_to_platform_keyring(const char *source,
 {
 }
 #endif
+#endif /*__INTEGRITY_H*/

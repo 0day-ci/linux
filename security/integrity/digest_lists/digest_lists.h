@@ -28,7 +28,8 @@
 #include <linux/hash_info.h>
 #include <uapi/linux/digest_lists.h>
 
-#define MAX_DIGEST_SIZE	64
+#include "../integrity.h"
+
 #define HASH_BITS 10
 #define MEASURE_HTABLE_SIZE (1 << HASH_BITS)
 
