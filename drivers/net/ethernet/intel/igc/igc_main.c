@@ -5432,6 +5432,11 @@ static int igc_save_launchtime_params(struct igc_adapter *adapter, int queue,
 	if (queue < 0 || queue >= adapter->num_tx_queues)
 		return -EINVAL;
 
+	if (ring->preemptible) {
+		netdev_err(adapter->netdev, "Cannot enable LaunchTime on a preemptible queue\n");
+		return -EINVAL;
+	}
+
 	ring = adapter->tx_ring[queue];
 	ring->launchtime_enable = enable;
 
@@ -5573,8 +5578,14 @@ static int igc_save_frame_preemption(struct igc_adapter *adapter,
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		struct igc_ring *ring = adapter->tx_ring[i];
+		bool preemptible = preempt & BIT(i);
 
-		ring->preemptible = preempt & BIT(i);
+		if (ring->launchtime_enable && preemptible) {
+			netdev_err(adapter->netdev, "Cannot set queue as preemptible if LaunchTime is enabled\n");
+			return -EINVAL;
+		}
+
+		ring->preemptible = preemptible;
 	}
 
 	return 0;
