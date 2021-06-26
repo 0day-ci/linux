@@ -278,11 +278,18 @@ struct i801_priv {
 #endif
 	struct platform_device *tco_pdev;
 
+	/* BIOS left the controller marked busy. */
+	bool inuse_stuck;
 	/*
-	 * If set to true the host controller registers are reserved for
-	 * ACPI AML use. Protected by acpi_lock.
+	 * If set to true, ACPI AML uses the host controller registers.
+	 * Protected by acpi_lock.
 	 */
-	bool acpi_reserved;
+	bool acpi_usage;
+	/*
+	 * If set to true, ACPI AML uses the host controller registers in an
+	 * unsafe way. Protected by acpi_lock.
+	 */
+	bool acpi_unsafe;
 	struct mutex acpi_lock;
 };
 
@@ -824,10 +831,37 @@ static s32 i801_access(struct i2c_adapter *adap, u16 addr,
 	int hwpec;
 	int block = 0;
 	int ret = 0, xact = 0;
+	int timeout = 0;
 	struct i801_priv *priv = i2c_get_adapdata(adap);
 
+	/*
+	 * The controller provides a bit that implements a mutex mechanism
+	 * between users of the bus. First, try to lock the hardware mutex.
+	 * If this doesn't work, we give up trying to do this, but then
+	 * bail if ACPI uses SMBus at all.
+	 */
+	if (!priv->inuse_stuck) {
+		while (inb_p(SMBHSTSTS(priv)) & SMBHSTSTS_INUSE_STS) {
+			if (++timeout >= MAX_RETRIES) {
+				dev_warn(&priv->pci_dev->dev,
+					 "BIOS left SMBus locked\n");
+				priv->inuse_stuck = true;
+				break;
+			}
+			usleep_range(250, 500);
+		}
+	}
+
 	mutex_lock(&priv->acpi_lock);
-	if (priv->acpi_reserved) {
+	if (priv->acpi_usage && priv->inuse_stuck && !priv->acpi_unsafe) {
+		priv->acpi_unsafe = true;
+
+		dev_warn(&priv->pci_dev->dev, "BIOS uses SMBus unsafely\n");
+		dev_warn(&priv->pci_dev->dev,
+			 "Driver SMBus register access inhibited\n");
+	}
+
+	if (priv->acpi_unsafe) {
 		mutex_unlock(&priv->acpi_lock);
 		return -EBUSY;
 	}
@@ -1610,6 +1644,16 @@ static bool i801_acpi_is_smbus_ioport(const struct i801_priv *priv,
 }
 
 static acpi_status
+i801_acpi_do_access(u32 function, acpi_physical_address address,
+				u32 bits, u64 *value)
+{
+	if ((function & ACPI_IO_MASK) == ACPI_READ)
+		return acpi_os_read_port(address, (u32 *)value, bits);
+	else
+		return acpi_os_write_port(address, (u32)*value, bits);
+}
+
+static acpi_status
 i801_acpi_io_handler(u32 function, acpi_physical_address address, u32 bits,
 		     u64 *value, void *handler_context, void *region_context)
 {
@@ -1618,17 +1662,38 @@ i801_acpi_io_handler(u32 function, acpi_physical_address address, u32 bits,
 	acpi_status status;
 
 	/*
-	 * Once BIOS AML code touches the OpRegion we warn and inhibit any
-	 * further access from the driver itself. This device is now owned
-	 * by the system firmware.
+	 * Non-i801 accesses pass through.
 	 */
-	mutex_lock(&priv->acpi_lock);
+	if (!i801_acpi_is_smbus_ioport(priv, address))
+		return i801_acpi_do_access(function, address, bits, value);
 
-	if (!priv->acpi_reserved && i801_acpi_is_smbus_ioport(priv, address)) {
-		priv->acpi_reserved = true;
+	if (!mutex_trylock(&priv->acpi_lock)) {
+		mutex_lock(&priv->acpi_lock);
+		/*
+		 * This better be a read of the status register to acquire
+		 * the lock...
+		 */
+		if (!priv->acpi_unsafe &&
+			!(address == SMBHSTSTS(priv) &&
+			 (function & ACPI_IO_MASK) == ACPI_READ)) {
+			/*
+			 * Uh-oh, ACPI AML is trying to do something with the
+			 * controller without locking it properly.
+			 */
+			priv->acpi_unsafe = true;
 
-		dev_warn(&pdev->dev, "BIOS is accessing SMBus registers\n");
-		dev_warn(&pdev->dev, "Driver SMBus register access inhibited\n");
+			dev_warn(&pdev->dev, "BIOS uses SMBus unsafely\n");
+			dev_warn(&pdev->dev,
+				 "Driver SMBus register access inhibited\n");
+		}
+	}
+
+	if (!priv->acpi_usage) {
+		priv->acpi_usage = true;
+
+		if (!priv->acpi_unsafe)
+			dev_info(&pdev->dev,
+				 "SMBus controller is shared with ACPI AML. This seems safe so far.\n");
 
 		/*
 		 * BIOS is accessing the host controller so prevent it from
@@ -1637,10 +1702,7 @@ i801_acpi_io_handler(u32 function, acpi_physical_address address, u32 bits,
 		pm_runtime_get_sync(&pdev->dev);
 	}
 
-	if ((function & ACPI_IO_MASK) == ACPI_READ)
-		status = acpi_os_read_port(address, (u32 *)value, bits);
-	else
-		status = acpi_os_write_port(address, (u32)*value, bits);
+	status = i801_acpi_do_access(function, address, bits, value);
 
 	mutex_unlock(&priv->acpi_lock);
 
@@ -1676,7 +1738,7 @@ static void i801_acpi_remove(struct i801_priv *priv)
 		ACPI_ADR_SPACE_SYSTEM_IO, i801_acpi_io_handler);
 
 	mutex_lock(&priv->acpi_lock);
-	if (priv->acpi_reserved)
+	if (priv->acpi_usage)
 		pm_runtime_put(&priv->pci_dev->dev);
 	mutex_unlock(&priv->acpi_lock);
 }
