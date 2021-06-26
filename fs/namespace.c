@@ -4180,6 +4180,7 @@ SYSCALL_DEFINE5(mount_setattr, int, dfd, const char __user *, path,
 	return err;
 }
 
+static char * __initdata rootfs_flags;
 static void __init init_mount_tree(void)
 {
 	struct vfsmount *mnt;
@@ -4187,7 +4188,7 @@ static void __init init_mount_tree(void)
 	struct mnt_namespace *ns;
 	struct path root;
 
-	mnt = vfs_kern_mount(&rootfs_fs_type, 0, "rootfs", NULL);
+	mnt = vfs_kern_mount(&rootfs_fs_type, 0, "rootfs", rootfs_flags);
 	if (IS_ERR(mnt))
 		panic("Can't create rootfs");
 
@@ -4241,7 +4242,7 @@ void __init mnt_init(void)
 	if (!fs_kobj)
 		printk(KERN_WARNING "%s: kobj create error\n", __func__);
 	shmem_init();
-	init_rootfs();
+	init_rootfs(&rootfs_flags);
 	init_mount_tree();
 }
 

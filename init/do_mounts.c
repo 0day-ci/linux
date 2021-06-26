@@ -632,9 +632,11 @@ struct file_system_type rootfs_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
-void __init init_rootfs(void)
+void __init init_rootfs(char **rootfs_flags)
 {
 	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
 		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
 		is_tmpfs = true;
+
+	*rootfs_flags = root_mount_data;
 }
