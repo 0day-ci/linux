@@ -6910,7 +6910,8 @@ sub process {
 		    $stat =~ /^.\s*extern\s+/)
 		{
 			WARN("AVOID_EXTERNS",
-			     "externs should be avoided in .c files\n" .  $herecurr);
+			     "externs should be avoided in .c files\n($stat)\n" .  $herecurr)
+			    unless $stat =~ /_start|_stop|_end/;
 		}
 
 # check for function declarations that have arguments without identifier names
