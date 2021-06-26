@@ -187,12 +187,9 @@ static void __add_badblock_range(struct badblocks *bb, u64 ns_offset, u64 len)
 	const unsigned int sector_size = 512;
 	sector_t start_sector, end_sector;
 	u64 num_sectors;
-	u32 rem;
 
 	start_sector = div_u64(ns_offset, sector_size);
-	end_sector = div_u64_rem(ns_offset + len, sector_size, &rem);
-	if (rem)
-		end_sector++;
+	end_sector = DIV_ROUND_UP(ns_offset + len, sector_size);
 	num_sectors = end_sector - start_sector;
 
 	if (unlikely(num_sectors > (u64)INT_MAX)) {
