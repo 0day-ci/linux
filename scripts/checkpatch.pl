@@ -2546,6 +2546,11 @@ sub get_raw_comment {
 	return $comment;
 }
 
+sub skip_on_filename {
+	my $fname = shift;
+	return $fname =~ m@\.lds\.h$@;
+}
+
 sub exclude_global_initialisers {
 	my ($realfile) = @_;
 
@@ -5134,7 +5139,8 @@ sub process {
 							}
 						}
 					} elsif ($ctx =~ /Wx[^WCE]|[^WCE]xW/) {
-						if (ERROR("SPACING",
+						if (!skip_on_filename($realfile) &&
+						    ERROR("SPACING",
 							  "need consistent spacing around '$op' $at\n" . $hereptr)) {
 							$good = rtrim($fix_elements[$n]) . " " . trim($fix_elements[$n + 1]) . " ";
 							if (defined $fix_elements[$n + 2]) {
