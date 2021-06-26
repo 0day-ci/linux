@@ -947,4 +947,181 @@ struct rm_feature_desc {
 	__u8 reserved4;
 };
 
+/**
+ * The READ TOC/PMA/ATIP format field values
+ */
+enum cdb_read_tpa_format {
+	/**
+	 * The Track/Session Number field specifies starting track number
+	 * for which the data is returned. For multi-session discs, TOC
+	 * data is returned for all sessions. Track number AAh is reported
+	 * only for the Lead-out area of the last complete session.
+	 */
+	CDB_TPA_FORMATTED_TOC,
+	/**
+	 * This format returns the first complete session number, last
+	 * complete session number and last complete session starting address.
+	 * In this format, the Track/Session Number field is reserved and
+	 * should be set to 00h.
+	 * NOTE: This format provides the Host access to the last closed
+	 * session starting address quickly.
+	 */
+	CDB_TPA_MULTI_SESS_INFO,
+	/**
+	 * This format returns all Q sub-code data in the Lead-In (TOC) areas
+	 * starting from a session number as specified in the Number
+	 * Track/Session Number field.
+	 * In this mode, the Drive shall support Q Sub-channel POINT field
+	 * value of A0h, A1h, A2h, Track numbers, B0h, B1h, B2h, B3h, B4h, C0h,
+	 * and C1h.
+	 * There is no defined LBA addressing and MSF bit shall be set to one.
+	 */
+	CDB_TPA_RAW_TOC,
+	/**
+	 * This format returns Q sub-channel data in the PMA area. In this
+	 * format, the Track/Session Number field is reserved and shall be
+	 * set to 00h. There is no defined LBA addressing and MSF bit
+	 * shall be set to one.
+	 */
+	CDB_TPA_PMA,
+	/**
+	 * This format returns ATIP data. In this format, the Track/Session
+	 * Number field is reserved and shall be set to 00h. There is no
+	 * defined LBA addressing and MSF bit shall be set to one.
+	 */
+	CDB_TPA_ATIP,
+	/**
+	 * This format returns CD-TEXT information that is recorded in the
+	 * Lead-in area as R-W Sub-channel Data.
+	 */
+	CDB_TPA_CD_TEXT,
+};
+
+#define TPA_SECTOR_MODE0		(0x00)
+#define TPA_SECTOR_AUDIO		(0x01)
+#define TPA_SECTOR_MODE1		(0x02)
+#define TPA_SECTOR_MODE2		(0x03)
+#define TPA_SECTOR_MODE2_FORM1		(0x04)
+#define TPA_SECTOR_MODE2_FORM2		(0x05)
+#define TPA_SECTOR_MODE2_MIXED		(TPA_SECTOR_MODE1 | TPA_SECTOR_MODE2_FORM1)
+#define TPA_SECTOR_RAW				(0x07)
+#define TPA_SECTOR_RAW_SCRAMBLED	(0x08)
+
+/**
+ * @brief The READ TOC/PMA/ATIP CDB (43h)
+ * The READ TOC/PMA/ATIP command requests that the Drive read data from a
+ * Table of Contents, the Program Memory Area (PMA), or the Absolute Time
+ * in Pre-Grove (ATIP) from CD media, format according to CDB parameters
+ * and transfer the result to the Host.
+ */
+struct cdb_read_toc_pma_atip {
+	__u8 code;
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+	__u8 reserved1 : 6;
+	/**
+	 * When MSF is set to zero, the address fields in some returned data
+	 * formats shall be in LBA form. When MSF is set to one, the address
+	 * fields in some returned data formats shall be in MSF form
+	 */
+	__u8 msf : 1;
+	__u8 reserved2 : 1;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 reserved2 : 1;
+	__u8 msf : 1;
+	__u8 reserved1 : 6;
+#endif
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+	__u8 reserved3 : 4;
+	/**
+	 * The Format field is used to select specific returned data format
+	 * according to @enum cdb_read_tpa_format
+	 */
+	__u8 format : 4;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 format : 4;
+	__u8 reserved3 : 4;
+#endif
+
+	__u8 reserved4[3];
+	/**
+	 * The Track/Session Number field provides a method to restrict the
+	 * returned of some data formats to a specific session or a track range
+	 */
+	__u8 number;
+
+	/**
+	 * The Allocation Length field specifies the maximum number of bytes that
+	 * may be returned by the Drive.
+	 * An Allocation Length field of zero shall not be considered an error
+	 */
+	__be16 length;
+
+	__u8 control;
+} __packed;
+
+#define READ_TPA_LEADOUT_TRACK	(0xAAU)
+/*
+ * Control magic byte
+ * Some legacy media recorder implementations set the control byte,
+ * helping determine the relevant TOC/PMA/ATIP formats.
+ * We should support this as well.
+ */
+#define READ_TPA_CTRL_MAGIC_SESS	(0x40U)
+#define READ_TPA_CTRL_MAGIC_RAW		(0x80U)
+
+/**
+ * @brief READ TOC/PMA/ATIP Data list header
+ * The response data list shows the general description of the response data
+ * to the Read TOC/PMA/ATIP command.
+ */
+struct read_tpa_header {
+	__be16 length;
+	/* First Track/Session/Reserved Field */
+	__u8 n_first_stf;
+	/* Last Track/Session/Reserved Field */
+	__u8 n_last_stf;
+} __packed;
+
+/**
+ * @brief Response Format 0000b: Formatted TOC
+ * The response data consist of four header bytes and zero or more track
+ * descriptors.
+ */
+struct read_tpa_toc_formatted {
+	__u8 reserved1;
+#if defined(__BIG_ENDIAN_BITFIELD)
+	/**
+	 * The ADR field gives the type of information encoded in the Q Sub-channel
+	 * of the block where this TOC entry was found.
+	 */
+	__u8 addr : 4;
+	/**
+	 * The CONTROL Field indicates the attributes of the track.
+	 */
+	__u8 control : 4;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 control : 4;
+	__u8 addr : 4;
+#endif
+	/**
+	 * The Track Start Address contains the address of the first block with user
+	 * information for that track number as read from the Table of Contents.
+	 * A MSF bit of zero indicates that the Track Start Address field shall contain
+	 * a logical block address.
+	 * A MSF bit of one indicates the Logical Block Address field shall contain a
+	 * MSF address
+	 */
+	__u8 track_number;
+	__u8 reserved2;
+	/**
+	 * The Track Number field indicates the track number for that the data in the
+	 * TOC track descriptor is valid. A track number of READ_TPA_LEADOUT_TRACK
+	 * indicates that the track descriptor is for the start of the Lead-out area.
+	 */
+	__be32 start_addr_track;
+} __packed;
+
+
 #endif /* _UAPI_LINUX_CDROM_H */

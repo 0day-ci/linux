@@ -223,6 +223,7 @@
 #include <linux/usb/composite.h>
 
 #include <linux/nospec.h>
+#include <linux/cdrom.h>
 
 #include "configfs.h"
 
@@ -1319,29 +1320,93 @@ static int do_read_header(struct fsg_common *common, struct fsg_buffhd *bh)
 
 static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 {
-	struct fsg_lun	*curlun = common->curlun;
-	int		msf = common->cmnd[1] & 0x02;
-	int		start_track = common->cmnd[6];
-	u8		*buf = (u8 *)bh->buf;
+	struct fsg_lun *curlun = common->curlun;
+	struct cdb_read_toc_pma_atip *cdb =
+		(struct cdb_read_toc_pma_atip *)common->cmnd;
+	struct read_tpa_header *header = (struct read_tpa_header *)bh->buf;
+	struct read_tpa_toc_formatted *data =
+		(struct read_tpa_toc_formatted *)((u8 *)bh->buf +
+						  sizeof(*header));
+	size_t data_size = sizeof(*header);
 
-	if ((common->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
-			start_track > 1) {
+	if (cdb->format == 0) {
+		if (cdb->control == READ_TPA_CTRL_MAGIC_SESS) {
+			LDBG(curlun,
+			    "The MMC-3 specifies format a control byte. Using Multi-Session info\n");
+			cdb->format = CDB_TPA_MULTI_SESS_INFO;
+		}
+		if (cdb->control == READ_TPA_CTRL_MAGIC_RAW) {
+			LDBG(curlun,
+			    "The MMC-3 specifies format a control byte. Using RAW TOC\n");
+			cdb->format = CDB_TPA_RAW_TOC;
+		}
+	}
+
+	/* Currently support response format 0000b: Formatted TOC only */
+	if (cdb->format > CDB_TPA_MULTI_SESS_INFO) {
+		LDBG(curlun, "Unsupported TOC/PMA/ATIP format: %02Xh\n",
+		    cdb->format);
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
 
-	memset(buf, 0, 20);
-	buf[1] = (20-2);		/* TOC data length */
-	buf[2] = 1;			/* First track number */
-	buf[3] = 1;			/* Last track number */
-	buf[5] = 0x16;			/* Data track, copying allowed */
-	buf[6] = 0x01;			/* Only track is number 1 */
-	store_cdrom_address(&buf[8], msf, 0);
+	/*
+	 * We only support one track per disk.
+	 * We also needs to indicate the number of the last track
+	 */
+	if (cdb->number > 1 && cdb->number != READ_TPA_LEADOUT_TRACK) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
 
-	buf[13] = 0x16;			/* Lead-out track is data */
-	buf[14] = 0xAA;			/* Lead-out track number */
-	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
-	common->data_size_to_handle = 20;
+	/*
+	 * MULTI-SESSIOIN information must be reported only for first track.
+	 */
+	if (cdb->format == CDB_TPA_MULTI_SESS_INFO && cdb->number > 1) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	memset(header, 0, sizeof(*header));
+	header->n_first_stf = 1;
+	header->n_last_stf = 1;
+
+	memset(data, 0, sizeof(*data));
+	data->addr = 1;
+	data->control = TPA_SECTOR_MODE2_MIXED;
+	data->track_number = cdb->number;
+	data_size += sizeof(*data);
+
+	/*
+	 * We have too case:
+	 *	1)	The request Track Number == 1.
+	 *		We shall set 2 descriptors: First Track, Lead-Out Track
+	 *	2)	The requested Track Number == 0xAA
+	 *		Only Lead-Out descriptor shall be set
+	 */
+	if (cdb->number == 1) {
+		DBG(common, "Fill first track addr\n");
+		store_cdrom_address((u8 *)&data->start_addr_track, cdb->msf, 0);
+
+		data += 1; /* Add one more descriptor */
+		data_size += sizeof(*data);
+		memset(data, 0, sizeof(*data));
+		/* setting the lead-out track info. First part of data*/
+		data->addr = 1;
+		data->control = TPA_SECTOR_MODE2_MIXED;
+		data->track_number = READ_TPA_LEADOUT_TRACK;
+	}
+
+	/*
+	 * Lead-out track must be set anyway.
+	 * If 0xAA Track is requested - the first part of data is already set.
+	 */
+	DBG(common, "Fill last track addr\n");
+	store_cdrom_address((u8 *)&data->start_addr_track,
+				cdb->msf, curlun->num_sectors);
+
+	header->length = cpu_to_be16(data_size - sizeof(header->length));
+	common->data_size_to_handle = data_size;
 	return 0;
 }
 
