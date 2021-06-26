@@ -296,6 +296,7 @@ struct fsg_common {
 	enum data_direction	data_dir;
 	u32			data_size;
 	u32			data_size_from_cmnd;
+	u32			data_size_to_handle;
 	u32			tag;
 	u32			residue;
 	u32			usb_amount_left;
@@ -1066,7 +1067,8 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 		memset(buf, 0, 36);
 		buf[0] = TYPE_NO_LUN;	/* Unsupported, no device-type */
 		buf[4] = 31;		/* Additional length */
-		return 36;
+		common->data_size_to_handle = 36;
+		return 0;
 	}
 
 	buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
@@ -1083,7 +1085,8 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	else
 		memcpy(buf + 8, common->inquiry_string,
 		       sizeof(common->inquiry_string));
-	return 36;
+	common->data_size_to_handle = 36;
+	return 0;
 }
 
 static int do_request_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1136,7 +1139,8 @@ static int do_request_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[7] = 18 - 8;			/* Additional sense length */
 	buf[12] = ASC(sd);
 	buf[13] = ASCQ(sd);
-	return 18;
+	common->data_size_to_handle = 18;
+	return 0;
 }
 
 static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1155,7 +1159,8 @@ static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
 	put_unaligned_be32(curlun->num_sectors - 1, &buf[0]);
 						/* Max logical block */
 	put_unaligned_be32(curlun->blksize, &buf[4]);/* Block length */
-	return 8;
+	common->data_size_to_handle = 8;
+	return 0;
 }
 
 static int do_read_header(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1177,7 +1182,8 @@ static int do_read_header(struct fsg_common *common, struct fsg_buffhd *bh)
 	memset(buf, 0, 8);
 	buf[0] = 0x01;		/* 2048 bytes of user data, rest is EC */
 	store_cdrom_address(&buf[4], msf, lba);
-	return 8;
+	common->data_size_to_handle = 8;
+	return 0;
 }
 
 static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1204,7 +1210,8 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[13] = 0x16;			/* Lead-out track is data */
 	buf[14] = 0xAA;			/* Lead-out track number */
 	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
-	return 20;
+	common->data_size_to_handle = 20;
+	return 0;
 }
 
 static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1290,7 +1297,8 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf0[0] = len - 1;
 	else
 		put_unaligned_be16(len - 2, buf0);
-	return len;
+	common->data_size_to_handle = len;
+	return 0;
 }
 
 static int do_start_stop(struct fsg_common *common)
@@ -1381,7 +1389,8 @@ static int do_read_format_capacities(struct fsg_common *common,
 						/* Number of blocks */
 	put_unaligned_be32(curlun->blksize, &buf[4]);/* Block length */
 	buf[4] = 0x02;				/* Current capacity */
-	return 12;
+	common->data_size_to_handle = 12;
+	return 0;
 }
 
 static int do_mode_select(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1796,7 +1805,7 @@ static int do_scsi_command(struct fsg_common *common)
 {
 	struct fsg_buffhd	*bh;
 	int			rc;
-	int			reply = -EINVAL;
+	int			status = -EINVAL;
 	int			i;
 	static char		unknown[16];
 
@@ -1813,104 +1822,107 @@ static int do_scsi_command(struct fsg_common *common)
 	common->short_packet_received = 0;
 
 	down_read(&common->filesem);	/* We're using the backing file */
+	/* flash all unhandled data */
+	common->data_size_to_handle = 0;
+
 	switch (common->cmnd[0]) {
 
 	case INQUIRY:
 		common->data_size_from_cmnd = common->cmnd[4];
-		reply = check_command(common, 6, DATA_DIR_TO_HOST,
+		status = check_command(common, 6, DATA_DIR_TO_HOST,
 				      (1<<4), 0,
 				      "INQUIRY");
-		if (reply == 0)
-			reply = do_inquiry(common, bh);
+		if (status == 0)
+			status = do_inquiry(common, bh);
 		break;
 
 	case MODE_SELECT:
 		common->data_size_from_cmnd = common->cmnd[4];
-		reply = check_command(common, 6, DATA_DIR_FROM_HOST,
+		status = check_command(common, 6, DATA_DIR_FROM_HOST,
 				      (1<<1) | (1<<4), 0,
 				      "MODE SELECT(6)");
-		if (reply == 0)
-			reply = do_mode_select(common, bh);
+		if (status == 0)
+			status = do_mode_select(common, bh);
 		break;
 
 	case MODE_SELECT_10:
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command(common, 10, DATA_DIR_FROM_HOST,
+		status = check_command(common, 10, DATA_DIR_FROM_HOST,
 				      (1<<1) | (3<<7), 0,
 				      "MODE SELECT(10)");
-		if (reply == 0)
-			reply = do_mode_select(common, bh);
+		if (status == 0)
+			status = do_mode_select(common, bh);
 		break;
 
 	case MODE_SENSE:
 		common->data_size_from_cmnd = common->cmnd[4];
-		reply = check_command(common, 6, DATA_DIR_TO_HOST,
+		status = check_command(common, 6, DATA_DIR_TO_HOST,
 				      (1<<1) | (1<<2) | (1<<4), 0,
 				      "MODE SENSE(6)");
-		if (reply == 0)
-			reply = do_mode_sense(common, bh);
+		if (status == 0)
+			status = do_mode_sense(common, bh);
 		break;
 
 	case MODE_SENSE_10:
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+		status = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (1<<1) | (1<<2) | (3<<7), 0,
 				      "MODE SENSE(10)");
-		if (reply == 0)
-			reply = do_mode_sense(common, bh);
+		if (status == 0)
+			status = do_mode_sense(common, bh);
 		break;
 
 	case ALLOW_MEDIUM_REMOVAL:
 		common->data_size_from_cmnd = 0;
-		reply = check_command(common, 6, DATA_DIR_NONE,
+		status = check_command(common, 6, DATA_DIR_NONE,
 				      (1<<4), 0,
 				      "PREVENT-ALLOW MEDIUM REMOVAL");
-		if (reply == 0)
-			reply = do_prevent_allow(common);
+		if (status == 0)
+			status = do_prevent_allow(common);
 		break;
 
 	case READ_6:
 		i = common->cmnd[4];
 		common->data_size_from_cmnd = (i == 0) ? 256 : i;
-		reply = check_command_size_in_blocks(common, 6,
+		status = check_command_size_in_blocks(common, 6,
 				      DATA_DIR_TO_HOST,
 				      (7<<1) | (1<<4), 1,
 				      "READ(6)");
-		if (reply == 0)
-			reply = do_read(common);
+		if (status == 0)
+			status = do_read(common);
 		break;
 
 	case READ_10:
 		common->data_size_from_cmnd =
 				get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command_size_in_blocks(common, 10,
+		status = check_command_size_in_blocks(common, 10,
 				      DATA_DIR_TO_HOST,
 				      (1<<1) | (0xf<<2) | (3<<7), 1,
 				      "READ(10)");
-		if (reply == 0)
-			reply = do_read(common);
+		if (status == 0)
+			status = do_read(common);
 		break;
 
 	case READ_12:
 		common->data_size_from_cmnd =
 				get_unaligned_be32(&common->cmnd[6]);
-		reply = check_command_size_in_blocks(common, 12,
+		status = check_command_size_in_blocks(common, 12,
 				      DATA_DIR_TO_HOST,
 				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
 				      "READ(12)");
-		if (reply == 0)
-			reply = do_read(common);
+		if (status == 0)
+			status = do_read(common);
 		break;
 
 	case READ_CAPACITY:
 		common->data_size_from_cmnd = 8;
-		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+		status = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (0xf<<2) | (1<<8), 1,
 				      "READ CAPACITY");
-		if (reply == 0)
-			reply = do_read_capacity(common, bh);
+		if (status == 0)
+			status = do_read_capacity(common, bh);
 		break;
 
 	case READ_HEADER:
@@ -1918,11 +1930,11 @@ static int do_scsi_command(struct fsg_common *common)
 			goto unknown_cmnd;
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+		status = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (3<<7) | (0x1f<<1), 1,
 				      "READ HEADER");
-		if (reply == 0)
-			reply = do_read_header(common, bh);
+		if (status == 0)
+			status = do_read_header(common, bh);
 		break;
 
 	case READ_TOC:
@@ -1930,53 +1942,53 @@ static int do_scsi_command(struct fsg_common *common)
 			goto unknown_cmnd;
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+		status = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (7<<6) | (1<<1), 1,
 				      "READ TOC");
-		if (reply == 0)
-			reply = do_read_toc(common, bh);
+		if (status == 0)
+			status = do_read_toc(common, bh);
 		break;
 
 	case READ_FORMAT_CAPACITIES:
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+		status = check_command(common, 10, DATA_DIR_TO_HOST,
 				      (3<<7), 1,
 				      "READ FORMAT CAPACITIES");
-		if (reply == 0)
-			reply = do_read_format_capacities(common, bh);
+		if (status == 0)
+			status = do_read_format_capacities(common, bh);
 		break;
 
 	case REQUEST_SENSE:
 		common->data_size_from_cmnd = common->cmnd[4];
-		reply = check_command(common, 6, DATA_DIR_TO_HOST,
+		status = check_command(common, 6, DATA_DIR_TO_HOST,
 				      (1<<4), 0,
 				      "REQUEST SENSE");
-		if (reply == 0)
-			reply = do_request_sense(common, bh);
+		if (status == 0)
+			status = do_request_sense(common, bh);
 		break;
 
 	case START_STOP:
 		common->data_size_from_cmnd = 0;
-		reply = check_command(common, 6, DATA_DIR_NONE,
+		status = check_command(common, 6, DATA_DIR_NONE,
 				      (1<<1) | (1<<4), 0,
 				      "START-STOP UNIT");
-		if (reply == 0)
-			reply = do_start_stop(common);
+		if (status == 0)
+			status = do_start_stop(common);
 		break;
 
 	case SYNCHRONIZE_CACHE:
 		common->data_size_from_cmnd = 0;
-		reply = check_command(common, 10, DATA_DIR_NONE,
+		status = check_command(common, 10, DATA_DIR_NONE,
 				      (0xf<<2) | (3<<7), 1,
 				      "SYNCHRONIZE CACHE");
-		if (reply == 0)
-			reply = do_synchronize_cache(common);
+		if (status == 0)
+			status = do_synchronize_cache(common);
 		break;
 
 	case TEST_UNIT_READY:
 		common->data_size_from_cmnd = 0;
-		reply = check_command(common, 6, DATA_DIR_NONE,
+		status = check_command(common, 6, DATA_DIR_NONE,
 				0, 1,
 				"TEST UNIT READY");
 		break;
@@ -1987,44 +1999,44 @@ static int do_scsi_command(struct fsg_common *common)
 	 */
 	case VERIFY:
 		common->data_size_from_cmnd = 0;
-		reply = check_command(common, 10, DATA_DIR_NONE,
+		status = check_command(common, 10, DATA_DIR_NONE,
 				      (1<<1) | (0xf<<2) | (3<<7), 1,
 				      "VERIFY");
-		if (reply == 0)
-			reply = do_verify(common);
+		if (status == 0)
+			status = do_verify(common);
 		break;
 
 	case WRITE_6:
 		i = common->cmnd[4];
 		common->data_size_from_cmnd = (i == 0) ? 256 : i;
-		reply = check_command_size_in_blocks(common, 6,
+		status = check_command_size_in_blocks(common, 6,
 				      DATA_DIR_FROM_HOST,
 				      (7<<1) | (1<<4), 1,
 				      "WRITE(6)");
-		if (reply == 0)
-			reply = do_write(common);
+		if (status == 0)
+			status = do_write(common);
 		break;
 
 	case WRITE_10:
 		common->data_size_from_cmnd =
 				get_unaligned_be16(&common->cmnd[7]);
-		reply = check_command_size_in_blocks(common, 10,
+		status = check_command_size_in_blocks(common, 10,
 				      DATA_DIR_FROM_HOST,
 				      (1<<1) | (0xf<<2) | (3<<7), 1,
 				      "WRITE(10)");
-		if (reply == 0)
-			reply = do_write(common);
+		if (status == 0)
+			status = do_write(common);
 		break;
 
 	case WRITE_12:
 		common->data_size_from_cmnd =
 				get_unaligned_be32(&common->cmnd[6]);
-		reply = check_command_size_in_blocks(common, 12,
+		status = check_command_size_in_blocks(common, 12,
 				      DATA_DIR_FROM_HOST,
 				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
 				      "WRITE(12)");
-		if (reply == 0)
-			reply = do_write(common);
+		if (status == 0)
+			status = do_write(common);
 		break;
 
 	/*
@@ -2042,27 +2054,29 @@ static int do_scsi_command(struct fsg_common *common)
 unknown_cmnd:
 		common->data_size_from_cmnd = 0;
 		sprintf(unknown, "Unknown x%02x", common->cmnd[0]);
-		reply = check_command(common, common->cmnd_size,
+		status = check_command(common, common->cmnd_size,
 				      DATA_DIR_UNKNOWN, ~0, 0, unknown);
-		if (reply == 0) {
+		if (status == 0) {
 			common->curlun->sense_data = SS_INVALID_COMMAND;
-			reply = -EINVAL;
+			status = -EINVAL;
 		}
 		break;
 	}
 	up_read(&common->filesem);
 
-	if (reply == -EINTR || signal_pending(current))
+	if (status == -EINTR || signal_pending(current))
 		return -EINTR;
 
-	/* Set up the single reply buffer for finish_reply() */
-	if (reply == -EINVAL)
-		reply = 0;		/* Error reply length */
-	if (reply >= 0 && common->data_dir == DATA_DIR_TO_HOST) {
-		reply = min((u32)reply, common->data_size_from_cmnd);
-		bh->inreq->length = reply;
+	/* Set up the single status buffer for finish_reply() */
+	if (status == -EINVAL)
+		status = 0;		/* Error reply length */
+	if (status == 0 && common->data_dir == DATA_DIR_TO_HOST) {
+		common->data_size_to_handle =
+			min_t(u32, common->data_size_to_handle,
+			      common->data_size_from_cmnd);
+		bh->inreq->length = common->data_size_to_handle;
 		bh->state = BUF_STATE_FULL;
-		common->residue -= reply;
+		common->residue -= common->data_size_to_handle;
 	}				/* Otherwise it's already set */
 
 	return 0;
