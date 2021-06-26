@@ -2560,6 +2560,18 @@ sub exclude_global_initialisers {
 		$realfile =~ m@/bpf/.*\.bpf\.c$@;
 }
 
+sub commitmsg_refers_to {	# see if $srch is in commit message
+	my ($srch, $lines) = @_;
+	#print "ok checking for $srch in $lines lines\n";
+	for my $i (0..$lines) {
+		if ($rawlines[$i] =~ /$srch/) {
+			print "\thmm: $srch mentioned in preamble, presuming it is explained\n";
+			return 1;
+		}
+	}
+	return 0;
+}
+
 sub process {
 	my $filename = shift;
 
@@ -2586,6 +2598,7 @@ sub process {
 	my $has_patch_separator = 0;	#Found a --- line
 	my $has_commit_log = 0;		#Encountered lines before patch
 	my $commit_log_lines = 0;	#Number of commit log lines
+	my $eopreamble = 0;		# above truncates at =~ /^\. \w+/
 	my $commit_log_possible_stack_dump = 0;
 	my $commit_log_long_line = 0;
 	my $commit_log_has_diff = 0;
@@ -2731,6 +2744,7 @@ sub process {
 		    ($line =~ /^rename (?:from|to) \S+\s*$/ ||
 		     $line =~ /^diff --git a\/[\w\/\.\_\-]+ b\/\S+\s*$/))) {
 			$is_patch = 1;
+			$eopreamble = $linenr;
 		}
 
 #extract the line range in the file after the patch is applied
@@ -4654,7 +4668,7 @@ sub process {
 		}
 
 # avoid BUG() or BUG_ON()
-		if ($line =~ /\b(?:BUG|BUG_ON)\b/) {
+		if ($line =~ /\b(BUG|BUG_ON)\b/ && !commitmsg_refers_to($1, $eopreamble)) {
 			my $msg_level = \&WARN;
 			$msg_level = \&CHK if ($file);
 			&{$msg_level}("AVOID_BUG",
