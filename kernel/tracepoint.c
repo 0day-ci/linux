@@ -287,10 +287,8 @@ static int tracepoint_add_func(struct tracepoint *tp,
 	tp_funcs = rcu_dereference_protected(tp->funcs,
 			lockdep_is_held(&tracepoints_mutex));
 	old = func_add(&tp_funcs, func, prio);
-	if (IS_ERR(old)) {
-		WARN_ON_ONCE(PTR_ERR(old) != -ENOMEM);
+	if (IS_ERR(old))
 		return PTR_ERR(old);
-	}
 
 	/*
 	 * rcu_assign_pointer has as smp_store_release() which makes sure
@@ -320,7 +318,7 @@ static int tracepoint_remove_func(struct tracepoint *tp,
 	tp_funcs = rcu_dereference_protected(tp->funcs,
 			lockdep_is_held(&tracepoints_mutex));
 	old = func_remove(&tp_funcs, func);
-	if (WARN_ON_ONCE(IS_ERR(old)))
+	if (IS_ERR(old))
 		return PTR_ERR(old);
 
 	if (tp_funcs == old)
