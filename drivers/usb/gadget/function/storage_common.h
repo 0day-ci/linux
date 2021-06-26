@@ -172,6 +172,11 @@ enum data_direction {
 	DATA_DIR_NONE
 };
 
+enum medium_required_values {
+	MEDIUM_OPTIONAL = 0,
+	MEDIUM_REQUIRED
+};
+
 static inline struct fsg_lun *fsg_lun_from_dev(struct device *dev)
 {
 	return container_of(dev, struct fsg_lun, dev);

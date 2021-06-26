@@ -237,6 +237,137 @@ static const char fsg_string_interface[] = "Mass Storage";
 #include "storage_common.h"
 #include "f_mass_storage.h"
 
+
+/*------------------------------------------------------------------------*/
+
+/**
+ * @brief The handler of incoming CDB command
+ * @param cmd		- SCSI command number
+ * @param callback	- The callback of handle the incoming command
+ */
+#define CDB_REG_HANDLER(cmd, callback)                                         \
+	.command = (cmd), .do_command = (callback),                            \
+	.type = CDB_HANDLER_COMMON, .name = (#cmd)
+
+/**
+ * @brief The handler of incoming CDB command
+ * @param cmd		- SCSI command nubmer with fsg buffhd
+ * @param callback	- The callback of handle the incoming command
+ */
+#define CDB_REG_HANDLER_BUFFHD(cmd, callback)                                  \
+	.command = (cmd), .do_command_with_buffhd = (callback),                \
+	.type = CDB_HANDLER_FSG_BUFFHD, .name = (#cmd)
+
+/**
+ * @see CDB_REG_CHECKER_DS
+ * @details Register CDB command without additional check handler.
+ */
+#define CDB_REG_NO_CHECKER(cmd, si, dir, req)                                  \
+	.command = (cmd), .direction = (dir), .size_index = (si),              \
+	.medium_required = (req), .do_check_command = NULL,
+
+/**
+ * @brief Register the CDB command checker, which checks an incoming command
+ * by specified criteria.
+ * This validator will take care of the specified data size (DS)
+ *
+ * @param cmd	- SCSI command nubmer
+ * @param s		- CDB command size in bytes
+ * @param si	- The CDB command might have the recommended response size.
+ * This field indicates the size field index in the input CDB command
+ * buffer
+ * @param dir	- Direction of data transfer of requested CDB command
+ * @param mask  - Mask of relevant bytes in the input command buffer.
+ * The ordinal number of a bit in the mask indicates that a byte in the
+ * CDB command buffer might be present.
+ * If that ordinal number bit equals zero, only a zero value must be
+ * present in this original byte.
+ * @param req	- Indicates that medium MUST be present or might be optional
+ * @param ds	- If @param SI member is equal to @enum CDB_SIZE_MANUAL, than this
+ * field indicates the custom response buffer size
+ */
+#define CDB_REG_CHECKER_DS(cmd, s, si, dir, mask, req, ds)                     \
+	.command = (cmd), .size = (s), .size_index = (si), .direction = (dir), \
+	.valid_bytes_bitmask = (mask), .medium_required = (req),               \
+	.data_size_manual = (ds), .do_check_command = &check_command
+
+/**
+ * @see CDB_REG_CHECKER_DS
+ * @details The data size is zero.
+ * This macro can't be used with the @enum CDB_SIZE_MANUAL
+ */
+#define CDB_REG_CHECKER(cmd, s, si, dir, mask, req)                            \
+	CDB_REG_CHECKER_DS(cmd, s, si, dir, mask, req, 0)
+
+/**
+ * @see CDB_REG_CHECKER_DS
+ * @details The checker which registried by this macros will validate the input
+ * data size in blocks.
+ * Block size specified by MSF interface type, in the curlun->blksize.
+ */
+#define CDB_REG_CHECKER_BLK(cmd, s, si, dir, mask, req)                        \
+	CDB_REG_CHECKER_DS(cmd, s, si, dir, mask, req, 0),                     \
+		.do_check_command = &check_command_size_in_blocks
+
+/**
+ * @brief Field index of possible data length of output buffer size, which
+ * contains in the input CDB command buffer
+ */
+enum cdb_data_size_field {
+	CDB_SIZE_MANUAL = -2,
+	CDB_NO_SIZE_FIELD = -1,
+	CDB_SIZE_FIELD_4 = 4,
+	CDB_SIZE_FIELD_6 = 6,
+	CDB_SIZE_FIELD_7 = 7,
+};
+
+/* Type of CDB command checker with associated data to check */
+struct cdb_command_check {
+	/* SCSI command number */
+	u8 command;
+	/* CDB command size */
+	size_t size;
+	/* Size field index in the input CDB command buffer */
+	enum cdb_data_size_field size_index;
+	/* CDB command data direction, @enum data_direction */
+	u8 direction;
+	/* Mask of expected meaningfull bytes in input CDB command buffer */
+	u32 valid_bytes_bitmask;
+	/* Is medium must be present or not */
+	u8 medium_required;
+	/* If data size is custom (the size_index is equal to CDB_SIZE_MANUAL),
+	 * then this field indicates the output data size
+	 */
+	u8 data_size_manual;
+	/* the CDB command checker */
+	int (*do_check_command)(struct fsg_common *common, int size,
+				enum data_direction direction,
+				unsigned int mask, int needs_medium,
+				const char *name);
+};
+
+/* CDB command hundler metadata */
+struct cdb_handler {
+	/* SCSI command number */
+	u8 command;
+	/**
+	 * @brief the CDB command hundler
+	 * @param fsg_common	- FSG instance
+	 */
+	int (*do_command)(struct fsg_common *common);
+	/**
+	 * @brief The CDB command hundler with a fsg_buffhd specified
+	 */
+	int (*do_command_with_buffhd)(struct fsg_common *common,
+				      struct fsg_buffhd *bufhd);
+	/* CDB handler type to pick a relevant callback */
+	enum { CDB_HANDLER_COMMON, CDB_HANDLER_FSG_BUFFHD } type;
+	/* SCSI command ASCII name */
+	char *name;
+};
+
+/*------------------------------------------------------------------------*/
+
 /* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
 static struct usb_string		fsg_strings[] = {
 	{FSG_STRING_INTERFACE,		fsg_string_interface},
@@ -1801,6 +1932,97 @@ static int check_command_size_in_blocks(struct fsg_common *common,
 			mask, needs_medium, name);
 }
 
+static struct cdb_command_check cdb_checker_table[] = {
+	{ CDB_REG_CHECKER(INQUIRY, 6, CDB_SIZE_FIELD_4, DATA_DIR_TO_HOST,
+			  0x0010, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(MODE_SELECT, 6, CDB_SIZE_FIELD_4, DATA_DIR_FROM_HOST,
+			  0x0012, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(MODE_SELECT_10, 10, CDB_SIZE_FIELD_7,
+			  DATA_DIR_FROM_HOST, 0x0182, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(MODE_SENSE, 6, CDB_SIZE_FIELD_4, DATA_DIR_TO_HOST,
+			  0x0016, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(MODE_SENSE_10, 10, CDB_SIZE_FIELD_7, DATA_DIR_TO_HOST,
+			  0x186, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(ALLOW_MEDIUM_REMOVAL, 6, CDB_NO_SIZE_FIELD,
+			  DATA_DIR_NONE, 0x0010, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER_BLK(READ_6, 6, CDB_SIZE_FIELD_4, DATA_DIR_TO_HOST,
+			      0x001E, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_BLK(READ_10, 10, CDB_SIZE_FIELD_7, DATA_DIR_TO_HOST,
+			      0x01BE, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_BLK(READ_12, 12, CDB_SIZE_FIELD_6, DATA_DIR_TO_HOST,
+			      0x03FE, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_DS(READ_CAPACITY, 10, CDB_SIZE_MANUAL,
+			     DATA_DIR_TO_HOST, 0x011E, MEDIUM_REQUIRED, 8) },
+	{ CDB_REG_CHECKER(READ_HEADER, 10, CDB_SIZE_FIELD_7, DATA_DIR_TO_HOST,
+			  0x01BE, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER(READ_TOC, 10, CDB_SIZE_FIELD_7, DATA_DIR_TO_HOST,
+			  0x03C7, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER(READ_FORMAT_CAPACITIES, 10, CDB_SIZE_FIELD_7,
+			  DATA_DIR_TO_HOST, 0x0180, MEDIUM_REQUIRED) },
+
+	{ CDB_REG_CHECKER(REQUEST_SENSE, 6, CDB_SIZE_FIELD_4, DATA_DIR_TO_HOST,
+			  0x0010, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(START_STOP, 6, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
+			  0x0012, MEDIUM_OPTIONAL) },
+	{ CDB_REG_CHECKER(SYNCHRONIZE_CACHE, 10, CDB_NO_SIZE_FIELD,
+			  DATA_DIR_NONE, 0x01BC, MEDIUM_REQUIRED) },
+
+	{ CDB_REG_CHECKER(TEST_UNIT_READY, 6, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
+			  0x0000, MEDIUM_REQUIRED) },
+
+	{ CDB_REG_CHECKER_BLK(VERIFY, 10, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
+			      0x0000, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_BLK(WRITE_6, 6, CDB_SIZE_FIELD_4, DATA_DIR_FROM_HOST,
+			      0x001E, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_BLK(WRITE_10, 10, CDB_SIZE_FIELD_7,
+			      DATA_DIR_FROM_HOST, 0x01BE, MEDIUM_REQUIRED) },
+	{ CDB_REG_CHECKER_BLK(WRITE_12, 12, CDB_SIZE_FIELD_6,
+			      DATA_DIR_FROM_HOST, 0x03FE, MEDIUM_REQUIRED) },
+};
+
+static struct cdb_handler cdb_handlers_table[] = {
+	{ CDB_REG_HANDLER_BUFFHD(INQUIRY, &do_inquiry) },
+	{ CDB_REG_HANDLER_BUFFHD(MODE_SELECT, &do_mode_select) },
+	{ CDB_REG_HANDLER_BUFFHD(MODE_SELECT_10, &do_mode_select) },
+	{ CDB_REG_HANDLER_BUFFHD(MODE_SENSE, &do_mode_sense) },
+	{ CDB_REG_HANDLER_BUFFHD(MODE_SENSE_10, &do_mode_sense) },
+	{ CDB_REG_HANDLER(ALLOW_MEDIUM_REMOVAL, &do_prevent_allow) },
+	{ CDB_REG_HANDLER(READ_6, &do_read) },
+	{ CDB_REG_HANDLER(READ_10, &do_read) },
+	{ CDB_REG_HANDLER(READ_12, &do_read) },
+	{ CDB_REG_HANDLER_BUFFHD(READ_CAPACITY, &do_read_capacity) },
+	{ CDB_REG_HANDLER_BUFFHD(READ_HEADER, &do_read_header) },
+	{ CDB_REG_HANDLER_BUFFHD(READ_TOC, &do_read_toc) },
+	{ CDB_REG_HANDLER_BUFFHD(READ_FORMAT_CAPACITIES, &do_read_format_capacities) },
+
+	{ CDB_REG_HANDLER_BUFFHD(REQUEST_SENSE, &do_request_sense) },
+	{ CDB_REG_HANDLER(START_STOP, &do_start_stop) },
+	{ CDB_REG_HANDLER(SYNCHRONIZE_CACHE, &do_synchronize_cache) },
+	{ CDB_REG_HANDLER(TEST_UNIT_READY, NULL) },
+
+	/*
+	 * Although optional, this command is used by MS-Windows.  We
+	 * support a minimal version: BytChk must be 0.
+	 */
+
+	{ CDB_REG_HANDLER(VERIFY, do_verify) },
+	{ CDB_REG_HANDLER(WRITE_6, do_write) },
+	{ CDB_REG_HANDLER(WRITE_10, do_write) },
+	{ CDB_REG_HANDLER(WRITE_12, do_write) },
+	/*
+	 * Some mandatory commands that we recognize but don't implement.
+	 * They don't mean much in this setting.  It's left as an exercise
+	 * for anyone interested to implement RESERVE and RELEASE in terms
+	 * of Posix locks.
+	 *
+	 * Commands:
+	 *	FORMAT_UNIT
+	 *	RELEASE
+	 *	RESERVE
+	 *	SEND_DIAGNOSTIC
+	 */
+};
+
 static int do_scsi_command(struct fsg_common *common)
 {
 	struct fsg_buffhd	*bh;
@@ -1810,6 +2032,14 @@ static int do_scsi_command(struct fsg_common *common)
 	static char		unknown[16];
 
 	dump_cdb(common);
+
+	/* The size of both handlers and SCSI-checkers tables must be equal */
+	if (WARN(ARRAY_SIZE(cdb_checker_table) !=
+			 ARRAY_SIZE(cdb_handlers_table),
+		 "The checkers and handlers tables length are not matched!\n")) {
+		pr_err("Invalid cdb handlers initialization.\n");
+		return status;
+	}
 
 	/* Wait for the next buffer to become available for data or status */
 	bh = common->next_buffhd_to_fill;
@@ -1825,243 +2055,84 @@ static int do_scsi_command(struct fsg_common *common)
 	/* flash all unhandled data */
 	common->data_size_to_handle = 0;
 
-	switch (common->cmnd[0]) {
+	for (i = 0; i < ARRAY_SIZE(cdb_checker_table); ++i) {
+		const struct cdb_command_check *curr_check =
+			&cdb_checker_table[i];
+		const struct cdb_handler *curr_handler = &cdb_handlers_table[i];
 
-	case INQUIRY:
-		common->data_size_from_cmnd = common->cmnd[4];
-		status = check_command(common, 6, DATA_DIR_TO_HOST,
-				      (1<<4), 0,
-				      "INQUIRY");
-		if (status == 0)
-			status = do_inquiry(common, bh);
-		break;
-
-	case MODE_SELECT:
-		common->data_size_from_cmnd = common->cmnd[4];
-		status = check_command(common, 6, DATA_DIR_FROM_HOST,
-				      (1<<1) | (1<<4), 0,
-				      "MODE SELECT(6)");
-		if (status == 0)
-			status = do_mode_select(common, bh);
-		break;
-
-	case MODE_SELECT_10:
-		common->data_size_from_cmnd =
-			get_unaligned_be16(&common->cmnd[7]);
-		status = check_command(common, 10, DATA_DIR_FROM_HOST,
-				      (1<<1) | (3<<7), 0,
-				      "MODE SELECT(10)");
-		if (status == 0)
-			status = do_mode_select(common, bh);
-		break;
-
-	case MODE_SENSE:
-		common->data_size_from_cmnd = common->cmnd[4];
-		status = check_command(common, 6, DATA_DIR_TO_HOST,
-				      (1<<1) | (1<<2) | (1<<4), 0,
-				      "MODE SENSE(6)");
-		if (status == 0)
-			status = do_mode_sense(common, bh);
-		break;
-
-	case MODE_SENSE_10:
-		common->data_size_from_cmnd =
-			get_unaligned_be16(&common->cmnd[7]);
-		status = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (1<<1) | (1<<2) | (3<<7), 0,
-				      "MODE SENSE(10)");
-		if (status == 0)
-			status = do_mode_sense(common, bh);
-		break;
-
-	case ALLOW_MEDIUM_REMOVAL:
-		common->data_size_from_cmnd = 0;
-		status = check_command(common, 6, DATA_DIR_NONE,
-				      (1<<4), 0,
-				      "PREVENT-ALLOW MEDIUM REMOVAL");
-		if (status == 0)
-			status = do_prevent_allow(common);
-		break;
-
-	case READ_6:
-		i = common->cmnd[4];
-		common->data_size_from_cmnd = (i == 0) ? 256 : i;
-		status = check_command_size_in_blocks(common, 6,
-				      DATA_DIR_TO_HOST,
-				      (7<<1) | (1<<4), 1,
-				      "READ(6)");
-		if (status == 0)
-			status = do_read(common);
-		break;
-
-	case READ_10:
-		common->data_size_from_cmnd =
-				get_unaligned_be16(&common->cmnd[7]);
-		status = check_command_size_in_blocks(common, 10,
-				      DATA_DIR_TO_HOST,
-				      (1<<1) | (0xf<<2) | (3<<7), 1,
-				      "READ(10)");
-		if (status == 0)
-			status = do_read(common);
-		break;
-
-	case READ_12:
-		common->data_size_from_cmnd =
-				get_unaligned_be32(&common->cmnd[6]);
-		status = check_command_size_in_blocks(common, 12,
-				      DATA_DIR_TO_HOST,
-				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
-				      "READ(12)");
-		if (status == 0)
-			status = do_read(common);
-		break;
-
-	case READ_CAPACITY:
-		common->data_size_from_cmnd = 8;
-		status = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (0xf<<2) | (1<<8), 1,
-				      "READ CAPACITY");
-		if (status == 0)
-			status = do_read_capacity(common, bh);
-		break;
-
-	case READ_HEADER:
-		if (!common->curlun || !common->curlun->cdrom)
-			goto unknown_cmnd;
-		common->data_size_from_cmnd =
-			get_unaligned_be16(&common->cmnd[7]);
-		status = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (3<<7) | (0x1f<<1), 1,
-				      "READ HEADER");
-		if (status == 0)
-			status = do_read_header(common, bh);
-		break;
-
-	case READ_TOC:
-		if (!common->curlun || !common->curlun->cdrom)
-			goto unknown_cmnd;
-		common->data_size_from_cmnd =
-			get_unaligned_be16(&common->cmnd[7]);
-		status = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (7<<6) | (1<<1), 1,
-				      "READ TOC");
-		if (status == 0)
-			status = do_read_toc(common, bh);
-		break;
-
-	case READ_FORMAT_CAPACITIES:
-		common->data_size_from_cmnd =
-			get_unaligned_be16(&common->cmnd[7]);
-		status = check_command(common, 10, DATA_DIR_TO_HOST,
-				      (3<<7), 1,
-				      "READ FORMAT CAPACITIES");
-		if (status == 0)
-			status = do_read_format_capacities(common, bh);
-		break;
-
-	case REQUEST_SENSE:
-		common->data_size_from_cmnd = common->cmnd[4];
-		status = check_command(common, 6, DATA_DIR_TO_HOST,
-				      (1<<4), 0,
-				      "REQUEST SENSE");
-		if (status == 0)
-			status = do_request_sense(common, bh);
-		break;
-
-	case START_STOP:
-		common->data_size_from_cmnd = 0;
-		status = check_command(common, 6, DATA_DIR_NONE,
-				      (1<<1) | (1<<4), 0,
-				      "START-STOP UNIT");
-		if (status == 0)
-			status = do_start_stop(common);
-		break;
-
-	case SYNCHRONIZE_CACHE:
-		common->data_size_from_cmnd = 0;
-		status = check_command(common, 10, DATA_DIR_NONE,
-				      (0xf<<2) | (3<<7), 1,
-				      "SYNCHRONIZE CACHE");
-		if (status == 0)
-			status = do_synchronize_cache(common);
-		break;
-
-	case TEST_UNIT_READY:
-		common->data_size_from_cmnd = 0;
-		status = check_command(common, 6, DATA_DIR_NONE,
-				0, 1,
-				"TEST UNIT READY");
-		break;
-
-	/*
-	 * Although optional, this command is used by MS-Windows.  We
-	 * support a minimal version: BytChk must be 0.
-	 */
-	case VERIFY:
-		common->data_size_from_cmnd = 0;
-		status = check_command(common, 10, DATA_DIR_NONE,
-				      (1<<1) | (0xf<<2) | (3<<7), 1,
-				      "VERIFY");
-		if (status == 0)
-			status = do_verify(common);
-		break;
-
-	case WRITE_6:
-		i = common->cmnd[4];
-		common->data_size_from_cmnd = (i == 0) ? 256 : i;
-		status = check_command_size_in_blocks(common, 6,
-				      DATA_DIR_FROM_HOST,
-				      (7<<1) | (1<<4), 1,
-				      "WRITE(6)");
-		if (status == 0)
-			status = do_write(common);
-		break;
-
-	case WRITE_10:
-		common->data_size_from_cmnd =
-				get_unaligned_be16(&common->cmnd[7]);
-		status = check_command_size_in_blocks(common, 10,
-				      DATA_DIR_FROM_HOST,
-				      (1<<1) | (0xf<<2) | (3<<7), 1,
-				      "WRITE(10)");
-		if (status == 0)
-			status = do_write(common);
-		break;
-
-	case WRITE_12:
-		common->data_size_from_cmnd =
-				get_unaligned_be32(&common->cmnd[6]);
-		status = check_command_size_in_blocks(common, 12,
-				      DATA_DIR_FROM_HOST,
-				      (1<<1) | (0xf<<2) | (0xf<<6), 1,
-				      "WRITE(12)");
-		if (status == 0)
-			status = do_write(common);
-		break;
-
-	/*
-	 * Some mandatory commands that we recognize but don't implement.
-	 * They don't mean much in this setting.  It's left as an exercise
-	 * for anyone interested to implement RESERVE and RELEASE in terms
-	 * of Posix locks.
-	 */
-	case FORMAT_UNIT:
-	case RELEASE:
-	case RESERVE:
-	case SEND_DIAGNOSTIC:
-
-	default:
-unknown_cmnd:
-		common->data_size_from_cmnd = 0;
-		sprintf(unknown, "Unknown x%02x", common->cmnd[0]);
-		status = check_command(common, common->cmnd_size,
-				      DATA_DIR_UNKNOWN, ~0, 0, unknown);
-		if (status == 0) {
-			common->curlun->sense_data = SS_INVALID_COMMAND;
-			status = -EINVAL;
+		if (common->cmnd[0] != curr_check->command)
+			continue;
+		if (WARN(curr_check->command != curr_handler->command,
+			 "Invalid CDB handlers initialization. Command not matches\n")) {
+			goto end;
 		}
-		break;
+
+		// The command was matched. Go to processing
+		switch (curr_check->size_index) {
+		case CDB_NO_SIZE_FIELD:
+			common->data_size_from_cmnd = 0;
+			break;
+		case CDB_SIZE_FIELD_4:
+			common->data_size_from_cmnd =
+				(common->cmnd[CDB_SIZE_FIELD_4] == 0) ?
+					0xFF :
+					common->cmnd[CDB_SIZE_FIELD_4];
+			break;
+		case CDB_SIZE_FIELD_6:
+			common->data_size_from_cmnd =
+				get_unaligned_be32(&common->cmnd[CDB_SIZE_FIELD_6]);
+			break;
+		case CDB_SIZE_FIELD_7:
+			common->data_size_from_cmnd =
+				get_unaligned_be16(&common->cmnd[CDB_SIZE_FIELD_7]);
+			break;
+		case CDB_SIZE_MANUAL:
+			common->data_size_from_cmnd =
+				curr_check->data_size_manual;
+			break;
+		default:
+			// should never happen
+			pr_err("error of get kind size field\n");
+			goto end;
+		}
+
+		if (curr_check->do_check_command) {
+			status = curr_check->do_check_command(common,
+				curr_check->size, curr_check->direction,
+				curr_check->valid_bytes_bitmask,
+				curr_check->medium_required,
+				curr_handler->name);
+		} else {
+			DBG(common, "SCSI command: %s\n", curr_handler->name);
+			status = 0;
+		}
+
+		if (status == 0) {
+			if (curr_handler->type == CDB_HANDLER_COMMON &&
+			    curr_handler->do_command) {
+				status = curr_handler->do_command(common);
+			} else if (curr_handler->type ==
+					   CDB_HANDLER_FSG_BUFFHD &&
+				   curr_handler->do_command_with_buffhd !=
+					   NULL) {
+				status =
+					curr_handler->do_command_with_buffhd(common, bh);
+			}
+		}
+
+		goto end;
 	}
+
+	common->data_size_from_cmnd = 0;
+	sprintf(unknown, "Unknown %02Xh", common->cmnd[0]);
+	status = check_command(common, common->cmnd_size, DATA_DIR_UNKNOWN, ~0,
+			       MEDIUM_OPTIONAL, unknown);
+	if (status == 0) {
+		common->curlun->sense_data = SS_INVALID_COMMAND;
+		status = -EINVAL;
+	}
+
+end:
 	up_read(&common->filesem);
 
 	if (status == -EINTR || signal_pending(current))
@@ -2081,7 +2152,6 @@ unknown_cmnd:
 
 	return 0;
 }
-
 
 /*-------------------------------------------------------------------------*/
 
