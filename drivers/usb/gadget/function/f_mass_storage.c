@@ -1932,6 +1932,40 @@ static void send_status(struct fsg_common *common)
 	return;
 }
 
+static int do_read_disc_info(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	struct fsg_lun *curlun = common->curlun;
+	struct cdb_disc_info *cdb = (struct cdb_disc_info *)common->cmnd;
+	disc_information *info = (disc_information *)bh->buf;
+
+	if (cdb->type != DISC_TYPE_STANDARD) {
+		LERROR(curlun,
+		       "Unsupported disc information type(%02Xh) requested\n",
+		       cdb->type);
+		return -EINVAL;
+	}
+	memset(info, 0, sizeof(disc_information));
+	info->disc_information_length = cpu_to_be16(
+		sizeof(*info) - sizeof(info->disc_information_length));
+
+	info->border_status = DISC_LAST_SESS_COMPLETE;
+	info->disc_status = DISC_STATUS_FINALIZED;
+
+	/* We only support one session per disk */
+	info->n_first_track = 1;
+	info->n_sessions_lsb = 1;
+	info->first_track_lsb = 1;
+	info->last_track_lsb = 1;
+
+	/* Setting the unrestricted use because we only support (CD/DVD/BD)-ROM */
+	info->uru = 1;
+
+	info->disc_type = DISC_FIELD_DA_ROM;
+
+	common->data_size_to_handle = sizeof(*info);
+	return 0;
+}
+
 /**
  * Attempts to guess medium type by looking at the length of the disc layout.
  */
@@ -2253,6 +2287,8 @@ static struct cdb_command_check cdb_checker_table[] = {
 	{ CDB_REG_CHECKER(TEST_UNIT_READY, 6, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
 			  0x0000, MEDIUM_REQUIRED) },
 
+	{ CDB_REG_NO_CHECKER(READ_DISC_INFORMATION, CDB_SIZE_FIELD_7,
+			     DATA_DIR_TO_HOST, MEDIUM_REQUIRED) },
 	{ CDB_REG_NO_CHECKER(GET_CONFIGURATION, CDB_SIZE_FIELD_7,
 			     DATA_DIR_TO_HOST, MEDIUM_REQUIRED) },
 
@@ -2286,6 +2322,7 @@ static struct cdb_handler cdb_handlers_table[] = {
 	{ CDB_REG_HANDLER(SYNCHRONIZE_CACHE, &do_synchronize_cache) },
 	{ CDB_REG_HANDLER(TEST_UNIT_READY, NULL) },
 
+	{ CDB_REG_HANDLER_BUFFHD(READ_DISC_INFORMATION, &do_read_disc_info) },
 	{ CDB_REG_HANDLER_BUFFHD(GET_CONFIGURATION, &do_get_configuration) },
 	/*
 	 * Although optional, this command is used by MS-Windows.  We

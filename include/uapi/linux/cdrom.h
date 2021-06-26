@@ -816,51 +816,204 @@ struct rwrt_feature_desc {
 	__u8 reserved3;
 };
 
+/* Disc Information Data Types */
+#define DISC_TYPE_STANDARD			(0x00U)
+#define DISC_TYPE_TRACK				(0x01U)
+#define DISC_TYPE_POW				(0x02U)
+
+/* Disc Status */
+#define DISC_STATUS_EMPTY			(0x00U)
+#define DISC_STATUS_INCOMPLETE		(0x01U)
+#define DISC_STATUS_FINALIZED		(0x02U)
+#define DISC_STATUS_OTHER			(0x03U)
+
+/* State of Last Session */
+#define DISC_LAST_SESS_EMPTY		(0x00U)
+#define DISC_LAST_SESS_INCOMPLETE	(0x01U)
+#define DISC_LAST_SESS_DAMAGED		(0x02U)
+#define DISC_LAST_SESS_COMPLETE		(0x03U)
+
+/* Background Format Status Codes */
+#define DISC_BACK_FMT_NEITHER		(0x00U)
+#define DISC_BACK_FMT_STARTED		(0x01U)
+#define DISC_BACK_FMT_PROGRESS		(0x02U)
+#define DISC_BACK_FMT_COMPLETED		(0x03U)
+
+/* Disc Type Field */
+#define DISC_FIELD_DA_ROM			(0x00U)
+#define DISC_FIELD_I				(0x10U)
+#define DISC_FIELD_ROM_XA			(0x20U)
+#define DISC_FIELD_UNDEF			(0xFFU)
+
+/**
+ * @brief The READ DISC INFORMATION CDB(0051h)
+ * The READ DISC INFORMATION command allows the Host to request information about
+ * the currently mounted MM disc.
+ */
+struct cdb_disc_info {
+	__u8 code;
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+	__u8 reserved1 : 5;
+	/**
+	 * When a disc is present, Data Type defines the specific information requested
+	 */
+	__u8 type : 3;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+	__u8 type : 3;
+	__u8 reserved1 : 5;
+#endif
+
+	__u8 reserved2[5];
+
+	__be16 length;
+
+	__u8 control;
+}  __packed;
+
 typedef struct {
 	__be16 disc_information_length;
 #if defined(__BIG_ENDIAN_BITFIELD)
-	__u8 reserved1			: 3;
-        __u8 erasable			: 1;
-        __u8 border_status		: 2;
-        __u8 disc_status		: 2;
+	/**
+	 * The Disc Information Data Type field shall be set to the reported
+	 * Disc Information Type
+	 */
+	__u8 info_data_type : 3;
+	/**
+	 * The Erasable bit, when set to one, indicates that CD-RW, DVD-RAM, DVD-RW, DVD+RW,
+	 * HD DVD-RAM, or BD-RE media is present and the Drive is capable of writing the media.
+	 * If the Erasable bit is set to zero, then either the medium is not erasable or the
+	 * Drive is unable to write the media.
+	 */
+	__u8 erasable : 1;
+	/**
+	 * The State of Last Session field specifies the recorded state of the last
+	 * session, regardless of the number of sessions on the disc.
+	 */
+	__u8 border_status : 2;
+	/* The Disc Status field indicates the recorded status of the disc */
+	__u8 disc_status : 2;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-        __u8 disc_status		: 2;
-        __u8 border_status		: 2;
-        __u8 erasable			: 1;
-	__u8 reserved1			: 3;
+	__u8 disc_status : 2;
+	__u8 border_status : 2;
+	__u8 erasable : 1;
+	__u8 info_data_type : 3;
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif
+	/**
+	 * The Number of First Track on Disc is the track number of the Logical Track that
+	 * contains LBA 0
+	 */
 	__u8 n_first_track;
 	__u8 n_sessions_lsb;
+	/**
+	 * First Track Number in Last Session (bytes 5 & 10) is the track number of the
+	 * first Logical Track in the last session.
+	 * This includes the incomplete logical track.
+	 */
 	__u8 first_track_lsb;
+	/**
+	 * Last Track Number in Last Session (bytes 6 & 11) is the track number of the last
+	 * Logical Track in the last session.
+	 * This includes the incomplete logical track.
+	 */
 	__u8 last_track_lsb;
 #if defined(__BIG_ENDIAN_BITFIELD)
-	__u8 did_v			: 1;
-        __u8 dbc_v			: 1;
-        __u8 uru			: 1;
-        __u8 reserved2			: 2;
-	__u8 dbit			: 1;
-	__u8 mrw_status			: 2;
+	/**
+	 * The DID_V (Disc ID Valid) bit, when set to one, indicates that the Disc
+	 * Identification field is valid
+	 */
+	__u8 did_v : 1;
+	/**
+	 * The DBC_V (Disc Bar Code Valid bit, when set to one, indicates that the Disc Bar
+	 * Code field (bytes 24 through 31) is valid
+	 */
+	__u8 dbc_v : 1;
+	/**
+	 * The URU (Unrestricted Use Disc) bit may be zero for special use CD-R, CD-RW,
+	 * or DVD-R, medium.
+	 * For all other media types, URU shall be set to one. When URU is zero, the mounted
+	 * disc is defined for restricted use.
+	 */
+	__u8 uru : 1;
+	/**
+	 * DAC_V indicates the validity of the Disc Application Code in byte 32. If DAC_V is
+	 * set to zero, then the Disc Application Code is not valid. If DAC_V is set to one,
+	 * the Disc Application Code is valid.
+	 */
+	__u8 dac_v: 1;
+	__u8 reserved2 : 1;
+	/**
+	 * If the disc is MRW formatted or MRW formatting (state = 01b, 10b, or 11b),
+	 * then bit 2 of byte 7 (Dbit) is a copy of the “dirty bit” from the defect table.
+	 * If Dbit is set to zero, then the MRW structures are current.
+	 * If Dbit is set to one, then the MRW structures may not be current.
+	 * When BG format status = 00b, Dbit shall be set to zero.
+	 */
+	__u8 dbit : 1;
+	/**
+	 * The BG format status is the background format status of the mounted disc.
+	 * Drives that report the Formattable Feature and either the MRW Feature or the DVD+RW
+	 * Feature, or both are required to implement Background format.
+	 * For all other Drives, this field shall be @param DISC_BACK_FMT_NEITHER.
+	 */
+	__u8 mrw_status : 2;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	__u8 mrw_status			: 2;
-	__u8 dbit			: 1;
-        __u8 reserved2			: 2;
-        __u8 uru			: 1;
-        __u8 dbc_v			: 1;
-	__u8 did_v			: 1;
+	__u8 mrw_status : 2;
+	__u8 dbit : 1;
+	__u8 reserved2 : 1;
+	__u8 dac_v: 1;
+	__u8 uru : 1;
+	__u8 dbc_v : 1;
+	__u8 did_v : 1;
 #endif
+	/**
+	 * The Disc Type field is associated only with CD media type
+	 */
 	__u8 disc_type;
 	__u8 n_sessions_msb;
 	__u8 first_track_msb;
 	__u8 last_track_msb;
+
+	/**
+	 * For CD-R/RW, the Disc Identification number recorded in the PMA is returned.
+	 * The Disc Identification Number is recorded in the PMA as a six-digit BCD number.
+	 * It is returned in the Disc Information Block as a 32 bit binary integer.
+	 * This value should be zero filled for all other media types.
+	 */
 	__u32 disc_id;
+	/**
+	 * The Last Session Lead-in Start Address field is dependent on medium and
+	 * recorded status.
+	 */
 	__u32 lead_in;
+	/**
+	 * The Last Possible Lead-out Start Address field is dependent on medium and
+	 * recorded status.
+	 */
 	__u32 lead_out;
+	/**
+	 * For CD, the Disc Bar Code field contains the hexadecimal value of the bar code
+	 * if the Drive has the ability to read Disc Bar Code and a bar code is present.
+	 * For all other media this field should be set to zeros.
+	 */
 	__u8 disc_bar_code[8];
+	/**
+	 *
+	 */
 	__u8 reserved3;
+	/**
+	 * The Number of OPC Tables field is the number of OPC tables that follow this field.
+	 * If OPC has not been determined for the currently mounted medium, the Number of
+	 * OPC Tables field is set to zero.
+	 * The Number of OPC Tables represents the number of disc speeds for which the OPC
+	 * values are known.
+	 * Since each OPC Table is 8 bytes in length, then the number of bytes that follow
+	 * the Number of OPC Tables field is 8 x Number of OPC Tables.
+	 */
 	__u8 n_opc;
-} disc_information;
+} __packed disc_information;
 
 typedef struct {
 	__be16 track_information_length;
