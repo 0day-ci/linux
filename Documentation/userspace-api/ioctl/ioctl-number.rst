@@ -180,6 +180,8 @@ Code  Seq#    Include File                                           Comments
 'R'   01     linux/rfkill.h                                          conflict!
 'R'   C0-DF  net/bluetooth/rfcomm.h
 'R'   E0     uapi/linux/fsl_mc.h
+'R'   F0-FF  uapi/misc/azure_blob.h                                  Microsoft Azure Blob driver
+                                                                     <mailto:longli@microsoft.com>
 'S'   all    linux/cdrom.h                                           conflict!
 'S'   80-81  scsi/scsi_ioctl.h                                       conflict!
 'S'   82-FF  scsi/scsi.h                                             conflict!
