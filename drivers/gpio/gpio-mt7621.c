@@ -207,6 +207,47 @@ mediatek_gpio_xlate(struct gpio_chip *chip,
 }
 
 static int
+mediatek_gpio_set_names(struct device *dev, struct mtk_gc *rg)
+{
+	struct device_node *np = dev->of_node;
+	const char **names;
+	int nstrings, base;
+	unsigned int i;
+
+	names = devm_kcalloc(dev, MTK_BANK_WIDTH, sizeof(*names),
+			     GFP_KERNEL);
+	if (!names)
+		return -ENOMEM;
+
+	base = rg->bank * MTK_BANK_WIDTH;
+	nstrings = of_property_count_strings(np, "gpio-line-names");
+	if (nstrings <= base)
+		goto assign_names;
+
+	for (i = 0; i < MTK_BANK_WIDTH; i++) {
+		const char *name;
+		int ret;
+
+		ret = of_property_read_string_index(np, "gpio-line-names",
+						    base + i, &name);
+		if (ret) {
+			if (ret != -ENODATA)
+				dev_err(dev, "unable to name line %d: %d\n",
+					base + i, ret);
+			break;
+		}
+
+		if (*name)
+			names[i] = name;
+	}
+
+assign_names:
+	rg->chip.names = names;
+
+	return 0;
+}
+
+static int
 mediatek_gpio_bank_probe(struct device *dev,
 			 struct device_node *node, int bank)
 {
@@ -240,6 +281,10 @@ mediatek_gpio_bank_probe(struct device *dev,
 					dev_name(dev), bank);
 	if (!rg->chip.label)
 		return -ENOMEM;
+
+	ret = mediatek_gpio_set_names(dev, rg);
+	if (ret)
+		return ret;
 
 	rg->irq_chip.name = dev_name(dev);
 	rg->irq_chip.parent_device = dev;
