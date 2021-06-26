@@ -54,7 +54,7 @@ static enum odd_mech_type zpodd_get_mech_type(struct ata_device *dev)
 {
 	char *buf;
 	unsigned int ret;
-	struct rm_feature_desc *desc;
+	struct cdf_removable_medium *desc;
 	struct ata_taskfile tf;
 	static const char cdb[ATAPI_CDB_LEN] = {  GPCMD_GET_CONFIGURATION,
 			2,      /* only 1 feature descriptor requested */
@@ -82,15 +82,15 @@ static enum odd_mech_type zpodd_get_mech_type(struct ata_device *dev)
 		return ODD_MECH_TYPE_UNSUPPORTED;
 	}
 
-	if (be16_to_cpu(desc->feature_code) != 3) {
+	if (be16_to_cpu(desc->code) != 3) {
 		kfree(buf);
 		return ODD_MECH_TYPE_UNSUPPORTED;
 	}
 
-	if (desc->mech_type == 0 && desc->load == 0 && desc->eject == 1) {
+	if (desc->mechanism == 0 && desc->load == 0 && desc->eject == 1) {
 		kfree(buf);
 		return ODD_MECH_TYPE_SLOT;
-	} else if (desc->mech_type == 1 && desc->load == 0 &&
+	} else if (desc->mechanism == 1 && desc->load == 0 &&
 		   desc->eject == 1) {
 		kfree(buf);
 		return ODD_MECH_TYPE_DRAWER;

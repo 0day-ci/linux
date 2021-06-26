@@ -366,6 +366,87 @@ struct cdb_handler {
 	/* SCSI command ASCII name */
 	char *name;
 };
+/*-------------------------------------------------------------------------*/
+
+#define CDF_PROFILES_COUNT (ARRAY_SIZE(cdf_supported_profiles))
+
+/* List of supported profiles */
+static struct mmc_profile cdf_supported_profiles[] = {
+	{ .profile = cpu_to_be16(MMC_PROFILE_BD_ROM) },
+	{ .profile = cpu_to_be16(MMC_PROFILE_DVD_ROM) },
+	{ .profile = cpu_to_be16(MMC_PROFILE_CD_ROM) },
+};
+
+struct cdf_profile_list_custom {
+	struct cdf_profile_list header;
+	/* We support several profiles, whose indices are declared in the
+	 * enum above
+	 */
+	struct mmc_profile profiles[CDF_PROFILES_COUNT];
+} __packed;
+
+/**
+ * Type to allocate of all supported features
+ * @param populate - callback to fill the specified feature data which
+ * is depended by medium
+ */
+struct cdr_features;
+struct cdr_features {
+	union {
+		struct cdf_profile_list_custom profile_list;
+		struct cdf_core core;
+		struct cdf_morphing morphing;
+		struct cdf_removable_medium removable;
+		struct cdf_random_readable random_readable;
+		struct cdf_multi_read multi_read;
+		struct cdf_cd_read cd_read;
+		struct cdf_dvd_read dvd_read;
+		struct cdf_rt_streaming rt_streaming;
+	} __packed feature;
+	void (*populate)(struct fsg_common *common,
+			 struct cdr_features **features);
+};
+
+/**
+ * @brief Adjust the Profile List members of actual data which is depended
+ * on the inserted medium image
+ *
+ * @param common - the FSG instance
+ * @param feature - a list of profile descriptors which to be configured
+ */
+static void cdf_populate_profile_list(struct fsg_common *common,
+				      struct cdr_features **feature);
+
+#define CDF_SET_VPC(v, p, c) .vpc = { .ver = (v), .per = (p), .cur = (c) }
+
+#define CDF_FT_SIZE(member)                                                    \
+	((sizeof(((struct cdr_features *)0)->feature.member)) -                \
+	 sizeof(struct cdb_ft_generic))
+
+#define CDR_FT_ITEM(item, c, ...)                                              \
+	CDR_FT_ITEM_S(item, c, CDF_FT_SIZE(item), __VA_ARGS__)
+
+#define CDR_FT_ITEM_S(item, c, s, ...)                                         \
+	.feature.item = { .code = cpu_to_be16(c), .length = (s), __VA_ARGS__ }
+
+static struct cdr_features features_table[] = {
+	{ CDR_FT_ITEM_S(profile_list.header, CDF_PROFILE_LIST_CODE,
+			CDF_FT_SIZE(profile_list), CDF_SET_VPC(0, 1, 1)),
+	  .populate = &cdf_populate_profile_list },
+	{ CDR_FT_ITEM(core, CDF_CORE, CDF_SET_VPC(2, 1, 1), .dbevent = 1,
+		      .interface = cpu_to_be32(CF_PIS_USB)) },
+	{ CDR_FT_ITEM(morphing, CDF_MORPHING_CODE, CDF_SET_VPC(1, 1, 1),
+		      .ocevent = 1) },
+	{ CDR_FT_ITEM(removable, CDF_REMOVEBLE_MEDIA, CDF_SET_VPC(2, 1, 1),
+		      .mechanism = CDF_LMT__TRAY_TYPE, .eject = 1, .lock = 1) },
+	{ CDR_FT_ITEM(random_readable, CDF_RANDOM_READ, CDF_SET_VPC(0, 0, 1),
+		      .block_size = cpu_to_be32(CD_FRAMESIZE),
+		      .blocking = cpu_to_be16(0x10), .pp = 1) },
+	{ CDR_FT_ITEM(dvd_read, CDF_DVD_READ, CDF_SET_VPC(2, 1, 1),
+		      .multi110 = 1, .dualr = 1) },
+	{ CDR_FT_ITEM(rt_streaming, CDF_REAL_TIME_STREAM, CDF_SET_VPC(5, 0, 1),
+		      .rbcb = 1, .scs = 1, .mp2a = 1, .wspd = 1, .sw = 1) },
+};
 
 /*------------------------------------------------------------------------*/
 
@@ -1851,6 +1932,143 @@ static void send_status(struct fsg_common *common)
 	return;
 }
 
+/**
+ * Attempts to guess medium type by looking at the length of the disc layout.
+ */
+static inline __be16 cdr_guess_medium_type(struct fsg_common *common)
+{
+	struct fsg_lun *curlun = common->curlun;
+	size_t length = curlun->num_sectors;
+
+	if (length <= CD_MAX_FRAMES) {
+		LDBG(curlun, "Disc layout size implies CD-ROM image\n");
+		return MMC_PROFILE_CD_ROM;
+	} else if (length <= CD_DVD_MAX_FRAMES) {
+		LDBG(curlun,
+		     "Disc layout size implies single-layer DVD-ROM image\n");
+		return MMC_PROFILE_DVD_ROM;
+	} else if (length <= CD_DVDDL_MAX_FRAMES) {
+		LDBG(curlun,
+		     "Disc layout size implies dual-layer DVD-ROM image\n");
+		return MMC_PROFILE_DVD_ROM;
+	} else if (length <= CD_BD_MAX_FRAMES) {
+		LDBG(curlun,
+		     "Disc layout size implies single-layer BD-ROM image\n");
+		return MMC_PROFILE_BD_ROM;
+	} else if (length <= CD_BDDL_MAX_FRAMES) {
+		LDBG(curlun,
+		     "Disc layout size implies dual-layer BD-ROM image\n");
+		return MMC_PROFILE_BD_ROM;
+	}
+
+	LDBG(curlun,
+	     "Disc layout size (%u) exceeds all known media types, assuming BD - ROM !\n",
+	     length);
+	return MMC_PROFILE_BD_ROM;
+}
+
+/* Adjust current profile which depended on an inserted medium */
+static inline void cdf_populate_profile_list(struct fsg_common *common,
+					     struct cdr_features **feature)
+{
+	__be16 current_media_type = cdr_guess_medium_type(common);
+	struct mmc_profile *profiles =
+		(*feature)->feature.profile_list.profiles;
+	int i;
+
+	/* copy profile list to the response buffer */
+	memcpy(profiles, cdf_supported_profiles,
+	       sizeof(cdf_supported_profiles));
+	for (i = 0; i < CDF_PROFILES_COUNT; ++i) {
+		/*
+		 * Reset the current profile bit,
+		 * because it might be set from the previous one
+		 */
+		profiles[i].current_p = 0;
+		if (be16_to_cpu(profiles[i].profile) == current_media_type) {
+			DBG(common, "Fill current profile: curr=(%04Xh)\n",
+			    be16_to_cpu(profiles[i].profile));
+			profiles[i].current_p = 1;
+		}
+	}
+}
+
+static int do_get_configuration(struct fsg_common *common,
+				struct fsg_buffhd *bh)
+{
+	struct fsg_lun *curlun = common->curlun;
+	int i;
+	struct cdb_get_configuration *cdb =
+		(struct cdb_get_configuration *)common->cmnd;
+	size_t buffer_size = sizeof(struct feature_header);
+	size_t generic_desc_size = sizeof(struct cdb_ft_generic);
+	struct feature_header *ret_header = (struct feature_header *)bh->buf;
+	u8 *ret_data = ((u8 *)ret_header) + buffer_size;
+
+	LDBG(curlun, "Requesting features from 0x%04X, with RT flag 0x%02X\n",
+	     be16_to_cpu(cdb->sfn), cdb->rt);
+
+	if (!common->curlun || !common->curlun->cdrom)
+		return -EINVAL;
+
+	/* Go over *all* features, and copy them according to RT value */
+	for (i = 0; i < ARRAY_SIZE(features_table); ++i) {
+		struct cdb_ft_generic *generic =
+			(struct cdb_ft_generic *)&features_table[i];
+		struct cdr_features *feature = &features_table[i];
+
+		if (feature->populate != NULL)
+			feature->populate(common, &feature);
+
+		// a) RT is 0x00 and feature's code >= SFN
+		// b) RT is 0x01, feature's code >= SFN and feature has 'current' bit set
+		// c) RT is 0x02 and feature's code == SFN
+
+		if (be16_to_cpu(generic->code) >= be16_to_cpu(cdb->sfn)) {
+			if ((cdb->rt == CDR_CFG_RT_FULL) ||
+			    (cdb->rt == CDR_CFG_RT_CURRENT &&
+			     generic->vpc.cur) ||
+			    (cdb->rt == CDR_CFG_RT_SPECIFIED_SFN &&
+			     be16_to_cpu(generic->code) ==
+				     be16_to_cpu(cdb->sfn))) {
+				LDBG(curlun, "Copying feature 0x%04X\n",
+				     be16_to_cpu(generic->code));
+
+				memset(ret_data, 0,
+				       (generic->length + generic_desc_size));
+				/* Copy feature */
+				memcpy(ret_data, feature,
+				       (generic->length + generic_desc_size));
+				buffer_size +=
+					(generic->length + generic_desc_size);
+				ret_data +=
+					(generic->length + generic_desc_size);
+
+				/* Break the loop if RT is CDR_CFG_RT_SPECIFIED_SFN */
+				if (cdb->rt == CDR_CFG_RT_SPECIFIED_SFN) {
+					LDBG(curlun,
+					     "Got the feature we wanted (0x%04X), breaking the loop\n",
+					     be16_to_cpu(cdb->sfn));
+					break;
+				}
+			}
+		}
+	}
+
+	memset(ret_header, 0, sizeof(struct feature_header));
+	/* Header */
+	ret_header->data_len = cpu_to_be32(buffer_size - generic_desc_size);
+	ret_header->curr_profile =
+		cpu_to_be16(cdr_guess_medium_type(common));
+
+	dump_msg(common, "feature header", (u8 *)ret_header,
+		 sizeof(struct feature_header));
+
+	dump_msg(common, "features table", (u8 *)bh->buf, buffer_size);
+
+	common->data_size_to_handle = buffer_size;
+	return 0;
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -2035,6 +2253,9 @@ static struct cdb_command_check cdb_checker_table[] = {
 	{ CDB_REG_CHECKER(TEST_UNIT_READY, 6, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
 			  0x0000, MEDIUM_REQUIRED) },
 
+	{ CDB_REG_NO_CHECKER(GET_CONFIGURATION, CDB_SIZE_FIELD_7,
+			     DATA_DIR_TO_HOST, MEDIUM_REQUIRED) },
+
 	{ CDB_REG_CHECKER_BLK(VERIFY, 10, CDB_NO_SIZE_FIELD, DATA_DIR_NONE,
 			      0x0000, MEDIUM_REQUIRED) },
 	{ CDB_REG_CHECKER_BLK(WRITE_6, 6, CDB_SIZE_FIELD_4, DATA_DIR_FROM_HOST,
@@ -2065,6 +2286,7 @@ static struct cdb_handler cdb_handlers_table[] = {
 	{ CDB_REG_HANDLER(SYNCHRONIZE_CACHE, &do_synchronize_cache) },
 	{ CDB_REG_HANDLER(TEST_UNIT_READY, NULL) },
 
+	{ CDB_REG_HANDLER_BUFFHD(GET_CONFIGURATION, &do_get_configuration) },
 	/*
 	 * Although optional, this command is used by MS-Windows.  We
 	 * support a minimal version: BytChk must be 0.
