@@ -248,6 +248,13 @@ static const struct dmi_system_id inverted_x_screen[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "I15-TC")
 		},
 	},
+	{
+		.ident = "TrekStor SurfTab duo W1 10.1 (VT4)",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TrekStor"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "SurfTab duo W1 10.1 (VT4)")
+		},
+	},
 #endif
 	{}
 };
