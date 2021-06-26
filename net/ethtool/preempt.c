@@ -48,6 +48,8 @@ static int preempt_reply_size(const struct ethnl_req_info *req_base,
 
 	len += nla_total_size(sizeof(u8)); /* _PREEMPT_ENABLED */
 	len += nla_total_size(sizeof(u32)); /* _PREEMPT_ADD_FRAG_SIZE */
+	len += nla_total_size(sizeof(u8)); /* _PREEMPT_DISABLE_VERIFY */
+	len += nla_total_size(sizeof(u8)); /* _PREEMPT_VERIFIED */
 
 	return len;
 }
@@ -64,6 +66,12 @@ static int preempt_fill_reply(struct sk_buff *skb,
 
 	if (nla_put_u32(skb, ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE,
 			preempt->add_frag_size))
+		return -EMSGSIZE;
+
+	if (nla_put_u8(skb, ETHTOOL_A_PREEMPT_DISABLE_VERIFY, preempt->disable_verify))
+		return -EMSGSIZE;
+
+	if (nla_put_u8(skb, ETHTOOL_A_PREEMPT_VERIFIED, preempt->verified))
 		return -EMSGSIZE;
 
 	return 0;
@@ -86,6 +94,7 @@ ethnl_preempt_set_policy[ETHTOOL_A_PREEMPT_MAX + 1] = {
 	[ETHTOOL_A_PREEMPT_HEADER]			= NLA_POLICY_NESTED(ethnl_header_policy),
 	[ETHTOOL_A_PREEMPT_ENABLED]			= NLA_POLICY_RANGE(NLA_U8, 0, 1),
 	[ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE]		= { .type = NLA_U32 },
+	[ETHTOOL_A_PREEMPT_DISABLE_VERIFY]		= NLA_POLICY_RANGE(NLA_U8, 0, 1),
 };
 
 int ethnl_set_preempt(struct sk_buff *skb, struct genl_info *info)
@@ -124,6 +133,8 @@ int ethnl_set_preempt(struct sk_buff *skb, struct genl_info *info)
 			tb[ETHTOOL_A_PREEMPT_ENABLED], &mod);
 	ethnl_update_u32(&preempt.add_frag_size,
 			 tb[ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE], &mod);
+	ethnl_update_u8(&preempt.disable_verify,
+			tb[ETHTOOL_A_PREEMPT_DISABLE_VERIFY], &mod);
 	ret = 0;
 	if (!mod)
 		goto out_ops;

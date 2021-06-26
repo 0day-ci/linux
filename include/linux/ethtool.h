@@ -420,6 +420,8 @@ struct ethtool_module_eeprom {
 struct ethtool_fp {
 	u8 enabled;
 	u32 add_frag_size;
+	u8 disable_verify;
+	u8 verified;
 };
 
 /**

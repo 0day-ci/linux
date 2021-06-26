@@ -675,6 +675,8 @@ enum {
 	ETHTOOL_A_PREEMPT_HEADER,			/* nest - _A_HEADER_* */
 	ETHTOOL_A_PREEMPT_ENABLED,			/* u8 */
 	ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE,		/* u32 */
+	ETHTOOL_A_PREEMPT_DISABLE_VERIFY,		/* u8 */
+	ETHTOOL_A_PREEMPT_VERIFIED,			/* u8 */
 
 	/* add new constants above here */
 	__ETHTOOL_A_PREEMPT_CNT,

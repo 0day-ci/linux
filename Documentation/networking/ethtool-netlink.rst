@@ -1494,6 +1494,8 @@ Request contents:
   ``ETHTOOL_A_PREEMPT_HEADER``           nested  reply header
   ``ETHTOOL_A_PREEMPT_ENABLED``          u8      frame preemption enabled
   ``ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE``    u32     Min additional frag size
+  ``ETHTOOL_A_PREEMPT_DISABLE_VERIFY``   u8      disable verification
+  ``ETHTOOL_A_PREEMPT_VERIFIED``         u8      verification procedure
   =====================================  ======  ==========================
 
 ``ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE`` configures the minimum non-final
@@ -1510,6 +1512,7 @@ Request contents:
   ``ETHTOOL_A_CHANNELS_HEADER``          nested  reply header
   ``ETHTOOL_A_PREEMPT_ENABLED``          u8      frame preemption enabled
   ``ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE``    u32     Min additional frag size
+  ``ETHTOOL_A_PREEMPT_DISABLE_VERIFY``   u8      disable verification
   =====================================  ======  ==========================
 
 ``ETHTOOL_A_PREEMPT_ADD_FRAG_SIZE`` configures the minimum non-final
