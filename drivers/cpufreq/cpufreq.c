@@ -544,8 +544,23 @@ unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 	if (cpufreq_driver->target_index) {
 		unsigned int idx;
 
+		/*  to find the frequency >= target_freq */
 		idx = cpufreq_frequency_table_target(policy, target_freq,
 						     CPUFREQ_RELATION_L);
+
+		/* frequency should subject to policy (min/max) */
+		if (policy->freq_table[idx].frequency > policy->max) {
+			if (policy->freq_table_sorted == CPUFREQ_TABLE_SORTED_ASCENDING)
+				idx--;
+			else
+				idx++;
+		} else if (policy->freq_table[idx].frequency < policy->min) {
+			if (policy->freq_table_sorted == CPUFREQ_TABLE_SORTED_ASCENDING)
+				idx++;
+			else
+				idx--;
+		}
+
 		policy->cached_resolved_idx = idx;
 		return policy->freq_table[idx].frequency;
 	}
