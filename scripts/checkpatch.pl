@@ -5474,9 +5474,8 @@ sub process {
 			}
 		}
 
-# Check for illegal assignment in if conditional -- and check for trailing
-# statements after the conditional.
-		if ($line =~ /do\s*(?!{)/) {
+# If we have sufficient context detect and handle do without braces ({).
+		if ($line =~ /\bdo\b\s*(?!{)/) {
 			($stat, $cond, $line_nr_next, $remain_next, $off_next) =
 				ctx_statement_block($linenr, $realcnt, 0)
 					if (!defined $stat);
@@ -5497,6 +5496,9 @@ sub process {
 								$offset} = 1;
 			}
 		}
+
+# Check for illegal assignment in if conditional -- and check for trailing
+# statements after the conditional.
 		if (!defined $suppress_whiletrailers{$linenr} &&
 		    defined($stat) && defined($cond) &&
 		    $line =~ /\b(?:if|while|for)\s*\(/ && $line !~ /^.\s*#/) {
