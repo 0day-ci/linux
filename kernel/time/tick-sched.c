@@ -931,6 +931,7 @@ static void tick_nohz_full_update_tick(struct tick_sched *ts)
 {
 #ifdef CONFIG_NO_HZ_FULL
 	int cpu = smp_processor_id();
+	static bool no_tick_warned;
 
 	if (!tick_nohz_full_cpu(cpu))
 		return;
@@ -938,10 +939,24 @@ static void tick_nohz_full_update_tick(struct tick_sched *ts)
 	if (!ts->tick_stopped && ts->nohz_mode == NOHZ_MODE_INACTIVE)
 		return;
 
-	if (can_stop_full_tick(cpu, ts))
+	if (can_stop_full_tick(cpu, ts)) {
 		tick_nohz_stop_sched_tick(ts, cpu);
-	else if (ts->tick_stopped)
-		tick_nohz_restart_sched_tick(ts, ktime_get());
+		if (no_tick_warned) {
+			pr_info("NO_HZ_FULL is now enabled in the system.\n");
+			no_tick_warned = false;
+		}
+	} else {
+		/*
+		 * Don't allow the user to think they can get
+		 * full NO_HZ with this machine.
+		 */
+		if (!no_tick_warned && tick_nohz_full_running) {
+			pr_info("NO_HZ_FULL has been disabled in the system.");
+			no_tick_warned = true;
+		}
+		if (ts->tick_stopped)
+			tick_nohz_restart_sched_tick(ts, ktime_get());
+	}
 #endif
 }
 
