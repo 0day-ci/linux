@@ -11,7 +11,7 @@
 #include <asm/traps.h>
 #include "sgx.h"
 
-/**
+/*
  * ENCLS_FAULT_FLAG - flag signifying an ENCLS return code is a trapnr
  *
  * ENCLS has its own (positive value) error codes and also generates
