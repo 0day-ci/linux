@@ -914,7 +914,7 @@ static int cached_dev_cache_miss(struct btree *b, struct search *s,
 	miss = bio_next_split(bio, sectors, GFP_NOIO, &s->d->bio_split);
 
 	/* btree_search_recurse()'s btree iterator is no good anymore */
-	ret = miss == bio ? MAP_DONE : -EINTR;
+	ret = miss == bio ? MAP_DONE : MAP_CONTINUE;
 
 	cache_bio = bio_alloc_bioset(GFP_NOWAIT,
 			DIV_ROUND_UP(s->insert_bio_sectors, PAGE_SECTORS),
