@@ -73,10 +73,11 @@ static int l_show(struct seq_file *m, void *v)
 #ifdef CONFIG_PROVE_LOCKING
 	seq_printf(m, " FD:%5ld", lockdep_count_forward_deps(class));
 	seq_printf(m, " BD:%5ld", lockdep_count_backward_deps(class));
-#endif
 
 	get_usage_chars(class, usage);
 	seq_printf(m, " %s", usage);
+#endif
+
 
 	seq_printf(m, ": ");
 	print_name(m, class);
