@@ -23,6 +23,9 @@ void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 {
 	unsigned long fp, sp, pc;
 
+	if (!task)
+		task = current;
+
 	if (regs) {
 		fp = frame_pointer(regs);
 		sp = user_stack_pointer(regs);
@@ -72,6 +75,9 @@ void notrace walk_stackframe(struct task_struct *task,
 {
 	unsigned long sp, pc;
 	unsigned long *ksp;
+
+	if (!task)
+		task = current;
 
 	if (regs) {
 		sp = user_stack_pointer(regs);
