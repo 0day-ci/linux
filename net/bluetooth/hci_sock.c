@@ -759,19 +759,39 @@ void hci_sock_dev_event(struct hci_dev *hdev, int event)
 	if (event == HCI_DEV_UNREG) {
 		struct sock *sk;
 
+restart:
 		/* Detach sockets from device */
 		read_lock(&hci_sk_list.lock);
 		sk_for_each(sk, &hci_sk_list.head) {
+			/* hci_sk_list.lock is preventing hci_sock_release()
+			 * from calling bt_sock_unlink().
+			 */
+			if (hci_pi(sk)->hdev != hdev || sk_unhashed(sk))
+				continue;
+			/* Take a ref because we can't call lock_sock() with
+			 * hci_sk_list.lock held.
+			 */
+			sock_hold(sk);
+			read_unlock(&hci_sk_list.lock);
 			lock_sock(sk);
-			if (hci_pi(sk)->hdev == hdev) {
+			/* Since hci_sock_release() might have already called
+			 * bt_sock_unlink() while waiting for lock_sock(),
+			 * use sk_hashed(sk) for checking that bt_sock_unlink()
+			 * is not yet called.
+			 */
+			if (sk_hashed(sk) && hci_pi(sk)->hdev == hdev) {
 				hci_pi(sk)->hdev = NULL;
 				sk->sk_err = EPIPE;
 				sk->sk_state = BT_OPEN;
 				sk->sk_state_change(sk);
-
 				hci_dev_put(hdev);
 			}
 			release_sock(sk);
+			sock_put(sk);
+			/* Restarting is safe, for hci_pi(sk)->hdev is now NULL
+			 * if condition met and will "continue;" otherwise.
+			 */
+			goto restart;
 		}
 		read_unlock(&hci_sk_list.lock);
 	}
