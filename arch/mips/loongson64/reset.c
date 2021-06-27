@@ -10,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/kexec.h>
+#include <linux/of_address.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
 
@@ -20,12 +21,50 @@
 #include <loongson.h>
 #include <boot_param.h>
 
+static char *pm_reg_name[] = {"pm1_sts", "pm1_cnt", "rst_cnt"};
+
+static void __iomem *get_reg_byname(struct device_node *node, const char *name)
+{
+	int index = of_property_match_string(node, "reg-names", name);
+
+	if (index < 0)
+		return NULL;
+
+	return of_iomap(node, index);
+}
+
+static int  __init loongson_fdt_reset_init(void)
+{
+	struct device_node *np;
+	int i;
+
+	np = of_find_node_by_type(NULL, "power management");
+	if (!np) {
+		pr_info("Failed to get PM node\n");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < sizeof(pm_reg_name)/sizeof(char *); i++) {
+		pm_reg_name[i] = get_reg_byname(np, pm_reg_name[i]);
+		if (!pm_reg_name[i])
+			iounmap(pm_reg_name[i]);
+	}
+
+	of_node_put(np);
+	return 0;
+}
+arch_initcall(loongson_fdt_reset_init);
+
 static void loongson_restart(char *command)
 {
+	if ((read_c0_prid() & PRID_IMP_MASK) == PRID_IMP_LOONGSON_64R) {
+		writel(0x1, (void *)pm_reg_name[2]);
+	} else {
+		void (*fw_restart)(void) = (void *)loongson_sysconf.restart_addr;
 
-	void (*fw_restart)(void) = (void *)loongson_sysconf.restart_addr;
+		fw_restart();
+	}
 
-	fw_restart();
 	while (1) {
 		if (cpu_wait)
 			cpu_wait();
@@ -34,9 +73,18 @@ static void loongson_restart(char *command)
 
 static void loongson_poweroff(void)
 {
-	void (*fw_poweroff)(void) = (void *)loongson_sysconf.poweroff_addr;
+	if ((read_c0_prid() & PRID_IMP_MASK) == PRID_IMP_LOONGSON_64R) {
+		/* Clear */
+		writel((readl((void *)pm_reg_name[0]) & 0xffffffff), (void *)pm_reg_name[0]);
+		/* Sleep Enable | Soft Off*/
+		writel(GENMASK(12, 10)|BIT(13), (void *)pm_reg_name[1]);
+	} else {
 
-	fw_poweroff();
+		void (*fw_poweroff)(void) = (void *)loongson_sysconf.poweroff_addr;
+
+		fw_poweroff();
+	}
+
 	while (1) {
 		if (cpu_wait)
 			cpu_wait();

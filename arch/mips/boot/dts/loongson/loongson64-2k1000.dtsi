@@ -101,6 +101,14 @@
 			no-loopback-test;
 		};
 
+		pm: power-controller {
+			device_type = "power management";
+			reg = <0 0x1fe0700c 0 0x8>,
+				<0 0x1fe07014 0 0x8>,
+				<0 0x1fe07030 0 0x8>;
+			reg-names = "pm1_sts", "pm1_cnt", "rst_cnt";
+		};
+
 		pci@1a000000 {
 			compatible = "loongson,ls2k-pci";
 			device_type = "pci";
