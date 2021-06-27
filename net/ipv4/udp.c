@@ -950,6 +950,8 @@ csum_partial:
 		uh->check = CSUM_MANGLED_0;
 
 send:
+	/* pick tx queue for this skb list. */
+	skb->ooo_okay = true;
 	err = ip_send_skb(sock_net(sk), skb);
 	if (err) {
 		if (err == -ENOBUFS && !inet->recverr) {

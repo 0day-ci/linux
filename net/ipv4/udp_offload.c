@@ -269,6 +269,7 @@ struct sk_buff *__udp_gso_segment(struct sk_buff *gso_skb,
 	struct udphdr *uh;
 	unsigned int mss;
 	bool copy_dtor;
+	bool ooo_okay;
 	__sum16 check;
 	__be16 newlen;
 
@@ -286,6 +287,8 @@ struct sk_buff *__udp_gso_segment(struct sk_buff *gso_skb,
 	if (copy_dtor)
 		gso_skb->destructor = NULL;
 
+	ooo_okay = gso_skb->ooo_okay;
+	gso_skb->ooo_okay = 0;
 	segs = skb_segment(gso_skb, features);
 	if (IS_ERR_OR_NULL(segs)) {
 		if (copy_dtor)
@@ -293,6 +296,7 @@ struct sk_buff *__udp_gso_segment(struct sk_buff *gso_skb,
 		return segs;
 	}
 
+	segs->ooo_okay = ooo_okay;
 	/* GSO partial and frag_list segmentation only requires splitting
 	 * the frame into an MSS multiple and possibly a remainder, both
 	 * cases return a GSO skb. So update the mss now.
