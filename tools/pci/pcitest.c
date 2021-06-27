@@ -40,7 +40,7 @@ struct pci_test {
 
 static int run_test(struct pci_test *test)
 {
-	struct pci_endpoint_test_xfer_param param;
+	struct pci_endpoint_test_xfer_param param = {0};
 	int ret = -EINVAL;
 	int fd;
 
