@@ -546,7 +546,8 @@ static int m88e1121_config_aneg_rgmii_delays(struct phy_device *phydev)
 {
 	int mscr;
 
-	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
 		mscr = MII_88E1121_PHY_MSCR_RX_DELAY |
 		       MII_88E1121_PHY_MSCR_TX_DELAY;
 	else if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
