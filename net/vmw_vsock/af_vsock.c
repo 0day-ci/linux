@@ -2024,6 +2024,7 @@ static int __vsock_seqpacket_recvmsg(struct sock *sk, struct msghdr *msg,
 		intr_err = vsock_connectible_wait_data(sk, &wait, timeout, NULL, 0);
 		if (intr_err <= 0) {
 			err = intr_err;
+			transport->seqpacket_drop(vsk);
 			break;
 		}
 
