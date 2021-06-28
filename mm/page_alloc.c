@@ -5047,7 +5047,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	int nr_populated = 0;
 
 	if (unlikely(nr_pages <= 0))
-		return 0;
+		goto out;
 
 	/*
 	 * Skip populated array elements to determine if any pages need
@@ -5058,7 +5058,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 
 	/* Already populated array? */
 	if (unlikely(page_array && nr_pages - nr_populated == 0))
-		return 0;
+		goto out;
 
 	/* Use the single page allocator for one page. */
 	if (nr_pages - nr_populated == 1)
@@ -5068,7 +5068,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	gfp &= gfp_allowed_mask;
 	alloc_gfp = gfp;
 	if (!prepare_alloc_pages(gfp, 0, preferred_nid, nodemask, &ac, &alloc_gfp, &alloc_flags))
-		return 0;
+		goto out;
 	gfp = alloc_gfp;
 
 	/* Find an allowed local zone that meets the low watermark. */
@@ -5141,6 +5141,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 
 	local_irq_restore(flags);
 
+out:
 	return nr_populated;
 
 failed_irq:
@@ -5156,7 +5157,7 @@ failed:
 		nr_populated++;
 	}
 
-	return nr_populated;
+	goto out;
 }
 EXPORT_SYMBOL_GPL(__alloc_pages_bulk);
 
