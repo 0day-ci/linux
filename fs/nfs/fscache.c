@@ -381,15 +381,25 @@ static void nfs_readpage_from_fscache_complete(struct page *page,
 					       void *context,
 					       int error)
 {
+	struct nfs_readdesc desc;
+	struct inode *inode = page->mapping->host;
+
 	dfprintk(FSCACHE,
 		 "NFS: readpage_from_fscache_complete (0x%p/0x%p/%d)\n",
 		 page, context, error);
 
-	/* if the read completes with an error, we just unlock the page and let
-	 * the VM reissue the readpage */
 	if (!error) {
 		SetPageUptodate(page);
 		unlock_page(page);
+	} else {
+		desc.ctx = context;
+		nfs_pageio_init_read(&desc.pgio, inode, false,
+				     &nfs_async_read_completion_ops);
+		error = readpage_async_filler(&desc, page);
+		if (error)
+			return;
+
+		nfs_pageio_complete_read(&desc.pgio);
 	}
 }
 
