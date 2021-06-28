@@ -5587,6 +5587,33 @@ static const struct attribute_group spr_uncore_chabox_format_group = {
 	.attrs = spr_uncore_cha_formats_attr,
 };
 
+static ssize_t alias_show(struct device *dev,
+			  struct device_attribute *attr,
+			  char *buf)
+{
+	struct intel_uncore_pmu *pmu = dev_to_uncore_pmu(dev);
+	char pmu_name[UNCORE_PMU_NAME_LEN];
+
+	uncore_get_alias_name(pmu_name, pmu);
+	return snprintf(buf, PAGE_SIZE, "%s\n", pmu_name);
+}
+
+static DEVICE_ATTR_RO(alias);
+
+static struct attribute *uncore_alias_name_attrs[] = {
+	&dev_attr_alias.attr,
+	NULL
+};
+
+static struct attribute_group uncore_alias_name = {
+	.attrs			= uncore_alias_name_attrs,
+};
+
+static const struct attribute_group *spr_uncore_attr_update[] = {
+	&uncore_alias_name,
+	NULL,
+};
+
 static struct intel_uncore_type spr_uncore_chabox = {
 	.name			= "cha",
 	.event_mask		= SPR_CHA_PMON_EVENT_MASK,
@@ -5594,6 +5621,7 @@ static struct intel_uncore_type spr_uncore_chabox = {
 	.num_shared_regs	= 1,
 	.ops			= &spr_uncore_chabox_ops,
 	.format_group		= &spr_uncore_chabox_format_group,
+	.attr_update		= spr_uncore_attr_update,
 };
 
 static struct intel_uncore_type spr_uncore_iio = {
@@ -5601,6 +5629,7 @@ static struct intel_uncore_type spr_uncore_iio = {
 	.event_mask		= SNBEP_PMON_RAW_EVENT_MASK,
 	.event_mask_ext		= SNR_IIO_PMON_RAW_EVENT_MASK_EXT,
 	.format_group		= &snr_uncore_iio_format_group,
+	.attr_update		= spr_uncore_attr_update,
 };
 
 static struct attribute *spr_uncore_raw_formats_attr[] = {
@@ -5620,7 +5649,8 @@ static const struct attribute_group spr_uncore_raw_format_group = {
 #define SPR_UNCORE_COMMON_FORMAT()				\
 	.event_mask		= SNBEP_PMON_RAW_EVENT_MASK,	\
 	.event_mask_ext		= SPR_RAW_EVENT_MASK_EXT,	\
-	.format_group		= &spr_uncore_raw_format_group
+	.format_group		= &spr_uncore_raw_format_group,	\
+	.attr_update		= spr_uncore_attr_update
 
 static struct intel_uncore_type spr_uncore_irp = {
 	SPR_UNCORE_COMMON_FORMAT(),
@@ -5635,6 +5665,7 @@ static struct intel_uncore_type spr_uncore_m2pcie = {
 
 static struct intel_uncore_type spr_uncore_pcu = {
 	.name			= "pcu",
+	.attr_update		= spr_uncore_attr_update,
 };
 
 static void spr_uncore_mmio_enable_event(struct intel_uncore_box *box,
@@ -5760,6 +5791,8 @@ static void uncore_type_customized_copy(struct intel_uncore_type *to_type,
 		to_type->event_descs = from_type->event_descs;
 	if (from_type->format_group)
 		to_type->format_group = from_type->format_group;
+	if (from_type->attr_update)
+		to_type->attr_update = from_type->attr_update;
 }
 
 static struct intel_uncore_type **
