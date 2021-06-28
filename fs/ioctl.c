@@ -845,6 +845,9 @@ static int fileattr_set_prepare(struct inode *inode,
 	if (fa->fsx_cowextsize == 0)
 		fa->fsx_xflags &= ~FS_XFLAG_COWEXTSIZE;
 
+	if (!projid_valid(KPROJIDT_INIT(fa->fsx_projid)))
+		return -EINVAL;
+
 	return 0;
 }
 
