@@ -2892,6 +2892,81 @@ out:
 	return ret;
 }
 
+/*
+ * Special case that some subvolume has missing ORPHAN_ITEM, but its refs is
+ * already 0 (without any ROOT_REF/BACKREF).
+ * In that case such subvolume is only taking space while unable to be deleted.
+ *
+ * No reproducer to reproduce such corruption, but it won't hurt to cleanup them
+ * as we can reuse existing code since we only need to insert an orphan item and
+ * queue them to be deleted.
+ */
+static int __cold remove_ghost_subvol(struct btrfs_fs_info *fs_info,
+				      u64 rootid)
+{
+	struct btrfs_trans_handle *trans;
+	struct btrfs_root *root;
+	struct btrfs_path *path;
+	struct btrfs_key key;
+	int ret;
+
+	root = btrfs_get_fs_root(fs_info, rootid, false);
+	if (IS_ERR(root)) {
+		ret = PTR_ERR(root);
+		return ret;
+	}
+
+	/* A ghost subvolume is already a problem, better to output a warning */
+	btrfs_warn(fs_info, "root %llu has no refs nor orphan item", rootid); 
+	if (btrfs_root_refs(&root->root_item) != 0) {
+		/* We get some strange root */
+		btrfs_warn(fs_info,
+			"root %llu has %u refs, but no proper root backref",
+			rootid, btrfs_root_refs(&root->root_item));
+		ret = -EUCLEAN;
+		goto out;
+	}
+
+	/* Already has orphan inserted */
+	if (test_bit(BTRFS_ROOT_ORPHAN_ITEM_INSERTED, &root->state))
+		goto out;
+
+	path = btrfs_alloc_path();
+	if (!path) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	key.objectid = BTRFS_ORPHAN_OBJECTID;
+	key.type = BTRFS_ORPHAN_ITEM_KEY;
+	key.offset = rootid;
+
+	ret = btrfs_search_slot(NULL, fs_info->tree_root, &key, path, 0, 0);
+	btrfs_free_path(path);
+	/* Either error or there is already an orphan item */
+	if (ret <= 0)
+		goto out;
+
+	trans = btrfs_start_transaction(fs_info->tree_root, 1);
+	if (IS_ERR(trans)) {
+		ret = PTR_ERR(trans);
+		goto out;
+	}
+
+	ret = btrfs_insert_orphan_item(trans, fs_info->tree_root, rootid);
+	if (ret < 0 && ret != -EEXIST) {
+		btrfs_abort_transaction(trans, ret);
+		goto end_trans;
+	}
+	ret = 0;
+	btrfs_add_dead_root(root);
+
+end_trans:
+	btrfs_end_transaction(trans);
+out:
+	btrfs_put_root(root);
+	return ret;
+}
+
 static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 					     void __user *arg,
 					     bool destroy_v2)
@@ -2947,6 +3022,9 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 					vol_args2->subvolid, 0, 0);
 			if (IS_ERR(dentry)) {
 				err = PTR_ERR(dentry);
+				if (err == -ENOENT)
+					err = remove_ghost_subvol(fs_info,
+							vol_args2->subvolid);
 				goto out_drop_write;
 			}
 
