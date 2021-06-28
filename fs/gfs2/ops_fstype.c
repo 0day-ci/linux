@@ -692,7 +692,8 @@ static int init_statfs(struct gfs2_sbd *sdp)
 				   &sdp->sd_sc_gh);
 	if (error) {
 		fs_err(sdp, "can't lock local \"sc\" file: %d\n", error);
-		goto free_local;
+		free_local_statfs_inodes(sdp);
+		goto put_statfs;
 	}
 	return 0;
 
