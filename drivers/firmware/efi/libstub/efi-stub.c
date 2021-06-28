@@ -205,6 +205,8 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
 
 	efi_retrieve_tpm2_eventlog();
 
+	efi_copy_confidential_computing_secret_area();
+
 	/* Ask the firmware to clear memory on unclean shutdown */
 	efi_enable_reset_attack_mitigation();
 

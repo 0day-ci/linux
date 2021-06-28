@@ -858,4 +858,6 @@ efi_enable_reset_attack_mitigation(void) { }
 
 void efi_retrieve_tpm2_eventlog(void);
 
+void efi_copy_confidential_computing_secret_area(void);
+
 #endif
