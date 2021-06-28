@@ -172,7 +172,8 @@ found_tag:
 	 * Give up this allocation if the hctx is inactive.  The caller will
 	 * retry on an active hctx.
 	 */
-	if (unlikely(test_bit(BLK_MQ_S_INACTIVE, &data->hctx->state))) {
+	if (unlikely(test_bit(BLK_MQ_S_INACTIVE, &data->hctx->state))
+			&& data->hctx->queue_num > num_online_cpus()) {
 		blk_mq_put_tag(tags, data->ctx, tag + tag_offset);
 		return BLK_MQ_NO_TAG;
 	}

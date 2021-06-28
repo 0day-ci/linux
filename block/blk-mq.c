@@ -436,7 +436,6 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
 		.cmd_flags	= op,
 	};
 	u64 alloc_time_ns = 0;
-	unsigned int cpu;
 	unsigned int tag;
 	int ret;
 
@@ -468,8 +467,7 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
 	data.hctx = q->queue_hw_ctx[hctx_idx];
 	if (!blk_mq_hw_queue_mapped(data.hctx))
 		goto out_queue_exit;
-	cpu = cpumask_first_and(data.hctx->cpumask, cpu_online_mask);
-	data.ctx = __blk_mq_get_ctx(q, cpu);
+	data.ctx = __blk_mq_get_ctx(q, hctx_idx);
 
 	if (!q->elevator)
 		blk_mq_tag_busy(data.hctx);
