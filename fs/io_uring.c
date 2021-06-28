@@ -1781,8 +1781,7 @@ static void io_dismantle_req(struct io_kiocb *req)
 		io_put_file(req->file);
 	if (req->fixed_rsrc_refs)
 		percpu_ref_put(req->fixed_rsrc_refs);
-	if (req->async_data)
-		kfree(req->async_data);
+	kfree(req->async_data);
 }
 
 /* must to be called somewhat shortly after putting a request */
@@ -3380,8 +3379,7 @@ done:
 	kiocb_done(kiocb, ret, issue_flags);
 out_free:
 	/* it's faster to check here then delegate to kfree */
-	if (iovec)
-		kfree(iovec);
+	kfree(iovec);
 	return 0;
 }
 
@@ -3481,8 +3479,7 @@ copy_iov:
 	}
 out_free:
 	/* it's reportedly faster than delegating the null check to kfree() */
-	if (iovec)
-		kfree(iovec);
+	kfree(iovec);
 	return ret;
 }
 
@@ -4563,8 +4560,7 @@ static int io_sendmsg(struct io_kiocb *req, unsigned int issue_flags)
 		ret = -EINTR;
 
 	/* fast path, check for non-NULL to avoid function call */
-	if (kmsg->free_iov)
-		kfree(kmsg->free_iov);
+	kfree(kmsg->free_iov);
 	req->flags &= ~REQ_F_NEED_CLEANUP;
 	if (ret < min_ret)
 		req_set_fail(req);
@@ -4800,8 +4796,7 @@ static int io_recvmsg(struct io_kiocb *req, unsigned int issue_flags)
 	if (req->flags & REQ_F_BUFFER_SELECTED)
 		cflags = io_put_recv_kbuf(req);
 	/* fast path, check for non-NULL to avoid function call */
-	if (kmsg->free_iov)
-		kfree(kmsg->free_iov);
+	kfree(kmsg->free_iov);
 	req->flags &= ~REQ_F_NEED_CLEANUP;
 	if (ret < min_ret || ((flags & MSG_WAITALL) && (kmsg->msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC))))
 		req_set_fail(req);
