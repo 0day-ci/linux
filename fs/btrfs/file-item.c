@@ -367,7 +367,7 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct extent_io_tree *io_tree = &BTRFS_I(inode)->io_tree;
-	struct btrfs_path *path;
+	struct btrfs_path path = {};
 	const u32 sectorsize = fs_info->sectorsize;
 	const u32 csum_size = fs_info->csum_size;
 	u32 orig_len = bio->bi_iter.bi_size;
@@ -393,9 +393,6 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 	 *   directly.
 	 */
 	ASSERT(bio_op(bio) == REQ_OP_READ);
-	path = btrfs_alloc_path();
-	if (!path)
-		return BLK_STS_RESOURCE;
 
 	if (!dst) {
 		struct btrfs_io_bio *btrfs_bio = btrfs_io_bio(bio);
@@ -403,10 +400,8 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 		if (nblocks * csum_size > BTRFS_BIO_INLINE_CSUM_SIZE) {
 			btrfs_bio->csum = kmalloc_array(nblocks, csum_size,
 							GFP_NOFS);
-			if (!btrfs_bio->csum) {
-				btrfs_free_path(path);
+			if (!btrfs_bio->csum)
 				return BLK_STS_RESOURCE;
-			}
 		} else {
 			btrfs_bio->csum = btrfs_bio->csum_inline;
 		}
@@ -420,7 +415,7 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 	 * kick the readahead for csum tree.
 	 */
 	if (nblocks > fs_info->csums_per_leaf)
-		path->reada = READA_FORWARD;
+		path.reada = READA_FORWARD;
 
 	/*
 	 * the free space stuff is only read when it hasn't been
@@ -429,8 +424,8 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 	 * between reading the free space cache and updating the csum tree.
 	 */
 	if (btrfs_is_free_space_inode(BTRFS_I(inode))) {
-		path->search_commit_root = 1;
-		path->skip_locking = 1;
+		path.search_commit_root = 1;
+		path.skip_locking = 1;
 	}
 
 	for (cur_disk_bytenr = orig_disk_bytenr;
@@ -453,7 +448,7 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 				fs_info->sectorsize_bits;
 		csum_dst = csum + sector_offset * csum_size;
 
-		count = search_csum_tree(fs_info, path, cur_disk_bytenr,
+		count = search_csum_tree(fs_info, &path, cur_disk_bytenr,
 					 search_len, csum_dst);
 		if (count <= 0) {
 			/*
@@ -489,7 +484,7 @@ blk_status_t btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio, u8 *dst
 		}
 	}
 
-	btrfs_free_path(path);
+	btrfs_release_path(&path);
 	return BLK_STS_OK;
 }
 
