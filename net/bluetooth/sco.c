@@ -173,10 +173,22 @@ static void sco_conn_del(struct hci_conn *hcon, int err)
 
 	if (sk) {
 		sock_hold(sk);
-		bh_lock_sock(sk);
+
+		spin_lock_bh(&sk->sk_lock.slock);
 		sco_sock_clear_timer(sk);
-		sco_chan_del(sk, err);
-		bh_unlock_sock(sk);
+		sco_pi(sk)->conn = NULL;
+		if (conn->hcon)
+			hci_conn_drop(conn->hcon);
+		sk->sk_state = BT_CLOSED;
+		sk->sk_err   = err;
+		sk->sk_state_change(sk);
+		sock_set_flag(sk, SOCK_ZAPPED);
+		spin_unlock_bh(&sk->sk_lock.slock);
+
+		sco_conn_lock(conn);
+		conn->sk = NULL;
+		sco_conn_unlock(conn);
+
 		sco_sock_kill(sk);
 		sock_put(sk);
 	}
@@ -1084,10 +1096,10 @@ static void sco_conn_ready(struct sco_conn *conn)
 
 	if (sk) {
 		sco_sock_clear_timer(sk);
-		bh_lock_sock(sk);
+		spin_lock_bh(&sk->sk_lock.slock);
 		sk->sk_state = BT_CONNECTED;
 		sk->sk_state_change(sk);
-		bh_unlock_sock(sk);
+		spin_unlock_bh(&sk->sk_lock.slock);
 	} else {
 		sco_conn_lock(conn);
 
@@ -1102,12 +1114,12 @@ static void sco_conn_ready(struct sco_conn *conn)
 			return;
 		}
 
-		bh_lock_sock(parent);
+		spin_lock_bh(&parent->sk_lock.slock);
 
 		sk = sco_sock_alloc(sock_net(parent), NULL,
 				    BTPROTO_SCO, GFP_ATOMIC, 0);
 		if (!sk) {
-			bh_unlock_sock(parent);
+			spin_unlock_bh(&parent->sk_lock.slock);
 			sco_conn_unlock(conn);
 			return;
 		}
@@ -1128,7 +1140,7 @@ static void sco_conn_ready(struct sco_conn *conn)
 		/* Wake up parent */
 		parent->sk_data_ready(parent);
 
-		bh_unlock_sock(parent);
+		spin_unlock_bh(&parent->sk_lock.slock);
 
 		sco_conn_unlock(conn);
 	}
