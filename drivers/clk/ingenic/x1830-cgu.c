@@ -270,13 +270,12 @@ static const struct ingenic_cgu_clk_info x1830_cgu_clocks[] = {
 		.gate = { CGU_REG_CLKGR0, 31 },
 	},
 
-	[X1830_CLK_MAC] = {
-		"mac", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
+	[X1830_CLK_MACPHY] = {
+		"mac_phy", CGU_CLK_MUX | CGU_CLK_DIV,
 		.parents = { X1830_CLK_SCLKA, X1830_CLK_MPLL,
 					 X1830_CLK_VPLL, X1830_CLK_EPLL },
 		.mux = { CGU_REG_MACCDR, 30, 2 },
 		.div = { CGU_REG_MACCDR, 0, 1, 8, 29, 28, 27 },
-		.gate = { CGU_REG_CLKGR1, 4 },
 	},
 
 	[X1830_CLK_LCD] = {
@@ -426,6 +425,12 @@ static const struct ingenic_cgu_clk_info x1830_cgu_clocks[] = {
 		"dtrng", CGU_CLK_GATE,
 		.parents = { X1830_CLK_PCLK, -1, -1, -1 },
 		.gate = { CGU_REG_CLKGR1, 1 },
+	},
+
+	[X1830_CLK_MAC] = {
+		"mac", CGU_CLK_GATE,
+		.parents = { X1830_CLK_AHB2 },
+		.gate = { CGU_REG_CLKGR1, 4 },
 	},
 
 	[X1830_CLK_OST] = {
