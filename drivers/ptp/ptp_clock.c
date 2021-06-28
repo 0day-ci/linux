@@ -63,6 +63,28 @@ static void enqueue_external_timestamp(struct timestamp_event_queue *queue,
 	spin_unlock_irqrestore(&queue->lock, flags);
 }
 
+static void enqueue_external_usr_timestamp(struct timestamp_event_queue *queue,
+					   struct ptp_clock_event *src)
+{
+	struct ptp_extts_event *dst;
+	unsigned long flags;
+
+	spin_lock_irqsave(&queue->lock, flags);
+
+	dst = &queue->buf[queue->tail];
+	dst->index = src->index;
+	dst->t.sec = src->pps_times.ts_real.tv_sec;
+	dst->t.nsec = src->pps_times.ts_real.tv_nsec;
+	dst->rsv[0] = src->data;
+
+	if (!queue_free(queue))
+		queue->head = (queue->head + 1) % PTP_MAX_TIMESTAMPS;
+
+	queue->tail = (queue->tail + 1) % PTP_MAX_TIMESTAMPS;
+
+	spin_unlock_irqrestore(&queue->lock, flags);
+}
+
 /* posix clock implementation */
 
 static int ptp_clock_getres(struct posix_clock *pc, struct timespec64 *tp)
@@ -308,6 +330,11 @@ void ptp_clock_event(struct ptp_clock *ptp, struct ptp_clock_event *event)
 
 	case PTP_CLOCK_EXTTS:
 		enqueue_external_timestamp(&ptp->tsevq, event);
+		wake_up_interruptible(&ptp->tsev_wq);
+		break;
+
+	case PTP_CLOCK_EXTTSUSR:
+		enqueue_external_usr_timestamp(&ptp->tsevq, event);
 		wake_up_interruptible(&ptp->tsev_wq);
 		break;
 

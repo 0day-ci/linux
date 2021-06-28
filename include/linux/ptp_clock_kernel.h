@@ -166,6 +166,7 @@ enum ptp_clock_events {
 	PTP_CLOCK_EXTTS,
 	PTP_CLOCK_PPS,
 	PTP_CLOCK_PPSUSR,
+	PTP_CLOCK_EXTTSUSR,
 };
 
 /**
@@ -175,6 +176,7 @@ enum ptp_clock_events {
  * @index: Identifies the source of the event.
  * @timestamp: When the event occurred (%PTP_CLOCK_EXTTS only).
  * @pps_times: When the event occurred (%PTP_CLOCK_PPSUSR only).
+ * @data: Extra data for event (%PTP_CLOCK_EXTTSUSR only).
  */
 
 struct ptp_clock_event {
@@ -184,6 +186,7 @@ struct ptp_clock_event {
 		u64 timestamp;
 		struct pps_event_time pps_times;
 	};
+	unsigned int data;
 };
 
 /**
