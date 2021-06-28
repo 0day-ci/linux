@@ -48,6 +48,7 @@ struct ingenic_cgu_pll_info {
 	unsigned reg;
 	unsigned rate_multiplier;
 	const s8 *od_encoding;
+	u8 mux_shift, mux_bits;
 	u8 m_shift, m_bits, m_offset;
 	u8 n_shift, n_bits, n_offset;
 	u8 od_shift, od_bits, od_max;
