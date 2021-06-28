@@ -2003,6 +2003,7 @@ static int __vsock_seqpacket_recvmsg(struct sock *sk, struct msghdr *msg,
 				     size_t len, int flags)
 {
 	const struct vsock_transport *transport;
+	bool msg_ready;
 	struct vsock_sock *vsk;
 	ssize_t record_len;
 	long timeout;
@@ -2013,23 +2014,36 @@ static int __vsock_seqpacket_recvmsg(struct sock *sk, struct msghdr *msg,
 	transport = vsk->transport;
 
 	timeout = sock_rcvtimeo(sk, flags & MSG_DONTWAIT);
+	msg_ready = false;
+	record_len = 0;
 
-	err = vsock_connectible_wait_data(sk, &wait, timeout, NULL, 0);
-	if (err <= 0)
-		goto out;
+	while (!msg_ready) {
+		ssize_t fragment_len;
+		int intr_err;
 
-	record_len = transport->seqpacket_dequeue(vsk, msg, flags);
+		intr_err = vsock_connectible_wait_data(sk, &wait, timeout, NULL, 0);
+		if (intr_err <= 0) {
+			err = intr_err;
+			break;
+		}
 
-	if (record_len < 0) {
-		err = -ENOMEM;
-		goto out;
+		fragment_len = transport->seqpacket_dequeue(vsk, msg, flags);
+
+		if (fragment_len < 0) {
+			err = -ENOMEM;
+			break;
+		}
+
+		record_len += fragment_len;
 	}
 
 	if (sk->sk_err) {
 		err = -sk->sk_err;
 	} else if (sk->sk_shutdown & RCV_SHUTDOWN) {
 		err = 0;
-	} else {
+	}
+
+	if (msg_ready && !err) {
 		/* User sets MSG_TRUNC, so return real length of
 		 * packet.
 		 */
@@ -2045,7 +2059,6 @@ static int __vsock_seqpacket_recvmsg(struct sock *sk, struct msghdr *msg,
 			msg->msg_flags |= MSG_TRUNC;
 	}
 
-out:
 	return err;
 }
 
