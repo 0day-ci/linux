@@ -29,7 +29,12 @@ static struct sg_table *i915_gem_map_dma_buf(struct dma_buf_attachment *attachme
 
 	assert_object_held(obj);
 
-	ret = i915_gem_object_pin_pages(obj);
+	if (!i915_gem_object_can_migrate(obj, INTEL_REGION_SMEM))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	ret = i915_gem_object_migrate(obj, NULL, INTEL_REGION_SMEM);
+	if (!ret)
+		ret = i915_gem_object_pin_pages(obj);
 	if (ret)
 		goto err;
 
