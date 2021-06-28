@@ -451,7 +451,6 @@ static struct virtio_transport vhost_transport = {
 		.seqpacket_dequeue        = virtio_transport_seqpacket_dequeue,
 		.seqpacket_enqueue        = virtio_transport_seqpacket_enqueue,
 		.seqpacket_allow          = vhost_transport_seqpacket_allow,
-		.seqpacket_has_data       = virtio_transport_seqpacket_has_data,
 
 		.notify_poll_in           = virtio_transport_notify_poll_in,
 		.notify_poll_out          = virtio_transport_notify_poll_out,
