@@ -46,7 +46,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr,
 	sizeof(*(ptr))))
 
 /*
- *  see rt-mutex-design.txt; cmpxchg supposedly checks if *ptr == A and swaps.
+ *  see rt-mutex-design.rst; cmpxchg supposedly checks if *ptr == A and swaps.
  *  looks just like atomic_cmpxchg on our arch currently with a bunch of
  *  variable casting.
  */
