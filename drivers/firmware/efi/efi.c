@@ -526,6 +526,9 @@ static const efi_config_table_type_t common_tables[] __initconst = {
 #ifdef CONFIG_LOAD_UEFI_KEYS
 	{LINUX_EFI_MOK_VARIABLE_TABLE_GUID,	&efi.mokvar_table,	"MOKvar"	},
 #endif
+	{LINUX_EFI_CONFIDENTIAL_COMPUTING_SECRET_AREA_GUID,
+						&efi.confidential_computing_secret,
+									"ConfCompSecret"},
 	{},
 };
 
@@ -612,6 +615,8 @@ int __init efi_config_parse_tables(const efi_config_table_t *config_tables,
 		efi_memattr_init();
 
 	efi_tpm_eventlog_init();
+
+	efi_confidential_computing_secret_area_reserve();
 
 	if (mem_reserve != EFI_INVALID_TABLE_ADDR) {
 		unsigned long prsv = mem_reserve;
