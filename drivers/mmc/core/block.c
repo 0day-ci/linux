@@ -2630,6 +2630,12 @@ static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)
 				card->part[idx].name);
 			if (ret)
 				return ret;
+		} else if((card->part[idx].area_type & MMC_BLK_DATA_AREA_BOOT) &&
+			  (card->quirks & MMC_QUIRK_BROKEN_BOOT_PARTITIONS)) {
+			pr_info("%s: skipping broken boot partition %s\n",
+				mmc_hostname(card->host),
+				card->part[idx].name);
+			continue;
 		} else if (card->part[idx].size) {
 			ret = mmc_blk_alloc_part(card, md,
 				card->part[idx].part_cfg,
