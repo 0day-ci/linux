@@ -11,6 +11,7 @@
 #include "dm-bio-record.h"
 #include "dm-path-selector.h"
 #include "dm-uevent.h"
+#include "dm-core.h"
 
 #include <linux/blkdev.h>
 #include <linux/ctype.h>
@@ -26,6 +27,7 @@
 #include <scsi/scsi_dh.h>
 #include <linux/atomic.h>
 #include <linux/blk-mq.h>
+#include <scsi/sg.h>
 
 #define DM_MSG_PREFIX "multipath"
 #define DM_PG_INIT_DELAY_MSECS 2000
@@ -2129,6 +2131,106 @@ static int multipath_busy(struct dm_target *ti)
 	return busy;
 }
 
+#ifdef CONFIG_DM_MULTIPATH_SG_IO
+static int pgpath_sg_io_ioctl(struct block_device *bdev,
+			    struct sg_io_hdr *hdr, struct multipath *m,
+			    fmode_t mode)
+{
+	int rc;
+	blk_status_t sts;
+	struct priority_group *pg;
+	struct pgpath *pgpath;
+	char path_name[BDEVNAME_SIZE];
+
+	rc = sg_io(bdev->bd_disk->queue, bdev->bd_disk, hdr, mode);
+	DMDEBUG("SG_IO via %s: rc = %d D%02xH%02xM%02xS%02x",
+		bdevname(bdev, path_name), rc,
+		hdr->driver_status, hdr->host_status,
+		hdr->msg_status, hdr->status);
+
+	/*
+	 * Errors resulting from invalid parameters shouldn't be retried
+	 * on another path.
+	 */
+	switch (rc) {
+	case -ENOIOCTLCMD:
+	case -EFAULT:
+	case -EINVAL:
+	case -EPERM:
+		return rc;
+	default:
+		break;
+	}
+
+	sts = sg_io_to_blk_status(hdr);
+	if (sts == BLK_STS_OK)
+		return 0;
+	else if (!blk_path_error(sts))
+		return blk_status_to_errno(sts);
+
+	/* path error - fail the path */
+	list_for_each_entry(pg, &m->priority_groups, list) {
+		list_for_each_entry(pgpath, &pg->pgpaths, list) {
+			if (pgpath->path.dev->bdev == bdev)
+				fail_path(pgpath);
+		}
+	}
+
+	return -EAGAIN;
+}
+
+static int multipath_sg_io_ioctl(struct block_device *bdev, fmode_t mode,
+				 unsigned int cmd, unsigned long uarg)
+{
+	struct mapped_device *md = bdev->bd_disk->private_data;
+	void __user *arg = (void __user *)uarg;
+	struct sg_io_hdr hdr;
+	int rc;
+	bool suspended;
+	int retries = 5;
+
+	if (copy_from_user(&hdr, arg, sizeof(hdr)))
+		return -EFAULT;
+
+	if (hdr.interface_id != 'S')
+		return -EINVAL;
+
+	if (hdr.dxfer_len > (queue_max_hw_sectors(bdev->bd_disk->queue) << 9))
+		return -EIO;
+
+	do {
+		struct block_device *path_dev;
+		struct dm_target *tgt;
+		struct sg_io_hdr rhdr;
+		int srcu_idx;
+
+		suspended = false;
+		/* This will fail and break the loop if no valid paths found */
+		rc = __dm_prepare_ioctl(md, &srcu_idx, &path_dev, &tgt);
+		if (rc == -EAGAIN)
+			suspended = true;
+		else if (rc < 0)
+			DMERR("%s: failed to get path: %d", __func__, rc);
+		else {
+			/* Need to copy the sg_io_hdr, it may be modified */
+			rhdr = hdr;
+			rc = pgpath_sg_io_ioctl(path_dev, &rhdr,
+						tgt->private, mode);
+			if (rc == 0 && copy_to_user(arg, &rhdr, sizeof(rhdr)))
+				rc = -EFAULT;
+		}
+		dm_unprepare_ioctl(md, srcu_idx);
+		if (suspended) {
+			DMDEBUG("%s: suspended, retries = %d\n",
+				__func__, retries);
+			msleep(20);
+		}
+	} while (rc == -EAGAIN && (!suspended || retries-- > 0));
+
+	return rc;
+}
+#endif
+
 /*-----------------------------------------------------------------
  * Module setup
  *---------------------------------------------------------------*/
@@ -2153,6 +2255,9 @@ static struct target_type multipath_target = {
 	.prepare_ioctl = multipath_prepare_ioctl,
 	.iterate_devices = multipath_iterate_devices,
 	.busy = multipath_busy,
+#ifdef CONFIG_DM_MULTIPATH_SG_IO
+	.sg_io_ioctl = multipath_sg_io_ioctl,
+#endif
 };
 
 static int __init dm_multipath_init(void)
