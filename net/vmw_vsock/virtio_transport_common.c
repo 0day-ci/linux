@@ -425,7 +425,7 @@ static int virtio_transport_seqpacket_do_dequeue(struct vsock_sock *vsk,
 		pkt = list_first_entry(&vvs->rx_queue, struct virtio_vsock_pkt, list);
 		pkt_len = (size_t)le32_to_cpu(pkt->hdr.len);
 
-		bytes_to_copy = min(user_buf_len, pkt_len);
+		bytes_to_copy = vvs->drop_until_eor ? 0 : min(user_buf_len, pkt_len);
 
 		if (bytes_to_copy) {
 			int err;
@@ -438,17 +438,22 @@ static int virtio_transport_seqpacket_do_dequeue(struct vsock_sock *vsk,
 
 			spin_lock_bh(&vvs->rx_lock);
 
-			if (err)
+			if (err) {
 				dequeued_len = err;
-			else
+				vvs->drop_until_eor = true;
+			} else {
 				user_buf_len -= bytes_to_copy;
+			}
 		}
 
 		if (dequeued_len >= 0)
 			dequeued_len += pkt_len;
 
 		if (le32_to_cpu(pkt->hdr.flags) & VIRTIO_VSOCK_SEQ_EOR) {
-			*msg_ready = true;
+			if (vvs->drop_until_eor)
+				vvs->drop_until_eor = false;
+			else
+				*msg_ready = true;
 		}
 
 		virtio_transport_dec_rx_pkt(vvs, pkt);
@@ -486,6 +491,16 @@ virtio_transport_seqpacket_dequeue(struct vsock_sock *vsk,
 	return virtio_transport_seqpacket_do_dequeue(vsk, msg, flags, msg_ready);
 }
 EXPORT_SYMBOL_GPL(virtio_transport_seqpacket_dequeue);
+
+void virtio_transport_seqpacket_drop(struct vsock_sock *vsk)
+{
+	struct virtio_vsock_sock *vvs = vsk->trans;
+
+	spin_lock_bh(&vvs->rx_lock);
+	vvs->drop_until_eor = true;
+	spin_unlock_bh(&vvs->rx_lock);
+}
+EXPORT_SYMBOL_GPL(virtio_transport_seqpacket_drop);
 
 int
 virtio_transport_seqpacket_enqueue(struct vsock_sock *vsk,
