@@ -2027,7 +2027,7 @@ static int __vsock_seqpacket_recvmsg(struct sock *sk, struct msghdr *msg,
 			break;
 		}
 
-		fragment_len = transport->seqpacket_dequeue(vsk, msg, flags);
+		fragment_len = transport->seqpacket_dequeue(vsk, msg, flags, &msg_ready);
 
 		if (fragment_len < 0) {
 			err = -ENOMEM;

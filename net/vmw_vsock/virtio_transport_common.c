@@ -489,7 +489,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_stream_dequeue);
 ssize_t
 virtio_transport_seqpacket_dequeue(struct vsock_sock *vsk,
 				   struct msghdr *msg,
-				   int flags)
+				   int flags, bool *msg_ready)
 {
 	if (flags & MSG_PEEK)
 		return -EOPNOTSUPP;
