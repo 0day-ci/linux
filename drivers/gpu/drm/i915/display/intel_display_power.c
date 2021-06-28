@@ -6384,8 +6384,16 @@ static void intel_power_domains_verify_state(struct drm_i915_private *i915)
 
 void intel_display_power_suspend_late(struct drm_i915_private *i915)
 {
+    struct drm_i915_private *dev_priv = i915;
+    u32 val;
 	if (DISPLAY_VER(i915) >= 11 || IS_GEMINILAKE(i915) ||
 	    IS_BROXTON(i915)) {
+		val = intel_de_read(dev_priv, PP_CONTROL(0));
+		/* Wa_14013120569:tgl */
+		if (IS_TIGERLAKE(i915)) {
+			val &= ~PANEL_POWER_ON;
+			intel_de_write(dev_priv, PP_CONTROL(0), val);
+	}
 		bxt_enable_dc9(i915);
 		/* Tweaked Wa_14010685332:icp,jsp,mcc */
 		if (INTEL_PCH_TYPE(i915) >= PCH_ICP && INTEL_PCH_TYPE(i915) <= PCH_MCC)

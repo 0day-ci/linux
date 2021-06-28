@@ -26,6 +26,7 @@
 #include "i915_drv.h"
 #include "intel_display_types.h"
 #include "intel_hotplug.h"
+#include "intel_de.h"
 
 /**
  * DOC: Hotplug
@@ -266,7 +267,9 @@ intel_encoder_hotplug(struct intel_encoder *encoder,
 		      struct intel_connector *connector)
 {
 	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	enum drm_connector_status old_status;
+	u32 val;
 	u64 old_epoch_counter;
 	bool ret = false;
 
@@ -288,6 +291,19 @@ intel_encoder_hotplug(struct intel_encoder *encoder,
 			      drm_get_connector_status_name(connector->base.status),
 			      old_epoch_counter,
 			      connector->base.epoch_counter);
+
+		/* Wa_14013120569:tgl */
+		if (IS_TIGERLAKE(dev_priv)) {
+			val = intel_de_read(dev_priv, PP_CONTROL(0));
+			if (connector->base.status == connector_status_connected) {
+				val |= PANEL_POWER_ON;
+				intel_de_write(dev_priv, PP_CONTROL(0), val);
+			}
+			else if (connector->base.status == connector_status_disconnected) {
+				val &= ~PANEL_POWER_ON;
+				intel_de_write(dev_priv, PP_CONTROL(0), val);
+			}
+		}
 		return INTEL_HOTPLUG_CHANGED;
 	}
 	return INTEL_HOTPLUG_UNCHANGED;
