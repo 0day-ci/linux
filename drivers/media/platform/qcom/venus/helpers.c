@@ -1137,8 +1137,12 @@ int venus_helper_set_format_constraints(struct venus_inst *inst)
 	if (!IS_V6(inst->core))
 		return 0;
 
+	if (inst->opb_fmt == HFI_COLOR_FORMAT_NV12_UBWC)
+		return 0;
+
 	pconstraint.buffer_type = HFI_BUFFER_OUTPUT2;
 	pconstraint.num_planes = 2;
+
 	pconstraint.plane_format[0].stride_multiples = 128;
 	pconstraint.plane_format[0].max_stride = 8192;
 	pconstraint.plane_format[0].min_plane_buffer_height_multiple = 32;
