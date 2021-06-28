@@ -21,6 +21,14 @@ echo "		--fail-unresolved Treat UNRESOLVED as a failure"
 echo "		-d|--debug Debug mode (trace all shell commands)"
 echo "		-l|--logdir <dir> Save logs on the <dir>"
 echo "		            If <dir> is -, all logs output in console only"
+echo ""
+echo " Test results:"
+echo "	PASS		The test succeeded"
+echo "	FAIL		The test failed, but was expected to succeed."
+echo "	UNRESOLVED	The test produced indeterminate results. (e.g. interrupted)"
+echo "	UNTESTED	The test was not run, currently just a placeholder."
+echo "	UNSUPPORTED	The test failed because of lack of feature."
+echo "	XFAIL		The test failed, and was expected to fail."
 exit $1
 }
 
