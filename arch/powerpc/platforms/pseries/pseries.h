@@ -113,4 +113,5 @@ extern u32 pseries_security_flavor;
 void pseries_setup_security_mitigations(void);
 void pseries_lpar_read_hblkrm_characteristics(void);
 
+void update_numa_distance(struct device_node *node);
 #endif /* _PSERIES_PSERIES_H */
