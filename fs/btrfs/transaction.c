@@ -1316,9 +1316,10 @@ again:
 }
 
 /*
- * dead roots are old snapshots that need to be deleted.  This allocates
- * a dirty root struct and adds it into the list of dead roots that need to
- * be deleted
+ * Dead roots are old snapshots that need to be deleted.
+ *
+ * This helper will queue them to the dead_roots list to be deleted by
+ * cleaner thread.
  */
 void btrfs_add_dead_root(struct btrfs_root *root)
 {
