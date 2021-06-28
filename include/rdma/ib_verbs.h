@@ -2179,6 +2179,7 @@ struct ib_port_data {
 
 	spinlock_t netdev_lock;
 
+	u8 cache_is_initialized:1;
 	struct list_head pkey_list;
 
 	struct ib_port_cache cache;

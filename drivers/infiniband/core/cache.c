@@ -1631,6 +1631,7 @@ int ib_cache_setup_one(struct ib_device *device)
 		err = ib_cache_update(device, p, true, true, true);
 		if (err)
 			return err;
+		device->port_data[p].cache_is_initialized = 1;
 	}
 
 	return 0;
