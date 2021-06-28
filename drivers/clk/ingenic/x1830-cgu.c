@@ -54,6 +54,54 @@
 
 static struct ingenic_cgu *cgu;
 
+static void x1830_i2s_calc_m_n(const struct ingenic_cgu_pll_info *pll_info,
+		       unsigned long rate, unsigned long parent_rate,
+		       unsigned int *pm, unsigned int *pn, unsigned int *pod)
+{
+	unsigned int delta, m, n;
+	u64 curr_delta, curr_m, curr_n;
+
+	if ((parent_rate % rate == 0) && ((parent_rate / rate) > 1)) {
+		m = 1;
+		n = parent_rate / rate;
+		goto out;
+	}
+
+	delta = rate;
+
+	/*
+	 * The length of M is 9 bits, its value must be between 1 and 511.
+	 * The length of N is 20 bits, its value must be between 2 and 1048575,
+	 * and must not be less than 2 times of the value of M.
+	 */
+	for (curr_m = 511; curr_m >= 1; curr_m--) {
+		curr_n = parent_rate * curr_m;
+		curr_delta = do_div(curr_n, rate);
+
+		if (curr_n < 2 * curr_m || curr_n > 1048575)
+			continue;
+
+		if (curr_delta == 0)
+			break;
+
+		if (curr_delta < delta) {
+			m = curr_m;
+			n = curr_n;
+			delta = curr_delta;
+		}
+	}
+
+out:
+	*pm = m;
+	*pn = n;
+
+	/*
+	 * The I2S PLL does not have OD bits, so set the *pod to 1 to ensure
+	 * that the ingenic_pll_calc() in cgu.c can run properly.
+	 */
+	*pod = 1;
+}
+
 static int x1830_usb_phy_enable(struct clk_hw *hw)
 {
 	void __iomem *reg_opcr		= cgu->base + CGU_REG_OPCR;
@@ -201,6 +249,28 @@ static const struct ingenic_cgu_clk_info x1830_cgu_clocks[] = {
 		},
 	},
 
+	[X1830_CLK_I2S] = {
+		"i2s", CGU_CLK_PLL,
+		.parents = { X1830_CLK_SCLKA, X1830_CLK_MPLL,
+					 X1830_CLK_VPLL, X1830_CLK_EPLL },
+		.pll = {
+			.reg = CGU_REG_I2SCDR,
+			.rate_multiplier = 1,
+			.mux_shift = 30,
+			.mux_bits = 2,
+			.m_shift = 20,
+			.m_bits = 9,
+			.m_offset = 0,
+			.n_shift = 0,
+			.n_bits = 20,
+			.n_offset = 0,
+			.bypass_bit = -1,
+			.enable_bit = 29,
+			.stable_bit = -1,
+			.calc_m_n_od = x1830_i2s_calc_m_n,
+		},
+	},
+
 	/* Custom (SoC-specific) OTG PHY */
 
 	[X1830_CLK_OTGPHY] = {
@@ -328,6 +398,14 @@ static const struct ingenic_cgu_clk_info x1830_cgu_clocks[] = {
 		.mux = { CGU_REG_SSICDR, 29, 1 },
 	},
 
+	[X1830_CLK_CIM] = {
+		"cim", CGU_CLK_MUX | CGU_CLK_DIV,
+		.parents = { X1830_CLK_SCLKA, X1830_CLK_MPLL,
+					 X1830_CLK_VPLL, X1830_CLK_EPLL },
+		.mux = { CGU_REG_CIMCDR, 30, 2 },
+		.div = { CGU_REG_CIMCDR, 0, 1, 8, 29, 28, 27 },
+	},
+
 	[X1830_CLK_EXCLK_DIV512] = {
 		"exclk_div512", CGU_CLK_FIXDIV,
 		.parents = { X1830_CLK_EXCLK },
@@ -383,6 +461,18 @@ static const struct ingenic_cgu_clk_info x1830_cgu_clocks[] = {
 		"smb2", CGU_CLK_GATE,
 		.parents = { X1830_CLK_PCLK, -1, -1, -1 },
 		.gate = { CGU_REG_CLKGR0, 9 },
+	},
+
+	[X1830_CLK_AIC] = {
+		"aic", CGU_CLK_GATE,
+		.parents = { X1830_CLK_EXCLK, -1, -1, -1 },
+		.gate = { CGU_REG_CLKGR0, 11 },
+	},
+
+	[X1830_CLK_DMIC] = {
+		"dmic", CGU_CLK_GATE,
+		.parents = { X1830_CLK_PCLK, -1, -1, -1 },
+		.gate = { CGU_REG_CLKGR0, 12 },
 	},
 
 	[X1830_CLK_UART0] = {
