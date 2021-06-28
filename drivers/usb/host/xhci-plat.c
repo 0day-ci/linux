@@ -24,6 +24,7 @@
 #include "xhci-plat.h"
 #include "xhci-mvebu.h"
 #include "xhci-rcar.h"
+#include "../dwc3/core.h"
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
 
@@ -430,6 +431,39 @@ static int xhci_plat_remove(struct platform_device *dev)
 
 	return 0;
 }
+static void xhci_dwc3_suspend_quirk(struct usb_hcd *hcd)
+{
+	int i, num_ports;
+	u32 reg;
+	unsigned int ss_phy_mode = 0;
+	struct dwc3 *dwc = dev_get_drvdata(hcd->self.controller->parent);
+	struct xhci_hcd	*xhci_hcd = hcd_to_xhci(hcd);
+
+	dwc->hs_phy_mode = 0;
+
+	reg = readl(&xhci_hcd->cap_regs->hcs_params1);
+	num_ports = HCS_MAX_PORTS(reg);
+
+	for (i = 0; i < num_ports; i++) {
+		reg = readl(&xhci_hcd->op_regs->port_status_base + i * 0x04);
+		if (reg & PORT_PE) {
+			if (DEV_HIGHSPEED(reg) || DEV_FULLSPEED(reg))
+				dwc->hs_phy_mode |= PHY_MODE_USB_HOST_HS;
+			else if (DEV_LOWSPEED(reg))
+				dwc->hs_phy_mode |= PHY_MODE_USB_HOST_LS;
+
+			if (DEV_SUPERSPEED(reg))
+				ss_phy_mode |= PHY_MODE_USB_HOST_SS;
+		}
+	}
+	phy_set_mode(dwc->usb2_generic_phy, dwc->hs_phy_mode);
+	phy_set_mode(dwc->usb3_generic_phy, ss_phy_mode);
+
+	if (usb_wakeup_enabled_descendants(hcd->self.root_hub))
+		dwc->phy_power_off = false;
+	else
+		dwc->phy_power_off = true;
+}
 
 static int __maybe_unused xhci_plat_suspend(struct device *dev)
 {
@@ -440,6 +474,10 @@ static int __maybe_unused xhci_plat_suspend(struct device *dev)
 	ret = xhci_priv_suspend_quirk(hcd);
 	if (ret)
 		return ret;
+
+	if (of_device_is_compatible(dev->parent->of_node, "snps,dwc3"))
+		xhci_dwc3_suspend_quirk(hcd);
+
 	/*
 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
 	 * to do wakeup during suspend.
