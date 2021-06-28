@@ -390,6 +390,27 @@ static struct page *dax_busy_page(void *entry)
 }
 
 /*
+ * dax_load_pfn - Load pfn of the DAX entry corresponding to a page
+ * @mapping:	The file whose entry we want to load
+ * @index:	offset where the DAX entry located in
+ *
+ * Return:	pfn number of the DAX entry
+ */
+unsigned long dax_load_pfn(struct address_space *mapping, unsigned long index)
+{
+	XA_STATE(xas, &mapping->i_pages, index);
+	void *entry;
+	unsigned long pfn;
+
+	xas_lock_irq(&xas);
+	entry = xas_load(&xas);
+	pfn = dax_to_pfn(entry);
+	xas_unlock_irq(&xas);
+
+	return pfn;
+}
+
+/*
  * dax_lock_mapping_entry - Lock the DAX entry corresponding to a page
  * @page: The page whose entry we want to lock
  *
@@ -787,16 +808,6 @@ static void *dax_insert_entry(struct xa_state *xas,
 
 	xas_unlock_irq(xas);
 	return entry;
-}
-
-static inline
-unsigned long pgoff_address(pgoff_t pgoff, struct vm_area_struct *vma)
-{
-	unsigned long address;
-
-	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
-	VM_BUG_ON_VMA(address < vma->vm_start || address >= vma->vm_end, vma);
-	return address;
 }
 
 /* Walk all mappings of a given index of a file and writeprotect them */
