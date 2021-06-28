@@ -36,7 +36,6 @@ struct virtio_vsock_sock {
 	u32 rx_bytes;
 	u32 buf_alloc;
 	struct list_head rx_queue;
-	u32 msg_count;
 };
 
 struct virtio_vsock_pkt {
