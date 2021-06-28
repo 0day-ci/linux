@@ -428,21 +428,30 @@ DEFINE_FIXED_SYMBOL(\name\()_common_real)
 
 		/* If coming from user, skip soft-mask tests. */
 		andi.	r10,r12,MSR_PR
-		bne	2f
+		bne	3f
 
 		/*
-		 * Kernel code running below __end_soft_masked is implicitly
-		 * soft-masked
+		 * Kernel code running below __end_soft_masked may be
+		 * implicitly soft-masked if it is within the regions
+		 * in the soft mask table.
 		 */
 		LOAD_HANDLER(r10, __end_soft_masked)
 		cmpld	r11,r10
+		bge+	1f
 
+		/* SEARCH_SOFT_MASK_TABLE clobbers r9,r10,r12 */
+		stw	r9,PACA_EXGEN+EX_CCR(r13)
+		SEARCH_SOFT_MASK_TABLE
+		lwz	r9,PACA_EXGEN+EX_CCR(r13)
+		cmpdi	r12,0
+		mfspr	r12,SPRN_SRR1	/* Restore r12 to SRR1 */
+		beq	1f		/* Not in soft-mask table */
 		li	r10,IMASK
-		blt-	1f
+		b	2f		/* In soft-mask table, always mask */
 
 		/* Test the soft mask state against our interrupt's bit */
-		lbz	r10,PACAIRQSOFTMASK(r13)
-1:		andi.	r10,r10,IMASK
+1:		lbz	r10,PACAIRQSOFTMASK(r13)
+2:		andi.	r10,r10,IMASK
 		/* Associate vector numbers with bits in paca->irq_happened */
 		.if IVEC == 0x500 || IVEC == 0xea0
 		li	r10,PACA_IRQ_EE
@@ -473,7 +482,7 @@ DEFINE_FIXED_SYMBOL(\name\()_common_real)
 
 	.if ISTACK
 	andi.	r10,r12,MSR_PR		/* See if coming from user	*/
-2:	mr	r10,r1			/* Save r1			*/
+3:	mr	r10,r1			/* Save r1			*/
 	subi	r1,r1,INT_FRAME_SIZE	/* alloc frame on kernel stack	*/
 	beq-	100f
 	ld	r1,PACAKSAVE(r13)	/* kernel stack to use		*/
@@ -618,6 +627,36 @@ END_FTR_SECTION_IFSET(CPU_FTR_CFAR)
 	b	303f
 301:
 	addi	r9,r9,24
+	b	300b
+302:
+	li	r12,0
+303:
+.endm
+
+.macro SEARCH_SOFT_MASK_TABLE
+#ifdef CONFIG_RELOCATABLE
+	mr	r12,r2
+	ld	r2,PACATOC(r13)
+	LOAD_REG_ADDR(r9, __start___soft_mask_table)
+	LOAD_REG_ADDR(r10, __stop___soft_mask_table)
+	mr	r2,r12
+#else
+	LOAD_REG_IMMEDIATE_SYM(r9, r12, __start___soft_mask_table)
+	LOAD_REG_IMMEDIATE_SYM(r10, r12, __stop___soft_mask_table)
+#endif
+300:
+	cmpd	r9,r10
+	beq	302f
+	ld	r12,0(r9)
+	cmpld	r11,r12
+	blt	301f
+	ld	r12,8(r9)
+	cmpld	r11,r12
+	bge	301f
+	li	r12,1
+	b	303f
+301:
+	addi	r9,r9,16
 	b	300b
 302:
 	li	r12,0
