@@ -173,7 +173,7 @@ static void
 ice_get_drvinfo(struct net_device *netdev, struct ethtool_drvinfo *drvinfo)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
-	struct ice_vsi *vsi = np->vsi;
+	struct ice_vsi *vsi = ice_get_netdev_priv_vsi(np);
 	struct ice_pf *pf = vsi->back;
 	struct ice_hw *hw = &pf->hw;
 	struct ice_orom_info *orom;
@@ -869,7 +869,7 @@ skip_ol_tests:
 static void ice_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
-	struct ice_vsi *vsi = np->vsi;
+	struct ice_vsi *vsi = ice_get_netdev_priv_vsi(np);
 	unsigned int i;
 	u8 *p = data;
 
@@ -878,6 +878,9 @@ static void ice_get_strings(struct net_device *netdev, u32 stringset, u8 *data)
 		for (i = 0; i < ICE_VSI_STATS_LEN; i++)
 			ethtool_sprintf(&p,
 					ice_gstrings_vsi_stats[i].stat_string);
+
+		if (ice_is_port_repr_netdev(netdev))
+			return;
 
 		ice_for_each_alloc_txq(vsi, i) {
 			ethtool_sprintf(&p, "tx_queue_%u_packets", i);
@@ -1301,6 +1304,9 @@ static int ice_get_sset_count(struct net_device *netdev, int sset)
 		 * order of strings will suffer from race conditions and are
 		 * not safe.
 		 */
+		if (ice_is_port_repr_netdev(netdev))
+			return ICE_VSI_STATS_LEN;
+
 		return ICE_ALL_STATS_LEN(netdev);
 	case ETH_SS_TEST:
 		return ICE_TEST_LEN;
@@ -1316,7 +1322,7 @@ ice_get_ethtool_stats(struct net_device *netdev,
 		      struct ethtool_stats __always_unused *stats, u64 *data)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
-	struct ice_vsi *vsi = np->vsi;
+	struct ice_vsi *vsi = ice_get_netdev_priv_vsi(np);
 	struct ice_pf *pf = vsi->back;
 	struct ice_ring *ring;
 	unsigned int j;
@@ -1331,6 +1337,9 @@ ice_get_ethtool_stats(struct net_device *netdev,
 		data[i++] = (ice_gstrings_vsi_stats[j].sizeof_stat ==
 			     sizeof(u64)) ? *(u64 *)p : *(u32 *)p;
 	}
+
+	if (ice_is_port_repr_netdev(netdev))
+		return;
 
 	/* populate per queue stats */
 	rcu_read_lock();
@@ -4049,6 +4058,23 @@ static const struct ethtool_ops ice_ethtool_safe_mode_ops = {
 void ice_set_ethtool_safe_mode_ops(struct net_device *netdev)
 {
 	netdev->ethtool_ops = &ice_ethtool_safe_mode_ops;
+}
+
+static const struct ethtool_ops ice_ethtool_repr_ops = {
+	.get_drvinfo		= ice_get_drvinfo,
+	.get_link		= ethtool_op_get_link,
+	.get_strings		= ice_get_strings,
+	.get_ethtool_stats      = ice_get_ethtool_stats,
+	.get_sset_count		= ice_get_sset_count,
+};
+
+/**
+ * ice_set_ethtool_repr_ops - setup VF's port representor ethtool ops
+ * @netdev: network interface device structure
+ */
+void ice_set_ethtool_repr_ops(struct net_device *netdev)
+{
+	netdev->ethtool_ops = &ice_ethtool_repr_ops;
 }
 
 /**
