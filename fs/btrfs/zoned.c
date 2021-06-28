@@ -619,7 +619,6 @@ int btrfs_check_zoned_mode(struct btrfs_fs_info *fs_info)
 	}
 
 	fs_info->zone_size = zone_size;
-	fs_info->max_zone_append_size = max_zone_append_size;
 	fs_info->fs_devices->chunk_alloc_policy = BTRFS_CHUNK_ALLOC_ZONED;
 
 	/*
@@ -1316,9 +1315,6 @@ bool btrfs_use_zone_append(struct btrfs_inode *inode, u64 start)
 	bool ret = false;
 
 	if (!btrfs_is_zoned(fs_info))
-		return false;
-
-	if (!fs_info->max_zone_append_size)
 		return false;
 
 	if (!is_data_inode(&inode->vfs_inode))
