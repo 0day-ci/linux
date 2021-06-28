@@ -15,6 +15,7 @@
  * @cmd_lock:		Lock to serialize the command interface
  * @resp:		command response
  * @link_info:		link related information
+ * @mac_to_index_bmap:	Mac address to CGX table index mapping
  * @event_cb:		callback for linkchange events
  * @event_cb_lock:	lock for serializing callback with unregister
  * @cmd_pend:		flag set before new command is started
@@ -29,12 +30,14 @@ struct lmac {
 	struct mutex cmd_lock;
 	u64 resp;
 	struct cgx_link_user_info link_info;
+	struct rsrc_bmap mac_to_index_bmap;
 	struct cgx_event_cb event_cb;
 	/* lock for serializing callback with unregister */
 	spinlock_t event_cb_lock;
-	bool cmd_pend;
 	struct cgx *cgx;
+	u8 mcast_filters_count;
 	u8 lmac_id;
+	bool cmd_pend;
 	char *name;
 };
 
