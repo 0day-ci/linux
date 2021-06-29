@@ -475,6 +475,9 @@ void gdsc_unregister(struct gdsc_desc *desc)
 	struct gdsc **scs = desc->scs;
 	size_t num = desc->num;
 
+	/* Remove provider first */
+	of_genpd_del_provider(dev->of_node);
+
 	/* Remove subdomains */
 	for (i = 0; i < num; i++) {
 		if (!scs[i])
@@ -482,7 +485,13 @@ void gdsc_unregister(struct gdsc_desc *desc)
 		if (scs[i]->parent)
 			pm_genpd_remove_subdomain(scs[i]->parent, &scs[i]->pd);
 	}
-	of_genpd_del_provider(dev->of_node);
+
+	/* Remove domains themselves */
+	for (i = 0; i < num; i++) {
+		if (!scs[i])
+			continue;
+		pm_genpd_remove(&scs[i]->pd);
+	}
 }
 
 /*
