@@ -198,6 +198,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 
 #ifdef CONFIG_PPC_BOOK3S
 syscall_vectored_\name\()_restart:
+_ASM_NOKPROBE_SYMBOL(syscall_vectored_\name\()_restart)
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
 	ld	r2,PACATOC(r13)
@@ -240,6 +241,7 @@ _ASM_NOKPROBE_SYMBOL(system_call_vectored_emulate)
 	.balign IFETCH_ALIGN_BYTES
 	.globl system_call_common_real
 system_call_common_real:
+_ASM_NOKPROBE_SYMBOL(system_call_common_real)
 	ld	r10,PACAKMSR(r13)	/* get MSR value for kernel */
 	mtmsrd	r10
 
@@ -404,6 +406,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 
 #ifdef CONFIG_PPC_BOOK3S
 syscall_restart:
+_ASM_NOKPROBE_SYMBOL(syscall_restart)
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
 	ld	r2,PACATOC(r13)
@@ -422,6 +425,7 @@ RESTART_TABLE(.Lsyscall_rst_start, .Lsyscall_rst_end, syscall_restart)
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 tabort_syscall:
+_ASM_NOKPROBE_SYMBOL(tabort_syscall)
 	/* Firstly we need to enable TM in the kernel */
 	mfmsr	r10
 	li	r9, 1
@@ -604,6 +608,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_STCX_CHECKS_ADDRESS)
 
 #ifdef CONFIG_PPC_BOOK3S
 interrupt_return_\srr\()_user_restart:
+_ASM_NOKPROBE_SYMBOL(interrupt_return_\srr\()_user_restart)
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
 	ld	r2,PACATOC(r13)
@@ -737,6 +742,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_STCX_CHECKS_ADDRESS)
 
 #ifdef CONFIG_PPC_BOOK3S
 interrupt_return_\srr\()_kernel_restart:
+_ASM_NOKPROBE_SYMBOL(interrupt_return_\srr\()_kernel_restart)
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
 	ld	r2,PACATOC(r13)
