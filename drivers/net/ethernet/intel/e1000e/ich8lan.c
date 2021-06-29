@@ -989,6 +989,27 @@ update_fextnvm6:
 	return ret_val;
 }
 
+static u32 convert_e1000e_ltr_scale(u32 val)
+{
+	if (val > 5)
+		return 0;
+
+	return 1U << (5 * val);
+}
+
+static u64 decoded_ltr(u32 val)
+{
+	u64 decoded_latency;
+	u32 value;
+	u32 scale;
+
+	value = val & 0x03FF;
+	scale = (val & 0x1C00) >> 10;
+	decoded_latency = value * convert_e1000e_ltr_scale(scale);
+
+	return decoded_latency;
+}
+
 /**
  *  e1000_platform_pm_pch_lpt - Set platform power management values
  *  @hw: pointer to the HW structure
@@ -1062,7 +1083,7 @@ static s32 e1000_platform_pm_pch_lpt(struct e1000_hw *hw, bool link)
 				     E1000_PCI_LTR_CAP_LPT + 2, &max_nosnoop);
 		max_ltr_enc = max_t(u16, max_snoop, max_nosnoop);
 
-		if (lat_enc > max_ltr_enc)
+		if (decoded_ltr(lat_enc) > decoded_ltr(max_ltr_enc))
 			lat_enc = max_ltr_enc;
 	}
 
