@@ -196,6 +196,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	RFI_TO_USER
 .Lsyscall_vectored_\name\()_rst_end:
 
+#ifdef CONFIG_PPC_BOOK3S
 syscall_vectored_\name\()_restart:
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
@@ -209,6 +210,7 @@ syscall_vectored_\name\()_restart:
 	b	.Lsyscall_vectored_\name\()_rst_start
 
 RESTART_TABLE(.Lsyscall_vectored_\name\()_rst_start, .Lsyscall_vectored_\name\()_rst_end, syscall_vectored_\name\()_restart)
+#endif
 
 .endm
 
@@ -320,10 +322,12 @@ END_BTB_FLUSH_SECTION
 	li	r5,0 /* !scv */
 	bl	syscall_exit_prepare
 	std	r1,PACA_EXIT_SAVE_R1(r13) /* save r1 for restart */
+#ifdef CONFIG_PPC_BOOK3S
 .Lsyscall_rst_start:
 	lbz	r11,PACAIRQHAPPENED(r13)
 	andi.	r11,r11,(~PACA_IRQ_HARD_DIS)@l
 	bne-	syscall_restart
+#endif
 	li	r11,IRQS_ENABLED
 	stb	r11,PACAIRQSOFTMASK(r13)
 	li	r11,0
@@ -396,6 +400,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	b	.Lsyscall_restore_regs_cont
 .Lsyscall_rst_end:
 
+#ifdef CONFIG_PPC_BOOK3S
 syscall_restart:
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
@@ -409,6 +414,7 @@ syscall_restart:
 	b	.Lsyscall_rst_start
 
 RESTART_TABLE(.Lsyscall_rst_start, .Lsyscall_rst_end, syscall_restart)
+#endif
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 tabort_syscall:
@@ -504,10 +510,12 @@ _ASM_NOKPROBE_SYMBOL(interrupt_return_\srr\())
 	bne-	.Lrestore_nvgprs_\srr
 .Lrestore_nvgprs_\srr\()_cont:
 	std	r1,PACA_EXIT_SAVE_R1(r13) /* save r1 for restart */
+#ifdef CONFIG_PPC_BOOK3S
 .Linterrupt_return_\srr\()_user_rst_start:
 	lbz	r11,PACAIRQHAPPENED(r13)
 	andi.	r11,r11,(~PACA_IRQ_HARD_DIS)@l
 	bne-	interrupt_return_\srr\()_user_restart
+#endif
 	li	r11,IRQS_ENABLED
 	stb	r11,PACAIRQSOFTMASK(r13)
 	li	r11,0
@@ -590,6 +598,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_STCX_CHECKS_ADDRESS)
 	REST_NVGPRS(r1)
 	b	.Lrestore_nvgprs_\srr\()_cont
 
+#ifdef CONFIG_PPC_BOOK3S
 interrupt_return_\srr\()_user_restart:
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
@@ -602,6 +611,7 @@ interrupt_return_\srr\()_user_restart:
 	b	.Linterrupt_return_\srr\()_user_rst_start
 
 RESTART_TABLE(.Linterrupt_return_\srr\()_user_rst_start, .Linterrupt_return_\srr\()_user_rst_end, interrupt_return_\srr\()_user_restart)
+#endif
 
 	.balign IFETCH_ALIGN_BYTES
 .Lkernel_interrupt_return_\srr\():
@@ -615,9 +625,11 @@ RESTART_TABLE(.Linterrupt_return_\srr\()_user_rst_start, .Linterrupt_return_\srr
 	cmpwi	r11,IRQS_ENABLED
 	stb	r11,PACAIRQSOFTMASK(r13)
 	bne	1f
+#ifdef CONFIG_PPC_BOOK3S
 	lbz	r11,PACAIRQHAPPENED(r13)
 	andi.	r11,r11,(~PACA_IRQ_HARD_DIS)@l
 	bne-	interrupt_return_\srr\()_kernel_restart
+#endif
 	li	r11,0
 	stb	r11,PACAIRQHAPPENED(r13) # clear out possible HARD_DIS
 1:
@@ -717,6 +729,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_STCX_CHECKS_ADDRESS)
 	b	.	/* prevent speculative execution */
 .Linterrupt_return_\srr\()_kernel_rst_end:
 
+#ifdef CONFIG_PPC_BOOK3S
 interrupt_return_\srr\()_kernel_restart:
 	GET_PACA(r13)
 	ld	r1,PACA_EXIT_SAVE_R1(r13)
@@ -729,14 +742,15 @@ interrupt_return_\srr\()_kernel_restart:
 	b	.Linterrupt_return_\srr\()_kernel_rst_start
 
 RESTART_TABLE(.Linterrupt_return_\srr\()_kernel_rst_start, .Linterrupt_return_\srr\()_kernel_rst_end, interrupt_return_\srr\()_kernel_restart)
+#endif
 
 .endm
 
 interrupt_return_macro srr
 #ifdef CONFIG_PPC_BOOK3S
 interrupt_return_macro hsrr
-#endif /* CONFIG_PPC_BOOK3S */
 
 	.globl __end_soft_masked
 __end_soft_masked:
 DEFINE_FIXED_SYMBOL(__end_soft_masked)
+#endif /* CONFIG_PPC_BOOK3S */
