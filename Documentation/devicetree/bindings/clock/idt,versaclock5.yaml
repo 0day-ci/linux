@@ -30,6 +30,22 @@ description: |
     3 -- OUT3
     4 -- OUT4
 
+  The idt,(en|dis)able-shutdown and idt,output-enable-active-(high|low)
+  properties control the SH (en_global_shutdown) and SP bits of the
+  Primary Source and Shutdown Register, respectively. Their behavior is
+  summarized by the following table:
+
+  SH SP Output when the SD/OE pin is Low/High
+  == == =====================================
+   0  0 Active/Inactive
+   0  1 Inactive/Active
+   1  0 Active/Shutdown
+   1  1 Inactive/Shutdown
+
+  If no properties related to these bits are specified, then they will
+  be left in their default state. This may be useful if the SH and SP
+  bits are set to a default value using the OTP memory.
+
 maintainers:
   - Luca Ceresoli <luca@lucaceresoli.net>
 
@@ -63,6 +79,34 @@ properties:
     minimum: 9000
     maximum: 22760
     description: Optional load capacitor for XTAL1 and XTAL2
+
+  idt,enable-shutdown:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      Enable the shutdown function when the SD/OE pin is high. This
+      corresponds to setting the SH bit of the Primary Source and
+      Shutdown Register.
+
+  idt,disable-shutdown:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      Disable the shutdown function for the SD/OE pin. This corresponds
+      to clearing the SH bit of the Primary Source and Shutdown
+      Register.
+
+  idt,output-enable-active-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      This enables output when the SD/OE pin is high, and disables
+      output when the SD/OE pin is low. This corresponds to setting the
+      SP bit of the Primary Source and Shutdown Register.
+
+  idt,output-enable-active-low:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      This disables output when the SD/OE pin is high, and enables
+      output when the SD/OE pin is low. This corresponds to clearing the
+      SP bit of the Primary Source and Shutdown Register.
 
 patternProperties:
   "^OUT[1-4]$":
