@@ -178,6 +178,7 @@ static int jz4780_otg_phy_set_rate(struct clk_hw *hw, unsigned long req_rate,
 	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
 
 	spin_unlock_irqrestore(&cgu->lock, flags);
+
 	return 0;
 }
 
@@ -188,6 +189,7 @@ static int jz4780_otg_phy_enable(struct clk_hw *hw)
 
 	writel(readl(reg_opcr) | OPCR_SPENDN0, reg_opcr);
 	writel(readl(reg_usbpcr) & ~USBPCR_OTG_DISABLE & ~USBPCR_SIDDQ, reg_usbpcr);
+
 	return 0;
 }
 
@@ -215,9 +217,9 @@ static const struct clk_ops jz4780_otg_phy_ops = {
 	.round_rate = jz4780_otg_phy_round_rate,
 	.set_rate = jz4780_otg_phy_set_rate,
 
-	.enable		= jz4780_otg_phy_enable,
-	.disable	= jz4780_otg_phy_disable,
-	.is_enabled	= jz4780_otg_phy_is_enabled,
+	.enable = jz4780_otg_phy_enable,
+	.disable = jz4780_otg_phy_disable,
+	.is_enabled = jz4780_otg_phy_is_enabled,
 };
 
 static int jz4780_core1_enable(struct clk_hw *hw)
@@ -336,11 +338,17 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 #undef DEF_PLL
 
-	/* Custom (SoC-specific) OTG PHY */
+	/* Custom (SoC-specific) */
+
+	[JZ4780_CLK_CORE1] = {
+		"core1", CGU_CLK_CUSTOM,
+		.parents = { JZ4780_CLK_CPU, -1, -1, -1 },
+		.custom = { &jz4780_core1_ops },
+	},
 
 	[JZ4780_CLK_OTGPHY] = {
 		"otg_phy", CGU_CLK_CUSTOM,
-		.parents = { -1, -1, JZ4780_CLK_EXCLK, -1 },
+		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
 		.custom = { &jz4780_otg_phy_ops },
 	},
 
@@ -362,13 +370,13 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_CPU] = {
 		"cpu", CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_CPUMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_CPUMUX },
 		.div = { CGU_REG_CLOCKCONTROL, 0, 1, 4, 22, -1, -1 },
 	},
 
 	[JZ4780_CLK_L2CACHE] = {
 		"l2cache", CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_CPUMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_CPUMUX },
 		.div = { CGU_REG_CLOCKCONTROL, 4, 1, 4, -1, -1, -1 },
 	},
 
@@ -389,13 +397,13 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_AHB2] = {
 		"ahb2", CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_AHB2PMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_AHB2PMUX },
 		.div = { CGU_REG_CLOCKCONTROL, 12, 1, 4, 20, -1, -1 },
 	},
 
 	[JZ4780_CLK_PCLK] = {
 		"pclk", CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_AHB2PMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_AHB2PMUX },
 		.div = { CGU_REG_CLOCKCONTROL, 16, 1, 4, 20, -1, -1 },
 	},
 
@@ -417,14 +425,14 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_I2SPLL] = {
 		"i2s_pll", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_EPLL, -1, -1 },
+		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_EPLL },
 		.mux = { CGU_REG_I2SCDR, 30, 1 },
 		.div = { CGU_REG_I2SCDR, 0, 1, 8, 29, 28, 27 },
 	},
 
 	[JZ4780_CLK_I2S] = {
 		"i2s", CGU_CLK_MUX,
-		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_I2SPLL, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_I2SPLL },
 		.mux = { CGU_REG_I2SCDR, 31, 1 },
 	},
 
@@ -452,21 +460,21 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_MSC0] = {
 		"msc0", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_MSCMUX },
 		.div = { CGU_REG_MSC0CDR, 0, 2, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 3 },
 	},
 
 	[JZ4780_CLK_MSC1] = {
 		"msc1", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_MSCMUX },
 		.div = { CGU_REG_MSC1CDR, 0, 2, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 11 },
 	},
 
 	[JZ4780_CLK_MSC2] = {
 		"msc2", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_MSCMUX, -1, -1, -1 },
+		.parents = { JZ4780_CLK_MSCMUX },
 		.div = { CGU_REG_MSC2CDR, 0, 2, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR0, 12 },
 	},
@@ -482,20 +490,20 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_SSIPLL] = {
 		"ssi_pll", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL, -1, -1 },
+		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL },
 		.mux = { CGU_REG_SSICDR, 30, 1 },
 		.div = { CGU_REG_SSICDR, 0, 1, 8, 29, 28, 27 },
 	},
 
 	[JZ4780_CLK_SSI] = {
 		"ssi", CGU_CLK_MUX,
-		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_SSIPLL, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_SSIPLL },
 		.mux = { CGU_REG_SSICDR, 31, 1 },
 	},
 
 	[JZ4780_CLK_CIMMCLK] = {
 		"cim_mclk", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL, -1, -1 },
+		.parents = { JZ4780_CLK_SCLKA, JZ4780_CLK_MPLL },
 		.mux = { CGU_REG_CIMCDR, 31, 1 },
 		.div = { CGU_REG_CIMCDR, 0, 1, 8, 30, 29, 28 },
 	},
@@ -510,7 +518,7 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_PCM] = {
 		"pcm", CGU_CLK_MUX | CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_PCMPLL, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK, JZ4780_CLK_PCMPLL },
 		.mux = { CGU_REG_PCMCDR, 31, 1 },
 		.gate = { CGU_REG_CLKGR1, 3 },
 	},
@@ -558,238 +566,231 @@ static const struct ingenic_cgu_clk_info jz4780_cgu_clocks[] = {
 
 	[JZ4780_CLK_NEMC] = {
 		"nemc", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_AHB2, -1, -1, -1 },
+		.parents = { JZ4780_CLK_AHB2 },
 		.gate = { CGU_REG_CLKGR0, 0 },
 	},
 
 	[JZ4780_CLK_OTG0] = {
 		"otg0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 2 },
 	},
 
 	[JZ4780_CLK_SSI0] = {
 		"ssi0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_SSI, -1, -1, -1 },
+		.parents = { JZ4780_CLK_SSI },
 		.gate = { CGU_REG_CLKGR0, 4 },
 	},
 
 	[JZ4780_CLK_SMB0] = {
 		"smb0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR0, 5 },
 	},
 
 	[JZ4780_CLK_SMB1] = {
 		"smb1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR0, 6 },
 	},
 
 	[JZ4780_CLK_SCC] = {
 		"scc", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 7 },
 	},
 
 	[JZ4780_CLK_AIC] = {
 		"aic", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 8 },
 	},
 
 	[JZ4780_CLK_TSSI0] = {
 		"tssi0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 9 },
 	},
 
 	[JZ4780_CLK_OWI] = {
 		"owi", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 10 },
 	},
 
 	[JZ4780_CLK_KBC] = {
 		"kbc", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 13 },
 	},
 
 	[JZ4780_CLK_SADC] = {
 		"sadc", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 14 },
 	},
 
 	[JZ4780_CLK_UART0] = {
 		"uart0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 15 },
 	},
 
 	[JZ4780_CLK_UART1] = {
 		"uart1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 16 },
 	},
 
 	[JZ4780_CLK_UART2] = {
 		"uart2", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 17 },
 	},
 
 	[JZ4780_CLK_UART3] = {
 		"uart3", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 18 },
 	},
 
 	[JZ4780_CLK_SSI1] = {
 		"ssi1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_SSI, -1, -1, -1 },
+		.parents = { JZ4780_CLK_SSI },
 		.gate = { CGU_REG_CLKGR0, 19 },
 	},
 
 	[JZ4780_CLK_SSI2] = {
 		"ssi2", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_SSI, -1, -1, -1 },
+		.parents = { JZ4780_CLK_SSI },
 		.gate = { CGU_REG_CLKGR0, 20 },
 	},
 
 	[JZ4780_CLK_PDMA] = {
 		"pdma", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 21 },
 	},
 
 	[JZ4780_CLK_GPS] = {
 		"gps", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 22 },
 	},
 
 	[JZ4780_CLK_MAC] = {
 		"mac", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 23 },
 	},
 
 	[JZ4780_CLK_SMB2] = {
 		"smb2", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR0, 24 },
 	},
 
 	[JZ4780_CLK_CIM] = {
 		"cim", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 26 },
 	},
 
 	[JZ4780_CLK_LCD] = {
 		"lcd", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 28 },
 	},
 
 	[JZ4780_CLK_TVE] = {
 		"tve", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_LCD, -1, -1, -1 },
+		.parents = { JZ4780_CLK_LCD },
 		.gate = { CGU_REG_CLKGR0, 27 },
 	},
 
 	[JZ4780_CLK_IPU] = {
 		"ipu", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR0, 29 },
 	},
 
 	[JZ4780_CLK_DDR0] = {
 		"ddr0", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_DDR, -1, -1, -1 },
+		.parents = { JZ4780_CLK_DDR },
 		.gate = { CGU_REG_CLKGR0, 30 },
 	},
 
 	[JZ4780_CLK_DDR1] = {
 		"ddr1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_DDR, -1, -1, -1 },
+		.parents = { JZ4780_CLK_DDR },
 		.gate = { CGU_REG_CLKGR0, 31 },
 	},
 
 	[JZ4780_CLK_SMB3] = {
 		"smb3", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR1, 0 },
 	},
 
 	[JZ4780_CLK_TSSI1] = {
 		"tssi1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 1 },
 	},
 
 	[JZ4780_CLK_COMPRESS] = {
 		"compress", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 5 },
 	},
 
 	[JZ4780_CLK_AIC1] = {
 		"aic1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 6 },
 	},
 
 	[JZ4780_CLK_GPVLC] = {
 		"gpvlc", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 7 },
 	},
 
 	[JZ4780_CLK_OTG1] = {
 		"otg1", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 8 },
 	},
 
 	[JZ4780_CLK_UART4] = {
 		"uart4", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 10 },
 	},
 
 	[JZ4780_CLK_AHBMON] = {
 		"ahb_mon", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 11 },
 	},
 
 	[JZ4780_CLK_SMB4] = {
 		"smb4", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR1, 12 },
 	},
 
 	[JZ4780_CLK_DES] = {
 		"des", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 13 },
 	},
 
 	[JZ4780_CLK_X2D] = {
 		"x2d", CGU_CLK_GATE,
-		.parents = { JZ4780_CLK_EXCLK, -1, -1, -1 },
+		.parents = { JZ4780_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR1, 14 },
 	},
-
-	[JZ4780_CLK_CORE1] = {
-		"core1", CGU_CLK_CUSTOM,
-		.parents = { JZ4780_CLK_CPU, -1, -1, -1 },
-		.custom = { &jz4780_core1_ops },
-	},
-
 };
 
 static void __init jz4780_cgu_init(struct device_node *np)
@@ -811,4 +812,5 @@ static void __init jz4780_cgu_init(struct device_node *np)
 
 	ingenic_cgu_register_syscore_ops(cgu);
 }
+
 CLK_OF_DECLARE_DRIVER(jz4780_cgu, "ingenic,jz4780-cgu", jz4780_cgu_init);

@@ -15,38 +15,38 @@
 #include "pm.h"
 
 /* CGU register offsets */
-#define CGU_REG_CPCCR		0x00
-#define CGU_REG_APLL		0x10
-#define CGU_REG_MPLL		0x14
-#define CGU_REG_CLKGR		0x20
-#define CGU_REG_OPCR		0x24
-#define CGU_REG_DDRCDR		0x2c
-#define CGU_REG_USBPCR		0x3c
-#define CGU_REG_USBPCR1		0x48
-#define CGU_REG_USBCDR		0x50
-#define CGU_REG_MACCDR		0x54
-#define CGU_REG_I2SCDR		0x60
-#define CGU_REG_LPCDR		0x64
-#define CGU_REG_MSC0CDR		0x68
-#define CGU_REG_I2SCDR1		0x70
-#define CGU_REG_SSICDR		0x74
-#define CGU_REG_CIMCDR		0x7c
-#define CGU_REG_PCMCDR		0x84
-#define CGU_REG_MSC1CDR		0xa4
-#define CGU_REG_CMP_INTR	0xb0
-#define CGU_REG_CMP_INTRE	0xb4
-#define CGU_REG_DRCG		0xd0
-#define CGU_REG_CPCSR		0xd4
-#define CGU_REG_PCMCDR1		0xe0
-#define CGU_REG_MACPHYC		0xe8
+#define CGU_REG_CPCCR			0x00
+#define CGU_REG_APLL			0x10
+#define CGU_REG_MPLL			0x14
+#define CGU_REG_CLKGR			0x20
+#define CGU_REG_OPCR			0x24
+#define CGU_REG_DDRCDR			0x2c
+#define CGU_REG_USBPCR			0x3c
+#define CGU_REG_USBPCR1			0x48
+#define CGU_REG_USBCDR			0x50
+#define CGU_REG_MACCDR			0x54
+#define CGU_REG_I2SCDR			0x60
+#define CGU_REG_LPCDR			0x64
+#define CGU_REG_MSC0CDR			0x68
+#define CGU_REG_I2SCDR1			0x70
+#define CGU_REG_SSICDR			0x74
+#define CGU_REG_CIMCDR			0x7c
+#define CGU_REG_PCMCDR			0x84
+#define CGU_REG_MSC1CDR			0xa4
+#define CGU_REG_CMP_INTR		0xb0
+#define CGU_REG_CMP_INTRE		0xb4
+#define CGU_REG_DRCG			0xd0
+#define CGU_REG_CPCSR			0xd4
+#define CGU_REG_PCMCDR1			0xe0
+#define CGU_REG_MACPHYC			0xe8
 
 /* bits within the OPCR register */
-#define OPCR_SPENDN0		BIT(7)
-#define OPCR_SPENDN1		BIT(6)
+#define OPCR_SPENDN0			BIT(7)
+#define OPCR_SPENDN1			BIT(6)
 
 /* bits within the USBPCR register */
-#define USBPCR_SIDDQ		BIT(21)
-#define USBPCR_OTG_DISABLE	BIT(20)
+#define USBPCR_SIDDQ			BIT(21)
+#define USBPCR_OTG_DISABLE		BIT(20)
 
 /* bits within the USBPCR1 register */
 #define USBPCR1_REFCLKSEL_SHIFT	26
@@ -174,6 +174,7 @@ static int x1000_otg_phy_set_rate(struct clk_hw *hw, unsigned long req_rate,
 	writel(usbpcr1, cgu->base + CGU_REG_USBPCR1);
 
 	spin_unlock_irqrestore(&cgu->lock, flags);
+
 	return 0;
 }
 
@@ -184,6 +185,7 @@ static int x1000_usb_phy_enable(struct clk_hw *hw)
 
 	writel(readl(reg_opcr) | OPCR_SPENDN0, reg_opcr);
 	writel(readl(reg_usbpcr) & ~USBPCR_OTG_DISABLE & ~USBPCR_SIDDQ, reg_usbpcr);
+
 	return 0;
 }
 
@@ -211,9 +213,9 @@ static const struct clk_ops x1000_otg_phy_ops = {
 	.round_rate = x1000_otg_phy_round_rate,
 	.set_rate = x1000_otg_phy_set_rate,
 
-	.enable		= x1000_usb_phy_enable,
-	.disable	= x1000_usb_phy_disable,
-	.is_enabled	= x1000_usb_phy_is_enabled,
+	.enable = x1000_usb_phy_enable,
+	.disable = x1000_usb_phy_disable,
+	.is_enabled = x1000_usb_phy_is_enabled,
 };
 
 static const s8 pll_od_encoding[8] = {
@@ -300,7 +302,7 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_OTGPHY] = {
 		"otg_phy", CGU_CLK_CUSTOM,
-		.parents = { -1, -1, X1000_CLK_EXCLK, -1 },
+		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
 		.custom = { &x1000_otg_phy_ops },
 	},
 
@@ -320,14 +322,14 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_CPU] = {
 		"cpu", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { X1000_CLK_CPUMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_CPUMUX },
 		.div = { CGU_REG_CPCCR, 0, 1, 4, 22, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 30 },
 	},
 
 	[X1000_CLK_L2CACHE] = {
 		"l2cache", CGU_CLK_DIV,
-		.parents = { X1000_CLK_CPUMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_CPUMUX },
 		.div = { CGU_REG_CPCCR, 4, 1, 4, 22, -1, -1 },
 	},
 
@@ -346,13 +348,13 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_AHB2] = {
 		"ahb2", CGU_CLK_DIV,
-		.parents = { X1000_CLK_AHB2PMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_AHB2PMUX },
 		.div = { CGU_REG_CPCCR, 12, 1, 4, 20, -1, -1 },
 	},
 
 	[X1000_CLK_PCLK] = {
 		"pclk", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { X1000_CLK_AHB2PMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_AHB2PMUX },
 		.div = { CGU_REG_CPCCR, 16, 1, 4, 20, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 28 },
 	},
@@ -382,20 +384,20 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_MSCMUX] = {
 		"msc_mux", CGU_CLK_MUX,
-		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL},
+		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL },
 		.mux = { CGU_REG_MSC0CDR, 31, 1 },
 	},
 
 	[X1000_CLK_MSC0] = {
 		"msc0", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { X1000_CLK_MSCMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_MSCMUX },
 		.div = { CGU_REG_MSC0CDR, 0, 2, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR, 4 },
 	},
 
 	[X1000_CLK_MSC1] = {
 		"msc1", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { X1000_CLK_MSCMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_MSCMUX },
 		.div = { CGU_REG_MSC1CDR, 0, 2, 8, 29, 28, 27 },
 		.gate = { CGU_REG_CLKGR, 5 },
 	},
@@ -411,7 +413,7 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_SSIPLL] = {
 		"ssi_pll", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL, -1, -1 },
+		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL },
 		.mux = { CGU_REG_SSICDR, 31, 1 },
 		.div = { CGU_REG_SSICDR, 0, 1, 8, 29, 28, 27 },
 	},
@@ -424,13 +426,13 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_SSIMUX] = {
 		"ssi_mux", CGU_CLK_MUX,
-		.parents = { X1000_CLK_EXCLK, X1000_CLK_SSIPLL_DIV2, -1, -1 },
+		.parents = { X1000_CLK_EXCLK, X1000_CLK_SSIPLL_DIV2 },
 		.mux = { CGU_REG_SSICDR, 30, 1 },
 	},
 
 	[X1000_CLK_CIM] = {
 		"cim", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL, -1, -1 },
+		.parents = { X1000_CLK_SCLKA, X1000_CLK_MPLL },
 		.mux = { CGU_REG_CIMCDR, 31, 1 },
 		.div = { CGU_REG_CIMCDR, 0, 1, 8, 29, 28, 27 },
 	},
@@ -452,91 +454,91 @@ static const struct ingenic_cgu_clk_info x1000_cgu_clocks[] = {
 
 	[X1000_CLK_EMC] = {
 		"emc", CGU_CLK_GATE,
-		.parents = { X1000_CLK_AHB2, -1, -1, -1 },
+		.parents = { X1000_CLK_AHB2 },
 		.gate = { CGU_REG_CLKGR, 0 },
 	},
 
 	[X1000_CLK_EFUSE] = {
 		"efuse", CGU_CLK_GATE,
-		.parents = { X1000_CLK_AHB2, -1, -1, -1 },
+		.parents = { X1000_CLK_AHB2 },
 		.gate = { CGU_REG_CLKGR, 1 },
 	},
 
 	[X1000_CLK_SFC] = {
 		"sfc", CGU_CLK_GATE,
-		.parents = { X1000_CLK_SSIPLL, -1, -1, -1 },
+		.parents = { X1000_CLK_SSIPLL },
 		.gate = { CGU_REG_CLKGR, 2 },
 	},
 
 	[X1000_CLK_I2C0] = {
 		"i2c0", CGU_CLK_GATE,
-		.parents = { X1000_CLK_PCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR, 7 },
 	},
 
 	[X1000_CLK_I2C1] = {
 		"i2c1", CGU_CLK_GATE,
-		.parents = { X1000_CLK_PCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR, 8 },
 	},
 
 	[X1000_CLK_I2C2] = {
 		"i2c2", CGU_CLK_GATE,
-		.parents = { X1000_CLK_PCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR, 9 },
 	},
 
 	[X1000_CLK_AIC] = {
 		"aic", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 11 },
 	},
 
 	[X1000_CLK_UART0] = {
 		"uart0", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 14 },
 	},
 
 	[X1000_CLK_UART1] = {
 		"uart1", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 15 },
 	},
 
 	[X1000_CLK_UART2] = {
 		"uart2", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 16 },
 	},
 
 	[X1000_CLK_DMIC] = {
 		"dmic", CGU_CLK_GATE,
-		.parents = { X1000_CLK_PCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR, 17 },
 	},
 
 	[X1000_CLK_TCU] = {
 		"tcu", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 18 },
 	},
 
 	[X1000_CLK_SSI] = {
 		"ssi", CGU_CLK_GATE,
-		.parents = { X1000_CLK_SSIMUX, -1, -1, -1 },
+		.parents = { X1000_CLK_SSIMUX },
 		.gate = { CGU_REG_CLKGR, 19 },
 	},
 
 	[X1000_CLK_OST] = {
 		"ost", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 20 },
 	},
 
 	[X1000_CLK_PDMA] = {
 		"pdma", CGU_CLK_GATE,
-		.parents = { X1000_CLK_EXCLK, -1, -1, -1 },
+		.parents = { X1000_CLK_EXCLK },
 		.gate = { CGU_REG_CLKGR, 21 },
 	},
 
@@ -566,6 +568,7 @@ static void __init x1000_cgu_init(struct device_node *np)
 
 	ingenic_cgu_register_syscore_ops(cgu);
 }
+
 /*
  * CGU has some children devices, this is useful for probing children devices
  * in the case where the device node is compatible with "simple-mfd".
