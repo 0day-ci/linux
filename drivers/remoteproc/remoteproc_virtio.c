@@ -425,6 +425,7 @@ int rproc_add_virtio_dev(struct rproc_vdev *rvdev, int id)
 out:
 	return ret;
 }
+EXPORT_SYMBOL(rproc_add_virtio_dev);
 
 /**
  * rproc_remove_virtio_dev() - remove an rproc-induced virtio device
@@ -440,3 +441,4 @@ int rproc_remove_virtio_dev(struct device *dev, void *data)
 	unregister_virtio_device(vdev);
 	return 0;
 }
+EXPORT_SYMBOL(rproc_remove_virtio_dev);
