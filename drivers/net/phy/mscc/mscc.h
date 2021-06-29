@@ -281,6 +281,7 @@ enum rgmii_clock_delay {
 #define PHY_ID_VSC8514			  0x00070670
 #define PHY_ID_VSC8530			  0x00070560
 #define PHY_ID_VSC8531			  0x00070570
+#define PHY_ID_VSC8531_02		  0x00070572
 #define PHY_ID_VSC8540			  0x00070760
 #define PHY_ID_VSC8541			  0x00070770
 #define PHY_ID_VSC8552			  0x000704e0
@@ -373,6 +374,8 @@ struct vsc8531_private {
 	 * package.
 	 */
 	unsigned int base_addr;
+	u32 rx_delay;
+	u32 tx_delay;
 
 #if IS_ENABLED(CONFIG_MACSEC)
 	/* MACsec fields:
