@@ -326,4 +326,17 @@ static inline void fsnotify_change(struct dentry *dentry, unsigned int ia_valid)
 		fsnotify_dentry(dentry, mask);
 }
 
+static inline int fsnotify_sb_error(struct super_block *sb, struct inode *inode,
+				    int error)
+{
+	struct fs_error_report report = {
+		.error = error,
+		.inode = inode,
+	};
+
+	return __fsnotify(FS_ERROR, &(struct fsnotify_event_info) {
+			.data = &report, .data_type = FSNOTIFY_EVENT_ERROR,
+			.sb = sb});
+}
+
 #endif	/* _LINUX_FS_NOTIFY_H */
