@@ -89,13 +89,13 @@ enum hw_tod_trig_sel {
 };
 
 /* Register bit definitions end */
-#define FW_FILENAME	"idt82p33xxx.bin"
-#define MAX_PHC_PLL (2)
-#define TOD_BYTE_COUNT (10)
-#define MAX_MEASURMENT_COUNT (5)
-#define SNAP_THRESHOLD_NS (150000)
-#define SYNC_TOD_TIMEOUT_SEC (5)
-#define IDT82P33_MAX_WRITE_COUNT (512)
+#define FW_FILENAME			"idt82p33xxx.bin"
+#define MAX_PHC_PLL			(2)
+#define TOD_BYTE_COUNT			(10)
+#define MAX_MEASURMENT_COUNT		(5)
+#define SNAP_THRESHOLD_NS		(10000)
+#define IMMEDIATE_SNAP_THRESHOLD_NS	(50000)
+#define IDT82P33_MAX_WRITE_COUNT	(512)
 
 #define PLLMASK_ADDR_HI	0xFF
 #define PLLMASK_ADDR_LO	0xA5
@@ -116,15 +116,19 @@ enum hw_tod_trig_sel {
 #define DEFAULT_OUTPUT_MASK_PLL0	(0xc0)
 #define DEFAULT_OUTPUT_MASK_PLL1	DEFAULT_OUTPUT_MASK_PLL0
 
+/* Bit definitions for DPLL_TOD_TRIGGER register */
+#define READ_TRIGGER_MASK	(0xF)
+#define READ_TRIGGER_SHIFT	(0x0)
+#define WRITE_TRIGGER_MASK	(0xF0)
+#define WRITE_TRIGGER_SHIFT	(0x4)
+
 /* PTP Hardware Clock interface */
 struct idt82p33_channel {
 	struct ptp_clock_info	caps;
 	struct ptp_clock	*ptp_clock;
-	struct idt82p33	*idt82p33;
-	enum pll_mode	pll_mode;
-	/* task to turn off SYNC_TOD bit after pps sync */
-	struct delayed_work	sync_tod_work;
-	bool			sync_tod_on;
+	struct idt82p33		*idt82p33;
+	enum pll_mode		pll_mode;
+	struct delayed_work	adjtime_work;
 	s32			current_freq_ppb;
 	u8			output_mask;
 	u16			dpll_tod_cnfg;
