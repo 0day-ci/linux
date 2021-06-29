@@ -87,7 +87,7 @@ struct gcm_context_data {
 	u64 partial_block_len;
 	u64 unused;
 	/* Allocate space for hash_keys later */
-	u8 hash_keys[0];
+	u8 hash_keys[];
 };
 
 asmlinkage int aesni_set_key(struct crypto_aes_ctx *ctx, const u8 *in_key,
