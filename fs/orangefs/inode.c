@@ -249,7 +249,6 @@ static void orangefs_readahead(struct readahead_control *rac)
 {
 	loff_t offset;
 	struct iov_iter iter;
-	struct file *file = rac->file;
 	struct inode *inode = rac->mapping->host;
 	struct xarray *i_pages;
 	struct page *page;
