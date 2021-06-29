@@ -1225,6 +1225,9 @@ iomap_alloc_ioend(struct inode *inode, struct iomap_writepage_ctx *wpc,
 	bio->bi_write_hint = inode->i_write_hint;
 	wbc_init_bio(wbc, bio);
 
+	BUILD_BUG_ON(offsetof(struct iomap_ioend, io_inline_bio) +
+		     sizeof(struct bio) != sizeof(struct iomap_ioend));
+
 	ioend = container_of(bio, struct iomap_ioend, io_inline_bio);
 	INIT_LIST_HEAD(&ioend->io_list);
 	ioend->io_type = wpc->iomap.type;
