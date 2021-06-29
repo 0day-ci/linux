@@ -954,6 +954,7 @@ static void vc4_hdmi_encoder_pre_crtc_configure(struct drm_encoder *encoder,
 	if (ret) {
 		DRM_ERROR("Failed to set pixel bvb clock rate: %d\n", ret);
 		clk_disable_unprepare(vc4_hdmi->pixel_clock);
+		pm_runtime_put(&vc4_hdmi->pdev->dev);
 		return;
 	}
 
@@ -961,6 +962,7 @@ static void vc4_hdmi_encoder_pre_crtc_configure(struct drm_encoder *encoder,
 	if (ret) {
 		DRM_ERROR("Failed to turn on pixel bvb clock: %d\n", ret);
 		clk_disable_unprepare(vc4_hdmi->pixel_clock);
+		pm_runtime_put(&vc4_hdmi->pdev->dev);
 		return;
 	}
 
