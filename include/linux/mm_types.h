@@ -286,9 +286,10 @@ struct vm_region {
 };
 
 #ifdef CONFIG_USERFAULTFD
-#define NULL_VM_UFFD_CTX ((struct vm_userfaultfd_ctx) { NULL, })
+#define NULL_VM_UFFD_CTX ((struct vm_userfaultfd_ctx) { NULL, 0, })
 struct vm_userfaultfd_ctx {
 	struct userfaultfd_ctx *ctx;
+	unsigned long address_tag;
 };
 #else /* CONFIG_USERFAULTFD */
 #define NULL_VM_UFFD_CTX ((struct vm_userfaultfd_ctx) {})

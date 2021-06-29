@@ -110,15 +110,15 @@ static int userfaultfd_wake_function(wait_queue_entry_t *wq, unsigned mode,
 	struct userfaultfd_wake_range *range = key;
 	int ret;
 	struct userfaultfd_wait_queue *uwq;
-	unsigned long start, len;
+	unsigned long start, len, addr;
 
 	uwq = container_of(wq, struct userfaultfd_wait_queue, wq);
 	ret = 0;
 	/* len == 0 means wake all */
 	start = range->start;
 	len = range->len;
-	if (len && (start > uwq->msg.arg.pagefault.address ||
-		    start + len <= uwq->msg.arg.pagefault.address))
+	addr = untagged_addr(uwq->msg.arg.pagefault.address);
+	if (len && (start > addr || start + len <= addr))
 		goto out;
 	WRITE_ONCE(uwq->waken, true);
 	/*
@@ -480,8 +480,9 @@ vm_fault_t handle_userfault(struct vm_fault *vmf, unsigned long reason)
 
 	init_waitqueue_func_entry(&uwq.wq, userfaultfd_wake_function);
 	uwq.wq.private = current;
-	uwq.msg = userfault_msg(vmf->address, vmf->flags, reason,
-			ctx->features);
+	uwq.msg = userfault_msg(
+		vmf->address + vmf->vma->vm_userfaultfd_ctx.address_tag,
+		vmf->flags, reason, ctx->features);
 	uwq.ctx = ctx;
 	uwq.waken = false;
 
@@ -1287,7 +1288,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	unsigned long vm_flags, new_flags;
 	bool found;
 	bool basic_ioctls;
-	unsigned long start, end, vma_end;
+	unsigned long address_tag, start, end, vma_end;
 
 	user_uffdio_register = (struct uffdio_register __user *) arg;
 
@@ -1312,6 +1313,9 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 #endif
 		vm_flags |= VM_UFFD_MINOR;
 	}
+
+	address_tag = uffdio_register.range.start -
+		      untagged_addr(uffdio_register.range.start);
 
 	ret = validate_range(mm, &uffdio_register.range.start,
 			     uffdio_register.range.len);
@@ -1462,6 +1466,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 		 */
 		vma->vm_flags = new_flags;
 		vma->vm_userfaultfd_ctx.ctx = ctx;
+		vma->vm_userfaultfd_ctx.address_tag = address_tag;
 
 		if (is_vm_hugetlb_page(vma) && uffd_disable_huge_pmd_share(vma))
 			hugetlb_unshare_all_pmds(vma);

@@ -73,6 +73,11 @@ flag setting.
 Non-zero tags are never preserved in sigcontext.fault_address
 regardless of the SA_EXPOSE_TAGBITS flag setting.
 
+When using userfaultfd the address tag supplied in the range.start
+field of the UFFDIO_REGISTER ioctl is preserved and returned to
+userspace via the fault.address field of struct uffd_msg, and the
+tag of the original fault address is discarded.
+
 The architecture prevents the use of a tagged PC, so the upper byte will
 be set to a sign-extension of bit 55 on exception return.
 
