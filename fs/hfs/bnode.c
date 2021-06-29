@@ -18,13 +18,23 @@
 void hfs_bnode_read(struct hfs_bnode *node, void *buf,
 		int off, int len)
 {
-	struct page *page;
+	struct page **pagep;
+	int l;
 
 	off += node->page_offset;
-	page = node->page[0];
+	pagep = node->page + (off >> PAGE_SHIFT);
+	off &= ~PAGE_MASK;
 
-	memcpy(buf, kmap(page) + off, len);
-	kunmap(page);
+	l = min_t(int, len, PAGE_SIZE - off);
+	memcpy(buf, kmap(*pagep) + off, l);
+	kunmap(*pagep);
+
+	while ((len -= l) != 0) {
+		buf += l;
+		l = min_t(int, len, PAGE_SIZE);
+		memcpy(buf, kmap(*++pagep), l);
+		kunmap(*pagep);
+	}
 }
 
 u16 hfs_bnode_read_u16(struct hfs_bnode *node, int off)
