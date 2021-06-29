@@ -760,6 +760,14 @@ void *__kfence_alloc(struct kmem_cache *s, size_t size, gfp_t flags)
 	if (size > PAGE_SIZE)
 		return NULL;
 
+	/*
+	 * Skip DMA allocations. These must reside in the low memory, which we
+	 * cannot guarantee.
+	 */
+	if ((flags & (__GFP_DMA | __GFP_DMA32)) ||
+	    (s->flags & (SLAB_CACHE_DMA | SLAB_CACHE_DMA32)))
+		return NULL;
+
 	return kfence_guarded_alloc(s, size, flags);
 }
 
