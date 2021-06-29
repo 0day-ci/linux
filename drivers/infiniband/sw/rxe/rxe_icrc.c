@@ -7,8 +7,44 @@
 #include "rxe.h"
 #include "rxe_loc.h"
 
-/* Compute a partial ICRC for all the IB transport headers. */
-u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
+/**
+ * rxe_crc32 - Compute incremental crc32 for a contiguous segment
+ * @rxe: rdma_rxe device object
+ * @crc: starting crc32 value from previous segments
+ * @addr: starting address of segment
+ * @len: length of the segment in bytes
+ *
+ * Returns the crc32 checksum of the segment starting from crc.
+ */
+static u32 rxe_crc32(struct rxe_dev *rxe, u32 crc, void *addr, size_t len)
+{
+	u32 icrc;
+	int err;
+
+	SHASH_DESC_ON_STACK(shash, rxe->tfm);
+
+	shash->tfm = rxe->tfm;
+	*(u32 *)shash_desc_ctx(shash) = crc;
+	err = crypto_shash_update(shash, addr, len);
+	if (unlikely(err)) {
+		pr_warn_ratelimited("failed crc calculation, err: %d\n", err);
+		return crc32_le(crc, addr, len);
+	}
+
+	icrc = *(u32 *)shash_desc_ctx(shash);
+	barrier_data(shash_desc_ctx(shash));
+
+	return icrc;
+}
+
+/**
+ * rxe_icrc_hdr - Compute a partial ICRC for the IB transport headers.
+ * @pkt: Information about the current packet
+ * @skb: The packet buffer
+ *
+ * Returns the partial ICRC
+ */
+static u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 {
 	unsigned int bth_offset = 0;
 	struct iphdr *ip4h = NULL;
@@ -71,9 +107,9 @@ u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 /**
  * rxe_icrc_check - Compute ICRC for a packet and compare to the ICRC
  *		    delivered in the packet.
- * @skb: The packet buffer with packet info in skb->cb[] (receive path)
+ * @skb: packet buffer with packet info in skb->cb[] (receive path)
  *
- * Returns 0 on success or an error on failure
+ * Returns 0 if the ICRCs match or an error on failure
  */
 int rxe_icrc_check(struct sk_buff *skb)
 {
@@ -106,7 +142,11 @@ int rxe_icrc_check(struct sk_buff *skb)
 	return 0;
 }
 
-/* rxe_icrc_generate- compute ICRC for a packet. */
+/**
+ * rxe_icrc_generate - Compute ICRC for a packet.
+ * @pkt: packet information
+ * @skb: packet buffer
+ */
 void rxe_icrc_generate(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 {
 	__be32 *icrcp;
