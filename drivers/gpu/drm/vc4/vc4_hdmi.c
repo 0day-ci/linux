@@ -2176,6 +2176,7 @@ static int vc4_hdmi_bind(struct device *dev, struct device *master, void *data)
 	if ((of_device_is_compatible(dev->of_node, "brcm,bcm2711-hdmi0") ||
 	     of_device_is_compatible(dev->of_node, "brcm,bcm2711-hdmi1")) &&
 	    HDMI_READ(HDMI_VID_CTL) & VC4_HD_VID_CTL_ENABLE) {
+		pm_runtime_set_active(dev);
 		clk_prepare_enable(vc4_hdmi->pixel_clock);
 		clk_prepare_enable(vc4_hdmi->hsm_clock);
 		clk_prepare_enable(vc4_hdmi->pixel_bvb_clock);
