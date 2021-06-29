@@ -241,8 +241,10 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 	 * extend local i_size without keeping userspace server in sync. So,
 	 * attr->size coming from server can be stale. We cannot trust it.
 	 */
-	if (!is_wb || !S_ISREG(inode->i_mode))
+	if (!is_wb || !S_ISREG(inode->i_mode)
+		|| (attr_newer_than_local(attr, inode) && !inode_is_open_for_write(inode))) {
 		i_size_write(inode, attr->size);
+	}
 	spin_unlock(&fi->lock);
 
 	if (!is_wb && S_ISREG(inode->i_mode)) {

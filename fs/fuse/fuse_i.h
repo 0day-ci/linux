@@ -909,6 +909,12 @@ static inline void fuse_page_descs_length_init(struct fuse_page_desc *descs,
 	for (i = index; i < index + nr_pages; i++)
 		descs[i].length = PAGE_SIZE - descs[i].offset;
 }
+static inline bool attr_newer_than_local(struct fuse_attr *attr, struct inode *inode)
+{
+	return (attr->mtime > inode->i_mtime.tv_sec) ||
+		((attr->mtime == inode->i_mtime.tv_sec) &&
+		 (attr->mtimensec > inode->i_mtime.tv_nsec));
+}
 
 /** Device operations */
 extern const struct file_operations fuse_dev_operations;
