@@ -351,8 +351,10 @@ static int mt6360_check_vendor_info(struct mt6360_ddata *ddata)
 	int ret;
 
 	ret = regmap_read(ddata->regmap, MT6360_PMU_DEV_INFO, &info);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(ddata->dev, "Failed to read device info from regmap\n");
 		return ret;
+	}
 
 	if ((info & CHIP_VEN_MASK) != CHIP_VEN_MT6360) {
 		dev_err(ddata->dev, "Device not supported\n");
