@@ -16,42 +16,42 @@
 
 /* FIXME: what about REVID_E0 */
 static const struct intel_step_info kbl_revids[] = {
-	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
-	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
-	[2] = { .gt_step = STEP_C0, .display_step = STEP_B0 },
-	[3] = { .gt_step = STEP_D0, .display_step = STEP_B0 },
-	[4] = { .gt_step = STEP_F0, .display_step = STEP_C0 },
-	[5] = { .gt_step = STEP_C0, .display_step = STEP_B1 },
-	[6] = { .gt_step = STEP_D1, .display_step = STEP_B1 },
-	[7] = { .gt_step = STEP_G0, .display_step = STEP_C0 },
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0, .soc_step = STEP_G0 },
+	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0, .soc_step = STEP_A0 },
+	[2] = { .gt_step = STEP_C0, .display_step = STEP_B0, .soc_step = STEP_H0 },
+	[3] = { .gt_step = STEP_D0, .display_step = STEP_B0, .soc_step = STEP_J0 },
+	[4] = { .gt_step = STEP_F0, .display_step = STEP_C0, .soc_step = STEP_B0 },
+	[5] = { .gt_step = STEP_C0, .display_step = STEP_B1, .soc_step = STEP_H5 },
+	[6] = { .gt_step = STEP_D1, .display_step = STEP_B1, .soc_step = STEP_J1 },
+	[7] = { .gt_step = STEP_G0, .display_step = STEP_C0, .soc_step = STEP_Y0 },
 };
 
 static const struct intel_step_info tgl_uy_revid_step_tbl[] = {
-	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
-	[1] = { .gt_step = STEP_B0, .display_step = STEP_C0 },
-	[2] = { .gt_step = STEP_B1, .display_step = STEP_C0 },
-	[3] = { .gt_step = STEP_C0, .display_step = STEP_D0 },
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0, .soc_step = STEP_A0 },
+	[1] = { .gt_step = STEP_B0, .display_step = STEP_C0, .soc_step = STEP_B2 },
+	[2] = { .gt_step = STEP_B1, .display_step = STEP_C0, .soc_step = STEP_B10 },
+	[3] = { .gt_step = STEP_C0, .display_step = STEP_D0, .soc_step = STEP_C0 },
 };
 
 /* Same GT stepping between tgl_uy_revids and tgl_revids don't mean the same HW */
 static const struct intel_step_info tgl_revid_step_tbl[] = {
-	[0] = { .gt_step = STEP_A0, .display_step = STEP_B0 },
-	[1] = { .gt_step = STEP_B0, .display_step = STEP_D0 },
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_B0, .soc_step = STEP_P0 },
+	[1] = { .gt_step = STEP_B0, .display_step = STEP_D0, .soc_step = STEP_R0 },
 };
 
 static const struct intel_step_info adls_revid_step_tbl[] = {
-	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
-	[0x1] = { .gt_step = STEP_A0, .display_step = STEP_A2 },
-	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
-	[0x8] = { .gt_step = STEP_C0, .display_step = STEP_B0 },
-	[0xC] = { .gt_step = STEP_D0, .display_step = STEP_C0 },
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0, .soc_step = STEP_A0 },
+	[0x1] = { .gt_step = STEP_A0, .display_step = STEP_A2, .soc_step = STEP_A2 },
+	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_B0, .soc_step = STEP_B0 },
+	[0x8] = { .gt_step = STEP_C0, .display_step = STEP_B0, .soc_step = STEP_G0 },
+	[0xC] = { .gt_step = STEP_D0, .display_step = STEP_C0, .soc_step = STEP_H0 },
 };
 
 static const struct intel_step_info adlp_revid_step_tbl[] = {
-	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
-	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
-	[0x8] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
-	[0xC] = { .gt_step = STEP_C0, .display_step = STEP_D0 },
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0, .soc_step = STEP_J0 },
+	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_B0, .soc_step = STEP_Q0 },
+	[0x8] = { .gt_step = STEP_C0, .display_step = STEP_C0, .soc_step = STEP_K0 },
+	[0xC] = { .gt_step = STEP_C0, .display_step = STEP_D0, .soc_step = STEP_L0 },
 };
 
 void intel_step_init(struct drm_i915_private *i915)
