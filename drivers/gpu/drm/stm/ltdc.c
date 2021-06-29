@@ -425,10 +425,17 @@ static void ltdc_crtc_atomic_enable(struct drm_crtc *crtc,
 {
 	struct ltdc_device *ldev = crtc_to_ltdc(crtc);
 	struct drm_device *ddev = crtc->dev;
+	int ret;
 
 	DRM_DEBUG_DRIVER("\n");
 
-	pm_runtime_get_sync(ddev->dev);
+	if (!pm_runtime_active(ddev->dev)) {
+		ret = pm_runtime_get_sync(ddev->dev);
+		if (ret) {
+			DRM_ERROR("Failed to set mode, cannot get sync\n");
+			return;
+		}
+	}
 
 	/* Sets the background color value */
 	reg_write(ldev->regs, LTDC_BCCR, BCCR_BCBLACK);
@@ -782,6 +789,7 @@ static void ltdc_plane_atomic_update(struct drm_plane *plane,
 	struct drm_plane_state *newstate = drm_atomic_get_new_plane_state(state,
 									  plane);
 	struct drm_framebuffer *fb = newstate->fb;
+	struct drm_device *ddev = plane->dev;
 	u32 lofs = plane->index * LAY_OFS;
 	u32 x0 = newstate->crtc_x;
 	u32 x1 = newstate->crtc_x + newstate->crtc_w - 1;
@@ -790,6 +798,11 @@ static void ltdc_plane_atomic_update(struct drm_plane *plane,
 	u32 src_x, src_y, src_w, src_h;
 	u32 val, pitch_in_bytes, line_length, paddr, ahbp, avbp, bpcr;
 	enum ltdc_pix_fmt pf;
+
+	if (!pm_runtime_active(ddev->dev)) {
+		DRM_DEBUG_DRIVER("crtc not activated");
+		return;
+	}
 
 	if (!newstate->crtc || !fb) {
 		DRM_DEBUG_DRIVER("fb or crtc NULL");
@@ -896,7 +909,13 @@ static void ltdc_plane_atomic_disable(struct drm_plane *plane,
 	struct drm_plane_state *oldstate = drm_atomic_get_old_plane_state(state,
 									  plane);
 	struct ltdc_device *ldev = plane_to_ltdc(plane);
+	struct drm_device *ddev = plane->dev;
 	u32 lofs = plane->index * LAY_OFS;
+
+	if (!pm_runtime_active(ddev->dev)) {
+		DRM_DEBUG_DRIVER("crtc already deactivated");
+		return;
+	}
 
 	/* disable layer */
 	reg_clear(ldev->regs, LTDC_L1CR + lofs, LXCR_LEN);
