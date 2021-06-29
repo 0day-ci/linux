@@ -157,8 +157,10 @@ static int img_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 	int ret;
 
 	ret = pm_runtime_get_sync(chip->dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_autosuspend(chip->dev);
 		return ret;
+	}
 
 	val = img_pwm_readl(pwm_chip, PWM_CTRL_CFG);
 	val |= BIT(pwm->hwpwm);
