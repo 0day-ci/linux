@@ -394,16 +394,18 @@ skip:
 	/*
 	 * Start a kernel thread to update the MMP block periodically.
 	 */
-	EXT4_SB(sb)->s_mmp_tsk = kthread_run(kmmpd, sb, "kmmpd-%.*s",
-					     (int)sizeof(mmp->mmp_bdevname),
-					     bdevname(bh->b_bdev,
-						      mmp->mmp_bdevname));
+	EXT4_SB(sb)->s_mmp_tsk = kthread_create(kmmpd, sb, "kmmpd-%.*s",
+						(int)sizeof(mmp->mmp_bdevname),
+						bdevname(bh->b_bdev,
+							 mmp->mmp_bdevname));
+
 	if (IS_ERR(EXT4_SB(sb)->s_mmp_tsk)) {
 		EXT4_SB(sb)->s_mmp_tsk = NULL;
 		ext4_warning(sb, "Unable to create kmmpd thread for %s.",
 			     sb->s_id);
 		goto failed;
 	}
+	wake_up_process(EXT4_SB(sb)->s_mmp_tsk);
 
 	return 0;
 
