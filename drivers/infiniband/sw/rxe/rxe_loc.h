@@ -193,7 +193,6 @@ int rxe_requester(void *arg);
 int rxe_responder(void *arg);
 
 /* rxe_icrc.c */
-u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb);
 int rxe_icrc_check(struct sk_buff *skb);
 void rxe_icrc_generate(struct rxe_pkt_info *pkt, struct sk_buff *skb);
 
