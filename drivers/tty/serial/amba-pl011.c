@@ -1703,9 +1703,30 @@ static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
 
 static int pl011_allocate_irq(struct uart_amba_port *uap)
 {
+	int ret = -1;
+	int i = 0;
+	unsigned int virq = 0;
+	struct amba_device *amba_dev = (struct amba_device *)uap->port.dev;
+
+	if (!amba_dev)
+		return -1;
+
 	pl011_write(uap->im, uap, REG_IMSC);
 
-	return request_irq(uap->port.irq, pl011_int, IRQF_SHARED, "uart-pl011", uap);
+	for (i = 0; i < AMBA_NR_IRQS; i++) {
+		virq = amba_dev->irq[i];
+		if (virq == 0)
+			break;
+
+		ret = request_irq(virq, pl011_int, IRQF_SHARED, "uart-pl011-*", uap);
+		if (ret < 0) {
+			dev_info(uap->port.dev, "%s %d request %u interrupt failed\n",
+					__func__, __LINE__, virq);
+			break;
+		}
+	}
+
+	return ret;
 }
 
 /*
