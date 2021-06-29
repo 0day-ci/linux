@@ -261,14 +261,119 @@ static const struct stepping_info icl_stepping_info[] = {
 };
 
 static const struct stepping_info no_stepping_info = { '*', '*' };
+struct stepping_info *soc;
+
+static struct stepping_info *
+intel_get_soc_stepping(struct intel_step_info step)
+{
+
+	switch (step.soc_step) {
+		case STEP_A0:
+			soc->stepping = 'A';
+			soc->substepping = '0';
+			break;
+		case STEP_A2:
+			soc->stepping = 'A';
+			soc->substepping = '2';
+			break;
+		case STEP_B0:
+			soc->stepping = 'B';
+			soc->substepping = '0';
+			break;
+		case STEP_B1:
+			soc->stepping = 'B';
+			soc->substepping = '1';
+			break;
+		case STEP_B2:
+			soc->stepping = 'B';
+			soc->substepping = '2';
+			break;
+		case STEP_B10:
+			soc->stepping = 'B';
+			soc->substepping = 'A';
+			break;
+		case STEP_C0:
+			soc->stepping = 'C';
+			soc->substepping = '0';
+			break;
+		case STEP_D0:
+			soc->stepping = 'D';
+			soc->substepping = '0';
+			break;
+		case STEP_D1:
+			soc->stepping = 'D';
+			soc->substepping = '1';
+			break;
+		case STEP_E0:
+			soc->stepping = 'E';
+			soc->substepping = '0';
+			break;
+		case STEP_F0:
+			soc->stepping = 'F';
+			soc->substepping = '0';
+			break;
+		case STEP_G0:
+			soc->stepping = 'G';
+			soc->substepping = '0';
+			break;
+		case STEP_H0:
+			soc->stepping = 'H';
+			soc->substepping = '0';
+			break;
+		case STEP_H5:
+			soc->stepping = 'H';
+			soc->substepping = '5';
+			break;
+		case STEP_J0:
+			soc->stepping = 'J';
+			soc->substepping = '0';
+			break;
+		case STEP_J1:
+			soc->stepping = 'J';
+			soc->substepping = '1';
+			break;
+		case STEP_K0:
+			soc->stepping = 'K';
+			soc->substepping = '0';
+			break;
+		case STEP_P0:
+			soc->stepping = 'L';
+			soc->substepping = '0';
+			break;
+		case STEP_L0:
+			soc->stepping = 'P';
+			soc->substepping = '0';
+			break;
+		case STEP_Q0:
+			soc->stepping = 'Q';
+			soc->substepping = '0';
+			break;
+		case STEP_R0:
+			soc->stepping = 'R';
+			soc->substepping = '0';
+			break;
+		case STEP_Y0:
+			soc->stepping = 'Y';
+			soc->substepping = '0';
+			break;
+		default:
+			soc->stepping = '*';
+			soc->substepping = '*';
+			break;
+	}
+	return soc;
+}
 
 static const struct stepping_info *
 intel_get_stepping_info(struct drm_i915_private *dev_priv)
 {
 	const struct stepping_info *si;
+	struct intel_step_info step = RUNTIME_INFO(dev_priv)->step;
 	unsigned int size;
 
-	if (IS_ICELAKE(dev_priv)) {
+	if (DISPLAY_VER(dev_priv) >= 12) {
+		si = intel_get_soc_stepping(step);
+	} else if (IS_ICELAKE(dev_priv)) {
 		size = ARRAY_SIZE(icl_stepping_info);
 		si = icl_stepping_info;
 	} else if (IS_SKYLAKE(dev_priv)) {
@@ -282,10 +387,10 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 		si = NULL;
 	}
 
-	if (INTEL_REVID(dev_priv) < size)
-		return si + INTEL_REVID(dev_priv);
+	if (DISPLAY_VER(dev_priv) < 12)
+		return INTEL_REVID(dev_priv) < size ? si + INTEL_REVID(dev_priv) : &no_stepping_info;
 
-	return &no_stepping_info;
+	return si;
 }
 
 static void gen9_set_dc_state_debugmask(struct drm_i915_private *dev_priv)
