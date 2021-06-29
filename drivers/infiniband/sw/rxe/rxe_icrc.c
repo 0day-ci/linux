@@ -4,34 +4,59 @@
  * Copyright (c) 2015 System Fabric Works, Inc. All rights reserved.
  */
 
+#include <linux/crc32.h>
 #include "rxe.h"
 #include "rxe_loc.h"
 
 /**
- * rxe_crc32 - Compute incremental crc32 for a contiguous segment
+ * rxe_icrc_init - Initialize crypto function for computing crc32
+ * @rxe: rdma_rxe device object
+ *
+ * Returns 0 on success else an error
+ */
+int rxe_icrc_init(struct rxe_dev *rxe)
+{
+	struct crypto_shash *tfm;
+
+	tfm = crypto_alloc_shash("crc32", 0, 0);
+	if (IS_ERR(tfm)) {
+		pr_err("failed to init crc32 algorithm err:%ld\n",
+			       PTR_ERR(tfm));
+		return PTR_ERR(tfm);
+	}
+
+	rxe->tfm = tfm;
+
+	return 0;
+}
+
+/**
+ * rxe_crc32 - Compute cumulative crc32 for a contiguous segment
  * @rxe: rdma_rxe device object
  * @crc: starting crc32 value from previous segments
  * @addr: starting address of segment
  * @len: length of the segment in bytes
  *
- * Returns the crc32 checksum of the segment starting from crc.
+ * Returns the crc32 cumulative checksum including the segment starting
+ * from crc.
  */
-static u32 rxe_crc32(struct rxe_dev *rxe, u32 crc, void *addr, size_t len)
+static __be32 rxe_crc32(struct rxe_dev *rxe, __be32 crc, void *addr,
+			size_t len)
 {
-	u32 icrc;
+	__be32 icrc;
 	int err;
 
 	SHASH_DESC_ON_STACK(shash, rxe->tfm);
 
 	shash->tfm = rxe->tfm;
-	*(u32 *)shash_desc_ctx(shash) = crc;
+	*(__be32 *)shash_desc_ctx(shash) = crc;
 	err = crypto_shash_update(shash, addr, len);
 	if (unlikely(err)) {
 		pr_warn_ratelimited("failed crc calculation, err: %d\n", err);
 		return crc32_le(crc, addr, len);
 	}
 
-	icrc = *(u32 *)shash_desc_ctx(shash);
+	icrc = *(__be32 *)shash_desc_ctx(shash);
 	barrier_data(shash_desc_ctx(shash));
 
 	return icrc;
@@ -39,19 +64,16 @@ static u32 rxe_crc32(struct rxe_dev *rxe, u32 crc, void *addr, size_t len)
 
 /**
  * rxe_icrc_hdr - Compute a partial ICRC for the IB transport headers.
- * @pkt: Information about the current packet
- * @skb: The packet buffer
+ * @pkt: packet information
+ * @skb: packet buffer
  *
  * Returns the partial ICRC
  */
 static u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 {
-	unsigned int bth_offset = 0;
-	struct iphdr *ip4h = NULL;
-	struct ipv6hdr *ip6h = NULL;
 	struct udphdr *udph;
 	struct rxe_bth *bth;
-	int crc;
+	__be32 crc;
 	int length;
 	int hdr_size = sizeof(struct udphdr) +
 		(skb->protocol == htons(ETH_P_IP) ?
@@ -69,6 +91,8 @@ static u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 	crc = 0xdebb20e3;
 
 	if (skb->protocol == htons(ETH_P_IP)) { /* IPv4 */
+		struct iphdr *ip4h = NULL;
+
 		memcpy(pshdr, ip_hdr(skb), hdr_size);
 		ip4h = (struct iphdr *)pshdr;
 		udph = (struct udphdr *)(ip4h + 1);
@@ -77,6 +101,8 @@ static u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 		ip4h->check = CSUM_MANGLED_0;
 		ip4h->tos = 0xff;
 	} else {				/* IPv6 */
+		struct ipv6hdr *ip6h = NULL;
+
 		memcpy(pshdr, ipv6_hdr(skb), hdr_size);
 		ip6h = (struct ipv6hdr *)pshdr;
 		udph = (struct udphdr *)(ip6h + 1);
@@ -85,12 +111,9 @@ static u32 rxe_icrc_hdr(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 		ip6h->priority = 0xf;
 		ip6h->hop_limit = 0xff;
 	}
-	udph->check = CSUM_MANGLED_0;
 
-	bth_offset += hdr_size;
-
-	memcpy(&pshdr[bth_offset], pkt->hdr, RXE_BTH_BYTES);
-	bth = (struct rxe_bth *)&pshdr[bth_offset];
+	bth = (struct rxe_bth *)(udph + 1);
+	memcpy(bth, pkt->hdr, RXE_BTH_BYTES);
 
 	/* exclude bth.resv8a */
 	bth->qpn |= cpu_to_be32(~BTH_QPN_MASK);
@@ -115,18 +138,18 @@ int rxe_icrc_check(struct sk_buff *skb)
 {
 	struct rxe_pkt_info *pkt = SKB_TO_PKT(skb);
 	__be32 *icrcp;
-	u32 pkt_icrc;
-	u32 icrc;
+	__be32 packet_icrc;
+	__be32 computed_icrc;
 
 	icrcp = (__be32 *)(pkt->hdr + pkt->paylen - RXE_ICRC_SIZE);
-	pkt_icrc = be32_to_cpu(*icrcp);
+	packet_icrc = *icrcp;
 
-	icrc = rxe_icrc_hdr(pkt, skb);
-	icrc = rxe_crc32(pkt->rxe, icrc, (u8 *)payload_addr(pkt),
-				payload_size(pkt) + bth_pad(pkt));
-	icrc = (__force u32)cpu_to_be32(~icrc);
+	computed_icrc = rxe_icrc_hdr(pkt, skb);
+	computed_icrc = rxe_crc32(pkt->rxe, computed_icrc,
+		(u8 *)payload_addr(pkt), payload_size(pkt) + bth_pad(pkt));
+	computed_icrc = ~computed_icrc;
 
-	if (unlikely(icrc != pkt_icrc)) {
+	if (unlikely(computed_icrc != packet_icrc)) {
 		if (skb->protocol == htons(ETH_P_IPV6))
 			pr_warn_ratelimited("bad ICRC from %pI6c\n",
 					    &ipv6_hdr(skb)->saddr);
@@ -150,7 +173,7 @@ int rxe_icrc_check(struct sk_buff *skb)
 void rxe_icrc_generate(struct rxe_pkt_info *pkt, struct sk_buff *skb)
 {
 	__be32 *icrcp;
-	u32 icrc;
+	__be32 icrc;
 
 	icrcp = (__be32 *)(pkt->hdr + pkt->paylen - RXE_ICRC_SIZE);
 	icrc = rxe_icrc_hdr(pkt, skb);
