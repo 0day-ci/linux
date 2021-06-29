@@ -357,4 +357,7 @@ source "fs/unicode/Kconfig"
 config IO_WQ
 	bool
 
+config FS_BOXED_FILE
+	bool
+
 endmenu

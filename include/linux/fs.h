@@ -955,6 +955,15 @@ struct file {
 	struct address_space	*f_mapping;
 	errseq_t		f_wb_err;
 	errseq_t		f_sb_err; /* for syncfs */
+
+#ifdef CONFIG_FS_BOXED_FILE
+	/* Only for file systems that wanna pass an *existing* file to the
+	   caller of open() instead of the newly created one. This has similar
+	   semantics like passing an fd via unix socket, but instead via some
+	   open() call.
+	*/
+	struct file		*boxed_file;
+#endif
 } __randomize_layout
   __attribute__((aligned(4)));	/* lest something weird decides that 2 is OK */
 

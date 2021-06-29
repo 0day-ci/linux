@@ -3496,7 +3496,7 @@ static struct file *path_openat(struct nameidata *nd,
 	}
 	if (likely(!error)) {
 		if (likely(file->f_mode & FMODE_OPENED))
-			return file;
+			return unbox_file(file);
 		WARN_ON(1);
 		error = -EINVAL;
 	}

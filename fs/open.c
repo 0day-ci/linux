@@ -769,6 +769,46 @@ SYSCALL_DEFINE3(fchown, unsigned int, fd, uid_t, user, gid_t, group)
 	return ksys_fchown(fd, user, group);
 }
 
+#ifdef CONFIG_FS_BOXED_FILE
+/*
+ * Finish up an open procedure before returning the file to the caller.
+ * in case the the fs returns some unusual things like directly passing
+ * another file, this will be handled here.
+ *
+ * This function is only supposed to be called by functions like dentry_open()
+ * and path_openat() that allocate a new struct file and finally pass it to
+ * vfs_open() - the struct file should not have been used in any ways in the
+ * meantime, or unpleasant things may happen.
+ */
+struct file *unbox_file(struct file *f)
+{
+	struct file *boxed;
+
+	if (unlikely(!f))
+		return NULL;
+
+	if (IS_ERR(f))
+		return f;
+
+	if (likely(!f->boxed_file))
+		return f;
+
+	/* the fs returned another struct file (f->lower_file) that should be
+	   directly passed to our callers instead of the one that had been newly
+	   created for the open procedure.
+
+	   the lower_file is already ref'ed, so we keep the refcount.
+	   since the upper file (f) just had been opened, and no further access,
+	   we can just call fput() on it.
+	*/
+
+	boxed = f->boxed_file;
+	fput(f);
+
+	return boxed;
+}
+#endif /* CONFIG_FS_BOXED_FILE */
+
 static int do_dentry_open(struct file *f,
 			  struct inode *inode,
 			  int (*open)(struct inode *, struct file *))
@@ -959,7 +999,7 @@ struct file *dentry_open(const struct path *path, int flags,
 			f = ERR_PTR(error);
 		}
 	}
-	return f;
+	return unbox_file(f);
 }
 EXPORT_SYMBOL(dentry_open);
 
