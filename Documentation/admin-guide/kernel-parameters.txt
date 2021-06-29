@@ -4851,6 +4851,8 @@
 
 	rootfstype=	[KNL] Set root filesystem type
 
+	rootopts=	[KNL] Set root filesystem mount flags bitmap
+
 	rootwait	[KNL] Wait (indefinitely) for root device to show up.
 			Useful for devices that are detected asynchronously
 			(e.g. USB and MMC devices).
