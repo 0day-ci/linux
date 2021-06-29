@@ -429,7 +429,7 @@ int gdsc_register(struct gdsc_desc *desc,
 		scs[i]->rcdev = rcdev;
 		ret = gdsc_init(scs[i]);
 		if (ret)
-			return ret;
+			goto err_init;
 		data->domains[i] = &scs[i]->pd;
 	}
 
@@ -437,11 +437,35 @@ int gdsc_register(struct gdsc_desc *desc,
 	for (i = 0; i < num; i++) {
 		if (!scs[i])
 			continue;
-		if (scs[i]->parent)
-			pm_genpd_add_subdomain(scs[i]->parent, &scs[i]->pd);
+		if (scs[i]->parent) {
+			ret = pm_genpd_add_subdomain(scs[i]->parent, &scs[i]->pd);
+			if (ret)
+				goto err_subdomain;
+		}
 	}
 
-	return of_genpd_add_provider_onecell(dev->of_node, data);
+	ret = of_genpd_add_provider_onecell(dev->of_node, data);
+	if (!ret)
+		return 0;
+
+err_subdomain:
+	i--;
+	for (; i >= 0; i--) {
+		if (!scs[i] || !scs[i]->parent)
+			continue;
+		pm_genpd_remove_subdomain(scs[i]->parent, &scs[i]->pd);
+	}
+	i = num;
+
+err_init:
+	i--;
+	for (; i >= 0; i--) {
+		if (!scs[i])
+			continue;
+		pm_genpd_remove(&scs[i]->pd);
+	}
+
+	return ret;
 }
 
 void gdsc_unregister(struct gdsc_desc *desc)
