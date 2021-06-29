@@ -419,6 +419,7 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 	res = hfs_cat_find_brec(sb, HFS_ROOT_CNID, &fd);
 	if (!res) {
 		if (fd.entrylength > sizeof(rec) || fd.entrylength < 0) {
+			hfs_find_exit(&fd);
 			res =  -EIO;
 			goto bail;
 		}
