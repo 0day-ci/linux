@@ -305,8 +305,10 @@ int unpin_extent_cache(struct extent_map_tree *tree, u64 start, u64 len,
 
 	WARN_ON(!em || em->start != start);
 
-	if (!em)
+	if (!em) {
+		ret = -ENOENT;
 		goto out;
+	}
 
 	em->generation = gen;
 	clear_bit(EXTENT_FLAG_PINNED, &em->flags);
