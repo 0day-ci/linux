@@ -2,9 +2,10 @@
 //
 // AMD SPI controller driver
 //
-// Copyright (c) 2020, Advanced Micro Devices, Inc.
+// Copyright (c) 2020-2021, Advanced Micro Devices, Inc.
 //
-// Author: Sanjay R Mehta <sanju.mehta@amd.com>
+// Authors: Sanjay R Mehta <sanju.mehta@amd.com>
+//          Nehal Bakulchandra Shah <nehal-bakulchandra.shah@amd.com>
 
 #include <linux/acpi.h>
 #include <linux/init.h>
@@ -29,7 +30,7 @@
 #define AMD_SPI_TX_COUNT_REG	0x48
 #define AMD_SPI_RX_COUNT_REG	0x4B
 #define AMD_SPI_STATUS_REG	0x4C
-
+#define AMD_SPI_FIFO_SIZE	72
 #define AMD_SPI_MEM_SIZE	200
 
 /* M_CMD OP codes for SPI */
@@ -215,8 +216,8 @@ static inline int amd_spi_fifo_xfer(struct amd_spi *amd_spi,
 	u8 cmd_opcode;
 	u8 *buf = NULL;
 	u32 m_cmd = 0;
-	u32 i = 0;
-	u32 tx_len = 0, rx_len = 0;
+	u32 i = 0, it = 0, tx_index = 0, rx_index = 0;
+	u32 tx_len = 0, rx_len = 0, iters = 0, remaining =  0;
 
 	list_for_each_entry(xfer, &message->transfers,
 			    transfer_list) {
@@ -230,17 +231,40 @@ static inline int amd_spi_fifo_xfer(struct amd_spi *amd_spi,
 			tx_len = xfer->len - 1;
 			cmd_opcode = *(u8 *)xfer->tx_buf;
 			buf++;
-			amd_spi_set_opcode(master, cmd_opcode);
 
-			/* Write data into the FIFO. */
-			for (i = 0; i < tx_len; i++) {
-				iowrite8(buf[i],
-					 ((u8 __iomem *)amd_spi->io_remap_addr +
-					 AMD_SPI_FIFO_BASE + i));
+			tx_index = 0;
+			iters = tx_len / AMD_SPI_FIFO_SIZE;
+			remaining = tx_len % AMD_SPI_FIFO_SIZE;
+
+			for (it = 0; it < iters; it++) {
+				amd_spi_clear_fifo_ptr(master);
+				amd_spi_set_opcode(master, cmd_opcode);
+
+				amd_spi_set_tx_count(master, AMD_SPI_FIFO_SIZE);
+				/* Write data into the FIFO. */
+				for (i = 0; i < AMD_SPI_FIFO_SIZE; i++) {
+					iowrite8(buf[tx_index],
+						 ((u8 __iomem *)amd_spi->io_remap_addr +
+						 AMD_SPI_FIFO_BASE + i));
+					tx_index++;
+				}
+
+				/* Execute command */
+				amd_spi_execute_opcode(master);
 			}
 
-			amd_spi_set_tx_count(master, tx_len);
 			amd_spi_clear_fifo_ptr(master);
+			amd_spi_set_opcode(master, cmd_opcode);
+
+			amd_spi_set_tx_count(master, remaining);
+			/* Write data into the FIFO. */
+			for (i = 0; i < remaining; i++) {
+				iowrite8(buf[tx_index],
+					 ((u8 __iomem *)amd_spi->io_remap_addr +
+					AMD_SPI_FIFO_BASE + i));
+				tx_index++;
+			}
+
 			/* Execute command */
 			amd_spi_execute_opcode(master);
 		}
@@ -250,16 +274,38 @@ static inline int amd_spi_fifo_xfer(struct amd_spi *amd_spi,
 			 * FIFO
 			 */
 			rx_len = xfer->len;
+			rx_index = 0;
+			iters = rx_len / AMD_SPI_FIFO_SIZE;
+			remaining = rx_len % AMD_SPI_FIFO_SIZE;
 			buf = (u8 *)xfer->rx_buf;
-			amd_spi_set_rx_count(master, rx_len);
+
+			for (it = 0 ; it < iters; it++) {
+				amd_spi_clear_fifo_ptr(master);
+
+				amd_spi_set_rx_count(master, AMD_SPI_FIFO_SIZE);
+
+				/* Execute command */
+				amd_spi_execute_opcode(master);
+				/* Read data from FIFO to receive buffer  */
+				for (i = 0; i < AMD_SPI_FIFO_SIZE; i++) {
+					buf[rx_index] = amd_spi_readreg8(master, AMD_SPI_FIFO_BASE +
+									tx_len + i);
+					rx_index++;
+				}
+			}
+
 			amd_spi_clear_fifo_ptr(master);
+
+			amd_spi_set_rx_count(master, remaining);
+
 			/* Execute command */
 			amd_spi_execute_opcode(master);
 			/* Read data from FIFO to receive buffer  */
-			for (i = 0; i < rx_len; i++)
-				buf[i] = amd_spi_readreg8(master,
-							  AMD_SPI_FIFO_BASE +
-							  tx_len + i);
+			for (i = 0; i < remaining; i++) {
+				buf[rx_index] = amd_spi_readreg8(master, AMD_SPI_FIFO_BASE +
+								tx_len + i);
+				rx_index++;
+			}
 		}
 	}
 
@@ -365,4 +411,5 @@ module_platform_driver(amd_spi_driver);
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Sanjay Mehta <sanju.mehta@amd.com>");
+MODULE_AUTHOR("Nehal Bakulchandra Shah <nehal-bakulchandra.shah@amd.com>");
 MODULE_DESCRIPTION("AMD SPI Master Controller Driver");
