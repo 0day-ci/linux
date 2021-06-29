@@ -107,6 +107,8 @@ struct kmem_cache *fanotify_perm_event_cachep __read_mostly;
 #define FANOTIFY_EVENT_ALIGN 4
 #define FANOTIFY_INFO_HDR_LEN \
 	(sizeof(struct fanotify_event_info_fid) + sizeof(struct file_handle))
+#define FANOTIFY_INFO_ERROR_LEN \
+	(sizeof(struct fanotify_event_info_error))
 
 static int fanotify_fid_info_len(int fh_len, int name_len)
 {
@@ -129,6 +131,9 @@ static size_t fanotify_event_len(struct fanotify_event *event,
 
 	if (!fid_mode)
 		return event_len;
+
+	if (fanotify_is_error_event(event->mask))
+		event_len += FANOTIFY_INFO_ERROR_LEN;
 
 	info = fanotify_event_info(event);
 	dir_fh_len = fanotify_event_dir_fh_len(event);
@@ -310,6 +315,30 @@ static int process_access_response(struct fsnotify_group *group,
 	return -ENOENT;
 }
 
+static size_t copy_error_info_to_user(struct fanotify_event *event,
+				      char __user *buf, int count)
+{
+	struct fanotify_event_info_error info;
+	struct fanotify_error_event *fee = FANOTIFY_EE(event);
+
+	info.hdr.info_type = FAN_EVENT_INFO_TYPE_ERROR;
+	info.hdr.pad = 0;
+	info.hdr.len = sizeof(struct fanotify_event_info_error);
+
+	if (WARN_ON(count < info.hdr.len))
+		return -EFAULT;
+
+	info.error = fee->error;
+
+	/* This effectively releases the event for logging another error */
+	info.error_count = atomic_xchg(&fee->err_count, 0);
+
+	if (copy_to_user(buf, &info, sizeof(info)))
+		return -EFAULT;
+
+	return info.hdr.len;
+}
+
 static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
 			     int info_type, const char *name, size_t name_len,
 			     char __user *buf, size_t count)
@@ -467,6 +496,14 @@ static ssize_t copy_event_to_user(struct fsnotify_group *group,
 
 	if (f)
 		fd_install(fd, f);
+
+	if (fanotify_is_error_event(event->mask)) {
+		ret = copy_error_info_to_user(event, buf, count);
+		if (ret < 0)
+			goto out_close_fd;
+		buf += ret;
+		count -= ret;
+	}
 
 	/* Event info records order is: dir fid + name, child fid */
 	if (fanotify_event_dir_fh_len(event)) {
@@ -896,6 +933,43 @@ static int fanotify_remove_inode_mark(struct fsnotify_group *group,
 				    flags, umask);
 }
 
+static int fanotify_create_fs_error_event(struct fsnotify_mark *fsn_mark,
+					   fsnotify_connp_t *connp)
+{
+	struct fanotify_sb_mark *sb_mark = FANOTIFY_SB_MARK(fsn_mark);
+	struct super_block *sb =
+		container_of(connp, struct super_block, s_fsnotify_marks);
+	struct fanotify_error_event *fee;
+	int fh_len;
+
+	/*
+	 * Since the allocation is done holding group->mark_mutex, the
+	 * error event allocation is guaranteed not to race with itself.
+	 */
+	if (READ_ONCE(sb_mark->error_event))
+		return 0;
+
+	/* Since, for error events, every memory must be preallocated,
+	 * the FH buffer size is predicted to be the same as the root
+	 * inode file handler size.  This should work for file systems
+	 * without variable sized FH.
+	 */
+	fh_len = fanotify_encode_fh_len(sb->s_root->d_inode);
+
+	fee = kzalloc(sizeof(*fee) + fh_len, GFP_KERNEL);
+	if (!fee)
+		return -ENOMEM;
+
+	fanotify_init_event(&fee->fae, 0, FS_ERROR);
+	fee->mark = fsn_mark;
+	fee->max_fh_len = fh_len;
+
+	WRITE_ONCE(sb_mark->error_event, fee);
+
+	return 0;
+
+}
+
 static __u32 fanotify_mark_add_to_mask(struct fsnotify_mark *fsn_mark,
 				       __u32 mask,
 				       unsigned int flags)
@@ -994,6 +1068,7 @@ static int fanotify_add_mark(struct fsnotify_group *group,
 {
 	struct fsnotify_mark *fsn_mark;
 	__u32 added;
+	int ret = 0;
 
 	mutex_lock(&group->mark_mutex);
 	fsn_mark = fsnotify_find_mark(connp, group);
@@ -1004,13 +1079,28 @@ static int fanotify_add_mark(struct fsnotify_group *group,
 			return PTR_ERR(fsn_mark);
 		}
 	}
+
+	/*
+	 * Error events are allocated per super-block mark, but only if
+	 * strictly needed (i.e. FAN_FS_ERROR was requested).
+	 */
+	if (type == FSNOTIFY_OBJ_TYPE_SB && !(flags & FAN_MARK_IGNORED_MASK) &&
+	    (mask & FAN_FS_ERROR)) {
+		if (fanotify_create_fs_error_event(fsn_mark, connp)) {
+			ret = -ENOMEM;
+			goto out;
+		}
+	}
+
 	added = fanotify_mark_add_to_mask(fsn_mark, mask, flags);
 	if (added & ~fsnotify_conn_mask(fsn_mark->connector))
 		fsnotify_recalc_mask(fsn_mark->connector);
+
+out:
 	mutex_unlock(&group->mark_mutex);
 
 	fsnotify_put_mark(fsn_mark);
-	return 0;
+	return ret;
 }
 
 static int fanotify_add_vfsmount_mark(struct fsnotify_group *group,
@@ -1425,6 +1515,11 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 			goto path_put_and_out;
 
 		fsid = &__fsid;
+	}
+
+	if (mask & FAN_FS_ERROR && mark_type != FAN_MARK_FILESYSTEM) {
+		ret = -EINVAL;
+		goto path_put_and_out;
 	}
 
 	/* inode held in place by reference to path; group by fget on fd */

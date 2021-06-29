@@ -336,23 +336,6 @@ static u32 fanotify_group_event_mask(
 	return test_mask & user_mask;
 }
 
-/*
- * Check size needed to encode fanotify_fh.
- *
- * Return size of encoded fh without fanotify_fh header.
- * Return 0 on failure to encode.
- */
-static int fanotify_encode_fh_len(struct inode *inode)
-{
-	int dwords = 0;
-
-	if (!inode)
-		return 0;
-
-	exportfs_encode_inode_fh(inode, NULL, &dwords, NULL);
-
-	return dwords << 2;
-}
 
 /*
  * Encode fanotify_fh.
@@ -405,8 +388,12 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 	fh->type = type;
 	fh->len = fh_len;
 
-	/* Mix fh into event merge key */
-	*hash ^= fanotify_hash_fh(fh);
+	/*
+	 * Mix fh into event merge key.  Hash might be NULL in case of
+	 * unhashed FID events (i.e. FAN_FS_ERROR).
+	 */
+	if (hash)
+		*hash ^= fanotify_hash_fh(fh);
 
 	return FANOTIFY_FH_HDR_LEN + fh_len;
 
@@ -692,6 +679,60 @@ static __kernel_fsid_t fanotify_get_fsid(struct fsnotify_iter_info *iter_info)
 	return fsid;
 }
 
+static int fanotify_merge_error_event(struct fsnotify_group *group,
+				      struct fsnotify_event *event)
+{
+	struct fanotify_event *fae = FANOTIFY_E(event);
+
+	/*
+	 * When err_count > 0, the reporting slot is full.  Just account
+	 * the additional error and abort the insertion.
+	 */
+	if (atomic_fetch_inc(&FANOTIFY_EE(fae)->err_count) != 0)
+		return 1;
+
+	return 0;
+}
+
+static void fanotify_insert_error_event(struct fsnotify_group *group,
+					struct fsnotify_event *event,
+					const void *data)
+{
+	const struct fsnotify_event_info *ei =
+		(struct fsnotify_event_info *) data;
+	struct fanotify_event *fae = FANOTIFY_E(event);
+	const struct fs_error_report *report;
+	struct fanotify_error_event *fee;
+	struct inode *inode;
+	int fh_len;
+
+	/* This might be an unexpected type of event (i.e. overflow). */
+	if (!fanotify_is_error_event(fae->mask))
+		return;
+
+	report = (struct fs_error_report *) ei->data;
+	inode = report->inode ?: ei->sb->s_root->d_inode;
+
+	fee = FANOTIFY_EE(fae);
+	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	fee->error = report->error;
+	fee->fsid = fee->mark->connector->fsid;
+
+	fsnotify_get_mark(fee->mark);
+
+	/*
+	 * Error reporting needs to happen in atomic context.  If this
+	 * inode's file handler is more than we initially predicted,
+	 * there is nothing better we can do than report the error with
+	 * a bad FH.
+	 */
+	fh_len = fanotify_encode_fh_len(inode);
+	if (WARN_ON(fh_len > fee->max_fh_len))
+		return;
+
+	fanotify_encode_fh(&fee->object_fh, inode, fh_len, NULL, 0);
+}
+
 /*
  * Add an event to hash table for faster merge.
  */
@@ -742,8 +783,9 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 	BUILD_BUG_ON(FAN_ONDIR != FS_ISDIR);
 	BUILD_BUG_ON(FAN_OPEN_EXEC != FS_OPEN_EXEC);
 	BUILD_BUG_ON(FAN_OPEN_EXEC_PERM != FS_OPEN_EXEC_PERM);
+	BUILD_BUG_ON(FAN_FS_ERROR != FS_ERROR);
 
-	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 19);
+	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 20);
 
 	mask = fanotify_group_event_mask(group, mask, event_info, iter_info);
 	if (!mask)
@@ -765,6 +807,17 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 		/* Racing with mark destruction or creation? */
 		if (!fsid.val[0] && !fsid.val[1])
 			return 0;
+	}
+
+	if (fanotify_is_error_event(mask)) {
+		struct fanotify_sb_mark *sb_mark =
+			FANOTIFY_SB_MARK(fsnotify_iter_sb_mark(iter_info));
+
+		ret = fsnotify_add_event(group, &sb_mark->error_event->fae.fse,
+					 fanotify_merge_error_event,
+					 fanotify_insert_error_event,
+					 event_info);
+		goto finish;
 	}
 
 	event = fanotify_alloc_event(group, mask, event_info, &fsid);
@@ -834,6 +887,17 @@ static void fanotify_free_name_event(struct fanotify_event *event)
 	kfree(FANOTIFY_NE(event));
 }
 
+static void fanotify_free_error_event(struct fanotify_event *event)
+{
+	/*
+	 * Just drop the reference acquired by
+	 * fanotify_insert_error_event.
+	 *
+	 * The actual memory is freed with the mark.
+	 */
+	fsnotify_put_mark(FANOTIFY_EE(event)->mark);
+}
+
 static void fanotify_free_event(struct fsnotify_event *fsn_event)
 {
 	struct fanotify_event *event;
@@ -856,6 +920,9 @@ static void fanotify_free_event(struct fsnotify_event *fsn_event)
 	case FANOTIFY_EVENT_TYPE_OVERFLOW:
 		kfree(event);
 		break;
+	case FANOTIFY_EVENT_TYPE_FS_ERROR:
+		fanotify_free_error_event(event);
+		break;
 	default:
 		WARN_ON_ONCE(1);
 	}
@@ -873,6 +940,7 @@ static void fanotify_free_mark(struct fsnotify_mark *mark)
 	if (mark->flags & FSNOTIFY_MARK_FLAG_SB) {
 		struct fanotify_sb_mark *fa_mark = FANOTIFY_SB_MARK(mark);
 
+		kfree(fa_mark->error_event);
 		kmem_cache_free(fanotify_sb_mark_cache, fa_mark);
 	} else {
 		kmem_cache_free(fanotify_mark_cache, mark);
