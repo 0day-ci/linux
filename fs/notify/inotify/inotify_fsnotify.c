@@ -52,6 +52,9 @@ static int inotify_merge(struct fsnotify_group *group,
 	struct list_head *list = &group->notification_list;
 	struct fsnotify_event *last_event;
 
+	if (list_empty(list))
+		return 0;
+
 	last_event = list_entry(list->prev, struct fsnotify_event, list);
 	return event_compare(last_event, event);
 }

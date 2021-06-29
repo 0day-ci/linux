@@ -168,7 +168,8 @@ static int fanotify_merge(struct fsnotify_group *group,
 	 * the event structure we have created in fanotify_handle_event() is the
 	 * one we should check for permission response.
 	 */
-	if (fanotify_is_perm_event(new->mask))
+	if (list_empty(&group->notification_list) ||
+	    fanotify_is_perm_event(new->mask))
 		return 0;
 
 	hlist_for_each_entry(old, hlist, merge_list) {

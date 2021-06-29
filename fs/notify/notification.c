@@ -111,7 +111,7 @@ int fsnotify_add_event(struct fsnotify_group *group,
 		goto queue;
 	}
 
-	if (!list_empty(list) && merge) {
+	if (merge) {
 		ret = merge(group, event);
 		if (ret) {
 			spin_unlock(&group->notification_lock);
