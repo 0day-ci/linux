@@ -107,8 +107,12 @@ const struct attribute_group amdgpu_gtt_mgr_attr_group = {
  */
 bool amdgpu_gtt_mgr_has_gart_addr(struct ttm_resource *res)
 {
-	struct amdgpu_gtt_node *node = to_amdgpu_gtt_node(res);
+	struct amdgpu_gtt_node *node;
 
+	if (WARN_ON(res->mem_type != TTM_PL_TT))
+		return false;
+
+	node = to_amdgpu_gtt_node(res);
 	return drm_mm_node_allocated(&node->base.mm_nodes[0]);
 }
 
