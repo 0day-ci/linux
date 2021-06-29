@@ -1,0 +1,9 @@
+config SRV_FS
+	tristate "Plan9-like /srv filesystem"
+	select FS_BOXED_FILE
+	help
+	  If you don't know what this is about, say N.
+
+	  To compile this as a module, choose M here: the module will be called
+	  srv-fs.  Note that the file system of your root partition (the one
+	  containing the directory /) cannot be compiled as a module.

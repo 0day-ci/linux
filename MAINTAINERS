@@ -239,6 +239,11 @@ F:	include/trace/events/9p.h
 F:	include/uapi/linux/virtio_9p.h
 F:	net/9p/
 
+SRV FILE SYSTEM:
+M:	Enrico Weigelt, metux IT consult <info@metux.net>
+S:	Maintained
+F:	fs/srvfs
+
 A8293 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
 L:	linux-media@vger.kernel.org

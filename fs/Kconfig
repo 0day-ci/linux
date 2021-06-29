@@ -248,6 +248,7 @@ config ARCH_HAS_GIGANTIC_PAGE
 
 source "fs/configfs/Kconfig"
 source "fs/efivarfs/Kconfig"
+source "fs/srvfs/Kconfig"
 
 endmenu
 
