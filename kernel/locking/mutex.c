@@ -118,9 +118,9 @@ static inline struct task_struct *__mutex_trylock_or_owner(struct mutex *lock)
 		}
 
 		/*
-		 * We set the HANDOFF bit, we must make sure it doesn't live
-		 * past the point where we acquire it. This would be possible
-		 * if we (accidentally) set the bit on an unlocked mutex.
+		 * Always clear the HANDOFF bit before acquiring the lock.
+		 * Note that if the bit is accidentally set on an unlocked
+		 * mutex, anyone can acquire it.
 		 */
 		flags &= ~MUTEX_FLAG_HANDOFF;
 
@@ -178,6 +178,11 @@ static __always_inline bool __mutex_unlock_fast(struct mutex *lock)
 static inline void __mutex_set_flag(struct mutex *lock, unsigned long flag)
 {
 	atomic_long_or(flag, &lock->owner);
+}
+
+static inline long __mutex_fetch_set_flag(struct mutex *lock, unsigned long flag)
+{
+	return atomic_long_fetch_or_relaxed(flag, &lock->owner);
 }
 
 static inline void __mutex_clear_flag(struct mutex *lock, unsigned long flag)
@@ -997,6 +1002,8 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 	set_current_state(state);
 	for (;;) {
+		long owner = 0L;
+
 		/*
 		 * Once we hold wait_lock, we're serialized against
 		 * mutex_unlock() handing the lock off to us, do a trylock
@@ -1026,23 +1033,32 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		schedule_preempt_disabled();
 
 		/*
-		 * ww_mutex needs to always recheck its position since its waiter
-		 * list is not FIFO ordered.
-		 */
-		if (ww_ctx || !first) {
-			first = __mutex_waiter_is_first(lock, &waiter);
-			if (first)
-				__mutex_set_flag(lock, MUTEX_FLAG_HANDOFF);
-		}
-
-		set_current_state(state);
-		/*
 		 * Here we order against unlock; we must either see it change
 		 * state back to RUNNING and fall through the next schedule(),
 		 * or we must see its unlock and acquire.
 		 */
-		if (__mutex_trylock(lock) ||
-		    (first && mutex_optimistic_spin(lock, ww_ctx, &waiter)))
+		if (__mutex_trylock(lock))
+			break;
+
+		set_current_state(state);
+
+		/*
+		 * ww_mutex needs to always recheck its position since its waiter
+		 * list is not FIFO ordered.
+		 */
+		if (ww_ctx || !first)
+			first = __mutex_waiter_is_first(lock, &waiter);
+
+		if (first)
+			owner = __mutex_fetch_set_flag(lock, MUTEX_FLAG_HANDOFF);
+
+		/*
+		 * If a lock holder is present with HANDOFF bit set, it will
+		 * guarantee that no one else can steal the lock. We may spin
+		 * on the lock to acquire it earlier.
+		 */
+		if ((owner & ~MUTEX_FLAGS) &&
+		     mutex_optimistic_spin(lock, ww_ctx, &waiter))
 			break;
 
 		spin_lock(&lock->wait_lock);
