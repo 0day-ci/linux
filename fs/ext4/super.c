@@ -4789,6 +4789,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	needs_recovery = (es->s_last_orphan != 0 ||
 			  ext4_has_feature_journal_needs_recovery(sb));
 
+	mutex_init(&sbi->s_mmp_lock);
 	if (ext4_has_feature_mmp(sb) && !sb_rdonly(sb))
 		if (ext4_multi_mount_protect(sb, le64_to_cpu(es->s_mmp_block)))
 			goto failed_mount3a;

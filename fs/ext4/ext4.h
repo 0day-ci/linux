@@ -1498,6 +1498,7 @@ struct ext4_sb_info {
 	struct completion s_kobj_unregister;
 	struct super_block *s_sb;
 	struct buffer_head *s_mmp_bh;
+	struct mutex s_mmp_lock;
 
 	/* Journaling */
 	struct journal_s *s_journal;

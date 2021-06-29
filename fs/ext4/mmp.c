@@ -128,8 +128,9 @@ void __dump_mmp_msg(struct super_block *sb, struct mmp_struct *mmp,
 static int kmmpd(void *data)
 {
 	struct super_block *sb = (struct super_block *) data;
-	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
-	struct buffer_head *bh = EXT4_SB(sb)->s_mmp_bh;
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
+	struct ext4_super_block *es = sbi->s_es;
+	struct buffer_head *bh = sbi->s_mmp_bh;
 	struct mmp_struct *mmp;
 	ext4_fsblk_t mmp_block;
 	u32 seq = 0;
@@ -245,16 +246,35 @@ static int kmmpd(void *data)
 	retval = write_mmp_block(sb, bh);
 
 exit_thread:
+	/*
+	 * Maybe s_mmp_tsk kthread is stoped by others or by itself. If exit
+	 * by itself then sbi->s_mmp_tsk will be wild ptr, so there is need
+	 * set sbi->s_mmp_tsk with NULL, and also release mmp buffer_head.
+	 */
+	while (!kthread_should_stop()) {
+		if (!mutex_trylock(&sbi->s_mmp_lock))
+			continue;
+
+		if (sbi->s_mmp_tsk) {
+			sbi->s_mmp_tsk = NULL;
+			brelse(bh);
+		}
+		mutex_unlock(&sbi->s_mmp_lock);
+		break;
+	}
+
 	return retval;
 }
 
 void ext4_stop_mmpd(struct ext4_sb_info *sbi)
 {
+	mutex_lock(&sbi->s_mmp_lock);
 	if (sbi->s_mmp_tsk) {
 		kthread_stop(sbi->s_mmp_tsk);
 		brelse(sbi->s_mmp_bh);
 		sbi->s_mmp_tsk = NULL;
 	}
+	mutex_unlock(&sbi->s_mmp_lock);
 }
 
 /*
