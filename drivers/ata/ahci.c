@@ -702,7 +702,7 @@ static int ahci_vt8251_hardreset(struct ata_link *link, unsigned int *class,
 	bool online;
 	int rc;
 
-	DPRINTK("ENTER\n");
+	pr_debug("ENTER %s();\n", __func__);
 
 	hpriv->stop_engine(ap);
 
@@ -711,7 +711,7 @@ static int ahci_vt8251_hardreset(struct ata_link *link, unsigned int *class,
 
 	hpriv->start_engine(ap);
 
-	DPRINTK("EXIT, rc=%d, class=%u\n", rc, *class);
+	pr_debug("EXIT %s();, rc=%d, class=%u\n", __func__, rc, *class);
 
 	/* vt8251 doesn't clear BSY on signature FIS reception,
 	 * request follow-up softreset.
@@ -792,7 +792,7 @@ static int ahci_avn_hardreset(struct ata_link *link, unsigned int *class,
 	bool online;
 	int rc, i;
 
-	DPRINTK("ENTER\n");
+	pr_debug("ENTER %s();\n", __func__);
 
 	hpriv->stop_engine(ap);
 
@@ -831,7 +831,7 @@ static int ahci_avn_hardreset(struct ata_link *link, unsigned int *class,
 	if (online)
 		*class = ahci_dev_classify(ap);
 
-	DPRINTK("EXIT, rc=%d, class=%u\n", rc, *class);
+	pr_debug("EXIT %s();, rc=%d, class=%u\n", __func__, rc, *class);
 	return rc;
 }
 
