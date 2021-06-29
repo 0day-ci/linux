@@ -886,10 +886,11 @@ static const struct of_device_id clk_vc5_of_match[];
 
 static int vc5_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+	bool oe_high, oe_low, sh_enable, sh_disable;
 	struct vc5_driver_data *vc5;
 	struct clk_init_data init;
 	const char *parent_names[2];
-	unsigned int n, idx = 0;
+	unsigned int sp_mask, sh_mask, sp_val, sh_val, n, idx = 0;
 	int ret;
 
 	vc5 = devm_kzalloc(&client->dev, sizeof(*vc5), GFP_KERNEL);
@@ -913,6 +914,26 @@ static int vc5_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		dev_err(&client->dev, "failed to allocate register map\n");
 		return PTR_ERR(vc5->regmap);
 	}
+
+	oe_high = of_property_read_bool(client->dev.of_node,
+					"idt,output-enable-active-high");
+	oe_low = of_property_read_bool(client->dev.of_node,
+					"idt,output-enable-active-low");
+	sh_enable = of_property_read_bool(client->dev.of_node,
+					  "idt,enable-shutdown");
+	sh_disable = of_property_read_bool(client->dev.of_node,
+					   "idt,disable-shutdown");
+	if ((oe_high && oe_low) || (sh_enable && sh_disable)) {
+		dev_err(&client->dev, "conflicting properties for SD/OE pin\n");
+		return -EINVAL;
+	}
+
+	sp_mask = (oe_high || oe_low) ? VC5_PRIM_SRC_SHDN_SP : 0;
+	sh_mask = (sh_enable || sh_disable) ? VC5_PRIM_SRC_SHDN_EN_GBL_SHDN : 0;
+	sp_val = oe_high ? VC5_PRIM_SRC_SHDN_SP : 0;
+	sh_val = sh_enable ? VC5_PRIM_SRC_SHDN_EN_GBL_SHDN : 0;
+	regmap_update_bits(vc5->regmap, VC5_PRIM_SRC_SHDN, sp_mask | sh_mask,
+			   sp_val | sh_val);
 
 	/* Register clock input mux */
 	memset(&init, 0, sizeof(init));
