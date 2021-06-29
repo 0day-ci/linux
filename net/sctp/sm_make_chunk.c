@@ -1162,7 +1162,7 @@ nodata:
 struct sctp_chunk *sctp_make_heartbeat(const struct sctp_association *asoc,
 				       const struct sctp_transport *transport)
 {
-	struct sctp_sender_hb_info hbinfo;
+	struct sctp_sender_hb_info hbinfo = {};
 	struct sctp_chunk *retval;
 
 	retval = sctp_make_control(asoc, SCTP_CID_HEARTBEAT, 0,
