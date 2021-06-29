@@ -18,6 +18,10 @@
  * struct ingenic_cgu_pll_info - information about a PLL
  * @reg: the offset of the PLL's control register within the CGU
  * @rate_multiplier: the multiplier needed by pll rate calculation
+ * @mux_shift: the number of bits to shift the mux value by (ie. the
+ *           index of the lowest bit of the mux value in the I2S PLL's
+ *           control register)
+ * @mux_bits: the size of the mux field in bits
  * @m_shift: the number of bits to shift the multiplier value by (ie. the
  *           index of the lowest bit of the multiplier value in the PLL's
  *           control register)
@@ -42,19 +46,21 @@
  * @bypass_bit: the index of the bypass bit in the PLL control register, or
  *              -1 if there is no bypass bit
  * @enable_bit: the index of the enable bit in the PLL control register
- * @stable_bit: the index of the stable bit in the PLL control register
+ * @stable_bit: the index of the stable bit in the PLL control register, or
+ *              -1 if there is no stable bit
  */
 struct ingenic_cgu_pll_info {
 	unsigned reg;
 	unsigned rate_multiplier;
 	const s8 *od_encoding;
+	u8 mux_shift, mux_bits;
 	u8 m_shift, m_bits, m_offset;
 	u8 n_shift, n_bits, n_offset;
 	u8 od_shift, od_bits, od_max;
 	unsigned bypass_reg;
 	s8 bypass_bit;
 	u8 enable_bit;
-	u8 stable_bit;
+	s8 stable_bit;
 	void (*calc_m_n_od)(const struct ingenic_cgu_pll_info *pll_info,
 			    unsigned long rate, unsigned long parent_rate,
 			    unsigned int *m, unsigned int *n, unsigned int *od);
