@@ -212,13 +212,15 @@ static u8 ifcvf_vdpa_get_status(struct vdpa_device *vdpa_dev)
 
 static void ifcvf_vdpa_set_status(struct vdpa_device *vdpa_dev, u8 status)
 {
+	struct ifcvf_vdpa_mgmt_dev *ifcvf_mgmt_dev;
 	struct ifcvf_adapter *adapter;
 	struct ifcvf_hw *vf;
 	u8 status_old;
 	int ret;
 
 	vf  = vdpa_to_vf(vdpa_dev);
-	adapter = dev_get_drvdata(vdpa_dev->dev.parent);
+	ifcvf_mgmt_dev = dev_get_drvdata(vdpa_dev->dev.parent);
+	adapter = ifcvf_mgmt_dev->adapter;
 	status_old = ifcvf_get_status(vf);
 
 	if (status_old == status)
