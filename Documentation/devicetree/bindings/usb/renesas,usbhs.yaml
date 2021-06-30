@@ -53,11 +53,12 @@ properties:
 
   clocks:
     minItems: 1
-    maxItems: 3
+    maxItems: 4
     items:
       - description: USB 2.0 host
       - description: USB 2.0 peripheral
       - description: USB 2.0 clock selector
+      - description: Optional external reference clock
 
   interrupts:
     maxItems: 1
