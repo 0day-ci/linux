@@ -475,14 +475,26 @@ void gdsc_unregister(struct gdsc_desc *desc)
 	struct gdsc **scs = desc->scs;
 	size_t num = desc->num;
 
-	/* Remove subdomains */
+	/*
+	 * Remove provider first so that we can remove the genpds without
+	 * worrying about consumers getting them during the removal process.
+	 */
+	of_genpd_del_provider(dev->of_node);
+
+	/* Break subdomain relationship */
 	for (i = 0; i < num; i++) {
 		if (!scs[i])
 			continue;
 		if (scs[i]->parent)
 			pm_genpd_remove_subdomain(scs[i]->parent, &scs[i]->pd);
 	}
-	of_genpd_del_provider(dev->of_node);
+
+	/* And finally remove domains themselves */
+	for (i = 0; i < num; i++) {
+		if (!scs[i])
+			continue;
+		pm_genpd_remove(&scs[i]->pd);
+	}
 }
 
 /*
