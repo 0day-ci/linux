@@ -1273,6 +1273,13 @@ int btintel_set_debug_features(struct hci_dev *hdev,
 EXPORT_SYMBOL_GPL(btintel_set_debug_features);
 
 #if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+static int btintel_get_data_path_id(struct hci_dev *hdev, __u8 *data_path_id)
+{
+	/* Intel uses 1 as data path id for all the usecases */
+	*data_path_id = 1;
+	return 0;
+}
+
 int btintel_configure_offload_usecases(struct hci_dev *hdev)
 {
 	struct sk_buff *skb;
@@ -1297,6 +1304,9 @@ int btintel_configure_offload_usecases(struct hci_dev *hdev)
 		err = -bt_to_errno(skb->data[0]);
 		goto error;
 	}
+
+	if (usecases->preset[0] & 0x03)
+		hdev->get_data_path_id = btintel_get_data_path_id;
 error:
 	kfree_skb(skb);
 	return err;
