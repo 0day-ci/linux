@@ -5252,7 +5252,8 @@ get_aspect_ratio(const struct drm_display_mode *mode_in)
 }
 
 static enum dc_color_space
-get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing)
+get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
+		       enum drm_mode_color_range preferred_color_range)
 {
 	enum dc_color_space color_space = COLOR_SPACE_SRGB;
 
@@ -5283,7 +5284,10 @@ get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing)
 	}
 	break;
 	case PIXEL_ENCODING_RGB:
-		color_space = COLOR_SPACE_SRGB;
+		if (preferred_color_range == DRM_MODE_COLOR_RANGE_LIMITED_16_235)
+			color_space = COLOR_SPACE_SRGB_LIMITED;
+		else
+			color_space = COLOR_SPACE_SRGB;
 		break;
 
 	default:
@@ -5429,7 +5433,10 @@ static void fill_stream_properties_from_drm_display_mode(
 
 	timing_out->aspect_ratio = get_aspect_ratio(mode_in);
 
-	stream->output_color_space = get_output_color_space(timing_out);
+	stream->output_color_space = get_output_color_space(timing_out,
+							    connector_state ?
+							    connector_state->preferred_color_range :
+							    DRM_MODE_COLOR_RANGE_UNSET);
 
 	stream->out_transfer_func->type = TF_TYPE_PREDEFINED;
 	stream->out_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
@@ -7780,6 +7787,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		drm_connector_attach_active_bpc_property(&aconnector->base, 8, 16);
 		drm_connector_attach_preferred_color_format_property(&aconnector->base);
 		drm_connector_attach_active_color_format_property(&aconnector->base);
+		drm_connector_attach_preferred_color_range_property(&aconnector->base);
 		drm_connector_attach_active_color_range_property(&aconnector->base);
 	}
 
