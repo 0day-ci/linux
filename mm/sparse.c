@@ -345,14 +345,15 @@ size_t mem_section_usage_size(void)
 	return sizeof(struct mem_section_usage) + usemap_size();
 }
 
-static inline phys_addr_t pgdat_to_phys(struct pglist_data *pgdat)
-{
-#ifndef CONFIG_NUMA
-	return __pa_symbol(pgdat);
-#else
-	return __pa(pgdat);
-#endif
-}
+#ifdef CONFIG_NUMA
+#define pgdat_to_phys(pgdat) __pa(pgdat)
+#else /* CONFIG_NUMA */
+/*
+ * When !CONFIG_NUMA, we only expect pgdat == &contig_page_data,
+ * and use __pa_symbol().
+ */
+#define pgdat_to_phys(pgdat) __pa_symbol(pgdat)
+#endif /* CONFIG_NUMA */
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
 static struct mem_section_usage * __init
