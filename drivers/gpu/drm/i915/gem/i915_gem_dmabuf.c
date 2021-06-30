@@ -12,6 +12,8 @@
 #include "i915_gem_object.h"
 #include "i915_scatterlist.h"
 
+I915_SELFTEST_DECLARE(static bool force_different_devices;)
+
 static struct drm_i915_gem_object *dma_buf_to_obj(struct dma_buf *buf)
 {
 	return to_intel_bo(buf->priv);
@@ -25,7 +27,14 @@ static struct sg_table *i915_gem_map_dma_buf(struct dma_buf_attachment *attachme
 	struct scatterlist *src, *dst;
 	int ret, i;
 
-	ret = i915_gem_object_pin_pages_unlocked(obj);
+	assert_object_held(obj);
+
+	/*
+	 * Note. In the dynamic importer case, the object is not yet pinned.
+	 * Let's pin it here to avoid having to call the move_notify
+	 * callback, The call of which is not yet implemented.
+	 */
+	ret = i915_gem_object_pin_pages(obj);
 	if (ret)
 		goto err;
 
@@ -168,6 +177,21 @@ retry:
 	return err;
 }
 
+static int i915_gem_dmabuf_pin(struct dma_buf_attachment *attach)
+{
+	struct drm_i915_gem_object *obj = dma_buf_to_obj(attach->dmabuf);
+
+	assert_object_held(obj);
+	return i915_gem_object_pin_pages(obj);
+}
+
+static void i915_gem_dmabuf_unpin(struct dma_buf_attachment *attach)
+{
+	struct drm_i915_gem_object *obj = dma_buf_to_obj(attach->dmabuf);
+
+	i915_gem_object_unpin_pages(obj);
+}
+
 static const struct dma_buf_ops i915_dmabuf_ops =  {
 	.map_dma_buf = i915_gem_map_dma_buf,
 	.unmap_dma_buf = i915_gem_unmap_dma_buf,
@@ -177,6 +201,8 @@ static const struct dma_buf_ops i915_dmabuf_ops =  {
 	.vunmap = i915_gem_dmabuf_vunmap,
 	.begin_cpu_access = i915_gem_begin_cpu_access,
 	.end_cpu_access = i915_gem_end_cpu_access,
+	.pin = i915_gem_dmabuf_pin,
+	.unpin = i915_gem_dmabuf_unpin,
 };
 
 struct dma_buf *i915_gem_prime_export(struct drm_gem_object *gem_obj, int flags)
@@ -241,7 +267,8 @@ struct drm_gem_object *i915_gem_prime_import(struct drm_device *dev,
 	if (dma_buf->ops == &i915_dmabuf_ops) {
 		obj = dma_buf_to_obj(dma_buf);
 		/* is it from our device? */
-		if (obj->base.dev == dev) {
+		if (obj->base.dev == dev &&
+		    !I915_SELFTEST_ONLY(force_different_devices)) {
 			/*
 			 * Importing dmabuf exported from out own gem increases
 			 * refcount on gem itself instead of f_count of dmabuf.
