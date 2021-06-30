@@ -840,12 +840,15 @@ int ima_post_load_data(char *buf, loff_t size,
  * @buf_hash: measure buffer data hash
  *
  * Based on policy, either the buffer data or buffer data hash is measured
+ *
+ * Returns 0 if the buffer has been successfully measured, a negative value
+ * otherwise.
  */
-void process_buffer_measurement(struct user_namespace *mnt_userns,
-				struct inode *inode, const void *buf, int size,
-				const char *eventname, enum ima_hooks func,
-				int pcr, const char *func_data,
-				bool buf_hash)
+int process_buffer_measurement(struct user_namespace *mnt_userns,
+			       struct inode *inode, const void *buf, int size,
+			       const char *eventname, enum ima_hooks func,
+			       int pcr, const char *func_data,
+			       bool buf_hash)
 {
 	int ret = 0;
 	const char *audit_cause = "ENOMEM";
@@ -867,7 +870,7 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 	u32 secid;
 
 	if (!ima_policy_flag)
-		return;
+		return -ENOENT;
 
 	template = ima_template_desc_buf();
 	if (!template) {
@@ -889,7 +892,7 @@ void process_buffer_measurement(struct user_namespace *mnt_userns,
 					secid, 0, func, &pcr, &template,
 					func_data);
 		if (!(action & IMA_MEASURE))
-			return;
+			return -ENOENT;
 	}
 
 	if (!pcr)
@@ -937,7 +940,7 @@ out:
 					func_measure_str(func),
 					audit_cause, ret, 0, ret);
 
-	return;
+	return ret;
 }
 
 /**
@@ -951,6 +954,7 @@ out:
 void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 {
 	struct fd f;
+	int ret __maybe_unused;
 
 	if (!buf || !size)
 		return;
@@ -959,9 +963,10 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 	if (!f.file)
 		return;
 
-	process_buffer_measurement(file_mnt_user_ns(f.file), file_inode(f.file),
-				   buf, size, "kexec-cmdline", KEXEC_CMDLINE, 0,
-				   NULL, false);
+	ret = process_buffer_measurement(file_mnt_user_ns(f.file),
+					 file_inode(f.file), buf, size,
+					 "kexec-cmdline", KEXEC_CMDLINE, 0,
+					 NULL, false);
 	fdput(f);
 }
 
@@ -977,18 +982,21 @@ void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
  * and extend the pcr.  Examples of critical data could be various data
  * structures, policies, and states stored in kernel memory that can
  * impact the integrity of the system.
+ *
+ * Returns 0 if the buffer has been successfully measured, a negative value
+ * otherwise.
  */
-void ima_measure_critical_data(const char *event_label,
-			       const char *event_name,
-			       const void *buf, size_t buf_len,
-			       bool hash)
+int ima_measure_critical_data(const char *event_label,
+			      const char *event_name,
+			      const void *buf, size_t buf_len,
+			      bool hash)
 {
 	if (!event_name || !event_label || !buf || !buf_len)
-		return;
+		return -ENOPARAM;
 
-	process_buffer_measurement(&init_user_ns, NULL, buf, buf_len, event_name,
-				   CRITICAL_DATA, 0, event_label,
-				   hash);
+	return process_buffer_measurement(&init_user_ns, NULL, buf, buf_len,
+					  event_name, CRITICAL_DATA, 0,
+					  event_label, hash);
 }
 
 static int __init init_ima(void)

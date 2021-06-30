@@ -134,6 +134,7 @@ void ima_process_queued_keys(void)
 {
 	struct ima_key_entry *entry, *tmp;
 	bool process = false;
+	int ret __maybe_unused;
 
 	if (ima_process_keys)
 		return;
@@ -159,13 +160,13 @@ void ima_process_queued_keys(void)
 
 	list_for_each_entry_safe(entry, tmp, &ima_keys, list) {
 		if (!timer_expired)
-			process_buffer_measurement(&init_user_ns, NULL,
-						   entry->payload,
-						   entry->payload_len,
-						   entry->keyring_name,
-						   KEY_CHECK, 0,
-						   entry->keyring_name,
-						   false);
+			ret = process_buffer_measurement(&init_user_ns, NULL,
+							 entry->payload,
+							 entry->payload_len,
+							 entry->keyring_name,
+							 KEY_CHECK, 0,
+							 entry->keyring_name,
+							 false);
 		list_del(&entry->list);
 		ima_free_key_entry(entry);
 	}

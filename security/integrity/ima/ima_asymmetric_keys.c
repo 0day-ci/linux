@@ -31,6 +31,7 @@ void ima_post_key_create_or_update(struct key *keyring, struct key *key,
 				   unsigned long flags, bool create)
 {
 	bool queued = false;
+	int ret __maybe_unused;
 
 	/* Only asymmetric keys are handled by this hook. */
 	if (key->type != &key_type_asymmetric)
@@ -60,7 +61,8 @@ void ima_post_key_create_or_update(struct key *keyring, struct key *key,
 	 * if the IMA policy is configured to measure a key linked
 	 * to the given keyring.
 	 */
-	process_buffer_measurement(&init_user_ns, NULL, payload, payload_len,
+	ret = process_buffer_measurement(&init_user_ns, NULL,
+				   payload, payload_len,
 				   keyring->description, KEY_CHECK, 0,
 				   keyring->description, false);
 }
