@@ -118,9 +118,9 @@ static inline struct task_struct *__mutex_trylock_or_owner(struct mutex *lock)
 		}
 
 		/*
-		 * We set the HANDOFF bit, we must make sure it doesn't live
-		 * past the point where we acquire it. This would be possible
-		 * if we (accidentally) set the bit on an unlocked mutex.
+		 * Always clear the HANDOFF bit before acquiring the lock.
+		 * Note that if the bit is accidentally set on an unlocked
+		 * mutex, anyone can acquire it.
 		 */
 		flags &= ~MUTEX_FLAG_HANDOFF;
 
@@ -1023,17 +1023,17 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 		}
 
 		spin_unlock(&lock->wait_lock);
-		schedule_preempt_disabled();
 
 		/*
 		 * ww_mutex needs to always recheck its position since its waiter
 		 * list is not FIFO ordered.
 		 */
-		if (ww_ctx || !first) {
+		if (ww_ctx || !first)
 			first = __mutex_waiter_is_first(lock, &waiter);
-			if (first)
-				__mutex_set_flag(lock, MUTEX_FLAG_HANDOFF);
-		}
+		if (first)
+			__mutex_set_flag(lock, MUTEX_FLAG_HANDOFF);
+
+		schedule_preempt_disabled();
 
 		set_current_state(state);
 		/*
