@@ -390,12 +390,19 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom,
 				     unsigned int domid)
 {
 	const struct mtk_iommu_iova_region *region;
+	struct mtk_iommu_data *tmpdata;
 
-	/* Use the exist domain as there is only one pgtable here. */
-	if (data->m4u_dom) {
-		dom->iop = data->m4u_dom->iop;
-		dom->cfg = data->m4u_dom->cfg;
-		dom->domain.pgsize_bitmap = data->m4u_dom->cfg.pgsize_bitmap;
+	/*
+	 * Loop to find if there is already the exist domain.
+	 * Use it when 2 iommu HWs share the pgtable.
+	 */
+	for_each_m4u(tmpdata) {
+		if (!tmpdata->m4u_dom)
+			continue;
+
+		dom->iop = tmpdata->m4u_dom->iop;
+		dom->cfg = tmpdata->m4u_dom->cfg;
+		dom->domain.pgsize_bitmap = tmpdata->m4u_dom->cfg.pgsize_bitmap;
 		goto update_iova_region;
 	}
 
