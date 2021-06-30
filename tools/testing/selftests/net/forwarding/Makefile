@@ -49,6 +49,7 @@ TEST_PROGS = bridge_igmp.sh \
 	tc_flower_router.sh \
 	tc_flower.sh \
 	tc_mpls_l2vpn.sh \
+	tc_redirect_l2l3.sh \
 	tc_shblocks.sh \
 	tc_vlan_modify.sh \
 	vxlan_asymmetric.sh \
