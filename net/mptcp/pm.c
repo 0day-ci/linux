@@ -255,9 +255,9 @@ void mptcp_pm_mp_prio_received(struct sock *sk, u8 bkup)
 
 bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
 			      unsigned int opt_size, unsigned int remaining,
-			      struct mptcp_out_options *opts,  u8 *add_addr)
+			      struct mptcp_out_options *opts,  u8 *add_addr, int *len)
 {
-	int ret = false, len;
+	int ret = false;
 
 	spin_lock_bh(&msk->pm.lock);
 
@@ -276,8 +276,8 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
 		remaining += opt_size;
 	}
 
-	len = mptcp_add_addr_len(msk, opts);
-	if (remaining < len)
+	*len = mptcp_add_addr_len(msk, opts);
+	if (remaining < *len)
 		goto out_unlock;
 
 	if ((msk->pm.addr_signal & BIT(MPTCP_ADD_ADDR_ECHO)))
@@ -287,17 +287,18 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
 
 	ret = true;
 out_unlock:
+	spin_unlock_bh(&msk->pm.lock);
+
 	if ((mptcp_pm_should_add_signal_echo(msk)) && (mptcp_pm_should_add_signal_addr(msk)))
 		mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_SEND_ACK);
 
-	spin_unlock_bh(&msk->pm.lock);
 	return ret;
 }
 
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			     struct mptcp_rm_list *rm_list)
+			     struct mptcp_rm_list *rm_list, int *len)
 {
-	int ret = false, len;
+	int ret = false;
 	u8 rm_addr;
 
 	spin_lock_bh(&msk->pm.lock);
@@ -307,12 +308,12 @@ bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 		goto out_unlock;
 
 	rm_addr = msk->pm.addr_signal & ~BIT(MPTCP_RM_ADDR_SIGNAL);
-	len = mptcp_rm_addr_len(&msk->pm.rm_list_tx);
-	if (len < 0) {
+	*len = mptcp_rm_addr_len(&msk->pm.rm_list_tx);
+	if (*len < 0) {
 		WRITE_ONCE(msk->pm.addr_signal, rm_addr);
 		goto out_unlock;
 	}
-	if (remaining < len)
+	if (remaining < *len)
 		goto out_unlock;
 
 	*rm_list = msk->pm.rm_list_tx;

@@ -667,7 +667,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	int len = 0;
 
 	if (!mptcp_pm_should_add_signal(msk) ||
-	    !mptcp_pm_add_addr_signal(msk, skb, opt_size, remaining, opts, &add_addr))
+	    !mptcp_pm_add_addr_signal(msk, skb, opt_size, remaining, opts, &add_addr, &len))
 		return false;
 
 	if (((add_addr & BIT(MPTCP_ADD_ADDR_ECHO)) ||
@@ -681,10 +681,6 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 		remaining += opt_size;
 		drop_other_suboptions = true;
 	}
-
-	len = mptcp_add_addr_len(msk, opts);
-	if (remaining < len)
-		return false;
 
 	*size = len;
 	if (drop_other_suboptions)
@@ -715,13 +711,7 @@ static bool mptcp_established_options_rm_addr(struct sock *sk,
 	int i, len;
 
 	if (!mptcp_pm_should_rm_signal(msk) ||
-	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list)))
-		return false;
-
-	len = mptcp_rm_addr_len(&rm_list);
-	if (len < 0)
-		return false;
-	if (remaining < len)
+	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list, &len)))
 		return false;
 
 	*size = len;
