@@ -24,6 +24,7 @@
 ALL_TESTS="
 	redir_gre
 	redir_ipip
+	redir_sit
 "
 
 NUM_NETIFS=0
@@ -226,6 +227,39 @@ ping_test()
 	set -e
 }
 
+# Inform the user and the kselftest infrastructure that a test has been
+# skipped.
+#
+# Parameters:
+#
+#   $1: Description of the reason why the test was skipped.
+#
+skip_test()
+{
+	echo "SKIP: $1"
+
+	# Do not override KSFT_FAIL
+	if [ "${KSFT_RET}" -eq "${KSFT_PASS}" ]; then
+		KSFT_RET="${KSFT_SKIP}"
+	fi
+}
+
+# Check that no fallback tunnels are automatically created in new network
+# namespaces.
+#
+has_fb_tunnels()
+{
+	local FB_TUNNELS
+
+	FB_TUNNELS=$(sysctl -n net.core.fb_tunnels_only_for_init_net 2>/dev/null || echo 0);
+
+	if [ "${FB_TUNNELS}" -ne 0 ]; then
+		return 1
+	else
+		return 0
+	fi
+}
+
 redir_gre()
 {
 	setup_tunnel "ipv4" "classical" "gre"
@@ -255,6 +289,32 @@ redir_ipip()
 	ping_test ipv4 "IPIP, external mode: IPv4 / IPv4"
 	ping_test ipv4-mpls "IPIP, external mode: IPv4 / MPLS / IPv4"
 	ping_test ipv6-mpls "IPIP, external mode: IPv4 / MPLS / IPv6"
+	cleanup_tunnel
+}
+
+redir_sit()
+{
+	setup_tunnel "ipv4" "classical" "sit" "mode any"
+	ping_test ipv4 "SIT, classical mode: IPv4 / IPv4"
+	ping_test ipv6 "SIT, classical mode: IPv4 / IPv6"
+	ping_test ipv4-mpls "SIT, classical mode: IPv4 / MPLS / IPv4"
+	ping_test ipv6-mpls "SIT, classical mode: IPv4 / MPLS / IPv6"
+	cleanup_tunnel
+
+	if has_fb_tunnels; then
+		skip_test "SIT, can't test the external mode, fallback tunnels are enabled: try \"sysctl -wq net.core.fb_tunnels_only_for_init_net=2\""
+		return 0
+	fi
+
+	setup_tunnel "ipv4" "collect_md" "sit" "mode any external"
+	ping_test ipv4 "SIT, external mode: IPv4 / IPv4"
+
+	# ip6ip currently doesn' work in collect_md mode
+	skip_test "SIT, ip6ip is known to fail in external mode (at least on Linux 5.13 and earlier versions)"
+	#ping_test ipv6 "SIT, external mode: IPv4 / IPv6"
+
+	ping_test ipv4-mpls "SIT, external mode: IPv4 / MPLS / IPv4"
+	ping_test ipv6-mpls "SIT, external mode: IPv4 / MPLS / IPv6"
 	cleanup_tunnel
 }
 
