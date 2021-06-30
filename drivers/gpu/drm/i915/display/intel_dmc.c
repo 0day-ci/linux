@@ -261,14 +261,55 @@ static const struct stepping_info icl_stepping_info[] = {
 };
 
 static const struct stepping_info no_stepping_info = { '*', '*' };
+struct stepping_info *display_step;
+
+static struct stepping_info *
+intel_get_display_stepping(struct intel_step_info step)
+{
+
+	switch (step.display_step) {
+	case STEP_A0:
+		display_step->stepping = 'A';
+		display_step->substepping = '0';
+		break;
+	case STEP_A2:
+		display_step->stepping = 'A';
+		display_step->substepping = '2';
+		break;
+	case STEP_B0:
+		display_step->stepping = 'B';
+		display_step->substepping = '0';
+		break;
+	case STEP_B1:
+		display_step->stepping = 'B';
+		display_step->substepping = '1';
+		break;
+	case STEP_C0:
+		display_step->stepping = 'C';
+		display_step->substepping = '0';
+		break;
+	case STEP_D0:
+		display_step->stepping = 'D';
+		display_step->substepping = '0';
+		break;
+	default:
+		display_step->stepping = '*';
+		display_step->substepping = '*';
+		break;
+	}
+	return display_step;
+}
 
 static const struct stepping_info *
 intel_get_stepping_info(struct drm_i915_private *dev_priv)
 {
 	const struct stepping_info *si;
+	struct intel_step_info step = RUNTIME_INFO(dev_priv)->step;
 	unsigned int size;
 
-	if (IS_ICELAKE(dev_priv)) {
+	if (DISPLAY_VER(dev_priv) >= 12) {
+		si = intel_get_display_stepping(step);
+	} else if (IS_ICELAKE(dev_priv)) {
 		size = ARRAY_SIZE(icl_stepping_info);
 		si = icl_stepping_info;
 	} else if (IS_SKYLAKE(dev_priv)) {
@@ -282,10 +323,10 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 		si = NULL;
 	}
 
-	if (INTEL_REVID(dev_priv) < size)
-		return si + INTEL_REVID(dev_priv);
+	if (DISPLAY_VER(dev_priv) < 12)
+		return INTEL_REVID(dev_priv) < size ? si + INTEL_REVID(dev_priv) : &no_stepping_info;
 
-	return &no_stepping_info;
+	return si;
 }
 
 static void gen9_set_dc_state_debugmask(struct drm_i915_private *dev_priv)
