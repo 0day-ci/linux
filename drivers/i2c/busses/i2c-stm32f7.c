@@ -1497,10 +1497,14 @@ static irqreturn_t stm32f7_i2c_isr_event(int irq, void *data)
 	u32 status, mask;
 	int ret = IRQ_HANDLED;
 
-	/* Check if the interrupt if for a slave device */
+	/* Check if the interrupt is for a slave device */
 	if (!i2c_dev->master_mode) {
-		ret = stm32f7_i2c_slave_isr_event(i2c_dev);
-		return ret;
+		if (i2c_dev->slave_running)
+			return stm32f7_i2c_slave_isr_event(i2c_dev);
+
+		dev_warn_ratelimited(i2c_dev->dev,
+				"Unexpected IT received: ISR:0x%x\n",
+				readl_relaxed(i2c_dev->base + STM32F7_I2C_ISR));
 	}
 
 	status = readl_relaxed(i2c_dev->base + STM32F7_I2C_ISR);
