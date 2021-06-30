@@ -1197,6 +1197,15 @@ static const struct drm_prop_enum_list dp_colorspaces[] = {
  *	drm_connector_attach_max_bpc_property() to create and attach the
  *	property to the connector during initialization.
  *
+ * active bpc:
+ *	This read-only range property tells userspace the pixel color bit depth
+ *	actually used by the hardware display engine "on the cable" on a
+ *	connector. This means after display stream compression and dithering
+ *	done by the GPU. The chosen value depends on hardware capabilities, both
+ *	display engine and connected monitor, and the "max bpc" property.
+ *	Drivers shall use drm_connector_attach_active_bpc_property() to install
+ *	this property. A value of 0 means "not applicable".
+ *
  * Connectors also have one standardized atomic property:
  *
  * CRTC_ID:
@@ -2151,6 +2160,50 @@ int drm_connector_attach_max_bpc_property(struct drm_connector *connector,
 	return 0;
 }
 EXPORT_SYMBOL(drm_connector_attach_max_bpc_property);
+
+/**
+ * drm_connector_attach_active_bpc_property - attach "active bpc" property
+ * @connector: connector to attach active bpc property on.
+ * @min: The minimum bit depth supported by the connector.
+ * @max: The maximum bit depth supported by the connector.
+ *
+ * This is used to check the applied bit depth on a connector.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_connector_attach_active_bpc_property(struct drm_connector *connector, int min, int max)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	if (!connector->active_bpc_property) {
+		prop = drm_property_create_range(dev, DRM_MODE_PROP_IMMUTABLE, "active bpc",
+						 min, max);
+		if (!prop)
+			return -ENOMEM;
+
+		connector->active_bpc_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base, prop, 0);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_connector_attach_active_bpc_property);
+
+/**
+ * drm_connector_set_active_bpc_property - sets the active bits per color property for a connector
+ * @connector: drm connector
+ * @active_bpc: bits per color for the connector currently active "on the cable"
+ *
+ * Should be used by atomic drivers to update the active bits per color over a connector.
+ */
+void drm_connector_set_active_bpc_property(struct drm_connector *connector, int active_bpc)
+{
+	drm_object_property_set_value(&connector->base, connector->active_bpc_property, active_bpc);
+}
+EXPORT_SYMBOL(drm_connector_set_active_bpc_property);
 
 /**
  * drm_connector_attach_hdr_output_metadata_property - attach "HDR_OUTPUT_METADA" property
