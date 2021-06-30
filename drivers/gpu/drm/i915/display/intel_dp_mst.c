@@ -833,7 +833,6 @@ static struct drm_connector *intel_dp_add_mst_connector(struct drm_dp_mst_topolo
 		goto err;
 
 	intel_attach_force_audio_property(connector);
-	intel_attach_broadcast_rgb_property(connector);
 
 	if (DISPLAY_VER(dev_priv) <= 12) {
 		ret = intel_dp_hdcp_init(dig_port, intel_connector);
@@ -865,6 +864,11 @@ static struct drm_connector *intel_dp_add_mst_connector(struct drm_dp_mst_topolo
 		intel_dp->attached_connector->base.active_color_format_property;
 	if (connector->active_color_format_property)
 		drm_connector_attach_active_color_format_property(connector);
+
+	connector->preferred_color_range_property =
+		intel_dp->attached_connector->base.preferred_color_range_property;
+	if (connector->preferred_color_range_property)
+		drm_connector_attach_preferred_color_range_property(connector);
 
 	connector->active_color_range_property =
 		intel_dp->attached_connector->base.active_color_range_property;

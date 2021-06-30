@@ -1417,8 +1417,6 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 bool intel_dp_limited_color_range(const struct intel_crtc_state *crtc_state,
 				  const struct drm_connector_state *conn_state)
 {
-	const struct intel_digital_connector_state *intel_conn_state =
-		to_intel_digital_connector_state(conn_state);
 	const struct drm_display_mode *adjusted_mode =
 		&crtc_state->hw.adjusted_mode;
 
@@ -1432,7 +1430,7 @@ bool intel_dp_limited_color_range(const struct intel_crtc_state *crtc_state,
 	if (crtc_state->output_format != INTEL_OUTPUT_FORMAT_RGB)
 		return false;
 
-	if (intel_conn_state->broadcast_rgb == INTEL_BROADCAST_RGB_AUTO) {
+	if (conn_state->preferred_color_range == DRM_MODE_COLOR_RANGE_UNSET) {
 		/*
 		 * See:
 		 * CEA-861-E - 5.1 Default Encoding Parameters
@@ -1442,8 +1440,7 @@ bool intel_dp_limited_color_range(const struct intel_crtc_state *crtc_state,
 			drm_default_rgb_quant_range(adjusted_mode) ==
 			HDMI_QUANTIZATION_RANGE_LIMITED;
 	} else {
-		return intel_conn_state->broadcast_rgb ==
-			INTEL_BROADCAST_RGB_LIMITED;
+		return conn_state->preferred_color_range == DRM_MODE_COLOR_RANGE_LIMITED_16_235;
 	}
 }
 
@@ -4690,7 +4687,7 @@ intel_dp_add_properties(struct intel_dp *intel_dp, struct drm_connector *connect
 	if (!IS_G4X(dev_priv) && port != PORT_A)
 		intel_attach_force_audio_property(connector);
 
-	intel_attach_broadcast_rgb_property(connector);
+	drm_connector_attach_preferred_color_range_property(connector);
 	drm_connector_attach_active_color_range_property(connector);
 	if (HAS_GMCH(dev_priv)) {
 		drm_connector_attach_max_bpc_property(connector, 6, 10);

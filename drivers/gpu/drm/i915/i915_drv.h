@@ -999,7 +999,6 @@ struct drm_i915_private {
 	struct intel_fbdev *fbdev;
 	struct work_struct fbdev_suspend_work;
 
-	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
 
 	/* hda/i915 audio component */
