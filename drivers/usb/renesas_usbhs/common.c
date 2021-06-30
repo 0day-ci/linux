@@ -297,6 +297,8 @@ static bool usbhsc_is_multi_clks(struct usbhs_priv *priv)
 
 static int usbhsc_clk_get(struct device *dev, struct usbhs_priv *priv)
 {
+	unsigned int i;
+
 	if (!usbhsc_is_multi_clks(priv))
 		return 0;
 
@@ -309,11 +311,13 @@ static int usbhsc_clk_get(struct device *dev, struct usbhs_priv *priv)
 	 * To backward compatibility with old DT, this driver checks the return
 	 * value if it's -ENOENT or not.
 	 */
-	priv->clks[1] = of_clk_get(dev_of_node(dev), 1);
-	if (PTR_ERR(priv->clks[1]) == -ENOENT)
-		priv->clks[1] = NULL;
-	else if (IS_ERR(priv->clks[1]))
-		return PTR_ERR(priv->clks[1]);
+	for (i = 1; i < ARRAY_SIZE(priv->clks); i++) {
+		priv->clks[1] = of_clk_get(dev->of_node, i);
+		if (PTR_ERR(priv->clks[i]) == -ENOENT)
+			priv->clks[i] = NULL;
+		else if (IS_ERR(priv->clks[i]))
+			return PTR_ERR(priv->clks[i]);
+	}
 
 	return 0;
 }
