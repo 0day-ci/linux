@@ -10838,6 +10838,9 @@ static int intel_atomic_commit(struct drm_device *dev,
 {
 	struct intel_atomic_state *state = to_intel_atomic_state(_state);
 	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_connector *connector;
+	struct drm_connector_state *new_conn_state;
+	int i;
 	int ret = 0;
 
 	state->wakeref = intel_runtime_pm_get(&dev_priv->runtime_pm);
@@ -10905,6 +10908,22 @@ static int intel_atomic_commit(struct drm_device *dev,
 	}
 	intel_shared_dpll_swap_state(state);
 	intel_atomic_track_fbs(state);
+
+	/* Extract information from crtc to communicate it to userspace as connector properties */
+	for_each_new_connector_in_state(&state->base, connector, new_conn_state, i) {
+		struct intel_crtc *crtc = to_intel_crtc(new_conn_state->crtc);
+
+		if (crtc) {
+			struct intel_crtc_state *new_crtc_state =
+				intel_atomic_get_new_crtc_state(state, crtc);
+
+			drm_connector_set_active_bpc_property(connector,
+				new_crtc_state->dsc.compression_enable ?
+					new_crtc_state->dsc.compressed_bpp / 3 :
+					new_crtc_state->pipe_bpp / 3);
+		} else
+			drm_connector_set_active_bpc_property(connector, 0);
+	}
 
 	drm_atomic_state_get(&state->base);
 	INIT_WORK(&state->base.commit_work, intel_atomic_commit_work);
