@@ -27,6 +27,8 @@ ALL_TESTS="
 	redir_sit
 	redir_ip6gre
 	redir_ip6tnl
+	redir_vxlan_gpe
+	redir_bareudp
 "
 
 NUM_NETIFS=0
@@ -352,6 +354,59 @@ redir_ip6tnl()
 	ping_test ipv4-mpls "IP6TNL, external mode: IPv6 / MPLS / IPv4"
 	ping_test ipv6-mpls "IP6TNL, external mode: IPv6 / MPLS / IPv6"
 	cleanup_tunnel
+}
+
+redir_vxlan_gpe()
+{
+	local IP
+
+	# As of Linux 5.13, VXLAN-GPE only supports collect-md mode
+	for UNDERLAY_IPVERS in 4 6; do
+		IP="IPv${UNDERLAY_IPVERS}"
+
+		setup_tunnel "${IP}" "collect_md" "vxlan" "gpe external" "id 10"
+		ping_test ipv4 "VXLAN-GPE, external mode: ${IP} / UDP / VXLAN-GPE / IPv4"
+		ping_test ipv6 "VXLAN-GPE, external mode: ${IP} / UDP / VXLAN-GPE / IPv6"
+		ping_test ipv4-mpls "VXLAN-GPE, external mode: ${IP} / UDP / VXLAN-GPE / MPLS / IPv4"
+		ping_test ipv6-mpls "VXLAN-GPE, external mode: ${IP} / UDP / VXLAN-GPE / MPLS / IPv6"
+		cleanup_tunnel
+	done
+}
+
+redir_bareudp()
+{
+	local IP
+
+	# As of Linux 5.13, Bareudp only supports collect-md mode
+	for UNDERLAY_IPVERS in 4 6; do
+		IP="IPv${UNDERLAY_IPVERS}"
+
+		# IPv4 overlay
+		setup_tunnel "${IP}" "collect_md" "bareudp" \
+			"dstport 6635 ethertype ipv4"
+		ping_test ipv4 "Bareudp, external mode: ${IP} / UDP / IPv4"
+		cleanup_tunnel
+
+		# IPv6 overlay
+		setup_tunnel "${IP}" "collect_md" "bareudp" \
+			"dstport 6635 ethertype ipv6"
+		ping_test ipv6 "Bareudp, external mode: ${IP} / UDP / IPv6"
+		cleanup_tunnel
+
+		# Combined IPv4/IPv6 overlay (multiproto mode)
+		setup_tunnel "${IP}" "collect_md" "bareudp" \
+			"dstport 6635 ethertype ipv4 multiproto"
+		ping_test ipv4 "Bareudp, external mode: ${IP} / UDP / IPv4 (multiproto)"
+		ping_test ipv6 "Bareudp, external mode: ${IP} / UDP / IPv6 (multiproto)"
+		cleanup_tunnel
+
+		# MPLS overlay
+		setup_tunnel "${IP}" "collect_md" "bareudp" \
+			"dstport 6635 ethertype mpls_uc"
+		ping_test ipv4-mpls "Bareudp, external mode: ${IP} / UDP / MPLS / IPv4"
+		ping_test ipv6-mpls "Bareudp, external mode: ${IP} / UDP / MPLS / IPv6"
+		cleanup_tunnel
+	done
 }
 
 exit_cleanup()
