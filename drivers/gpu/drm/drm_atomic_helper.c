@@ -691,6 +691,10 @@ drm_atomic_helper_check_modeset(struct drm_device *dev,
 			if (old_connector_state->preferred_color_format !=
 			    new_connector_state->preferred_color_format)
 				new_crtc_state->connectors_changed = true;
+
+			if (old_connector_state->preferred_color_range !=
+			    new_connector_state->preferred_color_range)
+				new_crtc_state->connectors_changed = true;
 		}
 
 		if (funcs->atomic_check)
