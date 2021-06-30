@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Landlock LSM - Credential hooks
+ * Landlock LSM - Credential and task hooks
  *
  * Copyright © 2019-2020 Mickaël Salaün <mic@digikod.net>
  * Copyright © 2019-2020 ANSSI
+ * Copyright © 2021 Microsoft Corporation
  */
 
 #ifndef _SECURITY_LANDLOCK_CRED_H
@@ -13,11 +14,20 @@
 #include <linux/init.h>
 #include <linux/rcupdate.h>
 
+#include "fs.h"
 #include "ruleset.h"
 #include "setup.h"
 
 struct landlock_cred_security {
 	struct landlock_ruleset *domain;
+};
+
+struct landlock_task_cache {
+	struct landlock_fs_cache *last_at;
+};
+
+struct landlock_task_security {
+	struct landlock_task_cache cache;
 };
 
 static inline struct landlock_cred_security *landlock_cred(
@@ -26,7 +36,13 @@ static inline struct landlock_cred_security *landlock_cred(
 	return cred->security + landlock_blob_sizes.lbs_cred;
 }
 
-static inline const struct landlock_ruleset *landlock_get_current_domain(void)
+static inline struct landlock_task_security *landlock_task(
+		const struct task_struct *task)
+{
+	return task->security + landlock_blob_sizes.lbs_task;
+}
+
+static inline struct landlock_ruleset *landlock_get_current_domain(void)
 {
 	return landlock_cred(current_cred())->domain;
 }

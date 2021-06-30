@@ -4,6 +4,7 @@
  *
  * Copyright © 2017-2020 Mickaël Salaün <mic@digikod.net>
  * Copyright © 2018-2020 ANSSI
+ * Copyright © 2021 Microsoft Corporation
  */
 
 #ifndef _SECURITY_LANDLOCK_FS_H
@@ -12,7 +13,9 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/rcupdate.h>
+#include <linux/refcount.h>
 
+#include "object.h"
 #include "ruleset.h"
 #include "setup.h"
 
@@ -50,6 +53,24 @@ struct landlock_superblock_security {
 	atomic_long_t inode_refs;
 };
 
+struct landlock_fs_cache;
+
+/**
+ * struct landlock_file_security - File security blob
+ *
+ * Cached access right for an open file.
+ */
+struct landlock_file_security {
+	/**
+	 * @cache: This cache is set once at the file opening and never change
+	 * after that (except when freeing the file).  This means that a file
+	 * open before a domain transition will not get an updated cache, but
+	 * the domain tied to the cache must always be checked with
+	 * landlock_cache_is_valid().
+	 */
+	struct landlock_fs_cache *cache;
+};
+
 static inline struct landlock_inode_security *landlock_inode(
 		const struct inode *const inode)
 {
@@ -62,7 +83,15 @@ static inline struct landlock_superblock_security *landlock_superblock(
 	return superblock->s_security + landlock_blob_sizes.lbs_superblock;
 }
 
+static inline struct landlock_file_security *landlock_file(
+		const struct file *const file)
+{
+	return file->f_security + landlock_blob_sizes.lbs_file;
+}
+
 __init void landlock_add_fs_hooks(void);
+
+void landlock_put_fs_cache(struct landlock_fs_cache *cache);
 
 int landlock_append_fs_rule(struct landlock_ruleset *const ruleset,
 		const struct path *const path, u32 access_hierarchy);

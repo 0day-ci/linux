@@ -4,6 +4,7 @@
  *
  * Copyright © 2016-2020 Mickaël Salaün <mic@digikod.net>
  * Copyright © 2018-2020 ANSSI
+ * Copyright © 2021 Microsoft Corporation
  */
 
 #include <linux/atomic.h>
@@ -20,6 +21,7 @@
 #include <linux/lsm_hooks.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/overflow.h>
 #include <linux/path.h>
 #include <linux/rcupdate.h>
 #include <linux/spinlock.h>
@@ -29,6 +31,7 @@
 #include <linux/workqueue.h>
 #include <uapi/linux/landlock.h>
 
+#include "cache.h"
 #include "common.h"
 #include "cred.h"
 #include "fs.h"
@@ -36,6 +39,78 @@
 #include "object.h"
 #include "ruleset.h"
 #include "setup.h"
+
+/* Cache management */
+
+/**
+ * struct landlock_fs_cache - Landlock access cache for the filesystem
+ *
+ * Cached accesses for a filesystem object relative to a specific domain.
+ */
+struct landlock_fs_cache {
+	/**
+	 * @dangling_path: Enables identifying a path (same mnt and dentry
+	 * fields), iff the other path is held and
+	 * READ_ONCE(core->dangling_domain) is not NULL.  Because there is no
+	 * synchronization mechanism, @dangling_path can only be safely
+	 * derefenced by the cache owner (e.g. with create_fs_cache()).
+	 */
+	struct path dangling_path;
+	/**
+	 * @core: Stores the generic caching.
+	 */
+	struct landlock_cache core;
+};
+
+static void build_check_cache(void)
+{
+	const struct landlock_cache cache = {
+		.allowed_accesses = ~0,
+	};
+	struct landlock_layer *layer;
+	struct landlock_ruleset *ruleset;
+
+	BUILD_BUG_ON(cache.allowed_accesses < LANDLOCK_MASK_ACCESS_FS);
+	BUILD_BUG_ON(!__same_type(cache.allowed_accesses, layer->access));
+	BUILD_BUG_ON(!__same_type(cache.allowed_accesses,
+				ruleset->fs_access_masks[0]));
+}
+
+static struct landlock_fs_cache *create_fs_cache(
+		struct landlock_ruleset *domain, const u16 allowed_accesses,
+		struct path *const path)
+{
+	struct landlock_fs_cache *cache;
+
+	build_check_cache();
+
+	/* Only creates useful cache. */
+	if (!allowed_accesses)
+		return NULL;
+
+	cache = kzalloc(sizeof(*cache), GFP_KERNEL_ACCOUNT);
+	if (!cache)
+		return NULL;
+
+	landlock_get_ruleset(domain);
+	cache->core.dangling_domain = domain;
+	cache->core.allowed_accesses = allowed_accesses;
+	path_get(path);
+	cache->dangling_path = *path;
+	refcount_set(&cache->core.usage, 1);
+	return cache;
+}
+
+static void landlock_get_fs_cache(struct landlock_fs_cache *cache)
+{
+	refcount_inc(&cache->core.usage);
+}
+
+void landlock_put_fs_cache(struct landlock_fs_cache *cache)
+{
+	if (cache && refcount_dec_and_test(&cache->core.usage))
+		kfree(cache);
+}
 
 /* Underlying object management */
 
@@ -180,10 +255,42 @@ int landlock_append_fs_rule(struct landlock_ruleset *const ruleset,
 
 /* Access-control management */
 
+static inline bool is_allowed_in_cache(
+		const struct landlock_ruleset *const domain,
+		const struct path *const path, const u32 access_request,
+		u16 (*const denied_cache)[])
+{
+	size_t i;
+	struct landlock_fs_cache *const fs_cache =
+		landlock_task(current)->cache.last_at;
+
+	if (!fs_cache)
+		return false;
+	/*
+	 * This domain check protects against race conditions when checking if
+	 * @path is equal to fs_cache->dangling_path because we own @path and
+	 * fs_cache->dangling_path is only reset after the cache is disabled.
+	 */
+	if (!landlock_cache_is_valid(&fs_cache->core, domain))
+		return false;
+	/* path_equal() doesn't dereference the mnt and dentry fields. */
+	if (!path_equal(path, &fs_cache->dangling_path))
+		return false;
+
+	/* Fills the returned cache as much as possible. */
+	for (i = 0; i < domain->num_layers; i++)
+		/* Removes allowed accesses from the denied lists. */
+		(*denied_cache)[i] &= ~fs_cache->core.allowed_accesses;
+
+	if ((access_request & fs_cache->core.allowed_accesses) != access_request)
+		return false;
+	return true;
+}
+
 static inline u64 unmask_layers(
 		const struct landlock_ruleset *const domain,
 		const struct path *const path, const u32 access_request,
-		u64 layer_mask)
+		u64 layer_mask, u16 (*const denied_cache)[])
 {
 	const struct landlock_rule *rule;
 	const struct inode *inode;
@@ -212,19 +319,20 @@ static inline u64 unmask_layers(
 		const u64 layer_level = BIT_ULL(layer->level - 1);
 
 		/* Checks that the layer grants access to the full request. */
-		if ((layer->access & access_request) == access_request) {
+		if ((layer->access & access_request) == access_request)
 			layer_mask &= ~layer_level;
 
-			if (layer_mask == 0)
-				return layer_mask;
-		}
+		/* Removes allowed accesses from the denied lists. */
+		(*denied_cache)[layer->level - 1] &= ~layer->access;
 	}
 	return layer_mask;
 }
 
 static int check_access_path(const struct landlock_ruleset *const domain,
-		const struct path *const path, u32 access_request)
+		const struct path *const path, const u32 access_request,
+		u16 *const allowed_accesses)
 {
+	typeof(*allowed_accesses) denied_cache[LANDLOCK_MAX_NUM_LAYERS];
 	bool allowed = false;
 	struct path walker_path;
 	u64 layer_mask;
@@ -252,6 +360,8 @@ static int check_access_path(const struct landlock_ruleset *const domain,
 	/* Saves all layers handling a subset of requested accesses. */
 	layer_mask = 0;
 	for (i = 0; i < domain->num_layers; i++) {
+		/* Stores potentially denied accesses. */
+		denied_cache[i] = domain->fs_access_masks[i];
 		if (domain->fs_access_masks[i] & access_request)
 			layer_mask |= BIT_ULL(i);
 	}
@@ -268,8 +378,15 @@ static int check_access_path(const struct landlock_ruleset *const domain,
 	while (true) {
 		struct dentry *parent_dentry;
 
+		if (is_allowed_in_cache(domain, &walker_path,
+					access_request, &denied_cache)) {
+			/* Stops when access request is allowed by a cache. */
+			allowed = true;
+			break;
+		}
+
 		layer_mask = unmask_layers(domain, &walker_path,
-				access_request, layer_mask);
+				access_request, layer_mask, &denied_cache);
 		if (layer_mask == 0) {
 			/* Stops when a rule from each layer grants access. */
 			allowed = true;
@@ -304,6 +421,15 @@ jump_up:
 		walker_path.dentry = parent_dentry;
 	}
 	path_put(&walker_path);
+
+	if (allowed_accesses) {
+		typeof(*allowed_accesses) allowed_cache =
+			LANDLOCK_MASK_ACCESS_FS;
+
+		for (i = 0; i < domain->num_layers; i++)
+			allowed_cache &= ~denied_cache[i];
+		*allowed_accesses = allowed_cache;
+	}
 	return allowed ? 0 : -EACCES;
 }
 
@@ -315,7 +441,7 @@ static inline int current_check_access_path(const struct path *const path,
 
 	if (!dom)
 		return 0;
-	return check_access_path(dom, path, access_request);
+	return check_access_path(dom, path, access_request, NULL);
 }
 
 /* Inode hooks */
@@ -560,7 +686,8 @@ static int hook_path_link(struct dentry *const old_dentry,
 	if (unlikely(d_is_negative(old_dentry)))
 		return -ENOENT;
 	return check_access_path(dom, new_dir,
-			get_mode_access(d_backing_inode(old_dentry)->i_mode));
+			get_mode_access(d_backing_inode(old_dentry)->i_mode),
+			NULL);
 }
 
 static inline u32 maybe_remove(const struct dentry *const dentry)
@@ -590,7 +717,8 @@ static int hook_path_rename(const struct path *const old_dir,
 	/* RENAME_EXCHANGE is handled because directories are the same. */
 	return check_access_path(dom, old_dir, maybe_remove(old_dentry) |
 			maybe_remove(new_dentry) |
-			get_mode_access(d_backing_inode(old_dentry)->i_mode));
+			get_mode_access(d_backing_inode(old_dentry)->i_mode),
+			NULL);
 }
 
 static int hook_path_mkdir(const struct path *const dir,
@@ -608,7 +736,7 @@ static int hook_path_mknod(const struct path *const dir,
 
 	if (!dom)
 		return 0;
-	return check_access_path(dom, dir, get_mode_access(mode));
+	return check_access_path(dom, dir, get_mode_access(mode), NULL);
 }
 
 static int hook_path_symlink(const struct path *const dir,
@@ -651,17 +779,83 @@ static inline u32 get_file_access(const struct file *const file)
 
 static int hook_file_open(struct file *const file)
 {
-	const struct landlock_ruleset *const dom =
-		landlock_get_current_domain();
+	int ret;
+	u16 allowed_accesses = 0;
+	struct landlock_ruleset *const dom = landlock_get_current_domain();
 
 	if (!dom)
 		return 0;
+
 	/*
 	 * Because a file may be opened with O_PATH, get_file_access() may
 	 * return 0.  This case will be handled with a future Landlock
 	 * evolution.
 	 */
-	return check_access_path(dom, &file->f_path, get_file_access(file));
+	ret = check_access_path(dom, &file->f_path, get_file_access(file),
+			&allowed_accesses);
+
+	/*
+	 * Ignores (accounted) memory allocation errors: just don't
+	 * create a cache.
+	 */
+	landlock_file(file)->cache = create_fs_cache(dom,
+			allowed_accesses, &file->f_path);
+	return ret;
+}
+
+static void hook_file_free_security(struct file *const file)
+{
+	struct landlock_fs_cache *const file_cache =
+		landlock_file(file)->cache;
+
+	if (!file_cache)
+		return;
+
+	/*
+	 * If there is a cache, it is well alive because it was created at this
+	 * file opening and is owned by this file.  Disables the cache and puts
+	 * the (dangling) object reference; the order doesn't matter.  There is
+	 * no access-control race-condition in is_allowed_in_cache() because
+	 * the dangling path can only match if it is also owned by the caller.
+	 */
+	landlock_disable_cache(&file_cache->core);
+	/*
+	 * Releases dangling_path; it may be freed at the end of file_free().
+	 * Even if it is not required, resets dangling_path as a safety
+	 * measure.
+	 */
+	path_put_init(&file_cache->dangling_path);
+	landlock_put_fs_cache(file_cache);
+}
+
+static int hook_resolve_path_at(const struct path *path_at,
+		struct file *file_at, int lookup_flags)
+{
+	const struct landlock_ruleset *const dom =
+		landlock_get_current_domain();
+	struct landlock_fs_cache **const current_at_cache =
+		&landlock_task(current)->cache.last_at;
+
+	if (!dom)
+		return 0;
+
+	/* Clean up previous cache, if any. */
+	landlock_put_fs_cache(*current_at_cache);
+	*current_at_cache = NULL;
+
+	if (file_at) {
+		struct landlock_fs_cache *const file_at_cache =
+			landlock_file(file_at)->cache;
+
+		if (!file_at_cache)
+			return 0;
+		/* Don't update existing cached accesses. */
+		if (!landlock_cache_is_valid(&file_at_cache->core, dom))
+			return 0;
+		landlock_get_fs_cache(file_at_cache);
+		*current_at_cache = file_at_cache;
+	}
+	return 0;
 }
 
 static struct security_hook_list landlock_hooks[] __lsm_ro_after_init = {
@@ -683,6 +877,8 @@ static struct security_hook_list landlock_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(path_rmdir, hook_path_rmdir),
 
 	LSM_HOOK_INIT(file_open, hook_file_open),
+	LSM_HOOK_INIT(file_free_security, hook_file_free_security),
+	LSM_HOOK_INIT(resolve_path_at, hook_resolve_path_at),
 };
 
 __init void landlock_add_fs_hooks(void)
