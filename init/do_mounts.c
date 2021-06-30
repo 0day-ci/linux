@@ -326,6 +326,16 @@ static int __init root_data_setup(char *str)
 	return 1;
 }
 
+static int __init root_flags_setup(char *str)
+{
+	int flags;
+
+	if (kstrtoint(str, 0, &flags))
+		return 0;
+	root_mountflags |= flags;
+	return 1;
+}
+
 static char * __initdata root_fs_names;
 static int __init fs_names_setup(char *str)
 {
@@ -341,6 +351,7 @@ static int __init root_delay_setup(char *str)
 }
 
 __setup("rootflags=", root_data_setup);
+__setup("rootopts=", root_flags_setup);
 __setup("rootfstype=", fs_names_setup);
 __setup("rootdelay=", root_delay_setup);
 
