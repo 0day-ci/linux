@@ -1213,9 +1213,28 @@ static void axienet_poll_controller(struct net_device *ndev)
 static int axienet_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct axienet_local *lp = netdev_priv(dev);
+	struct mii_ioctl_data *mii = if_mii(rq);
 
 	if (!netif_running(dev))
 		return -EINVAL;
+
+	if (lp->pcs_phy && lp->pcs_phy->addr == mii->phy_id) {
+		int ret;
+
+		switch (cmd) {
+		case SIOCGMIIREG:
+			ret = mdiobus_read(lp->pcs_phy->bus, mii->phy_id, mii->reg_num);
+			if (ret >= 0) {
+				mii->val_out = ret;
+				ret = 0;
+			}
+			return ret;
+
+		case SIOCSMIIREG:
+			return mdiobus_write(lp->pcs_phy->bus, mii->phy_id,
+					     mii->reg_num, mii->val_in);
+		}
+	}
 
 	return phylink_mii_ioctl(lp->phylink, rq, cmd);
 }
