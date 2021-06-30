@@ -156,7 +156,7 @@ int __init ima_init(void)
 
 	measure_rc = ima_measure_critical_data("kernel_info", "kernel_version",
 					       UTS_RELEASE, strlen(UTS_RELEASE),
-					       false);
+					       false, NULL);
 
 	return rc;
 }

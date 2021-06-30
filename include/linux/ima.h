@@ -38,7 +38,7 @@ extern void ima_kexec_cmdline(int kernel_fd, const void *buf, int size);
 extern int ima_measure_critical_data(const char *event_label,
 				     const char *event_name,
 				     const void *buf, size_t buf_len,
-				     bool hash);
+				     bool hash, u8 *digest);
 
 #ifdef CONFIG_IMA_APPRAISE_BOOTPARAM
 extern void ima_appraise_parse_cmdline(void);
@@ -147,7 +147,7 @@ static inline void ima_kexec_cmdline(int kernel_fd, const void *buf, int size) {
 static inline int ima_measure_critical_data(const char *event_label,
 					     const char *event_name,
 					     const void *buf, size_t buf_len,
-					     bool hash)
+					     bool hash, u8 *digest)
 {
 	return -ENOENT;
 }

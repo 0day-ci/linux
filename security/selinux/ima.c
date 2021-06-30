@@ -88,7 +88,7 @@ void selinux_ima_measure_state_locked(struct selinux_state *state)
 
 	measure_rc = ima_measure_critical_data("selinux", "selinux-state",
 					       state_str, strlen(state_str),
-					       false);
+					       false, NULL);
 
 	kfree(state_str);
 
@@ -105,7 +105,7 @@ void selinux_ima_measure_state_locked(struct selinux_state *state)
 	}
 
 	measure_rc = ima_measure_critical_data("selinux", "selinux-policy-hash",
-					       policy, policy_len, true);
+					       policy, policy_len, true, NULL);
 
 	vfree(policy);
 }
