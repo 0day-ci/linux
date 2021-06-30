@@ -113,6 +113,8 @@ struct vmci_ctx *vmci_ctx_create(u32 cid, u32 priv_flags,
 
 	kref_init(&context->kref);
 	spin_lock_init(&context->lock);
+	atomic_set(&context->no_destroy, 0);
+	init_waitqueue_head(&context->destroy_wait);
 	INIT_LIST_HEAD(&context->list_item);
 	INIT_LIST_HEAD(&context->datagram_queue);
 	INIT_LIST_HEAD(&context->notifier_list);
@@ -192,6 +194,7 @@ void vmci_ctx_destroy(struct vmci_ctx *context)
 	spin_unlock(&ctx_list.lock);
 	synchronize_rcu();
 
+	wait_event(context->destroy_wait, !atomic_read(&context->no_destroy));
 	vmci_ctx_put(context);
 }
 
@@ -307,7 +310,7 @@ int vmci_ctx_enqueue_datagram(u32 cid, struct vmci_datagram *dg)
 	}
 
 	/* Get the target VM's VMCI context. */
-	context = vmci_ctx_get(cid);
+	context = vmci_ctx_get_no_destroy(cid);
 	if (!context) {
 		pr_devel("Invalid context (ID=0x%x)\n", cid);
 		return VMCI_ERROR_INVALID_ARGS;
@@ -357,7 +360,7 @@ int vmci_ctx_enqueue_datagram(u32 cid, struct vmci_datagram *dg)
 	ctx_signal_notify(context);
 	wake_up(&context->host_context.wait_queue);
 	spin_unlock(&context->lock);
-	vmci_ctx_put(context);
+	vmci_ctx_put_allow_destroy(context);
 
 	return vmci_dg_size;
 }
@@ -407,6 +410,30 @@ struct vmci_ctx *vmci_ctx_get(u32 cid)
 			 * process of being destroyed.
 			 */
 			context = c;
+			kref_get(&context->kref);
+			break;
+		}
+	}
+	rcu_read_unlock();
+
+	return context;
+}
+
+/*
+ * Retrieves VMCI context corresponding to the given cid.
+ */
+struct vmci_ctx *vmci_ctx_get_no_destroy(u32 cid)
+{
+	struct vmci_ctx *c, *context = NULL;
+
+	if (cid == VMCI_INVALID_ID)
+		return NULL;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(c, &ctx_list.head, list_item) {
+		if (c->cid == cid) {
+			context = c;
+			atomic_set(&context->no_destroy, 1);
 			kref_get(&context->kref);
 			break;
 		}
@@ -495,6 +522,12 @@ static void ctx_free_ctx(struct kref *kref)
 void vmci_ctx_put(struct vmci_ctx *context)
 {
 	kref_put(&context->kref, ctx_free_ctx);
+}
+
+void vmci_ctx_put_allow_destroy(struct vmci_ctx *context)
+{
+	kref_put(&context->kref, ctx_free_ctx);
+	atomic_set(&context->no_destroy, 0);
 }
 
 /*

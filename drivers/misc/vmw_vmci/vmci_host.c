@@ -139,6 +139,7 @@ static int vmci_host_close(struct inode *inode, struct file *filp)
 {
 	struct vmci_host_dev *vmci_host_dev = filp->private_data;
 
+	filp->private_data = NULL;
 	if (vmci_host_dev->ct_type == VMCIOBJ_CONTEXT) {
 		vmci_ctx_destroy(vmci_host_dev->context);
 		vmci_host_dev->context = NULL;
@@ -154,7 +155,6 @@ static int vmci_host_close(struct inode *inode, struct file *filp)
 	vmci_host_dev->ct_type = VMCIOBJ_NOT_SET;
 
 	kfree(vmci_host_dev);
-	filp->private_data = NULL;
 	return 0;
 }
 

@@ -51,6 +51,8 @@ struct vmci_ctx {
 	 */
 	int user_version;
 	spinlock_t lock;  /* Locks callQueue and handle_arrays. */
+	atomic_t no_destroy;  /* Locks callQueue and handle_arrays. */
+	wait_queue_head_t destroy_wait;
 
 	/*
 	 * queue_pairs attached to.  The array of
@@ -134,7 +136,9 @@ int vmci_ctx_dequeue_datagram(struct vmci_ctx *context,
 			      size_t *max_size, struct vmci_datagram **dg);
 int vmci_ctx_pending_datagrams(u32 cid, u32 *pending);
 struct vmci_ctx *vmci_ctx_get(u32 cid);
+struct vmci_ctx *vmci_ctx_get_no_destroy(u32 cid);
 void vmci_ctx_put(struct vmci_ctx *context);
+void vmci_ctx_put_allow_destroy(struct vmci_ctx *context);
 bool vmci_ctx_exists(u32 cid);
 
 int vmci_ctx_add_notification(u32 context_id, u32 remote_cid);
