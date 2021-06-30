@@ -313,6 +313,7 @@
 };
 
 &hsusb {
+	clocks = <&cpg CPG_MOD 704>, <&cpg CPG_MOD 703>, <&usb2_clksel>, <&versaclock6_som 3>;
 	dr_mode = "otg";
 	status = "okay";
 };
