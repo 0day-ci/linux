@@ -177,6 +177,9 @@ config DRM_DP_CEC
 	  Note: not all adapters support this feature, and even for those
 	  that do support this they often do not hook up the CEC pin.
 
+config DRM_PAGE_POOL
+	bool
+
 config DRM_TTM
 	tristate
 	depends on DRM && MMU
