@@ -620,7 +620,7 @@ static int __maybe_unused imx_mu_resume_noirq(struct device *dev)
 	 * send failed, may lead to system freeze. This issue
 	 * is observed by testing freeze mode suspend.
 	 */
-	if (!imx_mu_read(priv, priv->dcfg->xCR) && !priv->clk)
+	if (!priv->clk && !imx_mu_read(priv, priv->dcfg->xCR))
 		imx_mu_write(priv, priv->xcr, priv->dcfg->xCR);
 
 	return 0;
