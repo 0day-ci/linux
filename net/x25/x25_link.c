@@ -360,18 +360,18 @@ int x25_subscr_ioctl(unsigned int cmd, void __user *arg)
 	if (cmd != SIOCX25GSUBSCRIP && cmd != SIOCX25SSUBSCRIP)
 		goto out;
 
-	rc = -EFAULT;
-	if (copy_from_user(&x25_subscr, arg, sizeof(x25_subscr)))
+	if (copy_from_user(&x25_subscr, arg, sizeof(x25_subscr))) {
+		rc = -EFAULT;
+		goto out;
+	}
+
+	dev = x25_dev_get(x25_subscr.device);
+	if (!dev)
 		goto out;
 
-	rc = -EINVAL;
-	if ((dev = x25_dev_get(x25_subscr.device)) == NULL)
-		goto out;
-
-	if ((nb = x25_get_neigh(dev)) == NULL)
+	nb = x25_get_neigh(dev);
+	if (!nb)
 		goto out_dev_put;
-
-	dev_put(dev);
 
 	if (cmd == SIOCX25GSUBSCRIP) {
 		read_lock_bh(&x25_neigh_list_lock);
@@ -381,7 +381,6 @@ int x25_subscr_ioctl(unsigned int cmd, void __user *arg)
 		rc = copy_to_user(arg, &x25_subscr,
 				  sizeof(x25_subscr)) ? -EFAULT : 0;
 	} else {
-		rc = -EINVAL;
 		if (!(x25_subscr.extended && x25_subscr.extended != 1)) {
 			rc = 0;
 			write_lock_bh(&x25_neigh_list_lock);
@@ -391,11 +390,11 @@ int x25_subscr_ioctl(unsigned int cmd, void __user *arg)
 		}
 	}
 	x25_neigh_put(nb);
-out:
-	return rc;
+
 out_dev_put:
 	dev_put(dev);
-	goto out;
+out:
+	return rc;
 }
 
 

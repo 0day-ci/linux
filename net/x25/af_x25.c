@@ -1625,20 +1625,18 @@ static int compat_x25_subscr_ioctl(unsigned int cmd,
 	struct net_device *dev;
 	int rc = -EINVAL;
 
-	rc = -EFAULT;
-	if (copy_from_user(&x25_subscr, x25_subscr32, sizeof(*x25_subscr32)))
+	if (copy_from_user(&x25_subscr, x25_subscr32, sizeof(*x25_subscr32))) {
+		rc = -EFAULT;
 		goto out;
+	}
 
-	rc = -EINVAL;
 	dev = x25_dev_get(x25_subscr.device);
-	if (dev == NULL)
+	if (!dev)
 		goto out;
 
 	nb = x25_get_neigh(dev);
-	if (nb == NULL)
+	if (!nb)
 		goto out_dev_put;
-
-	dev_put(dev);
 
 	if (cmd == SIOCX25GSUBSCRIP) {
 		read_lock_bh(&x25_neigh_list_lock);
@@ -1648,7 +1646,6 @@ static int compat_x25_subscr_ioctl(unsigned int cmd,
 		rc = copy_to_user(x25_subscr32, &x25_subscr,
 				sizeof(*x25_subscr32)) ? -EFAULT : 0;
 	} else {
-		rc = -EINVAL;
 		if (x25_subscr.extended == 0 || x25_subscr.extended == 1) {
 			rc = 0;
 			write_lock_bh(&x25_neigh_list_lock);
@@ -1658,11 +1655,11 @@ static int compat_x25_subscr_ioctl(unsigned int cmd,
 		}
 	}
 	x25_neigh_put(nb);
-out:
-	return rc;
+
 out_dev_put:
 	dev_put(dev);
-	goto out;
+out:
+	return rc;
 }
 
 static int compat_x25_ioctl(struct socket *sock, unsigned int cmd,
