@@ -101,7 +101,7 @@ struct page {
 			 * page_pool allocated pages.
 			 */
 			unsigned long pp_magic;
-			struct page_pool *pp;
+			struct page_pool_info *pp_info;
 			unsigned long _pp_mapping_pad;
 			/**
 			 * @dma_addr: might require a 64-bit value on

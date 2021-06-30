@@ -206,6 +206,49 @@ static bool page_pool_dma_map(struct page_pool *pool, struct page *page)
 	return true;
 }
 
+static int page_pool_set_pp_info(struct page_pool *pool,
+				 struct page *page, gfp_t gfp)
+{
+	struct page_pool_info *pp_info;
+
+	pp_info = kzalloc_node(sizeof(*pp_info), gfp, pool->p.nid);
+	if (!pp_info)
+		return -ENOMEM;
+
+	if (pool->p.flags & PP_FLAG_PAGECNT_BIAS) {
+		page_ref_add(page, USHRT_MAX);
+		pp_info->pagecnt_bias = USHRT_MAX;
+	} else {
+		pp_info->pagecnt_bias = 0;
+	}
+
+	page->pp_magic |= PP_SIGNATURE;
+	pp_info->pp = pool;
+	page->pp_info = pp_info;
+	return 0;
+}
+
+static int page_pool_clear_pp_info(struct page *page)
+{
+	struct page_pool_info *pp_info = page->pp_info;
+	int bias;
+
+	bias = pp_info->pagecnt_bias;
+
+	kfree(pp_info);
+	page->pp_info = NULL;
+	page->pp_magic = 0;
+
+	return bias;
+}
+
+static void page_pool_clear_and_drain_page(struct page *page)
+{
+	int bias = page_pool_clear_pp_info(page);
+
+	__page_frag_cache_drain(page, bias + 1);
+}
+
 static struct page *__page_pool_alloc_page_order(struct page_pool *pool,
 						 gfp_t gfp)
 {
@@ -216,13 +259,16 @@ static struct page *__page_pool_alloc_page_order(struct page_pool *pool,
 	if (unlikely(!page))
 		return NULL;
 
-	if ((pool->p.flags & PP_FLAG_DMA_MAP) &&
-	    unlikely(!page_pool_dma_map(pool, page))) {
+	if (unlikely(page_pool_set_pp_info(pool, page, gfp))) {
 		put_page(page);
 		return NULL;
 	}
 
-	page->pp_magic |= PP_SIGNATURE;
+	if ((pool->p.flags & PP_FLAG_DMA_MAP) &&
+	    unlikely(!page_pool_dma_map(pool, page))) {
+		page_pool_clear_and_drain_page(page);
+		return NULL;
+	}
 
 	/* Track how many pages are held 'in-flight' */
 	pool->pages_state_hold_cnt++;
@@ -261,12 +307,17 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 	 */
 	for (i = 0; i < nr_pages; i++) {
 		page = pool->alloc.cache[i];
-		if ((pp_flags & PP_FLAG_DMA_MAP) &&
-		    unlikely(!page_pool_dma_map(pool, page))) {
+		if (unlikely(page_pool_set_pp_info(pool, page, gfp))) {
 			put_page(page);
 			continue;
 		}
-		page->pp_magic |= PP_SIGNATURE;
+
+		if ((pp_flags & PP_FLAG_DMA_MAP) &&
+		    unlikely(!page_pool_dma_map(pool, page))) {
+			page_pool_clear_and_drain_page(page);
+			continue;
+		}
+
 		pool->alloc.cache[pool->alloc.count++] = page;
 		/* Track how many pages are held 'in-flight' */
 		pool->pages_state_hold_cnt++;
@@ -284,6 +335,25 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 	return page;
 }
 
+static void page_pool_sub_bias(struct page *page, int nr)
+{
+	struct page_pool_info *pp_info = page->pp_info;
+
+	/* "pp_info->pagecnt_bias == 0" indicates the PAGECNT_BIAS
+	 * flags is not set.
+	 */
+	if (!pp_info->pagecnt_bias)
+		return;
+
+	/* Make sure pagecnt_bias > 0 for elevated refcnt case */
+	if (unlikely(pp_info->pagecnt_bias <= nr)) {
+		page_ref_add(page, USHRT_MAX);
+		pp_info->pagecnt_bias += USHRT_MAX;
+	}
+
+	pp_info->pagecnt_bias -= nr;
+}
+
 /* For using page_pool replace: alloc_pages() API calls, but provide
  * synchronization guarantee for allocation side.
  */
@@ -293,14 +363,65 @@ struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp)
 
 	/* Fast-path: Get a page from cache */
 	page = __page_pool_get_cached(pool);
-	if (page)
+	if (page) {
+		page_pool_sub_bias(page, 1);
 		return page;
+	}
 
 	/* Slow-path: cache empty, do real allocation */
 	page = __page_pool_alloc_pages_slow(pool, gfp);
+	if (page)
+		page_pool_sub_bias(page, 1);
+
 	return page;
 }
 EXPORT_SYMBOL(page_pool_alloc_pages);
+
+struct page *page_pool_alloc_frag(struct page_pool *pool,
+				  unsigned int *offset, gfp_t gfp)
+{
+	unsigned int frag_offset = pool->frag_offset;
+	unsigned int frag_size = pool->p.frag_size;
+	struct page *frag_page = pool->frag_page;
+	unsigned int max_len = pool->p.max_len;
+
+	if (!frag_page || frag_offset + frag_size > max_len) {
+		frag_page = page_pool_alloc_pages(pool, gfp);
+		if (unlikely(!frag_page)) {
+			pool->frag_page = NULL;
+			return NULL;
+		}
+
+		pool->frag_page = frag_page;
+		frag_offset = 0;
+
+		page_pool_sub_bias(frag_page, max_len / frag_size - 1);
+	}
+
+	*offset = frag_offset;
+	pool->frag_offset = frag_offset + frag_size;
+
+	return frag_page;
+}
+EXPORT_SYMBOL(page_pool_alloc_frag);
+
+static void page_pool_empty_frag(struct page_pool *pool)
+{
+	unsigned int frag_offset = pool->frag_offset;
+	unsigned int frag_size = pool->p.frag_size;
+	struct page *frag_page = pool->frag_page;
+	unsigned int max_len = pool->p.max_len;
+
+	if (!frag_page)
+		return;
+
+	while (frag_offset + frag_size <= max_len) {
+		page_pool_put_full_page(pool, frag_page, false);
+		frag_offset += frag_size;
+	}
+
+	pool->frag_page = NULL;
+}
 
 /* Calculate distance between two u32 values, valid if distance is below 2^(31)
  *  https://en.wikipedia.org/wiki/Serial_number_arithmetic#General_Solution
@@ -326,10 +447,11 @@ static s32 page_pool_inflight(struct page_pool *pool)
  * a regular page (that will eventually be returned to the normal
  * page-allocator via put_page).
  */
-void page_pool_release_page(struct page_pool *pool, struct page *page)
+static int __page_pool_release_page(struct page_pool *pool,
+				    struct page *page)
 {
 	dma_addr_t dma;
-	int count;
+	int bias, count;
 
 	if (!(pool->p.flags & PP_FLAG_DMA_MAP))
 		/* Always account for inflight pages, even if we didn't
@@ -345,22 +467,29 @@ void page_pool_release_page(struct page_pool *pool, struct page *page)
 			     DMA_ATTR_SKIP_CPU_SYNC);
 	page_pool_set_dma_addr(page, 0);
 skip_dma_unmap:
-	page->pp_magic = 0;
+	bias = page_pool_clear_pp_info(page);
 
 	/* This may be the last page returned, releasing the pool, so
 	 * it is not safe to reference pool afterwards.
 	 */
 	count = atomic_inc_return(&pool->pages_state_release_cnt);
 	trace_page_pool_state_release(pool, page, count);
+	return bias;
+}
+
+void page_pool_release_page(struct page_pool *pool, struct page *page)
+{
+	int bias = __page_pool_release_page(pool, page);
+
+	WARN_ONCE(bias, "PAGECNT_BIAS is not supposed to be enabled\n");
 }
 EXPORT_SYMBOL(page_pool_release_page);
 
 /* Return a page to the page allocator, cleaning up our state */
 static void page_pool_return_page(struct page_pool *pool, struct page *page)
 {
-	page_pool_release_page(pool, page);
+	__page_frag_cache_drain(page, __page_pool_release_page(pool, page) + 1);
 
-	put_page(page);
 	/* An optimization would be to call __free_pages(page, pool->p.order)
 	 * knowing page is not part of page-cache (thus avoiding a
 	 * __page_cache_release() call).
@@ -395,7 +524,16 @@ static bool page_pool_recycle_in_cache(struct page *page,
 	return true;
 }
 
-/* If the page refcnt == 1, this will try to recycle the page.
+static bool page_pool_bias_page_recyclable(struct page *page, int bias)
+{
+	int ref = page_ref_dec_return(page);
+
+	WARN_ON(ref < bias);
+	return ref == bias + 1;
+}
+
+/* If pagecnt_bias == 0 and the page refcnt == 1, this will try to
+ * recycle the page.
  * if PP_FLAG_DMA_SYNC_DEV is set, we'll try to sync the DMA area for
  * the configured size min(dma_sync_size, pool->max_len).
  * If the page refcnt != 1, then the page will be returned to memory
@@ -405,16 +543,35 @@ static __always_inline struct page *
 __page_pool_put_page(struct page_pool *pool, struct page *page,
 		     unsigned int dma_sync_size, bool allow_direct)
 {
-	/* This allocator is optimized for the XDP mode that uses
+	int bias = page->pp_info->pagecnt_bias;
+
+	/* Handle the elevated refcnt case first:
+	 * multi-frames-per-page, it is likely from the skb, which
+	 * is likely called in non-sofrirq context, so do not recycle
+	 * it in pool->alloc.
+	 *
+	 * Then handle non-elevated refcnt case:
 	 * one-frame-per-page, but have fallbacks that act like the
 	 * regular page allocator APIs.
-	 *
 	 * refcnt == 1 means page_pool owns page, and can recycle it.
 	 *
 	 * page is NOT reusable when allocated when system is under
 	 * some pressure. (page_is_pfmemalloc)
 	 */
-	if (likely(page_ref_count(page) == 1 && !page_is_pfmemalloc(page))) {
+	if (bias) {
+		/* We have gave some refcnt to the stack, so wait for
+		 * all refcnt of the stack to be decremented before
+		 * enabling recycling.
+		 */
+		if (!page_pool_bias_page_recyclable(page, bias))
+			return NULL;
+
+		/* only enable recycling when it is not pfmemalloced */
+		if (!page_is_pfmemalloc(page))
+			return page;
+
+	} else if (likely(page_ref_count(page) == 1 &&
+			  !page_is_pfmemalloc(page))) {
 		/* Read barrier done in page_ref_count / READ_ONCE */
 
 		if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
@@ -428,22 +585,8 @@ __page_pool_put_page(struct page_pool *pool, struct page *page,
 		/* Page found as candidate for recycling */
 		return page;
 	}
-	/* Fallback/non-XDP mode: API user have elevated refcnt.
-	 *
-	 * Many drivers split up the page into fragments, and some
-	 * want to keep doing this to save memory and do refcnt based
-	 * recycling. Support this use case too, to ease drivers
-	 * switching between XDP/non-XDP.
-	 *
-	 * In-case page_pool maintains the DMA mapping, API user must
-	 * call page_pool_put_page once.  In this elevated refcnt
-	 * case, the DMA is unmapped/released, as driver is likely
-	 * doing refcnt based recycle tricks, meaning another process
-	 * will be invoking put_page.
-	 */
-	/* Do not replace this with page_pool_return_page() */
+
 	page_pool_release_page(pool, page);
-	put_page(page);
 
 	return NULL;
 }
@@ -452,6 +595,7 @@ void page_pool_put_page(struct page_pool *pool, struct page *page,
 			unsigned int dma_sync_size, bool allow_direct)
 {
 	page = __page_pool_put_page(pool, page, dma_sync_size, allow_direct);
+
 	if (page && !page_pool_recycle_in_ring(pool, page)) {
 		/* Cache full, fallback to free pages */
 		page_pool_return_page(pool, page);
@@ -503,8 +647,11 @@ static void page_pool_empty_ring(struct page_pool *pool)
 
 	/* Empty recycle ring */
 	while ((page = ptr_ring_consume_bh(&pool->ring))) {
-		/* Verify the refcnt invariant of cached pages */
-		if (!(page_ref_count(page) == 1))
+		/* Verify the refcnt invariant of cached pages for
+		 * non elevated refcnt case.
+		 */
+		if (!(pool->p.flags & PP_FLAG_PAGECNT_BIAS) &&
+		    !(page_ref_count(page) == 1))
 			pr_crit("%s() page_pool refcnt %d violation\n",
 				__func__, page_ref_count(page));
 
@@ -544,6 +691,7 @@ static void page_pool_empty_alloc_cache_once(struct page_pool *pool)
 
 static void page_pool_scrub(struct page_pool *pool)
 {
+	page_pool_empty_frag(pool);
 	page_pool_empty_alloc_cache_once(pool);
 	pool->destroy_cnt++;
 
@@ -637,14 +785,13 @@ bool page_pool_return_skb_page(struct page *page)
 	if (unlikely(page->pp_magic != PP_SIGNATURE))
 		return false;
 
-	pp = page->pp;
+	pp = page->pp_info->pp;
 
 	/* Driver set this to memory recycling info. Reset it on recycle.
 	 * This will *not* work for NIC using a split-page memory model.
 	 * The page will be returned to the pool here regardless of the
 	 * 'flipped' fragment being in use or not.
 	 */
-	page->pp = NULL;
 	page_pool_put_full_page(pp, page, false);
 
 	return true;

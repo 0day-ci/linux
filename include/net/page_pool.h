@@ -45,7 +45,9 @@
 					* Please note DMA-sync-for-CPU is still
 					* device driver responsibility
 					*/
-#define PP_FLAG_ALL		(PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV)
+#define PP_FLAG_PAGECNT_BIAS	BIT(2)	/* Enable elevated refcnt */
+#define PP_FLAG_ALL		(PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV |\
+				 PP_FLAG_PAGECNT_BIAS)
 
 /*
  * Fast allocation side cache array/stack
@@ -77,6 +79,7 @@ struct page_pool_params {
 	enum dma_data_direction dma_dir; /* DMA mapping direction */
 	unsigned int	max_len; /* max DMA sync memory size */
 	unsigned int	offset;  /* DMA addr offset */
+	unsigned int	frag_size;
 };
 
 struct page_pool {
@@ -88,6 +91,8 @@ struct page_pool {
 	unsigned long defer_warn;
 
 	u32 pages_state_hold_cnt;
+	unsigned int frag_offset;
+	struct page *frag_page;
 
 	/*
 	 * Data structure for allocation side
@@ -128,6 +133,11 @@ struct page_pool {
 	u64 destroy_cnt;
 };
 
+struct page_pool_info {
+	struct page_pool *pp;
+	int pagecnt_bias;
+};
+
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
 
 static inline struct page *page_pool_dev_alloc_pages(struct page_pool *pool)
@@ -135,6 +145,17 @@ static inline struct page *page_pool_dev_alloc_pages(struct page_pool *pool)
 	gfp_t gfp = (GFP_ATOMIC | __GFP_NOWARN);
 
 	return page_pool_alloc_pages(pool, gfp);
+}
+
+struct page *page_pool_alloc_frag(struct page_pool *pool,
+				  unsigned int *offset, gfp_t gfp);
+
+static inline struct page *page_pool_dev_alloc_frag(struct page_pool *pool,
+						    unsigned int *offset)
+{
+	gfp_t gfp = (GFP_ATOMIC | __GFP_NOWARN);
+
+	return page_pool_alloc_frag(pool, offset, gfp);
 }
 
 /* get the stored dma direction. A driver might decide to treat this locally and
@@ -251,13 +272,6 @@ static inline void page_pool_ring_unlock(struct page_pool *pool)
 		spin_unlock(&pool->ring.producer_lock);
 	else
 		spin_unlock_bh(&pool->ring.producer_lock);
-}
-
-/* Store mem_info on struct page and use it while recycling skb frags */
-static inline
-void page_pool_store_mem_info(struct page *page, struct page_pool *pp)
-{
-	page->pp = pp;
 }
 
 #endif /* _NET_PAGE_POOL_H */
