@@ -17,6 +17,7 @@
 #include <locale.h>
 #include <regex.h>
 #include <perf/cpumap.h>
+#include <fnmatch.h>
 #include "debug.h"
 #include "evsel.h"
 #include "pmu.h"
@@ -1871,4 +1872,19 @@ bool perf_pmu__has_hybrid(void)
 	}
 
 	return !list_empty(&perf_pmu__hybrid_pmus);
+}
+
+int perf_pmu__pattern_match(struct perf_pmu *pmu, char *pattern, char *tok)
+{
+	char *name = pmu->name;
+
+	if (!strncmp(name, "uncore_", 7) &&
+	    strncmp(tok, "uncore_", 7)) {
+		name += 7;
+	}
+
+	if (fnmatch(pattern, name, 0))
+		return -1;
+
+	return 0;
 }
