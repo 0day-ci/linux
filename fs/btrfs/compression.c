@@ -1263,96 +1263,93 @@ void __cold btrfs_exit_compress(void)
 }
 
 /*
- * Copy uncompressed data from working buffer to pages.
+ * Copy decompressed data from working buffer to pages.
  *
- * buf_start is the byte offset we're of the start of our workspace buffer.
+ * @buf:		The decompressed data buffer
+ * @buf_len:		The decompressed data length
+ * @decompressed:	Number of bytes that is already decompressed inside the
+ * 			compressed extent
+ * @cb:			The compressed extent descriptor
+ * @orig_bio:		The original bio that the caller wants to read for
  *
- * total_out is the last byte of the buffer
+ * An easier to understand graph is like below:
+ *
+ * 		|<- orig_bio ->|     |<- orig_bio->|
+ * 	|<-------      full decompressed extent      ----->|
+ * 	|<-----------    @cb range   ---->|
+ * 	|			|<-- @buf_len -->|
+ * 	|<--- @decompressed --->|
+ *
+ * Note that, @cb can be a subpage of the full decompressed extent, but
+ * @cb->start always has the same as the orig_file_offset value of the full
+ * decompressed extent.
+ *
+ * When reading compressed extent, we have to read the full compressed extent,
+ * while @orig_bio may only want part of the range.
+ * Thus this function will ensure only data covered by @orig_bio will be copied
+ * to.
+ *
+ * Return 0 if we have copied all needed contents for @orig_bio.
+ * Return >0 if we need continue decompress.
  */
-int btrfs_decompress_buf2page(const char *buf, unsigned long buf_start,
-			      unsigned long total_out, u64 disk_start,
-			      struct bio *bio)
+int btrfs_decompress_buf2page(const char *buf, u32 buf_len,
+			      struct compressed_bio *cb, u32 decompressed)
 {
-	unsigned long buf_offset;
-	unsigned long current_buf_start;
-	unsigned long start_byte;
-	unsigned long prev_start_byte;
-	unsigned long working_bytes = total_out - buf_start;
-	unsigned long bytes;
-	struct bio_vec bvec = bio_iter_iovec(bio, bio->bi_iter);
+	const u64 orig_file_offset = cb->start;
+	const u64 buf_file_offset = orig_file_offset + decompressed;
+	struct bio *orig_bio = cb->orig_bio;
+	u64 cur_file_offset = buf_file_offset;
 
-	/*
-	 * start byte is the first byte of the page we're currently
-	 * copying into relative to the start of the compressed data.
-	 */
-	start_byte = page_offset(bvec.bv_page) - disk_start;
+	/* The main loop to do the copy */
+	while (cur_file_offset < buf_file_offset + buf_len) {
+		struct bio_vec bvec = bio_iter_iovec(orig_bio,
+						     orig_bio->bi_iter);
+		size_t copy_len;
+		u32 offset_inside_decompressed_buf;
+		u64 copy_start_file_offset;
+		u64 bvec_file_offset;
 
-	/* we haven't yet hit data corresponding to this page */
-	if (total_out <= start_byte)
-		return 1;
+		bvec = bio_iter_iovec(orig_bio, orig_bio->bi_iter);
+		bvec_file_offset = page_offset(bvec.bv_page) + bvec.bv_offset;
 
-	/*
-	 * the start of the data we care about is offset into
-	 * the middle of our working buffer
-	 */
-	if (total_out > start_byte && buf_start < start_byte) {
-		buf_offset = start_byte - buf_start;
-		working_bytes -= buf_offset;
-	} else {
-		buf_offset = 0;
-	}
-	current_buf_start = buf_start;
+		/* Haven't reached the bvec range, exit */
+		if (buf_file_offset + buf_len <= bvec_file_offset)
+			return 1;
 
-	/* copy bytes from the working buffer into the pages */
-	while (working_bytes > 0) {
-		bytes = min_t(unsigned long, bvec.bv_len,
-				PAGE_SIZE - (buf_offset % PAGE_SIZE));
-		bytes = min(bytes, working_bytes);
-
-		memcpy_to_page(bvec.bv_page, bvec.bv_offset, buf + buf_offset,
-			       bytes);
-		flush_dcache_page(bvec.bv_page);
-
-		buf_offset += bytes;
-		working_bytes -= bytes;
-		current_buf_start += bytes;
-
-		/* check if we need to pick another page */
-		bio_advance(bio, bytes);
-		if (!bio->bi_iter.bi_size)
-			return 0;
-		bvec = bio_iter_iovec(bio, bio->bi_iter);
-		prev_start_byte = start_byte;
-		start_byte = page_offset(bvec.bv_page) - disk_start;
+		copy_start_file_offset = max(bvec_file_offset, cur_file_offset);
+		copy_len = min(bvec_file_offset + bvec.bv_len,
+			       buf_file_offset + buf_len) -
+			   copy_start_file_offset;
+		ASSERT(copy_len);
+		ASSERT(copy_len <= buf_file_offset + buf_len -
+				   copy_start_file_offset);
 
 		/*
-		 * We need to make sure we're only adjusting
-		 * our offset into compression working buffer when
-		 * we're switching pages.  Otherwise we can incorrectly
-		 * keep copying when we were actually done.
+		 * Extra range check to ensure we didn't go beyond
+		 * @buf + @buf_len.
+		 *
+		 * (copy_start_file_offset - orig_file_offset) is the offset
+		 * inside the full decompressed extent.
+		 * then (- decompressed) we got the offset inside the
+		 * decompressed data @buf, which should not exceed @buf_len.
 		 */
-		if (start_byte != prev_start_byte) {
-			/*
-			 * make sure our new page is covered by this
-			 * working buffer
-			 */
-			if (total_out <= start_byte)
-				return 1;
+		offset_inside_decompressed_buf = copy_start_file_offset -
+						 orig_file_offset -
+						 decompressed;
+		ASSERT(offset_inside_decompressed_buf < buf_len);
+		memcpy_to_page(bvec.bv_page, bvec.bv_offset,
+			       buf + offset_inside_decompressed_buf,
+			       copy_len);
+		cur_file_offset += copy_len;
 
-			/*
-			 * the next page in the biovec might not be adjacent
-			 * to the last page, but it might still be found
-			 * inside this working buffer. bump our offset pointer
-			 */
-			if (total_out > start_byte &&
-			    current_buf_start < start_byte) {
-				buf_offset = start_byte - buf_start;
-				working_bytes = total_out - start_byte;
-				current_buf_start = buf_start + buf_offset;
-			}
+		/* Check if we need to advanced to next bvec */
+		if (cur_file_offset >= bvec_file_offset + bvec.bv_len) {
+			bio_advance(orig_bio, copy_len);
+			/* Finished the bio */
+			if (!orig_bio->bi_iter.bi_size)
+				return 0;
 		}
 	}
-
 	return 1;
 }
 
