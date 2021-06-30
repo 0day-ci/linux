@@ -527,6 +527,10 @@ static inline bool tdp_mmu_set_spte_atomic_no_dirty_log(struct kvm *kvm,
 	if (is_removed_spte(iter->old_spte))
 		return false;
 
+	/*
+	 * TDP MMU sptes can also be concurrently cmpxchg'd in
+	 * fast_pf_fix_direct_spte as part of fast_page_fault.
+	 */
 	if (cmpxchg64(rcu_dereference(iter->sptep), iter->old_spte,
 		      new_spte) != iter->old_spte)
 		return false;
@@ -1545,4 +1549,36 @@ int kvm_tdp_mmu_get_walk_lockless(struct kvm_vcpu *vcpu, u64 addr, u64 *sptes,
 	}
 
 	return leaf;
+}
+
+/*
+ * Must be called between kvm_tdp_mmu_walk_shadow_page_lockless_{begin,end}.
+ *
+ * The returned sptep must not be used after
+ * kvm_tdp_mmu_walk_shadow_page_lockless_end.
+ */
+u64 *kvm_tdp_mmu_get_last_sptep_lockless(struct kvm_vcpu *vcpu, u64 addr,
+					 u64 *spte)
+{
+	struct tdp_iter iter;
+	struct kvm_mmu *mmu = vcpu->arch.mmu;
+	gfn_t gfn = addr >> PAGE_SHIFT;
+	tdp_ptep_t sptep = NULL;
+
+	tdp_mmu_for_each_pte(iter, mmu, gfn, gfn + 1) {
+		*spte = iter.old_spte;
+		sptep = iter.sptep;
+	}
+
+	if (sptep)
+		/*
+		 * Perform the rcu dereference here since we are passing the
+		 * sptep up to the generic MMU code which does not know the
+		 * synchronization details of the TDP MMU. This is safe as long
+		 * as the caller obeys the contract that the sptep is not used
+		 * after kvm_tdp_mmu_walk_shadow_page_lockless_end.
+		 */
+		return rcu_dereference(sptep);
+
+	return NULL;
 }
