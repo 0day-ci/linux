@@ -22,6 +22,7 @@
 #include <linux/vmalloc.h>
 
 #include <drm/page_pool.h>
+#include "deferred-free-helper.h"
 
 static struct dma_heap *sys_heap;
 
@@ -33,6 +34,7 @@ struct system_heap_buffer {
 	struct sg_table sg_table;
 	int vmap_cnt;
 	void *vaddr;
+	struct deferred_freelist_item deferred_free;
 };
 
 struct dma_heap_attachment {
@@ -289,25 +291,39 @@ static void system_heap_free_pages(struct drm_page_pool *pool, struct page *p)
 	__free_pages(p, pool->order);
 }
 
-static void system_heap_dma_buf_release(struct dma_buf *dmabuf)
+static void system_heap_buf_free(struct deferred_freelist_item *item,
+				 enum df_reason reason)
 {
-	struct system_heap_buffer *buffer = dmabuf->priv;
+	struct system_heap_buffer *buffer;
 	struct sg_table *table;
 	struct scatterlist *sg;
 	int i, j;
 
+	buffer = container_of(item, struct system_heap_buffer, deferred_free);
 	table = &buffer->sg_table;
 	for_each_sg(table->sgl, sg, table->nents, i) {
 		struct page *page = sg_page(sg);
 
-		for (j = 0; j < NUM_ORDERS; j++) {
-			if (compound_order(page) == orders[j])
-				break;
+		if (reason == DF_UNDER_PRESSURE) {
+			__free_pages(page, compound_order(page));
+		} else {
+			for (j = 0; j < NUM_ORDERS; j++) {
+				if (compound_order(page) == orders[j])
+					break;
+			}
+			drm_page_pool_add(&pools[j], page);
 		}
-		drm_page_pool_add(&pools[j], page);
 	}
 	sg_free_table(table);
 	kfree(buffer);
+}
+
+static void system_heap_dma_buf_release(struct dma_buf *dmabuf)
+{
+	struct system_heap_buffer *buffer = dmabuf->priv;
+	int npages = PAGE_ALIGN(buffer->len) / PAGE_SIZE;
+
+	deferred_free(&buffer->deferred_free, system_heap_buf_free, npages);
 }
 
 static const struct dma_buf_ops system_heap_buf_ops = {
