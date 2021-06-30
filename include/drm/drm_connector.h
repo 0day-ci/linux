@@ -649,6 +649,24 @@ struct drm_tv_connector_state {
 };
 
 /**
+ * enum drm_mode_color_range - color_range info for &drm_connector
+ *
+ * This enum is used to represent full or limited color range on the display
+ * connector signal.
+ *
+ * @DRM_MODE_COLOR_RANGE_UNSET:		 Color range is unspecified/default.
+ * @DRM_MODE_COLOR_RANGE_FULL:		 Color range is full range, 0-255 for
+ *					 8-Bit color depth.
+ * @DRM_MODE_COLOR_RANGE_LIMITED_16_235: Color range is limited range, 16-235
+ *					 for 8-Bit color depth.
+ */
+enum drm_mode_color_range {
+	DRM_MODE_COLOR_RANGE_UNSET,
+	DRM_MODE_COLOR_RANGE_FULL,
+	DRM_MODE_COLOR_RANGE_LIMITED_16_235,
+};
+
+/**
  * struct drm_connector_state - mutable connector state
  */
 struct drm_connector_state {
@@ -1392,6 +1410,12 @@ struct drm_connector {
 	 */
 	struct drm_property *active_color_format_property;
 
+	/**
+	 * @active_color_range_property: Default connector property for the
+	 * active color range to be driven out of the connector.
+	 */
+	struct drm_property *active_color_range_property;
+
 #define DRM_CONNECTOR_POLL_HPD (1 << 0)
 #define DRM_CONNECTOR_POLL_CONNECT (1 << 1)
 #define DRM_CONNECTOR_POLL_DISCONNECT (1 << 2)
@@ -1719,6 +1743,9 @@ void drm_connector_set_active_bpc_property(struct drm_connector *connector, int 
 int drm_connector_attach_active_color_format_property(struct drm_connector *connector);
 void drm_connector_set_active_color_format_property(struct drm_connector *connector,
 						    u32 active_color_format);
+int drm_connector_attach_active_color_range_property(struct drm_connector *connector);
+void drm_connector_set_active_color_range_property(struct drm_connector *connector,
+						   enum drm_mode_color_range active_color_range);
 
 /**
  * struct drm_tile_group - Tile group metadata

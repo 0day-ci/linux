@@ -897,6 +897,12 @@ static const struct drm_prop_enum_list drm_active_color_format_enum_list[] = {
 	{ DRM_COLOR_FORMAT_YCRCB420, "ycbcr420" },
 };
 
+static const struct drm_prop_enum_list drm_active_color_range_enum_list[] = {
+	{ DRM_MODE_COLOR_RANGE_UNSET, "Not Applicable" },
+	{ DRM_MODE_COLOR_RANGE_FULL, "Full" },
+	{ DRM_MODE_COLOR_RANGE_LIMITED_16_235, "Limited 16:235" },
+};
+
 DRM_ENUM_NAME_FN(drm_get_dp_subconnector_name,
 		 drm_dp_subconnector_enum_list)
 
@@ -1222,6 +1228,15 @@ static const struct drm_prop_enum_list dp_colorspaces[] = {
  *	drm_connector_attach_active_color_format_property() to install this
  *	property. Possible values are "not applicable", "rgb", "ycbcr444",
  *	"ycbcr422", and "ycbcr420".
+ *
+ * active color range:
+ *	This read-only property tells userspace the color range actually used by
+ *	the hardware display engine "on the cable" on a connector. The chosen
+ *	value depends on hardware capabilities of the monitor and the used color
+ *	format. Drivers shall use
+ *	drm_connector_attach_active_color_range_property() to install this
+ *	property. Possible values are "Not Applicable", "Full", and "Limited
+ *	16:235".
  *
  * Connectors also have one standardized atomic property:
  *
@@ -2267,6 +2282,52 @@ void drm_connector_set_active_color_format_property(struct drm_connector *connec
 				      active_color_format);
 }
 EXPORT_SYMBOL(drm_connector_set_active_color_format_property);
+
+/**
+ * drm_connector_attach_active_color_range_property - attach "active color range" property
+ * @connector: connector to attach active color range property on.
+ *
+ * This is used to check the applied color range on a connector.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_connector_attach_active_color_range_property(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_property *prop;
+
+	if (!connector->active_color_range_property) {
+		prop = drm_property_create_enum(dev, DRM_MODE_PROP_IMMUTABLE, "active color range",
+						drm_active_color_range_enum_list,
+						ARRAY_SIZE(drm_active_color_range_enum_list));
+		if (!prop)
+			return -ENOMEM;
+
+		connector->active_color_range_property = prop;
+	}
+
+	drm_object_attach_property(&connector->base, prop, DRM_MODE_COLOR_RANGE_UNSET);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_connector_attach_active_color_range_property);
+
+/**
+ * drm_connector_set_active_color_range_property - sets the active color range property for a
+ * connector
+ * @connector: drm connector
+ * @active_color_range: color range for the connector currently active "on the cable"
+ *
+ * Should be used by atomic drivers to update the active color range over a connector.
+ */
+void drm_connector_set_active_color_range_property(struct drm_connector *connector,
+						   enum drm_mode_color_range active_color_range)
+{
+	drm_object_property_set_value(&connector->base, connector->active_color_range_property,
+				      active_color_range);
+}
+EXPORT_SYMBOL(drm_connector_set_active_color_range_property);
 
 /**
  * drm_connector_attach_hdr_output_metadata_property - attach "HDR_OUTPUT_METADA" property
