@@ -18,6 +18,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_connector.h>
 #include <drm/drm_encoder.h>
+#include "loongson_i2c.h"
 
 /* General customization:
  */
@@ -28,6 +29,7 @@
 
 #define to_loongson_crtc(x) container_of(x, struct loongson_crtc, base)
 #define to_loongson_encoder(x) container_of(x, struct loongson_encoder, base)
+#define to_loongson_connector(x) container_of(x, struct loongson_connector, base)
 
 #define LS7A_CHIPCFG_REG_BASE (0x10010000)
 #define PCI_DEVICE_ID_LOONGSON_DC 0x7a06
@@ -92,8 +94,10 @@ struct loongson_encoder {
 struct loongson_connector {
 	struct drm_connector base;
 	struct loongson_device *ldev;
+	struct loongson_i2c *i2c;
 	u16 id;
 	u32 type;
+	u16 i2c_id;
 };
 
 struct loongson_mode_info {
@@ -115,6 +119,9 @@ struct loongson_device {
 	u32 num_crtc;
 	struct loongson_mode_info mode_info[2];
 	struct pci_dev *gpu_pdev; /* LS7A gpu device info */
+
+	struct loongson_i2c i2c_bus[LS_MAX_I2C_BUS];
+	struct gpio_chip chip;
 };
 
 /* crtc */
@@ -128,6 +135,9 @@ int loongson_encoder_init(struct loongson_device *ldev, int index);
 
 /* plane */
 int loongson_plane_init(struct loongson_crtc *lcrtc);
+
+/* i2c */
+int loongson_dc_gpio_init(struct loongson_device *ldev);
 
 /* device */
 u32 loongson_gpu_offset(struct drm_plane_state *state);
