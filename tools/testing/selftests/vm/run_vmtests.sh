@@ -346,4 +346,20 @@ else
 	exitcode=1
 fi
 
+echo "------------------------------------"
+echo "running KSM tests"
+echo "------------------------------------"
+./ksm_tests
+ret_val=$?
+
+if [ $ret_val -eq 0 ]; then
+	echo "[PASS]"
+elif [ $ret_val -eq $ksft_skip ]; then
+	echo "[SKIP]"
+	exitcode=$ksft_skip
+else
+	echo "[FAIL]"
+	exitcode=1
+fi
+
 exit $exitcode
