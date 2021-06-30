@@ -232,7 +232,7 @@ static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 	 * And bypass I/O abort, reset and bus suspend operations.
 	 */
 	if (sdio_is_io_busy(mrq->cmd->opcode, mrq->cmd->arg) &&
-	    host->ops->card_busy) {
+	    mmc_hw_busy_detect(host)) {
 		int tries = 500; /* Wait aprox 500ms at maximum */
 
 		while (host->ops->card_busy(host) && --tries)
@@ -1197,7 +1197,7 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 	 */
 	if (!host->ops->start_signal_voltage_switch)
 		return -EPERM;
-	if (!host->ops->card_busy)
+	if (!mmc_hw_busy_detect(host))
 		pr_warn("%s: cannot verify signal voltage switch\n",
 			mmc_hostname(host));
 
@@ -1217,7 +1217,7 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 	 * after the response of cmd11, but wait 1 ms to be sure
 	 */
 	mmc_delay(1);
-	if (host->ops->card_busy && !host->ops->card_busy(host)) {
+	if (mmc_hw_busy_detect(host) && !host->ops->card_busy(host)) {
 		err = -EAGAIN;
 		goto power_cycle;
 	}
@@ -1238,7 +1238,7 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 	 * Failure to switch is indicated by the card holding
 	 * dat[0:3] low
 	 */
-	if (host->ops->card_busy && host->ops->card_busy(host))
+	if (mmc_hw_busy_detect(host) && host->ops->card_busy(host))
 		err = -EAGAIN;
 
 power_cycle:

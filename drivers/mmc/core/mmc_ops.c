@@ -431,7 +431,7 @@ static int mmc_busy_status(struct mmc_card *card, bool retry_crc_err,
 	u32 status = 0;
 	int err;
 
-	if (host->ops->card_busy) {
+	if (mmc_hw_busy_detect(host)) {
 		*busy = host->ops->card_busy(host);
 		return 0;
 	}
@@ -480,7 +480,7 @@ static int __mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
 	 * capable of polling by using ->card_busy(), then rely on waiting the
 	 * stated timeout to be sufficient.
 	 */
-	if (!send_status && !host->ops->card_busy) {
+	if (!send_status && mmc_hw_busy_detect(host)) {
 		mmc_delay(timeout_ms);
 		return 0;
 	}

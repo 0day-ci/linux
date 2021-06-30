@@ -347,6 +347,24 @@ static int mmci_card_busy(struct mmc_host *mmc)
 	return busy;
 }
 
+/* Use this if the MMCI variant AND the card supports it */
+static bool mmci_use_busy_detect(struct mmci_host *host)
+{
+	struct mmc_card *card = host->mmc->card;
+
+	if (!host->variant->busy_detect)
+		return false;
+
+	/* We don't allow this until we know that the card can handle it */
+	if (!card)
+		return false;
+
+	if (card->quirks & MMC_QUIRK_BROKEN_HW_BUSY_DETECT)
+		return false;
+
+	return true;
+}
+
 static void mmci_reg_delay(struct mmci_host *host)
 {
 	/*
@@ -1381,7 +1399,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 		return;
 
 	/* Handle busy detection on DAT0 if the variant supports it. */
-	if (busy_resp && host->variant->busy_detect)
+	if (busy_resp && mmci_use_busy_detect(host))
 		if (!host->ops->busy_complete(host, status, err_msk))
 			return;
 
@@ -1725,7 +1743,7 @@ static void mmci_set_max_busy_timeout(struct mmc_host *mmc)
 	struct mmci_host *host = mmc_priv(mmc);
 	u32 max_busy_timeout = 0;
 
-	if (!host->variant->busy_detect)
+	if (!mmci_use_busy_detect(host))
 		return;
 
 	if (host->variant->busy_timeout && mmc->actual_clock)
