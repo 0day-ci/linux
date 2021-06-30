@@ -146,15 +146,17 @@ struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
 	if (obj && obj->id != id)
 		obj = NULL;
 
-	if (obj && drm_mode_object_lease_required(obj->type) &&
-	    !_drm_lease_held(file_priv, obj->id))
-		obj = NULL;
-
 	if (obj && obj->free_cb) {
 		if (!kref_get_unless_zero(&obj->refcount))
 			obj = NULL;
 	}
 	mutex_unlock(&dev->mode_config.idr_mutex);
+
+	if (obj && drm_mode_object_lease_required(obj->type) &&
+		!_drm_lease_held(file_priv, obj->id)) {
+		drm_mode_object_put(obj);
+		obj = NULL;
+	}
 
 	return obj;
 }
