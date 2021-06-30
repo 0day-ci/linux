@@ -1106,6 +1106,43 @@ const struct device_type disk_type = {
 };
 
 #ifdef CONFIG_PROC_FS
+static void print_disk_stats(struct seq_file *seqf,
+			     unsigned int inflight, struct disk_stats *stat)
+{
+	seq_printf(seqf, "%lu %lu %lu %u "
+		   "%lu %lu %lu %u "
+		   "%u %u %u "
+		   "%lu %lu %lu %u "
+		   "%lu %u"
+		   "\n",
+		   stat->ios[STAT_READ],
+		   stat->merges[STAT_READ],
+		   stat->sectors[STAT_READ],
+		   (unsigned int)div_u64(stat->nsecs[STAT_READ],
+					 NSEC_PER_MSEC),
+		   stat->ios[STAT_WRITE],
+		   stat->merges[STAT_WRITE],
+		   stat->sectors[STAT_WRITE],
+		   (unsigned int)div_u64(stat->nsecs[STAT_WRITE],
+					 NSEC_PER_MSEC),
+		   inflight,
+		   jiffies_to_msecs(stat->io_ticks),
+		   (unsigned int)div_u64(stat->nsecs[STAT_READ] +
+					 stat->nsecs[STAT_WRITE] +
+					 stat->nsecs[STAT_DISCARD] +
+					 stat->nsecs[STAT_FLUSH],
+					 NSEC_PER_MSEC),
+		   stat->ios[STAT_DISCARD],
+		   stat->merges[STAT_DISCARD],
+		   stat->sectors[STAT_DISCARD],
+		   (unsigned int)div_u64(stat->nsecs[STAT_DISCARD],
+					 NSEC_PER_MSEC),
+		   stat->ios[STAT_FLUSH],
+		   (unsigned int)div_u64(stat->nsecs[STAT_FLUSH],
+					 NSEC_PER_MSEC)
+		);
+}
+
 /*
  * aggregate disk stat collector.  Uses the same stats that the sysfs
  * entries do, above, but makes them available through one seq_file.
@@ -1140,41 +1177,10 @@ static int diskstats_show(struct seq_file *seqf, void *v)
 		else
 			inflight = part_in_flight(hd);
 
-		seq_printf(seqf, "%4d %7d %s "
-			   "%lu %lu %lu %u "
-			   "%lu %lu %lu %u "
-			   "%u %u %u "
-			   "%lu %lu %lu %u "
-			   "%lu %u"
-			   "\n",
+		seq_printf(seqf, "%4d %7d %s ",
 			   MAJOR(hd->bd_dev), MINOR(hd->bd_dev),
-			   disk_name(gp, hd->bd_partno, buf),
-			   stat.ios[STAT_READ],
-			   stat.merges[STAT_READ],
-			   stat.sectors[STAT_READ],
-			   (unsigned int)div_u64(stat.nsecs[STAT_READ],
-							NSEC_PER_MSEC),
-			   stat.ios[STAT_WRITE],
-			   stat.merges[STAT_WRITE],
-			   stat.sectors[STAT_WRITE],
-			   (unsigned int)div_u64(stat.nsecs[STAT_WRITE],
-							NSEC_PER_MSEC),
-			   inflight,
-			   jiffies_to_msecs(stat.io_ticks),
-			   (unsigned int)div_u64(stat.nsecs[STAT_READ] +
-						 stat.nsecs[STAT_WRITE] +
-						 stat.nsecs[STAT_DISCARD] +
-						 stat.nsecs[STAT_FLUSH],
-							NSEC_PER_MSEC),
-			   stat.ios[STAT_DISCARD],
-			   stat.merges[STAT_DISCARD],
-			   stat.sectors[STAT_DISCARD],
-			   (unsigned int)div_u64(stat.nsecs[STAT_DISCARD],
-						 NSEC_PER_MSEC),
-			   stat.ios[STAT_FLUSH],
-			   (unsigned int)div_u64(stat.nsecs[STAT_FLUSH],
-						 NSEC_PER_MSEC)
-			);
+			   disk_name(gp, hd->bd_partno, buf));
+		print_disk_stats(seqf, inflight, &stat);
 	}
 	rcu_read_unlock();
 
