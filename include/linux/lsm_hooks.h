@@ -600,6 +600,14 @@
  *	Save open-time permission checking state for later use upon
  *	file_permission, and recheck access if anything has changed
  *	since inode_permission.
+ * @resolve_path_at:
+ *	Check path resolution from a file descriptor, or the current working
+ *      directory, or the current root directory.
+ *      Can be called in RCU read-side critical section.
+ *      @path_at points to the base path.
+ *      @file_at can point to the file descriptor used to resolve the path, or
+ *      be NULL for AT_FDCWD.
+ *      @lookup_flags contains the lookup options (e.g. LOOKUP_IS_SCOPED).
  *
  * Security hooks for task operations.
  *

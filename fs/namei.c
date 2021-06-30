@@ -2331,6 +2331,9 @@ static const char *path_init(struct nameidata *nd, unsigned flags)
 		error = nd_jump_root(nd);
 		if (unlikely(error))
 			return ERR_PTR(error);
+		error = security_resolve_path_at(&nd->path, NULL, flags);
+		if (error)
+			return ERR_PTR(error);
 		return s;
 	}
 
@@ -2350,6 +2353,9 @@ static const char *path_init(struct nameidata *nd, unsigned flags)
 			get_fs_pwd(current->fs, &nd->path);
 			nd->inode = nd->path.dentry->d_inode;
 		}
+		error = security_resolve_path_at(&nd->path, NULL, flags);
+		if (error)
+			return ERR_PTR(error);
 	} else {
 		/* Caller must check execute permissions on the starting path component */
 		struct fd f = fdget_raw(nd->dfd);
@@ -2373,7 +2379,10 @@ static const char *path_init(struct nameidata *nd, unsigned flags)
 			path_get(&nd->path);
 			nd->inode = nd->path.dentry->d_inode;
 		}
+		error = security_resolve_path_at(&nd->path, f.file, flags);
 		fdput(f);
+		if (error)
+			return ERR_PTR(error);
 	}
 
 	/* For scoped-lookups we need to set the root to the dirfd as well. */

@@ -1637,6 +1637,12 @@ int security_file_open(struct file *file)
 	return fsnotify_perm(file, MAY_OPEN);
 }
 
+int security_resolve_path_at(const struct path *path_at, struct file *file_at,
+		int lookup_flags)
+{
+	return call_int_hook(resolve_path_at, 0, path_at, file_at, lookup_flags);
+}
+
 int security_task_alloc(struct task_struct *task, unsigned long clone_flags)
 {
 	int rc = lsm_task_alloc(task);
