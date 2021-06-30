@@ -92,6 +92,17 @@ config BT_LEDS
 	  This option selects a few LED triggers for different
 	  Bluetooth events.
 
+config BT_OFFLOAD_CODECS
+	bool "Enable offload codecs"
+	depends on BT && BT_BREDR
+	default n
+	help
+	  This option enables offload codecs if controller supports.
+	  When this option is enabled, user space audio modules can
+	  query offload codecs and can set the codec to be used for
+	  specific use case.
+
+
 config BT_MSFTEXT
 	bool "Enable Microsoft extensions"
 	depends on BT

@@ -131,6 +131,19 @@ struct bdaddr_list {
 	u8 bdaddr_type;
 };
 
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+struct codec_list {
+	struct list_head list;
+	u8	id;
+	__le16	cid;
+	__le16	vid;
+	u8	transport;
+	u8	num_caps;
+	u32	len;
+	struct hci_codec_caps caps[];
+};
+#endif
+
 struct bdaddr_list_with_irk {
 	struct list_head list;
 	bdaddr_t bdaddr;
@@ -535,6 +548,9 @@ struct hci_dev {
 	struct list_head	pend_le_conns;
 	struct list_head	pend_le_reports;
 	struct list_head	blocked_keys;
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+	struct list_head	local_codecs;
+#endif
 
 	struct hci_dev_stats	stat;
 
@@ -1848,5 +1864,12 @@ void hci_copy_identity_address(struct hci_dev *hdev, bdaddr_t *bdaddr,
 #define SCO_AIRMODE_MASK       0x0003
 #define SCO_AIRMODE_CVSD       0x0000
 #define SCO_AIRMODE_TRANSP     0x0003
+
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+#define LOCAL_CODEC_ACL_MASK	BIT(0)
+#define LOCAL_CODEC_SCO_MASK	BIT(1)
+
+#define TRANSPORT_TYPE_MAX	0x04
+#endif
 
 #endif /* __HCI_CORE_H */
