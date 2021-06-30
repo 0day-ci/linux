@@ -25,6 +25,8 @@ ALL_TESTS="
 	redir_gre
 	redir_ipip
 	redir_sit
+	redir_ip6gre
+	redir_ip6tnl
 "
 
 NUM_NETIFS=0
@@ -315,6 +317,40 @@ redir_sit()
 
 	ping_test ipv4-mpls "SIT, external mode: IPv4 / MPLS / IPv4"
 	ping_test ipv6-mpls "SIT, external mode: IPv4 / MPLS / IPv6"
+	cleanup_tunnel
+}
+
+redir_ip6gre()
+{
+	setup_tunnel "ipv6" "classical" "ip6gre"
+	ping_test ipv4 "IP6GRE, classical mode: IPv6 / GRE / IPv4"
+	ping_test ipv6 "IP6GRE, classical mode: IPv6 / GRE / IPv6"
+	ping_test ipv4-mpls "IP6GRE, classical mode: IPv6 / GRE / MPLS / IPv4"
+	ping_test ipv6-mpls "IP6GRE, classical mode: IPv6 / GRE / MPLS / IPv6"
+	cleanup_tunnel
+
+	setup_tunnel "ipv6" "collect_md" "ip6gre" "external" "nocsum"
+	ping_test ipv4 "IP6GRE, external mode: IPv6 / GRE / IPv4"
+	ping_test ipv6 "IP6GRE, external mode: IPv6 / GRE / IPv6"
+	ping_test ipv4-mpls "IP6GRE, external mode: IPv6 / GRE / MPLS / IPv4"
+	ping_test ipv6-mpls "IP6GRE, external mode: IPv6 / GRE / MPLS / IPv6"
+	cleanup_tunnel
+}
+
+redir_ip6tnl()
+{
+	setup_tunnel "ipv6" "classical" "ip6tnl" "mode any"
+	ping_test ipv4 "IP6TNL, classical mode: IPv6 / IPv4"
+	ping_test ipv6 "IP6TNL, classical mode: IPv6 / IPv6"
+	ping_test ipv4-mpls "IP6TNL, classical mode: IPv6 / MPLS / IPv4"
+	ping_test ipv6-mpls "IP6TNL, classical mode: IPv6 / MPLS / IPv6"
+	cleanup_tunnel
+
+	setup_tunnel "ipv6" "collect_md" "ip6tnl" "mode any external"
+	ping_test ipv4 "IP6TNL, external mode: IPv6 / IPv4"
+	ping_test ipv6 "IP6TNL, external mode: IPv6 / IPv6"
+	ping_test ipv4-mpls "IP6TNL, external mode: IPv6 / MPLS / IPv4"
+	ping_test ipv6-mpls "IP6TNL, external mode: IPv6 / MPLS / IPv6"
 	cleanup_tunnel
 }
 
