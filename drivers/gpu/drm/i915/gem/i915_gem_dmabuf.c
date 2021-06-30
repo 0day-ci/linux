@@ -34,7 +34,14 @@ static struct sg_table *i915_gem_map_dma_buf(struct dma_buf_attachment *attachme
 	 * Let's pin it here to avoid having to call the move_notify
 	 * callback, The call of which is not yet implemented.
 	 */
-	ret = i915_gem_object_pin_pages(obj);
+	if (!i915_gem_object_can_migrate(obj, INTEL_REGION_SMEM))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	ret = i915_gem_object_migrate(obj, NULL, INTEL_REGION_SMEM);
+	if (!ret)
+		ret = i915_gem_object_wait_migration(obj, 0);
+	if (!ret)
+		ret = i915_gem_object_pin_pages(obj);
 	if (ret)
 		goto err;
 
@@ -180,9 +187,19 @@ retry:
 static int i915_gem_dmabuf_pin(struct dma_buf_attachment *attach)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(attach->dmabuf);
+	int ret;
 
 	assert_object_held(obj);
-	return i915_gem_object_pin_pages(obj);
+
+	if (!i915_gem_object_can_migrate(obj, INTEL_REGION_SMEM))
+		return -EOPNOTSUPP;
+	ret = i915_gem_object_migrate(obj, NULL, INTEL_REGION_SMEM);
+	if (!ret)
+		ret = i915_gem_object_wait_migration(obj, 0);
+	if (!ret)
+		ret = i915_gem_object_pin_pages(obj);
+
+	return ret;
 }
 
 static void i915_gem_dmabuf_unpin(struct dma_buf_attachment *attach)
