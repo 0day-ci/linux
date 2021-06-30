@@ -10789,7 +10789,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	BUG_ON(strlen(name) >= sizeof(dev->name));
 
 	if (txqs < 1) {
-		pr_err("alloc_netdev: Unable to allocate device with zero queues\n");
+		pr_err("alloc_netdev: Unable to allocate device with zero TX queues\n");
 		return NULL;
 	}
 
@@ -10798,14 +10798,12 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		return NULL;
 	}
 
-	alloc_size = sizeof(struct net_device);
+	/* ensure 32-byte alignment of struct net_device*/
+	alloc_size = ALIGN(sizeof(struct net_device), NETDEV_ALIGN);
 	if (sizeof_priv) {
 		/* ensure 32-byte alignment of private area */
-		alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
-		alloc_size += sizeof_priv;
+		alloc_size += ALIGN(sizeof_priv, NETDEV_ALIGN);
 	}
-	/* ensure 32-byte alignment of whole construct */
-	alloc_size += NETDEV_ALIGN - 1;
 
 	p = kvzalloc(alloc_size, GFP_KERNEL | __GFP_RETRY_MAYFAIL);
 	if (!p)
