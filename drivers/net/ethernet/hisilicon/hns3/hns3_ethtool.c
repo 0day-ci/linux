@@ -983,6 +983,7 @@ static struct hns3_enet_ring *hns3_backup_ringparam(struct hns3_nic_priv *priv)
 		memcpy(&tmp_rings[i], &priv->ring[i],
 		       sizeof(struct hns3_enet_ring));
 		tmp_rings[i].skb = NULL;
+		priv->ring[i].page_pool = NULL;
 	}
 
 	return tmp_rings;
