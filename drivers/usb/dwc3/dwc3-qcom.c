@@ -640,6 +640,25 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_OF
+static void dwc3_qcom_add_dt_props(struct device *dev, struct device_node *np)
+{
+	struct property		*prop;
+	int ret;
+
+	prop = devm_kzalloc(dev, sizeof(*prop), GFP_KERNEL);
+	if (prop) {
+		prop->name = "tx-fifo-resize";
+		ret = of_add_property(np, prop);
+		if (ret < 0)
+			dev_info(dev, "unable to add tx-fifo-resize prop\n");
+	}
+}
+#else
+static void dwc3_qcom_add_dt_props(struct device *dev, struct device_node *np)
+{ }
+#endif
+
 static int dwc3_qcom_of_register_core(struct platform_device *pdev)
 {
 	struct dwc3_qcom	*qcom = platform_get_drvdata(pdev);
@@ -652,6 +671,8 @@ static int dwc3_qcom_of_register_core(struct platform_device *pdev)
 		dev_err(dev, "failed to find dwc3 core child\n");
 		return -ENODEV;
 	}
+
+	dwc3_qcom_add_dt_props(dev, dwc3_np);
 
 	ret = of_platform_populate(np, NULL, NULL, dev);
 	if (ret) {
