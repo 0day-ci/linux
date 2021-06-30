@@ -132,6 +132,13 @@ struct intel_debug_features {
 	__u8    page1[16];
 } __packed;
 
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+struct intel_offload_usecases {
+	__u8	status;
+	__u8	preset[8];
+} __packed;
+#endif
+
 #define INTEL_HW_PLATFORM(cnvx_bt)	((u8)(((cnvx_bt) & 0x0000ff00) >> 8))
 #define INTEL_HW_VARIANT(cnvx_bt)	((u8)(((cnvx_bt) & 0x003f0000) >> 16))
 #define INTEL_CNVX_TOP_TYPE(cnvx_top)	((cnvx_top) & 0x00000fff)
@@ -175,6 +182,9 @@ int btintel_read_debug_features(struct hci_dev *hdev,
 				struct intel_debug_features *features);
 int btintel_set_debug_features(struct hci_dev *hdev,
 			       const struct intel_debug_features *features);
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+int btintel_configure_offload_usecases(struct hci_dev *hdev);
+#endif
 #else
 
 static inline int btintel_check_bdaddr(struct hci_dev *hdev)
@@ -307,4 +317,10 @@ static inline int btintel_set_debug_features(struct hci_dev *hdev,
 	return -EOPNOTSUPP;
 }
 
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+static int btintel_configure_offload_usecases(struct hci_dev *hdev)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 #endif
