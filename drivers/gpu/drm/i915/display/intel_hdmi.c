@@ -2505,6 +2505,7 @@ intel_hdmi_add_properties(struct intel_hdmi *intel_hdmi, struct drm_connector *c
 
 	intel_attach_force_audio_property(connector);
 	intel_attach_broadcast_rgb_property(connector);
+	drm_connector_attach_active_color_range_property(connector);
 	intel_attach_aspect_ratio_property(connector);
 
 	intel_attach_hdmi_colorspace_property(connector);
