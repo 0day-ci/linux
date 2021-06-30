@@ -6733,6 +6733,33 @@ static int convert_dc_pixel_encoding_into_drm_color_format(
 	return 0;
 }
 
+static int convert_dc_color_space_into_drm_mode_color_range(enum dc_color_space color_space)
+{
+	if (color_space == COLOR_SPACE_SRGB ||
+	    color_space == COLOR_SPACE_XR_RGB ||
+	    color_space == COLOR_SPACE_MSREF_SCRGB ||
+	    color_space == COLOR_SPACE_2020_RGB_FULLRANGE ||
+	    color_space == COLOR_SPACE_ADOBERGB ||
+	    color_space == COLOR_SPACE_DCIP3 ||
+	    color_space == COLOR_SPACE_DOLBYVISION ||
+	    color_space == COLOR_SPACE_YCBCR601 ||
+	    color_space == COLOR_SPACE_XV_YCC_601 ||
+	    color_space == COLOR_SPACE_YCBCR709 ||
+	    color_space == COLOR_SPACE_XV_YCC_709 ||
+	    color_space == COLOR_SPACE_2020_YCBCR ||
+	    color_space == COLOR_SPACE_YCBCR709_BLACK ||
+	    color_space == COLOR_SPACE_DISPLAYNATIVE ||
+	    color_space == COLOR_SPACE_APPCTRL ||
+	    color_space == COLOR_SPACE_CUSTOMPOINTS)
+		return DRM_MODE_COLOR_RANGE_FULL;
+	if (color_space == COLOR_SPACE_SRGB_LIMITED ||
+	    color_space == COLOR_SPACE_2020_RGB_LIMITEDRANGE ||
+	    color_space == COLOR_SPACE_YCBCR601_LIMITED ||
+	    color_space == COLOR_SPACE_YCBCR709_LIMITED)
+		return DRM_MODE_COLOR_RANGE_LIMITED_16_235;
+	return DRM_MODE_COLOR_RANGE_UNSET;
+}
+
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
 					  struct drm_connector_state *conn_state)
@@ -7735,6 +7762,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		drm_connector_attach_max_bpc_property(&aconnector->base, 8, 16);
 		drm_connector_attach_active_bpc_property(&aconnector->base, 8, 16);
 		drm_connector_attach_active_color_format_property(&aconnector->base);
+		drm_connector_attach_active_color_range_property(&aconnector->base);
 	}
 
 	/* This defaults to the max in the range, but we want 8bpc for non-edp. */
@@ -9123,10 +9151,15 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 				drm_connector_set_active_color_format_property(connector,
 					convert_dc_pixel_encoding_into_drm_color_format(
 						dm_new_crtc_state->stream->timing.pixel_encoding));
+				drm_connector_set_active_color_range_property(connector,
+					convert_dc_color_space_into_drm_mode_color_range(
+						dm_new_crtc_state->stream->output_color_space));
 			}
 		} else {
 			drm_connector_set_active_bpc_property(connector, 0);
 			drm_connector_set_active_color_format_property(connector, 0);
+			drm_connector_set_active_color_range_property(connector,
+								      DRM_MODE_COLOR_RANGE_UNSET);
 		}
 	}
 
