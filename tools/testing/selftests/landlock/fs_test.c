@@ -154,7 +154,13 @@ out:
 	return err;
 }
 
-static void prepare_layout(struct __test_metadata *const _metadata)
+struct layout_context {
+	int init_layout_cwd_fd;
+	int init_sandbox_cwd_fd;
+};
+
+static void prepare_layout(struct __test_metadata *const _metadata,
+		struct layout_context *const ctx)
 {
 	disable_caps(_metadata);
 	umask(0077);
@@ -171,10 +177,18 @@ static void prepare_layout(struct __test_metadata *const _metadata)
 	clear_cap(_metadata, CAP_SYS_ADMIN);
 
 	ASSERT_EQ(0, chdir(TMP_DIR));
+	ctx->init_layout_cwd_fd = open(".", O_DIRECTORY | O_CLOEXEC);
+	ASSERT_LE(0, ctx->init_layout_cwd_fd);
+	ctx->init_sandbox_cwd_fd = -1;
 }
 
-static void cleanup_layout(struct __test_metadata *const _metadata)
+static void cleanup_layout(struct __test_metadata *const _metadata,
+		const struct layout_context *const ctx)
 {
+	EXPECT_EQ(0, close(ctx->init_layout_cwd_fd));
+	if (ctx->init_sandbox_cwd_fd != -1) {
+		EXPECT_EQ(0, close(ctx->init_sandbox_cwd_fd));
+	}
 	EXPECT_EQ(0, chdir(".."));
 
 	set_cap(_metadata, CAP_SYS_ADMIN);
@@ -227,11 +241,12 @@ static void remove_layout1(struct __test_metadata *const _metadata)
 }
 
 FIXTURE(layout1) {
+	struct layout_context ctx;
 };
 
 FIXTURE_SETUP(layout1)
 {
-	prepare_layout(_metadata);
+	prepare_layout(_metadata, &self->ctx);
 
 	create_layout1(_metadata);
 }
@@ -240,7 +255,7 @@ FIXTURE_TEARDOWN(layout1)
 {
 	remove_layout1(_metadata);
 
-	cleanup_layout(_metadata);
+	cleanup_layout(_metadata, &self->ctx);
 }
 
 /*
@@ -264,10 +279,83 @@ static int test_open_rel(const int dirfd, const char *const path, const int flag
 	return 0;
 }
 
-static int test_open(const char *const path, const int flags)
+static int _test_open_all(const int base_fd, char *const path, const int flags)
 {
-	return test_open_rel(AT_FDCWD, path, flags);
+	int ret_child, i;
+
+	ret_child = test_open_rel(base_fd, path, flags);
+	if (ret_child == ENOENT)
+		return ret_child;
+
+	for (i = strlen(path); i > 0; i--) {
+		int inter_fd, ret_parent;
+
+		if (path[i] != '/')
+			continue;
+		path[i] = '\0';
+		/* Using a non-O_PATH FD fills the cache. */
+		inter_fd = openat(base_fd, path, O_CLOEXEC | O_DIRECTORY);
+		path[i] = '/';
+		if (inter_fd < 0) {
+			if (errno != EACCES)
+				return -1;
+			/* If the sandbox denies access, then use O_PATH. */
+			path[i] = '\0';
+			inter_fd = openat(base_fd, path, O_CLOEXEC |
+					O_DIRECTORY | O_PATH);
+			path[i] = '/';
+			if (inter_fd < 0)
+				return -1;
+		}
+
+		/*
+		 * Checks all possible inter_fd combinations with
+		 * recursive calls.
+		 */
+		ret_parent = _test_open_all(inter_fd, path + i + 1, flags);
+		close(inter_fd);
+
+		/* Checks inconsistencies that may come from the cache. */
+		if (ret_parent != ret_child)
+			return -1;
+	}
+	return ret_child;
 }
+
+static int _test_open_ctx(const struct layout_context *const ctx,
+		const char *const path, const int flags)
+{
+	char *walker;
+	int ret_init, ret_next, i;
+	/*
+	 * Checks with a FD opened without sandbox, and another FD opened
+	 * within a sandbox (but maybe not the same).
+	 */
+	const int extra_dirfd[] = {
+		ctx->init_layout_cwd_fd,
+		ctx->init_sandbox_cwd_fd
+	};
+
+	walker = strdup(path);
+	if (!walker)
+		return ENOMEM;
+
+	ret_init = _test_open_all(AT_FDCWD, walker, flags);
+	for (i = 0; i < ARRAY_SIZE(extra_dirfd); i++) {
+		const int dirfd = extra_dirfd[i];
+
+		if (dirfd != -1) {
+			ret_next = _test_open_all(dirfd, walker, flags);
+			if (ret_next != ret_init)
+				return -1;
+		}
+	}
+
+	free(walker);
+	return ret_init;
+}
+
+#define test_open(path, flags)	_test_open_ctx(&self->ctx, path, flags)
 
 TEST_F_FORK(layout1, no_restriction)
 {
@@ -493,14 +581,27 @@ static int create_ruleset(struct __test_metadata *const _metadata,
 	return ruleset_fd;
 }
 
-static void enforce_ruleset(struct __test_metadata *const _metadata,
-		const int ruleset_fd)
+static void _enforce_ruleset(struct layout_context *const ctx,
+		struct __test_metadata *const _metadata, const int ruleset_fd)
 {
 	ASSERT_EQ(0, prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
 	ASSERT_EQ(0, landlock_restrict_self(ruleset_fd, 0)) {
 		TH_LOG("Failed to enforce ruleset: %s", strerror(errno));
 	}
+
+	if (ctx->init_sandbox_cwd_fd == -1) {
+		ctx->init_sandbox_cwd_fd = open(".", O_DIRECTORY | O_CLOEXEC);
+		if (ctx->init_sandbox_cwd_fd == -1) {
+			ASSERT_EQ(EACCES, errno);
+			ctx->init_sandbox_cwd_fd = open(".", O_DIRECTORY |
+					O_CLOEXEC | O_PATH);
+			ASSERT_LE(0, ctx->init_sandbox_cwd_fd);
+		}
+	}
 }
+
+#define enforce_ruleset(_metadata, ruleset_fd)	\
+	_enforce_ruleset(&self->ctx, _metadata, ruleset_fd)
 
 TEST_F_FORK(layout1, proc_nsfs)
 {
@@ -1265,7 +1366,6 @@ TEST_F_FORK(layout1, rule_inside_mount_ns)
 	enforce_ruleset(_metadata, ruleset_fd);
 	ASSERT_EQ(0, close(ruleset_fd));
 
-	ASSERT_EQ(0, test_open("s3d3", O_RDONLY));
 	ASSERT_EQ(EACCES, test_open("/", O_RDONLY));
 }
 
@@ -1366,7 +1466,8 @@ enum relative_access {
 	REL_CHROOT_CHDIR,
 };
 
-static void test_relative_path(struct __test_metadata *const _metadata,
+static void _test_relative_path(struct __test_metadata *const _metadata,
+		FIXTURE_DATA(layout1) *const self,
 		const enum relative_access rel)
 {
 	/*
@@ -1478,6 +1579,8 @@ static void test_relative_path(struct __test_metadata *const _metadata,
 		ASSERT_EQ(0, close(dirfd));
 	ASSERT_EQ(0, close(ruleset_fd));
 }
+
+#define test_relative_path(_metadata, rel)	_test_relative_path(_metadata, self, rel)
 
 TEST_F_FORK(layout1, relative_open)
 {
@@ -1809,7 +1912,8 @@ TEST_F_FORK(layout1, remove_file)
 	ASSERT_EQ(0, unlinkat(AT_FDCWD, file1_s1d3, 0));
 }
 
-static void test_make_file(struct __test_metadata *const _metadata,
+static void _test_make_file(struct __test_metadata *const _metadata,
+		FIXTURE_DATA(layout1) *self,
 		const __u64 access, const mode_t mode, const dev_t dev)
 {
 	const struct rule rules[] = {
@@ -1859,6 +1963,10 @@ static void test_make_file(struct __test_metadata *const _metadata,
 	ASSERT_EQ(0, unlink(file2_s1d3));
 	ASSERT_EQ(0, rename(file1_s1d3, file2_s1d3));
 }
+
+#define test_make_file(_metadata, access, mode, dev)	\
+	_test_make_file(_metadata, self, access, mode, dev)
+
 
 TEST_F_FORK(layout1, make_char)
 {
@@ -2076,11 +2184,12 @@ TEST_F_FORK(layout1, proc_pipe)
 }
 
 FIXTURE(layout1_bind) {
+	struct layout_context ctx;
 };
 
 FIXTURE_SETUP(layout1_bind)
 {
-	prepare_layout(_metadata);
+	prepare_layout(_metadata, &self->ctx);
 
 	create_layout1(_metadata);
 
@@ -2097,7 +2206,7 @@ FIXTURE_TEARDOWN(layout1_bind)
 
 	remove_layout1(_metadata);
 
-	cleanup_layout(_metadata);
+	cleanup_layout(_metadata, &self->ctx);
 }
 
 static const char bind_dir_s1d3[] = "./s2d1/s2d2/s1d3";
@@ -2417,11 +2526,12 @@ static const char (*merge_sub_files[])[] = {
  */
 
 FIXTURE(layout2_overlay) {
+	struct layout_context ctx;
 };
 
 FIXTURE_SETUP(layout2_overlay)
 {
-	prepare_layout(_metadata);
+	prepare_layout(_metadata, &self->ctx);
 
 	create_directory(_metadata, LOWER_BASE);
 	set_cap(_metadata, CAP_SYS_ADMIN);
@@ -2484,7 +2594,7 @@ FIXTURE_TEARDOWN(layout2_overlay)
 	clear_cap(_metadata, CAP_SYS_ADMIN);
 	EXPECT_EQ(0, remove_path(MERGE_DATA));
 
-	cleanup_layout(_metadata);
+	cleanup_layout(_metadata, &self->ctx);
 }
 
 TEST_F_FORK(layout2_overlay, no_restriction)
