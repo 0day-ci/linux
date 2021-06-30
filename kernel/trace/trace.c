@@ -2460,7 +2460,7 @@ void trace_find_cmdline(int pid, char comm[])
 
 int trace_find_tgid(int pid)
 {
-	if (unlikely(!tgid_map || !pid || pid > PID_MAX_DEFAULT))
+	if (unlikely(!tgid_map || !pid || pid > PID_MAX_LIMIT))
 		return 0;
 
 	return tgid_map[pid];
@@ -2472,7 +2472,7 @@ static int trace_save_tgid(struct task_struct *tsk)
 	if (!tsk->pid)
 		return 1;
 
-	if (unlikely(!tgid_map || tsk->pid > PID_MAX_DEFAULT))
+	if (unlikely(!tgid_map || tsk->pid > PID_MAX_LIMIT))
 		return 0;
 
 	tgid_map[tsk->pid] = tsk->tgid;
@@ -5194,7 +5194,7 @@ int set_tracer_flag(struct trace_array *tr, unsigned int mask, int enabled)
 
 	if (mask == TRACE_ITER_RECORD_TGID) {
 		if (!tgid_map)
-			tgid_map = kvcalloc(PID_MAX_DEFAULT + 1,
+			tgid_map = kvcalloc(PID_MAX_LIMIT + 1,
 					   sizeof(*tgid_map),
 					   GFP_KERNEL);
 		if (!tgid_map) {
@@ -5610,7 +5610,7 @@ static void *saved_tgids_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	int pid = ++(*pos);
 
-	if (pid > PID_MAX_DEFAULT)
+	if (pid > PID_MAX_LIMIT)
 		return NULL;
 
 	return &tgid_map[pid];
@@ -5618,7 +5618,7 @@ static void *saved_tgids_next(struct seq_file *m, void *v, loff_t *pos)
 
 static void *saved_tgids_start(struct seq_file *m, loff_t *pos)
 {
-	if (!tgid_map || *pos > PID_MAX_DEFAULT)
+	if (!tgid_map || *pos > PID_MAX_LIMIT)
 		return NULL;
 
 	return &tgid_map[*pos];
