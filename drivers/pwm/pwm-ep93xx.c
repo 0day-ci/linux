@@ -61,7 +61,7 @@ static void ep93xx_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 static int ep93xx_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 			    const struct pwm_state *state)
 {
-	int ret;
+	int ret = 0;
 	struct ep93xx_pwm *ep93xx_pwm = to_ep93xx_pwm(chip);
 	bool enabled = state->enabled;
 
