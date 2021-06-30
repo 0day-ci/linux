@@ -937,11 +937,13 @@ int mmc_execute_tuning(struct mmc_card *card)
 
 	err = host->ops->execute_tuning(host, opcode);
 
-	if (err)
+	if (!err)
+		mmc_retune_enable(host);
+
+	/* Only print error when we don't check for card removal */
+	if (err && !host->detect_change)
 		pr_err("%s: tuning execution failed: %d\n",
 			mmc_hostname(host), err);
-	else
-		mmc_retune_enable(host);
 
 	return err;
 }
