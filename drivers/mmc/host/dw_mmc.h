@@ -230,6 +230,11 @@ struct dw_mci {
 	struct timer_list       cmd11_timer;
 	struct timer_list       cto_timer;
 	struct timer_list       dto_timer;
+
+#ifdef CONFIG_FAULT_INJECTION
+	struct fault_attr	fail_data_crc;
+	struct hrtimer		fault_timer;
+#endif
 };
 
 /* DMA ops for Internal/External DMAC interface */
