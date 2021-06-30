@@ -3,6 +3,7 @@
 #include <linux/compiler.h>
 #include <linux/string.h>
 #include <linux/zalloc.h>
+#include <linux/ctype.h>
 #include <subcmd/pager.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -741,6 +742,28 @@ struct pmu_events_map *__weak pmu_events_map__find(void)
 	return perf_pmu__find_map(NULL);
 }
 
+static bool perf_pmu__valid_suffix(char *tok, char *pmu_name)
+{
+	char *p;
+
+	/*
+	 * The pmu_name has substring tok. If the format of
+	 * pmu_name is tok or tok_digit, return true.
+	 */
+	p = pmu_name + strlen(tok);
+	if (*p == 0)
+		return true;
+
+	if (*p != '_')
+		return false;
+
+	++p;
+	if (*p == 0 || !isdigit(*p))
+		return false;
+
+	return true;
+}
+
 bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 {
 	char *tmp = NULL, *tok, *str;
@@ -769,7 +792,7 @@ bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 	 */
 	for (; tok; name += strlen(tok), tok = strtok_r(NULL, ",", &tmp)) {
 		name = strstr(name, tok);
-		if (!name) {
+		if (!name || !perf_pmu__valid_suffix(tok, (char *)name)) {
 			res = false;
 			goto out;
 		}
@@ -1884,6 +1907,9 @@ int perf_pmu__pattern_match(struct perf_pmu *pmu, char *pattern, char *tok)
 	}
 
 	if (fnmatch(pattern, name, 0))
+		return -1;
+
+	if (!perf_pmu__valid_suffix(tok, name))
 		return -1;
 
 	return 0;
