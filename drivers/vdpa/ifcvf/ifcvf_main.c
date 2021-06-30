@@ -442,6 +442,26 @@ static const struct vdpa_config_ops ifc_vdpa_ops = {
 	.set_config_cb  = ifcvf_vdpa_set_config_cb,
 };
 
+static u32 get_dev_type(struct pci_dev *pdev)
+{
+	u32 dev_type;
+
+	/* This drirver drives both modern virtio devices and transitional
+	 * devices in modern mode.
+	 * vDPA requires feature bit VIRTIO_F_ACCESS_PLATFORM,
+	 * so legacy devices and transitional devices in legacy
+	 * mode will not work for vDPA, this driver will not
+	 * drive devices with legacy interface.
+	 */
+
+	if (pdev->device < 0x1040)
+		dev_type =  pdev->subsystem_device;
+	else
+		dev_type =  pdev->device - 0x1040;
+
+	return dev_type;
+}
+
 static int ifcvf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct device *dev = &pdev->dev;
@@ -486,19 +506,7 @@ static int ifcvf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_set_drvdata(pdev, adapter);
 
 	vf = &adapter->vf;
-
-	/* This drirver drives both modern virtio devices and transitional
-	 * devices in modern mode.
-	 * vDPA requires feature bit VIRTIO_F_ACCESS_PLATFORM,
-	 * so legacy devices and transitional devices in legacy
-	 * mode will not work for vDPA, this driver will not
-	 * drive devices with legacy interface.
-	 */
-	if (pdev->device < 0x1040)
-		vf->dev_type =  pdev->subsystem_device;
-	else
-		vf->dev_type =  pdev->device - 0x1040;
-
+	vf->dev_type = get_dev_type(pdev);
 	vf->base = pcim_iomap_table(pdev);
 
 	adapter->pdev = pdev;
