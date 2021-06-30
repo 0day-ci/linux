@@ -621,6 +621,9 @@ struct hci_dev {
 	int (*set_bdaddr)(struct hci_dev *hdev, const bdaddr_t *bdaddr);
 	void (*cmd_timeout)(struct hci_dev *hdev);
 	bool (*prevent_wake)(struct hci_dev *hdev);
+#if IS_ENABLED(CONFIG_BT_OFFLOAD_CODECS)
+	int (*get_data_path_id)(struct hci_dev *hdev, __u8 *data_path);
+#endif
 };
 
 #define HCI_PHY_HANDLE(handle)	(handle & 0xff)
