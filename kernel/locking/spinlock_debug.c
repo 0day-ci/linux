@@ -12,6 +12,7 @@
 #include <linux/debug_locks.h>
 #include <linux/delay.h>
 #include <linux/export.h>
+#include <linux/stacktrace.h>
 
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key, short inner)
@@ -27,6 +28,7 @@ void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 	lock->magic = SPINLOCK_MAGIC;
 	lock->owner = SPINLOCK_OWNER_INIT;
 	lock->owner_cpu = -1;
+	lock->stack_len = 0;
 }
 
 EXPORT_SYMBOL(__raw_spin_lock_init);
@@ -65,6 +67,10 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 		owner ? task_pid_nr(owner) : -1,
 		READ_ONCE(lock->owner_cpu));
 	dump_stack();
+	if (!strcmp(msg, "recursion")) {
+		printk(KERN_EMERG "Stack at lock acquisition: \n");
+		stack_trace_print(lock->stack_trace, lock->stack_len, 0);
+	}
 }
 
 static void spin_bug(raw_spinlock_t *lock, const char *msg)
@@ -90,6 +96,8 @@ static inline void debug_spin_lock_after(raw_spinlock_t *lock)
 {
 	WRITE_ONCE(lock->owner_cpu, raw_smp_processor_id());
 	WRITE_ONCE(lock->owner, current);
+	lock->stack_len = stack_trace_save(lock->stack_trace,
+					   ARRAY_SIZE(lock->stack_trace), 0);
 }
 
 static inline void debug_spin_unlock(raw_spinlock_t *lock)
@@ -101,6 +109,7 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 							lock, "wrong CPU");
 	WRITE_ONCE(lock->owner, SPINLOCK_OWNER_INIT);
 	WRITE_ONCE(lock->owner_cpu, -1);
+	WRITE_ONCE(lock->stack_len, 0);
 }
 
 /*

@@ -22,6 +22,9 @@ typedef struct raw_spinlock {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned int magic, owner_cpu;
 	void *owner;
+#define MAX_STACK_LEN 16
+	int stack_len;
+	unsigned long stack_trace[MAX_STACK_LEN];
 #endif
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map dep_map;
