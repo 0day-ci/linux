@@ -215,7 +215,7 @@ static int vgem_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 	struct drm_gem_object *gem_object;
 	u64 pitch, size;
 
-	pitch = args->width * DIV_ROUND_UP(args->bpp, 8);
+	pitch = ALIGN(args->width * DIV_ROUND_UP(args->bpp, 8), 256);
 	size = args->height * pitch;
 	if (size == 0)
 		return -EINVAL;
