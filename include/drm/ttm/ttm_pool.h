@@ -30,6 +30,7 @@
 #include <linux/llist.h>
 #include <linux/spinlock.h>
 #include <drm/ttm/ttm_caching.h>
+#include <drm/page_pool.h>
 
 struct device;
 struct ttm_tt;
@@ -39,22 +40,15 @@ struct ttm_operation_ctx;
 /**
  * ttm_pool_type - Pool for a certain memory type
  *
- * @pool: the pool we belong to, might be NULL for the global ones
- * @order: the allocation order our pages have
+ * @pool: the ttm pool we belong to, might be NULL for the global ones
  * @caching: the caching type our pages have
- * @shrinker_list: our place on the global shrinker list
- * @lock: protection of the page list
- * @pages: the list of pages in the pool
+ * @subpool: the dma_page_pool that we use to manage the pages
  */
 struct ttm_pool_type {
 	struct ttm_pool *pool;
-	unsigned int order;
 	enum ttm_caching caching;
 
-	struct list_head shrinker_list;
-
-	spinlock_t lock;
-	struct list_head pages;
+	struct drm_page_pool subpool;
 };
 
 /**
