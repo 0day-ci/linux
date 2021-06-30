@@ -582,6 +582,8 @@ static void copy_huge_page(struct page *dst, struct page *src)
  */
 void migrate_page_states(struct page *newpage, struct page *page)
 {
+	struct folio *folio = page_folio(page);
+	struct folio *newfolio = page_folio(newpage);
 	int cpupid;
 
 	if (PageError(page))
@@ -646,7 +648,7 @@ void migrate_page_states(struct page *newpage, struct page *page)
 	copy_page_owner(page, newpage);
 
 	if (!PageHuge(page))
-		mem_cgroup_migrate(page, newpage);
+		mem_cgroup_migrate(folio, newfolio);
 }
 EXPORT_SYMBOL(migrate_page_states);
 
