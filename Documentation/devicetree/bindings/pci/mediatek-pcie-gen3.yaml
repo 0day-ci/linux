@@ -96,6 +96,12 @@ properties:
   phys:
     maxItems: 1
 
+  disable-dvfsrc-vlt-req:
+    description: Disable dvfsrc voltage request, if this property is presented,
+      we assume that the requested voltage is always higher enough to keep
+      the PCIe controller active.
+    type: boolean
+
   '#interrupt-cells':
     const: 1
 
@@ -165,6 +171,8 @@ examples:
             resets = <&infracfg_rst 2>,
                      <&infracfg_rst 3>;
             reset-names = "phy", "mac";
+
+            disable-dvfsrc-vlt-req;
 
             #interrupt-cells = <1>;
             interrupt-map-mask = <0 0 0 0x7>;
