@@ -4,9 +4,11 @@
 #define __LOONGSON_DRV_H__
 
 #include <drm/drm_drv.h>
-#include <drm/drm_gem.h>
-#include <drm/drm_fb_helper.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_vblank.h>
+#include <drm/drm_gem.h>
+#include <drm/drm_irq.h>
+#include <drm/drm_fb_helper.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -49,6 +51,7 @@
 #define FB_HSYNC_REG (0x1420)
 #define FB_VDISPLAY_REG (0x1480)
 #define FB_VSYNC_REG (0x14a0)
+#define FB_INT_REG (0x1570)
 
 #define CFG_FMT GENMASK(2, 0)
 #define CFG_FBSWITCH BIT(7)
@@ -60,6 +63,10 @@
 #define FB_PANCFG_DEF 0x80001311
 #define FB_HSYNC_PULSE (1 << 30)
 #define FB_VSYNC_PULSE (1 << 30)
+#define FB_VSYNC1_ENABLE (1 << 16)
+#define FB_VSYNC0_ENABLE (1 << 18)
+#define FB_VSYNC1_INT (1 << 0)
+#define FB_VSYNC0_INT (1 << 2)
 
 /* PIX PLL */
 #define LOOPC_MIN 24
@@ -135,6 +142,14 @@ int loongson_encoder_init(struct loongson_device *ldev, int index);
 
 /* plane */
 int loongson_plane_init(struct loongson_crtc *lcrtc);
+
+/* irq */
+int loongson_irq_init(struct loongson_device *ldev);
+int loongson_crtc_enable_vblank(struct drm_crtc *crtc);
+void loongson_crtc_disable_vblank(struct drm_crtc *crtc);
+irqreturn_t loongson_irq_handler(int irq, void *arg);
+void loongson_irq_preinstall(struct drm_device *dev);
+void loongson_irq_uninstall(struct drm_device *dev);
 
 /* i2c */
 int loongson_dc_gpio_init(struct loongson_device *ldev);
