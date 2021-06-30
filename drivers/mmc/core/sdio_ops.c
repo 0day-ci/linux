@@ -6,6 +6,7 @@
  */
 
 #include <linux/scatterlist.h>
+#include <linux/sched/task_stack.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -124,6 +125,7 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	int err;
 
 	WARN_ON(blksz == 0);
+	WARN_ON_ONCE(is_vmalloc_or_module_addr(buf) || object_is_on_stack(buf));
 
 	/* sanity check */
 	if (addr & ~0x1FFFF)
