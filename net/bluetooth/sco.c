@@ -964,6 +964,11 @@ static int sco_sock_setsockopt(struct socket *sock, int level, int optname,
 			break;
 		}
 
+		if (!hci_dev_test_flag(hdev, HCI_OFFLOAD_CODECS_ENABLED)) {
+			err = -EOPNOTSUPP;
+			break;
+		}
+
 		if (!hdev->get_codec_config_data) {
 			err = -EOPNOTSUPP;
 			break;
@@ -1160,6 +1165,11 @@ static int sco_sock_getsockopt(struct socket *sock, int level, int optname,
 		hdev = hci_get_route(&sco_pi(sk)->dst, &sco_pi(sk)->src, BDADDR_BREDR);
 		if (!hdev) {
 			err = -EBADFD;
+			break;
+		}
+
+		if (!hci_dev_test_flag(hdev, HCI_OFFLOAD_CODECS_ENABLED)) {
+			err = -EOPNOTSUPP;
 			break;
 		}
 
