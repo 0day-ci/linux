@@ -264,6 +264,11 @@ static inline bool bpf_capable(void)
 	return capable(CAP_BPF) || capable(CAP_SYS_ADMIN);
 }
 
+static inline bool kill_capable(void)
+{
+	return capable(CAP_KILL) || capable(CAP_SYS_ADMIN);
+}
+
 static inline bool checkpoint_restore_ns_capable(struct user_namespace *ns)
 {
 	return ns_capable(ns, CAP_CHECKPOINT_RESTORE) ||
