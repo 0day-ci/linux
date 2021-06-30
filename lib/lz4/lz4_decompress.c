@@ -234,7 +234,7 @@ static FORCE_INLINE int LZ4_decompress_generic(
 					length = oend - op;
 				}
 				if ((endOnInput)
-					&& (ip + length > iend)) {
+					&& (ip + length >= iend)) {
 					/*
 					 * Error :
 					 * read attempt beyond
