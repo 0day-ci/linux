@@ -23,31 +23,31 @@
 #include "common.h"
 
 #define TMP_DIR		"tmp"
-#define BINARY_PATH	"./true"
+#define BINARY_PATH	"../true"
 
 /* Paths (sibling number and depth) */
-static const char dir_s1d1[] = TMP_DIR "/s1d1";
-static const char file1_s1d1[] = TMP_DIR "/s1d1/f1";
-static const char file2_s1d1[] = TMP_DIR "/s1d1/f2";
-static const char dir_s1d2[] = TMP_DIR "/s1d1/s1d2";
-static const char file1_s1d2[] = TMP_DIR "/s1d1/s1d2/f1";
-static const char file2_s1d2[] = TMP_DIR "/s1d1/s1d2/f2";
-static const char dir_s1d3[] = TMP_DIR "/s1d1/s1d2/s1d3";
-static const char file1_s1d3[] = TMP_DIR "/s1d1/s1d2/s1d3/f1";
-static const char file2_s1d3[] = TMP_DIR "/s1d1/s1d2/s1d3/f2";
+static const char dir_s1d1[] = "./s1d1";
+static const char file1_s1d1[] = "./s1d1/f1";
+static const char file2_s1d1[] = "./s1d1/f2";
+static const char dir_s1d2[] = "./s1d1/s1d2";
+static const char file1_s1d2[] = "./s1d1/s1d2/f1";
+static const char file2_s1d2[] = "./s1d1/s1d2/f2";
+static const char dir_s1d3[] = "./s1d1/s1d2/s1d3";
+static const char file1_s1d3[] = "./s1d1/s1d2/s1d3/f1";
+static const char file2_s1d3[] = "./s1d1/s1d2/s1d3/f2";
 
-static const char dir_s2d1[] = TMP_DIR "/s2d1";
-static const char file1_s2d1[] = TMP_DIR "/s2d1/f1";
-static const char dir_s2d2[] = TMP_DIR "/s2d1/s2d2";
-static const char file1_s2d2[] = TMP_DIR "/s2d1/s2d2/f1";
-static const char dir_s2d3[] = TMP_DIR "/s2d1/s2d2/s2d3";
-static const char file1_s2d3[] = TMP_DIR "/s2d1/s2d2/s2d3/f1";
-static const char file2_s2d3[] = TMP_DIR "/s2d1/s2d2/s2d3/f2";
+static const char dir_s2d1[] = "./s2d1";
+static const char file1_s2d1[] = "./s2d1/f1";
+static const char dir_s2d2[] = "./s2d1/s2d2";
+static const char file1_s2d2[] = "./s2d1/s2d2/f1";
+static const char dir_s2d3[] = "./s2d1/s2d2/s2d3";
+static const char file1_s2d3[] = "./s2d1/s2d2/s2d3/f1";
+static const char file2_s2d3[] = "./s2d1/s2d2/s2d3/f2";
 
-static const char dir_s3d1[] = TMP_DIR "/s3d1";
+static const char dir_s3d1[] = "./s3d1";
 /* dir_s3d2 is a mount point. */
-static const char dir_s3d2[] = TMP_DIR "/s3d1/s3d2";
-static const char dir_s3d3[] = TMP_DIR "/s3d1/s3d2/s3d3";
+static const char dir_s3d2[] = "./s3d1/s3d2";
+static const char dir_s3d3[] = "./s3d1/s3d2/s3d3";
 
 /*
  * layout1 hierarchy:
@@ -140,11 +140,12 @@ static int remove_path(const char *const path)
 		walker[i] = '\0';
 		ret = rmdir(walker);
 		if (ret) {
-			if (errno != ENOTEMPTY && errno != EBUSY)
+			if (errno != ENOTEMPTY && errno != EBUSY
+					&& errno != EINVAL)
 				err = errno;
 			goto out;
 		}
-		if (strcmp(walker, TMP_DIR) == 0)
+		if (strcmp(walker, ".") == 0)
 			goto out;
 	}
 
@@ -168,10 +169,14 @@ static void prepare_layout(struct __test_metadata *const _metadata)
 	ASSERT_EQ(0, mount("tmp", TMP_DIR, "tmpfs", 0, "size=4m,mode=700"));
 	ASSERT_EQ(0, mount(NULL, TMP_DIR, NULL, MS_PRIVATE | MS_REC, NULL));
 	clear_cap(_metadata, CAP_SYS_ADMIN);
+
+	ASSERT_EQ(0, chdir(TMP_DIR));
 }
 
 static void cleanup_layout(struct __test_metadata *const _metadata)
 {
+	EXPECT_EQ(0, chdir(".."));
+
 	set_cap(_metadata, CAP_SYS_ADMIN);
 	EXPECT_EQ(0, umount(TMP_DIR));
 	clear_cap(_metadata, CAP_SYS_ADMIN);
@@ -1370,7 +1375,7 @@ static void test_relative_path(struct __test_metadata *const _metadata,
 	 */
 	const struct rule layer1_base[] = {
 		{
-			.path = TMP_DIR,
+			.path = ".",
 			.access = ACCESS_RO,
 		},
 		{}
@@ -2095,8 +2100,8 @@ FIXTURE_TEARDOWN(layout1_bind)
 	cleanup_layout(_metadata);
 }
 
-static const char bind_dir_s1d3[] = TMP_DIR "/s2d1/s2d2/s1d3";
-static const char bind_file1_s1d3[] = TMP_DIR "/s2d1/s2d2/s1d3/f1";
+static const char bind_dir_s1d3[] = "./s2d1/s2d2/s1d3";
+static const char bind_file1_s1d3[] = "./s2d1/s2d2/s1d3/f1";
 
 /*
  * layout1_bind hierarchy:
@@ -2282,7 +2287,7 @@ TEST_F_FORK(layout1_bind, same_content_same_file)
 	ASSERT_EQ(EACCES, test_open(bind_file1_s1d3, O_WRONLY));
 }
 
-#define LOWER_BASE	TMP_DIR "/lower"
+#define LOWER_BASE	"./lower"
 #define LOWER_DATA	LOWER_BASE "/data"
 static const char lower_fl1[] = LOWER_DATA "/fl1";
 static const char lower_dl1[] = LOWER_DATA "/dl1";
@@ -2309,7 +2314,7 @@ static const char (*lower_sub_files[])[] = {
 	NULL
 };
 
-#define UPPER_BASE	TMP_DIR "/upper"
+#define UPPER_BASE	"./upper"
 #define UPPER_DATA	UPPER_BASE "/data"
 #define UPPER_WORK	UPPER_BASE "/work"
 static const char upper_fu1[] = UPPER_DATA "/fu1";
@@ -2337,7 +2342,7 @@ static const char (*upper_sub_files[])[] = {
 	NULL
 };
 
-#define MERGE_BASE	TMP_DIR "/merge"
+#define MERGE_BASE	"./merge"
 #define MERGE_DATA	MERGE_BASE "/data"
 static const char merge_fl1[] = MERGE_DATA "/fl1";
 static const char merge_dl1[] = MERGE_DATA "/dl1";
