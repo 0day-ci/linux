@@ -1655,8 +1655,16 @@ static void disk_check_events(struct disk_events *ev,
 		    (disk->event_flags & DISK_EVENT_FLAG_UEVENT))
 			envp[nr_events++] = disk_uevents[i];
 
-	if (nr_events)
-		kobject_uevent_env(&disk_to_dev(disk)->kobj, KOBJ_CHANGE, envp);
+	if (nr_events) {
+		struct kobject *dev_kobj = kobject_get(&disk_to_dev(disk)->kobj);
+		/* The device kobject might have been removed in the
+		 * meantime, so check for it first.
+		 * If it was removed there is no need to signal events
+		 */
+		if (!dev_kobj)
+			kobject_uevent_env(dev_kobj, KOBJ_CHANGE, envp);
+		kobject_put(dev_kobj);
+	}
 }
 
 /*
