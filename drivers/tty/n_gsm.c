@@ -2043,9 +2043,11 @@ static int gsm_disconnect(struct gsm_mux *gsm)
 
 	/* In theory disconnecting DLCI 0 is sufficient but for some
 	   modems this is apparently not the case. */
-	gc = gsm_control_send(gsm, CMD_CLD, NULL, 0);
-	if (gc)
-		gsm_control_wait(gsm, gc);
+	if (gsm->initiator) {
+		gc = gsm_control_send(gsm, CMD_CLD, NULL, 0);
+		if (gc)
+			gsm_control_wait(gsm, gc);
+	}
 
 	del_timer_sync(&gsm->t2_timer);
 	/* Now we are sure T2 has stopped */
