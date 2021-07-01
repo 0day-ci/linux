@@ -5198,10 +5198,12 @@ static irqreturn_t ufshcd_uic_cmd_compl(struct ufs_hba *hba, u32 intr_status)
 /**
  * ufshcd_transfer_req_compl - handle SCSI and query command completion
  * @hba: per adapter instance
- * @completed_reqs: requests to complete
+ * @completed_reqs: bitmask that indicates which requests to complete
+ * @retry_requests: whether to ask the SCSI core to retry completed requests
  */
 static void ufshcd_transfer_req_compl(struct ufs_hba *hba,
-				      unsigned long completed_reqs)
+				      unsigned long completed_reqs,
+				      bool retry_requests)
 {
 	struct ufshcd_lrb *lrbp;
 	struct scsi_cmnd *cmd;
@@ -5217,7 +5219,8 @@ static void ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			if (unlikely(ufshcd_should_inform_monitor(hba, lrbp)))
 				ufshcd_update_monitor(hba, lrbp);
 			ufshcd_add_command_trace(hba, index, UFS_CMD_COMP);
-			result = ufshcd_transfer_rsp_status(hba, lrbp);
+			result = retry_requests ? DID_BUS_BUSY << 16 :
+				ufshcd_transfer_rsp_status(hba, lrbp);
 			scsi_dma_unmap(cmd);
 			cmd->result = result;
 			/* Mark completed command as NULL in LRB */
@@ -5243,13 +5246,15 @@ static void ufshcd_transfer_req_compl(struct ufs_hba *hba,
 /**
  * ufshcd_trc_handler - handle transfer requests completion
  * @hba: per adapter instance
+ * @retry_requests: whether or not to ask to retry requests
  * @use_utrlcnr: get completed requests from UTRLCNR
  *
  * Returns
  *  IRQ_HANDLED - If interrupt is valid
  *  IRQ_NONE    - If invalid interrupt
  */
-static irqreturn_t ufshcd_trc_handler(struct ufs_hba *hba, bool use_utrlcnr)
+static irqreturn_t ufshcd_trc_handler(struct ufs_hba *hba, bool retry_requests,
+				      bool use_utrlcnr)
 {
 	unsigned long completed_reqs = 0;
 	unsigned long flags;
@@ -5285,7 +5290,7 @@ static irqreturn_t ufshcd_trc_handler(struct ufs_hba *hba, bool use_utrlcnr)
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 
 	if (completed_reqs) {
-		ufshcd_transfer_req_compl(hba, completed_reqs);
+		ufshcd_transfer_req_compl(hba, completed_reqs, retry_requests);
 		return IRQ_HANDLED;
 	} else {
 		return IRQ_NONE;
@@ -5764,7 +5769,14 @@ out:
 /* Complete requests that have door-bell cleared */
 static void ufshcd_complete_requests(struct ufs_hba *hba)
 {
-	ufshcd_trc_handler(hba, false);
+	ufshcd_trc_handler(hba, /*retry_requests=*/false,
+			   /*use_utrlcnr=*/false);
+	ufshcd_tmc_handler(hba);
+}
+
+static void ufshcd_retry_aborted_requests(struct ufs_hba *hba)
+{
+	ufshcd_trc_handler(hba, /*retry_requests=*/true, /*use_utrlcnr=*/false);
 	ufshcd_tmc_handler(hba);
 }
 
@@ -6083,8 +6095,7 @@ static void ufshcd_err_handler(struct Scsi_Host *host)
 	}
 
 lock_skip_pending_xfer_clear:
-	/* Complete the requests that are cleared by s/w */
-	ufshcd_complete_requests(hba);
+	ufshcd_retry_aborted_requests(hba);
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->silence_err_logs = false;
@@ -6385,7 +6396,8 @@ static irqreturn_t ufshcd_sl_intr(struct ufs_hba *hba, u32 intr_status)
 		retval |= ufshcd_tmc_handler(hba);
 
 	if (intr_status & UTP_TRANSFER_REQ_COMPL)
-		retval |= ufshcd_trc_handler(hba, ufshcd_use_utrlcnr(hba));
+		retval |= ufshcd_trc_handler(hba, /*retry_requests=*/false,
+					     ufshcd_use_utrlcnr(hba));
 
 	return retval;
 }
@@ -6803,7 +6815,8 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 			err = ufshcd_clear_cmd(hba, pos);
 			if (err)
 				break;
-			ufshcd_transfer_req_compl(hba, pos);
+			ufshcd_transfer_req_compl(hba, pos,
+						  /*retry_requests=*/true);
 		}
 	}
 
@@ -6963,7 +6976,8 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		dev_err(hba->dev,
 		"%s: cmd was completed, but without a notifying intr, tag = %d",
 		__func__, tag);
-		ufshcd_transfer_req_compl(hba, 1UL << tag);
+		ufshcd_transfer_req_compl(hba, 1UL << tag,
+					  /*retry_requests=*/false);
 		goto release;
 	}
 
@@ -7026,7 +7040,7 @@ static int ufshcd_host_reset_and_restore(struct ufs_hba *hba)
 	 */
 	ufshcd_hba_stop(hba);
 	hba->silence_err_logs = true;
-	ufshcd_complete_requests(hba);
+	ufshcd_retry_aborted_requests(hba);
 	hba->silence_err_logs = false;
 
 	/* scale up clocks to max frequency before full reinitialization */
