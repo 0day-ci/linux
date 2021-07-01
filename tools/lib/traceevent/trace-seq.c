@@ -87,11 +87,13 @@ static void expand_buffer(struct trace_seq *s)
 	buf = realloc(s->buffer, s->buffer_size + TRACE_SEQ_BUF_SIZE);
 	if (WARN_ONCE(!buf, "Can't allocate trace_seq buffer memory")) {
 		s->state = TRACE_SEQ__MEM_ALLOC_FAILED;
+		free(buf);
 		return;
 	}
 
 	s->buffer = buf;
 	s->buffer_size += TRACE_SEQ_BUF_SIZE;
+	free(buf);
 }
 
 /**
