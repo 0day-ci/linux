@@ -9067,6 +9067,9 @@ void __init sched_init(void)
 	 */
 	init_idle(current, smp_processor_id());
 
+	/* Must run before init_sched_fair_class(), which tests housekeeping */
+	housekeeping_init();
+
 	calc_load_update = jiffies + LOAD_FREQ;
 
 #ifdef CONFIG_SMP
