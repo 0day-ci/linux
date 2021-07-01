@@ -169,11 +169,14 @@ static int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv)
 
 	WARN_ON(fpriv->is_master);
 	old_master = fpriv->master;
+	mutex_lock(&fpriv->master_lock);
 	fpriv->master = drm_master_create(dev);
 	if (!fpriv->master) {
 		fpriv->master = old_master;
+		mutex_unlock(&fpriv->master_lock);
 		return -ENOMEM;
 	}
+	mutex_unlock(&fpriv->master_lock);
 
 	fpriv->is_master = 1;
 	fpriv->authenticated = 1;
@@ -332,10 +335,13 @@ int drm_master_open(struct drm_file *file_priv)
 	 * any master object for render clients
 	 */
 	mutex_lock(&dev->master_mutex);
-	if (!dev->master)
+	if (!dev->master) {
 		ret = drm_new_set_master(dev, file_priv);
-	else
+	} else {
+		mutex_lock(&file_priv->master_lock);
 		file_priv->master = drm_master_get(dev->master);
+		mutex_unlock(&file_priv->master_lock);
+	}
 	mutex_unlock(&dev->master_mutex);
 
 	return ret;
