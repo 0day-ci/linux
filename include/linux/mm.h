@@ -664,6 +664,7 @@ static inline void vma_init(struct vm_area_struct *vma, struct mm_struct *mm)
 	memset(vma, 0, sizeof(*vma));
 	vma->vm_mm = mm;
 	vma->vm_ops = &dummy_vm_ops;
+	vma->pte_table_counter_pending = true;
 	INIT_LIST_HEAD(&vma->anon_vma_chain);
 }
 
@@ -2250,6 +2251,9 @@ static inline bool pgtable_pte_page_ctor(struct page *page)
 		return false;
 	__SetPageTable(page);
 	inc_lruvec_page_state(page, NR_PAGETABLE);
+
+	atomic64_set(&(page->pte_table_refcount), 0);
+
 	return true;
 }
 
@@ -2276,11 +2280,17 @@ static inline void pgtable_pte_page_dtor(struct page *page)
 
 #define pte_alloc(mm, pmd) (unlikely(pmd_none(*(pmd))) && __pte_alloc(mm, pmd))
 
+#define tfork_pte_alloc(mm, pmd) (__tfork_pte_alloc(mm, pmd))
+
 #define pte_alloc_map(mm, pmd, address)			\
 	(pte_alloc(mm, pmd) ? NULL : pte_offset_map(pmd, address))
 
 #define pte_alloc_map_lock(mm, pmd, address, ptlp)	\
 	(pte_alloc(mm, pmd) ?			\
+		 NULL : pte_offset_map_lock(mm, pmd, address, ptlp))
+
+#define tfork_pte_alloc_map_lock(mm, pmd, address, ptlp)	\
+	(tfork_pte_alloc(mm, pmd) ?			\
 		 NULL : pte_offset_map_lock(mm, pmd, address, ptlp))
 
 #define pte_alloc_kernel(pmd, address)			\
@@ -2616,6 +2626,7 @@ extern int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, 
 #ifdef CONFIG_MMU
 extern int __mm_populate(unsigned long addr, unsigned long len,
 			 int ignore_errors);
+extern int __mm_populate_nolock(unsigned long addr, unsigned long len, int ignore_errors);
 static inline void mm_populate(unsigned long addr, unsigned long len)
 {
 	/* Ignore errors */

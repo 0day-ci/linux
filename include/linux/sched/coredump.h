@@ -83,7 +83,10 @@ static inline int get_dumpable(struct mm_struct *mm)
 #define MMF_HAS_PINNED		28	/* FOLL_PIN has run, never cleared */
 #define MMF_DISABLE_THP_MASK	(1 << MMF_DISABLE_THP)
 
+#define MMF_USE_ODF 29
+#define MMF_USE_ODF_MASK (1 << MMF_USE_ODF)
+
 #define MMF_INIT_MASK		(MMF_DUMPABLE_MASK | MMF_DUMP_FILTER_MASK |\
-				 MMF_DISABLE_THP_MASK)
+				 MMF_DISABLE_THP_MASK | MMF_USE_ODF_MASK)
 
 #endif /* _LINUX_SCHED_COREDUMP_H */

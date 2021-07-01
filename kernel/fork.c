@@ -594,8 +594,13 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		rb_parent = &tmp->vm_rb;
 
 		mm->map_count++;
-		if (!(tmp->vm_flags & VM_WIPEONFORK))
+		if (!(tmp->vm_flags & VM_WIPEONFORK)) {
 			retval = copy_page_range(tmp, mpnt);
+			if (oldmm->flags & MMF_USE_ODF_MASK) {
+				tmp->pte_table_counter_pending = false; // reference of the shared PTE table by the new VMA is counted in copy_pmd_range_tfork
+				mpnt->pte_table_counter_pending = false; // don't double count when forking again
+			}
+		}
 
 		if (tmp->vm_ops && tmp->vm_ops->open)
 			tmp->vm_ops->open(tmp);

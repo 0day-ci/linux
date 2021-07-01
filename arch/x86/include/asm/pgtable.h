@@ -410,6 +410,16 @@ static inline pmd_t pmd_clear_flags(pmd_t pmd, pmdval_t clear)
 	return native_make_pmd(v & ~clear);
 }
 
+static inline pmd_t pmd_mknonpresent(pmd_t pmd)
+{
+	return pmd_clear_flags(pmd, _PAGE_PRESENT);
+}
+
+static inline pmd_t pmd_mkpresent(pmd_t pmd)
+{
+	return pmd_set_flags(pmd, _PAGE_PRESENT);
+}
+
 #ifdef CONFIG_HAVE_ARCH_USERFAULTFD_WP
 static inline int pmd_uffd_wp(pmd_t pmd)
 {
@@ -798,6 +808,11 @@ static inline int pmd_present(pmd_t pmd)
 	return pmd_flags(pmd) & (_PAGE_PRESENT | _PAGE_PROTNONE | _PAGE_PSE);
 }
 
+static inline int pmd_iswrite(pmd_t pmd)
+{
+	return pmd_flags(pmd) & (_PAGE_RW);
+}
+
 #ifdef CONFIG_NUMA_BALANCING
 /*
  * These work without NUMA balancing but the kernel does not care. See the
@@ -833,7 +848,7 @@ static inline unsigned long pmd_page_vaddr(pmd_t pmd)
  * Currently stuck as a macro due to indirect forward reference to
  * linux/mmzone.h's __section_mem_map_addr() definition:
  */
-#define pmd_page(pmd)	pfn_to_page(pmd_pfn(pmd))
+#define pmd_page(pmd)	pfn_to_page(pmd_pfn(pmd_mkpresent(pmd)))
 
 /*
  * Conversion functions: convert a page and protection to a page entry,
@@ -846,7 +861,7 @@ static inline unsigned long pmd_page_vaddr(pmd_t pmd)
 
 static inline int pmd_bad(pmd_t pmd)
 {
-	return (pmd_flags(pmd) & ~_PAGE_USER) != _KERNPG_TABLE;
+	return ((pmd_flags(pmd) & ~(_PAGE_USER)) | (_PAGE_RW | _PAGE_PRESENT)) != _KERNPG_TABLE;
 }
 
 static inline unsigned long pages_to_mb(unsigned long npg)

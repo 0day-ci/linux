@@ -90,6 +90,11 @@ static inline pte_t *pte_offset_kernel(pmd_t *pmd, unsigned long address)
 	return (pte_t *)pmd_page_vaddr(*pmd) + pte_index(address);
 }
 #define pte_offset_kernel pte_offset_kernel
+static inline pte_t *tfork_pte_offset_kernel(pmd_t pmd_val, unsigned long address)
+{
+	return (pte_t *)pmd_page_vaddr(pmd_val) + pte_index(address);
+}
+#define tfork_pte_offset_kernel tfork_pte_offset_kernel
 #endif
 
 #if defined(CONFIG_HIGHPTE)
@@ -781,6 +786,12 @@ static inline void arch_swap_restore(swp_entry_t entry, struct page *page)
 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
 })
 #endif
+
+#define pte_table_start(addr)						\
+(addr & PMD_MASK)
+
+#define pte_table_end(addr)                                             \
+(((addr) + PMD_SIZE) & PMD_MASK)
 
 /*
  * When walking page tables, we usually want to skip any p?d_none entries;
