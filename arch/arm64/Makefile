@@ -34,6 +34,17 @@ $(warning LSE atomics not supported by binutils)
   endif
 endif
 
+ifneq ($(LLVM),)
+ifneq ($(LLVM_IAS),)
+ifeq ($(CROSS_COMPILE),)
+CLANG_TARGET	:=--target=aarch64-linux
+CLANG_FLAGS	+= $(CLANG_TARGET)
+KBUILD_CFLAGS	+= $(CLANG_TARGET)
+KBUILD_AFLAGS	+= $(CLANG_TARGET)
+endif
+endif
+endif
+
 cc_has_k_constraint := $(call try-run,echo				\
 	'int main(void) {						\
 		asm volatile("and w0, w0, %w0" :: "K" (4294967295));	\
