@@ -226,6 +226,66 @@ properties:
           required:
             - speed
 
+  signal-multiplexer:
+    type: object
+    description:
+      Specifies that the signal pins (for example SerDes lanes) are connected
+      to a multiplexer from which they can be multiplexed to several different
+      endpoints, depending on the multiplexer configuration. (For example SerDes
+      lanes can be switched between an ethernet PHY and a SFP cage.)
+
+    properties:
+      compatible:
+        const: gpio-signal-multiplexer
+
+      gpios:
+        maxItems: 1
+        description:
+          GPIO to determine which endpoint the multiplexer is switched to.
+
+    patternProperties:
+      "^endpoint@[01]$":
+        type: object
+        description:
+          Specifies a multiplexer endpoint settings. Each endpoint can have
+          different settings. (For example in the case when multiplexing between
+          an ethernet PHY and a SFP cage, the SFP cage endpoint should specify
+          SFP phandle, while the PHY endpoint should specify PHY handle.)
+
+        properties:
+          reg:
+            enum: [ 0, 1 ]
+
+          phy-connection-type:
+            $ref: #/properties/phy-connection-type
+
+          phy-mode:
+            $ref: #/properties/phy-mode
+
+          phy-handle:
+            $ref: #/properties/phy-handle
+
+          phy:
+            $ref: #/properties/phy
+
+          phy-device:
+            $ref: #/properties/phy-device
+
+          sfp:
+            $ref: #/properties/sfp
+
+          managed:
+            $ref: #/properties/managed
+
+          fixed-link:
+            $ref: #/properties/fixed-link
+
+        required:
+          - reg
+
+    required:
+      - gpios
+
 additionalProperties: true
 
 ...
