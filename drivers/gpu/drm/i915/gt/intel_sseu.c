@@ -171,7 +171,7 @@ static void gen12_sseu_info_init(struct intel_gt *gt)
 	 * across the entire device. Then calculate out the DSS for each
 	 * workload type within that software slice.
 	 */
-	if (IS_XEHPSDV(gt->i915)) {
+	if (IS_DG2(gt->i915) || IS_XEHPSDV(gt->i915)) {
 		intel_sseu_set_info(sseu, 1, 32, 16);
 		sseu->has_compute_dss = 1;
 	} else {
