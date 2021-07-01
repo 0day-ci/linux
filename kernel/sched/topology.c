@@ -1833,6 +1833,9 @@ void sched_init_numa(void)
 			sched_domains_numa_masks[i][j] = mask;
 
 			for_each_node(k) {
+				if (!node_online(j))
+					continue;
+
 				if (sched_debug() && (node_distance(j, k) != node_distance(k, j)))
 					sched_numa_warn("Node-distance not symmetric");
 
@@ -1891,12 +1894,30 @@ void sched_init_numa(void)
 void sched_domains_numa_masks_set(unsigned int cpu)
 {
 	int node = cpu_to_node(cpu);
-	int i, j;
+	int i, j, empty;
 
+	empty = cpumask_empty(sched_domains_numa_masks[0][node]);
 	for (i = 0; i < sched_domains_numa_levels; i++) {
 		for (j = 0; j < nr_node_ids; j++) {
-			if (node_distance(j, node) <= sched_domains_numa_distance[i])
+			if (!node_online(j))
+				continue;
+
+			if (node_distance(j, node) <= sched_domains_numa_distance[i]) {
 				cpumask_set_cpu(cpu, sched_domains_numa_masks[i][j]);
+
+				/*
+				 * We skip updating numa_masks for offline
+				 * nodes. However now that the node is
+				 * finally online, CPUs that were added
+				 * earlier, should now be accommodated into
+				 * newly oneline node's numa mask.
+				 */
+				if (node != j && empty) {
+					cpumask_or(sched_domains_numa_masks[i][node],
+							sched_domains_numa_masks[i][node],
+							sched_domains_numa_masks[0][j]);
+				}
+			}
 		}
 	}
 }
