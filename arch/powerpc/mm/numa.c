@@ -141,10 +141,11 @@ static void map_cpu_to_node(int cpu, int node)
 {
 	update_numa_cpu_lookup_table(cpu, node);
 
-	dbg("adding cpu %d to node %d\n", cpu, node);
 
-	if (!(cpumask_test_cpu(cpu, node_to_cpumask_map[node])))
+	if (!(cpumask_test_cpu(cpu, node_to_cpumask_map[node]))) {
+		dbg("adding cpu %d to node %d\n", cpu, node);
 		cpumask_set_cpu(cpu, node_to_cpumask_map[node]);
+	}
 }
 
 #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PPC_SPLPAR)
@@ -152,13 +153,11 @@ static void unmap_cpu_from_node(unsigned long cpu)
 {
 	int node = numa_cpu_lookup_table[cpu];
 
-	dbg("removing cpu %lu from node %d\n", cpu, node);
-
 	if (cpumask_test_cpu(cpu, node_to_cpumask_map[node])) {
 		cpumask_clear_cpu(cpu, node_to_cpumask_map[node]);
+		dbg("removing cpu %lu from node %d\n", cpu, node);
 	} else {
-		printk(KERN_ERR "WARNING: cpu %lu not found in node %d\n",
-		       cpu, node);
+		pr_err("WARNING: cpu %lu not found in node %d\n", cpu, node);
 	}
 }
 #endif /* CONFIG_HOTPLUG_CPU || CONFIG_PPC_SPLPAR */
