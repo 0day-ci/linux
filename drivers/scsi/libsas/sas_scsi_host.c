@@ -770,10 +770,8 @@ out:
 	/* check if any new eh work was scheduled during the last run */
 	spin_lock_irq(&ha->lock);
 	ha->eh_running = false;
-	if (ha->eh_active == 0) {
-		shost->host_eh_scheduled = 0;
+	if (ha->eh_active == 0)
 		retry = false;
-	}
 	spin_unlock_irq(&ha->lock);
 
 	if (retry)
