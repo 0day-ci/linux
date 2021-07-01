@@ -1403,7 +1403,9 @@ smbd_connected:
 		goto out_err_crypto_release;
 	}
 	tcp_ses->min_offload = ctx->min_offload;
+	spin_lock(&GlobalMid_Lock);
 	tcp_ses->tcpStatus = CifsNeedNegotiate;
+	spin_unlock(&GlobalMid_Lock);
 
 	if ((ctx->max_credits < 20) || (ctx->max_credits > 60000))
 		tcp_ses->max_credits = SMB2_MAX_CREDITS_AVAILABLE;
