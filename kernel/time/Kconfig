@@ -69,7 +69,7 @@ config TIME_KUNIT_TEST
 	depends on KUNIT
 	default KUNIT_ALL_TESTS
 	help
-	  Enable this option to test RTC library functions.
+	  Enable this option to test kernel/time functions.
 
 	  If unsure, say N.
 
