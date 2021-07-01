@@ -8,7 +8,9 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/of_device.h>
 #include <linux/of_irq.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 
 #include "timer-of.h"
@@ -229,3 +231,14 @@ void timer_of_cleanup(struct timer_of *to)
 	if (to->flags & TIMER_OF_BASE)
 		timer_of_base_exit(&to->of_base);
 }
+
+int platform_timer_probe(struct platform_device *pdev)
+{
+	int (*init_cb)(struct device_node *node);
+	struct device_node *np = pdev->dev.of_node;
+
+	init_cb = of_device_get_match_data(&pdev->dev);
+
+	return init_cb(np);
+}
+EXPORT_SYMBOL_GPL(platform_timer_probe);
