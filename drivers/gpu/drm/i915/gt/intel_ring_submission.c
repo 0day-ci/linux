@@ -185,7 +185,7 @@ static int xcs_resume(struct intel_engine_cs *engine)
 		     ring->head, ring->tail);
 
 	/* Double check the ring is empty & disabled before we resume */
-	synchronize_hardirq(engine->i915->drm.irq);
+	intel_synchronize_irq(engine->i915);
 	if (!stop_ring(engine))
 		goto err;
 
