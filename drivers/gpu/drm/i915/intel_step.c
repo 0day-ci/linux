@@ -54,6 +54,18 @@ static const struct intel_step_info adlp_revid_step_tbl[] = {
 	[0xC] = { .gt_step = STEP_C0, .display_step = STEP_D0 },
 };
 
+static const struct intel_step_info dg2_g10_revid_step_tbl[] = {
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[0x1] = { .gt_step = STEP_A1, .display_step = STEP_A0 },
+	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+	[0x8] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
+};
+
+static const struct intel_step_info dg2_g11_revid_step_tbl[] = {
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_B0 },
+	[0x4] = { .gt_step = STEP_B0, .display_step = STEP_C0 },
+};
+
 void intel_step_init(struct drm_i915_private *i915)
 {
 	const struct intel_step_info *revids = NULL;
@@ -61,7 +73,13 @@ void intel_step_init(struct drm_i915_private *i915)
 	int revid = INTEL_REVID(i915);
 	struct intel_step_info step = {};
 
-	if (IS_ALDERLAKE_P(i915)) {
+	if (IS_DG2_G10(i915)) {
+		revids = dg2_g10_revid_step_tbl;
+		size = ARRAY_SIZE(dg2_g10_revid_step_tbl);
+	} else if (IS_DG2_G11(i915)) {
+		revids = dg2_g11_revid_step_tbl;
+		size = ARRAY_SIZE(dg2_g11_revid_step_tbl);
+	} else if (IS_ALDERLAKE_P(i915)) {
 		revids = adlp_revid_step_tbl;
 		size = ARRAY_SIZE(adlp_revid_step_tbl);
 	} else if (IS_ALDERLAKE_S(i915)) {
