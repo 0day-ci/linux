@@ -45,8 +45,10 @@ static int fprintf_json(void *out, const char *fmt, ...)
 	char *s;
 
 	va_start(ap, fmt);
-	if (vasprintf(&s, fmt, ap) < 0)
+	if (vasprintf(&s, fmt, ap) < 0) {
+		va_end(ap);
 		return -1;
+	}
 	va_end(ap);
 
 	if (!oper_count) {
