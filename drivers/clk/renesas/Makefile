@@ -43,3 +43,7 @@ obj-$(CONFIG_CLK_RZG2L)			+= renesas-rzg2l-cpg.o
 obj-$(CONFIG_CLK_RENESAS_CPG_MSSR)	+= renesas-cpg-mssr.o
 obj-$(CONFIG_CLK_RENESAS_CPG_MSTP)	+= clk-mstp.o
 obj-$(CONFIG_CLK_RENESAS_DIV6)		+= clk-div6.o
+
+# 8T49N24x
+obj-$(CONFIG_COMMON_CLK_8T49N24X)	+= clk-8t49n24x.o
+clk-8t49n24x-objs 			:= 8t49n24x.o 8t49n24x-core.o
