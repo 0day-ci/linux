@@ -171,6 +171,12 @@ static int __init housekeeping_isolcpus_setup(char *str)
 			continue;
 		}
 
+		if (!strncmp(str, "vmstat_sync,", 12)) {
+			str += 12;
+			flags |= HK_FLAG_VMSTAT_SYNC;
+			continue;
+		}
+
 		/*
 		 * Skip unknown sub-parameter and validate that it is not
 		 * containing an invalid character.

@@ -2124,6 +2124,23 @@
 
 			The format of <cpu-list> is described above.
 
+                        vmstat_sync
+
+			  Page counters are maintained in per-CPU counters to
+			  improve performance. When a CPU modifies a page counter,
+			  this modification is kept in the per-CPU counter.
+			  Certain activities require a global count, which
+			  involves requesting each CPU to flush its local counters
+			  to the global VM counters.
+			  This flush is implemented via a workqueue item, which
+			  requires scheduling the workqueue task on isolated CPUs.
+
+			  To avoid this interruption, this option syncs the
+			  page counters on each return from system calls.
+			  To ensure the application returns to userspace
+  			  with no modified per-CPU counters, its necessary to
+			  use mlockall() in addition to this isolcpus flag.
+
 	iucv=		[HW,NET]
 
 	ivrs_ioapic	[HW,X86-64]
