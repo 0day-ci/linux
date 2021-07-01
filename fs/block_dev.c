@@ -224,7 +224,11 @@ static void blkdev_bio_end_io_simple(struct bio *bio)
 {
 	struct task_struct *waiter = bio->bi_private;
 
-	WRITE_ONCE(bio->bi_private, NULL);
+	/*
+	 * Paired with smp_load_acquire in __blkdev_direct_IO_simple()
+	 * to ensure the order between bi_private and bi_xxx
+	 */
+	smp_store_release(&bio->bi_private, NULL);
 	blk_wake_io_task(waiter);
 }
 
@@ -283,7 +287,8 @@ __blkdev_direct_IO_simple(struct kiocb *iocb, struct iov_iter *iter,
 	qc = submit_bio(&bio);
 	for (;;) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (!READ_ONCE(bio.bi_private))
+		/* Refer to comments in blkdev_bio_end_io_simple() */
+		if (!smp_load_acquire(&bio.bi_private))
 			break;
 		if (!(iocb->ki_flags & IOCB_HIPRI) ||
 		    !blk_poll(bdev_get_queue(bdev), qc, true))
@@ -353,7 +358,12 @@ static void blkdev_bio_end_io(struct bio *bio)
 		} else {
 			struct task_struct *waiter = dio->waiter;
 
-			WRITE_ONCE(dio->waiter, NULL);
+			/*
+			 * Paired with smp_load_acquire() in
+			 * __blkdev_direct_IO() to ensure the order between
+			 * dio->waiter and bio->bi_xxx
+			 */
+			smp_store_release(&dio->waiter, NULL);
 			blk_wake_io_task(waiter);
 		}
 	}
@@ -478,7 +488,8 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 
 	for (;;) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (!READ_ONCE(dio->waiter))
+		/* Refer to comments in blkdev_bio_end_io */
+		if (!smp_load_acquire(&dio->waiter))
 			break;
 
 		if (!(iocb->ki_flags & IOCB_HIPRI) ||
