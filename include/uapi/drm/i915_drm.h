@@ -867,10 +867,11 @@ struct drm_i915_gem_mmap_offset {
 	 * (GTT, WC, WB, UC, etc) should be included.
 	 */
 	__u64 flags;
-#define I915_MMAP_OFFSET_GTT 0
-#define I915_MMAP_OFFSET_WC  1
-#define I915_MMAP_OFFSET_WB  2
-#define I915_MMAP_OFFSET_UC  3
+#define I915_MMAP_OFFSET_GTT	0
+#define I915_MMAP_OFFSET_WC	1
+#define I915_MMAP_OFFSET_WB	2
+#define I915_MMAP_OFFSET_UC	3
+#define I915_MMAP_OFFSET_TTM	4
 
 	/*
 	 * Zero-terminated chain of extensions.
