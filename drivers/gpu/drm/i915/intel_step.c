@@ -38,6 +38,13 @@ static const struct intel_step_info skl_revid_step_tbl[] = {
 	[9] = { .gt_step = STEP_J0, .display_step = STEP_J0 },
 };
 
+static const struct intel_step_info glk_revid_step_tbl[] = {
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[1] = { .gt_step = STEP_A1, .display_step = STEP_A1 },
+	[2] = { .gt_step = STEP_A2, .display_step = STEP_A2 },
+	[3] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+};
+
 static const struct intel_step_info icl_revid_step_tbl[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[3] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
@@ -71,6 +78,18 @@ static const struct intel_step_info tgl_revid_step_tbl[] = {
 	[1] = { .gt_step = STEP_B0, .display_step = STEP_D0 },
 };
 
+static const struct intel_step_info dg1_revid_step_tbl[] = {
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[0x1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+};
+
+static const struct intel_step_info rkl_revid_step_tbl[] = {
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[0x1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+	[0x4] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
+
+};
+
 static const struct intel_step_info adls_revid_step_tbl[] = {
 	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[0x1] = { .gt_step = STEP_A0, .display_step = STEP_A2 },
@@ -99,6 +118,12 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_ALDERLAKE_S(i915)) {
 		revids = adls_revid_step_tbl;
 		size = ARRAY_SIZE(adls_revid_step_tbl);
+	} else if (IS_ROCKETLAKE(i915)) {
+		revids = rkl_revid_step_tbl;
+		size = ARRAY_SIZE(rkl_revid_step_tbl);
+	} else if (IS_DG1(i915)) {
+		revids = dg1_revid_step_tbl;
+		size = ARRAY_SIZE(dg1_revid_step_tbl);
 	} else if (IS_TGL_U(i915) || IS_TGL_Y(i915)) {
 		revids = tgl_uy_revid_step_tbl;
 		size = ARRAY_SIZE(tgl_uy_revid_step_tbl);
@@ -111,6 +136,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_ICELAKE(i915)) {
 		revids = icl_revid_step_tbl;
 		size = ARRAY_SIZE(icl_revid_step_tbl);
+	} else if (IS_GEMINILAKE(i915)) {
+		revids = glk_revid_step_tbl;
+		size = ARRAY_SIZE(glk_revid_step_tbl);
 	} else if (IS_SKYLAKE(i915)) {
 		revids = skl_revid_step_tbl;
 		size = ARRAY_SIZE(skl_revid_step_tbl);
