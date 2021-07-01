@@ -1,0 +1,30 @@
+drm drm-fixes 62fb9874f5da54fdb243003b386128037319b219
+	Linux 5.13
+drm-misc drm-misc-fixes 1988e0d84161dabd99d1c27033fbd6ee439bf432
+	drm/panel: nt35510: Do not fail if DSI read fails
+drm-intel drm-intel-fixes 62fb9874f5da54fdb243003b386128037319b219
+	Linux 5.13
+drm drm-next 8a02ea42bc1d4c448caf1bab0e05899dad503f74
+	Merge tag 'drm-intel-next-fixes-2021-06-29' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes f18f58012ee894039cd59ee8c889bf499d7a3943
+	drm/radeon: Fix NULL dereference when updating memory stats
+drm-intel drm-intel-next-fixes c90c4c6574f3feaf2203b5671db1907a1e15c653
+	drm/i915: Reinstate the mmap ioctl for some platforms
+drm-misc drm-misc-next 97c9bfe3f6605d41eb8f1206e6e0f62b31ba15d6
+	drm/aperture: Pass DRM driver structure instead of driver name
+drm-intel drm-intel-next a03e880a700d9e217f7660bfc3616d93783b6d8c
+	drm/i915/display: Fix state mismatch in drm infoframe
+drm-intel drm-intel-gt-next 32334c9b1fd78ad661582c55b15d263a5d6d157d
+	drm/i915/gtt: ignore min_page_size for paging structures
+sound-upstream for-linus 50de417b7a5bfe8ab5c571427703f67c934736dc
+	Merge tag 'asoc-v5.14' of https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound into for-linus
+sound-upstream for-next 50de417b7a5bfe8ab5c571427703f67c934736dc
+	Merge tag 'asoc-v5.14' of https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound into for-linus
+drm-intel topic/core-for-CI fae352efb12196e7110f98bc1297ce533472764d
+	drm/i915: allow DG1 autoprobe for CONFIG_BROKEN
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
+drm-intel topic/gen-removal 0d6695b112762aa7aad28c46e65561389b6f50d6
+	drm/i915/adl_p: Same slices mask is not same Dbuf state
