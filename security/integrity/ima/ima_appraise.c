@@ -345,6 +345,7 @@ int ima_check_blacklist(struct integrity_iint_cache *iint,
 	enum hash_algo hash_algo;
 	const u8 *digest = NULL;
 	u32 digestsize = 0;
+	int process_rc __maybe_unused;
 	int rc = 0;
 
 	if (!(iint->flags & IMA_CHECK_BLACKLIST))
@@ -355,7 +356,8 @@ int ima_check_blacklist(struct integrity_iint_cache *iint,
 
 		rc = is_binary_blacklisted(digest, digestsize);
 		if ((rc == -EPERM) && (iint->flags & IMA_MEASURE))
-			process_buffer_measurement(&init_user_ns, NULL, digest, digestsize,
+			process_rc = process_buffer_measurement(&init_user_ns,
+						   NULL, digest, digestsize,
 						   "blacklisted-hash", NONE,
 						   pcr, NULL, false);
 	}

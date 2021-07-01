@@ -118,6 +118,7 @@ void __init ima_load_x509(void)
 
 int __init ima_init(void)
 {
+	int measure_rc __maybe_unused;
 	int rc;
 
 	ima_tpm_chip = tpm_default_chip();
@@ -153,8 +154,9 @@ int __init ima_init(void)
 
 	ima_init_key_queue();
 
-	ima_measure_critical_data("kernel_info", "kernel_version",
-				  UTS_RELEASE, strlen(UTS_RELEASE), false);
+	measure_rc = ima_measure_critical_data("kernel_info", "kernel_version",
+					       UTS_RELEASE, strlen(UTS_RELEASE),
+					       false);
 
 	return rc;
 }
