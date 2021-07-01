@@ -364,6 +364,7 @@ struct sas_ha_struct {
 	struct mutex	  drain_mutex;
 	unsigned long	  state;
 	spinlock_t	  lock;
+	bool		  eh_running;
 	int		  eh_active;
 	wait_queue_head_t eh_wait_q;
 	struct list_head  eh_dev_q;

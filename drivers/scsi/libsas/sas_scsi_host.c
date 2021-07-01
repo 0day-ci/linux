@@ -462,6 +462,7 @@ int sas_eh_abort_handler(struct scsi_cmnd *cmd)
 	int res = TMF_RESP_FUNC_FAILED;
 	struct sas_task *task = TO_SAS_TASK(cmd);
 	struct Scsi_Host *host = cmd->device->host;
+	struct sas_ha_struct *ha = SHOST_TO_SAS_HA(host);
 	struct domain_device *dev = cmd_to_domain_dev(cmd);
 	struct sas_internal *i = to_sas_internal(host->transportt);
 	unsigned long flags;
@@ -471,7 +472,7 @@ int sas_eh_abort_handler(struct scsi_cmnd *cmd)
 
 	spin_lock_irqsave(host->host_lock, flags);
 	/* We cannot do async aborts for SATA devices */
-	if (dev_is_sata(dev) && !host->host_eh_scheduled) {
+	if (dev_is_sata(dev) && !ha->eh_running) {
 		spin_unlock_irqrestore(host->host_lock, flags);
 		return FAILED;
 	}
@@ -731,6 +732,7 @@ retry:
 	tries++;
 	retry = true;
 	spin_lock_irq(shost->host_lock);
+	ha->eh_running = true;
 	list_splice_init(&shost->eh_cmd_q, &eh_work_q);
 	spin_unlock_irq(shost->host_lock);
 
@@ -767,6 +769,7 @@ out:
 
 	/* check if any new eh work was scheduled during the last run */
 	spin_lock_irq(&ha->lock);
+	ha->eh_running = false;
 	if (ha->eh_active == 0) {
 		shost->host_eh_scheduled = 0;
 		retry = false;
