@@ -412,9 +412,9 @@ static int ct_write(struct intel_guc_ct *ct,
 	 * dw1: HXG header (including action code)
 	 * dw2+: action data
 	 */
-	header = FIELD_PREP(GUC_CTB_MSG_0_FORMAT, GUC_CTB_FORMAT_HXG) |
-		 FIELD_PREP(GUC_CTB_MSG_0_NUM_DWORDS, len) |
-		 FIELD_PREP(GUC_CTB_MSG_0_FENCE, fence);
+	header = FIELD_PREP(GUC_CTB_HDR_0_FORMAT, GUC_CTB_FORMAT_HXG) |
+		 FIELD_PREP(GUC_CTB_HDR_0_NUM_DWORDS, len) |
+		 FIELD_PREP(GUC_CTB_HDR_0_FENCE, fence);
 
 	hxg = FIELD_PREP(GUC_HXG_MSG_0_TYPE, GUC_HXG_TYPE_REQUEST) |
 	      FIELD_PREP(GUC_HXG_REQUEST_MSG_0_ACTION |
@@ -646,7 +646,7 @@ static int ct_read(struct intel_guc_ct *ct, struct ct_incoming_msg **msg)
 	head = (head + 1) % size;
 
 	/* message len with header */
-	len = FIELD_GET(GUC_CTB_MSG_0_NUM_DWORDS, header) + GUC_CTB_MSG_MIN_LEN;
+	len = FIELD_GET(GUC_CTB_HDR_0_NUM_DWORDS, header) + GUC_CTB_HDR_LEN;
 	if (unlikely(len > (u32)available)) {
 		CT_ERROR(ct, "Incomplete message %*ph %*ph %*ph\n",
 			 4, &header,
@@ -691,9 +691,9 @@ corrupted:
 
 static int ct_handle_response(struct intel_guc_ct *ct, struct ct_incoming_msg *response)
 {
-	u32 len = FIELD_GET(GUC_CTB_MSG_0_NUM_DWORDS, response->msg[0]);
-	u32 fence = FIELD_GET(GUC_CTB_MSG_0_FENCE, response->msg[0]);
-	const u32 *hxg = &response->msg[GUC_CTB_MSG_MIN_LEN];
+	u32 len = FIELD_GET(GUC_CTB_HDR_0_NUM_DWORDS, response->msg[0]);
+	u32 fence = FIELD_GET(GUC_CTB_HDR_0_FENCE, response->msg[0]);
+	const u32 *hxg = &response->msg[GUC_CTB_HDR_LEN];
 	const u32 *data = &hxg[GUC_HXG_MSG_MIN_LEN];
 	u32 datalen = len - GUC_HXG_MSG_MIN_LEN;
 	struct ct_request *req;
@@ -750,8 +750,8 @@ static int ct_process_request(struct intel_guc_ct *ct, struct ct_incoming_msg *r
 	u32 hxg_len, action, len;
 	int ret;
 
-	hxg = &request->msg[GUC_CTB_MSG_MIN_LEN];
-	hxg_len = request->size - GUC_CTB_MSG_MIN_LEN;
+	hxg = &request->msg[GUC_CTB_HDR_LEN];
+	hxg_len = request->size - GUC_CTB_HDR_LEN;
 	payload = &hxg[GUC_HXG_MSG_MIN_LEN];
 	action = FIELD_GET(GUC_HXG_EVENT_MSG_0_ACTION, hxg[0]);
 	len = hxg_len - GUC_HXG_MSG_MIN_LEN;
@@ -818,7 +818,7 @@ static void ct_incoming_request_worker_func(struct work_struct *w)
 
 static int ct_handle_event(struct intel_guc_ct *ct, struct ct_incoming_msg *request)
 {
-	const u32 *hxg = &request->msg[GUC_CTB_MSG_MIN_LEN];
+	const u32 *hxg = &request->msg[GUC_CTB_HDR_LEN];
 	unsigned long flags;
 
 	GEM_BUG_ON(FIELD_GET(GUC_HXG_MSG_0_TYPE, hxg[0]) != GUC_HXG_TYPE_EVENT);
@@ -840,7 +840,7 @@ static int ct_handle_hxg(struct intel_guc_ct *ct, struct ct_incoming_msg *msg)
 	if (unlikely(msg->size < GUC_CTB_HXG_MSG_MIN_LEN))
 		return -EBADMSG;
 
-	hxg = &msg->msg[GUC_CTB_MSG_MIN_LEN];
+	hxg = &msg->msg[GUC_CTB_HDR_LEN];
 
 	origin = FIELD_GET(GUC_HXG_MSG_0_ORIGIN, hxg[0]);
 	if (unlikely(origin != GUC_HXG_ORIGIN_GUC)) {
@@ -871,7 +871,7 @@ failed:
 
 static void ct_handle_msg(struct intel_guc_ct *ct, struct ct_incoming_msg *msg)
 {
-	u32 format = FIELD_GET(GUC_CTB_MSG_0_FORMAT, msg->msg[0]);
+	u32 format = FIELD_GET(GUC_CTB_HDR_0_FORMAT, msg->msg[0]);
 	int err;
 
 	if (format == GUC_CTB_FORMAT_HXG)

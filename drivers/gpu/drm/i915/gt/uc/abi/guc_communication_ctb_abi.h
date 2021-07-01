@@ -56,8 +56,9 @@ struct guc_ct_buffer_desc {
 } __packed;
 static_assert(sizeof(struct guc_ct_buffer_desc) == 64);
 
+
 /**
- * DOC: CTB Message
+ * DOC: CTB Header
  *
  *  +---+-------+--------------------------------------------------------------+
  *  |   | Bits  | Description                                                  |
@@ -71,21 +72,34 @@ static_assert(sizeof(struct guc_ct_buffer_desc) == 64);
  *  |   +-------+--------------------------------------------------------------+
  *  |   |   7:0 | **NUM_DWORDS** - length of the CTB message (w/o header)      |
  *  +---+-------+--------------------------------------------------------------+
- *  | 1 |  31:0 | optional (depends on FORMAT)                                 |
- *  +---+-------+                                                              |
- *  |...|       |                                                              |
- *  +---+-------+                                                              |
- *  | n |  31:0 |                                                              |
+ */
+
+#define GUC_CTB_HDR_LEN					1u
+#define GUC_CTB_HDR_0_FENCE				(0xffff << 16)
+#define GUC_CTB_HDR_0_FORMAT				(0xf << 12)
+#define   GUC_CTB_FORMAT_HXG				0u
+#define GUC_CTB_HDR_0_RESERVED				(0xf << 8)
+#define GUC_CTB_HDR_0_NUM_DWORDS			(0xff << 0)
+#define   GUC_CTB_MAX_DWORDS				255u
+
+/**
+ * DOC: CTB Message
+ *
+ *  +---+-------+--------------------------------------------------------------+
+ *  |   | Bits  | Description                                                  |
+ *  +===+=======+==============================================================+
+ *  | 0 |  31:0 | `CTB Header`_                                                |
+ *  +---+-------+--------------------------------------------------------------+
+ *  | 1 |  31:0 |  +--------------------------------------------------------+  |
+ *  +---+-------+  |                                                        |  |
+ *  |...|       |  |  optional payload (depends on FORMAT)                  |  |
+ *  +---+-------+  |                                                        |  |
+ *  | n |  31:0 |  +--------------------------------------------------------+  |
  *  +---+-------+--------------------------------------------------------------+
  */
 
-#define GUC_CTB_MSG_MIN_LEN			1u
-#define GUC_CTB_MSG_MAX_LEN			256u
-#define GUC_CTB_MSG_0_FENCE			(0xffff << 16)
-#define GUC_CTB_MSG_0_FORMAT			(0xf << 12)
-#define   GUC_CTB_FORMAT_HXG			0u
-#define GUC_CTB_MSG_0_RESERVED			(0xf << 8)
-#define GUC_CTB_MSG_0_NUM_DWORDS		(0xff << 0)
+#define GUC_CTB_MSG_MIN_LEN		GUC_CTB_HDR_LEN
+#define GUC_CTB_MSG_MAX_LEN		(GUC_CTB_HDR_LEN + GUC_CTB_MAX_DWORDS)
 
 /**
  * DOC: CTB HXG Message
@@ -93,13 +107,10 @@ static_assert(sizeof(struct guc_ct_buffer_desc) == 64);
  *  +---+-------+--------------------------------------------------------------+
  *  |   | Bits  | Description                                                  |
  *  +===+=======+==============================================================+
- *  | 0 | 31:16 | FENCE                                                        |
- *  |   +-------+--------------------------------------------------------------+
- *  |   | 15:12 | FORMAT = GUC_CTB_FORMAT_HXG_                                 |
- *  |   +-------+--------------------------------------------------------------+
- *  |   |  11:8 | RESERVED = MBZ                                               |
- *  |   +-------+--------------------------------------------------------------+
- *  |   |   7:0 | NUM_DWORDS = length (in dwords) of the embedded HXG message  |
+ *  | 0 |  31:0 | `CTB Header`_ with:                                          |
+ *  |   |       |                                                              |
+ *  |   |       |  - FORMAT = GUC_CTB_FORMAT_HXG_                              |
+ *  |   |       |  - NUM_DWORDS = **n**                                        |
  *  +---+-------+--------------------------------------------------------------+
  *  | 1 |  31:0 |  +--------------------------------------------------------+  |
  *  +---+-------+  |                                                        |  |
