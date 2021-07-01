@@ -170,9 +170,19 @@ static int i915_gem_dmabuf_attach(struct dma_buf *dmabuf,
 				  struct dma_buf_attachment *attach)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dmabuf);
+	int ret;
 
 	assert_object_held(obj);
-	return i915_gem_object_pin_pages(obj);
+
+	if (!i915_gem_object_can_migrate(obj, INTEL_REGION_SMEM))
+		return -EOPNOTSUPP;
+	ret = i915_gem_object_migrate(obj, NULL, INTEL_REGION_SMEM);
+	if (!ret)
+		ret = i915_gem_object_wait_migration(obj, 0);
+	if (!ret)
+		ret = i915_gem_object_pin_pages(obj);
+
+	return ret;
 }
 
 static void i915_gem_dmabuf_detach(struct dma_buf *dmabuf,
