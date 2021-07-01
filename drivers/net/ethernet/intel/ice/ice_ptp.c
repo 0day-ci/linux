@@ -776,6 +776,7 @@ ice_ptp_settime64(struct ptp_clock_info *info, const struct timespec64 *ts)
 	struct ice_pf *pf = ptp_info_to_pf(info);
 	struct timespec64 ts64 = *ts;
 	struct ice_hw *hw = &pf->hw;
+	u8 i;
 	int err;
 
 	if (!ice_ptp_lock(hw)) {
@@ -783,12 +784,22 @@ ice_ptp_settime64(struct ptp_clock_info *info, const struct timespec64 *ts)
 		goto exit;
 	}
 
+	/* Disable periodic outputs */
+	for (i = 0; i < info->n_per_out; i++)
+		if (pf->ptp.perout_channels[i].ena)
+			ice_ptp_cfg_clkout(pf, i, NULL, false);
+
 	err = ice_ptp_write_init(pf, &ts64);
 	ice_ptp_unlock(hw);
 
 	if (!err)
 		ice_ptp_update_cached_phctime(pf);
 
+	/* Reenable periodic outputs */
+	for (i = 0; i < info->n_per_out; i++)
+		if (pf->ptp.perout_channels[i].ena)
+			ice_ptp_cfg_clkout(pf, i, &pf->ptp.perout_channels[i],
+					   false);
 exit:
 	if (err) {
 		dev_err(ice_pf_to_dev(pf), "PTP failed to set time %d\n", err);
@@ -825,6 +836,7 @@ static int ice_ptp_adjtime(struct ptp_clock_info *info, s64 delta)
 	struct ice_hw *hw = &pf->hw;
 	struct device *dev;
 	int err;
+	u8 i;
 
 	dev = ice_pf_to_dev(pf);
 
@@ -842,7 +854,18 @@ static int ice_ptp_adjtime(struct ptp_clock_info *info, s64 delta)
 		return -EBUSY;
 	}
 
+	/* Disable periodic outputs */
+	for (i = 0; i < info->n_per_out; i++)
+		if (pf->ptp.perout_channels[i].ena)
+			ice_ptp_cfg_clkout(pf, i, NULL, false);
+
 	err = ice_ptp_write_adj(pf, delta);
+
+	/* Reenable periodic outputs */
+	for (i = 0; i < info->n_per_out; i++)
+		if (pf->ptp.perout_channels[i].ena)
+			ice_ptp_cfg_clkout(pf, i, &pf->ptp.perout_channels[i],
+					   false);
 
 	ice_ptp_unlock(hw);
 
@@ -1526,6 +1549,8 @@ err_kworker:
  */
 void ice_ptp_release(struct ice_pf *pf)
 {
+	int i;
+
 	/* Disable timestamping for both Tx and Rx */
 	ice_ptp_cfg_timestamp(pf, false);
 
@@ -1542,6 +1567,11 @@ void ice_ptp_release(struct ice_pf *pf)
 
 	if (!pf->ptp.clock)
 		return;
+
+	/* Disable periodic outputs */
+	for (i = 0; i < pf->ptp.info.n_per_out; i++)
+		if (pf->ptp.perout_channels[i].ena)
+			ice_ptp_cfg_clkout(pf, i, NULL, false);
 
 	ice_clear_ptp_clock_index(pf);
 	ptp_clock_unregister(pf->ptp.clock);
