@@ -490,9 +490,9 @@
 
 &usbdrd3_1 {
 	status = "okay";
+};
 
-	usb@fe900000 {
-		dr_mode = "host";
-		status = "okay";
-	};
+&usbdrd_dwc3_1 {
+	dr_mode = "host";
+	status = "okay";
 };
