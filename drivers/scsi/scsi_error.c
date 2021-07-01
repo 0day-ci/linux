@@ -2242,6 +2242,13 @@ int scsi_error_handler(void *data)
 			continue;
 		}
 
+		/*
+		 * Clear host_eh_scheduled before handling any errors such that
+		 * calling scsi_schedule_eh() while errors are being handled
+		 * causes the error handler to be rerun.
+		 */
+		shost->host_eh_scheduled = 0;
+
 		if (shost->transportt->eh_strategy_handler)
 			shost->transportt->eh_strategy_handler(shost);
 		else
