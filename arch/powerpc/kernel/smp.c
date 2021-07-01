@@ -1418,6 +1418,8 @@ static void remove_cpu_from_masks(int cpu)
 	struct cpumask *(*mask_fn)(int) = cpu_sibling_mask;
 	int i;
 
+	unmap_cpu_from_node(cpu);
+
 	if (shared_caches)
 		mask_fn = cpu_l2_cache_mask;
 
@@ -1502,6 +1504,7 @@ static void add_cpu_to_masks(int cpu)
 	 * This CPU will not be in the online mask yet so we need to manually
 	 * add it to it's own thread sibling mask.
 	 */
+	map_cpu_to_node(cpu, cpu_to_node(cpu));
 	cpumask_set_cpu(cpu, cpu_sibling_mask(cpu));
 
 	for (i = first_thread; i < first_thread + threads_per_core; i++)
