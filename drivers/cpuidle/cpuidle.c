@@ -457,7 +457,6 @@ void cpuidle_pause_and_lock(void)
 	mutex_lock(&cpuidle_lock);
 	cpuidle_uninstall_idle_handler();
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_pause_and_lock);
 
 /**
@@ -468,7 +467,6 @@ void cpuidle_resume_and_unlock(void)
 	cpuidle_install_idle_handler();
 	mutex_unlock(&cpuidle_lock);
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_resume_and_unlock);
 
 /* Currently used in suspend/resume path to suspend cpuidle */
@@ -538,7 +536,6 @@ fail_sysfs:
 
 	return ret;
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_enable_device);
 
 /**
@@ -566,7 +563,6 @@ void cpuidle_disable_device(struct cpuidle_device *dev)
 	cpuidle_remove_device_sysfs(dev);
 	enabled_devices--;
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_disable_device);
 
 static void __cpuidle_unregister_device(struct cpuidle_device *dev)
@@ -665,7 +661,6 @@ out_unregister:
 	__cpuidle_unregister_device(dev);
 	goto out_unlock;
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_register_device);
 
 /**
@@ -689,7 +684,6 @@ void cpuidle_unregister_device(struct cpuidle_device *dev)
 
 	cpuidle_resume_and_unlock();
 }
-
 EXPORT_SYMBOL_GPL(cpuidle_unregister_device);
 
 /**
