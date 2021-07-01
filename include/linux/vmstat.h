@@ -21,6 +21,15 @@ int sysctl_vm_numa_stat_handler(struct ctl_table *table, int write,
 		void *buffer, size_t *length, loff_t *ppos);
 #endif
 
+DECLARE_STATIC_KEY_FALSE(vmstat_sync_enabled);
+
+extern void __sync_vmstat(void);
+static inline void sync_vmstat(void)
+{
+	if (static_branch_unlikely(&vmstat_sync_enabled))
+		__sync_vmstat();
+}
+
 struct reclaim_stat {
 	unsigned nr_dirty;
 	unsigned nr_unqueued_dirty;

@@ -8,6 +8,7 @@
  *
  */
 #include "sched.h"
+#include <linux/vmstat.h>
 
 DEFINE_STATIC_KEY_FALSE(housekeeping_overridden);
 EXPORT_SYMBOL_GPL(housekeeping_overridden);
@@ -126,6 +127,9 @@ static int __init housekeeping_setup(char *str, enum hk_flags flags)
 			return 0;
 		}
 	}
+
+	if (flags & HK_FLAG_VMSTAT_SYNC)
+		static_branch_enable(&vmstat_sync_enabled);
 
 	housekeeping_flags |= flags;
 
