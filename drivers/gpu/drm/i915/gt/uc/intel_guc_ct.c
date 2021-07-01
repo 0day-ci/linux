@@ -490,9 +490,6 @@ static int wait_for_ct_request_update(struct ct_request *req, u32 *status)
 		err = wait_for(done, 10);
 #undef done
 
-	if (unlikely(err))
-		DRM_ERROR("CT: fence %u err %d\n", req->fence, err);
-
 	*status = req->status;
 	return err;
 }
@@ -536,8 +533,11 @@ static int ct_send(struct intel_guc_ct *ct,
 	intel_guc_notify(ct_to_guc(ct));
 
 	err = wait_for_ct_request_update(&request, status);
-	if (unlikely(err))
+	if (unlikely(err)) {
+		CT_ERROR(ct, "No response for request %#x (fence %u)\n",
+			 action[0], request.fence);
 		goto unlink;
+	}
 
 	if (FIELD_GET(GUC_HXG_MSG_0_TYPE, *status) != GUC_HXG_TYPE_RESPONSE_SUCCESS) {
 		err = -EIO;
