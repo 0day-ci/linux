@@ -3008,8 +3008,9 @@ static int gsmtty_open(struct tty_struct *tty, struct file *filp)
 	/* We could in theory open and close before we wait - eg if we get
 	   a DM straight back. This is ok as that will have caused a hangup */
 	tty_port_set_initialized(port, 1);
-	/* Start sending off SABM messages */
-	gsm_dlci_begin_open(dlci);
+	/* Start sending off SABM messages for initiator */
+	if (gsm->initiator)
+		gsm_dlci_begin_open(dlci);
 	/* And wait for virtual carrier */
 	return tty_port_block_til_ready(port, tty, filp);
 }
