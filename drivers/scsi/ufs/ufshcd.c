@@ -6370,7 +6370,7 @@ static irqreturn_t ufshcd_sl_intr(struct ufs_hba *hba, u32 intr_status)
 		retval |= ufshcd_tmc_handler(hba);
 
 	if (intr_status & UTP_TRANSFER_REQ_COMPL)
-		retval |= ufshcd_trc_handler(hba, ufshcd_has_utrlcnr(hba));
+		retval |= ufshcd_trc_handler(hba, ufshcd_use_utrlcnr(hba));
 
 	return retval;
 }
