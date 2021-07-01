@@ -5180,12 +5180,12 @@ static irqreturn_t ufshcd_uic_cmd_compl(struct ufs_hba *hba, u32 intr_status)
 }
 
 /**
- * __ufshcd_transfer_req_compl - handle SCSI and query command completion
+ * ufshcd_transfer_req_compl - handle SCSI and query command completion
  * @hba: per adapter instance
  * @completed_reqs: requests to complete
  */
-static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
-					unsigned long completed_reqs)
+static void ufshcd_transfer_req_compl(struct ufs_hba *hba,
+				      unsigned long completed_reqs)
 {
 	struct ufshcd_lrb *lrbp;
 	struct scsi_cmnd *cmd;
@@ -5270,7 +5270,7 @@ static irqreturn_t ufshcd_trc_handler(struct ufs_hba *hba, bool use_utrlcnr)
 	}
 
 	if (completed_reqs) {
-		__ufshcd_transfer_req_compl(hba, completed_reqs);
+		ufshcd_transfer_req_compl(hba, completed_reqs);
 		return IRQ_HANDLED;
 	} else {
 		return IRQ_NONE;
@@ -6808,7 +6808,7 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 			err = ufshcd_clear_cmd(hba, pos);
 			if (err)
 				break;
-			__ufshcd_transfer_req_compl(hba, pos);
+			ufshcd_transfer_req_compl(hba, pos);
 		}
 	}
 
@@ -6981,7 +6981,7 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	 */
 	if (lrbp->lun == UFS_UPIU_UFS_DEVICE_WLUN) {
 		ufshcd_update_evt_hist(hba, UFS_EVT_ABORT, lrbp->lun);
-		__ufshcd_transfer_req_compl(hba, (1UL << tag));
+		ufshcd_transfer_req_compl(hba, 1UL << tag);
 		set_bit(tag, &hba->outstanding_reqs);
 		spin_lock_irqsave(host->host_lock, flags);
 		hba->force_reset = true;
@@ -6998,7 +6998,7 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 
 	if (!err) {
 cleanup:
-		__ufshcd_transfer_req_compl(hba, (1UL << tag));
+		ufshcd_transfer_req_compl(hba, 1UL << tag);
 out:
 		err = SUCCESS;
 	} else {
