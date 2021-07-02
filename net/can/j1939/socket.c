@@ -930,20 +930,15 @@ j1939_sk_get_timestamping_opt_stats(struct j1939_session *session)
 	return stats;
 }
 
-void j1939_sk_errqueue(struct j1939_session *session,
-		       enum j1939_sk_errqueue_type type)
+static void __j1939_sk_errqueue(struct j1939_session *session, struct sock *sk,
+				enum j1939_sk_errqueue_type type)
 {
 	struct j1939_priv *priv = session->priv;
-	struct sock *sk = session->sk;
 	struct j1939_sock *jsk;
 	struct sock_exterr_skb *serr;
 	struct sk_buff *skb;
 	char *state = "UNK";
 	int err;
-
-	/* currently we have no sk for the RX session */
-	if (!sk)
-		return;
 
 	jsk = j1939_sk(sk);
 
@@ -970,7 +965,7 @@ void j1939_sk_errqueue(struct j1939_session *session,
 		serr->ee.ee_errno = ENOMSG;
 		serr->ee.ee_origin = SO_EE_ORIGIN_TIMESTAMPING;
 		serr->ee.ee_info = SCM_TSTAMP_ACK;
-		state = "ACK";
+		state = "TX ACK";
 		break;
 	case J1939_ERRQUEUE_TX_SCHED:
 		if (!(sk->sk_tsflags & SOF_TIMESTAMPING_TX_SCHED)) {
@@ -981,13 +976,31 @@ void j1939_sk_errqueue(struct j1939_session *session,
 		serr->ee.ee_errno = ENOMSG;
 		serr->ee.ee_origin = SO_EE_ORIGIN_TIMESTAMPING;
 		serr->ee.ee_info = SCM_TSTAMP_SCHED;
-		state = "SCH";
+		state = "TX SCH";
 		break;
 	case J1939_ERRQUEUE_TX_ABORT:
 		serr->ee.ee_errno = session->err;
 		serr->ee.ee_origin = SO_EE_ORIGIN_LOCAL;
 		serr->ee.ee_info = J1939_EE_INFO_TX_ABORT;
-		state = "ABT";
+		state = "TX ABT";
+		break;
+	case J1939_ERRQUEUE_RX_RTS:
+		serr->ee.ee_errno = session->err;
+		serr->ee.ee_origin = SO_EE_ORIGIN_LOCAL;
+		serr->ee.ee_info = J1939_EE_INFO_RX_RTS;
+		state = "RX RTS";
+		break;
+	case J1939_ERRQUEUE_RX_DPO:
+		serr->ee.ee_errno = session->err;
+		serr->ee.ee_origin = SO_EE_ORIGIN_LOCAL;
+		serr->ee.ee_info = J1939_EE_INFO_RX_DPO;
+		state = "RX DPO";
+		break;
+	case J1939_ERRQUEUE_RX_ABORT:
+		serr->ee.ee_errno = session->err;
+		serr->ee.ee_origin = SO_EE_ORIGIN_LOCAL;
+		serr->ee.ee_info = J1939_EE_INFO_RX_ABORT;
+		state = "RX ABT";
 		break;
 	default:
 		netdev_err(priv->ndev, "Unknown errqueue type %i\n", type);
@@ -997,12 +1010,33 @@ void j1939_sk_errqueue(struct j1939_session *session,
 	if (sk->sk_tsflags & SOF_TIMESTAMPING_OPT_ID)
 		serr->ee.ee_data = session->tskey;
 
-	netdev_dbg(session->priv->ndev, "%s: 0x%p tskey: %i, state: %s\n",
+	netdev_info(session->priv->ndev, "%s: 0x%p tskey: %i, state: %s\n",
 		   __func__, session, session->tskey, state);
 	err = sock_queue_err_skb(sk, skb);
 
 	if (err)
 		kfree_skb(skb);
+};
+
+void j1939_sk_errqueue(struct j1939_session *session,
+		       enum j1939_sk_errqueue_type type)
+{
+	struct j1939_priv *priv = session->priv;
+	struct j1939_sock *jsk;
+
+	if (session->sk) {
+		/* send TX notifications to the socket of origin  */
+		__j1939_sk_errqueue(session, session->sk, type);
+		return;
+	}
+
+	/* spread RX notifications to all sockets subscribed to this session */
+	spin_lock_bh(&priv->j1939_socks_lock);
+	list_for_each_entry(jsk, &priv->j1939_socks, list) {
+		if (j1939_sk_recv_match_one(jsk, &session->skcb))
+			__j1939_sk_errqueue(session, &jsk->sk, type);
+	}
+	spin_unlock_bh(&priv->j1939_socks_lock);
 };
 
 void j1939_sk_send_loop_abort(struct sock *sk, int err)
