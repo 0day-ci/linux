@@ -62,6 +62,10 @@ ALL_TESTS="$ALL_TESTS 0025:1:1:test_dev_y:block"
 ALL_TESTS="$ALL_TESTS 0026:1:1:test_dev_y:block"
 ALL_TESTS="$ALL_TESTS 0027:1:0:test_dev_x:block" # deadlock test
 ALL_TESTS="$ALL_TESTS 0028:1:0:test_dev_x:block" # deadlock test with rntl_lock
+ALL_TESTS="$ALL_TESTS 0029:1:1:test_dev_x:block" # kernfs race removal of store
+ALL_TESTS="$ALL_TESTS 0030:1:1:test_dev_x:block" # kernfs race removal before mutex
+ALL_TESTS="$ALL_TESTS 0031:1:1:test_dev_x:block" # kernfs race removal after mutex
+ALL_TESTS="$ALL_TESTS 0032:1:1:test_dev_x:block" # kernfs race removal after active
 
 allow_user_defaults()
 {
@@ -91,6 +95,9 @@ allow_user_defaults()
 	esac
 	if [ -z $SYSFS_DEBUGFS_DIR ]; then
 		SYSFS_DEBUGFS_DIR="/sys/kernel/debug/test_sysfs"
+	fi
+	if [ -z $KERNFS_DEBUGFS_DIR ]; then
+		KERNFS_DEBUGFS_DIR="/sys/kernel/debug/kernfs"
 	fi
 	if [ -z $PAGE_SIZE ]; then
 		PAGE_SIZE=$(getconf PAGESIZE)
@@ -167,6 +174,14 @@ modprobe_reset_enable_rtnl_lock_on_rmmod()
 	unset FIRST_MODPROBE_ARGS
 }
 
+modprobe_reset_enable_completion()
+{
+	FIRST_MODPROBE_ARGS="enable_completion_on_rmmod=1 enable_verbose_writes=1"
+	FIRST_MODPROBE_ARGS="$FIRST_MODPROBE_ARGS enable_verbose_rmmod=1 delay_rmmod_ms=0"
+	modprobe_reset
+	unset FIRST_MODPROBE_ARGS
+}
+
 load_req_mod()
 {
 	modprobe_reset
@@ -195,6 +210,63 @@ config_reset()
 debugfs_reset_first_test_dev_ignore_errors()
 {
 	echo -n "1" >"$SYSFS_DEBUGFS_DIR"/reset_first_test_dev
+}
+
+debugfs_kernfs_kernfs_fop_write_iter_exists()
+{
+	KNOB_DIR="${KERNFS_DEBUGFS_DIR}/config_fail_kernfs_fop_write_iter"
+	if [[ ! -d $KNOB_DIR ]]; then
+		echo "kernfs debugfs does not exist $KNOB_DIR"
+		return 0;
+	fi
+	KNOB_DEBUGFS="${KERNFS_DEBUGFS_DIR}/fail_kernfs_fop_write_iter"
+	if [[ ! -d $KNOB_DEBUGFS ]]; then
+		echo -n "kernfs debugfs for coniguring fail_kernfs_fop_write_iter "
+		echo "does not exist $KNOB_DIR"
+		return 0;
+	fi
+	return 1
+}
+
+debugfs_kernfs_kernfs_fop_write_iter_set_fail_once()
+{
+	KNOB_DEBUGFS="${KERNFS_DEBUGFS_DIR}/fail_kernfs_fop_write_iter"
+	echo 1 > $KNOB_DEBUGFS/interval
+	echo 100 > $KNOB_DEBUGFS/probability
+	echo 0 > $KNOB_DEBUGFS/space
+	# Disable verbose messages on the kernel ring buffer which may
+	# confuse developers with a kernel panic.
+	echo 0 > $KNOB_DEBUGFS/verbose
+
+	# Fail only once
+	echo 1 > $KNOB_DEBUGFS/times
+}
+
+debugfs_kernfs_kernfs_fop_write_iter_set_fail_never()
+{
+	KNOB_DEBUGFS="${KERNFS_DEBUGFS_DIR}/fail_kernfs_fop_write_iter"
+	echo 0 > $KNOB_DEBUGFS/times
+}
+
+debugfs_kernfs_set_wait_ms()
+{
+	SLEEP_AFTER_WAIT_MS="${KERNFS_DEBUGFS_DIR}/sleep_after_wait_ms"
+	echo $1 > $SLEEP_AFTER_WAIT_MS
+}
+
+debugfs_kernfs_disable_wait_kernfs_fop_write_iter()
+{
+	ENABLE_WAIT_KNOB="${KERNFS_DEBUGFS_DIR}/config_fail_kernfs_fop_write_iter/wait_"
+	for KNOB in ${ENABLE_WAIT_KNOB}*; do
+		echo 0 > $KNOB
+	done
+}
+
+debugfs_kernfs_enable_wait_kernfs_fop_write_iter()
+{
+	ENABLE_WAIT_KNOB="${KERNFS_DEBUGFS_DIR}/config_fail_kernfs_fop_write_iter/wait_$1"
+	echo -n "1" > $ENABLE_WAIT_KNOB
+	return $?
 }
 
 set_orig()
@@ -972,6 +1044,104 @@ sysfs_test_0028()
 	fi
 }
 
+sysfs_race_kernfs_kernfs_fop_write_iter()
+{
+	TARGET="${DIR}/$(get_test_target $1)"
+	WAIT_AT=$2
+	EXPECT_WRITE_RETURNS=$3
+	MSDELAY=$4
+
+	modprobe_reset_enable_completion
+	ORIG=$(cat "${TARGET}")
+	TEST_STR=$(( $ORIG + 1 ))
+
+	echo -n "Test racing removal of sysfs store op with kernfs $WAIT_AT ... "
+
+	if debugfs_kernfs_kernfs_fop_write_iter_exists; then
+		echo -n "skipping test as CONFIG_FAIL_KERNFS_KNOBS "
+		echo " or CONFIG_FAULT_INJECTION_DEBUG_FS is disabled"
+		return $ksft_skip
+	fi
+
+	# Allow for failing the kernfs_kernfs_fop_write_iter call once,
+	# we'll provide exact context shortly afterwards.
+	debugfs_kernfs_kernfs_fop_write_iter_set_fail_once
+
+	# First disable all waits
+	debugfs_kernfs_disable_wait_kernfs_fop_write_iter
+
+	# Enable a wait_for_completion(&kernfs_debug_wait_completion) at the
+	# specified location inside the kernfs_fop_write_iter() routine
+	debugfs_kernfs_enable_wait_kernfs_fop_write_iter $WAIT_AT
+
+	# Configure kernfs so that after its wait_for_completion() it
+	# will msleep() this amount of time and schedule(). We figure this
+	# will be sufficient time to allow for our module removal to complete.
+	debugfs_kernfs_set_wait_ms $MSDELAY
+
+	# Now we trigger a kernfs write op, which will run kernfs_fop_write_iter,
+	# but will wait until our driver sends a respective completion
+	set_test_ignore_errors &
+	write_pid=$!
+
+	# At this point kernfs_fop_write_iter() hasn't run our op, its
+	# waiting for our completion at the specified time $WAIT_AT.
+	# We now remove our module which will send a
+	# complete(&kernfs_debug_wait_completion) right before we deregister
+	# our device and the sysfs device attributes are removed.
+	#
+	# After the completion is sent, the test_sysfs driver races with
+	# kernfs to do the device deregistration with the kernfs msleep
+	# and schedule(). This should mean we've forced trying to remove the
+	# module prior to allowing kernfs to run our store operation. If the
+	# race did happen we'll panic with a null dereference on the store op.
+	#
+	# If no race happens we should see no write operation triggered.
+	modprobe -r $TEST_DRIVER > /dev/null 2>&1
+
+	debugfs_kernfs_kernfs_fop_write_iter_set_fail_never
+
+	wait $write_pid
+	if [[ $? -eq $EXPECT_WRITE_RETURNS ]]; then
+		echo "ok"
+	else
+		echo "FAIL" >&2
+	fi
+}
+
+sysfs_test_0029()
+{
+	for delay in 0 2 4 8 16 32 64 128 246 512 1024; do
+		echo "Using delay-after-completion: $delay"
+		sysfs_race_kernfs_kernfs_fop_write_iter 0029 at_start 1 $delay
+	done
+}
+
+sysfs_test_0030()
+{
+	for delay in 0 2 4 8 16 32 64 128 246 512 1024; do
+		echo "Using delay-after-completion: $delay"
+		sysfs_race_kernfs_kernfs_fop_write_iter 0030 before_mutex 1 $delay
+	done
+}
+
+sysfs_test_0031()
+{
+	for delay in 0 2 4 8 16 32 64 128 246 512 1024; do
+		echo "Using delay-after-completion: $delay"
+		sysfs_race_kernfs_kernfs_fop_write_iter 0031 after_mutex 1 $delay
+	done
+}
+
+# Even if we get the active reference the write fails
+sysfs_test_0032()
+{
+	for delay in 0 2 4 8 16 32 64 128 246 512 1024; do
+		echo "Using delay-after-completion: $delay"
+		sysfs_race_kernfs_kernfs_fop_write_iter 0032 after_active 1 $delay
+	done
+}
+
 test_gen_desc()
 {
 	echo -n "$1 x $(get_test_count $1)"
@@ -1013,6 +1183,10 @@ list_tests()
 	echo "$(test_gen_desc 0026) - block test writing y larger delay and resetting device"
 	echo "$(test_gen_desc 0027) - test rmmod deadlock while writing x ... "
 	echo "$(test_gen_desc 0028) - test rmmod deadlock using rtnl_lock while writing x ..."
+	echo "$(test_gen_desc 0029) - racing removal of store op with kernfs at start"
+	echo "$(test_gen_desc 0030) - racing removal of store op with kernfs before mutex"
+	echo "$(test_gen_desc 0031) - racing removal of store op with kernfs after mutex"
+	echo "$(test_gen_desc 0032) - racing removal of store op with kernfs after active"
 }
 
 usage()

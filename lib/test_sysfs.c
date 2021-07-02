@@ -38,6 +38,11 @@
 #include <linux/rtnetlink.h>
 #include <linux/genhd.h>
 #include <linux/blkdev.h>
+#include <linux/kernfs.h>
+
+#ifdef CONFIG_FAIL_KERNFS_KNOBS
+MODULE_IMPORT_NS(KERNFS_DEBUG_PRIVATE);
+#endif
 
 static bool enable_lock;
 module_param(enable_lock, bool_enable_only, 0644);
@@ -81,6 +86,13 @@ MODULE_PARM_DESC(delay_rmmod_ms, "if set how many ms to delay rmmod before devic
 static bool enable_verbose_rmmod;
 module_param(enable_verbose_rmmod, bool_enable_only, 0644);
 MODULE_PARM_DESC(enable_verbose_rmmod, "enable verbose print messages on rmmod");
+
+#ifdef CONFIG_FAIL_KERNFS_KNOBS
+static bool enable_completion_on_rmmod;
+module_param(enable_completion_on_rmmod, bool_enable_only, 0644);
+MODULE_PARM_DESC(enable_completion_on_rmmod,
+		 "enable sending a kernfs completion on rmmod");
+#endif
 
 static int sysfs_test_major;
 
@@ -288,6 +300,12 @@ static ssize_t config_show(struct device *dev,
 	len += snprintf(buf+len, PAGE_SIZE - len,
 			"enable_verbose_writes:\t%s\n",
 			enable_verbose_writes ? "true" : "false");
+
+#ifdef CONFIG_FAIL_KERNFS_KNOBS
+	len += snprintf(buf+len, PAGE_SIZE - len,
+			"enable_completion_on_rmmod:\t%s\n",
+			enable_completion_on_rmmod ? "true" : "false");
+#endif
 
 	test_dev_config_unlock(test_dev);
 
@@ -936,10 +954,23 @@ static int __init test_sysfs_init(void)
 }
 module_init(test_sysfs_init);
 
+#ifdef CONFIG_FAIL_KERNFS_KNOBS
+/* The goal is to race our device removal with a pending kernfs -> store call */
+static void test_sysfs_kernfs_send_completion_rmmod(void)
+{
+	if (!enable_completion_on_rmmod)
+		return;
+	complete(&kernfs_debug_wait_completion);
+}
+#else
+static inline void test_sysfs_kernfs_send_completion_rmmod(void) {}
+#endif
+
 static void __exit test_sysfs_exit(void)
 {
 	if (enable_debugfs)
 		debugfs_remove(debugfs_dir);
+	test_sysfs_kernfs_send_completion_rmmod();
 	if (delay_rmmod_ms)
 		msleep(delay_rmmod_ms);
 	unregister_test_dev_sysfs(first_test_dev);
