@@ -2852,6 +2852,40 @@ sub process {
 
 		$cnt_lines++ if ($realcnt != 0);
 
+# check if this may trip up common mailing list helpers to redirect email to the admin contact
+		if ($in_commit_log &&
+		    ($line =~ /\bcancel\b/i ||
+		    $line =~ /\badd me\b/i ||
+		    $line =~ /\bdelete me\b/i ||
+		    $line =~ /\bremove\s+me\b/i ||
+		    $line =~ /\bchange\b.*\baddress\b/ ||
+		    $line =~ /\bsubscribe\b/i ||
+		    $line =~ /^sub\b/i ||
+		    $line =~ /\bunsubscribe\b/i ||
+		    $line =~ /^unsub\b/i ||
+		    $line =~ /^\s*help\s*$/i ||
+		    $line =~ /^\s*info\s*$/i ||
+		    $line =~ /^\s*info\s+\S+\s*$/i ||
+		    $line =~ /^\s*lists\s*$/i ||
+		    $line =~ /^\s*which\s*$/i ||
+		    $line =~ /^\s*which\s+\S+\s*$/i ||
+		    $line =~ /^\s*index\s*$/i ||
+		    $line =~ /^\s*index\s+\S+\s*$/i ||
+		    $line =~ /^\s*who\s*$/i ||
+		    $line =~ /^\s*who\s+\S+\s*$/i ||
+		    $line =~ /^\s*get\s+\S+\s*$/i ||
+		    $line =~ /^\s*get\s+\S+\s+\S+\s*$/i ||
+		    $line =~ /^\s*approve\b/i ||
+		    $line =~ /^\s*passwd\b/i ||
+		    $line =~ /^\s*newinfo\b/i ||
+		    $line =~ /^\s*config\b/i ||
+		    $line =~ /^\s*newconfig\b/i ||
+		    $line =~ /^\s*writeconfig\b/i ||
+		    $line =~ /^\s*mkdigest\b/i)){
+			WARN("MAILING LIST HELPER",
+			     "Line matches common mailing list helpers, and may not be delivered correctly. Consider rewording (particularly the first word)\n" . $herecurr);
+		}
+
 # Verify the existence of a commit log if appropriate
 # 2 is used because a $signature is counted in $commit_log_lines
 		if ($in_commit_log) {
