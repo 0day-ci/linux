@@ -1730,6 +1730,11 @@ struct f2fs_sb_info {
 	struct kmem_cache *inline_xattr_slab;	/* inline xattr entry */
 	unsigned int inline_xattr_slab_size;	/* default inline xattr slab size */
 
+	/* For reclaimed dirty segs statistics per each GC urgent mode */
+	unsigned int gc_dirty_segs_mode;	/* GC state for reclaimed dirty segments */
+	u64 gc_urgent_high_dirty_segs;		/* Reclaimed dirty segs in GC_URGENT_HIGH */
+	u64 gc_urgent_low_dirty_segs;		/* Reclaimed dirty segs in GC_URGENT_LOW */
+
 #ifdef CONFIG_F2FS_FS_COMPRESSION
 	struct kmem_cache *page_array_slab;	/* page array entry */
 	unsigned int page_array_slab_size;	/* default page array slab size */

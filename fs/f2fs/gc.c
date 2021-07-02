@@ -1646,6 +1646,10 @@ static int do_garbage_collect(struct f2fs_sb_info *sbi,
 							force_migrate);
 
 		stat_inc_seg_count(sbi, type, gc_type);
+		if (sbi->gc_dirty_segs_mode == GC_URGENT_HIGH)
+			sbi->gc_urgent_high_dirty_segs++;
+		else if (sbi->gc_dirty_segs_mode == GC_URGENT_LOW)
+			sbi->gc_urgent_low_dirty_segs++;
 		migrated++;
 
 freed:

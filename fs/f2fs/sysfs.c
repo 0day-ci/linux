@@ -307,6 +307,25 @@ static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 		return sysfs_emit(buf, "%u\n", sbi->compr_new_inode);
 #endif
 
+	if (!strcmp(a->attr.name, "gc_urgent_dirty_segs_mode")) {
+		if (sbi->gc_dirty_segs_mode == GC_NORMAL)
+			return sysfs_emit(buf, "0\n");
+		else if (sbi->gc_dirty_segs_mode == GC_URGENT_HIGH)
+			return sysfs_emit(buf, "1\n");
+		else if (sbi->gc_dirty_segs_mode == GC_URGENT_LOW)
+			return sysfs_emit(buf, "2\n");
+	}
+
+	if (!strcmp(a->attr.name, "gc_urgent_dirty_segs")) {
+		if (sbi->gc_dirty_segs_mode == GC_URGENT_HIGH)
+			return sysfs_emit(buf, "%llu\n",
+					sbi->gc_urgent_high_dirty_segs);
+		if (sbi->gc_dirty_segs_mode == GC_URGENT_LOW)
+			return sysfs_emit(buf, "%llu\n",
+					sbi->gc_urgent_low_dirty_segs);
+		return sysfs_emit(buf, "0\n");
+	}
+
 	ui = (unsigned int *)(ptr + a->offset);
 
 	return sprintf(buf, "%u\n", *ui);
@@ -512,6 +531,28 @@ out:
 		if (t > 100)
 			return -EINVAL;
 		sbi->am.age_weight = t;
+		return count;
+	}
+
+	if (!strcmp(a->attr.name, "gc_urgent_dirty_segs_mode")) {
+		if (t == 0)
+			sbi->gc_dirty_segs_mode = GC_NORMAL;
+		else if (t == 1)
+			sbi->gc_dirty_segs_mode = GC_URGENT_HIGH;
+		else if (t == 2)
+			sbi->gc_dirty_segs_mode = GC_URGENT_LOW;
+		else
+			return -EINVAL;
+		return count;
+	}
+
+	if (!strcmp(a->attr.name, "gc_urgent_dirty_segs")) {
+		if (t != 0 || sbi->gc_dirty_segs_mode == GC_NORMAL)
+			return -EINVAL;
+		if (sbi->gc_dirty_segs_mode == GC_URGENT_HIGH)
+			sbi->gc_urgent_high_dirty_segs = 0;
+		else if (sbi->gc_dirty_segs_mode == GC_URGENT_LOW)
+			sbi->gc_urgent_low_dirty_segs = 0;
 		return count;
 	}
 
@@ -740,6 +781,9 @@ F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_candidate_count, max_candidate_cou
 F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_age_weight, age_weight);
 F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_age_threshold, age_threshold);
 
+F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, gc_urgent_dirty_segs_mode, gc_dirty_segs_mode);
+F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, gc_urgent_dirty_segs, gc_urgent_high_dirty_segs);
+
 #define ATTR_LIST(name) (&f2fs_attr_##name.attr)
 static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(gc_urgent_sleep_time),
@@ -812,6 +856,8 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(atgc_candidate_count),
 	ATTR_LIST(atgc_age_weight),
 	ATTR_LIST(atgc_age_threshold),
+	ATTR_LIST(gc_urgent_dirty_segs_mode),
+	ATTR_LIST(gc_urgent_dirty_segs),
 	NULL,
 };
 ATTRIBUTE_GROUPS(f2fs);
