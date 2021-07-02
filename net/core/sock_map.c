@@ -222,6 +222,9 @@ static int sock_map_link(struct bpf_map *map, struct sock *sk)
 	struct bpf_prog *msg_parser = NULL;
 	struct sk_psock *psock;
 	int ret;
+#ifdef CONFIG_PROC_FS
+	int idx;
+#endif
 
 	/* Only sockets we can redirect into/from in BPF need to hold
 	 * refs to parser/verdict progs and have their sk_data_ready
@@ -293,9 +296,15 @@ no_progs:
 	if (msg_parser)
 		psock_set_prog(&psock->progs.msg_parser, msg_parser);
 
+#ifdef CONFIG_PROC_FS
+	idx = sk->sk_prot->inuse_idx;
+#endif
 	ret = sock_map_init_proto(sk, psock);
 	if (ret < 0)
 		goto out_drop;
+#ifdef CONFIG_PROC_FS
+	sk->sk_prot->inuse_idx = idx;
+#endif
 
 	write_lock_bh(&sk->sk_callback_lock);
 	if (stream_parser && stream_verdict && !psock->saved_data_ready) {
