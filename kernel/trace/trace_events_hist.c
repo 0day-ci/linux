@@ -120,6 +120,7 @@ struct hist_field {
 	unsigned int			size;
 	unsigned int			offset;
 	unsigned int                    is_signed;
+	unsigned long			grouping;
 	const char			*type;
 	struct hist_field		*operands[HIST_FIELD_OPERANDS_MAX];
 	struct hist_trigger_data	*hist_data;
@@ -3761,6 +3762,7 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 {
 	struct trace_array *tr = hist_data->event_file->tr;
 	struct hist_field *hist_field = NULL;
+	char *field;
 	unsigned long flags = 0;
 	unsigned int key_size;
 	int ret = 0;
@@ -3768,14 +3770,16 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 	if (WARN_ON(key_idx >= HIST_FIELDS_MAX))
 		return -EINVAL;
 
+	field = strsep(&field_str, "-");
+
 	flags |= HIST_FIELD_FL_KEY;
 
-	if (strcmp(field_str, "stacktrace") == 0) {
+	if (strcmp(field, "stacktrace") == 0) {
 		flags |= HIST_FIELD_FL_STACKTRACE;
 		key_size = sizeof(unsigned long) * HIST_STACKTRACE_DEPTH;
 		hist_field = create_hist_field(hist_data, NULL, flags, NULL);
 	} else {
-		hist_field = parse_expr(hist_data, file, field_str, flags,
+		hist_field = parse_expr(hist_data, file, field, flags,
 					NULL, 0);
 		if (IS_ERR(hist_field)) {
 			ret = PTR_ERR(hist_field);
@@ -3783,13 +3787,21 @@ static int create_key_field(struct hist_trigger_data *hist_data,
 		}
 
 		if (field_has_hist_vars(hist_field, 0))	{
-			hist_err(tr, HIST_ERR_INVALID_REF_KEY, errpos(field_str));
+			hist_err(tr, HIST_ERR_INVALID_REF_KEY, errpos(field));
 			destroy_hist_field(hist_field, 0);
 			ret = -EINVAL;
 			goto out;
 		}
 
 		key_size = hist_field->size;
+	}
+
+	if (field_str) {
+		unsigned long grouping;
+
+		ret = kstrtoul(field_str, 0, &grouping);
+		if (!ret)
+			hist_field->grouping = grouping;
 	}
 
 	hist_data->fields[key_idx] = hist_field;
@@ -4548,8 +4560,18 @@ static void event_hist_trigger(struct event_trigger_data *data,
 			if (key_field->flags & HIST_FIELD_FL_STRING) {
 				key = (void *)(unsigned long)field_contents;
 				use_compound_key = true;
-			} else
+			} else {
+				if (key_field->grouping) {
+					unsigned long grouping = key_field->grouping;
+
+					if (field_contents >= LONG_MAX)
+						field_contents = div64_ul(field_contents, grouping);
+					else
+						field_contents = (u64)((unsigned long)field_contents / grouping);
+					field_contents *= grouping;
+				}
 				key = (void *)&field_contents;
+			}
 		}
 
 		if (use_compound_key)
@@ -4663,6 +4685,8 @@ static void hist_trigger_print_key(struct seq_file *m,
 		} else {
 			uval = *(u64 *)(key + key_field->offset);
 			seq_printf(m, "%s: %10llu", field_name, uval);
+			if (key_field->grouping)
+				seq_printf(m, "-%llu", uval + key_field->grouping - 1);
 		}
 	}
 
@@ -5096,6 +5120,8 @@ static void hist_field_print(struct seq_file *m, struct hist_field *hist_field)
 				seq_printf(m, ".%s", flags);
 		}
 	}
+	if (hist_field->grouping)
+		seq_printf(m, "-%ld", hist_field->grouping);
 }
 
 static int event_hist_trigger_print(struct seq_file *m,
