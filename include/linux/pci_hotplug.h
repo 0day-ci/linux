@@ -48,10 +48,14 @@ struct hotplug_slot_ops {
 };
 
 /**
- * struct hotplug_slot - used to register a physical slot with the hotplug pci core
- * @ops: pointer to the &struct hotplug_slot_ops to be used for this slot
- * @owner: The module owner of this structure
- * @mod_name: The module name (KBUILD_MODNAME) of this structure
+ * struct hotplug_slot - Used to register a physical slot with the hotplug PCI
+ *			 core.
+ * @ops:	Pointer to the &struct hotplug_slot_ops to be used for this
+ *		slot.
+ * @slot_list:	Internal list used to track hotplug PCI slots.
+ * @pci_slot:	Pepresents a physical slot.
+ * @owner:	The module owner of this structure.
+ * @mod_name:	The module name (KBUILD_MODNAME) of this structure.
  */
 struct hotplug_slot {
 	const struct hotplug_slot_ops	*ops;

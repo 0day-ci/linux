@@ -1876,8 +1876,8 @@ static void interrupt_event_handler(struct controller *ctrl)
 
 
 /**
- * cpqhp_pushbutton_thread - handle pushbutton events
- * @slot: target slot (struct)
+ * cpqhp_pushbutton_thread - Handle pushbutton events.
+ * @t: Pointer to struct timer_list which holds all timer related callbacks.
  *
  * Scheduled procedure to handle blocking stuff for the pushbuttons.
  * Handles all pending events and exits.
