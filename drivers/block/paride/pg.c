@@ -429,8 +429,6 @@ static void xs(char *buf, char *targ, int len)
 		if (c != ' ' && c != l)
 			l = *targ++ = c;
 	}
-	if (l == ' ')
-		targ--;
 	*targ = '\0';
 }
 
