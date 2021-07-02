@@ -89,6 +89,16 @@ static unsigned int intel_fbc_cfb_stride(struct drm_i915_private *i915,
 	unsigned int stride = _intel_fbc_cfb_stride(cache);
 
 	/*
+	 * Wa_16011863758: icl+
+	 * CFB segment stride needs at least one extra cacheline.
+	 * We make sure each line has an extra cacheline so that
+	 * the 4 line segment will have one regarless of the
+	 * compression limit we choose later.
+	 */
+	if (DISPLAY_VER(i915) >= 11)
+		stride = max(stride, cache->plane.src_w * 4 + 64u);
+
+	/*
 	 * At least some of the platforms require each 4 line segment to
 	 * be 512 byte aligned. Aligning each line to 512 bytes guarantees
 	 * that regardless of the compression limit we choose later.
