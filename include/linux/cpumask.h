@@ -983,6 +983,25 @@ cpumap_print_to_pagebuf(bool list, char *buf, const struct cpumask *mask)
 				      nr_cpu_ids);
 }
 
+/**
+ * cpumap_print_to_buf  - copies the cpumask into the buffer either
+ *      as comma-separated list of cpus or hex values of cpumask;
+ *      Typically used by bin_attribute to export cpumask bitmask and
+ *      list ABI.
+ * @list: indicates whether the cpumap must be list
+ *      true:  print in decimal list format
+ *      fasle: print in hexadecimal bitmask format
+ * @mask: the cpumask to copy
+ * @buf: the buffer to copy into
+ * @off: in the string from which we are copying, We copy to @buf
+ * @count: the maximum number of bytes to print
+ *
+ * Returns the length of how many bytes have been copied.
+ */
+extern ssize_t
+cpumap_print_to_buf(bool list, char *buf, const struct cpumask *mask,
+		    loff_t off, size_t count);
+
 #if NR_CPUS <= BITS_PER_LONG
 #define CPU_MASK_ALL							\
 (cpumask_t) { {								\
