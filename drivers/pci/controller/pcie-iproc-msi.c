@@ -49,14 +49,14 @@ enum iproc_msi_reg {
 struct iproc_msi;
 
 /**
- * iProc MSI group
+ * struct iproc_msi_grp - iProc MSI group.
  *
- * One MSI group is allocated per GIC interrupt, serviced by one iProc MSI
- * event queue.
+ * @msi:	Pointer to iProc MSI data.
+ * @gic_irq:	GIC interrupt.
+ * @eq:		Event queue number.
  *
- * @msi: pointer to iProc MSI data
- * @gic_irq: GIC interrupt
- * @eq: Event queue number
+ * One MSI group is allocated per GIC interrupt, serviced by one iProc MSI event
+ * queue.
  */
 struct iproc_msi_grp {
 	struct iproc_msi *msi;
@@ -65,30 +65,30 @@ struct iproc_msi_grp {
 };
 
 /**
- * iProc event queue based MSI
+ * struct iproc_msi - iProc event queue based MSI.
+ *
+ * @pcie:		Pointer to iProc PCIe data.
+ * @reg_offsets:	MSI register offsets.
+ * @grps:		MSI groups.
+ * @nr_irqs:		Number of total interrupts connected to GIC.
+ * @nr_cpus:		Number of toal CPUs.
+ * @has_inten_reg:	Indicates the MSI interrupt enable register needs to be
+ *			set explicitly (required for some legacy platforms).
+ * @bitmap:		MSI vector bitmap.
+ * @bitmap_lock:	Lock to protect access to the MSI bitmap.
+ * @nr_msi_vecs:	Total number of MSI vectors.
+ * @inner_domain:	Inner IRQ domain.
+ * @msi_domain:		MSI IRQ domain.
+ * @nr_eq_region:	Required number of 4K aligned memory region for MSI
+ *			event queues.
+ * @nr_msi_region:	Required number of 4K aligned address region for MSI
+ *			posted writes.
+ * @eq_cpu:		Pointer to allocated memory region for MSI event queues.
+ * @eq_dma:		DMA address of MSI event queues.
+ * @msi_addr:		MSI address.
  *
  * Only meant to be used on platforms without MSI support integrated into the
  * GIC.
- *
- * @pcie: pointer to iProc PCIe data
- * @reg_offsets: MSI register offsets
- * @grps: MSI groups
- * @nr_irqs: number of total interrupts connected to GIC
- * @nr_cpus: number of toal CPUs
- * @has_inten_reg: indicates the MSI interrupt enable register needs to be
- * set explicitly (required for some legacy platforms)
- * @bitmap: MSI vector bitmap
- * @bitmap_lock: lock to protect access to the MSI bitmap
- * @nr_msi_vecs: total number of MSI vectors
- * @inner_domain: inner IRQ domain
- * @msi_domain: MSI IRQ domain
- * @nr_eq_region: required number of 4K aligned memory region for MSI event
- * queues
- * @nr_msi_region: required number of 4K aligned address region for MSI posted
- * writes
- * @eq_cpu: pointer to allocated memory region for MSI event queues
- * @eq_dma: DMA address of MSI event queues
- * @msi_addr: MSI address
  */
 struct iproc_msi {
 	struct iproc_pcie *pcie;

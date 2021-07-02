@@ -89,10 +89,10 @@
 #define IPROC_PCIE_REG_INVALID		0xffff
 
 /**
- * iProc PCIe outbound mapping controller specific parameters
- *
- * @window_sizes: list of supported outbound mapping window sizes in MB
- * @nr_sizes: number of supported outbound mapping window sizes
+ * struct iproc_pcie_ob_map - iProc PCIe outbound mapping controller specific
+ *			      parameters.
+ * @window_sizes:	List of supported outbound mapping window sizes in MB.
+ * @nr_sizes:		Number of supported outbound mapping window sizes.
  */
 struct iproc_pcie_ob_map {
 	resource_size_t window_sizes[MAX_NUM_OB_WINDOW_SIZES];
@@ -136,32 +136,31 @@ static const struct iproc_pcie_ob_map paxb_v2_ob_map[] = {
 };
 
 /**
- * iProc PCIe inbound mapping type
+ * enum iproc_pcie_ib_map_type - iProc PCIe inbound mapping type.
+ * @IPROC_PCIE_IB_MAP_MEM:	DDR memory.
+ * @IPROC_PCIE_IB_MAP_IO:	Device I/O memory.
+ * @IPROC_PCIE_IB_MAP_INVALID:	Invalid or unused.
  */
 enum iproc_pcie_ib_map_type {
-	/* for DDR memory */
 	IPROC_PCIE_IB_MAP_MEM = 0,
-
-	/* for device I/O memory */
 	IPROC_PCIE_IB_MAP_IO,
-
-	/* invalid or unused */
 	IPROC_PCIE_IB_MAP_INVALID
 };
 
 /**
- * iProc PCIe inbound mapping controller specific parameters
- *
- * @type: inbound mapping region type
- * @size_unit: inbound mapping region size unit, could be SZ_1K, SZ_1M, or
- * SZ_1G
- * @region_sizes: list of supported inbound mapping region sizes in KB, MB, or
- * GB, depending on the size unit
- * @nr_sizes: number of supported inbound mapping region sizes
- * @nr_windows: number of supported inbound mapping windows for the region
- * @imap_addr_offset: register offset between the upper and lower 32-bit
- * IMAP address registers
- * @imap_window_offset: register offset between each IMAP window
+ * struct iproc_pcie_ib_map - iProc PCIe inbound mapping controller specific
+ *			      parameters.
+ * @type:		Inbound mapping region type
+ * @size_unit:		Inbound mapping region size unit, could be SZ_1K, SZ_1M,
+ *			or SZ_1G.
+ * @region_sizes:	List of supported inbound mapping region sizes in KB,
+ *			MB, or GB, depending on the size unit.
+ * @nr_sizes:		Number of supported inbound mapping region sizes.
+ * @nr_windows:		Number of supported inbound mapping windows for the
+ *			region.
+ * @imap_addr_offset:	Register offset between the upper and lower 32-bit IMAP
+ *			address registers.
+ * @imap_window_offset:	Register offset between each IMAP window.
  */
 struct iproc_pcie_ib_map {
 	enum iproc_pcie_ib_map_type type;
@@ -437,7 +436,7 @@ static inline void iproc_pcie_write_reg(struct iproc_pcie *pcie,
 	writel(val, pcie->base + offset);
 }
 
-/**
+/*
  * APB error forwarding can be disabled during access of configuration
  * registers of the endpoint device, to prevent unsupported requests
  * (typically seen during enumeration with multi-function devices) from
@@ -619,7 +618,7 @@ static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 	return PCIBIOS_SUCCESSFUL;
 }
 
-/**
+/*
  * Note access to the configuration registers are protected at the higher layer
  * by 'pci_lock' in drivers/pci/access.c
  */
@@ -897,7 +896,7 @@ static inline int iproc_pcie_ob_write(struct iproc_pcie *pcie, int window_idx,
 	return 0;
 }
 
-/**
+/*
  * Some iProc SoCs require the SW to configure the outbound address mapping
  *
  * Outbound address translation:

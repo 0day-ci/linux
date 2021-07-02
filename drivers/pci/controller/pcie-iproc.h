@@ -7,7 +7,16 @@
 #define _PCIE_IPROC_H
 
 /**
- * iProc PCIe interface type
+ * enum iproc_pcie_type - iProc PCIe interface type.
+ * @IPROC_PCIE_PAXB_BCMA:	New generation of iProc BCMA-based host
+ *				controllers.
+ * @IPROC_PCIE_PAXB:		iProc PAXB-based host controllers for SoCs such
+ *				as NS, NSP, Cygnus, NS2 and Pegasus.
+ * @IPROC_PCIE_PAXB_V2:		Next generation of iProc PAXB-based host
+ *				controllers using the Stingray SoCs.
+ * @IPROC_PCIE_PAXC:		iProx PAXC-based host controllers.
+ * @IPROC_PCIE_PAXC_V2:		Second generation of the iProc PAXC-based host
+ *				controllers.
  *
  * PAXB is the wrapper used in root complex that can be connected to an
  * external endpoint device.
@@ -24,10 +33,10 @@ enum iproc_pcie_type {
 };
 
 /**
- * iProc PCIe outbound mapping
- * @axi_offset: offset from the AXI address to the internal address used by
- * the iProc PCIe core
- * @nr_windows: total number of supported outbound mapping windows
+ * struct iproc_pcie_ob - iProc PCIe outbound mapping.
+ * @axi_offset:	Offset from the AXI address to the internal address used by the
+ *		iProc PCIe core.
+ * @nr_windows:	Total number of supported outbound mapping windows.
  */
 struct iproc_pcie_ob {
 	resource_size_t axi_offset;
@@ -35,8 +44,8 @@ struct iproc_pcie_ob {
 };
 
 /**
- * iProc PCIe inbound mapping
- * @nr_regions: total number of supported inbound mapping regions
+ * struct iproc_pcie_ib - iProc PCIe inbound mapping.
+ * @nr_regions:	Total number of supported inbound mapping regions.
  */
 struct iproc_pcie_ib {
 	unsigned int nr_regions;
@@ -47,35 +56,42 @@ struct iproc_pcie_ib_map;
 struct iproc_msi;
 
 /**
- * iProc PCIe device
- *
- * @dev: pointer to device data structure
- * @type: iProc PCIe interface type
- * @reg_offsets: register offsets
- * @base: PCIe host controller I/O register base
- * @base_addr: PCIe host controller register base physical address
- * @phy: optional PHY device that controls the Serdes
- * @map_irq: function callback to map interrupts
- * @ep_is_internal: indicates an internal emulated endpoint device is connected
- * @iproc_cfg_read: indicates the iProc config read function should be used
- * @rej_unconfig_pf: indicates the root complex needs to detect and reject
- * enumeration against unconfigured physical functions emulated in the ASIC
- * @has_apb_err_disable: indicates the controller can be configured to prevent
- * unsupported request from being forwarded as an APB bus error
- * @fix_paxc_cap: indicates the controller has corrupted capability list in its
- * config space registers and requires SW based fixup
- *
- * @need_ob_cfg: indicates SW needs to configure the outbound mapping window
- * @ob: outbound mapping related parameters
- * @ob_map: outbound mapping related parameters specific to the controller
- *
- * @need_ib_cfg: indicates SW needs to configure the inbound mapping window
- * @ib: inbound mapping related parameters
- * @ib_map: outbound mapping region related parameters
- *
- * @need_msi_steer: indicates additional configuration of the iProc PCIe
- * controller is required to steer MSI writes to external interrupt controller
- * @msi: MSI data
+ * struct iproc_pcie - iProc PCIe device.
+ * @dev:			Pointer to device data structure.
+ * @type:			iProc PCIe interface type.
+ * @reg_offsets:		Register offsets.
+ * @base:			PCIe host controller I/O register base.
+ * @base_addr:			PCIe host controller register base physical
+ *				address.
+ * @mem:			Host bridge memory window resource.
+ * @phy:			Optional PHY device that controls the Serdes.
+ * @map_irq:			Function callback to map interrupts.
+ * @ep_is_internal:		Indicates an internal emulated endpoint device
+ *				is connected.
+ * @iproc_cfg_read:		Indicates the iProc config read function should
+ *				be used.
+ * @rej_unconfig_pf:		Indicates the root complex needs to detect and
+ *				reject enumeration against unconfigured physical
+ *				functions emulated in the ASIC.
+ * @has_apb_err_disable:	Indicates the controller can be configured to
+ *				prevent unsupported request from being forwarded
+ *				as an APB bus error.
+ * @fix_paxc_cap:		Indicates the controller has corrupted
+ *				capability list in its config space registers
+ *				and requires SW based fixup.
+ * @need_ob_cfg:		Indicates SW needs to configure the outbound
+ *				mapping window.
+ * @ob:				Outbound mapping related parameters.
+ * @ob_map:			Outbound mapping related parameters specific to
+ *				the controller.
+ * @need_ib_cfg:		indicates SW needs to configure the inbound
+ *				mapping window.
+ * @ib:				Inbound mapping related parameters.
+ * @ib_map:			Outbound mapping region related parameters.
+ * @need_msi_steer:		Indicates additional configuration of the iProc
+ *				PCIe controller is required to steer MSI writes
+ *				to external interrupt controller.
+ * @msi:			MSI data.
  */
 struct iproc_pcie {
 	struct device *dev;
