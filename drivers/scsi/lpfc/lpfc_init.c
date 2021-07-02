@@ -4507,6 +4507,9 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 		vport->port_type = LPFC_PHYSICAL_PORT;
 	}
 
+	if (phba->hba_flag & HBA_USE_MANAGED_IRQ)
+		shost->use_managed_irq = 1;
+
 	lpfc_printf_log(phba, KERN_INFO, LOG_INIT | LOG_FCP,
 			"9081 CreatePort TMPLATE type %x TBLsize %d "
 			"SEGcnt %d/%d\n",
@@ -11658,6 +11661,7 @@ lpfc_sli4_enable_msix(struct lpfc_hba *phba)
 		goto vec_fail_out;
 	}
 	vectors = rc;
+	phba->hba_flag |= HBA_USE_MANAGED_IRQ;
 
 	/* Assign MSI-X vectors to interrupt handlers */
 	for (index = 0; index < vectors; index++) {

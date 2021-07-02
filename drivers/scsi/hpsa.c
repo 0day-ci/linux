@@ -5877,6 +5877,9 @@ static int hpsa_scsi_add_host(struct ctlr_info *h)
 {
 	int rv;
 
+	if (h->msix_vectors > 0)
+		h->scsi_host->use_managed_irq = 1;
+
 	rv = scsi_add_host(h->scsi_host, &h->pdev->dev);
 	if (rv) {
 		dev_err(&h->pdev->dev, "scsi_add_host failed\n");

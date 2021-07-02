@@ -633,6 +633,9 @@ csio_shost_init(struct csio_hw *hw, struct device *dev,
 	else
 		shost->transportt = csio_fcoe_transport_vport;
 
+	if (hw->num_pports <= IRQ_AFFINITY_MAX_SETS)
+		shost->use_managed_irq = 1;
+
 	/* root lnode */
 	if (!hw->rln)
 		hw->rln = ln;

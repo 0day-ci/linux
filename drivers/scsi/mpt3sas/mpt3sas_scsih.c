@@ -12236,6 +12236,9 @@ _scsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		    shost->can_queue, shost->nr_hw_queues);
 	}
 
+	if (ioc->smp_affinity_enable)
+		shost->use_managed_irq = 1;
+
 	rv = scsi_add_host(shost, &pdev->dev);
 	if (rv) {
 		ioc_err(ioc, "failure at %s:%d/%s()!\n",

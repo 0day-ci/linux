@@ -6971,6 +6971,9 @@ static int pqi_register_scsi(struct pqi_ctrl_info *ctrl_info)
 	shost->host_tagset = 1;
 	shost->hostdata[0] = (unsigned long)ctrl_info;
 
+	if (ctrl_info->num_msix_vectors_enabled)
+		shost->use_managed_irq = 1;
+
 	rc = scsi_add_host(shost, &ctrl_info->pci_dev->dev);
 	if (rc) {
 		dev_err(&ctrl_info->pci_dev->dev, "scsi_add_host failed\n");

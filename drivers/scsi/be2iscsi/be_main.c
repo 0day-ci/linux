@@ -5656,6 +5656,9 @@ static int beiscsi_dev_probe(struct pci_dev *pcidev,
 	}
 	hwi_enable_intr(phba);
 
+	if (phba->num_cpus > 1)
+		phba->shost->use_managed_irq = 1;
+
 	ret = iscsi_host_add(phba->shost, &phba->pcidev->dev);
 	if (ret)
 		goto free_irqs;

@@ -6961,6 +6961,9 @@ static int megasas_io_attach(struct megasas_instance *instance)
 		instance->iopoll_q_count = 0;
 	}
 
+	if (instance->smp_affinity_enable)
+		host->use_managed_irq = 1;
+
 	dev_info(&instance->pdev->dev,
 		"Max firmware commands: %d shared with default "
 		"hw_queues = %d poll_queues %d\n", instance->max_fw_cmds,

@@ -4761,6 +4761,7 @@ hisi_sas_v3_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (rc)
 		goto err_out_debugfs;
 	dev_err(dev, "%d hw queues\n", shost->nr_hw_queues);
+	shost->use_managed_irq = 1;
 	rc = scsi_add_host(shost, dev);
 	if (rc)
 		goto err_out_free_irq_vectors;
