@@ -91,6 +91,7 @@ enum {
 enum {
 	PRESTERA_CMD_SWITCH_ATTR_MAC = 1,
 	PRESTERA_CMD_SWITCH_ATTR_AGEING = 2,
+	PRESTERA_SWITCH_ATTR_TRAP_POLICER = 3,
 };
 
 enum {
@@ -319,6 +320,19 @@ struct prestera_msg_acl_action {
 	u32 id;
 };
 
+struct prestera_msg_acl_action_ext {
+	u32 id;
+	union {
+		struct {
+			u64 rate;
+			u64 burst;
+		} police;
+		struct {
+			u64 res[3];
+		} reserv;
+	} __packed;
+};
+
 struct prestera_msg_acl_match {
 	u32 type;
 	union {
@@ -352,6 +366,16 @@ struct prestera_msg_acl_rule_req {
 	u16 ruleset_id;
 	u8 n_actions;
 	u8 n_matches;
+};
+
+struct prestera_msg_acl_rule_ext_req {
+	struct prestera_msg_cmd cmd;
+	u32 id;
+	u32 priority;
+	u16 ruleset_id;
+	u8 n_actions;
+	u8 n_matches;
+	u8 hw_tc;
 };
 
 struct prestera_msg_acl_rule_resp {
@@ -908,6 +932,36 @@ static int prestera_hw_acl_actions_put(struct prestera_msg_acl_action *action,
 	return 0;
 }
 
+static int prestera_hw_acl_actions_ext_put(struct prestera_msg_acl_action_ext *action,
+					   struct prestera_acl_rule *rule)
+{
+	struct list_head *a_list = prestera_acl_rule_action_list_get(rule);
+	struct prestera_acl_rule_action_entry *a_entry;
+	int i = 0;
+
+	list_for_each_entry(a_entry, a_list, list) {
+		action[i].id = a_entry->id;
+
+		switch (a_entry->id) {
+		case PRESTERA_ACL_RULE_ACTION_ACCEPT:
+		case PRESTERA_ACL_RULE_ACTION_DROP:
+		case PRESTERA_ACL_RULE_ACTION_TRAP:
+			/* just rule action id, no specific data */
+			break;
+		case PRESTERA_ACL_RULE_ACTION_POLICE:
+			action[i].police.rate = a_entry->police.rate;
+			action[i].police.burst = a_entry->police.burst;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		i++;
+	}
+
+	return 0;
+}
+
 static int prestera_hw_acl_matches_put(struct prestera_msg_acl_match *match,
 				       struct prestera_acl_rule *rule)
 {
@@ -963,9 +1017,9 @@ static int prestera_hw_acl_matches_put(struct prestera_msg_acl_match *match,
 	return 0;
 }
 
-int prestera_hw_acl_rule_add(struct prestera_switch *sw,
-			     struct prestera_acl_rule *rule,
-			     u32 *rule_id)
+int __prestera_hw_acl_rule_add(struct prestera_switch *sw,
+			       struct prestera_acl_rule *rule,
+			       u32 *rule_id)
 {
 	struct prestera_msg_acl_action *actions;
 	struct prestera_msg_acl_match *matches;
@@ -1016,6 +1070,71 @@ free_buff:
 	kfree(buff);
 	return err;
 }
+
+int __prestera_hw_acl_rule_ext_add(struct prestera_switch *sw,
+				   struct prestera_acl_rule *rule,
+				   u32 *rule_id)
+{
+	struct prestera_msg_acl_action_ext *actions;
+	struct prestera_msg_acl_rule_ext_req *req;
+	struct prestera_msg_acl_match *matches;
+	struct prestera_msg_acl_rule_resp resp;
+	u8 n_actions;
+	u8 n_matches;
+	void *buff;
+	u32 size;
+	int err;
+
+	n_actions = prestera_acl_rule_action_len(rule);
+	n_matches = prestera_acl_rule_match_len(rule);
+
+	size = sizeof(*req) + sizeof(*actions) * n_actions +
+		sizeof(*matches) * n_matches;
+
+	buff = kzalloc(size, GFP_KERNEL);
+	if (!buff)
+		return -ENOMEM;
+
+	req = buff;
+	actions = buff + sizeof(*req);
+	matches = buff + sizeof(*req) + sizeof(*actions) * n_actions;
+
+	/* put acl actions into the message */
+	err = prestera_hw_acl_actions_ext_put(actions, rule);
+	if (err)
+		goto free_buff;
+
+	/* put acl matches into the message */
+	err = prestera_hw_acl_matches_put(matches, rule);
+	if (err)
+		goto free_buff;
+
+	req->ruleset_id = prestera_acl_rule_ruleset_id_get(rule);
+	req->priority = prestera_acl_rule_priority_get(rule);
+	req->n_actions = prestera_acl_rule_action_len(rule);
+	req->n_matches = prestera_acl_rule_match_len(rule);
+	req->hw_tc = prestera_acl_rule_hw_tc_get(rule);
+
+	err = prestera_cmd_ret(sw, PRESTERA_CMD_TYPE_ACL_RULE_ADD,
+			       &req->cmd, size, &resp.ret, sizeof(resp));
+	if (err)
+		goto free_buff;
+
+	*rule_id = resp.id;
+free_buff:
+	kfree(buff);
+	return err;
+}
+
+int prestera_hw_acl_rule_add(struct prestera_switch *sw,
+			     struct prestera_acl_rule *rule,
+			     u32 *rule_id)
+{
+	if (sw->dev->fw_rev.maj == 3 && sw->dev->fw_rev.min == 0)
+		return __prestera_hw_acl_rule_add(sw, rule, rule_id);
+
+	return __prestera_hw_acl_rule_ext_add(sw, rule, rule_id);
+};
 
 int prestera_hw_acl_rule_del(struct prestera_switch *sw, u32 rule_id)
 {

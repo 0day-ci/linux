@@ -5,6 +5,8 @@
 #include "prestera_acl.h"
 #include "prestera_flower.h"
 
+#define PRESTERA_HW_TC_NUM	8
+
 static int prestera_flower_parse_actions(struct prestera_flow_block *block,
 					 struct prestera_acl_rule *rule,
 					 struct flow_action *flow_action,
@@ -29,6 +31,11 @@ static int prestera_flower_parse_actions(struct prestera_flow_block *block,
 			break;
 		case FLOW_ACTION_TRAP:
 			a_entry.id = PRESTERA_ACL_RULE_ACTION_TRAP;
+			break;
+		case FLOW_ACTION_POLICE:
+			a_entry.id = PRESTERA_ACL_RULE_ACTION_POLICE;
+			a_entry.police.rate = act->police.rate_bytes_ps;
+			a_entry.police.burst = act->police.burst;
 			break;
 		default:
 			NL_SET_ERR_MSG_MOD(extack, "Unsupported action");
@@ -108,6 +115,17 @@ static int prestera_flower_parse(struct prestera_flow_block *block,
 	      BIT(FLOW_DISSECTOR_KEY_VLAN))) {
 		NL_SET_ERR_MSG_MOD(f->common.extack, "Unsupported key");
 		return -EOPNOTSUPP;
+	}
+
+	if (f->classid) {
+		int hw_tc = __tc_classid_to_hwtc(PRESTERA_HW_TC_NUM, f->classid);
+
+		if (hw_tc < 0) {
+			NL_SET_ERR_MSG_MOD(f->common.extack, "Unsupported HW TC");
+			return hw_tc;
+		}
+
+		prestera_acl_rule_hw_tc_set(rule, hw_tc);
 	}
 
 	prestera_acl_rule_priority_set(rule, f->common.prio);

@@ -25,7 +25,8 @@ enum prestera_acl_rule_match_entry_type {
 enum prestera_acl_rule_action {
 	PRESTERA_ACL_RULE_ACTION_ACCEPT,
 	PRESTERA_ACL_RULE_ACTION_DROP,
-	PRESTERA_ACL_RULE_ACTION_TRAP
+	PRESTERA_ACL_RULE_ACTION_TRAP,
+	PRESTERA_ACL_RULE_ACTION_POLICE,
 };
 
 struct prestera_switch;
@@ -50,6 +51,12 @@ struct prestera_flow_block {
 struct prestera_acl_rule_action_entry {
 	struct list_head list;
 	enum prestera_acl_rule_action id;
+	union {
+		struct {
+			u64 rate;
+			u64 burst;
+		} police;
+	};
 };
 
 struct prestera_acl_rule_match_entry {
@@ -120,5 +127,7 @@ void prestera_acl_rule_del(struct prestera_switch *sw,
 int prestera_acl_rule_get_stats(struct prestera_switch *sw,
 				struct prestera_acl_rule *rule,
 				u64 *packets, u64 *bytes, u64 *last_use);
+u8 prestera_acl_rule_hw_tc_get(struct prestera_acl_rule *rule);
+void prestera_acl_rule_hw_tc_set(struct prestera_acl_rule *rule, u8 hw_tc);
 
 #endif /* _PRESTERA_ACL_H_ */

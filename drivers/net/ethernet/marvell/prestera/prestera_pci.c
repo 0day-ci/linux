@@ -15,6 +15,7 @@
 #define PRESTERA_MSG_MAX_SIZE 1500
 
 static struct prestera_fw_rev prestera_fw_supp[] = {
+	{ 3, 1 },
 	{ 3, 0 },
 	{ 2, 0 }
 };
