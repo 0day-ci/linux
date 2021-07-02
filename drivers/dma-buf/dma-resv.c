@@ -235,7 +235,10 @@ EXPORT_SYMBOL(dma_resv_reset_shared_max);
  * @fence: the shared fence to add
  *
  * Add a fence to a shared slot, obj->lock must be held, and
- * dma_resv_reserve_shared() has been called.
+ * dma_resv_reserve_shared() has been called. The shared fences can signal in
+ * any order and there is especially no guarantee that shared fences signal
+ * after the exclusive one. Code relying on any signaling order is broken and
+ * needs to be fixed.
  */
 void dma_resv_add_shared_fence(struct dma_resv *obj, struct dma_fence *fence)
 {
