@@ -44,38 +44,54 @@ extern int pciehp_poll_time;
 #define SLOT_NAME_SIZE 10
 
 /**
- * struct controller - PCIe hotplug controller
- * @pcie: pointer to the controller's PCIe port service device
- * @slot_cap: cached copy of the Slot Capabilities register
- * @slot_ctrl: cached copy of the Slot Control register
- * @ctrl_lock: serializes writes to the Slot Control register
- * @cmd_started: jiffies when the Slot Control register was last written;
- *	the next write is allowed 1 second later, absent a Command Completed
- *	interrupt (PCIe r4.0, sec 6.7.3.2)
- * @cmd_busy: flag set on Slot Control register write, cleared by IRQ handler
- *	on reception of a Command Completed event
- * @queue: wait queue to wake up on reception of a Command Completed event,
- *	used for synchronous writes to the Slot Control register
- * @pending_events: used by the IRQ handler to save events retrieved from the
- *	Slot Status register for later consumption by the IRQ thread
- * @notification_enabled: whether the IRQ was requested successfully
- * @power_fault_detected: whether a power fault was detected by the hardware
- *	that has not yet been cleared by the user
- * @poll_thread: thread to poll for slot events if no IRQ is available,
- *	enabled with pciehp_poll_mode module parameter
- * @state: current state machine position
- * @state_lock: protects reads and writes of @state;
- *	protects scheduling, execution and cancellation of @button_work
- * @button_work: work item to turn the slot on or off after 5 seconds
- *	in response to an Attention Button press
- * @hotplug_slot: structure registered with the PCI hotplug core
- * @reset_lock: prevents access to the Data Link Layer Link Active bit in the
- *	Link Status register and to the Presence Detect State bit in the Slot
- *	Status register during a slot reset which may cause them to flap
- * @ist_running: flag to keep user request waiting while IRQ thread is running
- * @request_result: result of last user request submitted to the IRQ thread
- * @requester: wait queue to wake up on completion of user request,
- *	used for synchronous slot enable/disable request via sysfs
+ * struct controller - PCIe hotplug controller.
+ * @pcie:			Pointer to the controller's PCIe port service
+ *				device.
+ * @slot_cap:			Cached copy of the Slot Capabilities register.
+ * @inband_presence_disabled:	Flag to used to track whether the in-band
+ *				presence detection is disabled.
+ * @slot_ctrl:			Cached copy of the Slot Control register.
+ * @ctrl_lock:			Serializes writes to the Slot Control register.
+ * @cmd_started:		Jiffies when the Slot Control register was last
+ *				written; the next write is allowed 1 second
+ *				later, absent a Command Completed interrupt
+ *				(PCIe r4.0, sec 6.7.3.2).
+ * @cmd_busy:			Flag set on Slot Control register write, cleared
+ *				by IRQ handler on reception of a Command
+ *				Completed event.
+ * @queue:			Wait queue to wake up on reception of a Command
+ *				Completed event, used for synchronous writes to
+ *				the Slot Control register.
+ * @pending_events:		Used by the IRQ handler to save events retrieved
+ *				from the Slot Status register for later
+ *				consumption by the IRQ thread.
+ * @notification_enabled:	Whether the IRQ was requested successfully.
+ * @power_fault_detected:	Whether a power fault was detected by the
+ *				hardware that has not yet been cleared by the
+ *				user.
+ * @poll_thread:		Thread to poll for slot events if no IRQ is
+ *				available, enabled with pciehp_poll_mode module
+ *				parameter.
+ * @state:			Current state machine position.
+ * @state_lock:			Protects reads and writes of @state; protects
+ *				scheduling, execution and cancellation of
+ *				@button_work.
+ * @button_work:		Work item to turn the slot on or off after
+ *				5 seconds in response to an Attention Button
+ *				press.
+ * @hotplug_slot:		Structure registered with the PCI hotplug core.
+ * @reset_lock:			Prevents access to the Data Link Layer Link
+ *				Active bit in the Link Status register and to
+ *				the Presence Detect State bit in the Slot Status
+ *				register during a slot reset which may cause
+ *				them to flap.
+ * @ist_running:		Flag to keep user request waiting while IRQ
+ *				thread is running.
+ * @request_result:		Result of last user request submitted to the IRQ
+ *				thread.
+ * @requester:			Wait queue to wake up on completion of user
+ *				request, used for synchronous slot
+ *				enable/disable request via sysfs.
  *
  * PCIe hotplug has a 1:1 relationship between controller and slot, hence
  * unlike other drivers, the two aren't represented by separate structures.

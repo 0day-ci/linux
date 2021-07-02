@@ -292,15 +292,17 @@ static int ctrl_slot_cleanup(struct controller *ctrl)
 
 
 /**
- * get_slot_mapping - determine logical slot mapping for PCI device
+ * get_slot_mapping - Determine logical slot mapping for PCI device.
+ * @bus:	Pointer to the PCI bus structure.
+ * @bus_num:	Bus number of the PCI device.
+ * @dev_num:	Device number of the PCI device.
+ * @slot:	Pointer to where slot number will be returned.
  *
- * Won't work for more than one PCI-PCI bridge in a slot.
+ * Will not work for more than one PCI-PCI bridge in a slot.
  *
- * @bus_num - bus number of PCI device
- * @dev_num - device number of PCI device
- * @slot - Pointer to u8 where slot number will	be returned
- *
- * Output:	SUCCESS or FAILURE
+ * Return:
+ * * 0		- Logical slot mapping has been found for this PCI device.
+ * * < 0	- Unable to find entry in the routing table for this PCI device.
  */
 static int
 get_slot_mapping(struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *slot)
