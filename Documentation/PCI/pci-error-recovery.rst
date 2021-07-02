@@ -157,7 +157,7 @@ drivers.
 If all drivers on the segment/slot return PCI_ERS_RESULT_CAN_RECOVER,
 then the platform should re-enable IOs on the slot (or do nothing in
 particular, if the platform doesn't isolate slots), and recovery
-proceeds to STEP 2 (MMIO Enable).
+proceeds to STEP 3 (MMIO Enable).
 
 If any driver requested a slot reset (by returning PCI_ERS_RESULT_NEED_RESET),
 then recovery proceeds to STEP 4 (Slot Reset).
@@ -184,7 +184,14 @@ is STEP 6 (Permanent Failure).
    and prints an error to syslog.  A reboot is then required to
    get the device working again.
 
-STEP 2: MMIO Enabled
+STEP 2: Link Reset
+------------------
+The platform resets the link.  This is a PCI-Express specific step
+and is done whenever a fatal error has been detected that can be
+"solved" by resetting the link.
+
+
+STEP 3: MMIO Enabled
 --------------------
 The platform re-enables MMIO to the device (but typically not the
 DMA), and then calls the mmio_enabled() callback on all affected
@@ -197,8 +204,8 @@ information, if any, and eventually do things like trigger a device local
 reset or some such, but not restart operations. This callback is made if
 all drivers on a segment agree that they can try to recover and if no automatic
 link reset was performed by the HW. If the platform can't just re-enable IOs
-without a slot reset or a link reset, it will not call this callback, and
-instead will have gone directly to STEP 3 (Link Reset) or STEP 4 (Slot Reset)
+without a slot reset, it will not call this callback, and
+instead will have gone directly to STEP 4 (Slot Reset)
 
 .. note::
 
@@ -210,7 +217,7 @@ instead will have gone directly to STEP 3 (Link Reset) or STEP 4 (Slot Reset)
    such an error might cause IOs to be re-blocked for the whole
    segment, and thus invalidate the recovery that other devices
    on the same segment might have done, forcing the whole segment
-   into one of the next states, that is, link reset or slot reset.
+   into the next states, that is, slot reset.
 
 The driver should return one of the following result codes:
   - PCI_ERS_RESULT_RECOVERED
@@ -233,16 +240,10 @@ The driver should return one of the following result codes:
 
 The next step taken depends on the results returned by the drivers.
 If all drivers returned PCI_ERS_RESULT_RECOVERED, then the platform
-proceeds to either STEP3 (Link Reset) or to STEP 5 (Resume Operations).
+proceeds to STEP 5 (Resume Operations).
 
 If any driver returned PCI_ERS_RESULT_NEED_RESET, then the platform
 proceeds to STEP 4 (Slot Reset)
-
-STEP 3: Link Reset
-------------------
-The platform resets the link.  This is a PCI-Express specific step
-and is done whenever a fatal error has been detected that can be
-"solved" by resetting the link.
 
 STEP 4: Slot Reset
 ------------------
