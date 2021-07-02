@@ -1052,6 +1052,12 @@ void amdgpu_ras_query_error_count(struct amdgpu_device *adev,
 	struct ras_manager *obj;
 	unsigned long ce, ue;
 
+	if (ce_count)
+		*ce_count = 0;
+
+	if (ue_count)
+		*ue_count = 0;
+
 	if (!adev->ras_enabled || !con)
 		return;
 
