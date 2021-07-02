@@ -15,6 +15,8 @@
 #include "cedrus_hw.h"
 #include "cedrus_regs.h"
 
+static void cedrus_h264_trigger(struct cedrus_ctx *ctx);
+
 enum cedrus_h264_sram_off {
 	CEDRUS_SRAM_H264_PRED_WEIGHT_TABLE	= 0x000,
 	CEDRUS_SRAM_H264_FRAMEBUFFER_LIST	= 0x100,
@@ -318,6 +320,31 @@ static void cedrus_skip_bits(struct cedrus_dev *dev, int num)
 	}
 }
 
+static void cedrus_h264_setup_next_slice(struct cedrus_ctx *ctx)
+{
+	struct v4l2_ctrl_h264_slice_params *sp;
+	struct cedrus_h264_slice_ctx *sctx;
+	u32 offset;
+
+	sp = ctx->slice_ctx.priv;
+	sctx = &ctx->slice_ctx.h264;
+	offset = sp[sctx->cur_slice++].header_bit_size;
+
+	/* skip to the next slice */
+	cedrus_skip_bits(ctx->dev, offset);
+
+	/* clear status flags */
+	cedrus_write(ctx->dev, VE_H264_STATUS, cedrus_read(ctx->dev, VE_H264_STATUS));
+
+	/* enable int */
+	cedrus_write(ctx->dev, VE_H264_CTRL,
+		     VE_H264_CTRL_SLICE_DECODE_INT |
+		     VE_H264_CTRL_DECODE_ERR_INT |
+		     VE_H264_CTRL_VLD_DATA_REQ_INT);
+
+	cedrus_h264_trigger(ctx);
+}
+
 static void cedrus_set_params(struct cedrus_ctx *ctx,
 			      struct cedrus_run *run)
 {
@@ -510,6 +537,10 @@ static void cedrus_h264_setup(struct cedrus_ctx *ctx,
 	cedrus_write_frame_list(ctx, run);
 
 	cedrus_set_params(ctx, run);
+
+	if (ctx->slice_array_decode_mode)
+		ctx->slice_ctx.h264.cur_slice++;
+
 }
 
 static int cedrus_h264_start(struct cedrus_ctx *ctx)
@@ -682,11 +713,12 @@ static void cedrus_h264_trigger(struct cedrus_ctx *ctx)
 }
 
 struct cedrus_dec_ops cedrus_dec_ops_h264 = {
-	.irq_clear	= cedrus_h264_irq_clear,
-	.irq_disable	= cedrus_h264_irq_disable,
-	.irq_status	= cedrus_h264_irq_status,
-	.setup		= cedrus_h264_setup,
-	.start		= cedrus_h264_start,
-	.stop		= cedrus_h264_stop,
-	.trigger	= cedrus_h264_trigger,
+	.irq_clear	  = cedrus_h264_irq_clear,
+	.irq_disable	  = cedrus_h264_irq_disable,
+	.irq_status	  = cedrus_h264_irq_status,
+	.setup		  = cedrus_h264_setup,
+	.setup_next_slice = cedrus_h264_setup_next_slice,
+	.start		  = cedrus_h264_start,
+	.stop		  = cedrus_h264_stop,
+	.trigger	  = cedrus_h264_trigger,
 };

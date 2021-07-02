@@ -22,6 +22,37 @@
 #include "cedrus_dec.h"
 #include "cedrus_hw.h"
 
+static void fill_slice_ctx(struct cedrus_ctx *ctx, struct cedrus_run *run)
+{
+	struct v4l2_ctrl *ctrl;
+
+	ctrl = cedrus_find_control(ctx, V4L2_CID_STATELESS_H264_DECODE_MODE);
+	if (!ctrl)
+		return;
+
+	switch (ctx->current_codec) {
+	case CEDRUS_CODEC_H264:
+		ctx->slice_array_decode_mode =
+			ctrl->cur.val == V4L2_STATELESS_H264_DECODE_MODE_SLICE_ARRAY_BASED;
+
+		if (!ctx->slice_array_decode_mode)
+			return;
+
+		ctx->slice_ctx.h264.num_slices =
+			cedrus_control_num_elems(ctx, V4L2_CID_STATELESS_H264_SLICE_PARAMS);
+		ctx->slice_ctx.priv = kmalloc(sizeof(struct v4l2_ctrl_h264_slice_params) *
+			ctx->slice_ctx.h264.num_slices, GFP_KERNEL);
+
+		memcpy(ctx->slice_ctx.priv,
+		       run->h264.slice_params, sizeof(struct v4l2_ctrl_h264_slice_params) *
+		       ctx->slice_ctx.h264.num_slices);
+		break;
+
+	default:
+		break;
+	}
+}
+
 void cedrus_device_run(void *priv)
 {
 	struct cedrus_ctx *ctx = priv;
@@ -82,6 +113,8 @@ void cedrus_device_run(void *priv)
 	default:
 		break;
 	}
+
+	fill_slice_ctx(ctx, &run);
 
 	v4l2_m2m_buf_copy_metadata(run.src, run.dst, true);
 

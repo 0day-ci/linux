@@ -111,12 +111,25 @@ void cedrus_dst_format_set(struct cedrus_dev *dev,
 	}
 }
 
+static void clear_slice_ctx(struct cedrus_ctx *ctx)
+{
+	switch (ctx->current_codec) {
+	case CEDRUS_CODEC_H264:
+		kfree(ctx->slice_ctx.priv);
+		memset(&ctx->slice_ctx, 0, sizeof(ctx->slice_ctx));
+		break;
+	default:
+		break;
+	}
+}
+
 static irqreturn_t cedrus_irq(int irq, void *data)
 {
 	struct cedrus_dev *dev = data;
 	struct cedrus_ctx *ctx;
 	enum vb2_buffer_state state;
 	enum cedrus_irq_status status;
+	struct cedrus_h264_slice_ctx *h264sctx;
 
 	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
 	if (!ctx) {
@@ -132,10 +145,28 @@ static irqreturn_t cedrus_irq(int irq, void *data)
 	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
 	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
 
-	if (status == CEDRUS_IRQ_ERROR)
+	if (status == CEDRUS_IRQ_OK && ctx->slice_array_decode_mode) {
+		switch (ctx->current_codec) {
+		case CEDRUS_CODEC_H264:
+			h264sctx = &ctx->slice_ctx.h264;
+			if (h264sctx->cur_slice < h264sctx->num_slices - 1) {
+				dev->dec_ops[ctx->current_codec]->setup_next_slice(ctx);
+				return IRQ_HANDLED;
+			}
+		default:
+			break;
+		}
+
+		clear_slice_ctx(ctx);
+	}
+
+	if (status == CEDRUS_IRQ_ERROR) {
 		state = VB2_BUF_STATE_ERROR;
-	else
+		if (ctx->slice_array_decode_mode)
+			clear_slice_ctx(ctx);
+	} else {
 		state = VB2_BUF_STATE_DONE;
+	}
 
 	v4l2_m2m_buf_done_and_job_finish(ctx->dev->m2m_dev, ctx->fh.m2m_ctx,
 					 state);

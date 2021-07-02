@@ -58,6 +58,18 @@ struct cedrus_control {
 	enum cedrus_codec	codec;
 };
 
+struct cedrus_h264_slice_ctx {
+	u32 num_slices;
+	u32 cur_slice;
+};
+
+struct cedrus_slice_ctx {
+	void *priv;
+	union {
+		struct cedrus_h264_slice_ctx h264;
+	};
+};
+
 struct cedrus_h264_run {
 	const struct v4l2_ctrl_h264_decode_params	*decode_params;
 	const struct v4l2_ctrl_h264_pps			*pps;
@@ -118,6 +130,9 @@ struct cedrus_ctx {
 	struct v4l2_ctrl_handler	hdl;
 	struct v4l2_ctrl		**ctrls;
 
+	struct cedrus_slice_ctx		slice_ctx;
+	bool 				slice_array_decode_mode;
+
 	union {
 		struct {
 			void		*mv_col_buf;
@@ -160,6 +175,7 @@ struct cedrus_dec_ops {
 	void (*irq_disable)(struct cedrus_ctx *ctx);
 	enum cedrus_irq_status (*irq_status)(struct cedrus_ctx *ctx);
 	void (*setup)(struct cedrus_ctx *ctx, struct cedrus_run *run);
+	void (*setup_next_slice)(struct cedrus_ctx *ctx);
 	int (*start)(struct cedrus_ctx *ctx);
 	void (*stop)(struct cedrus_ctx *ctx);
 	void (*trigger)(struct cedrus_ctx *ctx);
@@ -256,5 +272,7 @@ vb2_to_cedrus_buffer(const struct vb2_buffer *p)
 }
 
 void *cedrus_find_control_data(struct cedrus_ctx *ctx, u32 id);
+u32 cedrus_control_num_elems(struct cedrus_ctx *ctx, u32 id);
+struct v4l2_ctrl *cedrus_find_control(struct cedrus_ctx *ctx, u32 id);
 
 #endif

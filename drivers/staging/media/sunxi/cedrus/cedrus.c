@@ -56,6 +56,11 @@ static const struct cedrus_control cedrus_controls[] = {
 	{
 		.cfg = {
 			.id	= V4L2_CID_STATELESS_H264_SLICE_PARAMS,
+			.flags  = V4L2_CTRL_FLAG_DYNAMIC_ARRAY,
+			.dims	= {32},
+			/* FIXME: I suppose these last two will not be necessary */
+			.type	= V4L2_CTRL_TYPE_H264_SLICE_PARAMS,
+			.name	= "H264 Slice Parameters",
 		},
 		.codec		= CEDRUS_CODEC_H264,
 	},
@@ -86,7 +91,7 @@ static const struct cedrus_control cedrus_controls[] = {
 	{
 		.cfg = {
 			.id	= V4L2_CID_STATELESS_H264_DECODE_MODE,
-			.max	= V4L2_STATELESS_H264_DECODE_MODE_SLICE_BASED,
+			.max	= V4L2_STATELESS_H264_DECODE_MODE_SLICE_ARRAY_BASED,
 			.def	= V4L2_STATELESS_H264_DECODE_MODE_SLICE_BASED,
 		},
 		.codec		= CEDRUS_CODEC_H264,
@@ -167,15 +172,38 @@ static const struct cedrus_control cedrus_controls[] = {
 
 #define CEDRUS_CONTROLS_COUNT	ARRAY_SIZE(cedrus_controls)
 
-void *cedrus_find_control_data(struct cedrus_ctx *ctx, u32 id)
+struct v4l2_ctrl *cedrus_find_control(struct cedrus_ctx *ctx, u32 id)
 {
 	unsigned int i;
 
 	for (i = 0; ctx->ctrls[i]; i++)
 		if (ctx->ctrls[i]->id == id)
-			return ctx->ctrls[i]->p_cur.p;
+			return ctx->ctrls[i];
 
 	return NULL;
+}
+
+void *cedrus_find_control_data(struct cedrus_ctx *ctx, u32 id)
+{
+	struct v4l2_ctrl *ctrl;
+
+	ctrl = cedrus_find_control(ctx, id);
+	if (ctrl)
+		return ctrl->p_cur.p;
+
+	return NULL;
+}
+
+u32 cedrus_control_num_elems(struct cedrus_ctx *ctx, u32 id)
+{
+	struct v4l2_ctrl *ctrl;
+
+	ctrl = cedrus_find_control(ctx, id);
+	if (ctrl) {
+		return ctrl->elems;
+	}
+
+	return 0;
 }
 
 static int cedrus_init_ctrls(struct cedrus_dev *dev, struct cedrus_ctx *ctx)

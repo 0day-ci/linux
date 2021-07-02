@@ -1231,10 +1231,17 @@ enum v4l2_detect_md_mode {
  * by device drivers that are able to parse the slice(s) header(s)
  * in hardware. When this mode is selected,
  * V4L2_CID_STATELESS_H264_SLICE_PARAMS is not used.
+ * @V4L2_STATELESS_H264_DECODE_MODE_SLICE_ARRAY_BASED: indicates that
+ * decoding is performed for the entire frame using a slice array.
+ * When this mode is selected, a pointer to a contiguous memory region
+ * of v4l2_ctrl_h264_slice elements is expected.
+
  */
 enum v4l2_stateless_h264_decode_mode {
 	V4L2_STATELESS_H264_DECODE_MODE_SLICE_BASED,
 	V4L2_STATELESS_H264_DECODE_MODE_FRAME_BASED,
+	V4L2_STATELESS_H264_DECODE_MODE_SLICE_ARRAY_BASED,
+
 };
 
 #define V4L2_CID_STATELESS_H264_START_CODE	(V4L2_CID_CODEC_STATELESS_BASE + 1)
