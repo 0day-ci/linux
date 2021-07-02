@@ -60,6 +60,11 @@ def run_analysis(entry):
 
 
 def main():
+    exitcode = subprocess.getstatusoutput('command -v clang-tidy')[0]
+    if exitcode == 1:
+        print("Command 'clang-tidy' is missing in the system", file=sys.stderr)
+        sys.exit(127)
+
     args = parse_arguments()
 
     lock = multiprocessing.Lock()
