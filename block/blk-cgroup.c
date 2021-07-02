@@ -56,6 +56,8 @@ static LIST_HEAD(all_blkcgs);		/* protected by blkcg_pol_mutex */
 bool blkcg_debug_stats = false;
 static struct workqueue_struct *blkcg_punt_bio_wq;
 
+#define BLKG_BATCH_OP_NUM 64
+
 static bool blkcg_policy_enabled(struct request_queue *q,
 				 const struct blkcg_policy *pol)
 {
@@ -422,7 +424,9 @@ static void blkg_destroy(struct blkcg_gq *blkg)
 static void blkg_destroy_all(struct request_queue *q)
 {
 	struct blkcg_gq *blkg, *n;
+	int count = BLKG_BATCH_OP_NUM;
 
+restart:
 	spin_lock_irq(&q->queue_lock);
 	list_for_each_entry_safe(blkg, n, &q->blkg_list, q_node) {
 		struct blkcg *blkcg = blkg->blkcg;
@@ -430,6 +434,17 @@ static void blkg_destroy_all(struct request_queue *q)
 		spin_lock(&blkcg->lock);
 		blkg_destroy(blkg);
 		spin_unlock(&blkcg->lock);
+
+		/*
+		 * in order to avoid holding the spin lock for too long, release
+		 * it when a batch of blkgs are destroyed.
+		 */
+		if (!(--count)) {
+			count = BLKG_BATCH_OP_NUM;
+			spin_unlock_irq(&q->queue_lock);
+			cond_resched();
+			goto restart;
+		}
 	}
 
 	q->root_blkg = NULL;
@@ -1291,6 +1306,7 @@ int blkcg_activate_policy(struct request_queue *q,
 {
 	struct blkg_policy_data *pd_prealloc = NULL;
 	struct blkcg_gq *blkg, *pinned_blkg = NULL;
+	int count;
 	int ret;
 
 	if (blkcg_policy_enabled(q, pol))
@@ -1299,6 +1315,7 @@ int blkcg_activate_policy(struct request_queue *q,
 	if (queue_is_mq(q))
 		blk_mq_freeze_queue(q);
 retry:
+	count = BLKG_BATCH_OP_NUM;
 	spin_lock_irq(&q->queue_lock);
 
 	/* blkg_list is pushed at the head, reverse walk to allocate parents first */
@@ -1342,6 +1359,16 @@ retry:
 		blkg->pd[pol->plid] = pd;
 		pd->blkg = blkg;
 		pd->plid = pol->plid;
+
+		/*
+		 * in order to avoid holding the spin lock for too long, release
+		 * it when a batch of blkgs are activated.
+		 */
+		if (!(--count)) {
+			spin_unlock_irq(&q->queue_lock);
+			cond_resched();
+			goto retry;
+		}
 	}
 
 	/* all allocated, init in the same order */
@@ -1389,6 +1416,7 @@ void blkcg_deactivate_policy(struct request_queue *q,
 			     const struct blkcg_policy *pol)
 {
 	struct blkcg_gq *blkg;
+	int count;
 
 	if (!blkcg_policy_enabled(q, pol))
 		return;
@@ -1397,15 +1425,31 @@ void blkcg_deactivate_policy(struct request_queue *q,
 		blk_mq_freeze_queue(q);
 
 	spin_lock_irq(&q->queue_lock);
-
 	__clear_bit(pol->plid, q->blkcg_pols);
+retry:
+	count = BLKG_BATCH_OP_NUM;
 
 	list_for_each_entry(blkg, &q->blkg_list, q_node) {
-		if (blkg->pd[pol->plid]) {
-			if (pol->pd_offline_fn)
-				pol->pd_offline_fn(blkg->pd[pol->plid]);
-			pol->pd_free_fn(blkg->pd[pol->plid]);
-			blkg->pd[pol->plid] = NULL;
+		if (!blkg->pd[pol->plid])
+			continue;
+
+		if (pol->pd_offline_fn) {
+			pol->pd_offline_fn(blkg->pd[pol->plid]);
+			count--;
+		}
+
+		pol->pd_free_fn(blkg->pd[pol->plid]);
+		blkg->pd[pol->plid] = NULL;
+
+		/*
+		 * in order to avoid holding the spin lock for too long, release
+		 * it when a batch of blkgs are deactivated.
+		 */
+		if (!count) {
+			spin_unlock_irq(&q->queue_lock);
+			cond_resched();
+			spin_lock_irq(&q->queue_lock);
+			goto retry;
 		}
 	}
 
