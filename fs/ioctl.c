@@ -806,6 +806,8 @@ static int fileattr_set_prepare(struct inode *inode,
 	if (err)
 		return err;
 
+	if (!projid_valid(make_kprojid(&init_user_ns, fa->fsx_projid)))
+		return -EINVAL;
 	/*
 	 * Project Quota ID state is only allowed to change from within the init
 	 * namespace. Enforce that restriction only if we are trying to change
