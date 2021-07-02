@@ -1902,6 +1902,8 @@ int scsi_mq_setup_tags(struct Scsi_Host *shost)
 {
 	unsigned int cmd_size, sgl_size;
 	struct blk_mq_tag_set *tag_set = &shost->tag_set;
+	unsigned long flags = BLK_MQ_F_SHOULD_MERGE |
+		BLK_ALLOC_POLICY_TO_MQ_FLAG(shost->hostt->tag_alloc_policy);
 
 	sgl_size = max_t(unsigned int, sizeof(struct scatterlist),
 				scsi_mq_inline_sgl_size(shost));
@@ -1920,12 +1922,12 @@ int scsi_mq_setup_tags(struct Scsi_Host *shost)
 	tag_set->queue_depth = shost->can_queue;
 	tag_set->cmd_size = cmd_size;
 	tag_set->numa_node = NUMA_NO_NODE;
-	tag_set->flags = BLK_MQ_F_SHOULD_MERGE;
-	tag_set->flags |=
-		BLK_ALLOC_POLICY_TO_MQ_FLAG(shost->hostt->tag_alloc_policy);
-	tag_set->driver_data = shost;
 	if (shost->host_tagset)
-		tag_set->flags |= BLK_MQ_F_TAG_HCTX_SHARED;
+		flags |= BLK_MQ_F_TAG_HCTX_SHARED;
+	if (shost->use_managed_irq)
+		flags |= BLK_MQ_F_MANAGED_IRQ;
+	tag_set->flags = flags;
+	tag_set->driver_data = shost;
 
 	return blk_mq_alloc_tag_set(tag_set);
 }
