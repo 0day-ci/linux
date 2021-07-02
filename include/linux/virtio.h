@@ -109,6 +109,7 @@ struct virtio_device {
 	bool failed;
 	bool config_enabled;
 	bool config_change_pending;
+	bool use_managed_irq;
 	spinlock_t config_lock;
 	struct device dev;
 	struct virtio_device_id id;
