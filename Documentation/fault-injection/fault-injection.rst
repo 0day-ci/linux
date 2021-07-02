@@ -24,6 +24,28 @@ Available fault injection capabilities
 
   injects futex deadlock and uaddr fault errors.
 
+- fail_kernfs_fop_write_iter
+
+  Allows for failures to be enabled inside kernfs_fop_write_iter(). Enabling
+  this does not immediately enable any errors to occur. You must configure
+  how you want this routine to fail or change behaviour by using the debugfs
+  knobs for it:
+
+  # ls -1 /sys/kernel/debug/kernfs/config_fail_kernfs_fop_write_iter/
+  wait_after_active
+  wait_after_mutex
+  wait_at_start
+  wait_before_mutex
+
+  You can also configure how long to sleep after a wait under
+
+  /sys/kernel/debug/kernfs/sleep_after_wait_ms
+
+  If you enable CONFIG_FAULT_INJECTION_DEBUG_FS the fail_add_disk failure
+  injection parameters are placed under:
+
+  /sys/kernel/debug/kernfs/fail_kernfs_fop_write_iter/
+
 - fail_make_request
 
   injects disk IO errors on devices permitted by setting
