@@ -1217,9 +1217,7 @@ static void cp210x_set_flow_control(struct tty_struct *tty,
 		chars.bXonChar = START_CHAR(tty);
 		chars.bXoffChar = STOP_CHAR(tty);
 
-		ret = cp210x_set_chars(port, &chars);
-		if (ret)
-			return;
+		cp210x_set_chars(port, &chars);
 	}
 
 	mutex_lock(&port_priv->mutex);
