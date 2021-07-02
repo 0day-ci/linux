@@ -9,6 +9,12 @@ Required Properties:
 	(a) "aptina,mt9p031" for mt9p031 sensor
 	(b) "aptina,mt9p031m" for mt9p031m sensor
 
+- clocks: Reference to the sensor input clock
+
+- vdd-supply: VDD supply regulator
+- vdd_io-supply: VDD_IO supply regulator
+- vaa-supply: VAA supply regulator
+
 - input-clock-frequency: Input clock frequency.
 
 - pixel-clock-frequency: Pixel clock frequency.
@@ -28,6 +34,12 @@ Example:
 			compatible = "aptina,mt9p031";
 			reg = <0x5d>;
 			reset-gpios = <&gpio3 30 0>;
+
+			clocks = <&sensor_clk>;
+
+			vdd-supply = <&reg_vdd>;
+			vdd_io-supply = <&reg_vdd_io>;
+			vaa-supply = <&reg_vaa>;
 
 			port {
 				mt9p031_1: endpoint {
