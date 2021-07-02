@@ -39,7 +39,7 @@ struct hpet_base {
 	struct hpet_channel		*channels;
 };
 
-#define HPET_MASK			CLOCKSOURCE_MASK(32)
+#define HPET_MASK			CLOCKSOURCE_MASK(64)
 
 #define HPET_MIN_CYCLES			128
 #define HPET_MIN_PROG_DELTA		(HPET_MIN_CYCLES + (HPET_MIN_CYCLES >> 1))
@@ -81,6 +81,16 @@ inline unsigned int hpet_readl(unsigned int a)
 static inline void hpet_writel(unsigned int d, unsigned int a)
 {
 	writel(d, hpet_virt_address + a);
+}
+
+inline unsigned long hpet_readq(unsigned int a)
+{
+	return readq(hpet_virt_address + a);
+}
+
+static inline void hpet_writeq(unsigned long d, unsigned int a)
+{
+	writeq(d, hpet_virt_address + a);
 }
 
 static inline void hpet_set_mapping(void)
@@ -254,8 +264,7 @@ static void hpet_stop_counter(void)
 
 static void hpet_reset_counter(void)
 {
-	hpet_writel(0, HPET_COUNTER);
-	hpet_writel(0, HPET_COUNTER + 4);
+	hpet_writeq(0, HPET_COUNTER);
 }
 
 static void hpet_start_counter(void)
@@ -296,19 +305,20 @@ static void hpet_enable_legacy_int(void)
 static int hpet_clkevt_set_state_periodic(struct clock_event_device *evt)
 {
 	unsigned int channel = clockevent_to_channel(evt)->num;
-	unsigned int cfg, cmp, now;
+	unsigned int cfg;
+	unsigned long cmp, now;
 	uint64_t delta;
 
 	hpet_stop_counter();
 	delta = ((uint64_t)(NSEC_PER_SEC / HZ)) * evt->mult;
 	delta >>= evt->shift;
-	now = hpet_readl(HPET_COUNTER);
-	cmp = now + (unsigned int)delta;
+	now = hpet_readq(HPET_COUNTER);
+	cmp = now + delta;
 	cfg = hpet_readl(HPET_Tn_CFG(channel));
-	cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC | HPET_TN_SETVAL |
-	       HPET_TN_32BIT;
+	cfg &= ~HPET_TN_32BIT;
+	cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC | HPET_TN_SETVAL;
 	hpet_writel(cfg, HPET_Tn_CFG(channel));
-	hpet_writel(cmp, HPET_Tn_CMP(channel));
+	hpet_writeq(cmp, HPET_Tn_CMP(channel));
 	udelay(1);
 	/*
 	 * HPET on AMD 81xx needs a second write (with HPET_TN_SETVAL
@@ -317,7 +327,7 @@ static int hpet_clkevt_set_state_periodic(struct clock_event_device *evt)
 	 * (See AMD-8111 HyperTransport I/O Hub Data Sheet,
 	 * Publication # 24674)
 	 */
-	hpet_writel((unsigned int)delta, HPET_Tn_CMP(channel));
+	hpet_writeq(delta, HPET_Tn_CMP(channel));
 	hpet_start_counter();
 	hpet_print_config();
 
@@ -330,8 +340,8 @@ static int hpet_clkevt_set_state_oneshot(struct clock_event_device *evt)
 	unsigned int cfg;
 
 	cfg = hpet_readl(HPET_Tn_CFG(channel));
-	cfg &= ~HPET_TN_PERIODIC;
-	cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+	cfg &= ~(HPET_TN_PERIODIC|HPET_TN_32BIT);
+	cfg |= HPET_TN_ENABLE;
 	hpet_writel(cfg, HPET_Tn_CFG(channel));
 
 	return 0;
@@ -343,7 +353,7 @@ static int hpet_clkevt_set_state_shutdown(struct clock_event_device *evt)
 	unsigned int cfg;
 
 	cfg = hpet_readl(HPET_Tn_CFG(channel));
-	cfg &= ~HPET_TN_ENABLE;
+	cfg &= ~(HPET_TN_PERIODIC|HPET_TN_32BIT);
 	hpet_writel(cfg, HPET_Tn_CFG(channel));
 
 	return 0;
@@ -360,12 +370,12 @@ static int
 hpet_clkevt_set_next_event(unsigned long delta, struct clock_event_device *evt)
 {
 	unsigned int channel = clockevent_to_channel(evt)->num;
-	u32 cnt;
-	s32 res;
+	u64 cnt;
+	s64 res;
 
-	cnt = hpet_readl(HPET_COUNTER);
-	cnt += (u32) delta;
-	hpet_writel(cnt, HPET_Tn_CMP(channel));
+	cnt = hpet_readq(HPET_COUNTER);
+	cnt += (u64) delta;
+	hpet_writeq(cnt, HPET_Tn_CMP(channel));
 
 	/*
 	 * HPETs are a complete disaster. The compare register is
@@ -389,7 +399,7 @@ hpet_clkevt_set_next_event(unsigned long delta, struct clock_event_device *evt)
 	 * the event. The minimum programming delta for the generic
 	 * clockevents code is set to 1.5 * HPET_MIN_CYCLES.
 	 */
-	res = (s32)(cnt - hpet_readl(HPET_COUNTER));
+	res = (s64)(cnt - hpet_readq(HPET_COUNTER));
 
 	return res < HPET_MIN_CYCLES ? -ETIME : 0;
 }
@@ -781,9 +791,10 @@ static inline void hpet_select_clockevents(void) { }
 union hpet_lock {
 	struct {
 		arch_spinlock_t lock;
-		u32 value;
+		u32 reserved;
+		u64 value;
 	};
-	u64 lockval;
+	u64 lockval1, lockval2;
 };
 
 static union hpet_lock hpet __cacheline_aligned = {
@@ -795,25 +806,28 @@ static u64 read_hpet(struct clocksource *cs)
 	unsigned long flags;
 	union hpet_lock old, new;
 
-	BUILD_BUG_ON(sizeof(union hpet_lock) != 8);
+	BUILD_BUG_ON(sizeof(union hpet_lock) != 16);
 
 	/*
 	 * Read HPET directly if in NMI.
 	 */
 	if (in_nmi())
-		return (u64)hpet_readl(HPET_COUNTER);
+		return (u64)hpet_readq(HPET_COUNTER);
 
 	/*
 	 * Read the current state of the lock and HPET value atomically.
 	 */
-	old.lockval = READ_ONCE(hpet.lockval);
+	local_irq_save(flags);
+	old.lockval1 = READ_ONCE(hpet.lockval1);
+	old.lockval2 = READ_ONCE(hpet.lockval2);
+	local_irq_restore(flags);
 
 	if (arch_spin_is_locked(&old.lock))
 		goto contended;
 
 	local_irq_save(flags);
 	if (arch_spin_trylock(&hpet.lock)) {
-		new.value = hpet_readl(HPET_COUNTER);
+		new.value = hpet_readq(HPET_COUNTER);
 		/*
 		 * Use WRITE_ONCE() to prevent store tearing.
 		 */
@@ -839,7 +853,10 @@ contended:
 	 */
 	do {
 		cpu_relax();
-		new.lockval = READ_ONCE(hpet.lockval);
+		local_irq_save(flags);
+		new.lockval1 = READ_ONCE(hpet.lockval1);
+		new.lockval2 = READ_ONCE(hpet.lockval2);
+		local_irq_restore(flags);
 	} while ((new.value == old.value) && arch_spin_is_locked(&new.lock));
 
 	return (u64)new.value;
@@ -850,7 +867,7 @@ contended:
  */
 static u64 read_hpet(struct clocksource *cs)
 {
-	return (u64)hpet_readl(HPET_COUNTER);
+	return hpet_readq(HPET_COUNTER);
 }
 #endif
 
@@ -897,7 +914,7 @@ static bool __init hpet_counting(void)
 
 	hpet_restart_counter();
 
-	t1 = hpet_readl(HPET_COUNTER);
+	t1 = hpet_readq(HPET_COUNTER);
 	start = rdtsc();
 
 	/*
@@ -907,7 +924,7 @@ static bool __init hpet_counting(void)
 	 * 1 GHz == 200us
 	 */
 	do {
-		if (t1 != hpet_readl(HPET_COUNTER))
+		if (t1 != hpet_readq(HPET_COUNTER))
 			return true;
 		now = rdtsc();
 	} while ((now - start) < 200000UL);
@@ -991,11 +1008,11 @@ int __init hpet_enable(void)
 		irq = (cfg & Tn_INT_ROUTE_CNF_MASK) >> Tn_INT_ROUTE_CNF_SHIFT;
 		hc->irq = irq;
 
-		cfg &= ~(HPET_TN_ENABLE | HPET_TN_LEVEL | HPET_TN_FSB);
+		cfg &= ~(HPET_TN_ENABLE | HPET_TN_32BIT | HPET_TN_LEVEL | HPET_TN_FSB);
 		hpet_writel(cfg, HPET_Tn_CFG(i));
 
 		cfg &= ~(HPET_TN_PERIODIC | HPET_TN_PERIODIC_CAP
-			 | HPET_TN_64BIT_CAP | HPET_TN_32BIT | HPET_TN_ROUTE
+			 | HPET_TN_64BIT_CAP | HPET_TN_ROUTE
 			 | HPET_TN_FSB | HPET_TN_FSB_CAP);
 		if (cfg)
 			pr_warn("Channel #%u config: Unknown bits %#x\n", i, cfg);
@@ -1138,9 +1155,9 @@ static unsigned long hpet_rtc_flags;
 static int hpet_prev_update_sec;
 static struct rtc_time hpet_alarm_time;
 static unsigned long hpet_pie_count;
-static u32 hpet_t1_cmp;
-static u32 hpet_default_delta;
-static u32 hpet_pie_delta;
+static u64 hpet_t1_cmp;
+static u64 hpet_default_delta;
+static u64 hpet_pie_delta;
 static unsigned long hpet_pie_limit;
 
 static rtc_irq_handler irq_handler;
@@ -1191,8 +1208,8 @@ EXPORT_SYMBOL_GPL(hpet_unregister_irq_handler);
  */
 int hpet_rtc_timer_init(void)
 {
-	unsigned int cfg, cnt, delta;
-	unsigned long flags;
+	unsigned int cfg;
+	unsigned long cnt, delta, flags;
 
 	if (!is_hpet_enabled())
 		return 0;
@@ -1213,13 +1230,13 @@ int hpet_rtc_timer_init(void)
 
 	local_irq_save(flags);
 
-	cnt = delta + hpet_readl(HPET_COUNTER);
-	hpet_writel(cnt, HPET_T1_CMP);
+	cnt = delta + hpet_readq(HPET_COUNTER);
+	hpet_writeq(cnt, HPET_T1_CMP);
 	hpet_t1_cmp = cnt;
 
 	cfg = hpet_readl(HPET_T1_CFG);
-	cfg &= ~HPET_TN_PERIODIC;
-	cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+	cfg &= ~(HPET_TN_PERIODIC|HPET_TN_32BIT);
+	cfg |= HPET_TN_ENABLE;
 	hpet_writel(cfg, HPET_T1_CFG);
 
 	local_irq_restore(flags);
@@ -1317,7 +1334,7 @@ EXPORT_SYMBOL_GPL(hpet_rtc_dropped_irq);
 
 static void hpet_rtc_timer_reinit(void)
 {
-	unsigned int delta;
+	unsigned long delta;
 	int lost_ints = -1;
 
 	if (unlikely(!hpet_rtc_flags))
@@ -1334,9 +1351,9 @@ static void hpet_rtc_timer_reinit(void)
 	 */
 	do {
 		hpet_t1_cmp += delta;
-		hpet_writel(hpet_t1_cmp, HPET_T1_CMP);
+		hpet_writeq(hpet_t1_cmp, HPET_T1_CMP);
 		lost_ints++;
-	} while (!hpet_cnt_ahead(hpet_t1_cmp, hpet_readl(HPET_COUNTER)));
+	} while (!hpet_cnt_ahead(hpet_t1_cmp, hpet_readq(HPET_COUNTER)));
 
 	if (lost_ints) {
 		if (hpet_rtc_flags & RTC_PIE)
