@@ -617,24 +617,12 @@ out:
 	init_chroot(".");
 }
 
-static bool is_tmpfs;
-static int rootfs_init_fs_context(struct fs_context *fc)
-{
-	if (IS_ENABLED(CONFIG_TMPFS) && is_tmpfs)
-		return shmem_init_fs_context(fc);
-
-	return ramfs_init_fs_context(fc);
-}
-
 struct file_system_type rootfs_fs_type = {
-	.name		= "rootfs",
-	.init_fs_context = rootfs_init_fs_context,
-	.kill_sb	= kill_litter_super,
+	.name			= "rootfs",
+#ifdef CONFIG_TMPFS
+	.init_fs_context	= shmem_init_fs_context,
+#else
+	.init_fs_context	= ramfs_init_fs_context,
+#endif
+	.kill_sb		= kill_litter_super,
 };
-
-void __init init_rootfs(void)
-{
-	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
-		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
-		is_tmpfs = true;
-}
