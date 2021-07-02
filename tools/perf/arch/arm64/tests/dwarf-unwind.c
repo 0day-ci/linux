@@ -39,6 +39,7 @@ static int sample_ustack(struct perf_sample *sample,
 	memcpy(buf, (void *) sp, stack_size);
 	stack->data = (char *) buf;
 	stack->size = stack_size;
+	free(buf);
 	return 0;
 }
 
