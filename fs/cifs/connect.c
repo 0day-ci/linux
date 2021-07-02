@@ -3380,6 +3380,12 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb3_fs_context *ctx)
 	char *oldmnt = NULL;
 	bool ref_server = false;
 
+	/*
+	 * Do not share tcp servers when CONFIG_CIFS_DFS_UPCALL option is enabled to properly handle
+	 * reconnect of regular and dfs shares when they were connected to same server.
+	 */
+	ctx->nosharesock = true;
+
 	rc = mount_get_conns(ctx, cifs_sb, &xid, &server, &ses, &tcon);
 	/*
 	 * If called with 'nodfs' mount option, then skip DFS resolving.  Otherwise unconditionally
@@ -3400,8 +3406,6 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb3_fs_context *ctx)
 		if (rc != -EREMOTE)
 			goto error;
 	}
-
-	ctx->nosharesock = true;
 
 	/* Get path of DFS root */
 	ref_path = build_unc_path_to_root(ctx, cifs_sb, false);
