@@ -9,6 +9,10 @@
 	model = "Microchip MPFS Icicle Kit";
 	compatible = "microchip,mpfs-icicle-kit";
 
+	aliases {
+		ethernet0 = &emac1;
+	};
+
 	chosen {
 	};
 
