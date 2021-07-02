@@ -291,7 +291,11 @@ static void delete_partition(struct block_device *part)
 	__invalidate_device(part, true);
 
 	xa_erase(&part->bd_disk->part_tbl, part->bd_partno);
-	kobject_put(part->bd_holder_dir);
+
+	if (!part->bd_holder_dir) {
+		kobject_put(part->bd_holder_dir);
+	}
+
 	device_del(&part->bd_device);
 
 	/*

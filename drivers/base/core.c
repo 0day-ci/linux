@@ -3486,16 +3486,20 @@ void device_del(struct device *dev)
 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
 					     BUS_NOTIFY_DEL_DEVICE, dev);
 
-	dpm_sysfs_remove(dev);
-	if (parent)
+	if (dev->kobj.sd)
+		dpm_sysfs_remove(dev);
+	if (parent && klist_node_attached(&dev->p->knode_parent))
 		klist_del(&dev->p->knode_parent);
 	if (MAJOR(dev->devt)) {
 		devtmpfs_delete_node(dev);
 		device_remove_sys_dev_entry(dev);
-		device_remove_file(dev, &dev_attr_dev);
+
+		if (dev->kobj.sd)
+			device_remove_file(dev, &dev_attr_dev);
 	}
 	if (dev->class) {
-		device_remove_class_symlinks(dev);
+		if (dev->kobj.sd)
+			device_remove_class_symlinks(dev);
 
 		mutex_lock(&dev->class->p->mutex);
 		/* notify any interfaces that the device is now gone */
@@ -3504,11 +3508,14 @@ void device_del(struct device *dev)
 			if (class_intf->remove_dev)
 				class_intf->remove_dev(dev, class_intf);
 		/* remove the device from the class list */
-		klist_del(&dev->p->knode_class);
+		if (klist_node_attached(&dev->p->knode_class))
+			klist_del(&dev->p->knode_class);
 		mutex_unlock(&dev->class->p->mutex);
 	}
-	device_remove_file(dev, &dev_attr_uevent);
-	device_remove_attrs(dev);
+	if (dev->kobj.sd) {
+		device_remove_file(dev, &dev_attr_uevent);
+		device_remove_attrs(dev);
+	}
 	bus_remove_device(dev);
 	device_pm_remove(dev);
 	driver_deferred_probe_del(dev);
