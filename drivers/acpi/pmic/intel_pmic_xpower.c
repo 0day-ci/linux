@@ -178,14 +178,16 @@ static int intel_xpower_pmic_update_power(struct regmap *regmap, int reg,
 {
 	int data, ret;
 
-	/* GPIO1 LDO regulator needs special handling */
-	if (reg == XPOWER_GPI1_CTRL)
-		return regmap_update_bits(regmap, reg, GPI1_LDO_MASK,
-					  on ? GPI1_LDO_ON : GPI1_LDO_OFF);
-
 	ret = iosf_mbi_block_punit_i2c_access();
 	if (ret)
 		return ret;
+
+	/* GPIO1 LDO regulator needs special handling */
+	if (reg == XPOWER_GPI1_CTRL) {
+		ret = regmap_update_bits(regmap, reg, GPI1_LDO_MASK,
+					 on ? GPI1_LDO_ON : GPI1_LDO_OFF);
+		goto out;
+	}
 
 	if (regmap_read(regmap, reg, &data)) {
 		ret = -EIO;
@@ -218,6 +220,10 @@ static int intel_xpower_pmic_get_raw_temp(struct regmap *regmap, int reg)
 	int ret, adc_ts_pin_ctrl;
 	u8 buf[2];
 
+	ret = iosf_mbi_block_punit_i2c_access();
+	if (ret)
+		return ret;
+
 	/*
 	 * The current-source used for the battery temp-sensor (TS) is shared
 	 * with the GPADC. For proper fuel-gauge and charger operation the TS
@@ -231,14 +237,14 @@ static int intel_xpower_pmic_get_raw_temp(struct regmap *regmap, int reg)
 	 */
 	ret = regmap_read(regmap, AXP288_ADC_TS_PIN_CTRL, &adc_ts_pin_ctrl);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (adc_ts_pin_ctrl & AXP288_ADC_TS_CURRENT_ON_OFF_MASK) {
 		ret = regmap_update_bits(regmap, AXP288_ADC_TS_PIN_CTRL,
 					 AXP288_ADC_TS_CURRENT_ON_OFF_MASK,
 					 AXP288_ADC_TS_CURRENT_ON_ONDEMAND);
 		if (ret)
-			return ret;
+			goto out;
 
 		/* Wait a bit after switching the current-source */
 		usleep_range(6000, 10000);
@@ -253,6 +259,9 @@ static int intel_xpower_pmic_get_raw_temp(struct regmap *regmap, int reg)
 				   AXP288_ADC_TS_CURRENT_ON_OFF_MASK,
 				   AXP288_ADC_TS_CURRENT_ON);
 	}
+
+out:
+	iosf_mbi_unblock_punit_i2c_access();
 
 	return ret;
 }
