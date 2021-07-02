@@ -29,6 +29,8 @@
 #include <linux/start_kernel.h>
 #include <linux/sched/mm.h>
 #include <linux/io.h>
+
+#include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
@@ -91,6 +93,7 @@ static void __init pte_advanced_tests(struct mm_struct *mm,
 				      unsigned long pfn, unsigned long vaddr,
 				      pgprot_t prot)
 {
+	struct page *page = pfn_to_page(pfn);
 	pte_t pte = pfn_pte(pfn, prot);
 
 	/*
@@ -102,6 +105,7 @@ static void __init pte_advanced_tests(struct mm_struct *mm,
 	pr_debug("Validating PTE advanced\n");
 	pte = pfn_pte(pfn, prot);
 	set_pte_at(mm, vaddr, ptep, pte);
+	flush_dcache_page(page);
 	ptep_set_wrprotect(mm, vaddr, ptep);
 	pte = ptep_get(ptep);
 	WARN_ON(pte_write(pte));
@@ -113,6 +117,7 @@ static void __init pte_advanced_tests(struct mm_struct *mm,
 	pte = pte_wrprotect(pte);
 	pte = pte_mkclean(pte);
 	set_pte_at(mm, vaddr, ptep, pte);
+	flush_dcache_page(page);
 	pte = pte_mkwrite(pte);
 	pte = pte_mkdirty(pte);
 	ptep_set_access_flags(vma, vaddr, ptep, pte, 1);
@@ -125,6 +130,7 @@ static void __init pte_advanced_tests(struct mm_struct *mm,
 	pte = pfn_pte(pfn, prot);
 	pte = pte_mkyoung(pte);
 	set_pte_at(mm, vaddr, ptep, pte);
+	flush_dcache_page(page);
 	ptep_test_and_clear_young(vma, vaddr, ptep);
 	pte = ptep_get(ptep);
 	WARN_ON(pte_young(pte));
@@ -186,6 +192,7 @@ static void __init pmd_advanced_tests(struct mm_struct *mm,
 				      unsigned long pfn, unsigned long vaddr,
 				      pgprot_t prot, pgtable_t pgtable)
 {
+	struct page *page = pfn_to_page(pfn);
 	pmd_t pmd;
 
 	if (!has_transparent_hugepage())
@@ -199,6 +206,7 @@ static void __init pmd_advanced_tests(struct mm_struct *mm,
 
 	pmd = pfn_pmd(pfn, prot);
 	set_pmd_at(mm, vaddr, pmdp, pmd);
+	flush_dcache_page(page);
 	pmdp_set_wrprotect(mm, vaddr, pmdp);
 	pmd = READ_ONCE(*pmdp);
 	WARN_ON(pmd_write(pmd));
@@ -210,6 +218,7 @@ static void __init pmd_advanced_tests(struct mm_struct *mm,
 	pmd = pmd_wrprotect(pmd);
 	pmd = pmd_mkclean(pmd);
 	set_pmd_at(mm, vaddr, pmdp, pmd);
+	flush_dcache_page(page);
 	pmd = pmd_mkwrite(pmd);
 	pmd = pmd_mkdirty(pmd);
 	pmdp_set_access_flags(vma, vaddr, pmdp, pmd, 1);
@@ -222,6 +231,7 @@ static void __init pmd_advanced_tests(struct mm_struct *mm,
 	pmd = pmd_mkhuge(pfn_pmd(pfn, prot));
 	pmd = pmd_mkyoung(pmd);
 	set_pmd_at(mm, vaddr, pmdp, pmd);
+	flush_dcache_page(page);
 	pmdp_test_and_clear_young(vma, vaddr, pmdp);
 	pmd = READ_ONCE(*pmdp);
 	WARN_ON(pmd_young(pmd));
@@ -334,6 +344,7 @@ static void __init pud_advanced_tests(struct mm_struct *mm,
 				      unsigned long pfn, unsigned long vaddr,
 				      pgprot_t prot)
 {
+	struct page *page = pfn_to_page(page);
 	pud_t pud;
 
 	if (!has_transparent_hugepage())
@@ -345,6 +356,7 @@ static void __init pud_advanced_tests(struct mm_struct *mm,
 
 	pud = pfn_pud(pfn, prot);
 	set_pud_at(mm, vaddr, pudp, pud);
+	flush_dcache_page(page);
 	pudp_set_wrprotect(mm, vaddr, pudp);
 	pud = READ_ONCE(*pudp);
 	WARN_ON(pud_write(pud));
@@ -358,6 +370,7 @@ static void __init pud_advanced_tests(struct mm_struct *mm,
 	pud = pud_wrprotect(pud);
 	pud = pud_mkclean(pud);
 	set_pud_at(mm, vaddr, pudp, pud);
+	flush_dcache_page(page);
 	pud = pud_mkwrite(pud);
 	pud = pud_mkdirty(pud);
 	pudp_set_access_flags(vma, vaddr, pudp, pud, 1);
@@ -373,6 +386,7 @@ static void __init pud_advanced_tests(struct mm_struct *mm,
 	pud = pfn_pud(pfn, prot);
 	pud = pud_mkyoung(pud);
 	set_pud_at(mm, vaddr, pudp, pud);
+	flush_dcache_page(page);
 	pudp_test_and_clear_young(vma, vaddr, pudp);
 	pud = READ_ONCE(*pudp);
 	WARN_ON(pud_young(pud));
@@ -604,6 +618,7 @@ static void __init pte_clear_tests(struct mm_struct *mm, pte_t *ptep,
 				   unsigned long pfn, unsigned long vaddr,
 				   pgprot_t prot)
 {
+	struct page *page = pfn_to_page(pfn);
 	pte_t pte = pfn_pte(pfn, prot);
 
 	pr_debug("Validating PTE clear\n");
@@ -611,6 +626,7 @@ static void __init pte_clear_tests(struct mm_struct *mm, pte_t *ptep,
 	pte = __pte(pte_val(pte) | RANDOM_ORVALUE);
 #endif
 	set_pte_at(mm, vaddr, ptep, pte);
+	flush_dcache_page(page);
 	barrier();
 	pte_clear(mm, vaddr, ptep);
 	pte = ptep_get(ptep);
