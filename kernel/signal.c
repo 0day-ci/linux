@@ -412,7 +412,7 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t gfp_flags,
 		 int override_rlimit, const unsigned int sigqueue_flags)
 {
 	struct sigqueue *q = NULL;
-	struct ucounts *ucounts = NULL;
+	struct ucounts *ucounts, *ucounts_new;
 	long sigpending;
 
 	/*
@@ -424,10 +424,10 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t gfp_flags,
 	 * changes from/to zero.
 	 */
 	rcu_read_lock();
-	ucounts = task_ucounts(t);
+	ucounts = ucounts_new = task_ucounts(t);
 	sigpending = inc_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_SIGPENDING, 1);
 	if (sigpending == 1)
-		ucounts = get_ucounts(ucounts);
+		ucounts_new = get_ucounts(ucounts);
 	rcu_read_unlock();
 
 	if (override_rlimit || (sigpending < LONG_MAX && sigpending <= task_rlimit(t, RLIMIT_SIGPENDING))) {
@@ -437,13 +437,24 @@ __sigqueue_alloc(int sig, struct task_struct *t, gfp_t gfp_flags,
 	}
 
 	if (unlikely(q == NULL)) {
-		if (ucounts && dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_SIGPENDING, 1))
-			put_ucounts(ucounts);
+		ucounts_new = NULL;
 	} else {
 		INIT_LIST_HEAD(&q->list);
 		q->flags = sigqueue_flags;
-		q->ucounts = ucounts;
+		q->ucounts = ucounts_new;
 	}
+
+	/*
+	 * In case it failed to allocate sigqueue or ucounts reference counter
+	 * overflow, we decrement UCOUNT_RLIMIT_SIGPENDING to avoid counter
+	 * leaks.
+	 */
+	if (unlikely(ucounts_new == NULL)) {
+		dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_SIGPENDING, 1);
+		if (sigpending == 1)
+			put_ucounts(ucounts);
+	}
+
 	return q;
 }
 
@@ -451,7 +462,7 @@ static void __sigqueue_free(struct sigqueue *q)
 {
 	if (q->flags & SIGQUEUE_PREALLOC)
 		return;
-	if (q->ucounts && dec_rlimit_ucounts(q->ucounts, UCOUNT_RLIMIT_SIGPENDING, 1)) {
+	if (dec_rlimit_ucounts(q->ucounts, UCOUNT_RLIMIT_SIGPENDING, 1)) {
 		put_ucounts(q->ucounts);
 		q->ucounts = NULL;
 	}
