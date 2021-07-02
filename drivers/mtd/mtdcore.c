@@ -880,7 +880,10 @@ static int mtd_otp_nvmem_add(struct mtd_info *mtd)
 
 	if (mtd->_get_user_prot_info && mtd->_read_user_prot_reg) {
 		size = mtd_otp_size(mtd, true);
-		if (size < 0)
+		/* ENODATA means there is no OTP region */
+		if (size == -ENODATA)
+			size = 0;
+		else if (size < 0)
 			return size;
 
 		if (size > 0) {
@@ -896,7 +899,10 @@ static int mtd_otp_nvmem_add(struct mtd_info *mtd)
 
 	if (mtd->_get_fact_prot_info && mtd->_read_fact_prot_reg) {
 		size = mtd_otp_size(mtd, false);
-		if (size < 0) {
+		/* ENODATA means there is no OTP region */
+		if (size == -ENODATA) {
+			size = 0;
+		} else if (size < 0) {
 			err = size;
 			goto err;
 		}
