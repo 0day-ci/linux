@@ -83,13 +83,14 @@ loff_t
 iomap_seek_data(struct inode *inode, loff_t offset, const struct iomap_ops *ops)
 {
 	loff_t size = i_size_read(inode);
-	loff_t length = size - offset;
+	loff_t length;
 	loff_t ret;
 
 	/* Nothing to be found before or beyond the end of the file. */
 	if (offset < 0 || offset >= size)
 		return -ENXIO;
 
+	length = size - offset;
 	while (length > 0) {
 		ret = iomap_apply(inode, offset, length, IOMAP_REPORT, ops,
 				  &offset, iomap_seek_data_actor);
