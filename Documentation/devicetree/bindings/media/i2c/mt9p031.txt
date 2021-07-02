@@ -22,6 +22,10 @@ Required Properties:
 Optional Properties:
 - reset-gpios: Chip reset GPIO
 
+Optional endpoint properties:
+- pclk-sample: For information see ../video-interfaces.txt. The value is set to
+  0 if it isn't specified.
+
 For further reading on port node refer to
 Documentation/devicetree/bindings/media/video-interfaces.txt.
 
@@ -45,6 +49,7 @@ Example:
 				mt9p031_1: endpoint {
 					input-clock-frequency = <6000000>;
 					pixel-clock-frequency = <96000000>;
+					pclk-sample = <1>;
 				};
 			};
 		};
