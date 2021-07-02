@@ -172,6 +172,7 @@ static int pids_can_attach(struct cgroup_taskset *tset)
 {
 	struct task_struct *task;
 	struct cgroup_subsys_state *dst_css;
+	int ret = 0;
 
 	cgroup_taskset_for_each(task, dst_css, tset) {
 		struct pids_cgroup *pids = css_pids(dst_css);
@@ -186,11 +187,17 @@ static int pids_can_attach(struct cgroup_taskset *tset)
 		old_css = task_css(task, pids_cgrp_id);
 		old_pids = css_pids(old_css);
 
-		pids_charge(pids, 1);
+		ret = pids_try_charge(pids, 1);
+		if (ret) {
+			pr_info("cgroup: attach rejected by pids controller in ");
+			pr_cont_cgroup_path(dst_css->cgroup);
+			pr_cont("\n");
+			break;
+		}
 		pids_uncharge(old_pids, 1);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void pids_cancel_attach(struct cgroup_taskset *tset)
