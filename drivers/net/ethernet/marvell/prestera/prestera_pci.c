@@ -14,11 +14,10 @@
 
 #define PRESTERA_MSG_MAX_SIZE 1500
 
-#define PRESTERA_SUPP_FW_MAJ_VER	3
-#define PRESTERA_SUPP_FW_MIN_VER	0
-
-#define PRESTERA_PREV_FW_MAJ_VER	2
-#define PRESTERA_PREV_FW_MIN_VER	0
+static struct prestera_fw_rev prestera_fw_supp[] = {
+	{ 3, 0 },
+	{ 2, 0 }
+};
 
 #define PRESTERA_FW_PATH_FMT	"mrvl/prestera/mvsw_prestera_fw-v%u.%u.img"
 
@@ -629,40 +628,34 @@ static int prestera_fw_hdr_parse(struct prestera_fw *fw)
 
 static int prestera_fw_get(struct prestera_fw *fw)
 {
-	int ver_maj = PRESTERA_SUPP_FW_MAJ_VER;
-	int ver_min = PRESTERA_SUPP_FW_MIN_VER;
 	char fw_path[128];
 	int err;
+	int i;
 
-pick_fw_ver:
-	snprintf(fw_path, sizeof(fw_path), PRESTERA_FW_PATH_FMT,
-		 ver_maj, ver_min);
+	for (i = 0; i < ARRAY_SIZE(prestera_fw_supp); i++) {
+		struct prestera_fw_rev *ver = &prestera_fw_supp[i];
 
-	err = request_firmware_direct(&fw->bin, fw_path, fw->dev.dev);
-	if (err) {
-		if (ver_maj == PRESTERA_SUPP_FW_MAJ_VER) {
-			ver_maj = PRESTERA_PREV_FW_MAJ_VER;
-			ver_min = PRESTERA_PREV_FW_MIN_VER;
+		snprintf(fw_path, sizeof(fw_path), PRESTERA_FW_PATH_FMT,
+			 ver->maj, ver->min);
 
-			dev_warn(fw->dev.dev,
-				 "missing latest %s firmware, fall-back to previous %u.%u version\n",
-				 fw_path, ver_maj, ver_min);
-
-			goto pick_fw_ver;
-		} else {
-			dev_err(fw->dev.dev, "failed to request previous firmware: %s\n",
-				fw_path);
-			return err;
+		err = request_firmware_direct(&fw->bin, fw_path, fw->dev.dev);
+		if (!err) {
+			dev_info(fw->dev.dev, "Loading %s ...", fw_path);
+			fw->rev_supp = *ver;
+			return 0;
 		}
+
+		if (i == 0)
+			dev_warn(fw->dev.dev,
+				 "missing latest %s firmware, fall-back to previous version\n",
+				 fw_path);
+		else
+			dev_warn(fw->dev.dev, "failed to request previous firmware: %s\n",
+				 fw_path);
 	}
 
-	dev_info(fw->dev.dev, "Loading %s ...", fw_path);
-
-	fw->rev_supp.maj = ver_maj;
-	fw->rev_supp.min = ver_min;
-	fw->rev_supp.sub = 0;
-
-	return 0;
+	dev_err(fw->dev.dev, "could not find any of the supported firmware versions\n");
+	return -ENOENT;
 }
 
 static void prestera_fw_put(struct prestera_fw *fw)
