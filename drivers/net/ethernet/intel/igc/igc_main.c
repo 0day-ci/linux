@@ -6074,6 +6074,10 @@ u32 igc_rd32(struct igc_hw *hw, u32 reg)
 	u8 __iomem *hw_addr = READ_ONCE(hw->hw_addr);
 	u32 value = 0;
 
+	if (igc->pdev &&
+		igc->pdev->error_state == pci_channel_io_perm_failure)
+		return 0;
+
 	value = readl(&hw_addr[reg]);
 
 	/* reads should not return all F's */
@@ -6088,6 +6092,18 @@ u32 igc_rd32(struct igc_hw *hw, u32 reg)
 	}
 
 	return value;
+}
+
+void igc_wr32(struct igc_hw *hw, u32 reg, u32 val)
+{
+	struct igc_adapter *igc = container_of(hw, struct igc_adapter, hw);
+	u8 __iomem *hw_addr = READ_ONCE(hw->hw_addr);
+
+	if (igc->pdev &&
+		igc->pdev->error_state == pci_channel_io_perm_failure)
+		return;
+
+	writel((val), &hw_addr[(reg)]);
 }
 
 int igc_set_spd_dplx(struct igc_adapter *adapter, u32 spd, u8 dplx)

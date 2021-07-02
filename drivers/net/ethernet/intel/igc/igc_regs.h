@@ -279,13 +279,10 @@ struct igc_hw;
 u32 igc_rd32(struct igc_hw *hw, u32 reg);
 
 /* write operations, indexed using DWORDS */
-#define wr32(reg, val) \
-do { \
-	u8 __iomem *hw_addr = READ_ONCE((hw)->hw_addr); \
-	writel((val), &hw_addr[(reg)]); \
-} while (0)
+void igc_wr32(struct igc_hw *hw, u32 reg, u32 val);
 
 #define rd32(reg) (igc_rd32(hw, reg))
+#define wr32(reg, val) (igc_wr32(hw, reg, val))
 
 #define wrfl() ((void)rd32(IGC_STATUS))
 
