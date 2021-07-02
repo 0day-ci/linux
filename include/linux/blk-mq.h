@@ -397,11 +397,6 @@ struct blk_mq_ops {
 enum {
 	BLK_MQ_F_SHOULD_MERGE	= 1 << 0,
 	BLK_MQ_F_TAG_QUEUE_SHARED = 1 << 1,
-	/*
-	 * Set when this device requires underlying blk-mq device for
-	 * completing IO:
-	 */
-	BLK_MQ_F_STACKING	= 1 << 2,
 	BLK_MQ_F_TAG_HCTX_SHARED = 1 << 3,
 	BLK_MQ_F_MANAGED_IRQ	= 1 << 4,
 	BLK_MQ_F_BLOCKING	= 1 << 5,
