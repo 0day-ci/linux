@@ -2327,7 +2327,8 @@ static void nvme_dev_add(struct nvme_dev *dev)
 		dev->tagset.queue_depth = min_t(unsigned int, dev->q_depth,
 						BLK_MQ_MAX_DEPTH) - 1;
 		dev->tagset.cmd_size = sizeof(struct nvme_iod);
-		dev->tagset.flags = BLK_MQ_F_SHOULD_MERGE;
+		dev->tagset.flags = BLK_MQ_F_SHOULD_MERGE |
+			BLK_MQ_F_MANAGED_IRQ;
 		dev->tagset.driver_data = dev;
 
 		/*
