@@ -1663,22 +1663,29 @@ unsigned int hidinput_count_leds(struct hid_device *hid)
 }
 EXPORT_SYMBOL_GPL(hidinput_count_leds);
 
-static void hidinput_led_worker(struct work_struct *work)
+static bool hidinput_is_led_report(struct hid_report *report)
 {
-	struct hid_device *hid = container_of(work, struct hid_device,
-					      led_work);
 	struct hid_field *field;
-	struct hid_report *report;
+	int i, j;
+
+	for (i = 0; i < report->maxfield; i++) {
+		field = report->field[i];
+		for (j = 0; j < field->maxusage; j++)
+			if (field->usage[j].type == EV_LED)
+				return true;
+	}
+
+	return false;
+}
+
+static void hidinput_led_update(struct hid_device *hid, struct hid_report *report)
+{
 	int ret;
 	u32 len;
 	__u8 *buf;
 
-	field = hidinput_get_led_field(hid);
-	if (!field)
-		return;
-
 	/*
-	 * field->report is accessed unlocked regarding HID core. So there might
+	 * report is accessed unlocked regarding HID core. So there might
 	 * be another incoming SET-LED request from user-space, which changes
 	 * the LED state while we assemble our outgoing buffer. However, this
 	 * doesn't matter as hid_output_report() correctly converts it into a
@@ -1689,8 +1696,6 @@ static void hidinput_led_worker(struct work_struct *work)
 	 * for every SET-LED request so the following worker will send the
 	 * correct value, guaranteed!
 	 */
-
-	report = field->report;
 
 	/* use custom SET_REPORT request if possible (asynchronous) */
 	if (hid->ll_driver->request)
@@ -1709,6 +1714,20 @@ static void hidinput_led_worker(struct work_struct *work)
 		hid_hw_raw_request(hid, report->id, buf, len, HID_OUTPUT_REPORT,
 				HID_REQ_SET_REPORT);
 	kfree(buf);
+}
+
+static void hidinput_led_worker(struct work_struct *work)
+{
+	struct hid_device *hid = container_of(work, struct hid_device,
+					      led_work);
+	struct hid_report *report;
+
+	list_for_each_entry(report,
+			    &hid->report_enum[HID_OUTPUT_REPORT].report_list,
+			    list) {
+		if (hidinput_is_led_report(report))
+			hidinput_led_update(hid, report);
+	}
 }
 
 static int hidinput_input_event(struct input_dev *dev, unsigned int type,
