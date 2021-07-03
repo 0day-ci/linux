@@ -23,29 +23,29 @@
 #include <asm/feature-fixups.h>
 
 #ifdef CONFIG_VSX
-#define __REST_32FPVSRS(n,c,base)					\
+#define __REST_32FPVSRS(c, base)					\
 BEGIN_FTR_SECTION							\
 	b	2f;							\
 END_FTR_SECTION_IFSET(CPU_FTR_VSX);					\
-	REST_32FPRS(n,base);						\
+	REST_FPRS(0, 31, base);						\
 	b	3f;							\
-2:	REST_32VSRS(n,c,base);						\
+2:	REST_32VSRS(0, c, base);					\
 3:
 
-#define __SAVE_32FPVSRS(n,c,base)					\
+#define __SAVE_32FPVSRS(c, base)					\
 BEGIN_FTR_SECTION							\
 	b	2f;							\
 END_FTR_SECTION_IFSET(CPU_FTR_VSX);					\
-	SAVE_32FPRS(n,base);						\
+	SAVE_FPRS(0, 31, base);						\
 	b	3f;							\
-2:	SAVE_32VSRS(n,c,base);						\
+2:	SAVE_32VSRS(0, c, base);					\
 3:
 #else
-#define __REST_32FPVSRS(n,b,base)	REST_32FPRS(n, base)
-#define __SAVE_32FPVSRS(n,b,base)	SAVE_32FPRS(n, base)
+#define __REST_32FPVSRS(c, base)	REST_FPRS(0, 31, base)
+#define __SAVE_32FPVSRS(c, base)	SAVE_FPRS(0, 31, base)
 #endif
-#define REST_32FPVSRS(n,c,base) __REST_32FPVSRS(n,__REG_##c,__REG_##base)
-#define SAVE_32FPVSRS(n,c,base) __SAVE_32FPVSRS(n,__REG_##c,__REG_##base)
+#define REST_32FPVSRS(c, base) __REST_32FPVSRS(__REG_##c, __REG_##base)
+#define SAVE_32FPVSRS(c, base) __SAVE_32FPVSRS(__REG_##c, __REG_##base)
 
 /*
  * Load state from memory into FP registers including FPSCR.
@@ -54,7 +54,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX);					\
 _GLOBAL(load_fp_state)
 	lfd	fr0,FPSTATE_FPSCR(r3)
 	MTFSF_L(fr0)
-	REST_32FPVSRS(0, R4, R3)
+	REST_32FPVSRS(R4, R3)
 	blr
 EXPORT_SYMBOL(load_fp_state)
 _ASM_NOKPROBE_SYMBOL(load_fp_state); /* used by restore_math */
@@ -64,7 +64,7 @@ _ASM_NOKPROBE_SYMBOL(load_fp_state); /* used by restore_math */
  * Assumes the caller has enabled FP in the MSR.
  */
 _GLOBAL(store_fp_state)
-	SAVE_32FPVSRS(0, R4, R3)
+	SAVE_32FPVSRS(R4, R3)
 	mffs	fr0
 	stfd	fr0,FPSTATE_FPSCR(r3)
 	blr
@@ -113,7 +113,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_VSX)
 	addi	r10,r5,THREAD_FPSTATE
 	lfd	fr0,FPSTATE_FPSCR(r10)
 	MTFSF_L(fr0)
-	REST_32FPVSRS(0, R4, R10)
+	REST_32FPVSRS(R4, R10)
 	/* restore registers and return */
 	/* we haven't used ctr or xer or lr */
 	blr
@@ -131,7 +131,7 @@ _GLOBAL(save_fpu)
 	PPC_LCMPI	0,r6,0
 	bne	2f
 	addi	r6,r3,THREAD_FPSTATE
-2:	SAVE_32FPVSRS(0, R4, R6)
+2:	SAVE_32FPVSRS(R4, R6)
 	mffs	fr0
 	stfd	fr0,FPSTATE_FPSCR(r6)
 	blr

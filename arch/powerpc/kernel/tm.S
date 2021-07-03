@@ -17,30 +17,30 @@
 
 #ifdef CONFIG_VSX
 /* See fpu.S, this is borrowed from there */
-#define __SAVE_32FPRS_VSRS(n,c,base)		\
+#define __SAVE_32FPRS_VSRS(c, base)		\
 BEGIN_FTR_SECTION				\
 	b	2f;				\
 END_FTR_SECTION_IFSET(CPU_FTR_VSX);		\
-	SAVE_32FPRS(n,base);			\
+	SAVE_FPRS(0, 31, base);			\
 	b	3f;				\
-2:	SAVE_32VSRS(n,c,base);			\
+2:	SAVE_32VSRS(0, c, base);		\
 3:
-#define __REST_32FPRS_VSRS(n,c,base)		\
+#define __REST_32FPRS_VSRS(c, base)		\
 BEGIN_FTR_SECTION				\
 	b	2f;				\
 END_FTR_SECTION_IFSET(CPU_FTR_VSX);		\
-	REST_32FPRS(n,base);			\
+	REST_FPRS(0, 31, base);			\
 	b	3f;				\
-2:	REST_32VSRS(n,c,base);			\
+2:	REST_32VSRS(0, c, base);		\
 3:
 #else
-#define __SAVE_32FPRS_VSRS(n,c,base)	SAVE_32FPRS(n, base)
-#define __REST_32FPRS_VSRS(n,c,base)	REST_32FPRS(n, base)
+#define __SAVE_32FPRS_VSRS(c,base)	SAVE_FPRS(0, 31, base)
+#define __REST_32FPRS_VSRS(c,base)	REST_FPRS(0, 31, base)
 #endif
-#define SAVE_32FPRS_VSRS(n,c,base) \
-	__SAVE_32FPRS_VSRS(n,__REG_##c,__REG_##base)
-#define REST_32FPRS_VSRS(n,c,base) \
-	__REST_32FPRS_VSRS(n,__REG_##c,__REG_##base)
+#define SAVE_32FPRS_VSRS(c, base) \
+	__SAVE_32FPRS_VSRS(__REG_##c, __REG_##base)
+#define REST_32FPRS_VSRS(c, base) \
+	__REST_32FPRS_VSRS(__REG_##c, __REG_##base)
 
 /* Stack frame offsets for local variables. */
 #define TM_FRAME_L0	TM_FRAME_SIZE-16
@@ -226,11 +226,8 @@ _GLOBAL(tm_reclaim)
 
 	/* Sync the userland GPRs 2-12, 14-31 to thread->regs: */
 	SAVE_GPR(0, r7)				/* user r0 */
-	SAVE_GPR(2, r7)				/* user r2 */
-	SAVE_4GPRS(3, r7)			/* user r3-r6 */
-	SAVE_GPR(8, r7)				/* user r8 */
-	SAVE_GPR(9, r7)				/* user r9 */
-	SAVE_GPR(10, r7)			/* user r10 */
+	SAVE_GPRS(2, 6, r7)			/* user r2-r6 */
+	SAVE_GPRS(8, 10, r7)			/* user r8-r10 */
 	ld	r3, GPR1(r1)			/* user r1 */
 	ld	r4, GPR7(r1)			/* user r7 */
 	ld	r5, GPR11(r1)			/* user r11 */
@@ -290,7 +287,7 @@ _GLOBAL(tm_reclaim)
 
 	/* Altivec (VEC/VMX/VR)*/
 	addi	r7, r3, THREAD_CKVRSTATE
-	SAVE_32VRS(0, r6, r7)	/* r6 scratch, r7 ckvr_state */
+	SAVE_VRS(0, 31, r6, r7)	/* r6 scratch, r7 ckvr_state */
 	mfvscr	v0
 	li	r6, VRSTATE_VSCR
 	stvx	v0, r7, r6
@@ -301,7 +298,7 @@ _GLOBAL(tm_reclaim)
 
 	/* Floating Point (FP) */
 	addi	r7, r3, THREAD_CKFPSTATE
-	SAVE_32FPRS_VSRS(0, R6, R7)	/* r6 scratch, r7 ckfp_state */
+	SAVE_32FPRS_VSRS(R6, R7)	/* r6 scratch, r7 ckfp_state */
 	mffs    fr0
 	stfd    fr0,FPSTATE_FPSCR(r7)
 
@@ -409,7 +406,7 @@ _GLOBAL(__tm_recheckpoint)
 	li	r5, VRSTATE_VSCR
 	lvx	v0, r8, r5
 	mtvscr	v0
-	REST_32VRS(0, r5, r8)			/* r5 scratch, r8 ptr */
+	REST_VRS(0, 31, r5, r8)			/* r5 scratch, r8 ptr */
 	ld	r5, THREAD_CKVRSAVE(r3)
 	mtspr	SPRN_VRSAVE, r5
 #endif
@@ -417,7 +414,7 @@ _GLOBAL(__tm_recheckpoint)
 	addi	r8, r3, THREAD_CKFPSTATE
 	lfd	fr0, FPSTATE_FPSCR(r8)
 	MTFSF_L(fr0)
-	REST_32FPRS_VSRS(0, R4, R8)
+	REST_32FPRS_VSRS(R4, R8)
 
 	mtmsr	r6				/* FP/Vec off again! */
 
@@ -445,12 +442,8 @@ restore_gprs:
 	ld	r6, THREAD_TM_PPR(r3)
 
 	REST_GPR(0, r7)				/* GPR0 */
-	REST_2GPRS(2, r7)			/* GPR2-3 */
-	REST_GPR(4, r7)				/* GPR4 */
-	REST_4GPRS(8, r7)			/* GPR8-11 */
-	REST_2GPRS(12, r7)			/* GPR12-13 */
-
-	REST_NVGPRS(r7)				/* GPR14-31 */
+	REST_GPRS(2, 4, r7)			/* GPR2-4 */
+	REST_GPRS(8, 31, r7)			/* GPR8-31 */
 
 	/* Load up PPR and DSCR here so we don't run with user values for long */
 	mtspr	SPRN_DSCR, r5

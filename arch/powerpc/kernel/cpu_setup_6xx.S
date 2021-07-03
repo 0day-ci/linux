@@ -283,7 +283,7 @@ _GLOBAL(__init_fpu_registers)
 	isync
 	addis	r9,r3,empty_zero_page@ha
 	addi	r9,r9,empty_zero_page@l
-	REST_32FPRS(0,r9)
+	REST_FPRS(0, 31, r9)
 	sync
 	mtmsr	r10
 	isync

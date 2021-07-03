@@ -18,7 +18,7 @@ _GLOBAL(load_vr_state)
 	li	r4,VRSTATE_VSCR
 	lvx	v0,r4,r3
 	mtvscr	v0
-	REST_32VRS(0,r4,r3)
+	REST_VRS(0, 31, r4, r3)
 	blr
 EXPORT_SYMBOL(load_vr_state)
 _ASM_NOKPROBE_SYMBOL(load_vr_state); /* used by restore_math */
@@ -28,7 +28,7 @@ _ASM_NOKPROBE_SYMBOL(load_vr_state); /* used by restore_math */
  * Assumes the caller has enabled VMX in the MSR.
  */
 _GLOBAL(store_vr_state)
-	SAVE_32VRS(0, r4, r3)
+	SAVE_VRS(0, 31, r4, r3)
 	mfvscr	v0
 	li	r4, VRSTATE_VSCR
 	stvx	v0, r4, r3
@@ -86,7 +86,7 @@ _GLOBAL(load_up_altivec)
 	stw	r4,THREAD_USED_VR(r5)
 	lvx	v0,r10,r6
 	mtvscr	v0
-	REST_32VRS(0,r4,r6)
+	REST_VRS(0, 31, r4, r6)
 	/* restore registers and return */
 	blr
 _ASM_NOKPROBE_SYMBOL(load_up_altivec)
@@ -102,7 +102,7 @@ _GLOBAL(save_altivec)
 	PPC_LCMPI	0,r7,0
 	bne	2f
 	addi	r7,r3,THREAD_VRSTATE
-2:	SAVE_32VRS(0,r4,r7)
+2:	SAVE_VRS(0, 31, r4, r7)
 	mfvscr	v0
 	li	r4,VRSTATE_VSCR
 	stvx	v0,r4,r7
