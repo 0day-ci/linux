@@ -129,6 +129,7 @@ enum {
 	DPU_SSPP_TS_PREFILL,
 	DPU_SSPP_TS_PREFILL_REC1,
 	DPU_SSPP_CDP,
+	DPU_SSPP_INLINE_ROTATION,
 	DPU_SSPP_MAX
 };
 
@@ -309,6 +310,24 @@ struct dpu_qos_lut_tbl {
 };
 
 /**
+ * struct dpu_rotation_cfg - define inline rotation config
+ * @version: Inline rotation version
+ * @rot_maxdwnscale_ratio_num: max downscale ratio for rotation numerator
+ * @rot_maxdwnscale_ratio_dem: max downscale ratio for denominator
+ * @rot_maxheight: max pre rotated height allowed for rotation
+ * @rot_num_formats: count of the formats
+ * @rot_format_list: list of supported rotator formats
+ */
+struct dpu_rotation_cfg {
+	u32 version;
+	u32 rot_maxdwnscale_ratio_num;
+	u32 rot_maxdwnscale_ratio_dem;
+	u32 rot_maxheight;
+	u32 rot_num_formats;
+	const u32 *rot_format_list;
+};
+
+/**
  * struct dpu_caps - define DPU capabilities
  * @max_mixer_width    max layer mixer line width support.
  * @max_mixer_blendstages max layer mixer blend stages or
@@ -384,6 +403,7 @@ struct dpu_sspp_sub_blks {
 	u32 num_formats;
 	const u32 *virt_format_list;
 	u32 virt_num_formats;
+	const struct dpu_rotation_cfg *rotation_cfg;
 };
 
 /**

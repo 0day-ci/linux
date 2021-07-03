@@ -542,15 +542,27 @@ static void _dpu_plane_set_scanout(struct drm_plane *plane,
 
 static void _dpu_plane_setup_scaler3(struct dpu_plane *pdpu,
 		struct dpu_plane_state *pstate,
-		uint32_t src_w, uint32_t src_h, uint32_t dst_w, uint32_t dst_h,
 		struct dpu_hw_scaler3_cfg *scale_cfg,
 		const struct dpu_format *fmt,
 		uint32_t chroma_subsmpl_h, uint32_t chroma_subsmpl_v)
 {
 	uint32_t i;
+	bool inline_rotation = (pstate->rotation & DRM_MODE_ROTATE_90);
+	uint32_t src_w = drm_rect_width(&pdpu->pipe_cfg.src_rect);
+	uint32_t src_h = drm_rect_height(&pdpu->pipe_cfg.src_rect);
+	uint32_t dst_w = drm_rect_width(&pdpu->pipe_cfg.dst_rect);
+	uint32_t dst_h = drm_rect_height(&pdpu->pipe_cfg.dst_rect);
 
 	memset(scale_cfg, 0, sizeof(*scale_cfg));
 	memset(&pstate->pixel_ext, 0, sizeof(struct dpu_hw_pixel_ext));
+
+	/*
+	 * For inline rotation cases, scaler config is post-rotation,
+	 * so swap the dimensions here. However, pixel extension will
+	 * need pre-rotation settings.
+	 */
+	if (inline_rotation)
+		swap(src_w, src_h);
 
 	scale_cfg->phase_step_x[DPU_SSPP_COMP_0] =
 		mult_frac((1 << PHASE_STEP_SHIFT), src_w, dst_w);
@@ -590,10 +602,10 @@ static void _dpu_plane_setup_scaler3(struct dpu_plane *pdpu,
 			scale_cfg->preload_y[i] = DPU_QSEED3_DEFAULT_PRELOAD_V;
 		}
 
-		pstate->pixel_ext.num_ext_pxls_top[i] =
-			scale_cfg->src_height[i];
-		pstate->pixel_ext.num_ext_pxls_left[i] =
-			scale_cfg->src_width[i];
+		pstate->pixel_ext.num_ext_pxls_top[i] = inline_rotation ?
+			scale_cfg->src_width[i] : scale_cfg->src_height[i];
+		pstate->pixel_ext.num_ext_pxls_left[i] = inline_rotation ?
+			scale_cfg->src_height[i] : scale_cfg->src_width[i];
 	}
 	if (!(DPU_FORMAT_IS_YUV(fmt)) && (src_h == dst_h)
 		&& (src_w == dst_w))
@@ -665,10 +677,6 @@ static void _dpu_plane_setup_scaler(struct dpu_plane *pdpu,
 	/* don't chroma subsample if decimating */
 	/* update scaler. calculate default config for QSEED3 */
 	_dpu_plane_setup_scaler3(pdpu, pstate,
-			drm_rect_width(&pdpu->pipe_cfg.src_rect),
-			drm_rect_height(&pdpu->pipe_cfg.src_rect),
-			drm_rect_width(&pdpu->pipe_cfg.dst_rect),
-			drm_rect_height(&pdpu->pipe_cfg.dst_rect),
 			&pstate->scaler3_cfg, fmt,
 			info->hsub, info->vsub);
 }
@@ -962,6 +970,7 @@ static int dpu_plane_atomic_check(struct drm_plane *plane,
 	const struct dpu_format *fmt;
 	struct drm_rect src, dst, fb_rect = { 0 };
 	uint32_t min_src_size, max_linewidth;
+	unsigned int rotation;
 
 	if (new_plane_state->crtc)
 		crtc_state = drm_atomic_get_new_crtc_state(state,
@@ -1031,6 +1040,48 @@ static int dpu_plane_atomic_check(struct drm_plane *plane,
 		return -E2BIG;
 	}
 
+	rotation = drm_rotation_simplify(new_plane_state->rotation,
+			    DRM_MODE_ROTATE_0 |
+			    DRM_MODE_ROTATE_90 |
+			    DRM_MODE_REFLECT_X |
+			    DRM_MODE_REFLECT_Y);
+
+	if (rotation & DRM_MODE_ROTATE_90) {
+		struct msm_drm_private *priv = plane->dev->dev_private;
+		struct dpu_kms *dpu_kms;
+		const struct msm_format *msm_fmt;
+		const struct dpu_format *fmt;
+		bool found = false;
+		u32 i, num_formats;
+		const u32 *supported_formats;
+
+		if (src.y2 > pdpu->pipe_sblk->rotation_cfg->rot_maxheight) {
+			DPU_DEBUG_PLANE(pdpu,
+			"invalid height for inline rot:%d max:%d\n",
+			src.y2, pdpu->pipe_sblk->rotation_cfg->rot_maxheight);
+			return -EINVAL;
+		}
+
+		/* check for valid formats supported by inline rotation */
+		dpu_kms = to_dpu_kms(priv->kms);
+		msm_fmt = msm_framebuffer_format(new_plane_state->fb);
+		fmt = to_dpu_format(msm_fmt);
+		supported_formats = pdpu->pipe_sblk->rotation_cfg->rot_format_list;
+		num_formats = pdpu->pipe_sblk->rotation_cfg->rot_num_formats;
+
+		for (i = 0; i < num_formats; i++) {
+			if (fmt->base.pixel_format == supported_formats[i] &&
+				fmt->fetch_mode == DPU_FETCH_UBWC)
+				found = true;
+		}
+
+		if (!found || !num_formats) {
+			DPU_DEBUG_PLANE(pdpu,
+			"supported_format not found num:%d\n", num_formats);
+			return -EINVAL;
+		}
+	}
+	pstate->rotation = rotation;
 	pstate->needs_qos_remap = drm_atomic_crtc_needs_modeset(crtc_state);
 
 	return 0;
@@ -1156,20 +1207,17 @@ static void dpu_plane_sspp_atomic_update(struct drm_plane *plane)
 				pstate->multirect_mode);
 
 	if (pdpu->pipe_hw->ops.setup_format) {
-		unsigned int rotation;
 
 		src_flags = 0x0;
 
-		rotation = drm_rotation_simplify(state->rotation,
-						 DRM_MODE_ROTATE_0 |
-						 DRM_MODE_REFLECT_X |
-						 DRM_MODE_REFLECT_Y);
-
-		if (rotation & DRM_MODE_REFLECT_X)
+		if (pstate->rotation & DRM_MODE_REFLECT_X)
 			src_flags |= DPU_SSPP_FLIP_LR;
 
-		if (rotation & DRM_MODE_REFLECT_Y)
+		if (pstate->rotation & DRM_MODE_REFLECT_Y)
 			src_flags |= DPU_SSPP_FLIP_UD;
+
+		if (pstate->rotation & DRM_MODE_ROTATE_90)
+			src_flags |= DPU_SSPP_ROT_90;
 
 		/* update format */
 		pdpu->pipe_hw->ops.setup_format(pdpu->pipe_hw, fmt, src_flags,
@@ -1581,6 +1629,8 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 	int zpos_max = DPU_ZPOS_MAX;
 	uint32_t num_formats;
 	int ret = -EINVAL;
+	unsigned int supported_rotations = DRM_MODE_ROTATE_0 |
+			DRM_MODE_ROTATE_180 | DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y;
 
 	/* create and zero local structure */
 	pdpu = kzalloc(sizeof(*pdpu), GFP_KERNEL);
@@ -1650,12 +1700,11 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 	if (ret)
 		DPU_ERROR("failed to install zpos property, rc = %d\n", ret);
 
+	if (pdpu->features & BIT(DPU_SSPP_INLINE_ROTATION))
+		supported_rotations |= DRM_MODE_ROTATE_90;
+
 	drm_plane_create_rotation_property(plane,
-			DRM_MODE_ROTATE_0,
-			DRM_MODE_ROTATE_0 |
-			DRM_MODE_ROTATE_180 |
-			DRM_MODE_REFLECT_X |
-			DRM_MODE_REFLECT_Y);
+		    DRM_MODE_ROTATE_0, supported_rotations);
 
 	drm_plane_enable_fb_damage_clips(plane);
 
