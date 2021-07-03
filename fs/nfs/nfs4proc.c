@@ -6188,6 +6188,8 @@ nfs4_init_nonuniform_client_string(struct nfs_client *clp)
 		strlen(rpc_peeraddr2str(clp->cl_rpcclient, RPC_DISPLAY_ADDR)) +
 		1;
 	rcu_read_unlock();
+	if (*clp->cl_namespace)
+		len += strlen(clp->cl_namespace) + 1;
 
 	buflen = nfs4_get_uniquifier(clp, buf, sizeof(buf));
 	if (buflen)
@@ -6207,15 +6209,19 @@ nfs4_init_nonuniform_client_string(struct nfs_client *clp)
 
 	rcu_read_lock();
 	if (buflen)
-		scnprintf(str, len, "Linux NFSv4.0 %s/%s/%s",
+		scnprintf(str, len, "Linux NFSv4.0 %s/%s/%s%s%s",
 			  clp->cl_rpcclient->cl_nodename, buf,
 			  rpc_peeraddr2str(clp->cl_rpcclient,
-					   RPC_DISPLAY_ADDR));
+					   RPC_DISPLAY_ADDR),
+			  *clp->cl_namespace ? "/" : "",
+			  clp->cl_namespace);
 	else
-		scnprintf(str, len, "Linux NFSv4.0 %s/%s",
+		scnprintf(str, len, "Linux NFSv4.0 %s/%s%s%s",
 			  clp->cl_rpcclient->cl_nodename,
 			  rpc_peeraddr2str(clp->cl_rpcclient,
-					   RPC_DISPLAY_ADDR));
+					   RPC_DISPLAY_ADDR),
+			  *clp->cl_namespace ? "/" : "",
+			  clp->cl_namespace);
 	rcu_read_unlock();
 
 	clp->cl_owner_id = str;
@@ -6235,6 +6241,8 @@ nfs4_init_uniform_client_string(struct nfs_client *clp)
 
 	len = 10 + 10 + 1 + 10 + 1 +
 		strlen(clp->cl_rpcclient->cl_nodename) + 1;
+	if (*clp->cl_namespace)
+		len += strlen(clp->cl_namespace) + 1;
 
 	buflen = nfs4_get_uniquifier(clp, buf, sizeof(buf));
 	if (buflen)
@@ -6253,13 +6261,17 @@ nfs4_init_uniform_client_string(struct nfs_client *clp)
 		return -ENOMEM;
 
 	if (buflen)
-		scnprintf(str, len, "Linux NFSv%u.%u %s/%s",
+		scnprintf(str, len, "Linux NFSv%u.%u %s/%s%s%s",
 			  clp->rpc_ops->version, clp->cl_minorversion,
-			  buf, clp->cl_rpcclient->cl_nodename);
+			  buf, clp->cl_rpcclient->cl_nodename,
+			  *clp->cl_namespace ? "/" : "",
+			  clp->cl_namespace);
 	else
-		scnprintf(str, len, "Linux NFSv%u.%u %s",
+		scnprintf(str, len, "Linux NFSv%u.%u %s%s%s",
 			  clp->rpc_ops->version, clp->cl_minorversion,
-			  clp->cl_rpcclient->cl_nodename);
+			  clp->cl_rpcclient->cl_nodename,
+			  *clp->cl_namespace ? "/" : "",
+			  clp->cl_namespace);
 	clp->cl_owner_id = str;
 	return 0;
 }

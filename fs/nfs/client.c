@@ -173,6 +173,13 @@ struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_init)
 		if (!clp->cl_hostname)
 			goto error_cleanup;
 	}
+	err = -ENOMEM;
+	if (cl_init->namespace && *cl_init->namespace)
+		clp->cl_namespace = kstrdup(cl_init->namespace, GFP_KERNEL);
+	else
+		clp->cl_namespace = "";
+	if (!clp->cl_namespace)
+		goto error_cleanup;
 
 	INIT_LIST_HEAD(&clp->cl_superblocks);
 	clp->cl_rpcclient = ERR_PTR(-EINVAL);
@@ -187,6 +194,7 @@ struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_init)
 	return clp;
 
 error_cleanup:
+	kfree(clp->cl_hostname);
 	put_nfs_version(clp->cl_nfs_mod);
 error_dealloc:
 	kfree(clp);
@@ -247,6 +255,8 @@ void nfs_free_client(struct nfs_client *clp)
 	put_nfs_version(clp->cl_nfs_mod);
 	kfree(clp->cl_hostname);
 	kfree(clp->cl_acceptor);
+	if (clp->cl_namespace && *clp->cl_namespace)
+		kfree(clp->cl_namespace);
 	kfree(clp);
 }
 EXPORT_SYMBOL_GPL(nfs_free_client);
@@ -288,7 +298,7 @@ static struct nfs_client *nfs_match_client(const struct nfs_client_initdata *dat
 
 again:
 	list_for_each_entry(clp, &nn->nfs_client_list, cl_share_link) {
-	        const struct sockaddr *clap = (struct sockaddr *)&clp->cl_addr;
+		const struct sockaddr *clap = (struct sockaddr *)&clp->cl_addr;
 		/* Don't match clients that failed to initialise properly */
 		if (clp->cl_cons_state < 0)
 			continue;
@@ -320,11 +330,17 @@ again:
 		    test_bit(NFS_CS_DS, &clp->cl_flags))
 			continue;
 
+		/* If admin has asked for different namespaces for these mounts,
+		 * don't share the client.
+		 */
+		if (strcmp(clp->cl_namespace, data->namespace ?: "") != 0)
+			continue;
+
 		/* Match the full socket address */
 		if (!rpc_cmp_addr_port(sap, clap))
 			/* Match all xprt_switch full socket addresses */
 			if (IS_ERR(clp->cl_rpcclient) ||
-                            !rpc_clnt_xprt_switch_has_addr(clp->cl_rpcclient,
+			    !rpc_clnt_xprt_switch_has_addr(clp->cl_rpcclient,
 							   sap))
 				continue;
 
@@ -676,6 +692,7 @@ static int nfs_init_server(struct nfs_server *server,
 		.timeparms = &timeparms,
 		.cred = server->cred,
 		.nconnect = ctx->nfs_server.nconnect,
+		.namespace = ctx->namespace,
 		.init_flags = (1UL << NFS_CS_REUSEPORT),
 	};
 	struct nfs_client *clp;

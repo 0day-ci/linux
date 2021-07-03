@@ -502,6 +502,12 @@ static int nfs4_match_client(struct nfs_client  *pos,  struct nfs_client *new,
 	if (pos->cl_minorversion != new->cl_minorversion)
 		return 1;
 
+	/* If admin has asked for different namespaces for these mounts,
+	 * don't share the client.
+	 */
+	if (strcmp(pos->cl_namespace, new->cl_namespace) != 0)
+		return 1;
+
 	/* If "pos" isn't marked ready, we can't trust the
 	 * remaining fields in "pos", especially the client
 	 * ID and serverowner fields.  Wait for CREATE_SESSION
@@ -865,6 +871,7 @@ static int nfs4_set_client(struct nfs_server *server,
 		const char *ip_addr,
 		int proto, const struct rpc_timeout *timeparms,
 		u32 minorversion, unsigned int nconnect,
+		const char *namespace,
 		struct net *net)
 {
 	struct nfs_client_initdata cl_init = {
@@ -875,6 +882,7 @@ static int nfs4_set_client(struct nfs_server *server,
 		.nfs_mod = &nfs_v4,
 		.proto = proto,
 		.minorversion = minorversion,
+		.namespace = namespace,
 		.net = net,
 		.timeparms = timeparms,
 		.cred = server->cred,
@@ -942,6 +950,7 @@ struct nfs_client *nfs4_set_ds_client(struct nfs_server *mds_srv,
 		.nfs_mod = &nfs_v4,
 		.proto = ds_proto,
 		.minorversion = minor_version,
+		.namespace = mds_clp->cl_namespace,
 		.net = mds_clp->cl_net,
 		.timeparms = &ds_timeout,
 		.cred = mds_srv->cred,
@@ -1122,6 +1131,7 @@ static int nfs4_init_server(struct nfs_server *server, struct fs_context *fc)
 				&timeparms,
 				ctx->minorversion,
 				ctx->nfs_server.nconnect,
+				ctx->namespace,
 				fc->net_ns);
 	if (error < 0)
 		return error;
@@ -1211,6 +1221,7 @@ struct nfs_server *nfs4_create_referral_server(struct fs_context *fc)
 				parent_server->client->cl_timeout,
 				parent_client->cl_mvops->minor_version,
 				parent_client->cl_nconnect,
+				parent_client->cl_namespace,
 				parent_client->cl_net);
 	if (!error)
 		goto init_server;
@@ -1226,6 +1237,7 @@ struct nfs_server *nfs4_create_referral_server(struct fs_context *fc)
 				parent_server->client->cl_timeout,
 				parent_client->cl_mvops->minor_version,
 				parent_client->cl_nconnect,
+				parent_client->cl_namespace,
 				parent_client->cl_net);
 	if (error < 0)
 		goto error;
@@ -1323,7 +1335,8 @@ int nfs4_update_server(struct nfs_server *server, const char *hostname,
 	error = nfs4_set_client(server, hostname, sap, salen, buf,
 				clp->cl_proto, clnt->cl_timeout,
 				clp->cl_minorversion,
-				clp->cl_nconnect, net);
+				clp->cl_nconnect,
+				clp->cl_namespace, net);
 	clear_bit(NFS_MIG_TSM_POSSIBLE, &server->mig_status);
 	if (error != 0) {
 		nfs_server_insert_lists(server);
