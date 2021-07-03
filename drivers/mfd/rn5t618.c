@@ -24,8 +24,10 @@ static const struct mfd_cell rn5t618_cells[] = {
 };
 
 static const struct mfd_cell rc5t619_cells[] = {
-	{ .name = "rn5t618-adc" },
-	{ .name = "rn5t618-power" },
+	{ .name = "rn5t618-adc",
+	  .of_compatible = "ricoh,rc5t619-adc" },
+	{ .name = "rn5t618-power",
+	  .of_compatible = "ricoh,rc5t619-power" },
 	{ .name = "rn5t618-regulator" },
 	{ .name = "rc5t619-rtc" },
 	{ .name = "rn5t618-wdt" },
