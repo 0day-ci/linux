@@ -126,4 +126,58 @@ struct zram {
 	struct dentry *debugfs_dir;
 #endif
 };
+
+#undef __ATTR_RO
+#undef __ATTR_RW
+#undef __ATTR_WO
+
+#define __ATTR_RO(_name) {						\
+	.attr	= { .name = __stringify(_name), .mode = 0444 },		\
+	.show	= module_##_name##_show,						\
+}
+#define __ATTR_RW(_name) __ATTR(_name, 0644, module_##_name##_show, module_##_name##_store)
+#define __ATTR_WO(_name) {						\
+	.attr	= { .name = __stringify(_name), .mode = 0200 },		\
+	.store	= module_##_name##_store,				\
+}
+
+#define MODULE_DEVICE_ATTR_FUNC_STORE(_name) \
+static ssize_t module_ ## _name ## _store(struct device *dev, \
+				   struct device_attribute *attr, \
+				   const char *buf, size_t len) \
+{ \
+	ssize_t __ret; \
+	if (!try_module_get(THIS_MODULE)) \
+		return -ENODEV; \
+	__ret = _name ## _store(dev, attr, buf, len); \
+	module_put(THIS_MODULE); \
+	return __ret; \
+}
+
+#define MODULE_DEVICE_ATTR_FUNC_SHOW(_name) \
+static ssize_t module_ ## _name ## _show(struct device *dev, \
+					 struct device_attribute *attr, \
+					 char *buf) \
+{ \
+	ssize_t __ret; \
+	if (!try_module_get(THIS_MODULE)) \
+		return -ENODEV; \
+	__ret = _name ## _show(dev, attr, buf); \
+	module_put(THIS_MODULE); \
+	return __ret; \
+}
+
+#define MODULE_DEVICE_ATTR_WO(_name) \
+MODULE_DEVICE_ATTR_FUNC_STORE(_name); \
+static DEVICE_ATTR_WO(_name)
+
+#define MODULE_DEVICE_ATTR_RW(_name) \
+MODULE_DEVICE_ATTR_FUNC_STORE(_name); \
+MODULE_DEVICE_ATTR_FUNC_SHOW(_name); \
+static DEVICE_ATTR_RW(_name)
+
+#define MODULE_DEVICE_ATTR_RO(_name) \
+MODULE_DEVICE_ATTR_FUNC_SHOW(_name); \
+static DEVICE_ATTR_RO(_name)
+
 #endif

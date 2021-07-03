@@ -1134,12 +1134,12 @@ static ssize_t debug_stat_show(struct device *dev,
 	return ret;
 }
 
-static DEVICE_ATTR_RO(io_stat);
-static DEVICE_ATTR_RO(mm_stat);
+MODULE_DEVICE_ATTR_RO(io_stat);
+MODULE_DEVICE_ATTR_RO(mm_stat);
 #ifdef CONFIG_ZRAM_WRITEBACK
-static DEVICE_ATTR_RO(bd_stat);
+MODULE_DEVICE_ATTR_RO(bd_stat);
 #endif
-static DEVICE_ATTR_RO(debug_stat);
+MODULE_DEVICE_ATTR_RO(debug_stat);
 
 static void zram_meta_free(struct zram *zram, u64 disksize)
 {
@@ -1861,20 +1861,20 @@ static const struct block_device_operations zram_wb_devops = {
 	.owner = THIS_MODULE
 };
 
-static DEVICE_ATTR_WO(compact);
-static DEVICE_ATTR_RW(disksize);
-static DEVICE_ATTR_RO(initstate);
-static DEVICE_ATTR_WO(reset);
-static DEVICE_ATTR_WO(mem_limit);
-static DEVICE_ATTR_WO(mem_used_max);
-static DEVICE_ATTR_WO(idle);
-static DEVICE_ATTR_RW(max_comp_streams);
-static DEVICE_ATTR_RW(comp_algorithm);
+MODULE_DEVICE_ATTR_WO(compact);
+MODULE_DEVICE_ATTR_RW(disksize);
+MODULE_DEVICE_ATTR_RO(initstate);
+MODULE_DEVICE_ATTR_WO(reset);
+MODULE_DEVICE_ATTR_WO(mem_limit);
+MODULE_DEVICE_ATTR_WO(mem_used_max);
+MODULE_DEVICE_ATTR_WO(idle);
+MODULE_DEVICE_ATTR_RW(max_comp_streams);
+MODULE_DEVICE_ATTR_RW(comp_algorithm);
 #ifdef CONFIG_ZRAM_WRITEBACK
-static DEVICE_ATTR_RW(backing_dev);
-static DEVICE_ATTR_WO(writeback);
-static DEVICE_ATTR_RW(writeback_limit);
-static DEVICE_ATTR_RW(writeback_limit_enable);
+MODULE_DEVICE_ATTR_RW(backing_dev);
+MODULE_DEVICE_ATTR_WO(writeback);
+MODULE_DEVICE_ATTR_RW(writeback_limit);
+MODULE_DEVICE_ATTR_RW(writeback_limit_enable);
 #endif
 
 static struct attribute *zram_disk_attrs[] = {
@@ -2037,13 +2037,19 @@ static ssize_t hot_add_show(struct class *class,
 {
 	int ret;
 
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
 	mutex_lock(&zram_index_mutex);
 	if (!zram_up) {
 		mutex_unlock(&zram_index_mutex);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto out;
 	}
 	ret = zram_add();
+out:
 	mutex_unlock(&zram_index_mutex);
+	module_put(THIS_MODULE);
 
 	if (ret < 0)
 		return ret;
@@ -2052,6 +2058,7 @@ static ssize_t hot_add_show(struct class *class,
 static struct class_attribute class_attr_hot_add =
 	__ATTR(hot_add, 0400, hot_add_show, NULL);
 
+#define module_hot_remove_store hot_remove_store
 static ssize_t hot_remove_store(struct class *class,
 			struct class_attribute *attr,
 			const char *buf,
@@ -2066,6 +2073,9 @@ static ssize_t hot_remove_store(struct class *class,
 		return ret;
 	if (dev_id < 0)
 		return -EINVAL;
+
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
 
 	mutex_lock(&zram_index_mutex);
 
@@ -2085,6 +2095,7 @@ static ssize_t hot_remove_store(struct class *class,
 
 out:
 	mutex_unlock(&zram_index_mutex);
+	module_put(THIS_MODULE);
 	return ret ? ret : count;
 }
 static CLASS_ATTR_WO(hot_remove);
