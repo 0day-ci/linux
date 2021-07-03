@@ -33,6 +33,8 @@ static const struct {
 	[LED_MISC]	= { "misc" },
 	[LED_MAIL]	= { "mail" },
 	[LED_CHARGING]	= { "charging" },
+	[LED_OFFHOOK]	= { "offhook" },
+	[LED_RING]	= { "ring" },
 };
 
 struct input_led {

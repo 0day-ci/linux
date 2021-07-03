@@ -798,6 +798,8 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 		case 0x4b:  map_led (LED_MISC);     break;    /*   "Generic Indicator"        */
 		case 0x19:  map_led (LED_MAIL);     break;    /*   "Message Waiting"          */
 		case 0x4d:  map_led (LED_CHARGING); break;    /*   "External Power Connected" */
+		case 0x17:  map_led (LED_OFFHOOK);  break;    /*   "Off-Hook"                 */
+		case 0x18:  map_led (LED_RING);     break;    /*   "Ring"                     */
 
 		default: goto ignore;
 		}
