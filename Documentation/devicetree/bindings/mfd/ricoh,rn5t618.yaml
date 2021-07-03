@@ -73,6 +73,48 @@ properties:
     description: |
       See Documentation/devicetree/bindings/power/power-controller.txt
 
+  adc:
+    type: object
+
+    properties:
+      compatible:
+        enum:
+          - ricoh,rn5t618-adc
+          - ricoh,rc5t619-adc
+
+      "#io-channel-cells":
+        const: 1
+
+    additionalProperties: false
+
+    required:
+      - compatible
+      - "#io-channel-cells"
+
+  power:
+    type: object
+
+    properties:
+      compatible:
+        enum:
+          - ricoh,rn5t618-power
+          - ricoh,rc5t619-power
+
+      io-channels:
+        items:
+          - description: ADP Voltage Channel
+          - description: USB Voltage Channel
+
+      io-channel-names:
+        items:
+          - const: vadp
+          - const: vusb
+
+    additionalProperties: false
+
+    required:
+      - compatible
+
   regulators:
     type: object
 
@@ -95,6 +137,17 @@ examples:
         interrupt-parent = <&gpio5>;
         interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
         system-power-controller;
+
+        rn5t618_adc: adc {
+          compatible = "ricoh,rn5t618-adc";
+          #io-channel-cells = <1>;
+        };
+
+        power {
+          compatible = "ricoh,rn5t618-power";
+          io-channels = <&rn5t618_adc 2>, <&rn5t618_adc 3>;
+          io-channel-names = "vadp", "vusb";
+        };
 
         regulators {
           DCDC1 {
