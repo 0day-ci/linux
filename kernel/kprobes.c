@@ -1277,20 +1277,21 @@ void kprobe_flush_task(struct task_struct *tk)
 }
 NOKPROBE_SYMBOL(kprobe_flush_task);
 
-static inline void free_rp_inst(struct kretprobe *rp)
+static int release_ri(void *context, void *node)
 {
 	struct kretprobe_instance *ri;
-	struct freelist_node *node;
+	ri = container_of(node, struct kretprobe_instance, freelist);
+	kfree(ri);
+	if (context)
+		(*((int *)context))++;
+	return 0;
+}
+
+static inline void free_rp_inst(struct kretprobe *rp)
+{
 	int count = 0;
 
-	node = rp->freelist.head;
-	while (node) {
-		ri = container_of(node, struct kretprobe_instance, freelist);
-		node = node->next;
-
-		kfree(ri);
-		count++;
-	}
+	freelist_destroy(&rp->freelist, &count, release_ri);
 
 	if (refcount_sub_and_test(count, &rp->rph->ref)) {
 		kfree(rp->rph);
@@ -2015,10 +2016,14 @@ int register_kretprobe(struct kretprobe *rp)
 		rp->maxactive = num_possible_cpus();
 #endif
 	}
-	rp->freelist.head = NULL;
-	rp->rph = kzalloc(sizeof(struct kretprobe_holder), GFP_KERNEL);
-	if (!rp->rph)
+	if (freelist_init(&rp->freelist, rp->maxactive))
 		return -ENOMEM;
+
+	rp->rph = kzalloc(sizeof(struct kretprobe_holder), GFP_KERNEL);
+	if (!rp->rph) {
+		freelist_destroy(&rp->freelist, NULL, NULL);
+		return -ENOMEM;
+	}
 
 	rp->rph->rp = rp;
 	for (i = 0; i < rp->maxactive; i++) {

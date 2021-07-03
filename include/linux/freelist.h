@@ -1,129 +1,122 @@
-/* SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef FREELIST_H
 #define FREELIST_H
 
+#include <linux/slab.h>
 #include <linux/atomic.h>
 
 /*
- * Copyright: cameron@moodycamel.com
+ * lockless queue for kretprobe instances
  *
- * A simple CAS-based lock-free free list. Not the fastest thing in the world
- * under heavy contention, but simple and correct (assuming nodes are never
- * freed until after the free list is destroyed), and fairly speedy under low
- * contention.
- *
- * Adapted from: https://moodycamel.com/blog/2014/solving-the-aba-problem-for-lock-free-free-lists
+ * It's an array-based MPMC lockless queue, solely for better scalability
+ * and contention mitigation. It's simple in implementation and compact in
+ * memory efficiency. The only concern is to retrieve kretprobe instance
+ * records as fast as possible, with both order and fairness ignored.
  */
 
 struct freelist_node {
-	atomic_t		refs;
-	struct freelist_node	*next;
+	struct freelist_node    *next;
 };
-
 struct freelist_head {
-	struct freelist_node	*head;
+	uint32_t                fh_size;	/* rounded to power of 2 */
+	uint32_t                fh_mask;	/* (fh_size - 1) */
+	uint16_t                fh_bits;	/* log2(fh_size) */
+	uint16_t                fh_step;	/* per-core shift stride */
+	uint32_t                fh_used;	/* num of elements in list */
+	struct freelist_node  **fh_ents;	/* array for krp instances */
 };
 
-#define REFS_ON_FREELIST 0x80000000
-#define REFS_MASK	 0x7FFFFFFF
-
-static inline void __freelist_add(struct freelist_node *node, struct freelist_head *list)
+static inline int freelist_init(struct freelist_head *list, int max)
 {
-	/*
-	 * Since the refcount is zero, and nobody can increase it once it's
-	 * zero (except us, and we run only one copy of this method per node at
-	 * a time, i.e. the single thread case), then we know we can safely
-	 * change the next pointer of the node; however, once the refcount is
-	 * back above zero, then other threads could increase it (happens under
-	 * heavy contention, when the refcount goes to zero in between a load
-	 * and a refcount increment of a node in try_get, then back up to
-	 * something non-zero, then the refcount increment is done by the other
-	 * thread) -- so if the CAS to add the node to the actual list fails,
-	 * decrese the refcount and leave the add operation to the next thread
-	 * who puts the refcount back to zero (which could be us, hence the
-	 * loop).
-	 */
-	struct freelist_node *head = READ_ONCE(list->head);
+	uint32_t size, cores = num_possible_cpus();
 
-	for (;;) {
-		WRITE_ONCE(node->next, head);
-		atomic_set_release(&node->refs, 1);
+	list->fh_used = 0;
+	list->fh_step = ilog2(L1_CACHE_BYTES / sizeof(void *));
+	if (max < (cores << list->fh_step))
+		list->fh_size = roundup_pow_of_two(cores) << list->fh_step;
+	else
+		list->fh_size = roundup_pow_of_two(max);
+	list->fh_mask = list->fh_size - 1;
+	list->fh_bits = (uint16_t)ilog2(list->fh_size);
+	size = list->fh_size * sizeof(struct freelist_node *);
+	list->fh_ents = kzalloc(size, GFP_KERNEL);
+	if (!list->fh_ents)
+		return -ENOMEM;
 
-		if (!try_cmpxchg_release(&list->head, &head, node)) {
-			/*
-			 * Hmm, the add failed, but we can only try again when
-			 * the refcount goes back to zero.
-			 */
-			if (atomic_fetch_add_release(REFS_ON_FREELIST - 1, &node->refs) == 1)
-				continue;
-		}
-		return;
-	}
+	return 0;
 }
 
-static inline void freelist_add(struct freelist_node *node, struct freelist_head *list)
+static inline int freelist_try_add(struct freelist_node *node, struct freelist_head *list)
 {
-	/*
-	 * We know that the should-be-on-freelist bit is 0 at this point, so
-	 * it's safe to set it using a fetch_add.
-	 */
-	if (!atomic_fetch_add_release(REFS_ON_FREELIST, &node->refs)) {
-		/*
-		 * Oh look! We were the last ones referencing this node, and we
-		 * know we want to add it to the free list, so let's do it!
-		 */
-		__freelist_add(node, list);
+	uint32_t i, hint = list->fh_used << list->fh_step;
+
+	for (i = 0; i < list->fh_size; i++) {
+		struct freelist_node *item = NULL;
+		uint32_t slot = (i + hint) & list->fh_mask;
+		if (try_cmpxchg_release(&list->fh_ents[slot], &item, node)) {
+			list->fh_used++;
+			break;
+		}
 	}
+
+	return (i >= list->fh_size);
+}
+
+static inline int freelist_add(struct freelist_node *node, struct freelist_head *list)
+{
+	uint32_t hint = raw_smp_processor_id() << list->fh_step;
+	uint32_t slot = ((uint32_t) hint) & list->fh_mask;
+
+	do {
+		struct freelist_node *item = NULL;
+		if (try_cmpxchg_release(&list->fh_ents[slot], &item, node))
+			return 0;
+		slot = (slot + 1) & list->fh_mask;
+	} while (1);
+
+	return -1;
 }
 
 static inline struct freelist_node *freelist_try_get(struct freelist_head *list)
 {
-	struct freelist_node *prev, *next, *head = smp_load_acquire(&list->head);
-	unsigned int refs;
+	struct freelist_node *node = NULL;
+	uint32_t i, hint = raw_smp_processor_id() << list->fh_step;
 
-	while (head) {
-		prev = head;
-		refs = atomic_read(&head->refs);
-		if ((refs & REFS_MASK) == 0 ||
-		    !atomic_try_cmpxchg_acquire(&head->refs, &refs, refs+1)) {
-			head = smp_load_acquire(&list->head);
-			continue;
+	for (i = 0; i < list->fh_size; i++) {
+		uint32_t slot = (hint + i) & list->fh_mask;
+		struct freelist_node *item = smp_load_acquire(&list->fh_ents[slot]);
+		if (item && try_cmpxchg_release(&list->fh_ents[slot], &item, NULL)) {
+			node = item;
+			break;
 		}
-
-		/*
-		 * Good, reference count has been incremented (it wasn't at
-		 * zero), which means we can read the next and not worry about
-		 * it changing between now and the time we do the CAS.
-		 */
-		next = READ_ONCE(head->next);
-		if (try_cmpxchg_acquire(&list->head, &head, next)) {
-			/*
-			 * Yay, got the node. This means it was on the list,
-			 * which means should-be-on-freelist must be false no
-			 * matter the refcount (because nobody else knows it's
-			 * been taken off yet, it can't have been put back on).
-			 */
-			WARN_ON_ONCE(atomic_read(&head->refs) & REFS_ON_FREELIST);
-
-			/*
-			 * Decrease refcount twice, once for our ref, and once
-			 * for the list's ref.
-			 */
-			atomic_fetch_add(-2, &head->refs);
-
-			return head;
-		}
-
-		/*
-		 * OK, the head must have changed on us, but we still need to decrement
-		 * the refcount we increased.
-		 */
-		refs = atomic_fetch_add(-1, &prev->refs);
-		if (refs == REFS_ON_FREELIST + 1)
-			__freelist_add(prev, list);
 	}
 
-	return NULL;
+	return node;
 }
 
+static inline void freelist_destroy(struct freelist_head *list, void *context,
+                                    int (*release)(void *, void *))
+{
+	uint32_t i;
+
+	if (!list->fh_ents)
+		return;
+
+	for (i = 0; i < list->fh_size; i++) {
+		uint32_t slot = i & list->fh_mask;
+		struct freelist_node *item = smp_load_acquire(&list->fh_ents[slot]);
+		while (item) {
+			if (try_cmpxchg_release(&list->fh_ents[slot], &item, NULL)) {
+				if (release)
+					release(context, item);
+				break;
+			}
+		}
+	}
+
+	if (list->fh_ents) {
+		kfree(list->fh_ents);
+		list->fh_ents = NULL;
+	}
+}
 #endif /* FREELIST_H */
