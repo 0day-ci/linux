@@ -518,6 +518,7 @@
 #define KEY_NOTIFICATION_CENTER	0x1bc	/* Show/hide the notification center */
 #define KEY_PICKUP_PHONE	0x1bd	/* Answer incoming call */
 #define KEY_HANGUP_PHONE	0x1be	/* Decline incoming call */
+#define KEY_TOGGLE_PHONE	0x1bf	/* Toggle phone hook */
 
 #define KEY_DEL_EOL		0x1c0
 #define KEY_DEL_EOS		0x1c1
@@ -659,6 +660,13 @@
 
 /* Select an area of screen to be copied */
 #define KEY_SELECTIVE_SCREENSHOT	0x27a
+
+/*
+ * In contrast to KEY_MICMUTE (that toggles the mute state), these set specific
+ * (on/off) states.
+ */
+#define KEY_MICMUTE_ON			0x280
+#define KEY_MICMUTE_OFF			0x281
 
 /*
  * Some keyboards have keys which do not have a defined meaning, these keys

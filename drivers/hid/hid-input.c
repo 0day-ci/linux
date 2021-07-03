@@ -579,6 +579,43 @@ static bool hidinput_field_in_collection(struct hid_device *device, struct hid_f
 	return collection->type == type && collection->usage == usage;
 }
 
+/**
+ * hidinput_get_onoff_keycodes - Gets on and off keycodes for OOC usages.
+ * @usage: HID usage.
+ * @code_on: Output parameter for the on keycode.
+ * @code_off: Output parameter for the off keycode.
+ *
+ * Returns true if @usage is a supported on/off control (OOC), as defined by HID
+ * Usage Tables 1.21 (3.4.1.2).
+ *
+ * Depending on the OOC type, we need to send either a toggle keycode or
+ * separate on/off keycodes. This function detects whether @usage is an OOC. If
+ * yes, and if this OOC is supported, it returns the on and off keycodes
+ * corresponding to the toggle keycode stored in usage->code.
+ */
+static bool hidinput_get_onoff_keycodes(struct hid_usage *usage,
+					u16 *code_on, u16 *code_off)
+{
+	if (usage->type != EV_KEY)
+		return false;
+
+	if ((usage->hid & HID_USAGE_PAGE) != HID_UP_TELEPHONY)
+		return false;
+
+	switch (usage->code) {
+	case KEY_TOGGLE_PHONE:
+		*code_on = KEY_PICKUP_PHONE;
+		*code_off = KEY_HANGUP_PHONE;
+		return true;
+	case KEY_MICMUTE:
+		*code_on = KEY_MICMUTE_ON;
+		*code_off = KEY_MICMUTE_OFF;
+		return true;
+	}
+
+	return false;
+}
+
 static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_field *field,
 				     struct hid_usage *usage)
 {
@@ -586,6 +623,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 	struct hid_device *device = input_get_drvdata(input);
 	int max = 0, code;
 	unsigned long *bit = NULL;
+	u16 code_on, code_off;
 
 	field->hidinput = hidinput;
 
@@ -887,6 +925,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 	case HID_UP_TELEPHONY:
 		switch (usage->hid & HID_USAGE) {
+		case 0x20: map_key_clear(KEY_TOGGLE_PHONE);	break;
 		case 0x2f: map_key_clear(KEY_MICMUTE);		break;
 		case 0xb0: map_key_clear(KEY_NUMERIC_0);	break;
 		case 0xb1: map_key_clear(KEY_NUMERIC_1);	break;
@@ -1198,6 +1237,11 @@ mapped:
 
 	set_bit(usage->type, input->evbit);
 
+	if (hidinput_get_onoff_keycodes(usage, &code_on, &code_off)) {
+		set_bit(code_on, bit);
+		set_bit(code_off, bit);
+	}
+
 	/*
 	 * This part is *really* controversial:
 	 * - HID aims at being generic so we should do our best to export
@@ -1312,6 +1356,92 @@ static void hidinput_handle_scroll(struct hid_usage *usage,
 
 	input_event(input, EV_REL, code, lo_res);
 	input_event(input, EV_REL, usage->code, hi_res);
+}
+
+/**
+ * hidinput_handle_onoff - Handle on/off control (OOC).
+ * @field: HID field that corresponds to the event.
+ * @value: HID value that corresponds to the event.
+ * @code_toggle: Key code to send when toggling state of the on/off control.
+ * @code_on: Key code to send when turning on the on/off control.
+ * @code_off: Key code to send when turning off the on/off control.
+ *
+ * Returns true if the event was handled, false if the @field flags are invalid.
+ *
+ * Handles on/off control (OOC), as defined by HID Usage Tables 1.21 (3.4.1.2).
+ * Determines the type of the OOC by looking at @field and sends one of the key
+ * codes accordingly. Whenever it's possible to distinguish on and off states,
+ * different key strokes (@code_on, @code_off) are sent, otherwise @code_toggle
+ * is sent.
+ */
+static bool hidinput_handle_onoff(struct hid_field *field, __s32 value, unsigned int scan,
+				  __u16 code_toggle, __u16 code_on, __u16 code_off)
+{
+	struct input_dev *input = field->hidinput->input;
+	__u16 code = 0;
+
+	/* Two buttons, on and off */
+	if ((field->flags & HID_MAIN_ITEM_RELATIVE) &&
+	    (field->flags & HID_MAIN_ITEM_NO_PREFERRED) &&
+	    (field->logical_minimum == -1) &&
+	    (field->logical_maximum == 1)) {
+		if (value != 1 && value != -1)
+			return true;
+
+		code = value == 1 ? code_on : code_off;
+	}
+
+	/* A single button that toggles the on/off state each time it is pressed */
+	if ((field->flags & HID_MAIN_ITEM_RELATIVE) &&
+	    !(field->flags & HID_MAIN_ITEM_NO_PREFERRED) &&
+	    (field->logical_minimum == 0) &&
+	    (field->logical_maximum == 1)) {
+		if (value != 1)
+			return true;
+
+		code = code_toggle;
+	}
+
+	/* A toggle switch that maintains the on/off state mechanically */
+	if (!(field->flags & HID_MAIN_ITEM_RELATIVE) &&
+	    (field->flags & HID_MAIN_ITEM_NO_PREFERRED) &&
+	    (field->logical_minimum == 0) &&
+	    (field->logical_maximum == 1))
+		code = value ? code_on : code_off;
+
+	if (!code)
+		return false;
+
+	input_event(input, EV_MSC, MSC_SCAN, scan);
+	input_event(input, EV_KEY, code, 1);
+	input_sync(input);
+	input_event(input, EV_KEY, code, 0);
+
+	return true;
+}
+
+/**
+ * hidinput_handle_onoffs - Handles an OOC event if the HID usage type is OOC.
+ * @usage: HID usage to check.
+ * @field: HID field that corresponds to the event.
+ * @value: HID value that corresponds to the event.
+ *
+ * Returns: 1 if @usage is a supported on/off control (OOC), as defined by HID
+ *          Usage Tables 1.21 (3.4.1.2).
+ *          0 if @usage is not a supported OOC.
+ *          -EINVAL if @usage is not a valid OOC (@field is invalid).
+ */
+static int hidinput_handle_onoffs(struct hid_usage *usage, struct hid_field *field, __s32 value)
+{
+	u16 code_on, code_off;
+
+	if (!hidinput_get_onoff_keycodes(usage, &code_on, &code_off))
+		return 0;
+
+	if (!hidinput_handle_onoff(field, value, usage->hid, usage->code, code_on, code_off))
+		return -EINVAL;
+
+	return 1;
 }
 
 void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value)
@@ -1437,6 +1567,16 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	    usage->usage_index < field->maxusage &&
 	    value == field->value[usage->usage_index])
 		return;
+
+	switch (hidinput_handle_onoffs(usage, field, value)) {
+	case 1:
+		return;
+	case -EINVAL:
+		hid_warn_once(hid, "Invalid OOC usage: code %u, flags %#x, min %d, max %d\n",
+			      usage->code, field->flags,
+			      field->logical_minimum, field->logical_maximum);
+		return;
+	}
 
 	/* report the usage code as scancode if the key status has changed */
 	if (usage->type == EV_KEY &&
