@@ -61,6 +61,10 @@ static int plantronics_input_mapping(struct hid_device *hdev,
 	if (field->application == HID_GD_JOYSTICK)
 		goto defaulted;
 
+	/* expose LEDs */
+	if ((usage->hid & HID_USAGE_PAGE) == HID_UP_LED)
+		goto defaulted;
+
 	/* handle volume up/down mapping */
 	/* non-standard types or multi-HID interfaces - plt_type is PID */
 	if (!(plt_type & HID_USAGE_PAGE)) {
