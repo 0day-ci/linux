@@ -299,6 +299,7 @@ static int pcpu_populate_chunk(struct pcpu_chunk *chunk,
  * @chunk: chunk to depopulate
  * @page_start: the start page
  * @page_end: the end page
+ * @flush_tlb: if should we flush the tlb
  *
  * For each cpu, depopulate and unmap pages [@page_start,@page_end)
  * from @chunk.
@@ -307,7 +308,8 @@ static int pcpu_populate_chunk(struct pcpu_chunk *chunk,
  * pcpu_alloc_mutex.
  */
 static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
-				  int page_start, int page_end)
+				  int page_start, int page_end,
+				  bool flush_tlb)
 {
 	struct page **pages;
 
@@ -324,7 +326,12 @@ static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
 
 	pcpu_unmap_pages(chunk, pages, page_start, page_end);
 
-	/* no need to flush tlb, vmalloc will handle it lazily */
+	/*
+	 * We need to flush the tlb unless the caller will pass it to vmalloc,
+	 * which will handle flushing for us.
+	 */
+	if (flush_tlb)
+		pcpu_post_unmap_tlb_flush(chunk, page_start, page_end);
 
 	pcpu_free_pages(chunk, pages, page_start, page_end);
 }

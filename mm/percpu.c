@@ -1580,7 +1580,8 @@ static void pcpu_chunk_depopulated(struct pcpu_chunk *chunk,
 static int pcpu_populate_chunk(struct pcpu_chunk *chunk,
 			       int page_start, int page_end, gfp_t gfp);
 static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
-				  int page_start, int page_end);
+				  int page_start, int page_end,
+				  bool flush_tlb);
 static struct pcpu_chunk *pcpu_create_chunk(gfp_t gfp);
 static void pcpu_destroy_chunk(struct pcpu_chunk *chunk);
 static struct page *pcpu_addr_to_page(void *addr);
@@ -2016,7 +2017,7 @@ static void pcpu_balance_free(bool empty_only)
 
 		bitmap_for_each_set_region(chunk->populated, rs, re, 0,
 					   chunk->nr_pages) {
-			pcpu_depopulate_chunk(chunk, rs, re);
+			pcpu_depopulate_chunk(chunk, rs, re, false);
 			spin_lock_irq(&pcpu_lock);
 			pcpu_chunk_depopulated(chunk, rs, re);
 			spin_unlock_irq(&pcpu_lock);
@@ -2189,7 +2190,7 @@ restart:
 				continue;
 
 			spin_unlock_irq(&pcpu_lock);
-			pcpu_depopulate_chunk(chunk, i + 1, end + 1);
+			pcpu_depopulate_chunk(chunk, i + 1, end + 1, true);
 			cond_resched();
 			spin_lock_irq(&pcpu_lock);
 

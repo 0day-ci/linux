@@ -39,7 +39,8 @@ static int pcpu_populate_chunk(struct pcpu_chunk *chunk,
 }
 
 static void pcpu_depopulate_chunk(struct pcpu_chunk *chunk,
-				  int page_start, int page_end)
+				  int page_start, int page_end,
+				  bool flush_tlb)
 {
 	/* nada */
 }
