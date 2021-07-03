@@ -84,6 +84,8 @@ static int plantronics_input_mapping(struct hid_device *hdev,
 		 (plt_type & HID_USAGE) != PLT_BASIC_EXCEPTION) {
 		if (PLT_ALLOW_CONSUMER)
 			goto defaulted;
+		if ((usage->hid & HID_USAGE_PAGE) == HID_UP_TELEPHONY)
+			goto defaulted;
 	}
 	/* not 'basic telephony' - apply legacy mapping */
 	/* only map if the field is in the device's primary vendor page */
