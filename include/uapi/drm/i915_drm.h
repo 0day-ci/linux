@@ -995,7 +995,7 @@ struct drm_i915_gem_exec_object {
 struct drm_i915_gem_execbuffer {
 	/**
 	 * List of buffers to be validated with their relocations to be
-	 * performend on them.
+	 * performed on them.
 	 *
 	 * This is a pointer to an array of struct drm_i915_gem_validate_entry.
 	 *
@@ -1067,7 +1067,7 @@ struct drm_i915_gem_exec_object2 {
  * used by the GPU - this flag only disables the synchronisation prior to
  * rendering with this object in this execbuf.
  *
- * Opting out of implicit synhronisation requires the user to do its own
+ * Opting out of implicit synchronisation requires the user to do its own
  * explicit tracking to avoid rendering corruption. See, for example,
  * I915_PARAM_HAS_EXEC_FENCE to order execbufs and execute them asynchronously.
  */

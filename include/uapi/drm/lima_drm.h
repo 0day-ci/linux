@@ -134,7 +134,7 @@ struct drm_lima_gem_submit {
 struct drm_lima_gem_wait {
 	__u32 handle;      /* in, GEM buffer handle */
 	__u32 op;          /* in, CPU want to read/write this buffer */
-	__s64 timeout_ns;  /* in, wait timeout in absulute time */
+	__s64 timeout_ns;  /* in, wait timeout in absolute time */
 };
 
 /**

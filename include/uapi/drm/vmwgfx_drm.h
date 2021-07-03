@@ -165,7 +165,7 @@ struct drm_vmw_context_arg {
 
 /*************************************************************************/
 /**
- * DRM_VMW_CREATE_SURFACE - Create a host suface.
+ * DRM_VMW_CREATE_SURFACE - Create a host surface.
  *
  * Allocates a device unique surface id, and queues a create surface command
  * for the host. Does not wait for host completion. The surface ID can be
@@ -442,7 +442,7 @@ union drm_vmw_alloc_bo_arg {
  *
  * This IOCTL controls the overlay units of the svga device.
  * The SVGA overlay units does not work like regular hardware units in
- * that they do not automaticaly read back the contents of the given dma
+ * that they do not automatically read back the contents of the given dma
  * buffer. But instead only read back for each call to this ioctl, and
  * at any point between this call being made and a following call that
  * either changes the buffer or disables the stream.

@@ -261,7 +261,7 @@ struct drm_vc4_mmap_bo {
  * shader BOs.
  *
  * Since allowing a shader to be overwritten while it's also being
- * executed from would allow privlege escalation, shaders must be
+ * executed from would allow privilege escalation, shaders must be
  * created using this ioctl, and they can't be mmapped later.
  */
 struct drm_vc4_create_shader_bo {

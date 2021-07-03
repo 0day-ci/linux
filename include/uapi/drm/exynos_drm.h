@@ -187,9 +187,9 @@ struct drm_exynos_ioctl_ipp_get_caps {
 };
 
 enum drm_exynos_ipp_limit_type {
-	/* size (horizontal/vertial) limits, in pixels (min, max, alignment) */
+	/* size (horizontal/vertical) limits, in pixels (min, max, alignment) */
 	DRM_EXYNOS_IPP_LIMIT_TYPE_SIZE		= 0x0001,
-	/* scale ratio (horizonta/vertial), 16.16 fixed point (min, max) */
+	/* scale ratio (horizontal/vertical), 16.16 fixed point (min, max) */
 	DRM_EXYNOS_IPP_LIMIT_TYPE_SCALE		= 0x0002,
 
 	/* image buffer area */
@@ -295,7 +295,7 @@ struct drm_exynos_ipp_task_rect {
 };
 
 /**
- * Image tranformation description.
+ * Image transformation description.
  *
  * @id: must be DRM_EXYNOS_IPP_TASK_TRANSFORM
  * @rotation: DRM_MODE_ROTATE_* and DRM_MODE_REFLECT_* values
