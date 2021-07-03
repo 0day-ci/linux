@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mfd/rn5t618.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/completion.h>
 #include <linux/regmap.h>
@@ -218,6 +219,7 @@ static int rn5t618_adc_probe(struct platform_device *pdev)
 	init_completion(&adc->conv_completion);
 
 	iio_dev->name = dev_name(&pdev->dev);
+	iio_dev->dev.of_node = pdev->dev.of_node;
 	iio_dev->info = &rn5t618_adc_iio_info;
 	iio_dev->modes = INDIO_DIRECT_MODE;
 	iio_dev->channels = rn5t618_adc_iio_channels;
@@ -242,9 +244,19 @@ static int rn5t618_adc_probe(struct platform_device *pdev)
 	return devm_iio_device_register(adc->dev, iio_dev);
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id rn5t618_adc_of_match[] = {
+	{ .compatible = "ricoh,rc5t619-adc", },
+	{ .compatible = "ricoh,rn5t618-adc", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, rn5t618_adc_of_match);
+#endif
+
 static struct platform_driver rn5t618_adc_driver = {
 	.driver = {
-		.name   = "rn5t618-adc",
+		.name = "rn5t618-adc",
+		.of_match_table = of_match_ptr(rn5t618_adc_of_match),
 	},
 	.probe = rn5t618_adc_probe,
 };
