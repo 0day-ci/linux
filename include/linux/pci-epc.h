@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/**
+/*
  * PCI Endpoint *Controller* (EPC) header file
  *
  * Copyright (C) 2017 Texas Instruments
@@ -40,25 +40,27 @@ pci_epc_interface_string(enum pci_epc_interface_type type)
 }
 
 /**
- * struct pci_epc_ops - set of function pointers for performing EPC operations
- * @write_header: ops to populate configuration space header
- * @set_bar: ops to configure the BAR
- * @clear_bar: ops to reset the BAR
- * @map_addr: ops to map CPU address to PCI address
- * @unmap_addr: ops to unmap CPU address and PCI address
- * @set_msi: ops to set the requested number of MSI interrupts in the MSI
- *	     capability register
- * @get_msi: ops to get the number of MSI interrupts allocated by the RC from
- *	     the MSI capability register
- * @set_msix: ops to set the requested number of MSI-X interrupts in the
- *	     MSI-X capability register
- * @get_msix: ops to get the number of MSI-X interrupts allocated by the RC
- *	     from the MSI-X capability register
- * @raise_irq: ops to raise a legacy, MSI or MSI-X interrupt
- * @map_msi_irq: ops to map physical address to MSI address and return MSI data
- * @start: ops to start the PCI link
- * @stop: ops to stop the PCI link
- * @owner: the module owner containing the ops
+ * struct pci_epc_ops - Set of function pointers for performing EPC operations.
+ * @write_header:	Ops to populate configuration space header.
+ * @set_bar:		Ops to configure the BAR.
+ * @clear_bar:		Ops to reset the BAR.
+ * @map_addr:		Ops to map CPU address to PCI address.
+ * @unmap_addr:		Ops to unmap CPU address and PCI address.
+ * @set_msi:		Ops to set the requested number of MSI interrupts in the
+ *			MSI capability register.
+ * @get_msi:		Ops to get the number of MSI interrupts allocated by the
+ *			RC from the MSI capability register.
+ * @set_msix:		Ops to set the requested number of MSI-X interrupts in
+ *			the MSI-X capability register.
+ * @get_msix:		Ops to get the number of MSI-X interrupts allocated by.
+ *			the RC from the MSI-X capability register.
+ * @raise_irq:		Ops to raise a legacy, MSI or MSI-X interrupt.
+ * @map_msi_irq:	Ops to map physical address to MSI address and return
+ *			MSI data.
+ * @start:		Ops to start the PCI link.
+ * @stop:		Ops to stop the PCI link.
+ * @get_features:	Ops to get the features supported by the EPC.
+ * @owner:		The module owner containing the ops.
  */
 struct pci_epc_ops {
 	int	(*write_header)(struct pci_epc *epc, u8 func_no,
@@ -148,14 +150,18 @@ struct pci_epc {
 };
 
 /**
- * struct pci_epc_features - features supported by a EPC device per function
- * @linkup_notifier: indicate if the EPC device can notify EPF driver on link up
- * @msi_capable: indicate if the endpoint function has MSI capability
- * @msix_capable: indicate if the endpoint function has MSI-X capability
- * @reserved_bar: bitmap to indicate reserved BAR unavailable to function driver
- * @bar_fixed_64bit: bitmap to indicate fixed 64bit BARs
- * @bar_fixed_size: Array specifying the size supported by each BAR
- * @align: alignment size required for BAR buffer allocation
+ * struct pci_epc_features - Features supported by a EPC device per function.
+ * @linkup_notifier:	Indicate if the EPC device can notify EPF driver on link
+ *			up.
+ * @core_init_notifier:	Indicate cores that can notify about their availability
+ *			for initialization.
+ * @msi_capable:	Indicate if the endpoint function has MSI capability.
+ * @msix_capable:	Indicate if the endpoint function has MSI-X capability.
+ * @reserved_bar:	Bitmap to indicate reserved BAR unavailable to function
+ *			driver.
+ * @bar_fixed_64bit:	Bitmap to indicate fixed 64bit BARs.
+ * @bar_fixed_size:	Array specifying the size supported by each BAR.
+ * @align:		Alignment size required for BAR buffer allocation.
  */
 struct pci_epc_features {
 	unsigned int	linkup_notifier : 1;

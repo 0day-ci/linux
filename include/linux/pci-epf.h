@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/**
+/*
  * PCI Endpoint *Function* (EPF) header file
  *
  * Copyright (C) 2017 Texas Instruments
@@ -98,10 +98,13 @@ struct pci_epf_driver {
 				driver))
 
 /**
- * struct pci_epf_bar - represents the BAR of EPF device
- * @phys_addr: physical address that should be mapped to the BAR
- * @addr: virtual address corresponding to the @phys_addr
- * @size: the size of the address space present in BAR
+ * struct pci_epf_bar - Represents the BAR of EPF device.
+ * @phys_addr:	Physical address that should be mapped to the BAR.
+ * @addr:	Virtual address corresponding to the @phys_addr.
+ * @size:	The size of the address space present in BAR.
+ * @barno:	The BAR number.
+ * @flags:	Flags that are set for the BAR. This is need so that specific
+ *		epc->ops->set_bar() implementations can modify BAR flags.
  */
 struct pci_epf_bar {
 	dma_addr_t	phys_addr;
@@ -112,24 +115,31 @@ struct pci_epf_bar {
 };
 
 /**
- * struct pci_epf - represents the PCI EPF device
- * @dev: the PCI EPF device
- * @name: the name of the PCI EPF device
- * @header: represents standard configuration header
- * @bar: represents the BAR of EPF device
- * @msi_interrupts: number of MSI interrupts required by this function
- * @func_no: unique function number within this endpoint device
- * @epc: the EPC device to which this EPF device is bound
- * @driver: the EPF driver to which this EPF device is bound
- * @list: to add pci_epf as a list of PCI endpoint functions to pci_epc
- * @nb: notifier block to notify EPF of any EPC events (like linkup)
- * @lock: mutex to protect pci_epf_ops
- * @sec_epc: the secondary EPC device to which this EPF device is bound
- * @sec_epc_list: to add pci_epf as list of PCI endpoint functions to secondary
- *   EPC device
- * @sec_epc_bar: represents the BAR of EPF device associated with secondary EPC
- * @sec_epc_func_no: unique (physical) function number within the secondary EPC
- * @group: configfs group associated with the EPF device
+ * struct pci_epf - Represents the PCI EPF device.
+ * @dev:		The PCI EPF device.
+ * @name:		The name of the PCI EPF device.
+ * @header:		Represents standard configuration header.
+ * @bar:		Represents the BAR of EPF device.
+ * @msi_interrupts:	Number of MSI interrupts required by this function.
+ * @msix_interrupts:	Maximum number of MSI-X interrupts required by this
+ *			function.
+ * @func_no:		Unique function number within this endpoint device.
+ * @epc:		The EPC device to which this EPF device is bound.
+ * @driver:		The EPF driver to which this EPF device is bound.
+ * @list:		To add pci_epf as a list of PCI endpoint functions to
+ *			pci_epc.
+ * @nb:			Notifier block to notify EPF of any EPC events (like
+ *			linkup).
+ * @lock:		Mutex to protect pci_epf_ops.
+ * @sec_epc:		The secondary EPC device to which this EPF device is
+ *			bound.
+ * @sec_epc_list:	To add pci_epf as list of PCI endpoint functions to
+ *			secondary EPC device.
+ * @sec_epc_bar:	Represents the BAR of EPF device associated with
+ *			secondary EPC.
+ * @sec_epc_func_no:	Unique (physical) function number within the secondary
+ *			EPC.
+ * @group:		Configfs group associated with the EPF device.
  */
 struct pci_epf {
 	struct device		dev;
