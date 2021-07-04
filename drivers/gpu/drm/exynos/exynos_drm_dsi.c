@@ -259,6 +259,7 @@ struct exynos_dsi {
 	struct list_head bridge_chain;
 	struct drm_bridge bridge;
 	struct drm_bridge *out_bridge;
+	struct drm_device *drm;
 	struct device *dev;
 
 	void __iomem *reg_base;
@@ -1495,11 +1496,11 @@ static const struct drm_connector_helper_funcs exynos_dsi_connector_helper_funcs
 	.get_modes = exynos_dsi_get_modes,
 };
 
-static int exynos_dsi_create_connector(struct exynos_dsi *dsi)
+static int exynos_dsi_create_connector(struct exynos_dsi *dsi,
+				       struct drm_device *drm)
 {
 	struct drm_encoder *encoder = &dsi->encoder;
 	struct drm_connector *connector = &dsi->connector;
-	struct drm_device *drm = encoder->dev;
 	int ret;
 
 	connector->polled = DRM_CONNECTOR_POLL_HPD;
@@ -1526,6 +1527,10 @@ static int exynos_dsi_create_connector(struct exynos_dsi *dsi)
 static int exynos_dsi_bridge_attach(struct drm_bridge *bridge,
 				    enum drm_bridge_attach_flags flags)
 {
+	struct exynos_dsi *dsi = bridge_to_dsi(bridge);
+
+	dsi->drm = bridge->dev;
+
 	return 0;
 }
 
@@ -1542,7 +1547,7 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
 	struct drm_encoder *encoder = &dsi->encoder;
-	struct drm_device *drm = encoder->dev;
+	struct drm_device *drm = dsi->drm;
 	struct drm_bridge *out_bridge;
 
 	out_bridge  = of_drm_find_bridge(device->dev.of_node);
@@ -1551,7 +1556,7 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 		dsi->out_bridge = out_bridge;
 		list_splice_init(&encoder->bridge_chain, &dsi->bridge_chain);
 	} else {
-		int ret = exynos_dsi_create_connector(dsi);
+		int ret = exynos_dsi_create_connector(dsi, drm);
 
 		if (ret) {
 			DRM_DEV_ERROR(dsi->dev,
@@ -1600,7 +1605,7 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 				  struct mipi_dsi_device *device)
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
-	struct drm_device *drm = dsi->encoder.dev;
+	struct drm_device *drm = dsi->drm;
 
 	if (dsi->panel) {
 		mutex_lock(&drm->mode_config.mutex);
@@ -1727,6 +1732,8 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 			drm_bridge_attach(encoder, in_bridge, NULL, 0);
 		of_node_put(in_bridge_node);
 	}
+
+	dsi->drm = drm_dev;
 
 	return mipi_dsi_host_register(&dsi->dsi_host);
 }
