@@ -407,58 +407,48 @@ out:
 
 static int virtio_transport_seqpacket_do_dequeue(struct vsock_sock *vsk,
 						 struct msghdr *msg,
-						 int flags)
+						 int flags,
+						 bool *msg_ready)
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;
 	struct virtio_vsock_pkt *pkt;
 	int dequeued_len = 0;
 	size_t user_buf_len = msg_data_left(msg);
-	bool msg_ready = false;
 
+	*msg_ready = false;
 	spin_lock_bh(&vvs->rx_lock);
 
-	if (vvs->msg_count == 0) {
-		spin_unlock_bh(&vvs->rx_lock);
-		return 0;
-	}
+	while (!*msg_ready && !list_empty(&vvs->rx_queue) && dequeued_len >= 0) {
+		size_t pkt_len;
+		size_t bytes_to_copy;
 
-	while (!msg_ready) {
 		pkt = list_first_entry(&vvs->rx_queue, struct virtio_vsock_pkt, list);
+		pkt_len = (size_t)le32_to_cpu(pkt->hdr.len);
 
-		if (dequeued_len >= 0) {
-			size_t pkt_len;
-			size_t bytes_to_copy;
+		bytes_to_copy = min(user_buf_len, pkt_len);
 
-			pkt_len = (size_t)le32_to_cpu(pkt->hdr.len);
-			bytes_to_copy = min(user_buf_len, pkt_len);
+		if (bytes_to_copy) {
+			int err;
+			/* sk_lock is held by caller so no one else can dequeue.
+			 * Unlock rx_lock since memcpy_to_msg() may sleep.
+			 */
+			spin_unlock_bh(&vvs->rx_lock);
 
-			if (bytes_to_copy) {
-				int err;
+			err = memcpy_to_msg(msg, pkt->buf, bytes_to_copy);
 
-				/* sk_lock is held by caller so no one else can dequeue.
-				 * Unlock rx_lock since memcpy_to_msg() may sleep.
-				 */
-				spin_unlock_bh(&vvs->rx_lock);
+			spin_lock_bh(&vvs->rx_lock);
 
-				err = memcpy_to_msg(msg, pkt->buf, bytes_to_copy);
-				if (err) {
-					/* Copy of message failed. Rest of
-					 * fragments will be freed without copy.
-					 */
-					dequeued_len = err;
-				} else {
-					user_buf_len -= bytes_to_copy;
-				}
-
-				spin_lock_bh(&vvs->rx_lock);
-			}
-
-			if (dequeued_len >= 0)
-				dequeued_len += pkt_len;
+			if (err)
+				dequeued_len = err;
+			else
+				user_buf_len -= bytes_to_copy;
 		}
 
+		if (dequeued_len >= 0)
+			dequeued_len += pkt_len;
+
 		if (le32_to_cpu(pkt->hdr.flags) & VIRTIO_VSOCK_SEQ_EOR) {
-			msg_ready = true;
+			*msg_ready = true;
 			vvs->msg_count--;
 		}
 
@@ -489,12 +479,12 @@ EXPORT_SYMBOL_GPL(virtio_transport_stream_dequeue);
 ssize_t
 virtio_transport_seqpacket_dequeue(struct vsock_sock *vsk,
 				   struct msghdr *msg,
-				   int flags)
+				   int flags, bool *msg_ready)
 {
 	if (flags & MSG_PEEK)
 		return -EOPNOTSUPP;
 
-	return virtio_transport_seqpacket_do_dequeue(vsk, msg, flags);
+	return virtio_transport_seqpacket_do_dequeue(vsk, msg, flags, msg_ready);
 }
 EXPORT_SYMBOL_GPL(virtio_transport_seqpacket_dequeue);
 
