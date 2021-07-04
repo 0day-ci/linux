@@ -291,8 +291,9 @@ static int pmcmsptwi_probe(struct platform_device *pldev)
 	}
 
 	/* request the irq */
-	pmcmsptwi_data.irq = platform_get_irq(pldev, 0);
-	if (pmcmsptwi_data.irq) {
+	rc = platform_get_irq(pldev, 0);
+	pmcmsptwi_data.irq = rc;
+	if (rc > 0) {
 		rc = request_irq(pmcmsptwi_data.irq, &pmcmsptwi_interrupt,
 				 IRQF_SHARED, pldev->name, &pmcmsptwi_data);
 		if (rc == 0) {
@@ -312,9 +313,14 @@ static int pmcmsptwi_probe(struct platform_device *pldev)
 				"Could not assign TWI IRQ handler "
 				"to irq %d (continuing with poll)\n",
 				pmcmsptwi_data.irq);
-			pmcmsptwi_data.irq = 0;
 		}
 	}
+	/*
+	 * We only get here with a negative rc if either platform_get_irq() or
+	 * request_irq() call has failed; we have to enforce the polling mode...
+	 */
+	if (rc < 0)
+		pmcmsptwi_data.irq = 0;
 
 	init_completion(&pmcmsptwi_data.wait);
 	mutex_init(&pmcmsptwi_data.lock);
