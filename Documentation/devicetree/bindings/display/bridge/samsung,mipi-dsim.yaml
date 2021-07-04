@@ -26,6 +26,7 @@ properties:
       - samsung,exynos5410-mipi-dsi
       - samsung,exynos5422-mipi-dsi
       - samsung,exynos5433-mipi-dsi
+      - fsl,imx8mm-mipi-dsim
 
   reg:
     maxItems: 1
@@ -38,6 +39,10 @@ properties:
 
   '#size-cells':
     const: 0
+
+  assigned-clock-parents: true
+  assigned-clock-rates: true
+  assigned-clocks: true
 
   clocks:
     minItems: 2
@@ -102,7 +107,7 @@ properties:
         properties:
           endpoint@0:
             $ref: /schemas/graph.yaml#/properties/endpoint
-            description: sub-node describing the input from MIC
+            description: sub-node describing the input from MIC or LCDIF
 
         unevaluatedProperties: false
 
@@ -128,6 +133,30 @@ required:
 
 allOf:
   - $ref: ../dsi-controller.yaml#
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: fsl,imx8mm-mipi-dsim
+
+    then:
+      properties:
+        clocks:
+          minItems: 2
+
+        clock-names:
+          items:
+            - const: bus_clk
+            - const: sclk_mipi
+
+        ports:
+          required:
+            - port@0
+            - port@1
+
+      required:
+        - ports
+
   - if:
       properties:
         compatible:
@@ -221,6 +250,59 @@ additionalProperties:
   type: object
 
 examples:
+  - |
+    #include <dt-bindings/clock/imx8mm-clock.h>
+    #include <dt-bindings/power/imx8mm-power.h>
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+    dsi@32e10000 {
+       compatible = "fsl,imx8mm-mipi-dsim";
+       reg = <0x32e10000 0x400>;
+       clocks = <&clk IMX8MM_CLK_DSI_CORE>,
+                <&clk IMX8MM_CLK_DSI_PHY_REF>;
+       clock-names = "bus_clk", "sclk_mipi";
+       assigned-clocks = <&clk IMX8MM_CLK_DSI_CORE>,
+                         <&clk IMX8MM_VIDEO_PLL1_OUT>,
+                         <&clk IMX8MM_CLK_DSI_PHY_REF>;
+       assigned-clock-parents = <&clk IMX8MM_SYS_PLL1_266M>,
+                         <&clk IMX8MM_VIDEO_PLL1_BYPASS>,
+                         <&clk IMX8MM_VIDEO_PLL1_OUT>;
+       assigned-clock-rates = <266000000>, <594000000>, <27000000>;
+       interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+       phys = <&mipi_phy 0>;
+       phy-names = "dsim";
+       power-domains = <&dispmix_blk_ctl IMX8MM_BLK_CTL_PD_DISPMIX_MIPI_DSI>;
+       samsung,burst-clock-frequency = <891000000>;
+       samsung,esc-clock-frequency = <54000000>;
+       samsung,pll-clock-frequency = <27000000>;
+       status = "disabled";
+
+       ports {
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          port@0 {
+             reg = <0>;
+             #address-cells = <1>;
+             #size-cells = <0>;
+
+             dsi_in_lcdif: endpoint@0 {
+                reg = <0>;
+                remote-endpoint = <&lcdif_out_dsi>;
+             };
+          };
+
+          port@1 {
+             reg = <1>;
+
+             dsi_out_panel: endpoint {
+                remote-endpoint = <&panel_in_dsi>;
+             };
+          };
+       };
+    };
+
   - |
     #include <dt-bindings/clock/exynos5433.h>
     #include <dt-bindings/gpio/gpio.h>
