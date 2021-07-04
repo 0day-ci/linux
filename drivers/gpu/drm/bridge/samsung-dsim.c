@@ -1437,6 +1437,13 @@ static void samsung_dsim_bridge_enable(struct drm_bridge *bridge)
 
 	dsi->state |= DSIM_STATE_ENABLED;
 
+	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
+		ret = samsung_dsim_init(dsi);
+		if (ret)
+			return;
+		dsi->state |= DSIM_STATE_INITIALIZED;
+	}
+
 	samsung_dsim_set_display_mode(dsi);
 	samsung_dsim_set_display_enable(dsi, true);
 
@@ -1601,13 +1608,6 @@ static ssize_t samsung_dsim_host_transfer(struct mipi_dsi_host *host,
 
 	if (!(dsi->state & DSIM_STATE_ENABLED))
 		return -EINVAL;
-
-	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
-		ret = samsung_dsim_init(dsi);
-		if (ret)
-			return ret;
-		dsi->state |= DSIM_STATE_INITIALIZED;
-	}
 
 	ret = mipi_dsi_create_packet(&xfer.packet, msg);
 	if (ret < 0)
