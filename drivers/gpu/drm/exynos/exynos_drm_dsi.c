@@ -24,6 +24,7 @@
 #include <video/videomode.h>
 
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_bridge_connector.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_mipi_dsi.h>
@@ -1591,6 +1592,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 	struct drm_device *drm_dev = data;
 	struct device_node *in_bridge_node;
 	struct drm_bridge *in_bridge;
+	struct drm_connector *connector;
 	int ret;
 
 	drm_simple_encoder_init(drm_dev, encoder, DRM_MODE_ENCODER_TMDS);
@@ -1599,11 +1601,21 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 	if (ret < 0)
 		return ret;
 
-	ret = drm_bridge_attach(&dsi->encoder, &dsi->bridge, NULL, 0);
+	ret = drm_bridge_attach(&dsi->encoder, &dsi->bridge, NULL,
+				DRM_BRIDGE_ATTACH_NO_CONNECTOR);
 	if (ret) {
 		drm_encoder_cleanup(&dsi->encoder);
 		return ret;
 	}
+
+	connector = drm_bridge_connector_init(drm_dev, &dsi->encoder);
+	if (IS_ERR(connector)) {
+		DRM_DEV_ERROR(dsi->dev, "Unable to create bridge connector\n");
+		drm_encoder_cleanup(&dsi->encoder);
+		return PTR_ERR(connector);
+	}
+
+	drm_connector_attach_encoder(connector, &dsi->encoder);
 
 	in_bridge_node = of_graph_get_remote_node(dev->of_node, DSI_PORT_IN, 0);
 	if (in_bridge_node) {
