@@ -5872,6 +5872,17 @@ T:	git git://anongit.freedesktop.org/drm/drm-misc
 F:	Documentation/devicetree/bindings/display/panel/samsung,lms397kf04.yaml
 F:	drivers/gpu/drm/panel/panel-samsung-db7430.c
 
+DRM DRIVER FOR SAMSUNG MIPI DSIM BRIDGE
+M:	Inki Dae <inki.dae@samsung.com>
+M:	Joonyoung Shim <jy0922.shim@samsung.com>
+M:	Seung-Woo Kim <sw0312.kim@samsung.com>
+M:	Kyungmin Park <kyungmin.park@samsung.com>
+M:	Andrzej Hajda <a.hajda@samsung.com>
+M:	Jagan Teki <jagan@amarulasolutions.com>
+S:	Maintained
+T:	git git://anongit.freedesktop.org/drm/drm-misc
+F:	drivers/gpu/drm/bridge/samsung-dsim.c
+
 DRM DRIVER FOR SITRONIX ST7703 PANELS
 M:	Guido Günther <agx@sigxcpu.org>
 R:	Purism Kernel Team <kernel@puri.sm>

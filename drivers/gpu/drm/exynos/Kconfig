@@ -53,15 +53,6 @@ config DRM_EXYNOS_DPI
 	help
 	  This enables support for Exynos parallel output.
 
-config DRM_EXYNOS_DSI
-	bool "MIPI-DSI host"
-	depends on DRM_EXYNOS_FIMD || DRM_EXYNOS5433_DECON || DRM_EXYNOS7_DECON
-	select DRM_MIPI_DSI
-	select DRM_PANEL
-	default n
-	help
-	  This enables support for Exynos MIPI-DSI device.
-
 config DRM_EXYNOS_DP
 	bool "Exynos specific extensions for Analogix DP driver"
 	depends on DRM_EXYNOS_FIMD || DRM_EXYNOS7_DECON
