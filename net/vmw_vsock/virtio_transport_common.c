@@ -507,17 +507,6 @@ virtio_transport_seqpacket_enqueue(struct vsock_sock *vsk,
 				   struct msghdr *msg,
 				   size_t len)
 {
-	struct virtio_vsock_sock *vvs = vsk->trans;
-
-	spin_lock_bh(&vvs->tx_lock);
-
-	if (len > vvs->peer_buf_alloc) {
-		spin_unlock_bh(&vvs->tx_lock);
-		return -EMSGSIZE;
-	}
-
-	spin_unlock_bh(&vvs->tx_lock);
-
 	return virtio_transport_stream_enqueue(vsk, msg, len);
 }
 EXPORT_SYMBOL_GPL(virtio_transport_seqpacket_enqueue);
