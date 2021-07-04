@@ -23,6 +23,10 @@ properties:
   reg:
     maxItems: 1
 
+  qcom,mode-in-imem:
+    description: Reboot mode is stored in IMEM rather than PON register
+    type: boolean
+
 patternProperties:
   "^mode-.+":
     $ref: /schemas/types.yaml#/definitions/uint32
@@ -35,6 +39,7 @@ required:
 additionalProperties: false
 
 examples:
+  # Example 1: Reboot mode is stored in PON register
   - |
     pmic {
         #address-cells = <1>;
@@ -45,5 +50,19 @@ examples:
             reg = <0x800>;
             mode-bootloader = <0x2>;
             mode-recovery = <0x1>;
+        };
+    };
+  # Example 2: Reboot mode is stored in IMEM
+  - |
+    pmic {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        pon@800 {
+            compatible = "qcom,pm8916-pon";
+            reg = <0x860065c>;
+            qcom,mode-in-imem;
+            mode-bootloader = <0x77665500>;
+            mode-recovery = <0x77665502>;
         };
     };
