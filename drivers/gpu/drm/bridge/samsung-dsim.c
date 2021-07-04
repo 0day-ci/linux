@@ -226,6 +226,11 @@ enum samsung_dsim_transfer_type {
 	EXYNOS_DSI_RX,
 };
 
+enum {
+	DSI_PORT_IN,
+	DSI_PORT_OUT
+};
+
 struct samsung_dsim_transfer {
 	struct list_head list;
 	struct completion completed;
@@ -1436,6 +1441,15 @@ static int samsung_dsim_panel_or_bridge(struct samsung_dsim *dsi,
 {
 	struct drm_bridge *panel_bridge;
 	struct drm_panel *panel;
+	struct device_node *remote;
+
+	if (of_graph_is_present(node)) {
+		remote = of_graph_get_remote_node(node, DSI_PORT_OUT, 0);
+		if (!remote)
+			return -ENODEV;
+
+		node = remote;
+	}
 
 	panel_bridge = of_drm_find_bridge(node);
 	if (!panel_bridge) {
@@ -1578,11 +1592,6 @@ static int samsung_dsim_of_read_u32(const struct device_node *np,
 
 	return ret;
 }
-
-enum {
-	DSI_PORT_IN,
-	DSI_PORT_OUT
-};
 
 static int samsung_dsim_parse_dt(struct samsung_dsim *dsi)
 {
