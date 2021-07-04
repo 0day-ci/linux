@@ -1,0 +1,49 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2021 Oracle. All Rights Reserved.
+#
+# FS QA Test 242
+#
+# Test that fstrim can run on the degraded filesystem
+#   Kernel requires fix for the null pointer deref in btrfs_trim_fs()
+#     [patch] btrfs: check for missing device in btrfs_trim_fs
+
+
+. ./common/preamble
+_begin_fstest auto quick replace trim
+
+# Import common functions.
+. ./common/filter
+
+# real QA test starts here
+_supported_fs btrfs
+_require_btrfs_forget_or_module_loadable
+_require_scratch_dev_pool 2
+#_require_command "$WIPEFS_PROG" wipefs
+
+_scratch_dev_pool_get 2
+dev1=$(echo $SCRATCH_DEV_POOL | $AWK_PROG '{ print $1 }')
+
+_scratch_pool_mkfs "-m raid1 -d raid1"
+_scratch_mount
+_require_batched_discard $SCRATCH_MNT
+
+# Add a test file with some data.
+$XFS_IO_PROG -f -c "pwrite -S 0xab 0 10M" $SCRATCH_MNT/foo > /dev/null
+
+# Unmount the filesystem.
+_scratch_unmount
+
+# Mount the filesystem in degraded mode 
+_btrfs_forget_or_module_reload
+_mount -o degraded $dev1 $SCRATCH_MNT
+
+# Run fstrim
+$FSTRIM_PROG $SCRATCH_MNT
+
+_scratch_dev_pool_put
+
+echo Silence is golden
+
+status=0
+exit
