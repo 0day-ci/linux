@@ -192,6 +192,21 @@ static int __init mem_sleep_default_setup(char *str)
 			break;
 		}
 
+	/*
+	 * When the suspend_ops has been set, "mem_sleep_default=*" will
+	 * be invalid, here to fix this situation.
+	 */
+	if (suspend_ops) {
+		if (mem_sleep_default == PM_SUSPEND_TO_IDLE)
+			mem_sleep_current = PM_SUSPEND_TO_IDLE;
+		else if ((mem_sleep_default == PM_SUSPEND_STANDBY) &&
+				valid_state(PM_SUSPEND_STANDBY))
+			mem_sleep_current = PM_SUSPEND_STANDBY;
+		else if ((mem_sleep_default >= PM_SUSPEND_MEM) &&
+				valid_state(PM_SUSPEND_MEM))
+			mem_sleep_current = PM_SUSPEND_MEM;
+	}
+
 	return 1;
 }
 __setup("mem_sleep_default=", mem_sleep_default_setup);
