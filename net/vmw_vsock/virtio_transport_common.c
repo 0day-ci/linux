@@ -449,7 +449,6 @@ static int virtio_transport_seqpacket_do_dequeue(struct vsock_sock *vsk,
 
 		if (le32_to_cpu(pkt->hdr.flags) & VIRTIO_VSOCK_SEQ_EOR) {
 			*msg_ready = true;
-			vvs->msg_count--;
 		}
 
 		virtio_transport_dec_rx_pkt(vvs, pkt);
@@ -1005,9 +1004,6 @@ virtio_transport_recv_enqueue(struct vsock_sock *vsk,
 		free_pkt = true;
 		goto out;
 	}
-
-	if (le32_to_cpu(pkt->hdr.flags) & VIRTIO_VSOCK_SEQ_EOR)
-		vvs->msg_count++;
 
 	/* Try to copy small packets into the buffer of last packet queued,
 	 * to avoid wasting memory queueing the entire buffer with a small
