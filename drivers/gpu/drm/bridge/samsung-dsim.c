@@ -248,6 +248,7 @@ struct samsung_dsim_transfer {
 #define DSIM_STATE_INITIALIZED		BIT(1)
 #define DSIM_STATE_CMD_LPM		BIT(2)
 #define DSIM_STATE_VIDOUT_AVAILABLE	BIT(3)
+#define DSIM_STATE_DEVICE_FOUND		BIT(4)
 
 struct samsung_dsim_driver_data {
 	const unsigned int *reg_ofs;
@@ -1475,6 +1476,15 @@ static int samsung_dsim_bridge_attach(struct drm_bridge *bridge,
 				      enum drm_bridge_attach_flags flags)
 {
 	struct samsung_dsim *dsi = bridge_to_dsi(bridge);
+	int ret;
+
+	if (!(dsi->state & DSIM_STATE_DEVICE_FOUND)) {
+		ret = samsung_dsim_panel_or_bridge(dsi, dsi->dev->of_node);
+		if (ret)
+			return ret;
+
+		dsi->state |= DSIM_STATE_DEVICE_FOUND;
+	}
 
 	dsi->drm = bridge->dev;
 
@@ -1498,9 +1508,13 @@ static int samsung_dsim_host_attach(struct mipi_dsi_host *host,
 	struct drm_device *drm = dsi->drm;
 	int ret;
 
-	ret = samsung_dsim_panel_or_bridge(dsi, device->dev.of_node);
-	if (ret)
-		return ret;
+	if (!(dsi->state & DSIM_STATE_DEVICE_FOUND)) {
+		ret = samsung_dsim_panel_or_bridge(dsi, device->dev.of_node);
+		if (ret)
+			return ret;
+
+		dsi->state |= DSIM_STATE_DEVICE_FOUND;
+	}
 
 	/*
 	 * This is a temporary solution and should be made by more generic way.
