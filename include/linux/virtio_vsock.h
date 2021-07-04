@@ -36,6 +36,7 @@ struct virtio_vsock_sock {
 	u32 rx_bytes;
 	u32 buf_alloc;
 	struct list_head rx_queue;
+	bool drop_until_eor;
 };
 
 struct virtio_vsock_pkt {
@@ -89,6 +90,7 @@ virtio_transport_seqpacket_dequeue(struct vsock_sock *vsk,
 				   struct msghdr *msg,
 				   int flags,
 				   bool *msg_ready);
+void virtio_transport_seqpacket_drop(struct vsock_sock *vsk);
 s64 virtio_transport_stream_has_data(struct vsock_sock *vsk);
 s64 virtio_transport_stream_has_space(struct vsock_sock *vsk);
 
