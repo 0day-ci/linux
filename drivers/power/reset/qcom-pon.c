@@ -42,6 +42,24 @@ static int pm8916_reboot_mode_write(struct reboot_mode_driver *reboot,
 	return ret;
 }
 
+static int pm8916_reboot_mode_write_imem(struct reboot_mode_driver *reboot,
+					 unsigned int magic)
+{
+	struct pm8916_pon *pon = container_of(reboot, struct pm8916_pon,
+					      reboot_mode);
+	void __iomem *imem;
+
+	imem = devm_ioremap(pon->dev, pon->baseaddr, 4);
+	if (!imem) {
+		dev_err(pon->dev, "failed to map imem\n");
+		return -ENOMEM;
+	}
+
+	writel(magic, imem);
+
+	return 0;
+}
+
 static int pm8916_pon_probe(struct platform_device *pdev)
 {
 	struct pm8916_pon *pon;
@@ -66,7 +84,12 @@ static int pm8916_pon_probe(struct platform_device *pdev)
 
 	pon->reboot_mode.dev = &pdev->dev;
 	pon->reason_shift = (long)of_device_get_match_data(&pdev->dev);
-	pon->reboot_mode.write = pm8916_reboot_mode_write;
+
+	if (device_property_present(&pdev->dev, "qcom,mode-in-imem"))
+		pon->reboot_mode.write = pm8916_reboot_mode_write_imem;
+	else
+		pon->reboot_mode.write = pm8916_reboot_mode_write;
+
 	error = devm_reboot_mode_register(&pdev->dev, &pon->reboot_mode);
 	if (error) {
 		dev_err(&pdev->dev, "can't register reboot mode\n");
