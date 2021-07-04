@@ -5881,6 +5881,7 @@ M:	Andrzej Hajda <a.hajda@samsung.com>
 M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
 T:	git git://anongit.freedesktop.org/drm/drm-misc
+F:	Documentation/devicetree/bindings/display/bridge/samsung,mipi-dsim.yaml
 F:	drivers/gpu/drm/bridge/samsung-dsim.c
 
 DRM DRIVER FOR SITRONIX ST7703 PANELS
