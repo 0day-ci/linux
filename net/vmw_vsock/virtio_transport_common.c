@@ -530,19 +530,6 @@ s64 virtio_transport_stream_has_data(struct vsock_sock *vsk)
 }
 EXPORT_SYMBOL_GPL(virtio_transport_stream_has_data);
 
-u32 virtio_transport_seqpacket_has_data(struct vsock_sock *vsk)
-{
-	struct virtio_vsock_sock *vvs = vsk->trans;
-	u32 msg_count;
-
-	spin_lock_bh(&vvs->rx_lock);
-	msg_count = vvs->msg_count;
-	spin_unlock_bh(&vvs->rx_lock);
-
-	return msg_count;
-}
-EXPORT_SYMBOL_GPL(virtio_transport_seqpacket_has_data);
-
 static s64 virtio_transport_has_space(struct vsock_sock *vsk)
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;

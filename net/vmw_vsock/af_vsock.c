@@ -860,16 +860,6 @@ s64 vsock_stream_has_data(struct vsock_sock *vsk)
 }
 EXPORT_SYMBOL_GPL(vsock_stream_has_data);
 
-static s64 vsock_connectible_has_data(struct vsock_sock *vsk)
-{
-	struct sock *sk = sk_vsock(vsk);
-
-	if (sk->sk_type == SOCK_SEQPACKET)
-		return vsk->transport->seqpacket_has_data(vsk);
-	else
-		return vsock_stream_has_data(vsk);
-}
-
 s64 vsock_stream_has_space(struct vsock_sock *vsk)
 {
 	return vsk->transport->stream_has_space(vsk);
