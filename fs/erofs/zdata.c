@@ -1416,7 +1416,8 @@ static void z_erofs_readahead(struct readahead_control *rac)
 	bool sync = (sbi->ctx.readahead_sync_decompress &&
 			nr_pages <= sbi->ctx.max_sync_decompress_pages);
 	struct z_erofs_decompress_frontend f = DECOMPRESS_FRONTEND_INIT(inode);
-	struct page *page, *head = NULL;
+	struct page *page;
+	pgoff_t index;
 	LIST_HEAD(pagepool);
 
 	trace_erofs_readpages(inode, readahead_index(rac), nr_pages, false);
@@ -1434,26 +1435,19 @@ static void z_erofs_readahead(struct readahead_control *rac)
 	 *  2) submission chain can be then in the forward order since
 	 *     pclusters are all inserted at head.
 	 */
-	while ((page = readahead_page(rac))) {
-		prefetchw(&page->flags);
-
-		/*
-		 * A pure asynchronous readahead is indicated if
-		 * a PG_readahead marked page is hitted at first.
-		 * Let's also do asynchronous decompression for this case.
-		 */
-		sync &= !(PageReadahead(page) && !head);
-
-		set_page_private(page, (unsigned long)head);
-		head = page;
-	}
-
-	while (head) {
-		struct page *page = head;
+	index = rac->_index + rac->_nr_pages;
+	while (rac->_nr_pages) {
+		struct page *head;
 		int err;
 
-		/* traversal in reverse order */
-		head = (void *)page_private(page);
+		--rac->_nr_pages;
+		page = xa_load(&rac->mapping->i_pages, --index);
+		/* XXX: very incomplete thp support */
+		head = thp_head(page);
+		if (head != page) {
+			index -= page->index - head->index;
+			page = head;
+		}
 
 		err = z_erofs_do_read_page(&f, page, &pagepool);
 		if (err)
