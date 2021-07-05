@@ -742,6 +742,7 @@ static int cz_probe(struct platform_device *pdev)
 	if (!machine)
 		return -ENOMEM;
 	card->dev = &pdev->dev;
+	cz_card.dai_reorder = true;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, machine);
 	ret = devm_snd_soc_register_card(&pdev->dev, card);

@@ -982,6 +982,7 @@ struct snd_soc_card {
 	unsigned int disable_route_checks:1;
 	unsigned int probed:1;
 	unsigned int component_chaining:1;
+	unsigned int dai_reorder:1;
 
 	void *drvdata;
 };
