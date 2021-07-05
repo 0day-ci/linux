@@ -1424,6 +1424,16 @@ static void z_erofs_readahead(struct readahead_control *rac)
 	f.readahead = true;
 	f.headoffset = readahead_pos(rac);
 
+	/*
+	 * All pages are locked in the forward order in advance, so directly
+	 * traverse pages in the reverse order since:
+	 *  1) more effective to get each extent start offset, calculate partial
+	 *     decompressed length w/o knowing the full extent length (which is
+	 *     more metadata costly). If traversing in the normal order, it's
+	 *     mandatory to get full extent length one-by-one.
+	 *  2) submission chain can be then in the forward order since
+	 *     pclusters are all inserted at head.
+	 */
 	while ((page = readahead_page(rac))) {
 		prefetchw(&page->flags);
 
@@ -1460,7 +1470,7 @@ static void z_erofs_readahead(struct readahead_control *rac)
 	if (f.map.mpage)
 		put_page(f.map.mpage);
 
-	/* clean up the remaining free pages */
+	/* drain the on-stack pagepool with unused non-LRU temporary pages */
 	put_pages_list(&pagepool);
 }
 
