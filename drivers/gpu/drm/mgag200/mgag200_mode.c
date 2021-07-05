@@ -114,7 +114,8 @@ static inline void mga_wait_busy(struct mga_device *mdev)
  * PLL setup
  */
 
-static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200(struct mga_device *mdev, long clock,
+					      struct mgag200_pll_values *pixpllc)
 {
 	struct drm_device *dev = &mdev->base;
 	const int post_div_max = 7;
@@ -130,7 +131,6 @@ static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
 	long ref_clk = mdev->model.g200.ref_clk;
 	long p_clk_min = mdev->model.g200.pclk_min;
 	long p_clk_max =  mdev->model.g200.pclk_max;
-	u8 misc;
 
 	if (clock > p_clk_max) {
 		drm_err(dev, "Pixel Clock %ld too high\n", clock);
@@ -175,19 +175,34 @@ static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
 	drm_dbg_kms(dev, "clock: %ld vco: %ld m: %d n: %d p: %d s: %d\n",
 		    clock, f_vco, m, n, p, s);
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = s;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200(struct mga_device *mdev,
+				    const struct mgag200_pll_values *pixpllc)
+{
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
 
-	WREG_DAC(MGA1064_PIX_PLLC_M, m);
-	WREG_DAC(MGA1064_PIX_PLLC_N, n);
-	WREG_DAC(MGA1064_PIX_PLLC_P, (p | (s << 3)));
-
-	return 0;
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
+	WREG_DAC(MGA1064_PIX_PLLC_M, xpixpllcm);
+	WREG_DAC(MGA1064_PIX_PLLC_N, xpixpllcn);
+	WREG_DAC(MGA1064_PIX_PLLC_P, xpixpllcp);
 }
 
-static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200se(struct mga_device *mdev, long clock,
+						struct mgag200_pll_values *pixpllc)
 {
 	static const unsigned int pvalues_e4[] = {16, 14, 12, 10, 8, 6, 4, 2, 1};
 
@@ -199,7 +214,6 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 	unsigned int computed;
 	unsigned int fvv;
 	unsigned int i;
-	u8 misc;
 
 	if (unique_rev_id <= 0x03) {
 
@@ -295,35 +309,47 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 		return -EINVAL;
 	}
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = 0;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200se(struct mga_device *mdev,
+				      const struct mgag200_pll_values *pixpllc)
+{
+	u32 unique_rev_id = mdev->model.g200se.unique_rev_id;
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
 
-	WREG_DAC(MGA1064_PIX_PLLC_M, m);
-	WREG_DAC(MGA1064_PIX_PLLC_N, n);
-	WREG_DAC(MGA1064_PIX_PLLC_P, p);
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
+	WREG_DAC(MGA1064_PIX_PLLC_M, xpixpllcm);
+	WREG_DAC(MGA1064_PIX_PLLC_N, xpixpllcn);
+	WREG_DAC(MGA1064_PIX_PLLC_P, xpixpllcp);
 
 	if (unique_rev_id >= 0x04) {
 		WREG_DAC(0x1a, 0x09);
 		msleep(20);
 		WREG_DAC(0x1a, 0x01);
-
 	}
-
-	return 0;
 }
 
-static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200wb(struct mga_device *mdev, long clock,
+						struct mgag200_pll_values *pixpllc)
 {
 	unsigned int vcomax, vcomin, pllreffreq;
 	unsigned int delta, tmpdelta;
 	unsigned int testp, testm, testn, testp2;
 	unsigned int p, m, n;
 	unsigned int computed;
-	int i, j, tmpcount, vcount;
-	bool pll_locked = false;
-	u8 tmp, misc;
 
 	m = n = p = 0;
 
@@ -396,10 +422,29 @@ static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
 		}
 	}
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = 0;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200wb(struct mga_device *mdev,
+				      const struct mgag200_pll_values *pixpllc)
+{
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp, tmp;
+	int i, j, tmpcount, vcount;
+	bool pll_locked = false;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
+
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
 
 	for (i = 0; i <= 32 && pll_locked == false; i++) {
 		if (i > 0) {
@@ -441,9 +486,9 @@ static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
 		udelay(50);
 
 		/* program pixel pll register */
-		WREG_DAC(MGA1064_WB_PIX_PLLC_N, n);
-		WREG_DAC(MGA1064_WB_PIX_PLLC_M, m);
-		WREG_DAC(MGA1064_WB_PIX_PLLC_P, p);
+		WREG_DAC(MGA1064_PIX_PLLC_N, xpixpllcn);
+		WREG_DAC(MGA1064_PIX_PLLC_M, xpixpllcm);
+		WREG_DAC(MGA1064_PIX_PLLC_P, xpixpllcp);
 
 		udelay(50);
 
@@ -491,21 +536,21 @@ static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
 				udelay(5);
 		}
 	}
+
 	WREG8(DAC_INDEX, MGA1064_REMHEADCTL);
 	tmp = RREG8(DAC_DATA);
 	tmp &= ~MGA1064_REMHEADCTL_CLKDIS;
 	WREG_DAC(MGA1064_REMHEADCTL, tmp);
-	return 0;
 }
 
-static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200ev(struct mga_device *mdev, long clock,
+						struct mgag200_pll_values *pixpllc)
 {
 	unsigned int vcomax, vcomin, pllreffreq;
 	unsigned int delta, tmpdelta;
 	unsigned int testp, testm, testn;
 	unsigned int p, m, n;
 	unsigned int computed;
-	u8 tmp, misc;
 
 	m = n = p = 0;
 	vcomax = 550000;
@@ -538,10 +583,27 @@ static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
 		}
 	}
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = 0;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200ev(struct mga_device *mdev,
+				      const struct mgag200_pll_values *pixpllc)
+{
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp, tmp;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
+
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
 
 	WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
 	tmp = RREG8(DAC_DATA);
@@ -561,9 +623,9 @@ static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
 	tmp |= MGA1064_PIX_CLK_CTL_CLK_POW_DOWN;
 	WREG8(DAC_DATA, tmp);
 
-	WREG_DAC(MGA1064_EV_PIX_PLLC_M, m);
-	WREG_DAC(MGA1064_EV_PIX_PLLC_N, n);
-	WREG_DAC(MGA1064_EV_PIX_PLLC_P, p);
+	WREG_DAC(MGA1064_EV_PIX_PLLC_M, xpixpllcm);
+	WREG_DAC(MGA1064_EV_PIX_PLLC_N, xpixpllcn);
+	WREG_DAC(MGA1064_EV_PIX_PLLC_P, xpixpllcp);
 
 	udelay(50);
 
@@ -592,20 +654,16 @@ static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
 	tmp = RREG8(DAC_DATA);
 	tmp &= ~MGA1064_PIX_CLK_CTL_CLK_DIS;
 	WREG8(DAC_DATA, tmp);
-
-	return 0;
 }
 
-static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200eh(struct mga_device *mdev, long clock,
+						struct mgag200_pll_values *pixpllc)
 {
 	unsigned int vcomax, vcomin, pllreffreq;
 	unsigned int delta, tmpdelta;
 	unsigned int testp, testm, testn;
 	unsigned int p, m, n;
 	unsigned int computed;
-	int i, j, tmpcount, vcount;
-	u8 tmp, misc;
-	bool pll_locked = false;
 
 	m = n = p = 0;
 
@@ -676,10 +734,29 @@ static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
 		}
 	}
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = 0;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200eh(struct mga_device *mdev,
+				      const struct mgag200_pll_values *pixpllc)
+{
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp, tmp;
+	int i, j, tmpcount, vcount;
+	bool pll_locked = false;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
+
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
 
 	for (i = 0; i <= 32 && pll_locked == false; i++) {
 		WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
@@ -698,9 +775,9 @@ static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
 
 		udelay(500);
 
-		WREG_DAC(MGA1064_EH_PIX_PLLC_M, m);
-		WREG_DAC(MGA1064_EH_PIX_PLLC_N, n);
-		WREG_DAC(MGA1064_EH_PIX_PLLC_P, p);
+		WREG_DAC(MGA1064_EH_PIX_PLLC_M, xpixpllcm);
+		WREG_DAC(MGA1064_EH_PIX_PLLC_N, xpixpllcn);
+		WREG_DAC(MGA1064_EH_PIX_PLLC_P, xpixpllcp);
 
 		udelay(500);
 
@@ -728,11 +805,10 @@ static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
 				udelay(5);
 		}
 	}
-
-	return 0;
 }
 
-static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
+static int mgag200_compute_pixpll_values_g200er(struct mga_device *mdev, long clock,
+						struct mgag200_pll_values *pixpllc)
 {
 	static const unsigned int m_div_val[] = { 1, 2, 4, 8 };
 	unsigned int vcomax, vcomin, pllreffreq;
@@ -740,8 +816,6 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 	int testr, testn, testm, testo;
 	unsigned int p, m, n;
 	unsigned int computed, vco;
-	int tmp;
-	u8 misc;
 
 	m = n = p = 0;
 	vcomax = 1488000;
@@ -782,10 +856,27 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 		}
 	}
 
+	pixpllc->m = m;
+	pixpllc->n = n;
+	pixpllc->p = p;
+	pixpllc->s = 0;
+
+	return 0;
+}
+
+static void mgag200_set_pixpll_g200er(struct mga_device *mdev,
+				      const struct mgag200_pll_values *pixpllc)
+{
+	u8 misc, xpixpllcm, xpixpllcn, xpixpllcp, tmp;
+
 	misc = RREG8(MGA_MISC_IN);
 	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
 	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
 	WREG8(MGA_MISC_OUT, misc);
+
+	xpixpllcm = pixpllc->m;
+	xpixpllcn = pixpllc->n;
+	xpixpllcp = pixpllc->p | (pixpllc->s << 3);
 
 	WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
 	tmp = RREG8(DAC_DATA);
@@ -809,37 +900,70 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 
 	udelay(500);
 
-	WREG_DAC(MGA1064_ER_PIX_PLLC_N, n);
-	WREG_DAC(MGA1064_ER_PIX_PLLC_M, m);
-	WREG_DAC(MGA1064_ER_PIX_PLLC_P, p);
+	WREG_DAC(MGA1064_ER_PIX_PLLC_N, xpixpllcn);
+	WREG_DAC(MGA1064_ER_PIX_PLLC_M, xpixpllcm);
+	WREG_DAC(MGA1064_ER_PIX_PLLC_P, xpixpllcp);
 
 	udelay(50);
-
-	return 0;
 }
 
-static int mgag200_crtc_set_plls(struct mga_device *mdev, long clock)
+static void mgag200_crtc_set_plls(struct mga_device *mdev, long clock)
 {
+	struct mgag200_pll_values pixpll;
+	int ret;
+
 	switch(mdev->type) {
 	case G200_PCI:
 	case G200_AGP:
-		return mgag200_g200_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200(mdev, clock, &pixpll);
+		break;
 	case G200_SE_A:
 	case G200_SE_B:
-		return mga_g200se_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200se(mdev, clock, &pixpll);
+		break;
 	case G200_WB:
 	case G200_EW3:
-		return mga_g200wb_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200wb(mdev, clock, &pixpll);
+		break;
 	case G200_EV:
-		return mga_g200ev_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200ev(mdev, clock, &pixpll);
+		break;
 	case G200_EH:
 	case G200_EH3:
-		return mga_g200eh_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200eh(mdev, clock, &pixpll);
+		break;
 	case G200_ER:
-		return mga_g200er_set_plls(mdev, clock);
+		ret = mgag200_compute_pixpll_values_g200er(mdev, clock, &pixpll);
+		break;
 	}
 
-	return 0;
+	if (ret)
+		return;
+
+	switch (mdev->type) {
+	case G200_PCI:
+	case G200_AGP:
+		mgag200_set_pixpll_g200(mdev, &pixpll);
+		break;
+	case G200_SE_A:
+	case G200_SE_B:
+		mgag200_set_pixpll_g200se(mdev, &pixpll);
+		break;
+	case G200_WB:
+	case G200_EW3:
+		mgag200_set_pixpll_g200wb(mdev, &pixpll);
+		break;
+	case G200_EV:
+		mgag200_set_pixpll_g200ev(mdev, &pixpll);
+		break;
+	case G200_EH:
+	case G200_EH3:
+		mgag200_set_pixpll_g200eh(mdev, &pixpll);
+		break;
+	case G200_ER:
+		mgag200_set_pixpll_g200er(mdev, &pixpll);
+		break;
+	}
 }
 
 static void mgag200_g200wb_hold_bmc(struct mga_device *mdev)
