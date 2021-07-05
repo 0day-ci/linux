@@ -10,6 +10,13 @@
 
 #include <stdbool.h>
 
+#include <linux/compiler.h>
+#include <asm/barrier.h>
+#include <asm/processor.h>
+
+#define smp_acquire	smp_rmb
+#define smp_release	smp_wmb
+
 extern int param;
 
 extern bool do_exit;
@@ -87,18 +94,6 @@ void wait_for_call(void);
 
 extern unsigned ring_size;
 
-/* Compiler barrier - similar to what Linux uses */
-#define barrier() asm volatile("" ::: "memory")
-
-/* Is there a portable way to do this? */
-#if defined(__x86_64__) || defined(__i386__)
-#define cpu_relax() asm ("rep; nop" ::: "memory")
-#elif defined(__s390x__)
-#define cpu_relax() barrier()
-#else
-#define cpu_relax() assert(0)
-#endif
-
 extern bool do_relax;
 
 static inline void busy_wait(void)
@@ -109,86 +104,5 @@ static inline void busy_wait(void)
 		/* prevent compiler from removing busy loops */
 		barrier();
 } 
-
-#if defined(__x86_64__) || defined(__i386__)
-#define smp_mb()     asm volatile("lock; addl $0,-132(%%rsp)" ::: "memory", "cc")
-#else
-/*
- * Not using __ATOMIC_SEQ_CST since gcc docs say they are only synchronized
- * with other __ATOMIC_SEQ_CST calls.
- */
-#define smp_mb() __sync_synchronize()
-#endif
-
-/*
- * This abuses the atomic builtins for thread fences, and
- * adds a compiler barrier.
- */
-#define smp_release() do { \
-    barrier(); \
-    __atomic_thread_fence(__ATOMIC_RELEASE); \
-} while (0)
-
-#define smp_acquire() do { \
-    __atomic_thread_fence(__ATOMIC_ACQUIRE); \
-    barrier(); \
-} while (0)
-
-#if defined(__i386__) || defined(__x86_64__) || defined(__s390x__)
-#define smp_wmb() barrier()
-#else
-#define smp_wmb() smp_release()
-#endif
-
-#ifdef __alpha__
-#define smp_read_barrier_depends() smp_acquire()
-#else
-#define smp_read_barrier_depends() do {} while(0)
-#endif
-
-static __always_inline
-void __read_once_size(const volatile void *p, void *res, int size)
-{
-        switch (size) {                                                 \
-        case 1: *(unsigned char *)res = *(volatile unsigned char *)p; break;              \
-        case 2: *(unsigned short *)res = *(volatile unsigned short *)p; break;            \
-        case 4: *(unsigned int *)res = *(volatile unsigned int *)p; break;            \
-        case 8: *(unsigned long long *)res = *(volatile unsigned long long *)p; break;            \
-        default:                                                        \
-                barrier();                                              \
-                __builtin_memcpy((void *)res, (const void *)p, size);   \
-                barrier();                                              \
-        }                                                               \
-}
-
-static __always_inline void __write_once_size(volatile void *p, void *res, int size)
-{
-	switch (size) {
-	case 1: *(volatile unsigned char *)p = *(unsigned char *)res; break;
-	case 2: *(volatile unsigned short *)p = *(unsigned short *)res; break;
-	case 4: *(volatile unsigned int *)p = *(unsigned int *)res; break;
-	case 8: *(volatile unsigned long long *)p = *(unsigned long long *)res; break;
-	default:
-		barrier();
-		__builtin_memcpy((void *)p, (const void *)res, size);
-		barrier();
-	}
-}
-
-#define READ_ONCE(x) \
-({									\
-	union { typeof(x) __val; char __c[1]; } __u;			\
-	__read_once_size(&(x), __u.__c, sizeof(x));		\
-	smp_read_barrier_depends(); /* Enforce dependency ordering from x */ \
-	__u.__val;							\
-})
-
-#define WRITE_ONCE(x, val) \
-({							\
-	union { typeof(x) __val; char __c[1]; } __u =	\
-		{ .__val = (typeof(x)) (val) }; \
-	__write_once_size(&(x), __u.__c, sizeof(x));	\
-	__u.__val;					\
-})
 
 #endif
