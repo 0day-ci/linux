@@ -185,9 +185,8 @@ static ssize_t sriov_vf_msix_count_store(struct device *dev,
 	struct pci_dev *pdev = pci_physfn(vf_dev);
 	int val, ret;
 
-	ret = kstrtoint(buf, 0, &val);
-	if (ret)
-		return ret;
+	if (kstrtoint(buf, 0, &val) < 0)
+		return -EINVAL;
 
 	if (val < 0)
 		return -EINVAL;
@@ -379,9 +378,8 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 	int ret;
 	u16 num_vfs;
 
-	ret = kstrtou16(buf, 0, &num_vfs);
-	if (ret < 0)
-		return ret;
+	if (kstrtou16(buf, 0, &num_vfs) < 0)
+		return -EINVAL;
 
 	if (num_vfs > pci_sriov_get_totalvfs(pdev))
 		return -ERANGE;
