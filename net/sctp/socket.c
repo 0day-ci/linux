@@ -9449,7 +9449,7 @@ void sctp_copy_sock(struct sock *newsk, struct sock *sk,
 	newinet->mc_index = 0;
 	newinet->mc_list = NULL;
 
-	if (newsk->sk_flags & SK_FLAGS_TIMESTAMP)
+	if (sock_needs_netstamp(newsk) && newsk->sk_flags & SK_FLAGS_TIMESTAMP)
 		net_enable_timestamp();
 
 	/* Set newsk security attributes from original sk and connection

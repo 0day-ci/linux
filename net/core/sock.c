@@ -429,7 +429,7 @@ static int sock_set_timeout(long *timeo_p, sockptr_t optval, int optlen,
 	return 0;
 }
 
-static bool sock_needs_netstamp(const struct sock *sk)
+bool sock_needs_netstamp(const struct sock *sk)
 {
 	switch (sk->sk_family) {
 	case AF_UNSPEC:
