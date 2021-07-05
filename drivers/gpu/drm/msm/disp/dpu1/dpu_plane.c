@@ -848,18 +848,6 @@ done:
 	return 0;
 }
 
-/**
- * dpu_plane_get_ctl_flush - get control flush for the given plane
- * @plane: Pointer to drm plane structure
- * @ctl: Pointer to hardware control driver
- * @flush_sspp: Pointer to sspp flush control word
- */
-void dpu_plane_get_ctl_flush(struct drm_plane *plane, struct dpu_hw_ctl *ctl,
-		u32 *flush_sspp)
-{
-	*flush_sspp = ctl->ops.get_bitmask_sspp(ctl, dpu_plane_pipe(plane));
-}
-
 static int dpu_plane_prepare_fb(struct drm_plane *plane,
 		struct drm_plane_state *new_state)
 {
@@ -940,8 +928,86 @@ static bool dpu_plane_validate_src(struct drm_rect *src,
 		drm_rect_equals(fb_rect, src);
 }
 
+int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate)
+{
+	struct dpu_kms *kms = _dpu_plane_get_kms(plane);
+	struct dpu_plane *pdpu = to_dpu_plane(plane);
+	struct dpu_global_state *global_state = dpu_kms_get_global_state(pstate->base.state);
+	enum dpu_sspp pipe;
+	bool yuv, scale;
+
+	if (pdpu->pipe != SSPP_NONE) {
+		pipe = pdpu->pipe;
+		goto out;
+	}
+
+	yuv = pstate->base.fb ? DPU_FORMAT_IS_YUV(to_dpu_format(msm_framebuffer_format(pstate->base.fb))) : false;
+	scale = (pstate->base.src_w >> 16 != pstate->base.crtc_w) ||
+		(pstate->base.src_h >> 16 != pstate->base.crtc_h);
+
+	pipe = dpu_rm_get_sspp(&kms->rm, global_state, plane->base.id, yuv, scale);
+
+	DRM_DEBUG_ATOMIC("PLANE %d got SSPP %d\n", plane->base.id, pipe);
+
+out:
+	if (pipe == SSPP_NONE || pipe >= SSPP_MAX || !kms->rm.sspp_blks[pipe - SSPP_NONE])
+		return -EINVAL;
+
+	pstate->pipe_hw = to_dpu_hw_pipe(kms->rm.sspp_blks[pipe - SSPP_NONE]);
+
+	return 0;
+}
+
 static int dpu_plane_atomic_check(struct drm_plane *plane,
 				  struct drm_atomic_state *state)
+{
+	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
+										 plane);
+	struct dpu_kms *dpu_kms = _dpu_plane_get_kms(plane);
+	struct dpu_plane *pdpu = to_dpu_plane(plane);
+	struct dpu_plane_state *pstate = to_dpu_plane_state(new_plane_state);
+	struct dpu_global_state *global_state = dpu_kms_get_global_state(state);
+
+	if (!new_plane_state->fb)
+		new_plane_state->visible = false;
+
+	/*
+	 * Free unused pipes during atomic_check. They might be picked up
+	 * later, during pipes reallocation. The real checks will be executed
+	 * later, from dpu_plane_real_atomic_check() called from
+	 * dpu_crtc_atomic_check when the pipes are allocated.
+	 */
+	if (!new_plane_state->visible &&
+	    pstate->pipe_hw != NULL) {
+		/*
+		 * If the pipe was statically allocated during dpu_plane_init, do not
+		 * touch dpu_rm here.
+		 */
+		if (pdpu->pipe != SSPP_NONE)
+			return 0;
+
+		DRM_DEBUG_ATOMIC("PLANE %d released SSPP %d\n", plane->base.id, pstate->pipe_hw->idx);
+		dpu_rm_release_sspp(&dpu_kms->rm, global_state, plane->base.id);
+		pstate->pipe_hw = NULL;
+	}
+
+	return 0;
+}
+
+static bool dpu_plane_check_sspp_format(struct dpu_hw_pipe *pipe_hw, u32 format)
+{
+	int i;
+
+	for (i = 0; i < pipe_hw->cap->sblk->num_formats; i++) {
+		if (format == pipe_hw->cap->sblk->format_list[i])
+			return true;
+	}
+
+	return false;
+}
+
+int dpu_plane_real_atomic_check(struct drm_plane *plane,
+				struct drm_atomic_state *state)
 {
 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
 										 plane);
@@ -968,6 +1034,13 @@ static int dpu_plane_atomic_check(struct drm_plane *plane,
 	}
 	if (!new_plane_state->visible)
 		return 0;
+
+	if (!dpu_plane_check_sspp_format(pstate->pipe_hw, new_plane_state->fb->format->format)) {
+		DPU_ERROR("Format %p4cc not supported by the selected SSPP %d\n",
+				&new_plane_state->fb->format->format, pstate->pipe_hw->idx);
+
+		return -EINVAL;
+	}
 
 	src.x1 = new_plane_state->src_x >> 16;
 	src.y1 = new_plane_state->src_y >> 16;
@@ -1205,6 +1278,8 @@ static void _dpu_plane_atomic_disable(struct drm_plane *plane)
 				pstate->multirect_mode);
 
 	pstate->pending = true;
+
+	pstate->pipe_hw = NULL;
 }
 
 static void dpu_plane_atomic_update(struct drm_plane *plane,
@@ -1286,7 +1361,6 @@ static void dpu_plane_reset(struct drm_plane *plane)
 {
 	struct dpu_plane *pdpu;
 	struct dpu_plane_state *pstate;
-	struct dpu_kms *kms = _dpu_plane_get_kms(plane);
 
 	if (!plane) {
 		DPU_ERROR("invalid plane\n");
@@ -1307,8 +1381,6 @@ static void dpu_plane_reset(struct drm_plane *plane)
 		DPU_ERROR_PLANE(pdpu, "failed to allocate state\n");
 		return;
 	}
-
-	pstate->pipe_hw = to_dpu_hw_pipe(kms->rm.sspp_blks[pdpu->pipe - SSPP_NONE]);
 
 	pstate->base.plane = plane;
 
@@ -1364,11 +1436,6 @@ static const struct drm_plane_helper_funcs dpu_plane_helper_funcs = {
 		.atomic_update = dpu_plane_atomic_update,
 };
 
-enum dpu_sspp dpu_plane_pipe(struct drm_plane *plane)
-{
-	return plane ? to_dpu_plane(plane)->pipe : SSPP_NONE;
-}
-
 /* initialize plane */
 struct drm_plane *dpu_plane_init(struct drm_device *dev,
 		uint32_t pipe, enum drm_plane_type type,
@@ -1379,7 +1446,6 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 	struct dpu_plane *pdpu;
 	struct msm_drm_private *priv = dev->dev_private;
 	struct dpu_kms *kms = to_dpu_kms(priv->kms);
-	struct dpu_hw_pipe *pipe_hw;
 	uint32_t num_formats;
 	int ret = -EINVAL;
 
@@ -1395,19 +1461,22 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 	plane = &pdpu->base;
 	pdpu->pipe = pipe;
 
-	/* initialize underlying h/w driver */
-	if (!kms->rm.sspp_blks[pipe - SSPP_NONE])
-		goto clean_plane;
-	pipe_hw = to_dpu_hw_pipe(kms->rm.sspp_blks[pipe - SSPP_NONE]);
+	if (pdpu->pipe == SSPP_NONE) {
+		format_list = kms->catalog->caps->format_list;
+		num_formats = kms->catalog->caps->num_formats;
+	} else if (pdpu->pipe < SSPP_MAX) {
+		struct dpu_hw_pipe *pipe_hw;
 
-	if (!pipe_hw->cap || !pipe_hw->cap->sblk) {
-		DPU_ERROR("[%u]SSPP init returned invalid cfg\n", pipe);
-		goto clean_plane;
+		if (!kms->rm.sspp_blks[pdpu->pipe - SSPP_NONE])
+			return ERR_PTR(-EINVAL);
+		pipe_hw = to_dpu_hw_pipe(kms->rm.sspp_blks[pdpu->pipe - SSPP_NONE]);
+		format_list = pipe_hw->cap->sblk->format_list;
+		num_formats = pipe_hw->cap->sblk->num_formats;
+	} else {
+		return ERR_PTR(-EINVAL);
 	}
 
-	format_list = pipe_hw->cap->sblk->format_list;
-	num_formats = pipe_hw->cap->sblk->num_formats;
-
+	/* initialize underlying h/w driver */
 	ret = drm_universal_plane_init(dev, plane, 0xff, &dpu_plane_funcs,
 				format_list, num_formats,
 				supported_format_modifiers, type, NULL);

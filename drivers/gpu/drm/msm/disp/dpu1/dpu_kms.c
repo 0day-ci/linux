@@ -47,6 +47,9 @@
 
 #define MIN_IB_BW	400000000ULL /* Min ib vote 400MB */
 
+static bool dpu_use_virtual_planes = false;
+module_param(dpu_use_virtual_planes, bool, 0);
+
 static int dpu_kms_hw_init(struct msm_kms *kms);
 static void _dpu_kms_mmu_destroy(struct dpu_kms *dpu_kms);
 
@@ -581,31 +584,19 @@ static void _dpu_kms_drm_obj_destroy(struct dpu_kms *dpu_kms)
 	priv->num_encoders = 0;
 }
 
-static int _dpu_kms_drm_obj_init(struct dpu_kms *dpu_kms)
+static int _dpu_kms_create_planes(struct dpu_kms *dpu_kms, int max_crtc_count, struct drm_plane **primary_planes, struct drm_plane **cursor_planes)
 {
 	struct drm_device *dev;
-	struct drm_plane *primary_planes[MAX_PLANES], *plane;
-	struct drm_plane *cursor_planes[MAX_PLANES] = { NULL };
-	struct drm_crtc *crtc;
+	struct drm_plane *plane;
 
 	struct msm_drm_private *priv;
 	struct dpu_mdss_cfg *catalog;
 
-	int primary_planes_idx = 0, cursor_planes_idx = 0, i, ret;
-	int max_crtc_count;
+	int primary_planes_idx = 0, cursor_planes_idx = 0, i;
+
 	dev = dpu_kms->dev;
 	priv = dev->dev_private;
 	catalog = dpu_kms->catalog;
-
-	/*
-	 * Create encoder and query display drivers to create
-	 * bridges and connectors
-	 */
-	ret = _dpu_kms_setup_displays(dev, priv, dpu_kms);
-	if (ret)
-		goto fail;
-
-	max_crtc_count = min(catalog->mixer_count, priv->num_encoders);
 
 	/* Create the planes, keeping track of one primary/cursor per crtc */
 	for (i = 0; i < catalog->sspp_count; i++) {
@@ -627,8 +618,7 @@ static int _dpu_kms_drm_obj_init(struct dpu_kms *dpu_kms)
 				       (1UL << max_crtc_count) - 1);
 		if (IS_ERR(plane)) {
 			DPU_ERROR("dpu_plane_init failed\n");
-			ret = PTR_ERR(plane);
-			goto fail;
+			return PTR_ERR(plane);
 		}
 		priv->planes[priv->num_planes++] = plane;
 
@@ -638,10 +628,91 @@ static int _dpu_kms_drm_obj_init(struct dpu_kms *dpu_kms)
 			primary_planes[primary_planes_idx++] = plane;
 	}
 
-	max_crtc_count = min(max_crtc_count, primary_planes_idx);
+	return 0;
+}
+
+static int _dpu_kms_create_planes_virtual(struct dpu_kms *dpu_kms, int max_crtc_count, struct drm_plane **primary_planes, struct drm_plane **cursor_planes)
+{
+	struct drm_device *dev;
+	struct drm_plane *plane;
+
+	struct msm_drm_private *priv;
+	struct dpu_mdss_cfg *catalog;
+
+	int primary_planes_idx = 0, cursor_planes_idx = 0, i;
+
+	dev = dpu_kms->dev;
+	priv = dev->dev_private;
+	catalog = dpu_kms->catalog;
+
+	/* Create the planes, keeping track of one primary/cursor per crtc */
+	for (i = 0; i < catalog->sspp_count; i++) {
+		enum drm_plane_type type;
+
+		if (primary_planes_idx < max_crtc_count)
+			type = DRM_PLANE_TYPE_PRIMARY;
+		else if (cursor_planes_idx < max_crtc_count)
+			type = DRM_PLANE_TYPE_CURSOR;
+		else
+			type = DRM_PLANE_TYPE_OVERLAY;
+
+		DPU_DEBUG("Create virtual plane type %d \n", type);
+
+		plane = dpu_plane_init(dev, SSPP_NONE, type,
+				       (1UL << max_crtc_count) - 1);
+		if (IS_ERR(plane)) {
+			DPU_ERROR("dpu_plane_init failed\n");
+			return PTR_ERR(plane);
+		}
+		priv->planes[priv->num_planes++] = plane;
+
+		if (type == DRM_PLANE_TYPE_CURSOR)
+			cursor_planes[cursor_planes_idx++] = plane;
+		else if (type == DRM_PLANE_TYPE_PRIMARY)
+			primary_planes[primary_planes_idx++] = plane;
+	}
+
+	return 0;
+}
+
+static int _dpu_kms_drm_obj_init(struct dpu_kms *dpu_kms)
+{
+	struct drm_device *dev;
+	struct drm_plane *primary_planes[MAX_PLANES] = { NULL };
+	struct drm_plane *cursor_planes[MAX_PLANES] = { NULL };
+	struct drm_crtc *crtc;
+
+	struct msm_drm_private *priv;
+	struct dpu_mdss_cfg *catalog;
+
+	int i, ret;
+	int max_crtc_count;
+	dev = dpu_kms->dev;
+	priv = dev->dev_private;
+	catalog = dpu_kms->catalog;
+
+	/*
+	 * Create encoder and query display drivers to create
+	 * bridges and connectors
+	 */
+	ret = _dpu_kms_setup_displays(dev, priv, dpu_kms);
+	if (ret)
+		goto fail;
+
+	max_crtc_count = min(catalog->mixer_count, priv->num_encoders);
+
+	if (dpu_use_virtual_planes)
+		ret = _dpu_kms_create_planes_virtual(dpu_kms, max_crtc_count, primary_planes, cursor_planes);
+	else
+		ret = _dpu_kms_create_planes(dpu_kms, max_crtc_count, primary_planes, cursor_planes);
+	if (ret)
+		goto fail;
 
 	/* Create one CRTC per encoder */
 	for (i = 0; i < max_crtc_count; i++) {
+		if (!primary_planes[i])
+			break;
+
 		crtc = dpu_crtc_init(dev, primary_planes[i], cursor_planes[i]);
 		if (IS_ERR(crtc)) {
 			ret = PTR_ERR(crtc);

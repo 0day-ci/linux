@@ -206,6 +206,7 @@ static void _dpu_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 	int zpos_cnt[DPU_STAGE_MAX + 1] = { 0 };
 	bool bg_alpha_enable = false;
 	DECLARE_BITMAP(fetch_active, SSPP_MAX);
+	enum dpu_sspp pipe;
 
 	memset(fetch_active, 0, sizeof(fetch_active));
 	drm_atomic_crtc_for_each_plane(plane, crtc) {
@@ -216,14 +217,19 @@ static void _dpu_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 		pstate = to_dpu_plane_state(state);
 		fb = state->fb;
 
-		dpu_plane_get_ctl_flush(plane, ctl, &flush_mask);
-		set_bit(dpu_plane_pipe(plane), fetch_active);
+		if (WARN_ON(!pstate->pipe_hw))
+			continue;
+
+		pipe = pstate->pipe_hw->idx;
+
+		flush_mask = ctl->ops.get_bitmask_sspp(ctl, pipe);
+		set_bit(pipe, fetch_active);
 
 		DRM_DEBUG_ATOMIC("crtc %d stage:%d - plane %d sspp %d fb %d\n",
 				crtc->base.id,
 				pstate->stage,
 				plane->base.id,
-				dpu_plane_pipe(plane) - SSPP_VIG0,
+				pipe - SSPP_VIG0,
 				state->fb ? state->fb->base.id : -1);
 
 		format = to_dpu_format(msm_framebuffer_format(pstate->base.fb));
@@ -233,13 +239,13 @@ static void _dpu_crtc_blend_setup_mixer(struct drm_crtc *crtc,
 
 		stage_idx = zpos_cnt[pstate->stage]++;
 		stage_cfg->stage[pstate->stage][stage_idx] =
-					dpu_plane_pipe(plane);
+					pipe;
 		stage_cfg->multirect_index[pstate->stage][stage_idx] =
 					pstate->multirect_index;
 
 		trace_dpu_crtc_setup_mixer(DRMID(crtc), DRMID(plane),
 					   state, pstate, stage_idx,
-					   dpu_plane_pipe(plane) - SSPP_VIG0,
+					   pipe - SSPP_VIG0,
 					   format->base.pixel_format,
 					   fb ? fb->modifier : 0);
 
@@ -875,13 +881,6 @@ static void dpu_crtc_enable(struct drm_crtc *crtc,
 	drm_crtc_vblank_on(crtc);
 }
 
-struct plane_state {
-	struct dpu_plane_state *dpu_pstate;
-	const struct drm_plane_state *drm_pstate;
-	int stage;
-	u32 pipe_id;
-};
-
 static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 		struct drm_atomic_state *state)
 {
@@ -889,17 +888,25 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 									  crtc);
 	struct dpu_crtc *dpu_crtc = to_dpu_crtc(crtc);
 	struct dpu_crtc_state *cstate = to_dpu_crtc_state(crtc_state);
-	struct plane_state *pstates;
+	struct dpu_kms *dpu_kms = _dpu_crtc_get_kms(crtc);
+	struct dpu_global_state *global_state = dpu_kms_get_global_state(state);
 
-	const struct drm_plane_state *pstate;
+	struct dpu_plane_state **pstates;
+	struct dpu_plane_state *pstate;
+
+	struct drm_plane_state *plane_state;
 	struct drm_plane *plane;
 	struct drm_display_mode *mode;
 
-	int cnt = 0, rc = 0, i;
+	int rc = 0, i;
+	unsigned int num_planes, max_zpos = 0;
 
+	struct drm_rect dst;
 	struct drm_rect crtc_rect = { 0 };
+	int stage;
 
-	pstates = kzalloc(sizeof(*pstates) * DPU_STAGE_MAX * 4, GFP_KERNEL);
+	num_planes = DPU_STAGE_MAX * 4;
+	pstates = kcalloc(num_planes, sizeof(*pstates), GFP_KERNEL);
 
 	if (!crtc_state->enable || !crtc_state->active) {
 		DRM_DEBUG_ATOMIC("crtc%d -> enable %d, active %d, skip atomic_check\n",
@@ -923,28 +930,57 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 	crtc_rect.y2 = mode->vdisplay;
 
 	 /* get plane state for all drm planes associated with crtc state */
-	drm_atomic_crtc_state_for_each_plane_state(plane, pstate, crtc_state) {
-		struct drm_rect dst, clip = crtc_rect;
-
-		if (IS_ERR_OR_NULL(pstate)) {
-			rc = PTR_ERR(pstate);
+	drm_atomic_crtc_state_for_each_plane(plane, crtc_state) {
+		plane_state = drm_atomic_get_plane_state(state, plane);
+		if (IS_ERR(plane_state)) {
+			rc = PTR_ERR(plane_state);
 			DPU_ERROR("%s: failed to get plane%d state, %d\n",
 					dpu_crtc->name, plane->base.id, rc);
 			goto end;
 		}
-		if (cnt >= DPU_STAGE_MAX * 4)
+
+		if (plane_state->normalized_zpos >= num_planes) {
+			DPU_ERROR("%s: normalized zpos is too big for plane %d: %d\n",
+					dpu_crtc->name, plane->base.id, plane_state->normalized_zpos);
+			rc = -EINVAL;
+			goto end;
+		}
+
+		pstate = to_dpu_plane_state(plane_state);
+		pstates[plane_state->normalized_zpos] = pstate;
+		max_zpos = max(max_zpos, plane_state->normalized_zpos);
+
+		/* Here we are going to release SSPP blocks and acquire them later in dpu_plane_set_pipe.
+		 *
+		 * TODO: optimize to that we do not reacquire SSPPs if none of
+		 * the plane modes/formats/etc were changed, no planes added or removed.
+		 */
+		if (pstate->pipe_hw) {
+			dpu_rm_release_sspp(&dpu_kms->rm, global_state, plane->base.id);
+			pstate->pipe_hw = NULL;
+		}
+	}
+
+	stage = DPU_STAGE_0;
+	for (i = 0; i <= max_zpos; i++) {
+		pstate = pstates[i];
+		if (!pstate)
 			continue;
 
-		pstates[cnt].dpu_pstate = to_dpu_plane_state(pstate);
-		pstates[cnt].drm_pstate = pstate;
-		pstates[cnt].stage = pstate->normalized_zpos;
+		/* verify stage setting before using it */
+		if (stage >= DPU_STAGE_MAX) {
+			DPU_ERROR("> %d plane stages assigned\n",
+					DPU_STAGE_MAX - DPU_STAGE_0);
+			rc = -EINVAL;
+			goto end;
+		}
 
-		dpu_plane_clear_multirect(pstate);
+		plane_state = &pstate->base;
 
-		cnt++;
+		dpu_plane_clear_multirect(plane_state);
 
-		dst = drm_plane_state_dest(pstate);
-		if (!drm_rect_intersect(&clip, &dst)) {
+		dst = drm_plane_state_dest(plane_state);
+		if (!drm_rect_intersect(&dst, &crtc_rect)) {
 			DPU_ERROR("invalid vertical/horizontal destination\n");
 			DPU_ERROR("display: " DRM_RECT_FMT " plane: "
 				  DRM_RECT_FMT "\n", DRM_RECT_ARG(&crtc_rect),
@@ -952,21 +988,22 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 			rc = -E2BIG;
 			goto end;
 		}
-	}
 
-	for (i = 0; i < cnt; i++) {
-		int z_pos = pstates[i].stage;
-
-		/* verify z_pos setting before using it */
-		if (z_pos >= DPU_STAGE_MAX - DPU_STAGE_0) {
-			DPU_ERROR("> %d plane stages assigned\n",
-					DPU_STAGE_MAX - DPU_STAGE_0);
-			rc = -EINVAL;
+		plane = pstate->base.plane;
+		rc = dpu_plane_set_pipe(plane, pstate);
+		if (rc) {
+			DPU_ERROR("%s: error setting pipe for %s\n", dpu_crtc->name, plane->name);
 			goto end;
 		}
 
-		pstates[i].dpu_pstate->stage = z_pos + DPU_STAGE_0;
-		DRM_DEBUG_ATOMIC("%s: zpos %d\n", dpu_crtc->name, z_pos);
+		rc = dpu_plane_real_atomic_check(plane, state);
+		if (rc) {
+			DPU_ERROR("%s: error checking pipe for %s\n", dpu_crtc->name, plane->name);
+			goto end;
+		}
+
+		pstates[i]->stage = stage++;
+		DRM_DEBUG_ATOMIC("%s: stage %d\n", dpu_crtc->name, stage);
 	}
 
 	atomic_inc(&_dpu_crtc_get_kms(crtc)->bandwidth_ref);
