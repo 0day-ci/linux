@@ -7778,6 +7778,19 @@ int __sched __cond_resched(void)
 		preempt_schedule_common();
 		return 1;
 	}
+	/*
+	 * A process spending a long time in the kernel space might
+	 * have too few opportunities to report quiescent states
+	 * when CONFIG_PREEMPT_RCU=n because then the tick can't know
+	 * if it's interrupting an RCU read side critical section. In the
+	 * absence of voluntary sleeps, the last resort resides in tracking
+	 * calls to cond_resched() which always imply quiescent states.
+	 *
+	 * On the other hand, preemptible RCU has a real RCU read side
+	 * tracking that allows the tick for reporting interrupted quiescent
+	 * states or, in the worst case, deferred quiescent states after
+	 * rcu_read_unlock().
+	 */
 #ifndef CONFIG_PREEMPT_RCU
 	rcu_all_qs();
 #endif
