@@ -480,6 +480,16 @@ static bool ima_match_rule_data(struct ima_rule_entry *rule,
 	if ((rule->flags & IMA_UID) && !rule->uid_op(cred->uid, rule->uid))
 		return false;
 
+	if (rule->flags & IMA_EUID) {
+		if (has_capability_noaudit(current, CAP_SETUID)) {
+			if (!rule->uid_op(cred->euid, rule->uid)
+			    && !rule->uid_op(cred->suid, rule->uid)
+			    && !rule->uid_op(cred->uid, rule->uid))
+				return false;
+		} else if (!rule->uid_op(cred->euid, rule->uid))
+			return false;
+	}
+
 	switch (rule->func) {
 	case KEY_CHECK:
 		if (!rule->keyrings)
@@ -1153,7 +1163,7 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 		if (entry->action & ~(MEASURE | DONT_MEASURE))
 			return false;
 
-		if (entry->flags & ~(IMA_FUNC | IMA_UID | IMA_PCR |
+		if (entry->flags & ~(IMA_FUNC | IMA_UID | IMA_EUID | IMA_PCR |
 				     IMA_LABEL))
 			return false;
 
