@@ -292,10 +292,10 @@ static u64 _dpu_plane_get_qos_lut(const struct dpu_qos_lut_tbl *tbl,
  * _dpu_plane_set_qos_lut - set QoS LUT of the given plane
  * @plane:		Pointer to drm plane
  * @fb:			Pointer to framebuffer associated with the given plane
- * @pipe_cfg:		Pointer to pipe configuration
+ * @src_width:		Plane source width (max for both multirect planes).
  */
 static void _dpu_plane_set_qos_lut(struct drm_plane *plane,
-		struct drm_framebuffer *fb, struct dpu_hw_pipe_cfg *pipe_cfg)
+		struct drm_framebuffer *fb, u32 src_width)
 {
 	struct dpu_plane *pdpu = to_dpu_plane(plane);
 	struct dpu_plane_state *pstate = to_dpu_plane_state(plane->state);
@@ -309,8 +309,7 @@ static void _dpu_plane_set_qos_lut(struct drm_plane *plane,
 		fmt = dpu_get_dpu_format_ext(
 				fb->format->format,
 				fb->modifier);
-		total_fl = _dpu_plane_calc_fill_level(plane, fmt,
-				drm_rect_width(&pipe_cfg->src_rect));
+		total_fl = _dpu_plane_calc_fill_level(plane, fmt, src_width);
 
 		if (fmt && DPU_FORMAT_IS_LINEAR(fmt))
 			lut_usage = DPU_QOS_LUT_USAGE_LINEAR;
@@ -570,6 +569,9 @@ static void _dpu_plane_setup_scaler3(struct dpu_plane *pdpu,
 		&& (src_w == dst_w))
 		return;
 
+	if (pstate->multirect_index != DPU_SSPP_RECT_SOLO)
+		return;
+
 	scale_cfg->dst_width = dst_w;
 	scale_cfg->dst_height = dst_h;
 	scale_cfg->y_rgb_filter_cfg = DPU_SCALE_BIL;
@@ -638,12 +640,15 @@ static const struct dpu_csc_cfg *_dpu_plane_get_csc(struct dpu_plane *pdpu, cons
 
 static void _dpu_plane_setup_scaler(struct dpu_plane *pdpu,
 		struct dpu_plane_state *pstate,
-		const struct dpu_format *fmt, bool color_fill,
+		const struct dpu_format *fmt,
 		struct dpu_hw_pipe_cfg *pipe_cfg)
 {
 	const struct drm_format_info *info = drm_format_info(fmt->base.pixel_format);
 	struct dpu_hw_scaler3_cfg scaler3_cfg;
 	struct dpu_hw_pixel_ext pixel_ext;
+
+	if (pstate->multirect_index == DPU_SSPP_RECT_1)
+		return;
 
 	memset(&scaler3_cfg, 0, sizeof(scaler3_cfg));
 	memset(&pixel_ext, 0, sizeof(pixel_ext));
@@ -667,8 +672,7 @@ static void _dpu_plane_setup_scaler(struct dpu_plane *pdpu,
 	 * bypassed. Still we need to update alpha and bitwidth
 	 * ONLY for RECT0
 	 */
-	if (pstate->pipe_hw->ops.setup_scaler &&
-			pstate->multirect_index != DPU_SSPP_RECT_1)
+	if (pstate->pipe_hw->ops.setup_scaler)
 		pstate->pipe_hw->ops.setup_scaler(pstate->pipe_hw,
 				pipe_cfg, &pixel_ext,
 				&scaler3_cfg);
@@ -723,23 +727,15 @@ static int _dpu_plane_color_fill(struct dpu_plane *pdpu,
 					&pipe_cfg,
 					pstate->multirect_index);
 
-		_dpu_plane_setup_scaler(pdpu, pstate, fmt, true, &pipe_cfg);
+		_dpu_plane_setup_scaler(pdpu, pstate, fmt, &pipe_cfg);
 	}
 
 	return 0;
 }
 
-void dpu_plane_clear_multirect(const struct drm_plane_state *drm_state)
+static int dpu_plane_validate_multirect_v2(struct dpu_plane_state *pstate0,
+					   struct dpu_plane_state *pstate1)
 {
-	struct dpu_plane_state *pstate = to_dpu_plane_state(drm_state);
-
-	pstate->multirect_index = DPU_SSPP_RECT_SOLO;
-	pstate->multirect_mode = DPU_SSPP_MULTIRECT_NONE;
-}
-
-int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
-{
-	struct dpu_plane_state *pstate[R_MAX];
 	const struct drm_plane_state *drm_state[R_MAX];
 	struct drm_rect src[R_MAX], dst[R_MAX];
 	struct dpu_plane *dpu_plane[R_MAX];
@@ -750,9 +746,17 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 	bool has_tiled_rect = false;
 
 	for (i = 0; i < R_MAX; i++) {
+		struct dpu_plane_state *pstate;
 		const struct msm_format *msm_fmt;
 
-		drm_state[i] = i ? plane->r1 : plane->r0;
+		pstate = i ? pstate1 : pstate0;
+		if (pstate == NULL) {
+			DPU_DEBUG("DPU plane state of plane id %d is NULL\n",
+				drm_state[i]->plane->base.id);
+			return -EINVAL;
+		}
+
+		drm_state[i] = &pstate->base;
 		msm_fmt = msm_framebuffer_format(drm_state[i]->fb);
 		fmt[i] = to_dpu_format(msm_fmt);
 
@@ -766,14 +770,7 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 	for (i = 0; i < R_MAX; i++) {
 		int width_threshold;
 
-		pstate[i] = to_dpu_plane_state(drm_state[i]);
 		dpu_plane[i] = to_dpu_plane(drm_state[i]->plane);
-
-		if (pstate[i] == NULL) {
-			DPU_ERROR("DPU plane state of plane id %d is NULL\n",
-				drm_state[i]->plane->base.id);
-			return -EINVAL;
-		}
 
 		src[i].x1 = drm_state[i]->src_x >> 16;
 		src[i].y1 = drm_state[i]->src_y >> 16;
@@ -784,13 +781,13 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 
 		if (drm_rect_calc_hscale(&src[i], &dst[i], 1, 1) != 1 ||
 		    drm_rect_calc_vscale(&src[i], &dst[i], 1, 1) != 1) {
-			DPU_ERROR_PLANE(dpu_plane[i],
+			DPU_DEBUG_PLANE(dpu_plane[i],
 				"scaling is not supported in multirect mode\n");
 			return -EINVAL;
 		}
 
 		if (DPU_FORMAT_IS_YUV(fmt[i])) {
-			DPU_ERROR_PLANE(dpu_plane[i],
+			DPU_DEBUG_PLANE(dpu_plane[i],
 				"Unsupported format for multirect mode\n");
 			return -EINVAL;
 		}
@@ -816,8 +813,8 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 
 	/* Prefer PARALLEL FETCH Mode over TIME_MX Mode */
 	if (parallel_fetch_qualified) {
-		pstate[R0]->multirect_mode = DPU_SSPP_MULTIRECT_PARALLEL;
-		pstate[R1]->multirect_mode = DPU_SSPP_MULTIRECT_PARALLEL;
+		pstate0->multirect_mode = DPU_SSPP_MULTIRECT_PARALLEL;
+		pstate1->multirect_mode = DPU_SSPP_MULTIRECT_PARALLEL;
 
 		goto done;
 	}
@@ -827,10 +824,10 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 
 	if (dst[R1].y1 >= dst[R0].y2 + buffer_lines ||
 	    dst[R0].y1 >= dst[R1].y2 + buffer_lines) {
-		pstate[R0]->multirect_mode = DPU_SSPP_MULTIRECT_TIME_MX;
-		pstate[R1]->multirect_mode = DPU_SSPP_MULTIRECT_TIME_MX;
+		pstate0->multirect_mode = DPU_SSPP_MULTIRECT_TIME_MX;
+		pstate1->multirect_mode = DPU_SSPP_MULTIRECT_TIME_MX;
 	} else {
-		DPU_ERROR(
+		DPU_DEBUG(
 			"No multirect mode possible for the planes (%d - %d)\n",
 			drm_state[R0]->plane->base.id,
 			drm_state[R1]->plane->base.id);
@@ -838,13 +835,15 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 	}
 
 done:
-	pstate[R0]->multirect_index = DPU_SSPP_RECT_0;
-	pstate[R1]->multirect_index = DPU_SSPP_RECT_1;
+	pstate0->multirect_index = DPU_SSPP_RECT_0;
+	pstate1->multirect_index = DPU_SSPP_RECT_1;
+
+	pstate0->qos_src_w = max(pstate0->qos_src_w, pstate1->base.src_w >> 16);
 
 	DPU_DEBUG_PLANE(dpu_plane[R0], "R0: %d - %d\n",
-		pstate[R0]->multirect_mode, pstate[R0]->multirect_index);
+		pstate0->multirect_mode, pstate0->multirect_index);
 	DPU_DEBUG_PLANE(dpu_plane[R1], "R1: %d - %d\n",
-		pstate[R1]->multirect_mode, pstate[R1]->multirect_index);
+		pstate1->multirect_mode, pstate1->multirect_index);
 	return 0;
 }
 
@@ -928,7 +927,8 @@ static bool dpu_plane_validate_src(struct drm_rect *src,
 		drm_rect_equals(fb_rect, src);
 }
 
-int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate)
+int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate,
+		struct dpu_plane_state *prev_plane_state)
 {
 	struct dpu_kms *kms = _dpu_plane_get_kms(plane);
 	struct dpu_plane *pdpu = to_dpu_plane(plane);
@@ -936,9 +936,22 @@ int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate)
 	enum dpu_sspp pipe;
 	bool yuv, scale;
 
+	pstate->multirect_index = DPU_SSPP_RECT_SOLO;
+	pstate->multirect_mode = DPU_SSPP_MULTIRECT_NONE;
+
 	if (pdpu->pipe != SSPP_NONE) {
 		pipe = pdpu->pipe;
 		goto out;
+	}
+
+	if (prev_plane_state &&
+	    kms->catalog->caps->smart_dma_rev != DPU_SMART_DMA_UNSUPPORTED &&
+	    !dpu_plane_validate_multirect_v2(prev_plane_state, pstate)) {
+		/* multirect capable, use the same pipe */
+		DPU_DEBUG_PLANE(pdpu, "multirect, SSPP %d\n", prev_plane_state->pipe_hw->idx);
+		pstate->pipe_hw = prev_plane_state->pipe_hw;
+
+		return 0;
 	}
 
 	yuv = pstate->base.fb ? DPU_FORMAT_IS_YUV(to_dpu_format(msm_framebuffer_format(pstate->base.fb))) : false;
@@ -952,6 +965,8 @@ int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate)
 out:
 	if (pipe == SSPP_NONE || pipe >= SSPP_MAX || !kms->rm.sspp_blks[pipe - SSPP_NONE])
 		return -EINVAL;
+
+	pstate->qos_src_w = pstate->base.src_w >> 16;
 
 	pstate->pipe_hw = to_dpu_hw_pipe(kms->rm.sspp_blks[pipe - SSPP_NONE]);
 
@@ -988,7 +1003,7 @@ static int dpu_plane_atomic_check(struct drm_plane *plane,
 
 		DRM_DEBUG_ATOMIC("PLANE %d released SSPP %d\n", plane->base.id, pstate->pipe_hw->idx);
 		dpu_rm_release_sspp(&dpu_kms->rm, global_state, plane->base.id);
-		pstate->pipe_hw = NULL;
+		/* do not clear pipe_hw here, use it in atomic_disable to cleanup mutlirect */
 	}
 
 	return 0;
@@ -1199,7 +1214,7 @@ static void dpu_plane_sspp_atomic_update(struct drm_plane *plane)
 				pstate->multirect_index);
 	}
 
-	_dpu_plane_setup_scaler(pdpu, pstate, fmt, false, &pipe_cfg);
+	_dpu_plane_setup_scaler(pdpu, pstate, fmt, &pipe_cfg);
 
 	if (pstate->pipe_hw->ops.setup_multirect)
 		pstate->pipe_hw->ops.setup_multirect(
@@ -1245,8 +1260,10 @@ static void dpu_plane_sspp_atomic_update(struct drm_plane *plane)
 		}
 	}
 
-	_dpu_plane_set_qos_lut(plane, fb, &pipe_cfg);
-	_dpu_plane_set_danger_lut(plane, fb);
+	if (pstate->multirect_index != DPU_SSPP_RECT_1) {
+		_dpu_plane_set_qos_lut(plane, fb, pstate->qos_src_w);
+		_dpu_plane_set_danger_lut(plane, fb);
+	}
 
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
 		_dpu_plane_set_qos_ctrl(plane, true, DPU_PLANE_QOS_PANIC_CTRL);
@@ -1279,7 +1296,13 @@ static void _dpu_plane_atomic_disable(struct drm_plane *plane)
 
 	pstate->pending = true;
 
-	pstate->pipe_hw = NULL;
+	if (pstate->multirect_index != DPU_SSPP_RECT_SOLO &&
+	    pstate->pipe_hw &&
+	    pstate->pipe_hw->ops.setup_multirect)
+		pstate->pipe_hw->ops.setup_multirect(
+				pstate->pipe_hw,
+				DPU_SSPP_RECT_SOLO,
+				DPU_SSPP_MULTIRECT_NONE);
 }
 
 static void dpu_plane_atomic_update(struct drm_plane *plane,

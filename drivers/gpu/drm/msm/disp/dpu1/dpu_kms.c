@@ -646,7 +646,7 @@ static int _dpu_kms_create_planes_virtual(struct dpu_kms *dpu_kms, int max_crtc_
 	catalog = dpu_kms->catalog;
 
 	/* Create the planes, keeping track of one primary/cursor per crtc */
-	for (i = 0; i < catalog->sspp_count; i++) {
+	for (i = 0; i < 2 * catalog->sspp_count; i++) {
 		enum drm_plane_type type;
 
 		if (primary_planes_idx < max_crtc_count)

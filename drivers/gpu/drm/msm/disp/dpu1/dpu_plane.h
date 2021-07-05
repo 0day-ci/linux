@@ -23,6 +23,7 @@
  * @multirect_index: index of the rectangle of SSPP
  * @multirect_mode: parallel or time multiplex multirect mode
  * @pending:	whether the current update is still pending
+ * @qos_src_w: src_width used for qos_lut setup
  * @plane_fetch_bw: calculated BW per plane
  * @plane_clk: calculated clk per plane
  */
@@ -35,20 +36,12 @@ struct dpu_plane_state {
 	uint32_t multirect_mode;
 	bool pending;
 
+	uint32_t qos_src_w;
+
 	struct dpu_hw_pipe *pipe_hw;
 
 	u64 plane_fetch_bw;
 	u64 plane_clk;
-};
-
-/**
- * struct dpu_multirect_plane_states: Defines multirect pair of drm plane states
- * @r0: drm plane configured on rect 0
- * @r1: drm plane configured on rect 1
- */
-struct dpu_multirect_plane_states {
-	const struct drm_plane_state *r0;
-	const struct drm_plane_state *r1;
 };
 
 #define to_dpu_plane_state(x) \
@@ -79,19 +72,6 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 		unsigned long possible_crtcs);
 
 /**
- * dpu_plane_validate_multirecti_v2 - validate the multirect planes
- *				      against hw limitations
- * @plane: drm plate states of the multirect pair
- */
-int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane);
-
-/**
- * dpu_plane_clear_multirect - clear multirect bits for the given pipe
- * @drm_state: Pointer to DRM plane state
- */
-void dpu_plane_clear_multirect(const struct drm_plane_state *drm_state);
-
-/**
  * dpu_plane_color_fill - enables color fill on plane
  * @plane:  Pointer to DRM plane object
  * @color:  RGB fill color value, [23..16] Blue, [15..8] Green, [7..0] Red
@@ -107,7 +87,8 @@ void dpu_plane_danger_signal_ctrl(struct drm_plane *plane, bool enable);
 static inline void dpu_plane_danger_signal_ctrl(struct drm_plane *plane, bool enable) {}
 #endif
 
-int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate);
+int dpu_plane_set_pipe(struct drm_plane *plane, struct dpu_plane_state *pstate,
+		struct dpu_plane_state *prev_plane_state);
 
 int dpu_plane_real_atomic_check(struct drm_plane *plane,
 				struct drm_atomic_state *state);

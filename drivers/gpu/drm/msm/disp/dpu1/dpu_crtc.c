@@ -892,7 +892,7 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 	struct dpu_global_state *global_state = dpu_kms_get_global_state(state);
 
 	struct dpu_plane_state **pstates;
-	struct dpu_plane_state *pstate;
+	struct dpu_plane_state *pstate, *prev_plane_state;
 
 	struct drm_plane_state *plane_state;
 	struct drm_plane *plane;
@@ -962,6 +962,7 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 	}
 
 	stage = DPU_STAGE_0;
+	prev_plane_state = NULL;
 	for (i = 0; i <= max_zpos; i++) {
 		pstate = pstates[i];
 		if (!pstate)
@@ -977,8 +978,6 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 
 		plane_state = &pstate->base;
 
-		dpu_plane_clear_multirect(plane_state);
-
 		dst = drm_plane_state_dest(plane_state);
 		if (!drm_rect_intersect(&dst, &crtc_rect)) {
 			DPU_ERROR("invalid vertical/horizontal destination\n");
@@ -990,7 +989,7 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 		}
 
 		plane = pstate->base.plane;
-		rc = dpu_plane_set_pipe(plane, pstate);
+		rc = dpu_plane_set_pipe(plane, pstate, prev_plane_state);
 		if (rc) {
 			DPU_ERROR("%s: error setting pipe for %s\n", dpu_crtc->name, plane->name);
 			goto end;
@@ -1001,6 +1000,17 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 			DPU_ERROR("%s: error checking pipe for %s\n", dpu_crtc->name, plane->name);
 			goto end;
 		}
+
+		/*
+		 * If this plane was not selected for multirect, so we can try
+		 * using it together with the next pipe.  If it selected for
+		 * the REC1, next pipe will have to start from REC_SOLO (and
+		 * maybe be promoted to REC0 later.
+		 */
+		if (pstate->multirect_index == DPU_SSPP_RECT_SOLO)
+			prev_plane_state = pstate;
+		else
+			prev_plane_state = NULL;
 
 		pstates[i]->stage = stage++;
 		DRM_DEBUG_ATOMIC("%s: stage %d\n", dpu_crtc->name, stage);
