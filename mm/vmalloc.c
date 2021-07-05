@@ -2789,10 +2789,34 @@ vm_area_alloc_pages(gfp_t gfp, int nid,
 	 * to fails, fallback to a single page allocator that is
 	 * more permissive.
 	 */
-	if (!order)
-		nr_allocated = alloc_pages_bulk_array_node(
-			gfp, nid, nr_pages, pages);
-	else
+	if (!order) {
+		while (nr_allocated < nr_pages) {
+			int nr, nr_pages_request;
+
+			/*
+			 * A maximum allowed request is hard-coded and is 100
+			 * pages per call. That is done in order to prevent a
+			 * long preemption off scenario in the bulk-allocator
+			 * so the range is [1:100].
+			 */
+			nr_pages_request = min(100, (int)(nr_pages - nr_allocated));
+
+			nr = alloc_pages_bulk_array_node(gfp, nid,
+				nr_pages_request, pages + nr_allocated);
+
+			nr_allocated += nr;
+
+			if (gfpflags_allow_blocking(gfp))
+				cond_resched();
+
+			/*
+			 * If zero or pages were obtained partly,
+			 * fallback to a single page allocator.
+			 */
+			if (nr != nr_pages_request)
+				break;
+		}
+	} else
 		/*
 		 * Compound pages required for remap_vmalloc_page if
 		 * high-order pages.
