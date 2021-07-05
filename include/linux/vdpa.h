@@ -137,6 +137,7 @@ struct vdpa_iova_range {
  *				@cb: virtio-vdev interrupt callback structure
  * @get_vq_num_max:		Get the max size of virtqueue
  *				@vdev: vdpa device
+ *				@idx: virtqueue index
  *				Returns u16: max size of virtqueue
  * @get_device_id:		Get virtio device id
  *				@vdev: vdpa device
@@ -229,7 +230,7 @@ struct vdpa_config_ops {
 	int (*set_features)(struct vdpa_device *vdev, u64 features);
 	void (*set_config_cb)(struct vdpa_device *vdev,
 			      struct vdpa_callback *cb);
-	u16 (*get_vq_num_max)(struct vdpa_device *vdev);
+	u16 (*get_vq_num_max)(struct vdpa_device *vdev, u16 idx);
 	u32 (*get_device_id)(struct vdpa_device *vdev);
 	u32 (*get_vendor_id)(struct vdpa_device *vdev);
 	u8 (*get_status)(struct vdpa_device *vdev);
@@ -269,6 +270,8 @@ void vdpa_unregister_device(struct vdpa_device *vdev);
 
 int _vdpa_register_device(struct vdpa_device *vdev, int nvqs);
 void _vdpa_unregister_device(struct vdpa_device *vdev);
+
+u16 vdpa_get_vq_num_max(struct vdpa_device *vdev);
 
 /**
  * struct vdpa_driver - operations for a vDPA driver

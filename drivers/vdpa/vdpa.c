@@ -240,6 +240,26 @@ void vdpa_unregister_driver(struct vdpa_driver *drv)
 EXPORT_SYMBOL_GPL(vdpa_unregister_driver);
 
 /**
+ * vdpa_get_vq_num_max - get the maximum virtqueue size
+ * @vdev: vdpa device
+ */
+u16 vdpa_get_vq_num_max(struct vdpa_device *vdev)
+{
+	const struct vdpa_config_ops *ops = vdev->config;
+	u16 s, size = ops->get_vq_num_max(vdev, 0);
+	int i;
+
+	for (i = 1; i < vdev->nvqs; i++) {
+		s = ops->get_vq_num_max(vdev, i);
+		if (s && s < size)
+			size = s;
+	}
+
+	return size;
+}
+EXPORT_SYMBOL_GPL(vdpa_get_vq_num_max);
+
+/**
  * vdpa_mgmtdev_register - register a vdpa management device
  *
  * @mdev: Pointer to vdpa management device
@@ -502,7 +522,7 @@ vdpa_dev_fill(struct vdpa_device *vdev, struct sk_buff *msg, u32 portid, u32 seq
 
 	device_id = vdev->config->get_device_id(vdev);
 	vendor_id = vdev->config->get_vendor_id(vdev);
-	max_vq_size = vdev->config->get_vq_num_max(vdev);
+	max_vq_size = vdpa_get_vq_num_max(vdev);
 
 	err = -EMSGSIZE;
 	if (nla_put_string(msg, VDPA_ATTR_DEV_NAME, dev_name(&vdev->dev)))

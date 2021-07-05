@@ -289,11 +289,14 @@ static long vhost_vdpa_set_features(struct vhost_vdpa *v, u64 __user *featurep)
 
 static long vhost_vdpa_get_vring_num(struct vhost_vdpa *v, u16 __user *argp)
 {
-	struct vdpa_device *vdpa = v->vdpa;
-	const struct vdpa_config_ops *ops = vdpa->config;
 	u16 num;
 
-	num = ops->get_vq_num_max(vdpa);
+	/*
+	 * VHOST_VDPA_GET_VRING_NUM asssumes a global max virtqueue
+	 * size. So we need to iterate all the virtqueue and return
+	 * the minimal one here.
+	 */
+	num = vdpa_get_vq_num_max(v->vdpa);
 
 	if (copy_to_user(argp, &num, sizeof(num)))
 		return -EFAULT;

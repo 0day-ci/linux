@@ -254,7 +254,7 @@ static void ifcvf_vdpa_set_status(struct vdpa_device *vdpa_dev, u8 status)
 	ifcvf_set_status(vf, status);
 }
 
-static u16 ifcvf_vdpa_get_vq_num_max(struct vdpa_device *vdpa_dev)
+static u16 ifcvf_vdpa_get_vq_num_max(struct vdpa_device *vdpa_dev, u16 qid)
 {
 	return IFCVF_QUEUE_MAX;
 }

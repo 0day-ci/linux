@@ -422,7 +422,7 @@ static void vdpasim_set_config_cb(struct vdpa_device *vdpa,
 	/* We don't support config interrupt */
 }
 
-static u16 vdpasim_get_vq_num_max(struct vdpa_device *vdpa)
+static u16 vdpasim_get_vq_num_max(struct vdpa_device *vdpa, u16 idx)
 {
 	return VDPASIM_QUEUE_MAX;
 }

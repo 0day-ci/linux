@@ -195,7 +195,7 @@ static void vp_vdpa_set_status(struct vdpa_device *vdpa, u8 status)
 		vp_vdpa_free_irq(vp_vdpa);
 }
 
-static u16 vp_vdpa_get_vq_num_max(struct vdpa_device *vdpa)
+static u16 vp_vdpa_get_vq_num_max(struct vdpa_device *vdpa, u16 qid)
 {
 	return VP_VDPA_QUEUE_MAX;
 }
