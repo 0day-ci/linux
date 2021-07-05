@@ -2050,7 +2050,8 @@ static int gsm_disconnect(struct gsm_mux *gsm)
 	del_timer_sync(&gsm->t2_timer);
 	/* Now we are sure T2 has stopped */
 
-	gsm_dlci_begin_close(dlci);
+	if (gsm->initiator)
+		gsm_dlci_begin_close(dlci);
 	wait_event_interruptible(gsm->event,
 				dlci->state == DLCI_CLOSED);
 
@@ -3027,7 +3028,8 @@ static void gsmtty_close(struct tty_struct *tty, struct file *filp)
 	mutex_unlock(&dlci->mutex);
 	if (tty_port_close_start(&dlci->port, tty, filp) == 0)
 		return;
-	gsm_dlci_begin_close(dlci);
+	if (dlci->gsm->initiator)
+		gsm_dlci_begin_close(dlci);
 	if (tty_port_initialized(&dlci->port) && C_HUPCL(tty))
 		tty_port_lower_dtr_rts(&dlci->port);
 	tty_port_close_end(&dlci->port, tty);
@@ -3038,10 +3040,12 @@ static void gsmtty_close(struct tty_struct *tty, struct file *filp)
 static void gsmtty_hangup(struct tty_struct *tty)
 {
 	struct gsm_dlci *dlci = tty->driver_data;
+	struct gsm_mux *gsm = dlci->gsm;
 	if (dlci->state == DLCI_CLOSED)
 		return;
 	tty_port_hangup(&dlci->port);
-	gsm_dlci_begin_close(dlci);
+	if (gsm->initiator)
+		gsm_dlci_begin_close(dlci);
 }
 
 static int gsmtty_write(struct tty_struct *tty, const unsigned char *buf,
