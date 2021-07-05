@@ -47,6 +47,14 @@ static int pm8916_pon_probe(struct platform_device *pdev)
 	struct pm8916_pon *pon;
 	int error;
 
+	if (device_property_present(&pdev->dev, "qcom,pon-reboot-not-used")) {
+		/*
+		 * Skip reboot-mode setup and registration if PON is not used
+		 * for passing reboot mode at all.
+		 */
+		goto done;
+	}
+
 	pon = devm_kzalloc(&pdev->dev, sizeof(*pon), GFP_KERNEL);
 	if (!pon)
 		return -ENOMEM;
@@ -75,6 +83,7 @@ static int pm8916_pon_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pon);
 
+done:
 	return devm_of_platform_populate(&pdev->dev);
 }
 
