@@ -2238,12 +2238,14 @@ void __init vm_area_add_early(struct vm_struct *vm)
  */
 void __init vm_area_register_early(struct vm_struct *vm, size_t align)
 {
-	static size_t vm_init_off __initdata;
+	unsigned long vm_start = VMALLOC_START;
+	struct vm_struct *tmp;
 	unsigned long addr;
 
-	addr = ALIGN(VMALLOC_START + vm_init_off, align);
-	vm_init_off = PFN_ALIGN(addr + vm->size) - VMALLOC_START;
+	for (tmp = vmlist; tmp; tmp = tmp->next)
+		vm_start = (unsigned long)tmp->addr + tmp->size;
 
+	addr = ALIGN(vm_start, align);
 	vm->addr = (void *)addr;
 
 	vm_area_add_early(vm);
