@@ -40,6 +40,11 @@ module_param_named(io_timeout, nvme_io_timeout, uint, 0644);
 MODULE_PARM_DESC(io_timeout, "timeout in seconds for I/O");
 EXPORT_SYMBOL_GPL(nvme_io_timeout);
 
+bool shutdown_type;
+EXPORT_SYMBOL_GPL(shutdown_type);
+module_param(shutdown_type, bool, 0644);
+MODULE_PARM_DESC(shutdown_type, "Type of controller shutdown");
+
 static unsigned char shutdown_timeout = 5;
 module_param(shutdown_timeout, byte, 0644);
 MODULE_PARM_DESC(shutdown_timeout, "timeout in seconds for controller shutdown");
@@ -2159,7 +2164,11 @@ int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
 	int ret;
 
 	ctrl->ctrl_config &= ~NVME_CC_SHN_MASK;
-	ctrl->ctrl_config |= NVME_CC_SHN_NORMAL;
+
+	if (shutdown_type)
+		ctrl->ctrl_config |= NVME_CC_SHN_ABRUPT;
+	else
+		ctrl->ctrl_config |= NVME_CC_SHN_NORMAL;
 
 	ret = ctrl->ops->reg_write32(ctrl, NVME_REG_CC, ctrl->ctrl_config);
 	if (ret)
