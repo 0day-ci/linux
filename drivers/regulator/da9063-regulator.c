@@ -412,6 +412,77 @@ static int da9063_ldo_set_suspend_mode(struct regulator_dev *rdev,
 	return regmap_field_write(regl->suspend_sleep, val);
 }
 
+static unsigned int da9063_get_overdrive_mask(const struct regulator_desc *desc)
+{
+	switch (desc->id) {
+	case DA9063_ID_BCORES_MERGED:
+	case DA9063_ID_BCORE1:
+		return DA9063_BCORE1_OD;
+	case DA9063_ID_BCORE2:
+		return DA9063_BCORE2_OD;
+	case DA9063_ID_BPRO:
+		return DA9063_BPRO_OD;
+	default:
+		return 0;
+	}
+}
+
+static int da9063_buck_set_current_limit(struct regulator_dev *rdev,
+					 int min_uA, int max_uA)
+{
+	struct da9063_regulator *regl = rdev_get_drvdata(rdev);
+	unsigned int mask, n_currents;
+	int ret, overdrive;
+	bool overdrive_changed = false;
+
+	mask = da9063_get_overdrive_mask(rdev->desc);
+	if (mask) {
+		n_currents = rdev->desc->n_current_limits;
+		if (n_currents == 0)
+			return -EINVAL;
+		if (max_uA > rdev->desc->curr_table[n_currents - 1]) {
+			overdrive = mask;
+			min_uA /= 2; // XXX: rounding ?
+			max_uA /= 2;
+		} else {
+			overdrive = 0;
+		}
+		ret = regmap_update_bits_check(regl->hw->regmap,
+					       DA9063_REG_CONFIG_H, mask,
+					       overdrive, &overdrive_changed);
+		if (ret < 0)
+			return ret;
+	}
+	ret = regulator_set_current_limit_regmap(rdev, min_uA, max_uA);
+	if (ret < 0 && overdrive_changed)
+		/* attempt to restore original overdrive state, ignore failure-
+		 * on-failure
+		 */
+		regmap_update_bits(regl->hw->regmap, DA9063_REG_CONFIG_H,
+				   mask, ~overdrive);
+	return ret;
+}
+
+static int da9063_buck_get_current_limit(struct regulator_dev *rdev)
+{
+	struct da9063_regulator *regl = rdev_get_drvdata(rdev);
+	int val, ret, limit;
+	unsigned int mask;
+
+	limit = regulator_get_current_limit_regmap(rdev);
+	if (limit < 0)
+		return limit;
+	mask = da9063_get_overdrive_mask(rdev->desc);
+	if (mask) {
+		ret = regmap_read(regl->hw->regmap, DA9063_REG_CONFIG_H, &val);
+		if (ret < 0)
+			return ret;
+		if (val & mask)
+			limit *= 2;
+	}
+	return limit;
+}
+
 static const struct regulator_ops da9063_buck_ops = {
 	.enable			= regulator_enable_regmap,
 	.disable		= regulator_disable_regmap,
@@ -419,8 +490,8 @@ static const struct regulator_ops da9063_buck_ops = {
 	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
 	.list_voltage		= regulator_list_voltage_linear,
-	.set_current_limit	= regulator_set_current_limit_regmap,
-	.get_current_limit	= regulator_get_current_limit_regmap,
+	.set_current_limit	= da9063_buck_set_current_limit,
+	.get_current_limit	= da9063_buck_get_current_limit,
 	.set_mode		= da9063_buck_set_mode,
 	.get_mode		= da9063_buck_get_mode,
 	.get_status		= da9063_buck_get_status,
