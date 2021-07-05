@@ -91,7 +91,6 @@ enum dpu_plane_qos {
  * struct dpu_plane - local dpu plane structure
  * @aspace: address space pointer
  * @csc_ptr: Points to dpu_csc_cfg structure to use for current
- * @mplane_list: List of multirect planes of the same pipe
  * @catalog: Points to dpu catalog structure
  * @revalidate: force revalidation of all the plane properties
  */
@@ -108,8 +107,6 @@ struct dpu_plane {
 	uint32_t color_fill;
 	bool is_error;
 	bool is_rt_pipe;
-	bool is_virtual;
-	struct list_head mplane_list;
 	struct dpu_mdss_cfg *catalog;
 
 	struct dpu_csc_cfg *csc_ptr;
@@ -237,7 +234,7 @@ static void _dpu_plane_calc_clk(struct drm_plane *plane)
 static int _dpu_plane_calc_fill_level(struct drm_plane *plane,
 		const struct dpu_format *fmt, u32 src_width)
 {
-	struct dpu_plane *pdpu, *tmp;
+	struct dpu_plane *pdpu;
 	struct dpu_plane_state *pstate;
 	u32 fixed_buff_size;
 	u32 total_fl;
@@ -251,16 +248,7 @@ static int _dpu_plane_calc_fill_level(struct drm_plane *plane,
 	pstate = to_dpu_plane_state(plane->state);
 	fixed_buff_size = pdpu->catalog->caps->pixel_ram_size;
 
-	list_for_each_entry(tmp, &pdpu->mplane_list, mplane_list) {
-		if (!tmp->base.state->visible)
-			continue;
-		DPU_DEBUG("plane%d/%d src_width:%d/%d\n",
-				pdpu->base.base.id, tmp->base.base.id,
-				src_width,
-				drm_rect_width(&tmp->pipe_cfg.src_rect));
-		src_width = max_t(u32, src_width,
-				  drm_rect_width(&tmp->pipe_cfg.src_rect));
-	}
+	/* FIXME: in multirect case account for the src_width of all the planes */
 
 	if (fmt->fetch_planes == DPU_PLANE_PSEUDO_PLANAR) {
 		if (fmt->chroma_sample == DPU_CHROMA_420) {
@@ -836,13 +824,8 @@ int dpu_plane_validate_multirect_v2(struct dpu_multirect_plane_states *plane)
 	}
 
 done:
-	if (dpu_plane[R0]->is_virtual) {
-		pstate[R0]->multirect_index = DPU_SSPP_RECT_1;
-		pstate[R1]->multirect_index = DPU_SSPP_RECT_0;
-	} else {
-		pstate[R0]->multirect_index = DPU_SSPP_RECT_0;
-		pstate[R1]->multirect_index = DPU_SSPP_RECT_1;
-	}
+	pstate[R0]->multirect_index = DPU_SSPP_RECT_0;
+	pstate[R1]->multirect_index = DPU_SSPP_RECT_1;
 
 	DPU_DEBUG_PLANE(dpu_plane[R0], "R0: %d - %d\n",
 		pstate[R0]->multirect_mode, pstate[R0]->multirect_index);
@@ -1218,19 +1201,13 @@ static void dpu_plane_sspp_atomic_update(struct drm_plane *plane)
 
 static void _dpu_plane_atomic_disable(struct drm_plane *plane)
 {
-	struct dpu_plane *pdpu = to_dpu_plane(plane);
 	struct drm_plane_state *state = plane->state;
 	struct dpu_plane_state *pstate = to_dpu_plane_state(state);
 
-	trace_dpu_plane_disable(DRMID(plane), is_dpu_plane_virtual(plane),
+	trace_dpu_plane_disable(DRMID(plane), false,
 				pstate->multirect_mode);
 
 	pstate->pending = true;
-
-	if (is_dpu_plane_virtual(plane) &&
-			pdpu->pipe_hw && pdpu->pipe_hw->ops.setup_multirect)
-		pdpu->pipe_hw->ops.setup_multirect(pdpu->pipe_hw,
-				DPU_SSPP_RECT_SOLO, DPU_SSPP_MULTIRECT_NONE);
 }
 
 static void dpu_plane_atomic_update(struct drm_plane *plane,
@@ -1556,17 +1533,12 @@ enum dpu_sspp dpu_plane_pipe(struct drm_plane *plane)
 	return plane ? to_dpu_plane(plane)->pipe : SSPP_NONE;
 }
 
-bool is_dpu_plane_virtual(struct drm_plane *plane)
-{
-	return plane ? to_dpu_plane(plane)->is_virtual : false;
-}
-
 /* initialize plane */
 struct drm_plane *dpu_plane_init(struct drm_device *dev,
 		uint32_t pipe, enum drm_plane_type type,
-		unsigned long possible_crtcs, u32 master_plane_id)
+		unsigned long possible_crtcs)
 {
-	struct drm_plane *plane = NULL, *master_plane = NULL;
+	struct drm_plane *plane = NULL;
 	const uint32_t *format_list;
 	struct dpu_plane *pdpu;
 	struct msm_drm_private *priv = dev->dev_private;
@@ -1586,18 +1558,9 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 	/* cache local stuff for later */
 	plane = &pdpu->base;
 	pdpu->pipe = pipe;
-	pdpu->is_virtual = (master_plane_id != 0);
-	INIT_LIST_HEAD(&pdpu->mplane_list);
-	master_plane = drm_plane_find(dev, NULL, master_plane_id);
-	if (master_plane) {
-		struct dpu_plane *mpdpu = to_dpu_plane(master_plane);
-
-		list_add_tail(&pdpu->mplane_list, &mpdpu->mplane_list);
-	}
 
 	/* initialize underlying h/w driver */
-	pdpu->pipe_hw = dpu_hw_sspp_init(pipe, kms->mmio, kms->catalog,
-							master_plane_id != 0);
+	pdpu->pipe_hw = dpu_hw_sspp_init(pipe, kms->mmio, kms->catalog);
 	if (IS_ERR(pdpu->pipe_hw)) {
 		DPU_ERROR("[%u]SSPP init failed\n", pipe);
 		ret = PTR_ERR(pdpu->pipe_hw);
@@ -1615,14 +1578,8 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 		goto clean_sspp;
 	}
 
-	if (pdpu->is_virtual) {
-		format_list = pdpu->pipe_sblk->virt_format_list;
-		num_formats = pdpu->pipe_sblk->virt_num_formats;
-	}
-	else {
-		format_list = pdpu->pipe_sblk->format_list;
-		num_formats = pdpu->pipe_sblk->num_formats;
-	}
+	format_list = pdpu->pipe_sblk->format_list;
+	num_formats = pdpu->pipe_sblk->num_formats;
 
 	ret = drm_universal_plane_init(dev, plane, 0xff, &dpu_plane_funcs,
 				format_list, num_formats,
@@ -1657,8 +1614,8 @@ struct drm_plane *dpu_plane_init(struct drm_device *dev,
 
 	mutex_init(&pdpu->lock);
 
-	DPU_DEBUG("%s created for pipe:%u id:%u virtual:%u\n", plane->name,
-					pipe, plane->base.id, master_plane_id);
+	DPU_DEBUG("%s created for pipe:%u id:%u\n", plane->name,
+					pipe, plane->base.id);
 	return plane;
 
 clean_sspp:
