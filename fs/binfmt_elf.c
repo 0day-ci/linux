@@ -1348,7 +1348,8 @@ static int load_elf_library(struct file *file)
 
 	/* First of all, some simple consistency checks */
 	if (elf_ex.e_type != ET_EXEC || elf_ex.e_phnum > 2 ||
-	    !elf_check_arch(&elf_ex) || !file->f_op->mmap)
+	    elf_ex.e_phnum == 0 || !elf_check_arch(&elf_ex) ||
+	    !file->f_op->mmap)
 		goto out;
 	if (elf_check_fdpic(&elf_ex))
 		goto out;
@@ -1356,7 +1357,7 @@ static int load_elf_library(struct file *file)
 	/* Now read in all of the header information */
 
 	j = sizeof(struct elf_phdr) * elf_ex.e_phnum;
-	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum <= 2 */
+	/* j < ELF_MIN_ALIGN because elf_ex.e_phnum is 1 or 2 */
 
 	error = -ENOMEM;
 	elf_phdata = kmalloc(j, GFP_KERNEL);
