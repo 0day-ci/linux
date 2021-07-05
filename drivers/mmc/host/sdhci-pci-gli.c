@@ -92,6 +92,9 @@
 #define PCIE_GLI_9763E_SCR	 0x8E0
 #define   GLI_9763E_SCR_AXI_REQ	   BIT(9)
 
+#define PCIE_GLI_9763E_CFG       0x8A0
+#define   GLI_9763E_CFG_LPSN_DIS   BIT(12)
+
 #define PCIE_GLI_9763E_CFG2      0x8A4
 #define   GLI_9763E_CFG2_L1DLY     GENMASK(28, 19)
 #define   GLI_9763E_CFG2_L1DLY_MID 0x54
@@ -135,6 +138,11 @@
 #define PCI_GLI_9755_SCP_DIS   BIT(19)
 
 #define GLI_MAX_TUNING_LOOP 40
+
+struct gli_host {
+	bool start_4k_r;
+	int continuous_4k_r;
+};
 
 /* Genesys Logic chipset */
 static inline void gl9750_wt_on(struct sdhci_host *host)
@@ -728,6 +736,62 @@ static void sdhci_gl9763e_dumpregs(struct mmc_host *mmc)
 	sdhci_dumpregs(mmc_priv(mmc));
 }
 
+static void gl9763e_set_low_power_negotiation(struct sdhci_pci_slot *slot, bool enable)
+{
+	struct pci_dev *pdev = slot->chip->pdev;
+	u32 value;
+
+	pci_read_config_dword(pdev, PCIE_GLI_9763E_VHS, &value);
+	value &= ~GLI_9763E_VHS_REV;
+	value |= FIELD_PREP(GLI_9763E_VHS_REV, GLI_9763E_VHS_REV_W);
+	pci_write_config_dword(pdev, PCIE_GLI_9763E_VHS, value);
+
+	pci_read_config_dword(pdev, PCIE_GLI_9763E_CFG, &value);
+
+	if (enable)
+		value &= ~GLI_9763E_CFG_LPSN_DIS;
+	else
+		value |= GLI_9763E_CFG_LPSN_DIS;
+
+	pci_write_config_dword(pdev, PCIE_GLI_9763E_CFG, value);
+
+	pci_read_config_dword(pdev, PCIE_GLI_9763E_VHS, &value);
+	value &= ~GLI_9763E_VHS_REV;
+	value |= FIELD_PREP(GLI_9763E_VHS_REV, GLI_9763E_VHS_REV_R);
+	pci_write_config_dword(pdev, PCIE_GLI_9763E_VHS, value);
+}
+
+static void gl9763e_request(struct mmc_host *mmc, struct mmc_request *mrq)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct mmc_command *cmd;
+	struct sdhci_pci_slot *slot = sdhci_priv(host);
+	struct gli_host *gli_host = sdhci_pci_priv(slot);
+
+	cmd = mrq->cmd;
+
+	if (cmd && (cmd->opcode == MMC_READ_MULTIPLE_BLOCK) && (cmd->data->blocks == 8)) {
+		gli_host->continuous_4k_r++;
+
+		if ((!gli_host->start_4k_r) && (gli_host->continuous_4k_r >= 3)) {
+			gl9763e_set_low_power_negotiation(slot, false);
+
+			gli_host->start_4k_r = true;
+		}
+	} else {
+		gli_host->continuous_4k_r = 0;
+
+		if (gli_host->start_4k_r)	{
+			gl9763e_set_low_power_negotiation(slot, true);
+
+			gli_host->start_4k_r = false;
+		}
+	}
+
+	sdhci_request(mmc, mrq);
+}
+
+
 static void sdhci_gl9763e_cqe_pre_enable(struct mmc_host *mmc)
 {
 	struct cqhci_host *cq_host = mmc->cqe_private;
@@ -885,6 +949,9 @@ static int gli_probe_slot_gl9763e(struct sdhci_pci_slot *slot)
 	gli_pcie_enable_msi(slot);
 	host->mmc_host_ops.hs400_enhanced_strobe =
 					gl9763e_hs400_enhanced_strobe;
+
+	host->mmc_host_ops.request = gl9763e_request;
+
 	gli_set_gl9763e(slot);
 	sdhci_enable_v4_mode(host);
 
@@ -950,4 +1017,5 @@ const struct sdhci_pci_fixes sdhci_gl9763e = {
 	.suspend	= sdhci_cqhci_gli_suspend,
 #endif
 	.add_host       = gl9763e_add_host,
+	.priv_size      = sizeof(struct gli_host),
 };
