@@ -309,6 +309,19 @@ config ARM_ARCH_TIMER_EVTSTREAM
 config ARM_ARCH_TIMER_OOL_WORKAROUND
 	bool
 
+config MARVELL_ERRATUM_38627
+	bool "Workaround for Marvell Erratum 38627"
+	default y
+	depends on ARM_ARCH_TIMER && ARM64
+	select ARM_ARCH_TIMER_OOL_WORKAROUND
+	help
+	  This option enables a workaround for Marvell Erratum
+	  38627. According to this errata CPU pipeline have
+	  unpredicted behavior when timer interrupt appears and
+	  then disappears prior to the exception happening.
+	  This Errata workaround is applicable only to some Marvell
+	  OcteonTX2 series of processors.
+
 config FSL_ERRATUM_A008585
 	bool "Workaround for Freescale/NXP Erratum A-008585"
 	default y
