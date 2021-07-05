@@ -23,6 +23,10 @@ properties:
   reg:
     maxItems: 1
 
+  qcom,pon-reboot-not-used:
+    description: Support of reboot mode passing through PON register is not used
+    type: boolean
+
 patternProperties:
   "^mode-.+":
     $ref: /schemas/types.yaml#/definitions/uint32
