@@ -273,7 +273,8 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
 	return __pgprot(PROT_DEVICE_nGnRnE);
 }
 
-void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
+static void __iomem *__acpi_os_ioremap(acpi_physical_address phys,
+				       acpi_size size, bool memory)
 {
 	efi_memory_desc_t *md, *region = NULL;
 	pgprot_t prot;
@@ -301,7 +302,8 @@ void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
 	 * regions that require a virtual mapping to make them accessible to
 	 * the EFI runtime services.
 	 */
-	prot = __pgprot(PROT_DEVICE_nGnRnE);
+	prot = memory ? __pgprot(PROT_NORMAL_NC) :
+			__pgprot(PROT_DEVICE_nGnRnE);
 	if (region) {
 		switch (region->type) {
 		case EFI_LOADER_CODE:
@@ -359,6 +361,16 @@ void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
 		}
 	}
 	return __ioremap(phys, size, prot);
+}
+
+void __iomem *acpi_os_ioremap(acpi_physical_address phys, acpi_size size)
+{
+	return __acpi_os_ioremap(phys, size, false);
+}
+
+void __iomem *acpi_os_memmap(acpi_physical_address phys, acpi_size size)
+{
+	return __acpi_os_ioremap(phys, size, true);
 }
 
 /*
