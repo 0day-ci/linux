@@ -68,6 +68,19 @@ config ARM_SCMI_TRANSPORT_SMC
 	  A matching DT entry will also be needed to indicate the effective
 	  presence of this kind of transport.
 
+config ARM_SCMI_TRANSPORT_VIRTIO
+	bool "SCMI transport based on VirtIO"
+	depends on ARM_SCMI_PROTOCOL && VIRTIO
+	select ARM_SCMI_HAVE_TRANSPORT
+	select ARM_SCMI_HAVE_MSG
+	help
+	  This enables the virtio based transport for SCMI.
+
+	  If you want the ARM SCMI PROTOCOL stack to include support for a
+	  transport based on VirtIO, answer Y.
+	  A matching DT entry will also be needed to indicate the effective
+	  presence of this kind of transport.
+
 config ARM_SCMI_POWER_DOMAIN
 	tristate "SCMI power domain driver"
 	depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)
