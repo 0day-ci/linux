@@ -3831,7 +3831,13 @@ static inline bool __should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 
 #endif /* CONFIG_FAIL_PAGE_ALLOC */
 
-static noinline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
+/*
+ * should_fail_alloc_page() is only called by page_alloc.c, however, is also
+ * included in a BTF IDs set and must remain non-static. Declare it to avoid a
+ * "missing prototypes" warning, and make it clear this is intentional.
+ */
+bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order);
+noinline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 {
 	return __should_fail_alloc_page(gfp_mask, order);
 }
