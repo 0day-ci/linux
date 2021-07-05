@@ -130,6 +130,7 @@ static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
 	long ref_clk = mdev->model.g200.ref_clk;
 	long p_clk_min = mdev->model.g200.pclk_min;
 	long p_clk_max =  mdev->model.g200.pclk_max;
+	u8 misc;
 
 	if (clock > p_clk_max) {
 		drm_err(dev, "Pixel Clock %ld too high\n", clock);
@@ -174,6 +175,11 @@ static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
 	drm_dbg_kms(dev, "clock: %ld vco: %ld m: %d n: %d p: %d s: %d\n",
 		    clock, f_vco, m, n, p, s);
 
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
+
 	WREG_DAC(MGA1064_PIX_PLLC_M, m);
 	WREG_DAC(MGA1064_PIX_PLLC_N, n);
 	WREG_DAC(MGA1064_PIX_PLLC_P, (p | (s << 3)));
@@ -194,6 +200,7 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 	unsigned int pvalues_e4[P_ARRAY_SIZE] = {16, 14, 12, 10, 8, 6, 4, 2, 1};
 	unsigned int fvv;
 	unsigned int i;
+	u8 misc;
 
 	if (unique_rev_id <= 0x03) {
 
@@ -289,6 +296,11 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 		return 1;
 	}
 
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
+
 	WREG_DAC(MGA1064_PIX_PLLC_M, m);
 	WREG_DAC(MGA1064_PIX_PLLC_N, n);
 	WREG_DAC(MGA1064_PIX_PLLC_P, p);
@@ -312,7 +324,7 @@ static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
 	unsigned int computed;
 	int i, j, tmpcount, vcount;
 	bool pll_locked = false;
-	u8 tmp;
+	u8 tmp, misc;
 
 	m = n = p = 0;
 
@@ -384,6 +396,11 @@ static int mga_g200wb_set_plls(struct mga_device *mdev, long clock)
 			}
 		}
 	}
+
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
 
 	for (i = 0; i <= 32 && pll_locked == false; i++) {
 		if (i > 0) {
@@ -489,7 +506,7 @@ static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
 	unsigned int testp, testm, testn;
 	unsigned int p, m, n;
 	unsigned int computed;
-	u8 tmp;
+	u8 tmp, misc;
 
 	m = n = p = 0;
 	vcomax = 550000;
@@ -521,6 +538,11 @@ static int mga_g200ev_set_plls(struct mga_device *mdev, long clock)
 			}
 		}
 	}
+
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
 
 	WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
 	tmp = RREG8(DAC_DATA);
@@ -583,7 +605,7 @@ static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
 	unsigned int p, m, n;
 	unsigned int computed;
 	int i, j, tmpcount, vcount;
-	u8 tmp;
+	u8 tmp, misc;
 	bool pll_locked = false;
 
 	m = n = p = 0;
@@ -654,6 +676,12 @@ static int mga_g200eh_set_plls(struct mga_device *mdev, long clock)
 			}
 		}
 	}
+
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
+
 	for (i = 0; i <= 32 && pll_locked == false; i++) {
 		WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
 		tmp = RREG8(DAC_DATA);
@@ -714,6 +742,7 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 	unsigned int p, m, n;
 	unsigned int computed, vco;
 	int tmp;
+	u8 misc;
 
 	m = n = p = 0;
 	vcomax = 1488000;
@@ -754,6 +783,11 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 		}
 	}
 
+	misc = RREG8(MGA_MISC_IN);
+	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
+	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
+	WREG8(MGA_MISC_OUT, misc);
+
 	WREG8(DAC_INDEX, MGA1064_PIX_CLK_CTL);
 	tmp = RREG8(DAC_DATA);
 	tmp |= MGA1064_PIX_CLK_CTL_CLK_DIS;
@@ -787,8 +821,6 @@ static int mga_g200er_set_plls(struct mga_device *mdev, long clock)
 
 static int mgag200_crtc_set_plls(struct mga_device *mdev, long clock)
 {
-	u8 misc;
-
 	switch(mdev->type) {
 	case G200_PCI:
 	case G200_AGP:
@@ -807,11 +839,6 @@ static int mgag200_crtc_set_plls(struct mga_device *mdev, long clock)
 	case G200_ER:
 		return mga_g200er_set_plls(mdev, clock);
 	}
-
-	misc = RREG8(MGA_MISC_IN);
-	misc &= ~MGAREG_MISC_CLK_SEL_MASK;
-	misc |= MGAREG_MISC_CLK_SEL_MGA_MSK;
-	WREG8(MGA_MISC_OUT, misc);
 
 	return 0;
 }
