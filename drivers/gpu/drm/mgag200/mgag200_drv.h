@@ -129,6 +129,8 @@ struct mgag200_pll_values {
 
 struct mgag200_crtc_state {
 	struct drm_crtc_state base;
+
+	struct mgag200_pll_values pixpll;
 };
 
 static inline struct mgag200_crtc_state *to_mgag200_crtc_state(struct drm_crtc_state *base)
