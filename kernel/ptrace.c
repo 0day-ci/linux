@@ -32,6 +32,7 @@
 #include <linux/compat.h>
 #include <linux/sched/signal.h>
 #include <linux/minmax.h>
+#include <linux/coredump.h>
 
 #include <asm/syscall.h>	/* for syscall_get_* */
 
@@ -377,6 +378,8 @@ static int ptrace_attach(struct task_struct *task, long request,
 {
 	bool seize = (request == PTRACE_SEIZE);
 	int retval;
+	bool core_state = false;
+	bool core_trace_allowed = false;
 
 	retval = -EIO;
 	if (seize) {
@@ -408,9 +411,16 @@ static int ptrace_attach(struct task_struct *task, long request,
 
 	task_lock(task);
 	retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+	if (unlikely(task->mm->core_state))
+		core_state = true;
 	task_unlock(task);
 	if (retval)
 		goto unlock_creds;
+
+	if (!seize && unlikely(core_state)) {
+		if (cdh_ptrace_allowed(task))
+			core_trace_allowed = true;
+	}
 
 	write_lock_irq(&tasklist_lock);
 	retval = -EPERM;
@@ -430,6 +440,13 @@ static int ptrace_attach(struct task_struct *task, long request,
 		send_sig_info(SIGSTOP, SEND_SIG_PRIV, task);
 
 	spin_lock(&task->sighand->siglock);
+
+	/*
+	 * Core state process does not process signals normally.
+	 * set directly to TASK_TRACED if allowed by cdh_ptrace_allowed.
+	 */
+	if (core_trace_allowed)
+		task->state = TASK_TRACED;
 
 	/*
 	 * If the task is already STOPPED, set JOBCTL_TRAP_STOP and
@@ -836,6 +853,8 @@ static int ptrace_resume(struct task_struct *child, long request,
 			 unsigned long data)
 {
 	bool need_siglock;
+
+	cdh_signal_continue(child);
 
 	if (!valid_signal(data))
 		return -EIO;

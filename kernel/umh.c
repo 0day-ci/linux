@@ -107,6 +107,7 @@ static int call_usermodehelper_exec_async(void *data)
 	}
 
 	commit_creds(new);
+	sub_info->pid = task_pid_nr(current);
 
 	wait_for_initramfs();
 	retval = kernel_execve(sub_info->path,
@@ -133,10 +134,12 @@ static void call_usermodehelper_exec_sync(struct subprocess_info *sub_info)
 	/* If SIGCLD is ignored do_wait won't populate the status. */
 	kernel_sigaction(SIGCHLD, SIG_DFL);
 	pid = kernel_thread(call_usermodehelper_exec_async, sub_info, SIGCHLD);
-	if (pid < 0)
+	if (pid < 0) {
 		sub_info->retval = pid;
-	else
+	} else {
+		sub_info->pid = pid;
 		kernel_wait(pid, &sub_info->retval);
+	}
 
 	/* Restore default kernel sig handler */
 	kernel_sigaction(SIGCHLD, SIG_IGN);

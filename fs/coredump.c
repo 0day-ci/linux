@@ -41,6 +41,7 @@
 #include <linux/fs.h>
 #include <linux/path.h>
 #include <linux/timekeeping.h>
+#include <linux/jiffies.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -61,6 +62,64 @@ struct core_name {
 	char *corename;
 	int used, size;
 };
+
+DEFINE_MUTEX(cdh_mutex);
+LIST_HEAD(cdh_list);
+
+/**
+ * struct cdh_entry - core dump helper (cdh) entry
+ * @cdh_list_link: cdh linked list reference
+ * @task_being_dumped: pointer to a task being core-dumped
+ * @ptrace_done: completion used to wait for ptrace operation by cdh to be done
+ * @helper_pid: PID of the core dump user-space helper process
+ */
+struct cdh_entry {
+	struct list_head cdh_list_link;
+	struct task_struct *task_being_dumped;
+	struct completion ptrace_done;
+	pid_t helper_pid;
+};
+
+/**
+ * cdh_link_current_locked() - Adds a new entry for the current task
+ *                             to the cdh linked list.
+ * @pid: PID of the core dump user-space helper process.
+ *
+ * If a core dump user-space helper process is configured in core_pattern,
+ * a cdh_entry, used to track the user-space helper PID,
+ * so it can be allowed to ptrace the task being core-dumped,
+ * and enable the task being core-dumped to await a potential ptrace operation
+ * by the user-space helper to finish,
+ * is created when the user-space helper process is started by kernel.
+ *
+ * Context: Expects the cdh_mutex to be held when called.
+ */
+static void cdh_link_current_locked(pid_t pid);
+
+/**
+ * cdh_unlink_current() - Removes the current task's cdh_entry from the list.
+ *
+ * When the core dump of the current task is finished,
+ * its corresponding cdh_entry is removed by calling this function.
+ *
+ * Context: Takes and releases the cdh_mutex.
+ */
+static void cdh_unlink_current(void);
+
+/**
+ * cdh_get_entry_for_current() - Returns a pointer to the cdh_entry
+ *                               for the current task.
+ *
+ * Called by __dump_emit to get the current task's cdh_entry
+ * and sleep on the ptrace_done completion object therein,
+ * waiting for ptrace to complete, if ptrace operation for it
+ * was started by the core dump user-space helper tracer.
+ *
+ * Context: Iterates over cdh_entry list without taking the cdh_mutex,
+ *          as it is safe to assume the cdh_entry it will return, if any,
+ *          is stably in the list at the time of calling.
+ */
+static struct cdh_entry *cdh_get_entry_for_current(void);
 
 /* The maximal length of core_pattern is also specified in sysctl.c */
 
@@ -692,9 +751,14 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		sub_info = call_usermodehelper_setup(helper_argv[0],
 						helper_argv, NULL, GFP_KERNEL,
 						umh_pipe_setup, NULL, &cprm);
-		if (sub_info)
+		if (sub_info) {
+			mutex_lock(&cdh_mutex);
 			retval = call_usermodehelper_exec(sub_info,
 							  UMH_WAIT_EXEC);
+			if (!retval)
+				cdh_link_current_locked(sub_info->pid);
+			mutex_unlock(&cdh_mutex);
+		}
 
 		kfree(helper_argv);
 		if (retval) {
@@ -833,6 +897,7 @@ fail_unlock:
 	kfree(argv);
 	kfree(cn.corename);
 	coredump_finish(mm, core_dumped);
+	cdh_unlink_current();
 	revert_creds(old_cred);
 fail_creds:
 	put_cred(cred);
@@ -850,6 +915,11 @@ static int __dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 	struct file *file = cprm->file;
 	loff_t pos = file->f_pos;
 	ssize_t n;
+	struct cdh_entry *entry;
+
+	entry = cdh_get_entry_for_current();
+	if (entry)
+		wait_for_completion_timeout(&(entry->ptrace_done, msecs_to_jiffies(5 * 60 * 1000));
 	if (cprm->written + nr > cprm->limit)
 		return 0;
 
@@ -1132,4 +1202,82 @@ int dump_vma_snapshot(struct coredump_params *cprm, int *vma_count,
 
 	*vma_data_size_ptr = vma_data_size;
 	return 0;
+}
+
+void cdh_link_current_locked(pid_t pid)
+{
+	struct cdh_entry *entry;
+
+	entry = kzalloc(sizeof(struct cdh_entry), GFP_KERNEL);
+	if (!entry)
+		return;
+	entry->task_being_dumped = current;
+	entry->helper_pid = pid;
+	init_completion(&(entry->ptrace_done));
+	/*
+	 * Instantly complete_all the ptrace_done completion,
+	 * as it should only be awaited if and when the ptrace
+	 * operation by the core dump user-space helper has been started,
+	 * in which case the completion object will be reinited.
+	 */
+	complete_all(&(entry->ptrace_done));
+	list_add(&entry->cdh_list_link, &cdh_list);
+}
+
+void cdh_unlink_current(void)
+{
+	struct cdh_entry *entry, *next;
+
+	mutex_lock(&cdh_mutex);
+	list_for_each_entry_safe(entry, next, &cdh_list, cdh_list_link) {
+		if (entry->task_being_dumped == current) {
+			list_del(&entry->cdh_list_link);
+			kfree(entry);
+			break;
+		}
+	}
+	mutex_unlock(&cdh_mutex);
+}
+
+bool cdh_ptrace_allowed(struct task_struct *task)
+{
+	struct cdh_entry *entry;
+
+	mutex_lock(&cdh_mutex);
+	list_for_each_entry(entry, &cdh_list, cdh_list_link) {
+		if (task_tgid_nr(entry->task_being_dumped) == task_tgid_nr(task)
+		    && entry->helper_pid == task_tgid_nr(current)) {
+			reinit_completion(&(entry->ptrace_done));
+			wait_task_inactive(entry->task_being_dumped, 0);
+			mutex_unlock(&cdh_mutex);
+			return true;
+		}
+	}
+	mutex_unlock(&cdh_mutex);
+	return false;
+}
+
+void cdh_signal_continue(struct task_struct *task)
+{
+	struct cdh_entry *entry;
+
+	mutex_lock(&cdh_mutex);
+	list_for_each_entry(entry, &cdh_list, cdh_list_link) {
+		if (task_tgid_nr(entry->task_being_dumped) == task_tgid_nr(task)) {
+			complete_all(&(entry->ptrace_done));
+			break;
+		}
+	}
+	mutex_unlock(&cdh_mutex);
+}
+
+struct cdh_entry *cdh_get_entry_for_current(void)
+{
+	struct cdh_entry *entry;
+
+	list_for_each_entry(entry, &cdh_list, cdh_list_link) {
+		if (entry->task_being_dumped == current)
+			return entry;
+	}
+	return NULL;
 }
