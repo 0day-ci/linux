@@ -912,8 +912,10 @@ static ssize_t amdgpu_ras_debugfs_table_read(struct file *f, char __user *buf,
 				 record.retired_page);
 
 			data_len = min_t(size_t, rec_hdr_fmt_size - r, size);
-			if (copy_to_user(buf, &data[r], data_len))
-				return -EINVAL;
+			if (copy_to_user(buf, &data[r], data_len)) {
+				res = -EINVAL;
+				goto Out;
+			}
 			buf += data_len;
 			size -= data_len;
 			*pos += data_len;
