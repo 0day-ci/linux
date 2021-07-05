@@ -134,7 +134,7 @@ static int mgag200_g200_set_plls(struct mga_device *mdev, long clock)
 
 	if (clock > p_clk_max) {
 		drm_err(dev, "Pixel Clock %ld too high\n", clock);
-		return 1;
+		return -EINVAL;
 	}
 
 	if (clock < p_clk_min >> 3)
@@ -293,7 +293,7 @@ static int mga_g200se_set_plls(struct mga_device *mdev, long clock)
 
 	if (delta > permitteddelta) {
 		pr_warn("PLL delta too large\n");
-		return 1;
+		return -EINVAL;
 	}
 
 	misc = RREG8(MGA_MISC_IN);
