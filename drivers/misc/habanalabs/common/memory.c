@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
 /*
- * Copyright 2016-2019 HabanaLabs, Ltd.
+ * Copyright 2016-2021 HabanaLabs, Ltd.
  * All Rights Reserved.
  */
 
@@ -11,11 +11,19 @@
 
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/pci-p2pdma.h>
 
 #define HL_MMU_DEBUG	0
 
 /* use small pages for supporting non-pow2 (32M/40M/48M) DRAM phys page sizes */
-#define DRAM_POOL_PAGE_SIZE SZ_8M
+#define DRAM_POOL_PAGE_SIZE		SZ_8M
+
+/* dma-buf alignment requirements when exporting memory with address/size */
+#define DMA_BUF_MEM_ADDR_ALIGNMENT	SZ_32M
+#define DMA_BUF_MEM_SIZE_ALIGNMENT	SZ_32M
+
+/* dma-buf chunk size cannot exceed the scatterlist "unsigned int" length */
+#define DMA_BUF_CHUNK_MAX_SIZE		SZ_512M
 
 /*
  * The va ranges in context object contain a list with the available chunks of
@@ -343,6 +351,13 @@ static int free_device_memory(struct hl_ctx *ctx, struct hl_mem_in *args)
 		if (atomic_read(&phys_pg_pack->mapping_cnt) > 0) {
 			dev_err(hdev->dev, "handle %u is mapped, cannot free\n",
 				handle);
+			spin_unlock(&vm->idr_lock);
+			return -EINVAL;
+		}
+
+		if (phys_pg_pack->exporting_cnt) {
+			dev_err(hdev->dev,
+				"handle %u is exported, cannot free\n",	handle);
 			spin_unlock(&vm->idr_lock);
 			return -EINVAL;
 		}
@@ -1411,13 +1426,444 @@ int hl_hw_block_mmap(struct hl_fpriv *hpriv, struct vm_area_struct *vma)
 	return 0;
 }
 
+static int alloc_sgt_from_device_pages(struct hl_device *hdev,
+					struct sg_table **sgt, u64 *pages,
+					u64 npages, u64 page_size,
+					struct device *dev,
+					enum dma_data_direction dir)
+{
+	struct asic_fixed_properties *prop;
+	int rc, i, j, nents, cur_page;
+	u64 chunk_size, bar_address;
+	struct scatterlist *sg;
+	dma_addr_t addr;
+
+	prop = &hdev->asic_prop;
+
+	*sgt = kzalloc(sizeof(**sgt), GFP_KERNEL);
+	if (!*sgt)
+		return -ENOMEM;
+
+	/* Get number of non-contiguous chunks */
+	for (i = 1, nents = 1, chunk_size = page_size ; i < npages ; i++) {
+		if (pages[i - 1] + page_size != pages[i] ||
+				chunk_size + page_size >
+					DMA_BUF_CHUNK_MAX_SIZE) {
+			nents++;
+			chunk_size = page_size;
+			continue;
+		}
+
+		chunk_size += page_size;
+	}
+
+	rc = sg_alloc_table(*sgt, nents, GFP_KERNEL | __GFP_ZERO);
+	if (rc)
+		goto error_free;
+
+	/* Merge pages and put them into the scatterlist */
+	cur_page = 0;
+	for_each_sgtable_sg((*sgt), sg, i) {
+		chunk_size = page_size;
+		for (j = cur_page + 1 ; j < npages ; j++) {
+			if (pages[j - 1] + page_size != pages[j] ||
+					chunk_size + page_size >
+						DMA_BUF_CHUNK_MAX_SIZE)
+				break;
+			chunk_size += page_size;
+		}
+
+		bar_address = hdev->dram_pci_bar_start +
+				(pages[cur_page] - prop->dram_base_address);
+
+		addr = dma_map_resource(dev, bar_address, chunk_size, dir,
+					DMA_ATTR_SKIP_CPU_SYNC);
+		rc = dma_mapping_error(dev, addr);
+		if (rc)
+			goto error_unmap;
+
+		sg_set_page(sg, NULL, chunk_size, 0);
+		sg_dma_address(sg) = addr;
+		sg_dma_len(sg) = chunk_size;
+
+		cur_page = j;
+	}
+
+	return 0;
+
+error_unmap:
+	for_each_sgtable_sg((*sgt), sg, i) {
+		if (!sg_dma_len(sg))
+			continue;
+
+		dma_unmap_resource(dev, sg_dma_address(sg),
+					sg_dma_len(sg), dir,
+					DMA_ATTR_SKIP_CPU_SYNC);
+	}
+
+	sg_free_table(*sgt);
+
+error_free:
+	kfree(*sgt);
+	return rc;
+}
+
+static int hl_dmabuf_attach(struct dma_buf *dmabuf,
+				struct dma_buf_attachment *attachment)
+{
+	struct hl_dmabuf_wrapper *hl_dmabuf;
+	struct hl_device *hdev;
+	int rc;
+
+	hl_dmabuf = dmabuf->priv;
+	hdev = hl_dmabuf->ctx->hdev;
+
+	rc = pci_p2pdma_distance_many(hdev->pdev, &attachment->dev, 1, true);
+
+	if (rc < 0)
+		attachment->peer2peer = false;
+
+	return 0;
+}
+
+static struct sg_table *hl_map_dmabuf(struct dma_buf_attachment *attachment,
+					enum dma_data_direction dir)
+{
+	struct dma_buf *dma_buf = attachment->dmabuf;
+	struct hl_vm_phys_pg_pack *phys_pg_pack;
+	struct hl_dmabuf_wrapper *hl_dmabuf;
+	struct hl_device *hdev;
+	struct sg_table *sgt;
+	int rc;
+
+	hl_dmabuf = dma_buf->priv;
+	hdev = hl_dmabuf->ctx->hdev;
+	phys_pg_pack = hl_dmabuf->phys_pg_pack;
+
+	if (!attachment->peer2peer) {
+		dev_err(hdev->dev,
+			"Failed to map dmabuf because p2p is disabled\n");
+		return ERR_PTR(-EPERM);
+	}
+
+	if (phys_pg_pack)
+		rc = alloc_sgt_from_device_pages(hdev, &sgt,
+						phys_pg_pack->pages,
+						phys_pg_pack->npages,
+						phys_pg_pack->page_size,
+						attachment->dev,
+						dir);
+	else
+		rc = alloc_sgt_from_device_pages(hdev, &sgt,
+						hl_dmabuf->pages,
+						hl_dmabuf->npages,
+						hl_dmabuf->page_size,
+						attachment->dev,
+						dir);
+
+	if (rc) {
+		dev_err(hdev->dev,
+			"failed (%d) to initialize sgt for dmabuf\n",
+			rc);
+		return ERR_PTR(rc);
+	}
+
+	return sgt;
+}
+
+static void hl_unmap_dmabuf(struct dma_buf_attachment *attachment,
+				  struct sg_table *sgt,
+				  enum dma_data_direction dir)
+{
+	struct scatterlist *sg;
+	int i;
+
+	for_each_sgtable_sg(sgt, sg, i)
+		dma_unmap_resource(attachment->dev, sg_dma_address(sg),
+					sg_dma_len(sg), dir,
+					DMA_ATTR_SKIP_CPU_SYNC);
+	sg_free_table(sgt);
+	kfree(sgt);
+}
+
+static void hl_release_dmabuf(struct dma_buf *dmabuf)
+{
+	struct hl_dmabuf_wrapper *hl_dmabuf = dmabuf->priv;
+	struct hl_ctx *ctx = hl_dmabuf->ctx;
+	struct hl_device *hdev = ctx->hdev;
+	struct hl_vm *vm = &hdev->vm;
+
+	if (hl_dmabuf->phys_pg_pack) {
+		spin_lock(&vm->idr_lock);
+		hl_dmabuf->phys_pg_pack->exporting_cnt--;
+		spin_unlock(&vm->idr_lock);
+	}
+
+	hl_ctx_put(hl_dmabuf->ctx);
+
+	kfree(hl_dmabuf->pages);
+	kfree(hl_dmabuf);
+}
+
+static const struct dma_buf_ops habanalabs_dmabuf_ops = {
+	.attach = hl_dmabuf_attach,
+	.map_dma_buf = hl_map_dmabuf,
+	.unmap_dma_buf = hl_unmap_dmabuf,
+	.release = hl_release_dmabuf,
+};
+
+static int export_dmabuf_common(struct hl_ctx *ctx,
+				struct hl_dmabuf_wrapper *hl_dmabuf,
+				u64 total_size, int flags, int *dmabuf_fd)
+{
+	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
+	struct hl_device *hdev = ctx->hdev;
+	int rc, fd;
+
+	exp_info.ops = &habanalabs_dmabuf_ops;
+	exp_info.size = total_size;
+	exp_info.flags = flags;
+	exp_info.priv = hl_dmabuf;
+
+	hl_dmabuf->dmabuf = dma_buf_export(&exp_info);
+	if (IS_ERR(hl_dmabuf->dmabuf)) {
+		dev_err(hdev->dev, "failed to export dma-buf\n");
+		return PTR_ERR(hl_dmabuf->dmabuf);
+	}
+
+	fd = dma_buf_fd(hl_dmabuf->dmabuf, flags);
+	if (fd < 0) {
+		dev_err(hdev->dev,
+			"failed to get a file descriptor for a dma-buf\n");
+		rc = fd;
+		goto err_dma_buf_put;
+	}
+
+	hl_dmabuf->ctx = ctx;
+	hl_ctx_get(hdev, hl_dmabuf->ctx);
+
+	*dmabuf_fd = fd;
+
+	return 0;
+
+err_dma_buf_put:
+	dma_buf_put(hl_dmabuf->dmabuf);
+	return rc;
+}
+
+/**
+ * export_dmabuf_from_addr() - export a dma-buf object for the given memory
+ *                             address and size.
+ * @ctx: pointer to the context structure.
+ * @device_addr:  device memory physical address.
+ * @size: size of device memory.
+ * @flags: DMA-BUF file/FD flags.
+ * @dmabuf_fd: pointer to result FD that represents the dma-buf object.
+ *
+ * Create and export a dma-buf object for an existing memory allocation inside
+ * the device memory, and return a FD which is associated with the dma-buf
+ * object.
+ *
+ * Return: 0 on success, non-zero for failure.
+ */
+static int export_dmabuf_from_addr(struct hl_ctx *ctx, u64 device_addr,
+					u64 size, int flags, int *dmabuf_fd)
+{
+	struct hl_dmabuf_wrapper *hl_dmabuf;
+	struct hl_device *hdev = ctx->hdev;
+	struct asic_fixed_properties *prop;
+	u64 bar_address;
+	int rc, i;
+
+	prop = &hdev->asic_prop;
+
+	if (!IS_ALIGNED(device_addr, DMA_BUF_MEM_ADDR_ALIGNMENT)) {
+		dev_err_ratelimited(hdev->dev,
+			"address of exported device memory should be aligned to 0x%x, address 0x%llx\n",
+			DMA_BUF_MEM_ADDR_ALIGNMENT, device_addr);
+		return -EINVAL;
+	}
+
+	if (!size) {
+		dev_err_ratelimited(hdev->dev,
+			"size of exported device memory should be greater than 0\n");
+		return -EINVAL;
+	}
+
+	if (!IS_ALIGNED(size, DMA_BUF_MEM_SIZE_ALIGNMENT)) {
+		dev_err_ratelimited(hdev->dev,
+			"size of exported device memory should be aligned to 0x%x, size 0x%llx\n",
+			DMA_BUF_MEM_SIZE_ALIGNMENT, device_addr);
+		return -EINVAL;
+	}
+
+	if (device_addr < prop->dram_user_base_address ||
+				device_addr + size > prop->dram_end_address ||
+				device_addr + size < device_addr) {
+		dev_err_ratelimited(hdev->dev,
+			"DRAM memory range is outside of DRAM boundaries, address 0x%llx, size 0x%llx\n",
+			device_addr, size);
+		return -EINVAL;
+	}
+
+	bar_address = hdev->dram_pci_bar_start +
+			(device_addr - prop->dram_base_address);
+
+	if (bar_address + size >
+			hdev->dram_pci_bar_start + prop->dram_pci_bar_size ||
+			bar_address + size < bar_address) {
+		dev_err_ratelimited(hdev->dev,
+			"DRAM memory range is outside of PCI BAR boundaries, address 0x%llx, size 0x%llx\n",
+			device_addr, size);
+		return -EINVAL;
+	}
+
+	hl_dmabuf = kzalloc(sizeof(*hl_dmabuf), GFP_KERNEL);
+	if (!hl_dmabuf)
+		return -ENOMEM;
+
+	/* In case we got a large memory area to export, we need to divide it
+	 * to smaller areas because each entry in the dmabuf sgt can only
+	 * describe unsigned int.
+	 */
+	if (size > DMA_BUF_CHUNK_MAX_SIZE) {
+		hl_dmabuf->page_size = DMA_BUF_MEM_SIZE_ALIGNMENT;
+		hl_dmabuf->npages = div_u64(size, hl_dmabuf->page_size);
+	} else {
+		hl_dmabuf->page_size = size;
+		hl_dmabuf->npages = 1;
+	}
+
+	hl_dmabuf->pages = kcalloc(hl_dmabuf->npages, sizeof(*hl_dmabuf->pages),
+								GFP_KERNEL);
+	if (!hl_dmabuf->pages) {
+		rc = -ENOMEM;
+		goto err_free_dmabuf_wrapper;
+	}
+
+	for (i = 0 ; i < hl_dmabuf->npages ; i++)
+		hl_dmabuf->pages[i] = device_addr +
+					i * hl_dmabuf->page_size;
+
+	rc = export_dmabuf_common(ctx, hl_dmabuf, size, flags, dmabuf_fd);
+	if (rc)
+		goto err_free_pages;
+
+	return 0;
+
+err_free_pages:
+	kfree(hl_dmabuf->pages);
+err_free_dmabuf_wrapper:
+	kfree(hl_dmabuf);
+	return rc;
+}
+
+/**
+ * export_dmabuf_from_handle() - export a dma-buf object for the given memory
+ *                               handle.
+ * @ctx: pointer to the context structure.
+ * @handle: device memory allocation handle.
+ * @flags: DMA-BUF file/FD flags.
+ * @dmabuf_fd: pointer to result FD that represents the dma-buf object.
+ *
+ * Create and export a dma-buf object for an existing memory allocation inside
+ * the device memory, and return a FD which is associated with the dma-buf
+ * object.
+ *
+ * Return: 0 on success, non-zero for failure.
+ */
+static int export_dmabuf_from_handle(struct hl_ctx *ctx, u64 handle, int flags,
+					int *dmabuf_fd)
+{
+	struct hl_vm_phys_pg_pack *phys_pg_pack;
+	struct hl_dmabuf_wrapper *hl_dmabuf;
+	struct hl_device *hdev = ctx->hdev;
+	struct asic_fixed_properties *prop;
+	struct hl_vm *vm = &hdev->vm;
+	u64 bar_address;
+	u32 idr_handle;
+	int rc, i;
+
+	prop = &hdev->asic_prop;
+
+	idr_handle = lower_32_bits(handle);
+
+	spin_lock(&vm->idr_lock);
+
+	phys_pg_pack = idr_find(&vm->phys_pg_pack_handles, idr_handle);
+	if (!phys_pg_pack) {
+		spin_unlock(&vm->idr_lock);
+		dev_err_ratelimited(hdev->dev, "no match for handle 0x%x\n",
+				idr_handle);
+		return -EINVAL;
+	}
+
+	/* increment now to avoid freeing device memory while exporting */
+	phys_pg_pack->exporting_cnt++;
+
+	spin_unlock(&vm->idr_lock);
+
+	if (phys_pg_pack->vm_type != VM_TYPE_PHYS_PACK) {
+		dev_err_ratelimited(hdev->dev,
+				"handle 0x%llx is not for DRAM memory\n",
+				handle);
+		rc = -EINVAL;
+		goto err_dec_exporting_cnt;
+	}
+
+	for (i = 0 ; i < phys_pg_pack->npages ; i++) {
+
+		bar_address = hdev->dram_pci_bar_start +
+						(phys_pg_pack->pages[i] -
+						prop->dram_base_address);
+
+		if (bar_address + phys_pg_pack->page_size >
+			hdev->dram_pci_bar_start + prop->dram_pci_bar_size ||
+			bar_address + phys_pg_pack->page_size < bar_address) {
+
+			dev_err_ratelimited(hdev->dev,
+				"DRAM memory range is outside of PCI BAR boundaries, address 0x%llx, size 0x%x\n",
+				phys_pg_pack->pages[i],
+				phys_pg_pack->page_size);
+
+			rc = -EINVAL;
+			goto err_dec_exporting_cnt;
+		}
+	}
+
+	hl_dmabuf = kzalloc(sizeof(*hl_dmabuf), GFP_KERNEL);
+	if (!hl_dmabuf) {
+		rc = -ENOMEM;
+		goto err_dec_exporting_cnt;
+	}
+
+	hl_dmabuf->phys_pg_pack = phys_pg_pack;
+
+	rc = export_dmabuf_common(ctx, hl_dmabuf, phys_pg_pack->total_size,
+				flags, dmabuf_fd);
+	if (rc)
+		goto err_free_dmabuf_wrapper;
+
+	return 0;
+
+err_free_dmabuf_wrapper:
+	kfree(hl_dmabuf);
+
+err_dec_exporting_cnt:
+	spin_lock(&vm->idr_lock);
+	phys_pg_pack->exporting_cnt--;
+	spin_unlock(&vm->idr_lock);
+
+	return rc;
+}
+
 static int mem_ioctl_no_mmu(struct hl_fpriv *hpriv, union hl_mem_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
 	struct hl_ctx *ctx = hpriv->ctx;
 	u64 block_handle, device_addr = 0;
 	u32 handle = 0, block_size;
-	int rc;
+	int rc, dmabuf_fd = -EBADF;
 
 	switch (args->in.op) {
 	case HL_MEM_OP_ALLOC:
@@ -1466,6 +1912,22 @@ static int mem_ioctl_no_mmu(struct hl_fpriv *hpriv, union hl_mem_args *args)
 		args->out.block_size = block_size;
 		break;
 
+	case HL_MEM_OP_EXPORT_DMABUF_FD:
+		if (hdev->asic_prop.dram_supports_virtual_memory)
+			rc = export_dmabuf_from_handle(ctx,
+					args->in.export_dmabuf_fd.handle,
+					args->in.flags,
+					&dmabuf_fd);
+		else
+			rc = export_dmabuf_from_addr(ctx,
+					args->in.export_dmabuf_fd.handle,
+					args->in.export_dmabuf_fd.mem_size,
+					args->in.flags,
+					&dmabuf_fd);
+		memset(args, 0, sizeof(*args));
+		args->out.fd = dmabuf_fd;
+		break;
+
 	default:
 		dev_err(hdev->dev, "Unknown opcode for memory IOCTL\n");
 		rc = -ENOTTY;
@@ -1484,7 +1946,7 @@ int hl_mem_ioctl(struct hl_fpriv *hpriv, void *data)
 	struct hl_ctx *ctx = hpriv->ctx;
 	u64 block_handle, device_addr = 0;
 	u32 handle = 0, block_size;
-	int rc;
+	int rc, dmabuf_fd = -EBADF;
 
 	if (!hl_device_operational(hdev, &status)) {
 		dev_warn_ratelimited(hdev->dev,
@@ -1573,6 +2035,16 @@ int hl_mem_ioctl(struct hl_fpriv *hpriv, void *data)
 				&block_handle, &block_size);
 		args->out.block_handle = block_handle;
 		args->out.block_size = block_size;
+		break;
+
+	case HL_MEM_OP_EXPORT_DMABUF_FD:
+		rc = export_dmabuf_from_addr(ctx,
+				args->in.export_dmabuf_fd.handle,
+				args->in.export_dmabuf_fd.mem_size,
+				args->in.flags,
+				&dmabuf_fd);
+		memset(args, 0, sizeof(*args));
+		args->out.fd = dmabuf_fd;
 		break;
 
 	default:
