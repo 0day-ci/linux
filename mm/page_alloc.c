@@ -5309,7 +5309,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 		}
 		nr_account++;
 
-		prep_new_page(page, 0, gfp, 0);
+		prep_new_page(page, 0, gfp | GFP_ATOMIC, 0);
 		if (page_list)
 			list_add(&page->lru, page_list);
 		else
