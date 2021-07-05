@@ -127,6 +127,15 @@ struct mgag200_pll_values {
 	unsigned int s;
 };
 
+struct mgag200_crtc_state {
+	struct drm_crtc_state base;
+};
+
+static inline struct mgag200_crtc_state *to_mgag200_crtc_state(struct drm_crtc_state *base)
+{
+	return container_of(base, struct mgag200_crtc_state, base);
+}
+
 #define to_mga_connector(x) container_of(x, struct mga_connector, base)
 
 struct mga_i2c_chan {
