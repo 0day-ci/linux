@@ -80,6 +80,7 @@ struct scmi_msg_resp_prot_version {
  * @status: Status of the transfer once it's complete
  * @poll_completion: Indicate if the transfer needs to be polled for
  *	completion or interrupt mode is used
+ * @saved_hdr: A copy of the original msg_hdr
  */
 struct scmi_msg_hdr {
 	u8 id;
@@ -88,6 +89,7 @@ struct scmi_msg_hdr {
 	u16 seq;
 	u32 status;
 	bool poll_completion;
+	u32 saved_hdr;
 };
 
 /**
@@ -152,6 +154,7 @@ struct scmi_msg {
  *	    - SCMI_XFER_SENT_OK -> SCMI_XFER_DRESP_OK
  *	      (Missing synchronous response is assumed OK and ignored)
  * @lock: A spinlock to protect state and busy fields.
+ * @priv: A pointer for transport private usage.
  */
 struct scmi_xfer {
 	int transfer_id;
@@ -171,6 +174,7 @@ struct scmi_xfer {
 #define SCMI_XFER_DRESP_OK	2
 	int state;
 	spinlock_t lock;
+	void *priv;
 };
 
 /*
@@ -372,6 +376,9 @@ struct scmi_device *scmi_child_dev_find(struct device *parent,
  * @max_msg: Maximum number of messages that can be pending
  *	simultaneously in the system
  * @max_msg_size: Maximum size of data per message that can be handled.
+ * @using_xfers_delegation: A flag to indicate if the described transport will
+ *			    handle delegated xfers, so the core can derive
+ *			    proper related assumptions.
  */
 struct scmi_desc {
 	int (*init)(void);
@@ -380,6 +387,7 @@ struct scmi_desc {
 	int max_rx_timeout_ms;
 	int max_msg;
 	int max_msg_size;
+	bool using_xfers_delegation;
 };
 
 extern const struct scmi_desc scmi_mailbox_desc;
@@ -407,4 +415,9 @@ bool shmem_poll_done(struct scmi_shared_mem __iomem *shmem,
 void scmi_notification_instance_data_set(const struct scmi_handle *handle,
 					 void *priv);
 void *scmi_notification_instance_data_get(const struct scmi_handle *handle);
+
+int scmi_transfer_lookup(struct scmi_chan_info *cinfo, u32 *msg_hdr,
+			 struct scmi_xfer **xfer);
+void scmi_transfer_release(struct scmi_chan_info *cinfo,
+			   struct scmi_xfer *xfer);
 #endif /* _SCMI_COMMON_H */

@@ -378,6 +378,22 @@ static struct scmi_xfer *scmi_xfer_get(const struct scmi_handle *handle,
 }
 
 /**
+ * __scmi_xfer_get  - Increment xfer refcount
+ *
+ * @minfo: Pointer to Tx/Rx Message management info based on channel type
+ * @xfer: message to be acquired
+ */
+static void
+__scmi_xfer_get(struct scmi_xfers_info *minfo, struct scmi_xfer *xfer)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&minfo->xfer_lock, flags);
+	refcount_inc(&xfer->users);
+	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
+}
+
+/**
  * __scmi_xfer_put() - Release a message
  *
  * @minfo: Pointer to Tx/Rx Message management info based on channel type
@@ -592,24 +608,185 @@ static inline void scmi_xfer_state_update(struct scmi_xfer *xfer)
 	}
 }
 
+/**
+ * scmi_xfer_notif_acquire  - Returns a valid xfer for notification processing
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @msg_hdr: A pointer to the message header to lookup.
+ *
+ * A brand new notification xfer is picked and initialized: msg_hdr is then
+ * mangled to match the monotonically increasing sequence number xfer->hdr.seq
+ * since it will be used as an index to refer back to this xfer later in the
+ * RX path (inside scmi_rx_callback()). Original msg_hdr is saved into
+ * xfer->saved_hdr.
+ */
+static inline struct scmi_xfer *
+scmi_xfer_notif_acquire(struct scmi_chan_info *cinfo, u32 *msg_hdr)
+{
+	struct scmi_xfer *xfer;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+
+	/* Get a brand new RX xfer if none found already allocated */
+	xfer = scmi_xfer_get(cinfo->handle, &info->rx_minfo, true);
+	if (!IS_ERR(xfer)) {
+		/* Get hold of this freshly allocated xfer */
+		__scmi_xfer_get(&info->rx_minfo, xfer);
+		/* Populate xfer->hdr, updates type too. */
+		unpack_scmi_header(*msg_hdr, &xfer->hdr);
+		/* Fix sequence number in msg_hdr since it is used as index */
+		xfer->hdr.saved_hdr = *msg_hdr;
+		*msg_hdr &= ~MSG_TOKEN_ID_MASK;
+		*msg_hdr |= FIELD_PREP(MSG_TOKEN_ID_MASK, xfer->hdr.seq);
+	}
+
+	return xfer;
+}
+
+/**
+ * scmi_transfer_lookup  -  Search for an xfer matching the provided msg_hdr
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @msg_hdr: A pointer to the message header to lookup.
+ * @xfer: On success holds a reference to the valid xfer.
+ *
+ * Lookup works as follows depending on message type in @msg_hdr:
+ *
+ *  - for commands a pre-existent @xfer is returned if determined to be valid
+ *    i.e.:
+ *	- associated with the sequence number in @msg_hdr
+ *	- whose current xfer->state is congruent with the msg type in @msg_hdr
+ *
+ *  - for notifications:
+ *	- a new @xfer is picked and initialized
+ *
+ * Returned @xfer is:
+ *  - guaranteed to represent a valid transfer (sequence number not stale)
+ *  - refcounted properly
+ *  - exclusively acquired (for commands xfers only) till released cleanly by
+ *    @scmi_transfer_release in order to exclude races between concurrently
+ *    received responses and delayed responses for the same messages on distinct
+ *    channels.
+ *
+ * Used only by transports using delegated xfers.
+ *
+ * Return: 0 if a valid xfer is returned in @xfer, error otherwise.
+ */
+int scmi_transfer_lookup(struct scmi_chan_info *cinfo, u32 *msg_hdr,
+			 struct scmi_xfer **xfer)
+{
+	u8 msg_type;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+
+	if (!xfer || !msg_hdr || !info->desc->using_xfers_delegation)
+		return -EINVAL;
+
+	msg_type = MSG_XTRACT_TYPE(*msg_hdr);
+
+	switch (msg_type) {
+	case MSG_TYPE_COMMAND:
+	case MSG_TYPE_DELAYED_RESP:
+		/* Grab an existing valid xfer matching xfer_id (if any) */
+		*xfer = scmi_xfer_command_acquire(cinfo, *msg_hdr);
+		break;
+	case MSG_TYPE_NOTIFICATION:
+		/* Allocate a new xfer and mangle msg_hdr to match hdr.seq_num */
+		*xfer = scmi_xfer_notif_acquire(cinfo, msg_hdr);
+		break;
+	default:
+		WARN_ONCE(1, "received unknown msg_type:%d\n", msg_type);
+		return -EINVAL;
+	}
+
+	if (IS_ERR(*xfer)) {
+		int ret = PTR_ERR(*xfer);
+
+		dev_err(cinfo->dev,
+			"Failed to acquire a valid xfer HDR:0x%X - ret:%d\n",
+			*msg_hdr, ret);
+
+		*xfer = NULL;
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * scmi_transfer_release  - Release a previously acquired xfer
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @xfer: A reference to the xfer to release.
+ *
+ * Used only by transports using delegated xfers.
+ */
+void scmi_transfer_release(struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
+{
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+
+	if (!xfer || !info->desc->using_xfers_delegation)
+		return;
+
+	if (xfer->hdr.type == MSG_TYPE_NOTIFICATION)
+		__scmi_xfer_put(&info->rx_minfo, xfer);
+	else
+		scmi_xfer_command_release(info, xfer);
+}
+
+/**
+ * scmi_xfer_notif_lookup_or_acquire  - Helper to lookup a notification xfer
+ *
+ * @cinfo: A reference to the channel descriptor.
+ * @msg_hdr: A pointer to the message header to lookup.
+ *
+ * This is called by scmi_rx_callback to get hold of an xfer to be used for
+ * notification processing.
+ *
+ * When no delegated xfers are used by the transport this simply returns a
+ * freshly allocated xfer to be filled with notification data as usual.
+ *
+ * If instead delegated xfers are used by the undierlying transport, this simply
+ * lookups the already allocated and initialized xfer.
+ */
+static inline struct scmi_xfer *
+scmi_xfer_notif_lookup_or_acquire(struct scmi_chan_info *cinfo, u32 msg_hdr)
+{
+	struct scmi_xfer *xfer;
+	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
+	struct scmi_xfers_info *minfo = &info->rx_minfo;
+
+	if (!info->desc->using_xfers_delegation) {
+		xfer = scmi_xfer_get(cinfo->handle, minfo, false);
+		if (!IS_ERR(xfer))
+			/* Populate xfer->hdr, updates type too. */
+			unpack_scmi_header(msg_hdr, &xfer->hdr);
+	} else {
+		unsigned long flags;
+		u16 xfer_id = MSG_XTRACT_TOKEN(msg_hdr);
+
+		spin_lock_irqsave(&minfo->xfer_lock, flags);
+		xfer = scmi_xfer_lookup_unlocked(minfo, xfer_id);
+		spin_unlock_irqrestore(&minfo->xfer_lock, flags);
+	}
+
+	return xfer;
+}
+
 static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 {
 	struct scmi_xfer *xfer;
-	struct device *dev = cinfo->dev;
 	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
-	struct scmi_xfers_info *minfo = &info->rx_minfo;
 	ktime_t ts;
 
 	ts = ktime_get_boottime();
-	xfer = scmi_xfer_get(cinfo->handle, minfo, false);
+	xfer = scmi_xfer_notif_lookup_or_acquire(cinfo, msg_hdr);
 	if (IS_ERR(xfer)) {
-		dev_err(dev, "failed to get free message slot (%ld)\n",
+		dev_err(cinfo->dev,
+			"failed to lookup notification message (%ld)\n",
 			PTR_ERR(xfer));
 		info->desc->ops->clear_channel(cinfo);
 		return;
 	}
 
-	unpack_scmi_header(msg_hdr, &xfer->hdr);
 	info->desc->ops->fetch_notification(cinfo, info->desc->max_msg_size,
 					    xfer);
 	scmi_notify(cinfo->handle, xfer->hdr.protocol_id,
@@ -619,7 +796,7 @@ static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 			   xfer->hdr.protocol_id, xfer->hdr.seq,
 			   MSG_TYPE_NOTIFICATION);
 
-	__scmi_xfer_put(minfo, xfer);
+	__scmi_xfer_put(&info->rx_minfo, xfer);
 
 	info->desc->ops->clear_channel(cinfo);
 }
