@@ -80,6 +80,7 @@ gen_xchg()
 	if [ "${xchg%${xchg#try_cmpxchg}}" = "try_cmpxchg" ] ; then
 
 cat <<EOF
+#if 0
 #define ${xchg}(ptr, oldp, ...) \\
 ({ \\
 	typeof(ptr) __ai_ptr = (ptr); \\
@@ -88,17 +89,26 @@ cat <<EOF
 	instrument_atomic_write(__ai_oldp, ${mult}sizeof(*__ai_oldp)); \\
 	arch_${xchg}(__ai_ptr, __ai_oldp, __VA_ARGS__); \\
 })
+#else
+#define ${xchg} \
+	arch_${xchg}
+#endif
 EOF
 
 	else
 
 cat <<EOF
+#if 0
 #define ${xchg}(ptr, ...) \\
 ({ \\
 	typeof(ptr) __ai_ptr = (ptr); \\
 	instrument_atomic_write(__ai_ptr, ${mult}sizeof(*__ai_ptr)); \\
 	arch_${xchg}(__ai_ptr, __VA_ARGS__); \\
 })
+#else
+#define ${xchg} \
+	arch_${xchg}
+#endif
 EOF
 
 	fi
