@@ -18,7 +18,6 @@
 #include <linux/virtio_pci.h>
 #include <linux/virtio_pci_modern.h>
 
-#define VP_VDPA_QUEUE_MAX 256
 #define VP_VDPA_DRIVER_NAME "vp_vdpa"
 #define VP_VDPA_NAME_SIZE 256
 
@@ -197,7 +196,10 @@ static void vp_vdpa_set_status(struct vdpa_device *vdpa, u8 status)
 
 static u16 vp_vdpa_get_vq_num_max(struct vdpa_device *vdpa, u16 qid)
 {
-	return VP_VDPA_QUEUE_MAX;
+	struct vp_vdpa *vp_vdpa = vdpa_to_vp(vdpa);
+	struct virtio_pci_modern_device *mdev = &vp_vdpa->mdev;
+
+	return vp_modern_get_queue_size(mdev, qid);
 }
 
 static int vp_vdpa_get_vq_state(struct vdpa_device *vdpa, u16 qid,
