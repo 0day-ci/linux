@@ -63,13 +63,13 @@ static ssize_t broken_parity_status_store(struct device *dev,
 					  struct device_attribute *attr,
 					  const char *buf, size_t count)
 {
+	bool enable;
 	struct pci_dev *pdev = to_pci_dev(dev);
-	unsigned long val;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &enable) < 0)
 		return -EINVAL;
 
-	pdev->broken_parity_status = !!val;
+	pdev->broken_parity_status = enable;
 
 	return count;
 }
@@ -271,12 +271,12 @@ static DEVICE_ATTR_RO(modalias);
 static ssize_t enable_store(struct device *dev, struct device_attribute *attr,
 			     const char *buf, size_t count)
 {
+	bool enable;
 	struct pci_dev *pdev = to_pci_dev(dev);
-	unsigned long val;
-	ssize_t result = kstrtoul(buf, 0, &val);
+	ssize_t result = 0;
 
-	if (result < 0)
-		return result;
+	if (kstrtobool(buf, &enable) < 0)
+		return -EINVAL;
 
 	/* this can crash the machine when done on the "wrong" device */
 	if (!capable(CAP_SYS_ADMIN))
@@ -285,7 +285,7 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr,
 	device_lock(dev);
 	if (dev->driver)
 		result = -EBUSY;
-	else if (val)
+	else if (enable)
 		result = pci_enable_device(pdev);
 	else if (pci_is_enabled(pdev))
 		pci_disable_device(pdev);
@@ -311,15 +311,14 @@ static ssize_t numa_node_store(struct device *dev,
 			       struct device_attribute *attr, const char *buf,
 			       size_t count)
 {
+	int node;
 	struct pci_dev *pdev = to_pci_dev(dev);
-	int node, ret;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	ret = kstrtoint(buf, 0, &node);
-	if (ret)
-		return ret;
+	if (kstrtoint(buf, 0, &node) < 0)
+		return -EINVAL;
 
 	if ((node < 0 && node != NUMA_NO_NODE) || node >= MAX_NUMNODES)
 		return -EINVAL;
@@ -374,11 +373,11 @@ static ssize_t msi_bus_show(struct device *dev, struct device_attribute *attr,
 static ssize_t msi_bus_store(struct device *dev, struct device_attribute *attr,
 			     const char *buf, size_t count)
 {
+	bool enable;
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct pci_bus *subordinate = pdev->subordinate;
-	unsigned long val;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &enable) < 0)
 		return -EINVAL;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -390,32 +389,32 @@ static ssize_t msi_bus_store(struct device *dev, struct device_attribute *attr,
 	 * already requested MSI or MSI-X.
 	 */
 	if (!subordinate) {
-		pdev->no_msi = !val;
+		pdev->no_msi = !enable;
 		pci_info(pdev, "MSI/MSI-X %s for future drivers\n",
-			 val ? "allowed" : "disallowed");
+			 enable ? "allowed" : "disallowed");
 		return count;
 	}
 
-	if (val)
+	if (enable)
 		subordinate->bus_flags &= ~PCI_BUS_FLAGS_NO_MSI;
 	else
 		subordinate->bus_flags |= PCI_BUS_FLAGS_NO_MSI;
 
 	dev_info(&subordinate->dev, "MSI/MSI-X %s for future drivers of devices on this bus\n",
-		 val ? "allowed" : "disallowed");
+		 enable ? "allowed" : "disallowed");
 	return count;
 }
 static DEVICE_ATTR_RW(msi_bus);
 
 static ssize_t rescan_store(struct bus_type *bus, const char *buf, size_t count)
 {
-	unsigned long val;
+	bool rescan;
 	struct pci_bus *b = NULL;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &rescan) < 0)
 		return -EINVAL;
 
-	if (val) {
+	if (rescan) {
 		pci_lock_rescan_remove();
 		while ((b = pci_find_next_bus(b)) != NULL)
 			pci_rescan_bus(b);
@@ -443,13 +442,13 @@ static ssize_t dev_rescan_store(struct device *dev,
 				struct device_attribute *attr, const char *buf,
 				size_t count)
 {
-	unsigned long val;
+	bool rescan;
 	struct pci_dev *pdev = to_pci_dev(dev);
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &rescan) < 0)
 		return -EINVAL;
 
-	if (val) {
+	if (rescan) {
 		pci_lock_rescan_remove();
 		pci_rescan_bus(pdev->bus);
 		pci_unlock_rescan_remove();
@@ -462,12 +461,12 @@ static struct device_attribute dev_attr_dev_rescan = __ATTR(rescan, 0200, NULL,
 static ssize_t remove_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
-	unsigned long val;
+	bool remove;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &remove) < 0)
 		return -EINVAL;
 
-	if (val && device_remove_file_self(dev, attr))
+	if (remove && device_remove_file_self(dev, attr))
 		pci_stop_and_remove_bus_device_locked(to_pci_dev(dev));
 	return count;
 }
@@ -478,13 +477,13 @@ static ssize_t bus_rescan_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	unsigned long val;
+	bool rescan;
 	struct pci_bus *bus = to_pci_bus(dev);
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &rescan) < 0)
 		return -EINVAL;
 
-	if (val) {
+	if (rescan) {
 		pci_lock_rescan_remove();
 		if (!pci_is_root_bus(bus) && list_empty(&bus->devices))
 			pci_rescan_bus_bridge_resize(bus->self);
@@ -502,14 +501,14 @@ static ssize_t d3cold_allowed_store(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf, size_t count)
 {
+	bool allowed;
 	struct pci_dev *pdev = to_pci_dev(dev);
-	unsigned long val;
 
-	if (kstrtoul(buf, 0, &val) < 0)
+	if (kstrtobool(buf, &allowed) < 0)
 		return -EINVAL;
 
-	pdev->d3cold_allowed = !!val;
-	if (pdev->d3cold_allowed)
+	pdev->d3cold_allowed = allowed;
+	if (allowed)
 		pci_d3cold_enable(pdev);
 	else
 		pci_d3cold_disable(pdev);
@@ -1257,12 +1256,13 @@ static ssize_t pci_write_rom(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr, char *buf,
 			     loff_t off, size_t count)
 {
+	bool enable;
 	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
 
-	if ((off ==  0) && (*buf == '0') && (count == 2))
-		pdev->rom_attr_enabled = 0;
-	else
-		pdev->rom_attr_enabled = 1;
+	if (kstrtobool(buf, &enable) < 0)
+		return -EINVAL;
+
+	pdev->rom_attr_enabled = enable;
 
 	return count;
 }
@@ -1337,23 +1337,20 @@ static const struct attribute_group pci_dev_rom_attr_group = {
 static ssize_t reset_store(struct device *dev, struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
+	bool reset;
 	struct pci_dev *pdev = to_pci_dev(dev);
-	unsigned long val;
-	ssize_t result = kstrtoul(buf, 0, &val);
+	ssize_t result = 0;
 
-	if (result < 0)
-		return result;
-
-	if (val != 1)
+	if (kstrtobool(buf, &reset) < 0)
 		return -EINVAL;
 
-	pm_runtime_get_sync(dev);
-	result = pci_reset_function(pdev);
-	pm_runtime_put(dev);
-	if (result < 0)
-		return result;
+	if (reset) {
+		pm_runtime_get_sync(dev);
+		result = pci_reset_function(pdev);
+		pm_runtime_put(dev);
+	}
 
-	return count;
+	return result < 0 ? result : count;
 }
 static DEVICE_ATTR_WO(reset);
 
