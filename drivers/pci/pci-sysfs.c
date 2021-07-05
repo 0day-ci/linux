@@ -1393,7 +1393,8 @@ static ssize_t reset_method_store(struct device *dev,
 
 		for (i = 1; i < PCI_NUM_RESET_METHODS; i++) {
 			if (sysfs_streq(name, pci_reset_fn_methods[i].name) &&
-			    !pci_reset_fn_methods[i].reset_fn(pdev, 1)) {
+			    !pci_reset_fn_methods[i].reset_fn(pdev,
+							      PCI_RESET_PROBE)) {
 				reset_methods[n++] = i;
 				break;
 			}
@@ -1405,7 +1406,8 @@ static ssize_t reset_method_store(struct device *dev,
 		}
 	}
 
-	if (!pci_reset_fn_methods[1].reset_fn(pdev, 1) && reset_methods[0] != 1)
+	if (!pci_reset_fn_methods[1].reset_fn(pdev, PCI_RESET_PROBE) &&
+	    reset_methods[0] != 1)
 		pci_warn(pdev, "Device specific reset disabled/de-prioritized by user");
 
 set_reset_methods:
