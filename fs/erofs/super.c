@@ -11,6 +11,7 @@
 #include <linux/crc32c.h>
 #include <linux/fs_context.h>
 #include <linux/fs_parser.h>
+#include <linux/dax.h>
 #include "xattr.h"
 
 #define CREATE_TRACE_POINTS
@@ -355,6 +356,7 @@ enum {
 	Opt_user_xattr,
 	Opt_acl,
 	Opt_cache_strategy,
+	Opt_dax,
 	Opt_err
 };
 
@@ -370,6 +372,7 @@ static const struct fs_parameter_spec erofs_fs_parameters[] = {
 	fsparam_flag_no("acl",		Opt_acl),
 	fsparam_enum("cache_strategy",	Opt_cache_strategy,
 		     erofs_param_cache_strategy),
+	fsparam_flag("dax",             Opt_dax),
 	{}
 };
 
@@ -410,6 +413,14 @@ static int erofs_fc_parse_param(struct fs_context *fc,
 		ctx->cache_strategy = result.uint_32;
 #else
 		errorfc(fc, "compression not supported, cache_strategy ignored");
+#endif
+		break;
+	case Opt_dax:
+#ifdef CONFIG_FS_DAX
+		warnfc(fc, "DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
+		set_opt(ctx, DAX);
+#else
+		errorfc(fc, "dax options not supported");
 #endif
 		break;
 	default:
@@ -496,9 +507,16 @@ static int erofs_fc_fill_super(struct super_block *sb, struct fs_context *fc)
 		return -ENOMEM;
 
 	sb->s_fs_info = sbi;
+	sbi->dax_dev = fs_dax_get_by_bdev(sb->s_bdev);
 	err = erofs_read_superblock(sb);
 	if (err)
 		return err;
+
+	if (test_opt(ctx, DAX) &&
+	    !bdev_dax_supported(sb->s_bdev, EROFS_BLKSIZ)) {
+		errorfc(fc, "DAX unsupported by block device. Turning off DAX.");
+		clear_opt(ctx, DAX);
+	}
 
 	sb->s_flags |= SB_RDONLY | SB_NOATIME;
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
@@ -609,6 +627,8 @@ static void erofs_kill_sb(struct super_block *sb)
 	sbi = EROFS_SB(sb);
 	if (!sbi)
 		return;
+	if (sbi->dax_dev)
+		fs_put_dax(sbi->dax_dev);
 	kfree(sbi);
 	sb->s_fs_info = NULL;
 }
@@ -711,8 +731,8 @@ static int erofs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 static int erofs_show_options(struct seq_file *seq, struct dentry *root)
 {
-	struct erofs_sb_info *sbi __maybe_unused = EROFS_SB(root->d_sb);
-	struct erofs_fs_context *ctx __maybe_unused = &sbi->ctx;
+	struct erofs_sb_info *sbi = EROFS_SB(root->d_sb);
+	struct erofs_fs_context *ctx = &sbi->ctx;
 
 #ifdef CONFIG_EROFS_FS_XATTR
 	if (test_opt(ctx, XATTR_USER))
@@ -734,6 +754,8 @@ static int erofs_show_options(struct seq_file *seq, struct dentry *root)
 	else if (ctx->cache_strategy == EROFS_ZIP_CACHE_READAROUND)
 		seq_puts(seq, ",cache_strategy=readaround");
 #endif
+	if (test_opt(ctx, DAX))
+		seq_puts(seq, ",dax");
 	return 0;
 }
 
