@@ -708,7 +708,6 @@ static int em28xx_ir_init(struct em28xx *dev)
 		return 0;
 	}
 
-	kref_get(&dev->ref);
 	INIT_DELAYED_WORK(&dev->buttons_query_work, em28xx_query_buttons);
 
 	if (dev->board.buttons)
@@ -833,6 +832,9 @@ static int em28xx_ir_init(struct em28xx *dev)
 
 	dev_info(&dev->intf->dev, "Input extension successfully initialized\n");
 
+	/* Only increase refcount when this function is executed successfully */
+	kref_get(&dev->ref);
+
 	return 0;
 
 error:
@@ -842,7 +844,6 @@ error:
 	kfree(ir);
 ref_put:
 	em28xx_shutdown_buttons(dev);
-	kref_put(&dev->ref, em28xx_free_device);
 	return err;
 }
 
@@ -861,7 +862,7 @@ static int em28xx_ir_fini(struct em28xx *dev)
 
 	/* skip detach on non attached boards */
 	if (!ir)
-		goto ref_put;
+		return 0;
 
 	rc_unregister_device(ir->rc);
 
@@ -871,7 +872,6 @@ static int em28xx_ir_fini(struct em28xx *dev)
 	kfree(ir);
 	dev->ir = NULL;
 
-ref_put:
 	kref_put(&dev->ref, em28xx_free_device);
 
 	return 0;
