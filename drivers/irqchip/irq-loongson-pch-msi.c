@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  *  Copyright (C) 2020, Jiaxun Yang <jiaxun.yang@flygoat.com>
+ *			Jianmin Lv <lvjianmin@loongson.cn>
+ *			Huacai Chen <chenhuacai@loongson.cn>
  *  Loongson PCH MSI support
  */
 
@@ -21,6 +23,7 @@ struct pch_msi_data {
 	u32		irq_first;	/* The vector number that MSIs starts */
 	u32		num_irqs;	/* The number of vectors for MSIs */
 	unsigned long	*msi_map;
+	struct fwnode_handle *domain_handle;
 };
 
 static void pch_msi_mask_msi_irq(struct irq_data *d)
@@ -159,7 +162,12 @@ static int pch_msi_init_domains(struct pch_msi_data *priv,
 {
 	struct irq_domain *middle_domain, *msi_domain;
 
-	middle_domain = irq_domain_create_linear(of_node_to_fwnode(node),
+	if (node)
+		priv->domain_handle = of_node_to_fwnode(node);
+	else
+		priv->domain_handle = irq_domain_alloc_fwnode((phys_addr_t *)priv);
+
+	middle_domain = irq_domain_create_linear(priv->domain_handle,
 						priv->num_irqs,
 						&pch_msi_middle_domain_ops,
 						priv);
@@ -171,7 +179,7 @@ static int pch_msi_init_domains(struct pch_msi_data *priv,
 	middle_domain->parent = parent;
 	irq_domain_update_bus_token(middle_domain, DOMAIN_BUS_NEXUS);
 
-	msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(node),
+	msi_domain = pci_msi_create_irq_domain(priv->domain_handle,
 					       &pch_msi_domain_info,
 					       middle_domain);
 	if (!msi_domain) {
@@ -183,8 +191,9 @@ static int pch_msi_init_domains(struct pch_msi_data *priv,
 	return 0;
 }
 
-static int pch_msi_init(struct device_node *node,
-			    struct device_node *parent)
+#ifdef CONFIG_OF
+
+int pch_msi_of_init(struct device_node *node, struct device_node *parent)
 {
 	struct pch_msi_data *priv;
 	struct irq_domain *parent_domain;
@@ -247,4 +256,54 @@ err_priv:
 	return ret;
 }
 
-IRQCHIP_DECLARE(pch_msi, "loongson,pch-msi-1.0", pch_msi_init);
+IRQCHIP_DECLARE(pch_msi, "loongson,pch-msi-1.0", pch_msi_of_init);
+
+#endif
+
+#ifdef CONFIG_ACPI
+
+struct fwnode_handle *pch_msi_acpi_init(struct fwnode_handle *parent,
+					struct acpi_madt_msi_pic *acpi_pchmsi)
+{
+	int ret;
+	struct pch_msi_data *priv;
+	struct irq_domain *parent_domain;
+
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return NULL;
+
+	mutex_init(&priv->msi_map_lock);
+
+	priv->doorbell = acpi_pchmsi->msg_address;
+	priv->irq_first = acpi_pchmsi->start;
+	priv->num_irqs = acpi_pchmsi->count;
+
+	parent_domain = irq_find_matching_fwnode(parent, DOMAIN_BUS_ANY);
+	if (!parent_domain) {
+		pr_err("Failed to find the parent domain\n");
+		return NULL;
+	}
+
+	priv->msi_map = bitmap_zalloc(priv->num_irqs, GFP_KERNEL);
+	if (!priv->msi_map)
+		goto err_priv;
+
+	pr_debug("Registering %d MSIs, starting at %d\n",
+		 priv->num_irqs, priv->irq_first);
+
+	ret = pch_msi_init_domains(priv, NULL, parent_domain);
+	if (ret)
+		goto err_map;
+
+	return priv->domain_handle;
+
+err_map:
+	kfree(priv->msi_map);
+err_priv:
+	kfree(priv);
+
+	return NULL;
+}
+
+#endif
