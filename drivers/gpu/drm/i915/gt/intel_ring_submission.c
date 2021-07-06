@@ -184,8 +184,11 @@ static int xcs_resume(struct intel_engine_cs *engine)
 	ENGINE_TRACE(engine, "ring:{HEAD:%04x, TAIL:%04x}\n",
 		     ring->head, ring->tail);
 
-	/* Double check the ring is empty & disabled before we resume */
-	synchronize_hardirq(engine->i915->drm.irq);
+	/*
+	 * Double check the ring is empty & disabled before we resume. Called
+	 * from atomic context during PCI probe, so _hardirq().
+	 */
+	intel_synchronize_hardirq(engine->i915);
 	if (!stop_ring(engine))
 		goto err;
 
@@ -339,9 +342,9 @@ static void reset_rewind(struct intel_engine_cs *engine, bool stalled)
 	u32 head;
 
 	rq = NULL;
-	spin_lock_irqsave(&engine->active.lock, flags);
+	spin_lock_irqsave(&engine->sched_engine->lock, flags);
 	rcu_read_lock();
-	list_for_each_entry(pos, &engine->active.requests, sched.link) {
+	list_for_each_entry(pos, &engine->sched_engine->requests, sched.link) {
 		if (!__i915_request_is_complete(pos)) {
 			rq = pos;
 			break;
@@ -396,7 +399,7 @@ static void reset_rewind(struct intel_engine_cs *engine, bool stalled)
 	}
 	engine->legacy.ring->head = intel_ring_wrap(engine->legacy.ring, head);
 
-	spin_unlock_irqrestore(&engine->active.lock, flags);
+	spin_unlock_irqrestore(&engine->sched_engine->lock, flags);
 }
 
 static void reset_finish(struct intel_engine_cs *engine)
@@ -408,16 +411,16 @@ static void reset_cancel(struct intel_engine_cs *engine)
 	struct i915_request *request;
 	unsigned long flags;
 
-	spin_lock_irqsave(&engine->active.lock, flags);
+	spin_lock_irqsave(&engine->sched_engine->lock, flags);
 
 	/* Mark all submitted requests as skipped. */
-	list_for_each_entry(request, &engine->active.requests, sched.link)
+	list_for_each_entry(request, &engine->sched_engine->requests, sched.link)
 		i915_request_put(i915_request_mark_eio(request));
 	intel_engine_signal_breadcrumbs(engine);
 
 	/* Remaining _unready_ requests will be nop'ed when submitted */
 
-	spin_unlock_irqrestore(&engine->active.lock, flags);
+	spin_unlock_irqrestore(&engine->sched_engine->lock, flags);
 }
 
 static void i9xx_submit_request(struct i915_request *request)
