@@ -53,6 +53,8 @@ static inline s64 div_frac(s64 x, s64 y)
  * struct power_allocator_params - parameters for the power allocator governor
  * @allocated_tzp:	whether we have allocated tzp for this thermal zone and
  *			it needs to be freed on unbind
+ * @actors_ready:	set to 1 when power actors are properly setup or set to
+ *			-EINVAL when there were errors during preparation
  * @err_integral:	accumulated error in the PID controller.
  * @prev_err:	error in the previous iteration of the PID controller.
  *		Used to calculate the derivative term.
@@ -68,6 +70,7 @@ static inline s64 div_frac(s64 x, s64 y)
  */
 struct power_allocator_params {
 	bool allocated_tzp;
+	int actors_ready;
 	s64 err_integral;
 	s32 prev_err;
 	int trip_switch_on;
@@ -693,8 +696,19 @@ free_params:
 static void power_allocator_unbind(struct thermal_zone_device *tz)
 {
 	struct power_allocator_params *params = tz->governor_data;
+	struct thermal_instance *instance;
 
 	dev_dbg(&tz->device, "Unbinding from thermal zone %d\n", tz->id);
+
+	/* Calm down cooling devices and stop monitoring mechanims */
+	list_for_each_entry(instance, &tz->thermal_instances, tz_node) {
+		struct thermal_cooling_device *cdev = instance->cdev;
+
+		if (!cdev_is_power_actor(cdev))
+			continue;
+		if (cdev->ops->change_governor)
+			cdev->ops->change_governor(cdev, false);
+	}
 
 	if (params->allocated_tzp) {
 		kfree(tz->tzp);
@@ -703,6 +717,51 @@ static void power_allocator_unbind(struct thermal_zone_device *tz)
 
 	kfree(tz->governor_data);
 	tz->governor_data = NULL;
+}
+
+static int prepare_power_actors(struct thermal_zone_device *tz)
+{
+	struct power_allocator_params *params = tz->governor_data;
+	struct thermal_instance *instance;
+	int ret;
+
+	if (params->actors_ready > 0)
+		return 0;
+
+	if (params->actors_ready < 0)
+		return -EINVAL;
+
+	mutex_lock(&tz->lock);
+
+	list_for_each_entry(instance, &tz->thermal_instances, tz_node) {
+		struct thermal_cooling_device *cdev = instance->cdev;
+
+		if (!cdev_is_power_actor(cdev))
+			continue;
+		if (cdev->ops->change_governor) {
+			ret = cdev->ops->change_governor(cdev, true);
+			if (ret)
+				goto clean_up;
+		}
+	}
+
+	mutex_unlock(&tz->lock);
+	params->actors_ready = 1;
+	return 0;
+
+clean_up:
+	list_for_each_entry(instance, &tz->thermal_instances, tz_node) {
+		struct thermal_cooling_device *cdev = instance->cdev;
+
+		if (!cdev_is_power_actor(cdev))
+			continue;
+		if (cdev->ops->change_governor)
+			cdev->ops->change_governor(cdev, false);
+	}
+
+	mutex_unlock(&tz->lock);
+	params->actors_ready = -EINVAL;
+	return -EINVAL;
 }
 
 static int power_allocator_throttle(struct thermal_zone_device *tz, int trip)
@@ -718,6 +777,18 @@ static int power_allocator_throttle(struct thermal_zone_device *tz, int trip)
 	 */
 	if (trip != params->trip_max_desired_temperature)
 		return 0;
+
+	/*
+	 * If we are called for the first time (e.g. after enabling thermal
+	 * zone), setup properly power actors
+	 */
+	ret = prepare_power_actors(tz);
+	if (ret) {
+		dev_warn_once(&tz->device,
+			      "Failed to setup IPA power actors: %d\n",
+			      ret);
+		return ret;
+	}
 
 	ret = tz->ops->get_trip_temp(tz, params->trip_switch_on,
 				     &switch_on_temp);
