@@ -1413,6 +1413,25 @@ static void ip_mc_hash_remove(struct in_device *in_dev,
 	*mc_hash = im->next_hash;
 }
 
+static struct ip_mc_list *ip_mc_hash_lookup(struct ip_mc_list __rcu **mc_hash,
+					    __be32 mc_addr)
+{
+	struct ip_mc_list *im;
+	u32 hash;
+
+	if (mc_hash) {
+		hash = hash_32((__force u32)mc_addr, MC_HASH_SZ_LOG);
+		for (im = rcu_dereference(mc_hash[hash]);
+		     im != NULL;
+		     im = rcu_dereference(im->next_hash)) {
+			if (im->multiaddr == mc_addr)
+				break;
+			}
+	}
+
+	return im;
+}
+
 
 /*
  *	A socket has joined a multicast group on device dev.
@@ -2166,7 +2185,7 @@ static int __ip_mc_join_group(struct sock *sk, struct ip_mreqn *imr,
 
 	ASSERT_RTNL();
 
-	if (!ipv4_is_multicast(addr))
+	if (!ipv4_is_multicast(addr) && addr != htonl(INADDR_ANY))
 		return -EINVAL;
 
 	in_dev = ip_mc_find_dev(net, imr);
@@ -2627,6 +2646,11 @@ int ip_mc_sf_allow(struct sock *sk, __be32 loc_addr, __be32 rmt_addr,
 
 	rcu_read_lock();
 	for_each_pmc_rcu(inet, pmc) {
+		if (pmc->multi.imr_multiaddr.s_addr == htonl(INADDR_ANY) &&
+		    pmc->multi.imr_ifindex == dif) {
+			ret = 1;
+			goto unlock;
+		}
 		if (pmc->multi.imr_multiaddr.s_addr == loc_addr &&
 		    (pmc->multi.imr_ifindex == dif ||
 		     (sdif && pmc->multi.imr_ifindex == sdif)))
@@ -2695,18 +2719,18 @@ int ip_check_mc_rcu(struct in_device *in_dev, __be32 mc_addr, __be32 src_addr, u
 
 	mc_hash = rcu_dereference(in_dev->mc_hash);
 	if (mc_hash) {
-		u32 hash = hash_32((__force u32)mc_addr, MC_HASH_SZ_LOG);
-
-		for (im = rcu_dereference(mc_hash[hash]);
-		     im != NULL;
-		     im = rcu_dereference(im->next_hash)) {
-			if (im->multiaddr == mc_addr)
-				break;
+		im = ip_mc_hash_lookup(mc_hash, mc_addr);
+		if (!im) {
+			if (ip_mc_hash_lookup(mc_hash, htonl(INADDR_ANY)))
+				return 1;
 		}
+
 	} else {
 		for_each_pmc_rcu(in_dev, im) {
 			if (im->multiaddr == mc_addr)
 				break;
+			if (im->multiaddr == htonl(INADDR_ANY))
+				return 1;
 		}
 	}
 	if (im && proto == IPPROTO_IGMP) {

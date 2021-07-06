@@ -177,7 +177,7 @@ static int __ipv6_sock_mc_join(struct sock *sk, int ifindex,
 
 	ASSERT_RTNL();
 
-	if (!ipv6_addr_is_multicast(addr))
+	if (!ipv6_addr_is_multicast(addr) && !ipv6_addr_any(addr))
 		return -EINVAL;
 
 	for_each_pmc_socklock(np, sk, mc_lst) {
@@ -254,7 +254,7 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, const struct in6_addr *addr)
 
 	ASSERT_RTNL();
 
-	if (!ipv6_addr_is_multicast(addr))
+	if (!ipv6_addr_is_multicast(addr) && !ipv6_addr_any(addr))
 		return -EINVAL;
 
 	for (lnk = &np->ipv6_mc_list;
@@ -374,7 +374,7 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 	source = &((struct sockaddr_in6 *)&pgsr->gsr_source)->sin6_addr;
 	group = &((struct sockaddr_in6 *)&pgsr->gsr_group)->sin6_addr;
 
-	if (!ipv6_addr_is_multicast(group))
+	if (!ipv6_addr_is_multicast(group) && !ipv6_addr_any(group))
 		return -EINVAL;
 
 	idev = ip6_mc_find_dev_rtnl(net, group, pgsr->gsr_interface);
@@ -497,7 +497,7 @@ int ip6_mc_msfilter(struct sock *sk, struct group_filter *gsf,
 
 	group = &((struct sockaddr_in6 *)&gsf->gf_group)->sin6_addr;
 
-	if (!ipv6_addr_is_multicast(group))
+	if (!ipv6_addr_is_multicast(group) && !ipv6_addr_any(group))
 		return -EINVAL;
 	if (gsf->gf_fmode != MCAST_INCLUDE &&
 	    gsf->gf_fmode != MCAST_EXCLUDE)
@@ -585,7 +585,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 
 	group = &((struct sockaddr_in6 *)&gsf->gf_group)->sin6_addr;
 
-	if (!ipv6_addr_is_multicast(group))
+	if (!ipv6_addr_is_multicast(group) && !ipv6_addr_any(group))
 		return -EINVAL;
 
 	/* changes to the ipv6_mc_list require the socket lock and
@@ -634,6 +634,10 @@ bool inet6_mc_check(struct sock *sk, const struct in6_addr *mc_addr,
 	for_each_pmc_rcu(np, mc) {
 		if (ipv6_addr_equal(&mc->addr, mc_addr))
 			break;
+		if (ipv6_addr_any(&mc->addr)) {
+			rcu_read_unlock();
+			return rv;
+		}
 	}
 	if (!mc) {
 		rcu_read_unlock();
@@ -1019,8 +1023,12 @@ bool ipv6_chk_mcast_addr(struct net_device *dev, const struct in6_addr *group,
 		for_each_mc_rcu(idev, mc) {
 			if (ipv6_addr_equal(&mc->mca_addr, group))
 				break;
+			if (ipv6_addr_any(&mc->mca_addr)) {
+				rv = true;
+				break;
+			}
 		}
-		if (mc) {
+		if (mc && !ipv6_addr_any(&mc->mca_addr)) {
 			if (src_addr && !ipv6_addr_any(src_addr)) {
 				struct ip6_sf_list *psf;
 
