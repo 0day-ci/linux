@@ -2253,7 +2253,11 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
 	}
 
 	dev_dbg(&pdev->dev, "%s: adding port\n", __func__);
-	uart_add_one_port(&s3c24xx_uart_drv, &ourport->port);
+	ret = uart_add_one_port(&s3c24xx_uart_drv, &ourport->port);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to add uart port, err %d\n", ret);
+		goto add_port_error;
+	}
 	platform_set_drvdata(pdev, &ourport->port);
 
 	/*
@@ -2272,6 +2276,17 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
 	probe_index++;
 
 	return 0;
+
+add_port_error:
+	ourport->port.mapbase = 0;
+	clk_disable_unprepare(ourport->clk);
+	clk_put(ourport->clk);
+	if (!IS_ERR(ourport->baudclk)) {
+		clk_disable_unprepare(ourport->baudclk);
+		clk_put(ourport->baudclk);
+	}
+	uart_unregister_driver(&s3c24xx_uart_drv);
+	return ret;
 }
 
 static int s3c24xx_serial_remove(struct platform_device *dev)
