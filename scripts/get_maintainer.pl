@@ -627,6 +627,7 @@ my %email_hash_address;
 my @email_to = ();
 my %hash_list_to;
 my @list_to = ();
+my @list_the_rest_to = ();
 my @scm = ();
 my @web = ();
 my @subsystem = ();
@@ -949,6 +950,11 @@ sub get_maintainers {
 	foreach my $line (@keyword_tvi) {
 	    add_categories($line);
 	}
+    }
+
+    # if no other list would be printed, fall back to THE REST
+    if (scalar(@list_to) == 0) {
+	@list_to = @list_the_rest_to
     }
 
     foreach my $email (@email_to, @list_to) {
@@ -1303,10 +1309,6 @@ sub get_list_role {
 
     my $subsystem = get_subsystem_name($index);
 
-    if ($subsystem eq "THE REST") {
-	$subsystem = "";
-    }
-
     return $subsystem;
 }
 
@@ -1355,8 +1357,13 @@ sub add_categories {
 				}
 			    } else {
 				$hash_list_to{lc($list_address)} = 1;
-				push(@list_to, [$list_address,
-						"open list${list_role}"]);
+				if ($list_role eq ":THE REST") {
+				    push(@list_the_rest_to, [$list_address,
+							     "open list"]);
+				} else {
+				    push(@list_to, [$list_address,
+						    "open list${list_role}"]);
+				}
 			    }
 			}
 		    }
