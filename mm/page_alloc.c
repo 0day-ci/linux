@@ -5286,11 +5286,6 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	if (unlikely(!zone))
 		goto failed;
 
-	/* Attempt the batch allocation */
-	local_lock_irqsave(&pagesets.lock, flags);
-	pcp = this_cpu_ptr(zone->per_cpu_pageset);
-	pcp_list = &pcp->lists[order_to_pindex(ac.migratetype, 0)];
-
 	while (nr_populated < nr_pages) {
 
 		/* Skip existing pages */
@@ -5299,14 +5294,23 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 			continue;
 		}
 
+		/* Attempt the batch allocation */
+		local_lock_irqsave(&pagesets.lock, flags);
+		pcp = this_cpu_ptr(zone->per_cpu_pageset);
+		pcp_list = &pcp->lists[order_to_pindex(ac.migratetype, 0)];
+
 		page = __rmqueue_pcplist(zone, 0, ac.migratetype, alloc_flags,
 								pcp, pcp_list);
 		if (unlikely(!page)) {
 			/* Try and get at least one page */
 			if (!nr_populated)
 				goto failed_irq;
+
+			local_unlock_irqrestore(&pagesets.lock, flags);
 			break;
 		}
+
+		local_unlock_irqrestore(&pagesets.lock, flags);
 		nr_account++;
 
 		prep_new_page(page, 0, gfp, 0);
@@ -5316,8 +5320,6 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 			page_array[nr_populated] = page;
 		nr_populated++;
 	}
-
-	local_unlock_irqrestore(&pagesets.lock, flags);
 
 	__count_zid_vm_events(PGALLOC, zone_idx(zone), nr_account);
 	zone_statistics(ac.preferred_zoneref->zone, zone, nr_account);
