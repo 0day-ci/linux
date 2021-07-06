@@ -446,6 +446,14 @@ F:	Documentation/virt/acrn/
 F:	drivers/virt/acrn/
 F:	include/uapi/linux/acrn.h
 
+ACTIVE STATS
+M:	Lukasz Luba <lukasz.luba@arm.com>
+L:	linux-pm@vger.kernel.org
+S:	Maintained
+F:	Documentation/power/active_stats.rst
+F:	include/linux/active_stats.h
+F:	kernel/power/active_stats.c
+
 AD1889 ALSA SOUND DRIVER
 L:	linux-parisc@vger.kernel.org
 S:	Maintained
