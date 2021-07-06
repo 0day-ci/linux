@@ -4519,11 +4519,12 @@ static void schedule_delayed(struct ceph_mds_client *mdsc, unsigned long delay)
 
 static void delayed_work(struct work_struct *work)
 {
-	int i;
 	struct ceph_mds_client *mdsc =
 		container_of(work, struct ceph_mds_client, delayed_work.work);
+	unsigned long delay;
 	int renew_interval;
 	int renew_caps;
+	int i;
 
 	dout("mdsc delayed_work\n");
 
@@ -4563,7 +4564,7 @@ static void delayed_work(struct work_struct *work)
 	}
 	mutex_unlock(&mdsc->mutex);
 
-	ceph_check_delayed_caps(mdsc);
+	delay = ceph_check_delayed_caps(mdsc);
 
 	ceph_queue_cap_reclaim_work(mdsc);
 
@@ -4571,7 +4572,7 @@ static void delayed_work(struct work_struct *work)
 
 	maybe_recover_session(mdsc);
 
-	schedule_delayed(mdsc, 0);
+	schedule_delayed(mdsc, delay);
 }
 
 int ceph_mdsc_init(struct ceph_fs_client *fsc)
