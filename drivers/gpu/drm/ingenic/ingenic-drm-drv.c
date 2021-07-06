@@ -33,7 +33,6 @@
 #include <drm/drm_fourcc.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
-#include <drm/drm_irq.h>
 #include <drm/drm_managed.h>
 #include <drm/drm_of.h>
 #include <drm/drm_panel.h>
@@ -799,8 +798,6 @@ static const struct drm_driver ingenic_drm_driver_data = {
 	.fops			= &ingenic_drm_fops,
 	.gem_create_object	= ingenic_drm_gem_create_object,
 	DRM_GEM_CMA_DRIVER_OPS,
-
-	.irq_handler		= ingenic_drm_irq_handler,
 };
 
 static const struct drm_plane_funcs ingenic_drm_primary_plane_funcs = {
@@ -1099,7 +1096,7 @@ static int ingenic_drm_bind(struct device *dev, bool has_components)
 		encoder->possible_clones = clone_mask;
 	}
 
-	ret = drm_irq_install(drm, irq);
+	ret = request_irq(irq, ingenic_drm_irq_handler, 0, drm->driver->name, drm);
 	if (ret) {
 		dev_err(dev, "Unable to install IRQ handler\n");
 		return ret;
@@ -1193,14 +1190,18 @@ static void ingenic_drm_unbind(struct device *dev)
 {
 	struct ingenic_drm *priv = dev_get_drvdata(dev);
 	struct clk *parent_clk = clk_get_parent(priv->pix_clk);
+	struct drm_device *drm = &priv->drm;
+	struct platform_device *pdev = to_platform_device(drm->dev);
+
+	free_irq(platform_get_irq(pdev, 0), drm);
 
 	clk_notifier_unregister(parent_clk, &priv->clock_nb);
 	if (priv->lcd_clk)
 		clk_disable_unprepare(priv->lcd_clk);
 	clk_disable_unprepare(priv->pix_clk);
 
-	drm_dev_unregister(&priv->drm);
-	drm_atomic_helper_shutdown(&priv->drm);
+	drm_dev_unregister(drm);
+	drm_atomic_helper_shutdown(drm);
 }
 
 static const struct component_master_ops ingenic_master_ops = {
