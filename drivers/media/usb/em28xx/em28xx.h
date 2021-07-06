@@ -835,6 +835,7 @@ void em28xx_stop_urbs(struct em28xx *dev);
 int em28xx_set_mode(struct em28xx *dev, enum em28xx_mode set_mode);
 int em28xx_gpio_set(struct em28xx *dev, const struct em28xx_reg_seq *gpio);
 int em28xx_register_extension(struct em28xx_ops *dev);
+void em28xx_reset_lists(void);
 void em28xx_unregister_extension(struct em28xx_ops *dev);
 void em28xx_init_extension(struct em28xx *dev);
 void em28xx_close_extension(struct em28xx *dev);

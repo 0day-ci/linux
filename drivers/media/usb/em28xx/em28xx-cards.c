@@ -4148,6 +4148,8 @@ static void em28xx_usb_disconnect(struct usb_interface *intf)
 		dev->dev_next = NULL;
 	}
 	kref_put(&dev->ref, em28xx_free_device);
+
+	em28xx_reset_lists();
 }
 
 static int em28xx_usb_suspend(struct usb_interface *intf,

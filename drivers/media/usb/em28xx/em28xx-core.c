@@ -1131,6 +1131,12 @@ void em28xx_init_extension(struct em28xx *dev)
 	mutex_unlock(&em28xx_devlist_mutex);
 }
 
+void em28xx_reset_lists(void)
+{
+	INIT_LIST_HEAD(&em28xx_devlist);
+	INIT_LIST_HEAD(&em28xx_extension_devlist);
+}
+
 void em28xx_close_extension(struct em28xx *dev)
 {
 	const struct em28xx_ops *ops = NULL;
