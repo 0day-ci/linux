@@ -544,7 +544,7 @@ static void __init dmi_format_ids(char *buf, size_t len)
 			    dmi_get_system_info(DMI_PRODUCT_NAME));
 
 	board = dmi_get_system_info(DMI_BOARD_NAME);
-	if (board) {
+	if (board && *board) {
 		c += scnprintf(buf + c, len - c, "/");
 		c += print_filtered(buf + c, len - c, board);
 	}
