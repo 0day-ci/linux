@@ -1657,6 +1657,25 @@ static bool dp_ctrl_any_lane_cr_lose(struct dp_ctrl_private *ctrl,
 	return false;
 }
 
+static bool dp_ctrl_loss_symbol_lock(struct dp_ctrl_private *ctrl)
+{
+	u8 link_status[6];
+	u8 status;
+	int i;
+	int lane = ctrl->link->link_params.num_lanes;
+
+	dp_ctrl_read_link_status(ctrl, link_status);
+
+	for (i = 0; i < lane; i++) {
+		status = link_status[i / 2];
+		status >>= ((i % 2) * 4);
+		if (!(status & DP_LANE_SYMBOL_LOCKED))
+			return true;
+	}
+
+	return false;
+}
+
 int dp_ctrl_on_link(struct dp_ctrl *dp_ctrl)
 {
 	int rc = 0;
@@ -1773,6 +1792,17 @@ int dp_ctrl_on_link(struct dp_ctrl *dp_ctrl)
 	return rc;
 }
 
+static int dp_ctrl_link_retrain(struct dp_ctrl_private *ctrl)
+{
+	int ret = 0;
+	u8 cr_status[2];
+	int training_step = DP_TRAINING_NONE;
+
+	ret = dp_ctrl_setup_main_link(ctrl, cr_status, &training_step);
+
+	return ret;
+}
+
 int dp_ctrl_on_stream(struct dp_ctrl *dp_ctrl)
 {
 	int ret = 0;
@@ -1797,6 +1827,10 @@ int dp_ctrl_on_stream(struct dp_ctrl *dp_ctrl)
 			goto end;
 		}
 	}
+
+	/* if loss symbol lock happen, then retaining the link */
+	if (dp_ctrl_loss_symbol_lock(ctrl))
+		dp_ctrl_link_retrain(ctrl);
 
 	/* stop txing train pattern to end link training */
 	dp_ctrl_clear_training_pattern(ctrl);
