@@ -14,6 +14,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/active_stats.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/cpu_cooling.h>
@@ -387,6 +388,8 @@ static void cpufreq_notify_transition(struct cpufreq_policy *policy,
 
 		cpufreq_stats_record_transition(policy, freqs->new);
 		policy->cur = freqs->new;
+
+		active_stats_cpu_freq_change(policy->cpu, freqs->new);
 	}
 }
 
@@ -2091,6 +2094,8 @@ unsigned int cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
 	arch_set_freq_scale(policy->related_cpus, freq,
 			    policy->cpuinfo.max_freq);
 	cpufreq_stats_record_transition(policy, freq);
+
+	active_stats_cpu_freq_fast_change(policy->cpu, freq);
 
 	if (trace_cpu_frequency_enabled()) {
 		for_each_cpu(cpu, policy->cpus)
