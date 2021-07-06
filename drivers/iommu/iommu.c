@@ -1507,14 +1507,15 @@ EXPORT_SYMBOL_GPL(fsl_mc_device_group);
 static int iommu_get_def_domain_type(struct device *dev)
 {
 	const struct iommu_ops *ops = dev->bus->iommu_ops;
+	unsigned int type = 0;
 
 	if (dev_is_pci(dev) && to_pci_dev(dev)->untrusted)
 		return IOMMU_DOMAIN_DMA;
 
 	if (ops->def_domain_type)
-		return ops->def_domain_type(dev);
+		type = ops->def_domain_type(dev);
 
-	return 0;
+	return (type == 0) ? iommu_def_domain_type : type;
 }
 
 static int iommu_group_alloc_default_domain(struct bus_type *bus,
