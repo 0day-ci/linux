@@ -1101,6 +1101,7 @@ static void genpd_sync_power_on(struct generic_pm_domain *genpd, bool use_lock,
 				unsigned int depth)
 {
 	struct gpd_link *link;
+	int ret;
 
 	if (genpd_status_on(genpd))
 		return;
@@ -1117,8 +1118,9 @@ static void genpd_sync_power_on(struct generic_pm_domain *genpd, bool use_lock,
 			genpd_unlock(link->parent);
 	}
 
-	_genpd_power_on(genpd, false);
-	genpd->status = GENPD_STATE_ON;
+	ret = _genpd_power_on(genpd, false);
+	if (!ret)
+		genpd->status = GENPD_STATE_ON;
 }
 
 /**
