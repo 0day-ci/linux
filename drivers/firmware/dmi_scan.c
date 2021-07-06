@@ -535,17 +535,23 @@ static int __init print_filtered(char *buf, size_t len, const char *info)
 static void __init dmi_format_ids(char *buf, size_t len)
 {
 	int c = 0;
+	const char *vendor;
 	const char *board;	/* Board Name is optional */
+	const char *name;
 
-	c += print_filtered(buf + c, len - c,
-			    dmi_get_system_info(DMI_SYS_VENDOR));
+	vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+	if (!vendor || !*vendor)
+		vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+	c += print_filtered(buf + c, len - c, vendor);
 	c += scnprintf(buf + c, len - c, " ");
-	c += print_filtered(buf + c, len - c,
-			    dmi_get_system_info(DMI_PRODUCT_NAME));
+
+	name = dmi_get_system_info(DMI_PRODUCT_NAME);
+	c += print_filtered(buf + c, len - c, name);
 
 	board = dmi_get_system_info(DMI_BOARD_NAME);
 	if (board && *board) {
-		c += scnprintf(buf + c, len - c, "/");
+		if (name && *name)
+			c += scnprintf(buf + c, len - c, "/");
 		c += print_filtered(buf + c, len - c, board);
 	}
 	c += scnprintf(buf + c, len - c, ", BIOS ");
