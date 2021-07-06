@@ -5309,12 +5309,14 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 		}
 		nr_account++;
 
+		local_unlock_irqrestore(&pagesets.lock, flags);
 		prep_new_page(page, 0, gfp, 0);
 		if (page_list)
 			list_add(&page->lru, page_list);
 		else
 			page_array[nr_populated] = page;
 		nr_populated++;
+		local_lock_irqsave(&pagesets.lock, flags);
 	}
 
 	local_unlock_irqrestore(&pagesets.lock, flags);
