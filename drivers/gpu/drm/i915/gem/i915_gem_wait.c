@@ -305,7 +305,7 @@ i915_gem_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *file)
 int i915_gem_object_wait_migration(struct drm_i915_gem_object *obj,
 				   unsigned int flags)
 {
-	might_sleep();
+	dma_fence_might_wait();
 	/* NOP for now. */
 	return 0;
 }
