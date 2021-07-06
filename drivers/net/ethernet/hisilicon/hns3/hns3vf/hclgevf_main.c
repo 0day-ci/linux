@@ -3374,6 +3374,9 @@ static int hclgevf_init_hdev(struct hclgevf_dev *hdev)
 		goto err_config;
 	}
 
+	hclgevf_devlink_set_params_init_values(hdev);
+	devlink_params_publish(hdev->devlink);
+
 	ret = hclgevf_alloc_tqps(hdev);
 	if (ret) {
 		dev_err(&pdev->dev, "failed(%d) to allocate TQPs\n", ret);
