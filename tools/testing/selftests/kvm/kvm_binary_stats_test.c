@@ -109,6 +109,23 @@ static void stats_test(int stats_fd)
 		/* Check size field, which should not be zero */
 		TEST_ASSERT(pdesc->size, "KVM descriptor(%s) with size of 0",
 				pdesc->name);
+		/* Check hist_param field */
+		switch (pdesc->flags & KVM_STATS_TYPE_MASK) {
+		case KVM_STATS_TYPE_LINEAR_HIST:
+			TEST_ASSERT(pdesc->hist_param,
+			    "Bucket size of Linear Histogram stats (%s) is zero",
+			    pdesc->name);
+			break;
+		case KVM_STATS_TYPE_LOG_HIST:
+			TEST_ASSERT(pdesc->hist_param == 2,
+				"Base of Log Histogram stats (%s) is not 2",
+				pdesc->name);
+			break;
+		default:
+			TEST_ASSERT(!pdesc->hist_param,
+			    "Simple stats (%s) with hist_param of nonzero",
+			    pdesc->name);
+		}
 		size_data += pdesc->size * sizeof(*stats_data);
 	}
 	/* Check overlap */
