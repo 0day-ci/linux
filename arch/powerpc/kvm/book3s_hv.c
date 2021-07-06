@@ -4144,19 +4144,33 @@ out:
 
 	/* Attribute wait time */
 	if (do_sleep) {
-		vc->runner->stat.halt_wait_ns +=
+		vc->runner->stat.generic.halt_wait_ns +=
 			ktime_to_ns(cur) - ktime_to_ns(start_wait);
+		kvm_stats_log_hist_update(
+				vc->runner->stat.generic.halt_wait_hist,
+				LOGHIST_SIZE_LARGE,
+				ktime_to_ns(cur) - ktime_to_ns(start_wait));
 		/* Attribute failed poll time */
-		if (vc->halt_poll_ns)
+		if (vc->halt_poll_ns) {
 			vc->runner->stat.generic.halt_poll_fail_ns +=
 				ktime_to_ns(start_wait) -
 				ktime_to_ns(start_poll);
+			kvm_stats_log_hist_update(
+				vc->runner->stat.generic.halt_poll_fail_hist,
+				LOGHIST_SIZE_LARGE, ktime_to_ns(start_wait) -
+				ktime_to_ns(start_poll));
+		}
 	} else {
 		/* Attribute successful poll time */
-		if (vc->halt_poll_ns)
+		if (vc->halt_poll_ns) {
 			vc->runner->stat.generic.halt_poll_success_ns +=
 				ktime_to_ns(cur) -
 				ktime_to_ns(start_poll);
+			kvm_stats_log_hist_update(
+				vc->runner->stat.generic.halt_poll_success_hist,
+				LOGHIST_SIZE_LARGE,
+				ktime_to_ns(cur) - ktime_to_ns(start_poll));
+		}
 	}
 
 	/* Adjust poll time */
