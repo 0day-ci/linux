@@ -62,7 +62,7 @@ static int rvu_get_lmtaddr(struct rvu *rvu, u16 pcifunc,
 	int err;
 
 	if (!iova) {
-		dev_err(rvu->dev, "%s Requested Null address for transulation\n", __func__);
+		dev_err(rvu->dev, "%s Requested Null address for translation\n", __func__);
 		return -EINVAL;
 	}
 
@@ -74,12 +74,12 @@ static int rvu_get_lmtaddr(struct rvu *rvu, u16 pcifunc,
 
 	err = rvu_poll_reg(rvu, BLKADDR_RVUM, RVU_AF_SMMU_ADDR_RSP_STS, BIT_ULL(0), false);
 	if (err) {
-		dev_err(rvu->dev, "%s LMTLINE iova transulation failed\n", __func__);
+		dev_err(rvu->dev, "%s LMTLINE iova translation failed\n", __func__);
 		return err;
 	}
 	val = rvu_read64(rvu, BLKADDR_RVUM, RVU_AF_SMMU_ADDR_RSP_STS);
 	if (val & ~0x1ULL) {
-		dev_err(rvu->dev, "%s LMTLINE iova transulation failed err:%llx\n", __func__, val);
+		dev_err(rvu->dev, "%s LMTLINE iova translation failed err:%llx\n", __func__, val);
 		return -EIO;
 	}
 	/* PA[51:12] = RVU_AF_SMMU_TLN_FLIT1[60:21]
@@ -243,7 +243,7 @@ int rvu_set_channels_base(struct rvu *rvu)
 	/* If programmable channels are present then configure
 	 * channels such that all channel numbers are contiguous
 	 * leaving no holes. This way the new CPT channels can be
-	 * accomodated. The order of channel numbers assigned is
+	 * accommodated. The order of channel numbers assigned is
 	 * LBK, SDP, CGX and CPT.
 	 */
 	hw->sdp_chan_base = hw->lbk_chan_base + hw->lbk_links *
@@ -294,7 +294,7 @@ static void rvu_lbk_set_channels(struct rvu *rvu)
 	u16 chans;
 
 	/* To loopback packets between multiple NIX blocks
-	 * mutliple LBK blocks are needed. With two NIX blocks,
+	 * multiple LBK blocks are needed. With two NIX blocks,
 	 * four LBK blocks are needed and each LBK block
 	 * source and destination are as follows:
 	 * LBK0 - source NIX0 and destination NIX1

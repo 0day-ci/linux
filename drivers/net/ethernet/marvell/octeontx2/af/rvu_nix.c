@@ -398,11 +398,11 @@ static int rvu_nix_get_bpid(struct rvu *rvu, struct nix_bp_cfg_req *req,
 	pfvf = rvu_get_pfvf(rvu, req->hdr.pcifunc);
 
 	/* Backpressure IDs range division
-	 * CGX channles are mapped to (0 - 191) BPIDs
-	 * LBK channles are mapped to (192 - 255) BPIDs
-	 * SDP channles are mapped to (256 - 511) BPIDs
+	 * CGX channels are mapped to (0 - 191) BPIDs
+	 * LBK channels are mapped to (192 - 255) BPIDs
+	 * SDP channels are mapped to (256 - 511) BPIDs
 	 *
-	 * Lmac channles and bpids mapped as follows
+	 * Lmac channels and bpids mapped as follows
 	 * cgx(0)_lmac(0)_chan(0 - 15) = bpid(0 - 15)
 	 * cgx(0)_lmac(1)_chan(0 - 15) = bpid(16 - 31) ....
 	 * cgx(1)_lmac(0)_chan(0 - 15) = bpid(64 - 79) ....
@@ -1491,7 +1491,7 @@ static int nix_check_txschq_alloc_req(struct rvu *rvu, int lvl, u16 pcifunc,
 		return 0;
 	}
 
-	/* Get free SCHQ count and check if request can be accomodated */
+	/* Get free SCHQ count and check if request can be accommodated */
 	if (hw->cap.nix_fixed_txschq_mapping) {
 		nix_get_txschq_range(rvu, pcifunc, link, &start, &end);
 		schq = start + (pcifunc & RVU_PFVF_FUNC_MASK);
@@ -1625,7 +1625,7 @@ int rvu_mbox_handler_nix_txsch_alloc(struct rvu *rvu,
 	mutex_lock(&rvu->rsrc_lock);
 
 	/* Check if request is valid as per HW capabilities
-	 * and can be accomodated.
+	 * and can be accommodated.
 	 */
 	for (lvl = 0; lvl < NIX_TXSCH_LVL_CNT; lvl++) {
 		rc = nix_check_txschq_alloc_req(rvu, lvl, pcifunc, nix_hw, req);
@@ -3041,7 +3041,7 @@ static int reserve_flowkey_alg_idx(struct rvu *rvu, int blkaddr, u32 flow_cfg)
 			    NIX_AF_RX_FLOW_KEY_ALGX_FIELDX(hw->flowkey.in_use,
 							   fid), field[fid]);
 
-	/* Store the flow_cfg for futher lookup */
+	/* Store the flow_cfg for further lookup */
 	rc = hw->flowkey.in_use;
 	hw->flowkey.flowkey[rc] = flow_cfg;
 	hw->flowkey.in_use++;
@@ -3723,7 +3723,7 @@ static int rvu_nix_block_init(struct rvu *rvu, struct nix_hw *nix_hw)
 				    (ltdefs->rx_apad1.ltype_match << 4) |
 				    ltdefs->rx_apad1.ltype_mask);
 
-			/* Receive ethertype defination register defines layer
+			/* Receive ethertype definition register defines layer
 			 * information in NPC_RESULT_S to identify the Ethertype
 			 * location in L2 header. Used for Ethertype overwriting
 			 * in inline IPsec flow.

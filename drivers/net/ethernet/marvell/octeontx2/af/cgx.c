@@ -972,7 +972,7 @@ static int cgx_link_usertable_index_map(int speed)
 static void set_mod_args(struct cgx_set_link_mode_args *args,
 			 u32 speed, u8 duplex, u8 autoneg, u64 mode)
 {
-	/* Fill default values incase of user did not pass
+	/* Fill default values in case of user did not pass
 	 * valid parameters
 	 */
 	if (args->duplex == DUPLEX_UNKNOWN)
@@ -1183,7 +1183,7 @@ static irqreturn_t cgx_fwi_event_handler(int irq, void *data)
 		/* Ensure response is updated before thread context starts */
 		smp_wmb();
 
-		/* There wont be separate events for link change initiated from
+		/* There won't be separate events for link change initiated from
 		 * software; Hence report the command responses as events
 		 */
 		if (cgx_cmdresp_is_linkevent(event))

@@ -1048,7 +1048,7 @@ void npc_enadis_default_mce_entry(struct rvu *rvu, u16 pcifunc,
 		return;
 	}
 
-	/* return incase mce list is not enabled */
+	/* return in case mce list is not enabled */
 	pfvf = rvu_get_pfvf(rvu, pcifunc & ~RVU_PFVF_FUNC_MASK);
 	if (hw->cap.nix_rx_multicast && is_vf(pcifunc) &&
 	    type != NIXLF_BCAST_ENTRY && !pfvf->use_mce_list)
@@ -2298,7 +2298,7 @@ npc_get_mcam_search_range_priority(struct npc_mcam *mcam,
 	 * - If reference entry is not in hprio zone then
 	 *      search range: ref_entry to end.
 	 * - If reference entry is in hprio zone and if
-	 *   request can be accomodated in non-hprio zone then
+	 *   request can be accommodated in non-hprio zone then
 	 *      search range: 'start of middle zone' to 'end'
 	 * - else search in reverse, so that less number of hprio
 	 *   zone entries are allocated.
@@ -2325,7 +2325,7 @@ hprio:
 	 * - If reference entry is not in lprio zone then
 	 *      search range: 0 to ref_entry.
 	 * - If reference entry is in lprio zone and if
-	 *   request can be accomodated in middle zone then
+	 *   request can be accommodated in middle zone then
 	 *      search range: 'hprio_end' to 'lprio_start'
 	 */
 
@@ -2376,7 +2376,7 @@ static int npc_mcam_alloc_entries(struct npc_mcam *mcam, u16 pcifunc,
 	 * Reverse bitmap is used to allocate entries
 	 * - when a higher priority entry is requested
 	 * - when available free entries are less.
-	 * Lower priority ones out of avaialble free entries are always
+	 * Lower priority ones out of available free entries are always
 	 * chosen when 'high vs low' question arises.
 	 */
 
@@ -2397,7 +2397,7 @@ static int npc_mcam_alloc_entries(struct npc_mcam *mcam, u16 pcifunc,
 	hp_fcnt = npc_mcam_get_free_count(mcam->bmap, 0, mcam->hprio_end);
 	fcnt = mcam->bmap_fcnt - lp_fcnt - hp_fcnt;
 
-	/* Check if request can be accomodated in the middle zone */
+	/* Check if request can be accommodated in the middle zone */
 	if (fcnt > req->count) {
 		start = mcam->hprio_end;
 		end = mcam->lprio_start;
@@ -2461,7 +2461,7 @@ alloc:
 		}
 	}
 
-	/* If allocating requested no of entries is unsucessful,
+	/* If allocating requested no of entries is unsuccessful,
 	 * expand the search range to full bitmap length and retry.
 	 */
 	if (!req->priority && (rsp->count < req->count) &&

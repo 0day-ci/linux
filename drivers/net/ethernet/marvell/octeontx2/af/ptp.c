@@ -117,7 +117,7 @@ static int ptp_adjfine(struct ptp *ptp, long scaled_ppm)
 
 	/* The hardware adds the clock compensation value to the PTP clock
 	 * on every coprocessor clock cycle. Typical convention is that it
-	 * represent number of nanosecond betwen each cycle. In this
+	 * represent number of nanosecond between each cycle. In this
 	 * convention compensation value is in 64 bit fixed-point
 	 * representation where upper 32 bits are number of nanoseconds
 	 * and lower is fractions of nanosecond.
@@ -127,7 +127,7 @@ static int ptp_adjfine(struct ptp *ptp, long scaled_ppm)
 	 * arithmetic on following formula
 	 * comp = tbase + tbase * scaled_ppm / (1M * 2^16)
 	 * where tbase is the basic compensation value calculated
-	 * initialy in the probe function.
+	 * initially in the probe function.
 	 */
 	comp = ((u64)1000000000ull << 32) / ptp->clock_rate;
 	/* convert scaled_ppm to ppb */

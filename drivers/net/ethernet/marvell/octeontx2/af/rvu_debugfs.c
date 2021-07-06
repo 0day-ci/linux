@@ -431,7 +431,7 @@ static void print_npa_qsize(struct seq_file *m, struct rvu_pfvf *pfvf)
 /* The 'qsize' entry dumps current Aura/Pool context Qsize
  * and each context's current enable/disable status in a bitmap.
  */
-static int rvu_dbg_qsize_display(struct seq_file *filp, void *unsused,
+static int rvu_dbg_qsize_display(struct seq_file *filp, void *unused,
 				 int blktype)
 {
 	void (*print_qsize)(struct seq_file *filp,
@@ -2141,7 +2141,7 @@ static void rvu_print_npc_mcam_info(struct seq_file *s,
 	}
 }
 
-static int rvu_dbg_npc_mcam_info_display(struct seq_file *filp, void *unsued)
+static int rvu_dbg_npc_mcam_info_display(struct seq_file *filp, void *unused)
 {
 	struct rvu *rvu = filp->private;
 	int pf, vf, numvfs, blkaddr;
