@@ -516,7 +516,7 @@ static int ext4_journalled_submit_inode_data_buffers(struct jbd2_inode *jinode)
 		.nr_to_write = LONG_MAX,
 		.range_start = jinode->i_dirty_start,
 		.range_end = jinode->i_dirty_end,
-        };
+	};
 
 	return write_cache_pages(mapping, &wbc,
 				 ext4_journalled_writepage_callback,
@@ -860,9 +860,11 @@ const char *ext4_decode_error(struct super_block *sb, int errno,
 			errstr = "Readonly filesystem";
 		break;
 	default:
-		/* If the caller passed in an extra buffer for unknown
+		/*
+		 * If the caller passed in an extra buffer for unknown
 		 * errors, textualise them now.  Else we just return
-		 * NULL. */
+		 * NULL.
+		 */
 		if (nbuf) {
 			/* Check for truncated error codes... */
 			if (snprintf(nbuf, 16, "error %d", -errno) >= 0)
@@ -874,8 +876,10 @@ const char *ext4_decode_error(struct super_block *sb, int errno,
 	return errstr;
 }
 
-/* __ext4_std_error decodes expected errors from journaling functions
- * automatically and invokes the appropriate error response.  */
+/*
+ * __ext4_std_error decodes expected errors from journaling functions
+ * automatically and invokes the appropriate error response.
+ */
 
 void __ext4_std_error(struct super_block *sb, const char *function,
 		      unsigned int line, int errno)
@@ -886,9 +890,11 @@ void __ext4_std_error(struct super_block *sb, const char *function,
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(sb))))
 		return;
 
-	/* Special case: if the error is EROFS, and we're not already
+	/*
+	 * Special case: if the error is EROFS, and we're not already
 	 * inside a transaction, then there's really no point in logging
-	 * an error. */
+	 * an error.
+	 */
 	if (errno == -EROFS && journal_current_handle() == NULL && sb_rdonly(sb))
 		return;
 
@@ -1228,10 +1234,12 @@ static void ext4_put_super(struct super_block *sb)
 		kfree(get_qf_name(sb, sbi, i));
 #endif
 
-	/* Debugging code just in case the in-memory inode orphan list
+	/*
+	 * Debugging code just in case the in-memory inode orphan list
 	 * isn't empty.  The on-disk one can be non-empty if we've
 	 * detected an error and taken the fs readonly, but the
-	 * in-memory list had better be clean by this point. */
+	 * in-memory list had better be clean by this point.
+	 */
 	if (!list_empty(&sbi->s_orphan))
 		dump_orphan_list(sb, sbi);
 	ASSERT(list_empty(&sbi->s_orphan));
@@ -4321,7 +4329,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 				 encoding_flags);
 			goto failed_mount;
 		}
-		ext4_msg(sb, KERN_INFO,"Using encoding defined by superblock: "
+		ext4_msg(sb, KERN_INFO, "Using encoding defined by superblock: "
 			 "%s-%s with flags 0x%hx", encoding_info->name,
 			 encoding_info->version?:"\b", encoding_flags);
 
@@ -4849,11 +4857,14 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount_wq;
 	}
 
-	/* We have now updated the journal if required, so we can
-	 * validate the data journaling mode. */
+	/*
+	 * We have now updated the journal if required, so we can
+	 * validate the data journaling mode.
+	 */
 	switch (test_opt(sb, DATA_FLAGS)) {
 	case 0:
-		/* No mode set, assume a default based on the journal
+		/*
+		 * No mode set, assume a default based on the journal
 		 * capabilities: ORDERED_DATA if the journal can
 		 * cope, else JOURNAL_DATA
 		 */
@@ -6492,8 +6503,10 @@ static int ext4_quota_off(struct super_block *sb, int type)
 	handle_t *handle;
 	int err;
 
-	/* Force all delayed allocation blocks to be allocated.
-	 * Caller already holds s_umount sem */
+	/*
+	 * Force all delayed allocation blocks to be allocated.
+	 * Caller already holds s_umount sem
+	 */
 	if (test_opt(sb, DELALLOC))
 		sync_filesystem(sb);
 
@@ -6530,10 +6543,12 @@ out:
 	return dquot_quota_off(sb, type);
 }
 
-/* Read data from quotafile - avoid pagecache and such because we cannot afford
+/*
+ * Read data from quotafile - avoid pagecache and such because we cannot afford
  * acquiring the locks... As quota files are never truncated and quota code
  * itself serializes the operations (and no one else should touch the files)
- * we don't have to be afraid of races */
+ * we don't have to be afraid of races
+ */
 static ssize_t ext4_quota_read(struct super_block *sb, int type, char *data,
 			       size_t len, loff_t off)
 {
@@ -6569,8 +6584,10 @@ static ssize_t ext4_quota_read(struct super_block *sb, int type, char *data,
 	return len;
 }
 
-/* Write to quotafile (we know the transaction is already started and has
- * enough credits) */
+/*
+ * Write to quotafile, we know, that the transaction was already started
+ * and has enough credits.
+ */
 static ssize_t ext4_quota_write(struct super_block *sb, int type,
 				const char *data, size_t len, loff_t off)
 {
