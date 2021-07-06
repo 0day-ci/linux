@@ -162,6 +162,17 @@ Currently, the types available are:
 
   - The device is able to do memory to memory copies
 
+- - DMA_MEMCPY_SG
+
+  - The device supports memory to memory scatter-gather transfers.
+
+  - Even though a plain memcpy can look like a particular case of a
+    scatter-gather transfer, with a single chunk to transfer, it's a
+    distinct transaction type in the mem2mem transfer case. This is
+    because some very simple devices might be able to do contiguous
+    single-chunk memory copies, but have no support for more
+    complex SG transfers.
+
 - DMA_XOR
 
   - The device is able to perform XOR operations on memory areas
