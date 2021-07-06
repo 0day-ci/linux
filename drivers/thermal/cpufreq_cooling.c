@@ -10,6 +10,7 @@
  *		Viresh Kumar <viresh.kumar@linaro.org>
  *
  */
+#include <linux/active_stats.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/cpu_cooling.h>
@@ -61,6 +62,7 @@ struct time_in_idle {
  * @policy: cpufreq policy.
  * @idle_time: idle time stats
  * @qos_req: PM QoS contraint to apply
+ * @ast_mon: Active Stats Monitor array of pointers
  *
  * This structure is required for keeping information of each registered
  * cpufreq_cooling_device.
@@ -75,6 +77,9 @@ struct cpufreq_cooling_device {
 	struct time_in_idle *idle_time;
 #endif
 	struct freq_qos_request qos_req;
+#ifdef CONFIG_ACTIVE_STATS
+	struct active_stats_monitor **ast_mon;
+#endif
 };
 
 #ifdef CONFIG_THERMAL_GOV_POWER_ALLOCATOR
@@ -123,6 +128,107 @@ static u32 cpu_power_to_freq(struct cpufreq_cooling_device *cpufreq_cdev,
 
 	return cpufreq_cdev->em->table[i].frequency;
 }
+
+#ifdef CONFIG_ACTIVE_STATS
+static u32 account_cpu_power(struct active_stats_monitor *ast_mon,
+			     struct em_perf_domain *em)
+{
+	u64 single_power, residency, total_time;
+	struct active_stats_state *result;
+	u32 power = 0;
+	int i;
+
+	mutex_lock(&ast_mon->lock);
+	result = ast_mon->snapshot.result;
+	total_time = ast_mon->local_period;
+
+	for (i = 0; i < ast_mon->states_count; i++) {
+		residency = result->residency[i];
+		single_power = em->table[i].power * residency;
+		single_power = div64_u64(single_power, total_time);
+		power += (u32)single_power;
+	}
+
+	mutex_unlock(&ast_mon->lock);
+
+	return power;
+}
+
+static u32 get_power_est(struct cpufreq_cooling_device *cdev)
+{
+	int num_cpus, ret, i;
+	u32 total_power = 0;
+
+	num_cpus = cpumask_weight(cdev->policy->related_cpus);
+
+	for (i = 0; i < num_cpus; i++) {
+		ret = active_stats_cpu_update_monitor(cdev->ast_mon[i]);
+		if (ret)
+			return 0;
+
+		total_power += account_cpu_power(cdev->ast_mon[i], cdev->em);
+	}
+
+	return total_power;
+}
+
+static int cpufreq_get_requested_power(struct thermal_cooling_device *cdev,
+				       u32 *power)
+{
+	struct cpufreq_cooling_device *cpufreq_cdev = cdev->devdata;
+	struct cpufreq_policy *policy = cpufreq_cdev->policy;
+
+	*power = get_power_est(cpufreq_cdev);
+
+	trace_thermal_power_cpu_get_power(policy->related_cpus, 0, 0, 0,
+					  *power);
+
+	return 0;
+}
+
+static void clean_cpu_monitoring(struct cpufreq_cooling_device *cdev)
+{
+	int num_cpus, i;
+
+	if (!cdev->ast_mon)
+		return;
+
+	num_cpus = cpumask_weight(cdev->policy->related_cpus);
+
+	for (i = 0; i < num_cpus; i++)
+		active_stats_cpu_free_monitor(cdev->ast_mon[i++]);
+
+	kfree(cdev->ast_mon);
+	cdev->ast_mon = NULL;
+}
+
+static int setup_cpu_monitoring(struct cpufreq_cooling_device *cdev)
+{
+	int cpu, cpus, i = 0;
+
+	if (cdev->ast_mon)
+		return 0;
+
+	cpus = cpumask_weight(cdev->policy->related_cpus);
+
+	cdev->ast_mon = kcalloc(cpus, sizeof(struct active_stats_monitor *),
+				GFP_KERNEL);
+	if (!cdev->ast_mon)
+		return -ENOMEM;
+
+	for_each_cpu(cpu, cdev->policy->related_cpus) {
+		cdev->ast_mon[i] = active_stats_cpu_setup_monitor(cpu);
+		if (IS_ERR_OR_NULL(cdev->ast_mon[i++]))
+			goto cleanup;
+	}
+
+	return 0;
+
+cleanup:
+	clean_cpu_monitoring(cdev);
+	return -EINVAL;
+}
+#else
 
 /**
  * get_load() - get load for a cpu
@@ -182,6 +288,15 @@ static u32 get_dynamic_power(struct cpufreq_cooling_device *cpufreq_cdev,
 
 	raw_cpu_power = cpu_freq_to_power(cpufreq_cdev, freq);
 	return (raw_cpu_power * cpufreq_cdev->last_load) / 100;
+}
+
+static void clean_cpu_monitoring(struct cpufreq_cooling_device *cpufreq_cdev)
+{
+}
+
+static int setup_cpu_monitoring(struct cpufreq_cooling_device *cpufreq_cdev)
+{
+	return 0;
 }
 
 /**
@@ -252,6 +367,7 @@ static int cpufreq_get_requested_power(struct thermal_cooling_device *cdev,
 
 	return 0;
 }
+#endif
 
 /**
  * cpufreq_state2power() - convert a cpu cdev state to power consumed
@@ -321,6 +437,20 @@ static int cpufreq_power2state(struct thermal_cooling_device *cdev,
 	trace_thermal_power_cpu_limit(policy->related_cpus, target_freq, *state,
 				      power);
 	return 0;
+}
+
+static int cpufreq_change_governor(struct thermal_cooling_device *cdev,
+				   bool governor_up)
+{
+	struct cpufreq_cooling_device *cpufreq_cdev = cdev->devdata;
+	int ret = 0;
+
+	if (governor_up)
+		ret = setup_cpu_monitoring(cpufreq_cdev);
+	else
+		clean_cpu_monitoring(cpufreq_cdev);
+
+	return ret;
 }
 
 static inline bool em_is_sane(struct cpufreq_cooling_device *cpufreq_cdev,
@@ -566,6 +696,7 @@ __cpufreq_cooling_register(struct device_node *np,
 		cooling_ops->get_requested_power = cpufreq_get_requested_power;
 		cooling_ops->state2power = cpufreq_state2power;
 		cooling_ops->power2state = cpufreq_power2state;
+		cooling_ops->change_governor = cpufreq_change_governor;
 	} else
 #endif
 	if (policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED) {
@@ -690,6 +821,7 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
 
 	thermal_cooling_device_unregister(cdev);
 	freq_qos_remove_request(&cpufreq_cdev->qos_req);
+	clean_cpu_monitoring(cpufreq_cdev);
 	free_idle_time(cpufreq_cdev);
 	kfree(cpufreq_cdev);
 }
