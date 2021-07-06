@@ -33,7 +33,7 @@ static int sy7636a_get_vcom_voltage_op(struct regulator_dev *rdev)
 
 static int sy7636a_get_status(struct regulator_dev *rdev)
 {
-	struct sy7636a *sy7636a = rdev_get_drvdata(rdev);
+	struct sy7636a *sy7636a = dev_get_drvdata(rdev->dev.parent);
 	int ret = 0;
 
 	ret = gpiod_get_value_cansleep(sy7636a->pgood_gpio);
