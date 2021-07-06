@@ -197,6 +197,14 @@ int da9063_device_init(struct da9063 *da9063, unsigned int irq)
 		}
 	}
 
+	ret = regmap_read(da9063->regmap, DA9063_REG_T_OFFSET, &da9063->t_offset);
+	if (ret < 0) {
+		da9063->t_offset = 0;
+		dev_warn(da9063->dev,
+			 "Temperature trimming value cannot be read (defaulting to 0)\n");
+		ret = 0;
+	}
+
 	return ret;
 }
 
