@@ -335,6 +335,21 @@ void __dma_fence_might_wait(void)
 }
 #endif
 
+/**
+ * dma_fence_might_wait - entering a section which might wait on DMA fence
+ * critical section.
+ *
+ * This is also potentially useful for drivers to call directly, when annotating
+ * a path where hitting the actual wait path might be difficult or unlikely
+ * through normal testing.
+ */
+void dma_fence_might_wait(void)
+{
+	might_sleep();
+	__dma_fence_might_wait();
+}
+EXPORT_SYMBOL(dma_fence_might_wait);
+
 
 /**
  * dma_fence_signal_timestamp_locked - signal completion of a fence
@@ -495,9 +510,7 @@ dma_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 	if (WARN_ON(timeout < 0))
 		return -EINVAL;
 
-	might_sleep();
-
-	__dma_fence_might_wait();
+	dma_fence_might_wait();
 
 	trace_dma_fence_wait_start(fence);
 	if (fence->ops->wait)
