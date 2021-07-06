@@ -1327,7 +1327,7 @@ static int cygnus_ssp_probe(struct platform_device *pdev)
 	if (IS_ERR(cygaud->i2s_in))
 		return PTR_ERR(cygaud->i2s_in);
 
-	/* Tri-state all controlable pins until we know that we need them */
+	/* Tri-state all controllable pins until we know that we need them */
 	writel(CYGNUS_SSP_TRISTATE_MASK,
 			cygaud->audio + AUD_MISC_SEROUT_OE_REG_BASE);
 
