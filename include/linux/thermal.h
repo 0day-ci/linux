@@ -87,6 +87,7 @@ struct thermal_cooling_device_ops {
 	int (*get_requested_power)(struct thermal_cooling_device *, u32 *);
 	int (*state2power)(struct thermal_cooling_device *, unsigned long, u32 *);
 	int (*power2state)(struct thermal_cooling_device *, u32, unsigned long *);
+	int (*change_governor)(struct thermal_cooling_device *cdev, bool set);
 };
 
 struct thermal_cooling_device {
