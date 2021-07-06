@@ -5345,6 +5345,9 @@ static void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 	if (!cfs_b->throttled_cfs_rq.next)
 		return;
 
+	if (cfs_b->quota != RUNTIME_INF)
+		cfs_bandwidth_usage_dec();
+
 	hrtimer_cancel(&cfs_b->period_timer);
 	hrtimer_cancel(&cfs_b->slack_timer);
 }
