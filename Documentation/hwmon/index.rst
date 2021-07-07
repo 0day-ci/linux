@@ -51,6 +51,7 @@ Hardware Monitoring Kernel Drivers
    corsair-psu
    da9052
    da9055
+   da9063
    dell-smm-hwmon
    dme1737
    drivetemp
