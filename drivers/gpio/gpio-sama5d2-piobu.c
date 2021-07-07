@@ -189,7 +189,6 @@ static int sama5d2_piobu_probe(struct platform_device *pdev)
 	if (!piobu)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, piobu);
 	piobu->chip.label = pdev->name;
 	piobu->chip.parent = &pdev->dev;
 	piobu->chip.of_node = pdev->dev.of_node;
@@ -210,12 +209,6 @@ static int sama5d2_piobu_probe(struct platform_device *pdev)
 		return PTR_ERR(piobu->regmap);
 	}
 
-	ret = devm_gpiochip_add_data(&pdev->dev, &piobu->chip, piobu);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to add gpiochip %d\n", ret);
-		return ret;
-	}
-
 	for (i = 0; i < PIOBU_NUM; ++i) {
 		ret = sama5d2_piobu_setup_pin(&piobu->chip, i);
 		if (ret) {
@@ -225,7 +218,7 @@ static int sama5d2_piobu_probe(struct platform_device *pdev)
 		}
 	}
 
-	return 0;
+	return devm_gpiochip_add_data(&pdev->dev, &piobu->chip, piobu);
 }
 
 static const struct of_device_id sama5d2_piobu_ids[] = {
