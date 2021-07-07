@@ -1118,7 +1118,7 @@ static int cs42l73_set_bias_level(struct snd_soc_component *component,
 			mdelay(cs42l73->shutdwn_delay);
 			cs42l73->shutdwn_delay = 0;
 		} else {
-			mdelay(15); /* Min amount of time requred to power
+			mdelay(15); /* Min amount of time required to power
 				     * down.
 				     */
 		}

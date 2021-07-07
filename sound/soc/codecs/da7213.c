@@ -778,7 +778,7 @@ static int da7213_dai_event(struct snd_soc_dapm_widget *w,
 
 		return 0;
 	case SND_SOC_DAPM_POST_PMD:
-		/* Revert 32KHz PLL lock udpates if applied previously */
+		/* Revert 32KHz PLL lock updates if applied previously */
 		pll_ctrl = snd_soc_component_read(component, DA7213_PLL_CTRL);
 		if (pll_ctrl & DA7213_PLL_32K_MODE) {
 			snd_soc_component_write(component, 0xF0, 0x8B);

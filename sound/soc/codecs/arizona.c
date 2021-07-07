@@ -2261,7 +2261,7 @@ static int arizona_calc_fll(struct arizona_fll *fll,
 
 	arizona_fll_dbg(fll, "Fref=%u Fout=%u\n", Fref, fll->fout);
 
-	/* Fvco should be over the targt; don't check the upper bound */
+	/* Fvco should be over the target; don't check the upper bound */
 	div = ARIZONA_FLL_MIN_OUTDIV;
 	while (fll->fout * div < ARIZONA_FLL_MIN_FVCO * fll->vco_mult) {
 		div++;

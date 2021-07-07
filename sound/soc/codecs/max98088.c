@@ -95,7 +95,7 @@ static const struct reg_default max98088_reg[] = {
 
 	{ 0x30, 0x00 }, /* 30 DAI1 playback level */
 	{ 0x31, 0x00 }, /* 31 DAI2 playback level */
-	{ 0x32, 0x00 }, /* 32 DAI2 playbakc level */
+	{ 0x32, 0x00 }, /* 32 DAI2 playback level */
 	{ 0x33, 0x00 }, /* 33 left ADC level */
 	{ 0x34, 0x00 }, /* 34 right ADC level */
 	{ 0x35, 0x00 }, /* 35 MIC1 level */

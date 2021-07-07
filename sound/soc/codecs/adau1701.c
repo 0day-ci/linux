@@ -689,7 +689,7 @@ static int adau1701_probe(struct snd_soc_component *component)
 	 */
 	adau1701->pll_clkdiv = ADAU1707_CLKDIV_UNSET;
 
-	/* initalize with pre-configured pll mode settings */
+	/* initialize with pre-configured pll mode settings */
 	ret = adau1701_reset(component, adau1701->pll_clkdiv, 0);
 	if (ret < 0)
 		goto exit_regulators_disable;

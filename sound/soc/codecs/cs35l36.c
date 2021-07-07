@@ -1246,7 +1246,7 @@ static int cs35l36_component_probe(struct snd_soc_component *component)
 	 * L37 is 12V
 	 * If L36 we need to clamp some values for safety
 	 * after probe has setup dt values. We want to make
-	 * sure we dont miss any values set in probe
+	 * sure we don't miss any values set in probe
 	 */
 	if (cs35l36->chip_version == CS35L36_10V_L36) {
 		regmap_update_bits(cs35l36->regmap,

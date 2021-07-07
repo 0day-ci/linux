@@ -265,7 +265,7 @@ static int ad1836_probe(struct snd_soc_component *component)
 	regmap_write(ad1836->regmap, AD1836_DAC_CTRL2, 0x0);
 	/* high-pass filter enable, power-on adc */
 	regmap_write(ad1836->regmap, AD1836_ADC_CTRL1, 0x100);
-	/* unmute adc channles, adc aux mode */
+	/* unmute adc channels, adc aux mode */
 	regmap_write(ad1836->regmap, AD1836_ADC_CTRL2, 0x180);
 	/* volume */
 	for (i = 1; i <= num_dacs; ++i) {

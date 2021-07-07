@@ -684,7 +684,7 @@ static int adau1372_set_tdm_slot(struct snd_soc_dai *dai, unsigned int tx_mask,
 
 	/* I2S mode */
 	if (slots == 0) {
-		/* The other settings dont matter in I2S mode */
+		/* The other settings don't matter in I2S mode */
 		regmap_update_bits(adau1372->regmap, ADAU1372_REG_SAI0,
 				   ADAU1372_SAI0_SAI_MASK, ADAU1372_SAI0_SAI_I2S);
 		adau1372->rate_constraints.mask = ADAU1372_RATE_MASK_TDM2;

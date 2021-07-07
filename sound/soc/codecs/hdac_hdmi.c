@@ -1051,7 +1051,7 @@ static void hdac_hdmi_add_pinmux_cvt_route(struct hdac_device *hdev,
  * Widgets are added in the below sequence
  *	Converter widgets for num converters enumerated
  *	Pin-port widgets for num ports for Pins enumerated
- *	Pin-port mux widgets to represent connenction list of pin widget
+ *	Pin-port mux widgets to represent connection list of pin widget
  *
  * For each port, one Mux and One output widget is added
  * Total widgets elements = num_cvt + (num_ports * 2);
@@ -1256,7 +1256,7 @@ static void hdac_hdmi_present_sense(struct hdac_hdmi_pin *pin,
 		return;
 
 	/*
-	 * In case of non MST pin, get_eld info API expectes port
+	 * In case of non MST pin, get_eld info API expects port
 	 * to be -1.
 	 */
 	mutex_lock(&hdmi->pin_mutex);
@@ -2039,7 +2039,7 @@ static int hdmi_codec_resume(struct device *dev)
 	/*
 	 * As the ELD notify callback request is not entertained while the
 	 * device is in suspend state. Need to manually check detection of
-	 * all pins here. pin capablity change is not support, so use the
+	 * all pins here. pin capability change is not support, so use the
 	 * already set pin caps.
 	 *
 	 * NOTE: this is safe to call even if the codec doesn't actually resume.

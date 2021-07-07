@@ -521,7 +521,7 @@ static int ak4613_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	 *
 	 * Calling ak4613_dummy_write() function might be delayed.
 	 * In such case, ak4613 volume might be temporarily 0dB when
-	 * beggining of playback.
+	 * beginning of playback.
 	 * see also
 	 *	ak4613_dummy_write()
 	 */

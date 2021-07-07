@@ -176,7 +176,7 @@ static const struct snd_soc_dapm_route cs4270_dapm_routes[] = {
  * @speed_mode is the corresponding bit pattern to be written to the
  * MODE bits of the Mode Control Register
  *
- * @mclk is the corresponding bit pattern to be wirten to the MCLK bits of
+ * @mclk is the corresponding bit pattern to be written to the MCLK bits of
  * the Mode Control Register.
  *
  * In situations where a single ratio is represented by multiple speed
