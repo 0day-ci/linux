@@ -564,16 +564,30 @@ static int max9286_notify_bound(struct v4l2_async_notifier *notifier,
 		return 0;
 
 	/*
+	 * Once all cameras have probed, increase the channel amplitude
+	 * to compensate for the remote noise immunity threshold and call
+	 * the camera post_register operation to complete initialization with
+	 * noise immunity enabled.
+	 */
+	max9286_reverse_channel_setup(priv, MAX9286_REV_AMP_HIGH);
+	for_each_source(priv, source) {
+		ret = v4l2_subdev_call(source->sd, core, post_register);
+		if (ret) {
+			dev_err(&priv->client->dev,
+				"Failed to initialize camera device %u\n",
+				index);
+			return ret;
+		}
+	}
+
+	/*
 	 * All enabled sources have probed and enabled their reverse control
 	 * channels:
 	 *
-	 * - Increase the reverse channel amplitude to compensate for the
-	 *   remote ends high threshold
 	 * - Verify all configuration links are properly detected
 	 * - Disable auto-ack as communication on the control channel are now
 	 *   stable.
 	 */
-	max9286_reverse_channel_setup(priv, MAX9286_REV_AMP_HIGH);
 	max9286_check_config_link(priv, priv->source_mask);
 	max9286_configure_i2c(priv, false);
 
@@ -626,6 +640,7 @@ static int max9286_v4l2_notifier_register(struct max9286_priv *priv)
 	}
 
 	priv->notifier.ops = &max9286_notify_ops;
+	priv->notifier.flags |= V4L2_ASYNC_NOTIFIER_DEFER_POST_REGISTER;
 
 	ret = v4l2_async_subdev_notifier_register(&priv->sd, &priv->notifier);
 	if (ret) {
