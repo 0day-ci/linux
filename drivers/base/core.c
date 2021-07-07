@@ -539,7 +539,8 @@ static void devlink_remove_symlinks(struct device *dev,
 	struct device *con = link->consumer;
 	char *buf;
 
-	sysfs_remove_link(&link->link_dev.kobj, "consumer");
+	if (device_is_registered(con))
+		sysfs_remove_link(&link->link_dev.kobj, "consumer");
 	sysfs_remove_link(&link->link_dev.kobj, "supplier");
 
 	len = max(strlen(dev_bus_name(sup)) + strlen(dev_name(sup)),
@@ -552,8 +553,10 @@ static void devlink_remove_symlinks(struct device *dev,
 		return;
 	}
 
-	snprintf(buf, len, "supplier:%s:%s", dev_bus_name(sup), dev_name(sup));
-	sysfs_remove_link(&con->kobj, buf);
+	if (device_is_registered(con)) {
+		snprintf(buf, len, "supplier:%s:%s", dev_bus_name(sup), dev_name(sup));
+		sysfs_remove_link(&con->kobj, buf);
+	}
 	snprintf(buf, len, "consumer:%s:%s", dev_bus_name(con), dev_name(con));
 	sysfs_remove_link(&sup->kobj, buf);
 	kfree(buf);
@@ -1531,6 +1534,19 @@ static void device_links_purge(struct device *dev)
 
 	device_links_write_unlock();
 }
+
+/**
+ * device_links_scrap - Device was never registered, delete any device links.
+ * @dev: Target device.
+ */
+void device_links_scrap(struct device *dev)
+{
+	if (WARN_ON(device_is_registered(dev)))
+		return;
+
+	device_links_purge(dev);
+}
+EXPORT_SYMBOL_GPL(device_links_scrap);
 
 #define FW_DEVLINK_FLAGS_PERMISSIVE	(DL_FLAG_INFERRED | \
 					 DL_FLAG_SYNC_STATE_ONLY)

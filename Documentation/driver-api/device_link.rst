@@ -75,7 +75,9 @@ driver is compiled as a module, the device link is added on module load and
 orderly deleted on unload.  The same restrictions that apply to device link
 addition (e.g. exclusion of a parallel suspend/resume transition) apply equally
 to deletion.  Device links managed by the driver core are deleted automatically
-by it.
+by it, except if the consumer device is never registered (e.g. because of an
+error), in which case the device links must be explicitly removed using
+:c:func:`device_links_scrap()`.
 
 Several flags may be specified on device link addition, two of which
 have already been mentioned above:  ``DL_FLAG_STATELESS`` to express that no
@@ -317,4 +319,5 @@ State machine
 API
 ===
 
-See device_link_add(), device_link_del() and device_link_remove().
+See device_link_add(), device_link_del(), device_link_remove() and
+device_links_scrap().
