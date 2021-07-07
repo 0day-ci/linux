@@ -13,6 +13,18 @@
  * can test against in a regular manner.
  */
 
+static const struct intel_step_info skl_revids[] = {
+	[0] = { .gt_step = STEP_A0 },
+	[1] = { .gt_step = STEP_B0 },
+	[2] = { .gt_step = STEP_C0 },
+	[3] = { .gt_step = STEP_D0 },
+	[4] = { .gt_step = STEP_E0 },
+	[5] = { .gt_step = STEP_F0 },
+	[6] = { .gt_step = STEP_G0 },
+	[7] = { .gt_step = STEP_H0 },
+	[8] = { .gt_step = STEP_I0 },
+	[9] = { .gt_step = STEP_J0 },
+};
 
 /* FIXME: what about REVID_E0 */
 static const struct intel_step_info kbl_revids[] = {
@@ -76,6 +88,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_KABYLAKE(i915)) {
 		revids = kbl_revids;
 		size = ARRAY_SIZE(kbl_revids);
+	} else if (IS_SKYLAKE(i915)) {
+		revids = skl_revids;
+		size = ARRAY_SIZE(skl_revids);
 	}
 
 	/* Not using the stepping scheme for the platform yet. */
@@ -111,6 +126,9 @@ void intel_step_init(struct drm_i915_private *i915)
 
 	if (drm_WARN_ON(&i915->drm, step.gt_step == STEP_NONE))
 		return;
+
+	if (step.display_step == STEP_NONE)
+		step.display_step = step.gt_step;
 
 	RUNTIME_INFO(i915)->step = step;
 }
