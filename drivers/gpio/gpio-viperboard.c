@@ -422,12 +422,8 @@ static int vprbrd_gpio_probe(struct platform_device *pdev)
 	vb_gpio->gpiob.direction_input = vprbrd_gpiob_direction_input;
 	vb_gpio->gpiob.direction_output = vprbrd_gpiob_direction_output;
 	ret = devm_gpiochip_add_data(&pdev->dev, &vb_gpio->gpiob, vb_gpio);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(vb_gpio->gpiob.parent, "could not add gpio b");
-		return ret;
-	}
-
-	platform_set_drvdata(pdev, vb_gpio);
 
 	return ret;
 }
