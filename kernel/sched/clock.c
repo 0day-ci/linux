@@ -183,6 +183,7 @@ static void __clear_sched_clock_stable(void)
 		return;
 
 	tick_dep_set(TICK_DEP_BIT_CLOCK_UNSTABLE);
+	pr_warn("sched_clock: Marking unstable.\n");
 	schedule_work(&sched_clock_work);
 }
 
