@@ -798,42 +798,24 @@ static int ext4_ioctl_checkpoint(struct file *filp, unsigned long arg)
 	__u32 flags = 0;
 	unsigned int flush_flags = 0;
 	struct super_block *sb = file_inode(filp)->i_sb;
-	struct request_queue *q;
 
-	if (copy_from_user(&flags, (__u32 __user *)arg,
-				sizeof(__u32)))
+	if (copy_from_user(&flags, (__u32 __user *)arg, sizeof(__u32)))
 		return -EFAULT;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	/* check for invalid bits set */
-	if ((flags & ~EXT4_IOC_CHECKPOINT_FLAG_VALID) ||
-				((flags & JBD2_JOURNAL_FLUSH_DISCARD) &&
-				(flags & JBD2_JOURNAL_FLUSH_ZEROOUT)))
+	if (flags & ~EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT)
 		return -EINVAL;
 
 	if (!EXT4_SB(sb)->s_journal)
 		return -ENODEV;
 
-	if (flags & ~JBD2_JOURNAL_FLUSH_VALID)
-		return -EINVAL;
-
-	q = bdev_get_queue(EXT4_SB(sb)->s_journal->j_dev);
-	if (!q)
-		return -ENXIO;
-	if ((flags & JBD2_JOURNAL_FLUSH_DISCARD) && !blk_queue_discard(q))
-		return -EOPNOTSUPP;
-
-	if (flags & EXT4_IOC_CHECKPOINT_FLAG_DRY_RUN)
-		return 0;
-
-	if (flags & EXT4_IOC_CHECKPOINT_FLAG_DISCARD)
-		flush_flags |= JBD2_JOURNAL_FLUSH_DISCARD;
-
 	if (flags & EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT) {
 		flush_flags |= JBD2_JOURNAL_FLUSH_ZEROOUT;
-		pr_info_ratelimited("warning: checkpointing journal with EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT can be slow");
+		if (!bdev_write_zeroes_sectors(EXT4_SB(sb)->s_journal->j_dev))
+			pr_info_ratelimited("warning: checkpointing journal with EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT can be slow");
 	}
 
 	jbd2_journal_lock_updates(EXT4_SB(sb)->s_journal);

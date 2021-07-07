@@ -1685,34 +1685,16 @@ static void jbd2_mark_journal_empty(journal_t *journal, int write_op)
 /**
  * __jbd2_journal_erase() - Discard or zeroout journal blocks (excluding superblock)
  * @journal: The journal to erase.
- * @flags: A discard/zeroout request is sent for each physically contigous
- *	region of the journal. Either JBD2_JOURNAL_FLUSH_DISCARD or
- *	JBD2_JOURNAL_FLUSH_ZEROOUT must be set to determine which operation
- *	to perform.
  *
- * Note: JBD2_JOURNAL_FLUSH_ZEROOUT attempts to use hardware offload. Zeroes
- * will be explicitly written if no hardware offload is available, see
- * blkdev_issue_zeroout for more details.
+ * Note: Attempts to use hardware offload. Zeroes will be explicitly written if
+ * no hardware offload is available, see blkdev_issue_zeroout for more details.
  */
-static int __jbd2_journal_erase(journal_t *journal, unsigned int flags)
+static int __jbd2_journal_erase(journal_t *journal)
 {
 	int err = 0;
 	unsigned long block, log_offset; /* logical */
 	unsigned long long phys_block, block_start, block_stop; /* physical */
 	loff_t byte_start, byte_stop, byte_count;
-	struct request_queue *q = bdev_get_queue(journal->j_dev);
-
-	/* flags must be set to either discard or zeroout */
-	if ((flags & ~JBD2_JOURNAL_FLUSH_VALID) || !flags ||
-			((flags & JBD2_JOURNAL_FLUSH_DISCARD) &&
-			(flags & JBD2_JOURNAL_FLUSH_ZEROOUT)))
-		return -EINVAL;
-
-	if (!q)
-		return -ENXIO;
-
-	if ((flags & JBD2_JOURNAL_FLUSH_DISCARD) && !blk_queue_discard(q))
-		return -EOPNOTSUPP;
 
 	/*
 	 * lookup block mapping and issue discard/zeroout for each
@@ -1762,18 +1744,10 @@ static int __jbd2_journal_erase(journal_t *journal, unsigned int flags)
 		truncate_inode_pages_range(journal->j_dev->bd_inode->i_mapping,
 				byte_start, byte_stop);
 
-		if (flags & JBD2_JOURNAL_FLUSH_DISCARD) {
-			err = blkdev_issue_discard(journal->j_dev,
-					byte_start >> SECTOR_SHIFT,
-					byte_count >> SECTOR_SHIFT,
-					GFP_NOFS, 0);
-		} else if (flags & JBD2_JOURNAL_FLUSH_ZEROOUT) {
-			err = blkdev_issue_zeroout(journal->j_dev,
-					byte_start >> SECTOR_SHIFT,
-					byte_count >> SECTOR_SHIFT,
-					GFP_NOFS, 0);
-		}
-
+		err = blkdev_issue_zeroout(journal->j_dev,
+				byte_start >> SECTOR_SHIFT,
+				byte_count >> SECTOR_SHIFT,
+				GFP_NOFS, 0);
 		if (unlikely(err != 0)) {
 			pr_err("JBD2: (error %d) unable to wipe journal at physical blocks %llu - %llu",
 					err, block_start, block_stop);
@@ -2453,7 +2427,6 @@ EXPORT_SYMBOL(jbd2_journal_clear_features);
  * can be issued on the journal blocks after flushing.
  *
  * flags:
- *	JBD2_JOURNAL_FLUSH_DISCARD: issues discards for the journal blocks
  *	JBD2_JOURNAL_FLUSH_ZEROOUT: issues zeroouts for the journal blocks
  */
 int jbd2_journal_flush(journal_t *journal, unsigned int flags)
@@ -2511,8 +2484,8 @@ int jbd2_journal_flush(journal_t *journal, unsigned int flags)
 	 * s_start value. */
 	jbd2_mark_journal_empty(journal, REQ_SYNC | REQ_FUA);
 
-	if (flags)
-		err = __jbd2_journal_erase(journal, flags);
+	if (flags & JBD2_JOURNAL_FLUSH_ZEROOUT)
+		err = __jbd2_journal_erase(journal);
 
 	mutex_unlock(&journal->j_checkpoint_mutex);
 	write_lock(&journal->j_state_lock);

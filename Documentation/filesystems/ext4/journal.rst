@@ -742,15 +742,8 @@ the filesystem including journal recovery, filesystem resizing, and freeing of
 the journal_t structure.
 
 A journal checkpoint can be triggered from userspace via the ioctl
-EXT4_IOC_CHECKPOINT. This ioctl takes a single, u64 argument for flags.
-Currently, three flags are supported. First, EXT4_IOC_CHECKPOINT_FLAG_DRY_RUN
-can be used to verify input to the ioctl. It returns error if there is any
-invalid input, otherwise it returns success without performing
-any checkpointing. This can be used to check whether the ioctl exists on a
-system and to verify there are no issues with arguments or flags. The
-other two flags are EXT4_IOC_CHECKPOINT_FLAG_DISCARD and
-EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT. These flags cause the journal blocks to be
-discarded or zero-filled, respectively, after the journal checkpoint is
-complete. EXT4_IOC_CHECKPOINT_FLAG_DISCARD and EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT
-cannot both be set. The ioctl may be useful when snapshotting a system or for
-complying with content deletion SLOs.
+EXT4_IOC_CHECKPOINT. This ioctl takes a u64 argument for flags.
+The only supported flags is EXT4_IOC_CHECKPOINT_FLAG_ZEROOUT. This flag cause
+the journal blocks to be zero-filled after the journal checkpoint is complete.
+The ioctl may be useful when snapshotting a system or for complying with
+content deletion SLOs.
