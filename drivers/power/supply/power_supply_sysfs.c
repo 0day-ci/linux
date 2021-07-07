@@ -78,6 +78,7 @@ static const char * const POWER_SUPPLY_STATUS_TEXT[] = {
 	[POWER_SUPPLY_STATUS_DISCHARGING]	= "Discharging",
 	[POWER_SUPPLY_STATUS_NOT_CHARGING]	= "Not charging",
 	[POWER_SUPPLY_STATUS_FULL]		= "Full",
+	[POWER_SUPPLY_STATUS_FULL_CHARGING]	= "Full charging",
 };
 
 static const char * const POWER_SUPPLY_CHARGE_TYPE_TEXT[] = {
