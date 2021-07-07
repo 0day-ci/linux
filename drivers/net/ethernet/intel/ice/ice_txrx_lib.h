@@ -32,6 +32,22 @@ ice_build_ctob(u64 td_cmd, u64 td_offset, unsigned int size, u64 td_tag)
 }
 
 /**
+ * ice_xdp_ring_set_rs - Sets RS bit on a Tx descriptor
+ * @xdp_ring: XDP Tx ring
+ *
+ * This function sets RS bit on the last descriptor of a batch,
+ * before the update of HW tail register
+ */
+static inline void ice_xdp_ring_set_rs(struct ice_ring *xdp_ring)
+{
+	struct ice_tx_desc *next_rs_desc;
+
+	next_rs_desc = ICE_TX_DESC(xdp_ring, xdp_ring->next_rs_idx);
+	next_rs_desc->cmd_type_offset_bsz |=
+		cpu_to_le64(ICE_TX_DESC_CMD_RS << ICE_TXD_QW1_CMD_S);
+}
+
+/**
  * ice_xdp_ring_update_tail - Updates the XDP Tx ring tail register
  * @xdp_ring: XDP Tx ring
  *
