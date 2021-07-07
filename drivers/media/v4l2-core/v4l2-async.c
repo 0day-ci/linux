@@ -293,6 +293,16 @@ static int v4l2_async_match_notify(struct v4l2_async_notifier *notifier,
 		return ret;
 	}
 
+	if (!(notifier->flags & V4L2_ASYNC_NOTIFIER_DEFER_POST_REGISTER) &&
+	    sd->ops->core && sd->ops->core->post_register) {
+		ret = sd->ops->core->post_register(sd);
+		if (ret) {
+			v4l2_async_notifier_call_unbind(notifier, sd, sd->asd);
+			v4l2_device_unregister_subdev(sd);
+			return ret;
+		}
+	}
+
 	/* Remove from the waiting list */
 	list_del(&asd->list);
 	sd->asd = asd;
