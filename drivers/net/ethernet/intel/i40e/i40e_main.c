@@ -100,6 +100,35 @@ MODULE_LICENSE("GPL v2");
 static struct workqueue_struct *i40e_wq;
 
 /**
+ * i40e_pseudo_num_online_cpus - use as possible as what we can use actually
+ * @pf: board private structure
+ *
+ * We mignt not use all the cores because some old nics are not compatible
+ * with the machine which has a large number of cores, say, 128 cores
+ * combined with X722 nic.
+ *
+ * We should avoid this situation where the number of core is too large
+ * while the nic is a little bit old. Therefore, we have to limit the
+ * actual number of cpus we can use by adding the calculation of parameters
+ * of the hardware.
+ *
+ * The algorithm is violent and shrink the number exponentially, so that we
+ * make sure that the driver can work definitely.
+ */
+static u16 i40e_pseudo_num_online_cpus(struct i40e_pf *pf)
+{
+	u32 limit;
+	u16 pow;
+
+	limit = pf->hw.func_caps.num_tx_qp / 3;
+	pow = roundup_pow_of_two(num_online_cpus());
+	while (pow >= limit)
+		pow = rounddown_pow_of_two(pow - 1);
+
+	return pow;
+}
+
+/**
  * i40e_allocate_dma_mem_d - OS specific memory alloc for shared code
  * @hw:   pointer to the HW structure
  * @mem:  ptr to mem struct to fill out
@@ -11395,7 +11424,7 @@ static int i40e_init_msix(struct i40e_pf *pf)
 	 * will use any remaining vectors to reach as close as we can to the
 	 * number of online CPUs.
 	 */
-	cpus = num_online_cpus();
+	cpus = i40e_pseudo_num_online_cpus(pf);
 	pf->num_lan_msix = min_t(int, cpus, vectors_left / 2);
 	vectors_left -= pf->num_lan_msix;
 
@@ -11457,7 +11486,7 @@ static int i40e_init_msix(struct i40e_pf *pf)
 	 * the number of vectors for num_lan_msix to be at most 50% of the
 	 * available vectors, to allow for other features. Now, we add back
 	 * the remaining vectors. However, we ensure that the total
-	 * num_lan_msix will not exceed num_online_cpus(). To do this, we
+	 * num_lan_msix will not exceed i40e_pseudo_num_online_cpus(). To do this, we
 	 * calculate the number of vectors we can add without going over the
 	 * cap of CPUs. For systems with a small number of CPUs this will be
 	 * zero.
@@ -12102,7 +12131,7 @@ int i40e_reconfig_rss_queues(struct i40e_pf *pf, int queue_count)
 	if (!(pf->flags & I40E_FLAG_RSS_ENABLED))
 		return 0;
 
-	queue_count = min_t(int, queue_count, num_online_cpus());
+	queue_count = min_t(int, queue_count, i40e_pseudo_num_online_cpus(pf));
 	new_rss_size = min_t(int, queue_count, pf->rss_size_max);
 
 	if (queue_count != vsi->num_queue_pairs) {
@@ -12348,13 +12377,13 @@ static int i40e_sw_init(struct i40e_pf *pf)
 				 pf->hw.func_caps.num_tx_qp);
 
 	/* find the next higher power-of-2 of num cpus */
-	pow = roundup_pow_of_two(num_online_cpus());
+	pow = roundup_pow_of_two(i40e_pseudo_num_online_cpus(pf));
 	pf->rss_size_max = min_t(int, pf->rss_size_max, pow);
 
 	if (pf->hw.func_caps.rss) {
 		pf->flags |= I40E_FLAG_RSS_ENABLED;
 		pf->alloc_rss_size = min_t(int, pf->rss_size_max,
-					   num_online_cpus());
+					   i40e_pseudo_num_online_cpus(pf));
 	}
 
 	/* MFP mode enabled */
@@ -12446,16 +12475,16 @@ static int i40e_sw_init(struct i40e_pf *pf)
 	    pf->hw.aq.fw_maj_ver >= 6)
 		pf->hw_features |= I40E_HW_PTP_L4_CAPABLE;
 
-	if (pf->hw.func_caps.vmdq && num_online_cpus() != 1) {
+	if (pf->hw.func_caps.vmdq && i40e_pseudo_num_online_cpus(pf) != 1) {
 		pf->num_vmdq_vsis = I40E_DEFAULT_NUM_VMDQ_VSI;
 		pf->flags |= I40E_FLAG_VMDQ_ENABLED;
 		pf->num_vmdq_qps = i40e_default_queues_per_vmdq(pf);
 	}
 
-	if (pf->hw.func_caps.iwarp && num_online_cpus() != 1) {
+	if (pf->hw.func_caps.iwarp && i40e_pseudo_num_online_cpus(pf) != 1) {
 		pf->flags |= I40E_FLAG_IWARP_ENABLED;
 		/* IWARP needs one extra vector for CQP just like MISC.*/
-		pf->num_iwarp_msix = (int)num_online_cpus() + 1;
+		pf->num_iwarp_msix = (int)i40e_pseudo_num_online_cpus(pf) + 1;
 	}
 	/* Stopping FW LLDP engine is supported on XL710 and X722
 	 * starting from FW versions determined in i40e_init_adminq.
@@ -14805,7 +14834,7 @@ static void i40e_determine_queue_usage(struct i40e_pf *pf)
 		}
 
 		/* limit lan qps to the smaller of qps, cpus or msix */
-		q_max = max_t(int, pf->rss_size_max, num_online_cpus());
+		q_max = max_t(int, pf->rss_size_max, i40e_pseudo_num_online_cpus(pf));
 		q_max = min_t(int, q_max, pf->hw.func_caps.num_tx_qp);
 		q_max = min_t(int, q_max, pf->hw.func_caps.num_msix_vectors);
 		pf->num_lan_qps = q_max;
