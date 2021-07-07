@@ -7361,6 +7361,7 @@ static void yield_task_fair(struct rq *rq)
 static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
 {
 	struct sched_entity *se = &p->se;
+	struct sched_entity *curr = &rq->curr->se;
 
 	/* throttled hierarchies are not runnable */
 	if (!se->on_rq || throttled_hierarchy(cfs_rq_of(se)))
@@ -7370,6 +7371,16 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
 	set_next_buddy(se);
 
 	yield_task_fair(rq);
+
+	/*
+	 * This path is special and only called from KVM. In contrast to yield,
+	 * in yield_to we really know that current is spinning and we know
+	 * (s390) or have good heuristics whom are we waiting for. There is
+	 * absolutely no point in continuing the current task, even if this
+	 * means to become unfairer. Let us give the current process some
+	 * "fake" penalty.
+	 */
+	curr->vruntime += sched_slice(cfs_rq_of(curr), curr);
 
 	return true;
 }
