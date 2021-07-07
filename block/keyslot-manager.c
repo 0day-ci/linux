@@ -468,12 +468,101 @@ bool blk_ksm_is_empty(struct blk_keyslot_manager *ksm)
 }
 EXPORT_SYMBOL_GPL(blk_ksm_is_empty);
 
+/*
+ * Restrict the supported data unit sizes of the ksm based on the request queue
+ * limits
+ */
+static unsigned long
+blk_ksm_largest_dus_for_queue_limits(struct blk_keyslot_manager *ksm,
+				     struct request_queue *q)
+{
+	/* The largest possible data unit size we support is PAGE_SIZE. */
+	unsigned long largest_dus = PAGE_SIZE;
+	struct queue_limits *limits = &q->limits;
+
+	/*
+	 * If the queue doesn't support SG gaps, then a bio may have to be split
+	 * between any two bio_vecs.  Since the size of each bio_vec is only
+	 * guaranteed to be a multiple of logical_block_size, logical_block_size
+	 * is also the maximum crypto data unit size that can be supported in
+	 * this case, as bios must not be split in the middle of a data unit.
+	 */
+	if (limits->virt_boundary_mask)
+		largest_dus = queue_logical_block_size(q);
+
+	/*
+	 * Similarly, if chunk_sectors is set and a bio is submitted that
+	 * crosses a chunk boundary, then that bio may have to be split at a
+	 * boundary that is only logical_block_size aligned.  So that limits the
+	 * crypto data unit size to logical_block_size as well.
+	 */
+	if (limits->chunk_sectors)
+		largest_dus = queue_logical_block_size(q);
+
+	/*
+	 * Each bio_vec can be as small as logical_block_size.  Therefore the
+	 * crypto data unit size can't be greater than 'max_segments *
+	 * logical_block_size', as otherwise in the worst case there would be no
+	 * way to process the first data unit without exceeding max_segments.
+	 */
+	largest_dus = min(largest_dus,
+			  rounddown_pow_of_two(limits->max_segments) *
+			  queue_logical_block_size(q));
+
+	return largest_dus;
+}
+
+/**
+ * blk_ksm_register() - Sets the queue's keyslot manager to the provided ksm, if
+ *			compatible
+ * @ksm: The ksm to register
+ * @q: The request_queue to register the ksm to
+ *
+ * Checks if the keyslot manager provided is compatible with the request queue
+ * (i.e. the queue shouldn't also support integrity). After that, the crypto
+ * capabilities of the given keyslot manager are restricted to what the queue
+ * can support based on it's limits. Note that if @ksm won't support any
+ * crypto capabilities if its capabilities are restricted, the queue's ksm is
+ * set to NULL, instead of being set to a pointer to an "empty" @ksm, and @ksm
+ * is *not* modified.
+ *
+ * Return: true if @q's ksm is set to the provided @ksm, false otherwise
+ *	   (in which case @ksm will not have been modified)
+ */
 bool blk_ksm_register(struct blk_keyslot_manager *ksm, struct request_queue *q)
 {
+	unsigned long largest_dus_allowed;
+	unsigned int dus_allowed_mask;
+	bool dus_was_restricted = false;
+	int i;
+
 	if (blk_integrity_queue_supports_integrity(q)) {
 		pr_warn("Integrity and hardware inline encryption are not supported together. Disabling hardware inline encryption.\n");
 		return false;
 	}
+
+	largest_dus_allowed = blk_ksm_largest_dus_for_queue_limits(ksm, q);
+	dus_allowed_mask = (largest_dus_allowed << 1) - 1;
+
+	/*
+	 * Check if ksm will become empty if we clear disallowed data unit
+	 * sizes (in which case, don't modify the ksm)
+	 */
+	if (blk_ksm_is_empty_mask(ksm, dus_allowed_mask))
+		return false;
+
+	/* Clear all unsupported data unit sizes. */
+	for (i = 0; i < ARRAY_SIZE(ksm->crypto_modes_supported); i++) {
+		if (ksm->crypto_modes_supported[i] & (~dus_allowed_mask))
+			dus_was_restricted = true;
+		ksm->crypto_modes_supported[i] &= dus_allowed_mask;
+	}
+
+	if (dus_was_restricted) {
+		pr_warn("Device: %s - Disallowed use of encryption data unit sizes above %lu bytes with inline encryption hardware because of device request queue limits.\n",
+			q->backing_dev_info->dev_name, largest_dus_allowed);
+	}
+
 	q->ksm = ksm;
 	return true;
 }
