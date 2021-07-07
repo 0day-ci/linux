@@ -247,97 +247,82 @@ bool intel_dmc_has_payload(struct drm_i915_private *i915)
 	return i915->dmc.dmc_info[DMC_FW_MAIN].payload;
 }
 
-static const struct stepping_info icl_stepping_info[] = {
-	{'A', '0'}, {'A', '1'}, {'A', '2'},
-	{'B', '0'}, {'B', '2'},
-	{'C', '0'}
-};
-
-static const struct stepping_info no_stepping_info = { '*', '*' };
 struct stepping_info *display_step;
 
 static const struct stepping_info *
 intel_get_stepping_info(struct drm_i915_private *dev_priv)
 {
 	struct intel_step_info step = RUNTIME_INFO(dev_priv)->step;
-	const struct stepping_info *si;
-	unsigned int size;
 
-	if (IS_ICELAKE(dev_priv)) {
-		size = ARRAY_SIZE(icl_stepping_info);
-		si = icl_stepping_info;
-	}
-
-	if (IS_ICELAKE(dev_priv))
-		return INTEL_REVID(dev_priv) < size ? si + INTEL_REVID(dev_priv) : &no_stepping_info;
-
-	else {
-		switch (step.display_step) {
-		case STEP_A0:
-			display_step->stepping = 'A';
-			display_step->substepping = '0';
-			break;
-		case STEP_A1:
-			display_step->stepping = 'A';
-			display_step->substepping = '1';
-			break;
-		case STEP_A2:
-			display_step->stepping = 'A';
-			display_step->substepping = '2';
-			break;
-		case STEP_B0:
-			display_step->stepping = 'B';
-			display_step->substepping = '0';
-			break;
-		case STEP_B1:
-			display_step->stepping = 'B';
-			display_step->substepping = '1';
-			break;
-		case STEP_B2:
-			display_step->stepping = 'B';
-			display_step->substepping = '2';
-			break;
-		case STEP_C0:
-			display_step->stepping = 'C';
-			display_step->substepping = '0';
-			break;
-		case STEP_D0:
-			display_step->stepping = 'D';
-			display_step->substepping = '0';
-			break;
-		case STEP_D1:
-			display_step->stepping = 'D';
-			display_step->substepping = '1';
-			break;
-		case STEP_E0:
-			display_step->stepping = 'E';
-			display_step->substepping = '0';
-			break;
-		case STEP_F0:
-			display_step->stepping = 'F';
-			display_step->substepping = '0';
-			break;
-		case STEP_G0:
-			display_step->stepping = 'G';
-			display_step->substepping = '0';
-			break;
-		case STEP_H0:
-			display_step->stepping = 'H';
-			display_step->substepping = '0';
-			break;
-		case STEP_I0:
-			display_step->stepping = 'I';
-			display_step->substepping = '0';
-			break;
-		case STEP_J0:
-			display_step->stepping = 'J';
-			display_step->substepping = '0';
-			break;
-		default:
-			display_step->stepping = '*';
-			display_step->substepping = '*';
-			break;
-		}
+	switch (step.display_step) {
+	case STEP_A0:
+		display_step->stepping = 'A';
+		display_step->substepping = '0';
+		break;
+	case STEP_A1:
+		display_step->stepping = 'A';
+		display_step->substepping = '1';
+		break;
+	case STEP_A2:
+		display_step->stepping = 'A';
+		display_step->substepping = '2';
+		break;
+	case STEP_B0:
+		display_step->stepping = 'B';
+		display_step->substepping = '0';
+		break;
+	case STEP_B1:
+		display_step->stepping = 'B';
+		display_step->substepping = '1';
+		break;
+	case STEP_B2:
+		display_step->stepping = 'B';
+		display_step->substepping = '2';
+		break;
+	case STEP_C0:
+		display_step->stepping = 'C';
+		display_step->substepping = '0';
+		break;
+	case STEP_C1:
+		display_step->stepping = 'C';
+		display_step->substepping = '1';
+		break;
+	case STEP_D0:
+		display_step->stepping = 'D';
+		display_step->substepping = '0';
+		break;
+	case STEP_D1:
+		display_step->stepping = 'D';
+		display_step->substepping = '1';
+		break;
+	case STEP_E0:
+		display_step->stepping = 'E';
+		display_step->substepping = '0';
+		break;
+	case STEP_F0:
+		display_step->stepping = 'F';
+		display_step->substepping = '0';
+		break;
+	case STEP_G0:
+		display_step->stepping = 'G';
+		display_step->substepping = '0';
+		break;
+	case STEP_H0:
+		display_step->stepping = 'H';
+		display_step->substepping = '0';
+		break;
+	case STEP_I0:
+		display_step->stepping = 'I';
+		display_step->substepping = '0';
+		break;
+	case STEP_J0:
+		display_step->stepping = 'J';
+		display_step->substepping = '0';
+		break;
+	default:
+		display_step->stepping = '*';
+		display_step->substepping = '*';
+		break;
 	}
 	return display_step;
 }

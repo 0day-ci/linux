@@ -35,6 +35,15 @@ static const struct intel_step_info bxt_revids[] = {
 	[8] = { .gt_step = STEP_B2 },
 };
 
+static const struct intel_step_info icl_revids[] = {
+	[0] = { .gt_step = STEP_A0 },
+	[3] = { .gt_step = STEP_B0 },
+	[4] = { .gt_step = STEP_B2 },
+	[5] = { .gt_step = STEP_C0 },
+	[6] = { .gt_step = STEP_C1 },
+	[7] = { .gt_step = STEP_D0 },
+};
+
 /* FIXME: what about REVID_E0 */
 static const struct intel_step_info kbl_revids[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
@@ -103,6 +112,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_BROXTON(i915)) {
 		revids = bxt_revids;
 		size = ARRAY_SIZE(bxt_revids);
+	} else if (IS_ICELAKE(i915)) {
+		revids = icl_revids;
+		size = ARRAY_SIZE(icl_revids);
 	}
 
 	/* Not using the stepping scheme for the platform yet. */

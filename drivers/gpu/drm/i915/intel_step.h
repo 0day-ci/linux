@@ -28,6 +28,7 @@ enum intel_step {
 	STEP_B1,
 	STEP_B2,
 	STEP_C0,
+	STEP_C1,
 	STEP_D0,
 	STEP_D1,
 	STEP_E0,
