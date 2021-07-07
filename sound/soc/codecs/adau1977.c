@@ -241,7 +241,7 @@ static int adau1977_reset(struct adau1977 *adau1977)
 }
 
 /*
- * Returns the appropriate setting for ths FS field in the CTRL0 register
+ * Returns the appropriate setting for the FS field in the CTRL0 register
  * depending on the rate.
  */
 static int adau1977_lookup_fs(unsigned int rate)

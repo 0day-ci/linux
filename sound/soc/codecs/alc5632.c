@@ -149,7 +149,7 @@ static const DECLARE_TLV_DB_RANGE(boost_tlv,
 );
 /* 0db min scale, 6 db steps, no mute */
 static const DECLARE_TLV_DB_SCALE(dig_tlv, 0, 600, 0);
-/* 0db min scalem 0.75db steps, no mute */
+/* 0db min scale 0.75db steps, no mute */
 static const DECLARE_TLV_DB_SCALE(vdac_tlv, -3525, 75, 0);
 
 static const struct snd_kcontrol_new alc5632_vol_snd_controls[] = {

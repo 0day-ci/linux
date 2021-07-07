@@ -19,7 +19,7 @@
  *
  * CPU/Codec DAI image
  *
- * CPU-DAI1 (plaback only fmt = RIGHT_J) --+-- ak4554
+ * CPU-DAI1 (playback only fmt = RIGHT_J) --+-- ak4554
  *					   |
  * CPU-DAI2 (capture only fmt = LEFT_J) ---+
  */

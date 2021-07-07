@@ -800,7 +800,7 @@ static const struct snd_soc_dapm_widget cpcap_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA("EMU Left PGA",
 		CPCAP_REG_RXOA, CPCAP_BIT_EMU_SPKR_L_EN, 0, NULL, 0),
 
-	/* Headet Charge Pump */
+	/* Headset Charge Pump */
 	SND_SOC_DAPM_SUPPLY("Headset Charge Pump",
 		CPCAP_REG_RXOA, CPCAP_BIT_ST_HS_CP_EN, 0, NULL, 0),
 

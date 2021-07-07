@@ -752,7 +752,7 @@ static void config_eint_init_by_mode(struct mt6359_accdet *priv)
 	/* ESD switches on */
 	regmap_update_bits(priv->regmap, RG_ACCDETSPARE_ADDR,
 			   1 << 8, 1 << 8);
-	/* before playback, set NCP pull low before nagative voltage */
+	/* before playback, set NCP pull low before negative voltage */
 	regmap_update_bits(priv->regmap, RG_NCP_PDDIS_EN_ADDR,
 			   RG_NCP_PDDIS_EN_MASK_SFT, BIT(RG_NCP_PDDIS_EN_SFT));
 

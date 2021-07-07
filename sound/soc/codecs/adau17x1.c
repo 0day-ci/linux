@@ -876,7 +876,7 @@ static int adau17x1_setup_firmware(struct snd_soc_component *component,
 	 * point in performing the below steps as the call to
 	 * sigmadsp_setup(...) will return directly when it finds the sample
 	 * rate to be the same as before. By checking this we can prevent an
-	 * audiable popping noise which occours when toggling DSP_RUN.
+	 * audible popping noise which occurs when toggling DSP_RUN.
 	 */
 	if (adau->sigmadsp->current_samplerate == rate)
 		return 0;

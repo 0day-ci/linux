@@ -565,7 +565,7 @@ static int cx2072x_reg_read(void *context, unsigned int reg,
 	return 0;
 }
 
-/* get suggested pre_div valuce from mclk frequency */
+/* get suggested pre_div value from mclk frequency */
 static unsigned int get_div_from_mclk(unsigned int mclk)
 {
 	unsigned int div = 8;
@@ -1571,7 +1571,7 @@ static struct snd_soc_dai_driver soc_codec_cx2072x_dai[] = {
 		.ops = &cx2072x_dai_ops,
 		.symmetric_rate = 1,
 	},
-	{ /* plabayck only, return echo reference to Conexant DSP chip */
+	{ /* playback only, return echo reference to Conexant DSP chip */
 		.name = "cx2072x-dsp",
 		.id	= CX2072X_DAI_DSP,
 		.probe = cx2072x_dsp_dai_probe,
@@ -1584,7 +1584,7 @@ static struct snd_soc_dai_driver soc_codec_cx2072x_dai[] = {
 		},
 		.ops = &cx2072x_dai_ops,
 	},
-	{ /* plabayck only, return echo reference through I2S TX */
+	{ /* playback only, return echo reference through I2S TX */
 		.name = "cx2072x-aec",
 		.id	= 3,
 		.capture = {

@@ -307,7 +307,7 @@ SOC_ENUM("Limiter Release Rate", max98373_limiter_release_rate_enum),
 };
 
 static const struct snd_soc_dapm_route max98373_audio_map[] = {
-	/* Plabyack */
+	/* Playback */
 	{"DAI Sel Mux", "Left", "Amp Enable"},
 	{"DAI Sel Mux", "Right", "Amp Enable"},
 	{"DAI Sel Mux", "LeftRight", "Amp Enable"},

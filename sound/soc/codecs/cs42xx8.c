@@ -184,7 +184,7 @@ struct cs42xx8_ratios {
 };
 
 /*
- * According to reference mannual, define the cs42xx8_ratio struct
+ * According to reference manual, define the cs42xx8_ratio struct
  * MFreq2 | MFreq1 | MFreq0 |     Description     | SSM | DSM | QSM |
  * 0      | 0      | 0      |1.029MHz to 12.8MHz  | 256 | 128 |  64 |
  * 0      | 0      | 1      |1.536MHz to 19.2MHz  | 384 | 192 |  96 |

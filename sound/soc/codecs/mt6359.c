@@ -68,7 +68,7 @@ static void mt6359_reset_capture_gpio(struct mt6359_priv *priv)
 			   0x3 << 0, 0x0);
 }
 
-/* use only when doing mtkaif calibraiton at the boot time */
+/* use only when doing mtkaif calibration at the boot time */
 static void mt6359_set_dcxo(struct mt6359_priv *priv, bool enable)
 {
 	regmap_update_bits(priv->regmap, MT6359_DCXO_CW12,
@@ -76,7 +76,7 @@ static void mt6359_set_dcxo(struct mt6359_priv *priv, bool enable)
 			   (enable ? 1 : 0) << RG_XO_AUDIO_EN_M_SFT);
 }
 
-/* use only when doing mtkaif calibraiton at the boot time */
+/* use only when doing mtkaif calibration at the boot time */
 static void mt6359_set_clksq(struct mt6359_priv *priv, bool enable)
 {
 	/* Enable/disable CLKSQ 26MHz */
@@ -85,7 +85,7 @@ static void mt6359_set_clksq(struct mt6359_priv *priv, bool enable)
 			   (enable ? 1 : 0) << RG_CLKSQ_EN_SFT);
 }
 
-/* use only when doing mtkaif calibraiton at the boot time */
+/* use only when doing mtkaif calibration at the boot time */
 static void mt6359_set_aud_global_bias(struct mt6359_priv *priv, bool enable)
 {
 	regmap_update_bits(priv->regmap, MT6359_AUDDEC_ANA_CON13,
@@ -93,7 +93,7 @@ static void mt6359_set_aud_global_bias(struct mt6359_priv *priv, bool enable)
 			   (enable ? 0 : 1) << RG_AUDGLB_PWRDN_VA32_SFT);
 }
 
-/* use only when doing mtkaif calibraiton at the boot time */
+/* use only when doing mtkaif calibration at the boot time */
 static void mt6359_set_topck(struct mt6359_priv *priv, bool enable)
 {
 	regmap_update_bits(priv->regmap, MT6359_AUD_TOP_CKPDN_CON0,
@@ -1731,7 +1731,7 @@ static int mt_pga_3_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-/* It is based on hw's control sequenece to add some delay when PMU/PMD */
+/* It is based on hw's control sequence to add some delay when PMU/PMD */
 static int mt_delay_250_event(struct snd_soc_dapm_widget *w,
 			      struct snd_kcontrol *kcontrol,
 			      int event)

@@ -686,7 +686,7 @@ static const struct snd_soc_dapm_widget max98390_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route max98390_audio_map[] = {
-	/* Plabyack */
+	/* Playback */
 	{"DAI Sel Mux", "Left", "Amp Enable"},
 	{"DAI Sel Mux", "Right", "Amp Enable"},
 	{"DAI Sel Mux", "LeftRight", "Amp Enable"},
