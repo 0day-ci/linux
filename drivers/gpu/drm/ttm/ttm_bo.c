@@ -419,7 +419,8 @@ static void ttm_bo_release(struct kref *kref)
 			bo->bdev->funcs->release_notify(bo);
 
 		drm_vma_offset_remove(bdev->vma_manager, &bo->base.vma_node);
-		ttm_mem_io_free(bdev, bo->resource);
+		if (bo->resource)
+			ttm_mem_io_free(bdev, bo->resource);
 	}
 
 	if (!dma_resv_test_signaled(bo->base.resv, true) ||
