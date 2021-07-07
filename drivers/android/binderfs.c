@@ -58,6 +58,10 @@ enum binderfs_stats_mode {
 	binderfs_stats_mode_global,
 };
 
+struct binder_capabilities {
+	bool oneway_spam;
+};
+
 static const struct constant_table binderfs_param_stats[] = {
 	{ "global", binderfs_stats_mode_global },
 	{}
@@ -67,6 +71,10 @@ static const struct fs_parameter_spec binderfs_fs_parameters[] = {
 	fsparam_u32("max",	Opt_max),
 	fsparam_enum("stats",	Opt_stats_mode, binderfs_param_stats),
 	{}
+};
+
+static struct binder_capabilities binder_caps = {
+	.oneway_spam = true,
 };
 
 static inline struct binderfs_info *BINDERFS_SB(const struct super_block *sb)
@@ -583,6 +591,39 @@ out:
 	return dentry;
 }
 
+static int binder_caps_show(struct seq_file *m, void *unused)
+{
+	bool *cap = m->private;
+
+	seq_printf(m, "%d\n", *cap);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(binder_caps);
+
+static int init_binder_caps(struct super_block *sb)
+{
+	struct dentry *dentry, *root;
+	int ret = 0;
+
+	root = binderfs_create_dir(sb->s_root, "caps");
+	if (IS_ERR(root)) {
+		ret = PTR_ERR(root);
+		goto out;
+	}
+
+	dentry = binderfs_create_file(root, "oneway_spam",
+				      &binder_caps_fops,
+				      &binder_caps.oneway_spam);
+	if (IS_ERR(dentry)) {
+		ret = PTR_ERR(dentry);
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 static int init_binder_logs(struct super_block *sb)
 {
 	struct dentry *binder_logs_root_dir, *dentry, *proc_log_dir;
@@ -722,6 +763,10 @@ static int binderfs_fill_super(struct super_block *sb, struct fs_context *fc)
 		if (*name == ',')
 			name++;
 	}
+
+	ret = init_binder_caps(sb);
+	if (ret)
+		return ret;
 
 	if (info->mount_opts.stats_mode == binderfs_stats_mode_global)
 		return init_binder_logs(sb);
