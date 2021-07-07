@@ -2621,6 +2621,7 @@ static void kvm_s390_crypto_init(struct kvm *kvm)
 			 sizeof(kvm->arch.crypto.crycb->aes_wrapping_key_mask));
 	get_random_bytes(kvm->arch.crypto.crycb->dea_wrapping_key_mask,
 			 sizeof(kvm->arch.crypto.crycb->dea_wrapping_key_mask));
+	init_rwsem(&kvm->arch.crypto.pqap_hook_rwsem);
 }
 
 static void sca_dispose(struct kvm *kvm)

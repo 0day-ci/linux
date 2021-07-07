@@ -270,6 +270,9 @@ static struct ap_queue_status vfio_ap_irq_enable(struct vfio_ap_queue *q,
  * We take the matrix_dev lock to ensure serialization on queues and
  * mediated device access.
  *
+ * Note: This function must be called with a read lock held on
+ *	 vcpu->kvm->arch.crypto.pqap_hook_rwsem.
+ *
  * Return 0 if we could handle the request inside KVM.
  * otherwise, returns -EOPNOTSUPP to let QEMU handle the fault.
  */
@@ -287,21 +290,11 @@ static int handle_pqap(struct kvm_vcpu *vcpu)
 		return -EOPNOTSUPP;
 
 	apqn = vcpu->run->s.regs.gprs[0] & 0xffff;
-	mutex_lock(&matrix_dev->lock);
 
 	if (!vcpu->kvm->arch.crypto.pqap_hook)
 		goto out_unlock;
 	matrix_mdev = container_of(vcpu->kvm->arch.crypto.pqap_hook,
 				   struct ap_matrix_mdev, pqap_hook);
-
-	/*
-	 * If the KVM pointer is in the process of being set, wait until the
-	 * process has completed.
-	 */
-	wait_event_cmd(matrix_mdev->wait_for_kvm,
-		       !matrix_mdev->kvm_busy,
-		       mutex_unlock(&matrix_dev->lock),
-		       mutex_lock(&matrix_dev->lock));
 
 	/* If the there is no guest using the mdev, there is nothing to do */
 	if (!matrix_mdev->kvm)
@@ -323,7 +316,6 @@ static int handle_pqap(struct kvm_vcpu *vcpu)
 out_unlock:
 	memcpy(&vcpu->run->s.regs.gprs[1], &qstatus, sizeof(qstatus));
 	vcpu->run->s.regs.gprs[1] >>= 32;
-	mutex_unlock(&matrix_dev->lock);
 	return 0;
 }
 
@@ -350,10 +342,8 @@ static int vfio_ap_mdev_create(struct mdev_device *mdev)
 
 	matrix_mdev->mdev = mdev;
 	vfio_ap_matrix_init(&matrix_dev->info, &matrix_mdev->matrix);
-	init_waitqueue_head(&matrix_mdev->wait_for_kvm);
 	mdev_set_drvdata(mdev, matrix_mdev);
-	matrix_mdev->pqap_hook.hook = handle_pqap;
-	matrix_mdev->pqap_hook.owner = THIS_MODULE;
+	matrix_mdev->pqap_hook = handle_pqap;
 	mutex_lock(&matrix_dev->lock);
 	list_add(&matrix_mdev->node, &matrix_dev->mdev_list);
 	mutex_unlock(&matrix_dev->lock);
@@ -634,7 +624,7 @@ static ssize_t assign_adapter_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of adapter
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -707,7 +697,7 @@ static ssize_t unassign_adapter_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of adapter
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -797,7 +787,7 @@ static ssize_t assign_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * assignment of domain
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -865,7 +855,7 @@ static ssize_t unassign_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of domain
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -919,7 +909,7 @@ static ssize_t assign_control_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * assignment of control domain.
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -978,7 +968,7 @@ static ssize_t unassign_control_domain_store(struct device *dev,
 	 * If the KVM pointer is in flux or the guest is running, disallow
 	 * un-assignment of control domain.
 	 */
-	if (matrix_mdev->kvm_busy || matrix_mdev->kvm) {
+	if (matrix_mdev->kvm) {
 		ret = -EBUSY;
 		goto done;
 	}
@@ -1118,25 +1108,30 @@ static int vfio_ap_mdev_set_kvm(struct ap_matrix_mdev *matrix_mdev,
 {
 	struct ap_matrix_mdev *m;
 
-	if (kvm->arch.crypto.crycbd) {
-		list_for_each_entry(m, &matrix_dev->mdev_list, node) {
-			if (m != matrix_mdev && m->kvm == kvm)
-				return -EPERM;
-		}
+	if (!kvm->arch.crypto.crycbd)
+		return 0;
 
-		kvm_get_kvm(kvm);
-		matrix_mdev->kvm_busy = true;
-		mutex_unlock(&matrix_dev->lock);
-		kvm_arch_crypto_set_masks(kvm,
-					  matrix_mdev->matrix.apm,
-					  matrix_mdev->matrix.aqm,
-					  matrix_mdev->matrix.adm);
-		mutex_lock(&matrix_dev->lock);
-		kvm->arch.crypto.pqap_hook = &matrix_mdev->pqap_hook;
-		matrix_mdev->kvm = kvm;
-		matrix_mdev->kvm_busy = false;
-		wake_up_all(&matrix_mdev->wait_for_kvm);
+	down_write(&kvm->arch.crypto.pqap_hook_rwsem);
+	mutex_lock(&matrix_dev->lock);
+
+	list_for_each_entry(m, &matrix_dev->mdev_list, node) {
+		if (m != matrix_mdev && m->kvm == kvm) {
+			up_read(&kvm->arch.crypto.pqap_hook_rwsem);
+			mutex_unlock(&matrix_dev->lock);
+			return -EPERM;
+		}
 	}
+
+	kvm_get_kvm(kvm);
+	matrix_mdev->kvm = kvm;
+	kvm->arch.crypto.pqap_hook = &matrix_mdev->pqap_hook;
+	mutex_unlock(&matrix_dev->lock);
+
+	kvm_arch_crypto_set_masks(kvm,
+				  matrix_mdev->matrix.apm,
+				  matrix_mdev->matrix.aqm,
+				  matrix_mdev->matrix.adm);
+	up_write(&kvm->arch.crypto.pqap_hook_rwsem);
 
 	return 0;
 }
@@ -1174,6 +1169,7 @@ static int vfio_ap_mdev_iommu_notifier(struct notifier_block *nb,
  * vfio_ap_mdev_unset_kvm
  *
  * @matrix_mdev: a matrix mediated device
+ * @kvm: the KVM guest state object
  *
  * Performs clean-up of resources no longer needed by @matrix_mdev.
  *
@@ -1185,29 +1181,30 @@ static int vfio_ap_mdev_iommu_notifier(struct notifier_block *nb,
  * done under the @matrix_mdev->lock.
  *
  */
-static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev)
+static void vfio_ap_mdev_unset_kvm(struct ap_matrix_mdev *matrix_mdev,
+				   struct kvm *kvm)
 {
-	/*
-	 * If the KVM pointer is in the process of being set, wait until the
-	 * process has completed.
-	 */
-	wait_event_cmd(matrix_mdev->wait_for_kvm,
-		       !matrix_mdev->kvm_busy,
-		       mutex_unlock(&matrix_dev->lock),
-		       mutex_lock(&matrix_dev->lock));
+	if (!kvm)
+		return;
 
-	if (matrix_mdev->kvm) {
-		matrix_mdev->kvm_busy = true;
+	down_write(&kvm->arch.crypto.pqap_hook_rwsem);
+	mutex_lock(&matrix_dev->lock);
+	if ((!matrix_mdev->kvm) || (!matrix_mdev->kvm->arch.crypto.crycbd)) {
+		up_write(&kvm->arch.crypto.pqap_hook_rwsem);
 		mutex_unlock(&matrix_dev->lock);
-		kvm_arch_crypto_clear_masks(matrix_mdev->kvm);
-		mutex_lock(&matrix_dev->lock);
-		vfio_ap_mdev_reset_queues(matrix_mdev->mdev);
-		matrix_mdev->kvm->arch.crypto.pqap_hook = NULL;
-		kvm_put_kvm(matrix_mdev->kvm);
-		matrix_mdev->kvm = NULL;
-		matrix_mdev->kvm_busy = false;
-		wake_up_all(&matrix_mdev->wait_for_kvm);
+		return;
 	}
+	mutex_unlock(&matrix_dev->lock);
+
+	kvm_arch_crypto_clear_masks(kvm);
+
+	mutex_lock(&matrix_dev->lock);
+	vfio_ap_mdev_reset_queues(matrix_mdev->mdev);
+	kvm_put_kvm(kvm);
+	kvm->arch.crypto.pqap_hook = NULL;
+	matrix_mdev->kvm = NULL;
+	mutex_unlock(&matrix_dev->lock);
+	up_write(&kvm->arch.crypto.pqap_hook_rwsem);
 }
 
 static int vfio_ap_mdev_group_notifier(struct notifier_block *nb,
@@ -1219,15 +1216,12 @@ static int vfio_ap_mdev_group_notifier(struct notifier_block *nb,
 	if (action != VFIO_GROUP_NOTIFY_SET_KVM)
 		return NOTIFY_OK;
 
-	mutex_lock(&matrix_dev->lock);
 	matrix_mdev = container_of(nb, struct ap_matrix_mdev, group_notifier);
 
 	if (!data)
-		vfio_ap_mdev_unset_kvm(matrix_mdev);
+		vfio_ap_mdev_unset_kvm(matrix_mdev, matrix_mdev->kvm);
 	else if (vfio_ap_mdev_set_kvm(matrix_mdev, data))
 		notify_rc = NOTIFY_DONE;
-
-	mutex_unlock(&matrix_dev->lock);
 
 	return notify_rc;
 }
@@ -1362,14 +1356,12 @@ static void vfio_ap_mdev_release(struct mdev_device *mdev)
 {
 	struct ap_matrix_mdev *matrix_mdev = mdev_get_drvdata(mdev);
 
-	mutex_lock(&matrix_dev->lock);
-	vfio_ap_mdev_unset_kvm(matrix_mdev);
-	mutex_unlock(&matrix_dev->lock);
-
 	vfio_unregister_notifier(mdev_dev(mdev), VFIO_IOMMU_NOTIFY,
 				 &matrix_mdev->iommu_notifier);
 	vfio_unregister_notifier(mdev_dev(mdev), VFIO_GROUP_NOTIFY,
 				 &matrix_mdev->group_notifier);
+
+	vfio_ap_mdev_unset_kvm(matrix_mdev, matrix_mdev->kvm);
 	module_put(THIS_MODULE);
 }
 
@@ -1410,15 +1402,6 @@ static ssize_t vfio_ap_mdev_ioctl(struct mdev_device *mdev,
 			ret = -EINVAL;
 			break;
 		}
-
-		/*
-		 * If the KVM pointer is in the process of being set, wait until
-		 * the process has completed.
-		 */
-		wait_event_cmd(matrix_mdev->wait_for_kvm,
-			       !matrix_mdev->kvm_busy,
-			       mutex_unlock(&matrix_dev->lock),
-			       mutex_lock(&matrix_dev->lock));
 
 		ret = vfio_ap_mdev_reset_queues(mdev);
 		break;
