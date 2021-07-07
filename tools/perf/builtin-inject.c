@@ -918,6 +918,7 @@ int cmd_inject(int argc, const char **argv)
 		.use_stdio = true,
 	};
 	int ret;
+	bool repipe = true;
 
 	struct option options[] = {
 		OPT_BOOLEAN('b', "build-ids", &inject.build_ids,
@@ -992,10 +993,18 @@ int cmd_inject(int argc, const char **argv)
 	}
 
 	data.path = inject.input_name;
-	if (!strcmp(inject.input_name, "-") || inject.output.is_pipe)
+	if (!strcmp(inject.input_name, "-") || inject.output.is_pipe) {
 		inject.is_pipe = true;
+		/*
+		 * Do not repipe header when input is a regular file
+		 * since either it can rewrite the header at the end
+		 * or write a new pipe header.
+		 */
+		if (strcmp(inject.input_name, "-"))
+			repipe = false;
+	}
 
-	inject.session = __perf_session__new(&data, inject.is_pipe,
+	inject.session = __perf_session__new(&data, repipe,
 					     perf_data__fd(&inject.output),
 					     &inject.tool);
 	if (IS_ERR(inject.session))
@@ -1003,6 +1012,50 @@ int cmd_inject(int argc, const char **argv)
 
 	if (zstd_init(&(inject.session->zstd_data), 0) < 0)
 		pr_warning("Decompression initialization failed.\n");
+
+	if (!data.is_pipe && inject.output.is_pipe) {
+		ret = perf_header__write_pipe(perf_data__fd(&inject.output));
+		if (ret < 0) {
+			pr_err("Couldn't write a new pipe header.\n");
+			goto out_delete;
+		}
+
+		ret = perf_event__synthesize_attrs(&inject.tool,
+						   inject.session->evlist,
+						   perf_event__repipe);
+		if (ret < 0) {
+			pr_err("Couldn't inject synthesized attrs.\n");
+			goto out_delete;
+		}
+
+		ret = perf_event__synthesize_features(&inject.tool,
+						      inject.session,
+						      inject.session->evlist,
+						      perf_event__repipe);
+		if (ret < 0) {
+			pr_err("Couldn't inject synthesized features.\n");
+			goto out_delete;
+		}
+
+		if (have_tracepoints(&inject.session->evlist->core.entries)) {
+			/*
+			 * FIXME err <= 0 here actually means that
+			 * there were no tracepoints so its not really
+			 * an error, just that we don't need to
+			 * synthesize anything.  We really have to
+			 * return this more properly and also
+			 * propagate errors that now are calling die()
+			 */
+			ret = perf_event__synthesize_tracing_data(&inject.tool,
+						perf_data__fd(&inject.output),
+						inject.session->evlist,
+						perf_event__repipe);
+			if (ret <= 0) {
+				pr_err("Couldn't inject tracing data.\n");
+				goto out_delete;
+			}
+		}
+	}
 
 	if (inject.build_ids && !inject.build_id_all) {
 		/*
