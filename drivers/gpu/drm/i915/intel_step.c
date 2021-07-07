@@ -35,6 +35,13 @@ static const struct intel_step_info bxt_revids[] = {
 	[8] = { .gt_step = STEP_B2 },
 };
 
+static const struct intel_step_info glk_revids[] = {
+	[0] = { .gt_step = STEP_A0 },
+	[1] = { .gt_step = STEP_A1 },
+	[2] = { .gt_step = STEP_A2 },
+	[3] = { .gt_step = STEP_B0 },
+};
+
 static const struct intel_step_info icl_revids[] = {
 	[0] = { .gt_step = STEP_A0 },
 	[3] = { .gt_step = STEP_B0 },
@@ -112,6 +119,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_BROXTON(i915)) {
 		revids = bxt_revids;
 		size = ARRAY_SIZE(bxt_revids);
+	} else if (IS_GEMINILAKE(i915)) {
+		revids = glk_revids;
+		size = ARRAY_SIZE(glk_revids);
 	} else if (IS_ICELAKE(i915)) {
 		revids = icl_revids;
 		size = ARRAY_SIZE(icl_revids);

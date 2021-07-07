@@ -274,7 +274,7 @@ static void intel_detect_preproduction_hw(struct drm_i915_private *dev_priv)
 	pre |= IS_SKL_GT_STEP(dev_priv, 0, STEP_F0);
 	pre |= IS_BXT_GT_STEP(dev_priv, 0, STEP_B2);
 	pre |= IS_KBL_GT_STEP(dev_priv, 0, STEP_A0);
-	pre |= IS_GLK_REVID(dev_priv, 0, GLK_REVID_A2);
+	pre |= IS_GLK_GT_STEP(dev_priv, 0, STEP_A2);
 
 	if (pre) {
 		drm_err(&dev_priv->drm, "This is a pre-production stepping. "
