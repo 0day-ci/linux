@@ -32,6 +32,10 @@
 #define I2S_MODE 0x00
 #define ACP5x_I2S_MODE 0x00
 
+struct i2s_dev_data {
+	void __iomem *acp5x_base;
+};
+
 static inline u32 acp_readl(void __iomem *base_addr)
 {
 	return readl(base_addr - ACP5x_PHY_BASE_ADDRESS);
