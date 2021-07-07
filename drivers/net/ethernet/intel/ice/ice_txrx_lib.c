@@ -246,19 +246,13 @@ int ice_xmit_xdp_ring(void *data, u16 size, struct ice_ring *xdp_ring)
 
 	tx_desc = ICE_TX_DESC(xdp_ring, i);
 	tx_desc->buf_addr = cpu_to_le64(dma);
-	tx_desc->cmd_type_offset_bsz = ice_build_ctob(ICE_TXD_LAST_DESC_CMD, 0,
+	tx_desc->cmd_type_offset_bsz = ice_build_ctob(ICE_TX_DESC_CMD_EOP, 0,
 						      size, 0);
 
-	/* Make certain all of the status bits have been updated
-	 * before next_to_watch is written.
-	 */
-	smp_wmb();
-
+	xdp_ring->next_rs_idx = i;
 	i++;
 	if (i == xdp_ring->count)
 		i = 0;
-
-	tx_buf->next_to_watch = tx_desc;
 	xdp_ring->next_to_use = i;
 
 	return ICE_XDP_TX;
@@ -298,7 +292,10 @@ void ice_finalize_xdp_rx(struct ice_ring *rx_ring, unsigned int xdp_res)
 	if (xdp_res & ICE_XDP_TX) {
 		struct ice_ring *xdp_ring =
 			rx_ring->vsi->xdp_rings[smp_processor_id()];
+		struct ice_tx_desc *next_rs_desc = ICE_TX_DESC(xdp_ring, xdp_ring->next_rs_idx);
 
+		next_rs_desc->cmd_type_offset_bsz |=
+			cpu_to_le64(ICE_TX_DESC_CMD_RS << ICE_TXD_QW1_CMD_S);
 		ice_xdp_ring_update_tail(xdp_ring);
 	}
 }
