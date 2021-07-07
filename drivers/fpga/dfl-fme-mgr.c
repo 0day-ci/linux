@@ -272,17 +272,31 @@ static const struct fpga_manager_ops fme_mgr_ops = {
 	.status = fme_mgr_status,
 };
 
-static void fme_mgr_get_compat_id(void __iomem *fme_pr,
-				  struct fpga_compat_id *id)
+static ssize_t compat_id_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
 {
-	id->id_l = readq(fme_pr + FME_PR_INTFC_ID_L);
-	id->id_h = readq(fme_pr + FME_PR_INTFC_ID_H);
+	struct dfl_fme_mgr_pdata *pdata = dev_get_platdata(dev);
+	u64 l, h;
+
+	l = readq(pdata->ioaddr + FME_PR_INTFC_ID_L);
+	h = readq(pdata->ioaddr + FME_PR_INTFC_ID_H);
+
+	return sysfs_emit(buf, "%016llx%016llx\n",
+			  (unsigned long long)h,
+			  (unsigned long long)l);
 }
+
+static DEVICE_ATTR_RO(compat_id);
+
+static struct attribute *fme_mgr_attrs[] = {
+	&dev_attr_compat_id.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(fme_mgr);
 
 static int fme_mgr_probe(struct platform_device *pdev)
 {
 	struct dfl_fme_mgr_pdata *pdata = dev_get_platdata(&pdev->dev);
-	struct fpga_compat_id *compat_id;
 	struct device *dev = &pdev->dev;
 	struct fme_mgr_priv *priv;
 	struct fpga_manager *mgr;
@@ -300,20 +314,13 @@ static int fme_mgr_probe(struct platform_device *pdev)
 		priv->ioaddr = devm_ioremap_resource(dev, res);
 		if (IS_ERR(priv->ioaddr))
 			return PTR_ERR(priv->ioaddr);
+		pdata->ioaddr = priv->ioaddr;
 	}
-
-	compat_id = devm_kzalloc(dev, sizeof(*compat_id), GFP_KERNEL);
-	if (!compat_id)
-		return -ENOMEM;
-
-	fme_mgr_get_compat_id(priv->ioaddr, compat_id);
 
 	mgr = devm_fpga_mgr_create(dev, "DFL FME FPGA Manager",
 				   &fme_mgr_ops, priv);
 	if (!mgr)
 		return -ENOMEM;
-
-	mgr->compat_id = compat_id;
 
 	return devm_fpga_mgr_register(dev, mgr);
 }
@@ -321,6 +328,7 @@ static int fme_mgr_probe(struct platform_device *pdev)
 static struct platform_driver fme_mgr_driver = {
 	.driver	= {
 		.name    = DFL_FPGA_FME_MGR,
+		.dev_groups = fme_mgr_groups,
 	},
 	.probe   = fme_mgr_probe,
 };

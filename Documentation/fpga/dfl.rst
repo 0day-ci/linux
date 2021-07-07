@@ -246,7 +246,7 @@ generated for the exact static FPGA region and targeted reconfigurable region
 (port) of the FPGA, otherwise, the reconfiguration operation will fail and
 possibly cause system instability. This compatibility can be checked by
 comparing the compatibility ID noted in the header of PR bitstream file against
-the compat_id exposed by the target FPGA region. This check is usually done by
+the compat_id exposed by the target FME. This check is usually done by
 userspace before calling the reconfiguration IOCTL.
 
 
