@@ -328,13 +328,15 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 	ret = _pci_assign_resource(dev, resno, size, align);
 
 	/*
-	 * If we failed to assign anything, let's try the address
-	 * where firmware left it.  That at least has a chance of
-	 * working, which is better than just leaving it disabled.
+	 * If we failed to assign anything and we're not behind a P2P
+	 * or CardBus bridge, let's try the address where firmware
+	 * left it.  That at least has a chance of working, which is
+	 * better than just leaving it disabled.
 	 */
 	if (ret < 0) {
 		pci_info(dev, "BAR %d: no space for %pR\n", resno, res);
-		ret = pci_revert_fw_address(res, dev, resno, size);
+		if (!dev->bus->parent)
+			ret = pci_revert_fw_address(res, dev, resno, size);
 	}
 
 	if (ret < 0) {
