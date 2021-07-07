@@ -5026,6 +5026,13 @@ static void ufshcd_slave_destroy(struct scsi_device *sdev)
 		spin_lock_irqsave(hba->host->host_lock, flags);
 		hba->sdev_ufs_device = NULL;
 		spin_unlock_irqrestore(hba->host->host_lock, flags);
+	} else {
+		/*
+		 * If a LUN fails to probe (e.g. absent BOOT WLUN), the device
+		 * will not have been registered but can still have a device
+		 * link holding a reference to the device.
+		 */
+		device_links_scrap(&sdev->sdev_gendev);
 	}
 }
 
