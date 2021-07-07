@@ -2,6 +2,7 @@
 /* Copyright (c) 2019, Intel Corporation. */
 
 #include "ice_txrx_lib.h"
+#include "ice_base.h"
 #include "ice_eswitch.h"
 
 /**
@@ -290,12 +291,21 @@ void ice_finalize_xdp_rx(struct ice_ring *rx_ring, unsigned int xdp_res)
 		xdp_do_flush_map();
 
 	if (xdp_res & ICE_XDP_TX) {
-		struct ice_ring *xdp_ring =
-			rx_ring->vsi->xdp_rings[smp_processor_id()];
-		struct ice_tx_desc *next_rs_desc = ICE_TX_DESC(xdp_ring, xdp_ring->next_rs_idx);
+		u16 idx = smp_processor_id();
+		struct ice_ring *xdp_ring;
 
-		next_rs_desc->cmd_type_offset_bsz |=
-			cpu_to_le64(ICE_TX_DESC_CMD_RS << ICE_TXD_QW1_CMD_S);
+		if (static_branch_unlikely(&ice_xdp_locking_key)) {
+			idx %= rx_ring->vsi->num_xdp_txq;
+			xdp_ring = rx_ring->vsi->xdp_rings[idx];
+			spin_lock(&xdp_ring->tx_lock);
+		} else {
+			xdp_ring = rx_ring->vsi->xdp_rings[idx];
+		}
+		ice_xdp_ring_set_rs(xdp_ring);
 		ice_xdp_ring_update_tail(xdp_ring);
+		if (static_branch_unlikely(&ice_xdp_locking_key)) {
+			spin_unlock(&xdp_ring->tx_lock);
+			ice_trigger_sw_intr(&rx_ring->vsi->back->hw, xdp_ring->q_vector);
+		}
 	}
 }

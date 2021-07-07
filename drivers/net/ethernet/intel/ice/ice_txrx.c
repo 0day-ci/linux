@@ -578,19 +578,35 @@ ice_run_xdp(struct ice_ring *rx_ring, struct xdp_buff *xdp,
 	    struct bpf_prog *xdp_prog)
 {
 	struct ice_ring *xdp_ring;
-	int err, result;
+	int err;
 	u32 act;
+	u16 idx;
 
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 	switch (act) {
 	case XDP_PASS:
 		return ICE_XDP_PASS;
 	case XDP_TX:
-		xdp_ring = rx_ring->vsi->xdp_rings[smp_processor_id()];
-		result = ice_xmit_xdp_ring(xdp->data, xdp->data_end - xdp->data, xdp_ring);
-		if (result == ICE_XDP_CONSUMED)
+		idx = smp_processor_id();
+		if (static_branch_unlikely(&ice_xdp_locking_key)) {
+			idx %= rx_ring->vsi->num_xdp_txq;
+			xdp_ring = rx_ring->vsi->xdp_rings[idx];
+			spin_lock(&xdp_ring->tx_lock);
+		} else {
+			xdp_ring = rx_ring->vsi->xdp_rings[idx];
+		}
+		err = ice_xmit_xdp_ring(xdp->data, xdp->data_end - xdp->data, xdp_ring);
+		if (static_branch_unlikely(&ice_xdp_locking_key)) {
+			spin_unlock(&xdp_ring->tx_lock);
+			if (err == ICE_XDP_CONSUMED) {
+				/* kick the remote NAPI that xdp_ring belongs to */
+				ice_trigger_sw_intr(&xdp_ring->vsi->back->hw, xdp_ring->q_vector);
+				goto out_failure;
+			}
+		}
+		if (err == ICE_XDP_CONSUMED)
 			goto out_failure;
-		return result;
+		return err;
 	case XDP_REDIRECT:
 		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
 		if (err)
@@ -639,7 +655,14 @@ ice_xdp_xmit(struct net_device *dev, int n, struct xdp_frame **frames,
 	if (unlikely(flags & ~XDP_XMIT_FLAGS_MASK))
 		return -EINVAL;
 
-	xdp_ring = vsi->xdp_rings[queue_index];
+	if (static_branch_unlikely(&ice_xdp_locking_key)) {
+		queue_index %= vsi->num_xdp_txq;
+		xdp_ring = vsi->xdp_rings[queue_index];
+		spin_lock(&xdp_ring->tx_lock);
+	} else {
+		xdp_ring = vsi->xdp_rings[queue_index];
+	}
+
 	for (i = 0; i < n; i++) {
 		struct xdp_frame *xdpf = frames[i];
 		int err;
@@ -650,8 +673,15 @@ ice_xdp_xmit(struct net_device *dev, int n, struct xdp_frame **frames,
 		nxmit++;
 	}
 
-	if (unlikely(flags & XDP_XMIT_FLUSH))
+	if (unlikely(flags & XDP_XMIT_FLUSH)) {
+		ice_xdp_ring_set_rs(xdp_ring);
 		ice_xdp_ring_update_tail(xdp_ring);
+	}
+
+	if (static_branch_unlikely(&ice_xdp_locking_key)) {
+		spin_unlock(&xdp_ring->tx_lock);
+		ice_trigger_sw_intr(&vsi->back->hw, xdp_ring->q_vector);
+	}
 
 	return nxmit;
 }
