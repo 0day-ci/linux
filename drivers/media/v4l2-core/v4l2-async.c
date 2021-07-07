@@ -472,6 +472,7 @@ static int v4l2_async_notifier_asd_valid(struct v4l2_async_notifier *notifier,
 void v4l2_async_notifier_init(struct v4l2_async_notifier *notifier)
 {
 	INIT_LIST_HEAD(&notifier->asd_list);
+	notifier->flags = 0;
 }
 EXPORT_SYMBOL(v4l2_async_notifier_init);
 

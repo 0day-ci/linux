@@ -92,6 +92,13 @@ struct v4l2_async_notifier_operations {
 		       struct v4l2_async_subdev *asd);
 };
 
+/*
+ * Set this flag to instruct the core framework not to call the post_register()
+ * core operation. The driver that registered the notifier will take care to
+ * do so eventually.
+ */
+#define V4L2_ASYNC_NOTIFIER_DEFER_POST_REGISTER			BIT(0)
+
 /**
  * struct v4l2_async_notifier - v4l2_device notifier data
  *
@@ -103,6 +110,8 @@ struct v4l2_async_notifier_operations {
  * @waiting:	list of struct v4l2_async_subdev, waiting for their drivers
  * @done:	list of struct v4l2_subdev, already probed
  * @list:	member in a global list of notifiers
+ * @flags:	notifier's flags. Can be:
+ *	%V4L2_ASYNC_NOTIFIER_DEFER_POST_REGISTER
  */
 struct v4l2_async_notifier {
 	const struct v4l2_async_notifier_operations *ops;
@@ -113,6 +122,7 @@ struct v4l2_async_notifier {
 	struct list_head waiting;
 	struct list_head done;
 	struct list_head list;
+	u32 flags;
 };
 
 /**
