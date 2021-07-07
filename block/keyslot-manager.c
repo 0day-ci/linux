@@ -437,6 +437,37 @@ void blk_ksm_destroy(struct blk_keyslot_manager *ksm)
 }
 EXPORT_SYMBOL_GPL(blk_ksm_destroy);
 
+/*
+ * Returns true iff @ksm doesn't support any crypto capabilities if
+ * @dus_allowed_mask were applied to each crypto mode of @ksm.
+ */
+static inline bool blk_ksm_is_empty_mask(struct blk_keyslot_manager *ksm,
+					 unsigned long dus_allowed_mask)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ksm->crypto_modes_supported); i++) {
+		if (ksm->crypto_modes_supported[i] & dus_allowed_mask)
+			return false;
+	}
+
+	return true;
+}
+
+/**
+ * blk_ksm_is_empty() - Checks if the keyslot manager has any crypto
+ *			capabilities at all.
+ * @ksm: The input keyslot manager to check
+ *
+ * Return: true if @ksm doesn't have any crypto capabilities at all, and
+ *	   false otherwise.
+ */
+bool blk_ksm_is_empty(struct blk_keyslot_manager *ksm)
+{
+	return blk_ksm_is_empty_mask(ksm, ~0);
+}
+EXPORT_SYMBOL_GPL(blk_ksm_is_empty);
+
 bool blk_ksm_register(struct blk_keyslot_manager *ksm, struct request_queue *q)
 {
 	if (blk_integrity_queue_supports_integrity(q)) {
