@@ -239,7 +239,7 @@ void __evlist__set_leader(struct list_head *list)
 	}
 }
 
-void evlist__set_leader(struct evlist *evlist)
+static void evlist__set_leader(struct evlist *evlist)
 {
 	if (evlist->core.nr_entries) {
 		evlist->nr_groups = evlist->core.nr_entries > 1 ? 1 : 0;
