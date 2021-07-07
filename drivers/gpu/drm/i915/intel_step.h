@@ -22,9 +22,11 @@ struct intel_step_info {
 enum intel_step {
 	STEP_NONE = 0,
 	STEP_A0,
+	STEP_A1,
 	STEP_A2,
 	STEP_B0,
 	STEP_B1,
+	STEP_B2,
 	STEP_C0,
 	STEP_D0,
 	STEP_D1,

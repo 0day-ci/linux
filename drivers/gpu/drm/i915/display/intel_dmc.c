@@ -247,11 +247,6 @@ bool intel_dmc_has_payload(struct drm_i915_private *i915)
 	return i915->dmc.dmc_info[DMC_FW_MAIN].payload;
 }
 
-static const struct stepping_info bxt_stepping_info[] = {
-	{'A', '0'}, {'A', '1'}, {'A', '2'},
-	{'B', '0'}, {'B', '1'}, {'B', '2'}
-};
-
 static const struct stepping_info icl_stepping_info[] = {
 	{'A', '0'}, {'A', '1'}, {'A', '2'},
 	{'B', '0'}, {'B', '2'},
@@ -271,12 +266,9 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 	if (IS_ICELAKE(dev_priv)) {
 		size = ARRAY_SIZE(icl_stepping_info);
 		si = icl_stepping_info;
-	} else if (IS_BROXTON(dev_priv)) {
-		size = ARRAY_SIZE(bxt_stepping_info);
-		si = bxt_stepping_info;
 	}
 
-	if (IS_ICELAKE(dev_priv) || IS_BROXTON(dev_priv))
+	if (IS_ICELAKE(dev_priv))
 		return INTEL_REVID(dev_priv) < size ? si + INTEL_REVID(dev_priv) : &no_stepping_info;
 
 	else {
@@ -284,6 +276,10 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 		case STEP_A0:
 			display_step->stepping = 'A';
 			display_step->substepping = '0';
+			break;
+		case STEP_A1:
+			display_step->stepping = 'A';
+			display_step->substepping = '1';
 			break;
 		case STEP_A2:
 			display_step->stepping = 'A';
@@ -296,6 +292,10 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 		case STEP_B1:
 			display_step->stepping = 'B';
 			display_step->substepping = '1';
+			break;
+		case STEP_B2:
+			display_step->stepping = 'B';
+			display_step->substepping = '2';
 			break;
 		case STEP_C0:
 			display_step->stepping = 'C';

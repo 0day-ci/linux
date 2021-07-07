@@ -1466,15 +1466,10 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 	(IS_SKYLAKE(__i915) && \
 	 IS_GT_STEP(__i915, since, until))
 
+#define IS_BXT_GT_STEP(__i915, since, until) \
+	(IS_BROXTON(__i915) && \
+	 IS_GT_STEP(__i915, since, until))
 
-#define BXT_REVID_A0		0x0
-#define BXT_REVID_A1		0x1
-#define BXT_REVID_B0		0x3
-#define BXT_REVID_B_LAST	0x8
-#define BXT_REVID_C0		0x9
-
-#define IS_BXT_REVID(dev_priv, since, until) \
-	(IS_BROXTON(dev_priv) && IS_REVID(dev_priv, since, until))
 
 #define IS_KBL_GT_STEP(dev_priv, since, until) \
 	(IS_KABYLAKE(dev_priv) && IS_GT_STEP(dev_priv, since, until))
