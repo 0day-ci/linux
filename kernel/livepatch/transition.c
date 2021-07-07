@@ -26,6 +26,8 @@ static int klp_target_state = KLP_UNDEFINED;
 
 static unsigned int klp_signals_cnt;
 
+static atomic_t klp_procs;
+
 /*
  * This work can be performed periodically to finish patching or unpatching any
  * "straggler" tasks which failed to transition in the first attempt.
@@ -181,8 +183,15 @@ void klp_update_patch_state(struct task_struct *task)
 	 *    of func->transition, if klp_ftrace_handler() is called later on
 	 *    the same CPU.  See __klp_disable_patch().
 	 */
-	if (test_and_clear_tsk_thread_flag(task, TIF_PATCH_PENDING))
+	if (test_and_clear_tsk_thread_flag(task, TIF_PATCH_PENDING)) {
 		task->patch_state = READ_ONCE(klp_target_state);
+		if (atomic_read(&klp_procs) == 0)
+			pr_err("klp_procs misaccounting\n");
+		else if (atomic_sub_return(1, &klp_procs) == 0) {
+			if (delayed_work_pending(&klp_transition_work))
+				mod_delayed_work(system_wq, &klp_transition_work, 0);
+		}
+	}
 
 	preempt_enable_notrace();
 }
@@ -320,7 +329,8 @@ static bool klp_try_switch_task(struct task_struct *task)
 
 	success = true;
 
-	clear_tsk_thread_flag(task, TIF_PATCH_PENDING);
+	if (test_and_clear_tsk_thread_flag(task, TIF_PATCH_PENDING))
+		atomic_sub(1, &klp_procs);
 	task->patch_state = klp_target_state;
 
 done:
@@ -402,11 +412,6 @@ void klp_try_complete_transition(void)
 	 * Usually this will transition most (or all) of the tasks on a system
 	 * unless the patch includes changes to a very common function.
 	 */
-	read_lock(&tasklist_lock);
-	for_each_process_thread(g, task)
-		if (!klp_try_switch_task(task))
-			complete = false;
-	read_unlock(&tasklist_lock);
 
 	/*
 	 * Ditto for the idle "swapper" tasks.
@@ -421,9 +426,16 @@ void klp_try_complete_transition(void)
 			/* offline idle tasks can be switched immediately */
 			clear_tsk_thread_flag(task, TIF_PATCH_PENDING);
 			task->patch_state = klp_target_state;
+			atomic_sub(1, &klp_procs);
 		}
 	}
 	put_online_cpus();
+
+	read_lock(&tasklist_lock);
+	for_each_process_thread(g, task)
+		if (!klp_try_switch_task(task))
+			complete = false;
+	read_unlock(&tasklist_lock);
 
 	if (!complete) {
 		if (klp_signals_cnt && !(klp_signals_cnt % SIGNALS_TIMEOUT))
@@ -435,8 +447,8 @@ void klp_try_complete_transition(void)
 		 * later and/or wait for other methods like kernel exit
 		 * switching.
 		 */
-		schedule_delayed_work(&klp_transition_work,
-				      round_jiffies_relative(HZ));
+		schedule_delayed_work(&klp_transition_work, atomic_read(&klp_procs) ?
+				      round_jiffies_relative(HZ) : 0);
 		return;
 	}
 
@@ -470,6 +482,7 @@ void klp_start_transition(void)
 		  klp_transition_patch->mod->name,
 		  klp_target_state == KLP_PATCHED ? "patching" : "unpatching");
 
+	atomic_set(&klp_procs, 0);
 	/*
 	 * Mark all normal tasks as needing a patch state update.  They'll
 	 * switch either in klp_try_complete_transition() or as they exit the
@@ -477,8 +490,10 @@ void klp_start_transition(void)
 	 */
 	read_lock(&tasklist_lock);
 	for_each_process_thread(g, task)
-		if (task->patch_state != klp_target_state)
+		if (task->patch_state != klp_target_state) {
 			set_tsk_thread_flag(task, TIF_PATCH_PENDING);
+			atomic_inc(&klp_procs);
+		}
 	read_unlock(&tasklist_lock);
 
 	/*
@@ -488,8 +503,10 @@ void klp_start_transition(void)
 	 */
 	for_each_possible_cpu(cpu) {
 		task = idle_task(cpu);
-		if (task->patch_state != klp_target_state)
+		if (task->patch_state != klp_target_state) {
 			set_tsk_thread_flag(task, TIF_PATCH_PENDING);
+			atomic_inc(&klp_procs);
+		}
 	}
 
 	klp_signals_cnt = 0;
@@ -611,6 +628,8 @@ void klp_reverse_transition(void)
 void klp_copy_process(struct task_struct *child)
 {
 	child->patch_state = current->patch_state;
+	if (child->patch_state != klp_target_state)
+		atomic_add(1, &klp_procs);
 
 	/* TIF_PATCH_PENDING gets copied in setup_thread_stack() */
 }
