@@ -2992,6 +2992,8 @@ ttwu_do_activate(struct rq *rq, struct task_struct *p, int wake_flags,
 
 	lockdep_assert_held(&rq->lock);
 
+	/* Pairs with smp_wmb in __schedule() */
+	smp_rmb();
 	if (p->sched_contributes_to_load)
 		rq->nr_uninterruptible--;
 
@@ -5084,6 +5086,11 @@ static void __sched notrace __schedule(bool preempt)
 				!(prev_state & TASK_NOLOAD) &&
 				!(prev->flags & PF_FROZEN);
 
+			/*
+			 * Make sure the previous write is ordered before p->on_rq etc so
+			 * that it is visible to other cpus in the wakeup path (ttwu_do_activate()).
+			 */
+			smp_wmb();
 			if (prev->sched_contributes_to_load)
 				rq->nr_uninterruptible++;
 
