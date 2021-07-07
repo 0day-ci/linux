@@ -253,8 +253,9 @@ void mptcp_pm_mp_prio_received(struct sock *sk, u8 bkup)
 
 /* path manager helpers */
 
-bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			      struct mptcp_addr_info *saddr, bool *echo, bool *port)
+bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
+			      unsigned int opt_size, unsigned int remaining,
+			      struct mptcp_out_options *opts,  u8 *add_addr)
 {
 	int ret = false;
 
@@ -264,13 +265,20 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 	if (!mptcp_pm_should_add_signal(msk))
 		goto out_unlock;
 
-	*echo = mptcp_pm_should_add_signal_echo(msk);
-	*port = mptcp_pm_should_add_signal_port(msk);
+	opts->local = msk->pm.local;
+	opts->remote = msk->pm.remote;
+	*add_addr = msk->pm.addr_signal;
 
-	if (remaining < mptcp_add_addr_len(msk->pm.local.family, *echo, *port))
+	if (((msk->pm.addr_signal & BIT(MPTCP_ADD_ADDR_ECHO)) ||
+	     ((msk->pm.addr_signal & BIT(MPTCP_ADD_ADDR_SIGNAL)) &&
+	      (msk->pm.local.family == AF_INET6 || msk->pm.local.port))) &&
+	    skb && skb_is_tcp_pure_ack(skb)) {
+		remaining += opt_size;
+	}
+
+	if (remaining < mptcp_add_addr_len(opts, *add_addr))
 		goto out_unlock;
 
-	*saddr = msk->pm.local;
 	if ((msk->pm.addr_signal & BIT(MPTCP_ADD_ADDR_ECHO)))
 		WRITE_ONCE(msk->pm.addr_signal, msk->pm.addr_signal & ~BIT(MPTCP_ADD_ADDR_ECHO));
 	else

@@ -751,16 +751,25 @@ static inline bool mptcp_pm_should_rm_signal(struct mptcp_sock *msk)
 	return READ_ONCE(msk->pm.addr_signal) & BIT(MPTCP_RM_ADDR_SIGNAL);
 }
 
-static inline unsigned int mptcp_add_addr_len(int family, bool echo, bool port)
+static inline unsigned int mptcp_add_addr_len(struct mptcp_out_options *opts,
+					      u8 add_addr)
 {
-	u8 len = TCPOLEN_MPTCP_ADD_ADDR_BASE;
+	struct mptcp_addr_info *addr = &opts->remote;
+	u8 len = 0;
 
-	if (family == AF_INET6)
-		len = TCPOLEN_MPTCP_ADD_ADDR6_BASE;
-	if (!echo)
+	if (!(add_addr & BIT(MPTCP_ADD_ADDR_ECHO)) &&
+	    (add_addr & BIT(MPTCP_ADD_ADDR_SIGNAL))) {
+		addr = &opts->local;
 		len += MPTCPOPT_THMAC_LEN;
+	}
+
+	if (addr->family == AF_INET6)
+		len += TCPOLEN_MPTCP_ADD_ADDR6_BASE;
+	else
+		len += TCPOLEN_MPTCP_ADD_ADDR_BASE;
+
 	/* account for 2 trailing 'nop' options */
-	if (port)
+	if (addr->port)
 		len += TCPOLEN_MPTCP_PORT_LEN + TCPOLEN_MPTCP_PORT_ALIGN;
 
 	return len;
@@ -774,8 +783,9 @@ static inline int mptcp_rm_addr_len(const struct mptcp_rm_list *rm_list)
 	return TCPOLEN_MPTCP_RM_ADDR_BASE + roundup(rm_list->nr - 1, 4) + 1;
 }
 
-bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			      struct mptcp_addr_info *saddr, bool *echo, bool *port);
+bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
+			      unsigned int opt_size, unsigned int remaining,
+			      struct mptcp_out_options *opts,  u8 *add_addr);
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 			     struct mptcp_rm_list *rm_list);
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
