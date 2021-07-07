@@ -371,6 +371,12 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.modifiers_property = prop;
 
+	prop = drm_property_create_range(dev, 0, "BACKGROUND_COLOR",
+					 0, GENMASK_ULL(63, 0));
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.bgcolor_property = prop;
+
 	return 0;
 }
 

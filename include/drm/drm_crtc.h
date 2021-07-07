@@ -289,6 +289,18 @@ struct drm_crtc_state {
 	struct drm_property_blob *gamma_lut;
 
 	/**
+	 * @bgcolor:
+	 *
+	 * RGB value representing the pipe's background color.  The background
+	 * color (aka "canvas color") of a pipe is the color that will be used
+	 * for pixels not covered by a plane, or covered by transparent pixels
+	 * of a plane.  The value here should be built via drm_argb();
+	 * individual color components can be extracted with desired precision
+	 * via the DRM_ARGB_*() macros.
+	 */
+	u64 bgcolor;
+
+	/**
 	 * @target_vblank:
 	 *
 	 * Target vertical blank period when a page flip

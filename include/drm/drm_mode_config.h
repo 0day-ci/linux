@@ -867,6 +867,11 @@ struct drm_mode_config {
 	 */
 	struct drm_property *hdcp_content_type_property;
 
+	/**
+	 * @bgcolor_property: RGB background color for CRTC.
+	 */
+	struct drm_property *bgcolor_property;
+
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
 
