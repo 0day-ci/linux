@@ -193,6 +193,8 @@ enum kern_feature_id {
 	FEAT_MODULE_BTF,
 	/* BTF_KIND_FLOAT support */
 	FEAT_BTF_FLOAT,
+	/* BPF_OBJ_GET_INFO_BY_FD support */
+	FEAT_OBJ_GET_INFO_BY_FD,
 	__FEAT_CNT,
 };
 
@@ -3894,14 +3896,54 @@ static int bpf_map_find_btf_info(struct bpf_object *obj, struct bpf_map *map)
 	return 0;
 }
 
-int bpf_map__reuse_fd(struct bpf_map *map, int fd)
+static int bpf_get_map_info_from_fdinfo(int fd, struct bpf_map_info *info)
+{
+	char file[PATH_MAX], buff[4096];
+	FILE *fp;
+	__u32 val;
+	int err;
+
+	snprintf(file, sizeof(file), "/proc/%d/fdinfo/%d", getpid(), fd);
+	memset(info, 0, sizeof(*info));
+
+	fp = fopen(file, "r");
+	if (!fp) {
+		err = -errno;
+		pr_warn("failed to open %s: %d. No procfs support?\n", file,
+			err);
+		return err;
+	}
+
+	while (fgets(buff, sizeof(buff), fp)) {
+		if (sscanf(buff, "map_type:\t%u", &val) == 1)
+			info->type = val;
+		else if (sscanf(buff, "key_size:\t%u", &val) == 1)
+			info->key_size = val;
+		else if (sscanf(buff, "value_size:\t%u", &val) == 1)
+			info->value_size = val;
+		else if (sscanf(buff, "max_entries:\t%u", &val) == 1)
+			info->max_entries = val;
+		else if (sscanf(buff, "map_flags:\t%i", &val) == 1)
+			info->map_flags = val;
+	}
+
+	fclose(fp);
+
+	return 0;
+}
+
+static int bpf_map__reuse_fd_safe(struct bpf_object *obj, struct bpf_map *map,
+				  int fd)
 {
 	struct bpf_map_info info = {};
 	__u32 len = sizeof(info);
 	int new_fd, err;
 	char *new_name;
 
-	err = bpf_obj_get_info_by_fd(fd, &info, &len);
+	if (!obj || kernel_supports(obj, FEAT_OBJ_GET_INFO_BY_FD))
+		err = bpf_obj_get_info_by_fd(fd, &info, &len);
+	else
+		err = bpf_get_map_info_from_fdinfo(fd, &info);
 	if (err)
 		return libbpf_err(err);
 
@@ -3946,6 +3988,11 @@ err_close_new_fd:
 err_free_new_name:
 	free(new_name);
 	return libbpf_err(err);
+}
+
+int bpf_map__reuse_fd(struct bpf_map *map, int fd)
+{
+	return bpf_map__reuse_fd_safe(NULL, map, fd);
 }
 
 __u32 bpf_map__max_entries(const struct bpf_map *map)
@@ -4298,6 +4345,27 @@ static int probe_module_btf(void)
 	return !err;
 }
 
+static int probe_kern_bpf_get_info_by_fd(void)
+{
+	int fd, err;
+	__u32 len;
+	struct bpf_map_info info;
+	struct bpf_create_map_attr attr = {
+		.map_type = BPF_MAP_TYPE_ARRAY,
+		.key_size = sizeof(int),
+		.value_size = sizeof(int),
+		.max_entries = 1,
+	};
+
+	fd = bpf_create_map_xattr(&attr);
+	if (fd < 0)
+		return 0;
+
+	err = bpf_obj_get_info_by_fd(fd, &info, &len);
+	close(fd);
+	return !err;
+}
+
 enum kern_feature_result {
 	FEAT_UNKNOWN = 0,
 	FEAT_SUPPORTED = 1,
@@ -4348,6 +4416,9 @@ static struct kern_feature_desc {
 	[FEAT_BTF_FLOAT] = {
 		"BTF_KIND_FLOAT support", probe_kern_btf_float,
 	},
+	[FEAT_OBJ_GET_INFO_BY_FD] = {
+		"BPF_OBJ_GET_INFO_BY_FD support", probe_kern_bpf_get_info_by_fd,
+	},
 };
 
 static bool kernel_supports(const struct bpf_object *obj, enum kern_feature_id feat_id)
@@ -4376,7 +4447,8 @@ static bool kernel_supports(const struct bpf_object *obj, enum kern_feature_id f
 	return READ_ONCE(feat->res) == FEAT_SUPPORTED;
 }
 
-static bool map_is_reuse_compat(const struct bpf_map *map, int map_fd)
+static bool map_is_reuse_compat(struct bpf_object *obj,
+				const struct bpf_map *map, int map_fd)
 {
 	struct bpf_map_info map_info = {};
 	char msg[STRERR_BUFSIZE];
@@ -4384,10 +4456,19 @@ static bool map_is_reuse_compat(const struct bpf_map *map, int map_fd)
 
 	map_info_len = sizeof(map_info);
 
-	if (bpf_obj_get_info_by_fd(map_fd, &map_info, &map_info_len)) {
-		pr_warn("failed to get map info for map FD %d: %s\n",
-			map_fd, libbpf_strerror_r(errno, msg, sizeof(msg)));
-		return false;
+	if (kernel_supports(obj, FEAT_OBJ_GET_INFO_BY_FD)) {
+		if (bpf_obj_get_info_by_fd(map_fd, &map_info, &map_info_len)) {
+			pr_warn("failed to get map info for map FD %d: %s\n",
+				map_fd,
+				libbpf_strerror_r(errno, msg, sizeof(msg)));
+			return false;
+		}
+	} else {
+		if (bpf_get_map_info_from_fdinfo(map_fd, &map_info)) {
+			pr_warn("failed to get map info for fdinfo: %s\n",
+				libbpf_strerror_r(errno, msg, sizeof(msg)));
+			return false;
+		}
 	}
 
 	return (map_info.type == map->def.type &&
@@ -4398,7 +4479,7 @@ static bool map_is_reuse_compat(const struct bpf_map *map, int map_fd)
 }
 
 static int
-bpf_object__reuse_map(struct bpf_map *map)
+bpf_object__reuse_map(struct bpf_object *obj, struct bpf_map *map)
 {
 	char *cp, errmsg[STRERR_BUFSIZE];
 	int err, pin_fd;
@@ -4418,14 +4499,14 @@ bpf_object__reuse_map(struct bpf_map *map)
 		return err;
 	}
 
-	if (!map_is_reuse_compat(map, pin_fd)) {
+	if (!map_is_reuse_compat(obj, map, pin_fd)) {
 		pr_warn("couldn't reuse pinned map at '%s': parameter mismatch\n",
 			map->pin_path);
 		close(pin_fd);
 		return -EINVAL;
 	}
 
-	err = bpf_map__reuse_fd(map, pin_fd);
+	err = bpf_map__reuse_fd_safe(obj, map, pin_fd);
 	if (err) {
 		close(pin_fd);
 		return err;
@@ -4621,7 +4702,7 @@ bpf_object__create_maps(struct bpf_object *obj)
 		map = &obj->maps[i];
 
 		if (map->pin_path) {
-			err = bpf_object__reuse_map(map);
+			err = bpf_object__reuse_map(obj, map);
 			if (err) {
 				pr_warn("map '%s': error reusing pinned map\n",
 					map->name);
