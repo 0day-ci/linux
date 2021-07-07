@@ -52,6 +52,8 @@ struct io_uring_sqe {
 		__u16	buf_index;
 		/* for grouped buffer selection */
 		__u16	buf_group;
+		/* index into fixed files */
+		__u16	file_index;
 	} __attribute__((packed));
 	/* personality to use, if used */
 	__u16	personality;
