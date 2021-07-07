@@ -261,9 +261,9 @@ static void __j1939_session_drop(struct j1939_session *session)
 static void j1939_session_destroy(struct j1939_session *session)
 {
 	if (session->err)
-		j1939_sk_errqueue(session, J1939_ERRQUEUE_ABORT);
+		j1939_sk_errqueue(session, J1939_ERRQUEUE_TX_ABORT);
 	else
-		j1939_sk_errqueue(session, J1939_ERRQUEUE_ACK);
+		j1939_sk_errqueue(session, J1939_ERRQUEUE_TX_ACK);
 
 	netdev_dbg(session->priv->ndev, "%s: 0x%p\n", __func__, session);
 
@@ -1026,7 +1026,7 @@ static int j1939_simple_txnext(struct j1939_session *session)
 	if (ret)
 		return ret;
 
-	j1939_sk_errqueue(session, J1939_ERRQUEUE_SCHED);
+	j1939_sk_errqueue(session, J1939_ERRQUEUE_TX_SCHED);
 	j1939_sk_queue_activate_next(session);
 
 	return 0;
@@ -1405,7 +1405,7 @@ j1939_xtp_rx_cts_one(struct j1939_session *session, struct sk_buff *skb)
 		if (session->transmission) {
 			if (session->pkt.tx_acked)
 				j1939_sk_errqueue(session,
-						  J1939_ERRQUEUE_SCHED);
+						  J1939_ERRQUEUE_TX_SCHED);
 			j1939_session_txtimer_cancel(session);
 			j1939_tp_schedule_txtimer(session, 0);
 		}
