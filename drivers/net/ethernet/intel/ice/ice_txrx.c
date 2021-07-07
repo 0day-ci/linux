@@ -196,6 +196,63 @@ void ice_free_tx_ring(struct ice_ring *tx_ring)
 }
 
 /**
+ * ice_clean_xdp_irq - Reclaim resources after transmit completes on XDP ring
+ * @xdp_ring: XDP ring to clean
+ *
+ * Returns true if there's any budget left (e.g. the clean is finished)
+ */
+static bool ice_clean_xdp_irq(struct ice_ring *xdp_ring)
+{
+	unsigned int total_bytes = 0, total_pkts = 0;
+	u16 next_rs_idx = xdp_ring->next_rs_idx;
+	u16 ntc = xdp_ring->next_to_clean;
+	struct ice_tx_desc *next_rs_desc;
+	struct ice_tx_buf *tx_buf;
+	u16 frames_ready = 0;
+	u16 frames_to_clean;
+	int i;
+
+	next_rs_desc = ICE_TX_DESC(xdp_ring, next_rs_idx);
+	if (next_rs_desc->cmd_type_offset_bsz &
+	    cpu_to_le64(ICE_TX_DESC_DTYPE_DESC_DONE)) {
+		if (next_rs_idx >= ntc)
+			frames_ready = next_rs_idx - ntc;
+		else
+			frames_ready = next_rs_idx + xdp_ring->count - ntc;
+	}
+
+	if (!frames_ready)
+		return true;
+
+	frames_to_clean = min_t(u16, frames_ready, ICE_DFLT_IRQ_WORK);
+
+	for (i = 0; i < frames_to_clean; i++) {
+		tx_buf = &xdp_ring->tx_buf[ntc];
+
+		total_bytes += tx_buf->bytecount;
+		/* normally tx_buf->gso_segs was taken but at this point
+		 * it's always 1 for us
+		 */
+		total_pkts++;
+
+		page_frag_free(tx_buf->raw_buf);
+		dma_unmap_single(xdp_ring->dev, dma_unmap_addr(tx_buf, dma),
+				 dma_unmap_len(tx_buf, len), DMA_TO_DEVICE);
+		dma_unmap_len_set(tx_buf, len, 0);
+		tx_buf->raw_buf = NULL;
+
+		ntc++;
+		if (ntc >= xdp_ring->count)
+			ntc = 0;
+	}
+
+	xdp_ring->next_to_clean = ntc;
+	ice_update_tx_ring_stats(xdp_ring, total_pkts, total_bytes);
+
+	return frames_ready <= frames_to_clean;
+}
+
+/**
  * ice_clean_tx_irq - Reclaim resources after transmit completes
  * @tx_ring: Tx ring to clean
  * @napi_budget: Used to determine if we are in netpoll
@@ -239,11 +296,8 @@ static bool ice_clean_tx_irq(struct ice_ring *tx_ring, int napi_budget)
 		total_bytes += tx_buf->bytecount;
 		total_pkts += tx_buf->gso_segs;
 
-		if (ice_ring_is_xdp(tx_ring))
-			page_frag_free(tx_buf->raw_buf);
-		else
-			/* free the skb */
-			napi_consume_skb(tx_buf->skb, napi_budget);
+		/* free the skb */
+		napi_consume_skb(tx_buf->skb, napi_budget);
 
 		/* unmap skb header data */
 		dma_unmap_single(tx_ring->dev,
@@ -298,10 +352,6 @@ static bool ice_clean_tx_irq(struct ice_ring *tx_ring, int napi_budget)
 	tx_ring->next_to_clean = i;
 
 	ice_update_tx_ring_stats(tx_ring, total_pkts, total_bytes);
-
-	if (ice_ring_is_xdp(tx_ring))
-		return !!budget;
-
 	netdev_tx_completed_queue(txring_txq(tx_ring), total_pkts,
 				  total_bytes);
 
@@ -1397,9 +1447,14 @@ int ice_napi_poll(struct napi_struct *napi, int budget)
 	 * budget and be more aggressive about cleaning up the Tx descriptors.
 	 */
 	ice_for_each_ring(ring, q_vector->tx) {
-		bool wd = ring->xsk_pool ?
-			  ice_clean_tx_irq_zc(ring, budget) :
-			  ice_clean_tx_irq(ring, budget);
+		bool wd;
+
+		if (ring->xsk_pool)
+			wd = ice_clean_tx_irq_zc(ring, budget);
+		else if (ice_ring_is_xdp(ring))
+			wd = ice_clean_xdp_irq(ring);
+		else
+			wd = ice_clean_tx_irq(ring, budget);
 
 		if (!wd)
 			clean_complete = false;
