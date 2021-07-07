@@ -266,10 +266,12 @@ static const struct stepping_info icl_stepping_info[] = {
 };
 
 static const struct stepping_info no_stepping_info = { '*', '*' };
+struct stepping_info *display_step;
 
 static const struct stepping_info *
 intel_get_stepping_info(struct drm_i915_private *dev_priv)
 {
+	struct intel_step_info step = RUNTIME_INFO(dev_priv)->step;
 	const struct stepping_info *si;
 	unsigned int size;
 
@@ -282,15 +284,60 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 	} else if (IS_BROXTON(dev_priv)) {
 		size = ARRAY_SIZE(bxt_stepping_info);
 		si = bxt_stepping_info;
-	} else {
-		size = 0;
-		si = NULL;
 	}
 
-	if (INTEL_REVID(dev_priv) < size)
-		return si + INTEL_REVID(dev_priv);
+	if (IS_ICELAKE(dev_priv) || IS_SKYLAKE(dev_priv) || IS_BROXTON(dev_priv))
+		return INTEL_REVID(dev_priv) < size ? si + INTEL_REVID(dev_priv) : &no_stepping_info;
 
-	return &no_stepping_info;
+	else {
+		switch (step.display_step) {
+		case STEP_A0:
+			display_step->stepping = 'A';
+			display_step->substepping = '0';
+			break;
+		case STEP_A2:
+			display_step->stepping = 'A';
+			display_step->substepping = '2';
+			break;
+		case STEP_B0:
+			display_step->stepping = 'B';
+			display_step->substepping = '0';
+			break;
+		case STEP_B1:
+			display_step->stepping = 'B';
+			display_step->substepping = '1';
+			break;
+		case STEP_C0:
+			display_step->stepping = 'C';
+			display_step->substepping = '0';
+			break;
+		case STEP_D0:
+			display_step->stepping = 'D';
+			display_step->substepping = '0';
+			break;
+		case STEP_D1:
+			display_step->stepping = 'D';
+			display_step->substepping = '1';
+			break;
+		case STEP_E0:
+			display_step->stepping = 'E';
+			display_step->substepping = '0';
+			break;
+		case STEP_F0:
+			display_step->stepping = 'F';
+			display_step->substepping = '0';
+			break;
+		case STEP_G0:
+			display_step->stepping = 'G';
+			display_step->substepping = '0';
+			break;
+		default:
+			display_step->stepping = '*';
+			display_step->substepping = '*';
+			break;
+		}
+	}
+	return display_step;
 }
 
 static void gen9_set_dc_state_debugmask(struct drm_i915_private *dev_priv)
