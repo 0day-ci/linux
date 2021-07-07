@@ -196,6 +196,11 @@
 
 #define NB_PF		8		/* Max nb of HW pixel format */
 
+#define DRM_ARGB_TO_LTDC_RGB24(bgcolor) \
+	((u32)(DRM_ARGB_RED(bgcolor, 8) << 16	\
+	| DRM_ARGB_GREEN(bgcolor, 8) << 8	\
+	| DRM_ARGB_BLUE(bgcolor, 8)))
+
 enum ltdc_pix_fmt {
 	PF_NONE,
 	/* RGB formats */
@@ -364,6 +369,15 @@ static inline u32 get_pixelformat_without_alpha(u32 drm)
 	}
 }
 
+/*
+ * All non-alpha color formats derived from native alpha color formats are
+ * either characterized by a FourCC format code (such as XR24, RX24, BX24...)
+ */
+static inline u32 is_xrgb(u32 drm)
+{
+	return ((drm & 'X') == 'X' || (drm & ('X' << 8)) == ('X' << 8));
+}
+
 static irqreturn_t ltdc_irq_thread(int irq, void *arg)
 {
 	struct drm_device *ddev = arg;
@@ -431,7 +445,8 @@ static void ltdc_crtc_atomic_enable(struct drm_crtc *crtc,
 	pm_runtime_get_sync(ddev->dev);
 
 	/* Sets the background color value */
-	reg_write(ldev->regs, LTDC_BCCR, BCCR_BCBLACK);
+	reg_write(ldev->regs, LTDC_BCCR,
+		  DRM_ARGB_TO_LTDC_RGB24(crtc->state->bgcolor));
 
 	/* Enable IRQ */
 	reg_set(ldev->regs, LTDC_IER, IER_RRIE | IER_FUIE | IER_TERRIE);
@@ -451,6 +466,9 @@ static void ltdc_crtc_atomic_disable(struct drm_crtc *crtc,
 	DRM_DEBUG_DRIVER("\n");
 
 	drm_crtc_vblank_off(crtc);
+
+	/* Reset background color */
+	reg_write(ldev->regs, LTDC_BCCR, BCCR_BCBLACK);
 
 	/* disable IRQ */
 	reg_clear(ldev->regs, LTDC_IER, IER_RRIE | IER_FUIE | IER_TERRIE);
@@ -789,6 +807,7 @@ static void ltdc_plane_atomic_update(struct drm_plane *plane,
 	u32 y1 = newstate->crtc_y + newstate->crtc_h - 1;
 	u32 src_x, src_y, src_w, src_h;
 	u32 val, pitch_in_bytes, line_length, paddr, ahbp, avbp, bpcr;
+	u32 bgcolor = DRM_ARGB_TO_LTDC_RGB24(newstate->crtc->state->bgcolor);
 	enum ltdc_pix_fmt pf;
 
 	if (!newstate->crtc || !fb) {
@@ -852,10 +871,28 @@ static void ltdc_plane_atomic_update(struct drm_plane *plane,
 	if (!fb->format->has_alpha)
 		val = BF1_CA | BF2_1CA;
 
-	/* Manage hw-specific capabilities */
-	if (ldev->caps.non_alpha_only_l1 &&
-	    plane->type != DRM_PLANE_TYPE_PRIMARY)
-		val = BF1_PAXCA | BF2_1PAXCA;
+	/*
+	 * Manage hw-specific capabilities
+	 *
+	 * Depending on the hardware version, the background color can not be
+	 * properly displayed with non-alpha color formats derived from native
+	 * alpha color formats (such as XR24 or XR15) since the use of this
+	 * pixel format generates a non transparent layer. As a workaround,
+	 * the stage background color of the layer and the general background
+	 * color need to be synced.
+	 *
+	 * This is done by activating for all XRGB color format the default
+	 * color as the background color and then setting blending factor
+	 * accordingly.
+	 */
+	if (ldev->caps.non_alpha_only_l1) {
+		if (is_xrgb(fb->format->format)) {
+			val = BF1_CA | BF2_1CA;
+			reg_write(ldev->regs, LTDC_L1DCCR + lofs, bgcolor);
+		} else {
+			val = BF1_PAXCA | BF2_1PAXCA;
+		}
+	}
 
 	reg_update_bits(ldev->regs, LTDC_L1BFCR + lofs,
 			LXBFCR_BF2 | LXBFCR_BF1, val);
@@ -1033,6 +1070,7 @@ static int ltdc_crtc_init(struct drm_device *ddev, struct drm_crtc *crtc)
 
 	drm_crtc_helper_add(crtc, &ltdc_crtc_helper_funcs);
 
+	drm_crtc_add_bgcolor_property(crtc);
 	drm_mode_crtc_set_gamma_size(crtc, CLUT_SIZE);
 	drm_crtc_enable_color_mgmt(crtc, 0, false, CLUT_SIZE);
 
