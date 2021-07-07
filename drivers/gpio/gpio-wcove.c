@@ -428,8 +428,6 @@ static int wcove_gpio_probe(struct platform_device *pdev)
 
 	wg->regmap_irq_chip = pmic->irq_chip_data;
 
-	platform_set_drvdata(pdev, wg);
-
 	mutex_init(&wg->buslock);
 	wg->chip.label = KBUILD_MODNAME;
 	wg->chip.direction_input = wcove_gpio_dir_in;
@@ -469,12 +467,6 @@ static int wcove_gpio_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = devm_gpiochip_add_data(dev, &wg->chip, wg);
-	if (ret) {
-		dev_err(dev, "Failed to add gpiochip: %d\n", ret);
-		return ret;
-	}
-
 	/* Enable GPIO0 interrupts */
 	ret = regmap_clear_bits(wg->regmap, IRQ_MASK_BASE + 0, GPIO_IRQ0_MASK);
 	if (ret)
@@ -485,7 +477,7 @@ static int wcove_gpio_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	return 0;
+	return devm_gpiochip_add_data(dev, &wg->chip, wg);
 }
 
 /*
