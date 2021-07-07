@@ -465,7 +465,7 @@ static int mmc_busy_cb(void *cb_data, bool *busy)
 	if (err)
 		return err;
 
-	*busy = !mmc_ready_for_data(status);
+	*busy = !mmc_tran_and_ready_for_data(status);
 	return 0;
 }
 

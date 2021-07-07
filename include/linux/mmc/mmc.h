@@ -64,6 +64,7 @@
 #define MMC_WRITE_MULTIPLE_BLOCK 25   /* adtc                    R1  */
 #define MMC_PROGRAM_CID          26   /* adtc                    R1  */
 #define MMC_PROGRAM_CSD          27   /* adtc                    R1  */
+#define MMC_SET_TIME             49   /* adtc                    R1  */
 
   /* class 6 */
 #define MMC_SET_WRITE_PROT       28   /* ac   [31:0] data addr   R1b */
@@ -163,10 +164,11 @@ static inline bool mmc_op_multi(u32 opcode)
 
 static inline bool mmc_ready_for_data(u32 status)
 {
-	/*
-	 * Some cards mishandle the status bits, so make sure to check both the
-	 * busy indication and the card state.
-	 */
+	return status & R1_READY_FOR_DATA;
+}
+
+static inline bool mmc_tran_and_ready_for_data(u32 status)
+{
 	return status & R1_READY_FOR_DATA &&
 	       R1_CURRENT_STATE(status) == R1_STATE_TRAN;
 }

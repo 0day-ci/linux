@@ -411,6 +411,68 @@ static int mmc_blk_ioctl_copy_to_user(struct mmc_ioc_cmd __user *ic_ptr,
 	return 0;
 }
 
+static int is_prog_cmd(struct mmc_command *cmd)
+{
+	/*
+	 * Cards will move to programming state (PROG) after these commands.
+	 * So we must not consider the command as completed until the card
+	 * has actually returned back to TRAN state.
+	 */
+	switch (cmd->opcode) {
+	case MMC_STOP_TRANSMISSION:
+	case MMC_WRITE_DAT_UNTIL_STOP:
+	case MMC_WRITE_BLOCK:
+	case MMC_WRITE_MULTIPLE_BLOCK:
+	case MMC_PROGRAM_CID:
+	case MMC_PROGRAM_CSD:
+	case MMC_SET_WRITE_PROT:
+	case MMC_CLR_WRITE_PROT:
+	case MMC_ERASE:
+	case MMC_LOCK_UNLOCK:
+	case MMC_SET_TIME: /* Also covers SD_WRITE_EXTR_SINGLE */
+	case MMC_GEN_CMD:
+	case SD_WRITE_EXTR_MULTI:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static int card_poll_until_tran(struct mmc_card *card, unsigned int timeout_ms,
+			    u32 *resp_errs)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(timeout_ms);
+	int err = 0;
+	u32 status;
+
+	do {
+		bool done = time_after(jiffies, timeout);
+
+		err = __mmc_send_status(card, &status, 5);
+		if (err) {
+			dev_err(mmc_dev(card->host),
+				"error %d requesting status\n", err);
+			return err;
+		}
+
+		/* Accumulate any response error bits seen */
+		if (resp_errs)
+			*resp_errs |= status;
+
+		/*
+		 * Timeout if the device never returns to TRAN state.
+		 */
+		if (done) {
+			dev_err(mmc_dev(card->host),
+				"Card stuck in wrong state! %s status: %#x\n",
+				 __func__, status);
+			return -ETIMEDOUT;
+		}
+	} while (R1_CURRENT_STATE(status) != R1_STATE_TRAN);
+
+	return err;
+}
+
 static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 			    u32 *resp_errs)
 {
@@ -433,12 +495,11 @@ static int card_busy_detect(struct mmc_card *card, unsigned int timeout_ms,
 			*resp_errs |= status;
 
 		/*
-		 * Timeout if the device never becomes ready for data and never
-		 * leaves the program state.
+		 * Timeout if the device never becomes ready for data.
 		 */
 		if (done) {
 			dev_err(mmc_dev(card->host),
-				"Card stuck in wrong state! %s status: %#x\n",
+				"Card remained busy! %s status: %#x\n",
 				 __func__, status);
 			return -ETIMEDOUT;
 		}
@@ -596,10 +657,17 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 
 	if (idata->rpmb || (cmd.flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
 		/*
-		 * Ensure RPMB/R1B command has completed by polling CMD13
-		 * "Send Status".
+		 * Ensure card is no longer signalling busy by polling CMD13.
 		 */
 		err = card_busy_detect(card, MMC_BLK_TIMEOUT_MS, NULL);
+	}
+
+	if (is_prog_cmd(&cmd)) {
+		/*
+		 * Ensure card has returned back to TRAN state
+		 * and is ready to accept a new command.
+		 */
+		err = card_poll_until_tran(card, MMC_BLK_TIMEOUT_MS, NULL);
 	}
 
 	return err;
@@ -1630,7 +1698,7 @@ static int mmc_blk_fix_state(struct mmc_card *card, struct request *req)
 
 	mmc_blk_send_stop(card, timeout);
 
-	err = card_busy_detect(card, timeout, NULL);
+	err = card_poll_until_tran(card, timeout, NULL);
 
 	mmc_retune_release(card->host);
 
@@ -1662,7 +1730,7 @@ static void mmc_blk_read_single(struct mmc_queue *mq, struct request *req)
 			goto error_exit;
 
 		if (!mmc_host_is_spi(host) &&
-		    !mmc_ready_for_data(status)) {
+		    !mmc_tran_and_ready_for_data(status)) {
 			err = mmc_blk_fix_state(card, req);
 			if (err)
 				goto error_exit;
@@ -1784,7 +1852,7 @@ static void mmc_blk_mq_rw_recovery(struct mmc_queue *mq, struct request *req)
 
 	/* Try to get back to "tran" state */
 	if (!mmc_host_is_spi(mq->card->host) &&
-	    (err || !mmc_ready_for_data(status)))
+	    (err || !mmc_tran_and_ready_for_data(status)))
 		err = mmc_blk_fix_state(mq->card, req);
 
 	/*
@@ -1854,7 +1922,7 @@ static int mmc_blk_card_busy(struct mmc_card *card, struct request *req)
 	if (mmc_host_is_spi(card->host) || rq_data_dir(req) == READ)
 		return 0;
 
-	err = card_busy_detect(card, MMC_BLK_TIMEOUT_MS, &status);
+	err = card_poll_until_tran(card, MMC_BLK_TIMEOUT_MS, &status);
 
 	/*
 	 * Do not assume data transferred correctly if there are any error bits
