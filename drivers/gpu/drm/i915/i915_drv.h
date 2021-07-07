@@ -1515,11 +1515,9 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 	(IS_ROCKETLAKE(__i915) && \
 	 IS_GT_STEP(__i915, since, until))
 
-#define DG1_REVID_A0		0x0
-#define DG1_REVID_B0		0x1
-
-#define IS_DG1_REVID(p, since, until) \
-	(IS_DG1(p) && IS_REVID(p, since, until))
+#define IS_DG1_GT_STEP(__i915, since, until) \
+	(IS_DG1(__i915) && \
+	 IS_GT_STEP(__i915, since, until))
 
 #define IS_ADLS_DISPLAY_STEP(__i915, since, until) \
 	(IS_ALDERLAKE_S(__i915) && \
