@@ -182,3 +182,61 @@ void intel_step_init(struct drm_i915_private *i915)
 
 	RUNTIME_INFO(i915)->step = step;
 }
+
+const char *intel_step_name(enum intel_step step) {
+	switch (step) {
+	case STEP_A0:
+		return "A0";
+		break;
+	case STEP_A1:
+		return "A1";
+		break;
+	case STEP_A2:
+		return "A2";
+		break;
+	case STEP_B0:
+		return "B0";
+		break;
+	case STEP_B1:
+		return "B1";
+		break;
+	case STEP_B2:
+		return "B2";
+		break;
+	case STEP_C0:
+		return "C0";
+		break;
+	case STEP_C1:
+		return "C1";
+		break;
+	case STEP_D0:
+		return "D0";
+		break;
+	case STEP_D1:
+		return "D1";
+		break;
+	case STEP_E0:
+		return "E0";
+		break;
+	case STEP_F0:
+		return "F0";
+		break;
+	case STEP_G0:
+		return "G0";
+		break;
+	case STEP_H0:
+		return "H0";
+		break;
+	case STEP_I0:
+		return "I0";
+		break;
+	case STEP_I1:
+		return "I1";
+		break;
+	case STEP_J0:
+		return "J0";
+		break;
+	default:
+		return "**";
+	}
+}
