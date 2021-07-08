@@ -1719,6 +1719,13 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	}
 	off = (data + nhead) - skb->head;
 
+	/* If it's a cloned skb we expand with frags attached we must prohibit
+	 * the recycling code from running, otherwise we might trigger a race
+	 * while trying to recycle the fragments from the original and cloned
+	 * skb
+	 */
+	if (skb_cloned(skb))
+		skb->pp_recycle = 0;
 	skb->head     = data;
 	skb->head_frag = 0;
 	skb->data    += off;
