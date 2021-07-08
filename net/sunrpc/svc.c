@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
+#include <linux/pagemap.h>
 
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>
@@ -838,6 +839,33 @@ svc_set_num_threads_sync(struct svc_serv *serv, struct svc_pool *pool, int nrser
 }
 EXPORT_SYMBOL_GPL(svc_set_num_threads_sync);
 
+static void svc_rqst_release_replaced_pages(struct svc_rqst *rqstp)
+{
+	release_pages(rqstp->rq_relpages, rqstp->rq_numrelpages);
+	rqstp->rq_numrelpages = 0;
+}
+
+/**
+ * svc_rqst_replace_page - Replace one page in rq_pages[]
+ * @rqstp: svc_rqst with pages to replace
+ * @page: replacement page
+ *
+ * When replacing a page in rq_pages, batch the release of the
+ * replaced pages to avoid hammering put_page().
+ */
+void svc_rqst_replace_page(struct svc_rqst *rqstp, struct page *page)
+{
+	if (*rqstp->rq_next_page) {
+		if (rqstp->rq_numrelpages >= ARRAY_SIZE(rqstp->rq_relpages))
+			svc_rqst_release_replaced_pages(rqstp);
+		rqstp->rq_relpages[rqstp->rq_numrelpages++] = *rqstp->rq_next_page;
+	}
+
+	get_page(page);
+	*(rqstp->rq_next_page++) = page;
+}
+EXPORT_SYMBOL_GPL(svc_rqst_replace_page);
+
 /*
  * Called from a server thread as it's exiting. Caller must hold the "service
  * mutex" for the service.
@@ -846,6 +874,7 @@ void
 svc_rqst_free(struct svc_rqst *rqstp)
 {
 	svc_release_buffer(rqstp);
+	svc_rqst_release_replaced_pages(rqstp);
 	if (rqstp->rq_scratch_page)
 		put_page(rqstp->rq_scratch_page);
 	kfree(rqstp->rq_resp);
