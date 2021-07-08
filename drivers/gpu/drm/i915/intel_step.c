@@ -7,15 +7,31 @@
 #include "intel_step.h"
 
 /*
- * KBL revision ID ordering is bizarre; higher revision ID's map to lower
- * steppings in some cases.  So rather than test against the revision ID
- * directly, let's map that into our own range of increasing ID's that we
- * can test against in a regular manner.
+ * Some platforms have unusual ways of mapping PCI revision ID to GT/display
+ * steppings.  E.g., in some cases a higher PCI revision may translate to a
+ * lower stepping of the GT and/or display IP.  This file provides lookup
+ * tables to map the PCI revision into a standard set of stepping values that
+ * can be compared numerically.
+ *
+ * Also note that some revisions/steppings may have been set aside as
+ * placeholders but never materialized in real hardware; in those cases there
+ * may be jumps in the revision IDs or stepping values in the tables below.
  */
 
+static const struct intel_step_info skl_revid_step_tbl[] = {
+	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[0x1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+	[0x2] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
+	[0x3] = { .gt_step = STEP_D0, .display_step = STEP_D0 },
+	[0x4] = { .gt_step = STEP_E0, .display_step = STEP_E0 },
+	[0x5] = { .gt_step = STEP_F0, .display_step = STEP_F0 },
+	[0x6] = { .gt_step = STEP_G0, .display_step = STEP_G0 },
+	[0x7] = { .gt_step = STEP_H0, .display_step = STEP_H0 },
+	[0x9] = { .gt_step = STEP_J0, .display_step = STEP_J0 },
+	[0xA] = { .gt_step = STEP_I1, .display_step = STEP_I1 },
+};
 
-/* FIXME: what about REVID_E0 */
-static const struct intel_step_info kbl_revids[] = {
+static const struct intel_step_info kbl_revid_step_tbl[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
 	[2] = { .gt_step = STEP_C0, .display_step = STEP_B0 },
@@ -74,8 +90,11 @@ void intel_step_init(struct drm_i915_private *i915)
 		revids = tgl_revid_step_tbl;
 		size = ARRAY_SIZE(tgl_revid_step_tbl);
 	} else if (IS_KABYLAKE(i915)) {
-		revids = kbl_revids;
-		size = ARRAY_SIZE(kbl_revids);
+		revids = kbl_revid_step_tbl;
+		size = ARRAY_SIZE(kbl_revid_step_tbl);
+	} else if (IS_SKYLAKE(i915)) {
+		revids = skl_revid_step_tbl;
+		size = ARRAY_SIZE(skl_revid_step_tbl);
 	}
 
 	/* Not using the stepping scheme for the platform yet. */
