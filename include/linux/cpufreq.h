@@ -115,6 +115,11 @@ struct cpufreq_policy {
 	bool			strict_target;
 
 	/*
+	 * Set if the driver supports CPUFREQ_RELATION_E.
+	 */
+	bool			relation_efficient;
+
+	/*
 	 * Preferred average time interval between consecutive invocations of
 	 * the driver to set the frequency for this policy.  To be set by the
 	 * scaling driver (0, which is the default, means no preference).
@@ -269,6 +274,7 @@ static inline void cpufreq_stats_record_transition(struct cpufreq_policy *policy
 #define CPUFREQ_RELATION_L 0  /* lowest frequency at or above target */
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 #define CPUFREQ_RELATION_C 2  /* closest frequency to target */
+#define CPUFREQ_RELATION_E 3  /* lowest efficient frequency at or above target */
 
 struct freq_attr {
 	struct attribute attr;
@@ -973,17 +979,45 @@ static inline int cpufreq_table_find_index_c(struct cpufreq_policy *policy,
 		return cpufreq_table_find_index_dc(policy, target_freq);
 }
 
+static inline unsigned int
+cpufreq_frequency_relation_efficient(struct cpufreq_policy *policy,
+				     unsigned int relation)
+{
+	if (!policy->relation_efficient && relation == CPUFREQ_RELATION_E)
+		return CPUFREQ_RELATION_L;
+
+	return relation;
+}
+
+static inline unsigned int
+cpufreq_frequency_find_efficient(struct cpufreq_policy *policy,
+				 unsigned int idx)
+{
+	struct cpufreq_frequency_table *table = policy->freq_table;
+	unsigned int efficient_idx = table[idx].efficient;
+
+	return table[efficient_idx].frequency <= policy->max ? efficient_idx :
+							       idx;
+}
+
 static inline int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 						 unsigned int target_freq,
 						 unsigned int relation)
 {
+	unsigned int idx;
+
 	if (unlikely(policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED))
 		return cpufreq_table_index_unsorted(policy, target_freq,
 						    relation);
 
+	relation = cpufreq_frequency_relation_efficient(policy, relation);
+
 	switch (relation) {
 	case CPUFREQ_RELATION_L:
-		return cpufreq_table_find_index_l(policy, target_freq);
+	case CPUFREQ_RELATION_E:
+		idx = cpufreq_table_find_index_l(policy, target_freq);
+		return relation == CPUFREQ_RELATION_L ? idx :
+			cpufreq_frequency_find_efficient(policy, idx);
 	case CPUFREQ_RELATION_H:
 		return cpufreq_table_find_index_h(policy, target_freq);
 	case CPUFREQ_RELATION_C:

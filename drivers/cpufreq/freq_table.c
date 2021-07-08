@@ -143,6 +143,9 @@ int cpufreq_table_index_unsorted(struct cpufreq_policy *policy,
 	case CPUFREQ_RELATION_C:
 		optimal.frequency = ~0;
 		break;
+	case CPUFREQ_RELATION_E:
+		relation = CPUFREQ_RELATION_L;
+		break;
 	}
 
 	cpufreq_for_each_valid_entry_idx(pos, table, i) {
