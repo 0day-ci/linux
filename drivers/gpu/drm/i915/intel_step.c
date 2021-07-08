@@ -42,6 +42,15 @@ static const struct intel_step_info kbl_revid_step_tbl[] = {
 	[7] = { .gt_step = STEP_G0, .display_step = STEP_C0 },
 };
 
+static const struct intel_step_info icl_revid_step_tbl[] = {
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[3] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+	[4] = { .gt_step = STEP_B2, .display_step = STEP_B2 },
+	[5] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
+	[6] = { .gt_step = STEP_C1, .display_step = STEP_C1 },
+	[7] = { .gt_step = STEP_D0, .display_step = STEP_D0 },
+};
+
 static const struct intel_step_info tgl_uy_revid_step_tbl[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[1] = { .gt_step = STEP_B0, .display_step = STEP_C0 },
@@ -89,6 +98,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_TIGERLAKE(i915)) {
 		revids = tgl_revid_step_tbl;
 		size = ARRAY_SIZE(tgl_revid_step_tbl);
+	} else if (IS_ICELAKE(i915)) {
+		revids = icl_revid_step_tbl;
+		size = ARRAY_SIZE(icl_revid_step_tbl);
 	} else if (IS_KABYLAKE(i915)) {
 		revids = kbl_revid_step_tbl;
 		size = ARRAY_SIZE(kbl_revid_step_tbl);
