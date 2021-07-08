@@ -75,6 +75,11 @@ static const struct intel_step_info rkl_revid_step_tbl[] = {
 	[4] = { .gt_step = STEP_C0, .display_step = STEP_C0 },
 };
 
+static const struct intel_step_info dg1_revid_step_tbl[] = {
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+};
+
 static const struct intel_step_info adls_revid_step_tbl[] = {
 	[0x0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[0x1] = { .gt_step = STEP_A0, .display_step = STEP_A2 },
@@ -103,6 +108,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_ALDERLAKE_S(i915)) {
 		revids = adls_revid_step_tbl;
 		size = ARRAY_SIZE(adls_revid_step_tbl);
+	} else if (IS_DG1(i915)) {
+		revids = dg1_revid_step_tbl;
+		size = ARRAY_SIZE(dg1_revid_step_tbl);
 	} else if (IS_ROCKETLAKE(i915)) {
 		revids = rkl_revid_step_tbl;
 		size = ARRAY_SIZE(rkl_revid_step_tbl);
