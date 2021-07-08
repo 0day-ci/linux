@@ -440,6 +440,14 @@ struct cpufreq_driver {
  */
 #define CPUFREQ_NO_AUTO_DYNAMIC_SWITCHING	BIT(6)
 
+/*
+ * Set by drivers which register an Energy Model and want to use the latter to
+ * populate the freq-table with inefficiency information. If the same driver
+ * is not implementing the ->target() callback, setting this flag will also
+ * automatically enable CPUFREQ_RELATION_E.
+ */
+#define CPUFREQ_READ_ENERGY_MODEL		BIT(7)
+
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
 

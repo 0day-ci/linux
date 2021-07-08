@@ -19,6 +19,7 @@
 #include <linux/cpu_cooling.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/energy_model.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
@@ -1313,6 +1314,58 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy)
 	kfree(policy);
 }
 
+static inline void
+cpufreq_read_inefficiencies_from_em(struct cpufreq_policy *policy,
+				    struct em_perf_domain *em_pd)
+{
+	struct cpufreq_frequency_table *pos, *table = policy->freq_table;
+	struct em_perf_state *em_table;
+	bool found = false;
+	int i;
+
+	if (!(cpufreq_driver->flags & CPUFREQ_READ_ENERGY_MODEL))
+		return;
+
+	if (!em_pd) {
+		pr_warn("CPUFreq driver wants to read inefficiencies from the Energy Model but none found\n");
+		return;
+	}
+
+	em_table = em_pd->table;
+
+	for (i = 0; i < em_pd->nr_perf_states; i++) {
+		if (!(em_table[i].flags & EM_PERF_STATE_INEFFICIENT))
+			continue;
+
+		cpufreq_for_each_valid_entry(pos, table) {
+			if (pos->frequency == em_table[i].frequency) {
+				pos->flags |= CPUFREQ_INEFFICIENT_FREQ;
+				found = true;
+				break;
+			}
+		}
+	}
+
+	if (!found)
+		return;
+
+	/*
+	 * If the driver does not use a custom ->target() callback, we can
+	 * automatically enable CPUFREQ_RELATION_E, supported by the default
+	 * function cpufreq_frequency_table_target(). Otherwise, the driver
+	 * must set this flag itself.
+	 */
+	if (!cpufreq_driver->target)
+		policy->relation_efficient = true;
+
+	/*
+	 * With CPUFREQ_RELATION_E enabled, inefficient frequencies will be
+	 * skipped. Let know the Energy Model it can skip them too.
+	 */
+	if (policy->relation_efficient)
+		em_pd->flags |= EM_PERF_DOMAIN_SKIP_INEFFICIENCIES;
+}
+
 static int cpufreq_online(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
@@ -1366,6 +1419,12 @@ static int cpufreq_online(unsigned int cpu)
 				 __LINE__);
 			goto out_free_policy;
 		}
+
+		/*
+		 * Sync potential inefficiencies with the Energy Model if the
+		 * driver requested CPUFREQ_READ_ENERGY_MODEL.
+		 */
+		cpufreq_read_inefficiencies_from_em(policy, em_cpu_get(cpu));
 
 		ret = cpufreq_table_validate_and_sort(policy);
 		if (ret)
