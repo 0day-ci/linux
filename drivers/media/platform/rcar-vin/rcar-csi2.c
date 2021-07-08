@@ -724,18 +724,37 @@ static int rcsi2_set_pad_format(struct v4l2_subdev *sd,
 {
 	struct rcar_csi2 *priv = sd_to_csi2(sd);
 	struct v4l2_mbus_framefmt *framefmt;
+	int ret = 0;
+
+	mutex_lock(&priv->lock);
 
 	if (!rcsi2_code_to_fmt(format->format.code))
 		format->format.code = rcar_csi2_formats[0].code;
 
 	if (format->which == V4L2_SUBDEV_FORMAT_ACTIVE) {
+
+		/*
+		 * Do not apply changes to active format while streaming.
+		 *
+		 * Since video streams could be forwarded from sink pad to any
+		 * source pad (depending on CSI-2 channel routing), all
+		 * media pads are effected by this rule.
+		 */
+		if (priv->stream_count > 0) {
+			ret = -EBUSY;
+			goto out;
+		}
+
 		priv->mf = format->format;
 	} else {
 		framefmt = v4l2_subdev_get_try_format(sd, sd_state, 0);
 		*framefmt = format->format;
 	}
 
-	return 0;
+out:
+	mutex_unlock(&priv->lock);
+
+	return ret;
 }
 
 static int rcsi2_get_pad_format(struct v4l2_subdev *sd,
