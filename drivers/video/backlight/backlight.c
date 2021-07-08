@@ -676,6 +676,7 @@ EXPORT_SYMBOL(of_find_backlight_by_node);
 static struct backlight_device *of_find_backlight(struct device *dev)
 {
 	struct backlight_device *bd = NULL;
+	bool is_gpio_backlight = false;
 	struct device_node *np;
 
 	if (!dev)
@@ -685,6 +686,8 @@ static struct backlight_device *of_find_backlight(struct device *dev)
 		np = of_parse_phandle(dev->of_node, "backlight", 0);
 		if (np) {
 			bd = of_find_backlight_by_node(np);
+			is_gpio_backlight =
+				of_device_is_compatible(np, "gpio-backlight");
 			of_node_put(np);
 			if (!bd)
 				return ERR_PTR(-EPROBE_DEFER);
@@ -692,7 +695,7 @@ static struct backlight_device *of_find_backlight(struct device *dev)
 			 * Note: gpio_backlight uses brightness as
 			 * power state during probe
 			 */
-			if (!bd->props.brightness)
+			if (is_gpio_backlight && !bd->props.brightness)
 				bd->props.brightness = bd->props.max_brightness;
 		}
 	}
