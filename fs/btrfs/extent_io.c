@@ -3153,7 +3153,8 @@ struct bio *btrfs_io_bio_alloc(unsigned int nr_iovecs)
 	return bio;
 }
 
-struct bio *btrfs_bio_clone_partial(struct bio *orig, int offset, int size)
+struct bio *btrfs_bio_clone_partial(struct bio *orig, unsigned int offset,
+				    unsigned int size)
 {
 	struct bio *bio;
 	struct btrfs_io_bio *btrfs_bio;
