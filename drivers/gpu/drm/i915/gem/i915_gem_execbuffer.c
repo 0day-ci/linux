@@ -2566,7 +2566,7 @@ static int eb_parse_pipeline(struct i915_execbuffer *eb,
 
 	/* Wait for all writes (and relocs) into the batch to complete */
 	err = i915_sw_fence_await_reservation(&pw->base.chain,
-					      pw->batch->resv, NULL, false,
+					      pw->batch->resv, false,
 					      0, I915_FENCE_GFP);
 	if (err < 0)
 		goto err_commit;
