@@ -3895,6 +3895,31 @@ struct apply_wqattrs_ctx {
 	struct pool_workqueue	*pwq_tbl[];
 };
 
+static void free_pwq(struct pool_workqueue *pwq)
+{
+	if (!pwq || --pwq->refcnt)
+		return;
+
+	put_unbound_pool(pwq->pool);
+	kmem_cache_free(pwq_cache, pwq);
+}
+
+static void free_wqattrs_ctx(struct apply_wqattrs_ctx *ctx)
+{
+	int node;
+
+	if (!ctx)
+		return;
+
+	for_each_node(node)
+		free_pwq(ctx->pwq_tbl[node]);
+	free_pwq(ctx->dfl_pwq);
+
+	free_workqueue_attrs(ctx->attrs);
+
+	kfree(ctx);
+}
+
 /* free the resources after success or abort */
 static void apply_wqattrs_cleanup(struct apply_wqattrs_ctx *ctx)
 {
@@ -3978,7 +4003,7 @@ apply_wqattrs_prepare(struct workqueue_struct *wq,
 out_free:
 	free_workqueue_attrs(tmp_attrs);
 	free_workqueue_attrs(new_attrs);
-	apply_wqattrs_cleanup(ctx);
+	free_wqattrs_ctx(ctx);
 	return NULL;
 }
 
