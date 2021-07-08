@@ -1465,7 +1465,7 @@ EXPORT_SYMBOL(bio_split);
  * @offset:	number of sectors to trim from the front of @bio
  * @size:	size we want to trim @bio to, in sectors
  */
-void bio_trim(struct bio *bio, int offset, int size)
+void bio_trim(struct bio *bio, sector_t offset, sector_t size)
 {
 	/* 'bio' is a cloned bio which we need to trim to match
 	 * the given offset and size.
