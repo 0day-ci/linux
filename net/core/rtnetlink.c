@@ -289,24 +289,27 @@ int rtnl_unregister(int protocol, int msgtype)
 	struct rtnl_link __rcu **tab;
 	struct rtnl_link *link;
 	int msgindex;
+	int ret = -ENOENT;
 
 	BUG_ON(protocol < 0 || protocol > RTNL_FAMILY_MAX);
 	msgindex = rtm_msgindex(msgtype);
 
 	rtnl_lock();
 	tab = rtnl_dereference(rtnl_msg_handlers[protocol]);
-	if (!tab) {
-		rtnl_unlock();
-		return -ENOENT;
-	}
+	if (!tab)
+		goto unlock;
 
 	link = rtnl_dereference(tab[msgindex]);
+	if (!link)
+		goto unlock;
+
 	rcu_assign_pointer(tab[msgindex], NULL);
-	rtnl_unlock();
-
 	kfree_rcu(link, rcu);
+	ret = 0;
 
-	return 0;
+unlock:
+	rtnl_unlock();
+	return ret;
 }
 EXPORT_SYMBOL_GPL(rtnl_unregister);
 
