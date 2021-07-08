@@ -581,8 +581,7 @@ int drm_sched_job_init(struct drm_sched_job *job,
 	struct drm_gpu_scheduler *sched;
 
 	drm_sched_entity_select_rq(entity);
-	if (!entity->rq)
-		return -ENOENT;
+	BUG_ON(!entity->rq);
 
 	sched = entity->rq->sched;
 
