@@ -467,6 +467,10 @@ static int icl_pcode_read_mem_global_info(struct drm_i915_private *dev_priv)
 	}
 
 	dram_info->num_channels = (val & 0xf0) >> 4;
+	if (dram_info->num_channels > 2) {
+		drm_info(&dev_priv->drm, "More DRAM channels than expected, setting to max.\n");
+		dram_info->num_channels = 2;
+	}
 	dram_info->num_qgv_points = (val & 0xf00) >> 8;
 
 	return 0;
