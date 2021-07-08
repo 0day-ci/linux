@@ -719,8 +719,14 @@ static int snd_compr_pause(struct snd_compr_stream *stream)
 		if (!stream->device->use_pause_in_draining)
 			return -EPERM;
 		retval = stream->ops->trigger(stream, SNDRV_PCM_TRIGGER_PAUSE_PUSH);
-		if (!retval)
+		if (!retval) {
+			if (stream->device->leave_draining_in_pause) {
+				stream->runtime->state = SNDRV_PCM_STATE_PAUSED;
+				wake_up(&stream->runtime->sleep);
+				break;
+			}
 			stream->pause_in_draining = true;
+		}
 		break;
 	default:
 		return -EPERM;

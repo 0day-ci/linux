@@ -145,6 +145,7 @@ struct snd_compr_ops {
  * @lock: device lock
  * @device: device id
  * @use_pause_in_draining: allow pause in draining, true when set
+ * @leave_draining_in_pause: leave draining state when pausing in draining
  */
 struct snd_compr {
 	const char *name;
@@ -156,6 +157,7 @@ struct snd_compr {
 	struct mutex lock;
 	int device;
 	bool use_pause_in_draining;
+	bool leave_draining_in_pause;
 #ifdef CONFIG_SND_VERBOSE_PROCFS
 	/* private: */
 	char id[64];
@@ -180,6 +182,18 @@ int snd_compress_new(struct snd_card *card, int device,
 static inline void snd_compr_use_pause_in_draining(struct snd_compr_stream *substream)
 {
 	substream->device->use_pause_in_draining = true;
+}
+
+/**
+ * snd_compr_leave_draining_in_pause - Leave draining state when pause in draining
+ * @substream: compress substream to set
+ *
+ * In some platform, we need to leave draining state when we use pause in draining.
+ * Add API to allow leave draining state.
+ */
+static inline void snd_compr_leave_draining_in_pause(struct snd_compr_stream *substream)
+{
+	substream->device->leave_draining_in_pause = true;
 }
 
 /* dsp driver callback apis
