@@ -1204,6 +1204,12 @@ config REGULATOR_SY8827N
 	help
 	  This driver supports SY8827N single output regulator.
 
+config REGULATOR_SWNODE
+	bool "Software Node Regulator Support"
+	help
+	  This option configures support for providing regulator constraints and
+	  mappings to consumers through the use of software nodes.
+
 config REGULATOR_TPS51632
 	tristate "TI TPS51632 Power Regulator"
 	depends on I2C

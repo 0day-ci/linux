@@ -20,11 +20,13 @@
 #include <linux/gpio/consumer.h>
 #include <linux/of.h>
 #include <linux/regmap.h>
+#include <linux/property.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/coupler.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/regulator/swnode_regulator.h>
 #include <linux/module.h>
 
 #define CREATE_TRACE_POINTS
@@ -1869,6 +1871,7 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
 						  const char *supply)
 {
 	struct regulator_dev *r = NULL;
+	struct fwnode_handle *swnode;
 	struct device_node *node;
 	struct regulator_map *map;
 	const char *devname = NULL;
@@ -1880,6 +1883,22 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
 		node = of_get_regulator(dev, supply);
 		if (node) {
 			r = of_find_regulator_by_node(node);
+			if (r)
+				return r;
+
+			/*
+			 * We have a node, but there is no device.
+			 * assume it has not registered yet.
+			 */
+			return ERR_PTR(-EPROBE_DEFER);
+		}
+	}
+
+	/* next, try software nodes */
+	if (dev && dev->fwnode && is_software_node(dev->fwnode->secondary)) {
+		swnode = swnode_get_regulator_node(dev, supply);
+		if (!IS_ERR(swnode)) {
+			r = swnode_find_regulator_by_node(swnode);
 			if (r)
 				return r;
 
@@ -5385,6 +5404,10 @@ regulator_register(const struct regulator_desc *regulator_desc,
 
 	init_data = regulator_of_get_init_data(dev, regulator_desc, config,
 					       &rdev->dev.of_node);
+
+	if (!init_data)
+		init_data = regulator_swnode_get_init_data(dev, regulator_desc,
+							   config, &rdev->dev.fwnode);
 
 	/*
 	 * Sometimes not all resources are probed already so we need to take
