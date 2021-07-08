@@ -485,7 +485,7 @@ blk_status_t btrfs_submit_compressed_write(struct btrfs_inode *inode, u64 start,
 				BUG_ON(ret); /* -ENOMEM */
 			}
 
-			ret = btrfs_map_bio(fs_info, bio, 0);
+			ret = btrfs_map_bio(fs_info, bio);
 			if (ret) {
 				bio->bi_status = ret;
 				bio_endio(bio);
@@ -521,7 +521,7 @@ blk_status_t btrfs_submit_compressed_write(struct btrfs_inode *inode, u64 start,
 		BUG_ON(ret); /* -ENOMEM */
 	}
 
-	ret = btrfs_map_bio(fs_info, bio, 0);
+	ret = btrfs_map_bio(fs_info, bio);
 	if (ret) {
 		bio->bi_status = ret;
 		bio_endio(bio);
@@ -662,7 +662,7 @@ next:
  * bio we were passed and then call the bio end_io calls
  */
 blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
-				 int mirror_num, unsigned long bio_flags)
+				 unsigned long bio_flags)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct extent_map_tree *em_tree;
@@ -699,7 +699,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	refcount_set(&cb->pending_bios, 0);
 	cb->errors = 0;
 	cb->inode = inode;
-	cb->mirror_num = mirror_num;
+	cb->mirror_num = btrfs_io_bio(bio)->mirror_num;
 	sums = cb->sums;
 
 	cb->start = em->orig_start;
@@ -741,6 +741,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	comp_bio->bi_opf = REQ_OP_READ;
 	comp_bio->bi_private = cb;
 	comp_bio->bi_end_io = end_compressed_bio_read;
+	btrfs_io_bio(comp_bio)->mirror_num = cb->mirror_num;
 	refcount_set(&cb->pending_bios, 1);
 
 	for (pg_index = 0; pg_index < nr_pages; pg_index++) {
@@ -789,7 +790,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 						  fs_info->sectorsize);
 			sums += fs_info->csum_size * nr_sectors;
 
-			ret = btrfs_map_bio(fs_info, comp_bio, mirror_num);
+			ret = btrfs_map_bio(fs_info, comp_bio);
 			if (ret) {
 				comp_bio->bi_status = ret;
 				bio_endio(comp_bio);
@@ -799,6 +800,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 			comp_bio->bi_opf = REQ_OP_READ;
 			comp_bio->bi_private = cb;
 			comp_bio->bi_end_io = end_compressed_bio_read;
+			btrfs_io_bio(comp_bio)->mirror_num = cb->mirror_num;
 
 			bio_add_page(comp_bio, page, pg_len, 0);
 		}
@@ -811,7 +813,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	ret = btrfs_lookup_bio_sums(inode, comp_bio, sums);
 	BUG_ON(ret); /* -ENOMEM */
 
-	ret = btrfs_map_bio(fs_info, comp_bio, mirror_num);
+	ret = btrfs_map_bio(fs_info, comp_bio);
 	if (ret) {
 		comp_bio->bi_status = ret;
 		bio_endio(comp_bio);

@@ -113,7 +113,6 @@ struct async_submit_bio {
 	struct inode *inode;
 	struct bio *bio;
 	extent_submit_bio_start_t *submit_bio_start;
-	int mirror_num;
 
 	/* Optional parameter for submit_bio_start used by direct io */
 	u64 dio_file_offset;
@@ -827,7 +826,7 @@ static void run_one_async_done(struct btrfs_work *work)
 	 * This changes nothing when cgroups aren't in use.
 	 */
 	async->bio->bi_opf |= REQ_CGROUP_PUNT;
-	ret = btrfs_map_bio(btrfs_sb(inode->i_sb), async->bio, async->mirror_num);
+	ret = btrfs_map_bio(btrfs_sb(inode->i_sb), async->bio);
 	if (ret) {
 		async->bio->bi_status = ret;
 		bio_endio(async->bio);
@@ -843,7 +842,7 @@ static void run_one_async_free(struct btrfs_work *work)
 }
 
 blk_status_t btrfs_wq_submit_bio(struct inode *inode, struct bio *bio,
-				 int mirror_num, unsigned long bio_flags,
+				 unsigned long bio_flags,
 				 u64 dio_file_offset,
 				 extent_submit_bio_start_t *submit_bio_start)
 {
@@ -856,7 +855,6 @@ blk_status_t btrfs_wq_submit_bio(struct inode *inode, struct bio *bio,
 
 	async->inode = inode;
 	async->bio = bio;
-	async->mirror_num = mirror_num;
 	async->submit_bio_start = submit_bio_start;
 
 	btrfs_init_work(&async->work, run_one_async_start, run_one_async_done,
@@ -914,7 +912,7 @@ static bool should_async_write(struct btrfs_fs_info *fs_info,
 }
 
 blk_status_t btrfs_submit_metadata_bio(struct inode *inode, struct bio *bio,
-				       int mirror_num, unsigned long bio_flags)
+				       unsigned long bio_flags)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	blk_status_t ret;
@@ -928,18 +926,18 @@ blk_status_t btrfs_submit_metadata_bio(struct inode *inode, struct bio *bio,
 					  BTRFS_WQ_ENDIO_METADATA);
 		if (ret)
 			goto out_w_error;
-		ret = btrfs_map_bio(fs_info, bio, mirror_num);
+		ret = btrfs_map_bio(fs_info, bio);
 	} else if (!should_async_write(fs_info, BTRFS_I(inode))) {
 		ret = btree_csum_one_bio(bio);
 		if (ret)
 			goto out_w_error;
-		ret = btrfs_map_bio(fs_info, bio, mirror_num);
+		ret = btrfs_map_bio(fs_info, bio);
 	} else {
 		/*
 		 * kthread helpers are used to submit writes so that
 		 * checksumming can happen in parallel across all CPUs
 		 */
-		ret = btrfs_wq_submit_bio(inode, bio, mirror_num, 0,
+		ret = btrfs_wq_submit_bio(inode, bio, 0,
 					  0, btree_submit_bio_start);
 	}
 

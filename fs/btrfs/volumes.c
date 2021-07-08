@@ -6758,8 +6758,7 @@ static void bbio_error(struct btrfs_bio *bbio, struct bio *bio, u64 logical)
 	}
 }
 
-blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio,
-			   int mirror_num)
+blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio)
 {
 	struct btrfs_device *dev;
 	struct bio *first_bio = bio;
@@ -6770,6 +6769,7 @@ blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio,
 	int dev_nr;
 	int total_devs;
 	struct btrfs_bio *bbio = NULL;
+	int mirror_num = btrfs_io_bio(bio)->mirror_num;
 
 	length = bio->bi_iter.bi_size;
 	map_length = length;

@@ -71,7 +71,6 @@ struct io_failure_record;
 struct extent_io_tree;
 
 typedef blk_status_t (submit_bio_hook_t)(struct inode *inode, struct bio *bio,
-					 int mirror_num,
 					 unsigned long bio_flags);
 
 typedef blk_status_t (extent_submit_bio_start_t)(struct inode *inode,
@@ -177,8 +176,7 @@ typedef struct extent_map *(get_extent_t)(struct btrfs_inode *inode,
 int try_release_extent_mapping(struct page *page, gfp_t mask);
 int try_release_extent_buffer(struct page *page);
 
-int __must_check submit_one_bio(struct bio *bio, int mirror_num,
-				unsigned long bio_flags);
+int __must_check submit_one_bio(struct bio *bio, unsigned long bio_flags);
 int btrfs_do_readpage(struct page *page, struct extent_map **em_cached,
 		      struct btrfs_bio_ctrl *bio_ctrl,
 		      unsigned int read_flags, u64 *prev_em_start);
@@ -309,7 +307,7 @@ struct io_failure_record {
 int btrfs_repair_one_sector(struct inode *inode,
 			    struct bio *failed_bio, u32 bio_offset,
 			    struct page *page, unsigned int pgoff,
-			    u64 start, int failed_mirror,
+			    u64 start,
 			    submit_bio_hook_t *submit_bio_hook);
 
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS

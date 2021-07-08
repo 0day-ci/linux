@@ -164,8 +164,7 @@ static int add_extent_changeset(struct extent_state *state, u32 bits,
 	return ret;
 }
 
-int __must_check submit_one_bio(struct bio *bio, int mirror_num,
-				unsigned long bio_flags)
+int __must_check submit_one_bio(struct bio *bio, unsigned long bio_flags)
 {
 	blk_status_t ret = 0;
 	struct extent_io_tree *tree = bio->bi_private;
@@ -173,11 +172,11 @@ int __must_check submit_one_bio(struct bio *bio, int mirror_num,
 	bio->bi_private = NULL;
 
 	if (is_data_inode(tree->private_data))
-		ret = btrfs_submit_data_bio(tree->private_data, bio, mirror_num,
+		ret = btrfs_submit_data_bio(tree->private_data, bio,
 					    bio_flags);
 	else
 		ret = btrfs_submit_metadata_bio(tree->private_data, bio,
-						mirror_num, bio_flags);
+						bio_flags);
 
 	return blk_status_to_errno(ret);
 }
@@ -206,7 +205,7 @@ static int __must_check flush_write_bio(struct extent_page_data *epd)
 	struct bio *bio = epd->bio_ctrl.bio;
 
 	if (bio) {
-		ret = submit_one_bio(bio, 0, 0);
+		ret = submit_one_bio(bio, 0);
 		/*
 		 * Clean up of epd->bio is handled by its endio function.
 		 * And endio is either triggered by successful bio execution
@@ -2620,7 +2619,7 @@ static bool btrfs_check_repairable(struct inode *inode,
 int btrfs_repair_one_sector(struct inode *inode,
 			    struct bio *failed_bio, u32 bio_offset,
 			    struct page *page, unsigned int pgoff,
-			    u64 start, int failed_mirror,
+			    u64 start,
 			    submit_bio_hook_t *submit_bio_hook)
 {
 	struct io_failure_record *failrec;
@@ -2628,6 +2627,7 @@ int btrfs_repair_one_sector(struct inode *inode,
 	struct extent_io_tree *tree = &BTRFS_I(inode)->io_tree;
 	struct extent_io_tree *failure_tree = &BTRFS_I(inode)->io_failure_tree;
 	struct btrfs_io_bio *failed_io_bio = btrfs_io_bio(failed_bio);
+	int failed_mirror = failed_io_bio->mirror_num;
 	const int icsum = bio_offset >> fs_info->sectorsize_bits;
 	struct bio *repair_bio;
 	struct btrfs_io_bio *repair_io_bio;
@@ -2654,6 +2654,7 @@ int btrfs_repair_one_sector(struct inode *inode,
 	repair_bio->bi_end_io = failed_bio->bi_end_io;
 	repair_bio->bi_iter.bi_sector = failrec->logical >> 9;
 	repair_bio->bi_private = failed_bio->bi_private;
+	btrfs_io_bio(repair_bio)->mirror_num = failrec->this_mirror;
 
 	if (failed_io_bio->csum) {
 		const u32 csum_size = fs_info->csum_size;
@@ -2671,8 +2672,7 @@ int btrfs_repair_one_sector(struct inode *inode,
 		    "repair read error: submitting new read to mirror %d",
 		    failrec->this_mirror);
 
-	status = submit_bio_hook(inode, repair_bio, failrec->this_mirror,
-				 failrec->bio_flags);
+	status = submit_bio_hook(inode, repair_bio, failrec->bio_flags);
 	if (status) {
 		free_io_failure(failure_tree, tree, failrec);
 		bio_put(repair_bio);
@@ -2743,7 +2743,7 @@ static blk_status_t submit_read_repair(struct inode *inode,
 		ret = btrfs_repair_one_sector(inode, failed_bio,
 				bio_offset + offset,
 				page, pgoff + offset, start + offset,
-				failed_mirror, submit_bio_hook);
+				submit_bio_hook);
 		if (!ret) {
 			/*
 			 * We have submitted the read repair, the page release
@@ -3140,6 +3140,7 @@ struct bio *btrfs_bio_clone(struct bio *bio)
 	btrfs_bio = btrfs_io_bio(new);
 	btrfs_io_bio_init(btrfs_bio);
 	btrfs_bio->iter = bio->bi_iter;
+	btrfs_bio->mirror_num = btrfs_io_bio(bio)->mirror_num;
 	return new;
 }
 
@@ -3320,7 +3321,7 @@ static int submit_extent_page(unsigned int opf,
 		if (force_bio_submit ||
 		    !btrfs_bio_add_page(bio_ctrl, page, disk_bytenr, io_size,
 					pg_offset, bio_flags)) {
-			ret = submit_one_bio(bio, mirror_num, bio_ctrl->bio_flags);
+			ret = submit_one_bio(bio, bio_ctrl->bio_flags);
 			bio_ctrl->bio = NULL;
 			if (ret < 0)
 				return ret;
@@ -3337,6 +3338,7 @@ static int submit_extent_page(unsigned int opf,
 	bio->bi_private = tree;
 	bio->bi_write_hint = page->mapping->host->i_write_hint;
 	bio->bi_opf = opf;
+	btrfs_io_bio(bio)->mirror_num = mirror_num;
 	if (wbc) {
 		struct block_device *bdev;
 
@@ -5041,7 +5043,7 @@ void extent_readahead(struct readahead_control *rac)
 		free_extent_map(em_cached);
 
 	if (bio_ctrl.bio) {
-		if (submit_one_bio(bio_ctrl.bio, 0, bio_ctrl.bio_flags))
+		if (submit_one_bio(bio_ctrl.bio, bio_ctrl.bio_flags))
 			return;
 	}
 }
@@ -6385,7 +6387,7 @@ static int read_extent_buffer_subpage(struct extent_buffer *eb, int wait,
 	if (bio_ctrl.bio) {
 		int tmp;
 
-		tmp = submit_one_bio(bio_ctrl.bio, mirror_num, 0);
+		tmp = submit_one_bio(bio_ctrl.bio, 0);
 		bio_ctrl.bio = NULL;
 		if (tmp < 0)
 			return tmp;
@@ -6493,7 +6495,7 @@ int read_extent_buffer_pages(struct extent_buffer *eb, int wait, int mirror_num)
 	}
 
 	if (bio_ctrl.bio) {
-		err = submit_one_bio(bio_ctrl.bio, mirror_num, bio_ctrl.bio_flags);
+		err = submit_one_bio(bio_ctrl.bio, bio_ctrl.bio_flags);
 		bio_ctrl.bio = NULL;
 		if (err)
 			return err;

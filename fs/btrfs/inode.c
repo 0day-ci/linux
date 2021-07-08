@@ -2465,7 +2465,7 @@ out:
  *    c-3) otherwise:			async submit
  */
 blk_status_t btrfs_submit_data_bio(struct inode *inode, struct bio *bio,
-				   int mirror_num, unsigned long bio_flags)
+				   unsigned long bio_flags)
 
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
@@ -2497,7 +2497,6 @@ blk_status_t btrfs_submit_data_bio(struct inode *inode, struct bio *bio,
 
 		if (bio_flags & EXTENT_BIO_COMPRESSED) {
 			ret = btrfs_submit_compressed_read(inode, bio,
-							   mirror_num,
 							   bio_flags);
 			goto out;
 		} else {
@@ -2516,7 +2515,7 @@ blk_status_t btrfs_submit_data_bio(struct inode *inode, struct bio *bio,
 		if (root->root_key.objectid == BTRFS_DATA_RELOC_TREE_OBJECTID)
 			goto mapit;
 		/* we're doing a write, do the async checksumming */
-		ret = btrfs_wq_submit_bio(inode, bio, mirror_num, bio_flags,
+		ret = btrfs_wq_submit_bio(inode, bio, bio_flags,
 					  0, btrfs_submit_bio_start);
 		goto out;
 	} else if (!skip_sum) {
@@ -2526,7 +2525,7 @@ blk_status_t btrfs_submit_data_bio(struct inode *inode, struct bio *bio,
 	}
 
 mapit:
-	ret = btrfs_map_bio(fs_info, bio, mirror_num);
+	ret = btrfs_map_bio(fs_info, bio);
 
 out:
 	if (ret) {
@@ -7999,7 +7998,6 @@ static void btrfs_dio_private_put(struct btrfs_dio_private *dip)
 }
 
 static blk_status_t submit_dio_repair_bio(struct inode *inode, struct bio *bio,
-					  int mirror_num,
 					  unsigned long bio_flags)
 {
 	struct btrfs_dio_private *dip = bio->bi_private;
@@ -8013,7 +8011,7 @@ static blk_status_t submit_dio_repair_bio(struct inode *inode, struct bio *bio,
 		return ret;
 
 	refcount_inc(&dip->refs);
-	ret = btrfs_map_bio(fs_info, bio, mirror_num);
+	ret = btrfs_map_bio(fs_info, bio);
 	if (ret)
 		refcount_dec(&dip->refs);
 	return ret;
@@ -8057,7 +8055,7 @@ static blk_status_t btrfs_check_read_dio_bio(struct inode *inode,
 						&io_bio->bio,
 						start - io_bio->logical,
 						bvec.bv_page, pgoff,
-						start, io_bio->mirror_num,
+						start,
 						submit_dio_repair_bio);
 				if (ret)
 					err = errno_to_blk_status(ret);
@@ -8134,7 +8132,7 @@ static inline blk_status_t btrfs_submit_dio_bio(struct bio *bio,
 		goto map;
 
 	if (write && async_submit) {
-		ret = btrfs_wq_submit_bio(inode, bio, 0, 0, file_offset,
+		ret = btrfs_wq_submit_bio(inode, bio, 0, file_offset,
 					  btrfs_submit_bio_start_direct_io);
 		goto err;
 	} else if (write) {
@@ -8154,7 +8152,7 @@ static inline blk_status_t btrfs_submit_dio_bio(struct bio *bio,
 		btrfs_io_bio(bio)->csum = dip->csums + csum_offset;
 	}
 map:
-	ret = btrfs_map_bio(fs_info, bio, 0);
+	ret = btrfs_map_bio(fs_info, bio);
 err:
 	return ret;
 }
@@ -8361,7 +8359,7 @@ int btrfs_readpage(struct file *file, struct page *page)
 
 	ret = btrfs_do_readpage(page, NULL, &bio_ctrl, 0, NULL);
 	if (bio_ctrl.bio)
-		ret = submit_one_bio(bio_ctrl.bio, 0, bio_ctrl.bio_flags);
+		ret = submit_one_bio(bio_ctrl.bio, bio_ctrl.bio_flags);
 	return ret;
 }
 
