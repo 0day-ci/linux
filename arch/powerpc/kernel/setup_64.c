@@ -871,6 +871,30 @@ err_alloc:
 	      __func__, PAGE_SIZE, PAGE_SIZE, PAGE_SIZE);
 }
 
+static size_t pcpu_atom_size(void)
+{
+	size_t atom_size = PAGE_SIZE;
+
+	/*
+	 * Radix: Use PAGE_SIZE by default or 2M if available.
+	 */
+	if (radix_enabled()) {
+		if (mmu_psize_defs[MMU_PAGE_2M].shift)
+			atom_size = 1 << mmu_psize_defs[MMU_PAGE_2M].shift;
+		goto out;
+	}
+
+	/*
+	 * Hash: Linear mapping is one of 4K, 1M and 16M.  For 4K, no need
+	 * to group units.  For larger mappings, use 1M atom which
+	 * should be large enough to contain a number of units.
+	 */
+	if (mmu_linear_psize != MMU_PAGE_4K)
+		atom_size = 1 << 20;
+
+out:
+	return atom_size;
+}
 
 void __init setup_per_cpu_areas(void)
 {
@@ -880,15 +904,7 @@ void __init setup_per_cpu_areas(void)
 	unsigned int cpu;
 	int rc = -EINVAL;
 
-	/*
-	 * Linear mapping is one of 4K, 1M and 16M.  For 4K, no need
-	 * to group units.  For larger mappings, use 1M atom which
-	 * should be large enough to contain a number of units.
-	 */
-	if (mmu_linear_psize == MMU_PAGE_4K)
-		atom_size = PAGE_SIZE;
-	else
-		atom_size = 1 << 20;
+	atom_size = pcpu_atom_size();
 
 	if (pcpu_chosen_fc != PCPU_FC_PAGE) {
 		rc = pcpu_embed_first_chunk(0, dyn_size, atom_size, pcpu_cpu_distance,
