@@ -379,6 +379,15 @@ static int axi_fan_control_init(struct axi_fan_control_data *ctl,
 		      ADI_IRQ_SRC_PWM_CHANGED | ADI_IRQ_SRC_TEMP_INCREASE),
 		    ADI_REG_IRQ_MASK, ctl);
 
+	/*
+	 * The core might pull itself out of reset automatically which means it can run with
+	 * invalid tacho evaluation parameters for some time. Thus, it will trigger a FAN
+	 * FAULT interrupt as soon as we unmask it(and some userland apps might be sensitive to
+	 * this). Hence, we will clear it here and if there's something really wrong with the
+	 * FAN or the evaluation parameters, we'll get that interrupt again...
+	 */
+	axi_iowrite(ADI_IRQ_SRC_TACH_ERR, ADI_REG_IRQ_PENDING, ctl);
+
 	/* bring the device out of reset */
 	axi_iowrite(0x01, ADI_REG_RSTN, ctl);
 
