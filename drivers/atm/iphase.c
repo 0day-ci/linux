@@ -1243,7 +1243,7 @@ static void rx_intr(struct atm_dev *dev)
                ((iadev->rx_pkt_cnt - iadev->rx_tmp_cnt) == 0)) {
         for (i = 1; i <= iadev->num_rx_desc; i++)
                free_desc(dev, i);
-printk("Test logic RUN!!!!\n");
+        printk("Test logic RUN!!!!\n");
         writew( ~(RX_FREEQ_EMPT|RX_EXCP_RCVD),iadev->reass_reg+REASS_MASK_REG);
         iadev->rxing = 1;
      }

@@ -1456,7 +1456,7 @@ static int start_tx(struct atm_dev *dev)
 
 static void foo(void)
 {
-printk(KERN_INFO
+  printk(KERN_INFO
   "tx_complete=%d,dma_complete=%d,queued=%d,requeued=%d,sub=%d,\n"
   "backlogged=%d,rx_enqueued=%d,rx_dequeued=%d,putting=%d,pushed=%d\n",
   tx_complete,dma_complete,queued,requeued,submitted,backlogged,

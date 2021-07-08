@@ -633,7 +633,7 @@ static void iosapic_unmask_irq(struct irq_data *d)
 	printk("\n");
 }
 
-printk("iosapic_enable_irq(): sel ");
+	printk("iosapic_enable_irq(): sel ");
 {
 	struct iosapic_info *isp = vi->iosapic;
 
@@ -642,7 +642,7 @@ printk("iosapic_enable_irq(): sel ");
 		printk(" %x", d1);
 	}
 }
-printk("\n");
+	printk("\n");
 #endif
 
 	/*

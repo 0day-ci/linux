@@ -3169,7 +3169,7 @@ dc2114x_autoconf(struct net_device *dev)
 
     default:
 	lp->tcount++;
-printk("Huh?: media:%02x\n", lp->media);
+	printk("Huh?: media:%02x\n", lp->media);
 	lp->media = INIT;
 	break;
     }

@@ -380,7 +380,7 @@ static void poll_rx(struct atm_dev *dev,int mbx)
 			pos = zatm_dev->mbx_start[mbx];
 		cells = here[0] & uPD98401_AAL5_SIZE;
 #if 0
-printk("RX IND: 0x%x, 0x%x, 0x%x, 0x%x\n",here[0],here[1],here[2],here[3]);
+		printk("RX IND: 0x%x, 0x%x, 0x%x, 0x%x\n",here[0],here[1],here[2],here[3]);
 {
 unsigned long *x;
 		printk("POOL: 0x%08x, 0x%08x\n",zpeekl(zatm_dev,
@@ -403,14 +403,14 @@ EVENT("error code 0x%x/0x%x\n",(here[3] & uPD98401_AAL5_ES) >>
 		skb = ((struct rx_buffer_head *) bus_to_virt(here[2]))->skb;
 		__net_timestamp(skb);
 #if 0
-printk("[-3..0] 0x%08lx 0x%08lx 0x%08lx 0x%08lx\n",((unsigned *) skb->data)[-3],
+		printk("[-3..0] 0x%08lx 0x%08lx 0x%08lx 0x%08lx\n",((unsigned *) skb->data)[-3],
   ((unsigned *) skb->data)[-2],((unsigned *) skb->data)[-1],
   ((unsigned *) skb->data)[0]);
 #endif
 		EVENT("skb 0x%lx, here 0x%lx\n",(unsigned long) skb,
 		    (unsigned long) here);
 #if 0
-printk("dummy: 0x%08lx, 0x%08lx\n",dummy[0],dummy[1]);
+		printk("dummy: 0x%08lx, 0x%08lx\n",dummy[0],dummy[1]);
 #endif
 		size = error ? 0 : ntohs(((__be16 *) skb->data)[cells*
 		    ATM_CELL_PAYLOAD/sizeof(u16)-3]);
@@ -664,7 +664,7 @@ static int do_tx(struct sk_buff *skb)
 		EVENT("dsc (0x%lx)\n",(unsigned long) dsc,0);
 	}
 	else {
-printk("NONONONOO!!!!\n");
+		printk("NONONONOO!!!!\n");
 		dsc = NULL;
 #if 0
 		u32 *put;
