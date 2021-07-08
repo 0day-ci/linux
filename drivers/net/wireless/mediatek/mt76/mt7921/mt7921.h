@@ -45,6 +45,19 @@
 #define MT7921_SKU_MAX_DELTA_IDX	MT7921_SKU_RATE_NUM
 #define MT7921_SKU_TABLE_SIZE		(MT7921_SKU_RATE_NUM + 1)
 
+#define MT7921_CCK_RATE(_idx, _rate) {				\
+	.bitrate = _rate,					\
+	.flags = IEEE80211_RATE_SHORT_PREAMBLE,			\
+	.hw_value = (MT_PHY_TYPE_CCK << 6) | (_idx),		\
+	.hw_value_short = (MT_PHY_TYPE_CCK << 6) | (4 + _idx),	\
+}
+
+#define MT7921_OFDM_RATE(_idx, _rate) {				\
+	.bitrate = _rate,					\
+	.hw_value = (MT_PHY_TYPE_OFDM << 6) | (_idx),		\
+	.hw_value_short = (MT_PHY_TYPE_OFDM << 6) | (_idx),	\
+}
+
 #define to_rssi(field, rxv)		((FIELD_GET(field, rxv) - 220) / 2)
 #define to_rcpi(rssi)			(2 * (rssi) + 220)
 
@@ -241,6 +254,7 @@ static inline u8 mt7921_lmac_mapping(struct mt7921_dev *dev, u8 ac)
 
 extern const struct ieee80211_ops mt7921_ops;
 extern struct pci_driver mt7921_pci_driver;
+extern struct ieee80211_rate mt7921_rates[12];
 
 u32 mt7921_reg_map(struct mt7921_dev *dev, u32 addr);
 

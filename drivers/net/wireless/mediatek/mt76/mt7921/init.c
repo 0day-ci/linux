@@ -24,6 +24,21 @@ static const struct ieee80211_iface_combination if_comb[] = {
 	}
 };
 
+struct ieee80211_rate mt7921_rates[] = {
+	MT7921_CCK_RATE(0, 10),
+	MT7921_CCK_RATE(1, 20),
+	MT7921_CCK_RATE(2, 55),
+	MT7921_CCK_RATE(3, 110),
+	MT7921_OFDM_RATE(11, 60),
+	MT7921_OFDM_RATE(15, 90),
+	MT7921_OFDM_RATE(10, 120),
+	MT7921_OFDM_RATE(14, 180),
+	MT7921_OFDM_RATE(9,  240),
+	MT7921_OFDM_RATE(13, 360),
+	MT7921_OFDM_RATE(8,  480),
+	MT7921_OFDM_RATE(12, 540),
+};
+
 static void
 mt7921_regd_notifier(struct wiphy *wiphy,
 		     struct regulatory_request *request)
@@ -227,8 +242,8 @@ int mt7921_register_device(struct mt7921_dev *dev)
 	mt76_set_stream_caps(&dev->mphy, true);
 	mt7921_set_stream_he_caps(&dev->phy);
 
-	ret = mt76_register_device(&dev->mt76, true, mt76_rates,
-				   ARRAY_SIZE(mt76_rates));
+	ret = mt76_register_device(&dev->mt76, true, mt7921_rates,
+				   ARRAY_SIZE(mt7921_rates));
 	if (ret)
 		return ret;
 

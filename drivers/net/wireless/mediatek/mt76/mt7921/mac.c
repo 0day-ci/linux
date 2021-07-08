@@ -749,6 +749,22 @@ static void mt7921_update_txs(struct mt76_wcid *wcid, __le32 *txwi)
 			       FIELD_PREP(MT_TXD5_PID, pid));
 }
 
+static u16
+mt7921_default_basic_rates(struct mt7921_dev *dev, struct ieee80211_vif *vif)
+{
+	struct mt76_phy *mphy = &dev->mphy;
+	struct ieee80211_rate *rate;
+	int i, offset = 0;
+
+	if (mphy->chandef.chan->band == NL80211_BAND_5GHZ)
+		offset = 4;
+
+	i = ffs(vif->bss_conf.basic_rates) - 1;
+	rate = &mt7921_rates[offset + i];
+
+	return rate->hw_value;
+}
+
 void mt7921_mac_write_txwi(struct mt7921_dev *dev, __le32 *txwi,
 			   struct sk_buff *skb, struct mt76_wcid *wcid,
 			   struct ieee80211_key_conf *key, bool beacon)
@@ -815,10 +831,7 @@ void mt7921_mac_write_txwi(struct mt7921_dev *dev, __le32 *txwi,
 		/* hardware won't add HTC for mgmt/ctrl frame */
 		txwi[2] |= cpu_to_le32(MT_TXD2_HTC_VLD);
 
-		if (mphy->chandef.chan->band == NL80211_BAND_5GHZ)
-			rate = MT7921_5G_RATE_DEFAULT;
-		else
-			rate = MT7921_2G_RATE_DEFAULT;
+		rate = mt7921_default_basic_rates(dev, vif);
 
 		val = MT_TXD6_FIXED_BW |
 		      FIELD_PREP(MT_TXD6_TX_RATE, rate);
