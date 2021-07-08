@@ -23,6 +23,14 @@
 #define ADI_REG_PWM_PERIOD	0x00c0
 #define ADI_REG_TACH_MEASUR	0x00c4
 #define ADI_REG_TEMPERATURE	0x00c8
+#define ADI_REG_TACH_25		0x0140
+#define ADI_REG_TACH_50		0x0144
+#define ADI_REG_TACH_75		0x0148
+#define ADI_REG_TACH_100	0x014c
+#define ADI_REG_TACH_25_TOL	0x0150
+#define ADI_REG_TACH_50_TOL	0x0154
+#define ADI_REG_TACH_75_TOL	0x0158
+#define ADI_REG_TACH_100_TOL	0x015c
 
 #define ADI_REG_IRQ_MASK	0x0040
 #define ADI_REG_IRQ_PENDING	0x0044
@@ -328,6 +336,7 @@ static int axi_fan_control_init(struct axi_fan_control_data *ctl,
 				const struct device_node *np)
 {
 	int ret;
+	u32 tacho_val;
 
 	/* get fan pulses per revolution */
 	ret = of_property_read_u32(np, "pulses-per-revolution", &ctl->ppr);
@@ -337,6 +346,31 @@ static int axi_fan_control_init(struct axi_fan_control_data *ctl,
 	/* 1, 2 and 4 are the typical and accepted values */
 	if (ctl->ppr != 1 && ctl->ppr != 2 && ctl->ppr != 4)
 		return -EINVAL;
+
+	if (!of_property_read_u32(np, "adi,tacho-25-us", &tacho_val)) {
+		tacho_val = DIV_ROUND_CLOSEST_ULL((u64)tacho_val * ctl->clk_rate, 1000000);
+		axi_iowrite(tacho_val, ADI_REG_TACH_25, ctl);
+		axi_iowrite(DIV_ROUND_CLOSEST(tacho_val * 25, 100), ADI_REG_TACH_25_TOL, ctl);
+	}
+
+	if (!of_property_read_u32(np, "adi,tacho-50-us", &tacho_val)) {
+		tacho_val = DIV_ROUND_CLOSEST_ULL((u64)tacho_val * ctl->clk_rate, 1000000);
+		axi_iowrite(tacho_val, ADI_REG_TACH_50, ctl);
+		axi_iowrite(DIV_ROUND_CLOSEST(tacho_val * 25, 100), ADI_REG_TACH_50_TOL, ctl);
+	}
+
+	if (!of_property_read_u32(np, "adi,tacho-75-us", &tacho_val)) {
+		tacho_val = DIV_ROUND_CLOSEST_ULL((u64)tacho_val * ctl->clk_rate, 1000000);
+		axi_iowrite(tacho_val, ADI_REG_TACH_75, ctl);
+		axi_iowrite(DIV_ROUND_CLOSEST(tacho_val * 25, 100), ADI_REG_TACH_75_TOL, ctl);
+	}
+
+	if (!of_property_read_u32(np, "adi,tacho-100-us", &tacho_val)) {
+		tacho_val = DIV_ROUND_CLOSEST_ULL((u64)tacho_val * ctl->clk_rate, 1000000);
+		axi_iowrite(tacho_val, ADI_REG_TACH_100, ctl);
+		axi_iowrite(DIV_ROUND_CLOSEST(tacho_val * 25, 100), ADI_REG_TACH_100_TOL, ctl);
+	}
+
 	/*
 	 * Enable all IRQs
 	 */
