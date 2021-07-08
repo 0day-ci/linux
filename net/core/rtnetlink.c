@@ -281,10 +281,8 @@ void rtnl_register(int protocol, int msgtype,
  * rtnl_unregister - Unregister a rtnetlink message type
  * @protocol: Protocol family or PF_UNSPEC
  * @msgtype: rtnetlink message type
- *
- * Returns 0 on success or a negative error code.
  */
-int rtnl_unregister(int protocol, int msgtype)
+void rtnl_unregister(int protocol, int msgtype)
 {
 	struct rtnl_link __rcu **tab;
 	struct rtnl_link *link;
@@ -295,18 +293,18 @@ int rtnl_unregister(int protocol, int msgtype)
 
 	rtnl_lock();
 	tab = rtnl_dereference(rtnl_msg_handlers[protocol]);
-	if (!tab) {
-		rtnl_unlock();
-		return -ENOENT;
-	}
+	if (!tab)
+		goto unlock;
 
 	link = rtnl_dereference(tab[msgindex]);
-	rcu_assign_pointer(tab[msgindex], NULL);
-	rtnl_unlock();
+	if (!link)
+		goto unlock;
 
+	rcu_assign_pointer(tab[msgindex], NULL);
 	kfree_rcu(link, rcu);
 
-	return 0;
+unlock:
+	rtnl_unlock();
 }
 EXPORT_SYMBOL_GPL(rtnl_unregister);
 
