@@ -697,23 +697,22 @@ static int __init vtpm_module_init(void)
 {
 	int rc;
 
-	rc = vtpmx_init();
-	if (rc) {
-		pr_err("couldn't create vtpmx device\n");
-		return rc;
-	}
-
 	workqueue = create_workqueue("tpm-vtpm");
 	if (!workqueue) {
 		pr_err("couldn't create workqueue\n");
-		rc = -ENOMEM;
-		goto err_vtpmx_cleanup;
+		return -ENOMEM;
+	}
+
+	rc = vtpmx_init();
+	if (rc) {
+		pr_err("couldn't create vtpmx device\n");
+		goto err_destroy_workqueue;
 	}
 
 	return 0;
 
-err_vtpmx_cleanup:
-	vtpmx_cleanup();
+err_destroy_workqueue:
+	destroy_workqueue(workqueue);
 
 	return rc;
 }
