@@ -760,7 +760,7 @@ sb1000_rx(struct net_device *dev)
 
 	insw(ioaddr, (unsigned short*) st, 1);
 #ifdef XXXDEBUG
-printk("cm0: received: %02x %02x\n", st[0], st[1]);
+	printk("cm0: received: %02x %02x\n", st[0], st[1]);
 #endif /* XXXDEBUG */
 	lp->rx_frames++;
 
@@ -805,7 +805,7 @@ good_frame:
 		/* get data length */
 		insw(ioaddr, buffer, NewDatagramHeaderSize / 2);
 #ifdef XXXDEBUG
-printk("cm0: IP identification: %02x%02x  fragment offset: %02x%02x\n", buffer[30], buffer[31], buffer[32], buffer[33]);
+		printk("cm0: IP identification: %02x%02x  fragment offset: %02x%02x\n", buffer[30], buffer[31], buffer[32], buffer[33]);
 #endif /* XXXDEBUG */
 		if (buffer[0] != NewDatagramHeaderSkip) {
 			if (sb1000_debug > 1)
