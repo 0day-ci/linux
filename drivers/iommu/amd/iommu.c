@@ -344,6 +344,9 @@ static int iommu_init_device(struct device *dev)
 
 		iommu = amd_iommu_rlookup_table[dev_data->devid];
 		dev_data->iommu_v2 = iommu->is_iommu_v2;
+
+		if (dev_data->iommu_v2)
+			swiotlb = 1;
 	}
 
 	dev_iommu_priv_set(dev, dev_data);
