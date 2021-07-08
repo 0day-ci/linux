@@ -51,6 +51,11 @@ static const struct intel_step_info icl_revid_step_tbl[] = {
 	[7] = { .gt_step = STEP_D0, .display_step = STEP_D0 },
 };
 
+static const struct intel_step_info jsl_ehl_revid_step_tbl[] = {
+	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
+	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
+};
+
 static const struct intel_step_info tgl_uy_revid_step_tbl[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[1] = { .gt_step = STEP_B0, .display_step = STEP_C0 },
@@ -98,6 +103,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_TIGERLAKE(i915)) {
 		revids = tgl_revid_step_tbl;
 		size = ARRAY_SIZE(tgl_revid_step_tbl);
+	} else if (IS_JSL_EHL(i915)) {
+		revids = jsl_ehl_revid_step_tbl;
+		size = ARRAY_SIZE(jsl_ehl_revid_step_tbl);
 	} else if (IS_ICELAKE(i915)) {
 		revids = icl_revid_step_tbl;
 		size = ARRAY_SIZE(icl_revid_step_tbl);
