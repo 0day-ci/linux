@@ -650,7 +650,7 @@ static struct platform_driver imx8mq_clk_driver = {
 		.of_match_table = imx8mq_clk_of_match,
 	},
 };
-module_platform_driver(imx8mq_clk_driver);
+builtin_platform_driver(imx8mq_clk_driver);
 
 MODULE_AUTHOR("Abel Vesa <abel.vesa@nxp.com>");
 MODULE_DESCRIPTION("NXP i.MX8MQ clock driver");

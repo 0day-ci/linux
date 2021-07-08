@@ -654,7 +654,7 @@ static struct platform_driver imx8mm_clk_driver = {
 		.of_match_table = imx8mm_clk_of_match,
 	},
 };
-module_platform_driver(imx8mm_clk_driver);
+builtin_platform_driver(imx8mm_clk_driver);
 
 MODULE_AUTHOR("Bai Ping <ping.bai@nxp.com>");
 MODULE_DESCRIPTION("NXP i.MX8MM clock driver");
