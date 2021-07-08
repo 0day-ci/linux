@@ -31,6 +31,15 @@ static const struct intel_step_info skl_revid_step_tbl[] = {
 	[0xA] = { .gt_step = STEP_I1, .display_step = STEP_I1 },
 };
 
+static const struct intel_step_info bxt_revids[] = {
+	[0] = { .gt_step = STEP_A0 },
+	[1] = { .gt_step = STEP_A1 },
+	[2] = { .gt_step = STEP_A2 },
+	[6] = { .gt_step = STEP_B0 },
+	[7] = { .gt_step = STEP_B1 },
+	[8] = { .gt_step = STEP_B2 },
+};
+
 static const struct intel_step_info kbl_revid_step_tbl[] = {
 	[0] = { .gt_step = STEP_A0, .display_step = STEP_A0 },
 	[1] = { .gt_step = STEP_B0, .display_step = STEP_B0 },
@@ -129,6 +138,9 @@ void intel_step_init(struct drm_i915_private *i915)
 	} else if (IS_KABYLAKE(i915)) {
 		revids = kbl_revid_step_tbl;
 		size = ARRAY_SIZE(kbl_revid_step_tbl);
+	} else if (IS_BROXTON(i915)) {
+		revids = bxt_revids;
+		size = ARRAY_SIZE(bxt_revids);
 	} else if (IS_SKYLAKE(i915)) {
 		revids = skl_revid_step_tbl;
 		size = ARRAY_SIZE(skl_revid_step_tbl);
