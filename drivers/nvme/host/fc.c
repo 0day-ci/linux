@@ -3248,6 +3248,7 @@ nvme_fc_delete_association(struct nvme_fc_ctrl *ctrl)
 		nvme_fc_xmt_ls_rsp(disls);
 
 	if (ctrl->ctrl.tagset) {
+		nvme_start_freeze(&ctrl->ctrl);
 		nvme_fc_delete_hw_io_queues(ctrl);
 		nvme_fc_free_io_queues(ctrl);
 	}
