@@ -178,7 +178,7 @@ struct cpu_lpi_count {
 	atomic_t	unmanaged;
 };
 
-static DEFINE_PER_CPU(struct cpu_lpi_count, cpu_lpi_count);
+DEFINE_PER_CPU(struct cpu_lpi_count, cpu_lpi_count);
 
 static LIST_HEAD(its_nodes);
 static DEFINE_RAW_SPINLOCK(its_lock);
@@ -1521,7 +1521,7 @@ static void its_unmask_irq(struct irq_data *d)
 	lpi_update_config(d, 0, LPI_PROP_ENABLED);
 }
 
-static __maybe_unused u32 its_read_lpi_count(struct irq_data *d, int cpu)
+__maybe_unused u32 its_read_lpi_count(struct irq_data *d, int cpu)
 {
 	if (irqd_affinity_is_managed(d))
 		return atomic_read(&per_cpu_ptr(&cpu_lpi_count, cpu)->managed);
@@ -1529,7 +1529,7 @@ static __maybe_unused u32 its_read_lpi_count(struct irq_data *d, int cpu)
 	return atomic_read(&per_cpu_ptr(&cpu_lpi_count, cpu)->unmanaged);
 }
 
-static void its_inc_lpi_count(struct irq_data *d, int cpu)
+void its_inc_lpi_count(struct irq_data *d, int cpu)
 {
 	if (irqd_affinity_is_managed(d))
 		atomic_inc(&per_cpu_ptr(&cpu_lpi_count, cpu)->managed);
@@ -1537,7 +1537,7 @@ static void its_inc_lpi_count(struct irq_data *d, int cpu)
 		atomic_inc(&per_cpu_ptr(&cpu_lpi_count, cpu)->unmanaged);
 }
 
-static void its_dec_lpi_count(struct irq_data *d, int cpu)
+void its_dec_lpi_count(struct irq_data *d, int cpu)
 {
 	if (irqd_affinity_is_managed(d))
 		atomic_dec(&per_cpu_ptr(&cpu_lpi_count, cpu)->managed);
@@ -1545,7 +1545,7 @@ static void its_dec_lpi_count(struct irq_data *d, int cpu)
 		atomic_dec(&per_cpu_ptr(&cpu_lpi_count, cpu)->unmanaged);
 }
 
-static unsigned int cpumask_pick_least_loaded(struct irq_data *d,
+unsigned int cpumask_pick_least_loaded(struct irq_data *d,
 					      const struct cpumask *cpu_mask)
 {
 	unsigned int cpu = nr_cpu_ids, tmp;
@@ -2121,7 +2121,7 @@ static int __init its_lpi_init(u32 id_bits)
 	return err;
 }
 
-static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
+unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
 {
 	unsigned long *bitmap = NULL;
 	int err = 0;
@@ -2153,7 +2153,7 @@ out:
 	return bitmap;
 }
 
-static void its_lpi_free(unsigned long *bitmap, u32 base, u32 nr_ids)
+void its_lpi_free(unsigned long *bitmap, u32 base, u32 nr_ids)
 {
 	WARN_ON(free_lpi_range(base, nr_ids));
 	kfree(bitmap);
@@ -3506,9 +3506,9 @@ static struct msi_domain_ops its_msi_domain_ops = {
 	.msi_prepare	= its_msi_prepare,
 };
 
-static int its_irq_gic_domain_alloc(struct irq_domain *domain,
-				    unsigned int virq,
-				    irq_hw_number_t hwirq)
+int its_irq_gic_domain_alloc(struct irq_domain *domain,
+			     unsigned int virq,
+			     irq_hw_number_t hwirq)
 {
 	struct irq_fwspec fwspec;
 
@@ -5186,16 +5186,21 @@ static int redist_disable_lpis(void)
 
 int its_cpu_init(void)
 {
-	if (!list_empty(&its_nodes)) {
-		int ret;
+	int ret;
 
-		ret = redist_disable_lpis();
-		if (ret)
-			return ret;
+	/* LPI's can be supported with an ITS or with DirectLPI */
+	if (list_empty(&its_nodes) && !gic_rdists->has_direct_lpi)
+		return 0;
 
-		its_cpu_init_lpis();
+	ret = redist_disable_lpis();
+	if (ret)
+		return ret;
+
+	its_cpu_init_lpis();
+
+	/* collections require an ITS */
+	if (!list_empty(&its_nodes))
 		its_cpu_init_collections();
-	}
 
 	return 0;
 }
@@ -5402,8 +5407,16 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 		its_acpi_probe();
 
 	if (list_empty(&its_nodes)) {
-		pr_warn("ITS: No ITS available, not enabling LPIs\n");
-		return -ENXIO;
+		/* DirectLPI without ITS is architecturally supported. */
+		if (gic_rdists->has_direct_lpi) {
+			pr_info("Direct LPI with no ITS\n");
+			err = direct_lpi_init(parent_domain, rdists);
+			if (err)
+				return err;
+		} else {
+			pr_warn("ITS: No ITS or Direct LPI available, not enabling LPIs\n");
+			return -ENXIO;
+		}
 	}
 
 	err = allocate_lpi_tables();

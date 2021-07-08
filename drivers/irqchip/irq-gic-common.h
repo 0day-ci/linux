@@ -30,4 +30,26 @@ void gic_enable_of_quirks(const struct device_node *np,
 
 void gic_set_kvm_info(const struct gic_kvm_info *info);
 
+/* LPI related functionality */
+/*
+ * TODO: Ideally, I think these should be moved to a different file
+ *	 such as irq-gic-v3-lpi-common.h/.c. But, keeping it here
+ *	 for now to get comments from the RFC.
+ */
+DECLARE_PER_CPU(struct cpu_lpi_count, cpu_lpi_count);
+
+__maybe_unused u32 its_read_lpi_count(struct irq_data *d, int cpu);
+void its_inc_lpi_count(struct irq_data *d, int cpu);
+void its_dec_lpi_count(struct irq_data *d, int cpu);
+unsigned int cpumask_pick_least_loaded(struct irq_data *d,
+				       const struct cpumask *cpu_mask);
+int its_irq_gic_domain_alloc(struct irq_domain *domain,
+			     unsigned int virq,
+			     irq_hw_number_t hwirq);
+unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids);
+void its_lpi_free(unsigned long *bitmap, u32 base, u32 nr_ids);
+
+struct rdists;
+int direct_lpi_init(struct irq_domain *parent, struct rdists *rdists);
+
 #endif /* _IRQ_GIC_COMMON_H */
