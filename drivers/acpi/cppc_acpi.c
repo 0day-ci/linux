@@ -562,6 +562,8 @@ bool __weak cpc_ffh_supported(void)
 /**
  * pcc_data_alloc() - Allocate the pcc_data memory for pcc subspace
  *
+ * @pcc_ss_id: PCC Subspace channel identifier
+ *
  * Check and allocate the cppc_pcc_data memory.
  * In some processor configurations it is possible that same subspace
  * is shared between multiple CPUs. This is seen especially in CPUs
@@ -1347,10 +1349,15 @@ EXPORT_SYMBOL_GPL(cppc_set_perf);
 /**
  * cppc_get_transition_latency - returns frequency transition latency in ns
  *
+ * @cpu_num: Logical index of the CPU for which latencty is requested
+ *
  * ACPI CPPC does not explicitly specify how a platform can specify the
  * transition latency for performance change requests. The closest we have
  * is the timing information from the PCCT tables which provides the info
  * on the number and frequency of PCC commands the platform can handle.
+ *
+ * Returns: frequency transition latency on success or CPUFREQ_ETERNAL on
+ * failure
  */
 unsigned int cppc_get_transition_latency(int cpu_num)
 {
