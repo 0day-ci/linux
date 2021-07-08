@@ -134,7 +134,7 @@ static unsigned int cs_dbs_update(struct cpufreq_policy *policy)
 		else
 			requested_freq = policy->min;
 
-		__cpufreq_driver_target(policy, requested_freq, CPUFREQ_RELATION_L);
+		__cpufreq_driver_target(policy, requested_freq, CPUFREQ_RELATION_E);
 		dbs_info->requested_freq = requested_freq;
 	}
 

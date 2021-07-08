@@ -480,7 +480,7 @@ static void sugov_work(struct kthread_work *work)
 	raw_spin_unlock_irqrestore(&sg_policy->update_lock, flags);
 
 	mutex_lock(&sg_policy->work_lock);
-	__cpufreq_driver_target(sg_policy->policy, freq, CPUFREQ_RELATION_L);
+	__cpufreq_driver_target(sg_policy->policy, freq, CPUFREQ_RELATION_E);
 	mutex_unlock(&sg_policy->work_lock);
 }
 

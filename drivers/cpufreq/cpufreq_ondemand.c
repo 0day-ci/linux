@@ -123,7 +123,7 @@ static void dbs_freq_increase(struct cpufreq_policy *policy, unsigned int freq)
 		return;
 
 	__cpufreq_driver_target(policy, freq, od_tuners->powersave_bias ?
-			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
+			CPUFREQ_RELATION_E : CPUFREQ_RELATION_H);
 }
 
 /*
@@ -161,7 +161,7 @@ static void od_update(struct cpufreq_policy *policy)
 		if (od_tuners->powersave_bias)
 			freq_next = od_ops.powersave_bias_target(policy,
 								 freq_next,
-								 CPUFREQ_RELATION_L);
+								 CPUFREQ_RELATION_E);
 
 		__cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_C);
 	}
