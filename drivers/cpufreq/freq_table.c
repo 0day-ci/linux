@@ -351,6 +351,52 @@ static int set_freq_table_sorted(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static void set_freq_table_efficiencies(struct cpufreq_policy *policy)
+{
+	struct cpufreq_frequency_table *pos, *table = policy->freq_table;
+	enum cpufreq_table_sorting sort = policy->freq_table_sorted;
+	int efficient, idx;
+
+	/* Not supported */
+	if (sort == CPUFREQ_TABLE_UNSORTED) {
+		cpufreq_for_each_entry_idx(pos, table, idx)
+			pos->efficient = idx;
+		return;
+	}
+
+	/* The highest frequency is always efficient */
+	cpufreq_for_each_entry_idx(pos, table, idx) {
+		if (pos->frequency == CPUFREQ_ENTRY_INVALID)
+			continue;
+
+		efficient = idx;
+
+		if (sort == CPUFREQ_TABLE_SORTED_DESCENDING)
+			break;
+	}
+
+	for (;;) {
+		pos = &table[idx];
+
+		if (pos->frequency != CPUFREQ_ENTRY_INVALID) {
+			if (pos->flags & CPUFREQ_INEFFICIENT_FREQ) {
+				pos->efficient = efficient;
+			} else {
+				pos->efficient = idx;
+				efficient = idx;
+			}
+		}
+
+		if (sort == CPUFREQ_TABLE_SORTED_ASCENDING) {
+			if (--idx < 0)
+				break;
+		} else {
+			if (table[++idx].frequency == CPUFREQ_TABLE_END)
+				break;
+		}
+	}
+}
+
 int cpufreq_table_validate_and_sort(struct cpufreq_policy *policy)
 {
 	int ret;
@@ -362,7 +408,13 @@ int cpufreq_table_validate_and_sort(struct cpufreq_policy *policy)
 	if (ret)
 		return ret;
 
-	return set_freq_table_sorted(policy);
+	ret = set_freq_table_sorted(policy);
+	if (ret)
+		return ret;
+
+	set_freq_table_efficiencies(policy);
+
+	return ret;
 }
 
 MODULE_AUTHOR("Dominik Brodowski <linux@brodo.de>");

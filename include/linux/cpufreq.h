@@ -666,13 +666,15 @@ struct governor_attr {
 #define CPUFREQ_ENTRY_INVALID	~0u
 #define CPUFREQ_TABLE_END	~1u
 /* Special Values of .flags field */
-#define CPUFREQ_BOOST_FREQ	(1 << 0)
+#define CPUFREQ_BOOST_FREQ	 (1 << 0)
+#define CPUFREQ_INEFFICIENT_FREQ (1 << 1)
 
 struct cpufreq_frequency_table {
 	unsigned int	flags;
 	unsigned int	driver_data; /* driver specific data, not used by core */
 	unsigned int	frequency; /* kHz - doesn't need to be in ascending
 				    * order */
+	unsigned int	efficient; /* idx of an efficient frequency */
 };
 
 #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
