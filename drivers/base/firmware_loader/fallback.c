@@ -89,9 +89,10 @@ static void __fw_load_abort(struct fw_priv *fw_priv)
 {
 	/*
 	 * There is a small window in which user can write to 'loading'
-	 * between loading done and disappearance of 'loading'
+	 * between loading done or aborted and disappearance of
+	 * 'loading'
 	 */
-	if (fw_sysfs_done(fw_priv))
+	if (fw_sysfs_done(fw_priv) || fw_state_is_aborted(fw_priv))
 		return;
 
 	list_del_init(&fw_priv->pending_list);
