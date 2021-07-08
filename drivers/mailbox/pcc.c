@@ -69,13 +69,14 @@ static struct mbox_chan *pcc_mbox_channels;
  *
  * @chan: PCC channel information with Shared Memory Region info
  * @db_vaddr: cached virtual address for doorbell register
- * @db_ack_vaddr: cached virtual address for doorbell ack register
+ * @plat_irq_ack_vaddr: cached virtual address for platform interrupt
+ *	acknowledge register
  * @db_irq: doorbell interrupt
  */
 struct pcc_chan_info {
 	struct pcc_mbox_chan chan;
 	void __iomem *db_vaddr;
-	void __iomem *db_ack_vaddr;
+	void __iomem *plat_irq_ack_vaddr;
 	int db_irq;
 };
 
@@ -198,12 +199,12 @@ static irqreturn_t pcc_mbox_irq(int irq, void *p)
 		doorbell_ack_preserve = pcct2_ss->ack_preserve_mask;
 		doorbell_ack_write = pcct2_ss->ack_write_mask;
 
-		ret = read_register(pchan->db_ack_vaddr,
+		ret = read_register(pchan->plat_irq_ack_vaddr,
 				    &doorbell_ack_val, doorbell_ack->bit_width);
 		if (ret)
 			return IRQ_NONE;
 
-		ret = write_register(pchan->db_ack_vaddr,
+		ret = write_register(pchan->plat_irq_ack_vaddr,
 				     (doorbell_ack_val & doorbell_ack_preserve)
 					| doorbell_ack_write,
 				     doorbell_ack->bit_width);
@@ -406,10 +407,10 @@ static int pcc_parse_subspace_irq(struct pcc_chan_info *pchan,
 	if (pcct_ss->header.type == ACPI_PCCT_TYPE_HW_REDUCED_SUBSPACE_TYPE2) {
 		struct acpi_pcct_hw_reduced_type2 *pcct2_ss = (void *)pcct_ss;
 
-		pchan->db_ack_vaddr =
+		pchan->plat_irq_ack_vaddr =
 			acpi_os_ioremap(pcct2_ss->platform_ack_register.address,
 					pcct2_ss->platform_ack_register.bit_width / 8);
-		if (!pchan->db_ack_vaddr) {
+		if (!pchan->plat_irq_ack_vaddr) {
 			pr_err("Failed to ioremap PCC ACK register\n");
 			return -ENOMEM;
 		}
