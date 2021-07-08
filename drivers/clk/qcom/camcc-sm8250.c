@@ -2212,6 +2212,7 @@ static struct gdsc bps_gdsc = {
 	},
 	.flags = HW_CTRL | POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct gdsc ipe_0_gdsc = {
@@ -2221,6 +2222,7 @@ static struct gdsc ipe_0_gdsc = {
 	},
 	.flags = HW_CTRL | POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct gdsc sbi_gdsc = {
@@ -2230,6 +2232,7 @@ static struct gdsc sbi_gdsc = {
 	},
 	.flags = HW_CTRL | POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct gdsc ife_0_gdsc = {
@@ -2239,6 +2242,7 @@ static struct gdsc ife_0_gdsc = {
 	},
 	.flags = POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct gdsc ife_1_gdsc = {
@@ -2248,6 +2252,7 @@ static struct gdsc ife_1_gdsc = {
 	},
 	.flags = POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct gdsc titan_top_gdsc = {
@@ -2257,6 +2262,7 @@ static struct gdsc titan_top_gdsc = {
 	},
 	.flags = POLL_CFG_GDSCR,
 	.pwrsts = PWRSTS_OFF_ON,
+	.supply = "mmcx",
 };
 
 static struct clk_regmap *cam_cc_sm8250_clocks[] = {
