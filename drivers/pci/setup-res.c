@@ -208,9 +208,19 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
 	res->end = res->start + size - 1;
 	res->flags &= ~IORESOURCE_UNSET;
 
+	/*
+	 * If we're behind a P2P or CardBus bridge, make sure we're
+	 * inside the relevant forwarding window, or otherwise the
+	 * assignment must have been bogus and accesses intended for
+	 * the range assigned would not reach the device anyway.
+	 * On the root bus accept anything under the assumption the
+	 * host bridge will let it through.
+	 */
 	root = pci_find_parent_resource(dev, res);
 	if (!root) {
-		if (res->flags & IORESOURCE_IO)
+		if (dev->bus->parent)
+			return -ENXIO;
+		else if (res->flags & IORESOURCE_IO)
 			root = &ioport_resource;
 		else
 			root = &iomem_resource;
