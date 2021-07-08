@@ -54,6 +54,7 @@ struct thread_info {
 #if defined(CONFIG_VIRT_CPU_ACCOUNTING_NATIVE) && defined(CONFIG_PPC32)
 	struct cpu_accounting_data accounting;
 #endif
+	struct mm_struct *slb_preload_mm;
 	unsigned char slb_preload_nr;
 	unsigned char slb_preload_tail;
 	u32 slb_preload_esid[SLB_PRELOAD_NR];

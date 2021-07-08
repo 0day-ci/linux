@@ -294,10 +294,19 @@ static bool preload_hit(struct thread_info *ti, unsigned long esid)
 	return false;
 }
 
-static bool preload_add(struct thread_info *ti, unsigned long ea)
+static bool preload_add(struct thread_info *ti, struct mm_struct *mm, unsigned long ea)
 {
 	unsigned char idx;
 	unsigned long esid;
+
+	if (unlikely(ti->slb_preload_mm != mm)) {
+		/*
+		 * kthread_use_mm or other temporary mm switching can
+		 * change the mm being used by a particular thread.
+		 */
+		ti->slb_preload_nr = 0;
+		ti->slb_preload_mm = mm;
+	}
 
 	if (mmu_has_feature(MMU_FTR_1T_SEGMENT)) {
 		/* EAs are stored >> 28 so 256MB segments don't need clearing */
@@ -362,13 +371,13 @@ void slb_setup_new_exec(void)
 	 * 0x10000000 so it makes sense to preload this segment.
 	 */
 	if (!is_kernel_addr(exec)) {
-		if (preload_add(ti, exec))
+		if (preload_add(ti, mm, exec))
 			slb_allocate_user(mm, exec);
 	}
 
 	/* Libraries and mmaps. */
 	if (!is_kernel_addr(mm->mmap_base)) {
-		if (preload_add(ti, mm->mmap_base))
+		if (preload_add(ti, mm, mm->mmap_base))
 			slb_allocate_user(mm, mm->mmap_base);
 	}
 
@@ -394,19 +403,19 @@ void preload_new_slb_context(unsigned long start, unsigned long sp)
 
 	/* Userspace entry address. */
 	if (!is_kernel_addr(start)) {
-		if (preload_add(ti, start))
+		if (preload_add(ti, mm, start))
 			slb_allocate_user(mm, start);
 	}
 
 	/* Top of stack, grows down. */
 	if (!is_kernel_addr(sp)) {
-		if (preload_add(ti, sp))
+		if (preload_add(ti, mm, sp))
 			slb_allocate_user(mm, sp);
 	}
 
 	/* Bottom of heap, grows up. */
 	if (heap && !is_kernel_addr(heap)) {
-		if (preload_add(ti, heap))
+		if (preload_add(ti, mm, heap))
 			slb_allocate_user(mm, heap);
 	}
 
@@ -502,6 +511,11 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 
 	copy_mm_to_paca(mm);
 
+	if (unlikely(ti->slb_preload_mm != mm)) {
+		ti->slb_preload_nr = 0;
+		ti->slb_preload_mm = mm;
+	}
+
 	/*
 	 * We gradually age out SLBs after a number of context switches to
 	 * reduce reload overhead of unused entries (like we do with FP/VEC
@@ -513,7 +527,7 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 		unsigned long pc = KSTK_EIP(tsk);
 
 		preload_age(ti);
-		preload_add(ti, pc);
+		preload_add(ti, mm, pc);
 	}
 
 	for (i = 0; i < ti->slb_preload_nr; i++) {
@@ -527,9 +541,9 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 	}
 
 	/*
-	 * Synchronize slbmte preloads with possible subsequent user memory
-	 * address accesses by the kernel (user mode won't happen until
-	 * rfid, which is safe).
+	 * Synchronize slbias and slbmte preloads with possible subsequent user
+	 * memory address accesses by the kernel (user mode won't happen until
+	 * rfid, which is synchronizing).
 	 */
 	isync();
 }
@@ -863,7 +877,7 @@ DEFINE_INTERRUPT_HANDLER_RAW(do_slb_fault)
 
 		err = slb_allocate_user(mm, ea);
 		if (!err)
-			preload_add(current_thread_info(), ea);
+			preload_add(current_thread_info(), mm, ea);
 
 		return err;
 	}
