@@ -18,7 +18,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
 #include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/of_graph.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
@@ -172,9 +171,6 @@ struct max9286_priv {
 	struct v4l2_ctrl *pixelrate;
 
 	struct v4l2_mbus_framefmt fmt[MAX9286_N_SINKS];
-
-	/* Protects controls and fmt structures */
-	struct mutex mutex;
 
 	unsigned int nsources;
 	unsigned int source_mask;
@@ -768,9 +764,7 @@ static int max9286_set_fmt(struct v4l2_subdev *sd,
 	if (!cfg_fmt)
 		return -EINVAL;
 
-	mutex_lock(&priv->mutex);
 	*cfg_fmt = format->format;
-	mutex_unlock(&priv->mutex);
 
 	return 0;
 }
@@ -796,9 +790,7 @@ static int max9286_get_fmt(struct v4l2_subdev *sd,
 	if (!cfg_fmt)
 		return -EINVAL;
 
-	mutex_lock(&priv->mutex);
 	format->format = *cfg_fmt;
-	mutex_unlock(&priv->mutex);
 
 	return 0;
 }
@@ -1258,8 +1250,6 @@ static int max9286_probe(struct i2c_client *client)
 	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
-
-	mutex_init(&priv->mutex);
 
 	priv->client = client;
 	i2c_set_clientdata(client, priv);
