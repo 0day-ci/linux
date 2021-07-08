@@ -583,6 +583,25 @@ static ssize_t uevent_store(struct device_driver *drv, const char *buf,
 }
 static DRIVER_ATTR_WO(uevent);
 
+static ssize_t probe_type_show(struct device_driver *drv, char *buf)
+{
+	return sysfs_emit(buf, "%d\n", drv->probe_type);
+}
+
+static ssize_t probe_type_store(struct device_driver *drv, const char *buf,
+		size_t count)
+{
+	if (buf[0] == '0')
+		drv->probe_type = 0;
+	else if (buf[0] == '1')
+		drv->probe_type = 1;
+	else if (buf[0] == '2')
+		drv->probe_type = 2;
+
+	return count;
+}
+static DRIVER_ATTR_RW(probe_type);
+
 /**
  * bus_add_driver - Add a driver to the bus.
  * @drv: driver.
@@ -626,6 +645,12 @@ int bus_add_driver(struct device_driver *drv)
 		printk(KERN_ERR "%s: uevent attr (%s) failed\n",
 			__func__, drv->name);
 	}
+	error = driver_create_file(drv, &driver_attr_probe_type);
+	if (error) {
+		printk(KERN_ERR "%s: probe_type attr (%s) failed\n",
+				__func__, drv->name);
+	}
+
 	error = driver_add_groups(drv, bus->drv_groups);
 	if (error) {
 		/* How the hell do we get out of this pickle? Give up */
