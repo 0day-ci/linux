@@ -544,11 +544,14 @@ static void ses_enclosure_data_process(struct enclosure_device *edev,
 			char *name = NULL;
 			struct enclosure_component *ecomp;
 
+			if (desc_ptr + 4 >= buf + page7_len)
+				desc_ptr = NULL;
+
 			if (desc_ptr) {
-				if (desc_ptr >= buf + page7_len) {
+				len = (desc_ptr[2] << 8) + desc_ptr[3];
+				if (desc_ptr + 4 + len >= buf + page7_len) {
 					desc_ptr = NULL;
 				} else {
-					len = (desc_ptr[2] << 8) + desc_ptr[3];
 					desc_ptr += 4;
 					/* Add trailing zero - pushes into
 					 * reserved space */
