@@ -37,6 +37,18 @@ properties:
     $ref: /schemas/types.yaml#/definitions/uint32
     enum: [1, 2, 4]
 
+  adi,tacho-25-us:
+    description: Expected tacho signal when the PWM is at 25%.
+
+  adi,tacho-50-us:
+    description: Expected tacho signal when the PWM is at 50%.
+
+  adi,tacho-75-us:
+    description: Expected tacho signal when the PWM is at 75%.
+
+  adi,tacho-100-us:
+    description: Expected tacho signal when the PWM is at 100%.
+
 required:
   - compatible
   - reg
