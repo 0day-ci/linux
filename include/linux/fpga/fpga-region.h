@@ -30,7 +30,6 @@ struct fpga_region_ops {
  * @bridge_list: list of FPGA bridges specified in region
  * @mgr: FPGA manager
  * @info: FPGA image info
- * @compat_id: FPGA region id for compatibility check.
  * @priv: private data
  * @rops: optional pointer to struct for fpga region ops
  */
@@ -40,7 +39,6 @@ struct fpga_region {
 	struct list_head bridge_list;
 	struct fpga_manager *mgr;
 	struct fpga_image_info *info;
-	struct fpga_compat_id *compat_id;
 	void *priv;
 	const struct fpga_region_ops *rops;
 };

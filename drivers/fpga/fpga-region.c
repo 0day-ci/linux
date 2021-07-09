@@ -172,12 +172,7 @@ static ssize_t compat_id_show(struct device *dev,
 	if (region->rops && region->rops->compat_id_show)
 		return region->rops->compat_id_show(region, buf);
 
-	if (!region->compat_id)
-		return -ENOENT;
-
-	return sprintf(buf, "%016llx%016llx\n",
-		       (unsigned long long)region->compat_id->id_h,
-		       (unsigned long long)region->compat_id->id_l);
+	return -ENOENT;
 }
 
 static DEVICE_ATTR_RO(compat_id);
