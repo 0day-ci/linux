@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/ktime.h>
 #include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset-controller.h>
@@ -49,6 +50,30 @@ enum gdsc_status {
 	GDSC_OFF,
 	GDSC_ON
 };
+
+static int gdsc_pm_runtime_get(struct gdsc *sc)
+{
+	int ret;
+
+	if (!sc->rpm_dev)
+		return 0;
+
+	ret = pm_runtime_get_sync(sc->rpm_dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(sc->rpm_dev);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int gdsc_pm_runtime_put(struct gdsc *sc)
+{
+	if (!sc->rpm_dev)
+		return 0;
+
+	return pm_runtime_put_sync(sc->rpm_dev);
+}
 
 /* Returns 1 if GDSC status is status, 0 if not, and < 0 on error */
 static int gdsc_check_status(struct gdsc *sc, enum gdsc_status status)
@@ -232,9 +257,8 @@ static void gdsc_retain_ff_on(struct gdsc *sc)
 	regmap_update_bits(sc->regmap, sc->gdscr, mask, mask);
 }
 
-static int gdsc_enable(struct generic_pm_domain *domain)
+static int _gdsc_enable(struct gdsc *sc)
 {
-	struct gdsc *sc = domain_to_gdsc(domain);
 	int ret;
 
 	if (sc->pwrsts == PWRSTS_ON)
@@ -290,9 +314,26 @@ static int gdsc_enable(struct generic_pm_domain *domain)
 	return 0;
 }
 
-static int gdsc_disable(struct generic_pm_domain *domain)
+static int gdsc_enable(struct generic_pm_domain *domain)
 {
 	struct gdsc *sc = domain_to_gdsc(domain);
+	int ret;
+
+	ret = gdsc_pm_runtime_get(sc);
+	if (ret)
+		return ret;
+
+	ret = _gdsc_enable(sc);
+	if (ret) {
+		gdsc_pm_runtime_put(sc);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int _gdsc_disable(struct gdsc *sc)
+{
 	int ret;
 
 	if (sc->pwrsts == PWRSTS_ON)
@@ -327,6 +368,18 @@ static int gdsc_disable(struct generic_pm_domain *domain)
 		gdsc_assert_clamp_io(sc);
 
 	return 0;
+}
+
+static int gdsc_disable(struct generic_pm_domain *domain)
+{
+	struct gdsc *sc = domain_to_gdsc(domain);
+	int ret;
+
+	ret = _gdsc_disable(sc);
+	if (ret)
+		return ret;
+
+	return gdsc_pm_runtime_put(sc);
 }
 
 static int gdsc_init(struct gdsc *sc)
@@ -425,6 +478,8 @@ int gdsc_register(struct gdsc_desc *desc,
 	for (i = 0; i < num; i++) {
 		if (!scs[i])
 			continue;
+		if (pm_runtime_enabled(dev))
+			scs[i]->rpm_dev = dev;
 		scs[i]->regmap = regmap;
 		scs[i]->rcdev = rcdev;
 		ret = gdsc_init(scs[i]);
@@ -486,7 +541,10 @@ void gdsc_unregister(struct gdsc_desc *desc)
  */
 int gdsc_gx_do_nothing_enable(struct generic_pm_domain *domain)
 {
+	struct gdsc *sc = domain_to_gdsc(domain);
+
 	/* Do nothing but give genpd the impression that we were successful */
-	return 0;
+	/* Get the runtime PM device only */
+	return gdsc_pm_runtime_get(sc);
 }
 EXPORT_SYMBOL_GPL(gdsc_gx_do_nothing_enable);
