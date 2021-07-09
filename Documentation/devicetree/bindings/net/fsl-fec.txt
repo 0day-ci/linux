@@ -39,6 +39,17 @@ Optional properties:
   tx/rx queues 1 and 2. "int0" will be used for queue 0 and ENET_MII interrupts.
   For imx6sx, "int0" handles all 3 queues and ENET_MII. "pps" is for the pulse
   per second interrupt associated with 1588 precision time protocol(PTP).
+- clocks: Phandles to input clocks.
+- clock-name: Should be the names of the clocks
+  - "ipg", for MAC ipg_clk_s, ipg_clk_mac_s that are for register accessing.
+  - "ahb", for MAC ipg_clk, ipg_clk_mac that are bus clock.
+  - "ptp"(option), for IEEE1588 timer clock that requires the clock.
+  - "enet_clk_ref"(option), for MAC transmit/receiver reference clock like
+    RGMII TXC clock or RMII reference clock. It depends on board design,
+    the clock is required if RGMII TXC and RMII reference clock source from
+    SOC internal PLL.
+  - "enet_out"(option), output clock for external device, like supply clock
+    for PHY. The clock is required if PHY clock source from SOC.
 
 Optional subnodes:
 - mdio : specifies the mdio bus in the FEC, used as a container for phy nodes
