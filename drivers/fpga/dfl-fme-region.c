@@ -17,6 +17,7 @@
 #include <linux/fpga/fpga-mgr.h>
 #include <linux/fpga/fpga-region.h>
 
+#include "dfl.h"
 #include "dfl-fme-pr.h"
 
 static int fme_region_get_bridges(struct fpga_region *region)
@@ -27,8 +28,21 @@ static int fme_region_get_bridges(struct fpga_region *region)
 	return fpga_bridge_get_to_list(dev, region->info, &region->bridge_list);
 }
 
+static ssize_t fme_region_compat_id_show(struct fpga_region *region, char *buf)
+{
+	struct fpga_manager *mgr = region->mgr;
+	struct dfl_compat_id compat_id;
+
+	fme_mgr_get_compat_id(mgr, &compat_id);
+
+	return sysfs_emit(buf, "%016llx%016llx\n",
+			  (unsigned long long)compat_id.id_h,
+			  (unsigned long long)compat_id.id_l);
+}
+
 static const struct fpga_region_ops fme_fpga_region_ops = {
 	.get_bridges = fme_region_get_bridges,
+	.compat_id_show = fme_region_compat_id_show,
 };
 
 static int fme_region_probe(struct platform_device *pdev)

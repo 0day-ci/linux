@@ -22,6 +22,7 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/fpga/fpga-mgr.h>
 
+#include "dfl.h"
 #include "dfl-fme-pr.h"
 
 /* FME Partial Reconfiguration Sub Feature Register Set */
@@ -70,6 +71,7 @@
 struct fme_mgr_priv {
 	void __iomem *ioaddr;
 	u64 pr_error;
+	struct dfl_compat_id compat_id;
 };
 
 static u64 pr_error_to_mgr_status(u64 err)
@@ -272,12 +274,20 @@ static const struct fpga_manager_ops fme_mgr_ops = {
 	.status = fme_mgr_status,
 };
 
-static void fme_mgr_get_compat_id(void __iomem *fme_pr,
-				  struct fpga_compat_id *id)
+static void _fme_mgr_get_compat_id(void __iomem *fme_pr,
+				   struct dfl_compat_id *id)
 {
 	id->id_l = readq(fme_pr + FME_PR_INTFC_ID_L);
 	id->id_h = readq(fme_pr + FME_PR_INTFC_ID_H);
 }
+
+void fme_mgr_get_compat_id(struct fpga_manager *mgr,
+			   struct dfl_compat_id *id)
+{
+	struct fme_mgr_priv *priv = mgr->priv;
+	*id = priv->compat_id;
+}
+EXPORT_SYMBOL_GPL(fme_mgr_get_compat_id);
 
 static int fme_mgr_probe(struct platform_device *pdev)
 {
@@ -306,7 +316,7 @@ static int fme_mgr_probe(struct platform_device *pdev)
 	if (!compat_id)
 		return -ENOMEM;
 
-	fme_mgr_get_compat_id(priv->ioaddr, compat_id);
+	_fme_mgr_get_compat_id(priv->ioaddr, &priv->compat_id);
 
 	mgr = devm_fpga_mgr_create(dev, "DFL FME FPGA Manager",
 				   &fme_mgr_ops, priv);

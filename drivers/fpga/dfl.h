@@ -170,6 +170,20 @@
 #define PORT_UINT_CAP_FST_VECT	GENMASK_ULL(23, 12)	/* First Vector */
 
 /**
+ * struct dfl_compat_id - id for compatibility check
+ *
+ * @id_h: high 64bit of the compat_id
+ * @id_l: low 64bit of the compat_id
+ */
+struct dfl_compat_id {
+	u64 id_h;
+	u64 id_l;
+};
+
+void fme_mgr_get_compat_id(struct fpga_manager *mgr,
+			   struct dfl_compat_id *id);
+
+/**
  * struct dfl_fpga_port_ops - port ops
  *
  * @name: name of this port ops, to match with port platform device.
