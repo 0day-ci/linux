@@ -9,9 +9,15 @@
 #include <linux/phy.h>
 #include <linux/of.h>
 
+#define XWAY_MDIO_MIICTRL		0x17	/* mii control */
 #define XWAY_MDIO_IMASK			0x19	/* interrupt mask */
 #define XWAY_MDIO_ISTAT			0x1A	/* interrupt status */
 #define XWAY_MDIO_LED			0x1B	/* led control */
+
+#define XWAY_MDIO_MIICTRL_RXSKEW_MASK	GENMASK(14, 12)
+#define XWAY_MDIO_MIICTRL_RXSKEW_SHIFT	12
+#define XWAY_MDIO_MIICTRL_TXSKEW_MASK	GENMASK(10, 8)
+#define XWAY_MDIO_MIICTRL_TXSKEW_SHIFT	8
 
 /* bit 15:12 are reserved */
 #define XWAY_MDIO_LED_LED3_EN		BIT(11)	/* Enable the integrated function of LED3 */
@@ -157,6 +163,86 @@
 #define PHY_ID_PHY11G_VR9_1_2		0xD565A409
 #define PHY_ID_PHY22F_VR9_1_2		0xD565A419
 
+#if IS_ENABLED(CONFIG_OF_MDIO)
+static const int xway_internal_delay[] = {0, 500, 1000, 1500, 2000, 2500,
+					 3000, 3500};
+
+static int xway_gphy_of_reg_init(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	int delay_size = ARRAY_SIZE(xway_internal_delay);
+	s32 rx_int_delay;
+	s32 tx_int_delay;
+	u16 mask = 0;
+	int val = 0;
+
+	if (!phy_interface_is_rgmii(phydev))
+		return 0;
+
+	/* Existing behavior was to use default pin strapping delay in rgmii
+	 * mode, but rgmii should have meant no delay.  Warn existing users,
+	 * but do not change anything at the moment.
+	 */
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII) {
+		u16 txskew, rxskew;
+
+		val = phy_read(phydev, XWAY_MDIO_MIICTRL);
+		if (val < 0)
+			return val;
+
+		txskew = (val & XWAY_MDIO_MIICTRL_TXSKEW_MASK) >>
+			 XWAY_MDIO_MIICTRL_TXSKEW_SHIFT;
+		rxskew = (val & XWAY_MDIO_MIICTRL_RXSKEW_MASK) >>
+			 XWAY_MDIO_MIICTRL_RXSKEW_SHIFT;
+
+		if (txskew > 0 || rxskew > 0)
+			phydev_warn(phydev,
+				    "PHY has delays (e.g. via pin strapping), but phy-mode = 'rgmii'\n"
+				    "Should be 'rgmii-id' to use internal delays txskew:%d ps rxskew:%d ps\n",
+				    xway_internal_delay[txskew],
+				    xway_internal_delay[rxskew]);
+		return 0;
+	}
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+		rx_int_delay = phy_get_internal_delay(phydev, dev,
+						      &xway_internal_delay[0],
+						      delay_size, true);
+
+		if (rx_int_delay < 0) {
+			phydev_warn(phydev, "rx-internal-delay-ps is missing, use default of 2.0 ns\n");
+			rx_int_delay = 4; /* 2000 ps */
+		}
+
+		mask |= XWAY_MDIO_MIICTRL_RXSKEW_MASK;
+		val |= rx_int_delay << XWAY_MDIO_MIICTRL_RXSKEW_SHIFT;
+	}
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+		tx_int_delay = phy_get_internal_delay(phydev, dev,
+						      &xway_internal_delay[0],
+						      delay_size, false);
+
+		if (tx_int_delay < 0) {
+			phydev_warn(phydev, "tx-internal-delay-ps is missing, use default of 2.0ns\n");
+			tx_int_delay = 4; /* 2000 ps */
+		}
+
+		mask |= XWAY_MDIO_MIICTRL_TXSKEW_MASK;
+		val |= tx_int_delay << XWAY_MDIO_MIICTRL_TXSKEW_SHIFT;
+	}
+
+	return phy_modify(phydev, XWAY_MDIO_MIICTRL, mask, val);
+}
+#else
+static int xway_gphy_of_reg_init(struct phy_device *phydev)
+{
+	return 0;
+}
+#endif /* CONFIG_OF_MDIO */
+
 static int xway_gphy_config_init(struct phy_device *phydev)
 {
 	int err;
@@ -203,6 +289,10 @@ static int xway_gphy_config_init(struct phy_device *phydev)
 	phy_write_mmd(phydev, MDIO_MMD_VEND2, XWAY_MMD_LED1L, ledxl);
 	phy_write_mmd(phydev, MDIO_MMD_VEND2, XWAY_MMD_LED2H, ledxh);
 	phy_write_mmd(phydev, MDIO_MMD_VEND2, XWAY_MMD_LED2L, ledxl);
+
+	err = xway_gphy_of_reg_init(phydev);
+	if (err)
+		return err;
 
 	return 0;
 }
