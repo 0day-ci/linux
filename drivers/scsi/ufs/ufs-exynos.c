@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/mfd/syscon.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 
@@ -905,6 +906,10 @@ static int exynos_ufs_parse_dt(struct device *dev, struct exynos_ufs *ufs)
 		ret = -EINVAL;
 		goto out;
 	}
+
+	ufs->sysreg = syscon_regmap_lookup_by_phandle(np, "sysreg");
+	if (IS_ERR(ufs->sysreg))
+		ufs->sysreg = NULL;
 
 	ufs->pclk_avail_min = PCLK_AVAIL_MIN;
 	ufs->pclk_avail_max = PCLK_AVAIL_MAX;
