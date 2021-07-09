@@ -6701,8 +6701,8 @@ void mem_cgroup_calculate_protection(struct mem_cgroup *root,
 			atomic_long_read(&parent->memory.children_low_usage)));
 }
 
-static int __mem_cgroup_charge(struct page *page, struct mem_cgroup *memcg,
-			       gfp_t gfp)
+int __mem_cgroup_charge(struct page *page, struct mem_cgroup *memcg,
+			gfp_t gfp)
 {
 	unsigned int nr_pages = thp_nr_pages(page);
 	int ret;
@@ -6719,35 +6719,6 @@ static int __mem_cgroup_charge(struct page *page, struct mem_cgroup *memcg,
 	memcg_check_events(memcg, page);
 	local_irq_enable();
 out:
-	return ret;
-}
-
-/**
- * mem_cgroup_charge - charge a newly allocated page to a cgroup
- * @page: page to charge
- * @mm: mm context of the victim
- * @gfp_mask: reclaim mode
- *
- * Try to charge @page to the memcg that @mm belongs to, reclaiming
- * pages according to @gfp_mask if necessary. if @mm is NULL, try to
- * charge to the active memcg.
- *
- * Do not use this for pages allocated for swapin.
- *
- * Returns 0 on success. Otherwise, an error code is returned.
- */
-int mem_cgroup_charge(struct page *page, struct mm_struct *mm, gfp_t gfp_mask)
-{
-	struct mem_cgroup *memcg;
-	int ret;
-
-	if (mem_cgroup_disabled())
-		return 0;
-
-	memcg = get_mem_cgroup_from_mm(mm);
-	ret = __mem_cgroup_charge(page, memcg, gfp_mask);
-	css_put(&memcg->css);
-
 	return ret;
 }
 
@@ -6921,12 +6892,9 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
  *
  * Uncharge a page previously charged with mem_cgroup_charge().
  */
-void mem_cgroup_uncharge(struct page *page)
+void __mem_cgroup_uncharge(struct page *page)
 {
 	struct uncharge_gather ug;
-
-	if (mem_cgroup_disabled())
-		return;
 
 	/* Don't touch page->lru of any random page, pre-check: */
 	if (!page_memcg(page))
@@ -6944,13 +6912,10 @@ void mem_cgroup_uncharge(struct page *page)
  * Uncharge a list of pages previously charged with
  * mem_cgroup_charge().
  */
-void mem_cgroup_uncharge_list(struct list_head *page_list)
+void __mem_cgroup_uncharge_list(struct list_head *page_list)
 {
 	struct uncharge_gather ug;
 	struct page *page;
-
-	if (mem_cgroup_disabled())
-		return;
 
 	uncharge_gather_clear(&ug);
 	list_for_each_entry(page, page_list, lru)
