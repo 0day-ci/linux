@@ -27,7 +27,7 @@ static struct callback_head work_exited; /* all we need is ->next == NULL */
  * list is LIFO.
  *
  * RETURNS:
- * 0 if succeeds or -ESRCH.
+ * 0 if succeeds or -ESRCH, -EBUSY.
  */
 int task_work_add(struct task_struct *task, struct callback_head *work,
 		  enum task_work_notify_mode notify)
@@ -41,6 +41,8 @@ int task_work_add(struct task_struct *task, struct callback_head *work,
 		head = READ_ONCE(task->task_works);
 		if (unlikely(head == &work_exited))
 			return -ESRCH;
+		if (unlikely(head == work))
+			return -EBUSY;
 		work->next = head;
 	} while (cmpxchg(&task->task_works, head, work) != head);
 
