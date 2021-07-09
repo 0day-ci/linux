@@ -29,7 +29,7 @@
 #define HW_BUFFER_MASK 0x7f
 
 /* Max number on VIN instances that can be in a system */
-#define RCAR_VIN_NUM 8
+#define RCAR_VIN_NUM 32
 
 struct rvin_group;
 
@@ -48,7 +48,17 @@ enum rvin_csi_id {
 	RVIN_CSI_MAX,
 };
 
-#define RVIN_REMOTES_MAX RVIN_CSI_MAX
+enum rvin_isp_id {
+	RVIN_ISP0,
+	RVIN_ISP1,
+	RVIN_ISP2,
+	RVIN_ISP4,
+	RVIN_ISP_MAX,
+};
+
+#define RVIN_REMOTES_MAX \
+	(((unsigned int)RVIN_CSI_MAX) > ((unsigned int)RVIN_ISP_MAX) ? \
+	 RVIN_CSI_MAX : RVIN_ISP_MAX)
 
 /**
  * enum rvin_dma_state - DMA states
@@ -158,6 +168,7 @@ struct rvin_group_route {
 struct rvin_info {
 	enum model_id model;
 	bool use_mc;
+	bool use_isp;
 	bool nv12;
 
 	unsigned int max_width;
