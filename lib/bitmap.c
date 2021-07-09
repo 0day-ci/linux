@@ -487,6 +487,49 @@ int bitmap_print_to_pagebuf(bool list, char *buf, const unsigned long *maskp,
 }
 EXPORT_SYMBOL(bitmap_print_to_pagebuf);
 
+/**
+ * bitmap_print_to_buf  - convert bitmap to list or hex format ASCII string
+ * @list: indicates whether the bitmap must be list
+ *      true:  print in decimal list format
+ *      false: print in hexadecimal bitmask format
+ * @buf: buffer into which string is placed
+ * @maskp: pointer to bitmap to convert
+ * @nmaskbits: size of bitmap, in bits
+ * @off: in the string from which we are copying, We copy to @buf
+ * @count: the maximum number of bytes to print
+ *
+ * The role of cpumap_print_to_buf() and cpumap_print_to_pagebuf() is similar,
+ * the difference is that bitmap_print_to_pagebuf() mainly serves sysfs
+ * attribute with the assumption the destination buffer is exactly one page
+ * aligned with PAGE_SIZE and it won't be more than one page, thus,
+ * bitmap_print_to_pagebuf() needs neither offset to copy from nor count
+ * which is the length we are going to copy. cpumap_print_to_buf(), on the
+ * other hand, mainly serves bin_attribute which doesn't work with exact
+ * one page, and it has explicit parameters like "offset" to copy from and
+ * "count" bytes to copy. So cpumap_print_to_buf() can break the size limit
+ * of converted decimal list and hexadecimal bitmask. And buf doesn't have
+ * to be exactly one page.
+ *
+ * Returns the number of characters actually printed to @buf
+ */
+int bitmap_print_to_buf(bool list, char *buf, const unsigned long *maskp,
+		int nmaskbits, loff_t off, size_t count)
+{
+	const char *fmt = list ? "%*pbl\n" : "%*pb\n";
+	ssize_t size;
+	void *data;
+
+	data = kasprintf(GFP_KERNEL, fmt, nmaskbits, maskp);
+	if (!data)
+		return -ENOMEM;
+
+	size = memory_read_from_buffer(buf, count, &off, data, strlen(data) + 1);
+	kfree(data);
+
+	return size;
+}
+EXPORT_SYMBOL(bitmap_print_to_buf);
+
 /*
  * Region 9-38:4/10 describes the following bitmap structure:
  * 0	   9  12    18			38	     N
