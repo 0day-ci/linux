@@ -5661,6 +5661,13 @@ static void quirk_iommu_nosp(struct pci_dev *dev)
 	intel_iommu_superpage = 0;
 }
 
+/* Broxton igfx has issues with superpage */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x0A84, quirk_iommu_nosp);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1A84, quirk_iommu_nosp);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1A85, quirk_iommu_nosp);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x5A84, quirk_iommu_nosp);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x5A85, quirk_iommu_nosp);
+
 /* Geminilake igfx appears to have issues with superpage */
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x3184, quirk_iommu_nosp);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x3185, quirk_iommu_nosp);
