@@ -2699,6 +2699,10 @@ int genpd_dev_pm_attach(struct device *dev)
 	if (!dev->of_node)
 		return 0;
 
+	/* Don't try to attach a genpd provider. */
+	if (of_find_property(dev->of_node, "#power-domain-cells", NULL))
+		return NULL;
+
 	/*
 	 * Devices with multiple PM domains must be attached separately, as we
 	 * can only attach one PM domain per device.
@@ -2735,6 +2739,10 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
 	int ret;
 
 	if (!dev->of_node)
+		return NULL;
+
+	/* Don't try to attach a genpd provider. */
+	if (of_find_property(dev->of_node, "#power-domain-cells", NULL))
 		return NULL;
 
 	/* Verify that the index is within a valid range. */
