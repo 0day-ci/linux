@@ -328,6 +328,7 @@ struct vcpu_vmx {
 	u64 current_tsc_ratio;
 
 	unsigned long host_debugctlmsr;
+	unsigned long host_lbrctlmsr;
 
 	/*
 	 * Only bits masked by msr_ia32_feature_control_valid_bits can be set in

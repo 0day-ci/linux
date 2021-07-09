@@ -1397,6 +1397,26 @@ void vmx_vcpu_load_vmcs(struct kvm_vcpu *vcpu, int cpu,
 		decache_tsc_multiplier(vmx);
 }
 
+static inline unsigned long get_lbrctlmsr(void)
+{
+	unsigned long lbrctlmsr = 0;
+
+	if (!static_cpu_has(X86_FEATURE_ARCH_LBR))
+		return 0;
+
+	rdmsrl(MSR_ARCH_LBR_CTL, lbrctlmsr);
+
+	return lbrctlmsr;
+}
+
+static inline void update_lbrctlmsr(unsigned long lbrctlmsr)
+{
+	if (!static_cpu_has(X86_FEATURE_ARCH_LBR))
+		return;
+
+	wrmsrl(MSR_ARCH_LBR_CTL, lbrctlmsr);
+}
+
 /*
  * Switches to specified vcpu, until a matching vcpu_put(), but assumes
  * vcpu mutex is already taken.
@@ -1410,6 +1430,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	vmx_vcpu_pi_load(vcpu, cpu);
 
 	vmx->host_debugctlmsr = get_debugctlmsr();
+	vmx->host_lbrctlmsr = get_lbrctlmsr();
 }
 
 static void vmx_vcpu_put(struct kvm_vcpu *vcpu)
@@ -6795,6 +6816,8 @@ static fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	/* MSR_IA32_DEBUGCTLMSR is zeroed on vmexit. Restore it if needed */
 	if (vmx->host_debugctlmsr)
 		update_debugctlmsr(vmx->host_debugctlmsr);
+	if (vmx->host_lbrctlmsr)
+		update_lbrctlmsr(vmx->host_lbrctlmsr);
 
 #ifndef CONFIG_X86_64
 	/*
