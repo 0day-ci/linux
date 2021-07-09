@@ -123,6 +123,7 @@
 **   o disable IRdT - call disable_irq(vector[line]->processor_irq)
 */
 
+#include <linux/dev_printk.h>
 #include <linux/pci.h>
 
 #include <asm/pdc.h>
@@ -141,18 +142,17 @@
 #undef DEBUG_IOSAPIC
 #undef DEBUG_IOSAPIC_IRT
 
-
 #ifdef DEBUG_IOSAPIC
-#define DBG(x...) printk(x)
-#else /* DEBUG_IOSAPIC */
+#define DBG(x...) dev_dbg(x)
+#else /* !DEBUG_IOSAPIC */
 #define DBG(x...)
-#endif /* DEBUG_IOSAPIC */
+#endif /* !DEBUG_IOSAPIC */
 
 #ifdef DEBUG_IOSAPIC_IRT
-#define DBG_IRT(x...) printk(x)
-#else
+#define DBG_IRT(x...) dev_dbg(x)
+#else /* !DEBUG_IOSAPIC_IRT */
 #define DBG_IRT(x...)
-#endif
+#endif /* !DEBUG_IOSAPIC_IRT */
 
 #ifdef CONFIG_64BIT
 #define COMPARE_IRTE_ADDR(irte, hpa)	((irte)->dest_iosapic_addr == (hpa))
@@ -335,14 +335,14 @@ iosapic_load_irt(unsigned long cell_num, struct irt_entry **irt)
 	struct irt_entry *p = table;
 	int i;
 
-	printk(MODULE_NAME " Interrupt Routing Table (cell %ld)\n", cell_num);
-	printk(MODULE_NAME " start = 0x%p num_entries %ld entry_size %d\n",
+	DBG_IRT("Interrupt Routing Table (cell %ld)\n", cell_num);
+	DBG_IRT("start = 0x%p num_entries %ld entry_size %d\n",
 		table,
 		num_entries,
 		(int) sizeof(struct irt_entry));
 
 	for (i = 0 ; i < num_entries ; i++, p++) {
-		printk(MODULE_NAME " %02x %02x %02x %02x %02x %02x %02x %02x %08x%08x\n",
+		DBG_IRT(" %02x %02x %02x %02x %02x %02x %02x %02x %08x%08x\n",
 		p->entry_type, p->entry_length, p->interrupt_type,
 		p->polarity_trigger, p->src_bus_irq_devno, p->src_bus_id,
 		p->src_seg_id, p->dest_iosapic_intin,
@@ -627,22 +627,22 @@ static void iosapic_unmask_irq(struct irq_data *d)
 #ifdef DEBUG_IOSAPIC_IRT
 {
 	u32 *t = (u32 *) ((ulong) vi->eoi_addr & ~0xffUL);
-	printk("iosapic_enable_irq(): regs %p", vi->eoi_addr);
+	DBG_IRT("iosapic_enable_irq(): regs %p", vi->eoi_addr);
 	for ( ; t < vi->eoi_addr; t++)
-		printk(" %x", readl(t));
-	printk("\n");
+		DBG_IRT(" %x", readl(t));
+	DBG_IRT("\n");
 }
 
-printk("iosapic_enable_irq(): sel ");
+	DBG_IRT("iosapic_enable_irq(): sel ");
 {
 	struct iosapic_info *isp = vi->iosapic;
 
 	for (d0=0x10; d0<0x1e; d0++) {
 		d1 = iosapic_read(isp->addr, d0);
-		printk(" %x", d1);
+		DBG_IRT(" %x", d1);
 	}
 }
-printk("\n");
+	DBG_IRT("\n");
 #endif
 
 	/*
@@ -738,7 +738,7 @@ int iosapic_fixup_irq(void *isi_obj, struct pci_dev *pcidev)
 	/* lookup IRT entry for isi/slot/pin set */
 	irte = iosapic_xlate_pin(isi, pcidev);
 	if (!irte) {
-		printk("iosapic: no IRTE for %s (IRQ not connected?)\n",
+		printk(KERN_NOTICE "iosapic: no IRTE for %s (IRQ not connected?)\n",
 				pci_name(pcidev));
 		return -1;
 	}
@@ -956,36 +956,33 @@ iosapic_prt_irt(void *irt, long num_entry)
 {
 	unsigned int i, *irp = (unsigned int *) irt;
 
-
-	printk(KERN_DEBUG MODULE_NAME ": Interrupt Routing Table (%lx entries)\n", num_entry);
+	DBG("Interrupt Routing Table (%lx entries)\n", num_entry);
 
 	for (i=0; i<num_entry; i++, irp += 4) {
-		printk(KERN_DEBUG "%p : %2d %.8x %.8x %.8x %.8x\n",
+		DBG("%p : %2d %.8x %.8x %.8x %.8x\n",
 					irp, i, irp[0], irp[1], irp[2], irp[3]);
 	}
 }
 
-
 static void
 iosapic_prt_vi(struct vector_info *vi)
 {
-	printk(KERN_DEBUG MODULE_NAME ": vector_info[%d] is at %p\n", vi->irqline, vi);
-	printk(KERN_DEBUG "\t\tstatus:	 %.4x\n", vi->status);
-	printk(KERN_DEBUG "\t\ttxn_irq:  %d\n",  vi->txn_irq);
-	printk(KERN_DEBUG "\t\ttxn_addr: %lx\n", vi->txn_addr);
-	printk(KERN_DEBUG "\t\ttxn_data: %lx\n", vi->txn_data);
-	printk(KERN_DEBUG "\t\teoi_addr: %p\n",  vi->eoi_addr);
-	printk(KERN_DEBUG "\t\teoi_data: %x\n",  vi->eoi_data);
+	DBG("vector_info[%d] is at %p\n", vi->irqline, vi);
+	DBG("\t\tstatus:	 %.4x\n", vi->status);
+	DBG("\t\ttxn_irq:  %d\n",  vi->txn_irq);
+	DBG("\t\ttxn_addr: %lx\n", vi->txn_addr);
+	DBG("\t\ttxn_data: %lx\n", vi->txn_data);
+	DBG("\t\teoi_addr: %p\n",  vi->eoi_addr);
+	DBG("\t\teoi_data: %x\n",  vi->eoi_data);
 }
-
 
 static void
 iosapic_prt_isi(struct iosapic_info *isi)
 {
-	printk(KERN_DEBUG MODULE_NAME ": io_sapic_info at %p\n", isi);
-	printk(KERN_DEBUG "\t\tisi_hpa:       %lx\n", isi->isi_hpa);
-	printk(KERN_DEBUG "\t\tisi_status:    %x\n", isi->isi_status);
-	printk(KERN_DEBUG "\t\tisi_version:   %x\n", isi->isi_version);
-	printk(KERN_DEBUG "\t\tisi_vector:    %p\n", isi->isi_vector);
+	DBG("io_sapic_info at %p\n", isi);
+	DBG("\t\tisi_hpa:       %lx\n", isi->isi_hpa);
+	DBG("\t\tisi_status:    %x\n", isi->isi_status);
+	DBG("\t\tisi_version:   %x\n", isi->isi_version);
+	DBG("\t\tisi_vector:    %p\n", isi->isi_vector);
 }
 #endif /* DEBUG_IOSAPIC */
