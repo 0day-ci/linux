@@ -116,6 +116,9 @@ struct lbr_desc {
 
 	/* True if LBRs are marked as not intercepted in the MSR bitmap */
 	bool msr_passthrough;
+
+	/* Reset all LBR entries on a guest write to MSR_ARCH_LBR_DEPTH */
+	bool arch_lbr_reset;
 };
 
 /*
