@@ -171,6 +171,12 @@ static int __init housekeeping_isolcpus_setup(char *str)
 			continue;
 		}
 
+		if (!strncmp(str, "quiesce_on_exit_to_usermode,", 28)) {
+			str += 28;
+			flags |= HK_FLAG_QUIESCE_URET;
+			continue;
+		}
+
 		/*
 		 * Skip unknown sub-parameter and validate that it is not
 		 * containing an invalid character.
