@@ -1299,7 +1299,9 @@ static void queue_task_work(struct mce *m, int kill_current_task)
 	else
 		current->mce_kill_me.func = kill_me_maybe;
 
-	task_work_add(current, &current->mce_kill_me, TWA_RESUME);
+	/* Avoid endless loops in task_work_run */
+	if (READ_ONCE(current->task_works) != &current->mce_kill_me)
+		task_work_add(current, &current->mce_kill_me, TWA_RESUME);
 }
 
 /*
