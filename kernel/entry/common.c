@@ -284,9 +284,18 @@ static void syscall_exit_to_user_mode_prepare(struct pt_regs *regs)
 		syscall_exit_work(regs, work);
 }
 
+/*
+ * Isolaton specific exit to user mode preparation. Runs with interrupts
+ * enabled.
+ */
+static void isolation_exit_to_user_mode_prepare(void)
+{
+}
+
 static __always_inline void __syscall_exit_to_user_mode_work(struct pt_regs *regs)
 {
 	syscall_exit_to_user_mode_prepare(regs);
+	isolation_exit_to_user_mode_prepare();
 	local_irq_disable_exit_to_user();
 	exit_to_user_mode_prepare(regs);
 }
