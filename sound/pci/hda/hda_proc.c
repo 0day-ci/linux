@@ -590,7 +590,7 @@ static void print_proc_caps(struct snd_info_buffer *buffer,
 		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_COEF_INDEX, i);
 		val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_PROC_COEF,
 					 0);
-		snd_iprintf(buffer, "    Coeff 0x%02x: 0x%04x\n", i, val);
+		snd_iprintf(buffer, "    Coeff 0x%02X: 0x%04X\n", i, val);
 	}
 	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_COEF_INDEX, oldindex);
 }
