@@ -33,6 +33,7 @@
 #include <asm/kup.h>
 #include <asm/bug.h>
 #include <asm/interrupt.h>
+#include <asm/code-patching-asm.h>
 
 #include "head_32.h"
 
@@ -55,11 +56,10 @@ prepare_transfer_to_handler:
 #ifdef CONFIG_PPC_KUEP
 	beq	1f
 
-	mfsr    r4,0
-	rlwinm  r4,r4,0,8,3
-	oris    r4,r4,SR_NX@h
+0:	blr	/* lwz	r4, current->thread.sr0(r2) */
 	update_user_segments_by_6 r4, r5, r6, r7, r8, r9
 	blr
+	patch_site	0b, patch__kuep_interrupt_entry
 1:
 #endif
 	/* if from kernel, check interrupted DOZE/NAP mode */
@@ -104,10 +104,10 @@ transfer_to_syscall:
 	SAVE_2GPRS(7, r1)
 	addi	r2,r10,-THREAD
 #if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
-	mfsr    r9,0
-	rlwinm  r9,r9,0,8,3
-	oris    r9,r9,SR_NX@h
+0:	b	1f	/* lwz	r9, &thread.sr0(r10) */
 	update_user_segments_by_4 r9, r10, r11, r12
+	patch_site	0b, patch__kuep_syscall_entry
+1:
 #endif
 	SAVE_NVGPRS(r1)
 
@@ -127,9 +127,11 @@ ret_from_syscall:
 	bne-	2f
 #endif /* CONFIG_PPC_47x */
 #if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
-	mfsr    r7,0
-	rlwinm  r7,r7,0,8,2
+0:	b	1f	/* lwz	r7, current->thread.sr0(r2) */
+	rlwinm  r7,r7,0,~SR_NX
 	update_user_segments_by_6 r7, r8, r9, r10, r11, r12
+	patch_site	0b, patch__kuep_syscall_exit
+1:
 #endif
 	lwz	r4,_LINK(r1)
 	lwz	r5,_CCR(r1)
@@ -295,9 +297,11 @@ interrupt_return:
 	bl	interrupt_exit_user_prepare
 	cmpwi	r3,0
 #if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
-	mfsr    r7,0
-	rlwinm  r7,r7,0,8,2
+0:	b	1f	/* lwz	r7, current->thread.sr0(r2) */
+	rlwinm  r7,r7,0,~SR_NX
 	update_user_segments_by_6 r7, r8, r9, r10, r11, r12
+	patch_site	0b, patch__kuep_interrupt_exit
+1:
 #endif
 	bne-	.Lrestore_nvgprs
 
