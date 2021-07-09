@@ -6,6 +6,7 @@
 #include <linux/livepatch.h>
 #include <linux/audit.h>
 #include <linux/tick.h>
+#include <linux/vmstat.h>
 
 #include "common.h"
 
@@ -290,6 +291,7 @@ static void syscall_exit_to_user_mode_prepare(struct pt_regs *regs)
  */
 static void isolation_exit_to_user_mode_prepare(void)
 {
+	sync_vmstat();
 }
 
 static __always_inline void __syscall_exit_to_user_mode_work(struct pt_regs *regs)
