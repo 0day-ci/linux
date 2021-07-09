@@ -176,6 +176,7 @@ vmlinux_link()
 			objects="--whole-archive		\
 				vmlinux.o 			\
 				--no-whole-archive		\
+				-Map=.tmp_vmlinux.map		\
 				${@}"
 		else
 			objects="--whole-archive		\
@@ -184,6 +185,7 @@ vmlinux_link()
 				--start-group			\
 				${KBUILD_VMLINUX_LIBS}		\
 				--end-group			\
+				-Map=.tmp_vmlinux.map		\
 				${@}"
 		fi
 
@@ -199,6 +201,7 @@ vmlinux_link()
 			-Wl,--start-group			\
 			${KBUILD_VMLINUX_LIBS}			\
 			-Wl,--end-group				\
+			-Wl,-Map=.tmp_vmlinux.map		\
 			${@}"
 
 		${CC} ${CFLAGS_vmlinux}				\
@@ -257,6 +260,19 @@ kallsyms()
 {
 	local kallsymopt;
 
+	# read the linker map to identify ranges of addresses:
+	#   - for each *.o file, report address, size, pathname
+	#       - most such lines will have four fields
+	#       - but sometimes there is a line break after the first field
+	#   - start reading at "Linker script and memory map"
+	#   - stop reading at ".brk"
+	${AWK} '
+	    /\.o$/ && start==1 { print $(NF-2), $(NF-1), $NF }
+	    /^Linker script and memory map/ { start = 1 }
+	    /^\.brk/ { exit(0) }
+	' .tmp_vmlinux.map | sort > .tmp_vmlinux.ranges
+
+	# get kallsyms options
 	if [ -n "${CONFIG_KALLSYMS_ALL}" ]; then
 		kallsymopt="${kallsymopt} --all-symbols"
 	fi
