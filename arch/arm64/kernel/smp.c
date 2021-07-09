@@ -50,6 +50,7 @@
 #include <asm/tlbflush.h>
 #include <asm/ptrace.h>
 #include <asm/virt.h>
+#include <asm/paravirt.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
@@ -755,6 +756,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	store_cpu_topology(this_cpu);
 	numa_store_cpu_info(this_cpu);
 	numa_add_cpu(this_cpu);
+
+	/* Init paravirt CPU state */
+	pv_vcpu_state_init();
 
 	/*
 	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set

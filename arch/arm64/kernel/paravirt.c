@@ -40,6 +40,11 @@ struct pv_time_stolen_time_region {
 
 static DEFINE_PER_CPU(struct pv_time_stolen_time_region, stolen_time_region);
 
+static DEFINE_PER_CPU(struct vcpu_state, vcpus_states);
+struct static_key pv_vcpu_is_preempted_enabled;
+
+DEFINE_STATIC_CALL(pv_vcpu_is_preempted, dummy_vcpu_is_preempted);
+
 static bool steal_acc = true;
 static int __init parse_no_stealacc(char *arg)
 {
@@ -163,5 +168,94 @@ int __init pv_time_init(void)
 
 	pr_info("using stolen time PV\n");
 
+	return 0;
+}
+
+bool dummy_vcpu_is_preempted(unsigned int cpu)
+{
+	return false;
+}
+
+static bool __vcpu_is_preempted(unsigned int cpu)
+{
+	struct vcpu_state *st;
+
+	st = &per_cpu(vcpus_states, cpu);
+	return READ_ONCE(st->preempted);
+}
+
+static bool has_pv_vcpu_state(void)
+{
+	struct arm_smccc_res res;
+
+	/* To detect the presence of PV time support we require SMCCC 1.1+ */
+	if (arm_smccc_1_1_get_conduit() == SMCCC_CONDUIT_NONE)
+		return false;
+
+	arm_smccc_1_1_invoke(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+			     ARM_SMCCC_HV_PV_VCPU_STATE_FEATURES,
+			     &res);
+
+	if (res.a0 != SMCCC_RET_SUCCESS)
+		return false;
+	return true;
+}
+
+static int __pv_vcpu_state_hook(unsigned int cpu, int event)
+{
+	struct arm_smccc_res res;
+	struct vcpu_state *st;
+
+	st = &per_cpu(vcpus_states, cpu);
+	arm_smccc_1_1_invoke(event, virt_to_phys(st), &res);
+	if (res.a0 != SMCCC_RET_SUCCESS)
+		return -EINVAL;
+	return 0;
+}
+
+static int vcpu_state_init(unsigned int cpu)
+{
+	int ret = __pv_vcpu_state_hook(cpu, ARM_SMCCC_HV_PV_VCPU_STATE_INIT);
+
+	if (ret)
+		pr_warn("Unable to ARM_SMCCC_HV_PV_STATE_INIT\n");
+	return ret;
+}
+
+static int vcpu_state_release(unsigned int cpu)
+{
+	int ret = __pv_vcpu_state_hook(cpu, ARM_SMCCC_HV_PV_VCPU_STATE_RELEASE);
+
+	if (ret)
+		pr_warn("Unable to ARM_SMCCC_HV_PV_STATE_RELEASE\n");
+	return ret;
+}
+
+static int pv_vcpu_state_register_hooks(void)
+{
+	int ret;
+
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
+				"hypervisor/arm/pvstate:starting",
+				vcpu_state_init,
+				vcpu_state_release);
+	if (ret < 0)
+		pr_warn("Failed to register CPU hooks\n");
+	return 0;
+}
+
+int __init pv_vcpu_state_init(void)
+{
+	int ret;
+
+	if (!has_pv_vcpu_state())
+		return 0;
+
+	ret = pv_vcpu_state_register_hooks();
+	if (ret)
+		return ret;
+
+	static_call_update(pv_vcpu_is_preempted, __vcpu_is_preempted);
+	static_key_slow_inc(&pv_vcpu_is_preempted_enabled);
 	return 0;
 }
