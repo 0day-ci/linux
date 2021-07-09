@@ -56,6 +56,19 @@ properties:
       The POR value is 0x1000h. This number is in mA (e.g. 8064).
       See the spec for more information about the InputCurrent (0x3fh) register.
 
+  ti,wdt-timeout:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: |
+      Used to control and set the charger watchdog delay between consecutive
+      charge voltage and charge current commands.
+      This value must be:
+        0 - disabled
+        1 - 44 seconds
+        2 - 88 seconds
+        3 - 175 seconds
+      The POR value is 0x11 (3).
+      See the spec for more information about the ChargeOptions(0x12h) register.
+
   ti,external-control:
     type: boolean
     description: |

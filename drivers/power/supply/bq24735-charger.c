@@ -45,6 +45,8 @@
 /* ChargeOptions bits of interest */
 #define BQ24735_CHARGE_OPT_CHG_DISABLE	(1 << 0)
 #define BQ24735_CHARGE_OPT_AC_PRESENT	(1 << 4)
+#define BQ24735_CHARGE_OPT_WDT_OFFSET	13
+#define BQ24735_CHARGE_OPT_WDT		(3 << BQ24735_CHARGE_OPT_WDT_OFFSET)
 
 struct bq24735 {
 	struct power_supply		*charger;
@@ -151,6 +153,20 @@ static int bq24735_config_charger(struct bq24735 *charger)
 		if (ret < 0) {
 			dev_err(&charger->client->dev,
 				"Failed to write input current : %d\n",
+				ret);
+			return ret;
+		}
+	}
+
+	if (pdata->wdt_timeout) {
+		value = pdata->wdt_timeout;
+
+		ret = bq24735_update_word(charger->client, BQ24735_CHARGE_OPT,
+					  BQ24735_CHARGE_OPT_WDT,
+					  (value << BQ24735_CHARGE_OPT_WDT_OFFSET));
+		if (ret < 0) {
+			dev_err(&charger->client->dev,
+				"Failed to write watchdog timer: %d\n",
 				ret);
 			return ret;
 		}
@@ -347,6 +363,17 @@ static struct bq24735_platform *bq24735_parse_dt_data(struct i2c_client *client)
 	if (!ret)
 		pdata->input_current = val;
 
+	ret = of_property_read_u32(np, "ti,wdt-timeout", &val);
+	if (!ret) {
+		if (val <= 3) {
+			pdata->wdt_timeout = val;
+		} else {
+			dev_warn(&client->dev,
+				 "Invalid value for ti,wdt-timeout: %d",
+				 val);
+		}
+	}
+
 	pdata->ext_control = of_property_read_bool(np, "ti,external-control");
 
 	return pdata;
@@ -476,6 +503,27 @@ static int bq24735_charger_probe(struct i2c_client *client,
 			return 0;
 		if (!charger->poll_interval)
 			return 0;
+		if (charger->pdata->wdt_timeout) {
+			int wdt_ms;
+
+			switch (charger->pdata->wdt_timeout) {
+			case 1:
+				wdt_ms = 44000;
+				break;
+			case 2:
+				wdt_ms = 88000;
+				break;
+			case 3:
+				wdt_ms = 175000;
+				break;
+			}
+
+			if (charger->poll_interval > wdt_ms) {
+				dev_err(&client->dev,
+					"Poll interval greater than WDT timeout\n");
+				return -EINVAL;
+			}
+		}
 
 		ret = devm_delayed_work_autocancel(&client->dev, &charger->poll,
 						   bq24735_poll);
