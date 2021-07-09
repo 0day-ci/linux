@@ -12,6 +12,7 @@ struct fpga_region;
 /**
  * struct fpga_region_ops - ops for low level fpga region drivers
  * @get_bridges: optional function to get bridges to a list
+ * @compat_id_show: optional function emit to sysfs a compatible id
  *
  * fpga_region_ops are the low level functions implemented by a specific
  * fpga region driver.  The optional ones are tested for NULL before being
@@ -19,6 +20,7 @@ struct fpga_region;
  */
 struct fpga_region_ops {
 	int (*get_bridges)(struct fpga_region *region);
+	ssize_t (*compat_id_show)(struct fpga_region *region, char *buf);
 };
 
 /**

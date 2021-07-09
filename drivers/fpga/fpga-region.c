@@ -169,6 +169,9 @@ static ssize_t compat_id_show(struct device *dev,
 {
 	struct fpga_region *region = to_fpga_region(dev);
 
+	if (region->rops && region->rops->compat_id_show)
+		return region->rops->compat_id_show(region, buf);
+
 	if (!region->compat_id)
 		return -ENOENT;
 
