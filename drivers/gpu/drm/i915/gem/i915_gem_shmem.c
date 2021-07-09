@@ -298,11 +298,12 @@ __i915_gem_object_release_shmem(struct drm_i915_gem_object *obj,
 
 void i915_gem_object_put_pages_shmem(struct drm_i915_gem_object *obj, struct sg_table *pages)
 {
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct sgt_iter sgt_iter;
 	struct pagevec pvec;
 	struct page *page;
 
-	GEM_WARN_ON(IS_DGFX(to_i915(obj->base.dev)));
+	GEM_WARN_ON(IS_DGFX(i915));
 	__i915_gem_object_release_shmem(obj, pages, true);
 
 	i915_gem_gtt_finish_pages(obj, pages);
@@ -325,7 +326,12 @@ void i915_gem_object_put_pages_shmem(struct drm_i915_gem_object *obj, struct sg_
 	}
 	if (pagevec_count(&pvec))
 		check_release_pagevec(&pvec);
-	obj->mm.dirty = false;
+
+	/* See the comment in shmem_object_init() for why we need this */
+	if (IS_JSL_EHL(i915) && obj->flags & I915_BO_ALLOC_USER)
+		obj->mm.dirty = true;
+	else
+		obj->mm.dirty = false;
 
 	sg_free_table(pages);
 	kfree(pages);
@@ -538,6 +544,25 @@ static int shmem_object_init(struct intel_memory_region *mem,
 		cache_level = I915_CACHE_NONE;
 
 	i915_gem_object_set_cache_coherency(obj, cache_level);
+
+	/*
+	 * EHL and JSL add the 'Bypass LLC' MOCS entry, which should make it
+	 * possible for userspace to bypass the GTT caching bits set by the
+	 * kernel, as per the given object cache_level. This is troublesome
+	 * since the heavy flush we apply when first gathering the pages is
+	 * skipped if the kernel thinks the object is coherent with the GPU. As
+	 * a result it might be possible to bypass the cache and read the
+	 * contents of the page directly, which could be stale data. If it's
+	 * just a case of userspace shooting themselves in the foot then so be
+	 * it, but since i915 takes the stance of always zeroing memory before
+	 * handing it to userspace, we need to prevent this.
+	 *
+	 * By setting cache_dirty here we make the clflush when first acquiring
+	 * the pages unconditional on such platforms. We also set this again in
+	 * put_pages().
+	 */
+	if (IS_JSL_EHL(i915) && flags & I915_BO_ALLOC_USER)
+		obj->cache_dirty = true;
 
 	i915_gem_object_init_memory_region(obj, mem);
 
