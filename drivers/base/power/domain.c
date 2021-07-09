@@ -455,6 +455,30 @@ void dev_pm_genpd_set_next_wakeup(struct device *dev, ktime_t next)
 }
 EXPORT_SYMBOL_GPL(dev_pm_genpd_set_next_wakeup);
 
+static int _genpd_pm_runtime_get(struct generic_pm_domain *genpd)
+{
+	int ret;
+
+	if (!(genpd->flags & _GENPD_FLAG_RPM_ENABLED))
+		return 0;
+
+	ret = pm_runtime_get_sync(genpd->dev.parent);
+	if (ret < 0) {
+		pm_runtime_put_noidle(genpd->dev.parent);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void _genpd_pm_runtime_put(struct generic_pm_domain *genpd)
+{
+	if (!(genpd->flags & _GENPD_FLAG_RPM_ENABLED))
+		return;
+
+	pm_runtime_put_sync(genpd->dev.parent);
+}
+
 static int _genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 {
 	unsigned int state_idx = genpd->state_idx;
@@ -467,6 +491,10 @@ static int _genpd_power_on(struct generic_pm_domain *genpd, bool timed)
 					     GENPD_NOTIFY_PRE_ON,
 					     GENPD_NOTIFY_OFF, NULL);
 	ret = notifier_to_errno(ret);
+	if (ret)
+		return ret;
+
+	ret = _genpd_pm_runtime_get(genpd);
 	if (ret)
 		return ret;
 
@@ -499,6 +527,7 @@ out:
 	raw_notifier_call_chain(&genpd->power_notifiers, GENPD_NOTIFY_ON, NULL);
 	return 0;
 err:
+	_genpd_pm_runtime_put(genpd);
 	raw_notifier_call_chain(&genpd->power_notifiers, GENPD_NOTIFY_OFF,
 				NULL);
 	return ret;
@@ -545,6 +574,7 @@ static int _genpd_power_off(struct generic_pm_domain *genpd, bool timed)
 		 genpd->name, "off", elapsed_ns);
 
 out:
+	_genpd_pm_runtime_put(genpd);
 	raw_notifier_call_chain(&genpd->power_notifiers, GENPD_NOTIFY_OFF,
 				NULL);
 	return 0;
@@ -1952,6 +1982,9 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.restore_noirq = genpd_restore_noirq;
 	genpd->domain.ops.complete = genpd_complete;
 	genpd->domain.start = genpd_dev_pm_start;
+
+	if (genpd->dev.parent && pm_runtime_enabled(genpd->dev.parent))
+		genpd->flags |= GENPD_FLAG_RPM_ENABLED;
 
 	if (genpd->flags & GENPD_FLAG_PM_CLK) {
 		genpd->dev_ops.stop = pm_clk_suspend;
