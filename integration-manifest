@@ -1,0 +1,28 @@
+drm drm-fixes 62fb9874f5da54fdb243003b386128037319b219
+	Linux 5.13
+drm-misc drm-misc-fixes 1988e0d84161dabd99d1c27033fbd6ee439bf432
+	drm/panel: nt35510: Do not fail if DSI read fails
+drm-intel drm-intel-fixes 62fb9874f5da54fdb243003b386128037319b219
+	Linux 5.13
+drm drm-next 21c355b09711e95f8f0e7c1890b343c6cd350042
+	Merge tag 'drm-misc-next-fixes-2021-07-01' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes 34bd46bcf3de72cbffcdc42d3fa67e543d1c869b
+	drm/vmwgfx: Fix a bad merge in otable batch takedown
+drm-intel drm-intel-next-fixes 21c355b09711e95f8f0e7c1890b343c6cd350042
+	Merge tag 'drm-misc-next-fixes-2021-07-01' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next f08a2a1eecb63debef0c6cac3d94dd06dd5abbc1
+	drm/panel: simple: Add support for EDT ETM0350G0DH6 panel
+drm-intel drm-intel-next ca6374e267e2735fe382fe95de2a8a9c30c6bdb3
+	drm/i915: Add release id version
+drm-intel drm-intel-gt-next b3f450d9e1f386cda3e15f76efcb1b763d9a2856
+	drm/i915: use consistent CPU mappings for pin_map users
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI fae352efb12196e7110f98bc1297ce533472764d
+	drm/i915: allow DG1 autoprobe for CONFIG_BROKEN
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
