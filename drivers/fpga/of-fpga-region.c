@@ -138,6 +138,10 @@ static int of_fpga_region_get_bridges(struct fpga_region *region)
 	return 0;
 }
 
+static const struct fpga_region_ops of_fpga_region_ops = {
+	.get_bridges = of_fpga_region_get_bridges,
+};
+
 /**
  * child_regions_with_firmware
  * @overlay: device node of the overlay
@@ -405,7 +409,7 @@ static int of_fpga_region_probe(struct platform_device *pdev)
 	if (IS_ERR(mgr))
 		return -EPROBE_DEFER;
 
-	region = devm_fpga_region_create(dev, mgr, of_fpga_region_get_bridges);
+	region = devm_fpga_region_create(dev, mgr, &of_fpga_region_ops);
 	if (!region) {
 		ret = -ENOMEM;
 		goto eprobe_mgr_put;

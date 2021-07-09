@@ -151,7 +151,7 @@ static int fme_pr(struct platform_device *pdev, unsigned long arg)
 	 * reenabling the bridge to clear things out between accleration runs.
 	 * so no need to hold the bridges after partial reconfiguration.
 	 */
-	if (region->get_bridges)
+	if (region->rops && region->rops->get_bridges)
 		fpga_bridges_put(&region->bridge_list);
 
 	put_device(&region->dev);

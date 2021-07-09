@@ -27,6 +27,10 @@ static int fme_region_get_bridges(struct fpga_region *region)
 	return fpga_bridge_get_to_list(dev, region->info, &region->bridge_list);
 }
 
+static const struct fpga_region_ops fme_fpga_region_ops = {
+	.get_bridges = fme_region_get_bridges,
+};
+
 static int fme_region_probe(struct platform_device *pdev)
 {
 	struct dfl_fme_region_pdata *pdata = dev_get_platdata(&pdev->dev);
@@ -39,7 +43,7 @@ static int fme_region_probe(struct platform_device *pdev)
 	if (IS_ERR(mgr))
 		return -EPROBE_DEFER;
 
-	region = devm_fpga_region_create(dev, mgr, fme_region_get_bridges);
+	region = devm_fpga_region_create(dev, mgr, &fme_fpga_region_ops);
 	if (!region) {
 		ret = -ENOMEM;
 		goto eprobe_mgr_put;

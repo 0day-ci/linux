@@ -18,6 +18,14 @@
 static DEFINE_IDA(fpga_region_ida);
 static struct class *fpga_region_class;
 
+static int fpga_region_get_bridges(struct fpga_region *region)
+{
+	if (region->rops && region->rops->get_bridges)
+		return region->rops->get_bridges(region);
+
+	return 0;
+}
+
 struct fpga_region *fpga_region_class_find(
 	struct device *start, const void *data,
 	int (*match)(struct device *, const void *))
@@ -115,12 +123,10 @@ int fpga_region_program_fpga(struct fpga_region *region)
 	 * In some cases, we already have a list of bridges in the
 	 * fpga region struct.  Or we don't have any bridges.
 	 */
-	if (region->get_bridges) {
-		ret = region->get_bridges(region);
-		if (ret) {
-			dev_err(dev, "failed to get fpga region bridges\n");
-			goto err_unlock_mgr;
-		}
+	ret = fpga_region_get_bridges(region);
+	if (ret) {
+		dev_err(dev, "failed to get fpga region bridges\n");
+		goto err_unlock_mgr;
 	}
 
 	ret = fpga_bridges_disable(&region->bridge_list);
@@ -147,7 +153,7 @@ int fpga_region_program_fpga(struct fpga_region *region)
 	return 0;
 
 err_put_br:
-	if (region->get_bridges)
+	if (region->rops && region->rops->get_bridges)
 		fpga_bridges_put(&region->bridge_list);
 err_unlock_mgr:
 	fpga_mgr_unlock(region->mgr);
@@ -183,7 +189,7 @@ ATTRIBUTE_GROUPS(fpga_region);
  * fpga_region_create - alloc and init a struct fpga_region
  * @parent: device parent
  * @mgr: manager that programs this region
- * @get_bridges: optional function to get bridges to a list
+ * @rops:  optional pointer to struct for fpga region ops
  *
  * The caller of this function is responsible for freeing the resulting region
  * struct with fpga_region_free().  Using devm_fpga_region_create() instead is
@@ -194,7 +200,7 @@ ATTRIBUTE_GROUPS(fpga_region);
 struct fpga_region
 *fpga_region_create(struct device *parent,
 		    struct fpga_manager *mgr,
-		    int (*get_bridges)(struct fpga_region *))
+		    const struct fpga_region_ops *rops)
 {
 	struct fpga_region *region;
 	int id, ret = 0;
@@ -208,7 +214,7 @@ struct fpga_region
 		goto err_free;
 
 	region->mgr = mgr;
-	region->get_bridges = get_bridges;
+	region->rops = rops;
 	mutex_init(&region->mutex);
 	INIT_LIST_HEAD(&region->bridge_list);
 
@@ -255,7 +261,7 @@ static void devm_fpga_region_release(struct device *dev, void *res)
  * devm_fpga_region_create - create and initialize a managed FPGA region struct
  * @parent: device parent
  * @mgr: manager that programs this region
- * @get_bridges: optional function to get bridges to a list
+ * @rops:  optional pointer to struct for fpga region ops
  *
  * This function is intended for use in an FPGA region driver's probe function.
  * After the region driver creates the region struct with
@@ -270,7 +276,7 @@ static void devm_fpga_region_release(struct device *dev, void *res)
 struct fpga_region
 *devm_fpga_region_create(struct device *parent,
 			 struct fpga_manager *mgr,
-			 int (*get_bridges)(struct fpga_region *))
+			 const struct fpga_region_ops *rops)
 {
 	struct fpga_region **ptr, *region;
 
@@ -278,7 +284,7 @@ struct fpga_region
 	if (!ptr)
 		return NULL;
 
-	region = fpga_region_create(parent, mgr, get_bridges);
+	region = fpga_region_create(parent, mgr, rops);
 	if (!region) {
 		devres_free(ptr);
 	} else {
