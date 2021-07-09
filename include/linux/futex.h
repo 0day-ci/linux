@@ -159,6 +159,9 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 int futex_wake(u32 __user *uaddr, unsigned int flags, int nr_wake, u32 bitset);
 int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val, ktime_t *abs_time,
 	       u32 bitset);
+int futex_requeue(u32 __user *uaddr1, unsigned int flags1, u32 __user *uaddr2,
+		  unsigned int flags2, int nr_wake, int nr_requeue, u32 *cmpval,
+		  int requeue_pi);
 void queue_me(struct futex_q *q, struct futex_hash_bucket *hb);
 int unqueue_me(struct futex_q *q);
 void queue_unlock(struct futex_hash_bucket *hb);

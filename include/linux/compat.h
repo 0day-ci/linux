@@ -372,6 +372,11 @@ struct compat_futex_waitv {
 	compat_uint_t flags;
 };
 
+struct compat_futex_requeue {
+	compat_uptr_t uaddr;
+	compat_uint_t flags;
+};
+
 #ifdef CONFIG_COMPAT_OLD_SIGACTION
 struct compat_old_sigaction {
 	compat_uptr_t			sa_handler;
@@ -703,6 +708,11 @@ asmlinkage long compat_sys_futex_wait(void __user *uaddr, compat_u64 val,
 asmlinkage long compat_sys_futex_waitv(struct compat_futex_waitv *waiters,
 				       compat_uint_t nr_futexes, compat_uint_t flags,
 				       struct __kernel_timespec __user *timo);
+asmlinkage long compat_sys_futex_requeue(struct futex_requeue __user *rq1,
+					 struct futex_requeue __user *rq2,
+					 unsigned int nr_wake,
+					 unsigned int nr_requeue,
+					 u64 cmpval, unsigned int flags);
 /* kernel/itimer.c */
 asmlinkage long compat_sys_getitimer(int which,
 				     struct old_itimerval32 __user *it);

@@ -446,3 +446,114 @@ SYSCALL_DEFINE3(futex_wake, void __user *, uaddr, unsigned int, nr_wake,
 
 	return futex_wake(uaddr, futex_flags, nr_wake, FUTEX_BITSET_MATCH_ANY);
 }
+
+#ifdef CONFIG_COMPAT
+static int compat_futex_parse_requeue(struct compat_futex_requeue __user *rq,
+				      void __user **uaddr, unsigned int *flags)
+{
+	struct compat_futex_requeue aux;
+	unsigned int futex_flags = 0;
+
+	if (copy_from_user(&aux, rq, sizeof(*rq)))
+		return -EFAULT;
+
+	if (aux.flags & ~FUTEXV_WAITER_MASK ||
+	    (aux.flags & FUTEX_SIZE_MASK) != FUTEX_32)
+		return -EINVAL;
+
+	if (aux.flags & FUTEX_SHARED_FLAG)
+		futex_flags |= FLAGS_SHARED;
+
+	*uaddr = compat_ptr(aux.uaddr);
+	*flags = futex_flags;
+
+	return 0;
+}
+
+COMPAT_SYSCALL_DEFINE6(futex_requeue, struct compat_futex_requeue __user *, rq1,
+		       struct compat_futex_requeue __user *, rq2,
+		       unsigned int, nr_wake, unsigned int, nr_requeue,
+		       compat_u64, cmpval, unsigned int, flags)
+{
+	void __user *uaddr1, *uaddr2;
+	unsigned int flags1, flags2;
+	u32 val = cmpval;
+	int ret;
+
+	if (flags)
+		return -EINVAL;
+
+	ret = compat_futex_parse_requeue(rq1, &uaddr1, &flags1);
+	if (ret)
+		return ret;
+
+	ret = compat_futex_parse_requeue(rq2, &uaddr2, &flags2);
+	if (ret)
+		return ret;
+
+	return futex_requeue(uaddr1, flags1, uaddr2, flags2, nr_wake, nr_requeue, &val, 0);
+}
+#endif
+
+static int futex_parse_requeue(struct futex_requeue __user *rq,
+			       void __user **uaddr, unsigned int *flags)
+{
+	struct futex_requeue aux;
+	unsigned int futex_flags = 0;
+
+	if (copy_from_user(&aux, rq, sizeof(*rq)))
+		return -EFAULT;
+
+	if (aux.flags & ~FUTEXV_WAITER_MASK ||
+	    (aux.flags & FUTEX_SIZE_MASK) != FUTEX_32)
+		return -EINVAL;
+
+	if (aux.flags & FUTEX_SHARED_FLAG)
+		futex_flags |= FLAGS_SHARED;
+
+	*uaddr = aux.uaddr;
+	*flags = futex_flags;
+
+	return 0;
+}
+
+/**
+ * sys_futex_requeue - Wake futexes at rq1 and requeue from rq1 to rq2
+ * @rq1:	Address of futexes to be waken/dequeued
+ * @rq2:	Address for the futexes to be enqueued
+ * @nr_wake:    Number of futexes waiting in uaddr1 to be woken up
+ * @nr_requeue: Number of futexes to be requeued from uaddr1 to uaddr2
+ * @cmpval:     Expected value at uaddr1
+ * @flags:      Reserved flags arg for requeue operation expansion. Must be 0.
+ *
+ * If (rq1->uaddr == cmpval), wake at uaddr1->uaddr a nr_wake number of
+ * waiters and then, remove a number of nr_requeue waiters at rq1->uaddr
+ * and add then to rq2->uaddr list. Each uaddr has its own set of flags,
+ * that must be defined at struct futex_requeue (such as size, shared, NUMA).
+ *
+ * Return the number of the woken futexes + the number of requeued ones on
+ * success, error code otherwise.
+ */
+SYSCALL_DEFINE6(futex_requeue, struct futex_requeue __user *, rq1,
+		struct futex_requeue __user *, rq2,
+		unsigned int, nr_wake, unsigned int, nr_requeue,
+		u64, cmpval, unsigned int, flags)
+{
+	void __user *uaddr1, *uaddr2;
+	unsigned int flags1, flags2;
+	u32 val = cmpval;
+	int ret;
+
+	if (flags)
+		return -EINVAL;
+
+	ret = futex_parse_requeue(rq1, &uaddr1, &flags1);
+	if (ret)
+		return ret;
+
+	ret = futex_parse_requeue(rq2, &uaddr2, &flags2);
+	if (ret)
+		return ret;
+
+	return futex_requeue(uaddr1, flags1, uaddr2, flags2, nr_wake, nr_requeue, &val, 0);
+}
