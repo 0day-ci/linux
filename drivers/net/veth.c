@@ -72,6 +72,8 @@ struct veth_priv {
 	atomic64_t		dropped;
 	struct bpf_prog		*_xdp_prog;
 	struct veth_rq		*rq;
+	unsigned int		num_tx_queues;
+	unsigned int		num_rx_queues;
 	unsigned int		requested_headroom;
 };
 
@@ -224,10 +226,49 @@ static void veth_get_channels(struct net_device *dev,
 {
 	channels->tx_count = dev->real_num_tx_queues;
 	channels->rx_count = dev->real_num_rx_queues;
-	channels->max_tx = dev->real_num_tx_queues;
-	channels->max_rx = dev->real_num_rx_queues;
+	channels->max_tx = dev->num_tx_queues;
+	channels->max_rx = dev->num_rx_queues;
 	channels->combined_count = min(dev->real_num_rx_queues, dev->real_num_tx_queues);
-	channels->max_combined = min(dev->real_num_rx_queues, dev->real_num_tx_queues);
+	channels->max_combined = min(dev->num_rx_queues, dev->num_tx_queues);
+}
+
+static int veth_close(struct net_device *dev);
+static int veth_open(struct net_device *dev);
+
+static int veth_set_channels(struct net_device *dev,
+			     struct ethtool_channels *ch)
+{
+	struct veth_priv *priv = netdev_priv(dev);
+	struct veth_priv *peer_priv;
+
+	/* accept changes only on rx/tx */
+	if (ch->combined_count != min(dev->real_num_rx_queues, dev->real_num_tx_queues))
+		return -EINVAL;
+
+	/* respect contraint posed at device creation time */
+	if (ch->rx_count > dev->num_rx_queues || ch->tx_count > dev->num_tx_queues)
+		return -EINVAL;
+
+	if (!ch->rx_count || !ch->tx_count)
+		return -EINVAL;
+
+	/* avoid braking XDP, if that is enabled */
+	if (priv->_xdp_prog && ch->rx_count < priv->peer->real_num_tx_queues)
+		return -EINVAL;
+
+	peer_priv = netdev_priv(priv->peer);
+	if (peer_priv->_xdp_prog && ch->tx_count > priv->peer->real_num_rx_queues)
+		return -EINVAL;
+
+	if (netif_running(dev))
+		veth_close(dev);
+
+	priv->num_tx_queues = ch->tx_count;
+	priv->num_rx_queues = ch->rx_count;
+
+	if (netif_running(dev))
+		veth_open(dev);
+	return 0;
 }
 
 static const struct ethtool_ops veth_ethtool_ops = {
@@ -239,6 +280,7 @@ static const struct ethtool_ops veth_ethtool_ops = {
 	.get_link_ksettings	= veth_get_link_ksettings,
 	.get_ts_info		= ethtool_op_get_ts_info,
 	.get_channels		= veth_get_channels,
+	.set_channels		= veth_set_channels,
 };
 
 /* general routines */
@@ -1104,6 +1146,14 @@ static int veth_open(struct net_device *dev)
 	if (!peer)
 		return -ENOTCONN;
 
+	err = netif_set_real_num_rx_queues(dev, priv->num_rx_queues);
+	if (err)
+		return err;
+
+	err = netif_set_real_num_tx_queues(dev, priv->num_tx_queues);
+	if (err)
+		return err;
+
 	if (priv->_xdp_prog) {
 		err = veth_enable_xdp(dev);
 		if (err)
@@ -1551,14 +1601,18 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	netif_carrier_off(dev);
 
 	/*
-	 * tie the deviced together
+	 * tie the deviced together and init the default queue nr
 	 */
 
 	priv = netdev_priv(dev);
 	rcu_assign_pointer(priv->peer, peer);
+	priv->num_tx_queues = dev->num_tx_queues;
+	priv->num_rx_queues = dev->num_rx_queues;
 
 	priv = netdev_priv(peer);
 	rcu_assign_pointer(priv->peer, dev);
+	priv->num_tx_queues = peer->num_tx_queues;
+	priv->num_rx_queues = peer->num_rx_queues;
 
 	veth_disable_gro(dev);
 	return 0;
