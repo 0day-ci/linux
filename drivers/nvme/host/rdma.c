@@ -2168,6 +2168,14 @@ static void nvme_rdma_complete_rq(struct request *rq)
 	nvme_complete_rq(rq);
 }
 
+static const struct cpumask *nvme_rdma_get_queue_affinity(
+		void *dev_data, int offset, int queue)
+{
+	struct ib_device *dev = dev_data;
+
+	return ib_get_vector_affinity(dev, offset + queue);
+}
+
 static int nvme_rdma_map_queues(struct blk_mq_tag_set *set)
 {
 	struct nvme_rdma_ctrl *ctrl = set->driver_data;
@@ -2191,10 +2199,12 @@ static int nvme_rdma_map_queues(struct blk_mq_tag_set *set)
 			ctrl->io_queues[HCTX_TYPE_DEFAULT];
 		set->map[HCTX_TYPE_READ].queue_offset = 0;
 	}
-	blk_mq_rdma_map_queues(&set->map[HCTX_TYPE_DEFAULT],
-			ctrl->device->dev, 0);
-	blk_mq_rdma_map_queues(&set->map[HCTX_TYPE_READ],
-			ctrl->device->dev, 0);
+	blk_mq_dev_map_queues(&set->map[HCTX_TYPE_DEFAULT],
+			ctrl->device->dev, 0, nvme_rdma_get_queue_affinity,
+			true, false);
+	blk_mq_dev_map_queues(&set->map[HCTX_TYPE_READ],
+			ctrl->device->dev, 0, nvme_rdma_get_queue_affinity,
+			true, false);
 
 	if (opts->nr_poll_queues && ctrl->io_queues[HCTX_TYPE_POLL]) {
 		/* map dedicated poll queues only if we have queues left */
