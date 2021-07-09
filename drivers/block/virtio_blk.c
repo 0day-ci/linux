@@ -677,12 +677,20 @@ static int virtblk_init_request(struct blk_mq_tag_set *set, struct request *rq,
 	return 0;
 }
 
+static const struct cpumask *virtblk_get_vq_affinity(void *dev_data,
+		int offset, int queue)
+{
+	struct virtio_device *vdev = dev_data;
+
+	return virtio_get_vq_affinity(vdev, offset + queue);
+}
+
 static int virtblk_map_queues(struct blk_mq_tag_set *set)
 {
 	struct virtio_blk *vblk = set->driver_data;
 
-	return blk_mq_virtio_map_queues(&set->map[HCTX_TYPE_DEFAULT],
-					vblk->vdev, 0);
+	return blk_mq_dev_map_queues(&set->map[HCTX_TYPE_DEFAULT], vblk->vdev,
+				     0, virtblk_get_vq_affinity, true, true);
 }
 
 static const struct blk_mq_ops virtio_mq_ops = {

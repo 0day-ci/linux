@@ -712,12 +712,21 @@ static int virtscsi_abort(struct scsi_cmnd *sc)
 	return virtscsi_tmf(vscsi, cmd);
 }
 
+static const struct cpumask *virtscsi_get_vq_affinity(void *dev_data,
+		int offset, int queue)
+{
+	struct virtio_device *vdev = dev_data;
+
+	return virtio_get_vq_affinity(vdev, offset + queue);
+}
+
 static int virtscsi_map_queues(struct Scsi_Host *shost)
 {
 	struct virtio_scsi *vscsi = shost_priv(shost);
 	struct blk_mq_queue_map *qmap = &shost->tag_set.map[HCTX_TYPE_DEFAULT];
 
-	return blk_mq_virtio_map_queues(qmap, vscsi->vdev, 2);
+	return blk_mq_dev_map_queues(qmap, vscsi->vdev, 2,
+			virtscsi_get_vq_affinity, true, true);
 }
 
 static void virtscsi_commit_rqs(struct Scsi_Host *shost, u16 hwq)
