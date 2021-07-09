@@ -170,7 +170,7 @@ static inline void __set_page_owner_handle(struct page_ext *page_ext,
 }
 
 noinline void __set_page_owner(struct page *page, unsigned int order,
-					gfp_t gfp_mask)
+					gfp_t alloc_gfp, gfp_t page_gfp_mask)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
 	depot_stack_handle_t handle;
@@ -178,8 +178,8 @@ noinline void __set_page_owner(struct page *page, unsigned int order,
 	if (unlikely(!page_ext))
 		return;
 
-	handle = save_stack(gfp_mask);
-	__set_page_owner_handle(page_ext, handle, order, gfp_mask);
+	handle = save_stack(alloc_gfp);
+	__set_page_owner_handle(page_ext, handle, order, page_gfp_mask);
 }
 
 void __set_page_owner_migrate_reason(struct page *page, int reason)

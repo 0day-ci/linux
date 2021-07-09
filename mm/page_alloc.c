@@ -2322,7 +2322,7 @@ static bool check_new_pages(struct page *page, unsigned int order)
 }
 
 inline void post_alloc_hook(struct page *page, unsigned int order,
-				gfp_t gfp_flags)
+				gfp_t alloc_gfp, gfp_t page_gfp_mask)
 {
 	bool init;
 
@@ -2344,20 +2344,21 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
 	 * kasan_alloc_pages and kernel_init_free_pages must be
 	 * kept together to avoid discrepancies in behavior.
 	 */
-	init = !want_init_on_free() && want_init_on_alloc(gfp_flags);
+	init = !want_init_on_free() && want_init_on_alloc(page_gfp_mask);
 	kasan_alloc_pages(page, order, init);
 	if (init && !kasan_has_integrated_init())
 		kernel_init_free_pages(page, 1 << order);
 
-	set_page_owner(page, order, gfp_flags);
+	set_page_owner(page, order, alloc_gfp, page_gfp_mask);
 }
 
-static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
-							unsigned int alloc_flags)
+static void prep_new_page(struct page *page, unsigned int order,
+			  gfp_t alloc_gfp, gfp_t page_gfp_mask,
+			  unsigned int alloc_flags)
 {
-	post_alloc_hook(page, order, gfp_flags);
+	post_alloc_hook(page, order, alloc_gfp, page_gfp_mask);
 
-	if (order && (gfp_flags & __GFP_COMP))
+	if (order && (page_gfp_mask & __GFP_COMP))
 		prep_compound_page(page, order);
 
 	/*
@@ -3991,7 +3992,7 @@ try_this_zone:
 		page = rmqueue(ac->preferred_zoneref->zone, zone, order,
 				gfp_mask, alloc_flags, ac->migratetype);
 		if (page) {
-			prep_new_page(page, order, gfp_mask, alloc_flags);
+			prep_new_page(page, order, gfp_mask, gfp_mask, alloc_flags);
 
 			/*
 			 * If this is a high-order atomic allocation then check
@@ -4211,7 +4212,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 
 	/* Prep a captured page if available */
 	if (page)
-		prep_new_page(page, order, gfp_mask, alloc_flags);
+		prep_new_page(page, order, gfp_mask, gfp_mask, alloc_flags);
 
 	/* Try get a page from the freelist if available */
 	if (!page)
@@ -5131,7 +5132,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 		__count_zid_vm_events(PGALLOC, zone_idx(zone), 1);
 		zone_statistics(ac.preferred_zoneref->zone, zone);
 
-		prep_new_page(page, 0, gfp, 0);
+		prep_new_page(page, 0, GFP_ATOMIC, gfp, 0);
 		if (page_list)
 			list_add(&page->lru, page_list);
 		else
