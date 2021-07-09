@@ -1052,7 +1052,6 @@ static bool dp_ctrl_train_pattern_set(struct dp_ctrl_private *ctrl,
 		u8 pattern)
 {
 	u8 buf;
-	int ret = 0;
 
 	DRM_DEBUG_DP("sink: pattern=%x\n", pattern);
 
@@ -1061,8 +1060,7 @@ static bool dp_ctrl_train_pattern_set(struct dp_ctrl_private *ctrl,
 	if (pattern && pattern != DP_TRAINING_PATTERN_4)
 		buf |= DP_LINK_SCRAMBLING_DISABLE;
 
-	ret = drm_dp_dpcd_writeb(ctrl->aux, DP_TRAINING_PATTERN_SET, buf);
-	return ret == 1;
+	return drm_dp_dpcd_writeb(ctrl->aux, DP_TRAINING_PATTERN_SET, buf) == 1;
 }
 
 static int dp_ctrl_read_link_status(struct dp_ctrl_private *ctrl,

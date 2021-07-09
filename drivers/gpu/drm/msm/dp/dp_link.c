@@ -782,7 +782,6 @@ static int dp_link_process_link_training_request(struct dp_link_private *link)
 bool dp_link_send_test_response(struct dp_link *dp_link)
 {
 	struct dp_link_private *link = NULL;
-	int ret = 0;
 
 	if (!dp_link) {
 		DRM_ERROR("invalid input\n");
@@ -791,10 +790,8 @@ bool dp_link_send_test_response(struct dp_link *dp_link)
 
 	link = container_of(dp_link, struct dp_link_private, dp_link);
 
-	ret = drm_dp_dpcd_writeb(link->aux, DP_TEST_RESPONSE,
-			dp_link->test_response);
-
-	return ret == 1;
+	return drm_dp_dpcd_writeb(link->aux, DP_TEST_RESPONSE,
+			dp_link->test_response) == 1;
 }
 
 int dp_link_psm_config(struct dp_link *dp_link,
@@ -829,7 +826,6 @@ int dp_link_psm_config(struct dp_link *dp_link,
 bool dp_link_send_edid_checksum(struct dp_link *dp_link, u8 checksum)
 {
 	struct dp_link_private *link = NULL;
-	int ret = 0;
 
 	if (!dp_link) {
 		DRM_ERROR("invalid input\n");
@@ -838,9 +834,8 @@ bool dp_link_send_edid_checksum(struct dp_link *dp_link, u8 checksum)
 
 	link = container_of(dp_link, struct dp_link_private, dp_link);
 
-	ret = drm_dp_dpcd_writeb(link->aux, DP_TEST_EDID_CHECKSUM,
-						checksum);
-	return ret == 1;
+	return drm_dp_dpcd_writeb(link->aux, DP_TEST_EDID_CHECKSUM,
+						checksum) == 1;
 }
 
 static int dp_link_parse_vx_px(struct dp_link_private *link)
