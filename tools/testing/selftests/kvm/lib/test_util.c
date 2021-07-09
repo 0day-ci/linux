@@ -135,7 +135,8 @@ size_t get_trans_hugepagesz(void)
 	f = fopen("/sys/kernel/mm/transparent_hugepage/hpage_pmd_size", "r");
 	TEST_ASSERT(f != NULL, "Error in opening transparent_hugepage/hpage_pmd_size");
 
-	fscanf(f, "%ld", &size);
+	if (fscanf(f, "%ld", &size) != 1)
+		size = 0;
 	fclose(f);
 
 	return size;

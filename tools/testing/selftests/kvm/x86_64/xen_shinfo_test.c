@@ -106,7 +106,8 @@ static long get_run_delay(void)
 
         sprintf(path, "/proc/%ld/schedstat", syscall(SYS_gettid));
         fp = fopen(path, "r");
-        fscanf(fp, "%ld %ld ", &val[0], &val[1]);
+	if (fscanf(fp, "%ld %ld ", &val[0], &val[1]) != 2)
+		val[1] = 0;
         fclose(fp);
 
         return val[1];
