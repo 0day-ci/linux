@@ -12,6 +12,9 @@
 extern struct static_key_false disable_kuap_key;
 extern struct static_key_false disable_kuep_key;
 
+extern s32 patch__kuep_interrupt_entry, patch__kuep_interrupt_exit;
+extern s32 patch__kuep_syscall_entry, patch__kuep_syscall_exit;
+
 static __always_inline bool kuap_is_disabled(void)
 {
 	return !IS_ENABLED(CONFIG_PPC_KUAP) || static_branch_unlikely(&disable_kuap_key);
