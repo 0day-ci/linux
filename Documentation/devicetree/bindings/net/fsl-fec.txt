@@ -50,6 +50,10 @@ Optional properties:
     SOC internal PLL.
   - "enet_out"(option), output clock for external device, like supply clock
     for PHY. The clock is required if PHY clock source from SOC.
+  - "enet_2x_txclk"(option), for RGMII sampleing clock which fixed at 250Mhz.
+    The clock is required if SOC RGMII enable clock delay.
+- fsl,rgmii_txc_dly: add RGMII TXC delayed clock from MAC.
+- fsl,rgmii_rxc_dly: add RGMII RXC delayed clock from MAC.
 
 Optional subnodes:
 - mdio : specifies the mdio bus in the FEC, used as a container for phy nodes
