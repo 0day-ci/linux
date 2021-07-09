@@ -5235,16 +5235,18 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	if (unlikely(nr_pages <= 0))
 		return 0;
 
-	/*
-	 * Skip populated array elements to determine if any pages need
-	 * to be allocated before disabling IRQs.
-	 */
-	while (page_array && nr_populated < nr_pages && page_array[nr_populated])
-		nr_populated++;
+	if (page_array) {
+		/*
+		 * Skip populated array elements to determine if any pages need
+		 * to be allocated before disabling IRQs.
+		 */
+		while (nr_populated < nr_pages && page_array[nr_populated])
+			nr_populated++;
 
-	/* Already populated array? */
-	if (unlikely(page_array && nr_pages - nr_populated == 0))
-		return nr_populated;
+		/* Already populated array? */
+		if (unlikely(nr_pages - nr_populated == 0))
+			return nr_populated;
+	}
 
 	/* Use the single page allocator for one page. */
 	if (nr_pages - nr_populated == 1)
@@ -5319,9 +5321,10 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 
 	local_unlock_irqrestore(&pagesets.lock, flags);
 
-	__count_zid_vm_events(PGALLOC, zone_idx(zone), nr_account);
-	zone_statistics(ac.preferred_zoneref->zone, zone, nr_account);
-
+	if (likely(nr_account)) {
+		__count_zid_vm_events(PGALLOC, zone_idx(zone), nr_account);
+		zone_statistics(ac.preferred_zoneref->zone, zone, nr_account);
+	}
 	return nr_populated;
 
 failed_irq:
