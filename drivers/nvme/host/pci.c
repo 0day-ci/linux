@@ -433,6 +433,14 @@ static int nvme_init_request(struct blk_mq_tag_set *set, struct request *req,
 	return 0;
 }
 
+static const struct cpumask *nvme_pci_get_queue_affinity(
+		void *dev_data, int offset, int queue)
+{
+	struct pci_dev *pdev = dev_data;
+
+	return pci_irq_get_affinity(pdev, offset + queue);
+}
+
 static int queue_irq_offset(struct nvme_dev *dev)
 {
 	/* if we have more than 1 vec, admin queue offsets us by 1 */
@@ -463,7 +471,9 @@ static int nvme_pci_map_queues(struct blk_mq_tag_set *set)
 		 */
 		map->queue_offset = qoff;
 		if (i != HCTX_TYPE_POLL && offset)
-			blk_mq_pci_map_queues(map, to_pci_dev(dev->dev), offset);
+			blk_mq_dev_map_queues(map, to_pci_dev(dev->dev), offset,
+					nvme_pci_get_queue_affinity, false,
+					true);
 		else
 			blk_mq_map_queues(map);
 		qoff += map->nr_queues;
