@@ -849,31 +849,60 @@ struct drm_i915_gem_mmap_gtt {
 	__u64 offset;
 };
 
+/**
+ * struct drm_i915_gem_mmap_offset - Retrieve an offset so we can mmap this buffer object.
+ *
+ * This struct is passed as argument to the `DRM_IOCTL_I915_GEM_MMAP_OFFSET` ioctl,
+ * and is used to retrieve the fake offset to mmap an object specified by &handle.
+ *
+ * The legacy way of using `DRM_IOCTL_I915_GEM_MMAP` is removed on gen12+.
+ * `DRM_IOCTL_I915_GEM_MMAP_GTT` is an older supported alias to this struct, but will behave
+ * as setting the &extensions to 0, and &flags to `I915_MMAP_OFFSET_GTT`.
+ */
 struct drm_i915_gem_mmap_offset {
-	/** Handle for the object being mapped. */
+	/** @handle: Handle for the object being mapped. */
 	__u32 handle;
+	/** @pad: Must be zero */
 	__u32 pad;
 	/**
-	 * Fake offset to use for subsequent mmap call
+	 * @offset: The fake offset to use for subsequent mmap call
 	 *
 	 * This is a fixed-size type for 32/64 compatibility.
 	 */
 	__u64 offset;
 
 	/**
-	 * Flags for extended behaviour.
+	 * @flags: Flags for extended behaviour.
 	 *
-	 * It is mandatory that one of the MMAP_OFFSET types
-	 * (GTT, WC, WB, UC, etc) should be included.
+	 * It is mandatory that one of the `MMAP_OFFSET` types
+	 * should be included:
+	 * - `I915_MMAP_OFFSET_GTT`: Use mmap with the object bound to GTT.
+	 * - `I915_MMAP_OFFSET_WC`: Use Write-Combined caching.
+	 * - `I915_MMAP_OFFSET_WB`: Use Write-Back caching.
+	 * - `I915_MMAP_OFFSET_TTM`: Use TTM to determine caching based on object placement.
+	 *
+	 * Only on devices with local memory is `I915_MMAP_OFFSET_TTM` valid. On
+	 * devices without local memory, this caching mode is invalid.
+	 *
+	 * As caching mode when specifying `I915_MMAP_OFFSET_TTM`, WC or WB will
+	 * be used, depending on the object placement. WC will be used
+	 * when the object resides in local memory, WB otherwise.
 	 */
 	__u64 flags;
-#define I915_MMAP_OFFSET_GTT 0
-#define I915_MMAP_OFFSET_WC  1
-#define I915_MMAP_OFFSET_WB  2
-#define I915_MMAP_OFFSET_UC  3
 
-	/*
-	 * Zero-terminated chain of extensions.
+/** Use an mmap for the object by binding to GTT. */
+#define I915_MMAP_OFFSET_GTT	0
+/** Use Write-Combined caching. */
+#define I915_MMAP_OFFSET_WC	1
+/** Use Write-Back caching. */
+#define I915_MMAP_OFFSET_WB	2
+/** Do not use caching when binding this mmap. */
+#define I915_MMAP_OFFSET_UC	3
+/** Use the TTM binding, which determines the appropriate caching mode. */
+#define I915_MMAP_OFFSET_TTM	4
+
+	/**
+	 * @extensions: Zero-terminated chain of extensions.
 	 *
 	 * No current extensions defined; mbz.
 	 */
