@@ -134,7 +134,9 @@ _ASM_NOKPROBE_SYMBOL(\name\()_virt)
 .macro prepare_transfer_to_handler
 #ifdef CONFIG_PPC_BOOK3S_32
 	andi.	r12,r9,MSR_PR
+#ifndef CONFIG_PPC_KUEP
 	bne	777f
+#endif
 	bl	prepare_transfer_to_handler
 777:
 #endif
