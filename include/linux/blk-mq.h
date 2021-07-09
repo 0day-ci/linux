@@ -192,7 +192,8 @@ struct blk_mq_hw_ctx {
 struct blk_mq_queue_map {
 	unsigned int *mq_map;
 	unsigned int nr_queues;
-	unsigned int queue_offset;
+	unsigned int queue_offset:31;
+	unsigned int use_managed_irq:1;
 };
 
 /**
@@ -556,7 +557,7 @@ typedef const struct cpumask * (get_queue_affinty_fn)(void *dev_data,
 int blk_mq_map_queues(struct blk_mq_queue_map *qmap);
 int blk_mq_dev_map_queues(struct blk_mq_queue_map *qmap, void *dev_data,
 		int dev_off, get_queue_affinty_fn *get_queue_affinity,
-		bool fallback);
+		bool fallback, bool managed_irq);
 void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues);
 
 void blk_mq_quiesce_queue_nowait(struct request_queue *q);

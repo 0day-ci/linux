@@ -103,6 +103,8 @@ int blk_mq_hw_queue_to_node(struct blk_mq_queue_map *qmap, unsigned int index)
  * @dev_data:	Device data passed to get_queue_affinity()
  * @fallback:	If true, fallback to default blk-mq mapping in case of
  * any failure
+ * @managed_irq: If driver is likely to use managed irq, pass @managed_irq
+ * as true.
  *
  * Generic function to setup each queue mapping in @qmap. It will query
  * each queue's affinity via @get_queue_affinity and built queue mapping
@@ -113,7 +115,7 @@ int blk_mq_hw_queue_to_node(struct blk_mq_queue_map *qmap, unsigned int index)
  */
 int blk_mq_dev_map_queues(struct blk_mq_queue_map *qmap, void *dev_data,
 		int dev_off, get_queue_affinty_fn *get_queue_affinity,
-		bool fallback)
+		bool fallback, bool managed_irq)
 {
 	const struct cpumask *mask;
 	unsigned int queue, cpu;
@@ -135,6 +137,8 @@ int blk_mq_dev_map_queues(struct blk_mq_queue_map *qmap, void *dev_data,
 		for_each_cpu(cpu, mask)
 			qmap->mq_map[cpu] = qmap->queue_offset + queue;
 	}
+
+	qmap->use_managed_irq = managed_irq;
 
 	return 0;
 
