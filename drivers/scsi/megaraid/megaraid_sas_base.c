@@ -47,6 +47,7 @@
 #include <scsi/scsi_dbg.h>
 #include "megaraid_sas_fusion.h"
 #include "megaraid_sas.h"
+#include "../scsi_priv.h"
 
 /*
  * Number of sectors per IO command
@@ -3185,7 +3186,8 @@ static int megasas_map_queues(struct Scsi_Host *shost)
 	map = &shost->tag_set.map[HCTX_TYPE_DEFAULT];
 	map->nr_queues = instance->msix_vectors - offset;
 	map->queue_offset = 0;
-	blk_mq_pci_map_queues(map, instance->pdev, offset);
+	blk_mq_dev_map_queues(map, instance->pdev, offset,
+			scsi_pci_get_queue_affinity, false, true);
 	qoff += map->nr_queues;
 	offset += map->nr_queues;
 

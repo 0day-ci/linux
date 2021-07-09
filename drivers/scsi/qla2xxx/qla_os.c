@@ -21,6 +21,7 @@
 #include <scsi/scsi_transport_fc.h>
 
 #include "qla_target.h"
+#include "../scsi_priv.h"
 
 /*
  * Driver version
@@ -7696,7 +7697,8 @@ static int qla2xxx_map_queues(struct Scsi_Host *shost)
 	if (USER_CTRL_IRQ(vha->hw) || !vha->hw->mqiobase)
 		rc = blk_mq_map_queues(qmap);
 	else
-		rc = blk_mq_pci_map_queues(qmap, vha->hw->pdev, vha->irq_offset);
+		rc = blk_mq_dev_map_queues(qmap, vha->hw->pdev, vha->irq_offset,
+				scsi_pci_get_queue_affinity, false, true);
 	return rc;
 }
 

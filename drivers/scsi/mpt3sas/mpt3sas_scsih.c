@@ -57,6 +57,7 @@
 #include <linux/blk-mq-pci.h>
 #include <asm/unaligned.h>
 
+#include "../scsi_priv.h"
 #include "mpt3sas_base.h"
 
 #define RAID_CHANNEL 1
@@ -11784,8 +11785,9 @@ static int scsih_map_queues(struct Scsi_Host *shost)
 	if (ioc->shost->nr_hw_queues == 1)
 		return 0;
 
-	return blk_mq_pci_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
-	    ioc->pdev, ioc->high_iops_queues);
+	return blk_mq_dev_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
+	    ioc->pdev, ioc->high_iops_queues, scsi_pci_get_queue_affinity,
+	    false, true);
 }
 
 /* shost template for SAS 2.0 HBA devices */

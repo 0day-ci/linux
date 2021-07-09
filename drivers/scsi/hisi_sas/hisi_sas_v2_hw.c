@@ -3547,6 +3547,14 @@ static struct device_attribute *host_attrs_v2_hw[] = {
 	NULL
 };
 
+static inline const struct cpumask *hisi_hba_get_queue_affinity(
+		void *dev_data, int offset, int idx)
+{
+	struct hisi_hba *hba = dev_data;
+
+	return irq_get_affinity_mask(hba->irq_map[offset + idx]);
+}
+
 static int map_queues_v2_hw(struct Scsi_Host *shost)
 {
 	struct hisi_hba *hisi_hba = shost_priv(shost);
@@ -3554,17 +3562,8 @@ static int map_queues_v2_hw(struct Scsi_Host *shost)
 	const struct cpumask *mask;
 	unsigned int queue, cpu;
 
-	for (queue = 0; queue < qmap->nr_queues; queue++) {
-		mask = irq_get_affinity_mask(hisi_hba->irq_map[96 + queue]);
-		if (!mask)
-			continue;
-
-		for_each_cpu(cpu, mask)
-			qmap->mq_map[cpu] = qmap->queue_offset + queue;
-	}
-
-	return 0;
-
+	return blk_mq_dev_map_queues(qmap, hisi_hba, 96,
+			hisi_hba_get_queue_affinity, false, true);
 }
 
 static struct scsi_host_template sht_v2_hw = {

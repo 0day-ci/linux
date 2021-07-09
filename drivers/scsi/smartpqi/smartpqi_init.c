@@ -26,6 +26,7 @@
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_transport_sas.h>
 #include <asm/unaligned.h>
+#include "../scsi_priv.h"
 #include "smartpqi.h"
 #include "smartpqi_sis.h"
 
@@ -6104,8 +6105,10 @@ static int pqi_map_queues(struct Scsi_Host *shost)
 {
 	struct pqi_ctrl_info *ctrl_info = shost_to_hba(shost);
 
-	return blk_mq_pci_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
-					ctrl_info->pci_dev, 0);
+	return blk_mq_dev_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
+					ctrl_info->pci_dev, 0,
+					scsi_pci_get_queue_affinity, false,
+					true);
 }
 
 static int pqi_slave_configure(struct scsi_device *sdev)

@@ -6,6 +6,7 @@
 #include <linux/async.h>
 #include <scsi/scsi_device.h>
 #include <linux/sbitmap.h>
+#include <linux/pci.h>
 
 struct request_queue;
 struct request;
@@ -189,5 +190,13 @@ extern int scsi_device_max_queue_depth(struct scsi_device *sdev);
  */
 
 #define SCSI_DEVICE_BLOCK_MAX_TIMEOUT	600	/* units in seconds */
+
+static inline const struct cpumask *scsi_pci_get_queue_affinity(
+		void *dev_data, int offset, int queue)
+{
+	struct pci_dev *pdev = dev_data;
+
+	return pci_irq_get_affinity(pdev, offset + queue);
+}
 
 #endif /* _SCSI_PRIV_H */

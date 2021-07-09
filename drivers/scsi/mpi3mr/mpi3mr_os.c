@@ -2787,17 +2787,18 @@ static int mpi3mr_bios_param(struct scsi_device *sdev,
  * mpi3mr_map_queues - Map queues callback handler
  * @shost: SCSI host reference
  *
- * Call the blk_mq_pci_map_queues with from which operational
+ * Call the blk_mq_dev_map_queues with from which operational
  * queue the mapping has to be done
  *
- * Return: return of blk_mq_pci_map_queues
+ * Return: return of blk_mq_dev_map_queues
  */
 static int mpi3mr_map_queues(struct Scsi_Host *shost)
 {
 	struct mpi3mr_ioc *mrioc = shost_priv(shost);
 
-	return blk_mq_pci_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
-	    mrioc->pdev, mrioc->op_reply_q_offset);
+	return blk_mq_dev_map_queues(&shost->tag_set.map[HCTX_TYPE_DEFAULT],
+	    mrioc->pdev, mrioc->op_reply_q_offset,
+	    scsi_pci_get_queue_affinity, false, true);
 }
 
 /**
