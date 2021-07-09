@@ -27,6 +27,11 @@
 #include <linux/bpf_trace.h>
 #include <linux/net_tstamp.h>
 
+static int queues_nr	= 1;
+
+module_param(queues_nr, int, 0644);
+MODULE_PARM_DESC(queues_nr, "Max number of RX and TX queues (default = 1)");
+
 #define DRV_NAME	"veth"
 #define DRV_VERSION	"1.0"
 
@@ -1662,6 +1667,18 @@ static struct net *veth_get_link_net(const struct net_device *dev)
 	return peer ? dev_net(peer) : dev_net(dev);
 }
 
+unsigned int veth_get_num_tx_queues(void)
+{
+	/* enforce the same queue limit as rtnl_create_link */
+	int queues = queues_nr;
+
+	if (queues < 1)
+		queues = 1;
+	if (queues > 4096)
+		queues = 4096;
+	return queues;
+}
+
 static struct rtnl_link_ops veth_link_ops = {
 	.kind		= DRV_NAME,
 	.priv_size	= sizeof(struct veth_priv),
@@ -1672,6 +1689,10 @@ static struct rtnl_link_ops veth_link_ops = {
 	.policy		= veth_policy,
 	.maxtype	= VETH_INFO_MAX,
 	.get_link_net	= veth_get_link_net,
+	.get_num_tx_queues	= veth_get_num_tx_queues,
+	.get_num_rx_queues	= veth_get_num_tx_queues, /* Use the same number
+							   * as for TX queues
+							   */
 };
 
 /*
