@@ -94,3 +94,56 @@ int blk_mq_hw_queue_to_node(struct blk_mq_queue_map *qmap, unsigned int index)
 
 	return NUMA_NO_NODE;
 }
+
+/**
+ * blk_mq_dev_map_queues - provide generic queue mapping
+ * @qmap:	CPU to hardware queue map.
+ * @dev_off:	Offset to use for the device
+ * @get_queue_affinity:	Callback to retrieve queue affinity
+ * @dev_data:	Device data passed to get_queue_affinity()
+ * @fallback:	If true, fallback to default blk-mq mapping in case of
+ * any failure
+ *
+ * Generic function to setup each queue mapping in @qmap. It will query
+ * each queue's affinity via @get_queue_affinity and built queue mapping
+ * that maps a queue to the CPUs in the queue affinity.
+ *
+ * Driver has to set correct @dev_data, so that the driver callback
+ * of @get_queue_affinity can work correctly.
+ */
+int blk_mq_dev_map_queues(struct blk_mq_queue_map *qmap, void *dev_data,
+		int dev_off, get_queue_affinty_fn *get_queue_affinity,
+		bool fallback)
+{
+	const struct cpumask *mask;
+	unsigned int queue, cpu;
+
+	/*
+	 * fallback to default mapping if driver doesn't provide
+	 * get_queue_affinity callback
+	 */
+	if (!get_queue_affinity) {
+		fallback = true;
+		goto fallback;
+	}
+
+	for (queue = 0; queue < qmap->nr_queues; queue++) {
+		mask = get_queue_affinity(dev_data, dev_off, queue);
+		if (!mask)
+			goto fallback;
+
+		for_each_cpu(cpu, mask)
+			qmap->mq_map[cpu] = qmap->queue_offset + queue;
+	}
+
+	return 0;
+
+fallback:
+	if (!fallback) {
+		WARN_ON_ONCE(qmap->nr_queues > 1);
+		blk_mq_clear_mq_map(qmap);
+		return 0;
+	}
+	return blk_mq_map_queues(qmap);
+}
+EXPORT_SYMBOL_GPL(blk_mq_dev_map_queues);
