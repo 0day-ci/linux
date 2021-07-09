@@ -278,25 +278,21 @@ int ip6_xmit(const struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
 	struct ipv6hdr *hdr;
 	u8  proto = fl6->flowi6_proto;
 	int seg_len = skb->len;
-	int hlimit = -1;
+	int delta, hlimit = -1;
 	u32 mtu;
 
 	head_room = sizeof(struct ipv6hdr) + LL_RESERVED_SPACE(dst->dev);
 	if (opt)
 		head_room += opt->opt_nflen + opt->opt_flen;
 
-	if (unlikely(skb_headroom(skb) < head_room)) {
-		struct sk_buff *skb2 = skb_realloc_headroom(skb, head_room);
-		if (!skb2) {
-			IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
+	delta = head_room - skb_headroom(skb);
+	if (unlikely(delta > 0)) {
+		skb = skb_expand_head(skb, delta);
+		if (!skb) {
+			IP6_INC_STATS(net, ip6_dst_idev(dst),
 				      IPSTATS_MIB_OUTDISCARDS);
-			kfree_skb(skb);
 			return -ENOBUFS;
 		}
-		if (skb->sk)
-			skb_set_owner_w(skb2, skb->sk);
-		consume_skb(skb);
-		skb = skb2;
 	}
 
 	if (opt) {
