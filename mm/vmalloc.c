@@ -2794,17 +2794,23 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	}
 
 	area->pages = pages;
-	area->nr_pages = nr_small_pages;
+	area->nr_pages = 0;
 	set_vm_area_page_order(area, page_shift - PAGE_SHIFT);
 
 	page_order = vm_area_page_order(area);
-
+	/* first try alloc in alloc bulk when order is 0*/
+	if (!page_order) {
+		area->nr_pages = alloc_pages_bulk_array(
+			gfp_mask, nr_small_pages, area->pages);
+		if (likely(area->nr_pages == nr_small_pages))
+			goto success;
+	}
 	/*
 	 * Careful, we allocate and map page_order pages, but tracking is done
 	 * per PAGE_SIZE page so as to keep the vm_struct APIs independent of
 	 * the physical/mapped size.
 	 */
-	for (i = 0; i < area->nr_pages; i += 1U << page_order) {
+	for (i = area->nr_pages; i < nr_small_pages; i += 1U << page_order) {
 		struct page *page;
 		int p;
 
@@ -2827,6 +2833,8 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		if (gfpflags_allow_blocking(gfp_mask))
 			cond_resched();
 	}
+	area->nr_pages = nr_small_pages;
+success:
 	atomic_long_add(area->nr_pages, &nr_vmalloc_pages);
 
 	if (vmap_pages_range(addr, addr + size, prot, pages, page_shift) < 0) {
