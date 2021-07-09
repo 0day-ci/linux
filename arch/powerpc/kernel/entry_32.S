@@ -52,6 +52,16 @@
 #if defined(CONFIG_PPC_BOOK3S_32) || defined(CONFIG_E500)
 	.globl	prepare_transfer_to_handler
 prepare_transfer_to_handler:
+#ifdef CONFIG_PPC_KUEP
+	beq	1f
+
+	mfsr    r4,0
+	rlwinm  r4,r4,0,8,3
+	oris    r4,r4,SR_NX@h
+	update_user_segments_by_6 r4, r5, r6, r7, r8, r9
+	blr
+1:
+#endif
 	/* if from kernel, check interrupted DOZE/NAP mode */
 	lwz	r12,TI_LOCAL_FLAGS(r2)
 	mtcrf	0x01,r12
@@ -93,6 +103,12 @@ transfer_to_syscall:
 	SAVE_4GPRS(3, r1)
 	SAVE_2GPRS(7, r1)
 	addi	r2,r10,-THREAD
+#if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
+	mfsr    r9,0
+	rlwinm  r9,r9,0,8,3
+	oris    r9,r9,SR_NX@h
+	update_user_segments_by_4 r9, r10, r11, r12
+#endif
 	SAVE_NVGPRS(r1)
 
 	/* Calling convention has r9 = orig r0, r10 = regs */
@@ -110,6 +126,11 @@ ret_from_syscall:
 	cmplwi	cr0,r5,0
 	bne-	2f
 #endif /* CONFIG_PPC_47x */
+#if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
+	mfsr    r7,0
+	rlwinm  r7,r7,0,8,2
+	update_user_segments_by_6 r7, r8, r9, r10, r11, r12
+#endif
 	lwz	r4,_LINK(r1)
 	lwz	r5,_CCR(r1)
 	mtlr	r4
@@ -273,6 +294,11 @@ interrupt_return:
 	beq	.Lkernel_interrupt_return
 	bl	interrupt_exit_user_prepare
 	cmpwi	r3,0
+#if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
+	mfsr    r7,0
+	rlwinm  r7,r7,0,8,2
+	update_user_segments_by_6 r7, r8, r9, r10, r11, r12
+#endif
 	bne-	.Lrestore_nvgprs
 
 .Lfast_user_interrupt_return:

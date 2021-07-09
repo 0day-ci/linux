@@ -64,7 +64,103 @@ struct ppc_bat {
 #define SR_KP	0x20000000	/* User key */
 #define SR_KS	0x40000000	/* Supervisor key */
 
-#ifndef __ASSEMBLY__
+#ifdef __ASSEMBLY__
+
+#include <asm/asm-offsets.h>
+
+.macro uus_addi sr reg1 reg2 imm
+	.if NUM_USER_SEGMENTS > \sr
+	addi	\reg1,\reg2,\imm
+	.endif
+.endm
+
+.macro uus_mtsr sr reg1
+	.if NUM_USER_SEGMENTS > \sr
+	mtsr	\sr, \reg1
+	.endif
+.endm
+
+.macro update_user_segments_by_4 tmp1 tmp2 tmp3 tmp4
+	uus_addi	1, \tmp2, \tmp1, 0x111
+	uus_addi	2, \tmp3, \tmp1, 0x222
+	uus_addi	3, \tmp4, \tmp1, 0x333
+
+	uus_mtsr	0, \tmp1
+	uus_mtsr	1, \tmp2
+	uus_mtsr	2, \tmp3
+	uus_mtsr	3, \tmp4
+
+	uus_addi	4, \tmp1, \tmp1, 0x444
+	uus_addi	5, \tmp2, \tmp2, 0x444
+	uus_addi	6, \tmp3, \tmp3, 0x444
+	uus_addi	7, \tmp4, \tmp4, 0x444
+
+	uus_mtsr	4, \tmp1
+	uus_mtsr	5, \tmp2
+	uus_mtsr	6, \tmp3
+	uus_mtsr	7, \tmp4
+
+	uus_addi	8, \tmp1, \tmp1, 0x444
+	uus_addi	9, \tmp2, \tmp2, 0x444
+	uus_addi	10, \tmp3, \tmp3, 0x444
+	uus_addi	11, \tmp4, \tmp4, 0x444
+
+	uus_mtsr	8, \tmp1
+	uus_mtsr	9, \tmp2
+	uus_mtsr	10, \tmp3
+	uus_mtsr	11, \tmp4
+
+	uus_addi	12, \tmp1, \tmp1, 0x444
+	uus_addi	13, \tmp2, \tmp2, 0x444
+	uus_addi	14, \tmp3, \tmp3, 0x444
+	uus_addi	15, \tmp4, \tmp4, 0x444
+
+	uus_mtsr	12, \tmp1
+	uus_mtsr	13, \tmp2
+	uus_mtsr	14, \tmp3
+	uus_mtsr	15, \tmp4
+.endm
+
+.macro update_user_segments_by_6 tmp1 tmp2 tmp3 tmp4 tmp5 tmp6
+	uus_addi	1, \tmp2, \tmp1, 0x111
+	uus_addi	2, \tmp3, \tmp1, 0x222
+	uus_addi	3, \tmp4, \tmp1, 0x333
+	uus_addi	4, \tmp5, \tmp1, 0x444
+	uus_addi	5, \tmp6, \tmp1, 0x555
+
+	uus_mtsr	0, \tmp1
+	uus_mtsr	1, \tmp2
+	uus_mtsr	2, \tmp3
+	uus_mtsr	3, \tmp4
+	uus_mtsr	4, \tmp5
+	uus_mtsr	5, \tmp6
+
+	uus_addi	6, \tmp1, \tmp1, 0x666
+	uus_addi	7, \tmp2, \tmp2, 0x666
+	uus_addi	8, \tmp3, \tmp3, 0x666
+	uus_addi	9, \tmp4, \tmp4, 0x666
+	uus_addi	10, \tmp5, \tmp5, 0x666
+	uus_addi	11, \tmp6, \tmp6, 0x666
+
+	uus_mtsr	6, \tmp1
+	uus_mtsr	7, \tmp2
+	uus_mtsr	8, \tmp3
+	uus_mtsr	9, \tmp4
+	uus_mtsr	10, \tmp5
+	uus_mtsr	11, \tmp6
+
+	uus_addi	12, \tmp1, \tmp1, 0x666
+	uus_addi	13, \tmp2, \tmp2, 0x666
+	uus_addi	14, \tmp3, \tmp3, 0x666
+	uus_addi	15, \tmp4, \tmp4, 0x666
+
+	uus_mtsr	12, \tmp1
+	uus_mtsr	13, \tmp2
+	uus_mtsr	14, \tmp3
+	uus_mtsr	15, \tmp4
+.endm
+
+#else
 
 /*
  * This macro defines the mapping from contexts to VSIDs (virtual
