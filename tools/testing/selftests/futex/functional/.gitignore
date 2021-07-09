@@ -10,3 +10,4 @@ futex_wait
 futex_requeue
 futex2_wait
 futex2_waitv
+futex2_requeue

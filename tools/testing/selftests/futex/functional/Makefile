@@ -20,7 +20,8 @@ TEST_GEN_FILES := \
 	futex_wait \
 	futex_requeue \
 	futex2_wait \
-	futex2_waitv
+	futex2_waitv \
+	futex2_requeue
 
 TEST_PROGS := run.sh
 
