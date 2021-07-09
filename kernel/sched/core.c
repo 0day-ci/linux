@@ -8152,10 +8152,12 @@ void sched_show_task(struct task_struct *p)
 	if (pid_alive(p))
 		ppid = task_pid_nr(rcu_dereference(p->real_parent));
 	rcu_read_unlock();
-	pr_cont(" stack:%5lu pid:%5d ppid:%6d flags:0x%08lx\n",
+	pr_cont(" stack:%5lu pid:%5d ppid:%6d flags:0x%08lx",
 		free, task_pid_nr(p), ppid,
 		(unsigned long)task_thread_info(p)->flags);
-
+#ifdef CONFIG_SCHED_INFO
+	pr_cont(" sched:%llu\n", p->sched_info.last_arrival);
+#endif
 	print_worker_info(KERN_INFO, p);
 	print_stop_info(KERN_INFO, p);
 	show_stack(p, NULL, KERN_INFO);
