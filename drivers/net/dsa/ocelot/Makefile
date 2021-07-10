@@ -8,4 +8,5 @@ mscc_felix-objs := \
 
 mscc_seville-objs := \
 	felix.o \
+	felix_mdio.o \
 	seville_vsc9953.o
