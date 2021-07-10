@@ -370,6 +370,20 @@ done:
 	return ret;
 }
 
+void intel_guc_pm_intrmsk_enable(struct intel_gt *gt)
+{
+	u32 pm_intrmsk_mbz = 0;
+
+	/* Allow GuC to receive ARAT timer expiry event.
+	 * This interrupt register is setup by RPS code
+	 * when host based Turbo is enabled.
+	 */
+	pm_intrmsk_mbz |= ARAT_EXPIRED_INTRMSK;
+
+	intel_uncore_rmw(gt->uncore,
+			   GEN6_PMINTRMSK, pm_intrmsk_mbz, 0);
+}
+
 /*
  * intel_guc_slpc_enable() - Start SLPC
  * @slpc: pointer to intel_guc_slpc.
@@ -416,6 +430,8 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	}
 
 	DRM_INFO("SLPC state: %s\n", get_slpc_state(slpc));
+
+	intel_guc_pm_intrmsk_enable(&i915->gt);
 
 	if (slpc_read_task_state(slpc))
 		drm_err(&i915->drm, "Unable to read task state data");

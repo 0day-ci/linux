@@ -10,6 +10,7 @@
 #include <linux/mutex.h>
 #include "intel_guc_slpc_fwif.h"
 
+struct intel_gt;
 struct drm_printer;
 
 struct intel_guc_slpc {
@@ -41,5 +42,6 @@ int intel_guc_slpc_set_min_freq(struct intel_guc_slpc *slpc, u32 val);
 int intel_guc_slpc_get_max_freq(struct intel_guc_slpc *slpc, u32 *val);
 int intel_guc_slpc_get_min_freq(struct intel_guc_slpc *slpc, u32 *val);
 int intel_guc_slpc_info(struct intel_guc_slpc *slpc, struct drm_printer *p);
+void intel_guc_pm_intrmsk_enable(struct intel_gt *gt);
 
 #endif
