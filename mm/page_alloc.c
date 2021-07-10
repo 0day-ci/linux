@@ -5315,6 +5315,8 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 		else
 			page_array[nr_populated] = page;
 		nr_populated++;
+
+		touch_nmi_watchdog();
 	}
 
 	local_unlock_irqrestore(&pagesets.lock, flags);
