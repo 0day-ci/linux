@@ -738,7 +738,23 @@ static void tmc_etr_sync_sg_buf(struct etr_buf *etr_buf, u64 rrp, u64 rwp)
 	else
 		etr_buf->len = ((w_offset < r_offset) ? etr_buf->size : 0) +
 				w_offset - r_offset;
-	tmc_sg_table_sync_data_range(table, r_offset, etr_buf->len);
+
+	if (r_offset + etr_buf->len > etr_buf->size) {
+		int len1, len2;
+
+		/*
+		 * If trace data is wrapped around, sync AUX bounce buffer
+		 * for two chunks: "len1" is for the trace date length at
+		 * the tail of bounce buffer, and "len2" is the length from
+		 * the start of the buffer after wrapping around.
+		 */
+		len1 = etr_buf->size - r_offset;
+		len2 = etr_buf->len - len1;
+		tmc_sg_table_sync_data_range(table, r_offset, len1);
+		tmc_sg_table_sync_data_range(table, 0, len2);
+	} else {
+		tmc_sg_table_sync_data_range(table, r_offset, etr_buf->len);
+	}
 }
 
 static const struct etr_buf_operations etr_sg_buf_ops = {
