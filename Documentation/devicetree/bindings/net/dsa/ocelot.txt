@@ -8,6 +8,7 @@ Currently the switches supported by the felix driver are:
 
 - VSC9959 (Felix)
 - VSC9953 (Seville)
+- VSC7511, VSC7512, VSC7513, VSC7514 via SPI
 
 The VSC9959 switch is found in the NXP LS1028A. It is a PCI device, part of the
 larger ENETC root complex. As a result, the ethernet-switch node is a sub-node
@@ -207,6 +208,73 @@ Example:
 					speed = <2500>;
 					full-duplex;
 				};
+			};
+		};
+	};
+};
+
+The VSC7513 and VSC7514 switches can be controlled internally via the MIPS
+processor. The VSC7511 and VSC7512 don't have this internal processor, but all
+four chips can be controlled externally through SPI with the following required
+properties:
+
+- compatible:
+	Can be "mscc,vsc7511", "mscc,vsc7512", "mscc,vsc7513", or
+	"mscc,vsc7514".
+
+Supported phy modes for all chips are:
+
+* phy_mode = "internal": on ports 0, 1, 2, 3
+
+Additionally, the VSC7512 and VSC7514 support SGMII and QSGMII on various ports,
+though that is currently untested.
+
+Example for control from a BeagleBone Black
+
+&spi0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	vsc7512: vsc7512@0 {
+		compatible = "mscc,vsc7512";
+		spi-max-frequency = <250000>;
+		reg = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				ethernet = <&mac>;
+				phy-mode = "internal";
+
+				fixed-link {
+					speed = <100>;
+					full-duplex;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				label = "swp1";
+				status = "okay";
+				phy-mode = "internal";
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "swp2";
+				status = "okay";
+				phy-mode = "internal";
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "swp3";
+				status = "okay";
+				phy-mode = "internal";
 			};
 		};
 	};
