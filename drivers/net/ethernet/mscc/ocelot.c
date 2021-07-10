@@ -2016,6 +2016,14 @@ int ocelot_init(struct ocelot *ocelot)
 	int i, ret;
 	u32 port;
 
+	if (ocelot->ops->bus_init) {
+		ret = ocelot->ops->bus_init(ocelot);
+		if (ret) {
+			dev_err(ocelot->dev, "Bus init failed\n");
+			return ret;
+		}
+	}
+
 	if (ocelot->ops->reset) {
 		ret = ocelot->ops->reset(ocelot);
 		if (ret) {

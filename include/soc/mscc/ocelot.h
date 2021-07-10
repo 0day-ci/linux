@@ -129,6 +129,7 @@ enum ocelot_target {
 	PTP,
 	GCB,
 	DEV_GMII,
+	DEV_CPUORG,
 	TARGET_MAX,
 };
 
@@ -407,6 +408,8 @@ enum ocelot_reg {
 	GCB_MIIM_MII_STATUS,
 	GCB_MIIM_MII_CMD,
 	GCB_MIIM_MII_DATA,
+	GCB_PHY_PHY_CFG,
+	GCB_PHY_PHY_STAT,
 	DEV_CLOCK_CFG = DEV_GMII << TARGET_OFFSET,
 	DEV_PORT_MISC,
 	DEV_EVENTS,
@@ -446,6 +449,20 @@ enum ocelot_reg {
 	PCS1G_TSTPAT_STATUS,
 	DEV_PCS_FX100_CFG,
 	DEV_PCS_FX100_STATUS,
+	DEV_CPUORG_IF_CTRL = DEV_CPUORG << TARGET_OFFSET,
+	DEV_CPUORG_IF_CFGSTAT,
+	DEV_CPUORG_ORG_CFG,
+	DEV_CPUORG_ERR_CNTS,
+	DEV_CPUORG_TIMEOUT_CFG,
+	DEV_CPUORG_GPR,
+	DEV_CPUORG_MAILBOX_SET,
+	DEV_CPUORG_MAILBOX_CLR,
+	DEV_CPUORG_MAILBOX,
+	DEV_CPUORG_SEMA_CFG,
+	DEV_CPUORG_SEMA0,
+	DEV_CPUORG_SEMA0_OWNER,
+	DEV_CPUORG_SEMA1,
+	DEV_CPUORG_SEMA1_OWNER,
 };
 
 enum ocelot_regfield {
@@ -504,6 +521,7 @@ enum ocelot_regfield {
 	SYS_RESET_CFG_MEM_ENA,
 	SYS_RESET_CFG_MEM_INIT,
 	GCB_SOFT_RST_SWC_RST,
+	GCB_SOFT_RST_CHIP_RST,
 	GCB_MIIM_MII_STATUS_PENDING,
 	GCB_MIIM_MII_STATUS_BUSY,
 	SYS_PAUSE_CFG_PAUSE_START,
@@ -560,6 +578,7 @@ struct ocelot;
 struct ocelot_ops {
 	struct net_device *(*port_to_netdev)(struct ocelot *ocelot, int port);
 	int (*netdev_to_port)(struct net_device *dev);
+	int (*bus_init)(struct ocelot *ocelot);
 	int (*reset)(struct ocelot *ocelot);
 	u16 (*wm_enc)(u16 value);
 	u16 (*wm_dec)(u16 value);
