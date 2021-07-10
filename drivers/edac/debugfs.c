@@ -61,7 +61,7 @@ void edac_create_debugfs_nodes(struct mem_ctl_info *mci)
 	parent = debugfs_create_dir(mci->dev.kobj.name, edac_debugfs);
 
 	for (i = 0; i < mci->n_layers; i++) {
-		sprintf(name, "fake_inject_%s",
+		scnprintf(name, sizeof(name), "fake_inject_%s",
 			     edac_layer_name[mci->layers[i].type]);
 		debugfs_create_u8(name, S_IRUGO | S_IWUSR, parent,
 				  &mci->fake_inject_layer[i]);
