@@ -106,6 +106,19 @@ static int slpc_send(struct intel_guc_slpc *slpc,
 	return intel_guc_send(guc, action, in_len);
 }
 
+static int host2guc_slpc_set_param(struct intel_guc_slpc *slpc,
+				   u32 id, u32 value)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_SET, 2);
+	data.args[0] = id;
+	data.args[1] = value;
+
+	return slpc_send(slpc, &data, 4);
+}
+
+
 static bool slpc_running(struct intel_guc_slpc *slpc)
 {
 	struct slpc_shared_data *data;
@@ -132,6 +145,19 @@ static int host2guc_slpc_query_task_state(struct intel_guc_slpc *slpc)
 	data.args[1] = 0;
 
 	return slpc_send(slpc, &data, 4);
+}
+
+static int slpc_set_param(struct intel_guc_slpc *slpc, u32 id, u32 value)
+{
+	struct drm_i915_private *i915 = slpc_to_i915(slpc);
+	GEM_BUG_ON(id >= SLPC_MAX_PARAM);
+
+	if (host2guc_slpc_set_param(slpc, id, value)) {
+		drm_err(&i915->drm, "Unable to set param %x", id);
+		return -EIO;
+	}
+
+	return 0;
 }
 
 static int slpc_read_task_state(struct intel_guc_slpc *slpc)
@@ -216,6 +242,74 @@ int intel_guc_slpc_init(struct intel_guc_slpc *slpc)
 	GEM_BUG_ON(slpc->vma);
 
 	return slpc_shared_data_init(slpc);
+}
+
+/**
+ * intel_guc_slpc_max_freq_set() - Set max frequency limit for SLPC.
+ * @slpc: pointer to intel_guc_slpc.
+ * @val: encoded frequency
+ *
+ * This function will invoke GuC SLPC action to update the max frequency
+ * limit for slice and unslice.
+ *
+ * Return: 0 on success, non-zero error code on failure.
+ */
+int intel_guc_slpc_set_max_freq(struct intel_guc_slpc *slpc, u32 val)
+{
+	int ret;
+	struct drm_i915_private *i915 = slpc_to_i915(slpc);
+	intel_wakeref_t wakeref;
+
+	wakeref = intel_runtime_pm_get(&i915->runtime_pm);
+
+	ret = slpc_set_param(slpc,
+		       SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+		       val);
+
+	if (ret) {
+		drm_err(&i915->drm,
+			"Set max frequency unslice returned %d", ret);
+		ret = -EIO;
+		goto done;
+	}
+
+done:
+	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
+	return ret;
+}
+
+/**
+ * intel_guc_slpc_min_freq_set() - Set min frequency limit for SLPC.
+ * @slpc: pointer to intel_guc_slpc.
+ * @val: encoded frequency
+ *
+ * This function will invoke GuC SLPC action to update the min frequency
+ * limit.
+ *
+ * Return: 0 on success, non-zero error code on failure.
+ */
+int intel_guc_slpc_set_min_freq(struct intel_guc_slpc *slpc, u32 val)
+{
+	int ret;
+	struct intel_guc *guc = slpc_to_guc(slpc);
+	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
+	intel_wakeref_t wakeref;
+
+	wakeref = intel_runtime_pm_get(&i915->runtime_pm);
+
+	ret = slpc_set_param(slpc,
+		       SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+		       val);
+	if (ret) {
+		drm_err(&i915->drm,
+			"Set min frequency for unslice returned %d", ret);
+		ret = -EIO;
+		goto done;
+	}
+
+done:
+	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
+	return ret;
 }
 
 /*
