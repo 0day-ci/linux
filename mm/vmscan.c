@@ -1891,7 +1891,6 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 		 */
 		scan += nr_pages;
 		if (!__isolate_lru_page_prepare(page, mode)) {
-			/* It is being freed elsewhere */
 			list_move(&page->lru, src);
 			continue;
 		}
@@ -1901,6 +1900,7 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 		 * page release code relies on it.
 		 */
 		if (unlikely(!get_page_unless_zero(page))) {
+			/* It is being freed elsewhere. */
 			list_move(&page->lru, src);
 			continue;
 		}
