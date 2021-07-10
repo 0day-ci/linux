@@ -224,6 +224,34 @@ static inline bool arch_irqs_disabled(void)
 	return arch_irqs_disabled_flags(arch_local_save_flags());
 }
 
+static inline void set_pmi_irq_pending(void)
+{
+	/*
+	 * Invoked currently from PMU callback functions
+	 * to set PMI bit in Paca. This has to be called
+	 * with irq's disabled ( via hard_irq_disable ).
+	 */
+	if (IS_ENABLED(CONFIG_PPC_IRQ_SOFT_MASK_DEBUG))
+		WARN_ON_ONCE(mfmsr() & MSR_EE);
+	get_paca()->irq_happened |= PACA_IRQ_PMI;
+}
+
+static inline void clear_pmi_irq_pending(void)
+{
+	/*
+	 * Some corner cases could clear the PMU counter overflow
+	 * while a masked PMI is pending. One of such case is
+	 * when a PMI happens during interrupt replay and perf
+	 * counter values gets cleared by PMU callbacks before
+	 * replay. So the pending PMI must be cleared here.
+	 */
+	if (get_paca()->irq_happened & PACA_IRQ_PMI) {
+		if (IS_ENABLED(CONFIG_PPC_IRQ_SOFT_MASK_DEBUG))
+			WARN_ON_ONCE(mfmsr() & MSR_EE);
+		get_paca()->irq_happened &= ~PACA_IRQ_PMI;
+	}
+}
+
 #ifdef CONFIG_PPC_BOOK3S
 /*
  * To support disabling and enabling of irq with PMI, set of
@@ -407,6 +435,9 @@ static inline void do_hard_irq_enable(void)
 {
 	BUILD_BUG();
 }
+
+static inline void clear_pmi_irq_pending(void) { }
+static inline void set_pmi_irq_pending(void) { }
 
 static inline void irq_soft_mask_regs_set_state(struct pt_regs *regs, unsigned long val)
 {
