@@ -86,6 +86,9 @@ static int slpc_shared_data_init(struct intel_guc_slpc *slpc)
 		return err;
 	}
 
+	slpc->max_freq_softlimit = 0;
+	slpc->min_freq_softlimit = 0;
+
 	return err;
 }
 
@@ -384,6 +387,29 @@ void intel_guc_pm_intrmsk_enable(struct intel_gt *gt)
 			   GEN6_PMINTRMSK, pm_intrmsk_mbz, 0);
 }
 
+static int intel_guc_slpc_set_softlimits(struct intel_guc_slpc *slpc)
+{
+	int ret = 0;
+
+	/* Softlimits are initially equivalent to platform limits
+	 * unless they have deviated from defaults, in which case,
+	 * we retain the values and set min/max accordingly.
+	 */
+	if (!slpc->max_freq_softlimit)
+		slpc->max_freq_softlimit = slpc->rp0_freq;
+	else if (slpc->max_freq_softlimit != slpc->rp0_freq)
+		ret = intel_guc_slpc_set_max_freq(slpc,
+					slpc->max_freq_softlimit);
+
+	if (!slpc->min_freq_softlimit)
+		slpc->min_freq_softlimit = slpc->min_freq;
+	else if (slpc->min_freq_softlimit != slpc->min_freq)
+		ret = intel_guc_slpc_set_min_freq(slpc,
+					slpc->min_freq_softlimit);
+
+	return ret;
+}
+
 /*
  * intel_guc_slpc_enable() - Start SLPC
  * @slpc: pointer to intel_guc_slpc.
@@ -402,6 +428,7 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	struct drm_i915_private *i915 = slpc_to_i915(slpc);
 	struct slpc_shared_data *data;
 	int ret;
+	u32 rp_state_cap;
 
 	GEM_BUG_ON(!slpc->vma);
 
@@ -444,6 +471,20 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 				GT_FREQUENCY_MULTIPLIER, GEN9_FREQ_SCALER),
 			DIV_ROUND_CLOSEST(data->task_state_data.max_unslice_freq *
 				GT_FREQUENCY_MULTIPLIER, GEN9_FREQ_SCALER));
+
+	rp_state_cap = intel_uncore_read(i915->gt.uncore, GEN6_RP_STATE_CAP);
+
+	slpc->rp0_freq = ((rp_state_cap >> 0) & 0xff) * GT_FREQUENCY_MULTIPLIER;
+	slpc->min_freq = ((rp_state_cap >> 16) & 0xff) * GT_FREQUENCY_MULTIPLIER;
+	slpc->rp1_freq = ((rp_state_cap >> 8) & 0xff) * GT_FREQUENCY_MULTIPLIER;
+
+	if (intel_guc_slpc_set_softlimits(slpc))
+		drm_err(&i915->drm, "Unable to set softlimits");
+
+	drm_info(&i915->drm,
+		 "Platform fused frequency values -  min: %u Mhz, max: %u Mhz",
+		 slpc->min_freq,
+		 slpc->rp0_freq);
 
 	return 0;
 }
