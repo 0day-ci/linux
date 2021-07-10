@@ -109,6 +109,17 @@ static int slpc_send(struct intel_guc_slpc *slpc,
 	return intel_guc_send(guc, action, in_len);
 }
 
+static int host2guc_slpc_unset_param(struct intel_guc_slpc *slpc,
+				   u32 id)
+{
+	struct slpc_event_input data = {0};
+
+	data.header.value = SLPC_EVENT(SLPC_EVENT_PARAMETER_UNSET, 1);
+	data.args[0] = id;
+
+	return slpc_send(slpc, &data, 4);
+}
+
 static int host2guc_slpc_set_param(struct intel_guc_slpc *slpc,
 				   u32 id, u32 value)
 {
@@ -148,6 +159,20 @@ static int host2guc_slpc_query_task_state(struct intel_guc_slpc *slpc)
 	data.args[1] = 0;
 
 	return slpc_send(slpc, &data, 4);
+}
+
+static int slpc_unset_param(struct intel_guc_slpc *slpc, u32 id)
+{
+	struct drm_i915_private *i915 = slpc_to_i915(slpc);
+
+	GEM_BUG_ON(id >= SLPC_MAX_PARAM);
+
+	if (host2guc_slpc_unset_param(slpc, id)) {
+		drm_err(&i915->drm, "Unable to unset param %x", id);
+		return -EIO;
+	}
+
+	return 0;
 }
 
 static int slpc_set_param(struct intel_guc_slpc *slpc, u32 id, u32 value)
@@ -410,6 +435,32 @@ static int intel_guc_slpc_set_softlimits(struct intel_guc_slpc *slpc)
 	return ret;
 }
 
+static void intel_guc_slpc_ignore_eff_freq(struct intel_guc_slpc *slpc, bool ignore)
+{
+	if (ignore) {
+		/* A failure here does not affect the algorithm in a fatal way */
+		slpc_set_param(slpc,
+		   SLPC_IGNORE_EFFICIENT_FREQUENCY,
+		   ignore);
+		slpc_set_param(slpc,
+		   SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+		   slpc->min_freq);
+	} else {
+		slpc_unset_param(slpc,
+		   SLPC_IGNORE_EFFICIENT_FREQUENCY);
+		slpc_unset_param(slpc,
+		   SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ);
+	}
+}
+
+static void intel_guc_slpc_use_fused_rp0(struct intel_guc_slpc *slpc)
+{
+	/* Force slpc to used platform rp0 */
+	slpc_set_param(slpc,
+	   SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
+	   slpc->rp0_freq);
+}
+
 /*
  * intel_guc_slpc_enable() - Start SLPC
  * @slpc: pointer to intel_guc_slpc.
@@ -477,6 +528,10 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	slpc->rp0_freq = ((rp_state_cap >> 0) & 0xff) * GT_FREQUENCY_MULTIPLIER;
 	slpc->min_freq = ((rp_state_cap >> 16) & 0xff) * GT_FREQUENCY_MULTIPLIER;
 	slpc->rp1_freq = ((rp_state_cap >> 8) & 0xff) * GT_FREQUENCY_MULTIPLIER;
+
+	/* Ignore efficient freq and set min/max to platform min/max */
+	intel_guc_slpc_ignore_eff_freq(slpc, true);
+	intel_guc_slpc_use_fused_rp0(slpc);
 
 	if (intel_guc_slpc_set_softlimits(slpc))
 		drm_err(&i915->drm, "Unable to set softlimits");
