@@ -1676,15 +1676,25 @@ struct drm_i915_gem_context_param {
  */
 #define I915_CONTEXT_PARAM_RECOVERABLE	0x8
 
-	/*
-	 * The id of the associated virtual memory address space (ppGTT) of
-	 * this context. Can be retrieved and passed to another context
-	 * (on the same fd) for both to use the same ppGTT and so share
-	 * address layouts, and avoid reloading the page tables on context
-	 * switches between themselves.
-	 *
-	 * See DRM_I915_GEM_VM_CREATE and DRM_I915_GEM_VM_DESTROY.
-	 */
+/*
+ * The id of the associated virtual memory address space (ppGTT) of
+ * this context. Can be retrieved and passed to another context
+ * (on the same fd) for both to use the same ppGTT and so share
+ * address layouts, and avoid reloading the page tables on context
+ * switches between themselves.
+ *
+ * The VM id should only be set via I915_CONTEXT_CREATE_EXT_SETPARAM.
+ *
+ * On GPUs with graphics version 12 and earlier, it may also be set via
+ * DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM.  However, this is only for
+ * backwards compatibility with old userspace and should be considered
+ * deprecated.  Starting with graphics version 13, it can only be set via
+ * I915_CONTEXT_CREATE_EXT_SETPARAM.  When using setparam, it may only be
+ * set once for each context and, once the context has been used with any
+ * ioctl other than I915_CONTEXT_CREATE_EXT_SETPARAM, it may not be set.
+ *
+ * See DRM_I915_GEM_VM_CREATE and DRM_I915_GEM_VM_DESTROY.
+ */
 #define I915_CONTEXT_PARAM_VM		0x9
 
 /*
@@ -1700,8 +1710,15 @@ struct drm_i915_gem_context_param {
  * to specify a gap in the array that can be filled in later, e.g. by a
  * virtual engine used for load balancing.
  *
- * Setting the number of engines bound to the context to 0, by passing a zero
- * sized argument, will revert back to default settings.
+ * The engine set should only be set via I915_CONTEXT_CREATE_EXT_SETPARAM.
+ *
+ * On GPUs with graphics version 12 and earlier, it may also be set via
+ * DRM_IOCTL_I915_GEM_CONTEXT_SETPARAM.  However, this is only for
+ * backwards compatibility with old userspace and should be considered
+ * deprecated.  Starting with graphics version 13, it can only be set via
+ * I915_CONTEXT_CREATE_EXT_SETPARAM.  When using setparam, it may only be
+ * set once for each context and, once the context has been used with any
+ * ioctl other than I915_CONTEXT_CREATE_EXT_SETPARAM, it may not be set.
  *
  * See struct i915_context_param_engines.
  *
