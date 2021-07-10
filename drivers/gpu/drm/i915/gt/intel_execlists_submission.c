@@ -114,6 +114,7 @@
 #include "gen8_engine_cs.h"
 #include "intel_breadcrumbs.h"
 #include "intel_context.h"
+#include "intel_engine_heartbeat.h"
 #include "intel_engine_pm.h"
 #include "intel_engine_stats.h"
 #include "intel_execlists_submission.h"
@@ -192,6 +193,9 @@ static struct virtual_engine *to_virtual_engine(struct intel_engine_cs *engine)
 	GEM_BUG_ON(!intel_engine_is_virtual(engine));
 	return container_of(engine, struct virtual_engine, base);
 }
+
+static struct intel_context *
+execlists_create_virtual(struct intel_engine_cs **siblings, unsigned int count);
 
 static struct i915_request *
 __active_request(const struct intel_timeline * const tl,
@@ -2533,10 +2537,25 @@ static int execlists_context_alloc(struct intel_context *ce)
 	return lrc_alloc(ce, ce->engine);
 }
 
+static void execlists_context_cancel_request(struct intel_context *ce,
+					     struct i915_request *rq)
+{
+	struct intel_engine_cs *engine = NULL;
+
+	i915_request_active_engine(rq, &engine);
+
+	if (engine && intel_engine_pulse(engine))
+		intel_gt_handle_error(engine->gt, engine->mask, 0,
+				      "request cancellation by %s",
+				      current->comm);
+}
+
 static const struct intel_context_ops execlists_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
 	.alloc = execlists_context_alloc,
+
+	.cancel_request = execlists_context_cancel_request,
 
 	.pre_pin = execlists_context_pre_pin,
 	.pin = execlists_context_pin,
@@ -2548,6 +2567,8 @@ static const struct intel_context_ops execlists_context_ops = {
 
 	.reset = lrc_reset,
 	.destroy = lrc_destroy,
+
+	.create_virtual = execlists_create_virtual,
 };
 
 static int emit_pdps(struct i915_request *rq)
@@ -3101,6 +3122,42 @@ static void execlists_park(struct intel_engine_cs *engine)
 	cancel_timer(&engine->execlists.preempt);
 }
 
+static void add_to_engine(struct i915_request *rq)
+{
+	lockdep_assert_held(&rq->engine->sched_engine->lock);
+	list_move_tail(&rq->sched.link, &rq->engine->sched_engine->requests);
+}
+
+static void remove_from_engine(struct i915_request *rq)
+{
+	struct intel_engine_cs *engine, *locked;
+
+	/*
+	 * Virtual engines complicate acquiring the engine timeline lock,
+	 * as their rq->engine pointer is not stable until under that
+	 * engine lock. The simple ploy we use is to take the lock then
+	 * check that the rq still belongs to the newly locked engine.
+	 */
+	locked = READ_ONCE(rq->engine);
+	spin_lock_irq(&locked->sched_engine->lock);
+	while (unlikely(locked != (engine = READ_ONCE(rq->engine)))) {
+		spin_unlock(&locked->sched_engine->lock);
+		spin_lock(&engine->sched_engine->lock);
+		locked = engine;
+	}
+	list_del_init(&rq->sched.link);
+
+	clear_bit(I915_FENCE_FLAG_PQUEUE, &rq->fence.flags);
+	clear_bit(I915_FENCE_FLAG_HOLD, &rq->fence.flags);
+
+	/* Prevent further __await_execution() registering a cb, then flush */
+	set_bit(I915_FENCE_FLAG_ACTIVE, &rq->fence.flags);
+
+	spin_unlock_irq(&locked->sched_engine->lock);
+
+	i915_request_notify_execute_cb_imm(rq);
+}
+
 static bool can_preempt(struct intel_engine_cs *engine)
 {
 	if (GRAPHICS_VER(engine->i915) > 8)
@@ -3186,6 +3243,11 @@ static void execlists_release(struct intel_engine_cs *engine)
 	lrc_fini_wa_ctx(engine);
 }
 
+static void execlist_bump_serial(struct intel_engine_cs *engine)
+{
+	engine->serial++;
+}
+
 static void
 logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 {
@@ -3195,6 +3257,9 @@ logical_ring_default_vfuncs(struct intel_engine_cs *engine)
 
 	engine->cops = &execlists_context_ops;
 	engine->request_alloc = execlists_request_alloc;
+	engine->bump_serial = execlist_bump_serial;
+	engine->add_active_request = add_to_engine;
+	engine->remove_active_request = remove_from_engine;
 
 	engine->reset.prepare = execlists_reset_prepare;
 	engine->reset.rewind = execlists_reset_rewind;
@@ -3396,7 +3461,7 @@ static void rcu_virtual_context_destroy(struct work_struct *wrk)
 	intel_context_fini(&ve->context);
 
 	if (ve->base.breadcrumbs)
-		intel_breadcrumbs_free(ve->base.breadcrumbs);
+		intel_breadcrumbs_put(ve->base.breadcrumbs);
 	if (ve->base.sched_engine)
 		i915_sched_engine_put(ve->base.sched_engine);
 	intel_engine_free_request_pool(&ve->base);
@@ -3493,10 +3558,23 @@ static void virtual_context_exit(struct intel_context *ce)
 		intel_engine_pm_put(ve->siblings[n]);
 }
 
+static struct intel_engine_cs *
+virtual_get_sibling(struct intel_engine_cs *engine, unsigned int sibling)
+{
+	struct virtual_engine *ve = to_virtual_engine(engine);
+
+	if (sibling >= ve->num_siblings)
+		return NULL;
+
+	return ve->siblings[sibling];
+}
+
 static const struct intel_context_ops virtual_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
 	.alloc = virtual_context_alloc,
+
+	.cancel_request = execlists_context_cancel_request,
 
 	.pre_pin = virtual_context_pre_pin,
 	.pin = virtual_context_pin,
@@ -3507,6 +3585,8 @@ static const struct intel_context_ops virtual_context_ops = {
 	.exit = virtual_context_exit,
 
 	.destroy = virtual_context_destroy,
+
+	.get_sibling = virtual_get_sibling,
 };
 
 static intel_engine_mask_t virtual_submission_mask(struct virtual_engine *ve)
@@ -3655,19 +3735,12 @@ unlock:
 	spin_unlock_irqrestore(&ve->base.sched_engine->lock, flags);
 }
 
-struct intel_context *
-intel_execlists_create_virtual(struct intel_engine_cs **siblings,
-			       unsigned int count)
+static struct intel_context *
+execlists_create_virtual(struct intel_engine_cs **siblings, unsigned int count)
 {
 	struct virtual_engine *ve;
 	unsigned int n;
 	int err;
-
-	if (count == 0)
-		return ERR_PTR(-EINVAL);
-
-	if (count == 1)
-		return intel_context_create(siblings[0]);
 
 	ve = kzalloc(struct_size(ve, siblings, count), GFP_KERNEL);
 	if (!ve)
@@ -3780,6 +3853,8 @@ intel_execlists_create_virtual(struct intel_engine_cs **siblings,
 			 "v%dx%d", ve->base.class, count);
 		ve->base.context_size = sibling->context_size;
 
+		ve->base.add_active_request = sibling->add_active_request;
+		ve->base.remove_active_request = sibling->remove_active_request;
 		ve->base.emit_bb_start = sibling->emit_bb_start;
 		ve->base.emit_flush = sibling->emit_flush;
 		ve->base.emit_init_breadcrumb = sibling->emit_init_breadcrumb;

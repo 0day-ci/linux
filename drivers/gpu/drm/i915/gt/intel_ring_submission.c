@@ -586,8 +586,28 @@ static void ring_context_reset(struct intel_context *ce)
 	clear_bit(CONTEXT_VALID_BIT, &ce->flags);
 }
 
+static void ring_context_ban(struct intel_context *ce,
+			     struct i915_request *rq)
+{
+	struct intel_engine_cs *engine;
+
+	if (!rq || !i915_request_is_active(rq))
+		return;
+
+	engine = rq->engine;
+	lockdep_assert_held(&engine->sched_engine->lock);
+	list_for_each_entry_continue(rq, &engine->sched_engine->requests,
+				     sched.link)
+		if (rq->context == ce) {
+			i915_request_set_error_once(rq, -EIO);
+			__i915_request_skip(rq);
+		}
+}
+
 static const struct intel_context_ops ring_context_ops = {
 	.alloc = ring_context_alloc,
+
+	.ban = ring_context_ban,
 
 	.pre_pin = ring_context_pre_pin,
 	.pin = ring_context_pin,
@@ -1047,6 +1067,30 @@ static void setup_irq(struct intel_engine_cs *engine)
 	}
 }
 
+static void ring_bump_serial(struct intel_engine_cs *engine)
+{
+	engine->serial++;
+}
+
+static void add_to_engine(struct i915_request *rq)
+{
+	lockdep_assert_held(&rq->engine->sched_engine->lock);
+	list_move_tail(&rq->sched.link, &rq->engine->sched_engine->requests);
+}
+
+static void remove_from_engine(struct i915_request *rq)
+{
+	spin_lock_irq(&rq->engine->sched_engine->lock);
+	list_del_init(&rq->sched.link);
+
+	/* Prevent further __await_execution() registering a cb, then flush */
+	set_bit(I915_FENCE_FLAG_ACTIVE, &rq->fence.flags);
+
+	spin_unlock_irq(&rq->engine->sched_engine->lock);
+
+	i915_request_notify_execute_cb_imm(rq);
+}
+
 static void setup_common(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *i915 = engine->i915;
@@ -1064,8 +1108,12 @@ static void setup_common(struct intel_engine_cs *engine)
 	engine->reset.cancel = reset_cancel;
 	engine->reset.finish = reset_finish;
 
+	engine->add_active_request = add_to_engine;
+	engine->remove_active_request = remove_from_engine;
+
 	engine->cops = &ring_context_ops;
 	engine->request_alloc = ring_request_alloc;
+	engine->bump_serial = ring_bump_serial;
 
 	/*
 	 * Using a global execution timeline; the previous final breadcrumb is

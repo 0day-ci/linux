@@ -431,13 +431,18 @@ void i915_request_show_with_schedule(struct drm_printer *m,
 	rcu_read_unlock();
 }
 
-void i915_sched_engine_free(struct kref *kref)
+static void default_destroy(struct kref *kref)
 {
 	struct i915_sched_engine *sched_engine =
 		container_of(kref, typeof(*sched_engine), ref);
 
 	tasklet_kill(&sched_engine->tasklet); /* flush the callback */
 	kfree(sched_engine);
+}
+
+static bool default_disabled(struct i915_sched_engine *sched_engine)
+{
+	return false;
 }
 
 struct i915_sched_engine *
@@ -453,6 +458,8 @@ i915_sched_engine_create(unsigned int subclass)
 
 	sched_engine->queue = RB_ROOT_CACHED;
 	sched_engine->queue_priority_hint = INT_MIN;
+	sched_engine->destroy = default_destroy;
+	sched_engine->disabled = default_disabled;
 
 	INIT_LIST_HEAD(&sched_engine->requests);
 	INIT_LIST_HEAD(&sched_engine->hold);

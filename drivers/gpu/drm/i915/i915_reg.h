@@ -4142,6 +4142,7 @@ enum {
 	FAULT_AND_CONTINUE /* Unsupported */
 };
 
+#define CTX_GTT_ADDRESS_MASK GENMASK(31, 12)
 #define GEN8_CTX_VALID (1 << 0)
 #define GEN8_CTX_FORCE_PD_RESTORE (1 << 1)
 #define GEN8_CTX_FORCE_RESTORE (1 << 2)
@@ -12308,6 +12309,7 @@ enum skl_power_gate {
 
 /* MOCS (Memory Object Control State) registers */
 #define GEN9_LNCFCMOCS(i)	_MMIO(0xb020 + (i) * 4)	/* L3 Cache Control */
+#define GEN9_LNCFCMOCS_REG_COUNT	32
 
 #define __GEN9_RCS0_MOCS0	0xc800
 #define GEN9_GFX_MOCS(i)	_MMIO(__GEN9_RCS0_MOCS0 + (i) * 4)

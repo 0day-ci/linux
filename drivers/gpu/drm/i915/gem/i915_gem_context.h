@@ -10,6 +10,7 @@
 #include "i915_gem_context_types.h"
 
 #include "gt/intel_context.h"
+#include "gt/intel_engine.h"
 
 #include "i915_drv.h"
 #include "i915_gem.h"

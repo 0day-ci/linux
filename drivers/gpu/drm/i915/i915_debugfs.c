@@ -36,6 +36,7 @@
 #include "gt/intel_gt_clock_utils.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
+#include "gt/intel_gt.h"
 #include "gt/intel_gt_requests.h"
 #include "gt/intel_reset.h"
 #include "gt/intel_rc6.h"
@@ -49,6 +50,7 @@
 #include "i915_trace.h"
 #include "intel_pm.h"
 #include "intel_sideband.h"
+#include "gt/intel_lrc_reg.h"
 
 static inline struct drm_i915_private *node_to_i915(struct drm_info_node *node)
 {
