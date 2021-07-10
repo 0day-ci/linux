@@ -21,6 +21,7 @@
 
 struct etr_flat_buf {
 	struct device	*dev;
+	struct page	*pages;
 	dma_addr_t	daddr;
 	void		*vaddr;
 	size_t		size;
@@ -600,6 +601,7 @@ static int tmc_etr_alloc_flat_buf(struct tmc_drvdata *drvdata,
 {
 	struct etr_flat_buf *flat_buf;
 	struct device *real_dev = drvdata->csdev->dev.parent;
+	ssize_t	aligned_size;
 
 	/* We cannot reuse existing pages for flat buf */
 	if (pages)
@@ -609,12 +611,17 @@ static int tmc_etr_alloc_flat_buf(struct tmc_drvdata *drvdata,
 	if (!flat_buf)
 		return -ENOMEM;
 
-	flat_buf->vaddr = dma_alloc_coherent(real_dev, etr_buf->size,
-					     &flat_buf->daddr, GFP_KERNEL);
-	if (!flat_buf->vaddr) {
-		kfree(flat_buf);
-		return -ENOMEM;
-	}
+	aligned_size = PAGE_ALIGN(etr_buf->size);
+	flat_buf->pages = alloc_pages_node(node, GFP_KERNEL | __GFP_ZERO,
+					   get_order(aligned_size));
+	if (!flat_buf->pages)
+		goto fail_alloc_pages;
+
+	flat_buf->vaddr = page_address(flat_buf->pages);
+	flat_buf->daddr = dma_map_page(real_dev, flat_buf->pages, 0,
+				       aligned_size, DMA_FROM_DEVICE);
+	if (dma_mapping_error(real_dev, flat_buf->daddr))
+		goto fail_dma_map_page;
 
 	flat_buf->size = etr_buf->size;
 	flat_buf->dev = &drvdata->csdev->dev;
@@ -622,23 +629,34 @@ static int tmc_etr_alloc_flat_buf(struct tmc_drvdata *drvdata,
 	etr_buf->mode = ETR_MODE_FLAT;
 	etr_buf->private = flat_buf;
 	return 0;
+
+fail_dma_map_page:
+	__free_pages(flat_buf->pages, get_order(aligned_size));
+fail_alloc_pages:
+	kfree(flat_buf);
+	return -ENOMEM;
 }
 
 static void tmc_etr_free_flat_buf(struct etr_buf *etr_buf)
 {
 	struct etr_flat_buf *flat_buf = etr_buf->private;
 
-	if (flat_buf && flat_buf->daddr) {
+	if (flat_buf && flat_buf->vaddr) {
 		struct device *real_dev = flat_buf->dev->parent;
+		ssize_t aligned_size = PAGE_ALIGN(etr_buf->size);
 
-		dma_free_coherent(real_dev, flat_buf->size,
-				  flat_buf->vaddr, flat_buf->daddr);
+		dma_unmap_page(real_dev, flat_buf->daddr, aligned_size,
+			       DMA_FROM_DEVICE);
+		__free_pages(flat_buf->pages, get_order(aligned_size));
 	}
 	kfree(flat_buf);
 }
 
 static void tmc_etr_sync_flat_buf(struct etr_buf *etr_buf, u64 rrp, u64 rwp)
 {
+	struct etr_flat_buf *flat_buf = etr_buf->private;
+	struct device *real_dev = flat_buf->dev->parent;
+
 	/*
 	 * Adjust the buffer to point to the beginning of the trace data
 	 * and update the available trace data.
@@ -648,6 +666,28 @@ static void tmc_etr_sync_flat_buf(struct etr_buf *etr_buf, u64 rrp, u64 rwp)
 		etr_buf->len = etr_buf->size;
 	else
 		etr_buf->len = rwp - rrp;
+
+	if (etr_buf->offset + etr_buf->len > etr_buf->size) {
+		int len1, len2;
+
+		/*
+		 * If trace data is wrapped around, sync AUX bounce buffer
+		 * for two chunks: "len1" is for the trace date length at
+		 * the tail of bounce buffer, and "len2" is the length from
+		 * the start of the buffer after wrapping around.
+		 */
+		len1 = etr_buf->size - etr_buf->offset;
+		len2 = etr_buf->len - len1;
+		dma_sync_single_for_cpu(real_dev,
+					flat_buf->daddr + etr_buf->offset,
+					len1, DMA_FROM_DEVICE);
+		dma_sync_single_for_cpu(real_dev, flat_buf->daddr,
+					len2, DMA_FROM_DEVICE);
+	} else {
+		dma_sync_single_for_cpu(real_dev,
+					flat_buf->daddr + etr_buf->offset,
+					etr_buf->len, DMA_FROM_DEVICE);
+	}
 }
 
 static ssize_t tmc_etr_get_data_flat_buf(struct etr_buf *etr_buf,
