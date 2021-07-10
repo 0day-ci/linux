@@ -10,6 +10,8 @@
 #include <linux/mutex.h>
 #include "intel_guc_slpc_fwif.h"
 
+struct drm_printer;
+
 struct intel_guc_slpc {
 	/*Protects access to vma and SLPC actions */
 	struct i915_vma *vma;
@@ -38,5 +40,6 @@ int intel_guc_slpc_set_max_freq(struct intel_guc_slpc *slpc, u32 val);
 int intel_guc_slpc_set_min_freq(struct intel_guc_slpc *slpc, u32 val);
 int intel_guc_slpc_get_max_freq(struct intel_guc_slpc *slpc, u32 *val);
 int intel_guc_slpc_get_min_freq(struct intel_guc_slpc *slpc, u32 *val);
+int intel_guc_slpc_info(struct intel_guc_slpc *slpc, struct drm_printer *p);
 
 #endif

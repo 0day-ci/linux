@@ -432,6 +432,59 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	return 0;
 }
 
+int intel_guc_slpc_info(struct intel_guc_slpc *slpc, struct drm_printer *p)
+{
+	struct drm_i915_private *i915 = guc_to_gt(slpc_to_guc(slpc))->i915;
+	struct slpc_shared_data *data;
+	struct slpc_platform_info *platform_info;
+	struct slpc_task_state_data *task_state_data;
+	intel_wakeref_t wakeref;
+	int ret = 0;
+
+	wakeref = intel_runtime_pm_get(&i915->runtime_pm);
+
+	if (slpc_read_task_state(slpc)) {
+		ret = -EIO;
+		goto done;
+	}
+
+	GEM_BUG_ON(!slpc->vma);
+
+	drm_clflush_virt_range(slpc->vaddr, sizeof(struct slpc_shared_data));
+	data = slpc->vaddr;
+
+	platform_info = &data->platform_info;
+	task_state_data = &data->task_state_data;
+
+	drm_printf(p, "SLPC state: %s\n", slpc_state_stringify(data->global_state));
+	drm_printf(p, "\tgtperf task active: %d\n",
+			task_state_data->gtperf_task_active);
+	drm_printf(p, "\tdcc task active: %d\n",
+				task_state_data->dcc_task_active);
+	drm_printf(p, "\tin dcc: %d\n",
+				task_state_data->in_dcc);
+	drm_printf(p, "\tfreq switch active: %d\n",
+				task_state_data->freq_switch_active);
+	drm_printf(p, "\tibc enabled: %d\n",
+				task_state_data->ibc_enabled);
+	drm_printf(p, "\tibc active: %d\n",
+				task_state_data->ibc_active);
+	drm_printf(p, "\tpg1 enabled: %s\n",
+				yesno(task_state_data->pg1_enabled));
+	drm_printf(p, "\tpg1 active: %s\n",
+				yesno(task_state_data->pg1_active));
+	drm_printf(p, "\tmax freq: %dMHz\n",
+				DIV_ROUND_CLOSEST(data->task_state_data.max_unslice_freq *
+				GT_FREQUENCY_MULTIPLIER, GEN9_FREQ_SCALER));
+	drm_printf(p, "\tmin freq: %dMHz\n",
+				DIV_ROUND_CLOSEST(data->task_state_data.min_unslice_freq *
+				GT_FREQUENCY_MULTIPLIER, GEN9_FREQ_SCALER));
+
+done:
+	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
+	return ret;
+}
+
 void intel_guc_slpc_fini(struct intel_guc_slpc *slpc)
 {
 	if (!slpc->vma)
