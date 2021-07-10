@@ -202,10 +202,14 @@ static u32 guc_ctl_debug_flags(struct intel_guc *guc)
 
 static u32 guc_ctl_feature_flags(struct intel_guc *guc)
 {
+	struct intel_gt *gt = guc_to_gt(guc);
 	u32 flags = 0;
 
 	if (!intel_guc_submission_is_used(guc))
 		flags |= GUC_CTL_DISABLE_SCHEDULER;
+
+	if (intel_uc_uses_guc_slpc(&gt->uc))
+		flags |= GUC_CTL_ENABLE_SLPC;
 
 	return flags;
 }

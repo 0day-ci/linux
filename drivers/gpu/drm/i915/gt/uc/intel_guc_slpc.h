@@ -6,6 +6,8 @@
 #ifndef _INTEL_GUC_SLPC_H_
 #define _INTEL_GUC_SLPC_H_
 
+#include "intel_guc_slpc_fwif.h"
+
 struct intel_guc_slpc {
 };
 

@@ -114,6 +114,8 @@
 #define   GUC_ADS_ADDR_SHIFT		1
 #define   GUC_ADS_ADDR_MASK		(0xFFFFF << GUC_ADS_ADDR_SHIFT)
 
+#define GUC_CTL_ENABLE_SLPC            BIT(2)
+
 #define GUC_CTL_MAX_DWORDS		(SOFT_SCRATCH_COUNT - 2) /* [1..14] */
 
 /* Generic GT SysInfo data types */
