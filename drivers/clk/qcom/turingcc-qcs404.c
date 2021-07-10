@@ -100,8 +100,12 @@ static const struct regmap_config turingcc_regmap_config = {
 	.fast_io	= true,
 };
 
+static const char * const turingcc_pm_clks[] = { NULL };
+
 static const struct qcom_cc_desc turingcc_desc = {
 	.config = &turingcc_regmap_config,
+	.pm_clks = turingcc_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(turingcc_pm_clks),
 	.clks = turingcc_clocks,
 	.num_clks = ARRAY_SIZE(turingcc_clocks),
 };
@@ -110,36 +114,9 @@ static int turingcc_probe(struct platform_device *pdev)
 {
 	int ret;
 
-	pm_runtime_enable(&pdev->dev);
-	ret = pm_clk_create(&pdev->dev);
-	if (ret)
-		goto disable_pm_runtime;
-
-	ret = pm_clk_add(&pdev->dev, NULL);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-		goto destroy_pm_clk;
-	}
-
 	ret = qcom_cc_probe(pdev, &turingcc_desc);
 	if (ret < 0)
-		goto destroy_pm_clk;
-
-	return 0;
-
-destroy_pm_clk:
-	pm_clk_destroy(&pdev->dev);
-
-disable_pm_runtime:
-	pm_runtime_disable(&pdev->dev);
-
-	return ret;
-}
-
-static int turingcc_remove(struct platform_device *pdev)
-{
-	pm_clk_destroy(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
+		return ret;
 
 	return 0;
 }
@@ -156,7 +133,6 @@ MODULE_DEVICE_TABLE(of, turingcc_match_table);
 
 static struct platform_driver turingcc_driver = {
 	.probe		= turingcc_probe,
-	.remove		= turingcc_remove,
 	.driver		= {
 		.name	= "qcs404-turingcc",
 		.of_match_table = turingcc_match_table,

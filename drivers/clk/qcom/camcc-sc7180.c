@@ -9,7 +9,6 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/pm_clock.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,camcc-sc7180.h>
@@ -1631,8 +1630,12 @@ static const struct regmap_config cam_cc_sc7180_regmap_config = {
 	.fast_io = true,
 };
 
+static const char * const cam_cc_sc7180_pm_clks[] = { "xo", "iface" };
+
 static const struct qcom_cc_desc cam_cc_sc7180_desc = {
 	.config = &cam_cc_sc7180_regmap_config,
+	.pm_clks = cam_cc_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(cam_cc_sc7180_pm_clks),
 	.clk_hws = cam_cc_sc7180_hws,
 	.num_clk_hws = ARRAY_SIZE(cam_cc_sc7180_hws),
 	.clks = cam_cc_sc7180_clocks,
@@ -1652,33 +1655,9 @@ static int cam_cc_sc7180_probe(struct platform_device *pdev)
 	struct regmap *regmap;
 	int ret;
 
-	pm_runtime_enable(&pdev->dev);
-	ret = pm_clk_create(&pdev->dev);
-	if (ret < 0)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, "xo");
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to acquire XO clock\n");
-		goto disable_pm_runtime;
-	}
-
-	ret = pm_clk_add(&pdev->dev, "iface");
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to acquire iface clock\n");
-		goto disable_pm_runtime;
-	}
-
-	ret = pm_runtime_get(&pdev->dev);
-	if (ret)
-		goto destroy_pm_clk;
-
 	regmap = qcom_cc_map(pdev, &cam_cc_sc7180_desc);
-	if (IS_ERR(regmap)) {
-		ret = PTR_ERR(regmap);
-		pm_runtime_put(&pdev->dev);
-		goto destroy_pm_clk;
-	}
+	if (IS_ERR(regmap))
+		return PTR_ERR(regmap);
 
 	clk_fabia_pll_configure(&cam_cc_pll0, regmap, &cam_cc_pll0_config);
 	clk_fabia_pll_configure(&cam_cc_pll1, regmap, &cam_cc_pll1_config);
@@ -1686,21 +1665,12 @@ static int cam_cc_sc7180_probe(struct platform_device *pdev)
 	clk_fabia_pll_configure(&cam_cc_pll3, regmap, &cam_cc_pll3_config);
 
 	ret = qcom_cc_really_probe(pdev, &cam_cc_sc7180_desc, regmap);
-	pm_runtime_put(&pdev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to register CAM CC clocks\n");
-		goto destroy_pm_clk;
+		return 0;
 	}
 
 	return 0;
-
-destroy_pm_clk:
-	pm_clk_destroy(&pdev->dev);
-
-disable_pm_runtime:
-	pm_runtime_disable(&pdev->dev);
-
-	return ret;
 }
 
 static const struct dev_pm_ops cam_cc_pm_ops = {

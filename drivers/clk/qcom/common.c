@@ -7,6 +7,8 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/platform_device.h>
+#include <linux/pm_clock.h>
+#include <linux/pm_runtime.h>
 #include <linux/clk-provider.h>
 #include <linux/reset-controller.h>
 #include <linux/of.h>
@@ -69,12 +71,86 @@ int qcom_find_src_index(struct clk_hw *hw, const struct parent_map *map, u8 src)
 }
 EXPORT_SYMBOL_GPL(qcom_find_src_index);
 
+static void qcom_cc_pm_runtime_disable(void *data)
+{
+	pm_runtime_disable(data);
+}
+
+static void qcom_cc_pm_clk_destroy(void *data)
+{
+	pm_clk_destroy(data);
+}
+
+static int
+qcom_cc_add_pm_clks(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+{
+	struct device *dev = &pdev->dev;
+	int ret;
+	int i;
+
+	if (!desc->num_pm_clks)
+		return 0;
+
+	ret = pm_clk_create(dev);
+	if (ret < 0)
+		return ret;
+	ret = devm_add_action_or_reset(dev, qcom_cc_pm_clk_destroy, dev);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < desc->num_pm_clks; i++) {
+		ret = pm_clk_add(dev, desc->pm_clks[i]);
+		if (ret < 0) {
+			dev_err(dev, "Failed to acquire %s pm clk\n", desc->pm_clks[i]);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int
+qcom_cc_manage_pm(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+{
+	struct device *dev = &pdev->dev;
+	int ret;
+
+	/* For now enable runtime PM only if we have PM clocks in use */
+	if (desc->num_pm_clks && !pm_runtime_enabled(dev)) {
+		pm_runtime_enable(dev);
+
+		ret = devm_add_action_or_reset(dev, qcom_cc_pm_runtime_disable, dev);
+		if (ret)
+			return ret;
+	}
+
+	ret = qcom_cc_add_pm_clks(pdev, desc);
+	if (ret)
+		return ret;
+
+	/* Other code might have enabled runtime PM, resume device here */
+	if (pm_runtime_enabled(dev)) {
+		ret = pm_runtime_get_sync(dev);
+		if (ret) {
+			pm_runtime_put_noidle(dev);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 static struct regmap *
 qcom_cc_map_by_index(struct platform_device *pdev, const struct qcom_cc_desc *desc, int index)
 {
 	void __iomem *base;
 	struct resource *res;
 	struct device *dev = &pdev->dev;
+	int ret;
+
+	ret = qcom_cc_manage_pm(pdev, desc);
+	if (ret)
+		return ERR_PTR(ret);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, index);
 	base = devm_ioremap_resource(dev, res);
@@ -244,8 +320,10 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 	struct clk_hw **clk_hws = desc->clk_hws;
 
 	cc = devm_kzalloc(dev, sizeof(*cc), GFP_KERNEL);
-	if (!cc)
-		return -ENOMEM;
+	if (!cc) {
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	reset = &cc->reset;
 	reset->rcdev.of_node = dev->of_node;
@@ -257,22 +335,25 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 
 	ret = devm_reset_controller_register(dev, &reset->rcdev);
 	if (ret)
-		return ret;
+		goto err;
 
 	if (desc->gdscs && desc->num_gdscs) {
 		scd = devm_kzalloc(dev, sizeof(*scd), GFP_KERNEL);
-		if (!scd)
-			return -ENOMEM;
+		if (!scd) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
 		scd->dev = dev;
 		scd->scs = desc->gdscs;
 		scd->num = desc->num_gdscs;
 		ret = gdsc_register(scd, &reset->rcdev, regmap);
 		if (ret)
-			return ret;
+			goto err;
 		ret = devm_add_action_or_reset(dev, qcom_cc_gdsc_unregister,
 					       scd);
 		if (ret)
-			return ret;
+			goto err;
 	}
 
 	cc->rclks = rclks;
@@ -283,7 +364,7 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 	for (i = 0; i < num_clk_hws; i++) {
 		ret = devm_clk_hw_register(dev, clk_hws[i]);
 		if (ret)
-			return ret;
+			goto err;
 	}
 
 	for (i = 0; i < num_clks; i++) {
@@ -292,14 +373,26 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 
 		ret = devm_clk_register_regmap(dev, rclks[i]);
 		if (ret)
-			return ret;
+			goto err;
 	}
 
 	ret = devm_of_clk_add_hw_provider(dev, qcom_cc_clk_hw_get, cc);
 	if (ret)
-		return ret;
+		goto err;
+
+	if (pm_runtime_enabled(dev)) {
+		/* for the LPASS on sc7180, which uses autosuspend */
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put(dev);
+	}
 
 	return 0;
+
+err:
+	if (pm_runtime_enabled(dev))
+		pm_runtime_put(dev);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
 

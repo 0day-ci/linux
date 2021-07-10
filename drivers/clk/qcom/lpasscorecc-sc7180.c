@@ -338,8 +338,12 @@ static struct regmap_config lpass_core_cc_sc7180_regmap_config = {
 	.fast_io = true,
 };
 
+static const char * const lpass_sc7180_pm_clks[] = { "iface" };
+
 static const struct qcom_cc_desc lpass_core_hm_sc7180_desc = {
 	.config = &lpass_core_cc_sc7180_regmap_config,
+	.pm_clks = lpass_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(lpass_sc7180_pm_clks),
 	.gdscs = lpass_core_hm_sc7180_gdscs,
 	.num_gdscs = ARRAY_SIZE(lpass_core_hm_sc7180_gdscs),
 };
@@ -352,45 +356,11 @@ static const struct qcom_cc_desc lpass_core_cc_sc7180_desc = {
 
 static const struct qcom_cc_desc lpass_audio_hm_sc7180_desc = {
 	.config = &lpass_core_cc_sc7180_regmap_config,
+	.pm_clks = lpass_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(lpass_sc7180_pm_clks),
 	.gdscs = lpass_audio_hm_sc7180_gdscs,
 	.num_gdscs = ARRAY_SIZE(lpass_audio_hm_sc7180_gdscs),
 };
-
-static void lpass_pm_runtime_disable(void *data)
-{
-	pm_runtime_disable(data);
-}
-
-static void lpass_pm_clk_destroy(void *data)
-{
-	pm_clk_destroy(data);
-}
-
-static int lpass_create_pm_clks(struct platform_device *pdev)
-{
-	int ret;
-
-	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
-	pm_runtime_enable(&pdev->dev);
-
-	ret = devm_add_action_or_reset(&pdev->dev, lpass_pm_runtime_disable, &pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_create(&pdev->dev);
-	if (ret)
-		return ret;
-	ret = devm_add_action_or_reset(&pdev->dev, lpass_pm_clk_destroy, &pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, "iface");
-	if (ret < 0)
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-
-	return ret;
-}
 
 static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 {
@@ -398,9 +368,8 @@ static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 	struct regmap *regmap;
 	int ret;
 
-	ret = lpass_create_pm_clks(pdev);
-	if (ret)
-		return ret;
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
 
 	lpass_core_cc_sc7180_regmap_config.name = "lpass_audio_cc";
 	desc = &lpass_audio_hm_sc7180_desc;
@@ -428,20 +397,15 @@ static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 
 	ret = qcom_cc_really_probe(pdev, &lpass_core_cc_sc7180_desc, regmap);
 
-	pm_runtime_mark_last_busy(&pdev->dev);
-	pm_runtime_put_autosuspend(&pdev->dev);
-
 	return ret;
 }
 
 static int lpass_hm_core_probe(struct platform_device *pdev)
 {
 	const struct qcom_cc_desc *desc;
-	int ret;
 
-	ret = lpass_create_pm_clks(pdev);
-	if (ret)
-		return ret;
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
 
 	lpass_core_cc_sc7180_regmap_config.name = "lpass_hm_core";
 	desc = &lpass_core_hm_sc7180_desc;

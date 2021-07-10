@@ -117,6 +117,8 @@ static struct regmap_config q6sstop_regmap_config = {
 	.fast_io	= true,
 };
 
+static const char * const qcs404_pm_clks[] = { NULL };
+
 static struct clk_regmap *q6sstop_qcs404_clocks[] = {
 	[LCC_AHBFABRIC_CBC_CLK] = &lcc_ahbfabric_cbc_clk.clkr,
 	[LCC_Q6SS_AHBS_CBC_CLK] = &lcc_q6ss_ahbs_cbc_clk.clkr,
@@ -144,6 +146,8 @@ static struct clk_regmap *tcsr_qcs404_clocks[] = {
 
 static const struct qcom_cc_desc tcsr_qcs404_desc = {
 	.config = &q6sstop_regmap_config,
+	.pm_clks = qcs404_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(qcs404_pm_clks),
 	.clks = tcsr_qcs404_clocks,
 	.num_clks = ARRAY_SIZE(tcsr_qcs404_clocks),
 };
@@ -159,46 +163,19 @@ static int q6sstopcc_qcs404_probe(struct platform_device *pdev)
 	const struct qcom_cc_desc *desc;
 	int ret;
 
-	pm_runtime_enable(&pdev->dev);
-	ret = pm_clk_create(&pdev->dev);
-	if (ret)
-		goto disable_pm_runtime;
-
-	ret = pm_clk_add(&pdev->dev, NULL);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-		goto destroy_pm_clk;
-	}
-
 	q6sstop_regmap_config.name = "q6sstop_tcsr";
 	desc = &tcsr_qcs404_desc;
 
 	ret = qcom_cc_probe_by_index(pdev, 1, desc);
 	if (ret)
-		goto destroy_pm_clk;
+		return ret;
 
 	q6sstop_regmap_config.name = "q6sstop_cc";
 	desc = &q6sstop_qcs404_desc;
 
 	ret = qcom_cc_probe_by_index(pdev, 0, desc);
 	if (ret)
-		goto destroy_pm_clk;
-
-	return 0;
-
-destroy_pm_clk:
-	pm_clk_destroy(&pdev->dev);
-
-disable_pm_runtime:
-	pm_runtime_disable(&pdev->dev);
-
-	return ret;
-}
-
-static int q6sstopcc_qcs404_remove(struct platform_device *pdev)
-{
-	pm_clk_destroy(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
+		return ret;
 
 	return 0;
 }
@@ -209,7 +186,6 @@ static const struct dev_pm_ops q6sstopcc_pm_ops = {
 
 static struct platform_driver q6sstopcc_qcs404_driver = {
 	.probe		= q6sstopcc_qcs404_probe,
-	.remove		= q6sstopcc_qcs404_remove,
 	.driver		= {
 		.name	= "qcs404-q6sstopcc",
 		.of_match_table = q6sstopcc_qcs404_match_table,

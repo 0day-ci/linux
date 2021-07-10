@@ -19,8 +19,14 @@ struct clk_hw;
 #define PLL_VOTE_FSM_ENA	BIT(20)
 #define PLL_VOTE_FSM_RESET	BIT(21)
 
+/*
+ * Note: if pm_clks are used, pm_clk_suspend/resume should be called manually
+ * from runtime pm callbacks (or just passed to SET_RUNTIME_PM_OPS).
+ */
 struct qcom_cc_desc {
 	const struct regmap_config *config;
+	const char *const *pm_clks;
+	size_t num_pm_clks;
 	struct clk_regmap **clks;
 	size_t num_clks;
 	const struct qcom_reset_map *resets;
