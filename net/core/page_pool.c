@@ -350,6 +350,53 @@ struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp)
 }
 EXPORT_SYMBOL(page_pool_alloc_pages);
 
+struct page *page_pool_alloc_frag(struct page_pool *pool,
+				  unsigned int *offset, gfp_t gfp)
+{
+	unsigned int frag_offset = pool->frag_offset;
+	unsigned int frag_size = pool->p.frag_size;
+	struct page *frag_page = pool->frag_page;
+	unsigned int max_len = pool->p.max_len;
+
+	if (!frag_page || frag_offset + frag_size > max_len) {
+		frag_page = page_pool_alloc_pages(pool, gfp);
+		if (unlikely(!frag_page)) {
+			pool->frag_page = NULL;
+			return NULL;
+		}
+
+		pool->frag_page = frag_page;
+		frag_offset = 0;
+
+		page_pool_sub_bias(pool, frag_page,
+				   max_len / frag_size - 1);
+	}
+
+	*offset = frag_offset;
+	pool->frag_offset = frag_offset + frag_size;
+
+	return frag_page;
+}
+EXPORT_SYMBOL(page_pool_alloc_frag);
+
+static void page_pool_empty_frag(struct page_pool *pool)
+{
+	unsigned int frag_offset = pool->frag_offset;
+	unsigned int frag_size = pool->p.frag_size;
+	struct page *frag_page = pool->frag_page;
+	unsigned int max_len = pool->p.max_len;
+
+	if (!frag_page)
+		return;
+
+	while (frag_offset + frag_size <= max_len) {
+		page_pool_put_full_page(pool, frag_page, false);
+		frag_offset += frag_size;
+	}
+
+	pool->frag_page = NULL;
+}
+
 /* Calculate distance between two u32 values, valid if distance is below 2^(31)
  *  https://en.wikipedia.org/wiki/Serial_number_arithmetic#General_Solution
  */
@@ -669,6 +716,8 @@ void page_pool_destroy(struct page_pool *pool)
 
 	if (!page_pool_put(pool))
 		return;
+
+	page_pool_empty_frag(pool);
 
 	if (!page_pool_release(pool))
 		return;
