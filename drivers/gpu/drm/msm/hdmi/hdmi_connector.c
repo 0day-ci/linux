@@ -386,15 +386,16 @@ static int msm_hdmi_connector_mode_valid(struct drm_connector *connector,
 	long actual, requested;
 
 	requested = 1000 * mode->clock;
-	actual = kms->funcs->round_pixclk(kms,
-			requested, hdmi_connector->hdmi->encoder);
 
+	if (kms->funcs->round_pixclk)
+		actual = kms->funcs->round_pixclk(kms,
+			requested, hdmi_connector->hdmi->encoder);
+	else if (config->pwr_clk_cnt > 0)
 	/* for mdp5/apq8074, we manage our own pixel clk (as opposed to
 	 * mdp4/dtv stuff where pixel clk is assigned to mdp/encoder
 	 * instead):
 	 */
-	if (config->pwr_clk_cnt > 0)
-		actual = clk_round_rate(hdmi->pwr_clks[0], actual);
+		actual = clk_round_rate(hdmi->pwr_clks[0], requested);
 
 	DBG("requested=%ld, actual=%ld", requested, actual);
 

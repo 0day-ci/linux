@@ -60,17 +60,6 @@ static int edp_connector_mode_valid(struct drm_connector *connector,
 {
 	struct edp_connector *edp_connector = to_edp_connector(connector);
 	struct msm_edp *edp = edp_connector->edp;
-	struct msm_drm_private *priv = connector->dev->dev_private;
-	struct msm_kms *kms = priv->kms;
-	long actual, requested;
-
-	requested = 1000 * mode->clock;
-	actual = kms->funcs->round_pixclk(kms,
-			requested, edp_connector->edp->encoder);
-
-	DBG("requested=%ld, actual=%ld", requested, actual);
-	if (actual != requested)
-		return MODE_CLOCK_RANGE;
 
 	if (!msm_edp_ctrl_pixel_clock_valid(
 		edp->ctrl, mode->clock, NULL, NULL))
