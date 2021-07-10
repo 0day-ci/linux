@@ -151,6 +151,9 @@ static int usb_phy_uevent(struct device *dev, struct kobj_uevent_env *env)
 	char uchger_state[50] = { 0 };
 	char uchger_type[50] = { 0 };
 
+	if (list_empty(&phy_list))
+		return -ENODEV;
+
 	usb_phy = __device_to_usb_phy(dev);
 
 	snprintf(uchger_state, ARRAY_SIZE(uchger_state),
