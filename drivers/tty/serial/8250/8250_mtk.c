@@ -91,11 +91,14 @@ static void mtk8250_dma_rx_complete(void *param)
 	struct mtk8250_data *data = up->port.private_data;
 	struct tty_port *tty_port = &up->port.state->port;
 	struct dma_tx_state state;
-	int copied, total, cnt;
+	unsigned int copied, total, cnt;
 	unsigned char *ptr;
+	unsigned long flags;
 
 	if (data->rx_status == DMA_RX_SHUTDOWN)
 		return;
+
+	spin_lock_irqsave(&up->port.lock, flags);
 
 	dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
 	total = dma->rx_size - state.residue;
@@ -104,9 +107,11 @@ static void mtk8250_dma_rx_complete(void *param)
 	if ((data->rx_pos + cnt) > dma->rx_size)
 		cnt = dma->rx_size - data->rx_pos;
 
-	ptr = (unsigned char *)(data->rx_pos + dma->rx_buf);
-	copied = tty_insert_flip_string(tty_port, ptr, cnt);
-	data->rx_pos += cnt;
+	if (cnt != 0) {
+		ptr = (unsigned char *)(data->rx_pos + dma->rx_buf);
+		copied = tty_insert_flip_string(tty_port, ptr, cnt);
+		data->rx_pos += cnt;
+	}
 
 	if (total > cnt) {
 		ptr = (unsigned char *)(dma->rx_buf);
@@ -120,6 +125,8 @@ static void mtk8250_dma_rx_complete(void *param)
 	tty_flip_buffer_push(tty_port);
 
 	mtk8250_rx_dma(up);
+
+	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static void mtk8250_rx_dma(struct uart_8250_port *up)
