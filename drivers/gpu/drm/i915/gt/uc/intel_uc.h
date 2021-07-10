@@ -83,6 +83,7 @@ __uc_state_checker(x, func, uses, used)
 uc_state_checkers(guc, guc);
 uc_state_checkers(huc, huc);
 uc_state_checkers(guc, guc_submission);
+uc_state_checkers(guc, guc_slpc);
 
 #undef uc_state_checkers
 #undef __uc_state_checker

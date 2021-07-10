@@ -13,6 +13,7 @@
 struct drm_printer;
 struct intel_engine_cs;
 
+void intel_guc_slpc_init_early(struct intel_guc *guc);
 void intel_guc_submission_init_early(struct intel_guc *guc);
 int intel_guc_submission_init(struct intel_guc *guc);
 void intel_guc_submission_enable(struct intel_guc *guc);
@@ -48,6 +49,21 @@ static inline bool intel_guc_submission_is_wanted(struct intel_guc *guc)
 static inline bool intel_guc_submission_is_used(struct intel_guc *guc)
 {
 	return intel_guc_is_used(guc) && intel_guc_submission_is_wanted(guc);
+}
+
+static inline bool intel_guc_slpc_is_supported(struct intel_guc *guc)
+{
+	return guc->slpc_supported;
+}
+
+static inline bool intel_guc_slpc_is_wanted(struct intel_guc *guc)
+{
+	return guc->slpc_selected;
+}
+
+static inline bool intel_guc_slpc_is_used(struct intel_guc *guc)
+{
+	return intel_guc_submission_is_used(guc) && intel_guc_slpc_is_wanted(guc);
 }
 
 #endif

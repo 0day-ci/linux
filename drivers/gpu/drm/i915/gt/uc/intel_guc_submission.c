@@ -2351,6 +2351,27 @@ void intel_guc_submission_init_early(struct intel_guc *guc)
 	guc->submission_selected = __guc_submission_selected(guc);
 }
 
+static bool __guc_slpc_supported(struct intel_guc *guc)
+{
+	/* GuC slpc is unavailable for pre-Gen12 */
+	return guc->submission_supported &&
+		GRAPHICS_VER(guc_to_gt(guc)->i915) >= 12;
+}
+
+static bool __guc_slpc_selected(struct intel_guc *guc)
+{
+	if (!intel_guc_slpc_is_supported(guc))
+		return false;
+
+	return guc->submission_selected;
+}
+
+void intel_guc_slpc_init_early(struct intel_guc *guc)
+{
+	guc->slpc_supported = __guc_slpc_supported(guc);
+	guc->slpc_selected = __guc_slpc_selected(guc);
+}
+
 static inline struct intel_context *
 g2h_context_lookup(struct intel_guc *guc, u32 desc_idx)
 {

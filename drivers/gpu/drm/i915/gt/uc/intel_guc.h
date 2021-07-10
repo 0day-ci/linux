@@ -57,6 +57,8 @@ struct intel_guc {
 
 	bool submission_supported;
 	bool submission_selected;
+	bool slpc_supported;
+	bool slpc_selected;
 
 	struct i915_vma *ads_vma;
 	struct __guc_ads_blob *ads_blob;
