@@ -1481,7 +1481,7 @@ static int hns3_handle_vtags(struct hns3_enet_ring *tx_ring,
 		return -EINVAL;
 
 	if (skb->protocol == htons(ETH_P_8021Q) &&
-	    !(handle->kinfo.netdev->features & NETIF_F_HW_VLAN_CTAG_TX)) {
+	    !(handle->kinfo.netdev->features[0] & NETIF_F_HW_VLAN_CTAG_TX)) {
 		/* When HW VLAN acceleration is turned off, and the stack
 		 * sets the protocol to 802.1q, the driver just need to
 		 * set the protocol to the encapsulated ethertype.
@@ -2300,56 +2300,57 @@ static int hns3_nic_do_ioctl(struct net_device *netdev,
 }
 
 static int hns3_nic_set_features(struct net_device *netdev,
-				 netdev_features_t features)
+				 netdev_features_t *features)
 {
-	netdev_features_t changed = netdev->features ^ features;
+	netdev_features_t changed[NETDEV_FEATURE_DWORDS];
 	struct hns3_nic_priv *priv = netdev_priv(netdev);
 	struct hnae3_handle *h = priv->ae_handle;
 	bool enable;
 	int ret;
 
-	if (changed & (NETIF_F_GRO_HW) && h->ae_algo->ops->set_gro_en) {
-		enable = !!(features & NETIF_F_GRO_HW);
+	netdev_features_xor(changed, netdev->features, features);
+	if (changed[0] & (NETIF_F_GRO_HW) && h->ae_algo->ops->set_gro_en) {
+		enable = !!(features[0] & NETIF_F_GRO_HW);
 		ret = h->ae_algo->ops->set_gro_en(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	if ((changed & NETIF_F_HW_VLAN_CTAG_RX) &&
+	if ((changed[0] & NETIF_F_HW_VLAN_CTAG_RX) &&
 	    h->ae_algo->ops->enable_hw_strip_rxvtag) {
-		enable = !!(features & NETIF_F_HW_VLAN_CTAG_RX);
+		enable = !!(features[0] & NETIF_F_HW_VLAN_CTAG_RX);
 		ret = h->ae_algo->ops->enable_hw_strip_rxvtag(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	if ((changed & NETIF_F_NTUPLE) && h->ae_algo->ops->enable_fd) {
-		enable = !!(features & NETIF_F_NTUPLE);
+	if ((changed[0] & NETIF_F_NTUPLE) && h->ae_algo->ops->enable_fd) {
+		enable = !!(features[0] & NETIF_F_NTUPLE);
 		h->ae_algo->ops->enable_fd(h, enable);
 	}
 
-	if ((netdev->features & NETIF_F_HW_TC) > (features & NETIF_F_HW_TC) &&
+	if ((netdev->features[0] & NETIF_F_HW_TC) >
+	     (features[0] & NETIF_F_HW_TC) &&
 	    h->ae_algo->ops->cls_flower_active(h)) {
 		netdev_err(netdev,
 			   "there are offloaded TC filters active, cannot disable HW TC offload");
 		return -EINVAL;
 	}
 
-	if ((changed & NETIF_F_HW_VLAN_CTAG_FILTER) &&
+	if ((changed[0] & NETIF_F_HW_VLAN_CTAG_FILTER) &&
 	    h->ae_algo->ops->enable_vlan_filter) {
-		enable = !!(features & NETIF_F_HW_VLAN_CTAG_FILTER);
+		enable = !!(features[0] & NETIF_F_HW_VLAN_CTAG_FILTER);
 		ret = h->ae_algo->ops->enable_vlan_filter(h, enable);
 		if (ret)
 			return ret;
 	}
 
-	netdev->features = features;
+	netdev_features_copy(netdev->features, features);
 	return 0;
 }
 
-static netdev_features_t hns3_features_check(struct sk_buff *skb,
-					     struct net_device *dev,
-					     netdev_features_t features)
+static void hns3_features_check(struct sk_buff *skb, struct net_device *dev,
+				netdev_features_t *features)
 {
 #define HNS3_MAX_HDR_LEN	480U
 #define HNS3_MAX_L4_HDR_LEN	60U
@@ -2373,9 +2374,7 @@ static netdev_features_t hns3_features_check(struct sk_buff *skb,
 	 * len of 480 bytes.
 	 */
 	if (len > HNS3_MAX_HDR_LEN)
-		features &= ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
-
-	return features;
+		features[0] &= ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
 }
 
 static void hns3_nic_get_stats64(struct net_device *netdev,
@@ -3127,27 +3126,28 @@ static void hns3_set_default_feature(struct net_device *netdev)
 
 	netdev->priv_flags |= IFF_UNICAST_FLT;
 
-	netdev->hw_enc_features |= NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
+	netdev->hw_enc_features[0] |=
+		NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 		NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_GSO_GRE |
 		NETIF_F_GSO_GRE_CSUM | NETIF_F_GSO_UDP_TUNNEL |
 		NETIF_F_SCTP_CRC | NETIF_F_TSO_MANGLEID | NETIF_F_FRAGLIST;
 
 	netdev->gso_partial_features |= NETIF_F_GSO_GRE_CSUM;
 
-	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER |
+	netdev->features[0] |= NETIF_F_HW_VLAN_CTAG_FILTER |
 		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
 		NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 		NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_GSO_GRE |
 		NETIF_F_GSO_GRE_CSUM | NETIF_F_GSO_UDP_TUNNEL |
 		NETIF_F_SCTP_CRC | NETIF_F_FRAGLIST;
 
-	netdev->vlan_features |= NETIF_F_RXCSUM |
+	netdev->vlan_features[0] |= NETIF_F_RXCSUM |
 		NETIF_F_SG | NETIF_F_GSO | NETIF_F_GRO |
 		NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_GSO_GRE |
 		NETIF_F_GSO_GRE_CSUM | NETIF_F_GSO_UDP_TUNNEL |
 		NETIF_F_SCTP_CRC | NETIF_F_FRAGLIST;
 
-	netdev->hw_features |= NETIF_F_HW_VLAN_CTAG_TX |
+	netdev->hw_features[0] |= NETIF_F_HW_VLAN_CTAG_TX |
 		NETIF_F_HW_VLAN_CTAG_RX |
 		NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 		NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_GSO_GRE |
@@ -3155,48 +3155,49 @@ static void hns3_set_default_feature(struct net_device *netdev)
 		NETIF_F_SCTP_CRC | NETIF_F_FRAGLIST;
 
 	if (ae_dev->dev_version >= HNAE3_DEVICE_VERSION_V2) {
-		netdev->hw_features |= NETIF_F_GRO_HW;
-		netdev->features |= NETIF_F_GRO_HW;
+		netdev->hw_features[0] |= NETIF_F_GRO_HW;
+		netdev->features[0] |= NETIF_F_GRO_HW;
 
 		if (!(h->flags & HNAE3_SUPPORT_VF)) {
-			netdev->hw_features |= NETIF_F_NTUPLE;
-			netdev->features |= NETIF_F_NTUPLE;
+			netdev->hw_features[0] |= NETIF_F_NTUPLE;
+			netdev->features[0] |= NETIF_F_NTUPLE;
 		}
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_UDP_GSO_B, ae_dev->caps)) {
-		netdev->hw_features |= NETIF_F_GSO_UDP_L4;
-		netdev->features |= NETIF_F_GSO_UDP_L4;
-		netdev->vlan_features |= NETIF_F_GSO_UDP_L4;
-		netdev->hw_enc_features |= NETIF_F_GSO_UDP_L4;
+		netdev->hw_features[0] |= NETIF_F_GSO_UDP_L4;
+		netdev->features[0] |= NETIF_F_GSO_UDP_L4;
+		netdev->vlan_features[0] |= NETIF_F_GSO_UDP_L4;
+		netdev->hw_enc_features[0] |= NETIF_F_GSO_UDP_L4;
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_HW_TX_CSUM_B, ae_dev->caps)) {
-		netdev->hw_features |= NETIF_F_HW_CSUM;
-		netdev->features |= NETIF_F_HW_CSUM;
-		netdev->vlan_features |= NETIF_F_HW_CSUM;
-		netdev->hw_enc_features |= NETIF_F_HW_CSUM;
+		netdev->hw_features[0] |= NETIF_F_HW_CSUM;
+		netdev->features[0] |= NETIF_F_HW_CSUM;
+		netdev->vlan_features[0] |= NETIF_F_HW_CSUM;
+		netdev->hw_enc_features[0] |= NETIF_F_HW_CSUM;
 	} else {
-		netdev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
-		netdev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
-		netdev->vlan_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
-		netdev->hw_enc_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		netdev->hw_features[0] |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		netdev->features[0] |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		netdev->vlan_features[0] |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		netdev->hw_enc_features[0] |=
+					NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_UDP_TUNNEL_CSUM_B, ae_dev->caps)) {
-		netdev->hw_features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
-		netdev->features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
-		netdev->vlan_features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
-		netdev->hw_enc_features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+		netdev->hw_features[0] |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+		netdev->features[0] |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+		netdev->vlan_features[0] |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+		netdev->hw_enc_features[0] |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_FD_FORWARD_TC_B, ae_dev->caps)) {
-		netdev->hw_features |= NETIF_F_HW_TC;
-		netdev->features |= NETIF_F_HW_TC;
+		netdev->hw_features[0] |= NETIF_F_HW_TC;
+		netdev->features[0] |= NETIF_F_HW_TC;
 	}
 
 	if (test_bit(HNAE3_DEV_SUPPORT_VLAN_FLTR_MDF_B, ae_dev->caps))
-		netdev->hw_features |= NETIF_F_HW_VLAN_CTAG_FILTER;
+		netdev->hw_features[0] |= NETIF_F_HW_VLAN_CTAG_FILTER;
 }
 
 static int hns3_alloc_buffer(struct hns3_enet_ring *ring,
@@ -3727,7 +3728,7 @@ static void hns3_rx_checksum(struct hns3_enet_ring *ring, struct sk_buff *skb,
 
 	skb_checksum_none_assert(skb);
 
-	if (!(netdev->features & NETIF_F_RXCSUM))
+	if (!(netdev->features[0] & NETIF_F_RXCSUM))
 		return;
 
 	if (test_bit(HNS3_NIC_STATE_RXD_ADV_LAYOUT_ENABLE, &priv->state))
@@ -4024,7 +4025,7 @@ static int hns3_handle_bdinfo(struct hns3_enet_ring *ring, struct sk_buff *skb)
 	 * ot_vlan_tag in two layer tag case, and stored at vlan_tag
 	 * in one layer tag case.
 	 */
-	if (netdev->features & NETIF_F_HW_VLAN_CTAG_RX) {
+	if (netdev->features[0] & NETIF_F_HW_VLAN_CTAG_RX) {
 		u16 vlan_tag;
 
 		if (hns3_parse_vlan_tag(ring, desc, l234info, &vlan_tag))

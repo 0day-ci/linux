@@ -79,8 +79,8 @@ MODULE_PARM_DESC(rx_weight, "Number Rx packets for NAPI budget (default=64)");
 static int change_mac_addr(struct net_device *netdev, const u8 *addr);
 
 static int set_features(struct hinic_dev *nic_dev,
-			netdev_features_t pre_features,
-			netdev_features_t features, bool force_change);
+			netdev_features_t *pre_features,
+			netdev_features_t *features, bool force_change);
 
 static void update_rx_stats(struct hinic_dev *nic_dev, struct hinic_rxq *rxq)
 {
@@ -880,7 +880,7 @@ static void hinic_get_stats64(struct net_device *netdev,
 }
 
 static int hinic_set_features(struct net_device *netdev,
-			      netdev_features_t features)
+			      netdev_features_t *features)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
 
@@ -888,18 +888,16 @@ static int hinic_set_features(struct net_device *netdev,
 			    features, false);
 }
 
-static netdev_features_t hinic_fix_features(struct net_device *netdev,
-					    netdev_features_t features)
+static void hinic_fix_features(struct net_device *netdev,
+			       netdev_features_t features)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
 
 	/* If Rx checksum is disabled, then LRO should also be disabled */
-	if (!(features & NETIF_F_RXCSUM)) {
+	if (!(features[0] & NETIF_F_RXCSUM)) {
 		netif_info(nic_dev, drv, netdev, "disabling LRO as RXCSUM is off\n");
-		features &= ~NETIF_F_LRO;
+		features[0] &= ~NETIF_F_LRO;
 	}
-
-	return features;
 }
 
 static const struct net_device_ops hinic_netdev_ops = {
@@ -943,19 +941,22 @@ static const struct net_device_ops hinicvf_netdev_ops = {
 
 static void netdev_features_init(struct net_device *netdev)
 {
-	netdev->hw_features = NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_IP_CSUM |
-			      NETIF_F_IPV6_CSUM | NETIF_F_TSO | NETIF_F_TSO6 |
-			      NETIF_F_RXCSUM | NETIF_F_LRO |
-			      NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
-			      NETIF_F_GSO_UDP_TUNNEL | NETIF_F_GSO_UDP_TUNNEL_CSUM;
+	netdev->hw_features[0] =
+			NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_IP_CSUM |
+			NETIF_F_IPV6_CSUM | NETIF_F_TSO | NETIF_F_TSO6 |
+			NETIF_F_RXCSUM | NETIF_F_LRO |
+			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
+			NETIF_F_GSO_UDP_TUNNEL | NETIF_F_GSO_UDP_TUNNEL_CSUM;
 
-	netdev->vlan_features = netdev->hw_features;
+	netdev_features_copy(netdev->vlan_features, netdev->hw_features);
 
-	netdev->features = netdev->hw_features | NETIF_F_HW_VLAN_CTAG_FILTER;
+	netdev->features[0] =
+			netdev->hw_features[0] | NETIF_F_HW_VLAN_CTAG_FILTER;
 
-	netdev->hw_enc_features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_SCTP_CRC |
-				  NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_TSO_ECN |
-				  NETIF_F_GSO_UDP_TUNNEL_CSUM | NETIF_F_GSO_UDP_TUNNEL;
+	netdev->hw_enc_features[0] =
+		NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_SCTP_CRC |
+		NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_TSO_ECN |
+		NETIF_F_GSO_UDP_TUNNEL_CSUM | NETIF_F_GSO_UDP_TUNNEL;
 }
 
 static void hinic_refresh_nic_cfg(struct hinic_dev *nic_dev)
@@ -1072,21 +1073,22 @@ static void link_err_event(void *handle,
 }
 
 static int set_features(struct hinic_dev *nic_dev,
-			netdev_features_t pre_features,
-			netdev_features_t features, bool force_change)
+			netdev_features_t *pre_features,
+			netdev_features_t *features, bool force_change)
 {
-	netdev_features_t changed = force_change ? ~0 : pre_features ^ features;
+	netdev_features_t failed_features[NETDEV_FEATURE_DWORDS] = {0};
 	u32 csum_en = HINIC_RX_CSUM_OFFLOAD_EN;
-	netdev_features_t failed_features = 0;
+	netdev_features_t changed;
 	int ret = 0;
 	int err = 0;
 
+	changed = force_change ? ~0 : pre_features[0] ^ features[0];
 	if (changed & NETIF_F_TSO) {
-		ret = hinic_port_set_tso(nic_dev, (features & NETIF_F_TSO) ?
+		ret = hinic_port_set_tso(nic_dev, (features[0] & NETIF_F_TSO) ?
 					 HINIC_TSO_ENABLE : HINIC_TSO_DISABLE);
 		if (ret) {
 			err = ret;
-			failed_features |= NETIF_F_TSO;
+			failed_features[0] |= NETIF_F_TSO;
 		}
 	}
 
@@ -1094,33 +1096,34 @@ static int set_features(struct hinic_dev *nic_dev,
 		ret = hinic_set_rx_csum_offload(nic_dev, csum_en);
 		if (ret) {
 			err = ret;
-			failed_features |= NETIF_F_RXCSUM;
+			failed_features[0] |= NETIF_F_RXCSUM;
 		}
 	}
 
 	if (changed & NETIF_F_LRO) {
 		ret = hinic_set_rx_lro_state(nic_dev,
-					     !!(features & NETIF_F_LRO),
+					     !!(features[0] & NETIF_F_LRO),
 					     HINIC_LRO_RX_TIMER_DEFAULT,
 					     HINIC_LRO_MAX_WQE_NUM_DEFAULT);
 		if (ret) {
 			err = ret;
-			failed_features |= NETIF_F_LRO;
+			failed_features[0] |= NETIF_F_LRO;
 		}
 	}
 
 	if (changed & NETIF_F_HW_VLAN_CTAG_RX) {
 		ret = hinic_set_rx_vlan_offload(nic_dev,
-						!!(features &
+						!!(features[0] &
 						   NETIF_F_HW_VLAN_CTAG_RX));
 		if (ret) {
 			err = ret;
-			failed_features |= NETIF_F_HW_VLAN_CTAG_RX;
+			failed_features[0] |= NETIF_F_HW_VLAN_CTAG_RX;
 		}
 	}
 
 	if (err) {
-		nic_dev->netdev->features = features ^ failed_features;
+		netdev_features_xor(nic_dev->netdev->features, features,
+				    failed_features)
 		return -EIO;
 	}
 

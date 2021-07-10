@@ -328,7 +328,7 @@ static void vlan_transfer_features(struct net_device *dev,
 	vlandev->gso_max_size = dev->gso_max_size;
 	vlandev->gso_max_segs = dev->gso_max_segs;
 
-	if (vlan_hw_offload_capable(dev->features, vlan->vlan_proto))
+	if (vlan_hw_offload_capable(dev->features[0], vlan->vlan_proto))
 		vlandev->hard_header_len = dev->hard_header_len;
 	else
 		vlandev->hard_header_len = dev->hard_header_len + VLAN_HLEN;
@@ -339,7 +339,7 @@ static void vlan_transfer_features(struct net_device *dev,
 
 	vlandev->priv_flags &= ~IFF_XMIT_DST_RELEASE;
 	vlandev->priv_flags |= (vlan->real_dev->priv_flags & IFF_XMIT_DST_RELEASE);
-	vlandev->hw_enc_features = vlan_tnl_features(vlan->real_dev);
+	vlandev->hw_enc_features[0] = vlan_tnl_features(vlan->real_dev);
 
 	netdev_update_features(vlandev);
 }

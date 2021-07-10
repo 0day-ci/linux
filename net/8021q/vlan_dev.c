@@ -566,21 +566,21 @@ static int vlan_dev_init(struct net_device *dev)
 	if (vlan->flags & VLAN_FLAG_BRIDGE_BINDING)
 		dev->state |= (1 << __LINK_STATE_NOCARRIER);
 
-	dev->hw_features = NETIF_F_HW_CSUM | NETIF_F_SG |
-			   NETIF_F_FRAGLIST | NETIF_F_GSO_SOFTWARE |
-			   NETIF_F_GSO_ENCAP_ALL |
-			   NETIF_F_HIGHDMA | NETIF_F_SCTP_CRC |
-			   NETIF_F_ALL_FCOE;
+	dev->hw_features[0] = NETIF_F_HW_CSUM | NETIF_F_SG |
+			      NETIF_F_FRAGLIST | NETIF_F_GSO_SOFTWARE |
+			      NETIF_F_GSO_ENCAP_ALL |
+			      NETIF_F_HIGHDMA | NETIF_F_SCTP_CRC |
+			      NETIF_F_ALL_FCOE;
 
-	dev->features |= dev->hw_features | NETIF_F_LLTX;
+	dev->features[0] |= dev->hw_features[0] | NETIF_F_LLTX;
 	dev->gso_max_size = real_dev->gso_max_size;
 	dev->gso_max_segs = real_dev->gso_max_segs;
-	if (dev->features & NETIF_F_VLAN_FEATURES)
+	if (dev->features[0] & NETIF_F_VLAN_FEATURES)
 		netdev_warn(real_dev, "VLAN features are set incorrectly.  Q-in-Q configurations may not work correctly.\n");
 
-	dev->vlan_features = real_dev->vlan_features & ~NETIF_F_ALL_FCOE;
-	dev->hw_enc_features = vlan_tnl_features(real_dev);
-	dev->mpls_features = real_dev->mpls_features;
+	dev->vlan_features[0] = real_dev->vlan_features[0] & ~NETIF_F_ALL_FCOE;
+	dev->hw_enc_features[0] = vlan_tnl_features(real_dev);
+	netdev_features_copy(dev->mpls_features, real_dev->mpls_features);
 
 	/* ipv6 shared card related stuff */
 	dev->dev_id = real_dev->dev_id;
@@ -633,27 +633,30 @@ void vlan_dev_uninit(struct net_device *dev)
 	}
 }
 
-static netdev_features_t vlan_dev_fix_features(struct net_device *dev,
-	netdev_features_t features)
+static void vlan_dev_fix_features(struct net_device *dev,
+				  netdev_features_t *features)
 {
 	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
-	netdev_features_t old_features = features;
-	netdev_features_t lower_features;
+	netdev_features_t lower_features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t old_features[NETDEV_FEATURE_DWORDS];
 
-	lower_features = netdev_intersect_features((real_dev->vlan_features |
-						    NETIF_F_RXCSUM),
-						   real_dev->features);
+	netdev_features_copy(lower_features, features);
+
+	lower_features[0] =
+		netdev_intersect_features((real_dev->vlan_features[0] |
+					   NETIF_F_RXCSUM),
+					  real_dev->features[0]);
 
 	/* Add HW_CSUM setting to preserve user ability to control
 	 * checksum offload on the vlan device.
 	 */
-	if (lower_features & (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM))
-		lower_features |= NETIF_F_HW_CSUM;
-	features = netdev_intersect_features(features, lower_features);
-	features |= old_features & (NETIF_F_SOFT_FEATURES | NETIF_F_GSO_SOFTWARE);
-	features |= NETIF_F_LLTX;
+	if (lower_features[0] & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM))
+		lower_features[0] |= NETIF_F_HW_CSUM;
 
-	return features;
+	features[0] = netdev_intersect_features(features[0], lower_features[0]);
+	features[0] |= old_features[0] &
+			(NETIF_F_SOFT_FEATURES | NETIF_F_GSO_SOFTWARE);
+	features[0] |= NETIF_F_LLTX;
 }
 
 static int vlan_ethtool_get_link_ksettings(struct net_device *dev,

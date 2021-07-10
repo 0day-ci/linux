@@ -25,12 +25,13 @@ const struct nla_policy ethnl_features_get_policy[] = {
 		NLA_POLICY_NESTED(ethnl_header_policy),
 };
 
-static void ethnl_features_to_bitmap32(u32 *dest, netdev_features_t src)
+static void ethnl_features_to_bitmap32(u32 *dest, netdev_features_t *src)
 {
+	u32 *__src = (u32 *)src;
 	unsigned int i;
 
 	for (i = 0; i < ETHTOOL_DEV_FEATURE_WORDS; i++)
-		dest[i] = src >> (32 * i);
+		dest[i] = __src[i];
 }
 
 static int features_prepare_data(const struct ethnl_req_info *req_base,
@@ -38,15 +39,23 @@ static int features_prepare_data(const struct ethnl_req_info *req_base,
 				 struct genl_info *info)
 {
 	struct features_reply_data *data = FEATURES_REPDATA(reply_base);
+	netdev_features_t features[NETDEV_FEATURE_DWORDS] = {0};
 	struct net_device *dev = reply_base->dev;
-	netdev_features_t all_features;
+	unsigned int i;
 
 	ethnl_features_to_bitmap32(data->hw, dev->hw_features);
 	ethnl_features_to_bitmap32(data->wanted, dev->wanted_features);
 	ethnl_features_to_bitmap32(data->active, dev->features);
-	ethnl_features_to_bitmap32(data->nochange, NETIF_F_NEVER_CHANGE);
-	all_features = GENMASK_ULL(NETDEV_FEATURE_COUNT - 1, 0);
-	ethnl_features_to_bitmap32(data->all, all_features);
+	features[0] = NETIF_F_NEVER_CHANGE;
+	ethnl_features_to_bitmap32(data->nochange, features);
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++) {
+		if (NETDEV_FEATURE_COUNT >= (i + 1) * 64)
+			features[i] = GENMASK_ULL(63, 0);
+		else
+			features[i] = GENMASK_ULL(NETDEV_FEATURE_COUNT - i * 64,
+						  0);
+	}
+	ethnl_features_to_bitmap32(data->all, features);
 
 	return 0;
 }
@@ -131,27 +140,29 @@ const struct nla_policy ethnl_features_set_policy[] = {
 	[ETHTOOL_A_FEATURES_WANTED]	= { .type = NLA_NESTED },
 };
 
-static void ethnl_features_to_bitmap(unsigned long *dest, netdev_features_t val)
+static void ethnl_features_to_bitmap(unsigned long *dest,
+				     netdev_features_t *val)
 {
 	const unsigned int words = BITS_TO_LONGS(NETDEV_FEATURE_COUNT);
 	unsigned int i;
 
 	bitmap_zero(dest, NETDEV_FEATURE_COUNT);
 	for (i = 0; i < words; i++)
-		dest[i] = (unsigned long)(val >> (i * BITS_PER_LONG));
+		dest[i] =
+			(unsigned long)(val[i / 2] >> (i % 2 * BITS_PER_LONG));
 }
 
-static netdev_features_t ethnl_bitmap_to_features(unsigned long *src)
+static void ethnl_bitmap_to_features(netdev_features_t *val, unsigned long *src)
 {
-	const unsigned int nft_bits = sizeof(netdev_features_t) * BITS_PER_BYTE;
 	const unsigned int words = BITS_TO_LONGS(NETDEV_FEATURE_COUNT);
-	netdev_features_t ret = 0;
 	unsigned int i;
 
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		val[i] = 0;
+
 	for (i = 0; i < words; i++)
-		ret |= (netdev_features_t)(src[i]) << (i * BITS_PER_LONG);
-	ret &= ~(netdev_features_t)0 >> (nft_bits - NETDEV_FEATURE_COUNT);
-	return ret;
+		val[i / 2] |=
+			(netdev_features_t)(src[i]) << (i % 2 * BITS_PER_LONG);
 }
 
 static int features_send_reply(struct net_device *dev, struct genl_info *info,
@@ -212,12 +223,14 @@ int ethnl_set_features(struct sk_buff *skb, struct genl_info *info)
 {
 	DECLARE_BITMAP(wanted_diff_mask, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(active_diff_mask, NETDEV_FEATURE_COUNT);
+	netdev_features_t features[NETDEV_FEATURE_DWORDS];
 	DECLARE_BITMAP(old_active, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(old_wanted, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(new_active, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(new_wanted, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(req_wanted, NETDEV_FEATURE_COUNT);
 	DECLARE_BITMAP(req_mask, NETDEV_FEATURE_COUNT);
+	netdev_features_t tmp[NETDEV_FEATURE_DWORDS];
 	struct ethnl_req_info req_info = {};
 	struct nlattr **tb = info->attrs;
 	struct net_device *dev;
@@ -242,7 +255,11 @@ int ethnl_set_features(struct sk_buff *skb, struct genl_info *info)
 				 netdev_features_strings, info->extack);
 	if (ret < 0)
 		goto out_rtnl;
-	if (ethnl_bitmap_to_features(req_mask) & ~NETIF_F_ETHTOOL_BITS) {
+
+	ethnl_bitmap_to_features(features, req_mask);
+	netdev_features_ethtool_bits(tmp);
+	netdev_features_andnot(features, features, tmp);
+	if (!netdev_features_empty(features)) {
 		GENL_SET_ERR_MSG(info, "attempt to change non-ethtool features");
 		ret = -EINVAL;
 		goto out_rtnl;
@@ -253,8 +270,13 @@ int ethnl_set_features(struct sk_buff *skb, struct genl_info *info)
 	bitmap_andnot(new_wanted, old_wanted, req_mask, NETDEV_FEATURE_COUNT);
 	bitmap_or(req_wanted, new_wanted, req_wanted, NETDEV_FEATURE_COUNT);
 	if (!bitmap_equal(req_wanted, old_wanted, NETDEV_FEATURE_COUNT)) {
-		dev->wanted_features &= ~dev->hw_features;
-		dev->wanted_features |= ethnl_bitmap_to_features(req_wanted) & dev->hw_features;
+		netdev_features_andnot(dev->wanted_features,
+				       dev->wanted_features,
+				       dev->hw_features);
+		ethnl_bitmap_to_features(features, req_wanted);
+		netdev_features_and(features, features, dev->hw_features);
+		netdev_features_or(dev->wanted_features, dev->wanted_features,
+				   features);
 		__netdev_update_features(dev);
 	}
 	ethnl_features_to_bitmap(new_active, dev->features);

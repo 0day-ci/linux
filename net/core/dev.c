@@ -1765,7 +1765,7 @@ void dev_disable_lro(struct net_device *dev)
 	dev->wanted_features &= ~NETIF_F_LRO;
 	netdev_update_features(dev);
 
-	if (unlikely(dev->features & NETIF_F_LRO))
+	if (unlikely(dev->features[0] & NETIF_F_LRO))
 		netdev_WARN(dev, "failed to disable LRO!\n");
 
 	netdev_for_each_lower_dev(dev, lower_dev, iter)
@@ -1786,7 +1786,7 @@ static void dev_disable_gro_hw(struct net_device *dev)
 	dev->wanted_features &= ~NETIF_F_GRO_HW;
 	netdev_update_features(dev);
 
-	if (unlikely(dev->features & NETIF_F_GRO_HW))
+	if (unlikely(dev->features[0] & NETIF_F_GRO_HW))
 		netdev_WARN(dev, "failed to disable GRO_HW!\n");
 }
 
@@ -3276,7 +3276,7 @@ static void skb_warn_bad_offload(const struct sk_buff *skb)
 	}
 	skb_dump(KERN_WARNING, skb, false);
 	WARN(1, "%s: caps=(%pNF, %pNF)\n",
-	     name, dev ? &dev->features : &null_features,
+	     name, dev ? &dev->features[0] : &null_features,
 	     skb->sk ? &skb->sk->sk_route_caps : &null_features);
 }
 
@@ -3463,7 +3463,8 @@ struct sk_buff *__skb_gso_segment(struct sk_buff *skb,
 		netdev_features_t partial_features = NETIF_F_GSO_ROBUST;
 		struct net_device *dev = skb->dev;
 
-		partial_features |= dev->features & dev->gso_partial_features;
+		partial_features |=
+				dev->features[0] & dev->gso_partial_features;
 		if (!skb_gso_ok(skb, features | partial_features))
 			features &= ~NETIF_F_GSO_PARTIAL;
 	}
@@ -3508,7 +3509,7 @@ static int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 #ifdef CONFIG_HIGHMEM
 	int i;
 
-	if (!(dev->features & NETIF_F_HIGHDMA)) {
+	if (!(dev->features[0] & NETIF_F_HIGHDMA)) {
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
@@ -3612,34 +3613,33 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 	return features;
 }
 
-netdev_features_t netif_skb_features(struct sk_buff *skb)
+void netif_skb_features(struct sk_buff *skb, netdev_features_t *features)
 {
 	struct net_device *dev = skb->dev;
-	netdev_features_t features = dev->features;
 
+	netdev_features_copy(features, dev->features);
 	if (skb_is_gso(skb))
-		features = gso_features_check(skb, dev, features);
+		features[0] = gso_features_check(skb, dev, features[0]);
 
 	/* If encapsulation offload request, verify we are testing
 	 * hardware encapsulation features instead of standard
 	 * features for the netdev
 	 */
 	if (skb->encapsulation)
-		features &= dev->hw_enc_features;
+		netdev_features_and(features, dev->hw_enc_features);
 
 	if (skb_vlan_tagged(skb))
-		features = netdev_intersect_features(features,
-						     dev->vlan_features |
-						     NETIF_F_HW_VLAN_CTAG_TX |
-						     NETIF_F_HW_VLAN_STAG_TX);
+		features[0] = netdev_intersect_features(features[0],
+							dev->vlan_features[0] |
+							NETIF_F_HW_VLAN_CTAG_TX |
+							NETIF_F_HW_VLAN_STAG_TX);
 
 	if (dev->netdev_ops->ndo_features_check)
-		features &= dev->netdev_ops->ndo_features_check(skb, dev,
-								features);
+		dev->netdev_ops->ndo_features_check(skb, dev, features);
 	else
-		features &= dflt_features_check(skb, dev, features);
+		features[0] &= dflt_features_check(skb, dev, features[0]);
 
-	return harmonize_features(skb, features);
+	features[0] = harmonize_features(skb, features[0]);
 }
 EXPORT_SYMBOL(netif_skb_features);
 
@@ -3722,10 +3722,10 @@ EXPORT_SYMBOL(skb_csum_hwoffload_help);
 
 static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device *dev, bool *again)
 {
-	netdev_features_t features;
+	netdev_features_t features[NETDEV_FEATURE_DWORDS];
 
-	features = netif_skb_features(skb);
-	skb = validate_xmit_vlan(skb, features);
+	netif_skb_features(skb, features);
+	skb = validate_xmit_vlan(skb, features[0]);
 	if (unlikely(!skb))
 		goto out_null;
 
@@ -3733,10 +3733,10 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 	if (unlikely(!skb))
 		goto out_null;
 
-	if (netif_needs_gso(skb, features)) {
+	if (netif_needs_gso(skb, features[0])) {
 		struct sk_buff *segs;
 
-		segs = skb_gso_segment(skb, features);
+		segs = skb_gso_segment(skb, features[0]);
 		if (IS_ERR(segs)) {
 			goto out_kfree_skb;
 		} else if (segs) {
@@ -3744,7 +3744,7 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 			skb = segs;
 		}
 	} else {
-		if (skb_needs_linearize(skb, features) &&
+		if (skb_needs_linearize(skb, features[0]) &&
 		    __skb_linearize(skb))
 			goto out_kfree_skb;
 
@@ -3759,12 +3759,12 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 			else
 				skb_set_transport_header(skb,
 							 skb_checksum_start_offset(skb));
-			if (skb_csum_hwoffload_help(skb, features))
+			if (skb_csum_hwoffload_help(skb, features[0]))
 				goto out_kfree_skb;
 		}
 	}
 
-	skb = validate_xmit_xfrm(skb, features, again);
+	skb = validate_xmit_xfrm(skb, features[0], again);
 
 	return skb;
 
@@ -4429,7 +4429,7 @@ set_rps_cpu(struct net_device *dev, struct sk_buff *skb,
 
 		/* Should we steer this flow to a different hardware queue? */
 		if (!skb_rx_queue_recorded(skb) || !dev->rx_cpu_rmap ||
-		    !(dev->features & NETIF_F_NTUPLE))
+		    !(dev->features[0] & NETIF_F_NTUPLE))
 			goto out;
 		rxq_index = cpu_rmap_lookup_index(dev->rx_cpu_rmap, next_cpu);
 		if (rxq_index == skb_get_rx_queue(skb))
@@ -9799,171 +9799,179 @@ static void net_set_todo(struct net_device *dev)
 	dev_net(dev)->dev_unreg_count++;
 }
 
-static netdev_features_t netdev_sync_upper_features(struct net_device *lower,
-	struct net_device *upper, netdev_features_t features)
+static void netdev_sync_upper_features(struct net_device *lower,
+				       struct net_device *upper,
+				       netdev_features_t *features)
 {
 	netdev_features_t upper_disables = NETIF_F_UPPER_DISABLES;
 	netdev_features_t feature;
 	int feature_bit;
+	unsigned int i;
 
-	for_each_netdev_feature(upper_disables, feature_bit) {
-		feature = __NETIF_F_BIT(feature_bit);
-		if (!(upper->wanted_features & feature)
-		    && (features & feature)) {
-			netdev_dbg(lower, "Dropping feature %pNF, upper dev %s has it off.\n",
-				   &feature, upper->name);
-			features &= ~feature;
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++) {
+		for_each_netdev_feature(upper_disables, feature_bit) {
+			feature = __NETIF_F_BIT(feature_bit);
+			if (!(upper->wanted_features[i] & feature) &&
+			    (features[i] & feature)) {
+				netdev_dbg(lower, "Dropping feature[%u] %pNF, upper dev %s has it off.\n",
+					   i, &feature, upper->name);
+				features[i] &= ~feature;
+			}
 		}
 	}
-
-	return features;
 }
 
 static void netdev_sync_lower_features(struct net_device *upper,
-	struct net_device *lower, netdev_features_t features)
+	struct net_device *lower, netdev_features_t *features)
 {
 	netdev_features_t upper_disables = NETIF_F_UPPER_DISABLES;
 	netdev_features_t feature;
 	int feature_bit;
+	unsigned int i;
 
-	for_each_netdev_feature(upper_disables, feature_bit) {
-		feature = __NETIF_F_BIT(feature_bit);
-		if (!(features & feature) && (lower->features & feature)) {
-			netdev_dbg(upper, "Disabling feature %pNF on lower dev %s.\n",
-				   &feature, lower->name);
-			lower->wanted_features &= ~feature;
-			__netdev_update_features(lower);
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++) {
+		for_each_netdev_feature(upper_disables, feature_bit) {
+			feature = __NETIF_F_BIT(feature_bit);
+			if (!(features[i] & feature) &&
+			    (lower->features[i] & feature)) {
+				netdev_dbg(upper, "Disabling feature[%u] %pNF on lower dev %s.\n",
+					   i, &feature, lower->name);
+				lower->wanted_features[i] &= ~feature[i];
+				__netdev_update_features(lower);
 
-			if (unlikely(lower->features & feature))
-				netdev_WARN(upper, "failed to disable %pNF on %s!\n",
-					    &feature, lower->name);
-			else
-				netdev_features_change(lower);
+				if (unlikely(lower->features[i] & feature))
+					netdev_WARN(upper, "failed to disable feature[%u] %pNF on %s!\n",
+						    i, &feature, lower->name);
+				else
+					netdev_features_change(lower);
+			}
 		}
 	}
 }
 
-static netdev_features_t netdev_fix_features(struct net_device *dev,
-	netdev_features_t features)
+static void netdev_fix_features(struct net_device *dev,
+				netdev_features_t *features)
 {
 	/* Fix illegal checksum combinations */
-	if ((features & NETIF_F_HW_CSUM) &&
-	    (features & (NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM))) {
+	if ((features[0] & NETIF_F_HW_CSUM) &&
+	    (features[0] & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM))) {
 		netdev_warn(dev, "mixed HW and IP checksum settings.\n");
-		features &= ~(NETIF_F_IP_CSUM|NETIF_F_IPV6_CSUM);
+		features[0] &= ~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 	}
 
 	/* TSO requires that SG is present as well. */
-	if ((features & NETIF_F_ALL_TSO) && !(features & NETIF_F_SG)) {
+	if ((features[0] & NETIF_F_ALL_TSO) && !(features[0] & NETIF_F_SG)) {
 		netdev_dbg(dev, "Dropping TSO features since no SG feature.\n");
-		features &= ~NETIF_F_ALL_TSO;
+		features[0] &= ~NETIF_F_ALL_TSO;
 	}
 
-	if ((features & NETIF_F_TSO) && !(features & NETIF_F_HW_CSUM) &&
-					!(features & NETIF_F_IP_CSUM)) {
+	if ((features[0] & NETIF_F_TSO) && !(features[0] & NETIF_F_HW_CSUM) &&
+	    !(features[0] & NETIF_F_IP_CSUM)) {
 		netdev_dbg(dev, "Dropping TSO features since no CSUM feature.\n");
-		features &= ~NETIF_F_TSO;
-		features &= ~NETIF_F_TSO_ECN;
+		features[0] &= ~NETIF_F_TSO;
+		features[0] &= ~NETIF_F_TSO_ECN;
 	}
 
-	if ((features & NETIF_F_TSO6) && !(features & NETIF_F_HW_CSUM) &&
-					 !(features & NETIF_F_IPV6_CSUM)) {
+	if ((features[0] & NETIF_F_TSO6) && !(features[0] & NETIF_F_HW_CSUM) &&
+	    !(features[0] & NETIF_F_IPV6_CSUM)) {
 		netdev_dbg(dev, "Dropping TSO6 features since no CSUM feature.\n");
-		features &= ~NETIF_F_TSO6;
+		features[0] &= ~NETIF_F_TSO6;
 	}
 
 	/* TSO with IPv4 ID mangling requires IPv4 TSO be enabled */
-	if ((features & NETIF_F_TSO_MANGLEID) && !(features & NETIF_F_TSO))
-		features &= ~NETIF_F_TSO_MANGLEID;
+	if ((features[0] & NETIF_F_TSO_MANGLEID) &&
+	    !(features[0] & NETIF_F_TSO))
+		features[0] &= ~NETIF_F_TSO_MANGLEID;
 
 	/* TSO ECN requires that TSO is present as well. */
-	if ((features & NETIF_F_ALL_TSO) == NETIF_F_TSO_ECN)
-		features &= ~NETIF_F_TSO_ECN;
+	if ((features[0] & NETIF_F_ALL_TSO) == NETIF_F_TSO_ECN)
+		features[0] &= ~NETIF_F_TSO_ECN;
 
 	/* Software GSO depends on SG. */
-	if ((features & NETIF_F_GSO) && !(features & NETIF_F_SG)) {
+	if ((features[0] & NETIF_F_GSO) && !(features[0] & NETIF_F_SG)) {
 		netdev_dbg(dev, "Dropping NETIF_F_GSO since no SG feature.\n");
-		features &= ~NETIF_F_GSO;
+		features[0] &= ~NETIF_F_GSO;
 	}
 
 	/* GSO partial features require GSO partial be set */
-	if ((features & dev->gso_partial_features) &&
-	    !(features & NETIF_F_GSO_PARTIAL)) {
+	if ((features[0] & dev->gso_partial_features) &&
+	    !(features[0] & NETIF_F_GSO_PARTIAL)) {
 		netdev_dbg(dev,
 			   "Dropping partially supported GSO features since no GSO partial.\n");
-		features &= ~dev->gso_partial_features;
+		features[0] &= ~dev->gso_partial_features;
 	}
 
-	if (!(features & NETIF_F_RXCSUM)) {
+	if (!(features[0] & NETIF_F_RXCSUM)) {
 		/* NETIF_F_GRO_HW implies doing RXCSUM since every packet
 		 * successfully merged by hardware must also have the
 		 * checksum verified by hardware.  If the user does not
 		 * want to enable RXCSUM, logically, we should disable GRO_HW.
 		 */
-		if (features & NETIF_F_GRO_HW) {
+		if (features[0] & NETIF_F_GRO_HW) {
 			netdev_dbg(dev, "Dropping NETIF_F_GRO_HW since no RXCSUM feature.\n");
-			features &= ~NETIF_F_GRO_HW;
+			features[0] &= ~NETIF_F_GRO_HW;
 		}
 	}
 
 	/* LRO/HW-GRO features cannot be combined with RX-FCS */
-	if (features & NETIF_F_RXFCS) {
-		if (features & NETIF_F_LRO) {
+	if (features[0] & NETIF_F_RXFCS) {
+		if (features[0] & NETIF_F_LRO) {
 			netdev_dbg(dev, "Dropping LRO feature since RX-FCS is requested.\n");
-			features &= ~NETIF_F_LRO;
+			features[0] &= ~NETIF_F_LRO;
 		}
 
-		if (features & NETIF_F_GRO_HW) {
+		if (features[0] & NETIF_F_GRO_HW) {
 			netdev_dbg(dev, "Dropping HW-GRO feature since RX-FCS is requested.\n");
-			features &= ~NETIF_F_GRO_HW;
+			features[0] &= ~NETIF_F_GRO_HW;
 		}
 	}
 
-	if (features & NETIF_F_HW_TLS_TX) {
-		bool ip_csum = (features & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)) ==
+	if (features[0] & NETIF_F_HW_TLS_TX) {
+		bool ip_csum = (features[0] & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)) ==
 			(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-		bool hw_csum = features & NETIF_F_HW_CSUM;
+		bool hw_csum = features[0] & NETIF_F_HW_CSUM;
 
 		if (!ip_csum && !hw_csum) {
 			netdev_dbg(dev, "Dropping TLS TX HW offload feature since no CSUM feature.\n");
-			features &= ~NETIF_F_HW_TLS_TX;
+			features[0] &= ~NETIF_F_HW_TLS_TX;
 		}
 	}
 
-	if ((features & NETIF_F_HW_TLS_RX) && !(features & NETIF_F_RXCSUM)) {
+	if ((features[0] & NETIF_F_HW_TLS_RX) &&
+	    !(features[0] & NETIF_F_RXCSUM)) {
 		netdev_dbg(dev, "Dropping TLS RX HW offload feature since no RXCSUM feature.\n");
-		features &= ~NETIF_F_HW_TLS_RX;
+		features[0] &= ~NETIF_F_HW_TLS_RX;
 	}
-
-	return features;
 }
 
 int __netdev_update_features(struct net_device *dev)
 {
+	netdev_features_t features[NETDEV_FEATURE_DWORDS];
 	struct net_device *upper, *lower;
-	netdev_features_t features;
 	struct list_head *iter;
+	unsigned int i;
 	int err = -1;
 
 	ASSERT_RTNL();
 
-	features = netdev_get_wanted_features(dev);
+	netdev_get_wanted_features(dev, features);
 
 	if (dev->netdev_ops->ndo_fix_features)
-		features = dev->netdev_ops->ndo_fix_features(dev, features);
+		dev->netdev_ops->ndo_fix_features(dev, features);
 
 	/* driver might be less strict about feature dependencies */
-	features = netdev_fix_features(dev, features);
+	netdev_fix_features(dev, features);
 
 	/* some features can't be enabled if they're off on an upper device */
 	netdev_for_each_upper_dev_rcu(dev, upper, iter)
-		features = netdev_sync_upper_features(dev, upper, features);
+		netdev_sync_upper_features(dev, upper, features);
 
-	if (dev->features == features)
+	if (netdev_features_equal(dev->features, features))
 		goto sync_lower;
 
-	netdev_dbg(dev, "Features changed: %pNF -> %pNF\n",
-		&dev->features, &features);
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		netdev_dbg(dev, "Features[%u] changed: %pNF -> %pNF\n",
+			   i, &dev->features[i], &features[i]);
 
 	if (dev->netdev_ops->ndo_set_features)
 		err = dev->netdev_ops->ndo_set_features(dev, features);
@@ -9971,9 +9979,10 @@ int __netdev_update_features(struct net_device *dev)
 		err = 0;
 
 	if (unlikely(err < 0)) {
-		netdev_err(dev,
-			"set_features() failed (%d); wanted %pNF, left %pNF\n",
-			err, &features, &dev->features);
+		for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+			netdev_err(dev,
+				   "set_features() failed (%d); wanted[%u] %pNF, left[%u] %pNF\n",
+				   err, i, &features[i], i, &dev->features[i]);
 		/* return non-0 since some features might have changed and
 		 * it's better to fire a spurious notification than miss it
 		 */
@@ -9988,9 +9997,10 @@ sync_lower:
 		netdev_sync_lower_features(dev, lower, features);
 
 	if (!err) {
-		netdev_features_t diff = features ^ dev->features;
+		netdev_features_t diff[NETDEV_FEATURE_DWORDS];
 
-		if (diff & NETIF_F_RX_UDP_TUNNEL_PORT) {
+		netdev_features_xor(diff, features, dev->features);
+		if (diff[0] & NETIF_F_RX_UDP_TUNNEL_PORT) {
 			/* udp_tunnel_{get,drop}_rx_info both need
 			 * NETIF_F_RX_UDP_TUNNEL_PORT enabled on the
 			 * device, or they won't do anything.
@@ -9998,33 +10008,33 @@ sync_lower:
 			 * *before* calling udp_tunnel_get_rx_info,
 			 * but *after* calling udp_tunnel_drop_rx_info.
 			 */
-			if (features & NETIF_F_RX_UDP_TUNNEL_PORT) {
-				dev->features = features;
+			if (features[0] & NETIF_F_RX_UDP_TUNNEL_PORT) {
+				dev->features[0] = features[0];
 				udp_tunnel_get_rx_info(dev);
 			} else {
 				udp_tunnel_drop_rx_info(dev);
 			}
 		}
 
-		if (diff & NETIF_F_HW_VLAN_CTAG_FILTER) {
-			if (features & NETIF_F_HW_VLAN_CTAG_FILTER) {
-				dev->features = features;
+		if (diff[0] & NETIF_F_HW_VLAN_CTAG_FILTER) {
+			if (features[0] & NETIF_F_HW_VLAN_CTAG_FILTER) {
+				dev->features[0] = features[0];
 				err |= vlan_get_rx_ctag_filter_info(dev);
 			} else {
 				vlan_drop_rx_ctag_filter_info(dev);
 			}
 		}
 
-		if (diff & NETIF_F_HW_VLAN_STAG_FILTER) {
+		if (diff[0] & NETIF_F_HW_VLAN_STAG_FILTER) {
 			if (features & NETIF_F_HW_VLAN_STAG_FILTER) {
-				dev->features = features;
+				dev->features[0] = features[0];
 				err |= vlan_get_rx_stag_filter_info(dev);
 			} else {
 				vlan_drop_rx_stag_filter_info(dev);
 			}
 		}
 
-		dev->features = features;
+		netdev_features_copy(dev->features, features);
 	}
 
 	return err < 0 ? 0 : 1;
@@ -10213,7 +10223,7 @@ int register_netdevice(struct net_device *dev)
 	int ret;
 	struct net *net = dev_net(dev);
 
-	BUILD_BUG_ON(sizeof(netdev_features_t) * BITS_PER_BYTE <
+	BUILD_BUG_ON(sizeof(dev->features) * BITS_PER_BYTE <
 		     NETDEV_FEATURE_COUNT);
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
@@ -10250,7 +10260,7 @@ int register_netdevice(struct net_device *dev)
 		}
 	}
 
-	if (((dev->hw_features | dev->features) &
+	if (((dev->hw_features[0] | dev->features[0]) &
 	     NETIF_F_HW_VLAN_CTAG_FILTER) &&
 	    (!dev->netdev_ops->ndo_vlan_rx_add_vid ||
 	     !dev->netdev_ops->ndo_vlan_rx_kill_vid)) {
@@ -10268,44 +10278,46 @@ int register_netdevice(struct net_device *dev)
 	/* Transfer changeable features to wanted_features and enable
 	 * software offloads (GSO and GRO).
 	 */
-	dev->hw_features |= (NETIF_F_SOFT_FEATURES | NETIF_F_SOFT_FEATURES_OFF);
-	dev->features |= NETIF_F_SOFT_FEATURES;
+	dev->hw_features[0] |=
+			(NETIF_F_SOFT_FEATURES | NETIF_F_SOFT_FEATURES_OFF);
+	dev->features[0] |= NETIF_F_SOFT_FEATURES;
 
 	if (dev->udp_tunnel_nic_info) {
-		dev->features |= NETIF_F_RX_UDP_TUNNEL_PORT;
-		dev->hw_features |= NETIF_F_RX_UDP_TUNNEL_PORT;
+		dev->features[0] |= NETIF_F_RX_UDP_TUNNEL_PORT;
+		dev->hw_features[0] |= NETIF_F_RX_UDP_TUNNEL_PORT;
 	}
 
-	dev->wanted_features = dev->features & dev->hw_features;
+	netdev_features_and(dev->wanted_features, dev->features,
+			    dev->hw_features);
 
 	if (!(dev->flags & IFF_LOOPBACK))
-		dev->hw_features |= NETIF_F_NOCACHE_COPY;
+		dev->hw_features[0] |= NETIF_F_NOCACHE_COPY;
 
 	/* If IPv4 TCP segmentation offload is supported we should also
 	 * allow the device to enable segmenting the frame with the option
 	 * of ignoring a static IP ID value.  This doesn't enable the
 	 * feature itself but allows the user to enable it later.
 	 */
-	if (dev->hw_features & NETIF_F_TSO)
-		dev->hw_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->vlan_features & NETIF_F_TSO)
-		dev->vlan_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->mpls_features & NETIF_F_TSO)
-		dev->mpls_features |= NETIF_F_TSO_MANGLEID;
-	if (dev->hw_enc_features & NETIF_F_TSO)
-		dev->hw_enc_features |= NETIF_F_TSO_MANGLEID;
+	if (dev->hw_features[0] & NETIF_F_TSO)
+		dev->hw_features[0] |= NETIF_F_TSO_MANGLEID;
+	if (dev->vlan_features[0] & NETIF_F_TSO)
+		dev->vlan_features[0] |= NETIF_F_TSO_MANGLEID;
+	if (dev->mpls_features[0] & NETIF_F_TSO)
+		dev->mpls_features[0] |= NETIF_F_TSO_MANGLEID;
+	if (dev->hw_enc_features[0] & NETIF_F_TSO)
+		dev->hw_enc_features[0] |= NETIF_F_TSO_MANGLEID;
 
 	/* Make NETIF_F_HIGHDMA inheritable to VLAN devices.
 	 */
-	dev->vlan_features |= NETIF_F_HIGHDMA;
+	dev->vlan_features[0] |= NETIF_F_HIGHDMA;
 
 	/* Make NETIF_F_SG inheritable to tunnel devices.
 	 */
-	dev->hw_enc_features |= NETIF_F_SG | NETIF_F_GSO_PARTIAL;
+	dev->hw_enc_features[0] |= NETIF_F_SG | NETIF_F_GSO_PARTIAL;
 
 	/* Make NETIF_F_SG inheritable to MPLS.
 	 */
-	dev->mpls_features |= NETIF_F_SG;
+	dev->mpls_features[0] |= NETIF_F_SG;
 
 	ret = call_netdevice_notifiers(NETDEV_POST_INIT, dev);
 	ret = notifier_to_errno(ret);
@@ -11146,7 +11158,7 @@ int __dev_change_net_namespace(struct net_device *dev, struct net *net,
 
 	/* Don't allow namespace local devices to be moved. */
 	err = -EINVAL;
-	if (dev->features & NETIF_F_NETNS_LOCAL)
+	if (dev->features[0] & NETIF_F_NETNS_LOCAL)
 		goto out;
 
 	/* Ensure the device has been registrered */
@@ -11506,7 +11518,7 @@ static void __net_exit default_device_exit(struct net *net)
 		char fb_name[IFNAMSIZ];
 
 		/* Ignore unmoveable devices (i.e. loopback) */
-		if (dev->features & NETIF_F_NETNS_LOCAL)
+		if (dev->features[0] & NETIF_F_NETNS_LOCAL)
 			continue;
 
 		/* Leave virtual devices for the generic cleanup */

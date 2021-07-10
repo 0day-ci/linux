@@ -1347,9 +1347,9 @@ struct net_device_ops {
 	int			(*ndo_stop)(struct net_device *dev);
 	netdev_tx_t		(*ndo_start_xmit)(struct sk_buff *skb,
 						  struct net_device *dev);
-	netdev_features_t	(*ndo_features_check)(struct sk_buff *skb,
+	void			(*ndo_features_check)(struct sk_buff *skb,
 						      struct net_device *dev,
-						      netdev_features_t features);
+						      netdev_features_t *features);
 	u16			(*ndo_select_queue)(struct net_device *dev,
 						    struct sk_buff *skb,
 						    struct net_device *sb_dev);
@@ -1467,10 +1467,10 @@ struct net_device_ops {
 						      bool all_slaves);
 	struct net_device*	(*ndo_sk_get_lower_dev)(struct net_device *dev,
 							struct sock *sk);
-	netdev_features_t	(*ndo_fix_features)(struct net_device *dev,
-						    netdev_features_t features);
+	void			(*ndo_fix_features)(struct net_device *dev,
+						    netdev_features_t *features);
 	int			(*ndo_set_features)(struct net_device *dev,
-						    netdev_features_t features);
+						    netdev_features_t *features);
 	int			(*ndo_neigh_construct)(struct net_device *dev,
 						       struct neighbour *n);
 	void			(*ndo_neigh_destroy)(struct net_device *dev,
@@ -1978,12 +1978,12 @@ struct net_device {
 	unsigned short		needed_headroom;
 	unsigned short		needed_tailroom;
 
-	netdev_features_t	features;
-	netdev_features_t	hw_features;
-	netdev_features_t	wanted_features;
-	netdev_features_t	vlan_features;
-	netdev_features_t	hw_enc_features;
-	netdev_features_t	mpls_features;
+	netdev_features_t	features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t	hw_features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t	wanted_features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t	vlan_features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t	hw_enc_features[NETDEV_FEATURE_DWORDS];
+	netdev_features_t	mpls_features[NETDEV_FEATURE_DWORDS];
 	netdev_features_t	gso_partial_features;
 
 	unsigned int		min_mtu;
@@ -4986,10 +4986,11 @@ static inline netdev_features_t netdev_intersect_features(netdev_features_t f1,
 	return f1 & f2;
 }
 
-static inline netdev_features_t netdev_get_wanted_features(
-	struct net_device *dev)
+static inline void netdev_get_wanted_features(struct net_device *dev,
+					      netdev_features_t *wanted)
 {
-	return (dev->features & ~dev->hw_features) | dev->wanted_features;
+	netdev_features_andnot(wanted, dev->features, dev->hw_features);
+	netdev_features_or(wanted, wanted, dev->wanted_features);
 }
 netdev_features_t netdev_increment_features(netdev_features_t all,
 	netdev_features_t one, netdev_features_t mask);
@@ -5014,7 +5015,7 @@ void netif_stacked_transfer_operstate(const struct net_device *rootdev,
 netdev_features_t passthru_features_check(struct sk_buff *skb,
 					  struct net_device *dev,
 					  netdev_features_t features);
-netdev_features_t netif_skb_features(struct sk_buff *skb);
+void netif_skb_features(struct sk_buff *skb, netdev_features_t *features);
 
 static inline bool net_gso_ok(netdev_features_t features, int gso_type)
 {

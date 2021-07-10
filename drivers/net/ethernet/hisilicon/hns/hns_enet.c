@@ -479,7 +479,7 @@ static void hns_nic_rx_checksum(struct hns_nic_ring_data *ring_data,
 	u32 l4id;
 
 	/* check if RX checksum offload is enabled */
-	if (unlikely(!(netdev->features & NETIF_F_RXCSUM)))
+	if (unlikely(!(netdev->features[0] & NETIF_F_RXCSUM)))
 		return;
 
 	/* In hardware, we only support checksum for the following protocols:
@@ -1768,17 +1768,17 @@ out:
 }
 
 static int hns_nic_set_features(struct net_device *netdev,
-				netdev_features_t features)
+				netdev_features_t *features)
 {
 	struct hns_nic_priv *priv = netdev_priv(netdev);
 
 	switch (priv->enet_ver) {
 	case AE_VERSION_1:
-		if (features & (NETIF_F_TSO | NETIF_F_TSO6))
+		if (features[0] & (NETIF_F_TSO | NETIF_F_TSO6))
 			netdev_info(netdev, "enet v1 do not support tso!\n");
 		break;
 	default:
-		if (features & (NETIF_F_TSO | NETIF_F_TSO6)) {
+		if (features[0] & (NETIF_F_TSO | NETIF_F_TSO6)) {
 			priv->ops.fill_desc = fill_tso_desc;
 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
 			/* The chip only support 7*4096 */
@@ -1789,24 +1789,23 @@ static int hns_nic_set_features(struct net_device *netdev,
 		}
 		break;
 	}
-	netdev->features = features;
+	netdev->features[0] = features[0];
 	return 0;
 }
 
-static netdev_features_t hns_nic_fix_features(
-		struct net_device *netdev, netdev_features_t features)
+static void hns_nic_fix_features(struct net_device *netdev,
+				 netdev_features_t *features)
 {
 	struct hns_nic_priv *priv = netdev_priv(netdev);
 
 	switch (priv->enet_ver) {
 	case AE_VERSION_1:
-		features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
+		features[0] &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
 				NETIF_F_HW_VLAN_CTAG_FILTER);
 		break;
 	default:
 		break;
 	}
-	return features;
 }
 
 static int hns_nic_uc_sync(struct net_device *netdev, const unsigned char *addr)
@@ -2163,8 +2162,8 @@ static void hns_nic_set_priv_ops(struct net_device *netdev)
 		priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
 	} else {
 		priv->ops.get_rxd_bnum = get_v2rx_desc_bnum;
-		if ((netdev->features & NETIF_F_TSO) ||
-		    (netdev->features & NETIF_F_TSO6)) {
+		if ((netdev->features[0] & NETIF_F_TSO) ||
+		    (netdev->features[0] & NETIF_F_TSO6)) {
 			priv->ops.fill_desc = fill_tso_desc;
 			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
 			/* This chip only support 7*4096 */
@@ -2325,22 +2324,23 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
 	ndev->netdev_ops = &hns_nic_netdev_ops;
 	hns_ethtool_set_ops(ndev);
 
-	ndev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+	ndev->features[0] |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 		NETIF_F_GRO;
-	ndev->vlan_features |=
+	ndev->vlan_features[0] |=
 		NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM;
-	ndev->vlan_features |= NETIF_F_SG | NETIF_F_GSO | NETIF_F_GRO;
+	ndev->vlan_features[0] |= NETIF_F_SG | NETIF_F_GSO | NETIF_F_GRO;
 
 	/* MTU range: 68 - 9578 (v1) or 9706 (v2) */
 	ndev->min_mtu = MAC_MIN_MTU;
 	switch (priv->enet_ver) {
 	case AE_VERSION_2:
-		ndev->features |= NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_NTUPLE;
-		ndev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+		ndev->features[0] |=
+				NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_NTUPLE;
+		ndev->hw_features[0] |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 			NETIF_F_RXCSUM | NETIF_F_SG | NETIF_F_GSO |
 			NETIF_F_GRO | NETIF_F_TSO | NETIF_F_TSO6;
-		ndev->vlan_features |= NETIF_F_TSO | NETIF_F_TSO6;
+		ndev->vlan_features[0] |= NETIF_F_TSO | NETIF_F_TSO6;
 		ndev->max_mtu = MAC_MAX_MTU_V2 -
 				(ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
 		break;

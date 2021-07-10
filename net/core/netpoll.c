@@ -74,13 +74,13 @@ static netdev_tx_t netpoll_start_xmit(struct sk_buff *skb,
 				      struct net_device *dev,
 				      struct netdev_queue *txq)
 {
+	netdev_features_t features[NETDEV_FEATURE_DWORDS];
 	netdev_tx_t status = NETDEV_TX_OK;
-	netdev_features_t features;
 
-	features = netif_skb_features(skb);
+	netif_skb_features(skb, features);
 
 	if (skb_vlan_tag_present(skb) &&
-	    !vlan_hw_offload_capable(features, skb->vlan_proto)) {
+	    !vlan_hw_offload_capable(features[0], skb->vlan_proto)) {
 		skb = __vlan_hwaccel_push_inside(skb);
 		if (unlikely(!skb)) {
 			/* This is actually a packet drop, but we

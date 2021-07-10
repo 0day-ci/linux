@@ -107,7 +107,7 @@ static inline netdev_features_t vlan_tnl_features(struct net_device *real_dev)
 {
 	netdev_features_t ret;
 
-	ret = real_dev->hw_enc_features &
+	ret = real_dev->hw_enc_features[0] &
 	      (NETIF_F_CSUM_MASK | NETIF_F_GSO_SOFTWARE |
 	       NETIF_F_GSO_ENCAP_ALL);
 

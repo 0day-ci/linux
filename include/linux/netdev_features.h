@@ -102,7 +102,8 @@ enum {
 };
 
 /* copy'n'paste compression ;) */
-#define __NETIF_F_BIT(bit)	((netdev_features_t)1 << (bit))
+#define __NETIF_F_BIT(bit)	((netdev_features_t)1 << (bit & 0x3F))
+
 #define __NETIF_F(name)		__NETIF_F_BIT(NETIF_F_##name##_BIT)
 
 #define NETIF_F_FCOE_CRC	__NETIF_F(FCOE_CRC)
@@ -169,6 +170,8 @@ enum {
 #define NETIF_F_HW_HSR_FWD	__NETIF_F(HW_HSR_FWD)
 #define NETIF_F_HW_HSR_DUP	__NETIF_F(HW_HSR_DUP)
 
+#define NETDEV_FEATURE_DWORDS	DIV_ROUND_UP(NETDEV_FEATURE_COUNT, 64)
+
 /* Finds the next feature with the highest number of the range of start till 0.
  */
 static inline int find_next_netdev_feature(u64 feature, unsigned long start)
@@ -185,8 +188,7 @@ static inline int find_next_netdev_feature(u64 feature, unsigned long start)
  * mask_addr should be a u64 and bit an int
  */
 #define for_each_netdev_feature(mask_addr, bit)				\
-	for ((bit) = find_next_netdev_feature((mask_addr),		\
-					      NETDEV_FEATURE_COUNT);	\
+	for ((bit) = find_next_netdev_feature((mask_addr), 64);		\
 	     (bit) >= 0;						\
 	     (bit) = find_next_netdev_feature((mask_addr), (bit) - 1))
 
@@ -194,11 +196,6 @@ static inline int find_next_netdev_feature(u64 feature, unsigned long start)
 /* = all defined minus driver/device-class-related */
 #define NETIF_F_NEVER_CHANGE	(NETIF_F_VLAN_CHALLENGED | \
 				 NETIF_F_LLTX | NETIF_F_NETNS_LOCAL)
-
-/* remember that ((t)1 << t_BITS) is undefined in C99 */
-#define NETIF_F_ETHTOOL_BITS	((__NETIF_F_BIT(NETDEV_FEATURE_COUNT - 1) | \
-		(__NETIF_F_BIT(NETDEV_FEATURE_COUNT - 1) - 1)) & \
-		~NETIF_F_NEVER_CHANGE)
 
 /* Segmentation offload feature mask */
 #define NETIF_F_GSO_MASK	(__NETIF_F_BIT(NETIF_F_GSO_LAST + 1) - \
@@ -260,5 +257,97 @@ static inline int find_next_netdev_feature(u64 feature, unsigned long start)
 				 NETIF_F_GSO_IPXIP6 |			\
 				 NETIF_F_GSO_UDP_TUNNEL |		\
 				 NETIF_F_GSO_UDP_TUNNEL_CSUM)
+
+static inline void netdev_features_copy(netdev_features_t *dst,
+					const netdev_features_t *src)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		dst[i] = src[i];
+}
+
+static inline void netdev_features_and(netdev_features_t *dst,
+				       const netdev_features_t *a,
+				       const netdev_features_t *b)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		dst[i] = a[i] & b[i];
+}
+
+static inline void netdev_features_andnot(netdev_features_t *dst,
+					  const netdev_features_t *a,
+					  const netdev_features_t *b)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		dst[i] = a[i] & ~b[i];
+}
+
+static inline void netdev_features_or(netdev_features_t *dst,
+				      const netdev_features_t *a,
+				      const netdev_features_t *b)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		dst[i] = a[i] | b[i];
+}
+
+static inline void netdev_features_xor(netdev_features_t *dst,
+				       const netdev_features_t *a,
+				       const netdev_features_t *b)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		dst[i] = a[i] ^ b[i];
+}
+
+static inline void netdev_features_set(netdev_features_t *dst,
+				       unsigned int bit)
+{
+	dst[bit / 64] |= __NETIF_F_BIT(bit);
+}
+
+static inline bool netdev_features_equal(const netdev_features_t *a,
+					 const netdev_features_t *b)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		if (a[i] != b[i])
+			return false;
+
+	return true;
+}
+
+static inline void netdev_features_empty(netdev_features_t *src)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++)
+		if (src[i])
+			return false;
+
+	return true;
+}
+
+static inline void netdev_features_ethtool_bits(netdev_features_t *dst)
+{
+	unsigned int i;
+
+	for (i = 0; i < NETDEV_FEATURE_DWORDS; i++) {
+		if (NETDEV_FEATURE_COUNT >= (i + 1) * 64)
+			dst[i] = GENMASK_ULL(63, 0);
+		else
+			dst[i] = GENMASK_ULL(NETDEV_FEATURE_COUNT - i * 64,
+						  0);
+	}
+	dst[0] &= ~NETIF_F_NEVER_CHANGE;
+}
 
 #endif	/* _LINUX_NETDEV_FEATURES_H */

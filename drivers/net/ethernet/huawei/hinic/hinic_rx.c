@@ -106,7 +106,7 @@ static void rx_csum(struct hinic_rxq *rxq, u32 status,
 
 	csum_err = HINIC_RQ_CQE_STATUS_GET(status, CSUM_ERR);
 
-	if (!(netdev->features & NETIF_F_RXCSUM))
+	if (!(netdev->features[0] & NETIF_F_RXCSUM))
 		return;
 
 	if (!csum_err) {
@@ -411,7 +411,7 @@ static int rxq_recv(struct hinic_rxq *rxq, int budget)
 
 		offload_type = be32_to_cpu(cqe->offload_type);
 		vlan_len = be32_to_cpu(cqe->len);
-		if ((netdev->features & NETIF_F_HW_VLAN_CTAG_RX) &&
+		if ((netdev->features[0] & NETIF_F_HW_VLAN_CTAG_RX) &&
 		    HINIC_GET_RX_VLAN_OFFLOAD_EN(offload_type)) {
 			vid = HINIC_GET_RX_VLAN_TAG(vlan_len);
 			__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vid);

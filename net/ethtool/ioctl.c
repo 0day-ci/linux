@@ -67,12 +67,15 @@ static int ethtool_get_features(struct net_device *dev, void __user *useraddr)
 	int i;
 
 	/* in case feature bits run out again */
-	BUILD_BUG_ON(ETHTOOL_DEV_FEATURE_WORDS * sizeof(u32) > sizeof(netdev_features_t));
+	BUILD_BUG_ON(ETHTOOL_DEV_FEATURE_WORDS * sizeof(u32) > sizeof(dev->features));
 
 	for (i = 0; i < ETHTOOL_DEV_FEATURE_WORDS; ++i) {
-		features[i].available = (u32)(dev->hw_features >> (32 * i));
-		features[i].requested = (u32)(dev->wanted_features >> (32 * i));
-		features[i].active = (u32)(dev->features >> (32 * i));
+		features[i].available =
+			(u32)(dev->hw_features[i / 2] >> (i % 2 * 32));
+		features[i].requested =
+			(u32)(dev->wanted_features[i / 2] >> (i % 2 * 32));
+		features[i].active =
+			(u32)(dev->features[i / 2] >> (i % 2 * 32));
 		features[i].never_changed =
 			(u32)(NETIF_F_NEVER_CHANGE >> (32 * i));
 	}
@@ -97,7 +100,9 @@ static int ethtool_set_features(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_sfeatures cmd;
 	struct ethtool_set_features_block features[ETHTOOL_DEV_FEATURE_WORDS];
-	netdev_features_t wanted = 0, valid = 0;
+	netdev_features_t wanted[NETDEV_FEATURE_DWORDS] = {0};
+	netdev_features_t valid[NETDEV_FEATURE_DWORDS] = {0};
+	netdev_features_t tmp[NETDEV_FEATURE_DWORDS];
 	int i, ret = 0;
 
 	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
@@ -111,23 +116,33 @@ static int ethtool_set_features(struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	for (i = 0; i < ETHTOOL_DEV_FEATURE_WORDS; ++i) {
-		valid |= (netdev_features_t)features[i].valid << (32 * i);
-		wanted |= (netdev_features_t)features[i].requested << (32 * i);
+		valid[i / 2] |=
+			(netdev_features_t)features[i].valid << (32 * i);
+		wanted[i / 2] |=
+			(netdev_features_t)features[i].requested << (32 * i);
 	}
 
-	if (valid & ~NETIF_F_ETHTOOL_BITS)
+	netdev_features_ethtool_bits(tmp);
+	netdev_features_andnot(tmp, features, tmp);
+	if (!netdev_features_empty(tmp))
 		return -EINVAL;
 
-	if (valid & ~dev->hw_features) {
-		valid &= dev->hw_features;
+	netdev_features_andnot(tmp, valid, dev->hw_features);
+
+	if (!netdev_features_empty(tmp)) {
+		netdev_features_and(valid, valid, dev->hw_features);
 		ret |= ETHTOOL_F_UNSUPPORTED;
 	}
 
-	dev->wanted_features &= ~valid;
-	dev->wanted_features |= wanted & valid;
+	netdev_features_andnot(dev->wanted_features, dev->wanted_features,
+			       valid);
+	netdev_features_and(wanted, wanted, valid);
+	netdev_features_or(dev->wanted_features, dev->wanted_features, wanted);
 	__netdev_update_features(dev);
 
-	if ((dev->wanted_features ^ dev->features) & valid)
+	netdev_features_xor(tmp, dev->wanted_features, dev->features);
+	netdev_features_and(tmp, tmp, valid);
+	if (!netdev_features_empty(tmp))
 		ret |= ETHTOOL_F_WISH;
 
 	return ret;
@@ -227,7 +242,7 @@ static int ethtool_get_one_feature(struct net_device *dev,
 	netdev_features_t mask = ethtool_get_feature_mask(ethcmd);
 	struct ethtool_value edata = {
 		.cmd = ethcmd,
-		.data = !!(dev->features & mask),
+		.data = !!(dev->features[0] & mask),
 	};
 
 	if (copy_to_user(useraddr, &edata, sizeof(edata)))
@@ -238,21 +253,23 @@ static int ethtool_get_one_feature(struct net_device *dev,
 static int ethtool_set_one_feature(struct net_device *dev,
 	void __user *useraddr, u32 ethcmd)
 {
+	netdev_features_t mask[NETDEV_FEATURE_DWORDS] = {0};
 	struct ethtool_value edata;
-	netdev_features_t mask;
 
 	if (copy_from_user(&edata, useraddr, sizeof(edata)))
 		return -EFAULT;
 
-	mask = ethtool_get_feature_mask(ethcmd);
-	mask &= dev->hw_features;
-	if (!mask)
+	mask[0] = ethtool_get_feature_mask(ethcmd);
+	netdev_features_and(mask, mask, dev->hw_features);
+	if (netdev_features_empty(mask))
 		return -EOPNOTSUPP;
 
 	if (edata.data)
-		dev->wanted_features |= mask;
+		netdev_features_or(dev->wanted_features, dev->wanted_features,
+				   mask)
 	else
-		dev->wanted_features &= ~mask;
+		netdev_features_andnot(dev->wanted_features,
+				       dev->wanted_features, mask);
 
 	__netdev_update_features(dev);
 
@@ -285,29 +302,37 @@ static u32 __ethtool_get_flags(struct net_device *dev)
 
 static int __ethtool_set_flags(struct net_device *dev, u32 data)
 {
-	netdev_features_t features = 0, changed;
+	netdev_features_t features[NETDEV_FEATURE_DWORDS] = {0};
+	netdev_features_t changed[NETDEV_FEATURE_DWORDS];
+	netdev_features_t tmp[NETDEV_FEATURE_DWORDS];
 
 	if (data & ~ETH_ALL_FLAGS)
 		return -EINVAL;
 
 	if (data & ETH_FLAG_LRO)
-		features |= NETIF_F_LRO;
+		features[0] |= NETIF_F_LRO;
 	if (data & ETH_FLAG_RXVLAN)
-		features |= NETIF_F_HW_VLAN_CTAG_RX;
+		features[0] |= NETIF_F_HW_VLAN_CTAG_RX;
 	if (data & ETH_FLAG_TXVLAN)
-		features |= NETIF_F_HW_VLAN_CTAG_TX;
+		features[0] |= NETIF_F_HW_VLAN_CTAG_TX;
 	if (data & ETH_FLAG_NTUPLE)
-		features |= NETIF_F_NTUPLE;
+		features[0] |= NETIF_F_NTUPLE;
 	if (data & ETH_FLAG_RXHASH)
-		features |= NETIF_F_RXHASH;
+		features[0] |= NETIF_F_RXHASH;
 
 	/* allow changing only bits set in hw_features */
-	changed = (features ^ dev->features) & ETH_ALL_FEATURES;
-	if (changed & ~dev->hw_features)
-		return (changed & dev->hw_features) ? -EINVAL : -EOPNOTSUPP;
+	netdev_features_xor(changed, features, dev->features);
+	changed[0] &= ETH_ALL_FEATURES;
 
-	dev->wanted_features =
-		(dev->wanted_features & ~changed) | (features & changed);
+	netdev_features_andnot(tmp, changed, dev->hw_features);
+	if (!netdev_features_empty(tmp)) {
+		netdev_features_and(tmp, changed, dev->hw_features);
+		return (!netdev_features_empty(tmp)) ? -EINVAL : -EOPNOTSUPP;
+	}
+
+	netdev_features_andnot(tmp, dev->wanted_features, changed);
+	netdev_features_and(features, features, changed);
+	netdev_features_or(dev->wanted_features, tmp, features);
 
 	__netdev_update_features(dev);
 
@@ -2587,7 +2612,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	void __user *useraddr = ifr->ifr_data;
 	u32 ethcmd, sub_cmd;
 	int rc;
-	netdev_features_t old_features;
+	netdev_features_t old_features[NETDEV_FEATURE_DWORDS];
 
 	if (!dev || !netif_device_present(dev))
 		return -ENODEV;
@@ -2650,7 +2675,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 		if (rc  < 0)
 			return rc;
 	}
-	old_features = dev->features;
+	netdev_features_copy(old_features, dev->features);
 
 	switch (ethcmd) {
 	case ETHTOOL_GSET:
@@ -2865,7 +2890,7 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	if (dev->ethtool_ops->complete)
 		dev->ethtool_ops->complete(dev);
 
-	if (old_features != dev->features)
+	if (!netdev_features_equal(old_features, dev->features))
 		netdev_features_change(dev);
 
 	return rc;
