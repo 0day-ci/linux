@@ -319,7 +319,6 @@ static int set_proto_ctx_vm(struct drm_i915_file_private *fpriv,
 			    const struct drm_i915_gem_context_param *args)
 {
 	struct drm_i915_private *i915 = fpriv->dev_priv;
-	struct i915_address_space *vm;
 
 	if (args->size)
 		return -EINVAL;
@@ -327,16 +326,15 @@ static int set_proto_ctx_vm(struct drm_i915_file_private *fpriv,
 	if (!HAS_FULL_PPGTT(i915))
 		return -ENODEV;
 
+	if (pc->vm)
+		return -EINVAL;
+
 	if (upper_32_bits(args->value))
 		return -ENOENT;
 
-	vm = i915_gem_vm_lookup(fpriv, args->value);
-	if (!vm)
+	pc->vm = i915_gem_vm_lookup(fpriv, args->value);
+	if (!pc->vm)
 		return -ENOENT;
-
-	if (pc->vm)
-		i915_vm_put(pc->vm);
-	pc->vm = vm;
 
 	return 0;
 }
