@@ -137,7 +137,8 @@ static inline void qdisc_enqueue_skb_bad_txq(struct Qdisc *q,
 		spin_unlock(lock);
 }
 
-static inline void dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
+static inline void dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q,
+				   struct netdev_queue *txq)
 {
 	spinlock_t *lock = NULL;
 
@@ -149,6 +150,7 @@ static inline void dev_requeue_skb(struct sk_buff *skb, struct Qdisc *q)
 	while (skb) {
 		struct sk_buff *next = skb->next;
 
+		trace_qdisc_requeue(skb, q, txq);
 		__skb_queue_tail(&q->gso_skb, skb);
 
 		/* it's still part of the queue */
@@ -325,7 +327,7 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 		if (root_lock)
 			spin_lock(root_lock);
 
-		dev_requeue_skb(skb, q);
+		dev_requeue_skb(skb, q, txq);
 		return false;
 	}
 #endif
@@ -353,7 +355,7 @@ bool sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 			net_warn_ratelimited("BUG %s code %d qlen %d\n",
 					     dev->name, ret, q->q.qlen);
 
-		dev_requeue_skb(skb, q);
+		dev_requeue_skb(skb, q, txq);
 		return false;
 	}
 
