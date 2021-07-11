@@ -2503,21 +2503,27 @@ error:
 
 static int filemap_readahead(struct kiocb *iocb, struct file *file,
 		struct address_space *mapping, struct page *page,
-		pgoff_t last_index)
+		pgoff_t index, pgoff_t last_index)
 {
+	DEFINE_READAHEAD(ractl, file, &file->f_ra, mapping, index);
+
 	if (iocb->ki_flags & IOCB_NOIO)
 		return -EAGAIN;
-	page_cache_async_readahead(mapping, &file->f_ra, file, page,
-			page->index, last_index - page->index);
+	if (iocb->ki_flags & IOCB_NOWAIT)
+		ractl.gfp_flags &= ~__GFP_DIRECT_RECLAIM;
+
+	if (page)
+		page_cache_async_ra(&ractl, page, last_index - index);
+	else
+		page_cache_sync_ra(&ractl, last_index - index);
 	return 0;
 }
 
 static int filemap_get_pages(struct kiocb *iocb, struct iov_iter *iter,
 		struct pagevec *pvec)
 {
-	struct file *filp = iocb->ki_filp;
-	struct address_space *mapping = filp->f_mapping;
-	struct file_ra_state *ra = &filp->f_ra;
+	struct file *file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
 	pgoff_t index = iocb->ki_pos >> PAGE_SHIFT;
 	pgoff_t last_index;
 	struct page *page;
@@ -2530,16 +2536,16 @@ retry:
 
 	filemap_get_read_batch(mapping, index, last_index, pvec);
 	if (!pagevec_count(pvec)) {
-		if (iocb->ki_flags & IOCB_NOIO)
-			return -EAGAIN;
-		page_cache_sync_readahead(mapping, ra, filp, index,
-				last_index - index);
+		err = filemap_readahead(iocb, file, mapping, NULL, index,
+					last_index);
+		if (err)
+			return err;
 		filemap_get_read_batch(mapping, index, last_index, pvec);
 	}
 	if (!pagevec_count(pvec)) {
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
-		err = filemap_create_page(filp, mapping,
+		err = filemap_create_page(file, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, pvec);
 		if (err == AOP_TRUNCATED_PAGE)
 			goto retry;
@@ -2548,7 +2554,8 @@ retry:
 
 	page = pvec->pages[pagevec_count(pvec) - 1];
 	if (PageReadahead(page)) {
-		err = filemap_readahead(iocb, filp, mapping, page, last_index);
+		err = filemap_readahead(iocb, file, mapping, page, page->index,
+					last_index);
 		if (err)
 			goto err;
 	}
