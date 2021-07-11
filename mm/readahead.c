@@ -177,7 +177,6 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
 	struct address_space *mapping = ractl->mapping;
 	unsigned long index = readahead_index(ractl);
 	LIST_HEAD(page_pool);
-	gfp_t gfp_mask = readahead_gfp_mask(mapping);
 	unsigned long i;
 
 	/*
@@ -213,14 +212,14 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
 			continue;
 		}
 
-		page = __page_cache_alloc(gfp_mask);
+		page = __page_cache_alloc(ractl->gfp_flags);
 		if (!page)
 			break;
 		if (mapping->a_ops->readpages) {
 			page->index = index + i;
 			list_add(&page->lru, &page_pool);
 		} else if (add_to_page_cache_lru(page, mapping, index + i,
-					gfp_mask) < 0) {
+					ractl->gfp_flags) < 0) {
 			put_page(page);
 			read_pages(ractl, &page_pool, true);
 			i = ractl->_index + ractl->_nr_pages - index - 1;
@@ -665,7 +664,6 @@ void readahead_expand(struct readahead_control *ractl,
 	struct address_space *mapping = ractl->mapping;
 	struct file_ra_state *ra = ractl->ra;
 	pgoff_t new_index, new_nr_pages;
-	gfp_t gfp_mask = readahead_gfp_mask(mapping);
 
 	new_index = new_start / PAGE_SIZE;
 
@@ -677,10 +675,11 @@ void readahead_expand(struct readahead_control *ractl,
 		if (page && !xa_is_value(page))
 			return; /* Page apparently present */
 
-		page = __page_cache_alloc(gfp_mask);
+		page = __page_cache_alloc(ractl->gfp_flags);
 		if (!page)
 			return;
-		if (add_to_page_cache_lru(page, mapping, index, gfp_mask) < 0) {
+		if (add_to_page_cache_lru(page, mapping, index,
+					  ractl->gfp_flags) < 0) {
 			put_page(page);
 			return;
 		}
@@ -700,10 +699,11 @@ void readahead_expand(struct readahead_control *ractl,
 		if (page && !xa_is_value(page))
 			return; /* Page apparently present */
 
-		page = __page_cache_alloc(gfp_mask);
+		page = __page_cache_alloc(ractl->gfp_flags);
 		if (!page)
 			return;
-		if (add_to_page_cache_lru(page, mapping, index, gfp_mask) < 0) {
+		if (add_to_page_cache_lru(page, mapping, index,
+					  ractl->gfp_flags) < 0) {
 			put_page(page);
 			return;
 		}

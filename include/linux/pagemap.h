@@ -883,11 +883,13 @@ static inline int add_to_page_cache(struct page *page,
  *	  May be NULL if invoked internally by the filesystem.
  * @mapping: Readahead this filesystem object.
  * @ra: File readahead state.  May be NULL.
+ * @gfp_flags: Memory allocation flags to use.
  */
 struct readahead_control {
 	struct file *file;
 	struct address_space *mapping;
 	struct file_ra_state *ra;
+	gfp_t gfp_flags;
 /* private: use the readahead_* accessors instead */
 	pgoff_t _index;
 	unsigned int _nr_pages;
@@ -899,6 +901,7 @@ struct readahead_control {
 		.file = f,						\
 		.mapping = m,						\
 		.ra = r,						\
+		.gfp_flags = readahead_gfp_mask(m),			\
 		._index = i,						\
 	}
 
