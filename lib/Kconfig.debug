@@ -1268,7 +1268,7 @@ config PROVE_LOCKING
 
 config PROVE_RAW_LOCK_NESTING
 	bool "Enable raw_spinlock - spinlock nesting checks"
-	depends on PROVE_LOCKING
+	depends on PROVE_LOCKING && PREEMPT_RT
 	default n
 	help
 	 Enable the raw_spinlock vs. spinlock nesting checks which ensure
