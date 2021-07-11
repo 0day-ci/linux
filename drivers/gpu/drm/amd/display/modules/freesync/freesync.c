@@ -620,9 +620,8 @@ static void build_vrr_infopacket_data_v3(const struct mod_vrr_params *vrr,
 			(vrr->state == VRR_STATE_INACTIVE) ? min_refresh :
 			max_refresh; // Non-fs case, program nominal range
 
-	max_programmed = (vrr->state == VRR_STATE_ACTIVE_FIXED) ? fixed_refresh :
-			(vrr->state == VRR_STATE_ACTIVE_VARIABLE) ? max_refresh :
-			max_refresh;// Non-fs case, program nominal range
+	max_programmed = (vrr->state == VRR_STATE_ACTIVE_FIXED) ?
+		fixed_refresh : max_refresh;
 
 	/* PB7 = FreeSync Minimum refresh rate (Hz) */
 	infopacket->sb[7] = min_programmed & 0xFF;
