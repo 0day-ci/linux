@@ -131,6 +131,7 @@
 #include <trace/events/napi.h>
 #include <trace/events/net.h>
 #include <trace/events/skb.h>
+#include <trace/events/qdisc.h>
 #include <linux/inetdevice.h>
 #include <linux/cpu_rmap.h>
 #include <linux/static_key.h>
@@ -3864,6 +3865,8 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 			if (unlikely(!nolock_qdisc_is_empty(q))) {
 				rc = q->enqueue(skb, q, &to_free) &
 					NET_XMIT_MASK;
+				if (rc == NET_XMIT_SUCCESS)
+					trace_qdisc_enqueue(q, txq, skb);
 				__qdisc_run(q);
 				qdisc_run_end(q);
 
@@ -3880,6 +3883,9 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 		}
 
 		rc = q->enqueue(skb, q, &to_free) & NET_XMIT_MASK;
+		if (rc == NET_XMIT_SUCCESS)
+			trace_qdisc_enqueue(q, txq, skb);
+
 		qdisc_run(q);
 
 no_lock_out:
@@ -3924,6 +3930,9 @@ no_lock_out:
 		rc = NET_XMIT_SUCCESS;
 	} else {
 		rc = q->enqueue(skb, q, &to_free) & NET_XMIT_MASK;
+		if (rc == NET_XMIT_SUCCESS)
+			trace_qdisc_enqueue(q, txq, skb);
+
 		if (qdisc_run_begin(q)) {
 			if (unlikely(contended)) {
 				spin_unlock(&q->busylock);
