@@ -52,7 +52,74 @@ MODULE_PARM_DESC(debug, "Enable debug output, where each bit enables a debug cat
 "\t\tBit 5 (0x20)  will enable VBL messages (vblank code)\n"
 "\t\tBit 7 (0x80)  will enable LEASE messages (leasing code)\n"
 "\t\tBit 8 (0x100) will enable DP messages (displayport code)");
+
+#ifndef CONFIG_DRM_USE_DYNAMIC_DEBUG
 module_param_named(debug, __drm_debug, int, 0600);
+
+#else
+static char *format_class_prefixes[] = {
+	cDRM_UT_CORE,
+	cDRM_UT_DRIVER,
+	cDRM_UT_KMS,
+	cDRM_UT_PRIME,
+	cDRM_UT_ATOMIC,
+	cDRM_UT_VBL,
+	cDRM_UT_STATE,
+	cDRM_UT_LEASE,
+	cDRM_UT_DP,
+	cDRM_UT_DRMRES
+};
+
+#define OUR_QUERY_SIZE 64 /* > strlen "format '^%s' %cp" + longest prefix */
+
+static int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{
+	unsigned int val;
+	unsigned long changes, result;
+	int rc, chgct = 0, totct = 0, bitpos;
+	char query[OUR_QUERY_SIZE];
+
+	rc = kstrtouint(instr, 0, &val);
+	if (rc) {
+		pr_err("%s: failed\n", __func__);
+		return -EINVAL;
+	}
+	result = val;
+	changes = result ^ __drm_debug;
+
+	pr_debug("changes:0x%lx from result:0x%lx\n", changes, result);
+
+	for_each_set_bit(bitpos, &changes, ARRAY_SIZE(format_class_prefixes)) {
+
+		sprintf(query, "format '^%s' %cp", format_class_prefixes[bitpos],
+			test_bit(bitpos, &result) ? '+' : '-');
+
+		chgct = dynamic_debug_exec_queries(query, "drm*");
+		if (chgct < 0) {
+			pr_err("%s: exec err:%d on: %s\n", __func__, chgct, query);
+			continue;
+		}
+		pr_debug("change ct:%d on %s\n", chgct, query);
+		totct += chgct;
+	}
+	pr_debug("total changes: %d\n", totct);
+	__drm_debug = result;
+	return 0;
+}
+
+static int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{
+	pr_debug("debug-val:0x%x %u\n", __drm_debug, *((unsigned int *)kp->arg));
+	return scnprintf(buffer, PAGE_SIZE, "%u\n",
+			 *((unsigned int *)kp->arg));
+}
+static const struct kernel_param_ops param_ops_debug = {
+	.set = param_set_dyndbg,
+	.get = param_get_dyndbg,
+};
+module_param_cb(debug, &param_ops_debug, &__drm_debug, 0644);
+
+#endif /* CONFIG_DRM_USE_DYNAMIC_DEBUG */
 
 void __drm_puts_coredump(struct drm_printer *p, const char *str)
 {
@@ -256,7 +323,7 @@ void drm_dev_printk(const struct device *dev, const char *level,
 }
 EXPORT_SYMBOL(drm_dev_printk);
 
-void drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
+void _drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
 		 const char *format, ...)
 {
 	struct va_format vaf;
@@ -278,9 +345,9 @@ void drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
 
 	va_end(args);
 }
-EXPORT_SYMBOL(drm_dev_dbg);
+EXPORT_SYMBOL(_drm_dev_dbg);
 
-void __drm_dbg(enum drm_debug_category category, const char *format, ...)
+void ___drm_dbg(enum drm_debug_category category, const char *format, ...)
 {
 	struct va_format vaf;
 	va_list args;
@@ -297,7 +364,7 @@ void __drm_dbg(enum drm_debug_category category, const char *format, ...)
 
 	va_end(args);
 }
-EXPORT_SYMBOL(__drm_dbg);
+EXPORT_SYMBOL(___drm_dbg);
 
 void __drm_err(const char *format, ...)
 {
