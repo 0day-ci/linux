@@ -341,7 +341,7 @@ Exceeding this number will trigger the following lockdep warning::
 
 	(DEBUG_LOCKS_WARN_ON(id >= MAX_LOCKDEP_KEYS))
 
-By default, MAX_LOCKDEP_KEYS is currently set to 8191, and typical
+By default, MAX_LOCKDEP_KEYS is currently set to 8192, and typical
 desktop systems have less than 1,000 lock classes, so this warning
 normally results from lock-class leakage or failure to properly
 initialize locks.  These two problems are illustrated below:
@@ -383,7 +383,7 @@ you the number of lock classes currently in use along with the maximum::
 
 This command produces the following output on a modest system::
 
-	lock-classes:                          748 [max: 8191]
+	lock-classes:                          748 [max: 8192]
 
 If the number allocated (748 above) increases continually over time,
 then there is likely a leak.  The following command can be used to
