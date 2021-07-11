@@ -415,6 +415,17 @@ void __qdisc_run(struct Qdisc *q)
 	}
 }
 
+int qdisc_enqueue_skb(struct netdev_queue *txq, struct Qdisc *q,
+		      struct sk_buff *skb,
+		      struct sk_buff **to_free)
+{
+	int ret;
+
+	ret = q->enqueue(skb, q, to_free) & NET_XMIT_MASK;
+	trace_qdisc_enqueue(q, txq, skb, ret);
+	return ret;
+}
+
 unsigned long dev_trans_start(struct net_device *dev)
 {
 	unsigned long val, res;

@@ -133,6 +133,10 @@ static inline void qdisc_run(struct Qdisc *q)
 	}
 }
 
+int qdisc_enqueue_skb(struct netdev_queue *txq, struct Qdisc *q,
+		      struct sk_buff *skb,
+		      struct sk_buff **to_free);
+
 /* Calculate maximal size of packet seen by hard_start_xmit
    routine of this device.
  */
