@@ -1236,7 +1236,7 @@ int find_and_online_cpu_nid(int cpu)
 #endif
 	}
 
-	pr_debug("%s:%d cpu %d nid %d\n", __FUNCTION__, __LINE__,
+	pr_debug("%s:%d cpu %d nid %d\n", __func__, __LINE__,
 		cpu, new_nid);
 	return new_nid;
 }
