@@ -18,6 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/code-patching.h>
 #include <asm/interrupt.h>
+#include <asm/rtas.h>
 
 #ifdef CONFIG_PPC64
 #include "internal.h"
@@ -58,6 +59,7 @@ struct cpu_hw_events {
 
 	/* Store the PMC values */
 	unsigned long pmcs[MAX_HWEVENTS];
+	int migrate;
 };
 
 static DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events);
@@ -1335,6 +1337,22 @@ static void power_pmu_disable(struct pmu *pmu)
 }
 
 /*
+ * Called from powerpc mobility code
+ * before migration to disable counters
+ * if the PMU is active.
+ */
+void mobility_pmu_disable(void)
+{
+	struct cpu_hw_events *cpuhw;
+
+	cpuhw = this_cpu_ptr(&cpu_hw_events);
+	if (cpuhw->n_events != 0) {
+		power_pmu_disable(NULL);
+		cpuhw->migrate = 1;
+	}
+}
+
+/*
  * Re-enable all events if disable == 0.
  * If we were previously disabled and events were added, then
  * put the new config on the PMU.
@@ -1379,8 +1397,10 @@ static void power_pmu_enable(struct pmu *pmu)
 	 * no need to recalculate MMCR* settings and reset the PMCs.
 	 * Just reenable the PMU with the current MMCR* settings
 	 * (possibly updated for removal of events).
+	 * While reenabling PMU during partition migration, continue
+	 * with normal flow.
 	 */
-	if (!cpuhw->n_added) {
+	if (!cpuhw->n_added && !cpuhw->migrate) {
 		mtspr(SPRN_MMCRA, cpuhw->mmcr.mmcra & ~MMCRA_SAMPLE_ENABLE);
 		mtspr(SPRN_MMCR1, cpuhw->mmcr.mmcr1);
 		if (ppmu->flags & PPMU_ARCH_31)
@@ -1434,11 +1454,15 @@ static void power_pmu_enable(struct pmu *pmu)
 	/*
 	 * Read off any pre-existing events that need to move
 	 * to another PMC.
+	 * While enabling PMU during partition migration,
+	 * skip power_pmu_read since all event count settings
+	 * needs to be re-initialised after migration.
 	 */
 	for (i = 0; i < cpuhw->n_events; ++i) {
 		event = cpuhw->event[i];
-		if (event->hw.idx && event->hw.idx != hwc_index[i] + 1) {
-			power_pmu_read(event);
+		if ((event->hw.idx && event->hw.idx != hwc_index[i] + 1) || (cpuhw->migrate)) {
+			if (!cpuhw->migrate)
+				power_pmu_read(event);
 			write_pmc(event->hw.idx, 0);
 			event->hw.idx = 0;
 		}
@@ -1504,6 +1528,20 @@ static void power_pmu_enable(struct pmu *pmu)
  out:
 
 	local_irq_restore(flags);
+}
+
+/*
+ * Called from powerpc mobility code
+ * during migration completion to
+ * enable back PMU counters.
+ */
+void mobility_pmu_enable(void)
+{
+	struct cpu_hw_events *cpuhw;
+
+	cpuhw = this_cpu_ptr(&cpu_hw_events);
+	power_pmu_enable(NULL);
+	cpuhw->migrate = 0;
 }
 
 static int collect_events(struct perf_event *group, int max_count,

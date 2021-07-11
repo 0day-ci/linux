@@ -380,5 +380,13 @@ void read_24x7_sys_info(void);
 static inline void read_24x7_sys_info(void) { }
 #endif
 
+#ifdef CONFIG_PPC_PERF_CTRS
+void mobility_pmu_disable(void);
+void mobility_pmu_enable(void);
+#else
+static inline void mobility_pmu_disable(void) { }
+static inline void mobility_pmu_enable(void) { }
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _POWERPC_RTAS_H */

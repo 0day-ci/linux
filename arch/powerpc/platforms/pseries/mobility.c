@@ -476,6 +476,8 @@ static int do_join(void *arg)
 retry:
 	/* Must ensure MSR.EE off for H_JOIN. */
 	hard_irq_disable();
+	/* Disable PMU before suspend */
+	mobility_pmu_disable();
 	hvrc = plpar_hcall_norets(H_JOIN);
 
 	switch (hvrc) {
@@ -530,6 +532,8 @@ retry:
 	 * reset the watchdog.
 	 */
 	touch_nmi_watchdog();
+	/* Enable PMU after resuming */
+	mobility_pmu_enable();
 	return ret;
 }
 
