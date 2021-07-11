@@ -731,6 +731,8 @@ static int loop_change_fd(struct loop_device *lo, struct block_device *bdev,
 		goto out_err;
 
 	/* and ... switch */
+	lo->changed = true;
+	bdev_check_media_change(bdev);
 	blk_mq_freeze_queue(lo->lo_queue);
 	mapping_set_gfp_mask(old_file->f_mapping, lo->old_gfp_mask);
 	lo->lo_backing_file = file;
@@ -1205,6 +1207,9 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 		goto out_unlock;
 	}
 
+	lo->changed = true;
+	bdev_check_media_change(bdev);
+
 	set_disk_ro(lo->lo_disk, (lo->lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
 	INIT_WORK(&lo->rootcg_work, loop_rootcg_workfn);
@@ -1349,6 +1354,8 @@ static int __loop_clr_fd(struct loop_device *lo, bool release)
 
 	partscan = lo->lo_flags & LO_FLAGS_PARTSCAN && bdev;
 	lo_number = lo->lo_number;
+	lo->changed = true;
+	bdev_check_media_change(bdev);
 out_unlock:
 	mutex_unlock(&lo->lo_mutex);
 	if (partscan) {
@@ -2016,11 +2023,22 @@ out_unlock:
 	mutex_unlock(&lo->lo_mutex);
 }
 
+static unsigned int lo_check_events(struct gendisk *disk, unsigned int clearing)
+{
+	struct loop_device *lo = disk->private_data;
+	bool changed = lo->changed;
+
+	lo->changed = false;
+
+	return changed ? DISK_EVENT_MEDIA_CHANGE : 0;
+}
+
 static const struct block_device_operations lo_fops = {
 	.owner =	THIS_MODULE,
 	.open =		lo_open,
 	.release =	lo_release,
 	.ioctl =	lo_ioctl,
+	.check_events = lo_check_events,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl =	lo_compat_ioctl,
 #endif
@@ -2325,6 +2343,8 @@ static int loop_add(int i)
 	disk->fops		= &lo_fops;
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
+	disk->events		= DISK_EVENT_MEDIA_CHANGE;
+	disk->event_flags	= DISK_EVENT_FLAG_UEVENT;
 	sprintf(disk->disk_name, "loop%d", i);
 	add_disk(disk);
 	mutex_unlock(&loop_ctl_mutex);

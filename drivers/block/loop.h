@@ -63,6 +63,7 @@ struct loop_device {
 	struct timer_list       timer;
 	bool			use_dio;
 	bool			sysfs_inited;
+	bool 			changed;
 
 	struct request_queue	*lo_queue;
 	struct blk_mq_tag_set	tag_set;
