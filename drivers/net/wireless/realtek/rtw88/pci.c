@@ -280,7 +280,7 @@ static int rtw_pci_init_rx_ring(struct rtw_dev *rtwdev,
 	}
 	rx_ring->r.head = head;
 
-	for (i = 0; i < len; i++) {
+	for (i = 0; i < ARRAY_SIZE(rx_ring->buf); i++) {
 		skb = dev_alloc_skb(buf_sz);
 		if (!skb) {
 			allocated = i;
