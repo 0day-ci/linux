@@ -305,10 +305,8 @@ static enum mod_hdcp_status wait_for_ready(struct mod_hdcp *hdcp,
 				hdcp, "bcaps_read"))
 			goto out;
 	}
-	if (!mod_hdcp_execute_and_set(check_ksv_ready,
-			&input->ready_check, &status,
-			hdcp, "ready_check"))
-		goto out;
+	mod_hdcp_execute_and_set(check_ksv_ready, &input->ready_check, &status,
+				 hdcp, "ready_check");
 out:
 	return status;
 }
