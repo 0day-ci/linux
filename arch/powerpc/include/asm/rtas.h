@@ -376,8 +376,12 @@ extern int call_rtas(const char *, int, int, unsigned long *, ...);
 
 #ifdef CONFIG_HV_PERF_CTRS
 void read_24x7_sys_info(void);
+void mobility_pmu_disable(void);
+void mobility_pmu_enable(void);
 #else
 static inline void read_24x7_sys_info(void) { }
+static inline void mobility_pmu_disable(void) { }
+static inline void mobility_pmu_enable(void) { }
 #endif
 
 #endif /* __KERNEL__ */
