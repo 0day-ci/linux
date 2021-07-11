@@ -22,7 +22,6 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
-#include <drm/drm_irq.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
 
@@ -521,9 +520,8 @@ atmel_hlcdc_dc_mode_valid(struct atmel_hlcdc_dc *dc,
 	return MODE_OK;
 }
 
-static int atmel_hlcdc_dc_irq_postinstall(struct drm_device *dev)
+static int atmel_hlcdc_dc_irq_postinstall(struct atmel_hlcdc_dc *dc)
 {
-	struct atmel_hlcdc_dc *dc = dev->dev_private;
 	unsigned int cfg = 0;
 	int i;
 
@@ -538,9 +536,8 @@ static int atmel_hlcdc_dc_irq_postinstall(struct drm_device *dev)
 	return 0;
 }
 
-static void atmel_hlcdc_dc_irq_uninstall(struct drm_device *dev)
+static void atmel_hlcdc_dc_irq_reset(struct atmel_hlcdc_dc *dc)
 {
-	struct atmel_hlcdc_dc *dc = dev->dev_private;
 	unsigned int isr;
 
 	regmap_write(dc->hlcdc->regmap, ATMEL_HLCDC_IDR, 0xffffffff);
@@ -672,12 +669,14 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
 	drm_mode_config_reset(dev);
 
 	pm_runtime_get_sync(dev->dev);
-	ret = drm_irq_install(dev, dc->hlcdc->irq);
+	atmel_hlcdc_dc_irq_reset(dc);
+	ret = request_irq(dc->hlcdc->irq, atmel_hlcdc_dc_irq_handler, 0, dev->driver->name, dev);
 	pm_runtime_put_sync(dev->dev);
 	if (ret < 0) {
 		dev_err(dev->dev, "failed to install IRQ handler\n");
 		goto err_periph_clk_disable;
 	}
+	atmel_hlcdc_dc_irq_postinstall(dc);
 
 	platform_set_drvdata(pdev, dev);
 
@@ -701,7 +700,9 @@ static void atmel_hlcdc_dc_unload(struct drm_device *dev)
 	drm_mode_config_cleanup(dev);
 
 	pm_runtime_get_sync(dev->dev);
-	drm_irq_uninstall(dev);
+
+	atmel_hlcdc_dc_irq_reset(dc);
+	free_irq(dc->hlcdc->irq, dev);
 	pm_runtime_put_sync(dev->dev);
 
 	dev->dev_private = NULL;
@@ -714,10 +715,6 @@ DEFINE_DRM_GEM_CMA_FOPS(fops);
 
 static const struct drm_driver atmel_hlcdc_dc_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
-	.irq_handler = atmel_hlcdc_dc_irq_handler,
-	.irq_preinstall = atmel_hlcdc_dc_irq_uninstall,
-	.irq_postinstall = atmel_hlcdc_dc_irq_postinstall,
-	.irq_uninstall = atmel_hlcdc_dc_irq_uninstall,
 	DRM_GEM_CMA_DRIVER_OPS,
 	.fops = &fops,
 	.name = "atmel-hlcdc",
