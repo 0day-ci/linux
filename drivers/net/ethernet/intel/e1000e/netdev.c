@@ -7317,6 +7317,27 @@ static const struct net_device_ops e1000e_netdev_ops = {
 	.ndo_features_check	= passthru_features_check,
 };
 
+static void e1000e_create_device_links(struct pci_dev *pdev)
+{
+	struct pci_dev *tgp_mei_me;
+
+	/* Find TGP mei_me devices and make e1000e power depend on mei_me */
+	tgp_mei_me = pci_get_device(PCI_VENDOR_ID_INTEL, 0xa0e0, NULL);
+	if (!tgp_mei_me) {
+		tgp_mei_me = pci_get_device(PCI_VENDOR_ID_INTEL, 0x43e0, NULL);
+		if (!tgp_mei_me)
+			return;
+	}
+
+	if (device_link_add(&pdev->dev, &tgp_mei_me->dev,
+			    DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE |
+			    DL_FLAG_AUTOREMOVE_CONSUMER))
+		pci_info(pdev, "System and runtime PM depends on %s\n",
+			 pci_name(tgp_mei_me));
+
+	pci_dev_put(tgp_mei_me);
+}
+
 /**
  * e1000_probe - Device Initialization Routine
  * @pdev: PCI device information struct
@@ -7645,6 +7666,9 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (pci_dev_run_wake(pdev) && hw->mac.type != e1000_pch_cnp)
 		pm_runtime_put_noidle(&pdev->dev);
 
+	if (hw->mac.type == e1000_pch_tgp)
+		e1000e_create_device_links(pdev);
+
 	return 0;
 
 err_register:
@@ -7917,6 +7941,8 @@ static void __exit e1000_exit_module(void)
 }
 module_exit(e1000_exit_module);
 
+/* Ensure device link can be created if e1000e is in the initramfs. */
+MODULE_SOFTDEP("pre: mei_me");
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("GPL v2");
