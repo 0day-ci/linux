@@ -458,15 +458,15 @@ iomap_releasepage(struct page *page, gfp_t gfp_mask)
 {
 	struct folio *folio = page_folio(page);
 
-	trace_iomap_releasepage(page->mapping->host, page_offset(page),
-			PAGE_SIZE);
+	trace_iomap_releasepage(folio->mapping->host, folio_pos(folio),
+			folio_size(folio));
 
 	/*
 	 * mm accommodates an old ext3 case where clean pages might not have had
 	 * the dirty bit cleared. Thus, it can send actual dirty pages to
 	 * ->releasepage() via shrink_active_list(), skip those here.
 	 */
-	if (PageDirty(page) || PageWriteback(page))
+	if (folio_dirty(folio) || folio_writeback(folio))
 		return 0;
 	iomap_page_release(folio);
 	return 1;
