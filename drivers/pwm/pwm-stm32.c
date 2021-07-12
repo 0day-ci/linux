@@ -544,7 +544,7 @@ static int stm32_pwm_probe_breakinputs(struct stm32_pwm *priv,
 		return -EINVAL;
 
 	priv->num_breakinputs = nb;
-	array_size = nb * sizeof(struct stm32_breakinput) / sizeof(u32);
+	array_size = nb * sizeof(struct stm32_breakinput) / (3 * sizeof(u32));
 	ret = of_property_read_u32_array(np, "st,breakinput",
 					 (u32 *)priv->breakinputs, array_size);
 	if (ret)
