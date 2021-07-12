@@ -2302,10 +2302,29 @@ void pci_pme_wakeup_bus(struct pci_bus *bus)
  */
 bool pci_pme_capable(struct pci_dev *dev, pci_power_t state)
 {
+	struct pci_dev *parent;
+
 	if (!dev->pm_cap)
 		return false;
 
-	return !!(dev->pme_support & (1 << state));
+	if (dev->pme_support & (1 << state))
+		return true;
+
+	/*
+	 * Special case: The target state is D3hot and the device only supports
+	 * signaling PME from D3cold, but it is a PCIe device whose parent port
+	 * can go into D3cold.  In that case, if the device is allowed to go
+	 * into D3hot, the parent port can go into D3cold which will cause the
+	 * device to end up in D3cold, so it will be able to signal PME from the
+	 * final state.
+	 */
+	if (state != PCI_D3hot || !(dev->pme_support & (1 << PCI_D3cold)))
+		return false;
+
+	parent = dev->bus->self;
+	return pci_bridge_d3_possible(parent) &&
+		platform_pci_power_manageable(parent) &&
+		platform_pci_choose_state(parent) == PCI_D3cold;
 }
 EXPORT_SYMBOL(pci_pme_capable);
 
@@ -2599,17 +2618,12 @@ static pci_power_t pci_target_state(struct pci_dev *dev, bool wakeup)
 	if (dev->current_state == PCI_D3cold)
 		target_state = PCI_D3cold;
 
-	if (wakeup) {
-		/*
-		 * Find the deepest state from which the device can generate
-		 * PME#.
-		 */
-		if (dev->pme_support) {
-			while (target_state
-			      && !(dev->pme_support & (1 << target_state)))
-				target_state--;
-		}
-	}
+	if (!wakeup || !dev->pme_support || pci_pme_capable(dev, target_state))
+		return target_state;
+
+	/* Find the deepest state from which the device can generate PME#. */
+	while (target_state && !(dev->pme_support & (1 << target_state)))
+		target_state--;
 
 	return target_state;
 }
