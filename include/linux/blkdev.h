@@ -1373,6 +1373,11 @@ static inline unsigned int queue_max_sectors(const struct request_queue *q)
 	return q->limits.max_sectors;
 }
 
+static inline int queue_max_sectors_bytes(struct request_queue *q)
+{
+	return min_t(unsigned int, queue_max_sectors(q), INT_MAX >> 9) << 9;
+}
+
 static inline unsigned int queue_max_hw_sectors(const struct request_queue *q)
 {
 	return q->limits.max_hw_sectors;
