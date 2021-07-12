@@ -10,6 +10,11 @@ struct blk_mq_tags {
 	unsigned int nr_reserved_tags;
 
 	atomic_t active_queues;
+	/*
+	 * if multiple queues share a tag set, pending_queues record the
+	 * number of queues that can't get driver tag.
+	 */
+	atomic_t pending_queues;
 
 	struct sbitmap_queue *bitmap_tags;
 	struct sbitmap_queue *breserved_tags;
@@ -69,8 +74,10 @@ enum {
 	BLK_MQ_TAG_MAX		= BLK_MQ_NO_TAG - 1,
 };
 
-extern bool __blk_mq_tag_busy(struct blk_mq_hw_ctx *);
-extern void __blk_mq_tag_idle(struct blk_mq_hw_ctx *);
+extern bool __blk_mq_tag_busy(struct blk_mq_hw_ctx *hctx);
+extern void __blk_mq_tag_idle(struct blk_mq_hw_ctx *hctx);
+extern void __blk_mq_dtag_busy(struct blk_mq_hw_ctx *hctx);
+extern void __blk_mq_dtag_idle(struct blk_mq_hw_ctx *hctx);
 
 static inline bool blk_mq_tag_busy(struct blk_mq_hw_ctx *hctx)
 {
@@ -86,6 +93,22 @@ static inline void blk_mq_tag_idle(struct blk_mq_hw_ctx *hctx)
 		return;
 
 	__blk_mq_tag_idle(hctx);
+}
+
+static inline void blk_mq_dtag_busy(struct blk_mq_hw_ctx *hctx)
+{
+	if (!(hctx->flags & BLK_MQ_F_TAG_QUEUE_SHARED))
+		return;
+
+	__blk_mq_dtag_busy(hctx);
+}
+
+static inline void blk_mq_dtag_idle(struct blk_mq_hw_ctx *hctx)
+{
+	if (!(hctx->flags & BLK_MQ_F_TAG_QUEUE_SHARED))
+		return;
+
+	__blk_mq_dtag_idle(hctx);
 }
 
 static inline bool blk_mq_tag_is_reserved(struct blk_mq_tags *tags,

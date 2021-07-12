@@ -337,10 +337,18 @@ static inline bool hctx_may_queue(struct blk_mq_hw_ctx *hctx,
 
 		if (!test_bit(QUEUE_FLAG_HCTX_ACTIVE, &q->queue_flags))
 			return true;
+
+		if (!atomic_read(&set->pending_queues_shared_sbitmap))
+			return true;
+
 		users = atomic_read(&set->active_queues_shared_sbitmap);
 	} else {
 		if (!test_bit(BLK_MQ_S_TAG_ACTIVE, &hctx->state))
 			return true;
+
+		if (!atomic_read(&hctx->tags->pending_queues))
+			return true;
+
 		users = atomic_read(&hctx->tags->active_queues);
 	}
 
