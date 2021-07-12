@@ -63,6 +63,8 @@ static const int phy_10_features_array[] = {
 
 #define ADIN_FC_EN				0x8001
 
+#define ADIN_MSE_VAL				0x830B
+
 #define ADIN_CRSM_SFT_RST			0x8810
 #define   ADIN_CRSM_SFT_RST_EN			BIT(0)
 
@@ -81,6 +83,8 @@ static const int phy_10_features_array[] = {
 #define   ADIN_MAC_IF_LOOPBACK_EN		BIT(0)
 #define   ADIN_MAC_IF_REMOTE_LOOPBACK_EN	BIT(2)
 
+#define ADIN_SQI_MAX	7
+
 struct adin_hw_stat {
 	const char *string;
 	u16 reg1;
@@ -98,6 +102,22 @@ static const struct adin_hw_stat adin_hw_stats[] = {
 	{ "odd_nibble_frames_count",		0x8010 },
 	{ "odd_preamble_packet_count",		0x8011 },
 	{ "false_carrier_events_count",		0x8013 },
+};
+
+struct adin_mse_sqi_range {
+	u16 start;
+	u16 end;
+};
+
+static const struct adin_mse_sqi_range adin_mse_sqi_map[] = {
+	{ 0x0A74, 0xFFFF },
+	{ 0x084E, 0x0A74 },
+	{ 0x0698, 0x084E },
+	{ 0x053D, 0x0698 },
+	{ 0x0429, 0x053D },
+	{ 0x034E, 0x0429 },
+	{ 0x02A0, 0x034E },
+	{ 0x0000, 0x02A0 },
 };
 
 /**
@@ -436,6 +456,36 @@ static void adin_get_stats(struct phy_device *phydev, struct ethtool_stats *stat
 		data[i] = adin_get_stat(phydev, i);
 }
 
+static int adin_get_sqi(struct phy_device *phydev)
+{
+	u16 mse_val;
+	int sqi;
+	int ret;
+
+	ret = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_STAT1);
+	if (ret < 0)
+		return ret;
+	else if (!(ret & MDIO_STAT1_LSTATUS))
+		return 0;
+
+	ret = phy_read_mmd(phydev, MDIO_STAT1, ADIN_MSE_VAL);
+	if (ret < 0)
+		return ret;
+
+	mse_val = 0xFFFF & ret;
+	for (sqi = 0; sqi < ARRAY_SIZE(adin_mse_sqi_map); sqi++) {
+		if (mse_val >= adin_mse_sqi_map[sqi].start && mse_val <= adin_mse_sqi_map[sqi].end)
+			return sqi;
+	}
+
+	return -EINVAL;
+}
+
+static int adin_get_sqi_max(struct phy_device *phydev)
+{
+	return ADIN_SQI_MAX;
+}
+
 static int adin_probe(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -466,6 +516,8 @@ static struct phy_driver adin_driver[] = {
 		.get_sset_count		= adin_get_sset_count,
 		.get_strings		= adin_get_strings,
 		.get_stats		= adin_get_stats,
+		.get_sqi		= adin_get_sqi,
+		.get_sqi_max		= adin_get_sqi_max,
 	},
 };
 
