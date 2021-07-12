@@ -37,7 +37,11 @@ static const int phy_10_features_array[] = {
 
 #define ADIN_AN_STATUS				0x0201
 #define ADIN_AN_ADV_ABILITY_L			0x0202
+#define   ADIN_AN_ADV_FORCE_MS			BIT(12)
+
 #define ADIN_AN_ADV_ABILITY_M			0x0203
+#define   ADIN_AN_ADV_MST			BIT(4)
+
 #define ADIN_AN_ADV_ABILITY_H			0x0204U
 #define   ADIN_AN_ADV_B10L_TX_LVL_HI_ABL	BIT(13)
 #define   ADIN_AN_ADV_B10L_TX_LVL_HI_REQ	BIT(12)
@@ -68,6 +72,10 @@ static const int phy_10_features_array[] = {
 #define ADIN_CRSM_STAT				0x8818
 #define   ADIN_CRSM_SFT_PD_RDY			BIT(1)
 #define   ADIN_CRSM_SYS_RDY			BIT(0)
+
+#define AN_PHY_INST_STATUS			0x8030
+#define   ADIN_IS_CFG_SLV			BIT(2)
+#define   ADIN_IS_CFG_MST			BIT(3)
 
 #define ADIN_MAC_IF_LOOPBACK			0x803d
 #define   ADIN_MAC_IF_LOOPBACK_EN		BIT(0)
@@ -164,6 +172,7 @@ static int adin_read_lpa(struct phy_device *phydev)
 static int adin_read_status(struct phy_device *phydev)
 {
 	int ret;
+	int cfg;
 
 	ret = genphy_c45_read_link(phydev);
 	if (ret)
@@ -173,6 +182,8 @@ static int adin_read_status(struct phy_device *phydev)
 	phydev->duplex = DUPLEX_UNKNOWN;
 	phydev->pause = 0;
 	phydev->asym_pause = 0;
+	phydev->master_slave_get = MASTER_SLAVE_CFG_UNKNOWN;
+	phydev->master_slave_state = MASTER_SLAVE_STATE_UNKNOWN;
 
 	if (phydev->autoneg == AUTONEG_ENABLE) {
 		ret = adin_read_lpa(phydev);
@@ -187,7 +198,37 @@ static int adin_read_status(struct phy_device *phydev)
 		phydev->duplex = DUPLEX_FULL;
 	}
 
-	return ret;
+	ret = phy_read_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_L);
+	if (ret < 0)
+		return ret;
+
+	cfg = phy_read_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_M);
+	if (cfg < 0)
+		return cfg;
+
+	if (ret & ADIN_AN_ADV_FORCE_MS) {
+		if (cfg & ADIN_AN_ADV_MST)
+			phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_FORCE;
+		else
+			phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_FORCE;
+	} else {
+		if (cfg & ADIN_AN_ADV_MST)
+			phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_PREFERRED;
+		else
+			phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_PREFERRED;
+	}
+
+	ret = phy_read_mmd(phydev, MDIO_MMD_AN, AN_PHY_INST_STATUS);
+	if (ret < 0)
+		return ret;
+
+	if (ret & ADIN_IS_CFG_SLV)
+		phydev->master_slave_state = MASTER_SLAVE_STATE_SLAVE;
+
+	if (ret & ADIN_IS_CFG_MST)
+		phydev->master_slave_state = MASTER_SLAVE_STATE_MASTER;
+
+	return 0;
 }
 
 static int adin_config_aneg(struct phy_device *phydev)
@@ -200,6 +241,41 @@ static int adin_config_aneg(struct phy_device *phydev)
 	 */
 	if (phydev->autoneg == AUTONEG_DISABLE)
 		return 0;
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+		ret = phy_set_bits_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_L,
+				       ADIN_AN_ADV_FORCE_MS);
+		if (ret < 0)
+			return ret;
+		break;
+	case MASTER_SLAVE_CFG_MASTER_PREFERRED:
+	case MASTER_SLAVE_CFG_SLAVE_PREFERRED:
+		ret = phy_clear_bits_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_L,
+					 ADIN_AN_ADV_FORCE_MS);
+		break;
+	default:
+		break;
+	}
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+	case MASTER_SLAVE_CFG_MASTER_PREFERRED:
+		ret = phy_set_bits_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_M, ADIN_AN_ADV_MST);
+		if (ret < 0)
+			return ret;
+		break;
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+	case MASTER_SLAVE_CFG_SLAVE_PREFERRED:
+		ret = phy_clear_bits_mmd(phydev, MDIO_MMD_AN, ADIN_AN_ADV_ABILITY_M,
+					 ADIN_AN_ADV_MST);
+		if (ret < 0)
+			return ret;
+		break;
+	default:
+		break;
+	}
 
 	if (priv->tx_level_24v)
 		ret = phy_set_bits_mmd(phydev, MDIO_MMD_AN,
