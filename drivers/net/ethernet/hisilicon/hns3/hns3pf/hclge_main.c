@@ -11510,6 +11510,9 @@ static int hclge_init_ae_dev(struct hnae3_ae_dev *ae_dev)
 		goto err_cmd_uninit;
 	}
 
+	hclge_devlink_set_params_init_values(hdev);
+	devlink_params_publish(hdev->devlink);
+
 	ret = hclge_init_msi(hdev);
 	if (ret) {
 		dev_err(&pdev->dev, "Init MSI/MSI-X error, ret = %d.\n", ret);

@@ -763,6 +763,7 @@ struct hnae3_knic_private_info {
 	u16 num_tx_desc;
 	u16 num_rx_desc;
 	u32 tx_spare_buf_size;
+	u32 devlink_tx_spare_buf_size;
 
 	struct hnae3_tc_info tc_info;
 
