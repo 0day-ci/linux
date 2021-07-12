@@ -83,6 +83,31 @@ struct trbe_drvdata {
 	struct platform_device *pdev;
 };
 
+static inline void write_trfcr(u64 val)
+{
+	write_sysreg_s(val, SYS_TRFCR_EL1);
+	isb();
+}
+
+/*
+ * Prohibit the CPU tracing at all ELs, in preparation to collect
+ * the trace buffer.
+ *
+ * Returns the original value of the trfcr for restoring later.
+ */
+static u64 cpu_prohibit_tracing(void)
+{
+	u64 trfcr = read_sysreg_s(SYS_TRFCR_EL1);
+
+	write_trfcr(trfcr & ~(TRFCR_ELx_ExTRE | TRFCR_ELx_E0TRE));
+	return trfcr;
+}
+
+static void cpu_restore_tracing(u64 trfcr)
+{
+	write_trfcr(trfcr);
+}
+
 static int trbe_alloc_node(struct perf_event *event)
 {
 	if (event->cpu == -1)
@@ -681,7 +706,7 @@ static int arm_trbe_disable(struct coresight_device *csdev)
 	return 0;
 }
 
-static void trbe_handle_spurious(struct perf_output_handle *handle)
+static void trbe_handle_spurious(struct perf_output_handle *handle, u64 trfcr)
 {
 	struct trbe_buf *buf = etm_perf_sink_config(handle);
 
@@ -691,6 +716,7 @@ static void trbe_handle_spurious(struct perf_output_handle *handle)
 		trbe_drain_and_disable_local();
 		return;
 	}
+	cpu_restore_tracing(trfcr);
 	trbe_enable_hw(buf);
 }
 
@@ -760,7 +786,18 @@ static irqreturn_t arm_trbe_irq_handler(int irq, void *dev)
 	struct perf_output_handle **handle_ptr = dev;
 	struct perf_output_handle *handle = *handle_ptr;
 	enum trbe_fault_action act;
-	u64 status;
+	u64 status, trfcr;
+
+	/*
+	 * Prohibit the tracing, while we process this. We turn
+	 * things back right, if we get to enabling the TRBE
+	 * back again. Otherwise, the tracing still remains
+	 * prohibited, until the perf event state changes
+	 * or another event is scheduled. This ensures that
+	 * the trace is not generated when it cannot be
+	 * captured.
+	 */
+	trfcr = cpu_prohibit_tracing();
 
 	/*
 	 * Ensure the trace is visible to the CPUs and
@@ -791,7 +828,7 @@ static irqreturn_t arm_trbe_irq_handler(int irq, void *dev)
 		trbe_handle_overflow(handle);
 		break;
 	case TRBE_FAULT_ACT_SPURIOUS:
-		trbe_handle_spurious(handle);
+		trbe_handle_spurious(handle, trfcr);
 		break;
 	case TRBE_FAULT_ACT_FATAL:
 		trbe_stop_and_truncate_event(handle);
