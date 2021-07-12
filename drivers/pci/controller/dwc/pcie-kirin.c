@@ -472,6 +472,7 @@ static int kirin_pcie_probe(struct platform_device *pdev)
 
 static const struct of_device_id kirin_pcie_match[] = {
 	{ .compatible = "hisilicon,kirin960-pcie" },
+	{ .compatible = "hisilicon,kirin970-pcie" },
 	{},
 };
 
