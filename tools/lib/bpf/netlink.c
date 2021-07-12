@@ -22,6 +22,24 @@
 #define SOL_NETLINK 270
 #endif
 
+#ifndef TC_H_CLSACT
+#define TC_H_CLSACT TC_H_INGRESS
+#endif
+
+#ifndef TC_H_MIN_INGRESS
+#define TC_H_MIN_INGRESS 0xFFF2U
+#endif
+
+#ifndef TC_H_MIN_EGRESS
+#define TC_H_MIN_EGRESS 0xFFF3U
+#endif
+
+/* TCA_BPF_ID is an enumerate value in uapi/linux/pkt_cls.h.
+ * Declare it as a macro here so old system can still work
+ * without TCA_BPF_ID defined in pkt_cls.h.
+ */
+#define TCA_BPF_ID 11
+
 typedef int (*libbpf_dump_nlmsg_t)(void *cookie, void *msg, struct nlattr **tb);
 
 typedef int (*__dump_nlmsg_t)(struct nlmsghdr *nlmsg, libbpf_dump_nlmsg_t,
@@ -504,6 +522,8 @@ static int __get_tc_info(void *cookie, struct tcmsg *tc, struct nlattr **tb,
 		return -EINVAL;
 	if (!tb[TCA_OPTIONS])
 		return NL_CONT;
+	if (TCA_BPF_MAX < TCA_BPF_ID)
+		return -EOPNOTSUPP;
 
 	libbpf_nla_parse_nested(tbb, TCA_BPF_MAX, tb[TCA_OPTIONS], NULL);
 	if (!tbb[TCA_BPF_ID])
