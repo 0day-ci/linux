@@ -696,10 +696,8 @@ static void trbe_handle_spurious(struct perf_output_handle *handle)
 
 static void trbe_handle_overflow(struct perf_output_handle *handle)
 {
-	struct perf_event *event = handle->event;
 	struct trbe_buf *buf = etm_perf_sink_config(handle);
 	unsigned long offset, size;
-	struct etm_event_data *event_data;
 
 	offset = get_trbe_limit_pointer() - get_trbe_base_pointer();
 	size = offset - PERF_IDX2OFF(handle->head, buf);
@@ -709,30 +707,22 @@ static void trbe_handle_overflow(struct perf_output_handle *handle)
 	/*
 	 * Mark the buffer as truncated, as we have stopped the trace
 	 * collection upon the WRAP event, without stopping the source.
+	 *
+	 * We don't re-enable the TRBE here, as the event is
+	 * bound to be disabled due to the TRUNCATED flag.
+	 * This is not ideal, as we could use the available space in
+	 * the ring buffer and continue the tracing.
+	 *
+	 * TODO: Revisit the use of TRUNCATED flag and may be instead use
+	 * PARTIAL, to indicate trace may contain partial packets.
+	 * And TRUNCATED can be used only if we do not have enough space
+	 * in the buffer. This would need additional changes in
+	 * etm_event_stop() to allow the sinks to leave a closed
+	 * aux_handle.
 	 */
 	perf_aux_output_flag(handle, PERF_AUX_FLAG_CORESIGHT_FORMAT_RAW |
 				     PERF_AUX_FLAG_TRUNCATED);
 	perf_aux_output_end(handle, size);
-	event_data = perf_aux_output_begin(handle, event);
-	if (!event_data) {
-		/*
-		 * We are unable to restart the trace collection,
-		 * thus leave the TRBE disabled. The etm-perf driver
-		 * is able to detect this with a disconnected handle
-		 * (handle->event = NULL).
-		 */
-		trbe_drain_and_disable_local();
-		*this_cpu_ptr(buf->cpudata->drvdata->handle) = NULL;
-		return;
-	}
-	buf->trbe_limit = compute_trbe_buffer_limit(handle);
-	buf->trbe_write = buf->trbe_base + PERF_IDX2OFF(handle->head, buf);
-	if (buf->trbe_limit == buf->trbe_base) {
-		trbe_stop_and_truncate_event(handle);
-		return;
-	}
-	*this_cpu_ptr(buf->cpudata->drvdata->handle) = handle;
-	trbe_enable_hw(buf);
 }
 
 static bool is_perf_trbe(struct perf_output_handle *handle)
