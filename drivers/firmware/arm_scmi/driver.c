@@ -777,25 +777,34 @@ static int do_xfer(const struct scmi_protocol_handle *ph,
 	}
 
 	if (xfer->hdr.poll_completion) {
-		ktime_t stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLL_TO_NS);
+		if (info->desc->ops->poll_done) {
+			ktime_t stop = ktime_add_ns(ktime_get(),
+						    SCMI_MAX_POLL_TO_NS);
 
-		spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer, stop));
+			spin_until_cond(scmi_xfer_done_no_timeout(cinfo, xfer,
+								  stop));
 
-		if (ktime_before(ktime_get(), stop)) {
-			unsigned long flags;
+			if (ktime_before(ktime_get(), stop)) {
+				unsigned long flags;
 
-			/*
-			 * Do not fetch_response if an out-of-order delayed
-			 * response is being processed.
-			 */
-			spin_lock_irqsave(&xfer->lock, flags);
-			if (xfer->state == SCMI_XFER_SENT_OK) {
-				info->desc->ops->fetch_response(cinfo, xfer);
-				xfer->state = SCMI_XFER_RESP_OK;
+				/*
+				 * Do not fetch_response if an out-of-order delayed
+				 * response is being processed.
+				 */
+				spin_lock_irqsave(&xfer->lock, flags);
+				if (xfer->state == SCMI_XFER_SENT_OK) {
+					info->desc->ops->fetch_response(cinfo,
+									xfer);
+					xfer->state = SCMI_XFER_RESP_OK;
+				}
+				spin_unlock_irqrestore(&xfer->lock, flags);
+			} else {
+				ret = -ETIMEDOUT;
 			}
-			spin_unlock_irqrestore(&xfer->lock, flags);
 		} else {
-			ret = -ETIMEDOUT;
+			dev_warn_once(dev,
+				      "Polling mode is not supported by transport.\n");
+			ret = EINVAL;
 		}
 	} else {
 		/* And we wait for the response. */
