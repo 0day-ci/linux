@@ -538,54 +538,6 @@ int migrate_huge_page_move_mapping(struct address_space *mapping,
 }
 
 /*
- * Gigantic pages are so large that we do not guarantee that page++ pointer
- * arithmetic will work across the entire page.  We need something more
- * specialized.
- */
-static void __copy_gigantic_page(struct page *dst, struct page *src,
-				int nr_pages)
-{
-	int i;
-	struct page *dst_base = dst;
-	struct page *src_base = src;
-
-	for (i = 0; i < nr_pages; ) {
-		cond_resched();
-		copy_highpage(dst, src);
-
-		i++;
-		dst = mem_map_next(dst, dst_base, i);
-		src = mem_map_next(src, src_base, i);
-	}
-}
-
-void copy_huge_page(struct page *dst, struct page *src)
-{
-	int i;
-	int nr_pages;
-
-	if (PageHuge(src)) {
-		/* hugetlbfs page */
-		struct hstate *h = page_hstate(src);
-		nr_pages = pages_per_huge_page(h);
-
-		if (unlikely(nr_pages > MAX_ORDER_NR_PAGES)) {
-			__copy_gigantic_page(dst, src, nr_pages);
-			return;
-		}
-	} else {
-		/* thp page */
-		BUG_ON(!PageTransHuge(src));
-		nr_pages = thp_nr_pages(src);
-	}
-
-	for (i = 0; i < nr_pages; i++) {
-		cond_resched();
-		copy_highpage(dst + i, src + i);
-	}
-}
-
-/*
  * Copy the flags and some other ancillary information
  */
 void folio_migrate_flags(struct folio *newfolio, struct folio *folio)
@@ -661,16 +613,19 @@ void folio_migrate_flags(struct folio *newfolio, struct folio *folio)
 }
 EXPORT_SYMBOL(folio_migrate_flags);
 
-void migrate_page_copy(struct page *newpage, struct page *page)
+void folio_migrate_copy(struct folio *newfolio, struct folio *folio)
 {
-	if (PageHuge(page) || PageTransHuge(page))
-		copy_huge_page(newpage, page);
-	else
-		copy_highpage(newpage, page);
+	unsigned int i, nr = folio_nr_pages(folio);
 
-	migrate_page_states(newpage, page);
+	for (i = 0; i < nr; i++) {
+		/* folio_page() handles discontinuities in memmap */
+		copy_highpage(folio_page(newfolio, i), folio_page(folio, i));
+		cond_resched();
+	}
+
+	folio_migrate_flags(newfolio, folio);
 }
-EXPORT_SYMBOL(migrate_page_copy);
+EXPORT_SYMBOL(folio_migrate_copy);
 
 /************************************************************
  *                    Migration functions
@@ -698,7 +653,7 @@ int migrate_page(struct address_space *mapping,
 		return rc;
 
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		migrate_page_copy(newpage, page);
+		folio_migrate_copy(newfolio, folio);
 	else
 		folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;
