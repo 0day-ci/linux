@@ -198,7 +198,13 @@ static bool page_pool_dma_map(struct page_pool *pool, struct page *page)
 	if (dma_mapping_error(pool->p.dev, dma))
 		return false;
 
-	page_pool_set_dma_addr(page, dma);
+	if (unlikely(!page_pool_set_dma_addr(page, dma))) {
+		dma_unmap_page_attrs(pool->p.dev, dma,
+				     PAGE_SIZE << pool->p.order,
+				     pool->p.dma_dir,
+				     DMA_ATTR_SKIP_CPU_SYNC);
+		return false;
+	}
 
 	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
 		page_pool_dma_sync_for_device(pool, page, pool->p.max_len);

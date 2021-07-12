@@ -200,17 +200,42 @@ static inline void page_pool_recycle_direct(struct page_pool *pool,
 
 static inline dma_addr_t page_pool_get_dma_addr(struct page *page)
 {
-	dma_addr_t ret = page->dma_addr[0];
+	dma_addr_t ret = READ_ONCE(page->dma_addr[0]) & PAGE_MASK;
 	if (sizeof(dma_addr_t) > sizeof(unsigned long))
 		ret |= (dma_addr_t)page->dma_addr[1] << 16 << 16;
 	return ret;
 }
 
-static inline void page_pool_set_dma_addr(struct page *page, dma_addr_t addr)
+static inline bool page_pool_set_dma_addr(struct page *page, dma_addr_t addr)
 {
+	if (WARN_ON(addr & ~PAGE_MASK))
+		return false;
+
 	page->dma_addr[0] = addr;
 	if (sizeof(dma_addr_t) > sizeof(unsigned long))
 		page->dma_addr[1] = upper_32_bits(addr);
+
+	return true;
+}
+
+static inline int page_pool_get_pagecnt_bias(struct page *page)
+{
+	return READ_ONCE(page->dma_addr[0]) & ~PAGE_MASK;
+}
+
+static inline unsigned long *page_pool_pagecnt_bias_ptr(struct page *page)
+{
+	return page->dma_addr;
+}
+
+static inline void page_pool_set_pagecnt_bias(struct page *page, int bias)
+{
+	unsigned long dma_addr_0 = READ_ONCE(page->dma_addr[0]);
+
+	dma_addr_0 &= PAGE_MASK;
+	dma_addr_0 |= bias;
+
+	WRITE_ONCE(page->dma_addr[0], dma_addr_0);
 }
 
 static inline bool is_page_pool_compiled_in(void)
