@@ -255,6 +255,7 @@ of the luma plane.
 .. _V4L2-PIX-FMT-NV12MT:
 .. _V4L2-PIX-FMT-NV12MT-16X16:
 .. _V4L2-PIX-FMT-NV12-32L32:
+.. _V4L2-PIX-FMT-NV12-4L4:
 
 Tiled NV12
 ----------
@@ -281,6 +282,11 @@ planes are identical.
 ``V4L2_PIX_FMT_NV12_32L32`` stores pixel in 2D 32x32 macroblocks, and stores
 macroblocks linearly in memory. The line stride and image height must be
 aligned to a multiple of 32. The layouts of the luma and chroma planes are
+identical.
+
+``V4L2_PIX_FMT_NV12_4L4`` stores pixel in 2D 4x4 macroblocks, and stores
+macroblocks linearly in memory. The line stride and image height must be
+aligned to a multiple of 4. The layouts of the luma and chroma planes are
 identical.
 
 .. _nv12mt:
