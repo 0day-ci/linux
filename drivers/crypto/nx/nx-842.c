@@ -134,8 +134,7 @@ EXPORT_SYMBOL_GPL(nx842_crypto_exit);
 static void check_constraints(struct nx842_constraints *c)
 {
 	/* limit maximum, to always have enough bounce buffer to decompress */
-	if (c->maximum > BOUNCE_BUFFER_SIZE)
-		c->maximum = BOUNCE_BUFFER_SIZE;
+	c->maximum = min(c->maximum, BOUNCE_BUFFER_SIZE);
 }
 
 static int nx842_crypto_add_header(struct nx842_crypto_header *hdr, u8 *buf)
