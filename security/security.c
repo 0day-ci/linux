@@ -321,6 +321,8 @@ static void __init ordered_lsm_init(void)
 
 	ordered_lsms = kcalloc(LSM_COUNT + 1, sizeof(*ordered_lsms),
 				GFP_KERNEL);
+	if (ordered_lsms)
+		return;
 
 	if (chosen_lsm_order) {
 		if (chosen_major_lsm) {
