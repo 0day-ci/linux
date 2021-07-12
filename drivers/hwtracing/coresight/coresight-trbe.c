@@ -723,6 +723,14 @@ static void trbe_handle_overflow(struct perf_output_handle *handle)
 	perf_aux_output_flag(handle, PERF_AUX_FLAG_CORESIGHT_FORMAT_RAW |
 				     PERF_AUX_FLAG_TRUNCATED);
 	perf_aux_output_end(handle, size);
+
+	/*
+	 * Ensure perf callbacks have completed. Since we
+	 * always TRUNCATE the buffer on IRQ, the event
+	 * is scheduled to be disabled. Make sure that happens
+	 * as soon as possible.
+	 */
+	irq_work_run();
 }
 
 static bool is_perf_trbe(struct perf_output_handle *handle)
@@ -776,12 +784,6 @@ static irqreturn_t arm_trbe_irq_handler(int irq, void *dev)
 
 	if (!is_perf_trbe(handle))
 		return IRQ_NONE;
-
-	/*
-	 * Ensure perf callbacks have completed, which may disable
-	 * the trace buffer in response to a TRUNCATION flag.
-	 */
-	irq_work_run();
 
 	act = trbe_get_fault_act(status);
 	switch (act) {
