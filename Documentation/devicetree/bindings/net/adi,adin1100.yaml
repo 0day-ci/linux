@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/adi,adin1100.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Analog Devices ADIN1100 PHY
+
+maintainers:
+  - Alexandru Tachici <alexandru.tachici@analog.com>
+
+description:
+  Bindings for Analog Devices Industrial Low Power 10BASE-T1L Ethernet PHY
+
+allOf:
+  - $ref: ethernet-phy.yaml#
+
+properties:
+  adi,disable-2400mv-tx-level:
+    description:
+      Prevent ADIN1100 from using the 2.4 V pk-pk transmit level.
+    type: boolean
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    ethernet@e000c000 {
+            compatible = "cdns,zynq-gem", "cdns,gem";
+            reg = <0xe000c000 0x1000>;
+            status = "okay";
+            phy-mode = "mii";
+            interrupts = <0 45 4>;
+            clocks = <&clkc 31>, <&clkc 31>, <&clkc 14>;
+            clock-names = "pclk", "hclk", "tx_clk";
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            ethernet-phy@0 {
+                    reg = <0>;
+                    device_type = "ethernet-phy";
+                    adi,disable-2400mv-tx-level;
+            };
+
+    };
