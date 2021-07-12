@@ -593,7 +593,8 @@ static inline void scmi_xfer_state_update(struct scmi_xfer *xfer)
 	}
 }
 
-static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
+static void scmi_handle_notification(struct scmi_chan_info *cinfo,
+				     u32 msg_hdr, void *priv)
 {
 	struct scmi_xfer *xfer;
 	struct device *dev = cinfo->dev;
@@ -611,6 +612,8 @@ static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 	}
 
 	unpack_scmi_header(msg_hdr, &xfer->hdr);
+	if (priv)
+		xfer->priv = priv;
 	info->desc->ops->fetch_notification(cinfo, info->desc->max_msg_size,
 					    xfer);
 	scmi_notify(cinfo->handle, xfer->hdr.protocol_id,
@@ -625,7 +628,8 @@ static void scmi_handle_notification(struct scmi_chan_info *cinfo, u32 msg_hdr)
 	info->desc->ops->clear_channel(cinfo);
 }
 
-static void scmi_handle_response(struct scmi_chan_info *cinfo, u32 msg_hdr)
+static void scmi_handle_response(struct scmi_chan_info *cinfo,
+				 u32 msg_hdr, void *priv)
 {
 	struct scmi_xfer *xfer;
 	struct scmi_info *info = handle_to_scmi_info(cinfo->handle);
@@ -642,6 +646,8 @@ static void scmi_handle_response(struct scmi_chan_info *cinfo, u32 msg_hdr)
 	if (xfer->hdr.type == MSG_TYPE_DELAYED_RESP)
 		xfer->rx.len = info->desc->max_msg_size;
 
+	if (priv)
+		xfer->priv = priv;
 	info->desc->ops->fetch_response(cinfo, xfer);
 
 	trace_scmi_rx_done(xfer->transfer_id, xfer->hdr.id,
@@ -663,6 +669,7 @@ static void scmi_handle_response(struct scmi_chan_info *cinfo, u32 msg_hdr)
  *
  * @cinfo: SCMI channel info
  * @msg_hdr: Message header
+ * @priv: Transport specific private data.
  *
  * Processes one received message to appropriate transfer information and
  * signals completion of the transfer.
@@ -670,17 +677,17 @@ static void scmi_handle_response(struct scmi_chan_info *cinfo, u32 msg_hdr)
  * NOTE: This function will be invoked in IRQ context, hence should be
  * as optimal as possible.
  */
-void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr)
+void scmi_rx_callback(struct scmi_chan_info *cinfo, u32 msg_hdr, void *priv)
 {
 	u8 msg_type = MSG_XTRACT_TYPE(msg_hdr);
 
 	switch (msg_type) {
 	case MSG_TYPE_NOTIFICATION:
-		scmi_handle_notification(cinfo, msg_hdr);
+		scmi_handle_notification(cinfo, msg_hdr, priv);
 		break;
 	case MSG_TYPE_COMMAND:
 	case MSG_TYPE_DELAYED_RESP:
-		scmi_handle_response(cinfo, msg_hdr);
+		scmi_handle_response(cinfo, msg_hdr, priv);
 		break;
 	default:
 		WARN_ONCE(1, "received unknown msg_type:%d\n", msg_type);
