@@ -2565,10 +2565,6 @@ static struct pci_driver fst_driver = {
 static int __init
 fst_init(void)
 {
-	int i;
-
-	for (i = 0; i < FST_MAX_CARDS; i++)
-		fst_card_array[i] = NULL;
 	return pci_register_driver(&fst_driver);
 }
 
