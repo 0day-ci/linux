@@ -474,12 +474,16 @@ iomap_invalidatepage(struct page *page, unsigned int offset, unsigned int len)
 	trace_iomap_invalidatepage(folio->mapping->host, offset, len);
 
 	/*
-	 * If we are invalidating the entire page, clear the dirty state from it
-	 * and release it to avoid unnecessary buildup of the LRU.
+	 * If we are invalidating the entire folio, clear the dirty state
+	 * from it and release it to avoid unnecessary buildup of the LRU.
 	 */
 	if (offset == 0 && len == folio_size(folio)) {
 		WARN_ON_ONCE(folio_writeback(folio));
 		folio_cancel_dirty(folio);
+		iomap_page_release(folio);
+	} else if (folio_multi(folio)) {
+		/* Must release the iop so the page can be split */
+		WARN_ON_ONCE(!folio_uptodate(folio) && folio_dirty(folio));
 		iomap_page_release(folio);
 	}
 }
@@ -1300,7 +1304,7 @@ iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 		struct writeback_control *wbc, struct inode *inode,
 		struct folio *folio, loff_t end_pos)
 {
-	struct iomap_page *iop = to_iomap_page(folio);
+	struct iomap_page *iop = iomap_page_create(inode, folio);
 	struct iomap_ioend *ioend, *next;
 	unsigned len = i_blocksize(inode);
 	unsigned nblocks = i_blocks_per_folio(inode, folio);
@@ -1308,7 +1312,6 @@ iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 	int error = 0, count = 0, i;
 	LIST_HEAD(submit_list);
 
-	WARN_ON_ONCE(nblocks > 1 && !iop);
 	WARN_ON_ONCE(iop && atomic_read(&iop->write_bytes_pending) != 0);
 
 	/*
