@@ -915,7 +915,9 @@ static int nl802154_new_interface(struct sk_buff *skb, struct genl_info *info)
 
 	if (info->attrs[NL802154_ATTR_IFTYPE]) {
 		type = nla_get_u32(info->attrs[NL802154_ATTR_IFTYPE]);
-		if (type > NL802154_IFTYPE_MAX ||
+		if (type < NL802154_IFTYPE_UNSPEC || type > NL802154_IFTYPE_MAX)
+			return -EINVAL;
+		if (type != NL802154_IFTYPE_UNSPEC &&
 		    !(rdev->wpan_phy.supported.iftypes & BIT(type)))
 			return -EINVAL;
 	}
