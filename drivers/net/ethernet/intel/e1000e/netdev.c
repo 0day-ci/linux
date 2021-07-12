@@ -7319,7 +7319,8 @@ static const struct net_device_ops e1000e_netdev_ops = {
 
 static void e1000e_create_device_links(struct pci_dev *pdev)
 {
-	struct pci_dev *tgp_mei_me;
+	struct pci_bus *bus = pdev->bus;
+	struct pci_dev *tgp_mei_me, *p;
 
 	/* Find TGP mei_me devices and make e1000e power depend on mei_me */
 	tgp_mei_me = pci_get_device(PCI_VENDOR_ID_INTEL, 0xa0e0, NULL);
@@ -7334,6 +7335,17 @@ static void e1000e_create_device_links(struct pci_dev *pdev)
 			    DL_FLAG_AUTOREMOVE_CONSUMER))
 		pci_info(pdev, "System and runtime PM depends on %s\n",
 			 pci_name(tgp_mei_me));
+
+	/* Find other devices in the SoC and make them depend on e1000e */
+	list_for_each_entry(p, &bus->devices, bus_list) {
+		if (&p->dev == &pdev->dev || &p->dev == &tgp_mei_me->dev)
+			continue;
+
+		if (device_link_add(&p->dev, &pdev->dev,
+				    DL_FLAG_AUTOREMOVE_SUPPLIER))
+			pci_info(p, "System PM depends on %s\n",
+				 pci_name(pdev));
+	}
 
 	pci_dev_put(tgp_mei_me);
 }
