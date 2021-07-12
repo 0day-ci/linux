@@ -203,6 +203,8 @@ boot parameters that allow disabling KASAN or controlling its features.
   report or also panic the kernel (default: ``report``). The panic happens even
   if ``kasan_multi_shot`` is enabled.
 
+  Note: The boot parameter 'kasan.fault' is supported by all KASAN modes.
+
 Implementation details
 ----------------------
 
