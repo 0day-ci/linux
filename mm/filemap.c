@@ -134,7 +134,6 @@ static void page_cache_delete(struct address_space *mapping,
 	}
 
 	VM_BUG_ON_FOLIO(!folio_locked(folio), folio);
-	VM_BUG_ON_FOLIO(nr != 1 && shadow, folio);
 
 	xas_store(&xas, shadow);
 	xas_init_marks(&xas);
@@ -276,8 +275,7 @@ void filemap_remove_folio(struct folio *folio)
  * from the mapping. The function expects @pvec to be sorted by page index
  * and is optimised for it to be dense.
  * It tolerates holes in @pvec (mapping entries at those indices are not
- * modified). The function expects only THP head pages to be present in the
- * @pvec.
+ * modified). The function expects only folios to be present in the @pvec.
  *
  * The function expects the i_pages lock to be held.
  */
@@ -312,20 +310,12 @@ static void page_cache_delete_batch(struct address_space *mapping,
 
 		WARN_ON_ONCE(!folio_locked(folio));
 
-		if (folio->index == xas.xa_index)
-			folio->mapping = NULL;
-		/* Leave page->index set: truncation lookup relies on it */
+		folio->mapping = NULL;
+		/* Leave folio->index set: truncation lookup relies on it */
 
-		/*
-		 * Move to the next page in the vector if this is a regular
-		 * page or the index is of the last sub-page of this compound
-		 * page.
-		 */
-		if (folio->index + folio_nr_pages(folio) - 1 ==
-								xas.xa_index)
-			i++;
+		i++;
 		xas_store(&xas, NULL);
-		total_pages++;
+		total_pages += folio_nr_pages(folio);
 	}
 	mapping->nrpages -= total_pages;
 }
@@ -2027,22 +2017,25 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t start,
 		indices[pvec->nr] = xas.xa_index;
 		if (!pagevec_add(pvec, &folio->page))
 			break;
-		goto next;
+		continue;
 unlock:
 		folio_unlock(folio);
 put:
 		folio_put(folio);
-next:
-		if (!xa_is_value(folio) && folio_multi(folio)) {
-			xas_set(&xas, folio->index + folio_nr_pages(folio));
-			/* Did we wrap on 32-bit? */
-			if (!xas.xa_index)
-				break;
-		}
 	}
 	rcu_read_unlock();
 
 	return pagevec_count(pvec);
+}
+
+static inline
+bool folio_more_pages(struct folio *folio, pgoff_t index, pgoff_t max)
+{
+	if (folio_single(folio) || folio_hugetlb(folio))
+		return false;
+	if (index >= max)
+		return false;
+	return index < folio->index + folio_nr_pages(folio) - 1;
 }
 
 /**
@@ -2083,10 +2076,16 @@ unsigned find_get_pages_range(struct address_space *mapping, pgoff_t *start,
 		if (xa_is_value(folio))
 			continue;
 
+again:
 		pages[ret] = folio_file_page(folio, xas.xa_index);
 		if (++ret == nr_pages) {
 			*start = xas.xa_index + 1;
 			goto out;
+		}
+		if (folio_more_pages(folio, xas.xa_index, end)) {
+			xas.xa_index++;
+			folio_ref_inc(folio);
+			goto again;
 		}
 	}
 
@@ -2145,9 +2144,15 @@ unsigned find_get_pages_contig(struct address_space *mapping, pgoff_t index,
 		if (unlikely(folio != xas_reload(&xas)))
 			goto put_page;
 
-		pages[ret] = &folio->page;
+again:
+		pages[ret] = folio_file_page(folio, xas.xa_index);
 		if (++ret == nr_pages)
 			break;
+		if (folio_more_pages(folio, xas.xa_index, ULONG_MAX)) {
+			xas.xa_index++;
+			folio_ref_inc(folio);
+			goto again;
+		}
 		continue;
 put_page:
 		folio_put(folio);
@@ -3169,6 +3174,7 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 	addr = vma->vm_start + ((start_pgoff - vma->vm_pgoff) << PAGE_SHIFT);
 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, addr, &vmf->ptl);
 	do {
+again:
 		page = folio_file_page(folio, xas.xa_index);
 		if (PageHWPoison(page))
 			goto unlock;
@@ -3190,9 +3196,18 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 		do_set_pte(vmf, page, addr);
 		/* no need to invalidate: a not-present page won't be cached */
 		update_mmu_cache(vma, addr, vmf->pte);
+		if (folio_more_pages(folio, xas.xa_index, end_pgoff)) {
+			xas.xa_index++;
+			folio_ref_inc(folio);
+			goto again;
+		}
 		folio_unlock(folio);
 		continue;
 unlock:
+		if (folio_more_pages(folio, xas.xa_index, end_pgoff)) {
+			xas.xa_index++;
+			goto again;
+		}
 		folio_unlock(folio);
 		folio_put(folio);
 	} while ((folio = next_map_page(mapping, &xas, end_pgoff)) != NULL);
