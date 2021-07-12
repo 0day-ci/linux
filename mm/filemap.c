@@ -2419,10 +2419,11 @@ static int filemap_readahead(struct kiocb *iocb, struct file *file,
 		struct address_space *mapping, struct folio *folio,
 		pgoff_t last_index)
 {
+	DEFINE_READAHEAD(ractl, file, &file->f_ra, mapping, folio->index);
+
 	if (iocb->ki_flags & IOCB_NOIO)
 		return -EAGAIN;
-	page_cache_async_readahead(mapping, &file->f_ra, file, &folio->page,
-			folio->index, last_index - folio->index);
+	page_cache_async_ra(&ractl, folio, last_index - folio->index);
 	return 0;
 }
 

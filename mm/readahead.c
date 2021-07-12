@@ -580,7 +580,7 @@ void page_cache_sync_ra(struct readahead_control *ractl,
 EXPORT_SYMBOL_GPL(page_cache_sync_ra);
 
 void page_cache_async_ra(struct readahead_control *ractl,
-		struct page *page, unsigned long req_count)
+		struct folio *folio, unsigned long req_count)
 {
 	/* no read-ahead */
 	if (!ractl->ra->ra_pages)
@@ -589,10 +589,10 @@ void page_cache_async_ra(struct readahead_control *ractl,
 	/*
 	 * Same bit is used for PG_readahead and PG_reclaim.
 	 */
-	if (PageWriteback(page))
+	if (folio_writeback(folio))
 		return;
 
-	ClearPageReadahead(page);
+	folio_clear_readahead_flag(folio);
 
 	/*
 	 * Defer asynchronous read-ahead on IO congestion.
