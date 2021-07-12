@@ -558,7 +558,7 @@ int __udp6_lib_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	sk = __udp6_lib_lookup(net, daddr, uh->dest, saddr, uh->source,
 			       inet6_iif(skb), inet6_sdif(skb), udptable, NULL);
-	if (!sk || udp_sk(sk)->encap_type) {
+	if (!sk || udp_sk(sk)->encap_enabled) {
 		/* No socket for error: try tunnels before discarding */
 		sk = ERR_PTR(-ENOENT);
 		if (static_branch_unlikely(&udpv6_encap_needed_key)) {
@@ -661,7 +661,7 @@ static int udpv6_queue_rcv_one_skb(struct sock *sk, struct sk_buff *skb)
 	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto drop;
 
-	if (static_branch_unlikely(&udpv6_encap_needed_key) && up->encap_type) {
+	if (static_branch_unlikely(&udpv6_encap_needed_key) && up->encap_enabled) {
 		int (*encap_rcv)(struct sock *sk, struct sk_buff *skb);
 
 		/*
@@ -1605,13 +1605,11 @@ void udpv6_destroy_sock(struct sock *sk)
 	release_sock(sk);
 
 	if (static_branch_unlikely(&udpv6_encap_needed_key)) {
-		if (up->encap_type) {
+		if (up->encap_enabled) {
 			void (*encap_destroy)(struct sock *sk);
 			encap_destroy = READ_ONCE(up->encap_destroy);
 			if (encap_destroy)
 				encap_destroy(sk);
-		}
-		if (up->encap_enabled) {
 			static_branch_dec(&udpv6_encap_needed_key);
 			udp_encap_disable();
 		}

@@ -707,7 +707,7 @@ int __udp4_lib_err(struct sk_buff *skb, u32 info, struct udp_table *udptable)
 	sk = __udp4_lib_lookup(net, iph->daddr, uh->dest,
 			       iph->saddr, uh->source, skb->dev->ifindex,
 			       inet_sdif(skb), udptable, NULL);
-	if (!sk || udp_sk(sk)->encap_type) {
+	if (!sk || udp_sk(sk)->encap_enabled) {
 		/* No socket for error: try tunnels before discarding */
 		sk = ERR_PTR(-ENOENT);
 		if (static_branch_unlikely(&udp_encap_needed_key)) {
@@ -2105,7 +2105,7 @@ static int udp_queue_rcv_one_skb(struct sock *sk, struct sk_buff *skb)
 		goto drop;
 	nf_reset_ct(skb);
 
-	if (static_branch_unlikely(&udp_encap_needed_key) && up->encap_type) {
+	if (static_branch_unlikely(&udp_encap_needed_key) && up->encap_enabled) {
 		int (*encap_rcv)(struct sock *sk, struct sk_buff *skb);
 
 		/*
@@ -2615,14 +2615,13 @@ void udp_destroy_sock(struct sock *sk)
 	udp_flush_pending_frames(sk);
 	unlock_sock_fast(sk, slow);
 	if (static_branch_unlikely(&udp_encap_needed_key)) {
-		if (up->encap_type) {
+		if (up->encap_enabled) {
 			void (*encap_destroy)(struct sock *sk);
 			encap_destroy = READ_ONCE(up->encap_destroy);
 			if (encap_destroy)
 				encap_destroy(sk);
-		}
-		if (up->encap_enabled)
 			static_branch_dec(&udp_encap_needed_key);
+		}
 	}
 }
 
