@@ -75,6 +75,7 @@ struct scmi_requested_dev {
  *	Index of this bitmap table is also used for message
  *	sequence identifier.
  * @xfer_lock: Protection for message allocation
+ * @max_msg: Maximum number of messages that can be pending
  * @last_token: A counter to use as base to generate for monotonically
  *		increasing tokens.
  * @free_xfers: A free list for available to use xfers. It is initialized with
@@ -86,6 +87,7 @@ struct scmi_requested_dev {
 struct scmi_xfers_info {
 	unsigned long *xfer_alloc_table;
 	spinlock_t xfer_lock;
+	int max_msg;
 	atomic_t last_token;
 	struct hlist_head free_xfers;
 	DECLARE_HASHTABLE(pending_xfers, SCMI_PENDING_XFERS_HT_ORDER_SZ);
@@ -1370,10 +1372,10 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 	const struct scmi_desc *desc = sinfo->desc;
 
 	/* Pre-allocated messages, no more than what hdr.seq can support */
-	if (WARN_ON(!desc->max_msg || desc->max_msg > MSG_TOKEN_MAX)) {
+	if (WARN_ON(!info->max_msg || info->max_msg > MSG_TOKEN_MAX)) {
 		dev_err(dev,
 			"Invalid max_msg %d. Maximum messages supported %lu.\n",
-			desc->max_msg, MSG_TOKEN_MAX);
+			info->max_msg, MSG_TOKEN_MAX);
 		return -EINVAL;
 	}
 
@@ -1391,7 +1393,7 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 	 * attach all of them to the free list
 	 */
 	INIT_HLIST_HEAD(&info->free_xfers);
-	for (i = 0; i < desc->max_msg; i++) {
+	for (i = 0; i < info->max_msg; i++) {
 		xfer = devm_kzalloc(dev, sizeof(*xfer), GFP_KERNEL);
 		if (!xfer)
 			return -ENOMEM;
@@ -1415,10 +1417,40 @@ static int __scmi_xfer_info_init(struct scmi_info *sinfo,
 	return 0;
 }
 
+static int scmi_channels_max_msg_configure(struct scmi_info *sinfo)
+{
+	const struct scmi_desc *desc = sinfo->desc;
+
+	if (!desc->ops->get_max_msg) {
+		sinfo->tx_minfo.max_msg = desc->max_msg;
+		sinfo->rx_minfo.max_msg = desc->max_msg;
+	} else {
+		struct scmi_chan_info *base_cinfo;
+
+		base_cinfo = idr_find(&sinfo->tx_idr, SCMI_PROTOCOL_BASE);
+		if (!base_cinfo)
+			return -EINVAL;
+		sinfo->tx_minfo.max_msg = desc->ops->get_max_msg(base_cinfo);
+
+		/* RX channel is optional so can be skipped */
+		base_cinfo = idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE);
+		if (base_cinfo)
+			sinfo->rx_minfo.max_msg =
+				desc->ops->get_max_msg(base_cinfo);
+	}
+
+	return 0;
+}
+
 static int scmi_xfer_info_init(struct scmi_info *sinfo)
 {
-	int ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo);
+	int ret;
 
+	ret = scmi_channels_max_msg_configure(sinfo);
+	if (ret)
+		return ret;
+
+	ret = __scmi_xfer_info_init(sinfo, &sinfo->tx_minfo);
 	if (!ret && idr_find(&sinfo->rx_idr, SCMI_PROTOCOL_BASE))
 		ret = __scmi_xfer_info_init(sinfo, &sinfo->rx_minfo);
 
