@@ -707,7 +707,29 @@ int __udp4_lib_err(struct sk_buff *skb, u32 info, struct udp_table *udptable)
 	sk = __udp4_lib_lookup(net, iph->daddr, uh->dest,
 			       iph->saddr, uh->source, skb->dev->ifindex,
 			       inet_sdif(skb), udptable, NULL);
-	if (!sk || udp_sk(sk)->encap_enabled) {
+	if (sk && udp_sk(sk)->encap_enabled) {
+		int (*lookup)(struct sock *sk, struct sk_buff *skb);
+
+		lookup = READ_ONCE(udp_sk(sk)->encap_err_lookup);
+		if (lookup) {
+			int network_offset, transport_offset;
+
+			network_offset = skb_network_offset(skb);
+			transport_offset = skb_transport_offset(skb);
+
+			/* Network header needs to point to the outer IPv4 header inside ICMP */
+			skb_reset_network_header(skb);
+
+			/* Transport header needs to point to the UDP header */
+			skb_set_transport_header(skb, iph->ihl << 2);
+			if (lookup(sk, skb))
+				sk = NULL;
+			skb_set_transport_header(skb, transport_offset);
+			skb_set_network_header(skb, network_offset);
+		}
+	}
+
+	if (!sk) {
 		/* No socket for error: try tunnels before discarding */
 		sk = ERR_PTR(-ENOENT);
 		if (static_branch_unlikely(&udp_encap_needed_key)) {

@@ -558,6 +558,28 @@ int __udp6_lib_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	sk = __udp6_lib_lookup(net, daddr, uh->dest, saddr, uh->source,
 			       inet6_iif(skb), inet6_sdif(skb), udptable, NULL);
+	if (sk && udp_sk(sk)->encap_enabled) {
+		int (*lookup)(struct sock *sk, struct sk_buff *skb);
+
+		lookup = READ_ONCE(udp_sk(sk)->encap_err_lookup);
+		if (lookup) {
+			int network_offset, transport_offset;
+
+			network_offset = skb_network_offset(skb);
+			transport_offset = skb_transport_offset(skb);
+
+			/* Network header needs to point to the outer IPv6 header inside ICMP */
+			skb_reset_network_header(skb);
+
+			/* Transport header needs to point to the UDP header */
+			skb_set_transport_header(skb, offset);
+			if (lookup(sk, skb))
+				sk = NULL;
+			skb_set_transport_header(skb, transport_offset);
+			skb_set_network_header(skb, network_offset);
+		}
+	}
+
 	if (!sk || udp_sk(sk)->encap_enabled) {
 		/* No socket for error: try tunnels before discarding */
 		sk = ERR_PTR(-ENOENT);
