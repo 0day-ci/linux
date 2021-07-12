@@ -146,7 +146,7 @@ static inline void filemap_nr_thps_inc(struct address_space *mapping)
 	if (!mapping_thp_support(mapping))
 		atomic_inc(&mapping->nr_thps);
 #else
-	WARN_ON_ONCE(1);
+	WARN_ON_ONCE(!mapping_thp_support(mapping));
 #endif
 }
 
@@ -156,7 +156,7 @@ static inline void filemap_nr_thps_dec(struct address_space *mapping)
 	if (!mapping_thp_support(mapping))
 		atomic_dec(&mapping->nr_thps);
 #else
-	WARN_ON_ONCE(1);
+	WARN_ON_ONCE(!mapping_thp_support(mapping));
 #endif
 }
 
