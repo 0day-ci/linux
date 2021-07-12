@@ -73,6 +73,7 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t start,
 unsigned find_get_entries(struct address_space *mapping, pgoff_t start,
 		pgoff_t end, struct pagevec *pvec, pgoff_t *indices);
 bool truncate_inode_partial_page(struct page *page, loff_t start, loff_t end);
+void filemap_free_folio(struct address_space *mapping, struct folio *folio);
 
 /**
  * folio_evictable - Test whether a folio is evictable.
