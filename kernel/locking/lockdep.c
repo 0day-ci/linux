@@ -4633,16 +4633,16 @@ static inline short task_wait_context(struct task_struct *curr)
 	return LD_WAIT_MAX;
 }
 
-static int
+static void
 print_lock_invalid_wait_context(struct task_struct *curr,
 				struct held_lock *hlock)
 {
 	short curr_inner;
 
 	if (!debug_locks_off())
-		return 0;
+		return;
 	if (debug_locks_silent)
-		return 0;
+		return;
 
 	pr_warn("\n");
 	pr_warn("=============================\n");
@@ -4662,8 +4662,6 @@ print_lock_invalid_wait_context(struct task_struct *curr,
 
 	pr_warn("stack backtrace:\n");
 	dump_stack();
-
-	return 0;
 }
 
 /*
@@ -4680,6 +4678,8 @@ print_lock_invalid_wait_context(struct task_struct *curr,
  *
  * Therefore we must look for the strictest environment in the lock stack and
  * compare that to the lock we're trying to acquire.
+ *
+ * Return 1 if no nesting confilct, otherwise return 0.
  */
 static int check_wait_context(struct task_struct *curr, struct held_lock *next)
 {
@@ -4689,7 +4689,7 @@ static int check_wait_context(struct task_struct *curr, struct held_lock *next)
 	int depth;
 
 	if (!next_inner || next->trylock)
-		return 0;
+		return 1;
 
 	if (!next_outer)
 		next_outer = next_inner;
@@ -4721,10 +4721,12 @@ static int check_wait_context(struct task_struct *curr, struct held_lock *next)
 		}
 	}
 
-	if (next_outer > curr_inner)
-		return print_lock_invalid_wait_context(curr, next);
+	if (next_outer > curr_inner) {
+		print_lock_invalid_wait_context(curr, next);
+		return 0;
+	}
 
-	return 0;
+	return 1;
 }
 
 #else /* CONFIG_PROVE_LOCKING */
@@ -4749,7 +4751,7 @@ static inline int separate_irq_context(struct task_struct *curr,
 static inline int check_wait_context(struct task_struct *curr,
 				     struct held_lock *next)
 {
-	return 0;
+	return 1;
 }
 
 #endif /* CONFIG_PROVE_LOCKING */
@@ -4960,7 +4962,7 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 #endif
 	hlock->pin_count = pin_count;
 
-	if (check_wait_context(curr, hlock))
+	if (!check_wait_context(curr, hlock))
 		return 0;
 
 	/* Initialize the lock usage bit */
