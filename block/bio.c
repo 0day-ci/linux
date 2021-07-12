@@ -933,6 +933,27 @@ int bio_add_page(struct bio *bio, struct page *page,
 }
 EXPORT_SYMBOL(bio_add_page);
 
+/**
+ * bio_add_folio - Attempt to add part of a folio to a bio.
+ * @bio: Bio to add to.
+ * @folio: Folio to add.
+ * @len: How many bytes from the folio to add.
+ * @off: First byte in this folio to add.
+ *
+ * Always uses the head page of the folio in the bio.  If a submitter
+ * only uses bio_add_folio(), it can count on never seeing tail pages
+ * in the completion routine.  BIOs do not support folios larger than 2GiB.
+ *
+ * Return: The number of bytes from this folio added to the bio.
+ */
+size_t bio_add_folio(struct bio *bio, struct folio *folio, size_t len,
+		size_t off)
+{
+	if (len > UINT_MAX || off > UINT_MAX)
+		return 0;
+	return bio_add_page(bio, &folio->page, len, off);
+}
+
 void bio_release_pages(struct bio *bio, bool mark_dirty)
 {
 	struct bvec_iter_all iter_all;
