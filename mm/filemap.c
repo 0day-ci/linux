@@ -2355,9 +2355,8 @@ static bool filemap_range_uptodate(struct address_space *mapping,
 
 static int filemap_update_page(struct kiocb *iocb,
 		struct address_space *mapping, struct iov_iter *iter,
-		struct page *page)
+		struct folio *folio)
 {
-	struct folio *folio = page_folio(page);
 	int error;
 
 	if (!folio_trylock(folio)) {
@@ -2426,13 +2425,13 @@ error:
 }
 
 static int filemap_readahead(struct kiocb *iocb, struct file *file,
-		struct address_space *mapping, struct page *page,
+		struct address_space *mapping, struct folio *folio,
 		pgoff_t last_index)
 {
 	if (iocb->ki_flags & IOCB_NOIO)
 		return -EAGAIN;
-	page_cache_async_readahead(mapping, &file->f_ra, file, page,
-			page->index, last_index - page->index);
+	page_cache_async_readahead(mapping, &file->f_ra, file, &folio->page,
+			folio->index, last_index - folio->index);
 	return 0;
 }
 
@@ -2444,7 +2443,7 @@ static int filemap_get_pages(struct kiocb *iocb, struct iov_iter *iter,
 	struct file_ra_state *ra = &filp->f_ra;
 	pgoff_t index = iocb->ki_pos >> PAGE_SHIFT;
 	pgoff_t last_index;
-	struct page *page;
+	struct folio *folio;
 	int err = 0;
 
 	last_index = DIV_ROUND_UP(iocb->ki_pos + iter->count, PAGE_SIZE);
@@ -2470,16 +2469,16 @@ retry:
 		return err;
 	}
 
-	page = pvec->pages[pagevec_count(pvec) - 1];
-	if (PageReadahead(page)) {
-		err = filemap_readahead(iocb, filp, mapping, page, last_index);
+	folio = page_folio(pvec->pages[pagevec_count(pvec) - 1]);
+	if (folio_readahead(folio)) {
+		err = filemap_readahead(iocb, filp, mapping, folio, last_index);
 		if (err)
 			goto err;
 	}
-	if (!PageUptodate(page)) {
+	if (!folio_uptodate(folio)) {
 		if ((iocb->ki_flags & IOCB_WAITQ) && pagevec_count(pvec) > 1)
 			iocb->ki_flags |= IOCB_NOWAIT;
-		err = filemap_update_page(iocb, mapping, iter, page);
+		err = filemap_update_page(iocb, mapping, iter, folio);
 		if (err)
 			goto err;
 	}
@@ -2487,7 +2486,7 @@ retry:
 	return 0;
 err:
 	if (err < 0)
-		put_page(page);
+		folio_put(folio);
 	if (likely(--pvec->nr))
 		return 0;
 	if (err == AOP_TRUNCATED_PAGE)
