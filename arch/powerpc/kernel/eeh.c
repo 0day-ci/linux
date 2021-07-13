@@ -714,7 +714,7 @@ static void eeh_restore_dev_state(struct eeh_dev *edev, void *userdata)
  * Return value:
  * 	0 if success
  */
-int pcibios_set_pcie_reset_state(struct pci_dev *dev, enum pcie_reset_state state)
+int pcibios_set_pcie_reset_state(struct pci_dev *dev, pcie_reset_state_t state)
 {
 	struct eeh_dev *edev = pci_dev_to_eeh_dev(dev);
 	struct eeh_pe *pe = eeh_dev_to_pe(edev);
