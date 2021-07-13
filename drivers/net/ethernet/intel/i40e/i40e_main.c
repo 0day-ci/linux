@@ -8784,7 +8784,8 @@ int i40e_vsi_open(struct i40e_vsi *vsi)
 err_up_complete:
 	i40e_down(vsi);
 err_set_queues:
-	i40e_vsi_free_irq(vsi);
+	if ((vsi->netdev) || (vsi->type == I40E_VSI_FDIR))
+		i40e_vsi_free_irq(vsi);
 err_setup_rx:
 	i40e_vsi_free_rx_resources(vsi);
 err_setup_tx:
