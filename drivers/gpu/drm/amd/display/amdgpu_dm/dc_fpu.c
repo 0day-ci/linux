@@ -29,6 +29,19 @@
 #include <asm/fpu/api.h>
 
 /**
+ * DOC: DC FPU manipulation overview
+ *
+ * DC core uses FPU operations in multiple parts of the code, which requires a
+ * more specialized way to manage these areas' entrance. To fulfill this
+ * requirement, we created some wrapper functions that encapsulate
+ * kernel_fpu_begin/end to better fit our need in the display component. In
+ * summary, in this file, you can find functions related to FPU operation
+ * management.
+ */
+
+static DEFINE_PER_CPU(int, fpu_recursion_depth);
+
+/**
  * dc_fpu_begin - Enables FPU protection
  * @function_name: A string containing the function name for debug purposes
  *   (usually __func__)
@@ -43,8 +56,16 @@
  */
 void dc_fpu_begin(const char *function_name, const int line)
 {
-	TRACE_DCN_FPU(true, function_name, line);
-	kernel_fpu_begin();
+	int *pcpu;
+
+	pcpu = get_cpu_ptr(&fpu_recursion_depth);
+	*pcpu = this_cpu_inc_return(fpu_recursion_depth);
+
+	if (*pcpu == 1)
+		kernel_fpu_begin();
+
+	TRACE_DCN_FPU(true, function_name, line, *pcpu);
+	put_cpu_ptr(&fpu_recursion_depth);
 }
 
 /**
@@ -59,6 +80,13 @@ void dc_fpu_begin(const char *function_name, const int line)
  */
 void dc_fpu_end(const char *function_name, const int line)
 {
-	TRACE_DCN_FPU(false, function_name, line);
-	kernel_fpu_end();
+	int *pcpu;
+
+	pcpu = get_cpu_ptr(&fpu_recursion_depth);
+	*pcpu = this_cpu_dec_return(fpu_recursion_depth);
+	if (*pcpu <= 0)
+		kernel_fpu_end();
+
+	TRACE_DCN_FPU(false, function_name, line, *pcpu);
+	put_cpu_ptr(&fpu_recursion_depth);
 }
