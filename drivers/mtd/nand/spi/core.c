@@ -9,6 +9,7 @@
 
 #define pr_fmt(fmt)	"spi-nand: " fmt
 
+#include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
@@ -663,6 +664,48 @@ static int spinand_reset_op(struct spinand_device *spinand)
 			    SPINAND_RESET_INITIAL_DELAY_US,
 			    SPINAND_RESET_POLL_DELAY_US,
 			    NULL);
+}
+
+static int spinand_power_on_rst_op(struct spinand_device *spinand)
+{
+	struct spi_mem_op op;
+	int ret;
+
+	if (!(spinand->flags & SPINAND_HAS_POR_CMD_BIT))
+		return -EOPNOTSUPP;
+
+	/*
+	 * If flash is in a busy state, wait for it to finish the operation.
+	 * As the operation is unknown, use reset poll delays here.
+	 */
+	ret = spinand_wait(spinand,
+			   SPINAND_RESET_INITIAL_DELAY_US,
+			   SPINAND_RESET_POLL_DELAY_US,
+			   NULL);
+	if (ret)
+		return ret;
+
+	op = (struct spi_mem_op)SPINAND_EN_POWER_ON_RST_OP;
+
+	spinand_setup_op(spinand, &op);
+	ret = spi_mem_exec_op(spinand->spimem, &op);
+	if (ret)
+		return ret;
+
+	op = (struct spi_mem_op)SPINAND_POWER_ON_RST_OP;
+
+	spinand_setup_op(spinand, &op);
+	ret = spi_mem_exec_op(spinand->spimem, &op);
+	if (ret)
+		return ret;
+
+	/* PoR can take max 500 us to complete, so sleep for 1000 to 1200 us*/
+	usleep_range(SPINAND_POR_MIN_DELAY_US, SPINAND_POR_MAX_DELAY_US);
+
+	dev_dbg(&spinand->spimem->spi->dev,
+		"%s SPI NAND reset to Power-On-Reset state.\n",
+		spinand->manufacturer->name);
+	return 0;
 }
 
 static int spinand_lock_block(struct spinand_device *spinand, u8 lock)

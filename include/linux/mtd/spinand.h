@@ -26,6 +26,18 @@
 		   SPI_MEM_OP_NO_DUMMY,					\
 		   SPI_MEM_OP_NO_DATA)
 
+#define SPINAND_EN_POWER_ON_RST_OP					\
+	SPI_MEM_OP(SPI_MEM_OP_CMD(0x66, 1),				\
+		   SPI_MEM_OP_NO_ADDR,					\
+		   SPI_MEM_OP_NO_DUMMY,					\
+		   SPI_MEM_OP_NO_DATA)
+
+#define SPINAND_POWER_ON_RST_OP						\
+	SPI_MEM_OP(SPI_MEM_OP_CMD(0x99, 1),				\
+		   SPI_MEM_OP_NO_ADDR,					\
+		   SPI_MEM_OP_NO_DUMMY,					\
+		   SPI_MEM_OP_NO_DATA)
+
 #define SPINAND_WR_EN_DIS_OP(enable)					\
 	SPI_MEM_OP(SPI_MEM_OP_CMD((enable) ? 0x06 : 0x04, 1),		\
 		   SPI_MEM_OP_NO_ADDR,					\
@@ -218,6 +230,8 @@ struct spinand_device;
  * reading/programming/erasing when the RESET occurs. Since we always
  * issue a RESET when the device is IDLE, 5us is selected for both initial
  * and poll delay.
+ * Power on Reset can take max upto 500 us to complete, so sleep for 1000 us
+ * to 1200 us safely.
  */
 #define SPINAND_READ_INITIAL_DELAY_US	6
 #define SPINAND_READ_POLL_DELAY_US	5
@@ -227,6 +241,8 @@ struct spinand_device;
 #define SPINAND_WRITE_POLL_DELAY_US	15
 #define SPINAND_ERASE_INITIAL_DELAY_US	250
 #define SPINAND_ERASE_POLL_DELAY_US	50
+#define SPINAND_POR_MIN_DELAY_US	1000
+#define SPINAND_POR_MAX_DELAY_US	1200
 
 #define SPINAND_WAITRDY_TIMEOUT_MS	400
 
@@ -351,6 +367,7 @@ struct spinand_ecc_info {
 #define SPINAND_HAS_QE_BIT		BIT(0)
 #define SPINAND_HAS_CR_FEAT_BIT		BIT(1)
 #define SPINAND_HAS_OCTAL_DTR_BIT	BIT(2)
+#define SPINAND_HAS_POR_CMD_BIT		BIT(3)
 
 /**
  * struct spinand_ondie_ecc_conf - private SPI-NAND on-die ECC engine structure
