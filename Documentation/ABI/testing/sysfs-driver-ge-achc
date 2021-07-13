@@ -1,0 +1,14 @@
+What:		/sys/bus/spi/<dev>/update_firmware
+Date:		Jul 2021
+Contact:	sebastian.reichel@collabora.com
+Description:	Write 1 to this file to update the ACHC microcontroller
+		firmware via the EzPort interface. For this the kernel
+		will load "achc.bin" via the firmware API (so usually
+		from /lib/firmware). The write will block until the FW
+		has either been flashed successfully or an error occured.
+
+What:		/sys/bus/spi/<dev>/reset
+Date:		Jul 2021
+Contact:	sebastian.reichel@collabora.com
+Description:	Write 1 to this file to reset the microcontroller via the
+		reset GPIO. The write will block until the reset completes.
