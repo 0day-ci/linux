@@ -41,3 +41,7 @@ obj-$(CONFIG_CLK_RCAR_USB2_CLOCK_SEL)	+= rcar-usb2-clock-sel.o
 obj-$(CONFIG_CLK_RENESAS_CPG_MSSR)	+= renesas-cpg-mssr.o
 obj-$(CONFIG_CLK_RENESAS_CPG_MSTP)	+= clk-mstp.o
 obj-$(CONFIG_CLK_RENESAS_DIV6)		+= clk-div6.o
+
+# 8T49N24x
+obj-$(CONFIG_COMMON_CLK_8T49N24X)	+= clk-8t49n24x.o
+clk-8t49n24x-objs 			:= 8t49n24x.o 8t49n24x-core.o
