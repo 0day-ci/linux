@@ -285,6 +285,7 @@ static void mctp_unregister(struct net_device *dev)
 	RCU_INIT_POINTER(mdev->dev->mctp_ptr, NULL);
 
 	mctp_route_remove_dev(mdev);
+	mctp_neigh_remove_dev(mdev);
 	list_for_each_entry_safe(ifa, tmp, &mdev->addrs, dev_list) {
 		list_del_rcu(&ifa->dev_list);
 		kfree_rcu(ifa, rcu);
