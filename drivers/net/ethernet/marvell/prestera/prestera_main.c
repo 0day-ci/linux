@@ -567,6 +567,14 @@ static int prestera_lag_port_add(struct prestera_port *port,
 	lag->member_count++;
 	port->lag = lag;
 
+	if (netif_is_bridge_port(lag_dev)) {
+		struct net_device *br_dev;
+
+		br_dev = netdev_master_upper_dev_get(lag_dev);
+
+		return prestera_bridge_port_join(br_dev, port);
+	}
+
 	return 0;
 }
 
