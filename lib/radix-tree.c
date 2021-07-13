@@ -12,19 +12,21 @@
 #include <linux/bitmap.h>
 #include <linux/bitops.h>
 #include <linux/bug.h>
+#include <linux/container_of.h>
 #include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/export.h>
 #include <linux/idr.h>
 #include <linux/init.h>
-#include <linux/kernel.h>
 #include <linux/kmemleak.h>
+#include <linux/math.h>
 #include <linux/percpu.h>
 #include <linux/preempt.h>		/* in_interrupt() */
 #include <linux/radix-tree.h>
 #include <linux/rcupdate.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/types.h>
 #include <linux/xarray.h>
 
 /*
@@ -284,6 +286,8 @@ out:
 	}
 	return ret;
 }
+
+extern void radix_tree_node_rcu_free(struct rcu_head *head);
 
 void radix_tree_node_rcu_free(struct rcu_head *head)
 {

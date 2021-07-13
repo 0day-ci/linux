@@ -15,18 +15,18 @@
 #ifndef _KOBJECT_H_
 #define _KOBJECT_H_
 
-#include <linux/types.h>
-#include <linux/list.h>
-#include <linux/sysfs.h>
+#include <linux/atomic.h>
 #include <linux/compiler.h>
-#include <linux/spinlock.h>
+#include <linux/container_of.h>
+#include <linux/list.h>
 #include <linux/kref.h>
 #include <linux/kobject_ns.h>
-#include <linux/kernel.h>
 #include <linux/wait.h>
-#include <linux/atomic.h>
-#include <linux/workqueue.h>
+#include <linux/spinlock.h>
+#include <linux/sysfs.h>
+#include <linux/types.h>
 #include <linux/uidgid.h>
+#include <linux/workqueue.h>
 
 #define UEVENT_HELPER_PATH_LEN		256
 #define UEVENT_NUM_ENVP			64	/* number of env pointers */
