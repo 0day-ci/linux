@@ -41,6 +41,22 @@
  *    that deals with FP register is contained within this call.
  * 3. All function that needs to be accessed outside this file requires a
  *    public interface that not uses any FPU reference.
+ * 4. Developers should not use DC_FP_START/END in this file, but they need to
+ *    ensure that the caller invokes it before access any function available in
+ *    this file. For this reason, public API in this file must invoke
+ *    ASSERT(dc_assert_fp_enabled());
+ *
+ * Let's expand a little bit more the idea in the code pattern number for. To
+ * fully isolate FPU operations in a single place, we must avoid situations
+ * where compilers spill FP values to registers due to FP enable in a specific
+ * C file. Note that even if we isolate all FPU functions in a single file and
+ * call its interface from other files, the compiler might enable the use of
+ * FPU before we call DC_FP_START. Nevertheless, it is the programmer's
+ * responsibility to invoke DC_FP_START/END in the correct place. To highlight
+ * situations where developers forgot to use the FP protection before calling
+ * the DC FPU interface functions, we introduce a helper that checks if the
+ * function is invoked under FP protection. If not, it will trigger a kernel
+ * warning.
  */
 
 static noinline void _dcn20_populate_dml_writeback_from_context(struct dc *dc,
@@ -83,5 +99,6 @@ static noinline void _dcn20_populate_dml_writeback_from_context(struct dc *dc,
 void dcn20_populate_dml_writeback_from_context(struct dc *dc,
 	struct resource_context *res_ctx, display_e2e_pipe_params_st *pipes)
 {
+	ASSERT(dc_assert_fp_enabled());
 	_dcn20_populate_dml_writeback_from_context(dc, res_ctx, pipes);
 }
