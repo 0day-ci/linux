@@ -629,6 +629,8 @@ static int tps6598x_probe(struct i2c_client *client)
 	if (!fwnode)
 		return -ENODEV;
 
+	fw_devlink_purge_absent_suppliers(fwnode);
+
 	tps->role_sw = fwnode_usb_role_switch_get(fwnode);
 	if (IS_ERR(tps->role_sw)) {
 		ret = PTR_ERR(tps->role_sw);
