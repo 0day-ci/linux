@@ -7,6 +7,7 @@
  *        tasks which are handled in sched/fair.c )
  */
 #include "sched.h"
+#include <asm/idle_hint.h>
 
 #include <trace/events/power.h>
 
@@ -290,6 +291,7 @@ static void do_idle(void)
 			arch_cpu_idle_dead();
 		}
 
+		set_idle_hint(cpu, 1);
 		arch_cpu_idle_enter();
 		rcu_nocb_flush_deferred_wakeup();
 
@@ -306,6 +308,7 @@ static void do_idle(void)
 			cpuidle_idle_call();
 		}
 		arch_cpu_idle_exit();
+		set_idle_hint(cpu, 0);
 	}
 
 	/*
