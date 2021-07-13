@@ -7,6 +7,7 @@
 #include <linux/sched.h>
 #include <linux/sched/clock.h>
 #include <linux/sched/idle.h>
+#include <linux/poll_source.h>
 
 #define POLL_IDLE_RELAX_COUNT	200
 
@@ -22,9 +23,12 @@ static int __cpuidle poll_idle(struct cpuidle_device *dev,
 		unsigned int loop_count = 0;
 		u64 limit;
 
+		poll_source_start();
+
 		limit = cpuidle_poll_time(drv, dev);
 
 		while (!need_resched()) {
+			poll_source_run_once();
 			cpu_relax();
 			if (loop_count++ < POLL_IDLE_RELAX_COUNT)
 				continue;
@@ -35,6 +39,8 @@ static int __cpuidle poll_idle(struct cpuidle_device *dev,
 				break;
 			}
 		}
+
+		poll_source_stop();
 	}
 	current_clr_polling();
 
