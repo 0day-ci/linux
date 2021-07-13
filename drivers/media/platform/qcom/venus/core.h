@@ -450,6 +450,7 @@ struct venus_inst {
 	bool next_buf_last;
 	bool drain_active;
 	enum venus_inst_modes flags;
+	u32 dpb_out_tag[VB2_MAX_FRAME];
 };
 
 #define IS_V1(core)	((core)->res->hfi_version == HFI_VERSION_1XX)
@@ -483,5 +484,7 @@ venus_caps_by_codec(struct venus_core *core, u32 codec, u32 domain)
 
 	return NULL;
 }
+
+void dpb_out_tag_init(struct venus_inst *inst);
 
 #endif

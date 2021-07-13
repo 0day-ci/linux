@@ -21,14 +21,6 @@
 #define NUM_MBS_720P	(((1280 + 15) >> 4) * ((720 + 15) >> 4))
 #define NUM_MBS_4K	(((4096 + 15) >> 4) * ((2304 + 15) >> 4))
 
-struct intbuf {
-	struct list_head list;
-	u32 type;
-	size_t size;
-	void *va;
-	dma_addr_t da;
-	unsigned long attrs;
-};
 
 bool venus_helper_check_codec(struct venus_inst *inst, u32 v4l2_pixfmt)
 {
@@ -95,9 +87,16 @@ int venus_helper_queue_dpb_bufs(struct venus_inst *inst)
 		fdata.device_addr = buf->da;
 		fdata.buffer_type = buf->type;
 
+		if (buf->owned_by == FIRMWARE)
+			continue;
+
+		fdata.clnt_data = buf->dpb_out_tag;
+
 		ret = hfi_session_process_buf(inst, &fdata);
 		if (ret)
 			goto fail;
+
+		buf->owned_by = FIRMWARE;
 	}
 
 fail:
@@ -110,17 +109,35 @@ int venus_helper_free_dpb_bufs(struct venus_inst *inst)
 	struct intbuf *buf, *n;
 
 	list_for_each_entry_safe(buf, n, &inst->dpbbufs, list) {
+		if (buf->owned_by == FIRMWARE)
+			continue;
+
+		inst->dpb_out_tag[buf->dpb_out_tag - VB2_MAX_FRAME] = 0;
+
 		list_del_init(&buf->list);
 		dma_free_attrs(inst->core->dev, buf->size, buf->va, buf->da,
 			       buf->attrs);
 		kfree(buf);
 	}
 
-	INIT_LIST_HEAD(&inst->dpbbufs);
 
 	return 0;
 }
 EXPORT_SYMBOL_GPL(venus_helper_free_dpb_bufs);
+
+int venus_helper_get_free_dpb_tag(struct venus_inst *inst)
+{
+	u32 i;
+
+	for (i = 0; i < VB2_MAX_FRAME; i++) {
+		if (inst->dpb_out_tag[i] == 0) {
+			inst->dpb_out_tag[i] = i + VB2_MAX_FRAME;
+			return inst->dpb_out_tag[i];
+		}
+	}
+
+	return 0;
+}
 
 int venus_helper_alloc_dpb_bufs(struct venus_inst *inst)
 {
@@ -171,6 +188,8 @@ int venus_helper_alloc_dpb_bufs(struct venus_inst *inst)
 			ret = -ENOMEM;
 			goto fail;
 		}
+		buf->owned_by = DRIVER;
+		buf->dpb_out_tag = venus_helper_get_free_dpb_tag(inst);
 
 		list_add_tail(&buf->list, &inst->dpbbufs);
 	}

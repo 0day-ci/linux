@@ -8,6 +8,22 @@
 
 #include <media/videobuf2-v4l2.h>
 
+enum dpb_buf_owner {
+	DRIVER,
+	FIRMWARE,
+};
+
+struct intbuf {
+	struct list_head list;
+	u32 type;
+	size_t size;
+	void *va;
+	dma_addr_t da;
+	unsigned long attrs;
+	enum dpb_buf_owner owned_by;
+	u32 dpb_out_tag;
+};
+
 struct venus_inst;
 struct venus_core;
 
@@ -66,4 +82,5 @@ int venus_helper_get_profile_level(struct venus_inst *inst, u32 *profile, u32 *l
 int venus_helper_set_profile_level(struct venus_inst *inst, u32 profile, u32 level);
 int venus_helper_set_stride(struct venus_inst *inst, unsigned int aligned_width,
 			    unsigned int aligned_height);
+
 #endif
