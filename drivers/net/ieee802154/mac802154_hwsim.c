@@ -132,9 +132,11 @@ static int hwsim_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 			struct sk_buff *newskb = pskb_copy(skb, GFP_ATOMIC);
 
 			einfo = rcu_dereference(e->info);
-			if (newskb)
+			if (newskb) {
 				ieee802154_rx_irqsafe(e->endpoint->hw, newskb,
 						      einfo->lqi);
+				kfree_skb(newskb);
+			}
 		}
 	}
 	rcu_read_unlock();
