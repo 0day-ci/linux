@@ -387,6 +387,13 @@ GEM BO Management Implementation Details
 .. kernel-doc:: drivers/gpu/drm/i915/i915_vma_types.h
    :doc: Virtual Memory Address
 
+GEM Buffer Object
+-----------------
+This section documents our core GEM object, and related bits.
+
+.. kernel-doc:: drivers/gpu/drm/i915/gem/i915_gem_object_types.h
+   :internal:
+
 Buffer Object Eviction
 ----------------------
 
