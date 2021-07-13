@@ -198,19 +198,83 @@ static inline void page_pool_recycle_direct(struct page_pool *pool,
 	page_pool_put_full_page(pool, page, true);
 }
 
+#define PAGE_POOP_USE_DMA_ADDR_1	(sizeof(dma_addr_t) > sizeof(unsigned long))
+
 static inline dma_addr_t page_pool_get_dma_addr(struct page *page)
 {
-	dma_addr_t ret = page->dma_addr[0];
-	if (sizeof(dma_addr_t) > sizeof(unsigned long))
+	dma_addr_t ret;
+
+	if (PAGE_POOP_USE_DMA_ADDR_1) {
+		ret = READ_ONCE(page->dma_addr[0]) & PAGE_MASK;
 		ret |= (dma_addr_t)page->dma_addr[1] << 16 << 16;
+	} else {
+		ret = page->dma_addr[0];
+	}
+
 	return ret;
 }
 
 static inline void page_pool_set_dma_addr(struct page *page, dma_addr_t addr)
 {
 	page->dma_addr[0] = addr;
-	if (sizeof(dma_addr_t) > sizeof(unsigned long))
+	if (PAGE_POOP_USE_DMA_ADDR_1)
 		page->dma_addr[1] = upper_32_bits(addr);
+}
+
+static inline int page_pool_atomic_sub_bias_return(struct page *page, int nr)
+{
+	int bias;
+
+	if (PAGE_POOP_USE_DMA_ADDR_1) {
+		unsigned long *bias_ptr = &page->dma_addr[0];
+		unsigned long old_bias = READ_ONCE(*bias_ptr);
+		unsigned long new_bias;
+
+		do {
+			bias = (int)(old_bias & ~PAGE_MASK);
+
+			/* Warn when page_pool_dev_alloc_pages() is called
+			 * with PP_FLAG_PAGE_FRAG flag in driver.
+			 */
+			WARN_ON(!bias);
+
+			/* already the last user */
+			if (!(bias - nr))
+				return 0;
+
+			new_bias = old_bias - nr;
+		} while (!try_cmpxchg(bias_ptr, &old_bias, new_bias));
+
+		WARN_ON((new_bias & PAGE_MASK) != (old_bias & PAGE_MASK));
+
+		bias = new_bias & ~PAGE_MASK;
+	} else {
+		atomic_t *v = (atomic_t *)&page->dma_addr[1];
+
+		if (atomic_read(v) == nr)
+			return 0;
+
+		bias = atomic_sub_return(nr, v);
+		WARN_ON(bias < 0);
+	}
+
+	return bias;
+}
+
+static inline void page_pool_set_bias(struct page *page, int bias)
+{
+	if (PAGE_POOP_USE_DMA_ADDR_1) {
+		unsigned long dma_addr_0 = READ_ONCE(page->dma_addr[0]);
+
+		dma_addr_0 &= PAGE_MASK;
+		dma_addr_0 |= bias;
+
+		WRITE_ONCE(page->dma_addr[0], dma_addr_0);
+	} else {
+		atomic_t *v = (atomic_t *)&page->dma_addr[1];
+
+		atomic_set(v, bias);
+	}
 }
 
 static inline bool is_page_pool_compiled_in(void)

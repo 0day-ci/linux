@@ -198,6 +198,16 @@ static bool page_pool_dma_map(struct page_pool *pool, struct page *page)
 	if (dma_mapping_error(pool->p.dev, dma))
 		return false;
 
+	if (PAGE_POOP_USE_DMA_ADDR_1 &&
+	    WARN_ON(pool->p.flags & PP_FLAG_PAGE_FRAG &&
+		    dma & ~PAGE_MASK)) {
+		dma_unmap_page_attrs(pool->p.dev, dma,
+				     PAGE_SIZE << pool->p.order,
+				     pool->p.dma_dir,
+				     DMA_ATTR_SKIP_CPU_SYNC);
+		return false;
+	}
+
 	page_pool_set_dma_addr(page, dma);
 
 	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
