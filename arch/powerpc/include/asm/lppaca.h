@@ -111,7 +111,8 @@ struct lppaca {
 	__be32	page_ins;		/* CMO Hint - # page ins by OS */
 	u8	reserved11[148];
 	volatile __be64 dtl_idx;	/* Dispatch Trace Log head index */
-	u8	reserved12[96];
+	volatile __be32 idle_hint;	/* Can vCPU be scheduled instantly? */
+	u8	reserved12[92];
 } ____cacheline_aligned;
 
 #define lppaca_of(cpu)	(*paca_ptrs[cpu]->lppaca_ptr)

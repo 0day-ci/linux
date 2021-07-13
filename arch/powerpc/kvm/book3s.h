@@ -7,6 +7,8 @@
 #ifndef __POWERPC_KVM_BOOK3S_H__
 #define __POWERPC_KVM_BOOK3S_H__
 
+#include <asm/idle_hint.h>
+
 extern void kvmppc_core_flush_memslot_hv(struct kvm *kvm,
 					 struct kvm_memory_slot *memslot);
 extern bool kvm_unmap_gfn_range_hv(struct kvm *kvm, struct kvm_gfn_range *range);
