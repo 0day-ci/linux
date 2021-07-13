@@ -19075,7 +19075,15 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 W:	https://github.com/petkan/rtl8150
 T:	git git://github.com/petkan/rtl8150.git
-F:	drivers/net/usb/rtl8150.c
+F:	drivers/net/usb/realtek/rtl8150.c
+
+USB RTL8152 DRIVER
+L:	nic_swsd@realtek.com
+L:	linux-usb@vger.kernel.org
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/usb/realtek/*
+X:	drivers/net/usb/realtek/rtl8150.c
 
 USB SERIAL SUBSYSTEM
 M:	Johan Hovold <johan@kernel.org>
