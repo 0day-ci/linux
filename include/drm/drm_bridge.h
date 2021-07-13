@@ -136,6 +136,9 @@ struct drm_bridge_funcs {
 	 *
 	 * NOTE:
 	 *
+	 * This is deprecated, do not use!
+	 * New drivers shall use &drm_bridge_funcs.atomic_check.
+	 *
 	 * This function is called in the check phase of atomic modesets, which
 	 * can be aborted for any reason (including on userspace's request to
 	 * just check whether a configuration would be possible). Drivers MUST
