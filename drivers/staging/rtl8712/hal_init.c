@@ -43,6 +43,7 @@ static void rtl871x_load_fw_cb(const struct firmware *firmware, void *context)
 		r8712_free_drv_sw(adapter);
 		adapter->dvobj_deinit(adapter);
 		complete(&adapter->rtl8712_fw_ready);
+		shedule();				/* to not trigger UAF in wait_for_completion() */
 		free_netdev(adapter->pnetdev);
 		return;
 	}
