@@ -21,4 +21,11 @@ extern struct workqueue_struct *create_workqueue(struct threadpool_struct *pool)
 extern int destroy_workqueue(struct workqueue_struct *wq);
 
 extern int workqueue_nr_threads(struct workqueue_struct *wq);
+
+extern int queue_work(struct workqueue_struct *wq, struct work_struct *work);
+
+extern int flush_workqueue(struct workqueue_struct *wq);
+
+extern void init_work(struct work_struct *work);
+
 #endif /* __WORKQUEUE_WORKQUEUE_H */

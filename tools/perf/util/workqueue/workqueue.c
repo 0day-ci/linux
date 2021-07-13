@@ -21,6 +21,7 @@ enum worker_msg {
 
 enum workqueue_status {
 	WORKQUEUE_STATUS__READY,	/* wq is ready to receive work */
+	WORKQUEUE_STATUS__STOPPING,	/* wq is being destructed */
 	WORKQUEUE_STATUS__ERROR,
 	WORKQUEUE_STATUS__MAX
 };
@@ -100,6 +101,39 @@ __must_hold(&wq->lock)
 	list_move(&w->entry, &wq->idle_list);
 	if (list_empty(&wq->busy_list))
 		pthread_cond_signal(&wq->idle_cond);
+}
+
+/**
+ * wake_worker - wake worker @w of workqueue @wq assigning @work to do
+ *
+ * Called from main thread.
+ * Moves worker from idle to busy list, assigns @work to it and sends it a
+ * wake up message.
+ *
+ * NB: this function releases the lock to be able to send the notification
+ * outside the critical section.
+ */
+static int wake_worker(struct workqueue_struct *wq, struct worker *w,
+			struct work_struct *work)
+__must_hold(&wq->lock)
+__releases(&wq->lock)
+{
+	enum worker_msg msg = WORKER_MSG__WAKE;
+	int err;
+
+	list_move(&w->entry, &wq->busy_list);
+	w->current_work = work;
+	unlock_workqueue(wq);
+
+	// send wake msg outside critical section to reduce time spent inside it
+	err = write(w->msg_pipe[1], &msg, sizeof(msg));
+	if (err < 0) {
+		pr_err("wake_worker[%d]: error seding msg: %s\n",
+			w->tidx, strerror(errno));
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -302,6 +336,11 @@ static int detach_threadpool_from_workqueue(struct workqueue_struct *wq)
 		return -1;
 	}
 
+	wq->status = WORKQUEUE_STATUS__STOPPING;
+	ret = flush_workqueue(wq);
+	if (ret)
+		return -1;
+
 	lock_workqueue(wq);
 	for_each_idle_worker(wq, w) {
 		ret = stop_worker(w);
@@ -421,4 +460,58 @@ int destroy_workqueue(struct workqueue_struct *wq)
 int workqueue_nr_threads(struct workqueue_struct *wq)
 {
 	return threadpool_size(wq->pool);
+}
+
+/**
+ * queue_work - add @work to @wq internal queue
+ *
+ * If there are idle threads, one of these will be woken up.
+ * Otherwise, the work is added to the pending list.
+ */
+int queue_work(struct workqueue_struct *wq, struct work_struct *work)
+{
+	int ret = 0;
+	struct worker *chosen_worker;
+
+	// in particular, this can fail if workqueue is marked to be stopping
+	if (wq->status != WORKQUEUE_STATUS__READY) {
+		pr_err("workqueue: trying to queue but workqueue is not ready\n");
+		return -1;
+	}
+
+	lock_workqueue(wq);
+	if (list_empty(&wq->idle_list)) {
+		list_add_tail(&work->entry, &wq->pending);
+		unlock_workqueue(wq);
+		pr_debug("workqueue: queued new work item\n");
+	} else {
+		chosen_worker = list_first_entry(&wq->idle_list, struct worker, entry);
+		ret = wake_worker(wq, chosen_worker, work);
+		pr_debug("workqueue: woke worker %d\n", chosen_worker->tidx);
+	}
+
+	return ret;
+}
+
+/**
+ * flush_workqueue - wait for all currently executed and pending work to finish
+ *
+ * This function blocks until all threads become idle.
+ */
+int flush_workqueue(struct workqueue_struct *wq)
+{
+	lock_workqueue(wq);
+	while (!list_empty(&wq->busy_list))
+		pthread_cond_wait(&wq->idle_cond, &wq->lock);
+	unlock_workqueue(wq);
+
+	return 0;
+}
+
+/**
+ * init_work - initialize the @work struct
+ */
+void init_work(struct work_struct *work)
+{
+	INIT_LIST_HEAD(&work->entry);
 }
