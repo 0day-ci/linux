@@ -19,6 +19,12 @@ struct workqueue_test_args_t {
 	int n_work_items;
 };
 
+struct parallel_for_test_args_t {
+	int pool_size;
+	int n_work_items;
+	int work_size;
+};
+
 struct test_task {
 	struct task_struct task;
 	int n_threads;
@@ -265,6 +271,44 @@ static int __test__workqueue(void *_args)
 	return 0;
 }
 
+static void test_pfw_fn(int i, void *args)
+{
+	int *array = args;
+
+	dummy_work(i);
+	array[i] = i+1;
+}
+
+static int __test__parallel_for(void *_args)
+{
+	struct parallel_for_test_args_t *args = _args;
+	struct threadpool_struct *pool;
+	struct workqueue_struct *wq;
+	int ret, i;
+	int *array;
+
+	array = calloc(args->n_work_items, sizeof(*array));
+
+	ret = __workqueue__prepare(&pool, &wq, args->pool_size);
+	if (ret)
+		return ret;
+
+	ret = parallel_for(wq, 0, args->n_work_items, args->work_size,
+				test_pfw_fn, array);
+	TEST_ASSERT_VAL("parallel_for failure", ret == 0);
+
+	for (i = 0; i < args->n_work_items; i++)
+		TEST_ASSERT_VAL("failed array check", array[i] == i+1);
+
+	ret = __workqueue__teardown(pool, wq);
+	if (ret)
+		return ret;
+
+	free(array);
+
+	return 0;
+}
+
 static const struct threadpool_test_args_t threadpool_test_args[] = {
 	{
 		.pool_size = 1
@@ -310,6 +354,39 @@ static const struct workqueue_test_args_t workqueue_test_args[] = {
 	}
 };
 
+static const struct parallel_for_test_args_t parallel_for_test_args[] = {
+	{
+		.pool_size = 1,
+		.n_work_items = 1,
+		.work_size = 1
+	},
+	{
+		.pool_size = 1,
+		.n_work_items = 10,
+		.work_size = 3
+	},
+	{
+		.pool_size = 2,
+		.n_work_items = 1,
+		.work_size = 1
+	},
+	{
+		.pool_size = 2,
+		.n_work_items = 100,
+		.work_size = 10
+	},
+	{
+		.pool_size = 16,
+		.n_work_items = 7,
+		.work_size = 2
+	},
+	{
+		.pool_size = 16,
+		.n_work_items = 2789,
+		.work_size = 16
+	}
+};
+
 struct test_case {
 	const char *desc;
 	int (*func)(void *args);
@@ -332,6 +409,13 @@ static struct test_case workqueue_testcase_table[] = {
 		.args = (void *) workqueue_test_args,
 		.n_args = (int)ARRAY_SIZE(workqueue_test_args),
 		.arg_size = sizeof(struct workqueue_test_args_t)
+	},
+	{
+		.desc = "Workqueue parallel-for",
+		.func = __test__parallel_for,
+		.args = (void *) parallel_for_test_args,
+		.n_args = (int)ARRAY_SIZE(parallel_for_test_args),
+		.arg_size = sizeof(struct parallel_for_test_args_t)
 	}
 };
 

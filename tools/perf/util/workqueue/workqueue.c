@@ -515,3 +515,128 @@ void init_work(struct work_struct *work)
 {
 	INIT_LIST_HEAD(&work->entry);
 }
+
+/* Parallel-for utility */
+
+#define ceil_div(a, b) (((a)+(b)-1)/(b))
+
+struct parallel_for_work {
+	struct work_struct work;	/* work item that is queued */
+	parallel_for_func_t func;	/* function to execute for each item */
+	void *args;			/* additional args to pass to func */
+	int start;			/* first item to execute */
+	int num;			/* number of items to execute */
+};
+
+/**
+ * parallel_for_work_fn - execute parallel_for_work.func in parallel
+ *
+ * This function will be executed by workqueue's workers.
+ */
+static void parallel_for_work_fn(struct work_struct *work)
+{
+	struct parallel_for_work *pfw = container_of(work, struct parallel_for_work, work);
+	int i;
+
+	for (i = 0; i < pfw->num; i++)
+		pfw->func(pfw->start+i, pfw->args);
+}
+
+static inline void init_parallel_for_work(struct parallel_for_work *pfw,
+					parallel_for_func_t func, void *args,
+					int start, int num)
+{
+	init_work(&pfw->work);
+	pfw->work.func = parallel_for_work_fn;
+	pfw->func = func;
+	pfw->args = args;
+	pfw->start = start;
+	pfw->num = num;
+
+	pr_debug2("pfw: start=%d, num=%d\n", start, num);
+}
+
+/**
+ * parallel_for - execute @func in parallel over indexes between @from and @to
+ * @wq: workqueue that will run @func in parallel
+ * @from: first index
+ * @to: last index (excluded)
+ * @work_size: number of indexes to handle on the same work item.
+ *             ceil((to-from)/work_size) work items will be added to @wq
+ *             NB: this is only a hint. The function will reduce the size of
+ *                 the work items to fill all workers.
+ * @func: function to execute in parallel
+ * @args: additional arguments to @func
+ *
+ * This function is equivalent to:
+ * for (i = from; i < to; i++) {
+ *     // parallel
+ *     func(i, args);
+ * }
+ * // sync
+ *
+ * This function takes care of:
+ *  - creating balanced work items to submit to workqueue
+ *  - submitting the work items to the workqueue
+ *  - waiting for completion of the work items
+ *  - cleanup of the work items
+ */
+int parallel_for(struct workqueue_struct *wq, int from, int to, int work_size,
+		parallel_for_func_t func, void *args)
+{
+	int n = to-from;
+	int n_work_items;
+	int nr_threads = workqueue_nr_threads(wq);
+	int i, j, start, num, m, base, num_per_item;
+	struct parallel_for_work *pfw_array;
+	int err = 0;
+
+	if (work_size <= 0) {
+		pr_err("workqueue parallel-for: work_size must be >0\n");
+		return -EINVAL;
+	}
+
+	if (to < from) {
+		pr_err("workqueue parallel-for: to must be >= from\n");
+		return -EINVAL;
+	} else if (to == from) {
+		pr_info("workqueue parallel-for: skip since from == to\n");
+		return 0;
+	}
+
+	n_work_items = ceil_div(n, work_size);
+	if (n_work_items < nr_threads)
+		n_work_items = min(n, nr_threads);
+
+	pfw_array = calloc(n_work_items, sizeof(*pfw_array));
+
+	num_per_item = n / n_work_items;
+	m = n % n_work_items;
+
+	for (i = 0; i < m; i++) {
+		num = num_per_item + 1;
+		start = i * num;
+		init_parallel_for_work(&pfw_array[i], func, args, start, num);
+		err = queue_work(wq, &pfw_array[i].work);
+		if (err)
+			goto out;
+	}
+	if (i != 0)
+		base = pfw_array[i-1].start + pfw_array[i-1].num;
+	else
+		base = 0;
+	for (j = i; j < n_work_items; j++) {
+		num = num_per_item;
+		start = base + (j - i) * num;
+		init_parallel_for_work(&pfw_array[j], func, args, start, num);
+		err = queue_work(wq, &pfw_array[j].work);
+		if (err)
+			goto out;
+	}
+
+out:
+	err = flush_workqueue(wq);
+
+	free(pfw_array);
+	return err;
+}
