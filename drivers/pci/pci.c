@@ -206,7 +206,8 @@ int pci_status_get_and_clear_errors(struct pci_dev *pdev)
 EXPORT_SYMBOL_GPL(pci_status_get_and_clear_errors);
 
 #ifdef CONFIG_HAS_IOMEM
-void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
+static void __iomem *__pci_ioremap_resource(struct pci_dev *pdev, int bar,
+					    bool write_combine)
 {
 	struct resource *res = &pdev->resource[bar];
 
@@ -214,24 +215,25 @@ void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
 	 * Make sure the BAR is actually a memory resource, not an IO resource
 	 */
 	if (res->flags & IORESOURCE_UNSET || !(res->flags & IORESOURCE_MEM)) {
-		pci_warn(pdev, "can't ioremap BAR %d: %pR\n", bar, res);
+		pci_err(pdev, "can't ioremap BAR %d: %pR\n", bar, res);
 		return NULL;
 	}
-	return ioremap(res->start, resource_size(res));
+
+	if (write_combine)
+		return pci_iomap_wc_range(pdev, bar, 0, 0);
+
+	return pci_iomap_range(pdev, bar, 0, 0);
+}
+
+void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
+{
+	return __pci_ioremap_resource(pdev, bar, false);
 }
 EXPORT_SYMBOL_GPL(pci_ioremap_bar);
 
 void __iomem *pci_ioremap_wc_bar(struct pci_dev *pdev, int bar)
 {
-	/*
-	 * Make sure the BAR is actually a memory resource, not an IO resource
-	 */
-	if (!(pci_resource_flags(pdev, bar) & IORESOURCE_MEM)) {
-		WARN_ON(1);
-		return NULL;
-	}
-	return ioremap_wc(pci_resource_start(pdev, bar),
-			  pci_resource_len(pdev, bar));
+	return __pci_ioremap_resource(pdev, bar, true);
 }
 EXPORT_SYMBOL_GPL(pci_ioremap_wc_bar);
 #endif
