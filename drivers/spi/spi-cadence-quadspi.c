@@ -322,7 +322,9 @@ static int cqspi_set_protocol(struct cqspi_flash_pdata *f_pdata,
 	f_pdata->inst_width = CQSPI_INST_TYPE_SINGLE;
 	f_pdata->addr_width = CQSPI_INST_TYPE_SINGLE;
 	f_pdata->data_width = CQSPI_INST_TYPE_SINGLE;
-	f_pdata->dtr = op->data.dtr && op->cmd.dtr && op->addr.dtr;
+	f_pdata->dtr = op->cmd.dtr &&
+		       (op->addr.dtr || !op->addr.nbytes) &&
+		       (op->data.dtr || !op->data.nbytes);
 
 	switch (op->data.buswidth) {
 	case 0:
@@ -1225,8 +1227,12 @@ static bool cqspi_supports_mem_op(struct spi_mem *mem,
 {
 	bool all_true, all_false;
 
-	all_true = op->cmd.dtr && op->addr.dtr && op->dummy.dtr &&
-		   op->data.dtr;
+	/* op->dummy.dtr is checked when converting nbytes into ncycles.*/
+	all_true = op->cmd.dtr &&
+		   (op->addr.dtr || !op->addr.nbytes) &&
+		   (op->dummy.dtr || !op->dummy.nbytes) &&
+		   (op->data.dtr || !op->data.nbytes);
+
 	all_false = !op->cmd.dtr && !op->addr.dtr && !op->dummy.dtr &&
 		    !op->data.dtr;
 
