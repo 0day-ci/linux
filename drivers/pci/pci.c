@@ -2194,7 +2194,7 @@ EXPORT_SYMBOL(pci_disable_device);
  * implementation. Architecture implementations can override this.
  */
 int __weak pcibios_set_pcie_reset_state(struct pci_dev *dev,
-					enum pcie_reset_state state)
+					pcie_reset_state_t state)
 {
 	return -EINVAL;
 }
@@ -2206,7 +2206,7 @@ int __weak pcibios_set_pcie_reset_state(struct pci_dev *dev,
  *
  * Sets the PCI reset state for the device.
  */
-int pci_set_pcie_reset_state(struct pci_dev *dev, enum pcie_reset_state state)
+int pci_set_pcie_reset_state(struct pci_dev *dev, pcie_reset_state_t state)
 {
 	return pcibios_set_pcie_reset_state(dev, state);
 }

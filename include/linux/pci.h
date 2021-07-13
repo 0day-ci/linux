@@ -191,7 +191,6 @@ enum {
 };
 
 typedef unsigned int __bitwise pcie_reset_state_t;
-
 enum pcie_reset_state {
 	/* Reset is NOT asserted (Use to deassert reset) */
 	pcie_deassert_reset = (__force pcie_reset_state_t) 1,
@@ -1205,7 +1204,7 @@ extern unsigned int pcibios_max_latency;
 void pci_set_master(struct pci_dev *dev);
 void pci_clear_master(struct pci_dev *dev);
 
-int pci_set_pcie_reset_state(struct pci_dev *dev, enum pcie_reset_state state);
+int pci_set_pcie_reset_state(struct pci_dev *dev, pcie_reset_state_t state);
 int pci_set_cacheline_size(struct pci_dev *dev);
 int __must_check pci_set_mwi(struct pci_dev *dev);
 int __must_check pcim_set_mwi(struct pci_dev *dev);
@@ -2079,7 +2078,7 @@ extern u8 pci_cache_line_size;
 void pcibios_disable_device(struct pci_dev *dev);
 void pcibios_set_master(struct pci_dev *dev);
 int pcibios_set_pcie_reset_state(struct pci_dev *dev,
-				 enum pcie_reset_state state);
+				 pcie_reset_state_t state);
 int pcibios_add_device(struct pci_dev *dev);
 void pcibios_release_device(struct pci_dev *dev);
 #ifdef CONFIG_PCI
