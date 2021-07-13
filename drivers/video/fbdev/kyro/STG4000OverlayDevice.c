@@ -407,6 +407,9 @@ int SetOverlayViewPort(volatile STG4000REG __iomem *pSTGReg,
 		ulVertDecFactor = 1;
 	}
 
+	if ((ulDest + 1) == 0)
+		return -EINVAL;
+
 	ulDacYScale = ((ulSrc - 1) * 2048) / (ulDest + 1);
 
 	tmp = STG_READ_REG(DACOverlayVtDec);	/* Decimation */
@@ -470,6 +473,9 @@ int SetOverlayViewPort(volatile STG4000REG __iomem *pSTGReg,
 		 * round down the pixel pos to the nearest 8 pixels.
 		 */
 		ulScaleLeft = ulSrcLeft;
+
+		if ((ulRight - ulLeft + 2) == 0)
+			return -EINVAL;
 
 		/* shift fxscale until it is in the range of the scaler */
 		ulhDecim = 0;
