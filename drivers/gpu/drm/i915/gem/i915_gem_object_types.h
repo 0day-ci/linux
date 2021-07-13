@@ -522,6 +522,12 @@ struct drm_i915_gem_object {
 	 * I915_BO_CACHE_COHERENT_FOR_WRITE, i.e that the GPU will be coherent
 	 * for both reads and writes though the CPU cache. So pretty much this
 	 * should only be needed for I915_CACHE_NONE objects.
+	 *
+	 * Update: Some bonkers hardware decided to add the 'Bypass LLC' MOCS
+	 * entry, which defeats our @cache_coherent tracking, since userspace
+	 * can freely bypass the CPU cache when touching the pages with the GPU,
+	 * where the kernel is completely unaware. On such platform we need
+	 * apply the sledgehammer-on-acquire regardless of the @cache_coherent.
 	 */
 	unsigned int cache_dirty:1;
 
