@@ -4,12 +4,23 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <pthread.h>
+#include <signal.h>
+#include <syscall.h>
 #include "debug.h"
 #include "asm/bug.h"
 #include "threadpool.h"
 
+#ifndef HAVE_GETTID
+static inline pid_t gettid(void)
+{
+	return (pid_t)syscall(__NR_gettid);
+}
+#endif
+
 enum threadpool_status {
 	THREADPOOL_STATUS__STOPPED,		/* no threads */
+	THREADPOOL_STATUS__READY,		/* threads are ready but idle */
 	THREADPOOL_STATUS__ERROR,		/* errors */
 	THREADPOOL_STATUS__MAX
 };
@@ -29,6 +40,21 @@ struct thread_struct {
 		int from[2];			/* messages from thread (acks) */
 		int to[2];			/* messages to thread (commands) */
 	} pipes;
+};
+
+enum thread_msg {
+	THREAD_MSG__UNDEFINED = 0,
+	THREAD_MSG__ACK,		/* from th: create and exit ack */
+	THREAD_MSG__WAKE,		/* to th: wake up */
+	THREAD_MSG__STOP,		/* to th: exit */
+	THREAD_MSG__MAX
+};
+
+static const char * const thread_msg_tags[] = {
+	"undefined",
+	"ack",
+	"wake",
+	"stop"
 };
 
 /**
@@ -87,6 +113,113 @@ static void close_pipes(struct thread_struct *thread)
 		close(thread->pipes.to[1]);
 		thread->pipes.to[1] = -1;
 	}
+}
+
+/**
+ * wait_thread - receive ack from thread
+ *
+ * NB: call only from main thread!
+ */
+static int wait_thread(struct thread_struct *thread)
+{
+	int res;
+	enum thread_msg msg = THREAD_MSG__UNDEFINED;
+
+	res = read(thread->pipes.from[0], &msg, sizeof(msg));
+	if (res < 0) {
+		pr_err("threadpool: failed to recv msg from tid=%d: %s\n",
+		       thread->tid, strerror(errno));
+		return -1;
+	}
+	if (msg != THREAD_MSG__ACK) {
+		pr_err("threadpool: received unexpected msg from tid=%d: %s\n",
+		       thread->tid, thread_msg_tags[msg]);
+		return -1;
+	}
+
+	pr_debug2("threadpool: received ack from tid=%d\n", thread->tid);
+
+	return 0;
+}
+
+/**
+ * terminate_thread - send stop signal to thread and wait for ack
+ *
+ * NB: call only from main thread!
+ */
+static int terminate_thread(struct thread_struct *thread)
+{
+	int res;
+	enum thread_msg msg = THREAD_MSG__STOP;
+
+	res = write(thread->pipes.to[1], &msg, sizeof(msg));
+	if (res < 0) {
+		pr_err("threadpool: error sending stop msg to tid=%d: %s\n",
+			thread->tid, strerror(errno));
+		return res;
+	}
+
+	res = wait_thread(thread);
+
+	return res;
+}
+
+/**
+ * threadpool_thread - function running on thread
+ *
+ * This function waits for a signal from main thread to start executing
+ * a task.
+ * On completion, it will go back to sleep, waiting for another signal.
+ * Signals are delivered through pipes.
+ */
+static void *threadpool_thread(void *args)
+{
+	struct thread_struct *thread = (struct thread_struct *) args;
+	enum thread_msg msg;
+	int err;
+
+	thread->tid = gettid();
+
+	pr_debug2("threadpool[%d]: started\n", thread->tid);
+
+	for (;;) {
+		msg = THREAD_MSG__ACK;
+		err = write(thread->pipes.from[1], &msg, sizeof(msg));
+		if (err == -1) {
+			pr_err("threadpool[%d]: failed to send ack: %s\n",
+				thread->tid, strerror(errno));
+			break;
+		}
+
+		msg = THREAD_MSG__UNDEFINED;
+		err = read(thread->pipes.to[0], &msg, sizeof(msg));
+		if (err < 0) {
+			pr_err("threadpool[%d]: error receiving msg: %s\n",
+				thread->tid, strerror(errno));
+			break;
+		}
+
+		if (msg != THREAD_MSG__WAKE && msg != THREAD_MSG__STOP) {
+			pr_err("threadpool[%d]: received unexpected msg: %s\n",
+				thread->tid, thread_msg_tags[msg]);
+			break;
+		}
+
+		if (msg == THREAD_MSG__STOP)
+			break;
+	}
+
+	pr_debug2("threadpool[%d]: exit\n", thread->tid);
+
+	msg = THREAD_MSG__ACK;
+	err = write(thread->pipes.from[1], &msg, sizeof(msg));
+	if (err == -1) {
+		pr_err("threadpool[%d]: failed to send ack: %s\n",
+			thread->tid, strerror(errno));
+		return NULL;
+	}
+
+	return NULL;
 }
 
 /**
@@ -172,4 +305,109 @@ void destroy_threadpool(struct threadpool_struct *pool)
 int threadpool_size(struct threadpool_struct *pool)
 {
 	return pool->nr_threads;
+}
+
+/**
+ * __start_threadpool - start all threads in the pool.
+ *
+ * This function does not change @pool->status.
+ */
+static int __start_threadpool(struct threadpool_struct *pool)
+{
+	int t, tt, ret = 0, nr_threads = pool->nr_threads;
+	sigset_t full, mask;
+	pthread_t handle;
+	pthread_attr_t attrs;
+
+	sigfillset(&full);
+	if (sigprocmask(SIG_SETMASK, &full, &mask)) {
+		pr_err("Failed to block signals on threads start: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	pthread_attr_init(&attrs);
+	pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
+
+	for (t = 0; t < nr_threads; t++) {
+		struct thread_struct *thread = &pool->threads[t];
+
+		if (pthread_create(&handle, &attrs, threadpool_thread, thread)) {
+			for (tt = 1; tt < t; tt++)
+				terminate_thread(thread);
+			pr_err("Failed to start threads: %s\n", strerror(errno));
+			ret = -1;
+			goto out_free_attr;
+		}
+
+		if (wait_thread(thread)) {
+			for (tt = 1; tt <= t; tt++)
+				terminate_thread(thread);
+			ret = -1;
+			goto out_free_attr;
+		}
+	}
+
+out_free_attr:
+	pthread_attr_destroy(&attrs);
+
+	if (sigprocmask(SIG_SETMASK, &mask, NULL)) {
+		pr_err("Failed to unblock signals on threads start: %s\n",
+			strerror(errno));
+		ret = -1;
+	}
+
+	return ret;
+}
+
+/**
+ * start_threadpool - start all threads in the pool.
+ *
+ * The function blocks until all threads are up and running.
+ */
+int start_threadpool(struct threadpool_struct *pool)
+{
+	int err;
+
+	if (pool->status != THREADPOOL_STATUS__STOPPED) {
+		pr_err("threadpool: starting not stopped pool\n");
+		return -1;
+	}
+
+	err = __start_threadpool(pool);
+	pool->status = err ? THREADPOOL_STATUS__ERROR : THREADPOOL_STATUS__READY;
+	return err;
+}
+
+/**
+ * stop_threadpool - stop all threads in the pool.
+ *
+ * This function blocks waiting for ack from all threads.
+ */
+int stop_threadpool(struct threadpool_struct *pool)
+{
+	int t, ret, err = 0;
+
+	if (pool->status != THREADPOOL_STATUS__READY) {
+		pr_err("threadpool: stopping not ready pool\n");
+		return -1;
+	}
+
+	for (t = 0; t < pool->nr_threads; t++) {
+		ret = terminate_thread(&pool->threads[t]);
+		if (ret && !err)
+			err = -1;
+	}
+
+	pool->status = err ? THREADPOOL_STATUS__ERROR : THREADPOOL_STATUS__STOPPED;
+
+	return err;
+}
+
+/**
+ * threadpool_is_ready - check if the threads are running
+ */
+bool threadpool_is_ready(struct threadpool_struct *pool)
+{
+	return pool->status == THREADPOOL_STATUS__READY;
 }

@@ -10,16 +10,29 @@ struct threadpool_test_args_t {
 
 static int __threadpool__prepare(struct threadpool_struct **pool, int pool_size)
 {
+	int ret;
+
 	*pool = create_threadpool(pool_size);
 	TEST_ASSERT_VAL("threadpool creation failure", *pool != NULL);
 	TEST_ASSERT_VAL("threadpool size is wrong",
 			threadpool_size(*pool) == pool_size);
+
+	ret = start_threadpool(*pool);
+	TEST_ASSERT_VAL("threadpool start failure", ret == 0);
+	TEST_ASSERT_VAL("threadpool is not ready", threadpool_is_ready(*pool));
 
 	return 0;
 }
 
 static int __threadpool__teardown(struct threadpool_struct *pool)
 {
+	int ret;
+
+	ret = stop_threadpool(pool);
+	TEST_ASSERT_VAL("threadpool start failure", ret == 0);
+	TEST_ASSERT_VAL("stopped threadpool is ready",
+			!threadpool_is_ready(pool));
+
 	destroy_threadpool(pool);
 
 	return 0;

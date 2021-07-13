@@ -14,6 +14,11 @@ struct task_struct {
 extern struct threadpool_struct *create_threadpool(int n_threads);
 extern void destroy_threadpool(struct threadpool_struct *pool);
 
+extern int start_threadpool(struct threadpool_struct *pool);
+extern int stop_threadpool(struct threadpool_struct *pool);
+
 extern int threadpool_size(struct threadpool_struct *pool);
+
+extern bool threadpool_is_ready(struct threadpool_struct *pool);
 
 #endif /* __WORKQUEUE_THREADPOOL_H */
