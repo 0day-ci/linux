@@ -271,6 +271,7 @@ struct spinand_devid {
  * @init: initialize a SPI NAND device
  * @adjust_op: modify the ops for any variation in their cmd, address, dummy or
  *	       data phase by the manufacturer
+ * @octal_dtr_enable: switch the SPI NAND flash into Octal DTR SPI mode
  * @cleanup: cleanup a SPI NAND device
  *
  * Each SPI NAND manufacturer driver should implement this interface so that
@@ -280,6 +281,7 @@ struct spinand_manufacturer_ops {
 	int (*init)(struct spinand_device *spinand);
 	void (*adjust_op)(struct spi_mem_op *op,
 			  const enum spinand_proto reg_proto);
+	int (*octal_dtr_enable)(struct spinand_device *spinand);
 	void (*cleanup)(struct spinand_device *spinand);
 };
 
@@ -348,6 +350,7 @@ struct spinand_ecc_info {
 
 #define SPINAND_HAS_QE_BIT		BIT(0)
 #define SPINAND_HAS_CR_FEAT_BIT		BIT(1)
+#define SPINAND_HAS_OCTAL_DTR_BIT	BIT(2)
 
 /**
  * struct spinand_ondie_ecc_conf - private SPI-NAND on-die ECC engine structure

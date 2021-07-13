@@ -256,6 +256,48 @@ static int spinand_init_quad_enable(struct spinand_device *spinand)
 			       enable ? CFG_QUAD_ENABLE : 0);
 }
 
+static bool spinand_op_is_octal_dtr(const struct spi_mem_op *op)
+{
+	return  op->cmd.buswidth == 8 && op->cmd.dtr &&
+		op->addr.buswidth == 8 && op->addr.dtr &&
+		op->data.buswidth == 8 && op->data.dtr;
+}
+
+static int spinand_init_octal_dtr_enable(struct spinand_device *spinand)
+{
+	struct device *dev = &spinand->spimem->spi->dev;
+	int ret;
+
+	if (!(spinand->flags & SPINAND_HAS_OCTAL_DTR_BIT))
+		return 0;
+
+	if (!(spinand_op_is_octal_dtr(spinand->op_templates.read_cache) &&
+	      spinand_op_is_octal_dtr(spinand->op_templates.write_cache) &&
+	      spinand_op_is_octal_dtr(spinand->op_templates.update_cache)))
+		return 0;
+
+	if (!spinand->manufacturer->ops->octal_dtr_enable) {
+		dev_err(dev,
+			"Missing ->octal_dtr_enable(), unable to switch mode\n");
+		return -EINVAL;
+	}
+
+	ret = spinand->manufacturer->ops->octal_dtr_enable(spinand);
+	if (ret) {
+		dev_err(dev,
+			"Failed to enable Octal DTR SPI mode (err = %d)\n",
+			ret);
+		return ret;
+	}
+
+	spinand->reg_proto = SPINAND_OCTAL_DTR;
+
+	dev_dbg(dev,
+		"%s SPI NAND switched to Octal DTR SPI (8D-8D-8D) mode\n",
+		spinand->manufacturer->name);
+	return 0;
+}
+
 static int spinand_ecc_enable(struct spinand_device *spinand,
 			      bool enable)
 {
@@ -1186,6 +1228,10 @@ static int spinand_init_flash(struct spinand_device *spinand)
 		return ret;
 
 	ret = spinand_init_quad_enable(spinand);
+	if (ret)
+		return ret;
+
+	ret = spinand_init_octal_dtr_enable(spinand);
 	if (ret)
 		return ret;
 
