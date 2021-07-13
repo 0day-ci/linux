@@ -93,6 +93,7 @@ dma_addr_t virtqueue_get_used_addr(struct virtqueue *vq);
  * virtio_device - representation of a device using virtio
  * @index: unique position on the virtio bus
  * @failed: saved value for VIRTIO_CONFIG_S_FAILED bit (for restore)
+ * @poll_source_enabled: poll_source API enabled for vq polling
  * @config_enabled: configuration change reporting enabled
  * @config_change_pending: configuration change reported while disabled
  * @config_lock: protects configuration change reporting
@@ -107,6 +108,7 @@ dma_addr_t virtqueue_get_used_addr(struct virtqueue *vq);
 struct virtio_device {
 	int index;
 	bool failed;
+	bool poll_source_enabled;
 	bool config_enabled;
 	bool config_change_pending;
 	spinlock_t config_lock;

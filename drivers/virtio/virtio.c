@@ -59,12 +59,44 @@ static ssize_t features_show(struct device *_d,
 }
 static DEVICE_ATTR_RO(features);
 
+static ssize_t poll_source_show(struct device *_d,
+				struct device_attribute *attr, char *buf)
+{
+	struct virtio_device *dev = dev_to_virtio(_d);
+	return sprintf(buf, "%d\n", dev->poll_source_enabled);
+}
+
+static ssize_t poll_source_store(struct device *_d,
+		                 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct virtio_device *dev = dev_to_virtio(_d);
+	bool val;
+	int rc;
+
+	rc = kstrtobool(buf, &val);
+	if (rc)
+		return rc;
+
+	if (val == dev->poll_source_enabled)
+		return count;
+	if (!dev->config->enable_poll_source)
+		return -ENOTSUPP;
+
+	rc = dev->config->enable_poll_source(dev, val);
+	if (rc)
+		return rc;
+	return count;
+}
+static DEVICE_ATTR_RW(poll_source);
+
 static struct attribute *virtio_dev_attrs[] = {
 	&dev_attr_device.attr,
 	&dev_attr_vendor.attr,
 	&dev_attr_status.attr,
 	&dev_attr_modalias.attr,
 	&dev_attr_features.attr,
+	&dev_attr_poll_source.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(virtio_dev);
@@ -342,6 +374,8 @@ int register_virtio_device(struct virtio_device *dev)
 
 	dev->index = err;
 	dev_set_name(&dev->dev, "virtio%u", dev->index);
+
+	dev->poll_source_enabled = false;
 
 	spin_lock_init(&dev->config_lock);
 	dev->config_enabled = false;

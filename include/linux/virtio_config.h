@@ -72,6 +72,7 @@ struct virtio_shm_region {
  * @set_vq_affinity: set the affinity for a virtqueue (optional).
  * @get_vq_affinity: get the affinity for a virtqueue (optional).
  * @get_shm_region: get a shared memory region based on the index.
+ * @enable_poll_source: enable/disable poll_source API vq polling (optional).
  */
 typedef void vq_callback_t(struct virtqueue *);
 struct virtio_config_ops {
@@ -97,6 +98,7 @@ struct virtio_config_ops {
 			int index);
 	bool (*get_shm_region)(struct virtio_device *vdev,
 			       struct virtio_shm_region *region, u8 id);
+	int (*enable_poll_source)(struct virtio_device *dev, bool enable);
 };
 
 /* If driver didn't advertise the feature, it will never appear. */

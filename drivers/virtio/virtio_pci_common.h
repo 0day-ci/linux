@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/poll_source.h>
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
 #include <linux/virtio_ring.h>
@@ -38,6 +39,9 @@ struct virtio_pci_vq_info {
 
 	/* MSI-X vector (or none) */
 	unsigned msix_vector;
+
+	/* the cpuidle poll_source */
+	struct poll_source poll_source;
 };
 
 /* Our device structure */
@@ -101,6 +105,9 @@ static struct virtio_pci_device *to_vp_device(struct virtio_device *vdev)
 {
 	return container_of(vdev, struct virtio_pci_device, vdev);
 }
+
+/* enable poll_source API for vq polling */
+int vp_enable_poll_source(struct virtio_device *vdev, bool enable);
 
 /* wait for pending irq handlers */
 void vp_synchronize_vectors(struct virtio_device *vdev);
