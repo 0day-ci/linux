@@ -598,6 +598,9 @@ EXPORT_SYMBOL(drm_fb_helper_alloc_fbi);
  * A wrapper around unregister_framebuffer, to release the fb_info
  * framebuffer device. This must be called before releasing all resources for
  * @fb_helper by calling drm_fb_helper_fini().
+ *
+ * Note that this is fundamentally racy on hotunload because it doen't handle
+ * open fbdev file descriptors at all. Use drm_fbdev_generic_setup() instead.
  */
 void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
@@ -611,6 +614,9 @@ EXPORT_SYMBOL(drm_fb_helper_unregister_fbi);
  * @fb_helper: driver-allocated fbdev helper, can be NULL
  *
  * This cleans up all remaining resources associated with @fb_helper.
+ *
+ * Note that this is fundamentally racy on hotunload because it doen't handle
+ * open fbdev file descriptors at all. Use drm_fbdev_generic_setup() instead.
  */
 void drm_fb_helper_fini(struct drm_fb_helper *fb_helper)
 {
@@ -2378,6 +2384,10 @@ static const struct drm_fb_helper_funcs drm_fb_helper_generic_funcs = {
 static void drm_fbdev_client_unregister(struct drm_client_dev *client)
 {
 	struct drm_fb_helper *fb_helper = drm_fb_helper_from_client(client);
+
+	mutex_lock(&fb_helper->lock);
+	fb_helper->deferred_setup = false;
+	mutex_unlock(&fb_helper->lock);
 
 	if (fb_helper->fbdev)
 		/* drm_fbdev_fb_destroy() takes care of cleanup */
