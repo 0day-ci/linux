@@ -20,6 +20,51 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-mem.h>
 
+/**
+ * spinand_setup_op() - Helper function to setup the spi_mem op based on the
+ *			spinand->reg_proto
+ * @spinand: the spinand device
+ * @op: the spi_mem op to setup
+ *
+ * Set up buswidth and dtr fields for cmd, addr, dummy and data phase. Also
+ * adjust cmd opcode and dummy nbytes. This function doesn't make any changes
+ * to addr val or data buf.
+ */
+static void spinand_setup_op(const struct spinand_device *spinand,
+			     struct spi_mem_op *op)
+{
+	u8 op_buswidth = SPINAND_PROTO_BUSWIDTH(spinand->reg_proto);
+	u8 op_is_dtr = SPINAND_PROTO_IS_DTR(spinand->reg_proto);
+
+	if (spinand->reg_proto == SPINAND_SINGLE_STR)
+		return;
+
+	op->cmd.buswidth = op_buswidth;
+	op->cmd.dtr = op_is_dtr;
+	if (spinand->reg_proto == SPINAND_OCTAL_DTR) {
+		op->cmd.opcode = (op->cmd.opcode << 8) | op->cmd.opcode;
+		op->cmd.nbytes = 2;
+	}
+
+	if (op->addr.nbytes) {
+		op->addr.buswidth = op_buswidth;
+		op->addr.dtr = op_is_dtr;
+	}
+
+	if (op->dummy.nbytes) {
+		op->dummy.buswidth = op_buswidth;
+		if (op_is_dtr) {
+			op->dummy.nbytes *= 2;
+			op->dummy.dtr = true;
+		}
+	}
+
+	if (op->data.nbytes) {
+		op->data.buswidth = op_buswidth;
+		op->data.dtr = op_is_dtr;
+	}
+}
+
 static int spinand_read_reg_op(struct spinand_device *spinand, u8 reg, u8 *val)
 {
 	struct spi_mem_op op = SPINAND_GET_FEATURE_OP(reg,
@@ -341,6 +386,7 @@ static int spinand_write_enable_op(struct spinand_device *spinand)
 {
 	struct spi_mem_op op = SPINAND_WR_EN_DIS_OP(true);
 
+	spinand_setup_op(spinand, &op);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -351,6 +397,7 @@ static int spinand_load_page_op(struct spinand_device *spinand,
 	unsigned int row = nanddev_pos_to_row(nand, &req->pos);
 	struct spi_mem_op op = SPINAND_PAGE_READ_OP(row);
 
+	spinand_setup_op(spinand, &op);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -475,6 +522,7 @@ static int spinand_program_op(struct spinand_device *spinand,
 	unsigned int row = nanddev_pos_to_row(nand, &req->pos);
 	struct spi_mem_op op = SPINAND_PROG_EXEC_OP(row);
 
+	spinand_setup_op(spinand, &op);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -485,6 +533,7 @@ static int spinand_erase_op(struct spinand_device *spinand,
 	unsigned int row = nanddev_pos_to_row(nand, pos);
 	struct spi_mem_op op = SPINAND_BLK_ERASE_OP(row);
 
+	spinand_setup_op(spinand, &op);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -531,6 +580,7 @@ static int spinand_read_id_op(struct spinand_device *spinand, u8 naddr,
 		naddr, ndummy, spinand->scratchbuf, SPINAND_MAX_ID_LEN);
 	int ret;
 
+	spinand_setup_op(spinand, &op);
 	ret = spi_mem_exec_op(spinand->spimem, &op);
 	if (!ret)
 		memcpy(buf, spinand->scratchbuf, SPINAND_MAX_ID_LEN);
@@ -543,6 +593,7 @@ static int spinand_reset_op(struct spinand_device *spinand)
 	struct spi_mem_op op = SPINAND_RESET_OP;
 	int ret;
 
+	spinand_setup_op(spinand, &op);
 	ret = spi_mem_exec_op(spinand->spimem, &op);
 	if (ret)
 		return ret;
