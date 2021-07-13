@@ -1028,6 +1028,8 @@ static int spinand_manufacturer_match(struct spinand_device *spinand,
 		if (id[0] != manufacturer->id)
 			continue;
 
+		spinand->manufacturer = manufacturer;
+
 		ret = spinand_match_and_init(spinand,
 					     manufacturer->chips,
 					     manufacturer->nchips,
@@ -1035,7 +1037,6 @@ static int spinand_manufacturer_match(struct spinand_device *spinand,
 		if (ret < 0)
 			continue;
 
-		spinand->manufacturer = manufacturer;
 		return 0;
 	}
 	return -ENOTSUPP;
@@ -1096,6 +1097,10 @@ spinand_select_op_variant(struct spinand_device *spinand,
 		struct spi_mem_op op = variants->ops[i];
 		unsigned int nbytes;
 		int ret;
+
+		if (spinand_op_is_octal_dtr(&op) &&
+		    !spinand->manufacturer->ops->octal_dtr_enable)
+			continue;
 
 		nbytes = nanddev_per_page_oobsize(nand) +
 			 nanddev_page_size(nand);
