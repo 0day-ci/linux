@@ -610,6 +610,20 @@ void irq_enter(void)
 	irq_enter_rcu();
 }
 
+/**
+ * softirq_poll() - invoke pending softirqs
+ *
+ * Normally it is not necessary to explicitly poll for softirqs, but in the
+ * cpuidle driver a polling function may have raised a softirq with no irq exit
+ * to invoke it. Therefore it is necessary to poll for pending softirqs and
+ * invoke them explicitly.
+ */
+void softirq_poll(void)
+{
+	if (!in_interrupt() && local_softirq_pending())
+		invoke_softirq();
+}
+
 static inline void tick_irq_exit(void)
 {
 #ifdef CONFIG_NO_HZ_COMMON

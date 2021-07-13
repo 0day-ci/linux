@@ -6,6 +6,7 @@
 #include <linux/lockdep.h>
 #include <linux/percpu.h>
 #include <linux/poll_source.h>
+#include <linux/interrupt.h>
 
 /* The per-cpu list of registered poll sources */
 DEFINE_PER_CPU(struct list_head, poll_source_list);
@@ -26,6 +27,8 @@ void poll_source_run_once(void)
 
 	list_for_each_entry(src, this_cpu_ptr(&poll_source_list), node)
 		src->ops->poll(src);
+
+	softirq_poll();
 }
 
 /* Called from idle task with TIF_POLLING_NRFLAG set and irqs enabled */
