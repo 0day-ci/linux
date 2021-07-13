@@ -2404,6 +2404,12 @@ module_param_named(console_suspend, console_suspend_enabled,
 MODULE_PARM_DESC(console_suspend, "suspend console during suspend"
 	" and hibernate operations");
 
+bool printk_console_verbose = true;
+EXPORT_SYMBOL(printk_console_verbose);
+
+module_param_named(console_verbose, printk_console_verbose, bool, 0644);
+MODULE_PARM_DESC(console_verbose, "Raise console loglevel to highest on oops/panic/etc");
+
 /**
  * suspend_console - suspend the console subsystem
  *

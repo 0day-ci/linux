@@ -70,9 +70,11 @@ extern int console_printk[];
 #define minimum_console_loglevel (console_printk[2])
 #define default_console_loglevel (console_printk[3])
 
+extern bool printk_console_verbose;
+
 static inline void console_verbose(void)
 {
-	if (console_loglevel)
+	if (console_loglevel && printk_console_verbose)
 		console_loglevel = CONSOLE_LOGLEVEL_MOTORMOUTH;
 }
 

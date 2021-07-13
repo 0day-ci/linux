@@ -4167,6 +4167,15 @@
 			Format: <bool>  (1/Y/y=enable, 0/N/n=disable)
 			default: disabled
 
+	printk.console_verbose=
+			Raise console loglevel to highest on oops, panic or
+			lockdep-detected issues (only if lock debug is on).
+			With an exception to setups with low baudrate on
+			serial console, keeping this enabled is a good choice
+			in order to provide more debug information.
+			Format: <bool>  (1/Y/y=enable, 0/N/n=disable)
+			default: enabled
+
 	printk.devkmsg={on,off,ratelimit}
 			Control writing to /dev/kmsg.
 			on - unlimited logging to /dev/kmsg from userspace
