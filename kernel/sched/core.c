@@ -8191,6 +8191,11 @@ void show_state_filter(unsigned int state_filter)
 {
 	struct task_struct *g, *p;
 
+#if BITS_PER_LONG == 32
+	pr_info("  task                PC stack   pid father\n");
+#else
+	pr_info("  task                        PC stack   pid father\n");
+#endif
 	rcu_read_lock();
 	for_each_process_thread(g, p) {
 		/*
