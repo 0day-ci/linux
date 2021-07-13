@@ -58,18 +58,6 @@ struct serial_private {
 
 #define PCI_DEVICE_ID_HPE_PCI_SERIAL	0x37e
 
-static const struct pci_device_id pci_use_msi[] = {
-	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9900,
-			 0xA000, 0x1000) },
-	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9912,
-			 0xA000, 0x1000) },
-	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9922,
-			 0xA000, 0x1000) },
-	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_HP_3PAR, PCI_DEVICE_ID_HPE_PCI_SERIAL,
-			 PCI_ANY_ID, PCI_ANY_ID) },
-	{ }
-};
-
 static int pci_default_setup(struct serial_private*,
 	  const struct pciserial_board*, struct uart_8250_port *, int);
 
@@ -3988,14 +3976,9 @@ pciserial_init_ports(struct pci_dev *dev, const struct pciserial_board *board)
 	if (board->flags & FL_NOIRQ) {
 		uart.port.irq = 0;
 	} else {
-		if (pci_match_id(pci_use_msi, dev)) {
-			dev_dbg(&dev->dev, "Using MSI(-X) interrupts\n");
-			pci_set_master(dev);
-			rc = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_ALL_TYPES);
-		} else {
-			dev_dbg(&dev->dev, "Using legacy interrupts\n");
-			rc = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_LEGACY);
-		}
+		pci_set_master(dev);
+
+		rc = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_ALL_TYPES);
 		if (rc < 0) {
 			kfree(priv);
 			priv = ERR_PTR(rc);
@@ -4003,6 +3986,11 @@ pciserial_init_ports(struct pci_dev *dev, const struct pciserial_board *board)
 		}
 
 		uart.port.irq = pci_irq_vector(dev, 0);
+
+		if (pci_dev_msi_enabled(dev))
+			dev_dbg(&dev->dev, "Using MSI(-X) interrupts\n");
+		else
+			dev_dbg(&dev->dev, "Using legacy interrupts\n");
 	}
 
 	uart.port.dev = &dev->dev;
