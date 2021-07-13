@@ -92,6 +92,57 @@ struct drm_i915_gem_object_ops {
 	const char *name; /* friendly name for debug, e.g. lockdep classes */
 };
 
+/**
+ * enum i915_cache_level - The supported GTT caching values for system memory
+ * pages.
+ *
+ * These translate to some special GTT PTE bits when binding pages into some
+ * address space. It also determines whether an object, or rather its pages are
+ * coherent with the GPU, when also reading or writing through the CPU cache
+ * with those pages.
+ *
+ * Userspace can also control this through struct drm_i915_gem_caching.
+ */
+enum i915_cache_level {
+	/**
+	 * @I915_CACHE_NONE:
+	 *
+	 * Not coherent with the CPU cache. If the cache is dirty and we need
+	 * the underlying pages to be coherent with some later GPU access then
+	 * we need to manually flush the pages.
+	 *
+	 * Note that on shared-LLC platforms reads through the CPU cache are
+	 * still coherent even with this setting. See also
+	 * I915_BO_CACHE_COHERENT_FOR_READ for more details.
+	 */
+	I915_CACHE_NONE = 0,
+	/**
+	 * @I915_CACHE_LLC:
+	 *
+	 * Coherent with the CPU cache. If the cache is dirty, then the GPU will
+	 * ensure that access remains coherent, when both reading and writing
+	 * through the CPU cache.
+	 *
+	 * Applies to both platforms with shared-LLC(HAS_LLC), and snooping
+	 * based platforms(HAS_SNOOP).
+	 */
+	I915_CACHE_LLC,
+	/**
+	 * @I915_CACHE_L3_LLC:
+	 *
+	 * gen7+, L3 sits between the domain specifc caches, eg sampler/render
+	 * caches, and the large Last-Level-Cache. LLC is coherent with the CPU,
+	 * but L3 is only visible to the GPU.
+	 */
+	I915_CACHE_L3_LLC,
+	/**
+	 * @I915_CACHE_WT:
+	 *
+	 * hsw:gt3e Write-through for scanout buffers.
+	 */
+	I915_CACHE_WT,
+};
+
 enum i915_map_type {
 	I915_MAP_WB = 0,
 	I915_MAP_WC,
@@ -228,14 +279,90 @@ struct drm_i915_gem_object {
 	unsigned int mem_flags;
 #define I915_BO_FLAG_STRUCT_PAGE BIT(0) /* Object backed by struct pages */
 #define I915_BO_FLAG_IOMEM       BIT(1) /* Object backed by IO memory */
-	/*
-	 * Is the object to be mapped as read-only to the GPU
-	 * Only honoured if hardware has relevant pte bit
+	/**
+	 * @cache_level: The desired GTT caching level.
+	 *
+	 * See enum i915_cache_level for possible values, along with what
+	 * each does.
 	 */
 	unsigned int cache_level:3;
-	unsigned int cache_coherent:2;
+	/**
+	 * @cache_coherent:
+	 *
+	 * Track whether the pages are coherent with the GPU if reading or
+	 * writing through the CPU cache.
+	 *
+	 * This largely depends on the @cache_level, for example if the object
+	 * is marked as I915_CACHE_LLC, then GPU access is coherent for both
+	 * reads and writes through the CPU cache.
+	 *
+	 * Note that on platforms with shared-LLC support(HAS_LLC) reads through
+	 * the CPU cache are always coherent, regardless of the @cache_level. On
+	 * snooping based platforms this is not the case, unless the full
+	 * I915_CACHE_LLC or similar setting is used.
+	 *
+	 * As a result of this we need to track coherency separately for reads
+	 * and writes, in order to avoid superfluous flushing on shared-LLC
+	 * platforms, for reads.
+	 *
+	 * I915_BO_CACHE_COHERENT_FOR_READ:
+	 *
+	 * When reading through the CPU cache, the GPU is still coherent. Note
+	 * that no data has actually been modified here, so it might seem
+	 * strange that we care about this.
+	 *
+	 * As an example, if some object is mapped on the CPU with write-back
+	 * caching, and we read some page, then the cache likely now contains
+	 * the data from that read. At this point the cache and main memory
+	 * match up, so all good. But next the GPU needs to write some data to
+	 * that same page. Now if the @cache_level is I915_CACHE_NONE and the
+	 * the platform doesn't have the shared-LLC, then the GPU will
+	 * effectively skip invalidating the cache(or however that works
+	 * internally) when writing the new value.  This is really bad since the
+	 * GPU has just written some new data to main memory, but the CPU cache
+	 * is still valid and now contains stale data. As a result the next time
+	 * we do a cached read with the CPU, we are rewarded with stale data.
+	 * Likewise if the cache is later flushed, we might be rewarded with
+	 * overwriting main memory with stale data.
+	 *
+	 * I915_BO_CACHE_COHERENT_FOR_WRITE:
+	 *
+	 * When writing through the CPU cache, the GPU is still coherent. Note
+	 * that this also implies I915_BO_CACHE_COHERENT_FOR_READ.
+	 *
+	 * This is never set when I915_CACHE_NONE is used for @cache_level,
+	 * where instead we have to manually flush the caches after writing
+	 * through the CPU cache. For other cache levels this should be set and
+	 * the object is therefore considered coherent for both reads and writes
+	 * through the CPU cache.
+	 */
 #define I915_BO_CACHE_COHERENT_FOR_READ BIT(0)
 #define I915_BO_CACHE_COHERENT_FOR_WRITE BIT(1)
+	unsigned int cache_coherent:2;
+	/**
+	 * @cache_dirty:
+	 *
+	 * Track if the cache might be dirty for the @pages i.e it has yet to be
+	 * written back to main memory. As a result reading directly from main
+	 * memory might yield stale data.
+	 *
+	 * This also ties into whether the kernel is tracking the object as
+	 * coherent with the GPU, as per @cache_coherent, as it determines if
+	 * flushing might be needed at various points.
+	 *
+	 * Another part of @cache_dirty is managing flushing when first
+	 * acquiring the pages for system memory, at this point the pages are
+	 * considered foreign, so the default assumption is that the cache is
+	 * dirty, for example the page zeroing done my the kernel might leave
+	 * writes though the CPU cache, or swapping-in, while the actual data in
+	 * main memory is potentially stale.  Note that this is a potential
+	 * security issue when dealing with userspace objects and zeroing. Now,
+	 * whether we actually need apply the big sledgehammer of flushing all
+	 * the pages on acquire depends on if @cache_coherent is marked as
+	 * I915_BO_CACHE_COHERENT_FOR_WRITE, i.e that the GPU will be coherent
+	 * for both reads and writes though the CPU cache. So pretty much this
+	 * should only be needed for I915_CACHE_NONE objects.
+	 */
 	unsigned int cache_dirty:1;
 
 	/**
