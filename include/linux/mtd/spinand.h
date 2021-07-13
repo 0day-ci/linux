@@ -140,6 +140,31 @@
 		   SPI_MEM_OP_NO_DUMMY,					\
 		   SPI_MEM_OP_DATA_OUT(len, buf, 4))
 
+#define SPINAND_PROTO_BUSWIDTH_MASK	GENMASK(6, 0)
+#define SPINAND_PROTO_DTR_BIT		BIT(7)
+
+#define SPINAND_PROTO_STR(__buswidth)	\
+	((u8)(((__buswidth) - 1) & SPINAND_PROTO_BUSWIDTH_MASK))
+#define SPINAND_PROTO_DTR(__buswidth)	\
+	(SPINAND_PROTO_DTR_BIT | SPINAND_PROTO_STR(__buswidth))
+
+#define SPINAND_PROTO_BUSWIDTH(__proto)	\
+	((u8)(((__proto) & SPINAND_PROTO_BUSWIDTH_MASK) + 1))
+#define SPINAND_PROTO_IS_DTR(__proto)	(!!((__proto) & SPINAND_PROTO_DTR_BIT))
+
+/**
+ * enum spinand_proto - List allowable SPI protocol variants for read reg,
+ *			write reg, blk erase, write enable/disable, page read
+ *			and program exec operations.
+ */
+enum spinand_proto {
+	SPINAND_SINGLE_STR = SPINAND_PROTO_STR(1),
+	SPINAND_DUAL_STR = SPINAND_PROTO_STR(2),
+	SPINAND_QUAD_STR = SPINAND_PROTO_STR(4),
+	SPINAND_OCTAL_STR = SPINAND_PROTO_STR(8),
+	SPINAND_OCTAL_DTR = SPINAND_PROTO_DTR(8),
+};
+
 /**
  * Standard SPI NAND flash commands
  */
@@ -407,6 +432,9 @@ struct spinand_dirmap {
  *		   this die. Only required if your chip exposes several dies
  * @cur_target: currently selected target/die
  * @eccinfo: on-die ECC information
+ * @reg_proto: select a variant of SPI IO protocol (single, quad, octal or
+ *	       octal DTR) for read_reg/write_reg/erase operations. Update on
+ *	       successful transition into a different SPI IO protocol.
  * @cfg_cache: config register cache. One entry per die
  * @databuf: bounce buffer for data
  * @oobbuf: bounce buffer for OOB data
@@ -437,6 +465,8 @@ struct spinand_device {
 	unsigned int cur_target;
 
 	struct spinand_ecc_info eccinfo;
+
+	enum spinand_proto reg_proto;
 
 	u8 *cfg_cache;
 	u8 *databuf;
