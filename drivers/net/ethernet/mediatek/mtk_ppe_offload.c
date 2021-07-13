@@ -10,6 +10,7 @@
 #include <net/pkt_cls.h>
 #include <net/dsa.h>
 #include "mtk_eth_soc.h"
+#include "mtk_wed.h"
 
 struct mtk_flow_data {
 	struct ethhdr eth;
@@ -39,6 +40,7 @@ struct mtk_flow_entry {
 	struct rhash_head node;
 	unsigned long cookie;
 	u16 hash;
+	s8 wed_index;
 };
 
 static const struct rhashtable_params mtk_flow_ht_params = {
@@ -127,35 +129,38 @@ mtk_flow_mangle_ipv4(const struct flow_action_entry *act,
 }
 
 static int
-mtk_flow_get_dsa_port(struct net_device **dev)
-{
-#if IS_ENABLED(CONFIG_NET_DSA)
-	struct dsa_port *dp;
-
-	dp = dsa_port_from_netdev(*dev);
-	if (IS_ERR(dp))
-		return -ENODEV;
-
-	if (dp->cpu_dp->tag_ops->proto != DSA_TAG_PROTO_MTK)
-		return -ENODEV;
-
-	*dev = dp->cpu_dp->master;
-
-	return dp->index;
-#else
-	return -ENODEV;
-#endif
-}
-
-static int
 mtk_flow_set_output_device(struct mtk_eth *eth, struct mtk_foe_entry *foe,
-			   struct net_device *dev)
+			   struct net_device *dev, const u8 *dest_mac,
+			   int *wed_index)
 {
-	int pse_port, dsa_port;
+	struct net_device_path_ctx ctx = {
+		.dev    = dev,
+		.daddr  = dest_mac,
+	};
+	struct net_device_path path = {};
+	int pse_port;
 
-	dsa_port = mtk_flow_get_dsa_port(&dev);
-	if (dsa_port >= 0)
-		mtk_foe_entry_set_dsa(foe, dsa_port);
+	if (!dev->netdev_ops->ndo_fill_forward_path ||
+	    dev->netdev_ops->ndo_fill_forward_path(&ctx, &path) < 0)
+		path.type = DEV_PATH_ETHERNET;
+
+	switch (path.type) {
+	case DEV_PATH_DSA:
+		if (path.dsa.proto != DSA_TAG_PROTO_MTK)
+			break;
+
+		mtk_foe_entry_set_dsa(foe, path.dsa.port);
+		break;
+	case DEV_PATH_MTK_WDMA:
+		mtk_foe_entry_set_wdma(foe, path.mtk_wdma.wdma_idx,
+				       path.mtk_wdma.queue, path.mtk_wdma.bss,
+				       path.mtk_wdma.wcid);
+		mtk_foe_entry_set_pse_port(foe, 3);
+		*wed_index = path.mtk_wdma.wdma_idx;
+		return 0;
+	default:
+		break;
+	}
 
 	if (dev == eth->netdev[0])
 		pse_port = 1;
@@ -179,6 +184,7 @@ mtk_flow_offload_replace(struct mtk_eth *eth, struct flow_cls_offload *f)
 	struct net_device *odev = NULL;
 	struct mtk_flow_entry *entry;
 	int offload_type = 0;
+	int wed_index = -1;
 	u16 addr_type = 0;
 	u32 timestamp;
 	u8 l4proto = 0;
@@ -323,8 +329,12 @@ mtk_flow_offload_replace(struct mtk_eth *eth, struct flow_cls_offload *f)
 	if (data.pppoe.num == 1)
 		mtk_foe_entry_set_pppoe(&foe, data.pppoe.sid);
 
-	err = mtk_flow_set_output_device(eth, &foe, odev);
+	err = mtk_flow_set_output_device(eth, &foe, odev, data.eth.h_dest,
+					 &wed_index);
 	if (err)
+		return err;
+
+	if (wed_index >= 0 && (err = mtk_wed_flow_add(wed_index)) < 0)
 		return err;
 
 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
@@ -340,6 +350,7 @@ mtk_flow_offload_replace(struct mtk_eth *eth, struct flow_cls_offload *f)
 	}
 
 	entry->hash = hash;
+	entry->wed_index = wed_index;
 	err = rhashtable_insert_fast(&eth->flow_table, &entry->node,
 				     mtk_flow_ht_params);
 	if (err < 0)
@@ -350,6 +361,8 @@ clear_flow:
 	mtk_foe_entry_clear(&eth->ppe, hash);
 free:
 	kfree(entry);
+	if (wed_index >= 0)
+	    mtk_wed_flow_remove(wed_index);
 	return err;
 }
 
@@ -366,6 +379,8 @@ mtk_flow_offload_destroy(struct mtk_eth *eth, struct flow_cls_offload *f)
 	mtk_foe_entry_clear(&eth->ppe, entry->hash);
 	rhashtable_remove_fast(&eth->flow_table, &entry->node,
 			       mtk_flow_ht_params);
+	if (entry->wed_index >= 0)
+		mtk_wed_flow_remove(entry->wed_index);
 	kfree(entry);
 
 	return 0;
