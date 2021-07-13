@@ -457,10 +457,10 @@ mode_fixup(struct drm_atomic_state *state)
 		} else if (funcs && funcs->mode_fixup) {
 			ret = funcs->mode_fixup(encoder, &new_crtc_state->mode,
 						&new_crtc_state->adjusted_mode);
-			if (!ret) {
+			if (ret) {
 				DRM_DEBUG_ATOMIC("[ENCODER:%d:%s] fixup failed\n",
 						 encoder->base.id, encoder->name);
-				return -EINVAL;
+				return ret;
 			}
 		}
 	}
@@ -481,10 +481,10 @@ mode_fixup(struct drm_atomic_state *state)
 
 		ret = funcs->mode_fixup(crtc, &new_crtc_state->mode,
 					&new_crtc_state->adjusted_mode);
-		if (!ret) {
+		if (ret) {
 			DRM_DEBUG_ATOMIC("[CRTC:%d:%s] fixup failed\n",
 					 crtc->base.id, crtc->name);
-			return -EINVAL;
+			return ret;
 		}
 	}
 

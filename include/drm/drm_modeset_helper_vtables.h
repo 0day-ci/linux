@@ -184,7 +184,7 @@ struct drm_crtc_helper_funcs {
 	 * True if an acceptable configuration is possible, false if the modeset
 	 * operation should be rejected.
 	 */
-	bool (*mode_fixup)(struct drm_crtc *crtc,
+	int (*mode_fixup)(struct drm_crtc *crtc,
 			   const struct drm_display_mode *mode,
 			   struct drm_display_mode *adjusted_mode);
 
@@ -599,7 +599,7 @@ struct drm_encoder_helper_funcs {
 	 * True if an acceptable configuration is possible, false if the modeset
 	 * operation should be rejected.
 	 */
-	bool (*mode_fixup)(struct drm_encoder *encoder,
+	int (*mode_fixup)(struct drm_encoder *encoder,
 			   const struct drm_display_mode *mode,
 			   struct drm_display_mode *adjusted_mode);
 

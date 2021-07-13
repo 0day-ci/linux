@@ -739,9 +739,9 @@ static int drm_atomic_bridge_check(struct drm_bridge *bridge,
 		if (ret)
 			return ret;
 	} else if (bridge->funcs->mode_fixup) {
-		if (!bridge->funcs->mode_fixup(bridge, &crtc_state->mode,
+		if (bridge->funcs->mode_fixup(bridge, &crtc_state->mode,
 					       &crtc_state->adjusted_mode))
-			return -EINVAL;
+			return ret;
 	}
 
 	return 0;

@@ -153,7 +153,7 @@ struct drm_bridge_funcs {
 	 * True if an acceptable configuration is possible, false if the modeset
 	 * operation should be rejected.
 	 */
-	bool (*mode_fixup)(struct drm_bridge *bridge,
+	int (*mode_fixup)(struct drm_bridge *bridge,
 			   const struct drm_display_mode *mode,
 			   struct drm_display_mode *adjusted_mode);
 	/**
