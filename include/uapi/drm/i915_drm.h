@@ -1492,20 +1492,54 @@ struct drm_i915_get_pipe_from_crtc_id {
 	__u32 pipe;
 };
 
+/**
+ * struct drm_i915_gem_madvise - Update the madvise hint for the object.
+ *
+ * The kernel uses this to know when it can safely discard the backing pages for
+ * an object, when under memory pressure.
+ */
+struct drm_i915_gem_madvise {
+	/**
+	 * @handle: Handle of the buffer to change the backing store advice for.
+	 */
+	__u32 handle;
+
+	/**
+	 * @madv: The madvise hint to set for the object.
+	 *
+	 * Supported values:
+	 *
+	 * I915_MADV_WILLNEED:
+	 *
+	 * The buffer will be needed again in the near future. By default all
+	 * objects are set as I915_MADV_WILLNEED. Once the pages become
+	 * dirty, the kernel is no longer allowed to simply discard the pages,
+	 * and instead can only resort to swapping the pages out, if under
+	 * memory pressure, where the page contents must persist when swapping
+	 * the pages back in.
+	 *
+	 * I915_MADV_DONTNEED:
+	 *
+	 * The buffer wont be needed. The pages and their contents can be
+	 * discarded under memory pressure.
+	 *
+	 * Note that if the pages were discarded then the kernel updates the
+	 * internal madvise value of the object to __I915_MADV_PURGED, which
+	 * effectively kills the object, since all further requests to allocate
+	 * pages for the object will be rejected. At this point a new object is
+	 * needed. This will be reflected in @retained.
+	 */
 #define I915_MADV_WILLNEED 0
 #define I915_MADV_DONTNEED 1
 #define __I915_MADV_PURGED 2 /* internal state */
-
-struct drm_i915_gem_madvise {
-	/** Handle of the buffer to change the backing store advice */
-	__u32 handle;
-
-	/* Advice: either the buffer will be needed again in the near future,
-	 *         or wont be and could be discarded under memory pressure.
-	 */
 	__u32 madv;
 
-	/** Whether the backing store still exists. */
+	/**
+	 * @retained: Whether the backing store still exists.
+	 *
+	 * Set to false if the kernel purged the object and marked the object as
+	 * __I915_MADV_PURGED.
+	 */
 	__u32 retained;
 };
 
