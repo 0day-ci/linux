@@ -17,8 +17,13 @@ extern void destroy_threadpool(struct threadpool_struct *pool);
 extern int start_threadpool(struct threadpool_struct *pool);
 extern int stop_threadpool(struct threadpool_struct *pool);
 
+extern int execute_in_threadpool(struct threadpool_struct *pool,
+				struct task_struct *task);
+extern int wait_threadpool(struct threadpool_struct *pool);
+
 extern int threadpool_size(struct threadpool_struct *pool);
 
 extern bool threadpool_is_ready(struct threadpool_struct *pool);
+extern int threadpool_is_busy(struct threadpool_struct *pool);
 
 #endif /* __WORKQUEUE_THREADPOOL_H */
