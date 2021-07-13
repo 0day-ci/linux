@@ -58,8 +58,10 @@ int btintel_check_bdaddr(struct hci_dev *hdev)
 	 * address 00:03:19:9E:8B:00 can be found. These controllers are
 	 * fully operational, but have the danger of duplicate addresses
 	 * and that in turn can cause problems with Bluetooth operation.
+	 * Also mark controllers having zero bdaddress
 	 */
-	if (!bacmp(&bda->bdaddr, BDADDR_INTEL)) {
+	if (!bacmp(&bda->bdaddr, BDADDR_INTEL) ||
+	    !bacmp(&bda->bdaddr, BDADDR_ANY)) {
 		bt_dev_err(hdev, "Found Intel default device address (%pMR)",
 			   &bda->bdaddr);
 		set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
@@ -483,30 +485,15 @@ int btintel_version_info_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 }
 EXPORT_SYMBOL_GPL(btintel_version_info_tlv);
 
-int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *version)
+static int btintel_parse_version_tlv(struct hci_dev *hdev, struct sk_buff *skb,
+				     struct intel_version_tlv *version)
 {
-	struct sk_buff *skb;
-	const u8 param[1] = { 0xFF };
+	int err = 0;
 
-	if (!version)
-		return -EINVAL;
-
-	skb = __hci_cmd_sync(hdev, 0xfc05, 1, param, HCI_CMD_TIMEOUT);
-	if (IS_ERR(skb)) {
-		bt_dev_err(hdev, "Reading Intel version information failed (%ld)",
-			   PTR_ERR(skb));
-		return PTR_ERR(skb);
-	}
-
-	if (skb->data[0]) {
-		bt_dev_err(hdev, "Intel Read Version command failed (%02x)",
-			   skb->data[0]);
-		kfree_skb(skb);
-		return -EIO;
-	}
+	memset(version, 0x00, sizeof(*version));
 
 	/* Consume Command Complete Status field */
-	skb_pull(skb, 1);
+	skb_pull(skb, sizeof(__u8));
 
 	/* Event parameters contatin multiple TLVs. Read each of them
 	 * and only keep the required data. Also, it use existing legacy
@@ -516,27 +503,62 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 	while (skb->len) {
 		struct intel_tlv *tlv;
 
+		if (skb->len < sizeof(*tlv)) {
+			err = -EILSEQ;
+			break;
+		}
+
 		tlv = (struct intel_tlv *)skb->data;
+
+		if (skb->len < (sizeof(*tlv) + tlv->len)) {
+			err = -EILSEQ;
+			break;
+		}
+
 		switch (tlv->type) {
 		case INTEL_TLV_CNVI_TOP:
+			if (tlv->len != sizeof(__le32)) {
+				err = -EILSEQ;
+				break;
+			}
 			version->cnvi_top = get_unaligned_le32(tlv->val);
 			break;
 		case INTEL_TLV_CNVR_TOP:
+			if (tlv->len != sizeof(__le32)) {
+				err = -EILSEQ;
+				break;
+			}
 			version->cnvr_top = get_unaligned_le32(tlv->val);
 			break;
 		case INTEL_TLV_CNVI_BT:
+			if (tlv->len != sizeof(__le32)) {
+				err = -EILSEQ;
+				break;
+			}
 			version->cnvi_bt = get_unaligned_le32(tlv->val);
 			break;
 		case INTEL_TLV_CNVR_BT:
+			if (tlv->len != sizeof(__le32)) {
+				err = -EILSEQ;
+				break;
+			}
 			version->cnvr_bt = get_unaligned_le32(tlv->val);
 			break;
 		case INTEL_TLV_DEV_REV_ID:
+			if (tlv->len != sizeof(__le16)) {
+				err = -EILSEQ;
+				break;
+			}
 			version->dev_rev_id = get_unaligned_le16(tlv->val);
 			break;
 		case INTEL_TLV_IMAGE_TYPE:
 			version->img_type = tlv->val[0];
 			break;
 		case INTEL_TLV_TIME_STAMP:
+			if (tlv->len != sizeof(__le16)) {
+				err = -EILSEQ;
+				break;
+			}
 			/* If image type is Operational firmware (0x03), then
 			 * running FW Calendar Week and Year information can
 			 * be extracted from Timestamp information
@@ -549,6 +571,10 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 			version->build_type = tlv->val[0];
 			break;
 		case INTEL_TLV_BUILD_NUM:
+			if (tlv->len != sizeof(__le32)) {
+				err = -EILSEQ;
+				break;
+			}
 			/* If image type is Operational firmware (0x03), then
 			 * running FW build number can be extracted from the
 			 * Build information
@@ -569,6 +595,10 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 			version->debug_lock = tlv->val[0];
 			break;
 		case INTEL_TLV_MIN_FW:
+			if (tlv->len != 3) {
+				err = -EILSEQ;
+				break;
+			}
 			version->min_fw_build_nn = tlv->val[0];
 			version->min_fw_build_cw = tlv->val[1];
 			version->min_fw_build_yy = tlv->val[2];
@@ -580,20 +610,95 @@ int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *ver
 			version->sbe_type = tlv->val[0];
 			break;
 		case INTEL_TLV_OTP_BDADDR:
+			if (tlv->len != sizeof(version->otp_bd_addr)) {
+				err = -EILSEQ;
+				break;
+			}
 			memcpy(&version->otp_bd_addr, tlv->val, tlv->len);
 			break;
 		default:
 			/* Ignore rest of information */
 			break;
 		}
+
+		if (err)
+			break;
+
 		/* consume the current tlv and move to next*/
 		skb_pull(skb, tlv->len + sizeof(*tlv));
 	}
+	return err;
+}
+
+int btintel_read_version_tlv(struct hci_dev *hdev, struct intel_version_tlv *version)
+{
+	int err;
+	struct sk_buff *skb;
+	const u8 param[1] = { 0xFF };
+
+	if (!version)
+		return -EINVAL;
+
+	skb = __hci_cmd_sync(hdev, 0xfc05, 1, param, HCI_CMD_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Reading Intel version information failed (%ld)",
+			   PTR_ERR(skb));
+		return PTR_ERR(skb);
+	}
+
+	if (skb->data[0]) {
+		bt_dev_err(hdev, "Intel Read Version command failed (%02x)",
+			   skb->data[0]);
+		kfree_skb(skb);
+		return -EIO;
+	}
+
+	err = btintel_parse_version_tlv(hdev, skb, version);
 
 	kfree_skb(skb);
-	return 0;
+
+	return err;
 }
 EXPORT_SYMBOL_GPL(btintel_read_version_tlv);
+
+int btintel_generic_read_version(struct hci_dev *hdev,
+				 struct intel_version_tlv *ver_tlv,
+				 struct intel_version *ver, bool *is_tlv)
+{
+	int err = 0;
+	struct sk_buff *skb;
+	const u8 param[1] = { 0xFF };
+
+	skb = __hci_cmd_sync(hdev, 0xfc05, 1, param, HCI_CMD_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_err(hdev, "Reading Intel version information failed (%ld)",
+			   PTR_ERR(skb));
+		return PTR_ERR(skb);
+	}
+
+	if (skb->data[0]) {
+		bt_dev_err(hdev, "Intel Read Version command failed (%02x)",
+			   skb->data[0]);
+		kfree_skb(skb);
+		return -EIO;
+	}
+
+	if (skb->len < sizeof(struct intel_version))
+		return -EILSEQ;
+
+	if (skb->len == sizeof(struct intel_version) &&
+	    skb->data[1] == 0x37) {
+		*is_tlv = false;
+		memcpy(ver, skb->data, sizeof(*ver));
+	} else {
+		*is_tlv = true;
+		err = btintel_parse_version_tlv(hdev, skb, ver_tlv);
+	}
+
+	kfree_skb(skb);
+	return err;
+}
+EXPORT_SYMBOL_GPL(btintel_generic_read_version);
 
 /* ------- REGMAP IBT SUPPORT ------- */
 

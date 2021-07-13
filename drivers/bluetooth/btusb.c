@@ -60,7 +60,6 @@ static struct usb_driver btusb_driver;
 #define BTUSB_WIDEBAND_SPEECH	0x400000
 #define BTUSB_VALID_LE_STATES   0x800000
 #define BTUSB_QCA_WCN6855	0x1000000
-#define BTUSB_INTEL_NEWGEN	0x2000000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -368,9 +367,9 @@ static const struct usb_device_id blacklist_table[] = {
 						     BTUSB_WIDEBAND_SPEECH },
 	{ USB_DEVICE(0x8087, 0x0029), .driver_info = BTUSB_INTEL_NEW |
 						     BTUSB_WIDEBAND_SPEECH },
-	{ USB_DEVICE(0x8087, 0x0032), .driver_info = BTUSB_INTEL_NEWGEN |
+	{ USB_DEVICE(0x8087, 0x0032), .driver_info = BTUSB_INTEL_NEW |
 						     BTUSB_WIDEBAND_SPEECH},
-	{ USB_DEVICE(0x8087, 0x0033), .driver_info = BTUSB_INTEL_NEWGEN |
+	{ USB_DEVICE(0x8087, 0x0033), .driver_info = BTUSB_INTEL_NEW |
 						     BTUSB_WIDEBAND_SPEECH},
 	{ USB_DEVICE(0x8087, 0x07da), .driver_info = BTUSB_CSR },
 	{ USB_DEVICE(0x8087, 0x07dc), .driver_info = BTUSB_INTEL },
@@ -2521,8 +2520,8 @@ static int btusb_intel_download_firmware_newgen(struct hci_dev *hdev,
 		return -EINVAL;
 
 	/* The firmware variant determines if the device is in bootloader
-	 * mode or is running operational firmware. The value 0x03 identifies
-	 * the bootloader and the value 0x23 identifies the operational
+	 * mode or is running operational firmware. The value 0x23 identifies
+	 * the bootloader and the value 0x03 identifies the operational
 	 * firmware.
 	 *
 	 * When the operational firmware is already present, then only
@@ -2536,14 +2535,14 @@ static int btusb_intel_download_firmware_newgen(struct hci_dev *hdev,
 	if (ver->img_type == 0x03) {
 		clear_bit(BTUSB_BOOTLOADER, &data->flags);
 		btintel_check_bdaddr(hdev);
-	}
-
-	/* If the OTP has no valid Bluetooth device address, then there will
-	 * also be no valid address for the operational firmware.
-	 */
-	if (!bacmp(&ver->otp_bd_addr, BDADDR_ANY)) {
-		bt_dev_info(hdev, "No device address configured");
-		set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
+	} else {
+		/* In Boot mode, bd address is part of tlv data. Check for
+		 * valid bd address
+		 */
+		if (!bacmp(&ver->otp_bd_addr, BDADDR_ANY)) {
+			bt_dev_info(hdev, "No device address configured");
+			set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
+		}
 	}
 
 	btusb_setup_intel_newgen_get_fw_name(ver, fwname, sizeof(fwname), "sfi");
@@ -2842,10 +2841,9 @@ static int btusb_intel_boot(struct hci_dev *hdev, u32 boot_addr)
 	return err;
 }
 
-static int btusb_setup_intel_new(struct hci_dev *hdev)
+static int btusb_setup_intel_new(struct hci_dev *hdev, struct intel_version *ver)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
-	struct intel_version ver;
 	struct intel_boot_params params;
 	u32 boot_param;
 	char ddcname[64];
@@ -2860,27 +2858,16 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	 */
 	boot_param = 0x00000000;
 
-	/* Read the Intel version information to determine if the device
-	 * is in bootloader mode or if it already has operational firmware
-	 * loaded.
-	 */
-	err = btintel_read_version(hdev, &ver);
-	if (err) {
-		bt_dev_err(hdev, "Intel Read version failed (%d)", err);
-		btintel_reset_to_bootloader(hdev);
-		return err;
-	}
-
-	err = btintel_version_info(hdev, &ver);
+	err = btintel_version_info(hdev, ver);
 	if (err)
 		return err;
 
-	err = btusb_intel_download_firmware(hdev, &ver, &params, &boot_param);
+	err = btusb_intel_download_firmware(hdev, ver, &params, &boot_param);
 	if (err)
 		return err;
 
 	/* controller is already having an operational firmware */
-	if (ver.fw_variant == 0x23)
+	if (ver->fw_variant == 0x23)
 		goto finish;
 
 	err = btusb_intel_boot(hdev, boot_param);
@@ -2889,7 +2876,7 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 
 	clear_bit(BTUSB_BOOTLOADER, &data->flags);
 
-	err = btusb_setup_intel_new_get_fw_name(&ver, &params, ddcname,
+	err = btusb_setup_intel_new_get_fw_name(ver, &params, ddcname,
 						sizeof(ddcname), "ddc");
 
 	if (err < 0) {
@@ -2913,17 +2900,17 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	btintel_set_debug_features(hdev, &features);
 
 	/* Read the Intel version information after loading the FW  */
-	err = btintel_read_version(hdev, &ver);
+	err = btintel_read_version(hdev, ver);
 	if (err)
 		return err;
 
-	btintel_version_info(hdev, &ver);
+	btintel_version_info(hdev, ver);
 
 finish:
 	/* All Intel controllers that support the Microsoft vendor
 	 * extension are using 0xFC1E for VsMsftOpCode.
 	 */
-	switch (ver.hw_variant) {
+	switch (ver->hw_variant) {
 	case 0x11:	/* JfP */
 	case 0x12:	/* ThP */
 	case 0x13:	/* HrP */
@@ -2944,14 +2931,13 @@ finish:
 	return 0;
 }
 
-static int btusb_setup_intel_newgen(struct hci_dev *hdev)
+static int btusb_setup_intel_newgen(struct hci_dev *hdev, struct intel_version_tlv *version)
 {
 	struct btusb_data *data = hci_get_drvdata(hdev);
 	u32 boot_param;
 	char ddcname[64];
 	int err;
 	struct intel_debug_features features;
-	struct intel_version_tlv version;
 
 	bt_dev_dbg(hdev, "");
 
@@ -2961,27 +2947,16 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 	 */
 	boot_param = 0x00000000;
 
-	/* Read the Intel version information to determine if the device
-	 * is in bootloader mode or if it already has operational firmware
-	 * loaded.
-	 */
-	err = btintel_read_version_tlv(hdev, &version);
-	if (err) {
-		bt_dev_err(hdev, "Intel Read version failed (%d)", err);
-		btintel_reset_to_bootloader(hdev);
-		return err;
-	}
-
-	err = btintel_version_info_tlv(hdev, &version);
+	err = btintel_version_info_tlv(hdev, version);
 	if (err)
 		return err;
 
-	err = btusb_intel_download_firmware_newgen(hdev, &version, &boot_param);
+	err = btusb_intel_download_firmware_newgen(hdev, version, &boot_param);
 	if (err)
 		return err;
 
 	/* check if controller is already having an operational firmware */
-	if (version.img_type == 0x03)
+	if (version->img_type == 0x03)
 		goto finish;
 
 	err = btusb_intel_boot(hdev, boot_param);
@@ -2990,7 +2965,7 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 
 	clear_bit(BTUSB_BOOTLOADER, &data->flags);
 
-	btusb_setup_intel_newgen_get_fw_name(&version, ddcname, sizeof(ddcname),
+	btusb_setup_intel_newgen_get_fw_name(version, ddcname, sizeof(ddcname),
 					     "ddc");
 	/* Once the device is running in operational mode, it needs to
 	 * apply the device configuration (DDC) parameters.
@@ -3009,11 +2984,11 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 	btintel_set_debug_features(hdev, &features);
 
 	/* Read the Intel version information after loading the FW  */
-	err = btintel_read_version_tlv(hdev, &version);
+	err = btintel_read_version_tlv(hdev, version);
 	if (err)
 		return err;
 
-	btintel_version_info_tlv(hdev, &version);
+	btintel_version_info_tlv(hdev, version);
 
 finish:
 	/* Set the event mask for Intel specific vendor events. This enables
@@ -3027,6 +3002,56 @@ finish:
 
 	return 0;
 }
+
+static bool btintel_is_newgen_controller(struct hci_dev *hdev, u32 cnvi)
+{
+	bt_dev_dbg(hdev, "CNVi - %x", cnvi & 0xFFF);
+
+	switch (cnvi & 0xFFF) {
+	case 0x400: /* Slr */
+	case 0x401: /* Slr-F */
+	case 0x410: /* TyP */
+		return true;
+	}
+	return false;
+}
+
+static int btusb_setup_intel_generic(struct hci_dev *hdev)
+{
+	struct intel_version_tlv ver_tlv;
+	struct intel_version ver;
+	bool is_tlv;
+	int err;
+
+	err = btintel_generic_read_version(hdev, &ver_tlv, &ver, &is_tlv);
+	if (err) {
+		bt_dev_err(hdev, "Intel Read version failed (%d)", err);
+		btintel_reset_to_bootloader(hdev);
+		goto done;
+	}
+
+	if (!is_tlv) {
+		err = btusb_setup_intel_new(hdev, &ver);
+	} else {
+		/* In OP mode Quasar/Pulsar ram products returns TLV data.
+		 * Find out CNVi and then  branch out appropriately
+		 */
+		if (btintel_is_newgen_controller(hdev, ver_tlv.cnvi_top)) {
+			err = btusb_setup_intel_newgen(hdev, &ver_tlv);
+		} else {
+			err = btintel_read_version(hdev, &ver);
+			if (err) {
+				bt_dev_err(hdev, "Intel Read version failed (%d)", err);
+				goto done;
+			}
+			err = btusb_setup_intel_new(hdev, &ver);
+		}
+	}
+done:
+
+	return err;
+}
+
 static int btusb_shutdown_intel(struct hci_dev *hdev)
 {
 	struct sk_buff *skb;
@@ -4649,7 +4674,7 @@ static int btusb_probe(struct usb_interface *intf,
 	if (id->driver_info & BTUSB_INTEL_NEW) {
 		hdev->manufacturer = 2;
 		hdev->send = btusb_send_frame_intel;
-		hdev->setup = btusb_setup_intel_new;
+		hdev->setup = btusb_setup_intel_generic;
 		hdev->shutdown = btusb_shutdown_intel_new;
 		hdev->hw_error = btintel_hw_error;
 		hdev->set_diag = btintel_set_diag;
@@ -4658,24 +4683,6 @@ static int btusb_probe(struct usb_interface *intf,
 		set_bit(HCI_QUIRK_STRICT_DUPLICATE_FILTER, &hdev->quirks);
 		set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
 		set_bit(HCI_QUIRK_NON_PERSISTENT_DIAG, &hdev->quirks);
-	}
-
-	if (id->driver_info & BTUSB_INTEL_NEWGEN) {
-		hdev->manufacturer = 2;
-		hdev->send = btusb_send_frame_intel;
-		hdev->setup = btusb_setup_intel_newgen;
-		hdev->shutdown = btusb_shutdown_intel_new;
-		hdev->hw_error = btintel_hw_error;
-		hdev->set_diag = btintel_set_diag;
-		hdev->set_bdaddr = btintel_set_bdaddr;
-		hdev->cmd_timeout = btusb_intel_cmd_timeout;
-		set_bit(HCI_QUIRK_STRICT_DUPLICATE_FILTER, &hdev->quirks);
-		set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
-		set_bit(HCI_QUIRK_NON_PERSISTENT_DIAG, &hdev->quirks);
-
-		data->recv_event = btusb_recv_event_intel;
-		data->recv_bulk = btusb_recv_bulk_intel;
-		set_bit(BTUSB_BOOTLOADER, &data->flags);
 	}
 
 	if (id->driver_info & BTUSB_MARVELL)
