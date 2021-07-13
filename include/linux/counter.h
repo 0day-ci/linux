@@ -297,6 +297,7 @@ struct counter_ops {
  * @events:		queue of detected Counter events
  * @events_wait:	wait queue to allow blocking reads of Counter events
  * @events_lock:	lock to protect Counter events queue read operations
+ * @chrdev_lock:	lock to limit chrdev to a single open at a time
  */
 struct counter_device {
 	const char *name;
@@ -323,6 +324,7 @@ struct counter_device {
 	DECLARE_KFIFO_PTR(events, struct counter_event);
 	wait_queue_head_t events_wait;
 	struct mutex events_lock;
+	DECLARE_BITMAP(chrdev_lock, 1);
 };
 
 int counter_register(struct counter_device *const counter);

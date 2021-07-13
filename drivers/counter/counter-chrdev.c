@@ -3,6 +3,7 @@
  * Generic Counter character device interface
  * Copyright (C) 2020 William Breathitt Gray
  */
+#include <linux/bitops.h>
 #include <linux/cdev.h>
 #include <linux/counter.h>
 #include <linux/err.h>
@@ -336,6 +337,9 @@ static int counter_chrdev_open(struct inode *inode, struct file *filp)
 							    typeof(*counter),
 							    chrdev);
 
+	if (test_and_set_bit_lock(0, counter->chrdev_lock))
+		return -EBUSY;
+
 	get_device(&counter->dev);
 	filp->private_data = counter;
 
@@ -352,6 +356,7 @@ static int counter_chrdev_release(struct inode *inode, struct file *filp)
 		return err;
 
 	put_device(&counter->dev);
+	clear_bit_unlock(0, counter->chrdev_lock);
 
 	return 0;
 }
@@ -376,6 +381,7 @@ int counter_chrdev_add(struct counter_device *const counter)
 	mutex_init(&counter->events_lock);
 
 	/* Initialize character device */
+	clear_bit(0, counter->chrdev_lock);
 	cdev_init(&counter->chrdev, &counter_fops);
 
 	/* Allocate Counter events queue */
