@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR MIT
 /**************************************************************************
  *
- * Copyright 2009-2016 VMware, Inc., Palo Alto, CA., USA
+ * Copyright 2009-2021 VMware, Inc., Palo Alto, CA., USA
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
@@ -301,8 +301,12 @@ static void vmw_print_capabilities2(uint32_t capabilities2)
 		DRM_INFO("  Grow oTable.\n");
 	if (capabilities2 & SVGA_CAP2_INTRA_SURFACE_COPY)
 		DRM_INFO("  IntraSurface copy.\n");
+	if (capabilities2 & SVGA_CAP2_CURSOR_MOB)
+		DRM_INFO("  Cursor Mob.\n");
 	if (capabilities2 & SVGA_CAP2_DX3)
 		DRM_INFO("  DX3.\n");
+	if (capabilities2 & SVGA_CAP2_EXTRA_REGS)
+		DRM_INFO("  Extra Regs.\n");
 }
 
 static void vmw_print_capabilities(uint32_t capabilities)
@@ -505,6 +509,7 @@ static int vmw_request_device_late(struct vmw_private *dev_priv)
 static int vmw_request_device(struct vmw_private *dev_priv)
 {
 	int ret;
+	size_t i;
 
 	ret = vmw_device_init(dev_priv);
 	if (unlikely(ret != 0)) {
@@ -525,6 +530,37 @@ static int vmw_request_device(struct vmw_private *dev_priv)
 	ret = vmw_dummy_query_bo_create(dev_priv);
 	if (unlikely(ret != 0))
 		goto out_no_query_bo;
+
+	/* Set up mobs for cursor updates */
+	if (dev_priv->has_mob && dev_priv->capabilities2 & SVGA_CAP2_CURSOR_MOB) {
+		const uint32_t cursor_max_dim = vmw_read(dev_priv, SVGA_REG_CURSOR_MAX_DIMENSION);
+
+		for (i = 0; i < ARRAY_SIZE(dev_priv->cursor_mob); i++) {
+			struct ttm_buffer_object **const bo = &dev_priv->cursor_mob[i];
+
+			ret = vmw_bo_create_kernel(dev_priv,
+				cursor_max_dim * cursor_max_dim * sizeof(u32) + sizeof(SVGAGBCursorHeader),
+				&vmw_mob_placement, bo);
+
+			if (ret != 0) {
+				DRM_ERROR("Unable to create CursorMob array.\n");
+				break;
+			}
+
+			BUG_ON((*bo)->resource->mem_type != VMW_PL_MOB);
+
+			/* Fence the mob creation so we are guarateed to have the mob */
+			ret = ttm_bo_reserve(*bo, false, true, NULL);
+			BUG_ON(ret);
+
+			vmw_bo_fence_single(*bo, NULL);
+
+			ttm_bo_unreserve(*bo);
+
+			DRM_INFO("Using CursorMob mobid %lu, max dimension %u\n",
+				 (*bo)->resource->start, cursor_max_dim);
+		}
+	}
 
 	return 0;
 
@@ -556,6 +592,8 @@ out_no_mob:
  */
 static void vmw_release_device_early(struct vmw_private *dev_priv)
 {
+	size_t i;
+
 	/*
 	 * Previous destructions should've released
 	 * the pinned bo.
@@ -569,6 +607,11 @@ static void vmw_release_device_early(struct vmw_private *dev_priv)
 
 	if (dev_priv->has_mob) {
 		struct ttm_resource_manager *man;
+
+		for (i = 0; i < ARRAY_SIZE(dev_priv->cursor_mob); i++) {
+			if (dev_priv->cursor_mob[i] != NULL)
+				ttm_bo_put(dev_priv->cursor_mob[i]);
+		}
 
 		man = ttm_manager_type(&dev_priv->bdev, VMW_PL_MOB);
 		ttm_resource_manager_evict_all(&dev_priv->bdev, man);

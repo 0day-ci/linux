@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR MIT
 /**************************************************************************
  *
- * Copyright 2009-2015 VMware, Inc., Palo Alto, CA., USA
+ * Copyright 2009-2021 VMware, Inc., Palo Alto, CA., USA
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
@@ -53,6 +53,10 @@ void vmw_du_cleanup(struct vmw_display_unit *du)
  * Display Unit Cursor functions
  */
 
+static int vmw_cursor_update_mob(struct vmw_private *dev_priv,
+				 u32 *image, u32 width, u32 height,
+				 u32 hotspotX, u32 hotspotY);
+
 static int vmw_cursor_update_image(struct vmw_private *dev_priv,
 				   u32 *image, u32 width, u32 height,
 				   u32 hotspotX, u32 hotspotY)
@@ -66,6 +70,10 @@ static int vmw_cursor_update_image(struct vmw_private *dev_priv,
 
 	if (!image)
 		return -EINVAL;
+
+	if (dev_priv->cursor_mob[ARRAY_SIZE(dev_priv->cursor_mob) - 1] != NULL)
+		return vmw_cursor_update_mob(dev_priv, image, width, height,
+					     hotspotX, hotspotY);
 
 	cmd = VMW_CMD_RESERVE(dev_priv, cmd_size);
 	if (unlikely(cmd == NULL))
@@ -85,6 +93,62 @@ static int vmw_cursor_update_image(struct vmw_private *dev_priv,
 	vmw_cmd_commit_flush(dev_priv, cmd_size);
 
 	return 0;
+}
+
+static int vmw_cursor_update_mob(struct vmw_private *dev_priv,
+				 u32 *image, u32 width, u32 height,
+				 u32 hotspotX, u32 hotspotY)
+{
+	SVGAGBCursorHeader *header;
+	SVGAGBAlphaCursorHeader *alpha_header;
+	const u32 image_size = width * height * sizeof(*image);
+	const u32 mob_size = sizeof(*header) + image_size;
+
+	struct ttm_buffer_object *bo;
+	struct ttm_bo_kmap_obj map;
+	bool dummy;
+	int ret;
+
+	bo = dev_priv->cursor_mob[atomic_inc_return(&dev_priv->cursor_mob_idx) %
+		ARRAY_SIZE(dev_priv->cursor_mob)];
+	BUG_ON(bo == NULL);
+
+	ret = ttm_bo_reserve(bo, true, false, NULL);
+
+	if (unlikely(ret != 0)) {
+		DRM_ERROR("reserve failed\n");
+		return -EINVAL;
+	}
+
+	ret = ttm_bo_kmap(bo, 0, vmw_num_pages(mob_size), &map);
+
+	if (unlikely(ret != 0))
+		goto err_map;
+
+	header = (SVGAGBCursorHeader *)ttm_kmap_obj_virtual(&map, &dummy);
+	alpha_header = &header->header.alphaHeader;
+
+	header->type = SVGA_ALPHA_CURSOR;
+	header->sizeInBytes = image_size;
+
+	alpha_header->hotspotX = hotspotX;
+	alpha_header->hotspotY = hotspotY;
+	alpha_header->width = width;
+	alpha_header->height = height;
+
+	memcpy(header + 1, image, image_size);
+
+	ttm_bo_kunmap(&map);
+	ttm_bo_unreserve(bo);
+
+	vmw_write(dev_priv, SVGA_REG_CURSOR_MOBID, bo->resource->start);
+
+	return 0;
+
+err_map:
+	ttm_bo_unreserve(bo);
+
+	return ret;
 }
 
 static int vmw_cursor_update_bo(struct vmw_private *dev_priv,
@@ -127,11 +191,18 @@ err_unreserve:
 static void vmw_cursor_update_position(struct vmw_private *dev_priv,
 				       bool show, int x, int y)
 {
+	const uint32_t svga_cursor_on = show ? SVGA_CURSOR_ON_SHOW
+					     : SVGA_CURSOR_ON_HIDE;
 	uint32_t count;
 
 	spin_lock(&dev_priv->cursor_lock);
-	if (vmw_is_cursor_bypass3_enabled(dev_priv)) {
-		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_ON, show ? 1 : 0);
+	if (dev_priv->capabilities2 & SVGA_CAP2_EXTRA_REGS) {
+		vmw_write(dev_priv, SVGA_REG_CURSOR4_X, x);
+		vmw_write(dev_priv, SVGA_REG_CURSOR4_Y, y);
+		vmw_write(dev_priv, SVGA_REG_CURSOR4_ON, svga_cursor_on);
+		vmw_write(dev_priv, SVGA_REG_CURSOR4_SUBMIT, TRUE);
+	} else if (vmw_is_cursor_bypass3_enabled(dev_priv)) {
+		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_ON, svga_cursor_on);
 		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_X, x);
 		vmw_fifo_mem_write(dev_priv, SVGA_FIFO_CURSOR_Y, y);
 		count = vmw_fifo_mem_read(dev_priv, SVGA_FIFO_CURSOR_COUNT);
@@ -139,7 +210,7 @@ static void vmw_cursor_update_position(struct vmw_private *dev_priv,
 	} else {
 		vmw_write(dev_priv, SVGA_REG_CURSOR_X, x);
 		vmw_write(dev_priv, SVGA_REG_CURSOR_Y, y);
-		vmw_write(dev_priv, SVGA_REG_CURSOR_ON, show ? 1 : 0);
+		vmw_write(dev_priv, SVGA_REG_CURSOR_ON, svga_cursor_on);
 	}
 	spin_unlock(&dev_priv->cursor_lock);
 }

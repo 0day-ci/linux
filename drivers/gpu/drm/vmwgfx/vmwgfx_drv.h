@@ -642,6 +642,12 @@ struct vmw_private {
 	u8 mksstat_kern_top_timer[MKSSTAT_CAPACITY];
 	atomic_t mksstat_kern_pids[MKSSTAT_CAPACITY];
 #endif
+
+	/*
+	 * CursorMob buffer objects
+	 */
+	struct ttm_buffer_object *cursor_mob[2];
+	atomic_t cursor_mob_idx;
 };
 
 static inline struct vmw_surface *vmw_res_to_srf(struct vmw_resource *res)
