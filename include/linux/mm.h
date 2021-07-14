@@ -1720,6 +1720,8 @@ extern void user_shm_unlock(size_t, struct ucounts *);
 #define  ZAP_FLAG_CHECK_MAPPING             BIT(0)
 /* Whether to skip zapping swap entries */
 #define  ZAP_FLAG_SKIP_SWAP                 BIT(1)
+/* Whether to completely drop uffd-wp entries for file-backed memory */
+#define  ZAP_FLAG_DROP_FILE_UFFD_WP         BIT(2)
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
@@ -1751,6 +1753,15 @@ zap_skip_swap(struct zap_details *details)
 		return false;
 
 	return details->zap_flags & ZAP_FLAG_SKIP_SWAP;
+}
+
+static inline bool
+zap_drop_file_uffd_wp(struct zap_details *details)
+{
+	if (!details)
+		return false;
+
+	return details->zap_flags & ZAP_FLAG_DROP_FILE_UFFD_WP;
 }
 
 struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
