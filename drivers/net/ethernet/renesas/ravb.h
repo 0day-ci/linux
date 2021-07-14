@@ -81,6 +81,7 @@ enum ravb_reg {
 	RQC3	= 0x00A0,
 	RQC4	= 0x00A4,
 	RPC	= 0x00B0,
+	RTC	= 0x00B4,	/* RZ/G2L only */
 	UFCW	= 0x00BC,
 	UFCS	= 0x00C0,
 	UFCV0	= 0x00C4,
@@ -156,6 +157,7 @@ enum ravb_reg {
 	TIS	= 0x037C,
 	ISS	= 0x0380,
 	CIE	= 0x0384,	/* R-Car Gen3 only */
+	RIC3	= 0x0388,	/* RZ/G2L only */
 	GCCR	= 0x0390,
 	GMTT	= 0x0394,
 	GPTC	= 0x0398,
@@ -181,25 +183,39 @@ enum ravb_reg {
 
 	/* E-MAC registers */
 	ECMR	= 0x0500,
+	CXR20	= 0x0500,	/* Documented for RZ/G2L only */
 	RFLR	= 0x0508,
+	CXR2A	= 0x0508,	/* Documented for RZ/G2L only */
 	ECSR	= 0x0510,
 	ECSIPR	= 0x0518,
 	PIR	= 0x0520,
 	PSR	= 0x0528,
 	PIPR	= 0x052c,
+	CXR31	= 0x0530,	/* Documented for RZ/G2L only */
+	CXR35	= 0x0540,	/* Documented for RZ/G2L only */
 	MPR	= 0x0558,
 	PFTCR	= 0x055c,
 	PFRCR	= 0x0560,
 	GECMR	= 0x05b0,
 	MAHR	= 0x05c0,
 	MALR	= 0x05c8,
-	TROCR	= 0x0700,	/* R-Car Gen3 only */
+	TROCR	= 0x0700,	/* R-Car Gen3 and RZ/G2L only */
+	CDCR	= 0x0708,	/* Documented for RZ/G2L only */
+	LCCR	= 0x0710,	/* Documented for RZ/G2L only */
 	CEFCR	= 0x0740,
 	FRECR	= 0x0748,
 	TSFRCR	= 0x0750,
 	TLFRCR	= 0x0758,
 	RFCR	= 0x0760,
+	CERCR	= 0x0768,	/* Documented for RZ/G2L only */
+	CEECR	= 0x0770,	/* Documented for RZ/G2L only */
 	MAFCR	= 0x0778,
+	LPTXMOD2 = 0x07B4,	/* Documented for RZ/G2L only */
+	LPTXGTH1 = 0x07C0,	/* Documented for RZ/G2L only */
+	LPTXMTH1 = 0x07D0,	/* Documented for RZ/G2L only */
+	CSR0     = 0x0800,	/* Documented for RZ/G2L only */
+	CSR1     = 0x0804,	/* Documented for RZ/G2L only */
+	CSR2     = 0x0808,	/* Documented for RZ/G2L only */
 };
 
 
@@ -216,6 +232,7 @@ enum CCC_BIT {
 	CCC_CSEL_HPB	= 0x00010000,
 	CCC_CSEL_ETH_TX	= 0x00020000,
 	CCC_CSEL_GMII_REF = 0x00030000,
+	CCC_BOC		= 0x00100000,	/* Documented for RZ/G2L only */
 	CCC_LBME	= 0x01000000,
 };
 
@@ -804,16 +821,21 @@ enum TID_BIT {
 enum ECMR_BIT {
 	ECMR_PRM	= 0x00000001,
 	ECMR_DM		= 0x00000002,
+	CXR20_LPM	= 0x00000010,	/* Documented for RZ/G2L only */
 	ECMR_TE		= 0x00000020,
 	ECMR_RE		= 0x00000040,
 	ECMR_MPDE	= 0x00000200,
+	CXR20_CER	= 0x00001000,	/* Documented for RZ/G2L only */
 	ECMR_TXF	= 0x00010000,	/* Documented for R-Car Gen3 only */
 	ECMR_RXF	= 0x00020000,
 	ECMR_PFR	= 0x00040000,
 	ECMR_ZPF	= 0x00080000,	/* Documented for R-Car Gen3 only */
 	ECMR_RZPF	= 0x00100000,
 	ECMR_DPAD	= 0x00200000,
+	CXR20_CXSER	= 0x00400000,	/* Documented for RZ/G2L only */
 	ECMR_RCSC	= 0x00800000,
+	CXR20_TCPT	= 0x01000000,	/* Documented for RZ/G2L only */
+	CXR20_RCPT	= 0x02000000,	/* Documented for RZ/G2L only */
 	ECMR_TRCCM	= 0x04000000,
 };
 
@@ -823,6 +845,7 @@ enum ECSR_BIT {
 	ECSR_MPD	= 0x00000002,
 	ECSR_LCHNG	= 0x00000004,
 	ECSR_PHYI	= 0x00000008,
+	ECSR_RFRI	= 0x00000010,	/* Documented for RZ/G2L only */
 };
 
 /* ECSIPR */
@@ -860,6 +883,14 @@ enum GECMR_BIT {
 	GECMR_SPEED	= 0x00000001,
 	GECMR_SPEED_100	= 0x00000000,
 	GECMR_SPEED_1000 = 0x00000001,
+};
+
+/* GECMR */
+enum RGETH_GECMR_BIT {
+	RGETH_GECMR_SPEED	= 0x00000030,
+	RGETH_GECMR_SPEED_10	= 0x00000000,
+	RGETH_GECMR_SPEED_100	= 0x00000010,
+	RGETH_GECMR_SPEED_1000	= 0x00000020,
 };
 
 /* The Ethernet AVB descriptor definitions. */
@@ -949,6 +980,54 @@ enum RAVB_QUEUE {
 	RAVB_NC,	/* Network Control Queue */
 };
 
+enum CXR31_BIT {
+	CXR31_SEL_LINK0	= 0x00000001,
+	CXR31_SEL_LINK1	= 0x00000008,
+};
+
+enum CXR35_BIT {
+	CXR35_SEL_MODIN	= 0x00000100,
+};
+
+enum CSR0_BIT {
+	CSR0_CCM	= 0x00000001,
+	CSR0_TPE	= 0x00000010,
+	CSR0_RPE	= 0x00000020,
+	CSR0_TBP	= 0x00000100,
+	CSR0_RBP	= 0x00000200,
+	CSR0_FIFOCAP	= 0x00003000,
+};
+
+enum CSR1_BIT {
+	CSR1_TIP4	= 0x00000001,
+	CSR1_TTCP4	= 0x00000010,
+	CSR1_TUDP4	= 0x00000020,
+	CSR1_TICMP4	= 0x00000040,
+	CSR1_TTCP6	= 0x00100000,
+	CSR1_TUDP6	= 0x00200000,
+	CSR1_TICMP6	= 0x00400000,
+	CSR1_THOP	= 0x01000000,
+	CSR1_TROUT	= 0x02000000,
+	CSR1_TAHD	= 0x04000000,
+	CSR1_TDHD	= 0x08000000,
+	CSR1_ALL	= 0x0F700071,
+};
+
+enum CSR2_BIT {
+	CSR2_RIP4	= 0x00000001,
+	CSR2_RTCP4	= 0x00000010,
+	CSR2_RUDP4	= 0x00000020,
+	CSR2_RICMP4	= 0x00000040,
+	CSR2_RTCP6	= 0x00100000,
+	CSR2_RUDP6	= 0x00200000,
+	CSR2_RICMP6	= 0x00400000,
+	CSR2_RHOP	= 0x01000000,
+	CSR2_RROUT	= 0x02000000,
+	CSR2_RAHD	= 0x04000000,
+	CSR2_RDHD	= 0x08000000,
+	CSR2_ALL	= 0x0F700071,
+};
+
 #define DBAT_ENTRY_NUM	22
 #define RX_QUEUE_OFFSET	4
 #define NUM_RX_QUEUE	2
@@ -956,8 +1035,11 @@ enum RAVB_QUEUE {
 
 #define RX_BUF_SZ	(2048 - ETH_FCS_LEN + sizeof(__sum16))
 
+#define RGETH_RCV_BUFF_MAX 8192
+#define RGETH_RCV_DESCRIPTOR_DATA_SIZE 4080
+
 /* TX descriptors per packet */
-#define NUM_TX_DESC_GEN2	2
+#define NUM_TX_DESC_GEN2	2	/* RCar Gen2 or RZ/G2L */
 #define NUM_TX_DESC_GEN3	1
 
 struct ravb_tstamp_skb {
@@ -986,6 +1068,7 @@ struct ravb_ptp {
 enum ravb_chip_id {
 	RCAR_GEN2,
 	RCAR_GEN3,
+	RZ_G2L,
 };
 
 struct ravb_private {
@@ -1040,6 +1123,11 @@ struct ravb_private {
 	unsigned txcidm:1;		/* TX Clock Internal Delay Mode */
 	unsigned rgmii_override:1;	/* Deprecated rgmii-*id behavior */
 	int num_tx_desc;		/* TX descriptors per packet */
+
+	int duplex;
+	struct ravb_rx_desc *rgeth_rx_ring[NUM_RX_QUEUE];
+	struct sk_buff *rxtop_skb;
+	struct reset_control *rstc;
 };
 
 static inline u32 ravb_read(struct net_device *ndev, enum ravb_reg reg)
