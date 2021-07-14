@@ -7241,3 +7241,11 @@ The argument to KVM_ENABLE_CAP is also a bitmask, and must be a subset
 of the result of KVM_CHECK_EXTENSION.  KVM will forward to userspace
 the hypercalls whose corresponding bit is in the argument, and return
 ENOSYS for the others.
+
+8.35 KVM_CAP_BINARY_STATS_FD
+----------------------------
+
+:Architectures: all
+
+This capability indicates the feature that userspace can get a file descriptor
+for every VM and VCPU to read statistics data in binary format.
