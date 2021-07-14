@@ -1359,11 +1359,24 @@ out:
 	return err;
 }
 
+static void *get_xa_entry_at_vma_addr(struct vm_area_struct *vma,
+		unsigned long addr)
+{
+	struct inode *inode = file_inode(vma->vm_file);
+	struct address_space *mapping = inode->i_mapping;
+	pgoff_t offset = linear_page_index(vma, addr);
+
+	return xa_load(&mapping->i_pages, offset);
+}
+
 static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 		struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 {
 	u64 frame = 0, flags = 0;
 	struct page *page = NULL;
+
+	if (vma->vm_flags & VM_SOFTDIRTY)
+		flags |= PM_SOFT_DIRTY;
 
 	if (pte_present(pte)) {
 		if (pm->show_pfn)
@@ -1374,13 +1387,22 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 			flags |= PM_SOFT_DIRTY;
 		if (pte_uffd_wp(pte))
 			flags |= PM_UFFD_WP;
-	} else if (is_swap_pte(pte)) {
+	} else if (is_swap_pte(pte) || shmem_file(vma->vm_file)) {
 		swp_entry_t entry;
-		if (pte_swp_soft_dirty(pte))
-			flags |= PM_SOFT_DIRTY;
-		if (pte_swp_uffd_wp(pte))
-			flags |= PM_UFFD_WP;
-		entry = pte_to_swp_entry(pte);
+		if (is_swap_pte(pte)) {
+			entry = pte_to_swp_entry(pte);
+			if (pte_swp_soft_dirty(pte))
+				flags |= PM_SOFT_DIRTY;
+			if (pte_swp_uffd_wp(pte))
+				flags |= PM_UFFD_WP;
+		} else {
+			void *xa_entry = get_xa_entry_at_vma_addr(vma, addr);
+
+			if (xa_is_value(xa_entry))
+				entry = radix_to_swp_entry(xa_entry);
+			else
+				goto out;
+		}
 		if (pm->show_pfn)
 			frame = swp_type(entry) |
 				(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
@@ -1393,9 +1415,8 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 		flags |= PM_FILE;
 	if (page && page_mapcount(page) == 1)
 		flags |= PM_MMAP_EXCLUSIVE;
-	if (vma->vm_flags & VM_SOFTDIRTY)
-		flags |= PM_SOFT_DIRTY;
 
+out:
 	return make_pme(frame, flags);
 }
 
