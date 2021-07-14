@@ -2438,9 +2438,6 @@ struct drm_i915_query {
  *                 Z / 8] >> (Z % 8)) & 1
  */
 struct drm_i915_query_topology_info {
-	/*
-	 * Unused for now. Must be cleared to zero.
-	 */
 	__u16 flags;
 
 	__u16 max_slices;
