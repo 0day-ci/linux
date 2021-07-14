@@ -2503,8 +2503,6 @@ static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 
 	if (first_dev)
 		seq_escape(m, rcu_str_deref(first_dev->name), " \t\n\\");
-	else
-		WARN_ON(1);
 	rcu_read_unlock();
 	return 0;
 }
