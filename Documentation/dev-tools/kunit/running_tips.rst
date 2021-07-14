@@ -80,6 +80,16 @@ file ``.kunitconfig``, you can just pass in the dir, e.g.
 	automagically, but tests could theoretically depend on incompatible
 	options, so handling that would be tricky.
 
+Setting kernel commandline parameters
+-------------------------------------
+
+You can use ``--kernel_arg`` to pass arbitrary kernel arguments, e.g.
+
+.. code-block:: bash
+
+	$ ./tools/testing/kunit/kunit.py run --kernel_arg=param=42 --kernel_arg=param2=false
+
+
 Generating code coverage reports under UML
 ------------------------------------------
 
