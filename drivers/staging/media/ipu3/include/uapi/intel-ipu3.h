@@ -534,6 +534,9 @@ struct ipu3_uapi_ff_status {
  *
  * @awb_raw_buffer: auto white balance meta data &ipu3_uapi_awb_raw_buffer
  * @ae_raw_buffer: auto exposure raw data &ipu3_uapi_ae_raw_buffer_aligned
+ *                 current Imgu does not output the auto exposure statistics
+ *                 to ae_raw_buffer, the user such as 3A algorithm can use the
+ *                 RGB table in &ipu3_uapi_awb_raw_buffer to do auto-exposure.
  * @af_raw_buffer: &ipu3_uapi_af_raw_buffer for auto focus meta data
  * @awb_fr_raw_buffer: value as specified by &ipu3_uapi_awb_fr_raw_buffer
  * @stats_4a_config: 4a statistics config as defined by &ipu3_uapi_4a_config.
