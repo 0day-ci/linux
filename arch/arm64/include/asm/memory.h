@@ -178,6 +178,7 @@
 #include <asm/bug.h>
 
 extern u64			vabits_actual;
+extern u64			arm64_lpa2_enabled;
 
 extern s64			memstart_addr;
 /* PHYS_OFFSET - the physical address of the start of memory. */

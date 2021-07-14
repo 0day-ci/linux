@@ -94,6 +94,21 @@ SYM_CODE_START(primary_entry)
 	adrp	x23, __PHYS_OFFSET
 	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
 	bl	set_cpu_boot_mode_flag
+
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA2
+	mrs     x10, ID_AA64MMFR0_EL1
+	ubfx    x10, x10, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+	cmp     x10, #ID_AA64MMFR0_TGRAN_LPA2
+	b.ne	1f
+
+	mov	x10, #1
+	adr_l	x11, arm64_lpa2_enabled
+	str	x10, [x11]
+	dmb	sy
+	dc	ivac, x11
+1:
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA2 */
+
 	bl	__create_page_tables
 	/*
 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
