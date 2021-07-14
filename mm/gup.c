@@ -2234,31 +2234,55 @@ static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
 }
 #endif /* CONFIG_ARCH_HAS_PTE_SPECIAL */
 
+
+static int record_subpages(struct page *page, unsigned long addr,
+			   unsigned long end, struct page **pages)
+{
+	int nr;
+
+	for (nr = 0; addr != end; addr += PAGE_SIZE)
+		pages[nr++] = page++;
+
+	return nr;
+}
+
 #if defined(CONFIG_ARCH_HAS_PTE_DEVMAP) && defined(CONFIG_TRANSPARENT_HUGEPAGE)
 static int __gup_device_huge(unsigned long pfn, unsigned long addr,
 			     unsigned long end, unsigned int flags,
 			     struct page **pages, int *nr)
 {
-	int nr_start = *nr;
+	int refs, nr_start = *nr;
 	struct dev_pagemap *pgmap = NULL;
 
 	do {
-		struct page *page = pfn_to_page(pfn);
+		struct page *pinned_head, *head, *page = pfn_to_page(pfn);
+		unsigned long next;
 
 		pgmap = get_dev_pagemap(pfn, pgmap);
 		if (unlikely(!pgmap)) {
 			undo_dev_pagemap(nr, nr_start, flags, pages);
 			return 0;
 		}
-		SetPageReferenced(page);
-		pages[*nr] = page;
-		if (unlikely(!try_grab_page(page, flags))) {
-			undo_dev_pagemap(nr, nr_start, flags, pages);
+
+		head = compound_head(page);
+		/* @end is assumed to be limited at most one compound page */
+		next = PageCompound(head) ? end : addr + PAGE_SIZE;
+		refs = record_subpages(page, addr, next, pages + *nr);
+
+		SetPageReferenced(head);
+		pinned_head = try_grab_compound_head(head, refs, flags);
+		if (!pinned_head) {
+			if (PageCompound(head)) {
+				ClearPageReferenced(head);
+				put_dev_pagemap(pgmap);
+			} else {
+				undo_dev_pagemap(nr, nr_start, flags, pages);
+			}
 			return 0;
 		}
-		(*nr)++;
-		pfn++;
-	} while (addr += PAGE_SIZE, addr != end);
+		*nr += refs;
+		pfn += refs;
+	} while (addr += (refs << PAGE_SHIFT), addr != end);
 
 	if (pgmap)
 		put_dev_pagemap(pgmap);
@@ -2317,17 +2341,6 @@ static int __gup_device_huge_pud(pud_t pud, pud_t *pudp, unsigned long addr,
 	return 0;
 }
 #endif
-
-static int record_subpages(struct page *page, unsigned long addr,
-			   unsigned long end, struct page **pages)
-{
-	int nr;
-
-	for (nr = 0; addr != end; addr += PAGE_SIZE)
-		pages[nr++] = page++;
-
-	return nr;
-}
 
 #ifdef CONFIG_ARCH_HAS_HUGEPD
 static unsigned long hugepte_addr_end(unsigned long addr, unsigned long end,
