@@ -2335,13 +2335,16 @@ xfs_rmap_finish_one_cleanup(
 	int			error)
 {
 	struct xfs_buf		*agbp;
+	struct xfs_perag	*pag;
 
 	if (rcur == NULL)
 		return;
 	agbp = rcur->bc_ag.agbp;
+	pag = rcur->bc_ag.pag;
 	xfs_btree_del_cursor(rcur, error);
 	if (error)
 		xfs_trans_brelse(tp, agbp);
+	xfs_perag_put(pag);
 }
 
 /*
@@ -2408,7 +2411,9 @@ xfs_rmap_finish_one(
 			goto out_drop;
 		}
 
+		/* The cursor now owns the AGF buf and perag ref */
 		rcur = xfs_rmapbt_init_cursor(mp, tp, agbp, pag);
+		pag = NULL;
 	}
 	*pcur = rcur;
 
@@ -2447,7 +2452,8 @@ xfs_rmap_finish_one(
 		error = -EFSCORRUPTED;
 	}
 out_drop:
-	xfs_perag_put(pag);
+	if (pag)
+		xfs_perag_put(pag);
 	return error;
 }
 

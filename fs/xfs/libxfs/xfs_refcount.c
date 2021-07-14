@@ -1113,13 +1113,16 @@ xfs_refcount_finish_one_cleanup(
 	int			error)
 {
 	struct xfs_buf		*agbp;
+	struct xfs_perag	*pag;
 
 	if (rcur == NULL)
 		return;
 	agbp = rcur->bc_ag.agbp;
+	pag = rcur->bc_ag.pag;
 	xfs_btree_del_cursor(rcur, error);
 	if (error)
 		xfs_trans_brelse(tp, agbp);
+	xfs_perag_put(pag);
 }
 
 /*
@@ -1142,19 +1145,20 @@ xfs_refcount_finish_one(
 	struct xfs_mount		*mp = tp->t_mountp;
 	struct xfs_btree_cur		*rcur;
 	struct xfs_buf			*agbp = NULL;
-	int				error = 0;
+	struct xfs_perag		*pag;
+	unsigned long			nr_ops = 0;
+	xfs_agnumber_t			agno;
 	xfs_agblock_t			bno;
 	xfs_agblock_t			new_agbno;
-	unsigned long			nr_ops = 0;
 	int				shape_changes = 0;
-	struct xfs_perag		*pag;
+	int				error = 0;
 
-	pag = xfs_perag_get(mp, XFS_FSB_TO_AGNO(mp, startblock));
+	agno = XFS_FSB_TO_AGNO(mp, startblock);
+	pag = xfs_perag_get(mp, agno);
 	bno = XFS_FSB_TO_AGBNO(mp, startblock);
 
-	trace_xfs_refcount_deferred(mp, XFS_FSB_TO_AGNO(mp, startblock),
-			type, XFS_FSB_TO_AGBNO(mp, startblock),
-			blockcount);
+	trace_xfs_refcount_deferred(mp, agno, type,
+			 XFS_FSB_TO_AGBNO(mp, startblock), blockcount);
 
 	if (XFS_TEST_ERROR(false, mp, XFS_ERRTAG_REFCOUNT_FINISH_ONE)) {
 		error = -EIO;
@@ -1174,14 +1178,16 @@ xfs_refcount_finish_one(
 		*pcur = NULL;
 	}
 	if (rcur == NULL) {
-		error = xfs_alloc_read_agf(tp->t_mountp, tp, pag->pag_agno,
+		error = xfs_alloc_read_agf(mp, tp, agno,
 				XFS_ALLOC_FLAG_FREEING, &agbp);
 		if (error)
 			goto out_drop;
 
+		/* The cursor now owns the AGF buf and perag ref */
 		rcur = xfs_refcountbt_init_cursor(mp, tp, agbp, pag);
 		rcur->bc_ag.refc.nr_ops = nr_ops;
 		rcur->bc_ag.refc.shape_changes = shape_changes;
+		pag = NULL;
 	}
 	*pcur = rcur;
 
@@ -1189,12 +1195,12 @@ xfs_refcount_finish_one(
 	case XFS_REFCOUNT_INCREASE:
 		error = xfs_refcount_adjust(rcur, bno, blockcount, &new_agbno,
 			new_len, XFS_REFCOUNT_ADJUST_INCREASE, NULL);
-		*new_fsb = XFS_AGB_TO_FSB(mp, pag->pag_agno, new_agbno);
+		*new_fsb = XFS_AGB_TO_FSB(mp, agno, new_agbno);
 		break;
 	case XFS_REFCOUNT_DECREASE:
 		error = xfs_refcount_adjust(rcur, bno, blockcount, &new_agbno,
 			new_len, XFS_REFCOUNT_ADJUST_DECREASE, NULL);
-		*new_fsb = XFS_AGB_TO_FSB(mp, pag->pag_agno, new_agbno);
+		*new_fsb = XFS_AGB_TO_FSB(mp, agno, new_agbno);
 		break;
 	case XFS_REFCOUNT_ALLOC_COW:
 		*new_fsb = startblock + blockcount;
@@ -1211,10 +1217,11 @@ xfs_refcount_finish_one(
 		error = -EFSCORRUPTED;
 	}
 	if (!error && *new_len > 0)
-		trace_xfs_refcount_finish_one_leftover(mp, pag->pag_agno, type,
-				bno, blockcount, new_agbno, *new_len);
+		trace_xfs_refcount_finish_one_leftover(mp, agno, type, bno,
+				blockcount, new_agbno, *new_len);
 out_drop:
-	xfs_perag_put(pag);
+	if (pag)
+		xfs_perag_put(pag);
 	return error;
 }
 
