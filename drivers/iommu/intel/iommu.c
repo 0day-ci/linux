@@ -5683,6 +5683,33 @@ static void quirk_skip_igfx_superpage(struct pci_dev *dev)
 	iommu_skip_igfx_superpage = 1;
 }
 
+/* Skylake igfx has issues with superpage */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1906, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1913, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x190E, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1915, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1902, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x190A, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x190B, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1917, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1916, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1921, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x191E, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1912, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x191A, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x191B, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x191D, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1923, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1926, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1927, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x192A, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x192B, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x192D, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1932, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x193A, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x193B, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x193D, quirk_skip_igfx_superpage);
+
 /* Broxton igfx has issues with superpage */
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x0A84, quirk_skip_igfx_superpage);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1A84, quirk_skip_igfx_superpage);
