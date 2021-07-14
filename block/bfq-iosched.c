@@ -269,6 +269,15 @@ static struct kmem_cache *bfq_pool;
 #define BFQ_RATE_SHIFT		16
 
 /*
+ * 1) bfq keep dispatching requests with same size for at least one second.
+ * 2) bfq dispatch at lease 1024 requests
+ *
+ * We think bfq are dispatching request with same size if the above two
+ * conditions hold true.
+ */
+#define VARIED_REQUEST_SIZE(bfqd) ((bfqd)->dispatch_count < 1024 ||\
+		time_before(jiffies, (bfqd)->dispatch_time + HZ))
+/*
  * When configured for computing the duration of the weight-raising
  * for interactive queues automatically (see the comments at the
  * beginning of this file), BFQ does it using the following formula:
@@ -724,7 +733,8 @@ static bool bfq_asymmetric_scenario(struct bfq_data *bfqd,
 	bool multiple_classes_busy;
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
-	if (bfqd->num_groups_with_pending_reqs > 1)
+	if (bfqd->num_groups_with_pending_reqs > 1 &&
+	    VARIED_REQUEST_SIZE(bfqd))
 		return true;
 #endif
 
