@@ -5612,6 +5612,12 @@ struct nfs4_renewdata {
  * nfs4_proc_async_renew(): This is not one of the nfs_rpc_ops; it is a special
  * standalone procedure for queueing an asynchronous RENEW.
  */
+static void nfs4_renew_prepare(struct rpc_task *task, void *calldata)
+{
+	task->tk_flags &= ~RPC_TASK_NO_RETRANS_TIMEOUT;
+	rpc_call_start(task);
+}
+
 static void nfs4_renew_release(void *calldata)
 {
 	struct nfs4_renewdata *data = calldata;
@@ -5650,6 +5656,7 @@ static void nfs4_renew_done(struct rpc_task *task, void *calldata)
 }
 
 static const struct rpc_call_ops nfs4_renew_ops = {
+	.rpc_call_prepare = nfs4_renew_prepare,
 	.rpc_call_done = nfs4_renew_done,
 	.rpc_release = nfs4_renew_release,
 };
@@ -9218,6 +9225,8 @@ static void nfs41_sequence_prepare(struct rpc_task *task, void *data)
 	struct nfs_client *clp = calldata->clp;
 	struct nfs4_sequence_args *args;
 	struct nfs4_sequence_res *res;
+
+	task->tk_flags &= ~RPC_TASK_NO_RETRANS_TIMEOUT;
 
 	args = task->tk_msg.rpc_argp;
 	res = task->tk_msg.rpc_resp;
