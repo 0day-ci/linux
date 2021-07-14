@@ -122,7 +122,8 @@ IF_HAVE_PG_ARCH_2(PG_arch_2,		"arch_2"	)		\
 IF_HAVE_PG_SKIP_KASAN_POISON(PG_skip_kasan_poison, "skip_kasan_poison")
 
 #define save_page_flags(page)						\
-	(((page)->flags & ~PAGEFLAGS_MASK))
+	(PageHead(page) ? ((page)->flags & ~PAGEFLAGS_MASK) :		\
+	 ((page)->flags & ~(PAGEFLAGS_MASK | PG_head_mask)))
 
 #define show_page_flags(flags)						\
 	(flags) ? __print_flags(flags, "|",				\
