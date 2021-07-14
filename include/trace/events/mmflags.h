@@ -121,6 +121,9 @@ IF_HAVE_PG_IDLE(PG_idle,		"idle"		)		\
 IF_HAVE_PG_ARCH_2(PG_arch_2,		"arch_2"	)		\
 IF_HAVE_PG_SKIP_KASAN_POISON(PG_skip_kasan_poison, "skip_kasan_poison")
 
+#define save_page_flags(page)						\
+	(((page)->flags & ~PAGEFLAGS_MASK))
+
 #define show_page_flags(flags)						\
 	(flags) ? __print_flags(flags, "|",				\
 	__def_pageflag_names						\
