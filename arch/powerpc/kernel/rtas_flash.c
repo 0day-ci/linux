@@ -470,9 +470,14 @@ static int get_validate_flash_msg(struct rtas_validate_flash_t *args_buf,
 	if (args_buf->status >= VALIDATE_TMP_UPDATE) { 
 		n = sprintf(msg, "%d\n", args_buf->update_results);
 		if ((args_buf->update_results >= VALIDATE_CUR_UNKNOWN) ||
-		    (args_buf->update_results == VALIDATE_TMP_UPDATE))
+		    (args_buf->update_results == VALIDATE_TMP_UPDATE)) {
 			n += snprintf(msg + n, msglen - n, "%s\n",
 					args_buf->buf);
+			if (n >= msglen) {
+				n = msglen;
+				printk(KERN_ERR "FLASH: msg too long.\n");
+			}
+		}
 	} else {
 		n = sprintf(msg, "%d\n", args_buf->status);
 	}
