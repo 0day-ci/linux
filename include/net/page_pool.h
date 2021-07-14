@@ -198,19 +198,61 @@ static inline void page_pool_recycle_direct(struct page_pool *pool,
 	page_pool_put_full_page(pool, page, true);
 }
 
+#define PAGE_POOL_DMA_USE_PP_FRAG_COUNT	\
+			(sizeof(dma_addr_t) > sizeof(unsigned long))
+
 static inline dma_addr_t page_pool_get_dma_addr(struct page *page)
 {
-	dma_addr_t ret = page->dma_addr[0];
-	if (sizeof(dma_addr_t) > sizeof(unsigned long))
-		ret |= (dma_addr_t)page->dma_addr[1] << 16 << 16;
+	dma_addr_t ret = page->dma_addr;
+
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT) {
+		ret <<= 32;
+		ret |= atomic_long_read(&page->pp_frag_count) & PAGE_MASK;
+	}
+
 	return ret;
 }
 
 static inline void page_pool_set_dma_addr(struct page *page, dma_addr_t addr)
 {
-	page->dma_addr[0] = addr;
-	if (sizeof(dma_addr_t) > sizeof(unsigned long))
-		page->dma_addr[1] = upper_32_bits(addr);
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT) {
+		atomic_long_set(&page->pp_frag_count, addr & PAGE_MASK);
+		addr >>= 32;
+	}
+
+	page->dma_addr = addr;
+}
+
+static inline long page_pool_atomic_sub_frag_count_return(struct page *page,
+							  long nr)
+{
+	long frag_count = atomic_long_read(&page->pp_frag_count);
+	long ret;
+
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT) {
+		if ((frag_count & ~PAGE_MASK) == nr)
+			return 0;
+
+		ret = atomic_long_sub_return(nr, &page->pp_frag_count);
+		WARN_ON((ret & PAGE_MASK) != (frag_count & PAGE_MASK));
+		ret &= ~PAGE_MASK;
+	} else {
+		if (frag_count == nr)
+			return 0;
+
+		ret = atomic_long_sub_return(nr, &page->pp_frag_count);
+		WARN_ON(ret < 0);
+	}
+
+	return ret;
+}
+
+static inline void page_pool_set_frag_count(struct page *page, long nr)
+{
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT)
+		nr |= atomic_long_read(&page->pp_frag_count) & PAGE_MASK;
+
+	atomic_long_set(&page->pp_frag_count, nr);
 }
 
 static inline bool is_page_pool_compiled_in(void)

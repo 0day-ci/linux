@@ -103,11 +103,15 @@ struct page {
 			unsigned long pp_magic;
 			struct page_pool *pp;
 			unsigned long _pp_mapping_pad;
+			atomic_long_t pp_frag_count;
 			/**
 			 * @dma_addr: might require a 64-bit value on
-			 * 32-bit architectures.
+			 * 32-bit architectures, if so, store the lower 32
+			 * bits in pp_frag_count, and a DMA mapping should
+			 * be page aligned, so the frag count can be stored
+			 * in lower 12 bits for 4K page size.
 			 */
-			unsigned long dma_addr[2];
+			unsigned long dma_addr;
 		};
 		struct {	/* slab, slob and slub */
 			union {
