@@ -292,7 +292,7 @@ struct vdpasim *vdpasim_create(struct vdpasim_dev_attr *dev_attr)
 		goto err_iommu;
 
 	/* For simplicity we use an IOVA allocator with byte granularity */
-	init_iova_domain(&vdpasim->iova, 1, 0);
+	init_iova_domain(&vdpasim->iova, 1, 0, 0);
 
 	vdpasim->vdpa.dma_dev = dev;
 

@@ -89,7 +89,7 @@ int tegra_vde_iommu_init(struct tegra_vde *vde)
 		goto free_domain;
 
 	order = __ffs(vde->domain->pgsize_bitmap);
-	init_iova_domain(&vde->iova, 1UL << order, 0);
+	init_iova_domain(&vde->iova, 1UL << order, 0, 0);
 
 	err = iommu_attach_group(vde->domain, vde->group);
 	if (err)

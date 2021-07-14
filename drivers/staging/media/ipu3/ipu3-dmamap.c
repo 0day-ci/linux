@@ -238,7 +238,7 @@ int imgu_dmamap_init(struct imgu_device *imgu)
 
 	order = __ffs(IPU3_PAGE_SIZE);
 	base_pfn = max_t(unsigned long, 1, imgu->mmu->aperture_start >> order);
-	init_iova_domain(&imgu->iova_domain, 1UL << order, base_pfn);
+	init_iova_domain(&imgu->iova_domain, 1UL << order, base_pfn, 0);
 
 	return 0;
 }

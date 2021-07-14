@@ -278,7 +278,7 @@ static struct iommu_domain *host1x_iommu_attach(struct host1x *host)
 		end = geometry->aperture_end & host->info->dma_mask;
 
 		order = __ffs(host->domain->pgsize_bitmap);
-		init_iova_domain(&host->iova, 1UL << order, start >> order);
+		init_iova_domain(&host->iova, 1UL << order, start >> order, 0);
 		host->iova_end = end;
 
 		domain = host->domain;
