@@ -5694,8 +5694,11 @@ DEFINE_PER_CPU(cpumask_var_t, select_idle_mask);
 
 #ifdef CONFIG_NO_HZ_COMMON
 
+DEFINE_PER_CPU(cpumask_var_t, nohz_balance_mask);
+
 static struct {
-	cpumask_var_t idle_cpus_mask;
+	cpumask_var_t idle_cpus_mask;    /* CPUs in NOHZ idle */
+	cpumask_var_t last_balance_mask; /* CPUs covered by last NOHZ balance */
 	atomic_t nr_cpus;
 	int has_blocked;		/* Idle CPUS has blocked load */
 	unsigned long next_balance;     /* in jiffy units */
@@ -10351,6 +10354,13 @@ static void nohz_balancer_kick(struct rq *rq)
 unlock:
 	rcu_read_unlock();
 out:
+	/*
+	 * Some CPUs have recently gone into NOHZ idle; kick a balance to
+	 * collate the proper next balance interval.
+	 */
+	if (!cpumask_subset(nohz.idle_cpus_mask, nohz.last_balance_mask))
+		flags |= NOHZ_STATS_KICK;
+
 	if (flags)
 		kick_ilb(flags);
 }
@@ -10487,6 +10497,7 @@ static bool update_nohz_stats(struct rq *rq)
 static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags,
 			       enum cpu_idle_type idle)
 {
+	struct cpumask *cpus = this_cpu_cpumask_var_ptr(nohz_balance_mask);
 	/* Earliest time when we have to do rebalance again */
 	unsigned long now = jiffies;
 	unsigned long next_balance = now + 60*HZ;
@@ -10518,7 +10529,8 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags,
 	 * Start with the next CPU after this_cpu so we will end with this_cpu and let a
 	 * chance for other idle cpu to pull load.
 	 */
-	for_each_cpu_wrap(balance_cpu,  nohz.idle_cpus_mask, this_cpu+1) {
+	cpumask_copy(cpus, nohz.idle_cpus_mask);
+	for_each_cpu_wrap(balance_cpu, cpus, this_cpu+1) {
 		if (!idle_cpu(balance_cpu))
 			continue;
 
@@ -10564,6 +10576,8 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags,
 	 */
 	if (likely(update_next_balance))
 		nohz.next_balance = next_balance;
+
+	cpumask_copy(nohz.last_balance_mask, cpus);
 
 	WRITE_ONCE(nohz.next_blocked,
 		now + msecs_to_jiffies(LOAD_AVG_PERIOD));
@@ -11550,6 +11564,7 @@ __init void init_sched_fair_class(void)
 	nohz.next_balance = jiffies;
 	nohz.next_blocked = jiffies;
 	zalloc_cpumask_var(&nohz.idle_cpus_mask, GFP_NOWAIT);
+	zalloc_cpumask_var(&nohz.last_balance_mask, GFP_NOWAIT);
 #endif
 #endif /* SMP */
 

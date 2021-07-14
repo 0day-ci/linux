@@ -8893,6 +8893,10 @@ static struct kmem_cache *task_group_cache __read_mostly;
 DECLARE_PER_CPU(cpumask_var_t, load_balance_mask);
 DECLARE_PER_CPU(cpumask_var_t, select_idle_mask);
 
+#ifdef CONFIG_NOHZ_COMMON
+DECLARE_PER_CPU(cpumask_var_t, nohz_balance_mask);
+#endif /* CONFIG_NOHZ_COMMON */
+
 void __init sched_init(void)
 {
 	unsigned long ptr = 0;
@@ -8942,6 +8946,10 @@ void __init sched_init(void)
 			cpumask_size(), GFP_KERNEL, cpu_to_node(i));
 		per_cpu(select_idle_mask, i) = (cpumask_var_t)kzalloc_node(
 			cpumask_size(), GFP_KERNEL, cpu_to_node(i));
+#ifdef CONFIG_NOHZ_COMMON
+		per_cpu(nohz_balance_mask, i) = (cpumask_var_t)kzalloc_node(
+			cpumask_size(), GFP_KERNEL, cpu_to_node(i));
+#endif /* CONFIG_NOHZ_COMMON */
 	}
 #endif /* CONFIG_CPUMASK_OFFSTACK */
 
