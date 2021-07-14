@@ -5,6 +5,9 @@
 #include <linux/types.h>
 #include <linux/soc/qcom/apr.h>
 #include <sound/soc.h>
+struct q6apm;
+struct q6apm_graph;
+
 
 /* Module IDs */
 #define MODULE_ID_WR_SHARED_MEM_EP	0x07001000
@@ -26,6 +29,13 @@
 #define PRM_MODULE_INSTANCE_ID		0x00000002
 #define AMDB_MODULE_INSTANCE_ID		0x00000003
 #define VCPM_MODULE_INSTANCE_ID		0x00000004
+#define AR_MODULE_INSTANCE_ID_START	0x00006000
+#define AR_MODULE_INSTANCE_ID_END	0x00007000
+#define AR_MODULE_DYNAMIC_INSTANCE_ID_START	0x00007000
+#define AR_MODULE_DYNAMIC_INSTANCE_ID_END	0x00008000
+#define AR_CONT_INSTANCE_ID_START	0x00005000
+#define AR_CONT_INSTANCE_ID_END		0x00006000
+#define AR_SG_INSTANCE_ID_START		0x00004000
 
 #define APM_CMD_GRAPH_OPEN			0x01001000
 #define APM_CMD_GRAPH_PREPARE			0x01001001
@@ -621,4 +631,17 @@ void *audioreach_alloc_apm_pkt(int pkt_size, uint32_t opcode, uint32_t token,
 				uint32_t src_port);
 void *audioreach_alloc_pkt(int pkt_size, uint32_t opcode, uint32_t token,
 				uint32_t src_port, uint32_t dest_port);
+void *audioreach_alloc_graph_pkt(struct q6apm *apm,
+				 struct list_head *sg_list,
+				  int graph_id);
+struct audioreach_module *audioreach_get_container_last_module(
+				struct audioreach_container *container);
+struct audioreach_module *audioreach_get_container_first_module(
+				struct audioreach_container *container);
+struct audioreach_module *audioreach_get_container_next_module(
+				struct audioreach_container *container,
+				struct audioreach_module *module);
+#define list_for_each_container_module(mod, cont) \
+	for (mod = audioreach_get_container_first_module(cont); mod != NULL; \
+	     mod = audioreach_get_container_next_module(cont, mod))
 #endif /* __AUDIOREACH_H__ */
