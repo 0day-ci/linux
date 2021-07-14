@@ -607,26 +607,26 @@ alternative_endif
 	.endm
 
 	.macro	phys_to_pte, pte, phys
-#ifdef CONFIG_ARM64_PA_BITS_52
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA
 	/*
 	 * We assume \phys is 64K aligned and this is guaranteed by only
 	 * supporting this configuration with 64K pages.
 	 */
 	orr	\pte, \phys, \phys, lsr #36
 	and	\pte, \pte, #PTE_ADDR_MASK
-#else
+#else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	mov	\pte, \phys
-#endif
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA */
 	.endm
 
 	.macro	pte_to_phys, phys, pte
-#ifdef CONFIG_ARM64_PA_BITS_52
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA
 	ubfiz	\phys, \pte, #(48 - 16 - 12), #16
 	bfxil	\phys, \pte, #16, #32
 	lsl	\phys, \phys, #16
-#else
+#else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	and	\phys, \pte, #PTE_ADDR_MASK
-#endif
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA */
 	.endm
 
 /*
