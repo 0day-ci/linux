@@ -1215,14 +1215,18 @@ done:
  */
 static void l2cap_sock_kill(struct sock *sk)
 {
+	struct l2cap_chan *chan;
+
 	if (!sock_flag(sk, SOCK_ZAPPED) || sk->sk_socket)
 		return;
 
 	BT_DBG("sk %p state %s", sk, state_to_string(sk->sk_state));
 
 	/* Kill poor orphan */
-
-	l2cap_chan_put(l2cap_pi(sk)->chan);
+	chan = l2cap_pi(sk)->chan;
+	l2cap_chan_put(chan);
+	if (refcount_read(&sk->sk_refcnt) == 1)
+		chan->data = NULL;
 	sock_set_flag(sk, SOCK_DEAD);
 	sock_put(sk);
 }
@@ -1508,6 +1512,9 @@ static void l2cap_sock_close_cb(struct l2cap_chan *chan)
 {
 	struct sock *sk = chan->data;
 
+	if (!sk)
+		return;
+
 	l2cap_sock_kill(sk);
 }
 
@@ -1515,6 +1522,9 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 {
 	struct sock *sk = chan->data;
 	struct sock *parent;
+
+	if (!sk)
+		return;
 
 	BT_DBG("chan %p state %s", chan, state_to_string(chan->state));
 
