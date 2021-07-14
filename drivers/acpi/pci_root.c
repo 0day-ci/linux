@@ -199,9 +199,7 @@ static acpi_status acpi_pci_query_osc(struct acpi_pci_root *root,
 	acpi_status status;
 	u32 result, capbuf[3];
 
-	support &= OSC_PCI_SUPPORT_MASKS;
 	support |= root->osc_support_set;
-	*control &= OSC_PCI_CONTROL_MASKS;
 
 	capbuf[OSC_QUERY_DWORD] = OSC_QUERY_ENABLE;
 	capbuf[OSC_SUPPORT_DWORD] = support;
@@ -347,7 +345,7 @@ static acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32
 	if (!mask)
 		return AE_BAD_PARAMETER;
 
-	ctrl = *mask & OSC_PCI_CONTROL_MASKS;
+	ctrl = *mask;
 	if ((ctrl & req) != req)
 		return AE_TYPE;
 
