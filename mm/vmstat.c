@@ -28,6 +28,7 @@
 #include <linux/mm_inline.h>
 #include <linux/page_ext.h>
 #include <linux/page_owner.h>
+#include <linux/sched/isolation.h>
 
 #include "internal.h"
 
@@ -308,6 +309,17 @@ void set_pgdat_percpu_threshold(pg_data_t *pgdat,
 	}
 }
 
+DEFINE_STATIC_KEY_FALSE(vmstat_sync_enabled);
+static DEFINE_PER_CPU_ALIGNED(bool, vmstat_dirty);
+
+static inline void mark_vmstat_dirty(void)
+{
+	if (!static_branch_unlikely(&vmstat_sync_enabled))
+		return;
+
+	raw_cpu_write(vmstat_dirty, true);
+}
+
 /*
  * For use when we know that interrupts are disabled,
  * or when we know that preemption is disabled and that
@@ -330,6 +342,7 @@ void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 		x = 0;
 	}
 	__this_cpu_write(*p, x);
+	mark_vmstat_dirty();
 }
 EXPORT_SYMBOL(__mod_zone_page_state);
 
@@ -361,6 +374,7 @@ void __mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
 		x = 0;
 	}
 	__this_cpu_write(*p, x);
+	mark_vmstat_dirty();
 }
 EXPORT_SYMBOL(__mod_node_page_state);
 
@@ -401,6 +415,7 @@ void __inc_zone_state(struct zone *zone, enum zone_stat_item item)
 		zone_page_state_add(v + overstep, zone, item);
 		__this_cpu_write(*p, -overstep);
 	}
+	mark_vmstat_dirty();
 }
 
 void __inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
@@ -419,6 +434,7 @@ void __inc_node_state(struct pglist_data *pgdat, enum node_stat_item item)
 		node_page_state_add(v + overstep, pgdat, item);
 		__this_cpu_write(*p, -overstep);
 	}
+	mark_vmstat_dirty();
 }
 
 void __inc_zone_page_state(struct page *page, enum zone_stat_item item)
@@ -447,6 +463,7 @@ void __dec_zone_state(struct zone *zone, enum zone_stat_item item)
 		zone_page_state_add(v - overstep, zone, item);
 		__this_cpu_write(*p, overstep);
 	}
+	mark_vmstat_dirty();
 }
 
 void __dec_node_state(struct pglist_data *pgdat, enum node_stat_item item)
@@ -465,6 +482,7 @@ void __dec_node_state(struct pglist_data *pgdat, enum node_stat_item item)
 		node_page_state_add(v - overstep, pgdat, item);
 		__this_cpu_write(*p, overstep);
 	}
+	mark_vmstat_dirty();
 }
 
 void __dec_zone_page_state(struct page *page, enum zone_stat_item item)
@@ -528,6 +546,7 @@ static inline void mod_zone_state(struct zone *zone,
 
 	if (z)
 		zone_page_state_add(z, zone, item);
+	mark_vmstat_dirty();
 }
 
 void mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
@@ -596,6 +615,7 @@ static inline void mod_node_state(struct pglist_data *pgdat,
 
 	if (z)
 		node_page_state_add(z, pgdat, item);
+	mark_vmstat_dirty();
 }
 
 void mod_node_page_state(struct pglist_data *pgdat, enum node_stat_item item,
@@ -2004,6 +2024,37 @@ static void vmstat_shepherd(struct work_struct *w)
 
 	schedule_delayed_work(&shepherd,
 		round_jiffies_relative(sysctl_stat_interval));
+}
+
+void __sync_vmstat(void)
+{
+	int cpu;
+
+	cpu = get_cpu();
+	if (housekeeping_cpu(cpu, HK_FLAG_QUIESCE_URET)) {
+		put_cpu();
+		return;
+	}
+
+	if (!raw_cpu_read(vmstat_dirty)) {
+		put_cpu();
+		return;
+	}
+
+	refresh_cpu_vm_stats(false);
+	raw_cpu_write(vmstat_dirty, false);
+	put_cpu();
+
+	/*
+	 * If task is migrated to another CPU between put_cpu
+	 * and cancel_delayed_work_sync, the code below might
+	 * cancel vmstat_update work for a different cpu
+	 * (than the one from which the vmstats were flushed).
+	 *
+	 * However, vmstat shepherd will re-enable it later,
+	 * so its harmless.
+	 */
+	cancel_delayed_work_sync(&per_cpu(vmstat_work, cpu));
 }
 
 static void __init start_shepherd_timer(void)
