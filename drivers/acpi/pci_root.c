@@ -201,29 +201,18 @@ static acpi_status acpi_pci_query_osc(struct acpi_pci_root *root,
 
 	support &= OSC_PCI_SUPPORT_MASKS;
 	support |= root->osc_support_set;
+	*control &= OSC_PCI_CONTROL_MASKS;
 
 	capbuf[OSC_QUERY_DWORD] = OSC_QUERY_ENABLE;
 	capbuf[OSC_SUPPORT_DWORD] = support;
-	if (control) {
-		*control &= OSC_PCI_CONTROL_MASKS;
-		capbuf[OSC_CONTROL_DWORD] = *control | root->osc_control_set;
-	} else {
-		/* Run _OSC query only with existing controls. */
-		capbuf[OSC_CONTROL_DWORD] = root->osc_control_set;
-	}
+	capbuf[OSC_CONTROL_DWORD] = *control | root->osc_control_set;
 
 	status = acpi_pci_run_osc(root->device->handle, capbuf, &result);
 	if (ACPI_SUCCESS(status)) {
 		root->osc_support_set = support;
-		if (control)
-			*control = result;
+		*control = result;
 	}
 	return status;
-}
-
-static acpi_status acpi_pci_osc_support(struct acpi_pci_root *root, u32 flags)
-{
-	return acpi_pci_query_osc(root, flags, NULL);
 }
 
 struct acpi_pci_root *acpi_pci_find_root(acpi_handle handle)
@@ -348,7 +337,8 @@ EXPORT_SYMBOL_GPL(acpi_get_pci_dev);
  * _OSC bits the BIOS has granted control of, but its contents are meaningless
  * on failure.
  **/
-static acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32 *mask, u32 req)
+static acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32
+					    *mask, u32 req, u32 support)
 {
 	struct acpi_pci_root *root;
 	acpi_status status;
@@ -372,7 +362,7 @@ static acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32 *mask, u32 r
 
 	/* Need to check the available controls bits before requesting them. */
 	while (*mask) {
-		status = acpi_pci_query_osc(root, root->osc_support_set, mask);
+		status = acpi_pci_query_osc(root, support, mask);
 		if (ACPI_FAILURE(status))
 			return status;
 		if (ctrl == *mask)
@@ -402,7 +392,7 @@ static acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32 *mask, u32 r
 static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm,
 				 bool is_pcie)
 {
-	u32 support, control, requested;
+	u32 support, control = 0, requested;
 	acpi_status status;
 	struct acpi_device *device = root->device;
 	acpi_handle handle = device->handle;
@@ -435,59 +425,49 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm,
 		support |= OSC_PCI_EDR_SUPPORT;
 
 	decode_osc_support(root, "OS supports", support);
-	status = acpi_pci_osc_support(root, support);
-	if (ACPI_FAILURE(status)) {
-		*no_aspm = 1;
 
-		/* _OSC is optional for PCI host bridges */
-		if ((status == AE_NOT_FOUND) && !is_pcie)
+	if (!pcie_ports_disabled) {
+		if ((support & ACPI_PCIE_REQ_SUPPORT) != ACPI_PCIE_REQ_SUPPORT) {
+			decode_osc_support(root, "not requesting OS control; OS requires",
+					ACPI_PCIE_REQ_SUPPORT);
 			return;
+		}
 
-		dev_info(&device->dev, "_OSC: platform retains control of PCIe features (%s)\n",
-			 acpi_format_exception(status));
-		return;
+		control = OSC_PCI_EXPRESS_CAPABILITY_CONTROL
+			| OSC_PCI_EXPRESS_PME_CONTROL;
+
+		if (IS_ENABLED(CONFIG_PCIEASPM))
+			control |= OSC_PCI_EXPRESS_LTR_CONTROL;
+
+		if (IS_ENABLED(CONFIG_HOTPLUG_PCI_PCIE))
+			control |= OSC_PCI_EXPRESS_NATIVE_HP_CONTROL;
+
+		if (IS_ENABLED(CONFIG_HOTPLUG_PCI_SHPC))
+			control |= OSC_PCI_SHPC_NATIVE_HP_CONTROL;
+
+		if (pci_aer_available())
+			control |= OSC_PCI_EXPRESS_AER_CONTROL;
+
+		/*
+		 * Per the Downstream Port Containment Related Enhancements ECN to
+		 * the PCI Firmware Spec, r3.2, sec 4.5.1, table 4-5,
+		 * OSC_PCI_EXPRESS_DPC_CONTROL indicates the OS supports both DPC
+		 * and EDR.
+		 */
+		if (IS_ENABLED(CONFIG_PCIE_DPC) && IS_ENABLED(CONFIG_PCIE_EDR))
+			control |= OSC_PCI_EXPRESS_DPC_CONTROL;
 	}
 
-	if (pcie_ports_disabled) {
-		dev_info(&device->dev, "PCIe port services disabled; not requesting _OSC control\n");
-		return;
-	}
-
-	if ((support & ACPI_PCIE_REQ_SUPPORT) != ACPI_PCIE_REQ_SUPPORT) {
-		decode_osc_support(root, "not requesting OS control; OS requires",
-				   ACPI_PCIE_REQ_SUPPORT);
-		return;
-	}
-
-	control = OSC_PCI_EXPRESS_CAPABILITY_CONTROL
-		| OSC_PCI_EXPRESS_PME_CONTROL;
-
-	if (IS_ENABLED(CONFIG_PCIEASPM))
-		control |= OSC_PCI_EXPRESS_LTR_CONTROL;
-
-	if (IS_ENABLED(CONFIG_HOTPLUG_PCI_PCIE))
-		control |= OSC_PCI_EXPRESS_NATIVE_HP_CONTROL;
-
-	if (IS_ENABLED(CONFIG_HOTPLUG_PCI_SHPC))
-		control |= OSC_PCI_SHPC_NATIVE_HP_CONTROL;
-
-	if (pci_aer_available())
-		control |= OSC_PCI_EXPRESS_AER_CONTROL;
-
-	/*
-	 * Per the Downstream Port Containment Related Enhancements ECN to
-	 * the PCI Firmware Spec, r3.2, sec 4.5.1, table 4-5,
-	 * OSC_PCI_EXPRESS_DPC_CONTROL indicates the OS supports both DPC
-	 * and EDR.
-	 */
-	if (IS_ENABLED(CONFIG_PCIE_DPC) && IS_ENABLED(CONFIG_PCIE_EDR))
-		control |= OSC_PCI_EXPRESS_DPC_CONTROL;
-
+	/* Need an _OSC call even with pcie_ports_disabled set */
 	requested = control;
 	status = acpi_pci_osc_control_set(handle, &control,
-					  OSC_PCI_EXPRESS_CAPABILITY_CONTROL);
+					  OSC_PCI_EXPRESS_CAPABILITY_CONTROL,
+					  support);
+
 	if (ACPI_SUCCESS(status)) {
-		decode_osc_control(root, "OS now controls", control);
+		if (control)
+			decode_osc_control(root, "OS now controls", control);
+
 		if (acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_ASPM) {
 			/*
 			 * We have ASPM control, but the FADT indicates that
@@ -498,10 +478,8 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm,
 			*no_aspm = 1;
 		}
 	} else {
-		decode_osc_control(root, "OS requested", requested);
-		decode_osc_control(root, "platform willing to grant", control);
-		dev_info(&device->dev, "_OSC: platform retains control of PCIe features (%s)\n",
-			acpi_format_exception(status));
+		/* Platform wants to control PCIe features */
+		root->osc_support_set = 0;
 
 		/*
 		 * We want to disable ASPM here, but aspm_disabled
@@ -511,6 +489,18 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm,
 		 * root scan.
 		 */
 		*no_aspm = 1;
+
+		/* _OSC is optional for PCI host bridges */
+		if ((status == AE_NOT_FOUND) && !is_pcie)
+			return;
+
+		if (requested) {
+			decode_osc_control(root, "OS requested", requested);
+			decode_osc_control(root, "platform willing to grant", control);
+		}
+
+		dev_info(&device->dev, "_OSC: platform retains control of PCIe features (%s)\n",
+			acpi_format_exception(status));
 	}
 }
 
