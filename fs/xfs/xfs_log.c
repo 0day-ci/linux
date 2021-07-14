@@ -41,6 +41,8 @@ xlog_dealloc_log(
 /* local state machine functions */
 STATIC void xlog_state_done_syncing(
 	struct xlog_in_core	*iclog);
+STATIC void xlog_state_do_callback(
+	struct xlog		*log);
 STATIC int
 xlog_state_get_iclog_space(
 	struct xlog		*log,
@@ -492,6 +494,11 @@ out_error:
  * space waiters so they can process the newly set shutdown state. We really
  * don't care what order we process callbacks here because the log is shut down
  * and so state cannot change on disk anymore.
+ *
+ * We avoid processing actively referenced iclogs so that we don't run callbacks
+ * while the iclog owner might still be preparing the iclog for IO submssion.
+ * These will be caught by xlog_state_iclog_release() and call this function
+ * again to process any callbacks that may have been added to that iclog.
  */
 static void
 xlog_state_shutdown_callbacks(
@@ -503,7 +510,12 @@ xlog_state_shutdown_callbacks(
 	spin_lock(&log->l_icloglock);
 	iclog = log->l_iclog;
 	do {
+		if (atomic_read(&iclog->ic_refcnt)) {
+			/* Reference holder will re-run iclog callbacks. */
+			continue;
+		}
 		list_splice_init(&iclog->ic_callbacks, &cb_list);
+		wake_up_all(&iclog->ic_write_wait);
 		wake_up_all(&iclog->ic_force_wait);
 	} while ((iclog = iclog->ic_next) != log->l_iclog);
 
@@ -514,7 +526,7 @@ xlog_state_shutdown_callbacks(
 }
 
 static bool
-__xlog_state_release_iclog(
+xlog_state_want_sync(
 	struct xlog		*log,
 	struct xlog_in_core	*iclog)
 {
@@ -537,27 +549,46 @@ __xlog_state_release_iclog(
 }
 
 /*
- * Flush iclog to disk if this is the last reference to the given iclog and the
- * it is in the WANT_SYNC state.
+ * Release the active reference to the iclog. If this is the last reference to
+ * the iclog being dropped, check if the caller wants to be synced to disk and
+ * initiate IO submission. If the log has been shut down, then we need to run
+ * callback processing on this iclog as shutdown callback processing skips
+ * actively referenced iclogs.
  */
 int
 xlog_state_release_iclog(
 	struct xlog		*log,
 	struct xlog_in_core	*iclog)
+		__releases(&log->l_icloglock)
+		__acquires(&log->l_icloglock)
 {
 	lockdep_assert_held(&log->l_icloglock);
 
 	trace_xlog_iclog_release(iclog, _RET_IP_);
-	if (xlog_is_shutdown(log))
-		return -EIO;
+	if (!atomic_dec_and_test(&iclog->ic_refcnt))
+		goto out_check_shutdown;
 
-	if (atomic_dec_and_test(&iclog->ic_refcnt) &&
-	    __xlog_state_release_iclog(log, iclog)) {
+	if (xlog_is_shutdown(log)) {
+		/*
+		 * No more references to this iclog, so process the pending
+		 * iclog callbacks that were waiting on the release of this
+		 * iclog.
+		 */
+		spin_unlock(&log->l_icloglock);
+		xlog_state_shutdown_callbacks(log);
+		spin_lock(&log->l_icloglock);
+		return -EIO;
+	}
+
+	if (xlog_state_want_sync(log, iclog)) {
 		spin_unlock(&log->l_icloglock);
 		xlog_sync(log, iclog);
 		spin_lock(&log->l_icloglock);
 	}
 
+out_check_shutdown:
+	if (xlog_is_shutdown(log))
+		return -EIO;
 	return 0;
 }
 
