@@ -668,7 +668,7 @@ static int convert_to_trace_point(Dwarf_Die *sp_die, Dwfl_Module *mod,
 	}
 
 	tp->offset = (unsigned long)(paddr - eaddr);
-	tp->address = (unsigned long)paddr;
+	tp->address = paddr;
 	tp->symbol = strdup(symbol);
 	if (!tp->symbol)
 		return -ENOMEM;
@@ -1707,7 +1707,7 @@ int debuginfo__get_text_offset(struct debuginfo *dbg, Dwarf_Addr *offs,
 }
 
 /* Reverse search */
-int debuginfo__find_probe_point(struct debuginfo *dbg, unsigned long addr,
+int debuginfo__find_probe_point(struct debuginfo *dbg, u64 addr,
 				struct perf_probe_point *ppt)
 {
 	Dwarf_Die cudie, spdie, indie;
@@ -1720,7 +1720,7 @@ int debuginfo__find_probe_point(struct debuginfo *dbg, unsigned long addr,
 		addr += baseaddr;
 	/* Find cu die */
 	if (!dwarf_addrdie(dbg->dbg, (Dwarf_Addr)addr, &cudie)) {
-		pr_warning("Failed to find debug information for address %lx\n",
+		pr_warning("Failed to find debug information for address %" PRIx64 "\n",
 			   addr);
 		ret = -EINVAL;
 		goto end;
@@ -1742,7 +1742,7 @@ int debuginfo__find_probe_point(struct debuginfo *dbg, unsigned long addr,
 		}
 
 		fname = dwarf_decl_file(&spdie);
-		if (addr == (unsigned long)baseaddr) {
+		if (addr == baseaddr) {
 			/* Function entry - Relative line number is 0 */
 			lineno = baseline;
 			goto post;
@@ -1788,7 +1788,7 @@ post:
 	if (lineno)
 		ppt->line = lineno - baseline;
 	else if (basefunc) {
-		ppt->offset = addr - (unsigned long)baseaddr;
+		ppt->offset = addr - baseaddr;
 		func = basefunc;
 	}
 
