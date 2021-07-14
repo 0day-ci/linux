@@ -365,6 +365,7 @@ static int intel_iommu_strict;
 static int intel_iommu_superpage = 1;
 static int iommu_identity_mapping;
 static int iommu_skip_te_disable;
+static int iommu_skip_igfx_superpage;
 
 #define IDENTMAP_GFX		2
 #define IDENTMAP_AZALIA		4
@@ -676,6 +677,27 @@ static bool domain_update_iommu_snooping(struct intel_iommu *skip)
 	return ret;
 }
 
+static bool domain_use_super_page(struct dmar_domain *domain)
+{
+	struct dmar_drhd_unit *drhd;
+	struct intel_iommu *iommu;
+	bool ret = true;
+
+	if (!intel_iommu_superpage)
+		return false;
+
+	rcu_read_lock();
+	for_each_active_iommu(iommu, drhd) {
+		if (drhd->gfx_dedicated && iommu_skip_igfx_superpage) {
+			ret = false;
+			break;
+		}
+	}
+	rcu_read_unlock();
+
+	return ret;
+}
+
 static int domain_update_iommu_superpage(struct dmar_domain *domain,
 					 struct intel_iommu *skip)
 {
@@ -683,7 +705,7 @@ static int domain_update_iommu_superpage(struct dmar_domain *domain,
 	struct intel_iommu *iommu;
 	int mask = 0x3;
 
-	if (!intel_iommu_superpage)
+	if (!domain_use_super_page(domain))
 		return 0;
 
 	/* set iommu_superpage to the smallest common denominator */
@@ -5654,6 +5676,16 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x163E, quirk_iommu_igfx);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x1632, quirk_iommu_igfx);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x163A, quirk_iommu_igfx);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x163D, quirk_iommu_igfx);
+
+static void quirk_skip_igfx_superpage(struct pci_dev *dev)
+{
+	pci_info(dev, "Disabling IOMMU superpage for graphics on this chipset\n");
+	iommu_skip_igfx_superpage = 1;
+}
+
+/* Geminilake igfx appears to have issues with superpage */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x3184, quirk_skip_igfx_superpage);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x3185, quirk_skip_igfx_superpage);
 
 static void quirk_iommu_rwbf(struct pci_dev *dev)
 {
