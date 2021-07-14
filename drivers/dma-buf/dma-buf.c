@@ -331,20 +331,20 @@ out:
  * purpose between different devices.
  *
  * @dmabuf: [in]     dmabuf buffer that will be renamed.
- * @buf:    [in]     A piece of userspace memory that contains the name of
+ * @buf:    [in]     A piece of memory that contains the name of
  *                   the dma-buf.
  *
  * Returns 0 on success. If the dma-buf buffer is already attached to
  * devices, return -EBUSY.
  *
  */
-static long dma_buf_set_name(struct dma_buf *dmabuf, const char __user *buf)
+long dma_buf_set_name(struct dma_buf *dmabuf, const char *buf)
 {
-	char *name = strndup_user(buf, DMA_BUF_NAME_LEN);
+	char *name = kstrndup(buf, DMA_BUF_NAME_LEN, GFP_KERNEL);
 	long ret = 0;
 
-	if (IS_ERR(name))
-		return PTR_ERR(name);
+	if (!name)
+		return -ENOMEM;
 
 	dma_resv_lock(dmabuf->resv, NULL);
 	if (!list_empty(&dmabuf->attachments)) {
@@ -359,6 +359,22 @@ static long dma_buf_set_name(struct dma_buf *dmabuf, const char __user *buf)
 
 out_unlock:
 	dma_resv_unlock(dmabuf->resv);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dma_buf_set_name);
+
+static long
+dma_buf_set_name_user(struct dma_buf *dmabuf, const char __user *buf)
+{
+	char *name = strndup_user(buf, DMA_BUF_NAME_LEN);
+	long ret = 0;
+
+	if (IS_ERR(name))
+		return PTR_ERR(name);
+
+	ret = dma_buf_set_name(dmabuf, name);
+	kfree(name);
+
 	return ret;
 }
 
@@ -403,7 +419,7 @@ static long dma_buf_ioctl(struct file *file,
 
 	case DMA_BUF_SET_NAME_A:
 	case DMA_BUF_SET_NAME_B:
-		return dma_buf_set_name(dmabuf, (const char __user *)arg);
+		return dma_buf_set_name_user(dmabuf, (const char __user *)arg);
 
 	default:
 		return -ENOTTY;
