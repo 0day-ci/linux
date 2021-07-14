@@ -124,7 +124,6 @@ static void __init reserve_crashkernel(void)
 }
 #endif /* CONFIG_KEXEC_CORE */
 
-#ifdef CONFIG_CRASH_DUMP
 /*
  * reserve_elfcorehdr() - reserves memory for elf core header
  *
@@ -135,7 +134,7 @@ static void __init reserve_crashkernel(void)
  */
 static void __init reserve_elfcorehdr(void)
 {
-	if (!elfcorehdr_size)
+	if (!IS_ENABLED(CONFIG_CRASH_DUMP) || !elfcorehdr_size)
 		return;
 
 	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
@@ -148,11 +147,6 @@ static void __init reserve_elfcorehdr(void)
 	pr_info("Reserving %lldKB of memory at 0x%llx for elfcorehdr\n",
 		elfcorehdr_size >> 10, elfcorehdr_addr);
 }
-#else
-static void __init reserve_elfcorehdr(void)
-{
-}
-#endif /* CONFIG_CRASH_DUMP */
 
 /*
  * Return the maximum physical address for a zone accessible by the given bits
