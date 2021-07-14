@@ -54,6 +54,9 @@ void blk_mq_put_rq_ref(struct request *rq);
  */
 void blk_mq_free_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 		     unsigned int hctx_idx);
+void __blk_mq_free_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
+		       unsigned int depth, struct list_head *page_list,
+		       struct request **static_rqs);
 void blk_mq_free_rq_map(struct blk_mq_tags *tags, unsigned int flags);
 struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 					unsigned int hctx_idx,
@@ -62,6 +65,10 @@ struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 					unsigned int flags);
 int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 		     unsigned int hctx_idx, unsigned int depth);
+
+int __blk_mq_alloc_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
+		       unsigned int depth, struct list_head *page_list,
+		       struct request **static_rqs);
 
 /*
  * Internal helpers for request insertion into sw queues

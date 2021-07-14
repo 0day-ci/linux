@@ -2310,14 +2310,15 @@ static size_t order_to_size(unsigned int order)
 }
 
 /* called before freeing request pool in @tags */
-static void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
-		struct blk_mq_tags *tags, unsigned int hctx_idx)
+void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
+			     unsigned int hctx_idx,
+			     struct list_head *page_list)
 {
 	struct blk_mq_tags *drv_tags = set->tags[hctx_idx];
 	struct page *page;
 	unsigned long flags;
 
-	list_for_each_entry(page, &tags->page_list, lru) {
+	list_for_each_entry(page, page_list, lru) {
 		unsigned long start = (unsigned long)page_address(page);
 		unsigned long end = start + order_to_size(page->private);
 		int i;
@@ -2343,28 +2344,29 @@ static void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
 	spin_unlock_irqrestore(&drv_tags->lock, flags);
 }
 
-void blk_mq_free_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
-		     unsigned int hctx_idx)
+void __blk_mq_free_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
+		       unsigned int depth, struct list_head *page_list,
+		       struct request **static_rqs)
 {
 	struct page *page;
 
-	if (tags->static_rqs && set->ops->exit_request) {
+	if (static_rqs && set->ops->exit_request) {
 		int i;
 
-		for (i = 0; i < tags->nr_tags; i++) {
-			struct request *rq = tags->static_rqs[i];
+		for (i = 0; i < depth; i++) {
+			struct request *rq = static_rqs[i];
 
 			if (!rq)
 				continue;
 			set->ops->exit_request(set, rq, hctx_idx);
-			tags->static_rqs[i] = NULL;
+			static_rqs[i] = NULL;
 		}
 	}
 
-	blk_mq_clear_rq_mapping(set, tags, hctx_idx);
+	blk_mq_clear_rq_mapping(set, hctx_idx, page_list);
 
-	while (!list_empty(&tags->page_list)) {
-		page = list_first_entry(&tags->page_list, struct page, lru);
+	while (!list_empty(page_list)) {
+		page = list_first_entry(page_list, struct page, lru);
 		list_del_init(&page->lru);
 		/*
 		 * Remove kmemleak object previously allocated in
@@ -2373,6 +2375,13 @@ void blk_mq_free_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 		kmemleak_free(page_address(page));
 		__free_pages(page, page->private);
 	}
+}
+
+void blk_mq_free_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
+		     unsigned int hctx_idx)
+{
+	__blk_mq_free_rqs(set, hctx_idx, tags->nr_tags, &tags->page_list,
+			  tags->static_rqs);
 }
 
 void blk_mq_free_rq_map(struct blk_mq_tags *tags, unsigned int flags)
@@ -2437,8 +2446,10 @@ static int blk_mq_init_request(struct blk_mq_tag_set *set, struct request *rq,
 	return 0;
 }
 
-int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
-		     unsigned int hctx_idx, unsigned int depth)
+
+int __blk_mq_alloc_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
+		       unsigned int depth, struct list_head *page_list,
+		       struct request **static_rqs)
 {
 	unsigned int i, j, entries_per_page, max_order = 4;
 	size_t rq_size, left;
@@ -2448,7 +2459,7 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 	if (node == NUMA_NO_NODE)
 		node = set->numa_node;
 
-	INIT_LIST_HEAD(&tags->page_list);
+	INIT_LIST_HEAD(page_list);
 
 	/*
 	 * rq_size is the size of the request plus driver payload, rounded
@@ -2483,7 +2494,7 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 			goto fail;
 
 		page->private = this_order;
-		list_add_tail(&page->lru, &tags->page_list);
+		list_add_tail(&page->lru, page_list);
 
 		p = page_address(page);
 		/*
@@ -2497,9 +2508,9 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 		for (j = 0; j < to_do; j++) {
 			struct request *rq = p;
 
-			tags->static_rqs[i] = rq;
+			static_rqs[i] = rq;
 			if (blk_mq_init_request(set, rq, hctx_idx, node)) {
-				tags->static_rqs[i] = NULL;
+				static_rqs[i] = NULL;
 				goto fail;
 			}
 
@@ -2510,8 +2521,15 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 	return 0;
 
 fail:
-	blk_mq_free_rqs(set, tags, hctx_idx);
+	__blk_mq_free_rqs(set, hctx_idx, depth, page_list, static_rqs);
 	return -ENOMEM;
+}
+
+int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
+		     unsigned int hctx_idx, unsigned int depth)
+{
+	return __blk_mq_alloc_rqs(set, hctx_idx, depth, &tags->page_list,
+				  tags->static_rqs);
 }
 
 struct rq_iter_data {
@@ -2856,12 +2874,13 @@ static bool __blk_mq_alloc_map_and_request(struct blk_mq_tag_set *set,
 	int ret = 0;
 
 	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx,
-					set->queue_depth, set->reserved_tags, flags);
+						  set->queue_depth,
+						  set->reserved_tags, flags);
 	if (!set->tags[hctx_idx])
 		return false;
 
 	ret = blk_mq_alloc_rqs(set, set->tags[hctx_idx], hctx_idx,
-				set->queue_depth);
+			       set->queue_depth);
 	if (!ret)
 		return true;
 
