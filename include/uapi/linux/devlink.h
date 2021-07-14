@@ -131,6 +131,9 @@ enum devlink_command {
 	DEVLINK_CMD_RATE_NEW,
 	DEVLINK_CMD_RATE_DEL,
 
+	DEVLINK_CMD_FLASH_SUPPORT,	/* can dump */
+	DEVLINK_CMD_RELOAD_SUPPORT,	/* can dump */
+
 	/* add new commands above here */
 	__DEVLINK_CMD_MAX,
 	DEVLINK_CMD_MAX = __DEVLINK_CMD_MAX - 1
@@ -550,6 +553,9 @@ enum devlink_attr {
 	DEVLINK_ATTR_RATE_TX_MAX,		/* u64 */
 	DEVLINK_ATTR_RATE_NODE_NAME,		/* string */
 	DEVLINK_ATTR_RATE_PARENT_NODE_NAME,	/* string */
+
+	DEVLINK_ATTR_FLASH_SUPPORT_COMPONENT,		/* flag */
+	DEVLINK_ATTR_FLASH_SUPPORT_OVERWRITE_MASK,	/* flag */
 
 	/* add new attributes above here, update the policy in devlink.c */
 

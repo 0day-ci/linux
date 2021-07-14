@@ -4044,6 +4044,118 @@ static int devlink_nl_cmd_reload(struct sk_buff *skb, struct genl_info *info)
 						       DEVLINK_CMD_RELOAD, info);
 }
 
+static int
+devlink_nl_reload_support_fill(struct sk_buff *msg, struct devlink *devlink,
+			       enum devlink_command cmd, u32 portid, u32 seq,
+			       int flags, struct netlink_ext_ack *extack)
+{
+	u32 supported_actions, supported_limits;
+	void *hdr;
+	int err;
+
+	hdr = genlmsg_put(msg, portid, seq, &devlink_nl_family, flags, cmd);
+	if (!hdr)
+		return -EMSGSIZE;
+
+	if (devlink_nl_put_handle(msg, devlink)) {
+		err = -EMSGSIZE;
+		goto err_cancel_msg;
+	}
+
+	supported_actions = devlink->ops->reload_actions;
+	supported_limits = devlink->ops->reload_limits;
+
+	if (nla_put_bitfield32(msg, DEVLINK_ATTR_RELOAD_ACTIONS_PERFORMED,
+			       supported_actions, supported_actions)) {
+		err = -EMSGSIZE;
+		goto err_cancel_msg;
+	}
+
+	if (nla_put_bitfield32(msg, DEVLINK_ATTR_RELOAD_LIMITS,
+			       supported_limits, supported_limits)) {
+		err = -EMSGSIZE;
+		goto err_cancel_msg;
+	}
+
+	genlmsg_end(msg, hdr);
+	return 0;
+
+err_cancel_msg:
+	genlmsg_cancel(msg, hdr);
+	return err;
+}
+
+static int
+devlink_nl_cmd_reload_support_doit(struct sk_buff *skb, struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct sk_buff *msg;
+	int err;
+
+	if (!devlink_reload_supported(devlink->ops))
+		/* This indicates that reload update is not supported */
+		return -EOPNOTSUPP;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	err = devlink_nl_reload_support_fill(msg, devlink,
+					     DEVLINK_CMD_RELOAD_SUPPORT,
+					     info->snd_portid, info->snd_seq,
+					     0, info->extack);
+	if (err) {
+		nlmsg_free(msg);
+		return err;
+	}
+
+	return genlmsg_reply(msg, info);
+}
+
+static int
+devlink_nl_cmd_reload_support_dumpit(struct sk_buff *msg,
+				     struct netlink_callback *cb)
+{
+	struct devlink *devlink;
+	int start = cb->args[0];
+	int idx = 0;
+	int err = 0;
+
+	mutex_lock(&devlink_mutex);
+	list_for_each_entry(devlink, &devlink_list, list) {
+		if (!net_eq(devlink_net(devlink), sock_net(msg->sk)))
+			continue;
+		if (idx < start) {
+			idx++;
+			continue;
+		}
+
+		if (!devlink_reload_supported(devlink->ops)) {
+			idx++;
+			continue;
+		}
+
+		mutex_lock(&devlink->lock);
+		err = devlink_nl_reload_support_fill(msg, devlink,
+						     DEVLINK_CMD_RELOAD_SUPPORT,
+						     NETLINK_CB(cb->skb).portid,
+						     cb->nlh->nlmsg_seq,
+						     NLM_F_MULTI,
+						     cb->extack);
+		mutex_unlock(&devlink->lock);
+		if (err)
+			break;
+		idx++;
+	}
+	mutex_unlock(&devlink_mutex);
+
+	if (err != -EMSGSIZE)
+		return err;
+
+	cb->args[0] = idx;
+	return msg->len;
+}
+
 static int devlink_nl_flash_update_fill(struct sk_buff *msg,
 					struct devlink *devlink,
 					enum devlink_command cmd,
@@ -4225,6 +4337,119 @@ static int devlink_nl_cmd_flash_update(struct sk_buff *skb,
 	release_firmware(params.fw);
 
 	return ret;
+}
+
+static int
+devlink_nl_flash_support_fill(struct sk_buff *msg, struct devlink *devlink,
+			      enum devlink_command cmd, u32 portid, u32 seq,
+			      int flags, struct netlink_ext_ack *extack)
+{
+	u32 supported_params;
+	void *hdr;
+	int err;
+
+	hdr = genlmsg_put(msg, portid, seq, &devlink_nl_family, flags, cmd);
+	if (!hdr)
+		return -EMSGSIZE;
+
+	if (devlink_nl_put_handle(msg, devlink)) {
+		err = -EMSGSIZE;
+		goto err_cancel_msg;
+	}
+
+	supported_params = devlink->ops->supported_flash_update_params;
+
+	if (supported_params & DEVLINK_SUPPORT_FLASH_UPDATE_COMPONENT) {
+		if (nla_put_flag(msg, DEVLINK_ATTR_FLASH_SUPPORT_COMPONENT)) {
+			err = -EMSGSIZE;
+			goto err_cancel_msg;
+		}
+	}
+
+	if (supported_params & DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK) {
+		if (nla_put_flag(msg, DEVLINK_ATTR_FLASH_SUPPORT_OVERWRITE_MASK)) {
+			err = -EMSGSIZE;
+			goto err_cancel_msg;
+		}
+	}
+
+	genlmsg_end(msg, hdr);
+	return 0;
+
+err_cancel_msg:
+	genlmsg_cancel(msg, hdr);
+	return err;
+}
+
+static int
+devlink_nl_cmd_flash_support_doit(struct sk_buff *skb, struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct sk_buff *msg;
+	int err;
+
+	if (!devlink->ops->flash_update)
+		/* This indicates that flash update is not supported */
+		return -EOPNOTSUPP;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	err = devlink_nl_flash_support_fill(msg, devlink,
+					    DEVLINK_CMD_FLASH_SUPPORT,
+					    info->snd_portid, info->snd_seq, 0,
+					    info->extack);
+	if (err) {
+		nlmsg_free(msg);
+		return err;
+	}
+
+	return genlmsg_reply(msg, info);
+}
+
+static int
+devlink_nl_cmd_flash_support_dumpit(struct sk_buff *msg,
+				     struct netlink_callback *cb)
+{
+	struct devlink *devlink;
+	int start = cb->args[0];
+	int idx = 0;
+	int err = 0;
+
+	mutex_lock(&devlink_mutex);
+	list_for_each_entry(devlink, &devlink_list, list) {
+		if (!net_eq(devlink_net(devlink), sock_net(msg->sk)))
+			continue;
+		if (idx < start) {
+			idx++;
+			continue;
+		}
+
+		if (!devlink->ops->flash_update) {
+			idx++;
+			continue;
+		}
+
+		mutex_lock(&devlink->lock);
+		err = devlink_nl_flash_support_fill(msg, devlink,
+						    DEVLINK_CMD_FLASH_SUPPORT,
+						    NETLINK_CB(cb->skb).portid,
+						    cb->nlh->nlmsg_seq,
+						    NLM_F_MULTI,
+						    cb->extack);
+		mutex_unlock(&devlink->lock);
+		if (err)
+			break;
+		idx++;
+	}
+	mutex_unlock(&devlink_mutex);
+
+	if (err != -EMSGSIZE)
+		return err;
+
+	cb->args[0] = idx;
+	return msg->len;
 }
 
 static const struct devlink_param devlink_param_generic[] = {
@@ -8564,6 +8789,12 @@ static const struct genl_small_ops devlink_nl_ops[] = {
 		.internal_flags = DEVLINK_NL_FLAG_NO_LOCK,
 	},
 	{
+		.cmd = DEVLINK_CMD_RELOAD_SUPPORT,
+		.doit = devlink_nl_cmd_reload_support_doit,
+		.dumpit = devlink_nl_cmd_reload_support_dumpit,
+		/* can be retrieved by unprivileged users */
+	},
+	{
 		.cmd = DEVLINK_CMD_PARAM_GET,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = devlink_nl_cmd_param_get_doit,
@@ -8687,6 +8918,12 @@ static const struct genl_small_ops devlink_nl_ops[] = {
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = devlink_nl_cmd_flash_update,
 		.flags = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd = DEVLINK_CMD_FLASH_SUPPORT,
+		.doit = devlink_nl_cmd_flash_support_doit,
+		.dumpit = devlink_nl_cmd_flash_support_dumpit,
+		/* can be retrieved by unprivileged users */
 	},
 	{
 		.cmd = DEVLINK_CMD_TRAP_GET,
