@@ -10,12 +10,13 @@
 
 #include <linux/pgtable.h> /* for pgprot_t */
 
+/* For IS_ENABLED(CONFIG_CRASH_DUMP) */
+extern unsigned long long elfcorehdr_addr;
+extern unsigned long long elfcorehdr_size;
+
 #ifdef CONFIG_CRASH_DUMP
 #define ELFCORE_ADDR_MAX	(-1ULL)
 #define ELFCORE_ADDR_ERR	(-2ULL)
-
-extern unsigned long long elfcorehdr_addr;
-extern unsigned long long elfcorehdr_size;
 
 extern int elfcorehdr_alloc(unsigned long long *addr, unsigned long long *size);
 extern void elfcorehdr_free(unsigned long long addr);
