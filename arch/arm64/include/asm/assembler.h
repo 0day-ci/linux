@@ -606,7 +606,7 @@ alternative_endif
 #endif
 	.endm
 
-	.macro	phys_to_pte, pte, phys
+	.macro	phys_to_pte, pte, phys, tmp
 #ifdef CONFIG_ARM64_PA_BITS_52_LPA
 	/*
 	 * We assume \phys is 64K aligned and this is guaranteed by only
@@ -614,6 +614,17 @@ alternative_endif
 	 */
 	orr	\pte, \phys, \phys, lsr #36
 	and	\pte, \pte, #PTE_ADDR_MASK
+#elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	orr	\pte, \phys, \phys, lsr #42
+
+	/*
+	 * The 'tmp' is being used here to just prepare
+	 * and hold PTE_ADDR_MASK which cannot be passed
+	 * to the subsequent 'and' instruction.
+	 */
+	mov	\tmp, #PTE_ADDR_LOW
+	orr	\tmp, \tmp, #PTE_ADDR_HIGH
+	and	\pte, \pte, \tmp
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	mov	\pte, \phys
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */
@@ -621,9 +632,13 @@ alternative_endif
 
 	.macro	pte_to_phys, phys, pte
 #ifdef CONFIG_ARM64_PA_BITS_52_LPA
-	ubfiz	\phys, \pte, #(48 - 16 - 12), #16
-	bfxil	\phys, \pte, #16, #32
-	lsl	\phys, \phys, #16
+	ubfiz	\phys, \pte, #(48 - PAGE_SHIFT - 12), #16
+	bfxil	\phys, \pte, #PAGE_SHIFT, #(48 - PAGE_SHIFT)
+	lsl	\phys, \phys, #PAGE_SHIFT
+#elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	ubfiz	\phys, \pte, #(52 - PAGE_SHIFT - 10), #10
+	bfxil	\phys, \pte, #PAGE_SHIFT, #(50 - PAGE_SHIFT)
+	lsl	\phys, \phys, #PAGE_SHIFT
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	and	\phys, \pte, #PTE_ADDR_MASK
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */

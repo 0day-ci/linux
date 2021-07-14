@@ -134,9 +134,9 @@ SYM_CODE_END(preserve_boot_args)
  * Corrupts:	ptrs, tmp1, tmp2
  * Returns:	tbl -> next level table page address
  */
-	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
+	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2, tmp3
 	add	\tmp1, \tbl, #PAGE_SIZE
-	phys_to_pte \tmp2, \tmp1
+	phys_to_pte \tmp2, \tmp1, \tmp3
 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
 	lsr	\tmp1, \virt, #\shift
 	sub	\ptrs, \ptrs, #1
@@ -161,8 +161,8 @@ SYM_CODE_END(preserve_boot_args)
  * Corrupts:	index, tmp1
  * Returns:	rtbl
  */
-	.macro populate_entries, tbl, rtbl, index, eindex, flags, inc, tmp1
-.Lpe\@:	phys_to_pte \tmp1, \rtbl
+	.macro populate_entries, tbl, rtbl, index, eindex, flags, inc, tmp1, tmp2
+.Lpe\@:	phys_to_pte \tmp1, \rtbl, \tmp2
 	orr	\tmp1, \tmp1, \flags	// tmp1 = table entry
 	str	\tmp1, [\tbl, \index, lsl #3]
 	add	\rtbl, \rtbl, \inc	// rtbl = pa next level
@@ -224,31 +224,32 @@ SYM_CODE_END(preserve_boot_args)
  * Preserves:	vstart, vend, flags
  * Corrupts:	tbl, rtbl, istart, iend, tmp, count, sv
  */
-	.macro map_memory, tbl, rtbl, vstart, vend, flags, phys, pgds, istart, iend, tmp, count, sv
+	.macro map_memory, tbl, rtbl, vstart, vend, flags, phys, pgds, istart, iend, \
+								tmp, tmp1, count, sv
 	add \rtbl, \tbl, #PAGE_SIZE
 	mov \sv, \rtbl
 	mov \count, #0
 	compute_indices \vstart, \vend, #PGDIR_SHIFT, \pgds, \istart, \iend, \count
-	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp, \tmp1
 	mov \tbl, \sv
 	mov \sv, \rtbl
 
 #if SWAPPER_PGTABLE_LEVELS > 3
 	compute_indices \vstart, \vend, #PUD_SHIFT, #PTRS_PER_PUD, \istart, \iend, \count
-	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp, \tmp1
 	mov \tbl, \sv
 	mov \sv, \rtbl
 #endif
 
 #if SWAPPER_PGTABLE_LEVELS > 2
 	compute_indices \vstart, \vend, #SWAPPER_TABLE_SHIFT, #PTRS_PER_PMD, \istart, \iend, \count
-	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp, \tmp1
 	mov \tbl, \sv
 #endif
 
 	compute_indices \vstart, \vend, #SWAPPER_BLOCK_SHIFT, #PTRS_PER_PTE, \istart, \iend, \count
 	bic \count, \phys, #SWAPPER_BLOCK_SIZE - 1
-	populate_entries \tbl, \count, \istart, \iend, \flags, #SWAPPER_BLOCK_SIZE, \tmp
+	populate_entries \tbl, \count, \istart, \iend, \flags, #SWAPPER_BLOCK_SIZE, \tmp, \tmp1
 	.endm
 
 /*
@@ -343,7 +344,7 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 #endif
 
 	mov	x4, EXTRA_PTRS
-	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
+	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6, x20
 #else
 	/*
 	 * If VA_BITS == 48, we don't have to configure an additional
@@ -356,7 +357,7 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 	ldr_l	x4, idmap_ptrs_per_pgd
 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
 
-	map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
+	map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x20, x13, x14
 
 	/*
 	 * Map the kernel image (starting with PHYS_OFFSET).
@@ -370,7 +371,7 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 	sub	x6, x6, x3			// _end - _text
 	add	x6, x6, x5			// runtime __va(_end)
 
-	map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
+	map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x20, x13, x14
 
 	/*
 	 * Since the page tables have been populated with non-cacheable
