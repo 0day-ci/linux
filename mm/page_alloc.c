@@ -6608,6 +6608,31 @@ static void __ref __init_zone_device_page(struct page *page, unsigned long pfn,
 	}
 }
 
+static void __ref memmap_init_compound(struct page *page, unsigned long pfn,
+					unsigned long zone_idx, int nid,
+					struct dev_pagemap *pgmap,
+					unsigned long nr_pages)
+{
+	unsigned int order_align = order_base_2(nr_pages);
+	unsigned long i;
+
+	__SetPageHead(page);
+
+	for (i = 1; i < nr_pages; i++) {
+		__init_zone_device_page(page + i, pfn + i, zone_idx,
+					nid, pgmap);
+		prep_compound_tail(page, i);
+
+		/*
+		 * The first and second tail pages need to
+		 * initialized first, hence the head page is
+		 * prepared last.
+		 */
+		if (i == 2)
+			prep_compound_head(page, order_align);
+	}
+}
+
 void __ref memmap_init_zone_device(struct zone *zone,
 				   unsigned long start_pfn,
 				   unsigned long nr_pages,
@@ -6616,6 +6641,7 @@ void __ref memmap_init_zone_device(struct zone *zone,
 	unsigned long pfn, end_pfn = start_pfn + nr_pages;
 	struct pglist_data *pgdat = zone->zone_pgdat;
 	struct vmem_altmap *altmap = pgmap_altmap(pgmap);
+	unsigned int pfns_per_compound = pgmap_pfn_geometry(pgmap);
 	unsigned long zone_idx = zone_idx(zone);
 	unsigned long start = jiffies;
 	int nid = pgdat->node_id;
@@ -6633,10 +6659,16 @@ void __ref memmap_init_zone_device(struct zone *zone,
 		nr_pages = end_pfn - start_pfn;
 	}
 
-	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
+	for (pfn = start_pfn; pfn < end_pfn; pfn += pfns_per_compound) {
 		struct page *page = pfn_to_page(pfn);
 
 		__init_zone_device_page(page, pfn, zone_idx, nid, pgmap);
+
+		if (pfns_per_compound == 1)
+			continue;
+
+		memmap_init_compound(page, pfn, zone_idx, nid, pgmap,
+				     pfns_per_compound);
 	}
 
 	pr_info("%s initialised %lu pages in %ums\n", __func__,

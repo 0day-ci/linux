@@ -318,8 +318,12 @@ static int pagemap_range(struct dev_pagemap *pgmap, struct mhp_params *params,
 	memmap_init_zone_device(&NODE_DATA(nid)->node_zones[ZONE_DEVICE],
 				PHYS_PFN(range->start),
 				PHYS_PFN(range_len(range)), pgmap);
-	percpu_ref_get_many(pgmap->ref, pfn_end(pgmap, range_id)
-			- pfn_first(pgmap, range_id));
+	if (pgmap_geometry(pgmap) > PAGE_SIZE)
+		percpu_ref_get_many(pgmap->ref, (pfn_end(pgmap, range_id)
+			- pfn_first(pgmap, range_id)) / pgmap_pfn_geometry(pgmap));
+	else
+		percpu_ref_get_many(pgmap->ref, pfn_end(pgmap, range_id)
+				- pfn_first(pgmap, range_id));
 	return 0;
 
 err_add_memory:
