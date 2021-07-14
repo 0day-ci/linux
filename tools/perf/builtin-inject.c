@@ -991,7 +991,8 @@ int cmd_inject(int argc, const char **argv)
 	}
 
 	data.path = inject.input_name;
-	inject.session = perf_session__new(&data, inject.output.is_pipe, &inject.tool);
+	inject.session = __perf_session__new(&data, inject.output.is_pipe,
+					     &inject.tool);
 	if (IS_ERR(inject.session))
 		return PTR_ERR(inject.session);
 
