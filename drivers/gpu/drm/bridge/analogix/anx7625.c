@@ -1559,7 +1559,20 @@ static void anx7625_bridge_enable(struct drm_bridge *bridge)
 
 	DRM_DEV_DEBUG_DRIVER(dev, "drm enable\n");
 
-	pm_runtime_get_sync(dev);
+	/*
+	 * The only case where pm_runtime is disabled here is when the function
+	 * is called other driver's resume hook by
+	 * drm_mode_config_helper_resume, but when the pm_runtime_force_resume
+	 * hasn't been called on this device.
+	 *
+	 * pm_runtime_get_sync won't power on anx7625 in this case since we're
+	 * in system resume, so instead we force resume anx7625 to make sure
+	 * the following anx7625_dp_start would succeed.
+	 */
+	if (pm_runtime_enabled(dev))
+		pm_runtime_get_sync(dev);
+	else
+		pm_runtime_force_resume(dev);
 
 	anx7625_dp_start(ctx);
 }
@@ -1571,9 +1584,10 @@ static void anx7625_bridge_disable(struct drm_bridge *bridge)
 
 	DRM_DEV_DEBUG_DRIVER(dev, "drm disable\n");
 
-	anx7625_dp_stop(ctx);
-
-	pm_runtime_put_sync(dev);
+	if (pm_runtime_enabled(dev)) {
+		anx7625_dp_stop(ctx);
+		pm_runtime_put_sync(dev);
+	}
 }
 
 static enum drm_connector_status
@@ -1705,38 +1719,9 @@ static int __maybe_unused anx7625_runtime_pm_resume(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused anx7625_resume(struct device *dev)
-{
-	struct anx7625_data *ctx = dev_get_drvdata(dev);
-
-	if (!ctx->pdata.intp_irq)
-		return 0;
-
-	if (!pm_runtime_enabled(dev) || !pm_runtime_suspended(dev)) {
-		enable_irq(ctx->pdata.intp_irq);
-		anx7625_runtime_pm_resume(dev);
-	}
-
-	return 0;
-}
-
-static int __maybe_unused anx7625_suspend(struct device *dev)
-{
-	struct anx7625_data *ctx = dev_get_drvdata(dev);
-
-	if (!ctx->pdata.intp_irq)
-		return 0;
-
-	if (!pm_runtime_enabled(dev) || !pm_runtime_suspended(dev)) {
-		anx7625_runtime_pm_suspend(dev);
-		disable_irq(ctx->pdata.intp_irq);
-	}
-
-	return 0;
-}
-
 static const struct dev_pm_ops anx7625_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(anx7625_suspend, anx7625_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				pm_runtime_force_resume)
 	SET_RUNTIME_PM_OPS(anx7625_runtime_pm_suspend,
 			   anx7625_runtime_pm_resume, NULL)
 };
