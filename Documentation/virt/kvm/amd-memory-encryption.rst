@@ -427,6 +427,49 @@ issued by the hypervisor to make the guest ready for execution.
 
 Returns: 0 on success, -negative on error
 
+10. KVM_SEV_INTRA_HOST_SEND
+----------------------------------
+
+The KVM_SEV_INTRA_HOST_SEND command is used to stage the VM's SEV info
+for the purposes of migrating memory to a new local VM while using the same SEV
+key. If the source VM is destroyed before the staged info has been received by
+the target, the info is lost. Once the info has been staged, only commands
+KVM_SEV_DBG_DECRYPT, and KVM_SEV_DBG_ENCRYPT
+can be used by the source.
+
+Parameters (in): struct kvm_sev_intra_host_send
+
+Returns: 0 on success, -negative on error
+
+::
+
+    struct kvm_sev_intra_host_send {
+        __u64 info_token;    /* token referencing the staged info */
+    };
+
+11. KVM_SEV_INTRA_HOST_RECEIVE
+-------------------------------------
+
+The KVM_SEV_INTRA_HOST_RECEIVE command is used to transfer staged SEV
+info to a target VM from some source VM. SEV on the target VM should be active
+when receive is performed, but not yet launched and without any pinned memory.
+The launch commands should be skipped after receive because they should have
+already been performed on the source.
+
+Parameters (in/out): struct kvm_sev_intra_host_receive
+
+Returns: 0 on success, -negative on error
+
+::
+
+    struct kvm_sev_intra_host_receive {
+        __u64 info_token;    /* token referencing the staged info */
+        __u32 handle;        /* guest handle */
+    };
+
+On success, the 'handle' field contains the handle for this SEV guest.
+
+
 References
 ==========
 
