@@ -597,10 +597,26 @@ isert_conn_terminate(struct isert_conn *isert_conn)
 			   isert_conn);
 }
 
+static void isert_np_reinit_id_work(struct work_struct *w)
+{
+	struct isert_np *isert_np = container_of(w, struct isert_np, work);
+
+	rdma_destroy_id(isert_np->cm_id);
+
+	isert_np->cm_id = isert_setup_id(isert_np);
+	if (IS_ERR(isert_np->cm_id)) {
+		isert_err("isert np %p setup id failed: %ld\n",
+			  isert_np, PTR_ERR(isert_np->cm_id));
+		isert_np->cm_id = NULL;
+	}
+}
+
 static int
 isert_np_cma_handler(struct isert_np *isert_np,
 		     enum rdma_cm_event_type event)
 {
+	int ret = -1;
+
 	isert_dbg("%s (%d): isert np %p\n",
 		  rdma_event_msg(event), event, isert_np);
 
@@ -609,19 +625,15 @@ isert_np_cma_handler(struct isert_np *isert_np,
 		isert_np->cm_id = NULL;
 		break;
 	case RDMA_CM_EVENT_ADDR_CHANGE:
-		isert_np->cm_id = isert_setup_id(isert_np);
-		if (IS_ERR(isert_np->cm_id)) {
-			isert_err("isert np %p setup id failed: %ld\n",
-				  isert_np, PTR_ERR(isert_np->cm_id));
-			isert_np->cm_id = NULL;
-		}
+		queue_work(isert_np->reinit_id_wq, &isert_np->work);
+		ret = 0;
 		break;
 	default:
 		isert_err("isert np %p Unexpected event %d\n",
 			  isert_np, event);
 	}
 
-	return -1;
+	return ret;
 }
 
 static int
@@ -2272,6 +2284,15 @@ isert_setup_np(struct iscsi_np *np,
 	if (!isert_np)
 		return -ENOMEM;
 
+	isert_np->reinit_id_wq = alloc_ordered_workqueue("isert_reinit_id_wq", WQ_MEM_RECLAIM);
+	if (unlikely(!isert_np->reinit_id_wq)) {
+		isert_err("Unable to allocate reinit workqueue\n");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	INIT_WORK(&isert_np->work, isert_np_reinit_id_work);
+
 	sema_init(&isert_np->sem, 0);
 	mutex_init(&isert_np->mutex);
 	INIT_LIST_HEAD(&isert_np->accepted);
@@ -2288,7 +2309,7 @@ isert_setup_np(struct iscsi_np *np,
 	isert_lid = isert_setup_id(isert_np);
 	if (IS_ERR(isert_lid)) {
 		ret = PTR_ERR(isert_lid);
-		goto out;
+		goto free_wq;
 	}
 
 	isert_np->cm_id = isert_lid;
@@ -2296,6 +2317,8 @@ isert_setup_np(struct iscsi_np *np,
 
 	return 0;
 
+free_wq:
+	destroy_workqueue(isert_np->reinit_id_wq);
 out:
 	kfree(isert_np);
 
@@ -2465,6 +2488,8 @@ isert_free_np(struct iscsi_np *np)
 		}
 	}
 	mutex_unlock(&isert_np->mutex);
+
+	destroy_workqueue(isert_np->reinit_id_wq);
 
 	np->np_context = NULL;
 	kfree(isert_np);

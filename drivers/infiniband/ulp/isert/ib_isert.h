@@ -209,4 +209,6 @@ struct isert_np {
 	struct mutex		mutex;
 	struct list_head	accepted;
 	struct list_head	pending;
+	struct work_struct      work;
+	struct workqueue_struct *reinit_id_wq;
 };
