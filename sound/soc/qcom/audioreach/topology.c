@@ -706,6 +706,25 @@ static int audioreach_widget_load_mixer(struct snd_soc_component *component,
 	return 0;
 }
 
+static int audioreach_widget_load_pga(struct snd_soc_component *component,
+					int index, struct snd_soc_dapm_widget *w,
+					struct snd_soc_tplg_dapm_widget *tplg_w)
+{
+	struct audioreach_module *mod;
+	struct snd_soc_dobj *dobj;
+	int ret;
+
+	ret = audioreach_widget_load_module_common(component, index, w, tplg_w);
+	if (ret)
+		return ret;
+
+	dobj = &w->dobj;
+	mod = dobj->private;
+	mod->gain = VOL_CTRL_DEFAULT_GAIN;
+
+	return 0;
+}
+
 static int audioreach_widget_ready(struct snd_soc_component *component,
 				   int index, struct snd_soc_dapm_widget *w,
 				   struct snd_soc_tplg_dapm_widget *tplg_w)
@@ -725,8 +744,9 @@ static int audioreach_widget_ready(struct snd_soc_component *component,
 		break;
 	case snd_soc_dapm_mixer:
 		return audioreach_widget_load_mixer(component, index, w, tplg_w);
-	case snd_soc_dapm_dai_link:
 	case snd_soc_dapm_pga:
+		return audioreach_widget_load_pga(component, index, w, tplg_w);
+	case snd_soc_dapm_dai_link:
 	case snd_soc_dapm_scheduler:
 	case snd_soc_dapm_out_drv:
 	default:
@@ -898,6 +918,40 @@ static int audioreach_put_audio_mixer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int audioreach_get_vol_ctrl_audio_mixer(struct snd_kcontrol *kcontrol,
+				       struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget *dw = snd_soc_dapm_kcontrol_widget(kcontrol);
+	struct audioreach_module *mod = dw->dobj.private;
+
+	/* Check if the graph is active or not */
+	ucontrol->value.integer.value[0] = mod->gain;
+
+	return 0;
+}
+
+static int audioreach_put_vol_ctrl_audio_mixer(struct snd_kcontrol *kcontrol,
+				      struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget *dw = snd_soc_dapm_kcontrol_widget(kcontrol);
+	struct snd_soc_dapm_context *dapm = snd_soc_dapm_kcontrol_dapm(kcontrol);
+	struct snd_soc_component *c = snd_soc_dapm_to_component(dapm);
+	struct audioreach_module *mod = dw->dobj.private;
+	struct q6apm *apm = dev_get_drvdata(c->dev);
+	int vol = ucontrol->value.integer.value[0];
+
+	/* Check if the graph is active or not */
+	if (dw->power) {
+		audioreach_gain_set_vol_ctrl(apm, mod, vol);
+		mod->gain = vol;
+		return 1;
+	}
+
+	dev_err(apm->dev, "Unable to set volume as graph is not	active\n");
+	return 0;
+
+}
+
 static int audioreach_control_load_mix(struct snd_soc_component *scomp,
 					  struct snd_ar_control *scontrol,
 					  struct snd_kcontrol_new *kc,
@@ -948,6 +1002,10 @@ static int audioreach_control_load(struct snd_soc_component *scomp, int index,
 		dobj = &sm->dobj;
 		ret = audioreach_control_load_mix(scomp, scontrol, kc, hdr);
 		break;
+	case SND_SOC_AR_TPLG_VOL_CTL:
+		sm = (struct soc_mixer_control *)kc->private_value;
+		dobj = &sm->dobj;
+		break;
 	default:
 		dev_warn(scomp->dev, "control type not supported %d:%d:%d\n",
 			 hdr->ops.get, hdr->ops.put, hdr->ops.info);
@@ -972,6 +1030,8 @@ static int audioreach_control_unload(struct snd_soc_component *scomp,
 static const struct snd_soc_tplg_kcontrol_ops audioreach_io_ops[] = {
 	{SND_SOC_AR_TPLG_FE_BE_GRAPH_CTL_MIX, audioreach_get_audio_mixer,
 		audioreach_put_audio_mixer, snd_soc_info_volsw},
+	{SND_SOC_AR_TPLG_VOL_CTL, audioreach_get_vol_ctrl_audio_mixer,
+		audioreach_put_vol_ctrl_audio_mixer, snd_soc_info_volsw},
 };
 
 static struct snd_soc_tplg_ops audioreach_tplg_ops  = {
