@@ -948,6 +948,13 @@ static int vmw_driver_load(struct vmw_private *dev_priv, u32 pci_id)
 		dev_priv->texture_max_height = 8192;
 		dev_priv->max_primary_mem = dev_priv->vram_size;
 	}
+	DRM_INFO("Legacy memory limits: VRAM = %llu kB, FIFO = %llu kB, surface = %u kB\n",
+		 (u64)dev_priv->vram_size / 1024,
+		 (u64)dev_priv->fifo_mem_size / 1024,
+		 dev_priv->memory_size / 1024);
+
+	DRM_INFO("MOB limits: max mob size = %u kB, max mob pages = %u\n",
+		 dev_priv->max_mob_size / 1024, dev_priv->max_mob_pages);
 
 	vmw_print_capabilities(dev_priv->capabilities);
 	if (dev_priv->capabilities & SVGA_CAP_CAP2_REGISTER)
@@ -1094,7 +1101,6 @@ static int vmw_driver_load(struct vmw_private *dev_priv, u32 pci_id)
 		DRM_INFO("SM4_1 support available.\n");
 	if (dev_priv->sm_type == VMW_SM_4)
 		DRM_INFO("SM4 support available.\n");
-	DRM_INFO("Running without reservation semaphore\n");
 
 	vmw_host_printf("vmwgfx: Module Version: %d.%d.%d (kernel: %s)",
 			VMWGFX_DRIVER_MAJOR, VMWGFX_DRIVER_MINOR,
