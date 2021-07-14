@@ -281,6 +281,7 @@ static void nfs4_destroy_callback(struct nfs_client *clp)
 
 static void nfs4_shutdown_client(struct nfs_client *clp)
 {
+	clp->cl_rpcclient->cl_noretranstimeo = 0;
 	if (__test_and_clear_bit(NFS_CS_RENEWD, &clp->cl_res_state))
 		nfs4_kill_renewd(clp);
 	clp->cl_mvops->shutdown_client(clp);
