@@ -144,3 +144,35 @@ ssize_t kvm_stats_read(char *id, const struct kvm_stats_header *header,
 	*offset = pos;
 	return len;
 }
+
+/**
+ * kvm_stats_linear_hist_update() - Update bucket value for linear histogram
+ * statistics data.
+ *
+ * @data: start address of the stats data
+ * @size: the number of bucket of the stats data
+ * @value: the new value used to update the linear histogram's bucket
+ * @bucket_size: the size (width) of a bucket
+ */
+void kvm_stats_linear_hist_update(u64 *data, size_t size,
+				  u64 value, size_t bucket_size)
+{
+	size_t index = min((size_t)div64_u64(value, bucket_size), size - 1);
+
+	++data[index];
+}
+
+/**
+ * kvm_stats_log_hist_update() - Update bucket value for logarithmic histogram
+ * statistics data.
+ *
+ * @data: start address of the stats data
+ * @size: the number of bucket of the stats data
+ * @value: the new value used to update the logarithmic histogram's bucket
+ */
+void kvm_stats_log_hist_update(u64 *data, size_t size, u64 value)
+{
+	size_t index = min((size_t)fls64(value), size - 1);
+
+	++data[index];
+}

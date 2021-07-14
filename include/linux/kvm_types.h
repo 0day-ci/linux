@@ -76,6 +76,21 @@ struct kvm_mmu_memory_cache {
 };
 #endif
 
+/* Constants used for histogram stats */
+#define LINHIST_SIZE_SMALL			10
+#define LINHIST_SIZE_MEDIUM			20
+#define LINHIST_SIZE_LARGE			50
+#define LINHIST_SIZE_XLARGE			100
+#define LINHIST_BUCKET_SIZE_SMALL		10
+#define LINHIST_BUCKET_SIZE_MEDIUM		100
+#define LINHIST_BUCKET_SIZE_LARGE		1000
+#define LINHIST_BUCKET_SIZE_XLARGE		10000
+
+#define LOGHIST_BUCKET_COUNT_SMALL		8
+#define LOGHIST_BUCKET_COUNT_MEDIUM		16
+#define LOGHIST_BUCKET_COUNT_LARGE		32
+#define LOGHIST_BUCKET_COUNT_XLARGE		64
+
 struct kvm_vm_stat_generic {
 	u64 remote_tlb_flush;
 };
