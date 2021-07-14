@@ -1311,7 +1311,6 @@ static int stk_camera_probe(struct usb_interface *interface,
 
 	dev->udev = udev;
 	dev->interface = interface;
-	usb_get_intf(interface);
 
 	if (hflip != -1)
 		dev->vsettings.hflip = hflip;
