@@ -103,6 +103,12 @@ config SND_SOC_QDSP6
 	 audio drivers. This includes q6asm, q6adm,
 	 q6afe interfaces to DSP using apr.
 
+config SND_SOC_QCOM_AUDIOREACH
+	tristate "SoC ALSA audio drives for Qualcomm AUDIOREACH"
+	depends on QCOM_GPR
+	help
+	 Support for AudioReach in QDSP
+
 config SND_SOC_MSM8996
 	tristate "SoC Machine driver for MSM8996 and APQ8096 boards"
 	depends on QCOM_APR
