@@ -4341,6 +4341,9 @@ static int kvm_vcpu_ioctl_set_lapic(struct kvm_vcpu *vcpu,
 
 static int kvm_cpu_accept_dm_intr(struct kvm_vcpu *vcpu)
 {
+	if (kvm_event_needs_reinjection(vcpu))
+		return false;
+
 	/*
 	 * We can accept userspace's request for interrupt injection
 	 * as long as we have a place to store the interrupt number.
