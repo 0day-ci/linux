@@ -316,6 +316,7 @@ int vpu_ipi_send(struct platform_device *pdev,
 {
 	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
 	struct share_obj __iomem *send_obj = vpu->send_buf;
+	unsigned char data[SHARE_BUF_SIZE];
 	unsigned long timeout;
 	int ret = 0;
 
@@ -349,7 +350,9 @@ int vpu_ipi_send(struct platform_device *pdev,
 		}
 	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
 
-	memcpy_toio(send_obj->share_buf, buf, len);
+	memset(data, 0, sizeof(data));
+	memcpy(data, buf, len);
+	memcpy_toio(send_obj->share_buf, data, round_up(len, 8));
 	writel(len, &send_obj->len);
 	writel(id, &send_obj->id);
 
