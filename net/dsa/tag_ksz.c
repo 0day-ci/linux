@@ -56,6 +56,9 @@ static struct sk_buff *ksz8795_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb_linearize(skb))
 		return NULL;
 
+	if (skb->ip_summed == CHECKSUM_PARTIAL && skb_checksum_help(skb))
+		return NULL;
+
 	/* Tag encoding */
 	tag = skb_put(skb, KSZ_INGRESS_TAG_LEN);
 	addr = skb_mac_header(skb);
@@ -120,6 +123,9 @@ static struct sk_buff *ksz9477_xmit(struct sk_buff *skb,
 	if (skb_linearize(skb))
 		return NULL;
 
+	if (skb->ip_summed == CHECKSUM_PARTIAL && skb_checksum_help(skb))
+		return NULL;
+
 	/* Tag encoding */
 	tag = skb_put(skb, KSZ9477_INGRESS_TAG_LEN);
 	addr = skb_mac_header(skb);
@@ -171,6 +177,9 @@ static struct sk_buff *ksz9893_xmit(struct sk_buff *skb,
 	u8 *tag;
 
 	if (skb_linearize(skb))
+		return NULL;
+
+	if (skb->ip_summed == CHECKSUM_PARTIAL && skb_checksum_help(skb))
 		return NULL;
 
 	/* Tag encoding */
