@@ -62,6 +62,7 @@ static void dma_buf_release(struct dentry *dentry)
 	if (unlikely(!dmabuf))
 		return;
 
+	WARN_ON(atomic64_read(&dmabuf->kernel_ref));
 	BUG_ON(dmabuf->vmapping_counter);
 
 	/*
@@ -555,6 +556,7 @@ struct dma_buf *dma_buf_export(const struct dma_buf_export_info *exp_info)
 		goto err_module;
 	}
 
+	atomic64_set(&dmabuf->kernel_ref, 1);
 	dmabuf->priv = exp_info->priv;
 	dmabuf->ops = exp_info->ops;
 	dmabuf->size = exp_info->size;
@@ -617,6 +619,9 @@ int dma_buf_fd(struct dma_buf *dmabuf, int flags)
 
 	fd_install(fd, dmabuf->file);
 
+	/* Add file cnt for each new fd */
+	get_file(dmabuf->file);
+
 	return fd;
 }
 EXPORT_SYMBOL_GPL(dma_buf_fd);
@@ -626,12 +631,13 @@ EXPORT_SYMBOL_GPL(dma_buf_fd);
  * @fd:	[in]	fd associated with the struct dma_buf to be returned
  *
  * On success, returns the struct dma_buf associated with an fd; uses
- * file's refcounting done by fget to increase refcount. returns ERR_PTR
- * otherwise.
+ * dmabuf's ref refcounting done by kref_get to increase refcount.
+ * Returns ERR_PTR otherwise.
  */
 struct dma_buf *dma_buf_get(int fd)
 {
 	struct file *file;
+	struct dma_buf *dmabuf;
 
 	file = fget(fd);
 
@@ -643,7 +649,12 @@ struct dma_buf *dma_buf_get(int fd)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return file->private_data;
+	dmabuf = file->private_data;
+	/* replace file count increase as ref increase for kernel user */
+	get_dma_buf(dmabuf);
+	fput(file);
+
+	return dmabuf;
 }
 EXPORT_SYMBOL_GPL(dma_buf_get);
 
@@ -662,7 +673,11 @@ void dma_buf_put(struct dma_buf *dmabuf)
 	if (WARN_ON(!dmabuf || !dmabuf->file))
 		return;
 
-	fput(dmabuf->file);
+	if (WARN_ON(!atomic64_read(&dmabuf->kernel_ref)))
+		return;
+
+	if (!atomic64_dec_return(&dmabuf->kernel_ref))
+		fput(dmabuf->file);
 }
 EXPORT_SYMBOL_GPL(dma_buf_put);
 

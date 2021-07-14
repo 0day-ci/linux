@@ -308,6 +308,7 @@ struct dma_buf_ops {
 struct dma_buf {
 	size_t size;
 	struct file *file;
+	atomic64_t kernel_ref;
 	struct list_head attachments;
 	const struct dma_buf_ops *ops;
 	struct mutex lock;
@@ -436,7 +437,7 @@ struct dma_buf_export_info {
 					 .owner = THIS_MODULE }
 
 /**
- * get_dma_buf - convenience wrapper for get_file.
+ * get_dma_buf - increase a kernel ref of dma-buf
  * @dmabuf:	[in]	pointer to dma_buf
  *
  * Increments the reference count on the dma-buf, needed in case of drivers
@@ -446,7 +447,8 @@ struct dma_buf_export_info {
  */
 static inline void get_dma_buf(struct dma_buf *dmabuf)
 {
-	get_file(dmabuf->file);
+	if (atomic64_inc_return(&dmabuf->kernel_ref) == 1)
+		get_file(dmabuf->file);
 }
 
 /**
