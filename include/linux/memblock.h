@@ -25,6 +25,12 @@ extern unsigned long max_pfn;
  */
 extern unsigned long long max_possible_pfn;
 
+/*
+ * limited region in which memory may be considered usable by the kernel
+ */
+extern phys_addr_t cap_mem_addr;
+extern phys_addr_t cap_mem_size;
+
 /**
  * enum memblock_flags - definition of memory region attributes
  * @MEMBLOCK_NONE: no special request
