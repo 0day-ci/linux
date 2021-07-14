@@ -100,10 +100,7 @@ static void unmap_region(struct mm_struct *mm,
  *								w: (no) no
  *								x: (yes) yes
  */
-pgprot_t protection_map[16] __ro_after_init = {
-	__P000, __P001, __P010, __P011, __P100, __P101, __P110, __P111,
-	__S000, __S001, __S010, __S011, __S100, __S101, __S110, __S111
-};
+pgprot_t protection_map[16] __ro_after_init;
 
 #ifndef CONFIG_ARCH_HAS_FILTER_PGPROT
 static inline pgprot_t arch_filter_pgprot(pgprot_t prot)
@@ -3715,6 +3712,26 @@ void mm_drop_all_locks(struct mm_struct *mm)
 	mutex_unlock(&mm_all_locks_mutex);
 }
 
+static void init_protection_map(void)
+{
+	protection_map[0] = __P000;
+	protection_map[1] = __P001;
+	protection_map[2] = __P010;
+	protection_map[3] = __P011;
+	protection_map[4] = __P100;
+	protection_map[5] = __P101;
+	protection_map[6] = __P110;
+	protection_map[7] = __P111;
+	protection_map[8] = __S000;
+	protection_map[9] = __S001;
+	protection_map[10] = __S010;
+	protection_map[11] = __S011;
+	protection_map[12] = __S100;
+	protection_map[13] = __S101;
+	protection_map[14] = __S110;
+	protection_map[15] = __S111;
+}
+
 /*
  * initialise the percpu counter for VM
  */
@@ -3722,6 +3739,7 @@ void __init mmap_init(void)
 {
 	int ret;
 
+	init_protection_map();
 	ret = percpu_counter_init(&vm_committed_as, 0, GFP_KERNEL);
 	VM_BUG_ON(ret);
 }
