@@ -6611,10 +6611,22 @@ static void __ref __init_zone_device_page(struct page *page, unsigned long pfn,
 static void __ref memmap_init_compound(struct page *page, unsigned long pfn,
 					unsigned long zone_idx, int nid,
 					struct dev_pagemap *pgmap,
+					struct vmem_altmap *altmap,
 					unsigned long nr_pages)
 {
 	unsigned int order_align = order_base_2(nr_pages);
 	unsigned long i;
+
+	/*
+	 * With compound page geometry and when struct pages are stored in ram
+	 * (!altmap) most tail pages are reused. Consequently, the amount of
+	 * unique struct pages to initialize is a lot smaller that the total
+	 * amount of struct pages being mapped.
+	 * See vmemmap_populate_compound_pages().
+	 */
+	if (!altmap)
+		nr_pages = min_t(unsigned long, nr_pages,
+				 2 * (PAGE_SIZE/sizeof(struct page)));
 
 	__SetPageHead(page);
 
@@ -6668,7 +6680,7 @@ void __ref memmap_init_zone_device(struct zone *zone,
 			continue;
 
 		memmap_init_compound(page, pfn, zone_idx, nid, pgmap,
-				     pfns_per_compound);
+				     altmap, pfns_per_compound);
 	}
 
 	pr_info("%s initialised %lu pages in %ums\n", __func__,
