@@ -30,6 +30,19 @@ static inline void clk_fd_writel(struct clk_fractional_divider *fd, u32 val)
 		writel(val, fd->reg);
 }
 
+static inline void clk_fd_get_max_m_n(struct clk_fractional_divider *fd,
+				      unsigned long *max_m,
+				      unsigned long *max_n)
+{
+	*max_m = GENMASK(fd->mwidth - 1, 0);
+	*max_n = GENMASK(fd->nwidth - 1, 0);
+
+	if (fd->flags & CLK_FRAC_DIVIDER_ZERO_BASED) {
+		(*max_m)++;
+		(*max_n)++;
+	}
+}
+
 static unsigned long clk_fd_recalc_rate(struct clk_hw *hw,
 					unsigned long parent_rate)
 {
@@ -73,7 +86,7 @@ static void clk_fd_general_approximation(struct clk_hw *hw, unsigned long rate,
 					 unsigned long *m, unsigned long *n)
 {
 	struct clk_fractional_divider *fd = to_clk_fd(hw);
-	unsigned long scale;
+	unsigned long scale, max_m, max_n;
 
 	/*
 	 * Get rate closer to *parent_rate to guarantee there is no overflow
@@ -84,9 +97,9 @@ static void clk_fd_general_approximation(struct clk_hw *hw, unsigned long rate,
 	if (scale > fd->nwidth)
 		rate <<= scale - fd->nwidth;
 
-	rational_best_approximation(rate, *parent_rate,
-			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
-			m, n);
+	clk_fd_get_max_m_n(fd, &max_m, &max_n);
+
+	rational_best_approximation(rate, *parent_rate, max_m, max_n, m, n);
 }
 
 static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
@@ -115,12 +128,13 @@ static int clk_fd_set_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct clk_fractional_divider *fd = to_clk_fd(hw);
 	unsigned long flags = 0;
+	unsigned long max_m, max_n;
 	unsigned long m, n;
 	u32 val;
 
-	rational_best_approximation(rate, parent_rate,
-			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
-			&m, &n);
+	clk_fd_get_max_m_n(fd, &max_m, &max_n);
+
+	rational_best_approximation(rate, parent_rate, max_m, max_n, &m, &n);
 
 	if (fd->flags & CLK_FRAC_DIVIDER_ZERO_BASED) {
 		m--;
