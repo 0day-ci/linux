@@ -165,6 +165,11 @@
 
 	};
 
+	watchdog {
+		compatible = "fsl,imx8qm-sc-wdt", "fsl,imx-sc-wdt";
+		timeout-sec = <60>;
+	};
+
 	/* sorted in register address */
 	#include "imx8-ss-dma.dtsi"
 	#include "imx8-ss-conn.dtsi"
