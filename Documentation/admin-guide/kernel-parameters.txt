@@ -2124,6 +2124,43 @@
 
 			The format of <cpu-list> is described above.
 
+                         quiesce_on_exit_to_usermode
+
+			  This flag allows userspace to take preventive measures to
+			  avoid deferred actions and create a OS noise free environment for
+			  the application, by quiescing such activities on
+			  return from syscalls (that is, perform the necessary
+			  background work on return to userspace, rather than allowing
+			  it to happen when userspace is executing, in the form of
+			  an interruption to the application).
+
+			  There might be a performance degradation from using this,
+			  on systemcall heavy workloads, for the isolated CPUs.
+			  This option is intended to be used by specialized workloads.
+
+			  It should be deprecated in favour of a prctl() interface
+			  to enable this mode (which allows the quiescing to take
+			  place only on select sections of userspace execution, namely
+			  the latency sensitive loops).
+
+			  Note: one of the preventive measures this option
+			  enables is the following.
+
+			  Page counters are maintained in per-CPU counters to
+			  improve performance. When a CPU modifies a page counter,
+			  this modification is kept in the per-CPU counter.
+			  Certain activities require a global count, which
+			  involves requesting each CPU to flush its local counters
+			  to the global VM counters.
+			  This flush is implemented via a workqueue item, which
+			  requires scheduling the workqueue task on isolated CPUs.
+
+			  To avoid this interruption, quiesce_on_exit_to_usermode
+			  syncs the page counters on each return from system calls.
+			  To ensure the application returns to userspace
+			  with no modified per-CPU counters, its necessary to
+			  use mlockall() in addition to this isolcpus flag.
+
 	iucv=		[HW,NET]
 
 	ivrs_ioapic	[HW,X86-64]
