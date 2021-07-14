@@ -116,13 +116,21 @@
 #define PMD_TYPE_SECT		(_AT(pmdval_t, 1) << 0)
 #define PMD_TABLE_BIT		(_AT(pmdval_t, 1) << 1)
 
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA2
+#define PTE_SHARED		(arm64_lpa2_enabled ? 0 : PTE_SHARED_STATIC)
+#define PMD_SECT_S		(arm64_lpa2_enabled ? 0 : PMD_SECT_S_STATIC)
+#else  /* !CONFIG_ARM64_PA_BITS_52_LPA2 */
+#define PTE_SHARED		PTE_SHARED_STATIC
+#define PMD_SECT_S		PMD_SECT_S_STATIC
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA2 */
+
 /*
  * Section
  */
 #define PMD_SECT_VALID		(_AT(pmdval_t, 1) << 0)
 #define PMD_SECT_USER		(_AT(pmdval_t, 1) << 6)		/* AP[1] */
 #define PMD_SECT_RDONLY		(_AT(pmdval_t, 1) << 7)		/* AP[2] */
-#define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+#define PMD_SECT_S_STATIC	(_AT(pmdval_t, 3) << 8)
 #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
 #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
 #define PMD_SECT_CONT		(_AT(pmdval_t, 1) << 52)
@@ -146,7 +154,7 @@
 #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
 #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
 #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
-#define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+#define PTE_SHARED_STATIC	(_AT(pteval_t, 3) << 8)         /* SH[1:0], inner shareable */
 #define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
 #define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
 #define PTE_GP			(_AT(pteval_t, 1) << 50)	/* BTI guarded */

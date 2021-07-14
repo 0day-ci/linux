@@ -302,6 +302,21 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 
 	mov	x7, SWAPPER_MM_MMUFLAGS
 
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA2
+	ldr_l   x2, arm64_lpa2_enabled
+	cmp     x2, #1
+	b.eq    1f
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA2 */
+
+	/*
+	 * FEAT_LPA2 has not been detected during boot.
+	 * Hence SWAPPER_MM_MMUFLAGS needs to have the
+	 * regular sharability attributes in PTE[9:8].
+	 * Same is also applicable when FEAT_LPA2 has
+	 * not been requested in the first place.
+	 */
+	orr     x7, x7, PTE_SHARED_STATIC
+1:
 	/*
 	 * Create the identity mapping.
 	 */

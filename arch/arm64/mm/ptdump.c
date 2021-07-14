@@ -115,8 +115,8 @@ static const struct prot_bits pte_bits[] = {
 		.set	= "NX",
 		.clear	= "x ",
 	}, {
-		.mask	= PTE_SHARED,
-		.val	= PTE_SHARED,
+		.mask	= PTE_SHARED_STATIC,
+		.val	= PTE_SHARED_STATIC,
 		.set	= "SHD",
 		.clear	= "   ",
 	}, {
@@ -211,6 +211,28 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
 	for (i = 0; i < num; i++, bits++) {
 		const char *s;
 
+		if (IS_ENABLED(CONFIG_ARM64_PA_BITS_52_LPA2) &&
+		   (bits->mask == PTE_SHARED_STATIC)) {
+			/*
+			 * If FEAT_LPA2 has been detected and enabled
+			 * sharing attributes for page table entries
+			 * are inherited from TCR_EL1.SH1 as init_mm
+			 * based mappings are enabled from TTBR1_EL1.
+			 */
+			if (arm64_lpa2_enabled) {
+				if ((read_sysreg(tcr_el1) & TCR_SH1_INNER) == TCR_SH1_INNER)
+					pt_dump_seq_printf(st->seq, " SHD ");
+				else
+					pt_dump_seq_printf(st->seq, " ");
+				continue;
+			}
+			/*
+			 * In case FEAT_LPA2 has not been detected and
+			 * enabled sharing attributes should be found
+			 * in the regular PTE positions. It just falls
+			 * through regular PTE attribute handling.
+			 */
+		}
 		if ((st->current_prot & bits->mask) == bits->val)
 			s = bits->set;
 		else
