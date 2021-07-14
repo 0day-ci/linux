@@ -537,13 +537,22 @@ static void * __meminit vmemmap_alloc_block_zero(unsigned long size, int node)
 	return p;
 }
 
-pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
+pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node,
+				       struct page *block)
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd)) {
-		void *p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
-		if (!p)
-			return NULL;
+		void *p;
+
+		if (!block) {
+			p = vmemmap_alloc_block_zero(PAGE_SIZE, node);
+			if (!p)
+				return NULL;
+		} else {
+			/* See comment in vmemmap_pte_populate(). */
+			get_page(block);
+			p = page_to_virt(block);
+		}
 		pmd_populate_kernel(&init_mm, pmd, p);
 	}
 	return pmd;
@@ -585,15 +594,14 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 	return pgd;
 }
 
-static int __meminit vmemmap_populate_address(unsigned long addr, int node,
-					      struct vmem_altmap *altmap,
-					      struct page *reuse, struct page **page)
+static int __meminit vmemmap_populate_pmd_address(unsigned long addr, int node,
+						  struct vmem_altmap *altmap,
+						  struct page *reuse, pmd_t **ptr)
 {
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
-	pte_t *pte;
 
 	pgd = vmemmap_pgd_populate(addr, node);
 	if (!pgd)
@@ -604,9 +612,24 @@ static int __meminit vmemmap_populate_address(unsigned long addr, int node,
 	pud = vmemmap_pud_populate(p4d, addr, node);
 	if (!pud)
 		return -ENOMEM;
-	pmd = vmemmap_pmd_populate(pud, addr, node);
+	pmd = vmemmap_pmd_populate(pud, addr, node, reuse);
 	if (!pmd)
 		return -ENOMEM;
+	if (ptr)
+		*ptr = pmd;
+	return 0;
+}
+
+static int __meminit vmemmap_populate_address(unsigned long addr, int node,
+					      struct vmem_altmap *altmap,
+					      struct page *reuse, struct page **page)
+{
+	pmd_t *pmd;
+	pte_t *pte;
+
+	if (vmemmap_populate_pmd_address(addr, node, altmap, NULL, &pmd))
+		return -ENOMEM;
+
 	pte = vmemmap_pte_populate(pmd, addr, node, altmap, reuse);
 	if (!pte)
 		return -ENOMEM;
@@ -650,6 +673,20 @@ static inline int __meminit vmemmap_populate_page(unsigned long addr, int node,
 	return vmemmap_populate_address(addr, node, NULL, NULL, page);
 }
 
+static int __meminit vmemmap_populate_pmd_range(unsigned long start,
+						unsigned long end,
+						int node, struct page *page)
+{
+	unsigned long addr = start;
+
+	for (; addr < end; addr += PMD_SIZE) {
+		if (vmemmap_populate_pmd_address(addr, node, NULL, page, NULL))
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+
 static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 						     unsigned long start,
 						     unsigned long end, int node,
@@ -670,6 +707,7 @@ static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 	offset = PFN_PHYS(start_pfn) - pgmap->ranges[pgmap->nr_range].start;
 	if (!IS_ALIGNED(offset, pgmap_geometry(pgmap)) &&
 	    pgmap_geometry(pgmap) > SUBSECTION_SIZE) {
+		pmd_t *pmdp;
 		pte_t *ptep;
 
 		addr = start - PAGE_SIZE;
@@ -681,11 +719,25 @@ static int __meminit vmemmap_populate_compound_pages(unsigned long start_pfn,
 		 * the previous struct pages are mapped when trying to lookup
 		 * the last tail page.
 		 */
-		ptep = pte_offset_kernel(pmd_off_k(addr), addr);
-		if (!ptep)
+		pmdp = pmd_off_k(addr);
+		if (!pmdp)
 			return -ENOMEM;
 
 		/*
+		 * Reuse the tail pages vmemmap pmd page
+		 * See layout diagram in Documentation/vm/vmemmap_dedup.rst
+		 */
+		if (offset % pgmap_geometry(pgmap) > PFN_PHYS(PAGES_PER_SECTION))
+			return vmemmap_populate_pmd_range(start, end, node,
+							  pmd_page(*pmdp));
+
+		/* See comment above when pmd_off_k() is called. */
+		ptep = pte_offset_kernel(pmdp, addr);
+		if (pte_none(*ptep))
+			return -ENOMEM;
+
+		/*
+		 * Populate the tail pages vmemmap pmd page.
 		 * Reuse the page that was populated in the prior iteration
 		 * with just tail struct pages.
 		 */
