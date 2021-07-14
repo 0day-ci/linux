@@ -69,6 +69,8 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 int __blk_mq_alloc_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
 		       unsigned int depth, struct list_head *page_list,
 		       struct request **static_rqs);
+void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set, unsigned int hctx_idx,
+			     struct list_head *page_list);
 
 /*
  * Internal helpers for request insertion into sw queues

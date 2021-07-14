@@ -711,6 +711,7 @@ void blk_mq_sched_free_requests(struct request_queue *q)
 	queue_for_each_hw_ctx(q, hctx, i) {
 		if (hctx->sched_tags) {
 			if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
+				blk_mq_clear_rq_mapping(q->tag_set, i, &q->page_list);
 			} else {
 				blk_mq_free_rqs(q->tag_set, hctx->sched_tags, i);
 			}
