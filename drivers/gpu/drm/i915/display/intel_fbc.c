@@ -1451,19 +1451,6 @@ static int intel_sanitize_fbc_option(struct drm_i915_private *dev_priv)
 	return 0;
 }
 
-static bool need_fbc_vtd_wa(struct drm_i915_private *dev_priv)
-{
-	/* WaFbcTurnOffFbcWhenHyperVisorIsUsed:skl,bxt */
-	if (intel_vtd_active() &&
-	    (IS_SKYLAKE(dev_priv) || IS_BROXTON(dev_priv))) {
-		drm_info(&dev_priv->drm,
-			 "Disabling framebuffer compression (FBC) to prevent screen flicker with VT-d enabled\n");
-		return true;
-	}
-
-	return false;
-}
-
 /**
  * intel_fbc_init - Initialize FBC
  * @dev_priv: the i915 device
@@ -1479,9 +1466,6 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	fbc->active = false;
 
 	if (!drm_mm_initialized(&dev_priv->mm.stolen))
-		mkwrite_device_info(dev_priv)->display.has_fbc = false;
-
-	if (need_fbc_vtd_wa(dev_priv))
 		mkwrite_device_info(dev_priv)->display.has_fbc = false;
 
 	dev_priv->params.enable_fbc = intel_sanitize_fbc_option(dev_priv);
