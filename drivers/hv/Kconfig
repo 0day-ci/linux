@@ -27,4 +27,14 @@ config HYPERV_BALLOON
 	help
 	  Select this option to enable Hyper-V Balloon driver.
 
+config HYPERV_AZURE_BLOB
+	tristate "Microsoft Azure Blob driver"
+	depends on HYPERV && X86_64
+	help
+	  Select this option to enable Microsoft Azure Blob driver.
+
+	  This driver supports accelerated Microsoft Azure Blob access.
+	  To compile this driver as a module, choose M here. The module will be
+	  called azure_blob.
+
 endmenu
