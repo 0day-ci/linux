@@ -63,3 +63,19 @@ Description:	/sys/kernel/iommu_groups/<grp_id>/type shows the type of default
 		system could lead to catastrophic effects (the users might
 		need to reboot the machine to get it to normal state). So, it's
 		expected that the users understand what they're doing.
+
+What:		/sys/kernel/iommu_groups/<grp_id>/max_opt_dma_size
+Date:		July 2021
+KernelVersion:	v5.15
+Contact:	John Garry <john.garry@huawei.com>
+Description:	/sys/kernel/iommu_groups/<grp_id>/max_opt_dma_size shows the
+		max optimised DMA size for the default IOMMU domain associated
+		with the group.
+		Each IOMMU domain has an IOVA domain. The IOVA domain caches
+		IOVAs upto a certain size as a performance optimisation.
+		This sysfs file allows the range of the IOVA domain caching be
+		set, such that larger than default IOVAs may be cached.
+		A value of 0 means that the default caching range is chosen.
+		A privileged user could request the kernel the change the range
+		by writing to this file. For this to happen, the same rules
+		and procedure applies as in changing the default domain type.

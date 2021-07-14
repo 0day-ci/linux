@@ -45,6 +45,7 @@ struct iommu_group {
 	struct iommu_domain *default_domain;
 	struct iommu_domain *domain;
 	struct list_head entry;
+	size_t max_opt_dma_size;
 };
 
 struct group_device {
@@ -86,6 +87,9 @@ static int iommu_create_device_direct_mappings(struct iommu_group *group,
 static struct iommu_group *iommu_group_get_for_dev(struct device *dev);
 static ssize_t iommu_group_store_type(struct iommu_group *group,
 				      const char *buf, size_t count);
+static ssize_t iommu_group_store_max_opt_dma_size(struct iommu_group *group,
+						  const char *buf,
+						  size_t count);
 
 #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
 struct iommu_group_attribute iommu_group_attr_##_name =		\
@@ -554,6 +558,12 @@ static ssize_t iommu_group_show_type(struct iommu_group *group,
 	return strlen(type);
 }
 
+static ssize_t iommu_group_show_max_opt_dma_size(struct iommu_group *group,
+				     char *buf)
+{
+	return sprintf(buf, "%zu\n", group->max_opt_dma_size);
+}
+
 static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
 
 static IOMMU_GROUP_ATTR(reserved_regions, 0444,
@@ -561,6 +571,9 @@ static IOMMU_GROUP_ATTR(reserved_regions, 0444,
 
 static IOMMU_GROUP_ATTR(type, 0644, iommu_group_show_type,
 			iommu_group_store_type);
+
+static IOMMU_GROUP_ATTR(max_opt_dma_size, 0644, iommu_group_show_max_opt_dma_size,
+			iommu_group_store_max_opt_dma_size);
 
 static void iommu_group_release(struct kobject *kobj)
 {
@@ -645,6 +658,10 @@ struct iommu_group *iommu_group_alloc(void)
 		return ERR_PTR(ret);
 
 	ret = iommu_group_create_file(group, &iommu_group_attr_type);
+	if (ret)
+		return ERR_PTR(ret);
+
+	ret = iommu_group_create_file(group, &iommu_group_attr_max_opt_dma_size);
 	if (ret)
 		return ERR_PTR(ret);
 
@@ -2279,6 +2296,11 @@ struct iommu_domain *iommu_get_dma_domain(struct device *dev)
 	return dev->iommu_group->default_domain;
 }
 
+size_t iommu_group_get_max_opt_dma_size(struct iommu_group *group)
+{
+	return group->max_opt_dma_size;
+}
+
 /*
  * IOMMU groups are really the natural working unit of the IOMMU, but
  * the IOMMU API works on domains and devices.  Bridge that gap by
@@ -3045,12 +3067,14 @@ EXPORT_SYMBOL_GPL(iommu_sva_get_pasid);
  *	 hasn't changed after the caller has called this function)
  * @type: The type of the new default domain that gets associated with the group
  * @new: Allocate new default domain, keeping same type when no type passed
+ * @max_opt_dma_size: If set, set the IOMMU group max_opt_dma_size when success
  *
  * Returns 0 on success and error code on failure
  *
  */
 static int iommu_change_dev_def_domain(struct iommu_group *group,
-				       struct device *prev_dev, int type, bool new)
+				       struct device *prev_dev, int type, bool new,
+				       unsigned long max_opt_dma_size)
 {
 	struct iommu_domain *prev_dom;
 	struct group_device *grp_dev;
@@ -3142,6 +3166,9 @@ static int iommu_change_dev_def_domain(struct iommu_group *group,
 		goto free_new_domain;
 
 	group->domain = group->default_domain;
+
+	if (max_opt_dma_size)
+		group->max_opt_dma_size = max_opt_dma_size;
 
 	/*
 	 * Release the mutex here because ops->probe_finalize() call-back of
@@ -3269,7 +3296,7 @@ static int iommu_group_store_type_cb(const char *buf,
 	else
 		return -EINVAL;
 
-	return iommu_change_dev_def_domain(group, dev, type, false);
+	return iommu_change_dev_def_domain(group, dev, type, false, 0);
 }
 
 static ssize_t iommu_group_store_type(struct iommu_group *group,
@@ -3277,4 +3304,24 @@ static ssize_t iommu_group_store_type(struct iommu_group *group,
 {
 	return iommu_group_store_common(group, buf, count,
 					iommu_group_store_type_cb);
+}
+
+static int iommu_group_store_max_opt_dma_size_cb(const char *buf,
+						 struct iommu_group *group,
+						 struct device *dev)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 0, &val) || !val)
+		return -EINVAL;
+
+	return iommu_change_dev_def_domain(group, dev, 0, true, val);
+}
+
+static ssize_t iommu_group_store_max_opt_dma_size(struct iommu_group *group,
+						  const char *buf,
+						  size_t count)
+{
+	return iommu_group_store_common(group, buf, count,
+					iommu_group_store_max_opt_dma_size_cb);
 }
