@@ -666,6 +666,7 @@ static int bochs_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent
 	return ret;
 
 err_free_dev:
+	pci_disable_device(pdev);
 	drm_dev_put(dev);
 	return ret;
 }
