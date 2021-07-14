@@ -2350,6 +2350,9 @@ void __blk_mq_free_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
 {
 	struct page *page;
 
+	if (WARN_ON((hctx_idx > 0) && blk_mq_is_sbitmap_shared(set->flags)))
+		return;
+
 	if (static_rqs && set->ops->exit_request) {
 		int i;
 
@@ -2454,6 +2457,9 @@ int __blk_mq_alloc_rqs(struct blk_mq_tag_set *set, unsigned int hctx_idx,
 	unsigned int i, j, entries_per_page, max_order = 4;
 	size_t rq_size, left;
 	int node;
+
+	if (WARN_ON((hctx_idx > 0) && blk_mq_is_sbitmap_shared(set->flags)))
+		return -EINVAL;
 
 	node = blk_mq_hw_queue_to_node(&set->map[HCTX_TYPE_DEFAULT], hctx_idx);
 	if (node == NUMA_NO_NODE)
@@ -2875,15 +2881,30 @@ static bool __blk_mq_alloc_map_and_request(struct blk_mq_tag_set *set,
 
 	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx,
 						  set->queue_depth,
-						  set->reserved_tags, flags);
+						  set->reserved_tags,
+						  flags);
 	if (!set->tags[hctx_idx])
 		return false;
 
-	ret = blk_mq_alloc_rqs(set, set->tags[hctx_idx], hctx_idx,
-			       set->queue_depth);
+	if (blk_mq_is_sbitmap_shared(flags)) {
+		int i;
+
+		if (!set->static_rqs)
+			goto err_out;
+
+		for (i = 0; i < set->queue_depth; i++)
+			set->tags[hctx_idx]->static_rqs[i] =
+						set->static_rqs[i];
+
+		return true;
+	} else {
+		ret = blk_mq_alloc_rqs(set, set->tags[hctx_idx], hctx_idx,
+				       set->queue_depth);
+	}
 	if (!ret)
 		return true;
 
+err_out:
 	blk_mq_free_rq_map(set->tags[hctx_idx], flags);
 	set->tags[hctx_idx] = NULL;
 	return false;
@@ -2895,7 +2916,8 @@ static void blk_mq_free_map_and_requests(struct blk_mq_tag_set *set,
 	unsigned int flags = set->flags;
 
 	if (set->tags && set->tags[hctx_idx]) {
-		blk_mq_free_rqs(set, set->tags[hctx_idx], hctx_idx);
+		if (!blk_mq_is_sbitmap_shared(set->flags))
+			blk_mq_free_rqs(set, set->tags[hctx_idx], hctx_idx);
 		blk_mq_free_rq_map(set->tags[hctx_idx], flags);
 		set->tags[hctx_idx] = NULL;
 	}
@@ -3363,6 +3385,21 @@ static int __blk_mq_alloc_rq_maps(struct blk_mq_tag_set *set)
 {
 	int i;
 
+	if (blk_mq_is_sbitmap_shared(set->flags)) {
+		gfp_t flags = GFP_NOIO | __GFP_NOWARN | __GFP_NORETRY;
+		int ret;
+
+		set->static_rqs = kcalloc_node(set->queue_depth,
+					       sizeof(struct request *),
+					       flags, set->numa_node);
+		if (!set->static_rqs)
+			return -ENOMEM;
+		ret = __blk_mq_alloc_rqs(set, 0, set->queue_depth,
+					 &set->page_list, set->static_rqs);
+		if (ret < 0)
+			goto out_free_static_rqs;
+	}
+
 	for (i = 0; i < set->nr_hw_queues; i++) {
 		if (!__blk_mq_alloc_map_and_request(set, i))
 			goto out_unwind;
@@ -3374,7 +3411,15 @@ static int __blk_mq_alloc_rq_maps(struct blk_mq_tag_set *set)
 out_unwind:
 	while (--i >= 0)
 		blk_mq_free_map_and_requests(set, i);
-
+	if (blk_mq_is_sbitmap_shared(set->flags)) {
+		__blk_mq_free_rqs(set, 0, set->queue_depth, &set->page_list,
+				  set->static_rqs);
+	}
+out_free_static_rqs:
+	if (blk_mq_is_sbitmap_shared(set->flags)) {
+		kfree(set->static_rqs);
+		set->static_rqs = NULL;
+	}
 	return -ENOMEM;
 }
 
@@ -3601,11 +3646,16 @@ void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 {
 	int i, j;
 
+	if (blk_mq_is_sbitmap_shared(set->flags)) {
+		blk_mq_exit_shared_sbitmap(set);
+		__blk_mq_free_rqs(set, 0, set->queue_depth, &set->page_list,
+				  set->static_rqs);
+		kfree(set->static_rqs);
+		set->static_rqs = NULL;
+	}
+
 	for (i = 0; i < set->nr_hw_queues; i++)
 		blk_mq_free_map_and_requests(set, i);
-
-	if (blk_mq_is_sbitmap_shared(set->flags))
-		blk_mq_exit_shared_sbitmap(set);
 
 	for (j = 0; j < set->nr_maps; j++) {
 		kfree(set->map[j].mq_map);

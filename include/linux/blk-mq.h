@@ -261,6 +261,10 @@ struct blk_mq_tag_set {
 	struct sbitmap_queue	__breserved_tags;
 	struct blk_mq_tags	**tags;
 
+	/* for shared sbitmap */
+	struct request **static_rqs;
+	struct list_head page_list;
+
 	struct mutex		tag_list_lock;
 	struct list_head	tag_list;
 };
